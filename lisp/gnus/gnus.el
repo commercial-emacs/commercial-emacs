@@ -2156,10 +2156,19 @@ following hook:
 
 (defcustom gnus-group-change-level-function nil
   "Function run when a group level is changed.
-It is called with three parameters -- GROUP, LEVEL and OLDLEVEL."
+It is called with four parameters -- GROUP, LEVEL, OLDLEVEL, and optionally PREVIOUS"
   :group 'gnus-group-levels
   :type '(choice (const nil)
-		 function))
+		 function)
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (when value
+           (set-default 'gnus-group-change-level-functions (list value)))))
+
+(defvar gnus-group-change-level-functions nil
+  "\"Abnormal\" hook run when a group level is changed.
+Each function element is called with three parameters -- GROUP, LEVEL, OLDLEVEL, and optionally PREVIOUS.
+Its default value is determined by the :set method of `gnus-group-change-level-function'")
 
 ;;; Face thingies.
 

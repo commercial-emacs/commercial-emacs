@@ -1320,9 +1320,8 @@ string name) to insert this group before."
 	  (gnus-dribble-enter
 	   (format "(gnus-group-set-info '%S)" info)
 	   (concat "^(gnus-group-set-info '(\"" (regexp-quote group) "\"")))))
-      (when gnus-group-change-level-function
-	(funcall gnus-group-change-level-function
-		 group level oldlevel previous)))))
+      (run-hook-with-args 'gnus-group-change-level-functions
+                          group level oldlevel previous))))
 
 (defun gnus-check-bogus-newsgroups (&optional confirm)
   "Remove bogus newsgroups.

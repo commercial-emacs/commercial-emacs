@@ -1163,9 +1163,10 @@ articles in the topic and its subtopics."
       (setq-local gnus-group-update-group-function
 	          #'gnus-topic-update-topics-containing-group)
       (setq-local gnus-group-sort-alist-function #'gnus-group-sort-topic)
-      (setq gnus-group-change-level-function #'gnus-topic-change-level)
       (setq gnus-goto-missing-group-function #'gnus-topic-goto-missing-group)
       (add-hook 'gnus-check-bogus-groups-hook #'gnus-topic-clean-alist
+		nil 'local)
+      (add-hook 'gnus-group-change-level-functions 'gnus-topic-change-level
 		nil 'local)
       (setq gnus-topology-checked-p nil)
       ;; We check the topology.
@@ -1174,7 +1175,7 @@ articles in the topic and its subtopics."
     ;; Remove topic infestation.
     (unless gnus-topic-mode
       (remove-hook 'gnus-summary-exit-hook #'gnus-topic-update-topic)
-      (setq gnus-group-change-level-function nil)
+      (remove-hook 'gnus-group-change-level-functions 'gnus-topic-change-level 'local)
       (remove-hook 'gnus-check-bogus-groups-hook #'gnus-topic-clean-alist)
       (setq gnus-group-prepare-function #'gnus-group-prepare-flat)
       (setq gnus-group-sort-alist-function #'gnus-group-sort-flat))
@@ -1777,7 +1778,7 @@ If REVERSE, reverse the sorting order."
 
 (defun gnus-subscribe-topics (newsgroup)
   (catch 'end
-    (let (match gnus-group-change-level-function)
+    (let (match gnus-group-change-level-functions)
       (dolist (topic (gnus-topic-list))
 	(when (and (setq match (cdr (assq 'subscribe
 					  (gnus-topic-parameters topic))))

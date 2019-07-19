@@ -4027,9 +4027,8 @@ of groups killed."
 	(setq gnus-newsrc-alist
 	      (delq (assoc group gnus-newsrc-alist)
 		    gnus-newsrc-alist))
-	(when gnus-group-change-level-function
-	  (funcall gnus-group-change-level-function
-		   group gnus-level-killed 3))
+	(run-hook-with-args 'gnus-group-change-level-functions
+                            group gnus-level-killed 3)
 	(cond
 	 ((setq entry (gnus-group-entry group))
 	  (push (cons (car entry) (nth 1 entry))
