@@ -37,7 +37,7 @@
 ;; The Lisp setup may involve setting a few variables and setting up the
 ;; search engine.  You can define the variables in the server definition
 ;; like this :
-;;   (setq gnus-secondary-select-methods '(
+;;   (setq gnus-select-methods '(
 ;;       (nnimap "" (nnimap-address "localhost")
 ;;                  (nnir-search-engine namazu)
 ;;       )))

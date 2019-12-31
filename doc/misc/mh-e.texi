@@ -8635,7 +8635,7 @@ modify. Note that for them to become accessible, you'll have to load
 @key{RET} nnml @key{RET}}.
 
 @vtable @code
-@item gnus-secondary-select-methods
+@item gnus-select-methods
 Select the @samp{nnml} value. This select method uses directories for
 folders and individual files for messages, just like MH@. You do not
 have to set an address.

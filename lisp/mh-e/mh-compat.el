@@ -45,8 +45,7 @@
 (mh-do-in-xemacs
   (defun mh-require (feature &optional filename noerror)
     "If feature FEATURE is not loaded, load it from FILENAME.
-If FEATURE is not a member of the list `features', then the feature
-is not loaded; so load the file FILENAME.
+Loaded features are recorded in the list variable `features'.
 If FILENAME is omitted, the printname of FEATURE is used as the file name.
 If the optional third argument NOERROR is non-nil,
 then return nil if the file is not found instead of signaling an error.

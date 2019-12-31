@@ -31,6 +31,7 @@
 (require 'message)
 (require 'gnus-art)
 (require 'gnus-util)
+(require 'cl-extra)
 
 (defcustom gnus-post-method 'current
   "Preferred method for posting USENET news.
@@ -577,8 +578,8 @@ instead."
   (when gnus-agent
     (add-hook 'message-header-hook #'gnus-agent-possibly-save-gcc nil t))
   (setq message-post-method
-	(let ((gn gnus-newsgroup-name))
-	  (lambda (&optional arg) (gnus-post-method arg gn))))
+        `(lambda (&optional arg)
+           (gnus-post-method arg ,(buffer-local-value 'gnus-newsgroup-name (get-buffer buffer)))))
   (message-add-action
    `(progn
       (setq gnus-current-window-configuration ',winconf-name)
@@ -661,7 +662,7 @@ a news."
 	       (or (gnus-group-group-name) ""))
 	   ""))
 	;; make sure last viewed article doesn't affect posting styles:
-	(gnus-article-copy))
+	gnus-article-copy)
     (gnus-post-news 'post gnus-newsgroup-name nil nil nil nil
 		    (string= gnus-newsgroup-name ""))))
 
@@ -869,58 +870,86 @@ header line with the old Message-ID."
     (mm-enable-multibyte))
   (let ((article-buffer (or article-buffer gnus-article-buffer))
 	end beg)
-    (if (not (gnus-buffer-live-p article-buffer))
-	(error "Can't find any article buffer")
-      (with-current-buffer article-buffer
-	(let ((gnus-newsgroup-charset (or gnus-article-charset
-					  gnus-newsgroup-charset))
-	      (inhibit-read-only t)
-	      (gnus-newsgroup-ignored-charsets
-	       (or gnus-article-ignored-charsets
-		   gnus-newsgroup-ignored-charsets)))
-	  (save-restriction
-	    ;; Copy over the (displayed) article buffer, delete
-	    ;; hidden text and remove text properties.
-	    (widen)
-	    (copy-to-buffer gnus-article-copy (point-min) (point-max))
-	    (set-buffer gnus-article-copy)
-	    (when yank-string
-	      (message-goto-body)
-	      (delete-region (point) (point-max))
-	      (insert yank-string))
-	    (gnus-article-delete-text-of-type 'annotation)
-	    (gnus-article-delete-text-of-type 'multipart)
-	    (gnus-remove-text-with-property 'gnus-prev)
-	    (gnus-remove-text-with-property 'gnus-next)
-	    (gnus-remove-text-with-property 'gnus-decoration)
-	    (insert
-	     (prog1
-		 (buffer-substring-no-properties (point-min) (point-max))
-	       (erase-buffer)))
-	    ;; Find the original headers.
-	    (set-buffer gnus-original-article-buffer)
-	    (goto-char (point-min))
-	    (while (looking-at message-unix-mail-delimiter)
-	      (forward-line 1))
-	    (let ((mail-header-separator ""))
-	      (setq beg (point)
-		    end (or (message-goto-body)
-			    ;; There may be just a header.
-			    (point-max))))
-	    ;; Delete the headers from the displayed articles.
-	    (set-buffer gnus-article-copy)
-	    (let ((mail-header-separator ""))
-	      (delete-region (goto-char (point-min))
-			     (or (message-goto-body) (point-max))))
-	    ;; Insert the original article headers.
-	    (insert-buffer-substring gnus-original-article-buffer beg end)
-	    ;; Decode charsets.
-	    (let ((gnus-article-decode-hook
-		   (delq 'article-decode-charset
-			 (copy-sequence gnus-article-decode-hook)))
-		  (rfc2047-quote-decoded-words-containing-tspecials t))
-	      (run-hooks 'gnus-article-decode-hook)))))
-      gnus-article-copy)))
+    (unless (gnus-buffer-live-p article-buffer)
+      (error "Can't find any article buffer"))
+    (gnus-msg-inherit-variables (get-buffer article-buffer) gnus-article-copy)
+    (with-current-buffer article-buffer
+      (let ((gnus-newsgroup-charset (or gnus-article-charset
+                                        gnus-newsgroup-charset))
+            (inhibit-read-only t)
+            (gnus-newsgroup-ignored-charsets
+             (or gnus-article-ignored-charsets
+                 gnus-newsgroup-ignored-charsets)))
+        (save-restriction
+          ;; Copy over the (displayed) article buffer, delete
+          ;; hidden text and remove text properties.
+          (widen)
+          (copy-to-buffer gnus-article-copy (point-min) (point-max))
+          (with-current-buffer gnus-article-copy
+            (when yank-string
+              (message-goto-body)
+              (delete-region (point) (point-max))
+              (insert yank-string))
+            (gnus-article-delete-text-of-type 'annotation)
+            (gnus-article-delete-text-of-type 'multipart)
+            (gnus-remove-text-with-property 'gnus-prev)
+            (gnus-remove-text-with-property 'gnus-next)
+            (gnus-remove-text-with-property 'gnus-decoration)
+            (insert
+             (prog1
+                 (buffer-substring-no-properties (point-min) (point-max))
+               (erase-buffer))))
+          ;; Find the original headers.
+          (with-current-buffer gnus-original-article-buffer
+            (goto-char (point-min))
+            (while (looking-at message-unix-mail-delimiter)
+              (forward-line 1))
+            (let ((mail-header-separator ""))
+              (setq beg (point)
+                    end (or (message-goto-body)
+                            ;; There may be just a header.
+                            (point-max)))))
+          ;; Delete the headers from the displayed articles.
+          (with-current-buffer gnus-article-copy
+            (let ((mail-header-separator ""))
+              (delete-region (goto-char (point-min))
+                             (or (message-goto-body) (point-max))))
+            ;; Insert the original article headers.
+            (insert-buffer-substring gnus-original-article-buffer beg end)
+            ;; Decode charsets.
+            (let ((gnus-article-decode-hook
+                   (delq 'article-decode-charset
+                         (copy-sequence gnus-article-decode-hook)))
+                  (rfc2047-quote-decoded-words-containing-tspecials t))
+              (run-hooks 'gnus-article-decode-hook))))))
+    gnus-article-copy))
+
+(defmacro gnus-msg-preserve-variables (parent-buffer &rest body)
+  (declare (indent 1))
+  "If BODY changes the current buffer, ensure important variables preserved."
+  (declare (indent 0))
+  `(progn
+     ,@body
+     (unless (eq ,parent-buffer (current-buffer))
+       (gnus-msg-inherit-variables ,parent-buffer (current-buffer)))))
+
+(defun gnus-msg-inherit-variables (source-buffer dest-buffer)
+  "Transfer formerly global variables from SOURCE-BUFFER to DEST-BUFFER."
+  (with-current-buffer dest-buffer
+    (mapc (lambda (pair)
+            (set (make-local-variable (car pair))
+                 (cdr pair)))
+          (cl-mapcan (lambda (variable)
+                       (when (local-variable-if-set-p variable)
+                         (list `(,variable . ,(buffer-local-value
+                                               variable
+                                               source-buffer)))))
+                     '(gnus-summary-buffer
+                       gnus-article-buffer
+                       gnus-original-article-buffer
+                       gnus-newsgroup-name
+                       gnus-article-current
+                       gnus-current-article)))))
 
 (defun gnus-post-news (post &optional group header article-buffer yank _subject
 			    force-news)
@@ -928,7 +957,9 @@ header line with the old Message-ID."
     (gnus-copy-article-buffer))
   (let ((gnus-article-reply (and article-buffer (gnus-summary-article-number)))
 	(gnus-article-yanked-articles yank)
-	(add-to-list gnus-add-to-list))
+	(add-to-list gnus-add-to-list)
+        (parent-buffer (or (when article-buffer (get-buffer article-buffer))
+                           (current-buffer))))
     (gnus-setup-message (cond (yank 'reply-yank)
 			      (article-buffer 'reply)
 			      (t 'message))
@@ -963,13 +994,14 @@ header line with the old Message-ID."
 		     (and (not (gnus-virtual-group-p pgroup)) group)))
 	      (set-buffer gnus-article-copy)
 	      (gnus-msg-treat-broken-reply-to)
-	      (message-followup (if (or newsgroup-p force-news)
-				    (if (save-restriction
-					  (article-narrow-to-head)
-					  (message-fetch-field "newsgroups"))
-					nil
-				      "")
-				  to-group)))
+              (gnus-msg-preserve-variables parent-buffer
+                (message-followup (if (or newsgroup-p force-news)
+                                      (if (save-restriction
+                                            (article-narrow-to-head)
+                                            (message-fetch-field "newsgroups"))
+                                          nil
+                                        "")
+                                    to-group))))
 	  ;; The is mail.
 	  (if post
 	      (progn
@@ -983,7 +1015,8 @@ header line with the old Message-ID."
 			message-send-actions)))
 	    (set-buffer gnus-article-copy)
 	    (gnus-msg-treat-broken-reply-to)
-	    (message-wide-reply to-address)))
+            (gnus-msg-preserve-variables parent-buffer
+              (message-wide-reply to-address))))
 	(when yank
 	  (gnus-inews-yank-articles yank))))))
 
@@ -1027,10 +1060,9 @@ If SILENT, don't prompt the user."
 		 (if (listp (car gnus-post-method))
 		     gnus-post-method
 		   (list gnus-post-method)))
-	       gnus-secondary-select-methods
+	       gnus-select-methods
 	       (mapcar #'cdr gnus-server-alist)
 	       (mapcar #'car gnus-opened-servers)
-	       (list gnus-select-method)
 	       (list group-method)))
 	     method-alist post-methods method)
 	;; Weed out all mail methods.
@@ -1105,10 +1137,11 @@ See the variable `gnus-user-agent'."
 If prefix argument YANK is non-nil, the original article is yanked
 automatically.
 If WIDE, make a wide reply.
-If VERY-WIDE, make a very wide reply."
-  (interactive (list (and current-prefix-arg
-			  (gnus-summary-work-articles 1)))
-	       gnus-summary-mode)
+VERY-WIDE is a list of other articles to reply to."
+  (interactive
+   (list (and current-prefix-arg
+	      (gnus-summary-work-articles 1))
+	 gnus-summary-mode))
   ;; Allow user to require confirmation before replying by mail to the
   ;; author of a news article (or mail message).
   (when (or (not (or (gnus-news-group-p gnus-newsgroup-name)
@@ -1120,40 +1153,37 @@ If VERY-WIDE, make a very wide reply."
 			(funcall gnus-confirm-mail-reply-to-news
 				 gnus-newsgroup-name))
 		       (t gnus-confirm-mail-reply-to-news)))
-	    (if (or wide very-wide)
-		t ;; Ignore gnus-confirm-mail-reply-to-news for wide and very
-		  ;; wide replies.
-	      (y-or-n-p "Really reply by mail to article author? ")))
-    (let* ((article
-	    (if (listp (car yank))
-		(caar yank)
-	      (car yank)))
+	    (or wide very-wide
+                (y-or-n-p "Really reply by mail to article author? ")))
+    (let* ((article (if (listp (car yank)) (caar yank) (car yank)))
 	   (gnus-article-reply (or article (gnus-summary-article-number)))
-	   (gnus-article-yanked-articles yank)
-	   (headers ""))
+	   (gnus-article-yanked-articles yank))
       ;; Stripping headers should be specified with mail-yank-ignored-headers.
       (when yank
 	(gnus-summary-goto-subject article))
       (gnus-setup-message (if yank 'reply-yank 'reply)
-	(if (not very-wide)
-	    (gnus-summary-select-article)
-	  (dolist (article very-wide)
-	    (gnus-summary-select-article nil nil nil article)
-	    (with-current-buffer (gnus-copy-article-buffer)
-	      (gnus-msg-treat-broken-reply-to)
-	      (save-restriction
-		(message-narrow-to-head)
-		(setq headers (concat headers (buffer-string)))))))
+        (gnus-summary-select-article nil nil nil gnus-article-reply)
 	(set-buffer (gnus-copy-article-buffer))
 	(gnus-msg-treat-broken-reply-to gnus-msg-force-broken-reply-to)
-	(save-restriction
-	  (message-narrow-to-head)
-	  (when very-wide
-	    (erase-buffer)
-	    (insert headers))
-	  (goto-char (point-max)))
-	(mml-quote-region (point) (point-max))
-	(message-reply nil wide)
+        (save-restriction
+          (message-narrow-to-head)
+          (when-let ((very-wide-headers
+                      (save-current-buffer
+                        (let (result)
+                          (dolist (art very-wide result)
+                            (gnus-summary-select-article nil nil nil art)
+                            (with-current-buffer (gnus-copy-article-buffer)
+                              (gnus-msg-treat-broken-reply-to)
+                              (save-restriction
+                                (message-narrow-to-head)
+                                (setq result (concat (or result "")
+                                                     (buffer-string))))))))))
+            (erase-buffer)
+            (insert very-wide-headers))
+          (goto-char (point-max)))
+        (gnus-msg-preserve-variables (current-buffer)
+          (mml-quote-region (point) (point-max))
+          (message-reply nil wide))
 	(when yank
 	  (gnus-inews-yank-articles yank))
 	(gnus-summary-handle-replysign)))))
