@@ -391,6 +391,19 @@ during splitting, which may be slow."
                              :initial-resync 0))
     (push (list buffer (current-buffer)) nnimap-connection-alist)
     (push (current-buffer) nnimap-process-buffers)
+    (with-current-buffer buffer
+      (add-hook 'kill-buffer-hook
+                (apply-partially
+                 (lambda (buffer)
+                   (when-let ((pbuffer
+                               (car (alist-get buffer nnimap-connection-alist))))
+                     (setq nnimap-process-buffers
+                           (delq pbuffer nnimap-process-buffers))
+                     (kill-buffer pbuffer) ;; should HUP its process
+                     (setq nnimap-connection-alist
+                           (assq-delete-all buffer nnimap-connection-alist))))
+                 buffer)
+                nil t))
     (current-buffer)))
 
 (defvar auth-source-creation-prompts)

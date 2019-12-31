@@ -3096,8 +3096,7 @@ require_unwind (Lisp_Object old_value)
 
 DEFUN ("require", Frequire, Srequire, 1, 3, 0,
        doc: /* If feature FEATURE is not loaded, load it from FILENAME.
-If FEATURE is not a member of the list `features', then the feature is
-not loaded; so load the file FILENAME.
+Loaded features are recorded in the list variable `features'.
 
 If FILENAME is omitted, the printname of FEATURE is used as the file
 name, and `load' will try to load this name appended with the suffix

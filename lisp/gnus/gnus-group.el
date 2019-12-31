@@ -4147,13 +4147,15 @@ entail asking the server for the groups."
 	(gnus-activate-foreign-newsgroups level))
     (gnus-group-get-new-news)))
 
-(defun gnus-group-get-new-news (&optional arg one-level)
+(defun gnus-group-get-new-news (&optional arg one-level background)
   "Get newly arrived articles.
 If ARG is a number, it specifies which levels you are interested in
 re-scanning.  If ARG is non-nil and not a number, this will force
 \"hard\" re-reading of the active files from all servers.
 If ONE-LEVEL is not nil, then re-scan only the specified level,
-otherwise all levels below ARG will be scanned too."
+otherwise all levels below ARG will be scanned too.
+If BACKGROUND then run `gnus-get-unread-articles' in a separate thread.
+"
   (interactive "P" gnus-group-mode)
   (require 'nnmail)
   (let ((gnus-inhibit-demon t)
@@ -4167,17 +4169,13 @@ otherwise all levels below ARG will be scanned too."
     (unless gnus-child
       (gnus-parent-read-child-newsrc))
 
-    (gnus-get-unread-articles (gnus-group-default-level arg t)
-			      nil one-level)
+    (gnus-get-unread-articles arg nil one-level background)
 
     ;; If the user wants it, we scan for new groups.
     (when (eq gnus-check-new-newsgroups 'always)
       (gnus-find-new-newsgroups))
 
-    (gnus-check-reasonable-setup)
-    (gnus-run-hooks 'gnus-after-getting-new-news-hook)
-    (gnus-group-list-groups (and (numberp arg)
-				 (max (car gnus-group-list-mode) arg)))))
+    (gnus-check-reasonable-setup)))
 
 (defun gnus-group-get-new-news-this-group (&optional n dont-scan)
   "Check for newly arrived news in the current group (and the N-1 next groups).

@@ -1086,7 +1086,7 @@ Heathens} first.
 If your system administrator has set things up properly, starting Gnus
 and reading news is extremely easy---you just type @kbd{M-x gnus} in
 your Emacs.  If not, you should customize the variable
-@code{gnus-select-method} as described in @ref{Finding the News}.  For a
+@code{gnus-select-methods} as described in @ref{Finding the News}.  For a
 minimal setup for posting should also customize the variables
 @code{user-full-name} and @code{user-mail-address}.
 
@@ -1127,25 +1127,23 @@ a foreign server's definition, agentize or de-agentize a server, and
 do many other neat things.  @xref{Server Buffer}.
 @xref{Foreign Groups}.  @xref{Agent Basics}.
 
-@vindex gnus-select-method
+@vindex gnus-select-methods
 @c @head
-The @code{gnus-select-method} variable says where Gnus should look for
-news.  This variable should be a list where the first element says
-@dfn{how} and the second element says @dfn{where}.  This method is your
-native method.  All groups not fetched with this method are
-secondary or foreign groups.
+The @code{gnus-select-methods} should be a list of @xref{Select Methods}.
+A select method is a list where the first element says @dfn{how} and the
+second element says @dfn{where}.
 
 For instance, if the @samp{news.somewhere.edu} @acronym{NNTP} server is where
 you want to get your daily dosage of news from, you'd say:
 
 @lisp
-(setq gnus-select-method '(nntp "news.somewhere.edu"))
+(setq gnus-select-methods '((nntp "news.somewhere.edu")))
 @end lisp
 
 If you want to read directly from the local spool, say:
 
 @lisp
-(setq gnus-select-method '(nnspool ""))
+(setq gnus-select-methods '((nnspool "")))
 @end lisp
 
 If you can use a local spool, you probably should, as it will almost
@@ -1171,25 +1169,6 @@ better served by using the @kbd{B} command in the group buffer.  It will
 let you have a look at what groups are available, and you can subscribe
 to any of the groups you want to.  This also makes @file{.newsrc}
 maintenance much tidier.  @xref{Foreign Groups}.
-
-@vindex gnus-secondary-select-methods
-@c @head
-A slightly different approach to foreign groups is to set the
-@code{gnus-secondary-select-methods} variable.  The select methods
-listed in this variable are in many ways just as native as the
-@code{gnus-select-method} server.  They will also be queried for active
-files during startup (if that's required), and new newsgroups that
-appear on these servers will be subscribed (or not) just as native
-groups are.
-
-For instance, if you use the @code{nnmbox} back end to read your mail,
-you would typically set this variable to
-
-@lisp
-(setq gnus-secondary-select-methods '((nnmbox "")))
-@end lisp
-
-
 
 @node The Server is Down
 @section The Server is Down
@@ -1460,14 +1439,14 @@ This happens very rarely, but perhaps you change jobs, or one server is
 very flaky and you want to use another.
 
 Changing the server is pretty easy, right?  You just change
-@code{gnus-select-method} to point to the new server?
+@code{gnus-select-methods} to point to the new server?
 
 @emph{Wrong!}
 
 Article numbers are not (in any way) kept synchronized between different
 @acronym{NNTP} servers, and the only way Gnus keeps track of what articles
 you have read is by keeping track of article numbers.  So when you
-change @code{gnus-select-method}, your @file{.newsrc} file becomes
+change @code{gnus-select-methods}, your @file{.newsrc} file becomes
 worthless.
 
 @findex gnus-group-clear-data-on-native-groups
@@ -2632,8 +2611,8 @@ the command to be executed.
 @cindex foreign groups
 
 If you recall how to subscribe to servers (@pxref{Finding the News})
-you will remember that @code{gnus-secondary-select-methods} and
-@code{gnus-select-method} let you write a definition in Emacs Lisp of
+you will remember that @code{gnus-select-methods}
+lets you write a definition in Emacs Lisp of
 what servers you want to see when you start up.  The alternate
 approach is to use foreign servers and groups.  ``Foreign'' here means
 they are not coming from the select methods.  All foreign server
@@ -7325,18 +7304,6 @@ result in a new thread.
 This is a number that says how much each sub-thread should be indented.
 The default is 4.
 
-@item gnus-sort-gathered-threads-function
-@vindex gnus-sort-gathered-threads-function
-Sometimes, particularly with mailing lists, the order in which mails
-arrive locally is not necessarily the same as the order in which they
-arrived on the mailing list.  Consequently, when sorting sub-threads
-using the default @code{gnus-thread-sort-by-number}, responses can end
-up appearing before the article to which they are responding to.
-Setting this variable to an alternate value
-(e.g., @code{gnus-thread-sort-by-date}), in a group's parameters or in an
-appropriate hook (e.g., @code{gnus-summary-generate-hook}) can produce a
-more logical sub-thread ordering in such instances.
-
 @end table
 
 
@@ -10953,7 +10920,7 @@ follow up to articles you have posted.  These usually have a
 @code{Newsgroups} header in them, but not always.  This command
 (@code{gnus-summary-article-posted-p}) will try to fetch the current
 article from your news server (or rather, from
-@code{gnus-refer-article-method} or @code{gnus-select-method}) and will
+@code{gnus-refer-article-method} or @code{gnus-select-methods}) and will
 report back whether it found the article or not.  Even if it says that
 it didn't find the article, it may have been posted anyway---mail
 propagation is much faster than news propagation, and the news copy may
@@ -13619,14 +13586,14 @@ See also @code{nntp-via-rlogin-command-switches}.  Here's an example for
 an indirect connection:
 
 @lisp
-(setq gnus-select-method
-      '(nntp "indirect"
+(setq gnus-select-methods
+      '((nntp "indirect"
              (nntp-address "news.server.example")
              (nntp-via-user-name "intermediate_user_name")
              (nntp-via-address "intermediate.host.example")
              (nntp-via-rlogin-command "ssh")
              (nntp-via-rlogin-command-switches ("-C"))
-             (nntp-open-connection-function nntp-open-via-rlogin-and-netcat)))
+             (nntp-open-connection-function nntp-open-via-rlogin-and-netcat))))
 @end lisp
 
 This means that you have to have set up @code{ssh-agent} correctly to
@@ -13712,7 +13679,7 @@ Server variables are often called @dfn{server parameters}.
 @subsection Servers and Methods
 
 Wherever you would normally use a select method
-(e.g., @code{gnus-secondary-select-method}, in the group select method,
+(e.g., @code{gnus-select-methods}, in the group select method,
 when browsing a foreign server) you can use a virtual server name
 instead.  This could potentially save lots of typing.  And it's nice all
 over.
@@ -13998,11 +13965,11 @@ you connect to such a server, set this variable to a non-@code{nil}
 value, and Gnus never uses article numbers.  For example:
 
 @lisp
-(setq gnus-select-method
-      '(nntp "newszilla"
-             (nntp-address "newszilla.example.com")
-             (nntp-xref-number-is-evil t)
-             @dots{}))
+(setq gnus-select-methods
+      '((nntp "newszilla"
+              (nntp-address "newszilla.example.com")
+              (nntp-xref-number-is-evil t)
+              @dots{})))
 @end lisp
 
 The default value of this server variable is @code{nil}.
@@ -14446,8 +14413,8 @@ group buffer, or (if your primary interest is reading email), say
 something like:
 
 @example
-(setq gnus-select-method
-      '(nnimap "imap.gmail.com"))
+(setq gnus-select-methods
+      '((nnimap "imap.gmail.com")))
 @end example
 
 You'll be prompted for a user name and password.  If you grow tired of
@@ -14737,14 +14704,14 @@ You Do.)
 @subsection Getting Started Reading Mail
 
 It's quite easy to use Gnus to read your new mail.  You just plonk the
-mail back end of your choice into @code{gnus-secondary-select-methods},
+mail back end of your choice into @code{gnus-select-methods},
 and things will happen automatically.
 
 For instance, if you want to use @code{nnml} (which is a ``one file per
 mail'' back end), you could put the following in your @file{~/.gnus.el} file:
 
 @lisp
-(setq gnus-secondary-select-methods '((nnml "")))
+(setq gnus-select-methods '((nnml "")))
 @end lisp
 
 Now, the next time you start Gnus, this back end will be queried for new
@@ -17933,15 +17900,10 @@ So, to use this, simply say something like:
 @cindex nnnil
 
 @code{nnnil} is a backend that can be used as a placeholder if you
-have to specify a backend somewhere, but don't really want to.  The
-classical example is if you don't want to have a primary select
-methods, but want to only use secondary ones:
+have to specify a backend somewhere, but don't really want to:
 
 @lisp
-(setq gnus-select-method '(nnnil ""))
-(setq gnus-secondary-select-methods
-      '((nnimap "foo")
-        (nnml "")))
+(setq gnus-select-methods '((nnnil "")))
 @end lisp
 
 
@@ -18334,7 +18296,7 @@ This is the diary-specific replacement for the standard
 
   Finally, you may add a permanent @code{nndiary} virtual server
 (something like @code{(nndiary "diary")} should do) to your
-@code{gnus-secondary-select-methods}.
+@code{gnus-select-methods}.
 
   Hopefully, almost everything (see the TODO section in
 @file{nndiary.el}) will work as expected when you restart Gnus: in
@@ -19685,14 +19647,14 @@ setup, you may be able to use something like the following as your
 @lisp
 ;; @r{Define how Gnus is to fetch news.  We do this over @acronym{NNTP}}
 ;; @r{from your ISP's server.}
-(setq gnus-select-method '(nntp "news.your-isp.com"))
+(setq gnus-select-methods '((nntp "news.your-isp.com")))
 
 ;; @r{Define how Gnus is to read your mail.  We read mail from}
 ;; @r{your ISP's @acronym{POP} server.}
 (setq mail-sources '((pop :server "pop.your-isp.com")))
 
 ;; @r{Say how Gnus is to store the mail.  We use nnml groups.}
-(setq gnus-secondary-select-methods '((nnml "")))
+(push '(nnml "") gnus-select-methods)
 
 ;; @r{Make Gnus into an offline newsreader.}
 ;; (gnus-agentize) ; @r{The obsolete setting.}
@@ -28830,11 +28792,8 @@ in Gnus 5.10.9.
 @item
 @code{gnus-agent}
 
-The Gnus Agent has seen a major updated and is now enabled by default,
-and all nntp and nnimap servers from @code{gnus-select-method} and
-@code{gnus-secondary-select-method} are agentized by default.  Earlier
-only the server in @code{gnus-select-method} was agentized by the
-default, and the agent was disabled by default.  When the agent is
+The Gnus Agent now agentizes all nnimap and nntp entries in
+@code{gnus-select-methods} by default.  When the agent is
 enabled, headers are now also retrieved from the Agent cache instead
 of the back ends when possible.  Earlier this only happened in the
 unplugged state.  You can enroll or remove servers with @kbd{J a} and

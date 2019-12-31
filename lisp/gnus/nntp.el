@@ -1311,6 +1311,19 @@ If SEND-IF-FORCE, only send authinfo to the server if the
 	  (prog1
 	      (caar (push (list process buffer nil) nntp-connection-alist))
 	    (push process nntp-connection-list)
+            (with-current-buffer buffer
+              (add-hook 'kill-buffer-hook
+                        (apply-partially
+                         (lambda (buffer)
+                           (when-let ((process
+                                       (car (nntp-find-connection-entry buffer))))
+                             (setq nntp-connection-list
+                                   (delq process nntp-connection-list))
+                             (setq nntp-connection-alist
+                                   (assq-delete-all process nntp-connection-alist))
+                             (ignore-errors (delete-process process))))
+                         buffer)
+                        nil t))
 	    (with-current-buffer pbuffer
 	      (nntp-read-server-type)
 	      (erase-buffer)
