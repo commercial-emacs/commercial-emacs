@@ -5,7 +5,7 @@
 @variable server :string (or (gnus-getenv-nntpserver) "your-server-here")
 @variable port :number 119
 @validate (or (assistant-validate-connect-to-server server port) (y-or-n-p "Do you want to use the server anyway, although you can't confirm it's valid?"))
-@result gnus-select-method (list 'nntp server (list 'nntp-server port))
+@result gnus-select-methods (list (list 'nntp server (list 'nntp-server port)))
 @text
 Usenet news is usually read from your Internet service provider's news
 server.  If you don't know the name of this server, contact your ISP.
@@ -20,7 +20,7 @@ Port number: @variable{port}
 
 @node User name and password
 @type interstitial
-@next 
+@next
 (if (assistant-password-required-p)
     "Enter user name and password"
   "Want user name and password?")

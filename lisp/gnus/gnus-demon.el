@@ -250,7 +250,8 @@ minutes, the connection is closed."
 	(save-window-excursion
 	  (when (gnus-alive-p)
 	    (with-current-buffer gnus-group-buffer
-	      (gnus-group-get-new-news))))
+	      (gnus-group-get-new-news nil nil
+                                       gnus-threaded-get-unread-articles))))
       (set-window-configuration win))))
 
 (defun gnus-demon-add-scan-timestamps ()

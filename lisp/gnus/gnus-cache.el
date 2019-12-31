@@ -81,7 +81,7 @@ it's not cached."
 
 ;;; Internal variables.
 
-(defvar gnus-cache-removable-articles nil)
+(defvar-local gnus-cache-removable-articles nil)
 (defvar gnus-cache-buffer nil)
 (defvar gnus-cache-active-hashtb nil)
 (defvar gnus-cache-active-altered nil)

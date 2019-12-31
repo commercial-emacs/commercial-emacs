@@ -31,7 +31,7 @@
 
 ;;; Internal variables.
 
-(defvar gnus-summary-mark-positions nil)
+(defvar-local gnus-summary-mark-positions nil)
 (defvar gnus-group-mark-positions nil)
 (defvar gnus-group-indentation "")
 
@@ -374,7 +374,7 @@ or to characters when given a pad value."
     (if (string-match
 	 "\\`\\(.*\\)%[0-9]?[{(«]\\(.*\\)%[0-9]?[»})]\\(.*\n?\\)\\'\\|%[-0-9]*=\\|%[-0-9]*\\*"
 	 format)
-	(gnus-parse-complex-format format spec-alist)
+        (gnus-parse-complex-format format spec-alist)
       ;; This is a simple format.
       (gnus-parse-simple-format format spec-alist insert))))
 

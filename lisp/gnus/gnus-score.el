@@ -460,7 +460,7 @@ inhibited for all groups."
 (defvar gnus-score-trace nil)
 (defvar gnus-score-edit-buffer nil)
 
-(defvar gnus-score-alist nil
+(defvar-local gnus-score-alist nil
   "Alist containing score information.
 The keys can be symbols or strings.  The following symbols are defined.
 

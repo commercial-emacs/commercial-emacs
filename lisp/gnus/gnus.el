@@ -1025,6 +1025,8 @@ Check the NNTPSERVER environment variable and the
 ;; starting or even loading Gnus.
 ;;;###autoload(custom-autoload 'gnus-select-method "gnus")
 
+(defvar gnus-secondary-select-methods)
+(defvar gnus-select-methods)
 (defcustom gnus-select-method
   (list 'nntp (or (gnus-getenv-nntpserver)
                   (when (and gnus-default-nntp-server
@@ -1053,7 +1055,11 @@ see the manual for details."
   :group 'gnus-server
   :group 'gnus-start
   :initialize 'custom-initialize-default
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (setq gnus-select-methods (cons value gnus-secondary-select-methods)))
   :type 'gnus-select-method)
+(make-obsolete-variable 'gnus-select-method 'gnus-select-methods "27.1" 'set)
 
 (defcustom gnus-message-archive-method "archive"
   "Method used for archiving messages you've sent.
@@ -1129,6 +1135,28 @@ you could set this variable:
 
 \(setq gnus-secondary-select-methods \\='((nnml \"\")))"
   :group 'gnus-server
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (setq gnus-select-methods (cons gnus-select-method value)))
+  :type '(repeat gnus-select-method))
+(make-obsolete-variable 'gnus-secondary-select-methods 'gnus-select-methods "27.1" 'set)
+
+(defcustom gnus-select-methods (cons gnus-select-method gnus-secondary-select-methods)
+  "((BACKEND1 ADDRESS1) (BACKEND2 ADDRESS2) ... ) where BACKEND is a symbol, e.g.,
+nntp, and ADDRESS is a string, e.g., \"flab.flab.edu\".
+
+For example, this specifies a local spool,
+
+\(setq gnus-select-methods `(,(list 'nnspool (system-name))))
+"
+  :group 'gnus-server
+  :initialize 'custom-initialize-default
+  :set (lambda (symbol value)
+         (unless (listp (car value))
+           (setq value (list value)))
+         (set-default symbol value)
+         (setq gnus-select-method (car value))
+         (setq gnus-secondary-select-methods (cdr value)))
   :type '(repeat gnus-select-method))
 
 (defcustom gnus-local-domain nil
@@ -2310,8 +2338,8 @@ automatically cache the article in the agent cache."
 (defvar gnus-agent-target-move-group-header "X-Gnus-Agent-Move-To")
 (defvar gnus-draft-meta-information-header "X-Draft-From")
 (defvar gnus-group-get-parameter-function #'gnus-group-get-parameter)
-(defvar gnus-original-article-buffer " *Original Article*")
-(defvar gnus-newsgroup-name nil)
+(defvar-local gnus-original-article-buffer " *Original Article*")
+(defvar-local gnus-newsgroup-name nil)
 (defvar gnus-ephemeral-servers nil)
 (defvar gnus-server-method-cache nil)
 (defvar gnus-extended-servers nil)
@@ -2423,8 +2451,8 @@ such as a mark that says whether an article is stored in the cache
     (gnus-tree-mode "(gnus)Tree Display"))
   "Alist of major modes and related Info nodes.")
 
-(defvar gnus-summary-buffer "*Summary*")
-(defvar gnus-article-buffer "*Article*")
+(defvar-local gnus-summary-buffer "*Summary*")
+(defvar-local gnus-article-buffer "*Article*")
 (defvar gnus-server-buffer "*Server*")
 
 (defvar gnus-child nil
@@ -2488,7 +2516,7 @@ are always t.")
 ;; Save window configuration.
 (defvar gnus-prev-winconf nil)
 
-(defvar gnus-reffed-article-number nil)
+(defvar-local gnus-reffed-article-number -1)
 
 (defvar gnus-dead-summary nil)
 
@@ -3455,9 +3483,13 @@ server is native)."
   "Return the prefix of the current group name."
   (< 0 (length (gnus-group-real-prefix group))))
 
-(defun gnus-summary-buffer-name (group)
+(defun gnus-summary-buffer-name (group &optional canonical)
   "Return the summary buffer name of GROUP."
-  (concat "*Summary " group "*"))
+  (let ((name (concat "*Summary " group "*"))
+        (main-thread-p (eq (current-thread) (car (all-threads)))))
+    (if (or canonical main-thread-p)
+        name
+      (format " %s %s" (thread-name (current-thread)) name))))
 
 (defun gnus-group-method (group)
   "Return the server or method used for selecting GROUP.
