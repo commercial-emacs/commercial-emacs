@@ -1617,23 +1617,30 @@ backend check whether the group actually exists."
          ,@forms))))
 
 (defun gnus-thread-body (thread-name mtx working fns)
+  "Errors need to be trapped for a clean exit.
+Else we get unblocked but permanently yielded threads."
   (let ((inhibit-debugger t))
-    (with-mutex mtx
-      (with-current-buffer working
-        (nnheader-message 9 "gnus-thread-body: start %s <%s>"
-                          thread-name (current-buffer))
-        (let (gnus-run-thread--subresult
-              current-fn
-              (nntp-server-buffer working))
-          (condition-case err
-              (dolist (fn fns)
-                (setq current-fn fn)
-                (setq gnus-run-thread--subresult (funcall fn)))
-            (error (nnheader-message
-                    4 "gnus-thread-body: '%s' in %S"
-                    (error-message-string err) current-fn)))))
-      (kill-buffer working)
-      (nnheader-message 9 "gnus-thread-body: finish %s" thread-name))))
+    (condition-case err
+        (with-mutex mtx
+          (with-current-buffer working
+            (nnheader-message 9 "gnus-thread-body: start %s <%s>"
+                              thread-name (current-buffer))
+            (let (gnus-run-thread--subresult
+                  current-fn
+                  (nntp-server-buffer working))
+              (condition-case err
+                  (dolist (fn fns)
+                    (setq current-fn fn)
+                    (setq gnus-run-thread--subresult (funcall fn)))
+                (error
+                 ;; feed current-fn to outer condition-case
+                 (error "dolist: '%s' in %S"
+                        (error-message-string err) current-fn)))))
+          (kill-buffer working)
+          (nnheader-message 9 "gnus-thread-body: finish %s" thread-name))
+      (error
+       ;; would use `nnheader-message' if it weren't possible that errored
+       (message "gnus-thread-body: '%s'" (error-message-string err))))))
 
 (defun gnus-run-thread (mtx thread-group &rest fns)
   "MTX, if non-nil, is the mutex for the new thread.
@@ -1854,7 +1861,7 @@ All FNS must finish before MTX is released."
                          :before-while coda
                          (apply-partially
                           (lambda (thread-group* &rest _args)
-                            "Proceed with before-while if I'm the last one."
+                            "Proceed with CODA if I'm the last one."
                             (<= (cl-count thread-group*
                                           (all-threads)
                                           :test (lambda (s thr)
