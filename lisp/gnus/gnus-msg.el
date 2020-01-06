@@ -918,9 +918,8 @@ header line with the old Message-ID."
     gnus-article-copy))
 
 (defmacro gnus-msg-preserve-variables (parent-buffer &rest body)
-  (declare (indent 1))
   "If BODY changes the current buffer, ensure important variables preserved."
-  (declare (indent 0))
+  (declare (indent 1))
   `(progn
      ,@body
      (unless (eq ,parent-buffer (current-buffer))
@@ -987,14 +986,15 @@ header line with the old Message-ID."
 		     (and (not (gnus-virtual-group-p pgroup)) group)))
 	      (set-buffer gnus-article-copy)
 	      (gnus-msg-treat-broken-reply-to)
-              (gnus-msg-preserve-variables parent-buffer
-                (message-followup (if (or newsgroup-p force-news)
-                                      (if (save-restriction
-                                            (article-narrow-to-head)
-                                            (message-fetch-field "newsgroups"))
-                                          nil
-                                        "")
-                                    to-group))))
+              (let ((parent-buffer (current-buffer)))
+                (gnus-msg-preserve-variables parent-buffer
+                  (message-followup (if (or newsgroup-p force-news)
+                                        (if (save-restriction
+                                              (article-narrow-to-head)
+                                              (message-fetch-field "newsgroups"))
+                                            nil
+                                          "")
+                                      to-group)))))
 	  ;; The is mail.
 	  (if post
 	      (progn
@@ -1008,8 +1008,9 @@ header line with the old Message-ID."
 			message-send-actions)))
 	    (set-buffer gnus-article-copy)
 	    (gnus-msg-treat-broken-reply-to)
-            (gnus-msg-preserve-variables parent-buffer
-              (message-wide-reply to-address))))
+            (let ((parent-buffer (current-buffer)))
+              (gnus-msg-preserve-variables parent-buffer
+                (message-wide-reply to-address)))))
 	(when yank
 	  (gnus-inews-yank-articles yank))))))
 
@@ -1174,9 +1175,10 @@ VERY-WIDE is a list of other articles to reply to."
             (erase-buffer)
             (insert very-wide-headers))
           (goto-char (point-max)))
-        (gnus-msg-preserve-variables (current-buffer)
-          (mml-quote-region (point) (point-max))
-          (message-reply nil wide))
+        (let ((parent-buffer (current-buffer)))
+          (gnus-msg-preserve-variables parent-buffer
+            (mml-quote-region (point) (point-max))
+            (message-reply nil wide)))
 	(when yank
 	  (gnus-inews-yank-articles yank))
 	(gnus-summary-handle-replysign)))))
