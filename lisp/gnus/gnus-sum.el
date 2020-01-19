@@ -4526,9 +4526,10 @@ the id of the parent article (if any)."
   "If we are not in an summary buffer, go there, and execute BODY.  Restore."
   (declare (indent 0) (debug t))
   `(save-current-buffer
-     (unless (derived-mode-p 'gnus-summary-mode)
-       (set-buffer gnus-summary-buffer))
-     ,@body))
+     (when (or (derived-mode-p 'gnus-summary-mode)
+               (when (gnus-buffer-live-p gnus-summary-buffer)
+                 (set-buffer gnus-summary-buffer)))
+       ,@body)))
 
 (defun gnus-summary-update-article (article &optional iheader)
   "Update ARTICLE in the summary buffer."
@@ -5664,9 +5665,11 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 	    (and (gnus-group-auto-expirable-p group)
 		 (not (gnus-group-read-only-p group))))
       ;; Set up the article buffer now, if necessary.
-      (unless (and gnus-single-article-buffer
-		   (equal gnus-article-buffer "*Article*"))
-	(gnus-article-setup-buffer))
+      (let ((single-article-p (and gnus-single-article-buffer
+                                   (equal gnus-article-buffer "*Article*"))))
+        (when (and (not single-article-p)
+                   (gnus-buffer-live-p gnus-summary-buffer))))
+      (gnus-article-setup-buffer)
       ;; First and last article in this newsgroup.
       (when gnus-newsgroup-headers
 	(setq gnus-newsgroup-begin
