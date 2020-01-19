@@ -1619,8 +1619,8 @@ backend check whether the group actually exists."
 (defun gnus-thread-body (thread-name mtx working fns)
   "Errors need to be trapped for a clean exit.
 Else we get unblocked but permanently yielded threads."
-  (let ((inhibit-debugger t))
-    (condition-case err
+  (let ((inhibit-debugger nil))
+    (condition-case-unless-debug err
         (with-mutex mtx
           (with-current-buffer working
             (nnheader-message 9 "gnus-thread-body: start %s <%s>"
@@ -1628,7 +1628,7 @@ Else we get unblocked but permanently yielded threads."
             (let (gnus-run-thread--subresult
                   current-fn
                   (nntp-server-buffer working))
-              (condition-case err
+              (condition-case-unless-debug err
                   (dolist (fn fns)
                     (setq current-fn fn)
                     (setq gnus-run-thread--subresult (funcall fn)))
