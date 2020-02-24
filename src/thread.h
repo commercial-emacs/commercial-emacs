@@ -204,7 +204,7 @@ CHECK_THREAD (Lisp_Object x)
 INLINE struct thread_state *
 XTHREAD (Lisp_Object a)
 {
-  eassert (THREADP (a));
+  eassume (THREADP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct thread_state);
 }
 
@@ -251,7 +251,7 @@ CHECK_MUTEX (Lisp_Object x)
 INLINE struct Lisp_Mutex *
 XMUTEX (Lisp_Object a)
 {
-  eassert (MUTEXP (a));
+  eassume (MUTEXP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Mutex);
 }
 
@@ -285,11 +285,29 @@ CHECK_CONDVAR (Lisp_Object x)
 INLINE struct Lisp_CondVar *
 XCONDVAR (Lisp_Object a)
 {
-  eassert (CONDVARP (a));
+  eassume (CONDVARP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_CondVar);
 }
 
 extern struct thread_state *current_thread;
+
+union aligned_thread_state
+{
+  struct thread_state s;
+  GCALIGNED_UNION_MEMBER
+};
+verify (GCALIGNED (union aligned_thread_state));
+
+/* Make main_thread a global symbol so that we can check for it in
+   other TUs with a arithmetic comparison instead of a function
+   call.  */
+extern union aligned_thread_state main_thread;
+
+INLINE bool
+main_thread_p (const void *const p)
+{
+  return p == &main_thread.s;
+}
 
 extern void finalize_one_thread (struct thread_state *state);
 extern void finalize_one_mutex (struct Lisp_Mutex *);
@@ -298,7 +316,6 @@ extern void maybe_reacquire_global_lock (void);
 
 extern void init_threads (void);
 extern void syms_of_threads (void);
-extern bool main_thread_p (const void *);
 extern bool in_current_thread (void);
 
 typedef int select_func (int, fd_set *, fd_set *, fd_set *,

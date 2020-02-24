@@ -53,6 +53,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "widget.h"
 #endif
 #include "pdumper.h"
+#include "alloc.h"
 
 /* The currently selected frame.  */
 Lisp_Object selected_frame;
@@ -63,7 +64,7 @@ Lisp_Object old_selected_frame;
 /* A frame which is not just a mini-buffer, or NULL if there are no such
    frames.  This is usually the most recent such frame that was selected.  */
 
-static struct frame *last_nonminibuf_frame;
+static Lisp_Object last_nonminibuf_frame;
 
 /* False means there are no visible garbaged frames.  */
 bool frame_garbaged;
@@ -924,8 +925,8 @@ adjust_frame_size (struct frame *f, int new_text_width, int new_text_height,
 static struct frame *
 allocate_frame (void)
 {
-  return ALLOCATE_ZEROED_PSEUDOVECTOR (struct frame, tool_bar_items,
-				       PVEC_FRAME);
+  return ALLOCATE_PSEUDOVECTOR_AND_ZERO (
+    struct frame, tool_bar_items, PVEC_FRAME);
 }
 
 struct frame *
@@ -1177,22 +1178,18 @@ static intmax_t tty_frame_count;
 struct frame *
 make_initial_frame (void)
 {
-  struct frame *f;
-  struct terminal *terminal;
-  Lisp_Object frame;
-
   eassert (initial_kboard);
   eassert (NILP (Vframe_list) || CONSP (Vframe_list));
 
-  terminal = init_initial_terminal ();
+  struct terminal *const terminal = init_initial_terminal ();
 
-  f = make_frame (true);
-  XSETFRAME (frame, f);
+  struct frame *const f = make_frame (true);
+  const Lisp_Object frame = make_lisp_ptr (f, Lisp_Vectorlike);
 
   Vframe_list = Fcons (frame, Vframe_list);
 
   tty_frame_count = 1;
-  fset_name (f, build_pure_c_string ("F1"));
+  fset_name (f, build_c_string ("F1"));
 
   SET_FRAME_VISIBLE (f, 1);
 
@@ -1220,7 +1217,7 @@ make_initial_frame (void)
   if (!noninteractive)
     init_frame_faces (f);
 
-  last_nonminibuf_frame = f;
+  last_nonminibuf_frame = frame;
 
   f->can_set_window_size = true;
   f->after_make_frame = true;
@@ -1570,7 +1567,7 @@ do_switch_frame (Lisp_Object frame, int track, int for_deletion, Lisp_Object nor
   f->select_mini_window_flag = false;
 
   if (! FRAME_MINIBUF_ONLY_P (XFRAME (selected_frame)))
-    last_nonminibuf_frame = XFRAME (selected_frame);
+    last_nonminibuf_frame = selected_frame;
 
   Fselect_window (f->selected_window, norecord);
 
@@ -1892,12 +1889,7 @@ DEFUN ("last-nonminibuffer-frame", Flast_nonminibuf_frame,
        doc: /* Return last non-minibuffer frame selected. */)
   (void)
 {
-  Lisp_Object frame = Qnil;
-
-  if (last_nonminibuf_frame)
-    XSETFRAME (frame, last_nonminibuf_frame);
-
-  return frame;
+  return last_nonminibuf_frame;
 }
 
 /**
@@ -1970,7 +1962,7 @@ other_frames (struct frame *f, bool invisible, bool force)
 Lisp_Object
 delete_frame (Lisp_Object frame, Lisp_Object force)
 {
-  struct frame *f = decode_any_frame (frame);
+  struct frame *const f = decode_any_frame (frame);
   struct frame *sf;
   struct kboard *kb;
   Lisp_Object frames, frame1;
@@ -2246,9 +2238,9 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
 
   /* If we've deleted the last_nonminibuf_frame, then try to find
      another one.  */
-  if (f == last_nonminibuf_frame)
+  if (EQ (frame, last_nonminibuf_frame))
     {
-      last_nonminibuf_frame = 0;
+      last_nonminibuf_frame = Qnil;
 
       FOR_EACH_FRAME (frames, frame1)
 	{
@@ -2256,7 +2248,7 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
 
 	  if (!FRAME_MINIBUF_ONLY_P (f1))
 	    {
-	      last_nonminibuf_frame = f1;
+	      last_nonminibuf_frame = frame1;
 	      break;
 	    }
 	}
@@ -6040,7 +6032,8 @@ init_frame_once (void)
 {
   staticpro (&Vframe_list);
   staticpro (&selected_frame);
-  PDUMPER_IGNORE (last_nonminibuf_frame);
+  staticpro (&old_selected_frame);
+  staticpro (&last_nonminibuf_frame);
   Vframe_list = Qnil;
   selected_frame = Qnil;
   pdumper_do_now_and_after_load (init_frame_once_for_pdumper);

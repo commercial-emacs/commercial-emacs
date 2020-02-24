@@ -10038,7 +10038,7 @@ w32_read_registry (HKEY rootkey, Lisp_Object lkey, Lisp_Object lname)
 	  int i;
 	  unsigned char *dbuf = (unsigned char *)pvalue;
 
-	  val = make_uninit_vector (vsize);
+	  val = make_nil_vector (vsize);
 	  for (i = 0; i < vsize; i++)
 	    ASET (val, i, make_fixnum (dbuf[i]));
 

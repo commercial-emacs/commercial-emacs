@@ -44,6 +44,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "systime.h"
 #include "thread.h"
 #include "bignum.h"
+#include "bitset.h"
+#include "sysmem.h"
+#include "alloc.h"
 
 #ifdef CHECK_STRUCTS
 # include "dmpstruct.h"
@@ -69,30 +72,19 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_PDUMPER
 
-#if GNUC_PREREQ (4, 7, 0)
-# pragma GCC diagnostic error "-Wshadow"
-#endif
-
-#define VM_POSIX 1
-#define VM_MS_WINDOWS 2
-
-#if defined (HAVE_MMAP) && defined (MAP_FIXED)
-# define VM_SUPPORTED VM_POSIX
-# if !defined (MAP_POPULATE) && defined (MAP_PREFAULT_READ)
-#  define MAP_POPULATE MAP_PREFAULT_READ
-# elif !defined (MAP_POPULATE)
-#  define MAP_POPULATE 0
-# endif
-#elif defined (WINDOWSNT)
+#if defined (WINDOWSNT)
   /* Use a float infinity, to avoid compiler warnings in comparing vs
      candidates' score.  */
 # undef INFINITY
 # define INFINITY __builtin_inff ()
 # include <windows.h>
-# define VM_SUPPORTED VM_MS_WINDOWS
-#else
-# define VM_SUPPORTED 0
 #endif
+
+#if GNUC_PREREQ (4, 7, 0)
+# pragma GCC diagnostic error "-Wshadow"
+#endif
+
+
 
 /* Require an architecture in which pointers, ptrdiff_t and intptr_t
    are the same size and have the same layout, and where bytes have
@@ -148,8 +140,6 @@ dump_trace (const char *fmt, ...)
       va_end (args);
     }
 }
-
-static ssize_t dump_read_all (int fd, void *buf, size_t bytes_to_read);
 
 static dump_off
 ptrdiff_t_to_dump_off (ptrdiff_t value)
@@ -1144,7 +1134,7 @@ dump_queue_scan_fancy (struct dump_queue *dump_queue,
           if (first)
             first = false;
         }
-      cons_ptr = &XCONS (*cons_ptr)->u.s.u.cdr;
+      cons_ptr = xcdr_addr (*cons_ptr);
     }
 
   *out_highest_score_cons_ptr = highest_score_cons_ptr;
@@ -1706,7 +1696,7 @@ dump_remember_fixup_ptr_raw (struct dump_context *ctx,
 }
 
 static void
-dump_root_visitor (Lisp_Object const *root_ptr, enum gc_root_type type,
+dump_root_visitor (Lisp_Object *root_ptr, enum gc_root_type type,
 		   void *data)
 {
   struct dump_context *ctx = data;
@@ -2014,7 +2004,7 @@ dump_cons (struct dump_context *ctx, const struct Lisp_Cons *cons)
   struct Lisp_Cons out;
   dump_object_start (ctx, &out, sizeof (out));
   dump_field_lv (ctx, &out, cons, &cons->u.s.car, WEIGHT_STRONG);
-  dump_field_lv (ctx, &out, cons, &cons->u.s.u.cdr, WEIGHT_NORMAL);
+  dump_field_lv (ctx, &out, cons, &cons->u.s.cdr, WEIGHT_NORMAL);
   return dump_object_finish (ctx, &out, sizeof (out));
 }
 
@@ -2044,7 +2034,6 @@ dump_interval_tree (struct dump_context *ctx,
   else
     dump_field_lv (ctx, &out, tree, &tree->up.obj, WEIGHT_STRONG);
   DUMP_FIELD_COPY (&out, tree, up_obj);
-  eassert (tree->gcmarkbit == 0);
   DUMP_FIELD_COPY (&out, tree, write_protect);
   DUMP_FIELD_COPY (&out, tree, visible);
   DUMP_FIELD_COPY (&out, tree, front_sticky);
@@ -2061,6 +2050,18 @@ dump_interval_tree (struct dump_context *ctx,
 	(ctx,
 	 offset + dump_offsetof (struct interval, right),
 	 dump_interval_tree (ctx, tree->right, offset));
+
+  /* The new moving GC wants to know about intervals as well as
+     conventional Lisp objects, but we don't have a Lisp type tag for
+     intervals: instead, abuse Lisp_Int0 to signal "I actually have an
+     interval" --- just like the GC does internally.  */
+  if (ctx->flags.record_object_starts)
+    {
+      eassert (!ctx->flags.pack_objects);
+      dump_push (&ctx->object_starts,
+                 list2 (dump_off_to_lisp (Lisp_Int0),
+                        dump_off_to_lisp (offset)));
+    }
   return offset;
 }
 
@@ -2081,32 +2082,49 @@ dump_string (struct dump_context *ctx, const struct Lisp_String *string)
      If, however, the string's size_byte field is -2, the string data
      is actually a pointer to Emacs data segment, so we can do even
      better by emitting a relocation instead of bothering to copy the
-     string data.  */
+     string data.
+
+     If the string refers to Emacs rodata, just emit a relocation to
+     the Emacs image instead of copying the string into the dump.  */
   struct Lisp_String out;
   dump_object_start (ctx, &out, sizeof (out));
-  DUMP_FIELD_COPY (&out, string, u.s.size);
-  DUMP_FIELD_COPY (&out, string, u.s.size_byte);
-  if (string->u.s.intervals)
-    dump_field_fixup_later (ctx, &out, string, &string->u.s.intervals);
-
-  if (string->u.s.size_byte == -2)
-    /* String literal in Emacs rodata.  */
-    dump_field_emacs_ptr (ctx, &out, string, &string->u.s.data);
+  if (STRING_INTERNAL_P (string))
+    DUMP_FIELD_COPY (&out, string, u.s.u.internal);
   else
     {
-      dump_field_fixup_later (ctx, &out, string, &string->u.s.data);
-      dump_remember_cold_op (ctx,
-                             COLD_OP_STRING,
-			     make_lisp_ptr ((void *) string, Lisp_String));
+      DUMP_FIELD_COPY (&out, string, u.s.u.external.is_internal);
+      DUMP_FIELD_COPY (&out, string, u.s.u.external.is_c_string);
+      DUMP_FIELD_COPY (&out, string, u.s.u.external.size_byte);
+      DUMP_FIELD_COPY (&out, string, u.s.u.external.size);
+      if (string->u.s.u.external.is_c_string)
+        {
+          /* String literal in Emacs rodata.  */
+          dump_field_emacs_ptr (
+            ctx, &out, string, &string->u.s.u.external.data);
+        }
+      else
+        {
+          /* Set the is_c_string flag so GC doesn't try to mark the
+             data field of the string.  */
+          out.u.s.u.external.is_c_string = true;
+          dump_field_fixup_later (
+            ctx, &out, string, &string->u.s.u.external.data);
+          dump_remember_cold_op (
+            ctx,
+            COLD_OP_STRING,
+            make_lisp_ptr ((void *) string, Lisp_String));
+        }
     }
 
-  dump_off offset = dump_object_finish (ctx, &out, sizeof (out));
+  if (string->u.s.intervals)
+    dump_field_fixup_later (ctx, &out, string,
+                            &string->u.s.intervals);
+  const dump_off offset = dump_object_finish (ctx, &out, sizeof (out));
   if (string->u.s.intervals)
     dump_remember_fixup_ptr_raw
       (ctx,
        offset + dump_offsetof (struct Lisp_String, u.s.intervals),
        dump_interval_tree (ctx, string->u.s.intervals, 0));
-
   return offset;
 }
 
@@ -2146,20 +2164,6 @@ dump_overlay (struct dump_context *ctx, const struct Lisp_Overlay *overlay)
   return finish_dump_pvec (ctx, &out->header);
 }
 
-static void
-dump_field_finalizer_ref (struct dump_context *ctx,
-                          void *out,
-                          const struct Lisp_Finalizer *finalizer,
-                          struct Lisp_Finalizer *const *field)
-{
-  if (*field == &finalizers || *field == &doomed_finalizers)
-    dump_field_emacs_ptr (ctx, out, finalizer, field);
-  else
-    dump_field_lv_rawptr (ctx, out, finalizer, field,
-                          Lisp_Vectorlike,
-                          WEIGHT_NORMAL);
-}
-
 static dump_off
 dump_finalizer (struct dump_context *ctx,
                 const struct Lisp_Finalizer *finalizer)
@@ -2172,8 +2176,7 @@ dump_finalizer (struct dump_context *ctx,
      only Lisp field, finalizer->function, manually, so we can give it
      a low weight.  */
   dump_field_lv (ctx, &out, finalizer, &finalizer->function, WEIGHT_NONE);
-  dump_field_finalizer_ref (ctx, &out, finalizer, &finalizer->prev);
-  dump_field_finalizer_ref (ctx, &out, finalizer, &finalizer->next);
+  dump_field_lv (ctx, &out, finalizer, &finalizer->next, WEIGHT_STRONG);
   return finish_dump_pvec (ctx, &out->header);
 }
 
@@ -2230,7 +2233,7 @@ dump_float (struct dump_context *ctx, const struct Lisp_Float *lfloat)
   eassert (ctx->header.cold_start);
   struct Lisp_Float out;
   dump_object_start (ctx, &out, sizeof (out));
-  DUMP_FIELD_COPY (&out, lfloat, u.data);
+  DUMP_FIELD_COPY (&out, lfloat, data);
   return dump_object_finish (ctx, &out, sizeof (out));
 }
 
@@ -2391,7 +2394,7 @@ dump_pre_dump_symbol (struct dump_context *ctx, struct Lisp_Symbol *symbol)
   eassert (!dump_recall_symbol_aux (ctx, symbol_lv));
   if (dump_set_referrer (ctx))
     ctx->current_referrer = symbol_lv;
-  switch (symbol->u.s.redirect)
+  switch (symbol->u.s.f.redirect)
     {
     case SYMBOL_LOCALIZED:
       dump_remember_symbol_aux (ctx, symbol_lv,
@@ -2444,14 +2447,13 @@ dump_symbol (struct dump_context *ctx,
   struct Lisp_Symbol *symbol = XSYMBOL (object);
   struct Lisp_Symbol out;
   dump_object_start (ctx, &out, sizeof (out));
-  eassert (symbol->u.s.gcmarkbit == 0);
-  DUMP_FIELD_COPY (&out, symbol, u.s.redirect);
-  DUMP_FIELD_COPY (&out, symbol, u.s.trapped_write);
-  DUMP_FIELD_COPY (&out, symbol, u.s.interned);
-  DUMP_FIELD_COPY (&out, symbol, u.s.declared_special);
-  DUMP_FIELD_COPY (&out, symbol, u.s.pinned);
+  DUMP_FIELD_COPY (&out, symbol, u.s.f.redirect);
+  DUMP_FIELD_COPY (&out, symbol, u.s.f.trapped_write);
+  DUMP_FIELD_COPY (&out, symbol, u.s.f.interned);
+  DUMP_FIELD_COPY (&out, symbol, u.s.f.declared_special);
+  DUMP_FIELD_COPY (&out, symbol, u.s.f.identity_hash_code);
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.name, WEIGHT_STRONG);
-  switch (symbol->u.s.redirect)
+  switch (symbol->u.s.f.redirect)
     {
     case SYMBOL_PLAINVAL:
       dump_field_lv (ctx, &out, symbol, &symbol->u.s.val.value,
@@ -2479,7 +2481,7 @@ dump_symbol (struct dump_context *ctx,
   offset = dump_object_finish (ctx, &out, sizeof (out));
   dump_off aux_offset;
 
-  switch (symbol->u.s.redirect)
+  switch (symbol->u.s.f.redirect)
     {
     case SYMBOL_LOCALIZED:
       aux_offset = dump_recall_symbol_aux (ctx, make_lisp_symbol (symbol));
@@ -2682,7 +2684,6 @@ dump_hash_table (struct dump_context *ctx,
      them as close to the hash table as possible.  */
   DUMP_FIELD_COPY (out, hash, count);
   DUMP_FIELD_COPY (out, hash, next_free);
-  DUMP_FIELD_COPY (out, hash, purecopy);
   DUMP_FIELD_COPY (out, hash, mutable);
   DUMP_FIELD_COPY (out, hash, rehash_threshold);
   DUMP_FIELD_COPY (out, hash, rehash_size);
@@ -2697,6 +2698,60 @@ dump_hash_table (struct dump_context *ctx,
   eassert (hash->next_weak == NULL);
   return finish_dump_pvec (ctx, &out->header);
 }
+
+static dump_off
+dump_buffer_text (struct dump_context *ctx,
+                  const struct buffer *buffer)
+{
+  eassert (!buffer->base_buffer);
+  const struct buffer_text *const text = buffer->text;
+  const dump_off intervals_offset = text->intervals
+    ? dump_interval_tree (ctx, text->intervals, 0)
+    : 0;
+
+  struct buffer_text out;
+  dump_object_start (ctx, &out, sizeof (out));
+  if (text->beg)
+    {
+      dump_field_fixup_later (ctx, &out, text, &text->beg);
+      dump_remember_cold_op (ctx, COLD_OP_BUFFER,
+                             make_lisp_ptr ((void *) buffer,
+                                            Lisp_Vectorlike));
+    }
+  else
+    eassert (!buffer->text || buffer->text->beg == NULL);
+
+  DUMP_FIELD_COPY (&out, text, gpt);
+  DUMP_FIELD_COPY (&out, text, z);
+  DUMP_FIELD_COPY (&out, text, gpt_byte);
+  DUMP_FIELD_COPY (&out, text, z_byte);
+  DUMP_FIELD_COPY (&out, text, gap_size);
+  DUMP_FIELD_COPY (&out, text, modiff);
+  DUMP_FIELD_COPY (&out, text, chars_modiff);
+  DUMP_FIELD_COPY (&out, text, save_modiff);
+  DUMP_FIELD_COPY (&out, text, overlay_modiff);
+  DUMP_FIELD_COPY (&out, text, compact);
+  DUMP_FIELD_COPY (&out, text, beg_unchanged);
+  DUMP_FIELD_COPY (&out, text, end_unchanged);
+  DUMP_FIELD_COPY (&out, text, unchanged_modified);
+  DUMP_FIELD_COPY (&out, text, overlay_unchanged_modified);
+  if (text->intervals)
+    dump_field_fixup_later (ctx, &out, text, &text->intervals);
+  dump_field_lv_rawptr (ctx, &out, text, &text->markers,
+                        Lisp_Vectorlike, WEIGHT_NORMAL);
+  DUMP_FIELD_COPY (&out, text, inhibit_shrinking);
+  DUMP_FIELD_COPY (&out, text, redisplay);
+
+  if (intervals_offset)
+    dump_remember_fixup_ptr_raw
+      (ctx,
+       ctx->obj_offset + dump_offsetof (struct buffer_text, intervals),
+       intervals_offset);
+  return dump_object_finish (ctx, &out, sizeof (out));
+}
+
+static const dump_off buffer_text_nr_bytes_rounded =
+  ROUNDUP (sizeof (struct buffer_text), DUMP_ALIGNMENT);
 
 static dump_off
 dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
@@ -2728,56 +2783,25 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
 	 make_lisp_ptr (buffer->base_buffer, Lisp_Vectorlike));
     }
 
-  eassert ((base_offset == 0 && buffer->text == &in_buffer->own_text)
-	   || (base_offset > 0 && buffer->text != &in_buffer->own_text));
+  const dump_off text_offset = buffer->text == NULL
+    ? 0
+    : buffer->base_buffer
+    ? base_offset - buffer_text_nr_bytes_rounded
+    : dump_buffer_text (ctx, in_buffer);
 
   START_DUMP_PVEC (ctx, &buffer->header, struct buffer, out);
-  dump_pseudovector_lisp_fields (ctx, &out->header, &buffer->header);
   if (base_offset == 0)
     base_offset = ctx->obj_offset;
   eassert (base_offset > 0);
-  if (buffer->base_buffer == NULL)
-    {
-      eassert (base_offset == ctx->obj_offset);
-
-      if (BUFFER_LIVE_P (buffer))
-        {
-          dump_field_fixup_later (ctx, out, buffer, &buffer->own_text.beg);
-	  dump_remember_cold_op (ctx, COLD_OP_BUFFER,
-				 make_lisp_ptr ((void *) in_buffer,
-						Lisp_Vectorlike));
-        }
-      else
-        eassert (buffer->own_text.beg == NULL);
-
-      DUMP_FIELD_COPY (out, buffer, own_text.gpt);
-      DUMP_FIELD_COPY (out, buffer, own_text.z);
-      DUMP_FIELD_COPY (out, buffer, own_text.gpt_byte);
-      DUMP_FIELD_COPY (out, buffer, own_text.z_byte);
-      DUMP_FIELD_COPY (out, buffer, own_text.gap_size);
-      DUMP_FIELD_COPY (out, buffer, own_text.modiff);
-      DUMP_FIELD_COPY (out, buffer, own_text.chars_modiff);
-      DUMP_FIELD_COPY (out, buffer, own_text.save_modiff);
-      DUMP_FIELD_COPY (out, buffer, own_text.overlay_modiff);
-      DUMP_FIELD_COPY (out, buffer, own_text.compact);
-      DUMP_FIELD_COPY (out, buffer, own_text.beg_unchanged);
-      DUMP_FIELD_COPY (out, buffer, own_text.end_unchanged);
-      DUMP_FIELD_COPY (out, buffer, own_text.unchanged_modified);
-      DUMP_FIELD_COPY (out, buffer, own_text.overlay_unchanged_modified);
-      if (buffer->own_text.intervals)
-        dump_field_fixup_later (ctx, out, buffer, &buffer->own_text.intervals);
-      dump_field_lv_rawptr (ctx, out, buffer, &buffer->own_text.markers,
-                            Lisp_Vectorlike, WEIGHT_NORMAL);
-      DUMP_FIELD_COPY (out, buffer, own_text.inhibit_shrinking);
-      DUMP_FIELD_COPY (out, buffer, own_text.redisplay);
-      DUMP_FIELD_COPY (out, buffer, own_text.monospace);
-    }
-
   eassert (ctx->obj_offset > 0);
-  dump_remember_fixup_ptr_raw
-    (ctx,
-     ctx->obj_offset + dump_offsetof (struct buffer, text),
-     base_offset + dump_offsetof (struct buffer, own_text));
+  eassume (text_offset == base_offset - buffer_text_nr_bytes_rounded);
+
+  dump_pseudovector_lisp_fields (ctx, &out->header, &buffer->header);
+  if (text_offset)
+    dump_remember_fixup_ptr_raw
+      (ctx,
+       ctx->obj_offset + dump_offsetof (struct buffer, text),
+       text_offset);
 
   DUMP_FIELD_COPY (out, buffer, pt);
   DUMP_FIELD_COPY (out, buffer, pt_byte);
@@ -2806,7 +2830,7 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
   DUMP_FIELD_COPY (out, buffer, auto_save_failure_time);
   DUMP_FIELD_COPY (out, buffer, last_window_start);
 
-  /* Not worth serializing these caches.  TODO: really? */
+  /* Not worth serializing these caches.  */
   out->newline_cache = NULL;
   out->width_run_cache = NULL;
   out->bidi_paragraph_cache = NULL;
@@ -2824,14 +2848,7 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
   DUMP_FIELD_COPY (out, buffer, overlay_center);
   dump_field_lv (ctx, out, buffer, &buffer->undo_list_,
                  WEIGHT_STRONG);
-  dump_off offset = finish_dump_pvec (ctx, &out->header);
-  if (!buffer->base_buffer && buffer->own_text.intervals)
-    dump_remember_fixup_ptr_raw
-      (ctx,
-       offset + dump_offsetof (struct buffer, own_text.intervals),
-       dump_interval_tree (ctx, buffer->own_text.intervals, 0));
-
-  return offset;
+  return finish_dump_pvec (ctx, &out->header);
 }
 
 static dump_off
@@ -2844,7 +2861,7 @@ dump_bool_vector (struct dump_context *ctx, const struct Lisp_Vector *v)
   dump_align_output (ctx, DUMP_ALIGNMENT);
   eassert (ctx->offset >= ctx->header.cold_start);
   dump_off offset = ctx->offset;
-  ptrdiff_t nbytes = vector_nbytes ((struct Lisp_Vector *) v);
+  ptrdiff_t nbytes = vectorlike_nbytes (&v->header);
   if (nbytes > DUMP_OFF_MAX)
     error ("vector too large");
   dump_write (ctx, v, ptrdiff_t_to_dump_off (nbytes));
@@ -2971,38 +2988,30 @@ dump_vectorlike (struct dump_context *ctx,
     case PVEC_CHAR_TABLE:
     case PVEC_SUB_CHAR_TABLE:
     case PVEC_RECORD:
-      offset = dump_vectorlike_generic (ctx, &v->header);
-      break;
+      return dump_vectorlike_generic (ctx, &v->header);
+    case PVEC_STRING_DATA:
+      emacs_abort ();  // XXX
     case PVEC_BOOL_VECTOR:
-      offset = dump_bool_vector(ctx, v);
-      break;
+      return dump_bool_vector(ctx, v);
     case PVEC_HASH_TABLE:
-      offset = dump_hash_table (ctx, lv, offset);
-      break;
+      return dump_hash_table (ctx, lv, offset);
     case PVEC_BUFFER:
-      offset = dump_buffer (ctx, XBUFFER (lv));
-      break;
+      return dump_buffer (ctx, XBUFFER (lv));
     case PVEC_SUBR:
-      offset = dump_subr (ctx, XSUBR (lv));
-      break;
+      return dump_subr (ctx, XSUBR (lv));
     case PVEC_FRAME:
     case PVEC_WINDOW:
     case PVEC_PROCESS:
     case PVEC_TERMINAL:
-      offset = dump_nilled_pseudovec (ctx, &v->header);
-      break;
+      return dump_nilled_pseudovec (ctx, &v->header);
     case PVEC_MARKER:
-      offset = dump_marker (ctx, XMARKER (lv));
-      break;
+      return dump_marker (ctx, XMARKER (lv));
     case PVEC_OVERLAY:
-      offset = dump_overlay (ctx, XOVERLAY (lv));
-      break;
+      return dump_overlay (ctx, XOVERLAY (lv));
     case PVEC_FINALIZER:
-      offset = dump_finalizer (ctx, XFINALIZER (lv));
-      break;
+      return dump_finalizer (ctx, XFINALIZER (lv));
     case PVEC_BIGNUM:
-      offset = dump_bignum (ctx, lv);
-      break;
+      return dump_bignum (ctx, lv);
 #ifdef HAVE_NATIVE_COMP
     case PVEC_NATIVE_COMP_UNIT:
       offset = dump_native_comp_unit (ctx, XNATIVE_COMP_UNIT (lv));
@@ -3034,11 +3043,8 @@ dump_vectorlike (struct dump_context *ctx,
       error_unsupported_dump_object (ctx, lv, "sqlite");
     case PVEC_MODULE_FUNCTION:
       error_unsupported_dump_object (ctx, lv, "module function");
-    default:
-      error_unsupported_dump_object(ctx, lv, "weird pseudovector");
     }
-
-  return offset;
+  emacs_unreachable ();
 }
 
 /* Add an object to the dump.
@@ -3226,18 +3232,6 @@ dump_charset_table (struct dump_context *ctx)
 }
 
 static void
-dump_finalizer_list_head_ptr (struct dump_context *ctx,
-                              struct Lisp_Finalizer **ptr)
-{
-  struct Lisp_Finalizer *value = *ptr;
-  if (value != &finalizers && value != &doomed_finalizers)
-    dump_emacs_reloc_to_dump_ptr_raw
-      (ctx, ptr,
-       dump_object_for_offset (ctx,
-			       make_lisp_ptr (value, Lisp_Vectorlike)));
-}
-
-static void
 dump_metadata_for_pdumper (struct dump_context *ctx)
 {
   for (int i = 0; i < nr_dump_hooks; ++i)
@@ -3345,13 +3339,15 @@ dump_cold_string (struct dump_context *ctx, Lisp_Object string)
   eassert (string_offset > 0);
   if (SBYTES (string) > DUMP_OFF_MAX - 1)
     error ("string too large");
+  eassert (!STRING_INTERNAL_P (XSTRING (string)));
   dump_off total_size = ptrdiff_t_to_dump_off (SBYTES (string) + 1);
   eassert (total_size > 0);
   dump_remember_fixup_ptr_raw
     (ctx,
-     string_offset + dump_offsetof (struct Lisp_String, u.s.data),
+     string_offset + dump_offsetof (
+       struct Lisp_String, u.s.u.external.data),
      ctx->offset);
-  dump_write (ctx, XSTRING (string)->u.s.data, total_size);
+  dump_write (ctx, XSTRING (string)->u.s.u.external.data, total_size);
 }
 
 static void
@@ -3374,8 +3370,11 @@ dump_cold_buffer (struct dump_context *ctx, Lisp_Object data)
   /* Dump buffer text.  */
   dump_off buffer_offset = dump_recall_object (ctx, data);
   eassert (buffer_offset > 0);
+  dump_off text_offset = buffer_offset - buffer_text_nr_bytes_rounded;
+  eassert (text_offset > 0);
+
   struct buffer *b = XBUFFER (data);
-  eassert (b->text == &b->own_text);
+  eassert (!b->base_buffer);
   /* Zero the gap so we don't dump uninitialized bytes.  */
   memset (BUF_GPT_ADDR (b), 0, BUF_GAP_SIZE (b));
   /* See buffer.c for this calculation.  */
@@ -3388,9 +3387,9 @@ dump_cold_buffer (struct dump_context *ctx, Lisp_Object data)
     error ("buffer too large");
   dump_remember_fixup_ptr_raw
     (ctx,
-     buffer_offset + dump_offsetof (struct buffer, own_text.beg),
+     text_offset + dump_offsetof (struct buffer_text, beg),
      ctx->offset);
-  dump_write (ctx, b->own_text.beg, ptrdiff_t_to_dump_off (nbytes));
+  dump_write (ctx, b->text->beg, ptrdiff_t_to_dump_off (nbytes));
 }
 
 static void
@@ -4042,7 +4041,7 @@ types.  */)
   do
     {
       number_finalizers_run = 0;
-      garbage_collect ();
+      Fgarbage_collect (Qnil/*major*/);
     }
   while (number_finalizers_run);
 
@@ -4142,12 +4141,12 @@ types.  */)
   /* Start the dump process by processing the static roots and
      queuing up the objects to which they refer.   */
   dump_roots (ctx);
+  /* These lists aren't real roots, but we treat them as roots for
+    dumping purposes.  */
+  dump_root_visitor (&finalizers, GC_ROOT_STATICPRO, ctx);
+  dump_root_visitor (&doomed_finalizers, GC_ROOT_STATICPRO, ctx);
 
   dump_charset_table (ctx);
-  dump_finalizer_list_head_ptr (ctx, &finalizers.prev);
-  dump_finalizer_list_head_ptr (ctx, &finalizers.next);
-  dump_finalizer_list_head_ptr (ctx, &doomed_finalizers.prev);
-  dump_finalizer_list_head_ptr (ctx, &doomed_finalizers.next);
   dump_drain_user_remembered_data_hot (ctx);
 
   /* We've already remembered all the objects to which GC roots point,
@@ -4947,77 +4946,35 @@ typedef uint_fast32_t dump_bitset_word;
 
 struct dump_bitset
 {
-  dump_bitset_word *restrict bits;
-  ptrdiff_t number_words;
+  emacs_bitset_word *bits;
+  size_t number_words;
 };
 
 static bool
 dump_bitsets_init (struct dump_bitset bitset[2], size_t number_bits)
 {
-  int xword_size = sizeof (bitset[0].bits[0]);
-  int bits_per_word = xword_size * CHAR_BIT;
-  ptrdiff_t words_needed = divide_round_up (number_bits, bits_per_word);
-  dump_bitset_word *bits = calloc (words_needed, 2 * xword_size);
-  if (!bits)
-    return false;
-  bitset[0].bits = bits;
-  bitset[0].number_words = bitset[1].number_words = words_needed;
-  bitset[1].bits = memset (bits + words_needed, UCHAR_MAX,
-			   words_needed * xword_size);
-  return true;
-}
-
-static dump_bitset_word *
-dump_bitset__bit_slot (const struct dump_bitset *bitset,
-                       size_t bit_number)
-{
-  int xword_size = sizeof (bitset->bits[0]);
-  int bits_per_word = xword_size * CHAR_BIT;
-  ptrdiff_t word_number = bit_number / bits_per_word;
-  eassert (word_number < bitset->number_words);
-  return &bitset->bits[word_number];
+  const size_t words_needed = divide_round_up (
+    number_bits, emacs_bitset_bits_per_word);
+  bitset->number_words = words_needed;
+  bitset->bits = calloc (words_needed, sizeof (bitset->bits[0]));
+  return bitset->bits != NULL;
 }
 
 static bool
 dump_bitset_bit_set_p (const struct dump_bitset *bitset,
                        size_t bit_number)
 {
-  unsigned xword_size = sizeof (bitset->bits[0]);
-  unsigned bits_per_word = xword_size * CHAR_BIT;
-  dump_bitset_word bit = 1;
-  bit <<= bit_number % bits_per_word;
-  return *dump_bitset__bit_slot (bitset, bit_number) & bit;
-}
-
-static void
-dump_bitset__set_bit_value (struct dump_bitset *bitset,
-                            size_t bit_number,
-                            bool bit_is_set)
-{
-  int xword_size = sizeof (bitset->bits[0]);
-  int bits_per_word = xword_size * CHAR_BIT;
-  dump_bitset_word *slot = dump_bitset__bit_slot (bitset, bit_number);
-  dump_bitset_word bit = 1;
-  bit <<= bit_number % bits_per_word;
-  if (bit_is_set)
-    *slot = *slot | bit;
-  else
-    *slot = *slot & ~bit;
+  const emacs_bitset_word *const restrict bits = bitset->bits;
+  return emacs_bitset_bit_set_p (bits,
+                                 bitset->number_words,
+                                 bit_number);
 }
 
 static void
 dump_bitset_set_bit (struct dump_bitset *bitset, size_t bit_number)
 {
-  dump_bitset__set_bit_value (bitset, bit_number, true);
-}
-
-static void
-dump_bitset_clear (struct dump_bitset *bitset)
-{
-  /* Skip the memset if bitset->number_words == 0, because then bitset->bits
-     might be NULL and the memset would have undefined behavior.  */
-  if (bitset->number_words)
-    memset (bitset->bits, 0, bitset->number_words * sizeof bitset->bits[0]);
+  emacs_bitset_word *const restrict bits = bitset->bits;
+  emacs_bitset_set_bit (bits, bitset->number_words, bit_number);
 }
 
 struct pdumper_loaded_dump_private
@@ -5184,36 +5141,53 @@ pdumper_set_marked_impl (const void *obj)
   dump_bitset_set_bit (&dump_private.mark_bits, bitno);
 }
 
+/* Sweep dumped objects. Rewrite pointers to mobile objects and clear
+   all the mark bits.
+   TODO: generational support: avoid scanning the whole dump.  */
 void
-pdumper_clear_marks_impl (void)
+pdumper_sweep_impl (void)
 {
-  dump_bitset_word *swap = dump_private.last_mark_bits.bits;
-  dump_private.last_mark_bits.bits = dump_private.mark_bits.bits;
-  dump_private.mark_bits.bits = swap;
-  dump_bitset_clear (&dump_private.mark_bits);
-}
-
-static ssize_t
-dump_read_all (int fd, void *buf, size_t bytes_to_read)
-{
-  /* We don't want to use emacs_read, since that relies on the lisp
-     world, and we're not in the lisp world yet.  */
-  size_t bytes_read = 0;
-  while (bytes_read < bytes_to_read)
+  const uintptr_t dump_base = dump_public.start;
+  if (dump_base == 0)
+    return  /* No dump loaded */;
+  const struct dump_bitset mark_bitset = dump_private.mark_bits;
+  const emacs_bitset_word *const restrict mark_words = mark_bitset.bits;
+  const struct dump_table_locator table = dump_private.header.object_starts;
+  const struct dump_reloc *start_reloc = dump_ptr (dump_base, table.offset);
+  const struct dump_reloc *const start_reloc_end =
+    start_reloc + table.nr_entries;
+  eassume (start_reloc < start_reloc_end);
+  for (size_t word_nr = 0; word_nr < mark_bitset.number_words; ++word_nr)
     {
-      /* Some platforms accept only int-sized values to read.
-         Round this down to a page size (see MAX_RW_COUNT in sysdep.c).  */
-      int max_rw_count = INT_MAX >> 18 << 18;
-      int chunk_to_read = min (bytes_to_read - bytes_read, max_rw_count);
-      ssize_t chunk = read (fd, (char *) buf + bytes_read, chunk_to_read);
-      if (chunk < 0)
-        return chunk;
-      if (chunk == 0)
-        break;
-      bytes_read += chunk;
+      eassume (!INT_MULTIPLY_OVERFLOW (word_nr, emacs_bitset_bits_per_word));
+      const dump_off word_slot_nr =
+        (dump_off) word_nr * emacs_bitset_bits_per_word;
+      emacs_bitset_word mark_bits = mark_words[word_nr];
+      int pos = 0;
+      while (mark_bits)
+        {
+          const int lz = emacs_ctz_bw (mark_bits);
+          pos += lz;
+          mark_bits >>= lz;
+          eassume (mark_bits & 1);
+          const dump_off marked_bitno = word_slot_nr + pos;
+          const dump_off marked_offset = marked_bitno * DUMP_ALIGNMENT;
+          while (dump_reloc_get_offset (*start_reloc) < marked_offset)
+            {
+              ++start_reloc;
+              eassume (start_reloc < start_reloc_end);
+            }
+          eassume (dump_reloc_get_offset (*start_reloc) == marked_offset);
+          sweep_pdumper_object (dump_ptr (dump_base, marked_offset),
+                                (enum Lisp_Type) start_reloc->type);
+          pos += 1;
+          mark_bits >>= 1;
+          ++start_reloc;
+        }
     }
-
-  return bytes_read;
+  const size_t nr_bitset_bytes =
+    mark_bitset.number_words * sizeof (emacs_bitset_word);
+  emacs_zero_memory (mark_bitset.bits, nr_bitset_bytes);
 }
 
 /* Return the number of bytes written when we perform the given
@@ -5542,7 +5516,7 @@ pdumper_load (const char *dump_filename, char *argv0)
 
   struct dump_header header_buf = { 0 };
   struct dump_header *header = &header_buf;
-  struct dump_memory_map sections[NUMBER_DUMP_SECTIONS] = { 0 };
+  struct emacs_memory_map sections[NUMBER_DUMP_SECTIONS] = { 0 };
 
   const struct timespec start_time = current_timespec ();
   char *dump_filename_copy;
@@ -5577,9 +5551,9 @@ pdumper_load (const char *dump_filename, char *argv0)
     goto out;
 
   err = PDUMPER_LOAD_BAD_FILE_TYPE;
-  if (dump_read_all (dump_fd,
-                     header,
-                     sizeof (*header)) < sizeof (*header))
+  if (emacs_read_all_nolisp (dump_fd,
+                             header,
+                             sizeof (*header)) < sizeof (*header))
     goto out;
 
   if (memcmp (header->magic, dump_magic, sizeof (dump_magic)) != 0)
@@ -5615,37 +5589,37 @@ pdumper_load (const char *dump_filename, char *argv0)
   err = PDUMPER_LOAD_OOM;
 
   adj_discardable_start = header->discardable_start;
-  dump_page_size = dump_get_max_page_size ();
+  dump_page_size = EMACS_ALLOCATION_GRANULARITY;
   /* Snap to next page boundary.  */
   adj_discardable_start = ROUNDUP (adj_discardable_start, dump_page_size);
   eassert (adj_discardable_start % dump_page_size == 0);
   eassert (adj_discardable_start <= header->cold_start);
 
-  sections[DS_HOT].spec = (struct dump_memory_map_spec)
+  sections[DS_HOT].spec = (struct emacs_memory_map_spec)
     {
      .fd = dump_fd,
      .size = adj_discardable_start,
      .offset = 0,
-     .protection = DUMP_MEMORY_ACCESS_READWRITE,
+     .protection = EMACS_MEMORY_ACCESS_READWRITE,
     };
 
-  sections[DS_DISCARDABLE].spec = (struct dump_memory_map_spec)
+  sections[DS_DISCARDABLE].spec = (struct emacs_memory_map_spec)
     {
      .fd = dump_fd,
      .size = header->cold_start - adj_discardable_start,
      .offset = adj_discardable_start,
-     .protection = DUMP_MEMORY_ACCESS_READWRITE,
+     .protection = EMACS_MEMORY_ACCESS_READWRITE,
     };
 
-  sections[DS_COLD].spec = (struct dump_memory_map_spec)
+  sections[DS_COLD].spec = (struct emacs_memory_map_spec)
     {
      .fd = dump_fd,
      .size = dump_size - header->cold_start,
      .offset = header->cold_start,
-     .protection = DUMP_MEMORY_ACCESS_READWRITE,
+     .protection = EMACS_MEMORY_ACCESS_READWRITE,
     };
 
-  if (!dump_mmap_contiguous (sections, ARRAYELTS (sections)))
+  if (!emacs_mmap_contiguous (sections, ARRAYELTS (sections), GCALIGNMENT))
     goto out;
 
   err = PDUMPER_LOAD_ERROR;
@@ -5667,9 +5641,9 @@ pdumper_load (const char *dump_filename, char *argv0)
   dump_do_all_dump_reloc_for_phase (header, dump_base, EARLY_RELOCS);
   dump_do_all_emacs_relocations (header, dump_base);
 
-  dump_mmap_discard_contents (&sections[DS_DISCARDABLE]);
+  emacs_mmap_discard_contents (&sections[DS_DISCARDABLE]);
   for (int i = 0; i < ARRAYELTS (sections); ++i)
-    dump_mmap_reset (&sections[i]);
+    emacs_mmap_release (&sections[i]);
 
   Lisp_Object hashes = zero_vector;
   if (header->hash_list)
@@ -5708,7 +5682,7 @@ pdumper_load (const char *dump_filename, char *argv0)
 
  out:
   for (int i = 0; i < ARRAYELTS (sections); ++i)
-    dump_mmap_release (&sections[i]);
+    emacs_mmap_unmap (&sections[i]);
   if (dump_fd >= 0)
     emacs_close (dump_fd);
 

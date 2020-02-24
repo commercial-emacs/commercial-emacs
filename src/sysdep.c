@@ -162,7 +162,7 @@ maybe_disable_address_randomization (int argc, char **argv)
       /* If dumping via unexec, ASLR must be disabled, as otherwise
 	 data may be scattered and undumpable as a simple executable.
 	 If pdumping, disabling ASLR lessens differences in the .pdmp file.  */
-      bool disable_aslr = will_dump_p ();
+      bool disable_aslr = will_dump_with_unexec_p ();
 # ifdef __PPC64__
       disable_aslr = true;
 # endif
@@ -1869,9 +1869,10 @@ stack_overflow (siginfo_t *siginfo)
 static void
 handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
 {
-  /* Hard GC error may lead to stack overflow caused by
-     too nested calls to mark_object.  No way to survive.  */
-  bool fatal = gc_in_progress;
+  if (gc_try_handle_sigsegv (siginfo->si_addr))
+    return;
+
+  bool fatal = gc_is_in_progress ();
 
 #ifdef FORWARD_SIGNAL_TO_MAIN_THREAD
   if (!fatal && !pthread_equal (pthread_self (), main_thread_id))
@@ -1882,7 +1883,7 @@ handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
     siglongjmp (return_to_command_loop, 1);
 
   /* Otherwise we can't do anything with this.  */
-  deliver_fatal_thread_signal (sig);
+  deliver_fatal_thread_signal (SIGABRT);
 }
 
 /* Return true if we have successfully set up SIGSEGV handler on alternate
@@ -4472,6 +4473,36 @@ str_collate (Lisp_Object s1, Lisp_Object s2,
   return res;
 }
 #endif	/* WINDOWSNT */
+
+/* Read all bytes from the given file descriptor into the given
+   buffer.  Short reads happen only on EOF.  Return the number of
+   bytes read.  On error, return -1 with errno set.  Can be used
+   before the lisp world is initialized.  */
+ssize_t
+emacs_read_all_nolisp (const int fd,
+                       void *const buf,
+                       const size_t bytes_to_read)
+{
+  /* We don't want to use emacs_read, since that relies on the lisp
+     world, and we're not in the lisp world yet.  */
+  eassert (bytes_to_read <= SSIZE_MAX);
+  size_t bytes_read = 0;
+  while (bytes_read < bytes_to_read)
+    {
+      /* Some platforms accept only int-sized values to read.  */
+      unsigned chunk_to_read = INT_MAX;
+      if (bytes_to_read - bytes_read < chunk_to_read)
+	chunk_to_read = (unsigned) (bytes_to_read - bytes_read);
+      const ssize_t chunk = read (fd, (char *) buf + bytes_read,
+                                  chunk_to_read);
+      if (chunk < 0)
+        return chunk;
+      if (chunk == 0)
+        break;
+      bytes_read += chunk;
+    }
+  return bytes_read;
+}
 
 void
 syms_of_sysdep (void)

@@ -134,7 +134,7 @@ menubar_id_to_frame (LWLIB_ID id)
       f = XFRAME (frame);
       if (!FRAME_WINDOW_P (f))
 	continue;
-      if (f->output_data.x->id == id)
+      if (FRAME_X_OUTPUT(f)->id == id)
 	return f;
     }
   return 0;
@@ -612,12 +612,12 @@ x_activate_menubar (struct frame *f)
 {
   eassert (FRAME_X_P (f));
 
-  if (!f->output_data.x->saved_menu_event->type)
+  if (!FRAME_X_OUTPUT(f)->saved_menu_event->type)
     return;
 
 #ifdef USE_GTK
   if (! xg_win_to_widget (FRAME_X_DISPLAY (f),
-                          f->output_data.x->saved_menu_event->xany.window))
+                          FRAME_X_OUTPUT(f)->saved_menu_event->xany.window))
     return;
 #endif
 
@@ -625,8 +625,8 @@ x_activate_menubar (struct frame *f)
   block_input ();
   popup_activated_flag = 1;
 #ifdef USE_GTK
-  XPutBackEvent (f->output_data.x->display_info->display,
-                 f->output_data.x->saved_menu_event);
+  XPutBackEvent (FRAME_X_OUTPUT(f)->display_info->display,
+                 FRAME_X_OUTPUT(f)->saved_menu_event);
 #else
 #if defined USE_X_TOOLKIT && defined HAVE_XINPUT2
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
@@ -651,7 +651,7 @@ x_activate_menubar (struct frame *f)
   unblock_input ();
 
   /* Ignore this if we get it a second time.  */
-  f->output_data.x->saved_menu_event->type = 0;
+  FRAME_X_OUTPUT(f)->saved_menu_event->type = 0;
 }
 
 /* This callback is invoked when the user selects a menubar cascade
@@ -820,7 +820,7 @@ update_frame_menubar (struct frame *f)
 
   eassert (FRAME_X_P (f));
 
-  x = f->output_data.x;
+  x = FRAME_X_OUTPUT(f);
 
   if (!x->menubar_widget || XtIsManaged (x->menubar_widget))
     return;
@@ -901,24 +901,24 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
   eassert (FRAME_X_P (f));
 
-  menubar_widget = old_widget = f->output_data.x->menubar_widget;
+  menubar_widget = old_widget = FRAME_X_OUTPUT(f)->menubar_widget;
 
   XSETFRAME (Vmenu_updating_frame, f);
 
 #ifdef USE_X_TOOLKIT
-  if (f->output_data.x->id == 0)
-    f->output_data.x->id = next_menubar_widget_id++;
-  id = f->output_data.x->id;
+  if (FRAME_X_OUTPUT(f)->id == 0)
+    FRAME_X_OUTPUT(f)->id = next_menubar_widget_id++;
+  id = FRAME_X_OUTPUT(f)->id;
 #endif
 
   if (! menubar_widget)
     deep_p = true;
   /* Make the first call for any given frame always go deep.  */
-  else if (!f->output_data.x->saved_menu_event && !deep_p)
+  else if (!FRAME_X_OUTPUT(f)->saved_menu_event && !deep_p)
     {
       deep_p = true;
-      f->output_data.x->saved_menu_event = xmalloc (sizeof (XEvent));
-      f->output_data.x->saved_menu_event->type = 0;
+      FRAME_X_OUTPUT(f)->saved_menu_event = xmalloc (sizeof (XEvent));
+      FRAME_X_OUTPUT(f)->saved_menu_event->type = 0;
     }
 
   if (deep_p)
@@ -1135,7 +1135,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
                             G_CALLBACK (popup_deactivate_callback),
                             G_CALLBACK (menu_highlight_callback));
 
-      f->output_data.x->menubar_widget = menubar_widget;
+      FRAME_X_OUTPUT(f)->menubar_widget = menubar_widget;
     }
 
 
@@ -1143,14 +1143,14 @@ set_frame_menubar (struct frame *f, bool deep_p)
   if (menubar_widget)
     {
       /* Disable resizing (done for Motif!) */
-      lw_allow_resizing (f->output_data.x->widget, False);
+      lw_allow_resizing (FRAME_X_OUTPUT(f)->widget, False);
 
       /* The third arg is DEEP_P, which says to consider the entire
 	 menu trees we supply, rather than just the menu bar item names.  */
       lw_modify_all_widgets (id, first_wv, deep_p);
 
       /* Re-enable the edit widget to resize.  */
-      lw_allow_resizing (f->output_data.x->widget, True);
+      lw_allow_resizing (FRAME_X_OUTPUT(f)->widget, True);
     }
   else
     {
@@ -1158,17 +1158,17 @@ set_frame_menubar (struct frame *f, bool deep_p)
       XtTranslations  override = XtParseTranslationTable (menuOverride);
 
 #ifdef USE_LUCID
-      apply_systemfont_to_menu (f, f->output_data.x->column_widget);
+      apply_systemfont_to_menu (f, FRAME_X_OUTPUT(f)->column_widget);
 #endif
       menubar_widget = lw_create_widget ("menubar", "menubar", id,
                                          first_wv,
-					 f->output_data.x->column_widget,
+					 FRAME_X_OUTPUT(f)->column_widget,
 					 false,
 					 popup_activate_callback,
 					 menubar_selection_callback,
 					 popup_deactivate_callback,
 					 menu_highlight_callback);
-      f->output_data.x->menubar_widget = menubar_widget;
+      FRAME_X_OUTPUT(f)->menubar_widget = menubar_widget;
 
       /* Make menu pop down on C-g.  */
       XtOverrideTranslations (menubar_widget, override);
@@ -1176,19 +1176,19 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
   {
     int menubar_size;
-    if (f->output_data.x->menubar_widget)
-      XtRealizeWidget (f->output_data.x->menubar_widget);
+    if (FRAME_X_OUTPUT(f)->menubar_widget)
+      XtRealizeWidget (FRAME_X_OUTPUT(f)->menubar_widget);
 
     menubar_size
-      = (f->output_data.x->menubar_widget
-	 ? (f->output_data.x->menubar_widget->core.height
+      = (FRAME_X_OUTPUT(f)->menubar_widget
+	 ? (FRAME_X_OUTPUT(f)->menubar_widget->core.height
 #ifndef USE_LUCID
 	    /* Damn me...  With Lucid I get a core.border_width of 1
 	       only the first time this is called and an ibw of 1 every
 	       time this is called.  So the first time this is called I
 	       was off by one.  Fix that here by never adding
 	       core.border_width for Lucid.  */
-	    + f->output_data.x->menubar_widget->core.border_width
+	    + FRAME_X_OUTPUT(f)->menubar_widget->core.border_width
 #endif /* USE_LUCID */
 	    )
 	 : 0);
@@ -1202,7 +1202,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
       {
         Dimension ibw = 0;
 
-        XtVaGetValues (f->output_data.x->column_widget,
+        XtVaGetValues (FRAME_X_OUTPUT(f)->column_widget,
 		       XtNinternalBorderWidth, &ibw, NULL);
 	menubar_size += ibw;
       }
@@ -1256,7 +1256,7 @@ free_frame_menubar (struct frame *f)
 
   eassert (FRAME_X_P (f));
 
-  menubar_widget = f->output_data.x->menubar_widget;
+  menubar_widget = FRAME_X_OUTPUT(f)->menubar_widget;
 
   FRAME_MENUBAR_HEIGHT (f) = 0;
 
@@ -1277,12 +1277,12 @@ free_frame_menubar (struct frame *f)
       block_input ();
 
 #ifdef USE_MOTIF
-      if (f->output_data.x->widget)
-	XtVaGetValues (f->output_data.x->widget, XtNx, &x0, XtNy, &y0, NULL);
+      if (FRAME_X_OUTPUT(f)->widget)
+	XtVaGetValues (FRAME_X_OUTPUT(f)->widget, XtNx, &x0, XtNy, &y0, NULL);
 #endif
 
-      lw_destroy_all_widgets ((LWLIB_ID) f->output_data.x->id);
-      f->output_data.x->menubar_widget = NULL;
+      lw_destroy_all_widgets ((LWLIB_ID) FRAME_X_OUTPUT(f)->id);
+      FRAME_X_OUTPUT(f)->menubar_widget = NULL;
 
       /* When double-buffering is enabled and the frame shall not be
 	 resized either because resizing is inhibited or the frame is
@@ -1290,10 +1290,10 @@ free_frame_menubar (struct frame *f)
 	 doubled mode line may show up.  Sometimes the configuration
 	 gets messed up in a more serious fashion though and you may
 	 have to resize the frame to get it back in a normal state.  */
-      if (f->output_data.x->widget)
+      if (FRAME_X_OUTPUT(f)->widget)
 	{
 #ifdef USE_MOTIF
-	  XtVaGetValues (f->output_data.x->widget, XtNx, &x1, XtNy, &y1, NULL);
+	  XtVaGetValues (FRAME_X_OUTPUT(f)->widget, XtNx, &x1, XtNy, &y1, NULL);
 	  if (x1 == 0 && y1 == 0)
 	    XtVaSetValues (f->output_data.x->widget, XtNx, x0, XtNy, y0, NULL);
 	  /* When resizing is inhibited and a normal Motif frame is not
@@ -1638,12 +1638,12 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
   eassert (FRAME_X_P (f));
 
 #ifdef USE_LUCID
-  apply_systemfont_to_menu (f, f->output_data.x->widget);
+  apply_systemfont_to_menu (f, FRAME_X_OUTPUT(f)->widget);
 #endif
 
   menu_id = widget_id_tick++;
   menu = lw_create_widget ("popup", first_wv->name, menu_id, first_wv,
-                           f->output_data.x->widget, true, 0,
+                           FRAME_X_OUTPUT(f)->widget, true, 0,
                            popup_selection_callback,
                            popup_deactivate_callback,
                            menu_highlight_callback);
@@ -2141,10 +2141,10 @@ create_and_show_dialog (struct frame *f, widget_value *first_wv)
 
   dialog_id = widget_id_tick++;
 #ifdef USE_LUCID
-  apply_systemfont_to_dialog (f->output_data.x->widget);
+  apply_systemfont_to_dialog (FRAME_X_OUTPUT(f)->widget);
 #endif
   lw_create_widget (first_wv->name, "dialog", dialog_id, first_wv,
-                    f->output_data.x->widget, true, 0,
+                    FRAME_X_OUTPUT(f)->widget, true, 0,
                     dialog_selection_callback, 0, 0);
   lw_modify_all_widgets (dialog_id, first_wv->contents, True);
   /* Display the dialog box.  */
@@ -2369,12 +2369,6 @@ xw_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
 }
 
 #else /* not USE_X_TOOLKIT && not USE_GTK */
-
-/* The frame of the last activated non-toolkit menu bar.
-   Used to generate menu help events.  */
-
-static struct frame *menu_help_frame;
-
 
 /* Show help HELP_STRING, or clear help if HELP_STRING is null.
 

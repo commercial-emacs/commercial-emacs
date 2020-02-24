@@ -587,20 +587,11 @@ do
 	yes)		ac_enable_checking=1 ;;
 	no)		ac_enable_checking= ;
 			CHECK_STRUCTS=false
-			ac_gc_check_stringbytes= ;
-	                ac_gc_check_string_overrun= ;
-	                ac_gc_check_string_free_list= ;
 			ac_glyphs_debug= ;;
 	all)		ac_enable_checking=1 ;
 			CHECK_STRUCTS=true
-			ac_gc_check_stringbytes=1 ;
-	                ac_gc_check_string_overrun=1 ;
-	                ac_gc_check_string_free_list=1 ;
 			ac_glyphs_debug=1 ;;
 	# these enable particular checks
-	stringbytes)	ac_gc_check_stringbytes=1 ;;
-	stringoverrun)	ac_gc_check_string_overrun=1 ;;
-	stringfreelist) ac_gc_check_string_free_list=1 ;;
 	structs)	CHECK_STRUCTS=true ;;
 	glyphs)		ac_glyphs_debug=1 ;;
 	*)	AC_MSG_ERROR(unknown check category $check) ;;
@@ -621,20 +612,6 @@ if $CHECK_STRUCTS; then
      by manually copying the hash from the newly-generated dmpstruct.h.])
 fi
 AC_SUBST([CHECK_STRUCTS])
-if test x$ac_gc_check_stringbytes != x ; then
-  AC_DEFINE(GC_CHECK_STRING_BYTES, 1,
-[Define this temporarily to hunt a bug.  If defined, the size of
-   strings is redundantly recorded in sdata structures so that it can
-   be compared to the sizes recorded in Lisp strings.])
-fi
-if test x$ac_gc_check_string_overrun != x ; then
-  AC_DEFINE(GC_CHECK_STRING_OVERRUN, 1,
-[Define this to check for short string overrun.])
-fi
-if test x$ac_gc_check_string_free_list != x ; then
-  AC_DEFINE(GC_CHECK_STRING_FREE_LIST, 1,
-[Define this to check the string free list.])
-fi
 if test x$ac_glyphs_debug != x ; then
   AC_DEFINE(GLYPH_DEBUG, 1,
 [Define this to enable glyphs debugging code.])
@@ -1167,7 +1144,7 @@ if test "${enableval}" != "no"; then
    if test "$emacs_cv_clang" = yes; then
       AC_MSG_CHECKING([whether link-time optimization is supported by clang])
       GOLD_PLUGIN=`$CC -print-file-name=LLVMgold.so 2>/dev/null`
-      if test -x "$GOLD_PLUGIN"; then
+      if test -r "$GOLD_PLUGIN"; then
 	 LTO="-flto"
       fi
    elif test x$GCC = xyes; then

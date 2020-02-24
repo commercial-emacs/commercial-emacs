@@ -108,6 +108,7 @@ sys_thread_yield (void)
 void
 sys_mutex_init (sys_mutex_t *mutex)
 {
+  eassume (!mutex->initialized);
   pthread_mutexattr_t *attr_ptr;
 #ifdef ENABLE_CHECKING
   pthread_mutexattr_t attr;
@@ -121,8 +122,9 @@ sys_mutex_init (sys_mutex_t *mutex)
 #else
   attr_ptr = NULL;
 #endif
-  int error = pthread_mutex_init (mutex, attr_ptr);
+  int error = pthread_mutex_init (&mutex->mutex, attr_ptr);
   /* We could get ENOMEM.  Can't do anything except aborting.  */
+  /* TODO: uh, we could memory_full().  */
   if (error != 0)
     {
       fprintf (stderr, "\npthread_mutex_init failed: %s\n", strerror (error));
@@ -132,52 +134,56 @@ sys_mutex_init (sys_mutex_t *mutex)
   error = pthread_mutexattr_destroy (&attr);
   eassert (error == 0);
 #endif
+  mutex->initialized = true;
 }
 
 void
 sys_mutex_lock (sys_mutex_t *mutex)
 {
-  int error = pthread_mutex_lock (mutex);
+  int error = pthread_mutex_lock (&mutex->mutex);
   eassert (error == 0);
 }
 
 void
 sys_mutex_unlock (sys_mutex_t *mutex)
 {
-  int error = pthread_mutex_unlock (mutex);
+  int error = pthread_mutex_unlock (&mutex->mutex);
   eassert (error == 0);
 }
 
 void
 sys_cond_init (sys_cond_t *cond)
 {
-  int error = pthread_cond_init (cond, NULL);
+  eassume (!cond->initialized);
+  int error = pthread_cond_init (&cond->cond, NULL);
   /* We could get ENOMEM.  Can't do anything except aborting.  */
+  /* TODO: uh, we could memory_full().  */
   if (error != 0)
     {
       fprintf (stderr, "\npthread_cond_init failed: %s\n", strerror (error));
       emacs_abort ();
     }
+  cond->initialized = true;
 }
 
 void
 sys_cond_wait (sys_cond_t *cond, sys_mutex_t *mutex)
 {
-  int error = pthread_cond_wait (cond, mutex);
+  int error = pthread_cond_wait (&cond->cond, &mutex->mutex);
   eassert (error == 0);
 }
 
 void
 sys_cond_signal (sys_cond_t *cond)
 {
-  int error = pthread_cond_signal (cond);
+  int error = pthread_cond_signal (&cond->cond);
   eassert (error == 0);
 }
 
 void
 sys_cond_broadcast (sys_cond_t *cond)
 {
-  int error = pthread_cond_broadcast (cond);
+  int error = pthread_cond_broadcast (&cond->cond);
   eassert (error == 0);
 #ifdef HAVE_NS
   /* Send an app defined event to break out of the NS run loop.
@@ -191,7 +197,9 @@ sys_cond_broadcast (sys_cond_t *cond)
 void
 sys_cond_destroy (sys_cond_t *cond)
 {
-  int error = pthread_cond_destroy (cond);
+  if (!cond->initialized)
+    return;
+  int error = pthread_cond_destroy (&cond->cond);
   eassert (error == 0);
 }
 
@@ -304,8 +312,8 @@ sys_mutex_unlock (sys_mutex_t *mutex)
 void
 sys_cond_init (sys_cond_t *cond)
 {
-  cond->initialized = false;
-  cond->wait_count = 0;
+  eassume (!cond->initialized);
+  eassume (cond->wait_count == 0);
   /* Auto-reset event for signal.  */
   cond->events[CONDV_SIGNAL] = CreateEvent (NULL, FALSE, FALSE, NULL);
   /* Manual-reset event for broadcast.  */
@@ -388,13 +396,13 @@ sys_cond_broadcast (sys_cond_t *cond)
 void
 sys_cond_destroy (sys_cond_t *cond)
 {
+  if (!cond->initialized)
+    return;
+
   if (cond->events[CONDV_SIGNAL])
     CloseHandle (cond->events[CONDV_SIGNAL]);
   if (cond->events[CONDV_BROADCAST])
     CloseHandle (cond->events[CONDV_BROADCAST]);
-
-  if (!cond->initialized)
-    return;
 
   /* FIXME: What if wait_count is non-zero, i.e. there are still
      threads waiting on this condition variable?  */

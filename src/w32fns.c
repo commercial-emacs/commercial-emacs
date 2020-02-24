@@ -5875,6 +5875,7 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
 
   f->output_method = output_w32;
   f->output_data.w32 = xzalloc (sizeof (struct w32_output));
+  f->output_data.w32->f = f;
   FRAME_FONTSET (f) = -1;
 
   /* Need to finish setting up of user-defined fringe bitmaps that
@@ -6985,6 +6986,7 @@ w32_create_tip_frame (struct w32_display_info *dpyinfo, Lisp_Object parms)
   f->terminal = dpyinfo->terminal;
   f->output_method = output_w32;
   f->output_data.w32 = xzalloc (sizeof (struct w32_output));
+  f->output_data.w32->frame = f;
 
   FRAME_FONTSET (f)  = -1;
   fset_icon_name (f, Qnil);
@@ -10922,7 +10924,7 @@ stack_overflow_handler (void)
 {
   /* Hard GC error may lead to stack overflow caused by
      too nested calls to mark_object.  No way to survive.  */
-  if (gc_in_progress)
+  if (gc_is_in_progress ())
     terminate_due_to_signal (SIGSEGV, 40);
 #ifdef _WIN64
   /* See ms-w32.h: MinGW64's longjmp crashes if invoked in this context.  */

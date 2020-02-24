@@ -42,6 +42,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "tparam.h"
 #include "xwidget.h"
 #include "pdumper.h"
+#include "alloc.h"
 
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
@@ -6423,6 +6424,12 @@ WINDOW nil or omitted means report on the selected window.  */)
 /***********************************************************************
 			    Initialization
  ***********************************************************************/
+
+void
+scan_dispnew_roots (const gc_phase phase)
+{
+  xscan_reference_pointer_to_vectorlike (&frame_matrix_frame, phase);
+}
 
 static void syms_of_display_for_pdumper (void);
 

@@ -1242,7 +1242,7 @@ define_charset_internal (Lisp_Object name,
 
   args[charset_arg_name] = name;
   args[charset_arg_dimension] = make_fixnum (dimension);
-  val = make_uninit_vector (8);
+  val = make_nil_vector (8);
   for (i = 0; i < 8; i++)
     ASET (val, i, make_fixnum (code_space[i]));
   args[charset_arg_code_space] = val;

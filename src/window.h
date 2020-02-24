@@ -469,7 +469,7 @@ CHECK_WINDOW (Lisp_Object x)
 INLINE struct window *
 XWINDOW (Lisp_Object a)
 {
-  eassert (WINDOWP (a));
+  eassume (WINDOWP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct window);
 }
 
@@ -1203,7 +1203,7 @@ extern void syms_of_window (void);
 INLINE void
 output_cursor_to (struct window *w, int vpos, int hpos, int y, int x)
 {
-  eassert (w);
+  eassume (w);
   w->output_cursor.hpos = hpos;
   w->output_cursor.vpos = vpos;
   w->output_cursor.x = x;

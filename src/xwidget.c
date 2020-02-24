@@ -2720,6 +2720,54 @@ xwidget_init_view (struct xwidget *xww,
 #ifdef HAVE_X_WINDOWS
   xv->dpy = FRAME_X_DISPLAY (s->f);
 
+      /* Draw the view on damage-event.  */
+      g_signal_connect (G_OBJECT (xww->widgetwindow_osr), "damage-event",
+                        G_CALLBACK (offscreen_damage_event), xv->widget);
+
+      if (EQ (xww->type, Qwebkit))
+        {
+          g_signal_connect (G_OBJECT (xv->widget), "button-press-event",
+                            G_CALLBACK (xwidget_osr_event_forward), NULL);
+          g_signal_connect (G_OBJECT (xv->widget), "button-release-event",
+                            G_CALLBACK (xwidget_osr_event_forward), NULL);
+          g_signal_connect (G_OBJECT (xv->widget), "motion-notify-event",
+                            G_CALLBACK (xwidget_osr_event_forward), NULL);
+        }
+      else
+        {
+          /* xwgir debug, orthogonal to forwarding.  */
+          g_signal_connect (G_OBJECT (xv->widget), "enter-notify-event",
+                            G_CALLBACK (xwidget_osr_event_set_embedder), xv);
+        }
+      g_signal_connect (G_OBJECT (xv->widget), "draw",
+                        G_CALLBACK (xwidget_osr_draw_cb), NULL);
+    }
+
+  /* Widget realization.
+
+     Make container widget first, and put the actual widget inside the
+     container later.  Drawing should crop container window if necessary
+     to handle case where xwidget is partially obscured by other Emacs
+     windows.  Other containers than gtk_fixed where explored, but
+     gtk_fixed had the most predictable behavior so far.  */
+
+  xv->emacswindow = FRAME_GTK_WIDGET (s->f);
+  xv->widgetwindow = gtk_fixed_new ();
+  gtk_widget_set_has_window (xv->widgetwindow, TRUE);
+  gtk_container_add (GTK_CONTAINER (xv->widgetwindow), xv->widget);
+
+  /* Store some xwidget data in the gtk widgets.  */
+  g_object_set_data (G_OBJECT (xv->widget), XG_FRAME_DATA,
+                     FRAME_X_OUTPUT (s->f));
+  g_object_set_data (G_OBJECT (xv->widget), XG_XWIDGET, xww);
+  g_object_set_data (G_OBJECT (xv->widget), XG_XWIDGET_VIEW, xv);
+  g_object_set_data (G_OBJECT (xv->widgetwindow), XG_XWIDGET, xww);
+  g_object_set_data (G_OBJECT (xv->widgetwindow), XG_XWIDGET_VIEW, xv);
+
+  gtk_widget_set_size_request (GTK_WIDGET (xv->widget), xww->width,
+                               xww->height);
+  gtk_widget_set_size_request (xv->widgetwindow, xww->width, xww->height);
+  gtk_fixed_put (GTK_FIXED (FRAME_GTK_WIDGET (s->f)), xv->widgetwindow, x, y);
   xv->x = x;
   xv->y = y;
 

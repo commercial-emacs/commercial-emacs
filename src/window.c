@@ -2662,8 +2662,8 @@ candidate_window_p (Lisp_Object window, Lisp_Object owindow,
 			`visible'.  I'd argue it should be at least
 			something like `iconified', but don't know how to do
 			that yet.  --Stef  */
-		     || (FRAME_X_P (f) && f->output_data.x->asked_for_visible
-			 && !f->output_data.x->has_been_visible)
+		     || (FRAME_X_P (f) && FRAME_X_OUTPUT (f)->asked_for_visible
+			 && !FRAME_X_OUTPUT (f)->has_been_visible)
 #endif
 		     )
 	&& (FRAME_TERMINAL (XFRAME (w->frame))
@@ -4252,8 +4252,8 @@ temp_output_buffer_show (register Lisp_Object buf)
 static struct window *
 allocate_window (void)
 {
-  return ALLOCATE_ZEROED_PSEUDOVECTOR (struct window, mode_line_help_echo,
-				       PVEC_WINDOW);
+  return ALLOCATE_PSEUDOVECTOR_AND_ZERO (
+    struct window, mode_line_help_echo, PVEC_WINDOW);
 }
 
 /* Make new window, have it replace WINDOW in window-tree, and make
@@ -7518,8 +7518,9 @@ saved by this function.  */)
   struct frame *f = decode_live_frame (frame);
   ptrdiff_t n_windows = count_windows (XWINDOW (FRAME_ROOT_WINDOW (f)));
   struct save_window_data *data
-    = ALLOCATE_PSEUDOVECTOR (struct save_window_data, saved_windows,
-			     PVEC_WINDOW_CONFIGURATION);
+    = ALLOCATE_PSEUDOVECTOR_AND_ZERO (
+      struct save_window_data, saved_windows,
+      PVEC_WINDOW_CONFIGURATION);
   data->frame_cols = FRAME_COLS (f);
   data->frame_lines = FRAME_LINES (f);
   data->frame_menu_bar_lines = FRAME_MENU_BAR_LINES (f);

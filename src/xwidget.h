@@ -157,7 +157,7 @@ struct xwidget_view
 
 /* Test for xwidget pseudovector.  */
 #define XWIDGETP(x) PSEUDOVECTORP (x, PVEC_XWIDGET)
-#define XXWIDGET(a) (eassert (XWIDGETP (a)), \
+#define XXWIDGET(a) (eassume (XWIDGETP (a)), \
 		     XUNTAG (a, Lisp_Vectorlike, struct xwidget))
 
 #define XWIDGET_LIVE_P(w) (!NILP ((w)->buffer))
@@ -172,7 +172,7 @@ struct xwidget_view
 
 /* Test for xwidget_view pseudovector.  */
 #define XWIDGET_VIEW_P(x) PSEUDOVECTORP (x, PVEC_XWIDGET_VIEW)
-#define XXWIDGET_VIEW(a) (eassert (XWIDGET_VIEW_P (a)), \
+#define XXWIDGET_VIEW(a) (eassume (XWIDGET_VIEW_P (a)), \
 			  XUNTAG (a, Lisp_Vectorlike, struct xwidget_view))
 
 #define CHECK_XWIDGET_VIEW(x) \
@@ -233,8 +233,8 @@ INLINE_HEADER_BEGIN
 INLINE void syms_of_xwidget (void) {}
 INLINE bool valid_xwidget_spec_p (Lisp_Object obj) { return false; }
 INLINE void xwidget_view_delete_all_in_window (struct window *w) {}
-INLINE void x_draw_xwidget_glyph_string (struct glyph_string *s) { eassume (0); }
-INLINE struct xwidget *lookup_xwidget (Lisp_Object obj) { eassume (0); }
+INLINE void x_draw_xwidget_glyph_string (struct glyph_string *s) { emacs_unreachable (); }
+INLINE struct xwidget *lookup_xwidget (Lisp_Object obj) { emacs_unreachable (); }
 INLINE void xwidget_end_redisplay (struct window *w, struct glyph_matrix *m) {}
 INLINE void kill_buffer_xwidgets (Lisp_Object buf) {}
 INLINE_HEADER_END

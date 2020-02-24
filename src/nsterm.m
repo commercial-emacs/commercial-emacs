@@ -79,6 +79,8 @@ static EmacsMenu *dockMenu;
 static EmacsMenu *mainMenu;
 #endif
 
+#include "alloc.h"
+
 /* ==========================================================================
 
    NSTRACE, Trace support.
@@ -9923,6 +9925,19 @@ ns_xlfd_to_fontname (const char *xlfd)
   return ret;
 }
 
+void
+scan_terminal_display_info_ns (struct ns_display_info *const info,
+                               const gc_phase phase)
+{
+  scan_reference_pointer_to_vectorlike (&info->terminal, phase);
+  /* info->name_list_element is weak and handled specially */
+  scan_reference_pointer_to_vectorlike (&info->rdb, phase);
+  scan_reference_pointer_to_vectorlike (&info->highlight_frame, phase);
+  scan_reference_pointer_to_vectorlike (&info->ns_focus_frame, phase);
+  scan_reference_pointer_to_vectorlike (&info->last_mouse_frame, phase);
+  scan_reference_pointer_to_vectorlike (&info->last_mouse_motion_frame, phase);
+  emacs_abort ();  /* XXX: figure out how to mark scroller.  */
+}
 
 void
 syms_of_nsterm (void)

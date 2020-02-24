@@ -237,11 +237,7 @@ handle_profiler_signal (int signal)
 {
   if (EQ (backtrace_top_function (), QAutomatic_GC))
     /* Special case the time-count inside GC because the hash-table
-       code is not prepared to be used while the GC is running.
-       More specifically it uses ASIZE at many places where it does
-       not expect the ARRAY_MARK_FLAG to be set.  We could try and
-       harden the hash-table code, but it doesn't seem worth the
-       effort.  */
+       code is not prepared to be used while the GC is running.  */
     cpu_gc_count = saturated_add (cpu_gc_count, 1);
   else
     {

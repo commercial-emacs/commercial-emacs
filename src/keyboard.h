@@ -255,8 +255,6 @@ extern ptrdiff_t point_before_last_command_or_undo;
    boundary.*/
 extern struct buffer *buffer_before_last_command_or_undo;
 
-extern struct buffer *prev_buffer;
-
 /* Nonzero means polling for input is temporarily suppressed.  */
 extern int poll_suppress_count;
 
@@ -488,7 +486,6 @@ extern void add_user_signal (int, const char *);
 
 extern int tty_read_avail_input (struct terminal *, struct input_event *);
 extern struct timespec timer_check (void);
-extern void mark_kboards (void);
 
 #if defined HAVE_NTGUI || defined HAVE_X_WINDOWS || defined HAVE_PGTK
 extern const char *const lispy_function_keys[];

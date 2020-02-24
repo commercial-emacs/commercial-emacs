@@ -1823,6 +1823,7 @@ boyer_moore (EMACS_INT n, unsigned char *base_pat,
       eassume (0x80 <= char_base && char_base <= MAX_CHAR);
       unsigned char str[MAX_MULTIBYTE_LENGTH];
       int cblen = CHAR_STRING (char_base, str);
+      eassume (cblen >= 2);
 
       translate_prev_byte1 = str[cblen - 2];
       if (cblen > 2)
@@ -3383,19 +3384,19 @@ syms_of_search (void)
   DEFSYM (Qinvalid_regexp, "invalid-regexp");
 
   Fput (Qsearch_failed, Qerror_conditions,
-	pure_list (Qsearch_failed, Qerror));
+	list (Qsearch_failed, Qerror));
   Fput (Qsearch_failed, Qerror_message,
-	build_pure_c_string ("Search failed"));
+	build_c_string ("Search failed"));
 
   Fput (Quser_search_failed, Qerror_conditions,
-	pure_list (Quser_search_failed, Quser_error, Qsearch_failed, Qerror));
+	list (Quser_search_failed, Quser_error, Qsearch_failed, Qerror));
   Fput (Quser_search_failed, Qerror_message,
-        build_pure_c_string ("Search failed"));
+        build_c_string ("Search failed"));
 
   Fput (Qinvalid_regexp, Qerror_conditions,
-	pure_list (Qinvalid_regexp, Qerror));
+	list (Qinvalid_regexp, Qerror));
   Fput (Qinvalid_regexp, Qerror_message,
-	build_pure_c_string ("Invalid regexp"));
+	build_c_string ("Invalid regexp"));
 
   re_match_object = Qnil;
   staticpro (&re_match_object);

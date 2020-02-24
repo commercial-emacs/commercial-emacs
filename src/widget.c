@@ -315,7 +315,7 @@ static void
 update_from_various_frame_slots (EmacsFrame ew)
 {
   struct frame *f = ew->emacs_frame.frame;
-  struct x_output *x = f->output_data.x;
+  struct x_output *x = FRAME_X_OUTPUT(f);
 
   ew->core.height = FRAME_PIXEL_HEIGHT (f) - x->menubar_height;
   ew->core.width = FRAME_PIXEL_WIDTH (f);

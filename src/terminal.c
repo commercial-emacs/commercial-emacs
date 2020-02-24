@@ -262,8 +262,8 @@ get_named_terminal (const char *name)
 static struct terminal *
 allocate_terminal (void)
 {
-  return ALLOCATE_ZEROED_PSEUDOVECTOR (struct terminal, glyph_code_table,
-				       PVEC_TERMINAL);
+  return ALLOCATE_PSEUDOVECTOR_AND_ZERO (
+    struct terminal, glyph_code_table, PVEC_TERMINAL);
 }
 
 /* Create a new terminal object of TYPE and add it to the terminal list.  RIF

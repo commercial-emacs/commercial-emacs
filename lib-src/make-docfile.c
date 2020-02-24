@@ -680,6 +680,7 @@ write_globals (void)
   bool seen_defun = false;
   ptrdiff_t symnum = 0;
   ptrdiff_t num_symbols = 0;
+  ptrdiff_t num_subrs = 0;
   qsort (globals, num_globals, sizeof (struct global), compare_globals);
 
   j = 0;
@@ -740,6 +741,8 @@ write_globals (void)
 		globals[i].name, symnum++, globals[i].name);
       else
 	{
+          num_subrs++;
+
 	  if (globals[i].flags & DEFUN_noreturn)
 	    fputs ("_Noreturn ", stdout);
 	  if (globals[i].flags & DEFUN_noinline)
@@ -781,6 +784,7 @@ write_globals (void)
     if (globals[i].type == SYMBOL && num_symbols++ != 0)
       printf ("# define %s builtin_lisp_symbol (%td)\n",
 	      globals[i].name, num_symbols - 1);
+  printf ("#define EMACS_NUM_SUBRS %td\n", num_subrs);
   puts ("#endif");
 }
 

@@ -160,10 +160,11 @@ static Lisp_Object
 font_make_spec (void)
 {
   Lisp_Object font_spec;
-  struct font_spec *spec
-    = ((struct font_spec *)
-       allocate_pseudovector (VECSIZE (struct font_spec),
-			      FONT_SPEC_MAX, FONT_SPEC_MAX, PVEC_FONT));
+  struct font_spec *spec =
+    ((struct font_spec *)
+     allocate_pseudovector_and_zero (
+       VECSIZE (struct font_spec),
+       FONT_SPEC_MAX, PVEC_FONT));
   XSETFONT (font_spec, spec);
   return font_spec;
 }
@@ -174,8 +175,9 @@ font_make_entity (void)
   Lisp_Object font_entity;
   struct font_entity *entity
     = ((struct font_entity *)
-       allocate_pseudovector (VECSIZE (struct font_entity),
-			      FONT_ENTITY_MAX, FONT_ENTITY_MAX, PVEC_FONT));
+       allocate_pseudovector_and_zero (
+         VECSIZE (struct font_entity),
+         FONT_ENTITY_MAX, PVEC_FONT));
   XSETFONT (font_entity, entity);
   return font_entity;
 }
@@ -188,8 +190,8 @@ font_make_object (int size, Lisp_Object entity, int pixelsize)
 {
   Lisp_Object font_object;
   struct font *font
-    = (struct font *) allocate_pseudovector (size, FONT_OBJECT_MAX,
-					     FONT_OBJECT_MAX, PVEC_FONT);
+    = (struct font *) allocate_pseudovector_and_zero (
+      size, FONT_OBJECT_MAX, PVEC_FONT);
   int i;
 
   /* Poison the max_width, so we can detect when it hasn't been set.  */
@@ -4182,7 +4184,7 @@ copy_font_spec (Lisp_Object font)
   CHECK_FONT (font);
 
   /* Make an uninitialized font-spec object.  */
-  spec = (struct font_spec *) allocate_vector (font_spec_size);
+  spec = (struct font_spec *) XVECTOR (make_nil_vector (font_spec_size));
   XSETPVECTYPESIZE (spec, PVEC_FONT, FONT_SPEC_MAX,
 		    font_spec_size - FONT_SPEC_MAX);
 
@@ -5668,7 +5670,7 @@ gets the repertory information by an opened font and ENCODING.  */);
      table used by the font display code.  So we make them read-only,
      to avoid this confusing situation.  */
 
-  DEFVAR_LISP_NOPRO ("font-weight-table", Vfont_weight_table,
+  DEFVAR_LISP ("font-weight-table", Vfont_weight_table,
 	       doc: /*  Vector of valid font weight values.
 Each element has the form:
     [NUMERIC-VALUE SYMBOLIC-NAME ALIAS-NAME ...]
@@ -5677,14 +5679,14 @@ This variable cannot be set; trying to do so will signal an error.  */);
   Vfont_weight_table = BUILD_STYLE_TABLE (weight_table);
   make_symbol_constant (intern_c_string ("font-weight-table"));
 
-  DEFVAR_LISP_NOPRO ("font-slant-table", Vfont_slant_table,
+  DEFVAR_LISP ("font-slant-table", Vfont_slant_table,
 	       doc: /*  Vector of font slant symbols vs the corresponding numeric values.
 See `font-weight-table' for the format of the vector.
 This variable cannot be set; trying to do so will signal an error.  */);
   Vfont_slant_table = BUILD_STYLE_TABLE (slant_table);
   make_symbol_constant (intern_c_string ("font-slant-table"));
 
-  DEFVAR_LISP_NOPRO ("font-width-table", Vfont_width_table,
+  DEFVAR_LISP ("font-width-table", Vfont_width_table,
 	       doc: /*  Alist of font width symbols vs the corresponding numeric values.
 See `font-weight-table' for the format of the vector.
 This variable cannot be set; trying to do so will signal an error.  */);

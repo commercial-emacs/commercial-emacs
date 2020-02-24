@@ -876,7 +876,7 @@ TERMINALP (Lisp_Object a)
 INLINE struct terminal *
 XTERMINAL (Lisp_Object a)
 {
-  eassert (TERMINALP (a));
+  eassume (TERMINALP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct terminal);
 }
 
@@ -921,20 +921,20 @@ extern struct terminal *terminal_list;
 /* Return font cache data for the specified terminal.  The historical
    name is grossly misleading, actually it is (NAME . FONT-LIST-CACHE).  */
 #if defined (HAVE_X_WINDOWS)
-#define TERMINAL_FONT_CACHE(t)						\
-  (t->type == output_x_window ? t->display_info.x->name_list_element : Qnil)
+#define TERMINAL_FONT_CACHEP(t)						\
+  (t->type == output_x_window ? &t->display_info.x->name_list_element : NULL)
 #elif defined (HAVE_NTGUI)
-#define TERMINAL_FONT_CACHE(t)						\
-  (t->type == output_w32 ? t->display_info.w32->name_list_element : Qnil)
+#define TERMINAL_FONT_CACHEP(t)						\
+  (t->type == output_w32 ? &t->display_info.w32->name_list_element : NULL)
 #elif defined (HAVE_NS)
 #define TERMINAL_FONT_CACHE(t)						\
-  (t->type == output_ns ? t->display_info.ns->name_list_element : Qnil)
+  (t->type == output_ns ? &t->display_info.ns->name_list_element : NULL)
 #elif defined (HAVE_PGTK)
 #define TERMINAL_FONT_CACHE(t)						\
-  (t->type == output_pgtk ? t->display_info.pgtk->name_list_element : Qnil)
+  (t->type == output_pgtk ? &t->display_info.pgtk->name_list_element : NULL)
 #elif defined (HAVE_HAIKU)
 #define TERMINAL_FONT_CACHE(t)						\
-  (t->type == output_haiku ? t->display_info.haiku->name_list_element : Qnil)
+  (t->type == output_haiku ? &t->display_info.haiku->name_list_element : NULL)
 #endif
 
 extern struct terminal *decode_live_terminal (Lisp_Object);

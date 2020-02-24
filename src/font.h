@@ -432,13 +432,6 @@ FONT_SPEC_P (Lisp_Object x)
   return FONTP (x) && PVSIZE (x) == FONT_SPEC_MAX;
 }
 
-/* Like FONT_SPEC_P, but can be used in the garbage collector.  */
-INLINE bool
-GC_FONT_SPEC_P (Lisp_Object x)
-{
-  return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_SPEC_MAX;
-}
-
 /* True iff X is font-entity.  */
 INLINE bool
 FONT_ENTITY_P (Lisp_Object x)
@@ -446,25 +439,11 @@ FONT_ENTITY_P (Lisp_Object x)
   return FONTP (x) && PVSIZE (x) == FONT_ENTITY_MAX;
 }
 
-/* Like FONT_ENTITY_P, but can be used in the garbage collector.  */
-INLINE bool
-GC_FONT_ENTITY_P (Lisp_Object x)
-{
-  return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_ENTITY_MAX;
-}
-
 /* True iff X is font-object.  */
 INLINE bool
 FONT_OBJECT_P (Lisp_Object x)
 {
   return FONTP (x) && PVSIZE (x) == FONT_OBJECT_MAX;
-}
-
-/* Like FONT_OBJECT_P, but can be used in the garbage collector.  */
-INLINE bool
-GC_FONT_OBJECT_P (Lisp_Object x)
-{
-  return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_OBJECT_MAX;
 }
 
 /* Type checking functions for various font-related objects.  */
@@ -498,42 +477,21 @@ CHECK_FONT_OBJECT (Lisp_Object x)
 INLINE struct font_spec *
 XFONT_SPEC (Lisp_Object p)
 {
-  eassert (FONT_SPEC_P (p));
-  return XUNTAG (p, Lisp_Vectorlike, struct font_spec);
-}
-
-INLINE struct font_spec *
-GC_XFONT_SPEC (Lisp_Object p)
-{
-  eassert (GC_FONT_SPEC_P (p));
+  eassume (FONT_SPEC_P (p));
   return XUNTAG (p, Lisp_Vectorlike, struct font_spec);
 }
 
 INLINE struct font_entity *
 XFONT_ENTITY (Lisp_Object p)
 {
-  eassert (FONT_ENTITY_P (p));
-  return XUNTAG (p, Lisp_Vectorlike, struct font_entity);
-}
-
-INLINE struct font_entity *
-GC_XFONT_ENTITY (Lisp_Object p)
-{
-  eassert (GC_FONT_ENTITY_P (p));
+  eassume (FONT_ENTITY_P (p));
   return XUNTAG (p, Lisp_Vectorlike, struct font_entity);
 }
 
 INLINE struct font *
 XFONT_OBJECT (Lisp_Object p)
 {
-  eassert (FONT_OBJECT_P (p));
-  return XUNTAG (p, Lisp_Vectorlike, struct font);
-}
-
-INLINE struct font *
-GC_XFONT_OBJECT (Lisp_Object p)
-{
-  eassert (GC_FONT_OBJECT_P (p));
+  eassume (FONT_OBJECT_P (p));
   return XUNTAG (p, Lisp_Vectorlike, struct font);
 }
 
@@ -1002,7 +960,7 @@ font_data_structures_may_be_ill_formed (void)
 #if defined USE_CAIRO || defined USE_BE_CAIRO
   /* Although this works around Bug#20890, it is probably not the
      right thing to do.  */
-  return gc_in_progress;
+  return gc_is_in_progress ();
 #else
   return false;
 #endif

@@ -44,6 +44,7 @@ typedef struct pgtk_output xp_output;
 #include "termhooks.h"
 #include "keyboard.h"
 #include "coding.h"
+#include "alloc.h"
 
 #include <gdk/gdkkeysyms.h>
 
@@ -873,7 +874,7 @@ qttip_cb (GtkWidget  *widget,
       gtk_widget_realize (x->ttip_lbl);
 
       g_signal_connect (x->ttip_lbl, "hierarchy-changed",
-                        G_CALLBACK (hierarchy_ch_cb), f);
+                        G_CALLBACK (hierarchy_ch_cb), x);
     }
 
   return FALSE;
@@ -1725,7 +1726,8 @@ xg_create_frame_widgets (struct frame *f)
   f->output_data.xp->ttip_window = 0;
 #ifndef HAVE_PGTK
   gtk_widget_set_tooltip_text (wtop, "Dummy text");
-  g_signal_connect (wtop, "query-tooltip", G_CALLBACK (qttip_cb), f);
+  g_signal_connect (wtop, "query-tooltip", G_CALLBACK (qttip_cb),
+                    FRAME_X_OUTPUT (f));
 
   imc = gtk_im_multicontext_new ();
   g_object_ref (imc);
@@ -3017,37 +3019,41 @@ unref_cl_data (xg_menu_cb_data *cl_data)
 /* Function that marks all lisp data during GC.  */
 
 void
-xg_mark_data (void)
+xg_scan_data (const gc_phase phase)
 {
   xg_list_node *iter;
-  Lisp_Object rest, frame;
 
   for (iter = xg_menu_cb_list.next; iter; iter = iter->next)
-    mark_object (((xg_menu_cb_data *) iter)->menu_bar_vector);
+    xscan_reference (&((xg_menu_cb_data *) iter)->menu_bar_vector, phase);
 
   for (iter = xg_menu_item_cb_list.next; iter; iter = iter->next)
     {
       xg_menu_item_cb_data *cb_data = (xg_menu_item_cb_data *) iter;
 
       if (! NILP (cb_data->help))
-        mark_object (cb_data->help);
+        xscan_reference (&cb_data->help, phase);
     }
+}
 
-  FOR_EACH_FRAME (rest, frame)
+/* Called by the GC on each frame we scan during GC.  We need to provide
+   this function instead of iterating over all frames in xg_scan_data
+   because in xg_scan_data  */
+
+void
+xg_scan_frame (struct frame *const f, const gc_phase phase)
+{
+  if (FRAME_X_P (f) && FRAME_GTK_OUTER_WIDGET_NOCHECK (f))
     {
       struct frame *f = XFRAME (frame);
 
       if ((FRAME_X_P (f) || FRAME_PGTK_P (f)) && FRAME_GTK_OUTER_WIDGET (f))
         {
-          struct xg_frame_tb_info *tbinfo
-            = g_object_get_data (G_OBJECT (FRAME_GTK_OUTER_WIDGET (f)),
-                                 TB_INFO_KEY);
-          if (tbinfo)
-            {
-              mark_object (tbinfo->last_tool_bar);
-              mark_object (tbinfo->style);
-            }
+          xscan_reference (&tbinfo->last_tool_bar, phase);
+          xscan_reference (&tbinfo->style, phase);
         }
+#ifdef HAVE_GTK3
+      xg_scan_frame_widget (FRAME_GTK_WIDGET_NOCHECK (f), phase);
+#endif
     }
 
 #ifndef HAVE_PGTK
@@ -4096,8 +4102,9 @@ xg_modify_menubar_widgets (GtkWidget *menubar, struct frame *f,
 static void
 menubar_map_cb (GtkWidget *w, gpointer user_data)
 {
+  struct x_output *const x = user_data;
+  struct frame *const f = FRAME_FROM_OUTPUT_DATA(x);
   GtkRequisition req;
-  struct frame *f = user_data;
   gtk_widget_get_preferred_size (w, NULL, &req);
   req.height *= xg_get_scale (f);
   if (FRAME_MENUBAR_HEIGHT (f) != req.height)
@@ -4129,7 +4136,8 @@ xg_update_frame_menubar (struct frame *f)
                       FALSE, FALSE, 0);
   gtk_box_reorder_child (GTK_BOX (x->vbox_widget), x->menubar_widget, 0);
 
-  g_signal_connect (x->menubar_widget, "map", G_CALLBACK (menubar_map_cb), f);
+  g_signal_connect (x->menubar_widget, "map", G_CALLBACK (menubar_map_cb),
+                    FRAME_X_OUTPUT (f));
   gtk_widget_show_all (x->menubar_widget);
   gtk_widget_get_preferred_size (x->menubar_widget, NULL, &req);
   req.height *= xg_get_scale (f);
@@ -4179,7 +4187,7 @@ free_frame_menubar (struct frame *f)
 bool
 xg_event_is_for_menubar (struct frame *f, const XEvent *event)
 {
-  struct x_output *x = f->output_data.x;
+  struct x_output *x = FRAME_X_OUTPUT(f);
   GList *iter;
   GdkRectangle rec;
   GList *list;
@@ -5158,7 +5166,7 @@ xg_get_page_setup (void)
       orientation_symbol = Qreverse_landscape;
       break;
     default:
-      eassume (false);
+      emacs_unreachable ();
     }
 
 #define GETSETUP(f) make_float (f (page_setup, GTK_UNIT_POINTS))
@@ -5267,7 +5275,9 @@ xg_tool_bar_callback (GtkWidget *w, gpointer client_data)
   gpointer gmod = g_object_get_data (G_OBJECT (w), XG_TOOL_BAR_LAST_MODIFIER);
   intptr_t mod = (intptr_t) gmod;
 
-  struct frame *f = g_object_get_data (G_OBJECT (w), XG_FRAME_DATA);
+  struct x_output *const x =
+    g_object_get_data (G_OBJECT (w), XG_FRAME_DATA);
+  struct frame *const f = FRAME_FROM_OUTPUT_DATA(x);
   Lisp_Object key, frame;
   struct input_event event;
   EVENT_INIT (event);
@@ -5326,7 +5336,8 @@ xg_tool_bar_help_callback (GtkWidget *w,
                            gpointer client_data)
 {
   intptr_t idx = (intptr_t) client_data;
-  struct frame *f = g_object_get_data (G_OBJECT (w), XG_FRAME_DATA);
+  struct x_output *const x = g_object_get_data (G_OBJECT (w), XG_FRAME_DATA);
+  struct frame *const f = FRAME_FROM_OUTPUT_DATA(x);
   Lisp_Object help, frame;
 
   if (! f || ! f->n_tool_bar_items || NILP (f->tool_bar_items))
@@ -5432,7 +5443,8 @@ tb_size_cb (GtkWidget    *widget,
   /* When tool bar is created it has one preferred size.  But when size is
      allocated between widgets, it may get another.  So we must update
      size hints if tool bar size changes.  Seen on Fedora 18 at least.  */
-  struct frame *f = user_data;
+  struct x_output *const x = user_data;
+  struct frame *const f = FRAME_FROM_OUTPUT_DATA(x);
 
   if (xg_update_tool_bar_sizes (f))
     adjust_frame_size (f, -1, -1, 2, false, Qtool_bar_lines);
@@ -5471,7 +5483,7 @@ xg_create_tool_bar (struct frame *f)
   gtk_orientable_set_orientation (GTK_ORIENTABLE (x->toolbar_widget),
                                   GTK_ORIENTATION_HORIZONTAL);
   g_signal_connect (x->toolbar_widget, "size-allocate",
-                    G_CALLBACK (tb_size_cb), f);
+                    G_CALLBACK (tb_size_cb), FRAME_X_OUTPUT (f));
 #ifdef HAVE_GTK3
   gsty = gtk_widget_get_style_context (x->toolbar_widget);
   gtk_style_context_add_class (gsty, "primary-toolbar");
@@ -5570,7 +5582,8 @@ xg_make_tool_item (struct frame *f,
                         G_CALLBACK (xg_tool_bar_callback),
                         gi);
 
-      g_object_set_data (G_OBJECT (weventbox), XG_FRAME_DATA, (gpointer)f);
+      g_object_set_data (G_OBJECT (weventbox), XG_FRAME_DATA,
+                         FRAME_X_OUTPUT (f));
 
 #ifndef HAVE_GTK3
       /* Catch expose events to overcome an annoying redraw bug, see
@@ -5589,7 +5602,7 @@ xg_make_tool_item (struct frame *f,
                         G_CALLBACK (xg_tool_bar_button_cb),
                         NULL);
 
-      g_object_set_data (G_OBJECT (wb), XG_FRAME_DATA, (gpointer)f);
+      g_object_set_data (G_OBJECT (wb), XG_FRAME_DATA, FRAME_X_OUTPUT (f));
 
       /* Use enter/leave notify to show help.  We use the events
          rather than the GtkButton specific signals "enter" and

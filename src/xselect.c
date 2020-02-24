@@ -1700,7 +1700,7 @@ selection_data_to_lisp_data (struct x_display_info *dpyinfo,
   else if (format == 16)
     {
       ptrdiff_t i;
-      Lisp_Object v = make_uninit_vector (size / 2);
+      Lisp_Object v = make_nil_vector (size / 2);
 
       if (type == XA_INTEGER)
         {

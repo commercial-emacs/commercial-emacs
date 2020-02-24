@@ -221,7 +221,7 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
     key = components;
   else if (NILP (components))
     {
-      key = make_uninit_vector (nchars);
+      key = make_nil_vector (nchars);
       if (STRINGP (string))
 	for (ptrdiff_t i = 0; i < nchars; i++)
 	  {
@@ -812,7 +812,7 @@ fill_gstring_header (ptrdiff_t from, ptrdiff_t from_byte,
   eassume (0 < len);
   Lisp_Object header = (len <= 8
 			? AREF (gstring_work_headers, len - 1)
-			: make_uninit_vector (len + 1));
+			: make_nil_vector (len + 1));
 
   ASET (header, 0, font_object);
   for (ptrdiff_t i = 0; i < len; i++)
@@ -1879,11 +1879,6 @@ should be ignored.  */)
 	  for (i = SBYTES (string) - 1; i >= 0; i--)
 	    if (!ASCII_CHAR_P (SREF (string, i)))
 	      error ("Attempt to shape unibyte text");
-	  /* STRING is a pure-ASCII string, so we can convert it (or,
-	     rather, its copy) to multibyte and use that thereafter.  */
-	  Lisp_Object string_copy = Fconcat (1, &string);
-	  STRING_SET_MULTIBYTE (string_copy);
-	  string = string_copy;
 	}
       frombyte = string_char_to_byte (string, frompos);
     }

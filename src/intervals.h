@@ -51,8 +51,6 @@ struct interval
   } up;
   bool_bf up_obj : 1;
 
-  bool_bf gcmarkbit : 1;
-
   /* The remaining components are `properties' of the interval.
      The first four are duplicates for things which can be on the list,
      for purposes of speed.  */
@@ -136,9 +134,9 @@ struct interval
    progress.  */
 
 #define INTERVAL_PARENT(i)					\
-   (eassert ((i) != 0 && ! (i)->up_obj), (i)->up.interval)
+   (eassume ((i) != 0 && ! (i)->up_obj), (i)->up.interval)
 
-#define GET_INTERVAL_OBJECT(d,s) (eassert ((s)->up_obj), (d) = (s)->up.obj)
+#define GET_INTERVAL_OBJECT(d,s) (eassume ((s)->up_obj), (d) = (s)->up.obj)
 
 /* Use these functions to set Lisp_Object
    or pointer slots of struct interval.  */
@@ -146,7 +144,7 @@ struct interval
 INLINE void
 set_interval_object (INTERVAL i, Lisp_Object obj)
 {
-  eassert (BUFFERP (obj) || STRINGP (obj));
+  eassume (BUFFERP (obj) || STRINGP (obj));
   i->up_obj = 1;
   i->up.obj = obj;
 }
@@ -169,18 +167,6 @@ set_interval_plist (INTERVAL i, Lisp_Object plist)
    "next" value, and test the result to see if it's NULL.  */
 #define INTERVAL_PARENT_OR_NULL(i) \
    (INTERVAL_HAS_PARENT (i) ? INTERVAL_PARENT (i) : 0)
-
-/* Reset this interval to its vanilla, or no-property state.  */
-#define RESET_INTERVAL(i)		      \
- do {					      \
-  (i)->total_length = (i)->position = 0;      \
-  (i)->left = (i)->right = NULL;	      \
-  set_interval_parent (i, NULL);	      \
-  (i)->write_protect = false;		      \
-  (i)->visible = false;			      \
-  (i)->front_sticky = (i)->rear_sticky = false;	\
-  set_interval_plist (i, Qnil);		      \
- } while (false)
 
 /* Copy the cached property values of interval FROM to interval TO.  */
 #define COPY_INTERVAL_CACHE(from,to)		\

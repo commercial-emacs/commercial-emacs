@@ -37,6 +37,9 @@ if defined_HAVE_PGTK
   handle SIGPIPE nostop noprint
 end
 
+# Don't trap SIGSEGV: Emacs uses it internally for GC stuff.
+handle SIGSEGV noprint nostop pass
+
 # Use $bugfix so that the value isn't a constant.
 # Using a constant runs into GDB bugs sometimes.
 define xgetptr
@@ -378,7 +381,15 @@ define pwinx
   xgetptr $w->contents
   set $tem = (struct buffer *) $ptr
   xgetptr $tem->name_
-  printf "%s", $ptr ? (char *) ((struct Lisp_String *) $ptr)->u.s.data : "DEAD"
+  if $ptr == 0
+    printf "DEAD"
+  end
+  if ($ptr && ((struct Lisp_String *) $ptr)->u.s.u.internal.is_internal)
+    printf "%s" ((struct Lisp_String *) $ptr)->u.s.u.internal.buffer
+  end
+  if ($ptr && !((struct Lisp_String *) $ptr)->u.s.u.internal.is_internal)
+    printf "%s" ((struct Lisp_String *) $ptr)->u.s.u.external.data
+  end
   printf "\n"
   xgetptr $w->start
   set $tem = (struct Lisp_Marker *) $ptr
@@ -507,8 +518,11 @@ define pgx
   xgettype ($g.object)
   if ($type == Lisp_String)
     xgetptr $g.object
-    if ($ptr)
-      printf " str=0x%x", ((struct Lisp_String *)$ptr)->u.s.data
+    if ($ptr && ((struct Lisp_String *)$ptr)->u.s.u.internal.is_internal)
+      printf " str=0x%x", ((struct Lisp_String *)$ptr)->u.s.u.internal.buffer
+    end
+    if ($ptr && !((struct Lisp_String *)$ptr)->u.s.u.internal.is_internal)
+      printf " str=0x%x", ((struct Lisp_String *)$ptr)->u.s.u.external.data
     else
       printf " str=DEAD"
     end
@@ -690,7 +704,7 @@ define pvecsize
     echo \n
     output (($size & PSEUDOVECTOR_REST_MASK) >> PSEUDOVECTOR_SIZE_BITS)
   else
-    output ($size & ~ARRAY_MARK_FLAG)
+    output ($size)
   end
   echo \n
 end
@@ -768,7 +782,7 @@ end
 define xvector
   xgetptr $
   print (struct Lisp_Vector *) $ptr
-  output ($->header.size > 50) ? 0 : ($->contents[0])@($->header.size & ~ARRAY_MARK_FLAG)
+  output ($->header.size > 50) ? 0 : ($->contents[0])@($->header.size)
 echo \n
 end
 document xvector
@@ -880,7 +894,15 @@ define xbuffer
   xgetptr $
   print (struct buffer *) $ptr
   xgetptr $->name_
-  output $ptr ? (char *) ((struct Lisp_String *) $ptr)->u.s.data : "DEAD"
+  if $ptr == 0
+    printf "DEAD"
+  end
+  if ($ptr && ((struct Lisp_String *) $ptr)->u.s.u.internal.is_internal)
+    printf "%s" ((struct Lisp_String *) $ptr)->u.s.u.internal.buffer
+  end
+  if ($ptr && !((struct Lisp_String *) $ptr)->u.s.u.internal.is_internal)
+    printf "%s" ((struct Lisp_String *) $ptr)->u.s.u.external.data
+  end
   echo \n
 end
 document xbuffer
@@ -928,7 +950,7 @@ end
 define xcdr
   xgetptr $
   xgettype $
-  print/x ($type == Lisp_Cons ? ((struct Lisp_Cons *) $ptr)->u.s.u.cdr : 0)
+  print/x ($type == Lisp_Cons ? ((struct Lisp_Cons *) $ptr)->u.s.cdr : 0)
 end
 document xcdr
 Assume that $ is an Emacs Lisp pair and print its cdr.
@@ -943,7 +965,7 @@ define xlist
   while $cons != $nil && $i < 10
     p/x $cons->u.s.car
     xpr
-    xgetptr $cons->u.s.u.cdr
+    xgetptr $cons->u.s.cdr
     set $cons = (struct Lisp_Cons *) $ptr
     set $i = $i + 1
     printf "---\n"
@@ -1050,13 +1072,19 @@ define xprintstr
   if (! $arg0)
     output "DEAD"
   else
-    set $data = (char *) $arg0->u.s.data
-    set $strsize = ($arg0->u.s.size_byte < 0) ? ($arg0->u.s.size & ~ARRAY_MARK_FLAG) : $arg0->u.s.size_byte
+    if (((struct Lisp_String *) $ptr)->u.s.u.internal.is_internal)
+      set $data = ((struct Lisp_String *) $ptr)->u.s.u.internal.buffer
+      set $strsize = ((struct Lisp_String *) $ptr)->u.s.u.internal.size
+    end
+    if (!((struct Lisp_String *) $ptr)->u.s.u.internal.is_internal)
+      set $data = ((struct Lisp_String *) $ptr)->u.s.u.external.data
+      set $strsize = ((struct Lisp_String *) $ptr)->u.s.u.external.size
+    end
     # GDB doesn't like zero repetition counts
     if $strsize == 0
       output ""
     else
-      output ($arg0->u.s.size > 1000) ? 0 : ($data[0])@($strsize)
+      output ($strsize > 1000) ? 0 : ($data[0])@($strsize)
     end
   end
 end
@@ -1153,7 +1181,7 @@ define xbacktrace
         if ($size & PSEUDOVECTOR_FLAG)
 	  output (enum pvec_type) (($size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_AREA_BITS)
 	else
-	  output $size & ~ARRAY_MARK_FLAG
+	  output $size
 	end
       else
         printf "Lisp type %d", $type
@@ -1171,7 +1199,7 @@ end
 
 define xprintbytestr
   set $data = (char *) $arg0->data
-  set $bstrsize = ($arg0->size_byte < 0) ? ($arg0->size & ~ARRAY_MARK_FLAG) : $arg0->size_byte
+  set $bstrsize = ($arg0->size_byte < 0) ? ($arg0->size) : $arg0->size_byte
   printf "Bytecode: "
   if $bstrsize > 0
     output/u ($arg0->size > 1000) ? 0 : ($data[0])@($bvsize)

@@ -39,9 +39,7 @@ typedef struct _EmacsFixedPrivate       EmacsFixedPrivate;
 struct _EmacsFixed
 {
   GtkFixed container;
-
-  /*< private >*/
-  EmacsFixedPrivate *priv;
+  struct frame *f;
 };
 
 struct _EmacsFixedClass

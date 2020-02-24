@@ -757,10 +757,10 @@ extern Lisp_Object from_unicode_buffer (const wchar_t *wstr);
 INLINE int
 surrogates_to_codepoint (int low, int high)
 {
-  eassert (0 <= low && low <= 0xFFFF);
-  eassert (0 <= high && high <= 0xFFFF);
-  eassert (UTF_16_LOW_SURROGATE_P (low));
-  eassert (UTF_16_HIGH_SURROGATE_P (high));
+  eassume (0 <= low && low <= 0xFFFF);
+  eassume (0 <= high && high <= 0xFFFF);
+  eassume (UTF_16_LOW_SURROGATE_P (low));
+  eassume (UTF_16_HIGH_SURROGATE_P (high));
   return 0x10000 + (low - 0xDC00) + ((high - 0xD800) * 0x400);
 }
 

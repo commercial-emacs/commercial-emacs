@@ -836,7 +836,7 @@ default_pixels_per_inch_y (void)
 #define FRAME_IMAGE_CACHE(F) ((F)->terminal->image_cache)
 
 #define XFRAME(p) \
-  (eassert (FRAMEP (p)), XUNTAG (p, Lisp_Vectorlike, struct frame))
+  (eassume (FRAMEP (p)), XUNTAG (p, Lisp_Vectorlike, struct frame))
 #define XSETFRAME(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_FRAME))
 
 /* Given a window, return its frame as a Lisp_Object.  */
@@ -898,9 +898,9 @@ default_pixels_per_inch_y (void)
 #ifdef HAVE_WINDOW_SYSTEM
 
 #define FRAME_RES_X(f)						\
-  (eassert (FRAME_WINDOW_P (f)), FRAME_DISPLAY_INFO (f)->resx)
+  (eassume (FRAME_WINDOW_P (f)), FRAME_DISPLAY_INFO (f)->resx)
 #define FRAME_RES_Y(f)						\
-  (eassert (FRAME_WINDOW_P (f)), FRAME_DISPLAY_INFO (f)->resy)
+  (eassume (FRAME_WINDOW_P (f)), FRAME_DISPLAY_INFO (f)->resy)
 
 #else /* !HAVE_WINDOW_SYSTEM */
 
@@ -1280,7 +1280,7 @@ extern bool frame_garbaged;
 INLINE void
 SET_FRAME_VISIBLE (struct frame *f, int v)
 {
-  eassert (0 <= v && v <= 2);
+  eassume (0 <= v && v <= 2);
   if (v)
     {
       if (v == 1 && f->visible != 1)
@@ -1291,9 +1291,10 @@ SET_FRAME_VISIBLE (struct frame *f, int v)
   f->visible = v;
 }
 
-/* Set iconified status of frame F.  */
-#define SET_FRAME_ICONIFIED(f, i)				\
-  (f)->iconified = (eassert (0 <= (i) && (i) <= 1), (i))
+/* Set iconify of frame F.  */
+
+#define SET_FRAME_ICONIFIED(f, i)			\
+  (f)->iconified = (eassume (0 <= (i) && (i) <= 1), (i))
 
 extern Lisp_Object selected_frame;
 extern Lisp_Object old_selected_frame;
@@ -1455,7 +1456,7 @@ FRAME_BOTTOM_DIVIDER_WIDTH (struct frame *f)
 INLINE struct face *
 FACE_FROM_ID (struct frame *f, int id)
 {
-  eassert (0 <= id && id < FRAME_FACE_CACHE (f)->used);
+  eassume (0 <= id && id < FRAME_FACE_CACHE (f)->used);
   return FRAME_FACE_CACHE (f)->faces_by_id[id];
 }
 
@@ -1477,7 +1478,7 @@ FACE_FROM_ID_OR_NULL (struct frame *f, int id)
 INLINE struct image *
 IMAGE_FROM_ID (struct frame *f, int id)
 {
-  eassert (0 <= id && id < FRAME_IMAGE_CACHE (f)->used);
+  eassume (0 <= id && id < FRAME_IMAGE_CACHE (f)->used);
   return FRAME_IMAGE_CACHE (f)->images[id];
 }
 

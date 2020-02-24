@@ -44,6 +44,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "keyboard.h"
 #include "menu.h"	/* for w32_menu_show */
+#include "alloc.h"
 
 #ifdef WINDOWSNT
 #include "w32.h"	/* for filename_from_utf16, filename_from_ansi */
@@ -1563,7 +1564,7 @@ w32_query_frame_background_color (struct frame *f, Emacs_Color *bgcolor)
    string S.  RELIEF is a pointer to a struct relief containing the GC
    with which lines will be drawn.  Use a color that is FACTOR or
    DELTA lighter or darker than the relief's background which is found
-   in S->f->output_data.x->relief_background.  If such a color cannot
+   in FRAME_X_OUTPUT(S->f)->relief_background.  If such a color cannot
    be allocated, use DEFAULT_PIXEL, instead.  */
 
 static void
@@ -3010,13 +3011,13 @@ w32_focus_changed (int type, int state, struct w32_display_info *dpyinfo,
           XSETFRAME (bufp->frame_or_window, frame);
         }
 
-      frame->output_data.x->focus_state |= state;
+      FRAME_X_OUTPUT (frame)->focus_state |= state;
 
       /* TODO: IME focus?  */
     }
   else if (type == WM_KILLFOCUS)
     {
-      frame->output_data.x->focus_state &= ~state;
+      FRAME_X_OUTPUT (frame)->focus_state &= ~state;
 
       if (dpyinfo->w32_focus_event_frame == frame)
         {
@@ -7506,6 +7507,23 @@ w32_delete_display (struct w32_display_info *dpyinfo)
       DeleteObject (dpyinfo->palette);
   }
   w32_reset_fringes ();
+}
+
+
+void
+scan_terminal_display_info_w32 (struct w32_display_info *const info,
+                                const gc_phase phase)
+{
+  scan_reference_pointer_to_vectorlike (&info->terminal, phase);
+  /* info->name_list_element is weak and handled specially */
+  scan_reference_pointer_to_vectorlike (&info->w32_focus_frame, phase);
+  scan_reference_pointer_to_vectorlike (&info->w32_focus_event_frame, phase);
+  scan_reference_pointer_to_vectorlike (&info->highlight_frame, phase);
+  scan_reference_pointer_to_vectorlike (&info->w32_pending_autoraise_frame,
+                                        phase);
+  scan_reference_pointer_to_vectorlike (&info->last_mouse_frame, phase);
+  scan_reference_pointer_to_vectorlike (&info->last_mouse_glyph_frame, phase);
+  scan_reference_pointer_to_vectorlike (&info->last_mouse_scroll_bar, phase);
 }
 
 

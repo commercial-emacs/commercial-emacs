@@ -50,6 +50,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "termhooks.h"
 #include "font.h"
 #include "pdumper.h"
+#include "alloc.h"
 
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -2911,25 +2912,22 @@ anim_get_animation_cache (Lisp_Object spec)
 /* Mark Lisp objects in image IMG.  */
 
 static void
-mark_image (struct image *img)
+scan_image (struct image *const img, const gc_phase phase)
 {
-  mark_object (img->spec);
-  mark_object (img->dependencies);
-
-  if (!NILP (img->lisp_data))
-    mark_object (img->lisp_data);
+  xscan_reference (&img->spec, phase);
+  xscan_reference (&img->dependencies, phase);
+  xscan_reference (&img->lisp_data, phase);
 }
 
-
 void
-mark_image_cache (struct image_cache *c)
+scan_image_cache (struct image_cache *const c, const gc_phase phase)
 {
   if (c)
     {
       ptrdiff_t i;
       for (i = 0; i < c->used; ++i)
 	if (c->images[i])
-	  mark_image (c->images[i]);
+	  scan_image (c->images[i], phase);
     }
 
 #if defined HAVE_WEBP || defined HAVE_GIF

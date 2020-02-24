@@ -539,21 +539,11 @@ even if it is dead.  The return value is never nil.  */)
   b = allocate_buffer ();
 
   /* An ordinary buffer uses its own struct buffer_text.  */
-  b->text = &b->own_text;
-  b->base_buffer = NULL;
-  /* No one shares the text with us now.  */
-  b->indirections = 0;
-  /* No one shows us now.  */
-  b->window_count = 0;
-
-  memset (&b->local_flags, 0, sizeof (b->local_flags));
-
+  b->text = xzalloc (sizeof (*b->text));
   BUF_GAP_SIZE (b) = 20;
-  block_input ();
   /* We allocate extra 1-byte at the tail and keep it always '\0' for
      anchoring a search.  */
   alloc_buffer_text (b, BUF_GAP_SIZE (b) + 1);
-  unblock_input ();
   if (! BUF_BEG_ADDR (b))
     buffer_memory_full (BUF_GAP_SIZE (b) + 1);
 
@@ -574,27 +564,11 @@ even if it is dead.  The return value is never nil.  */)
   BUF_OVERLAY_MODIFF (b) = 1;
   BUF_SAVE_MODIFF (b) = 1;
   BUF_COMPACT (b) = 1;
-  set_buffer_intervals (b, NULL);
   BUF_UNCHANGED_MODIFIED (b) = 1;
   BUF_OVERLAY_UNCHANGED_MODIFIED (b) = 1;
-  BUF_END_UNCHANGED (b) = 0;
-  BUF_BEG_UNCHANGED (b) = 0;
   *(BUF_GPT_ADDR (b)) = *(BUF_Z_ADDR (b)) = 0; /* Put an anchor '\0'.  */
-  b->text->inhibit_shrinking = false;
-  b->text->redisplay = false;
   b->text->monospace = true;
-
-  b->newline_cache = 0;
-  b->width_run_cache = 0;
-  b->bidi_paragraph_cache = 0;
-  bset_width_table (b, Qnil);
   b->prevent_redisplay_optimizations_p = 1;
-
-  /* An ordinary buffer normally doesn't need markers
-     to handle BEGV and ZV.  */
-  bset_pt_marker (b, Qnil);
-  bset_begv_marker (b, Qnil);
-  bset_zv_marker (b, Qnil);
 
   name = Fcopy_sequence (buffer_or_name);
   set_string_intervals (name, NULL);
@@ -814,8 +788,6 @@ does not run the hooks `kill-buffer-hook',
   /* Always -1 for an indirect buffer.  */
   b->window_count = -1;
 
-  memset (&b->local_flags, 0, sizeof (b->local_flags));
-
   b->pt = b->base_buffer->pt;
   b->begv = b->base_buffer->begv;
   b->zv = b->base_buffer->zv;
@@ -823,11 +795,6 @@ does not run the hooks `kill-buffer-hook',
   b->begv_byte = b->base_buffer->begv_byte;
   b->zv_byte = b->base_buffer->zv_byte;
   b->inhibit_buffer_hooks = !NILP (inhibit_buffer_hooks);
-
-  b->newline_cache = 0;
-  b->width_run_cache = 0;
-  b->bidi_paragraph_cache = 0;
-  bset_width_table (b, Qnil);
 
   name = Fcopy_sequence (name);
   set_string_intervals (name, NULL);
@@ -1039,11 +1006,11 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
           Lisp_Object sym = local_var;
 
           /* Watchers are run *before* modifying the var.  */
-          if (XSYMBOL (local_var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+          if (XSYMBOL (local_var)->u.s.f.trapped_write == SYMBOL_TRAPPED_WRITE)
             notify_variable_watchers (local_var, Qnil,
                                       Qmakunbound, Fcurrent_buffer ());
 
-          eassert (XSYMBOL (sym)->u.s.redirect == SYMBOL_LOCALIZED);
+          eassert (XSYMBOL (sym)->u.s.f.redirect == SYMBOL_LOCALIZED);
           /* Need not do anything if some other buffer's binding is
 	     now cached.  */
           if (EQ (SYMBOL_BLV (XSYMBOL (sym))->where, buffer))
@@ -1078,7 +1045,7 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
                           newlist = Fcons (elt, newlist);
                       }
                   newlist = Fnreverse (newlist);
-                  if (XSYMBOL (local_var)->u.s.trapped_write
+                  if (XSYMBOL (local_var)->u.s.f.trapped_write
 		      == SYMBOL_TRAPPED_WRITE)
                     notify_variable_watchers (local_var, newlist,
                                               Qmakunbound, Fcurrent_buffer ());
@@ -1222,7 +1189,7 @@ buffer_local_value (Lisp_Object variable, Lisp_Object buffer)
   sym = XSYMBOL (variable);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
     case SYMBOL_PLAINVAL: result = SYMBOL_VAL (sym); break;
@@ -2181,7 +2148,7 @@ void set_buffer_internal_2 (register struct buffer *b)
 	{
 	  Lisp_Object var = XCAR (XCAR (tail));
 	  struct Lisp_Symbol *sym = XSYMBOL (var);
-	  if (sym->u.s.redirect == SYMBOL_LOCALIZED /* Just to be sure.  */
+	  if (sym->u.s.f.redirect == SYMBOL_LOCALIZED /* Just to be sure.  */
 	      && SYMBOL_BLV (sym)->fwd.fwdptr)
 	    /* Just reference the variable
 	       to cause it to become set for this buffer.  */
@@ -2351,7 +2318,7 @@ results, see Info node `(elisp)Swapping Text'.  */)
   CHECK_BUFFER (buffer);
   other_buffer = XBUFFER (buffer);
 
-  if (!BUFFER_LIVE_P (other_buffer))
+  if (!BUFFER_LIVE_P (current_buffer) || !BUFFER_LIVE_P (other_buffer))
     error ("Cannot swap a dead buffer's text");
 
   /* Actually, it probably works just fine.
@@ -2385,14 +2352,12 @@ results, see Info node `(elisp)Swapping Text'.  */)
     bset_##field (current_buffer, tmp##field);			\
   } while (0)
 
-  swapfield (own_text, struct buffer_text);
-  eassert (current_buffer->text == &current_buffer->own_text);
-  eassert (other_buffer->text == &other_buffer->own_text);
+  swapfield (text, struct buffer_text *);
 #ifdef REL_ALLOC
-  r_alloc_reset_variable ((void **) &current_buffer->own_text.beg,
-			  (void **) &other_buffer->own_text.beg);
-  r_alloc_reset_variable ((void **) &other_buffer->own_text.beg,
-			  (void **) &current_buffer->own_text.beg);
+  r_alloc_reset_variable ((void **) &current_buffer->text->beg,
+			  (void **) &other_buffer->text->beg);
+  r_alloc_reset_variable ((void **) &other_buffer->text->beg,
+			  (void **) &current_buffer->text->beg);
 #endif /* REL_ALLOC */
 
   swapfield (pt, ptrdiff_t);
@@ -5099,8 +5064,6 @@ enlarge_buffer_text (struct buffer *b, ptrdiff_t delta)
 static void
 free_buffer_text (struct buffer *b)
 {
-  block_input ();
-
   if (!pdumper_object_p (b->text->beg))
     {
 #if defined USE_MMAP_FOR_BUFFERS
@@ -5113,9 +5076,24 @@ free_buffer_text (struct buffer *b)
     }
 
   BUF_BEG_ADDR (b) = NULL;
-  unblock_input ();
 }
 
+/* Free any resources owned by this buffer just before the buffer is
+   garbage-collected.  */
+void
+buffer_cleanup (struct buffer *const b)
+{
+  if (!b->base_buffer)
+    {
+      free_buffer_text (b);     /* Idempotent.  */
+      xfree (b->text);
+    }
+}
+
+
+/***********************************************************************
+			    Initialization
+ ***********************************************************************/
 void
 init_buffer_once (void)
 {
@@ -5235,20 +5213,15 @@ init_buffer_once (void)
   eassert (NILP (BVAR (&buffer_local_symbols, name)));
   reset_buffer (&buffer_local_symbols);
   reset_buffer_local_variables (&buffer_local_symbols, 1);
-  /* Prevent GC from getting confused.  */
-  buffer_defaults.text = &buffer_defaults.own_text;
-  buffer_local_symbols.text = &buffer_local_symbols.own_text;
   /* No one will share the text with these buffers, but let's play it safe.  */
   buffer_defaults.indirections = 0;
   buffer_local_symbols.indirections = 0;
   /* Likewise no one will display them.  */
   buffer_defaults.window_count = 0;
   buffer_local_symbols.window_count = 0;
-  set_buffer_intervals (&buffer_defaults, NULL);
-  set_buffer_intervals (&buffer_local_symbols, NULL);
   /* This is not strictly necessary, but let's make them initialized.  */
-  bset_name (&buffer_defaults, build_pure_c_string (" *buffer-defaults*"));
-  bset_name (&buffer_local_symbols, build_pure_c_string (" *buffer-local-symbols*"));
+  bset_name (&buffer_defaults, build_c_string (" *buffer-defaults*"));
+  bset_name (&buffer_local_symbols, build_c_string (" *buffer-local-symbols*"));
   BUFFER_PVEC_INIT (&buffer_defaults);
   BUFFER_PVEC_INIT (&buffer_local_symbols);
 
@@ -5256,7 +5229,7 @@ init_buffer_once (void)
   /* Must do these before making the first buffer! */
 
   /* real setup is done in bindings.el */
-  bset_mode_line_format (&buffer_defaults, build_pure_c_string ("%-"));
+  bset_mode_line_format (&buffer_defaults, build_c_string ("%-"));
   bset_header_line_format (&buffer_defaults, Qnil);
   bset_tab_line_format (&buffer_defaults, Qnil);
   bset_abbrev_mode (&buffer_defaults, Qnil);
@@ -5323,7 +5296,7 @@ init_buffer_once (void)
   current_buffer = 0;
   pdumper_remember_lv_ptr_raw (&current_buffer, Lisp_Vectorlike);
 
-  QSFundamental = build_pure_c_string ("Fundamental");
+  QSFundamental = build_c_string ("Fundamental");
 
   DEFSYM (Qfundamental_mode, "fundamental-mode");
   bset_major_mode (&buffer_defaults, Qfundamental_mode);
@@ -5336,11 +5309,10 @@ init_buffer_once (void)
   Fput (Qkill_buffer_hook, Qpermanent_local, Qt);
 
   /* Super-magic invisible buffer.  */
-  Vprin1_to_string_buffer =
-    Fget_buffer_create (build_pure_c_string (" prin1"), Qt);
+  Vprin1_to_string_buffer = Fget_buffer_create (build_c_string (" prin1"), Qt);
   Vbuffer_alist = Qnil;
 
-  Fset_buffer (Fget_buffer_create (build_pure_c_string ("*scratch*"), Qnil));
+  Fset_buffer (Fget_buffer_create (build_c_string ("*scratch*"), Qnil));
 
   inhibit_modification_hooks = 0;
 }
@@ -5467,8 +5439,8 @@ defvar_per_buffer (struct Lisp_Buffer_Objfwd *bo_fwd, const char *namestring,
   bo_fwd->type = Lisp_Fwd_Buffer_Obj;
   bo_fwd->offset = offset;
   bo_fwd->predicate = predicate;
-  sym->u.s.declared_special = true;
-  sym->u.s.redirect = SYMBOL_FORWARDED;
+  sym->u.s.f.declared_special = true;
+  sym->u.s.f.redirect = SYMBOL_FORWARDED;
   SET_SYMBOL_FWD (sym, bo_fwd);
   XSETSYMBOL (PER_BUFFER_SYMBOL (offset), sym);
 
@@ -5522,9 +5494,9 @@ syms_of_buffer (void)
 	       Qoverwrite_mode_binary));
 
   Fput (Qprotected_field, Qerror_conditions,
-	pure_list (Qprotected_field, Qerror));
+	list (Qprotected_field, Qerror));
   Fput (Qprotected_field, Qerror_message,
-	build_pure_c_string ("Attempt to modify a protected field"));
+	build_c_string ("Attempt to modify a protected field"));
 
   DEFSYM (Qclone_indirect_buffer_hook, "clone-indirect-buffer-hook");
 

@@ -652,7 +652,7 @@ json_handle_nonlocal_exit (enum nonlocal_exit type, Lisp_Object data)
     case NONLOCAL_EXIT_THROW:
       return Fcons (Qno_catch, data);
     default:
-      eassume (false);
+      emacs_unreachable ();
     }
 }
 

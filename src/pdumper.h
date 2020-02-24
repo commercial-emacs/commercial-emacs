@@ -120,7 +120,7 @@ pdumper_do_now_and_after_late_load (pdumper_hook hook)
     if (dumped_with_pdumper_p ())              \
       (variable) = (value);                    \
     else                                       \
-      eassert ((variable) == (value));         \
+      eassume ((variable) == (value));         \
   } while (0)
 
 #define PDUMPER_RESET_LV(variable, value)         \
@@ -200,7 +200,7 @@ pdumper_find_object_type (const void *obj)
   return pdumper_find_object_type_impl (obj);
 #else
   (void) obj;
-  emacs_abort ();
+  emacs_unreachable ();
 #endif
 }
 
@@ -223,23 +223,23 @@ pdumper_object_p_precise (const void *obj)
   return pdumper_valid_object_type_p (pdumper_find_object_type (obj));
 #else
   (void) obj;
-  emacs_abort ();
+  emacs_unreachable ();
 #endif
 }
 
-extern bool pdumper_marked_p_impl (const void *obj);
+extern bool pdumper_marked_p_impl (const void *obj) ATTRIBUTE_PURE;
 
 /* Return whether OBJ is marked according to the portable dumper.
    It is an error to call this routine for an OBJ for which
    pdumper_object_p_precise would return false.  */
-INLINE bool
+INLINE bool ATTRIBUTE_PURE
 pdumper_marked_p (const void *obj)
 {
 #ifdef HAVE_PDUMPER
   return pdumper_marked_p_impl (obj);
 #else
   (void) obj;
-  emacs_abort ();
+  emacs_unreachable ();
 #endif
 }
 
@@ -255,18 +255,19 @@ pdumper_set_marked (const void *obj)
   pdumper_set_marked_impl (obj);
 #else
   (void) obj;
-  emacs_abort ();
+  emacs_unreachable ();
 #endif
 }
 
-extern void pdumper_clear_marks_impl (void);
+extern void pdumper_sweep_impl (void);
 
-/* Clear all the mark bits for pdumper objects.  */
+/* Clear all the mark bits for pdumper objects and scan
+   each live object.  */
 INLINE void
-pdumper_clear_marks (void)
+pdumper_sweep (void)
 {
 #ifdef HAVE_PDUMPER
-  pdumper_clear_marks_impl ();
+  pdumper_sweep_impl ();
 #endif
 }
 

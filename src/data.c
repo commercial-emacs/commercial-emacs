@@ -30,7 +30,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "bignum.h"
-#include "puresize.h"
 #include "character.h"
 #include "buffer.h"
 #include "keyboard.h"
@@ -143,12 +142,6 @@ wrong_type_argument (Lisp_Object predicate, Lisp_Object value)
 }
 
 void
-pure_write_error (Lisp_Object obj)
-{
-  xsignal2 (Qerror, build_string ("Attempt to modify read-only object"), obj);
-}
-
-void
 args_out_of_range (Lisp_Object a1, Lisp_Object a2)
 {
   xsignal2 (Qargs_out_of_range, a1, a2);
@@ -236,7 +229,7 @@ for example, (type-of 1) returns `integer'.  */)
           if (FONT_OBJECT_P (object))
 	    return Qfont_object;
           else
-            emacs_abort (); /* return Qfont?  */
+            emacs_unreachable (); /* return Qfont?  */
         case PVEC_THREAD: return Qthread;
         case PVEC_MUTEX: return Qmutex;
         case PVEC_CONDVAR: return Qcondition_variable;
@@ -268,16 +261,17 @@ for example, (type-of 1) returns `integer'.  */)
 	case PVEC_MISC_PTR:
         case PVEC_OTHER:
         case PVEC_SUB_CHAR_TABLE:
-        case PVEC_FREE: ;
+        case PVEC_STRING_DATA:
+          break;
         }
-      emacs_abort ();
+      emacs_unreachable ();
 
     case Lisp_Float:
       return Qfloat;
-
-    default:
-      emacs_abort ();
+    case Lisp_Type_Unused0:
+      break;
     }
+  emacs_unreachable ();
 }
 
 DEFUN ("consp", Fconsp, Sconsp, 1, 1, 0,
@@ -626,7 +620,6 @@ DEFUN ("setcar", Fsetcar, Ssetcar, 2, 2, 0,
   (register Lisp_Object cell, Lisp_Object newcar)
 {
   CHECK_CONS (cell);
-  CHECK_IMPURE (cell, XCONS (cell));
   XSETCAR (cell, newcar);
   return newcar;
 }
@@ -636,7 +629,6 @@ DEFUN ("setcdr", Fsetcdr, Ssetcdr, 2, 2, 0,
   (register Lisp_Object cell, Lisp_Object newcdr)
 {
   CHECK_CONS (cell);
-  CHECK_IMPURE (cell, XCONS (cell));
   XSETCDR (cell, newcdr);
   return newcdr;
 }
@@ -655,7 +647,7 @@ global value outside of any lexical scope.  */)
   sym = XSYMBOL (symbol);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_PLAINVAL: valcontents = SYMBOL_VAL (sym); break;
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
@@ -1157,10 +1149,10 @@ indirect_variable (struct Lisp_Symbol *symbol)
 
   hare = tortoise = symbol;
 
-  while (hare->u.s.redirect == SYMBOL_VARALIAS)
+  while (hare->u.s.f.redirect == SYMBOL_VARALIAS)
     {
       hare = SYMBOL_ALIAS (hare);
-      if (hare->u.s.redirect != SYMBOL_VARALIAS)
+      if (hare->u.s.f.redirect != SYMBOL_VARALIAS)
 	break;
 
       hare = SYMBOL_ALIAS (hare);
@@ -1438,7 +1430,7 @@ find_symbol_value (Lisp_Object symbol)
   sym = XSYMBOL (symbol);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
     case SYMBOL_PLAINVAL: return SYMBOL_VAL (sym);
@@ -1499,7 +1491,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 
   CHECK_SYMBOL (symbol);
   struct Lisp_Symbol *sym = XSYMBOL (symbol);
-  switch (sym->u.s.trapped_write)
+  switch (sym->u.s.f.trapped_write)
     {
     case SYMBOL_NOWRITE:
       if (NILP (Fkeywordp (symbol))
@@ -1526,7 +1518,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
     }
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
     case SYMBOL_PLAINVAL: SET_SYMBOL_VAL (sym , newval); return;
@@ -1631,7 +1623,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 	if (voide)
 	  { /* If storing void (making the symbol void), forward only through
 	       buffer-local indicator, not through Lisp_Objfwd, etc.  */
-	    sym->u.s.redirect = SYMBOL_PLAINVAL;
+	    sym->u.s.f.redirect = SYMBOL_PLAINVAL;
 	    SET_SYMBOL_VAL (sym, newval);
 	  }
 	else
@@ -1647,9 +1639,9 @@ static void
 set_symbol_trapped_write (Lisp_Object symbol, enum symbol_trapped_write trap)
 {
   struct Lisp_Symbol *sym = XSYMBOL (symbol);
-  if (sym->u.s.trapped_write == SYMBOL_NOWRITE)
+  if (sym->u.s.f.trapped_write == SYMBOL_NOWRITE)
     xsignal1 (Qtrapping_constant, symbol);
-  sym->u.s.trapped_write = trap;
+  sym->u.s.f.trapped_write = trap;
 }
 
 static void
@@ -1664,7 +1656,7 @@ harmonize_variable_watchers (Lisp_Object alias, Lisp_Object base_variable)
   if (!EQ (base_variable, alias)
       && EQ (base_variable, Findirect_variable (alias)))
     set_symbol_trapped_write
-      (alias, XSYMBOL (base_variable)->u.s.trapped_write);
+      (alias, XSYMBOL (base_variable)->u.s.f.trapped_write);
 }
 
 DEFUN ("add-variable-watcher", Fadd_variable_watcher, Sadd_variable_watcher,
@@ -1780,7 +1772,7 @@ default_value (Lisp_Object symbol)
   sym = XSYMBOL (symbol);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
     case SYMBOL_PLAINVAL: return SYMBOL_VAL (sym);
@@ -1849,7 +1841,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 {
   CHECK_SYMBOL (symbol);
   struct Lisp_Symbol *sym = XSYMBOL (symbol);
-  switch (sym->u.s.trapped_write)
+  switch (sym->u.s.f.trapped_write)
     {
     case SYMBOL_NOWRITE:
       if (NILP (Fkeywordp (symbol))
@@ -1861,7 +1853,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 
     case SYMBOL_TRAPPED_WRITE:
       /* Don't notify here if we're going to call Fset anyway.  */
-      if (sym->u.s.redirect != SYMBOL_PLAINVAL
+      if (sym->u.s.f.redirect != SYMBOL_PLAINVAL
           /* Setting due to thread switching doesn't count.  */
           && bindflag != SET_INTERNAL_THREAD_SWITCH)
         notify_variable_watchers (symbol, value, Qset_default, Qnil);
@@ -1874,7 +1866,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
     }
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
     case SYMBOL_PLAINVAL: set_internal (symbol, value, Qnil, bindflag); return;
@@ -2012,7 +2004,7 @@ See also `defvar-local'.  */)
   sym = XSYMBOL (variable);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
     case SYMBOL_PLAINVAL:
@@ -2040,7 +2032,7 @@ See also `defvar-local'.  */)
   if (!blv)
     {
       blv = make_blv (sym, forwarded, valcontents);
-      sym->u.s.redirect = SYMBOL_LOCALIZED;
+      sym->u.s.f.redirect = SYMBOL_LOCALIZED;
       SET_SYMBOL_BLV (sym, blv);
     }
 
@@ -2078,7 +2070,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
   sym = XSYMBOL (variable);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS:
       sym = indirect_variable (sym);
@@ -2100,7 +2092,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
       break;
     }
 
-  if (sym->u.s.trapped_write == SYMBOL_NOWRITE)
+  if (sym->u.s.f.trapped_write == SYMBOL_NOWRITE)
     xsignal1 (Qsetting_constant, variable);
 
   if ((sym->u.s.redirect == SYMBOL_FORWARDED
@@ -2121,7 +2113,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
       || ! SYMBOL_BLV (sym))
     {
       bool forwarded_p = sym->u.s.redirect == SYMBOL_FORWARDED;
-      sym->u.s.redirect = SYMBOL_LOCALIZED;
+      sym->u.s.f.redirect = SYMBOL_LOCALIZED;
       SET_SYMBOL_BLV (sym, make_blv (sym, forwarded_p, valcontents));
     }
 
@@ -2181,7 +2173,7 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
   sym = XSYMBOL (variable);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
     case SYMBOL_PLAINVAL: return variable;
@@ -2207,10 +2199,10 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
     default: emacs_abort ();
     }
 
-  eassert (sym->u.s.redirect == SYMBOL_LOCALIZED
+  eassert (sym->u.s.f.redirect == SYMBOL_LOCALIZED
 	   && SYMBOL_BLV (sym));
 
-  if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+  if (sym->u.s.f.trapped_write == SYMBOL_TRAPPED_WRITE)
     notify_variable_watchers (variable, Qnil, Qmakunbound, Fcurrent_buffer ());
 
   /* Get rid of this buffer's alist element, if any.  */
@@ -2250,7 +2242,7 @@ Also see `buffer-local-boundp'.*/)
   sym = XSYMBOL (variable);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
     case SYMBOL_PLAINVAL: return Qnil;
@@ -2300,7 +2292,7 @@ value in BUFFER, or if VARIABLE is automatically buffer-local (see
   sym = XSYMBOL (variable);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
     case SYMBOL_PLAINVAL: return Qnil;
@@ -2335,7 +2327,7 @@ If the current binding is global (the default), the value is nil.  */)
   find_symbol_value (variable);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
     case SYMBOL_PLAINVAL: return Qnil;
@@ -2353,7 +2345,7 @@ If the current binding is global (the default), the value is nil.  */)
 	 buffer's or frame's value we are saving.  */
       if (!NILP (Flocal_variable_p (variable, Qnil)))
 	return Fcurrent_buffer ();
-      else if (sym->u.s.redirect == SYMBOL_LOCALIZED
+      else if (sym->u.s.f.redirect == SYMBOL_LOCALIZED
 	       && blv_found (SYMBOL_BLV (sym)))
 	return SYMBOL_BLV (sym)->where;
       else
@@ -2486,7 +2478,6 @@ bool-vector.  IDX starts at 0.  */)
 
   if (VECTORP (array))
     {
-      CHECK_IMPURE (array, XVECTOR (array));
       if (idxval < 0 || idxval >= ASIZE (array))
 	args_out_of_range (array, idx);
       ASET (array, idxval, newelt);
@@ -2510,7 +2501,6 @@ bool-vector.  IDX starts at 0.  */)
     }
   else /* STRINGP */
     {
-      CHECK_IMPURE (array, XSTRING (array));
       if (idxval < 0 || idxval >= SCHARS (array))
 	args_out_of_range (array, idx);
       CHECK_CHARACTER (newelt);
@@ -2535,8 +2525,6 @@ bool-vector.  IDX starts at 0.  */)
 	  for (ptrdiff_t i = SBYTES (array) - 1; i >= 0; i--)
 	    if (!ASCII_CHAR_P (SREF (array, i)))
 	      args_out_of_range (array, newelt);
-	  /* ARRAY is an ASCII string.  Convert it to a multibyte string.  */
-	  STRING_SET_MULTIBYTE (array);
 	  idxval_byte = idxval;
 	  p1 = SDATA (array) + idxval_byte;
 	  prev_bytes = 1;
@@ -2696,7 +2684,7 @@ arithcompare (Lisp_Object num1, Lisp_Object num2,
       break;
 
     default:
-      eassume (false);
+      emacs_unreachable ();
     }
 
   return test ? Qt : Qnil;
@@ -3016,7 +3004,7 @@ floatop_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	    xsignal0 (Qarith_error);
 	  accum /= next;
 	  break;
-	default: eassume (false);
+	default: emacs_unreachable ();
 	}
 
     next_arg:
@@ -3077,7 +3065,7 @@ bignum_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	  mpz_tdiv_q (mpz[0], *accum, *next);
 	  break;
 	default:
-	  eassume (false);
+	  emacs_unreachable ();
 	}
       accum = &mpz[0];
 
@@ -3141,7 +3129,7 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	  case Alogand: accum &= next; continue;
 	  case Alogior: accum |= next; continue;
 	  case Alogxor: accum ^= next; continue;
-	  default: eassume (false);
+	  default: emacs_unreachable ();
 	  }
 	if (overflow)
 	  break;
@@ -3684,7 +3672,7 @@ bool_vector_binop_driver (Lisp_Object a,
       break;
 
     default:
-      eassume (0);
+      emacs_unreachable ();
     }
 
   return dest;
@@ -4034,7 +4022,7 @@ syms_of_data (void)
 
   DEFSYM (Qcdr, "cdr");
 
-  error_tail = pure_cons (Qerror, Qnil);
+  error_tail = Fcons (Qerror, Qnil);
 
   /* ERROR is used as a signaler for random errors for which nothing else is
      right.  */
@@ -4042,11 +4030,11 @@ syms_of_data (void)
   Fput (Qerror, Qerror_conditions,
 	error_tail);
   Fput (Qerror, Qerror_message,
-	build_pure_c_string ("error"));
+	build_c_string ("error"));
 
 #define PUT_ERROR(sym, tail, msg)			\
-  Fput (sym, Qerror_conditions, pure_cons (sym, tail)); \
-  Fput (sym, Qerror_message, build_pure_c_string (msg))
+  Fput (sym, Qerror_conditions, Fcons (sym, tail)); \
+  Fput (sym, Qerror_message, build_c_string (msg))
 
   PUT_ERROR (Qquit, Qnil, "Quit");
   PUT_ERROR (Qminibuffer_quit, pure_cons (Qquit, Qnil), "Quit");
@@ -4075,14 +4063,14 @@ syms_of_data (void)
   PUT_ERROR (Qno_catch, error_tail, "No catch for tag");
   PUT_ERROR (Qend_of_file, error_tail, "End of file during parsing");
 
-  arith_tail = pure_cons (Qarith_error, error_tail);
+  arith_tail = Fcons (Qarith_error, error_tail);
   Fput (Qarith_error, Qerror_conditions, arith_tail);
-  Fput (Qarith_error, Qerror_message, build_pure_c_string ("Arithmetic error"));
+  Fput (Qarith_error, Qerror_message, build_c_string ("Arithmetic error"));
 
   PUT_ERROR (Qbeginning_of_buffer, error_tail, "Beginning of buffer");
   PUT_ERROR (Qend_of_buffer, error_tail, "End of buffer");
   PUT_ERROR (Qbuffer_read_only, error_tail, "Buffer is read-only");
-  PUT_ERROR (Qtext_read_only, pure_cons (Qbuffer_read_only, error_tail),
+  PUT_ERROR (Qtext_read_only, Fcons (Qbuffer_read_only, error_tail),
 	     "Text is read-only");
   PUT_ERROR (Qinhibited_interaction, error_tail,
 	     "User interaction while inhibited");

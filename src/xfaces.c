@@ -362,18 +362,17 @@ static bool menu_face_changed_default;
 
 struct named_merge_point;
 
-static struct face *realize_face (struct face_cache *,
-				  Lisp_Object [LFACE_VECTOR_SIZE],
-				  int);
+static struct face *realize_face (struct face_cache *, struct frame *,
+                                  Lisp_Object [LFACE_VECTOR_SIZE], int);
 static struct face *realize_gui_face (struct face_cache *,
-				      Lisp_Object [LFACE_VECTOR_SIZE]);
+                                      struct frame *, Lisp_Object [LFACE_VECTOR_SIZE]);
 static struct face *realize_tty_face (struct face_cache *,
-				      Lisp_Object [LFACE_VECTOR_SIZE]);
+                                      struct frame *, Lisp_Object [LFACE_VECTOR_SIZE]);
 static bool realize_basic_faces (struct frame *);
 static bool realize_default_face (struct frame *);
 static void realize_named_face (struct frame *, Lisp_Object, int);
 static struct face_cache *make_face_cache (struct frame *);
-static void free_face_cache (struct face_cache *);
+static void free_face_cache (struct face_cache *, struct frame *);
 static bool merge_face_ref (struct window *w,
                             struct frame *, Lisp_Object, Lisp_Object *,
                             bool, struct named_merge_point *,
@@ -382,7 +381,7 @@ static int color_distance (Emacs_Color *x, Emacs_Color *y);
 
 #ifdef HAVE_WINDOW_SYSTEM
 static void set_font_frame_param (Lisp_Object, Lisp_Object);
-static void clear_face_gcs (struct face_cache *);
+static void clear_face_gcs (struct face_cache *, struct frame *);
 static struct face *realize_non_ascii_face (struct frame *, Lisp_Object,
 					    struct face *);
 #endif /* HAVE_WINDOW_SYSTEM */
@@ -645,7 +644,7 @@ free_frame_faces (struct frame *f)
 
   if (face_cache)
     {
-      free_face_cache (face_cache);
+      free_face_cache (face_cache, f);
       FRAME_FACE_CACHE (f) = NULL;
     }
 
@@ -717,7 +716,7 @@ clear_face_cache (bool clear_fonts_p)
 	{
 	  struct frame *f = XFRAME (frame);
 	  if (FRAME_WINDOW_P (f))
-	      clear_face_gcs (FRAME_FACE_CACHE (f));
+            clear_face_gcs (FRAME_FACE_CACHE (f), f);
 	}
       clear_image_caches (Qnil);
     }
@@ -1731,7 +1730,8 @@ the WIDTH times as wide as FACE on FRAME.  */)
       && EQ (AREF (LFACE, 0), Qface))
 
 
-/* Face attribute symbols for each value of LFACE_*_INDEX.  */
+/* Face attribute symbols for each value of LFACE_*_INDEX.  No need to
+   mark for GC: each value is a C symbol and thus pinned.  */
 static Lisp_Object face_attr_sym[LFACE_VECTOR_SIZE];
 
 #ifdef GLYPH_DEBUG
@@ -3926,7 +3926,7 @@ x_update_menu_appearance (struct frame *f)
 	    }
 	}
 
-      if (changed_p && f->output_data.x->menubar_widget)
+      if (changed_p && FRAME_X_OUTPUT(f)->menubar_widget)
 	free_frame_menubar (f);
 
       if (buf != line)
@@ -4071,7 +4071,7 @@ Default face attributes override any local face attributes.  */)
 {
   int i;
   Lisp_Object global_lface, local_lface, *gvec, *lvec;
-  struct frame *f = XFRAME (frame);
+  struct frame *const f = XFRAME (frame);
 
   CHECK_LIVE_FRAME (frame);
   global_lface = lface_from_face_name (NULL, face, true);
@@ -4108,7 +4108,7 @@ Default face attributes override any local face attributes.  */)
 	  memcpy (attrs, oldface->lface, sizeof attrs);
 	  merge_face_vectors (NULL, f, lvec, attrs, 0);
 	  vcopy (local_lface, 0, attrs, LFACE_VECTOR_SIZE);
-	  newface = realize_face (c, lvec, DEFAULT_FACE_ID);
+	  newface = realize_face (c, f, lvec, DEFAULT_FACE_ID);
 
 	  if ((! UNSPECIFIEDP (gvec[LFACE_FAMILY_INDEX])
 	       || ! UNSPECIFIEDP (gvec[LFACE_FOUNDRY_INDEX])
@@ -4548,7 +4548,6 @@ make_face_cache (struct frame *f)
   c->size = 50;
   c->used = 0;
   c->faces_by_id = xmalloc (c->size * sizeof *c->faces_by_id);
-  c->f = f;
   c->menu_face_changed_p = menu_face_changed_default;
   return c;
 }
@@ -4560,20 +4559,20 @@ make_face_cache (struct frame *f)
    keeping too many graphics contexts that are no longer needed.  */
 
 static void
-clear_face_gcs (struct face_cache *c)
+clear_face_gcs (struct face_cache *const c, struct frame *const f)
 {
-  if (c && FRAME_WINDOW_P (c->f))
+  if (c)
     {
-      int i;
-      for (i = BASIC_FACE_ID_SENTINEL; i < c->used; ++i)
+      eassert (FRAME_WINDOW_P (f));
+      for (int i = BASIC_FACE_ID_SENTINEL; i < c->used; ++i)
 	{
-	  struct face *face = c->faces_by_id[i];
+	  struct face *const face = c->faces_by_id[i];
 	  if (face && face->gc)
 	    {
 	      block_input ();
 	      if (face->font)
-		font_done_for_face (c->f, face);
-	      x_free_gc (c->f, face->gc);
+		font_done_for_face (f, face);
+	      x_free_gc (f, face->gc);
 	      face->gc = 0;
 	      unblock_input ();
 	    }
@@ -4589,12 +4588,11 @@ clear_face_gcs (struct face_cache *c)
    event doesn't try to use faces we destroyed.  */
 
 static void
-free_realized_faces (struct face_cache *c)
+free_realized_faces (struct face_cache *const c, struct frame *const f)
 {
   if (c && c->used)
     {
       int i, size;
-      struct frame *f = c->f;
 
       /* We must block input here because we can't process X events
 	 safely while only some faces are freed, or when the frame's
@@ -4639,22 +4637,23 @@ free_all_realized_faces (Lisp_Object frame)
     {
       Lisp_Object rest;
       FOR_EACH_FRAME (rest, frame)
-	free_realized_faces (FRAME_FACE_CACHE (XFRAME (frame)));
+	free_realized_faces (FRAME_FACE_CACHE (XFRAME (frame)),
+                             XFRAME (frame));
       windows_or_buffers_changed = 58;
     }
   else
-    free_realized_faces (FRAME_FACE_CACHE (XFRAME (frame)));
+    free_realized_faces (FRAME_FACE_CACHE (XFRAME (frame)), XFRAME (frame));
 }
 
 
 /* Free face cache C and faces in it, including their X resources.  */
 
 static void
-free_face_cache (struct face_cache *c)
+free_face_cache (struct face_cache *const c, struct frame *const f)
 {
   if (c)
     {
-      free_realized_faces (c);
+      free_realized_faces (c, f);
       xfree (c->buckets);
       xfree (c->faces_by_id);
       xfree (c);
@@ -4791,7 +4790,7 @@ lookup_face (struct frame *f, Lisp_Object *attr)
 
   /* If not found, realize a new face.  */
   if (face == NULL)
-    face = realize_face (cache, attr, -1);
+    face = realize_face (cache, f, attr, -1);
 
 #ifdef GLYPH_DEBUG
   eassert (face == FACE_FROM_ID_OR_NULL (f, face->id));
@@ -5644,7 +5643,7 @@ realize_basic_faces (struct frame *f)
 static bool
 realize_default_face (struct frame *f)
 {
-  struct face_cache *c = FRAME_FACE_CACHE (f);
+  struct face_cache *const c = FRAME_FACE_CACHE (f);
   Lisp_Object lface;
   Lisp_Object attrs[LFACE_VECTOR_SIZE];
 
@@ -5738,8 +5737,8 @@ realize_default_face (struct frame *f)
   /* Realize the face; it must be fully-specified now.  */
   eassert (lface_fully_specified_p (XVECTOR (lface)->contents));
   check_lface (lface);
-  memcpy (attrs, xvector_contents (lface), sizeof attrs);
-  struct face *face = realize_face (c, attrs, DEFAULT_FACE_ID);
+  memcpy (attrs, XVECTOR (lface)->contents, sizeof attrs);
+  struct face *face = realize_face (c, f, attrs, DEFAULT_FACE_ID);
 
 #ifndef HAVE_WINDOW_SYSTEM
   (void) face;
@@ -5792,7 +5791,7 @@ realize_named_face (struct frame *f, Lisp_Object symbol, int id)
   merge_face_vectors (NULL, f, symbol_attrs, attrs, 0);
 
   /* Realize the face.  */
-  realize_face (c, attrs, id);
+  realize_face (c, f, attrs, id);
 }
 
 
@@ -5802,8 +5801,10 @@ realize_named_face (struct frame *f, Lisp_Object symbol, int id)
    face.  Value is a pointer to the newly created realized face.  */
 
 static struct face *
-realize_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE],
-	      int former_face_id)
+realize_face (struct face_cache *const cache,
+              struct frame *const f,
+              Lisp_Object attrs[LFACE_VECTOR_SIZE],
+	      const int former_face_id)
 {
   struct face *face;
 
@@ -5816,15 +5817,15 @@ realize_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE],
       /* Remove the former face.  */
       struct face *former_face = cache->faces_by_id[former_face_id];
       uncache_face (cache, former_face);
-      free_realized_face (cache->f, former_face);
-      SET_FRAME_GARBAGED (cache->f);
+      free_realized_face (f, former_face);
+      SET_FRAME_GARBAGED (f);
     }
 
-  if (FRAME_WINDOW_P (cache->f))
-    face = realize_gui_face (cache, attrs);
-  else if (FRAME_TERMCAP_P (cache->f) || FRAME_MSDOS_P (cache->f))
-    face = realize_tty_face (cache, attrs);
-  else if (FRAME_INITIAL_P (cache->f))
+  if (FRAME_WINDOW_P (f))
+    face = realize_gui_face (cache, f, attrs);
+  else if (FRAME_TERMCAP_P (f) || FRAME_MSDOS_P (f))
+    face = realize_tty_face (cache, f, attrs);
+  else if (FRAME_INITIAL_P (f))
     {
       /* Create a dummy face. */
       face = make_realized_face (attrs);
@@ -5879,21 +5880,20 @@ realize_non_ascii_face (struct frame *f, Lisp_Object font_object,
    newly created realized face.  */
 
 static struct face *
-realize_gui_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE])
+realize_gui_face (struct face_cache *const cache,
+                  struct frame *const f,
+                  Lisp_Object attrs[LFACE_VECTOR_SIZE])
 {
   struct face *face = NULL;
 #ifdef HAVE_WINDOW_SYSTEM
   struct face *default_face;
-  struct frame *f;
   Lisp_Object stipple, underline, overline, strike_through, box;
 
-  eassert (FRAME_WINDOW_P (cache->f));
+  eassert (FRAME_WINDOW_P (f));
 
   /* Allocate a new realized face.  */
   face = make_realized_face (attrs);
   face->ascii_face = face;
-
-  f = cache->f;
 
   /* Determine the font to use.  Most of the time, the font will be
      the same as the font of the default face, so try that first.  */
@@ -6246,21 +6246,21 @@ map_tty_color (struct frame *f, struct face *face,
    Value is a pointer to the newly created realized face.  */
 
 static struct face *
-realize_tty_face (struct face_cache *cache,
+realize_tty_face (struct face_cache *const cache,
+                  struct frame *const f,
 		  Lisp_Object attrs[LFACE_VECTOR_SIZE])
 {
   struct face *face;
   int weight, slant;
   bool face_colors_defaulted = false;
-  struct frame *f = cache->f;
 
   /* Frame must be a termcap frame.  */
-  eassert (FRAME_TERMCAP_P (cache->f) || FRAME_MSDOS_P (cache->f));
+  eassert (FRAME_TERMCAP_P (f) || FRAME_MSDOS_P (f));
 
   /* Allocate a new realized face.  */
   face = make_realized_face (attrs);
 #if false
-  face->font_name = FRAME_MSDOS_P (cache->f) ? "ms-dos" : "tty";
+  face->font_name = FRAME_MSDOS_P (f) ? "ms-dos" : "tty";
 #endif
 
   /* Map face attributes to TTY appearances.  */
@@ -7077,7 +7077,7 @@ only for this purpose.  */);
 This stipple pattern is used on monochrome displays
 instead of shades of gray for a face background color.
 See `set-face-stipple' for possible values for this variable.  */);
-  Vface_default_stipple = build_pure_c_string ("gray3");
+  Vface_default_stipple = build_c_string ("gray3");
 
   DEFVAR_LISP ("tty-defined-color-alist", Vtty_defined_color_alist,
    doc: /* An alist of defined terminal colors and their RGB values.

@@ -279,6 +279,7 @@ extern int emacs_setenv_TZ (char const *);
 
 #define NO_INLINE _GL_ATTRIBUTE_NOINLINE
 #define EXTERNALLY_VISIBLE _GL_ATTRIBUTE_EXTERNALLY_VISIBLE
+#define ALWAYS_INLINE _GL_ATTRIBUTE_ALWAYS_INLINE
 
 #if GNUC_PREREQ (4, 4, 0) && defined __GLIBC_MINOR__
 # define PRINTF_ARCHETYPE __gnu_printf__

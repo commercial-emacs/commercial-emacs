@@ -148,7 +148,7 @@ CHAR_BYTE8_HEAD_P (int byte)
 INLINE int
 make_char_multibyte (int c)
 {
-  eassert (SINGLE_BYTE_CHAR_P (c));
+  eassume (SINGLE_BYTE_CHAR_P (c));
   return UNIBYTE_TO_CHAR (c);
 }
 
@@ -594,9 +594,9 @@ INLINE int
 char_table_translate (Lisp_Object obj, int ch)
 {
   /* This internal function is expected to be called with valid arguments,
-     so there is an eassert instead of CHECK_xxx for the sake of speed.  */
-  eassert (CHAR_VALID_P (ch));
-  eassert (CHAR_TABLE_P (obj));
+     so there is an eassume instead of CHECK_xxx for the sake of speed.  */
+  eassume (CHAR_VALID_P (ch));
+  eassume (CHAR_TABLE_P (obj));
   obj = CHAR_TABLE_REF (obj, ch);
   return CHARACTERP (obj) ? XFIXNUM (obj) : ch;
 }

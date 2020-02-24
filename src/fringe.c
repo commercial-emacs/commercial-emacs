@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "termhooks.h"
 #include "pdumper.h"
+#include "alloc.h"
 
 #ifdef HAVE_PGTK
 # include "pgtkterm.h"
@@ -1764,9 +1765,10 @@ If nil, also continue lines which are exactly as wide as the window.  */);
 /* Garbage collection hook */
 
 void
-mark_fringe_data (void)
+scan_fringe_data (const gc_phase phase)
 {
-  mark_objects (fringe_faces, max_fringe_bitmaps);
+  for (int i = 0; i < max_fringe_bitmaps; i++)
+    xscan_reference (&fringe_faces[i], phase);
 }
 
 /* Initialize this module when Emacs starts.  */

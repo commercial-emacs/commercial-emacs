@@ -58,7 +58,7 @@ INLINE_HEADER_BEGIN
 INLINE struct Lisp_Bignum *
 XBIGNUM (Lisp_Object a)
 {
-  eassert (BIGNUMP (a));
+  eassume (BIGNUMP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Bignum);
 }
 

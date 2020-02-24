@@ -2071,6 +2071,28 @@ nil.  */)
      context structure.  This code cargo-cults from the existing
      caller in src/analyze.c of GNU Diffutils, which appears to
      work.  */
+  if (NILP (max_costs))
+    XSETFASTINT (max_costs, 1000000);
+  else
+    CHECK_FIXNUM (max_costs);
+
+  struct timespec time_limit = make_timespec (0, -1);
+  if (!NILP (max_secs))
+    {
+      struct timespec
+	tlim = timespec_add (current_timespec (),
+			     lisp_time_argument (max_secs)),
+	tmax = make_timespec (TYPE_MAXIMUM (time_t), TIMESPEC_HZ - 1);
+      if (timespec_cmp (tlim, tmax) < 0)
+	time_limit = tlim;
+    }
+
+  /* Micro-optimization: Casting to size_t generates much better
+     code.  */
+  ptrdiff_t del_bytes = (size_t) size_a / CHAR_BIT + 1;
+  ptrdiff_t ins_bytes = (size_t) size_b / CHAR_BIT + 1;
+  void *const a_deletions = SAFE_ALLOCA (del_bytes);
+  void* const a_insertions = SAFE_ALLOCA (ins_bytes);
   struct context ctx = {
     .buffer_a = a,
     .buffer_b = b,
@@ -2078,8 +2100,8 @@ nil.  */)
     .beg_b = min_b,
     .a_unibyte = BUF_ZV (a) == BUF_ZV_BYTE (a),
     .b_unibyte = BUF_ZV (b) == BUF_ZV_BYTE (b),
-    .deletions = deletions_insertions,
-    .insertions = deletions_insertions + del_bytes,
+    .deletions = a_deletions,
+    .insertions = a_insertions,
     .fdiag = buffer + size_b + 1,
     .bdiag = buffer + diags + size_b + 1,
     .heuristic = true,
@@ -3683,7 +3705,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		    {
 		      double d = XFLOAT_DATA (arg);
 		      double abs_d = fabs (d);
-		      if (abs_d < UINTMAX_MAX + 1.0)
+		      if (abs_d < (double) UINTMAX_MAX + 1.0)
 			{
 			  negative = d <= -1;
 			  x = abs_d;

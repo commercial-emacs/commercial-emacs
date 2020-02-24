@@ -966,6 +966,7 @@ struct x_output
 /* This gives the ns_display_info structure for the display F is on.  */
 #define FRAME_DISPLAY_INFO(f) ((f)->output_data.ns->display_info)
 #define FRAME_OUTPUT_DATA(f) ((f)->output_data.ns)
+#define FRAME_OUTPUT_DATA_NOCHECK FRAME_OUTPUT_DATA
 #define FRAME_NS_WINDOW(f) ((f)->output_data.ns->window_desc)
 #define FRAME_NATIVE_WINDOW(f) FRAME_NS_WINDOW (f)
 
@@ -982,6 +983,7 @@ struct x_output
 #define FRAME_POINTER_TYPE(f) ((f)->output_data.ns->current_pointer)
 
 #define FRAME_FONT(f) ((f)->output_data.ns->font)
+#define FRAME_FONT_NOCHECK FRAME_FONT
 
 #ifdef __OBJC__
 #define XNS_SCROLL_BAR(vec) ((id) xmint_pointer (vec))

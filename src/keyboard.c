@@ -70,6 +70,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <ignore-value.h>
 
 #include "pdumper.h"
+#include "alloc.h"
 
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
@@ -2841,9 +2842,7 @@ read_char (int commandflag, Lisp_Object map,
 	    }
 	}
 
-      /* If there is still no input available, ask for GC.  */
-      if (! detect_input_pending_run_timers (0))
-	maybe_garbage_collect ();
+      detect_input_pending_run_timers (0);
     }
 
   /* Notify the caller if an autosave hook, or a timer, sentinel or
@@ -11294,7 +11293,7 @@ handle_interrupt (bool in_signal_handler)
 
       /* It doesn't work to autosave while GC is in progress;
 	 the code used for auto-saving doesn't cope with the mark bit.  */
-      if (!gc_in_progress)
+      if (!gc_is_in_progress ())
 	{
 	  write_stdout ("Auto-save? (y or n) ");
 	  c = read_stdin ();
@@ -11966,14 +11965,14 @@ syms_of_keyboard (void)
   pending_funcalls = Qnil;
   staticpro (&pending_funcalls);
 
-  Vlispy_mouse_stem = build_pure_c_string ("mouse");
+  Vlispy_mouse_stem = build_c_string ("mouse");
   staticpro (&Vlispy_mouse_stem);
 
-  regular_top_level_message = build_pure_c_string ("Back to top level");
+  regular_top_level_message = build_c_string ("Back to top level");
   staticpro (&regular_top_level_message);
 #ifdef HAVE_STACK_OVERFLOW_HANDLING
   recover_top_level_message
-    = build_pure_c_string ("Re-entering top level after C stack overflow");
+    = build_c_string ("Re-entering top level after C stack overflow");
   staticpro (&recover_top_level_message);
 #endif
   DEFVAR_LISP ("internal--top-level-message", Vinternal__top_level_message,
@@ -12216,6 +12215,9 @@ syms_of_keyboard (void)
 
   pinch_syms = Qnil;
   staticpro (&pinch_syms);
+
+  echo_message_buffer = Qnil;
+  staticpro (&echo_message_buffer);
 
   unread_switch_frame = Qnil;
   staticpro (&unread_switch_frame);
@@ -12488,7 +12490,7 @@ for that character after that prefix key.  */);
 	       doc: /* Form to evaluate when Emacs starts up.
 Useful to set before you dump a modified Emacs.  */);
   Vtop_level = Qnil;
-  XSYMBOL (Qtop_level)->u.s.declared_special = false;
+  XSYMBOL (Qtop_level)->u.s.f.declared_special = false;
 
   DEFVAR_KBOARD ("keyboard-translate-table", Vkeyboard_translate_table,
                  doc: /* Translate table for local keyboard input, or nil.
@@ -12888,7 +12890,7 @@ and other useful cleanups.  These cleanups are potentially unsafe and may
 lead to deadlocks or data corruption, but it usually works and may
 preserve data in modified buffers that would otherwise be lost.
 If nil, Emacs crashes immediately in response to fatal signals.  */);
-  attempt_orderly_shutdown_on_fatal_signal = true;
+  attempt_orderly_shutdown_on_fatal_signal = false /* XXX */;
 
   DEFVAR_LISP ("while-no-input-ignore-events",
                Vwhile_no_input_ignore_events,
@@ -13039,31 +13041,35 @@ keys_of_keyboard (void)
 /* Mark the pointers in the kboard objects.
    Called by Fgarbage_collect.  */
 void
-mark_kboards (void)
+scan_kboards (const gc_phase phase)
 {
+  Lisp_Object *p;
+  xscan_reference_pointer_to_vectorlike (&buffer_before_last_command_or_undo,
+                                         phase);
+
   for (KBOARD *kb = all_kboards; kb; kb = kb->next_kboard)
     {
       if (kb->kbd_macro_buffer)
-	mark_objects (kb->kbd_macro_buffer,
-		      kb->kbd_macro_ptr - kb->kbd_macro_buffer);
-      mark_object (KVAR (kb, Voverriding_terminal_local_map));
-      mark_object (KVAR (kb, Vlast_command));
-      mark_object (KVAR (kb, Vreal_last_command));
-      mark_object (KVAR (kb, Vkeyboard_translate_table));
-      mark_object (KVAR (kb, Vlast_repeatable_command));
-      mark_object (KVAR (kb, Vprefix_arg));
-      mark_object (KVAR (kb, Vlast_prefix_arg));
-      mark_object (KVAR (kb, kbd_queue));
-      mark_object (KVAR (kb, defining_kbd_macro));
-      mark_object (KVAR (kb, Vlast_kbd_macro));
-      mark_object (KVAR (kb, Vsystem_key_alist));
-      mark_object (KVAR (kb, system_key_syms));
-      mark_object (KVAR (kb, Vwindow_system));
-      mark_object (KVAR (kb, Vinput_decode_map));
-      mark_object (KVAR (kb, Vlocal_function_key_map));
-      mark_object (KVAR (kb, Vdefault_minibuffer_frame));
-      mark_object (KVAR (kb, echo_string));
-      mark_object (KVAR (kb, echo_prompt));
+        for (p = kb->kbd_macro_buffer; p < kb->kbd_macro_ptr; p++)
+          xscan_reference (p, phase);
+      xscan_reference (&KVAR (kb, Voverriding_terminal_local_map), phase);
+      xscan_reference (&KVAR (kb, Vlast_command), phase);
+      xscan_reference (&KVAR (kb, Vreal_last_command), phase);
+      xscan_reference (&KVAR (kb, Vkeyboard_translate_table), phase);
+      xscan_reference (&KVAR (kb, Vlast_repeatable_command), phase);
+      xscan_reference (&KVAR (kb, Vprefix_arg), phase);
+      xscan_reference (&KVAR (kb, Vlast_prefix_arg), phase);
+      xscan_reference (&KVAR (kb, kbd_queue), phase);
+      xscan_reference (&KVAR (kb, defining_kbd_macro), phase);
+      xscan_reference (&KVAR (kb, Vlast_kbd_macro), phase);
+      xscan_reference (&KVAR (kb, Vsystem_key_alist), phase);
+      xscan_reference (&KVAR (kb, system_key_syms), phase);
+      xscan_reference (&KVAR (kb, Vwindow_system), phase);
+      xscan_reference (&KVAR (kb, Vinput_decode_map), phase);
+      xscan_reference (&KVAR (kb, Vlocal_function_key_map), phase);
+      xscan_reference (&KVAR (kb, Vdefault_minibuffer_frame), phase);
+      xscan_reference (&KVAR (kb, echo_string), phase);
+      xscan_reference (&KVAR (kb, echo_prompt), phase);
     }
 
   for (union buffered_input_event *event = kbd_fetch_ptr;
@@ -13073,16 +13079,16 @@ mark_kboards (void)
       if (event->kind != SELECTION_REQUEST_EVENT
 	  && event->kind != SELECTION_CLEAR_EVENT)
 	{
-	  mark_object (event->ie.x);
-	  mark_object (event->ie.y);
-	  mark_object (event->ie.frame_or_window);
-	  mark_object (event->ie.arg);
+	  xscan_reference (&event->ie.x, phase);
+	  xscan_reference (&event->ie.y, phase);
+	  xscan_reference (&event->ie.frame_or_window, phase);
+	  xscan_reference (&event->ie.arg, phase);
 
 	  /* This should never be allocated for a single event, but
 	     mark it anyway in the situation where the list of devices
 	     changed but an event with an old device is still present
 	     in the queue.  */
-	  mark_object (event->ie.device);
+	  xscan_reference (&event->ie.device, phase);
 	}
     }
 }

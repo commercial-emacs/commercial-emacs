@@ -112,7 +112,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "syntax.h"
 #include "sysselect.h"
 #include "systime.h"
-#include "puresize.h"
 
 #include "getpagesize.h"
 #include "gnutls.h"
@@ -2480,7 +2479,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   /* Enter editor command loop.  This never returns.  */
   set_initial_minibuffer_mode ();
   Frecursive_edit ();
-  eassume (false);
+  emacs_unreachable ();
 }
 
 /* Sort the args so we can find the most important ones
@@ -3010,8 +3009,6 @@ You must run Emacs in batch mode in order to dump it.  */)
   Lisp_Object tem;
   Lisp_Object symbol;
   specpdl_ref count = SPECPDL_INDEX ();
-
-  check_pure_size ();
 
   if (! noninteractive)
     error ("Dumping Emacs works only in batch mode");

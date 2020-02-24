@@ -219,7 +219,7 @@ CHECK_PROCESS (Lisp_Object x)
 INLINE struct Lisp_Process *
 XPROCESS (Lisp_Object a)
 {
-  eassert (PROCESSP (a));
+  eassume (PROCESSP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Process);
 }
 

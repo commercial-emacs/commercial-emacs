@@ -31,9 +31,16 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* A system mutex is just a pthread mutex.  This is only used for the
    GIL.  */
-typedef pthread_mutex_t sys_mutex_t;
 
-typedef pthread_cond_t sys_cond_t;
+typedef struct {
+  pthread_mutex_t mutex;
+  bool initialized;
+} sys_mutex_t;
+
+typedef struct {
+  pthread_cond_t cond;
+  bool initialized;
+} sys_cond_t;
 
 /* A system thread.  */
 typedef pthread_t sys_thread_t;

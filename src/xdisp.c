@@ -208,6 +208,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "fontset.h"
 #include "blockinput.h"
 #include "xwidget.h"
+#include "alloc.h"
+
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
@@ -405,7 +407,7 @@ static struct text_pos static_sline_min_pos;
 
 /* Buffer that static_sline_.* variables are referring to.  */
 
-static struct buffer *static_sline_buffer;
+static Lisp_Object static_sline_buffer;
 
 /* True if an overlay arrow has been displayed in this window.  */
 
@@ -14997,7 +14999,8 @@ redisplay_internal (void)
       && !XFRAME (w->frame)->cursor_type_changed
       && !XFRAME (w->frame)->face_change
       /* Make sure recorded data applies to current buffer, etc.  */
-      && static_sline_buffer == current_buffer
+      && EQ (static_sline_buffer,
+             make_lisp_ptr (current_buffer, Lisp_Vectorlike))
       && match_p
       && !w->force_start
       && !w->optional_new_start
@@ -15560,6 +15563,7 @@ redisplay_internal (void)
     request_sigio ();
 
   unbind_to (count, Qnil);
+  displayed_buffer = NULL;
   RESUME_POLLING;
 }
 
@@ -15783,6 +15787,7 @@ redisplay_windows (Lisp_Object window)
 
       window = w->next;
     }
+  displayed_buffer = NULL;
 }
 
 static Lisp_Object
@@ -16372,7 +16377,7 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	  && ! MATRIX_ROW_CONTINUATION_LINE_P (row)
 	  && row->x == 0)
 	{
-	  static_sline_buffer = XBUFFER (w->contents);
+	  static_sline_buffer = w->contents;
 
 	  CHARPOS (static_sline_start_pos)
 	    = MATRIX_ROW_START_CHARPOS (row) + delta;
@@ -23565,7 +23570,7 @@ in order to avoid these problems.  */)
 	    nglyphs++;
 
 	  /* Create and fill the array.  */
-	  levels = make_uninit_vector (nglyphs);
+	  levels = make_nil_vector (nglyphs);
 	  for (i = 0; g1 < g; i++, g1++)
 	    ASET (levels, i, make_fixnum (g1->resolved_level));
 	}
@@ -23580,7 +23585,7 @@ in order to avoid these problems.  */)
 	  g1 = g;
 	  for (nglyphs = 0; g > e && !NILP (g->object); g--)
 	    nglyphs++;
-	  levels = make_uninit_vector (nglyphs);
+	  levels = make_nil_vector (nglyphs);
 	  for (i = 0; g1 > g; i++, g1--)
 	    ASET (levels, i, make_fixnum (g1->resolved_level));
 	}
@@ -27451,6 +27456,7 @@ draw_glyphs (struct window *w, int x, struct glyph_row *row,
 {
   struct glyph_string *head, *tail;
   struct glyph_string *s;
+  if (enable_checking) s = NULL;  /* Pacify compiler */
   struct glyph_string *clip_head = NULL, *clip_tail = NULL;
   int i, j, x_reached, last_x, area_left = 0;
   struct frame *f = XFRAME (WINDOW_FRAME (w));
@@ -33253,6 +33259,12 @@ gui_intersect_rectangles (const Emacs_Rectangle *r1, const Emacs_Rectangle *r2,
  ***********************************************************************/
 
 void
+scan_xdisp_roots (gc_phase phase)
+{
+  xscan_reference_pointer_to_vectorlike (&displayed_buffer, phase);
+}
+
+void
 syms_of_xdisp (void)
 {
   Vwith_echo_area_save_vector = Qnil;
@@ -33283,12 +33295,24 @@ places where they are necessary.  This variable is intended to
 be let-bound around code that needs to disable messages temporarily. */);
   inhibit_message = false;
 
-  message_dolog_marker1 = Fmake_marker ();
   staticpro (&message_dolog_marker1);
-  message_dolog_marker2 = Fmake_marker ();
+  message_dolog_marker1 = Fmake_marker ();
   staticpro (&message_dolog_marker2);
-  message_dolog_marker3 = Fmake_marker ();
+  message_dolog_marker2 = Fmake_marker ();
   staticpro (&message_dolog_marker3);
+  message_dolog_marker3 = Fmake_marker ();
+
+  staticpro (&this_line_buffer);
+
+  /* The default ellipsis glyphs `...'.  */
+  for (int i = 0; i < ARRAYELTS (default_invis_vector); ++i)
+    {
+      default_invis_vector[i] = make_fixnum ('.');
+      staticpro (&default_invis_vector[i]);
+    }
+
+  echo_area_window = Qnil;
+  staticpro (&echo_area_window);
 
   defsubr (&Sset_buffer_redisplay);
 #ifdef HAVE_WINDOW_SYSTEM
@@ -33552,7 +33576,7 @@ See also `overlay-arrow-string'.  */);
   DEFVAR_LISP ("overlay-arrow-string", Voverlay_arrow_string,
     doc: /* String to display as an arrow in non-window frames.
 See also `overlay-arrow-position'.  */);
-  Voverlay_arrow_string = build_pure_c_string ("=>");
+  Voverlay_arrow_string = build_c_string ("=>");
 
   DEFVAR_LISP ("overlay-arrow-variable-list", Voverlay_arrow_variable_list,
     doc: /* List of variables (symbols) which hold markers for overlay arrows.
@@ -33690,14 +33714,14 @@ and is used only on frames for which no explicit name has been set
   /* Do not nest calls to pure_list.  This works around a bug in
      Oracle Developer Studio 12.6.  */
   Lisp_Object icon_title_name_format
-    = pure_list (empty_unibyte_string,
-		 build_pure_c_string ("%b - Commercial Emacs at "),
-		 intern_c_string ("system-name"));
+    = list (empty_unibyte_string,
+	    build_c_string ("%b - Commercial Emacs at "),
+	    intern_c_string ("system-name"));
   Vicon_title_format
     = Vframe_title_format
-    = pure_list (intern_c_string ("multiple-frames"),
-		 build_pure_c_string ("%b"),
-		 icon_title_name_format);
+    = list (intern_c_string ("multiple-frames"),
+            build_c_string ("%b"),
+            icon_title_name_format);
 
   DEFVAR_LISP ("message-log-max", Vmessage_log_max,
     doc: /* Maximum number of lines to keep in the message log buffer.
@@ -34304,7 +34328,6 @@ init_xdisp (void)
       struct frame *f = XFRAME (frame);
       Lisp_Object root = FRAME_ROOT_WINDOW (f);
       struct window *r = XWINDOW (root);
-      int i;
 
       r->top_line = FRAME_TOP_MARGIN (f);
       r->pixel_top = r->top_line * FRAME_LINE_HEIGHT (f);
@@ -34323,10 +34346,6 @@ init_xdisp (void)
       scratch_glyph_row.glyphs[TEXT_AREA] = scratch_glyphs;
       scratch_glyph_row.glyphs[TEXT_AREA + 1]
 	= scratch_glyphs + MAX_SCRATCH_GLYPHS;
-
-      /* The default ellipsis glyphs `...'.  */
-      for (i = 0; i < 3; ++i)
-	default_invis_vector[i] = make_fixnum ('.');
     }
 
   {

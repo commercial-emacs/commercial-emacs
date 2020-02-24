@@ -637,6 +637,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "sysselect.h"
 #include "menu.h"
 #include "pdumper.h"
+#include "alloc.h"
 
 #ifdef USE_X_TOOLKIT
 #include <X11/Shell.h>
@@ -5212,7 +5213,7 @@ x_display_info_for_display (Display *dpy)
 static Window
 x_find_topmost_parent (struct frame *f)
 {
-  struct x_output *x = f->output_data.x;
+  struct x_output *x = FRAME_X_OUTPUT (f);
   Window win = None, wi = x->parent_desc;
   Display *dpy = FRAME_X_DISPLAY (f);
 
@@ -5340,14 +5341,14 @@ x_draw_vertical_window_border (struct window *w, int x, int y0, int y1)
 
   face = FACE_FROM_ID_OR_NULL (f, VERTICAL_BORDER_FACE_ID);
   if (face)
-    XSetForeground (FRAME_X_DISPLAY (f), f->output_data.x->normal_gc,
+    XSetForeground (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->normal_gc,
 		    face->foreground);
 
 #ifdef USE_CAIRO
   x_fill_rectangle (f, f->output_data.x->normal_gc, x, y0, 1, y1 - y0, false);
 #else
   XDrawLine (FRAME_X_DISPLAY (f), FRAME_X_DRAWABLE (f),
-	     f->output_data.x->normal_gc, x, y0, x, y1);
+	     FRAME_X_OUTPUT(f)->normal_gc, x, y0, x, y1);
 #endif
 }
 
@@ -5586,7 +5587,7 @@ x_clear_under_internal_border (struct frame *f)
 	{
 	  unsigned long color = face->background;
 	  Display *display = FRAME_X_DISPLAY (f);
-	  GC gc = f->output_data.x->normal_gc;
+	  GC gc = FRAME_X_OUTPUT(f)->normal_gc;
 
 	  XSetForeground (display, gc, color);
 	  x_fill_rectangle (f, gc, 0, margin, width, border, false);
@@ -5656,7 +5657,7 @@ x_after_update_window_line (struct window *w, struct glyph_row *desired_row)
 	  {
 	    unsigned long color = face->background;
 	    Display *display = FRAME_X_DISPLAY (f);
-	    GC gc = f->output_data.x->normal_gc;
+	    GC gc = FRAME_X_OUTPUT(f)->normal_gc;
 
 	    XSetForeground (display, gc, color);
 	    x_fill_rectangle (f, gc, 0, y, width, height, true);
@@ -5680,7 +5681,7 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fring
 {
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   Display *display = FRAME_X_DISPLAY (f);
-  GC gc = f->output_data.x->normal_gc;
+  GC gc = FRAME_X_OUTPUT(f)->normal_gc;
   struct face *face = p->face;
 
   /* Must clip because of partially visible lines.  */
@@ -5714,7 +5715,7 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fring
       XGetGCValues (display, gc, GCForeground | GCBackground, &gcv);
       XSetForeground (display, gc, (p->cursor_p
 				    ? (p->overlay_p ? face->background
-				       : f->output_data.x->cursor_pixel)
+				       : FRAME_X_OUTPUT(f)->cursor_pixel)
 				    : face->foreground));
       XSetBackground (display, gc, face->background);
       if (!fringe_bmp[p->which])
@@ -5776,7 +5777,7 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fring
       pixmap = XCreatePixmapFromBitmapData (display, drawable, bits, p->wd, p->h,
 					    (p->cursor_p
 					     ? (p->overlay_p ? face->background
-						: f->output_data.x->cursor_pixel)
+						: FRAME_X_OUTPUT(f)->cursor_pixel)
 					     : face->foreground),
 					    background, depth);
 
@@ -5947,7 +5948,7 @@ x_set_cursor_gc (struct glyph_string *s)
       && s->face->background == FRAME_BACKGROUND_PIXEL (s->f)
       && s->face->foreground == FRAME_FOREGROUND_PIXEL (s->f)
       && !s->cmp)
-    s->gc = s->f->output_data.x->cursor_gc;
+    s->gc = FRAME_X_OUTPUT(s->f)->cursor_gc;
   else
     {
       /* Cursor on non-default face: must merge.  */
@@ -5955,14 +5956,14 @@ x_set_cursor_gc (struct glyph_string *s)
       unsigned long mask;
       Display *display = FRAME_X_DISPLAY (s->f);
 
-      xgcv.background = s->f->output_data.x->cursor_pixel;
+      xgcv.background = FRAME_X_OUTPUT(s->f)->cursor_pixel;
       xgcv.foreground = s->face->background;
 
       /* If the glyph would be invisible, try a different foreground.  */
       if (xgcv.foreground == xgcv.background)
 	xgcv.foreground = s->face->foreground;
       if (xgcv.foreground == xgcv.background)
-	xgcv.foreground = s->f->output_data.x->cursor_foreground_pixel;
+	xgcv.foreground = FRAME_X_OUTPUT(s->f)->cursor_foreground_pixel;
       if (xgcv.foreground == xgcv.background)
 	xgcv.foreground = s->face->foreground;
 
@@ -6517,7 +6518,7 @@ x_frame_of_widget (Widget widget)
       f = XFRAME (frame);
       if (FRAME_X_P (f)
 	  && FRAME_DISPLAY_INFO (f) == dpyinfo
-	  && f->output_data.x->widget == widget)
+	  && FRAME_X_OUTPUT(f)->widget == widget)
 	return f;
     }
   emacs_abort ();
@@ -6697,6 +6698,9 @@ x_color_cells (Display *dpy, int *ncells)
 {
   struct x_display_info *dpyinfo = x_display_info_for_display (dpy);
   eassume (dpyinfo);
+  /* Pacify compiler.  */
+  if (!dpyinfo)
+    emacs_abort ();
 
   if (dpyinfo->color_cells == NULL)
     {
@@ -7008,6 +7012,9 @@ x_alloc_nearest_color_1 (Display *dpy, Colormap cmap, XColor *color)
       struct x_display_info *dpyinfo = x_display_info_for_display (dpy);
       eassume (dpyinfo);
 
+      /* Pacify compiler.  */
+      if (!dpyinfo)
+        emacs_abort ();
       if (dpyinfo->color_cells)
 	{
 	  XColor *cached_color = &dpyinfo->color_cells[color->pixel];
@@ -7180,7 +7187,7 @@ x_alloc_lighter_color (struct frame *f, Display *display, Colormap cmap,
    string S.  RELIEF is a pointer to a struct relief containing the GC
    with which lines will be drawn.  Use a color that is FACTOR or
    DELTA lighter or darker than the relief's background which is found
-   in S->f->output_data.x->relief_background.  If such a color cannot
+   in S->FRAME_X_OUTPUT(f)->relief_background.  If such a color cannot
    be allocated, use DEFAULT_PIXEL, instead.  */
 
 static void
@@ -7188,7 +7195,7 @@ x_setup_relief_color (struct frame *f, struct relief *relief, double factor,
 		      int delta, unsigned long default_pixel)
 {
   XGCValues xgcv;
-  struct x_output *di = f->output_data.x;
+  struct x_output *di = FRAME_X_OUTPUT (f);
   unsigned long mask = GCForeground | GCLineWidth | GCGraphicsExposures;
   unsigned long pixel;
   unsigned long background = di->relief_background;
@@ -7231,7 +7238,7 @@ x_setup_relief_color (struct frame *f, struct relief *relief, double factor,
 static void
 x_setup_relief_colors (struct glyph_string *s)
 {
-  struct x_output *di = s->f->output_data.x;
+  struct x_output *di = FRAME_X_OUTPUT (s->f);
   unsigned long color;
 
   if (s->face->use_box_color_for_shadows_p)
@@ -7282,13 +7289,13 @@ x_draw_relief_rect (struct frame *f,
 
   if (raised_p)
     {
-      top_left_gc = f->output_data.x->white_relief.gc;
-      bottom_right_gc = f->output_data.x->black_relief.gc;
+      top_left_gc = FRAME_X_OUTPUT(f)->white_relief.gc;
+      bottom_right_gc = FRAME_X_OUTPUT(f)->black_relief.gc;
     }
   else
     {
-      top_left_gc = f->output_data.x->black_relief.gc;
-      bottom_right_gc = f->output_data.x->white_relief.gc;
+      top_left_gc = FRAME_X_OUTPUT(f)->black_relief.gc;
+      bottom_right_gc = FRAME_X_OUTPUT(f)->white_relief.gc;
     }
 
   x_set_clip_rectangles (f, top_left_gc, clip_rect, 1);
@@ -7355,9 +7362,9 @@ x_draw_relief_rect (struct frame *f,
   GC gc;
 
   if (raised_p)
-    gc = f->output_data.x->white_relief.gc;
+    gc = FRAME_X_OUTPUT(f)->white_relief.gc;
   else
-    gc = f->output_data.x->black_relief.gc;
+    gc = FRAME_X_OUTPUT(f)->black_relief.gc;
   XSetClipRectangles (dpy, gc, 0, 0, clip_rect, 1, Unsorted);
 
   /* This code is more complicated than it has to be, because of two
@@ -7393,9 +7400,9 @@ x_draw_relief_rect (struct frame *f,
 
   XSetClipMask (dpy, gc, None);
   if (raised_p)
-    gc = f->output_data.x->black_relief.gc;
+    gc = FRAME_X_OUTPUT(f)->black_relief.gc;
   else
-    gc = f->output_data.x->white_relief.gc;
+    gc = FRAME_X_OUTPUT(f)->white_relief.gc;
   XSetClipRectangles (dpy, gc, 0, 0, clip_rect, 1, Unsorted);
 
   /* Outermost top line.  */
@@ -8608,7 +8615,7 @@ x_shift_glyphs_for_insert (struct frame *f, int x, int y, int width, int height,
    https://lists.gnu.org/r/emacs-devel/2015-05/msg00456.html
 */
   XCopyArea (FRAME_X_DISPLAY (f), FRAME_X_DRAWABLE (f), FRAME_X_DRAWABLE (f),
-	     f->output_data.x->normal_gc,
+	     FRAME_X_OUTPUT(f)->normal_gc,
 	     x, y, width, height,
 	     x + shift_by, y);
 }
@@ -9123,7 +9130,7 @@ x_scroll_run (struct window *w, struct run *run)
 	  cairo_surface_flush (surface);
 	  XCopyArea (FRAME_X_DISPLAY (f),
 		     FRAME_X_DRAWABLE (f), FRAME_X_DRAWABLE (f),
-		     f->output_data.x->normal_gc,
+		     FRAME_X_OUTPUT(f)->normal_gc,
 		     x, from_y,
 		     width, height,
 		     x, to_y);
@@ -9166,7 +9173,7 @@ x_scroll_run (struct window *w, struct run *run)
 #endif	/* USE_CAIRO */
     XCopyArea (FRAME_X_DISPLAY (f),
 	       FRAME_X_DRAWABLE (f), FRAME_X_DRAWABLE (f),
-	       f->output_data.x->normal_gc,
+	       FRAME_X_OUTPUT(f)->normal_gc,
 	       x, from_y,
 	       width, height,
 	       x, to_y);
@@ -9195,7 +9202,7 @@ x_frame_highlight (struct frame *f)
      because of this (bug#9310).  */
   x_catch_errors (FRAME_X_DISPLAY (f));
   XSetWindowBorder (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		    f->output_data.x->border_pixel);
+		    FRAME_X_OUTPUT(f)->border_pixel);
   x_uncatch_errors ();
   unblock_input ();
   gui_update_cursor (f, true);
@@ -9213,7 +9220,7 @@ x_frame_unhighlight (struct frame *f)
   /* Same as above for XSetWindowBorder (bug#9310).  */
   x_catch_errors (FRAME_X_DISPLAY (f));
   XSetWindowBorderPixmap (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-			  f->output_data.x->border_tile);
+			  FRAME_X_OUTPUT(f)->border_tile);
   x_uncatch_errors ();
   unblock_input ();
   gui_update_cursor (f, true);
@@ -9292,7 +9299,7 @@ x_focus_changed (int type, int state, struct x_display_info *dpyinfo, struct fra
           XSETFRAME (bufp->frame_or_window, frame);
         }
 
-      frame->output_data.x->focus_state |= state;
+      FRAME_X_OUTPUT(frame)->focus_state |= state;
 
 #ifdef HAVE_X_I18N
       if (FRAME_XIC (frame))
@@ -9312,7 +9319,7 @@ x_focus_changed (int type, int state, struct x_display_info *dpyinfo, struct fra
     }
   else if (type == FocusOut)
     {
-      frame->output_data.x->focus_state &= ~state;
+      FRAME_X_OUTPUT(frame)->focus_state &= ~state;
 
       if (dpyinfo->x_focus_event_frame == frame)
         {
@@ -9368,28 +9375,28 @@ x_window_to_frame (struct x_display_info *dpyinfo, int wdesc)
       f = XFRAME (frame);
       if (!FRAME_X_P (f) || FRAME_DISPLAY_INFO (f) != dpyinfo)
 	continue;
-      if (f->output_data.x->hourglass_window == wdesc)
+      if (FRAME_X_OUTPUT(f)->hourglass_window == wdesc)
 	return f;
 #ifdef USE_X_TOOLKIT
-      if ((f->output_data.x->edit_widget
-	   && XtWindow (f->output_data.x->edit_widget) == wdesc)
+      if ((FRAME_X_OUTPUT(f)->edit_widget
+	   && XtWindow (FRAME_X_OUTPUT(f)->edit_widget) == wdesc)
 	  /* A tooltip frame?  */
-	  || (!f->output_data.x->edit_widget
+	  || (!FRAME_X_OUTPUT(f)->edit_widget
 	      && FRAME_X_WINDOW (f) == wdesc)
-          || f->output_data.x->icon_desc == wdesc)
+          || FRAME_X_OUTPUT(f)->icon_desc == wdesc)
         return f;
 #else /* not USE_X_TOOLKIT */
 #ifdef USE_GTK
-      if (f->output_data.x->edit_widget)
+      if (FRAME_X_OUTPUT(f)->edit_widget)
       {
         GtkWidget *gwdesc = xg_win_to_widget (dpyinfo->display, wdesc);
-        struct x_output *x = f->output_data.x;
+        struct x_output *x = FRAME_X_OUTPUT (f);
         if (gwdesc != 0 && gwdesc == x->edit_widget)
           return f;
       }
 #endif /* USE_GTK */
       if (FRAME_X_WINDOW (f) == wdesc
-          || f->output_data.x->icon_desc == wdesc)
+          || FRAME_X_OUTPUT(f)->icon_desc == wdesc)
         return f;
 #endif /* not USE_X_TOOLKIT */
     }
@@ -9426,7 +9433,7 @@ x_any_window_to_frame (struct x_display_info *dpyinfo, int wdesc)
       if (FRAME_X_P (f) && FRAME_DISPLAY_INFO (f) == dpyinfo)
 	{
 	  /* This frame matches if the window is any of its widgets.  */
-	  x = f->output_data.x;
+	  x = FRAME_X_OUTPUT(f);
 	  if (x->hourglass_window == wdesc)
 	    found = f;
 	  else if (x->widget)
@@ -9483,7 +9490,7 @@ x_menubar_window_to_frame (struct x_display_info *dpyinfo,
       f = XFRAME (frame);
       if (!FRAME_X_P (f) || FRAME_DISPLAY_INFO (f) != dpyinfo)
 	continue;
-      x = f->output_data.x;
+      x = FRAME_X_OUTPUT(f);
 #ifdef USE_GTK
       if (x->menubar_widget && xg_event_is_for_menubar (f, event))
         return f;
@@ -9515,8 +9522,7 @@ x_top_window_to_frame (struct x_display_info *dpyinfo, int wdesc)
       f = XFRAME (frame);
       if (!FRAME_X_P (f) || FRAME_DISPLAY_INFO (f) != dpyinfo)
 	continue;
-      x = f->output_data.x;
-
+      x = FRAME_X_OUTPUT(f);
       if (x->widget)
 	{
 	  /* This frame matches if the window is its topmost widget.  */
@@ -10004,7 +10010,7 @@ x_detect_focus_change (struct x_display_info *dpyinfo, struct frame *frame,
       {
         struct frame *focus_frame = dpyinfo->x_focus_event_frame;
         int focus_state
-          = focus_frame ? focus_frame->output_data.x->focus_state : 0;
+          = focus_frame ? FRAME_X_OUTPUT(focus_frame)->focus_state : 0;
 
         if (event->xcrossing.detail != NotifyInferior
             && event->xcrossing.focus
@@ -10687,8 +10693,8 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	    /* If we end up with the menu bar window, say it's not
 	       on the frame.  */
 	    if (f1 != NULL
-		&& f1->output_data.x->menubar_widget
-		&& win == XtWindow (f1->output_data.x->menubar_widget))
+		&& FRAME_X_OUTPUT (f1)->menubar_widget
+		&& win == XtWindow (FRAME_X_OUTPUT (f1)->menubar_widget))
 	      f1 = NULL;
 #endif /* USE_X_TOOLKIT */
 	  }
@@ -10846,7 +10852,7 @@ x_window_to_menu_bar (Window window)
   FOR_EACH_FRAME (tail, frame)
     if (FRAME_X_P (XFRAME (frame)))
       {
-	Widget menu_bar = XFRAME (frame)->output_data.x->menubar_widget;
+	Widget menu_bar = FRAME_X_OUTPUT (XFRAME (frame))->menubar_widget;
 
 	if (menu_bar && xlwmenu_window_p (menu_bar, window))
 	  return menu_bar;
@@ -11243,7 +11249,9 @@ xg_scroll_callback (GtkRange     *range,
   struct scroll_bar *bar = user_data;
   enum scroll_bar_part part = scroll_bar_nowhere;
   GtkAdjustment *adj = GTK_ADJUSTMENT (gtk_range_get_adjustment (range));
-  struct frame *f = g_object_get_data (G_OBJECT (range), XG_FRAME_DATA);
+  struct x_output *const x =
+    g_object_get_data (G_OBJECT (range), XG_FRAME_DATA);
+  struct frame *const f = FRAME_FROM_OUTPUT_DATA (x);
 
   if (xg_ignore_gtk_scrollbar) return false;
 
@@ -11517,21 +11525,21 @@ x_create_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
 
   /* Note: "background" is the thumb color, and "trough" is the color behind
      everything. */
-  pixel = f->output_data.x->scroll_bar_foreground_pixel;
+  pixel = FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel;
   if (pixel != -1)
     {
       XtSetArg (av[ac], XmNbackground, pixel);
       ++ac;
     }
 
-  pixel = f->output_data.x->scroll_bar_background_pixel;
+  pixel = FRAME_X_OUTPUT(f)->scroll_bar_background_pixel;
   if (pixel != -1)
     {
       XtSetArg (av[ac], XmNtroughColor, pixel);
       ++ac;
     }
 
-  widget = XmCreateScrollBar (f->output_data.x->edit_widget,
+  widget = XmCreateScrollBar (FRAME_X_OUTPUT(f)->edit_widget,
 			      (char *) scroll_bar_name, av, ac);
 
   /* Add one callback for everything that can happen.  */
@@ -11556,7 +11564,7 @@ x_create_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
   /* Set the cursor to an arrow.  I didn't find a resource to do that.
      And I'm wondering why it hasn't an arrow cursor by default.  */
   XDefineCursor (XtDisplay (widget), XtWindow (widget),
-                 f->output_data.x->nontext_cursor);
+                 FRAME_X_OUTPUT(f)->nontext_cursor);
 
 #ifdef HAVE_XINPUT2
   /* Ask for input extension button and motion events.  This lets us
@@ -11593,14 +11601,14 @@ x_create_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
   /* For smoother scrolling with Xaw3d   -sm */
   /* XtSetArg (av[ac], XtNpickTop, True); ++ac; */
 
-  pixel = f->output_data.x->scroll_bar_foreground_pixel;
+  pixel = FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel;
   if (pixel != -1)
     {
       XtSetArg (av[ac], XtNforeground, pixel);
       ++ac;
     }
 
-  pixel = f->output_data.x->scroll_bar_background_pixel;
+  pixel = FRAME_X_OUTPUT(f)->scroll_bar_background_pixel;
   if (pixel != -1)
     {
       XtSetArg (av[ac], XtNbackground, pixel);
@@ -11610,35 +11618,35 @@ x_create_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
   /* Top/bottom shadow colors.  */
 
   /* Allocate them, if necessary.  */
-  if (f->output_data.x->scroll_bar_top_shadow_pixel == -1)
+  if (FRAME_X_OUTPUT(f)->scroll_bar_top_shadow_pixel == -1)
     {
-      pixel = f->output_data.x->scroll_bar_background_pixel;
+      pixel = FRAME_X_OUTPUT(f)->scroll_bar_background_pixel;
       if (pixel != -1)
         {
           if (!x_alloc_lighter_color (f, FRAME_X_DISPLAY (f),
                                       FRAME_X_COLORMAP (f),
                                       &pixel, 1.2, 0x8000))
             pixel = -1;
-          f->output_data.x->scroll_bar_top_shadow_pixel = pixel;
+          FRAME_X_OUTPUT(f)->scroll_bar_top_shadow_pixel = pixel;
         }
     }
-  if (f->output_data.x->scroll_bar_bottom_shadow_pixel == -1)
+  if (FRAME_X_OUTPUT(f)->scroll_bar_bottom_shadow_pixel == -1)
     {
-      pixel = f->output_data.x->scroll_bar_background_pixel;
+      pixel = FRAME_X_OUTPUT(f)->scroll_bar_background_pixel;
       if (pixel != -1)
         {
           if (!x_alloc_lighter_color (f, FRAME_X_DISPLAY (f),
                                       FRAME_X_COLORMAP (f),
                                       &pixel, 0.6, 0x4000))
             pixel = -1;
-          f->output_data.x->scroll_bar_bottom_shadow_pixel = pixel;
+          FRAME_X_OUTPUT(f)->scroll_bar_bottom_shadow_pixel = pixel;
         }
     }
 
 #ifdef XtNbeNiceToColormap
   /* Tell the toolkit about them.  */
-  if (f->output_data.x->scroll_bar_top_shadow_pixel == -1
-      || f->output_data.x->scroll_bar_bottom_shadow_pixel == -1)
+  if (FRAME_X_OUTPUT(f)->scroll_bar_top_shadow_pixel == -1
+      || FRAME_X_OUTPUT(f)->scroll_bar_bottom_shadow_pixel == -1)
     /* We tried to allocate a color for the top/bottom shadow, and
        failed, so tell Xaw3d to use dithering instead.   */
     /* But only if we have a small colormap.  Xaw3d can allocate nice
@@ -11659,13 +11667,13 @@ x_create_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
       ++ac;
 
       /* Specify the colors.  */
-      pixel = f->output_data.x->scroll_bar_top_shadow_pixel;
+      pixel = FRAME_X_OUTPUT(f)->scroll_bar_top_shadow_pixel;
       if (pixel != -1)
 	{
 	  XtSetArg (av[ac], (String) XtNtopShadowPixel, pixel);
 	  ++ac;
 	}
-      pixel = f->output_data.x->scroll_bar_bottom_shadow_pixel;
+      pixel = FRAME_X_OUTPUT(f)->scroll_bar_bottom_shadow_pixel;
       if (pixel != -1)
 	{
 	  XtSetArg (av[ac], (String) XtNbottomShadowPixel, pixel);
@@ -11675,7 +11683,7 @@ x_create_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
 #endif
 
   widget = XtCreateWidget (scroll_bar_name, scrollbarWidgetClass,
-			   f->output_data.x->edit_widget, av, ac);
+			   FRAME_X_OUTPUT(f)->edit_widget, av, ac);
 
   {
     char const *initial = "";
@@ -11742,21 +11750,21 @@ x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
 
   /* Note: "background" is the thumb color, and "trough" is the color behind
      everything. */
-  pixel = f->output_data.x->scroll_bar_foreground_pixel;
+  pixel = FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel;
   if (pixel != -1)
     {
       XtSetArg (av[ac], XmNbackground, pixel);
       ++ac;
     }
 
-  pixel = f->output_data.x->scroll_bar_background_pixel;
+  pixel = FRAME_X_OUTPUT(f)->scroll_bar_background_pixel;
   if (pixel != -1)
     {
       XtSetArg (av[ac], XmNtroughColor, pixel);
       ++ac;
     }
 
-  widget = XmCreateScrollBar (f->output_data.x->edit_widget,
+  widget = XmCreateScrollBar (FRAME_X_OUTPUT(f)->edit_widget,
 			      (char *) scroll_bar_name, av, ac);
 
   /* Add one callback for everything that can happen.  */
@@ -11781,7 +11789,7 @@ x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
   /* Set the cursor to an arrow.  I didn't find a resource to do that.
      And I'm wondering why it hasn't an arrow cursor by default.  */
   XDefineCursor (XtDisplay (widget), XtWindow (widget),
-                 f->output_data.x->nontext_cursor);
+                 FRAME_X_OUTPUT(f)->nontext_cursor);
 
 #ifdef HAVE_XINPUT2
   /* Ask for input extension button and motion events.  This lets us
@@ -11818,14 +11826,14 @@ x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
   /* For smoother scrolling with Xaw3d   -sm */
   /* XtSetArg (av[ac], XtNpickTop, True); ++ac; */
 
-  pixel = f->output_data.x->scroll_bar_foreground_pixel;
+  pixel = FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel;
   if (pixel != -1)
     {
       XtSetArg (av[ac], XtNforeground, pixel);
       ++ac;
     }
 
-  pixel = f->output_data.x->scroll_bar_background_pixel;
+  pixel = FRAME_X_OUTPUT(f)->scroll_bar_background_pixel;
   if (pixel != -1)
     {
       XtSetArg (av[ac], XtNbackground, pixel);
@@ -11835,35 +11843,35 @@ x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
   /* Top/bottom shadow colors.  */
 
   /* Allocate them, if necessary.  */
-  if (f->output_data.x->scroll_bar_top_shadow_pixel == -1)
+  if (FRAME_X_OUTPUT(f)->scroll_bar_top_shadow_pixel == -1)
     {
-      pixel = f->output_data.x->scroll_bar_background_pixel;
+      pixel = FRAME_X_OUTPUT(f)->scroll_bar_background_pixel;
       if (pixel != -1)
         {
           if (!x_alloc_lighter_color (f, FRAME_X_DISPLAY (f),
                                       FRAME_X_COLORMAP (f),
                                       &pixel, 1.2, 0x8000))
             pixel = -1;
-          f->output_data.x->scroll_bar_top_shadow_pixel = pixel;
+          FRAME_X_OUTPUT(f)->scroll_bar_top_shadow_pixel = pixel;
         }
     }
-  if (f->output_data.x->scroll_bar_bottom_shadow_pixel == -1)
+  if (FRAME_X_OUTPUT(f)->scroll_bar_bottom_shadow_pixel == -1)
     {
-      pixel = f->output_data.x->scroll_bar_background_pixel;
+      pixel = FRAME_X_OUTPUT(f)->scroll_bar_background_pixel;
       if (pixel != -1)
         {
           if (!x_alloc_lighter_color (f, FRAME_X_DISPLAY (f),
                                       FRAME_X_COLORMAP (f),
                                       &pixel, 0.6, 0x4000))
             pixel = -1;
-          f->output_data.x->scroll_bar_bottom_shadow_pixel = pixel;
+          FRAME_X_OUTPUT(f)->scroll_bar_bottom_shadow_pixel = pixel;
         }
     }
 
 #ifdef XtNbeNiceToColormap
   /* Tell the toolkit about them.  */
-  if (f->output_data.x->scroll_bar_top_shadow_pixel == -1
-      || f->output_data.x->scroll_bar_bottom_shadow_pixel == -1)
+  if (FRAME_X_OUTPUT(f)->scroll_bar_top_shadow_pixel == -1
+      || FRAME_X_OUTPUT(f)->scroll_bar_bottom_shadow_pixel == -1)
     /* We tried to allocate a color for the top/bottom shadow, and
        failed, so tell Xaw3d to use dithering instead.   */
     /* But only if we have a small colormap.  Xaw3d can allocate nice
@@ -11884,13 +11892,13 @@ x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
       ++ac;
 
       /* Specify the colors.  */
-      pixel = f->output_data.x->scroll_bar_top_shadow_pixel;
+      pixel = FRAME_X_OUTPUT(f)->scroll_bar_top_shadow_pixel;
       if (pixel != -1)
 	{
 	  XtSetArg (av[ac], (String) XtNtopShadowPixel, pixel);
 	  ++ac;
 	}
-      pixel = f->output_data.x->scroll_bar_bottom_shadow_pixel;
+      pixel = FRAME_X_OUTPUT(f)->scroll_bar_bottom_shadow_pixel;
       if (pixel != -1)
 	{
 	  XtSetArg (av[ac], (String) XtNbottomShadowPixel, pixel);
@@ -11900,7 +11908,7 @@ x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
 #endif
 
   widget = XtCreateWidget (scroll_bar_name, scrollbarWidgetClass,
-			   f->output_data.x->edit_widget, av, ac);
+			   FRAME_X_OUTPUT(f)->edit_widget, av, ac);
 
   {
     char const *initial = "";
@@ -12177,8 +12185,8 @@ x_scroll_bar_create (struct window *w, int top, int left,
 		     int width, int height, bool horizontal)
 {
   struct frame *f = XFRAME (w->frame);
-  struct scroll_bar *bar = ALLOCATE_PSEUDOVECTOR (struct scroll_bar, prev,
-						  PVEC_OTHER);
+  struct scroll_bar *bar =
+    ALLOCATE_PSEUDOVECTOR_AND_ZERO (struct scroll_bar, prev, PVEC_OTHER);
   Lisp_Object barobj;
 
   block_input ();
@@ -12197,7 +12205,7 @@ x_scroll_bar_create (struct window *w, int top, int left,
     Drawable drawable;
 #endif
 
-    a.background_pixel = f->output_data.x->scroll_bar_background_pixel;
+    a.background_pixel = FRAME_X_OUTPUT(f)->scroll_bar_background_pixel;
     if (a.background_pixel == -1)
       a.background_pixel = FRAME_BACKGROUND_PIXEL (f);
 
@@ -12348,7 +12356,7 @@ x_scroll_bar_set_handle (struct scroll_bar *bar, int start, int end,
   Drawable w = bar->x_drawable;
 #endif
   struct frame *f = XFRAME (WINDOW_FRAME (XWINDOW (bar->window)));
-  GC gc = f->output_data.x->normal_gc;
+  GC gc = FRAME_X_OUTPUT(f)->normal_gc;
 
   /* If the display is already accurate, do nothing.  */
   if (! rebuild
@@ -12414,9 +12422,9 @@ x_scroll_bar_set_handle (struct scroll_bar *bar, int start, int end,
       }
 
     /* Change to proper foreground color if one is specified.  */
-    if (f->output_data.x->scroll_bar_foreground_pixel != -1)
+    if (FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel != -1)
       XSetForeground (FRAME_X_DISPLAY (f), gc,
-		      f->output_data.x->scroll_bar_foreground_pixel);
+		      FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel);
 
     /* Draw the handle itself.  */
     XFillRectangle (FRAME_X_DISPLAY (f), w, gc,
@@ -12910,7 +12918,7 @@ x_scroll_bar_expose (struct scroll_bar *bar, const XEvent *event)
 #endif
 
   struct frame *f = XFRAME (WINDOW_FRAME (XWINDOW (bar->window)));
-  GC gc = f->output_data.x->normal_gc;
+  GC gc = FRAME_X_OUTPUT(f)->normal_gc;
 
   block_input ();
 
@@ -12939,9 +12947,9 @@ x_scroll_bar_expose (struct scroll_bar *bar, const XEvent *event)
   x_scroll_bar_set_handle (bar, bar->start, bar->end, true);
 
   /* Switch to scroll bar foreground color.  */
-  if (f->output_data.x->scroll_bar_foreground_pixel != -1)
+  if (FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel != -1)
     XSetForeground (FRAME_X_DISPLAY (f), gc,
-		    f->output_data.x->scroll_bar_foreground_pixel);
+                    FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel);
 
   /* Draw a one-pixel border just inside the edges of the scroll bar.  */
   XDrawRectangle (FRAME_X_DISPLAY (f), w, gc,
@@ -12952,7 +12960,7 @@ x_scroll_bar_expose (struct scroll_bar *bar, const XEvent *event)
 	      bar->width - 1, bar->height - 1);
 
   /* Restore the foreground color of the GC if we changed it above.  */
-  if (f->output_data.x->scroll_bar_foreground_pixel != -1)
+  if (FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel != -1)
     XSetForeground (FRAME_X_DISPLAY (f), gc,
 		    FRAME_FOREGROUND_PIXEL (f));
 
@@ -14177,7 +14185,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
           {
 	    f = any;
 	    if (f)
-              _XEditResCheckMessages (f->output_data.x->widget,
+              _XEditResCheckMessages (FRAME_X_OUTPUT(f)->widget,
 				      NULL, (XEvent *) event, NULL);
 	    goto done;
           }
@@ -14377,8 +14385,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		 hidden anymore, treat it as deiconified.  */
 	      SET_FRAME_VISIBLE (f, 1);
 	      SET_FRAME_ICONIFIED (f, false);
-
-	      f->output_data.x->has_been_visible = true;
+	      FRAME_X_OUTPUT(f)->has_been_visible = true;
 	      inev.ie.kind = DEICONIFY_EVENT;
 #if defined USE_GTK && defined HAVE_GTK3
 	      /* If GTK3 wants to impose some old size here (Bug#24526),
@@ -14434,7 +14441,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       if (f)
         {
 	  /* Maybe we shouldn't set this for child frames ??  */
-	  f->output_data.x->parent_desc = event->xreparent.parent;
+	  FRAME_X_OUTPUT(f)->parent_desc = event->xreparent.parent;
 	  if (!FRAME_PARENT_FRAME (f))
 	    x_real_positions (f, &f->left_pos, &f->top_pos);
 	  else
@@ -14697,7 +14704,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	  /* Check if fullscreen was specified before we where mapped the
              first time, i.e. from the command line.  */
-          if (!f->output_data.x->has_been_visible)
+          if (!FRAME_X_OUTPUT(f)->has_been_visible)
 	    {
 
 	      x_check_fullscreen (f);
@@ -15240,7 +15247,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
       /* EnterNotify counts as mouse movement,
 	 so update things that depend on mouse position.  */
-      if (f && !f->output_data.x->hourglass_p)
+      if (f && ! FRAME_X_OUTPUT(f)->hourglass_p)
 	x_note_mouse_movement (f, &event->xmotion, Qnil);
 #ifdef USE_GTK
       /* We may get an EnterNotify on the buttons in the toolbar.  In that
@@ -19300,7 +19307,7 @@ x_draw_hollow_cursor (struct window *w, struct glyph_row *row)
 
   /* The foreground of cursor_gc is typically the same as the normal
      background color, which can cause the cursor box to be invisible.  */
-  xgcv.foreground = f->output_data.x->cursor_pixel;
+  xgcv.foreground = FRAME_X_OUTPUT(f)->cursor_pixel;
   xgcv.line_width = 1;
   if (dpyinfo->scratch_cursor_gc)
     XChangeGC (dpy, dpyinfo->scratch_cursor_gc, GCForeground | GCLineWidth, &xgcv);
@@ -19373,10 +19380,10 @@ x_draw_bar_cursor (struct window *w, struct glyph_row *row, int width, enum text
 	 invisible.  Use the glyph's foreground color instead in this
 	 case, on the assumption that the glyph's colors are chosen so
 	 that the glyph is legible.  */
-      if (face->background == f->output_data.x->cursor_pixel)
+      if (face->background == FRAME_X_OUTPUT(f)->cursor_pixel)
 	xgcv.background = xgcv.foreground = face->foreground;
       else
-	xgcv.background = xgcv.foreground = f->output_data.x->cursor_pixel;
+	xgcv.background = xgcv.foreground = FRAME_X_OUTPUT(f)->cursor_pixel;
       xgcv.graphics_exposures = False;
 
       if (gc)
@@ -19441,9 +19448,9 @@ static void
 x_define_frame_cursor (struct frame *f, Emacs_Cursor cursor)
 {
   if (!f->pointer_invisible
-      && f->output_data.x->current_cursor != cursor)
+      && FRAME_X_OUTPUT(f)->current_cursor != cursor)
     XDefineCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), cursor);
-  f->output_data.x->current_cursor = cursor;
+  FRAME_X_OUTPUT(f)->current_cursor = cursor;
 }
 
 
@@ -19532,9 +19539,9 @@ x_bitmap_icon (struct frame *f, Lisp_Object file)
     return true;
 
   /* Free up our existing icon bitmap and mask if any.  */
-  if (f->output_data.x->icon_bitmap > 0)
-    image_destroy_bitmap (f, f->output_data.x->icon_bitmap);
-  f->output_data.x->icon_bitmap = 0;
+  if (FRAME_X_OUTPUT(f)->icon_bitmap > 0)
+    image_destroy_bitmap (f, FRAME_X_OUTPUT(f)->icon_bitmap);
+  FRAME_X_OUTPUT(f)->icon_bitmap = 0;
 
   if (STRINGP (file))
     {
@@ -19604,7 +19611,7 @@ x_bitmap_icon (struct frame *f, Lisp_Object file)
     }
 
   x_wm_set_icon_pixmap (f, bitmap_id);
-  f->output_data.x->icon_bitmap = bitmap_id;
+  FRAME_X_OUTPUT(f)->icon_bitmap = bitmap_id;
 
   return false;
 }
@@ -19628,9 +19635,9 @@ x_text_icon (struct frame *f, const char *icon_name)
     XSetWMIconName (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f), &text);
   }
 
-  if (f->output_data.x->icon_bitmap > 0)
-    image_destroy_bitmap (f, f->output_data.x->icon_bitmap);
-  f->output_data.x->icon_bitmap = 0;
+  if (FRAME_X_OUTPUT(f)->icon_bitmap > 0)
+    image_destroy_bitmap (f, FRAME_X_OUTPUT(f)->icon_bitmap);
+  FRAME_X_OUTPUT(f)->icon_bitmap = 0;
   x_wm_set_icon_pixmap (f, 0);
 
   return false;
@@ -20306,7 +20313,7 @@ x_calc_absolute_position (struct frame *f)
 
       /* A frame that has been visible at least once should have outer
 	 edges.  */
-      if (f->output_data.x->has_been_visible && !p)
+      if (FRAME_X_OUTPUT(f)->has_been_visible && !p)
 	{
 	  Lisp_Object frame;
 	  Lisp_Object edges = Qnil;
@@ -20344,10 +20351,10 @@ x_calc_absolute_position (struct frame *f)
 	 It's not obvious where the initial small difference comes from.
 	 2000-12-01, gerd.  */
 
-      XtVaGetValues (f->output_data.x->column_widget, XtNheight, &height, NULL);
+      XtVaGetValues (FRAME_X_OUTPUT(f)->column_widget, XtNheight, &height, NULL);
 #endif
 
-      if (f->output_data.x->has_been_visible && !p)
+      if (FRAME_X_OUTPUT(f)->has_been_visible && !p)
 	{
 	  Lisp_Object frame;
 	  Lisp_Object edges = Qnil;
@@ -20991,7 +20998,7 @@ x_check_fullscreen (struct frame *f)
   if (do_ewmh_fullscreen (f))
     return;
 
-  if (f->output_data.x->parent_desc != FRAME_DISPLAY_INFO (f)->root_window)
+  if (FRAME_X_OUTPUT(f)->parent_desc != FRAME_DISPLAY_INFO (f)->root_window)
     return; /* Only fullscreen without WM or with EWM hints (above). */
 
   /* Setting fullscreen to nil doesn't do anything.  We could save the
@@ -21541,7 +21548,7 @@ x_make_frame_visible (struct frame *f)
 	 before the window gets really visible.  */
       if (! FRAME_ICONIFIED_P (f)
 	  && ! FRAME_X_EMBEDDED_P (f)
-	  && ! f->output_data.x->asked_for_visible)
+	  && ! FRAME_X_OUTPUT(f)->asked_for_visible)
 	x_set_offset (f, f->left_pos, f->top_pos, 0);
 
 #ifndef USE_GTK
@@ -21608,7 +21615,7 @@ x_make_frame_visible (struct frame *f)
       else
 	{
 	  /* This was XtPopup, but that did nothing for an iconified frame.  */
-	  XtMapWidget (f->output_data.x->widget);
+	  XtMapWidget (FRAME_X_OUTPUT(f)->widget);
 	}
 #else /* not USE_X_TOOLKIT */
 #ifdef USE_GTK
@@ -21639,7 +21646,7 @@ x_make_frame_visible (struct frame *f)
     /* This must be before UNBLOCK_INPUT
        since events that arrive in response to the actions above
        will set it when they are handled.  */
-    bool previously_visible = f->output_data.x->has_been_visible;
+    bool previously_visible = FRAME_X_OUTPUT(f)->has_been_visible;
 
     XSETFRAME (frame, f);
 
@@ -21829,7 +21836,7 @@ x_iconify_frame (struct frame *f)
       if (! EQ (Vx_no_window_manager, Qt))
 	x_wm_set_window_state (f, IconicState);
       /* This was XtPopup, but that did nothing for an iconified frame.  */
-      XtMapWidget (f->output_data.x->widget);
+      XtMapWidget (FRAME_X_OUTPUT(f)->widget);
       /* The server won't give us any event to indicate
 	 that an invisible frame was changed to an icon,
 	 so we have to record it here.  */
@@ -21840,7 +21847,7 @@ x_iconify_frame (struct frame *f)
     }
 
   result = XIconifyWindow (FRAME_X_DISPLAY (f),
-			   XtWindow (f->output_data.x->widget),
+			   XtWindow (FRAME_X_OUTPUT(f)->widget),
 			   DefaultScreen (FRAME_X_DISPLAY (f)));
   unblock_input ();
 
@@ -21935,8 +21942,8 @@ x_free_frame_resources (struct frame *f)
       free_frame_faces (f);
       tear_down_x_back_buffer (f);
 
-      if (f->output_data.x->icon_desc)
-	XDestroyWindow (FRAME_X_DISPLAY (f), f->output_data.x->icon_desc);
+      if (FRAME_X_OUTPUT(f)->icon_desc)
+	XDestroyWindow (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->icon_desc);
 
 #ifdef USE_X_TOOLKIT
       /* Explicitly destroy the scroll bars of the frame.  Without
@@ -21959,10 +21966,10 @@ x_free_frame_resources (struct frame *f)
       x_cr_destroy_frame_context (f);
 #endif
 #ifdef USE_X_TOOLKIT
-      if (f->output_data.x->widget)
+      if (FRAME_X_OUTPUT(f)->widget)
 	{
-	  XtDestroyWidget (f->output_data.x->widget);
-	  f->output_data.x->widget = NULL;
+	  XtDestroyWidget (FRAME_X_OUTPUT(f)->widget);
+	  FRAME_X_OUTPUT(f)->widget = NULL;
 	}
       /* Tooltips don't have widgets, only a simple X window, even if
 	 we are using a toolkit.  */
@@ -22000,72 +22007,72 @@ x_free_frame_resources (struct frame *f)
 
       unload_color (f, FRAME_FOREGROUND_PIXEL (f));
       unload_color (f, FRAME_BACKGROUND_PIXEL (f));
-      unload_color (f, f->output_data.x->cursor_pixel);
-      unload_color (f, f->output_data.x->cursor_foreground_pixel);
-      unload_color (f, f->output_data.x->border_pixel);
-      unload_color (f, f->output_data.x->mouse_pixel);
+      unload_color (f, FRAME_X_OUTPUT(f)->cursor_pixel);
+      unload_color (f, FRAME_X_OUTPUT(f)->cursor_foreground_pixel);
+      unload_color (f, FRAME_X_OUTPUT(f)->border_pixel);
+      unload_color (f, FRAME_X_OUTPUT(f)->mouse_pixel);
 
-      if (f->output_data.x->scroll_bar_background_pixel != -1)
-	unload_color (f, f->output_data.x->scroll_bar_background_pixel);
-      if (f->output_data.x->scroll_bar_foreground_pixel != -1)
-	unload_color (f, f->output_data.x->scroll_bar_foreground_pixel);
+      if (FRAME_X_OUTPUT(f)->scroll_bar_background_pixel != -1)
+	unload_color (f, FRAME_X_OUTPUT(f)->scroll_bar_background_pixel);
+      if (FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel != -1)
+	unload_color (f, FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel);
 #if defined (USE_LUCID) && defined (USE_TOOLKIT_SCROLL_BARS)
       /* Scrollbar shadow colors.  */
-      if (f->output_data.x->scroll_bar_top_shadow_pixel != -1)
-	unload_color (f, f->output_data.x->scroll_bar_top_shadow_pixel);
-      if (f->output_data.x->scroll_bar_bottom_shadow_pixel != -1)
-	unload_color (f, f->output_data.x->scroll_bar_bottom_shadow_pixel);
+      if (FRAME_X_OUTPUT(f)->scroll_bar_top_shadow_pixel != -1)
+	unload_color (f, FRAME_X_OUTPUT(f)->scroll_bar_top_shadow_pixel);
+      if (FRAME_X_OUTPUT(f)->scroll_bar_bottom_shadow_pixel != -1)
+	unload_color (f, FRAME_X_OUTPUT(f)->scroll_bar_bottom_shadow_pixel);
 #endif /* USE_LUCID && USE_TOOLKIT_SCROLL_BARS */
-      if (f->output_data.x->white_relief.pixel != -1)
-	unload_color (f, f->output_data.x->white_relief.pixel);
-      if (f->output_data.x->black_relief.pixel != -1)
-	unload_color (f, f->output_data.x->black_relief.pixel);
+      if (FRAME_X_OUTPUT(f)->white_relief.pixel != -1)
+	unload_color (f, FRAME_X_OUTPUT(f)->white_relief.pixel);
+      if (FRAME_X_OUTPUT(f)->black_relief.pixel != -1)
+	unload_color (f, FRAME_X_OUTPUT(f)->black_relief.pixel);
 
       x_free_gcs (f);
 
       /* Free extra GCs allocated by x_setup_relief_colors.  */
-      if (f->output_data.x->white_relief.gc)
+      if (FRAME_X_OUTPUT(f)->white_relief.gc)
 	{
-	  XFreeGC (dpyinfo->display, f->output_data.x->white_relief.gc);
-	  f->output_data.x->white_relief.gc = 0;
+	  XFreeGC (dpyinfo->display, FRAME_X_OUTPUT(f)->white_relief.gc);
+	  FRAME_X_OUTPUT(f)->white_relief.gc = 0;
 	}
-      if (f->output_data.x->black_relief.gc)
+      if (FRAME_X_OUTPUT(f)->black_relief.gc)
 	{
-	  XFreeGC (dpyinfo->display, f->output_data.x->black_relief.gc);
-	  f->output_data.x->black_relief.gc = 0;
+	  XFreeGC (dpyinfo->display, FRAME_X_OUTPUT(f)->black_relief.gc);
+	  FRAME_X_OUTPUT(f)->black_relief.gc = 0;
 	}
 
       /* Free cursors.  */
-      if (f->output_data.x->text_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->text_cursor);
-      if (f->output_data.x->nontext_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->nontext_cursor);
-      if (f->output_data.x->modeline_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->modeline_cursor);
-      if (f->output_data.x->hand_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->hand_cursor);
-      if (f->output_data.x->hourglass_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->hourglass_cursor);
-      if (f->output_data.x->horizontal_drag_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->horizontal_drag_cursor);
-      if (f->output_data.x->vertical_drag_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->vertical_drag_cursor);
-      if (f->output_data.x->left_edge_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->left_edge_cursor);
-      if (f->output_data.x->top_left_corner_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->top_left_corner_cursor);
-      if (f->output_data.x->top_edge_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->top_edge_cursor);
-      if (f->output_data.x->top_right_corner_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->top_right_corner_cursor);
-      if (f->output_data.x->right_edge_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->right_edge_cursor);
-      if (f->output_data.x->bottom_right_corner_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->bottom_right_corner_cursor);
-      if (f->output_data.x->bottom_edge_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->bottom_edge_cursor);
-      if (f->output_data.x->bottom_left_corner_cursor != 0)
-	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->bottom_left_corner_cursor);
+      if (FRAME_X_OUTPUT(f)->text_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->text_cursor);
+      if (FRAME_X_OUTPUT(f)->nontext_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->nontext_cursor);
+      if (FRAME_X_OUTPUT(f)->modeline_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->modeline_cursor);
+      if (FRAME_X_OUTPUT(f)->hand_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->hand_cursor);
+      if (FRAME_X_OUTPUT(f)->hourglass_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->hourglass_cursor);
+      if (FRAME_X_OUTPUT(f)->horizontal_drag_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->horizontal_drag_cursor);
+      if (FRAME_X_OUTPUT(f)->vertical_drag_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->vertical_drag_cursor);
+      if (FRAME_X_OUTPUT(f)->left_edge_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->left_edge_cursor);
+      if (FRAME_X_OUTPUT(f)->top_left_corner_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->top_left_corner_cursor);
+      if (FRAME_X_OUTPUT(f)->top_edge_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->top_edge_cursor);
+      if (FRAME_X_OUTPUT(f)->top_right_corner_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->top_right_corner_cursor);
+      if (FRAME_X_OUTPUT(f)->right_edge_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->right_edge_cursor);
+      if (FRAME_X_OUTPUT(f)->bottom_right_corner_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->bottom_right_corner_cursor);
+      if (FRAME_X_OUTPUT(f)->bottom_edge_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->bottom_edge_cursor);
+      if (FRAME_X_OUTPUT(f)->bottom_left_corner_cursor != 0)
+	XFreeCursor (FRAME_X_DISPLAY (f), FRAME_X_OUTPUT(f)->bottom_left_corner_cursor);
 
       XFlush (FRAME_X_DISPLAY (f));
     }
@@ -22145,7 +22152,7 @@ x_wm_set_size_hint (struct frame *f, long flags, bool user_position)
     return;
 
 #ifdef USE_X_TOOLKIT
-  if (f->output_data.x->widget)
+  if (FRAME_X_OUTPUT(f)->widget)
     {
       /* Do this dance in xterm.c because some stuff is not as easily
 	 available in widget.c.  */
@@ -22305,14 +22312,14 @@ x_wm_set_window_state (struct frame *f, int state)
   Arg al[1];
 
   XtSetArg (al[0], XtNinitialState, state);
-  XtSetValues (f->output_data.x->widget, al, 1);
+  XtSetValues (FRAME_X_OUTPUT(f)->widget, al, 1);
 #else /* not USE_X_TOOLKIT */
   Window window = FRAME_X_WINDOW (f);
 
-  f->output_data.x->wm_hints.flags |= StateHint;
-  f->output_data.x->wm_hints.initial_state = state;
+  FRAME_X_OUTPUT(f)->wm_hints.flags |= StateHint;
+  FRAME_X_OUTPUT(f)->wm_hints.initial_state = state;
 
-  XSetWMHints (FRAME_X_DISPLAY (f), window, &f->output_data.x->wm_hints);
+  XSetWMHints (FRAME_X_DISPLAY (f), window, &FRAME_X_OUTPUT(f)->wm_hints);
 #endif /* not USE_X_TOOLKIT */
 }
 
@@ -22328,9 +22335,9 @@ x_wm_set_icon_pixmap (struct frame *f, ptrdiff_t pixmap_id)
   if (pixmap_id > 0)
     {
       icon_pixmap = image_bitmap_pixmap (f, pixmap_id);
-      f->output_data.x->wm_hints.icon_pixmap = icon_pixmap;
+      FRAME_X_OUTPUT(f)->wm_hints.icon_pixmap = icon_pixmap;
       icon_mask = x_bitmap_mask (f, pixmap_id);
-      f->output_data.x->wm_hints.icon_mask = icon_mask;
+      FRAME_X_OUTPUT(f)->wm_hints.icon_mask = icon_mask;
     }
   else
     {
@@ -22351,15 +22358,15 @@ x_wm_set_icon_pixmap (struct frame *f, ptrdiff_t pixmap_id)
   {
     Arg al[1];
     XtSetArg (al[0], XtNiconPixmap, icon_pixmap);
-    XtSetValues (f->output_data.x->widget, al, 1);
+    XtSetValues (FRAME_X_OUTPUT(f)->widget, al, 1);
     XtSetArg (al[0], XtNiconMask, icon_mask);
-    XtSetValues (f->output_data.x->widget, al, 1);
+    XtSetValues (FRAME_X_OUTPUT(f)->widget, al, 1);
   }
 
 #else /* not USE_X_TOOLKIT && not USE_GTK */
 
-  f->output_data.x->wm_hints.flags |= (IconPixmapHint | IconMaskHint);
-  XSetWMHints (FRAME_X_DISPLAY (f), window, &f->output_data.x->wm_hints);
+  FRAME_X_OUTPUT(f)->wm_hints.flags |= (IconPixmapHint | IconMaskHint);
+  XSetWMHints (FRAME_X_DISPLAY (f), window, &FRAME_X_OUTPUT(f)->wm_hints);
 
 #endif /* not USE_X_TOOLKIT && not USE_GTK */
 }
@@ -22369,11 +22376,11 @@ x_wm_set_icon_position (struct frame *f, int icon_x, int icon_y)
 {
   Window window = FRAME_OUTER_WINDOW (f);
 
-  f->output_data.x->wm_hints.flags |= IconPositionHint;
-  f->output_data.x->wm_hints.icon_x = icon_x;
-  f->output_data.x->wm_hints.icon_y = icon_y;
+  FRAME_X_OUTPUT(f)->wm_hints.flags |= IconPositionHint;
+  FRAME_X_OUTPUT(f)->wm_hints.icon_x = icon_x;
+  FRAME_X_OUTPUT(f)->wm_hints.icon_y = icon_y;
 
-  XSetWMHints (FRAME_X_DISPLAY (f), window, &f->output_data.x->wm_hints);
+  XSetWMHints (FRAME_X_DISPLAY (f), window, &FRAME_X_OUTPUT(f)->wm_hints);
 }
 
 
@@ -22621,7 +22628,7 @@ x_toggle_visible_pointer (struct frame *f, bool invisible)
 		   FRAME_DISPLAY_INFO (f)->invisible_cursor);
   else
     XDefineCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		   f->output_data.x->current_cursor);
+		   FRAME_X_OUTPUT(f)->current_cursor);
   f->pointer_invisible = invisible;
 }
 
@@ -23952,6 +23959,22 @@ x_create_terminal (struct x_display_info *dpyinfo)
   return terminal;
 }
 
+void
+scan_terminal_display_info_x (struct x_display_info *const info,
+                              const gc_phase phase)
+{
+  xscan_reference_pointer_to_vectorlike (&info->terminal, phase);
+  /* info->name_list_element is weak and handled specially */
+  xscan_reference_pointer_to_vectorlike (&info->x_focus_frame, phase);
+  xscan_reference_pointer_to_vectorlike (&info->x_focus_event_frame, phase);
+  xscan_reference_pointer_to_vectorlike (&info->highlight_frame, phase);
+  xscan_reference_pointer_to_vectorlike (&info->x_pending_autoraise_frame,
+                                         phase);
+  xscan_reference_pointer_to_vectorlike (&info->last_mouse_frame, phase);
+  xscan_reference_pointer_to_vectorlike (&info->last_mouse_glyph_frame, phase);
+  xscan_reference_pointer_to_vectorlike (&info->last_mouse_scroll_bar, phase);
+}
+
 static void
 x_initialize (void)
 {
@@ -24073,7 +24096,7 @@ syms_of_xterm (void)
   DEFSYM (Qnow, "now");
 
 #ifdef USE_GTK
-  xg_default_icon_file = build_pure_c_string ("icons/hicolor/scalable/apps/emacs.svg");
+  xg_default_icon_file = build_c_string ("icons/hicolor/scalable/apps/emacs.svg");
   staticpro (&xg_default_icon_file);
 
   DEFSYM (Qx_gtk_map_stock, "x-gtk-map-stock");

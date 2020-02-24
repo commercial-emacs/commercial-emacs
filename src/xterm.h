@@ -708,6 +708,9 @@ extern Window tip_window;
 
 struct x_output
 {
+  /* Frame that owns this output data.  */
+  struct frame *frame;
+
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
   /* Height of menu bar widget, in pixels.  This value
      is not meaningful if the menubar is turned off.  */
@@ -1003,15 +1006,24 @@ enum
 
 
 /* Return the X output data for frame F.  */
-#define FRAME_X_OUTPUT(f) ((f)->output_data.x)
+
+#define FRAME_X_OUTPUT_NOCHECK(f) (f)->output_data.x
+#define FRAME_X_OUTPUT(f)                                       \
+  (eassume (FRAME_OUTPUT_DATA_NOCHECK (f)->frame == (f)),       \
+   FRAME_OUTPUT_DATA_NOCHECK (f))
 #define FRAME_OUTPUT_DATA(f) FRAME_X_OUTPUT (f)
+#define FRAME_OUTPUT_DATA_NOCHECK(f) FRAME_X_OUTPUT_NOCHECK (f)
+
+/* Return the frame displaying the given output data.  */
+#define FRAME_FROM_OUTPUT_DATA(x)                       \
+  (eassume(FRAME_X_OUTPUT (x->frame) == (x)), x->frame)
 
 /* Return the X window used for displaying data in frame F.  */
-#define FRAME_X_WINDOW(f) ((f)->output_data.x->window_desc)
+#define FRAME_X_WINDOW(f) (FRAME_X_OUTPUT(f)->window_desc)
 #define FRAME_NATIVE_WINDOW(f) FRAME_X_WINDOW (f)
 
 /* Return the drawable used for rendering to frame F.  */
-#define FRAME_X_RAW_DRAWABLE(f) ((f)->output_data.x->draw_desc)
+#define FRAME_X_RAW_DRAWABLE(f) (FRAME_X_OUTPUT(f)->draw_desc)
 
 extern void x_mark_frame_dirty (struct frame *f);
 
@@ -1026,12 +1038,12 @@ extern void x_mark_frame_dirty (struct frame *f);
   (FRAME_X_WINDOW (f) != FRAME_X_RAW_DRAWABLE (f))
 
 /* Return the need-buffer-flip flag for frame F.  */
-#define FRAME_X_NEED_BUFFER_FLIP(f) ((f)->output_data.x->need_buffer_flip)
+#define FRAME_X_NEED_BUFFER_FLIP(f) (FRAME_X_OUTPUT(f)->need_buffer_flip)
 
 /* Return the outermost X window associated with the frame F.  */
 #ifdef USE_X_TOOLKIT
-#define FRAME_OUTER_WINDOW(f) ((f)->output_data.x->widget ?             \
-                               XtWindow ((f)->output_data.x->widget) :  \
+#define FRAME_OUTER_WINDOW(f) (FRAME_X_OUTPUT(f)->widget ?             \
+                               XtWindow (FRAME_X_OUTPUT(f)->widget) :  \
                                FRAME_X_WINDOW (f))
 #else
 #ifdef USE_GTK
@@ -1051,8 +1063,10 @@ extern void x_mark_frame_dirty (struct frame *f);
   ((w) && gtk_widget_get_window (w) \
    ? GDK_WINDOW_XID (gtk_widget_get_window (w)) : 0)
 
-#define FRAME_GTK_OUTER_WIDGET(f) ((f)->output_data.x->widget)
-#define FRAME_GTK_WIDGET(f) ((f)->output_data.x->edit_widget)
+#define FRAME_GTK_OUTER_WIDGET(f) (FRAME_X_OUTPUT(f)->widget)
+#define FRAME_GTK_OUTER_WIDGET_NOCHECK(f) (FRAME_X_OUTPUT_NOCHECK(f)->widget)
+#define FRAME_GTK_WIDGET(f) (FRAME_X_OUTPUT(f)->edit_widget)
+#define FRAME_GTK_WIDGET_NOCHECK(f) (FRAME_X_OUTPUT_NOCHECK(f)->edit_widget)
 #define FRAME_OUTER_WINDOW(f)                                   \
        (FRAME_GTK_OUTER_WIDGET (f) ?                            \
         GTK_WIDGET_TO_X_WIN (FRAME_GTK_OUTER_WIDGET (f)) :      \
@@ -1064,26 +1078,27 @@ extern void x_mark_frame_dirty (struct frame *f);
 #endif
 
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
-#define FRAME_MENUBAR_HEIGHT(f) ((f)->output_data.x->menubar_height)
+#define FRAME_MENUBAR_HEIGHT(f) (FRAME_X_OUTPUT(f)->menubar_height)
 #else
 #define FRAME_MENUBAR_HEIGHT(f) ((void) f, 0)
 #endif /* USE_X_TOOLKIT || USE_GTK */
 
-#define FRAME_FONT(f) ((f)->output_data.x->font)
-#define FRAME_FONTSET(f) ((f)->output_data.x->fontset)
-#define FRAME_TOOLBAR_TOP_HEIGHT(f) ((f)->output_data.x->toolbar_top_height)
+#define FRAME_FONT_NOCHECK(f) (FRAME_OUTPUT_DATA_NOCHECK (f)->font)
+#define FRAME_FONT(f) (FRAME_X_OUTPUT(f)->font)
+#define FRAME_FONTSET(f) (FRAME_X_OUTPUT(f)->fontset)
+#define FRAME_TOOLBAR_TOP_HEIGHT(f) (FRAME_X_OUTPUT(f)->toolbar_top_height)
 #define FRAME_TOOLBAR_BOTTOM_HEIGHT(f) \
-  ((f)->output_data.x->toolbar_bottom_height)
+  (FRAME_X_OUTPUT(f)->toolbar_bottom_height)
 #define FRAME_TOOLBAR_HEIGHT(f) \
   (FRAME_TOOLBAR_TOP_HEIGHT (f) + FRAME_TOOLBAR_BOTTOM_HEIGHT (f))
-#define FRAME_TOOLBAR_LEFT_WIDTH(f) ((f)->output_data.x->toolbar_left_width)
-#define FRAME_TOOLBAR_RIGHT_WIDTH(f) ((f)->output_data.x->toolbar_right_width)
+#define FRAME_TOOLBAR_LEFT_WIDTH(f) (FRAME_X_OUTPUT(f)->toolbar_left_width)
+#define FRAME_TOOLBAR_RIGHT_WIDTH(f) (FRAME_X_OUTPUT(f)->toolbar_right_width)
 #define FRAME_TOOLBAR_WIDTH(f) \
   (FRAME_TOOLBAR_LEFT_WIDTH (f) + FRAME_TOOLBAR_RIGHT_WIDTH (f))
-#define FRAME_BASELINE_OFFSET(f) ((f)->output_data.x->baseline_offset)
+#define FRAME_BASELINE_OFFSET(f) (FRAME_X_OUTPUT(f)->baseline_offset)
 
 /* This gives the x_display_info structure for the display F is on.  */
-#define FRAME_DISPLAY_INFO(f) ((f)->output_data.x->display_info)
+#define FRAME_DISPLAY_INFO(f) (FRAME_X_OUTPUT(f)->display_info)
 
 /* This is the `Display *' which frame F is on.  */
 #define FRAME_X_DISPLAY(f) (FRAME_DISPLAY_INFO (f)->display)
@@ -1118,11 +1133,11 @@ extern void x_mark_frame_dirty (struct frame *f);
 /* This is the Colormap which frame F uses.  */
 #define FRAME_X_COLORMAP(f) FRAME_DISPLAY_INFO (f)->cmap
 
-#define FRAME_XIC(f) ((f)->output_data.x->xic)
+#define FRAME_XIC(f) (FRAME_X_OUTPUT(f)->xic)
 #define FRAME_X_XIM(f) (FRAME_DISPLAY_INFO (f)->xim)
 #define FRAME_X_XIM_STYLES(f) (FRAME_DISPLAY_INFO (f)->xim_styles)
-#define FRAME_XIC_STYLE(f) ((f)->output_data.x->xic_style)
-#define FRAME_XIC_FONTSET(f) ((f)->output_data.x->xic_xfs)
+#define FRAME_XIC_STYLE(f) (FRAME_X_OUTPUT(f)->xic_style)
+#define FRAME_XIC_FONTSET(f) (FRAME_X_OUTPUT(f)->xic_xfs)
 
 /* X-specific scroll bar stuff.  */
 

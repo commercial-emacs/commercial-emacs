@@ -62,6 +62,8 @@ static int been_here = -1;
 #include "w32term.h"
 #endif
 
+#include "alloc.h"
+
 static void tty_set_scroll_region (struct frame *f, int start, int stop);
 static void turn_on_face (struct frame *, int face_id);
 static void turn_off_face (struct frame *, int face_id);
@@ -4479,6 +4481,15 @@ delete_tty (struct terminal *terminal)
   xfree (tty->old_tty);
   xfree (tty->Wcm);
   xfree (tty);
+}
+
+void
+scan_terminal_display_info_tty (struct tty_display_info *const info,
+                                const gc_phase phase)
+{
+  xscan_reference_pointer_to_vectorlike (&info->terminal, phase);
+  xscan_reference (&info->top_frame, phase);
+  xscan_reference_pointer_to_vectorlike (&info->previous_frame, phase);
 }
 
 void

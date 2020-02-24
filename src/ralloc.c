@@ -912,6 +912,9 @@ r_alloc_free (void **ptr)
 {
   bloc_ptr dead_bloc;
 
+  if (!*ptr)
+    return;
+
   if (! r_alloc_initialized)
     r_alloc_init ();
 

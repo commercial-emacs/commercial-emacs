@@ -592,13 +592,10 @@ struct buffer
   /* No more Lisp_Object beyond cursor_in_non_selected_windows_.
      Except undo_list, which is handled specially in Fgarbage_collect.  */
 
-  /* This structure holds the coordinates of the buffer contents
-     in ordinary buffers.  In indirect buffers, this is not used.  */
-  struct buffer_text own_text;
-
-  /* This points to the `struct buffer_text' that used for this buffer.
-     In an ordinary buffer, this is the own_text field above.
-     In an indirect buffer, this is the own_text field of another buffer.  */
+  /* This points to the `struct buffer_text' that used for this
+     buffer.  In an ordinary buffer, this is a normal owned heap
+     allocation.  In an indirect buffer, this is a heap allocation
+     owned by the base buffer.  */
   struct buffer_text *text;
 
   /* Char position of point in buffer.  */
@@ -735,7 +732,7 @@ CHECK_BUFFER (Lisp_Object x)
 INLINE struct buffer *
 XBUFFER (Lisp_Object a)
 {
-  eassert (BUFFERP (a));
+  eassume (BUFFERP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct buffer);
 }
 
@@ -1124,11 +1121,11 @@ BUFFER_CHECK_INDIRECTION (struct buffer *b)
     {
       if (b->base_buffer)
 	{
-	  eassert (b->indirections == -1);
-	  eassert (b->base_buffer->indirections > 0);
+	  eassume (b->indirections == -1);
+	  eassume (b->base_buffer->indirections > 0);
 	}
       else
-	eassert (b->indirections >= 0);
+	eassume (b->indirections >= 0);
     }
 }
 
@@ -1163,6 +1160,7 @@ extern void fix_overlays_before (struct buffer *, ptrdiff_t, ptrdiff_t);
 extern void mmap_set_vars (bool);
 extern void restore_buffer (Lisp_Object);
 extern void set_buffer_if_live (Lisp_Object);
+extern void buffer_cleanup (struct buffer *);
 
 /* Return B as a struct buffer pointer, defaulting to the current buffer.  */
 
@@ -1231,7 +1229,7 @@ extern Lisp_Object Vbuffer_alist;
 INLINE INTERVAL
 buffer_intervals (struct buffer *b)
 {
-  eassert (b->text != NULL);
+  eassume (b->text != NULL);
   return b->text->intervals;
 }
 
@@ -1240,7 +1238,7 @@ buffer_intervals (struct buffer *b)
 INLINE void
 set_buffer_intervals (struct buffer *b, INTERVAL i)
 {
-  eassert (b->text != NULL);
+  eassume (b->text != NULL);
   b->text->intervals = i;
 }
 
@@ -1361,7 +1359,7 @@ buffer_window_count (struct buffer *b)
 {
   if (b->base_buffer)
     b = b->base_buffer;
-  eassert (b->window_count >= 0);
+  eassume (b->window_count >= 0);
   return b->window_count;
 }
 
@@ -1418,14 +1416,14 @@ extern bool valid_per_buffer_idx (int);
 INLINE bool
 PER_BUFFER_VALUE_P (struct buffer *b, int idx)
 {
-  eassert (valid_per_buffer_idx (idx));
+  eassume (valid_per_buffer_idx (idx));
   return b->local_flags[idx];
 }
 
 INLINE void
 SET_PER_BUFFER_VALUE_P (struct buffer *b, int idx, bool val)
 {
-  eassert (valid_per_buffer_idx (idx));
+  eassume (valid_per_buffer_idx (idx));
   b->local_flags[idx] = val;
 }
 

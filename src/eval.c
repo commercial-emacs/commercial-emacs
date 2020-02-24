@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "pdumper.h"
 #include "atimer.h"
+#include "alloc.h"
 
 /* CACHEABLE is ordinarily nothing, except it is 'volatile' if
    necessary to cajole GCC into not warning incorrectly that a
@@ -68,11 +69,17 @@ static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
 static Lisp_Object apply_lambda (Lisp_Object, Lisp_Object, specpdl_ref);
 static Lisp_Object lambda_arity (Lisp_Object);
 
+static Lisp_Object *
+specpdl_symbolp (union specbinding *pdl)
+{
+  eassert (pdl->kind >= SPECPDL_LET);
+  return &pdl->let.symbol;
+}
+
 static Lisp_Object
 specpdl_symbol (union specbinding *pdl)
 {
-  eassert (pdl->kind >= SPECPDL_LET);
-  return pdl->let.symbol;
+  return *specpdl_symbolp (pdl);
 }
 
 static enum specbind_tag
@@ -82,11 +89,17 @@ specpdl_kind (union specbinding *pdl)
   return pdl->let.kind;
 }
 
+static Lisp_Object *
+specpdl_old_valuep (union specbinding *pdl)
+{
+  eassert (pdl->kind >= SPECPDL_LET);
+  return &pdl->let.old_value;
+}
+
 static Lisp_Object
 specpdl_old_value (union specbinding *pdl)
 {
-  eassert (pdl->kind >= SPECPDL_LET);
-  return pdl->let.old_value;
+  return *specpdl_old_valuep (pdl);
 }
 
 static void
@@ -96,25 +109,44 @@ set_specpdl_old_value (union specbinding *pdl, Lisp_Object val)
   pdl->let.old_value = val;
 }
 
+static Lisp_Object *
+specpdl_wherep (union specbinding *pdl)
+{
+  eassert (pdl->kind > SPECPDL_LET);
+  return &pdl->let.where;
+}
+
 static Lisp_Object
 specpdl_where (union specbinding *pdl)
 {
-  eassert (pdl->kind > SPECPDL_LET);
-  return pdl->let.where;
+  return *specpdl_wherep (pdl);
+}
+
+static Lisp_Object *
+specpdl_saved_valuep (union specbinding *pdl)
+{
+  eassert (pdl->kind >= SPECPDL_LET);
+  return &pdl->let.saved_value;
 }
 
 static Lisp_Object
 specpdl_arg (union specbinding *pdl)
 {
   eassert (pdl->kind == SPECPDL_UNWIND);
-  return pdl->unwind.arg;
+  return &pdl->unwind.arg;
+}
+
+static Lisp_Object *
+backtrace_functionp (union specbinding *pdl)
+{
+  eassert (pdl->kind == SPECPDL_BACKTRACE);
+  return &pdl->bt.function;
 }
 
 Lisp_Object
 backtrace_function (union specbinding *pdl)
 {
-  eassert (pdl->kind == SPECPDL_BACKTRACE);
-  return pdl->bt.function;
+  return *backtrace_functionp (pdl);
 }
 
 static ptrdiff_t
@@ -597,7 +629,7 @@ The return value is BASE-VARIABLE.  */)
 
   sym = XSYMBOL (new_alias);
 
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_FORWARDED:
       error ("Cannot make an internal variable an alias");
@@ -636,14 +668,14 @@ The return value is BASE-VARIABLE.  */)
 	error ("Don't know how to make a let-bound variable an alias");
   }
 
-  if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+  if (sym->u.s.f.trapped_write == SYMBOL_TRAPPED_WRITE)
     notify_variable_watchers (new_alias, base_variable, Qdefvaralias, Qnil);
 
-  sym->u.s.declared_special = true;
-  XSYMBOL (base_variable)->u.s.declared_special = true;
-  sym->u.s.redirect = SYMBOL_VARALIAS;
+  sym->u.s.f.declared_special = true;
+  XSYMBOL (base_variable)->u.s.f.declared_special = true;
+  sym->u.s.f.redirect = SYMBOL_VARALIAS;
   SET_SYMBOL_ALIAS (sym, XSYMBOL (base_variable));
-  sym->u.s.trapped_write = XSYMBOL (base_variable)->u.s.trapped_write;
+  sym->u.s.f.trapped_write = XSYMBOL (base_variable)->u.s.f.trapped_write;
   LOADHIST_ATTACH (new_alias);
   /* Even if docstring is nil: remove old docstring.  */
   Fput (new_alias, Qvariable_documentation, docstring);
@@ -734,7 +766,7 @@ This is like `defvar' and `defconst' but without affecting the variable's
 value.  */)
   (Lisp_Object symbol, Lisp_Object doc)
 {
-  if (!XSYMBOL (symbol)->u.s.declared_special
+  if (!XSYMBOL (symbol)->u.s.f.declared_special
       && lexbound_p (symbol))
     /* This test tries to catch the situation where we do
        (let ((<foo-var> ...)) ...(<foo-function> ...)....)
@@ -743,7 +775,7 @@ value.  */)
        because the <foo-var> wasn't yet declared as dynamic at that point.  */
     error ("Defining as dynamic an already lexical var");
 
-  XSYMBOL (symbol)->u.s.declared_special = true;
+  XSYMBOL (symbol)->u.s.f.declared_special = true;
   if (! NILP (doc))
     {
       if (! NILP (Vloadup_pure_table))
@@ -816,7 +848,7 @@ usage: (defvar SYMBOL &optional INITVALUE DOCSTRING)  */)
 	}
     }
   else if (!NILP (Vinternal_interpreter_environment)
-	   && (SYMBOLP (sym) && !XSYMBOL (sym)->u.s.declared_special))
+	   && (SYMBOLP (sym) && !XSYMBOL (sym)->u.s.f.declared_special))
     /* A simple (defvar foo) with lexical scoping does "nothing" except
        declare that var to be dynamically scoped *locally* (i.e. within
        the current file or let-block).  */
@@ -878,7 +910,7 @@ DEFUN ("internal-make-var-non-special", Fmake_var_non_special,
      (Lisp_Object symbol)
 {
   CHECK_SYMBOL (symbol);
-  XSYMBOL (symbol)->u.s.declared_special = false;
+  XSYMBOL (symbol)->u.s.f.declared_special = false;
   return Qnil;
 }
 
@@ -918,7 +950,7 @@ usage: (let* VARLIST BODY...)  */)
 	}
 
       if (!NILP (lexenv) && SYMBOLP (var)
-	  && !XSYMBOL (var)->u.s.declared_special
+	  && !XSYMBOL (var)->u.s.f.declared_special
 	  && NILP (Fmemq (var, Vinternal_interpreter_environment)))
 	/* Lexically bind VAR by adding it to the interpreter's binding
 	   alist.  */
@@ -993,7 +1025,7 @@ usage: (let VARLIST BODY...)  */)
       tem = temps[argnum];
 
       if (!NILP (lexenv) && SYMBOLP (var)
-	  && !XSYMBOL (var)->u.s.declared_special
+	  && !XSYMBOL (var)->u.s.f.declared_special
 	  && NILP (Fmemq (var, Vinternal_interpreter_environment)))
 	/* Lexically bind VAR by adding it to the lexenv alist.  */
 	lexenv = Fcons (Fcons (var, tem), lexenv);
@@ -1649,7 +1681,7 @@ See also the function `condition-case'.  */
   if (NILP (error_symbol) && NILP (data))
     error_symbol = Qerror;
   signal_or_quit (error_symbol, data, false);
-  eassume (false);
+  emacs_unreachable ();
 }
 
 /* Quit, in response to a keyboard quit request.  */
@@ -1677,7 +1709,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
   Lisp_Object clause = Qnil;
   struct handler *h;
 
-  if (gc_in_progress)
+  if (gc_in_progress ())
     emacs_abort ();
 
 #if 0 /* rms: I don't know why this was here,
@@ -2298,8 +2330,6 @@ eval_sub (Lisp_Object form)
 
   maybe_quit ();
 
-  maybe_garbage_collect ();
-
   if (++lisp_eval_depth > max_lisp_eval_depth)
     {
       if (max_lisp_eval_depth < 100)
@@ -2878,8 +2908,6 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
 
   count = record_in_backtrace (args[0], &args[1], nargs - 1);
 
-  maybe_garbage_collect ();
-
   if (debug_on_next_call)
     do_debug_on_call (Qlambda, count);
 
@@ -3303,7 +3331,7 @@ let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol)
     if ((--p)->kind > SPECPDL_LET)
       {
 	struct Lisp_Symbol *let_bound_symbol = XSYMBOL (specpdl_symbol (p));
-	eassert (let_bound_symbol->u.s.redirect != SYMBOL_VARALIAS);
+	eassert (let_bound_symbol->u.s.f.redirect != SYMBOL_VARALIAS);
 	if (symbol == let_bound_symbol
 	    && EQ (specpdl_where (p), buf))
 	  return 1;
@@ -3316,10 +3344,10 @@ static void
 do_specbind (struct Lisp_Symbol *sym, union specbinding *bind,
              Lisp_Object value, enum Set_Internal_Bind bindflag)
 {
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_PLAINVAL:
-      if (!sym->u.s.trapped_write)
+      if (!sym->u.s.f.trapped_write)
 	SET_SYMBOL_VAL (sym, value);
       else
         set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
@@ -3363,7 +3391,7 @@ specbind (Lisp_Object symbol, Lisp_Object value)
   sym = XSYMBOL (symbol);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.f.redirect)
     {
     case SYMBOL_VARALIAS:
       sym = indirect_variable (sym);
@@ -3385,10 +3413,10 @@ specbind (Lisp_Object symbol, Lisp_Object value)
 	specpdl_ptr->let.old_value = ovalue;
 	specpdl_ptr->let.where = Fcurrent_buffer ();
 
-	eassert (sym->u.s.redirect != SYMBOL_LOCALIZED
+	eassert (sym->u.s.f.redirect != SYMBOL_LOCALIZED
 		 || (EQ (SYMBOL_BLV (sym)->where, Fcurrent_buffer ())));
 
-	if (sym->u.s.redirect == SYMBOL_LOCALIZED)
+	if (sym->u.s.f.redirect == SYMBOL_LOCALIZED)
 	  {
 	    if (! blv_found (SYMBOL_BLV (sym)))
 	      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
@@ -3546,9 +3574,9 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
       { /* If variable has a trivial value (no forwarding), and isn't
 	   trapped, we can just set it.  */
 	Lisp_Object sym = specpdl_symbol (this_binding);
-	if (SYMBOLP (sym) && XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
+	if (SYMBOLP (sym) && XSYMBOL (sym)->u.s.f.redirect == SYMBOL_PLAINVAL)
 	  {
-	    if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
+	    if (XSYMBOL (sym)->u.s.f.trapped_write == SYMBOL_UNTRAPPED_WRITE)
 	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_old_value (this_binding));
 	    else
 	      set_internal (sym, specpdl_old_value (this_binding),
@@ -3666,7 +3694,7 @@ context where binding is lexical by default.  */)
   (Lisp_Object symbol)
 {
    CHECK_SYMBOL (symbol);
-   return XSYMBOL (symbol)->u.s.declared_special ? Qt : Qnil;
+   return XSYMBOL (symbol)->u.s.f.declared_special ? Qt : Qnil;
 }
 
 
@@ -3863,7 +3891,7 @@ specpdl_unrewind (union specbinding *pdl, int distance, bool vars_only)
 	       since that was already done by specbind.  */
 	    Lisp_Object sym = specpdl_symbol (tmp);
 	    if (SYMBOLP (sym)
-		&& XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
+		&& XSYMBOL (sym)->u.s.f.redirect == SYMBOL_PLAINVAL)
 	      {
 		Lisp_Object old_value = specpdl_old_value (tmp);
 		set_specpdl_old_value (tmp, SYMBOL_VAL (XSYMBOL (sym)));
@@ -4013,7 +4041,9 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
 
 
 void
-mark_specpdl (union specbinding *first, union specbinding *ptr)
+scan_specpdl (union specbinding *const first,
+              union specbinding *const ptr,
+              const gc_phase phase)
 {
   union specbinding *pdl;
   for (pdl = first; pdl != ptr; pdl++)
@@ -4021,25 +4051,29 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
       switch (pdl->kind)
         {
 	case SPECPDL_UNWIND:
-	  mark_object (specpdl_arg (pdl));
+	  xscan_reference (specpdl_argp (pdl), phase);
 	  break;
 
 	case SPECPDL_UNWIND_ARRAY:
-	  mark_objects (pdl->unwind_array.array, pdl->unwind_array.nelts);
+          /* Used for overflow stack in exec_byte_code.  */
+	  xscan_maybe_objects (pdl->unwind_array.array,
+                               pdl->unwind_array.nelts,
+                               phase);
 	  break;
 
 	case SPECPDL_UNWIND_EXCURSION:
-	  mark_object (pdl->unwind_excursion.marker);
-	  mark_object (pdl->unwind_excursion.window);
+	  xscan_reference (&pdl->unwind_excursion.marker, phase);
+	  xscan_reference (&pdl->unwind_excursion.window, phase);
 	  break;
 
 	case SPECPDL_BACKTRACE:
 	  {
 	    ptrdiff_t nargs = backtrace_nargs (pdl);
-	    mark_object (backtrace_function (pdl));
+	    xscan_reference (backtrace_functionp (pdl), phase);
 	    if (nargs == UNEVALLED)
 	      nargs = 1;
-	    mark_objects (backtrace_args (pdl), nargs);
+	    while (nargs--)
+	      xscan_reference (&backtrace_args (pdl)[nargs], phase);
 	  }
 	  break;
 
@@ -4053,11 +4087,11 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 
 	case SPECPDL_LET_DEFAULT:
 	case SPECPDL_LET_LOCAL:
-	  mark_object (specpdl_where (pdl));
+	  xscan_reference (specpdl_wherep (pdl), phase);
 	  FALLTHROUGH;
 	case SPECPDL_LET:
-	  mark_object (specpdl_symbol (pdl));
-	  mark_object (specpdl_old_value (pdl));
+	  xscan_reference (specpdl_symbolp (pdl), phase);
+	  xscan_reference (specpdl_old_valuep (pdl), phase);
 	  break;
 
 	case SPECPDL_UNWIND_PTR:
@@ -4290,7 +4324,7 @@ alist of active lexical bindings.  */);
      also use something like Fcons (Qnil, Qnil), but json.c treats any
      cons cell as error data, so use an uninterned symbol instead.  */
   Qcatch_all_memory_full
-    = Fmake_symbol (build_pure_c_string ("catch-all-memory-full"));
+    = Fmake_symbol (build_c_string ("catch-all-memory-full"));
 
   defsubr (&Sor);
   defsubr (&Sand);

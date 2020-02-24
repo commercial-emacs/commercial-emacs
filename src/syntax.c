@@ -26,6 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "syntax.h"
 #include "intervals.h"
 #include "category.h"
+#include "alloc.h"
 
 /* Make syntax table lookup grant data in gl_state.  */
 #define SYNTAX(c) syntax_property (c, 1)
@@ -709,7 +710,7 @@ back_comment (ptrdiff_t from, ptrdiff_t from_byte, ptrdiff_t stop,
   ptrdiff_t comment_end = from;
   ptrdiff_t comment_end_byte = from_byte;
   ptrdiff_t comstart_pos = 0;
-  ptrdiff_t comstart_byte;
+  ptrdiff_t comstart_byte = 0;
   /* Place where the containing defun starts,
      or 0 if we didn't come across it yet.  */
   ptrdiff_t defun_start = 0;
@@ -1688,7 +1689,7 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim,
 
   multibyte = (!NILP (BVAR (current_buffer, enable_multibyte_characters))
 	       && (XFIXNUM (lim) - PT != CHAR_TO_BYTE (XFIXNUM (lim)) - PT_BYTE));
-  string_multibyte = SBYTES (string) > SCHARS (string);
+  string_multibyte = STRING_MULTIBYTE (string);
 
   memset (fastmap, 0, sizeof fastmap);
 
@@ -2133,7 +2134,7 @@ skip_syntaxes (bool forwardp, Lisp_Object string, Lisp_Object lim)
 
   memset (fastmap, 0, sizeof fastmap);
 
-  if (SBYTES (string) > SCHARS (string))
+  if (eunlikely (STRING_MULTIBYTE (string)))
     /* As this is very rare case (syntax spec is ASCII only), don't
        consider efficiency.  */
     string = string_make_unibyte (string);
@@ -3636,6 +3637,12 @@ the end of that comment or string.  */)
 }
 
 void
+scan_syntax_roots (gc_phase phase)
+{
+  xscan_reference_pointer_to_vectorlike (&find_start_buffer, phase);
+}
+
+void
 init_syntax_once (void)
 {
   register int i, c;
@@ -3736,10 +3743,8 @@ syms_of_syntax (void)
   staticpro (&gl_state.old_prop);
 
   DEFSYM (Qscan_error, "scan-error");
-  Fput (Qscan_error, Qerror_conditions,
-	pure_list (Qscan_error, Qerror));
-  Fput (Qscan_error, Qerror_message,
-	build_pure_c_string ("Scan error"));
+  Fput (Qscan_error, Qerror_conditions, list (Qscan_error, Qerror));
+  Fput (Qscan_error, Qerror_message, build_c_string ("Scan error"));
 
   DEFVAR_BOOL ("parse-sexp-ignore-comments", parse_sexp_ignore_comments,
 	       doc: /* Non-nil means `forward-sexp', etc., should treat comments as whitespace.  */);

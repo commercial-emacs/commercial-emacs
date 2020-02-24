@@ -307,6 +307,8 @@ struct w32_output
   /* Placeholder for things accessed through output_data.x.  */
   struct x_output x_compatible;
 
+  struct frame *frame;
+
   /* Menubar "widget" handle.  */
   HMENU menubar_widget;
 
@@ -418,12 +420,14 @@ extern struct w32_output w32term_display;
 
 /* Return the output data for frame F.  */
 #define FRAME_OUTPUT_DATA(f) ((f)->output_data.w32)
+#define FRAME_OUTPUT_DATA_NOCHECK FRAME_OUTPUT_DATA
 
 /* Return the window associated with the frame F.  */
 #define FRAME_W32_WINDOW(f) ((f)->output_data.w32->window_desc)
 #define FRAME_NATIVE_WINDOW(f) FRAME_W32_WINDOW (f)
 
 #define FRAME_FONT(f) ((f)->output_data.w32->font)
+#define FRAME_FONT_NOCHECK FRAME_FONT
 #define FRAME_FONTSET(f) ((f)->output_data.w32->fontset)
 #define FRAME_BASELINE_OFFSET(f) ((f)->output_data.w32->baseline_offset)
 

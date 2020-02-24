@@ -27,6 +27,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "syssignal.h"
 #include "pdumper.h"
 #include "keyboard.h"
+#include "alloc.h"
 
 union aligned_thread_state
 {
@@ -295,8 +296,9 @@ informational only.  */)
   if (!NILP (name))
     CHECK_STRING (name);
 
+  /* Can't GC beween  */
   struct Lisp_Mutex *mutex
-    = ALLOCATE_ZEROED_PSEUDOVECTOR (struct Lisp_Mutex, name, PVEC_MUTEX);
+    = ALLOCATE_PSEUDOVECTOR_AND_ZERO (struct Lisp_Mutex, name, PVEC_MUTEX);
   mutex->name = name;
   lisp_mutex_init (&mutex->mutex);
 
@@ -411,7 +413,7 @@ informational only.  */)
     CHECK_STRING (name);
 
   struct Lisp_CondVar *condvar
-    = ALLOCATE_ZEROED_PSEUDOVECTOR (struct Lisp_CondVar, name, PVEC_CONDVAR);
+    = ALLOCATE_PSEUDOVECTOR_AND_ZERO (struct Lisp_CondVar, name, PVEC_CONDVAR);
   condvar->mutex = mutex;
   condvar->name = name;
   sys_cond_init (&condvar->cond);
@@ -636,61 +638,58 @@ thread_select (select_func *func, int max_fds, fd_set *rfds,
 
 
 
+struct thread_scan {
+  struct thread_state *thread;
+  gc_phase phase;
+};
+
 static void
-mark_one_thread (struct thread_state *thread)
+scan_thread_1 (void *const scanp)
 {
-  /* Get the stack top now, in case mark_specpdl changes it.  */
-  void const *stack_top = thread->stack_top;
+  const struct thread_scan *const scan = scanp;
+  struct thread_state *const thread = scan->thread;
+  const gc_phase phase = scan->phase;
+  /* Scan the ordinary pseudovector part of the thread.  */
+  xscan_vector_lisp_fields (&thread->header, phase);
 
-  mark_specpdl (thread->m_specpdl, thread->m_specpdl_ptr);
+  /* Scan the special part of the thread.  Get the stack top now, in
+     case mark_specpdl changes it.  */
+  void const *const stack_top = thread->stack_top;
 
-  mark_c_stack (thread->m_stack_bottom, stack_top);
+  scan_specpdl (thread->m_specpdl, thread->m_specpdl_ptr, phase);
+
+  xscan_stack (thread->m_stack_bottom, stack_top, phase);
 
   for (struct handler *handler = thread->m_handlerlist;
        handler; handler = handler->next)
     {
-      mark_object (handler->tag_or_ch);
-      mark_object (handler->val);
+      xscan_reference (&handler->tag_or_ch, phase);
+      xscan_reference (&handler->val, phase);
     }
 
-  if (thread->m_current_buffer)
-    {
-      Lisp_Object tem;
-      XSETBUFFER (tem, thread->m_current_buffer);
-      mark_object (tem);
-    }
-
-  mark_bytecode (&thread->bc);
-
-  /* No need to mark Lisp_Object members like m_last_thing_searched,
-     as mark_threads_callback does that by calling mark_object.  */
-}
-
-static void
-mark_threads_callback (void *ignore)
-{
-  struct thread_state *iter;
-
-  for (iter = all_threads; iter; iter = iter->next_thread)
-    {
-      Lisp_Object thread_obj;
-
-      XSETTHREAD (thread_obj, iter);
-      mark_object (thread_obj);
-      mark_one_thread (iter);
-    }
+  xscan_reference_pointer_to_vectorlike (&thread->m_current_buffer, phase);
+  xscan_reference_pointer_to_vectorlike (&thread->next_thread, phase);
 }
 
 void
-mark_threads (void)
+scan_thread (struct thread_state *const s, const gc_phase phase)
 {
-  flush_stack_call_func (mark_threads_callback, NULL);
+  struct thread_scan scan = {
+    .thread = s,
+    .phase = phase,
+  };
+
+  if (s == current_thread)
+    flush_stack_call_func (scan_thread_1, &scan);
+  else
+    scan_thread_1 (&scan);
 }
 
 void
-unmark_main_thread (void)
+scan_thread_roots (const gc_phase phase)
 {
-  main_thread.s.header.size &= ~ARRAY_MARK_FLAG;
+  xscan_reference_pointer_to_vectorlike (&all_threads, phase);
+  scan_thread (&main_thread.s, phase);
 }
 
 
@@ -847,8 +846,10 @@ If NAME is given, it must be a string; it names the new thread.  */)
     CHECK_STRING (name);
 
   struct thread_state *new_thread
-    = ALLOCATE_ZEROED_PSEUDOVECTOR (struct thread_state, event_object,
-				    PVEC_THREAD);
+    = ALLOCATE_PSEUDOVECTOR_AND_ZERO (
+      struct thread_state, event_object, PVEC_THREAD);
+  /* N.B. orange thread_state so that we can finalize it safely even
+     if it's only partially constructed.  */
   new_thread->function = function;
   new_thread->name = name;
   /* Perhaps copy m_last_thing_searched from parent?  */
@@ -1098,12 +1099,6 @@ thread_check_current_buffer (struct buffer *buffer)
 }
 
 
-
-bool
-main_thread_p (const void *ptr)
-{
-  return ptr == &main_thread.s;
-}
 
 bool
 in_current_thread (void)

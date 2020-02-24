@@ -454,7 +454,7 @@ base_obj = dispnew.o frame.o scroll.o xdisp.o menu.o $(XMENU_OBJ) window.o \
 	doprnt.o intervals.o textprop.o composite.o xml.o lcms.o $(NOTIFY_OBJ) \
 	$(XWIDGETS_OBJ) \
 	profiler.o decompress.o \
-	thread.o systhread.o \
+	thread.o systhread.o sqlite.o sysmem.o \
 	$(if $(HYBRID_MALLOC),sheap.o) \
 	$(MSDOS_OBJ) $(MSDOS_X_OBJ) $(NS_OBJ) $(CYGWIN_OBJ) $(FONT_OBJ) \
 	$(W32_OBJ) $(WINDOW_SYSTEM_OBJ) $(XGSELOBJ) $(JSON_OBJ) \
@@ -951,4 +951,10 @@ endif
 ### Flymake support (for C only)
 check-syntax:
 	$(AM_V_CC)$(CC) -c $(CPPFLAGS) $(ALL_CFLAGS) ${CHK_SOURCES} || true
+
+test-bitset$(EXEEXT): test-bitset.o bitset.h
+	$(AM_V_CCLD)$(CC) -o $@ \
+	$(ALL_CFLAGS) $(LDFLAGS) \
+	test-bitset.c $(LIBEGNU_ARCHIVE) $(W32_RES_LINK) $(LIBES)
+
 .PHONY: check-syntax

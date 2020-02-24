@@ -140,7 +140,7 @@ static Lisp_Object
 make_sub_char_table (int depth, int min_char, Lisp_Object defalt)
 {
   int i;
-  Lisp_Object table = make_uninit_sub_char_table (depth, min_char);
+  Lisp_Object table = make_nil_sub_char_table (depth, min_char);
 
   for (i = 0; i < chartab_size[depth]; i++)
     XSUB_CHAR_TABLE (table)->contents[i] = defalt;
@@ -1155,7 +1155,7 @@ uniprop_decode_value_run_length (Lisp_Object table, Lisp_Object value)
     {
       Lisp_Object valvec = XCHAR_TABLE (table)->extras[4];
 
-      if (XFIXNUM (value) >= 0 && XFIXNUM (value) < ASIZE (valvec))
+      if (XFIXNUM (value) >= 0 && XFIXNUM (value) < ASIZE_ANY (valvec))
 	value = AREF (valvec, XFIXNUM (value));
     }
   return value;
@@ -1201,7 +1201,7 @@ static Lisp_Object
 uniprop_encode_value_run_length (Lisp_Object table, Lisp_Object value)
 {
   Lisp_Object *value_table = XVECTOR (XCHAR_TABLE (table)->extras[4])->contents;
-  int i, size = ASIZE (XCHAR_TABLE (table)->extras[4]);
+  int i, size = ASIZE_ANY (XCHAR_TABLE (table)->extras[4]);
 
   for (i = 0; i < size; i++)
     if (EQ (value, value_table[i]))
@@ -1219,7 +1219,7 @@ static Lisp_Object
 uniprop_encode_value_numeric (Lisp_Object table, Lisp_Object value)
 {
   Lisp_Object *value_table = XVECTOR (XCHAR_TABLE (table)->extras[4])->contents;
-  int i, size = ASIZE (XCHAR_TABLE (table)->extras[4]);
+  int i, size = ASIZE_ANY (XCHAR_TABLE (table)->extras[4]);
 
   CHECK_FIXNUM (value);
   for (i = 0; i < size; i++)

@@ -28,6 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "xterm.h"
 #endif
 #include "emacsgtkfixed.h"
+#include "alloc.h"
 
 /* Silence a bogus diagnostic; see GNOME bug 683906.  */
 #if GNUC_PREREQ (4, 7, 0) && ! GLIB_CHECK_VERSION (2, 35, 7)
@@ -42,7 +43,6 @@ struct _EmacsFixedPrivate
 {
   struct frame *f;
 };
-
 
 static void emacs_fixed_get_preferred_width  (GtkWidget *widget,
                                               gint      *minimum,
@@ -77,17 +77,14 @@ emacs_fixed_class_init (EmacsFixedClass *klass)
 static void
 emacs_fixed_init (EmacsFixed *fixed)
 {
-  fixed->priv = G_TYPE_INSTANCE_GET_PRIVATE (fixed, emacs_fixed_get_type (),
-                                             EmacsFixedPrivate);
-  fixed->priv->f = 0;
+  fixed->f = NULL;
 }
 
 GtkWidget *
 emacs_fixed_new (struct frame *f)
 {
   EmacsFixed *fixed = g_object_new (emacs_fixed_get_type (), NULL);
-  EmacsFixedPrivate *priv = fixed->priv;
-  priv->f = f;
+  fixed->f = f;
   return GTK_WIDGET (fixed);
 }
 
@@ -103,7 +100,7 @@ emacs_fixed_get_preferred_width (GtkWidget *widget,
   if (minimum) *minimum = w;
   if (natural) *natural = priv->f->output_data.pgtk->preferred_width;
 #else
-  int w = priv->f->output_data.x->size_hints.min_width;
+  int w = FRAME_X_OUTPUT(fixed->f)->size_hints.min_width;
   if (minimum) *minimum = w;
   if (natural) *natural = w;
 #endif
@@ -121,7 +118,7 @@ emacs_fixed_get_preferred_height (GtkWidget *widget,
   if (minimum) *minimum = h;
   if (natural) *natural = priv->f->output_data.pgtk->preferred_height;
 #else
-  int h = priv->f->output_data.x->size_hints.min_height;
+  int h = FRAME_X_OUTPUT(fixed->f)->size_hints.min_height;
   if (minimum) *minimum = h;
   if (natural) *natural = h;
 #endif
@@ -207,4 +204,9 @@ XSetWMNormalHints (Display *d, Window w, XSizeHints *hints)
   XSetWMSizeHints (d, w, hints, XA_WM_NORMAL_HINTS);
 }
 
-#endif
+void
+xg_scan_frame_widget (GtkWidget *const widget, const gc_phase phase)
+{
+  EmacsFixed *fixed = EMACS_FIXED (widget);
+  xscan_reference_pointer_to_vectorlike (&fixed->f, phase);
+}
