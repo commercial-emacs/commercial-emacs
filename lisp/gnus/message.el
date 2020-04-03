@@ -5139,6 +5139,7 @@ Otherwise, generate and save a value for `canlock-password' first."
 (autoload 'nnheader-get-report "nnheader")
 
 (declare-function gnus-setup-posting-charset "gnus-msg" (group))
+(declare-function gnus-msg-inherit-variables "gnus-msg" (source-buffer dest-buffer))
 
 (defun message-send-news (&optional arg)
   (require 'gnus-msg)
@@ -7317,7 +7318,9 @@ If TO-NEWSGROUPS, use that as the new Newsgroups line."
       (setq subject (concat "Re: " (message-simplify-subject subject)))
       (widen))
 
-    (message-pop-to-buffer (message-buffer-name "followup" from newsgroups))
+    (let ((before-pop (current-buffer)))
+      (message-pop-to-buffer (message-buffer-name "followup" from newsgroups))
+      (gnus-msg-inherit-variables before-pop (current-buffer)))
 
     (setq message-reply-headers
 	  (make-full-mail-header
