@@ -1743,7 +1743,7 @@ this trigger is subscribed to `gdb-buf-publisher' and called with
     map))
 
 ;; We want to use comint because it has various nifty and familiar features.
-(define-derived-mode gdb-inferior-io-mode comint-mode "Inferior I/O"
+(define-derived-mode gdb-inferior-io-mode special-mode "Inferior I/O"
   "Major mode for gdb inferior-io."
   :syntax-table nil :abbrev-table nil
   (make-comint-in-buffer "gdb-inferior" (current-buffer) nil))

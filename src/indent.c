@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
+#include <stdio.h>
 
 #include "lisp.h"
 #include "character.h"
@@ -2214,24 +2215,63 @@ whether or not it is currently displayed in some window.  */)
 	  it.current_x = it.hpos = 0;
 	}
       if (IT_CHARPOS (it) != PT)
-	/* We used to temporarily disable selective display here; the
-	   comment said this is "so we don't move too far" (2005-01-19
-	   checkin by kfs).  But this does nothing useful that I can
-	   tell, and it causes Bug#2694 .  -- cyd */
-	/* When the position we started from is covered by a display
-	   string, move_it_to will overshoot it, while vertical-motion
-	   wants to put the cursor _before_ the display string.  So in
-	   that case, we move to buffer position before the display
-	   string, and avoid overshooting.  But if the position before
-	   the display string is a newline, we don't do this, because
-	   otherwise we will end up in a screen line that is one too
-	   far back.  */
-	move_it_to (&it,
-		    (!disp_string_at_start_p
-		     || FETCH_BYTE (IT_BYTEPOS (it)) == '\n')
-		    ? PT
-		    : PT - 1,
-		    -1, -1, -1, MOVE_TO_POS);
+        {
+          /* We used to temporarily disable selective display here; the
+             comment said this is "so we don't move too far" (2005-01-19
+             checkin by kfs).  But this does nothing useful that I can
+             tell, and it causes Bug#2694 .  -- cyd */
+          /* When the position we started from is covered by a display
+             string, move_it_to will overshoot it, while vertical-motion
+             wants to put the cursor _before_ the display string.  So in
+             that case, we move to buffer position before the display
+             string, and avoid overshooting.  But if the position before
+             the display string is a newline, we don't do this, because
+             otherwise we will end up in a screen line that is one too
+             far back.  */
+          /* this is a brutal call */
+	  int nlines;
+          clock_t t;
+          struct it it2;
+          struct face *face;
+          ptrdiff_t target;
+
+          target =
+            (!disp_string_at_start_p ||
+             FETCH_BYTE (IT_BYTEPOS (it)) == '\n')
+            ? PT
+            : PT - 1;
+
+          it2 = it;
+          face = FACE_FROM_ID (it2.f, it2.face_id);
+          if (face && face->font) {
+            it2.pixel_width = face->font->space_width;
+          }
+
+          // bol to window start
+          nlines = ((target - IT_CHARPOS (it2))) / it2.last_visible_x;
+          for (int i=0, z=(target - IT_CHARPOS (it2)); i<z; ++i)
+            INC_TEXT_POS(it2.current.pos, 1);
+          it2.current_x = target % it2.last_visible_x - 1;
+          it2.c = FETCH_CHAR (IT_BYTEPOS (it2));
+          it2.continuation_lines_width = nlines * it2.last_visible_x;
+          it2.current_y = nlines;
+          it2.position = it2.current.pos;
+
+          t = clock();
+          // move_it_to (&it, target, -1, -1, -1, MOVE_TO_POS);
+          it = it2;
+          t = clock() - t;
+          fprintf(stderr,
+                  "brutal2 seconds=%f it.y=%d it2.y=%d it.dpvi=%d it2.dpvi=%d it.cw=%d it2.cw=%d it.c=%c it2.c=%c it.x=%d it2.x=%d nlines=%d it.pos=%ld it2.pos=%ld\n",
+                  ((double)t) / CLOCKS_PER_SEC,
+                  it.current_y, it2.current_y,
+                  it.current.dpvec_index, it2.current.dpvec_index,
+                  it.continuation_lines_width, it2.continuation_lines_width,
+                  it.c, it2.c,
+                  it.current_x, it2.current_x,
+                  nlines,
+                  it.position.charpos, it2.position.charpos);
+        }
 
       /* IT may move too far if truncate-lines is on and PT lies
 	 beyond the right margin.  IT may also move too far if the

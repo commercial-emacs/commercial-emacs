@@ -24,15 +24,6 @@ set $dummy = Fmake_symbol + 8
 dir ../lwlib
 #dir /gd/gnu/lesstif-0.89.9/lib/Xm
 
-# Don't enter GDB when user types C-g to quit.
-# This has one unfortunate effect: you can't type C-c
-# at the GDB to stop Emacs, when using X.
-# However, C-z works just as well in that case.
-handle 2 noprint pass
-
-# Make it work like SIGINT normally does.
-handle SIGTSTP nopass
-
 # Pass on user signals
 handle SIGUSR1 noprint pass
 handle SIGUSR2 noprint pass

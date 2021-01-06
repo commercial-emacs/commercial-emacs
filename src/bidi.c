@@ -71,18 +71,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    The sequential processing steps described by UAX#9 are implemented
    as recursive levels of processing, all of which examine the next
    character in the logical order.  This hierarchy of processing looks
-   as follows, from the innermost (deepest) to the outermost level,
-   omitting some subroutines used by each level:
+   as follows:
 
-     bidi_fetch_char         -- fetch next character
-     bidi_resolve_explicit   -- resolve explicit levels and directions
-     bidi_resolve_weak       -- resolve weak types
-     bidi_resolve_brackets   -- resolve "paired brackets" neutral types
-     bidi_resolve_neutral    -- resolve neutral types
      bidi_level_of_next_char -- resolve implicit levels
-
-   Each level calls the level below it, and works on the result
-   returned by the lower level, including all of its sub-levels.
+     bidi_resolve_neutral    -- resolve neutral types
+     bidi_resolve_brackets   -- resolve "paired brackets" neutral types
+     bidi_resolve_weak       -- resolve weak types
+     bidi_resolve_explicit   -- resolve explicit levels and directions
+     bidi_fetch_char         -- fetch next character
 
    Unlike all the levels below it, bidi_level_of_next_char can return
    the information about either the next or previous character in the
@@ -3396,6 +3392,8 @@ bidi_find_other_level_edge (struct bidi_it *bidi_it, int level, bool end_flag)
     }
 }
 
+unsigned int bmtvn_count = 0;
+
 void
 bidi_move_to_visually_next (struct bidi_it *bidi_it)
 {
@@ -3433,7 +3431,13 @@ bidi_move_to_visually_next (struct bidi_it *bidi_it)
     }
 
   old_level = bidi_it->resolved_level;
-  new_level = bidi_level_of_next_char (bidi_it);
+
+  // HERE
+  if (++bmtvn_count == 20000) {
+    new_level = bidi_level_of_next_char (bidi_it);
+  } else {
+    new_level = bidi_level_of_next_char (bidi_it);
+  }
 
   /* Reordering of resolved levels (clause L2) is implemented by
      jumping to the other edge of the level and flipping direction of

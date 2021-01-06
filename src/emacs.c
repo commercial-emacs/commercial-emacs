@@ -2797,6 +2797,8 @@ all of which are called before Emacs is actually killed.  */
 void
 shut_down_emacs (int sig, Lisp_Object stuff)
 {
+  fprintf(stderr, "heyo %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u\n", mit_calls1, mit_calls2, mit_calls3, mit_calls4, mit_calls5, mit_calls6, mit_calls7, mit_calls8, mit_calls9, mit_calls10, mit_calls11, mit_calls12, mit_calls13, mit_calls14, mit_calls15, bmtvn_calls1);
+
   /* Prevent running of hooks from now on.  */
   Vrun_hooks = Qnil;
 
