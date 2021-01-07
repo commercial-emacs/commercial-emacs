@@ -4514,9 +4514,10 @@ even if this catches the signal."
 FORMAT is a string passed to `message' to format any error message.
 It should contain a single %-sequence; e.g., \"Error: %S\".
 
-If `debug-on-error' is non-nil, run BODY without catching its errors.
 This is to be used around code that is not expected to signal an error
 but that should be robust in the unexpected case that an error is signaled.
+
+If `debug-on-error' is non-nil, the debugger gets invoked as usual.
 
 For backward compatibility, if FORMAT is not a constant string, it
 is assumed to be part of BODY, in which case the message format

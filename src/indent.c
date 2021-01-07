@@ -2258,8 +2258,8 @@ whether or not it is currently displayed in some window.  */)
           it2.position = it2.current.pos;
 
           t = clock();
-          // move_it_to (&it, target, -1, -1, -1, MOVE_TO_POS);
-          it = it2;
+          move_it_to (&it, target, -1, -1, -1, MOVE_TO_POS);
+          // it = it2;
           t = clock() - t;
           fprintf(stderr,
                   "brutal2 seconds=%f it.y=%d it2.y=%d it.dpvi=%d it2.dpvi=%d it.cw=%d it2.cw=%d it.c=%c it2.c=%c it.x=%d it2.x=%d nlines=%d it.pos=%ld it2.pos=%ld\n",

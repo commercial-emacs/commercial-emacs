@@ -3534,7 +3534,7 @@ start_display (struct it *it, struct window *w, struct text_pos pos)
 
           t = clock();
           // HERE
-	  // move_it_to (it, CHARPOS (pos), -1, -1, -1, MOVE_TO_POS); // this is a brutal call!
+	  move_it_to (it, CHARPOS (pos), -1, -1, -1, MOVE_TO_POS);
           t = clock() - t;
           fprintf(stderr,
                   "brutal seconds=%f it.y=%d it2.y=%d it.dpvi=%d it2.dpvi=%d it.cw=%d it2.cw=%d it.c=%c it2.c=%c it.x=%d it2.x=%d nlines=%d it.pos=%ld it2.pos=%ld\n",
@@ -3545,7 +3545,7 @@ start_display (struct it *it, struct window *w, struct text_pos pos)
                   it->c, it2.c,
                   it->current_x, it2.current_x, nlines,
                   it->position.charpos, it2.position.charpos);
-          *it = it2;
+          // *it = it2;
 	  new_x = it->current_x + it->pixel_width;
 
 	  /* If lines are continued, this line may end in the middle
@@ -8705,21 +8705,21 @@ get_visually_first_element (struct it *it)
 						    IT_BYTEPOS (*it), -1,
 						    &it->bidi_it.bytepos);
       bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
-      bidi_move_to_visually_next (&it->bidi_it);
       fprintf(stderr, "brutal6 src=%ld dest=%ld ", it->bidi_it.bytepos, orig_bytepos);
       bmtvn_reps = 0;
       t = clock();
-      /* do */
-      /*   { */
-      /*     /\* Now return to buffer/string position where we were asked */
-      /*        to get the next display element, and produce that.  *\/ */
-      /*     bidi_move_to_visually_next (&it->bidi_it); */
-      /*     bmtvn_reps++; */
-      /*   } */
-      /* while (it->bidi_it.bytepos != orig_bytepos */
-      /*        && it->bidi_it.charpos < eob); */
-      it->bidi_it.charpos = orig_charpos;
-      it->bidi_it.bytepos = orig_bytepos;
+      do
+        {
+          /* Now return to buffer/string position where we were asked
+             to get the next display element, and produce that.  */
+          bidi_move_to_visually_next (&it->bidi_it);
+          bmtvn_reps++;
+        }
+      while (it->bidi_it.bytepos != orig_bytepos
+             && it->bidi_it.charpos < eob);
+      /* bidi_move_to_visually_next (&it->bidi_it); */
+      /* it->bidi_it.charpos = orig_charpos; */
+      /* it->bidi_it.bytepos = orig_bytepos; */
       t = clock() - t;
       fprintf(stderr, "bmtvn_reps=%u seconds=%f oc=%ld nc=%ld\n",
               bmtvn_reps, ((double)t) / CLOCKS_PER_SEC, orig_charpos, it->bidi_it.charpos);
@@ -10800,7 +10800,7 @@ move_it_vertically (struct it *it, int dy)
       mit_calls12++;
       t = clock();
       move_trace ("move_it_v: from %td, %d\n", IT_CHARPOS (*it), dy);
-      // move_it_to (it, ZV, -1, it->current_y + dy, -1, MOVE_TO_POS | MOVE_TO_Y);
+      move_it_to (it, ZV, -1, it->current_y + dy, -1, MOVE_TO_POS | MOVE_TO_Y);
       move_trace ("move_it_v: to %td\n", IT_CHARPOS (*it));
       t = clock() - t;
       fprintf(stderr,
@@ -10813,7 +10813,7 @@ move_it_vertically (struct it *it, int dy)
               it->current_x, it2.current_x,
               dy,
               it->position.charpos, it2.position.charpos);
-      *it = it2;
+      // *it = it2;
       /* If buffer ends in ZV without a newline, move to the start of
 	 the line to satisfy the post-condition.  */
       if (IT_CHARPOS (*it) == ZV
