@@ -394,12 +394,13 @@ if test "$with_dumping" = "unexec" && test "$with_unexec" = "no"; then
   AC_MSG_ERROR(['--with-dumping=unexec' requires unexec support])
 fi
 
-AC_DEFINE([HAVE_PDUMPER], 1, [Define to build with portable dumper support])
 if test "$with_pdumper" = "yes"; then
+  AC_DEFINE([HAVE_PDUMPER], 1, [Define to build with portable dumper support])
   HAVE_PDUMPER=yes
 else
   HAVE_PDUMPER=no
 fi
+AC_SUBST([HAVE_PDUMPER])
 
 DUMPING=$with_dumping
 AC_SUBST(DUMPING)

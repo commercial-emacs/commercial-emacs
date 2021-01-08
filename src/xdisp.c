@@ -10508,9 +10508,9 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
       line_start_x = 0;
       it->hpos = 0;
       it->line_number_produced_p = false;
-      it->current_y += it->max_ascent + it->max_descent;
-      ++it->vpos;
       last_height = it->max_ascent + it->max_descent;
+      it->current_y += last_height;
+      ++it->vpos;
       it->max_ascent = it->max_descent = 0;
     }
 
@@ -10633,25 +10633,28 @@ move_it_vertically_backward (struct it *it, int dy)
   fprintf(stderr, "wtf1a it2.current_y=%d it2.continuation_lines_width=%d\n", it2.current_y, it2.continuation_lines_width);
 
   t = clock(); // HERE
-  // move_it_to (&it2, start_pos, -1, -1, -1, MOVE_TO_POS);
+  move_it_to (&it2, start_pos, -1, -1, -1, MOVE_TO_POS);
   // can I get 7293 without calling get_next_display_element
   /* it2.current_y = 7293; */
   /* it2.vpos = 7272; */
   t = clock() - t;
 
-  fprintf(stderr, "wtf1b it2.current_y=%d it2.continuation_lines_width=%d seconds=%f manual_nlines=%ld\n",
+  fprintf(stderr, "brutal4 it2.current_y=%d it2.continuation_lines_width=%d seconds=%f manual_nlines=%ld\n",
           it2.current_y, it2.continuation_lines_width, ((double)t) / CLOCKS_PER_SEC,
           ((start_pos - IT_CHARPOS(*it))) / it2.last_visible_x);
 
   eassert (IT_CHARPOS (*it) >= BEGV);
   /* H is the actual vertical distance from the position in *IT
      and the starting position.  */
-  h = it2.current_y - it->current_y;
   h = ((start_pos - IT_CHARPOS(*it))) / it->last_visible_x;
-  fprintf(stderr, "wtf2 h=%d\n", h);
+  fprintf(stderr, "wtf2 ((start_pos=%ld - itcharpos=%ld) / lvx=%d) = %d\n",
+          start_pos, IT_CHARPOS(*it), it->last_visible_x, h);
+  h = it2.current_y - it->current_y;
+  fprintf(stderr, "wtf2b (it2.cy=%d - it.cy=%d) = %d\n",
+          it2.current_y, it->current_y, h);
+
   /* NLINES is the distance in number of lines.  */
   nlines = it2.vpos - it->vpos;
-  nlines = h;
   fprintf(stderr, "wtf3 it2.vpos=%d\n", it2.vpos);
   fprintf(stderr, "wtf3 it.vpos=%d\n", it->vpos);
   fprintf(stderr, "wtf3 nlines=%d\n", nlines);
@@ -10661,6 +10664,7 @@ move_it_vertically_backward (struct it *it, int dy)
   it->current_y -= h;
   fprintf(stderr, "wtf4 it.vpos=%d\n", it->vpos);
   fprintf(stderr, "wtf4 it.current_y=%d\n", it->current_y);
+  /* By this point, IT's vpos is settled. What if it weren't? */
 
   if (dy == 0)
     {
@@ -10693,8 +10697,8 @@ move_it_vertically_backward (struct it *it, int dy)
     }
   else
     {
-      /* The y-position we try to reach, relative to *IT.
-	 Note that H has been subtracted in front of the if-statement.  */
+      /* Since IT had H subtracted, the target is merely the original IT
+         modulo a DY term. */
       int target_y = it->current_y + h - dy;
       int y0 = it3.current_y;
       int y1;
