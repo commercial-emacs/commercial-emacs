@@ -2756,6 +2756,9 @@ struct it
      is the x position of the start of the run of glyphs. */
   Lisp_Object min_width_property;
   int min_width_start;
+
+  /* Experimental y-position relative to window-start.  */
+  int relative_y;
 };
 
 

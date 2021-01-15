@@ -8722,7 +8722,8 @@ get_visually_first_element (struct it *it)
       /* it->bidi_it.bytepos = orig_bytepos; */
       t = clock() - t;
       fprintf(stderr, "bmtvn_reps=%u seconds=%f oc=%ld nc=%ld\n",
-              bmtvn_reps, ((double)t) / CLOCKS_PER_SEC, orig_charpos, it->bidi_it.charpos);
+              bmtvn_reps, ((double)t) / CLOCKS_PER_SEC,
+              orig_charpos, it->bidi_it.charpos);
     }
 
   /*  Adjust IT's position information to where we ended up.  */
@@ -9447,7 +9448,7 @@ move_it_in_display_line_to (struct it *it,
   ptrdiff_t prev_pos = IT_CHARPOS (*it);
   bool saw_smaller_pos = prev_pos < to_charpos;
   bool line_number_pending = false;
-  static unsigned int iterations = 0;
+  unsigned int iterations = 0;
 
   miidlt_calls++;
 
@@ -10094,8 +10095,12 @@ move_it_in_display_line_to (struct it *it,
       }
 #undef IT_RESET_X_ASCENT_DESCENT
     }
-  fprintf(stderr, "coda %u %u %u\n", miidlt_calls, iterations, result);
-
+  fprintf(stderr, "coda miidlt=%u goround=%u term=%s\n",
+          miidlt_calls, iterations,
+          (result == MOVE_NEWLINE_OR_CR) ? "newline" :
+          (result == MOVE_LINE_CONTINUED) ? "continued" :
+          (result == MOVE_POS_MATCH_OR_ZV) ? "match_or_zv" :
+          (result == MOVE_X_REACHED) ? "reachedx" : "other");
 
 #undef BUFFER_POS_REACHED_P
 
@@ -10205,6 +10210,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	      if (it->vpos == to_vpos)
 		{
 		  reached = 1;
+                  move_trace ("move_it_to to_vpos=%d\n", to_vpos);
 		  break;
 		}
 	      else {
@@ -10221,6 +10227,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		 TO_VPOS, or at TO_POS, whichever comes first.  */
 	      if (it->vpos == to_vpos)
 		{
+                  move_trace ("move_it_to to_vpos=%d\n", to_vpos);
 		  reached = 2;
 		  break;
 		}
@@ -10285,15 +10292,15 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		  && to_y < it->current_y + line_height)
 		{
 		  reached = 6;
+                  move_trace ("move_it_to to_y=%d\n", to_y);
 		  break;
 		}
 	      SAVE_IT (it_backup, *it, backup_data);
-	      move_trace ("move_it: from %td\n", IT_CHARPOS (*it));
               mit_calls5++;
 	      skip2 = move_it_in_display_line_to (it, to_charpos, -1, op & MOVE_TO_POS);
-	      move_trace ("move_it: to %td\n", IT_CHARPOS (*it));
 	      line_height = it->max_ascent + it->max_descent;
-	      move_trace ("move_it: line_height = %d\n", line_height);
+	      move_trace ("move_it_to: from %td to %td h=%d\n",
+                          IT_CHARPOS (it_backup), IT_CHARPOS (*it), line_height);
 
 	      if (to_y >= it->current_y
 		  && to_y < it->current_y + line_height)
@@ -10312,14 +10319,15 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		  RESTORE_IT (it, &it_backup, backup_data);
 		  it->max_ascent = max_ascent;
 		  it->max_descent = max_descent;
-		  reached = 6;
+                  move_trace ("move_it_to %d\n", to_y);
+		  reached = 7;
 		}
 	      else
 		{
 		  skip = skip2;
 		  if (skip == MOVE_POS_MATCH_OR_ZV)
 		    {
-		      reached = 7;
+		      reached = 8;
 		      /* If the last move_it_in_display_line_to call
 			 took us away from TO_CHARPOS, back up to the
 			 previous position, as it is a better
@@ -10345,7 +10353,6 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	    {
 	      /* Check whether TO_Y is in this line.  */
 	      line_height = it->max_ascent + it->max_descent;
-	      move_trace ("move_it: line_height = %d\n", line_height);
 
 	      if (to_y >= it->current_y
 		  && to_y < it->current_y + line_height)
@@ -10366,8 +10373,8 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		      skip = move_it_in_display_line_to
 			(it, -1, prev_x, MOVE_TO_X);
 		    }
-
-		  reached = 6;
+                  move_trace ("move_it_to %d\n", to_y);
+		  reached = 9;
 		}
 	    }
 
@@ -10402,7 +10409,8 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	{
 	case MOVE_POS_MATCH_OR_ZV:
 	  max_current_x = max (it->current_x, max_current_x);
-	  reached = 8;
+          move_trace ("move_it_to to_charpos=%ld\n", to_charpos);
+	  reached = 10;
 	  goto out;
 
 	case MOVE_NEWLINE_OR_CR:
@@ -10435,7 +10443,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 				         >= it->n_overlay_strings - 1))
 			      && IT_STRING_CHARPOS (*it) >= it->end_charpos)))))
 	    {
-	      reached = 9;
+	      reached = 11;
 	      goto out;
 	    }
 	  break;
@@ -10543,7 +10551,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
   if (backup_data)
     bidi_unshelve_cache (backup_data, true);
 
-  move_trace ("move_it_to: reached %d\n", reached);
+  move_trace ("move_it_to reached %d\n", reached);
 
   return max_current_x;
 }
@@ -10562,13 +10570,14 @@ void
 move_it_vertically_backward (struct it *it, int dy)
 {
   int nlines, h;
-  struct it it2, it3;
-  void *it2data = NULL, *it3data = NULL;
+  struct it it2;
+  void *it2data = NULL;
   ptrdiff_t start_pos;
   int nchars_per_row
     = (it->last_visible_x - it->first_visible_x) / FRAME_COLUMN_WIDTH (it->f);
   ptrdiff_t pos_limit;
   clock_t t;
+  struct window *w = XWINDOW (selected_window);
 
  move_further_back:
   eassert (dy >= 0);
@@ -10581,7 +10590,7 @@ move_it_vertically_backward (struct it *it, int dy)
     pos_limit = BEGV;
   else
     pos_limit = max (start_pos - nlines * nchars_per_row, BEGV);
-  fprintf(stderr, "wtf0 dy=%d it.vpos=%d nlines=%d pos_limit=%ld\n", dy, it->vpos, nlines, pos_limit);
+  fprintf(stderr, "wtf0 dy=%d it.vpos=%d guesslines=%d pos_limit=%ld\n", dy, it->vpos, nlines, pos_limit);
 
   /* Set the iterator's position that many lines back.  But don't go
      back more than NLINES full screen lines -- this wins a day with
@@ -10589,7 +10598,7 @@ move_it_vertically_backward (struct it *it, int dy)
   fprintf(stderr, "wtf0a it.cpos=%ld\n", IT_CHARPOS(*it));
   while (nlines-- && IT_CHARPOS (*it) > pos_limit)
     back_to_previous_visible_line_start (it);
-  fprintf(stderr, "wtf0b it.cpos=%ld\n", IT_CHARPOS(*it));
+  fprintf(stderr, "wtf0b it.cpos=%ld\n", IT_CHARPOS (*it));
 
   /* Reseat the iterator here.  When moving backward, we don't want
      reseat to skip forward over invisible text, set up the iterator
@@ -10605,65 +10614,40 @@ move_it_vertically_backward (struct it *it, int dy)
 				   reordering is in effect.  */
   it->continuation_lines_width = 0;
 
-  /* Move forward and see what y-distance we moved.  First move to the
-     start of the next line so that we get its height.  We need this
-     height to be able to tell whether we reached the specified
-     y-distance.  */
   SAVE_IT (it2, *it, it2data);
+  // IT_CHARPOS (it2) = max (pos_limit, IT_CHARPOS (it2));
   it2.max_ascent = it2.max_descent = 0;
-  do
-    {
-      mit_calls13++;
-      move_it_to (&it2, start_pos, -1, -1, it2.vpos + 1,
-		  MOVE_TO_POS | MOVE_TO_VPOS);
-    }
-  while (!(IT_POS_VALID_AFTER_MOVE_P (&it2)
-	   /* If we are in a display string which starts at START_POS,
-	      and that display string includes a newline, and we are
-	      right after that newline (i.e. at the beginning of a
-	      display line), exit the loop, because otherwise we will
-	      infloop, since move_it_to will see that it is already at
-	      START_POS and will not move.  */
-	   || (it2.method == GET_FROM_STRING
-	       && IT_CHARPOS (it2) == start_pos
-	       && SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) == '\n')));
-  eassert (IT_CHARPOS (*it) >= BEGV);
-  SAVE_IT (it3, it2, it3data);
-
-  fprintf(stderr, "wtf1a it2.current_y=%d it2.continuation_lines_width=%d\n", it2.current_y, it2.continuation_lines_width);
+  fprintf(stderr, "wtf1a it2.cy=%d it2.cw=%d\n", it2.current_y, it2.continuation_lines_width);
 
   t = clock(); // HERE
+  // can I get 7293 without calling get_next_display_element?  No.
   move_it_to (&it2, start_pos, -1, -1, -1, MOVE_TO_POS);
-  // can I get 7293 without calling get_next_display_element
-  /* it2.current_y = 7293; */
-  /* it2.vpos = 7272; */
   t = clock() - t;
 
-  fprintf(stderr, "brutal4 it2.current_y=%d it2.continuation_lines_width=%d seconds=%f manual_nlines=%ld\n",
+  fprintf(stderr, "brutal4 it2.cy=%d it2.cw=%d seconds=%f manual_nlines=%ld\n",
           it2.current_y, it2.continuation_lines_width, ((double)t) / CLOCKS_PER_SEC,
           ((start_pos - IT_CHARPOS(*it))) / it2.last_visible_x);
 
   eassert (IT_CHARPOS (*it) >= BEGV);
   /* H is the actual vertical distance from the position in *IT
      and the starting position.  */
-  h = ((start_pos - IT_CHARPOS(*it))) / it->last_visible_x;
-  fprintf(stderr, "wtf2 ((start_pos=%ld - itcharpos=%ld) / lvx=%d) = %d\n",
-          start_pos, IT_CHARPOS(*it), it->last_visible_x, h);
   h = it2.current_y - it->current_y;
-  fprintf(stderr, "wtf2b (it2.cy=%d - it.cy=%d) = %d\n",
+  fprintf(stderr, "wtf2b [ it2.cy(%d) - it.cy(%d) ] = h(%d)\n",
           it2.current_y, it->current_y, h);
 
   /* NLINES is the distance in number of lines.  */
   nlines = it2.vpos - it->vpos;
-  fprintf(stderr, "wtf3 it2.vpos=%d\n", it2.vpos);
-  fprintf(stderr, "wtf3 it.vpos=%d\n", it->vpos);
-  fprintf(stderr, "wtf3 nlines=%d\n", nlines);
+  fprintf(stderr, "wtf3 [ it2.vpos(%d) - it.vpos(%d) ] = nlines(%d)\n",
+          it2.vpos, it->vpos, nlines);
   /* Correct IT's y and vpos position
      so that they are relative to the starting point.  */
   it->vpos -= nlines;
   it->current_y -= h;
   fprintf(stderr, "wtf4 it.vpos=%d\n", it->vpos);
-  fprintf(stderr, "wtf4 it.current_y=%d\n", it->current_y);
+  fprintf(stderr, "wtf4 it.cy=%d\n", it->current_y);
+  fprintf(stderr, "wtf4 it.lvy=%d\n", it->last_visible_y);
+  fprintf(stderr, "wtf4 it.wtby=%d\n", window_text_bottom_y (w));
+
   /* By this point, IT's vpos is settled. What if it weren't? */
 
   if (dy == 0)
@@ -10693,22 +10677,42 @@ move_it_vertically_backward (struct it *it, int dy)
           mit_calls15++;
 	  move_it_to (it, cp, -1, -1, -1, MOVE_TO_POS);
 	}
-      bidi_unshelve_cache (it3data, true);
     }
   else
     {
       /* Since IT had H subtracted, the target is merely the original IT
-         modulo a DY term. */
+         modulo the centering_position (dy). */
       int target_y = it->current_y + h - dy;
-      int y0 = it3.current_y;
-      int y1;
-      int line_height;
+      int y0, line_height;
 
-      fprintf(stderr, "wtf5 target_y=%d\n", target_y);
-      RESTORE_IT (&it3, &it3, it3data);
-      y1 = line_bottom_y (&it3);
-      line_height = y1 - y0;
       RESTORE_IT (it, it, it2data);
+
+      /* Move forward and see what y-distance we moved.  First move to the
+	 start of the next line so that we get its height.  We need this
+	 height to be able to tell whether we reached the specified
+	 y-distance.  */
+      SAVE_IT (it2, *it, it2data);
+      y0 = it2.current_y;
+      do
+	{
+	  mit_calls13++;
+	  move_it_to (&it2, start_pos, -1, -1, it2.vpos + 1,
+		      MOVE_TO_POS | MOVE_TO_VPOS);
+	}
+      while (!(IT_POS_VALID_AFTER_MOVE_P (&it2)
+	       /* If we are in a display string which starts at START_POS,
+		  and that display string includes a newline, and we are
+		  right after that newline (i.e. at the beginning of a
+		  display line), exit the loop, because otherwise we will
+		  infloop, since move_it_to will see that it is already at
+		  START_POS and will not move.  */
+	       || (it2.method == GET_FROM_STRING
+		   && IT_CHARPOS (it2) == start_pos
+		   && SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) == '\n')));
+      line_height = line_bottom_y (&it2) - y0;
+      RESTORE_IT (it, it, it2data);
+
+      fprintf(stderr, "wtf5 target_y=%d line_height=%d y0=%d y1=%d\n", target_y, line_height, y0, it2.current_y);
       /* If we did not reach target_y, try to move further backward if
 	 we can.  If we moved too far backward, try to move forward.  */
       if (target_y < it->current_y
@@ -10738,7 +10742,9 @@ move_it_vertically_backward (struct it *it, int dy)
 
 	  if (!FRAME_WINDOW_P (it->f))
             {
-              move_it_vertically (it, target_y - it->current_y);
+              fprintf(stderr, "move_it_vertically from %d to %d\n",
+                      it->current_y, target_y);
+	      move_it_vertically (it, target_y - it->current_y);
             }
           else
 	    {
@@ -10901,7 +10907,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
       move_it_to (it, -1, -1, -1, it->vpos + dvpos, MOVE_TO_VPOS);
       t = clock() - t;
       fprintf(stderr,
-              "nonbrutal seconds=%f it.y=%d it2.y=%d it.dpvi=%d it2.dpvi=%d it.cw=%d it2.cw=%d it.c=%c it2.c=%c it.x=%d it2.x=%d nlines=%d it.pos=%ld it2.pos=%ld\n",
+              "nonbrutal seconds=%f it.y=%d it2.y=%d it.dpvi=%d it2.dpvi=%d it.cw=%d it2.cw=%d it.c=%c it2.c=%c it.x=%d it2.x=%d nlines=%d it.cpos=%ld it2.cpos=%ld\n",
               ((double)t) / CLOCKS_PER_SEC,
               it->current_y, it2.current_y,
               it->current.dpvec_index, it2.current.dpvec_index,
@@ -20052,6 +20058,15 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
   start_display (&it, w, pos);
   it.glyph_row->reversed_p = false;
 
+  if (CHARPOS(pos) == 293)
+    {
+      it.glyph_row->reversed_p = false;
+    }
+  else
+    {
+      it.glyph_row->reversed_p = false;
+    }
+
   /* Display all lines of W.  */
   while (it.current_y < it.last_visible_y)
     {
@@ -24767,7 +24782,7 @@ display_line (struct it *it, int cursor_vpos)
       }
     }
 
-  // fprintf(stderr, "nonbrutal5 display_reps=%d\n", display_reps);
+   /* fprintf(stderr, "nonbrutal5 display_reps=%d cpos=%ld\n", display_reps, IT_CHARPOS (*it)); */
   if (wrap_data)
     bidi_unshelve_cache (wrap_data, true);
 
