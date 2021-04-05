@@ -43,6 +43,7 @@ extern bool gc_object_limit_try_increase (size_t delta);
 extern void xscan_maybe_objects (Lisp_Object const *, ptrdiff_t, gc_phase);
 extern void xscan_stack (char const *, char const *, gc_phase);
 extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
+extern void flush_stack_call_func1 (void (*func) (void *arg), void *arg);
 
 extern void scan_kboards (gc_phase);
 extern void scan_thread (struct thread_state *, gc_phase);

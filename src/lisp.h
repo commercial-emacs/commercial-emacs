@@ -1735,13 +1735,6 @@ ASIZE (Lisp_Object array)
   return size;
 }
 
-/* INLINE ptrdiff_t */
-/* gc_asize (Lisp_Object array) */
-/* { */
-/*   /\* Like ASIZE, but also can be used in the garbage collector.  *\/ */
-/*   return XVECTOR (array)->header.size & ~ARRAY_MARK_FLAG; */
-/* } */
-
 INLINE ptrdiff_t
 PVSIZE (Lisp_Object pv)
 {
@@ -1950,7 +1943,7 @@ AREF (Lisp_Object array, ptrdiff_t idx)
 INLINE Lisp_Object *
 aref_addr (Lisp_Object array, ptrdiff_t idx)
 {
-  eassert (0 <= idx && idx <= gc_asize (array));
+  eassert (0 <= idx && idx <= ASIZE_ANY (array));
   return & XVECTOR (array)->contents[idx];
 }
 
@@ -5427,8 +5420,8 @@ stack_string_p (const struct Lisp_String *const s)
 }
 
 /* Declare NAME as an auto Lisp string if possible, a GC-based one if not.
-   Take its unibyte value from the null-terminated string STR with length LEN.
-   STR may have side effects and may contain null bytes.
+   Take its unibyte value from the NUL-terminated string STR with length LEN.
+   STR may have side effects and may contain NUL bytes.
    STR's value is not necessarily copied.  The resulting Lisp string
    should not be modified or given text properties or made visible to
    user code.

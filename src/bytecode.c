@@ -508,7 +508,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
   void *alloc;
   SAFE_ALLOCA_LISP (alloc, stack_items);
   const ptrdiff_t item_bytes = stack_items * word_size;
-  Lisp_Object *const stack_base = ptr_bounds_clip (alloc, item_bytes);
+  Lisp_Object *const stack_base = alloc;
   Lisp_Object *top = stack_base;
   /* Here, we used to store VECTOR to the top stack slot to fix
      bug#33014.  But now that conservative GC understands interior
