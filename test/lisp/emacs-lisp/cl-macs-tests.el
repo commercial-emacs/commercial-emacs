@@ -555,14 +555,13 @@ collection clause."
                             for x = (* 2 k) and y = (1+ (elt arr k))
                             collect (list k x y)))
                  '((0 0 1) (1 2 1) (2 4 1) (3 6 1) (4 8 1) (5 10 1) (6 12 1))))
-  (should (equal (cl-loop with result
-                          for x below 3
+
+  (should (equal (cl-loop for x below 3
                           for y below 2 and z = 1
                           collect x)
                  '(0 1)))
 
-  (should (equal (cl-loop with result
-                          for x below 3
+  (should (equal (cl-loop for x below 3
                           and y below 2
                           collect x)
                  '(0 1)))
@@ -571,21 +570,13 @@ collection clause."
   (should (equal (cl-loop with result
                           for x below 3
                           for y = (progn (push x result) x) and z = 1
-                          append (list x y) into result
-                          finally return result)
+                          append (list x y) into result1
+                          finally return (append result result1))
                  '(2 1 0 0 0 1 1 2 2)))
 
-  ;; this is actually disallowed in clisp, but is semantically consistent
   (should (equal (cl-loop with result
                           for x below 3
-                          and y = (progn (push x result) x) and z = 1
-                          append (list x y) into result
-                          finally return result)
-                 '(2 1 0 0 0 0 1 0 2 1)))
-
-  (should (equal (cl-loop with result
-                          for x below 3
-                          for y = (progn (push x result))
+                          for _y = (progn (push x result))
                           finally return result)
                  '(2 1 0)))
 
