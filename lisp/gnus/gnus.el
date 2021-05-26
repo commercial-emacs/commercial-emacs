@@ -1025,7 +1025,6 @@ Check the NNTPSERVER environment variable and the
 ;; starting or even loading Gnus.
 ;;;###autoload(custom-autoload 'gnus-select-method "gnus")
 
-(defvar gnus-secondary-select-methods)
 (defcustom gnus-select-method
   (list 'nntp (or (gnus-getenv-nntpserver)
                   (when (and gnus-default-nntp-server
