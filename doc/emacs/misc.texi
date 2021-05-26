@@ -97,7 +97,8 @@ by the @env{NNTPSERVER} environment variable.
   If your system does not have a default news server, or if you wish
 to use Gnus for reading email, then before invoking @kbd{M-x gnus} you
 need to tell Gnus where to get news and/or mail.  To do this,
-customize the variable @code{gnus-select-methods}.
+customize the variables @code{gnus-select-method} and/or
+@code{gnus-secondary-select-methods}.
 @iftex
 See the Gnus manual for details.
 @end iftex

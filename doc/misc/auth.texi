@@ -280,14 +280,14 @@ that sort of thing. Just point to a JSON file with entries like this:
 @chapter Multiple GMail accounts with Gnus
 
 For multiple GMail accounts with Gnus, you have to make two nnimap
-entries in your @code{gnus-select-methods} with distinct
+entries in your @code{gnus-secondary-select-methods} with distinct
 names:
 
 @example
-(setq gnus-select-methods '((nnimap "gmail"
-                               (nnimap-address "imap.gmail.com"))
-                            (nnimap "gmail2"
-                               (nnimap-address "imap.gmail.com"))))
+(setq gnus-secondary-select-methods '((nnimap "gmail"
+                                         (nnimap-address "imap.gmail.com"))
+                                      (nnimap "gmail2"
+                                         (nnimap-address "imap.gmail.com"))))
 @end example
 
 Your netrc entries will then be:

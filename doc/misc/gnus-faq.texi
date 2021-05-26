@@ -357,7 +357,7 @@ the documentation for information on how to do this. As a
 first start, put those lines in @file{~/.gnus.el}:
 
 @example
-(setq gnus-select-methods '((nntp "news.yourprovider.net")))
+(setq gnus-select-method '(nntp "news.yourprovider.net"))
 (setq user-mail-address "you@@yourprovider.net")
 (setq user-full-name "Your Name")
 @end example
@@ -471,13 +471,13 @@ I want Gnus to fetch news from several servers, is this possible?
 @subsubheading Answer
 
 Of course. You can specify more sources for articles in the
-variable gnus-select-methods. Add something like
+variable gnus-secondary-select-methods. Add something like
 this in @file{~/.gnus.el}:
 
 @example
-(add-to-list 'gnus-select-methods
+(add-to-list 'gnus-secondary-select-methods
              '(nntp "news.yourSecondProvider.net"))
-(add-to-list 'gnus-select-methods
+(add-to-list 'gnus-secondary-select-methods
              '(nntp "news.yourThirdProvider.net"))
 @end example
 @noindent
@@ -493,7 +493,7 @@ No problem, this is just one more select method called
 nnspool, so you want this:
 
 @example
-(add-to-list 'gnus-select-methods '(nnspool ""))
+(add-to-list 'gnus-secondary-select-methods '(nnspool ""))
 @end example
 @noindent
 
@@ -508,7 +508,7 @@ Gnus will look for the spool file in /usr/spool/news, if you
 want something different, change the line above to something like this:
 
 @example
-(add-to-list 'gnus-select-methods
+(add-to-list 'gnus-secondary-select-methods
              '(nnspool ""
                        (nnspool-directory "/usr/local/myspoolddir")))
 @end example
@@ -546,14 +546,14 @@ many small files, the nnfolder back end is then probably the
 choice for you.  To use nnml add the following to @file{~/.gnus.el}:
 
 @example
-(add-to-list 'gnus-select-methods '(nnml ""))
+(add-to-list 'gnus-secondary-select-methods '(nnml ""))
 @end example
 @noindent
 
 As you might have guessed, if you want nnfolder, it's
 
 @example
-(add-to-list 'gnus-select-methods '(nnfolder ""))
+(add-to-list 'gnus-secondary-select-methods '(nnfolder ""))
 @end example
 @noindent
 
@@ -650,7 +650,7 @@ back end to your select method and give the information
 about the server there.
 
 @example
-(add-to-list 'gnus-select-methods
+(add-to-list 'gnus-secondary-select-methods
              '(nnimap "Give the baby a name"
                       (nnimap-address "imap.yourProvider.net")
                       (nnimap-port 143)
