@@ -646,7 +646,7 @@ minor mode in all Gnus buffers."
 	   (push (gnus-method-to-server method)
 		 gnus-agent-covered-methods)
 	   (setq gnus-agent-method-p-cache nil))))
-     gnus-select-methods)
+     (cons gnus-select-method gnus-secondary-select-methods))
     (gnus-agent-write-servers)))
 
 (defun gnus-agent-queue-setup (&optional group-name)
