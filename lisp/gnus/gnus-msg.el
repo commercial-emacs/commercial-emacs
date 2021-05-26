@@ -399,90 +399,83 @@ only affect the Gcc copy, but not the original message."
 (defvar gnus-article-reply nil)
 (defmacro gnus-setup-message (config &rest forms)
   (declare (indent 1) (debug t))
-  (let ((winconf (make-symbol "gnus-setup-message-winconf"))
-	(winconf-name (make-symbol "gnus-setup-message-winconf-name"))
-	(buffer (make-symbol "gnus-setup-message-buffer"))
-	(article (make-symbol "gnus-setup-message-article"))
-	(oarticle (make-symbol "gnus-setup-message-oarticle"))
-	(yanked (make-symbol "gnus-setup-yanked-articles"))
-	(group (make-symbol "gnus-setup-message-group")))
-    `(let ((,winconf (current-window-configuration))
-	   (,winconf-name gnus-current-window-configuration)
-	   (,buffer (buffer-name (current-buffer)))
-	   (,article   (when gnus-article-reply
-			 (or (nnselect-article-number
-			      (or (car-safe gnus-article-reply)
-				  gnus-article-reply))
-			     gnus-article-reply)))
-	   (,oarticle gnus-article-reply)
-	   (,yanked gnus-article-yanked-articles)
-           (,group (if gnus-article-reply
-		       (or (nnselect-article-group
-			    (or (car-safe gnus-article-reply)
-			        gnus-article-reply))
-                           gnus-newsgroup-name)
-                     gnus-newsgroup-name))
-	   (message-header-setup-hook
-	    (copy-sequence message-header-setup-hook))
-	   (mbl mml-buffer-list)
-	   (message-mode-hook (copy-sequence message-mode-hook)))
-       (setq mml-buffer-list nil)
-       (add-hook 'message-header-setup-hook (lambda ()
-					      (gnus-inews-insert-gcc ,group)))
-       ;; message-newsreader and message-mailer were formerly set in
-       ;; gnus-inews-add-send-actions, but this is too late when
-       ;; message-generate-headers-first is used. --ansel
-       (add-hook 'message-mode-hook
-		 (lambda nil
-		   (setq message-newsreader
-			 (setq message-mailer (gnus-extended-version)))))
-       ;; #### FIXME: for a reason that I did not manage to identify yet,
-       ;; the variable `gnus-newsgroup-name' does not honor a dynamically
-       ;; scoped or setq'ed value from a caller like `C-u gnus-summary-mail'.
-       ;; After evaluation of @forms below, it gets the value we actually want
-       ;; to override, and the posting styles are used. For that reason, I've
-       ;; added an optional argument to `gnus-configure-posting-styles' to
-       ;; make sure that the correct value for the group name is used. -- drv
-       (add-hook 'message-mode-hook
-		 (if (memq ,config '(reply-yank reply))
-		     (lambda ()
-		       (gnus-configure-posting-styles ,group))
+  `(let ((setup-winconf (current-window-configuration))
+	 (setup-winconf-name gnus-current-window-configuration)
+	 (setup-buffer (buffer-name (current-buffer)))
+	 (setup-article (when gnus-article-reply
+			  (or (nnselect-article-number
+			       (or (car-safe gnus-article-reply)
+				   gnus-article-reply))
+			      gnus-article-reply)))
+	 (setup-oarticle gnus-article-reply)
+	 (setup-yanked gnus-article-yanked-articles)
+         (setup-group (if gnus-article-reply
+			  (or (nnselect-article-group
+			       (or (car-safe gnus-article-reply)
+			           gnus-article-reply))
+			      gnus-newsgroup-name)
+			gnus-newsgroup-name))
+	 (message-header-setup-hook
+	  (copy-sequence message-header-setup-hook))
+	 (mbl mml-buffer-list)
+	 (message-mode-hook (copy-sequence message-mode-hook)))
+     (setq mml-buffer-list nil)
+     (add-hook 'message-header-setup-hook (lambda ()
+					    (gnus-inews-insert-gcc setup-group)))
+     ;; message-newsreader and message-mailer were formerly set in
+     ;; gnus-inews-add-send-actions, but this is too late when
+     ;; message-generate-headers-first is used. --ansel
+     (add-hook 'message-mode-hook
+	       (lambda nil
+		 (setq message-newsreader
+		       (setq message-mailer (gnus-extended-version)))))
+     ;; #### FIXME: for a reason that I did not manage to identify yet,
+     ;; the variable `gnus-newsgroup-name' does not honor a dynamically
+     ;; scoped or setq'ed value from a caller like `C-u gnus-summary-mail'.
+     ;; After evaluation of @forms below, it gets the value we actually want
+     ;; to override, and the posting styles are used. For that reason, I've
+     ;; added an optional argument to `gnus-configure-posting-styles' to
+     ;; make sure that the correct value for the group name is used. -- drv
+     (add-hook 'message-mode-hook
+	       (if (memq ,config '(reply-yank reply))
 		   (lambda ()
-		     ;; There may be an old " *gnus article copy*" buffer.
-		     (let (gnus-article-copy)
-		       (gnus-configure-posting-styles ,group)))))
-       (gnus-alist-pull ',(intern gnus-draft-meta-information-header)
-		  message-required-headers)
-       (when (and ,group
-		  (not (string= ,group "")))
-	 (push (cons
-		(intern gnus-draft-meta-information-header)
-		(gnus-inews-make-draft (or ,yanked ,article)))
-	       message-required-headers))
-       (unwind-protect
-	   (progn
-	     ,@forms)
-	 (gnus-inews-add-send-actions ,winconf ,buffer ,oarticle ,config
-				      ,yanked ,winconf-name)
-	 (setq gnus-message-buffer (current-buffer))
-         (setq-local gnus-message-group-art (cons ,group ,article))
-         ;; Enable highlighting of different citation levels
-         (when gnus-message-highlight-citation
-           (gnus-message-citation-mode 1))
-         (gnus-run-hooks 'gnus-message-setup-hook)
-         (if (eq major-mode 'message-mode)
-             (let ((mbl1 mml-buffer-list))
-               (setq mml-buffer-list mbl)  ;; Global value
-               (setq-local mml-buffer-list mbl1) ;; Local value
-               (add-hook 'change-major-mode-hook #'mml-destroy-buffers nil t)
-               (add-hook 'kill-buffer-hook #'mml-destroy-buffers t t))
-           (mml-destroy-buffers)
-           (setq mml-buffer-list mbl)))
-       (message-hide-headers)
-       (gnus-add-buffer)
-       (gnus-configure-windows ,config t)
-       (run-hooks 'post-command-hook)
-       (set-buffer-modified-p nil))))
+		     (gnus-configure-posting-styles setup-group))
+		 (lambda ()
+		   ;; There may be an old " *gnus article copy*" buffer.
+		   (let (gnus-article-copy)
+		     (gnus-configure-posting-styles setup-group)))))
+     (gnus-alist-pull ',(intern gnus-draft-meta-information-header)
+		      message-required-headers)
+     (when (and setup-group
+		(not (string= setup-group "")))
+       (push (cons
+	      (intern gnus-draft-meta-information-header)
+	      (gnus-inews-make-draft (or setup-yanked setup-article)))
+	     message-required-headers))
+     (unwind-protect
+	 (progn
+	   ,@forms)
+       (gnus-inews-add-send-actions setup-winconf setup-buffer setup-oarticle ,config
+				    setup-yanked setup-winconf-name)
+       (setq gnus-message-buffer (current-buffer))
+       (setq-local gnus-message-group-art (cons setup-group setup-article))
+       ;; Enable highlighting of different citation levels
+       (when gnus-message-highlight-citation
+         (gnus-message-citation-mode 1))
+       (gnus-run-hooks 'gnus-message-setup-hook)
+       (if (eq major-mode 'message-mode)
+           (let ((mbl1 mml-buffer-list))
+             (setq mml-buffer-list mbl)  ;; Global value
+             (setq-local mml-buffer-list mbl1) ;; Local value
+             (add-hook 'change-major-mode-hook #'mml-destroy-buffers nil t)
+             (add-hook 'kill-buffer-hook #'mml-destroy-buffers t t))
+         (mml-destroy-buffers)
+         (setq mml-buffer-list mbl)))
+     (message-hide-headers)
+     (gnus-add-buffer)
+     (gnus-configure-windows ,config t)
+     (run-hooks 'post-command-hook)
+     (set-buffer-modified-p nil)))
 
 (defun gnus-inews-make-draft-meta-information (group articles)
   (when (numberp articles)
