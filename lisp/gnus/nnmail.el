@@ -1624,7 +1624,7 @@ See the documentation for the variable `nnmail-split-fancy' for details."
 	  (insert id "\n"))))))
 
 (defun nnmail-cache-primary-mail-backend ()
-  (let ((be-list gnus-select-methods)
+  (let ((be-list (cons gnus-select-method gnus-secondary-select-methods))
 	(be nil)
 	(res nil)
         (get-new-mail nil))
