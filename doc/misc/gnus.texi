@@ -1139,13 +1139,13 @@ For instance, if the @samp{news.somewhere.edu} @acronym{NNTP} server is where
 you want to get your daily dosage of news from, you'd say:
 
 @lisp
-(setq gnus-select-method '((nntp "news.somewhere.edu")))
+(setq gnus-select-method '(nntp "news.somewhere.edu"))
 @end lisp
 
 If you want to read directly from the local spool, say:
 
 @lisp
-(setq gnus-select-method '((nnspool "")))
+(setq gnus-select-method '(nnspool ""))
 @end lisp
 
 If you can use a local spool, you probably should, as it will almost
@@ -14453,7 +14453,7 @@ something like:
 
 @example
 (setq gnus-select-method
-            '(nnimap "imap.gmail.com"))
+      '(nnimap "imap.gmail.com"))
 @end example
 
 You'll be prompted for a user name and password.  If you grow tired of
@@ -19747,6 +19747,7 @@ emacs -batch -l ~/.emacs -l ~/.gnus.el -f gnus-agent-batch >/dev/null 2>&1
 
 @node Agent Caveats
 @subsection Agent Caveats
+
 The Gnus Agent doesn't seem to work like most other offline
 newsreaders.  Here are some common questions that some imaginary people
 may ask:
@@ -28836,6 +28837,7 @@ in Gnus 5.10.9.
 
 @item
 @code{gnus-agent}
+
 The Gnus Agent has seen a major updated and is now enabled by default,
 and all nntp and nnimap servers from @code{gnus-select-method} and
 @code{gnus-secondary-select-method} are agentized by default.  Earlier
