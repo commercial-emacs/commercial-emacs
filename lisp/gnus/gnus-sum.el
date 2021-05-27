@@ -1522,7 +1522,7 @@ the type of the variable (string, integer, character, etc).")
   "Default shell command on article.")
 
 (defvar gnus-newsgroup-agentized nil
-  "Locally bound in each summary buffer to indicate whether the server has been agentized.")
+  "Locally bound in each summary buffer to indicate if server has been agentized.")
 (defvar-local gnus-newsgroup-begin nil)
 (defvar-local gnus-newsgroup-end nil)
 (defvar-local gnus-newsgroup-last-rmail nil)
@@ -1552,7 +1552,7 @@ the type of the variable (string, integer, character, etc).")
 (defvar-local gnus-newsgroup-expunged-tally 0)
 
 (defvar-local gnus-newsgroup-marked nil
-  "Sorted list of ticked articles in the current newsgroup (a subset of unread art).")
+  "Sorted list of ticked articles in current newsgroup (a subset of unread art).")
 
 (defvar-local gnus-newsgroup-spam-marked nil
   "List of ranges of articles that have been marked as spam.")
