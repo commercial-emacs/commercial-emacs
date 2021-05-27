@@ -1461,8 +1461,7 @@ If LIMIT, first try to limit the search to the N last articles."
       t)))
 
 (deffoo nnimap-retrieve-group-data-early (server infos)
-  (when (and (nnimap-change-group nil server)
-	     infos)
+  (when (nnimap-change-group nil server)
     (with-current-buffer (nnimap-buffer)
       (erase-buffer)
       (setf (nnimap-group nnimap-object) nil)

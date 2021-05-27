@@ -1629,6 +1629,7 @@ Else we get unblocked but permanently yielded threads."
             (let (gnus-run-thread--subresult
                   current-fn
                   (nntp-server-buffer working))
+              (ignore gnus-run-thread--subresult)
               (condition-case-unless-debug err
                   (dolist (fn fns)
                     (setq current-fn fn)
@@ -1759,7 +1760,7 @@ All FNS must finish before MTX is released."
     ;; aren't equal (and that need extension; i.e., they are async).
     (let (methods)
       (dolist (elem type-cache)
-	(cl-destructuring-bind (method method-type infos) elem
+	(cl-destructuring-bind (method _method-type infos) elem
 	  (let ((gnus-opened-servers methods))
 	    (when (and (gnus-similar-server-opened method)
 		       (gnus-check-backend-function
@@ -1812,28 +1813,16 @@ All FNS must finish before MTX is released."
                            'retrieve-group-data-early backend))
                  (update-p (gnus-check-backend-function
                             'request-update-info backend))
-                 commands early-data)
+                 commands)
                   elem
                 (when (and method infos (not denied-p) (not already-p))
                   (push method methods)
                   (gnus-push-end (apply-partially #'gnus-open-server method)
                                  commands)
                   (when early-p
-                    ;; Just mark this server as "cleared".
-                    (gnus-push-end (apply-partially
-                                    #'gnus-retrieve-group-data-early method nil)
-                                   commands)
-
-                    ;; This is a sanity check, so that we never
-                    ;; attempt to start two async requests to the
-                    ;; same server, because that will fail.  This
-                    ;; should never happen, since the methods should
-                    ;; be unique at this point, but apparently it
-                    ;; does happen in the wild with some setups.
                     (when scan-p
                       (gnus-push-end (apply-partially #'gnus-request-scan nil method)
                                      commands))
-
                     ;; Store the token we get back from -early so that we
                     ;; can pass it to -finish later.
                     (gnus-push-end (apply-partially
@@ -1875,6 +1864,7 @@ All FNS must finish before MTX is released."
                                thread-group
                                commands))
                     (let (gnus-run-thread--subresult)
+                      (ignore gnus-run-thread--subresult)
                       (mapc (lambda (fn)
                               (setq gnus-run-thread--subresult (funcall fn)))
                             commands))))))
