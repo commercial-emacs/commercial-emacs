@@ -252,7 +252,6 @@ update their active files often, this can help.")
 
 ;;; Internal variables.
 
-(defvoo nntp-retrieval-in-progress nil)
 (defcustom nntp-record-commands nil
   "If non-nil, nntp will record all commands in the \"*nntp-log*\" buffer."
   :type 'boolean)
@@ -399,9 +398,8 @@ retried once before actually displaying the error report."
 
 (defun nntp-kill-buffer (buffer)
   (when (buffer-live-p buffer)
-    (let ((process (get-buffer-process buffer)))
-      (when process
-	(delete-process process)))
+    (when-let ((process (get-buffer-process buffer)))
+      (delete-process process))
     (kill-buffer buffer)
     (nnheader-init-server-buffer)))
 
@@ -410,7 +408,7 @@ retried once before actually displaying the error report."
   (with-current-buffer buffer
     (erase-buffer)))
 
-(defsubst nntp-find-connection (buffer)
+(defun nntp-find-connection (buffer)
   "Find the connection delivering to BUFFER."
   (let ((alist nntp-connection-alist)
 	(buffer (if (stringp buffer) (get-buffer buffer) buffer))
@@ -432,9 +430,8 @@ retried once before actually displaying the error report."
 
 (defun nntp-find-connection-buffer (buffer)
   "Return the process connection buffer tied to BUFFER."
-  (let ((process (nntp-find-connection buffer)))
-    (when process
-      (process-buffer process))))
+  (when-let ((process (nntp-find-connection buffer)))
+    (process-buffer process)))
 
 (defun nntp-retrieve-data (command address _port buffer
 				      &optional wait-for callback decode)
@@ -528,8 +525,8 @@ retried once before actually displaying the error report."
 
 (defun nntp-send-command-and-decode (wait-for &rest strings)
   "Send STRINGS to server and wait until WAIT-FOR returns."
-  (when (not (or nnheader-callback-function
-                 nntp-inhibit-output))
+  (when (and (not nnheader-callback-function)
+             (not nntp-inhibit-output))
     (nntp-erase-buffer nntp-server-buffer))
   (let* ((command (mapconcat #'identity strings " "))
 	 (process (nntp-find-connection nntp-server-buffer))
@@ -734,32 +731,19 @@ command whose response triggered the error."
 (deffoo nntp-retrieve-group-data-early (server infos)
   "Retrieve group info on INFOS."
   (nntp-with-open-group nil server
-    (let ((buffer (nntp-find-connection-buffer nntp-server-buffer)))
-      (unless infos
-	(with-current-buffer buffer
-	  (setq nntp-retrieval-in-progress nil)))
-      (when (and buffer
-		 infos
-		 (with-current-buffer buffer
-		   (not nntp-retrieval-in-progress)))
-	;; The first time this is run, this variable is `try'.  So we
-	;; try.
-	(when (eq nntp-server-list-active-group 'try)
-	  (nntp-try-list-active
-	   (gnus-group-real-name (gnus-info-group (car infos)))))
-	(with-current-buffer buffer
-	  (erase-buffer)
-	  ;; Mark this buffer as "in use" in case we try to issue two
-	  ;; retrievals from the same server.  This shouldn't happen,
-	  ;; so this is mostly a sanity check.
-	  (setq nntp-retrieval-in-progress t)
-	  (let ((nntp-inhibit-erase t)
-		(command (if nntp-server-list-active-group
-			     "LIST ACTIVE" "GROUP")))
-	    (dolist (info infos)
-	      (nntp-send-command
-	       nil command (gnus-group-real-name (gnus-info-group info)))))
-	  (length infos))))))
+    (when-let ((buffer (nntp-find-connection-buffer nntp-server-buffer)))
+      (when (eq nntp-server-list-active-group 'try) ;; `try' is initial value
+	(nntp-try-list-active
+	 (gnus-group-real-name (gnus-info-group (car infos)))))
+      (with-current-buffer buffer
+	(erase-buffer)
+	(let ((nntp-inhibit-erase t)
+	      (command (if nntp-server-list-active-group
+			   "LIST ACTIVE" "GROUP")))
+	  (dolist (info infos)
+	    (nntp-send-command
+	     nil command (gnus-group-real-name (gnus-info-group info)))))
+	(length infos)))))
 
 (deffoo nntp-finish-retrieve-group-infos (server infos count)
   (nntp-with-open-group nil server
@@ -769,8 +753,6 @@ command whose response triggered the error."
 		   (car infos)))
 	  (received 0)
 	  (last-point 1))
-      (with-current-buffer buf
-	(setq nntp-retrieval-in-progress nil))
       (when (and buf
 		 count)
 	(with-current-buffer buf
@@ -815,14 +797,7 @@ command whose response triggered the error."
   "Retrieve group info on GROUPS."
   (nntp-with-open-group
    nil server
-   (when (and (nntp-find-connection-buffer nntp-server-buffer)
-	      (with-current-buffer
-		  (nntp-find-connection-buffer nntp-server-buffer)
-		(if (not nntp-retrieval-in-progress)
-		    t
-		  (message "Warning: Refusing to do retrieval from %s because a retrieval is already happening"
-			   server)
-		  nil)))
+   (when (nntp-find-connection-buffer nntp-server-buffer)
      (catch 'done
        (save-excursion
          ;; Erase nntp-server-buffer before nntp-inhibit-erase.
@@ -1235,8 +1210,7 @@ If SEND-IF-FORCE, only send authinfo to the server if the
 		nntp-process-callback nil
 		nntp-process-to-buffer nil
 		nntp-process-start-point nil
-		nntp-process-decode nil
-		nntp-retrieval-in-progress nil)
+		nntp-process-decode nil)
     (current-buffer)))
 
 (defun nntp-open-connection (buffer)
