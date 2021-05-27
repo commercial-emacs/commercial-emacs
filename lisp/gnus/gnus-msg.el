@@ -1133,8 +1133,8 @@ If WIDE, make a wide reply.
 VERY-WIDE is a list of other articles to reply to."
   (interactive
    (list (and current-prefix-arg
-	      (gnus-summary-work-articles 1))
-	 gnus-summary-mode))
+	      (gnus-summary-work-articles 1)))
+   gnus-summary-mode)
   ;; Allow user to require confirmation before replying by mail to the
   ;; author of a news article (or mail message).
   (when (or (not (or (gnus-news-group-p gnus-newsgroup-name)
