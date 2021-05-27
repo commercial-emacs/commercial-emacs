@@ -7287,7 +7287,6 @@ This is an extended text-mode.
   (make-local-variable 'gnus-prev-winconf)
   (setq-local font-lock-defaults '(message-font-lock-keywords t))
   (setq-local mail-header-separator "")
-  (easy-menu-add message-mode-field-menu message-mode-map)
   (mml-mode)
   (setq buffer-read-only nil)
   (buffer-enable-undo)
