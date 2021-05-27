@@ -31,7 +31,6 @@
 (defvar gnus-decode-encoded-word-function)
 (defvar gnus-decode-encoded-address-function)
 (defvar gnus-alter-header-function)
-
 (defvar nnmail-extra-headers)
 (defvar gnus-newsgroup-name)
 (defvar jka-compr-compression-info-list)
