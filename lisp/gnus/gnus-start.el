@@ -1601,11 +1601,6 @@ backend check whether the group actually exists."
     (nnheader-prep-server-buffer buffer)
     buffer))
 
-(defmacro gnus-get-unread-articles-pass-preceding (f args)
-  "Tack preceding return value to ARGS before applying F."
-  `(apply ,f (nconc ,args (list (and (boundp 'gnus-run-thread--subresult)
-                                     gnus-run-thread--subresult)))))
-
 (defmacro gnus-scope-globals (&rest forms)
   "Sandbox globals for thread safety."
   (declare (indent 0))
@@ -1640,11 +1635,10 @@ Else we get unblocked but permanently yielded threads."
             (let (gnus-run-thread--subresult
                   current-fn
                   (nntp-server-buffer working))
-              (ignore gnus-run-thread--subresult)
               (condition-case-unless-debug err
                   (dolist (fn fns)
                     (setq current-fn fn)
-                    (setq gnus-run-thread--subresult (funcall fn)))
+                    (setq gnus-run-thread--subresult (funcall fn gnus-run-thread--subresult)))
                 (error
                  ;; feed current-fn to outer condition-case
                  (error "dolist: '%s' in %S"
@@ -1680,6 +1674,10 @@ All FNS must finish before MTX is released."
 
 (defvar gnus-mutex-get-unread-articles (make-mutex "gnus-mutex-get-unread-articles")
   "Updating or displaying state of unread articles are critical sections.")
+
+(defun gnus-chain-arg (tack-p f &rest args)
+  (lambda (prev)
+    (apply f (append args (when tack-p (list prev))))))
 
 (cl-defun gnus-get-unread-articles (&optional requested-level dont-connect
                                               one-level background
@@ -1829,24 +1827,29 @@ All FNS must finish before MTX is released."
                   elem
                 (when (and method infos (not denied-p) (not already-p))
                   (push method methods)
-                  (gnus-push-end (apply-partially #'gnus-open-server method)
+                  (gnus-push-end (gnus-chain-arg
+                                  nil
+                                  #'gnus-open-server
+                                  method)
                                  commands)
                   (when early-p
                     (when scan-p
-                      (gnus-push-end (apply-partially #'gnus-request-scan nil method)
+                      (gnus-push-end (gnus-chain-arg nil #'gnus-request-scan nil method)
                                      commands))
                     ;; Store the token we get back from -early so that we
                     ;; can pass it to -finish later.
-                    (gnus-push-end (apply-partially
+                    (gnus-push-end (gnus-chain-arg
+                                    nil
                                     #'gnus-retrieve-group-data-early
                                     method infos)
                                    commands))
-                  (gnus-push-end (apply-partially
-                                  (lambda (f &rest args)
-                                    (gnus-get-unread-articles-pass-preceding f args))
-                                  #'gnus-read-active-for-groups method infos)
+                  (gnus-push-end (gnus-chain-arg
+                                  t
+                                  #'gnus-read-active-for-groups
+                                  method infos)
                                  commands)
-                  (gnus-push-end (apply-partially
+                  (gnus-push-end (gnus-chain-arg
+                                  nil
                                   (lambda (infos* update-p*)
                                     (mapc (lambda (info)
                                             (gnus-get-unread-articles-in-group
@@ -1870,15 +1873,15 @@ All FNS must finish before MTX is released."
                                                   (cl-search s (thread-name thr))))
                                 1))
                           thread-group))
-                        (gnus-push-end coda commands)
+                        (gnus-push-end (gnus-chain-arg nil coda) commands)
                         (apply #'gnus-run-thread
                                gnus-mutex-get-unread-articles
                                thread-group
                                commands))
                     (let (gnus-run-thread--subresult)
-                      (ignore gnus-run-thread--subresult)
                       (mapc (lambda (fn)
-                              (setq gnus-run-thread--subresult (funcall fn)))
+                              (setq gnus-run-thread--subresult
+                                    (funcall fn gnus-run-thread--subresult)))
                             commands))))))
             type-cache)
       (unless background
