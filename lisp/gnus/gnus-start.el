@@ -1572,12 +1572,23 @@ backend check whether the group actually exists."
 		     (> (cdar srange) (cdr active)))
 	    (setcdr (car srange) (cdr active))))
 	;; Compute the number of unread articles.
+        (when (cl-search "chiang:INBOX" (gnus-info-group info))
+          (gnus-message 5 "Funk: range=%s" range))
 	(while range
 	  (setq num (+ num (- (1+ (or (and (atom (car range)) (car range))
 				      (cdar range)))
 			      (or (and (atom (car range)) (car range))
 				  (caar range)))))
 	  (setq range (cdr range)))
+        (when (cl-search "chiang:INBOX" (gnus-info-group info))
+          (gnus-message 5 "Funk: %s active=%s num=%s %s=%s"
+                        (gnus-info-group info)
+                        active
+                        num
+                        nntp-server-buffer
+                        (with-current-buffer nntp-server-buffer
+                          (buffer-substring-no-properties (point-min) (point-max))))
+          (gnus-message 5 "Funk: done"))
 	(setq num (max 0 (- (cdr active) num)))))
       ;; Set the number of unread articles.
       (when (and info
