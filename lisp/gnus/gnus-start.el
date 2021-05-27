@@ -1767,6 +1767,7 @@ All FNS must finish before MTX is released."
 		(lambda (c1 c2)
 		  (< (gnus-method-rank (cadr c1) (car c1))
 		     (gnus-method-rank (cadr c2) (car c2))))))
+
     ;; Go through the list of servers and possibly extend methods that
     ;; aren't equal (and that need extension; i.e., they are async).
     (let (methods)
