@@ -116,9 +116,10 @@ If CONFIRM is non-nil, the user will be asked for an NNTP server."
                                   nil gnus-nntp-server)))
     (when (and (stringp gnus-nntp-server)
                (not (zerop (length gnus-nntp-server))))
+      ;; this will also assign the obsolete variable `gnus-select-method'
       (custom-set-variables
-       `(gnus-select-method
-         (quote ,(cond ((string= gnus-nntp-server "::")
+       `(gnus-select-methods
+         (quote (,(cond ((string= gnus-nntp-server "::")
                          (list 'nnspool (system-name)))
                         ((string-match "^:" gnus-nntp-server)
                          (list 'nnmh gnus-nntp-server
@@ -128,7 +129,7 @@ If CONFIRM is non-nil, the user will be asked for an NNTP server."
                                        (substring gnus-nntp-server 1) "~/")))
                                (list 'nnmh-get-new-mail nil)))
                         (t
-                         (list 'nntp gnus-nntp-server)))))))
+                         (list 'nntp gnus-nntp-server))))))))
     (setq gnus-current-select-method gnus-select-method)
     (cl-case (car gnus-select-method)
       ('nnspool

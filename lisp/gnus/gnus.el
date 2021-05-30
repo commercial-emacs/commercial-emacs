@@ -1024,6 +1024,8 @@ Check the NNTPSERVER environment variable and the
 ;; starting or even loading Gnus.
 ;;;###autoload(custom-autoload 'gnus-select-method "gnus")
 
+(defvar gnus-secondary-select-methods)
+(defvar gnus-select-methods)
 (defcustom gnus-select-method
   (list 'nntp (or (gnus-getenv-nntpserver)
                   (when (and gnus-default-nntp-server
@@ -1052,7 +1054,11 @@ see the manual for details."
   :group 'gnus-server
   :group 'gnus-start
   :initialize 'custom-initialize-default
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (setq gnus-select-methods (cons value gnus-secondary-select-methods)))
   :type 'gnus-select-method)
+(make-obsolete-variable 'gnus-select-method 'gnus-select-methods "29.1" 'set)
 
 (defcustom gnus-message-archive-method "archive"
   "Method used for archiving messages you've sent.
@@ -1128,6 +1134,28 @@ you could set this variable:
 
 \(setq gnus-secondary-select-methods \\='((nnml \"\")))"
   :group 'gnus-server
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (setq gnus-select-methods (cons gnus-select-method value)))
+  :type '(repeat gnus-select-method))
+(make-obsolete-variable 'gnus-secondary-select-methods 'gnus-select-methods "27.1" 'set)
+
+(defcustom gnus-select-methods (cons gnus-select-method gnus-secondary-select-methods)
+  "((BACKEND1 ADDRESS1) (BACKEND2 ADDRESS2) ... ) where BACKEND is a symbol, e.g.,
+nntp, and ADDRESS is a string, e.g., \"flab.flab.edu\".
+
+For example, this specifies a local spool,
+
+\(setq gnus-select-methods `(,(list 'nnspool (system-name))))
+"
+  :group 'gnus-server
+  :initialize 'custom-initialize-default
+  :set (lambda (symbol value)
+         (unless (listp (car value))
+           (setq value (list value)))
+         (set-default symbol value)
+         (setq gnus-select-method (car value))
+         (setq gnus-secondary-select-methods (cdr value)))
   :type '(repeat gnus-select-method))
 
 (defcustom gnus-local-domain nil
