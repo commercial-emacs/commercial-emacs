@@ -1052,10 +1052,9 @@ If SILENT, don't prompt the user."
 		 (if (listp (car gnus-post-method))
 		     gnus-post-method
 		   (list gnus-post-method)))
-	       gnus-secondary-select-methods
+	       gnus-select-methods
 	       (mapcar #'cdr gnus-server-alist)
 	       (mapcar #'car gnus-opened-servers)
-               (list gnus-select-method)
 	       (list group-method)))
 	     method-alist post-methods method)
 	;; Weed out all mail methods.
