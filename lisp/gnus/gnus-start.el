@@ -1175,14 +1175,13 @@ for new groups, and subscribe the new groups as zombies."
 (defun gnus-ask-server-for-new-groups ()
   (let* ((new-date (message-make-date))
 	 (date (or gnus-newsrc-last-checked-date new-date))
-	 (methods (cons gnus-select-method
-                        (nconc
-                         (when (gnus-archive-server-wanted-p)
-                           (list "archive"))
-                         (append
-                          (and (consp gnus-check-new-newsgroups)
-                               gnus-check-new-newsgroups)
-                          gnus-secondary-select-methods))))
+	 (methods (nconc
+                   (when (gnus-archive-server-wanted-p)
+                     (list "archive"))
+                   (append
+                    (and (consp gnus-check-new-newsgroups)
+                         gnus-check-new-newsgroups)
+                    gnus-select-methods)))
 	 (groups 0)
 	 new-newsgroups got-new method hashtb ;; group
 	 gnus-override-subscribe-method)
@@ -1756,8 +1755,8 @@ All FNS must finish before MTX is released."
 	  (when (setq entry (gnus-group-entry group))
 	    (setcar entry t)))))
 
-    ;; Sort the methods based so that the primary and secondary
-    ;; methods come first.  This is done for legacy reasons to try to
+    ;; Sort the methods based on their ordering in `gnus-select-methods'.
+    ;; This is done for legacy reasons to try to
     ;; ensure that side-effect behavior doesn't change from previous
     ;; Gnus versions.
     (setq type-cache
@@ -1783,7 +1782,7 @@ All FNS must finish before MTX is released."
 
     ;; For methods with no groups to update, we still request-list if supported.
     (unless dont-connect
-      (dolist (method (cons gnus-select-method gnus-secondary-select-methods))
+      (dolist (method gnus-select-methods)
 	(when (and (not (assoc method type-cache))
 		   (gnus-check-backend-function 'request-list (car method)))
 	  (with-current-buffer nntp-server-buffer
@@ -1892,18 +1891,17 @@ All FNS must finish before MTX is released."
    ;; Get info for virtual groups last.
    ((eq (car method) 'nnvirtual)
     200)
-   ((eq type 'primary)
-    1)
-   ;; Compute the rank of the secondary methods based on where they
-   ;; are in the secondary select list.
-   ((eq type 'secondary)
-    (let ((i 2))
+   ;; Compute the rank of the method based on where they
+   ;; are in the select list.
+   ((or (eq type 'primary)
+        (eq type 'secondary))
+    (let ((i 1))
       (cl-block nil
-        (cl-dolist (smethod gnus-secondary-select-methods)
-          (when (equal method smethod)
-            (cl-return i))
-          (cl-incf i))
-        i)))
+	(cl-dolist (smethod gnus-select-methods)
+	  (when (equal method smethod)
+	    (cl-return i))
+	  (cl-incf i))
+	i)))
    ;; Just say that all foreign groups have the same rank.
    (t
     100)))
@@ -2139,10 +2137,12 @@ The info element is shared with the same element of
 	   (if (and (not not-native)
 		    (gnus-check-server gnus-select-method))
 	       ;; The native server is available.
-               (cons gnus-select-method gnus-secondary-select-methods)
+               gnus-select-methods
 	     ;; The native server is down, so we just do the
 	     ;; secondary ones.
-             gnus-secondary-select-methods)
+             (cl-remove-if
+              (lambda (method) (gnus-method-equal method gnus-select-method))
+              gnus-select-methods))
 	   ;; Also read from the archive server.
 	   (when (gnus-archive-server-wanted-p)
 	     (list "archive")))))
@@ -3204,11 +3204,10 @@ SPECIFIC-VARIABLES, or those in `gnus-variable-list'."
 ;;;
 
 (defun gnus-read-all-descriptions-files ()
-  (let ((methods (cons gnus-select-method
-                       (nconc
-                        (when (gnus-archive-server-wanted-p)
-                          (list "archive"))
-                        gnus-secondary-select-methods))))
+  (let ((methods (nconc
+                  (when (gnus-archive-server-wanted-p)
+                    (list "archive"))
+                  gnus-select-methods)))
     (while methods
       (gnus-read-descriptions-file (car methods))
       (setq methods (cdr methods)))

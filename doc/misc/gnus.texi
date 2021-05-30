@@ -1139,13 +1139,13 @@ For instance, if the @samp{news.somewhere.edu} @acronym{NNTP} server is where
 you want to get your daily dosage of news from, you'd say:
 
 @lisp
-(setq gnus-select-method '(nntp "news.somewhere.edu"))
+(setq gnus-select-method '((nntp "news.somewhere.edu")))
 @end lisp
 
 If you want to read directly from the local spool, say:
 
 @lisp
-(setq gnus-select-method '(nnspool ""))
+(setq gnus-select-method '((nnspool "")))
 @end lisp
 
 If you can use a local spool, you probably should, as it will almost
@@ -14453,7 +14453,7 @@ something like:
 
 @example
 (setq gnus-select-method
-      '(nnimap "imap.gmail.com"))
+            '(nnimap "imap.gmail.com"))
 @end example
 
 You'll be prompted for a user name and password.  If you grow tired of
