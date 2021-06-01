@@ -457,8 +457,7 @@ Two predefined functions are available:
   (buffer-disable-undo)
   (setq buffer-read-only t)
   (setq truncate-lines t)
-  (save-current-buffer
-    (gnus-set-work-buffer)
+  (with-temp-buffer
     (gnus-tree-node-insert (make-mail-header "") nil)
     (setq gnus-tree-node-length (1- (point)))))
 

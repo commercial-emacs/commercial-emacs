@@ -1028,30 +1028,12 @@ Check the NNTPSERVER environment variable and the
 (defvar gnus-secondary-select-methods)
 (defvar gnus-select-methods)
 (defcustom gnus-select-method
-  (list 'nntp (or (gnus-getenv-nntpserver)
-                  (when (and gnus-default-nntp-server
-                             (not (string= gnus-default-nntp-server "")))
-                    gnus-default-nntp-server)
-                  "news"))
-  "Default method for selecting a newsgroup.
-This variable should be a list, where the first element is how the
-news is to be fetched, the second is the address.
-
-For instance, if you want to get your news via \"flab.flab.edu\" using
-NNTP, you could say:
-
-\(setq gnus-select-method \\='(nntp \"flab.flab.edu\"))
-
-If you want to use your local spool, say:
-
-\(setq gnus-select-method (list \\='nnspool (system-name)))
-
-If you use this variable, you must set `gnus-nntp-server' to nil.
-
-There is a lot more to know about select methods and virtual servers -
-see the manual for details."
-  ;; Emacs has set-after since 22.1.
-  ;set-after '(gnus-default-nntp-server)
+  (if-let ((nntp (or (gnus-getenv-nntpserver)
+                     (unless (zerop (length gnus-default-nntp-server))
+                       gnus-default-nntp-server))))
+      `(nntp ,nntp)
+    '(nnnil ""))
+  "This variable is deprecated in favor of `gnus-select-methods'."
   :group 'gnus-server
   :group 'gnus-start
   :initialize 'custom-initialize-default
@@ -1063,7 +1045,6 @@ see the manual for details."
 (add-variable-watcher
  'gnus-select-method
  (lambda (symbol newval operation _where)
-   "Whoever expected users to customize doesn't understand human nature."
    (pcase operation
      ((or 'set 'let 'unlet)
       (custom-set-variables `(,symbol (quote ,newval)))))))
@@ -1133,14 +1114,7 @@ non-numeric prefix - `C-u M-x gnus', in short."
 (make-obsolete-variable 'gnus-secondary-servers 'gnus-select-method "24.1")
 
 (defcustom gnus-secondary-select-methods nil
-  "A list of secondary methods that will be used for reading news.
-This is a list where each element is a complete select method (see
-`gnus-select-method').
-
-If, for instance, you want to read your mail with the nnml back end,
-you could set this variable:
-
-\(setq gnus-secondary-select-methods \\='((nnml \"\")))"
+  "This variable is deprecated in favor of `gnus-select-methods'."
   :group 'gnus-server
   :set (lambda (symbol value)
          (set-default symbol value)
@@ -1150,18 +1124,41 @@ you could set this variable:
 (add-variable-watcher
  'gnus-secondary-select-methods
  (lambda (symbol newval operation _where)
-   "Whoever expected users to customize doesn't understand human nature."
    (pcase operation
      ((or 'set 'let 'unlet)
       (custom-set-variables `(,symbol (quote ,newval)))))))
 
 (defcustom gnus-select-methods (cons gnus-select-method gnus-secondary-select-methods)
-  "((BACKEND1 ADDRESS1) (BACKEND2 ADDRESS2) ... ) where BACKEND is a symbol, e.g.,
-nntp, and ADDRESS is a string, e.g., \"flab.flab.edu\".
+  "((BACKEND1 SERVER1 ) (BACKEND2 SERVER2) ... ) where BACKEND is a symbol, e.g.,
+nntp, and SERVER is a string, e.g., \"news.gmane.io\".
 
-For example, this specifies a local spool,
+For example, these settings specify gmane over nntp, and a home
+dovecot imap server.
 
-\(setq gnus-select-methods `(,(list 'nnspool (system-name))))
+Method: nntp
+Server: \"news.gmane.io\"
+
+Method: nnimap
+Server: \"dovecot\"
+Options:
+Variable: nnimap-address
+   Value: \"localhost\"
+Variable: nnimap-stream
+   Value: network
+Variable: nnimap-server-port
+   Value: 143
+Variable: nnimap-inbox
+   Value: \"INBOX\"
+
+Or equivalently,
+
+\(custom-set-variables \\=`(gnus-select-methods
+                        \\='((nntp \"news.gmane.io\")
+                          (nnimap \"dovecot\"
+                           (nnimap-address \"localhost\")
+                           (nnimap-stream network)
+                           (nnimap-server-port 143)
+                           (nnimap-inbox \"INBOX\")))))
 "
   :group 'gnus-server
   :initialize 'custom-initialize-default
@@ -1172,6 +1169,12 @@ For example, this specifies a local spool,
          (setq gnus-select-method (car value))
          (setq gnus-secondary-select-methods (cdr value)))
   :type '(repeat gnus-select-method))
+(add-variable-watcher
+ 'gnus-select-methods
+ (lambda (symbol newval operation _where)
+   (pcase operation
+     ((or 'set 'let 'unlet)
+      (custom-set-variables `(,symbol (quote ,newval)))))))
 
 (defcustom gnus-local-domain nil
   "Local domain name without a host name.
@@ -1439,7 +1442,7 @@ this variable.  I think."
 				      (intern (car entry))))
 			      gnus-valid-select-methods)
 		    (symbol :tag "other"))
-	    (string :tag "Address")
+	    (string :tag "Server")
 	    (repeat :tag "Options"
 		    :inline t
 		    (list :format "%v"
@@ -3537,10 +3540,10 @@ You should probably use `gnus-find-method-for-group' instead."
 (defsubst gnus-secondary-method-p (method)
   "Return whether METHOD is a secondary select method."
   (let ((methods gnus-secondary-select-methods)
-	(gmethod (inline (gnus-server-get-method nil method))))
+	(gmethod (gnus-server-get-method nil method)))
     (while (and methods
 		(not (gnus-method-equal
-		      (inline (gnus-server-get-method nil (car methods)))
+		      (gnus-server-get-method nil (car methods))
 		      gmethod)))
       (setq methods (cdr methods)))
     methods))
@@ -3917,7 +3920,7 @@ parameters."
   ;; "hello", and the select method is ("hello" (my-var "something"))
   ;; in the group "alt.alt", this will result in a new virtual server
   ;; called "hello+alt.alt".
-  (if (or (not (inline (gnus-similar-server-opened method)))
+  (if (or (not (gnus-similar-server-opened method))
 	  (not (cddr method)))
       method
     (let ((address-slot
@@ -3989,12 +3992,11 @@ parameters."
 	    gnus-select-method
 	  (setq method
 		(cond ((stringp method)
-		       (inline (gnus-server-to-method method)))
+		       (gnus-server-to-method method))
 		      ((stringp (cadr method))
 		       (or
-			(inline
-			 (gnus-same-method-different-name method))
-			(inline (gnus-server-extend-method group method))))
+			(gnus-same-method-different-name method)
+			(gnus-server-extend-method group method)))
 		      (t
 		       method)))
 	  (cond ((equal (cadr method) "")
@@ -4073,7 +4075,7 @@ Allow completion over sensible values."
      ((assoc method gnus-valid-select-methods)
       (let ((address (if (memq 'prompt-address
 			       (assoc method gnus-valid-select-methods))
-			 (read-string "Address: ")
+			 (read-string "Server: ")
 		       "")))
 	(or (cadr (assoc (format "%s:%s" method address) open-servers))
 	    (list (intern method) address))))
