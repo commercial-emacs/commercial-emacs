@@ -33,6 +33,11 @@
 (autoload 'gnus-agent-regenerate-group "gnus-agent")
 (autoload 'gnus-agent-read-servers-validate-native "gnus-agent")
 (autoload 'gnus-agent-possibly-synchronize-flags-server "gnus-agent")
+(autoload 'gnus-agent-unfetch-articles "gnus-agent")
+(autoload 'gnus-summary-select-article "gnus-sum")
+(autoload 'gnus-summary-insert-subject "gnus-sum")
+(autoload 'gnus-summary-setup-buffer "gnus-sum")
+(autoload 'gnus-summary-read-group-1 "gnus-sum")
 
 (defcustom gnus-open-server-hook nil
   "Hook called just before opening connection to the news server."
@@ -84,7 +89,7 @@ server denied."
            (if (stringp command-method)
                (gnus-server-to-method command-method)
              command-method)))
-      (funcall (inline (gnus-get-function gnus-command-method 'server-opened))
+      (funcall (gnus-get-function gnus-command-method 'server-opened)
                (nth 1 gnus-command-method)))))
 
 (defun gnus-status-message (command-method)
@@ -212,7 +217,7 @@ If it is down, start it up (again)."
     (setq method (gnus-server-to-method method)))
   ;; Check cache of constructed names.
   (let* ((method-sym (if gnus-agent
-			 (inline (gnus-agent-get-function method))
+			 (gnus-agent-get-function method)
 		       (car method)))
 	 (method-fns (get method-sym 'gnus-method-functions))
 	 (func (let ((method-fnlist-elt (assq function method-fns)))
@@ -481,11 +486,11 @@ Groups matching the IGNORED regexp are excluded."
 (defun gnus-request-group (group &optional dont-check command-method info)
   "Request GROUP.  If DONT-CHECK, no information is required."
   (let ((gnus-command-method
-	 (or command-method (inline (gnus-find-method-for-group group)))))
+	 (or command-method (gnus-find-method-for-group group))))
     (when (stringp gnus-command-method)
       (setq gnus-command-method
-	    (inline (gnus-server-to-method gnus-command-method))))
-    (funcall (inline (gnus-get-function gnus-command-method 'request-group))
+	    (gnus-server-to-method gnus-command-method)))
+    (funcall (gnus-get-function gnus-command-method 'request-group)
 	     (gnus-group-real-name group) (nth 1 gnus-command-method)
 	     dont-check
 	     info)))
@@ -508,7 +513,7 @@ Groups matching the IGNORED regexp are excluded."
 
 (defun gnus-close-group (group)
   "Request the GROUP be closed."
-  (let ((gnus-command-method (inline (gnus-find-method-for-group group))))
+  (let ((gnus-command-method (gnus-find-method-for-group group)))
     (funcall (gnus-get-function gnus-command-method 'close-group)
 	     (gnus-group-real-name group) (nth 1 gnus-command-method))))
 

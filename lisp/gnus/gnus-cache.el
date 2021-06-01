@@ -630,8 +630,7 @@ $ emacs -batch -l ~/.emacs -l gnus -f gnus-jog-cache"
       ;; There is no active file, so we generate one.
       (gnus-cache-generate-active)
     ;; We simply read the active file.
-    (save-excursion
-      (gnus-set-work-buffer)
+    (with-temp-buffer
       (nnheader-insert-file-contents gnus-cache-active-file)
       (gnus-active-to-gnus-format
        nil (setq gnus-cache-active-hashtb

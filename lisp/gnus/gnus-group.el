@@ -1144,19 +1144,17 @@ The following commands are available:
     (gnus-child-mode)))
 
 (defun gnus-update-group-mark-positions ()
-  (save-excursion
-    (let ((gnus-process-mark ?\200)
-	  (gnus-group-update-hook nil)
-	  (gnus-group-marked '("dummy.group"))
-	  (gnus-active-hashtb (gnus-make-hashtable 10)))
-      (gnus-set-active "dummy.group" '(0 . 0))
-      (gnus-set-work-buffer)
-      (gnus-group-insert-group-line "dummy.group" 0 nil 0 nil)
-      (goto-char (point-min))
+  (let ((gnus-process-mark ?\200)
+	(gnus-group-update-hook nil)
+	(gnus-group-marked '("dummy.group"))
+	(gnus-active-hashtb (gnus-make-hashtable 10)))
+    (gnus-set-active "dummy.group" '(0 . 0))
+    (with-temp-buffer
+      (save-excursion
+        (gnus-group-insert-group-line "dummy.group" 0 nil 0 nil))
       (setq gnus-group-mark-positions
-	    (list (cons 'process (and (search-forward
-				       (string gnus-process-mark) nil t)
-				      (- (point) (point-min) 1))))))))
+	    (list (cons 'process (when (search-forward (string gnus-process-mark) nil t)
+				   (- (point) (point-min) 1))))))))
 
 (defun gnus-mouse-pick-group (e)
   "Enter the group under the mouse pointer."
@@ -1590,7 +1588,7 @@ if it is a string, only list groups matching REGEXP."
     (setq end (point))
     (gnus-group--setup-tool-bar-update beg end)
     (forward-line -1)
-    (when (inline (gnus-visual-p 'group-highlight 'highlight))
+    (when (gnus-visual-p 'group-highlight 'highlight)
       (gnus-group-highlight-line gnus-tmp-group beg end))
     (gnus-run-hooks 'gnus-group-update-hook)
     (forward-line)))
@@ -1615,8 +1613,7 @@ Some value are bound so the form can use them."
     (let* ((entry (gnus-group-entry group))
            (active (gnus-active group))
            (info (nth 1 entry))
-           (method (inline (gnus-server-get-method
-			    group (gnus-info-method info))))
+           (method (gnus-server-get-method group (gnus-info-method info)))
            (marked (gnus-info-marks info))
 	   (env
 	    (list
@@ -4137,7 +4134,7 @@ entail asking the server for the groups."
 			 "\n"))
        (list 'gnus-group group
 	     'gnus-unread t
-	     'gnus-level (inline (gnus-group-level group)))))
+	     'gnus-level (gnus-group-level group))))
     (goto-char (point-min))))
 
 (defun gnus-activate-all-groups (level)

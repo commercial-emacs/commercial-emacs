@@ -894,16 +894,14 @@ If REGEXP is given, lines that match it will be deleted."
       (buffer-disable-undo)
       (bury-buffer (current-buffer))
       (set-buffer-modified-p nil)
-      (let ((auto (make-auto-save-file-name))
-	    (gnus-dribble-ignore t)
-	    (purpose nil)
-	    modes)
-	(when (or (file-exists-p auto) (file-exists-p dribble-file))
-	  ;; Load whichever file is newest -- the auto save file
-	  ;; or the "real" file.
-	  (if (file-newer-than-file-p auto dribble-file)
-	      (nnheader-insert-file-contents auto)
-	    (nnheader-insert-file-contents dribble-file))
+      (let* ((gnus-dribble-ignore t)
+             (auto (make-auto-save-file-name))
+	     (state (if (file-newer-than-file-p auto dribble-file)
+                        auto
+                      dribble-file))
+	     modes)
+	(when (file-exists-p state)
+          (nnheader-insert-file-contents state)
 	  (unless (zerop (buffer-size))
 	    (set-buffer-modified-p t))
 	  ;; Set the file modes to reflect the .newsrc file modes.
@@ -912,14 +910,9 @@ If REGEXP is given, lines that match it will be deleted."
 		     (file-exists-p dribble-file))
 	    (gnus-set-file-modes dribble-file modes))
 	  (goto-char (point-min))
-	  (when (search-forward "Gnus was exited on purpose" nil t)
-	    (setq purpose t))
 	  ;; Possibly eval the file later.
 	  (when (or gnus-always-read-dribble-file
-		    (gnus-y-or-n-p
-		     (if purpose
-			 "Gnus exited on purpose without saving; read auto-save file anyway? "
-		     "Gnus auto-save file exists.  Do you want to read it? ")))
+		    (gnus-y-or-n-p (format "Read unsaved state %s? " state)))
 	    (setq gnus-dribble-eval-file t)))))))
 
 (defun gnus-dribble-eval-file ()
@@ -1441,9 +1434,9 @@ that select method instead of determining the method based on the
 group name.  If DONT-CHECK, don't check whether the group
 actually exists.  If DONT-SUB-CHECK or DONT-CHECK, don't let the
 backend check whether the group actually exists."
-  (let ((method (or method (inline (gnus-find-method-for-group group))))
+  (let ((method (or method (gnus-find-method-for-group group)))
 	active)
-    (and (inline (gnus-check-server method))
+    (and (gnus-check-server method)
 	 ;; We escape all bugs and quit here to make it possible to
 	 ;; continue if a group is so out-there that it reports bugs
 	 ;; and stuff.
@@ -1453,13 +1446,13 @@ backend check whether the group actually exists."
 		(gnus-request-scan group method))
 	   t)
 	 (if (or debug-on-error debug-on-quit)
-	     (inline (gnus-request-group group (or dont-sub-check dont-check)
-					 method
-					 (gnus-get-info group)))
+	     (gnus-request-group group (or dont-sub-check dont-check)
+				 method
+				 (gnus-get-info group))
 	   (condition-case nil
-	       (inline (gnus-request-group group (or dont-sub-check dont-check)
-					   method
-					   (gnus-get-info group)))
+	       (gnus-request-group group (or dont-sub-check dont-check)
+				   method
+				   (gnus-get-info group))
 	     (quit
 	      (if debug-on-quit
 		  (debug "Quit")
@@ -1478,8 +1471,7 @@ backend check whether the group actually exists."
 
              ;; If a cache is present, we may have to alter the active info.
              (when gnus-use-cache
-               (inline (gnus-cache-possibly-alter-active
-                        group active)))
+               (gnus-cache-possibly-alter-active group active))
 
              ;; If the agent is enabled, we may have to alter the active info.
              (when gnus-agent
@@ -1494,8 +1486,7 @@ backend check whether the group actually exists."
     ;; Allow the backend to update the info in the group.
     (when (and update
 	       (gnus-request-update-info
-		info (inline (gnus-find-method-for-group
-			      (gnus-info-group info)))))
+		info (gnus-find-method-for-group (gnus-info-group info))))
       (gnus-activate-group (gnus-info-group info) nil t))
 
     (let* ((range (gnus-info-read info))
@@ -1506,8 +1497,7 @@ backend check whether the group actually exists."
 
       ;; If a cache is present, we may have to alter the active info.
       (when (and gnus-use-cache info)
-	(inline (gnus-cache-possibly-alter-active
-		 (gnus-info-group info) active)))
+	(gnus-cache-possibly-alter-active (gnus-info-group info) active))
 
       ;; If the agent is enabled, we may have to alter the active info.
       (when (and gnus-agent info)
@@ -1722,8 +1712,7 @@ All FNS must finish before MTX is released."
 	    (setq method (cdr cmethod))
 	  (setq cmethod (if (stringp method)
 			    (gnus-server-to-method method)
-			  (inline (gnus-find-method-for-group
-				   (gnus-info-group info) info))))
+			  (gnus-find-method-for-group (gnus-info-group info) info)))
 	  (push (cons method cmethod) methods-cache)
 	  (setq method cmethod)))
       (setq method-group-list (assoc method type-cache))
@@ -1734,7 +1723,7 @@ All FNS must finish before MTX is released."
 		    (and (gnus-archive-server-wanted-p)
 			 (gnus-methods-equal-p archive-method method)))
 		'secondary)
-	       ((inline (gnus-server-equal gnus-select-method method))
+	       ((gnus-server-equal gnus-select-method method)
 		'primary)
 	       (t
 		'foreign)))
@@ -2814,58 +2803,57 @@ If FORCE is non-nil, the .newsrc file is read."
 ;; groups will be ignored.  Note that "options -n !all rec.all" is very
 ;; different from "options -n rec.all !all".
 (defun gnus-newsrc-parse-options (options)
-  (let (out eol)
-    (save-excursion
-      (gnus-set-work-buffer)
-      (insert (regexp-quote options))
-      ;; First we treat all continuation lines.
-      (goto-char (point-min))
-      (while (re-search-forward "\n[ \t]+" nil t)
-	(replace-match " " t t))
-      ;; Then we transform all "all"s into ".+"s.
-      (goto-char (point-min))
-      (while (re-search-forward "\\ball\\b" nil t)
-	(replace-match ".+" t t))
-      (goto-char (point-min))
-      ;; We remove all other options than the "-n" ones.
-      (while (re-search-forward "[ \t]-[^n][^-]*" nil t)
-	(replace-match " ")
-	(forward-char -1))
-      (goto-char (point-min))
+  (with-temp-buffer
+    (insert (regexp-quote options))
+    ;; First we treat all continuation lines.
+    (goto-char (point-min))
+    (while (re-search-forward "\n[ \t]+" nil t)
+      (replace-match " " t t))
+    ;; Then we transform all "all"s into ".+"s.
+    (goto-char (point-min))
+    (while (re-search-forward "\\ball\\b" nil t)
+      (replace-match ".+" t t))
+    (goto-char (point-min))
+    ;; We remove all other options than the "-n" ones.
+    (while (re-search-forward "[ \t]-[^n][^-]*" nil t)
+      (replace-match " ")
+      (forward-char -1))
+    (goto-char (point-min))
 
-      ;; We are only interested in "options -n" lines - we
-      ;; ignore the other option lines.
-      (while (re-search-forward "[ \t]-n" nil t)
-	(setq eol
-	      (or (save-excursion
-		    (and (re-search-forward "[ \t]-n" (point-at-eol) t)
-			 (- (point) 2)))
-		  (point-at-eol)))
-	;; Search for all "words"...
-	(while (re-search-forward "[^ \t,\n]+" eol t)
-	  (if (eq (char-after (match-beginning 0)) ?!)
-	      ;; If the word begins with a bang (!), this is a "not"
-	      ;; spec.  We put this spec (minus the bang) and the
-	      ;; symbol `ignore' into the list.
-	      (push (cons (concat
-			   "^" (buffer-substring
-				(1+ (match-beginning 0))
-				(match-end 0))
-			   "\\($\\|\\.\\)")
-			  'ignore)
-		    out)
-	    ;; There was no bang, so this is a "yes" spec.
-	    (push (cons (concat "^" (match-string 0) "\\($\\|\\.\\)")
-			'subscribe)
-		  out))))
-
-      (setq gnus-newsrc-options-n out))))
-
-(eval-and-compile
-  (defalias 'gnus-long-file-names
-    (if (fboundp 'msdos-long-file-names)
-      'msdos-long-file-names
-      (lambda () t))))
+    ;; We are only interested in "options -n" lines - we
+    ;; ignore the other option lines.
+    (setq gnus-newsrc-options-n
+          (let (out)
+            (while (re-search-forward "[ \t]-n" nil t)
+	      ;; Search for all "words"...
+	      (while (re-search-forward
+                      "[^ \t,\n]+"
+                      (or (save-excursion
+		            (and (re-search-forward "[ \t]-n" (point-at-eol) t)
+			         (- (point) 2)))
+		          (point-at-eol))
+                      t)
+	        (if (eq (char-after (match-beginning 0)) ?!)
+	            ;; If the word begins with a bang (!), this is a "not"
+	            ;; spec.  We put this spec (minus the bang) and the
+	            ;; symbol `ignore' into the list.
+	            (push (cons (concat
+			         "^" (buffer-substring
+				      (1+ (match-beginning 0))
+				      (match-end 0))
+			         "\\($\\|\\.\\)")
+			        'ignore)
+		          out)
+	          ;; There was no bang, so this is a "yes" spec.
+	          (push (cons (concat "^" (match-string 0) "\\($\\|\\.\\)")
+			      'subscribe)
+		        out))))
+            out)))
+  (eval-and-compile
+    (defalias 'gnus-long-file-names
+      (if (fboundp 'msdos-long-file-names)
+          'msdos-long-file-names
+        (lambda () t)))))
 
 (defvar gnus-save-newsrc-file-last-timestamp nil)
 (defun gnus-save-newsrc-file (&optional force)
@@ -3089,7 +3077,7 @@ SPECIFIC-VARIABLES, or those in `gnus-variable-list'."
 	;; Maybe don't write foreign groups to .newsrc.
 	(when (or (null (setq method (gnus-info-method info)))
 		  (equal method "native")
-		  (inline (gnus-server-equal method gnus-select-method))
+		  (gnus-server-equal method gnus-select-method)
                   foreign-ok)
 	  (insert g-name
 		  (if (> (gnus-info-level info) gnus-level-subscribed)

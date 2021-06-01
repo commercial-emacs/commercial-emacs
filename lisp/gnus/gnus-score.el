@@ -2916,7 +2916,7 @@ Destroys the current buffer."
     (let ((alist
 	   (mapcar
 	    (lambda (file)
-	      (cons (inline (gnus-score-file-rank file)) file))
+	      (cons (gnus-score-file-rank file) file))
 	    files)))
       (mapcar #'cdr (sort alist #'car-less-than-car)))))
 
