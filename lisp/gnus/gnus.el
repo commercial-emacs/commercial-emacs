@@ -1059,7 +1059,14 @@ see the manual for details."
          (set-default symbol value)
          (setq gnus-select-methods (cons value gnus-secondary-select-methods)))
   :type 'gnus-select-method)
-(make-obsolete-variable 'gnus-select-method 'gnus-select-methods "29.1" 'set)
+(make-obsolete-variable 'gnus-select-method 'gnus-select-methods "28.1" 'set)
+(add-variable-watcher
+ 'gnus-select-method
+ (lambda (symbol newval operation _where)
+   "Whoever expected users to customize doesn't understand human nature."
+   (pcase operation
+     ((or 'set 'let 'unlet)
+      (custom-set-variables `(,symbol (quote ,newval)))))))
 
 (defcustom gnus-message-archive-method "archive"
   "Method used for archiving messages you've sent.
@@ -1140,6 +1147,13 @@ you could set this variable:
          (setq gnus-select-methods (cons gnus-select-method value)))
   :type '(repeat gnus-select-method))
 (make-obsolete-variable 'gnus-secondary-select-methods 'gnus-select-methods "28.1" 'set)
+(add-variable-watcher
+ 'gnus-secondary-select-methods
+ (lambda (symbol newval operation _where)
+   "Whoever expected users to customize doesn't understand human nature."
+   (pcase operation
+     ((or 'set 'let 'unlet)
+      (custom-set-variables `(,symbol (quote ,newval)))))))
 
 (defcustom gnus-select-methods (cons gnus-select-method gnus-secondary-select-methods)
   "((BACKEND1 ADDRESS1) (BACKEND2 ADDRESS2) ... ) where BACKEND is a symbol, e.g.,

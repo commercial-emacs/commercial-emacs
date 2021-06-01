@@ -45,6 +45,22 @@ also modifies `gnus-select-methods'."
                       (cl-mapcar #'gnus-methods-equal-p gnus-secondary-select-methods
                                  (cdr gnus-select-methods))))))
 
+(ert-deftest gnus-test-select-methods-out-of-band ()
+  "Hamfistedly setting, not customizing, `gnus-select-method' and
+`gnus-secondary-select-methods' also modifies `gnus-select-methods'."
+  (let (gnus-select-method
+        gnus-secondary-select-methods
+        gnus-select-methods
+        (test-methods '((nnnil) (nntp "flab.flab.edu"))))
+    (setq gnus-select-method (car test-methods)
+          gnus-secondary-select-methods (cdr test-methods))
+    (should (cl-every #'identity
+                      (cl-mapcar #'gnus-methods-equal-p gnus-select-methods test-methods)))
+    (should (gnus-method-equal gnus-select-method (car gnus-select-methods)))
+    (should (cl-every #'identity
+                      (cl-mapcar #'gnus-methods-equal-p gnus-secondary-select-methods
+                                 (cdr gnus-select-methods))))))
+
 (ert-deftest gnus-test-select-methods-override ()
   "Customizing `gnus-select-methods' overrides earlier customizations
 of `gnus-select-method' and `gnus-secondary-select-methods'."
