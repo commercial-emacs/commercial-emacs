@@ -1139,7 +1139,7 @@ you could set this variable:
          (set-default symbol value)
          (setq gnus-select-methods (cons gnus-select-method value)))
   :type '(repeat gnus-select-method))
-(make-obsolete-variable 'gnus-secondary-select-methods 'gnus-select-methods "27.1" 'set)
+(make-obsolete-variable 'gnus-secondary-select-methods 'gnus-select-methods "28.1" 'set)
 
 (defcustom gnus-select-methods (cons gnus-select-method gnus-secondary-select-methods)
   "((BACKEND1 ADDRESS1) (BACKEND2 ADDRESS2) ... ) where BACKEND is a symbol, e.g.,
