@@ -550,7 +550,7 @@ If N, return the Nth ancestor instead."
   (when (and references
 	     (not (zerop (length references))))
     (if n
-	(let ((ids (inline (gnus-split-references references))))
+	(let ((ids (gnus-split-references references)))
 	  (while (nthcdr n ids)
 	    (setq ids (cdr ids)))
 	  (car ids))
@@ -612,20 +612,6 @@ If N, return the Nth ancestor instead."
 (declare-function gnus-get-buffer-create "gnus" (name))
 ;; gnus.el requires mm-util.
 (declare-function mm-enable-multibyte "mm-util")
-
-(defun gnus-set-work-buffer ()
-  "Put point in the empty Gnus work buffer."
-  (let ((lvars (buffer-local-variables)))
-    (ignore-errors (kill-buffer gnus-work-buffer))
-    (set-buffer (get-buffer-create gnus-work-buffer))
-    (mm-enable-multibyte)
-    (mapc (lambda (v)
-            (ignore-errors ;; in case var is read-only
-              (if (symbolp v)
-                  (makunbound v)
-                (set (make-local-variable (car v)) (cdr v)))))
-          lvars)
-    (setq buffer-read-only nil)))
 
 (defmacro gnus-group-real-name (group)
   "Find the real name of a foreign newsgroup."

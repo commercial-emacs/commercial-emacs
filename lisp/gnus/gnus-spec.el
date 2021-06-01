@@ -379,51 +379,50 @@ or to characters when given a pad value."
       (gnus-parse-simple-format format spec-alist insert))))
 
 (defun gnus-parse-complex-format (format spec-alist)
-  (let ((cursor-spec nil))
-    (save-excursion
-      (gnus-set-work-buffer)
-      (insert format)
-      (goto-char (point-min))
-      (while (re-search-forward "\"" nil t)
-	(replace-match "\\\"" nil t))
-      (goto-char (point-min))
-      (insert "(\"")
-      ;; Convert all font specs into font spec lists.
-      (while (re-search-forward "%\\([0-9]+\\)?\\([«»{}()]\\)" nil t)
-	(let ((number (if (match-beginning 1)
-			  (match-string 1) "0"))
-	      (delim (aref (match-string 2) 0)))
-	  (if (or (= delim ?\()
-		  (= delim ?\{)
-		  (= delim 171)) ; «
-	      (replace-match (concat "\"("
-				     (cond ((= delim ?\() "mouse")
-					   ((= delim ?\{) "face")
-					   (t "balloon"))
-				     " " number " \"")
-			     t t)
-	    (replace-match "\")\""))))
-      (goto-char (point-max))
-      (insert "\")")
-      ;; Convert point position commands.
-      (goto-char (point-min))
+  (with-temp-buffer
+    (insert format)
+    (goto-char (point-min))
+    (while (re-search-forward "\"" nil t)
+      (replace-match "\\\"" nil t))
+    (goto-char (point-min))
+    (insert "(\"")
+    ;; Convert all font specs into font spec lists.
+    (while (re-search-forward "%\\([0-9]+\\)?\\([«»{}()]\\)" nil t)
+      (let ((number (if (match-beginning 1)
+			(match-string 1) "0"))
+	    (delim (aref (match-string 2) 0)))
+	(if (or (= delim ?\()
+		(= delim ?\{)
+		(= delim 171)) ; «
+	    (replace-match (concat "\"("
+				   (cond ((= delim ?\() "mouse")
+					 ((= delim ?\{) "face")
+					 (t "balloon"))
+				   " " number " \"")
+			   t t)
+	  (replace-match "\")\""))))
+    (goto-char (point-max))
+    (insert "\")")
+    ;; Convert point position commands.
+    (goto-char (point-min))
+    (let (cursor-spec)
       (let ((case-fold-search nil))
-	(while (re-search-forward "%\\([-0-9]+\\)?\\*" nil t)
+        (while (re-search-forward "%\\([-0-9]+\\)?\\*" nil t)
 	  (replace-match "\"(point)\"" t t)
 	  (setq cursor-spec t)))
       ;; Convert TAB commands.
       (goto-char (point-min))
       (while (re-search-forward "%\\([-0-9]+\\)=" nil t)
-	(replace-match (format "\"(tab %s)\"" (match-string 1)) t t))
+        (replace-match (format "\"(tab %s)\"" (match-string 1)) t t))
       ;; Convert the buffer into the spec.
       (goto-char (point-min))
       (let ((form (read (current-buffer))))
-	(if cursor-spec
+        (if cursor-spec
 	    `(let (gnus-position)
 	       ,@(gnus-complex-form-to-spec form spec-alist)
 	       (if gnus-position
 		   (put-text-property gnus-position (1+ gnus-position)
-					   'gnus-position t)))
+				      'gnus-position t)))
 	  `(progn
 	     ,@(gnus-complex-form-to-spec form spec-alist)))))))
 
@@ -452,8 +451,7 @@ or to characters when given a pad value."
 	spec flist fstring elem result dontinsert user-defined
 	type value pad-width spec-beg cut-width ignore-value
 	tilde-form tilde elem-type extended-spec)
-    (save-excursion
-      (gnus-set-work-buffer)
+    (with-temp-buffer
       (insert format)
       (goto-char (point-min))
       (while (re-search-forward "%" nil t)

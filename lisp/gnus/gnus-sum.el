@@ -1770,17 +1770,15 @@ matter is removed.  Additional things can be deleted by setting
 (defun gnus-simplify-subject-fuzzy (subject)
   "Simplify a subject string fuzzily.
 See `gnus-simplify-buffer-fuzzy' for details."
-  (save-excursion
-    (let ((regexp gnus-simplify-subject-fuzzy-regexp))
-      (gnus-set-work-buffer)
-      (let ((case-fold-search t))
-	;; Remove uninteresting prefixes.
-	(when (and gnus-simplify-ignored-prefixes
-		   (string-match gnus-simplify-ignored-prefixes subject))
-	  (setq subject (substring subject (match-end 0))))
-	(insert subject)
-	(inline (gnus-simplify-buffer-fuzzy regexp))
-	(buffer-string)))))
+  (with-temp-buffer
+    (let ((case-fold-search t))
+      ;; Remove uninteresting prefixes.
+      (when (and gnus-simplify-ignored-prefixes
+		 (string-match gnus-simplify-ignored-prefixes subject))
+	(setq subject (substring subject (match-end 0))))
+      (insert subject)
+      (gnus-simplify-buffer-fuzzy gnus-simplify-subject-fuzzy-regexp)
+      (buffer-string))))
 
 (defsubst gnus-simplify-subject-fully (subject)
   "Simplify a subject string according to `gnus-summary-gather-subject-limit'."
@@ -3485,59 +3483,59 @@ Return non-nil if caller must prepare the summary buffer."
 (defun gnus-update-summary-mark-positions ()
   "Compute where the summary marks are to go."
   (with-current-buffer gnus-summary-buffer
-    (let (pos)
-      (save-excursion
-        (gnus-set-work-buffer)
-        (let* ((spec gnus-summary-line-format-spec)
-               (gnus-tmp-unread ?Z)
-               (gnus-replied-mark ?Z)
-               (gnus-score-below-mark ?Z)
-               (gnus-score-over-mark ?Z)
-               (gnus-undownloaded-mark ?Z)
-               (gnus-summary-line-format-spec spec)
-               ;; Make sure `gnus-data-find' finds a dummy element
-               ;; so we don't call gnus-data-<field> accessors on nil.
-               (gnus-newsgroup-data gnus--dummy-data-list)
-               (gnus-newsgroup-downloadable '(0))
-               case-fold-search ignores gnus-visual)
-          ;; Here, all marks are bound to Z.
-          (gnus-summary-insert-line gnus--dummy-mail-header
-                                    0 nil t gnus-tmp-unread t nil "" nil 1)
-          (goto-char (point-min))
-          ;; Memorize the positions of the same characters as dummy marks.
-          (while (re-search-forward "[A-D]" nil t)
-            (push (point) ignores))
-          (erase-buffer)
-          ;; We use A-D as dummy marks in order to know column positions
-          ;; where marks should be inserted.
-          (setq gnus-tmp-unread ?A
-                gnus-replied-mark ?B
-                gnus-score-below-mark ?C
-                gnus-score-over-mark ?C
-                gnus-undownloaded-mark ?D)
-          (gnus-summary-insert-line gnus--dummy-mail-header
-                                    0 nil t gnus-tmp-unread t nil "" nil 1)
-          ;; Ignore characters which aren't dummy marks.
-          (dolist (p ignores)
-            (delete-region (goto-char (1- p)) p)
-            (insert ?Z))
-          (goto-char (point-min))
-          (setq pos (list (cons 'unread
-                                (and (search-forward "A" nil t)
-                                     (- (point) (point-min) 1)))))
-          (goto-char (point-min))
-          (push (cons 'replied (and (search-forward "B" nil t)
-                                    (- (point) (point-min) 1)))
-                pos)
-          (goto-char (point-min))
-          (push (cons 'score (and (search-forward "C" nil t)
-                                  (- (point) (point-min) 1)))
-                pos)
-          (goto-char (point-min))
-          (push (cons 'download (and (search-forward "D" nil t)
-                                     (- (point) (point-min) 1)))
-                pos)))
-      (setq gnus-summary-mark-positions pos))))
+    (setq gnus-summary-mark-positions
+          (with-temp-buffer
+            (let* (pos
+                   (spec gnus-summary-line-format-spec)
+                   (gnus-tmp-unread ?Z)
+                   (gnus-replied-mark ?Z)
+                   (gnus-score-below-mark ?Z)
+                   (gnus-score-over-mark ?Z)
+                   (gnus-undownloaded-mark ?Z)
+                   (gnus-summary-line-format-spec spec)
+                   ;; Make sure `gnus-data-find' finds a dummy element
+                   ;; so we don't call gnus-data-<field> accessors on nil.
+                   (gnus-newsgroup-data gnus--dummy-data-list)
+                   (gnus-newsgroup-downloadable '(0))
+                   case-fold-search ignores gnus-visual)
+              ;; Here, all marks are bound to Z.
+              (gnus-summary-insert-line gnus--dummy-mail-header
+                                        0 nil t gnus-tmp-unread t nil "" nil 1)
+              (goto-char (point-min))
+              ;; Memorize the positions of the same characters as dummy marks.
+              (while (re-search-forward "[A-D]" nil t)
+                (push (point) ignores))
+              (erase-buffer)
+              ;; We use A-D as dummy marks in order to know column positions
+              ;; where marks should be inserted.
+              (setq gnus-tmp-unread ?A
+                    gnus-replied-mark ?B
+                    gnus-score-below-mark ?C
+                    gnus-score-over-mark ?C
+                    gnus-undownloaded-mark ?D)
+              (gnus-summary-insert-line gnus--dummy-mail-header
+                                        0 nil t gnus-tmp-unread t nil "" nil 1)
+              ;; Ignore characters which aren't dummy marks.
+              (dolist (p ignores)
+                (delete-region (goto-char (1- p)) p)
+                (insert ?Z))
+              (goto-char (point-min))
+              (setq pos (list (cons 'unread
+                                    (and (search-forward "A" nil t)
+                                         (- (point) (point-min) 1)))))
+              (goto-char (point-min))
+              (push (cons 'replied (and (search-forward "B" nil t)
+                                        (- (point) (point-min) 1)))
+                    pos)
+              (goto-char (point-min))
+              (push (cons 'score (and (search-forward "C" nil t)
+                                      (- (point) (point-min) 1)))
+                    pos)
+              (goto-char (point-min))
+              (push (cons 'download (and (search-forward "D" nil t)
+                                         (- (point) (point-min) 1)))
+                    pos)
+              pos)))))
 
 (defun gnus-summary-insert-dummy-line (subject number)
   "Insert a dummy root in the summary buffer."
@@ -4151,7 +4149,7 @@ effects."
     (while threads
       (when (setq references (mail-header-references (caar threads)))
 	(setq id (mail-header-id (caar threads))
-	      ids (inline (gnus-split-references references))
+	      ids (gnus-split-references references)
 	      entered nil)
 	(while (setq ref (pop ids))
 	  (setq ids (delete ref ids))
@@ -5864,7 +5862,7 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 (defun gnus-killed-articles (killed articles)
   (let (out)
     (while articles
-      (when (inline (gnus-member-of-range (car articles) killed))
+      (when (gnus-member-of-range (car articles) killed)
 	(push (car articles) out))
       (setq articles (cdr articles)))
     out))
