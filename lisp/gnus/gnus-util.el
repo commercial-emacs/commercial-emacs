@@ -607,11 +607,7 @@ If N, return the Nth ancestor instead."
     (setq to (read-file-name "Copy file to: " default-directory)))
   (copy-file file to))
 
-(defvar gnus-work-buffer " *gnus work*")
-
 (declare-function gnus-get-buffer-create "gnus" (name))
-;; gnus.el requires mm-util.
-(declare-function mm-enable-multibyte "mm-util")
 
 (defmacro gnus-group-real-name (group)
   "Find the real name of a foreign newsgroup."
