@@ -37,6 +37,7 @@
 (require 'seq)
 (require 'time-date)
 (require 'text-property-search)
+(require 'cl-seq)
 
 (defcustom gnus-completing-read-function 'gnus-emacs-completing-read
   "Function use to do completing read."
@@ -1670,6 +1671,18 @@ lists of strings."
 	 (overlays (delq nil (nconc (car overlayss) (cdr overlayss)))))
     (while overlays
       (delete-overlay (pop overlays)))))
+
+(defmacro gnus-with-temp-buffer (&rest forms)
+  "Formerly gnus-set-work-buffer.  Relay buffer-locals to temp buffer."
+  (declare (indent defun))
+  `(let ((gnus-vars (cl-remove-if-not
+                     (lambda (entry)
+                       (zerop (or (cl-search "gnus-" (symbol-name (car entry)))
+                                  -1)))
+                     (buffer-local-variables))))
+     (with-temp-buffer
+       (mapc (lambda (v) (set (make-local-variable (car v)) (cdr v))) gnus-vars)
+       ,@forms)))
 
 (provide 'gnus-util)
 

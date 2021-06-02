@@ -24,13 +24,11 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-(defvar gnus-newsrc-file-version)
-
 (require 'gnus)
 
 ;;; Internal variables.
 
+(defvar gnus-newsrc-file-version)
 (defvar-local gnus-summary-mark-positions nil)
 (defvar gnus-group-mark-positions nil)
 (defvar gnus-group-indentation "")
@@ -378,7 +376,7 @@ or to characters when given a pad value."
       (gnus-parse-simple-format format spec-alist insert))))
 
 (defun gnus-parse-complex-format (format spec-alist)
-  (with-temp-buffer
+  (gnus-with-temp-buffer
     (insert format)
     (goto-char (point-min))
     (while (re-search-forward "\"" nil t)
@@ -450,7 +448,7 @@ or to characters when given a pad value."
 	spec flist fstring elem result dontinsert user-defined
 	type value pad-width spec-beg cut-width ignore-value
 	tilde-form tilde elem-type extended-spec)
-    (with-temp-buffer
+    (gnus-with-temp-buffer
       (insert format)
       (goto-char (point-min))
       (while (re-search-forward "%" nil t)

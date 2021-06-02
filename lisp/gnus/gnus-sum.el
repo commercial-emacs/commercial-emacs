@@ -1770,7 +1770,7 @@ matter is removed.  Additional things can be deleted by setting
 (defun gnus-simplify-subject-fuzzy (subject)
   "Simplify a subject string fuzzily.
 See `gnus-simplify-buffer-fuzzy' for details."
-  (with-temp-buffer
+  (gnus-with-temp-buffer
     (let ((case-fold-search t))
       ;; Remove uninteresting prefixes.
       (when (and gnus-simplify-ignored-prefixes
@@ -3484,7 +3484,7 @@ Return non-nil if caller must prepare the summary buffer."
   "Compute where the summary marks are to go."
   (with-current-buffer gnus-summary-buffer
     (setq gnus-summary-mark-positions
-          (with-temp-buffer
+          (gnus-with-temp-buffer
             (let ((gnus-tmp-unread ?Z)
                   (gnus-replied-mark ?Z)
                   (gnus-score-below-mark ?Z)

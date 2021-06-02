@@ -24,8 +24,6 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-
 (require 'gnus)
 (require 'gnus-sum)
 
@@ -630,7 +628,7 @@ $ emacs -batch -l ~/.emacs -l gnus -f gnus-jog-cache"
       ;; There is no active file, so we generate one.
       (gnus-cache-generate-active)
     ;; We simply read the active file.
-    (with-temp-buffer
+    (gnus-with-temp-buffer
       (nnheader-insert-file-contents gnus-cache-active-file)
       (gnus-active-to-gnus-format
        nil (setq gnus-cache-active-hashtb
