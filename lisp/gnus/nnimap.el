@@ -31,7 +31,6 @@
   (require 'subr-x))
 
 (require 'nnheader)
-(require 'gnus-util)
 (require 'gnus)
 (require 'nnoo)
 (require 'netrc)

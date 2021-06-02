@@ -64,14 +64,12 @@
 (require 'gnus-range)
 (require 'gnus-int)
 (require 'gnus-undo)
-(require 'gnus-util)
 (require 'gmm-utils)
 (require 'mm-decode)
 (require 'shr)
 (require 'url)
 (require 'nnoo)
-(eval-when-compile
-  (require 'subr-x))
+(require 'subr-x)
 
 (autoload 'gnus-summary-limit-include-cached "gnus-cache" nil
   '(gnus-summary-mode))
@@ -80,6 +78,7 @@
 (autoload 'nnselect-article-rsv "nnselect" nil nil)
 (autoload 'nnselect-article-group "nnselect" nil nil)
 (autoload 'gnus-nnselect-group-p "nnselect" nil nil)
+(autoload 'gnus-agent-get-undownloaded-list "gnus-agent")
 
 (defcustom gnus-kill-summary-on-exit t
   "If non-nil, kill the summary buffer when you exit from it.
@@ -5686,7 +5685,6 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 (declare-function gnus-get-predicate "gnus-agent" (predicate))
 
 (defun gnus-summary-display-make-predicate (display)
-  (require 'gnus-agent)
   (when (= (length display) 1)
     (setq display (car display)))
   (unless gnus-summary-display-cache

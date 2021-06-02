@@ -29,7 +29,6 @@
 (require 'gnus)				; for macro gnus-kill-buffer, at least
 (require 'nnheader)
 (require 'message)
-(require 'gnus-util)
 (require 'mail-source)
 (require 'mm-util)
 (require 'gnus-int)

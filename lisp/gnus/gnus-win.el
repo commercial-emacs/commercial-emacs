@@ -24,11 +24,7 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-
 (require 'gnus)
-(require 'gnus-util)
-(require 'seq)
 
 (declare-function gnus-group-name-at-point "gnus-group")
 

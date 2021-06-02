@@ -50,7 +50,6 @@
 
 (require 'nnheader)
 (require 'gnus)
-(require 'gnus-util)
 (require 'gnus-range)
 (require 'gnus-start)
 (require 'gnus-int)
