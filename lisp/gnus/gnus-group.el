@@ -1149,7 +1149,7 @@ The following commands are available:
 	(gnus-group-marked '("dummy.group"))
 	(gnus-active-hashtb (gnus-make-hashtable 10)))
     (gnus-set-active "dummy.group" '(0 . 0))
-    (with-temp-buffer
+    (gnus-with-temp-buffer
       (save-excursion
         (gnus-group-insert-group-line "dummy.group" 0 nil 0 nil))
       (setq gnus-group-mark-positions

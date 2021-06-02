@@ -31,10 +31,10 @@
 
 (eval-when-compile (require 'cl-lib)
 		   (require 'subr-x))
+(require 'gnus-util)
 (require 'wid-edit)
 (require 'mm-util)
 (require 'nnheader)
-(require 'seq)
 
 ;; These are defined afterwards with gnus-define-group-parameter
 (defvar gnus-ham-process-destinations)
@@ -850,9 +850,6 @@ be used directly.")
        list)))
 
 ;;; Do the rest.
-
-(require 'gnus-util)
-(require 'nnheader)
 
 (defcustom gnus-parameters nil
   "Alist of group parameters.
