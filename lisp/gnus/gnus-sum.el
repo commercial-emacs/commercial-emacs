@@ -3439,7 +3439,7 @@ Return non-nil if caller must prepare the summary buffer."
         (turn-on-gnus-mailing-list-mode)
         ;; These functions don't currently depend on GROUP, but might in
         ;; the future.
-        (gnus-update-format-specifications nil 'summary 'summary-mode 'summary-dummy)
+        (gnus-update-format-specifications 'summary 'summary-mode 'summary-dummy)
         (gnus-update-summary-mark-positions)
         ;; Set any local variables in the group parameters.
         (gnus-summary-set-local-parameters gnus-newsgroup-name)
@@ -3927,7 +3927,7 @@ effects."
                ;; You can change the summary buffer in some way with this hook.
                (gnus-run-hooks 'gnus-select-group-hook)
                (when (memq 'summary (gnus-update-format-specifications
-                                     nil 'summary 'summary-mode 'summary-dummy))
+                                     'summary 'summary-mode 'summary-dummy))
                  ;; The format specification for the summary line was updated,
                  ;; so we need to update the mark positions as well.
                  (gnus-update-summary-mark-positions))
@@ -6050,8 +6050,8 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 
 (defun gnus-set-mode-line (where)
   "Set the mode line of the article or summary buffers.
-If WHERE is `summary', the summary mode line format will be used."
-  ;; Is this mode line one we keep updated?
+If WHERE is `summary', the summary mode line format will be used.
+"
   (when (and (memq where gnus-updated-mode-lines)
 	     (symbol-value
 	      (intern (format "gnus-%s-mode-line-format-spec" where))))
