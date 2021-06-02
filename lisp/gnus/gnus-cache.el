@@ -24,7 +24,6 @@
 
 ;;; Code:
 
-(require 'gnus)
 (require 'gnus-sum)
 
 (declare-function gnus-agent-load-alist "gnus-agent" (group))

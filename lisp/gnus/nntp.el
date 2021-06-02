@@ -27,8 +27,6 @@
 
 (require 'nnheader)
 (require 'nnoo)
-(require 'gnus-util)
-(require 'gnus)
 (require 'gnus-group) ;; gnus-group-name-charset
 
 (nnoo-declare nntp)

@@ -32,8 +32,6 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-
 (require 'seq)
 (require 'time-date)
 (require 'text-property-search)

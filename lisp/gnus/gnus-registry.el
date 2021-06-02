@@ -79,16 +79,14 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-(eval-when-compile (require 'subr-x))
 
 (require 'gnus)
 (require 'gnus-int)
 (require 'gnus-sum)
 (require 'gnus-art)
-(require 'gnus-util)
 (require 'nnmail)
 (require 'registry)
+(require 'subr-x)
 
 (defvar gnus-adaptive-word-syntax-table)
 

@@ -33,7 +33,6 @@
 (require 'nnmail)
 (require 'nnoo)
 (require 'gnus)
-(require 'gnus-util)
 (require 'gnus-range)
 
 ;; FIXME not explicitly used in this file.

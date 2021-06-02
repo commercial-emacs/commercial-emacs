@@ -26,7 +26,6 @@
 
 ;;; Code:
 (require 'gnus-start)
-(require 'gnus-util)
 (require 'gnus-range)
 (require 'gnus-agent)
 

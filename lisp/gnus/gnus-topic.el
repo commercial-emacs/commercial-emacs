@@ -25,14 +25,10 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-
 (require 'gnus)
 (require 'gnus-group)
 (require 'gnus-start)
-(require 'gnus-util)
-(eval-when-compile
-  (require 'subr-x))
+(require 'subr-x)
 
 (defgroup gnus-topic nil
   "Group topics."

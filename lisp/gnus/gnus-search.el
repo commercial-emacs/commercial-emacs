@@ -81,9 +81,8 @@
 (require 'gnus-group)
 (require 'gnus-sum)
 (require 'message)
-(require 'gnus-util)
 (require 'eieio)
-(eval-when-compile (require 'cl-lib))
+
 (autoload 'eieio-build-class-alist "eieio-opt")
 (autoload 'nnmaildir-base-name-to-article-number "nnmaildir")
 
