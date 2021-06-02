@@ -1136,7 +1136,7 @@ The following commands are available:
   (setq truncate-lines t)
   (setq show-trailing-whitespace nil)
   (gnus-set-default-directory)
-  (gnus-update-format-specifications nil 'group 'group-mode)
+  (gnus-update-format-specifications 'group 'group-mode)
   (gnus-update-group-mark-positions)
   (when gnus-use-undo
     (gnus-undo-mode 1))
@@ -1246,7 +1246,7 @@ Also see the `gnus-group-use-permanent-levels' variable."
 	  unread (cdr gnus-group-list-mode)))
   (setq level (gnus-group-default-level level))
   (gnus-group-setup-buffer)
-  (gnus-update-format-specifications nil 'group 'group-mode)
+  (gnus-update-format-specifications 'group 'group-mode)
   (let ((case-fold-search nil)
 	(props (text-properties-at (point-at-bol)))
 	(empty (= (point-min) (point-max)))
