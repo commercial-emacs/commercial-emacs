@@ -3485,19 +3485,16 @@ Return non-nil if caller must prepare the summary buffer."
   (with-current-buffer gnus-summary-buffer
     (setq gnus-summary-mark-positions
           (with-temp-buffer
-            (let* (pos
-                   (spec gnus-summary-line-format-spec)
-                   (gnus-tmp-unread ?Z)
-                   (gnus-replied-mark ?Z)
-                   (gnus-score-below-mark ?Z)
-                   (gnus-score-over-mark ?Z)
-                   (gnus-undownloaded-mark ?Z)
-                   (gnus-summary-line-format-spec spec)
-                   ;; Make sure `gnus-data-find' finds a dummy element
-                   ;; so we don't call gnus-data-<field> accessors on nil.
-                   (gnus-newsgroup-data gnus--dummy-data-list)
-                   (gnus-newsgroup-downloadable '(0))
-                   case-fold-search ignores gnus-visual)
+            (let ((gnus-tmp-unread ?Z)
+                  (gnus-replied-mark ?Z)
+                  (gnus-score-below-mark ?Z)
+                  (gnus-score-over-mark ?Z)
+                  (gnus-undownloaded-mark ?Z)
+                  ;; Make sure `gnus-data-find' finds a dummy element
+                  ;; so we don't call gnus-data-<field> accessors on nil.
+                  (gnus-newsgroup-data gnus--dummy-data-list)
+                  (gnus-newsgroup-downloadable '(0))
+                  pos case-fold-search ignores gnus-visual)
               ;; Here, all marks are bound to Z.
               (gnus-summary-insert-line gnus--dummy-mail-header
                                         0 nil t gnus-tmp-unread t nil "" nil 1)
