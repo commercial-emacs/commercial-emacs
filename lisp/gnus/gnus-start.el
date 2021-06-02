@@ -2803,7 +2803,7 @@ If FORCE is non-nil, the .newsrc file is read."
 ;; groups will be ignored.  Note that "options -n !all rec.all" is very
 ;; different from "options -n rec.all !all".
 (defun gnus-newsrc-parse-options (options)
-  (with-temp-buffer
+  (gnus-with-temp-buffer
     (insert (regexp-quote options))
     ;; First we treat all continuation lines.
     (goto-char (point-min))

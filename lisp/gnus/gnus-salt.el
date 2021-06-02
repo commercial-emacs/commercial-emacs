@@ -24,8 +24,6 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-
 (require 'gnus)
 (require 'gnus-sum)
 (require 'gnus-win)
@@ -457,7 +455,7 @@ Two predefined functions are available:
   (buffer-disable-undo)
   (setq buffer-read-only t)
   (setq truncate-lines t)
-  (with-temp-buffer
+  (gnus-with-temp-buffer
     (gnus-tree-node-insert (make-mail-header "") nil)
     (setq gnus-tree-node-length (1- (point)))))
 
