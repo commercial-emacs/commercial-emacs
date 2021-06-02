@@ -32,7 +32,6 @@
 ;;; Code:
 
 (require 'gnus-sum)
-(require 'gnus-util)
 (require 'nnheader)
 (or (require 'nnselect nil t)           ; Emacs >= 28
     (require 'nnir nil t))              ; Emacs < 28

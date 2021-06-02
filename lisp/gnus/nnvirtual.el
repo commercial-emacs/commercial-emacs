@@ -32,9 +32,7 @@
 
 (require 'nntp)
 (require 'nnheader)
-(require 'gnus)
 (require 'nnoo)
-(require 'gnus-util)
 (require 'gnus-start)
 (require 'gnus-sum)
 (require 'gnus-msg)

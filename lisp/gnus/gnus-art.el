@@ -24,7 +24,6 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
 (defvar tool-bar-map)
 (defvar w3m-minor-mode-map)
 
@@ -41,7 +40,6 @@
 (require 'mm-uu)
 (require 'message)
 (require 'mouse)
-(require 'seq)
 
 (autoload 'gnus-msg-mail "gnus-msg" nil t)
 (autoload 'gnus-button-mailto "gnus-msg")

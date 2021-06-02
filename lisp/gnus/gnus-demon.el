@@ -24,8 +24,6 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-
 (require 'gnus)
 (require 'gnus-int)
 (require 'nnheader)
@@ -250,8 +248,7 @@ minutes, the connection is closed."
 	(save-window-excursion
 	  (when (gnus-alive-p)
 	    (with-current-buffer gnus-group-buffer
-	      (gnus-group-get-new-news nil nil
-                                       gnus-threaded-get-unread-articles))))
+	      (gnus-group-get-new-news))))
       (set-window-configuration win))))
 
 (defun gnus-demon-add-scan-timestamps ()

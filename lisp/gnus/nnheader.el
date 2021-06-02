@@ -26,18 +26,12 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-
 (defvar gnus-decode-encoded-word-function)
 (defvar gnus-decode-encoded-address-function)
 (defvar gnus-alter-header-function)
 (defvar nnmail-extra-headers)
 (defvar gnus-newsgroup-name)
 (defvar jka-compr-compression-info-list)
-
-;; Requiring `gnus-util' at compile time creates a circular
-;; dependency between nnheader.el and gnus-util.el.
-;;(eval-when-compile (require 'gnus-util))
 
 (require 'mail-utils)
 (require 'mm-util)
@@ -560,7 +554,7 @@ the line could be found."
 
 (defsubst nnheader-prep-server-buffer (buffer)
   "Refactor \"setting the table\" of BUFFER for `nnheader-init-server-buffer' and
-`gnus-instantiate-server-buffer'."
+`gnus-thread-body'."
   (with-current-buffer buffer
     (erase-buffer)
     (mm-enable-multibyte)

@@ -25,12 +25,8 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-
-(require 'gnus)
 (require 'message)
 (require 'gnus-art)
-(require 'gnus-util)
 (require 'cl-extra)
 
 (defcustom gnus-post-method 'current

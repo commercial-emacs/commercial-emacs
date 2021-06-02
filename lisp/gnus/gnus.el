@@ -29,12 +29,11 @@
 
 (run-hooks 'gnus-load-hook)
 
-(eval-when-compile (require 'cl-lib)
-		   (require 'subr-x))
 (require 'gnus-util)
 (require 'wid-edit)
 (require 'mm-util)
 (require 'nnheader)
+(require 'subr-x)
 
 ;; These are defined afterwards with gnus-define-group-parameter
 (defvar gnus-ham-process-destinations)
