@@ -110,7 +110,7 @@ It accepts the same format specs that `gnus-summary-line-format' does."
     ;; Change line format.
     (setq gnus-summary-line-format gnus-summary-pick-line-format)
     (setq gnus-summary-line-format-spec nil)
-    (gnus-update-format-specifications nil 'summary)
+    (gnus-update-format-specifications 'summary)
     (gnus-update-summary-mark-positions)
     ;; FIXME: a buffer-local minor mode adding globally to a hook??
     (add-hook 'gnus-message-setup-hook #'gnus-pick-setup-message)

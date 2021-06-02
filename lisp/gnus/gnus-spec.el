@@ -129,13 +129,12 @@
     (lisp-interaction-mode)
     (insert (gnus-pp-to-string spec))))
 
-(defun gnus-update-format-specifications (&optional force &rest types)
+(defun gnus-update-format-specifications (&rest types)
   "Update all (necessary) format specifications.
 Return a list of updated types."
   ;; Make the indentation array.
   ;; See whether all the stored info needs to be flushed.
-  (when (or force
-	    (not gnus-newsrc-file-version)
+  (when (or (not gnus-newsrc-file-version)
 	    (not (equal (gnus-continuum-version)
 			(gnus-continuum-version gnus-newsrc-file-version)))
 	    (not (equal emacs-version
