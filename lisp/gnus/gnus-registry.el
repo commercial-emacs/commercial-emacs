@@ -1185,7 +1185,7 @@ non-nil."
   (gnus-registry-install-shortcuts)
   (if (gnus-alive-p)
       (gnus-registry-load)
-    (add-hook 'gnus-read-newsrc-el-hook #'gnus-registry-load)))
+    (add-hook 'gnus-read-newsrc-hook #'gnus-registry-load)))
 
 (defun gnus-registry-install-hooks ()
   "Install the registry hooks."
@@ -1207,7 +1207,7 @@ non-nil."
   (remove-hook 'nnmail-spool-hook #'gnus-registry-spool-action)
 
   (remove-hook 'gnus-save-newsrc-hook #'gnus-registry-save)
-  (remove-hook 'gnus-read-newsrc-el-hook #'gnus-registry-load)
+  (remove-hook 'gnus-read-newsrc-hook #'gnus-registry-load)
 
   (remove-hook 'gnus-summary-prepare-hook #'gnus-registry-register-message-ids)
   (setq gnus-registry-enabled nil))
