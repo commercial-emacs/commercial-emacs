@@ -70,7 +70,7 @@ match any of the group-specified splitting rules.  See
      ;; Split updating requires `gnus-newsrc-hashtb' to be
      ;; initialized; the read newsrc hook is the only hook that comes
      ;; after initialization, but before checking for new news.
-     'gnus-read-newsrc-el-hook)
+     'gnus-read-newsrc-hook)
    #'gnus-group-split-update))
 
 ;;;###autoload
