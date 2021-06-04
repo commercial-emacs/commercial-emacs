@@ -1558,8 +1558,7 @@ Else we get unblocked but permanently yielded threads."
                       (dolist (fn fns)
                         (setq current-fn fn)
                         (setq gnus-run-thread--subresult
-                              (funcall fn gnus-run-thread--subresult))
-                        (thread-yield))
+                              (funcall fn gnus-run-thread--subresult)))
                     (error
                      (ignore-errors (mutex-unlock mtx))
                      ;; feed current-fn to outer condition-case

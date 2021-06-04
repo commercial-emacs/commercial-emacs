@@ -393,7 +393,8 @@ that much harder."
   (with-current-buffer
       (generate-new-buffer (format " *nnimap %s %s %s*"
 				   nnimap-address nnimap-server-port
-                                   (buffer-name buffer)))
+                                   (buffer-name buffer))
+                           t)
     (mm-disable-multibyte)
     (buffer-disable-undo)
     (gnus-add-buffer)
