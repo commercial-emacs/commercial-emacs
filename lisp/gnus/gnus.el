@@ -1125,7 +1125,7 @@ non-numeric prefix - `C-u M-x gnus', in short."
       (custom-set-variables `(,symbol (quote ,newval)))))))
 
 (defcustom gnus-select-methods (cons gnus-select-method gnus-secondary-select-methods)
-  "((BACKEND1 SERVER1 ) (BACKEND2 SERVER2) ... ) where BACKEND is a symbol, e.g.,
+  "((BACKEND1 SERVER1) (BACKEND2 SERVER2) ... ) where BACKEND is a symbol, e.g.,
 nntp, and SERVER is a string, e.g., \"news.gmane.io\".
 
 For example, these settings specify gmane over nntp, and a home
