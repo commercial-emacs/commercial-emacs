@@ -366,41 +366,54 @@ during splitting, which may be slow."
       (mapconcat #'identity (nreverse result) ",")))))
 
 (deffoo nnimap-open-server (server &optional defs no-reconnect)
+  "Context switch based on SERVER.
+
+nnimap is one of the few (only?) backends which handles
+SERVER context switching on the singleton `nntp-server-buffer'.
+
+If `nnoo-current-server-p' is false for SERVER,
+`nnoo-change-server' replaces the current context in `nnoo-state-alist'
+with DEFS.  And does so for all parent classes of nnimap.
+
+While the vicissitudes of sticking with a global `nntp-server-buffer'
+and shunning EIEIO are put paid, our job of parallelizing gnus becomes
+that much harder."
   (if (nnimap-server-opened server)
       t
     (unless (assq 'nnimap-address defs)
       (setq defs (append defs (list (list 'nnimap-address server)))))
     (nnoo-change-server 'nnimap server defs)
-    (if no-reconnect
-	(nnimap-find-connection nntp-server-buffer)
-      (or (nnimap-find-connection nntp-server-buffer)
-	  (nnimap-open-connection nntp-server-buffer)))))
+    (let ((found-p (nnimap-find-connection nntp-server-buffer)))
+      (if no-reconnect
+	  found-p
+        (or found-p
+	    (nnimap-open-connection nntp-server-buffer))))))
 
 (defun nnimap-make-process-buffer (buffer)
   (with-current-buffer
       (generate-new-buffer (format " *nnimap %s %s %s*"
 				   nnimap-address nnimap-server-port
-                                   buffer))
+                                   (buffer-name buffer)))
     (mm-disable-multibyte)
     (buffer-disable-undo)
     (gnus-add-buffer)
-    (setq-local after-change-functions nil) ;FIXME: Why?
+    (cl-assert (null after-change-functions))
     (setq-local nnimap-object
                 (make-nnimap :server (nnoo-current-server 'nnimap)
                              :initial-resync 0))
-    (push (list buffer (current-buffer)) nnimap-connection-alist)
+    (setf (alist-get buffer nnimap-connection-alist) (list (current-buffer)))
     (push (current-buffer) nnimap-process-buffers)
     (with-current-buffer buffer
       (add-hook 'kill-buffer-hook
                 (apply-partially
                  (lambda (buffer)
-                   (when-let ((pbuffer
-                               (car (alist-get buffer nnimap-connection-alist))))
+                   (when-let ((pbuffer (nnimap-find-process-buffer buffer)))
                      (setq nnimap-process-buffers
                            (delq pbuffer nnimap-process-buffers))
-                     (kill-buffer pbuffer) ;; should HUP its process
-                     (setq nnimap-connection-alist
-                           (assq-delete-all buffer nnimap-connection-alist))))
+                     ;; should HUP its process
+                     (kill-buffer pbuffer))
+                   (setq nnimap-connection-alist
+                         (assq-delete-all buffer nnimap-connection-alist)))
                  buffer)
                 nil t))
     (current-buffer)))
@@ -1944,7 +1957,19 @@ Return the server's response to the SELECT or EXAMINE command."
             result)))))))
 
 (defun nnimap-find-connection (buffer)
-  "Find the connection delivering to BUFFER."
+  "Find the connection delivering to BUFFER.
+Confusingly, BUFFER will always be `nntp-server-buffer', i.e.,\" *nntpd*\",
+so `nnimap-connection-alist' will usually be of length 1, and look like,
+\((#<buffer  *nntpd*> #<buffer  *nnimap localhost 143  *nntpd**-XXXXXX>))
+
+Multiplexing of different imap servers is made possible because
+`nnoo-change-server' deftly swaps out this associative pair with the
+current imap source (only the XXXXXX string changes).
+
+Under parallelized gnus, BUFFER takes on the per-thread value of
+`nntp-server-buffer' (which will not be \" *nntpd*\"), so the kill-buffer-hook
+in `nnimap-make-process-buffer' is important in cleaning up
+`nnimap-connection-alist'."
   (let ((entry (assoc buffer nnimap-connection-alist)))
     (when entry
       (if (and (buffer-live-p (cadr entry))

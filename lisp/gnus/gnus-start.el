@@ -1542,7 +1542,7 @@ backend check whether the group actually exists."
 (defun gnus-thread-body (thread-name mtx fns)
   "Errors need to be trapped for a clean exit.
 Else we get unblocked but permanently yielded threads."
-  (let ((working (get-buffer-create (format " *%s*" thread-name) t)))
+  (let ((working (get-buffer-create (format " *%s*" thread-name))))
     (unwind-protect
         (condition-case err
             (with-mutex mtx
@@ -1552,20 +1552,24 @@ Else we get unblocked but permanently yielded threads."
                                              thread-name (buffer-name))
                 (let (gnus-run-thread--subresult
                       current-fn
-                      (nntp-server-buffer working)
+                      (nntp-server-buffer working) ;; !! what makes this work !!
                       inhibit-debugger)
                   (condition-case-unless-debug err
                       (dolist (fn fns)
                         (setq current-fn fn)
                         (setq gnus-run-thread--subresult
-                              (funcall fn gnus-run-thread--subresult)))
+                              (funcall fn gnus-run-thread--subresult))
+                        (thread-yield))
                     (error
+                     (ignore-errors (mutex-unlock mtx))
                      ;; feed current-fn to outer condition-case
                      (error "dolist: '%s' in %s"
                             (error-message-string err) current-fn))))))
           (error
            (gnus-message-with-timestamp "gnus-thread-body: '%s'" (error-message-string err))))
-      (kill-buffer working) ;; inhibit-buffer-hooks was t
+      (let (kill-buffer-query-functions)
+        (kill-buffer working))
+      (ignore-errors (mutex-unlock mtx))
       (gnus-message-with-timestamp "gnus-thread-body: finish %s" thread-name))))
 
 (defun gnus-thread-group-running-p (thread-group)
