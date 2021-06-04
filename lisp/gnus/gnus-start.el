@@ -1733,7 +1733,8 @@ All FNS must finish before MTX is released."
                                               (gnus-get-unread-articles-in-group
                                                info
                                                (gnus-active (gnus-info-group info))
-                                               update-p*))
+                                               update-p*)
+                                              (gnus-group-update-group (gnus-info-group info) t))
                                             infos*)
                                       (gnus-message 6 "Checking new news...done"))
                                     infos update-p)

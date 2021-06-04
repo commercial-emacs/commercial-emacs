@@ -4518,7 +4518,7 @@ The hook `gnus-exit-gnus-hook' is called before actually exiting."
 	    gnus-expert-user
 	    (gnus-yes-or-no-p
 	     (format "Quit reading news without saving %s? "
-		     (file-name-nondirectory gnus-state-file))))
+		     (file-name-nondirectory gnus-newsrc-file))))
     (gnus-run-hooks 'gnus-exit-gnus-hook)
     (gnus-configure-windows 'group t)
     (when (and (gnus-buffer-live-p gnus-dribble-buffer)
