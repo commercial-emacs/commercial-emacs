@@ -453,13 +453,12 @@ during splitting, which may be slow."
   (let ((stream
 	 (if (eq nnimap-stream 'undecided)
 	     (cl-loop for type in '(ssl network)
-		   for stream = (let ((nnimap-stream type))
-				  (nnimap-open-connection-1 buffer))
-		   while (eq stream 'no-connect)
-		   finally (return stream))
+		      for stream = (let ((nnimap-stream type))
+				     (nnimap-open-connection-1 buffer))
+		      while (eq stream 'no-connect)
+		      finally (return stream))
 	   (nnimap-open-connection-1 buffer))))
-    (if (eq stream 'no-connect)
-	nil
+    (unless (eq stream 'no-connect)
       stream)))
 
 ;; This is only needed for Windows XP or earlier
