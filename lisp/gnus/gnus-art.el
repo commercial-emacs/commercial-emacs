@@ -4491,7 +4491,7 @@ commands:
   (setq-local nobreak-char-display nil)
   ;; Enable `gnus-article-remove-images' to delete images shr.el renders.
   (setq-local shr-put-image-function #'gnus-shr-put-image)
-  (setq-local show-trailing-whitespace nil)
+  (setq show-trailing-whitespace nil)
   (unless gnus-article-show-cursor
     (setq cursor-in-non-selected-windows nil))
   (gnus-set-default-directory)
