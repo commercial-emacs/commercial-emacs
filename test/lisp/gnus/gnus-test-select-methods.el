@@ -87,27 +87,6 @@ of `gnus-select-method' and `gnus-secondary-select-methods'."
       (gnus-start-news-server)
       (should (gnus-method-equal gnus-select-method `(nnspool ,(system-name)))))))
 
-(ert-deftest gnus-test-gnus-method-rank ()
-  "Ensure unification does right by `gnus-method-rank'."
-  (let (gnus-select-method
-        gnus-secondary-select-methods
-        gnus-select-methods
-        type-cache
-        (test-methods '((nnnil) (nntp "flab.flab.edu")))
-        (sort-f (lambda (c1 c2)
-                  (< (gnus-method-rank (cadr c1) (car c1))
-                     (gnus-method-rank (cadr c2) (car c2))))))
-    (custom-set-variables `(gnus-select-methods (quote ,test-methods)))
-    (dolist (method test-methods)
-      (push `(,method
-              ,(cond
-                ((gnus-secondary-method-p method) 'secondary)
-                ((gnus-method-equal gnus-select-method method) 'primary)
-                (t 'foreign)))
-            type-cache))
-    (equal '(nnnil nntp)
-           (mapcar (lambda (x) (car (car x))) (sort type-cache sort-f)))))
-
 (ert-deftest gnus-test-gnus-read-active-file ()
   "Ensure unification does right by `gnus-read-active-file'."
   (let (gnus-select-method
