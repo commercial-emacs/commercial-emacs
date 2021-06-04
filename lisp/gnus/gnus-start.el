@@ -1624,8 +1624,8 @@ All FNS must finish before MTX is released."
       (while newsrc
         (when-let ((info (pop newsrc))
                    (group (gnus-info-group info))
-                   (active (gnus-active group))
-                   (method (gnus-find-method-for-group group info)))
+                   (method (gnus-find-method-for-group group info))
+                   (backend (car method)))
           (if (or (and foreign-level (not (numberp foreign-level)))
 	          (funcall (if one-level #'= #'<=)
                            (gnus-info-level info)
@@ -1639,7 +1639,7 @@ All FNS must finish before MTX is released."
 	    ;; The group is inactive, so we nix out the number of unread articles.
 	    ;; It leads `(gnus-group-unread group)' to return t.  See also
 	    ;; `gnus-group-prepare-flat'.
-	    (unless active
+	    (unless (gnus-active group)
 	      (when-let ((entry (gnus-group-entry group)))
 	        (setcar entry t))))))
 
