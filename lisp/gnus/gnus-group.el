@@ -1248,23 +1248,17 @@ Also see the `gnus-group-use-permanent-levels' variable."
   (gnus-group-setup-buffer)
   (gnus-update-format-specifications 'group 'group-mode)
   (let ((props (text-properties-at (point-at-bol)))
-	(empty (= (point-min) (point-max)))
 	(group (gnus-group-group-name))
-        case-fold-search
-	number)
-    (set-buffer gnus-group-buffer)
-    (setq number (funcall gnus-group-prepare-function level unread lowest))
+        (number (funcall gnus-group-prepare-function level unread lowest))
+        case-fold-search)
     (when (or (and (numberp number)
 		   (zerop number))
 	      (zerop (buffer-size)))
-      ;; No groups in the buffer.
       (gnus-message 5 "%s" gnus-no-groups-message))
-    ;; We have some groups displayed.
     (when (or (not gnus-group-goto-next-group-function)
 	      (not (funcall gnus-group-goto-next-group-function
 			    group props)))
       (cond
-       (empty)
        ((not group)
 	;; Go to the first group with unread articles.
 	(gnus-group-search-forward t))
@@ -1282,7 +1276,8 @@ Also see the `gnus-group-use-permanent-levels' variable."
 	    (unless groups
 	      (goto-char (point-max))
 	      (forward-line -1)))))))
-    ;; Adjust cursor point.
+    (when (eobp)
+      (goto-char (point-min)))
     (gnus-group-position-point)))
 
 (defun gnus-group-list-level (level &optional all)
