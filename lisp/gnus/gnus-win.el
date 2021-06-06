@@ -393,9 +393,7 @@ Formerly `gnus-configure-frame'.  Wasn't thread-safe."
 
 (defun gnus-configure-windows (setting &optional force)
   (cond
-   ((null setting)
-    ;; Do nothing.
-    )
+   ((null setting))
    ((window-configuration-p setting)
     (set-window-configuration setting))
    (t
