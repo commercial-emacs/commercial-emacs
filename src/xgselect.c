@@ -28,6 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "blockinput.h"
 #include "systime.h"
+#include "thread.h"
 
 static ptrdiff_t threads_holding_glib_lock;
 static GMainContext *glib_main_context;
@@ -96,7 +97,8 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   bool need_to_dispatch;
 
   context = g_main_context_default ();
-  context_acquired = g_main_context_acquire (context);
+  if (main_thread_p (current_thread))
+    context_acquired = g_main_context_acquire (context);
   /* FIXME: If we couldn't acquire the context, we just silently proceed
      because this function handles more than just glib file descriptors.
      Note that, as implemented, this failure is completely silent: there is
