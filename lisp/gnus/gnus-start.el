@@ -47,6 +47,7 @@
 (defvar gnus-agent-file-loading-local)
 (defvar gnus-agent-file-loading-cache)
 (defvar gnus-topic-alist)
+(defvar gnus-inhibit-demon)
 
 (defconst gnus-thread-group "gnus-get-unread-articles"
   "Identifying prefix for fetching threads.")
@@ -754,8 +755,8 @@ prompt the user for the name of an NNTP server to use."
       (add-to-list 'gnus-predefined-server-alist
 		   (cons "native" gnus-select-method)))
 
-    (if gnus-agent
-	(gnus-agentize))
+    (when gnus-agent
+      (gnus-agentize))
 
     (let ((level (and (numberp arg) (> arg 0) arg))
 	  did-connect)
@@ -783,7 +784,7 @@ prompt the user for the name of an NNTP server to use."
 	    (gnus-dbus-register-sleep-signal))
 	  (gnus-start-draft-setup)
 	  ;; Generate the group buffer.
-	  (gnus-group-list-groups level)
+          (gnus-group-list-groups level)
 	  (gnus-group-first-unread-group)
 	  (gnus-configure-windows 'group)
 	  (gnus-group-set-mode-line)
@@ -1553,12 +1554,14 @@ Else we get unblocked but permanently yielded threads."
                 (let (gnus-run-thread--subresult
                       current-fn
                       (nntp-server-buffer working) ;; !! what makes this work !!
+                      (gnus-inhibit-demon t)
                       inhibit-debugger)
                   (condition-case-unless-debug err
                       (dolist (fn fns)
                         (setq current-fn fn)
                         (setq gnus-run-thread--subresult
-                              (funcall fn gnus-run-thread--subresult)))
+                              (funcall fn gnus-run-thread--subresult))
+                        (thread-yield))
                     (error
                      (ignore-errors (mutex-unlock mtx))
                      ;; feed current-fn to outer condition-case

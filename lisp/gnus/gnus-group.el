@@ -1247,10 +1247,10 @@ Also see the `gnus-group-use-permanent-levels' variable."
   (setq level (gnus-group-default-level level))
   (gnus-group-setup-buffer)
   (gnus-update-format-specifications 'group 'group-mode)
-  (let ((case-fold-search nil)
-	(props (text-properties-at (point-at-bol)))
+  (let ((props (text-properties-at (point-at-bol)))
 	(empty (= (point-min) (point-max)))
 	(group (gnus-group-group-name))
+        case-fold-search
 	number)
     (set-buffer gnus-group-buffer)
     (setq number (funcall gnus-group-prepare-function level unread lowest))
@@ -1260,13 +1260,11 @@ Also see the `gnus-group-use-permanent-levels' variable."
       ;; No groups in the buffer.
       (gnus-message 5 "%s" gnus-no-groups-message))
     ;; We have some groups displayed.
-    (goto-char (point-max))
     (when (or (not gnus-group-goto-next-group-function)
 	      (not (funcall gnus-group-goto-next-group-function
 			    group props)))
       (cond
-       (empty
-	(goto-char (point-min)))
+       (empty)
        ((not group)
 	;; Go to the first group with unread articles.
 	(gnus-group-search-forward t))
@@ -1275,8 +1273,7 @@ Also see the `gnus-group-use-permanent-levels' variable."
 	;; has disappeared in the new listing, try to find the next
 	;; one.  If no next one can be found, just leave point at the
 	;; first newsgroup in the buffer.
-	(when (not (gnus-text-property-search
-		    'gnus-group group nil 'goto))
+	(unless (gnus-text-property-search 'gnus-group group nil 'goto)
 	  (let ((groups (cdr-safe (member group gnus-group-list))))
 	    (while (and groups
 			(not (gnus-text-property-search
@@ -2722,17 +2719,13 @@ If EXCLUDE-GROUP, do not go to that group."
 (defun gnus-group-first-unread-group ()
   "Go to the first group with unread articles."
   (interactive nil gnus-group-mode)
-  (prog1
-      (let ((opoint (point))
-	    unread)
-	(goto-char (point-min))
-	(if (or (eq (setq unread (gnus-group-group-unread)) t) ; Not active.
-		(and (numberp unread)	; Not a topic.
-		     (not (zerop unread))) ; Has unread articles.
-		(zerop (gnus-group-next-unread-group 1))) ; Next unread group.
-	    (point)			; Success.
-	  (goto-char opoint)
-	  nil))				; Not success.
+  (let ((opoint (point)))
+    (goto-char (save-excursion
+                 (goto-char (point-min))
+                 (let ((unread (gnus-group-group-unread)))
+                   (cond ((and (numberp unread) (not (zerop unread)))
+	                  (point))
+	                 (t opoint)))))
     (gnus-group-position-point)))
 
 (defun gnus-group-enter-server-mode ()
