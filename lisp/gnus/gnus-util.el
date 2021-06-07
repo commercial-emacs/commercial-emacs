@@ -739,14 +739,7 @@ nil.  See also `gnus-bind-print-variables'."
   (when (file-exists-p file)
     (delete-file file)))
 
-(defun gnus-delete-duplicates (list)
-  "Remove duplicate entries from LIST."
-  (let ((result nil))
-    (while list
-      (unless (member (car list) result)
-	(push (car list) result))
-      (pop list))
-    (nreverse result)))
+(defalias 'gnus-delete-duplicates #'delete-dups)
 
 (defun gnus-delete-directory (directory)
   "Delete files in DIRECTORY.  Subdirectories remain.

@@ -1576,7 +1576,7 @@ Else we get unblocked but permanently yielded threads."
                        (error "dolist: '%s' in %s"
                               (error-message-string err) current-fn)))))))
           (error
-           (gnus-message-with-timestamp "gnus-thread-body: '%s'" (error-message-string err))))
+           (gnus-message-with-timestamp "gnus-thread-body: error %s '%s'" thread-name (error-message-string err))))
       (let (kill-buffer-query-functions)
         (kill-buffer working))
       (ignore-errors (mutex-unlock mtx))
