@@ -52,6 +52,11 @@
 (defconst gnus-thread-group "gnus-get-unread-articles"
   "Identifying prefix for fetching threads.")
 
+(defcustom gnus-max-seconds-hold-mutex 75
+  "Timeout in seconds before relinquishing `gnus-mutex-get-unread-articles'."
+  :group 'gnus-start
+  :type 'integer)
+
 (defvar gnus-mutex-get-unread-articles (make-mutex gnus-thread-group)
   "Updating or displaying state of unread articles are critical sections.")
 
@@ -1547,26 +1552,29 @@ Else we get unblocked but permanently yielded threads."
     (unwind-protect
         (condition-case err
             (with-mutex mtx
-              (with-current-buffer working
-                (nnheader-prep-server-buffer working)
-                (gnus-message-with-timestamp "gnus-thread-body: start %s <%s>"
-                                             thread-name (buffer-name))
-                (let (gnus-run-thread--subresult
-                      current-fn
-                      (nntp-server-buffer working) ;; !! what makes this work !!
-                      (gnus-inhibit-demon t)
-                      inhibit-debugger)
-                  (condition-case-unless-debug err
-                      (dolist (fn fns)
-                        (setq current-fn fn)
-                        (setq gnus-run-thread--subresult
-                              (funcall fn gnus-run-thread--subresult))
-                        (thread-yield))
-                    (error
-                     (ignore-errors (mutex-unlock mtx))
-                     ;; feed current-fn to outer condition-case
-                     (error "dolist: '%s' in %s"
-                            (error-message-string err) current-fn))))))
+              (with-timeout
+                  (gnus-max-seconds-hold-mutex
+                   (error "Timed out after %s seconds" gnus-max-seconds-hold-mutex))
+                (with-current-buffer working
+                  (nnheader-prep-server-buffer working)
+                  (gnus-message-with-timestamp "gnus-thread-body: start %s <%s>"
+                                               thread-name (buffer-name))
+                  (let (gnus-run-thread--subresult
+                        current-fn
+                        (nntp-server-buffer working) ;; !! what makes this work !!
+                        (gnus-inhibit-demon t)
+                        inhibit-debugger)
+                    (condition-case-unless-debug err
+                        (dolist (fn fns)
+                          (setq current-fn fn)
+                          (setq gnus-run-thread--subresult
+                                (funcall fn gnus-run-thread--subresult))
+                          (thread-yield))
+                      (error
+                       (ignore-errors (mutex-unlock mtx))
+                       ;; feed current-fn to outer condition-case
+                       (error "dolist: '%s' in %s"
+                              (error-message-string err) current-fn)))))))
           (error
            (gnus-message-with-timestamp "gnus-thread-body: '%s'" (error-message-string err))))
       (let (kill-buffer-query-functions)
