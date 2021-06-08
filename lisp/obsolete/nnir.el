@@ -518,7 +518,7 @@ construct the vector entries."
 
 (autoload 'gnus-server-get-active "gnus-int")
 (autoload 'nnimap-change-group "nnimap")
-(declare-function nnimap-buffer "nnimap" ())
+(declare-function nnimap-process-buffer "nnimap" ())
 (declare-function nnimap-command "nnimap" (&rest args))
 
 ;; imap interface
@@ -547,7 +547,7 @@ extensions."
 		(condition-case ()
 		    (when (nnimap-change-group
 			   (gnus-group-short-name group) server)
-		      (with-current-buffer (nnimap-buffer)
+		      (with-current-buffer (nnimap-process-buffer)
 			(message "Searching %s..." group)
 			(let ((arts 0)
 			      (result (nnimap-command "UID SEARCH %s"
