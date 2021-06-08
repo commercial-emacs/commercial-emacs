@@ -3498,7 +3498,7 @@ server is native)."
 (defun gnus-summary-buffer-name (group &optional canonical)
   "Return the summary buffer name of GROUP."
   (let ((name (concat "*Summary " group "*"))
-        (main-thread-p (eq (current-thread) (car (all-threads)))))
+        (main-thread-p (eq (current-thread) main-thread)))
     (if (or canonical main-thread-p)
         name
       (format " %s %s" (thread-name (current-thread)) name))))
