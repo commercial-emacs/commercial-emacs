@@ -29,7 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "systime.h"
 
-static ptrdiff_t threads_holding_glib_lock;
+static ptrdiff_t volatile threads_holding_glib_lock;
 static GMainContext *glib_main_context;
 
 void release_select_lock (void)
