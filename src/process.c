@@ -4752,27 +4752,6 @@ corresponding connection was closed.  */)
   intmax_t secs;
   int nsecs;
 
-  if (! NILP (process))
-    {
-      CHECK_PROCESS (process);
-      struct Lisp_Process *proc = XPROCESS (process);
-
-      /* Can't wait for a process that is dedicated to a different
-	 thread.  */
-      if (!NILP (proc->thread) && !EQ (proc->thread, Fcurrent_thread ()))
-	{
-	  Lisp_Object proc_thread_name = XTHREAD (proc->thread)->name;
-
-	  error ("Attempt to accept output from process %s locked to thread %s",
-		 SDATA (proc->name),
-		 STRINGP (proc_thread_name)
-		 ? SDATA (proc_thread_name)
-		 : SDATA (Fprin1_to_string (proc->thread, Qt)));
-	}
-    }
-  else
-    just_this_one = Qnil;
-
   if (!NILP (millisec))
     { /* Obsolete calling convention using integers rather than floats.  */
       CHECK_FIXNUM (millisec);
@@ -4810,14 +4789,14 @@ corresponding connection was closed.  */)
       else
 	wrong_type_argument (Qnumberp, seconds);
     }
-  else if (! NILP (process))
+  else if (!NILP (process))
     nsecs = 0;
 
   return
     ((wait_reading_process_output (secs, nsecs, 0, 0,
 				   Qnil,
 				   !NILP (process) ? XPROCESS (process) : NULL,
-				   (NILP (just_this_one) ? 0
+				   ((NILP (process) || NILP (just_this_one)) ? 0
 				    : !FIXNUMP (just_this_one) ? 1 : -1))
       <= 0)
      ? Qnil : Qt);
@@ -5173,10 +5152,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
   /* Close to the current time if known, an invalid timespec otherwise.  */
   struct timespec now = invalid_timespec ();
-
-  eassert (wait_proc == NULL
-	   || NILP (wait_proc->thread)
-	   || XTHREAD (wait_proc->thread) == current_thread);
 
   FD_ZERO (&Available);
   FD_ZERO (&Writeok);
