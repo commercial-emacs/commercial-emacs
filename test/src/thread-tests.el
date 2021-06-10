@@ -466,6 +466,7 @@ The failure manifests only by being unable to exit the interactive emacs."
 For whatever reason, in 2012, tromey inserted an assertion forbidding this.
 We test flouting that edict here."
   (skip-unless (featurep 'threads))
+  (thread-last-error t)
   (let* ((thread-tests-main (get-buffer-create "thread-tests-main" t))
          (buffers (list thread-tests-main))
          (start-proc (lambda (n b)
@@ -481,18 +482,22 @@ We test flouting that edict here."
       (dotimes (i (1- n))
         (make-thread
          (lambda ()
-           (cl-loop repeat 10
+           (cl-loop repeat 5
                     do (accept-process-output
                         (nth (random (length procs)) procs)
-                        0.3
+                        0.2
+                        nil
                         t)))
          (format "thread-tests-%d" i)))
-      (cl-loop repeat 50
-               while (cl-some (lambda (thr)
-                                (cl-search "thread-tests-" (thread-name thr)))
-                              (all-threads))
-               do (accept-process-output (nth (random (length procs)) procs) 1.0)
-               finally do (mapc
-                           (lambda (b) (kill-buffer b))
-                           buffers)))))
+      (should (cl-loop repeat 20
+                       unless (cl-some
+                               (lambda (thr)
+                                 (cl-search "thread-tests-" (thread-name thr)))
+                               (all-threads))
+                       return t
+                       do (accept-process-output
+                           (nth (random (length procs)) procs) 1.0)
+                       finally return nil)))
+    (mapc (lambda (b) (kill-buffer b)) buffers))
+  (should-not (thread-last-error t)))
 ;;; thread-tests.el ends here
