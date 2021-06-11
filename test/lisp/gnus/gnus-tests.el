@@ -27,6 +27,8 @@
 ;;; Code:
 ;;
 
+(require 'cl-macs)
+
 (cl-defmacro gnus-tests--doit (&rest body &key select-methods &allow-other-keys)
   (declare (indent defun))
   `(unwind-protect
@@ -87,6 +89,7 @@
      (gnus-tests-for-mock (expand-file-name "test" elpaso-dev-toplevel-dir)
        (delete-directory ".git" t))))
 
+(ert-deftest gnus-test-stub () (should t))
 
 (provide 'gnus-tests)
 ;;; gnus-tests.el ends here
