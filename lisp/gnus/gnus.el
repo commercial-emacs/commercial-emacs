@@ -2464,7 +2464,7 @@ such as a mark that says whether an article is stored in the cache
   "Alist of major modes and related Info nodes.")
 
 (defvar-local gnus-summary-buffer nil)
-(defvar-local gnus-article-buffer nil)
+(defvar-local gnus-article-buffer "*Article*")
 (defvar gnus-server-buffer "*Server*")
 
 (defvar gnus-child nil
