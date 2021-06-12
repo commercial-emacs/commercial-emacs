@@ -1554,7 +1554,9 @@ Else we get unblocked but permanently yielded threads."
             (with-mutex mtx
               (with-timeout
                   (gnus-max-seconds-hold-mutex
-                   (error "Timed out after %s seconds" gnus-max-seconds-hold-mutex))
+                   (gnus-message-with-timestamp
+                    "gnus-thread-body: timed out after %s seconds"
+                    gnus-max-seconds-hold-mutex))
                 (with-current-buffer working
                   (nnheader-prep-server-buffer working)
                   (gnus-message-with-timestamp "gnus-thread-body: start %s <%s>"

@@ -3078,7 +3078,8 @@ The following commands are available:
   (mm-enable-multibyte)
   (setq-local bookmark-make-record-function
               #'gnus-summary-bookmark-make-record)
-  (setq gnus-summary-buffer (current-buffer)))
+  (setq gnus-summary-buffer (current-buffer))
+  (set-default 'gnus-summary-buffer gnus-summary-buffer))
 
 ;; Summary data functions.
 
