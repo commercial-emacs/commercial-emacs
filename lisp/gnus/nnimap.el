@@ -1906,10 +1906,14 @@ If LIMIT, first try to limit the search to the N last articles."
              (cl-find-if (lambda (b)
                            (equal key (buffer-name b)))
                          (gnus-buffers))))
-    (if-let ((extant (get process-buffer-key)))
-        extant
-      (nnimap-open-connection process-buffer-key)
-      (get process-buffer-key))))
+    (let ((extant (get process-buffer-key)))
+      (when extant
+        (unless (get-buffer-process extant)
+          (gnus-kill-buffer extant))
+        (setq extant nil))
+      (or extant
+          (progn (nnimap-open-connection process-buffer-key)
+                 (get process-buffer-key))))))
 
 (deffoo nnimap-request-post (&optional _server)
   (setq nnimap-status-string "Read-only server")
