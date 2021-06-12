@@ -1914,9 +1914,8 @@ If LIMIT, first try to limit the search to the N last articles."
                            (equal key (buffer-name b)))
                          (gnus-buffers))))
     (let ((extant (get process-buffer-key)))
-      (when extant
-        (unless (get-buffer-process extant)
-          (gnus-kill-buffer extant))
+      (when (and extant (not (get-buffer-process extant)))
+        (gnus-kill-buffer extant)
         (setq extant nil))
       (or extant
           (progn (nnimap-open-connection process-buffer-key)
