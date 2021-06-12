@@ -3078,8 +3078,7 @@ The following commands are available:
   (mm-enable-multibyte)
   (setq-local bookmark-make-record-function
               #'gnus-summary-bookmark-make-record)
-  (setq gnus-summary-buffer (current-buffer))
-  (set-default 'gnus-summary-buffer gnus-summary-buffer))
+  (setq gnus-summary-buffer (current-buffer)))
 
 ;; Summary data functions.
 
@@ -3430,9 +3429,8 @@ Return non-nil if caller must prepare the summary buffer."
         (with-current-buffer name
           (not gnus-newsgroup-prepared))
       (with-current-buffer (gnus-get-buffer-create name)
-        (setq gnus-newsgroup-name group)
-        (set-default 'gnus-newsgroup-name gnus-newsgroup-name)
         (gnus-summary-mode)
+        (setq gnus-newsgroup-name group)
         (when (gnus-group-quit-config gnus-newsgroup-name)
           (set (make-local-variable 'gnus-single-article-buffer) nil))
         (turn-on-gnus-mailing-list-mode)
