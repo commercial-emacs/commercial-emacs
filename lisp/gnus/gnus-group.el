@@ -4532,8 +4532,7 @@ and the second element is the address."
     (let* ((entry (gnus-group-entry
 		   (or method-only-group (gnus-info-group info))))
 	   (part-info info)
-	   (info (if method-only-group (nth 1 entry) info))
-	   method)
+	   (info (if method-only-group (nth 1 entry) info)))
       (when method-only-group
 	(unless entry
 	  (error "Trying to change non-existent group %s" method-only-group))
@@ -4550,45 +4549,35 @@ and the second element is the address."
       (unless entry
 	;; This is a new group, so we just create it.
 	(with-current-buffer gnus-group-buffer
-	  (setq method (gnus-info-method info))
-	  (when (gnus-server-equal method "native")
-	    (setq method nil))
-	  (with-current-buffer gnus-group-buffer
-	    (if method
-		;; It's a foreign group...
+          (let ((method (gnus-info-method info)))
+	    (with-current-buffer gnus-group-buffer
+	      (if (gnus-server-equal method "native")
+                  (gnus-group-make-group (gnus-info-group info))
 		(gnus-group-make-group
 		 (gnus-group-real-name (gnus-info-group info))
-		 (if (stringp method) method
+		 (if (stringp method)
+                     method
 		   (prin1-to-string (car method)))
-		 (and (consp method)
-		      (nth 1 (gnus-info-method info)))
-		 nil)
-	      ;; It's a native group.
-	      (gnus-group-make-group (gnus-info-group info) nil nil nil)))
-	  (gnus-message 6 "Note: New group created")
-	  (setq entry
-		(gnus-group-entry (gnus-group-prefixed-name
-				   (gnus-group-real-name (gnus-info-group info))
-				   (or (gnus-info-method info) gnus-select-method))))))
-      ;; Whether it was a new group or not, we now have the entry, so we
-      ;; can do the update.
-      (if entry
-	  (progn
-	    (setcar (nthcdr 1 entry) info)
-	    (when (and (not (eq (car entry) t))
-		       (gnus-active (gnus-info-group info)))
-	      (setcar entry (length
-			     (gnus-list-of-unread-articles (car info)))))
-	    ;; The above `setcar' will only affect the hashtable, not
-	    ;; the alist: update the alist separately, but only if
-	    ;; it's been initialized.
-	    (when gnus-newsrc-alist
-	      (push info (cdr (setq gnus-newsrc-alist
-				    (remove (assoc-string
-					     (gnus-info-group info)
-					     gnus-newsrc-alist)
-					    gnus-newsrc-alist))))))
-	(error "No such group: %s" (gnus-info-group info))))))
+		 (when (consp method)
+		   (nth 1 (gnus-info-method info))))))
+	    (setq entry
+	          (gnus-group-entry (gnus-group-prefixed-name
+				     (gnus-group-real-name (gnus-info-group info))
+				     (or method gnus-select-method))))
+	    (gnus-message 6 "Note: New group created"))))
+      (setcar (nthcdr 1 entry) info)
+      (when (and (not (eq (car entry) t))
+		 (gnus-active (gnus-info-group info)))
+	(setcar entry (length
+		       (gnus-list-of-unread-articles (car info)))))
+      ;; How `gnus-newsrc-hashtb' and `gnus-newsrc-alist' are
+      ;; dutifully kept in-sync is anyone's guess...
+      (when gnus-newsrc-alist
+	(push info (cdr (setq gnus-newsrc-alist
+			      (remove (assoc-string
+				       (gnus-info-group info)
+				       gnus-newsrc-alist)
+				      gnus-newsrc-alist))))))))
 
 ;; Ad-hoc function for inserting data from a different newsrc.eld
 ;; file.  Use with caution, if at all.
