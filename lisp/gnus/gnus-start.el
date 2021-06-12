@@ -1558,12 +1558,11 @@ Else we get unblocked but permanently yielded threads."
                     "gnus-thread-body: timed out after %s seconds"
                     gnus-max-seconds-hold-mutex))
                 (with-current-buffer working
-                  (nnheader-prep-server-buffer working)
+                  (setq-local nntp-server-buffer (current-buffer))
                   (gnus-message-with-timestamp "gnus-thread-body: start %s <%s>"
                                                thread-name (buffer-name))
                   (let (gnus-run-thread--subresult
                         current-fn
-                        (nntp-server-buffer working) ;; !! what makes this work !!
                         (gnus-inhibit-demon t)
                         inhibit-debugger)
                     (condition-case-unless-debug err
