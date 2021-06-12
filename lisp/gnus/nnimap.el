@@ -561,6 +561,7 @@ the key of the front-line assoc list to incorporate SERVER."
 	    (nnheader-report 'nnimap "Unable to contact %s:%s via %s"
 			     nnimap-address (car ports) nnimap-stream))
 	(set-process-query-on-exit-flag stream nil)
+        (set-process-thread stream nil)
 	(if (not (string-match-p "[*.] \\(OK\\|PREAUTH\\)" greeting))
 	    (nnheader-report 'nnimap "%s" greeting)
 	  (setf (nnimap-greeting nnimap-object) greeting)
