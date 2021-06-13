@@ -1558,14 +1558,15 @@ Else we get unblocked but permanently yielded threads."
                     "gnus-thread-body: timed out after %s seconds"
                     gnus-max-seconds-hold-mutex))
                 (with-current-buffer working
-                  (setq-local nntp-server-buffer (current-buffer))
                   (gnus-message-with-timestamp "gnus-thread-body: start %s <%s>"
                                                thread-name (buffer-name))
+                  ;; let's of buffer-locals have problems, so avoid them
                   (let (gnus-run-thread--subresult
                         current-fn
                         (gnus-inhibit-demon t)
-                        inhibit-debugger)
-                    (condition-case-unless-debug err
+                        (nntp-server-buffer (current-buffer))
+                        (inhibit-debugger t))
+                    (condition-case err
                         (dolist (fn fns)
                           (setq current-fn fn)
                           (setq gnus-run-thread--subresult
@@ -1576,8 +1577,9 @@ Else we get unblocked but permanently yielded threads."
                        ;; feed current-fn to outer condition-case
                        (error "dolist: '%s' in %s"
                               (error-message-string err) current-fn)))))))
-          (error
-           (gnus-message-with-timestamp "gnus-thread-body: error %s '%s'" thread-name (error-message-string err))))
+          (error (gnus-message-with-timestamp
+                  "gnus-thread-body: error %s '%s'"
+                  thread-name (error-message-string err))))
       (let (kill-buffer-query-functions)
         (kill-buffer working))
       (ignore-errors (mutex-unlock mtx))
