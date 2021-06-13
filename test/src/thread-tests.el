@@ -478,7 +478,13 @@ We test flouting that edict here."
       (make-thread (apply-partially start-proc
                                     (format "thread-tests-%d" i)
                                     (car buffers))))
+    (should (cl-loop repeat 10
+                     when (cl-every #'processp (mapcar #'get-buffer-process buffers))
+                     return t
+                     do (accept-process-output nil 0.1)
+                     finally return nil))
     (let ((procs (mapcar #'get-buffer-process buffers)))
+      (mapc (lambda (proc) (set-process-thread proc nil)) procs)
       (dotimes (i (1- n))
         (make-thread
          (lambda ()
