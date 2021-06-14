@@ -1550,34 +1550,31 @@ backend check whether the group actually exists."
 Else we get unblocked but permanently yielded threads."
   (let ((working (get-buffer-create (format " *%s*" thread-name)))
         (inhibit-debugger t)
-        debug-on quit debug-on-error)
+        debug-on-quit
+        debug-on-error)
+    ;; once context switch occurs handlerlist in eval.c(throw) is lost
     (unwind-protect
         (condition-case err
             (with-mutex mtx
-              (with-timeout
-                  (gnus-max-seconds-hold-mutex
-                   (gnus-message-with-timestamp
-                    "gnus-thread-body: timed out after %s seconds"
-                    gnus-max-seconds-hold-mutex))
-                (with-current-buffer working
-                  (gnus-message-with-timestamp "gnus-thread-body: start %s <%s>"
-                                               thread-name (buffer-name))
-                  ;; let's of buffer-locals have problems, so avoid them
-                  (let (gnus-run-thread--subresult
-                        current-fn
-                        (gnus-inhibit-demon t)
-                        (nntp-server-buffer (current-buffer)))
-                    (condition-case err
-                        (dolist (fn fns)
-                          (setq current-fn fn)
-                          (setq gnus-run-thread--subresult
-                                (funcall fn gnus-run-thread--subresult))
-                          (thread-yield))
-                      (error
-                       (ignore-errors (mutex-unlock mtx))
-                       ;; feed current-fn to outer condition-case
-                       (error "dolist: '%s' in %s"
-                              (error-message-string err) current-fn)))))))
+              (with-current-buffer working
+                (gnus-message-with-timestamp "gnus-thread-body: start %s <%s>"
+                                             thread-name (buffer-name))
+                ;; buffer-locals have global state, it seems also (avoid them)
+                (let (gnus-run-thread--subresult
+                      current-fn
+                      (gnus-inhibit-demon t)
+                      (nntp-server-buffer (current-buffer)))
+                  (condition-case err
+                      (dolist (fn fns)
+                        (setq current-fn fn)
+                        (setq gnus-run-thread--subresult
+                              (funcall fn gnus-run-thread--subresult))
+                        (thread-yield))
+                    (error
+                     (ignore-errors (mutex-unlock mtx))
+                     ;; feed current-fn to outer condition-case
+                     (error "dolist: '%s' in %s"
+                            (error-message-string err) current-fn))))))
           (error (gnus-message-with-timestamp
                   "gnus-thread-body: error %s '%s'"
                   thread-name (error-message-string err))))
@@ -1596,14 +1593,30 @@ Else we get unblocked but permanently yielded threads."
       (prog1 nil
         (thread-signal thr 'error nil)))))
 
+(defvar gnus-thread-sentinels nil
+  "(float-time . thread) alist earliest first.
+The macro `with-timeout' within thread body is verboten since handlerlist is not
+thread-safe in eval.c.")
+
 (defun gnus-run-thread (label mtx thread-group &rest fns)
   "MTX, if non-nil, is the mutex for the new thread.
 THREAD-GROUP is string useful for naming working buffer and threads.
 All FNS must finish before MTX is released."
   (when fns
-    (let ((thread-name (concat thread-group "-" label)))
-      (make-thread (apply-partially #'gnus-thread-body thread-name mtx fns)
-                   thread-name))))
+    (cl-flet ((tack
+               (x onto)
+               (let ((add (list x)))
+                 (setcdr (last onto) add)
+                 onto)))
+      (let* ((thread-name (concat thread-group "-" label))
+             (timed-entry (cons (float-time)
+                                (make-thread
+                                 (apply-partially #'gnus-thread-body
+                                                  thread-name mtx fns)
+                                 thread-name))))
+        (if gnus-thread-sentinels
+            (tack timed-entry gnus-thread-sentinels)
+          (push timed-entry gnus-thread-sentinels))))))
 
 (defun gnus-chain-arg (tack-p f &rest args)
   (lambda (prev)
@@ -1619,6 +1632,18 @@ All FNS must finish before MTX is released."
   (setq gnus-server-method-cache nil)
   (defvar gnus-agent-article-local-times)
   (cl-assert (eq (current-thread) main-thread))
+
+  (when gnus-background-get-unread-articles
+    (run-at-time nil gnus-max-seconds-hold-mutex
+                 (lambda ()
+                   (when-let ((next (car gnus-thread-sentinels)))
+                     (cl-destructuring-bind (started . thread)
+                         next
+                       (when (time-less-p (time-add (seconds-to-time started)
+                                                    gnus-max-seconds-hold-mutex)
+                                          nil)
+                         ))
+                     ))))
 
   (if-let ((pending (gnus-thread-group-running-p gnus-thread-group)))
       (gnus-message 3 "gnus-get-unread-articles: %s still running" pending)
