@@ -247,6 +247,7 @@ during splitting, which may be slow."
 
 (defalias 'nnimap-buffer #'nnimap-process-buffer)
 (defun nnimap-process-buffer ()
+
   (nnimap-get-process-buffer (nnimap-process-buffer-key)))
 
 (defun nnimap-header-parameters ()
@@ -912,9 +913,8 @@ the key of the front-line assoc list to incorporate SERVER."
   (let ((result (nnimap-change-group
 		 ;; Don't SELECT the group if we're going to select it
 		 ;; later, anyway.
-		 (if (and (not dont-check)
-			  (assoc group nnimap-current-infos))
-		     nil
+		 (when (or dont-check
+			   (not (assoc group nnimap-current-infos)))
 		   group)
 		 server))
 	(info (when info (list info)))
@@ -1920,7 +1920,8 @@ If LIMIT, first try to limit the search to the N last articles."
         (setq extant nil))
       (or extant
           (progn (nnimap-open-connection process-buffer-key)
-                 (get process-buffer-key))))))
+                 (get process-buffer-key))
+          (error "Cannot connect to %s" process-buffer-key)))))
 
 (deffoo nnimap-request-post (&optional _server)
   (setq nnimap-status-string "Read-only server")

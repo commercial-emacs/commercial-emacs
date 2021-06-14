@@ -492,6 +492,12 @@ See also `gnus-before-startup-hook'."
 
 ;; Suggested by Brian Edmonds <edmonds@cs.ubc.ca>.
 (defvar gnus-init-inhibit nil)
+
+(defvar gnus-thread-start nil
+  "(lisp-time . thread) when background thread got mutex.
+The macro `with-timeout' within thread body is verboten since handlerlist is not
+thread-safe in eval.c.")
+
 (defun gnus-read-init-file (&optional inhibit-next)
   ;; Don't load .gnus if the -q option was used.
   (when init-file-user
@@ -1556,10 +1562,11 @@ Else we get unblocked but permanently yielded threads."
     (unwind-protect
         (condition-case err
             (with-mutex mtx
+              (setq gnus-thread-start (cons (current-time) (current-thread)))
               (with-current-buffer working
                 (gnus-message-with-timestamp "gnus-thread-body: start %s <%s>"
                                              thread-name (buffer-name))
-                ;; buffer-locals have global state, it seems also (avoid them)
+                ;; buffer-locals not thread-safe (avoid them)
                 (let (gnus-run-thread--subresult
                       current-fn
                       (gnus-inhibit-demon t)
@@ -1580,6 +1587,7 @@ Else we get unblocked but permanently yielded threads."
                   thread-name (error-message-string err))))
       (let (kill-buffer-query-functions)
         (kill-buffer working))
+      (setq gnus-thread-start nil)
       (ignore-errors (mutex-unlock mtx))
       (gnus-message-with-timestamp "gnus-thread-body: finish %s" thread-name))))
 
@@ -1593,34 +1601,36 @@ Else we get unblocked but permanently yielded threads."
       (prog1 nil
         (thread-signal thr 'error nil)))))
 
-(defvar gnus-thread-sentinels nil
-  "(float-time . thread) alist earliest first.
-The macro `with-timeout' within thread body is verboten since handlerlist is not
-thread-safe in eval.c.")
-
 (defun gnus-run-thread (label mtx thread-group &rest fns)
   "MTX, if non-nil, is the mutex for the new thread.
 THREAD-GROUP is string useful for naming working buffer and threads.
 All FNS must finish before MTX is released."
   (when fns
-    (cl-flet ((tack
-               (x onto)
-               (let ((add (list x)))
-                 (setcdr (last onto) add)
-                 onto)))
-      (let* ((thread-name (concat thread-group "-" label))
-             (timed-entry (cons (float-time)
-                                (make-thread
-                                 (apply-partially #'gnus-thread-body
-                                                  thread-name mtx fns)
-                                 thread-name))))
-        (if gnus-thread-sentinels
-            (tack timed-entry gnus-thread-sentinels)
-          (push timed-entry gnus-thread-sentinels))))))
+    (let ((thread-name (concat thread-group "-" label)))
+      (make-thread
+       (apply-partially #'gnus-thread-body thread-name mtx fns)
+       thread-name))))
 
 (defun gnus-chain-arg (tack-p f &rest args)
   (lambda (prev)
     (apply f (append args (when tack-p (list prev))))))
+
+(defun gnus-time-out-thread ()
+  (interactive)
+  (when gnus-thread-start
+    (cl-destructuring-bind (started . thread)
+        gnus-thread-start
+      (when (time-less-p
+             (time-add started gnus-max-seconds-hold-mutex)
+             nil)
+        (setq gnus-thread-start nil)
+        (if (thread-live-p thread)
+            (progn
+              (gnus-message-with-timestamp
+               "gnus-time-out-thread: signal quit %s" (thread-name thread))
+              (thread-signal thread 'quit nil))
+          (gnus-message-with-timestamp
+           "gnus-time-out-thread: race on dead %s" (thread-name thread)))))))
 
 (cl-defun gnus-get-unread-articles (&optional
                                     requested-level
@@ -1632,19 +1642,15 @@ All FNS must finish before MTX is released."
   (setq gnus-server-method-cache nil)
   (defvar gnus-agent-article-local-times)
   (cl-assert (eq (current-thread) main-thread))
-
   (when gnus-background-get-unread-articles
-    (run-at-time nil gnus-max-seconds-hold-mutex
-                 (lambda ()
-                   (when-let ((next (car gnus-thread-sentinels)))
-                     (cl-destructuring-bind (started . thread)
-                         next
-                       (when (time-less-p (time-add (seconds-to-time started)
-                                                    gnus-max-seconds-hold-mutex)
-                                          nil)
-                         ))
-                     ))))
-
+    (unless (cl-find-if (lambda (timer)
+                          (eq (timer--function timer)
+                              #'gnus-time-out-thread))
+                        timer-list)
+      (run-at-time
+       nil
+       (/ gnus-max-seconds-hold-mutex 2)
+       #'gnus-time-out-thread)))
   (if-let ((pending (gnus-thread-group-running-p gnus-thread-group)))
       (gnus-message 3 "gnus-get-unread-articles: %s still running" pending)
     (let* ((newsrc (cdr gnus-newsrc-alist))
@@ -1721,6 +1727,11 @@ All FNS must finish before MTX is released."
             (coda (apply-partially
                    (lambda (level*)
                      (gnus-message-with-timestamp "gnus-get-unread-articles: all done")
+                     (when-let ((timer (cl-find-if (lambda (timer)
+                                                     (eq (timer--function timer)
+                                                         #'gnus-time-out-thread))
+                                                   timer-list)))
+                       (cancel-timer timer))
                      (gnus-group-list-groups level*)
                      (gnus-run-hooks 'gnus-after-getting-new-news-hook)
                      (gnus-group-list-groups)
