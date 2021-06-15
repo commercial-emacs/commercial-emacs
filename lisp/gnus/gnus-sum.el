@@ -1396,6 +1396,7 @@ the normal Gnus MIME machinery."
 
 (defvar gnus-thread-indent-array nil)
 (defvar gnus-thread-indent-array-level gnus-thread-indent-level)
+(make-obsolete-variable 'gnus-sort-gathered-threads-function nil "28.1")
 
 (defvar gnus-summary-save-parts-type-history nil)
 (defvar gnus-summary-save-parts-last-directory mm-default-directory)
