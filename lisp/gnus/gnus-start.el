@@ -224,7 +224,7 @@ groups."
 
 (defvaralias 'gnus-save-dot-newsrc 'gnus-save-newsrc-file)
 (defcustom gnus-save-newsrc-file t
-  "Save a USENIX .newsrc for nntp groups.
+  "Save a Usenet .newsrc for nntp groups.
 Note the .newsrc is primarily for the benefit of other newsreaders.
 Gnus uses .newsrc.eld, not .newsrc."
   :group 'gnus-newsrc
