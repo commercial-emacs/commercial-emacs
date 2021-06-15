@@ -1494,13 +1494,11 @@ cache for all groups).
 @cindex .newsrc
 @cindex .newsrc.eld
 
-The @file{.newsrc.eld} is Gnus's initialization and persistent store
-of state.  Avoid deleting it.  Its contents are state-as-code so
-users are urged to learn some Emacs Lisp before editing it manually.
+The @file{.newsrc.eld} contains s-exprs persisting Gnus's state.
+Avoid deleting it.
 
-The @file{.newsrc} is a USENIX relic, which Gnus will generally ignore
-UNLESS the @file{.newsrc.eld} did not, for whatever reason, assign a
-@code{gnus-newsrc-alist}.
+The @file{.newsrc} is the standard Usenet rcfile, which Gnus will generally
+ignore unless the @file{.newsrc.eld} did not assign a @code{gnus-newsrc-alist}.
 
 @vindex gnus-save-killed-list
 If @code{gnus-save-killed-list} (default @code{t}) is @code{nil}, Gnus
@@ -1636,10 +1634,9 @@ secondary select methods.
 @table @code
 
 @item gnus-save-dot-newsrc
-If this is @code{nil}, Gnus will never save @file{.newsrc}---it will
-only save @file{.newsrc.eld}.  This means that you will not be able to
-use any other newsreaders than Gnus.  This variable is @code{t} by
-default.
+If changed to @code{nil} from its default value @code{t}, Gnus will
+stop saving @file{.newsrc}, meaning other newsreaders cannot pick
+up from where Gnus left off.
 
 @item gnus-before-startup-hook
 @vindex gnus-before-startup-hook
@@ -2599,9 +2596,8 @@ special-purpose groups.  All these commands insert the newly created
 groups under point---@code{gnus-subscribe-newsgroup-method} is not
 consulted.
 
-Changes from the group editing commands are stored in
-@file{~/.newsrc.eld}.  An alternative is the
-variable @code{gnus-parameters}, @xref{Group Parameters}.
+Changes from the group editing commands are stored in @file{~/.newsrc.eld}.
+An alternative is the variable @code{gnus-parameters}, @xref{Group Parameters}.
 
 @table @kbd
 
@@ -14407,7 +14403,7 @@ something like:
 
 @example
 (setq gnus-select-method
-            '(nnimap "imap.gmail.com"))
+      '(nnimap "imap.gmail.com"))
 @end example
 
 You'll be prompted for a user name and password.  If you grow tired of
