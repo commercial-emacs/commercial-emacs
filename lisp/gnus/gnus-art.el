@@ -4504,10 +4504,6 @@ commands:
                                          original-article-buffer-name)
   "Refactor."
   (gnus-summary-assume-in-summary
-    ;; set crutches
-    (set-default 'gnus-original-article-buffer original-article-buffer-name)
-    (set-default 'gnus-article-buffer article-buffer-name)
-
     (with-current-buffer (gnus-get-buffer-create original-article-buffer-name)
       (mm-enable-multibyte)
       (setq major-mode 'gnus-original-article-mode))
