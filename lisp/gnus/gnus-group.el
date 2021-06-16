@@ -4167,8 +4167,7 @@ If ARG is a number, it specifies which levels you are interested in
 re-scanning.  If ARG is non-nil and not a number, this will force
 \"hard\" re-reading of the active files from all servers.
 If ONE-LEVEL is not nil, then re-scan only the specified level,
-otherwise all levels below ARG will be scanned too.
-"
+otherwise all levels below ARG will be scanned too."
   (interactive "P" gnus-group-mode)
   (require 'nnmail)
   (let ((gnus-inhibit-demon t)
