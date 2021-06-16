@@ -1640,8 +1640,10 @@ This list will always be a subset of gnus-newsgroup-undownloaded.")
 (defvar-local gnus-newsgroup-charset nil)
 (defvar gnus-newsgroup-ephemeral-charset nil)
 (defvar gnus-newsgroup-ephemeral-ignored-charsets nil)
-
 (defvar gnus-article-before-search nil)
+
+(make-obsolete-variable 'gnus-summary-local-variables nil "28.1")
+(make-obsolete-variable 'gnus-newsgroup-variables nil "28.1")
 
 (eval-when-compile
   ;; Bind features so that require will believe that gnus-sum has
@@ -3080,8 +3082,7 @@ The following commands are available:
   (mm-enable-multibyte)
   (setq-local bookmark-make-record-function
               #'gnus-summary-bookmark-make-record)
-  (setq gnus-summary-buffer (current-buffer))
-  (set-default 'gnus-summary-buffer gnus-summary-buffer))
+  (setq gnus-summary-buffer (current-buffer)))
 
 ;; Summary data functions.
 
