@@ -61,7 +61,7 @@
   "Updating or displaying state of unread articles are critical sections.")
 
 (defconst gnus-dot-newsrc (nnheader-concat gnus-home-directory ".newsrc")
-  "Traditional USENIX .newsrc file.  Its time is long past.")
+  "Traditional Usenet .newsrc file.  Its time is long past.")
 
 (defcustom gnus-newsrc-file (nnheader-concat gnus-home-directory ".newsrc.eld")
   "So-called El Dingo state file.  Do not change this."
@@ -2859,7 +2859,7 @@ SPECIFIC-VARIABLES, or those in `gnus-variable-list'."
     (nreverse olist)))
 
 (defun gnus-gnus-to-newsrc-format (&optional foreign-ok)
-  "Save NNTP state into the USENIX .newsrc file.
+  "Save NNTP state into the Usenet .newsrc file.
 We save a .newsrc file for the benefit of other newsreaders, although
 Gnus itself doesn't consult it in most cases."
   (interactive (list (gnus-y-or-n-p "write foreign groups too? ")))

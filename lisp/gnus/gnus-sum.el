@@ -1390,6 +1390,7 @@ the normal Gnus MIME machinery."
 (defvar-local gnus-article-charset nil)
 (defvar gnus-article-ignored-charsets nil)
 (defvar-local gnus-scores-exclude-files nil)
+(defvar gnus-article-internal-prepare-hook nil)
 (defvar-local gnus-page-broken nil)
 
 (defvar-local gnus-newsgroup-process-stack nil)
