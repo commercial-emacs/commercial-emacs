@@ -4375,7 +4375,7 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
       XSYMBOL (sym)->u.s.f.redirect = SYMBOL_PLAINVAL;
       /* Mark keywords as special.  This makes (let ((:key 'foo)) ...)
 	 in lexically bound elisp signal an error, as documented.  */
-      XSYMBOL (sym)->u.s.declared_special = true;
+      XSYMBOL (sym)->u.s.f.declared_special = true;
       SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
 
@@ -5180,10 +5180,10 @@ This list includes suffixes for both compiled and source Emacs Lisp files.
 This list should not include the empty string.
 `load' and related functions try to append these suffixes, in order,
 to the specified file name if a suffix is allowed or required.  */);
-  Vload_suffixes = list2 (build_pure_c_string (".elc"),
-			  build_pure_c_string (".el"));
+  Vload_suffixes = list2 (build_c_string (".elc"),
+			  build_c_string (".el"));
 #ifdef HAVE_MODULES
-  Vload_suffixes = Fcons (build_pure_c_string (MODULES_SUFFIX), Vload_suffixes);
+  Vload_suffixes = Fcons (build_c_string (MODULES_SUFFIX), Vload_suffixes);
 #ifdef MODULES_SECONDARY_SUFFIX
   Vload_suffixes =
     Fcons (build_c_string (MODULES_SECONDARY_SUFFIX), Vload_suffixes);

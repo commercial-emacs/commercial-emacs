@@ -2076,21 +2076,10 @@ nil.  */)
   else
     CHECK_FIXNUM (max_costs);
 
-  struct timespec time_limit = make_timespec (0, -1);
-  if (!NILP (max_secs))
-    {
-      struct timespec
-	tlim = timespec_add (current_timespec (),
-			     lisp_time_argument (max_secs)),
-	tmax = make_timespec (TYPE_MAXIMUM (time_t), TIMESPEC_HZ - 1);
-      if (timespec_cmp (tlim, tmax) < 0)
-	time_limit = tlim;
-    }
-
   /* Micro-optimization: Casting to size_t generates much better
      code.  */
-  ptrdiff_t del_bytes = (size_t) size_a / CHAR_BIT + 1;
-  ptrdiff_t ins_bytes = (size_t) size_b / CHAR_BIT + 1;
+  /* ptrdiff_t del_bytes = (size_t) size_a / CHAR_BIT + 1; */
+  /* ptrdiff_t ins_bytes = (size_t) size_b / CHAR_BIT + 1; */
   void *const a_deletions = SAFE_ALLOCA (del_bytes);
   void* const a_insertions = SAFE_ALLOCA (ins_bytes);
   struct context ctx = {

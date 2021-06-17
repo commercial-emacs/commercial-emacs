@@ -445,8 +445,8 @@ module_make_global_ref (emacs_env *env, emacs_value value)
   else
     {
       struct module_global_reference *ref
-        = ALLOCATE_PLAIN_PSEUDOVECTOR (struct module_global_reference,
-                                       PVEC_OTHER);
+        = ALLOCATE_PLAIN_PSEUDOVECTOR_AND_ZERO (struct module_global_reference,
+						PVEC_OTHER);
       ref->value.v = new_obj;
       ref->refcount = 1;
       Lisp_Object value;
@@ -1422,7 +1422,7 @@ allocate_emacs_value (emacs_env *env, Lisp_Object obj)
 /* Mark all objects allocated from local environments so that they
    don't get garbage-collected.  */
 void
-scan_modules (void *ptr, const gc_phase phase)
+scan_module_environment (void *ptr, const gc_phase phase)
 {
   emacs_env *env = ptr;
   struct emacs_env_private *priv = env->private_members;

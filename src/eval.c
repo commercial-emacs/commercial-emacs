@@ -4081,7 +4081,7 @@ scan_specpdl (union specbinding *const first,
         case SPECPDL_MODULE_RUNTIME:
           break;
         case SPECPDL_MODULE_ENVIRONMENT:
-          mark_module_environment (pdl->unwind_ptr.arg);
+          scan_module_environment (pdl->unwind_ptr.arg, phase);
           break;
 #endif
 

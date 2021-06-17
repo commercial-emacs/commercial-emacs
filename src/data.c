@@ -4037,7 +4037,7 @@ syms_of_data (void)
   Fput (sym, Qerror_message, build_c_string (msg))
 
   PUT_ERROR (Qquit, Qnil, "Quit");
-  PUT_ERROR (Qminibuffer_quit, pure_cons (Qquit, Qnil), "Quit");
+  PUT_ERROR (Qminibuffer_quit, Fcons (Qquit, Qnil), "Quit");
 
   PUT_ERROR (Quser_error, error_tail, "");
   PUT_ERROR (Qwrong_length_argument, error_tail, "Wrong length argument");

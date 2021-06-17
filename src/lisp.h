@@ -1630,7 +1630,7 @@ SBYTES (const Lisp_Object string)
 extern Lisp_Object empty_unibyte_string, empty_multibyte_string;
 
 INLINE void
-string_set_unibyte (struct Lisp_Object *const sp)
+string_set_unibyte (Lisp_Object *const sp)
 {
   struct Lisp_String *const s = XSTRING (*sp);
   if (STRING_CHARS (s) == 0)

@@ -29,14 +29,25 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keyboard.h"
 #include "alloc.h"
 
-union aligned_thread_state
-{
-  struct thread_state s;
-  GCALIGNED_UNION_MEMBER
-};
-verify (GCALIGNED (union aligned_thread_state));
+#ifdef HAVE_NS
+#include "nsterm.h"
+#endif
 
-static union aligned_thread_state main_thread
+#if defined HAVE_GLIB && ! defined (HAVE_NS)
+#include <xgselect.h>
+#else
+#define release_select_lock() do { } while (0)
+#endif
+
+/* union aligned_thread_state */
+/* { */
+/*   struct thread_state s; */
+/*   GCALIGNED_UNION_MEMBER */
+/* }; */
+/* verify (GCALIGNED (union aligned_thread_state)); */
+
+//static
+union aligned_thread_state main_thread
   = {{
       .header.size = PVECHEADERSIZE (PVEC_THREAD,
 				     PSEUDOVECSIZE (struct thread_state,

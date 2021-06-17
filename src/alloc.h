@@ -49,7 +49,7 @@ extern void scan_kboards (gc_phase);
 extern void scan_thread (struct thread_state *, gc_phase);
 extern void scan_thread_roots (gc_phase);
 extern void scan_fringe_data (gc_phase);
-extern void scan_modules (gc_phase);
+extern void scan_modules (void *,gc_phase);
 extern void scan_specpdl (union specbinding *, union specbinding *, gc_phase);
 extern void scan_image_cache (struct image_cache *, gc_phase);
 

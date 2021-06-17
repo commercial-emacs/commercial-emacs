@@ -2663,7 +2663,7 @@ ARRAY is a vector, string, char-table, or bool-vector.  */)
       size = SCHARS (array);
       if (size != 0)
 	{
-	  CHECK_IMPURE (array, XSTRING (array));
+	  //CHECK_IMPURE (array, XSTRING (array));
 	  unsigned char str[MAX_MULTIBYTE_LENGTH];
 	  int len;
 	  if (STRING_MULTIBYTE (array))
@@ -2702,7 +2702,7 @@ This makes STRING unibyte and may change its length.  */)
   (Lisp_Object string)
 {
   CHECK_STRING (string);
-  len = SBYTES (string);
+  ptrdiff_t len = SBYTES (string);
   memset (SDATA (string), 0, len);
   STRING_SET_UNIBYTE (string);
   return Qnil;

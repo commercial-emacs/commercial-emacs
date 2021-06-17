@@ -2611,7 +2611,7 @@ hash_table_contents (struct Lisp_Hash_Table *h)
     error ("cannot dump hash tables with user-defined tests");  /* Bug#36769 */
 
   ptrdiff_t size = HASH_TABLE_SIZE (h);
-  Lisp_Object key_and_value = make_uninit_vector (2 * size);
+  Lisp_Object key_and_value = make_nil_vector (2 * size);
   ptrdiff_t n = 0;
 
   /* Make sure key_and_value ends up in the same order; charset.c

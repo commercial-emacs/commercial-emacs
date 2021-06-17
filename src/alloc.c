@@ -1010,7 +1010,7 @@ struct large_vector_meta {
    which are allocated at their own, e.g. outside of vector blocks.
    This structure contains the actual content of the vector.  */
 struct large_vector {
-  large_vector_meta *meta;
+  large_vector_meta meta;
 #ifdef ENABLE_CHECKING
   uint32_t magic;
 #endif
@@ -1304,6 +1304,7 @@ NRML Lisp_Object live_vector_holding (const struct mem_node *, const void *);
 NRML bool live_vector_p (const struct mem_node *, const void *);
 NOIL void sweep_large_vectors (void);
 NRML void large_vector_meta_free (large_vector_meta *);
+NRML large_vector_meta * large_vector_meta_allocate (void);
 NRML gc_vector_allocation large_vector_allocate (size_t, bool);
 NRML gc_vector_allocation small_vector_allocate (size_t, bool);
 NRML struct Lisp_Vector *gc_vector_allocation_vector (gc_vector_allocation);
@@ -5432,63 +5433,6 @@ font_cleanup (struct font *const font)
       eassert (valid_font_driver (drv));
       drv->close_font (font);
     }
-
-#ifdef HAVE_MODULES
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_MODULE_FUNCTION))
-    {
-      ATTRIBUTE_MAY_ALIAS struct Lisp_Module_Function *function
-        = (struct Lisp_Module_Function *) vector;
-      module_finalize_function (function);
-    }
-#endif
-#ifdef HAVE_NATIVE_COMP
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_NATIVE_COMP_UNIT))
-    {
-      struct Lisp_Native_Comp_Unit *cu =
-	PSEUDOVEC_STRUCT (vector, Lisp_Native_Comp_Unit);
-      unload_comp_unit (cu);
-    }
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_SUBR))
-    {
-      struct Lisp_Subr *subr =
-	PSEUDOVEC_STRUCT (vector, Lisp_Subr);
-      if (! NILP (subr->native_comp_u))
-	{
-	  /* FIXME Alternative and non invasive solution to this
-	     cast?  */
-	  xfree ((char *)subr->symbol_name);
-	  xfree (subr->native_c_name);
-	}
-    }
-#endif
-#ifdef HAVE_TREE_SITTER
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TREE_SITTER))
-    {
-      struct Lisp_Tree_Sitter *lisp_parser
-	= PSEUDOVEC_STRUCT (vector, Lisp_Tree_Sitter);
-      if (lisp_parser->highlight_names != NULL)
-	xfree (lisp_parser->highlight_names);
-      if (lisp_parser->highlights_query != NULL)
-	xfree (lisp_parser->highlights_query);
-      if (lisp_parser->highlighter != NULL)
-	ts_highlighter_delete (lisp_parser->highlighter);
-      if (lisp_parser->tree != NULL)
-	ts_tree_delete(lisp_parser->tree);
-      if (lisp_parser->prev_tree != NULL)
-	ts_tree_delete(lisp_parser->prev_tree);
-      if (lisp_parser->parser != NULL)
-	ts_parser_delete(lisp_parser->parser);
-    }
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TREE_SITTER_NODE))
-    {
-    }
-#endif
-#ifdef HAVE_SQLITE3
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_SQLITE))
-    {
-      /* clean s___ up.  To be implemented.  */
-    }
-#endif
 }
 
 void
@@ -5546,6 +5490,9 @@ vector_cleanup (void *const p)
       return;
     case PVEC_THREAD:
       finalize_one_thread (p);
+      return;
+    case PVEC_NATIVE_COMP_UNIT:
+      //TODO: finalizenative comp
       return;
     case PVEC_MUTEX:
       finalize_one_mutex (p);
@@ -5610,7 +5557,7 @@ sweep_large_vectors (void)
     else
       {
         *lvmprev = lvm->next;
-        large_vector_meta_free (lvm);
+        //large_vector_meta_free (lvm);
       }
 }
 
@@ -5628,18 +5575,18 @@ large_vector_allocate (const size_t nbytes, const bool clearit)
   struct large_vector *const lv = lisp_malloc (
     total_nr_bytes,
     clearit, MEM_TYPE_LARGE_VECTOR,
-    offsetof (struct large_vector, mem));
+    offsetof (struct large_vector_meta, mem));
   if (!gc_object_limit_try_increase (1))
     {
-      lisp_free (lv, offsetof (struct large_vector, mem));
+      lisp_free (lv, offsetof (struct large_vector_meta, mem));
       memory_full (gc_aux_block_nr_bytes);
     }
 #ifdef ENABLE_CHECKING
   lv->magic = large_vector_magic;
 #endif
   if (!clearit)
-    lv->marked = false;
-  lv->next = large_vectors;
+    lv->meta.marked = false;
+  lv->meta.next = large_vectors;
   large_vectors = lv;
   return (gc_vector_allocation){
     .u.large = {
@@ -5659,7 +5606,7 @@ large_vector_free (struct large_vector *const lv)
   lv->magic = 0;
 #endif
   gc_global_object_limit_decrease (1);
-  lisp_free (lv, offsetof (struct large_vector, mem));
+  lisp_free (lv, offsetof (struct large_vector_meta, mem));
 }
 
 gc_vector_allocation
@@ -5963,7 +5910,7 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
   ptrdiff_t nvars = nargs - 1;
   if (nvars > constsize)
     error ("Closure vars do not fit in constvec");
-  Lisp_Object constvec = make_uninit_vector (constsize);
+  Lisp_Object constvec = make_nil_vector (constsize);
   memcpy (XVECTOR (constvec)->contents, args + 1, nvars * word_size);
   memcpy (XVECTOR (constvec)->contents + nvars,
 	  XVECTOR (proto_constvec)->contents + nvars,
@@ -5971,7 +5918,10 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
 
   /* Return a copy of the prototype function with the new constant vector. */
   ptrdiff_t protosize = PVSIZE (protofun);
-  struct Lisp_Vector *v = allocate_vectorlike (protosize, false);
+  //struct Lisp_Vector *v
+  gc_vector_allocation vr = allocate_vectorlike (protosize, false);
+  struct Lisp_Vector *const v = gc_vector_allocation_vector (vr);
+
   v->header = XVECTOR (protofun)->header;
   memcpy (v->contents, XVECTOR (protofun)->contents, protosize * word_size);
   v->contents[COMPILED_CONSTANTS] = constvec;
@@ -6487,7 +6437,7 @@ vectorlike_marked_p (const union vectorlike_header *const v)
   if (PVTYPE (v) == PVEC_THREAD && main_thread_p (v))
     return true;
   if (vectorlike_nbytes (v) >= large_vector_min_nr_bytes)
-    return large_vector_from_vectorlike (v)->marked;
+    return large_vector_from_vectorlike (v)->meta.marked;
   return gc_object_is_marked (v, &gc_vector_heap);
 }
 
@@ -6501,7 +6451,7 @@ set_vectorlike_marked (union vectorlike_header *const v)
       pdumper_set_marked (v);
     }
   else if (vectorlike_nbytes (v) >= large_vector_min_nr_bytes)
-    large_vector_from_vectorlike (v)->marked = true;
+    large_vector_from_vectorlike (v)->meta.marked = true;
   else
     gc_object_set_marked (v, &gc_vector_heap);
 }
@@ -7446,7 +7396,7 @@ xscan_stack (char const *bottom, char const *end, const gc_phase phase)
    are spilled.  (Bug#41357)  */
 
 NO_INLINE void
-flush_stack_call_func1 (void (*func) (void *arg), void *arg)
+flush_stack_call_func/* 1 */ (void (*func) (void *arg), void *arg)
 {
   void *end;
   struct thread_state *self = current_thread;
@@ -7754,7 +7704,7 @@ scan_roots (const gc_phase phase)
 #endif
 
 #ifdef HAVE_MODULES
-  scan_modules (phase);
+  //  scan_modules (NULL, phase);
 #endif
 }
 
@@ -8615,28 +8565,29 @@ See Info node `(elisp)Garbage Collection'.  */)
   return info;
 }
 
-DEFUN ("garbage-collect-maybe", Fgarbage_collect_maybe,
-Sgarbage_collect_maybe, 1, 1, 0,
-       doc: /* Call `garbage-collect' if enough allocation happened.
-FACTOR determines what "enough" means here:
-If FACTOR is a positive number N, it means to run GC if more than
-1/Nth of the allocations needed to trigger automatic allocation took
-place.
-Therefore, as N gets higher, this is more likely to perform a GC.
-Returns non-nil if GC happened, and nil otherwise.  */)
-  (Lisp_Object factor)
-{
-  CHECK_FIXNAT (factor);
-  EMACS_INT fact = XFIXNAT (factor);
+/* DEFUN ("garbage-collect-maybe", Fgarbage_collect_maybe, */
+/* Sgarbage_collect_maybe, 1, 1, 0, */
+/*        doc: /\* Call `garbage-collect' if enough allocation happened. */
+/* FACTOR determines what "enough" means here: */
+/* If FACTOR is a positive number N, it means to run GC if more than */
+/* 1/Nth of the allocations needed to trigger automatic allocation took */
+/* place. */
+/* Therefore, as N gets higher, this is more likely to perform a GC. */
+/* Returns non-nil if GC happened, and nil otherwise.  *\/) */
+/*   (Lisp_Object factor) */
+/* { */
+/*   CHECK_FIXNAT (factor); */
+/*   EMACS_INT fact = XFIXNAT (factor); */
 
-  if (fact >= 1 && bytes_since_gc > bytes_between_gc / fact)
-    {
-      garbage_collect ();
-      return Qt;
-    }
-  else
-    return Qnil;
-}
+/*   EMACS_INT since_gc = gc_threshold - consing_until_gc; */
+/*   if (fact >= 1 && since_gc > gc_threshold / fact) */
+/*     { */
+/*       garbage_collect (true); */
+/*       return Qt; */
+/*     } */
+/*   else */
+/*     return Qnil; */
+/* } */
 
 /* Mark Lisp objects in glyph matrix MATRIX.  Currently the
    only interesting objects referenced from glyphs are strings.  */
@@ -10071,7 +10022,7 @@ N should be nonnegative.  */);
   defsubr (&Smake_finalizer);
   defsubr (&Spurecopy);
   defsubr (&Sgarbage_collect);
-  defsubr (&Sgarbage_collect_maybe);
+  //  defsubr (&Sgarbage_collect_maybe);
   defsubr (&Smemory_info);
   defsubr (&Smemory_full);
   defsubr (&Smemory_use_counts);
