@@ -618,6 +618,9 @@ gnutls_try_handshake (struct Lisp_Process *proc, bool blocking)
 
   ++proc->gnutls_handshakes_tried;
 
+# ifdef HAVE_GNUTLS3
+  gnutls_handshake_set_timeout(state, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
+# endif
   while ((ret = gnutls_handshake (state)) < 0)
     {
       if (emacs_gnutls_handle_error (state, ret) == 0) /* fatal */
