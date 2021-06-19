@@ -3432,7 +3432,9 @@ Return non-nil if caller must prepare the summary buffer."
   (let ((name (gnus-summary-buffer-name group)))
     (if (gnus-buffer-live-p name)
         (with-current-buffer name
-          (not gnus-newsgroup-prepared))
+          (prog1 (not gnus-newsgroup-prepared)
+            (setq gnus-summary-buffer (current-buffer))
+            (set-default 'gnus-summary-buffer gnus-summary-buffer)))
       (with-current-buffer (gnus-get-buffer-create name)
         (gnus-summary-mode)
         (setq gnus-newsgroup-name group)
