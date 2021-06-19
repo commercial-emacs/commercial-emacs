@@ -198,9 +198,8 @@ See the Gnus manual for an explanation of the syntax used.")
   :type 'hook)
 
 ;;; Internal variables.
-
-(defvar gnus-current-window-configuration nil
-  "The most recently set window configuration.")
+(defvar-local gnus-current-window-configuration nil
+  "Potential race between debbugs and gnus proper, so localize.")
 
 (defvar gnus-created-frames nil)
 (defvar gnus-window-frame-focus nil)
