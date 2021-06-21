@@ -274,22 +274,21 @@ how long to wait for a response before giving up."
                           (setq asynch-buffer
                                 (buffer-local-value 'url-redirect-buffer
                                                     asynch-buffer))))
-            (if (and proc (memq (process-status proc)
-                                '(closed exit signal failed))
-                     ;; Make sure another process hasn't been started.
-                     (eq proc (or (get-buffer-process asynch-buffer) proc)))
-                ;; FIXME: It's not clear whether url-retrieve's callback is
-                ;; guaranteed to be called or not.  It seems that url-http
-                ;; decides sometimes consciously not to call it, so it's not
-                ;; clear that it's a bug, but even then we need to decide how
-                ;; url-http can then warn us that the download has completed.
-                ;; In the mean time, we use this here workaround.
-		;; XXX: The callback must always be called.  Any
-		;; exception is a bug that should be fixed, not worked
-		;; around.
-		(progn ;; Call delete-process so we run any sentinel now.
-		  (delete-process proc)
-		  (setq retrieval-done t)))
+            (when (and proc (memq (process-status proc)
+                                  '(closed exit signal failed))
+                       ;; Make sure another process hasn't been started.
+                       (eq proc (or (get-buffer-process asynch-buffer) proc)))
+              ;; FIXME: It's not clear whether url-retrieve's callback is
+              ;; guaranteed to be called or not.  It seems that url-http
+              ;; decides sometimes consciously not to call it, so it's not
+              ;; clear that it's a bug, but even then we need to decide how
+              ;; url-http can then warn us that the download has completed.
+              ;; In the mean time, we use this here workaround.
+	      ;; XXX: The callback must always be called.  Any
+	      ;; exception is a bug that should be fixed, not worked
+	      ;; around.
+	      (delete-process proc) ;; Call delete-process so we run any sentinel now.
+	      (setq retrieval-done t))
             ;; We used to use `sit-for' here, but in some cases it wouldn't
             ;; work because apparently pending keyboard input would always
             ;; interrupt it before it got a chance to handle process input.
@@ -301,10 +300,9 @@ how long to wait for a response before giving up."
               ;; accept-process-output returned nil, maybe because the process
               ;; exited (and may have been replaced with another).  If we got
 	      ;; a quit, just stop.
-	      (when quit-flag
-		(delete-process proc))
-              (setq proc (and (not quit-flag)
-			      (get-buffer-process asynch-buffer))))))
+	      (if quit-flag
+                  (setq proc (prog1 nil (delete-process proc)))
+                (setq proc (get-buffer-process asynch-buffer))))))
         ;; On timeouts, make sure we kill any pending processes.
         ;; There may be more than one if we had a redirect.
         (when timed-out
