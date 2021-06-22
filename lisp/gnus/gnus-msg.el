@@ -1908,9 +1908,10 @@ this is a reply."
 	    (setq results (delq (assoc element results) results))
 	    (push (cons element v) results))))
       ;; Now we have all the styles, so we insert them.
-      (setq name (assq 'name results)
-	    address (assq 'address results))
-      (setq results (delq name (delq address results)))
+      (setq name (alist-get 'name results)
+	    address (alist-get 'address results))
+      (setq results (assq-delete-all 'name results))
+      (setq results (assq-delete-all 'address results))
       (setq results (sort results (lambda (x y)
 				    (string-lessp (car x) (car y)))))
       (dolist (result results)
@@ -1950,19 +1951,17 @@ this is a reply."
 			    (unless (bolp)
 			      (insert "\n"))))))))
 		  nil 'local))
-      (when (or name address)
-	(add-hook 'message-setup-hook
-		  (let ((name (or (cdr name) (user-full-name)))
-		        (email (or (cdr address) user-mail-address)))
-		    (lambda ()
-                      (setq-local user-mail-address email)
-		      (let ((user-full-name name)
-			    (user-mail-address email))
-			(save-excursion
-			  (message-remove-header "From")
-			  (message-goto-eoh)
-			  (insert "From: " (message-make-from) "\n")))))
-		  nil 'local)))))
+      (add-hook 'message-setup-hook
+		(lambda ()
+                  (when address
+                    (setq-local user-mail-address address))
+                  (when name
+                    (setq-local user-full-name name))
+		  (save-excursion
+		    (message-remove-header "From")
+		    (message-goto-eoh)
+		    (insert "From: " (message-make-from name address) "\n")))
+		nil 'local))))
 
 (defun gnus-summary-attach-article (n)
   "Attach the current article(s) to an outgoing Message buffer.
