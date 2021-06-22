@@ -418,20 +418,10 @@ only affect the Gcc copy, but not the original message."
      (setq mml-buffer-list nil)
      (add-hook 'message-header-setup-hook (lambda ()
 					    (gnus-inews-insert-gcc setup-group)))
-     ;; message-newsreader and message-mailer were formerly set in
-     ;; gnus-inews-add-send-actions, but this is too late when
-     ;; message-generate-headers-first is used. --ansel
      (add-hook 'message-mode-hook
 	       (lambda nil
 		 (setq message-newsreader
 		       (setq message-mailer (gnus-extended-version)))))
-     ;; #### FIXME: for a reason that I did not manage to identify yet,
-     ;; the variable `gnus-newsgroup-name' does not honor a dynamically
-     ;; scoped or setq'ed value from a caller like `C-u gnus-summary-mail'.
-     ;; After evaluation of @forms below, it gets the value we actually want
-     ;; to override, and the posting styles are used. For that reason, I've
-     ;; added an optional argument to `gnus-configure-posting-styles' to
-     ;; make sure that the correct value for the group name is used. -- drv
      (add-hook 'message-mode-hook
 	       (if (memq ,config '(reply-yank reply))
 		   (lambda ()
