@@ -43,6 +43,8 @@
   (declare (indent defun))
   `(with-current-buffer ,buffer ,@body))
 
+(defconst nnimap--process-buffer-fmt " *nnimap %s*")
+
 (defmacro nnimap-for-process-buffers (b &rest body)
   (declare (indent defun))
   `(cl-flet ((match
@@ -212,8 +214,6 @@ during splitting, which may be slow."
 
 (defvar nnimap-inhibit-logging nil)
 
-(defconst nnimap--process-buffer-fmt " *nnimap %s*")
-
 (defun nnimap-assert-context (&optional dont-assert)
   (let ((result (cl-every (lambda (v) (and (boundp v) v))
                           '(nnimap-address nnimap-server-port))))
@@ -247,7 +247,6 @@ during splitting, which may be slow."
 
 (defalias 'nnimap-buffer #'nnimap-process-buffer)
 (defun nnimap-process-buffer ()
-
   (nnimap-get-process-buffer (nnimap-process-buffer-key)))
 
 (defun nnimap-header-parameters ()
