@@ -269,7 +269,7 @@ that was fetched."
   "Wait until ARTICLE is no longer the currently-being-fetched article."
   (save-excursion
     (gnus-async-set-buffer)
-    (let ((proc (nntp-find-connection (current-buffer)))
+    (let ((proc (nntp-get-process))
 	  (nntp-server-buffer (current-buffer))
 	  (nntp-have-messaged nil)
 	  (tries 0))
