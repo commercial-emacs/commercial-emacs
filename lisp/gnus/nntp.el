@@ -1035,7 +1035,7 @@ command whose response triggered the error."
        nntp-server-buffer
        (gnus-buffer-live-p nntp-server-buffer)))
 
-(deffoo nntp-open-server (server &optional defs connectionless)
+(deffoo nntp-open-server (server &optional defs _connectionless)
   "Context switch based on SERVER.
 
 If `nnoo-current-server-p' is false for SERVER,
@@ -1046,17 +1046,15 @@ This imagined necessity of a back-line assoc list called `nnoo-state-alist'
 was of course another \"youthful indiscretion.\"  He just had to augment
 the key of the front-line assoc list to incorporate SERVER."
   (nnheader-init-server-buffer)
-  (if (nntp-server-opened server)
-      t
-    (when (or (stringp (car defs))
-	      (numberp (car defs)))
-      (setq defs (cons (list 'nntp-port-number (car defs)) (cdr defs))))
-    (unless (assq 'nntp-address defs)
-      (setq defs (append defs (list (list 'nntp-address server)))))
-    (nnoo-change-server 'nntp server defs)
-    (if connectionless
-	t
-      (nntp-get-process server))))
+  (prog1 t
+    (or (nntp-server-opened server)
+        (progn
+          (when (or (stringp (car defs))
+	            (numberp (car defs)))
+            (setq defs (cons (list 'nntp-port-number (car defs)) (cdr defs))))
+          (unless (assq 'nntp-address defs)
+            (setq defs (append defs (list (list 'nntp-address server)))))
+          (nnoo-change-server 'nntp server defs)))))
 
 (deffoo nntp-close-server (&optional server defs)
   (nnoo-change-server 'nntp server defs)
