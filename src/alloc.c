@@ -2706,7 +2706,7 @@ gc_block_flip_tospace_to_fromspace (gc_block *const b, const gc_heap *const h)
 void
 gc_block_write_unprotect (gc_block *const b, const gc_heap *const h)
 {
-  eassume (current_gc_phase == GC_PHASE_SWEEP);
+  eassume ((current_gc_phase == GC_PHASE_SWEEP) || ( current_gc_phase == GC_PHASE_CLEANUP));
   const ptrdiff_t gen_y_slot_nr = gc_block_gen_y_slot_nr (b, h);
   const size_t gen_y_byte_offset =
     gen_y_slot_nr * gc_heap_nr_bytes_per_slot (h);
@@ -2784,8 +2784,10 @@ gc_block_cleanup_after_all_sweeps (gc_block *const b, void *const hptr)
      tospace addresses during this GC cycle.
      XXX: only bother discarding the young generation
      */
+  gc_block_write_unprotect(b, h);
   if (gc_heap_is_moving_gc_this_cycle (h))
     emacs_discard_memory (gc_block_locators (b, h), h->tospace.nr_bytes);
+
 }
 
 bool
