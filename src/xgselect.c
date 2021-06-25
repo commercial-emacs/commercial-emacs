@@ -55,7 +55,6 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   GPollFD *gfds = gfds_buf;
   int gfds_size = ARRAYELTS (gfds_buf);
   int n_gfds, retval = 0, our_fds = 0, max_fds = fds_lim - 1;
-  bool context_acquired = false;
   int i, nfds, tmo_in_millisec, must_free = 0;
   bool need_to_dispatch;
 
@@ -72,10 +71,8 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   if (wfds) all_wfds = *wfds;
   else FD_ZERO (&all_wfds);
 
-  n_gfds = (context_acquired
-	    ? g_main_context_query (context, G_PRIORITY_LOW, &tmo_in_millisec,
-				    gfds, gfds_size)
-	    : -1);
+  n_gfds = g_main_context_query (context, G_PRIORITY_LOW, &tmo_in_millisec,
+				 gfds, gfds_size);
 
   if (gfds_size < n_gfds)
     {
@@ -160,8 +157,10 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 #else
   need_to_dispatch = true;
 #endif
-  if (need_to_dispatch && context_acquired)
+  if (need_to_dispatch)
     {
+      acquire_select_lock (context);
+
       int pselect_errno = errno;
       /* Prevent g_main_dispatch recursion, that would occur without
          block_input wrapper, because event handlers call
@@ -171,10 +170,8 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
         g_main_context_dispatch (context);
       unblock_input ();
       errno = pselect_errno;
+      release_select_lock ();
     }
-
-  if (context_acquired)
-    g_main_context_release (context);
 
   /* To not have to recalculate timeout, return like this.  */
   if ((our_fds > 0 || (nfds == 0 && tmop == &tmo)) && (retval == 0))
