@@ -596,6 +596,8 @@ really_call_select (void *arg)
   sa->result = (sa->func) (sa->max_fds, sa->rfds, sa->wfds, sa->efds,
 			   sa->timeout, sa->sigmask);
 
+  release_select_lock ();
+
   block_interrupt_signal (&oldset);
   /* If we were interrupted by C-g while inside sa->func above, the
      signal handler could have called maybe_reacquire_global_lock, in
