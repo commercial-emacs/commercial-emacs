@@ -1648,7 +1648,7 @@ All FNS must finish before MTX is released."
                               #'gnus-time-out-thread))
                         timer-list)
       (run-at-time
-       nil
+       t
        (/ gnus-max-seconds-hold-mutex 2)
        #'gnus-time-out-thread)))
   (if-let ((pending (gnus-thread-group-running-p gnus-thread-group)))
