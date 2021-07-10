@@ -1578,7 +1578,6 @@ Else we get unblocked but permanently yielded threads."
                               (funcall fn gnus-run-thread--subresult))
                         (thread-yield))
                     (error
-                     (ignore-errors (mutex-unlock mtx))
                      ;; feed current-fn to outer condition-case
                      (error "dolist: '%s' in %s"
                             (error-message-string err) current-fn))))))
@@ -1589,6 +1588,16 @@ Else we get unblocked but permanently yielded threads."
         (kill-buffer working))
       (setq gnus-thread-start nil)
       (ignore-errors (mutex-unlock mtx))
+      (when-let ((timer (cl-find-if (lambda (timer)
+                                      (eq (timer--function timer)
+                                          #'gnus-time-out-thread))
+                                    timer-list))
+                 (last-one (<= (cl-count gnus-thread-group
+                                         (all-threads)
+                                         :test (lambda (s thr)
+                                                 (cl-search s (thread-name thr))))
+                               1)))
+        (cancel-timer timer))
       (gnus-message-with-timestamp "gnus-thread-body: finish %s" thread-name))))
 
 (defun gnus-thread-group-running-p (thread-group)
