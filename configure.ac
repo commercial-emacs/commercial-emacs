@@ -455,6 +455,7 @@ OPTION_DEFAULT_ON([xml2],[don't compile with XML parsing support])
 OPTION_DEFAULT_OFF([imagemagick],[compile with ImageMagick image support])
 OPTION_DEFAULT_ON([native-image-api], [don't use native image APIs (GDI+ on Windows)])
 OPTION_DEFAULT_IFAVAILABLE([json], [compile with native JSON support])
+OPTION_DEFAULT_IFAVAILABLE([tree-sitter], [compile with tree-sitter])
 
 OPTION_DEFAULT_ON([xft],[don't use XFT for anti aliased fonts])
 OPTION_DEFAULT_ON([harfbuzz],[don't use HarfBuzz for text shaping])
@@ -3004,6 +3005,23 @@ AC_SUBST(JSON_LIBS)
 AC_SUBST(JSON_CFLAGS)
 AC_SUBST(JSON_OBJ)
 
+HAVE_TREE_SITTER=no
+TREE_SITTER_OBJ=
+
+if test "${with_tree_sitter}" != "no"; then
+  EMACS_CHECK_MODULES([TREE_SITTER], [tree-sitter >= 0.0],
+    [HAVE_TREE_SITTER=yes], [HAVE_TREE_SITTER=no])
+  if test "${HAVE_TREE_SITTER}" = yes; then
+    AC_DEFINE(HAVE_TREE_SITTER, 1, [Define if using tree-sitter.])
+    TREE_SITTER_LIBS=-ltree-sitter
+    TREE_SITTER_OBJ="tree_sitter.o"
+  fi
+fi
+
+AC_SUBST(TREE_SITTER_LIBS)
+AC_SUBST(TREE_SITTER_CFLAGS)
+AC_SUBST(TREE_SITTER_OBJ)
+
 NOTIFY_OBJ=
 NOTIFY_SUMMARY=no
 
@@ -4112,6 +4130,12 @@ case $with_json,$HAVE_JSON in
   *) MISSING="$MISSING json"
      WITH_IFAVAILABLE="$WITH_IFAVAILABLE --with-json=ifavailable";;
 esac
+case $with_tree_sitter,$HAVE_TREE_SITTER in
+  no,* | ifavailable,* | *,yes) ;;
+  *) MISSING="$MISSING tree-sitter"
+     WITH_IFAVAILABLE="$WITH_IFAVAILABLE --with-tree-sitter=ifavailable";;
+esac
+
 if test "X${MISSING}" != X; then
   # If we have a missing library, and we don't have pkg-config installed,
   # the missing pkg-config may be the reason.  Give the user a hint.
@@ -5921,7 +5945,7 @@ Configured for '${canonical}'.
 optsep=
 emacs_config_features=
 for opt in ACL CAIRO DBUS FREETYPE GCONF GIF GLIB GMP GNUTLS GPM GSETTINGS \
- HARFBUZZ IMAGEMAGICK JPEG JSON LCMS2 LIBOTF LIBSELINUX LIBSYSTEMD LIBXML2 \
+ HARFBUZZ IMAGEMAGICK JPEG JSON TREE-SITTER LCMS2 LIBOTF LIBSELINUX LIBSYSTEMD LIBXML2 \
  M17N_FLT MODULES NATIVE_COMP NOTIFY NS OLDXMENU PDUMPER PNG RSVG SECCOMP \
  SOUND THREADS TIFF TOOLKIT_SCROLL_BARS \
  UNEXEC WEBP X11 XAW3D XDBE XFT XIM XPM XWIDGETS X_TOOLKIT \
@@ -5991,6 +6015,7 @@ AS_ECHO(["  Does Emacs use -lXaw3d?                                 ${HAVE_XAW3D
   Does Emacs use -lxft?                                   ${HAVE_XFT}
   Does Emacs use -lsystemd?                               ${HAVE_LIBSYSTEMD}
   Does Emacs use -ljansson?                               ${HAVE_JSON}
+  Does Emacs use -ltree-sitter?                           ${HAVE_TREE_SITTER}
   Does Emacs use the GMP library?                         ${HAVE_GMP}
   Does Emacs directly use zlib?                           ${HAVE_ZLIB}
   Does Emacs have dynamic modules support?                ${HAVE_MODULES}

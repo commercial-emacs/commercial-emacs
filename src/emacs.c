@@ -85,6 +85,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "intervals.h"
 #include "character.h"
 #include "buffer.h"
+#include "tree_sitter.h"
 #include "window.h"
 #include "xwidget.h"
 #include "atimer.h"
@@ -2099,6 +2100,9 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_floatfns ();
 
       syms_of_buffer ();
+      #ifdef HAVE_TREE_SITTER
+      syms_of_tree_sitter ();
+      #endif
       syms_of_bytecode ();
       syms_of_callint ();
       syms_of_casefiddle ();

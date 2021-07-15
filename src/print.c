@@ -48,6 +48,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 # include <sys/socket.h> /* for F_DUPFD_CLOEXEC */
 #endif
 
+#ifdef HAVE_TREE_SITTER
+#include "tree_sitter.h"
+#endif
+
 struct terminal;
 
 /* Avoid actual stack overflow in print.  */
@@ -1857,6 +1861,19 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       }
       break;
 #endif
+
+#ifdef HAVE_TREE_SITTER
+    case PVEC_TS_PARSER:
+      print_c_string ("#<tree-sitter-parser in ", printcharfun);
+      print_string (BVAR (XTS_PARSER (obj)->buffer, name), printcharfun);
+      printchar ('>', printcharfun);
+      break;
+    case PVEC_TS_NODE:
+      print_c_string ("#<tree-sitter-node", printcharfun);
+      printchar ('>', printcharfun);
+      break;
+#endif
+
     default:
       emacs_abort ();
     }
