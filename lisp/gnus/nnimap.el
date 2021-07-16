@@ -424,7 +424,6 @@ the key of the front-line assoc list to incorporate SERVER."
         (mm-disable-multibyte)
         (buffer-disable-undo)
         (gnus-add-buffer)
-        (cl-assert (null after-change-functions))
         (mapc (lambda (v) (set (make-local-variable (car v)) (cdr v))) nnimap-vars)
         (setq-local nnimap-object (make-nnimap :server server
                                                :initial-resync 0))))))
