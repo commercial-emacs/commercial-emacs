@@ -31,6 +31,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "region-cache.h"
 #include "pdumper.h"
 
+#ifdef HAVE_TREE_SITTER
+#include "tree_sitter.h"
+#endif
+
 static void insert_from_string_1 (Lisp_Object, ptrdiff_t, ptrdiff_t, ptrdiff_t,
 				  ptrdiff_t, bool, bool);
 static void insert_from_buffer_1 (struct buffer *, ptrdiff_t, ptrdiff_t, bool);
@@ -2155,6 +2159,11 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
       run_hook (Qfirst_change_hook);
     }
 
+#ifdef HAVE_TREE_SITTER
+  /* FIXME: Is this the best place?  */
+  ts_before_change (start_int, end_int);
+#endif
+
   /* Now run the before-change-functions if any.  */
   if (!NILP (Vbefore_change_functions))
     {
@@ -2207,6 +2216,13 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
 
   if (inhibit_modification_hooks)
     return;
+
+#ifdef HAVE_TREE_SITTER
+  /* We disrespect combine-after-change, because if we don't record
+     this change, the information that we need (the end byte position
+     of the change) will be lost.  */
+  ts_after_change (charpos, lendel, lenins);
+#endif
 
   /* If we are deferring calls to the after-change functions
      and there are no before-change functions,

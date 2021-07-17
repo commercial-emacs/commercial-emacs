@@ -28,6 +28,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 INLINE_HEADER_BEGIN
 
+/* A wrapper for a tree-sitter parser, but also contains a parse tree
+   and other goodies for convenience.  */
 struct Lisp_TS_Parser
 {
   union vectorlike_header header;
@@ -35,8 +37,10 @@ struct Lisp_TS_Parser
   TSParser *parser;
   TSTree *tree;
   TSInput input;
+  TSInputEdit edit;
 };
 
+/* A wrapper around a tree-sitter node.  */
 struct Lisp_TS_Node
 {
   union vectorlike_header header;
@@ -73,6 +77,12 @@ XTS_NODE (Lisp_Object a)
   eassert (TS_NODEP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_TS_Node);
 }
+
+void
+ts_before_change (ptrdiff_t charpos, ptrdiff_t lendel);
+
+void
+ts_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins);
 
 Lisp_Object
 make_ts_parser (struct buffer *buffer, TSParser *parser, TSTree *tree);
