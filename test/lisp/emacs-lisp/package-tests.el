@@ -364,12 +364,13 @@ but with a different end of line convention (bug#48137)."
 (ert-deftest package-test-macro-compilation-gz ()
   "Built-in's can be superseded as well."
   (with-package-test (:basedir (ert-resource-directory))
-    (let ((dir (expand-file-name "macro-builtin-package-1.0"))
-          (load-file-rep-suffixes '(".gz" "")))
+    (let ((dir (expand-file-name "macro-builtin-package-1.0")))
       (unwind-protect
           (let ((load-path load-path))
             (add-to-list 'load-path (directory-file-name dir))
             (byte-recompile-directory dir 0 t)
+            (mapc (lambda (f) (rename-file f (concat f ".gz")))
+                  (directory-files-recursively dir "\\`[^\\.].*\\.el\\'"))
             (require 'macro-builtin)
             (should (member (expand-file-name "macro-builtin-aux.elc" dir)
                             (mapcar #'car load-history)))
@@ -382,7 +383,9 @@ but with a different end of line convention (bug#48137)."
             ;; `macro-builtin-10-and-90' depends on an entirely new macro from `macro-aux'.
             (should (equal (macro-builtin-10-and-90) '(10 90))))
         (mapc #'delete-file
-              (directory-files-recursively dir "\\`[^\\.].*\\.elc\\'"))))))
+              (directory-files-recursively dir "\\`[^\\.].*\\.elc\\'"))
+        (mapc (lambda (f) (rename-file f (file-name-sans-extension f)))
+              (directory-files-recursively dir "\\`[^\\.].*\\.el.gz\\'"))))))
 
 (ert-deftest package-test-install-two-dependencies ()
   "Install a package which includes a dependency."
