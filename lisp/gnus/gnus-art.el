@@ -4498,15 +4498,6 @@ commands:
   (buffer-disable-undo)
   (mm-enable-multibyte))
 
-(defmacro gnus-summary-assume-in-summary (&rest body)
-  "If we are not in an summary buffer, go there, and execute BODY.  Restore."
-  (declare (indent 0) (debug t))
-  `(save-current-buffer
-     (when (or (derived-mode-p 'gnus-summary-mode)
-               (when (gnus-buffer-live-p gnus-summary-buffer)
-                 (set-buffer gnus-summary-buffer)))
-       ,@body)))
-
 (defun gnus-article-setup-buffer-ensure (summary-buffer
                                          newsgroup-name
                                          article-buffer-name
