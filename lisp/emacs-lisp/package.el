@@ -764,7 +764,6 @@ PKG-DESC is a `package-desc' object."
   "If set to a list, we're computing the set of pkgs to activate.")
 
 (defsubst package--library-stem (file)
-  "Simply calling `file-name-sans-extension' on FILE is not sufficient."
   (catch 'done
     (let (result)
       (dolist (suffix (get-load-suffixes) file)
@@ -774,11 +773,8 @@ PKG-DESC is a `package-desc' object."
 
 (defun package--reload-previously-loaded (pkg-desc)
   "Force reimportation of files in PKG-DESC already present in `load-history'.
-
-This is done so that macros in these files are updated
-to their new definitions.  If another package is being installed which
-depends on this new definition, not doing this update would cause
-compilation errors and break the installation."
+New editions of files contain macro definitions and redefinitions,
+the overlooking of which would cause byte-compilation of the new package to fail."
   (with-demoted-errors "Error in package--load-files-for-activation: %s"
     (let* (result
            (dir (package-desc-dir pkg-desc))
