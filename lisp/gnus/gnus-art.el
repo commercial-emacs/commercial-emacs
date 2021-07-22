@@ -4503,37 +4503,38 @@ commands:
                                          article-buffer-name
                                          original-article-buffer-name)
   "Refactor."
-  (with-current-buffer (gnus-get-buffer-create original-article-buffer-name)
-    (mm-enable-multibyte)
-    (setq major-mode 'gnus-original-article-mode))
+  (gnus-summary-assume-in-summary
+    (with-current-buffer (gnus-get-buffer-create original-article-buffer-name)
+      (mm-enable-multibyte)
+      (setq major-mode 'gnus-original-article-mode))
 
-  (with-current-buffer (gnus-get-buffer-create article-buffer-name)
-    (dolist (buffer `(,(current-buffer) ,summary-buffer))
-      (gnus-assign-former-global 'gnus-article-buffer
-                                 article-buffer-name
-                                 buffer)
-      (gnus-assign-former-global 'gnus-original-article-buffer
-                                 original-article-buffer-name
-                                 buffer)
-      (gnus-assign-former-global 'gnus-newsgroup-name
-                                 newsgroup-name
-                                 buffer)
-      (gnus-assign-former-global 'gnus-summary-buffer
-                                 summary-buffer
-                                 buffer))
-    (gnus-article-stop-animations)
-    (mm-destroy-parts gnus-article-mime-handles)
-    (setq gnus-article-mime-handles nil
-          gnus-article-mime-handle-alist nil)
-    (unless (derived-mode-p 'gnus-article-mode)
-      (gnus-article-mode))
-    (setq truncate-lines gnus-article-truncate-lines)
-    (gnus-summary-set-local-parameters newsgroup-name)
-    (when article-lapsed-timer
-      (gnus-stop-date-timer))
-    (when gnus-article-update-date-headers
-      (gnus-start-date-timer gnus-article-update-date-headers))
-    (current-buffer)))
+    (with-current-buffer (gnus-get-buffer-create article-buffer-name)
+      (dolist (buffer `(,(current-buffer) ,summary-buffer))
+        (gnus-assign-former-global 'gnus-article-buffer
+                                   article-buffer-name
+                                   buffer)
+        (gnus-assign-former-global 'gnus-original-article-buffer
+                                   original-article-buffer-name
+                                   buffer)
+        (gnus-assign-former-global 'gnus-newsgroup-name
+                                   newsgroup-name
+                                   buffer)
+        (gnus-assign-former-global 'gnus-summary-buffer
+                                   summary-buffer
+                                   buffer))
+      (gnus-article-stop-animations)
+      (mm-destroy-parts gnus-article-mime-handles)
+      (setq gnus-article-mime-handles nil
+            gnus-article-mime-handle-alist nil)
+      (unless (derived-mode-p 'gnus-article-mode)
+        (gnus-article-mode))
+      (setq truncate-lines gnus-article-truncate-lines)
+      (gnus-summary-set-local-parameters newsgroup-name)
+      (when article-lapsed-timer
+        (gnus-stop-date-timer))
+      (when gnus-article-update-date-headers
+        (gnus-start-date-timer gnus-article-update-date-headers))
+      (current-buffer))))
 
 (defun gnus-article-setup-buffer ()
   "Initialize the article buffer."
