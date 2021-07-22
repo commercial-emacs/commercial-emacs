@@ -7,7 +7,7 @@
 ;;	Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news, mail
 ;; Version: 5.14pre
-;; Package-Requires: ((emacs "28.1"))
+;; Package-Requires: ((emacs "28"))
 
 ;; This file is part of GNU Emacs.
 
