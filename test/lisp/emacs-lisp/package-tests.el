@@ -364,7 +364,8 @@ but with a different end of line convention (bug#48137)."
 (ert-deftest package-test-macro-compilation-gz ()
   "Built-in's can be superseded as well."
   (with-package-test (:basedir (ert-resource-directory))
-    (let ((dir (expand-file-name "macro-builtin-package-1.0")))
+    (let ((dir (expand-file-name "macro-builtin-package-1.0"))
+          (load-file-rep-suffixes '(".gz" "")))
       (unwind-protect
           (let ((load-path load-path))
             (add-to-list 'load-path (directory-file-name dir))
