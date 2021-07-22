@@ -37,7 +37,7 @@ struct Lisp_TS_Parser
   TSParser *parser;
   TSTree *tree;
   TSInput input;
-  TSInputEdit edit;
+  bool need_reparse;
 };
 
 /* A wrapper around a tree-sitter node.  */
@@ -78,11 +78,21 @@ XTS_NODE (Lisp_Object a)
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_TS_Node);
 }
 
-void
-ts_before_change (ptrdiff_t charpos, ptrdiff_t lendel);
+INLINE void
+CHECK_TS_PARSER (Lisp_Object parser)
+{
+  CHECK_TYPE (TS_PARSERP (parser), Qtree_sitter_parser_p, parser);
+}
+
+INLINE void
+CHECK_TS_NODE (Lisp_Object node)
+{
+  CHECK_TYPE (TS_NODEP (node), Qtree_sitter_node_p, node);
+}
 
 void
-ts_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins);
+ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
+		  ptrdiff_t new_end_byte);
 
 Lisp_Object
 make_ts_parser (struct buffer *buffer, TSParser *parser, TSTree *tree);

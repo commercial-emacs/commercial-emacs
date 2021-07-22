@@ -947,6 +947,10 @@ insert_1_both (const char *string,
   adjust_point (nchars, nbytes);
 
   check_markers ();
+
+#ifdef HAVE_TREE_SITTER
+      ts_record_change (PT_BYTE - nbytes, PT_BYTE - nbytes, PT_BYTE);
+#endif
 }
 
 /* Insert the part of the text of STRING, a Lisp object assumed to be
@@ -1078,6 +1082,10 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
   adjust_point (nchars, outgoing_nbytes);
 
   check_markers ();
+
+#ifdef HAVE_TREE_SITTER
+  ts_record_change (PT_BYTE - nbytes, PT_BYTE - nbytes, PT_BYTE);
+#endif
 }
 
 /* Insert a sequence of NCHARS chars which occupy NBYTES bytes
@@ -1145,6 +1153,10 @@ insert_from_gap (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
     adjust_point (nchars, nbytes);
 
   check_markers ();
+
+#ifdef HAVE_TREE_SITTER
+  ts_record_change (PT_BYTE - nbytes, PT_BYTE - nbytes, nbytes);
+#endif
 }
 
 /* Insert text from BUF, NCHARS characters starting at CHARPOS, into the
@@ -1292,6 +1304,11 @@ insert_from_buffer_1 (struct buffer *buf,
   graft_intervals_into_buffer (intervals, PT, nchars, current_buffer, inherit);
 
   adjust_point (nchars, outgoing_nbytes);
+
+#ifdef HAVE_TREE_SITTER
+  ts_record_change (PT_BYTE - outgoing_nbytes,
+		    PT_BYTE - outgoing_nbytes, PT_BYTE);
+#endif
 }
 
 /* Record undo information and adjust markers and position keepers for
@@ -1561,6 +1578,10 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
       signal_after_change (from, nchars_del, GPT - from);
       update_compositions (from, GPT, CHECK_BORDER);
     }
+
+#ifdef HAVE_TREE_SITTER
+  ts_record_change (from_byte, to_byte, GPT_BYTE);
+#endif
 }
 
 /* Replace the text from character positions FROM to TO with
@@ -1686,6 +1707,11 @@ replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
 
   modiff_incr (&MODIFF);
   CHARS_MODIFF = MODIFF;
+
+#ifdef HAVE_TREE_SITTER
+  ts_record_change (from_byte, to_byte, from_byte + insbytes);
+#endif
+
 }
 
 /* Delete characters in current buffer
@@ -1895,6 +1921,10 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   check_markers ();
 
   evaporate_overlays (from);
+
+#ifdef HAVE_TREE_SITTER
+  ts_record_change (from_byte, to_byte, from_byte);
+#endif
 
   return deletion;
 }
@@ -2159,11 +2189,6 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
       run_hook (Qfirst_change_hook);
     }
 
-#ifdef HAVE_TREE_SITTER
-  /* FIXME: Is this the best place?  */
-  ts_before_change (start_int, end_int);
-#endif
-
   /* Now run the before-change-functions if any.  */
   if (!NILP (Vbefore_change_functions))
     {
@@ -2216,13 +2241,6 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
 
   if (inhibit_modification_hooks)
     return;
-
-#ifdef HAVE_TREE_SITTER
-  /* We disrespect combine-after-change, because if we don't record
-     this change, the information that we need (the end byte position
-     of the change) will be lost.  */
-  ts_after_change (charpos, lendel, lenins);
-#endif
 
   /* If we are deferring calls to the after-change functions
      and there are no before-change functions,
