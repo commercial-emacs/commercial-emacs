@@ -41,6 +41,9 @@
 (require 'message)
 (require 'mouse)
 
+(eval-when-compile
+  (cl-assert (featurep 'gnus-util)))
+
 (autoload 'gnus-msg-mail "gnus-msg" nil t)
 (autoload 'gnus-button-mailto "gnus-msg")
 (autoload 'gnus-button-reply "gnus-msg" nil t)
