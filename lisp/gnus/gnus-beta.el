@@ -141,6 +141,8 @@
           spam-wash
           spam)))
 
+(require 'gnus-util)
+(require 'gnus-sum)
 (require 'gnus)
 
 (provide 'gnus-beta)
