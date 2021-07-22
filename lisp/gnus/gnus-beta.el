@@ -141,7 +141,7 @@
           spam-wash
           spam)))
 
-(eval-and-compile (require 'gnus))
+(require 'gnus)
 
 (provide 'gnus-beta)
 
