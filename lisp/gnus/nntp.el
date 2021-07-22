@@ -301,12 +301,14 @@ backend doesn't catch this error.")
   (or (memq (process-status process) '(open run))
       (nntp-report "Server closed connection")))
 
-(defun nntp-assert-context (&optional dont-assert)
-  (let ((result (cl-every (lambda (v) (and (boundp v) v))
+(defun nntp-assert-context ()
+  (let ((result (cl-every (lambda (v) (and (boundp v) (symbol-value v)))
                           '(nntp-address nntp-port-number))))
     (prog1 result
-      (unless dont-assert
-        (cl-assert result)))))
+      (unless result
+        (ignore-errors (nntp-close-server))
+        (nntp-open-server)
+        (error "nntp-assert-context: bailing")))))
 
 (defconst nntp--process-buffer-fmt " *nntp %s*")
 
@@ -323,7 +325,8 @@ backend doesn't catch this error.")
   (get-buffer-process (nntp-get-process-buffer process-buffer-key)))
 
 (defun nntp-get-process-buffer (&optional process-buffer-key)
-  (setq process-buffer-key (nntp-process-buffer-key))
+  (setq process-buffer-key (or process-buffer-key
+                               (nntp-process-buffer-key)))
   (cl-flet ((get
              (key)
              (cl-find-if (lambda (b)
