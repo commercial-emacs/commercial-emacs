@@ -1594,7 +1594,11 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
    If MARKERS, relocate markers.
 
    Unlike most functions at this level, never call
-   prepare_to_modify_buffer and never call signal_after_change.  */
+   prepare_to_modify_buffer and never call signal_after_change.
+   Because this function is called in a loop, one character at a time.
+   The caller of 'replace_range_2' calls these hooks for the entire
+   region once.  Apart from signal_after_change, any caller of this
+   function should also call ts_record_change.  */
 
 void
 replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
@@ -1707,11 +1711,6 @@ replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
 
   modiff_incr (&MODIFF);
   CHARS_MODIFF = MODIFF;
-
-#ifdef HAVE_TREE_SITTER
-  ts_record_change (from_byte, to_byte, from_byte + insbytes);
-#endif
-
 }
 
 /* Delete characters in current buffer

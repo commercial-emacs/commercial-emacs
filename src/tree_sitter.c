@@ -35,6 +35,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* parser.h defines a macro ADVANCE that conflicts with alloc.c.  */
 #include <tree_sitter/parser.h>
 
+/*** Functions related to parser and node object.  */
+
 DEFUN ("tree-sitter-parser-p",
        Ftree_sitter_parser_p, Stree_sitter_parser_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a tree-sitter parser.  */)
@@ -57,6 +59,8 @@ DEFUN ("tree-sitter-node-p",
     return Qnil;
 }
 
+/*** Parsing functions */
+
 /* Update each parser's tree after the user made an edit.  This
 function does not parse the buffer and only updates the tree. (So it
 should be very fast.)  */
@@ -77,7 +81,6 @@ ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
       XTS_PARSER (lisp_parser)->need_reparse = true;
       parser_list = Fcdr (parser_list);
     }
-
 }
 
 /* Parse the buffer.  We don't parse until we have to. When we have
@@ -91,9 +94,19 @@ ts_ensure_parsed (Lisp_Object parser)
   TSTree *tree = XTS_PARSER(parser)->tree;
   TSInput input = XTS_PARSER (parser)->input;
   TSTree *new_tree = ts_parser_parse(ts_parser, tree, input);
+  /* This should be very rare: it only happens when 1) language is not
+     set (impossible in Emacs because the user has to supply a
+     language to create a parser), 2) parse canceled due to timeout
+     (impossible because we don't set a timeout), 3) parse canceled
+     due to cancellation flag (impossible because we don't set the
+     flag).  (See comments for ts_parser_parse in
+     tree_sitter/api.h.)  */
+  if (new_tree == NULL)
+    signal_error ("Parse failed", parser);
   ts_tree_delete (tree);
   XTS_PARSER (parser)->tree = new_tree;
   XTS_PARSER (parser)->need_reparse = false;
+  TSNode node = ts_tree_root_node (new_tree);
 }
 
 /* This is the read function provided to tree-sitter to read from a
@@ -103,9 +116,6 @@ const char*
 ts_read_buffer (void *buffer, uint32_t byte_index,
 		TSPoint position, uint32_t *bytes_read)
 {
-  if (!BUFFER_LIVE_P ((struct buffer *) buffer))
-    error ("BUFFER is not live");
-
   ptrdiff_t byte_pos = byte_index + 1;
 
   /* Read one character.  Tree-sitter wants us to set bytes_read to 0
@@ -114,8 +124,17 @@ ts_read_buffer (void *buffer, uint32_t byte_index,
      string.  */
   char *beg;
   int len;
+  /* This function could run from a user command, so it is better to
+     do nothing instead of raising an error. (It was a pain in the a**
+     to read mega-if-conditions in Emacs source, so I write the two
+     branches separately, hoping the compiler can merge them.)  */
+  if (!BUFFER_LIVE_P ((struct buffer *) buffer))
+    {
+      beg = "";
+      len = 0;
+    }
   // TODO BUF_ZV_BYTE?
-  if (byte_pos >= BUF_Z_BYTE ((struct buffer *) buffer))
+  else if (byte_pos >= BUF_Z_BYTE ((struct buffer *) buffer))
     {
       beg = "";
       len = 0;
@@ -123,19 +142,23 @@ ts_read_buffer (void *buffer, uint32_t byte_index,
   else
     {
       beg = (char *) BUF_BYTE_ADDRESS (buffer, byte_pos);
-      len = next_char_len(byte_pos);
+      len = BYTES_BY_CHAR_HEAD ((int) beg);
     }
   *bytes_read = (uint32_t) len;
 
   return beg;
 }
 
+/*** Creators and accessors for parser and node */
+
 /* Wrap the parser in a Lisp_Object to be used in the Lisp machine.  */
 Lisp_Object
-make_ts_parser (struct buffer *buffer, TSParser *parser, TSTree *tree)
+make_ts_parser (struct buffer *buffer, TSParser *parser,
+		TSTree *tree, Lisp_Object name)
 {
   struct Lisp_TS_Parser *lisp_parser
-    = ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_TS_Parser, PVEC_TS_PARSER);
+    = ALLOCATE_PSEUDOVECTOR (struct Lisp_TS_Parser, name, PVEC_TS_PARSER);
+  lisp_parser->name = name;
   lisp_parser->buffer = buffer;
   lisp_parser->parser = parser;
   lisp_parser->tree = tree;
@@ -156,17 +179,35 @@ make_ts_node (Lisp_Object parser, TSNode node)
   return make_lisp_ptr (lisp_node, Lisp_Vectorlike);
 }
 
+DEFUN ("tree-sitter-node-parser",
+       Ftree_sitter_node_parser, Stree_sitter_node_parser,
+       1, 1, 0,
+       doc: /* Return the parser to which NODE belongs.  */)
+  (Lisp_Object node)
+{
+  CHECK_TS_NODE (node);
+  return XTS_NODE (node)->parser;
+}
 
 DEFUN ("tree-sitter-create-parser",
        Ftree_sitter_create_parser, Stree_sitter_create_parser,
-       2, 2, 0,
+       2, 3, 0,
        doc: /* Create and return a parser in BUFFER for LANGUAGE.
+
 The parser is automatically added to BUFFER's
 `tree-sitter-parser-list'.  LANGUAGE should be the language provided
-by a tree-sitter language dynamic module.  */)
-  (Lisp_Object buffer, Lisp_Object language)
+by a tree-sitter language dynamic module.
+
+NAME (a string) is the name assigned to the parser, like the name for
+a process.  Unlike process names, not care is taken to make each
+parser's name unique.  By default, no name is assigned to the parser;
+the only consequence of that is you can't use
+`tree-sitter-get-parser' to find the parser by its name.  */)
+  (Lisp_Object buffer, Lisp_Object language, Lisp_Object name)
 {
   CHECK_BUFFER(buffer);
+  if (!NILP (name))
+    CHECK_STRING (name);
 
   /* LANGUAGE is a USER_PTR that contains the pointer to a TSLanguage
      struct.  */
@@ -175,9 +216,8 @@ by a tree-sitter language dynamic module.  */)
   ts_parser_set_language (parser, lang);
 
   Lisp_Object lisp_parser
-    = make_ts_parser (XBUFFER(buffer), parser, NULL);
+    = make_ts_parser (XBUFFER(buffer), parser, NULL, name);
 
-  // FIXME: Is this the correct way to set a buffer-local variable?
   struct buffer *old_buffer = current_buffer;
   set_buffer_internal (XBUFFER (buffer));
 
@@ -187,6 +227,30 @@ by a tree-sitter language dynamic module.  */)
   set_buffer_internal (old_buffer);
   return lisp_parser;
 }
+
+DEFUN ("tree-sitter-parser-buffer",
+       Ftree_sitter_parser_buffer, Stree_sitter_parser_buffer,
+       1, 1, 0,
+       doc: /* Return the buffer of PARSER.  */)
+  (Lisp_Object parser)
+{
+  CHECK_TS_PARSER (parser);
+  Lisp_Object buf;
+  XSETBUFFER (buf, XTS_PARSER (parser)->buffer);
+  return buf;
+}
+
+DEFUN ("tree-sitter-parser-name",
+       Ftree_sitter_parser_name, Stree_sitter_parser_name,
+       1, 1, 0,
+       doc: /* Return parser's name.  */)
+  (Lisp_Object parser)
+{
+  CHECK_TS_PARSER (parser);
+  return XTS_PARSER (parser)->name;
+}
+
+/*** Parser API */
 
 DEFUN ("tree-sitter-parser-root-node",
        Ftree_sitter_parser_root_node, Stree_sitter_parser_root_node,
@@ -200,7 +264,8 @@ DEFUN ("tree-sitter-parser-root-node",
   return make_ts_node (parser, root_node);
 }
 
-DEFUN ("tree-sitter-parse", Ftree_sitter_parse, Stree_sitter_parse,
+DEFUN ("tree-sitter-parse-string",
+       Ftree_sitter_parse_string, Stree_sitter_parse_string,
        2, 2, 0,
        doc: /* Parse STRING and return the root node.
 LANGUAGE should be the language provided by a tree-sitter language
@@ -219,23 +284,20 @@ dynamic module.  */)
 					 SSDATA (string),
 					 strlen (SSDATA (string)));
 
-  /* See comment for ts_parser_parse in tree_sitter/api.h
-     for possible reasons for a failure.  */
+  /* See comment in ts_ensure_parsed for possible reasons for a
+     failure.  */
   if (tree == NULL)
     signal_error ("Failed to parse STRING", string);
 
   TSNode root_node = ts_tree_root_node (tree);
 
-  Lisp_Object lisp_parser = make_ts_parser (NULL, parser, tree);
+  Lisp_Object lisp_parser = make_ts_parser (NULL, parser, tree, Qnil);
   Lisp_Object lisp_node = make_ts_node (lisp_parser, root_node);
 
   return lisp_node;
 }
 
-/* Below this point are uninteresting mechanical translations of
-   tree-sitter API.  */
-
-/* Node functions.  */
+/*** Node API  */
 
 DEFUN ("tree-sitter-node-type",
        Ftree_sitter_node_type, Stree_sitter_node_type, 1, 1, 0,
@@ -245,9 +307,31 @@ DEFUN ("tree-sitter-node-type",
   CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
   const char *type = ts_node_type(ts_node);
+  // TODO: Maybe return a string instead.
   return intern_c_string (type);
 }
 
+DEFUN ("tree-sitter-node-start-byte",
+       Ftree_sitter_node_start_byte, Stree_sitter_node_start_byte, 1, 1, 0,
+       doc: /* Return the NODE's start byte position.  */)
+  (Lisp_Object node)
+{
+  CHECK_TS_NODE (node);
+  TSNode ts_node = XTS_NODE (node)->node;
+  uint32_t start_byte = ts_node_start_byte(ts_node);
+  return make_fixnum(start_byte + 1);
+}
+
+DEFUN ("tree-sitter-node-end-byte",
+       Ftree_sitter_node_end_byte, Stree_sitter_node_end_byte, 1, 1, 0,
+       doc: /* Return the NODE's end byte position.  */)
+  (Lisp_Object node)
+{
+  CHECK_TS_NODE (node);
+  TSNode ts_node = XTS_NODE (node)->node;
+  uint32_t end_byte = ts_node_end_byte(ts_node);
+  return make_fixnum(end_byte + 1);
+}
 
 DEFUN ("tree-sitter-node-string",
        Ftree_sitter_node_string, Stree_sitter_node_string, 1, 1, 0,
@@ -303,15 +387,18 @@ DEFUN ("tree-sitter-node-check",
        Ftree_sitter_node_check, Stree_sitter_node_check, 2, 2, 0,
        doc: /* Return non-nil if NODE is in condition COND, nil otherwise.
 
-COND could be 'named, 'missing, 'extra, 'has-error.  Named nodes
-correspond to named rules in the grammar, whereas "anonymous" nodes
-correspond to string literals in the grammar.
+COND could be 'named, 'missing, 'extra, 'has-changes, 'has-error.
+Named nodes correspond to named rules in the grammar, whereas
+"anonymous" nodes correspond to string literals in the grammar.
 
 Missing nodes are inserted by the parser in order to recover from
 certain kinds of syntax errors, i.e., should be there but not there.
 
 Extra nodes represent things like comments, which are not required the
 grammar, but can appear anywhere.
+
+A node "has changes" if the buffer changed since the node is
+created. (Don't forget the "s" at the end of 'has-changes.)
 
 A node "has error" if itself is a syntax error or contains any syntax
 errors.  */)
@@ -329,7 +416,10 @@ errors.  */)
     result = ts_node_is_extra (ts_node);
   else if (EQ (cond, Qhas_error))
     result = ts_node_has_error (ts_node);
+  else if (EQ (cond, Qhas_changes))
+    result = ts_node_has_changes (ts_node);
   else
+    // TODO: Is this a good error message?
     signal_error ("Expecting one of four symbols, see docstring", cond);
   return result ? Qt : Qnil;
 }
@@ -432,7 +522,176 @@ child only.  NAMED defaults to nil.  */)
   return make_ts_node(XTS_NODE (node)->parser, sibling);
 }
 
+DEFUN ("tree-sitter-node-first-child-for-byte",
+       Ftree_sitter_node_first_child_for_byte,
+       Stree_sitter_node_first_child_for_byte, 2, 3, 0,
+       doc: /* Return the first child of NODE on POS.
+Specifically, return the first child that extends beyond POS.  POS is
+a byte position in the buffer counting from 1.  Return nil if there
+isn't any.  If NAMED is non-nil, look for named child only.  NAMED
+defaults to nil.  Note that this function returns an immediate child,
+not the smallest (grand)child.  */)
+  (Lisp_Object node, Lisp_Object pos, Lisp_Object named)
+{
+  CHECK_INTEGER (pos);
+
+  struct buffer *buf = (XTS_PARSER (XTS_NODE (node)->parser)->buffer);
+  ptrdiff_t byte_pos = XFIXNUM (pos);
+
+  if (byte_pos < BUF_BEGV_BYTE (buf) || byte_pos > BUF_ZV_BYTE (buf))
+    xsignal1 (Qargs_out_of_range, pos);
+
+  TSNode ts_node = XTS_NODE (node)->node;
+  TSNode child;
+  if (NILP (named))
+    child = ts_node_first_child_for_byte (ts_node, byte_pos - 1);
+  else
+    child = ts_node_first_named_child_for_byte (ts_node, byte_pos - 1);
+
+  if (ts_node_is_null(child))
+    return Qnil;
+
+  return make_ts_node(XTS_NODE (node)->parser, child);
+}
+
+DEFUN ("tree-sitter-node-descendant-for-byte-range",
+       Ftree_sitter_node_descendant_for_byte_range,
+       Stree_sitter_node_descendant_for_byte_range, 3, 4, 0,
+       doc: /* Return the smallest node that covers BEG to END.
+The returned node is a descendant of NODE.  POS is a byte position
+counting from 1.  Return nil if there isn't any.  If NAMED is non-nil,
+look for named child only.  NAMED defaults to nil.  */)
+  (Lisp_Object node, Lisp_Object beg, Lisp_Object end, Lisp_Object named)
+{
+  CHECK_INTEGER (beg);
+  CHECK_INTEGER (end);
+
+  struct buffer *buf = (XTS_PARSER (XTS_NODE (node)->parser)->buffer);
+  ptrdiff_t byte_beg = XFIXNUM (beg);
+  ptrdiff_t byte_end = XFIXNUM (end);
+
+  /* Checks for BUFFER_BEG <= BEG <= END <= BUFFER_END.  */
+  if (!(BUF_BEGV_BYTE (buf) <= byte_beg
+	&& byte_beg <= byte_end
+	&& byte_end <= BUF_ZV_BYTE (buf)))
+    xsignal2 (Qargs_out_of_range, beg, end);
+
+  TSNode ts_node = XTS_NODE (node)->node;
+  TSNode child;
+  if (NILP (named))
+    child = ts_node_descendant_for_byte_range
+      (ts_node, byte_beg - 1 , byte_end - 1);
+  else
+    child = ts_node_named_descendant_for_byte_range
+      (ts_node, byte_beg - 1, byte_end - 1);
+
+  if (ts_node_is_null(child))
+    return Qnil;
+
+  return make_ts_node(XTS_NODE (node)->parser, child);
+}
+
 /* Query functions */
+
+Lisp_Object ts_query_error_to_string (TSQueryError error)
+{
+  char *error_name;
+  switch (error)
+    {
+    case TSQueryErrorNone:
+      error_name = "none";
+      break;
+    case TSQueryErrorSyntax:
+      error_name = "syntax";
+      break;
+    case TSQueryErrorNodeType:
+      error_name = "node type";
+      break;
+    case TSQueryErrorField:
+      error_name = "field";
+      break;
+    case TSQueryErrorCapture:
+      error_name = "capture";
+      break;
+    case TSQueryErrorStructure:
+      error_name = "structure";
+      break;
+    }
+  return  make_pure_c_string (error_name, strlen(error_name));
+}
+
+DEFUN ("tree-sitter-query-capture",
+       Ftree_sitter_query_capture,
+       Stree_sitter_query_capture, 2, 4, 0,
+       doc: /* Query NODE with PATTERN.
+
+Returns a list of (CAPTURE_NAME . NODE).  CAPTURE_NAME is the name
+assigned to the node in PATTERN.  NODE is the captured node.
+
+PATTERN is a string containing one or more matching patterns.  See
+manual for further explanation for how to write a match pattern.
+
+BEG and END, if _both_ non-nil, specifies the range in which the query
+is executed.
+
+Return nil if the query failed.  */)
+  (Lisp_Object node, Lisp_Object pattern,
+   Lisp_Object beg, Lisp_Object end)
+{
+  CHECK_TS_NODE (node);
+  CHECK_STRING (pattern);
+
+  TSNode ts_node = XTS_NODE (node)->node;
+  Lisp_Object lisp_parser = XTS_NODE (node)->parser;
+  const TSLanguage *lang = ts_parser_language
+    (XTS_PARSER (lisp_parser)->parser);
+  char *source = SSDATA (pattern);
+
+  uint32_t error_offset;
+  uint32_t error_type;
+  TSQuery *query = ts_query_new (lang, source, strlen (source),
+				 &error_offset, &error_type);
+  TSQueryCursor *cursor = ts_query_cursor_new ();
+
+  if (query == NULL)
+    {
+      // FIXME: Signal an error?
+      return Qnil;
+    }
+  if (!NILP (beg) && !NILP (end))
+    {
+      EMACS_INT beg_byte = XFIXNUM (beg);
+      EMACS_INT end_byte = XFIXNUM (end);
+      ts_query_cursor_set_byte_range
+	(cursor, (uint32_t) beg_byte - 1, (uint32_t) end_byte - 1);
+    }
+
+  ts_query_cursor_exec (cursor, query, ts_node);
+  TSQueryMatch match;
+  TSQueryCapture capture;
+  Lisp_Object result = Qnil;
+  Lisp_Object entry;
+  Lisp_Object captured_node;
+  const char *capture_name;
+  uint32_t capture_name_len;
+  while (ts_query_cursor_next_match (cursor, &match))
+    {
+      const TSQueryCapture *captures = match.captures;
+      for (int idx=0; idx < match.capture_count; idx++)
+	{
+	  capture = captures[idx];
+	  captured_node = make_ts_node(lisp_parser, capture.node);
+	  capture_name = ts_query_capture_name_for_id
+	    (query, capture.index, &capture_name_len);
+	  entry = Fcons (intern_c_string (capture_name),
+			 captured_node);
+	  result = Fcons (entry, result);
+	}
+    }
+  ts_query_delete (query);
+  ts_query_cursor_delete (cursor);
+  return Freverse (result);
+}
 
 /* Initialize the tree-sitter routines.  */
 void
@@ -443,11 +702,18 @@ syms_of_tree_sitter (void)
   DEFSYM (Qnamed, "named");
   DEFSYM (Qmissing, "missing");
   DEFSYM (Qextra, "extra");
+  DEFSYM (Qhas_changes, "has-changes");
   DEFSYM (Qhas_error, "has-error");
 
+  DEFSYM (Qtree_sitter_query_error, "tree-sitter-query-error");
+  Fput (Qtree_sitter_query_error, Qerror_conditions,
+	pure_list (Qtree_sitter_query_error, Qerror));
+  Fput (Qtree_sitter_query_error, Qerror_message,
+	build_pure_c_string ("Error with query pattern"))
+
   DEFSYM (Qtree_sitter_parser_list, "tree-sitter-parser-list");
-  DEFVAR_LISP ("ts-parser-list", Vtree_sitter_parser_list,
-		     doc: /* A list of tree-sitter parsers.
+  DEFVAR_LISP ("tree-sitter-parser-list", Vtree_sitter_parser_list,
+	       doc: /* A list of tree-sitter parsers.
 // TODO: more doc.
 If you removed a parser from this list, do not put it back in.  */);
   Vtree_sitter_parser_list = Qnil;
@@ -455,11 +721,19 @@ If you removed a parser from this list, do not put it back in.  */);
 
   defsubr (&Stree_sitter_parser_p);
   defsubr (&Stree_sitter_node_p);
+
+  defsubr (&Stree_sitter_node_parser);
+
   defsubr (&Stree_sitter_create_parser);
+  defsubr (&Stree_sitter_parser_buffer);
+  defsubr (&Stree_sitter_parser_name);
+
   defsubr (&Stree_sitter_parser_root_node);
-  defsubr (&Stree_sitter_parse);
+  defsubr (&Stree_sitter_parse_string);
 
   defsubr (&Stree_sitter_node_type);
+  defsubr (&Stree_sitter_node_start_byte);
+  defsubr (&Stree_sitter_node_end_byte);
   defsubr (&Stree_sitter_node_string);
   defsubr (&Stree_sitter_node_parent);
   defsubr (&Stree_sitter_node_child);
@@ -469,4 +743,8 @@ If you removed a parser from this list, do not put it back in.  */);
   defsubr (&Stree_sitter_node_child_by_field_name);
   defsubr (&Stree_sitter_node_next_sibling);
   defsubr (&Stree_sitter_node_prev_sibling);
+  defsubr (&Stree_sitter_node_first_child_for_byte);
+  defsubr (&Stree_sitter_node_descendant_for_byte_range);
+
+  defsubr (&Stree_sitter_query_capture);
 }

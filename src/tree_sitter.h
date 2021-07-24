@@ -33,6 +33,7 @@ INLINE_HEADER_BEGIN
 struct Lisp_TS_Parser
 {
   union vectorlike_header header;
+  Lisp_Object name;
   struct buffer *buffer;
   TSParser *parser;
   TSTree *tree;
@@ -95,7 +96,8 @@ ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 		  ptrdiff_t new_end_byte);
 
 Lisp_Object
-make_ts_parser (struct buffer *buffer, TSParser *parser, TSTree *tree);
+make_ts_parser (struct buffer *buffer, TSParser *parser,
+		TSTree *tree, Lisp_Object name);
 
 Lisp_Object
 make_ts_node (Lisp_Object parser, TSNode node);

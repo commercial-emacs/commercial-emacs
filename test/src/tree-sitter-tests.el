@@ -21,6 +21,7 @@
 
 (require 'ert)
 (require 'tree-sitter-json)
+(require 'tree-sitter)
 
 (ert-deftest tree-sitter-basic-parsing ()
   "Test basic parsing routines."
@@ -52,12 +53,13 @@
 (ert-deftest tree-sitter-node-api ()
   "Tests for node API."
   (with-temp-buffer
-    (insert "[1,2,{\"name\": \"Bob\"},3]")
     (let (parser root-node doc-node object-node pair-node)
-      (setq parser (tree-sitter-create-parser
-                    (current-buffer) (tree-sitter-json)))
-      (setq root-node (tree-sitter-parser-root-node
-                       parser))
+      (progn
+        (insert "[1,2,{\"name\": \"Bob\"},3]")
+        (setq parser (tree-sitter-create-parser
+                      (current-buffer) (tree-sitter-json)))
+        (setq root-node (tree-sitter-parser-root-node
+                         parser)))
       ;; `tree-sitter-node-type'.
       (should (eq 'document (tree-sitter-node-type root-node)))
       ;; `tree-sitter-node-check'.
@@ -100,7 +102,51 @@
       (should (equal "(\",\")"
                      (tree-sitter-node-string
                       (tree-sitter-node-prev-sibling object-node))))
-      )))
+      ;; `tree-sitter-node-first-child-for-byte'.
+      (should (equal "(number)"
+                     (tree-sitter-node-string
+                      (tree-sitter-node-first-child-for-byte
+                       doc-node 3 t))))
+      (should (equal "(\",\")"
+                     (tree-sitter-node-string
+                      (tree-sitter-node-first-child-for-byte
+                       doc-node 3))))
+      ;; `tree-sitter-node-descendant-for-byte-range'.
+      (should (equal "(\"{\")"
+                     (tree-sitter-node-string
+                      (tree-sitter-node-descendant-for-byte-range
+                       root-node 6 7))))
+      (should (equal "(object (pair key: (string (string_content)) value: (string (string_content))))"
+                     (tree-sitter-node-string
+                      (tree-sitter-node-descendant-for-byte-range
+                       root-node 6 7 t)))))))
+
+(ert-deftest tree-sitter-query-api ()
+  "Tests for query API."
+  (with-temp-buffer
+    (let (parser root-node pattern doc-node object-node pair-node)
+      (progn
+        (insert "[1,2,{\"name\": \"Bob\"},3]")
+        (setq parser (tree-sitter-create-parser
+                      (current-buffer) (tree-sitter-json)))
+        (setq root-node (tree-sitter-parser-root-node
+                         parser))
+        (setq pattern "(string) @string
+(pair key: (_) @keyword)
+(number) @number"))
+
+      (should
+       (equal
+        '((number . "1") (number . "2")
+          (keyword . "\"name\"")
+          (string . "\"name\"")
+          (string . "\"Bob\"")
+          (number . "3"))
+        (mapcar (lambda (entry)
+                  (cons (car entry)
+                        (tree-sitter-node-content
+                         (cdr entry))))
+                (tree-sitter-query-capture root-node pattern)))))))
 
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here
