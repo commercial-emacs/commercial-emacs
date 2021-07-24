@@ -54,21 +54,6 @@ server spawn an nnrpd server.")
   "Function used to send AUTHINFO to the server.
 It is called with no parameters.")
 
-(defvoo nntp-process-buffer-key-group-alist nil
-  "Process buffer key to the group name it was last assigned.")
-
-(defun nntp-set-prevailing-group (group)
-  (with-current-buffer (nntp-get-process-buffer)
-    (let* ((key (buffer-name))
-           (prevailing (assoc-default key nntp-process-buffer-key-group-alist)))
-      (unless (equal prevailing group)
-        (setf (alist-get key nntp-process-buffer-key-group-alist nil nil #'equal)
-              group)
-        (erase-buffer)
-        (nntp-send-command "^[245].*\n" "GROUP" group)
-        (erase-buffer)
-        (nntp-erase-buffer nntp-server-buffer)))))
-
 (defvoo nntp-server-list-active-group 'try
   "If nil, then always use GROUP instead of LIST ACTIVE.
 This is usually slower, but on misconfigured servers that don't
@@ -497,34 +482,33 @@ retried once before actually displaying the error report."
   (when (and (not nnheader-callback-function)
              (not nntp-inhibit-output))
     (nntp-erase-buffer nntp-server-buffer))
-  (let* ((command (mapconcat #'identity strings " "))
-	 (process (nntp-get-process))
-	 (buffer (and process (process-buffer process)))
-	 (pos (and buffer (with-current-buffer buffer (point)))))
-    (if process
-	(prog1
-	    (nntp-retrieve-data command
-				nntp-address nntp-port-number
-				nntp-server-buffer
-				wait-for nnheader-callback-function)
-	  ;; If nothing to wait for, still remove possibly echo'ed commands.
-	  ;; We don't have echoes if `nntp-never-echoes-commands' is non-nil
-	  ;; or the value of `nntp-open-connection-function' is in
-	  ;; `nntp-open-connection-functions-never-echo-commands', so we
-	  ;; skip this in that cases.
-	  (unless (or wait-for
-		      nntp-never-echoes-commands
-		      (memq
-		       nntp-open-connection-function
-		       nntp-open-connection-functions-never-echo-commands))
-	    (nntp-accept-process-output (nntp-get-process))
-	    (with-current-buffer buffer
-	      (goto-char pos)
-	      (if (looking-at (regexp-quote command))
-		  (delete-region pos (progn (forward-line 1)
-					    (point-at-bol)))))))
-      (nnheader-report 'nntp "Couldn't open connection to %s."
-		       nntp-address))))
+  (if-let ((command (mapconcat #'identity strings " "))
+	   (process (nntp-get-process))
+	   (buffer (process-buffer process))
+	   (pos (with-current-buffer buffer (point))))
+    (prog1
+	(nntp-retrieve-data command
+			    nntp-address nntp-port-number
+			    nntp-server-buffer
+			    wait-for nnheader-callback-function)
+      ;; If nothing to wait for, still remove possibly echo'ed commands.
+      ;; We don't have echoes if `nntp-never-echoes-commands' is non-nil
+      ;; or the value of `nntp-open-connection-function' is in
+      ;; `nntp-open-connection-functions-never-echo-commands', so we
+      ;; skip this in that cases.
+      (unless (or wait-for
+		  nntp-never-echoes-commands
+		  (memq
+		   nntp-open-connection-function
+		   nntp-open-connection-functions-never-echo-commands))
+	(nntp-accept-process-output (nntp-get-process))
+	(with-current-buffer buffer
+	  (goto-char pos)
+	  (if (looking-at (regexp-quote command))
+	      (delete-region pos (progn (forward-line 1)
+					(point-at-bol)))))))
+    (nnheader-report 'nntp "Couldn't open connection to %s."
+		     nntp-address)))
 
 (defun nntp-send-command-nodelete (wait-for &rest strings)
   "Send STRINGS to server and wait until WAIT-FOR returns."
@@ -621,7 +605,7 @@ retried once before actually displaying the error report."
    (t
     nil)))
 
-(defmacro nntp-drop-guard (&rest forms)
+(defmacro nntp-drop-guard (group &rest forms)
   "Protect against servers that don't like clients that keep idle connections open.
 The problem being that these servers may either close a connection or
 simply ignore any further requests on a connection.  Closed
@@ -635,6 +619,8 @@ command whose response triggered the error."
   `(let (result
          (nntp-report-n nntp--report-1)
          (nntp--report-1 t))
+     (when ,group
+       (nntp-request-group ,group))
      (while (catch 'nntp-drop-guard-error
               (prog1 nil
                 (let ((timer
@@ -660,9 +646,9 @@ command whose response triggered the error."
        (setq nntp--report-1 nntp-report-n))
      result))
 
-(deffoo nntp-retrieve-headers (articles &optional group server fetch-old)
+(deffoo nntp-retrieve-headers (articles &optional group _server fetch-old)
   "Retrieve the headers of ARTICLES."
-  (nntp-drop-guard
+  (nntp-drop-guard group
     (with-current-buffer (nntp-get-process-buffer)
       (erase-buffer)
       (if (and (not gnus-nov-is-evil)
@@ -722,9 +708,9 @@ command whose response triggered the error."
 	  (nntp-copy-to-buffer nntp-server-buffer (point-min) (point-max))
           'headers)))))
 
-(deffoo nntp-retrieve-group-data-early (server infos)
+(deffoo nntp-retrieve-group-data-early (_server infos)
   "Retrieve group info on INFOS."
-  (nntp-drop-guard
+  (nntp-drop-guard nil
     (let ((buffer (nntp-get-process-buffer)))
       (when (eq nntp-server-list-active-group 'try) ;; `try' is initial value
 	(nntp-try-list-active
@@ -739,8 +725,8 @@ command whose response triggered the error."
 	     nil command (gnus-group-real-name (gnus-info-group info)))))
 	(length infos)))))
 
-(deffoo nntp-finish-retrieve-group-infos (server infos count)
-  (nntp-drop-guard
+(deffoo nntp-finish-retrieve-group-infos (_server infos count)
+  (nntp-drop-guard nil
     (let ((buf (nntp-get-process-buffer))
 	  (method (gnus-find-method-for-group
 		   (gnus-info-group (car infos))
@@ -788,7 +774,7 @@ command whose response triggered the error."
 
 (deffoo nntp-retrieve-groups (groups &optional server)
   "Retrieve group info on GROUPS."
-  (nntp-drop-guard
+  (nntp-drop-guard nil
     (catch 'done
       (save-excursion
         ;; Erase nntp-server-buffer before nntp-inhibit-erase.
@@ -875,8 +861,8 @@ command whose response triggered the error."
 	    (nntp-copy-to-buffer nntp-server-buffer (point-min) (point-max))
             'active))))))
 
-(deffoo nntp-retrieve-articles (articles &optional group server)
-  (nntp-drop-guard
+(deffoo nntp-retrieve-articles (articles &optional group _server)
+  (nntp-drop-guard group
     (save-excursion
       (let ((number (length articles))
             (articles articles)
@@ -954,18 +940,18 @@ command whose response triggered the error."
 	  (t
 	   (setq nntp-server-list-active-group t)))))
 
-(deffoo nntp-list-active-group (group &optional server)
+(deffoo nntp-list-active-group (group &optional _server)
   "Return the active info on GROUP (which can be a regexp)."
-  (nntp-drop-guard
+  (nntp-drop-guard group
     (nntp-send-command "^\\.*\r?\n" "LIST ACTIVE" group)))
 
-(deffoo nntp-request-group-articles (group &optional server)
+(deffoo nntp-request-group-articles (group &optional _server)
   "Return the list of existing articles in GROUP."
-  (nntp-drop-guard
+  (nntp-drop-guard group
     (nntp-send-command "^\\.*\r?\n" "LISTGROUP" group)))
 
-(deffoo nntp-request-article (article &optional group server buffer _command)
-  (nntp-drop-guard
+(deffoo nntp-request-article (article &optional group _server buffer _command)
+  (nntp-drop-guard group
     (when (nntp-send-command-and-decode
            "\r?\n\\.\r?\n" "ARTICLE"
            (if (numberp article) (int-to-string article) article))
@@ -975,8 +961,8 @@ command whose response triggered the error."
 	  (copy-to-buffer buffer (point-min) (point-max))))
       (nntp-find-group-and-number group))))
 
-(deffoo nntp-request-head (article &optional group server)
-  (nntp-drop-guard
+(deffoo nntp-request-head (article &optional group _server)
+  (nntp-drop-guard group
     (when (nntp-send-command
            "\r?\n\\.\r?\n" "HEAD"
            (if (numberp article) (int-to-string article) article))
@@ -984,14 +970,14 @@ command whose response triggered the error."
           (nntp-find-group-and-number group)
         (nntp-decode-text)))))
 
-(deffoo nntp-request-body (article &optional group server)
-  (nntp-drop-guard
+(deffoo nntp-request-body (article &optional group _server)
+  (nntp-drop-guard group
     (nntp-send-command-and-decode
      "\r?\n\\.\r?\n" "BODY"
      (if (numberp article) (int-to-string article) article))))
 
-(deffoo nntp-request-group (group &optional server _dont-check _info)
-  (nntp-drop-guard
+(deffoo nntp-request-group (group &optional _server _dont-check _info)
+  (nntp-drop-guard nil
     (nntp-send-command "^[245].*\n" "GROUP" group)))
 
 (deffoo nntp-close-group (_group &optional _server)
@@ -1059,16 +1045,16 @@ the key of the front-line assoc list to incorporate SERVER."
 	      (sleep-for 1)))))
       (gnus-kill-buffer b))))
 
-(deffoo nntp-request-list (&optional server)
-  (nntp-drop-guard
+(deffoo nntp-request-list (&optional _server)
+  (nntp-drop-guard nil
     (nntp-send-command-and-decode "\r?\n\\.\r?\n" "LIST")))
 
-(deffoo nntp-request-list-newsgroups (&optional server)
-  (nntp-drop-guard
+(deffoo nntp-request-list-newsgroups (&optional _server)
+  (nntp-drop-guard nil
     (nntp-send-command "\r?\n\\.\r?\n" "LIST NEWSGROUPS")))
 
-(deffoo nntp-request-newgroups (date &optional server)
-  (nntp-drop-guard
+(deffoo nntp-request-newgroups (date &optional _server)
+  (nntp-drop-guard nil
     (with-current-buffer nntp-server-buffer
       (prog1
 	  (nntp-send-command
@@ -1077,8 +1063,8 @@ the key of the front-line assoc list to incorporate SERVER."
 	   "GMT")
 	(nntp-decode-text)))))
 
-(deffoo nntp-request-post (&optional server)
-  (nntp-drop-guard
+(deffoo nntp-request-post (&optional _server)
+  (nntp-drop-guard nil
     (when (nntp-send-command "^[23].*\r?\n" "POST")
       (let ((response (with-current-buffer nntp-server-buffer
                         nntp-process-response))
