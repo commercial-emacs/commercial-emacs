@@ -307,7 +307,6 @@ backend doesn't catch this error.")
     (prog1 result
       (unless result
         (ignore-errors (nntp-close-server))
-        (nntp-open-server)
         (error "nntp-assert-context: bailing")))))
 
 (defconst nntp--process-buffer-fmt " *nntp %s*")
