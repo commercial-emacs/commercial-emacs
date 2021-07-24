@@ -346,7 +346,6 @@ backend doesn't catch this error.")
         (mm-disable-multibyte)
         (buffer-disable-undo)
         (gnus-add-buffer)
-        (cl-assert (null after-change-functions))
         (mapc (lambda (v) (set (make-local-variable (car v)) (cdr v))) nntp-vars)))))
 
 (defun nntp-record-command (string)
