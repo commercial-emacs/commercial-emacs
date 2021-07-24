@@ -644,7 +644,7 @@ command whose response triggered the error."
        (setq nntp--report-1 nntp-report-n))
      result))
 
-(deffoo nntp-retrieve-headers (articles &optional group _server fetch-old)
+(deffoo nntp-retrieve-headers (articles &optional _group _server fetch-old)
   "Retrieve the headers of ARTICLES."
   (nntp-drop-guard
     (with-current-buffer (nntp-get-process-buffer)
@@ -859,7 +859,7 @@ command whose response triggered the error."
 	    (nntp-copy-to-buffer nntp-server-buffer (point-min) (point-max))
             'active))))))
 
-(deffoo nntp-retrieve-articles (articles &optional group _server)
+(deffoo nntp-retrieve-articles (articles &optional _group _server)
   (nntp-drop-guard
     (save-excursion
       (let ((number (length articles))
@@ -968,7 +968,7 @@ command whose response triggered the error."
           (nntp-find-group-and-number group)
         (nntp-decode-text)))))
 
-(deffoo nntp-request-body (article &optional group _server)
+(deffoo nntp-request-body (article &optional _group _server)
   (nntp-drop-guard
     (nntp-send-command-and-decode
      "\r?\n\\.\r?\n" "BODY"
