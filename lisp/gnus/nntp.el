@@ -306,13 +306,11 @@ backend doesn't catch this error.")
                           '(nntp-address nntp-port-number))))
     (prog1 result
       (unless result
-        (ignore-errors (nntp-close-server))
-        (nntp-open-server)
         (error "nntp-assert-context: bailing")))))
 
 (defconst nntp--process-buffer-fmt " *nntp %s*")
 
-(defsubst nntp-process-buffer-key ()
+(defun nntp-process-buffer-key ()
   (nntp-assert-context)
   (format nntp--process-buffer-fmt
           (mapconcat (apply-partially #'format "%s")
@@ -321,18 +319,17 @@ backend doesn't catch this error.")
                       nntp-port-number)
                      " ")))
 
-(defun nntp-get-process (&optional process-buffer-key)
-  (get-buffer-process (nntp-get-process-buffer process-buffer-key)))
+(defun nntp-get-process ()
+  (get-buffer-process (nntp-get-process-buffer)))
 
-(defun nntp-get-process-buffer (&optional process-buffer-key)
-  (setq process-buffer-key (or process-buffer-key
-                               (nntp-process-buffer-key)))
+(defun nntp-get-process-buffer ()
   (cl-flet ((get
              (key)
              (cl-find-if (lambda (b)
                            (equal key (buffer-name b)))
                          (gnus-buffers))))
-    (let ((extant (get process-buffer-key)))
+    (let* ((process-buffer-key (nntp-process-buffer-key))
+           (extant (get process-buffer-key)))
       (when (and extant (not (get-buffer-process extant)))
         (gnus-kill-buffer extant)
         (setq extant nil))
@@ -455,7 +452,7 @@ retried once before actually displaying the error report."
                            &optional
                            wait-for callback decode)
   "Use COMMAND to retrieve data into BUFFER from PORT on ADDRESS."
-  (let ((process (nntp-get-process (nnoo-current-server 'nntp))))
+  (let ((process (nntp-get-process)))
     (if process
         (progn
           (unless (or nntp-inhibit-erase nnheader-callback-function)
@@ -490,7 +487,7 @@ retried once before actually displaying the error report."
                  nntp-inhibit-output))
     (nntp-erase-buffer nntp-server-buffer))
   (let* ((command (mapconcat #'identity strings " "))
-	 (process (nntp-get-process (nnoo-current-server 'nntp)))
+	 (process (nntp-get-process))
 	 (buffer (and process (process-buffer process)))
 	 (pos (and buffer (with-current-buffer buffer (point)))))
     (if process
@@ -509,7 +506,7 @@ retried once before actually displaying the error report."
 		      (memq
 		       nntp-open-connection-function
 		       nntp-open-connection-functions-never-echo-commands))
-	    (nntp-accept-response)
+	    (nntp-accept-process-output (nntp-get-process))
 	    (with-current-buffer buffer
 	      (goto-char pos)
 	      (if (looking-at (regexp-quote command))
@@ -521,7 +518,7 @@ retried once before actually displaying the error report."
 (defun nntp-send-command-nodelete (wait-for &rest strings)
   "Send STRINGS to server and wait until WAIT-FOR returns."
   (let* ((command (mapconcat #'identity strings " "))
-	 (process (nntp-get-process (nnoo-current-server 'nntp)))
+	 (process (nntp-get-process))
 	 (buffer (and process (process-buffer process)))
 	 (pos (and buffer (with-current-buffer buffer (point)))))
     (if process
@@ -532,7 +529,7 @@ retried once before actually displaying the error report."
 				wait-for nnheader-callback-function)
 	  ;; If nothing to wait for, still remove possibly echo'ed commands
 	  (unless wait-for
-	    (nntp-accept-response)
+	    (nntp-accept-process-output (nntp-get-process))
 	    (with-current-buffer buffer
 	      (goto-char pos)
 	      (if (looking-at (regexp-quote command))
@@ -547,7 +544,7 @@ retried once before actually displaying the error report."
              (not nntp-inhibit-output))
     (nntp-erase-buffer nntp-server-buffer))
   (let* ((command (mapconcat #'identity strings " "))
-	 (process (nntp-get-process (nnoo-current-server 'nntp)))
+	 (process (nntp-get-process))
 	 (buffer (and process (process-buffer process)))
 	 (pos (and buffer (with-current-buffer buffer (point)))))
     (if process
@@ -558,7 +555,7 @@ retried once before actually displaying the error report."
 				wait-for nnheader-callback-function t)
 	  ;; If nothing to wait for, still remove possibly echo'ed commands
 	  (unless wait-for
-	    (nntp-accept-response)
+	    (nntp-accept-process-output (nntp-get-process))
 	    (with-current-buffer buffer
 	      (goto-char pos)
 	      (if (looking-at (regexp-quote command))
@@ -570,16 +567,15 @@ retried once before actually displaying the error report."
 
 (defun nntp-send-buffer (wait-for)
   "Send the current buffer to server and wait until WAIT-FOR returns."
-  (when (not (or nnheader-callback-function
-                 nntp-inhibit-output))
-    (nntp-erase-buffer
-     (nntp-get-process-buffer nntp-server-buffer)))
+  (when (and (not nnheader-callback-function)
+             (not nntp-inhibit-output))
+    (nntp-erase-buffer (nntp-get-process-buffer)))
   (nntp-encode-text)
   ;; Make sure we did not forget to encode some of the content.
   (cl-assert (save-excursion (goto-char (point-min))
                           (not (re-search-forward "[^\000-\377]" nil t))))
   (mm-disable-multibyte)
-  (process-send-region (nntp-get-process (nnoo-current-server 'nntp))
+  (process-send-region (nntp-get-process)
                        (point-min) (point-max))
   (nntp-retrieve-data
    nil nntp-address nntp-port-number nntp-server-buffer
@@ -614,7 +610,7 @@ retried once before actually displaying the error report."
    (t
     nil)))
 
-(defun nntp-with-open-group-function (group server connectionless bodyfun)
+(defun nntp-with-open-group-function (group server bodyfun)
   "Protect against servers that don't like clients that keep idle connections open.
 The problem being that these servers may either close a connection or
 simply ignore any further requests on a connection.  Closed
@@ -625,46 +621,42 @@ connection timeouts (which may be several minutes) or
 `nntp-with-open-group', opens a new connection then re-issues the NNTP
 command whose response triggered the error."
   (setq server (or server (nnoo-current-server 'nntp)))
+  (when group
+    (gnus-check-group group)
+    (with-current-buffer (nntp-get-process-buffer)
+      (erase-buffer)
+      (nntp-send-command "^[245].*\n" "GROUP" group)
+      (erase-buffer)
+      (nntp-erase-buffer nntp-server-buffer)))
   (let ((nntp-report-n nntp--report-1)
         (nntp--report-1 t)
         (nntp-with-open-group-internal nil))
     (while (catch 'nntp-with-open-group-error
-             ;; Open the connection to the server
-             ;; NOTE: Existing connections are NOT tested.
-             (nntp-possibly-change-group group server connectionless)
-
-             (let ((timer
-                    (and nntp-connection-timeout
-                         (run-at-time
-                          nntp-connection-timeout nil
-                          (lambda ()
-                            (when-let* ((process (nntp-get-process server))
-                                        (buffer (process-buffer process)))
-                              ;; When I an able to identify the
-                              ;; connection to the server AND I've
-                              ;; received NO response for
-                              ;; nntp-connection-timeout seconds.
-                              (when (zerop (buffer-size buffer))
-                                ;; Close the connection.  Take no
-                                ;; other action as the accept input
-                                ;; code will handle the closed
-                                ;; connection.
-                                (gnus-kill-buffer buffer))))))))
-               (unwind-protect
-                   (setq nntp-with-open-group-internal
-                         (condition-case nil
-                             (funcall bodyfun)
-                           (quit
-                            (unless debug-on-quit
-                              (nntp-close-server))
-                            (signal 'quit nil))))
-                 (when timer
-                   (cancel-timer timer)))
-               nil))
+             (prog1 nil
+               (let ((timer
+                      (and nntp-connection-timeout
+                           (run-at-time
+                            nntp-connection-timeout nil
+                            (lambda ()
+                              (when-let ((process (nntp-get-process))
+                                         (buffer (process-buffer process)))
+                                ;; When I an able to identify the
+                                ;; connection to the server AND I've
+                                ;; received NO response for
+                                ;; nntp-connection-timeout seconds.
+                                (when (zerop (buffer-size buffer))
+                                  ;; Close the connection.  Take no
+                                  ;; other action as the accept input
+                                  ;; code will handle the closed
+                                  ;; connection.
+                                  (gnus-kill-buffer buffer))))))))
+                 (unwind-protect
+                     (setq nntp-with-open-group-internal (funcall bodyfun))
+                   (when timer (cancel-timer timer))))))
       (setq nntp--report-1 nntp-report-n))
     nntp-with-open-group-internal))
 
-(defmacro nntp-with-open-group (group server &optional connectionless &rest forms)
+(defmacro nntp-with-open-group (group server &rest forms)
   "Protect against servers that don't like clients that keep idle connections open.
 The problem being that these servers may either close a connection or
 simply ignore any further requests on a connection.  Closed
@@ -674,20 +666,16 @@ connection timeouts (which may be several minutes) or
 `nntp-connection-timeout' has expired.  When these occur
 `nntp-with-open-group', opens a new connection then re-issues the NNTP
 command whose response triggered the error."
-  (declare (indent 2) (debug (form form [&optional symbolp] def-body)))
-  (when (and (listp connectionless)
-	     (not (eq connectionless nil)))
-    (setq forms (cons connectionless forms)
-	  connectionless nil))
-  `(nntp-with-open-group-function ,group (or ,server (nnoo-current-server 'nntp))
-                                  ,connectionless
-                                  (lambda () ,@forms)))
+  (declare (indent defun))
+  `(let ((server (or ,server (nnoo-current-server 'nntp))))
+     (when (nntp-server-opened server)
+       (nntp-with-open-group-function ,group server (lambda () ,@forms)))))
 
 (deffoo nntp-retrieve-headers (articles &optional group server fetch-old)
   "Retrieve the headers of ARTICLES."
   (nntp-with-open-group
    group server
-   (with-current-buffer (nntp-get-process-buffer nntp-server-buffer)
+   (with-current-buffer (nntp-get-process-buffer)
      (erase-buffer)
      (if (and (not gnus-nov-is-evil)
               (not nntp-nov-is-evil)
@@ -701,7 +689,7 @@ command whose response triggered the error."
              (count 0)
              (received 0)
              (last-point (point-min))
-             (buf (nntp-get-process-buffer nntp-server-buffer))
+             (buf (nntp-get-process-buffer))
              (nntp-inhibit-erase t)
              article)
          ;; Send HEAD commands.
@@ -718,7 +706,7 @@ command whose response triggered the error."
            ;; order to avoid deadlocks.
            (when (or (null articles)    ;All requests have been sent.
                      (zerop (% count nntp-maximum-request)))
-             (nntp-accept-response)
+             (nntp-accept-process-output (nntp-get-process))
              (while (progn
                       (set-buffer buf)
                       (goto-char last-point)
@@ -734,7 +722,7 @@ command whose response triggered the error."
                     (zerop (% received 20))
                     (nnheader-message 6 "NNTP: Receiving headers... %d%%"
                                       (floor (* received 100.0) number)))
-               (nntp-accept-response))))
+               (nntp-accept-process-output (nntp-get-process)))))
          (and (numberp nntp-large-newsgroup)
               (> number nntp-large-newsgroup)
               (nnheader-message 6 "NNTP: Receiving headers...done"))
@@ -749,7 +737,7 @@ command whose response triggered the error."
 (deffoo nntp-retrieve-group-data-early (server infos)
   "Retrieve group info on INFOS."
   (nntp-with-open-group nil server
-    (when-let ((buffer (nntp-get-process-buffer nntp-server-buffer)))
+    (let ((buffer (nntp-get-process-buffer)))
       (when (eq nntp-server-list-active-group 'try) ;; `try' is initial value
 	(nntp-try-list-active
 	 (gnus-group-real-name (gnus-info-group (car infos)))))
@@ -765,14 +753,13 @@ command whose response triggered the error."
 
 (deffoo nntp-finish-retrieve-group-infos (server infos count)
   (nntp-with-open-group nil server
-    (let ((buf (nntp-get-process-buffer nntp-server-buffer))
+    (let ((buf (nntp-get-process-buffer))
 	  (method (gnus-find-method-for-group
 		   (gnus-info-group (car infos))
 		   (car infos)))
 	  (received 0)
 	  (last-point 1))
-      (when (and buf
-		 count)
+      (when count
 	(with-current-buffer buf
 	  (while (and (gnus-buffer-live-p buf)
 		      (progn
@@ -786,7 +773,7 @@ command whose response triggered the error."
 			  (cl-incf received))
 			(setq last-point (point))
 			(< received count)))
-	    (nntp-accept-response))
+	    (nntp-accept-process-output (nntp-get-process)))
 	  ;; We now have all the entries.  Remove CRs.
 	  (nnheader-strip-cr)
 	  (if (not nntp-server-list-active-group)
@@ -813,164 +800,161 @@ command whose response triggered the error."
 
 (deffoo nntp-retrieve-groups (groups &optional server)
   "Retrieve group info on GROUPS."
-  (nntp-with-open-group
-   nil server
-   (when (nntp-get-process-buffer nntp-server-buffer)
-     (catch 'done
-       (save-excursion
-         ;; Erase nntp-server-buffer before nntp-inhibit-erase.
-	 (nntp-erase-buffer nntp-server-buffer)
-         (set-buffer (nntp-get-process-buffer nntp-server-buffer))
-         ;; The first time this is run, this variable is `try'.  So we
-         ;; try.
-         (when (eq nntp-server-list-active-group 'try)
-           (nntp-try-list-active (car groups)))
-         (erase-buffer)
-         (let ((count 0)
-               (groups groups)
-               (received 0)
-               (last-point (point-min))
-               (nntp-inhibit-erase t)
-               (buf (nntp-get-process-buffer nntp-server-buffer))
-               (command (if nntp-server-list-active-group
-                            "LIST ACTIVE" "GROUP")))
-           (while groups
-             ;; Timeout may have killed the buffer.
-             (unless (gnus-buffer-live-p buf)
-               (nnheader-report 'nntp "Connection to %s is closed." server)
-               (throw 'done nil))
-             ;; Send the command to the server.
-             (nntp-send-command nil command (pop groups))
-             (cl-incf count)
-             ;; Every 400 requests we have to read the stream in
-             ;; order to avoid deadlocks.
-             (when (or (null groups)    ;All requests have been sent.
-                       (zerop (% count nntp-maximum-request)))
-               (nntp-accept-response)
-               (while (and (gnus-buffer-live-p buf)
-                           (progn
-                             ;; Search `blue moon' in this file for the
-                             ;; reason why set-buffer here.
-                             (set-buffer buf)
-                             (goto-char last-point)
-                             ;; Count replies.
-                             (while (re-search-forward "^[0-9]" nil t)
-                               (cl-incf received))
-                             (setq last-point (point))
-                             (< received count)))
-                 (nntp-accept-response))))
+  (nntp-with-open-group nil server
+    (catch 'done
+      (save-excursion
+        ;; Erase nntp-server-buffer before nntp-inhibit-erase.
+        (nntp-erase-buffer nntp-server-buffer)
+        (set-buffer (nntp-get-process-buffer))
+        ;; The first time this is run, this variable is `try'.  So we
+        ;; try.
+        (when (eq nntp-server-list-active-group 'try)
+          (nntp-try-list-active (car groups)))
+        (erase-buffer)
+        (let ((count 0)
+              (groups groups)
+              (received 0)
+              (last-point (point-min))
+              (nntp-inhibit-erase t)
+              (buf (nntp-get-process-buffer))
+              (command (if nntp-server-list-active-group
+                           "LIST ACTIVE" "GROUP")))
+          (while groups
+            ;; Timeout may have killed the buffer.
+            (unless (gnus-buffer-live-p buf)
+              (nnheader-report 'nntp "Connection to %s is closed." server)
+              (throw 'done nil))
+            ;; Send the command to the server.
+            (nntp-send-command nil command (pop groups))
+            (cl-incf count)
+            ;; Every 400 requests we have to read the stream in
+            ;; order to avoid deadlocks.
+            (when (or (null groups)    ;All requests have been sent.
+                      (zerop (% count nntp-maximum-request)))
+              (nntp-accept-process-output (nntp-get-process))
+              (while (and (gnus-buffer-live-p buf)
+                          (progn
+                            ;; Search `blue moon' in this file for the
+                            ;; reason why set-buffer here.
+                            (set-buffer buf)
+                            (goto-char last-point)
+                            ;; Count replies.
+                            (while (re-search-forward "^[0-9]" nil t)
+                              (cl-incf received))
+                            (setq last-point (point))
+                            (< received count)))
+                (nntp-accept-process-output (nntp-get-process)))))
 
-           ;; Wait for the reply from the final command.
-           (unless (gnus-buffer-live-p buf)
-             (nnheader-report 'nntp "Connection to %s is closed." server)
-             (throw 'done nil))
-           (set-buffer buf)
-           (goto-char (point-max))
-           (re-search-backward "^[0-9]" nil t)
-           (when (looking-at "^[23]")
-             (while (and (gnus-buffer-live-p buf)
-                         (progn
-                           (set-buffer buf)
-                           (goto-char (point-max))
-                           (if (not nntp-server-list-active-group)
-                               (not (re-search-backward "\r?\n"
-							(- (point) 3) t))
-                             (not (re-search-backward "^\\.\r?\n"
-                                                      (- (point) 4) t)))))
-               (nntp-accept-response)))
+          ;; Wait for the reply from the final command.
+          (unless (gnus-buffer-live-p buf)
+            (nnheader-report 'nntp "Connection to %s is closed." server)
+            (throw 'done nil))
+          (set-buffer buf)
+          (goto-char (point-max))
+          (re-search-backward "^[0-9]" nil t)
+          (when (looking-at "^[23]")
+            (while (and (gnus-buffer-live-p buf)
+                        (progn
+                          (set-buffer buf)
+                          (goto-char (point-max))
+                          (if (not nntp-server-list-active-group)
+                              (not (re-search-backward "\r?\n"
+						       (- (point) 3) t))
+                            (not (re-search-backward "^\\.\r?\n"
+                                                     (- (point) 4) t)))))
+              (nntp-accept-process-output (nntp-get-process))))
 
-           ;; Now all replies are received.  We remove CRs.
-           (unless (gnus-buffer-live-p buf)
-             (nnheader-report 'nntp "Connection to %s is closed." server)
-             (throw 'done nil))
-           (set-buffer buf)
-           (goto-char (point-min))
-           (while (search-forward "\r" nil t)
-             (replace-match "" t t))
+          ;; Now all replies are received.  We remove CRs.
+          (unless (gnus-buffer-live-p buf)
+            (nnheader-report 'nntp "Connection to %s is closed." server)
+            (throw 'done nil))
+          (set-buffer buf)
+          (goto-char (point-min))
+          (while (search-forward "\r" nil t)
+            (replace-match "" t t))
 
-           (if (not nntp-server-list-active-group)
-               (progn
-		 (nntp-copy-to-buffer nntp-server-buffer
-				      (point-min) (point-max))
-                 'group)
-             ;; We have read active entries, so we just delete the
-             ;; superfluous gunk.
-             (goto-char (point-min))
-             (while (re-search-forward "^[.2-5]" nil t)
-               (delete-region (match-beginning 0)
-                              (progn (forward-line 1) (point))))
-	     (nntp-copy-to-buffer nntp-server-buffer (point-min) (point-max))
-             'active)))))))
+          (if (not nntp-server-list-active-group)
+              (progn
+	        (nntp-copy-to-buffer nntp-server-buffer
+				     (point-min) (point-max))
+                'group)
+            ;; We have read active entries, so we just delete the
+            ;; superfluous gunk.
+            (goto-char (point-min))
+            (while (re-search-forward "^[.2-5]" nil t)
+              (delete-region (match-beginning 0)
+                             (progn (forward-line 1) (point))))
+	    (nntp-copy-to-buffer nntp-server-buffer (point-min) (point-max))
+            'active))))))
 
 (deffoo nntp-retrieve-articles (articles &optional group server)
-  (nntp-with-open-group
-    group server
-   (save-excursion
-     (let ((number (length articles))
-           (articles articles)
-           (count 0)
-           (received 0)
-           (last-point (point-min))
-           (buf (nntp-get-process-buffer nntp-server-buffer))
-           (nntp-inhibit-erase t)
-           (map (apply #'vector articles))
-           (point 1)
-           article)
-       (set-buffer buf)
-       (erase-buffer)
-       ;; Send ARTICLE command.
-       (while (setq article (pop articles))
-         (nntp-send-command
-          nil
-          "ARTICLE" (if (numberp article)
-                        (int-to-string article)
-                      ;; `articles' is either a list of article numbers
-                      ;; or a list of article IDs.
-                      article))
-         (cl-incf count)
-         ;; Every 400 requests we have to read the stream in
-         ;; order to avoid deadlocks.
-         (when (or (null articles)	;All requests have been sent.
-                   (zerop (% count nntp-maximum-request)))
-           (nntp-accept-response)
-           (while (progn
-                    (set-buffer buf)
-                    (goto-char last-point)
-                    ;; Count replies.
-                    (while (nntp-next-result-arrived-p)
-                      (aset map received (cons (aref map received) (point)))
-                      (setq last-point (point))
-                      (cl-incf received))
-                    (< received count))
-             ;; If number of headers is greater than 100, give
-             ;;  informative messages.
-             (and (numberp nntp-large-newsgroup)
-                  (> number nntp-large-newsgroup)
-                  (zerop (% received 20))
-                  (nnheader-message 6 "NNTP: Receiving articles... %d%%"
-                                    (floor (* received 100.0) number)))
-             (nntp-accept-response))))
-       (and (numberp nntp-large-newsgroup)
-            (> number nntp-large-newsgroup)
-            (nnheader-message 6 "NNTP: Receiving articles...done"))
+  (nntp-with-open-group group server
+    (save-excursion
+      (let ((number (length articles))
+            (articles articles)
+            (count 0)
+            (received 0)
+            (last-point (point-min))
+            (buf (nntp-get-process-buffer))
+            (nntp-inhibit-erase t)
+            (map (apply #'vector articles))
+            (point 1)
+            article)
+        (set-buffer buf)
+        (erase-buffer)
+        ;; Send ARTICLE command.
+        (while (setq article (pop articles))
+          (nntp-send-command
+           nil
+           "ARTICLE" (if (numberp article)
+                         (int-to-string article)
+                       ;; `articles' is either a list of article numbers
+                       ;; or a list of article IDs.
+                       article))
+          (cl-incf count)
+          ;; Every 400 requests we have to read the stream in
+          ;; order to avoid deadlocks.
+          (when (or (null articles)	;All requests have been sent.
+                    (zerop (% count nntp-maximum-request)))
+            (nntp-accept-process-output (nntp-get-process))
+            (while (progn
+                     (set-buffer buf)
+                     (goto-char last-point)
+                     ;; Count replies.
+                     (while (nntp-next-result-arrived-p)
+                       (aset map received (cons (aref map received) (point)))
+                       (setq last-point (point))
+                       (cl-incf received))
+                     (< received count))
+              ;; If number of headers is greater than 100, give
+              ;;  informative messages.
+              (and (numberp nntp-large-newsgroup)
+                   (> number nntp-large-newsgroup)
+                   (zerop (% received 20))
+                   (nnheader-message 6 "NNTP: Receiving articles... %d%%"
+                                     (floor (* received 100.0) number)))
+              (nntp-accept-process-output (nntp-get-process)))))
+        (and (numberp nntp-large-newsgroup)
+             (> number nntp-large-newsgroup)
+             (nnheader-message 6 "NNTP: Receiving articles...done"))
 
-       ;; Now we have all the responses.  We go through the results,
-       ;; wash it and copy it over to the server buffer.
-       (set-buffer nntp-server-buffer)
-       (erase-buffer)
-       (setq last-point (point-min))
-       (mapcar
-        (lambda (entry)
-          (narrow-to-region
-           (setq point (goto-char (point-max)))
-           (progn
-	     (nnheader-insert-buffer-substring buf last-point (cdr entry))
-             (point-max)))
-          (setq last-point (cdr entry))
-          (nntp-decode-text)
-          (widen)
-          (cons (car entry) point))
-        map)))))
+        ;; Now we have all the responses.  We go through the results,
+        ;; wash it and copy it over to the server buffer.
+        (set-buffer nntp-server-buffer)
+        (erase-buffer)
+        (setq last-point (point-min))
+        (mapcar
+         (lambda (entry)
+           (narrow-to-region
+            (setq point (goto-char (point-max)))
+            (progn
+	      (nnheader-insert-buffer-substring buf last-point (cdr entry))
+              (point-max)))
+           (setq last-point (cdr entry))
+           (nntp-decode-text)
+           (widen)
+           (cons (car entry) point))
+         map)))))
 
 (defun nntp-try-list-active (group)
   (nntp-list-active-group group)
@@ -984,19 +968,16 @@ command whose response triggered the error."
 
 (deffoo nntp-list-active-group (group &optional server)
   "Return the active info on GROUP (which can be a regexp)."
-  (nntp-with-open-group
-   nil server
-   (nntp-send-command "^\\.*\r?\n" "LIST ACTIVE" group)))
+  (nntp-with-open-group nil server
+    (nntp-send-command "^\\.*\r?\n" "LIST ACTIVE" group)))
 
 (deffoo nntp-request-group-articles (group &optional server)
   "Return the list of existing articles in GROUP."
-  (nntp-with-open-group
-   nil server
-   (nntp-send-command "^\\.*\r?\n" "LISTGROUP" group)))
+  (nntp-with-open-group nil server
+    (nntp-send-command "^\\.*\r?\n" "LISTGROUP" group)))
 
 (deffoo nntp-request-article (article &optional group server buffer _command)
-  (nntp-with-open-group
-      group server
+  (nntp-with-open-group group server
     (when (nntp-send-command-and-decode
            "\r?\n\\.\r?\n" "ARTICLE"
            (if (numberp article) (int-to-string article) article))
@@ -1007,25 +988,22 @@ command whose response triggered the error."
       (nntp-find-group-and-number group))))
 
 (deffoo nntp-request-head (article &optional group server)
-  (nntp-with-open-group
-   group server
-   (when (nntp-send-command
-          "\r?\n\\.\r?\n" "HEAD"
-          (if (numberp article) (int-to-string article) article))
-     (prog1
-         (nntp-find-group-and-number group)
-       (nntp-decode-text)))))
+  (nntp-with-open-group group server
+    (when (nntp-send-command
+           "\r?\n\\.\r?\n" "HEAD"
+           (if (numberp article) (int-to-string article) article))
+      (prog1
+          (nntp-find-group-and-number group)
+        (nntp-decode-text)))))
 
 (deffoo nntp-request-body (article &optional group server)
-  (nntp-with-open-group
-   group server
-   (nntp-send-command-and-decode
-    "\r?\n\\.\r?\n" "BODY"
-    (if (numberp article) (int-to-string article) article))))
+  (nntp-with-open-group group server
+    (nntp-send-command-and-decode
+     "\r?\n\\.\r?\n" "BODY"
+     (if (numberp article) (int-to-string article) article))))
 
 (deffoo nntp-request-group (group &optional server _dont-check _info)
-  (nntp-with-open-group
-    nil server
+  (nntp-with-open-group nil server
     (nntp-send-command "^[245].*\n" "GROUP" group)))
 
 (deffoo nntp-close-group (_group &optional _server)
@@ -1038,7 +1016,7 @@ command whose response triggered the error."
        nntp-server-buffer
        (gnus-buffer-live-p nntp-server-buffer)))
 
-(deffoo nntp-open-server (server &optional defs _connectionless)
+(deffoo nntp-open-server (server &optional defs)
   "Context switch based on SERVER.
 
 If `nnoo-current-server-p' is false for SERVER,
@@ -1061,8 +1039,7 @@ the key of the front-line assoc list to incorporate SERVER."
 
 (deffoo nntp-close-server (&optional server defs)
   (nnoo-change-server 'nntp server defs)
-  (nntp-possibly-change-group nil server t)
-  (when-let ((process (nntp-get-process (nntp-process-buffer-key))))
+  (when-let ((process (nntp-get-process)))
     (when (memq (process-status process) '(open run))
       (ignore-errors
 	(nntp-send-string process "QUIT")
@@ -1072,8 +1049,7 @@ the key of the front-line assoc list to incorporate SERVER."
 	  ;; QUIT command actually is sent out before we kill
 	  ;; the process.
 	  (sleep-for 1)))))
-  (when-let ((buffer (nntp-get-process-buffer (nntp-process-buffer-key))))
-    (gnus-kill-buffer buffer))
+  (gnus-kill-buffer (nntp-get-process-buffer))
   (nnoo-close-server 'nntp))
 
 (deffoo nntp-request-close ()
@@ -1101,13 +1077,11 @@ the key of the front-line assoc list to incorporate SERVER."
    (nntp-send-command-and-decode "\r?\n\\.\r?\n" "LIST")))
 
 (deffoo nntp-request-list-newsgroups (&optional server)
-  (nntp-with-open-group
-   nil server
-   (nntp-send-command "\r?\n\\.\r?\n" "LIST NEWSGROUPS")))
+  (nntp-with-open-group nil server
+    (nntp-send-command "\r?\n\\.\r?\n" "LIST NEWSGROUPS")))
 
 (deffoo nntp-request-newgroups (date &optional server)
-  (nntp-with-open-group
-      nil server
+  (nntp-with-open-group nil server
     (with-current-buffer nntp-server-buffer
       (prog1
 	  (nntp-send-command
@@ -1117,26 +1091,25 @@ the key of the front-line assoc list to incorporate SERVER."
 	(nntp-decode-text)))))
 
 (deffoo nntp-request-post (&optional server)
-  (nntp-with-open-group
-   nil server
-   (when (nntp-send-command "^[23].*\r?\n" "POST")
-     (let ((response (with-current-buffer nntp-server-buffer
-                       nntp-process-response))
-           server-id)
-       (when (and response
-                  (string-match "^[23].*\\(<[^\t\n @<>]+@[^\t\n @<>]+>\\)"
-                                response))
-         (setq server-id (match-string 1 response))
-         (narrow-to-region (goto-char (point-min))
-                           (if (search-forward "\n\n" nil t)
-                               (1- (point))
-                             (point-max)))
-         (unless (mail-fetch-field "Message-ID")
-           (goto-char (point-min))
-           (insert "Message-ID: " server-id "\n"))
-         (widen))
-       (run-hooks 'nntp-prepare-post-hook)
-       (nntp-send-buffer "^[23].*\n")))))
+  (nntp-with-open-group nil server
+    (when (nntp-send-command "^[23].*\r?\n" "POST")
+      (let ((response (with-current-buffer nntp-server-buffer
+                        nntp-process-response))
+            server-id)
+        (when (and response
+                   (string-match "^[23].*\\(<[^\t\n @<>]+@[^\t\n @<>]+>\\)"
+                                 response))
+          (setq server-id (match-string 1 response))
+          (narrow-to-region (goto-char (point-min))
+                            (if (search-forward "\n\n" nil t)
+                                (1- (point))
+                              (point-max)))
+          (unless (mail-fetch-field "Message-ID")
+            (goto-char (point-min))
+            (insert "Message-ID: " server-id "\n"))
+          (widen))
+        (run-hooks 'nntp-prepare-post-hook)
+        (nntp-send-buffer "^[23].*\n")))))
 
 (deffoo nntp-request-type (_group _article)
   'news)
@@ -1227,12 +1200,11 @@ If SEND-IF-FORCE, only send authinfo to the server if the
   (nntp-assert-context)
   (run-hooks 'nntp-prepare-server-hook)
   (let* ((pbuffer (nntp-make-process-buffer process-buffer-key))
-	 (timer
-	  (and nntp-connection-timeout
-	       (run-at-time
-		nntp-connection-timeout nil
-		(lambda ()
-		  (gnus-kill-buffer pbuffer)))))
+	 (timer (and nntp-connection-timeout
+	             (run-at-time
+		      nntp-connection-timeout nil
+		      (lambda ()
+		        (gnus-kill-buffer pbuffer)))))
 	 (process
 	  (condition-case err
 	      (let ((coding-system-for-read 'binary)
@@ -1398,8 +1370,7 @@ If SEND-IF-FORCE, only send authinfo to the server if the
 
 (defun nntp-accept-process-output (process)
   "Wait for output from PROCESS and message some dots."
-  (with-current-buffer (or (nntp-get-process-buffer nntp-server-buffer)
-                           nntp-server-buffer)
+  (with-current-buffer (nntp-get-process-buffer)
     (let ((len (/ (buffer-size) 1024))
 	  message-log-max)
       (unless (< len 10)
@@ -1414,18 +1385,6 @@ If SEND-IF-FORCE, only send authinfo to the server if the
       (or (and process
 	       (memq (process-status process) '(open run)))
           (nntp-report "Server closed connection")))))
-
-(defun nntp-accept-response ()
-  "Wait for output from the process that outputs to BUFFER."
-  (nntp-accept-process-output (nntp-get-process (nntp-process-buffer-key))))
-
-(defun nntp-possibly-change-group (group _server &optional _connectionless)
-  (when group
-    (with-current-buffer (nntp-get-process-buffer (nntp-process-buffer-key))
-      (erase-buffer)
-      (nntp-send-command "^[245].*\n" "GROUP" group)
-      (erase-buffer)
-      (nntp-erase-buffer nntp-server-buffer))))
 
 (defun nntp-decode-text (&optional cr-only)
   "Decode the text in the current buffer."
@@ -1508,7 +1467,7 @@ If SEND-IF-FORCE, only send authinfo to the server if the
 	  last-point
 	  in-process-buffer-p
 	  (buf nntp-server-buffer)
-	  (process-buffer (nntp-get-process-buffer nntp-server-buffer))
+	  (process-buffer (nntp-get-process-buffer))
 	  first status)
       ;; We have to check `nntp-server-xover'.  If it gets set to nil,
       ;; that means that the server does not understand XOVER, but we
@@ -1534,7 +1493,7 @@ If SEND-IF-FORCE, only send authinfo to the server if the
 	  (when (or (null articles)	;All requests have been sent.
 		    (= 1 (% count nntp-maximum-request)))
 
-	    (nntp-accept-response)
+	    (nntp-accept-process-output (nntp-get-process))
 	    ;; On some Emacs versions the preceding function has a
 	    ;; tendency to change the buffer.  Perhaps.  It's quite
 	    ;; difficult to reproduce, because it only seems to happen
@@ -1560,7 +1519,7 @@ If SEND-IF-FORCE, only send authinfo to the server if the
 			     (forward-line -1)
 			     (not (looking-at "^\\.\r?\n"))))))
 	      ;; I haven't read the end of the final response
-	      (nntp-accept-response)
+	      (nntp-accept-process-output (nntp-get-process))
 	      (set-buffer process-buffer))))
 
         ;; Some nntp servers seem to have an extension to the XOVER
