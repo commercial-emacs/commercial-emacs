@@ -28,7 +28,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "blockinput.h"
 #include "systime.h"
-#include "thread.h"
 
 static ptrdiff_t threads_holding_glib_lock;
 static GMainContext *glib_main_context;
