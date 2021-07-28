@@ -1012,7 +1012,7 @@ unnecessary, and obfuscate things considerably."
   (when (or (stringp (car defs))
 	    (numberp (car defs)))
     (setq defs (cons (list 'nntp-port-number (car defs)) (cdr defs))))
-  (unless (assq 'nntp-address defs)
+  (unless (cadr (assq 'nntp-address defs))
     (setq defs (append defs (list (list 'nntp-address server)))))
   (nnoo-change-server 'nntp server defs))
 
