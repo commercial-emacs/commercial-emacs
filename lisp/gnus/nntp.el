@@ -643,8 +643,9 @@ command whose response triggered the error."
        (setq nntp--report-1 nntp-report-n))
      result))
 
-(deffoo nntp-retrieve-headers (articles &optional _group _server fetch-old)
+(deffoo nntp-retrieve-headers (articles &optional _group server fetch-old)
   "Retrieve the headers of ARTICLES."
+  (nntp-change-server server)
   (nntp-drop-guard
     (with-current-buffer (nntp-get-process-buffer)
       (erase-buffer)
@@ -705,8 +706,9 @@ command whose response triggered the error."
 	  (nntp-copy-to-buffer nntp-server-buffer (point-min) (point-max))
           'headers)))))
 
-(deffoo nntp-retrieve-group-data-early (_server infos)
+(deffoo nntp-retrieve-group-data-early (server infos)
   "Retrieve group info on INFOS."
+  (nntp-change-server server)
   (nntp-drop-guard
     (let ((buffer (nntp-get-process-buffer)))
       (when (eq nntp-server-list-active-group 'try) ;; `try' is initial value
@@ -722,7 +724,8 @@ command whose response triggered the error."
 	     nil command (gnus-group-real-name (gnus-info-group info)))))
 	(length infos)))))
 
-(deffoo nntp-finish-retrieve-group-infos (_server infos count)
+(deffoo nntp-finish-retrieve-group-infos (server infos count)
+  (nntp-change-server server)
   (nntp-drop-guard
     (let ((buf (nntp-get-process-buffer))
 	  (method (gnus-find-method-for-group
@@ -771,6 +774,7 @@ command whose response triggered the error."
 
 (deffoo nntp-retrieve-groups (groups &optional server)
   "Retrieve group info on GROUPS."
+  (nntp-change-server server)
   (nntp-drop-guard
     (catch 'done
       (save-excursion
@@ -858,7 +862,8 @@ command whose response triggered the error."
 	    (nntp-copy-to-buffer nntp-server-buffer (point-min) (point-max))
             'active))))))
 
-(deffoo nntp-retrieve-articles (articles &optional _group _server)
+(deffoo nntp-retrieve-articles (articles &optional _group server)
+  (nntp-change-server server)
   (nntp-drop-guard
     (save-excursion
       (let ((number (length articles))
@@ -937,17 +942,20 @@ command whose response triggered the error."
 	  (t
 	   (setq nntp-server-list-active-group t)))))
 
-(deffoo nntp-list-active-group (group &optional _server)
+(deffoo nntp-list-active-group (group &optional server)
   "Return the active info on GROUP (which can be a regexp)."
+  (nntp-change-server server)
   (nntp-drop-guard
     (nntp-send-command "^\\.*\r?\n" "LIST ACTIVE" group)))
 
-(deffoo nntp-request-group-articles (group &optional _server)
+(deffoo nntp-request-group-articles (group &optional server)
   "Return the list of existing articles in GROUP."
+  (nntp-change-server server)
   (nntp-drop-guard
     (nntp-send-command "^\\.*\r?\n" "LISTGROUP" group)))
 
-(deffoo nntp-request-article (article &optional group _server buffer _command)
+(deffoo nntp-request-article (article &optional group server buffer _command)
+  (nntp-change-server server)
   (nntp-drop-guard
     (when (nntp-send-command-and-decode
            "\r?\n\\.\r?\n" "ARTICLE"
@@ -958,7 +966,8 @@ command whose response triggered the error."
 	  (copy-to-buffer buffer (point-min) (point-max))))
       (nntp-find-group-and-number group))))
 
-(deffoo nntp-request-head (article &optional group _server)
+(deffoo nntp-request-head (article &optional group server)
+  (nntp-change-server server)
   (nntp-drop-guard
     (when (nntp-send-command
            "\r?\n\\.\r?\n" "HEAD"
@@ -967,17 +976,20 @@ command whose response triggered the error."
           (nntp-find-group-and-number group)
         (nntp-decode-text)))))
 
-(deffoo nntp-request-body (article &optional _group _server)
+(deffoo nntp-request-body (article &optional _group server)
+  (nntp-change-server server)
   (nntp-drop-guard
     (nntp-send-command-and-decode
      "\r?\n\\.\r?\n" "BODY"
      (if (numberp article) (int-to-string article) article))))
 
-(deffoo nntp-request-group (group &optional _server _dont-check _info)
+(deffoo nntp-request-group (group &optional server _dont-check _info)
+  (nntp-change-server server)
   (nntp-drop-guard
     (nntp-send-command "^[245].*\n" "GROUP" group)))
 
-(deffoo nntp-close-group (_group &optional _server)
+(deffoo nntp-close-group (_group &optional server)
+  (nntp-change-server server)
   t)
 
 (deffoo nntp-server-opened (&optional server)
@@ -987,29 +999,30 @@ command whose response triggered the error."
        nntp-server-buffer
        (gnus-buffer-live-p nntp-server-buffer)))
 
-(deffoo nntp-open-server (server &optional defs)
+(defun nntp-change-server (server &optional defs)
   "Context switch based on SERVER.
 
 If `nnoo-current-server-p' is false for SERVER,
 `nnoo-change-server' replaces the current context in `nnoo-state-alist'
 with DEFS.  And does so for all parent classes of nnimap.
 
-This imagined necessity of a back-line assoc list called `nnoo-state-alist'
-was of course another \"youthful indiscretion.\"  He just had to augment
-the key of the front-line assoc list to incorporate SERVER."
+`nnoo-change-server' and `nnoo-state-alist' in hindsight were obviously
+unnecessary, and obfuscate things considerably."
+  (setq server (or server (nnoo-current-server 'nntp)))
+  (when (or (stringp (car defs))
+	    (numberp (car defs)))
+    (setq defs (cons (list 'nntp-port-number (car defs)) (cdr defs))))
+  (unless (assq 'nntp-address defs)
+    (setq defs (append defs (list (list 'nntp-address server)))))
+  (nnoo-change-server 'nntp server  defs))
+
+(deffoo nntp-open-server (server &optional defs)
   (nnheader-init-server-buffer)
   (prog1 t
-    (or (nntp-server-opened server)
-        (progn
-          (when (or (stringp (car defs))
-	            (numberp (car defs)))
-            (setq defs (cons (list 'nntp-port-number (car defs)) (cdr defs))))
-          (unless (assq 'nntp-address defs)
-            (setq defs (append defs (list (list 'nntp-address server)))))
-          (nnoo-change-server 'nntp server defs)))))
+    (nntp-change-server server defs)))
 
 (deffoo nntp-close-server (&optional server defs)
-  (nnoo-change-server 'nntp server defs)
+  (nntp-change-server server defs)
   (when-let ((process (nntp-get-process)))
     (when (memq (process-status process) '(open run))
       (ignore-errors
@@ -1042,15 +1055,18 @@ the key of the front-line assoc list to incorporate SERVER."
 	      (sleep-for 1)))))
       (gnus-kill-buffer b))))
 
-(deffoo nntp-request-list (&optional _server)
+(deffoo nntp-request-list (&optional server)
+  (nntp-change-server server)
   (nntp-drop-guard
     (nntp-send-command-and-decode "\r?\n\\.\r?\n" "LIST")))
 
-(deffoo nntp-request-list-newsgroups (&optional _server)
+(deffoo nntp-request-list-newsgroups (&optional server)
+  (nntp-change-server server)
   (nntp-drop-guard
     (nntp-send-command "\r?\n\\.\r?\n" "LIST NEWSGROUPS")))
 
-(deffoo nntp-request-newgroups (date &optional _server)
+(deffoo nntp-request-newgroups (date &optional server)
+  (nntp-change-server server)
   (nntp-drop-guard
     (with-current-buffer nntp-server-buffer
       (prog1
@@ -1060,7 +1076,8 @@ the key of the front-line assoc list to incorporate SERVER."
 	   "GMT")
 	(nntp-decode-text)))))
 
-(deffoo nntp-request-post (&optional _server)
+(deffoo nntp-request-post (&optional server)
+  (nntp-change-server server)
   (nntp-drop-guard
     (when (nntp-send-command "^[23].*\r?\n" "POST")
       (let ((response (with-current-buffer nntp-server-buffer
