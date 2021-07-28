@@ -3849,6 +3849,11 @@ Uses the process/prefix convention."
   (interactive "P" gnus-group-mode)
   (gnus-group-set-subscription-at-point n 'subscribe))
 
+(define-obsolete-function-alias 'gnus-group-unsubscribe-current-group
+  'gnus-group-toggle-subscription-at-point "28.1")
+(define-obsolete-function-alias 'gnus-group-unsubscribe-group
+  'gnus-group-toggle-subscription "28.1")
+
 (defun gnus-group-toggle-subscription-at-point (&optional n)
   "Toggle subscription of the current group.
 If given numerical prefix, toggle the N next groups."

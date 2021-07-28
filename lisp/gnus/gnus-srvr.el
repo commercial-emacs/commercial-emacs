@@ -931,8 +931,8 @@ If NUMBER, fetch this number of articles."
   (interactive "p" gnus-browse-mode)
   (gnus-browse-next-group (- n)))
 
-(defalias 'gnus-browse-unsubscribe-current-group #'gnus-browse-toggle-subscription)
-(defalias 'gnus-browse-subscribe-current-group #'gnus-browse-toggle-subscription)
+(define-obsolete-function-alias 'gnus-browse-unsubscribe-current-group
+  'gnus-browse-toggle-subscription "28.1")
 
 (defun gnus-browse-toggle-subscription (arg)
   "(Un)subscribe to the next ARG groups.
