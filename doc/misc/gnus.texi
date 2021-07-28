@@ -3686,10 +3686,10 @@ Enter the current group (@code{gnus-browse-select-group}).
 
 @item u
 @kindex u @r{(Browse)}
-@findex gnus-browse-unsubscribe-current-group
+@findex gnus-browse-toggle-subscription
 @vindex gnus-browse-subscribe-newsgroup-method
-Unsubscribe to the current group, or, as will be the case here,
-subscribe to it (@code{gnus-browse-unsubscribe-current-group}).  You
+Toggle subscription of the current group
+(@code{gnus-browse-toggle-subscription}).  You
 can affect the way the new group is entered into the Group buffer
 using the variable @code{gnus-browse-subscribe-newsgroup-method}.  See
 @pxref{Subscription Methods} for available options.

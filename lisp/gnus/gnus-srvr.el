@@ -714,7 +714,7 @@ claim them."
     "\M-n" gnus-browse-next-group
     "\M-p" gnus-browse-prev-group
     "\r" gnus-browse-select-group
-    "u" gnus-browse-unsubscribe-current-group
+    "u" gnus-browse-toggle-subscription
     "l" gnus-browse-exit
     "L" gnus-browse-exit
     "q" gnus-browse-exit
@@ -733,7 +733,7 @@ claim them."
     (easy-menu-define
      gnus-browse-menu gnus-browse-mode-map ""
      '("Browse"
-       ["Subscribe" gnus-browse-unsubscribe-current-group t]
+       ["Toggle Subscribe" gnus-browse-toggle-subscription t]
        ["Read" gnus-browse-read-group t]
        ["Select" gnus-browse-select-group t]
        ["Describe" gnus-browse-describe-group t]
@@ -879,9 +879,9 @@ All normal editing commands are switched off.
 \\<gnus-browse-mode-map>
 The only things you can do in this buffer is
 
-1) `\\[gnus-browse-unsubscribe-current-group]' to subscribe to a group.
-The group will be inserted into the group buffer upon exit from this
-buffer.
+1) `\\[gnus-browse-toggle-subscription]' to subscribe or unsubscribe to
+a group.  The group will be inserted into the group buffer upon exit from
+this buffer.
 
 2) `\\[gnus-browse-read-group]' to read a group ephemerally.
 
@@ -931,7 +931,10 @@ If NUMBER, fetch this number of articles."
   (interactive "p" gnus-browse-mode)
   (gnus-browse-next-group (- n)))
 
-(defun gnus-browse-unsubscribe-current-group (arg)
+(defalias 'gnus-browse-unsubscribe-current-group #'gnus-browse-toggle-subscription)
+(defalias 'gnus-browse-subscribe-current-group #'gnus-browse-toggle-subscription)
+
+(defun gnus-browse-toggle-subscription (arg)
   "(Un)subscribe to the next ARG groups.
 The variable `gnus-browse-subscribe-newsgroup-method' determines
 how new groups will be entered into the group buffer."
