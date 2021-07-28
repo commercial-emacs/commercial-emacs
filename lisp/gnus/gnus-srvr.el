@@ -932,9 +932,11 @@ If NUMBER, fetch this number of articles."
   (gnus-browse-next-group (- n)))
 
 (define-obsolete-function-alias 'gnus-browse-unsubscribe-current-group
+  'gnus-browse-toggle-subscription-at-point "28.1")
+(define-obsolete-function-alias 'gnus-browse-unsubscribe-group
   'gnus-browse-toggle-subscription "28.1")
 
-(defun gnus-browse-toggle-subscription (arg)
+(defun gnus-browse-toggle-subscription-at-point (arg)
   "(Un)subscribe to the next ARG groups.
 The variable `gnus-browse-subscribe-newsgroup-method' determines
 how new groups will be entered into the group buffer."
@@ -945,7 +947,7 @@ how new groups will be entered into the group buffer."
 	(arg (abs arg)))
     (while (and (> arg 0)
 		(not (eobp))
-		(gnus-browse-unsubscribe-group)
+		(gnus-browse-toggle-subscription)
 		(zerop (gnus-browse-next-group ward)))
       (cl-decf arg))
     (gnus-group-position-point)
@@ -977,7 +979,7 @@ doing the deletion."
 	       gnus-browse-mode)
   (gnus-group-delete-group group force))
 
-(defun gnus-browse-unsubscribe-group ()
+(defun gnus-browse-toggle-subscription ()
   "Toggle subscription of the current group in the browse buffer."
   (let ((sub nil)
 	(buffer-read-only nil)
