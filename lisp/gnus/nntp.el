@@ -1014,7 +1014,7 @@ unnecessary, and obfuscate things considerably."
     (setq defs (cons (list 'nntp-port-number (car defs)) (cdr defs))))
   (unless (assq 'nntp-address defs)
     (setq defs (append defs (list (list 'nntp-address server)))))
-  (nnoo-change-server 'nntp server  defs))
+  (nnoo-change-server 'nntp server defs))
 
 (deffoo nntp-open-server (server &optional defs)
   (nnheader-init-server-buffer)
