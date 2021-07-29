@@ -3849,11 +3849,15 @@ Uses the process/prefix convention."
   (interactive "P" gnus-group-mode)
   (gnus-group-set-subscription-at-point n 'subscribe))
 
-(defsubst gnus-group-unsubscribe-current-group (&optional n _do-sub)
-  (gnus-group-toggle-subscription-at-point n))
+(defsubst gnus-group-unsubscribe-current-group (&optional n do-sub)
+  (if do_sub
+      (gnus-group-set-subscription-at-point n do-sub)
+    (gnus-group-toggle-subscription-at-point n)))
 
-(defsubst gnus-group-unsubscribe-group (group &optional _level silent)
-  (gnus-group-toggle-subscription group silent))
+(defsubst gnus-group-unsubscribe-group (group &optional level silent)
+  (if level
+      (gnus-group-set-subscription group level silent)
+    (gnus-group-toggle-subscription group silent)))
 
 (make-obsolete 'gnus-group-unsubscribe-current-group
   'gnus-group-toggle-subscription-at-point "28.1")
