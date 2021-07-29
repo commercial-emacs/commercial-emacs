@@ -102,12 +102,13 @@ tree-sitter language dynamic modules.
 
 PATTERN is a tree-sitter query pattern. (See manual for how to
 write query patterns.)  This pattern should capture nodes with
-either face names or function names.  If captured with a face
-name, the node's corresponding text in the buffer is fontified
-with that face; if captured with a function name, the function is
-called with three arguments, BEG END NODE, where BEG and END
+either face symbols or function symbols.  If captured with a face
+symbol, the node's corresponding text in the buffer is fontified
+with that face; if captured with a function symbol, the function
+is called with three arguments, BEG END NODE, where BEG and END
 marks the span of the corresponding text, and NODE is the node
-itself.")
+itself.  If a symbol is both a face and a function, it is treated
+as a face.")
 
 (defun tree-sitter-fontify-region-function (beg end &optional verbose)
   "Fontify the region between BEG and END.

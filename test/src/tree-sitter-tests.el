@@ -148,5 +148,58 @@
                          (cdr entry))))
                 (tree-sitter-query-capture root-node pattern)))))))
 
+(ert-deftest tree-sitter-narrow ()
+  "Tests if narrowing works."
+  (with-temp-buffer
+    (let (parser root-node pattern doc-node object-node pair-node)
+      (progn
+        (insert "xxx[1,{\"name\": \"Bob\"},2,3]xxx")
+        (narrow-to-region (+ (point-min) 3) (- (point-max) 3))
+        (setq parser (tree-sitter-create-parser
+                      (current-buffer) (tree-sitter-json)))
+        (setq root-node (tree-sitter-parser-root-node
+                         parser)))
+      ;; This test is from the basic test.
+      (should
+       (equal
+        (tree-sitter-node-string
+         (tree-sitter-parser-root-node parser))
+        "(document (array (number) (object (pair key: (string (string_content)) value: (string (string_content)))) (number) (number)))"))
+
+      (widen)
+      (goto-char (point-min))
+      (insert "ooo")
+      (should (equal "oooxxx[1,{\"name\": \"Bob\"},2,3]xxx"
+                     (buffer-string)))
+      (delete-region 10 26)
+      (should (equal "oooxxx[1,2,3]xxx"
+                     (buffer-string)))
+      (narrow-to-region (+ (point-min) 6) (- (point-max) 3))
+      ;; This test is also from the basic test.
+      (should
+       (equal (tree-sitter-node-string
+               (tree-sitter-parser-root-node parser))
+              "(document (array (number) (number) (number)))"))
+      (widen)
+      (goto-char (point-max))
+      (insert "[1,2]")
+      (should (equal "oooxxx[1,2,3]xxx[1,2]"
+                     (buffer-string)))
+      (narrow-to-region (- (point-max) 5) (point-max))
+      (should
+       (equal (tree-sitter-node-string
+               (tree-sitter-parser-root-node parser))
+              "(document (array (number) (number)))"))
+      (widen)
+      (goto-char (point-min))
+      (insert "[1]")
+      (should (equal "[1]oooxxx[1,2,3]xxx[1,2]"
+                     (buffer-string)))
+      (narrow-to-region (point-min) (+ (point-min) 3))
+      (should
+       (equal (tree-sitter-node-string
+               (tree-sitter-parser-root-node parser))
+              "(document (array (number)))")))))
+
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here

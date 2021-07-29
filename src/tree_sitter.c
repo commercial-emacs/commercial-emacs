@@ -19,17 +19,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/param.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-
 #include "lisp.h"
 #include "buffer.h"
-#include "coding.h"
 #include "tree_sitter.h"
 
 /* parser.h defines a macro ADVANCE that conflicts with alloc.c.  */
@@ -61,6 +52,16 @@ DEFUN ("tree-sitter-node-p",
 
 /*** Parsing functions */
 
+static inline void
+ts_tree_edit_1 (TSTree *tree, ptrdiff_t start_byte,
+		ptrdiff_t old_end_byte, ptrdiff_t new_end_byte)
+{
+  TSPoint dummy_point = {0, 0};
+  TSInputEdit edit = {start_byte, old_end_byte, new_end_byte,
+		      dummy_point, dummy_point, dummy_point};
+  ts_tree_edit (tree, &edit);
+}
+
 /* Update each parser's tree after the user made an edit.  This
 function does not parse the buffer and only updates the tree. (So it
 should be very fast.)  */
@@ -68,18 +69,38 @@ void
 ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 		  ptrdiff_t new_end_byte)
 {
+  eassert(start_byte <= old_end_byte);
+  eassert(start_byte <= new_end_byte);
+
   Lisp_Object parser_list = Fsymbol_value (Qtree_sitter_parser_list);
-  TSPoint dummy_point = {0, 0};
-  TSInputEdit edit = {start_byte, old_end_byte, new_end_byte,
-		      dummy_point, dummy_point, dummy_point};
+
   while (!NILP (parser_list))
     {
       Lisp_Object lisp_parser = Fcar (parser_list);
       TSTree *tree = XTS_PARSER (lisp_parser)->tree;
       if (tree != NULL)
-	ts_tree_edit (tree, &edit);
-      XTS_PARSER (lisp_parser)->need_reparse = true;
-      parser_list = Fcdr (parser_list);
+	{
+	  /* We "clip" the change to between visible_beg and
+	     visible_end.  It is okay if visible_end ends up larger
+	     than BUF_Z, tree-sitter only access buffer text during
+	     re-parse, and we will adjust visible_beg/end before
+	     re-parse.  */
+	  ptrdiff_t visible_beg = XTS_PARSER (lisp_parser)->visible_beg;
+	  ptrdiff_t visible_end = XTS_PARSER (lisp_parser)->visible_end;
+
+	  ptrdiff_t visible_start =
+	    max (visible_beg, start_byte) - visible_beg;
+	  ptrdiff_t visible_old_end =
+	    min (visible_end, old_end_byte) - visible_beg;
+	  ptrdiff_t visible_new_end =
+	    min (visible_end, new_end_byte) - visible_beg;
+
+	  ts_tree_edit_1 (tree, visible_start, visible_old_end,
+			  visible_new_end);
+	  XTS_PARSER (lisp_parser)->need_reparse = true;
+
+	  parser_list = Fcdr (parser_list);
+	}
     }
 }
 
@@ -93,16 +114,67 @@ ts_ensure_parsed (Lisp_Object parser)
   TSParser *ts_parser = XTS_PARSER (parser)->parser;
   TSTree *tree = XTS_PARSER(parser)->tree;
   TSInput input = XTS_PARSER (parser)->input;
+  struct buffer *buffer = XTS_PARSER (parser)->buffer;
+
+  /* Before we parse, catch up with the narrowing situation.  We
+     change visible_beg and visible_end to match BUF_BEGV_BYTE and
+     BUF_ZV_BYTE, and inform tree-sitter of the change.  */
+  ptrdiff_t visible_beg = XTS_PARSER (parser)->visible_beg;
+  ptrdiff_t visible_end = XTS_PARSER (parser)->visible_end;
+  /* Before re-parse, we want to move the visible range of tree-sitter
+     to matched the narrowed range. For example:
+     Move ________|____|__
+     to   |____|__________ */
+
+  /* 1. Make sure visible_beg <= BUF_BEGV_BYTE.  */
+  if (visible_beg > BUF_BEGV_BYTE (buffer))
+    {
+      /* Tree-sitter sees: insert at the beginning. */
+      ts_tree_edit_1 (tree, 0, 0, visible_beg - BUF_BEGV_BYTE (buffer));
+      visible_beg = BUF_BEGV_BYTE (buffer);
+    }
+  /* 2. Make sure visible_end = BUF_ZV_BYTE.  */
+  if (visible_end < BUF_ZV_BYTE (buffer))
+    {
+      /* Tree-sitter sees: insert at the end.  */
+      ts_tree_edit_1 (tree, visible_end - visible_beg,
+		      visible_end - visible_beg,
+		      BUF_ZV_BYTE (buffer) - visible_beg);
+      visible_end = BUF_ZV_BYTE (buffer);
+    }
+  else if (visible_end > BUF_ZV_BYTE (buffer))
+    {
+      /* Tree-sitter sees: delete at the end.  */
+      ts_tree_edit_1 (tree, BUF_ZV_BYTE (buffer) - visible_beg,
+		      visible_end - visible_beg,
+		      BUF_ZV_BYTE (buffer) - visible_beg);
+      visible_end = BUF_ZV_BYTE (buffer);
+    }
+  /* 3. Make sure visible_beg = BUF_BEGV_BYTE.  */
+  if (visible_beg < BUF_BEGV_BYTE (buffer))
+    {
+      /* Tree-sitter sees: delete at the beginning.  */
+      ts_tree_edit_1 (tree, 0, BUF_BEGV_BYTE (buffer) - visible_beg, 0);
+      visible_beg = BUF_BEGV_BYTE (buffer);
+    }
+  XTS_PARSER (parser)->visible_beg = visible_beg;
+  XTS_PARSER (parser)->visible_end = visible_end;
+
   TSTree *new_tree = ts_parser_parse(ts_parser, tree, input);
-  /* This should be very rare: it only happens when 1) language is not
-     set (impossible in Emacs because the user has to supply a
-     language to create a parser), 2) parse canceled due to timeout
-     (impossible because we don't set a timeout), 3) parse canceled
-     due to cancellation flag (impossible because we don't set the
-     flag).  (See comments for ts_parser_parse in
+  /* This should be very rare (impossible, really): it only happens
+     when 1) language is not set (impossible in Emacs because the user
+     has to supply a language to create a parser), 2) parse canceled
+     due to timeout (impossible because we don't set a timeout), 3)
+     parse canceled due to cancellation flag (impossible because we
+     don't set the flag).  (See comments for ts_parser_parse in
      tree_sitter/api.h.)  */
   if (new_tree == NULL)
-    signal_error ("Parse failed", parser);
+    {
+      Lisp_Object buf;
+      XSETBUFFER(buf, buffer);
+      xsignal1 (Qtree_sitter_parse_error, buf);
+    }
+
   ts_tree_delete (tree);
   XTS_PARSER (parser)->tree = new_tree;
   XTS_PARSER (parser)->need_reparse = false;
@@ -110,13 +182,18 @@ ts_ensure_parsed (Lisp_Object parser)
 }
 
 /* This is the read function provided to tree-sitter to read from a
-   buffer.  It reads one character at a time and automatically skip
+   buffer.  It reads one character at a time and automatically skips
    the gap.  */
 const char*
-ts_read_buffer (void *buffer, uint32_t byte_index,
+ts_read_buffer (void *parser, uint32_t byte_index,
 		TSPoint position, uint32_t *bytes_read)
 {
-  ptrdiff_t byte_pos = byte_index + 1;
+  struct buffer *buffer = ((struct Lisp_TS_Parser *) parser)->buffer;
+  ptrdiff_t visible_beg = ((struct Lisp_TS_Parser *) parser)->visible_beg;
+  ptrdiff_t byte_pos = byte_index + visible_beg;
+  /* We will make sure visible_beg >= BUF_BEG_BYTE before re-parse (in
+     ts_ensure_parsed), so byte_pos will never be smaller than
+     BUF_BEG_BYTE (unless byte_index < 0).  */
 
   /* Read one character.  Tree-sitter wants us to set bytes_read to 0
      if it reads to the end of buffer.  It doesn't say what it wants
@@ -126,26 +203,26 @@ ts_read_buffer (void *buffer, uint32_t byte_index,
   int len;
   /* This function could run from a user command, so it is better to
      do nothing instead of raising an error. (It was a pain in the a**
-     to read mega-if-conditions in Emacs source, so I write the two
-     branches separately, hoping the compiler can merge them.)  */
-  if (!BUFFER_LIVE_P ((struct buffer *) buffer))
+     to decrypt mega-if-conditions in Emacs source, so I wrote the two
+     branches separately.)  */
+  if (!BUFFER_LIVE_P (buffer))
     {
       beg = "";
       len = 0;
     }
-  // TODO BUF_ZV_BYTE?
-  else if (byte_pos >= BUF_Z_BYTE ((struct buffer *) buffer))
+  /* Reached visible end-of-buffer, tell tree-sitter to read no more.  */
+  else if (byte_pos >= BUF_ZV_BYTE (buffer))
     {
       beg = "";
       len = 0;
     }
+  /* Normal case, read a character.  */
   else
     {
       beg = (char *) BUF_BYTE_ADDRESS (buffer, byte_pos);
-      len = BYTES_BY_CHAR_HEAD ((int) beg);
+      len = BYTES_BY_CHAR_HEAD ((int) *beg);
     }
   *bytes_read = (uint32_t) len;
-
   return beg;
 }
 
@@ -158,13 +235,16 @@ make_ts_parser (struct buffer *buffer, TSParser *parser,
 {
   struct Lisp_TS_Parser *lisp_parser
     = ALLOCATE_PSEUDOVECTOR (struct Lisp_TS_Parser, name, PVEC_TS_PARSER);
+
   lisp_parser->name = name;
   lisp_parser->buffer = buffer;
   lisp_parser->parser = parser;
   lisp_parser->tree = tree;
-  TSInput input = {buffer, ts_read_buffer, TSInputEncodingUTF8};
+  TSInput input = {lisp_parser, ts_read_buffer, TSInputEncodingUTF8};
   lisp_parser->input = input;
   lisp_parser->need_reparse = true;
+  lisp_parser->visible_beg = BUF_BEGV (buffer);
+  lisp_parser->visible_end = BUF_ZV (buffer);
   return make_lisp_ptr (lisp_parser, Lisp_Vectorlike);
 }
 
@@ -287,7 +367,7 @@ dynamic module.  */)
   /* See comment in ts_ensure_parsed for possible reasons for a
      failure.  */
   if (tree == NULL)
-    signal_error ("Failed to parse STRING", string);
+    xsignal1 (Qtree_sitter_parse_error, string);
 
   TSNode root_node = ts_tree_root_node (tree);
 
@@ -535,7 +615,9 @@ not the smallest (grand)child.  */)
 {
   CHECK_INTEGER (pos);
 
-  struct buffer *buf = (XTS_PARSER (XTS_NODE (node)->parser)->buffer);
+  struct buffer *buf = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
+  ptrdiff_t visible_beg =
+    XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   ptrdiff_t byte_pos = XFIXNUM (pos);
 
   if (byte_pos < BUF_BEGV_BYTE (buf) || byte_pos > BUF_ZV_BYTE (buf))
@@ -544,9 +626,10 @@ not the smallest (grand)child.  */)
   TSNode ts_node = XTS_NODE (node)->node;
   TSNode child;
   if (NILP (named))
-    child = ts_node_first_child_for_byte (ts_node, byte_pos - 1);
+    child = ts_node_first_child_for_byte (ts_node, byte_pos - visible_beg);
   else
-    child = ts_node_first_named_child_for_byte (ts_node, byte_pos - 1);
+    child = ts_node_first_named_child_for_byte
+      (ts_node, byte_pos - visible_beg);
 
   if (ts_node_is_null(child))
     return Qnil;
@@ -566,7 +649,9 @@ look for named child only.  NAMED defaults to nil.  */)
   CHECK_INTEGER (beg);
   CHECK_INTEGER (end);
 
-  struct buffer *buf = (XTS_PARSER (XTS_NODE (node)->parser)->buffer);
+  struct buffer *buf = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
+  ptrdiff_t visible_beg =
+    XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   ptrdiff_t byte_beg = XFIXNUM (beg);
   ptrdiff_t byte_end = XFIXNUM (end);
 
@@ -580,10 +665,10 @@ look for named child only.  NAMED defaults to nil.  */)
   TSNode child;
   if (NILP (named))
     child = ts_node_descendant_for_byte_range
-      (ts_node, byte_beg - 1 , byte_end - 1);
+      (ts_node, byte_beg - visible_beg , byte_end - visible_beg);
   else
     child = ts_node_named_descendant_for_byte_range
-      (ts_node, byte_beg - 1, byte_end - 1);
+      (ts_node, byte_beg - visible_beg, byte_end - visible_beg);
 
   if (ts_node_is_null(child))
     return Qnil;
@@ -593,31 +678,24 @@ look for named child only.  NAMED defaults to nil.  */)
 
 /* Query functions */
 
-Lisp_Object ts_query_error_to_string (TSQueryError error)
+char*
+ts_query_error_to_string (TSQueryError error)
 {
-  char *error_name;
   switch (error)
     {
     case TSQueryErrorNone:
-      error_name = "none";
-      break;
+      return "none";
     case TSQueryErrorSyntax:
-      error_name = "syntax";
-      break;
+      return "syntax";
     case TSQueryErrorNodeType:
-      error_name = "node type";
-      break;
+      return "node type";
     case TSQueryErrorField:
-      error_name = "field";
-      break;
+      return "field";
     case TSQueryErrorCapture:
-      error_name = "capture";
-      break;
+      return "capture";
     case TSQueryErrorStructure:
-      error_name = "structure";
-      break;
+      return "structure";
     }
-  return  make_pure_c_string (error_name, strlen(error_name));
 }
 
 DEFUN ("tree-sitter-query-capture",
@@ -634,7 +712,7 @@ manual for further explanation for how to write a match pattern.
 BEG and END, if _both_ non-nil, specifies the range in which the query
 is executed.
 
-Return nil if the query failed.  */)
+Raise an tree-sitter-query-error if PATTERN is malformed.  */)
   (Lisp_Object node, Lisp_Object pattern,
    Lisp_Object beg, Lisp_Object end)
 {
@@ -643,27 +721,33 @@ Return nil if the query failed.  */)
 
   TSNode ts_node = XTS_NODE (node)->node;
   Lisp_Object lisp_parser = XTS_NODE (node)->parser;
+  ptrdiff_t visible_beg =
+    XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   const TSLanguage *lang = ts_parser_language
     (XTS_PARSER (lisp_parser)->parser);
   char *source = SSDATA (pattern);
 
+
   uint32_t error_offset;
-  uint32_t error_type;
+  TSQueryError error_type;
   TSQuery *query = ts_query_new (lang, source, strlen (source),
 				 &error_offset, &error_type);
   TSQueryCursor *cursor = ts_query_cursor_new ();
 
   if (query == NULL)
     {
-      // FIXME: Signal an error?
-      return Qnil;
+      // FIXME: Still crashes, debug when I can get a gdb.
+      xsignal2 (Qtree_sitter_query_error,
+		make_fixnum (error_offset),
+		build_string (ts_query_error_to_string (error_type)));
     }
   if (!NILP (beg) && !NILP (end))
     {
       EMACS_INT beg_byte = XFIXNUM (beg);
       EMACS_INT end_byte = XFIXNUM (end);
       ts_query_cursor_set_byte_range
-	(cursor, (uint32_t) beg_byte - 1, (uint32_t) end_byte - 1);
+	(cursor, (uint32_t) beg_byte - visible_beg,
+	 (uint32_t) end_byte - visible_beg);
     }
 
   ts_query_cursor_exec (cursor, query, ts_node);
@@ -705,11 +789,15 @@ syms_of_tree_sitter (void)
   DEFSYM (Qhas_changes, "has-changes");
   DEFSYM (Qhas_error, "has-error");
 
+  DEFSYM(Qtree_sitter_error, "tree-sitter-error");
   DEFSYM (Qtree_sitter_query_error, "tree-sitter-query-error");
-  Fput (Qtree_sitter_query_error, Qerror_conditions,
-	pure_list (Qtree_sitter_query_error, Qerror));
-  Fput (Qtree_sitter_query_error, Qerror_message,
-	build_pure_c_string ("Error with query pattern"))
+  DEFSYM (Qtree_sitter_parse_error, "tree-sitter-parse-error")
+  define_error (Qtree_sitter_error, "Generic tree-sitter error", Qerror);
+  define_error (Qtree_sitter_query_error, "Query pattern is malformed",
+		Qtree_sitter_error);
+  define_error (Qtree_sitter_parse_error, "Parse failed",
+		Qtree_sitter_error);
+
 
   DEFSYM (Qtree_sitter_parser_list, "tree-sitter-parser-list");
   DEFVAR_LISP ("tree-sitter-parser-list", Vtree_sitter_parser_list,

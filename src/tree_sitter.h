@@ -20,8 +20,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifndef EMACS_TREE_SITTER_H
 #define EMACS_TREE_SITTER_H
 
-#include <sys/types.h>
-
 #include "lisp.h"
 
 #include <tree_sitter/api.h>
@@ -33,12 +31,25 @@ INLINE_HEADER_BEGIN
 struct Lisp_TS_Parser
 {
   union vectorlike_header header;
+  /* A parser's name is just a convenient tag, see docstring for
+     'tree-sitter-make-parser', and 'tree-sitter-get-parser'. */
   Lisp_Object name;
   struct buffer *buffer;
   TSParser *parser;
   TSTree *tree;
   TSInput input;
+  /* Re-parsing an unchanged buffer is not free for tree-sitter, so we
+     only make it re-parse when need_reparse == true.  That usually
+     means some change is made in the buffer.  But others could set
+     this field to true to force tree-sitter to re-parse.  */
   bool need_reparse;
+  /* This two positions record the byte position of the "visible
+     region" that tree-sitter sees.  Unlike markers, These two
+     positions do not change as the user inserts and deletes text
+     around them. Before re-parse, we move these positions to match
+     BUF_BEGV_BYTE and BUF_ZV_BYTE.  */
+  ptrdiff_t visible_beg;
+  ptrdiff_t visible_end;
 };
 
 /* A wrapper around a tree-sitter node.  */
