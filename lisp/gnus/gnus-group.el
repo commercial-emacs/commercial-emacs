@@ -3850,7 +3850,7 @@ Uses the process/prefix convention."
   (gnus-group-set-subscription-at-point n 'subscribe))
 
 (defsubst gnus-group-unsubscribe-current-group (&optional n do-sub)
-  (if do_sub
+  (if do-sub
       (gnus-group-set-subscription-at-point n do-sub)
     (gnus-group-toggle-subscription-at-point n)))
 
