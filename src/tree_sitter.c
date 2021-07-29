@@ -752,22 +752,25 @@ Raise an tree-sitter-query-error if PATTERN is malformed.  */)
 
   ts_query_cursor_exec (cursor, query, ts_node);
   TSQueryMatch match;
-  TSQueryCapture capture;
+
   Lisp_Object result = Qnil;
-  Lisp_Object entry;
-  Lisp_Object captured_node;
-  const char *capture_name;
-  uint32_t capture_name_len;
   while (ts_query_cursor_next_match (cursor, &match))
     {
       const TSQueryCapture *captures = match.captures;
       for (int idx=0; idx < match.capture_count; idx++)
 	{
+	  TSQueryCapture capture;
+	  Lisp_Object captured_node;
+	  const char *capture_name;
+	  Lisp_Object entry;
+	  uint32_t capture_name_len;
+
 	  capture = captures[idx];
 	  captured_node = make_ts_node(lisp_parser, capture.node);
 	  capture_name = ts_query_capture_name_for_id
 	    (query, capture.index, &capture_name_len);
-	  entry = Fcons (intern_c_string (capture_name),
+	  entry = Fcons (intern_c_string_1
+			 (capture_name, capture_name_len),
 			 captured_node);
 	  result = Fcons (entry, result);
 	}
