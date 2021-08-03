@@ -6079,23 +6079,24 @@ void
 gc_mark_or_enqueue_symbol (struct Lisp_Symbol *s)
 {
   bool checked_stack_depth = false;
- again:
-  if (symbol_marked_p (s))
-    return;  /* Already on mark queue or marked.  */
-  set_symbol_marked (s);
-  if (!checked_stack_depth)
-    {
-      checked_stack_depth = true;
-      ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_symbol (s));
-    }
-  scan_symbol (s, GC_PHASE_MARK);
-  /* Try marking the rest of the symbol chain.  We don't need to check
-     the stack depth again.  */
-  if (s->u.s.next)
-    {
-      s = s->u.s.next;
-      goto again;
-    }
+  do {
+    if (symbol_marked_p (s))
+      return;  /* Already on mark queue or marked.  */
+    set_symbol_marked (s);
+    if (!checked_stack_depth)
+      {
+	checked_stack_depth = true;
+	ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_symbol (s));
+      }
+    scan_symbol (s, GC_PHASE_MARK);
+    /* Try marking the rest of the symbol chain.  We don't need to check
+       the stack depth again.  */
+    s = s->u.s.next;
+  } while(s);
+    /* if (s->u.s.next) */
+    /*   { */
+    /* 	goto again; */
+    /*   } */
 }
 
 void
