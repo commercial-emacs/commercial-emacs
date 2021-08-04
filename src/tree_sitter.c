@@ -26,32 +26,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* parser.h defines a macro ADVANCE that conflicts with alloc.c.  */
 #include <tree_sitter/parser.h>
 
-/*** Functions related to parser and node object.  */
-
-DEFUN ("tree-sitter-parser-p",
-       Ftree_sitter_parser_p, Stree_sitter_parser_p, 1, 1, 0,
-       doc: /* Return t if OBJECT is a tree-sitter parser.  */)
-  (Lisp_Object object)
-{
-  if (TS_PARSERP (object))
-    return Qt;
-  else
-    return Qnil;
-}
-
-DEFUN ("tree-sitter-node-p",
-       Ftree_sitter_node_p, Stree_sitter_node_p, 1, 1, 0,
-       doc: /* Return t if OBJECT is a tree-sitter node.  */)
-  (Lisp_Object object)
-{
-  if (TS_NODEP (object))
-    return Qt;
-  else
-    return Qnil;
-}
-
 /*** Parsing functions */
 
+/* An auxiliary function that saves a few lines of code.  */
 static inline void
 ts_tree_edit_1 (TSTree *tree, ptrdiff_t start_byte,
 		ptrdiff_t old_end_byte, ptrdiff_t new_end_byte)
@@ -104,21 +81,16 @@ ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
     }
 }
 
-/* Parse the buffer.  We don't parse until we have to. When we have
-to, we call this function to parse and update the tree.  */
 void
-ts_ensure_parsed (Lisp_Object parser)
+ts_ensure_position_synced (Lisp_Object parser)
 {
-  if (!XTS_PARSER (parser)->need_reparse)
-    return;
   TSParser *ts_parser = XTS_PARSER (parser)->parser;
   TSTree *tree = XTS_PARSER(parser)->tree;
-  TSInput input = XTS_PARSER (parser)->input;
   struct buffer *buffer = XTS_PARSER (parser)->buffer;
-
-  /* Before we parse, catch up with the narrowing situation.  We
-     change visible_beg and visible_end to match BUF_BEGV_BYTE and
-     BUF_ZV_BYTE, and inform tree-sitter of the change.  */
+  /* Before we parse or set ranges, catch up with the narrowing
+     situation.  We change visible_beg and visible_end to match
+     BUF_BEGV_BYTE and BUF_ZV_BYTE, and inform tree-sitter of the
+     change.  */
   ptrdiff_t visible_beg = XTS_PARSER (parser)->visible_beg;
   ptrdiff_t visible_end = XTS_PARSER (parser)->visible_end;
   /* Before re-parse, we want to move the visible range of tree-sitter
@@ -159,6 +131,22 @@ ts_ensure_parsed (Lisp_Object parser)
     }
   XTS_PARSER (parser)->visible_beg = visible_beg;
   XTS_PARSER (parser)->visible_end = visible_end;
+}
+
+/* Parse the buffer.  We don't parse until we have to. When we have
+to, we call this function to parse and update the tree.  */
+void
+ts_ensure_parsed (Lisp_Object parser)
+{
+  if (!XTS_PARSER (parser)->need_reparse)
+    return;
+  TSParser *ts_parser = XTS_PARSER (parser)->parser;
+  TSTree *tree = XTS_PARSER(parser)->tree;
+  TSInput input = XTS_PARSER (parser)->input;
+  struct buffer *buffer = XTS_PARSER (parser)->buffer;
+
+  /* Before we parse, catch up with the narrowing situation.  */
+  ts_ensure_position_synced(parser);
 
   TSTree *new_tree = ts_parser_parse(ts_parser, tree, input);
   /* This should be very rare (impossible, really): it only happens
@@ -190,10 +178,13 @@ ts_read_buffer (void *parser, uint32_t byte_index,
 {
   struct buffer *buffer = ((struct Lisp_TS_Parser *) parser)->buffer;
   ptrdiff_t visible_beg = ((struct Lisp_TS_Parser *) parser)->visible_beg;
+  ptrdiff_t visible_end = ((struct Lisp_TS_Parser *) parser)->visible_end;
   ptrdiff_t byte_pos = byte_index + visible_beg;
-  /* We will make sure visible_beg >= BUF_BEG_BYTE before re-parse (in
+  /* We will make sure visible_beg = BUF_BEGV_BYTE before re-parse (in
      ts_ensure_parsed), so byte_pos will never be smaller than
-     BUF_BEG_BYTE (unless byte_index < 0).  */
+     BUF_BEG_BYTE.  */
+  eassert (visible_beg = BUF_BEGV_BYTE (buffer));
+  eassert (visible_end = BUF_ZV_BYTE (buffer));
 
   /* Read one character.  Tree-sitter wants us to set bytes_read to 0
      if it reads to the end of buffer.  It doesn't say what it wants
@@ -211,7 +202,7 @@ ts_read_buffer (void *parser, uint32_t byte_index,
       len = 0;
     }
   /* Reached visible end-of-buffer, tell tree-sitter to read no more.  */
-  else if (byte_pos >= BUF_ZV_BYTE (buffer))
+  else if (byte_pos >= visible_end)
     {
       beg = "";
       len = 0;
@@ -226,7 +217,7 @@ ts_read_buffer (void *parser, uint32_t byte_index,
   return beg;
 }
 
-/*** Creators and accessors for parser and node */
+/*** Functions for parser and node object*/
 
 /* Wrap the parser in a Lisp_Object to be used in the Lisp machine.  */
 Lisp_Object
@@ -257,6 +248,28 @@ make_ts_node (Lisp_Object parser, TSNode node)
   lisp_node->parser = parser;
   lisp_node->node = node;
   return make_lisp_ptr (lisp_node, Lisp_Vectorlike);
+}
+
+DEFUN ("tree-sitter-parser-p",
+       Ftree_sitter_parser_p, Stree_sitter_parser_p, 1, 1, 0,
+       doc: /* Return t if OBJECT is a tree-sitter parser.  */)
+  (Lisp_Object object)
+{
+  if (TS_PARSERP (object))
+    return Qt;
+  else
+    return Qnil;
+}
+
+DEFUN ("tree-sitter-node-p",
+       Ftree_sitter_node_p, Stree_sitter_node_p, 1, 1, 0,
+       doc: /* Return t if OBJECT is a tree-sitter node.  */)
+  (Lisp_Object object)
+{
+  if (TS_NODEP (object))
+    return Qt;
+  else
+    return Qnil;
 }
 
 DEFUN ("tree-sitter-node-parser",
@@ -348,6 +361,7 @@ DEFUN ("tree-sitter-parse-string",
        Ftree_sitter_parse_string, Stree_sitter_parse_string,
        2, 2, 0,
        doc: /* Parse STRING and return the root node.
+
 LANGUAGE should be the language provided by a tree-sitter language
 dynamic module.  */)
   (Lisp_Object string, Lisp_Object language)
@@ -377,6 +391,112 @@ dynamic module.  */)
   return lisp_node;
 }
 
+/* Checks that the RANGES argument of
+   `tree-sitter-parser-set-included-ranges is valid.  */
+void
+ts_check_range_argument (Lisp_Object ranges)
+{
+  EMACS_INT last_point = 1;
+  while (!NILP (ranges))
+    {
+      Lisp_Object range = XCAR (ranges);
+      CHECK_FIXNUM (XCAR (range));
+      CHECK_FIXNUM (XCDR (range));
+      EMACS_INT beg = XFIXNUM (XCAR (range));
+      EMACS_INT end = XFIXNUM (XCDR (range));
+      /* TODO: Maybe we should check for point-min/max, too?  */
+      if (!(last_point <= beg && beg <= end))
+	xsignal1 (Qtree_sitter_set_range_error, range);
+      last_point = end;
+      ranges = XCDR (ranges);
+    }
+}
+
+DEFUN ("tree-sitter-parser-set-included-ranges",
+       Ftree_sitter_parser_set_included_ranges,
+       Stree_sitter_parser_set_included_ranges,
+       2, 2, 0,
+       doc: /* Limit PARSER to RANGES.
+
+RANGES is a list of (BEG . END), each (BEG . END) confines a range in
+which the parser should operate in.  Each range must not overlap, and
+each range should come in order.  Signal `tree-sitter-set-range-error'
+if the argument is invalid, or something else went wrong.  If RANGES
+is nil, set PARSER to parse the whole buffer.  */)
+  (Lisp_Object parser, Lisp_Object ranges)
+{
+  CHECK_TS_PARSER (parser);
+  CHECK_CONS (ranges);
+  ts_check_range_argument(ranges);
+
+  /* Before we parse, catch up with narrowing/widening.  */
+  ts_ensure_position_synced(parser);
+
+  bool success;
+  if (NILP (ranges))
+    {
+      /* If length is 0, the entire document is parsed, ts_range is
+	 just a dummy.  */
+      TSRange ts_range = {0, 0, 0, 0};
+      success = ts_parser_set_included_ranges
+	(XTS_PARSER (parser)->parser, &ts_range , 0);
+    }
+  else
+    {
+      ptrdiff_t len = list_length (ranges);
+      TSRange *ts_ranges = malloc (sizeof(TSRange) * len);
+
+      for (int idx=0; !NILP (ranges); idx++, ranges = XCDR (ranges))
+	{
+	  Lisp_Object range = XCAR (ranges);
+	  struct buffer *buffer = XTS_PARSER (parser)->buffer;
+	  EMACS_INT beg = XFIXNUM (XCAR (range)) - BUF_BEGV_BYTE (buffer);
+	  EMACS_INT end = XFIXNUM (XCDR (range)) - BUF_BEGV_BYTE (buffer);
+	  /* We don't care about start and end points, put in dummy
+	     value.  */
+	  TSRange rg = {{0,0}, {0,0}, (uint32_t) beg, (uint32_t) end};
+	  ts_ranges[idx] = rg;
+	}
+      success = ts_parser_set_included_ranges
+	(XTS_PARSER (parser)->parser, ts_ranges, (uint32_t) len);
+      free (ts_ranges);
+    }
+
+  if (!success)
+    xsignal2 (Qtree_sitter_set_range_error, ranges,
+	      build_string ("Something went wrong when setting ranges"));
+
+  XTS_PARSER (parser)->need_reparse = true;
+  return Qnil;
+}
+
+DEFUN ("tree-sitter-parser-included-ranges",
+       Ftree_sitter_parser_included_ranges,
+       Stree_sitter_parser_included_ranges,
+       1, 1, 0,
+       doc: /* Return the ranges set for PARSER.
+
+See `tree-sitter-parser-set-ranges'.*/)
+  (Lisp_Object parser)
+{
+  CHECK_TS_PARSER (parser);
+  uint32_t len;
+  const TSRange *ranges = ts_parser_included_ranges
+    (XTS_PARSER (parser)->parser, &len);
+  struct buffer *buffer = XTS_PARSER (parser)->buffer;
+
+  Lisp_Object list = Qnil;
+  for (int idx=0; idx < len; idx++)
+    {
+      TSRange range = ranges[idx];
+      Lisp_Object lisp_range =
+	Fcons (make_fixnum (range.start_byte + BUF_BEGV_BYTE (buffer)) ,
+	       make_fixnum (range.end_byte + BUF_BEGV_BYTE (buffer)));
+      list = Fcons (lisp_range, list);
+    }
+  return Freverse (list);
+}
+
 /*** Node API  */
 
 DEFUN ("tree-sitter-node-type",
@@ -398,8 +518,10 @@ DEFUN ("tree-sitter-node-start-byte",
 {
   CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
+  ptrdiff_t visible_beg =
+    XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   uint32_t start_byte = ts_node_start_byte(ts_node);
-  return make_fixnum(start_byte + 1);
+  return make_fixnum(start_byte + visible_beg);
 }
 
 DEFUN ("tree-sitter-node-end-byte",
@@ -409,8 +531,10 @@ DEFUN ("tree-sitter-node-end-byte",
 {
   CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
+  ptrdiff_t visible_beg =
+    XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   uint32_t end_byte = ts_node_end_byte(ts_node);
-  return make_fixnum(end_byte + 1);
+  return make_fixnum(end_byte + visible_beg);
 }
 
 DEFUN ("tree-sitter-node-string",
@@ -427,6 +551,7 @@ DEFUN ("tree-sitter-node-string",
 DEFUN ("tree-sitter-node-parent",
        Ftree_sitter_node_parent, Stree_sitter_node_parent, 1, 1, 0,
        doc: /* Return the immediate parent of NODE.
+
 Return nil if there isn't any.  */)
   (Lisp_Object node)
 {
@@ -443,6 +568,7 @@ Return nil if there isn't any.  */)
 DEFUN ("tree-sitter-node-child",
        Ftree_sitter_node_child, Stree_sitter_node_child, 2, 3, 0,
        doc: /* Return the Nth child of NODE.
+
 Return nil if there isn't any.  If NAMED is non-nil, look for named
 child only.  NAMED defaults to nil.  */)
   (Lisp_Object node, Lisp_Object n, Lisp_Object named)
@@ -508,6 +634,7 @@ DEFUN ("tree-sitter-node-field-name-for-child",
        Ftree_sitter_node_field_name_for_child,
        Stree_sitter_node_field_name_for_child, 2, 2, 0,
        doc: /* Return the field name of the Nth child of NODE.
+
 Return nil if there isn't any child or no field is found.  */)
   (Lisp_Object node, Lisp_Object n)
 {
@@ -527,6 +654,7 @@ DEFUN ("tree-sitter-node-child-count",
        Ftree_sitter_node_child_count,
        Stree_sitter_node_child_count, 1, 2, 0,
        doc: /* Return the number of children of NODE.
+
 If NAMED is non-nil, count named child only.  NAMED defaults to
 nil.  */)
   (Lisp_Object node, Lisp_Object named)
@@ -544,6 +672,7 @@ DEFUN ("tree-sitter-node-child-by-field-name",
        Ftree_sitter_node_child_by_field_name,
        Stree_sitter_node_child_by_field_name, 2, 2, 0,
        doc: /* Return the child of NODE with field name NAME.
+
 Return nil if there isn't any.  */)
   (Lisp_Object node, Lisp_Object name)
 {
@@ -563,6 +692,7 @@ DEFUN ("tree-sitter-node-next-sibling",
        Ftree_sitter_node_next_sibling,
        Stree_sitter_node_next_sibling, 1, 2, 0,
        doc: /* Return the next sibling of NODE.
+
 Return nil if there isn't any.  If NAMED is non-nil, look for named
 child only.  NAMED defaults to nil.  */)
   (Lisp_Object node, Lisp_Object named)
@@ -584,6 +714,7 @@ DEFUN ("tree-sitter-node-prev-sibling",
        Ftree_sitter_node_prev_sibling,
        Stree_sitter_node_prev_sibling, 1, 2, 0,
        doc: /* Return the previous sibling of NODE.
+
 Return nil if there isn't any.  If NAMED is non-nil, look for named
 child only.  NAMED defaults to nil.  */)
   (Lisp_Object node, Lisp_Object named)
@@ -606,6 +737,7 @@ DEFUN ("tree-sitter-node-first-child-for-byte",
        Ftree_sitter_node_first_child_for_byte,
        Stree_sitter_node_first_child_for_byte, 2, 3, 0,
        doc: /* Return the first child of NODE on POS.
+
 Specifically, return the first child that extends beyond POS.  POS is
 a byte position in the buffer counting from 1.  Return nil if there
 isn't any.  If NAMED is non-nil, look for named child only.  NAMED
@@ -641,6 +773,7 @@ DEFUN ("tree-sitter-node-descendant-for-byte-range",
        Ftree_sitter_node_descendant_for_byte_range,
        Stree_sitter_node_descendant_for_byte_range, 3, 4, 0,
        doc: /* Return the smallest node that covers BEG to END.
+
 The returned node is a descendant of NODE.  POS is a byte position
 counting from 1.  Return nil if there isn't any.  If NAMED is non-nil,
 look for named child only.  NAMED defaults to nil.  */)
@@ -794,19 +927,26 @@ syms_of_tree_sitter (void)
 
   DEFSYM(Qtree_sitter_error, "tree-sitter-error");
   DEFSYM (Qtree_sitter_query_error, "tree-sitter-query-error");
-  DEFSYM (Qtree_sitter_parse_error, "tree-sitter-parse-error")
+  DEFSYM (Qtree_sitter_parse_error, "tree-sitter-parse-error");
+  DEFSYM (Qtree_sitter_set_range_error, "tree-sitter-set-range-error")
   define_error (Qtree_sitter_error, "Generic tree-sitter error", Qerror);
   define_error (Qtree_sitter_query_error, "Query pattern is malformed",
 		Qtree_sitter_error);
   define_error (Qtree_sitter_parse_error, "Parse failed",
 		Qtree_sitter_error);
+  define_error (Qtree_sitter_set_range_error,
+		"RANGES are invalid, they have to be ordered and not overlapping",
+		Qtree_sitter_error)
 
 
   DEFSYM (Qtree_sitter_parser_list, "tree-sitter-parser-list");
   DEFVAR_LISP ("tree-sitter-parser-list", Vtree_sitter_parser_list,
 	       doc: /* A list of tree-sitter parsers.
-// TODO: more doc.
-If you removed a parser from this list, do not put it back in.  */);
+
+If you removed a parser from this list, do not put it back in.  Emacs
+keeps the parser in this list updated with any change in the buffer.
+If removed and put back in, there is no guarantee that the parser is in
+sync with the buffer's content.  */);
   Vtree_sitter_parser_list = Qnil;
   Fmake_variable_buffer_local (Qtree_sitter_parser_list);
 
@@ -821,6 +961,9 @@ If you removed a parser from this list, do not put it back in.  */);
 
   defsubr (&Stree_sitter_parser_root_node);
   defsubr (&Stree_sitter_parse_string);
+
+  defsubr (&Stree_sitter_parser_set_included_ranges);
+  defsubr (&Stree_sitter_parser_included_ranges);
 
   defsubr (&Stree_sitter_node_type);
   defsubr (&Stree_sitter_node_start_byte);

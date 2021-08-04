@@ -47,32 +47,48 @@ If none exists, create one and return it.  LANGUAGE is passed to
 
 ;;; Node API supplement
 
-(defun tree-sitter-node-beginning (node)
+(defun tree-sitter-beginning-of-node (node)
   "Return the start position of NODE."
   (byte-to-position (tree-sitter-node-start-byte node)))
 
-(defun tree-sitter-node-end (node)
+(defun tree-sitter-end-of-node (node)
   "Return the end position of NODE."
   (byte-to-position (tree-sitter-node-end-byte node)))
 
 (defun tree-sitter-node-in-range (beg end &optional parser-name named)
   "Return the smallest node covering BEG to END.
 Find node in current buffer.  Return nil if none find.  If NAMED
-non-nil, only look for named node.  NAMED defaults to nil.  By
-default, use the first parser in `tree-sitter-parser-list'; but
-if PARSER-NAME is non-nil, it specifies the name of the parser that
-should be used."
-  (when-let ((root (tree-sitter-parser-root-node
-                    (if parser-name
-                        (tree-sitter-get-parser parser-name)
-                      (car tree-sitter-parser-list)))))
+non-nil, only look for named node.  NAMED defaults to nil.
+
+By default, use the first parser in `tree-sitter-parser-list';
+but if PARSER-NAME is non-nil, it specifies the name of the
+parser that should be used."
+  (when-let ((root (tree-sitter-buffer-root-node parser-name)))
     (tree-sitter-node-descendant-for-byte-range
      root (position-bytes beg) (position-bytes end) named)))
+
+(defun tree-sitter-node-at-point (&optional point parser-name named)
+  "Return the smallest node covering POINT.
+POINT defaults to the point.  For PARSER-NAME and NAMED see
+`tree-sitter-node-in-range'."
+  (tree-sitter-node-in-range (or point (point)) (1+ (or point (point)))
+                             parser-name named))
+
+(defun tree-sitter-buffer-root-node (&optional parser-name)
+  "Return the root node of the current buffer.
+If PARSER-NAME is nil, return the root node of the first parser
+in `tree-sitter-parser-list'; otherwise find the parser with
+PARSER-NAME and return the root node of that parser.  Return nil
+if couldn't find any."
+  (tree-sitter-parser-root-node
+   (if parser-name
+       (tree-sitter-get-parser parser-name)
+     (car tree-sitter-parser-list))))
 
 (defun tree-sitter-filter-child (node pred &optional named)
   "Return children of NODE that satisfies PRED.
 PRED is a function that takes one argument, the child node.  If
-NAMED non-nil, only search named node.  NAMED defaults to nil."
+NAMED non-nil, only search for named node.  NAMED defaults to nil."
   (let ((child (tree-sitter-node-child node 0 named))
         result)
     (while child
@@ -85,8 +101,18 @@ NAMED non-nil, only search named node.  NAMED defaults to nil."
   "Return the buffer content corresponding to NODE."
   (with-current-buffer (tree-sitter-node-buffer node)
     (buffer-substring-no-properties
-     (tree-sitter-node-beginning node)
-     (tree-sitter-node-end node))))
+     (tree-sitter-beginning-of-node node)
+     (tree-sitter-end-of-node node))))
+
+(defun tree-sitter-parent-until (node pred)
+  "Return the closest parent of NODE that satisfies PRED.
+Return nil if none found.  PRED should be a function that takes
+one argument, the parent node."
+  (catch 'found
+    (while node
+      (setq node (tree-sitter-node-parent node))
+      (when (funcall pred node)
+        (throw 'found node)))))
 
 ;;; Font-lock
 
@@ -131,8 +157,8 @@ If VERBOSE is non-nil, print status messages.
             (while captures
               (let* ((face (caar captures))
                      (node (cdar captures))
-                     (beg (tree-sitter-node-beginning node))
-                     (end (tree-sitter-node-end node)))
+                     (beg (tree-sitter-beginning-of-node node))
+                     (end (tree-sitter-end-of-node node)))
                 (cond ((facep face)
                        (put-text-property beg end 'face face))
                       ((functionp face)
@@ -142,8 +168,8 @@ If VERBOSE is non-nil, print status messages.
                     (message "Fontifying text from %d to %d with %s"
                              beg end face)))
               (setq captures (cdr captures))))
-          `(jit-lock-bounds ,(tree-sitter-node-beginning node)
-                            . ,(tree-sitter-node-end node)))))))
+          `(jit-lock-bounds ,(tree-sitter-beginning-of-node node)
+                            . ,(tree-sitter-end-of-node node)))))))
 
 
 (define-derived-mode json-mode js-mode "JSON"
@@ -171,7 +197,10 @@ If VERBOSE is non-nil, print status messages.
   (setq-local tree-sitter-font-lock-settings
               `(("font-lock-c"
                  ,(tree-sitter-c)
-                 "(null) @font-lock-constant-face
+                 "
+(function_definition body: _ @tree-sitter-mark-function-body
+
+(null) @font-lock-constant-face
 (true) @font-lock-constant-face
 (false) @font-lock-constant-face
 
@@ -271,6 +300,23 @@ If VERBOSE is non-nil, print status messages.
 
 (add-to-list 'auto-mode-alist '("\\.json\\'" . json-mode))
 (add-to-list 'auto-mode-alist '("\\.tsc\\'" . ts-c-mode))
+
+;;; Debug
+
+(defun tree-sitter-inspect-node-at-point ()
+  (interactive)
+  (tooltip-show
+   (tree-sitter-node-string
+    (tree-sitter-node-at-point))))
+
+(define-minor-mode tree-sitter-inspect-mode
+  "Shows the node at point."
+  :lighter nil
+  (if tree-sitter-inspect-mode
+      (add-hook 'post-command-hook #'tree-sitter-inspect-node-at-point
+                nil t)
+    (remove-hook 'post-command-hook #'tree-sitter-inspect-node-at-point
+                 t)))
 
 (provide 'tree-sitter)
 

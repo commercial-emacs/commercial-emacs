@@ -20,11 +20,11 @@
 ;;; Code:
 
 (require 'ert)
-(require 'tree-sitter-json)
 (require 'tree-sitter)
 
 (ert-deftest tree-sitter-basic-parsing ()
   "Test basic parsing routines."
+  (require 'tree-sitter-json)
   (with-temp-buffer
     (let ((parser (tree-sitter-create-parser
                    (current-buffer) (tree-sitter-json))))
@@ -52,6 +52,7 @@
 
 (ert-deftest tree-sitter-node-api ()
   "Tests for node API."
+  (require 'tree-sitter-json)
   (with-temp-buffer
     (let (parser root-node doc-node object-node pair-node)
       (progn
@@ -123,6 +124,7 @@
 
 (ert-deftest tree-sitter-query-api ()
   "Tests for query API."
+  (require 'tree-sitter-json)
   (with-temp-buffer
     (let (parser root-node pattern doc-node object-node pair-node)
       (progn
@@ -150,6 +152,7 @@
 
 (ert-deftest tree-sitter-narrow ()
   "Tests if narrowing works."
+  (require 'tree-sitter-json)
   (with-temp-buffer
     (let (parser root-node pattern doc-node object-node pair-node)
       (progn
@@ -200,6 +203,32 @@
        (equal (tree-sitter-node-string
                (tree-sitter-parser-root-node parser))
               "(document (array (number)))")))))
+
+(ert-deftest tree-sitter-range ()
+  "Tests if range works."
+  (require 'tree-sitter-json)
+  (with-temp-buffer
+    (let (parser root-node pattern doc-node object-node pair-node)
+      (progn
+        (insert "[[1],oooxxx[1,2,3],xxx[1,2]]")
+        (setq parser (tree-sitter-create-parser
+                      (current-buffer) (tree-sitter-json)))
+        (setq root-node (tree-sitter-parser-root-node
+                         parser)))
+      ;; TODO: signaling error crashes Emacs on Mac.
+      ;; (should-error
+      ;;  (tree-sitter-parser-set-included-ranges
+      ;;   parser '((1 . 6) (5 . 20)))
+      ;;  :type '(tree-sitter-set-range-error))
+
+      (tree-sitter-parser-set-included-ranges
+       parser '((1 . 6) (12 . 20) (23 . 29)))
+      (should (equal '((1 . 6) (12 . 20) (23 . 29))
+                     (tree-sitter-parser-included-ranges parser)))
+      (should (equal "(document (array (array (number)) (array (number) (number) (number)) (array (number) (number))))"
+                     (tree-sitter-node-string
+                      (tree-sitter-parser-root-node parser))))
+      )))
 
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here
