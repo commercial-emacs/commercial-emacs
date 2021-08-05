@@ -103,23 +103,23 @@
       (should (equal "(\",\")"
                      (tree-sitter-node-string
                       (tree-sitter-node-prev-sibling object-node))))
-      ;; `tree-sitter-node-first-child-for-byte'.
+      ;; `tree-sitter-node-first-child-for-pos'.
       (should (equal "(number)"
                      (tree-sitter-node-string
-                      (tree-sitter-node-first-child-for-byte
+                      (tree-sitter-node-first-child-for-pos
                        doc-node 3 t))))
       (should (equal "(\",\")"
                      (tree-sitter-node-string
-                      (tree-sitter-node-first-child-for-byte
+                      (tree-sitter-node-first-child-for-pos
                        doc-node 3))))
-      ;; `tree-sitter-node-descendant-for-byte-range'.
+      ;; `tree-sitter-node-descendant-for-range'.
       (should (equal "(\"{\")"
                      (tree-sitter-node-string
-                      (tree-sitter-node-descendant-for-byte-range
+                      (tree-sitter-node-descendant-for-range
                        root-node 6 7))))
       (should (equal "(object (pair key: (string (string_content)) value: (string (string_content))))"
                      (tree-sitter-node-string
-                      (tree-sitter-node-descendant-for-byte-range
+                      (tree-sitter-node-descendant-for-range
                        root-node 6 7 t)))))))
 
 (ert-deftest tree-sitter-query-api ()
@@ -228,6 +228,7 @@
       (should (equal "(document (array (array (number)) (array (number) (number) (number)) (array (number) (number))))"
                      (tree-sitter-node-string
                       (tree-sitter-parser-root-node parser))))
+      ;; TODO: More tests.
       )))
 
 (provide 'tree-sitter-tests)

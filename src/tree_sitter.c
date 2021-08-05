@@ -435,26 +435,34 @@ is nil, set PARSER to parse the whole buffer.  */)
   bool success;
   if (NILP (ranges))
     {
-      /* If length is 0, the entire document is parsed, ts_range is
-	 just a dummy.  */
+      /* If RANGES is nil, make parser to parse the whole document.
+	 To do that we give tree-sitter a 0 length, the range is a
+	 dummy.  */
       TSRange ts_range = {0, 0, 0, 0};
       success = ts_parser_set_included_ranges
 	(XTS_PARSER (parser)->parser, &ts_range , 0);
     }
   else
     {
+      /* Set ranges for PARSER.  */
       ptrdiff_t len = list_length (ranges);
       TSRange *ts_ranges = malloc (sizeof(TSRange) * len);
+      struct buffer *buffer = XTS_PARSER (parser)->buffer;
 
       for (int idx=0; !NILP (ranges); idx++, ranges = XCDR (ranges))
 	{
 	  Lisp_Object range = XCAR (ranges);
 	  struct buffer *buffer = XTS_PARSER (parser)->buffer;
-	  EMACS_INT beg = XFIXNUM (XCAR (range)) - BUF_BEGV_BYTE (buffer);
-	  EMACS_INT end = XFIXNUM (XCDR (range)) - BUF_BEGV_BYTE (buffer);
+
+	  EMACS_INT beg_byte = buf_charpos_to_bytepos
+	    (buffer, XFIXNUM (XCAR (range)));
+	  EMACS_INT end_byte = buf_charpos_to_bytepos
+	    (buffer, XFIXNUM (XCDR (range)));
 	  /* We don't care about start and end points, put in dummy
 	     value.  */
-	  TSRange rg = {{0,0}, {0,0}, (uint32_t) beg, (uint32_t) end};
+	  TSRange rg = {{0,0}, {0,0},
+			(uint32_t) beg_byte - BUF_BEGV_BYTE (buffer),
+			(uint32_t) end_byte - BUF_BEGV_BYTE (buffer)};
 	  ts_ranges[idx] = rg;
 	}
       success = ts_parser_set_included_ranges
@@ -489,9 +497,12 @@ See `tree-sitter-parser-set-ranges'.*/)
   for (int idx=0; idx < len; idx++)
     {
       TSRange range = ranges[idx];
+      uint32_t beg_byte = range.start_byte + BUF_BEGV_BYTE (buffer);
+      uint32_t end_byte = range.end_byte + BUF_BEGV_BYTE (buffer);
+
       Lisp_Object lisp_range =
-	Fcons (make_fixnum (range.start_byte + BUF_BEGV_BYTE (buffer)) ,
-	       make_fixnum (range.end_byte + BUF_BEGV_BYTE (buffer)));
+	Fcons (make_fixnum (buf_bytepos_to_charpos (buffer, beg_byte)) ,
+	       make_fixnum (buf_bytepos_to_charpos (buffer, end_byte)));
       list = Fcons (lisp_range, list);
     }
   return Freverse (list);
@@ -511,9 +522,9 @@ DEFUN ("tree-sitter-node-type",
   return intern_c_string (type);
 }
 
-DEFUN ("tree-sitter-node-start-byte",
-       Ftree_sitter_node_start_byte, Stree_sitter_node_start_byte, 1, 1, 0,
-       doc: /* Return the NODE's start byte position.  */)
+DEFUN ("tree-sitter-node-start",
+       Ftree_sitter_node_start, Stree_sitter_node_start, 1, 1, 0,
+       doc: /* Return the NODE's start position.  */)
   (Lisp_Object node)
 {
   CHECK_TS_NODE (node);
@@ -521,12 +532,15 @@ DEFUN ("tree-sitter-node-start-byte",
   ptrdiff_t visible_beg =
     XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   uint32_t start_byte = ts_node_start_byte(ts_node);
-  return make_fixnum(start_byte + visible_beg);
+  struct buffer *buffer = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
+  ptrdiff_t start_pos = buf_bytepos_to_charpos
+    (buffer, start_byte + visible_beg);
+  return make_fixnum(start_pos);
 }
 
-DEFUN ("tree-sitter-node-end-byte",
-       Ftree_sitter_node_end_byte, Stree_sitter_node_end_byte, 1, 1, 0,
-       doc: /* Return the NODE's end byte position.  */)
+DEFUN ("tree-sitter-node-end",
+       Ftree_sitter_node_end, Stree_sitter_node_end, 1, 1, 0,
+       doc: /* Return the NODE's end position.  */)
   (Lisp_Object node)
 {
   CHECK_TS_NODE (node);
@@ -534,7 +548,10 @@ DEFUN ("tree-sitter-node-end-byte",
   ptrdiff_t visible_beg =
     XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   uint32_t end_byte = ts_node_end_byte(ts_node);
-  return make_fixnum(end_byte + visible_beg);
+  struct buffer *buffer = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
+  ptrdiff_t end_pos = buf_bytepos_to_charpos
+    (buffer, end_byte + visible_beg);
+  return make_fixnum(end_pos);
 }
 
 DEFUN ("tree-sitter-node-string",
@@ -733,16 +750,16 @@ child only.  NAMED defaults to nil.  */)
   return make_ts_node(XTS_NODE (node)->parser, sibling);
 }
 
-DEFUN ("tree-sitter-node-first-child-for-byte",
-       Ftree_sitter_node_first_child_for_byte,
-       Stree_sitter_node_first_child_for_byte, 2, 3, 0,
+DEFUN ("tree-sitter-node-first-child-for-pos",
+       Ftree_sitter_node_first_child_for_pos,
+       Stree_sitter_node_first_child_for_pos, 2, 3, 0,
        doc: /* Return the first child of NODE on POS.
 
 Specifically, return the first child that extends beyond POS.  POS is
-a byte position in the buffer counting from 1.  Return nil if there
-isn't any.  If NAMED is non-nil, look for named child only.  NAMED
-defaults to nil.  Note that this function returns an immediate child,
-not the smallest (grand)child.  */)
+a position in the buffer.  Return nil if there isn't any.  If NAMED is
+non-nil, look for named child only.  NAMED defaults to nil.  Note that
+this function returns an immediate child, not the smallest
+(grand)child.  */)
   (Lisp_Object node, Lisp_Object pos, Lisp_Object named)
 {
   CHECK_INTEGER (pos);
@@ -750,7 +767,7 @@ not the smallest (grand)child.  */)
   struct buffer *buf = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
   ptrdiff_t visible_beg =
     XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
-  ptrdiff_t byte_pos = XFIXNUM (pos);
+  ptrdiff_t byte_pos = buf_charpos_to_bytepos(buf, XFIXNUM (pos));
 
   if (byte_pos < BUF_BEGV_BYTE (buf) || byte_pos > BUF_ZV_BYTE (buf))
     xsignal1 (Qargs_out_of_range, pos);
@@ -769,14 +786,14 @@ not the smallest (grand)child.  */)
   return make_ts_node(XTS_NODE (node)->parser, child);
 }
 
-DEFUN ("tree-sitter-node-descendant-for-byte-range",
-       Ftree_sitter_node_descendant_for_byte_range,
-       Stree_sitter_node_descendant_for_byte_range, 3, 4, 0,
+DEFUN ("tree-sitter-node-descendant-for-range",
+       Ftree_sitter_node_descendant_for_range,
+       Stree_sitter_node_descendant_for_range, 3, 4, 0,
        doc: /* Return the smallest node that covers BEG to END.
 
-The returned node is a descendant of NODE.  POS is a byte position
-counting from 1.  Return nil if there isn't any.  If NAMED is non-nil,
-look for named child only.  NAMED defaults to nil.  */)
+The returned node is a descendant of NODE.  POS is a position.  Return
+nil if there isn't any.  If NAMED is non-nil, look for named child
+only.  NAMED defaults to nil.  */)
   (Lisp_Object node, Lisp_Object beg, Lisp_Object end, Lisp_Object named)
 {
   CHECK_INTEGER (beg);
@@ -785,8 +802,8 @@ look for named child only.  NAMED defaults to nil.  */)
   struct buffer *buf = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
   ptrdiff_t visible_beg =
     XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
-  ptrdiff_t byte_beg = XFIXNUM (beg);
-  ptrdiff_t byte_end = XFIXNUM (end);
+  ptrdiff_t byte_beg = buf_charpos_to_bytepos(buf, XFIXNUM (beg));
+  ptrdiff_t byte_end = buf_charpos_to_bytepos(buf, XFIXNUM (end));
 
   /* Checks for BUFFER_BEG <= BEG <= END <= BUFFER_END.  */
   if (!(BUF_BEGV_BYTE (buf) <= byte_beg
@@ -966,8 +983,8 @@ sync with the buffer's content.  */);
   defsubr (&Stree_sitter_parser_included_ranges);
 
   defsubr (&Stree_sitter_node_type);
-  defsubr (&Stree_sitter_node_start_byte);
-  defsubr (&Stree_sitter_node_end_byte);
+  defsubr (&Stree_sitter_node_start);
+  defsubr (&Stree_sitter_node_end);
   defsubr (&Stree_sitter_node_string);
   defsubr (&Stree_sitter_node_parent);
   defsubr (&Stree_sitter_node_child);
@@ -977,8 +994,8 @@ sync with the buffer's content.  */);
   defsubr (&Stree_sitter_node_child_by_field_name);
   defsubr (&Stree_sitter_node_next_sibling);
   defsubr (&Stree_sitter_node_prev_sibling);
-  defsubr (&Stree_sitter_node_first_child_for_byte);
-  defsubr (&Stree_sitter_node_descendant_for_byte_range);
+  defsubr (&Stree_sitter_node_first_child_for_pos);
+  defsubr (&Stree_sitter_node_descendant_for_range);
 
   defsubr (&Stree_sitter_query_capture);
 }

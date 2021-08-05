@@ -47,13 +47,6 @@ If none exists, create one and return it.  LANGUAGE is passed to
 
 ;;; Node API supplement
 
-(defun tree-sitter-beginning-of-node (node)
-  "Return the start position of NODE."
-  (byte-to-position (tree-sitter-node-start-byte node)))
-
-(defun tree-sitter-end-of-node (node)
-  "Return the end position of NODE."
-  (byte-to-position (tree-sitter-node-end-byte node)))
 
 (defun tree-sitter-node-in-range (beg end &optional parser-name named)
   "Return the smallest node covering BEG to END.
@@ -64,8 +57,7 @@ By default, use the first parser in `tree-sitter-parser-list';
 but if PARSER-NAME is non-nil, it specifies the name of the
 parser that should be used."
   (when-let ((root (tree-sitter-buffer-root-node parser-name)))
-    (tree-sitter-node-descendant-for-byte-range
-     root (position-bytes beg) (position-bytes end) named)))
+    (tree-sitter-node-descendant-for-range root beg end named)))
 
 (defun tree-sitter-node-at-point (&optional point parser-name named)
   "Return the smallest node covering POINT.
@@ -101,8 +93,8 @@ NAMED non-nil, only search for named node.  NAMED defaults to nil."
   "Return the buffer content corresponding to NODE."
   (with-current-buffer (tree-sitter-node-buffer node)
     (buffer-substring-no-properties
-     (tree-sitter-beginning-of-node node)
-     (tree-sitter-end-of-node node))))
+     (tree-sitter-node-start node)
+     (tree-sitter-node-end node))))
 
 (defun tree-sitter-parent-until (node pred)
   "Return the closest parent of NODE that satisfies PRED.
@@ -148,17 +140,17 @@ If VERBOSE is non-nil, print status messages.
       (when-let ((node (tree-sitter-node-in-range beg end parser-name)))
         (let ((captures (tree-sitter-query-capture
                          node match-pattern
-                         ;; specifying the range is important. More
+                         ;; Specifying the range is important. More
                          ;; often than not, NODE will be the root
                          ;; node, and if we don't specify the range,
                          ;; we are basically querying the whole file.
-                         (position-bytes beg) (position-bytes end))))
+                         beg end)))
           (with-silent-modifications
             (while captures
               (let* ((face (caar captures))
                      (node (cdar captures))
-                     (beg (tree-sitter-beginning-of-node node))
-                     (end (tree-sitter-end-of-node node)))
+                     (beg (tree-sitter-node-start node))
+                     (end (tree-sitter-node-end node)))
                 (cond ((facep face)
                        (put-text-property beg end 'face face))
                       ((functionp face)
@@ -168,8 +160,8 @@ If VERBOSE is non-nil, print status messages.
                     (message "Fontifying text from %d to %d with %s"
                              beg end face)))
               (setq captures (cdr captures))))
-          `(jit-lock-bounds ,(tree-sitter-beginning-of-node node)
-                            . ,(tree-sitter-end-of-node node)))))))
+          `(jit-lock-bounds ,(tree-sitter-node-start node)
+                            . ,(tree-sitter-node-end node)))))))
 
 
 (define-derived-mode json-mode js-mode "JSON"
