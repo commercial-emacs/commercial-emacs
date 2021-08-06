@@ -1119,7 +1119,7 @@ The group buffer lists (some of) the groups available.  For instance,
 lists all zombie groups.
 
 Groups that are displayed can be entered with `\\[gnus-group-read-group]'.  To subscribe
-to a group not displayed, type `\\[gnus-group-unsubscribe-group]'.
+to a group not displayed, type `\\[gnus-group-toggle-subscription]'.
 
 For more in-depth information on this mode, read the manual (`\\[gnus-info-find-node]').
 
