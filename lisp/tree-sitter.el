@@ -40,6 +40,7 @@ Return nil if we can't find any."
 
 (defun tree-sitter-get-parser-create (name language)
   "Find the first parser with name NAME in `tree-sitter-parser-list'.
+
 If none exists, create one and return it.  LANGUAGE is passed to
 `tree-sitter-create-parser' when creating the parser."
   (or (tree-sitter-get-parser name)
@@ -48,26 +49,22 @@ If none exists, create one and return it.  LANGUAGE is passed to
 ;;; Node API supplement
 
 
-(defun tree-sitter-node-in-range (beg end &optional parser-name named)
+(defun tree-sitter-node-at (beg &optional end parser-name named)
   "Return the smallest node covering BEG to END.
-Find node in current buffer.  Return nil if none find.  If NAMED
-non-nil, only look for named node.  NAMED defaults to nil.
+
+If omitted, END equals to BEG.  Find node in current buffer.
+Return nil if none find.  If NAMED non-nil, only look for named
+node.  NAMED defaults to nil.
 
 By default, use the first parser in `tree-sitter-parser-list';
 but if PARSER-NAME is non-nil, it specifies the name of the
 parser that should be used."
-  (when-let ((root (tree-sitter-buffer-root-node parser-name)))
+  (when-let ((root (tree-sitter-buffer-root parser-name)))
     (tree-sitter-node-descendant-for-range root beg end named)))
 
-(defun tree-sitter-node-at-point (&optional point parser-name named)
-  "Return the smallest node covering POINT.
-POINT defaults to the point.  For PARSER-NAME and NAMED see
-`tree-sitter-node-in-range'."
-  (tree-sitter-node-in-range (or point (point)) (1+ (or point (point)))
-                             parser-name named))
-
-(defun tree-sitter-buffer-root-node (&optional parser-name)
+(defun tree-sitter-buffer-root (&optional parser-name)
   "Return the root node of the current buffer.
+
 If PARSER-NAME is nil, return the root node of the first parser
 in `tree-sitter-parser-list'; otherwise find the parser with
 PARSER-NAME and return the root node of that parser.  Return nil
@@ -79,6 +76,7 @@ if couldn't find any."
 
 (defun tree-sitter-filter-child (node pred &optional named)
   "Return children of NODE that satisfies PRED.
+
 PRED is a function that takes one argument, the child node.  If
 NAMED non-nil, only search for named node.  NAMED defaults to nil."
   (let ((child (tree-sitter-node-child node 0 named))
@@ -98,6 +96,7 @@ NAMED non-nil, only search for named node.  NAMED defaults to nil."
 
 (defun tree-sitter-parent-until (node pred)
   "Return the closest parent of NODE that satisfies PRED.
+
 Return nil if none found.  PRED should be a function that takes
 one argument, the parent node."
   (catch 'found

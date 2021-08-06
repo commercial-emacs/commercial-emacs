@@ -945,7 +945,8 @@ syms_of_tree_sitter (void)
   DEFSYM(Qtree_sitter_error, "tree-sitter-error");
   DEFSYM (Qtree_sitter_query_error, "tree-sitter-query-error");
   DEFSYM (Qtree_sitter_parse_error, "tree-sitter-parse-error");
-  DEFSYM (Qtree_sitter_set_range_error, "tree-sitter-set-range-error")
+  DEFSYM (Qtree_sitter_set_range_error, "tree-sitter-set-range-error");
+
   define_error (Qtree_sitter_error, "Generic tree-sitter error", Qerror);
   define_error (Qtree_sitter_query_error, "Query pattern is malformed",
 		Qtree_sitter_error);
@@ -953,7 +954,7 @@ syms_of_tree_sitter (void)
 		Qtree_sitter_error);
   define_error (Qtree_sitter_set_range_error,
 		"RANGES are invalid, they have to be ordered and not overlapping",
-		Qtree_sitter_error)
+		Qtree_sitter_error);
 
 
   DEFSYM (Qtree_sitter_parser_list, "tree-sitter-parser-list");
