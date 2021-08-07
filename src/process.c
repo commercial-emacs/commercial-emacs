@@ -4177,6 +4177,8 @@ usage: (make-network-process &rest ARGS)  */)
      postpone connecting to the server. */
   if (!p->is_server && NILP (addrinfos))
     {
+      const char *trouble = "TROUBLE!!!!";
+      message_dolog (trouble, strlen(trouble), 1, 0);
       p->dns_request = dns_request;
       p->status = list1 (Qconnect);
       postpone_connection = true;
@@ -5234,6 +5236,16 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #endif
 #ifdef HAVE_GNUTLS
 		/* Continue TLS negotiation. */
+
+		if (p->gnutls_initstage < GNUTLS_STAGE_READY) {
+		  char buf[128];
+		  sprintf(buf, "foo: %s (%u) tried %d times",
+			  SDATA (p->name),
+			  p->gnutls_initstage,
+			  p->gnutls_handshakes_tried);
+		  message_dolog (buf, strlen(buf), 1, 0);
+		}
+
 		if (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED
 		    && p->is_non_blocking_client
 		    /* Don't proceed until we have established a connection. */
