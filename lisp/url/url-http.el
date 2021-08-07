@@ -1390,7 +1390,11 @@ The return value of this function is the retrieval buffer."
                (url-https-proxy-connect connection)
              (set-process-sentinel connection
                                    #'url-http-end-of-document-sentinel)
-             (process-send-string connection (url-http-create-request)))))))
+             (let ((func (apply-partially #'process-send-string
+                                          connection
+                                          (url-http-create-request))))
+               (funcall func)
+               (setq-local my-func func)))))))
     buffer))
 
 (defun url-https-proxy-connect (connection)
