@@ -4177,8 +4177,14 @@ usage: (make-network-process &rest ARGS)  */)
      postpone connecting to the server. */
   if (!p->is_server && NILP (addrinfos))
     {
-      const char *trouble = "TROUBLE!!!!";
-      message_dolog (trouble, strlen(trouble), 1, 0);
+      char buf[128];
+      sprintf(buf, "trouble: %s (block=%d) nonblock_set=%d tried %d times",
+	      SDATA (p->name),
+	      !p->is_non_blocking_client,
+	      (fd_callback_info[p->outfd].flags
+	       & NON_BLOCKING_CONNECT_FD),
+	      p->gnutls_handshakes_tried);
+      message_dolog (buf, strlen(buf), 1, 0);
       p->dns_request = dns_request;
       p->status = list1 (Qconnect);
       postpone_connection = true;
@@ -5237,11 +5243,13 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #ifdef HAVE_GNUTLS
 		/* Continue TLS negotiation. */
 
-		if (p->gnutls_initstage < GNUTLS_STAGE_READY) {
+		if (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED) {
 		  char buf[128];
-		  sprintf(buf, "foo: %s (%u) tried %d times",
+		  sprintf(buf, "baz: %s (block=%d) nonblock_set=%d tried %d times",
 			  SDATA (p->name),
-			  p->gnutls_initstage,
+			  !p->is_non_blocking_client,
+			  (fd_callback_info[p->outfd].flags
+			   & NON_BLOCKING_CONNECT_FD),
 			  p->gnutls_handshakes_tried);
 		  message_dolog (buf, strlen(buf), 1, 0);
 		}
