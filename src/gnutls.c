@@ -730,13 +730,6 @@ emacs_gnutls_write (struct Lisp_Process *proc, const char *buf, ptrdiff_t nbyte)
   if (proc->gnutls_initstage != GNUTLS_STAGE_READY)
     {
       errno = EAGAIN;
-      if (!NILP (proc->log)) {
-	  char foo[64];
-	  sprintf(foo, "%s %u", SDATA (proc->name), proc->gnutls_initstage);
-	  GNUTLS_LOG2 (2, global_gnutls_log_level, "the faq:", foo);
-	  /* message_dolog ("foo: ", 5, 0, 0); */
-	  /* message_dolog (foo, strlen(foo), 1, 0); */
-      }
       return 0;
     }
 
