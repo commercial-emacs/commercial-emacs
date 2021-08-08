@@ -21,35 +21,69 @@
 
 ;;; Code:
 
-;;; Node & parser accessors
+(eval-when-compile (require 'cl-lib))
+
+;;; Activating tree-sitter
+
+(defgroup tree-sitter
+  nil
+  "Tree-sitter is an incremental parser."
+  :group 'tools)
+
+(defcustom tree-sitter-disabled-modes nil
+  "A list of major-modes for which tree-sitter support is disabled."
+  :type '(list symbol))
+
+(defcustom tree-sitter-maximum-size (* 4 1000 1000)
+  "Maximum buffer size for enabling tree-sitter parsing."
+  :type 'integer)
+
+(defun tree-sitter-should-enable-p (&optional mode)
+  "Return non-nil if MODE should activate tree-sitter support.
+MODE defaults to the value of `major-mode'."
+  (let* ((mode (or mode major-mode))
+         (disabled (cl-loop
+                    for disabled-mode in tree-sitter-disabled-modes
+                    if (provided-mode-derived-p mode disabled-mode)
+                    return t
+                    finally return nil)))
+    (and (not disabled)
+         (< (buffer-size) tree-sitter-maximum-size))))
+
+;;; Parser API supplement
+
+(defun tree-sitter-get-parser (name)
+  "Find the first parser with NAME in `tree-sitter-parser-list'.
+Return nil if we can't find any."
+  (unless (stringp name)
+    (signal 'wrong-type-argument `(stringp ,name)))
+  (catch 'found
+    (dolist (parser tree-sitter-parser-list)
+      (when (equal name (tree-sitter-parser-name parser))
+        (throw 'found parser)))))
+
+(defun tree-sitter-get-parser-create (language-symbol &optional name)
+  "Find the first parser with name NAME.
+
+First look for the parser in `tree-sitter-parser-list', if none
+exists, create one using LANGUAGE-SYMBOL as the language, NAME
+as the name in the current buffer, and return it.
+
+NAME defaults to (symbol-name LANGUAGE-SYMBOL)."
+  (or (tree-sitter-get-parser (or name (symbol-name language-symbol)))
+      (tree-sitter-create-parser
+       (current-buffer)
+       language-symbol
+       (or name (symbol-name language-symbol)))))
+
+;;; Node API supplement
 
 (defun tree-sitter-node-buffer (node)
   "Return the buffer in where NODE belongs."
   (tree-sitter-parser-buffer
    (tree-sitter-node-parser node)))
 
-;;; Parser API supplement
-
-(defun tree-sitter-get-parser (name)
-  "Find the first parser with name NAME in `tree-sitter-parser-list'.
-Return nil if we can't find any."
-  (catch 'found
-    (dolist (parser tree-sitter-parser-list)
-      (when (equal name (tree-sitter-parser-name parser))
-        (throw 'found parser)))))
-
-(defun tree-sitter-get-parser-create (name language)
-  "Find the first parser with name NAME in `tree-sitter-parser-list'.
-
-If none exists, create one and return it.  LANGUAGE is passed to
-`tree-sitter-create-parser' when creating the parser."
-  (or (tree-sitter-get-parser name)
-      (tree-sitter-create-parser (current-buffer) language name)))
-
-;;; Node API supplement
-
-
-(defun tree-sitter-node-at (beg &optional end parser-name named)
+(defun tree-sitter-node-at (beg &optional end parser-or-name named)
   "Return the smallest node covering BEG to END.
 
 If omitted, END equals to BEG.  Find node in current buffer.
@@ -57,22 +91,24 @@ Return nil if none find.  If NAMED non-nil, only look for named
 node.  NAMED defaults to nil.
 
 By default, use the first parser in `tree-sitter-parser-list';
-but if PARSER-NAME is non-nil, it specifies the name of the
-parser that should be used."
-  (when-let ((root (tree-sitter-buffer-root parser-name)))
+but if PARSER-OR-NAME is non-nil, use the parser it represents:
+if it is a parser, use that parser, if it is a name, look for the
+parser with that name."
+  (when-let ((root (tree-sitter-buffer-root-node parser-name)))
     (tree-sitter-node-descendant-for-range root beg end named)))
 
-(defun tree-sitter-buffer-root (&optional parser-name)
+(defun tree-sitter-buffer-root-node (&optional parser-or-name)
   "Return the root node of the current buffer.
 
-If PARSER-NAME is nil, return the root node of the first parser
-in `tree-sitter-parser-list'; otherwise find the parser with
-PARSER-NAME and return the root node of that parser.  Return nil
-if couldn't find any."
+If PARSER-OR-NAME is nil, return the root node of the first
+parser in `tree-sitter-parser-list'; otherwise find the parser
+represented by PARSER-OR-NAME and return the root node of that
+parser.  Return nil if couldn't find any.  PARSER-OR-NAME can be
+either a parser object, or the name of a parser."
   (tree-sitter-parser-root-node
-   (if parser-name
-       (tree-sitter-get-parser parser-name)
-     (car tree-sitter-parser-list))))
+   (cond ((tree-sitter-parser-p parser-or-name) parser-or-name)
+         ((null parser-or-name (car tree-sitter-parser-list)))
+         (t (tree-sitter-get-parser parser-or-name)))))
 
 (defun tree-sitter-filter-child (node pred &optional named)
   "Return children of NODE that satisfies PRED.
@@ -105,75 +141,19 @@ one argument, the parent node."
       (when (funcall pred node)
         (throw 'found node)))))
 
-;;; Font-lock
-
-(defvar-local tree-sitter-font-lock-settings nil
-  "A list of settings for tree-sitter-based font-locking.
-
-Each setting controls one parser (often of different language).
-A settings is a list of form (NAME LANGUAGE PATTERN).  NAME is
-the name given to the parser, by convention it is
-\"font-lock-<language>\", where <language> is the language that
-the parser uses.  LANGUAGE is the language object returned by
-tree-sitter language dynamic modules.
-
-PATTERN is a tree-sitter query pattern. (See manual for how to
-write query patterns.)  This pattern should capture nodes with
-either face symbols or function symbols.  If captured with a face
-symbol, the node's corresponding text in the buffer is fontified
-with that face; if captured with a function symbol, the function
-is called with three arguments, BEG END NODE, where BEG and END
-marks the span of the corresponding text, and NODE is the node
-itself.  If a symbol is both a face and a function, it is treated
-as a face.")
-
-(defun tree-sitter-fontify-region-function (beg end &optional verbose)
-  "Fontify the region between BEG and END.
-If VERBOSE is non-nil, print status messages.
-\(See `font-lock-fontify-region-function'.)"
-  (dolist (elm tree-sitter-font-lock-settings)
-    (let ((parser-name (car elm))
-          (language (nth 1 elm))
-          (match-pattern (nth 2 elm)))
-      (tree-sitter-get-parser-create parser-name language)
-      (when-let ((node (tree-sitter-node-in-range beg end parser-name)))
-        (let ((captures (tree-sitter-query-capture
-                         node match-pattern
-                         ;; Specifying the range is important. More
-                         ;; often than not, NODE will be the root
-                         ;; node, and if we don't specify the range,
-                         ;; we are basically querying the whole file.
-                         beg end)))
-          (with-silent-modifications
-            (while captures
-              (let* ((face (caar captures))
-                     (node (cdar captures))
-                     (beg (tree-sitter-node-start node))
-                     (end (tree-sitter-node-end node)))
-                (cond ((facep face)
-                       (put-text-property beg end 'face face))
-                      ((functionp face)
-                       (funcall face beg end node)))
-
-                (if verbose
-                    (message "Fontifying text from %d to %d with %s"
-                             beg end face)))
-              (setq captures (cdr captures))))
-          `(jit-lock-bounds ,(tree-sitter-node-start node)
-                            . ,(tree-sitter-node-end node)))))))
-
+;;; Lab
 
 (define-derived-mode json-mode js-mode "JSON"
   "Major mode for JSON documents."
-  (setq-local font-lock-fontify-region-function
-              #'tree-sitter-fontify-region-function)
-  (setq-local tree-sitter-font-lock-settings
-              `(("font-lock-json"
-                 ,(tree-sitter-json)
-                 "(string) @font-lock-string-face
+  (setq-local font-lock-tree-sitter-defaults
+              '((json-tree-sitter-settings-1))))
+
+(defvar json-tree-sitter-settings-1
+  '(tree-sitter-json
+    "(string) @font-lock-string-face
 (true) @font-lock-constant-face
 (false) @font-lock-constant-face
-(null) @font-lock-constant-face"))))
+(null) @font-lock-constant-face"))
 
 (defun ts-c-fontify-system-lib (beg end _)
   (put-text-property beg (1+ beg) 'face 'font-lock-preprocessor-face)
@@ -183,15 +163,27 @@ If VERBOSE is non-nil, print status messages.
 
 (define-derived-mode ts-c-mode prog-mode "TS C"
   "C mode with tree-sitter support."
-  (setq-local font-lock-fontify-region-function
-              #'tree-sitter-fontify-region-function)
-  (setq-local tree-sitter-font-lock-settings
-              `(("font-lock-c"
-                 ,(tree-sitter-c)
-                 "
-(function_definition body: _ @tree-sitter-mark-function-body
+  (if (tree-sitter-should-enable-p)
+      (progn (setq-local font-lock-tree-sitter-defaults
+                         '((ts-c-tree-sitter-settings-1)))
+             (setq-local font-lock-defaults
+                         (ignore t nil nil nil)))
+    (setq-local font-lock-defaults
+                '((c-font-lock-keywords
+                   c-font-lock-keywords-1
+                   c-font-lock-keywords-2
+                   c-font-lock-keywords-3)
+                  nil nil
+                  ((95 . "w")
+                   (36 . "w"))
+                  c-beginning-of-syntax
+                  (font-lock-mark-block-function . c-mark-function)))))
 
-(null) @font-lock-constant-face
+(add-to-list 'auto-mode-alist '("\\.json\\'" . json-mode))
+(add-to-list 'auto-mode-alist '("\\.tsc\\'" . ts-c-mode))
+
+(defvar ts-c-tree-sitter-settings-1
+  '(tree-sitter-c "(null) @font-lock-constant-face
 (true) @font-lock-constant-face
 (false) @font-lock-constant-face
 
@@ -287,10 +279,8 @@ If VERBOSE is non-nil, print status messages.
 \"#ifndef\" @font-lock-preprocessor-face
 \"#endif\" @font-lock-preprocessor-face
 \"#else\" @font-lock-preprocessor-face
-\"#elif\" @font-lock-preprocessor-face"))))
-
-(add-to-list 'auto-mode-alist '("\\.json\\'" . json-mode))
-(add-to-list 'auto-mode-alist '("\\.tsc\\'" . ts-c-mode))
+\"#elif\" @font-lock-preprocessor-face
+"))
 
 ;;; Debug
 
@@ -298,7 +288,7 @@ If VERBOSE is non-nil, print status messages.
   (interactive)
   (tooltip-show
    (tree-sitter-node-string
-    (tree-sitter-node-at-point))))
+    (tree-sitter-node-at (point)))))
 
 (define-minor-mode tree-sitter-inspect-mode
   "Shows the node at point."

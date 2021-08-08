@@ -258,6 +258,10 @@ for example, (type-of 1) returns `integer'.  */)
           return Qxwidget;
         case PVEC_XWIDGET_VIEW:
           return Qxwidget_view;
+	case PVEC_TS_PARSER:
+	  return Qtree_sitter_parser;
+	case PVEC_TS_NODE:
+	  return Qtree_sitter_node;
         /* "Impossible" cases.  */
 	case PVEC_MISC_PTR:
         case PVEC_OTHER:
@@ -4047,6 +4051,8 @@ syms_of_data (void)
   DEFSYM (Qterminal, "terminal");
   DEFSYM (Qxwidget, "xwidget");
   DEFSYM (Qxwidget_view, "xwidget-view");
+  DEFSYM (Qtree_sitter_parser, "tree-sitter-parser");
+  DEFSYM (Qtree_sitter_node, "tree-sitter-node");
 
   DEFSYM (Qdefun, "defun");
 

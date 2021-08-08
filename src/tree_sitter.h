@@ -31,7 +31,8 @@ INLINE_HEADER_BEGIN
 struct Lisp_TS_Parser
 {
   union vectorlike_header header;
-  /* A parser's name is just a convenient tag, see docstring for
+  /* A parser's name (a string) is just a convenient tag used for
+     conveniently retrieving the parser, see docstring for
      'tree-sitter-make-parser', and 'tree-sitter-get-parser'. */
   Lisp_Object name;
   struct buffer *buffer;

@@ -23,9 +23,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "tree_sitter.h"
 
-/* parser.h defines a macro ADVANCE that conflicts with alloc.c.  */
-#include <tree_sitter/parser.h>
-
 /*** Parsing functions */
 
 /* An auxiliary function that saves a few lines of code.  */
@@ -34,7 +31,9 @@ ts_tree_edit_1 (TSTree *tree, ptrdiff_t start_byte,
 		ptrdiff_t old_end_byte, ptrdiff_t new_end_byte)
 {
   TSPoint dummy_point = {0, 0};
-  TSInputEdit edit = {start_byte, old_end_byte, new_end_byte,
+  TSInputEdit edit = {(uint32_t) start_byte,
+		      (uint32_t) old_end_byte,
+		      (uint32_t) new_end_byte,
 		      dummy_point, dummy_point, dummy_point};
   ts_tree_edit (tree, &edit);
 }
@@ -133,6 +132,15 @@ ts_ensure_position_synced (Lisp_Object parser)
   XTS_PARSER (parser)->visible_end = visible_end;
 }
 
+void
+ts_check_buffer_size (struct buffer *buffer)
+{
+  ptrdiff_t buffer_size =
+    (BUF_Z (buffer) - BUF_BEG (buffer));
+  if (buffer_size > UINT32_MAX)
+    xsignal1(Qtree_sitter_size_error, make_fixnum (buffer_size));
+}
+
 /* Parse the buffer.  We don't parse until we have to. When we have
 to, we call this function to parse and update the tree.  */
 void
@@ -144,6 +152,7 @@ ts_ensure_parsed (Lisp_Object parser)
   TSTree *tree = XTS_PARSER(parser)->tree;
   TSInput input = XTS_PARSER (parser)->input;
   struct buffer *buffer = XTS_PARSER (parser)->buffer;
+  ts_check_buffer_size (buffer);
 
   /* Before we parse, catch up with the narrowing situation.  */
   ts_ensure_position_synced(parser);
@@ -166,7 +175,6 @@ ts_ensure_parsed (Lisp_Object parser)
   ts_tree_delete (tree);
   XTS_PARSER (parser)->tree = new_tree;
   XTS_PARSER (parser)->need_reparse = false;
-  TSNode node = ts_tree_root_node (new_tree);
 }
 
 /* This is the read function provided to tree-sitter to read from a
@@ -288,24 +296,28 @@ DEFUN ("tree-sitter-create-parser",
        doc: /* Create and return a parser in BUFFER for LANGUAGE.
 
 The parser is automatically added to BUFFER's
-`tree-sitter-parser-list'.  LANGUAGE should be the language provided
-by a tree-sitter language dynamic module.
+`tree-sitter-parser-list'.  LANGUAGE should be the symbol of a
+function provided by a tree-sitter language dynamic module, e.g.,
+'tree-sitter-json.
 
-NAME (a string) is the name assigned to the parser, like the name for
-a process.  Unlike process names, not care is taken to make each
-parser's name unique.  By default, no name is assigned to the parser;
-the only consequence of that is you can't use
-`tree-sitter-get-parser' to find the parser by its name.  */)
+NAME (a string) is the name assigned to the parser, like
+the name for a process.  If left omitted, no name is assigned to the
+parser; the only consequence of that is you can't use
+`tree-sitter-get-parser' to find the parser by its name.  Note that
+unlike process names, no care is taken to make each parser's name
+unique.  */)
   (Lisp_Object buffer, Lisp_Object language, Lisp_Object name)
 {
   CHECK_BUFFER(buffer);
+  CHECK_SYMBOL (language);
   if (!NILP (name))
     CHECK_STRING (name);
+  ts_check_buffer_size (XBUFFER (buffer));
 
-  /* LANGUAGE is a USER_PTR that contains the pointer to a TSLanguage
-     struct.  */
+  /* LANGUAGE is a function that returns a USER_PTR that contains the
+     pointer to a TSLanguage struct.  */
   TSParser *parser = ts_parser_new ();
-  TSLanguage *lang = (XUSER_PTR (language)->p);
+  TSLanguage *lang = (XUSER_PTR (Ffuncall (1, &language))->p);
   ts_parser_set_language (parser, lang);
 
   Lisp_Object lisp_parser
@@ -946,6 +958,7 @@ syms_of_tree_sitter (void)
   DEFSYM (Qtree_sitter_query_error, "tree-sitter-query-error");
   DEFSYM (Qtree_sitter_parse_error, "tree-sitter-parse-error");
   DEFSYM (Qtree_sitter_set_range_error, "tree-sitter-set-range-error");
+  DEFSYM (Qtree_sitter_size_error, "tree-sitter-size-error");
 
   define_error (Qtree_sitter_error, "Generic tree-sitter error", Qerror);
   define_error (Qtree_sitter_query_error, "Query pattern is malformed",
@@ -954,6 +967,8 @@ syms_of_tree_sitter (void)
 		Qtree_sitter_error);
   define_error (Qtree_sitter_set_range_error,
 		"RANGES are invalid, they have to be ordered and not overlapping",
+		Qtree_sitter_error);
+  define_error (Qtree_sitter_size_error, "Buffer too large (> 4GB)",
 		Qtree_sitter_error);
 
 

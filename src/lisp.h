@@ -550,6 +550,8 @@ enum Lisp_Fwd_Type
    your object -- this way, the same object could be used to represent
    several disparate C structures.
 
+   In addition, you need to add switch branches in data.c for Ftype_of.
+
    You also need to add the new type to the constant
    `cl--typeof-types' in lisp/emacs-lisp/cl-preloaded.el.  */
 

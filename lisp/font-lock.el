@@ -1258,6 +1258,7 @@ This function is the default `font-lock-fontify-region-function'."
            (setq start (max font-lock-syntactically-fontified (point-min)))
            (setq font-lock-syntactically-fontified end))
          (font-lock-fontify-syntactic-keywords-region start end)))
+     (font-lock-tree-sitter-fontify-region beg end loudly)
      (unless font-lock-keywords-only
        (font-lock-fontify-syntactically-region beg end loudly))
      (font-lock-fontify-keywords-region beg end loudly)
@@ -1793,6 +1794,63 @@ LOUDLY, if non-nil, allows progress-meter bar."
 
 ;; End of Keyword regexp fontification functions.
 
+;;; Tree-sitter fontification functions.
+
+(defvar-local font-lock-tree-sitter-settings nil
+  "A list of settings for tree-sitter-based fontification.
+
+Each setting controls one parser (often of different language).
+A pattern is a list of form (LANGUAGE PATTERN).  LANGUAGE is the
+symbol of a function that returns a tree-sitter language.  This
+function should be provided by a dynamic module for a particular
+tree-sitter language.
+
+PATTERN is a string containing tree-sitter queries.  TODO: more doc.")
+
+(defvar-local font-lock-tree-sitter-defaults nil
+  "Defaults for tree-sitter Font Lock specified by the major mode.
+
+It should be a list of defaults, each default is of the form:
+
+  (SETTINGS LANGUAGE)
+
+SETTINGS may be a symbol (a variable or function whose value is
+the settings to use for fontification) or a list of
+symbols (specifying different levels of fontification).  If the
+symbol is both a variable and a function, it is used as a
+function.  Different levels of fontification can be controlled by
+`font-lock-maximum-decoration'.")
+
+(defun font-lock-tree-sitter-fontify-region (start end &optional loudly)
+  (dolist (setting font-lock-tree-sitter-settings)
+    (let* ((language-symbol (nth 0 setting))
+           (match-pattern (nth 1 setting))
+           (parser (tree-sitter-get-parser-create language-symbol)))
+      (when-let ((node (tree-sitter-node-at start end parser)))
+        (let ((captures (tree-sitter-query-capture
+                         node match-pattern
+                         ;; Specifying the range is important. More
+                         ;; often than not, NODE will be the root
+                         ;; node, and if we don't specify the range,
+                         ;; we are basically querying the whole file.
+                         start end)))
+          (with-silent-modifications
+            (dolist (capture captures)
+              (let* ((face (car capture))
+                     (node (cdr capture))
+                     (start (tree-sitter-node-start node))
+                     (end (tree-sitter-node-end node)))
+                (cond ((facep face)
+                       (put-text-property start end 'face face))
+                      ((functionp face)
+                       (funcall face start end node)))
+                (if loudly
+                    (message
+                     "Fontifying text from %d to %d Face: %s Language: %s"
+                     start end face language-symbol))))))))))
+
+;; End of tree-sitter fontification functions.
+
 ;;; Various functions.
 
 (defun font-lock-compile-keywords (keywords &optional syntactic-keywords)
@@ -1828,7 +1886,7 @@ If SYNTACTIC-KEYWORDS is non-nil, it means these keywords are used for
 		  (0
 		   (if (memq (get-text-property (match-beginning 0) 'face)
 			     '(font-lock-string-face font-lock-doc-face
-			       font-lock-comment-face))
+			                             font-lock-comment-face))
 		       (list 'face font-lock-warning-face
                              'help-echo "Looks like a toplevel defun: escape the parenthesis"))
 		   prepend)))))
@@ -1960,6 +2018,15 @@ Sets various variables using `font-lock-defaults' and
       (unless (eq (car font-lock-keywords) t)
 	(setq font-lock-keywords
               (font-lock-compile-keywords font-lock-keywords))))
+    ;; Tree-sitter-based fontification.
+    (setq-local font-lock-tree-sitter-settings
+                (mapcar (lambda (defaults)
+                          (font-lock-eval-keywords
+                           (font-lock-choose-keywords
+                           (nth 0 defaults)
+	                   (font-lock-value-in-major-mode
+                            font-lock-maximum-decoration))))
+                        font-lock-tree-sitter-defaults))
     (font-lock-flush)))
 
 ;;; Color etc. support.

@@ -1869,10 +1869,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       if (NILP (name))
 	print_c_string ("anonymous", printcharfun);
       else
-	{
-	  eassert (STRINGP (name));
 	  print_string (name, printcharfun);
-	}
       print_c_string (" in ", printcharfun);
       print_string (BVAR (XTS_PARSER (obj)->buffer, name), printcharfun);
       printchar ('>', printcharfun);

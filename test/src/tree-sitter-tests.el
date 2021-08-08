@@ -27,7 +27,7 @@
   (require 'tree-sitter-json)
   (with-temp-buffer
     (let ((parser (tree-sitter-create-parser
-                   (current-buffer) (tree-sitter-json))))
+                   (current-buffer) 'tree-sitter-json)))
       (should
        (eq parser (car tree-sitter-parser-list)))
       (should
@@ -58,7 +58,7 @@
       (progn
         (insert "[1,2,{\"name\": \"Bob\"},3]")
         (setq parser (tree-sitter-create-parser
-                      (current-buffer) (tree-sitter-json)))
+                      (current-buffer) 'tree-sitter-json))
         (setq root-node (tree-sitter-parser-root-node
                          parser)))
       ;; `tree-sitter-node-type'.
@@ -130,7 +130,7 @@
       (progn
         (insert "[1,2,{\"name\": \"Bob\"},3]")
         (setq parser (tree-sitter-create-parser
-                      (current-buffer) (tree-sitter-json)))
+                      (current-buffer) 'tree-sitter-json))
         (setq root-node (tree-sitter-parser-root-node
                          parser))
         (setq pattern "(string) @string
@@ -159,7 +159,7 @@
         (insert "xxx[1,{\"name\": \"Bob\"},2,3]xxx")
         (narrow-to-region (+ (point-min) 3) (- (point-max) 3))
         (setq parser (tree-sitter-create-parser
-                      (current-buffer) (tree-sitter-json)))
+                      (current-buffer) 'tree-sitter-json))
         (setq root-node (tree-sitter-parser-root-node
                          parser)))
       ;; This test is from the basic test.
@@ -212,7 +212,7 @@
       (progn
         (insert "[[1],oooxxx[1,2,3],xxx[1,2]]")
         (setq parser (tree-sitter-create-parser
-                      (current-buffer) (tree-sitter-json)))
+                      (current-buffer) 'tree-sitter-json))
         (setq root-node (tree-sitter-parser-root-node
                          parser)))
       ;; TODO: signaling error crashes Emacs on Mac.
