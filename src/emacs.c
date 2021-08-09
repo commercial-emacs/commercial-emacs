@@ -85,7 +85,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "intervals.h"
 #include "character.h"
 #include "buffer.h"
-#include "tree_sitter.h"
+#include "tree-sitter.h"
 #include "window.h"
 #include "xwidget.h"
 #include "atimer.h"

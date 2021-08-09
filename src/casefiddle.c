@@ -31,7 +31,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keymap.h"
 
 #ifdef HAVE_TREE_SITTER
-#include "tree_sitter.h"
+#include "tree-sitter.h"
 #endif
 
 enum case_action {CASE_UP, CASE_DOWN, CASE_CAPITALIZE, CASE_CAPITALIZE_UP};

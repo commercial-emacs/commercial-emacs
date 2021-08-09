@@ -51,7 +51,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif /* HAVE_WINDOW_SYSTEM */
 
 #ifdef HAVE_TREE_SITTER
-#include "tree_sitter.h"
+#include "tree-sitter.h"
 #endif
 
 #include <flexmember.h>

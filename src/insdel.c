@@ -32,7 +32,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "pdumper.h"
 
 #ifdef HAVE_TREE_SITTER
-#include "tree_sitter.h"
+#include "tree-sitter.h"
 #endif
 
 static void insert_from_string_1 (Lisp_Object, ptrdiff_t, ptrdiff_t, ptrdiff_t,

@@ -21,7 +21,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "buffer.h"
-#include "tree_sitter.h"
+#include "tree-sitter.h"
 
 /*** Parsing functions */
 
