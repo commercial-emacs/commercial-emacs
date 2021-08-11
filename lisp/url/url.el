@@ -244,8 +244,7 @@ how long to wait for a response before giving up."
                                 data-buffer)))
          (start-time (current-time))
          (proc-buffer (url-retrieve url callback nil silent
-                                    inhibit-cookies))
-         (iterations 0))
+                                    inhibit-cookies)))
     (if (not proc-buffer)
         (url-debug 'retrieval "Synchronous fetching unnecessary %s" url)
       (unwind-protect
@@ -259,9 +258,6 @@ how long to wait for a response before giving up."
 	      (url-debug 'retrieval
 		         "Spinning in url-retrieve-synchronously: nil (%S)"
 		         proc-buffer)
-              (when (= (cl-incf iterations) 115)
-                (with-current-buffer proc-buffer
-                  (funcall (buffer-local-value 'my-func proc-buffer))))
               (when-let ((redirect-buffer
                           (buffer-local-value 'url-redirect-buffer
                                               proc-buffer)))
