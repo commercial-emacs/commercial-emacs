@@ -5914,6 +5914,14 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		      pset_status (p, list2 (Qfailed, make_fixnum (xerrno)));
 		    }
 		  deactivate_process (proc);
+		  {
+		      char buf[128];
+		      sprintf(buf, "the fudd: %s xerrno=%d addrinfos=%d",
+			      SDATA (p->name),
+			      xerrno,
+			      !NILP (addrinfos));
+		      message_dolog (buf, strlen(buf), 1, 0);
+		  }
 		  if (!NILP (addrinfos))
 		    connect_network_socket (proc, addrinfos, Qnil);
 		}
@@ -5936,7 +5944,17 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
 		  if (0 <= p->infd && !EQ (p->filter, Qt)
 		      && !EQ (p->command, Qt))
-		    add_process_read_fd (p->infd);
+		      add_process_read_fd (p->infd);
+		  else
+		      {
+			  char buf[128];
+			  sprintf(buf, "the fud: %s infd=%d filter=%s command=%s",
+				  SDATA (p->name),
+				  p->infd,
+				  (SSDATA (Fprin1_to_string (p->filter, Qnil))),
+				  (SSDATA (Fprin1_to_string (p->command, Qnil))));
+			  message_dolog (buf, strlen(buf), 1, 0);
+		      }
 		}
 	    }
 	}			/* End for each file descriptor.  */
