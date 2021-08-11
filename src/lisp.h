@@ -844,7 +844,7 @@ struct Lisp_Symbol
 
         /* Interned state of the symbol.  This is an enumerator from
            enum symbol_interned.  */
-        unsigned interned : 2;
+        ENUM_BF (symbol_interned) interned : 2;
 
         /* True means that this variable has been explicitly declared
            special (with `defvar' etc), and shouldn't be lexically bound.  */
