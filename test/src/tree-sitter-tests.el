@@ -231,5 +231,9 @@
       ;; TODO: More tests.
       )))
 
+;; TODO
+;; - Functions in tree-sitter.el
+;; - tree-sitter-node-eq
+
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here

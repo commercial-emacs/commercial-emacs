@@ -34,7 +34,7 @@
   "A list of major-modes for which tree-sitter support is disabled."
   :type '(list symbol))
 
-(defcustom tree-sitter-maximum-size (* 4 1000 1000)
+(defcustom tree-sitter-maximum-size (* 4 1024 1024)
   "Maximum buffer size for enabling tree-sitter parsing."
   :type 'integer)
 
@@ -94,8 +94,8 @@ By default, use the first parser in `tree-sitter-parser-list';
 but if PARSER-OR-NAME is non-nil, use the parser it represents:
 if it is a parser, use that parser, if it is a name, look for the
 parser with that name."
-  (when-let ((root (tree-sitter-buffer-root-node parser-name)))
-    (tree-sitter-node-descendant-for-range root beg end named)))
+  (when-let ((root (tree-sitter-buffer-root-node parser-or-name)))
+    (tree-sitter-node-descendant-for-range root beg (or end beg) named)))
 
 (defun tree-sitter-buffer-root-node (&optional parser-or-name)
   "Return the root node of the current buffer.
@@ -107,7 +107,7 @@ parser.  Return nil if couldn't find any.  PARSER-OR-NAME can be
 either a parser object, or the name of a parser."
   (tree-sitter-parser-root-node
    (cond ((tree-sitter-parser-p parser-or-name) parser-or-name)
-         ((null parser-or-name (car tree-sitter-parser-list)))
+         ((null parser-or-name) (car tree-sitter-parser-list))
          (t (tree-sitter-get-parser parser-or-name)))))
 
 (defun tree-sitter-filter-child (node pred &optional named)
@@ -135,11 +135,48 @@ NAMED non-nil, only search for named node.  NAMED defaults to nil."
 
 Return nil if none found.  PRED should be a function that takes
 one argument, the parent node."
-  (catch 'found
-    (while node
-      (setq node (tree-sitter-node-parent node))
-      (when (funcall pred node)
-        (throw 'found node)))))
+  (let ((node (tree-sitter-node-parent node)))
+    (while (and node (not (funcall pred node)))
+      (setq node (tree-sitter-node-parent node)))
+    node))
+
+(defun tree-sitter-parent-while (node pred)
+  "Return the furthest parent of NODE that satisfies PRED.
+
+Return nil if none found.  PRED should be a function that takes
+one argument, the parent node."
+  (let ((last nil))
+    (while (and node (funcall pred node))
+      (setq last node
+            node (tree-sitter-node-parent node)))
+    last))
+
+(defun tree-sitter-node-children (node &optional named)
+  "Return a list of NODE's children.
+If NAMED is non-nil, count named child only."
+  (mapcar (lambda (idx)
+            (tree-sitter-node-child idx named))
+          (number-sequence
+           0 (1- (tree-sitter-node-child-count node named)))))
+
+(defun tree-sitter-node-index (node &optional named)
+  "Return the index of NODE in its parent.
+If NAMED is non-nil, count named child only."
+  (let ((count 0))
+    (while (setq node (tree-sitter-node-prev-sibling node named))
+      (cl-incf count))
+    count))
+
+(defun tree-sitter-node-field-name (node)
+  "Return the field name of NODE as a child of its parent."
+  (when-let ((parent (tree-sitter-node-parent node))
+             (idx (tree-sitter-node-index node)))
+    (tree-sitter-node-field-name-for-child parent idx)))
+
+;;; Indent
+
+(defvar tree-sitter-indent-rules
+  '())
 
 ;;; Lab
 
@@ -284,20 +321,46 @@ one argument, the parent node."
 
 ;;; Debug
 
-(defun tree-sitter-inspect-node-at-point ()
-  (interactive)
-  (tooltip-show
-   (tree-sitter-node-string
-    (tree-sitter-node-at (point)))))
+(defun tree-sitter-inspect-node-at-point (&optional arg)
+  "Show information of the node at point.
+If called interactively, show in echo area, otherwise set
+`tree-sitter--inspect-name' (which will appear in the mode-line
+if `tree-sitter-inspect-mode' is enabled)."
+  (interactive "p")
+  (if-let ((node (tree-sitter-node-at (point))))
+      (setq tree-sitter--inspect-name
+            (format "(%s %s(%s))"
+                    (or (tree-sitter-node-type
+                         (tree-sitter-node-parent node))
+                        "N/A")
+                    (if (tree-sitter-node-field-name node)
+                        (format "%s: "
+                                (tree-sitter-node-field-name node))
+                      "")
+                    (tree-sitter-node-type node)))
+    (setq tree-sitter--inspect-name nil)
+    (force-mode-line-update))
+  (when arg
+    (if tree-sitter--inspect-name
+        (message "%s" tree-sitter--inspect-name)
+      (message "No node at point"))))
+
+(defvar-local tree-sitter--inspect-name nil
+  "Tree-sitter-inspect-mode uses this to show node name in mode-line.")
 
 (define-minor-mode tree-sitter-inspect-mode
   "Shows the node at point."
   :lighter nil
   (if tree-sitter-inspect-mode
-      (add-hook 'post-command-hook #'tree-sitter-inspect-node-at-point
-                nil t)
-    (remove-hook 'post-command-hook #'tree-sitter-inspect-node-at-point
-                 t)))
+      (progn
+        (add-hook 'post-command-hook
+                  #'tree-sitter-inspect-node-at-point 0 t)
+        (push '(:eval tree-sitter--inspect-name) mode-line-misc-info))
+    (remove-hook 'post-command-hook
+                 #'tree-sitter-inspect-node-at-point t)
+    (setq mode-line-misc-info
+          (remove '(:eval tree-sitter--inspect-name)
+                  mode-line-misc-info))))
 
 (provide 'tree-sitter)
 

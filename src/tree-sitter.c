@@ -45,8 +45,8 @@ void
 ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 		  ptrdiff_t new_end_byte)
 {
-  eassert(start_byte <= old_end_byte);
-  eassert(start_byte <= new_end_byte);
+  eassert (start_byte <= old_end_byte);
+  eassert (start_byte <= new_end_byte);
 
   Lisp_Object parser_list = Fsymbol_value (Qtree_sitter_parser_list);
 
@@ -84,7 +84,7 @@ void
 ts_ensure_position_synced (Lisp_Object parser)
 {
   TSParser *ts_parser = XTS_PARSER (parser)->parser;
-  TSTree *tree = XTS_PARSER(parser)->tree;
+  TSTree *tree = XTS_PARSER (parser)->tree;
   struct buffer *buffer = XTS_PARSER (parser)->buffer;
   /* Before we parse or set ranges, catch up with the narrowing
      situation.  We change visible_beg and visible_end to match
@@ -138,7 +138,7 @@ ts_check_buffer_size (struct buffer *buffer)
   ptrdiff_t buffer_size =
     (BUF_Z (buffer) - BUF_BEG (buffer));
   if (buffer_size > UINT32_MAX)
-    xsignal1(Qtree_sitter_size_error, make_fixnum (buffer_size));
+    xsignal1 (Qtree_sitter_size_error, make_fixnum (buffer_size));
 }
 
 /* Parse the buffer.  We don't parse until we have to. When we have
@@ -155,7 +155,7 @@ ts_ensure_parsed (Lisp_Object parser)
   ts_check_buffer_size (buffer);
 
   /* Before we parse, catch up with the narrowing situation.  */
-  ts_ensure_position_synced(parser);
+  ts_ensure_position_synced (parser);
 
   TSTree *new_tree = ts_parser_parse(ts_parser, tree, input);
   /* This should be very rare (impossible, really): it only happens
@@ -168,7 +168,7 @@ ts_ensure_parsed (Lisp_Object parser)
   if (new_tree == NULL)
     {
       Lisp_Object buf;
-      XSETBUFFER(buf, buffer);
+      XSETBUFFER (buf, buffer);
       xsignal1 (Qtree_sitter_parse_error, buf);
     }
 
@@ -364,7 +364,7 @@ DEFUN ("tree-sitter-parser-root-node",
   (Lisp_Object parser)
 {
   CHECK_TS_PARSER (parser);
-  ts_ensure_parsed(parser);
+  ts_ensure_parsed (parser);
   TSNode root_node = ts_tree_root_node (XTS_PARSER (parser)->tree);
   return make_ts_node (parser, root_node);
 }
@@ -379,11 +379,12 @@ dynamic module.  */)
   (Lisp_Object string, Lisp_Object language)
 {
   CHECK_STRING (string);
+  CHECK_SYMBOL (language);
 
-  /* LANGUAGE is a USER_PTR that contains the pointer to a TSLanguage
-     struct.  */
   TSParser *parser = ts_parser_new ();
-  TSLanguage *lang = (XUSER_PTR (language)->p);
+  /* LANGUAGE is a function that returns a USER_PTR that contains the
+     pointer to a TSLanguage struct.  */
+  TSLanguage *lang = (XUSER_PTR (Ffuncall (1, &language))->p);
   ts_parser_set_language (parser, lang);
 
   TSTree *tree = ts_parser_parse_string (parser, NULL,
@@ -439,10 +440,10 @@ is nil, set PARSER to parse the whole buffer.  */)
 {
   CHECK_TS_PARSER (parser);
   CHECK_CONS (ranges);
-  ts_check_range_argument(ranges);
+  ts_check_range_argument (ranges);
 
   /* Before we parse, catch up with narrowing/widening.  */
-  ts_ensure_position_synced(parser);
+  ts_ensure_position_synced (parser);
 
   bool success;
   if (NILP (ranges))
@@ -495,14 +496,16 @@ DEFUN ("tree-sitter-parser-included-ranges",
        Stree_sitter_parser_included_ranges,
        1, 1, 0,
        doc: /* Return the ranges set for PARSER.
-
-See `tree-sitter-parser-set-ranges'.*/)
+See `tree-sitter-parser-set-ranges'.  If no range is set, return
+nil.  */)
   (Lisp_Object parser)
 {
   CHECK_TS_PARSER (parser);
   uint32_t len;
   const TSRange *ranges = ts_parser_included_ranges
     (XTS_PARSER (parser)->parser, &len);
+  if (len == 0)
+    return Qnil;
   struct buffer *buffer = XTS_PARSER (parser)->buffer;
 
   Lisp_Object list = Qnil;
@@ -524,71 +527,83 @@ See `tree-sitter-parser-set-ranges'.*/)
 
 DEFUN ("tree-sitter-node-type",
        Ftree_sitter_node_type, Stree_sitter_node_type, 1, 1, 0,
-       doc: /* Return the NODE's type as a symbol.  */)
+       doc: /* Return the NODE's type as a string.
+If NODE is nil, return nil.  */)
   (Lisp_Object node)
 {
+  if (NILP (node))
+    return Qnil;
   CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
-  const char *type = ts_node_type(ts_node);
-  // TODO: Maybe return a string instead.
-  return intern_c_string (type);
+  const char *type = ts_node_type (ts_node);
+  return build_string (type);
 }
 
 DEFUN ("tree-sitter-node-start",
        Ftree_sitter_node_start, Stree_sitter_node_start, 1, 1, 0,
-       doc: /* Return the NODE's start position.  */)
+       doc: /* Return the NODE's start position.
+If NODE is nil, return nil.  */)
   (Lisp_Object node)
 {
+  if (NILP (node))
+    return Qnil;
   CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
   ptrdiff_t visible_beg =
     XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
-  uint32_t start_byte = ts_node_start_byte(ts_node);
+  uint32_t start_byte = ts_node_start_byte (ts_node);
   struct buffer *buffer = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
   ptrdiff_t start_pos = buf_bytepos_to_charpos
     (buffer, start_byte + visible_beg);
-  return make_fixnum(start_pos);
+  return make_fixnum (start_pos);
 }
 
 DEFUN ("tree-sitter-node-end",
        Ftree_sitter_node_end, Stree_sitter_node_end, 1, 1, 0,
-       doc: /* Return the NODE's end position.  */)
+       doc: /* Return the NODE's end position.
+If NODE is nil, return nil.  */)
   (Lisp_Object node)
 {
+  if (NILP (node))
+    return Qnil;
   CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
   ptrdiff_t visible_beg =
     XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
-  uint32_t end_byte = ts_node_end_byte(ts_node);
+  uint32_t end_byte = ts_node_end_byte (ts_node);
   struct buffer *buffer = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
   ptrdiff_t end_pos = buf_bytepos_to_charpos
     (buffer, end_byte + visible_beg);
-  return make_fixnum(end_pos);
+  return make_fixnum (end_pos);
 }
 
 DEFUN ("tree-sitter-node-string",
        Ftree_sitter_node_string, Stree_sitter_node_string, 1, 1, 0,
-       doc: /* Return the string representation of NODE.  */)
+       doc: /* Return the string representation of NODE.
+If NODE is nil, return nil.  */)
   (Lisp_Object node)
 {
+  if (NILP (node))
+    return Qnil;
   CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
-  char *string = ts_node_string(ts_node);
-  return make_string(string, strlen (string));
+  char *string = ts_node_string (ts_node);
+  return make_string (string, strlen (string));
 }
 
 DEFUN ("tree-sitter-node-parent",
        Ftree_sitter_node_parent, Stree_sitter_node_parent, 1, 1, 0,
        doc: /* Return the immediate parent of NODE.
-
-Return nil if there isn't any.  */)
+Return nil if there isn't any.  If NODE is nil, return nil.  */)
   (Lisp_Object node)
 {
+  if (NILP (node))
+    return Qnil;
   CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
   TSNode parent = ts_node_parent (ts_node);
 
-  if (ts_node_is_null(parent))
+  if (ts_node_is_null (parent))
     return Qnil;
 
   return make_ts_node (XTS_NODE (node)->parser, parent);
@@ -599,9 +614,11 @@ DEFUN ("tree-sitter-node-child",
        doc: /* Return the Nth child of NODE.
 
 Return nil if there isn't any.  If NAMED is non-nil, look for named
-child only.  NAMED defaults to nil.  */)
+child only.  NAMED defaults to nil.  If NODE is nil, return nil.  */)
   (Lisp_Object node, Lisp_Object n, Lisp_Object named)
 {
+  if (NILP (node))
+    return Qnil;
   CHECK_TS_NODE (node);
   CHECK_INTEGER (n);
   EMACS_INT idx = XFIXNUM (n);
@@ -612,10 +629,10 @@ child only.  NAMED defaults to nil.  */)
   else
     child = ts_node_named_child (ts_node, (uint32_t) idx);
 
-  if (ts_node_is_null(child))
+  if (ts_node_is_null (child))
     return Qnil;
 
-  return make_ts_node(XTS_NODE (node)->parser, child);
+  return make_ts_node (XTS_NODE (node)->parser, child);
 }
 
 DEFUN ("tree-sitter-node-check",
@@ -664,9 +681,13 @@ DEFUN ("tree-sitter-node-field-name-for-child",
        Stree_sitter_node_field_name_for_child, 2, 2, 0,
        doc: /* Return the field name of the Nth child of NODE.
 
-Return nil if there isn't any child or no field is found.  */)
+Return nil if there isn't any child or no field is found.
+If NODE is nil, return nil.  */)
   (Lisp_Object node, Lisp_Object n)
 {
+  if (NILP (node))
+    return Qnil;
+  CHECK_TS_NODE (node);
   CHECK_INTEGER (n);
   EMACS_INT idx = XFIXNUM (n);
   TSNode ts_node = XTS_NODE (node)->node;
@@ -685,9 +706,12 @@ DEFUN ("tree-sitter-node-child-count",
        doc: /* Return the number of children of NODE.
 
 If NAMED is non-nil, count named child only.  NAMED defaults to
-nil.  */)
+nil.  If NODE is nil, return nil.  */)
   (Lisp_Object node, Lisp_Object named)
 {
+  if (NILP (node))
+    return Qnil;
+  CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
   uint32_t count;
   if (NILP (named))
@@ -701,10 +725,12 @@ DEFUN ("tree-sitter-node-child-by-field-name",
        Ftree_sitter_node_child_by_field_name,
        Stree_sitter_node_child_by_field_name, 2, 2, 0,
        doc: /* Return the child of NODE with field name NAME.
-
-Return nil if there isn't any.  */)
+Return nil if there isn't any.  If NODE is nil, return nil.  */)
   (Lisp_Object node, Lisp_Object name)
 {
+  if (NILP (node))
+    return Qnil;
+  CHECK_TS_NODE (node);
   CHECK_STRING (name);
   char *name_str = SSDATA (name);
   TSNode ts_node = XTS_NODE (node)->node;
@@ -723,9 +749,12 @@ DEFUN ("tree-sitter-node-next-sibling",
        doc: /* Return the next sibling of NODE.
 
 Return nil if there isn't any.  If NAMED is non-nil, look for named
-child only.  NAMED defaults to nil.  */)
+child only.  NAMED defaults to nil.  If NODE is nil, return nil.  */)
   (Lisp_Object node, Lisp_Object named)
 {
+  if (NILP (node))
+    return Qnil;
+  CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
   TSNode sibling;
   if (NILP (named))
@@ -745,9 +774,12 @@ DEFUN ("tree-sitter-node-prev-sibling",
        doc: /* Return the previous sibling of NODE.
 
 Return nil if there isn't any.  If NAMED is non-nil, look for named
-child only.  NAMED defaults to nil.  */)
+child only.  NAMED defaults to nil.  If NODE is nil, return nil.  */)
   (Lisp_Object node, Lisp_Object named)
 {
+  if (NILP (node))
+    return Qnil;
+  CHECK_TS_NODE (node);
   TSNode ts_node = XTS_NODE (node)->node;
   TSNode sibling;
 
@@ -771,9 +803,12 @@ Specifically, return the first child that extends beyond POS.  POS is
 a position in the buffer.  Return nil if there isn't any.  If NAMED is
 non-nil, look for named child only.  NAMED defaults to nil.  Note that
 this function returns an immediate child, not the smallest
-(grand)child.  */)
+(grand)child.  If NODE is nil, return nil.  */)
   (Lisp_Object node, Lisp_Object pos, Lisp_Object named)
 {
+  if (NILP (node))
+    return Qnil;
+  CHECK_TS_NODE (node);
   CHECK_INTEGER (pos);
 
   struct buffer *buf = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
@@ -805,9 +840,12 @@ DEFUN ("tree-sitter-node-descendant-for-range",
 
 The returned node is a descendant of NODE.  POS is a position.  Return
 nil if there isn't any.  If NAMED is non-nil, look for named child
-only.  NAMED defaults to nil.  */)
+only.  NAMED defaults to nil.  If NODE is nil, return nil.  */)
   (Lisp_Object node, Lisp_Object beg, Lisp_Object end, Lisp_Object named)
 {
+  if (NILP (node))
+    return Qnil;
+  CHECK_TS_NODE (node);
   CHECK_INTEGER (beg);
   CHECK_INTEGER (end);
 
@@ -836,6 +874,25 @@ only.  NAMED defaults to nil.  */)
     return Qnil;
 
   return make_ts_node(XTS_NODE (node)->parser, child);
+}
+
+DEFUN ("tree-sitter-node-eq",
+       Ftree_sitter_node_eq,
+       Stree_sitter_node_eq, 2, 2, 0,
+       doc: /* Return non-nil if NODE1 and NODE2 are the same node.
+If any one of NODE1 and NODE2 is nil, return nil.  */)
+  (Lisp_Object node1, Lisp_Object node2)
+{
+  if (NILP (node1) || NILP (node2))
+    return Qnil;
+  CHECK_TS_NODE (node1);
+  CHECK_TS_NODE (node2);
+
+  TSNode ts_node_1 = XTS_NODE (node1)->node;
+  TSNode ts_node_2 = XTS_NODE (node2)->node;
+
+  bool same_node = ts_node_eq (ts_node_1, ts_node_2);
+  return same_node ? Qt : Qnil;
 }
 
 /* Query functions */
@@ -880,6 +937,8 @@ Raise an tree-sitter-query-error if PATTERN is malformed.  */)
 {
   CHECK_TS_NODE (node);
   CHECK_STRING (pattern);
+  CHECK_INTEGER (beg);
+  CHECK_INTEGER (end);
 
   TSNode ts_node = XTS_NODE (node)->node;
   Lisp_Object lisp_parser = XTS_NODE (node)->parser;
@@ -1012,6 +1071,7 @@ sync with the buffer's content.  */);
   defsubr (&Stree_sitter_node_prev_sibling);
   defsubr (&Stree_sitter_node_first_child_for_pos);
   defsubr (&Stree_sitter_node_descendant_for_range);
+  defsubr (&Stree_sitter_node_eq);
 
   defsubr (&Stree_sitter_query_capture);
 }
