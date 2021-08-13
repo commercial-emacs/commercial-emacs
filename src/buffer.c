@@ -6337,6 +6337,11 @@ If t, displays a cursor related to the usual cursor type
 You can also specify the cursor type as in the `cursor-type' variable.
 Use Custom to set this variable and update the display.  */);
 
+  DEFVAR_PER_BUFFER ("last-selected-window",
+		     &BVAR (current_buffer, last_selected_window), Qnil,
+		     doc: /* Last window displaying this buffer.
+Nil if that window no longer displays this buffer.  */);
+
   DEFVAR_LISP ("kill-buffer-query-functions", Vkill_buffer_query_functions,
 	       doc: /* List of functions called with no args to query before killing a buffer.
 The buffer being killed will be current while the functions are running.

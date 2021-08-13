@@ -6605,16 +6605,6 @@ In Transient Mark mode, activate mark if optional third arg ACTIVATE non-nil."
       (when old
         (set-marker old nil))))
   (set-marker (mark-marker) (or location (point)) (current-buffer))
-  ;; Don't push the mark on the global mark ring if the last global
-  ;; mark pushed was in this same buffer.
-  (unless (and global-mark-ring
-               (eq (marker-buffer (car global-mark-ring)) (current-buffer)))
-    (let ((old (nth global-mark-ring-max global-mark-ring))
-          (history-delete-duplicates nil))
-      (add-to-history
-       'global-mark-ring (copy-marker (mark-marker)) global-mark-ring-max t)
-      (when old
-        (set-marker old nil))))
   (or nomsg executing-kbd-macro (> (minibuffer-depth) 0)
       (message "Mark set"))
   (if (or activate (not transient-mark-mode))
@@ -6765,7 +6755,8 @@ for it.")
       (error "No global mark set"))
   (let* ((marker (car global-mark-ring))
 	 (buffer (marker-buffer marker))
-	 (position (marker-position marker)))
+	 (position (marker-position marker))
+         (buffer-list-update-hook buffer-list-update-hook))
     (setq global-mark-ring (nconc (cdr global-mark-ring)
 				  (list (car global-mark-ring))))
     (set-buffer buffer)
