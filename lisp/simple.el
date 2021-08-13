@@ -32,7 +32,6 @@
 
 (declare-function widget-convert "wid-edit" (type &rest args))
 (declare-function shell-mode "shell" ())
-(declare-function cl-remove-if "cl-seq" (cl-pred cl-list &rest cl-keys))
 
 ;;; From compile.el
 (defvar compilation-current-error)
@@ -6764,7 +6763,8 @@ for it.")
                     (when (and (buffer-live-p b)
                                (not (eq b (current-buffer)))
                                (not (minibufferp b))
-                               (eq (buffer-local-value 'last-selected-window b) w))
+                               (let ((lsw (buffer-local-value 'last-selected-window b)))
+                                 (or (not lsw) (eq w lsw))))
                       (throw 'done b))))))
     (with-current-buffer b
       (push-global-mark))))
@@ -6820,7 +6820,7 @@ to create a line, and moves the cursor to that line.  Otherwise it moves the
 cursor to the end of the buffer.
 
 If the variable `line-move-visual' is non-nil, this command moves
-by display lines.  Otherwise, it moves by buffer lines, without
+ lines.  Otherwise, it moves by buffer lines, without
 taking variable-width characters or continued lines into account.
 See \\[next-logical-line] for a command that always moves by buffer lines.
 
