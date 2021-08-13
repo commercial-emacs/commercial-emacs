@@ -6747,7 +6747,7 @@ for it.")
 
 (defun push-global-mark ()
   (interactive)
-  (push-mark (point) t)
+  (set-marker (mark-marker) (point) (current-buffer))
   (let ((history-delete-duplicates t)
         (old (nth global-mark-ring-max global-mark-ring)))
     (add-to-history
@@ -6758,16 +6758,14 @@ for it.")
 (defun update-global-mark ()
   "Record point of departed buffer onto `global-mark-ring'."
   (when-let ((w (selected-window))
-             (b (catch 'done
-                  (dolist (b (frame-parameter nil 'buffer-list))
-                    (when (and (buffer-live-p b)
-                               (not (eq b (current-buffer)))
-                               (not (minibufferp b))
-                               (let ((lsw (buffer-local-value 'last-selected-window b)))
-                                 (or (not lsw) (eq w lsw))))
-                      (throw 'done b))))))
-    (with-current-buffer b
-      (push-global-mark))))
+             (from (cl-second (frame-parameter nil 'buffer-list))))
+    (when (and (buffer-live-p from)
+               (not (eq from (current-buffer)))
+               (not (minibufferp from))
+               (let ((lsw (buffer-local-value 'last-selected-window from)))
+                 (or (not lsw) (eq w lsw))))
+      (with-current-buffer from
+        (push-global-mark)))))
 
 (add-hook 'buffer-list-update-hook #'update-global-mark)
 
@@ -6785,16 +6783,15 @@ for it.")
          (buffer-list-update-hook
           (delq #'update-global-mark buffer-list-update-hook)))
     (setq global-mark-ring (nconc (cdr global-mark-ring)
-				  (list (car global-mark-ring))))
-    (set-buffer buffer)
+				  (list marker)))
+    (switch-to-buffer buffer)
     (or (and (>= position (point-min))
 	     (<= position (point-max)))
 	(if widen-automatically
 	    (widen)
 	  (error "Global mark position is outside accessible part of buffer %s"
                  (buffer-name buffer))))
-    (goto-char position)
-    (switch-to-buffer buffer)))
+    (goto-char position)))
 
 (defcustom next-line-add-newlines nil
   "If non-nil, `next-line' inserts newline to avoid `end of buffer' error."
