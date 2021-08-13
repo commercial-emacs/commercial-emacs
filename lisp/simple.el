@@ -32,6 +32,7 @@
 
 (declare-function widget-convert "wid-edit" (type &rest args))
 (declare-function shell-mode "shell" ())
+(declare-function cl-remove-if "cl-seq" (cl-pred cl-list &rest cl-keys))
 
 ;;; From compile.el
 (defvar compilation-current-error)
@@ -6745,6 +6746,31 @@ the user for a password when we are simply scanning a set of files in the
 background or displaying possible completions before the user even asked
 for it.")
 
+(defun push-global-mark ()
+  (interactive)
+  (push-mark (point) t)
+  (let ((history-delete-duplicates t)
+        (old (nth global-mark-ring-max global-mark-ring)))
+    (add-to-history
+     'global-mark-ring (copy-marker (mark-marker)) global-mark-ring-max t)
+    (when old
+      (set-marker old nil))))
+
+(defun update-global-mark ()
+  "Record point of departed buffer onto `global-mark-ring'."
+  (when-let ((w (selected-window))
+             (b (catch 'done
+                  (dolist (b (frame-parameter nil 'buffer-list))
+                    (when (and (buffer-live-p b)
+                               (not (eq b (current-buffer)))
+                               (not (minibufferp b))
+                               (eq (buffer-local-value 'last-selected-window b) w))
+                      (throw 'done b))))))
+    (with-current-buffer b
+      (push-global-mark))))
+
+(add-hook 'buffer-list-update-hook #'update-global-mark)
+
 (defun pop-global-mark ()
   "Pop off global mark ring and jump to the top location."
   (interactive)
@@ -6756,7 +6782,8 @@ for it.")
   (let* ((marker (car global-mark-ring))
 	 (buffer (marker-buffer marker))
 	 (position (marker-position marker))
-         (buffer-list-update-hook buffer-list-update-hook))
+         (buffer-list-update-hook
+          (delq #'update-global-mark buffer-list-update-hook)))
     (setq global-mark-ring (nconc (cdr global-mark-ring)
 				  (list (car global-mark-ring))))
     (set-buffer buffer)
