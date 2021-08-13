@@ -5182,6 +5182,7 @@ init_buffer_once (void)
   bset_point_before_scroll (&buffer_local_flags, make_fixnum (-1));
   bset_file_truename (&buffer_local_flags, make_fixnum (-1));
   bset_invisibility_spec (&buffer_local_flags, make_fixnum (-1));
+  bset_last_selected_window (&buffer_local_flags, make_fixnum (-1));
   bset_file_format (&buffer_local_flags, make_fixnum (-1));
   bset_auto_save_file_format (&buffer_local_flags, make_fixnum (-1));
   bset_display_count (&buffer_local_flags, make_fixnum (-1));
@@ -5202,7 +5203,6 @@ init_buffer_once (void)
   bset_pt_marker (&buffer_local_flags, make_fixnum (0));
   bset_begv_marker (&buffer_local_flags, make_fixnum (0));
   bset_zv_marker (&buffer_local_flags, make_fixnum (0));
-  bset_last_selected_window (&buffer_local_flags, make_fixnum (0));
 
   idx = 1;
   XSETFASTINT (BVAR (&buffer_local_flags, mode_line_format), idx); ++idx;
@@ -6255,6 +6255,11 @@ ellipsis will be displayed after the invisible characters.
 Setting this variable is very fast, much faster than scanning all the text in
 the buffer looking for properties to change.  */);
 
+  DEFVAR_PER_BUFFER ("last-selected-window",
+		     &BVAR (current_buffer, last_selected_window), Qnil,
+		     doc: /* Last window displaying this buffer.
+Nil if that window no longer displays this buffer.  */);
+
   DEFVAR_PER_BUFFER ("buffer-display-count",
 		     &BVAR (current_buffer, display_count), Qintegerp,
 		     doc: /* A number incremented each time this buffer is displayed in a window.
@@ -6336,11 +6341,6 @@ If t, displays a cursor related to the usual cursor type
 \(a solid box becomes hollow, a bar becomes a narrower bar).
 You can also specify the cursor type as in the `cursor-type' variable.
 Use Custom to set this variable and update the display.  */);
-
-  DEFVAR_PER_BUFFER ("last-selected-window",
-		     &BVAR (current_buffer, last_selected_window), Qnil,
-		     doc: /* Last window displaying this buffer.
-Nil if that window no longer displays this buffer.  */);
 
   DEFVAR_LISP ("kill-buffer-query-functions", Vkill_buffer_query_functions,
 	       doc: /* List of functions called with no args to query before killing a buffer.
