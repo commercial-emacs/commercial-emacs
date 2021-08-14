@@ -8191,6 +8191,8 @@ gc_phase_plan_sweep (void)
 void
 sweep_obarray (void)
 {
+  scan_reference (&(Vobarray), GC_PHASE_SWEEP);
+
   const Lisp_Object obarray = Vobarray;
   const size_t obsize = ASIZE (obarray);
 
