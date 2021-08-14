@@ -1786,7 +1786,6 @@ set_point_from_marker (Lisp_Object marker)
   else
     {
       bytepos = clip_to_bounds (BEGV_BYTE, bytepos, ZV_BYTE);
-      Fpush_global_mark (bytepos);
     }
   set_point_both (charpos, bytepos);
 }
