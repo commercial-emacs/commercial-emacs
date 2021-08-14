@@ -1779,9 +1779,9 @@ set_point_from_marker (Lisp_Object marker)
   ptrdiff_t charpos = clip_to_bounds (BEGV, marker_position (marker), ZV);
   ptrdiff_t bytepos = marker_byte_position (marker);
 
-  /* Don't trust the byte position if the marker belongs to a
-     different buffer.  */
   if (XMARKER (marker)->buffer != current_buffer)
+    /* Don't trust the byte position if the marker belongs to a
+       different buffer.  */
     bytepos = buf_charpos_to_bytepos (current_buffer, charpos);
   else
     bytepos = clip_to_bounds (BEGV_BYTE, bytepos, ZV_BYTE);

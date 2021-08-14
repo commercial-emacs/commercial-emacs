@@ -8469,7 +8469,13 @@ at the front of the list of recently selected ones."
           (unless (eq frame old-frame)
             (select-frame-set-input-focus frame norecord))
           ;; Make sure the window is selected (Bug#8615), (Bug#6954)
-          (select-window window norecord))
+          (select-window window norecord)
+          (unless norecord
+            (let ((prev (window-old-buffer window)))
+              (when (and (bufferp prev)
+                         (not (eq prev (window-buffer window))))
+                (with-current-buffer prev
+                  (push-global-mark))))))
       ;; If `display-buffer' failed to supply a window, just make the
       ;; buffer current.
       (set-buffer buffer))
@@ -8685,7 +8691,6 @@ Return the buffer switched to."
           (pop-to-buffer-same-window buffer norecord)
           (when (eq (selected-window) selected-window)
             (setq set-window-start-and-point t))))
-
       (when set-window-start-and-point
         (let* ((entry (assq buffer (window-prev-buffers)))
                (preserve-win-point
@@ -8699,9 +8704,13 @@ Return the buffer switched to."
 	    ;; window (Bug#4041).
 	    (set-window-start (selected-window) (nth 1 entry) t)
 	    (set-window-point nil (nth 2 entry)))))))
-
     (unless norecord
-      (select-window (selected-window)))
+      (select-window (selected-window))
+      (let ((prev (window-old-buffer (selected-window))))
+        (when (and (bufferp prev)
+                   (not (eq prev (window-buffer (selected-window)))))
+          (with-current-buffer prev
+            (push-global-mark)))))
     (set-buffer buffer)))
 
 (defun switch-to-buffer-other-window (buffer-or-name &optional norecord)

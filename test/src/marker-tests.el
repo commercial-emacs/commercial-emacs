@@ -57,4 +57,44 @@
     (set-marker marker-2 marker-1)
     (should (goto-char marker-2))))
 
+(ert-deftest marker-global-mark-ring ()
+  "`pop-global-mark' to retread buffer traversal."
+
+  (let (global-mark-ring
+        (global-mark-ring-max 3)
+        extant)
+    (cl-letf (((symbol-function 'window-old-buffer)
+               (lambda (_window) extant)))
+      (setq extant (current-buffer))
+      (find-file-read-only (locate-library "lisp.el"))
+      (setq extant (current-buffer))
+      (find-file-read-only (locate-library "package.el"))
+      (setq extant (current-buffer))
+      (xref-find-definitions "benchmark-run")
+      (setq extant (current-buffer))
+      (should (= (length global-mark-ring) global-mark-ring-max))
+      (call-interactively #'push-global-mark)
+      (should (= (length global-mark-ring) global-mark-ring-max))
+      (call-interactively #'pop-global-mark)
+      (should (equal (buffer-name) "benchmark.el"))
+      (call-interactively #'pop-global-mark)
+      (should (equal (buffer-name) "package.el"))
+      (call-interactively #'pop-global-mark)
+      (should (equal (buffer-name) "lisp.el"))
+      (call-interactively #'pop-global-mark)
+      (should (equal (buffer-name) "benchmark.el"))
+      (push-global-mark) ;; reverse rotate since pushed == back
+      (should (equal (buffer-name (marker-buffer (car (last global-mark-ring))))
+                     "lisp.el"))
+      (let ((unchanged (copy-tree global-mark-ring)))
+        (save-window-excursion
+          (find-file-read-only (locate-library "advice.el"))
+          (setq extant (current-buffer))
+          (find-file-read-only (locate-library "frame.el"))
+          (setq extant (current-buffer))
+          (should (= (length global-mark-ring) global-mark-ring-max))
+          (call-interactively #'pop-global-mark)
+          (should (equal (buffer-name) "advice.el")))
+        (should (equal global-mark-ring unchanged))))))
+
 ;;; marker-tests.el ends here.

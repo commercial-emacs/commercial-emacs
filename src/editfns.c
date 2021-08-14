@@ -52,7 +52,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "blockinput.h"
 
-#define GLOBAL_MARK_RING_MAX_DEFAULT (64)
+#define GLOBAL_MARK_RING_MAX_DEFAULT (128)
 
 #ifdef WINDOWSNT
 # include "w32common.h"
@@ -217,13 +217,21 @@ DEFUN ("push-global-mark", Fpush_global_mark, Spush_global_mark, 0, 0, "",
 	  }
       }
       eassert (list_length (Vglobal_mark_ring) < global_mark_ring_max);
+      if (list_length (Vglobal_mark_ring) > 1)
+	{
+	  Lisp_Object penultimate =
+	    Fnthcdr (make_fixnum (list_length (Vglobal_mark_ring) - 2),
+		     Vglobal_mark_ring);
+	  if (! NILP (Fequal (pt_marker, XCAR (XCDR (penultimate)))))
+	    Fsetcdr (penultimate, Qnil);
+	}
       Vglobal_mark_ring = Fcons (pt_marker, Vglobal_mark_ring);
     }
   return Qnil;
 }
 
 DEFUN ("goto-char", Fgoto_char, Sgoto_char, 1, 1,
-         "(goto-char--read-natnum-interactive \"Go to char: \")",
+       "(goto-char--read-natnum-interactive \"Go to char: \")",
        doc: /* Set point to POSITION, a number or marker.
 Beginning of buffer is position (point-min), end is (point-max).
 
@@ -827,6 +835,7 @@ save_excursion_save (union specbinding *pdl)
   pdl->unwind_excursion.window
     = (EQ (XWINDOW (selected_window)->contents, Fcurrent_buffer ())
        ? selected_window : Qnil);
+  pdl->unwind_excursion.mark_ring = Vglobal_mark_ring;
 }
 
 /* Restore saved buffer before leaving `save-excursion' special form.  */
@@ -874,12 +883,14 @@ To save the mark state as well as point and the current buffer, use
 usage: (save-excursion &rest BODY)  */)
   (Lisp_Object args)
 {
-  register Lisp_Object val;
+  register Lisp_Object val, mark_ring;
   ptrdiff_t count = SPECPDL_INDEX ();
 
+  mark_ring = Vglobal_mark_ring;
   record_unwind_protect_excursion ();
 
   val = Fprogn (args);
+  Vglobal_mark_ring = mark_ring;
   return unbind_to (count, val);
 }
 

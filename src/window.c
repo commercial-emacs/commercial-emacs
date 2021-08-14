@@ -494,11 +494,8 @@ functions were run.  */)
 
 EMACS_INT window_select_count;
 
-/* If select_window is called with inhibit_point_swap true it will
-   not store point of the old selected window's buffer back into that
-   window's pointm slot.  This is needed by Fset_window_configuration to
-   avoid that the display routine is called with selected_window set to
-   Qnil causing a subsequent crash.  */
+/* Fset_window_configuration sets inhibit_point_swap to true to
+   circumvent the degenerate case when selected_window is still Qnil. */
 static Lisp_Object
 select_window (Lisp_Object window, Lisp_Object norecord,
 	       bool inhibit_point_swap)
@@ -518,7 +515,7 @@ select_window (Lisp_Object window, Lisp_Object norecord,
     /* Do not select a tooltip window (Bug#47207).  */
     error ("Cannot select a tooltip window");
 
-  /* We deinitely want to select WINDOW, not the mini-window.  */
+  /* We definitely want to select WINDOW, not the mini-window.  */
   f->select_mini_window_flag = false;
 
   /* Make the selected window's buffer current.  */

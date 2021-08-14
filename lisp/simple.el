@@ -6735,32 +6735,6 @@ the user for a password when we are simply scanning a set of files in the
 background or displaying possible completions before the user even asked
 for it.")
 
-(defun update-global-mark ()
-  "Record point of departed buffer onto `global-mark-ring'."
-  (when-let ((w (selected-window))
-             (buffers (cl-remove-if #'minibufferp (frame-parameter nil 'buffer-list)))
-             (to (cl-first buffers))
-             (from (cl-second buffers))
-             (w-buffers (mapcar #'window-buffer (window-list))))
-    (princ (format "%s => %s\n" from to) #'external-debugging-output)
-    (when (and (not (memq from w-buffers))
-               (buffer-live-p from)
-               (let ((lsw (buffer-local-value 'last-selected-window from)))
-                 (or (not lsw) (eq w lsw))))
-      (with-current-buffer from
-        (push-global-mark)))
-    ;; from buffers, it's impossible to know what, if anything,
-    ;; got swapped out.  You have to tap into the C at this
-    ;; point since nothing in Lisp is going to get you there.
-    (when (and (not (eq from to))
-               (buffer-live-p to)
-               (let ((lsw (buffer-local-value 'last-selected-window to)))
-                 (or (not lsw) (eq w lsw))))
-      (with-current-buffer to
-        (push-global-mark)))))
-
-;; (add-hook 'buffer-list-update-hook #'update-global-mark)
-
 (defun pop-global-mark ()
   "Pop off global mark ring and jump to the top location."
   (interactive)
@@ -6772,18 +6746,19 @@ for it.")
   (let* ((marker (car global-mark-ring))
 	 (buffer (marker-buffer marker))
 	 (position (marker-position marker))
-         (buffer-list-update-hook
-          (delq #'update-global-mark buffer-list-update-hook)))
-    (setq global-mark-ring (nconc (cdr global-mark-ring)
-				  (list marker)))
-    (switch-to-buffer buffer)
-    (or (and (>= position (point-min))
-	     (<= position (point-max)))
-	(if widen-automatically
-	    (widen)
-	  (error "Global mark position is outside accessible part of buffer %s"
-                 (buffer-name buffer))))
-    (goto-char position)))
+         (rotated-ring (append (cdr global-mark-ring)
+			       (list marker))))
+    (unwind-protect
+        (progn
+          (switch-to-buffer buffer) ;; this changes global-mark-ring
+          (or (and (>= position (point-min))
+	           (<= position (point-max)))
+	      (if widen-automatically
+	          (widen)
+	        (error "Global mark position is outside accessible part of buffer %s"
+                       (buffer-name buffer))))
+          (goto-char position))
+      (setq global-mark-ring rotated-ring))))
 
 (defcustom next-line-add-newlines nil
   "If non-nil, `next-line' inserts newline to avoid `end of buffer' error."

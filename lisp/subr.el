@@ -4167,9 +4167,11 @@ a new window, since that window may sometimes appear in another frame,
 in which case `save-window-excursion' cannot help."
   (declare (indent 0) (debug t))
   (let ((c (make-symbol "wconfig")))
-    `(let ((,c (current-window-configuration)))
+    `(let ((,c (current-window-configuration))
+           (mark-ring (copy-tree global-mark-ring)))
        (unwind-protect (progn ,@body)
-         (set-window-configuration ,c)))))
+         (set-window-configuration ,c)
+         (setq global-mark-ring mark-ring)))))
 
 (defun internal-temp-output-buffer-show (buffer)
   "Internal function for `with-output-to-temp-buffer'."
