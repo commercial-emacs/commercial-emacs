@@ -201,29 +201,31 @@ DEFUN ("push-global-mark", Fpush_global_mark, Spush_global_mark, 0, 1, "d",
 If called interactively, POSITION is the current value of point. */)
   (Lisp_Object position)
 {
+  Lisp_Object pt_marker;
+
   if (NILP (position))
     position = Fpoint();
 
   CHECK_FIXNUM (position);
 
-  if (global_mark_ring_max > 0) {
-    Lisp_Object pt_marker, tem;
-
-    if (list_length (Vglobal_mark_ring) >= global_mark_ring_max) {
-      if (global_mark_ring_max == 1)
-	Vglobal_mark_ring = Qnil;
-      else
-	{
-	  tem = Fnthcdr (make_fixnum (global_mark_ring_max - 2),
-			 Vglobal_mark_ring);
-	  if (! NILP (tem))
-	    XSETCDR (tem, Qnil);
-	}
+  pt_marker = build_marker (current_buffer, XFIXNUM (position), PT_BYTE);
+  if (global_mark_ring_max > 0
+      && NILP (Fequal (CAR_SAFE (Vglobal_mark_ring), pt_marker)))
+    {
+      if (list_length (Vglobal_mark_ring) >= global_mark_ring_max) {
+	if (global_mark_ring_max == 1)
+	  Vglobal_mark_ring = Qnil;
+	else
+	  {
+	    Lisp_Object tem = Fnthcdr (make_fixnum (global_mark_ring_max - 2),
+				       Vglobal_mark_ring);
+	    if (! NILP (tem))
+	      XSETCDR (tem, Qnil);
+	  }
+      }
+      eassert (list_length (Vglobal_mark_ring) < global_mark_ring_max);
+      Vglobal_mark_ring = Fcons (pt_marker, Vglobal_mark_ring);
     }
-    eassert (list_length (Vglobal_mark_ring) < global_mark_ring_max);
-    pt_marker = build_marker (current_buffer, XFIXNUM (position), PT_BYTE);
-    Vglobal_mark_ring = Fcons (pt_marker, Vglobal_mark_ring);
-  }
   return Qnil;
 }
 
@@ -243,10 +245,10 @@ minibuffer.  The default value is the number at point (if any).  */)
     {
       struct buffer *b = XMARKER (position)->buffer;
       set_point_from_marker (position);
-      if (specpdl_ptr->unwind_excursion.kind != SPECPDL_UNWIND_EXCURSION &&
-	  b == current_buffer &&
-	  SREF (BVAR (current_buffer, name), 0) != ' ' &&
-	  NILP (Fminibufferp (make_lisp_ptr (b, Lisp_Vectorlike), Qnil)))
+      if (specpdl_ptr->unwind_excursion.kind != SPECPDL_UNWIND_EXCURSION
+	  && b == current_buffer
+	  && SREF (BVAR (current_buffer, name), 0) != ' '
+	  && NILP (Fminibufferp (make_lisp_ptr (b, Lisp_Vectorlike), Qnil)))
 	{
 	  ptrdiff_t bytepos = clip_to_bounds (BEGV_BYTE, marker_byte_position (position), ZV_BYTE);
 	  Fpush_global_mark (make_fixnum (bytepos));
