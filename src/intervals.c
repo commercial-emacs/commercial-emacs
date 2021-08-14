@@ -1784,7 +1784,10 @@ set_point_from_marker (Lisp_Object marker)
   if (XMARKER (marker)->buffer != current_buffer)
     bytepos = buf_charpos_to_bytepos (current_buffer, charpos);
   else
-    bytepos = clip_to_bounds (BEGV_BYTE, bytepos, ZV_BYTE);
+      {
+	  bytepos = clip_to_bounds (BEGV_BYTE, bytepos, ZV_BYTE);
+	  Fpush_global_mark (bytepos);
+      }
   set_point_both (charpos, bytepos);
 }
 

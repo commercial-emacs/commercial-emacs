@@ -6483,9 +6483,6 @@ is set to the buffer displayed in that window.")
   :type 'integer
   :group 'editing-basics)
 
-(defvar global-mark-ring nil
-  "The list of saved global marks, most recent first.")
-
 (defcustom global-mark-ring-max 16
   "Maximum size of global mark ring.  \
 Start discarding off end if gets this big."
