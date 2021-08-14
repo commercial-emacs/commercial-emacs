@@ -220,7 +220,7 @@ If called interactively, POSITION is the current value of point. */)
 	    Lisp_Object tem = Fnthcdr (make_fixnum (global_mark_ring_max - 2),
 				       Vglobal_mark_ring);
 	    if (! NILP (tem))
-	      XSETCDR (tem, Qnil);
+	      Fsetcdr (tem, Qnil);
 	  }
       }
       eassert (list_length (Vglobal_mark_ring) < global_mark_ring_max);
