@@ -6804,7 +6804,7 @@ to create a line, and moves the cursor to that line.  Otherwise it moves the
 cursor to the end of the buffer.
 
 If the variable `line-move-visual' is non-nil, this command moves
- lines.  Otherwise, it moves by buffer lines, without
+by display lines.  Otherwise, it moves by buffer lines, without
 taking variable-width characters or continued lines into account.
 See \\[next-logical-line] for a command that always moves by buffer lines.
 
