@@ -200,14 +200,32 @@ DEFUN ("push-global-mark", Fpush_global_mark, Spush_global_mark, 0, 1, "d",
        doc: /* Push current point as a marker object onto `global-mark-ring'. */)
   (Lisp_Object bytepos)
 {
-  Lisp_Object pt_marker;
+  Lisp_Object pt_marker, tem;
 
   if (NILP (bytepos))
     bytepos = Fpoint();
 
   CHECK_FIXNUM (bytepos);
-  pt_marker = build_marker (current_buffer, XFIXNUM (bytepos), PT_BYTE);
+  /* (add-to-history */
+  /*  'global-mark-ring (copy-marker (mark-marker)) global-mark-ring-max t) */
 
+  if (global_mark_ring_max > 0) {
+    if (list_length (Vglobal_mark_ring) >= global_mark_ring_max) {
+      if (global_mark_ring_max == 1)
+	Vglobal_mark_ring = Qnil;
+      else
+	{
+	  tem = Fnthcdr (make_fixnum (global_mark_ring_max - 1),
+			 Vglobal_mark_ring);
+	  if (! NILP (tem))
+	    XSETCDR (tem, Qnil);
+	}
+    }
+    eassert (list_length (Vglobal_mark_ring) < global_mark_ring_max);
+    pt_marker = build_marker (current_buffer, XFIXNUM (bytepos), PT_BYTE);
+    Vglobal_mark_ring = Fcons(pt_marker, Vglobal_mark_ring);
+  }
+  return Qnil;
 }
 
 DEFUN ("goto-char", Fgoto_char, Sgoto_char, 1, 1,

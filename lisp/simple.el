@@ -6742,16 +6742,6 @@ the user for a password when we are simply scanning a set of files in the
 background or displaying possible completions before the user even asked
 for it.")
 
-(defun push-global-mark ()
-  (interactive)
-  (set-marker (mark-marker) (point) (current-buffer))
-  (let ((history-delete-duplicates t)
-        (old (nth global-mark-ring-max global-mark-ring)))
-    (add-to-history
-     'global-mark-ring (copy-marker (mark-marker)) global-mark-ring-max t)
-    (when old
-      (set-marker old nil))))
-
 (defun update-global-mark ()
   "Record point of departed buffer onto `global-mark-ring'."
   (when-let ((w (selected-window))
