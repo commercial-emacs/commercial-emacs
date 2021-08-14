@@ -241,9 +241,7 @@ minibuffer.  The default value is the number at point (if any).  */)
   (register Lisp_Object position)
 {
   if (MARKERP (position))
-      {
-	  set_point_from_marker (position);
-      }
+    set_point_from_marker (position);
   else if (FIXNUMP (position))
     SET_PT (clip_to_bounds (BEGV, XFIXNUM (position), ZV));
   else
