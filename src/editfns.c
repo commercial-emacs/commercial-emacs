@@ -240,12 +240,12 @@ minibuffer.  The default value is the number at point (if any).  */)
       set_point_from_marker (position);
       if (specpdl_ptr->unwind_excursion.kind != SPECPDL_UNWIND_EXCURSION
 	  && b == current_buffer
+	  && NILP (Fminibufferp (make_lisp_ptr (b, Lisp_Vectorlike), Qnil))
 	  && SREF (BVAR (current_buffer, name), 0) != ' '
-	  //	  && window
-	  && NILP (Fminibufferp (make_lisp_ptr (b, Lisp_Vectorlike), Qnil)))
-	{
-	  Fpush_global_mark ();
-	}
+	  && EQ (Fget_buffer_window (Fcurrent_buffer (), Qnil), selected_window))
+      {
+	Fpush_global_mark ();
+      }
     }
   else if (FIXNUMP (position))
     SET_PT (clip_to_bounds (BEGV, XFIXNUM (position), ZV));
