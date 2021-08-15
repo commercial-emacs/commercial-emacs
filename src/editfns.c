@@ -237,8 +237,19 @@ minibuffer.  The default value is the number at point (if any).  */)
   if (MARKERP (position))
     {
       struct buffer *b = XMARKER (position)->buffer;
+      /* The nature of the specpdl stack is I can't look beneath me
+       * and so I can't know if there's an excursion prevailing.
+       * Even if I set a state flag, I can't know when to turn it off.
+       */
+      /* For one thing smushing goto-char is a no-go since
+       * it's called even for mouse events.
+       */
+      /* As soon as a funcall or subexpr happens, SPECPDL_BACKTRACE
+       * masks SPECPDL_UNWIND_EXCURSION.
+       */
+      bool excursion = specpdl_ptr->unwind_excursion.kind == SPECPDL_UNWIND_EXCURSION;
       set_point_from_marker (position);
-      if (specpdl_ptr->unwind_excursion.kind != SPECPDL_UNWIND_EXCURSION
+      if (! excursion
 	  && b == current_buffer
 	  && NILP (Fminibufferp (Fcurrent_buffer(), Qnil))
 	  && SREF (BVAR (current_buffer, name), 0) != ' '
