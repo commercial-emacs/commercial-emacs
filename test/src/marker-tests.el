@@ -57,4 +57,55 @@
     (set-marker marker-2 marker-1)
     (should (goto-char marker-2))))
 
+(ert-deftest marker-global-mark-ring ()
+  "`pop-global-mark' to retread errors."
+  (let* ((global-mark-ring-max 3)
+         global-mark-ring
+         buffer-list-update-hook
+         recorded
+         ;; with-temp-buffer creates an invisible buffer,
+         ;; which push-global-mark would ignore.
+         (buffer (get-buffer-create (make-temp-name "test")))
+         (record (lambda () (push (point-marker) recorded)))
+         (next-error-hook (list record)))
+    (unwind-protect
+        (with-current-buffer buffer
+          (insert "error 1
+error 2
+error 3
+error 4
+")
+          (occur "^error")
+          (setq global-mark-ring nil)
+          (call-interactively #'next-error)
+          (should (= (length global-mark-ring) 1))
+          (call-interactively #'next-error)
+          (call-interactively #'next-error)
+          (should (= (length global-mark-ring) global-mark-ring-max))
+          (call-interactively #'next-error)
+          (should (= (length global-mark-ring) global-mark-ring-max))
+          (call-interactively #'pop-global-mark)
+          (should (equal (pop recorded) (point-marker)))
+          (call-interactively #'pop-global-mark)
+          (should (equal (pop recorded) (point-marker)))
+          (call-interactively #'pop-global-mark)
+          (should (equal (pop recorded) (point-marker)))
+          (goto-char (pop recorded))
+          (let ((unchanged (copy-tree global-mark-ring)))
+            (push-global-mark)
+            (should (equal global-mark-ring unchanged)))
+          (goto-char (point-min))
+          (call-interactively #'isearch-forward-thing-at-point) ;; on "error" string
+          (call-interactively #'isearch-repeat-forward)
+          (call-interactively #'isearch-exit)
+          (let ((second-error-marker (point-marker)))
+            (forward-line 2)
+            (should-not (equal (point-marker) second-error-marker))
+            (call-interactively #'pop-global-mark)
+            (should (equal (point-marker) second-error-marker))))
+      (let (kill-buffer-query-functions)
+        (kill-buffer buffer)
+        (when (buffer-live-p (get-buffer "*Occur*"))
+          (kill-buffer "*Occur*"))))))
+
 ;;; marker-tests.el ends here.

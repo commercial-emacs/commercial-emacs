@@ -52,7 +52,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "blockinput.h"
 
-#define GLOBAL_MARK_RING_MAX_DEFAULT (128)
+#define GLOBAL_MARK_RING_MAX_DEFAULT (64)
 
 #ifdef WINDOWSNT
 # include "w32common.h"
@@ -242,7 +242,7 @@ minibuffer.  The default value is the number at point (if any).  */)
 	  && b == current_buffer
 	  && NILP (Fminibufferp (make_lisp_ptr (b, Lisp_Vectorlike), Qnil))
 	  && SREF (BVAR (current_buffer, name), 0) != ' '
-	  && EQ (Fget_buffer_window (Fcurrent_buffer (), Qnil), selected_window))
+	  && EQ (selected_window, Fget_buffer_window (Fcurrent_buffer (), Qnil)))
       {
 	Fpush_global_mark ();
       }
