@@ -201,10 +201,7 @@ is one."
 (defvar isearch-update-post-hook nil
   "Function(s) to call after isearch has found matches in the buffer.")
 
-(defcustom isearch-mode-end-hook
-  '((lambda ()
-      (unless isearch-mode-end-hook-quit
-        (push-global-mark))))
+(defcustom isearch-mode-end-hook nil
   "Function(s) to call after terminating an incremental search.
 When these functions are called, `isearch-mode-end-hook-quit'
 is non-nil if the user quits the search."

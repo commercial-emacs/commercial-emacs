@@ -6766,7 +6766,7 @@ for it.")
       (with-current-buffer to
         (push-global-mark)))))
 
-(add-hook 'buffer-list-update-hook #'update-global-mark)
+;; (add-hook 'buffer-list-update-hook #'update-global-mark)
 
 (defun pop-global-mark ()
   "Pop off global mark ring and jump to the top location."
