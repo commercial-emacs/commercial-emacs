@@ -52,7 +52,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "blockinput.h"
 
-#define GLOBAL_MARK_RING_MAX_DEFAULT (16)
+#define GLOBAL_MARK_RING_MAX_DEFAULT (128)
 
 #ifdef WINDOWSNT
 # include "w32common.h"
@@ -196,19 +196,12 @@ DEFUN ("point-marker", Fpoint_marker, Spoint_marker, 0, 0, 0,
   return build_marker (current_buffer, PT, PT_BYTE);
 }
 
-DEFUN ("push-global-mark", Fpush_global_mark, Spush_global_mark, 0, 1, "d",
-       doc: /* Push POSITION of current buffer as a marker onto `global-mark-ring'.
-If called interactively, POSITION is the current value of point. */)
-  (Lisp_Object position)
+DEFUN ("push-global-mark", Fpush_global_mark, Spush_global_mark, 0, 0, "",
+       doc: /* Push current value of point as a marker onto `global-mark-ring'.
+*/)
+  (void)
 {
-  Lisp_Object pt_marker;
-
-  if (NILP (position))
-    position = Fpoint();
-
-  CHECK_FIXNUM (position);
-
-  pt_marker = build_marker (current_buffer, XFIXNUM (position), PT_BYTE);
+  Lisp_Object pt_marker = Fpoint_marker();
   if (global_mark_ring_max > 0
       && NILP (Fequal (CAR_SAFE (Vglobal_mark_ring), pt_marker)))
     {
@@ -248,10 +241,10 @@ minibuffer.  The default value is the number at point (if any).  */)
       if (specpdl_ptr->unwind_excursion.kind != SPECPDL_UNWIND_EXCURSION
 	  && b == current_buffer
 	  && SREF (BVAR (current_buffer, name), 0) != ' '
+	  //	  && window
 	  && NILP (Fminibufferp (make_lisp_ptr (b, Lisp_Vectorlike), Qnil)))
 	{
-	  ptrdiff_t bytepos = clip_to_bounds (BEGV_BYTE, marker_byte_position (position), ZV_BYTE);
-	  Fpush_global_mark (make_fixnum (bytepos));
+	  Fpush_global_mark ();
 	}
     }
   else if (FIXNUMP (position))
