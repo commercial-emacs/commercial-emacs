@@ -6259,6 +6259,7 @@ the buffer looking for properties to change.  */);
 		     &BVAR (current_buffer, last_selected_window), Qnil,
 		     doc: /* Last window displaying this buffer.
 Nil if that window no longer displays this buffer.  */);
+  DEFSYM (Qlast_selected_window, "last-selected-window");
 
   DEFVAR_PER_BUFFER ("buffer-display-count",
 		     &BVAR (current_buffer, display_count), Qintegerp,
