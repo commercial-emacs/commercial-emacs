@@ -45,9 +45,6 @@ void
 ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 		  ptrdiff_t new_end_byte)
 {
-  eassert (start_byte <= old_end_byte);
-  eassert (start_byte <= new_end_byte);
-
   Lisp_Object parser_list = Fsymbol_value (Qtree_sitter_parser_list);
 
   while (!NILP (parser_list))
@@ -56,6 +53,12 @@ ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
       TSTree *tree = XTS_PARSER (lisp_parser)->tree;
       if (tree != NULL)
 	{
+	  /* If we put these assertions outside, they would run a lot
+	     and sometimes fail (in 'revert-buffer', for some reason).
+	     Better only check when we actually update some
+	     parsers.  */
+	  eassert (start_byte <= old_end_byte);
+	  eassert (start_byte <= new_end_byte);
 	  /* We "clip" the change to between visible_beg and
 	     visible_end.  It is okay if visible_end ends up larger
 	     than BUF_Z, tree-sitter only access buffer text during
@@ -230,12 +233,13 @@ ts_read_buffer (void *parser, uint32_t byte_index,
 /* Wrap the parser in a Lisp_Object to be used in the Lisp machine.  */
 Lisp_Object
 make_ts_parser (struct buffer *buffer, TSParser *parser,
-		TSTree *tree, Lisp_Object name)
+		TSTree *tree, Lisp_Object language_symbol)
 {
   struct Lisp_TS_Parser *lisp_parser
-    = ALLOCATE_PSEUDOVECTOR (struct Lisp_TS_Parser, name, PVEC_TS_PARSER);
+    = ALLOCATE_PSEUDOVECTOR
+    (struct Lisp_TS_Parser, language_symbol, PVEC_TS_PARSER);
 
-  lisp_parser->name = name;
+  lisp_parser->language_symbol = language_symbol;
   lisp_parser->buffer = buffer;
   lisp_parser->parser = parser;
   lisp_parser->tree = tree;
@@ -292,26 +296,17 @@ DEFUN ("tree-sitter-node-parser",
 
 DEFUN ("tree-sitter-create-parser",
        Ftree_sitter_create_parser, Stree_sitter_create_parser,
-       2, 3, 0,
+       2, 2, 0,
        doc: /* Create and return a parser in BUFFER for LANGUAGE.
 
 The parser is automatically added to BUFFER's
 `tree-sitter-parser-list'.  LANGUAGE should be the symbol of a
 function provided by a tree-sitter language dynamic module, e.g.,
-'tree-sitter-json.
-
-NAME (a string) is the name assigned to the parser, like
-the name for a process.  If left omitted, no name is assigned to the
-parser; the only consequence of that is you can't use
-`tree-sitter-get-parser' to find the parser by its name.  Note that
-unlike process names, no care is taken to make each parser's name
-unique.  */)
-  (Lisp_Object buffer, Lisp_Object language, Lisp_Object name)
+'tree-sitter-json.  */)
+  (Lisp_Object buffer, Lisp_Object language)
 {
   CHECK_BUFFER(buffer);
   CHECK_SYMBOL (language);
-  if (!NILP (name))
-    CHECK_STRING (name);
   ts_check_buffer_size (XBUFFER (buffer));
 
   /* LANGUAGE is a function that returns a USER_PTR that contains the
@@ -321,7 +316,7 @@ unique.  */)
   ts_parser_set_language (parser, lang);
 
   Lisp_Object lisp_parser
-    = make_ts_parser (XBUFFER(buffer), parser, NULL, name);
+    = make_ts_parser (XBUFFER(buffer), parser, NULL, language);
 
   struct buffer *old_buffer = current_buffer;
   set_buffer_internal (XBUFFER (buffer));
@@ -345,14 +340,15 @@ DEFUN ("tree-sitter-parser-buffer",
   return buf;
 }
 
-DEFUN ("tree-sitter-parser-name",
-       Ftree_sitter_parser_name, Stree_sitter_parser_name,
+DEFUN ("tree-sitter-parser-language",
+       Ftree_sitter_parser_language, Stree_sitter_parser_language,
        1, 1, 0,
-       doc: /* Return parser's name.  */)
+       doc: /* Return parser's language symbol.
+This symbol is the one used to create the parser.  */)
   (Lisp_Object parser)
 {
   CHECK_TS_PARSER (parser);
-  return XTS_PARSER (parser)->name;
+  return XTS_PARSER (parser)->language_symbol;
 }
 
 /*** Parser API */
@@ -937,8 +933,10 @@ Raise an tree-sitter-query-error if PATTERN is malformed.  */)
 {
   CHECK_TS_NODE (node);
   CHECK_STRING (pattern);
-  CHECK_INTEGER (beg);
-  CHECK_INTEGER (end);
+  if (!NILP (beg))
+    CHECK_INTEGER (beg);
+  if (!NILP (end))
+    CHECK_INTEGER (end);
 
   TSNode ts_node = XTS_NODE (node)->node;
   Lisp_Object lisp_parser = XTS_NODE (node)->parser;
@@ -957,7 +955,6 @@ Raise an tree-sitter-query-error if PATTERN is malformed.  */)
 
   if (query == NULL)
     {
-      // FIXME: Still crashes, debug when I can get a gdb.
       xsignal2 (Qtree_sitter_query_error,
 		make_fixnum (error_offset),
 		build_string (ts_query_error_to_string (error_type)));
@@ -1049,7 +1046,7 @@ sync with the buffer's content.  */);
 
   defsubr (&Stree_sitter_create_parser);
   defsubr (&Stree_sitter_parser_buffer);
-  defsubr (&Stree_sitter_parser_name);
+  defsubr (&Stree_sitter_parser_language);
 
   defsubr (&Stree_sitter_parser_root_node);
   defsubr (&Stree_sitter_parse_string);

@@ -62,7 +62,7 @@
         (setq root-node (tree-sitter-parser-root-node
                          parser)))
       ;; `tree-sitter-node-type'.
-      (should (eq 'document (tree-sitter-node-type root-node)))
+      (should (equal "document" (tree-sitter-node-type root-node)))
       ;; `tree-sitter-node-check'.
       (should (eq t (tree-sitter-node-check root-node 'named)))
       (should (eq nil (tree-sitter-node-check root-node 'missing)))
@@ -70,7 +70,7 @@
       (should (eq nil (tree-sitter-node-check root-node 'has-error)))
       ;; `tree-sitter-node-child'.
       (setq doc-node (tree-sitter-node-child root-node 0))
-      (should (eq 'array (tree-sitter-node-type doc-node)))
+      (should (equal "array" (tree-sitter-node-type doc-node)))
       (should (equal (tree-sitter-node-string doc-node)
                      "(array (number) (number) (object (pair key: (string (string_content)) value: (string (string_content)))) (number))"))
       ;; `tree-sitter-node-child-count'.
@@ -79,8 +79,8 @@
       ;; `tree-sitter-node-field-name-for-child'.
       (setq object-node (tree-sitter-node-child doc-node 2 t))
       (setq pair-node (tree-sitter-node-child object-node 0 t))
-      (should (eq 'object (tree-sitter-node-type object-node)))
-      (should (eq 'pair (tree-sitter-node-type pair-node)))
+      (should (equal "object" (tree-sitter-node-type object-node)))
+      (should (equal "pair" (tree-sitter-node-type pair-node)))
       (should (equal "key"
                      (tree-sitter-node-field-name-for-child
                       pair-node 0)))

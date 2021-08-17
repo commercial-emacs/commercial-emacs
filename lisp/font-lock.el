@@ -1823,9 +1823,9 @@ function.  Different levels of fontification can be controlled by
 
 (defun font-lock-tree-sitter-fontify-region (start end &optional loudly)
   (dolist (setting font-lock-tree-sitter-settings)
-    (let* ((language-symbol (nth 0 setting))
+    (let* ((language (nth 0 setting))
            (match-pattern (nth 1 setting))
-           (parser (tree-sitter-get-parser-create language-symbol)))
+           (parser (tree-sitter-get-parser-create language)))
       (when-let ((node (tree-sitter-node-at start end parser)))
         (let ((captures (tree-sitter-query-capture
                          node match-pattern
@@ -1847,7 +1847,7 @@ function.  Different levels of fontification can be controlled by
                 (if loudly
                     (message
                      "Fontifying text from %d to %d Face: %s Language: %s"
-                     start end face language-symbol))))))))))
+                     start end face language))))))))))
 
 ;; End of tree-sitter fontification functions.
 

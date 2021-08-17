@@ -31,10 +31,10 @@ INLINE_HEADER_BEGIN
 struct Lisp_TS_Parser
 {
   union vectorlike_header header;
-  /* A parser's name (a string) is just a convenient tag used for
-     conveniently retrieving the parser, see docstring for
-     'tree-sitter-make-parser', and 'tree-sitter-get-parser'. */
-  Lisp_Object name;
+  /* A symbol represents the language this parser uses.  It should be
+   the symbol of the function provided by a language dynamic
+   module.  */
+  Lisp_Object language_symbol;
   struct buffer *buffer;
   TSParser *parser;
   TSTree *tree;
@@ -109,7 +109,7 @@ ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 
 Lisp_Object
 make_ts_parser (struct buffer *buffer, TSParser *parser,
-		TSTree *tree, Lisp_Object name);
+		TSTree *tree, Lisp_Object language_symbol);
 
 Lisp_Object
 make_ts_node (Lisp_Object parser, TSNode node);

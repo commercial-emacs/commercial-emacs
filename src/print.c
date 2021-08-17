@@ -1865,11 +1865,8 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 #ifdef HAVE_TREE_SITTER
     case PVEC_TS_PARSER:
       print_c_string ("#<tree-sitter-parser ", printcharfun);
-      Lisp_Object name = XTS_PARSER (obj)->name;
-      if (NILP (name))
-	print_c_string ("anonymous", printcharfun);
-      else
-	  print_string (name, printcharfun);
+      Lisp_Object language = XTS_PARSER (obj)->language_symbol;
+      print_string (Fsymbol_name (language), printcharfun);
       print_c_string (" in ", printcharfun);
       print_string (BVAR (XTS_PARSER (obj)->buffer, name), printcharfun);
       printchar ('>', printcharfun);

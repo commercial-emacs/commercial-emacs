@@ -52,29 +52,34 @@ MODE defaults to the value of `major-mode'."
 
 ;;; Parser API supplement
 
-(defun tree-sitter-get-parser (name)
-  "Find the first parser with NAME in `tree-sitter-parser-list'.
-Return nil if we can't find any."
-  (unless (stringp name)
-    (signal 'wrong-type-argument `(stringp ,name)))
+(defun tree-sitter-get-parser (language)
+  "Find the first parser using LANGUAGE in `tree-sitter-parser-list'."
   (catch 'found
     (dolist (parser tree-sitter-parser-list)
-      (when (equal name (tree-sitter-parser-name parser))
+      (when (eq language (tree-sitter-parser-language parser))
         (throw 'found parser)))))
 
-(defun tree-sitter-get-parser-create (language-symbol &optional name)
-  "Find the first parser with name NAME.
-
-First look for the parser in `tree-sitter-parser-list', if none
-exists, create one using LANGUAGE-SYMBOL as the language, NAME
-as the name in the current buffer, and return it.
-
-NAME defaults to (symbol-name LANGUAGE-SYMBOL)."
-  (or (tree-sitter-get-parser (or name (symbol-name language-symbol)))
+(defun tree-sitter-get-parser-create (language)
+  "Find the first parser using LANGUAGE in `tree-sitter-parser-list'.
+If none exists, create one and return it."
+  (or (tree-sitter-get-parser language)
       (tree-sitter-create-parser
-       (current-buffer)
-       language-symbol
-       (or name (symbol-name language-symbol)))))
+       (current-buffer) language)))
+
+(defun tree-sitter-query-string (pattern string language)
+  "Query STRING with PATTERN in LANGUAGE."
+  (with-temp-buffer
+    (insert string)
+    (let ((parser (tree-sitter-create-parser (current-buffer) language)))
+      (tree-sitter-query-capture
+       (tree-sitter-parser-root-node parser)
+       pattern))))
+
+(defun tree-sitter-language-at (point)
+  "Return the language used at POINT."
+  (cl-loop for parser in tree-sitter-parser-list
+           if (tree-sitter-node-at point nil parser)
+           return (tree-sitter-parser-language parser)))
 
 ;;; Node API supplement
 
@@ -83,32 +88,28 @@ NAME defaults to (symbol-name LANGUAGE-SYMBOL)."
   (tree-sitter-parser-buffer
    (tree-sitter-node-parser node)))
 
-(defun tree-sitter-node-at (beg &optional end parser-or-name named)
+(defun tree-sitter-node-at (beg &optional end parser-or-lang named)
   "Return the smallest node covering BEG to END.
 
 If omitted, END equals to BEG.  Find node in current buffer.
 Return nil if none find.  If NAMED non-nil, only look for named
 node.  NAMED defaults to nil.
 
-By default, use the first parser in `tree-sitter-parser-list';
-but if PARSER-OR-NAME is non-nil, use the parser it represents:
-if it is a parser, use that parser, if it is a name, look for the
-parser with that name."
-  (when-let ((root (tree-sitter-buffer-root-node parser-or-name)))
+If PARSER-OR-LANG is nil, use the first parser in
+`tree-sitter-parser-list'; otherwise find the parser represented
+by PARSER-OR-LANG and use that parser.  Return nil if couldn't
+find any.  PARSER-OR-LANG can be either a parser object, or the
+language (symbol) used by a parser."
+  (when-let ((root (tree-sitter-buffer-root-node parser-or-lang)))
     (tree-sitter-node-descendant-for-range root beg (or end beg) named)))
 
-(defun tree-sitter-buffer-root-node (&optional parser-or-name)
+(defun tree-sitter-buffer-root-node (&optional parser-or-lang)
   "Return the root node of the current buffer.
-
-If PARSER-OR-NAME is nil, return the root node of the first
-parser in `tree-sitter-parser-list'; otherwise find the parser
-represented by PARSER-OR-NAME and return the root node of that
-parser.  Return nil if couldn't find any.  PARSER-OR-NAME can be
-either a parser object, or the name of a parser."
+PARSER-OR-LANG is the same as in `tree-sitter-node-at'."
   (tree-sitter-parser-root-node
-   (cond ((tree-sitter-parser-p parser-or-name) parser-or-name)
-         ((null parser-or-name) (car tree-sitter-parser-list))
-         (t (tree-sitter-get-parser parser-or-name)))))
+   (cond ((tree-sitter-parser-p parser-or-lang) parser-or-lang)
+         ((null parser-or-lang) (car tree-sitter-parser-list))
+         (t (tree-sitter-get-parser parser-or-lang)))))
 
 (defun tree-sitter-filter-child (node pred &optional named)
   "Return children of NODE that satisfies PRED.
@@ -175,8 +176,219 @@ If NAMED is non-nil, count named child only."
 
 ;;; Indent
 
-(defvar tree-sitter-indent-rules
-  '())
+(defvar tree-sitter--indent-verbose t
+  "If non-nil, log progress when indenting.")
+
+(defvar tree-sitter-simple-indent-rules nil
+  "A list of indent rule settings.
+Each indent rule setting should be (LANGUAGE . RULES),
+where LANGUAGE is a language symbol, and RULES is a list of
+(MATCHER ANCHOR OFFSET).
+
+MATCHER determines whether this rule applies, ANCHOR and OFFSET
+together determines which column to indent to.
+
+A MATCHER is a function that takes three arguments (NODE PARENT
+BOL).  NODE is the largest (highest-in-tree) node starting at
+point.  PARENT is the parent of NODE.  BOL is the point where we
+are indenting: the beginning of line content, the position of the
+first non-whitespace character.
+
+If MATCHER returns non-nil, meaning the rule matches, Emacs then
+uses ANCHOR to find an anchor, it should be a function that takes
+the same argument (NODE PARENT BOL) and returns a point.
+
+Finally Emacs computes the column of that point returned by ANCHOR
+and adds OFFSET to it, and indent the line to that column.
+
+For MATCHER and ANCHOR, Emacs provides some convenient presets.
+See `tree-sitter-simple-indent-presets'.
+
+TODO: examples in manual")
+
+(defvar tree-sitter-simple-indent-presets
+  '((match . (lambda
+               (&optional node-type parent-type node-field
+                          node-index-min node-index-max)
+               `(lambda (node parent bol &rest _)
+                  (and (or (null ,node-type)
+                           (equal (tree-sitter-node-type node)
+                                  ,node-type))
+                       (or (null ,parent-type)
+                           (equal (tree-sitter-node-type parent)
+                                  ,parent-type))
+                       (or (null ,node-field)
+                           (equal (tree-sitter-node-field-name node)
+                                  ,node-field))
+                       (or (null ,node-index-min)
+                           (>= (tree-sitter-node-index node t)
+                               ,node-index-min))
+                       (or (null ,node-index-max)
+                           (<= (tree-sitter-node-index node t)
+                               ,node-index-max))))))
+    (no-node . (lambda (node parent bol &rest _) (null node)))
+    (node-at-point . (lambda (type named)
+                       `(lambda (node parent bol &rest _)
+                          (equal ,type (tree-sitter-node-type
+                                        (tree-sitter-node-at
+                                         bol nil nil ,named))))))
+    (parent-is . (lambda (type)
+                   `(lambda (node parent bol &rest _)
+                      (equal ,type (tree-sitter-node-type parent)))))
+
+    (node-is . (lambda (type)
+                 `(lambda (node parent bol &rest _)
+                    (equal ,type (tree-sitter-node-type node)))))
+
+    (parent-match . (lambda (pattern)
+                      `(lambda (node parent bol &rest _)
+                         (cl-loop for capture
+                                  in (tree-sitter-query-capture
+                                      parent ,pattern)
+                                  if (tree-sitter-node-eq
+                                      (cdr capture) node)
+                                  return t
+                                  finally return nil))))
+    (node-match . (lambda (pattern)
+                    `(lambda (node parent bol &rest _)
+                       (tree-sitter-query-capture node ,pattern))))
+    (first-child . (lambda (node parent bol &rest _)
+                     (tree-sitter-node-start
+                      (tree-sitter-node-child parent 0 t))))
+
+    (parent . (lambda (node parent bol &rest _)
+                (tree-sitter-node-start
+                 (tree-sitter-node-parent node))))
+    (prev-sibling . (lambda (node parent bol &rest _)
+                      (tree-sitter-node-start
+                       (tree-sitter-node-prev-sibling node))))
+    (no-indent . (lambda (node parent bol &rest _) bol))
+    (prev-line . (lambda (node parent bol &rest _)
+                   (save-excursion
+                     (goto-char bol)
+                     (forward-line -1)
+                     (skip-chars-forward " \t")
+                     (tree-sitter-node-start
+                      (tree-sitter-node-at (point) nil nil t))))))
+  "A list of presets.
+These presets that can be used as MATHER and ANCHOR in
+`tree-sitter-simple-indent-rules'.
+
+MATCHER:
+
+(match NODE-TYPE PARENT-TYPE NODE-FIELD NODE-INDEX-MIN NODE-INDEX-MAX)
+
+    NODE-TYPE checks for node's type, PARENT-TYPE check for
+    parent's type, NODE-FIELD checks for the filed name of node
+    in the parent, NODE-INDEX-MIN and NODE-INDEX-MAX checks for
+    the node's index in the parent.  Therefore, to match the
+    first child where parent is \"argument_list\", use (match nil
+    \"argument_list\" nil nil 0 0).
+
+no-node
+
+    Matches the case where node is nil, i.e., there is no node
+    that starts at point.  This is the case when indenting an
+    empty line.
+
+(node-at-point TYPE NAMED)
+
+    Check that the node at point -- not the largest node at
+    point, has type TYPE.  If NAMED non-nil, check the named node
+    at point.
+
+(parent-is TYPE)
+
+    Check that the parent has type TYPE.
+
+(node-is TYPE)
+
+    Checks that the node has type TYPE.
+
+(parent-match PATTERN)
+
+    Checks that the parent matches PATTERN, a query pattern.
+
+(node-match PATTERN)
+
+    Checks that the node matches PATTERN, a query pattern.
+
+ANCHOR:
+
+first-child
+
+    Find the first child of the parent.
+
+parent
+
+    Find the parent.
+
+prev-sibling
+
+    Find node's previous sibling.
+
+no-indent
+
+    Do nothing.
+
+prev-line
+
+    Find the named node on previous line.  This can be used when
+    indenting an empty line: just indent like the previous node.
+
+TODO: manual?")
+
+(defun tree-sitter--simple-apply (fn args)
+  "Apply ARGS to FN.
+
+If FN is a key in `tree-sitter-simple-indent-presets', use the
+corresponding value as the function."
+  (cond ((consp fn)
+         (apply (tree-sitter--simple-apply (car fn) (cdr fn))
+                args))
+        ((and (symbolp fn)
+              (alist-get fn tree-sitter-simple-indent-presets))
+         (apply (alist-get fn tree-sitter-simple-indent-presets)
+                args))
+        ((functionp fn) (apply fn args))
+        (t (error "Couldn't find appropriate function for FN"))))
+
+(defun tree-sitter-simple-indent-function ()
+  "Indent according to `tree-sitter-simple-indent-rules'."
+  (let* ((orig-pos (point))
+         (bol (save-excursion
+                (beginning-of-line)
+                (skip-chars-forward " \t")
+                (point)))
+         (node (tree-sitter-parent-while
+                (cl-loop for parser in tree-sitter-parser-list
+                         for node = (tree-sitter-node-at
+                                     bol nil parser)
+                         if node return node)
+                (lambda (node)
+                  (eq bol (tree-sitter-node-start node)))))
+         (parent (tree-sitter-node-parent node))
+         (language (tree-sitter-language-at (point)))
+         (rules (alist-get language tree-sitter-simple-indent-rules)))
+    (cl-loop for rule in rules
+             for pred = (nth 0 rule)
+             for anchor = (nth 1 rule)
+             for offset = (nth 2 rule)
+             if (tree-sitter--simple-apply pred (list node parent bol))
+             do (let ((col (+ (save-excursion
+                                (goto-char
+                                 (tree-sitter--simple-apply
+                                  anchor (list node parent bol)))
+                                (current-column))
+                              offset)))
+                  (if (< bol orig-pos)
+                      (save-excursion
+                        (indent-line-to col))
+                    (indent-line-to col))
+                  (when tree-sitter--indent-verbose
+                    (message "matched %S\nindent to %s"
+                             pred col)))
+             and return nil)))
 
 ;;; Lab
 
@@ -198,13 +410,23 @@ If NAMED is non-nil, count named child only."
   (put-text-property (1+ beg) (1- end)
                      'face 'font-lock-string-face))
 
+;; Please compiler.
+(defvar ts-c-tree-sitter-indent-rules)
 (define-derived-mode ts-c-mode prog-mode "TS C"
   "C mode with tree-sitter support."
   (if (tree-sitter-should-enable-p)
-      (progn (setq-local font-lock-tree-sitter-defaults
-                         '((ts-c-tree-sitter-settings-1)))
-             (setq-local font-lock-defaults
-                         (ignore t nil nil nil)))
+      (setq-local font-lock-tree-sitter-defaults
+                  '((ts-c-tree-sitter-settings-1))
+
+                  font-lock-defaults
+                  (ignore t nil nil nil)
+
+                  indent-line-function
+                  #'tree-sitter-simple-indent-function
+
+                  tree-sitter-simple-indent-rules
+                  ts-c-tree-sitter-indent-rules)
+    ;; Copied from cc-mode.
     (setq-local font-lock-defaults
                 '((c-font-lock-keywords
                    c-font-lock-keywords-1
@@ -218,6 +440,43 @@ If NAMED is non-nil, count named child only."
 
 (add-to-list 'auto-mode-alist '("\\.json\\'" . json-mode))
 (add-to-list 'auto-mode-alist '("\\.tsc\\'" . ts-c-mode))
+
+(defvar ts-c-tree-sitter-indent-rules
+  `((tree-sitter-c
+     ;; Empty line.
+     (no-node prev-line 0)
+
+     ;; Function/struct definition body {}.
+     ((match nil "function_definition" "body") parent 0)
+     ((node-is "field_declaration_list") parent 0)
+
+     ;; Call expression.
+     ((parent-is "call_expression") parent 2)
+
+     ;; If-else.
+     ((match nil "if_statement" "condition") parent 2)
+     ((match nil "if_statement" "consequence") parent 2)
+     ((match nil "if_statement" "alternative") parent 2)
+     ((match nil "switch_statement" "condition")  parent 2)
+     ((node-is "else") parent 0)
+
+     ;; Switch case.
+     ((node-is "case_statement") parent 0)
+     ((parent-is "case_statement") parent 2)
+
+     ;; { and }.
+     ((node-is "compound_statement") parent 2)
+     ((node-is "}") parent 0)
+
+     ;; Multi-line string.
+     ((node-at-point "string_literal" t) no-indent 0)
+
+     ;; List.
+     ,@(cl-loop for type in '("compound_statement" "initializer_list"
+                              "argument_list" "parameter_list"
+                              "field_declaration_list")
+                collect `((match nil ,type nil 0 0) parent 2)
+                collect `((match nil ,type nil 1) first-child 0)))))
 
 (defvar ts-c-tree-sitter-settings-1
   '(tree-sitter-c "(null) @font-lock-constant-face
@@ -321,32 +580,38 @@ If NAMED is non-nil, count named child only."
 
 ;;; Debug
 
+(defvar-local tree-sitter--inspect-name nil
+  "Tree-sitter-inspect-mode uses this to show node name in mode-line.")
+
 (defun tree-sitter-inspect-node-at-point (&optional arg)
   "Show information of the node at point.
 If called interactively, show in echo area, otherwise set
 `tree-sitter--inspect-name' (which will appear in the mode-line
 if `tree-sitter-inspect-mode' is enabled)."
   (interactive "p")
-  (if-let ((node (tree-sitter-node-at (point))))
-      (setq tree-sitter--inspect-name
-            (format "(%s %s(%s))"
-                    (or (tree-sitter-node-type
-                         (tree-sitter-node-parent node))
-                        "N/A")
-                    (if (tree-sitter-node-field-name node)
-                        (format "%s: "
-                                (tree-sitter-node-field-name node))
-                      "")
-                    (tree-sitter-node-type node)))
-    (setq tree-sitter--inspect-name nil)
+  (let* ((node (tree-sitter-node-at (point)))
+         (pos (point))
+         (largest-node
+          (tree-sitter-parent-while
+           node (lambda (node)
+                  (eq pos (tree-sitter-node-start node))))))
+    (setq tree-sitter--inspect-name
+          (format "(%s %s(%s)) (%s)"
+                  (or (tree-sitter-node-type
+                       (tree-sitter-node-parent largest-node))
+                      "N/A")
+                  (if (tree-sitter-node-field-name largest-node)
+                      (format "%s: "
+                              (tree-sitter-node-field-name
+                               largest-node))
+                    "")
+                  (or (tree-sitter-node-type largest-node) "N/A")
+                  (or (tree-sitter-node-type node) "N/A")))
     (force-mode-line-update))
   (when arg
     (if tree-sitter--inspect-name
         (message "%s" tree-sitter--inspect-name)
       (message "No node at point"))))
-
-(defvar-local tree-sitter--inspect-name nil
-  "Tree-sitter-inspect-mode uses this to show node name in mode-line.")
 
 (define-minor-mode tree-sitter-inspect-mode
   "Shows the node at point."
@@ -355,7 +620,8 @@ if `tree-sitter-inspect-mode' is enabled)."
       (progn
         (add-hook 'post-command-hook
                   #'tree-sitter-inspect-node-at-point 0 t)
-        (push '(:eval tree-sitter--inspect-name) mode-line-misc-info))
+        (add-to-list 'mode-line-misc-info
+                     '(:eval tree-sitter--inspect-name)))
     (remove-hook 'post-command-hook
                  #'tree-sitter-inspect-node-at-point t)
     (setq mode-line-misc-info
