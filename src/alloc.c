@@ -1203,7 +1203,6 @@ NRML void scan_roots (gc_phase);
 NOIL void gc_phase_prepare (bool);
 NOIL void gc_phase_mark (void);
 NOIL void gc_phase_plan_sweep (void);
-NRML void sweep_obarray (void);
 NOIL void gc_phase_sweep (void);
 NOIL void gc_phase_cleanup (bool);
 NRML void init_alloc_once_for_pdumper (void);
@@ -8189,33 +8188,13 @@ gc_phase_plan_sweep (void)
 }
 
 void
-sweep_obarray (void)
-{
-  scan_reference (&(Vobarray), GC_PHASE_SWEEP);
-
-  const Lisp_Object obarray = Vobarray;
-  const size_t obsize = ASIZE (obarray);
-
-  for (size_t i = 0; i < obsize; ++i)
-    {
-      const Lisp_Object bucket = AREF (obarray, i);
-      if (!SYMBOLP (bucket))
-        continue;
-
-      Lisp_Object * slot = aref_addr (obarray, i);
-      scan_reference(slot, GC_PHASE_SWEEP);
-    }
-}
-
-
-void
 gc_phase_sweep (void)
 {
   for (int i = 0; i < ARRAYELTS (gc_heaps); ++i)
     gc_heap_sweep (gc_heaps[i]);
   scan_doomed_finalizers (GC_PHASE_SWEEP);
   sweep_large_vectors ();
-  sweep_obarray ();
+
   scan_roots (GC_PHASE_SWEEP);
   pdumper_sweep ();
 
