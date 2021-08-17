@@ -1626,20 +1626,24 @@ All FNS must finish before MTX is released."
 
 (defun gnus-time-out-thread ()
   (interactive)
-  (when gnus-thread-start
-    (cl-destructuring-bind (started . thread)
-        gnus-thread-start
-      (when (time-less-p
-             (time-add started gnus-max-seconds-hold-mutex)
-             nil)
-        (setq gnus-thread-start nil)
-        (if (thread-live-p thread)
-            (progn
-              (gnus-message-with-timestamp
-               "gnus-time-out-thread: signal quit %s" (thread-name thread))
-              (thread-signal thread 'quit nil))
-          (gnus-message-with-timestamp
-           "gnus-time-out-thread: race on dead %s" (thread-name thread)))))))
+  (if gnus-thread-start
+      (cl-destructuring-bind (started . thread)
+          gnus-thread-start
+        (if (time-less-p nil (time-add started gnus-max-seconds-hold-mutex))
+            (run-at-time
+             (/ gnus-max-seconds-hold-mutex 2)
+             nil
+             #'gnus-time-out-thread)
+          (setq gnus-thread-start nil)
+          (if (thread-live-p thread)
+              (progn
+                (gnus-message-with-timestamp
+                 "gnus-time-out-thread: signal quit %s" (thread-name thread))
+                (thread-signal thread 'quit nil))
+            (gnus-message-with-timestamp
+             "gnus-time-out-thread: race on dead %s" (thread-name thread)))))
+    (gnus-message-with-timestamp
+     "gnus-time-out-thread: degenerate %s" (thread-name thread))))
 
 (cl-defun gnus-get-unread-articles (&optional
                                     requested-level
@@ -1657,8 +1661,8 @@ All FNS must finish before MTX is released."
                               #'gnus-time-out-thread))
                         timer-list)
       (run-at-time
-       t
        (/ gnus-max-seconds-hold-mutex 2)
+       nil
        #'gnus-time-out-thread)))
   (if-let ((pending (gnus-thread-group-running-p gnus-thread-group)))
       (gnus-message 3 "gnus-get-unread-articles: %s still running" pending)
