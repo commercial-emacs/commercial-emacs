@@ -637,32 +637,6 @@ compute_non_keyboard_wait_mask (fd_set *mask)
     }
 }
 
-static int
-clean_write_mask (fd_set *mask)
-{
-  int fd, retval = 0;
-
-  for (fd = 0; fd <= max_desc; ++fd)
-    {
-      if (fd_callback_info[fd].thread != NULL
-	  && fd_callback_info[fd].thread != current_thread)
-	continue;
-      if (fd_callback_info[fd].waiting_thread != NULL
-	  && fd_callback_info[fd].waiting_thread != current_thread)
-	continue;
-      if ((fd_callback_info[fd].flags & FOR_WRITE) != 0)
-	{
-	  errno = 0;
-	  if (fcntl(fd, F_GETFD) < 0 && errno == EBADF)
-	    {
-	      delete_write_fd (fd);
-	      retval = 1;
-	    }
-	}
-    }
-  return retval;
-}
-
 static void
 compute_write_mask (fd_set *mask)
 {
@@ -2392,10 +2366,7 @@ usage:  (make-pipe-process &rest ARGS)  */)
   eassert (! p->pty_flag);
 
   if (!EQ (p->command, Qt))
-    {
-      add_process_read_fd (inchannel);
-      add_process_write_fd (outchannel);
-    }
+    add_process_read_fd (inchannel);
   p->adaptive_read_buffering
     = (NILP (Vprocess_adaptive_read_buffering) ? 0
        : EQ (Vprocess_adaptive_read_buffering, Qt) ? 1 : 2);
@@ -3628,17 +3599,12 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       eassert (0 <= inch && inch < FD_SETSIZE);
       add_process_write_fd (inch);
     }
-  else if ((!EQ (p->filter, Qt) && !EQ (p->command, Qt))
-	   || (EQ (p->status, Qlisten) && NILP (p->command)))
-    {
-      /* A server may have a client filter setting of Qt, but it must
-	 still listen for incoming connects unless it is stopped.  */
+  else
+    /* A server may have a client filter setting of Qt, but it must
+       still listen for incoming connects unless it is stopped.  */
+    if ((!EQ (p->filter, Qt) && !EQ (p->command, Qt))
+	|| (EQ (p->status, Qlisten) && NILP (p->command)))
       add_process_read_fd (inch);
-    }
-  else if (!p->is_server && p->socktype == SOCK_STREAM)
-    {
-      add_process_write_fd (inch);
-    }
 
   if (inch > max_desc)
     max_desc = inch;
@@ -5742,9 +5708,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		   && FD_ISSET (channel, &Available))
 		  || ((d->flags & FOR_WRITE)
 		      && FD_ISSET (channel, &Writeok))))
-	    {
-	      d->func (channel, d->data);
-	    }
+            d->func (channel, d->data);
 	}
 
       /* Do round robin if `process-pritoritize-lower-fds' is nil. */
@@ -5856,6 +5820,101 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		  if (EQ (XPROCESS (proc)->status, Qrun))
 		    pset_status (XPROCESS (proc),
 				 list2 (Qexit, make_fixnum (256)));
+		}
+	    }
+	  if (FD_ISSET (channel, &Writeok)
+	      && (fd_callback_info[channel].flags
+		  & NON_BLOCKING_CONNECT_FD) != 0)
+	    {
+	      struct Lisp_Process *p;
+
+	      delete_write_fd (channel);
+
+	      proc = chan_process[channel];
+	      if (NILP (proc))
+		continue;
+
+	      p = XPROCESS (proc);
+
+#ifndef WINDOWSNT
+	      {
+		socklen_t xlen = sizeof (xerrno);
+		if (getsockopt (channel, SOL_SOCKET, SO_ERROR, &xerrno, &xlen))
+		  xerrno = errno;
+	      }
+#else
+	      /* On MS-Windows, getsockopt clears the error for the
+		 entire process, which may not be the right thing; see
+		 w32.c.  Use getpeername instead.  */
+	      {
+		struct sockaddr pname;
+		socklen_t pnamelen = sizeof (pname);
+
+		/* If connection failed, getpeername will fail.  */
+		xerrno = 0;
+		if (getpeername (channel, &pname, &pnamelen) < 0)
+		  {
+		    /* Obtain connect failure code through error slippage.  */
+		    char dummy;
+		    xerrno = errno;
+		    if (errno == ENOTCONN && read (channel, &dummy, 1) < 0)
+		      xerrno = errno;
+		  }
+	      }
+#endif
+	      if (xerrno)
+		{
+		  Lisp_Object addrinfos
+		    = connecting_status (p->status) ? XCDR (p->status) : Qnil;
+		  if (!NILP (addrinfos))
+		    XSETCDR (p->status, XCDR (addrinfos));
+		  else
+		    {
+		      p->tick = ++process_tick;
+		      pset_status (p, list2 (Qfailed, make_fixnum (xerrno)));
+		    }
+		  deactivate_process (proc);
+		  {
+		      char buf[128];
+		      sprintf(buf, "the fudd: %s xerrno=%d addrinfos=%d",
+			      SDATA (p->name),
+			      xerrno,
+			      !NILP (addrinfos));
+		      message_dolog (buf, strlen(buf), 1, 0);
+		  }
+		  if (!NILP (addrinfos))
+		    connect_network_socket (proc, addrinfos, Qnil);
+		}
+	      else
+		{
+#ifdef HAVE_GNUTLS
+		  /* If we have an incompletely set up TLS connection,
+		     then defer the sentinel signaling until
+		     later. */
+		  if (NILP (p->gnutls_boot_parameters)
+		      && !p->gnutls_p)
+#endif
+		    {
+		      pset_status (p, Qrun);
+		      /* Execute the sentinel here.  If we had relied on
+			 status_notify to do it later, it will read input
+			 from the process before calling the sentinel.  */
+		      exec_sentinel (proc, build_string ("open\n"));
+		    }
+
+		  if (0 <= p->infd && !EQ (p->filter, Qt)
+		      && !EQ (p->command, Qt))
+		      add_process_read_fd (p->infd);
+		  else
+		      {
+			  char buf[128];
+			  sprintf(buf, "the fud: %s infd=%d filter=%s command=%s",
+				  SDATA (p->name),
+				  p->infd,
+				  (SSDATA (Fprin1_to_string (p->filter, Qnil))),
+				  (SSDATA (Fprin1_to_string (p->command, Qnil))));
+			  message_dolog (buf, strlen(buf), 1, 0);
+		      }
 		}
 	    }
 	}			/* End for each file descriptor.  */
