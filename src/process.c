@@ -5594,8 +5594,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	case EINTR:
 	  break;
 	case EBADF:
-	  if (check_write && clean_write_mask(&Writeok))
-	    continue;
 	  emacs_abort ();
 	  break;
 	default:
@@ -5822,11 +5820,13 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 				 list2 (Qexit, make_fixnum (256)));
 		}
 	    }
-	  if (FD_ISSET (channel, &Writeok)
-	      && (fd_callback_info[channel].flags
-		  & NON_BLOCKING_CONNECT_FD) != 0)
+	  if (FD_ISSET (channel, &Writeok))
 	    {
 	      struct Lisp_Process *p;
+
+	      /* Ensure the only way getting here was via
+	       * connect network_socket. */
+	      eassert(p->is_non_blocking_client);
 
 	      delete_write_fd (channel);
 
