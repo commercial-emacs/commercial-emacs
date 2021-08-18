@@ -628,7 +628,9 @@ gnutls_try_handshake (struct Lisp_Process *proc)
       if (emacs_gnutls_handle_error (state, ret) == 0) /* fatal */
 	break;
       maybe_quit ();
-      if (non_blocking && ret != GNUTLS_E_INTERRUPTED)
+      if (non_blocking
+	  && ret != GNUTLS_E_INTERRUPTED
+	  && ret != GNUTLS_E_AGAIN)
 	break;
     }
 
@@ -737,10 +739,14 @@ emacs_gnutls_write (struct Lisp_Process *proc, const char *buf, ptrdiff_t nbyte)
 
   while (nbyte > 0)
     {
-      ssize_t rtnval;
+      ssize_t rtnval = 0;
       do
-	rtnval = gnutls_record_send (state, buf, nbyte);
-      while (rtnval == GNUTLS_E_INTERRUPTED);
+	{
+	  if (rtnval < 0)
+	    rtnval = gnutls_record_send (state, NULL, 0);
+	  else
+	    rtnval = gnutls_record_send (state, buf, nbyte);
+	} while (rtnval == GNUTLS_E_INTERRUPTED || rtnval == GNUTLS_E_AGAIN);
 
       if (rtnval < 0)
 	{
@@ -777,7 +783,7 @@ emacs_gnutls_read (struct Lisp_Process *proc, char *buf, ptrdiff_t nbyte)
   ssize_t rtnval;
   do
     rtnval = gnutls_record_recv (state, buf, nbyte);
-  while (rtnval == GNUTLS_E_INTERRUPTED);
+  while (rtnval == GNUTLS_E_INTERRUPTED || rtnval == GNUTLS_E_AGAIN);
 
   if (rtnval >= 0)
     return rtnval;

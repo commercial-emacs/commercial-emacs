@@ -271,9 +271,6 @@ static Lisp_Object
 network_lookup_address_info_1 (Lisp_Object host, const char *service,
                                struct addrinfo *hints, struct addrinfo **res);
 
-/* Number of bits set in connect_wait_mask.  */
-static int num_pending_connects;
-
 /* The largest descriptor currently in use; -1 if none.  */
 static int max_desc;
 
@@ -440,8 +437,6 @@ enum fd_bits
   KEYBOARD_FD = 4,
   /* This descriptor refers to a process.  */
   PROCESS_FD = 8,
-  /* A non-blocking connect.  Only valid if FOR_WRITE is set.  */
-  NON_BLOCKING_CONNECT_FD = 16
 };
 
 static struct fd_callback_data
@@ -481,17 +476,30 @@ add_non_keyboard_read_fd (int fd, fd_callback func, void *data)
 }
 
 static void
-add_process_read_fd (int fd)
+add_process_fd (int fd, int plus, int minus)
 {
   eassert (fd >= 0 && fd < FD_SETSIZE);
   eassert (fd_callback_info[fd].func == NULL);
 
-  fd_callback_info[fd].flags &= ~KEYBOARD_FD;
-  fd_callback_info[fd].flags |= FOR_READ;
+  if (minus)
+    fd_callback_info[fd].flags &= ~minus;
+  if (plus)
+    fd_callback_info[fd].flags |= plus;
+
   if (fd > max_desc)
     max_desc = fd;
-  eassert (0 <= fd && fd < FD_SETSIZE);
-  fd_callback_info[fd].flags |= PROCESS_FD;
+}
+
+static void
+add_process_read_fd (int fd)
+{
+  add_process_fd (fd, (FOR_READ | PROCESS_FD), KEYBOARD_FD);
+}
+
+static void
+add_process_write_fd (int fd)
+{
+  add_process_fd (fd, (FOR_WRITE | PROCESS_FD), KEYBOARD_FD);
 }
 
 /* Stop monitoring file descriptor FD for when read is possible.  */
@@ -525,18 +533,6 @@ add_write_fd (int fd, fd_callback func, void *data)
 }
 
 static void
-add_non_blocking_write_fd (int fd)
-{
-  eassert (fd >= 0 && fd < FD_SETSIZE);
-  eassert (fd_callback_info[fd].func == NULL);
-
-  fd_callback_info[fd].flags |= FOR_WRITE | NON_BLOCKING_CONNECT_FD;
-  if (fd > max_desc)
-    max_desc = fd;
-  ++num_pending_connects;
-}
-
-static void
 recompute_max_desc (void)
 {
   int fd;
@@ -559,12 +555,7 @@ void
 delete_write_fd (int fd)
 {
   eassert (0 <= fd && fd < FD_SETSIZE);
-  if ((fd_callback_info[fd].flags & NON_BLOCKING_CONNECT_FD) != 0)
-    {
-      if (--num_pending_connects < 0)
-	emacs_abort ();
-    }
-  fd_callback_info[fd].flags &= ~(FOR_WRITE | NON_BLOCKING_CONNECT_FD);
+  fd_callback_info[fd].flags &= ~FOR_WRITE;
   if (fd_callback_info[fd].flags == 0)
     {
       fd_callback_info[fd].func = 0;
@@ -644,6 +635,32 @@ compute_non_keyboard_wait_mask (fd_set *mask)
 	  fd_callback_info[fd].waiting_thread = current_thread;
 	}
     }
+}
+
+static int
+clean_write_mask (fd_set *mask)
+{
+  int fd, retval = 0;
+
+  for (fd = 0; fd <= max_desc; ++fd)
+    {
+      if (fd_callback_info[fd].thread != NULL
+	  && fd_callback_info[fd].thread != current_thread)
+	continue;
+      if (fd_callback_info[fd].waiting_thread != NULL
+	  && fd_callback_info[fd].waiting_thread != current_thread)
+	continue;
+      if ((fd_callback_info[fd].flags & FOR_WRITE) != 0)
+	{
+	  errno = 0;
+	  if (fcntl(fd, F_GETFD) < 0 && errno == EBADF)
+	    {
+	      delete_write_fd (fd);
+	      retval = 1;
+	    }
+	}
+    }
+  return retval;
 }
 
 static void
@@ -2356,9 +2373,6 @@ usage:  (make-pipe-process &rest ARGS)  */)
   p->infd = inchannel;
   p->outfd = outchannel;
 
-  if (inchannel > max_desc)
-    max_desc = inchannel;
-
   buffer = Fplist_get (contact, QCbuffer);
   if (NILP (buffer))
     buffer = name;
@@ -2378,7 +2392,10 @@ usage:  (make-pipe-process &rest ARGS)  */)
   eassert (! p->pty_flag);
 
   if (!EQ (p->command, Qt))
-    add_process_read_fd (inchannel);
+    {
+      add_process_read_fd (inchannel);
+      add_process_write_fd (outchannel);
+    }
   p->adaptive_read_buffering
     = (NILP (Vprocess_adaptive_read_buffering) ? 0
        : EQ (Vprocess_adaptive_read_buffering, Qt) ? 1 : 2);
@@ -3277,15 +3294,9 @@ finish_after_tls_connection (Lisp_Object proc)
       pset_status (p, Qfailed);
       deactivate_process (proc);
     }
-  else if ((fd_callback_info[p->outfd].flags & NON_BLOCKING_CONNECT_FD) == 0)
+  else
     {
-      /* If we cleared the connection wait mask before we did the TLS
-	 setup, then we have to say that the process is finally "open"
-	 here. */
       pset_status (p, Qrun);
-      /* Execute the sentinel here.  If we had relied on status_notify
-	 to do it later, it will read input from the process before
-	 calling the sentinel.  */
       exec_sentinel (proc, build_string ("open\n"));
     }
 }
@@ -3615,15 +3626,19 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	     && EQ (XCDR (p->status), addrinfos)))
 	pset_status (p, Fcons (Qconnect, addrinfos));
       eassert (0 <= inch && inch < FD_SETSIZE);
-      if ((fd_callback_info[inch].flags & NON_BLOCKING_CONNECT_FD) == 0)
-	add_non_blocking_write_fd (inch);
+      add_process_write_fd (inch);
     }
-  else
-    /* A server may have a client filter setting of Qt, but it must
-       still listen for incoming connects unless it is stopped.  */
-    if ((!EQ (p->filter, Qt) && !EQ (p->command, Qt))
-	|| (EQ (p->status, Qlisten) && NILP (p->command)))
+  else if ((!EQ (p->filter, Qt) && !EQ (p->command, Qt))
+	   || (EQ (p->status, Qlisten) && NILP (p->command)))
+    {
+      /* A server may have a client filter setting of Qt, but it must
+	 still listen for incoming connects unless it is stopped.  */
       add_process_read_fd (inch);
+    }
+  else if (!p->is_server && p->socktype == SOCK_STREAM)
+    {
+      add_process_write_fd (inch);
+    }
 
   if (inch > max_desc)
     max_desc = inch;
@@ -4178,11 +4193,9 @@ usage: (make-network-process &rest ARGS)  */)
   if (!p->is_server && NILP (addrinfos))
     {
       char buf[128];
-      sprintf(buf, "trouble: %s (block=%d) nonblock_set=%d tried %d times",
+      sprintf(buf, "trouble: %s (block=%d) tried %d times",
 	      SDATA (p->name),
 	      !p->is_non_blocking_client,
-	      (fd_callback_info[p->outfd].flags
-	       & NON_BLOCKING_CONNECT_FD),
 	      p->gnutls_handshakes_tried);
       message_dolog (buf, strlen(buf), 1, 0);
       p->dns_request = dns_request;
@@ -4706,8 +4719,7 @@ deactivate_process (Lisp_Object proc)
 #endif
       chan_process[inchannel] = Qnil;
       delete_read_fd (inchannel);
-      if ((fd_callback_info[inchannel].flags & NON_BLOCKING_CONNECT_FD) != 0)
-	delete_write_fd (inchannel);
+      delete_write_fd (inchannel);
       if (inchannel == max_desc)
 	recompute_max_desc ();
     }
@@ -5151,8 +5163,8 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
   fd_set Writeok;
   bool check_write;
   int check_delay;
-  bool no_avail;
-  int xerrno;
+  bool avail = false;
+  int xerrno = 0;
   Lisp_Object proc;
   struct timespec timeout, end_time, timer_delay;
   struct timespec got_output_end_time = invalid_timespec ();
@@ -5245,20 +5257,15 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
 		if (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED) {
 		  char buf[128];
-		  sprintf(buf, "baz: %s (block=%d) nonblock_set=%d tried %d times",
+		  sprintf(buf, "baz: %s (block=%d) tried %d times",
 			  SDATA (p->name),
 			  !p->is_non_blocking_client,
-			  (fd_callback_info[p->outfd].flags
-			   & NON_BLOCKING_CONNECT_FD),
 			  p->gnutls_handshakes_tried);
 		  message_dolog (buf, strlen(buf), 1, 0);
 		}
 
 		if (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED
-		    && p->is_non_blocking_client
-		    /* Don't proceed until we have established a connection. */
-		    && !(fd_callback_info[p->outfd].flags
-			 & NON_BLOCKING_CONNECT_FD))
+		    && p->is_non_blocking_client)
 		  {
 		    gnutls_try_handshake (p);
 		    p->gnutls_handshakes_tried++;
@@ -5367,7 +5374,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  timeout = make_timespec (0, 0);
 	  if ((thread_select (pselect, max_desc + 1,
 			      &Atemp,
-			      (num_pending_connects > 0 ? &Ctemp : NULL),
+			      &Ctemp,
 			      NULL, &timeout, NULL)
 	       <= 0))
 	    {
@@ -5475,20 +5482,14 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	 waiting for keyboard input or a cell change (which can be
 	 triggered by processing X events).  In the latter case, set
 	 nfds to 1 to avoid breaking the loop.  */
-      no_avail = 0;
       if ((read_kbd || !NILP (wait_for_cell))
 	  && detect_input_pending ())
 	{
-	  nfds = read_kbd ? 0 : 1;
-	  no_avail = 1;
+	  avail = ! read_kbd;
 	  FD_ZERO (&Available);
 	}
       else
 	{
-#ifdef HAVE_GNUTLS
-	  int tls_nfds;
-	  fd_set tls_available;
-#endif
 	  /* Set the timeout for adaptive read buffering if any
 	     process has non-zero read_output_skip and non-zero
 	     read_output_delay, and we are not reading output for a
@@ -5529,7 +5530,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		  || timeout.tv_nsec > READ_OUTPUT_DELAY_INCREMENT))
 	    timeout = make_timespec (0, READ_OUTPUT_DELAY_INCREMENT);
 
-
 	  if (NILP (wait_for_cell) && just_wait_proc >= 0
 	      && timespec_valid_p (timer_delay)
 	      && timespec_cmp (timer_delay, timeout) < 0)
@@ -5559,11 +5559,12 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #endif
 
 #ifdef HAVE_GNUTLS
-          /* GnuTLS buffers data internally. We need to check if some
-	     data is available in the buffers manually before the select.
-	     And if so, we need to skip the select which could block. */
+          /* GnuTLS provides its own readiness data, the
+	   * confirmed presence of which can be used
+	   * to avoid blocking in pselect().
+	   */
+	  fd_set tls_available;
 	  FD_ZERO (&tls_available);
-	  tls_nfds = 0;
 	  for (channel = 0; channel < FD_SETSIZE; ++channel)
 	    if (! NILP (chan_process[channel])
 		&& FD_ISSET (channel, &Available))
@@ -5573,18 +5574,12 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		    && p->gnutls_p && p->gnutls_state
 		    && emacs_gnutls_record_check_pending (p->gnutls_state) > 0)
 		  {
-		    tls_nfds++;
 		    eassert (p->infd == channel);
 		    FD_SET (p->infd, &tls_available);
+		    if (!wait_proc || wait_proc->infd == p->infd)
+			timeout = make_timespec (0, 0);
 		  }
 	      }
-	  /* If wait_proc is somebody else, we have to wait in select
-	     as usual.  Otherwise, clobber the timeout. */
-	  if (tls_nfds > 0
-	      && (!wait_proc ||
-		  (wait_proc->infd >= 0
-		   && FD_ISSET (wait_proc->infd, &tls_available))))
-	    timeout = make_timespec (0, 0);
 #endif
 
 	  /* Non-macOS HAVE_GLIB builds call thread_select in xgselect.c.  */
@@ -5604,27 +5599,22 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 				NULL, &timeout, NULL);
 #endif	/* !HAVE_GLIB */
 
+	  xerrno = errno;
+	  avail = (nfds > 0);
 #ifdef HAVE_GNUTLS
 	  /* Merge tls_available into Available. */
-	  if (tls_nfds > 0)
+	  for (channel = 0; channel < FD_SETSIZE; ++channel)
 	    {
-	      if (nfds == 0 || (nfds < 0 && errno == EINTR))
+	      if (FD_ISSET(channel, &tls_available))
+		FD_SET(channel, &Available);
+	      if (FD_ISSET(channel, &Available))
 		{
-		  /* Fast path, just copy. */
-		  nfds = tls_nfds;
-		  Available = tls_available;
+		  avail = true;
+		  xerrno = 0;
 		}
-	      else if (nfds > 0)
-		/* Slow path, merge one by one.  Note: nfds does not need
-		   to be accurate, just positive is enough. */
-		for (channel = 0; channel < FD_SETSIZE; ++channel)
-		  if (FD_ISSET(channel, &tls_available))
-		    FD_SET(channel, &Available);
 	    }
 #endif
 	}
-
-      xerrno = errno;
 
       /* Make C-g and alarm signals set flags again.  */
       clear_waiting_for_input ();
@@ -5632,7 +5622,22 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       /*  If we woke up due to SIGWINCH, actually change size now.  */
       do_pending_window_change (0);
 
-      if (nfds == 0)
+      switch (xerrno)
+	{
+	case 0:
+	case EINTR:
+	  break;
+	case EBADF:
+	  if (check_write && clean_write_mask(&Writeok))
+	    continue;
+	  emacs_abort ();
+	  break;
+	default:
+	  report_file_errno ("Failed select", Qnil, xerrno);
+	  break;
+	}
+
+      if (! avail && ! xerrno)
 	{
           /* Exit the main loop if we've passed the requested timeout,
              or have read some bytes from our wait_proc (either directly
@@ -5664,16 +5669,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	      if (timespec_cmp (cmp_time, now) <= 0)
 		break;
 	    }
-	}
-
-      if (nfds < 0)
-	{
-	  if (xerrno == EINTR)
-	    no_avail = 1;
-	  else if (xerrno == EBADF)
-	    emacs_abort ();
-	  else
-	    report_file_errno ("Failed select", Qnil, xerrno);
 	}
 
       /* Check for keyboard input.  */
@@ -5736,8 +5731,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       if (read_kbd || ! NILP (wait_for_cell))
 	do_pending_window_change (0);
 
-      /* Check for data from a process.  */
-      if (no_avail || nfds == 0)
+      if (! avail)
 	continue;
 
       for (channel = 0; channel <= max_desc; ++channel)
@@ -5748,7 +5742,9 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		   && FD_ISSET (channel, &Available))
 		  || ((d->flags & FOR_WRITE)
 		      && FD_ISSET (channel, &Writeok))))
-            d->func (channel, d->data);
+	    {
+	      d->func (channel, d->data);
+	    }
 	}
 
       /* Do round robin if `process-pritoritize-lower-fds' is nil. */
@@ -5860,101 +5856,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		  if (EQ (XPROCESS (proc)->status, Qrun))
 		    pset_status (XPROCESS (proc),
 				 list2 (Qexit, make_fixnum (256)));
-		}
-	    }
-	  if (FD_ISSET (channel, &Writeok)
-	      && (fd_callback_info[channel].flags
-		  & NON_BLOCKING_CONNECT_FD) != 0)
-	    {
-	      struct Lisp_Process *p;
-
-	      delete_write_fd (channel);
-
-	      proc = chan_process[channel];
-	      if (NILP (proc))
-		continue;
-
-	      p = XPROCESS (proc);
-
-#ifndef WINDOWSNT
-	      {
-		socklen_t xlen = sizeof (xerrno);
-		if (getsockopt (channel, SOL_SOCKET, SO_ERROR, &xerrno, &xlen))
-		  xerrno = errno;
-	      }
-#else
-	      /* On MS-Windows, getsockopt clears the error for the
-		 entire process, which may not be the right thing; see
-		 w32.c.  Use getpeername instead.  */
-	      {
-		struct sockaddr pname;
-		socklen_t pnamelen = sizeof (pname);
-
-		/* If connection failed, getpeername will fail.  */
-		xerrno = 0;
-		if (getpeername (channel, &pname, &pnamelen) < 0)
-		  {
-		    /* Obtain connect failure code through error slippage.  */
-		    char dummy;
-		    xerrno = errno;
-		    if (errno == ENOTCONN && read (channel, &dummy, 1) < 0)
-		      xerrno = errno;
-		  }
-	      }
-#endif
-	      if (xerrno)
-		{
-		  Lisp_Object addrinfos
-		    = connecting_status (p->status) ? XCDR (p->status) : Qnil;
-		  if (!NILP (addrinfos))
-		    XSETCDR (p->status, XCDR (addrinfos));
-		  else
-		    {
-		      p->tick = ++process_tick;
-		      pset_status (p, list2 (Qfailed, make_fixnum (xerrno)));
-		    }
-		  deactivate_process (proc);
-		  {
-		      char buf[128];
-		      sprintf(buf, "the fudd: %s xerrno=%d addrinfos=%d",
-			      SDATA (p->name),
-			      xerrno,
-			      !NILP (addrinfos));
-		      message_dolog (buf, strlen(buf), 1, 0);
-		  }
-		  if (!NILP (addrinfos))
-		    connect_network_socket (proc, addrinfos, Qnil);
-		}
-	      else
-		{
-#ifdef HAVE_GNUTLS
-		  /* If we have an incompletely set up TLS connection,
-		     then defer the sentinel signaling until
-		     later. */
-		  if (NILP (p->gnutls_boot_parameters)
-		      && !p->gnutls_p)
-#endif
-		    {
-		      pset_status (p, Qrun);
-		      /* Execute the sentinel here.  If we had relied on
-			 status_notify to do it later, it will read input
-			 from the process before calling the sentinel.  */
-		      exec_sentinel (proc, build_string ("open\n"));
-		    }
-
-		  if (0 <= p->infd && !EQ (p->filter, Qt)
-		      && !EQ (p->command, Qt))
-		      add_process_read_fd (p->infd);
-		  else
-		      {
-			  char buf[128];
-			  sprintf(buf, "the fud: %s infd=%d filter=%s command=%s",
-				  SDATA (p->name),
-				  p->infd,
-				  (SSDATA (Fprin1_to_string (p->filter, Qnil))),
-				  (SSDATA (Fprin1_to_string (p->command, Qnil))));
-			  message_dolog (buf, strlen(buf), 1, 0);
-		      }
 		}
 	    }
 	}			/* End for each file descriptor.  */
@@ -8365,8 +8266,6 @@ init_process_emacs (int sockfd)
 
   max_desc = -1;
   memset (fd_callback_info, 0, sizeof (fd_callback_info));
-
-  num_pending_connects = 0;
 
   process_output_delay_count = 0;
   process_output_skip = 0;

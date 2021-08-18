@@ -581,19 +581,19 @@ FD_SETSIZE file descriptors (Bug#24325)."
               (dolist (process processes)
                 ;; The process now should either be running, or have
                 ;; already failed before `exec'.
-                (should (memq (process-status process) '(run exit)))
+                (should (memq (process-status process) '(signal run exit)))
                 (when (process-live-p process)
-                  (process-send-eof process))
-                (while (accept-process-output process))
-                (should (eq (process-status process) 'exit))
-                ;; If there's an error between fork and exec, Emacs
-                ;; will use exit statuses between 125 and 127, see
-                ;; process.h.  This can happen if the child process
-                ;; tries to set up terminal device but fails due to
-                ;; file number limits.  We don't treat this as an
-                ;; error.
-                (should (memql (process-exit-status process)
-                               '(0 125 126 127)))))))))))
+                  (process-send-eof process)
+                  (while (accept-process-output process))
+                  (should (eq (process-status process) 'exit))
+                  ;; If there's an error between fork and exec, Emacs
+                  ;; will use exit statuses between 125 and 127, see
+                  ;; process.h.  This can happen if the child process
+                  ;; tries to set up terminal device but fails due to
+                  ;; file number limits.  We don't treat this as an
+                  ;; error.
+                  (should (memql (process-exit-status process)
+                                 '(0 125 126 127))))))))))))
 
 (ert-deftest process-tests/fd-setsize-no-crash/make-pipe-process ()
   "Check that Emacs doesn't crash when trying to use more than
@@ -920,24 +920,20 @@ Return nil if FILENAME doesn't exist."
 (ert-deftest process-async-https-with-delay ()
   "Bug#49449: asynchronous TLS connection with delayed completion."
   (skip-unless (and internet-is-working (gnutls-available-p)))
-  (let* ((status nil)
+  (let* (status
+         (url-debug t)
          (buf (url-http
-                 #s(url "https" nil nil "elpa.gnu.org" nil
-                        "/packages/archive-contents" nil nil t silent t t)
-                 (lambda (s) (setq status s))
-                 '(nil) nil 'tls)))
+               #s(url "https" nil nil "elpa.gnu.org" nil
+                      "/packages/archive-contents" nil nil t silent t t)
+               (lambda (s) (setq status s))
+               '(nil) nil 'tls)))
     (unwind-protect
         (progn
-          ;; Busy-wait for 1 s to allow for the TCP connection to complete.
-          (let ((delay 1.0)
-                (t0 (float-time)))
-            (while (< (float-time) (+ t0 delay))))
-          ;; Wait for the entire operation to finish.
-          (let ((limit 4.0)
-                (t0 (float-time)))
-            (while (and (null status)
-                        (< (float-time) (+ t0 limit)))
-              (sit-for 0.1)))
+          (catch 'done
+            (dotimes (_i 40)
+              (when status
+                (throw 'done status))
+              (accept-process-output nil 0.1)))
           (should status)
           (should-not (assq :error status))
           (should buf)

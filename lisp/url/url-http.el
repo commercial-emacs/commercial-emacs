@@ -1002,11 +1002,8 @@ should be shown to the user."
   (when (buffer-live-p (process-buffer proc))
     (with-current-buffer (process-buffer proc)
       (goto-char (point-min))
-      (if (looking-at "HTTP/")
-          (url-http-parse-headers)
-        (url-http-debug "url-http-end-of-document-sentinel wtf %s\n%s"
-                        why
-		        (buffer-substring-no-properties (point-min) (point-max))))
+      (when (looking-at "HTTP/")
+        (url-http-parse-headers))
       (url-http-activate-callback))))
 
 (defun url-http-simple-after-change-function (_st _nd _length)
