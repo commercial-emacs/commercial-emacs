@@ -78,7 +78,7 @@ EMACSOPT = --no-init-file --no-site-file --no-site-lisp -L "$(SEPCHAR)$(srcdir)"
 unexport EMACSDATA EMACSDOC EMACSPATH GREP_OPTIONS
 
 ## To run tests under a debugger, set this to eg: "gdb --args".
-GDB =
+GDB ?=
 
 # Set this to 'yes' to run the tests in an interactive instance.
 TEST_INTERACTIVE ?= no
@@ -160,7 +160,11 @@ endif
 	$(AM_V_ELC)$(emacs) --batch -f batch-byte-compile $<
 
 ## Save logs, and show logs for failed tests.
+ifeq ($(GDB),)
 WRITE_LOG = > $@ 2>&1 || { STAT=$$?; cat $@; exit $$STAT; }
+else
+WRITE_LOG =
+endif
 ## On Hydra or Emba, always show logs for certain problematic tests.
 ifdef EMACS_HYDRA_CI
 lisp/net/tramp-tests.log \

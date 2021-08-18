@@ -5130,7 +5130,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
   bool check_write;
   int check_delay;
   bool avail = false;
-  int xerrno = 0;
+  int xerrno;
   Lisp_Object proc;
   struct timespec timeout, end_time, timer_delay;
   struct timespec got_output_end_time = invalid_timespec ();
@@ -5588,21 +5588,22 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       /*  If we woke up due to SIGWINCH, actually change size now.  */
       do_pending_window_change (0);
 
-      switch (xerrno)
+      if (! avail)
 	{
-	case 0:
-	case EINTR:
-	  break;
-	case EBADF:
-	  emacs_abort ();
-	  break;
-	default:
-	  report_file_errno ("Failed select", Qnil, xerrno);
-	  break;
-	}
+	  switch (xerrno)
+	    {
+	    case 0:
+	    case EAGAIN:
+	    case EINTR:
+	      break;
+	    case EBADF:
+	      emacs_abort ();
+	      break;
+	    default:
+	      report_file_errno ("Failed select", Qnil, xerrno);
+	      break;
+	    }
 
-      if (! avail && ! xerrno)
-	{
           /* Exit the main loop if we've passed the requested timeout,
              or have read some bytes from our wait_proc (either directly
              in this call or indirectly through timers / process filters),
