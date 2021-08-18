@@ -1212,6 +1212,37 @@ not the name of the pty that Emacs uses to talk with that terminal.  */)
   return XPROCESS (process)->tty_name;
 }
 
+DEFUN ("process-select", Fprocess_select, Sprocess_select, 1, 1, 0,
+       doc: /* Return list of read-write readiness of PROCESS descriptor.
+The list contains two booleans describing whether the process is ready
+for read and write in that order.  If the underlying call to pselect()
+fails, return nil.  */)
+  (register Lisp_Object process)
+{
+  int nfds;
+  struct timespec timeout;
+
+  CHECK_PROCESS (process);
+
+  /* wait_reading_process_output will not compute_write_mask
+     unless it's for all processes. */
+  fd_set read, write;
+  FD_ZERO (&read);
+  FD_ZERO (&write);
+  FD_SET (XPROCESS (process)->infd, &read);
+  FD_SET (XPROCESS (process)->outfd, &write);
+
+  timeout = make_timespec (0, 0);
+  nfds = thread_select (pselect, max_desc + 1, &read, &write,
+			NULL, &timeout, NULL);
+  return nfds < 0
+    ? Qnil
+    : list2 (FD_ISSET (XPROCESS (process)->infd, &read)
+	     ? Qt : Qnil,
+	     FD_ISSET (XPROCESS (process)->outfd, &write)
+	     ? Qt : Qnil);
+}
+
 static void
 update_process_mark (struct Lisp_Process *p)
 {
@@ -3599,11 +3630,10 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       eassert (0 <= inch && inch < FD_SETSIZE);
       add_process_write_fd (inch);
     }
-  else
-    /* A server may have a client filter setting of Qt, but it must
-       still listen for incoming connects unless it is stopped.  */
-    if ((!EQ (p->filter, Qt) && !EQ (p->command, Qt))
-	|| (EQ (p->status, Qlisten) && NILP (p->command)))
+  else if ((!EQ (p->filter, Qt) && !EQ (p->command, Qt))
+	   || (EQ (p->status, Qlisten) && NILP (p->command)))
+      /* A server may have a client filter setting of Qt, but it must
+	 still listen for incoming connects unless it is stopped.  */
       add_process_read_fd (inch);
 
   if (inch > max_desc)
@@ -5074,12 +5104,6 @@ wait_reading_process_output_unwind (int data)
   waiting_for_user_input_p = data;
 }
 
-/* This is here so breakpoints can be put on it.  */
-static void
-wait_reading_process_output_1 (void)
-{
-}
-
 /* Read and dispose of subprocess output while waiting for timeout to
    elapse and/or keyboard input to be available.
 
@@ -5298,10 +5322,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  if (read_kbd != 0
 	      && requeued_events_pending_p ())
 	    break;
-
-          /* This is so a breakpoint can be put here.  */
-          if (!timespec_valid_p (timer_delay))
-              wait_reading_process_output_1 ();
         }
 
       /* Cause C-g and alarm signals to take immediate action,
@@ -5531,7 +5551,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	   */
 	  fd_set tls_available;
 	  FD_ZERO (&tls_available);
-	  for (channel = 0; channel < FD_SETSIZE; ++channel)
+	  for (channel = 0; channel <= max_desc; ++channel)
 	    if (! NILP (chan_process[channel])
 		&& FD_ISSET (channel, &Available))
 	      {
@@ -5548,35 +5568,26 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	      }
 #endif
 
-	  /* Non-macOS HAVE_GLIB builds call thread_select in xgselect.c.  */
-#if defined HAVE_GLIB && !defined HAVE_NS
-	  nfds = xg_select (max_desc + 1,
-			    &Available, (check_write ? &Writeok : 0),
-			    NULL, &timeout, NULL);
-#elif defined HAVE_NS
-          /* And NS builds call thread_select in ns_select. */
-          nfds = ns_select (max_desc + 1,
-			    &Available, (check_write ? &Writeok : 0),
-			    NULL, &timeout, NULL);
-#else  /* !HAVE_GLIB */
-	  nfds = thread_select (pselect, max_desc + 1,
-				&Available,
-				(check_write ? &Writeok : 0),
-				NULL, &timeout, NULL);
-#endif	/* !HAVE_GLIB */
-
-	  xerrno = errno;
+#if defined HAVE_NS
+#define WAIT_SELECT ns_select
+#elif defined HAVE_GLIB
+#define WAIT_SELECT xg_select
+#else
+#define WAIT_SELECT thread_select
+#endif
+	  nfds = WAIT_SELECT(max_desc + 1, &Available, (check_write ? &Writeok : 0),
+			     NULL, &timeout, NULL);
+	  xerrno = (nfds < 0) ? errno : 0;
 	  avail = (nfds > 0);
 #ifdef HAVE_GNUTLS
 	  /* Merge tls_available into Available. */
-	  for (channel = 0; channel < FD_SETSIZE; ++channel)
+	  for (channel = 0; channel <= max_desc; ++channel)
 	    {
 	      if (FD_ISSET(channel, &tls_available))
-		FD_SET(channel, &Available);
-	      if (FD_ISSET(channel, &Available))
 		{
-		  avail = true;
 		  xerrno = 0;
+		  avail = true;
+		  FD_SET(channel, &Available);
 		}
 	    }
 #endif
@@ -6376,6 +6387,13 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
   struct Lisp_Process *p = XPROCESS (proc);
   ssize_t rv;
   struct coding_system *coding;
+
+  for (int i=0; i<10; ++i)
+    {
+      if (EQ (XCAR (XCDR (Fprocess_select (proc))), Qt))
+	break;
+      Faccept_process_output(Qnil, make_fixnum(0.05), Qnil, Qnil);
+    }
 
   if (NETCONN_P (proc))
     {
@@ -8539,6 +8557,7 @@ amounts of data in one go.  */);
   defsubr (&Sprocess_id);
   defsubr (&Sprocess_name);
   defsubr (&Sprocess_tty_name);
+  defsubr (&Sprocess_select);
   defsubr (&Sprocess_command);
   defsubr (&Sset_process_buffer);
   defsubr (&Sprocess_buffer);

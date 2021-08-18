@@ -780,10 +780,12 @@ emacs_gnutls_read (struct Lisp_Process *proc, char *buf, ptrdiff_t nbyte)
       return -1;
     }
 
+  /* GNUTLS_E_AGAIN requires another call to pselect()
+   * outside this function. */
   ssize_t rtnval;
   do
     rtnval = gnutls_record_recv (state, buf, nbyte);
-  while (rtnval == GNUTLS_E_INTERRUPTED || rtnval == GNUTLS_E_AGAIN);
+  while (rtnval == GNUTLS_E_INTERRUPTED);
 
   if (rtnval >= 0)
     return rtnval;
