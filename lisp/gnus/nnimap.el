@@ -535,7 +535,6 @@ the key of the front-line assoc list to incorporate SERVER."
              :always-query-capabilities t
 	     :end-of-command "\r\n"
 	     :success " OK "
-             :tcpnodelay t
 	     :starttls-function
 	     (lambda (capabilities)
 	       (when (string-match-p "STARTTLS" capabilities)

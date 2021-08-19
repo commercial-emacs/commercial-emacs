@@ -1218,7 +1218,6 @@ If SEND-IF-FORCE, only send authinfo to the server if the
 			 ;; Use the correct command for everything else.
 			 "CAPABILITIES\r\n"))
 		     :success "^3"
-                     :tcpnodelay t
 		     :starttls-function
 		     (lambda (capabilities)
 		       (if (not (string-match "STARTTLS" capabilities))
