@@ -1626,14 +1626,14 @@ All FNS must finish before MTX is released."
 
 (defun gnus-time-out-thread ()
   (interactive)
+  (run-at-time
+   (/ gnus-max-seconds-hold-mutex 2)
+   nil
+   #'gnus-time-out-thread)
   (if gnus-thread-start
       (cl-destructuring-bind (started . thread)
           gnus-thread-start
-        (if (time-less-p nil (time-add started gnus-max-seconds-hold-mutex))
-            (run-at-time
-             (/ gnus-max-seconds-hold-mutex 2)
-             nil
-             #'gnus-time-out-thread)
+        (unless (time-less-p nil (time-add started gnus-max-seconds-hold-mutex))
           (setq gnus-thread-start nil)
           (if (thread-live-p thread)
               (progn
