@@ -6388,11 +6388,16 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
   ssize_t rv;
   struct coding_system *coding;
 
-  for (int i=0; i<10; ++i)
+  if (!EQ (p->filter, Qt) || EQ (p->status, Qlisten))
     {
-      if (EQ (XCAR (XCDR (Fprocess_select (proc))), Qt))
-	break;
-      Faccept_process_output(Qnil, make_fixnum(0.05), Qnil, Qnil);
+      for (int i=0; i<100; ++i)
+	{
+	  if (EQ (XCAR (XCDR (Fprocess_select (proc))), Qt))
+	    break;
+	  Faccept_process_output(Qnil, make_fixnum(0.05), Qnil, Qnil);
+	}
+      if (! EQ (XCAR (XCDR (Fprocess_select (proc))), Qt))
+	error ("Output file descriptor of %s is unready", SDATA (p->name));
     }
 
   if (NETCONN_P (proc))

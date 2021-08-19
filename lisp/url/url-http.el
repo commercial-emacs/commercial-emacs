@@ -1369,11 +1369,6 @@ The return value of this function is the retrieval buffer."
                (url-https-proxy-connect connection)
              (set-process-sentinel connection
                                    #'url-http-end-of-document-sentinel)
-             (catch 'ready
-               (dotimes (_i 20)
-                 (when (cadr (process-select connection))
-                   (throw 'ready t))
-                 (accept-process-output nil 0.05)))
              (let ((func (apply-partially #'process-send-string
                                           connection
                                           (url-http-create-request))))
