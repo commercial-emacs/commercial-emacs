@@ -2784,12 +2784,6 @@ static const struct socket_options {
 #ifdef SO_RCVBUF
     { ":rcvbuf", SOL_SOCKET, SO_RCVBUF, SOPT_INT, OPIX_MISC },
 #endif
-#ifdef SO_SNDLOWAT
-    { ":sndlowat", SOL_SOCKET, SO_SNDLOWAT, SOPT_INT, OPIX_MISC },
-#endif
-#ifdef SO_RCVLOWAT
-    { ":rcvlowat", SOL_SOCKET, SO_RCVLOWAT, SOPT_INT, OPIX_MISC },
-#endif
     { 0, 0, 0, SOPT_UNKNOWN, OPIX_NONE }
   };
 
@@ -3827,6 +3821,10 @@ The following network options can be specified for this connection:
                       (this is allowed by default for a server process).
 :bindtodevice NAME -- bind to interface NAME.  Using this may require
                       special privileges on some systems.
+:tcpnodelay BOOL   -- Disable Nagle buffering.
+:sndbuf INT        -- Bytes of near-side outgoing buffer.
+:rcvbuf INT        -- Bytes of near-side incoming buffer.
+
 :use-external-socket BOOL -- Use any pre-allocated sockets that have
                              been passed to Emacs.  If Emacs wasn't
                              passed a socket, this option is silently
@@ -6398,21 +6396,15 @@ write_queue_pop (struct Lisp_Process *p, Lisp_Object *obj,
    If OBJECT is not nil, the data is encoded by PROC's coding-system
    for encoding before it is sent.
 
-   PLIST contains setsockopt() settings with keyword properties
-   constructed by taking the option name, dropping the prefix up to
-   underscore, removing all underscores, and prepending colon, e.g.,
-   :tcpnodelay
-
    This function can evaluate Lisp code and can garbage collect.  */
 
 static void
 send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
-	      Lisp_Object object, Lisp_Object plist)
+	      Lisp_Object object)
 {
   struct Lisp_Process *p = XPROCESS (proc);
   ssize_t rv;
   struct coding_system *coding;
-  Lisp_Object unwind_plist = Qnil;
 
   if (!EQ (p->filter, Qt) || EQ (p->status, Qlisten))
     {
@@ -6477,7 +6469,7 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 	    {
 	      /* But, before changing the coding, we must flush out data.  */
 	      coding->mode |= CODING_MODE_LAST_BLOCK;
-	      send_process (proc, "", 0, Qt, Qnil);
+	      send_process (proc, "", 0, Qt);
 	      coding->mode &= CODING_MODE_LAST_BLOCK;
 	    }
 	  setup_coding_system (raw_text_coding_system
@@ -6530,18 +6522,6 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
   if (!NILP (p->write_queue))
     write_queue_push (p, object, buf, len, 0);
 
-  if (p->socktype == SOCK_STREAM)
-    {
-      unwind_plist = Fcopy_sequence (plist);
-      for (int i=0; i < XFIXNUM (Flength(plist)) - 1; i = i + 2)
-	{
-	  Lisp_Object key = Fnth (make_fixnum (i), plist),
-	    val = Fnth (make_fixnum (i+1), plist);
-	  unwind_plist = Fplist_put (unwind_plist, key,
-				     Fprocess_contact (proc, key, Qnil));
-	  Fset_network_process_option(proc, key, val, Qt);
-	}
-    }
   do   /* while !NILP (p->write_queue) */
     {
       ptrdiff_t cur_len = -1;
@@ -6657,16 +6637,10 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 	}
     }
   while (!NILP (p->write_queue));
-  for (int i=0; i < XFIXNUM (Flength(unwind_plist)) - 1; i = i + 2)
-    {
-      Lisp_Object key = Fnth (make_fixnum (i), unwind_plist),
-	val = Fnth (make_fixnum (i+1), unwind_plist);
-      Fset_network_process_option(proc, key, val, Qt);
-    }
 }
 
 DEFUN ("process-send-region", Fprocess_send_region, Sprocess_send_region,
-       3, 4, 0,
+       3, 3, 0,
        doc: /* Send current contents of region as input to PROCESS.
 PROCESS may be a process, a buffer, the name of a process or buffer, or
 nil, indicating the current buffer's process.
@@ -6676,14 +6650,10 @@ length of which depends on the process connection type and the
 operating system), it is sent in several bunches.  This may happen
 even for shorter regions.  Output from processes can arrive in between
 bunches.
-The optional PLIST contains setsockopt() settings with keyword
-properties constructed by taking the option name, dropping the
-prefix up to underscore, removing all underscores, and prepending colon,
-e.g., :tcpnodelay
 
 If PROCESS is a non-blocking network process that hasn't been fully
 set up yet, this function will block until socket setup has completed.  */)
-  (Lisp_Object process, Lisp_Object start, Lisp_Object end, Lisp_Object plist)
+  (Lisp_Object process, Lisp_Object start, Lisp_Object end)
 {
   Lisp_Object proc = get_process (process);
   ptrdiff_t start_byte, end_byte;
@@ -6700,13 +6670,13 @@ set up yet, this function will block until socket setup has completed.  */)
     wait_while_connecting (proc);
 
   send_process (proc, (char *) BYTE_POS_ADDR (start_byte),
-		end_byte - start_byte, Fcurrent_buffer (), plist);
+		end_byte - start_byte, Fcurrent_buffer ());
 
   return Qnil;
 }
 
 DEFUN ("process-send-string", Fprocess_send_string, Sprocess_send_string,
-       2, 3, 0,
+       2, 2, 0,
        doc: /* Send PROCESS the contents of STRING as input.
 PROCESS may be a process, a buffer, the name of a process or buffer, or
 nil, indicating the current buffer's process.
@@ -6714,19 +6684,15 @@ If STRING is larger than the input buffer of the process (the length
 of which depends on the process connection type and the operating
 system), it is sent in several bunches.  This may happen even for
 shorter strings.  Output from processes can arrive in between bunches.
-The optional PLIST contains setsockopt() settings with keyword
-properties constructed by taking the option name, dropping the
-prefix up to underscore, removing all underscores, and prepending colon,
-e.g., :tcpnodelay
 
 If PROCESS is a non-blocking network process that hasn't been fully
 set up yet, this function will block until socket setup has completed.  */)
-  (Lisp_Object process, Lisp_Object string, Lisp_Object plist)
+  (Lisp_Object process, Lisp_Object string)
 {
   CHECK_STRING (string);
   Lisp_Object proc = get_process (process);
   send_process (proc, SSDATA (string),
-		SBYTES (string), string, plist);
+		SBYTES (string), string);
   return Qnil;
 }
 
@@ -6857,7 +6823,7 @@ process_send_signal (Lisp_Object process, int signo, Lisp_Object current_group,
 
       if (sig_char && *sig_char != CDISABLE)
 	{
-	  send_process (proc, (char *) sig_char, 1, Qnil, Qnil);
+	  send_process (proc, (char *) sig_char, 1, Qnil);
 	  return;
 	}
       /* If we can't send the signal with a character,
@@ -7167,11 +7133,11 @@ process has been transmitted to the serial port.  */)
   if (coding && CODING_REQUIRE_FLUSHING (coding))
     {
       coding->mode |= CODING_MODE_LAST_BLOCK;
-      send_process (proc, "", 0, Qnil, Qnil);
+      send_process (proc, "", 0, Qnil);
     }
 
   if (XPROCESS (proc)->pty_flag)
-    send_process (proc, "\004", 1, Qnil, Qnil);
+    send_process (proc, "\004", 1, Qnil);
   else if (EQ (XPROCESS (proc)->type, Qserial))
     {
 #ifndef WINDOWSNT
@@ -8467,8 +8433,6 @@ syms_of_process (void)
   DEFSYM (QCtcpnodelay, ":tcpnodelay");
   DEFSYM (QCtcpnodelay, ":sndbuf");
   DEFSYM (QCtcpnodelay, ":rcvbuf");
-  DEFSYM (QCtcpnodelay, ":sndlowat");
-  DEFSYM (QCtcpnodelay, ":rcvlowat");
 
   DEFSYM (Qodd, "odd");
   DEFSYM (Qeven, "even");
