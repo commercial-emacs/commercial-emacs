@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <netinet/tcp.h>
 
 #include "lisp.h"
 
@@ -2774,6 +2775,21 @@ static const struct socket_options {
 #ifdef SO_REUSEADDR
     { ":reuseaddr", SOL_SOCKET, SO_REUSEADDR, SOPT_BOOL, OPIX_REUSEADDR },
 #endif
+#ifdef TCP_NODELAY
+    { ":tcpnodelay", IPPROTO_TCP, TCP_NODELAY, SOPT_BOOL, OPIX_MISC },
+#endif
+#ifdef SO_SNDBUF
+    { ":sndbuf", SOL_SOCKET, SO_SNDBUF, SOPT_INT, OPIX_MISC },
+#endif
+#ifdef SO_RCVBUF
+    { ":rcvbuf", SOL_SOCKET, SO_RCVBUF, SOPT_INT, OPIX_MISC },
+#endif
+#ifdef SO_SNDLOWAT
+    { ":sndlowat", SOL_SOCKET, SO_SNDLOWAT, SOPT_INT, OPIX_MISC },
+#endif
+#ifdef SO_RCVLOWAT
+    { ":rcvlowat", SOL_SOCKET, SO_RCVLOWAT, SOPT_INT, OPIX_MISC },
+#endif
     { 0, 0, 0, SOPT_UNKNOWN, OPIX_NONE }
   };
 
@@ -4188,12 +4204,14 @@ usage: (make-network-process &rest ARGS)  */)
      postpone connecting to the server. */
   if (!p->is_server && NILP (addrinfos))
     {
+#ifdef HAVE_GNUTLS
       char buf[128];
       sprintf(buf, "trouble: %s (block=%d) tried %d times",
 	      SDATA (p->name),
 	      !p->is_non_blocking_client,
 	      p->gnutls_handshakes_tried);
       message_dolog (buf, strlen(buf), 1, 0);
+#endif
       p->dns_request = dns_request;
       p->status = list1 (Qconnect);
       postpone_connection = true;
@@ -5246,12 +5264,14 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		/* Continue TLS negotiation. */
 
 		if (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED) {
+#ifdef HAVE_GNUTLS
 		  char buf[128];
 		  sprintf(buf, "baz: %s (block=%d) tried %d times",
 			  SDATA (p->name),
 			  !p->is_non_blocking_client,
 			  p->gnutls_handshakes_tried);
 		  message_dolog (buf, strlen(buf), 1, 0);
+#endif
 		}
 
 		if (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED
@@ -6387,6 +6407,7 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
   struct Lisp_Process *p = XPROCESS (proc);
   ssize_t rv;
   struct coding_system *coding;
+  Lisp_Object tcpnodelay = Qnil;
 
   if (!EQ (p->filter, Qt) || EQ (p->status, Qlisten))
     {
@@ -6504,6 +6525,11 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
   if (!NILP (p->write_queue))
     write_queue_push (p, object, buf, len, 0);
 
+  if (p->socktype == SOCK_STREAM)
+    {
+      tcpnodelay = Fprocess_contact (proc, QCtcpnodelay, Qnil);
+      Fset_network_process_option(proc, QCtcpnodelay, Qt, Qnil);
+    }
   do   /* while !NILP (p->write_queue) */
     {
       ptrdiff_t cur_len = -1;
@@ -6619,6 +6645,8 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 	}
     }
   while (!NILP (p->write_queue));
+  if (p->socktype == SOCK_STREAM)
+    Fset_network_process_option(proc, QCtcpnodelay, tcpnodelay, Qnil);
 }
 
 DEFUN ("process-send-region", Fprocess_send_region, Sprocess_send_region,
@@ -8412,6 +8440,12 @@ syms_of_process (void)
   DEFSYM (QCbytesize, ":bytesize");
   DEFSYM (QCstopbits, ":stopbits");
   DEFSYM (QCparity, ":parity");
+  DEFSYM (QCtcpnodelay, ":tcpnodelay");
+  DEFSYM (QCtcpnodelay, ":sndbuf");
+  DEFSYM (QCtcpnodelay, ":rcvbuf");
+  DEFSYM (QCtcpnodelay, ":sndlowat");
+  DEFSYM (QCtcpnodelay, ":rcvlowat");
+
   DEFSYM (Qodd, "odd");
   DEFSYM (Qeven, "even");
   DEFSYM (QCflowcontrol, ":flowcontrol");
