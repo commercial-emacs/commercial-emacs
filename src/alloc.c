@@ -8274,13 +8274,20 @@ XXX_check_obarray (void)
   for (size_t i = 0; i < obsize; ++i)
     {
       const Lisp_Object sym = AREF (obarray, i);
+      register Lisp_Object tail = sym;
       if (!SYMBOLP (sym))
-        continue;
-      const char *sname = SSDATA (SYMBOL_NAME (sym));
-      const size_t sname_len = SBYTES (SYMBOL_NAME (sym));
-      eassert (strlen (sname) == sname_len);
-      const size_t hash = hash_string (sname, sname_len) % obsize;
-      eassert (hash == i);
+	continue;
+      do {
+	if (!SYMBOLP (tail))
+	  break; // second check
+
+	const char *sname = SSDATA (SYMBOL_NAME (tail));
+	const size_t sname_len = SBYTES (SYMBOL_NAME (tail));
+	eassert (strlen (sname) == sname_len);
+	const size_t hash = hash_string (sname, sname_len) % obsize;
+	eassert (hash == i);
+	XSETSYMBOL(tail, XSYMBOL(tail)->u.s.next);
+      } while (XSYMBOL(tail));
     }
 }
 
