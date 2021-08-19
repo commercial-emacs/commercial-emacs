@@ -88,7 +88,7 @@ ts_ensure_position_synced (Lisp_Object parser)
 {
   TSParser *ts_parser = XTS_PARSER (parser)->parser;
   TSTree *tree = XTS_PARSER (parser)->tree;
-  struct buffer *buffer = XTS_PARSER (parser)->buffer;
+  struct buffer *buffer = XBUFFER (XTS_PARSER (parser)->buffer);
   /* Before we parse or set ranges, catch up with the narrowing
      situation.  We change visible_beg and visible_end to match
      BUF_BEGV_BYTE and BUF_ZV_BYTE, and inform tree-sitter of the
@@ -154,7 +154,7 @@ ts_ensure_parsed (Lisp_Object parser)
   TSParser *ts_parser = XTS_PARSER (parser)->parser;
   TSTree *tree = XTS_PARSER(parser)->tree;
   TSInput input = XTS_PARSER (parser)->input;
-  struct buffer *buffer = XTS_PARSER (parser)->buffer;
+  struct buffer *buffer = XBUFFER (XTS_PARSER (parser)->buffer);
   ts_check_buffer_size (buffer);
 
   /* Before we parse, catch up with the narrowing situation.  */
@@ -187,7 +187,8 @@ const char*
 ts_read_buffer (void *parser, uint32_t byte_index,
 		TSPoint position, uint32_t *bytes_read)
 {
-  struct buffer *buffer = ((struct Lisp_TS_Parser *) parser)->buffer;
+  struct buffer *buffer =
+    XBUFFER (((struct Lisp_TS_Parser *) parser)->buffer);
   ptrdiff_t visible_beg = ((struct Lisp_TS_Parser *) parser)->visible_beg;
   ptrdiff_t visible_end = ((struct Lisp_TS_Parser *) parser)->visible_end;
   ptrdiff_t byte_pos = byte_index + visible_beg;
@@ -232,12 +233,12 @@ ts_read_buffer (void *parser, uint32_t byte_index,
 
 /* Wrap the parser in a Lisp_Object to be used in the Lisp machine.  */
 Lisp_Object
-make_ts_parser (struct buffer *buffer, TSParser *parser,
+make_ts_parser (Lisp_Object buffer, TSParser *parser,
 		TSTree *tree, Lisp_Object language_symbol)
 {
   struct Lisp_TS_Parser *lisp_parser
     = ALLOCATE_PSEUDOVECTOR
-    (struct Lisp_TS_Parser, language_symbol, PVEC_TS_PARSER);
+    (struct Lisp_TS_Parser, parser, PVEC_TS_PARSER);
 
   lisp_parser->language_symbol = language_symbol;
   lisp_parser->buffer = buffer;
@@ -246,8 +247,8 @@ make_ts_parser (struct buffer *buffer, TSParser *parser,
   TSInput input = {lisp_parser, ts_read_buffer, TSInputEncodingUTF8};
   lisp_parser->input = input;
   lisp_parser->need_reparse = true;
-  lisp_parser->visible_beg = BUF_BEGV (buffer);
-  lisp_parser->visible_end = BUF_ZV (buffer);
+  lisp_parser->visible_beg = BUF_BEGV (XBUFFER (buffer));
+  lisp_parser->visible_end = BUF_ZV (XBUFFER (buffer));
   return make_lisp_ptr (lisp_parser, Lisp_Vectorlike);
 }
 
@@ -316,7 +317,7 @@ function provided by a tree-sitter language dynamic module, e.g.,
   ts_parser_set_language (parser, lang);
 
   Lisp_Object lisp_parser
-    = make_ts_parser (XBUFFER(buffer), parser, NULL, language);
+    = make_ts_parser (buffer, parser, NULL, language);
 
   struct buffer *old_buffer = current_buffer;
   set_buffer_internal (XBUFFER (buffer));
@@ -336,7 +337,7 @@ DEFUN ("tree-sitter-parser-buffer",
 {
   CHECK_TS_PARSER (parser);
   Lisp_Object buf;
-  XSETBUFFER (buf, XTS_PARSER (parser)->buffer);
+  XSETBUFFER (buf, XBUFFER (XTS_PARSER (parser)->buffer));
   return buf;
 }
 
@@ -363,41 +364,6 @@ DEFUN ("tree-sitter-parser-root-node",
   ts_ensure_parsed (parser);
   TSNode root_node = ts_tree_root_node (XTS_PARSER (parser)->tree);
   return make_ts_node (parser, root_node);
-}
-
-DEFUN ("tree-sitter-parse-string",
-       Ftree_sitter_parse_string, Stree_sitter_parse_string,
-       2, 2, 0,
-       doc: /* Parse STRING and return the root node.
-
-LANGUAGE should be the language provided by a tree-sitter language
-dynamic module.  */)
-  (Lisp_Object string, Lisp_Object language)
-{
-  CHECK_STRING (string);
-  CHECK_SYMBOL (language);
-
-  TSParser *parser = ts_parser_new ();
-  /* LANGUAGE is a function that returns a USER_PTR that contains the
-     pointer to a TSLanguage struct.  */
-  TSLanguage *lang = (XUSER_PTR (Ffuncall (1, &language))->p);
-  ts_parser_set_language (parser, lang);
-
-  TSTree *tree = ts_parser_parse_string (parser, NULL,
-					 SSDATA (string),
-					 strlen (SSDATA (string)));
-
-  /* See comment in ts_ensure_parsed for possible reasons for a
-     failure.  */
-  if (tree == NULL)
-    xsignal1 (Qtree_sitter_parse_error, string);
-
-  TSNode root_node = ts_tree_root_node (tree);
-
-  Lisp_Object lisp_parser = make_ts_parser (NULL, parser, tree, Qnil);
-  Lisp_Object lisp_node = make_ts_node (lisp_parser, root_node);
-
-  return lisp_node;
 }
 
 /* Checks that the RANGES argument of
@@ -456,12 +422,12 @@ is nil, set PARSER to parse the whole buffer.  */)
       /* Set ranges for PARSER.  */
       ptrdiff_t len = list_length (ranges);
       TSRange *ts_ranges = malloc (sizeof(TSRange) * len);
-      struct buffer *buffer = XTS_PARSER (parser)->buffer;
+      struct buffer *buffer = XBUFFER (XTS_PARSER (parser)->buffer);
 
       for (int idx=0; !NILP (ranges); idx++, ranges = XCDR (ranges))
 	{
 	  Lisp_Object range = XCAR (ranges);
-	  struct buffer *buffer = XTS_PARSER (parser)->buffer;
+	  struct buffer *buffer = XBUFFER (XTS_PARSER (parser)->buffer);
 
 	  EMACS_INT beg_byte = buf_charpos_to_bytepos
 	    (buffer, XFIXNUM (XCAR (range)));
@@ -502,7 +468,7 @@ nil.  */)
     (XTS_PARSER (parser)->parser, &len);
   if (len == 0)
     return Qnil;
-  struct buffer *buffer = XTS_PARSER (parser)->buffer;
+  struct buffer *buffer = XBUFFER (XTS_PARSER (parser)->buffer);
 
   Lisp_Object list = Qnil;
   for (int idx=0; idx < len; idx++)
@@ -548,7 +514,8 @@ If NODE is nil, return nil.  */)
   ptrdiff_t visible_beg =
     XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   uint32_t start_byte = ts_node_start_byte (ts_node);
-  struct buffer *buffer = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
+  struct buffer *buffer =
+    XBUFFER (XTS_PARSER (XTS_NODE (node)->parser)->buffer);
   ptrdiff_t start_pos = buf_bytepos_to_charpos
     (buffer, start_byte + visible_beg);
   return make_fixnum (start_pos);
@@ -567,7 +534,8 @@ If NODE is nil, return nil.  */)
   ptrdiff_t visible_beg =
     XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   uint32_t end_byte = ts_node_end_byte (ts_node);
-  struct buffer *buffer = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
+  struct buffer *buffer =
+    XBUFFER (XTS_PARSER (XTS_NODE (node)->parser)->buffer);
   ptrdiff_t end_pos = buf_bytepos_to_charpos
     (buffer, end_byte + visible_beg);
   return make_fixnum (end_pos);
@@ -633,42 +601,44 @@ child only.  NAMED defaults to nil.  If NODE is nil, return nil.  */)
 
 DEFUN ("tree-sitter-node-check",
        Ftree_sitter_node_check, Stree_sitter_node_check, 2, 2, 0,
-       doc: /* Return non-nil if NODE is in condition COND, nil otherwise.
+       doc: /* Return non-nil if NODE has PROPERTY, nil otherwise.
 
-COND could be 'named, 'missing, 'extra, 'has-changes, 'has-error.
-Named nodes correspond to named rules in the grammar, whereas
-"anonymous" nodes correspond to string literals in the grammar.
+PROPERTY could be 'named, 'missing, 'extra, 'has-changes, 'has-error.
+Named nodes correspond to named rules in the language definition,
+whereas "anonymous" nodes correspond to string literals in the
+language definition.
 
 Missing nodes are inserted by the parser in order to recover from
 certain kinds of syntax errors, i.e., should be there but not there.
 
 Extra nodes represent things like comments, which are not required the
-grammar, but can appear anywhere.
+language definition, but can appear anywhere.
 
 A node "has changes" if the buffer changed since the node is
 created. (Don't forget the "s" at the end of 'has-changes.)
 
 A node "has error" if itself is a syntax error or contains any syntax
 errors.  */)
-  (Lisp_Object node, Lisp_Object cond)
+  (Lisp_Object node, Lisp_Object property)
 {
   CHECK_TS_NODE (node);
-  CHECK_SYMBOL (cond);
+  CHECK_SYMBOL (property);
   TSNode ts_node = XTS_NODE (node)->node;
   bool result;
-  if (EQ (cond, Qnamed))
+  if (EQ (property, Qnamed))
     result = ts_node_is_named (ts_node);
-  else if (EQ (cond, Qmissing))
+  else if (EQ (property, Qmissing))
     result = ts_node_is_missing (ts_node);
-  else if (EQ (cond, Qextra))
+  else if (EQ (property, Qextra))
     result = ts_node_is_extra (ts_node);
-  else if (EQ (cond, Qhas_error))
+  else if (EQ (property, Qhas_error))
     result = ts_node_has_error (ts_node);
-  else if (EQ (cond, Qhas_changes))
+  else if (EQ (property, Qhas_changes))
     result = ts_node_has_changes (ts_node);
   else
     // TODO: Is this a good error message?
-    signal_error ("Expecting one of four symbols, see docstring", cond);
+    signal_error ("Expecting one of four symbols, see docstring",
+		  property);
   return result ? Qt : Qnil;
 }
 
@@ -720,15 +690,15 @@ nil.  If NODE is nil, return nil.  */)
 DEFUN ("tree-sitter-node-child-by-field-name",
        Ftree_sitter_node_child_by_field_name,
        Stree_sitter_node_child_by_field_name, 2, 2, 0,
-       doc: /* Return the child of NODE with field name NAME.
+       doc: /* Return the child of NODE with FIELD-NAME.
 Return nil if there isn't any.  If NODE is nil, return nil.  */)
-  (Lisp_Object node, Lisp_Object name)
+  (Lisp_Object node, Lisp_Object field_name)
 {
   if (NILP (node))
     return Qnil;
   CHECK_TS_NODE (node);
-  CHECK_STRING (name);
-  char *name_str = SSDATA (name);
+  CHECK_STRING (field_name);
+  char *name_str = SSDATA (field_name);
   TSNode ts_node = XTS_NODE (node)->node;
   TSNode child
     = ts_node_child_by_field_name (ts_node, name_str, strlen (name_str));
@@ -807,7 +777,8 @@ this function returns an immediate child, not the smallest
   CHECK_TS_NODE (node);
   CHECK_INTEGER (pos);
 
-  struct buffer *buf = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
+  struct buffer *buf =
+    XBUFFER (XTS_PARSER (XTS_NODE (node)->parser)->buffer);
   ptrdiff_t visible_beg =
     XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   ptrdiff_t byte_pos = buf_charpos_to_bytepos(buf, XFIXNUM (pos));
@@ -845,7 +816,8 @@ only.  NAMED defaults to nil.  If NODE is nil, return nil.  */)
   CHECK_INTEGER (beg);
   CHECK_INTEGER (end);
 
-  struct buffer *buf = XTS_PARSER (XTS_NODE (node)->parser)->buffer;
+  struct buffer *buf =
+    XBUFFER (XTS_PARSER (XTS_NODE (node)->parser)->buffer);
   ptrdiff_t visible_beg =
     XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   ptrdiff_t byte_beg = buf_charpos_to_bytepos(buf, XFIXNUM (beg));
@@ -891,7 +863,7 @@ If any one of NODE1 and NODE2 is nil, return nil.  */)
   return same_node ? Qt : Qnil;
 }
 
-/* Query functions */
+/*** Query functions */
 
 char*
 ts_query_error_to_string (TSQueryError error)
@@ -1049,7 +1021,7 @@ sync with the buffer's content.  */);
   defsubr (&Stree_sitter_parser_language);
 
   defsubr (&Stree_sitter_parser_root_node);
-  defsubr (&Stree_sitter_parse_string);
+  /* defsubr (&Stree_sitter_parse_string); */
 
   defsubr (&Stree_sitter_parser_set_included_ranges);
   defsubr (&Stree_sitter_parser_included_ranges);

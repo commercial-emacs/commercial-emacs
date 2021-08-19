@@ -75,6 +75,14 @@ If none exists, create one and return it."
        (tree-sitter-parser-root-node parser)
        pattern))))
 
+(defun tree-sitter-parse-string (string language)
+  "Parse STRING using a parser for LANGUAGE.
+Return the root node of the syntax tree."
+  (with-temp-buffer
+    (insert string)
+    (tree-sitter-parser-root-node
+     (tree-sitter-create-parser (current-buffer) language))))
+
 (defun tree-sitter-language-at (point)
   "Return the language used at POINT."
   (cl-loop for parser in tree-sitter-parser-list
@@ -91,25 +99,24 @@ If none exists, create one and return it."
 (defun tree-sitter-node-at (beg &optional end parser-or-lang named)
   "Return the smallest node covering BEG to END.
 
-If omitted, END equals to BEG.  Find node in current buffer.
-Return nil if none find.  If NAMED non-nil, only look for named
-node.  NAMED defaults to nil.
+If omitted, END defaults to BEG.  Return nil if none find.  If
+NAMED non-nil, only look for named node.  NAMED defaults to nil.
 
 If PARSER-OR-LANG is nil, use the first parser in
-`tree-sitter-parser-list'; otherwise find the parser represented
-by PARSER-OR-LANG and use that parser.  Return nil if couldn't
-find any.  PARSER-OR-LANG can be either a parser object, or the
-language (symbol) used by a parser."
-  (when-let ((root (tree-sitter-buffer-root-node parser-or-lang)))
+`tree-sitter-parser-list'; if PARSER-OR-LANG is a parser, use
+that parser; if PARSER-OR-LANG is a language, find a parser using
+that language (symbol) and use that."
+  (when-let ((root (if (tree-sitter-parser-p parser-or-lang)
+                       (tree-sitter-parser-root-node parser-or-lang)
+                     (tree-sitter-buffer-root-node parser-or-lang))))
     (tree-sitter-node-descendant-for-range root beg (or end beg) named)))
 
-(defun tree-sitter-buffer-root-node (&optional parser-or-lang)
+(defun tree-sitter-buffer-root-node (&optional language)
   "Return the root node of the current buffer.
-PARSER-OR-LANG is the same as in `tree-sitter-node-at'."
+PARSER-OR-LANG is like in `tree-sitter-node-at'."
   (tree-sitter-parser-root-node
-   (cond ((tree-sitter-parser-p parser-or-lang) parser-or-lang)
-         ((null parser-or-lang) (car tree-sitter-parser-list))
-         (t (tree-sitter-get-parser parser-or-lang)))))
+   (if language (tree-sitter-get-parser language)
+     (car tree-sitter-parser-list))))
 
 (defun tree-sitter-filter-child (node pred &optional named)
   "Return children of NODE that satisfies PRED.
@@ -124,12 +131,18 @@ NAMED non-nil, only search for named node.  NAMED defaults to nil."
       (setq child (tree-sitter-node-next-sibling child named)))
     result))
 
-(defun tree-sitter-node-content (node)
-  "Return the buffer content corresponding to NODE."
-  (with-current-buffer (tree-sitter-node-buffer node)
-    (buffer-substring-no-properties
-     (tree-sitter-node-start node)
-     (tree-sitter-node-end node))))
+(defun tree-sitter-node-content (node &optional object)
+  "Return the buffer content corresponding to NODE.
+If NODE is generated from parsing a string instead of a buffer,
+pass that string to OBJECT."
+  (if object
+      (substring object
+                 (tree-sitter-node-start node)
+                 (tree-sitter-node-end node))
+    (with-current-buffer (tree-sitter-node-buffer node)
+      (buffer-substring-no-properties
+       (tree-sitter-node-start node)
+       (tree-sitter-node-end node)))))
 
 (defun tree-sitter-parent-until (node pred)
   "Return the closest parent of NODE that satisfies PRED.

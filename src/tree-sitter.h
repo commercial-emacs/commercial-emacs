@@ -35,7 +35,7 @@ struct Lisp_TS_Parser
    the symbol of the function provided by a language dynamic
    module.  */
   Lisp_Object language_symbol;
-  struct buffer *buffer;
+  Lisp_Object buffer;
   TSParser *parser;
   TSTree *tree;
   TSInput input;
@@ -108,7 +108,7 @@ ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 		  ptrdiff_t new_end_byte);
 
 Lisp_Object
-make_ts_parser (struct buffer *buffer, TSParser *parser,
+make_ts_parser (Lisp_Object buffer, TSParser *parser,
 		TSTree *tree, Lisp_Object language_symbol);
 
 Lisp_Object
