@@ -221,6 +221,7 @@ process_socket (int domain, int type, int protocol)
 #define SERIALCONN1_P(p) (EQ (p->type, Qserial))
 #define PIPECONN_P(p) (EQ (XPROCESS (p)->type, Qpipe))
 #define PIPECONN1_P(p) (EQ (p->type, Qpipe))
+#define DUP_IF_THREAD(fd) (main_thread_p (current_thread) ? fd : dup (fd))
 
 /* Number of events of change of status of a process.  */
 static EMACS_INT process_tick;
@@ -2131,10 +2132,10 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
       if (emacs_pipe (p->open_fd + SUBPROCESS_STDIN) != 0
 	  || emacs_pipe (p->open_fd + READ_FROM_SUBPROCESS) != 0)
 	report_file_error ("Creating pipe", Qnil);
-      forkin = p->open_fd[SUBPROCESS_STDIN];
-      outchannel = p->open_fd[WRITE_TO_SUBPROCESS];
-      inchannel = p->open_fd[READ_FROM_SUBPROCESS];
-      forkout = p->open_fd[SUBPROCESS_STDOUT];
+      forkin = DUP_IF_THREAD (p->open_fd[SUBPROCESS_STDIN]);
+      outchannel = DUP_IF_THREAD (p->open_fd[WRITE_TO_SUBPROCESS]);
+      inchannel = DUP_IF_THREAD (p->open_fd[READ_FROM_SUBPROCESS]);
+      forkout = DUP_IF_THREAD (p->open_fd[SUBPROCESS_STDOUT]);
 
       if (!NILP (p->stderrproc))
 	{
@@ -2360,8 +2361,8 @@ usage:  (make-pipe-process &rest ARGS)  */)
   if (emacs_pipe (p->open_fd + SUBPROCESS_STDIN) != 0
       || emacs_pipe (p->open_fd + READ_FROM_SUBPROCESS) != 0)
     report_file_error ("Creating pipe", Qnil);
-  outchannel = p->open_fd[WRITE_TO_SUBPROCESS];
-  inchannel = p->open_fd[READ_FROM_SUBPROCESS];
+  outchannel = DUP_IF_THREAD (p->open_fd[WRITE_TO_SUBPROCESS]);
+  inchannel = DUP_IF_THREAD (p->open_fd[READ_FROM_SUBPROCESS]);
 
   if (FD_SETSIZE <= inchannel || FD_SETSIZE <= outchannel)
     report_file_errno ("Creating pipe", Qnil, EMFILE);
@@ -3318,7 +3319,7 @@ static void
 connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
                         Lisp_Object use_external_socket_p)
 {
-  int s = -1, outch, inch;
+  int s = -1;
   int xerrno = 0;
   int family;
   int ret;
@@ -3367,7 +3368,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	  int socktype = p->socktype | SOCK_CLOEXEC;
 	  if (p->is_non_blocking_client)
 	    socktype |= SOCK_NONBLOCK;
-	  s = socket (family, socktype, protocol);
+	  s = DUP_IF_THREAD (socket (family, socktype, protocol));
 	  if (s < 0)
 	    {
 	      xerrno = errno;
@@ -3607,18 +3608,15 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       report_file_errno (err, contact, xerrno);
     }
 
-  inch = s;
-  outch = s;
+  eassert (0 <= s && s < FD_SETSIZE);
+  chan_process[s] = proc;
 
-  eassert (0 <= inch && inch < FD_SETSIZE);
-  chan_process[inch] = proc;
-
-  fcntl (inch, F_SETFL, O_NONBLOCK);
+  fcntl (s, F_SETFL, O_NONBLOCK);
 
   p = XPROCESS (proc);
-  p->open_fd[SUBPROCESS_STDIN] = inch;
-  p->infd  = inch;
-  p->outfd = outch;
+  p->open_fd[SUBPROCESS_STDIN] = s;
+  p->infd  = s;
+  p->outfd = s;
 
   /* Discard the unwind protect for closing S, if any.  */
   specpdl_ptr = specpdl + count1;
@@ -3637,17 +3635,16 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       if (! (connecting_status (p->status)
 	     && EQ (XCDR (p->status), addrinfos)))
 	pset_status (p, Fcons (Qconnect, addrinfos));
-      eassert (0 <= inch && inch < FD_SETSIZE);
-      add_process_write_fd (inch);
+      add_process_write_fd (s);
     }
   else if ((!EQ (p->filter, Qt) && !EQ (p->command, Qt))
 	   || (EQ (p->status, Qlisten) && NILP (p->command)))
       /* A server may have a client filter setting of Qt, but it must
 	 still listen for incoming connects unless it is stopped.  */
-      add_process_read_fd (inch);
+      add_process_read_fd (s);
 
-  if (inch > max_desc)
-    max_desc = inch;
+  if (s > max_desc)
+    max_desc = s;
 
   /* Set up the masks based on the process filter. */
   set_process_filter_masks (p);
