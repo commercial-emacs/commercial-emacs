@@ -742,6 +742,8 @@ emacs_gnutls_write (struct Lisp_Process *proc, const char *buf, ptrdiff_t nbyte)
       ssize_t rtnval = 0;
       do
 	{
+	  /* gnutls_record_send(3): If GNUTLS_E_INTERRUPTED or GNUTLS_E_AGAIN,
+	     retry with NULL data, and 0 size. */
 	  if (rtnval < 0)
 	    rtnval = gnutls_record_send (state, NULL, 0);
 	  else
@@ -781,7 +783,7 @@ emacs_gnutls_read (struct Lisp_Process *proc, char *buf, ptrdiff_t nbyte)
     }
 
   /* GNUTLS_E_AGAIN requires another call to pselect()
-   * outside this function. */
+     outside this function. */
   ssize_t rtnval;
   do
     rtnval = gnutls_record_recv (state, buf, nbyte);

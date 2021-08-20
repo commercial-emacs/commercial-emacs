@@ -221,7 +221,6 @@ process_socket (int domain, int type, int protocol)
 #define SERIALCONN1_P(p) (EQ (p->type, Qserial))
 #define PIPECONN_P(p) (EQ (XPROCESS (p)->type, Qpipe))
 #define PIPECONN1_P(p) (EQ (p->type, Qpipe))
-#define DUP_IF_THREAD(fd) (main_thread_p (current_thread) ? fd : dup (fd))
 
 /* Number of events of change of status of a process.  */
 static EMACS_INT process_tick;
@@ -2132,10 +2131,10 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
       if (emacs_pipe (p->open_fd + SUBPROCESS_STDIN) != 0
 	  || emacs_pipe (p->open_fd + READ_FROM_SUBPROCESS) != 0)
 	report_file_error ("Creating pipe", Qnil);
-      forkin = DUP_IF_THREAD (p->open_fd[SUBPROCESS_STDIN]);
-      outchannel = DUP_IF_THREAD (p->open_fd[WRITE_TO_SUBPROCESS]);
-      inchannel = DUP_IF_THREAD (p->open_fd[READ_FROM_SUBPROCESS]);
-      forkout = DUP_IF_THREAD (p->open_fd[SUBPROCESS_STDOUT]);
+      forkin = p->open_fd[SUBPROCESS_STDIN];
+      outchannel = p->open_fd[WRITE_TO_SUBPROCESS];
+      inchannel = p->open_fd[READ_FROM_SUBPROCESS];
+      forkout = p->open_fd[SUBPROCESS_STDOUT];
 
       if (!NILP (p->stderrproc))
 	{
@@ -2361,8 +2360,8 @@ usage:  (make-pipe-process &rest ARGS)  */)
   if (emacs_pipe (p->open_fd + SUBPROCESS_STDIN) != 0
       || emacs_pipe (p->open_fd + READ_FROM_SUBPROCESS) != 0)
     report_file_error ("Creating pipe", Qnil);
-  outchannel = DUP_IF_THREAD (p->open_fd[WRITE_TO_SUBPROCESS]);
-  inchannel = DUP_IF_THREAD (p->open_fd[READ_FROM_SUBPROCESS]);
+  outchannel = p->open_fd[WRITE_TO_SUBPROCESS];
+  inchannel = p->open_fd[READ_FROM_SUBPROCESS];
 
   if (FD_SETSIZE <= inchannel || FD_SETSIZE <= outchannel)
     report_file_errno ("Creating pipe", Qnil, EMFILE);
@@ -3368,7 +3367,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	  int socktype = p->socktype | SOCK_CLOEXEC;
 	  if (p->is_non_blocking_client)
 	    socktype |= SOCK_NONBLOCK;
-	  s = DUP_IF_THREAD (socket (family, socktype, protocol));
+	  s = socket (family, socktype, protocol);
 	  if (s < 0)
 	    {
 	      xerrno = errno;
