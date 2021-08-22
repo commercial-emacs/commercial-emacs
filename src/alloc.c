@@ -8169,6 +8169,14 @@ gc_phase_mark (void)
     gc_mark_drain_queue ();
   while (mark_strong_references_of_reachable_weak_objects ());
 
+  struct Lisp_Vector * ob = XVECTOR(Vobarray);
+  for  ( int i = 0; i <ob->header.size; i ++)
+    {
+      if (SYMBOLP(ob->contents[i] ))
+	{
+	  scan_reference(&ob->contents[i],current_gc_phase);
+	}
+    }
   /* We move any finalizer not marked at this point to the
      doomed_finalizers list; after we do that, we have to actually
      mark the doomed_finalizers list so that its entries actually do
@@ -8194,6 +8202,15 @@ gc_phase_sweep (void)
     gc_heap_sweep (gc_heaps[i]);
   scan_doomed_finalizers (GC_PHASE_SWEEP);
   sweep_large_vectors ();
+
+  struct Lisp_Vector * ob = XVECTOR(Vobarray);
+  for  ( int i = 0; i <ob->header.size; i ++)
+    {
+      if (SYMBOLP(ob->contents[i] ))
+	{
+	  point_symbol_into_tospace(XSYMBOL(ob->contents[i]));
+	}
+    }
 
   scan_roots (GC_PHASE_SWEEP);
   pdumper_sweep ();
