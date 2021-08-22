@@ -247,7 +247,9 @@ overriding the value of `url-gateway-method'."
 			   ;; Use non-blocking socket if we can.
 			   :nowait (and (featurep 'make-network-process)
                                         (url-asynchronous url-current-object)
-                                        '(:nowait t))))
+                                        '(:nowait t))
+                           :sndtimeo (and (featurep 'make-network-process)
+                                          (url-timeout url-current-object))))
                          ('socks
 			  (socks-open-network-stream name buffer host service))
 			 ('telnet

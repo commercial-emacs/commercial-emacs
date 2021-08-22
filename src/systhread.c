@@ -252,7 +252,7 @@ sys_thread_create (sys_thread_t *thread_ptr, thread_creation_function *func,
         goto out;
     }
 
-  if (!pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED))
+  if (pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED) == 0)
     result = pthread_create (thread_ptr, &attr, func, arg) == 0;
 
  out: ;

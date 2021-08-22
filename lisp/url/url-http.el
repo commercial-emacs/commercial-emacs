@@ -1,4 +1,4 @@
-;;; url-http.el --- HTTP retrieval routines  -*- lexical-binding:t -*-
+;; url-http.el --- HTTP retrieval routines  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 1999, 2001, 2004-2021 Free Software Foundation, Inc.
 

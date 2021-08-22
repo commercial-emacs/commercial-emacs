@@ -320,7 +320,12 @@ inotify_callback (int fd, void *_)
   char *buffer = SAFE_ALLOCA (to_read);
   ssize_t n = read (fd, buffer, to_read);
   if (n < 0)
-    report_file_notify_error ("Error while reading file system events", Qnil);
+    {
+      if (errno == EAGAIN)
+	n = 0;
+      else
+	report_file_notify_error ("Error while reading file system events", Qnil);
+    }
 
   struct input_event event;
   EVENT_INIT (event);

@@ -169,8 +169,6 @@ struct Lisp_Process
        flag indicates that `raw_status' contains a new status that still
        needs to be synced to `status'.  */
     bool_bf raw_status_new : 1;
-    /* Whether this is a nonblocking socket. */
-    bool_bf is_non_blocking_client : 1;
     /* Whether this is a server or a client socket. */
     bool_bf is_server : 1;
     int raw_status;
@@ -198,7 +196,6 @@ struct Lisp_Process
     unsigned int gnutls_extra_peer_verification;
     int gnutls_log_level;
     int gnutls_handshakes_tried;
-    bool_bf gnutls_p : 1;
     bool_bf gnutls_complete_negotiation_p : 1;
 #endif
   } GCALIGNED_STRUCT;

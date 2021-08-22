@@ -37,7 +37,8 @@
             (:copier nil))
   type user password host portspec filename target attributes fullness
   silent (use-cookies t)
-  (asynchronous t))
+  (asynchronous t)
+  timeout)
 
 (defsubst url-port (urlobj)
   "Return the port number for the URL specified by URLOBJ.

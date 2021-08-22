@@ -615,20 +615,13 @@ gnutls_try_handshake (struct Lisp_Process *proc)
 {
   gnutls_session_t state = proc->gnutls_state;
   int ret;
-  bool non_blocking = proc->is_non_blocking_client;
-
-  if (proc->gnutls_complete_negotiation_p)
-    non_blocking = false;
-
-  if (non_blocking)
-    proc->gnutls_p = true;
 
   while ((ret = gnutls_handshake (state)) < 0)
     {
       if (emacs_gnutls_handle_error (state, ret) == 0) /* fatal */
 	break;
       maybe_quit ();
-      if (non_blocking
+      if (!proc->gnutls_complete_negotiation_p
 	  && ret != GNUTLS_E_INTERRUPTED
 	  && ret != GNUTLS_E_AGAIN)
 	break;
@@ -699,9 +692,8 @@ emacs_gnutls_handshake (struct Lisp_Process *proc)
       gnutls_transport_set_ptr2 (state,
 				 (void *) (intptr_t) proc->infd,
 				 (void *) (intptr_t) proc->outfd);
-      if (proc->is_non_blocking_client)
-	gnutls_transport_set_errno_function (state,
-					     emacs_gnutls_nonblock_errno);
+      gnutls_transport_set_errno_function (state,
+					   emacs_gnutls_nonblock_errno);
 # endif
 
       proc->gnutls_initstage = GNUTLS_STAGE_TRANSPORT_POINTERS_SET;
@@ -939,9 +931,6 @@ emacs_gnutls_deinit (Lisp_Object proc)
 
   CHECK_PROCESS (proc);
 
-  if (! XPROCESS (proc)->gnutls_p)
-    return Qnil;
-
   log_level = XPROCESS (proc)->gnutls_log_level;
 
   if (XPROCESS (proc)->gnutls_x509_cred)
@@ -969,7 +958,6 @@ emacs_gnutls_deinit (Lisp_Object proc)
   if (XPROCESS (proc)->gnutls_certificates)
     gnutls_deinit_certificates (XPROCESS (proc));
 
-  XPROCESS (proc)->gnutls_p = false;
   return Qt;
 }
 
@@ -1581,10 +1569,7 @@ boot_error (struct Lisp_Process *p, const char *m, ...)
 {
   va_list ap;
   va_start (ap, m);
-  if (p->is_non_blocking_client)
-    pset_status (p, list2 (Qfailed, vformat_string (m, ap)));
-  else
-    verror (m, ap);
+  pset_status (p, list2 (Qfailed, vformat_string (m, ap)));
   va_end (ap);
 }
 
@@ -1780,9 +1765,6 @@ gnutls_verify_boot (Lisp_Object proc, Lisp_Object proplist)
 			 c_hostname);
 	}
     }
-
-  /* Set this flag only if the whole initialization succeeded.  */
-  p->gnutls_p = true;
 
   return gnutls_make_error (ret);
 }
@@ -2076,8 +2058,7 @@ one trustfile (usually a CA bundle).  */)
   GNUTLS_LOG (1, max_log_level, "gnutls_init");
   int gnutls_flags = GNUTLS_CLIENT;
 # ifdef GNUTLS_NONBLOCK
-  if (XPROCESS (proc)->is_non_blocking_client)
-    gnutls_flags |= GNUTLS_NONBLOCK;
+  gnutls_flags |= GNUTLS_NONBLOCK;
 # endif
   ret = gnutls_init (&state, gnutls_flags);
   XPROCESS (proc)->gnutls_state = state;
