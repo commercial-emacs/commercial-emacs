@@ -618,8 +618,6 @@ gnutls_try_handshake (struct Lisp_Process *proc, bool blocking)
 
   ++proc->gnutls_handshakes_tried;
 
-  fprintf(stderr, "got here\n");
-
   while ((ret = gnutls_handshake (state)) < 0)
     {
       if (emacs_gnutls_handle_error (state, ret) == 0) /* fatal */
@@ -629,13 +627,9 @@ gnutls_try_handshake (struct Lisp_Process *proc, bool blocking)
 	break;
     }
 
-  fprintf(stderr, "the fuq %d\n", ret);
-
   proc->gnutls_initstage = (ret == GNUTLS_E_SUCCESS)
     ? GNUTLS_STAGE_READY
     : GNUTLS_STAGE_HANDSHAKE_TRIED;
-
-  fprintf(stderr, "the faq %u\n", proc->gnutls_initstage);
 
   return ret;
 }
