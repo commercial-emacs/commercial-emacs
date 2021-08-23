@@ -1663,9 +1663,7 @@ gnutls_verify_boot (Lisp_Object proc, Lisp_Object proplist)
      check of the certificate's hostname with
      gnutls_x509_crt_check_hostname against :hostname.  */
 
-  fprintf (stderr, "doomsday %s\n", c_hostname);
   ret = gnutls_certificate_verify_peers2 (state, &peer_verification);
-  fprintf (stderr, "doomsday 2 %d\n", ret);
 
   if (ret < GNUTLS_E_SUCCESS)
     return gnutls_make_error (ret);
@@ -1683,8 +1681,6 @@ gnutls_verify_boot (Lisp_Object proc, Lisp_Object proplist)
             GNUTLS_LOG2 (1, max_log_level, "verification:", SSDATA (message));
         }
     }
-
-  fprintf (stderr, "intensely %s\n", c_hostname);
 
   if (peer_verification != 0)
     {
@@ -1773,8 +1769,6 @@ gnutls_verify_boot (Lisp_Object proc, Lisp_Object proplist)
 			 c_hostname);
 	}
     }
-
-  fprintf (stderr, "intensely 2 %s\n", c_hostname);
 
   return gnutls_make_error (ret);
 }
@@ -2115,7 +2109,6 @@ one trustfile (usually a CA bundle).  */)
   ret = emacs_gnutls_handshake (XPROCESS (proc), !NILP (blocking));
   if (ret < GNUTLS_E_SUCCESS)
     return gnutls_make_error (ret);
-  fprintf (stderr, "the feq %d\n", ret);
   return gnutls_verify_boot (proc, proplist);
 }
 
