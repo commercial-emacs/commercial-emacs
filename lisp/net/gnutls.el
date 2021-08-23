@@ -216,7 +216,7 @@ trust and key files, and priority string."
 
 (define-error 'gnutls-error "GnuTLS error")
 
-(declare-function gnutls-boot "gnutls.c" (proc type proplist))
+(declare-function gnutls-boot "gnutls.c" (proc type proplist blocking))
 (declare-function gnutls-errorp "gnutls.c" (error))
 (defvar gnutls-log-level)               ; gnutls.c
 
@@ -249,9 +249,7 @@ For the meaning of the rest of the parameters, see `gnutls-boot-parameters'."
                   :verify-hostname-error verify-hostname-error))
          ret)
     (gnutls-message-maybe
-     (setq ret (gnutls-boot process type
-                            (append (list :complete-negotiation t)
-                                    params)))
+     (setq ret (gnutls-boot process type params t))
      "boot: %s" params)
 
     (when (gnutls-errorp ret)

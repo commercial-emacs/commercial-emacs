@@ -1,4 +1,4 @@
-;; url-http.el --- HTTP retrieval routines  -*- lexical-binding:t -*-
+;;; url-http.el --- HTTP retrieval routines  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 1999, 2001, 2004-2021 Free Software Foundation, Inc.
 
@@ -1265,7 +1265,7 @@ the end of the document."
     (when (eq process-buffer (current-buffer))
       (goto-char (point-max)))))
 
-(cl-defun url-http (url callback cbargs &optional retry-buffer gateway-method :key timeout)
+(cl-defun url-http (url callback cbargs &optional retry-buffer gateway-method &key timeout)
   "Retrieve URL via HTTP asynchronously.
 URL must be a parsed URL.  See `url-generic-parse-url' for details.
 
@@ -1628,13 +1628,15 @@ p3p
 (defalias 'url-https-expand-file-name 'url-default-expander)
 
 (defmacro url-https-create-secure-wrapper (method args)
-  `(defun ,(intern (format (if method "url-https-%s" "url-https") method)) ,args
-    ,(format "HTTPS wrapper around `%s' call." (or method "url-http"))
-    (,(intern (format (if method "url-http-%s" "url-http") method))
-     ,@(remove '&rest (remove '&optional (append args (if method nil '(nil 'tls))))))))
+  `(cl-defun ,(intern (format "url-https-%s" method)) ,args
+     ,(format "HTTPS wrapper around `%s' call." method)
+     (,(intern (format "url-http-%s" method))
+      ,@(remove '&rest (remove '&optional args)))))
 
 ;;;###autoload (autoload 'url-https "url-http")
-(url-https-create-secure-wrapper nil (url callback cbargs))
+(cl-defun url-https (url callback cbargs &key timeout)
+  "HTTPS wrapper around `url-http' call."
+  (url-http url callback cbargs nil 'tls :timeout timeout))
 ;;;###autoload (autoload 'url-https-file-exists-p "url-http")
 (url-https-create-secure-wrapper file-exists-p (url))
 ;;;###autoload (autoload 'url-https-file-readable-p "url-http")

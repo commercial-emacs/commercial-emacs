@@ -496,6 +496,12 @@ add_process_read_fd (int fd)
   add_process_fd (fd, (FOR_READ | PROCESS_FD), KEYBOARD_FD);
 }
 
+static void
+add_process_write_fd (int fd)
+{
+  add_process_fd (fd, (FOR_WRITE | PROCESS_FD), KEYBOARD_FD);
+}
+
 /* Stop monitoring file descriptor FD for when read is possible.  */
 void
 delete_read_fd (int fd)
@@ -3295,7 +3301,7 @@ set_network_socket_coding_system (Lisp_Object proc, Lisp_Object host,
 
 #ifdef HAVE_GNUTLS
 static void
-finish_after_tls_connection (Lisp_Object proc)
+handshaked_callback (Lisp_Object proc)
 {
   struct Lisp_Process *p = XPROCESS (proc);
   Lisp_Object contact = p->childp;
@@ -3325,6 +3331,65 @@ finish_after_tls_connection (Lisp_Object proc)
 }
 #endif
 
+static bool
+connected_callback (Lisp_Object proc)
+{
+  struct Lisp_Process *p = XPROCESS (proc);
+  bool handshaked = false;
+
+#ifdef HAVE_GNUTLS
+  if (!NILP (p->gnutls_boot_parameters))
+    {
+      Lisp_Object retval, params = p->gnutls_boot_parameters;
+      retval = Fgnutls_boot (proc, XCAR (params), XCDR (params),
+			     p->blocking_connect ? Qt : Qnil);
+      if (p->gnutls_initstage == GNUTLS_STAGE_READY)
+	{
+	  handshaked = true;
+	  handshaked_callback (proc);
+	}
+      else if (p->gnutls_initstage != GNUTLS_STAGE_HANDSHAKE_TRIED ||
+	       p->gnutls_handshakes_tried > GNUTLS_EMACS_HANDSHAKES_LIMIT)
+	{
+	  deactivate_process (proc);
+	  pset_status (p, list2 (Qfailed,
+				 NILP (retval)
+				 ? build_string ("tls error")
+				 : retval));
+	}
+    }
+#else
+  handshaked = true;
+#endif
+
+  if (handshaked)
+    {
+      pset_status (p, Qrun);
+      exec_sentinel (proc, build_string ("open\n"));
+      if (EQ (p->filter, Qt))
+	delete_read_fd (p->infd);
+      else if (!EQ (p->command, Qt))
+	add_process_read_fd(p->infd);
+    }
+  return handshaked;
+}
+
+/* "After select(2) indicates writability,
+   use getsockopt(2) to read the SO_ERROR option at
+   level SOL_SOCKET to determine whether connect()
+   completed successfully." connect(2)  */
+static int
+connect_errno (int fd)
+{
+  int optval = 0;
+  socklen_t optlen = sizeof (optval);
+  errno = -1;
+  if (getsockopt (fd, SOL_SOCKET, SO_ERROR, &optval, &optlen) == 0
+      && optval == 0)
+    errno = 0;
+  return errno;
+}
+
 static void
 connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
                         Lisp_Object use_external_socket_p)
@@ -3346,6 +3411,9 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
       /* Ensure we don't consume the external socket twice.  */
       external_sock_fd = -1;
+
+      /* non blocking retries disallowed for external */
+      XSETCDR (addrinfos, Qnil);
     }
 
   struct sockaddr *sa = NULL;
@@ -3369,13 +3437,9 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       set_unwind_protect_ptr (count, xfree, sa);
       conv_lisp_to_sockaddr (family, ip_address, sa, addrlen);
 
-      if (0 <= socket_to_use)
-	s = socket_to_use;
-      else
-	{
-	  int socktype = p->socktype | SOCK_CLOEXEC | SOCK_NONBLOCK;
-	  s = socket (family, socktype, protocol);
-	}
+      s = (0 <= socket_to_use)
+	? socket_to_use
+	: socket (family, p->socktype | SOCK_CLOEXEC | SOCK_NONBLOCK, protocol);
 
       if (s < 0)
 	{
@@ -3409,7 +3473,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	break;
 #endif /* DATAGRAM_SOCKETS */
 
-      /* Make us close S if quit.  */
+      /* Make us close socket if quit.  */
       record_unwind_protect_int (close_file_unwind, s);
 
       /* Parse network options in the arg list.  We simply ignore anything
@@ -3503,19 +3567,17 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	      break;
 	    case EINPROGRESS:
 	      {
-		int nfds = 0, optval = 0;
-		socklen_t optlen = sizeof optval;
-		fd_set write;
-		/* cf. connect(2) "After select(2) indicates writability,
-		   use getsockopt(2) to read the SO_ERROR option at
-		   level SOL_SOCKET to determine whether connect()
-		   completed successfully. */
-		FD_ZERO (&write);
-		FD_SET (s, &write);
-		nfds = thread_select (pselect, s + 1, NULL, &write, NULL, NULL, NULL);
-		if (nfds > 0
-		    && getsockopt (s, SOL_SOCKET, SO_ERROR, &optval, &optlen) == 0
-		    && optval == 0)
+		if (p->blocking_connect)
+		  {
+		    int nfds;
+		    fd_set write;
+		    FD_ZERO (&write);
+		    FD_SET (s, &write);
+		    nfds = thread_select (pselect, s + 1, NULL, &write, NULL, NULL, NULL);
+		    if (nfds > 0 && connect_errno (s) == 0)
+		      ret = 0;
+		  }
+		else
 		  ret = 0;
 	      }
 	      goto connect_done;
@@ -3550,17 +3612,13 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	  s = -1;
 	}
     }
+  specpdl_ptr = specpdl + count1;
 
   if (s < 0)
-    {
-      const char *err = (p->is_server
-			 ? "make server process failed"
-			 : "make client process failed");
-      Lisp_Object data = get_file_errno_data (err, contact, xerrno);
-      pset_status (p, list2 (Fcar (data), Fcdr (data)));
-      unbind_to (count, Qnil);
-      return;
-    }
+    report_file_errno (p->is_server
+		       ? "make server process failed"
+		       : "make client process failed",
+		       contact, xerrno);
 
   eassert (0 <= s && s < FD_SETSIZE);
 
@@ -3592,8 +3650,9 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
     }
 #endif
 
-  contact = Fplist_put (contact, p->is_server? QClocal: QCremote,
+  contact = Fplist_put (contact, p->is_server ? QClocal : QCremote,
 			conv_sockaddr_to_lisp (sa, addrlen));
+
 #ifdef HAVE_GETSOCKNAME
   if (!p->is_server)
     {
@@ -3613,12 +3672,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
   p->infd = s;
   p->outfd = s;
 
-  /* Discard the unwind protect for closing S, if any.  */
-  specpdl_ptr = specpdl + count1;
-
-  if (p->is_server && p->socktype != SOCK_DGRAM)
-    pset_status (p, Qlisten);
-
   /* Make the process marker point into the process buffer (if any).  */
   update_process_mark (p);
 
@@ -3627,38 +3680,25 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
   setup_process_coding_systems (proc);
 
-#ifdef HAVE_GNUTLS
-  if (!NILP (p->gnutls_boot_parameters))
+  if (p->is_server)
     {
-      Lisp_Object retval, params = p->gnutls_boot_parameters;
-
-      retval = Fgnutls_boot (proc, XCAR (params), XCDR (params));
-
-      if (p->gnutls_initstage == GNUTLS_STAGE_READY)
-	finish_after_tls_connection (proc);
-      else
+      if (p->socktype != SOCK_DGRAM)
 	{
-	  deactivate_process (proc);
-	  pset_status (p, list2 (Qfailed, retval));
+	  pset_status (p, Qlisten);
+	  if (NILP (p->command))
+	    add_process_read_fd (p->infd);
 	}
     }
-#endif
-
-  if (0 <= p->infd)
+  else if (p->blocking_connect)
     {
-      pset_status (p, Qrun);
-      exec_sentinel (proc, build_string ("open\n"));
+      if (!connected_callback (proc))
+	deactivate_process (proc);
     }
-
-  if (EQ (p->status, Qlisten))
+  else
     {
-      if (NILP (p->command))
-	add_process_read_fd(p->infd);
+      pset_status (p, Fcons (Qconnect, addrinfos));
+      add_process_write_fd (s);
     }
-  else if (EQ (p->filter, Qt))
-    delete_read_fd (p->infd);
-  else if (!EQ (p->command, Qt))
-    add_process_read_fd(p->infd);
 
   unbind_to (count, Qnil);
 }
@@ -4173,21 +4213,25 @@ usage: (make-network-process &rest ARGS)  */)
   if (TYPE_RANGED_FIXNUMP (int, server))
     p->backlog = XFIXNUM (server);
 
-  if (use_external_socket_p && NILP (addrinfos))
-    report_file_error ("dns failure", Qnil);
+  /* :nowait BOOL */
+  p->blocking_connect = !nowait;
 
-#ifdef HAVE_GETADDRINFO_A
-  if (!p->is_server && NILP (addrinfos))
+  if (NILP (addrinfos))
     {
-      p->dns_request = dns_request;
-      p->status = list1 (Qconnect);
+      if (use_external_socket_p || p->is_server)
+	report_file_error ("dns failure", Qnil);
+      else
+	{
+#ifdef HAVE_GETADDRINFO_A
+	  p->dns_request = dns_request;
+	  p->status = list1 (Qconnect);
+#else
+	  report_file_error ("dns failure", Qnil);
+#endif
+	}
     }
   else
-#endif
-    {
-      connect_network_socket (proc, addrinfos, use_external_socket_p);
-    }
-
+    connect_network_socket (proc, addrinfos, use_external_socket_p);
   specpdl_ptr = specpdl + count;
   return proc;
 }
@@ -5209,12 +5253,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       {
 	Lisp_Object process_list_head, aproc;
 	struct Lisp_Process *p;
-
 	retry_for_async = false;
+
 	FOR_EACH_PROCESS(process_list_head, aproc)
 	  {
 	    p = XPROCESS (aproc);
-
 	    if (! wait_proc || p == wait_proc)
 	      {
 		/* Check for pending DNS requests. */
@@ -5779,6 +5822,53 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		    pset_status (XPROCESS (proc),
 				 list2 (Qexit, make_fixnum (256)));
 		}
+	    }
+
+	  if (FD_ISSET (channel, &Writeok))
+	    {
+	      struct Lisp_Process *p;
+	      delete_write_fd (channel);
+	      proc = chan_process[channel];
+	      if (NILP (proc))
+		  continue;
+
+	      p = XPROCESS (proc);
+#ifndef WINDOWSNT
+	      xerrno = connect_errno (channel);
+#else
+	      /* On MS-Windows, getsockopt clears the error for the
+		 entire process, which may not be the right thing; see
+		 w32.c.  Use getpeername instead.  */
+	      {
+		struct sockaddr pname;
+		socklen_t pnamelen = sizeof (pname);
+
+		/* If connection failed, getpeername will fail.  */
+		xerrno = 0;
+		if (getpeername (channel, &pname, &pnamelen) < 0)
+		  {
+		    /* Obtain connect failure code through error slippage.  */
+		    char dummy;
+		    xerrno = errno;
+		    if (errno == ENOTCONN && read (channel, &dummy, 1) < 0)
+		      xerrno = errno;
+		  }
+	      }
+#endif
+	      if (xerrno)
+		{
+		  Lisp_Object remaining = CDR_SAFE (CDR_SAFE (p->status));
+		  deactivate_process (proc);
+		  if (NILP (remaining))
+		    {
+		      pset_status (p, list2 (Qfailed, make_fixnum (xerrno)));
+		      p->tick = ++process_tick;
+		    }
+		  else
+		    connect_network_socket (proc, remaining, Qnil);
+		}
+	      else if (!connected_callback (proc))
+		add_process_write_fd(channel);
 	    }
 	}			/* End for each file descriptor.  */
     }				/* End while exit conditions not met.  */

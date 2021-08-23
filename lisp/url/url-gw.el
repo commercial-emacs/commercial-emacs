@@ -249,7 +249,8 @@ Optional key TIMEOUT is a list of seconds and microseconds."
                                   (when (and (featurep 'make-network-process)
                                              (url-asynchronous url-current-object))
                                     (cons :nowait (list '(:nowait t))))
-                                  (when (featurep 'make-network-process)
+                                  (when (and (featurep 'make-network-process)
+                                             timeout)
                                     (cons :sndtimeo (list timeout))))))
                          ('socks
 			  (socks-open-network-stream name buffer host service))

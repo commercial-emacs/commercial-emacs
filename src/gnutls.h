@@ -91,7 +91,7 @@ extern int w32_gnutls_rnd (gnutls_rnd_level_t, void *, size_t);
 #endif
 extern Lisp_Object emacs_gnutls_deinit (Lisp_Object);
 extern Lisp_Object emacs_gnutls_global_init (void);
-extern int gnutls_try_handshake (struct Lisp_Process *p);
+extern int gnutls_try_handshake (struct Lisp_Process *p, bool blocking);
 extern Lisp_Object gnutls_verify_boot (Lisp_Object proc, Lisp_Object proplist);
 
 #endif

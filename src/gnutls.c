@@ -611,33 +611,26 @@ gnutls_log_function2 (int level, const char *string, const char *extra)
 }
 
 int
-gnutls_try_handshake (struct Lisp_Process *proc)
+gnutls_try_handshake (struct Lisp_Process *proc, bool blocking)
 {
-  gnutls_session_t state = proc->gnutls_state;
   int ret;
+  gnutls_session_t state = proc->gnutls_state;
+
+  ++proc->gnutls_handshakes_tried;
 
   while ((ret = gnutls_handshake (state)) < 0)
     {
       if (emacs_gnutls_handle_error (state, ret) == 0) /* fatal */
 	break;
       maybe_quit ();
-      if (!proc->gnutls_complete_negotiation_p
-	  && ret != GNUTLS_E_INTERRUPTED
-	  && ret != GNUTLS_E_AGAIN)
+      if (!blocking && ret != GNUTLS_E_INTERRUPTED)
 	break;
     }
 
-  proc->gnutls_initstage = GNUTLS_STAGE_HANDSHAKE_TRIED;
+  proc->gnutls_initstage = (ret == GNUTLS_E_SUCCESS)
+    ? GNUTLS_STAGE_READY
+    : GNUTLS_STAGE_HANDSHAKE_TRIED;
 
-  if (ret == GNUTLS_E_SUCCESS)
-    {
-      /* Here we're finally done.  */
-      proc->gnutls_initstage = GNUTLS_STAGE_READY;
-    }
-  else
-    {
-      /* check_memory_full (gnutls_alert_send_appropriate (state, ret));  */
-    }
   return ret;
 }
 
@@ -667,7 +660,7 @@ emacs_gnutls_nonblock_errno (gnutls_transport_ptr_t ptr)
 # endif	/* !WINDOWSNT */
 
 static int
-emacs_gnutls_handshake (struct Lisp_Process *proc)
+emacs_gnutls_handshake (struct Lisp_Process *proc, bool blocking)
 {
   gnutls_session_t state = proc->gnutls_state;
 
@@ -692,14 +685,15 @@ emacs_gnutls_handshake (struct Lisp_Process *proc)
       gnutls_transport_set_ptr2 (state,
 				 (void *) (intptr_t) proc->infd,
 				 (void *) (intptr_t) proc->outfd);
-      gnutls_transport_set_errno_function (state,
-					   emacs_gnutls_nonblock_errno);
+      if (!proc->blocking_connect)
+	gnutls_transport_set_errno_function (state,
+					     emacs_gnutls_nonblock_errno);
 # endif
 
       proc->gnutls_initstage = GNUTLS_STAGE_TRANSPORT_POINTERS_SET;
     }
 
-  return gnutls_try_handshake (proc);
+  return gnutls_try_handshake (proc, blocking);
 }
 
 ptrdiff_t
@@ -1569,7 +1563,10 @@ boot_error (struct Lisp_Process *p, const char *m, ...)
 {
   va_list ap;
   va_start (ap, m);
-  pset_status (p, list2 (Qfailed, vformat_string (m, ap)));
+  if (p->blocking_connect)
+    verror (m, ap);
+  else
+    pset_status (p, list2 (Qfailed, vformat_string (m, ap)));
   va_end (ap);
 }
 
@@ -1769,13 +1766,15 @@ gnutls_verify_boot (Lisp_Object proc, Lisp_Object proplist)
   return gnutls_make_error (ret);
 }
 
-DEFUN ("gnutls-boot", Fgnutls_boot, Sgnutls_boot, 3, 3, 0,
+DEFUN ("gnutls-boot", Fgnutls_boot, Sgnutls_boot, 3, 4, 0,
        doc: /* Initialize GnuTLS client for process PROC with TYPE+PROPLIST.
 Currently only client mode is supported.  Return a success/failure
 value you can check with `gnutls-errorp'.
 
 TYPE is a symbol, either `gnutls-anon' or `gnutls-x509pki'.
+BLOCKING, if non-nil, forces the boot to complete or fail.
 PROPLIST is a property list with the following keys:
+
 
 :hostname is a string naming the remote host.
 
@@ -1805,9 +1804,6 @@ t to do all checks.  Currently it can contain `:trustfiles' and
 :min-prime-bits is the minimum accepted number of bits the client will
 accept in Diffie-Hellman key exchange.
 
-:complete-negotiation, if non-nil, will make negotiation complete
-before returning even on non-blocking sockets.
-
 The debug level will be set for this process AND globally for GnuTLS.
 So if you set it higher or lower at any point, it affects global
 debugging.
@@ -1826,7 +1822,7 @@ verification function (UNUSED).
 Each authentication type may need additional information in order to
 work.  For X.509 PKI (`gnutls-x509pki'), you probably need at least
 one trustfile (usually a CA bundle).  */)
-  (Lisp_Object proc, Lisp_Object type, Lisp_Object proplist)
+  (Lisp_Object proc, Lisp_Object type, Lisp_Object proplist, Lisp_Object blocking)
 {
   int ret = GNUTLS_E_SUCCESS;
   int max_log_level = 0;
@@ -2102,13 +2098,10 @@ one trustfile (usually a CA bundle).  */)
 	return gnutls_make_error (ret);
     }
 
-  XPROCESS (proc)->gnutls_complete_negotiation_p =
-    !NILP (Fplist_get (proplist, QCcomplete_negotiation));
   GNUTLS_INITSTAGE (proc) = GNUTLS_STAGE_CRED_SET;
-  ret = emacs_gnutls_handshake (XPROCESS (proc));
+  ret = emacs_gnutls_handshake (XPROCESS (proc), !NILP (blocking));
   if (ret < GNUTLS_E_SUCCESS)
     return gnutls_make_error (ret);
-
   return gnutls_verify_boot (proc, proplist);
 }
 
@@ -2853,7 +2846,7 @@ level in the ones.  For builds without libgnutls, the value is -1.  */);
   DEFSYM (QCcrlfiles, ":crlfiles");
   DEFSYM (QCmin_prime_bits, ":min-prime-bits");
   DEFSYM (QCloglevel, ":loglevel");
-  DEFSYM (QCcomplete_negotiation, ":complete-negotiation");
+  DEFSYM (QCcomplete_negotiation, ":complete-negotiation"); /* obsolete */
   DEFSYM (QCverify_flags, ":verify-flags");
   DEFSYM (QCverify_error, ":verify-error");
 

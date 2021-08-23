@@ -207,22 +207,22 @@ URL-encoded before it's used."
        (message "Error when expiring the cache: %s" error))))
   (setq url-retrieve-number-of-calls (1+ url-retrieve-number-of-calls))
   (let* ((loader (url-scheme-get-property (url-type url) 'loader))
-	 (url-using-proxy (if (url-host url)
-			      (url-find-proxy-for-url url (url-host url))))
+	 (url-using-proxy (when (url-host url)
+			    (url-find-proxy-for-url url (url-host url))))
 	 (buffer nil)
 	 (asynch (url-scheme-get-property (url-type url) 'asynchronous-p))
-         (timeout (if (and asynch
-                           (or (eq loader #'url-http)
-                               (eq loader #'url-https)))
-                      (cons :timeout (list timeout)))))
+         (kludge (if (eq loader #'url-http)
+                      `(nil nil ,@(when timeout (list :timeout (list timeout))))
+                   (when (eq loader #'url-https)
+                     (when timeout (list :timeout (list timeout)))))))
     (when url-using-proxy
       (setf asynch t
 	    loader #'url-proxy
             (url-asynchronous url) t
-            timeout nil))
+            kludge nil))
     (if asynch
 	(let ((url-current-object url))
-	  (setq buffer (apply loader url callback cbargs nil nil timeout)))
+	  (setq buffer (apply loader url callback cbargs kludge)))
       (setq buffer (funcall loader url))
       (when buffer
 	(with-current-buffer buffer
