@@ -3335,11 +3335,17 @@ static bool
 connected_callback (Lisp_Object proc)
 {
   struct Lisp_Process *p = XPROCESS (proc);
-  bool handshaked = false;
+  /* open-gnutls-stream takes it upon itself to perform
+     gnutls handshake only for blocking connections, i.e.,
+     when :nowait is true.  Inexplicable, lateral actions like
+     that make it impossible to maintain proper sequencing. */
+  bool handshaked = p->blocking_connect;
 
 #ifdef HAVE_GNUTLS
-  if (!NILP (p->gnutls_boot_parameters))
+  eassert (handshaked == NILP (p->gnutls_boot_parameters));
+  if (!handshaked)
     {
+      eassert ();
       Lisp_Object retval, params = p->gnutls_boot_parameters;
       retval = Fgnutls_boot (proc, XCAR (params), XCDR (params),
 			     p->blocking_connect ? Qt : Qnil);
@@ -3697,7 +3703,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
   else
     {
       pset_status (p, Fcons (Qconnect, addrinfos));
-      add_process_write_fd (s);
+      add_process_write_fd (p->infd);
     }
 
   unbind_to (count, Qnil);

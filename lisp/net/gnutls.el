@@ -216,8 +216,8 @@ trust and key files, and priority string."
 
 (define-error 'gnutls-error "GnuTLS error")
 
-(declare-function gnutls-boot "gnutls.c" (proc type proplist blocking))
-(declare-function gnutls-errorp "gnutls.c" (error))
+(declare-function gnutls-boot "gnutls.c")
+(declare-function gnutls-errorp "gnutls.c")
 (defvar gnutls-log-level)               ; gnutls.c
 
 (cl-defun gnutls-negotiate

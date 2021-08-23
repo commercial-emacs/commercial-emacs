@@ -170,7 +170,7 @@ request.")
 	     url-http-open-connections))
   nil)
 
-(defun url-http-find-free-connection (host port &optional gateway-method &key timeout)
+(cl-defun url-http-find-free-connection (host port &optional gateway-method &key timeout)
   (let ((conns (gethash (cons host port) url-http-open-connections))
 	(connection nil))
     (while (and conns (not connection))
@@ -212,8 +212,8 @@ request.")
 	    (set-process-query-on-exit-flag (get-buffer-process buf) nil))
 	  (kill-buffer buf))))
 
-    (if connection
-	(url-http-mark-connection-as-busy host port connection))))
+    (when connection
+      (url-http-mark-connection-as-busy host port connection))))
 
 (defun url-http--user-agent-default-string ()
   "Compute a default User-Agent string based on `url-privacy-level'."
