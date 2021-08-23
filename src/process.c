@@ -3439,7 +3439,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
       s = (0 <= socket_to_use)
 	? socket_to_use
-	: socket (family, p->socktype | SOCK_CLOEXEC | SOCK_NONBLOCK, protocol);
+	: socket (family, (p->socktype | SOCK_CLOEXEC | SOCK_NONBLOCK), protocol);
 
       if (s < 0)
 	{

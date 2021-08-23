@@ -199,8 +199,7 @@ gnutls-boot (as returned by `gnutls-boot-parameters')."
 			      :host (puny-encode-domain host) :service service
 			      :nowait (plist-get parameters :nowait)
                               :sndtimeo (plist-get parameters :sndtimeo)
-                              :tls-parameters
-                              (plist-get parameters :tls-parameters)
+                              :tls-parameters (plist-get parameters :tls-parameters)
                               :coding (plist-get parameters :coding))
       (let ((work-buffer (or buffer
 			     (generate-new-buffer " *stream buffer*")))
