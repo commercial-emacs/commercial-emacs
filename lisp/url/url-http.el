@@ -170,7 +170,7 @@ request.")
 	     url-http-open-connections))
   nil)
 
-(defun url-http-find-free-connection (host port &optional gateway-method)
+(defun url-http-find-free-connection (host port &optional gateway-method &key timeout)
   (let ((conns (gethash (cons host port) url-http-open-connections))
 	(connection nil))
     (while (and conns (not connection))
@@ -199,7 +199,8 @@ request.")
                                          (if url-using-proxy
                                              (url-port url-using-proxy)
                                            port)
-                                         gateway-method)))
+                                         gateway-method
+                                         :timeout timeout)))
 	      ;; url-open-stream might return nil.
 	      (when (processp proc)
 		;; Drop the temp buffer link before killing the buffer.
@@ -1264,7 +1265,7 @@ the end of the document."
     (when (eq process-buffer (current-buffer))
       (goto-char (point-max)))))
 
-(defun url-http (url callback cbargs &optional retry-buffer gateway-method)
+(cl-defun url-http (url callback cbargs &optional retry-buffer gateway-method :key timeout)
   "Retrieve URL via HTTP asynchronously.
 URL must be a parsed URL.  See `url-generic-parse-url' for details.
 
@@ -1293,7 +1294,8 @@ The return value of this function is the retrieval buffer."
          (url-current-object url)
          (connection (url-http-find-free-connection (url-host url)
                                                     (url-port url)
-                                                    gateway-method))
+                                                    gateway-method
+                                                    :timeout timeout))
          (mime-accept-string url-mime-accept-string)
 	 (buffer (or retry-buffer
 		     (generate-new-buffer

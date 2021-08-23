@@ -204,14 +204,15 @@ linked Emacs under SunOS 4.x."
       proc)))
 
 ;;;###autoload
-(defun url-open-stream (name buffer host service &optional gateway-method)
+(cl-defun url-open-stream (name buffer host service &optional gateway-method &key timeout)
   "Open a stream to HOST, possibly via a gateway.
 Args per `open-network-stream'.
 Will not make a connection if `url-gateway-unplugged' is non-nil.
 Might do a non-blocking connection; use `process-status' to check.
 
 Optional arg GATEWAY-METHOD specifies the gateway to be used,
-overriding the value of `url-gateway-method'."
+overriding the value of `url-gateway-method'.
+Optional key TIMEOUT is a list of seconds and microseconds."
   (unless url-gateway-unplugged
     (let* ((gwm (or gateway-method url-gateway-method))
            (gw-method (if (and url-gateway-local-host-regexp
@@ -241,15 +242,15 @@ overriding the value of `url-gateway-method'."
 			 ((or 'tls 'ssl 'native)
 			  (if (eq gw-method 'native)
 			      (setq gw-method 'plain))
-			  (open-network-stream
-			   name buffer host service
-			   :type gw-method
-			   ;; Use non-blocking socket if we can.
-			   :nowait (and (featurep 'make-network-process)
-                                        (url-asynchronous url-current-object)
-                                        '(:nowait t))
-                           :sndtimeo (and (featurep 'make-network-process)
-                                          (url-timeout url-current-object))))
+			  (apply #'open-network-stream
+			         name buffer host service
+			         :type gw-method
+                                 (append
+                                  (when (and (featurep 'make-network-process)
+                                             (url-asynchronous url-current-object))
+                                    (cons :nowait (list '(:nowait t))))
+                                  (when (featurep 'make-network-process)
+                                    (cons :sndtimeo (list timeout))))))
                          ('socks
 			  (socks-open-network-stream name buffer host service))
 			 ('telnet

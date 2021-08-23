@@ -455,15 +455,6 @@ static struct fd_callback_data
   struct thread_state *waiting_thread;
 } fd_callback_info[FD_SETSIZE];
 
-
-static bool
-process_reader_p (struct Lisp_Process *proc)
-{
-  return 0 <= proc->infd
-    && !EQ (proc->filter, Qt)
-    && !EQ (proc->command, Qt);
-}
-
 /* Add a file descriptor FD to be monitored for when read is possible.
    When read is possible, call FUNC with argument DATA.  */
 
@@ -505,14 +496,7 @@ add_process_read_fd (int fd)
   add_process_fd (fd, (FOR_READ | PROCESS_FD), KEYBOARD_FD);
 }
 
-static void
-add_process_write_fd (int fd)
-{
-  add_process_fd (fd, (FOR_WRITE | PROCESS_FD), KEYBOARD_FD);
-}
-
 /* Stop monitoring file descriptor FD for when read is possible.  */
-
 void
 delete_read_fd (int fd)
 {
@@ -1187,6 +1171,21 @@ For a network, serial, and pipe connections, this value is nil.  */)
   CHECK_PROCESS (process);
   pid = XPROCESS (process)->pid;
   return pid ? INT_TO_INTEGER (pid) : Qnil;
+}
+
+DEFUN ("process-descriptors", Fprocess_descriptors, Sprocess_descriptors, 1, 1, 0,
+       doc: /* Return the file descriptors of PROCESS. */)
+  (register Lisp_Object process)
+{
+  Lisp_Object result = Qnil;
+  struct Lisp_Process *p;
+
+  CHECK_PROCESS (process);
+  p = XPROCESS (process);
+  for (int i = 0; i < PROCESS_OPEN_FDS; i++)
+    if (p->open_fd[i] >= 0)
+      result = nconc2 (result, list (make_fixnum (p->open_fd[i])));
+  return result;
 }
 
 DEFUN ("process-name", Fprocess_name, Sprocess_name, 1, 1, 0,
@@ -2836,11 +2835,14 @@ set_socket_option (int s, Lisp_Object opt, Lisp_Object val)
     case SOPT_TIMEVAL:
       {
 	struct timeval timeout;
-	CHECK_LIST (val);
-	timeout.tv_sec = XFIXNUM (XCAR (val));
-	timeout.tv_usec = XFIXNUM (XCAR (XCDR (val)));
-	ret = setsockopt (s, sopt->optlevel, sopt->optnum,
-			  (char *)&timeout, sizeof (timeout));
+	if (TYPE_RANGED_FIXNUMP (int, CAR_SAFE (val))
+	    && TYPE_RANGED_FIXNUMP (int, CAR_SAFE (CDR_SAFE (val))))
+	  {
+	    timeout.tv_sec = XFIXNUM (XCAR (val));
+	    timeout.tv_usec = XFIXNUM (XCAR (XCDR (val)));
+	    ret = setsockopt (s, sopt->optlevel, sopt->optnum,
+			      (char *)&timeout, sizeof (timeout));
+	  }
 	break;
       }
 
@@ -3320,52 +3322,8 @@ finish_after_tls_connection (Lisp_Object proc)
       pset_status (p, Qfailed);
       deactivate_process (proc);
     }
-  else
-    {
-      pset_status (p, Qrun);
-      exec_sentinel (proc, build_string ("open\n"));
-    }
 }
 #endif
-
-static void
-handle_process(Lisp_Object proc)
-{
-  struct Lisp_Process *p = XPROCESS (proc);
-#ifdef HAVE_GNUTLS
-  if (!NILP (p->gnutls_boot_parameters))
-    {
-      Lisp_Object retval, params = p->gnutls_boot_parameters;
-
-      retval = Fgnutls_boot (proc, XCAR (params), XCDR (params));
-
-      if (p->gnutls_initstage == GNUTLS_STAGE_READY)
-	finish_after_tls_connection (proc);
-      else
-	{
-	  deactivate_process (proc);
-	  pset_status (p, list2 (Qfailed, retval));
-	}
-    }
-  else
-#else
-    {
-      pset_status (p, Qrun);
-      exec_sentinel (proc, build_string ("open\n"));
-    }
-#endif
-
-  if (EQ (p->filter, Qt)
-      && !EQ (p->status, Qlisten))
-    delete_read_fd (p->infd);
-  else if (EQ (p->filter, Qt)
-	   /* Network or serial process not stopped:  */
-	   && !EQ (p->command, Qt))
-    add_process_read_fd (p->infd);
-  else if (process_reader_p (p))
-    add_process_read_fd (p->infd);
-}
-
 
 static void
 connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
@@ -3531,8 +3489,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       maybe_quit ();
 
       debug_print (Fthread_name (Fcurrent_thread()));
-      debug_print (ip_address);
-
       while ((ret = connect (s, sa, addrlen)) < 0)
 	{
 	  xerrno = errno;
@@ -3550,30 +3506,17 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 		int nfds = 0, optval = 0;
 		socklen_t optlen = sizeof optval;
 		fd_set write;
-		/* cf. socket(7) "just as if socket was specified
-		   to be nonblocking". */
-		eassert (! NILP (Fplist_get (p->childp, QCsndtimeo)) ||
-			 ! NILP (Fplist_get (p->childp, QCrcvtimeo)));
 		/* cf. connect(2) "After select(2) indicates writability,
 		   use getsockopt(2) to read the SO_ERROR option at
 		   level SOL_SOCKET to determine whether connect()
 		   completed successfully. */
 		FD_ZERO (&write);
 		FD_SET (s, &write);
-		/* thread_select() releases global lock, just pselect() doesn't */
-		errno = 0;
-		nfds = thread_select (pselect, s + 1, NULL, &write,
-				      NULL, NULL, NULL);
-		if (nfds < 0)
-		  xerrno = errno;
-		else if (nfds > 0
-			 && getsockopt (s, SOL_SOCKET, SO_ERROR, &optval, &optlen) == 0
-			 && optval != 0)
+		nfds = thread_select (pselect, s + 1, NULL, &write, NULL, NULL, NULL);
+		if (nfds > 0
+		    && getsockopt (s, SOL_SOCKET, SO_ERROR, &optval, &optlen) == 0
+		    && optval == 0)
 		  ret = 0;
-		else
-		  xerrno = errno;
-		fprintf(stderr, "ret=%d fd=%d nfds=%d xerrno=%d optval=%d\n",
-			ret, s, nfds, xerrno, optval);
 	      }
 	      goto connect_done;
 	      break;
@@ -3613,13 +3556,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       const char *err = (p->is_server
 			 ? "make server process failed"
 			 : "make client process failed");
-
-      /* If non-blocking got this far - and failed - assume non-blocking is
-	 not supported after all.  This is probably a wrong assumption, but
-	 the normal blocking calls to open-network-stream handles this error
-	 better.  */
       Lisp_Object data = get_file_errno_data (err, contact, xerrno);
-
       pset_status (p, list2 (Fcar (data), Fcdr (data)));
       unbind_to (count, Qnil);
       return;
@@ -3671,8 +3608,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
   chan_process[s] = proc;
 
-  fcntl (s, F_SETFL, O_NONBLOCK);
-
   p = XPROCESS (proc);
   p->open_fd[SUBPROCESS_STDIN] = s;
   p->infd = s;
@@ -3692,10 +3627,38 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
   setup_process_coding_systems (proc);
 
-  if (EQ (p->status, Qlisten) && NILP (p->command))
+#ifdef HAVE_GNUTLS
+  if (!NILP (p->gnutls_boot_parameters))
+    {
+      Lisp_Object retval, params = p->gnutls_boot_parameters;
+
+      retval = Fgnutls_boot (proc, XCAR (params), XCDR (params));
+
+      if (p->gnutls_initstage == GNUTLS_STAGE_READY)
+	finish_after_tls_connection (proc);
+      else
+	{
+	  deactivate_process (proc);
+	  pset_status (p, list2 (Qfailed, retval));
+	}
+    }
+#endif
+
+  if (0 <= p->infd)
+    {
+      pset_status (p, Qrun);
+      exec_sentinel (proc, build_string ("open\n"));
+    }
+
+  if (EQ (p->status, Qlisten))
+    {
+      if (NILP (p->command))
+	add_process_read_fd(p->infd);
+    }
+  else if (EQ (p->filter, Qt))
+    delete_read_fd (p->infd);
+  else if (!EQ (p->command, Qt))
     add_process_read_fd(p->infd);
-  else
-    handle_process(proc);
 
   unbind_to (count, Qnil);
 }
@@ -4210,13 +4173,11 @@ usage: (make-network-process &rest ARGS)  */)
   if (TYPE_RANGED_FIXNUMP (int, server))
     p->backlog = XFIXNUM (server);
 
-  bool postpone_connection = false;
-#ifdef HAVE_GETADDRINFO_A
-  /* With async address resolution, the list of addresses is empty, so
-     postpone connecting to the server. */
   if (use_external_socket_p && NILP (addrinfos))
     report_file_error ("dns failure", Qnil);
-  else if (!p->is_server && NILP (addrinfos))
+
+#ifdef HAVE_GETADDRINFO_A
+  if (!p->is_server && NILP (addrinfos))
     {
       p->dns_request = dns_request;
       p->status = list1 (Qconnect);
@@ -5179,7 +5140,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
   bool check_write;
   int check_delay;
   bool avail = false;
-  int xerrno;
+  int xerrno = 0;
   Lisp_Object proc;
   struct timespec timeout, end_time, timer_delay;
   struct timespec got_output_end_time = invalid_timespec ();
@@ -5586,7 +5547,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       /*  If we woke up due to SIGWINCH, actually change size now.  */
       do_pending_window_change (0);
 
-      if (! avail)
+      if (!avail)
 	{
 	  switch (xerrno)
 	    {
@@ -8445,6 +8406,7 @@ amounts of data in one go.  */);
   defsubr (&Sprocess_exit_status);
   defsubr (&Sprocess_id);
   defsubr (&Sprocess_name);
+  defsubr (&Sprocess_descriptors);
   defsubr (&Sprocess_tty_name);
   defsubr (&Sprocess_select);
   defsubr (&Sprocess_command);
