@@ -25,6 +25,7 @@
 
 (require 'url-vars)
 (require 'url-parse)
+(require 'network-stream)
 
 ;; Fixme: support SSH explicitly or via a url-gateway-rlogin-program?
 

@@ -3344,9 +3344,8 @@ connected_callback (Lisp_Object proc)
      when :nowait is false.  Double negatives are bad, but
      even worse, such arbitrary and surprising lateral actions
      confound reasoning about control flow.. */
-  handshaked = p->blocking_connect;
-
-  eassert (handshaked == NILP (params));
+  handshaked = NILP (p->gnutls_boot_parameters)
+    || (p->gnutls_initstage >= GNUTLS_STAGE_READY);
   if (!handshaked)
     {
       Lisp_Object retval = (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED)

@@ -45,6 +45,7 @@
 (require 'auth-source)
 (require 'nsm)
 (require 'puny)
+(require 'gnutls)
 
 (eval-when-compile
   (require 'epa)) ; for epa-suppress-error-buffer
@@ -53,8 +54,6 @@
 (declare-function starttls-negotiate "starttls" (process))
 (declare-function starttls-open-stream "starttls" (name buffer host port))
 
-(autoload 'gnutls-negotiate "gnutls")
-(autoload 'open-gnutls-stream "gnutls")
 (defvar starttls-extra-arguments)
 (defvar starttls-extra-args)
 (defvar starttls-use-gnutls)
