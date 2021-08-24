@@ -3335,20 +3335,26 @@ static bool
 connected_callback (Lisp_Object proc)
 {
   struct Lisp_Process *p = XPROCESS (proc);
+  bool retry = false, handshaked = true;
+
+#ifdef HAVE_GNUTLS
+  Lisp_Object params = p->gnutls_boot_parameters;
+
   /* open-gnutls-stream takes it upon itself to perform
      gnutls handshake only for blocking connections, i.e.,
      when :nowait is true.  Inexplicable, lateral actions like
      that make it impossible to maintain proper sequencing. */
-  bool handshaked = p->blocking_connect;
+  handshaked = p->blocking_connect;
 
-#ifdef HAVE_GNUTLS
-  eassert (handshaked == NILP (p->gnutls_boot_parameters));
+  eassert (handshaked == NILP (params));
   if (!handshaked)
     {
-      eassert ();
-      Lisp_Object retval, params = p->gnutls_boot_parameters;
-      retval = Fgnutls_boot (proc, XCAR (params), XCDR (params),
-			     p->blocking_connect ? Qt : Qnil);
+      Lisp_Object retval;
+      if (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED)
+	retval = make_fixnum (gnutls_try_handshake(p, p->blocking_connect));
+      else
+	retval = Fgnutls_boot (proc, XCAR (params), XCDR (params),
+			       p->blocking_connect ? Qt : Qnil);
       if (p->gnutls_initstage == GNUTLS_STAGE_READY)
 	{
 	  handshaked = true;
@@ -3363,6 +3369,8 @@ connected_callback (Lisp_Object proc)
 				 ? build_string ("tls error")
 				 : retval));
 	}
+      else
+	retry = true;
     }
 #else
   handshaked = true;
@@ -3377,7 +3385,7 @@ connected_callback (Lisp_Object proc)
       else if (!EQ (p->command, Qt))
 	add_process_read_fd(p->infd);
     }
-  return handshaked;
+  return retry;
 }
 
 /* "After select(2) indicates writability,
@@ -3697,7 +3705,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
     }
   else if (p->blocking_connect)
     {
-      if (!connected_callback (proc))
+      if (connected_callback (proc))
 	deactivate_process (proc);
     }
   else
@@ -5873,7 +5881,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		  else
 		    connect_network_socket (proc, remaining, Qnil);
 		}
-	      else if (!connected_callback (proc))
+	      else if (connected_callback (proc))
 		add_process_write_fd(channel);
 	    }
 	}			/* End for each file descriptor.  */

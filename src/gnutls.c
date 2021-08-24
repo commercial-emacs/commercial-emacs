@@ -1658,7 +1658,6 @@ gnutls_verify_boot (Lisp_Object proc, Lisp_Object proplist)
      gnutls_x509_crt_check_hostname against :hostname.  */
 
   ret = gnutls_certificate_verify_peers2 (state, &peer_verification);
-
   if (ret < GNUTLS_E_SUCCESS)
     return gnutls_make_error (ret);
 
