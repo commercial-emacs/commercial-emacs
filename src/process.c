@@ -3342,19 +3342,18 @@ connected_callback (Lisp_Object proc)
 
   /* open-gnutls-stream takes it upon itself to perform
      gnutls handshake only for blocking connections, i.e.,
-     when :nowait is true.  Inexplicable, lateral actions like
-     that make it impossible to maintain proper sequencing. */
+     when :nowait is false.  Double negatives are bad, but
+     even worse, such arbitrary and surprising lateral actions
+     confound reasoning about control flow.. */
   handshaked = p->blocking_connect;
 
   eassert (handshaked == NILP (params));
   if (!handshaked)
     {
-      Lisp_Object retval;
-      if (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED)
-	retval = make_fixnum (gnutls_try_handshake(p, p->blocking_connect));
-      else
-	retval = Fgnutls_boot (proc, XCAR (params), XCDR (params),
-			       p->blocking_connect ? Qt : Qnil);
+      Lisp_Object retval = (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED)
+	? make_fixnum (gnutls_try_handshake(p, p->blocking_connect))
+	: Fgnutls_boot (proc, XCAR (params), XCDR (params),
+			p->blocking_connect ? Qt : Qnil);
       if (p->gnutls_initstage == GNUTLS_STAGE_READY)
 	{
 	  handshaked = true;
@@ -3372,8 +3371,6 @@ connected_callback (Lisp_Object proc)
       else
 	retry = true;
     }
-#else
-  handshaked = true;
 #endif
 
   if (handshaked)
@@ -3426,8 +3423,9 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       /* Ensure we don't consume the external socket twice.  */
       external_sock_fd = -1;
 
-      /* non blocking retries disallowed for external */
-      XSETCDR (addrinfos, Qnil);
+      /* Alternate name resolutions disallowed for external */
+      if (!NILP (addrinfos))
+	XSETCDR (addrinfos, Qnil);
     }
 
   struct sockaddr *sa = NULL;
@@ -3616,7 +3614,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 #endif
 	}
     connect_done:
-      if (ret == 0 || s == socket_to_use)
+      if (ret == 0)
 	break;
       else
 	{

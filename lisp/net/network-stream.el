@@ -174,7 +174,7 @@ a greeting from the server.
 asynchronously, if possible.
 
 :sndtimeo, if a list of seconds and microseconds, specifies the
-connect(SOCKET) timeout.
+connect(2) timeout.
 
 :shell-command is a `format-spec' string that can be used if
 :type is `shell'.  It has two specs, %s for host and %p for port
