@@ -1189,9 +1189,8 @@ DEFUN ("process-descriptors", Fprocess_descriptors, Sprocess_descriptors, 1, 1, 
   CHECK_PROCESS (process);
   p = XPROCESS (process);
   for (int i = 0; i < PROCESS_OPEN_FDS; i++)
-    if (p->open_fd[i] >= 0)
-      result = nconc2 (result, list (make_fixnum (p->open_fd[i])));
-  return result;
+    result = Fcons (make_fixnum (p->open_fd[i]), result);
+  return Fnreverse (result);
 }
 
 DEFUN ("process-name", Fprocess_name, Sprocess_name, 1, 1, 0,
