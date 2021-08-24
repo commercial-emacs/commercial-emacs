@@ -52,13 +52,10 @@
 (defconst gnus-thread-group "gnus-get-unread-articles"
   "Identifying prefix for fetching threads.")
 
-(defcustom gnus-max-seconds-hold-mutex 75
-  "Timeout in seconds before relinquishing `gnus-mutex-get-unread-articles'."
+(defcustom gnus-seconds-per-method 75
+  "Timeout for individual backend scan."
   :group 'gnus-start
   :type 'integer)
-
-(defvar gnus-mutex-get-unread-articles (make-mutex gnus-thread-group)
-  "Updating or displaying state of unread articles are critical sections.")
 
 (defconst gnus-dot-newsrc (nnheader-concat gnus-home-directory ".newsrc")
   "Traditional Usenet .newsrc file.  Its time is long past.")
@@ -492,11 +489,6 @@ See also `gnus-before-startup-hook'."
 
 ;; Suggested by Brian Edmonds <edmonds@cs.ubc.ca>.
 (defvar gnus-init-inhibit nil)
-
-(defvar gnus-thread-start nil
-  "(lisp-time . thread) when background thread got mutex.
-The macro `with-timeout' within thread body is verboten since handlerlist is not
-thread-safe in eval.c.")
 
 (defun gnus-read-init-file (&optional inhibit-next)
   ;; Don't load .gnus if the -q option was used.
@@ -1551,55 +1543,6 @@ backend check whether the group actually exists."
        (let ,(mapcar (apply-partially #'make-list 2) variables)
          ,@forms))))
 
-(defun gnus-thread-body (thread-name mtx fns)
-  "Errors need to be trapped for a clean exit.
-Else we get unblocked but permanently yielded threads."
-  (let ((working (get-buffer-create (format " *%s*" thread-name)))
-        (inhibit-debugger t)
-        debug-on-quit
-        debug-on-error)
-    ;; once context switch occurs handlerlist in eval.c(throw) is lost
-    (unwind-protect
-        (condition-case err
-            (with-mutex mtx
-              (setq gnus-thread-start (cons (current-time) (current-thread)))
-              (with-current-buffer working
-                (gnus-message-with-timestamp "gnus-thread-body: start %s <%s>"
-                                             thread-name (buffer-name))
-                ;; buffer-locals not thread-safe (avoid them)
-                (let (gnus-run-thread--subresult
-                      current-fn
-                      (gnus-inhibit-demon t)
-                      (nntp-server-buffer (current-buffer)))
-                  (condition-case err
-                      (dolist (fn fns)
-                        (setq current-fn fn)
-                        (setq gnus-run-thread--subresult
-                              (funcall fn gnus-run-thread--subresult))
-                        (thread-yield))
-                    (error
-                     ;; feed current-fn to outer condition-case
-                     (error "dolist: '%s' in %s"
-                            (error-message-string err) current-fn))))))
-          (error (gnus-message-with-timestamp
-                  "gnus-thread-body: error %s '%s'"
-                  thread-name (error-message-string err))))
-      (let (kill-buffer-query-functions)
-        (kill-buffer working))
-      (setq gnus-thread-start nil)
-      (ignore-errors (mutex-unlock mtx))
-      (when-let ((timer (cl-find-if (lambda (timer)
-                                      (eq (timer--function timer)
-                                          #'gnus-time-out-thread))
-                                    timer-list))
-                 (last-one (<= (cl-count gnus-thread-group
-                                         (all-threads)
-                                         :test (lambda (s thr)
-                                                 (cl-search s (thread-name thr))))
-                               1)))
-        (cancel-timer timer))
-      (gnus-message-with-timestamp "gnus-thread-body: finish %s" thread-name))))
-
 (defun gnus-thread-group-running-p (thread-group)
   (when-let ((thr (cl-some (lambda (thr)
                              (when (cl-search thread-group (thread-name thr))
@@ -1610,58 +1553,60 @@ Else we get unblocked but permanently yielded threads."
       (prog1 nil
         (thread-signal thr 'error nil)))))
 
-(defun gnus-run-thread (label mtx thread-group &rest fns)
-  "MTX, if non-nil, is the mutex for the new thread.
-THREAD-GROUP is string useful for naming working buffer and threads.
-All FNS must finish before MTX is released."
-  (when fns
-    (let ((thread-name (concat thread-group "-" label)))
-      (make-thread
-       (apply-partially #'gnus-thread-body thread-name mtx fns)
-       thread-name))))
+(defun gnus-run-method (label thread-group &rest fns)
+  "THREAD-GROUP is string useful for naming working buffer and threads.
+Errors need to be trapped for a clean exit.
+Else we get unblocked but permanently yielded threads."
+  (let* ((thread-name (concat thread-group "-" label))
+         (working (get-buffer-create (format " *%s*" thread-name)))
+         (inhibit-debugger t)
+         debug-on-quit
+         debug-on-error)
+    ;; once context switch occurs handlerlist in eval.c(throw) is lost
+    (unwind-protect
+        (condition-case err
+            (with-current-buffer working
+              (gnus-message-with-timestamp "gnus-run-method: start %s <%s>"
+                                           thread-name (buffer-name))
+              ;; buffer-locals not thread-safe (avoid them)
+              (let (gnus-run-method--subresult
+                    current-fn
+                    (gnus-inhibit-demon t)
+                    (nntp-server-buffer (current-buffer)))
+                (condition-case err
+                    (dolist (fn fns)
+                      (setq current-fn fn)
+                      (setq gnus-run-method--subresult
+                            (funcall fn gnus-run-method--subresult))
+                      (thread-yield))
+                  (error
+                   ;; feed current-fn to outer condition-case
+                   (error "dolist: '%s' in %s"
+                          (error-message-string err) current-fn)))))
+          (error (gnus-message-with-timestamp
+                  "gnus-run-method: error %s '%s'"
+                  thread-name (error-message-string err))))
+      (let (kill-buffer-query-functions)
+        (kill-buffer working))
+      (gnus-message-with-timestamp "gnus-run-method: finish %s" thread-name))))
 
 (defun gnus-chain-arg (tack-p f &rest args)
   (lambda (prev)
     (apply f (append args (when tack-p (list prev))))))
-
-(defun gnus-time-out-thread ()
-  (interactive)
-  (run-at-time
-   (/ gnus-max-seconds-hold-mutex 2)
-   nil
-   #'gnus-time-out-thread)
-  (when gnus-thread-start
-    (cl-destructuring-bind (started . thread)
-        gnus-thread-start
-      (unless (time-less-p nil (time-add started gnus-max-seconds-hold-mutex))
-        (setq gnus-thread-start nil)
-        (if (thread-live-p thread)
-            (progn
-              (gnus-message-with-timestamp
-               "gnus-time-out-thread: signal quit %s" (thread-name thread))
-              (thread-signal thread 'quit nil))
-          (gnus-message-with-timestamp
-           "gnus-time-out-thread: race on dead %s" (thread-name thread)))))))
 
 (cl-defun gnus-get-unread-articles (&optional
                                     requested-level
                                     dont-connect
                                     one-level
                                     &aux
-                                    (level (gnus-group-default-level requested-level t)))
-  "Workhorse of `gnus-group-get-new-news'."
+                                    (level (gnus-group-default-level requested-level t))
+                                    infos-by-method)
+  "Workhorse of `gnus-group-get-new-news'.
+Sets up `gnus-get-unread-articles--doit'."
   (setq gnus-server-method-cache nil)
   (defvar gnus-agent-article-local-times)
   (cl-assert (eq (current-thread) main-thread))
-  (when gnus-background-get-unread-articles
-    (unless (cl-find-if (lambda (timer)
-                          (eq (timer--function timer)
-                              #'gnus-time-out-thread))
-                        timer-list)
-      (run-at-time
-       (/ gnus-max-seconds-hold-mutex 2)
-       nil
-       #'gnus-time-out-thread)))
+
   (if-let ((pending (gnus-thread-group-running-p gnus-thread-group)))
       (gnus-message 3 "gnus-get-unread-articles: %s still running" pending)
     (let* ((newsrc (cdr gnus-newsrc-alist))
@@ -1678,8 +1623,7 @@ All FNS must finish before MTX is released."
 		    (t 0))
 	      alevel)))
 	   (gnus-agent-article-local-times 0)
-	   (archive-method (gnus-server-to-method "archive"))
-           infos-by-method)
+	   (archive-method (gnus-server-to-method "archive")))
       (gnus-message 6 "Checking new news...")
       (while newsrc
         (when-let ((info (pop newsrc))
@@ -1732,108 +1676,92 @@ All FNS must finish before MTX is released."
                (cl-destructuring-bind (method &rest infos) elem
                  (and (ignore-errors (gnus-get-function method 'open-server))
                       (memq (car method) (mapcar #'car gnus-select-methods)))))
-             infos-by-method))
+             infos-by-method)))
+    (let ((doit (apply-partially #'gnus-get-unread-articles--doit infos-by-method requested-level)))
+      (if gnus-background-get-unread-articles
+          (make-thread doit gnus-thread-group)
+        (funcall doit)))))
 
-      (let (methods
-            (coda (apply-partially
-                   (lambda (level*)
-                     (gnus-message-with-timestamp "gnus-get-unread-articles: all done")
-                     (when-let ((timer (cl-find-if (lambda (timer)
-                                                     (eq (timer--function timer)
-                                                         #'gnus-time-out-thread))
-                                                   timer-list)))
-                       (cancel-timer timer))
-                     (gnus-group-list-groups level*)
-                     (gnus-run-hooks 'gnus-after-getting-new-news-hook)
-                     (gnus-group-list-groups)
-                     (redisplay t))
-                   (and (numberp level)
-                        (max (or (and (numberp (car gnus-group-list-mode))
-                                      (car gnus-group-list-mode))
-                                 (gnus-group-default-level))
-                             level)))))
-        (mapc (lambda (elem)
-                (cl-destructuring-bind
-                    (method &rest infos
-                            &aux
-                            (backend (car method))
-                            (already-p
-                             (cl-some (apply-partially
-                                       #'gnus-methods-equal-p method)
-                                      methods))
-                            (denied-p (gnus-method-denied-p method))
-                            (scan-p (gnus-check-backend-function 'request-scan backend))
-                            (early-p (gnus-check-backend-function
-                                      'retrieve-group-data-early backend))
-                            (update-p (gnus-check-backend-function
-                                       'request-update-info backend))
-                            commands)
-                    elem
-                  (when (and method infos (not denied-p) (not already-p))
-                    (push method methods)
-                    (gnus-push-end (gnus-chain-arg
-                                    nil
-                                    #'gnus-open-server
-                                    method)
-                                   commands)
-                    (when early-p
-                      (when scan-p
-                        (gnus-push-end (gnus-chain-arg nil #'gnus-request-scan nil method)
-                                       commands))
-                      ;; Store the token we get back from -early so that we
-                      ;; can pass it to -finish later.
-                      (gnus-push-end (gnus-chain-arg
-                                      nil
-                                      #'gnus-retrieve-group-data-early
-                                      method infos)
-                                     commands))
-                    (gnus-push-end (gnus-chain-arg
-                                    t
-                                    #'gnus-read-active-for-groups
-                                    method infos)
-                                   commands)
-                    (gnus-push-end (gnus-chain-arg
-                                    nil
-                                    (lambda (infos* update-p*)
-                                      (mapc (lambda (info)
-                                              (gnus-get-unread-articles-in-group
-                                               info
-                                               (gnus-active (gnus-info-group info))
-                                               update-p*)
-                                              (gnus-group-update-group (gnus-info-group info) t))
-                                            infos*)
-                                      (gnus-message 6 "Checking new news...done"))
-                                    infos update-p)
-                                   commands)
-                    (if gnus-background-get-unread-articles
-                        (progn
-                          (add-function
-                           :before-while (var coda)
-                           (apply-partially
-                            (lambda (thread-group* &rest _args)
-                              "Proceed with CODA if I'm the last one."
-                              (<= (cl-count thread-group*
-                                            (all-threads)
-                                            :test (lambda (s thr)
-                                                    (cl-search s (thread-name thr))))
-                                  1))
-                            gnus-thread-group))
-                          (gnus-push-end (gnus-chain-arg nil coda) commands)
-                          (apply #'gnus-run-thread
-                                 (mapconcat (apply-partially #'format "%s")
-                                            (cl-subseq method 0 (min (length method) 2))
-                                            "-")
-                                 gnus-mutex-get-unread-articles
-                                 gnus-thread-group
+(cl-defun gnus-get-unread-articles--doit (infos-by-method
+                                          &optional
+                                          requested-level
+                                          &aux
+                                          (level (gnus-group-default-level requested-level t)))
+  "Workhorse of `gnus-get-unread-articles'."
+  (let (methods
+        (coda (apply-partially
+               (lambda (level*)
+                 (gnus-message-with-timestamp "gnus-get-unread-articles: all done")
+                 (gnus-group-list-groups level*)
+                 (gnus-run-hooks 'gnus-after-getting-new-news-hook)
+                 (gnus-group-list-groups)
+                 (redisplay t))
+               (and (numberp level)
+                    (max (or (and (numberp (car gnus-group-list-mode))
+                                  (car gnus-group-list-mode))
+                             (gnus-group-default-level))
+                         level)))))
+    (mapc (lambda (elem)
+            (cl-destructuring-bind
+                (method &rest infos
+                        &aux
+                        (backend (car method))
+                        (already-p
+                         (cl-some (apply-partially
+                                   #'gnus-methods-equal-p method)
+                                  methods))
+                        (denied-p (gnus-method-denied-p method))
+                        (scan-p (gnus-check-backend-function 'request-scan backend))
+                        (early-p (gnus-check-backend-function
+                                  'retrieve-group-data-early backend))
+                        (update-p (gnus-check-backend-function
+                                   'request-update-info backend))
+                        commands)
+                elem
+              (when (and method infos (not denied-p) (not already-p))
+                (push method methods)
+                (gnus-push-end (gnus-chain-arg
+                                nil
+                                #'gnus-open-server
+                                method)
+                               commands)
+                (when early-p
+                  (when scan-p
+                    (gnus-push-end (gnus-chain-arg nil #'gnus-request-scan nil method)
+                                   commands))
+                  ;; Store the token we get back from -early so that we
+                  ;; can pass it to -finish later.
+                  (gnus-push-end (gnus-chain-arg
+                                  nil
+                                  #'gnus-retrieve-group-data-early
+                                  method infos)
                                  commands))
-                      (let (gnus-run-thread--subresult)
-                        (mapc (lambda (fn)
-                                (setq gnus-run-thread--subresult
-                                      (funcall fn gnus-run-thread--subresult)))
-                              commands))))))
-              infos-by-method)
-        (unless gnus-background-get-unread-articles
-          (funcall coda))))))
+                (gnus-push-end (gnus-chain-arg
+                                t
+                                #'gnus-read-active-for-groups
+                                method infos)
+                               commands)
+                (gnus-push-end (gnus-chain-arg
+                                nil
+                                (lambda (infos* update-p*)
+                                  (mapc (lambda (info)
+                                          (gnus-get-unread-articles-in-group
+                                           info
+                                           (gnus-active (gnus-info-group info))
+                                           update-p*)
+                                          (gnus-group-update-group (gnus-info-group info) t))
+                                        infos*)
+                                  (gnus-message 6 "Checking new news...done"))
+                                infos update-p)
+                               commands)
+                (apply #'gnus-run-method
+                       (mapconcat (apply-partially #'format "%s")
+                                  (cl-subseq method 0 (min (length method) 2))
+                                  "-")
+                       gnus-thread-group
+                       commands))))
+          infos-by-method)
+    (funcall coda)))
 
 (defun gnus-read-active-for-groups (method infos early-data)
   (with-current-buffer nntp-server-buffer
