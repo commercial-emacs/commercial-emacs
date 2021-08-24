@@ -71,7 +71,6 @@ static void
 release_global_lock (void)
 {
   sys_mutex_unlock (&global_lock);
-  /* fprintf (stderr, "ZZZ %s\n", current_thread ? current_thread->thread_name : "ether"); */
 }
 
 /* You must call this after acquiring the global lock.
@@ -121,7 +120,6 @@ static void
 acquire_global_lock (struct thread_state *self)
 {
   sys_mutex_lock (&global_lock);
-  /* fprintf (stderr, "BBB %s\n", self ? self->thread_name : "ether"); */
   post_acquire_global_lock (self);
 }
 
@@ -744,7 +742,6 @@ run_thread (void *state)
   if (self->thread_name)
     sys_thread_set_name (self->thread_name);
 
-  /* fprintf (stderr, "AAA %s\n", self->thread_name); */
   acquire_global_lock (self);
 
   /* Put a dummy catcher at top-level so that handlerlist is never NULL.

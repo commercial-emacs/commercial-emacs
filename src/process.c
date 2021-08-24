@@ -3561,13 +3561,9 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	  break;
 	}
 
-      maybe_quit ();
-
-      debug_print (Fthread_name (Fcurrent_thread()));
       while ((ret = connect (s, sa, addrlen)) < 0)
 	{
 	  xerrno = errno;
-	  debug_print (make_fixnum(xerrno));
 	  maybe_quit();
 #ifndef WINDOWSNT
 	  switch (xerrno)
