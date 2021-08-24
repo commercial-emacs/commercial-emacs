@@ -30,9 +30,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 
-/* This limits the attempts to handshake per process (connection).  It
-   should work out to about one minute in asynchronous cases. */
-#define GNUTLS_EMACS_HANDSHAKES_LIMIT 6000
+/* An erstwhile limit of 6000 which claimed 100 tries per second
+   could not be verified in practice (actual rate faster by order of magnitude). */
+#define GNUTLS_EMACS_HANDSHAKES_LIMIT 30000
 
 typedef enum
 {

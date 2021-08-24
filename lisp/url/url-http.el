@@ -1363,8 +1363,10 @@ The return value of this function is the retrieval buffer."
            (set-process-sentinel connection 'url-http-async-sentinel))
           ('failed
            ;; Asynchronous connection failed
-           (error "Could not create connection to %s:%d" (url-host url)
-                  (url-port url)))
+           (error "Could not create connection to %s:%d (%s)"
+                  (url-host url)
+                  (url-port url)
+                  (process-exit-status connection)))
           (_
            (if (and url-http-proxy (string= "https"
                                             (url-type url-current-object)))
@@ -1445,10 +1447,8 @@ The return value of this function is the retrieval buffer."
     (with-current-buffer (process-buffer proc)
       (cond
        (url-http-connection-opened
-        (url-http-debug "holy smoke: %s %s" (process-name proc) why)
 	(url-http-end-of-document-sentinel proc why))
        ((string= (substring why 0 4) "open")
-        (url-http-debug "crazy daisy: %s %s" (process-name proc) why)
 	(setq url-http-connection-opened t)
         (if (and url-http-proxy (string= "https" (url-type url-current-object)))
             (url-https-proxy-connect proc)

@@ -3339,11 +3339,11 @@ connected_callback (Lisp_Object proc)
 #ifdef HAVE_GNUTLS
   Lisp_Object params = p->gnutls_boot_parameters;
 
-  /* open-gnutls-stream takes it upon itself to perform
-     gnutls handshake only for blocking connections, i.e.,
-     when :nowait is false.  Double negatives are bad, but
-     even worse, such arbitrary and surprising lateral actions
-     confound reasoning about control flow.. */
+  /* Surprising, out-of-band calls to gnutls-negotiate()
+     confound reasoning about control flow.  Ideally,
+     all handshaking happens here, but too many cooks
+     (or just one cut-rate one) spoil the broth.
+  */
   handshaked = NILP (p->gnutls_boot_parameters)
     || (p->gnutls_initstage >= GNUTLS_STAGE_READY);
   if (!handshaked)
@@ -5863,15 +5863,20 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #endif
 	      if (xerrno)
 		{
-		  Lisp_Object remaining = CDR_SAFE (CDR_SAFE (p->status));
-		  deactivate_process (proc);
-		  if (NILP (remaining))
-		    {
-		      pset_status (p, list2 (Qfailed, make_fixnum (xerrno)));
-		      p->tick = ++process_tick;
-		    }
+		  if (xerrno == EAGAIN || xerrno == EINTR)
+		    add_process_write_fd(channel);
 		  else
-		    connect_network_socket (proc, remaining, Qnil);
+		    {
+		      Lisp_Object remaining = CDR_SAFE (CDR_SAFE (p->status));
+		      deactivate_process (proc);
+		      if (NILP (remaining))
+			{
+			  pset_status (p, list2 (Qfailed, make_fixnum (xerrno)));
+			  p->tick = ++process_tick;
+			}
+		      else
+			connect_network_socket (proc, remaining, Qnil);
+		    }
 		}
 	      else if (connected_callback (proc))
 		add_process_write_fd(channel);
