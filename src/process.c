@@ -5806,10 +5806,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		      if (!wait_proc || wait_proc == XPROCESS (proc))
 			got_some_output = max (got_some_output, nread);
 		      if (do_display)
-			{
-			  fprintf (stderr, "get here\n");
-			  redisplay_preserve_echo_area (12);
-			}
+			redisplay_preserve_echo_area (12);
 		    }
 		}
 	    }
