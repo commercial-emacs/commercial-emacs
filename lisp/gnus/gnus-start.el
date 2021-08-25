@@ -1560,14 +1560,14 @@ backend check whether the group actually exists."
 
 (defun gnus-time-out-thread ()
   (interactive)
-  (run-at-time
-   (/ gnus-seconds-per-method 2)
-   nil
-   #'gnus-time-out-thread)
   (when gnus-thread-start
     (cl-destructuring-bind (started . thread)
         gnus-thread-start
-      (unless (time-less-p nil (time-add started gnus-seconds-per-method))
+      (if (time-less-p (time-add started gnus-seconds-per-method) nil)
+          (run-at-time
+           (/ gnus-seconds-per-method 2)
+           nil
+           #'gnus-time-out-thread)
         (setq gnus-thread-start nil)
         (if (thread-live-p thread)
             (progn
