@@ -490,6 +490,11 @@ See also `gnus-before-startup-hook'."
 ;; Suggested by Brian Edmonds <edmonds@cs.ubc.ca>.
 (defvar gnus-init-inhibit nil)
 
+(defvar gnus-thread-start nil
+  "(lisp-time . thread) when background thread got mutex.
+The macro `with-timeout' within thread body is verboten since handlerlist is not
+thread-safe in eval.c.")
+
 (defun gnus-read-init-file (&optional inhibit-next)
   ;; Don't load .gnus if the -q option was used.
   (when init-file-user
@@ -1553,6 +1558,25 @@ backend check whether the group actually exists."
       (prog1 nil
         (thread-signal thr 'error nil)))))
 
+(defun gnus-time-out-thread ()
+  (interactive)
+  (run-at-time
+   (/ gnus-seconds-per-method 2)
+   nil
+   #'gnus-time-out-thread)
+  (when gnus-thread-start
+    (cl-destructuring-bind (started . thread)
+        gnus-thread-start
+      (unless (time-less-p nil (time-add started gnus-seconds-per-method))
+        (setq gnus-thread-start nil)
+        (if (thread-live-p thread)
+            (progn
+              (gnus-message-with-timestamp
+               "gnus-time-out-thread: signal quit %s" (thread-name thread))
+              (thread-signal thread 'quit nil))
+          (gnus-message-with-timestamp
+           "gnus-time-out-thread: race on dead %s" (thread-name thread)))))))
+
 (defun gnus-run-method (label thread-group &rest fns)
   "THREAD-GROUP is string useful for naming working buffer and threads.
 Errors need to be trapped for a clean exit.
@@ -1574,6 +1598,8 @@ Else we get unblocked but permanently yielded threads."
                     (gnus-inhibit-demon t)
                     (nntp-server-buffer (current-buffer)))
                 (condition-case err
+                    ;; with-timeout doesn't work in non-main thread
+                    ;; i.e., (no-catch timeout timeout)
                     (dolist (fn fns)
                       (setq current-fn fn)
                       (setq gnus-run-method--subresult
@@ -1681,7 +1707,18 @@ Sets up `gnus-get-unread-articles--doit'."
                                  infos-by-method
                                  requested-level)))
       (if gnus-background-get-unread-articles
-          (make-thread doit gnus-thread-group)
+          (progn
+            (when gnus-background-get-unread-articles
+              (unless (cl-find-if (lambda (timer)
+                                    (eq (timer--function timer)
+                                        #'gnus-time-out-thread))
+                                  timer-list)
+                (run-at-time
+                 (/ gnus-seconds-per-method 2)
+                 nil
+                 #'gnus-time-out-thread)))
+            (setq gnus-thread-start
+                  (cons (current-time) (make-thread doit gnus-thread-group))))
         (funcall doit)))))
 
 (defun gnus-get-unread-articles--doit (infos-by-method requested-level)
@@ -1768,7 +1805,13 @@ Sets up `gnus-get-unread-articles--doit'."
           (redisplay t))
       (error (gnus-message-with-timestamp
               "gnus-get-unread-articles--doit: error coda %s"
-              (error-message-string err))))))
+              (error-message-string err))))
+    (setq gnus-thread-start nil)
+    (when-let ((timer (cl-find-if (lambda (timer)
+                                    (eq (timer--function timer)
+                                        #'gnus-time-out-thread))
+                                  timer-list)))
+      (cancel-timer timer))))
 
 (defun gnus-read-active-for-groups (method infos early-data)
   (with-current-buffer nntp-server-buffer
