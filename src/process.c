@@ -318,14 +318,6 @@ static void wait_for_socket_fds (Lisp_Object, char const *);
 /* Alist of elements (NAME . PROCESS).  */
 static Lisp_Object Vprocess_alist;
 
-/* Buffered-ahead input char from process, indexed by channel.
-   -1 means empty (no char is buffered).
-   Used on sys V where the only way to tell if there is any
-   output from the process is to read at least one char.
-   Always -1 on systems that support FIONREAD.  */
-
-static int proc_buffered_char[FD_SETSIZE];
-
 /* Table of `struct coding-system' for each process.  */
 static struct coding_system *proc_decode_coding_system[FD_SETSIZE];
 static struct coding_system *proc_encode_coding_system[FD_SETSIZE];
@@ -4762,7 +4754,6 @@ deactivate_process (Lisp_Object proc)
     close_process_fd (&p->open_fd[i]);
 
   inchannel = p->infd;
-  eassert (inchannel < FD_SETSIZE);
   if (inchannel >= 0)
     {
       p->infd  = -1;
@@ -5197,7 +5188,7 @@ wait_reading_process_output_unwind (int data)
 
    If JUST_WAIT_PROC is nonzero, handle only output from WAIT_PROC
      (suspending output from other processes).  A negative value
-     means don't run any timers either.
+     means don't run any timers either.  Deprecated.
 
    Return positive if we received input from WAIT_PROC (or from any
    process if WAIT_PROC is null), zero if we attempted to receive
@@ -5217,7 +5208,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
   int check_delay;
   bool avail = false;
   int xerrno = 0;
-  Lisp_Object proc;
   struct timespec timeout, end_time, timer_delay;
   struct timespec got_output_end_time = invalid_timespec ();
   enum { MINIMUM = -1, TIMEOUT, FOREVER } wait;
@@ -5264,8 +5254,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
   while (1)
     {
       bool process_skipped = false;
-      bool wrapped;
-      int channel_start;
 
       /* If calling from keyboard input, do not quit
 	 since we want to return C-g as an input character.
@@ -5411,6 +5399,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  if (wait_proc->infd >= 0)
 	    {
 	      unsigned int count = 0;
+	      Lisp_Object proc;
 	      XSETPROCESS (proc, wait_proc);
 
 	      while (true)
@@ -5424,8 +5413,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		    }
 		  else
 		    {
-		      if (got_some_output < nread)
-			got_some_output = nread;
+		      got_some_output = max (got_some_output, nread);
 		      if (nread == 0)
 			break;
 		      read_some_bytes = true;
@@ -5440,7 +5428,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	}
 
       /* Wait till there is something to do.  */
-
       if (wait_proc && just_wait_proc)
 	{
 	  if (wait_proc->infd < 0)  /* Terminated.  */
@@ -5511,12 +5498,10 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		adaptive_nsecs = READ_OUTPUT_DELAY_MAX;
 	      for (channel = 0; check_delay > 0 && channel <= max_desc; channel++)
 		{
-		  proc = chan_process[channel];
-		  if (NILP (proc))
-		    continue;
+		  Lisp_Object proc = chan_process[channel];
 		  /* Find minimum non-zero read_output_delay among the
 		     processes with non-zero read_output_skip.  */
-		  if (XPROCESS (proc)->read_output_delay > 0)
+		  if (!NILP (proc) && XPROCESS (proc)->read_output_delay > 0)
 		    {
 		      check_delay--;
 		      if (!XPROCESS (proc)->read_output_skip)
@@ -5598,7 +5583,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #else
 #define WAIT_SELECT thread_select
 #endif
-	  nfds = WAIT_SELECT(max_desc + 1, &Available, (check_write ? &Writeok : 0),
+	  nfds = WAIT_SELECT(max_desc + 1, &Available, (check_write ? &Writeok : NULL),
 			     NULL, &timeout, NULL);
 	  xerrno = (nfds < 0) ? errno : 0;
 	  avail = (nfds > 0);
@@ -5730,6 +5715,8 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       if (read_kbd || ! NILP (wait_for_cell))
 	do_pending_window_change (0);
 
+      /* Obviously we need to consolidate this check with the same
+	 one above. */
       if (! avail)
 	continue;
 
@@ -5744,168 +5731,142 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
             d->func (channel, d->data);
 	}
 
-      /* Do round robin if `process-pritoritize-lower-fds' is nil. */
-      channel_start
-	= process_prioritize_lower_fds ? 0 : last_read_channel + 1;
-
-      for (channel = channel_start, wrapped = false;
-	   !wrapped || (channel < channel_start && channel <= max_desc);
-	   channel++)
+      for (int count = 0, channel = last_read_channel + 1;
+	   count <= max_desc;
+	   ++count, ++channel)
 	{
-	  if (channel > max_desc)
-	    {
-	      wrapped = true;
-	      channel = -1;
-	      continue;
-	    }
-
+	  channel = channel % (max_desc + 1); /* max_desc >= 0 by loop cond */
 	  if (FD_ISSET (channel, &Available)
-	      && ((fd_callback_info[channel].flags & (KEYBOARD_FD | PROCESS_FD))
-		  == PROCESS_FD))
+	      && fd_callback_info[channel].flags & PROCESS_FD
+	      && ! (fd_callback_info[channel].flags & KEYBOARD_FD))
 	    {
-	      int nread;
-
-	      /* If waiting for this channel, arrange to return as
-		 soon as no more input to be processed.  No more
-		 waiting.  */
-	      proc = chan_process[channel];
+	      Lisp_Object proc = chan_process[channel];
 	      if (NILP (proc))
-		continue;
-
-	      /* If this is a server stream socket, accept connection.  */
-	      if (EQ (XPROCESS (proc)->status, Qlisten))
+		{
+		  delete_read_fd (channel);
+		  FD_CLR (channel, &Available);
+		}
+	      else if (EQ (XPROCESS (proc)->status, Qlisten))
 		{
 		  server_accept_connection (proc, channel);
-		  continue;
-		}
-
-	      /* Read data from the process, starting with our
-		 buffered-ahead character if we have one.  */
-
-	      nread = read_process_output (proc, channel);
-	      if ((!wait_proc || wait_proc == XPROCESS (proc))
-		  && got_some_output < nread)
-		got_some_output = nread;
-	      if (nread > 0)
-		{
-		  /* Vacuum up any leftovers without waiting.  */
-		  if (wait_proc == XPROCESS (proc))
-		    wait = MINIMUM;
-		  /* Since read_process_output can run a filter,
-		     which can call accept-process-output,
-		     don't try to read from any other processes
-		     before doing the select again.  */
-		  FD_ZERO (&Available);
-		  last_read_channel = channel;
-
-		  if (do_display)
-		    redisplay_preserve_echo_area (12);
-		}
-	      else if (nread == -1 && would_block (errno))
-		;
-#ifdef HAVE_PTYS
-	      /* On some OSs with ptys, when the process on one end of
-		 a pty exits, the other end gets an error reading with
-		 errno = EIO instead of getting an EOF (0 bytes read).
-		 Therefore, if we get an error reading and errno =
-		 EIO, just continue, because the child process has
-		 exited and should clean itself up soon (e.g. when we
-		 get a SIGCHLD).  */
-	      else if (nread == -1 && errno == EIO)
-		{
-		  struct Lisp_Process *p = XPROCESS (proc);
-
-		  /* Clear the descriptor now, so we only raise the
-		     signal once.  */
-		  delete_read_fd (channel);
-
-		  if (p->pid == -2)
-		    {
-		      /* If the EIO occurs on a pty, the SIGCHLD handler's
-			 waitpid call will not find the process object to
-			 delete.  Do it here.  */
-		      p->tick = ++process_tick;
-		      pset_status (p, Qfailed);
-		    }
-		}
-#endif /* HAVE_PTYS */
-	      /* If we can detect process termination, don't consider the
-		 process gone just because its pipe is closed.  */
-	      else if (nread == 0 && !NETCONN_P (proc) && !SERIALCONN_P (proc)
-		       && !PIPECONN_P (proc))
-		;
-	      else if (nread == 0 && PIPECONN_P (proc))
-		{
-		  /* Preserve status of processes already terminated.  */
-		  XPROCESS (proc)->tick = ++process_tick;
-		  deactivate_process (proc);
-		  if (EQ (XPROCESS (proc)->status, Qrun))
-		    pset_status (XPROCESS (proc),
-				 list2 (Qexit, make_fixnum (0)));
 		}
 	      else
 		{
-		  /* Preserve status of processes already terminated.  */
-		  XPROCESS (proc)->tick = ++process_tick;
-		  deactivate_process (proc);
-		  if (XPROCESS (proc)->raw_status_new)
-		    update_status (XPROCESS (proc));
-		  if (EQ (XPROCESS (proc)->status, Qrun))
-		    pset_status (XPROCESS (proc),
-				 list2 (Qexit, make_fixnum (256)));
+		  errno = 0;
+		  int nread = read_process_output (proc, channel);
+		  xerrno = errno;
+
+		  if (nread <= 0)
+		    {
+#ifdef HAVE_PTYS
+		      /* On some OSs with ptys, when the process on one end of
+			 a pty exits, the other end gets an error reading with
+			 errno = EIO instead of getting an EOF (0 bytes read).
+			 Therefore, if we get an error reading and errno =
+			 EIO, just continue, because the child process has
+			 exited and should clean itself up soon (e.g. when we
+			 get a SIGCHLD).  */
+		      if (xerrno == EIO)
+			{
+			  struct Lisp_Process *p = XPROCESS (proc);
+
+			  /* Clear the descriptor now, so we only raise the
+			     signal once.  */
+			  delete_read_fd (channel);
+			  FD_CLR (channel, &Available);
+
+			  if (p->pid == -2)
+			    {
+			      /* If the EIO occurs on a pty, the SIGCHLD handler's
+				 waitpid call will not find the process object to
+				 delete.  Do it here.  */
+			      p->tick = ++process_tick;
+			      pset_status (p, Qfailed);
+			    }
+			}
+		      else
+#endif /* HAVE_PTYS */
+		      if (PIPECONN_P (proc)
+			  || (xerrno && ! would_block (xerrno)))
+			{
+			  struct Lisp_Process *p = XPROCESS (proc);
+			  p->tick = ++process_tick;
+			  deactivate_process (proc);
+			  if (p->raw_status_new)
+			    update_status (p);
+			  if (EQ (p->status, Qrun))
+			    pset_status (p,
+					 list2 (Qexit,
+						make_fixnum (PIPECONN_P (proc) ? 0 : 256)));
+			}
+		    }
+		  else
+		    {
+		      last_read_channel = channel;
+		      if (!wait_proc || wait_proc == XPROCESS (proc))
+			got_some_output = max (got_some_output, nread);
+		      if (do_display)
+			{
+			  fprintf (stderr, "get here\n");
+			  redisplay_preserve_echo_area (12);
+			}
+		    }
 		}
 	    }
 
 	  if (FD_ISSET (channel, &Writeok))
 	    {
-	      struct Lisp_Process *p;
+	      Lisp_Object proc = chan_process[channel];
+
 	      delete_write_fd (channel);
-	      proc = chan_process[channel];
+
 	      if (NILP (proc))
-		  continue;
-
-	      p = XPROCESS (proc);
-#ifndef WINDOWSNT
-	      xerrno = connect_errno (channel);
-#else
-	      /* On MS-Windows, getsockopt clears the error for the
-		 entire process, which may not be the right thing; see
-		 w32.c.  Use getpeername instead.  */
-	      {
-		struct sockaddr pname;
-		socklen_t pnamelen = sizeof (pname);
-
-		/* If connection failed, getpeername will fail.  */
-		xerrno = 0;
-		if (getpeername (channel, &pname, &pnamelen) < 0)
-		  {
-		    /* Obtain connect failure code through error slippage.  */
-		    char dummy;
-		    xerrno = errno;
-		    if (errno == ENOTCONN && read (channel, &dummy, 1) < 0)
-		      xerrno = errno;
-		  }
-	      }
-#endif
-	      if (xerrno)
+		FD_CLR (channel, &Writeok);
+	      else
 		{
-		  if (xerrno == EAGAIN || xerrno == EINTR)
-		    add_process_write_fd(channel);
-		  else
+		  struct Lisp_Process *p = XPROCESS (proc);
+#ifndef WINDOWSNT
+		  xerrno = connect_errno (channel);
+#else
+		  /* On MS-Windows, getsockopt clears the error for the
+		     entire process, which may not be the right thing; see
+		     w32.c.  Use getpeername instead.  */
+		  {
+		    struct sockaddr pname;
+		    socklen_t pnamelen = sizeof (pname);
+
+		    /* If connection failed, getpeername will fail.  */
+		    xerrno = 0;
+		    if (getpeername (channel, &pname, &pnamelen) < 0)
+		      {
+			/* Obtain connect failure code through error slippage.  */
+			char dummy;
+			xerrno = errno;
+			if (errno == ENOTCONN && read (channel, &dummy, 1) < 0)
+			  xerrno = errno;
+		      }
+		  }
+#endif
+		  if (xerrno)
 		    {
-		      Lisp_Object remaining = CDR_SAFE (CDR_SAFE (p->status));
-		      deactivate_process (proc);
-		      if (NILP (remaining))
-			{
-			  pset_status (p, list2 (Qfailed, make_fixnum (xerrno)));
-			  p->tick = ++process_tick;
-			}
+		      if (xerrno == EAGAIN || xerrno == EINTR)
+			add_process_write_fd(channel);
 		      else
-			connect_network_socket (proc, remaining, Qnil);
+			{
+			  Lisp_Object remaining = CDR_SAFE (CDR_SAFE (p->status));
+			  deactivate_process (proc);
+			  if (NILP (remaining))
+			    {
+			      pset_status (p, list2 (Qfailed, make_fixnum (xerrno)));
+			      p->tick = ++process_tick;
+			    }
+			  else
+			    connect_network_socket (proc, remaining, Qnil);
+			}
 		    }
+		  else if (connected_callback (proc))
+		    add_process_write_fd(channel);
 		}
-	      else if (connected_callback (proc))
-		add_process_write_fd(channel);
 	    }
 	}			/* End for each file descriptor.  */
     }				/* End while exit conditions not met.  */
@@ -5957,8 +5918,7 @@ read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
 				    ssize_t nbytes,
 				    struct coding_system *coding);
 
-/* Read pending output from the process channel,
-   starting with our buffered-ahead character if we have one.
+/* Read pending output from the process channel.
    Yield number of decoded characters read,
    or -1 (setting errno) if there is a read error.
 
@@ -5990,7 +5950,6 @@ read_process_output (Lisp_Object proc, int channel)
     memcpy (chars, SDATA (p->decoding_buf), carryover);
 
 #ifdef DATAGRAM_SOCKETS
-  /* We have a working select, so proc_buffered_char is always -1.  */
   if (DATAGRAM_CHAN_P (channel))
     {
       socklen_t len = datagram_address[channel].len;
@@ -6002,20 +5961,14 @@ read_process_output (Lisp_Object proc, int channel)
   else
 #endif
     {
-      bool buffered = proc_buffered_char[channel] >= 0;
-      if (buffered)
-	{
-	  chars[carryover] = proc_buffered_char[channel];
-	  proc_buffered_char[channel] = -1;
-	}
 #ifdef HAVE_GNUTLS
       if (p->gnutls_state)
-	nbytes = emacs_gnutls_read (p, chars + carryover + buffered,
-				    readmax - buffered);
+	nbytes = emacs_gnutls_read (p, chars + carryover,
+				    readmax);
       else
 #endif
-	nbytes = emacs_read (channel, chars + carryover + buffered,
-			     readmax - buffered);
+	nbytes = emacs_read (channel, chars + carryover,
+			     readmax);
       if (nbytes > 0 && p->adaptive_read_buffering)
 	{
 	  int delay = p->read_output_delay;
@@ -6028,7 +5981,7 @@ read_process_output (Lisp_Object proc, int channel)
 		  delay += READ_OUTPUT_DELAY_INCREMENT * 2;
 		}
 	    }
-	  else if (delay > 0 && nbytes == readmax - buffered)
+	  else if (delay > 0 && nbytes == readmax)
 	    {
 	      delay -= READ_OUTPUT_DELAY_INCREMENT;
 	      if (delay == 0)
@@ -6041,8 +5994,6 @@ read_process_output (Lisp_Object proc, int channel)
 	      process_output_skip = 1;
 	    }
 	}
-      nbytes += buffered;
-      nbytes += buffered && nbytes <= 0;
     }
 
   p->decoding_carryover = 0;
@@ -6057,8 +6008,7 @@ read_process_output (Lisp_Object proc, int channel)
       coding->mode |= CODING_MODE_LAST_BLOCK;
     }
 
-  /* At this point, NBYTES holds number of bytes just received
-     (including the one in proc_buffered_char[channel]).  */
+  /* At this point, NBYTES holds number of bytes just received */
 
   /* Ignore carryover, it's been added by a previous iteration already.  */
   p->nbytes_read += nbytes;
@@ -8331,7 +8281,6 @@ init_process_emacs (int sockfd)
   for (i = 0; i < FD_SETSIZE; i++)
     {
       chan_process[i] = Qnil;
-      proc_buffered_char[i] = -1;
     }
   memset (proc_decode_coding_system, 0, sizeof proc_decode_coding_system);
   memset (proc_encode_coding_system, 0, sizeof proc_encode_coding_system);
@@ -8491,16 +8440,6 @@ If the value is t, the delay is reset after each write to the process; any other
 non-nil value means that the delay is not reset on write.
 The variable takes effect when `start-process' is called.  */);
   Vprocess_adaptive_read_buffering = Qt;
-
-  DEFVAR_BOOL ("process-prioritize-lower-fds", process_prioritize_lower_fds,
-	       doc: /* Whether to start checking for subprocess output from first file descriptor.
-Emacs loops through file descriptors to check for output from subprocesses.
-If this variable is nil, the default, then after accepting output from a
-subprocess, Emacs will continue checking the rest of descriptors, starting
-from the one following the descriptor it just read.  If this variable is
-non-nil, Emacs will always restart the loop from the first file descriptor,
-thus favoring processes with lower descriptors.  */);
-  process_prioritize_lower_fds = 0;
 
   DEFVAR_LISP ("interrupt-process-functions", Vinterrupt_process_functions,
 	       doc: /* List of functions to be called for `interrupt-process'.
