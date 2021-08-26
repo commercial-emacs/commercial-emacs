@@ -5748,61 +5748,66 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		}
 	      else
 		{
+		  int nread;
 		  errno = 0;
-		  int nread = read_process_output (proc, channel);
+		  nread = read_process_output (proc, channel);
 		  xerrno = errno;
+		  eassert(nread < 0 || xerrno == 0);
 
-		  if (nread <= 0)
-		    {
-#ifdef HAVE_PTYS
-		      /* On some OSs with ptys, when the process on one end of
-			 a pty exits, the other end gets an error reading with
-			 errno = EIO instead of getting an EOF (0 bytes read).
-			 Therefore, if we get an error reading and errno =
-			 EIO, just continue, because the child process has
-			 exited and should clean itself up soon (e.g. when we
-			 get a SIGCHLD).  */
-		      if (xerrno == EIO)
-			{
-			  struct Lisp_Process *p = XPROCESS (proc);
+		  bool terminate_on_empty_read =
+		    NETCONN_P (proc)
+		    || SERIALCONN_P (proc)
+		    || PIPECONN_P (proc);
 
-			  /* Clear the descriptor now, so we only raise the
-			     signal once.  */
-			  delete_read_fd (channel);
-			  FD_CLR (channel, &Available);
-
-			  if (p->pid == -2)
-			    {
-			      /* If the EIO occurs on a pty, the SIGCHLD handler's
-				 waitpid call will not find the process object to
-				 delete.  Do it here.  */
-			      p->tick = ++process_tick;
-			      pset_status (p, Qfailed);
-			    }
-			}
-		      else
-#endif /* HAVE_PTYS */
-		      if (PIPECONN_P (proc)
-			  || (xerrno && ! would_block (xerrno)))
-			{
-			  struct Lisp_Process *p = XPROCESS (proc);
-			  p->tick = ++process_tick;
-			  deactivate_process (proc);
-			  if (p->raw_status_new)
-			    update_status (p);
-			  if (EQ (p->status, Qrun))
-			    pset_status (p,
-					 list2 (Qexit,
-						make_fixnum (PIPECONN_P (proc) ? 0 : 256)));
-			}
-		    }
-		  else
+		  if (nread > 0)
 		    {
 		      last_read_channel = channel;
 		      if (!wait_proc || wait_proc == XPROCESS (proc))
 			got_some_output = max (got_some_output, nread);
 		      if (do_display)
 			redisplay_preserve_echo_area (12);
+		    }
+#ifdef HAVE_PTYS
+		  /* On some OSs with ptys, when the process on one end of
+		     a pty exits, the other end gets an error reading with
+		     errno = EIO instead of getting an EOF (0 bytes read).
+		     Therefore, if we get an error reading and errno =
+		     EIO, just continue, because the child process has
+		     exited and should clean itself up soon (e.g. when we
+		     get a SIGCHLD).  */
+		  else if (xerrno == EIO)
+		    {
+		      struct Lisp_Process *p = XPROCESS (proc);
+
+		      /* Clear the descriptor now, so we only raise the
+			 signal once.  */
+		      delete_read_fd (channel);
+		      FD_CLR (channel, &Available);
+
+		      if (p->pid == -2)
+			{
+			  /* If the EIO occurs on a pty, the SIGCHLD handler's
+			     waitpid call will not find the process object to
+			     delete.  Do it here.  */
+			  p->tick = ++process_tick;
+			  pset_status (p, Qfailed);
+			}
+		    }
+#endif /* HAVE_PTYS */
+		  else if ((nread == 0 && terminate_on_empty_read)
+			   ||
+			   (xerrno && ! would_block (xerrno)))
+		    {
+		      struct Lisp_Process *p = XPROCESS (proc);
+		      p->tick = ++process_tick;
+		      deactivate_process (proc);
+		      if (p->raw_status_new)
+			update_status (p);
+		      if (EQ (p->status, Qrun))
+			pset_status (p,
+				     list2 (Qexit,
+					    make_fixnum (PIPECONN_P (proc)
+							 ? 0 : 256)));
 		    }
 		}
 	    }
