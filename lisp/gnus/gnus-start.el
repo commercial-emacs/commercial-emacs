@@ -1555,7 +1555,7 @@ backend check whether the group actually exists."
 
 (defun gnus-time-out-thread (started thread)
   (interactive)
-  (if (time-less-p (time-add started gnus-thread-timeout-seconds) nil)
+  (if (time-less-p nil (time-add started gnus-thread-timeout-seconds))
       (run-at-time
        (/ gnus-thread-timeout-seconds 2)
        nil
