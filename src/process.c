@@ -3403,20 +3403,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
   struct Lisp_Process *p = XPROCESS (proc);
   Lisp_Object contact = p->childp;
   int optbits = 0;
-  int socket_to_use = -1;
-
-  if (!NILP (use_external_socket_p))
-    {
-      socket_to_use = external_sock_fd;
-      eassert (socket_to_use < FD_SETSIZE);
-
-      /* Ensure we don't consume the external socket twice.  */
-      external_sock_fd = -1;
-
-      /* Alternate name resolutions disallowed for external */
-      if (!NILP (addrinfos))
-	XSETCDR (addrinfos, Qnil);
-    }
 
   struct sockaddr *sa = NULL;
   ptrdiff_t count = SPECPDL_INDEX ();
@@ -3439,9 +3425,9 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       set_unwind_protect_ptr (count, xfree, sa);
       conv_lisp_to_sockaddr (family, ip_address, sa, addrlen);
 
-      s = NILP (use_external_socket_p)
-	? socket (family, (p->socktype | SOCK_CLOEXEC | SOCK_NONBLOCK), protocol)
-	: socket_to_use;
+      s = (! NILP (use_external_socket_p) && external_sock_fd != -1)
+	? external_sock_fd
+	: socket (family, (p->socktype | SOCK_CLOEXEC | SOCK_NONBLOCK), protocol);
 
       if (s < 0)
 	{
@@ -3458,7 +3444,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	}
 
       /* Systems with SOCK_NONBLOCK can save a call to fcntl */
-      if (!SOCK_NONBLOCK || s == socket_to_use)
+      if (! SOCK_NONBLOCK || s == external_sock_fd)
 	{
 	  ret = fcntl (s, F_SETFL, O_NONBLOCK);
 	  if (ret < 0)
@@ -3511,7 +3497,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	      }
 
           /* If passed a socket descriptor, it should be already bound. */
-	  if (s != socket_to_use && bind (s, sa, addrlen) != 0)
+	  if (s != external_sock_fd && bind (s, sa, addrlen) != 0)
 	    report_file_error ("Cannot bind server socket", Qnil);
 
 #ifdef HAVE_GETSOCKNAME
