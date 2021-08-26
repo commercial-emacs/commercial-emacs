@@ -5557,19 +5557,20 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	   * confirmed presence of which can be used
 	   * to avoid blocking in pselect().
 	   */
-	  fd_set tls_available;
-	  FD_ZERO (&tls_available);
+	  bool gnutls_pending_p = false;
+	  fd_set gnutls_pending;
+	  FD_ZERO (&gnutls_pending);
 	  for (channel = 0; channel <= max_desc; ++channel)
 	    if (! NILP (chan_process[channel])
 		&& FD_ISSET (channel, &Available))
 	      {
 		struct Lisp_Process *p = XPROCESS (chan_process[channel]);
-		if (p
-		    && p->gnutls_state
+		if (p->gnutls_state
 		    && emacs_gnutls_record_check_pending (p->gnutls_state) > 0)
 		  {
+		    gnutls_pending_p = true;
 		    eassert (p->infd == channel);
-		    FD_SET (p->infd, &tls_available);
+		    FD_SET (p->infd, &gnutls_pending);
 		    if (!wait_proc || wait_proc->infd == p->infd)
 			timeout = make_timespec (0, 0);
 		  }
@@ -5585,20 +5586,29 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #endif
 	  nfds = WAIT_SELECT(max_desc + 1, &Available, (check_write ? &Writeok : NULL),
 			     NULL, &timeout, NULL);
-	  xerrno = (nfds < 0) ? errno : 0;
-	  avail = (nfds > 0);
 #ifdef HAVE_GNUTLS
-	  /* Merge tls_available into Available. */
-	  for (channel = 0; channel <= max_desc; ++channel)
+	  /* Bug#40665 speculates gnutls is privy to ready descriptors
+	     that pselect() is not.  */
+	  if (gnutls_pending_p)
 	    {
-	      if (FD_ISSET(channel, &tls_available))
+	      if (nfds <= 0)
 		{
-		  xerrno = 0;
-		  avail = true;
-		  FD_SET(channel, &Available);
+		  /* pselect() returns zero nfds if none of
+		     the input descriptors changed status.
+		     However, the returned fdsets may and
+		     often does contain nonzero bits for
+		     descriptors unrelated to the inputs.  */
+		  FD_ZERO (&Available);
 		}
+	      for (channel = 0, nfds = 0; channel <= max_desc; ++channel)
+		if (FD_ISSET(channel, &gnutls_pending))
+		  {
+		    ++nfds;
+		    FD_SET(channel, &Available);
+		  }
 	    }
 #endif
+	  avail = (nfds > 0);
 	}
 
       /* Make C-g and alarm signals set flags again.  */
@@ -5607,22 +5617,8 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       /*  If we woke up due to SIGWINCH, actually change size now.  */
       do_pending_window_change (0);
 
-      if (!avail)
+      if (! avail)
 	{
-	  switch (xerrno)
-	    {
-	    case 0:
-	    case EAGAIN:
-	    case EINTR:
-	      break;
-	    case EBADF:
-	      emacs_abort ();
-	      break;
-	    default:
-	      report_file_errno ("Failed select", Qnil, xerrno);
-	      break;
-	    }
-
           /* Exit the main loop if we've passed the requested timeout,
              or have read some bytes from our wait_proc (either directly
              in this call or indirectly through timers / process filters),
