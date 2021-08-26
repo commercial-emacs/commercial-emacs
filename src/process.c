@@ -173,24 +173,6 @@ union u_sockaddr
 # define SOCK_NONBLOCK 0
 #endif
 
-/* Threads apparently taint file descriptors such that their netstat
-   recv-q does not drain.  */
-#ifdef UNTAINT_FILE_DESCRIPTORS
-#define UNTAINT(FD)						\
-  do {								\
-    int duped = dup (FD);					\
-    if (duped >= 0)						\
-      {								\
-	if (emacs_close (FD) < 0)				\
-	  emacs_close (duped);					\
-	else							\
-	  FD = duped;						\
-      }								\
-  } while (false)
-#else
-#define UNTAINT(FD) (void)FD
-#endif
-
 /* True if ERRNUM represents an error where the system call would
    block if a blocking variant were used.  */
 static bool
@@ -3460,9 +3442,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       s = NILP (use_external_socket_p)
 	? socket (family, (p->socktype | SOCK_CLOEXEC | SOCK_NONBLOCK), protocol)
 	: socket_to_use;
-
-      if (NILP (use_external_socket_p))
-	UNTAINT (s);
 
       if (s < 0)
 	{
