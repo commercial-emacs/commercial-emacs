@@ -23,6 +23,53 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "tree-sitter.h"
 
+/* Commentary
+
+   The Emacs wrapper of tree-sitter does not expose everything the C
+   API provides, most notably:
+
+   - It doesn't expose a syntax tree, we put the syntax tree in the
+     parser object, and updating the tree is handled in the C level.
+
+   - We don't expose tree cursor either.  I think Lisp is slow enough
+     to nullify any performance advantage of using a cursor, but I
+     don't have evidence.
+
+   - Because updating the change is handled in the C level as each
+     change is made in the buffer, there is no way for Lisp to
+     retrieve a node and update it.  But since we can just retrieve a
+     new node, it shouldn't be a limitation.
+
+   - I didn't expose setting timeout and cancellation flag for a
+     parser, mainly because I don't think they are really necessary
+     in Emacs' use cases.
+
+   - Many tree-sitter functions asks for a TSPoint, basically a (row,
+     column) location.  Emacs uses a gap buffer and keeps no
+     information about row and column position.  According to the
+     author of tree-sitter, tree-sitter only asks for (row, column)
+     position to carry it around and return back to the user later;
+     and the real position used is the byte position.  He also said
+     that he _think_ that it will work to use byte position only.
+     That's why whenever a TSPoint is asked, we pass a dummy one to
+     it.  Judging by the nature of parsing algorithms, I think it is
+     safe to use only byte position, and I don't think this will
+     change in the future.
+
+     REF: https://github.com/tree-sitter/tree-sitter/issues/445
+
+   tree-sitter.h has some commentary on the two main data structure
+   for the parser and node.  ts_ensure_position_synced has some
+   commentary on how do we make tree-sitter play well with narrowing
+   (tree-sitter parser only sees the visible region, so we need to
+   translate positions back and forth).  Most action happens in
+   ts_ensure_parsed, ts_read_buffer and ts_record_change.
+
+   A complete correspondence list between tree-sitter functions and
+   exposed Lisp functions can be found in the manual (elisp)API
+   Correspondence.
+ */
+
 /*** Parsing functions */
 
 /* An auxiliary function that saves a few lines of code.  */
@@ -295,8 +342,8 @@ DEFUN ("tree-sitter-node-parser",
   return XTS_NODE (node)->parser;
 }
 
-DEFUN ("tree-sitter-create-parser",
-       Ftree_sitter_create_parser, Stree_sitter_create_parser,
+DEFUN ("tree-sitter-parser-create",
+       Ftree_sitter_parser_create, Stree_sitter_parser_create,
        2, 2, 0,
        doc: /* Create and return a parser in BUFFER for LANGUAGE.
 
@@ -367,7 +414,7 @@ DEFUN ("tree-sitter-parser-root-node",
 }
 
 /* Checks that the RANGES argument of
-   `tree-sitter-parser-set-included-ranges is valid.  */
+   tree-sitter-parser-set-included-ranges is valid.  */
 void
 ts_check_range_argument (Lisp_Object ranges)
 {
@@ -894,12 +941,13 @@ Returns a list of (CAPTURE_NAME . NODE).  CAPTURE_NAME is the name
 assigned to the node in PATTERN.  NODE is the captured node.
 
 PATTERN is a string containing one or more matching patterns.  See
-manual for further explanation for how to write a match pattern.
+Info node `(elisp)Parsing' for how to write a query pattern.
 
 BEG and END, if _both_ non-nil, specifies the range in which the query
 is executed.
 
-Raise an tree-sitter-query-error if PATTERN is malformed.  */)
+Raise an tree-sitter-query-error if PATTERN is malformed.  See the
+info node for how to read the error message.  */)
   (Lisp_Object node, Lisp_Object pattern,
    Lisp_Object beg, Lisp_Object end)
 {
@@ -1016,7 +1064,7 @@ sync with the buffer's content.  */);
 
   defsubr (&Stree_sitter_node_parser);
 
-  defsubr (&Stree_sitter_create_parser);
+  defsubr (&Stree_sitter_parser_create);
   defsubr (&Stree_sitter_parser_buffer);
   defsubr (&Stree_sitter_parser_language);
 

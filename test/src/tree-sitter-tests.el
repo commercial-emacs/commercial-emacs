@@ -26,7 +26,7 @@
   "Test basic parsing routines."
   (require 'tree-sitter-json)
   (with-temp-buffer
-    (let ((parser (tree-sitter-create-parser
+    (let ((parser (tree-sitter-parser-create
                    (current-buffer) 'tree-sitter-json)))
       (should
        (eq parser (car tree-sitter-parser-list)))
@@ -57,7 +57,7 @@
     (let (parser root-node doc-node object-node pair-node)
       (progn
         (insert "[1,2,{\"name\": \"Bob\"},3]")
-        (setq parser (tree-sitter-create-parser
+        (setq parser (tree-sitter-parser-create
                       (current-buffer) 'tree-sitter-json))
         (setq root-node (tree-sitter-parser-root-node
                          parser)))
@@ -129,7 +129,7 @@
     (let (parser root-node pattern doc-node object-node pair-node)
       (progn
         (insert "[1,2,{\"name\": \"Bob\"},3]")
-        (setq parser (tree-sitter-create-parser
+        (setq parser (tree-sitter-parser-create
                       (current-buffer) 'tree-sitter-json))
         (setq root-node (tree-sitter-parser-root-node
                          parser))
@@ -146,7 +146,7 @@
           (number . "3"))
         (mapcar (lambda (entry)
                   (cons (car entry)
-                        (tree-sitter-node-content
+                        (tree-sitter-node-text
                          (cdr entry))))
                 (tree-sitter-query-capture root-node pattern)))))))
 
@@ -158,7 +158,7 @@
       (progn
         (insert "xxx[1,{\"name\": \"Bob\"},2,3]xxx")
         (narrow-to-region (+ (point-min) 3) (- (point-max) 3))
-        (setq parser (tree-sitter-create-parser
+        (setq parser (tree-sitter-parser-create
                       (current-buffer) 'tree-sitter-json))
         (setq root-node (tree-sitter-parser-root-node
                          parser)))
@@ -211,7 +211,7 @@
     (let (parser root-node pattern doc-node object-node pair-node)
       (progn
         (insert "[[1],oooxxx[1,2,3],xxx[1,2]]")
-        (setq parser (tree-sitter-create-parser
+        (setq parser (tree-sitter-parser-create
                       (current-buffer) 'tree-sitter-json))
         (setq root-node (tree-sitter-parser-root-node
                          parser)))
@@ -231,10 +231,46 @@
       ;; TODO: More tests.
       )))
 
+(ert-deftest tree-sitter-multi-lang ()
+  "Tests if parsing multiple language works."
+  (require 'tree-sitter-html)
+  (require 'tree-sitter-css)
+  (require 'tree-sitter-javascript)
+  (with-temp-buffer
+    (let (html css js html-range css-range js-range)
+      (progn
+        (insert "<html><script>1</script><style>body {}</style></html>")
+        (setq html (tree-sitter-get-parser-create 'tree-sitter-html))
+        (setq css (tree-sitter-get-parser-create 'tree-sitter-css))
+        (setq js (tree-sitter-get-parser-create 'tree-sitter-javascript)))
+      ;; JavaScript.
+      (setq js-range
+            (tree-sitter-query-range
+             'tree-sitter-html
+             "(script_element (raw_text) @capture)"))
+      (should (equal '((15 . 16)) js-range))
+      (tree-sitter-parser-set-included-ranges js js-range)
+      (should (equal "(program (expression_statement (number)))"
+                     (tree-sitter-node-string
+                      (tree-sitter-parser-root-node js))))
+      ;; CSS.
+      (setq css-range
+            (tree-sitter-query-range
+             'tree-sitter-html
+             "(style_element (raw_text) @capture)"))
+      (should (equal '((32 . 39)) css-range))
+      (tree-sitter-parser-set-included-ranges css css-range)
+      (should
+       (equal "(stylesheet (rule_set (selectors (tag_name)) (block)))"
+              (tree-sitter-node-string
+               (tree-sitter-parser-root-node css))))
+      ;; TODO: More tests.
+      )))
+
 ;; TODO
 ;; - Functions in tree-sitter.el
 ;; - tree-sitter-node-eq
-;; - tree-sitter-node-content
+;; - tree-sitter-node-text
 
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here

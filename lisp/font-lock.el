@@ -1800,32 +1800,64 @@ LOUDLY, if non-nil, allows progress-meter bar."
   "A list of settings for tree-sitter-based fontification.
 
 Each setting controls one parser (often of different language).
-A pattern is a list of form (LANGUAGE PATTERN).  LANGUAGE is the
-symbol of a function that returns a tree-sitter language.  This
-function should be provided by a dynamic module for a particular
-tree-sitter language.
+A pattern is a list of form (LANGUAGE PATTERN [RANGE-FUNCTION]).
+LANGUAGE is the symbol of a function that returns a tree-sitter
+language.  This function should be provided by a dynamic module
+for a particular tree-sitter language.
 
-PATTERN is a string containing tree-sitter queries.  TODO: more doc.")
+PATTERN is a string containing tree-sitter queries.  See Info
+node `(elisp)Pattern Matching' for writing query pattern.
+
+RANGE-FUNCTION is a optional function that sets ranges for the
+parser for LANGUAGE.  It's signature should be
+
+    (start end &optional loudly &rest _)
+
+where START and END marks the region that is about to be
+fontified.  RANGE-FUNCTION only need to adjust ranges in that
+region.  If loudly is non-nil, RANGE-FUNCTION can message some
+debug information.
+
+See Info node `(elisp)Multiple Languages' for what does it mean
+to set ranges for a parser.")
 
 (defvar-local font-lock-tree-sitter-defaults nil
   "Defaults for tree-sitter Font Lock specified by the major mode.
 
 It should be a list of defaults, each default is of the form:
 
-  (SETTINGS LANGUAGE)
+  (LANGUAGE SETTINGS [RANGE-FUNCTION])
 
-SETTINGS may be a symbol (a variable or function whose value is
-the settings to use for fontification) or a list of
-symbols (specifying different levels of fontification).  If the
-symbol is both a variable and a function, it is used as a
-function.  Different levels of fontification can be controlled by
-`font-lock-maximum-decoration'.")
+LANGUAGE is a tree-sitter language symbol (see Info
+node `(elisp)Language Definitions').  SETTINGS may be a symbol (a
+variable or function whose value is the settings to use for
+fontification) or a list of symbols (specifying different levels
+of fontification).  If the symbol is both a variable and a
+function, it is used as a function.  Different levels of
+fontification can be controlled by
+`font-lock-maximum-decoration'.
+
+RANGE-FUNCTION is a optional function that sets ranges for the
+parser for LANGUAGE.  It's signature should be
+
+    (start end &optional loudly &rest _)
+
+where START and END marks the region that is about to be
+fontified.  RANGE-FUNCTION only need to adjust ranges in that
+region.  If loudly is non-nil, RANGE-FUNCTION can message some
+debug information.
+
+See Info node `(elisp)Multiple Languages' for what does it mean
+to set ranges for a parser.")
 
 (defun font-lock-tree-sitter-fontify-region (start end &optional loudly)
   (dolist (setting font-lock-tree-sitter-settings)
     (let* ((language (nth 0 setting))
            (match-pattern (nth 1 setting))
+           (range-fn (nth 2 setting))
            (parser (tree-sitter-get-parser-create language)))
+      (when range-fn
+        (funcall range-fn start end loudly))
       (when-let ((node (tree-sitter-node-at start end parser)))
         (let ((captures (tree-sitter-query-capture
                          node match-pattern
@@ -2023,9 +2055,9 @@ Sets various variables using `font-lock-defaults' and
                 (mapcar (lambda (defaults)
                           (font-lock-eval-keywords
                            (font-lock-choose-keywords
-                           (nth 0 defaults)
-	                   (font-lock-value-in-major-mode
-                            font-lock-maximum-decoration))))
+                            (nth 1 defaults)
+	                    (font-lock-value-in-major-mode
+                             font-lock-maximum-decoration))))
                         font-lock-tree-sitter-defaults))
     (font-lock-flush)))
 

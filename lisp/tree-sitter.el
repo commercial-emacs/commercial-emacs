@@ -63,14 +63,14 @@ MODE defaults to the value of `major-mode'."
   "Find the first parser using LANGUAGE in `tree-sitter-parser-list'.
 If none exists, create one and return it."
   (or (tree-sitter-get-parser language)
-      (tree-sitter-create-parser
+      (tree-sitter-parser-create
        (current-buffer) language)))
 
 (defun tree-sitter-query-string (pattern string language)
   "Query STRING with PATTERN in LANGUAGE."
   (with-temp-buffer
     (insert string)
-    (let ((parser (tree-sitter-create-parser (current-buffer) language)))
+    (let ((parser (tree-sitter-parser-create (current-buffer) language)))
       (tree-sitter-query-capture
        (tree-sitter-parser-root-node parser)
        pattern))))
@@ -81,13 +81,30 @@ Return the root node of the syntax tree."
   (with-temp-buffer
     (insert string)
     (tree-sitter-parser-root-node
-     (tree-sitter-create-parser (current-buffer) language))))
+     (tree-sitter-parser-create (current-buffer) language))))
 
 (defun tree-sitter-language-at (point)
   "Return the language used at POINT."
   (cl-loop for parser in tree-sitter-parser-list
            if (tree-sitter-node-at point nil parser)
            return (tree-sitter-parser-language parser)))
+
+(defun tree-sitter-set-ranges (parser-or-lang ranges)
+  "Set the ranges of PARSER-OR-LANG to RANGES."
+  (tree-sitter-parser-set-included-ranges
+   (cond ((symbolp parser-or-lang)
+          (tree-sitter-get-parser parser-or-lang))
+         ((tree-sitter-parser-p parser-or-lang)
+          parser-or-lang))
+   ranges))
+
+(defun tree-sitter-get-ranges (parser-or-lang)
+  "Get the ranges of PARSER-OR-LANG."
+  (tree-sitter-parser-included-ranges
+   (cond ((symbolp parser-or-lang)
+          (tree-sitter-get-parser parser-or-lang))
+         ((tree-sitter-parser-p parser-or-lang)
+          parser-or-lang))))
 
 ;;; Node API supplement
 
@@ -131,18 +148,12 @@ NAMED non-nil, only search for named node.  NAMED defaults to nil."
       (setq child (tree-sitter-node-next-sibling child named)))
     result))
 
-(defun tree-sitter-node-content (node &optional object)
-  "Return the buffer content corresponding to NODE.
-If NODE is generated from parsing a string instead of a buffer,
-pass that string to OBJECT."
-  (if object
-      (substring object
-                 (tree-sitter-node-start node)
-                 (tree-sitter-node-end node))
-    (with-current-buffer (tree-sitter-node-buffer node)
-      (buffer-substring-no-properties
-       (tree-sitter-node-start node)
-       (tree-sitter-node-end node)))))
+(defun tree-sitter-node-text (node)
+  "Return the buffer (or string) content corresponding to NODE."
+  (with-current-buffer (tree-sitter-node-buffer node)
+    (buffer-substring
+     (tree-sitter-node-start node)
+     (tree-sitter-node-end node))))
 
 (defun tree-sitter-parent-until (node pred)
   "Return the closest parent of NODE that satisfies PRED.
@@ -186,6 +197,58 @@ If NAMED is non-nil, count named child only."
   (when-let ((parent (tree-sitter-node-parent node))
              (idx (tree-sitter-node-index node)))
     (tree-sitter-node-field-name-for-child parent idx)))
+
+;;; Query API suuplement
+
+(defun tree-sitter-query-buffer (source pattern &optional beg end)
+  "Query the current buffer with PATTERN.
+
+SOURCE can be a language symbol, a parser, or a node.  If a
+language symbol, use the root node of the first parser using that
+language; if a parser, use the root node of that parser; if a
+node, use that node.
+
+BEG and END, if _both_ non-nil, specifies the range in which the query
+is executed.
+
+Raise an tree-sitter-query-error if PATTERN is malformed.  See
+Info node `(elisp)Pattern Matching' for how to read the error message."
+  (tree-sitter-query-capture
+   (cond ((symbolp source) (tree-sitter-buffer-root-node source))
+         ((tree-sitter-parser-p source)
+          (tree-sitter-parser-root-node source))
+         ((tree-sitter-node-p source) source))
+   pattern
+   beg end))
+
+(defun tree-sitter-query-range (source pattern &optional beg end)
+  "Query the current buffer and return ranges of captured nodes.
+
+PATTERN, SOURCE, BEG, END are the same as in
+`tree-sitter-query-buffer'.  This function returns a list
+of (START . END), where START and END specifics the range of each
+captured node.  Capture names don't matter."
+  (cl-loop for capture
+           in (tree-sitter-query-buffer source pattern beg end)
+           for node = (cdr capture)
+           collect (cons (tree-sitter-node-start node)
+                         (tree-sitter-node-end node))))
+
+;;; Language API supplement
+
+(defun tree-sitter-display-grammar (language)
+  "Show the language grammar definition of LANGUAGE."
+  (interactive (list (intern (read-string "Language: "
+                                          "tree-sitter-"))))
+  (pop-to-buffer
+   (with-current-buffer
+       (get-buffer-create (format "*Grammar: %s*" language))
+     (let ((inhibit-read-only t))
+       (erase-buffer)
+       (insert (funcall (intern (format "%s-grammar" language))))
+       (javascript-mode))
+     (goto-char (point-min))
+     (current-buffer))))
 
 ;;; Indent
 
@@ -590,6 +653,7 @@ corresponding value as the function."
 \"#else\" @font-lock-preprocessor-face
 \"#elif\" @font-lock-preprocessor-face
 "))
+
 
 ;;; Debug
 

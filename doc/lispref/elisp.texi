@@ -1346,13 +1346,13 @@ Syntax Tables
 
 Parsing Program Source
 
-* Language definitions::    Loading tree-sitter language definitions.
-* Using parsers::           Introduction to parsers.
-* Accessing nodes::         Accessing syntax nodes.
-* Pattern matching::        Pattern matching with query patterns.
-* Multiple languages::      Parse buffers written in multiple languages.
-* API correspondence::      Correspondence between C API and ELisp API.
-
+* Language Definitions::   Loading and reading language definitions.
+* Using Parser::           Introduction to parsers.
+* Retrieving Node::        Retrieving node from syntax tree.
+* Accessing Node::         Accessing node information.
+* Pattern Matching::       Pattern matching with query patterns.
+* Multiple Languages::     Parsing text written in multiple languages.
+* Tree-sitter C API::      A map from the C API to the ELisp API.
 
 Syntax Descriptors
 
