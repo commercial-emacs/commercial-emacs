@@ -37,7 +37,6 @@
 
 (require 'cl-lib)
 (require 'puny)
-(require 'gnus-util)
 
 (declare-function network-stream-certificate "network-stream"
                   (host service parameters))
@@ -252,9 +251,7 @@ For the meaning of the rest of the parameters, see `gnutls-boot-parameters'."
     (gnutls-message-maybe
      (setq ret (gnutls-boot process type params t))
      "boot: %s" params)
-    (gnus-message-with-timestamp "gnutls-negotiate: %S desc %S"
-                                 ret
-                                 (process-descriptors process))
+
     (when (gnutls-errorp ret)
       ;; This is an error from the underlying C code.
       (signal 'gnutls-error (list process ret)))
