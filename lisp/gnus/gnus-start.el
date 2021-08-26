@@ -52,7 +52,7 @@
 (defconst gnus-thread-group "gnus-get-unread-articles"
   "Identifying prefix for fetching threads.")
 
-(defcustom gnus-seconds-per-method 75
+(defcustom gnus-thread-timeout-seconds 75
   "Timeout for individual backend scan."
   :group 'gnus-start
   :type 'integer)
@@ -489,11 +489,6 @@ See also `gnus-before-startup-hook'."
 
 ;; Suggested by Brian Edmonds <edmonds@cs.ubc.ca>.
 (defvar gnus-init-inhibit nil)
-
-(defvar gnus-thread-start nil
-  "(lisp-time . thread) when background thread got mutex.
-The macro `with-timeout' within thread body is verboten since handlerlist is not
-thread-safe in eval.c.")
 
 (defun gnus-read-init-file (&optional inhibit-next)
   ;; Don't load .gnus if the -q option was used.
@@ -1558,24 +1553,22 @@ backend check whether the group actually exists."
       (prog1 nil
         (thread-signal thr 'error nil)))))
 
-(defun gnus-time-out-thread ()
+(defun gnus-time-out-thread (started thread)
   (interactive)
-  (when gnus-thread-start
-    (cl-destructuring-bind (started . thread)
-        gnus-thread-start
-      (if (time-less-p (time-add started gnus-seconds-per-method) nil)
-          (run-at-time
-           (/ gnus-seconds-per-method 2)
-           nil
-           #'gnus-time-out-thread)
-        (setq gnus-thread-start nil)
-        (if (thread-live-p thread)
-            (progn
-              (gnus-message-with-timestamp
-               "gnus-time-out-thread: signal quit %s" (thread-name thread))
-              (thread-signal thread 'quit nil))
+  (if (time-less-p (time-add started gnus-thread-timeout-seconds) nil)
+      (run-at-time
+       (/ gnus-thread-timeout-seconds 2)
+       nil
+       #'gnus-time-out-thread
+       started
+       thread)
+    (if (thread-live-p thread)
+        (progn
           (gnus-message-with-timestamp
-           "gnus-time-out-thread: race on dead %s" (thread-name thread)))))))
+           "gnus-time-out-thread: signal quit %s" (thread-name thread))
+          (thread-signal thread 'quit nil))
+      (gnus-message-with-timestamp
+       "gnus-time-out-thread: race on dead %s" (thread-name thread)))))
 
 (defun gnus-run-method (label thread-group &rest fns)
   "THREAD-GROUP is string useful for naming working buffer and threads.
@@ -1709,16 +1702,12 @@ Sets up `gnus-get-unread-articles--doit'."
       (if gnus-background-get-unread-articles
           (progn
             (when gnus-background-get-unread-articles
-              (unless (cl-find-if (lambda (timer)
-                                    (eq (timer--function timer)
-                                        #'gnus-time-out-thread))
-                                  timer-list)
-                (run-at-time
-                 (/ gnus-seconds-per-method 2)
-                 nil
-                 #'gnus-time-out-thread)))
-            (setq gnus-thread-start
-                  (cons (current-time) (make-thread doit gnus-thread-group))))
+              (run-at-time
+               (/ gnus-thread-timeout-seconds 2)
+               nil
+               #'gnus-time-out-thread
+               (current-time)
+               (make-thread doit gnus-thread-group))))
         (funcall doit)))))
 
 (defun gnus-get-unread-articles--doit (infos-by-method requested-level)
@@ -1806,7 +1795,6 @@ Sets up `gnus-get-unread-articles--doit'."
       (error (gnus-message-with-timestamp
               "gnus-get-unread-articles--doit: error coda %s"
               (error-message-string err))))
-    (setq gnus-thread-start nil)
     (when-let ((timer (cl-find-if (lambda (timer)
                                     (eq (timer--function timer)
                                         #'gnus-time-out-thread))
