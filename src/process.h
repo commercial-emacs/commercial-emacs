@@ -129,8 +129,6 @@ struct Lisp_Process
     int infd;
     /* Byte-count for process output read on `infd'.  */
     uintmax_t nbytes_read;
-    /* Read `infd' NOW.  */
-    int forced;
 
     /* Descriptor by which we write to this process.  */
     int outfd;
@@ -149,7 +147,7 @@ struct Lisp_Process
        that process output can be read in as little as 1 byte at a
        time.  Value is nanoseconds to delay reading output from
        this process.  Range is 0 .. 50 * 1000 * 1000.  */
-    int read_output_delay;
+    unsigned int read_output_delay;
     /* Should we delay reading output from this process.
        Initialized from `Vprocess_adaptive_read_buffering'.
        0 = nil, 1 = t, 2 = other.  */

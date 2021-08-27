@@ -248,15 +248,6 @@ static EMACS_INT update_tick;
 #define READ_OUTPUT_DELAY_MAX       (READ_OUTPUT_DELAY_INCREMENT * 5)
 #define READ_OUTPUT_DELAY_MAX_MAX   (READ_OUTPUT_DELAY_INCREMENT * 7)
 
-/* Number of processes which have a non-zero read_output_delay,
-   and therefore might be delayed for adaptive read buffering.  */
-
-static int process_output_delay_count;
-
-/* True if any process has non-nil read_output_skip.  */
-
-static bool process_output_skip;
-
 static void start_process_unwind (Lisp_Object);
 static void create_process (Lisp_Object, char **, Lisp_Object);
 #ifdef USABLE_SIGIO
@@ -485,7 +476,6 @@ add_process_fd (int fd, int plus, int minus)
 static void
 add_process_read_fd (int fd)
 {
-  fprintf (stderr, "Adding %d\n", fd);
   add_process_fd (fd, (FOR_READ | PROCESS_FD), KEYBOARD_FD);
 }
 
@@ -499,7 +489,6 @@ add_process_write_fd (int fd)
 void
 delete_read_fd (int fd)
 {
-  fprintf (stderr, "Deleting %d\n", fd);
   delete_keyboard_wait_descriptor (fd);
 
   eassert (0 <= fd && fd < FD_SETSIZE);
@@ -1302,22 +1291,6 @@ DEFUN ("process-mark", Fprocess_mark, Sprocess_mark,
   return XPROCESS (process)->mark;
 }
 
-DEFUN ("set-process-forced", Fset_process_forced, Sset_process_forced,
-       2, 2, 0,
-       doc: /* Set forced to current bytes read.
-To avoid prematurely closing a network connection, we consult the
-forced to determine whether any bytes have been read since it was set.  */)
-  (Lisp_Object process, Lisp_Object forced)
-{
-  struct Lisp_Process *p;
-
-  CHECK_PROCESS (process);
-  p = XPROCESS (process);
-
-  p->forced = ! NILP (forced);
-  return forced;
-}
-
 DEFUN ("set-process-filter", Fset_process_filter, Sset_process_filter,
        2, 2, 0,
        doc: /* Give PROCESS the filter function FILTER; nil means default.
@@ -2054,7 +2027,6 @@ close_process_fd (int *fd_addr)
   if (0 <= fd)
     {
       *fd_addr = -1;
-      fprintf (stderr, "Killing %d\n", fd);
       emacs_close (fd);
     }
 }
@@ -4725,13 +4697,8 @@ deactivate_process (Lisp_Object proc)
   emacs_gnutls_deinit (proc);
 #endif /* HAVE_GNUTLS */
 
-  if (p->read_output_delay > 0)
-    {
-      process_output_delay_count =
-	max (process_output_delay_count - 1, 0);
-      p->read_output_delay = 0;
-      p->read_output_skip = 0;
-    }
+  p->read_output_delay = 0;
+  p->read_output_skip = 0;
 
   /* Beware SIGCHLD hereabouts.  */
 
@@ -5435,7 +5402,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  else
 	    compute_input_wait_mask (&Available);
 	  compute_write_mask (&Writeok);
- 	  check_delay = wait_proc ? 0 : process_output_delay_count;
+	  check_delay = ! wait_proc;
 	  check_write = true;
 	}
 
@@ -5472,35 +5439,31 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	}
       else
 	{
-	  /* Set the timeout for adaptive read buffering if any
-	     process has non-zero read_output_skip and non-zero
-	     read_output_delay, and we are not reading output for a
-	     specific process.  It is not executed if
-	     Vprocess_adaptive_read_buffering is nil.  */
-	  if (process_output_skip && check_delay > 0)
+	  /* Adaptive buffering is likely a false economy.  It also
+	     probably does nothing since the painstakingly calculated
+	     timeout will very likely get blithely overridden by all
+	     manner of other myopic logic.  */
+	  if (check_delay)
 	    {
-	      int adaptive_nsecs = timeout.tv_nsec;
-	      if (timeout.tv_sec > 0 || adaptive_nsecs > READ_OUTPUT_DELAY_MAX)
-		adaptive_nsecs = READ_OUTPUT_DELAY_MAX;
-	      for (channel = 0; check_delay > 0 && channel <= max_desc; channel++)
+	      int adaptive_nsecs = (timeout.tv_sec > 0)
+		? READ_OUTPUT_DELAY_MAX
+		: min (timeout.tv_nsec, READ_OUTPUT_DELAY_MAX);
+	      for (channel = 0; channel <= max_desc; channel++)
 		{
 		  Lisp_Object proc = chan_process[channel];
 		  /* Find minimum non-zero read_output_delay among the
 		     processes with non-zero read_output_skip.  */
-		  if (!NILP (proc) && XPROCESS (proc)->read_output_delay > 0)
+		  if (!NILP (proc)
+		      && XPROCESS (proc)->read_output_skip)
 		    {
-		      check_delay--;
-		      if (!XPROCESS (proc)->read_output_skip)
-			continue;
+		      XPROCESS (proc)->read_output_skip = 0;
+		      adaptive_nsecs = min (adaptive_nsecs,
+					    XPROCESS (proc)->read_output_delay);
 		      FD_CLR (channel, &Available);
 		      process_skipped = true;
-		      XPROCESS (proc)->read_output_skip = 0;
-		      if (XPROCESS (proc)->read_output_delay < adaptive_nsecs)
-			adaptive_nsecs = XPROCESS (proc)->read_output_delay;
 		    }
 		}
 	      timeout = make_timespec (0, adaptive_nsecs);
-	      process_output_skip = 0;
 	    }
 
 	  /* If we've got some output and haven't limited our timeout
@@ -5544,6 +5507,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	     utilize gnutls_record_check_pending, either before the
 	     system call, or after a call to gnutls_record_recv.
 	     -- gnutls manual */
+#ifdef HAVE_GNUTLS
 	  bool override_p = false;
 	  fd_set Override;
 	  FD_ZERO (&Override);
@@ -5553,18 +5517,9 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	      if (FD_ISSET (channel, &Available) && ! NILP (proc))
 		{
 		  struct Lisp_Process *p = XPROCESS (proc);
-		  if (p->forced
-#ifdef HAVE_GNUTLS
-		      ||
-		      (p->gnutls_state
-		       && emacs_gnutls_record_check_pending (p->gnutls_state) > 0)
-#endif
-		      )
+		  if (p->gnutls_state
+		      && emacs_gnutls_record_check_pending (p->gnutls_state) > 0)
 		    {
-		      if (p->forced)
-			fprintf (stderr, "forced boost %d\n", channel);
-		      else
-			fprintf (stderr, "gnutls boost %d\n", channel);
 		      override_p = true;
 		      eassert (p->infd == channel);
 		      FD_SET (p->infd, &Override);
@@ -5573,6 +5528,8 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		    }
 		}
 	    }
+#endif
+
 #if defined HAVE_NS
 #define WAIT_SELECT ns_select
 #elif defined HAVE_GLIB
@@ -5583,6 +5540,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  nfds = WAIT_SELECT (max_desc + 1, &Available,
 			      (check_write ? &Writeok : NULL),
 			      NULL, &timeout, NULL);
+#ifdef HAVE_GNUTLS
 	  if (override_p)
 	    {
 	      nfds = max (0, nfds);
@@ -5596,9 +5554,9 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		    }
 		}
 	    }
+#endif
 	  avail = (nfds > 0);
 	}
-
       /* Make C-g and alarm signals set flags again.  */
       clear_waiting_for_input ();
 
@@ -5624,9 +5582,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	      && got_some_output > 0
 	      && (timeout.tv_sec > 0 || timeout.tv_nsec > 0))
 	    {
-	      /* The convoluted logic of read_output_delay and
-		 read_output_skip are likely false economies, which
-		 we should eliminate.  */
 	      if (!timespec_valid_p (got_output_end_time)
 		  ||
 		  timespec_cmp (got_output_end_time, current_timespec ()) <= 0)
@@ -5748,7 +5703,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		  if (nread > 0)
 		    {
 		      last_read_channel = channel;
-		      fprintf (stderr, "Read %d from %d\n", nread, channel);
 		      if (!wait_proc || wait_proc == XPROCESS (proc))
 			got_some_output = max (got_some_output, nread);
 		      if (do_display)
@@ -5781,14 +5735,8 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #endif /* HAVE_PTYS */
 		  else if ((nread == 0 && terminate_on_empty_read)
 			   ||
-			   p->forced
-			   ||
 			   (xerrno && ! would_block (xerrno)))
 		    {
-		      if (terminate_on_empty_read)
-			fprintf (stderr, "Killing %d %lu\n",
-				 channel,
-				 p->nbytes_read);
 		      p->tick = ++process_tick;
 		      deactivate_process (proc);
 		      if (p->raw_status_new)
@@ -5950,28 +5898,17 @@ read_process_output (Lisp_Object proc, int channel)
 			     readmax);
       if (nbytes > 0 && p->adaptive_read_buffering)
 	{
-	  int delay = p->read_output_delay;
+	  unsigned int delay = p->read_output_delay;
 	  if (nbytes < 256)
 	    {
 	      if (delay < READ_OUTPUT_DELAY_MAX_MAX)
-		{
-		  if (delay == 0)
-		    process_output_delay_count++;
-		  delay += READ_OUTPUT_DELAY_INCREMENT * 2;
-		}
+		delay += READ_OUTPUT_DELAY_INCREMENT * 2;
 	    }
 	  else if (delay > 0 && nbytes == readmax)
-	    {
-	      delay -= READ_OUTPUT_DELAY_INCREMENT;
-	      if (delay == 0)
-		process_output_delay_count--;
-	    }
+	    delay -= READ_OUTPUT_DELAY_INCREMENT;
 	  p->read_output_delay = delay;
-	  if (delay)
-	    {
-	      p->read_output_skip = 1;
-	      process_output_skip = 1;
-	    }
+	  if (p->read_output_delay)
+	    p->read_output_skip = 1;
 	}
     }
 
@@ -6448,13 +6385,8 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 #endif
 		written = emacs_write_sig (outfd, cur_buf, cur_len);
 	      rv = (written ? 0 : -1);
-	      if (p->read_output_delay > 0
-		  && p->adaptive_read_buffering == 1)
-		{
-		  p->read_output_delay = 0;
-		  process_output_delay_count--;
-		  p->read_output_skip = 0;
-		}
+	      p->read_output_delay = 0;
+	      p->read_output_skip = 0;
 	    }
 
 	  if (rv < 0)
@@ -8244,9 +8176,6 @@ init_process_emacs (int sockfd)
   max_desc = -1;
   memset (fd_callback_info, 0, sizeof (fd_callback_info));
 
-  process_output_delay_count = 0;
-  process_output_skip = 0;
-
   /* Don't do this, it caused infinite select loops.  The display
      method should call add_keyboard_wait_descriptor on stdin if it
      needs that.  */
@@ -8457,7 +8386,6 @@ amounts of data in one go.  */);
   defsubr (&Sset_process_buffer);
   defsubr (&Sprocess_buffer);
   defsubr (&Sprocess_mark);
-  defsubr (&Sset_process_forced);
   defsubr (&Sset_process_filter);
   defsubr (&Sprocess_filter);
   defsubr (&Sset_process_sentinel);
