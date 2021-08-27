@@ -1973,6 +1973,9 @@ init_signals (void)
   main_thread_id = pthread_self ();
 #endif
 
+  if (!init_sigsegv ())
+    sigaction (SIGSEGV, &thread_fatal_action, 0);
+
   /* Don't alter signal handlers if dumping.  On some machines,
      changing signal handlers sets static data that would make signals
      fail to work right when the dumped Emacs is run.  */
