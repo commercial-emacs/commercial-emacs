@@ -1400,6 +1400,9 @@ GCFN ptrdiff_t gc_gen_y_bit_iter_slot_nr (const gc_gen_y_bit_iter *);
 GCFN emacs_bitset_word gc_gen_y_bit_iter_get (const gc_gen_y_bit_iter *, const emacs_bitset_word *);
 GCFN void gc_gen_y_bit_iter_set (const gc_gen_y_bit_iter *, emacs_bitset_word *, emacs_bitset_word);
 
+
+GCFN void check_obarray_elem(const Lisp_Object tail, size_t i, size_t obsize);
+
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 
 
@@ -8281,6 +8284,15 @@ gc_try_handle_sigsegv (void *const fault_address)
   emacs_unreachable ();
 }
 
+static inline void check_obarray_elem(const Lisp_Object tail, size_t i, size_t obsize)
+{
+  const char *sname = SSDATA (SYMBOL_NAME (tail));
+  const size_t sname_len = SBYTES (SYMBOL_NAME (tail));
+  eassert (strlen (sname) == sname_len);
+  const size_t hash = hash_string (sname, sname_len) % obsize;
+  eassert (hash == i);
+}
+
 static void
 XXX_check_obarray (void)
 {
@@ -8288,23 +8300,19 @@ XXX_check_obarray (void)
     return;
   const Lisp_Object obarray = Vobarray;
   const size_t obsize = ASIZE (obarray);
+  register Lisp_Object tail = {0};
+
   for (size_t i = 0; i < obsize; ++i)
     {
-      const Lisp_Object sym = AREF (obarray, i);
-      register Lisp_Object tail = sym;
-      if (!SYMBOLP (sym))
-	continue;
-      do {
-	if (!SYMBOLP (tail))
-	  break; // second check
-
-	const char *sname = SSDATA (SYMBOL_NAME (tail));
-	const size_t sname_len = SBYTES (SYMBOL_NAME (tail));
-	eassert (strlen (sname) == sname_len);
-	const size_t hash = hash_string (sname, sname_len) % obsize;
-	eassert (hash == i);
-	XSETSYMBOL(tail, XSYMBOL(tail)->u.s.next);
-      } while (XSYMBOL(tail));
+      tail = AREF (obarray, i);
+      if (SYMBOLP (tail))
+	while (1)
+	  {
+	    check_obarray_elem(tail, i, obsize);
+	    if (XSYMBOL (tail)->u.s.next == 0)
+	      break;
+	    XSETSYMBOL(tail, XSYMBOL(tail)->u.s.next);
+	  }
     }
 }
 
