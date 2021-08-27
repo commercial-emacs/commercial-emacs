@@ -937,10 +937,10 @@ Return nil if FILENAME doesn't exist."
           (should status)
           (should-not (assq :error status))
           (should buf)
-          (should (> (buffer-size buf) 0))
-          )
-      (when buf
-        (kill-buffer buf)))))
+          (should (> (buffer-size buf) 0)))
+      (when (buffer-live-p buf)
+        (let (kill-buffer-query-functions)
+          (kill-buffer buf))))))
 
 (provide 'process-tests)
 ;;; process-tests.el ends here

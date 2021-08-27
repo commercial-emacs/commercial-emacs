@@ -127,8 +127,11 @@ struct Lisp_Process
     pid_t pid;
     /* Descriptor by which we read from this process.  */
     int infd;
-    /* Byte-count modulo (UINTMAX_MAX + 1) for process output read from `infd'.  */
+    /* Byte-count for process output read on `infd'.  */
     uintmax_t nbytes_read;
+    /* Byte-count marker to avoid prematurely closing slow `infd' */
+    uintmax_t nbytes_watermark;
+
     /* Descriptor by which we write to this process.  */
     int outfd;
     /* Descriptors that were created for this process and that need

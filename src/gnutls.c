@@ -1764,10 +1764,21 @@ gnutls_handshake_and_verify(Lisp_Object proc,
 			    Lisp_Object proplist,
 			    Lisp_Object blocking)
 {
+  Lisp_Object retval;
   int ret = emacs_gnutls_handshake (XPROCESS (proc), ! NILP (blocking));
   if (ret < GNUTLS_E_SUCCESS)
-    return gnutls_make_error (ret);
-  return gnutls_verify_boot (proc, proplist);
+    {
+      retval = gnutls_make_error (ret);
+    }
+  else
+    {
+      struct Lisp_Process *p = XPROCESS (proc);
+      retval = gnutls_verify_boot (proc, proplist);
+      fprintf (stderr, "watermark %d %ld\n",
+	       p->infd,
+	       XFIXNUM (Fset_process_watermark (proc)));
+    }
+  return retval;
 }
 
 DEFUN ("gnutls-boot", Fgnutls_boot, Sgnutls_boot, 3, 4, 0,

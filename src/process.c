@@ -1300,6 +1300,22 @@ DEFUN ("process-mark", Fprocess_mark, Sprocess_mark,
   return XPROCESS (process)->mark;
 }
 
+DEFUN ("set-process-watermark", Fset_process_watermark, Sset_process_watermark,
+       1, 1, 0,
+       doc: /* Set watermark to current bytes read.
+To avoid prematurely closing a network connection, we consult the
+watermark to determine whether any bytes have been read since it was set.  */)
+  (register Lisp_Object process)
+{
+  struct Lisp_Process *p;
+
+  CHECK_PROCESS (process);
+  p = XPROCESS (process);
+
+  p->nbytes_watermark = p->nbytes_read;
+  return make_fixnum (p->nbytes_watermark);
+}
+
 DEFUN ("set-process-filter", Fset_process_filter, Sset_process_filter,
        2, 2, 0,
        doc: /* Give PROCESS the filter function FILTER; nil means default.
@@ -5165,19 +5181,20 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 			     Lisp_Object wait_for_cell,
 			     struct Lisp_Process *wait_proc, int just_wait_proc)
 {
-  static int last_read_channel = -1;
+  static int last_read_channel = 0;
   int channel, nfds;
-  fd_set Available;
-  fd_set Writeok;
+  fd_set Available, Writeok;
   bool check_write;
   int check_delay;
   bool avail = false;
   int xerrno = 0;
-  struct timespec timeout, end_time, timer_delay;
+  struct timespec timeout, timer_delay;
+  struct timespec end_time = invalid_timespec();
   struct timespec got_output_end_time = invalid_timespec ();
   enum { MINIMUM = -1, TIMEOUT, FOREVER } wait;
   int got_some_output = -1;
-  uintmax_t prev_wait_proc_nbytes_read = wait_proc ? wait_proc->nbytes_read : 0;
+  uintmax_t initial_nbytes_read = wait_proc ? wait_proc->nbytes_read : 0;
+
 #if defined HAVE_GETADDRINFO_A
   bool retry_for_async;
 #endif
@@ -5564,9 +5581,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		     often does contain nonzero bits for
 		     descriptors unrelated to the inputs.  */
 		  FD_ZERO (&Available);
+		  nfds = 0;
 		}
-	      for (channel = 0, nfds = 0; channel <= max_desc; ++channel)
-		if (FD_ISSET(channel, &gnutls_pending))
+	      for (channel = 0; channel <= max_desc; ++channel)
+		if (FD_ISSET(channel, &gnutls_pending)
+		    && ! FD_ISSET(channel, &Available))
 		  {
 		    ++nfds;
 		    FD_SET(channel, &Available);
@@ -5584,42 +5603,39 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
       if (! avail)
 	{
-          /* Exit the main loop if we've passed the requested timeout,
-             or have read some bytes from our wait_proc (either directly
-             in this call or indirectly through timers / process filters),
-             or aren't skipping processes and got some output and
-             haven't lowered our timeout due to timers or SIGIO and
-             have waited a long amount of time due to repeated
-             timers.  */
-	  struct timespec huge_timespec
-	    = make_timespec (TYPE_MAXIMUM (time_t), 2 * TIMESPEC_HZ);
-	  struct timespec cmp_time = huge_timespec;
-	  if (wait < TIMEOUT
-              || (wait_proc
-                  && wait_proc->nbytes_read != prev_wait_proc_nbytes_read))
+	  if (wait < TIMEOUT)
 	    break;
-	  if (wait == TIMEOUT)
-	    cmp_time = end_time;
-	  if (!process_skipped && got_some_output > 0
+
+	  if (wait_proc
+	      && wait_proc->nbytes_read > initial_nbytes_read)
+	    {
+	      /* a 2018 hack to perform an end run around out-of-band
+		 output, i.e., timers.  Solution is to eliminate
+		 wait_proc and just_wait_proc. */
+	      got_some_output = wait_proc->nbytes_read - initial_nbytes_read;
+	      break;
+	    }
+
+	  if (!process_skipped
+	      && got_some_output > 0
 	      && (timeout.tv_sec > 0 || timeout.tv_nsec > 0))
 	    {
-	      if (!timespec_valid_p (got_output_end_time))
-		break;
-	      if (timespec_cmp (got_output_end_time, cmp_time) < 0)
-		cmp_time = got_output_end_time;
-	    }
-	  if (timespec_cmp (cmp_time, huge_timespec) < 0)
-	    {
-	      now = current_timespec ();
-	      if (timespec_cmp (cmp_time, now) <= 0)
+	      /* The convoluted logic of read_output_delay and
+		 read_output_skip are likely false economies, which
+		 we should eliminate.  */
+	      if (!timespec_valid_p (got_output_end_time)
+		  ||
+		  timespec_cmp (got_output_end_time, current_timespec ()) <= 0)
 		break;
 	    }
+
+	  if (timespec_valid_p (end_time)
+	      && timespec_cmp (end_time, current_timespec ()) <= 0)
+	    break;
 	}
 
-      /* Check for keyboard input.  */
-      /* If there is any, return immediately
+      /* If there is any keyboard input, return immediately
 	 to give it higher priority than subprocesses.  */
-
       if (read_kbd != 0)
 	{
 	  bool leave = false;
@@ -5692,7 +5708,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
             d->func (channel, d->data);
 	}
 
-      for (int count = 0, channel = last_read_channel + 1;
+      for (int count = 0, channel = last_read_channel;
 	   count <= max_desc;
 	   ++count, ++channel)
 	{
@@ -5714,15 +5730,17 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	      else
 		{
 		  int nread;
+		  struct Lisp_Process *p = XPROCESS (proc);
 		  errno = 0;
 		  nread = read_process_output (proc, channel);
 		  xerrno = errno;
 		  eassert(nread < 0 || xerrno == 0);
 
 		  bool terminate_on_empty_read =
-		    NETCONN_P (proc)
-		    || SERIALCONN_P (proc)
-		    || PIPECONN_P (proc);
+		    (NETCONN_P (proc)
+		     || SERIALCONN_P (proc)
+		     || PIPECONN_P (proc))
+		    && p->nbytes_read > p->nbytes_watermark;
 
 		  if (nread > 0)
 		    {
@@ -5742,8 +5760,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		     get a SIGCHLD).  */
 		  else if (xerrno == EIO)
 		    {
-		      struct Lisp_Process *p = XPROCESS (proc);
-
 		      /* Clear the descriptor now, so we only raise the
 			 signal once.  */
 		      delete_read_fd (channel);
@@ -5763,7 +5779,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 			   ||
 			   (xerrno && ! would_block (xerrno)))
 		    {
-		      struct Lisp_Process *p = XPROCESS (proc);
+		      if (terminate_on_empty_read)
+			fprintf (stderr, "Killing %d %lu %lu\n",
+				 channel,
+				 p->nbytes_watermark,
+				 p->nbytes_read);
 		      p->tick = ++process_tick;
 		      deactivate_process (proc);
 		      if (p->raw_status_new)
@@ -5845,15 +5865,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       clear_input_pending ();
       maybe_quit ();
     }
-
-  /* Timers and/or process filters that we have run could have themselves called
-     `accept-process-output' (and by that indirectly this function), thus
-     possibly reading some (or all) output of wait_proc without us noticing it.
-     This could potentially lead to an endless wait (dealt with earlier in the
-     function) and/or a wrong return value (dealt with here).  */
-  if (wait_proc && wait_proc->nbytes_read != prev_wait_proc_nbytes_read)
-    got_some_output = min (INT_MAX, (wait_proc->nbytes_read
-                                     - prev_wait_proc_nbytes_read));
 
   return got_some_output;
 }
@@ -6979,7 +6990,6 @@ process has been transmitted to the serial port.  */)
   if (DATAGRAM_CONN_P (proc))
     return process;
 
-
   outfd = XPROCESS (proc)->outfd;
   eassert (outfd < FD_SETSIZE);
   if (outfd >= 0)
@@ -7012,6 +7022,8 @@ process has been transmitted to the serial port.  */)
       struct Lisp_Process *p = XPROCESS (proc);
       int old_outfd = p->outfd;
       int new_outfd;
+
+      p->nbytes_watermark = 0; /* no need to consult this anymore */
 
 #ifdef HAVE_SHUTDOWN
       /* If this is a network connection, or socketpair is used
@@ -8442,6 +8454,7 @@ amounts of data in one go.  */);
   defsubr (&Sset_process_buffer);
   defsubr (&Sprocess_buffer);
   defsubr (&Sprocess_mark);
+  defsubr (&Sset_process_watermark);
   defsubr (&Sset_process_filter);
   defsubr (&Sprocess_filter);
   defsubr (&Sset_process_sentinel);
