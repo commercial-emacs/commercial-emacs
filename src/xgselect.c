@@ -120,6 +120,13 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 			tmop, sigmask);
   if (nfds < 0)
     retval = nfds;
+  else if (nfds == 0)
+    {
+      if (rfds)
+	FD_ZERO (rfds);
+      if (wfds)
+	FD_ZERO (wfds);
+    }
   else if (nfds > 0)
     {
       for (i = 0; i < fds_lim; ++i)

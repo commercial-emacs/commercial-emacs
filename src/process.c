@@ -485,6 +485,7 @@ add_process_fd (int fd, int plus, int minus)
 static void
 add_process_read_fd (int fd)
 {
+  fprintf (stderr, "Adding %d\n", fd);
   add_process_fd (fd, (FOR_READ | PROCESS_FD), KEYBOARD_FD);
 }
 
@@ -498,6 +499,7 @@ add_process_write_fd (int fd)
 void
 delete_read_fd (int fd)
 {
+  fprintf (stderr, "Deleting %d\n", fd);
   delete_keyboard_wait_descriptor (fd);
 
   eassert (0 <= fd && fd < FD_SETSIZE);
@@ -1300,20 +1302,20 @@ DEFUN ("process-mark", Fprocess_mark, Sprocess_mark,
   return XPROCESS (process)->mark;
 }
 
-DEFUN ("set-process-watermark", Fset_process_watermark, Sset_process_watermark,
-       1, 1, 0,
-       doc: /* Set watermark to current bytes read.
+DEFUN ("set-process-forced", Fset_process_forced, Sset_process_forced,
+       2, 2, 0,
+       doc: /* Set forced to current bytes read.
 To avoid prematurely closing a network connection, we consult the
-watermark to determine whether any bytes have been read since it was set.  */)
-  (register Lisp_Object process)
+forced to determine whether any bytes have been read since it was set.  */)
+  (Lisp_Object process, Lisp_Object forced)
 {
   struct Lisp_Process *p;
 
   CHECK_PROCESS (process);
   p = XPROCESS (process);
 
-  p->nbytes_watermark = p->nbytes_read;
-  return make_fixnum (p->nbytes_watermark);
+  p->forced = ! NILP (forced);
+  return forced;
 }
 
 DEFUN ("set-process-filter", Fset_process_filter, Sset_process_filter,
@@ -2052,6 +2054,7 @@ close_process_fd (int *fd_addr)
   if (0 <= fd)
     {
       *fd_addr = -1;
+      fprintf (stderr, "Killing %d\n", fd);
       emacs_close (fd);
     }
 }
@@ -3462,7 +3465,8 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       /* Systems with SOCK_NONBLOCK can save a call to fcntl */
       if (! SOCK_NONBLOCK || s == external_sock_fd)
 	{
-	  ret = fcntl (s, F_SETFL, O_NONBLOCK);
+	  int flags = fcntl (s, F_GETFL, 0);
+	  ret = fcntl (s, F_SETFL, flags | O_NONBLOCK);
 	  if (ret < 0)
 	    {
 	      xerrno = errno;
@@ -5183,7 +5187,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 {
   static int last_read_channel = 0;
   int channel, nfds;
-  fd_set Available, Writeok;
+  fd_set Available, Writeok, Exception;
   bool check_write;
   int check_delay;
   bool avail = false;
@@ -5209,6 +5213,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
   FD_ZERO (&Available);
   FD_ZERO (&Writeok);
+  FD_ZERO (&Exception);
 
   if (time_limit == 0 && nsecs == 0 && wait_proc && !NILP (Vinhibit_quit)
       && !(CONSP (wait_proc->status)
@@ -5534,30 +5539,37 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	    }
 #endif
 
-#ifdef HAVE_GNUTLS
-          /* GnuTLS provides its own readiness data, the
-	   * confirmed presence of which can be used
-	   * to avoid blocking in pselect().
-	   */
-	  bool gnutls_pending_p = false;
-	  fd_set gnutls_pending;
-	  FD_ZERO (&gnutls_pending);
+	  /* When using the select system calls, one should remember
+	     that they only apply to the kernel sockets API. To check
+	     for any available buffered data in a GnuTLS session,
+	     utilize gnutls_record_check_pending, either before the
+	     system call, or after a call to gnutls_record_recv.
+	     -- gnutls manual */
+	  bool override_p = false;
+	  fd_set Override;
+	  FD_ZERO (&Override);
 	  for (channel = 0; channel <= max_desc; ++channel)
-	    if (! NILP (chan_process[channel])
-		&& FD_ISSET (channel, &Available))
+	    Lisp_Object proc = chan_process[channel];
+	    if (FD_ISSET (channel, &Available) && ! NILP (proc))
 	      {
-		struct Lisp_Process *p = XPROCESS (chan_process[channel]);
-		if (p->gnutls_state
-		    && emacs_gnutls_record_check_pending (p->gnutls_state) > 0)
+		struct Lisp_Process *p = XPROCESS (proc);
+		if (p->forced
+#ifdef HAVE_GNUTLS
+		    ||
+		    (p->gnutls_state
+		     && emacs_gnutls_record_check_pending (p->gnutls_state) > 0)
+#endif
+		    )
 		  {
-		    gnutls_pending_p = true;
+		    if (p->forced)
+		      fprintf (stderr, "forced boost %d\n", channel);
+		    override_p = true;
 		    eassert (p->infd == channel);
-		    FD_SET (p->infd, &gnutls_pending);
+		    FD_SET (p->infd, &Override);
 		    if (!wait_proc || wait_proc->infd == p->infd)
 			timeout = make_timespec (0, 0);
 		  }
 	      }
-#endif
 
 #if defined HAVE_NS
 #define WAIT_SELECT ns_select
@@ -5566,30 +5578,27 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #else
 #define WAIT_SELECT thread_select
 #endif
-	  nfds = WAIT_SELECT(max_desc + 1, &Available, (check_write ? &Writeok : NULL),
-			     NULL, &timeout, NULL);
+	  Exception = Available;
+	  nfds = WAIT_SELECT (max_desc + 1, &Available,
+			      (check_write ? &Writeok : NULL),
+			      NULL, &timeout, NULL);
+	  timeout = make_timespec (0, 0);
+	  WAIT_SELECT(max_desc + 1, NULL, NULL, &Exception, &timeout, NULL);
+
 #ifdef HAVE_GNUTLS
-	  /* Bug#40665 speculates gnutls is privy to ready descriptors
-	     that pselect() is not.  */
-	  if (gnutls_pending_p)
+	  if (override_p)
 	    {
-	      if (nfds <= 0)
-		{
-		  /* pselect() returns zero nfds if none of
-		     the input descriptors changed status.
-		     However, the returned fdsets may and
-		     often does contain nonzero bits for
-		     descriptors unrelated to the inputs.  */
-		  FD_ZERO (&Available);
-		  nfds = 0;
-		}
 	      for (channel = 0; channel <= max_desc; ++channel)
-		if (FD_ISSET(channel, &gnutls_pending)
-		    && ! FD_ISSET(channel, &Available))
-		  {
-		    ++nfds;
-		    FD_SET(channel, &Available);
-		  }
+		{
+		  if (FD_ISSET(channel, &Override)
+		      && ! FD_ISSET(channel, &Available))
+		    {
+		      nfds = max (0, nfds);
+		      ++nfds;
+		      fprintf (stderr, "boost %d\n", channel);
+		      FD_SET(channel, &Available);
+		    }
+		}
 	    }
 #endif
 	  avail = (nfds > 0);
@@ -5713,6 +5722,26 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	   ++count, ++channel)
 	{
 	  channel = channel % (max_desc + 1); /* max_desc >= 0 by loop cond */
+
+	  if (FD_ISSET (channel, &Exception)
+	      && fd_callback_info[channel].flags & PROCESS_FD
+	      && ! (fd_callback_info[channel].flags & KEYBOARD_FD))
+	    {
+	      Lisp_Object proc = chan_process[channel];
+	      struct Lisp_Process *p = XPROCESS (proc);
+	      fprintf (stderr, "Error %d having read %lu\n",
+		       channel, p->nbytes_read);
+	      FD_CLR (channel, &Available);
+	      FD_CLR (channel, &Writeok);
+	      p->tick = ++process_tick;
+	      deactivate_process (proc);
+	      if (p->raw_status_new)
+		update_status (p);
+	      if (EQ (p->status, Qrun))
+		pset_status (p,
+			     list2 (Qexit, make_fixnum (126)));
+	    }
+
 	  if (FD_ISSET (channel, &Available)
 	      && fd_callback_info[channel].flags & PROCESS_FD
 	      && ! (fd_callback_info[channel].flags & KEYBOARD_FD))
@@ -5737,14 +5766,14 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		  eassert(nread < 0 || xerrno == 0);
 
 		  bool terminate_on_empty_read =
-		    (NETCONN_P (proc)
-		     || SERIALCONN_P (proc)
-		     || PIPECONN_P (proc))
-		    && p->nbytes_read > p->nbytes_watermark;
+		    NETCONN_P (proc)
+		    || SERIALCONN_P (proc)
+		    || PIPECONN_P (proc);
 
 		  if (nread > 0)
 		    {
 		      last_read_channel = channel;
+		      fprintf (stderr, "Read %d from %d\n", nread, channel);
 		      if (!wait_proc || wait_proc == XPROCESS (proc))
 			got_some_output = max (got_some_output, nread);
 		      if (do_display)
@@ -5777,12 +5806,13 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #endif /* HAVE_PTYS */
 		  else if ((nread == 0 && terminate_on_empty_read)
 			   ||
+			   p->forced
+			   ||
 			   (xerrno && ! would_block (xerrno)))
 		    {
 		      if (terminate_on_empty_read)
-			fprintf (stderr, "Killing %d %lu %lu\n",
+			fprintf (stderr, "Killing %d %lu\n",
 				 channel,
-				 p->nbytes_watermark,
 				 p->nbytes_read);
 		      p->tick = ++process_tick;
 		      deactivate_process (proc);
@@ -7022,8 +7052,6 @@ process has been transmitted to the serial port.  */)
       struct Lisp_Process *p = XPROCESS (proc);
       int old_outfd = p->outfd;
       int new_outfd;
-
-      p->nbytes_watermark = 0; /* no need to consult this anymore */
 
 #ifdef HAVE_SHUTDOWN
       /* If this is a network connection, or socketpair is used
@@ -8454,7 +8482,7 @@ amounts of data in one go.  */);
   defsubr (&Sset_process_buffer);
   defsubr (&Sprocess_buffer);
   defsubr (&Sprocess_mark);
-  defsubr (&Sset_process_watermark);
+  defsubr (&Sset_process_forced);
   defsubr (&Sset_process_filter);
   defsubr (&Sprocess_filter);
   defsubr (&Sset_process_sentinel);

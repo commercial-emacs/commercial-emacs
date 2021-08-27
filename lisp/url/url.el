@@ -254,7 +254,8 @@ how long to wait for a response before giving up."
          (proc-buffer (apply #'url-retrieve
                              url callback nil silent inhibit-cookies
                              (when timeout
-                               (list :timeout timeout)))))
+                               (list :timeout timeout))))
+         (iterations 0))
     (if (not proc-buffer)
         (url-debug 'retrieval "Synchronous fetching unnecessary %s" url)
       (unwind-protect
@@ -287,6 +288,9 @@ how long to wait for a response before giving up."
                   (unless data-buffer
                     (url-debug 'retrieval "Dead process %s" url)
 		    (throw 'done 'exception))))
+              (when (> (cl-incf iterations) 115)
+                (set-process-forced
+                 (get-buffer-process proc-buffer) t))
               ;; Querying over consumer internet in the US takes 100
               ;; ms, so split the difference.
               (accept-process-output nil 0.05)))

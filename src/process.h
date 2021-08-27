@@ -129,8 +129,8 @@ struct Lisp_Process
     int infd;
     /* Byte-count for process output read on `infd'.  */
     uintmax_t nbytes_read;
-    /* Byte-count marker to avoid prematurely closing slow `infd' */
-    uintmax_t nbytes_watermark;
+    /* Read `infd' NOW.  */
+    int forced;
 
     /* Descriptor by which we write to this process.  */
     int outfd;
