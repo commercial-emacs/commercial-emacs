@@ -3341,7 +3341,7 @@ connected_callback (Lisp_Object proc)
   if (!handshaked)
     {
       Lisp_Object retval = (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED)
-	? make_fixnum (gnutls_try_handshake(p, p->blocking_connect))
+	? gnutls_handshake_and_verify (proc, XCDR (params), p->blocking_connect ? Qt : Qnil)
 	: Fgnutls_boot (proc, XCAR (params), XCDR (params),
 			p->blocking_connect ? Qt : Qnil);
       if (p->gnutls_initstage == GNUTLS_STAGE_READY)

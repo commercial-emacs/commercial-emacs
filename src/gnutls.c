@@ -610,7 +610,7 @@ gnutls_log_function2 (int level, const char *string, const char *extra)
   message ("gnutls.c: [%d] %s %s", level, string, extra);
 }
 
-int
+static int
 gnutls_try_handshake (struct Lisp_Process *proc, bool blocking)
 {
   int ret;
@@ -734,18 +734,11 @@ emacs_gnutls_write (struct Lisp_Process *proc, const char *buf, ptrdiff_t nbyte)
 	    rtnval = gnutls_record_send (state, NULL, 0);
 	  else
 	    rtnval = gnutls_record_send (state, buf, nbyte);
-	} while (rtnval == GNUTLS_E_INTERRUPTED || rtnval == GNUTLS_E_AGAIN);
+	} while (rtnval == GNUTLS_E_INTERRUPTED);
 
       if (rtnval < 0)
 	{
 	  emacs_gnutls_handle_error (state, rtnval);
-	  if (!NILP (proc->log)) {
-	      char foo[64];
-	      sprintf(foo, "%s %u", SDATA (proc->name), proc->gnutls_initstage);
-	      GNUTLS_LOG2 (2, global_gnutls_log_level, "the fuq:", foo);
-	      /* message_dolog ("foo: ", 5, 0, 0); */
-	      /* message_dolog (foo, strlen(foo), 1, 0); */
-	  }
 	  break;
 	}
 
@@ -1766,6 +1759,17 @@ gnutls_verify_boot (Lisp_Object proc, Lisp_Object proplist)
   return gnutls_make_error (ret);
 }
 
+Lisp_Object
+gnutls_handshake_and_verify(Lisp_Object proc,
+			    Lisp_Object proplist,
+			    Lisp_Object blocking)
+{
+  int ret = emacs_gnutls_handshake (XPROCESS (proc), ! NILP (blocking));
+  if (ret < GNUTLS_E_SUCCESS)
+    return gnutls_make_error (ret);
+  return gnutls_verify_boot (proc, proplist);
+}
+
 DEFUN ("gnutls-boot", Fgnutls_boot, Sgnutls_boot, 3, 4, 0,
        doc: /* Initialize GnuTLS client for process PROC with TYPE+PROPLIST.
 Currently only client mode is supported.  Return a success/failure
@@ -2099,10 +2103,7 @@ one trustfile (usually a CA bundle).  */)
     }
 
   GNUTLS_INITSTAGE (proc) = GNUTLS_STAGE_CRED_SET;
-  ret = emacs_gnutls_handshake (XPROCESS (proc), !NILP (blocking));
-  if (ret < GNUTLS_E_SUCCESS)
-    return gnutls_make_error (ret);
-  return gnutls_verify_boot (proc, proplist);
+  return gnutls_handshake_and_verify(proc, proplist, blocking);
 }
 
 DEFUN ("gnutls-bye", Fgnutls_bye,

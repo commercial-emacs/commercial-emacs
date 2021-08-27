@@ -292,15 +292,14 @@
   (skip-unless (executable-find "gnutls-serv"))
   (skip-unless (gnutls-available-p))
   (let ((server (make-tls-server 44331))
-        (times 0)
-        (network-security-level 'low)
-        proc status)
+        proc)
     (unwind-protect
-        (progn
+        (let ((times 0)
+              (network-security-level 'low)
+              handshaked status)
           (sleep-for 1)
           (with-current-buffer (process-buffer server)
             (message "gnutls-serv: %s" (buffer-string)))
-
           ;; It takes a while for gnutls-serv to start.
           (while (and (null (ignore-errors
                               (setq proc (make-network-process
@@ -313,23 +312,25 @@
                                                 (gnutls-boot-parameters
                                                  :hostname "localhost"))
                                           :host "localhost"
-                                          :service 44331))))
+                                          :service 44331
+                                          :sentinel (lambda (&rest _args)
+                                                      (setq handshaked t))))))
                       (< (setq times (1+ times)) 10))
             (sit-for 0.1))
           (should proc)
           (setq times 0)
-          (while (and (eq (process-status proc) 'connect)
+          (while (and (not handshaked)
                       (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
-          (skip-unless (not (eq (process-status proc) 'connect))))
-      (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
-    (should (consp status))
-    (delete-process proc)
-    (let ((issuer (plist-get (plist-get status :certificate) :issuer)))
-      (should (stringp issuer))
-      (setq issuer (split-string issuer ","))
-      (should (equal (nth 3 issuer) "O=Emacs Test Servicess LLC")))))
+            (accept-process-output nil 0.1))
+          (skip-unless (not (eq (process-status proc) 'connect)))
+          (setq status (gnutls-peer-status proc))
+          (should (consp status))
+          (let ((issuer (plist-get (plist-get status :certificate) :issuer)))
+            (should (stringp issuer))
+            (setq issuer (split-string issuer ","))
+            (should (equal (nth 3 issuer) "O=Emacs Test Servicess LLC"))))
+      (if (process-live-p server) (delete-process server))
+      (if (process-live-p proc) (delete-process proc)))))
 
 (ert-deftest connect-to-tls-ipv6-nowait ()
   (skip-unless (executable-find "gnutls-serv"))
@@ -611,7 +612,6 @@
   (skip-unless (gnutls-available-p))
   (let ((server (make-tls-server 44667))
         (times 0)
-        nowait
         proc status)
     (unwind-protect
         (progn
@@ -626,7 +626,7 @@
                                           (generate-new-buffer "*foo*")
                                           "localhost"
                                           44667
-                                          nowait))))
+                                          nil))))
                       (< (setq times (1+ times)) 10))
             (sit-for 0.1))
           (should proc)
