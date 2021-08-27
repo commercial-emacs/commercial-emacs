@@ -4727,8 +4727,8 @@ deactivate_process (Lisp_Object proc)
 
   if (p->read_output_delay > 0)
     {
-      if (--process_output_delay_count < 0)
-	process_output_delay_count = 0;
+      process_output_delay_count =
+	max (process_output_delay_count - 1, 0);
       p->read_output_delay = 0;
       p->read_output_skip = 0;
     }
@@ -5187,7 +5187,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 {
   static int last_read_channel = 0;
   int channel, nfds;
-  fd_set Available, Writeok, Exception;
+  fd_set Available, Writeok;
   bool check_write;
   int check_delay;
   bool avail = false;
@@ -5213,7 +5213,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
   FD_ZERO (&Available);
   FD_ZERO (&Writeok);
-  FD_ZERO (&Exception);
 
   if (time_limit == 0 && nsecs == 0 && wait_proc && !NILP (Vinhibit_quit)
       && !(CONSP (wait_proc->status)
@@ -5549,28 +5548,31 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  fd_set Override;
 	  FD_ZERO (&Override);
 	  for (channel = 0; channel <= max_desc; ++channel)
-	    Lisp_Object proc = chan_process[channel];
-	    if (FD_ISSET (channel, &Available) && ! NILP (proc))
-	      {
-		struct Lisp_Process *p = XPROCESS (proc);
-		if (p->forced
+	    {
+	      Lisp_Object proc = chan_process[channel];
+	      if (FD_ISSET (channel, &Available) && ! NILP (proc))
+		{
+		  struct Lisp_Process *p = XPROCESS (proc);
+		  if (p->forced
 #ifdef HAVE_GNUTLS
-		    ||
-		    (p->gnutls_state
-		     && emacs_gnutls_record_check_pending (p->gnutls_state) > 0)
+		      ||
+		      (p->gnutls_state
+		       && emacs_gnutls_record_check_pending (p->gnutls_state) > 0)
 #endif
-		    )
-		  {
-		    if (p->forced)
-		      fprintf (stderr, "forced boost %d\n", channel);
-		    override_p = true;
-		    eassert (p->infd == channel);
-		    FD_SET (p->infd, &Override);
-		    if (!wait_proc || wait_proc->infd == p->infd)
+		      )
+		    {
+		      if (p->forced)
+			fprintf (stderr, "forced boost %d\n", channel);
+		      else
+			fprintf (stderr, "gnutls boost %d\n", channel);
+		      override_p = true;
+		      eassert (p->infd == channel);
+		      FD_SET (p->infd, &Override);
+		      if (!wait_proc || wait_proc->infd == p->infd)
 			timeout = make_timespec (0, 0);
-		  }
-	      }
-
+		    }
+		}
+	    }
 #if defined HAVE_NS
 #define WAIT_SELECT ns_select
 #elif defined HAVE_GLIB
@@ -5578,29 +5580,22 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #else
 #define WAIT_SELECT thread_select
 #endif
-	  Exception = Available;
 	  nfds = WAIT_SELECT (max_desc + 1, &Available,
 			      (check_write ? &Writeok : NULL),
 			      NULL, &timeout, NULL);
-	  timeout = make_timespec (0, 0);
-	  WAIT_SELECT(max_desc + 1, NULL, NULL, &Exception, &timeout, NULL);
-
-#ifdef HAVE_GNUTLS
 	  if (override_p)
 	    {
+	      nfds = max (0, nfds);
 	      for (channel = 0; channel <= max_desc; ++channel)
 		{
 		  if (FD_ISSET(channel, &Override)
 		      && ! FD_ISSET(channel, &Available))
 		    {
-		      nfds = max (0, nfds);
 		      ++nfds;
-		      fprintf (stderr, "boost %d\n", channel);
 		      FD_SET(channel, &Available);
 		    }
 		}
 	    }
-#endif
 	  avail = (nfds > 0);
 	}
 
@@ -5722,26 +5717,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	   ++count, ++channel)
 	{
 	  channel = channel % (max_desc + 1); /* max_desc >= 0 by loop cond */
-
-	  if (FD_ISSET (channel, &Exception)
-	      && fd_callback_info[channel].flags & PROCESS_FD
-	      && ! (fd_callback_info[channel].flags & KEYBOARD_FD))
-	    {
-	      Lisp_Object proc = chan_process[channel];
-	      struct Lisp_Process *p = XPROCESS (proc);
-	      fprintf (stderr, "Error %d having read %lu\n",
-		       channel, p->nbytes_read);
-	      FD_CLR (channel, &Available);
-	      FD_CLR (channel, &Writeok);
-	      p->tick = ++process_tick;
-	      deactivate_process (proc);
-	      if (p->raw_status_new)
-		update_status (p);
-	      if (EQ (p->status, Qrun))
-		pset_status (p,
-			     list2 (Qexit, make_fixnum (126)));
-	    }
-
 	  if (FD_ISSET (channel, &Available)
 	      && fd_callback_info[channel].flags & PROCESS_FD
 	      && ! (fd_callback_info[channel].flags & KEYBOARD_FD))

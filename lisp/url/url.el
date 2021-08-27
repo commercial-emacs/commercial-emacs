@@ -289,6 +289,7 @@ how long to wait for a response before giving up."
                     (url-debug 'retrieval "Dead process %s" url)
 		    (throw 'done 'exception))))
               (when (> (cl-incf iterations) 115)
+                (message "wtf!")
                 (set-process-forced
                  (get-buffer-process proc-buffer) t))
               ;; Querying over consumer internet in the US takes 100
