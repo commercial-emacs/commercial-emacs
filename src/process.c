@@ -5565,18 +5565,12 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
       if (! avail)
 	{
-	  if (wait < TIMEOUT)
-	    break;
-
 	  if (wait_proc
 	      && wait_proc->nbytes_read > initial_nbytes_read)
-	    {
-	      /* a 2018 hack to perform an end run around out-of-band
-		 output, i.e., timers.  Solution is to eliminate
-		 wait_proc and just_wait_proc. */
-	      got_some_output = wait_proc->nbytes_read - initial_nbytes_read;
-	      break;
-	    }
+	    break;
+
+	  if (wait < TIMEOUT)
+	    break;
 
 	  if (!process_skipped
 	      && got_some_output > 0
@@ -5818,6 +5812,13 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       clear_input_pending ();
       maybe_quit ();
     }
+
+  /* a 2018 hack to perform an end run around out-of-band
+     output, i.e., timers.  Solution is to eliminate
+     wait_proc and just_wait_proc. */
+  if (wait_proc
+      && wait_proc->nbytes_read > initial_nbytes_read)
+    got_some_output = wait_proc->nbytes_read - initial_nbytes_read;
 
   return got_some_output;
 }
