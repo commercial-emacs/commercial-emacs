@@ -7850,7 +7850,7 @@ delete_keyboard_wait_descriptor (int desc)
 #ifdef subprocesses
   eassert (desc >= 0 && desc < FD_SETSIZE);
 
-  fd_callback_info[desc].flags &= ~(FOR_READ | KEYBOARD_FD | PROCESS_FD);
+  memset (&fd_callback_info[desc], 0, sizeof (struct fd_callback_data));
 
   if (desc == max_desc)
     recompute_max_desc ();
