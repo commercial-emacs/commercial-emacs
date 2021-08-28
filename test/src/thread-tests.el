@@ -462,9 +462,8 @@ The failure manifests only by being unable to exit the interactive emacs."
 		      (lambda () (threads-test-channel-recv channel))))))))
 
 (ert-deftest threads-test-promiscuous-process ()
-  "Can't we `accept-process-output' of a process started by another thread?
-For whatever reason, in 2012, tromey inserted an assertion forbidding this.
-We test flouting that edict here."
+  "Hold to Tromey's seemingly arbitrary 2012 edict outlawing
+`accept-process-output' of a process started by another thread."
   (skip-unless (featurep 'threads))
   (thread-last-error t)
   (let* ((thread-tests-main (get-buffer-create "thread-tests-main" t))
@@ -505,5 +504,5 @@ We test flouting that edict here."
                            (nth (random (length procs)) procs) 1.0)
                        finally return nil)))
     (mapc (lambda (b) (kill-buffer b)) buffers))
-  (should-not (thread-last-error t)))
+  (should (thread-last-error t)))
 ;;; thread-tests.el ends here
