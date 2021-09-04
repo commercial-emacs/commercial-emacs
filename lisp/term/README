@@ -249,7 +249,7 @@ it up to the user's .emacs file whether to call it.
 existing ones and learn the common conventions.
 
 
-This file is part of GNU Emacs.
+This file is NOT part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

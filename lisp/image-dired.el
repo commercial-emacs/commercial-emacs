@@ -6,7 +6,7 @@
 ;; Keywords: multimedia
 ;; Author: Mathias Dahl <mathias.rem0veth1s.dahl@gmail.com>
 
-;; This file is part of GNU Emacs.
+;; This file is NOT part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

@@ -1813,7 +1813,7 @@ A two-char comment-starter whose two chars are symbol constituents will
 not be noticed if it appears within a word.
 
 
-This file is part of GNU Emacs.
+This file is NOT part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -6,7 +6,7 @@
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: unix, tools
 
-;; This file is part of GNU Emacs.
+;; This file is NOT part of GNU Emacs.
 
 ;; Homepage: https://www.emacswiki.org/emacs/GDB-MI
 
