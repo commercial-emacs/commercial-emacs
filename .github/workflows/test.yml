@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+    paths-ignore:
+    - '**.rst'
+    - '**.org'
+    - '**.texi'
+    - '**.info'
+    - 'ChangeLog.**'
+  push:
+    paths-ignore:
+    - '**.rst'
+    - '**.org'
+    - '**.texi'
+    - '**.info'
+    - 'ChangeLog.**'
+    branches-ignore:
+    - 'master'
+    - 'main'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+    - uses: actions/checkout@v2
+    - name: paths
+      run: |
+        echo "$HOME/local/bin" >> $GITHUB_PATH
+        echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        echo "LD_LIBRARY_PATH=$HOME/.local/lib" >> $GITHUB_ENV
+    - run: "./autogen.sh"
+    - run: "./configure --prefix=$HOME/.local"
+    - run: "make -j2 check"
+    - run: "make install"
