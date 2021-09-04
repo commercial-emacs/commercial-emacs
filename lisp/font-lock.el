@@ -1797,67 +1797,62 @@ LOUDLY, if non-nil, allows progress-meter bar."
 ;;; Tree-sitter fontification functions.
 
 (defvar-local font-lock-tree-sitter-settings nil
-  "A list of settings for tree-sitter-based fontification.
+  "A list of SETTINGs for tree-sitter-based fontification.
 
-Each setting controls one parser (often of different language).
-A pattern is a list of form (LANGUAGE PATTERN [RANGE-FUNCTION]).
-LANGUAGE is the symbol of a function that returns a tree-sitter
-language.  This function should be provided by a dynamic module
-for a particular tree-sitter language.
+Each SETTING should look like
+
+    (LANGUAGE PATTERN)
+
+Each SETTING controls one parser (often of different languages).
+LANGUAGE is the language symbol.  See Info node `(elisp)Language
+Definitions'.
 
 PATTERN is a string containing tree-sitter queries.  See Info
 node `(elisp)Pattern Matching' for writing query pattern.
 
-RANGE-FUNCTION is a optional function that sets ranges for the
-parser for LANGUAGE.  It's signature should be
-
-    (start end &optional loudly &rest _)
-
-where START and END marks the region that is about to be
-fontified.  RANGE-FUNCTION only need to adjust ranges in that
-region.  If loudly is non-nil, RANGE-FUNCTION can message some
-debug information.
-
 See Info node `(elisp)Multiple Languages' for what does it mean
-to set ranges for a parser.")
+to set ranges for a parser.
+
+Generally, major-modes should set
+`font-lock-tree-sitter-defaults', and let Emacs automatically
+populate this variable.")
 
 (defvar-local font-lock-tree-sitter-defaults nil
   "Defaults for tree-sitter Font Lock specified by the major mode.
 
-It should be a list of defaults, each default is of the form:
+This variable should be a list
 
-  (LANGUAGE SETTINGS [RANGE-FUNCTION])
+    (DEFAULT :KEYWORD VALUE...)
 
-LANGUAGE is a tree-sitter language symbol (see Info
-node `(elisp)Language Definitions').  SETTINGS may be a symbol (a
-variable or function whose value is the settings to use for
-fontification) or a list of symbols (specifying different levels
-of fontification).  If the symbol is both a variable and a
-function, it is used as a function.  Different levels of
-fontification can be controlled by
+A DEFAULT may be a symbol (a variable or function whose value is
+the settings to use for fontification) or a list of
+symbols (specifying different levels of fontification).  If the
+symbol is both a variable and a function, it is used as a
+function.  Different levels of fontification can be controlled by
 `font-lock-maximum-decoration'.
 
-RANGE-FUNCTION is a optional function that sets ranges for the
-parser for LANGUAGE.  It's signature should be
+The symbol DEFAULT (or each symbol in DEFAULT) should contain or
+return a SETTING as explained in
+`font-lock-tree-sitter-settings'.  Basically,
 
-    (start end &optional loudly &rest _)
+    (LANGUAGE PATTERN)
 
-where START and END marks the region that is about to be
-fontified.  RANGE-FUNCTION only need to adjust ranges in that
-region.  If loudly is non-nil, RANGE-FUNCTION can message some
-debug information.
+KEYWORD and VALUE are additional settings can could be used to
+alter fontification behavior.  Currently there aren't any.
 
-See Info node `(elisp)Multiple Languages' for what does it mean
-to set ranges for a parser.")
+For multi-language major-modes, you should provide range functions
+in `tree-sitter-range-functions', and Emacs will set the ranges
+before fontifing a region.  See Info node `(elisp)Multiple
+Languages' for what does it mean to set ranges for a parser.")
 
 (defun font-lock-tree-sitter-fontify-region (start end &optional loudly)
+  "Fontify the region between START and END.
+If LOUDLY is non-nil, message some debugging information."
+  (tree-sitter-update-ranges start end)
   (dolist (setting font-lock-tree-sitter-settings)
-    (let* ((language (nth 0 setting))
-           (match-pattern (nth 1 setting))
-           (range-fn (nth 2 setting))
-           (parser (tree-sitter-get-parser-create language)))
-      (when range-fn
-        (funcall range-fn start end loudly))
+    (when-let* ((language (nth 0 setting))
+                (match-pattern (nth 1 setting))
+                (parser (tree-sitter-get-parser-create language)))
       (when-let ((node (tree-sitter-node-at start end parser)))
         (let ((captures (tree-sitter-query-capture
                          node match-pattern
@@ -2052,10 +2047,10 @@ Sets various variables using `font-lock-defaults' and
               (font-lock-compile-keywords font-lock-keywords))))
     ;; Tree-sitter-based fontification.
     (setq-local font-lock-tree-sitter-settings
-                (mapcar (lambda (defaults)
+                (mapcar (lambda (elm) ; (DEFAULT :setting ...)
                           (font-lock-eval-keywords
                            (font-lock-choose-keywords
-                            (nth 1 defaults)
+                            (nth 0 elm) ; DEFAULT
 	                    (font-lock-value-in-major-mode
                              font-lock-maximum-decoration))))
                         font-lock-tree-sitter-defaults))

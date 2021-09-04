@@ -51,6 +51,8 @@ Modules}).  To load a language definition, download the package
 (@pxref{Packages,,, emacs, The GNU Emacs Manual}), and @code{require}
 it (@pxref{Named Features}).
 
+TODO: list all available languages.
+
 The language definition provides a symbol,
 @code{tree-sitter-<language>}, that can be used anywhere a language
 definition is asked.  For example, C language definition provides a
@@ -93,6 +95,8 @@ We can also represent it in s-expression:
 (root (expression (number) (operator) (number)))
 @end example
 
+@subheading Node types
+
 @cindex tree-sitter node type
 @anchor{tree-sitter node type}
 @cindex tree-sitter named node
@@ -102,9 +106,9 @@ Names like @code{root}, @code{expression}, @code{number},
 @code{operator} are nodes' @dfn{type}.  However, not all nodes in a
 syntax tree have a type.  Nodes that don't are @dfn{anonymous nodes},
 and nodes with a type are @dfn{named nodes}.  Anonymous nodes usually
-represent punctuation marks (TODO: better word?) like quote @samp{"}
-and bracket @samp{[}, or tokens that have fixed representation, such
-as keywords like @code{return}.
+represent punctuation marks (FIXME: better word than ``puncturation
+marks''?) like quote @samp{"} and bracket @samp{[}, or tokens that
+have fixed representation, such as keywords like @code{return}.
 
 For example, a return expression could be defined as the @code{return}
 keyword followed by any expression and a semicolon:
@@ -115,9 +119,11 @@ keyword followed by any expression and a semicolon:
 
 @noindent
 The text that corresponds to an @code{expression} node can be
-different from node to node.  It can be @code{1}, @code{result},
-@code{success}, etc; but the @samp{return} keyword and the semicolon
-are always the same.
+different from node to node.  It can be @code{1}, @code{"string"}, a
+function call, anything; but the @code{return} keyword and the
+semicolon are always the same.
+
+@subheading Field names
 
 @cindex tree-sitter node field name
 @anchor{tree-sitter node field name} To make the syntax tree easier to
@@ -302,7 +308,7 @@ Returns the buffer associated with @var{parser}.
 @end defun
 
 @defun tree-sitter-parser-language parser
-Returns the language that @var{parser} uses.
+Returns the language that @var{parser} uses as a symbol.
 @end defun
 
 @defun tree-sitter-parser-p object
@@ -512,6 +518,10 @@ This function returns @var{node}'s associated parser.
 This function returns @var{node}'s parser's associated buffer.
 @end defun
 
+@defun tree-sitter-node-language node
+This function returns @var{node}'s parser's associated language symbol.
+@end defun
+
 Each node represents a piece of text in the buffer.  Functions below
 finds relevant information about that text.
 
@@ -674,8 +684,10 @@ node.  If a language symbol, use the root node of the first parser
 using that language; if a parser, use the root node of that parser; if
 a node, use that node.
 
-This function raise an @code{tree-sitter-query-error} if PATTERN is
-malformed.
+This function raise an @code{tree-sitter-query-error} if @var{pattern}
+is malformed.  The signal data looks like @code{(@var{type}
+@var{position})}, where @var{type} tells what how is @var{pattern}
+malformed, and @var{position} tells the position of the problem.
 @end defun
 
 @defun tree-sitter-query-capture node pattern beg end
@@ -849,6 +861,7 @@ adjacent children:
 ;; Anchor two adjacent children.
 (compound_expression
  (_) @@prev-child
+ .
  (_) @@next-child)
 @end group
 @end example
@@ -858,7 +871,7 @@ nodes.
 
 @subheading Predicate
 
-As for now, Emacs do not support predicates in query patterns.
+As for now, Emacs does not support predicates in query patterns.
 
 Tree-sitter project's documentation about pattern-matching can be
 found at
@@ -882,15 +895,14 @@ range in @var{ranges} is a list of cons @code{(@var{beg}
 . @var{end})}.
 
 Each range in @var{ranges} must come in order and not overlap.  That
-is,
+is, in pseudo code:
 
 @example
 @group
 (cl-loop for idx from 1 to (1- (length ranges))
          for prev = (nth (1- idx) ranges)
          for next = (nth idx ranges)
-         should (<= (car prev) (cdr prev)
-                    (car next) (cdr next)))
+         should (<= (car prev) (cdr prev) (car next) (cdr next)))
 @end group
 @end example
 
@@ -898,7 +910,9 @@ If @var{ranges} violates this constraint, or something else went
 wrong, this function signals a @code{tree-sitter-set-range-error}.
 
 This function can also be used for disabling ranges.  If @var{ranges}
-is nil, the parser will parse the whole buffer.
+is nil, the parser is set to parse the whole buffer.
+
+Example:
 
 @example
 @group
@@ -926,11 +940,11 @@ ranges, the return value is nil.
 @defun tree-sitter-set-ranges parser-or-lang ranges
 Like @code{tree-sitter-parser-set-included-ranges}, this function sets
 the ranges of @var{parser-or-lang} to @var{ranges}.  Conveniently,
-@var{parser-or-lang} could be either a parser, or a language symbol.
+@var{parser-or-lang} could be either a parser or a language symbol.
 If it is a language symbol, this function looks for the first parser
 in @var{tree-sitter-parser-list} that uses that language in the
 current buffer.
-@defun
+@end defun
 
 @defun tree-sitter-get-ranges parser-or-lang
 This function returns the ranges of @var{parser-or-lang}, like
@@ -942,26 +956,73 @@ a language symbol.
 @defun tree-sitter-query-range source pattern &optional beg end
 This function queries @var{source} and returns the ranges of captured
 nodes.  The return value has the same shape of other functions: a list
-of @code{(@var{start} . @var{end})}.
+of @code{(@var{beg} . @var{end})}.
 
 For convenience, @var{source} can be a language symbol, a parser, or a
 node.  If a language symbol, use the root node of the first parser
 using that language; if a parser, use the root node of that parser; if
 a node, use that node.
 
-Parameter @var{pattern} is the query pattern used to capture nodes,
-the capture names don't matter.  Parameter @var{beg} and @var{end}, if
+Parameter @var{pattern} is the query pattern used to capture nodes.
+The capture names don't matter.  Parameter @var{beg} and @var{end}, if
 both non-nil, limits the range in which this function queries.
 
-Like other query functions, this function raise an
-@code{tree-sitter-query-error} if PATTERN is malformed.
+Like other query functions, this function raises an
+@code{tree-sitter-query-error} if @var{pattern} is malformed.
 @end defun
 
 @heading An example
 
-Normally mixing languages in tree-sitter works like this:
+Normally, in a set of languages that can be mixed together, there is a
+major language and several embedded languages. The major language
+parses the whole document, and skips the embedded languages. Thus, the
+parser for the major language knows the ranges of the embedded
+languages. So we first parse the whole document with the major
+language’s parser, set ranges for the embedded languages, then parse
+the embedded languages.
 
-TODO
+Suppose we want to parse a very simple document that mixes HTML, CSS
+and JavaScript:
+
+@example
+@group
+<html>
+  <script>1 + 2</script>
+  <style>body @{ color: "blue"; @}</style>
+</html>
+@end group
+@end example
+
+We first parse with HTML, then set ranges for CSS and JavaScript:
+
+@example
+@group
+;; Create parsers.
+(setq html (tree-sitter-get-parser-create 'tree-sitter-html))
+(setq css (tree-sitter-get-parser-create 'tree-sitter-css))
+(setq js (tree-sitter-get-parser-create 'tree-sitter-javascript))
+
+;; Set CSS ranges.
+(setq css-range
+      (tree-sitter-query-range
+       'tree-sitter-html
+       "(style_element (raw_text) @@capture)"))
+(tree-sitter-parser-set-included-ranges css css-range)
+
+;; Set JavaScript ranges.
+(setq js-range
+      (tree-sitter-query-range
+       'tree-sitter-html
+       "(script_element (raw_text) @@capture)"))
+(tree-sitter-parser-set-included-ranges js js-range)
+@end group
+@end example
+
+We used query pattern @code{(style_element (raw_text) @@capture)} to
+find CSS nodes in the HTML parse tree. For how to write query
+patterns, @pxref{Pattern Matching}.
+
+TODO: mention font-lock and indenting
 
 @node Tree-sitter C API
 @section Tree-sitter C API Correspondence
