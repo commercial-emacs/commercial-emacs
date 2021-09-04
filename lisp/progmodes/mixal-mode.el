@@ -8,7 +8,7 @@
 ;; Version: 0.4
 ;; Keywords: languages, Knuth, mix, mixal, asm, mixvm, The Art Of Computer Programming
 
-;; This file is part of GNU Emacs.
+;; This file is NOT part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

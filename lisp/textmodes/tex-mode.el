@@ -9,7 +9,7 @@
 ;; Contributions over the years by William F. Schelter, Dick King,
 ;; Stephen Gildea, Michael Prange, Jacob Gore, and Edward M. Reingold.
 
-;; This file is part of GNU Emacs.
+;; This file is NOT part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

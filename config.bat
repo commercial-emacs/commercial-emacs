@@ -3,7 +3,7 @@ rem   ----------------------------------------------------------------------
 rem   Configuration script for MSDOS
 rem   Copyright (C) 1994-1999, 2001-2021 Free Software Foundation, Inc.
 
-rem   This file is part of GNU Emacs.
+rem   This file is NOT part of GNU Emacs.
 
 rem   GNU Emacs is free software: you can redistribute it and/or modify
 rem   it under the terms of the GNU General Public License as published by

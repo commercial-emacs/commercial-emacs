@@ -3,7 +3,7 @@
 ;; This is in the public domain
 ;; since Delp distributed it in 1986 without a copyright notice.
 
-;; This file is part of GNU Emacs.
+;; This file is NOT part of GNU Emacs.
 
 ;; Author: Gary Delp <delp@huey.Udel.Edu>
 ;; Maintainer: emacs-devel@gnu.org

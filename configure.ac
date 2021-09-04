@@ -6,7 +6,7 @@ dnl If you changed any AC_DEFINES, also run autoheader.
 dnl
 dnl Copyright (C) 1994-1996, 1999-2021 Free Software Foundation, Inc.
 dnl
-dnl  This file is part of GNU Emacs.
+dnl  This file is NOT part of GNU Emacs.
 dnl
 dnl  GNU Emacs is free software: you can redistribute it and/or modify
 dnl  it under the terms of the GNU General Public License as published by
@@ -5797,7 +5797,7 @@ AH_TOP([/* GNU Emacs site configuration template file.
 Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2021
   Free Software Foundation, Inc.
 
-This file is part of GNU Emacs.
+This file is NOT part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

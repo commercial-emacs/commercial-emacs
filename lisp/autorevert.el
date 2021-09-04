@@ -7,7 +7,7 @@
 ;; Created: 1997-06-01
 ;; Date: 1999-11-30
 
-;; This file is part of GNU Emacs.
+;; This file is NOT part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

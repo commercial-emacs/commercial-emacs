@@ -5,7 +5,7 @@
 # Author: Noah Friedman <friedman@splode.com>
 # Created: 2005-04-28
 
-# This file is part of GNU Emacs.
+# This file is NOT part of GNU Emacs.
 
 # GNU Emacs is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
