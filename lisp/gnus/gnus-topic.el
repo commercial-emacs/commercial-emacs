@@ -25,10 +25,14 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
+
 (require 'gnus)
 (require 'gnus-group)
 (require 'gnus-start)
-(require 'subr-x)
+(require 'gnus-util)
+(eval-when-compile
+  (require 'subr-x))
 
 (defgroup gnus-topic nil
   "Group topics."
@@ -434,7 +438,7 @@ If LOWEST is non-nil, list all newsgroups of level LOWEST or higher."
 	 (and gnus-group-listed-groups
 	      (copy-sequence gnus-group-listed-groups))))
 
-    (gnus-update-format-specifications 'topic)
+    (gnus-update-format-specifications nil 'topic)
 
     (when (or (not gnus-topic-alist)
 	      (not gnus-topology-checked-p))

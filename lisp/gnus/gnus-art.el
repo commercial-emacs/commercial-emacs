@@ -24,6 +24,7 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
 (defvar tool-bar-map)
 (defvar w3m-minor-mode-map)
 
@@ -40,6 +41,7 @@
 (require 'mm-uu)
 (require 'message)
 (require 'mouse)
+(require 'seq)
 
 (autoload 'gnus-msg-mail "gnus-msg" nil t)
 (autoload 'gnus-button-mailto "gnus-msg")
@@ -1641,10 +1643,9 @@ regexp."
     "September" "October" "November" "December"))
 
 (defvar article-goto-body-goes-to-point-min-p nil)
-(defvar-local gnus-article-wash-types nil)
+(defvar gnus-article-wash-types nil)
 (defvar gnus-article-emphasis-alist nil)
-(defvar-local gnus-original-group-and-article nil)
-(defvar-local gnus-article-image-alist nil)
+(defvar gnus-article-image-alist nil)
 
 (defvar gnus-article-mime-handle-alist-1 nil)
 (defvar gnus-treatment-function-alist
@@ -1694,9 +1695,9 @@ regexp."
     (gnus-treat-highlight-citation gnus-article-highlight-citation)
     (gnus-treat-body-boundary gnus-article-treat-body-boundary)))
 
-(defvar-local gnus-article-mime-handle-alist nil)
+(defvar gnus-article-mime-handle-alist nil)
 (defvar article-lapsed-timer nil)
-(defvar-local gnus-article-current-summary nil)
+(defvar gnus-article-current-summary nil)
 
 (defvar gnus-article-mode-syntax-table
   (let ((table (copy-syntax-table text-mode-syntax-table)))
@@ -1717,6 +1718,8 @@ Initialized from `text-mode-syntax-table'.")
 (defvar gnus-number-of-articles-to-be-saved nil)
 
 (defvar gnus-inhibit-hiding nil)
+
+(defvar gnus-article-edit-mode nil)
 
 ;;; Macros for dealing with the article buffer.
 
@@ -4491,72 +4494,74 @@ commands:
   (setq-local nobreak-char-display nil)
   ;; Enable `gnus-article-remove-images' to delete images shr.el renders.
   (setq-local shr-put-image-function #'gnus-shr-put-image)
-  (setq show-trailing-whitespace nil)
   (unless gnus-article-show-cursor
     (setq cursor-in-non-selected-windows nil))
   (gnus-set-default-directory)
   (buffer-disable-undo)
+  (setq show-trailing-whitespace nil)
   (mm-enable-multibyte))
-
-(defun gnus-article-setup-buffer-ensure (summary-buffer
-                                         newsgroup-name
-                                         article-buffer-name
-                                         original-article-buffer-name)
-  "Refactor."
-  (gnus-summary-assume-in-summary
-    (with-current-buffer (gnus-get-buffer-create original-article-buffer-name)
-      (mm-enable-multibyte)
-      (setq major-mode 'gnus-original-article-mode))
-
-    (with-current-buffer (gnus-get-buffer-create article-buffer-name)
-      (dolist (buffer `(,(current-buffer) ,summary-buffer))
-        (gnus-assign-former-global 'gnus-article-buffer
-                                   article-buffer-name
-                                   buffer)
-        (gnus-assign-former-global 'gnus-original-article-buffer
-                                   original-article-buffer-name
-                                   buffer)
-        (gnus-assign-former-global 'gnus-newsgroup-name
-                                   newsgroup-name
-                                   buffer)
-        (gnus-assign-former-global 'gnus-summary-buffer
-                                   summary-buffer
-                                   buffer))
-      (gnus-article-stop-animations)
-      (mm-destroy-parts gnus-article-mime-handles)
-      (setq gnus-article-mime-handles nil
-            gnus-article-mime-handle-alist nil)
-      (unless (derived-mode-p 'gnus-article-mode)
-        (gnus-article-mode))
-      (setq truncate-lines gnus-article-truncate-lines)
-      (gnus-summary-set-local-parameters newsgroup-name)
-      (when article-lapsed-timer
-        (gnus-stop-date-timer))
-      (when gnus-article-update-date-headers
-        (gnus-start-date-timer gnus-article-update-date-headers))
-      (current-buffer))))
 
 (defun gnus-article-setup-buffer ()
   "Initialize the article buffer."
-  (gnus-summary-assume-in-summary
+  (let* ((name (if gnus-single-article-buffer "*Article*"
+		 (concat "*Article " gnus-newsgroup-name "*")))
+	 (original
+	  (progn (string-match "\\*Article" name)
+		 (concat " *Original Article"
+			 (substring name (match-end 0))))))
+    (setq gnus-article-buffer name)
+    (setq gnus-original-article-buffer original)
+    (setq gnus-article-mime-handle-alist nil)
+    (with-current-buffer gnus-summary-buffer
+      ;; This might be a variable local to the summary buffer.
+      (unless gnus-single-article-buffer
+	(setq gnus-article-buffer name)
+	(setq gnus-original-article-buffer original)
+	(gnus-set-global-variables)))
     (gnus-article-setup-highlight-words)
-    (let* ((summary gnus-summary-buffer)
-           (group gnus-newsgroup-name)
-           (name (if gnus-single-article-buffer "*Article*"
-                   (concat "*Article " group "*")))
-           (original (progn (string-match "\\*Article" name)
-                            (concat " *Original Article"
-                                    (substring name (match-end 0))))))
-      (when-let ((existing-buffer (get-buffer name)))
-        (with-current-buffer existing-buffer
-          (when (eq major-mode 'gnus-article-edit-mode)
-            (if (y-or-n-p "Article mode edit in progress; discard? ")
-                (progn
-                  (set-buffer-modified-p nil)
-                  (gnus-kill-buffer existing-buffer)
-                  (message ""))
-              (error "Action aborted")))))
-      (gnus-article-setup-buffer-ensure summary group name original))))
+    ;; Init original article buffer.
+    (with-current-buffer (gnus-get-buffer-create gnus-original-article-buffer)
+      (mm-enable-multibyte)
+      (setq major-mode 'gnus-original-article-mode)
+      (make-local-variable 'gnus-original-article))
+    (if (and (get-buffer name)
+	     (with-current-buffer name
+	       (if gnus-article-edit-mode
+		   (if (y-or-n-p "Article mode edit in progress; discard? ")
+		       (progn
+			 (set-buffer-modified-p nil)
+			 (gnus-kill-buffer name)
+			 (message "")
+			 nil)
+		     (error "Action aborted"))
+		 t)))
+	(let ((summary gnus-summary-buffer))
+	  (with-current-buffer name
+            (setq-local gnus-article-edit-mode nil)
+	    (gnus-article-stop-animations)
+	    (when gnus-article-mime-handles
+	      (mm-destroy-parts gnus-article-mime-handles)
+	      (setq gnus-article-mime-handles nil))
+	    ;; Set it to nil in article-buffer!
+	    (setq gnus-article-mime-handle-alist nil)
+	    (buffer-disable-undo)
+	    (setq buffer-read-only t)
+	    (unless (derived-mode-p 'gnus-article-mode)
+	      (gnus-article-mode))
+            (setq-local gnus-summary-buffer summary)
+	    (setq truncate-lines gnus-article-truncate-lines)
+	    (current-buffer)))
+      (let ((summary gnus-summary-buffer))
+	(with-current-buffer (gnus-get-buffer-create name)
+	  (gnus-article-mode)
+	  (setq truncate-lines gnus-article-truncate-lines)
+          (setq-local gnus-summary-buffer summary)
+	  (gnus-summary-set-local-parameters gnus-newsgroup-name)
+	  (when article-lapsed-timer
+	    (gnus-stop-date-timer))
+	  (when gnus-article-update-date-headers
+	    (gnus-start-date-timer gnus-article-update-date-headers))
+	  (current-buffer))))))
 
 (defun gnus-article-stop-animations ()
   (cancel-function-timers 'image-animate-timeout))
@@ -4588,116 +4593,113 @@ commands:
 ARTICLE should either be an article number or a Message-ID.
 If ARTICLE is an id, HEADER should be the article headers.
 If ALL-HEADERS is non-nil, no headers are hidden."
-  (gnus-summary-assume-in-summary
-    (gnus-article-setup-buffer)
-    (let ((group gnus-newsgroup-name)
-          (summary (current-buffer))
-          result)
-      (with-current-buffer gnus-article-buffer
-        ;; Deactivate active regions.
-        (when transient-mark-mode
-          (setq mark-active nil))
-        (cond ((not (setq result (let ((inhibit-read-only t))
-                                   (gnus-request-article-this-buffer
-                                    article group))))
-               (with-current-buffer summary
-                 (when (and (numberp article)
-                            (not (memq article gnus-newsgroup-sparse)))
-                   (setq gnus-article-current
-                         (cons gnus-newsgroup-name article))
-                   (setq gnus-current-article article)
-                   (if (and (memq article gnus-newsgroup-undownloaded)
-                            (not (gnus-online (gnus-find-method-for-group
-                                               gnus-newsgroup-name))))
-                       (progn
-                         (gnus-summary-set-agent-mark article)
-                         (message "Message marked for downloading"))
-                     (gnus-summary-mark-article article gnus-canceled-mark)
-                     (unless (memq article gnus-newsgroup-sparse)
-                       (gnus-error
-                        1
-                        "No such article (may have expired or been canceled)"))))))
-              ((or (eq result 'pseudo) (eq result 'nneething))
-               (with-current-buffer summary
-                 (push article gnus-newsgroup-history)
-                 (setq gnus-last-article gnus-current-article
-                       gnus-current-article 0
-                       gnus-current-headers nil
-                       gnus-article-current nil)
-                 (if (eq result 'nneething)
-                     (gnus-configure-windows 'summary)
-                   (gnus-configure-windows 'article)))
-               (let ((gnus-article-mime-handle-alist-1
-                      gnus-article-mime-handle-alist))
-                 (gnus-set-mode-line 'article)))
-              ;; The result from the `request' was an actual article -
-              ;; or at least some text that is now displayed in the
-              ;; article buffer.
-              (t
-               (with-current-buffer summary
-                 (when (and (numberp article)
-                            (not (eq article gnus-current-article)))
-                   ;; Seems like a new article has been selected.
-                   ;; `gnus-current-article' must be an article number.
-                   (push article gnus-newsgroup-history)
-                   ;; TODO: a more elegant way to replicate former globals
-                   (dolist (buffer `(,(get-buffer gnus-article-buffer)
-                                     ,(get-buffer summary)))
-                     (gnus-assign-former-global
-                      'gnus-last-article
-                      gnus-current-article
-                      buffer)
-                     (gnus-assign-former-global
-                      'gnus-current-article
-                      article
-                      buffer)
-                     (gnus-assign-former-global
-                      'gnus-current-headers
-                      (gnus-summary-article-header article)
-                      buffer)
-                     (gnus-assign-former-global
-                      'gnus-article-current
-                      (cons gnus-newsgroup-name article)
-                      buffer))
-                   (unless (mail-header-p gnus-current-headers)
-                     (setq gnus-current-headers nil))
-                   (gnus-summary-goto-subject gnus-current-article)
-                   (when (gnus-summary-show-thread)
-                     ;; If the summary buffer really was folded, the
-                     ;; previous goto may not actually have gone to
-                     ;; the right article, but the thread root instead.
-                     ;; So we go again.
-                     (gnus-summary-goto-subject gnus-current-article))
-                   (gnus-run-hooks 'gnus-mark-article-hook)
-                   (gnus-set-mode-line 'summary)
-                   (when (gnus-visual-p 'article-highlight 'highlight)
-                     (gnus-run-hooks 'gnus-visual-mark-article-hook))
-                   (setq gnus-have-all-headers
-                         (or all-headers gnus-show-all-headers))))
-               (save-excursion
-                 (gnus-configure-windows 'article))
-               (when (or (numberp article)
-                         (stringp article))
-                 (gnus-article-prepare-display)
-                 ;; Do page break.
-                 (goto-char (point-min))
-                 (when gnus-break-pages
-                   (gnus-narrow-to-page)))
-               (let ((gnus-article-mime-handle-alist-1
-                      gnus-article-mime-handle-alist))
-                 (gnus-set-mode-line 'article))
-               (article-goto-body)
-               (unless (bobp)
-                 (forward-line -1))
-               (set-window-point (get-buffer-window (current-buffer)) (point))
-               (gnus-configure-windows 'article)
-               ;; Make sure the article begins with the top of the header.
-               (let ((window (get-buffer-window gnus-article-buffer)))
-                 (when window
-                   (with-current-buffer (window-buffer window)
-                     (set-window-point window (point-min)))))
-               (gnus-run-hooks 'gnus-article-prepare-hook)
-               t))))))
+  (save-excursion                ;FIXME: Shouldn't that be save-current-buffer?
+    ;; Make sure we start in a summary buffer.
+    (unless (derived-mode-p 'gnus-summary-mode)
+      (set-buffer gnus-summary-buffer))
+    (setq gnus-summary-buffer (current-buffer))
+    (let* ((summary-buffer (current-buffer))
+	   (gnus-tmp-internal-hook gnus-article-internal-prepare-hook)
+	   (group gnus-newsgroup-name)
+	   result)
+      (save-excursion
+	(gnus-article-setup-buffer)
+	(set-buffer gnus-article-buffer)
+	;; Deactivate active regions.
+	(when transient-mark-mode
+	  (setq mark-active nil))
+	(if (not (setq result (let ((inhibit-read-only t))
+				(gnus-request-article-this-buffer
+				 article group))))
+	    ;; There is no such article.
+	    (save-excursion
+	      (when (and (numberp article)
+			 (not (memq article gnus-newsgroup-sparse)))
+		(setq gnus-article-current
+		      (cons gnus-newsgroup-name article))
+		(set-buffer gnus-summary-buffer)
+		(setq gnus-current-article article)
+		(if (and (memq article gnus-newsgroup-undownloaded)
+			 (not (gnus-online (gnus-find-method-for-group
+					    gnus-newsgroup-name))))
+		    (progn
+		      (gnus-summary-set-agent-mark article)
+		      (message "Message marked for downloading"))
+		  (gnus-summary-mark-article article gnus-canceled-mark)
+		  (unless (memq article gnus-newsgroup-sparse)
+		    (gnus-error 1 "No such article (may have expired or been canceled)")))))
+	  (if (or (eq result 'pseudo)
+		  (eq result 'nneething))
+	      (progn
+		(with-current-buffer summary-buffer
+		  (push article gnus-newsgroup-history)
+		  (setq gnus-last-article gnus-current-article
+			gnus-current-article 0
+			gnus-current-headers nil
+			gnus-article-current nil)
+		  (if (eq result 'nneething)
+		      (gnus-configure-windows 'summary)
+		    (gnus-configure-windows 'article))
+		  (gnus-set-global-variables))
+		(let ((gnus-article-mime-handle-alist-1
+		       gnus-article-mime-handle-alist))
+		  (gnus-set-mode-line 'article)))
+	    ;; The result from the `request' was an actual article -
+	    ;; or at least some text that is now displayed in the
+	    ;; article buffer.
+	    (when (and (numberp article)
+		       (not (eq article gnus-current-article)))
+	      ;; Seems like a new article has been selected.
+	      ;; `gnus-current-article' must be an article number.
+	      (with-current-buffer summary-buffer
+		(push article gnus-newsgroup-history)
+		(setq gnus-last-article gnus-current-article
+		      gnus-current-article article
+		      gnus-current-headers
+		      (gnus-summary-article-header gnus-current-article)
+		      gnus-article-current
+		      (cons gnus-newsgroup-name gnus-current-article))
+		(unless (mail-header-p gnus-current-headers)
+		  (setq gnus-current-headers nil))
+		(gnus-summary-goto-subject gnus-current-article)
+		(when (gnus-summary-show-thread)
+		  ;; If the summary buffer really was folded, the
+		  ;; previous goto may not actually have gone to
+		  ;; the right article, but the thread root instead.
+		  ;; So we go again.
+		  (gnus-summary-goto-subject gnus-current-article))
+		(gnus-run-hooks 'gnus-mark-article-hook)
+		(gnus-set-mode-line 'summary)
+		(when (gnus-visual-p 'article-highlight 'highlight)
+		  (gnus-run-hooks 'gnus-visual-mark-article-hook))
+		;; Set the global newsgroup variables here.
+		(gnus-set-global-variables)
+		(setq gnus-have-all-headers
+		      (or all-headers gnus-show-all-headers))))
+	    (save-excursion
+	      (gnus-configure-windows 'article))
+	    (when (or (numberp article)
+		      (stringp article))
+	      (gnus-article-prepare-display)
+	      ;; Do page break.
+	      (goto-char (point-min))
+	      (when gnus-break-pages
+		(gnus-narrow-to-page)))
+	    (let ((gnus-article-mime-handle-alist-1
+		   gnus-article-mime-handle-alist))
+	      (gnus-set-mode-line 'article))
+	    (article-goto-body)
+	    (unless (bobp)
+	      (forward-line -1))
+	    (set-window-point (get-buffer-window (current-buffer)) (point))
+	    (gnus-configure-windows 'article)
+	    ;; Make sure the article begins with the top of the header.
+	    (let ((window (get-buffer-window gnus-article-buffer)))
+	      (when window
+		(with-current-buffer (window-buffer window)
+		  (set-window-point window (point-min)))))
+	    (gnus-run-hooks 'gnus-article-prepare-hook)
+	    t))))))
 
 ;;;###autoload
 (defun gnus-article-prepare-display ()
@@ -4712,7 +4714,7 @@ If ALL-HEADERS is non-nil, no headers are hidden."
     (setq buffer-read-only nil
 	  gnus-article-wash-types nil
 	  gnus-article-image-alist nil)
-    (gnus-run-hooks 'gnus-article-internal-prepare-hook)
+    (gnus-run-hooks 'gnus-tmp-internal-hook)
     (when gnus-display-mime-function
       (funcall gnus-display-mime-function))
     ;; Add attachment buttons to the header.
@@ -6703,6 +6705,7 @@ not have a face in `gnus-article-boring-faces'."
   (interactive nil gnus-article-mode)
   (if (not (gnus-buffer-live-p gnus-summary-buffer))
       (error "There is no summary buffer for this article buffer")
+    (gnus-article-set-globals)
     (gnus-configure-windows 'article)
     (gnus-summary-goto-subject gnus-current-article)
     (gnus-summary-position-point)))
@@ -6979,16 +6982,16 @@ the entire article will be yanked."
   (interactive nil gnus-article-mode)
   (let ((article (cdr gnus-article-current))
 	contents)
-    (if (not (and transient-mark-mode mark-active))
-        (with-current-buffer gnus-summary-buffer
-          (gnus-summary-followup (list (list article))))
-      (setq contents (buffer-substring (point) (mark t)))
-      ;; Deactivate active regions.
-      (when transient-mark-mode
-        (setq mark-active nil))
-      (with-current-buffer gnus-summary-buffer
-        (gnus-summary-followup
-         (list (list article contents)))))))
+      (if (not (and transient-mark-mode mark-active))
+	  (with-current-buffer gnus-summary-buffer
+	    (gnus-summary-followup (list (list article))))
+	(setq contents (buffer-substring (point) (mark t)))
+	;; Deactivate active regions.
+	(when transient-mark-mode
+	  (setq mark-active nil))
+	(with-current-buffer gnus-summary-buffer
+	  (gnus-summary-followup
+	   (list (list article contents)))))))
 
 (defun gnus-article-hide (&optional arg force)
   "Hide all the gruft in the current article.
@@ -7078,10 +7081,8 @@ If given a prefix, show the hidden text instead."
 	   ((and (get-buffer gnus-original-article-buffer)
 		 (numberp article)
 		 (with-current-buffer gnus-original-article-buffer
-                   (when (consp gnus-original-group-and-article)
-                     (cl-destructuring-bind (ogroup . oarticle)
-                         gnus-original-group-and-article
-                       (and (equal ogroup group) (eq oarticle article))))))
+		   (and (equal (car gnus-original-article) group)
+			(eq (cdr gnus-original-article) article))))
             (insert-buffer-substring gnus-original-article-buffer)
 	    'article)
 	   ;; Check the backlog.
@@ -7152,23 +7153,24 @@ If given a prefix, show the hidden text instead."
       ;; Take the article from the original article buffer
       ;; and place it in the buffer it's supposed to be in.
       (when (and (get-buffer gnus-article-buffer)
-                 (equal (buffer-name (current-buffer))
-                        (buffer-name (get-buffer gnus-article-buffer))))
-        (unless (get-buffer gnus-original-article-buffer)
-          (with-current-buffer (gnus-get-buffer-create gnus-original-article-buffer)
-            (buffer-disable-undo)
-            (setq major-mode 'gnus-original-article-mode)
-            (setq buffer-read-only t)))
-        (let ((article-buffer gnus-article-buffer))
-          (with-current-buffer (get-buffer gnus-original-article-buffer)
-            (let ((inhibit-read-only t))
-              (erase-buffer)
-              (insert-buffer-substring article-buffer))
-            (setq gnus-original-group-and-article (cons group article))))
-        ;; Decode charsets.
-        (run-hooks 'gnus-article-decode-hook)
-        ;; Mark article as decoded or not.
-        (setq gnus-article-decoded-p gnus-article-decode-hook))
+		 (equal (buffer-name (current-buffer))
+			(buffer-name (get-buffer gnus-article-buffer))))
+	(save-excursion
+	  (if (get-buffer gnus-original-article-buffer)
+	      (set-buffer gnus-original-article-buffer)
+	    (set-buffer (gnus-get-buffer-create gnus-original-article-buffer))
+	    (buffer-disable-undo)
+	    (setq major-mode 'gnus-original-article-mode)
+	    (setq buffer-read-only t))
+	  (let ((inhibit-read-only t))
+	    (erase-buffer)
+	    (insert-buffer-substring gnus-article-buffer))
+	  (setq gnus-original-article (cons group article)))
+
+	;; Decode charsets.
+	(run-hooks 'gnus-article-decode-hook)
+	;; Mark article as decoded or not.
+	(setq gnus-article-decoded-p gnus-article-decode-hook))
 
       ;; Update sparse articles.
       (when (and do-update-line
@@ -7281,6 +7283,7 @@ This is an extended text-mode.
   (make-local-variable 'gnus-prev-winconf)
   (setq-local font-lock-defaults '(message-font-lock-keywords t))
   (setq-local mail-header-separator "")
+  (setq-local gnus-article-edit-mode t)
   (mml-mode)
   (setq buffer-read-only nil)
   (buffer-enable-undo)
@@ -7354,7 +7357,7 @@ groups."
 (defun gnus-flush-original-article-buffer ()
   (when (get-buffer gnus-original-article-buffer)
     (with-current-buffer gnus-original-article-buffer
-      (setq gnus-original-group-and-article nil))))
+      (setq gnus-original-article nil))))
 
 (defun gnus-article-edit-exit ()
   "Exit the article editing without updating."
@@ -8153,6 +8156,10 @@ url is put as the `gnus-button-url' overlay property on the button."
 
 ;;; Internal functions:
 
+(defun gnus-article-set-globals ()
+  (with-current-buffer gnus-summary-buffer
+    (gnus-set-global-variables)))
+
 (defun gnus-signature-toggle (end)
   (gnus-with-article-buffer
     (let ((inhibit-point-motion-hooks t))
@@ -8643,6 +8650,7 @@ For example:
 	      (mail-parse-ignored-charsets gnus-newsgroup-ignored-charsets)
 	      (summary-buffer gnus-summary-buffer)
 	      references point)
+	  (gnus-set-global-variables)
 	  (when (gnus-group-read-only-p)
 	    (error "The current newsgroup does not support article encrypt"))
 	  (gnus-summary-show-article t)

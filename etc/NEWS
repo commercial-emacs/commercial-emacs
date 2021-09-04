@@ -343,6 +343,11 @@ commands.  The new keystrokes are 'C-x x g' ('revert-buffer-quick'),
 ** Commands 'set-frame-width' and 'set-frame-height' can now get their
 input using the minibuffer.
 
++++
+** New command 'clone-frame' (bound to 'C-x 5 c').
+This is like 'C-x 5 2', but uses the frame parameters of the current
+frame instead of 'default-frame-alist'.
+
 ---
 ** New help window when Emacs prompts before opening a large file.
 Commands like 'find-file' or 'visit-tags-table' ask to visit a file
@@ -992,6 +997,11 @@ keys, add the following to your init file:
 
 ** Change Logs and VC
 
++++
+*** 'vc-revert-show-diff' now has a third possible value: 'kill'.
+If this variable is 'kill', then the diff buffer will be killed after
+the 'vc-revert' action instead of buried.
+
 *** More VC commands can be used from non-file buffers.
 The relevant commands are those that don't change the VC state.
 The non-file buffers which can use VC commands are those that have
@@ -1488,6 +1498,13 @@ deleting.
 **** The spec operator ':name NAME' is obsolete, use '&name' instead.
 +++
 **** The spec element 'function-form' is obsolete, use 'form' instead.
+
+---
+*** rfc2368.el is now obsolete.
+Use rfc6068.el instead.  The main difference is that
+'rfc2368-parse-mailto-url' and 'rfc2368-unhexify-string' assumed that
+the strings were all-ASCII, while 'rfc6068-parse-mailto-url' and
+'rfc6068-unhexify-string' parse UTF-8 strings.
 
 +++
 *** New function 'def-edebug-elem-spec' to define Edebug spec elements.
@@ -2802,6 +2819,14 @@ never be narrower than 19 characters.
 'gomoku-move-sw' and 'gomoku-move-ne' now work correctly, and
 horizontal movements now stop at the edge of the board.
 
++++
+*** New diary sexp 'diary-offset'.
+It offsets another diary sexp by a number of days.  This is useful
+when for example your organization has a committee meeting two days
+after every monthly meeting which takes place on the third Thursday,
+or if you would like to attend a virtual meeting scheduled in a
+different timezone causing a difference in the date.
+
 ** xterm-mouse mode
 
 ---
@@ -2875,8 +2900,7 @@ like 'flymake-mode-line-error-counter',
 When Flyspell mode highlights a word as misspelled, you can click on
 it to display a menu of possible corrections and actions.  You can now
 easily bind this menu to 'down-mouse-3' (usually the right mouse button)
-instead of 'mouse-2' (the default) by customizing the new user option
-'flyspell-use-mouse-3-for-menu'.
+instead of 'mouse-2' (the default) by enabling 'context-menu-mode'.
 
 ---
 *** The current dictionary is now displayed in the minor mode lighter.
@@ -3035,9 +3059,10 @@ mode.  By default, these new options support 'view-mode'.
 Adding the new 'comint-osc-process-output' to
 'comint-output-filter-functions' enables the interpretation of OSC
 ("Operating System Command") escape sequences in comint buffers.  By
-default, only OSC 8, for hyperlinks, is acted upon.  Adding more
-entries to `comint-osc-handlers' allows a customized treatment of
-further escape sequences.
+default, only OSC 8, for hyperlinks, and OSC 7, for directory
+tracking, are acted upon.  Adding more entries to
+`comint-osc-handlers' allows a customized treatment of further escape
+sequences.
 
 +++
 *** 'comint-delete-output' can now save deleted text in the kill-ring.
@@ -3079,6 +3104,11 @@ similar to prefix arguments, but are more flexible and discoverable.
 
 
 * Incompatible Editing Changes in Emacs 28.1
+
+---
+** 'toggle-truncate-lines' now disables 'visual-line-mode'.
+This is for symmetry with 'visual-line-mode', which disables
+'truncate-lines'.
 
 ** 'electric-indent-mode' now also indents inside strings and comments,
 (unless the indentation function doesn't, of course).
@@ -3129,8 +3159,32 @@ directory instead of the default directory.
 ** 'project-shell' and 'shell' now use 'pop-to-buffer-same-window'.
 This is to keep the same behavior as Eshell.
 
+** The escape sequence '\e[29~' in Xterm is now mapped to 'menu'.
+Xterm sends this sequence for both 'F16' and 'Menu' keys
+It used to be mapped to 'print' but we couldn't find a terminal
+that uses this sequence for any kind of 'Print' key.
+This makes the Menu key (see https://en.wikipedia.org/wiki/Menu_key)
+work for `context-menu-mode` in Xterm.
+
+---
+** New user option 'xterm-store-paste-on-kill-ring'.
+If non-nil (the default), Emacs pushes pasted text onto the kill ring
+(if using an xterm-like terminal that supports bracketed paste).
+Setting this to nil inhibits that.
+
 
 * Incompatible Lisp Changes in Emacs 28.1
+
+---
+** 'run-at-time' now tries harder to implement the t TIME parameter.
+If TIME is t, the timer runs at an integral multiple of REPEAT.
+(I.e., if given a REPEAT of 60, it'll run at 08:11:00, 08:12:00,
+08:13:00.)  However, when a machine goes to sleep (or otherwise didn't
+get a time slot to run when the timer was scheduled), the timer would
+then fire every 60 seconds after the time the timer was fired.  This
+has now changed, and the timer code now recomputes the integral
+multiple every time it runs, which means that if the laptop wakes at
+08:16:43, it'll fire at that time, but then at 08:17:00, 08:18:00...
 
 ---
 ** 'parse-partial-sexp' now signals an error if TO is smaller than FROM.
@@ -3140,7 +3194,7 @@ refers to the old state at FROM.
 
 +++
 ** 'overlays-in' now handles zero-length overlays slightly differently.
-Previosly, zero-length overlays at the end of the buffer were included
+Previously, zero-length overlays at the end of the buffer were included
 in the result (if the region queried for stopped at that position).
 The same was not the case if the buffer had been narrowed to exclude
 the real end of the buffer.  This has now been changed, and
@@ -3369,7 +3423,10 @@ back in Emacs 23.1.  The affected functions are: 'make-obsolete',
 
 ** The variable 'keyboard-type' is obsolete and not dynamically scoped any more.
 
++++
 ** The 'values' variable is now obsolete.
+Using it just contributes to the growth of the Emacs memory
+footprint.
 
 +++
 ** The '&define' keyword in an Edebug specification now disables backtracking.
@@ -3389,6 +3446,17 @@ The former is now declared obsolete.
 
 
 * Lisp Changes in Emacs 28.1
+
++++
+*** Doc strings can now link to customization groups.
+Text like "customization group 'whitespace'" will be made into a
+button.  When clicked, it'll take the user to a Custom buffer
+displaying that customization group.
+
++++
+*** New macro 'with-existing-directory'.
+This macro binds 'default-directory' to some other existing directory
+if 'default-directory' doesn't exist, and then executes the body forms.
 
 +++
 *** New function 'file-name-concat'.
@@ -3862,7 +3930,7 @@ risk of excessively long file names.
 +++
 ** New user option 'kill-buffer-delete-auto-save-files'.
 If non-nil, killing a buffer that has an auto-save file will prompt
-the user for whether that buffer should be deleted.  (Note that
+the user for whether that file should be deleted.  (Note that
 'delete-auto-save-files', if non-nil, was previously documented to
 result in deletion of auto-save files when killing a buffer without
 unsaved changes, but this has apparently not worked for several

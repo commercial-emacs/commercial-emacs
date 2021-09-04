@@ -1136,13 +1136,17 @@ Revert the work file(s) in the current VC fileset to the last revision
 @findex vc-revert
 @vindex vc-revert-show-diff
   If you want to discard all the changes you have made to the current
-VC fileset, type @kbd{C-x v u} (@code{vc-revert}).  This shows
-you a diff between the work file(s) and the revision from which you
-started editing, and asks for confirmation for discarding the changes.
-If you agree, the fileset is reverted.  If you don't want @kbd{C-x v
-u} to show a diff, set the variable @code{vc-revert-show-diff} to
-@code{nil} (you can still view the diff directly with @kbd{C-x v =};
-@pxref{Old Revisions}).
+VC fileset, type @kbd{C-x v u} (@code{vc-revert}).  This will ask you
+for confirmation before discarding the changes.  If you agree, the
+fileset is reverted.
+
+  If @code{vc-revert-show-diff} is non-@code{nil}, this command will
+show you a diff between the work file(s) and the revision from which
+you started editing.  Afterwards, the diff buffer will either be
+killed (if this variable is @code{kill}), or the buffer will be buried
+(any other non-@code{nil} value).  If you don't want @kbd{C-x v u} to
+show a diff, set this variable to @code{nil} (you can still view the
+diff directly with @kbd{C-x v =}; @pxref{Old Revisions}).
 
   On locking-based version control systems, @kbd{C-x v u} leaves files
 unlocked; you must lock again to resume editing.  You can also use
@@ -2218,9 +2222,14 @@ the special XREF mode:
 
 @table @kbd
 @item @key{RET}
-@itemx mouse-2
+@itemx mouse-1
 Display the reference on the current line (@code{xref-goto-xref}).
 With prefix argument, also bury the @file{*xref*} buffer.
+
+@item mouse-2
+The same as @code{mouse-1}, but make the window displaying the
+@file{*xref*} buffer the selected window
+(@code{xref-select-and-goto-xref}).
 
 @item n
 @itemx .

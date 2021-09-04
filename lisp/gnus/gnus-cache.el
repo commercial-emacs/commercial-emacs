@@ -24,6 +24,9 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
+
+(require 'gnus)
 (require 'gnus-sum)
 
 (declare-function gnus-agent-load-alist "gnus-agent" (group))
@@ -78,7 +81,7 @@ it's not cached."
 
 ;;; Internal variables.
 
-(defvar-local gnus-cache-removable-articles nil)
+(defvar gnus-cache-removable-articles nil)
 (defvar gnus-cache-buffer nil)
 (defvar gnus-cache-active-hashtb nil)
 (defvar gnus-cache-active-altered nil)
@@ -627,7 +630,8 @@ $ emacs -batch -l ~/.emacs -l gnus -f gnus-jog-cache"
       ;; There is no active file, so we generate one.
       (gnus-cache-generate-active)
     ;; We simply read the active file.
-    (gnus-with-temp-buffer
+    (save-excursion
+      (gnus-set-work-buffer)
       (nnheader-insert-file-contents gnus-cache-active-file)
       (gnus-active-to-gnus-format
        nil (setq gnus-cache-active-hashtb

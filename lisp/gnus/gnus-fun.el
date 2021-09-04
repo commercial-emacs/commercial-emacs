@@ -25,6 +25,7 @@
 ;;; Code:
 
 (require 'mm-util)
+(require 'gnus-util)
 (require 'gnus)
 
 (defvar gnus-face-properties-alist)

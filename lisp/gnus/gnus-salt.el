@@ -24,6 +24,8 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
+
 (require 'gnus)
 (require 'gnus-sum)
 (require 'gnus-win)
@@ -108,7 +110,7 @@ It accepts the same format specs that `gnus-summary-line-format' does."
     ;; Change line format.
     (setq gnus-summary-line-format gnus-summary-pick-line-format)
     (setq gnus-summary-line-format-spec nil)
-    (gnus-update-format-specifications 'summary)
+    (gnus-update-format-specifications nil 'summary)
     (gnus-update-summary-mark-positions)
     ;; FIXME: a buffer-local minor mode adding globally to a hook??
     (add-hook 'gnus-message-setup-hook #'gnus-pick-setup-message)
@@ -455,7 +457,8 @@ Two predefined functions are available:
   (buffer-disable-undo)
   (setq buffer-read-only t)
   (setq truncate-lines t)
-  (gnus-with-temp-buffer
+  (save-current-buffer
+    (gnus-set-work-buffer)
     (gnus-tree-node-insert (make-mail-header "") nil)
     (setq gnus-tree-node-length (1- (point)))))
 

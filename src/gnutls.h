@@ -30,9 +30,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 
-/* An erstwhile limit of 6000 which claimed 100 tries per second
-   could not be verified in practice (actual rate faster by order of magnitude). */
-#define GNUTLS_EMACS_HANDSHAKES_LIMIT 30000
+/* This limits the attempts to handshake per process (connection).  It
+   should work out to about one minute in asynchronous cases. */
+#define GNUTLS_EMACS_HANDSHAKES_LIMIT 6000
 
 typedef enum
 {
@@ -91,8 +91,8 @@ extern int w32_gnutls_rnd (gnutls_rnd_level_t, void *, size_t);
 #endif
 extern Lisp_Object emacs_gnutls_deinit (Lisp_Object);
 extern Lisp_Object emacs_gnutls_global_init (void);
+extern int gnutls_try_handshake (struct Lisp_Process *p);
 extern Lisp_Object gnutls_verify_boot (Lisp_Object proc, Lisp_Object proplist);
-extern Lisp_Object gnutls_handshake_and_verify (Lisp_Object proc, Lisp_Object proplist, Lisp_Object blocking);
 
 #endif
 

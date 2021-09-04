@@ -19,6 +19,7 @@
 
 (require 'ert)
 (require 'memory-report)
+(require 'cl-macs)
 
 (defun setup-memory-report-tests ()
   ;; Set the sizes on things based on a 64-bit architecture.  (We're
@@ -67,6 +68,14 @@
                 (make-hash-table :test #'eq)
                 (vector string string))
                124))))
+
+(ert-deftest memory-report-sizes-structs ()
+  (cl-defstruct memory-report-test-struct
+    (item0 nil)
+    (item1 nil))
+  (let ((s (make-memory-report-test-struct :item0 "hello" :item1 "world")))
+    (should (= (memory-report-object-size s)
+               90))))
 
 (provide 'memory-report-tests)
 

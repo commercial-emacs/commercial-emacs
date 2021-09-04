@@ -5182,7 +5182,6 @@ init_buffer_once (void)
   bset_point_before_scroll (&buffer_local_flags, make_fixnum (-1));
   bset_file_truename (&buffer_local_flags, make_fixnum (-1));
   bset_invisibility_spec (&buffer_local_flags, make_fixnum (-1));
-  bset_last_selected_window (&buffer_local_flags, make_fixnum (-1));
   bset_file_format (&buffer_local_flags, make_fixnum (-1));
   bset_auto_save_file_format (&buffer_local_flags, make_fixnum (-1));
   bset_display_count (&buffer_local_flags, make_fixnum (-1));
@@ -5203,6 +5202,7 @@ init_buffer_once (void)
   bset_pt_marker (&buffer_local_flags, make_fixnum (0));
   bset_begv_marker (&buffer_local_flags, make_fixnum (0));
   bset_zv_marker (&buffer_local_flags, make_fixnum (0));
+  bset_last_selected_window (&buffer_local_flags, make_fixnum (0));
 
   idx = 1;
   XSETFASTINT (BVAR (&buffer_local_flags, mode_line_format), idx); ++idx;
@@ -5805,7 +5805,10 @@ Note that this is overridden by the variable
 `truncate-partial-width-windows' if that variable is non-nil
 and this buffer is not full-frame width.
 
-Minibuffers set this variable to nil.  */);
+Minibuffers set this variable to nil.
+
+Don't set this to a non-nil value when `visual-line-mode' is
+turned on, as it could produce confusing results.   */);
 
   DEFVAR_PER_BUFFER ("word-wrap", &BVAR (current_buffer, word_wrap), Qnil,
 		     doc: /* Non-nil means to use word-wrapping for continuation lines.
@@ -6254,12 +6257,6 @@ If the `(ATOM . ELLIPSIS)' form is used, and `ELLIPSIS' is non-nil, an
 ellipsis will be displayed after the invisible characters.
 Setting this variable is very fast, much faster than scanning all the text in
 the buffer looking for properties to change.  */);
-
-  DEFVAR_PER_BUFFER ("last-selected-window",
-		     &BVAR (current_buffer, last_selected_window), Qnil,
-		     doc: /* Last window displaying this buffer.
-Nil if that window no longer displays this buffer.  */);
-  DEFSYM (Qlast_selected_window, "last-selected-window");
 
   DEFVAR_PER_BUFFER ("buffer-display-count",
 		     &BVAR (current_buffer, display_count), Qintegerp,

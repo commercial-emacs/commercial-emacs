@@ -127,9 +127,8 @@ struct Lisp_Process
     pid_t pid;
     /* Descriptor by which we read from this process.  */
     int infd;
-    /* Byte-count for process output read on `infd'.  */
+    /* Byte-count modulo (UINTMAX_MAX + 1) for process output read from `infd'.  */
     uintmax_t nbytes_read;
-
     /* Descriptor by which we write to this process.  */
     int outfd;
     /* Descriptors that were created for this process and that need
@@ -147,7 +146,7 @@ struct Lisp_Process
        that process output can be read in as little as 1 byte at a
        time.  Value is nanoseconds to delay reading output from
        this process.  Range is 0 .. 50 * 1000 * 1000.  */
-    unsigned int read_output_delay;
+    int read_output_delay;
     /* Should we delay reading output from this process.
        Initialized from `Vprocess_adaptive_read_buffering'.
        0 = nil, 1 = t, 2 = other.  */
@@ -170,10 +169,8 @@ struct Lisp_Process
        flag indicates that `raw_status' contains a new status that still
        needs to be synced to `status'.  */
     bool_bf raw_status_new : 1;
-
-    /* Block until connection established */
-    bool_bf blocking_connect : 1;
-
+    /* Whether this is a nonblocking socket. */
+    bool_bf is_non_blocking_client : 1;
     /* Whether this is a server or a client socket. */
     bool_bf is_server : 1;
     int raw_status;
@@ -201,6 +198,8 @@ struct Lisp_Process
     unsigned int gnutls_extra_peer_verification;
     int gnutls_log_level;
     int gnutls_handshakes_tried;
+    bool_bf gnutls_p : 1;
+    bool_bf gnutls_complete_negotiation_p : 1;
 #endif
   } GCALIGNED_STRUCT;
 

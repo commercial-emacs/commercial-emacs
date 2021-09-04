@@ -24,11 +24,12 @@
 
 ;;; Code:
 
+(require 'gnus)
 (require 'gnus-sum)
+(require 'message)
 (require 'gnus-msg)
 (require 'nndraft)
 (require 'gnus-agent)
-(require 'gnus-cache)
 
 ;;; Draft minor mode
 

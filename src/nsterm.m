@@ -5014,6 +5014,12 @@ ns_delete_terminal (struct terminal *terminal)
 
   block_input ();
 
+#ifdef NS_IMPL_COCOA
+  /* Rather than try to clean up the NS environment we can just
+     disable the app and leave it waiting for any new frames.  */
+  [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
+#endif
+
   image_destroy_all_bitmaps (dpyinfo);
   ns_delete_display (dpyinfo);
   unblock_input ();
@@ -8363,14 +8369,14 @@ not_in_argv (NSString *arg)
 
 
 #ifdef NS_IMPL_COCOA
-  /* We have to set the accesibility subroles and/or the collection
+  /* We have to set the accessibility subroles and/or the collection
      behaviors early otherwise child windows may not go fullscreen as
      expected later.  */
 
 #if MAC_OS_X_VERSION_MIN_REQUIRED < 101000
   if ([child respondsToSelector:@selector(setAccessibilitySubrole:)])
 #endif
-    /* Set the accessibilty subroles.  */
+    /* Set the accessibility subroles.  */
     if (parentFrame)
       [self setAccessibilitySubrole:NSAccessibilityFloatingWindowSubrole];
     else

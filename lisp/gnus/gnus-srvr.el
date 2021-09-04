@@ -24,6 +24,8 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
+
 (require 'gnus)
 (require 'gnus-start)
 (require 'gnus-spec)
@@ -752,8 +754,8 @@ claim them."
   (setq gnus-browse-current-method (gnus-server-to-method server))
   (setq gnus-browse-return-buffer return-buffer)
   (let* ((method gnus-browse-current-method)
-	 (orig-select-methods gnus-select-methods)
-	 (gnus-select-methods (list method))
+	 (orig-select-method gnus-select-method)
+	 (gnus-select-method method)
 	 groups group)
     (gnus-message 5 "Connecting to %s..." (nth 1 method))
     (cond
@@ -820,7 +822,7 @@ claim them."
 			 (lambda (l1 l2)
 			   (string< (car l1) (car l2)))))
       (if gnus-server-browse-in-group-buffer
-	  (let* ((gnus-select-methods orig-select-methods)
+	  (let* ((gnus-select-method orig-select-method)
 		 (gnus-group-listed-groups
 		  (mapcar (lambda (group)
 			    (let ((name
@@ -844,7 +846,7 @@ claim them."
 		"Gnus: %%b {%s:%s}" (car method) (cadr method))))
 	(let ((buffer-read-only nil)
 	      name
-	      (prefix (let ((gnus-select-methods orig-select-methods))
+	      (prefix (let ((gnus-select-method orig-select-method))
 			(gnus-group-prefixed-name "" method))))
 	  (while (setq group (pop groups))
 	    (add-text-properties

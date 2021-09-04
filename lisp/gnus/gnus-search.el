@@ -81,8 +81,9 @@
 (require 'gnus-group)
 (require 'gnus-sum)
 (require 'message)
+(require 'gnus-util)
 (require 'eieio)
-
+(eval-when-compile (require 'cl-lib))
 (autoload 'eieio-build-class-alist "eieio-opt")
 (autoload 'nnmaildir-base-name-to-article-number "nnmaildir")
 
@@ -1028,7 +1029,7 @@ Responsible for handling and, or, and parenthetical expressions.")
       ;; We should only be doing this once, in
       ;; `nnimap-open-connection', but it's too frustrating to try to
       ;; get to the server from the process buffer.
-      (with-current-buffer (nnimap-process-buffer)
+      (with-current-buffer (nnimap-buffer)
 	(setf (slot-value engine 'literal-plus)
 	      (when (nnimap-capability "LITERAL+") t))
 	;; MULTISEARCH not yet implemented.
@@ -1066,7 +1067,7 @@ Responsible for handling and, or, and parenthetical expressions.")
 		  (or (null single-search) (null artlist)))
 	(when (nnimap-change-group
 	       (gnus-group-short-name group) server)
-	  (with-current-buffer (nnimap-process-buffer)
+	  (with-current-buffer (nnimap-buffer)
 	    (message "Searching %s..." group)
 	    (let ((result
 		   (gnus-search-imap-search-command engine q-string)))

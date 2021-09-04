@@ -333,48 +333,60 @@ If NEWSGROUP is nil, the global kill file is selected."
 (defun gnus-apply-kill-file-internal ()
   "Apply a kill file to the current newsgroup.
 Returns the number of articles marked as read."
-  (prog1 0
-    (let ((kill-files (list (gnus-newsgroup-kill-file nil)
-			    (gnus-newsgroup-kill-file gnus-newsgroup-name)))
-	  (gnus-summary-inhibit-highlight t))
-      (setq gnus-newsgroup-kill-headers nil)
-      ;; If there are any previously scored articles, we remove these
-      ;; from the `gnus-newsgroup-headers' list that the score functions
-      ;; will see.  This is probably pretty wasteful when it comes to
-      ;; conses, but is, I think, faster than having to assq in every
-      ;; single score function.
-      (let ((files kill-files))
-        (while files
-	  (if (file-exists-p (car files))
-	      (let ((headers gnus-newsgroup-headers))
-	        (if gnus-kill-killed
-		    (setq gnus-newsgroup-kill-headers
-			  (mapcar #'mail-header-number headers))
-		  (while headers
-		    (unless (gnus-member-of-range
-			     (mail-header-number (car headers))
-			     gnus-newsgroup-killed)
-		      (push (mail-header-number (car headers))
-			    gnus-newsgroup-kill-headers))
-		    (setq headers (cdr headers))))
-	        (setq files nil))
-	    (setq files (cdr files)))))
-      (unless gnus-newsgroup-kill-headers
-        (save-window-excursion
-	  (save-excursion
-	    (dolist (file kill-files)
-	      (unless (file-exists-p file)
-	        (gnus-message 6 "Processing kill file %s..." file)
-                (when-let ((buf (find-file-noselect file)))
-                  (unwind-protect
-                      (with-current-buffer buf
-	                (if (consp (ignore-errors (read (current-buffer))))
-		            (gnus-kill-parse-gnus-kill-file)
-		          (gnus-kill-parse-rn-kill-file))
-	                (gnus-message 6 "Processing kill file %s...done" file))
-                    (let (kill-buffer-query-functions)
-                      (kill-buffer buf))))))))
-        (gnus-set-mode-line 'summary)))))
+  (let* ((kill-files (list (gnus-newsgroup-kill-file nil)
+			   (gnus-newsgroup-kill-file gnus-newsgroup-name)))
+	 (unreads (length gnus-newsgroup-unreads))
+	 (gnus-summary-inhibit-highlight t)
+	 ) ;; beg
+    (setq gnus-newsgroup-kill-headers nil)
+    ;; If there are any previously scored articles, we remove these
+    ;; from the `gnus-newsgroup-headers' list that the score functions
+    ;; will see.  This is probably pretty wasteful when it comes to
+    ;; conses, but is, I think, faster than having to assq in every
+    ;; single score function.
+    (let ((files kill-files))
+      (while files
+	(if (file-exists-p (car files))
+	    (let ((headers gnus-newsgroup-headers))
+	      (if gnus-kill-killed
+		  (setq gnus-newsgroup-kill-headers
+			(mapcar #'mail-header-number headers))
+		(while headers
+		  (unless (gnus-member-of-range
+			   (mail-header-number (car headers))
+			   gnus-newsgroup-killed)
+		    (push (mail-header-number (car headers))
+			  gnus-newsgroup-kill-headers))
+		  (setq headers (cdr headers))))
+	      (setq files nil))
+	  (setq files (cdr files)))))
+    (if (not gnus-newsgroup-kill-headers)
+	()
+      (save-window-excursion
+	(save-excursion
+	  (while kill-files
+	    (if (not (file-exists-p (car kill-files)))
+		()
+	      (gnus-message 6 "Processing kill file %s..." (car kill-files))
+	      (find-file (car kill-files))
+	      (goto-char (point-min))
+
+	      (if (consp (ignore-errors (read (current-buffer))))
+		  (gnus-kill-parse-gnus-kill-file)
+		(gnus-kill-parse-rn-kill-file))
+
+	      (gnus-message
+	       6 "Processing kill file %s...done" (car kill-files)))
+	    (setq kill-files (cdr kill-files)))))
+
+      (gnus-set-mode-line 'summary)
+
+      (if nil ;; beg
+	  (let ((nunreads (- unreads (length gnus-newsgroup-unreads))))
+	    (or (eq nunreads 0)
+		(gnus-message 6 "Marked %d articles as read" nunreads))
+	    nunreads)
+	0))))
 
 ;; Parse a Gnus killfile.
 (defun gnus-kill-parse-gnus-kill-file ()

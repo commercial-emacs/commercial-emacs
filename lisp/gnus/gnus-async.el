@@ -24,6 +24,8 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
+
 (require 'gnus)
 (require 'gnus-sum)
 (require 'nntp)
@@ -269,7 +271,7 @@ that was fetched."
   "Wait until ARTICLE is no longer the currently-being-fetched article."
   (save-excursion
     (gnus-async-set-buffer)
-    (let ((proc (nntp-get-process))
+    (let ((proc (nntp-find-connection (current-buffer)))
 	  (nntp-server-buffer (current-buffer))
 	  (nntp-have-messaged nil)
 	  (tries 0))

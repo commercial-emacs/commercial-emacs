@@ -24,9 +24,11 @@
 
 ;;; Code:
 
-(require 'gnus)
+(eval-when-compile (require 'cl-lib))
 
-(declare-function gnus-group-name-at-point "gnus-group")
+(require 'gnus)
+(require 'gnus-util)
+(require 'seq)
 
 (defgroup gnus-windows nil
   "Window configuration."
@@ -198,8 +200,9 @@ See the Gnus manual for an explanation of the syntax used.")
   :type 'hook)
 
 ;;; Internal variables.
-(defvar-local gnus-current-window-configuration nil
-  "Potential race between debbugs and gnus proper, so localize.")
+
+(defvar gnus-current-window-configuration nil
+  "The most recently set window configuration.")
 
 (defvar gnus-created-frames nil)
 (defvar gnus-window-frame-focus nil)
@@ -234,28 +237,7 @@ See the Gnus manual for an explanation of the syntax used.")
 	 nil)))
 
 (defun gnus-configure-frame (split &optional window)
-  "TODO: rewrite `gnus-win.el' to be less opinionated.
-
-It's not ideal to maintain hardcoded maps like `gnus-window-to-buffer'
-and `gnus-buffer-configuration'."
-  (gnus-configure--frame
-   (progn
-     (when-let* ((what (cdr (assq (car split) gnus-window-to-buffer)))
-                 (buf (gnus-window-to-buffer-helper what))
-                 (dead-buf (and (bufferp buf) (not (buffer-live-p buf)))))
-       (if-let* ((live-buf (gnus-buffer-live-p gnus-group-buffer))
-                 (group (with-current-buffer live-buf
-                          (gnus-group-name-at-point))))
-           (setcar split
-                   (gnus-summary-buffer-name group))
-         (error "No group at point")))
-     split)
-   window))
-
-(defun gnus-configure--frame (split &optional window)
-  "Split WINDOW according to SPLIT.
-
-Formerly `gnus-configure-frame'.  Wasn't thread-safe."
+  "Split WINDOW according to SPLIT."
   (let* ((current-window (or (get-buffer-window (current-buffer))
                              (selected-window)))
          (window (or window current-window)))
@@ -281,7 +263,7 @@ Formerly `gnus-configure-frame'.  Wasn't thread-safe."
        ;; This is a buffer to be selected.
        ((not (memq type '(frame horizontal vertical)))
 	(let ((buffer (cond ((stringp type) type)
-                            (t (cdr (assq type gnus-window-to-buffer))))))
+			    (t (cdr (assq type gnus-window-to-buffer))))))
 	  (unless buffer
 	    (error "Invalid buffer type: %s" type))
 	  (let ((buf (gnus-get-buffer-create
@@ -392,7 +374,9 @@ Formerly `gnus-configure-frame'.  Wasn't thread-safe."
 
 (defun gnus-configure-windows (setting &optional force)
   (cond
-   ((null setting))
+   ((null setting)
+    ;; Do nothing.
+    )
    ((window-configuration-p setting)
     (set-window-configuration setting))
    (t
@@ -419,14 +403,14 @@ Formerly `gnus-configure-frame'.  Wasn't thread-safe."
         (unless (gnus-buffer-live-p nntp-server-buffer)
           (nnheader-init-server-buffer))
 
-        ;; Remove all 'window-atom parameters, as we're going to blast
-        ;; and recreate the window layout.
-        (when (window-parameter nil 'window-atom)
-          (let ((root (window-atom-root)))
-            (walk-window-subtree
-             (lambda (win)
-               (set-window-parameter win 'window-atom nil))
-             root t)))
+	;; Remove all 'window-atom parameters, as we're going to blast
+	;; and recreate the window layout.
+	(when (window-parameter nil 'window-atom)
+	  (let ((root (window-atom-root)))
+	    (walk-window-subtree
+	     (lambda (win)
+	       (set-window-parameter win 'window-atom nil))
+	     root t)))
 
         ;; Either remove all windows or just remove all Gnus windows.
         (let ((frame (selected-frame)))
@@ -450,11 +434,11 @@ Formerly `gnus-configure-frame'.  Wasn't thread-safe."
           (gnus-configure-frame split)
           (run-hooks 'gnus-configure-windows-hook)
 
-          ;; If we're using atomic windows, and the current frame has
-          ;; multiple windows, make them atomic.
-          (when (and gnus-use-atomic-windows
-                     (window-parent (selected-window)))
-            (window-make-atom (window-parent (selected-window))))
+	  ;; If we're using atomic windows, and the current frame has
+	  ;; multiple windows, make them atomic.
+	  (when (and gnus-use-atomic-windows
+		     (window-parent (selected-window)))
+	    (window-make-atom (window-parent (selected-window))))
 
           (when gnus-window-frame-focus
             (select-frame-set-input-focus

@@ -1145,49 +1145,46 @@ the mouse click event."
   "Insert image SPEC with a string ALT.  Return image.
 SPEC is either an image data blob, or a list where the first
 element is the data blob and the second element is the content-type."
-  (let (image)
-    (when (display-graphic-p)
+  (if (display-graphic-p)
       (let* ((size (cdr (assq 'size flags)))
 	     (data (if (consp spec)
 		       (car spec)
 		     spec))
 	     (content-type (and (consp spec)
 				(cadr spec)))
-	     (start (point)))
-        (setq image
-              (cond
-	       ((eq size 'original)
-		(create-image data nil t :ascent 100
-			      :format content-type))
-	       ((eq content-type 'image/svg+xml)
-                (when (image-type-available-p 'svg)
-		  (create-image data 'svg t :ascent 100)))
-               ((eq content-type 'application/octet-stream)
-                nil)
-	       ((eq size 'full)
-		(ignore-errors
-		  (shr-rescale-image data content-type
-                                     (plist-get flags :width)
-                                     (plist-get flags :height))))
-	       (t
-		(ignore-errors
-		  (shr-rescale-image data content-type
-                                     (plist-get flags :width)
-                                     (plist-get flags :height))))))
+	     (start (point))
+	     (image (cond
+		     ((eq size 'original)
+		      (create-image data nil t :ascent 100
+				    :format content-type))
+		     ((eq content-type 'image/svg+xml)
+                      (when (image-type-available-p 'svg)
+		        (create-image data 'svg t :ascent 100)))
+		     ((eq size 'full)
+		      (ignore-errors
+			(shr-rescale-image data content-type
+                                           (plist-get flags :width)
+                                           (plist-get flags :height))))
+		     (t
+		      (ignore-errors
+			(shr-rescale-image data content-type
+                                           (plist-get flags :width)
+                                           (plist-get flags :height)))))))
         (when image
 	  ;; When inserting big-ish pictures, put them at the
 	  ;; beginning of the line.
-          (when (and (> (current-column) 0)
+	  (when (and (> (current-column) 0)
 		     (> (car (image-size image t)) 400))
 	    (insert "\n"))
 	  (if (eq size 'original)
 	      (insert-sliced-image image (or alt "*") nil 20 1)
 	    (insert-image image (or alt "*")))
-          (put-text-property start (point) 'image-size size)
-          (when (and shr-image-animate
+	  (put-text-property start (point) 'image-size size)
+	  (when (and shr-image-animate
                      (cdr (image-multi-frame-p image)))
-            (image-animate image nil 60)))))
-    (or image (insert (or alt "")))))
+            (image-animate image nil 60)))
+	image)
+    (insert (or alt ""))))
 
 (defun shr--image-type ()
   "Emacs image type to use when displaying images.

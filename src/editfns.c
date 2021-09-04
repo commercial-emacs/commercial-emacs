@@ -52,8 +52,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "blockinput.h"
 
-#define GLOBAL_MARK_RING_MAX_DEFAULT (64)
-
 #ifdef WINDOWSNT
 # include "w32common.h"
 #endif
@@ -137,7 +135,6 @@ init_editfns (void)
 #else
   Voperating_system_release = Qnil;
 #endif
-  global_mark_ring_max = GLOBAL_MARK_RING_MAX_DEFAULT;
 }
 
 DEFUN ("char-to-string", Fchar_to_string, Schar_to_string, 1, 1, 0,
@@ -196,32 +193,6 @@ DEFUN ("point-marker", Fpoint_marker, Spoint_marker, 0, 0, 0,
   return build_marker (current_buffer, PT, PT_BYTE);
 }
 
-DEFUN ("push-global-mark", Fpush_global_mark, Spush_global_mark, 0, 0, "",
-       doc: /* Push current value of point as a marker onto `global-mark-ring'.
-*/)
-  (void)
-{
-  Lisp_Object pt_marker = Fpoint_marker();
-  if (global_mark_ring_max > 0
-      && NILP (Fequal (CAR_SAFE (Vglobal_mark_ring), pt_marker)))
-    {
-      if (list_length (Vglobal_mark_ring) >= global_mark_ring_max) {
-	if (global_mark_ring_max == 1)
-	  Vglobal_mark_ring = Qnil;
-	else
-	  {
-	    Lisp_Object tem = Fnthcdr (make_fixnum (global_mark_ring_max - 2),
-				       Vglobal_mark_ring);
-	    if (! NILP (tem))
-	      Fsetcdr (tem, Qnil);
-	  }
-      }
-      eassert (list_length (Vglobal_mark_ring) < global_mark_ring_max);
-      Vglobal_mark_ring = Fcons (pt_marker, Vglobal_mark_ring);
-    }
-  return Qnil;
-}
-
 DEFUN ("goto-char", Fgoto_char, Sgoto_char, 1, 1,
          "(goto-char--read-natnum-interactive \"Go to char: \")",
        doc: /* Set point to POSITION, a number or marker.
@@ -242,6 +213,7 @@ minibuffer.  The default value is the number at point (if any).  */)
     wrong_type_argument (Qinteger_or_marker_p, position);
   return position;
 }
+
 
 /* Return the start or end position of the region.
    BEGINNINGP means return the start.
@@ -4531,16 +4503,6 @@ functions if all the text being accessed has this property.  */);
 The value is a string.  It can also be nil if Emacs doesn't
 know how to get the kernel version on the underlying OS.  */);
 
-  DEFVAR_LISP ("global-mark-ring", Vglobal_mark_ring,
-	       doc: /* "The list of saved global marks, most recent first." */);
-  Vglobal_mark_ring = Qnil;
-  DEFSYM (Qglobal_mark_ring, "global-mark-ring");
-
-  DEFVAR_INT ("global-mark-ring-max", global_mark_ring_max,
-	       doc: /* "Maximum size of global mark ring.
-Start discarding off end if gets this big." */);
-  DEFSYM (Qglobal_mark_ring_max, "global-mark-ring-max");
-
   DEFVAR_BOOL ("binary-as-unsigned",
 	       binary_as_unsigned,
 	       doc: /* Non-nil means `format' %x and %o treat integers as unsigned.
@@ -4644,5 +4606,4 @@ it to be non-nil.  */);
   defsubr (&Snarrow_to_region);
   defsubr (&Ssave_restriction);
   defsubr (&Stranspose_regions);
-  defsubr (&Spush_global_mark);
 }

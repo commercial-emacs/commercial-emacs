@@ -2070,7 +2070,7 @@ This function uses the `read-extended-command-predicate' user option."
   "Say whether SYMBOL has been marked as a mode-specific command in BUFFER."
   ;; Check the modes.
   (let ((modes (command-modes symbol)))
-    ;; Common case: Just a single mode.
+    ;; Common fast case: Just a single mode.
     (if (null (cdr modes))
         (or (provided-mode-derived-p
              (buffer-local-value 'major-mode buffer) (car modes))
@@ -2078,13 +2078,7 @@ This function uses the `read-extended-command-predicate' user option."
                   (buffer-local-value 'local-minor-modes buffer))
             (memq (car modes) global-minor-modes))
       ;; Uncommon case: Multiple modes.
-      (apply #'provided-mode-derived-p
-             (buffer-local-value 'major-mode buffer)
-             modes)
-      (seq-intersection modes
-                        (buffer-local-value 'local-minor-modes buffer)
-                        #'eq)
-      (seq-intersection modes global-minor-modes #'eq))))
+      (command-completion-with-modes-p modes buffer))))
 
 (defun command-completion-default-include-p (symbol buffer)
   "Say whether SYMBOL should be offered as a completion.
@@ -6483,6 +6477,9 @@ is set to the buffer displayed in that window.")
   :type 'integer
   :group 'editing-basics)
 
+(defvar global-mark-ring nil
+  "The list of saved global marks, most recent first.")
+
 (defcustom global-mark-ring-max 16
   "Maximum size of global mark ring.  \
 Start discarding off end if gets this big."
@@ -6602,6 +6599,16 @@ In Transient Mark mode, activate mark if optional third arg ACTIVATE non-nil."
       (when old
         (set-marker old nil))))
   (set-marker (mark-marker) (or location (point)) (current-buffer))
+  ;; Don't push the mark on the global mark ring if the last global
+  ;; mark pushed was in this same buffer.
+  (unless (and global-mark-ring
+               (eq (marker-buffer (car global-mark-ring)) (current-buffer)))
+    (let ((old (nth global-mark-ring-max global-mark-ring))
+          (history-delete-duplicates nil))
+      (add-to-history
+       'global-mark-ring (copy-marker (mark-marker)) global-mark-ring-max t)
+      (when old
+        (set-marker old nil))))
   (or nomsg executing-kbd-macro (> (minibuffer-depth) 0)
       (message "Mark set"))
   (if (or activate (not transient-mark-mode))
@@ -6742,32 +6749,6 @@ the user for a password when we are simply scanning a set of files in the
 background or displaying possible completions before the user even asked
 for it.")
 
-(defun update-global-mark ()
-  "Record point of departed buffer onto `global-mark-ring'."
-  (when-let ((w (selected-window))
-             (buffers (cl-remove-if #'minibufferp (frame-parameter nil 'buffer-list)))
-             (to (cl-first buffers))
-             (from (cl-second buffers))
-             (w-buffers (mapcar #'window-buffer (window-list))))
-    (princ (format "%s => %s\n" from to) #'external-debugging-output)
-    (when (and (not (memq from w-buffers))
-               (buffer-live-p from)
-               (let ((lsw (buffer-local-value 'last-selected-window from)))
-                 (or (not lsw) (eq w lsw))))
-      (with-current-buffer from
-        (push-global-mark)))
-    ;; from buffers, it's impossible to know what, if anything,
-    ;; got swapped out.  You have to tap into the C at this
-    ;; point since nothing in Lisp is going to get you there.
-    (when (and (not (eq from to))
-               (buffer-live-p to)
-               (let ((lsw (buffer-local-value 'last-selected-window to)))
-                 (or (not lsw) (eq w lsw))))
-      (with-current-buffer to
-        (push-global-mark)))))
-
-;; (add-hook 'buffer-list-update-hook #'update-global-mark)
-
 (defun pop-global-mark ()
   "Pop off global mark ring and jump to the top location."
   (interactive)
@@ -6778,19 +6759,18 @@ for it.")
       (error "No global mark set"))
   (let* ((marker (car global-mark-ring))
 	 (buffer (marker-buffer marker))
-	 (position (marker-position marker))
-         (buffer-list-update-hook
-          (delq #'update-global-mark buffer-list-update-hook)))
+	 (position (marker-position marker)))
     (setq global-mark-ring (nconc (cdr global-mark-ring)
-				  (list marker)))
-    (switch-to-buffer buffer)
+				  (list (car global-mark-ring))))
+    (set-buffer buffer)
     (or (and (>= position (point-min))
 	     (<= position (point-max)))
 	(if widen-automatically
 	    (widen)
 	  (error "Global mark position is outside accessible part of buffer %s"
                  (buffer-name buffer))))
-    (goto-char position)))
+    (goto-char position)
+    (switch-to-buffer buffer)))
 
 (defcustom next-line-add-newlines nil
   "If non-nil, `next-line' inserts newline to avoid `end of buffer' error."
@@ -7797,7 +7777,9 @@ other purposes."
 When Visual Line mode is enabled, `word-wrap' is turned on in
 this buffer, and simple editing commands are redefined to act on
 visual lines, not logical lines.  See Info node `Visual Line
-Mode' for details."
+Mode' for details.
+Turning on this mode disables line truncation set up by
+variables `truncate-lines' and `truncate-partial-width-windows'."
   :keymap visual-line-mode-map
   :group 'visual-line
   :lighter " Wrap"
@@ -8326,8 +8308,13 @@ non-nil."
 		      (if (eq buffer (window-buffer window))
 			  (set-window-hscroll window 0)))
 		    nil t)))
-  (message "Truncate long lines %s"
-	   (if truncate-lines "enabled" "disabled")))
+  (message "Truncate long lines %s%s"
+	   (if truncate-lines "enabled" "disabled")
+           (if (and truncate-lines visual-line-mode)
+               (progn
+                 (visual-line-mode -1)
+                 (format-message " and `visual-line-mode' disabled"))
+             "")))
 
 (defun toggle-word-wrap (&optional arg)
   "Toggle whether to use word-wrapping for continuation lines.

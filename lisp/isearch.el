@@ -201,12 +201,10 @@ is one."
 (defvar isearch-update-post-hook nil
   "Function(s) to call after isearch has found matches in the buffer.")
 
-(defcustom isearch-mode-end-hook nil
+(defvar isearch-mode-end-hook nil
   "Function(s) to call after terminating an incremental search.
 When these functions are called, `isearch-mode-end-hook-quit'
-is non-nil if the user quits the search."
-  :group 'isearch
-  :type 'hook)
+is non-nil if the user quits the search.")
 
 (defvar isearch-mode-end-hook-quit nil
   "Non-nil while running `isearch-mode-end-hook' if the user quits the search.")
@@ -871,7 +869,8 @@ When you enter a space or spaces in ordinary incremental search, it
 will match any sequence matched by the regexp defined by the variable
 `search-whitespace-regexp'.  If the value is nil, each space you type
 matches literally, against one space.  You can toggle the value of this
-variable by the command `isearch-toggle-lax-whitespace'.")
+variable by the command `isearch-toggle-lax-whitespace', usually bound to
+`M-s SPC' during isearch.")
 
 (defvar isearch-regexp-lax-whitespace nil
   "If non-nil, a space will match a sequence of whitespace chars.
@@ -879,7 +878,8 @@ When you enter a space or spaces in regexp incremental search, it
 will match any sequence matched by the regexp defined by the variable
 `search-whitespace-regexp'.  If the value is nil, each space you type
 matches literally, against one space.  You can toggle the value of this
-variable by the command `isearch-toggle-lax-whitespace'.")
+variable by the command `isearch-toggle-lax-whitespace', usually bound to
+`M-s SPC' during isearch.")
 
 (defvar isearch-cmds nil
   "Stack of search status elements.

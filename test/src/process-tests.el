@@ -112,15 +112,6 @@
 	      (goto-char (point-min))
 	      (looking-at "hello stderr!"))))))
 
-(ert-deftest process-test-stopped-pipe ()
-  (skip-unless (executable-find "cat"))
-  (with-temp-buffer
-    (let ((proc (make-pipe-process :name "pipe" :buffer (current-buffer)
-                                   :command '("cat") :stop t)))
-      (unwind-protect
-          (should (list-processes--refresh))
-        (delete-process proc)))))
-
 (ert-deftest process-test-stderr-filter ()
   (skip-unless (executable-find "bash"))
   (with-timeout (60 (ert-fail "Test timed out"))
@@ -929,27 +920,31 @@ Return nil if FILENAME doesn't exist."
 (ert-deftest process-async-https-with-delay ()
   "Bug#49449: asynchronous TLS connection with delayed completion."
   (skip-unless (and internet-is-working (gnutls-available-p)))
-  (let* (status
-         (url-debug t)
+  (let* ((status nil)
          (buf (url-http
-               #s(url "https" nil nil "elpa.gnu.org" nil
-                      "/packages/archive-contents" nil nil t silent t t)
-               (lambda (s) (setq status s))
-               '(nil) nil 'tls)))
+                 #s(url "https" nil nil "elpa.gnu.org" nil
+                        "/packages/archive-contents" nil nil t silent t t)
+                 (lambda (s) (setq status s))
+                 '(nil) nil 'tls)))
     (unwind-protect
         (progn
-          (catch 'done
-            (dotimes (_i 40)
-              (when status
-                (throw 'done status))
-              (accept-process-output nil 0.1)))
+          ;; Busy-wait for 1 s to allow for the TCP connection to complete.
+          (let ((delay 1.0)
+                (t0 (float-time)))
+            (while (< (float-time) (+ t0 delay))))
+          ;; Wait for the entire operation to finish.
+          (let ((limit 4.0)
+                (t0 (float-time)))
+            (while (and (null status)
+                        (< (float-time) (+ t0 limit)))
+              (sit-for 0.1)))
           (should status)
           (should-not (assq :error status))
           (should buf)
-          (should (> (buffer-size buf) 0)))
-      (when (buffer-live-p buf)
-        (let (kill-buffer-query-functions)
-          (kill-buffer buf))))))
+          (should (> (buffer-size buf) 0))
+          )
+      (when buf
+        (kill-buffer buf)))))
 
 (provide 'process-tests)
 ;;; process-tests.el ends here

@@ -42,6 +42,8 @@
 (require 'gnus-sum)
 (require 'gnus-art)
 
+(eval-when-compile (require 'cl-lib))
+
 (defun gnus-icalendar-find-if (pred seq)
   (catch 'found
     (while seq

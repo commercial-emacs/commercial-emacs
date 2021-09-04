@@ -20,8 +20,6 @@
 ;;; Code:
 
 (require 'thread)
-(require 'eieio)
-(require 'ring)
 
 ;; Declare the functions in case Emacs has been configured --without-threads.
 (declare-function all-threads "thread.c" ())
@@ -43,26 +41,6 @@
 (declare-function thread-signal "thread.c" (thread error-symbol data))
 (declare-function thread-yield "thread.c" ())
 (defvar main-thread)
-
-(defclass threads-test-channel ()
-  ((condition :initarg :condition :type condition-variable)
-   (msg-queue :initarg :msg-queue :type ring)))
-
-(cl-defgeneric threads-test-channel-send ((channel threads-test-channel) message)
-  (with-slots (condition msg-queue) channel
-    (with-mutex (condition-mutex condition)
-      (while (<= (ring-size msg-queue) (ring-length msg-queue))
-        (condition-wait condition))
-      (ring-insert msg-queue message)
-      (condition-notify condition t))))
-
-(cl-defgeneric threads-test-channel-recv ((channel threads-test-channel))
-  (with-slots (condition msg-queue) channel
-    (with-mutex (condition-mutex condition)
-      (while (ring-empty-p msg-queue)
-        (condition-wait condition))
-      (prog1 (ring-remove msg-queue)
-        (condition-notify condition t)))))
 
 (ert-deftest threads-is-one ()
   "Test for existence of a thread."
@@ -340,7 +318,7 @@
          (make-thread (lambda ()
                         (while t (thread-yield))))))
     (thread-signal thread 'error nil)
-    (funcall (if noninteractive #'sit-for #'sleep-for) 1)
+    (sit-for 1)
     (should-not (thread-live-p thread))
     (should (equal (thread-last-error) '(error)))))
 
@@ -411,98 +389,7 @@
     (should (equal (thread-last-error) '(error "Die, die, die!")))))
 
 (ert-deftest threads-test-bug33073 ()
-  (skip-unless (featurep 'threads))
   (let ((th (make-thread 'ignore)))
     (should-not (equal th main-thread))))
 
-(ert-deftest threads-test-bug36609-signal ()
-  "Would only fail under TEST_INTERACTIVE=yes, and not every time.
-The failure manifests only by being unable to exit the interactive emacs."
-  (skip-unless (featurep 'threads))
-  (let* ((cv (make-condition-variable (make-mutex) "CV"))
-       condition
-       (notify (lambda ()
-                 (sleep-for 1) ;; let wait() start spinning first
-                 (with-mutex (condition-mutex cv)
-                   (setq condition t)
-                   (condition-notify cv))))
-       (wait (lambda () (with-mutex (condition-mutex cv)
-                          (while (not condition)
-                            (condition-wait cv)))))
-       (herring (make-thread (apply-partially #'sleep-for 1000) "unrelated")))
-    ;; herring is a non-main thread that, if the bug is still present,
-    ;; could assume the glib context lock when the main thread executes wait()
-    (make-thread notify "notify")
-    (funcall wait)
-    (thread-signal herring 'quit nil)))
-
-(ert-deftest threads-test-glib-lock ()
-  "Would only fail under TEST_INTERACTIVE=yes, and not every time.
-The failure manifests only by being unable to exit the interactive emacs."
-  (skip-unless (featurep 'threads))
-  (cl-macrolet ((run-thread
-                 (name what)
-                 `(make-thread
-                   (lambda ()
-                     (sleep-for (1+ (random 3)))
-                     (funcall ,what))
-                   ,name)))
-    (let* ((n 3)
-           (capacity 1)
-           (channel (make-instance
-                     'threads-test-channel
-                     :condition (make-condition-variable (make-mutex) "channel")
-                     :msg-queue (make-ring capacity))))
-      (dotimes (i n)
-        (let ((send-name (format "send-%d" (1+ i)))
-	      (recv-name (format "recv-%d" (- n i))))
-          (run-thread send-name
-		      (lambda () (threads-test-channel-send channel 42)))
-          (run-thread recv-name
-		      (lambda () (threads-test-channel-recv channel))))))))
-
-(ert-deftest threads-test-promiscuous-process ()
-  "Hold to Tromey's seemingly arbitrary 2012 edict outlawing
-`accept-process-output' of a process started by another thread."
-  (skip-unless (featurep 'threads))
-  (thread-last-error t)
-  (let* ((thread-tests-main (get-buffer-create "thread-tests-main" t))
-         (buffers (list thread-tests-main))
-         (start-proc (lambda (n b)
-                       (apply #'start-process n b "cat" (split-string "/dev/urandom"))))
-         (n 3))
-    (funcall start-proc "threads-tests-main" (car buffers))
-    (dotimes (i (1- n))
-      (push (get-buffer-create (format "thread-tests-%d" i) t) buffers)
-      (make-thread (apply-partially start-proc
-                                    (format "thread-tests-%d" i)
-                                    (car buffers))))
-    (should (cl-loop repeat 10
-                     when (cl-every #'processp (mapcar #'get-buffer-process buffers))
-                     return t
-                     do (accept-process-output nil 0.1)
-                     finally return nil))
-    (let ((procs (mapcar #'get-buffer-process buffers)))
-      (mapc (lambda (proc) (set-process-thread proc nil)) procs)
-      (dotimes (i (1- n))
-        (make-thread
-         (lambda ()
-           (cl-loop repeat 5
-                    do (accept-process-output
-                        (nth (random (length procs)) procs)
-                        0.2
-                        nil
-                        t)))
-         (format "thread-tests-%d" i)))
-      (should (cl-loop repeat 20
-                       unless (cl-some
-                               (lambda (thr)
-                                 (cl-search "thread-tests-" (thread-name thr)))
-                               (all-threads))
-                       return t
-                       do (accept-process-output
-                           (nth (random (length procs)) procs) 1.0)
-                       finally return nil)))
-    (mapc (lambda (b) (kill-buffer b)) buffers))
-  (should (thread-last-error t)))
-;;; thread-tests.el ends here
+;;; threads.el ends here

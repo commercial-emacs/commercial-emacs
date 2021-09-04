@@ -1335,7 +1335,9 @@ if test -n "$BREW"; then
 fi
 
 # Check MacPorts on macOS.
-AC_PATH_PROG(HAVE_MACPORTS, port)
+if test $opsys = darwin; then
+  AC_PATH_PROG(HAVE_MACPORTS, port)
+fi
 
 ## Require makeinfo >= 4.13 (last of the 4.x series) to build the manuals.
 : ${MAKEINFO:=makeinfo}
@@ -3795,7 +3797,7 @@ AC_DEFUN([libgccjit_dev_not_found], [
 not found.
 Please try installing libgccjit-dev or a similar package.
 If you are sure you want Emacs be compiled without ELisp native compiler,
-pass the --without-nativecomp option to configure.])])
+pass the --without-native-compilation option to configure.])])
 
 AC_DEFUN([libgccjit_broken], [
   AC_MSG_ERROR([The installed libgccjit failed to compile and run a test program using
@@ -3814,10 +3816,10 @@ LIBGCCJIT_LIBS=
 LIBGCCJIT_CFLAGS=
 if test "${with_native_compilation}" != "no"; then
     if test "${HAVE_PDUMPER}" = no; then
-       AC_MSG_ERROR(['--with-nativecomp' requires '--with-dumping=pdumper'])
+       AC_MSG_ERROR(['--with-native-compilation' requires '--with-dumping=pdumper'])
     fi
     if test "${HAVE_ZLIB}" = no; then
-       AC_MSG_ERROR(['--with-nativecomp' requires zlib])
+       AC_MSG_ERROR(['--with-native-compilation' requires zlib])
     fi
 
     # Ensure libgccjit installed by Homebrew can be found.
@@ -5665,7 +5667,7 @@ gl_INIT
 CFLAGS=$SAVE_CFLAGS
 LIBS=$SAVE_LIBS
 
-# timer_getoverrun needs the same libarary as timer_settime
+# timer_getoverrun needs the same library as timer_settime
 OLD_LIBS=$LIBS
 LIBS="$LIB_TIMER_TIME $LIBS"
 AC_CHECK_FUNCS(timer_getoverrun)

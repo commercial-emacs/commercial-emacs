@@ -123,7 +123,7 @@ variable in the original buffer as a forwarding pointer.")
   "Bind to nil before calling `url-retrieve' to signal :nowait connections.")
 
 ;;;###autoload
-(cl-defun url-retrieve (url callback &optional cbargs silent inhibit-cookies &key timeout)
+(defun url-retrieve (url callback &optional cbargs silent inhibit-cookies)
   "Retrieve URL asynchronously and call CALLBACK with CBARGS when finished.
 URL is either a string or a parsed URL.  If it is a string
 containing characters that are not valid in a URI, those
@@ -154,7 +154,6 @@ take effect.
 If SILENT, then don't message progress reports and the like.
 If INHIBIT-COOKIES, cookies will neither be stored nor sent to
 the server.
-TIMEOUT is an optional list of seconds and microseconds.
 If URL is a multibyte string, it will be encoded as utf-8 and
 URL-encoded before it's used."
   ;; XXX: There is code in Emacs that does dynamic binding
@@ -168,11 +167,10 @@ URL-encoded before it's used."
   ;; url-cookie-multiple-line needed anymore?  The other url-cookie-*
   ;; are (for now) only used in synchronous retrievals.
   (url-retrieve-internal url callback (cons nil cbargs) silent
-			 inhibit-cookies :timeout timeout))
+			 inhibit-cookies))
 
-(cl-defun url-retrieve-internal (url callback cbargs
-                                     &optional silent inhibit-cookies
-                                     &key timeout)
+(defun url-retrieve-internal (url callback cbargs &optional silent
+				  inhibit-cookies)
   "Internal function; external interface is `url-retrieve'.
 The callback function will receive an updated value of CBARGS as
 arguments; its first element should be a plist specifying what has
@@ -182,7 +180,6 @@ of `url-retrieve' (if in doubt, specify nil).
 If SILENT, don't message progress reports and the like.
 If INHIBIT-COOKIES, cookies will neither be stored nor sent to
 the server.
-Key argument TIMEOUT is list of seconds and microseconds.
 If URL is a multibyte string, it will be encoded as utf-8 and
 URL-encoded before it's used."
   (url-do-setup)
@@ -206,27 +203,22 @@ URL-encoded before it's used."
       (file-error
        (message "Error when expiring the cache: %s" error))))
   (setq url-retrieve-number-of-calls (1+ url-retrieve-number-of-calls))
-  (let* ((loader (url-scheme-get-property (url-type url) 'loader))
-	 (url-using-proxy (when (url-host url)
-			    (url-find-proxy-for-url url (url-host url))))
-	 (buffer nil)
-	 (asynch (url-scheme-get-property (url-type url) 'asynchronous-p))
-         (kludge (if (eq loader #'url-http)
-                      `(nil nil ,@(when timeout (list :timeout (list timeout))))
-                   (when (eq loader #'url-https)
-                     (when timeout (list :timeout (list timeout)))))))
+  (let ((loader (url-scheme-get-property (url-type url) 'loader))
+	(url-using-proxy (if (url-host url)
+			     (url-find-proxy-for-url url (url-host url))))
+	(buffer nil)
+	(asynch (url-scheme-get-property (url-type url) 'asynchronous-p)))
     (when url-using-proxy
       (setf asynch t
 	    loader #'url-proxy
-            (url-asynchronous url) t
-            kludge nil))
+            (url-asynchronous url) t))
     (if asynch
 	(let ((url-current-object url))
-	  (setq buffer (apply loader url callback cbargs kludge)))
+	  (setq buffer (funcall loader url callback cbargs)))
       (setq buffer (funcall loader url))
-      (when buffer
-	(with-current-buffer buffer
-	  (apply callback cbargs))))
+      (if buffer
+	  (with-current-buffer buffer
+	    (apply callback cbargs))))
     (if url-history-track
 	(url-history-update-url url (current-time)))
     buffer))
@@ -251,10 +243,8 @@ how long to wait for a response before giving up."
                                 "Synchronous fetching done (%S)"
                                 data-buffer)))
          (start-time (current-time))
-         (proc-buffer (apply #'url-retrieve
-                             url callback nil silent inhibit-cookies
-                             (when timeout
-                               (list :timeout timeout)))))
+         (proc-buffer (url-retrieve url callback nil silent
+                                    inhibit-cookies)))
     (if (not proc-buffer)
         (url-debug 'retrieval "Synchronous fetching unnecessary %s" url)
       (unwind-protect

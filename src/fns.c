@@ -1174,7 +1174,7 @@ string_make_multibyte (Lisp_Object string)
 
 
 /* Convert STRING (if unibyte) to a multibyte string without changing
-   the number of characters.  Characters 0200 trough 0237 are
+   the number of characters.  Characters 0200 through 0237 are
    converted to eight-bit characters. */
 
 Lisp_Object
@@ -3097,7 +3097,8 @@ require_unwind (Lisp_Object old_value)
 
 DEFUN ("require", Frequire, Srequire, 1, 3, 0,
        doc: /* If feature FEATURE is not loaded, load it from FILENAME.
-Loaded features are recorded in the list variable `features'.
+If FEATURE is not a member of the list `features', then the feature is
+not loaded; so load the file FILENAME.
 
 If FILENAME is omitted, the printname of FEATURE is used as the file
 name, and `load' will try to load this name appended with the suffix

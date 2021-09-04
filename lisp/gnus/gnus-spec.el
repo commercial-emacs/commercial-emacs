@@ -24,12 +24,14 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
+(defvar gnus-newsrc-file-version)
+
 (require 'gnus)
 
 ;;; Internal variables.
 
-(defvar gnus-newsrc-file-version)
-(defvar-local gnus-summary-mark-positions nil)
+(defvar gnus-summary-mark-positions nil)
 (defvar gnus-group-mark-positions nil)
 (defvar gnus-group-indentation "")
 
@@ -127,12 +129,13 @@
     (lisp-interaction-mode)
     (insert (gnus-pp-to-string spec))))
 
-(defun gnus-update-format-specifications (&rest types)
+(defun gnus-update-format-specifications (&optional force &rest types)
   "Update all (necessary) format specifications.
 Return a list of updated types."
   ;; Make the indentation array.
   ;; See whether all the stored info needs to be flushed.
-  (when (or (not gnus-newsrc-file-version)
+  (when (or force
+	    (not gnus-newsrc-file-version)
 	    (not (equal (gnus-continuum-version)
 			(gnus-continuum-version gnus-newsrc-file-version)))
 	    (not (equal emacs-version
@@ -371,55 +374,56 @@ or to characters when given a pad value."
     (if (string-match
 	 "\\`\\(.*\\)%[0-9]?[{(«]\\(.*\\)%[0-9]?[»})]\\(.*\n?\\)\\'\\|%[-0-9]*=\\|%[-0-9]*\\*"
 	 format)
-        (gnus-parse-complex-format format spec-alist)
+	(gnus-parse-complex-format format spec-alist)
       ;; This is a simple format.
       (gnus-parse-simple-format format spec-alist insert))))
 
 (defun gnus-parse-complex-format (format spec-alist)
-  (gnus-with-temp-buffer
-    (insert format)
-    (goto-char (point-min))
-    (while (re-search-forward "\"" nil t)
-      (replace-match "\\\"" nil t))
-    (goto-char (point-min))
-    (insert "(\"")
-    ;; Convert all font specs into font spec lists.
-    (while (re-search-forward "%\\([0-9]+\\)?\\([«»{}()]\\)" nil t)
-      (let ((number (if (match-beginning 1)
-			(match-string 1) "0"))
-	    (delim (aref (match-string 2) 0)))
-	(if (or (= delim ?\()
-		(= delim ?\{)
-		(= delim 171)) ; «
-	    (replace-match (concat "\"("
-				   (cond ((= delim ?\() "mouse")
-					 ((= delim ?\{) "face")
-					 (t "balloon"))
-				   " " number " \"")
-			   t t)
-	  (replace-match "\")\""))))
-    (goto-char (point-max))
-    (insert "\")")
-    ;; Convert point position commands.
-    (goto-char (point-min))
-    (let (cursor-spec)
+  (let ((cursor-spec nil))
+    (save-excursion
+      (gnus-set-work-buffer)
+      (insert format)
+      (goto-char (point-min))
+      (while (re-search-forward "\"" nil t)
+	(replace-match "\\\"" nil t))
+      (goto-char (point-min))
+      (insert "(\"")
+      ;; Convert all font specs into font spec lists.
+      (while (re-search-forward "%\\([0-9]+\\)?\\([«»{}()]\\)" nil t)
+	(let ((number (if (match-beginning 1)
+			  (match-string 1) "0"))
+	      (delim (aref (match-string 2) 0)))
+	  (if (or (= delim ?\()
+		  (= delim ?\{)
+		  (= delim 171)) ; «
+	      (replace-match (concat "\"("
+				     (cond ((= delim ?\() "mouse")
+					   ((= delim ?\{) "face")
+					   (t "balloon"))
+				     " " number " \"")
+			     t t)
+	    (replace-match "\")\""))))
+      (goto-char (point-max))
+      (insert "\")")
+      ;; Convert point position commands.
+      (goto-char (point-min))
       (let ((case-fold-search nil))
-        (while (re-search-forward "%\\([-0-9]+\\)?\\*" nil t)
+	(while (re-search-forward "%\\([-0-9]+\\)?\\*" nil t)
 	  (replace-match "\"(point)\"" t t)
 	  (setq cursor-spec t)))
       ;; Convert TAB commands.
       (goto-char (point-min))
       (while (re-search-forward "%\\([-0-9]+\\)=" nil t)
-        (replace-match (format "\"(tab %s)\"" (match-string 1)) t t))
+	(replace-match (format "\"(tab %s)\"" (match-string 1)) t t))
       ;; Convert the buffer into the spec.
       (goto-char (point-min))
       (let ((form (read (current-buffer))))
-        (if cursor-spec
+	(if cursor-spec
 	    `(let (gnus-position)
 	       ,@(gnus-complex-form-to-spec form spec-alist)
 	       (if gnus-position
 		   (put-text-property gnus-position (1+ gnus-position)
-				      'gnus-position t)))
+					   'gnus-position t)))
 	  `(progn
 	     ,@(gnus-complex-form-to-spec form spec-alist)))))))
 
@@ -448,7 +452,8 @@ or to characters when given a pad value."
 	spec flist fstring elem result dontinsert user-defined
 	type value pad-width spec-beg cut-width ignore-value
 	tilde-form tilde elem-type extended-spec)
-    (gnus-with-temp-buffer
+    (save-excursion
+      (gnus-set-work-buffer)
       (insert format)
       (goto-char (point-min))
       (while (re-search-forward "%" nil t)

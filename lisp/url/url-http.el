@@ -46,6 +46,7 @@
 (defvar url-http-extra-headers)
 (defvar url-http-noninteractive)
 (defvar url-http-method)
+(defvar url-http-no-retry)
 (defvar url-http-process)
 (defvar url-http-proxy)
 (defvar url-http-response-status)
@@ -170,7 +171,7 @@ request.")
 	     url-http-open-connections))
   nil)
 
-(cl-defun url-http-find-free-connection (host port &optional gateway-method &key timeout)
+(defun url-http-find-free-connection (host port &optional gateway-method)
   (let ((conns (gethash (cons host port) url-http-open-connections))
 	(connection nil))
     (while (and conns (not connection))
@@ -199,8 +200,7 @@ request.")
                                          (if url-using-proxy
                                              (url-port url-using-proxy)
                                            port)
-                                         gateway-method
-                                         :timeout timeout)))
+                                         gateway-method)))
 	      ;; url-open-stream might return nil.
 	      (when (processp proc)
 		;; Drop the temp buffer link before killing the buffer.
@@ -212,8 +212,8 @@ request.")
 	    (set-process-query-on-exit-flag (get-buffer-process buf) nil))
 	  (kill-buffer buf))))
 
-    (when connection
-      (url-http-mark-connection-as-busy host port connection))))
+    (if connection
+	(url-http-mark-connection-as-busy host port connection))))
 
 (defun url-http--user-agent-default-string ()
   "Compute a default User-Agent string based on `url-privacy-level'."
@@ -1000,12 +1000,30 @@ should be shown to the user."
   (url-http-debug "url-http-end-of-document-sentinel in buffer (%s)"
 		  (process-buffer proc))
   (url-http-idle-sentinel proc why)
-  (when (buffer-live-p (process-buffer proc))
+  (when (buffer-name (process-buffer proc))
     (with-current-buffer (process-buffer proc)
       (goto-char (point-min))
-      (when (looking-at "HTTP/")
-        (url-http-parse-headers))
-      (url-http-activate-callback))))
+      (cond ((not (looking-at "HTTP/"))
+	     (if url-http-no-retry
+		 ;; HTTP/0.9 just gets passed back no matter what
+		 (url-http-activate-callback)
+	       ;; Call `url-http' again if our connection expired.
+	       (erase-buffer)
+               (let ((url-request-method url-http-method)
+                     (url-request-extra-headers url-http-extra-headers)
+                     (url-request-data url-http-data)
+                     (url-using-proxy (url-find-proxy-for-url
+                                       url-current-object
+                                       (url-host url-current-object))))
+                 (when url-using-proxy
+                   (setq url-using-proxy
+                         (url-generic-parse-url url-using-proxy)))
+                 (url-http url-current-object url-callback-function
+                           url-callback-arguments (current-buffer)
+                           (and (string= "https" (url-type url-current-object))
+                                'tls)))))
+	    ((url-http-parse-headers)
+	     (url-http-activate-callback))))))
 
 (defun url-http-simple-after-change-function (_st _nd _length)
   ;; Function used when we do NOT know how long the document is going to be
@@ -1265,7 +1283,7 @@ the end of the document."
     (when (eq process-buffer (current-buffer))
       (goto-char (point-max)))))
 
-(cl-defun url-http (url callback cbargs &optional retry-buffer gateway-method &key timeout)
+(defun url-http (url callback cbargs &optional retry-buffer gateway-method)
   "Retrieve URL via HTTP asynchronously.
 URL must be a parsed URL.  See `url-generic-parse-url' for details.
 
@@ -1294,8 +1312,7 @@ The return value of this function is the retrieval buffer."
          (url-current-object url)
          (connection (url-http-find-free-connection (url-host url)
                                                     (url-port url)
-                                                    gateway-method
-                                                    :timeout timeout))
+                                                    gateway-method))
          (mime-accept-string url-mime-accept-string)
 	 (buffer (or retry-buffer
 		     (generate-new-buffer
@@ -1332,6 +1349,7 @@ The return value of this function is the retrieval buffer."
 		       url-http-noninteractive
 		       url-http-data
 		       url-http-target-url
+		       url-http-no-retry
 		       url-http-connection-opened
                        url-mime-accept-string
 		       url-http-proxy
@@ -1350,6 +1368,7 @@ The return value of this function is the retrieval buffer."
 	      url-callback-arguments cbargs
 	      url-http-after-change-function 'url-http-wait-for-headers-change-function
 	      url-http-target-url url-current-object
+	      url-http-no-retry retry-buffer
 	      url-http-connection-opened nil
               url-mime-accept-string mime-accept-string
 	      url-http-proxy url-using-proxy
@@ -1363,10 +1382,8 @@ The return value of this function is the retrieval buffer."
            (set-process-sentinel connection 'url-http-async-sentinel))
           ('failed
            ;; Asynchronous connection failed
-           (error "Could not create connection to %s:%d (%s)"
-                  (url-host url)
-                  (url-port url)
-                  (process-exit-status connection)))
+           (error "Could not create connection to %s:%d" (url-host url)
+                  (url-port url)))
           (_
            (if (and url-http-proxy (string= "https"
                                             (url-type url-current-object)))
@@ -1443,10 +1460,11 @@ The return value of this function is the retrieval buffer."
 (defun url-http-async-sentinel (proc why)
   ;; We are performing an asynchronous connection, and a status change
   ;; has occurred.
-  (when (buffer-live-p (process-buffer proc))
+  (when (buffer-name (process-buffer proc))
     (with-current-buffer (process-buffer proc)
       (cond
        (url-http-connection-opened
+	(setq url-http-no-retry t)
 	(url-http-end-of-document-sentinel proc why))
        ((string= (substring why 0 4) "open")
 	(setq url-http-connection-opened t)
@@ -1628,15 +1646,13 @@ p3p
 (defalias 'url-https-expand-file-name 'url-default-expander)
 
 (defmacro url-https-create-secure-wrapper (method args)
-  `(cl-defun ,(intern (format "url-https-%s" method)) ,args
-     ,(format "HTTPS wrapper around `%s' call." method)
-     (,(intern (format "url-http-%s" method))
-      ,@(remove '&rest (remove '&optional args)))))
+  `(defun ,(intern (format (if method "url-https-%s" "url-https") method)) ,args
+    ,(format "HTTPS wrapper around `%s' call." (or method "url-http"))
+    (,(intern (format (if method "url-http-%s" "url-http") method))
+     ,@(remove '&rest (remove '&optional (append args (if method nil '(nil 'tls))))))))
 
 ;;;###autoload (autoload 'url-https "url-http")
-(cl-defun url-https (url callback cbargs &key timeout)
-  "HTTPS wrapper around `url-http' call."
-  (url-http url callback cbargs nil 'tls :timeout timeout))
+(url-https-create-secure-wrapper nil (url callback cbargs))
 ;;;###autoload (autoload 'url-https-file-exists-p "url-http")
 (url-https-create-secure-wrapper file-exists-p (url))
 ;;;###autoload (autoload 'url-https-file-readable-p "url-http")

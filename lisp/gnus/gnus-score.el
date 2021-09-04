@@ -460,7 +460,7 @@ inhibited for all groups."
 (defvar gnus-score-trace nil)
 (defvar gnus-score-edit-buffer nil)
 
-(defvar-local gnus-score-alist nil
+(defvar gnus-score-alist nil
   "Alist containing score information.
 The keys can be symbols or strings.  The following symbols are defined.
 
@@ -1444,21 +1444,24 @@ If FORMAT, also format the current score file."
   ;; Save all score information.
   (let ((cache gnus-score-cache)
 	entry score file)
-    (with-temp-buffer
+    (save-excursion
       (setq gnus-score-alist nil)
+      (nnheader-set-temp-buffer " *Gnus Scores*")
       (while cache
+	(current-buffer)
 	(setq entry (pop cache)
 	      file (nnheader-translate-file-chars (car entry) t)
 	      score (cdr entry))
-	(when (and (equal (gnus-score-get 'touched score) '(t))
-		   (not (gnus-score-get 'read-only score))
-		   (or (not (file-exists-p file))
-		       (file-writable-p file)))
+	(if (or (not (equal (gnus-score-get 'touched score) '(t)))
+		(gnus-score-get 'read-only score)
+		(and (file-exists-p file)
+		     (not (file-writable-p file))))
+	    ()
 	  (setq score (setcdr entry (assq-delete-all 'touched score)))
 	  (erase-buffer)
 	  (let (emacs-lisp-mode-hook)
 	    (if (and (not gnus-adaptive-pretty-print)
-		     (string-match-p
+		     (string-match
 		      (concat (regexp-quote gnus-adaptive-file-suffix) "$")
 		      file))
 		;; This is an adaptive score file, so we do not run it through
@@ -1479,9 +1482,10 @@ If FORMAT, also format the current score file."
 		(gnus-write-buffer file))
 	      (when gnus-score-after-write-file-function
 		(funcall gnus-score-after-write-file-function file)))))
-	(when (and gnus-score-uncacheable-files
-	           (string-match-p gnus-score-uncacheable-files file))
-	  (gnus-score-remove-from-cache file))))))
+	(and gnus-score-uncacheable-files
+	     (string-match gnus-score-uncacheable-files file)
+	     (gnus-score-remove-from-cache file)))
+      (kill-buffer (current-buffer)))))
 
 (defun gnus-score-load-files (score-files)
   "Load all score files in SCORE-FILES."
@@ -1520,7 +1524,8 @@ If FORMAT, also format the current score file."
     (while news
       (setq scores news
 	    news nil)
-      (when (and gnus-summary-default-score scores)
+      (when (and gnus-summary-default-score
+		 scores)
 	(let* ((entries gnus-header-index)
 	       (now (time-to-days nil))
 	       (expire (and gnus-score-expiry-days
@@ -1539,7 +1544,8 @@ If FORMAT, also format the current score file."
 		    (cons (cons header (or gnus-summary-default-score 0))
 			  gnus-scores-articles))))
 
-	  (with-temp-buffer
+	  (with-current-buffer (gnus-get-buffer-create "*Headers*")
+	    (buffer-disable-undo)
 	    (when (gnus-buffer-live-p gnus-summary-buffer)
 	      (message-clone-locals gnus-summary-buffer))
 
@@ -1583,7 +1589,9 @@ If FORMAT, also format the current score file."
 	    (when (gnus-buffer-live-p gnus-summary-buffer)
 	      (let ((scored gnus-newsgroup-scored))
 		(with-current-buffer gnus-summary-buffer
-		  (setq gnus-newsgroup-scored scored)))))
+		  (setq gnus-newsgroup-scored scored))))
+	    ;; Remove the buffer.
+	    (gnus-kill-buffer (current-buffer)))
 
 	  ;; Add articles to `gnus-newsgroup-scored'.
 	  (while gnus-scores-articles
@@ -2908,7 +2916,7 @@ Destroys the current buffer."
     (let ((alist
 	   (mapcar
 	    (lambda (file)
-	      (cons (gnus-score-file-rank file) file))
+	      (cons (inline (gnus-score-file-rank file)) file))
 	    files)))
       (mapcar #'cdr (sort alist #'car-less-than-car)))))
 

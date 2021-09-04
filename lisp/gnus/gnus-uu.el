@@ -26,6 +26,8 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
+
 (require 'gnus)
 (require 'gnus-art)
 (require 'message)

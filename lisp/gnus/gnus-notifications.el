@@ -35,6 +35,7 @@
 (require 'gnus-group)
 (require 'gnus-int)
 (require 'gnus-art)
+(require 'gnus-util)
 (ignore-errors
   (require 'google-contacts))        ; Optional
 (require 'gnus-fun)

@@ -45,7 +45,6 @@
 (require 'auth-source)
 (require 'nsm)
 (require 'puny)
-(require 'gnutls)
 
 (eval-when-compile
   (require 'epa)) ; for epa-suppress-error-buffer
@@ -54,6 +53,8 @@
 (declare-function starttls-negotiate "starttls" (process))
 (declare-function starttls-open-stream "starttls" (name buffer host port))
 
+(autoload 'gnutls-negotiate "gnutls")
+(autoload 'open-gnutls-stream "gnutls")
 (defvar starttls-extra-arguments)
 (defvar starttls-extra-args)
 (defvar starttls-use-gnutls)
@@ -172,9 +173,6 @@ a greeting from the server.
 :nowait, if non-nil, says the connection should be made
 asynchronously, if possible.
 
-:sndtimeo, if a list of seconds and microseconds, specifies the
-connect(2) timeout.
-
 :shell-command is a `format-spec' string that can be used if
 :type is `shell'.  It has two specs, %s for host and %p for port
 number.  Example: \"ssh gateway nc %s %p\".
@@ -197,8 +195,8 @@ gnutls-boot (as returned by `gnutls-boot-parameters')."
 	(make-network-process :name name :buffer buffer
 			      :host (puny-encode-domain host) :service service
 			      :nowait (plist-get parameters :nowait)
-                              :sndtimeo (plist-get parameters :sndtimeo)
-                              :tls-parameters (plist-get parameters :tls-parameters)
+                              :tls-parameters
+                              (plist-get parameters :tls-parameters)
                               :coding (plist-get parameters :coding))
       (let ((work-buffer (or buffer
 			     (generate-new-buffer " *stream buffer*")))
@@ -259,7 +257,6 @@ gnutls-boot (as returned by `gnutls-boot-parameters')."
 				      :host (puny-encode-domain host)
                                       :service service
 				      :nowait (plist-get parameters :nowait)
-                                      :sndtimeo (plist-get parameters :sndtimeo)
                                       :coding (plist-get parameters :coding))))
     (when (plist-get parameters :warn-unless-encrypted)
       (setq stream (nsm-verify-connection stream host service nil t)))
