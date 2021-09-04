@@ -34,6 +34,11 @@ jobs:
         echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
         echo "$HOME/.local/bin" >> $GITHUB_PATH
         echo "LD_LIBRARY_PATH=$HOME/.local/lib" >> $GITHUB_ENV
+    - name: apt-get
+      if: startsWith(runner.os, 'Linux')
+      run: |
+        sudo apt-get -yq update
+        DEBIAN_FRONTEND=noninteractive sudo apt-get -yq install gnutls-bin sharutils dirmngr libreadline-dev libcurl4-openssl-dev libxml2-dev libssl-dev libcairo2-dev libdbus-1-dev libfreetype6-dev libgif-dev libgio3.0-cil-dev libglib2.0-dev libgmp-dev libgnutls28-dev libharfbuzz-dev libjpeg-dev libjansson-dev liblcms2-dev libselinux1-dev libxml2-dev libpng-dev librsvg2-dev libpthread-stubs0-dev libtiff-dev libx11-dev libxext-dev libxpm-dev libgtk3.0-cil-dev zlib1g-dev
     - run: "./autogen.sh"
     - run: "./configure --prefix=$HOME/.local"
     - run: "make -j2 check"
