@@ -45,8 +45,7 @@
 ;;
 ;; - Change the target of symbolic links.
 ;;
-;; - Change the permission bits of the filenames (in systems with a
-;;   working unix-alike `dired-chmod-program').  See and customize the
+;; - Change the permission bits of the filenames.  See and customize the
 ;;   variable `wdired-allow-to-change-permissions'.  To change a single
 ;;   char (toggling between its two more usual values) you can press
 ;;   the space bar over it or left-click the mouse.  To set any char to
@@ -125,10 +124,7 @@ everybody to that file.
 If `advanced', the bits are freely editable.  You can use
 `string-rectangle', `query-replace', etc.  You can put any value (even
 newlines), but if you want your changes to be useful, you better put a
-intelligible value.
-
-Anyway, the real change of the permissions is done by the external
-program `dired-chmod-program', which must exist."
+intelligible value."
   :type '(choice (const :tag "Not allowed" nil)
                  (const :tag "Toggle/set bits" t)
 		 (other :tag "Bits freely editable" advanced)))
@@ -995,7 +991,8 @@ Like original function but it skips read-only words."
         (setq filename (wdired-get-filename nil t))
         (if (= (length perms-new) 10)
             (condition-case nil
-                (set-file-modes filename (wdired-perms-to-number perms-new))
+		(set-file-modes filename (wdired-perms-to-number perms-new)
+				'nofollow)
               (error
                (setq errors (1+ errors))
                (dired-log "Setting mode of `%s' to `%s' failed\n\n"
