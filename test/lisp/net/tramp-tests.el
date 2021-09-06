@@ -2765,34 +2765,59 @@ This checks also `file-name-as-directory', `file-name-directory',
 	    (ignore-errors (delete-directory source 'recursive))
 	    (ignore-errors (delete-directory target 'recursive))))))))
 
-(ert-deftest tramp-test13-make-directory ()
-  "Check `make-directory'.
-This tests also `file-directory-p' and `file-accessible-directory-p'."
-  (skip-unless (tramp--test-enabled))
-
-  (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
+(defun tramp-test-make-directory-helper (test-default-file-modes-p)
+  "Helper test used by tramp-test13-make-directory* tests."
+  (dolist (quoted (if (and (tramp--test-expensive-test)
+                           (not test-default-file-modes-p))
+                      '(nil t)
+                    '(nil)))
     (let* ((tmp-name1 (tramp--test-make-temp-name nil quoted))
-	   (tmp-name2 (expand-file-name "foo/bar" tmp-name1)))
+	   (tmp-name2 (expand-file-name "foo/bar" tmp-name1))
+	   (unusual-file-mode-1 #o740)
+	   (unusual-file-mode-2 #o710))
       (unwind-protect
 	  (progn
-	    (make-directory tmp-name1)
+	    (with-file-modes unusual-file-mode-1
+	      (make-directory tmp-name1))
 	    (should-error
 	     (make-directory tmp-name1)
 	     :type 'file-already-exists)
 	    (should (file-directory-p tmp-name1))
 	    (should (file-accessible-directory-p tmp-name1))
+	    (and test-default-file-modes-p
+		 (should (equal (format "%#o" unusual-file-mode-1)
+				(format "%#o" (file-modes tmp-name1)))))
 	    (should-error
 	     (make-directory tmp-name2)
 	     :type 'file-error)
-	    (make-directory tmp-name2 'parents)
+	    (with-file-modes unusual-file-mode-2
+	      (make-directory tmp-name2 'parents))
 	    (should (file-directory-p tmp-name2))
 	    (should (file-accessible-directory-p tmp-name2))
+	    (and test-default-file-modes-p
+		 (should (equal (format "%#o" unusual-file-mode-2)
+				(format "%#o" (file-modes tmp-name2)))))
 	    ;; If PARENTS is non-nil, `make-directory' shall not
 	    ;; signal an error when DIR exists already.
 	    (make-directory tmp-name2 'parents))
 
 	;; Cleanup.
 	(ignore-errors (delete-directory tmp-name1 'recursive))))))
+
+(ert-deftest tramp-test13-make-directory ()
+  "Check `make-directory'.
+This tests also `file-directory-p' and `file-accessible-directory-p'."
+  (skip-unless (tramp--test-enabled))
+  (tramp-test-make-directory-helper nil))
+
+(ert-deftest tramp-test13-make-directory-with-file-modes ()
+  "Check that `make-directory' honors `default-file-modes'.
+This is a separate test from `tramp-test13-make-directory' because
+some backends cannot pass this test.  The \"smb\" backend fails
+unless the SMB server supports \"posix\" extensions.
+The \"adb\" backend fails on the /sdcard filesystem."
+  (skip-unless (tramp--test-enabled))
+  (tramp-test-make-directory-helper t))
 
 (ert-deftest tramp-test14-delete-directory ()
   "Check `delete-directory'."
