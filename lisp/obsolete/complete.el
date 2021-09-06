@@ -8,7 +8,7 @@
 ;;
 ;; Special thanks to Hallvard Furuseth for his many ideas and contributions.
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

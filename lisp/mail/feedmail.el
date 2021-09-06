@@ -2,7 +2,7 @@
 
 ;; This file is in the public domain.
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; Author: Bill Carpenter <bill@carpenter.ORG>
 ;; Version: 11

@@ -6,7 +6,7 @@
 ;; Created: Sun Mar 16 1997
 ;; Keywords: network comm
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

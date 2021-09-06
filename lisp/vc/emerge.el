@@ -2,7 +2,7 @@
 
 ;; The author has placed this file in the public domain.
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; Author: Dale R. Worley <worley@world.std.com>
 ;; Keywords: unix, vc, tools

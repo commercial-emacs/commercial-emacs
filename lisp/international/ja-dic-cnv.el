@@ -9,7 +9,7 @@
 
 ;; Keywords: i18n, mule, multilingual, Japanese
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -346,7 +346,7 @@ Saves the output as `ja-dic-filename', in directory DIRNAME (if specified)."
 	      ";;\tOriginal SKK dictionary file: "
 	      (file-relative-name (expand-file-name filename) dirname)
 	      "\n\n"
-	      ";; This file is NOT part of GNU Emacs.\n\n"
+	      ";; This file is part of GNU Emacs.\n\n"
 	      ";;; Start of the header of the original SKK dictionary.\n\n")
       (set-buffer skkbuf)
       (goto-char 1)

@@ -4,7 +4,7 @@
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 ;;
 ;; GNU Emacs is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -52,7 +52,7 @@
 ;; - responsible-p (file)
 ;; - receive-file (file rev)
 ;; - unregister (file)                                          DONE
-;; * checkin (files comment)
+;; * checkin (files comment)                                    DONE
 ;; * find-revision (file rev buffer)
 ;; * checkout (file &optional rev)
 ;; * revert (file &optional contents-done)
@@ -75,7 +75,7 @@
 ;; - show-log-entry (revision)
 ;; - comment-history (file)
 ;; - update-changelog (files)
-;; * diff (files &optional async rev1 rev2 buffer)
+;; * diff (files &optional async rev1 rev2 buffer)              DONE
 ;; - revision-completion-table (files)
 ;; - annotate-command (file buf &optional rev)
 ;; - annotate-time ()
@@ -110,6 +110,7 @@
 
 (require 'ert)
 (require 'vc)
+(require 'log-edit)
 
 (declare-function w32-application-type "w32proc.c")
 
@@ -598,6 +599,76 @@ This checks also `vc-backend' and `vc-responsible-backend'."
         (if tempdir (delete-directory tempdir t))
         (run-hooks 'vc-test--cleanup-hook)))))
 
+(declare-function log-edit-done "vc/log-edit")
+
+(defun vc-test--version-diff (backend)
+  "Check the diff version of a repository."
+
+  (let ((vc-handled-backends `(,backend))
+        (default-directory
+          (file-name-as-directory
+           (expand-file-name
+            (make-temp-name "vc-test") temporary-file-directory)))
+        (process-environment process-environment)
+        tempdir
+        vc-test--cleanup-hook)
+    (when (eq backend 'Bzr)
+      (setq tempdir (make-temp-file "vc-test--version-diff" t)
+            process-environment (cons (format "BZR_HOME=%s" tempdir)
+                                      process-environment)))
+    (when (memq backend '(Bzr Git))
+      (setq process-environment (cons "EMAIL=john@doe.ee"
+                                      process-environment)))
+    (unwind-protect
+        (progn
+          ;; Cleanup.
+          (add-hook
+           'vc-test--cleanup-hook
+           `(lambda () (delete-directory ,default-directory 'recursive)))
+
+          ;; Create empty repository.  Check repository checkout model.
+          (make-directory default-directory)
+          (vc-test--create-repo-function backend)
+
+          (let* ((tmp-name (expand-file-name "foo" default-directory))
+                 (files (list (file-name-nondirectory tmp-name))))
+            ;; Write and register a new file.
+            (write-region "originaltext" nil tmp-name nil 'nomessage)
+            (vc-register (list backend files))
+
+            (let ((buff (find-file tmp-name)))
+              (with-current-buffer buff
+                (progn
+                  ;; Optionally checkout file.
+                  (when (memq backend '(RCS CVS SCCS))
+                    (vc-checkout tmp-name))
+
+                  ;; Checkin file.
+                  (vc-checkin files backend)
+                  (insert "Testing vc-version-diff")
+                  (log-edit-done))))
+
+            ;; Modify file content.
+            (when (memq backend '(RCS CVS SCCS))
+              (vc-checkout tmp-name))
+            (write-region "updatedtext" nil tmp-name nil 'nomessage)
+
+            ;; Check version diff.
+            (vc-version-diff files nil nil)
+            (should (bufferp (get-buffer "*vc-diff*")))
+
+            (with-current-buffer "*vc-diff*"
+              (progn
+                (let ((rawtext (buffer-substring-no-properties (point-min)
+                                                               (point-max))))
+                  (should (string-search "-originaltext" rawtext))
+                  (should (string-search "+updatedtext" rawtext)))))))
+
+      ;; Save exit.
+      (ignore-errors
+        (if tempdir (delete-directory tempdir t))
+        (run-hooks 'vc-test--cleanup-hook)))))
+
 ;; Create the test cases.
 
 (defun vc-test--rcs-enabled ()
@@ -715,6 +786,18 @@ This checks also `vc-backend' and `vc-responsible-backend'."
           ;; "Really want to delete ...?"
           (skip-unless (not (eq 'CVS ',backend)))
           (vc-test--rename-file ',backend))
+
+        (ert-deftest
+            ,(intern (format "vc-test-%s06-version-diff" backend-string)) ()
+          ,(format "Check `vc-version-diff' for the %s backend."
+                   backend-string)
+          (skip-unless
+           (ert-test-passed-p
+            (ert-test-most-recent-result
+             (ert-get-test
+              ',(intern
+                 (format "vc-test-%s01-register" backend-string))))))
+          (vc-test--version-diff ',backend))
         ))))
 
 (provide 'vc-tests)

@@ -2,7 +2,7 @@
    Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2021 Free Software
    Foundation, Inc.
 
-This file is NOT part of GNU Emacs.
+This file is part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1045,6 +1045,8 @@ The value, if non-nil, is a list of mode name symbols.  */)
 
   if (COMPILEDP (fun))
     {
+      if (PVSIZE (fun) <= COMPILED_INTERACTIVE)
+	return Qnil;
       Lisp_Object form = AREF (fun, COMPILED_INTERACTIVE);
       if (VECTORP (form))
 	/* New form -- the second element is the command modes. */

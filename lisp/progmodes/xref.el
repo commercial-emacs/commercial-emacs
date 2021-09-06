@@ -1,13 +1,13 @@
 ;;; xref.el --- Cross-referencing commands              -*-lexical-binding:t-*-
 
 ;; Copyright (C) 2014-2021 Free Software Foundation, Inc.
-;; Version: 1.1.0
+;; Version: 1.2.2
 ;; Package-Requires: ((emacs "26.1"))
 
 ;; This is a GNU ELPA :core package.  Avoid functionality that is not
 ;; compatible with the version of Emacs recorded above.
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -415,6 +415,30 @@ elements is negated: these commands will NOT prompt."
   :type 'hook
   :version "28.1"
   :package-version '(xref . "1.0.4"))
+
+(defcustom xref-auto-jump-to-first-definition nil
+  "If t, `xref-find-definitions' always jumps to the first result.
+`show' means to show the first result's location, but keep the
+focus on the Xref buffer's window.
+`move' means to only move point to the first result."
+  :type '(choice (const :tag "Jump" t)
+                 (const :tag "Show" show)
+                 (const :tag "Move point only" move)
+                 (const :tag "No auto-jump" nil))
+  :version "28.1"
+  :package-version '(xref . "1.2.0"))
+
+(defcustom xref-auto-jump-to-first-xref nil
+  "If t, xref commands always jump to the first result.
+`show' means to show the first result's location, but keep the
+focus on the Xref buffer's window.
+`move' means to only move point to the first result."
+  :type '(choice (const :tag "Jump" t)
+                 (const :tag "Show" show)
+                 (const :tag "Move point only" move)
+                 (const :tag "No auto-jump" nil))
+  :version "28.1"
+  :package-version '(xref . "1.2.0"))
 
 (defvar xref--marker-ring (make-ring xref-marker-ring-length)
   "Ring of markers to implement the marker stack.")
@@ -898,10 +922,10 @@ beginning of the line."
 (defvar xref--button-map
   (let ((map (make-sparse-keymap)))
     (define-key map [mouse-1] #'xref-goto-xref)
-    (define-key map [mouse-2] #'xref-select-and-goto-xref)
+    (define-key map [mouse-2] #'xref-select-and-show-xref)
     map))
 
-(defun xref-select-and-goto-xref (event)
+(defun xref-select-and-show-xref (event)
   "Move point to the button and show the xref definition.
 The window showing the xref buffer will be selected."
   (interactive "e")
@@ -910,8 +934,9 @@ The window showing the xref buffer will be selected."
   (or (get-text-property (point) 'xref-item)
       (xref--search-property 'xref-item))
   (xref-show-location-at-point))
+
 (define-obsolete-function-alias
-  'xref--mouse-2 #'xref-select-and-goto-xref "28.1")
+  'xref--mouse-2 #'xref-select-and-show-xref "28.1")
 
 (defcustom xref-truncation-width 400
   "The column to visually \"truncate\" each Xref buffer line to."
@@ -1019,13 +1044,16 @@ Return an alist of the form ((FILENAME . (XREF ...)) ...)."
            (assoc-default 'fetched-xrefs alist)
            (funcall fetcher)))
          (xref-alist (xref--analyze xrefs))
-         (dd default-directory))
+         (dd default-directory)
+         buf)
     (with-current-buffer (get-buffer-create xref-buffer-name)
       (setq default-directory dd)
       (xref--xref-buffer-mode)
       (xref--show-common-initialize xref-alist fetcher alist)
       (pop-to-buffer (current-buffer))
-      (current-buffer))))
+      (setq buf (current-buffer)))
+    (xref--auto-jump-first buf (assoc-default 'auto-jump alist))
+    buf))
 
 (defun xref--project-root (project)
   (if (fboundp 'project-root)
@@ -1063,19 +1091,36 @@ Return an alist of the form ((FILENAME . (XREF ...)) ...)."
            (error-message-string err)
            'face 'error)))))))
 
+(defun xref--auto-jump-first (buf value)
+  (when value
+    (select-window (get-buffer-window buf))
+    (goto-char (point-min)))
+  (cond
+   ((eq value t)
+    (xref-next-line-no-show)
+    (xref-goto-xref))
+   ((eq value 'show)
+    (xref-next-line))
+   ((eq value 'move)
+    (forward-line 1))))
+
 (defun xref-show-definitions-buffer (fetcher alist)
   "Show the definitions list in a regular window.
 
 When only one definition found, jump to it right away instead."
-  (let ((xrefs (funcall fetcher)))
+  (let ((xrefs (funcall fetcher))
+        buf)
     (cond
      ((not (cdr xrefs))
       (xref-pop-to-location (car xrefs)
                             (assoc-default 'display-action alist)))
      (t
-      (xref--show-xref-buffer fetcher
-                              (cons (cons 'fetched-xrefs xrefs)
-                                    alist))))))
+      (setq buf
+            (xref--show-xref-buffer fetcher
+                                    (cons (cons 'fetched-xrefs xrefs)
+                                          alist)))
+      (xref--auto-jump-first buf (assoc-default 'auto-jump alist))
+      buf))))
 
 (define-obsolete-function-alias
   'xref--show-defs-buffer #'xref-show-definitions-buffer "28.1")
@@ -1091,7 +1136,8 @@ local keymap that binds `RET' to `xref-quit-and-goto-xref'."
          ;; XXX: Make percentage customizable maybe?
          (max-height (/ (window-height) 2))
          (size-fun (lambda (window)
-                     (fit-window-to-buffer window max-height))))
+                     (fit-window-to-buffer window max-height)))
+         buf)
     (cond
      ((not (cdr xrefs))
       (xref-pop-to-location (car xrefs)
@@ -1104,7 +1150,9 @@ local keymap that binds `RET' to `xref-quit-and-goto-xref'."
         (pop-to-buffer (current-buffer)
                        `(display-buffer-in-direction . ((direction . below)
                                                         (window-height . ,size-fun))))
-        (current-buffer))))))
+        (setq buf (current-buffer)))
+      (xref--auto-jump-first buf (assoc-default 'auto-jump alist))
+      buf))))
 
 (define-obsolete-function-alias 'xref--show-defs-buffer-at-bottom
   #'xref-show-definitions-buffer-at-bottom "28.1")
@@ -1233,13 +1281,15 @@ definitions."
                   (setq xrefs 'called-already)))))))
   (funcall xref-show-xrefs-function fetcher
            `((window . ,(selected-window))
-             (display-action . ,display-action))))
+             (display-action . ,display-action)
+             (auto-jump . ,xref-auto-jump-to-first-xref))))
 
 (defun xref--show-defs (xrefs display-action)
   (xref--push-markers)
   (funcall xref-show-definitions-function xrefs
            `((window . ,(selected-window))
-             (display-action . ,display-action))))
+             (display-action . ,display-action)
+             (auto-jump . ,xref-auto-jump-to-first-definition))))
 
 (defun xref--push-markers ()
   (unless (region-active-p) (push-mark nil t))
@@ -1580,7 +1630,7 @@ The template should have the following fields:
   "The program to use for regexp search inside files.
 
 This must reference a corresponding entry in `xref-search-program-alist'."
-  :type `(choice
+  :type '(choice
           (const :tag "Use Grep" grep)
           (const :tag "Use ripgrep" ripgrep)
           (symbol :tag "User defined"))

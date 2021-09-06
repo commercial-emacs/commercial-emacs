@@ -14,7 +14,7 @@ controls the compilation of Emacs C source files.  All of this should
 work transparently; you should only need to change to the parent
 directory, run './configure', and then run 'make'.
 
-This file is NOT part of GNU Emacs.
+This file is part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

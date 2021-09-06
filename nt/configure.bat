@@ -3,7 +3,7 @@ rem   ----------------------------------------------------------------------
 rem   This was the old configuration script for MS Windows operating systems
 rem   Copyright (C) 1999-2021 Free Software Foundation, Inc.
 
-rem   This file is NOT part of GNU Emacs.
+rem   This file is part of GNU Emacs.
 
 rem   GNU Emacs is free software: you can redistribute it and/or modify
 rem   it under the terms of the GNU General Public License as published by

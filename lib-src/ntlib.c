@@ -5,7 +5,7 @@ Copyright (C) 1994, 2001-2021 Free Software Foundation, Inc.
 Author: Geoff Voelker (voelker@cs.washington.edu)
 Created: 10-8-94
 
-This file is NOT part of GNU Emacs.
+This file is part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

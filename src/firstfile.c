@@ -1,7 +1,7 @@
 /* Mark beginning of data space to dump as pure, for GNU Emacs.
    Copyright (C) 1997, 2001-2021 Free Software Foundation, Inc.
 
-This file is NOT part of GNU Emacs.
+This file is part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

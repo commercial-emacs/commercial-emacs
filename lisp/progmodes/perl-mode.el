@@ -10,7 +10,7 @@
 ;; Adapted from C code editing commands 'c-mode.el', Copyright 1987 by the
 ;; Free Software Foundation, under terms of its General Public License.
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

@@ -3,7 +3,7 @@
 ;; This is in the public domain on account of being distributed since
 ;; 1985 or 1986 without a copyright notice.
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: games

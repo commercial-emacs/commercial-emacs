@@ -2,7 +2,7 @@
    Copyright (C) 1985, 1995, 2001-2021 Free Software Foundation, Inc.
     based primarily on public domain code written by Chris Torek
 
-This file is NOT part of GNU Emacs.
+This file is part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

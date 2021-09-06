@@ -1145,7 +1145,7 @@ For changes in Emacs 23.1 and later, see the main Emacs NEWS file.
    two parts for faster loading, and the manual is more complete.
 
 
-This file is NOT part of GNU Emacs.
+This file is part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

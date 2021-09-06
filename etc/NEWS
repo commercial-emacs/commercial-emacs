@@ -1,6 +1,6 @@
 GNU Emacs NEWS -- history of user-visible changes.
 
-Copyright (C) 2017-2021 Free Software Foundation, Inc.
+Copyright (C) 2019-2021 Free Software Foundation, Inc.
 See the end of the file for license conditions.
 
 Please send Emacs bug reports to 'bug-gnu-emacs@gnu.org'.
@@ -555,9 +555,10 @@ including the newlines that separate the lines.
 * Changes in Specialized Modes and Packages in Emacs 28.1
 
 ** Completion List Mode
-New key bindings have been added: 'n' and 'p' to navigate completions,
-and 'M-g M-c' to switch to the minibuffer, and you can also switch back
-to the completion list buffer with 'M-g M-c'.
+
+New key bindings have been added to 'completion-list-mode': 'n' and
+'p' now navigate completions, and 'M-g M-c' switches to the
+minibuffer and back to the completion list buffer.
 
 ** Benchmark
 *** New function 'benchmark-call' to measure the execution time of a function.
@@ -2152,12 +2153,23 @@ sub-directory.
 *** 'project-find-file' doesn't use the string at point as default input.
 Now it's only suggested as part of the "future history".
 
-** xref
+** Xref
 
 ---
 *** Prefix arg of 'xref-goto-xref' quits the "*xref*" buffer.
 So typing 'C-u RET' in the "*xref*" buffer quits its window
 before navigating to the selected location.
+
++++
+*** New user options to automatically show the first Xref match.
+The new option 'xref-auto-jump-to-first-definition' controls the
+behavior of 'xref-find-definitions' and related commands: if it's t or
+'show', the first match is automatically displayed; if it's 'move',
+point in the *xref* buffer is automatically moved to the first match
+without displaying it.
+The new option 'xref-auto-jump-to-first-xref' changes the behavior of
+all Xref commands in the same way as 'xref-auto-jump-to-first-definition'
+affects the "find-definitions" commands.
 
 *** New user options 'xref-search-program' and 'xref-search-program-alist'.
 So far 'grep' and 'ripgrep' are supported.  'ripgrep' seems to offer better
@@ -2193,6 +2205,11 @@ Use 'C-u RET' instead.  The 'TAB' binding in "*xref*" buffers is still
 supported, but we plan on removing it in a future version; at that
 time, the command 'xref-quit-and-goto-xref' will no longer have a key
 binding in 'xref--xref-buffer-mode-map'.
+
+---
+*** New user option 'etags-xref-prefer-current-file'.
+When non-nil, 'M-.' matches for identifiers in the file visited by the
+current buffer will be shown first in the "*xref*" buffer.
 
 ** json.el
 
@@ -3449,7 +3466,7 @@ The former is now declared obsolete.
 
 +++
 *** Doc strings can now link to customization groups.
-Text like "customization group 'whitespace'" will be made into a
+Text like "customization group `whitespace'" will be made into a
 button.  When clicked, it'll take the user to a Custom buffer
 displaying that customization group.
 
@@ -3938,11 +3955,6 @@ decades, so the documented semantics of this variable has been changed
 to match the behaviour.)
 
 ---
-** New user option 'etags-xref-prefer-current-file'.
-When non-nil, matches for identifiers in the file visited by the
-current buffer will be shown first in the "*xref*" buffer.
-
----
 ** New variable 'inhibit-mouse-event-check'.
 If bound to non-nil, a command with '(interactive "e")' doesn't signal
 an error when invoked by input event that is not a mouse click (e.g.,
@@ -4004,7 +4016,7 @@ to select previous/next frame are still bound to 's-~' and 's-`'.
 
 
 ----------------------------------------------------------------------
-This file is NOT part of GNU Emacs.
+This file is part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

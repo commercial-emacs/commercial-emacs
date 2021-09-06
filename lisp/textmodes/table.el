@@ -6,7 +6,7 @@
 ;; Author: Takaaki Ota <Takaaki.Ota@am.sony.com>
 ;; Created: Sat Jul 08 2000 13:28:45 (PST)
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

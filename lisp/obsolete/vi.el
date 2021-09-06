@@ -3,7 +3,7 @@
 ;; This file is in the public domain because the authors distributed it
 ;; without a copyright notice before the US signed the Bern Convention.
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; Author: Neal Ziring <nz@rsch.wisc.edu>
 ;;	Felix S. T. Wu <wu@crys.wisc.edu>

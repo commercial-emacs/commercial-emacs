@@ -12,7 +12,7 @@
 ;; This is an Elpa :core package. Don't use functionality that is not
 ;; compatible with Emacs 24.1.
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

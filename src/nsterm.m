@@ -3,7 +3,7 @@
 Copyright (C) 1989, 1993-1994, 2005-2006, 2008-2021 Free Software
 Foundation, Inc.
 
-This file is NOT part of GNU Emacs.
+This file is part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
