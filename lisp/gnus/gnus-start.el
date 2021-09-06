@@ -705,6 +705,9 @@ the first newsgroup."
     (kill-buffer buffer))
   ;; Clear the dribble buffer.
   (gnus-dribble-clear)
+  ;; Reset the level when Gnus is restarted.
+  (when (numberp gnus-group-use-permanent-levels)
+    (setq gnus-group-use-permanent-levels t))
   ;; Kill global KILL file buffer.
   (when (get-file-buffer (gnus-newsgroup-kill-file nil))
     (kill-buffer (get-file-buffer (gnus-newsgroup-kill-file nil))))
