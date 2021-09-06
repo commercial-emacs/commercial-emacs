@@ -9,9 +9,10 @@
 ### Why?
 
 This is the oft ideated, never sublimated "forge" repository for
-emacs.  As it is hosted on a site using non-free software, the work
-herein is not the official GNU Emacs code, and just as well since it
-asserts some improvements.
+emacs.  As it is hosted on a site using
+[non-free](https://www.gnu.org/philosophy/categories.en.html)
+software, the work herein is not the official GNU Emacs source, and
+does not entreat the FSF in enforcing its license.
 
 ### What do you mean by "commercial"?
 
@@ -20,9 +21,9 @@ after "NonGNU Elpa" which, like the present endeavor, was created to
 circumvent FSF strictures thereby giving it the procedural latitude to
 compete with MELPA (for attention, obviously, not dollars).  But
 describing something by what it is **not** breaks some basic marketing
-rule.
+rule.  Is an abortion rights opponent pro-life or pro-choice?
 
-### How is the code different thus far?
+### How has the code diverged thus far?
 
 - Gnus is rewritten to be non-blocking.
 - The module `process.c` is rewritten.
@@ -43,8 +44,8 @@ they're generally:
 2. Imprecise
 3. Lacking a minimum reproducible example
 
-Conversely, a bug report with a patch is a sure sign that the reporter
-made an effort to understand the problem.
+A bug report accompanied by a patch, on the other hand, is a sure sign
+that the reporter made an effort to understand the problem.
 
 ### How often are you merging commits from GNU?
 
