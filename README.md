@@ -16,10 +16,11 @@ asserts some improvements.
 ### What do you mean by "commercial"?
 
 I would have called this the less invidious-sounding "NonGNU Emacs"
-after "NonGNU Elpa" which was created to circumvent FSF strictures
-thereby giving it the necessary procedural latitude to compete with
-MELPA (for attention, obviously, not dollars).  But describing
-something by what it is **not** breaks some basic marketing rule.
+after "NonGNU Elpa" which, like the present endeavor, was created to
+circumvent FSF strictures thereby giving it the procedural latitude to
+compete with MELPA (for attention, obviously, not dollars).  But
+describing something by what it is **not** breaks some basic marketing
+rule.
 
 ### How is the code different thus far?
 
