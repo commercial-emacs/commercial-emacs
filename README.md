@@ -12,7 +12,7 @@ This is the oft ideated, never sublimated "forge" repository for
 emacs.  As it is hosted on a site using
 [non-free](https://www.gnu.org/philosophy/categories.en.html)
 software, the work herein is not the official GNU Emacs source, and
-does not entreat the FSF in enforcing its license.
+does not entreat the FSF to enforce its license.
 
 ### What do you mean by "commercial"?
 
@@ -50,3 +50,11 @@ that the reporter made an effort to understand the problem.
 ### How often are you merging commits from GNU?
 
 Roughly every ninety minutes.
+
+### Isn't this xemacs all over again?
+
+Ah, but if it could reach those heights.  If by some miracle it did,
+the choices for the FSF are the same as before: enlist RMS to embark
+on a coding frenzy that achieves feature parity, grant myself commit
+rights, or continue not noticing me.  If my history of user
+acquisition is any indication, the last outcome is most likely.
