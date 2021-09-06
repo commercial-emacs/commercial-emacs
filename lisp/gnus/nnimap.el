@@ -26,20 +26,36 @@
 
 ;;; Code:
 
-(eval-when-compile
-  (require 'cl-lib)
-  (require 'subr-x))
-
 (require 'nnheader)
-(require 'gnus-util)
 (require 'gnus)
 (require 'nnoo)
 (require 'netrc)
 (require 'utf7)
 (require 'nnmail)
+(require 'cl-seq)
 
 (autoload 'auth-source-forget+ "auth-source")
 (autoload 'auth-source-search "auth-source")
+
+(declare-function x-server-version "xfns.c" (&optional terminal))
+
+(defmacro nnimap-with-context (buffer &rest body)
+  (declare (indent defun))
+  `(with-current-buffer ,buffer ,@body))
+
+(defmacro nnimap-for-process-buffers (b &rest body)
+  (declare (indent defun))
+  `(cl-flet ((match
+              (buf)
+              (let* ((regex* (mapconcat
+                              #'identity
+                              (mapcar #'regexp-quote
+                                      (split-string nnimap--process-buffer-fmt "%s"))
+                              ".*"))
+                     (regex (format "^%s$" regex*)))
+                (string-match-p regex (buffer-name buf)))))
+     (dolist (,b (seq-filter #'match (gnus-buffers)))
+       ,@body)))
 
 (nnoo-declare nnimap)
 
@@ -123,8 +139,6 @@ expunge ALL articles that are currently flagged as deleted
 Switching this off will make nnimap slower, but it helps with
 some servers.")
 
-(defvoo nnimap-connection-alist nil)
-
 (defvoo nnimap-current-infos nil)
 
 (defvoo nnimap-namespace nil)
@@ -174,7 +188,6 @@ during splitting, which may be slow."
 (defvar nnimap-status-string "")
 
 (defvar nnimap-keepalive-timer nil)
-(defvar nnimap-process-buffers nil)
 
 (cl-defstruct nnimap
   group process commands capabilities select-result newlinep server
@@ -199,10 +212,29 @@ during splitting, which may be slow."
 
 (defvar nnimap-inhibit-logging nil)
 
+(defconst nnimap--process-buffer-fmt " *nnimap %s*")
+
+(defun nnimap-assert-context (&optional dont-assert)
+  (let ((result (cl-every (lambda (v) (and (boundp v) v))
+                          '(nnimap-address nnimap-server-port))))
+    (prog1 result
+      (unless dont-assert
+        (cl-assert result)))))
+
+(defsubst nnimap-process-buffer-key ()
+  (nnimap-assert-context)
+  (format nnimap--process-buffer-fmt
+          (mapconcat (apply-partially #'format "%s")
+                     (list
+                      (nnoo-current-server 'nnimap)
+                      nnimap-address
+                      nnimap-server-port)
+                     " ")))
+
 (defun nnimap-group-to-imap (group)
   "Convert Gnus group name to IMAP mailbox name."
-  (let* ((inbox (if nnimap-namespace
-                    (substring nnimap-namespace 0 -1) nil)))
+  (let ((inbox (when nnimap-namespace
+                 (substring nnimap-namespace 0 -1))))
     (utf7-encode
      (cond ((or (not inbox)
                 (string-equal group inbox))
@@ -210,10 +242,13 @@ during splitting, which may be slow."
            ((string-prefix-p "#" group)
             (substring group 1))
            (t
-            (concat nnimap-namespace group))) t)))
+            (concat nnimap-namespace group)))
+     t)))
 
-(defun nnimap-buffer ()
-  (nnimap-find-process-buffer nntp-server-buffer))
+(defalias 'nnimap-buffer #'nnimap-process-buffer)
+(defun nnimap-process-buffer ()
+
+  (nnimap-get-process-buffer (nnimap-process-buffer-key)))
 
 (defun nnimap-header-parameters ()
   (let (params)
@@ -233,10 +268,10 @@ during splitting, which may be slow."
     (format "%s" (nreverse params))))
 
 (deffoo nnimap-retrieve-headers (articles &optional group server _fetch-old)
-  (with-current-buffer nntp-server-buffer
+  (nnimap-with-context nntp-server-buffer
     (erase-buffer)
     (when (nnimap-change-group group server)
-      (with-current-buffer (nnimap-buffer)
+      (with-current-buffer (nnimap-process-buffer)
 	(erase-buffer)
 	(nnimap-wait-for-response
 	 (nnimap-send-command
@@ -248,8 +283,7 @@ during splitting, which may be slow."
 	  (error "Server closed connection"))
 	(nnimap-transform-headers)
 	(nnheader-remove-cr-followed-by-lf))
-      (insert-buffer-substring
-       (nnimap-find-process-buffer (current-buffer))))
+      (insert-buffer-substring (nnimap-process-buffer)))
     'headers))
 
 (defun nnimap-transform-headers ()
@@ -366,32 +400,35 @@ during splitting, which may be slow."
 	 result))
       (mapconcat #'identity (nreverse result) ",")))))
 
-(deffoo nnimap-open-server (server &optional defs no-reconnect)
-  (if (nnimap-server-opened server)
-      t
-    (unless (assq 'nnimap-address defs)
-      (setq defs (append defs (list (list 'nnimap-address server)))))
-    (nnoo-change-server 'nnimap server defs)
-    (if no-reconnect
-	(nnimap-find-connection nntp-server-buffer)
-      (or (nnimap-find-connection nntp-server-buffer)
-	  (nnimap-open-connection nntp-server-buffer)))))
+(deffoo nnimap-open-server (server &optional defs _no-reconnect)
+  "Context switch based on SERVER.
 
-(defun nnimap-make-process-buffer (buffer)
-  (with-current-buffer
-      (generate-new-buffer (format " *nnimap %s %s %s*"
-				   nnimap-address nnimap-server-port
-                                   buffer))
-    (mm-disable-multibyte)
-    (buffer-disable-undo)
-    (gnus-add-buffer)
-    (setq-local after-change-functions nil) ;FIXME: Why?
-    (setq-local nnimap-object
-                (make-nnimap :server (nnoo-current-server 'nnimap)
-                             :initial-resync 0))
-    (push (list buffer (current-buffer)) nnimap-connection-alist)
-    (push (current-buffer) nnimap-process-buffers)
-    (current-buffer)))
+If `nnoo-current-server-p' is false for SERVER,
+`nnoo-change-server' replaces the current context in `nnoo-state-alist'
+with DEFS.  And does so for all parent classes of nnimap.
+
+This imagined necessity of a back-line assoc list called `nnoo-state-alist'
+was of course another \"youthful indiscretion.\"  He just had to augment
+the key of the front-line assoc list to incorporate SERVER."
+  (nnoo-change-server 'nnimap server defs)
+  (nnimap-server-opened server))
+
+(defun nnimap-make-process-buffer (server process-buffer-key)
+  (nnimap-assert-context)
+  (let ((nnimap-vars (cl-remove-if-not
+                      (lambda (entry)
+                        (zerop (or (cl-search "nnimap-" (symbol-name (car entry)))
+                                   -1)))
+                      (buffer-local-variables))))
+    (with-current-buffer (get-buffer-create process-buffer-key t)
+      (prog1 (current-buffer)
+        (mm-disable-multibyte)
+        (buffer-disable-undo)
+        (gnus-add-buffer)
+        (cl-assert (null after-change-functions))
+        (mapc (lambda (v) (set (make-local-variable (car v)) (cdr v))) nnimap-vars)
+        (setq-local nnimap-object (make-nnimap :server server
+                                               :initial-resync 0))))))
 
 (defvar auth-source-creation-prompts)
 
@@ -418,173 +455,172 @@ during splitting, which may be slow."
   (let ((now (current-time))
         ;; Set this so we don't wait for a response.
         (nnimap-streaming t))
-    (dolist (buffer nnimap-process-buffers)
-      (when (buffer-live-p buffer)
-	(with-current-buffer buffer
-	  (when (and nnimap-object
-		     (nnimap-last-command-time nnimap-object)
-		     (time-less-p
-		      (cdr nnimap-keepalive-intervals)
-		      (time-subtract
-		       now
-		       (nnimap-last-command-time nnimap-object))))
-            (with-local-quit
-              (ignore-errors          ;E.g. "buffer foo has no process".
-                (nnimap-send-command "NOOP")))))))))
+    (nnimap-for-process-buffers buffer
+      (with-current-buffer buffer
+	(when (and nnimap-object
+		   (nnimap-last-command-time nnimap-object)
+		   (time-less-p
+		    (cdr nnimap-keepalive-intervals)
+		    (time-subtract
+		     now
+		     (nnimap-last-command-time nnimap-object))))
+          (with-local-quit
+            (ignore-errors (nnimap-send-command "NOOP"))))))))
 
-(defun nnimap-open-connection (buffer)
-  ;; Be backwards-compatible -- the earlier value of nnimap-stream was
-  ;; `ssl' when nnimap-server-port was nil.  Sort of.
+(defun nnimap-open-connection (process-buffer-key)
+  (nnimap-assert-context)
   (when (and nnimap-server-port
 	     (eq nnimap-stream 'undecided))
     (setq nnimap-stream 'ssl))
   (let ((stream
 	 (if (eq nnimap-stream 'undecided)
 	     (cl-loop for type in '(ssl network)
-		   for stream = (let ((nnimap-stream type))
-				  (nnimap-open-connection-1 buffer))
-		   while (eq stream 'no-connect)
-		   finally (return stream))
-	   (nnimap-open-connection-1 buffer))))
-    (if (eq stream 'no-connect)
-	nil
+		      for stream = (let ((nnimap-stream type))
+				     (nnimap-open-connection-1 process-buffer-key))
+		      while (eq stream 'no-connect)
+		      finally (return stream))
+	   (nnimap-open-connection-1 process-buffer-key))))
+    (unless (eq stream 'no-connect)
       stream)))
 
-;; This is only needed for Windows XP or earlier
-(defun nnimap-map-port (port)
-  (declare-function x-server-version "xfns.c" (&optional terminal))
-  (if (and (eq system-type 'windows-nt)
-           (<= (car (x-server-version)) 5)
-           (equal port "imaps"))
-      "993"
-    port))
-
-(defun nnimap-open-connection-1 (buffer)
-  (unless (or nnimap-keepalive-timer
-              (null nnimap-keepalive-intervals))
-    (setq nnimap-keepalive-timer (run-at-time
-                                  (car nnimap-keepalive-intervals)
-                                  (car nnimap-keepalive-intervals)
-				  #'nnimap-keepalive)))
-  (with-current-buffer (nnimap-make-process-buffer buffer)
+(defun nnimap-open-connection-1 (process-buffer-key)
+  (nnimap-assert-context)
+  (setq nnimap-keepalive-timer
+        (or nnimap-keepalive-timer
+            (when nnimap-keepalive-intervals
+              (run-at-time
+               (car nnimap-keepalive-intervals)
+               (car nnimap-keepalive-intervals)
+	       #'nnimap-keepalive))))
+  ;; Assert commit f33a5dc no longer necessary
+  (when (eq system-type 'windows-nt)
+    (cl-assert (> (car (x-server-version)) 5)))
+  (with-current-buffer
+      (nnimap-make-process-buffer
+       (nnoo-current-server 'nnimap)
+       process-buffer-key)
     (let* ((coding-system-for-read 'binary)
 	   (coding-system-for-write 'binary)
 	   (ports
-	    (cond
-	     ((memq nnimap-stream '(network plain starttls))
-	      (nnheader-message 7 "Opening connection to %s..."
-				nnimap-address)
-	      '("imap" "143"))
-	     ((eq nnimap-stream 'shell)
-	      (nnheader-message 7 "Opening connection to %s via shell..."
-				nnimap-address)
-	      '("imap"))
-	     ((memq nnimap-stream '(ssl tls))
-	      (nnheader-message 7 "Opening connection to %s via tls..."
-				nnimap-address)
-	      '("imaps" "imap" "993" "143"))
-	     (t
-	      (error "Unknown stream type: %s" nnimap-stream))))
-           login-result credentials)
-      (when nnimap-server-port
-	(push nnimap-server-port ports))
-      (let* ((stream-list
-	      (open-network-stream
-	       "*nnimap*" (current-buffer) nnimap-address
-	       (nnimap-map-port (car ports))
-	       :type nnimap-stream
-	       :warn-unless-encrypted t
-	       :return-list t
-	       :shell-command nnimap-shell-program
-	       :capability-command "1 CAPABILITY\r\n"
-               :always-query-capabilities t
-	       :end-of-command "\r\n"
-	       :success " OK "
-	       :starttls-function
-	       (lambda (capabilities)
-		 (when (string-match-p "STARTTLS" capabilities)
-		   "1 STARTTLS\r\n"))))
-	     (stream (car stream-list))
-	     (props (cdr stream-list))
-	     (greeting (plist-get props :greeting))
-	     (capabilities (plist-get props :capabilities))
-	     (stream-type (plist-get props :type))
-             (server (nnoo-current-server 'nnimap)))
-	(when (and stream (not (memq (process-status stream) '(open run))))
-	  (setq stream nil))
+            `(,@(when nnimap-server-port (list nnimap-server-port))
+              ,@(cl-remove-if
+                 (apply-partially #'equal nnimap-server-port)
+                 (cond
+	          ((memq nnimap-stream '(network plain starttls))
+	           (nnheader-message 7 "Opening connection to %s..."
+			             nnimap-address)
+	           '("imap" 143))
+	          ((eq nnimap-stream 'shell)
+	           (nnheader-message 7 "Opening connection to %s via shell..."
+			             nnimap-address)
+	           '("imap"))
+	          ((memq nnimap-stream '(ssl tls))
+	           (nnheader-message 7 "Opening connection to %s via tls..."
+			             nnimap-address)
+	           '("imaps" "imap" 993 143))
+	          (t
+	           (error "Unknown stream type: %s" nnimap-stream))))))
+           login-result
+           credentials
+           (stream-list
+	    (open-network-stream
+             (let ((muffs "[ \t\n\r*]+"))
+	       (string-trim process-buffer-key muffs muffs))
+             (current-buffer)
+             nnimap-address
+             (car ports)
+	     :type nnimap-stream
+	     :warn-unless-encrypted t
+	     :return-list t
+	     :shell-command nnimap-shell-program
+	     :capability-command "1 CAPABILITY\r\n"
+             :always-query-capabilities t
+	     :end-of-command "\r\n"
+	     :success " OK "
+	     :starttls-function
+	     (lambda (capabilities)
+	       (when (string-match-p "STARTTLS" capabilities)
+		 "1 STARTTLS\r\n"))))
+	   (stream (car stream-list))
+	   (props (cdr stream-list))
+	   (greeting (plist-get props :greeting))
+	   (capabilities (plist-get props :capabilities))
+	   (stream-type (plist-get props :type))
+           (server (nnoo-current-server 'nnimap)))
+      (when (and stream (not (memq (process-status stream) '(open run))))
+	(setq stream nil))
 
-        (when (eq (process-type stream) 'network)
-          ;; Use TCP-keepalive so that connections that pass through a NAT
-          ;; router don't hang when left idle.
-          (set-network-process-option stream :keepalive t))
+      (when (eq (process-type stream) 'network)
+        ;; Use TCP-keepalive so that connections that pass through a NAT
+        ;; router don't hang when left idle.
+        (set-network-process-option stream :keepalive t))
 
-	(setf (nnimap-process nnimap-object) stream)
-	(setf (nnimap-stream-type nnimap-object) stream-type)
-	(if (not stream)
-	    (progn
-	      (nnheader-report 'nnimap "Unable to contact %s:%s via %s"
-			       nnimap-address (car ports) nnimap-stream)
-	      'no-connect)
-	  (set-process-query-on-exit-flag stream nil)
-	  (if (not (string-match-p "[*.] \\(OK\\|PREAUTH\\)" greeting))
-	      (nnheader-report 'nnimap "%s" greeting)
-	    ;; Store the greeting (for debugging purposes).
-	    (setf (nnimap-greeting nnimap-object) greeting)
-	    (setf (nnimap-capabilities nnimap-object)
-		  (mapcar #'upcase
-			  (split-string capabilities)))
-	    (unless (string-match-p "[*.] PREAUTH" greeting)
-	      (if (not (setq credentials
-			     (if (eq nnimap-authenticator 'anonymous)
-				 (list "anonymous"
-				       (message-make-address))
-                               ;; Look for the credentials based on
-                               ;; the virtual server name and the address
-                               (nnimap-credentials
-				(gnus-delete-duplicates
-				 (list server nnimap-address))
-                                ports
-                                nnimap-user))))
-		  (setq nnimap-object nil)
-		(let ((nnimap-inhibit-logging t))
-		  (setq login-result
-			(nnimap-login (car credentials) (cadr credentials))))
-		(if (car login-result)
-		    (progn
-		      ;; Save the credentials if a save function exists
-		      ;; (such a function will only be passed if a new
-		      ;; token was created).
-		      (when (functionp (nth 2 credentials))
-			(funcall (nth 2 credentials)))
-		      ;; See if CAPABILITY is set as part of login
-		      ;; response.
-		      (dolist (response (cddr (nnimap-command "CAPABILITY")))
-			(when (string= "CAPABILITY" (upcase (car response)))
-			  (setf (nnimap-capabilities nnimap-object)
-				(mapcar #'upcase (cdr response)))))
-                      (when (and nnimap-use-namespaces
-                                 (nnimap-capability "NAMESPACE"))
-                        (erase-buffer)
-                        (nnimap-wait-for-response (nnimap-send-command "NAMESPACE"))
-                        (let ((response (nnimap-last-response-string)))
-                          (when (string-match
-                                 "^\\*\\W+NAMESPACE\\W+((\"\\([^\"\n]+\\)\"\\W+\"\\(.\\)\"))\\W+"
-                                 response)
-                            (setq nnimap-namespace (match-string 1 response))))))
-                  ;; If the login failed, then forget the credentials
-		  ;; that are now possibly cached.
-		  (dolist (host (list (nnoo-current-server 'nnimap)
-				      nnimap-address))
-		    (dolist (port ports)
-                      (auth-source-forget+ :host host :port port)))
-		  (delete-process (nnimap-process nnimap-object))
-		  (setq nnimap-object nil))))
-	    (when nnimap-object
-	      (when (nnimap-capability "QRESYNC")
-		(nnimap-command "ENABLE QRESYNC"))
-              (nnheader-message 7 "Opening connection to %s...done"
-				nnimap-address)
-	      (nnimap-process nnimap-object))))))))
+      (setf (nnimap-process nnimap-object) stream)
+      (setf (nnimap-stream-type nnimap-object) stream-type)
+      (if (not stream)
+	  (prog1 'no-connect
+	    (nnheader-report 'nnimap "Unable to contact %s:%s via %s"
+			     nnimap-address (car ports) nnimap-stream))
+	(set-process-query-on-exit-flag stream nil)
+        (set-process-thread stream nil)
+	(if (not (string-match-p "[*.] \\(OK\\|PREAUTH\\)" greeting))
+	    (nnheader-report 'nnimap "%s" greeting)
+	  (setf (nnimap-greeting nnimap-object) greeting)
+	  (setf (nnimap-capabilities nnimap-object)
+		(mapcar #'upcase
+			(split-string capabilities)))
+	  (unless (string-match-p "[*.] PREAUTH" greeting)
+	    (if (not (setq credentials
+			   (if (eq nnimap-authenticator 'anonymous)
+			       (list "anonymous"
+				     (message-make-address))
+                             ;; Look for the credentials based on
+                             ;; the virtual server name and the address
+                             (nnimap-credentials
+			      (gnus-delete-duplicates
+			       (list server nnimap-address))
+                              ports
+                              nnimap-user))))
+		(setq nnimap-object nil)
+	      (let ((nnimap-inhibit-logging t))
+		(setq login-result
+		      (nnimap-login (car credentials) (cadr credentials))))
+	      (if (car login-result)
+		  (progn
+		    ;; Save the credentials if a save function exists
+		    ;; (such a function will only be passed if a new
+		    ;; token was created).
+		    (when (functionp (nth 2 credentials))
+		      (funcall (nth 2 credentials)))
+		    ;; See if CAPABILITY is set as part of login
+		    ;; response.
+		    (dolist (response (cddr (nnimap-command "CAPABILITY")))
+		      (when (string= "CAPABILITY" (upcase (car response)))
+			(setf (nnimap-capabilities nnimap-object)
+			      (mapcar #'upcase (cdr response)))))
+                    (when (and nnimap-use-namespaces
+                               (nnimap-capability "NAMESPACE"))
+                      (erase-buffer)
+                      (nnimap-wait-for-response (nnimap-send-command "NAMESPACE"))
+                      (let ((response (nnimap-last-response-string)))
+                        (when (string-match
+                               "^\\*\\W+NAMESPACE\\W+((\"\\([^\"\n]+\\)\"\\W+\"\\(.\\)\"))\\W+"
+                               response)
+                          (setq nnimap-namespace (match-string 1 response))))))
+                ;; If the login failed, then forget the credentials
+		;; that are now possibly cached.
+		(dolist (host (list (nnoo-current-server 'nnimap)
+				    nnimap-address))
+		  (dolist (port ports)
+                    (auth-source-forget+ :host host :port port)))
+		(delete-process (nnimap-process nnimap-object))
+		(setq nnimap-object nil))))
+	  (when nnimap-object
+	    (when (nnimap-capability "QRESYNC")
+	      (nnimap-command "ENABLE QRESYNC"))
+            (nnheader-message 7 "Opening connection to %s...done"
+			      nnimap-address)
+	    (nnimap-process nnimap-object)))))))
 
 (autoload 'rfc2104-hash "rfc2104")
 
@@ -663,7 +699,7 @@ during splitting, which may be slow."
 (deffoo nnimap-close-server (&optional server defs)
   (when (nnoo-change-server 'nnimap server defs)
     (ignore-errors
-      (delete-process (get-buffer-process (nnimap-buffer))))
+      (delete-process (get-buffer-process (nnimap-process-buffer))))
     (nnoo-close-server 'nnimap server)
     t))
 
@@ -671,16 +707,13 @@ during splitting, which may be slow."
   t)
 
 (deffoo nnimap-server-opened (&optional server)
-  (and (nnoo-current-server-p 'nnimap server)
-       nntp-server-buffer
-       (gnus-buffer-live-p nntp-server-buffer)
-       (nnimap-find-connection nntp-server-buffer)))
+  (nnoo-current-server-p 'nnimap server))
 
 (deffoo nnimap-status-message (&optional _server)
   nnimap-status-string)
 
 (deffoo nnimap-request-article (article &optional group server to-buffer)
-  (with-current-buffer nntp-server-buffer
+  (nnimap-with-context nntp-server-buffer
     (let ((result (nnimap-change-group group server))
 	  parts structure)
       (when (stringp article)
@@ -688,7 +721,7 @@ during splitting, which may be slow."
       (when (and result
 		 article)
 	(erase-buffer)
-	(with-current-buffer (nnimap-buffer)
+	(with-current-buffer (nnimap-process-buffer)
 	  (erase-buffer)
 	  (when nnimap-fetch-partial-articles
 	    (nnimap-command "UID FETCH %d (BODYSTRUCTURE)" article)
@@ -712,7 +745,7 @@ during splitting, which may be slow."
 
 (deffoo nnimap-request-head (article &optional group server to-buffer)
   (when (nnimap-change-group group server)
-    (with-current-buffer (nnimap-buffer)
+    (with-current-buffer (nnimap-process-buffer)
       (when (stringp article)
 	(setq article (nnimap-find-article-by-message-id group server article)))
       (if (null article)
@@ -728,11 +761,11 @@ during splitting, which may be slow."
 	    (cons group article)))))))
 
 (deffoo nnimap-request-articles (articles &optional group server)
-  (with-current-buffer nntp-server-buffer
+  (nnimap-with-context nntp-server-buffer
     (let ((result (nnimap-change-group group server)))
       (when result
 	(erase-buffer)
-	(with-current-buffer (nnimap-buffer)
+	(with-current-buffer (nnimap-process-buffer)
 	  (erase-buffer)
 	  (when (nnimap-command
 		 (if (nnimap-ver4-p)
@@ -740,7 +773,7 @@ during splitting, which may be slow."
 		   "UID FETCH %s RFC822.PEEK")
 		 (nnimap-article-ranges (gnus-compress-sequence articles)))
 	    (let ((buffer (current-buffer)))
-	      (with-current-buffer nntp-server-buffer
+	      (nnimap-with-context nntp-server-buffer
 		(nnheader-insert-buffer-substring buffer)
 		(nnheader-ms-strip-cr)))
 	    t))))))
@@ -880,14 +913,13 @@ during splitting, which may be slow."
   (let ((result (nnimap-change-group
 		 ;; Don't SELECT the group if we're going to select it
 		 ;; later, anyway.
-		 (if (and (not dont-check)
-			  (assoc group nnimap-current-infos))
-		     nil
+		 (when (or dont-check
+			   (not (assoc group nnimap-current-infos)))
 		   group)
 		 server))
 	(info (when info (list info)))
 	active)
-    (with-current-buffer nntp-server-buffer
+    (nnimap-with-context nntp-server-buffer
       (when result
 	(when (or (not dont-check)
 		  (not (setq active
@@ -909,7 +941,7 @@ during splitting, which may be slow."
 (deffoo nnimap-request-group-scan (group &optional server info)
   (when (nnimap-change-group nil server)
     (let (marks high low)
-      (with-current-buffer (nnimap-buffer)
+      (with-current-buffer (nnimap-process-buffer)
 	(erase-buffer)
 	(let ((group-sequence
 	       (nnimap-send-command "SELECT %S" (nnimap-group-to-imap group)))
@@ -933,7 +965,7 @@ during splitting, which may be slow."
 			     (nth 3 (car marks)))
 			   0)
 		  low (or (nth 4 (car marks)) uidnext 1)))))
-      (with-current-buffer nntp-server-buffer
+      (nnimap-with-context nntp-server-buffer
 	(erase-buffer)
 	(insert
 	 (format
@@ -943,17 +975,17 @@ during splitting, which may be slow."
 
 (deffoo nnimap-request-create-group (group &optional server _args)
   (when (nnimap-change-group nil server)
-    (with-current-buffer (nnimap-buffer)
+    (with-current-buffer (nnimap-process-buffer)
       (car (nnimap-command "CREATE %S" (nnimap-group-to-imap group))))))
 
 (deffoo nnimap-request-delete-group (group &optional _force server)
   (when (nnimap-change-group nil server)
-    (with-current-buffer (nnimap-buffer)
+    (with-current-buffer (nnimap-process-buffer)
       (car (nnimap-command "DELETE %S" (nnimap-group-to-imap group))))))
 
 (deffoo nnimap-request-rename-group (group new-name &optional server)
   (when (nnimap-change-group nil server)
-    (with-current-buffer (nnimap-buffer)
+    (with-current-buffer (nnimap-process-buffer)
       (nnimap-unselect-group)
       (car (nnimap-command "RENAME %S %S"
 			   (nnimap-group-to-imap group) (nnimap-group-to-imap new-name))))))
@@ -967,13 +999,13 @@ during splitting, which may be slow."
 
 (deffoo nnimap-request-expunge-group (group &optional server)
   (when (nnimap-change-group group server)
-    (with-current-buffer (nnimap-buffer)
+    (with-current-buffer (nnimap-process-buffer)
       (car (nnimap-command "EXPUNGE")))))
 
 (defun nnimap-get-flags (spec)
   (let ((articles nil)
 	elems end)
-    (with-current-buffer (nnimap-buffer)
+    (with-current-buffer (nnimap-process-buffer)
       (erase-buffer)
       (nnimap-wait-for-response (nnimap-send-command
 				 "UID FETCH %s FLAGS" spec))
@@ -991,7 +1023,7 @@ during splitting, which may be slow."
 (deffoo nnimap-close-group (_group &optional server)
   (when (eq nnimap-expunge 'on-exit)
     (nnoo-change-server 'nnimap server nil)
-    (with-current-buffer (nnimap-buffer)
+    (with-current-buffer (nnimap-process-buffer)
       (nnimap-command "EXPUNGE"))))
 
 (deffoo nnimap-request-move-article (article group server accept-form
@@ -1007,7 +1039,7 @@ during splitting, which may be slow."
       ;; easy way.
       (let ((message-id (message-field-value "message-id")))
 	(if internal-move-group
-            (with-current-buffer (nnimap-buffer)
+            (with-current-buffer (nnimap-process-buffer)
               (let* ((can-move (and (nnimap-capability "MOVE")
 				    (equal (nnimap-quirk "MOVE") "MOVE")))
 		     (command (if can-move
@@ -1074,7 +1106,7 @@ during splitting, which may be slow."
 			      (gnus-server-to-method
 			       (format "nnimap:%s" server))))
       (and (nnimap-change-group group server)
-	   (with-current-buffer (nnimap-buffer)
+	   (with-current-buffer (nnimap-process-buffer)
 	     (nnheader-message 7 "Expiring articles from %s: %s" group articles)
              (let ((can-move (and (nnimap-capability "MOVE")
 				  (equal (nnimap-quirk "MOVE") "MOVE"))))
@@ -1119,7 +1151,7 @@ during splitting, which may be slow."
 (defun nnimap-find-expired-articles (group)
   (let ((cutoff (nnmail-expired-article-p group nil nil)))
     (when cutoff
-      (with-current-buffer (nnimap-buffer)
+      (with-current-buffer (nnimap-process-buffer)
 	(let ((result
 	       (nnimap-command
 		"UID SEARCH SENTBEFORE %s"
@@ -1133,7 +1165,7 @@ during splitting, which may be slow."
 						&optional limit)
   "Search for message with MESSAGE-ID in GROUP from SERVER.
 If LIMIT, first try to limit the search to the N last articles."
-  (with-current-buffer (nnimap-buffer)
+  (with-current-buffer (nnimap-process-buffer)
     (erase-buffer)
     (let* ((change-group-result (nnimap-change-group group server nil t))
            (number-of-article
@@ -1163,7 +1195,7 @@ If LIMIT, first try to limit the search to the N last articles."
 
 (defun nnimap-delete-article (articles)
   "Delete ARTICLES."
-  (with-current-buffer (nnimap-buffer)
+  (with-current-buffer (nnimap-process-buffer)
     (nnimap-command "UID STORE %s +FLAGS.SILENT (\\Deleted)"
 		    (nnimap-article-ranges articles))
     (cond
@@ -1215,13 +1247,13 @@ If LIMIT, first try to limit the search to the N last articles."
 		    '((subscribe "SUBSCRIBE")
 		      (unsubscribe "UNSUBSCRIBE")))))
       (when command
-	(with-current-buffer (nnimap-buffer)
+	(with-current-buffer (nnimap-process-buffer)
 	  (nnimap-command "%s %S" (cadr command) (nnimap-group-to-imap group)))))))
 
 (deffoo nnimap-request-set-mark (group actions &optional server)
   (when (nnimap-change-group group server)
     (let (sequence)
-      (with-current-buffer (nnimap-buffer)
+      (with-current-buffer (nnimap-process-buffer)
 	(erase-buffer)
 	;; Just send all the STORE commands without waiting for
 	;; response.  If they're successful, they're successful.
@@ -1266,7 +1298,7 @@ If LIMIT, first try to limit the search to the N last articles."
 	  sequence message)
       (nnimap-add-cr)
       (setq message (buffer-substring-no-properties (point-min) (point-max)))
-      (with-current-buffer (nnimap-buffer)
+      (with-current-buffer (nnimap-process-buffer)
 	(when (setq message (or (nnimap-process-quirk "OK Gimap " 'append message)
 				message))
 	  ;; If we have this group open read-only, then unselect it
@@ -1399,14 +1431,14 @@ If LIMIT, first try to limit the search to the N last articles."
 
 (deffoo nnimap-request-list (&optional server)
   (when (nnimap-change-group nil server)
-    (with-current-buffer nntp-server-buffer
+    (nnimap-with-context nntp-server-buffer
       (erase-buffer)
       (let ((groups
-	     (with-current-buffer (nnimap-buffer)
+	     (with-current-buffer (nnimap-process-buffer)
 	       (nnimap-get-groups)))
 	    sequences responses)
 	(when groups
-	  (with-current-buffer (nnimap-buffer)
+	  (with-current-buffer (nnimap-process-buffer)
 	    (setf (nnimap-group nnimap-object) nil)
 	    (dolist (group groups)
 	      (setf (nnimap-examined nnimap-object) group)
@@ -1445,9 +1477,9 @@ If LIMIT, first try to limit the search to the N last articles."
 
 (deffoo nnimap-request-newgroups (_date &optional server)
   (when (nnimap-change-group nil server)
-    (with-current-buffer nntp-server-buffer
+    (nnimap-with-context nntp-server-buffer
       (erase-buffer)
-      (dolist (group (with-current-buffer (nnimap-buffer)
+      (dolist (group (with-current-buffer (nnimap-process-buffer)
 		       (nnimap-get-groups)))
 	(unless (assoc group nnimap-current-infos)
 	  ;; Insert dummy numbers here -- they don't matter.
@@ -1455,9 +1487,8 @@ If LIMIT, first try to limit the search to the N last articles."
       t)))
 
 (deffoo nnimap-retrieve-group-data-early (server infos)
-  (when (and (nnimap-change-group nil server)
-	     infos)
-    (with-current-buffer (nnimap-buffer)
+  (when (nnimap-change-group nil server)
+    (with-current-buffer (nnimap-process-buffer)
       (erase-buffer)
       (setf (nnimap-group nnimap-object) nil)
       (setf (nnimap-initial-resync nnimap-object) 0)
@@ -1523,10 +1554,10 @@ If LIMIT, first try to limit the search to the N last articles."
   (when (and sequences
 	     (nnimap-change-group nil server t)
 	     ;; Check that the process is still alive.
-	     (get-buffer-process (nnimap-buffer))
-	     (memq (process-status (get-buffer-process (nnimap-buffer)))
+	     (get-buffer-process (nnimap-process-buffer))
+	     (memq (process-status (get-buffer-process (nnimap-process-buffer)))
 		   '(open run)))
-    (with-current-buffer (nnimap-buffer)
+    (with-current-buffer (nnimap-process-buffer)
       ;; Wait for the final data to trickle in.
       (when (nnimap-wait-for-response (if (eq (cadar sequences) 'qresync)
 					  (caar sequences)
@@ -1542,7 +1573,7 @@ If LIMIT, first try to limit the search to the N last articles."
 	(unless dont-insert
 	  ;; Finally, just return something resembling an active file in
 	  ;; the nntp buffer, so that the agent can save the info, too.
-	  (with-current-buffer nntp-server-buffer
+	  (nnimap-with-context nntp-server-buffer
 	    (erase-buffer)
 	    (dolist (info infos)
 	      (let* ((group (gnus-info-group info))
@@ -1877,8 +1908,20 @@ If LIMIT, first try to limit the search to the N last articles."
 	  (setq articles nil))))
     groups))
 
-(defun nnimap-find-process-buffer (buffer)
-  (cadr (assoc buffer nnimap-connection-alist)))
+(defun nnimap-get-process-buffer (process-buffer-key)
+  (cl-flet ((get
+             (key)
+             (cl-find-if (lambda (b)
+                           (equal key (buffer-name b)))
+                         (gnus-buffers))))
+    (let ((extant (get process-buffer-key)))
+      (when (and extant (not (get-buffer-process extant)))
+        (gnus-kill-buffer extant)
+        (setq extant nil))
+      (or extant
+          (progn (nnimap-open-connection process-buffer-key)
+                 (get process-buffer-key))
+          (error "Cannot connect to %s" process-buffer-key)))))
 
 (deffoo nnimap-request-post (&optional _server)
   (setq nnimap-status-string "Read-only server")
@@ -1895,7 +1938,7 @@ If LIMIT, first try to limit the search to the N last articles."
       (nnselect-search-thread header)
     (when (nnimap-change-group group server)
       (let* ((cmd (nnimap-make-thread-query header))
-             (result (with-current-buffer (nnimap-buffer)
+             (result (with-current-buffer (nnimap-process-buffer)
                        (nnimap-command  "UID SEARCH %s" cmd))))
         (when result
           (gnus-fetch-headers
@@ -1922,7 +1965,7 @@ Return the server's response to the SELECT or EXAMINE command."
      ((not group)
       t)
      (t
-      (with-current-buffer (nnimap-buffer)
+      (with-current-buffer (nnimap-process-buffer)
         (let ((result (nnimap-command "%s %S"
                                       (if read-only
                                           "EXAMINE"
@@ -1933,17 +1976,18 @@ Return the server's response to the SELECT or EXAMINE command."
                   (nnimap-select-result nnimap-object) result)
             result)))))))
 
-(defun nnimap-find-connection (buffer)
-  "Find the connection delivering to BUFFER."
-  (let ((entry (assoc buffer nnimap-connection-alist)))
-    (when entry
-      (if (and (buffer-live-p (cadr entry))
-	       (get-buffer-process (cadr entry))
-	       (memq (process-status (get-buffer-process (cadr entry)))
-		     '(open run)))
-	  (get-buffer-process (cadr entry))
-	(setq nnimap-connection-alist (delq entry nnimap-connection-alist))
-	nil))))
+(defun nnimap-find-connection (_buffer)
+  "Find the connection delivering to BUFFER.
+Confusingly, BUFFER will always be `nntp-server-buffer', i.e.,\" *nntpd*\",
+so `nnimap-connection-alist' will usually be of length 1, and look like,
+\((#<buffer  *nntpd*> #<buffer  *nnimap localhost 143  *nntpd**-XXXXXX>))
+
+Multiplexing of different imap servers is made possible because
+`nnoo-change-server' deftly swaps out this associative pair with the
+current imap source (only the XXXXXX string changes).
+
+This is all changing."
+  (cl-assert nil))
 
 ;; Leave room for `open-network-stream' to issue a couple of IMAP
 ;; commands before nnimap starts.
@@ -2019,8 +2063,8 @@ Return the server's response to the SELECT or EXAMINE command."
 	 (match-string 1))))
 
 (defun nnimap-wait-for-response (sequence &optional messagep)
-  (let ((process (get-buffer-process (current-buffer)))
-	openp)
+  (let (openp
+        (process (get-buffer-process (current-buffer))))
     (condition-case nil
         (progn
 	  (goto-char (point-max))
@@ -2147,7 +2191,7 @@ Return the server's response to the SELECT or EXAMINE command."
    t))
 
 (defun nnimap-split-incoming-mail ()
-  (with-current-buffer (nnimap-buffer)
+  (with-current-buffer (nnimap-process-buffer)
     (let ((nnimap-incoming-split-list nil)
 	  (nnmail-split-methods
 	   (cond

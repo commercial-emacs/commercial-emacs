@@ -31,7 +31,6 @@
 (require 'nnmail)
 (require 'message)
 (require 'mm-util)
-(require 'gnus-util)
 (require 'time-date)
 (require 'rfc2231)
 (require 'mm-url)

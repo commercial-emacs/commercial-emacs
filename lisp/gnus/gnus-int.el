@@ -33,6 +33,11 @@
 (autoload 'gnus-agent-regenerate-group "gnus-agent")
 (autoload 'gnus-agent-read-servers-validate-native "gnus-agent")
 (autoload 'gnus-agent-possibly-synchronize-flags-server "gnus-agent")
+(autoload 'gnus-agent-unfetch-articles "gnus-agent")
+(autoload 'gnus-summary-select-article "gnus-sum")
+(autoload 'gnus-summary-insert-subject "gnus-sum")
+(autoload 'gnus-summary-setup-buffer "gnus-sum")
+(autoload 'gnus-summary-read-group-1 "gnus-sum")
 
 (defcustom gnus-open-server-hook nil
   "Hook called just before opening connection to the news server."
@@ -84,7 +89,7 @@ server denied."
            (if (stringp command-method)
                (gnus-server-to-method command-method)
              command-method)))
-      (funcall (inline (gnus-get-function gnus-command-method 'server-opened))
+      (funcall (gnus-get-function gnus-command-method 'server-opened)
                (nth 1 gnus-command-method)))))
 
 (defun gnus-status-message (command-method)
@@ -105,73 +110,69 @@ The method this group uses will be queried."
 (defun gnus-start-news-server (&optional confirm)
   "Open a method for getting news.
 If CONFIRM is non-nil, the user will be asked for an NNTP server."
-  (let (how)
-    (if gnus-current-select-method
-	;; Stream is already opened.
-	nil
-      ;; Open NNTP server.
-      (when confirm
-	;; Read server name with completion.
-	(setq gnus-nntp-server
-	      (gnus-completing-read "NNTP server"
-                                    (cons gnus-nntp-server
-					  (if (boundp 'gnus-secondary-servers)
-					      gnus-secondary-servers))
-                                    nil gnus-nntp-server)))
+  (unless gnus-current-select-method
+    (when confirm
+      ;; Read server name with completion.
+      (setq gnus-nntp-server
+            (gnus-completing-read "NNTP server"
+                                  (cons gnus-nntp-server
+                                        (if (boundp 'gnus-secondary-servers)
+                                            gnus-secondary-servers))
+                                  nil gnus-nntp-server)))
+    (when (and (stringp gnus-nntp-server)
+               (not (zerop (length gnus-nntp-server))))
+      ;; this will also assign the obsolete variable `gnus-select-method'
+      (custom-set-variables
+       `(gnus-select-methods
+         (quote (,(cond ((string= gnus-nntp-server "::")
+                         (list 'nnspool (system-name)))
+                        ((string-match "^:" gnus-nntp-server)
+                         (list 'nnmh gnus-nntp-server
+                               (list 'nnmh-directory
+                                     (file-name-as-directory
+                                      (expand-file-name
+                                       (substring gnus-nntp-server 1) "~/")))
+                               (list 'nnmh-get-new-mail nil)))
+                        (t
+                         (list 'nntp gnus-nntp-server))))))))
+    (setq gnus-current-select-method gnus-select-method)
+    (cl-case (car gnus-select-method)
+      ('nnspool
+       (require 'nnspool)
+       (gnus-message 5 "Looking up local news spool..."))
+      ('nnmh
+       (require 'nnmh)
+       (gnus-message 5 "Looking up mh spool..."))
+      (t
+       (require 'nntp)))
+    (gnus-run-hooks 'gnus-open-server-hook)
 
-      (when (and gnus-nntp-server
-		 (stringp gnus-nntp-server)
-		 (not (string= gnus-nntp-server "")))
-	(setq gnus-select-method
-	      (cond ((or (string= gnus-nntp-server "")
-			 (string= gnus-nntp-server "::"))
-		     (list 'nnspool (system-name)))
-		    ((string-match "^:" gnus-nntp-server)
-		     (list 'nnmh gnus-nntp-server
-			   (list 'nnmh-directory
-				 (file-name-as-directory
-				  (expand-file-name
-				   (substring gnus-nntp-server 1) "~/")))
-			   (list 'nnmh-get-new-mail nil)))
-		    (t
-		     (list 'nntp gnus-nntp-server)))))
+    ;; Partially validate agent covered methods now that the
+    ;; gnus-select-method is known.
 
-      (setq how (car gnus-select-method))
-      (cond
-       ((eq how 'nnspool)
-	(require 'nnspool)
-	(gnus-message 5 "Looking up local news spool..."))
-       ((eq how 'nnmh)
-	(require 'nnmh)
-	(gnus-message 5 "Looking up mh spool..."))
-       (t
-	(require 'nntp)))
-      (setq gnus-current-select-method gnus-select-method)
-      (gnus-run-hooks 'gnus-open-server-hook)
+    (if gnus-agent
+        ;; NOTE: This is here for one purpose only.  By validating
+        ;; the current select method, it converts the old 5.10.3,
+        ;; and earlier, format to the current format.  That enables
+        ;; the agent code within gnus-open-server to function
+        ;; correctly.
+        (gnus-agent-read-servers-validate-native gnus-select-method))
 
-      ;; Partially validate agent covered methods now that the
-      ;; gnus-select-method is known.
-
-      (if gnus-agent
-          ;; NOTE: This is here for one purpose only.  By validating
-          ;; the current select method, it converts the old 5.10.3,
-          ;; and earlier, format to the current format.  That enables
-          ;; the agent code within gnus-open-server to function
-          ;; correctly.
-          (gnus-agent-read-servers-validate-native gnus-select-method))
-
-      (or
-       ;; gnus-open-server-hook might have opened it
-       (gnus-server-opened gnus-select-method)
-       (gnus-open-server gnus-select-method)
-       gnus-batch-mode
-       (gnus-y-or-n-p
-	(format-message
-	 "%s (%s) open error: `%s'.  Continue? "
-	 (car gnus-select-method) (cadr gnus-select-method)
-	 (gnus-status-message gnus-select-method)))
-       (gnus-error 1 "Couldn't open server on %s"
-		   (nth 1 gnus-select-method))))))
+    (or
+     ;; gnus-open-server-hook might have opened it
+     (gnus-server-opened gnus-select-method)
+     (gnus-open-server gnus-select-method)
+     gnus-batch-mode
+     (gnus-y-or-n-p
+      (format-message
+       "%s (%s) open error%s.  Continue? "
+       (car gnus-select-method) (cadr gnus-select-method)
+       (if-let ((status (gnus-status-message gnus-select-method))
+                (status* (not (zerop (length status)))))
+           (format ": `%s'" status)
+         "")))
+     (gnus-error 1 "Couldn't open server on %s"
+                 (nth 1 gnus-select-method)))))
 
 (defun gnus-check-group (group)
   "Try to make sure that the server where GROUP exists is alive."
@@ -219,7 +220,7 @@ If it is down, start it up (again)."
     (setq method (gnus-server-to-method method)))
   ;; Check cache of constructed names.
   (let* ((method-sym (if gnus-agent
-			 (inline (gnus-agent-get-function method))
+			 (gnus-agent-get-function method)
 		       (car method)))
 	 (method-fns (get method-sym 'gnus-method-functions))
 	 (func (let ((method-fnlist-elt (assq function method-fns)))
@@ -488,11 +489,11 @@ Groups matching the IGNORED regexp are excluded."
 (defun gnus-request-group (group &optional dont-check command-method info)
   "Request GROUP.  If DONT-CHECK, no information is required."
   (let ((gnus-command-method
-	 (or command-method (inline (gnus-find-method-for-group group)))))
+	 (or command-method (gnus-find-method-for-group group))))
     (when (stringp gnus-command-method)
       (setq gnus-command-method
-	    (inline (gnus-server-to-method gnus-command-method))))
-    (funcall (inline (gnus-get-function gnus-command-method 'request-group))
+	    (gnus-server-to-method gnus-command-method)))
+    (funcall (gnus-get-function gnus-command-method 'request-group)
 	     (gnus-group-real-name group) (nth 1 gnus-command-method)
 	     dont-check
 	     info)))
@@ -515,7 +516,7 @@ Groups matching the IGNORED regexp are excluded."
 
 (defun gnus-close-group (group)
   "Request the GROUP be closed."
-  (let ((gnus-command-method (inline (gnus-find-method-for-group group))))
+  (let ((gnus-command-method (gnus-find-method-for-group group)))
     (funcall (gnus-get-function gnus-command-method 'close-group)
 	     (gnus-group-real-name group) (nth 1 gnus-command-method))))
 

@@ -1139,13 +1139,13 @@ For instance, if the @samp{news.somewhere.edu} @acronym{NNTP} server is where
 you want to get your daily dosage of news from, you'd say:
 
 @lisp
-(setq gnus-select-method '(nntp "news.somewhere.edu"))
+(setq gnus-select-method '((nntp "news.somewhere.edu")))
 @end lisp
 
 If you want to read directly from the local spool, say:
 
 @lisp
-(setq gnus-select-method '(nnspool ""))
+(setq gnus-select-method '((nnspool "")))
 @end lisp
 
 If you can use a local spool, you probably should, as it will almost
@@ -1492,41 +1492,13 @@ cache for all groups).
 @section Startup Files
 @cindex startup files
 @cindex .newsrc
-@cindex .newsrc.el
 @cindex .newsrc.eld
 
-Most common Unix news readers use a shared startup file called
-@file{.newsrc}.  This file contains all the information about what
-groups are subscribed, and which articles in these groups have been
-read.
+The @file{.newsrc.eld} contains s-exprs persisting Gnus's state.
+Avoid deleting it.
 
-Things got a bit more complicated with @sc{gnus}.  In addition to
-keeping the @file{.newsrc} file updated, it also used a file called
-@file{.newsrc.el} for storing all the information that didn't fit into
-the @file{.newsrc} file.  (Actually, it also duplicated everything in
-the @file{.newsrc} file.)  @sc{gnus} would read whichever one of these
-files was the most recently saved, which enabled people to swap between
-@sc{gnus} and other newsreaders.
-
-That was kinda silly, so Gnus went one better: In addition to the
-@file{.newsrc} and @file{.newsrc.el} files, Gnus also has a file called
-@file{.newsrc.eld}.  It will read whichever of these files that are most
-recent, but it will never write a @file{.newsrc.el} file.  You should
-never delete the @file{.newsrc.eld} file---it contains much information
-not stored in the @file{.newsrc} file.
-
-@vindex gnus-save-newsrc-file
-@vindex gnus-read-newsrc-file
-You can turn off writing the @file{.newsrc} file by setting
-@code{gnus-save-newsrc-file} to @code{nil}, which means you can delete
-the file and save some space, as well as exiting from Gnus faster.
-However, this will make it impossible to use other newsreaders than
-Gnus.  But hey, who would want to, right?  Similarly, setting
-@code{gnus-read-newsrc-file} to @code{nil} makes Gnus ignore the
-@file{.newsrc} file and any @file{.newsrc-SERVER} files, which can be
-convenient if you use a different news reader occasionally, and you
-want to read a different subset of the available groups with that
-news reader.
+The @file{.newsrc} is the standard Usenet rcfile, which Gnus will generally
+ignore unless the @file{.newsrc.eld} did not assign a @code{gnus-newsrc-alist}.
 
 @vindex gnus-save-killed-list
 If @code{gnus-save-killed-list} (default @code{t}) is @code{nil}, Gnus
@@ -1541,34 +1513,8 @@ the case, remove all groups that do not match this regexp before
 saving.  This can be useful in certain obscure situations that involve
 several servers where not all servers support @code{ask-server}.
 
-@vindex gnus-startup-file
-@vindex gnus-backup-startup-file
-@vindex version-control
-The @code{gnus-startup-file} variable says where the startup files are.
-The default value is @file{~/.newsrc}, with the Gnus (El Dingo) startup
-file being whatever that one is, with a @samp{.eld} appended.
-If you want to keep multiple numbered backups of this file, set
-@code{gnus-backup-startup-file}.  It respects the same values as the
-@code{version-control} variable.
-
 @vindex gnus-save-newsrc-hook
-@vindex gnus-save-quick-newsrc-hook
-@vindex gnus-save-standard-newsrc-hook
-@code{gnus-save-newsrc-hook} is called before saving any of the newsrc
-files, while @code{gnus-save-quick-newsrc-hook} is called just before
-saving the @file{.newsrc.eld} file, and
-@code{gnus-save-standard-newsrc-hook} is called just before saving the
-@file{.newsrc} file.  The latter two are commonly used to turn version
-control on or off.  Version control is on by default when saving the
-startup files.  If you want to turn backup creation off, say something like:
-
-@lisp
-(defun turn-off-backup ()
-  (set (make-local-variable 'backup-inhibited) t))
-
-(add-hook 'gnus-save-quick-newsrc-hook 'turn-off-backup)
-(add-hook 'gnus-save-standard-newsrc-hook 'turn-off-backup)
-@end lisp
+@code{gnus-save-newsrc-hook} is called before saving the @file{.newsrc.eld}.
 
 @vindex gnus-init-file
 @vindex gnus-site-init-file
@@ -1686,6 +1632,11 @@ secondary select methods.
 @section Startup Variables
 
 @table @code
+
+@item gnus-save-dot-newsrc
+If changed to @code{nil} from its default value @code{t}, Gnus will
+stop saving @file{.newsrc}, meaning other newsreaders cannot pick
+up from where Gnus left off.
 
 @item gnus-before-startup-hook
 @vindex gnus-before-startup-hook
@@ -2645,9 +2596,8 @@ special-purpose groups.  All these commands insert the newly created
 groups under point---@code{gnus-subscribe-newsgroup-method} is not
 consulted.
 
-Changes from the group editing commands are stored in
-@file{~/.newsrc.eld} (@code{gnus-startup-file}).  An alternative is the
-variable @code{gnus-parameters}, @xref{Group Parameters}.
+Changes from the group editing commands are stored in @file{~/.newsrc.eld}.
+An alternative is the variable @code{gnus-parameters}, @xref{Group Parameters}.
 
 @table @kbd
 
@@ -7342,18 +7292,6 @@ result in a new thread.
 @vindex gnus-thread-indent-level
 This is a number that says how much each sub-thread should be indented.
 The default is 4.
-
-@item gnus-sort-gathered-threads-function
-@vindex gnus-sort-gathered-threads-function
-Sometimes, particularly with mailing lists, the order in which mails
-arrive locally is not necessarily the same as the order in which they
-arrived on the mailing list.  Consequently, when sorting sub-threads
-using the default @code{gnus-thread-sort-by-number}, responses can end
-up appearing before the article to which they are responding to.
-Setting this variable to an alternate value
-(e.g., @code{gnus-thread-sort-by-date}), in a group's parameters or in an
-appropriate hook (e.g., @code{gnus-summary-generate-hook}) can produce a
-more logical sub-thread ordering in such instances.
 
 @end table
 
@@ -29728,18 +29666,6 @@ The startup files can get rather large, so you may want to cut their
 sizes a bit if you are running out of space.
 
 @table @code
-
-@item gnus-save-newsrc-file
-If this is @code{nil}, Gnus will never save @file{.newsrc}---it will
-only save @file{.newsrc.eld}.  This means that you will not be able to
-use any other newsreaders than Gnus.  This variable is @code{t} by
-default.
-
-@item gnus-read-newsrc-file
-If this is @code{nil}, Gnus will never read @file{.newsrc}---it will
-only read @file{.newsrc.eld}.  This means that you will not be able to
-use any other newsreaders than Gnus.  This variable is @code{t} by
-default.
 
 @item gnus-save-killed-list
 If this is @code{nil}, Gnus will not save the list of dead groups.  You

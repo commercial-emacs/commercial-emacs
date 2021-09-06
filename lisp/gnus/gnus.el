@@ -6,7 +6,7 @@
 ;; Author: Masanobu UMEDA <umerin@flab.flab.fujitsu.junet>
 ;;	Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news, mail
-;; Version: 5.13
+;; Version: 5.14pre
 
 ;; This file is part of GNU Emacs.
 
@@ -29,12 +29,11 @@
 
 (run-hooks 'gnus-load-hook)
 
-(eval-when-compile (require 'cl-lib)
-		   (require 'subr-x))
+(require 'gnus-util)
 (require 'wid-edit)
 (require 'mm-util)
 (require 'nnheader)
-(require 'seq)
+(require 'subr-x)
 
 ;; These are defined afterwards with gnus-define-group-parameter
 (defvar gnus-ham-process-destinations)
@@ -296,7 +295,7 @@ is restarted, and sometimes reloaded."
   "D-Bus integration for Gnus."
   :group 'gnus)
 
-(defconst gnus-version-number "5.13"
+(defconst gnus-version-number "5.14pre"
   "Version number for this version of Gnus.")
 
 (defconst gnus-version (format "Gnus v%s" gnus-version-number)
@@ -851,9 +850,6 @@ be used directly.")
 
 ;;; Do the rest.
 
-(require 'gnus-util)
-(require 'nnheader)
-
 (defcustom gnus-parameters nil
   "Alist of group parameters.
 
@@ -1025,35 +1021,29 @@ Check the NNTPSERVER environment variable and the
 ;; starting or even loading Gnus.
 ;;;###autoload(custom-autoload 'gnus-select-method "gnus")
 
+(defvar gnus-secondary-select-methods)
+(defvar gnus-select-methods)
 (defcustom gnus-select-method
-  (list 'nntp (or (gnus-getenv-nntpserver)
-                  (when (and gnus-default-nntp-server
-                             (not (string= gnus-default-nntp-server "")))
-                    gnus-default-nntp-server)
-                  "news"))
-  "Default method for selecting a newsgroup.
-This variable should be a list, where the first element is how the
-news is to be fetched, the second is the address.
-
-For instance, if you want to get your news via \"flab.flab.edu\" using
-NNTP, you could say:
-
-\(setq gnus-select-method \\='(nntp \"flab.flab.edu\"))
-
-If you want to use your local spool, say:
-
-\(setq gnus-select-method (list \\='nnspool (system-name)))
-
-If you use this variable, you must set `gnus-nntp-server' to nil.
-
-There is a lot more to know about select methods and virtual servers -
-see the manual for details."
-  ;; Emacs has set-after since 22.1.
-  ;set-after '(gnus-default-nntp-server)
+  (if-let ((nntp (or (gnus-getenv-nntpserver)
+                     (unless (zerop (length gnus-default-nntp-server))
+                       gnus-default-nntp-server))))
+      `(nntp ,nntp)
+    '(nnnil ""))
+  "This variable is deprecated in favor of `gnus-select-methods'."
   :group 'gnus-server
   :group 'gnus-start
   :initialize 'custom-initialize-default
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (setq gnus-select-methods (cons value gnus-secondary-select-methods)))
   :type 'gnus-select-method)
+(make-obsolete-variable 'gnus-select-method 'gnus-select-methods "28.1" 'set)
+(add-variable-watcher
+ 'gnus-select-method
+ (lambda (symbol newval operation _where)
+   (pcase operation
+     ((or 'set 'let 'unlet)
+      (custom-set-variables `(,symbol (quote ,newval)))))))
 
 (defcustom gnus-message-archive-method "archive"
   "Method used for archiving messages you've sent.
@@ -1120,16 +1110,67 @@ non-numeric prefix - `C-u M-x gnus', in short."
 (make-obsolete-variable 'gnus-secondary-servers 'gnus-select-method "24.1")
 
 (defcustom gnus-secondary-select-methods nil
-  "A list of secondary methods that will be used for reading news.
-This is a list where each element is a complete select method (see
-`gnus-select-method').
-
-If, for instance, you want to read your mail with the nnml back end,
-you could set this variable:
-
-\(setq gnus-secondary-select-methods \\='((nnml \"\")))"
+  "This variable is deprecated in favor of `gnus-select-methods'."
   :group 'gnus-server
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (setq gnus-select-methods (cons gnus-select-method value)))
   :type '(repeat gnus-select-method))
+(make-obsolete-variable 'gnus-secondary-select-methods 'gnus-select-methods "28.1" 'set)
+(add-variable-watcher
+ 'gnus-secondary-select-methods
+ (lambda (symbol newval operation _where)
+   (pcase operation
+     ((or 'set 'let 'unlet)
+      (custom-set-variables `(,symbol (quote ,newval)))))))
+
+(defcustom gnus-select-methods (cons gnus-select-method gnus-secondary-select-methods)
+  "((BACKEND1 SERVER1) (BACKEND2 SERVER2) ... ) where BACKEND is a symbol, e.g.,
+nntp, and SERVER is a string, e.g., \"news.gmane.io\".
+
+For example, these settings specify gmane over nntp, and a home
+dovecot imap server.
+
+Method: nntp
+Server: \"news.gmane.io\"
+
+Method: nnimap
+Server: \"dovecot\"
+Options:
+Variable: nnimap-address
+   Value: \"localhost\"
+Variable: nnimap-stream
+   Value: network
+Variable: nnimap-server-port
+   Value: 143
+Variable: nnimap-inbox
+   Value: \"INBOX\"
+
+Or equivalently,
+
+\(custom-set-variables \\=`(gnus-select-methods
+                        \\='((nntp \"news.gmane.io\")
+                          (nnimap \"dovecot\"
+                           (nnimap-address \"localhost\")
+                           (nnimap-stream network)
+                           (nnimap-server-port 143)
+                           (nnimap-inbox \"INBOX\")))))
+"
+  :group 'gnus-server
+  :initialize 'custom-initialize-default
+  :set (lambda (symbol value)
+         (unless (listp (car value))
+           (setq value (list value)))
+         (set-default symbol value)
+         (setq gnus-select-method (car value))
+         (setq gnus-secondary-select-methods (cdr value)))
+  :type '(repeat gnus-select-method))
+(add-variable-watcher
+ 'gnus-select-methods
+ (lambda (symbol newval operation _where)
+   (pcase operation
+     ((or 'set 'let 'unlet)
+      (custom-set-variables `(,symbol (quote ,newval)))))))
 
 (defcustom gnus-local-domain nil
   "Local domain name without a host name.
@@ -1397,7 +1438,7 @@ this variable.  I think."
 				      (intern (car entry))))
 			      gnus-valid-select-methods)
 		    (symbol :tag "other"))
-	    (string :tag "Address")
+	    (string :tag "Server")
 	    (repeat :tag "Options"
 		    :inline t
 		    (list :format "%v"
@@ -2310,8 +2351,8 @@ automatically cache the article in the agent cache."
 (defvar gnus-agent-target-move-group-header "X-Gnus-Agent-Move-To")
 (defvar gnus-draft-meta-information-header "X-Draft-From")
 (defvar gnus-group-get-parameter-function #'gnus-group-get-parameter)
-(defvar gnus-original-article-buffer " *Original Article*")
-(defvar gnus-newsgroup-name nil)
+(defvar-local gnus-original-article-buffer " *Original Article*")
+(defvar-local gnus-newsgroup-name nil)
 (defvar gnus-ephemeral-servers nil)
 (defvar gnus-server-method-cache nil)
 (defvar gnus-extended-servers nil)
@@ -2423,8 +2464,8 @@ such as a mark that says whether an article is stored in the cache
     (gnus-tree-mode "(gnus)Tree Display"))
   "Alist of major modes and related Info nodes.")
 
-(defvar gnus-summary-buffer "*Summary*")
-(defvar gnus-article-buffer "*Article*")
+(defvar-local gnus-summary-buffer nil)
+(defvar-local gnus-article-buffer "*Article*")
 (defvar gnus-server-buffer "*Server*")
 
 (defvar gnus-child nil
@@ -2488,7 +2529,7 @@ are always t.")
 ;; Save window configuration.
 (defvar gnus-prev-winconf nil)
 
-(defvar gnus-reffed-article-number nil)
+(defvar-local gnus-reffed-article-number -1)
 
 (defvar gnus-dead-summary nil)
 
@@ -2957,7 +2998,7 @@ If ARG, insert string at point."
   "Return VERSION as a floating point number."
   (unless version
     (setq version gnus-version))
-  (when (or (string-match "^\\([^ ]+\\)? ?Gnus v?\\([0-9.]+\\)$" version)
+  (when (or (string-match "^\\([^ ]+\\)? ?Gnus v?\\([0-9.]+\\)\\S-*$" version)
 	    (string-match "^\\(.?\\)gnus-\\([0-9.]+\\)$" version))
     (let ((alpha (and (match-beginning 1) (match-string 1 version)))
 	  (number (match-string 2 version))
@@ -3455,9 +3496,13 @@ server is native)."
   "Return the prefix of the current group name."
   (< 0 (length (gnus-group-real-prefix group))))
 
-(defun gnus-summary-buffer-name (group)
+(defun gnus-summary-buffer-name (group &optional canonical)
   "Return the summary buffer name of GROUP."
-  (concat "*Summary " group "*"))
+  (let ((name (concat "*Summary " group "*"))
+        (main-thread-p (eq (current-thread) main-thread)))
+    (if (or canonical main-thread-p)
+        name
+      (format " %s %s" (thread-name (current-thread)) name))))
 
 (defun gnus-group-method (group)
   "Return the server or method used for selecting GROUP.
@@ -3491,10 +3536,10 @@ You should probably use `gnus-find-method-for-group' instead."
 (defsubst gnus-secondary-method-p (method)
   "Return whether METHOD is a secondary select method."
   (let ((methods gnus-secondary-select-methods)
-	(gmethod (inline (gnus-server-get-method nil method))))
+	(gmethod (gnus-server-get-method nil method)))
     (while (and methods
 		(not (gnus-method-equal
-		      (inline (gnus-server-get-method nil (car methods)))
+		      (gnus-server-get-method nil (car methods))
 		      gmethod)))
       (setq methods (cdr methods)))
     methods))
@@ -3871,7 +3916,7 @@ parameters."
   ;; "hello", and the select method is ("hello" (my-var "something"))
   ;; in the group "alt.alt", this will result in a new virtual server
   ;; called "hello+alt.alt".
-  (if (or (not (inline (gnus-similar-server-opened method)))
+  (if (or (not (gnus-similar-server-opened method))
 	  (not (cddr method)))
       method
     (let ((address-slot
@@ -3943,12 +3988,11 @@ parameters."
 	    gnus-select-method
 	  (setq method
 		(cond ((stringp method)
-		       (inline (gnus-server-to-method method)))
+		       (gnus-server-to-method method))
 		      ((stringp (cadr method))
 		       (or
-			(inline
-			 (gnus-same-method-different-name method))
-			(inline (gnus-server-extend-method group method))))
+			(gnus-same-method-different-name method)
+			(gnus-server-extend-method group method)))
 		      (t
 		       method)))
 	  (cond ((equal (cadr method) "")
@@ -4027,7 +4071,7 @@ Allow completion over sensible values."
      ((assoc method gnus-valid-select-methods)
       (let ((address (if (memq 'prompt-address
 			       (assoc method gnus-valid-select-methods))
-			 (read-string "Address: ")
+			 (read-string "Server: ")
 		       "")))
 	(or (cadr (assoc (format "%s:%s" method address) open-servers))
 	    (list (intern method) address))))
@@ -4161,14 +4205,6 @@ If ARG is non-nil and a positive number, Gnus will use that as the
 startup level.  If ARG is non-nil and not a positive number, Gnus will
 prompt the user for the name of an NNTP server to use."
   (interactive "P")
-  ;; When using the development version of Gnus, load the gnus-load
-  ;; file.
-  (unless (string-match "^Gnus" gnus-version)
-    (load "gnus-load" nil t))
-  (unless (or (byte-code-function-p (symbol-function 'gnus))
-	      (subr-native-elisp-p (symbol-function 'gnus)))
-    (message "You should compile Gnus")
-    (sit-for 2))
   (let ((gnus-action-message-log (list nil)))
     (gnus-1 arg dont-connect child)
     (gnus-final-warning)))

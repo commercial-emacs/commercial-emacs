@@ -43,7 +43,6 @@
 
 ;;; Code:
 
-(require 'gnus-util)
 (require 'gnus)
 
 (defgroup gnus-undo nil

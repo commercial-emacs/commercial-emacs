@@ -32,11 +32,10 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-
 (require 'seq)
 (require 'time-date)
 (require 'text-property-search)
+(require 'cl-seq)
 
 (defcustom gnus-completing-read-function 'gnus-emacs-completing-read
   "Function use to do completing read."
@@ -103,6 +102,9 @@ This is a compatibility function for different Emacsen."
 	       (pop-to-buffer ,buf))
 	     ,@forms)
 	 (select-window ,tempvar)))))
+
+(defmacro gnus-push-end (elt place)
+  `(push ,elt (if (consp ,place) (cdr (last ,place)) ,place)))
 
 (defsubst gnus-goto-char (point)
   (and point (goto-char point)))
@@ -547,7 +549,7 @@ If N, return the Nth ancestor instead."
   (when (and references
 	     (not (zerop (length references))))
     (if n
-	(let ((ids (inline (gnus-split-references references))))
+	(let ((ids (gnus-split-references references)))
 	  (while (nthcdr n ids)
 	    (setq ids (cdr ids)))
 	  (car ids))
@@ -555,10 +557,12 @@ If N, return the Nth ancestor instead."
 	(when (string-match "\\(<[^<]+>\\)[ \t]*\\'" references)
 	  (match-string 1 references))))))
 
-(defsubst gnus-buffer-live-p (buffer)
+(defsubst gnus-buffer-live-p (buffer-or-name)
   "If BUFFER names a live buffer, return its object; else nil."
-  (and buffer (buffer-live-p (setq buffer (get-buffer buffer)))
-       buffer))
+  (when-let* ((buffer-or-name buffer-or-name)
+              (buffer (get-buffer buffer-or-name)))
+    (when (buffer-live-p buffer)
+      buffer)))
 
 (define-obsolete-function-alias 'gnus-buffer-exists-p
   'gnus-buffer-live-p "27.1")
@@ -602,21 +606,7 @@ If N, return the Nth ancestor instead."
     (setq to (read-file-name "Copy file to: " default-directory)))
   (copy-file file to))
 
-(defvar gnus-work-buffer " *gnus work*")
-
 (declare-function gnus-get-buffer-create "gnus" (name))
-;; gnus.el requires mm-util.
-(declare-function mm-enable-multibyte "mm-util")
-
-(defun gnus-set-work-buffer ()
-  "Put point in the empty Gnus work buffer."
-  (if (get-buffer gnus-work-buffer)
-      (progn
-	(set-buffer gnus-work-buffer)
-	(erase-buffer))
-    (set-buffer (gnus-get-buffer-create gnus-work-buffer))
-    (kill-all-local-variables)
-    (mm-enable-multibyte)))
 
 (defmacro gnus-group-real-name (group)
   "Find the real name of a foreign newsgroup."
@@ -749,14 +739,7 @@ nil.  See also `gnus-bind-print-variables'."
   (when (file-exists-p file)
     (delete-file file)))
 
-(defun gnus-delete-duplicates (list)
-  "Remove duplicate entries from LIST."
-  (let ((result nil))
-    (while list
-      (unless (member (car list) result)
-	(push (car list) result))
-      (pop list))
-    (nreverse result)))
+(defalias 'gnus-delete-duplicates #'delete-dups)
 
 (defun gnus-delete-directory (directory)
   "Delete files in DIRECTORY.  Subdirectories remain.
@@ -1208,6 +1191,10 @@ ARG is passed to the first function."
   (and (= (length x) (length y))
        (or (string-equal x y)
 	   (string-equal (downcase x) (downcase y)))))
+
+(defmacro gnus-assign-former-global (var val buffer)
+  "Will rename this."
+  `(setf (buffer-local-value ,var ,buffer) ,val))
 
 (defcustom gnus-use-byte-compile t
   "If non-nil, byte-compile crucial run-time code."
@@ -1675,6 +1662,18 @@ lists of strings."
 	 (overlays (delq nil (nconc (car overlayss) (cdr overlayss)))))
     (while overlays
       (delete-overlay (pop overlays)))))
+
+(defmacro gnus-with-temp-buffer (&rest forms)
+  "Formerly gnus-set-work-buffer.  Relay buffer-locals to temp buffer."
+  (declare (indent defun))
+  `(let ((gnus-vars (cl-remove-if-not
+                     (lambda (entry)
+                       (zerop (or (cl-search "gnus-" (symbol-name (car entry)))
+                                  -1)))
+                     (buffer-local-variables))))
+     (with-temp-buffer
+       (mapc (lambda (v) (set (make-local-variable (car v)) (cdr v))) gnus-vars)
+       ,@forms)))
 
 (provide 'gnus-util)
 

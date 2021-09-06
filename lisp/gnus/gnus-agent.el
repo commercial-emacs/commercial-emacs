@@ -22,19 +22,19 @@
 
 ;;; Code:
 
-(require 'gnus)
-(require 'gnus-cache)
 (require 'nnmail)
-(require 'nnvirtual)
-(require 'gnus-sum)
-(require 'gnus-score)
-(require 'gnus-srvr)
-(require 'gnus-util)
 (require 'timer)
-(eval-when-compile (require 'cl-lib))
+(require 'gnus-start)
+(require 'gnus-sum)
 
+(autoload 'gnus-all-score-files "gnus-score")
 (autoload 'gnus-server-update-server "gnus-srvr")
+(autoload 'gnus-server-set-status "gnus-srvr")
+(autoload 'gnus-server-named-server "gnus-srvr")
+(autoload 'gnus-inews-do-gcc "gnus-msg")
+(autoload 'gnus-inews-group-method "gnus-msg")
 (autoload 'gnus-agent-customize-category "gnus-cus")
+(defvar gnus-cache-coding-system)
 
 (defcustom gnus-agent-directory (nnheader-concat gnus-directory "agent/")
   "Where the Gnus agent will store its files."
@@ -2063,7 +2063,7 @@ doesn't exist, to valid the overview buffer."
 	      (let (state sequence uncomp)
 		(while alist
 		  (setq state (caar alist)
-			sequence (inline (gnus-uncompress-range (cdar alist)))
+			sequence (gnus-uncompress-range (cdar alist))
 			alist (cdr alist))
 		  (while sequence
 		    (push (cons (pop sequence) state) uncomp)))

@@ -20,7 +20,7 @@ Port number: @variable{port}
 
 @node User name and password
 @type interstitial
-@next 
+@next
 (if (assistant-password-required-p)
     "Enter user name and password"
   "Want user name and password?")
