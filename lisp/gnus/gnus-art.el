@@ -2243,6 +2243,15 @@ This only works if the article in question is HTML."
 	    (funcall function (get-text-property start 'image-url)
 		     start end)))))))
 
+(defun gnus-article-toggle-fonts ()
+  "Toggle the use of proportional fonts for HTML articles."
+  (interactive nil gnus-article-mode gnus-summary-mode)
+  (gnus-with-article-buffer
+    (if (eq mm-text-html-renderer 'shr)
+        (progn
+          (setq-local shr-use-fonts (not shr-use-fonts))
+          (gnus-summary-show-article)))))
+
 (defun gnus-article-treat-fold-newsgroups ()
   "Fold the Newsgroups and Followup-To message headers."
   (interactive nil gnus-article-mode gnus-summary-mode)
@@ -4494,6 +4503,8 @@ commands:
   (setq-local nobreak-char-display nil)
   ;; Enable `gnus-article-remove-images' to delete images shr.el renders.
   (setq-local shr-put-image-function #'gnus-shr-put-image)
+  ;; Shadow global shr-use-fonts to support font toggling.
+  (setq-local shr-use-fonts shr-use-fonts)
   (unless gnus-article-show-cursor
     (setq cursor-in-non-selected-windows nil))
   (gnus-set-default-directory)
