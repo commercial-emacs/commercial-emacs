@@ -1007,27 +1007,6 @@ display of that particular string at all."
   :group 'erc-hooks
   :type 'hook)
 
-(defcustom erc-send-pre-hook nil
-  "Hook called first when some text is sent through `erc-send-current-line'.
-It gets called with one argument, STRING.
-
-To change the text that will be sent, set the variable `str' which is
-used in `erc-send-current-line'.
-
-To change the text inserted into the buffer without changing the text
-that will be sent, use `erc-send-modify-hook' instead.
-
-Filtering functions can set `erc-send-this' to nil to avoid sending of
-that particular string at all and `erc-insert-this' to prevent
-inserting that particular string into the buffer.
-
-Note that it's useless to set `erc-send-this' to nil and
-`erc-insert-this' to t.  ERC is sane enough to not insert the text
-anyway."
-  :group 'erc-hooks
-  :type 'hook)
-(make-obsolete-variable 'erc-send-pre-hook 'erc-pre-send-functions "27.1")
-
 (defcustom erc-pre-send-functions nil
   "Special hook run to possibly alter the string that is sent.
 The functions are called with one argument, an `erc-input' struct,
@@ -1037,7 +1016,10 @@ The struct has three slots:
 
   `string': The current input string.
   `insertp': Whether the string should be inserted into the erc buffer.
-  `sendp': Whether the string should be sent to the irc server."
+  `sendp': Whether the string should be sent to the irc server.
+
+Note that modifications to `erc-insert-this' will be ignored. Update
+the field `insertp' instead."
   :group 'erc
   :type 'hook
   :version "27.1")
@@ -1046,12 +1028,6 @@ The struct has three slots:
   "Insert the text into the target buffer or not.
 Functions on `erc-insert-pre-hook' can set this variable to nil
 if they wish to avoid insertion of a particular string.")
-
-(defvar erc-send-this t
-  "Send the text to the target or not.
-Functions on `erc-send-pre-hook' can set this variable to nil
-if they wish to avoid sending of a particular string.")
-(make-obsolete-variable 'erc-send-this 'erc-pre-send-functions "27.1")
 
 (defcustom erc-insert-modify-hook ()
   "Insertion hook for functions that will change the text's appearance.
@@ -1082,8 +1058,8 @@ preserve point if needed."
 
 (defcustom erc-send-modify-hook nil
   "Sending hook for functions that will change the text's appearance.
-This hook is called just after `erc-send-pre-hook' when the values
-of `erc-send-this' and `erc-insert-this' are both t.
+This hook is called just after `erc-send-pre-hook' when the value
+of `erc-insert-this' is t.
 While this hook is run, narrowing is in effect and `current-buffer' is
 the buffer where the text got inserted.
 
@@ -5565,42 +5541,25 @@ This returns non-nil only if we actually send anything."
       (beep))
     nil)
    (t
-    ;; This dynamic variable is used by `erc-send-pre-hook'.  It's
-    ;; obsolete, and when it's finally removed, this binding should
-    ;; also be removed.
-    (with-suppressed-warnings ((lexical str))
-      (defvar str))
-    (let ((str input)
-          (erc-insert-this t)
-	  (erc-send-this t)
-	  state)
-      ;; The calling convention of `erc-send-pre-hook' is that it
-      ;; should change the dynamic variable `str' or set
-      ;; `erc-send-this' to nil.  This has now been deprecated:
-      ;; Instead `erc-pre-send-functions' is used as a filter to do
-      ;; allow both changing and suppressing the string.
-      (run-hook-with-args 'erc-send-pre-hook input)
-      (setq state (make-erc-input :string str ;May be != from `input' now!
-				  :insertp erc-insert-this
-				  :sendp erc-send-this))
+    (let ((erc-insert-this t)
+          (state (make-erc-input :string input :insertp t :sendp t)))
+      ;; The `erc-pre-send-functions' filter allows both modifying and
+      ;; supressing inserted text.  It replaces `erc-send-pre-hook',
+      ;; which did the former via the dynamic var `str' and the latter
+      ;; via `erc-send-this', now `erc-input-sendp'.
       (run-hook-with-args 'erc-pre-send-functions state)
-      (when (and (erc-input-sendp state)
-		 erc-send-this)
-	(let ((string (erc-input-string state)))
+      (when (erc-input-sendp state)
+        (let ((string (erc-input-string state)))
           (if (or (string-search "\n" string)
                   (not (string-match erc-command-regexp string)))
-              (mapc
-               (lambda (line)
-		 (mapc
-                  (lambda (line)
-                    ;; Insert what has to be inserted for this.
-		    (when (erc-input-insertp state)
-                      (erc-display-msg line))
-                    (erc-process-input-line (concat line "\n")
-                                            (null erc-flood-protect) t))
-                  (or (and erc-flood-protect (erc-split-line line))
-                      (list line))))
-               (split-string string "\n"))
+              (dolist (line (split-string string "\n"))
+                (dolist (line (or (and erc-flood-protect (erc-split-line line))
+                                  (list line)))
+                  ;; Insert what has to be inserted for this.
+                  (when (erc-input-insertp state)
+                    (erc-display-msg line))
+                  (erc-process-input-line (concat line "\n")
+                                          (null erc-flood-protect) t)))
             (erc-process-input-line (concat string "\n") t nil))
           t))))))
 
