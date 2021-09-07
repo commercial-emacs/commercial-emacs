@@ -359,9 +359,10 @@ case, and the process object in the asynchronous case."
                 (pop-to-buffer (current-buffer))
                 (goto-char (point-min))
                 (shrink-window-if-larger-than-buffer))
-	      (error "Failed (%s): %s"
+	      (error "Failed (%s): %s -> %s"
 		     (if (integerp status) (format "status %d" status) status)
-		     full-command))
+		     full-command
+                     (buffer-substring-no-properties (point-min) (point-max))))
 	    (when vc-command-messages
 	      (let ((inhibit-message (eq (selected-window) (active-minibuffer-window))))
 		(message "Done (status=%d): %s" status full-command)))))
