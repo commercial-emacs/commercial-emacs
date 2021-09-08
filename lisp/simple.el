@@ -6735,19 +6735,35 @@ the user for a password when we are simply scanning a set of files in the
 background or displaying possible completions before the user even asked
 for it.")
 
+(defun skip-dupes (bogey sequence)
+  "Get remainder of SEQUENCE after removing any leading
+copies of BOGEY."
+  (let ((novel-index
+         (catch 'done
+           (dotimes (i (length sequence) i)
+             (unless (equal (nth i sequence) bogey)
+               (throw 'done i))))))
+    (nthcdr novel-index sequence)))
+
 (defun pop-global-mark ()
   "Pop off global mark ring and jump to the top location."
   (interactive)
   ;; Pop entries that refer to non-existent buffers.
   (while (and global-mark-ring (not (marker-buffer (car global-mark-ring))))
     (setq global-mark-ring (cdr global-mark-ring)))
-  (or global-mark-ring
-      (error "No global mark set"))
+  (unless global-mark-ring
+    (error "No global mark set"))
+
+  ;; first move us off a no-op marker
+  (when-let ((extant (point-marker)))
+    (when (equal extant (car global-mark-ring))
+      (setq global-mark-ring (append (skip-dupes extant global-mark-ring)
+                                     (list extant)))))
   (let* ((marker (car global-mark-ring))
 	 (buffer (marker-buffer marker))
 	 (position (marker-position marker))
-         (rotated-ring (append (cdr global-mark-ring)
-			       (list marker))))
+         (rotated-ring (append (skip-dupes marker global-mark-ring)
+                               (list marker))))
     (unwind-protect
         (progn
           (switch-to-buffer buffer) ;; this changes global-mark-ring

@@ -76,9 +76,8 @@
       (call-interactively #'push-global-mark)
       (should (= (length global-mark-ring) global-mark-ring-max))
       (call-interactively #'pop-global-mark)
-      (should (equal (buffer-name) "benchmark.el"))
-      (call-interactively #'pop-global-mark)
-      (should (equal (buffer-name) "package.el"))
+      (should-not (equal (buffer-name) "benchmark.el")) ;; get me off same
+      (should (equal (buffer-name) "package.el")) ;; i'm aware redundant with above
       (call-interactively #'pop-global-mark)
       (should (equal (buffer-name) "lisp.el"))
       (call-interactively #'pop-global-mark)
