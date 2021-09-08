@@ -129,6 +129,19 @@ window.  If the value is the symbol `maybe', then the echo area
 is only skipped if the documentation doesn't fit there."
   :type 'boolean)
 
+(defcustom eldoc-documentation-format-function #'eldoc-documentation-format-concat
+  "Function used to format documentation in the *eldoc* buffer.
+
+- `eldoc-documentation-format-concat': concatenates documentations together
+  joining with a newline character'.
+
+- `eldoc-documentation-format-concat-hr': concatenates documentations together
+  joining with a horizontal rule."
+  :type '(radio (function-item eldoc-documentation-format-concat)
+                (function-item eldoc-documentation-format-concat-hr)
+                function)
+  :version "28.1")
+
 (defface eldoc-highlight-function-argument
   '((t (:inherit bold)))
   "Face used for the argument at point in a function's argument list.
@@ -466,44 +479,71 @@ This holds the results of the last documentation request."
                                              (buffer-name)))
     (display-buffer (current-buffer))))
 
-(defun eldoc--format-doc-buffer (docs)
-  "Ensure DOCS are displayed in an *eldoc* buffer."
-  (with-current-buffer (if (buffer-live-p eldoc--doc-buffer)
-                           eldoc--doc-buffer
-                         (setq eldoc--doc-buffer
-                               (get-buffer-create " *eldoc*")))
-    (unless (eq docs eldoc--doc-buffer-docs)
-      (setq-local eldoc--doc-buffer-docs docs)
-      (let ((inhibit-read-only t)
-            (things-reported-on))
-        (erase-buffer) (setq buffer-read-only t)
-        (local-set-key "q" 'quit-window)
-        (cl-loop for (docs . rest) on docs
-                 for (this-doc . plist) = docs
-                 for thing = (plist-get plist :thing)
-                 when thing do
-                 (cl-pushnew thing things-reported-on)
-                 (setq this-doc
-                       (concat
-                        (propertize (format "%s" thing)
-                                    'face (plist-get plist :face))
-                        ": "
-                        this-doc))
-                 do (insert this-doc)
-                 when rest do (insert "\n")
-                 finally (goto-char (point-min)))
-        ;; Rename the buffer, taking into account whether it was
-        ;; hidden or not
-        (rename-buffer (format "%s*eldoc%s*"
-                               (if (string-match "^ " (buffer-name)) " " "")
-                               (if things-reported-on
-                                   (format " for %s"
-                                           (mapconcat
-                                            (lambda (s) (format "%s" s))
-                                            things-reported-on
-                                            ", "))
-                                 ""))))))
-  eldoc--doc-buffer)
+(defun eldoc-documentation-format-concat (items &optional separator)
+  "Return documentation ITEMS concatenated.
+Join with SEPARATOR which defaults to \n.
+See `eldoc-documentation-format-function'."
+  (mapconcat (lambda (item)
+               (pcase-let* ((`(,documentation . ,plist) item)
+                            (face (plist-get plist :face))
+                            (thing (plist-get plist :thing)))
+                 (concat (when thing
+                           (concat (propertize (format "%s" thing) 'face face) ": "))
+                         documentation)))
+             items
+             (or separator "\n")))
+
+(defun eldoc-documentation-format-concat-hr (items)
+  "Return ITEMS concatenated like `eldoc-documentation-format-concat' but join
+with a horizontal rule.
+See `eldoc-documentation-format-function'."
+  (let ((separator (concat
+                    "\n"
+                    (propertize "\n" 'face
+                                '(:extend t :inherit shadow :strike-through t)))))
+    (eldoc-documentation-format-concat items separator)))
+
+(defun eldoc--render-documentation-buffer (text buffer)
+  "Sub-routine to write documentation TEXT in BUFFER.  Return it afterwards."
+  (with-current-buffer buffer
+    (let ((inhibit-read-only t)
+          (things-reported-on))
+      (erase-buffer)
+      (setq-local buffer-read-only t)
+      (local-set-key "q" 'quit-window)
+      (insert text)
+      ;; Rename the buffer, taking into account whether it was hidden
+      (rename-buffer (format "%s*eldoc%s*"
+                             (if (string-match "^ " (buffer-name)) " " "")
+                             (if things-reported-on
+                                 (format " for %s"
+                                         (mapconcat
+                                          (lambda (s) (format "%s" s))
+                                          things-reported-on
+                                          ", "))
+                               "")))
+
+      ))
+  buffer)
+
+(defun eldoc-render-documentation (documentations &optional target)
+  "Render DOCUMENTATIONS onto TARGET.
+If optional TARGET is not provided, simply return the formatted string.  If it
+is t, render the documentation into the *eldoc* buffer `eldoc--doc-buffer'.
+Else, assume TARGET is a name that can be passed to `get-buffer-create'."
+  (unless (eq documentations eldoc--doc-buffer-docs)
+    (setq-local eldoc--doc-buffer-docs documentations)
+    (let ((buffer (when target
+                    (if (or (bufferp target) (stringp target))
+                        (get-buffer-create target)
+                      (setq eldoc--doc-buffer
+                            (get-buffer-create (if (buffer-live-p eldoc--doc-buffer)
+                                                   eldoc--doc-buffer
+                                                 " *eldoc*"))))))
+          (body (funcall eldoc-documentation-format-function documentations)))
+      (if buffer
+          (eldoc--render-documentation-buffer body buffer)
+        body))))
 
 (defun eldoc--echo-area-substring (available)
   "Given AVAILABLE lines, get buffer substring to display in echo area.
@@ -590,14 +630,11 @@ Honor `eldoc-echo-area-use-multiline-p' and
                ;; Else, given a positive number of logical lines, we
                ;; format the *eldoc* buffer, using as most of its
                ;; contents as we know will fit.
-               (with-current-buffer (eldoc--format-doc-buffer docs)
+               (with-current-buffer (eldoc-render-documentation docs t)
                  (save-excursion
                    (eldoc--echo-area-substring available))))
               (t ;; this is the "truncate brutally" situation
-               (let ((string
-                      (with-current-buffer (eldoc--format-doc-buffer docs)
-                        (buffer-substring (goto-char (point-min))
-                                          (line-end-position 1)))))
+               (let ((string (eldoc-render-documentation docs)))
                  (if (> (length string) width)  ; truncation to happen
                      (unless (eldoc--echo-area-prefer-doc-buffer-p t)
                        (truncate-string-to-width string width))
@@ -609,7 +646,7 @@ Honor `eldoc-echo-area-use-multiline-p' and
 (defun eldoc-display-in-buffer (docs interactive)
   "Display DOCS in a dedicated buffer.
 If INTERACTIVE is t, also display the buffer."
-  (eldoc--format-doc-buffer docs)
+  (eldoc-render-documentation docs t)
   (when interactive
     (eldoc-doc-buffer)))
 
