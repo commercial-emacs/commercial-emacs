@@ -6748,9 +6748,9 @@ copies of BOGEY."
 (defun pop-global-mark ()
   "Pop off global mark ring and jump to the top location."
   (interactive)
+
   ;; Pop entries that refer to non-existent buffers.
-  (while (and global-mark-ring (not (marker-buffer (car global-mark-ring))))
-    (setq global-mark-ring (cdr global-mark-ring)))
+  (setq global-mark-ring (cl-remove-if-not #'marker-buffer global-mark-ring))
   (unless global-mark-ring
     (error "No global mark set"))
 
