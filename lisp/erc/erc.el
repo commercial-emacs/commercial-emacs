@@ -2312,6 +2312,14 @@ message instead, to make debugging easier."
 
 ;;; Debugging the protocol
 
+(defvar erc-debug-irc-protocol-time-format "%FT%T.%6N%z "
+  "An optional format string for optional I/O timestamps.")
+
+(defconst erc-debug-irc-protocol-version "1"
+  "Protocol log format version number.
+These logs are machine-readable, but external tools used in bug
+reproduction, etc. need a way to track changes to the format.")
+
 (defvar erc-debug-irc-protocol nil
   "If non-nil, log all IRC protocol traffic to the buffer \"*erc-protocol*\".
 
@@ -2333,32 +2341,36 @@ This only has any effect if `erc-debug-irc-protocol' is non-nil.
 
 The buffer is created if it doesn't exist.
 
-If OUTBOUND is non-nil, STRING is being sent to the IRC server
-and appears in face `erc-input-face' in the buffer."
+If OUTBOUND is non-nil, STRING is being sent to the IRC server and
+appears in face `erc-input-face' in the buffer.  Lines must already
+contain CRLF endings.  Peer is identified by the most precise label
+available at run time, starting with the network name, followed by the
+self-reported host name, and falling back to the dialed <server>:<port>.
+When capturing logs for multiple peers and sorting them into buckets,
+such inconsistent labeling may pose a problem during an initial server
+burst.  For now, the recommended approach is to wrap this function with
+advice that temporarily redefines the symbol-function `erc-network'."
   (when erc-debug-irc-protocol
-    (let ((network-name (or (ignore-errors (erc-network-name))
-                            "???")))
+    (let ((esid (or (and (fboundp 'erc-network)
+                         (erc-network)
+                         (erc-network-name))
+                    erc-server-announced-name
+                    (format "%s:%s" erc-session-server erc-session-port)))
+          (ts (when erc-debug-irc-protocol-time-format
+                (format-time-string erc-debug-irc-protocol-time-format))))
       (with-current-buffer (get-buffer-create "*erc-protocol*")
         (save-excursion
           (goto-char (point-max))
           (let ((inhibit-read-only t))
-            (insert (if (not outbound)
-                        ;; Cope with the fact that string might
-                        ;; contain multiple lines of text.
-                        (let ((lines (delete "" (split-string string
-                                                              "\n\\|\r\n")))
-                              (result ""))
-                          (dolist (line lines)
-                            (setq result (concat result network-name
-                                                 " << " line "\n")))
-                          result)
-                      (propertize
-                       (concat network-name " >> " string
-                               (if (/= ?\n
-                                       (aref string
-                                             (1- (length string))))
-                                   "\n"))
-                       'font-lock-face 'erc-input-face)))))
+            (insert (if outbound
+                        (concat ts esid " >> " string)
+                      ;; Cope with multi-line messages
+                      (let ((lines (split-string string "[\r\n]+" t))
+                            result)
+                        (dolist (line lines)
+                          (setq result (concat result ts esid
+                                               " << " line "\r\n")))
+                        result)))))
         (let ((orig-win (selected-window))
               (debug-buffer-window (get-buffer-window (current-buffer) t)))
           (when debug-buffer-window
@@ -2371,24 +2383,34 @@ and appears in face `erc-input-face' in the buffer."
 (defun erc-toggle-debug-irc-protocol (&optional arg)
   "Toggle the value of `erc-debug-irc-protocol'.
 
-If ARG is non-nil, show the *erc-protocol* buffer."
+If ARG is non-nil, show the *erc-protocol* buffer.  Everything before
+the first CRLF is front matter.  Everything before the first double
+linefeed is a header."
   (interactive "P")
   (let* ((buf (get-buffer-create "*erc-protocol*")))
     (with-current-buffer buf
       (view-mode-enter)
       (when (null (current-local-map))
-        (let ((inhibit-read-only t))
-          (insert (erc-make-notice "This buffer displays all IRC protocol traffic exchanged with each server.\n"))
-          (insert (erc-make-notice "Kill this buffer to terminate protocol logging.\n\n")))
+        (let ((inhibit-read-only t)
+              (headers (concat "Version: " erc-debug-irc-protocol-version "\n"
+                               "Emacs-Version: " emacs-version "\n"
+                               "\n"))
+              (msg (concat "This buffer displays all IRC protocol traffic "
+                           "exchanged with servers.\n"
+                           "Kill it to disable logging.\n"
+                           "Press `t' to toggle.\n")))
+          (insert headers (erc-make-notice msg)))
         (use-local-map (make-sparse-keymap))
         (local-set-key (kbd "t") 'erc-toggle-debug-irc-protocol))
       (add-hook 'kill-buffer-hook
                 (lambda () (setq erc-debug-irc-protocol nil))
                 nil 'local)
       (goto-char (point-max))
+      ;; Searchable phrase printed twice between logs and once before
+      ;; the first. This is a single line with CRLF endings.
       (let ((inhibit-read-only t))
         (insert (erc-make-notice
-                 (format "IRC protocol logging %s at %s -- Press `t' to toggle logging.\n"
+                 (format "IRC protocol logging %s at %s\r\n"
                          (if erc-debug-irc-protocol "disabled" "enabled")
                          (current-time-string))))))
     (setq erc-debug-irc-protocol (not erc-debug-irc-protocol))
