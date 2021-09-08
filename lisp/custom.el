@@ -148,6 +148,9 @@ not the default value itself.
 DEFAULT is stored as SYMBOL's standard value, in SYMBOL's property
 `standard-value'.  At the same time, SYMBOL's property `force-value' is
 set to nil, as the value is no longer rogue."
+  (declare (compiler-macro
+            (lambda (form)
+              `(eval ',form lexical-binding))))
   (put symbol 'standard-value (purecopy (list default)))
   ;; Maybe this option was rogue in an earlier version.  It no longer is.
   (when (get symbol 'force-value)
