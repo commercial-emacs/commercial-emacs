@@ -1222,7 +1222,14 @@ it is displayed along with the global value."
               ;; Output the indented administrative bits.
               (with-current-buffer buffer
                 (help-fns--run-describe-functions
-                 help-fns-describe-variable-functions variable)))
+                 help-fns-describe-variable-functions variable))
+
+              (with-current-buffer standard-output
+                ;; If we have the long value of the variable at the
+                ;; end, remove superfluous empty lines before it.
+                (unless (eobp)
+                  (while (looking-at-p "\n")
+                    (delete-char 1)))))
 
 	    (with-current-buffer standard-output
 	      ;; Return the text we displayed.
@@ -1238,7 +1245,7 @@ it is displayed along with the global value."
       (let ((size (buffer-size standard-output)))
         (apply func args)
         ;; This function inserted something, so register it.
-        (when (> (buffer-size) size)
+        (when (> (buffer-size standard-output) size)
           (push func help-fns--activated-functions)))))
   (with-current-buffer standard-output
     (help-fns--ensure-empty-line)))
