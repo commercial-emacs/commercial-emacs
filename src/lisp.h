@@ -3189,7 +3189,7 @@ union specbinding
     } unwind_intmax;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      Lisp_Object marker, window, mark_ring;
+      Lisp_Object marker, window;
     } unwind_excursion;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;

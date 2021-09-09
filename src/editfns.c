@@ -1,5 +1,4 @@
 /* Lisp functions pertaining to editing.                 -*- coding: utf-8 -*-
-
 Copyright (C) 1985-1987, 1989, 1993-2021 Free Software Foundation, Inc.
 
 This file is NOT part of GNU Emacs.
@@ -217,14 +216,6 @@ DEFUN ("push-global-mark", Fpush_global_mark, Spush_global_mark, 0, 0, "",
 	  }
       }
       eassert (list_length (Vglobal_mark_ring) < global_mark_ring_max);
-      if (list_length (Vglobal_mark_ring) > 1)
-	{
-	  Lisp_Object penultimate =
-	    Fnthcdr (make_fixnum (list_length (Vglobal_mark_ring) - 2),
-		     Vglobal_mark_ring);
-	  if (! NILP (Fequal (pt_marker, XCAR (XCDR (penultimate)))))
-	    Fsetcdr (penultimate, Qnil);
-	}
       Vglobal_mark_ring = Fcons (pt_marker, Vglobal_mark_ring);
     }
   return Qnil;
@@ -835,7 +826,6 @@ save_excursion_save (union specbinding *pdl)
   pdl->unwind_excursion.window
     = (EQ (XWINDOW (selected_window)->contents, Fcurrent_buffer ())
        ? selected_window : Qnil);
-  pdl->unwind_excursion.mark_ring = Vglobal_mark_ring;
 }
 
 /* Restore saved buffer before leaving `save-excursion' special form.  */

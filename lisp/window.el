@@ -8435,6 +8435,15 @@ indirectly called by the latter."
   (when (cdr (assq 'allow-no-window alist))
     'fail))
 
+(defun conditional-push-global-mark (window)
+  "From `pop-to-buffer' and `switch-to-buffer', call
+`push-global-mark' if WINDOW admits an old buffer."
+  (let ((prev (window-old-buffer window)))
+    (when (and (bufferp prev)
+               (not (eq prev (window-buffer window))))
+      (with-current-buffer prev
+        (push-global-mark)))))
+
 ;;; Display + selection commands:
 (defun pop-to-buffer (buffer-or-name &optional action norecord)
   "Display buffer specified by BUFFER-OR-NAME and select its window.
@@ -8471,11 +8480,7 @@ at the front of the list of recently selected ones."
           ;; Make sure the window is selected (Bug#8615), (Bug#6954)
           (select-window window norecord)
           (unless norecord
-            (let ((prev (window-old-buffer window)))
-              (when (and (bufferp prev)
-                         (not (eq prev (window-buffer window))))
-                (with-current-buffer prev
-                  (push-global-mark))))))
+            (conditional-push-global-mark window)))
       ;; If `display-buffer' failed to supply a window, just make the
       ;; buffer current.
       (set-buffer buffer))
@@ -8706,11 +8711,7 @@ Return the buffer switched to."
 	    (set-window-point nil (nth 2 entry)))))))
     (unless norecord
       (select-window (selected-window))
-      (let ((prev (window-old-buffer (selected-window))))
-        (when (and (bufferp prev)
-                   (not (eq prev (window-buffer (selected-window)))))
-          (with-current-buffer prev
-            (push-global-mark)))))
+      (conditional-push-global-mark (selected-window)))
     (set-buffer buffer)))
 
 (defun switch-to-buffer-other-window (buffer-or-name &optional norecord)

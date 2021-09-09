@@ -4261,7 +4261,6 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 	case SPECPDL_UNWIND_EXCURSION:
 	  mark_object (pdl->unwind_excursion.marker);
 	  mark_object (pdl->unwind_excursion.window);
-	  mark_object (pdl->unwind_excursion.mark_ring);
 	  break;
 
 	case SPECPDL_BACKTRACE:
