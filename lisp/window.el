@@ -8439,7 +8439,7 @@ indirectly called by the latter."
   "From `pop-to-buffer' and `switch-to-buffer', call
 `push-global-mark' if WINDOW admits an old buffer."
   (let ((prev (window-old-buffer window)))
-    (when (and (bufferp prev)
+    (when (and (buffer-live-p prev)
                (not (eq prev (window-buffer window))))
       (with-current-buffer prev
         (push-global-mark)))))
