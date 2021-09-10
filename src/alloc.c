@@ -5088,24 +5088,24 @@ void
 gc_mark_or_enqueue_cons (struct Lisp_Cons *c)
 {
   bool checked_stack_depth = false;
- again:
-  if (cons_marked_p (c))
-    return;  /* Already on mark queue or marked.  */
-  set_cons_marked (c);
-  if (!checked_stack_depth)
-    {
-      checked_stack_depth = true;
-      ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (c, Lisp_Cons));
-    }
-  scan_cons (c, GC_PHASE_MARK);
-  /* Try looping over the CDR of the cons if it's also a cons ----
-     this way, we avoid some recursion.  Note that we don't have to
-     check the stack depth again.  */
-  if (CONSP (c->u.s.cdr))
-    {
+  do {
+    if (cons_marked_p (c))
+      return;  /* Already on mark queue or marked.  */
+    set_cons_marked (c);
+    if (!checked_stack_depth)
+      {
+	checked_stack_depth = true;
+	ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (c, Lisp_Cons));
+      }
+    scan_cons (c, GC_PHASE_MARK);
+    /* Try looping over the CDR of the cons if it's also a cons ----
+       this way, we avoid some recursion.  Note that we don't have to
+       check the stack depth again.  */
+    if (CONSP(c->u.s.cdr))
       c = XCONS (c->u.s.cdr);
-      goto again;
-    }
+    else
+      break;
+  } while (c);
 }
 
 DEFUN ("cons", Fcons, Scons, 2, 2, 0,
