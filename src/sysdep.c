@@ -4458,8 +4458,42 @@ str_collate (Lisp_Object s1, Lisp_Object s2,
 }
 #endif	/* WINDOWSNT */
 
+#ifdef DARWIN_OS
+
+/* This function prototype is not in the platform header files.
+   See https://reverse.put.as/wp-content/uploads/2011/09/Apple-Sandbox-Guide-v1.0.pdf
+   and https://chromium.googlesource.com/chromium/src/+/master/sandbox/mac/seatbelt_sandbox_design.md */
+int sandbox_init_with_parameters(const char *profile,
+                                 uint64_t flags,
+                                 const char *const parameters[],
+                                 char **errorbuf);
+
+DEFUN ("darwin-sandbox-init", Fdarwin_sandbox_init, Sdarwin_sandbox_init,
+       1, 1, 0,
+       doc: /* Enter a sandbox whose permitted access is curtailed by PROFILE.
+Already open descriptors can be used freely.
+PROFILE is a string in the macOS sandbox profile language,
+a set of rules in a Lisp-like syntax.
+
+This is not a supported interface and is for internal use only. */)
+  (Lisp_Object profile)
+{
+  CHECK_STRING (profile);
+  if (memchr (SSDATA (profile), '\0', SBYTES (profile)))
+    error ("NUL in sandbox profile");
+  char *err = NULL;
+  if (sandbox_init_with_parameters (SSDATA (profile), 0, NULL, &err) != 0)
+    error ("sandbox error: %s", err);
+  return Qnil;
+}
+
+#endif	/* DARWIN_OS */
+
 void
 syms_of_sysdep (void)
 {
   defsubr (&Sget_internal_run_time);
+#ifdef DARWIN_OS
+  defsubr (&Sdarwin_sandbox_init);
+#endif
 }
