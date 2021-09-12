@@ -128,6 +128,14 @@ Alternative suggestions are:
   :version "24.4"
   :type 'string)
 
+(defcustom shr-around-q-tag '("\"" . "\"")
+  "The before and after quotes for a Q-tag.
+- `car' is inserted before the Q-tag
+- `cdr' is inserted after the Q-tag.
+Alternative suggestions are: - '(\"“\" . \"”\")"
+  :version "28.1"
+  :type (cons 'string 'string))
+
 (defcustom shr-cookie-policy 'same-origin
   "When to use cookies when fetching dependent data like images.
 If t, always use cookies.  If nil, never use cookies.  If
@@ -182,6 +190,16 @@ temporarily blinks with this face."
   '((t :inherit underline :underline (:style wave)))
   "Face for <abbr> elements."
   :version "27.1")
+
+(defface shr-time
+  '((t :inherit underline :underline (:style wave)))
+  "Face for <time> elements."
+  :version "28.1")
+
+(defface shr-small
+  '((t :height 0.8))
+  "Face for <small> elements."
+  :version "28.1")
 
 (defface shr-h1
   '((t :height 1.3 :weight bold))
@@ -1501,8 +1519,35 @@ ones, in case fg and bg are nil."
 (defun shr-tag-em (dom)
   (shr-fontize-dom dom 'italic))
 
+(defun shr-tag-cite (dom)
+  (shr-fontize-dom dom 'italic))
+
+(defun shr-tag-dfn (dom)
+  (shr-fontize-dom dom 'italic))
+
 (defun shr-tag-strong (dom)
   (shr-fontize-dom dom 'bold))
+
+(defun shr-tag-small (dom)
+  (shr-fontize-dom dom (if shr-use-fonts 'shr-small)))
+
+(defun shr-tag-q (dom)
+  (shr-insert (car shr-around-q-tag))
+  (shr-generic dom)
+  (shr-insert (cdr shr-around-q-tag)))
+
+(defun shr-tag-time (dom)
+    (when-let* ((datetime (or
+                           (dom-attr dom 'title)
+                           (dom-attr dom 'datetime)))
+	        (start (point)))
+      (shr-generic dom)
+      (shr-add-font start (point) 'shr-time)
+      (add-text-properties
+       start (point)
+       (list
+        'help-echo datetime
+        'mouse-face 'highlight))))
 
 (defun shr-tag-u (dom)
   (shr-fontize-dom dom 'underline))
