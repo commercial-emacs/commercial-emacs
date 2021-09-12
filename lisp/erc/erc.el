@@ -3597,7 +3597,9 @@ If S is non-nil, it will be used as the quit reason."
 If S is non-nil, it will be used as the quit reason."
   (or s
       (if (fboundp 'yow)
-          (string-replace "\n" "" (yow))
+          (if (>= emacs-major-version 28)
+              (string-replace "\n" "" (yow))
+            (replace-regexp-in-string "\n" "" (yow)))
         (erc-quit/part-reason-default))))
 
 (make-obsolete 'erc-quit-reason-zippy "it will be removed." "24.4")
@@ -3624,7 +3626,9 @@ If S is non-nil, it will be used as the part reason."
 If S is non-nil, it will be used as the quit reason."
   (or s
       (if (fboundp 'yow)
-          (string-replace "\n" "" (yow))
+          (if (>= emacs-major-version 28)
+              (string-replace "\n" "" (yow))
+            (replace-regexp-in-string "\n" "" (yow)))
         (erc-quit/part-reason-default))))
 
 (make-obsolete 'erc-part-reason-zippy "it will be removed." "24.4")
@@ -5587,7 +5591,9 @@ This returns non-nil only if we actually send anything."
       (when (and (erc-input-sendp state)
 		 erc-send-this)
 	(let ((string (erc-input-string state)))
-          (if (or (string-search "\n" string)
+          (if (or (if (>= emacs-major-version 28)
+                      (string-search "\n" string)
+                    (string-match "\n" string))
                   (not (string-match erc-command-regexp string)))
               (mapc
                (lambda (line)
@@ -6528,13 +6534,21 @@ if `erc-away' is non-nil."
                                   (fill-region (point-min) (point-max))
                                   (buffer-string))))
                  (setq header-line-format
-                       (string-replace
-                        "%"
-                        "%%"
-                        (if face
-                            (propertize header 'help-echo help-echo
-                                        'face face)
-                          (propertize header 'help-echo help-echo))))))
+                       (if (>= emacs-major-version 28)
+                           (string-replace
+                            "%"
+                            "%%"
+                            (if face
+                                (propertize header 'help-echo help-echo
+                                            'face face)
+                              (propertize header 'help-echo help-echo)))
+                         (replace-regexp-in-string
+                          "%"
+                          "%%"
+                          (if face
+                              (propertize header 'help-echo help-echo
+                                          'face face)
+                            (propertize header 'help-echo help-echo)))))))
               (t (setq header-line-format
                        (if face
                            (propertize header 'face face)
@@ -6804,7 +6818,9 @@ functions."
               nick user host channel
               (if (not (string= reason ""))
                   (format ": %s"
-                          (string-replace "%" "%%" reason))
+                          (if (>= emacs-major-version 28)
+                              (string-replace "%" "%%" reason)
+                            (replace-regexp-in-string "%" "%%" reason)))
                 "")))))
 
 
