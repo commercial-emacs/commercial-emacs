@@ -1900,6 +1900,14 @@ ns_set_appearance (struct frame *f, Lisp_Object new_value, Lisp_Object old_value
 }
 
 void
+ns_update_system_appearance (struct frame *f, Lisp_Object new_value)
+{
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101000
+  store_frame_param (f, Qns_appearance, new_value);
+#endif /* MAC_OS_X_VERSION_MAX_ALLOWED >= 101000 */
+}
+
+void
 ns_set_transparent_titlebar (struct frame *f, Lisp_Object new_value,
                              Lisp_Object old_value)
 {
@@ -5627,6 +5635,15 @@ ns_term_shutdown (int sig)
 #endif
 
 #ifdef NS_IMPL_COCOA
+  [[NSDistributedNotificationCenter defaultCenter]
+    addObserver:self
+       selector:@selector(darkModeDidChange:)
+           name:@"AppleInterfaceThemeChangedNotification"
+         object:nil
+   ];
+#endif
+
+#ifdef NS_IMPL_COCOA
   /* Some functions/methods in CoreFoundation/Foundation increase the
      maximum number of open files for the process in their first call.
      We make dummy calls to them and then reduce the resource limit
@@ -5664,6 +5681,36 @@ ns_term_shutdown (int sig)
 #endif
 }
 
+- (void)darkModeDidChange:(NSNotification *)notification
+{
+#ifdef NS_IMPL_COCOA
+  NSTRACE ("[EmacsApp darkModeDidChange:]");
+
+  /* It appears that the AppleInterfaceThemeChangedNotification is
+     sent to the app before the effectiveAppearance is set, so
+     if the effectiveAppearance matches the dark theme, we assume
+     the new theme is the light theme, and vice-versa. */
+  Lisp_Object new_value = [[[self effectiveAppearance]
+                             bestMatchFromAppearancesWithNames:@[
+                                                                 NSAppearanceNameAqua,
+                                                                 NSAppearanceNameDarkAqua
+                                                                 ]
+                            ] isEqualToString:NSAppearanceNameDarkAqua] ? Qlight : Qdark;
+
+  Lisp_Object tail, frame;
+  FOR_EACH_FRAME (tail, frame)
+    {
+      struct frame *f = XFRAME (frame);
+      EmacsView *view = (EmacsView *)FRAME_NS_VIEW (f);
+      EmacsWindow *window = (EmacsWindow *)[view window];
+      ns_update_system_appearance (f, new_value);
+      ns_set_appearance (f, new_value,
+                         (new_value == Qdark ? Qlight : Qdark));
+    }
+
+  run_hook (Qns_dark_mode_changed_hook);
+#endif
+}
 
 /* Termination sequences:
     C-x C-c:
@@ -9934,6 +9981,11 @@ Default is nil.  */);
 Note that this does not apply to images.
 This variable is ignored on Mac OS X < 10.7 and GNUstep.  */);
   ns_use_srgb_colorspace = YES;
+
+  DEFSYM (Qns_dark_mode_changed_hook, "ns-dark-mode-changed-hook");
+
+  DEFVAR_LISP ("ns-dark-mode-changed-hook", Vns_dark_mode_changed_hook,
+               doc: /* Hook run when the Mac OS system-wide UI theme changes from dark to light or vice versa. */);
 
   DEFVAR_BOOL ("ns-use-mwheel-acceleration",
                ns_use_mwheel_acceleration,

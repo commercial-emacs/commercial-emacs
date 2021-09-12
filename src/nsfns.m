@@ -1263,7 +1263,15 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
   else if (EQ (tem, Qlight))
     FRAME_NS_APPEARANCE (f) = ns_appearance_aqua;
   else
-    FRAME_NS_APPEARANCE (f) = ns_appearance_system_default;
+    {
+      tem = [[[NSApp effectiveAppearance]
+               bestMatchFromAppearancesWithNames:@[
+                                                   NSAppearanceNameAqua,
+                                                   NSAppearanceNameDarkAqua
+                                                   ]
+              ] isEqualToString:NSAppearanceNameDarkAqua] ? Qdark : Qlight;
+      FRAME_NS_APPEARANCE (f) = (tem == Qdark ? ns_appearance_vibrant_dark : ns_appearance_aqua);
+    }
   store_frame_param (f, Qns_appearance,
                      (!NILP (tem) && !EQ (tem, Qunbound)) ? tem : Qnil);
 
