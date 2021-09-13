@@ -43,6 +43,7 @@
 (declare-function thread-signal "thread.c" (thread error-symbol data))
 (declare-function thread-yield "thread.c" ())
 (defvar main-thread)
+(defvar-local threads-test-bug48990 "global")
 
 (defclass threads-test-channel ()
   ((condition :initarg :condition :type condition-variable)
@@ -417,8 +418,34 @@
 
 (ert-deftest threads-test-bug48990 ()
   (skip-unless (featurep 'threads))
-  (let ((th (make-thread 'ignore)))
-    (should-not (equal th main-thread))))
+  (thread-last-error t)
+  (with-temp-buffer
+    (let ((success 0))
+      (with-temp-buffer
+        (dotimes (i 5 (progn
+                        (cl-loop repeat 50
+                                 until (zerop (1- (length (all-threads))))
+                                 do (accept-process-output nil 0.2))
+                        (should-not (thread-last-error))
+                        (should (= success i))
+                        (should (equal threads-test-bug48990 (format "local-%d" (1- i))))))
+          (setq threads-test-bug48990 (format "local-%d" i))
+          (should (equal threads-test-bug48990 (format "local-%d" i)))
+          (make-thread
+           (lambda ()
+             (let ((body (lambda ()
+                           (let ((threads-test-bug48990 "let"))
+                             (sleep-for (1+ (random 2)))
+                             (when (equal threads-test-bug48990 "let")
+                               (cl-incf success)))))
+                   (b (concat "*buffer-" (thread-name (current-thread)) "*")))
+               (unwind-protect
+                   (with-current-buffer (get-buffer-create b)
+                     (funcall body))
+                 (let (kill-buffer-query-functions)
+                   (kill-buffer b)))))
+           (format "%d" i))))))
+  (should (equal threads-test-bug48990 "global")))
 
 (ert-deftest threads-test-bug36609-signal ()
   "Would only fail under TEST_INTERACTIVE=yes, and not every time.
@@ -439,7 +466,11 @@ The failure manifests only by being unable to exit the interactive emacs."
     ;; could assume the glib context lock when the main thread executes wait()
     (make-thread notify "notify")
     (funcall wait)
-    (thread-signal herring 'quit nil)))
+    (thread-signal herring 'quit nil))
+  (cl-loop repeat 50
+           until (zerop (1- (length (all-threads))))
+           do (accept-process-output nil 0.2)
+           finally (should (zerop (1- (length (all-threads)))))))
 
 (ert-deftest threads-test-glib-lock ()
   "Would only fail under TEST_INTERACTIVE=yes, and not every time.
@@ -509,5 +540,5 @@ The failure manifests only by being unable to exit the interactive emacs."
                            (nth (random (length procs)) procs) 1.0)
                        finally return nil)))
     (mapc (lambda (b) (kill-buffer b)) buffers))
-  (should (thread-last-error t)))
+  (should-not (thread-last-error)))
 ;;; thread-tests.el ends here
