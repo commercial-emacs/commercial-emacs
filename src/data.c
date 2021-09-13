@@ -1363,7 +1363,7 @@ blv_reflect_current (struct Lisp_Symbol *symbol)
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
   Lisp_Object tem1;
 
-  if (NILP (blv->where)
+  if (! BUFFERP (blv->where)
       || current_buffer != XBUFFER (blv->where))
     {
       set_blv_where (blv, Fcurrent_buffer ());

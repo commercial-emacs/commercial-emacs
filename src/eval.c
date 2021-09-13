@@ -3594,7 +3594,7 @@ specbind (Lisp_Object symbol, Lisp_Object value)
 
 	if (sym->u.s.redirect == SYMBOL_LOCALIZED)
 	  {
-	    if (!blv_found (SYMBOL_BLV (sym)))
+	    if (! blv_found (SYMBOL_BLV (sym)))
 	      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
 	  }
 	else if (BUFFER_OBJFWDP (SYMBOL_FWD (sym)))
@@ -3699,8 +3699,8 @@ rebind_for_thread_switch (void)
     {
       if (bind->kind >= SPECPDL_LET)
 	{
-	  Lisp_Object value = specpdl_saved_value (bind);
-	  Lisp_Object sym = specpdl_symbol (bind);
+	  Lisp_Object sym = specpdl_symbol (bind),
+	    value = specpdl_saved_value (bind);
 	  bind->let.saved_value = Qnil;
           do_specbind (XSYMBOL (sym), bind, value,
                        SET_INTERNAL_THREAD_SWITCH);
