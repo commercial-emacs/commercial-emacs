@@ -1065,7 +1065,7 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
 	    {
 	      /* Symbol is set up for this buffer's old local value:
 	         swap it out!  */
-	      swap_in_global_binding (XSYMBOL (sym));
+	      blv_reflect_global (XSYMBOL (sym));
 	    }
 
           if (!NILP (prop))

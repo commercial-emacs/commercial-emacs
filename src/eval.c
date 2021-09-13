@@ -3568,7 +3568,9 @@ specbind (Lisp_Object symbol, Lisp_Object value)
   switch (sym->u.s.redirect)
     {
     case SYMBOL_VARALIAS:
-      sym = indirect_variable (sym); XSETSYMBOL (symbol, sym); goto start;
+      sym = indirect_variable (sym);
+      XSETSYMBOL (symbol, sym);
+      goto start;
     case SYMBOL_PLAINVAL:
       /* The most common case is that of a non-constant symbol with a
 	 trivial value.  Make that as fast as we can.  */
@@ -3576,8 +3578,6 @@ specbind (Lisp_Object symbol, Lisp_Object value)
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.old_value = SYMBOL_VAL (sym);
       specpdl_ptr->let.saved_value = Qnil;
-      grow_specpdl ();
-      do_specbind (sym, specpdl_ptr - 1, value, SET_INTERNAL_BIND);
       break;
     case SYMBOL_LOCALIZED:
     case SYMBOL_FORWARDED:
@@ -3605,22 +3605,16 @@ specbind (Lisp_Object symbol, Lisp_Object value)
 	       having their own value.  This is consistent with what
 	       happens with other buffer-local variables.  */
 	    if (NILP (Flocal_variable_p (symbol, Qnil)))
-	      {
-		specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
-		grow_specpdl ();
-                do_specbind (sym, specpdl_ptr - 1, value, SET_INTERNAL_BIND);
-		return;
-	      }
+	      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
 	  }
 	else
 	  specpdl_ptr->let.kind = SPECPDL_LET;
-
-	grow_specpdl ();
-        do_specbind (sym, specpdl_ptr - 1, value, SET_INTERNAL_BIND);
 	break;
       }
     default: emacs_abort ();
     }
+  grow_specpdl ();
+  do_specbind (sym, specpdl_ptr - 1, value, SET_INTERNAL_BIND);
 }
 
 /* Push unwind-protect entries of various types.  */
@@ -3708,6 +3702,11 @@ rebind_for_thread_switch (void)
 	  Lisp_Object value = specpdl_saved_value (bind);
 	  Lisp_Object sym = specpdl_symbol (bind);
 	  bind->let.saved_value = Qnil;
+
+	  if (0 == strcmp ("doomsday", SSDATA (Fsymbol_name (sym))))
+	    fprintf (stderr, "rebind %s %s\n", SSDATA (Fbuffer_name (Fcurrent_buffer ())),
+		     SSDATA (value));
+
           do_specbind (XSYMBOL (sym), bind, value,
                        SET_INTERNAL_THREAD_SWITCH);
 	}
@@ -3879,8 +3878,22 @@ unbind_for_thread_switch (struct thread_state *thr)
     {
       if ((--bind)->kind >= SPECPDL_LET)
 	{
+	  struct buffer *saved_current_buffer = current_buffer;
 	  Lisp_Object sym = specpdl_symbol (bind);
+	  Lisp_Object buf = bind->kind > SPECPDL_LET ? specpdl_where (bind) : Qnil;
+	  if (BUFFERP (buf))
+	    current_buffer = XBUFFER (buf);
 	  bind->let.saved_value = find_symbol_value (sym);
+	  current_buffer = saved_current_buffer;
+	  if (0 == strcmp (SSDATA (Fsymbol_name (sym)), "doomsday"))
+	    {
+	      struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (XSYMBOL (sym));
+	      fprintf (stderr, "fsv %s %s %s\n",
+		       blv->fwd.fwdptr ? "1" : "0",
+		       SSDATA (Fbuffer_name (Fcurrent_buffer ())),
+		       SSDATA (bind->let.saved_value));
+	    }
+
           do_one_unbind (bind, false, SET_INTERNAL_THREAD_SWITCH);
 	}
     }

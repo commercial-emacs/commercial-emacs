@@ -38,8 +38,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "frame.h"
 #include "keymap.h"
 
-static void swap_in_symval_forwarding (struct Lisp_Symbol *,
-				       struct Lisp_Buffer_Local_Value *);
+static struct Lisp_Buffer_Local_Value *blv_reflect_current (struct Lisp_Symbol *);
 
 static bool
 BOOLFWDP (lispfwd a)
@@ -663,7 +662,7 @@ global value outside of any lexical scope.  */)
     	  return Qt;
 	else
 	  {
-	    swap_in_symval_forwarding (sym, blv);
+	    blv = blv_reflect_current (sym);
 	    valcontents = blv_value (blv);
 	  }
 	break;
@@ -1146,7 +1145,7 @@ chain of aliases, signal a `cyclic-variable-indirection' error.  */)
 /* Given the raw contents of a symbol value cell,
    return the Lisp value of the symbol.
    This does not handle buffer-local variables; use
-   swap_in_symval_forwarding for that.  */
+   blv_reflect_current for that.  */
 
 Lisp_Object
 do_symval_forwarding (lispfwd valcontents)
@@ -1344,13 +1343,9 @@ store_symval_forwarding (lispfwd valcontents, Lisp_Object newval,
    of BLV are marked after this function has changed them.  */
 
 void
-swap_in_global_binding (struct Lisp_Symbol *symbol)
+blv_reflect_global (struct Lisp_Symbol *symbol)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
-
-  /* Unload the previously loaded binding.  */
-  if (blv->fwd.fwdptr)
-    set_blv_value (blv, do_symval_forwarding (blv->fwd));
 
   /* Select the global binding in the symbol.  */
   set_blv_valcell (blv, blv->defcell);
@@ -1362,45 +1357,24 @@ swap_in_global_binding (struct Lisp_Symbol *symbol)
   set_blv_found (blv, false);
 }
 
-/* Set up the buffer-local symbol SYMBOL for validity in the current buffer.
-   VALCONTENTS is the contents of its value cell,
-   which points to a struct Lisp_Buffer_Local_Value.
-
-   Return the value forwarded one step past the buffer-local stage.
-   This could be another forwarding pointer.  */
-
-static void
-swap_in_symval_forwarding (struct Lisp_Symbol *symbol, struct Lisp_Buffer_Local_Value *blv)
+static struct Lisp_Buffer_Local_Value *
+blv_reflect_current (struct Lisp_Symbol *symbol)
 {
-  register Lisp_Object tem1;
+  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
+  Lisp_Object tem1;
 
-  eassert (blv == SYMBOL_BLV (symbol));
-
-  tem1 = blv->where;
-
-  if (NILP (tem1)
-      || current_buffer != XBUFFER (tem1))
+  if (NILP (blv->where)
+      || current_buffer != XBUFFER (blv->where))
     {
-
-      /* Unload the previously loaded binding.  */
-      tem1 = blv->valcell;
-      if (blv->fwd.fwdptr)
-	set_blv_value (blv, do_symval_forwarding (blv->fwd));
-      /* Choose the new binding.  */
-      {
-	Lisp_Object var;
-	XSETSYMBOL (var, symbol);
-	tem1 = assq_no_quit (var, BVAR (current_buffer, local_var_alist));
-	set_blv_where (blv, Fcurrent_buffer ());
-      }
-      if (!(blv->found = !NILP (tem1)))
-	tem1 = blv->defcell;
-
-      /* Load the new binding.  */
-      set_blv_valcell (blv, tem1);
+      set_blv_where (blv, Fcurrent_buffer ());
+      tem1 = assq_no_quit (make_lisp_symbol (symbol),
+			   BVAR (current_buffer, local_var_alist));
+      blv->found = ! NILP (tem1);
+      set_blv_valcell (blv, blv->found ? tem1 : blv->defcell);
       if (blv->fwd.fwdptr)
 	store_symval_forwarding (blv->fwd, blv_value (blv), NULL);
     }
+  return blv;
 }
 
 /* Find the value of a symbol, returning Qunbound if it's not bound.
@@ -1424,8 +1398,7 @@ find_symbol_value (Lisp_Object symbol)
     case SYMBOL_PLAINVAL: return SYMBOL_VAL (sym);
     case SYMBOL_LOCALIZED:
       {
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
-	swap_in_symval_forwarding (sym, blv);
+	struct Lisp_Buffer_Local_Value *blv = blv_reflect_current (sym);
 	return (blv->fwd.fwdptr
 		? do_symval_forwarding (blv->fwd)
 		: blv_value (blv));
@@ -2112,7 +2085,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
       if (BUFFERP (blv->where) && current_buffer == XBUFFER (blv->where))
         /* Make sure the current value is permanently recorded, if it's the
            default value.  */
-        swap_in_global_binding (sym);
+        blv_reflect_global (sym);
 
       bset_local_var_alist
 	(current_buffer,
@@ -2127,7 +2100,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
          binding in, then that new value would clobber the default binding
          the next time we unload it.  See bug#34318.  */
       if (blv->fwd.fwdptr)
-        swap_in_symval_forwarding (sym, blv);
+        blv_reflect_current (sym);
     }
 
   return variable;
@@ -2191,7 +2164,7 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
   {
     Lisp_Object buf; XSETBUFFER (buf, current_buffer);
     if (EQ (buf, blv->where))
-      swap_in_global_binding (sym);
+      blv_reflect_global (sym);
   }
 
   return variable;
