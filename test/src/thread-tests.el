@@ -415,6 +415,11 @@
   (let ((th (make-thread 'ignore)))
     (should-not (equal th main-thread))))
 
+(ert-deftest threads-test-bug48990 ()
+  (skip-unless (featurep 'threads))
+  (let ((th (make-thread 'ignore)))
+    (should-not (equal th main-thread))))
+
 (ert-deftest threads-test-bug36609-signal ()
   "Would only fail under TEST_INTERACTIVE=yes, and not every time.
 The failure manifests only by being unable to exit the interactive emacs."
