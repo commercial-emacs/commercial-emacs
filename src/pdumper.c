@@ -72,16 +72,30 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_PDUMPER
 
-#if defined (WINDOWSNT)
+
+#if GNUC_PREREQ (4, 7, 0)
+# pragma GCC diagnostic error "-Wshadow"
+#endif
+
+#define VM_POSIX 1
+#define VM_MS_WINDOWS 2
+
+#if defined (HAVE_MMAP) && defined (MAP_FIXED)
+# define VM_SUPPORTED VM_POSIX
+# if !defined (MAP_POPULATE) && defined (MAP_PREFAULT_READ)
+#  define MAP_POPULATE MAP_PREFAULT_READ
+# elif !defined (MAP_POPULATE)
+#  define MAP_POPULATE 0
+# endif
+#elif defined (WINDOWSNT)
   /* Use a float infinity, to avoid compiler warnings in comparing vs
      candidates' score.  */
 # undef INFINITY
 # define INFINITY __builtin_inff ()
 # include <windows.h>
-#endif
-
-#if GNUC_PREREQ (4, 7, 0)
-# pragma GCC diagnostic error "-Wshadow"
+# define VM_SUPPORTED VM_MS_WINDOWS
+#else
+# define VM_SUPPORTED 0
 #endif
 
 
@@ -140,6 +154,8 @@ dump_trace (const char *fmt, ...)
       va_end (args);
     }
 }
+
+static ssize_t dump_read_all (int fd, void *buf, size_t bytes_to_read);
 
 static dump_off
 ptrdiff_t_to_dump_off (ptrdiff_t value)
@@ -5189,6 +5205,31 @@ pdumper_sweep_impl (void)
     mark_bitset.number_words * sizeof (emacs_bitset_word);
   emacs_zero_memory (mark_bitset.bits, nr_bitset_bytes);
 }
+
+
+static ssize_t
+dump_read_all (int fd, void *buf, size_t bytes_to_read)
+{
+  /* We don't want to use emacs_read, since that relies on the lisp
+     world, and we're not in the lisp world yet.  */
+  size_t bytes_read = 0;
+  while (bytes_read < bytes_to_read)
+    {
+      /* Some platforms accept only int-sized values to read.
+         Round this down to a page size (see MAX_RW_COUNT in sysdep.c).  */
+      int max_rw_count = INT_MAX >> 18 << 18;
+      int chunk_to_read = min (bytes_to_read - bytes_read, max_rw_count);
+      ssize_t chunk = read (fd, (char *) buf + bytes_read, chunk_to_read);
+      if (chunk < 0)
+        return chunk;
+      if (chunk == 0)
+        break;
+      bytes_read += chunk;
+    }
+
+  return bytes_read;
+}
+
 
 /* Return the number of bytes written when we perform the given
    relocation.  */
