@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t -*-
+
 (require 'cl-lib)
 (defvar doomsday "global")
 (cl-assert (equal (buffer-name) "*scratch*"))
