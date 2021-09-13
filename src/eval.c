@@ -3702,11 +3702,6 @@ rebind_for_thread_switch (void)
 	  Lisp_Object value = specpdl_saved_value (bind);
 	  Lisp_Object sym = specpdl_symbol (bind);
 	  bind->let.saved_value = Qnil;
-
-	  if (0 == strcmp ("doomsday", SSDATA (Fsymbol_name (sym))))
-	    fprintf (stderr, "rebind %s %s\n", SSDATA (Fbuffer_name (Fcurrent_buffer ())),
-		     SSDATA (value));
-
           do_specbind (XSYMBOL (sym), bind, value,
                        SET_INTERNAL_THREAD_SWITCH);
 	}
@@ -3885,15 +3880,6 @@ unbind_for_thread_switch (struct thread_state *thr)
 	    current_buffer = XBUFFER (buf);
 	  bind->let.saved_value = find_symbol_value (sym);
 	  current_buffer = saved_current_buffer;
-	  if (0 == strcmp (SSDATA (Fsymbol_name (sym)), "doomsday"))
-	    {
-	      struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (XSYMBOL (sym));
-	      fprintf (stderr, "fsv %s %s %s\n",
-		       blv->fwd.fwdptr ? "1" : "0",
-		       SSDATA (Fbuffer_name (Fcurrent_buffer ())),
-		       SSDATA (bind->let.saved_value));
-	    }
-
           do_one_unbind (bind, false, SET_INTERNAL_THREAD_SWITCH);
 	}
     }
