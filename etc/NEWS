@@ -1287,7 +1287,8 @@ the variables 'bookmark-bmenu-use-header-line' and
 ---
 *** New user option 'bookmark-fontify'.
 If non-nil, setting a bookmark will colorize the current line with
-'bookmark-face'.
+'bookmark-face', and jumping to a bookmark will colorize the line the
+bookmark was set on.
 
 ---
 *** New user option 'bookmark-menu-confirm-deletion'.
@@ -3683,8 +3684,7 @@ the current system.
 
 +++
 ** New function 'insert-into-buffer'.
-This is like 'insert-buffer-substring', but works in the opposite
-direction.
+This inserts the contents of the current buffer into another buffer.
 
 +++
 ** New function 'json-available-p'.
