@@ -937,11 +937,16 @@ repository, prompting for the directory and the VC backend to
 use."
   (catch 'found
     ;; First try: find a responsible backend, it must be a backend
-    ;; under which FILE is not yet registered.
-    (dolist (backend vc-handled-backends)
-      (and (not (vc-call-backend backend 'registered file))
-	   (vc-call-backend backend 'responsible-p file)
-	   (throw 'found backend)))
+    ;; under which FILE is not yet registered and with the most
+    ;; specific path to FILE.
+    (let ((max 0) bk)
+      (dolist (backend vc-handled-backends)
+        (when (not (vc-call-backend backend 'registered file))
+          (let* ((path (vc-call-backend backend 'responsible-p file))
+                 (len (length path)))
+            (when (and len (> len max))
+              (setq max len bk backend)))))
+      (when bk (throw 'found bk)))
     ;; no responsible backend
     (let* ((possible-backends
 	    (let (pos)
