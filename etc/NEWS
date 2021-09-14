@@ -2342,10 +2342,12 @@ This specifies the file in which to save the list of known projects.
 This command lets you interactively remove an entry from the list of projects
 in 'project-list-file'.
 
+---
 *** 'project-find-file' now accepts non-existent file names.
 This is to allow easy creation of files inside some nested
 sub-directory.
 
++++
 *** 'project-find-file' doesn't use the string at point as default input.
 Now it's only suggested as part of the "future history".
 
@@ -2521,6 +2523,15 @@ images are marked.
 *** New command 'image-dired-delete-marked'.
 
 ** Flymake mode
+
++++
+*** New command 'flymake-show-project-diagnostics'
+This lists all diagnostics for buffers in the currently active
+project.  The listing is similar to the one obtained by
+'flymake-show-buffer-diagnostics', but adds a column for the
+project-relative file name.  For backends which support it,
+'flymake-show-project-diagnostics' also lists diagnostics for files
+that have not yet been visited.
 
 +++
 *** New user options to customize Flymake's mode-line.
@@ -3372,6 +3383,19 @@ In Emacs 24.3, the variable 'dbus-event-error-hooks' was renamed to
 'dbus-call-method-non-blocking' was renamed to 'dbus-call-method'.
 The old names, which were kept as obsolete aliases of the new names,
 have now been removed.
+
+---
+** 'find-function-source-path' renamed and re-documented.
+The 'find-function' command (and various related commands) were
+documented to respect 'find-function-source-path', and to search for
+objects in files specified by that variable.  It's unclear when this
+actually changed, but at some point (perhaps decades ago) these
+commands started using 'load-history' to determine where symbols had
+been defined (which is much faster).  The doc strings of all the
+affected function has been updated.  'find-function-source-path' was
+still being used by 'find-library' and related commands, so the
+variable has been renamed to 'find-library-source-path', and
+'find-function-source-path' is now an obsolete variable alias.
 
 
 * Lisp Changes in Emacs 28.1
