@@ -663,6 +663,13 @@ AC_ARG_ENABLE([build-details],
   [test "$enableval" = no && BUILD_DETAILS=--no-build-details])
 AC_SUBST([BUILD_DETAILS])
 
+DUMPING_OVERWRITE=
+AC_ARG_ENABLE([dumping-overwrite],
+  [AS_HELP_STRING([--enable-dumping-overwrite],
+		  [Overwrite pdumper artifacts to conserve disk space.])],
+  [test "$enableval" = yes && DUMPING_OVERWRITE=--dumping-overwrite])
+AC_SUBST([DUMPING_OVERWRITE])
+
 dnl This used to use changequote, but, apart from 'changequote is evil'
 dnl per the autoconf manual, we can speed up autoconf somewhat by quoting
 dnl the great gob of text.  Thus it's not processed for possible expansion.

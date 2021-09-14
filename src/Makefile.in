@@ -334,6 +334,9 @@ DYNLIB_OBJ = @DYNLIB_OBJ@
 
 RUN_TEMACS = ./temacs
 
+# Whether loadup should overwrite existing artifacts.
+DUMPING_OVERWRITE = @DUMPING_OVERWRITE@
+
 # Whether builds should contain details. '--no-build-details' or empty.
 BUILD_DETAILS = @BUILD_DETAILS@
 
@@ -556,7 +559,7 @@ emacs$(EXEEXT): temacs$(EXEEXT) \
                 lisp.mk $(etc)/DOC $(lisp) \
                 $(lispsource)/international/charprop.el ${charsets}
 ifeq ($(DUMPING),unexec)
-	LC_ALL=C $(RUN_TEMACS) -batch $(BUILD_DETAILS) -l loadup --temacs=dump
+	LC_ALL=C $(RUN_TEMACS) -batch $(BUILD_DETAILS) $(DUMPING_OVERWRITE) -l loadup --temacs=dump
   ifneq ($(PAXCTL_dumped),)
 	      $(PAXCTL_dumped) emacs$(EXEEXT)
   endif
@@ -567,7 +570,7 @@ endif
 
 ifeq ($(DUMPING),pdumper)
 $(pdmp): emacs$(EXEEXT)
-	LC_ALL=C $(RUN_TEMACS) -batch $(BUILD_DETAILS) -l loadup --temacs=pdump \
+	LC_ALL=C $(RUN_TEMACS) -batch $(BUILD_DETAILS) $(DUMPING_OVERWRITE) -l loadup --temacs=pdump \
 		--bin-dest $(BIN_DESTDIR) --eln-dest $(ELN_DESTDIR)
 	cp -f $@ $(bootstrap_pdmp)
 endif
@@ -781,7 +784,7 @@ $(lispsource)/loaddefs.el: $(VCSWITNESS) | \
 bootstrap-emacs$(EXEEXT): temacs$(EXEEXT)
 	$(MAKE) -C ../lisp update-subdirs
 ifeq ($(DUMPING),unexec)
-	$(RUN_TEMACS) --batch $(BUILD_DETAILS) -l loadup --temacs=bootstrap
+	$(RUN_TEMACS) --batch $(BUILD_DETAILS) $(DUMPING_OVERWRITE) -l loadup --temacs=bootstrap
   ifneq ($(PAXCTL_dumped),)
 	$(PAXCTL_dumped) emacs$(EXEEXT)
   endif
@@ -796,7 +799,7 @@ endif
 ifeq ($(DUMPING),pdumper)
 $(bootstrap_pdmp): bootstrap-emacs$(EXEEXT)
 	rm -f $@
-	$(RUN_TEMACS) --batch $(BUILD_DETAILS) -l loadup --temacs=pbootstrap \
+	$(RUN_TEMACS) --batch $(BUILD_DETAILS) $(DUMPING_OVERWRITE) -l loadup --temacs=pbootstrap \
 		--bin-dest $(BIN_DESTDIR) --eln-dest $(ELN_DESTDIR)
 	@: Compile some files earlier to speed up further compilation.
 	$(MAKE) -C ../lisp compile-first EMACS="$(bootstrap_exe)"
