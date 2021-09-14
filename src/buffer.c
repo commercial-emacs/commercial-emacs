@@ -1065,7 +1065,7 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
 	    {
 	      /* Symbol is set up for this buffer's old local value:
 	         swap it out!  */
-	      blv_reflect_global (XSYMBOL (sym));
+	      symval_restore_default (XSYMBOL (sym));
 	    }
 
           if (!NILP (prop))
@@ -1260,7 +1260,7 @@ buffer_local_value (Lisp_Object variable, Lisp_Object buffer)
 		   in case that is the one we are about to use.  */
 
 		XSETCDR (current_alist_element,
-			 do_symval_forwarding (blv->fwd));
+			 symval_resolve (blv->fwd));
 	      }
 	    /* Now get the (perhaps updated) value out of the binding.  */
 	    result = XCDR (result);

@@ -3562,7 +3562,7 @@ extern uintmax_t cons_to_unsigned (Lisp_Object, uintmax_t);
 extern struct Lisp_Symbol *indirect_variable (struct Lisp_Symbol *);
 extern AVOID args_out_of_range (Lisp_Object, Lisp_Object);
 extern AVOID circular_list (Lisp_Object);
-extern Lisp_Object do_symval_forwarding (lispfwd);
+extern Lisp_Object symval_resolve (lispfwd);
 enum Set_Internal_Bind {
   SET_INTERNAL_SET,
   SET_INTERNAL_BIND,
@@ -3575,7 +3575,7 @@ extern void set_default_internal (Lisp_Object, Lisp_Object,
                                   enum Set_Internal_Bind bindflag);
 extern Lisp_Object expt_integer (Lisp_Object, Lisp_Object);
 extern void syms_of_data (void);
-extern void blv_reflect_global (struct Lisp_Symbol *);
+extern void symval_restore_default (struct Lisp_Symbol *);
 
 /* Defined in cmds.c */
 extern void syms_of_cmds (void);

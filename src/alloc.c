@@ -6495,8 +6495,8 @@ mark_localized_symbol (struct Lisp_Symbol *ptr)
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (ptr);
   Lisp_Object where = blv->where;
   /* If the value is set up for a killed buffer restore its global binding.  */
-  if ((BUFFERP (where) && !BUFFER_LIVE_P (XBUFFER (where))))
-    blv_reflect_global (ptr);
+  if (BUFFERP (where) && ! BUFFER_LIVE_P (XBUFFER (where)))
+    symval_restore_default (ptr);
   mark_object (blv->where);
   mark_object (blv->valcell);
   mark_object (blv->defcell);
