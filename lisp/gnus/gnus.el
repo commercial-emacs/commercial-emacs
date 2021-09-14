@@ -6,7 +6,7 @@
 ;; Author: Masanobu UMEDA <umerin@flab.flab.fujitsu.junet>
 ;;	Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news, mail
-;; Version: 5.14pre
+;; Version: 5.14
 ;; Package-Requires: ((emacs "28"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -296,7 +296,7 @@ is restarted, and sometimes reloaded."
   "D-Bus integration for Gnus."
   :group 'gnus)
 
-(defconst gnus-version-number "5.14pre"
+(defconst gnus-version-number "5.14"
   "Version number for this version of Gnus.")
 
 (defconst gnus-version (format "Gnus v%s" gnus-version-number)
