@@ -304,12 +304,21 @@ variable `checkdoc-common-verbs-wrong-voice' if you wish to add your own."
 Do not set this by hand, use a function like `checkdoc-current-buffer'
 with a universal argument.")
 
-(defcustom checkdoc-symbol-words nil
+(defcustom checkdoc-symbol-words '("byte-code" "command-line" "top-level")
   "A list of symbol names (strings) which also happen to make good words.
 These words are ignored when unquoted symbols are searched for.
 This should be set in an Emacs Lisp file's local variables."
-  :type '(repeat (symbol :tag "Word")))
+  :type '(repeat (symbol :tag "Word"))
+  :version "28.1")
 ;;;###autoload(put 'checkdoc-symbol-words 'safe-local-variable #'checkdoc-list-of-strings-p)
+
+(defcustom checkdoc-column-zero-backslash-before-paren t
+  "Non-nil means to warn if there is no '\\' before '(' in column zero.
+This backslash is no longer needed on Emacs 27.1 or later.
+
+See Info node `(elisp) Documentation Tips' for background."
+  :type 'boolean
+  :version "28.1")
 
 ;;;###autoload
 (defun checkdoc-list-of-strings-p (obj)
@@ -320,7 +329,7 @@ This should be set in an Emacs Lisp file's local variables."
        (not (memq nil (mapcar #'stringp obj)))))
 
 (defvar checkdoc-proper-noun-list
-  '("ispell" "xemacs" "emacs" "lisp")
+  '("ispell" "emacs" "lisp")
   "List of words (not capitalized) which should be capitalized.")
 
 (defvar checkdoc-proper-noun-regexp
@@ -1402,16 +1411,17 @@ buffer, otherwise stop after the first error."
 	      (match-beginning 1)
 	      (match-end 1)))))
      ;; * Check for '(' in column 0.
-     (save-excursion
-       (when (re-search-forward "^(" e t)
-	 (if (checkdoc-autofix-ask-replace (match-beginning 0)
-					   (match-end 0)
-					   (format-message "Escape this `('? ")
-					   "\\(")
-	     nil
-	   (checkdoc-create-error
-	    "Open parenthesis in column 0 should be escaped"
-	    (match-beginning 0) (match-end 0)))))
+     (when checkdoc-column-zero-backslash-before-paren
+       (save-excursion
+         (when (re-search-forward "^(" e t)
+           (if (checkdoc-autofix-ask-replace (match-beginning 0)
+                                     (match-end 0)
+                                     (format-message "Escape this `('? ")
+                                     "\\(")
+               nil
+             (checkdoc-create-error
+              "Open parenthesis in column 0 should be escaped"
+              (match-beginning 0) (match-end 0))))))
      ;; * Do not start or end a documentation string with whitespace.
      (let (start end)
        (if (or (if (looking-at "\"\\([ \t\n]+\\)")
@@ -2016,10 +2026,11 @@ Examples of abbreviations handled: \"e.g.\", \"i.e.\", \"cf.\"."
                     ;; so we need to skip it here too.
                     (? "\\(")
                     ;; The abbreviations:
-                    (or (seq (any "iI") "." (any "eE")) ; i.e.
-                        (seq (any "eE") ".g")           ; e.g.
-                        (seq (any "cC") "f")))          ; c.f.
-                   "vs")                                ; vs.
+                    (or (seq (any "cC") "f")              ; cf.
+                        (seq (any "eE") ".g")             ; e.g.
+                        (seq (any "iI") "." (any "eE")))) ; i.e.
+                   "etc"                                  ; etc.
+                   "vs")                                  ; vs.
                ".")))
       (error t))))
 
