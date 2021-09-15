@@ -789,11 +789,6 @@ the first use of @samp{\\[@dots{}]}.  The text inside the
 @samp{\\<@dots{}>} should be the name of the variable containing the
 local keymap for the major mode.
 
-It is not practical to use @samp{\\[@dots{}]} very many times, because
-display of the documentation string will become slow.  So use this to
-describe the most important commands in your major mode, and then use
-@samp{\\@{@dots{}@}} to display the rest of the mode's keymap.
-
 @item
 For consistency, phrase the verb in the first sentence of a function's
 documentation string as an imperative---for instance, use ``Return the
