@@ -131,7 +131,7 @@ transformed."
 
 (defcustom gnus-search-ignored-newsgroups ""
   "A regexp to match newsgroups in the active file that should
-  be skipped when searching."
+be skipped when searching."
   :version "24.1"
   :type 'regexp)
 
@@ -171,8 +171,7 @@ This variable can also be set per-server."
   :type 'regexp)
 
 (defcustom gnus-search-swish++-raw-queries-p nil
-  "If t, all Swish++ engines will only accept raw search query
-  strings."
+  "If t, all Swish++ engines will only accept raw search query strings."
   :type 'boolean
   :version "28.1")
 
@@ -216,8 +215,7 @@ This variable can also be set per-server."
   :version "28.1")
 
 (defcustom gnus-search-swish-e-raw-queries-p nil
-  "If t, all Swish-e engines will only accept raw search query
-  strings."
+  "If t, all Swish-e engines will only accept raw search query strings."
   :type 'boolean
   :version "28.1")
 
@@ -265,8 +263,7 @@ This variable can also be set per-server."
   :version "28.1")
 
 (defcustom gnus-search-namazu-raw-queries-p nil
-  "If t, all Namazu engines will only accept raw search query
-  strings."
+  "If t, all Namazu engines will only accept raw search query strings."
   :type 'boolean
   :version "28.1")
 
@@ -304,14 +301,12 @@ This variable can also be set per-server."
   :version "28.1")
 
 (defcustom gnus-search-notmuch-raw-queries-p nil
-  "If t, all Notmuch engines will only accept raw search query
-  strings."
+  "If t, all Notmuch engines will only accept raw search query strings."
   :type 'boolean
   :version "28.1")
 
 (defcustom gnus-search-imap-raw-queries-p nil
-  "If t, all IMAP engines will only accept raw search query
-  strings."
+  "If t, all IMAP engines will only accept raw search query strings."
   :version "28.1"
   :type 'boolean)
 
@@ -349,8 +344,7 @@ This variable can also be set per-server."
   :type 'regexp)
 
 (defcustom gnus-search-mairix-raw-queries-p nil
-  "If t, all Mairix engines will only accept raw search query
-  strings."
+  "If t, all Mairix engines will only accept raw search query strings."
   :version "28.1"
   :type 'boolean)
 
@@ -402,7 +396,7 @@ expressions.  Key is most often a mail header, but there are
 other keys.  Value is a string, quoted if it contains spaces.
 Key and value are separated by a colon, no space.  Expressions
 are implicitly ANDed; the \"or\" keyword can be used to
-OR. \"not\" will negate the following expression, or keys can be
+OR.  \"not\" will negate the following expression, or keys can be
 prefixed with a \"-\".  The \"near\" operator will work for
 engines that understand it; other engines will convert it to
 \"or\".  Parenthetical groups work as expected.
@@ -412,7 +406,7 @@ header.
 
 Search keys can be expanded with TAB during entry, or left
 abbreviated so long as they remain unambiguous, ie \"f\" will
-search the \"from\" header. \"s\" will raise an error.
+search the \"from\" header.  \"s\" will raise an error.
 
 Other keys:
 
@@ -432,7 +426,7 @@ It's also possible to use Gnus' internal marks, ie \"mark:R\"
 will be interpreted as mark:read.
 
 \"tag\" will search tags -- right now that's translated to
-\"keyword\" in IMAP, and left as \"tag\" for notmuch. At some
+\"keyword\" in IMAP, and left as \"tag\" for notmuch.  At some
 point this should also be used to search marks in the Gnus
 registry.
 
