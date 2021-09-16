@@ -249,11 +249,18 @@ with these words enabled."
   "List of words that are correct when spell-checking Lisp documentation.")
 ;;;###autoload(put 'checkdoc-ispell-list-words 'safe-local-variable #'checkdoc-list-of-strings-p)
 
-(defcustom checkdoc-max-keyref-before-warn 10
-  "The number of \\ [command-to-keystroke] tokens allowed in a doc string.
+(defcustom checkdoc-max-keyref-before-warn nil
+  "If non-nil, number of \\\\=[command-to-keystroke] tokens allowed in a doc string.
 Any more than this and a warning is generated suggesting that the construct
-\\ {keymap} be used instead."
-  :type 'integer)
+\\\\={keymap} be used instead.  If the value is nil, never warn.
+
+It used to not be practical to use `\\\\=[...]' very many times,
+because display of the documentation string would become slow.
+This is not an issue on modern machines, unless you have
+thousands of substitutions."
+  :type '(choice (const nil)
+                 integer)
+  :version "28.1")
 
 (defcustom checkdoc-arguments-in-order-flag nil
   "Non-nil means warn if arguments appear out of order.
@@ -304,7 +311,10 @@ variable `checkdoc-common-verbs-wrong-voice' if you wish to add your own."
 Do not set this by hand, use a function like `checkdoc-current-buffer'
 with a universal argument.")
 
-(defcustom checkdoc-symbol-words '("byte-code" "command-line" "top-level")
+(defcustom checkdoc-symbol-words
+  '("beginning-of-line" "byte-code" "command-line" "end-of-line"
+    "major-mode" "syntax-table" "top-level" "user-error"
+    "version-control" "window-system")
   "A list of symbol names (strings) which also happen to make good words.
 These words are ignored when unquoted symbols are searched for.
 This should be set in an Emacs Lisp file's local variables."
@@ -329,7 +339,7 @@ See Info node `(elisp) Documentation Tips' for background."
        (not (memq nil (mapcar #'stringp obj)))))
 
 (defvar checkdoc-proper-noun-list
-  '("ispell" "emacs" "lisp")
+  '("emacs" "lisp" "dired")
   "List of words (not capitalized) which should be capitalized.")
 
 (defvar checkdoc-proper-noun-regexp
@@ -361,8 +371,11 @@ See Info node `(elisp) Documentation Tips' for background."
     ("converts" . "convert")
     ("creates" . "create")
     ("destroys" . "destroy")
+    ("determines" . "determine")
     ("disables" . "disable")
+    ("echoes" . "echo")
     ("executes" . "execute")
+    ("extends" . "extend")
     ("evals" . "evaluate")
     ("evaluates" . "evaluate")
     ("finds" . "find")
@@ -387,7 +400,7 @@ See Info node `(elisp) Documentation Tips' for background."
     ("looks" . "look")
     ("makes" . "make")
     ("marks" . "mark")
-    ("matches" . "match")
+    ;;("matches" . "match") ; Leads to almost only false positives.
     ("moves" . "move")
     ("notifies" . "notify")
     ("offers" . "offer")
@@ -413,6 +426,7 @@ See Info node `(elisp) Documentation Tips' for background."
     ("signifies" . "signify")
     ("sorts" . "sort")
     ("starts" . "start")
+    ("steps" . "step")
     ("stores" . "store")
     ("switches" . "switch")
     ("tells" . "tell")
@@ -1543,21 +1557,19 @@ mouse-[0-3]\\)\\)\\>"))
 	       " embedded in doc string.  Use \\\\<keymap> & \\\\[function] "
 	       "instead")
 	      (match-beginning 1) (match-end 1) t))))
-     ;; It is not practical to use `\\[...]' very many times, because
-     ;; display of the documentation string will become slow.  So use this
-     ;; to describe the most important commands in your major mode, and
-     ;; then use `\\{...}' to display the rest of the mode's keymap.
-     (save-excursion
-       (if (and (re-search-forward "\\\\\\\\\\[\\w+" e t
-				   (1+ checkdoc-max-keyref-before-warn))
-		(not (re-search-forward "\\\\\\\\{\\w+}" e t)))
-	   (checkdoc-create-error
-	    "Too many occurrences of \\[function].  Use \\{keymap} instead"
-	    s (marker-position e))))
+     ;; Optionally warn about too many command substitutions.
+     (when checkdoc-max-keyref-before-warn
+       (save-excursion
+         (if (and (re-search-forward "\\\\\\\\\\[\\w+" e t
+                                     (1+ checkdoc-max-keyref-before-warn))
+                  (not (re-search-forward "\\\\\\\\{\\w+}" e t)))
+             (checkdoc-create-error
+              "Too many occurrences of \\[function].  Use \\{keymap} instead"
+              s (marker-position e)))))
      ;; Ambiguous quoted symbol.  When a symbol is both bound and fbound,
      ;; and is referred to in documentation, it should be prefixed with
      ;; something to disambiguate it.  This check must be before the
-     ;; 80 column check because it will probably break that.
+     ;; 80 column check because it might break that.
      (save-excursion
        (let ((case-fold-search t)
 	     (ret nil) mb me)
@@ -2030,7 +2042,10 @@ Examples of abbreviations handled: \"e.g.\", \"i.e.\", \"cf.\"."
                         (seq (any "eE") ".g")             ; e.g.
                         (seq (any "iI") "." (any "eE")))) ; i.e.
                    "etc"                                  ; etc.
-                   "vs")                                  ; vs.
+                   "vs"                                   ; vs.
+                   ;; Some non-standard or less common ones that we
+                   ;; might as well ignore.
+                   "Inc" "Univ" "misc" "resp")
                ".")))
       (error t))))
 
