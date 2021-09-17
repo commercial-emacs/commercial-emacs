@@ -4113,7 +4113,6 @@ intern_c_string (const char *str)
 }
 
 /* Defined in eval.c.  */
-extern EMACS_INT minibuffer_quit_level;
 extern Lisp_Object Vautoload_queue;
 extern Lisp_Object Vrun_hooks;
 extern Lisp_Object Vsignaling_function;
