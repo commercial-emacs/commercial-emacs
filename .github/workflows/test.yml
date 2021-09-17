@@ -1,13 +1,6 @@
 name: CI
 
 on:
-  pull_request:
-    paths-ignore:
-    - '**.rst'
-    - '**.org'
-    - '**.texi'
-    - '**.info'
-    - 'ChangeLog.**'
   push:
     paths-ignore:
     - '**.rst'
