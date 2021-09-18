@@ -944,13 +944,15 @@ insert_1_both (const char *string,
     set_text_properties (make_fixnum (PT), make_fixnum (PT + nchars),
 			 Qnil, Qnil, Qnil);
 
+#ifdef HAVE_TREE_SITTER
+  eassert (nbytes >= 0);
+  eassert (PT_BYTE >= 0);
+  ts_record_change (PT_BYTE, PT_BYTE, PT_BYTE + nbytes);
+#endif
+
   adjust_point (nchars, nbytes);
 
   check_markers ();
-
-#ifdef HAVE_TREE_SITTER
-      ts_record_change (PT_BYTE - nbytes, PT_BYTE - nbytes, PT_BYTE);
-#endif
 }
 
 /* Insert the part of the text of STRING, a Lisp object assumed to be
@@ -1079,13 +1081,15 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
   graft_intervals_into_buffer (intervals, PT, nchars,
 			       current_buffer, inherit);
 
+#ifdef HAVE_TREE_SITTER
+  eassert (nbytes >= 0);
+  eassert (PT_BYTE >= 0);
+  ts_record_change (PT_BYTE, PT_BYTE, PT_BYTE + nbytes);
+#endif
+
   adjust_point (nchars, outgoing_nbytes);
 
   check_markers ();
-
-#ifdef HAVE_TREE_SITTER
-  ts_record_change (PT_BYTE - nbytes, PT_BYTE - nbytes, PT_BYTE);
-#endif
 }
 
 /* Insert a sequence of NCHARS chars which occupy NBYTES bytes
@@ -1149,14 +1153,16 @@ insert_from_gap (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
 				   current_buffer, 0);
     }
 
+#ifdef HAVE_TREE_SITTER
+  eassert (nbytes >= 0);
+  eassert (ins_bytepos >= 0);
+  ts_record_change (ins_bytepos, ins_bytepos, ins_bytepos + nbytes);
+#endif
+
   if (ins_charpos < PT)
     adjust_point (nchars, nbytes);
 
   check_markers ();
-
-#ifdef HAVE_TREE_SITTER
-  ts_record_change (PT_BYTE - nbytes, PT_BYTE - nbytes, nbytes);
-#endif
 }
 
 /* Insert text from BUF, NCHARS characters starting at CHARPOS, into the
@@ -1303,12 +1309,13 @@ insert_from_buffer_1 (struct buffer *buf,
   /* Insert those intervals.  */
   graft_intervals_into_buffer (intervals, PT, nchars, current_buffer, inherit);
 
-  adjust_point (nchars, outgoing_nbytes);
-
 #ifdef HAVE_TREE_SITTER
-  ts_record_change (PT_BYTE - outgoing_nbytes,
-		    PT_BYTE - outgoing_nbytes, PT_BYTE);
+  eassert (outgoing_nbytes >= 0);
+  eassert (PT_BYTE >= 0);
+  ts_record_change (PT_BYTE, PT_BYTE, PT_BYTE + outgoing_nbytes);
 #endif
+
+  adjust_point (nchars, outgoing_nbytes);
 }
 
 /* Record undo information and adjust markers and position keepers for
@@ -1555,6 +1562,13 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   /* Insert those intervals.  */
   graft_intervals_into_buffer (intervals, from, inschars,
 			       current_buffer, inherit);
+
+#ifdef HAVE_TREE_SITTER
+  eassert (to_byte >= from_byte);
+  eassert (outgoing_insbytes >= 0);
+  eassert (from_byte >= 0);
+  ts_record_change (from_byte, to_byte, from_byte + outgoing_insbytes);
+#endif
 
   /* Relocate point as if it were a marker.  */
   if (from < PT)
@@ -1922,6 +1936,8 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   evaporate_overlays (from);
 
 #ifdef HAVE_TREE_SITTER
+  eassert (from_byte <= to_byte);
+  eassert (from_byte >= 0);
   ts_record_change (from_byte, to_byte, from_byte);
 #endif
 

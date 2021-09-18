@@ -24,7 +24,6 @@
 
 (ert-deftest tree-sitter-basic-parsing ()
   "Test basic parsing routines."
-  (require 'tree-sitter-json)
   (with-temp-buffer
     (let ((parser (tree-sitter-parser-create
                    (current-buffer) 'tree-sitter-json)))
@@ -52,7 +51,6 @@
 
 (ert-deftest tree-sitter-node-api ()
   "Tests for node API."
-  (require 'tree-sitter-json)
   (with-temp-buffer
     (let (parser root-node doc-node object-node pair-node)
       (progn
@@ -124,7 +122,6 @@
 
 (ert-deftest tree-sitter-query-api ()
   "Tests for query API."
-  (require 'tree-sitter-json)
   (with-temp-buffer
     (let (parser root-node pattern doc-node object-node pair-node)
       (progn
@@ -152,7 +149,6 @@
 
 (ert-deftest tree-sitter-narrow ()
   "Tests if narrowing works."
-  (require 'tree-sitter-json)
   (with-temp-buffer
     (let (parser root-node pattern doc-node object-node pair-node)
       (progn
@@ -206,7 +202,6 @@
 
 (ert-deftest tree-sitter-range ()
   "Tests if range works."
-  (require 'tree-sitter-json)
   (with-temp-buffer
     (let (parser root-node pattern doc-node object-node pair-node)
       (progn
@@ -233,9 +228,6 @@
 
 (ert-deftest tree-sitter-multi-lang ()
   "Tests if parsing multiple language works."
-  (require 'tree-sitter-html)
-  (require 'tree-sitter-css)
-  (require 'tree-sitter-javascript)
   (with-temp-buffer
     (let (html css js html-range css-range js-range)
       (progn
@@ -271,6 +263,7 @@
 ;; - Functions in tree-sitter.el
 ;; - tree-sitter-node-eq
 ;; - tree-sitter-node-text
+;; - tree-sitter-load-name-list
 
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here

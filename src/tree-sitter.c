@@ -32,13 +32,13 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
      parser object, and updating the tree is handled in the C level.
 
    - We don't expose tree cursor either.  I think Lisp is slow enough
-     to nullify any performance advantage of using a cursor, but I
+     to nullify any performance advantage of using a cursor, though I
      don't have evidence.
 
    - Because updating the change is handled in the C level as each
-     change is made in the buffer, there is no way for Lisp to
-     retrieve a node and update it.  But since we can just retrieve a
-     new node, it shouldn't be a limitation.
+     change is made in the buffer, there is no way for Lisp to update
+     a node.  But since we can just retrieve a new node, it shouldn't
+     be a limitation.
 
    - I didn't expose setting timeout and cancellation flag for a
      parser, mainly because I don't think they are really necessary
@@ -70,6 +70,145 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    Correspondence.
  */
 
+/*** Loading language library */
+
+/* Translates a symbol tree-sitter-<lang> to a C name
+   tree_sitter_<lang>.  */
+void
+ts_symbol_to_c_name (char *symbol_name)
+{
+  for (int idx=0; idx < strlen (symbol_name); idx++)
+    {
+      if (symbol_name[idx] == '-')
+	symbol_name[idx] = '_';
+    }
+}
+
+bool
+ts_find_override_name
+(Lisp_Object language_symbol, Lisp_Object *name, Lisp_Object *c_symbol)
+{
+  Lisp_Object list = Vtree_sitter_load_name_list;
+  while (!NILP (list))
+    {
+      Lisp_Object lang = XCAR (XCAR (list));
+      CHECK_SYMBOL (lang);
+      if (EQ (lang, language_symbol))
+	{
+	  *name = Fnth (make_fixnum (1), XCAR (list));
+	  CHECK_STRING (*name);
+	  *c_symbol = Fnth (make_fixnum (2), XCAR (list));
+	  CHECK_STRING (*c_symbol);
+	  return true;
+	}
+      list = XCDR (list);
+    }
+  return false;
+}
+
+/* Load the dynamic library of LANGUAGE_SYMBOL and return the pointer
+   to the language definition.  Signals
+   Qtree_sitter_load_language_error if something goes wrong.
+   Qtree_sitter_load_language_error carries the error message from
+   trying to load the library with each extension.
+
+   If SIGNAL is true, signal an error when failed to load LANGUAGE; if
+   false, return NULL when failed.  */
+TSLanguage*
+ts_load_language (Lisp_Object language_symbol, bool signal)
+{
+  CHECK_SYMBOL (language_symbol);
+  Lisp_Object symbol_name = Fsymbol_name (language_symbol);
+
+  /* Figure out the library name and C name.  */
+  Lisp_Object lib_base_name =
+    (concat2 (build_pure_c_string ("lib"), symbol_name));
+  char *c_name = strdup (SSDATA (symbol_name));
+  ts_symbol_to_c_name (c_name);
+
+  /* Override the library name and C name, if appropriate.  */
+  Lisp_Object override_name;
+  Lisp_Object override_c_name;
+  bool found_override = ts_find_override_name
+    (language_symbol, &override_name, &override_c_name);
+  if (found_override)
+    {
+      lib_base_name = override_name;
+      c_name = SSDATA (override_c_name);
+    }
+
+  Lisp_Object suffixes = Vdynamic_library_suffixes;
+  dynlib_handle_ptr handle;
+  char const *error;
+  Lisp_Object error_list = Qnil;
+  /* Try loading dynamic library with each extension in
+     'tree-sitter-load-suffixes'.  Stop when succeed, record error
+     message and try the next one when fail.  */
+  while (!NILP (suffixes))
+    {
+      char *library_name =
+	SSDATA (concat2 (lib_base_name, XCAR (suffixes)));
+      dynlib_error ();
+      handle = dynlib_open (library_name);
+      error = dynlib_error ();
+      if (error == NULL)
+	break;
+      else
+	error_list = Fcons (build_string (error), error_list);
+      suffixes = XCDR (suffixes);
+    }
+  if (error != NULL)
+    {
+      if (signal)
+	xsignal2 (Qtree_sitter_load_language_error,
+		  symbol_name, Freverse (error_list));
+      else
+	return NULL;
+    }
+
+  /* Load TSLanguage.  */
+  dynlib_error ();
+  TSLanguage *(*langfn) ();
+  langfn = dynlib_sym (handle, c_name);
+  error = dynlib_error ();
+  if (error != NULL)
+    {
+      if (signal)
+	xsignal1 (Qtree_sitter_load_language_error,
+		  build_string (error));
+      else
+	return NULL;
+    }
+  TSLanguage *lang = (*langfn) ();
+
+  /* Check if language version matches tree-sitter version.  */
+  TSParser *parser = ts_parser_new ();
+  bool success = ts_parser_set_language (parser, lang);
+  ts_parser_delete (parser);
+  if (!success)
+    {
+      if (signal)
+	xsignal2 (Qtree_sitter_load_language_error,
+		  build_pure_c_string ("Language version doesn't match tree-sitter version, language version:"),
+		  make_fixnum (ts_language_version (lang)));
+      else
+	return NULL;
+    }
+  return lang;
+}
+
+DEFUN ("tree-sitter-language-exists-p",
+       Ftree_sitter_langauge_exists_p, Stree_sitter_language_exists_p,
+       1, 1, 0,
+       doc: /* Return non-nil if LANGUAGE exists and is loadable.  */)
+  (Lisp_Object language)
+{
+  if (ts_load_language(language, false) == NULL)
+    return Qnil;
+  else
+    return Qt;
+}
+
 /*** Parsing functions */
 
 /* An auxiliary function that saves a few lines of code.  */
@@ -96,37 +235,35 @@ ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 
   while (!NILP (parser_list))
     {
-      Lisp_Object lisp_parser = Fcar (parser_list);
+      Lisp_Object lisp_parser = XCAR (parser_list);
       TSTree *tree = XTS_PARSER (lisp_parser)->tree;
       if (tree != NULL)
 	{
-	  /* If we put these assertions outside, they would run a lot
-	     and sometimes fail (in 'revert-buffer', for some reason).
-	     Better only check when we actually update some
-	     parsers.  */
 	  eassert (start_byte <= old_end_byte);
 	  eassert (start_byte <= new_end_byte);
-	  /* We "clip" the change to between visible_beg and
-	     visible_end.  It is okay if visible_end ends up larger
-	     than BUF_Z, tree-sitter only access buffer text during
-	     re-parse, and we will adjust visible_beg/end before
-	     re-parse.  */
+	  /* Think the recorded change as a delete followed by an
+	     insert, and think of them as moving unchanged text back
+	     and forth.  After all, the whole point of updating the
+	     tree is to update the position of unchanged text.  */
+	  ptrdiff_t bytes_del = old_end_byte - start_byte;
+	  ptrdiff_t bytes_ins = new_end_byte - start_byte;
+
 	  ptrdiff_t visible_beg = XTS_PARSER (lisp_parser)->visible_beg;
 	  ptrdiff_t visible_end = XTS_PARSER (lisp_parser)->visible_end;
 
-	  ptrdiff_t visible_start =
+	  ptrdiff_t affected_start =
 	    max (visible_beg, start_byte) - visible_beg;
-	  ptrdiff_t visible_old_end =
-	    min (visible_end, old_end_byte) - visible_beg;
-	  ptrdiff_t visible_new_end =
-	    min (visible_end, new_end_byte) - visible_beg;
+	  ptrdiff_t affected_old_end =
+	    min (visible_end, affected_start + bytes_del);
+	  ptrdiff_t affected_new_end =
+	    affected_start + bytes_ins;
 
-	  ts_tree_edit_1 (tree, visible_start, visible_old_end,
-			  visible_new_end);
+	  ts_tree_edit_1 (tree, affected_start, affected_old_end,
+			  affected_new_end);
+	  XTS_PARSER (lisp_parser)->visible_end = affected_new_end;
 	  XTS_PARSER (lisp_parser)->need_reparse = true;
-
-	  parser_list = Fcdr (parser_list);
 	}
+      parser_list = XCDR (parser_list);
     }
 }
 
@@ -143,9 +280,9 @@ ts_ensure_position_synced (Lisp_Object parser)
   ptrdiff_t visible_beg = XTS_PARSER (parser)->visible_beg;
   ptrdiff_t visible_end = XTS_PARSER (parser)->visible_end;
   /* Before re-parse, we want to move the visible range of tree-sitter
-     to matched the narrowed range. For example:
-     Move ________|____|__
-     to   |____|__________ */
+     to matched the narrowed range. For example,
+     from ________|xxxx|__
+     to   |xxxx|__________ */
 
   /* 1. Make sure visible_beg <= BUF_BEGV_BYTE.  */
   if (visible_beg > BUF_BEGV_BYTE (buffer))
@@ -178,6 +315,9 @@ ts_ensure_position_synced (Lisp_Object parser)
       ts_tree_edit_1 (tree, 0, BUF_BEGV_BYTE (buffer) - visible_beg, 0);
       visible_beg = BUF_BEGV_BYTE (buffer);
     }
+  eassert (0 <= visible_beg);
+  eassert (visible_beg <= visible_end);
+
   XTS_PARSER (parser)->visible_beg = visible_beg;
   XTS_PARSER (parser)->visible_end = visible_end;
 }
@@ -257,13 +397,13 @@ ts_read_buffer (void *parser, uint32_t byte_index,
      branches separately.)  */
   if (!BUFFER_LIVE_P (buffer))
     {
-      beg = "";
+      beg = NULL;
       len = 0;
     }
   /* Reached visible end-of-buffer, tell tree-sitter to read no more.  */
   else if (byte_pos >= visible_end)
     {
-      beg = "";
+      beg = NULL;
       len = 0;
     }
   /* Normal case, read a character.  */
@@ -360,7 +500,9 @@ function provided by a tree-sitter language dynamic module, e.g.,
   /* LANGUAGE is a function that returns a USER_PTR that contains the
      pointer to a TSLanguage struct.  */
   TSParser *parser = ts_parser_new ();
-  TSLanguage *lang = (XUSER_PTR (Ffuncall (1, &language))->p);
+  TSLanguage *lang = ts_load_language (language, true);
+  /* We check language version when loading a language, so this should
+     always succeed.  */
   ts_parser_set_language (parser, lang);
 
   Lisp_Object lisp_parser
@@ -494,7 +636,8 @@ is nil, set PARSER to parse the whole buffer.  */)
 
   if (!success)
     xsignal2 (Qtree_sitter_set_range_error, ranges,
-	      build_string ("Something went wrong when setting ranges"));
+	      build_pure_c_string
+	      ("Something went wrong when setting ranges"));
 
   XTS_PARSER (parser)->need_reparse = true;
   return Qnil;
@@ -1018,6 +1161,8 @@ info node for how to read the error message.  */)
   return Freverse (result);
 }
 
+/*** Initialization */
+
 /* Initialize the tree-sitter routines.  */
 void
 syms_of_tree_sitter (void)
@@ -1035,6 +1180,8 @@ syms_of_tree_sitter (void)
   DEFSYM (Qtree_sitter_parse_error, "tree-sitter-parse-error");
   DEFSYM (Qtree_sitter_set_range_error, "tree-sitter-set-range-error");
   DEFSYM (Qtree_sitter_size_error, "tree-sitter-size-error");
+  DEFSYM (Qtree_sitter_load_language_error,
+	  "tree-sitter-load-language-error");
 
   define_error (Qtree_sitter_error, "Generic tree-sitter error", Qerror);
   define_error (Qtree_sitter_query_error, "Query pattern is malformed",
@@ -1046,7 +1193,9 @@ syms_of_tree_sitter (void)
 		Qtree_sitter_error);
   define_error (Qtree_sitter_size_error, "Buffer too large (> 4GB)",
 		Qtree_sitter_error);
-
+  define_error (Qtree_sitter_load_language_error,
+		"Cannot load language definition",
+		Qtree_sitter_error);
 
   DEFSYM (Qtree_sitter_parser_list, "tree-sitter-parser-list");
   DEFVAR_LISP ("tree-sitter-parser-list", Vtree_sitter_parser_list,
@@ -1058,6 +1207,24 @@ If removed and put back in, there is no guarantee that the parser is in
 sync with the buffer's content.  */);
   Vtree_sitter_parser_list = Qnil;
   Fmake_variable_buffer_local (Qtree_sitter_parser_list);
+
+  DEFVAR_LISP ("tree-sitter-load-name-list",
+	       Vtree_sitter_load_name_list,
+	       doc:
+	       /* An override alist for irregular tree-sitter libraries.
+
+By default, Emacs assumes the dynamic library for tree-sitter-<lang>
+is libtree-sitter-<lang>.<ext>, where <ext> is the OS specific
+extension for dynamic libraries.  Emacs also assumes that the name of
+the C function the library provides is tree_sitter_<lang>. If that is
+not the case, add an entry
+
+    (LANGUAGE-SYMBOL LIBRARY-BASE-NAME C-SYMBOL-NAME)
+
+to this alist, where LIBRARY-BASE-NAME is the filename of the dynamic
+library without extension, C-SYMBOL-NAME is the C function that
+returns a TSLanguage pointer.  */);
+  Vtree_sitter_load_name_list = Qnil;
 
   defsubr (&Stree_sitter_parser_p);
   defsubr (&Stree_sitter_node_p);

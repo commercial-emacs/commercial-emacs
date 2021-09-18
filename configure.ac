@@ -3726,20 +3726,31 @@ if test "${HAVE_ZLIB}" = "yes"; then
 fi
 AC_SUBST(LIBZ)
 
+### Dynamic library support
+case $opsys in
+  cygwin|mingw32) DYNAMIC_LIB_SUFFIX=".dll" ;;
+  darwin) DYNAMIC_LIB_SUFFIX=".dylib" ;;
+  *) DYNAMIC_LIB_SUFFIX=".so" ;;
+esac
+case "${opsys}" in
+  darwin) DYNAMIC_LIB_SECONDARY_SUFFIX='.so' ;;
+  *) DYNAMIC_LIB_SECONDARY_SUFFIX='' ;;
+esac
+AC_DEFINE_UNQUOTED(DYNAMIC_LIB_SUFFIX, "$DYNAMIC_LIB_SUFFIX",
+  [System extension for dynamic libraries])
+AC_DEFINE_UNQUOTED(DYNAMIC_LIB_SECONDARY_SUFFIX, "$DYNAMIC_LIB_SECONDARY_SUFFIX",
+  [Alternative system extension for dynamic libraries.])
+
+AC_SUBST(DYNAMIC_LIB_SUFFIX)
+AC_SUBST(DYNAMIC_LIB_SECONDARY_SUFFIX)
+
 ### Dynamic modules support
 LIBMODULES=
 HAVE_MODULES=no
 MODULES_OBJ=
 NEED_DYNLIB=no
-case $opsys in
-  cygwin|mingw32) MODULES_SUFFIX=".dll" ;;
-  darwin) MODULES_SUFFIX=".dylib" ;;
-  *) MODULES_SUFFIX=".so" ;;
-esac
-case "${opsys}" in
-  darwin) MODULES_SECONDARY_SUFFIX='.so' ;;
-  *) MODULES_SECONDARY_SUFFIX='' ;;
-esac
+MODULES_SUFFIX="${DYNAMIC_LIB_SUFFIX}"
+MODULES_SECONDARY_SUFFIX="${DYNAMIC_LIB_SECONDARY_SUFFIX}"
 if test "${with_modules}" != "no"; then
   case $opsys in
     gnu|gnu-linux)
@@ -3770,10 +3781,10 @@ if test "${HAVE_MODULES}" = yes; then
    NEED_DYNLIB=yes
    AC_DEFINE(HAVE_MODULES, 1, [Define to 1 if dynamic modules are enabled])
    AC_DEFINE_UNQUOTED(MODULES_SUFFIX, "$MODULES_SUFFIX",
-     [System extension for dynamic libraries])
+     [System extension for dynamic modules])
    if test -n "${MODULES_SECONDARY_SUFFIX}"; then
      AC_DEFINE_UNQUOTED(MODULES_SECONDARY_SUFFIX, "$MODULES_SECONDARY_SUFFIX",
-       [Alternative system extension for dynamic libraries.])
+       [Alternative system extension for dynamic modules.])
    fi
 fi
 AC_SUBST(MODULES_OBJ)
