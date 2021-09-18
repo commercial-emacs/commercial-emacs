@@ -29,11 +29,12 @@
 ;; to forget.  The main checkdoc engine will perform the stylistic
 ;; checks needed to make sure these styles are remembered.
 ;;
-;; There are two ways to use checkdoc:
-;;   1) Periodically use `checkdoc' or `checkdoc-current-buffer'.
+;; There are three ways to use checkdoc:
+;;   1) Use `flymake-mode'.
+;;   2) Periodically use `checkdoc' or `checkdoc-current-buffer'.
 ;;      `checkdoc' is a more interactive version of
 ;;      `checkdoc-current-buffer'
-;;   2) Use `checkdoc-minor-mode' to automatically check your
+;;   3) Use `checkdoc-minor-mode' to automatically check your
 ;;      documentation whenever you evaluate Lisp code with C-M-x
 ;;      or [menu-bar emacs-lisp eval-buffer].  Additional key-bindings
 ;;      are also provided under C-c ? KEY
@@ -463,7 +464,7 @@ be re-created.")
   "Interactively check the entire buffer for style errors.
 The current status of the check will be displayed in a buffer which
 the users will view as each check is completed."
-  (interactive)
+  (interactive nil emacs-lisp-mode)
   (let ((status (list "Checking..." "-" "-" "-"))
 	(checkdoc-spellcheck-documentation-flag
 	 (car (memq checkdoc-spellcheck-documentation-flag
@@ -530,7 +531,7 @@ buffer.  Allows navigation forward and backwards through document
 errors.  Does not check for comment or space warnings.
 Optional argument SHOWSTATUS indicates that we should update the
 checkdoc status window instead of the usual behavior."
-  (interactive "P")
+  (interactive "P" emacs-lisp-mode)
   (let ((checkdoc-spellcheck-documentation-flag
 	 (car (memq checkdoc-spellcheck-documentation-flag
                     '(interactive t)))))
@@ -551,7 +552,7 @@ buffer.  Allows navigation forward and backwards through document
 errors.  Does not check for comment or space warnings.
 Optional argument SHOWSTATUS indicates that we should update the
 checkdoc status window instead of the usual behavior."
-  (interactive "P")
+  (interactive "P" emacs-lisp-mode)
   (let ((checkdoc-spellcheck-documentation-flag
 	 (car (memq checkdoc-spellcheck-documentation-flag
                     '(interactive t)))))
@@ -851,7 +852,7 @@ spacing are all verified."
 With a prefix argument (in Lisp, the argument TAKE-NOTES),
 store all errors found in a warnings buffer,
 otherwise stop after the first error."
-  (interactive "P")
+  (interactive "P" emacs-lisp-mode)
   (if (called-interactively-p 'interactive)
       (message "Checking buffer for style..."))
   ;; Assign a flag to spellcheck flag
@@ -890,7 +891,7 @@ Only documentation strings are checked.
 Use `checkdoc-continue' to continue checking if an error cannot be fixed.
 Prefix argument TAKE-NOTES means to collect all the warning messages into
 a separate buffer."
-  (interactive "P")
+  (interactive "P" emacs-lisp-mode)
   (let ((p (point)))
     (goto-char (point-min))
     (if (and take-notes (called-interactively-p 'interactive))
@@ -905,7 +906,7 @@ a separate buffer."
   "Find the next doc string in the current buffer which has a style error.
 Prefix argument TAKE-NOTES means to continue through the whole
 buffer and save warnings in a separate buffer."
-  (interactive "P")
+  (interactive "P" emacs-lisp-mode)
   (let ((wrong nil) (msg nil)
 	;; Assign a flag to spellcheck flag
 	(checkdoc-spellcheck-documentation-flag
@@ -974,7 +975,7 @@ don't move point."
 Prefix argument TAKE-NOTES non-nil means to save warnings in a
 separate buffer.  Otherwise print a message.  This returns the error
 if there is one."
-  (interactive "P")
+  (interactive "P" emacs-lisp-mode)
   (if take-notes (checkdoc-start-section "checkdoc-comments"))
   (if (not buffer-file-name)
       (error "Can only check comments for a file buffer"))
@@ -996,7 +997,7 @@ Prefix argument TAKE-NOTES non-nil means to save warnings in a
 separate buffer.  Otherwise print a message.  This returns the error
 if there is one.
 Optional argument INTERACT permits more interactive fixing."
-  (interactive "P")
+  (interactive "P" emacs-lisp-mode)
   (if take-notes (checkdoc-start-section "checkdoc-rogue-spaces"))
   (let* ((checkdoc-autofix-flag (if take-notes 'never checkdoc-autofix-flag))
 	 (e (checkdoc-rogue-space-check-engine nil nil interact))
@@ -1013,7 +1014,7 @@ Optional argument INTERACT permits more interactive fixing."
 (defun checkdoc-message-text (&optional take-notes)
   "Scan the buffer for occurrences of the error function, and verify text.
 Optional argument TAKE-NOTES causes all errors to be logged."
-  (interactive "P")
+  (interactive "P" emacs-lisp-mode)
   (if take-notes (checkdoc-start-section "checkdoc-message-text"))
   (let* ((p (point)) e
 	 (checkdoc-autofix-flag (if take-notes 'never checkdoc-autofix-flag))
