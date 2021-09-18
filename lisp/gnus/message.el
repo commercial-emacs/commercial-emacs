@@ -4391,7 +4391,7 @@ It should typically alter the sending method in some way or other."
 	(run-hooks 'message-sent-hook))
       (message "Sending...done")
       ;; Do ecomplete address snarfing.
-      (when (and (message-mail-alias-type-p 'ecomplete)
+      (when (and (bound-and-true-p ecomplete-database)
 		 (not message-inhibit-ecomplete))
 	(message-put-addresses-in-ecomplete))
       ;; Mark the buffer as unmodified and delete auto-save.
