@@ -129,23 +129,33 @@
         (setq parser (tree-sitter-parser-create
                       (current-buffer) 'tree-sitter-json))
         (setq root-node (tree-sitter-parser-root-node
-                         parser))
-        (setq pattern "(string) @string
-(pair key: (_) @keyword)
-(number) @number"))
+                         parser)))
 
-      (should
-       (equal
-        '((number . "1") (number . "2")
-          (keyword . "\"name\"")
-          (string . "\"name\"")
-          (string . "\"Bob\"")
-          (number . "3"))
-        (mapcar (lambda (entry)
-                  (cons (car entry)
-                        (tree-sitter-node-text
-                         (cdr entry))))
-                (tree-sitter-query-capture root-node pattern)))))))
+      (dolist (pattern
+               '("(string) @string
+(pair key: (_) @keyword)
+(number) @number"
+                 ((string) @string
+                  (pair key: (_) @keyword)
+                  (number) @number)))
+        (should
+         (equal
+          '((number . "1") (number . "2")
+            (keyword . "\"name\"")
+            (string . "\"name\"")
+            (string . "\"Bob\"")
+            (number . "3"))
+          (mapcar (lambda (entry)
+                    (cons (car entry)
+                          (tree-sitter-node-text
+                           (cdr entry))))
+                  (tree-sitter-query-capture root-node pattern))))
+        (should
+         (equal
+          "(type field: (_) @capture .) ? * + \"return\""
+          (tree-sitter-expand-pattern
+           '((type field: (_) @capture :anchor)
+             :? :* :+ "return"))))))))
 
 (ert-deftest tree-sitter-narrow ()
   "Tests if narrowing works."

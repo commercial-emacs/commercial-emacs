@@ -88,7 +88,7 @@ bool
 ts_find_override_name
 (Lisp_Object language_symbol, Lisp_Object *name, Lisp_Object *c_symbol)
 {
-  Lisp_Object list = Vtree_sitter_load_name_list;
+  Lisp_Object list = Vtree_sitter_load_name_override_list;
   while (!NILP (list))
     {
       Lisp_Object lang = XCAR (XCAR (list));
@@ -570,7 +570,10 @@ ts_check_range_argument (Lisp_Object ranges)
       EMACS_INT end = XFIXNUM (XCDR (range));
       /* TODO: Maybe we should check for point-min/max, too?  */
       if (!(last_point <= beg && beg <= end))
-	xsignal1 (Qtree_sitter_set_range_error, range);
+	xsignal2 (Qtree_sitter_set_range_error,
+		  build_pure_c_string
+		  ("RANGE is either overlapping or out-of-order"),
+		  range);
       last_point = end;
       ranges = XCDR (ranges);
     }
@@ -635,9 +638,10 @@ is nil, set PARSER to parse the whole buffer.  */)
     }
 
   if (!success)
-    xsignal2 (Qtree_sitter_set_range_error, ranges,
+    xsignal2 (Qtree_sitter_set_range_error,
 	      build_pure_c_string
-	      ("Something went wrong when setting ranges"));
+	      ("Something went wrong when setting ranges"),
+	      ranges);
 
   XTS_PARSER (parser)->need_reparse = true;
   return Qnil;
@@ -1055,6 +1059,78 @@ If any one of NODE1 and NODE2 is nil, return nil.  */)
 
 /*** Query functions */
 
+DEFUN ("tree-sitter-expand-pattern-1",
+       Ftree_sitter_expand_pattern_1,
+       Stree_sitter_expand_pattern_1, 1, 1, 0,
+       doc: /* Expand PATTERN to its string form.
+
+PATTERN can be
+
+    :anchor
+    :?
+    :*
+    :+
+    (TYPE PATTERN...)
+    [PATTERN...]
+    FIELD-NAME:
+    @CAPTURE-NAME
+    (_)
+    _
+    \"TYPE\"
+
+Consult Info node `(elisp)Pattern Matching' form detailed
+explanation.  */)
+  (Lisp_Object pattern)
+{
+  if (EQ (pattern, intern_c_string (":anchor")))
+    return build_pure_c_string(".");
+  if (EQ (pattern, intern_c_string (":?")))
+    return build_pure_c_string("?");
+  if (EQ (pattern, intern_c_string (":*")))
+    return build_pure_c_string("*");
+  if (EQ (pattern, intern_c_string (":+")))
+    return build_pure_c_string("+");
+  Lisp_Object opening_delimeter =
+    build_pure_c_string (VECTORP (pattern) ? "[" : "(");
+  Lisp_Object closing_delimiter =
+    build_pure_c_string (VECTORP (pattern) ? "]" : ")");
+  if (VECTORP (pattern) || CONSP (pattern))
+    return concat3 (opening_delimeter,
+		    Fmapconcat (intern_c_string
+				("tree-sitter-expand-pattern-1"),
+				pattern,
+				build_pure_c_string (" ")),
+		    closing_delimiter);
+  return CALLN (Fformat, build_pure_c_string("%S"), pattern);
+}
+
+DEFUN ("tree-sitter-expand-pattern",
+       Ftree_sitter_expand_pattern,
+       Stree_sitter_expand_pattern, 1, 1, 0,
+       doc: /* Expand PATTERN-LIST to its string form.
+
+A PATTERN in PATTERN-LIST can be
+
+    :anchor
+    :?
+    :*
+    :+
+    (TYPE PATTERN...)
+    [PATTERN...]
+    FIELD-NAME:
+    @CAPTURE-NAME
+    (_)
+    _
+    \"TYPE\"
+
+Consult Info node `(elisp)Pattern Matching' form detailed
+explanation.  */)
+  (Lisp_Object pattern_list)
+{
+  return Fmapconcat (intern_c_string ("tree-sitter-expand-pattern-1"),
+		     pattern_list, build_pure_c_string (" "));
+}
+
 char*
 ts_query_error_to_string (TSQueryError error)
 {
@@ -1083,8 +1159,10 @@ DEFUN ("tree-sitter-query-capture",
 Returns a list of (CAPTURE_NAME . NODE).  CAPTURE_NAME is the name
 assigned to the node in PATTERN.  NODE is the captured node.
 
-PATTERN is a string containing one or more matching patterns.  See
-Info node `(elisp)Parsing' for how to write a query pattern.
+PATTERN is either a string containing one or more matching patterns,
+or a list containing one or more s-expression matching patterns.  See
+Info node `(elisp)Parsing' for how to write a query pattern in either
+string or s-expression form.
 
 BEG and END, if _both_ non-nil, specifies the range in which the query
 is executed.
@@ -1095,11 +1173,15 @@ info node for how to read the error message.  */)
    Lisp_Object beg, Lisp_Object end)
 {
   CHECK_TS_NODE (node);
-  CHECK_STRING (pattern);
   if (!NILP (beg))
     CHECK_INTEGER (beg);
   if (!NILP (end))
     CHECK_INTEGER (end);
+
+  if (CONSP (pattern))
+    pattern = Ftree_sitter_expand_pattern (pattern);
+  else
+    CHECK_STRING (pattern);
 
   TSNode ts_node = XTS_NODE (node)->node;
   Lisp_Object lisp_parser = XTS_NODE (node)->parser;
@@ -1150,8 +1232,7 @@ info node for how to read the error message.  */)
 	  captured_node = make_ts_node(lisp_parser, capture.node);
 	  capture_name = ts_query_capture_name_for_id
 	    (query, capture.index, &capture_name_len);
-	  entry = Fcons (intern_c_string_1
-			 (capture_name, capture_name_len),
+	  entry = Fcons (intern_c_string (capture_name),
 			 captured_node);
 	  result = Fcons (entry, result);
 	}
@@ -1186,6 +1267,7 @@ syms_of_tree_sitter (void)
   define_error (Qtree_sitter_error, "Generic tree-sitter error", Qerror);
   define_error (Qtree_sitter_query_error, "Query pattern is malformed",
 		Qtree_sitter_error);
+  /* Should be impossible, so don't need to document.  */
   define_error (Qtree_sitter_parse_error, "Parse failed",
 		Qtree_sitter_error);
   define_error (Qtree_sitter_set_range_error,
@@ -1208,8 +1290,8 @@ sync with the buffer's content.  */);
   Vtree_sitter_parser_list = Qnil;
   Fmake_variable_buffer_local (Qtree_sitter_parser_list);
 
-  DEFVAR_LISP ("tree-sitter-load-name-list",
-	       Vtree_sitter_load_name_list,
+  DEFVAR_LISP ("tree-sitter-load-name-override_list",
+	       Vtree_sitter_load_name_override_list,
 	       doc:
 	       /* An override alist for irregular tree-sitter libraries.
 
@@ -1219,12 +1301,12 @@ extension for dynamic libraries.  Emacs also assumes that the name of
 the C function the library provides is tree_sitter_<lang>. If that is
 not the case, add an entry
 
-    (LANGUAGE-SYMBOL LIBRARY-BASE-NAME C-SYMBOL-NAME)
+    (LANGUAGE-SYMBOL LIBRARY-BASE-NAME FUNCTION-NAME)
 
 to this alist, where LIBRARY-BASE-NAME is the filename of the dynamic
-library without extension, C-SYMBOL-NAME is the C function that
-returns a TSLanguage pointer.  */);
-  Vtree_sitter_load_name_list = Qnil;
+library without extension, FUNCTION-NAME is the function provided by
+the library.  */);
+  Vtree_sitter_load_name_override_list = Qnil;
 
   defsubr (&Stree_sitter_parser_p);
   defsubr (&Stree_sitter_node_p);

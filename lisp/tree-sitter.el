@@ -40,7 +40,9 @@
 
 (defun tree-sitter-should-enable-p (&optional mode)
   "Return non-nil if MODE should activate tree-sitter support.
-MODE defaults to the value of `major-mode'."
+MODE defaults to the value of `major-mode'.  The result depends
+on the value of `tree-sitter-disabled-modes' and
+`tree-sitter-maximum-size'."
   (let* ((mode (or mode major-mode))
          (disabled (cl-loop
                     for disabled-mode in tree-sitter-disabled-modes
@@ -65,15 +67,6 @@ If none exists, create one and return it."
   (or (tree-sitter-get-parser language)
       (tree-sitter-parser-create
        (current-buffer) language)))
-
-(defun tree-sitter-query-string (pattern string language)
-  "Query STRING with PATTERN in LANGUAGE."
-  (with-temp-buffer
-    (insert string)
-    (let ((parser (tree-sitter-parser-create (current-buffer) language)))
-      (tree-sitter-query-capture
-       (tree-sitter-parser-root-node parser)
-       pattern))))
 
 (defun tree-sitter-parse-string (string language)
   "Parse STRING using a parser for LANGUAGE.
@@ -213,6 +206,11 @@ language symbol, use the root node of the first parser using that
 language; if a parser, use the root node of that parser; if a
 node, use that node.
 
+PATTERN is either a string containing one or more matching patterns,
+or a list containing one or more s-expression matching patterns.  See
+Info node `(elisp)Parsing' for how to write a query pattern in either
+string or s-expression form.
+
 BEG and END, if _both_ non-nil, specifies the range in which the query
 is executed.
 
@@ -226,11 +224,21 @@ Info node `(elisp)Pattern Matching' for how to read the error message."
    pattern
    beg end))
 
+(defun tree-sitter-query-string (string pattern language)
+  "Query STRING with PATTERN in LANGUAGE.
+See `tree-sitter-query-capture' for PATTERN."
+  (with-temp-buffer
+    (insert string)
+    (let ((parser (tree-sitter-parser-create (current-buffer) language)))
+      (tree-sitter-query-capture
+       (tree-sitter-parser-root-node parser)
+       pattern))))
+
 (defun tree-sitter-query-range (source pattern &optional beg end)
   "Query the current buffer and return ranges of captured nodes.
 
 PATTERN, SOURCE, BEG, END are the same as in
-`tree-sitter-query-buffer'.  This function returns a list
+`tree-sitter-query-capture'.  This function returns a list
 of (START . END), where START and END specifics the range of each
 captured node.  Capture names don't matter."
   (cl-loop for capture
@@ -238,6 +246,65 @@ captured node.  Capture names don't matter."
            for node = (cdr capture)
            collect (cons (tree-sitter-node-start node)
                          (tree-sitter-node-end node))))
+
+(defun tree-sitter-expand-pattern (pattern-list)
+  "Expand PATTERN-LIST to its string form.
+Each PATTERN in PATTERN-LIST can be
+
+    :anchor
+    :?
+    :*
+    :+
+    (TYPE PATTERN...)
+    [PATTERN...]
+    FIELD-NAME:
+    @CAPTURE-NAME
+    (_)
+    _
+    \"TYPE\"
+
+Consult Info node `(elisp)Pattern Matching' form detailed
+explanation."
+  (string-join (mapcar
+                #'tree-sitter-expand-pattern-1
+                pattern-list)
+               " "))
+
+(defun tree-sitter-expand-pattern-1 (pattern)
+  "Expand PATTERN to its string form.
+
+PATTERN can be
+
+    :anchor
+    :?
+    :*
+    :+
+    (TYPE PATTERN...)
+    [PATTERN...]
+    FIELD-NAME:
+    @CAPTURE-NAME
+    (_)
+    _
+    \"TYPE\"
+
+Consult Info node `(elisp)Pattern Matching' form detailed
+explanation."
+  (pcase pattern
+    (:anchor ".")
+    (:? "?")
+    (:* "*")
+    (:+ "+")
+    ((pred vectorp) (concat
+                     "["
+                     (mapconcat #'tree-sitter-expand-pattern-1
+                                pattern " ")
+                     "]"))
+    ((pred listp) (concat
+                   "("
+                   (mapconcat #'tree-sitter-expand-pattern-1
+                              pattern " ")
+                   ")"))
+    (_ (format "%S" pattern))))
 
 ;;; Language API supplement
 
