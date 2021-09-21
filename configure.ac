@@ -455,7 +455,7 @@ OPTION_DEFAULT_ON([xml2],[don't compile with XML parsing support])
 OPTION_DEFAULT_OFF([imagemagick],[compile with ImageMagick image support])
 OPTION_DEFAULT_ON([native-image-api], [don't use native image APIs (GDI+ on Windows)])
 OPTION_DEFAULT_IFAVAILABLE([json], [compile with native JSON support])
-OPTION_DEFAULT_IFAVAILABLE([tree-sitter], [compile with tree-sitter])
+OPTION_DEFAULT_OFF([tree-sitter], [compile with tree-sitter])
 
 OPTION_DEFAULT_ON([xft],[don't use XFT for anti aliased fonts])
 OPTION_DEFAULT_ON([harfbuzz],[don't use HarfBuzz for text shaping])
@@ -3008,7 +3008,7 @@ AC_SUBST(JSON_OBJ)
 HAVE_TREE_SITTER=no
 TREE_SITTER_OBJ=
 
-if test "${with_tree_sitter}" != "no"; then
+if test "${with_tree_sitter}" == "yes"; then
   EMACS_CHECK_MODULES([TREE_SITTER], [tree-sitter >= 0.0],
     [HAVE_TREE_SITTER=yes], [HAVE_TREE_SITTER=no])
   if test "${HAVE_TREE_SITTER}" = yes; then
@@ -4140,11 +4140,6 @@ case $with_json,$HAVE_JSON in
   no,* | ifavailable,* | *,yes) ;;
   *) MISSING="$MISSING json"
      WITH_IFAVAILABLE="$WITH_IFAVAILABLE --with-json=ifavailable";;
-esac
-case $with_tree_sitter,$HAVE_TREE_SITTER in
-  no,* | ifavailable,* | *,yes) ;;
-  *) MISSING="$MISSING tree-sitter"
-     WITH_IFAVAILABLE="$WITH_IFAVAILABLE --with-tree-sitter=ifavailable";;
 esac
 
 if test "X${MISSING}" != X; then

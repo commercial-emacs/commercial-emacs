@@ -81,11 +81,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
+#ifdef HAVE_TREE_SITTER
+#include "tree-sitter.h"
+#endif /* HAVE_TREE_SITTER */
+
 #include "bignum.h"
 #include "intervals.h"
 #include "character.h"
 #include "buffer.h"
-#include "tree-sitter.h"
 #include "window.h"
 #include "xwidget.h"
 #include "atimer.h"

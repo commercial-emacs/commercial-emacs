@@ -2,7 +2,7 @@
 
 Copyright (C) 2021 Free Software Foundation, Inc.
 
-This file is part of GNU Emacs.
+This file is NOT part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,58 +23,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "tree-sitter.h"
 
-/* Commentary
-
-   The Emacs wrapper of tree-sitter does not expose everything the C
-   API provides, most notably:
-
-   - It doesn't expose a syntax tree, we put the syntax tree in the
-     parser object, and updating the tree is handled in the C level.
-
-   - We don't expose tree cursor either.  I think Lisp is slow enough
-     to nullify any performance advantage of using a cursor, though I
-     don't have evidence.
-
-   - Because updating the change is handled in the C level as each
-     change is made in the buffer, there is no way for Lisp to update
-     a node.  But since we can just retrieve a new node, it shouldn't
-     be a limitation.
-
-   - I didn't expose setting timeout and cancellation flag for a
-     parser, mainly because I don't think they are really necessary
-     in Emacs' use cases.
-
-   - Many tree-sitter functions asks for a TSPoint, basically a (row,
-     column) location.  Emacs uses a gap buffer and keeps no
-     information about row and column position.  According to the
-     author of tree-sitter, tree-sitter only asks for (row, column)
-     position to carry it around and return back to the user later;
-     and the real position used is the byte position.  He also said
-     that he _think_ that it will work to use byte position only.
-     That's why whenever a TSPoint is asked, we pass a dummy one to
-     it.  Judging by the nature of parsing algorithms, I think it is
-     safe to use only byte position, and I don't think this will
-     change in the future.
-
-     REF: https://github.com/tree-sitter/tree-sitter/issues/445
-
-   tree-sitter.h has some commentary on the two main data structure
-   for the parser and node.  ts_ensure_position_synced has some
-   commentary on how do we make tree-sitter play well with narrowing
-   (tree-sitter parser only sees the visible region, so we need to
-   translate positions back and forth).  Most action happens in
-   ts_ensure_parsed, ts_read_buffer and ts_record_change.
-
-   A complete correspondence list between tree-sitter functions and
-   exposed Lisp functions can be found in the manual (elisp)API
-   Correspondence.
- */
-
-/*** Loading language library */
-
 /* Translates a symbol tree-sitter-<lang> to a C name
    tree_sitter_<lang>.  */
-void
+static void
 ts_symbol_to_c_name (char *symbol_name)
 {
   for (int idx=0; idx < strlen (symbol_name); idx++)
@@ -84,7 +35,7 @@ ts_symbol_to_c_name (char *symbol_name)
     }
 }
 
-bool
+static bool
 ts_find_override_name
 (Lisp_Object language_symbol, Lisp_Object *name, Lisp_Object *c_symbol)
 {
@@ -114,7 +65,7 @@ ts_find_override_name
 
    If SIGNAL is true, signal an error when failed to load LANGUAGE; if
    false, return NULL when failed.  */
-TSLanguage*
+static TSLanguage*
 ts_load_language (Lisp_Object language_symbol, bool signal)
 {
   CHECK_SYMBOL (language_symbol);
@@ -168,8 +119,8 @@ ts_load_language (Lisp_Object language_symbol, bool signal)
 
   /* Load TSLanguage.  */
   dynlib_error ();
-  TSLanguage *(*langfn) ();
-  langfn = dynlib_sym (handle, c_name);
+  typedef TSLanguage *(*langfn_t) (void);
+  langfn_t langfn = dynlib_sym (handle, c_name);
   error = dynlib_error ();
   if (error != NULL)
     {
@@ -267,10 +218,9 @@ ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
     }
 }
 
-void
+static void
 ts_ensure_position_synced (Lisp_Object parser)
 {
-  TSParser *ts_parser = XTS_PARSER (parser)->parser;
   TSTree *tree = XTS_PARSER (parser)->tree;
   struct buffer *buffer = XBUFFER (XTS_PARSER (parser)->buffer);
   /* Before we parse or set ranges, catch up with the narrowing
@@ -322,7 +272,7 @@ ts_ensure_position_synced (Lisp_Object parser)
   XTS_PARSER (parser)->visible_end = visible_end;
 }
 
-void
+static void
 ts_check_buffer_size (struct buffer *buffer)
 {
   ptrdiff_t buffer_size =
@@ -333,7 +283,7 @@ ts_check_buffer_size (struct buffer *buffer)
 
 /* Parse the buffer.  We don't parse until we have to. When we have
 to, we call this function to parse and update the tree.  */
-void
+static void
 ts_ensure_parsed (Lisp_Object parser)
 {
   if (!XTS_PARSER (parser)->need_reparse)
@@ -370,7 +320,7 @@ ts_ensure_parsed (Lisp_Object parser)
 /* This is the read function provided to tree-sitter to read from a
    buffer.  It reads one character at a time and automatically skips
    the gap.  */
-const char*
+static const char*
 ts_read_buffer (void *parser, uint32_t byte_index,
 		TSPoint position, uint32_t *bytes_read)
 {
@@ -557,7 +507,7 @@ DEFUN ("tree-sitter-parser-root-node",
 
 /* Checks that the RANGES argument of
    tree-sitter-parser-set-included-ranges is valid.  */
-void
+static void
 ts_check_range_argument (Lisp_Object ranges)
 {
   EMACS_INT last_point = 1;
@@ -605,7 +555,7 @@ is nil, set PARSER to parse the whole buffer.  */)
       /* If RANGES is nil, make parser to parse the whole document.
 	 To do that we give tree-sitter a 0 length, the range is a
 	 dummy.  */
-      TSRange ts_range = {0, 0, 0, 0};
+      TSRange ts_range = { { 0, 0 }, { 0, 0 }, 0, 0 };
       success = ts_parser_set_included_ranges
 	(XTS_PARSER (parser)->parser, &ts_range , 0);
     }
@@ -614,7 +564,6 @@ is nil, set PARSER to parse the whole buffer.  */)
       /* Set ranges for PARSER.  */
       ptrdiff_t len = list_length (ranges);
       TSRange *ts_ranges = malloc (sizeof(TSRange) * len);
-      struct buffer *buffer = XBUFFER (XTS_PARSER (parser)->buffer);
 
       for (int idx=0; !NILP (ranges); idx++, ranges = XCDR (ranges))
 	{
@@ -1131,24 +1080,33 @@ explanation.  */)
 		     pattern_list, build_pure_c_string (" "));
 }
 
-char*
+static const char*
 ts_query_error_to_string (TSQueryError error)
 {
   switch (error)
     {
     case TSQueryErrorNone:
       return "none";
+      break;
     case TSQueryErrorSyntax:
       return "syntax";
+      break;
     case TSQueryErrorNodeType:
       return "node type";
+      break;
     case TSQueryErrorField:
       return "field";
+      break;
     case TSQueryErrorCapture:
       return "capture";
+      break;
     case TSQueryErrorStructure:
       return "structure";
+      break;
+    default:
+      break;
     }
+  return "";
 }
 
 DEFUN ("tree-sitter-query-capture",
@@ -1338,6 +1296,8 @@ the library.  */);
   defsubr (&Stree_sitter_node_first_child_for_pos);
   defsubr (&Stree_sitter_node_descendant_for_range);
   defsubr (&Stree_sitter_node_eq);
-
+  defsubr (&Stree_sitter_expand_pattern);
+  defsubr (&Stree_sitter_expand_pattern_1);
+  defsubr (&Stree_sitter_language_exists_p);
   defsubr (&Stree_sitter_query_capture);
 }
