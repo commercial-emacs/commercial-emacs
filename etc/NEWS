@@ -1749,6 +1749,9 @@ tags to be considered as well.
 *** New user option 'vc-git-log-switches'.
 String or list of strings specifying switches for Git log under VC.
 
+---
+*** The macro 'vc-call' no longer evaluates its second argument twice.
+
 ** Gnus
 
 +++
@@ -3702,6 +3705,12 @@ This used to be named 'macroexp--warn-and-return' and has proved useful
 and well-behaved enough to lose the "internal" marker.
 
 ** map.el
+
+---
+*** Alist keys are now consistently compared with 'equal' by default.
+Until now, 'map-elt' and 'map-delete' compared alist keys with 'eq' by
+default.  They now use 'equal' instead, for consistency with
+'map-put!' and 'map-contains-key'.
 
 *** Pcase 'map' pattern added keyword symbols abbreviation.
 A pattern like '(map :sym)' binds the map's value for ':sym' to 'sym',
