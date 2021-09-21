@@ -174,6 +174,7 @@ completion list popped up by 'M-x' shows the key bindings for all the
 commands shown in the list of candidate completions that have a key
 binding.
 
++++
 ** New user option 'completions-detailed'.
 When non-nil, some commands like 'describe-symbol' show more detailed
 completions with more information in completion prefix and suffix.
@@ -1191,9 +1192,6 @@ keys, add the following to your init file:
 Using it instead of 'read-char-choice' allows using 'C-x o'
 to switch to the help window displayed after typing 'C-h'.
 
----
-*** 'dired-compress-file' now queries for a directory to uncompress to.
-
 +++
 ** New user option 'isearch-allow-motion'.
 When 'isearch-allow-motion' is set, the commands 'beginning-of-buffer',
@@ -1748,9 +1746,6 @@ tags to be considered as well.
 ---
 *** New user option 'vc-git-log-switches'.
 String or list of strings specifying switches for Git log under VC.
-
----
-*** The macro 'vc-call' no longer evaluates its second argument twice.
 
 ** Gnus
 
@@ -3548,6 +3543,9 @@ affected function has been updated.  'find-function-source-path' was
 still being used by 'find-library' and related commands, so the
 variable has been renamed to 'find-library-source-path', and
 'find-function-source-path' is now an obsolete variable alias.
+
+---
+** The macro 'vc-call' no longer evaluates its second argument twice.
 
 
 * Lisp Changes in Emacs 28.1
