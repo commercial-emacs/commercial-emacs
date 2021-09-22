@@ -152,15 +152,6 @@ positions of the thing found."
 		    (cons real-beg end))))))))))
 
 ;;;###autoload
-(defun thing-at-mouse (event thing &optional no-properties)
-  "Return the THING at mouse click.
-Like `thing-at-point', but tries to use the event
-where the mouse button is clicked to find a thing nearby."
-  (save-excursion
-    (mouse-set-point event)
-    (thing-at-point thing no-properties)))
-
-;;;###autoload
 (defun thing-at-point (thing &optional no-properties)
   "Return the THING at point.
 THING should be a symbol specifying a type of syntactic entity.
@@ -195,6 +186,24 @@ a symbol as a valid THING."
       (when (and text no-properties (sequencep text))
         (set-text-properties 0 (length text) nil text))
       text)))
+
+;;;###autoload
+(defun bounds-of-thing-at-mouse (event thing)
+  "Determine start and end locations for THING at mouse click given by EVENT.
+Like `bounds-of-thing-at-point', but tries to use the position in EVENT
+where the mouse button is clicked to find the thing nearby."
+  (save-excursion
+    (mouse-set-point event)
+    (bounds-of-thing-at-point thing)))
+
+;;;###autoload
+(defun thing-at-mouse (event thing &optional no-properties)
+  "Return the THING at mouse click specified by EVENT.
+Like `thing-at-point', but tries to use the position in EVENT
+where the mouse button is clicked to find the thing nearby."
+  (save-excursion
+    (mouse-set-point event)
+    (thing-at-point thing no-properties)))
 
 ;; Go to beginning/end
 
