@@ -260,8 +260,6 @@ for example, (type-of 1) returns `integer'.  */)
           return Qxwidget_view;
 	case PVEC_TS_PARSER:
 	  return Qtree_sitter_parser;
-	case PVEC_TS_NODE:
-	  return Qtree_sitter_node;
         /* "Impossible" cases.  */
 	case PVEC_MISC_PTR:
         case PVEC_OTHER:
@@ -1233,8 +1231,7 @@ wrong_range (Lisp_Object min, Lisp_Object max, Lisp_Object wrong)
 }
 
 static void
-symval_update (lispfwd valcontents, Lisp_Object newval,
-			 struct buffer *buf)
+symval_update (lispfwd valcontents, Lisp_Object newval, struct buffer *buf)
 {
   switch (XFWDTYPE (valcontents))
     {

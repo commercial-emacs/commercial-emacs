@@ -1589,7 +1589,6 @@ Else we get unblocked but permanently yielded threads."
             (with-current-buffer working
               (gnus-message-with-timestamp "gnus-run-method: start %s <%s>"
                                            run-name (buffer-name))
-              ;; buffer-locals not thread-safe (avoid them)
               (let (gnus-run-method--subresult
                     current-fn
                     (gnus-inhibit-demon t)

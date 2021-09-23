@@ -1861,8 +1861,6 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       }
       break;
 #endif
-
-#ifdef HAVE_TREE_SITTER
     case PVEC_TS_PARSER:
       print_c_string ("#<tree-sitter-parser for ", printcharfun);
       Lisp_Object language = XTS_PARSER (obj)->language_symbol;
@@ -1871,20 +1869,6 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       print_object (XTS_PARSER (obj)->buffer, printcharfun, escapeflag);
       printchar ('>', printcharfun);
       break;
-    case PVEC_TS_NODE:
-      print_c_string ("#<tree-sitter-node from ", printcharfun);
-      print_object (Ftree_sitter_node_start (obj),
-		    printcharfun, escapeflag);
-      print_c_string (" to ", printcharfun);
-      print_object (Ftree_sitter_node_end (obj),
-		    printcharfun, escapeflag);
-      print_c_string (" in ", printcharfun);
-      print_object (XTS_PARSER (XTS_NODE (obj)->parser)->buffer,
-		    printcharfun, escapeflag);
-      printchar ('>', printcharfun);
-      break;
-#endif
-
     default:
       emacs_abort ();
     }

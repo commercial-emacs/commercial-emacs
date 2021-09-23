@@ -3156,15 +3156,6 @@ cleanup_vector (struct Lisp_Vector *vector)
       if (uptr->finalizer)
 	uptr->finalizer (uptr->p);
     }
-#ifdef HAVE_TREE_SITTER
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TS_PARSER))
-    {
-      struct Lisp_TS_Parser *lisp_parser
-	= PSEUDOVEC_STRUCT (vector, Lisp_TS_Parser);
-      ts_tree_delete(lisp_parser->tree);
-      ts_parser_delete(lisp_parser->parser);
-    }
-#endif
 #ifdef HAVE_MODULES
   else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_MODULE_FUNCTION))
     {
@@ -3192,6 +3183,13 @@ cleanup_vector (struct Lisp_Vector *vector)
 	  xfree ((char *)subr->symbol_name);
 	  xfree (subr->native_c_name[0]);
 	}
+    }
+  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TS_PARSER))
+    {
+      struct Lisp_TS_Parser *lisp_parser
+	= PSEUDOVEC_STRUCT (vector, Lisp_TS_Parser);
+      ts_tree_delete(lisp_parser->tree);
+      ts_parser_delete(lisp_parser->parser);
     }
 }
 

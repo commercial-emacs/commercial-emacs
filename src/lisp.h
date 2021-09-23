@@ -1073,7 +1073,6 @@ enum pvec_type
   PVEC_MODULE_FUNCTION,
   PVEC_NATIVE_COMP_UNIT,
   PVEC_TS_PARSER,
-  PVEC_TS_NODE,
 
   /* These should be last, for internal_equal and sxhash_obj.  */
   PVEC_COMPILED,

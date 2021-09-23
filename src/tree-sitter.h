@@ -26,15 +26,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 INLINE_HEADER_BEGIN
 
-/* A wrapper for a tree-sitter parser, but also contains a parse tree
-   and other goodies for convenience.  */
-struct Lisp_TS_Parser
+struct Lisp_TS
 {
   union vectorlike_header header;
   /* A symbol represents the language this parser uses.  It should be
    the symbol of the function provided by a language dynamic
    module.  */
-  Lisp_Object language_symbol;
   Lisp_Object buffer;
   TSParser *parser;
   TSTree *tree;
@@ -65,54 +62,16 @@ struct Lisp_TS_Node
   TSNode node;
 };
 
-INLINE bool
-TS_PARSERP (Lisp_Object x)
-{
-  return PSEUDOVECTORP (x, PVEC_TS_PARSER);
-}
-
-INLINE struct Lisp_TS_Parser *
-XTS_PARSER (Lisp_Object a)
-{
-  eassert (TS_PARSERP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_TS_Parser);
-}
-
-INLINE bool
-TS_NODEP (Lisp_Object x)
-{
-  return PSEUDOVECTORP (x, PVEC_TS_NODE);
-}
-
-INLINE struct Lisp_TS_Node *
-XTS_NODE (Lisp_Object a)
-{
-  eassert (TS_NODEP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_TS_Node);
-}
-
-INLINE void
-CHECK_TS_PARSER (Lisp_Object parser)
-{
-  CHECK_TYPE (TS_PARSERP (parser), Qtree_sitter_parser_p, parser);
-}
-
-INLINE void
-CHECK_TS_NODE (Lisp_Object node)
-{
-  CHECK_TYPE (TS_NODEP (node), Qtree_sitter_node_p, node);
-}
-
 void
-ts_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
-		  ptrdiff_t new_end_byte);
+tree_sitter_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
+			   ptrdiff_t new_end_byte);
 
 Lisp_Object
-make_ts_parser (Lisp_Object buffer, TSParser *parser,
-		TSTree *tree, Lisp_Object language_symbol);
+make_tree_sitter_parser (Lisp_Object buffer, TSParser *parser,
+			 TSTree *tree, Lisp_Object language_symbol);
 
 Lisp_Object
-make_ts_node (Lisp_Object parser, TSNode node);
+make_tree_sitter_node (Lisp_Object parser, TSNode node);
 
 extern void syms_of_tree_sitter (void);
 
