@@ -1653,7 +1653,10 @@ mouse-[0-3]\\)\\)\\>"))
 		   me (match-end 1))
 	     (if (and sym (boundp sym) (fboundp sym)
                       checkdoc--disambiguate-symbol-flag
-		      (save-excursion
+                      ;; Mode names do not need disambiguating.  (Bug#4110)
+                      (not (string-match (rx "-mode" string-end)
+                                         (symbol-name sym)))
+                      (save-excursion
 			(goto-char mb)
 			(forward-word-strictly -1)
 			(not (looking-at
@@ -2105,14 +2108,15 @@ Examples of recognized abbreviations: \"e.g.\", \"i.e.\", \"cf.\"."
   (save-excursion
     (goto-char begin)
     (condition-case nil
-        (let ((single-letter t))
+        (let (single-letter)
           (forward-word -1)
           ;; Skip over all dots backwards, as `forward-word' will only
           ;; go one dot at a time in a string like "e.g.".
           (while (save-excursion (forward-char -1)
                                  (looking-at (rx ".")))
-            (setq single-letter nil)
             (forward-word -1))
+          (when (= (point) (1- begin))
+            (setq single-letter t))
           ;; Piece of an abbreviation.
           (looking-at
            (if single-letter
