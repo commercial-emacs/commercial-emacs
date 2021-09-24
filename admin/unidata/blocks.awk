@@ -237,8 +237,11 @@ END {
     override_start[idx] = "1F441"
     override_end[idx] = "1F441"
     idx++
-    override_start[idx] = "1F575"
+    override_start[idx] = "1F574"
     override_end[idx] = "1F575"
+    idx++
+    override_start[idx] = "1F590"
+    override_end[idx] = "1F590"
 
     for (k in override_start)
     {
@@ -250,7 +253,7 @@ END {
     }
 
     print ";;; charscript.el --- character script table  -*- lexical-binding:t -*-"
-    print ";;; Automatically generated from admin/unidata/Blocks.txt"
+    print ";;; Automatically generated from admin/unidata/{Blocks,emoji-data}.txt"
     print "(let (script-list)"
     print "  (dolist (elt '("
 
