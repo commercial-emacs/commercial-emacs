@@ -12935,7 +12935,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #endif
 
   Lisp_Object system_name = Fsystem_name ();
-  static char const title[] = "GNU Emacs";
+  static char const title[] = "Commercial Emacs";
   if (STRINGP (system_name))
     {
       static char const at[] = " at ";
