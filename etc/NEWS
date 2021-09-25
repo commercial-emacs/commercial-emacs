@@ -1703,8 +1703,10 @@ work as before.
 
 ** Emacs Lisp mode
 
+---
 *** The mode-line now indicates whether we're using lexical or dynamic scoping.
 
++++
 *** A space between an open paren and a symbol changes the indentation rule.
 The presence of a space between an open paren and a symbol now is
 taken as a statement by the programmer that this should be indented
@@ -2474,6 +2476,7 @@ visit. 'xref-auto-jump-to-first-xref' changes their behavior much in
 the same way as 'xref-auto-jump-to-first-definition' affects the
 "find-definitions" commands.
 
+---
 *** New user options 'xref-search-program' and 'xref-search-program-alist'.
 So far 'grep' and 'ripgrep' are supported.  'ripgrep' seems to offer better
 performance in certain cases, in particular for case-insensitive
@@ -2484,9 +2487,11 @@ searches.
 These commands are bound respectively to 'P' and 'N', and navigate to
 the first item of the previous or next group in the "*xref*" buffer.
 
+---
 *** New alternative value for 'xref-show-definitions-function':
 'xref-show-definitions-completing-read'.
 
+---
 *** The two existing alternatives for 'xref-show-definitions-function'
 have been renamed to have "proper" public names and documented
 ('xref-show-definitions-buffer' and
@@ -2600,6 +2605,7 @@ This new command (bound to 'C-c C-l') regenerates the current hunk.
 This is like 'filename', but is a full path, and is nil if the file
 doesn't exist.
 
++++
 *** New 'thing-at-point' target: 'string'.
 If point is inside a string, it returns that string.
 
@@ -2809,6 +2815,7 @@ declared obsolete and rewritten as 'erc-track-select-mode-line-face',
 with different expected arguments (the current and old faces are now
 separated) and clearer documentation.
 
+---
 *** Add '/opme' and '/deopme' convenience commands.
 The new '/opme' convenience command asks ChanServ to set the operator
 status for the current nick in the current channel, and '/deopme'
