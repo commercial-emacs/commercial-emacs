@@ -745,18 +745,21 @@ Applies to headings of shortdoc sections.
 *** New face 'separator-line'.
 This is used by 'make-separator-line' (see below).
 
++++
 *** 'redisplay-skip-fontification-on-input' helps Emacs keep up with fast input.
 This is another attempt to solve the problem of handling high key repeat rate
 and other "slow scrolling" situations.  It is hoped it behaves better
 than 'fast-but-imprecise-scrolling' and 'jit-lock-defer-time'.
 It is not enabled by default.
 
+---
 *** Obsolete aliases are no longer hidden from command completion.
 Completion of command names now considers obsolete aliases as
 candidates, if they were marked obsolete in the current major version
 of Emacs.  Invoking a command via an obsolete alias now mentions the
 obsolescence fact and shows the new name of the command.
 
++++
 *** Support for '(box . SIZE)' 'cursor-type'.
 By default, 'box' cursor always has a filled box shape.  But if you
 specify 'cursor-type' to be '(box . SIZE)', the cursor becomes a hollow
@@ -998,10 +1001,10 @@ If nil, Emacs does not prompt, but instead shows the buffer with its
 contents before the change, and provides instructions how to revert
 the buffer.
 
+---
 ** New value 'save-some-buffers-root' of 'save-some-buffers-default-predicate'.
-They allow to ask about saving only those files that are under the
-project root or in subdirectories of the directory that was default
-during command invocation.
+When using this predicate, only buffers under the current project root
+will be considered when saving buffers with 'save-some-buffers'.
 
 ---
 ** New user option 'save-place-abbreviate-file-names'.
