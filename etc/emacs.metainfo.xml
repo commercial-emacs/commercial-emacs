@@ -3,16 +3,16 @@
 <component type="desktop-application">
  <id>org.gnu.emacs</id>
  <metadata_license>GFDL-1.3+</metadata_license>
- <name>GNU Emacs</name>
+ <name>Commercial Emacs</name>
  <summary>An extensible text editor</summary>
  <icon type="remote" width="128" height="128">https://www.gnu.org/software/emacs/images/emacs.png</icon>
  <description>
   <p>
-   GNU Emacs is an extensible, customizable text editor - and more.
+   Commercial Emacs is an extensible, customizable text editor - and more.
    At its core is an interpreter for Emacs Lisp, a dialect of the Lisp
    programming language with extensions to support text editing.
   </p>
-  <p>The features of GNU Emacs include:</p>
+  <p>The features of Commercial Emacs include:</p>
   <ul>
    <li>Content-sensitive editing modes, including syntax coloring, for
    a wide-range of file types</li>

@@ -7111,7 +7111,7 @@ w32_initialize_display_info (Lisp_Object display_name)
   memset (dpyinfo, 0, sizeof (*dpyinfo));
 
   dpyinfo->name_list_element = Fcons (display_name, Qnil);
-  static char const title[] = "GNU Emacs";
+  static char const title[] = "Commercial Emacs";
   if (STRINGP (Vsystem_name))
     {
       static char const at[] = " at ";
