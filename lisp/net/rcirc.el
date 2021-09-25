@@ -4,7 +4,8 @@
 
 ;; Author: Ryan Yeske <rcyeske@gmail.com>
 ;; Maintainers: Ryan Yeske <rcyeske@gmail.com>,
-;;		Leo Liu <sdl.web@gmail.com>
+;;		Leo Liu <sdl.web@gmail.com>,
+;;              Philip Kaludercic <philipk@posteo.net>
 ;; Keywords: comm
 
 ;; This file is NOT part of GNU Emacs.
@@ -840,7 +841,8 @@ If QUIET is non-nil, no not emit a message."
         (dolist (buffer (mapcar #'cdr rcirc-buffer-alist))
 	  (when (buffer-live-p buffer)
             (with-current-buffer buffer
-	      (setq mode-line-process ":connecting"))))
+	      (setq rcirc-joined (current-time)
+                    mode-line-process ":connecting"))))
 	(let ((nprocess (apply #'rcirc-connect conn-info)))
           (when (and (< rcirc-failed-attempts rcirc-reconnect-attempts)
                      (eq (process-status nprocess) 'failed))
@@ -850,16 +852,17 @@ If QUIET is non-nil, no not emit a message."
                                  rcirc-failed-attempts
                                  rcirc-reconnect-attempts))
             (setq rcirc-reconnection-timer
-                  (run-at-time rcirc-timeout-seconds nil
+                  (run-at-time rcirc-reconnect-delay nil
                                #'rcirc-reconnect process t))))))))
 
 (defun rcirc-sentinel (process sentinel)
-  "Called when PROCESS receives SENTINEL."
-  (let ((sentinel (string-replace "\n" "" sentinel)))
+  "Called on a change of the state of PROCESS.
+SENTINEL describes the change in form of a string."
+  (let ((status (process-status process)))
     (rcirc-debug process (format "SENTINEL: %S %S\n" process sentinel))
     (with-rcirc-process-buffer process
       (cond
-       ((string= sentinel "open")
+       ((eq status 'open)
         (let* ((server (nth 0 rcirc-connection-info))
                (user-name (nth 3 rcirc-connection-info))
                (full-name (nth 4 rcirc-connection-info))
@@ -903,7 +906,7 @@ If QUIET is non-nil, no not emit a message."
           (dolist (buffer (cons nil (mapcar 'cdr rcirc-buffer-alist)))
 	    (with-current-buffer (or buffer (current-buffer))
 	      (setq mode-line-process nil)))))
-       ((string= sentinel "deleted")
+       ((eq status 'closed)
         (let ((now (current-time)))
           (with-rcirc-process-buffer process
             (when (and (< 0 rcirc-reconnect-delay)
@@ -911,7 +914,8 @@ If QUIET is non-nil, no not emit a message."
 				    (time-subtract now rcirc-last-connect-time)))
               (setq rcirc-last-connect-time now)
               (rcirc-reconnect process)))))
-       ((dolist (buffer (cons nil (mapcar 'cdr rcirc-buffer-alist)))
+       ((eq status 'failed)
+        (dolist (buffer (cons nil (mapcar 'cdr rcirc-buffer-alist)))
 	  (with-current-buffer (or buffer (current-buffer))
 	    (rcirc-print process "*rcirc*" "ERROR" rcirc-target
 		         (format "%s: %s (%S)"
