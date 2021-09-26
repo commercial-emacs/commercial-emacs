@@ -1630,6 +1630,13 @@ Sets up `gnus-get-unread-articles--doit'."
 
   (if-let ((pending (gnus-thread-group-running-p gnus-thread-group)))
       (gnus-message 3 "gnus-get-unread-articles: %s still running" pending)
+    (unless dont-connect
+      ;; Have gnus-newsrc-alist reflect any new methods just added to .emacs
+      (dolist (method gnus-select-methods)
+	(when (and (not (assoc method infos-by-method))
+		   (gnus-check-backend-function 'request-list (car method)))
+	  (with-current-buffer nntp-server-buffer
+	    (gnus-read-active-file-1 method nil)))))
     (let* ((newsrc (cdr gnus-newsrc-alist))
 	   (alevel (or level gnus-activate-level (1+ gnus-level-subscribed)))
 	   (foreign-level
@@ -1681,14 +1688,6 @@ Sets up `gnus-get-unread-articles--doit'."
 			      method))
 	        (setcar elem method))
 	      (push (list method 'ok) methods)))))
-
-      ;; For methods with no groups to update, we still request-list if supported.
-      (unless dont-connect
-        (dolist (method gnus-select-methods)
-	  (when (and (not (assoc method infos-by-method))
-		     (gnus-check-backend-function 'request-list (car method)))
-	    (with-current-buffer nntp-server-buffer
-	      (gnus-read-active-file-1 method nil)))))
 
       ;; Must be able to `gnus-open-server'
       (setq infos-by-method
