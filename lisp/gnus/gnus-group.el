@@ -4432,6 +4432,11 @@ If GROUP, edit that local kill file instead."
   (interactive (list nil (gnus-group-group-name)) gnus-group-mode)
   (gnus-group-edit-global-kill article group))
 
+(defun gnus-group-force-update ()
+  "Update `.newsrc' file."
+  (interactive nil gnus-group-mode)
+  (gnus-save-newsrc-file))
+
 (defvar gnus-backlog-articles)
 
 (defun gnus-group-suspend ()
