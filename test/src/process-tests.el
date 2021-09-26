@@ -754,7 +754,7 @@ Return nil if that can't be determined."
   process-tests--EMFILE-message)
 
 (ert-deftest process-tests/sentinel-called ()
-  "Check that sentinels are called after processes finish"
+  "Check that sentinels are called after processes finish."
   (let ((command (process-tests--emacs-command)))
     (skip-unless command)
     (dolist (conn-type '(pipe pty))
