@@ -369,6 +369,23 @@ you might have to restart Emacs to see the effect."
   :package-version '(project . "0.2.0")
   :safe #'booleanp)
 
+(defcustom project-vc-subprojects nil
+  "List of relative directory names to consider separate projects.
+Each entry should a string, name of a subproject root directory
+relative to the VC root.
+
+Every entry in this list will be considered a separate project
+for the purposes of files listings, searches, etc, and the parent
+project will exclude those files.
+
+One would usually set this variable through .dir-locals.el.
+
+If subprojects are Git submodules, you can use the variable
+`project-vc-merge-submodules' instead."
+  :type 'list
+  :version "28.1"
+  :safe (lambda (val) (and (listp val) (seq-every-p #'stringp val))))
+
 ;; FIXME: Using the current approach, major modes are supposed to set
 ;; this variable to a buffer-local value.  So we don't have access to
 ;; the "external roots" of language A from buffers of language B, which
@@ -428,7 +445,22 @@ backend implementation of `project-external-roots'.")
                       root)))))
             ('nil nil)
             (_ (ignore-errors (vc-call-backend backend 'root dir))))))
-    (and root (cons 'vc root))))
+    (when root
+      (let* ((relative-dir (file-relative-name dir root))
+             (subproject (seq-find
+                          (lambda (sub-dir)
+                            (string-prefix-p (file-name-as-directory sub-dir)
+                                             relative-dir))
+                          (project--value-in-dir
+                           'project-vc-subprojects
+                           dir))))
+        (if subproject
+            (cons 'vc (propertize
+                       (concat root subproject)
+                       ;; Side-channel so we don't change the value format.
+                       ;; But we could do that instead.
+                       'vc-subproject t))
+          (cons 'vc root))))))
 
 (defun project--submodule-p (root)
   ;; XXX: We only support Git submodules for now.
@@ -467,7 +499,9 @@ backend implementation of `project-external-roots'.")
 (cl-defmethod project-files ((project (head vc)) &optional dirs)
   (mapcan
    (lambda (dir)
-     (let ((ignores (project--value-in-dir 'project-vc-ignores dir))
+     (let ((ignores
+            (nconc (project--vc-subproject-ignores dir)
+                   (project--value-in-dir 'project-vc-ignores dir)))
            backend)
        (if (and (file-equal-p dir (cdr project))
                 (setq backend (vc-responsible-backend dir))
@@ -579,6 +613,12 @@ backend implementation of `project-external-roots'.")
           (nreverse res)))
     (file-missing nil)))
 
+(defun project--vc-subproject-ignores (dir)
+  (unless (get-text-property 0 'vc-subproject dir)
+    (mapcar
+     (lambda (supb) (format "./%s" (file-name-as-directory supb)))
+     (project--value-in-dir 'project-vc-subprojects dir))))
+
 (cl-defmethod project-ignores ((project (head vc)) dir)
   (let* ((root (cdr project))
          backend)
@@ -608,6 +648,7 @@ backend implementation of `project-external-roots'.")
              (vc-call-backend backend 'ignore-completion-table root)
            (vc-not-supported () nil)))))
      (project--value-in-dir 'project-vc-ignores root)
+     (project--vc-subproject-ignores root)
      (mapcar
       (lambda (dir)
         (concat dir "/"))
