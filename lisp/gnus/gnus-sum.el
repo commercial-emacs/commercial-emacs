@@ -4999,7 +4999,7 @@ Unscored articles will be counted as having a score of zero."
   (gnus-article-sort-by-number h1 h2))
 
 (defun gnus-thread-sort-by-most-recent-number (h1 h2)
-  "Sort threads such that the thread with the most recently arrived article comes first."
+  "Sort threads such that the thread with most recently arrived article is first."
   (> (gnus-thread-highest-number h1) (gnus-thread-highest-number h2)))
 
 (defun gnus-thread-highest-number (thread)
@@ -5013,7 +5013,7 @@ Unscored articles will be counted as having a score of zero."
   (gnus-article-sort-by-date h1 h2))
 
 (defun gnus-thread-sort-by-most-recent-date (h1 h2)
-  "Sort threads such that the thread with the most recently dated article comes first."
+  "Sort threads such that the thread with most recently dated article is first."
   (> (gnus-thread-latest-date h1) (gnus-thread-latest-date h2)))
 
 (defsubst gnus-article-sort-by-newsgroups (h1 h2)
@@ -5477,7 +5477,7 @@ or a straight list of headers."
         gnus-list-identifiers)))
 
 (defun gnus-summary-remove-list-identifiers ()
-  "Remove list identifiers in `gnus-list-identifiers' from articles in the current group."
+  "Remove identifiers in `gnus-list-identifiers' from articles in current group."
   (let ((regexp (gnus-group-get-list-identifiers gnus-newsgroup-name))
         changed subject)
     (when regexp
