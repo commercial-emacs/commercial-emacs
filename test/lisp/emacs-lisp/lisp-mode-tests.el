@@ -333,7 +333,7 @@ Expected initialization file: `%s'\"
 (ert-deftest test-cl-flet-indentation ()
   (should (equal
            (with-temp-buffer
-             (lisp-mode)
+             (emacs-lisp-mode)
              (insert "(cl-flet ((bla (x)\n(* x x)))\n(bla 42))")
              (indent-region (point-min) (point-max))
              (buffer-string))
