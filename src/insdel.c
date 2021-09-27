@@ -945,9 +945,7 @@ insert_1_both (const char *string,
 			 Qnil, Qnil, Qnil);
 
 #ifdef HAVE_TREE_SITTER
-  eassert (nbytes >= 0);
-  eassert (PT_BYTE >= 0);
-  ts_record_change (PT_BYTE, PT_BYTE, PT_BYTE + nbytes);
+  tree_sitter_record_change (PT_BYTE, PT_BYTE, PT_BYTE + nbytes);
 #endif
 
   adjust_point (nchars, nbytes);
@@ -1082,9 +1080,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 			       current_buffer, inherit);
 
 #ifdef HAVE_TREE_SITTER
-  eassert (nbytes >= 0);
-  eassert (PT_BYTE >= 0);
-  ts_record_change (PT_BYTE, PT_BYTE, PT_BYTE + nbytes);
+  tree_sitter_record_change (PT_BYTE, PT_BYTE, PT_BYTE + nbytes);
 #endif
 
   adjust_point (nchars, outgoing_nbytes);
@@ -1154,9 +1150,7 @@ insert_from_gap (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
     }
 
 #ifdef HAVE_TREE_SITTER
-  eassert (nbytes >= 0);
-  eassert (ins_bytepos >= 0);
-  ts_record_change (ins_bytepos, ins_bytepos, ins_bytepos + nbytes);
+  tree_sitter_record_change (ins_bytepos, ins_bytepos, ins_bytepos + nbytes);
 #endif
 
   if (ins_charpos < PT)
@@ -1310,9 +1304,7 @@ insert_from_buffer_1 (struct buffer *buf,
   graft_intervals_into_buffer (intervals, PT, nchars, current_buffer, inherit);
 
 #ifdef HAVE_TREE_SITTER
-  eassert (outgoing_nbytes >= 0);
-  eassert (PT_BYTE >= 0);
-  ts_record_change (PT_BYTE, PT_BYTE, PT_BYTE + outgoing_nbytes);
+  tree_sitter_record_change (PT_BYTE, PT_BYTE, PT_BYTE + incoming_nbytes);
 #endif
 
   adjust_point (nchars, outgoing_nbytes);
@@ -1368,6 +1360,9 @@ adjust_after_replace (ptrdiff_t from, ptrdiff_t from_byte,
 
   offset_intervals (current_buffer, from, len - nchars_del);
 
+#ifdef HAVE_TREE_SITTER
+  tree_sitter_record_change (from_byte, from_byte, from_byte + len_byte);
+#endif
   if (from < PT)
     adjust_point (len - nchars_del, len_byte - nbytes_del);
 
@@ -1564,10 +1559,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
 			       current_buffer, inherit);
 
 #ifdef HAVE_TREE_SITTER
-  eassert (to_byte >= from_byte);
-  eassert (outgoing_insbytes >= 0);
-  eassert (from_byte >= 0);
-  ts_record_change (from_byte, to_byte, from_byte + outgoing_insbytes);
+  tree_sitter_record_change (from_byte, to_byte, from_byte + insbytes);
 #endif
 
   /* Relocate point as if it were a marker.  */
@@ -1612,7 +1604,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
    Because this function is called in a loop, one character at a time.
    The caller of 'replace_range_2' calls these hooks for the entire
    region once.  Apart from signal_after_change, any caller of this
-   function should also call ts_record_change.  */
+   function should also call tree_sitter_record_change.  */
 
 void
 replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
@@ -1936,9 +1928,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   evaporate_overlays (from);
 
 #ifdef HAVE_TREE_SITTER
-  eassert (from_byte <= to_byte);
-  eassert (from_byte >= 0);
-  ts_record_change (from_byte, to_byte, from_byte);
+  tree_sitter_record_change (from_byte, to_byte, from_byte);
 #endif
 
   return deletion;

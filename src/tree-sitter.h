@@ -26,7 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 INLINE_HEADER_BEGIN
 
-struct Lisp_TS
+struct Lisp_Tree_Sitter
 {
   union vectorlike_header header;
   /* A symbol represents the language this parser uses.  It should be
@@ -50,28 +50,26 @@ struct Lisp_TS
   ptrdiff_t visible_end;
 };
 
-/* A wrapper around a tree-sitter node.  */
-struct Lisp_TS_Node
+INLINE bool
+TREE_SITTER_P (Lisp_Object x)
 {
-  union vectorlike_header header;
-  /* This should prevent the gc from collecting the parser before the
-     node is done with it.  TSNode contains a pointer to the tree it
-     belongs to, and the parser object, when collected by gc, will
-     free that tree. */
-  Lisp_Object parser;
-  TSNode node;
-};
+  return PSEUDOVECTORP (x, PVEC_TREE_SITTER);
+}
+
+INLINE struct Lisp_Tree_Sitter *
+XTREE_SITTER (Lisp_Object a)
+{
+  eassert (TREE_SITTER_P (a));
+  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Tree_Sitter);
+}
 
 void
 tree_sitter_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 			   ptrdiff_t new_end_byte);
 
 Lisp_Object
-make_tree_sitter_parser (Lisp_Object buffer, TSParser *parser,
-			 TSTree *tree, Lisp_Object language_symbol);
-
-Lisp_Object
-make_tree_sitter_node (Lisp_Object parser, TSNode node);
+make_tree_sitter (Lisp_Object buffer, TSParser *parser,
+		  TSTree *tree, Lisp_Object language);
 
 extern void syms_of_tree_sitter (void);
 

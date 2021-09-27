@@ -1861,7 +1861,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       }
       break;
 #endif
-    case PVEC_TS_PARSER:
+    case PVEC_TREE_SITTER:
       print_c_string ("#<tree-sitter-parser for ", printcharfun);
       Lisp_Object language = XTS_PARSER (obj)->language_symbol;
       print_string (Fsymbol_name (language), printcharfun);

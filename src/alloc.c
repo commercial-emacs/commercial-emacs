@@ -3184,10 +3184,10 @@ cleanup_vector (struct Lisp_Vector *vector)
 	  xfree (subr->native_c_name[0]);
 	}
     }
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TS_PARSER))
+  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TREE_SITTER))
     {
-      struct Lisp_TS_Parser *lisp_parser
-	= PSEUDOVEC_STRUCT (vector, Lisp_TS_Parser);
+      struct Lisp_Tree_Sitter *lisp_parser
+	= PSEUDOVEC_STRUCT (vector, Lisp_Tree_Sitter);
       ts_tree_delete(lisp_parser->tree);
       ts_parser_delete(lisp_parser->parser);
     }

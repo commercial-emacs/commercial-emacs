@@ -1258,7 +1258,6 @@ This function is the default `font-lock-fontify-region-function'."
            (setq start (max font-lock-syntactically-fontified (point-min)))
            (setq font-lock-syntactically-fontified end))
          (font-lock-fontify-syntactic-keywords-region start end)))
-     (font-lock-tree-sitter-fontify-region beg end loudly)
      (unless font-lock-keywords-only
        (font-lock-fontify-syntactically-region beg end loudly))
      (font-lock-fontify-keywords-region beg end loudly)
@@ -1793,91 +1792,34 @@ LOUDLY, if non-nil, allows progress-meter bar."
     (set-marker pos nil)))
 
 ;; End of Keyword regexp fontification functions.
-
-;;; Tree-sitter fontification functions.
 
-(defvar-local font-lock-tree-sitter-settings nil
-  "A list of SETTINGs for tree-sitter-based fontification.
-
-Each SETTING should look like
-
-    (LANGUAGE PATTERN)
-
-Each SETTING controls one parser (often of different languages).
-LANGUAGE is the language symbol.  See Info node `(elisp)Language
-Definitions'.
-
-PATTERN is a string containing tree-sitter queries.  See Info
-node `(elisp)Pattern Matching' for writing query pattern.
-
-See Info node `(elisp)Multiple Languages' for what does it mean
-to set ranges for a parser.
-
-Generally, major-modes should set
-`font-lock-tree-sitter-defaults', and let Emacs automatically
-populate this variable.")
-
-(defvar-local font-lock-tree-sitter-defaults nil
-  "Defaults for tree-sitter Font Lock specified by the major mode.
-
-This variable should be a list
-
-    (DEFAULT :KEYWORD VALUE...)
-
-A DEFAULT may be a symbol (a variable or function whose value is
-the settings to use for fontification) or a list of
-symbols (specifying different levels of fontification).  If the
-symbol is both a variable and a function, it is used as a
-function.  Different levels of fontification can be controlled by
-`font-lock-maximum-decoration'.
-
-The symbol DEFAULT (or each symbol in DEFAULT) should contain or
-return a SETTING as explained in
-`font-lock-tree-sitter-settings'.  Basically,
-
-    (LANGUAGE PATTERN)
-
-KEYWORD and VALUE are additional settings can could be used to
-alter fontification behavior.  Currently there aren't any.
-
-For multi-language major-modes, you should provide range functions
-in `tree-sitter-range-functions', and Emacs will set the ranges
-before fontifing a region.  See Info node `(elisp)Multiple
-Languages' for what does it mean to set ranges for a parser.")
-
-(defun font-lock-tree-sitter-fontify-region (start end &optional loudly)
-  "Fontify the region between START and END.
-If LOUDLY is non-nil, message some debugging information."
+(defun font-lock-tree-sitter-fontify-region (start end)
+  "Fontify the region between START and END."
   (tree-sitter-update-ranges start end)
   (dolist (setting font-lock-tree-sitter-settings)
-    (when-let* ((language (nth 0 setting))
-                (match-pattern (nth 1 setting))
-                (parser (tree-sitter-get-parser-create language)))
-      (when-let ((node (tree-sitter-node-at start end parser)))
-        (let ((captures (tree-sitter-query-capture
-                         node match-pattern
-                         ;; Specifying the range is important. More
-                         ;; often than not, NODE will be the root
-                         ;; node, and if we don't specify the range,
-                         ;; we are basically querying the whole file.
-                         start end)))
-          (with-silent-modifications
-            (dolist (capture captures)
-              (let* ((face (car capture))
-                     (node (cdr capture))
-                     (start (tree-sitter-node-start node))
-                     (end (tree-sitter-node-end node)))
-                (cond ((facep face)
-                       (put-text-property start end 'face face))
-                      ((functionp face)
-                       (funcall face start end node)))
-                (if loudly
-                    (message
-                     "Fontifying text from %d to %d Face: %s Language: %s"
-                     start end face language))))))))))
+    '
+    (when-let ((language (nth 0 setting))
+               (match-pattern (nth 1 setting))
+               (parser (tree-sitter-get-parser-create language))
+               (node (tree-sitter-node-at start end parser)))
+      (let ((captures (tree-sitter-query-capture
+                       node match-pattern
+                       ;; Specifying the range is important. More
+                       ;; often than not, NODE will be the root
+                       ;; node, and if we don't specify the range,
+                       ;; we are basically querying the whole file.
+                       start end)))
+        (with-silent-modifications
+          (dolist (capture captures)
+            (let* ((face (car capture))
+                   (node (cdr capture))
+                   (start (tree-sitter-node-start node))
+                   (end (tree-sitter-node-end node)))
+              (cond ((facep face)
+                     (put-text-property start end 'face face))
+                    ((functionp face)
+                     (funcall face start end node))))))))))
 
-;; End of tree-sitter fontification functions.
-
 ;;; Various functions.
 
 (defun font-lock-compile-keywords (keywords &optional syntactic-keywords)
@@ -2045,15 +1987,6 @@ Sets various variables using `font-lock-defaults' and
       (unless (eq (car font-lock-keywords) t)
 	(setq font-lock-keywords
               (font-lock-compile-keywords font-lock-keywords))))
-    ;; Tree-sitter-based fontification.
-    (setq-local font-lock-tree-sitter-settings
-                (mapcar (lambda (elm) ; (DEFAULT :setting ...)
-                          (font-lock-eval-keywords
-                           (font-lock-choose-keywords
-                            (nth 0 elm) ; DEFAULT
-	                    (font-lock-value-in-major-mode
-                             font-lock-maximum-decoration))))
-                        font-lock-tree-sitter-defaults))
     (font-lock-flush)))
 
 ;;; Color etc. support.
