@@ -1661,10 +1661,10 @@ Sets up `gnus-get-unread-articles--doit'."
                                alevel
 			     foreign-level)))
               (push info (alist-get method infos-by-method nil nil #'equal))
-	    ;; The group is inactive, so we nix out the number of unread articles.
-	    ;; It leads `(gnus-group-unread group)' to return t.  See also
-	    ;; `gnus-group-prepare-flat'.
 	    (unless (gnus-active group)
+	      ;; Group is inactive; nix out unread articles such that
+	      ;; (gnus-group-unread group) returns t.  See also
+	      ;; `gnus-group-prepare-flat'.
 	      (when-let ((entry (gnus-group-entry group)))
 	        (setcar entry t))))))
 
