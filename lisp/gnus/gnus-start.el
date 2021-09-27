@@ -1621,7 +1621,9 @@ Else we get unblocked but permanently yielded threads."
                                     one-level
                                     &aux
                                     (level (gnus-group-default-level requested-level t))
-                                    infos-by-method)
+                                    (infos-by-method
+                                     (mapcar (lambda (method) (list method nil))
+                                             gnus-select-methods)))
   "Workhorse of `gnus-group-get-new-news'.
 Sets up `gnus-get-unread-articles--doit'."
   (setq gnus-server-method-cache nil)
@@ -1646,11 +1648,12 @@ Sets up `gnus-get-unread-articles--doit'."
 	   (gnus-agent-article-local-times 0)
 	   (archive-method (gnus-server-to-method "archive")))
       (gnus-message 6 "Checking new news...")
+
       (while newsrc
         (when-let ((info (pop newsrc))
                    (group (gnus-info-group info))
                    (method (gnus-find-method-for-group group info))
-                   (backend (car method)))
+                   (registered (assoc method infos-by-method)))
           (if (or (and foreign-level (not (numberp foreign-level)))
 	          (funcall (if one-level #'= #'<=)
                            (gnus-info-level info)
@@ -1681,14 +1684,6 @@ Sets up `gnus-get-unread-articles--doit'."
 			      method))
 	        (setcar elem method))
 	      (push (list method 'ok) methods)))))
-
-      ;; For methods with no groups to update, we still request-list if supported.
-      (unless dont-connect
-        (dolist (method gnus-select-methods)
-	  (when (and (not (assoc method infos-by-method))
-		     (gnus-check-backend-function 'request-list (car method)))
-	    (with-current-buffer nntp-server-buffer
-	      (gnus-read-active-file-1 method nil)))))
 
       ;; Must be able to `gnus-open-server'
       (setq infos-by-method
