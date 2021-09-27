@@ -1617,13 +1617,11 @@ Else we get unblocked but permanently yielded threads."
 
 (cl-defun gnus-get-unread-articles (&optional
                                     requested-level
-                                    dont-connect
+                                    _dont-connect
                                     one-level
                                     &aux
                                     (level (gnus-group-default-level requested-level t))
-                                    (infos-by-method
-                                     (mapcar (lambda (method) (list method nil))
-                                             gnus-select-methods)))
+                                    (infos-by-method (mapcar #'list gnus-select-methods)))
   "Workhorse of `gnus-group-get-new-news'.
 Sets up `gnus-get-unread-articles--doit'."
   (setq gnus-server-method-cache nil)
@@ -1649,9 +1647,8 @@ Sets up `gnus-get-unread-articles--doit'."
 	   (archive-method (gnus-server-to-method "archive")))
       (gnus-message 6 "Checking new news...")
 
-      (while newsrc
-        (when-let ((info (pop newsrc))
-                   (group (gnus-info-group info))
+      (dolist (info (delq nil newsrc))
+        (when-let ((group (gnus-info-group info))
                    (method (gnus-find-method-for-group group info))
                    (registered (assoc method infos-by-method)))
           (if (or (and foreign-level (not (numberp foreign-level)))
@@ -1690,9 +1687,9 @@ Sets up `gnus-get-unread-articles--doit'."
             (cl-remove-if-not
              (lambda (elem)
                (cl-destructuring-bind (method &rest infos) elem
-                 (and (ignore-errors (gnus-get-function method 'open-server))
-                      (memq (car method) (mapcar #'car gnus-select-methods)))))
+                 (ignore-errors (gnus-get-function method 'open-server))))
              infos-by-method)))
+
     (let ((doit (apply-partially #'gnus-get-unread-articles--doit
                                  infos-by-method
                                  requested-level)))
@@ -1732,7 +1729,7 @@ Sets up `gnus-get-unread-articles--doit'."
                                        'request-update-info backend))
                             commands)
                     elem
-                  (when (and method infos (not denied-p) (not already-p))
+                  (when (and method (not denied-p) (not already-p))
                     (push method methods)
                     (gnus-push-end (gnus-chain-arg
                                     nil
@@ -1764,7 +1761,18 @@ Sets up `gnus-get-unread-articles--doit'."
                                                (gnus-active (gnus-info-group info))
                                                update-p*)
                                               (gnus-group-update-group (gnus-info-group info) t))
-                                            infos*)
+                                            (or infos*
+                                                ;; just added method had no newsrc infos
+                                                (cl-remove-if-not
+                                                 (lambda (info)
+                                                   (and (gnus-methods-equal-p
+                                                         method
+                                                         (let ((method (gnus-info-method info)))
+                                                           (if (stringp method)
+                                                               (gnus-server-to-method method)
+                                                             method)))
+                                                        (gnus-activate-group (gnus-info-group info))))
+                                                 (cdr gnus-newsrc-alist))))
                                       (gnus-message 6 "Checking new news...done"))
                                     infos update-p)
                                    commands)
@@ -1805,6 +1813,7 @@ Sets up `gnus-get-unread-articles--doit'."
      ;; methods.
      ((and
        early-data
+       infos
        (gnus-check-backend-function 'finish-retrieve-group-infos (car method))
        (or (not (gnus-agent-method-p method))
            (gnus-online method)))
@@ -2080,22 +2089,19 @@ The info element is shared with the same element of
 	      (gmethod (gnus-server-get-method nil method))
 	      groups info)
 	  (while (setq info (pop newsrc))
-	    (when (inline
-		    (gnus-server-equal
-			  (inline
-			    (gnus-find-method-for-group
-				  (gnus-info-group info) info))
-			  gmethod))
-	      (push (gnus-group-real-name (gnus-info-group info))
-		    groups)))
+	    (when (gnus-server-equal
+		   (gnus-find-method-for-group
+		    (gnus-info-group info) info)
+		   gmethod)
+	      (push (gnus-group-real-name (gnus-info-group info)) groups)))
 	  (gnus-read-active-file-2 groups method)))
        ((null method)
 	t)
        (t
 	(if (not (gnus-request-list method))
 	    (unless (equal method gnus-message-archive-method)
-	      (gnus-error 1 "Cannot read active file from %s server"
-			  (car method)))
+	      (gnus-error 1 "Cannot read active file from %S server"
+			  method))
 	  (gnus-message 5 "%s" mesg)
 	  (gnus-active-to-gnus-format method gnus-active-hashtb nil t)
 	  ;; We mark this active file as read.
@@ -2110,8 +2116,8 @@ The info element is shared with the same element of
       (let ((list-type (gnus-retrieve-groups groups method)))
 	(cond ((not list-type)
 	       (gnus-error
-		1.2 "Cannot read partial active file from %s server."
-		(car method)))
+		1.2 "Cannot read partial active file from %S server."
+		method))
 	      ((eq list-type 'active)
 	       (gnus-active-to-gnus-format method gnus-active-hashtb nil t))
 	      (t

@@ -2156,7 +2156,8 @@ following hook:
 
 (defcustom gnus-group-change-level-function nil
   "Function run when a group level is changed.
-It is called with four parameters -- GROUP, LEVEL, OLDLEVEL, and optionally PREVIOUS"
+It is called with four parameters -- GROUP, LEVEL, OLDLEVEL, and
+optionally PREVIOUS"
   :group 'gnus-group-levels
   :type '(choice (const nil)
 		 function)
@@ -2167,8 +2168,10 @@ It is called with four parameters -- GROUP, LEVEL, OLDLEVEL, and optionally PREV
 
 (defvar gnus-group-change-level-functions nil
   "\"Abnormal\" hook run when a group level is changed.
-Each function element is called with three parameters -- GROUP, LEVEL, OLDLEVEL, and optionally PREVIOUS.
-Its default value is determined by the :set method of `gnus-group-change-level-function'")
+Each function element is called with three parameters -- GROUP, LEVEL,
+OLDLEVEL, and optionally PREVIOUS.
+Its default value is determined by the :set method of
+`gnus-group-change-level-function'")
 
 ;;; Face thingies.
 
@@ -2896,8 +2899,6 @@ See Info node `(gnus)Formatting Variables'."
                (:constructor gnus-info-make
                 (group rank read &optional marks method params))
                (:constructor nil)
-	       ;; FIXME: gnus-newsrc-alist contains a list of those,
-               ;; so changing them to a real struct will take more work!
                (:type list))
   group rank read marks method params)
 

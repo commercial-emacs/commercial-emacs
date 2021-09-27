@@ -2987,7 +2987,7 @@ and NEW-NAME will be prompted for."
 	(gnus-group-kill-group 1))
       (gnus-activate-group new-group))
     ;; Set the info.
-    (if (not (and info new-group))
+    (if (or (not info) (not new-group))
 	(gnus-group-set-info form (or new-group group) part)
       (setq info (copy-tree info))
       (setcar info new-group)
