@@ -1185,6 +1185,7 @@ for a list of supported suffixes.
 ---
 *** Broken and circular links are shown with the 'dired-broken-symlink' face.
 
+---
 *** '=' ('dired-diff') will now put all backup files into the 'M-n' history.
 When using '=' on a file with backup files, the default file to use
 for diffing is the newest backup file.  You can now use 'M-n' to quickly
@@ -1205,6 +1206,7 @@ If set to non-nil, Dired will dereference symbolic links when copying.
 This can be switched off on a per-usage basis by providing
 'dired-do-copy' with a 'C-u' prefix.
 
+---
 *** New user option 'dired-do-revert-buffer'.
 Non-nil reverts the destination Dired buffer after performing one
 of these operations: 'dired-do-copy', 'dired-do-rename',
@@ -1624,8 +1626,10 @@ either an internal or external browser.
 If a remote file is specified, a local temporary copy of that file is
 passed to the browser.
 
+---
 *** Support for the conkeror browser is now obsolete.
 
+---
 *** Support for the Mosaic browser has been removed.
 This support has been obsolete since 25.1.
 
