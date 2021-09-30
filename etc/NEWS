@@ -1257,6 +1257,10 @@ during I-search by using their 'isearch-motion' property.  The
 option 'isearch-motion-changes-direction' controls whether the
 direction of the search changes after a motion command.
 
++++
+** Emacs 28.1 comes with Org v9.5.
+See the file ORG-NEWS for user-visible changes in Org.
+
 ** Outline
 
 +++
@@ -3289,17 +3293,6 @@ For instance, you could add something like the following to your init
 file:
 
     (add-hook 'foo-mode-hook (lambda () (auto-fill-mode -1))
-
----
-** Indentation of 'cl-flet' and 'cl-labels' has changed.
-These forms now indent like this:
-
-    (cl-flet ((bla (x)
-		(* x x)))
-      (bla 42))
-
-This change also affects 'cl-macrolet', 'cl-flet*' and
-'cl-symbol-macrolet'.
 
 
 * Incompatible Lisp Changes in Emacs 28.1
