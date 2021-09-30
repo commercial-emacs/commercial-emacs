@@ -70,6 +70,7 @@
     (define-key map "\C-s" 'search-forward-help-for-help)
     (define-key map "\C-t" 'view-emacs-todo)
     (define-key map "\C-w" 'describe-no-warranty)
+    (define-key map "\C-x" 'view-emacs-contributing)
 
     ;; This does not fit the pattern, but it is natural given the C-\ command.
     (define-key map "\C-\\" 'describe-input-method)
@@ -292,6 +293,7 @@ Do not call this in the scope of `with-help-window'."
        ("describe-distribution"
         "Emacs ordering and distribution information")
        ("C-m" "Order printed manuals")
+       ("view-emacs-contributing" "Contributing to Emacs")
        ("view-emacs-todo" "Emacs TODO")
        ("describe-no-warranty"
         "Information on absence of warranty"))
@@ -503,6 +505,11 @@ the variable `message-log-max'."
   "Display info on known problems with Emacs and possible workarounds."
   (interactive)
   (view-help-file "PROBLEMS"))
+
+(defun view-emacs-contributing ()
+  "Display info on how to contribute to Emacs."
+  (interactive)
+  (info "(emacs) Contributing"))
 
 (defun view-emacs-debugging ()
   "Display info on how to debug Emacs problems."

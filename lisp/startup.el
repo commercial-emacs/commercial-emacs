@@ -1649,7 +1649,7 @@ Each element in the list should be a list of strings or pairs
 	      (goto-char (point-min))))
      "\tMany people have contributed code included in GNU Emacs\n"
      :link ("Contributing"
-	    ,(lambda (_button) (info "(emacs)Contributing")))
+            ,(lambda (_button) (view-emacs-contributing)))
      "\tHow to report bugs and contribute improvements to Emacs\n"
      "\n"
      :link ("GNU and Freedom" ,(lambda (_button) (describe-gnu-project)))
@@ -2237,7 +2237,7 @@ Type \\[describe-distribution] for information on "))
 
   (insert-button "Contributing"
 		 'action
-		 (lambda (_button) (info "(emacs)Contributing"))
+                 (lambda (_button) (view-emacs-contributing))
 		 'follow-link t)
   (insert "\tHow to report bugs and contribute improvements to Emacs\n\n")
 
