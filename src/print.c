@@ -1862,11 +1862,10 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       break;
 #endif
     case PVEC_TREE_SITTER:
-      print_c_string ("#<tree-sitter-parser for ", printcharfun);
-      Lisp_Object language = XTS_PARSER (obj)->language_symbol;
-      print_string (Fsymbol_name (language), printcharfun);
+      print_c_string ("#<tree-sitter for ", printcharfun);
+      print_string (XTREE_SITTER (obj)->progmode, printcharfun);
       print_c_string (" in ", printcharfun);
-      print_object (XTS_PARSER (obj)->buffer, printcharfun, escapeflag);
+      print_object (XTREE_SITTER (obj)->buffer, printcharfun, escapeflag);
       printchar ('>', printcharfun);
       break;
     default:

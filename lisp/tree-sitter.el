@@ -27,77 +27,24 @@
   :group 'tools)
 
 (defcustom tree-sitter-mode-alist
-  '(("c++-mode" . "cpp")
-    ("rust-mode" . "rust")
-    ("sh-mode" . "bash")
-    ("c-mode" . "c")
-    ("go-mode" . "go")
-    ("html-mode" . "html")
-    ("java-mode" . "java")
-    ("js-mode" . "javascript")
-    ("python-mode" . "python")
-    ("ruby-mode" . "ruby"))
+  '((c++-mode . "cpp")
+    (rust-mode . "rust")
+    (sh-mode . "bash")
+    (c-mode . "c")
+    (go-mode . "go")
+    (html-mode . "html")
+    (java-mode . "java")
+    (js-mode . "javascript")
+    (python-mode . "python")
+    (ruby-mode . "ruby"))
   "Map prog-mode to tree-sitter grammar."
-  :type '(alist :key-type (string :tag "Prog mode")
+  :type '(alist :key-type (symbol :tag "Prog mode")
                 :value-type (string :tag "Tree-sitter symbol"))
   :risky t
   :version "28.1")
 
-(defun tree-sitter-get-parser (language)
-  "Find the first parser using LANGUAGE in `tree-sitter-parser-list'."
-  (catch 'found
-    (dolist (parser tree-sitter-parser-list)
-      (when (eq language (tree-sitter-parser-language parser))
-        (throw 'found parser)))))
-
-(defun tree-sitter-get-parser-create (language)
-  "Find the first parser using LANGUAGE in `tree-sitter-parser-list'.
-If none exists, create one and return it."
-  (or (tree-sitter-get-parser language)
-      (tree-sitter-parser-create
-       (current-buffer) language)))
-
-(defun tree-sitter-parse-string (string language)
-  "Parse STRING using a parser for LANGUAGE.
-Return the root node of the syntax tree."
-  (with-temp-buffer
-    (insert string)
-    (tree-sitter-parser-root-node
-     (tree-sitter-parser-create (current-buffer) language))))
-
-(defun tree-sitter-language-at (point)
-  "Return the language used at POINT."
-  (cl-loop for parser in tree-sitter-parser-list
-           if (tree-sitter-node-at point nil parser)
-           return (tree-sitter-parser-language parser)))
-
-(defun tree-sitter-set-ranges (parser-or-lang ranges)
-  "Set the ranges of PARSER-OR-LANG to RANGES."
-  (tree-sitter-parser-set-included-ranges
-   (cond ((symbolp parser-or-lang)
-          (tree-sitter-get-parser parser-or-lang))
-         ((tree-sitter-parser-p parser-or-lang)
-          parser-or-lang))
-   ranges))
-
-(defun tree-sitter-get-ranges (parser-or-lang)
-  "Get the ranges of PARSER-OR-LANG."
-  (tree-sitter-parser-included-ranges
-   (cond ((symbolp parser-or-lang)
-          (tree-sitter-get-parser parser-or-lang))
-         ((tree-sitter-parser-p parser-or-lang)
-          parser-or-lang))))
-
 ;;; Node API supplement
 
-
-
-(defun tree-sitter-buffer-state ()
-  "Get the enchilada."
-
-  (when-let ((parser (tree-sitter-get-parser language)
-                     (car tree-sitter-parser-list)))
-    (tree-sitter-parser-root-node parser)))
 
 ;;; Query API suuplement
 
@@ -109,25 +56,30 @@ Return the root node of the syntax tree."
 
 ;;; Debugging
 
+(defun tree-sitter-change-mode ()
+  (when (and (not (minibufferp (current-buffer)))
+             major-mode
+             (derived-mode-p 'prog-mode))
+    (setq tree-sitter-buffer-state (tree-sitter-create (current-buffer) major-mode))))
+
 (define-minor-mode tree-sitter-mode
   "Tree-sitter minor mode."
-  :after-hook (ignore)
   :lighter " TS"
   (when (or noninteractive (eq (aref (buffer-name) 0) ?\s))
     (setq tree-sitter-mode nil))
   (if tree-sitter-mode
       (progn
-        (add-hook 'change-major-mode-hook 'tree-sitter-change-mode nil t)
-        (tree-sitter-create (current-buffer) major-mode))
-    (remove-hook 'change-major-mode-hook 'tree-sitter-change-mode t)
-    (tree-sitter-destroy)))
+        (add-hook 'after-change-major-mode-hook 'tree-sitter-change-mode nil t)
+        (tree-sitter-change-mode))
+    (remove-hook 'after-change-major-mode-hook 'tree-sitter-change-mode t)))
 
 (defcustom tree-sitter-global-modes t
   "Modes for which tree-sitter mode is automagically turned on.
-If nil, means no modes have tree-sitter mode automatically turned on.
-If t, all modes that support tree-sitter mode have it automatically turned on.
-If a list, it should be a list of `major-mode' symbol names for which tree-sitter
-mode should be automatically turned on.  The sense of the list is negated if it
+If nil, means no modes have tree-sitter mode automatically turned
+on.  If t, all modes that support tree-sitter mode have it
+automatically turned on.  If a list, it should be a list of
+`major-mode' symbol names for which tree-sitter mode should be
+automatically turned on.  The sense of the list is negated if it
 begins with `not'.  For example:
  (c-mode c++-mode)
 means that tree-sitter mode is turned on for buffers in C and C++ modes only."

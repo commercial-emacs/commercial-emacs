@@ -5278,7 +5278,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
      unsavable chars (as was the case with X-Symbol).  */
   Vlast_coding_system_used
     = choose_write_coding_system (start, end, filename,
-                                 append, visit, lockname, &coding);
+				  append, visit, lockname, &coding);
 
   if (open_and_close_file && !auto_saving)
     {

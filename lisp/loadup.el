@@ -282,6 +282,7 @@
 (load "replace")
 (load "emacs-lisp/tabulated-list")
 (load "buff-menu")
+(load "tree-sitter")
 
 (if (fboundp 'x-create-frame)
     (progn

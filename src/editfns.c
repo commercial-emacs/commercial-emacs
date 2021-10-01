@@ -1603,7 +1603,7 @@ make_buffer_string (ptrdiff_t start, ptrdiff_t end, bool props)
    have them, if PROPS is true.
 
    We don't want to use plain old make_string here, because it calls
-   make_uninit_string, which can cause the buffer arena to be
+   make_uninit_string, which can cause the buffer area to be
    compacted.  make_string has no way of knowing that the data has
    been moved, and thus copies the wrong data into the string.  This
    doesn't effect most of the other users of make_string, so it should

@@ -29,25 +29,9 @@ INLINE_HEADER_BEGIN
 struct Lisp_Tree_Sitter
 {
   union vectorlike_header header;
-  /* A symbol represents the language this parser uses.  It should be
-   the symbol of the function provided by a language dynamic
-   module.  */
-  Lisp_Object buffer;
+  Lisp_Object progmode;
   TSParser *parser;
   TSTree *tree;
-  TSInput input;
-  /* Re-parsing an unchanged buffer is not free for tree-sitter, so we
-     only make it re-parse when need_reparse == true.  That usually
-     means some change is made in the buffer.  But others could set
-     this field to true to force tree-sitter to re-parse.  */
-  bool need_reparse;
-  /* This two positions record the byte position of the "visible
-     region" that tree-sitter sees.  Unlike markers, These two
-     positions do not change as the user inserts and deletes text
-     around them. Before re-parse, we move these positions to match
-     BUF_BEGV_BYTE and BUF_ZV_BYTE.  */
-  ptrdiff_t visible_beg;
-  ptrdiff_t visible_end;
 };
 
 INLINE bool
@@ -62,16 +46,6 @@ XTREE_SITTER (Lisp_Object a)
   eassert (TREE_SITTER_P (a));
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Tree_Sitter);
 }
-
-void
-tree_sitter_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
-			   ptrdiff_t new_end_byte);
-
-Lisp_Object
-make_tree_sitter (Lisp_Object buffer, TSParser *parser,
-		  TSTree *tree, Lisp_Object language);
-
-extern void syms_of_tree_sitter (void);
 
 INLINE_HEADER_END
 

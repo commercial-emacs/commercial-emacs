@@ -1080,7 +1080,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 			       current_buffer, inherit);
 
 #ifdef HAVE_TREE_SITTER
-  tree_sitter_record_change (PT_BYTE, PT_BYTE, PT_BYTE + nbytes);
+  tree_sitter_record_change (PT, PT, PT + nchars);
 #endif
 
   adjust_point (nchars, outgoing_nbytes);
@@ -1586,7 +1586,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
     }
 
 #ifdef HAVE_TREE_SITTER
-  ts_record_change (from_byte, to_byte, GPT_BYTE);
+  tree_sitter_record_change (from_byte, to_byte, GPT_BYTE);
 #endif
 }
 
