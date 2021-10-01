@@ -867,6 +867,33 @@ The option `delete-pair-blink-delay' can disable blinking."
     (delete-region (point) (save-excursion (forward-sexp 1) (point)))
     (save-excursion (insert s))))
 
+(defun slurp-sexp (&optional arg)
+  "Pull the next ARG sexps into the current list."
+  (interactive "p")
+  (save-excursion
+    (up-list 1)
+    (let ((start (point)))
+      (forward-sexp arg)
+      (let ((copy (delete-and-extract-region start (point))))
+        (down-list -1)
+        (insert copy)))
+    (let ((bounds (bounds-of-thing-at-point 'sexp)))
+      (indent-region (car bounds) (cdr bounds)))))
+
+(defun barf-sexp (&optional arg)
+  "Push the last ARG sexps out of the current list."
+  (interactive "p")
+  (save-excursion
+    (up-list 1)
+    (down-list -1)
+    (let ((start (point)))
+      (backward-sexp arg)
+      (let ((copy (delete-and-extract-region (point) start)))
+        (move-past-close-and-reindent)
+        (insert copy)))
+    (let ((bounds (bounds-of-thing-at-point 'sexp)))
+      (indent-region (car bounds) (cdr bounds)))))
+
 (defun move-past-close-and-reindent ()
   "Move past next `)', delete indentation before it, then indent after it."
   (interactive)
