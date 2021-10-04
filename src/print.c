@@ -941,13 +941,11 @@ print_error_message (Lisp_Object data, Lisp_Object stream, const char *context,
   else
     {
       Lisp_Object error_conditions = Fget (errname, Qerror_conditions);
-      /* Calling `substitute-command-keys' while bootstrapping will make
-	 Emacs exit, so don't do that.  */
-      if (will_bootstrap_p () || will_dump_p ())
-	errmsg = Fget (errname, Qerror_message);
-      else
-	errmsg = call1 (Qsubstitute_command_keys,
-			Fget (errname, Qerror_message));
+      errmsg = Fget (errname, Qerror_message);
+      /* During loadup 'substitute-command-keys' might not be available.  */
+      if (!NILP (Ffboundp (Qsubstitute_command_keys)))
+	errmsg = call1 (Qsubstitute_command_keys, errmsg);
+
       file_error = Fmemq (Qfile_error, error_conditions);
     }
 
