@@ -56,22 +56,12 @@
 
 ;;; Debugging
 
-(defun tree-sitter-change-mode ()
-  (when (and (not (minibufferp (current-buffer)))
-             major-mode
-             (derived-mode-p 'prog-mode))
-    (setq tree-sitter-buffer-state (tree-sitter-create (current-buffer) major-mode))))
-
 (define-minor-mode tree-sitter-mode
   "Tree-sitter minor mode."
   :lighter " TS"
-  (when (or noninteractive (eq (aref (buffer-name) 0) ?\s))
-    (setq tree-sitter-mode nil))
-  (if tree-sitter-mode
-      (progn
-        (add-hook 'after-change-major-mode-hook 'tree-sitter-change-mode nil t)
-        (tree-sitter-change-mode))
-    (remove-hook 'after-change-major-mode-hook 'tree-sitter-change-mode t)))
+  (setq tree-sitter-mode
+        (and tree-sitter-mode
+             (not (eq (aref (buffer-name) 0) ?\s)))))
 
 (defcustom tree-sitter-global-modes t
   "Modes for which tree-sitter mode is automagically turned on.

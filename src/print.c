@@ -1863,9 +1863,10 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 #endif
     case PVEC_TREE_SITTER:
       print_c_string ("#<tree-sitter for ", printcharfun);
-      print_string (XTREE_SITTER (obj)->progmode, printcharfun);
-      print_c_string (" in ", printcharfun);
-      print_object (XTREE_SITTER (obj)->buffer, printcharfun, escapeflag);
+      print_object (XTREE_SITTER (obj)->progmode, printcharfun, escapeflag);
+      printchar (' ', printcharfun);
+      int len = sprintf (buf, "%p", XTREE_SITTER (obj));
+      strout (buf, len, len, printcharfun);
       printchar ('>', printcharfun);
       break;
     default:

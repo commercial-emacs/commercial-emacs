@@ -31,44 +31,13 @@ make_tree_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
   struct Lisp_Tree_Sitter *sitter
     = ALLOCATE_PSEUDOVECTOR
     (struct Lisp_Tree_Sitter, progmode, PVEC_TREE_SITTER);
+
   CHECK_SYMBOL (progmode_arg);
 
-  sitter->progmode = Fsymbol_name (progmode_arg);
+  sitter->progmode = progmode_arg;
   sitter->parser = parser;
   sitter->tree = tree;
   return make_lisp_ptr (sitter, Lisp_Vectorlike);
-}
-
-static void
-tree_sitter_parse (Lisp_Object buffer)
-{
-  Lisp_Object state;
-  CHECK_BUFFER (buffer);
-  state = Fbuffer_local_value (Qtree_sitter_buffer_state, buffer);
-  if (NILP (state))
-    {
-
-    }
-
-  if (! NILP (state))
-    {
-
-      TSTree *tree = XTREE_SITTER (state)->tree;
-
-      TSInput input = (TSInput) { current_buffer, tree_sitter_read_buffer, TSInputEncodingUTF8 };
-
-
-      TSTree *new_tree = ts_parser_parse(ts_parser, tree, input);
-      if (new_tree == NULL)
-	{
-	  Lisp_Object buf;
-	  XSETBUFFER (buf, buffer);
-	  xsignal1 (Qtree_sitter_parse_error, buf);
-	}
-
-      ts_tree_delete (tree);
-      XTS_PARSER (parser)->tree = new_tree;
-    }
 }
 
 static TSLanguageFunctor
@@ -129,31 +98,22 @@ tree_sitter_language_functor (Lisp_Object progmode)
   return i >= 0 ? (TSLanguageFunctor) (xmint_pointer (HASH_VALUE (h, i))) : NULL;
 }
 
-/* The best approximation of byte_index in tree-sitter space is
-   a one-indexed character position (not a byte position) for a buffer
-   assumed to be utf-8-clean.  */
-void
-tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
-			   ptrdiff_t new_end_char)
+static Lisp_Object
+tree_sitter_create (Lisp_Object progmode)
 {
-  Lisp_Object state = Fbuffer_local_value (Qtree_sitter_buffer_state, Fcurrent_buffer ());
-  if (! NILP (state))
+  Lisp_Object tree_sitter = Qnil;
+  TSLanguageFunctor fn;
+
+  CHECK_SYMBOL (progmode);
+
+  fn = tree_sitter_language_functor (progmode);
+  if (fn != NULL)
     {
-      TSTree *tree = XTREE_SITTER (state)->tree;
-      if (tree != NULL)
-	{
-	  static const TSPoint dummy_point = { 0, 0 };
-	  TSInputEdit edit = {
-	    (uint32_t) CHAR_TO_BYTE (start_char),
-	    (uint32_t) CHAR_TO_BYTE (old_end_char),
-	    (uint32_t) CHAR_TO_BYTE (new_end_char),
-	    dummy_point,
-	    dummy_point,
-	    dummy_point
-	  };
-	  ts_tree_edit (tree, &edit);
-	}
+      TSParser *ts_parser = ts_parser_new ();
+      ts_parser_set_language (ts_parser, fn ());
+      tree_sitter = make_tree_sitter (ts_parser, NULL, progmode);
     }
+  return tree_sitter;
 }
 
 /* The best approximation of byte_index in tree-sitter space is
@@ -185,28 +145,135 @@ tree_sitter_read_buffer (void *payload, uint32_t byte_index,
 		   (make_fixnum (start),
 		    make_fixnum (min (start + tree_sitter_scan_characters,
 				      BUF_Z (bp) - BUF_BEG (bp) + 1)))));
+  *bytes_read = strlen (thread_unsafe_return_value);
   return thread_unsafe_return_value;
 }
 
-DEFUN ("tree-sitter-create",
-       Ftree_sitter_create, Stree_sitter_create,
-       2, 2, 0,
-       doc: /* Create and return a tree-sitter in BUFFER for PROGMODE. */)
-  (Lisp_Object progmode)
+DEFUN ("tree-sitter-highlight-buffer",
+       Ftree_sitter_highlight_buffer, Stree_sitter_highlight_buffer,
+       0, 1, 0,
+       doc: /* Highlight BUFFER. */)
+  (Lisp_Object buffer)
 {
-  Lisp_Object tree_sitter = Qnil;
-  TSLanguageFunctor fn;
+  TSTree *tree;
+  Lisp_Object retval = Qnil, sitter;
+  const char * const[] highlight_names = {
+    "constant", "type.builtin", "operator", "variable.parameter",
+    "function.builtin", "punctuation.delimiter", "attribute",
+    "punctuation.bracket", "string", "variable.builtin", "comment",
+    "number", "type", "embedded", "function", "keyword", "constructor",
+    "property", "tag", "string.special", "constant.builtin"
+  };
+  const highlight_count = sizeof (highlight_names) / sizeof (const char *);
 
-  CHECK_SYMBOL (progmode);
+  if (NILP (buffer))
+    buffer = Fcurrent_buffer ();
 
-  fn = tree_sitter_language_functor (progmode);
-  if (fn != NULL)
+  CHECK_BUFFER (buffer);
+  sitter = Ftree_sitter (buffer);
+
+  if (! NILP (sitter))
     {
-      TSParser *ts_parser = ts_parser_new ();
-      ts_parser_set_language (ts_parser, fn ());
-      tree_sitter = make_tree_sitter (ts_parser, NULL, progmode);
+      tree = XTREE_SITTER (sitter)->tree;
+      if (tree != NULL)
+	{
+	  ts_highlighter_new (highlight_names,
+			      NULL,
+			      highlight_count);
+	  ts_highlighter_add_language();
+	}
     }
-  return tree_sitter;
+  return retval;
+}
+
+DEFUN ("tree-sitter-root-node",
+       Ftree_sitter_root_node, Stree_sitter_root_node,
+       0, 1, 0,
+       doc: /* Return TSNode stash from BUFFER's sitter. */)
+  (Lisp_Object buffer)
+{
+  TSTree *tree;
+  Lisp_Object retval = Qnil, sitter;
+
+  if (NILP (buffer))
+    buffer = Fcurrent_buffer ();
+
+  CHECK_BUFFER (buffer);
+  sitter = Ftree_sitter (buffer);
+
+  if (! NILP (sitter))
+    {
+      tree = XTREE_SITTER (sitter)->tree;
+      if (tree != NULL)
+	retval = build_string (ts_node_string (ts_tree_root_node (tree)));
+    }
+  return retval;
+}
+
+DEFUN ("tree-sitter",
+       Ftree_sitter, Stree_sitter,
+       0, 1, 0,
+       doc: /* Return BUFFER's Lisp_Tree_Sitter. */)
+  (Lisp_Object buffer)
+{
+  Lisp_Object sitter;
+  if (NILP (buffer))
+    buffer = Fcurrent_buffer ();
+
+  CHECK_BUFFER (buffer);
+
+  sitter = Fbuffer_local_value (Qtree_sitter_sitter, buffer);
+  if (NILP (sitter)
+      || ! EQ (XTREE_SITTER (sitter)->progmode, BVAR (XBUFFER (buffer), major_mode)))
+    {
+      sitter = Fset (Qtree_sitter_sitter,
+		     tree_sitter_create (BVAR (XBUFFER (buffer), major_mode)));
+    }
+
+  if (! NILP (sitter))
+    {
+      if (XTREE_SITTER (sitter)->tree == NULL)
+	{
+	  XTREE_SITTER (sitter)->tree =
+	    ts_parser_parse (XTREE_SITTER (sitter)->parser,
+			     XTREE_SITTER (sitter)->tree,
+			     (TSInput) {
+			       XBUFFER (buffer),
+			       tree_sitter_read_buffer,
+			       TSInputEncodingUTF8
+			     });
+	  if (XTREE_SITTER (sitter)->tree == NULL)
+	    xsignal1 (Qtree_sitter_parse_error, BVAR (XBUFFER (buffer), name));
+	}
+    }
+  return sitter;
+}
+
+/* The best approximation of byte_index in tree-sitter space is
+   a one-indexed character position (not a byte position) for a buffer
+   assumed to be utf-8-clean.  */
+void
+tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
+			   ptrdiff_t new_end_char)
+{
+  Lisp_Object sitter = Fbuffer_local_value (Qtree_sitter_sitter, Fcurrent_buffer ());
+  if (! NILP (sitter))
+    {
+      TSTree *tree = XTREE_SITTER (sitter)->tree;
+      if (tree != NULL)
+	{
+	  static const TSPoint dummy_point = { 0, 0 };
+	  TSInputEdit edit = {
+	    (uint32_t) CHAR_TO_BYTE (start_char),
+	    (uint32_t) CHAR_TO_BYTE (old_end_char),
+	    (uint32_t) CHAR_TO_BYTE (new_end_char),
+	    dummy_point,
+	    dummy_point,
+	    dummy_point
+	  };
+	  ts_tree_edit (tree, &edit);
+	}
+    }
 }
 
 DEFUN ("tree-sitter-expand-pattern",
@@ -329,10 +396,14 @@ void
 syms_of_tree_sitter (void)
 {
   DEFSYM (Qtree_sitter_error, "tree-sitter-error");
+  DEFSYM (Qtree_sitter_parse_error, "tree-sitter-parse-error");
   DEFSYM (Qtree_sitter_query_error, "tree-sitter-query-error");
   DEFSYM (Qtree_sitter_language_error, "tree-sitter-language-error");
+  DEFSYM (Qtree_sitterp, "tree-sitterp");
 
   define_error (Qtree_sitter_error, "Generic tree-sitter exception", Qerror);
+  define_error (Qtree_sitter_parse_error, "Parse error",
+		Qtree_sitter_error);
   define_error (Qtree_sitter_query_error, "Query pattern is malformed",
 		Qtree_sitter_error);
   define_error (Qtree_sitter_language_error, "Cannot load language",
@@ -344,10 +415,12 @@ syms_of_tree_sitter (void)
 
   DEFSYM (Qtree_sitter_mode_alist, "tree-sitter-mode-alist");
 
-  DEFSYM (Qtree_sitter_buffer_state, "tree-sitter-buffer-state");
-  Fmake_variable_buffer_local (Qtree_sitter_buffer_state);
+  DEFSYM (Qtree_sitter_sitter, "tree-sitter-sitter");
+  Fmake_variable_buffer_local (Qtree_sitter_sitter);
 
-  defsubr (&Stree_sitter_create);
+  defsubr (&Stree_sitter);
+  defsubr (&Stree_sitter_root_node);
+  defsubr (&Stree_sitter_highlight_buffer);
 
   /* defsubr (&Stree_sitter_node_type); */
   /* defsubr (&Stree_sitter_node_start); */

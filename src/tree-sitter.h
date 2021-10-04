@@ -35,7 +35,7 @@ struct Lisp_Tree_Sitter
 };
 
 INLINE bool
-TREE_SITTER_P (Lisp_Object x)
+TREE_SITTERP (Lisp_Object x)
 {
   return PSEUDOVECTORP (x, PVEC_TREE_SITTER);
 }
@@ -43,8 +43,14 @@ TREE_SITTER_P (Lisp_Object x)
 INLINE struct Lisp_Tree_Sitter *
 XTREE_SITTER (Lisp_Object a)
 {
-  eassert (TREE_SITTER_P (a));
+  eassert (TREE_SITTERP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Tree_Sitter);
+}
+
+INLINE void
+CHECK_TREE_SITTER (Lisp_Object sitter)
+{
+  CHECK_TYPE (TREE_SITTERP (sitter), Qtree_sitterp, sitter);
 }
 
 INLINE_HEADER_END
