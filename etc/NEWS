@@ -80,6 +80,10 @@ Emacs buffers, like indentation and the like.  The new ert function
 
 * Lisp Changes in Emacs 29.1
 
++++
+** Third 'mapconcat' argument 'separator' is now optional.
+An explicit nil always meant the empty string, now it can be left out.
+
 ---
 ** Themes can now be made obsolete.
 Using 'make-obsolete' on a theme is now supported.  This will make
