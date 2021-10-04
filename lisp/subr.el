@@ -6480,9 +6480,6 @@ pairs.  Available keywords are:
 :keymap    If non-nil, instead of creating a new keymap, the given keymap
              will be destructively modified instead.
 
-:copy      If non-nil, copy this keymap and use it as the basis
-             (see `copy-keymap').
-
 :name      If non-nil, this should be a string to use as the menu for
              the keymap in case you use it as a menu with `x-popup-menu'.
 
@@ -6494,7 +6491,7 @@ KEY/DEFINITION pairs are as KEY and DEF in `define-key'.  KEY can
 also be the special symbol `:menu', in which case DEFINITION
 should be a MENU form as accepted by `easy-menu-define'.
 
-\n(fn [&key FULL PARENT SUPPRESS NAME PREFIX KEYMAP COPY] [KEY DEFINITION] ...)"
+\n(fn [&key FULL PARENT SUPPRESS NAME PREFIX KEYMAP] [KEY DEFINITION] ...)"
   ;; Handle keywords.
   (let ((options nil))
     (while (and definitions
@@ -6507,7 +6504,7 @@ should be a MENU form as accepted by `easy-menu-define'.
     (define-keymap--define (nreverse options) definitions)))
 
 (defun define-keymap--define (options definitions)
-  (let (full suppress parent name prefix copy keymap)
+  (let (full suppress parent name prefix keymap)
     (while options
       (let ((keyword (pop options))
             (value (pop options)))
@@ -6515,7 +6512,6 @@ should be a MENU form as accepted by `easy-menu-define'.
           (:full (setq full value))
           (:keymap (setq keymap value))
           (:parent (setq parent value))
-          (:copy (setq copy value))
           (:suppress (setq suppress value))
           (:name (setq name value))
           (:prefix (setq prefix value)))))
@@ -6524,16 +6520,12 @@ should be a MENU form as accepted by `easy-menu-define'.
                (or full parent suppress keymap))
       (error "A prefix keymap can't be defined with :full/:parent/:suppress/:keymap keywords"))
 
-    (when (and full copy)
-      (error "Invalid combination: :full/:copy"))
-
-    (when (and keymap (or full copy))
-      (error "Invalid combination: :keymap with :full/:copy"))
+    (when (and keymap full)
+      (error "Invalid combination: :keymap with :full"))
 
     (let ((keymap (cond
                    (keymap keymap)
                    (prefix (define-prefix-command prefix nil name))
-                   (copy (copy-keymap copy))
                    (full (make-keymap name))
                    (t (make-sparse-keymap name)))))
       (when suppress
