@@ -3930,8 +3930,8 @@ This format is defined by the `gnus-article-time-format' variable."
 		      ;; No split name was found.
 		      ((null split-name)
 		       (read-file-name
-			(concat prompt " (default "
-				(file-name-nondirectory default-name) "): ")
+                        (format-prompt prompt
+                                       (file-name-nondirectory default-name))
 			(file-name-directory default-name)
 			default-name))
 		      ;; A single group name is returned.
@@ -3940,8 +3940,8 @@ This format is defined by the `gnus-article-time-format' variable."
 			     (funcall function split-name headers
 				      (symbol-value variable)))
 		       (read-file-name
-			(concat prompt " (default "
-				(file-name-nondirectory default-name) "): ")
+                        (format-prompt prompt
+                                       (file-name-nondirectory default-name))
 			(file-name-directory default-name)
 			default-name))
 		      ;; A single split name was found
@@ -3953,9 +3953,8 @@ This format is defined by the `gnus-article-time-format' variable."
 					  (file-name-as-directory name))
 					 ((file-exists-p name) name)
 					 (t gnus-article-save-directory))))
-			 (read-file-name
-			  (concat prompt " (default " name "): ")
-			  dir name)))
+                         (read-file-name (format-prompt prompt name)
+                                         dir name)))
 		      ;; A list of splits was found.
 		      (t
 		       (setq split-name (nreverse split-name))
