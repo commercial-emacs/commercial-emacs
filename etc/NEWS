@@ -98,6 +98,12 @@ also handle ANSI codes for faint, italic and blinking text, displaying
 it with new 'ansi-term-faint/italic/slow-blinking/fast-blinking'
 faces.
 
+** Miscellaneous
+
++++
+*** User option 'minibuffer-eldef-shorten-default' is now obsolete.
+Customize the user option 'minibuffer-default-prompt-format' instead.
+
 
 * New Modes and Packages in Emacs 29.1
 
