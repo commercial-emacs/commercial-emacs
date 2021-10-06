@@ -654,6 +654,7 @@ the first newsgroup."
 (defvar mail-sources)
 (defvar nnmail-scan-directory-mail-source-once)
 (defvar nnmail-split-history)
+(defvar gnus-save-newsrc-file-last-timestamp nil)
 
 (defun gnus-close-all-servers ()
   "Close all servers."
@@ -2703,7 +2704,6 @@ The form should return either t or nil."
           'msdos-long-file-names
         (lambda () t)))))
 
-(defvar gnus-save-newsrc-file-last-timestamp nil)
 (defun gnus-save-newsrc-file (&optional force)
   "Save .newsrc file.
 Use the group string names in `gnus-group-list' to pull info
