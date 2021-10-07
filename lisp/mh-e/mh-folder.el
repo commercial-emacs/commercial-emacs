@@ -343,11 +343,7 @@ annotation.")
   [backtab]     mh-prev-button
   "\M-\t"       mh-prev-button)
 
-(cond
- ((featurep 'xemacs)
-  (define-key mh-folder-mode-map [button2] 'mh-show-mouse))
- (t
-  (define-key mh-folder-mode-map [mouse-2] 'mh-show-mouse)))
+(define-key mh-folder-mode-map [mouse-2] 'mh-show-mouse)
 
 ;; "C-c /" prefix is used in mh-folder-mode by pgp.el and mailcrypt
 
@@ -512,12 +508,8 @@ font-lock is done highlighting.")
 ;;; MH-Folder Mode
 
 (defmacro mh-remove-xemacs-horizontal-scrollbar ()
-  "Get rid of the horizontal scrollbar that XEmacs insists on putting in."
-  (when (featurep 'xemacs)
-    '(if (and (featurep 'scrollbar)
-              (fboundp 'set-specifier))
-         (set-specifier horizontal-scrollbar-visible-p nil
-                        (cons (current-buffer) nil)))))
+  (declare (obsolete nil "29.1"))
+  nil)
 
 ;; Register mh-folder-mode as supporting which-function-mode...
 (eval-and-compile (mh-require 'which-func nil t))
@@ -527,8 +519,6 @@ font-lock is done highlighting.")
 ;; Shush compiler.
 (defvar desktop-save-buffer)
 (defvar font-lock-auto-fontify)
-(mh-do-in-xemacs
-  (defvar font-lock-defaults))
 
 ;; Ensure new buffers won't get this mode if default major-mode is nil.
 (put 'mh-folder-mode 'mode-class 'special)
@@ -590,13 +580,10 @@ region in the MH-Folder buffer, then the MH-E command will
 perform the operation on all messages in that region.
 
 \\{mh-folder-mode-map}"
-  (mh-do-in-gnu-emacs
-    (unless mh-folder-tool-bar-map
-        (mh-tool-bar-folder-buttons-init))
-    (if (boundp 'tool-bar-map)
-        (set (make-local-variable 'tool-bar-map) mh-folder-tool-bar-map)))
-  (mh-do-in-xemacs
-    (mh-tool-bar-init :folder))
+  (unless mh-folder-tool-bar-map
+    (mh-tool-bar-folder-buttons-init))
+  (if (boundp 'tool-bar-map)
+      (set (make-local-variable 'tool-bar-map) mh-folder-tool-bar-map))
   (make-local-variable 'font-lock-defaults)
   (setq font-lock-defaults '(mh-folder-font-lock-keywords t))
   (make-local-variable 'desktop-save-buffer)
@@ -644,7 +631,6 @@ perform the operation on all messages in that region.
    'imenu-create-index-function 'mh-index-create-imenu-index
                                         ; Setup imenu support
    'mh-previous-window-config nil)      ; Previous window configuration
-  (mh-remove-xemacs-horizontal-scrollbar)
   (setq truncate-lines t)
   (auto-save-mode -1)
   (setq buffer-offer-save t)
@@ -655,15 +641,8 @@ perform the operation on all messages in that region.
   (mh-funcall-if-exists hl-line-mode 1)
   (setq revert-buffer-function #'mh-undo-folder)
   (add-to-list 'minor-mode-alist '(mh-showing-mode " Show"))
-  (mh-do-in-xemacs
-    (easy-menu-add mh-folder-sequence-menu)
-    (easy-menu-add mh-folder-message-menu)
-    (easy-menu-add mh-folder-folder-menu))
   (mh-inc-spool-make)
-  (mh-set-help mh-folder-mode-help-messages)
-  (if (and (featurep 'xemacs)
-           font-lock-auto-fontify)
-      (turn-on-font-lock)))             ; Force font-lock in XEmacs.
+  (mh-set-help mh-folder-mode-help-messages))
 
 
 

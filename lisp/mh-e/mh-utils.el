@@ -61,9 +61,9 @@ used in lieu of `search' in the CL package."
 ;;;###mh-autoload
 (defun mh-colors-available-p ()
   "Check if colors are available in the Emacs being used."
-  (or (featurep 'xemacs)
-      (let ((color-cells (mh-display-color-cells)))
-        (and (numberp color-cells) (>= color-cells 8)))))
+  ;; FIXME: Can this be replaced with `display-color-p'?
+  (let ((color-cells (mh-display-color-cells)))
+    (and (numberp color-cells) (>= color-cells 8))))
 
 ;;;###mh-autoload
 (defun mh-colors-in-use-p ()
@@ -127,26 +127,18 @@ Ignores case when searching for OLD."
 ;;;###mh-autoload
 (defun mh-logo-display ()
   "Modify mode line to display MH-E logo."
-  (mh-do-in-gnu-emacs
-    (let* ((load-path (mh-image-load-path-for-library "mh-e" "mh-logo.xpm"))
-           (image-load-path (cons (car load-path)
-                                  (when (boundp 'image-load-path)
-                                    image-load-path))))
-      (add-text-properties
-       0 2
-       `(display ,(or mh-logo-cache
-                      (setq mh-logo-cache
-                            (mh-funcall-if-exists
-                             find-image '((:type xpm :ascent center
-                                                 :file "mh-logo.xpm"))))))
-       (car mode-line-buffer-identification))))
-  (mh-do-in-xemacs
-    (setq modeline-buffer-identification
-          (list
-           (if mh-modeline-glyph
-               (cons modeline-buffer-id-left-extent mh-modeline-glyph)
-             (cons modeline-buffer-id-left-extent "XEmacs%N:"))
-           (cons modeline-buffer-id-right-extent " %17b")))))
+  (let* ((load-path (mh-image-load-path-for-library "mh-e" "mh-logo.xpm"))
+         (image-load-path (cons (car load-path)
+                                (when (boundp 'image-load-path)
+                                  image-load-path))))
+    (add-text-properties
+     0 2
+     `(display ,(or mh-logo-cache
+                    (setq mh-logo-cache
+                          (mh-funcall-if-exists
+                           find-image '((:type xpm :ascent center
+                                               :file "mh-logo.xpm"))))))
+     (car mode-line-buffer-identification))))
 
 
 
@@ -920,11 +912,7 @@ Handle RFC 822 (or later) continuation lines."
 
 (defvar mh-hidden-header-keymap
   (let ((map (make-sparse-keymap)))
-    (mh-do-in-gnu-emacs
-      (define-key map [mouse-2] #'mh-letter-toggle-header-field-display-button))
-    (mh-do-in-xemacs
-      (define-key map '(button2)
-        #'mh-letter-toggle-header-field-display-button))
+    (define-key map [mouse-2] #'mh-letter-toggle-header-field-display-button)
     map))
 
 ;;;###mh-autoload
