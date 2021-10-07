@@ -3013,7 +3013,7 @@ if test "${with_tree_sitter}" == "yes"; then
     [HAVE_TREE_SITTER=yes], [HAVE_TREE_SITTER=no])
   if test "${HAVE_TREE_SITTER}" = yes; then
     AC_DEFINE(HAVE_TREE_SITTER, 1, [Define if using tree-sitter.])
-    TREE_SITTER_LIBS=-ltree-sitter
+    TREE_SITTER_LIBS="-ltree-sitter -ltree_sitter_highlight"
     TREE_SITTER_OBJ="tree-sitter.o"
   fi
 fi

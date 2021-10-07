@@ -22,6 +22,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "buffer.h"
 #include "tree-sitter.h"
+#include <tree_sitter/highlight.h>
 
 typedef TSLanguage *(*TSLanguageFunctor) (void);
 
@@ -145,26 +146,26 @@ tree_sitter_read_buffer (void *payload, uint32_t byte_index,
 		   (make_fixnum (start),
 		    make_fixnum (min (start + tree_sitter_scan_characters,
 				      BUF_Z (bp) - BUF_BEG (bp) + 1)))));
-  *bytes_read = strlen (thread_unsafe_return_value);
+  if (bytes_read)
+    *bytes_read = strlen (thread_unsafe_return_value);
   return thread_unsafe_return_value;
 }
 
 DEFUN ("tree-sitter-highlight-buffer",
        Ftree_sitter_highlight_buffer, Stree_sitter_highlight_buffer,
-       0, 1, 0,
+       0, 1, "",
        doc: /* Highlight BUFFER. */)
   (Lisp_Object buffer)
 {
-  TSTree *tree;
   Lisp_Object retval = Qnil, sitter;
-  const char * const[] highlight_names = {
+  const char * highlight_names[] = {
     "constant", "type.builtin", "operator", "variable.parameter",
     "function.builtin", "punctuation.delimiter", "attribute",
     "punctuation.bracket", "string", "variable.builtin", "comment",
     "number", "type", "embedded", "function", "keyword", "constructor",
     "property", "tag", "string.special", "constant.builtin"
   };
-  const highlight_count = sizeof (highlight_names) / sizeof (const char *);
+  const uint32_t highlight_count = sizeof (highlight_names) / sizeof (const char *);
 
   if (NILP (buffer))
     buffer = Fcurrent_buffer ();
@@ -174,15 +175,104 @@ DEFUN ("tree-sitter-highlight-buffer",
 
   if (! NILP (sitter))
     {
-      tree = XTREE_SITTER (sitter)->tree;
-      if (tree != NULL)
+      char *scope;
+      uint32_t bytes_read;
+      TSHighlightEventSlice ts_highlight_event_slice =
+	(TSHighlightEventSlice) { NULL, 0 };
+      TSHighlightError ts_highlight_error = TSHighlightOk;
+      const char *error = NULL;
+      Lisp_Object suberror = Qnil;
+      TSHighlightBuffer *ts_highlight_buffer = NULL;
+      TSHighlighter *ts_highlighter =
+	ts_highlighter_new (highlight_names, highlight_names, highlight_count);
+      Lisp_Object language =
+	Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
+			  Fsymbol_value (Qtree_sitter_mode_alist))),
+	highlights_scm;
+      eassert (! NILP (language));
+
+      USE_SAFE_ALLOCA;
+      scope = SAFE_ALLOCA (strlen("scope.") + SCHARS (language) + 1);
+      sprintf (scope, "scope.%s", SSDATA (language));
+
+      highlights_scm =
+	Flocate_file_internal (concat3 (build_string ("queries/"), language, build_string ("/highlights.scm")),
+			       Vload_path, Qnil, Qnil);
+      if (! NILP (highlights_scm))
 	{
-	  ts_highlighter_new (highlight_names,
-			      NULL,
-			      highlight_count);
-	  ts_highlighter_add_language();
+	  char *highlights_query;
+	  long highlights_query_length;
+	  FILE *fp = fopen (SSDATA (highlights_scm), "rb");
+	  if (!fp) {
+	      suberror = highlights_scm;
+	      error = "Cannot fopen";
+	      goto finally;
+	  }
+	  fseek (fp, 0L, SEEK_END);
+	  highlights_query_length = ftell (fp);
+	  rewind(fp);
+
+	  highlights_query = xzalloc(highlights_query_length + 1);
+
+	  if (1 != fread (highlights_query, highlights_query_length, 1, fp))
+	    {
+	      suberror = highlights_scm;
+	      error = "Cannot fread";
+	    }
+	  else
+	    {
+	      ts_highlight_error =
+		ts_highlighter_add_language
+		(ts_highlighter,
+		 scope,
+		 NULL,
+		 ts_parser_language (XTREE_SITTER (sitter)->parser),
+		 highlights_query,
+		 "",
+		 "",
+		 strlen (highlights_query),
+		 0,
+		 0);
+	      if (ts_highlight_error != TSHighlightOk)
+		{
+		  suberror = make_fixnum (ts_highlight_error);
+		  error = "ts_highlighter_add_language non-Ok return";
+		}
+	    }
+	  xfree (highlights_query);
+	  fclose (fp);
+	  if (error != NULL)
+	    goto finally;
 	}
+      else
+	{
+	  suberror = language;
+	  error = "Could not locate highlights scm";
+	  goto finally;
+	}
+
+      ts_highlight_buffer = ts_highlight_buffer_new ();
+      const char *source_code =
+	tree_sitter_read_buffer (current_buffer, 0, (TSPoint) { 0, 0 },
+				 &bytes_read);
+      ts_highlight_event_slice =
+	ts_highlighter_return_highlights (ts_highlighter, scope, source_code, bytes_read,
+					  ts_highlight_buffer, NULL);
+
+
+
+    finally:
+      SAFE_FREE ();
+      if (ts_highlighter != NULL)
+	ts_highlighter_delete (ts_highlighter);
+      if (ts_highlight_buffer != NULL)
+	ts_highlight_buffer_delete (ts_highlight_buffer);
+      if (error != NULL)
+	xsignal2 (Qtree_sitter_error,
+		  build_string (error),
+		  suberror);
     }
+
   return retval;
 }
 
