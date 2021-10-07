@@ -640,9 +640,36 @@ E.g. (\"i\" \"m\" \"s\" \"b Quake!*@*\")
     newstring))
 
 (defcustom erc-prompt "ERC>"
-  "Prompt used by ERC.  Trailing whitespace is not required."
+  "Prompt used by ERC.  Trailing whitespace is not required.
+
+You can also use these substitution patterns:
+    \"%target\"   - channel, user, or server
+    \"%network\"  - IRC network"
   :group 'erc-display
   :type '(choice string function))
+
+(defun erc-prompt--subsitutions (prompt)
+  "Make \"%target\" substitutions in PROMPT.
+
+See also the variable `erc-prompt'."
+  (while (string-match (rx "%" (or "target"
+                                   "network"
+                                   ;; "modes"
+                                   ))
+                       prompt)
+    (setq prompt
+          (replace-match
+           (pcase (match-string 0 prompt)
+             ("%target" (or (erc-format-target)
+                            (erc-format-target-and/or-server)
+                            "ERC"))
+             ("%network" (and (fboundp 'erc-network-name) (erc-network-name)))
+             ;; TODO: Maybe have one variable for the prompt in the
+             ;;       server window and one for channels and queries?
+             ;;("%modes" (erc-format-channel-modes))
+             (_ ""))
+           nil nil prompt 0)))
+  prompt)
 
 (defun erc-prompt ()
   "Return the input prompt as a string.
@@ -650,7 +677,7 @@ E.g. (\"i\" \"m\" \"s\" \"b Quake!*@*\")
 See also the variable `erc-prompt'."
   (let ((prompt (if (functionp erc-prompt)
                     (funcall erc-prompt)
-                  erc-prompt)))
+                  (erc-prompt--subsitutions erc-prompt))))
     (if (> (length prompt) 0)
         (concat prompt " ")
       prompt)))
