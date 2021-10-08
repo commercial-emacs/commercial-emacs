@@ -422,7 +422,9 @@ The action is to call FUNCTION with arguments ARGS.
 
 This function returns a timer object which you can use in `cancel-timer'."
   (interactive "sRun after delay (seconds): \nNRepeat interval: \naFunction: ")
-  (apply 'run-at-time secs repeat function args))
+  (if (and (numberp secs) (= secs 0) (null repeat))
+      (apply function args)
+    (apply 'run-at-time secs repeat function args)))
 
 (defun add-timeout (secs function object &optional repeat)
   "Add a timer to run SECS seconds from now, to call FUNCTION on OBJECT.
@@ -448,13 +450,15 @@ exactly SECS seconds (that is, only once for each time Emacs becomes idle).
 This function returns a timer object which you can use in `cancel-timer'."
   (interactive
    (list (read-from-minibuffer "Run after idle (seconds): " nil nil t)
-	 (y-or-n-p "Repeat each time Emacs is idle? ")
-	 (intern (completing-read "Function: " obarray 'fboundp t))))
-  (let ((timer (timer-create)))
-    (timer-set-function timer function args)
-    (timer-set-idle-time timer secs repeat)
-    (timer-activate-when-idle timer t)
-    timer))
+         (y-or-n-p "Repeat each time Emacs is idle? ")
+         (intern (completing-read "Function: " obarray 'fboundp t))))
+  (if (and (numberp secs) (= secs 0) (null repeat))
+      (apply function args)
+    (let ((timer (timer-create)))
+      (timer-set-function timer function args)
+      (timer-set-idle-time timer secs repeat)
+      (timer-activate-when-idle timer t)
+      timer)))
 
 (defvar with-timeout-timers nil
   "List of all timers used by currently pending `with-timeout' calls.")
