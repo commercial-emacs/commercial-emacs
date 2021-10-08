@@ -112,7 +112,6 @@
 ;; customization stuff
 (defgroup speedbar nil
   "File and tag browser frame."
-  :group 'etags
   :group 'tools
   :group 'convenience
   :link '(custom-manual "(speedbar) Top")
@@ -306,17 +305,17 @@ attached to and added to this list before the new frame is initialized."
 		       (symbol :tag "Parameter")
 		       (sexp :tag "Value"))))
 
-(defcustom speedbar-use-imenu-flag (fboundp 'imenu)
+(defcustom speedbar-use-imenu-flag t
   "Non-nil means use imenu for file parsing, nil to use etags.
 XEmacs prior to 20.4 doesn't support imenu, therefore the default is to
 use etags instead.  Etags support is not as robust as imenu support."
   :tag "Use Imenu for tags"
   :group 'speedbar
   :type 'boolean)
+(make-obsolete-variable 'speedbar-use-imenu-flag nil "29.1")
 
 (defvar speedbar-dynamic-tags-function-list
-  '((speedbar-fetch-dynamic-imenu . speedbar-insert-imenu-list)
-    (speedbar-fetch-dynamic-etags . speedbar-insert-etags-list))
+  '((speedbar-fetch-dynamic-imenu . speedbar-insert-imenu-list))
   "Set to a list of functions which will return and insert a list of tags.
 Each element is of the form ( FETCH . INSERT ) where FETCH
 is a function which takes one parameter (the file to tag) and returns a
@@ -2350,6 +2349,7 @@ name will have the function FIND-FUN and not token."
 
 (defun speedbar-insert-etags-list (indent lst)
   "At level INDENT, insert the etags generated LST."
+  (declare (obsolete nil "29.1"))
   (speedbar-insert-generic-list indent lst
 				'speedbar-tag-expand
 				'speedbar-tag-find))
@@ -3356,7 +3356,7 @@ INDENT is the current indentation level."
 
 (defun speedbar-tag-expand (text token indent)
   "Expand a tag sublist.  Imenu will return sub-lists of specialized tag types.
-Etags does not support this feature.  TEXT will be the button string.
+TEXT will be the button string.
 TOKEN will be the list, and INDENT is the current indentation level."
   (cond ((string-search "+" text)	;we have to expand this file
 	 (speedbar-change-expand-button-char ?-)
@@ -3503,10 +3503,6 @@ functions to do caching and flushing if appropriate."
 
 ;;; Tag Management -- Imenu
 ;;
-(if (not speedbar-use-imenu-flag)
-
-    nil
-
 (eval-when-compile (condition-case nil (require 'imenu) (error nil)))
 (declare-function imenu--make-index-alist "imenu" (&optional no-error))
 
@@ -3524,7 +3520,7 @@ Returns the tag list, or t for an error."
 		  (lambda (a b) (string< (car a) (car b))))
 	  index-alist))
     (error t)))
-)
+
 
 ;;; Tag Management -- etags  (old XEmacs compatibility part)
 ;;
@@ -3548,12 +3544,14 @@ use a function symbol instead of regexp.  The function should expect
 to be at the beginning of a line in the etags buffer.
 
 This variable is ignored if `speedbar-use-imenu-flag' is non-nil.")
+(make-obsolete-variable 'speedbar-fetch-etags-parse-list nil "29.1")
 
 (defcustom speedbar-fetch-etags-command "etags"
   "Command used to create an etags file.
 This variable is ignored if `speedbar-use-imenu-flag' is t."
   :group 'speedbar
   :type 'string)
+(make-obsolete-variable 'speedbar-fetch-etags-command nil "29.1")
 
 (defcustom speedbar-fetch-etags-arguments '("-D" "-I" "-o" "-")
   "List of arguments to use with `speedbar-fetch-etags-command'.
@@ -3562,7 +3560,8 @@ modify this list conveniently.
 This variable is ignored if `speedbar-use-imenu-flag' is t."
   :group 'speedbar
   :type '(choice (const nil)
-		 (repeat :tag "List of arguments" string)))
+                 (repeat :tag "List of arguments" string)))
+(make-obsolete-variable 'speedbar-fetch-etags-arguments nil "29.1")
 
 (defun speedbar-toggle-etags (flag)
   "Toggle FLAG in `speedbar-fetch-etags-arguments'.
@@ -3573,6 +3572,7 @@ value is \"show\" then toggle the value of
 
   This function is a convenience function for XEmacs menu created by
 Farzin Guilak <farzin@protocol.com>."
+  (declare (obsolete nil "29.1"))
   (interactive)
   (cond
    ((equal flag "sort")
@@ -3591,6 +3591,7 @@ Farzin Guilak <farzin@protocol.com>."
 (defun speedbar-fetch-dynamic-etags (file)
   "For FILE, run etags and create a list of symbols extracted.
 Each symbol will be associated with its line position in FILE."
+  (declare (obsolete nil "29.1"))
   (let ((newlist nil))
     (unwind-protect
 	(save-excursion
@@ -3628,27 +3629,11 @@ Each symbol will be associated with its line position in FILE."
 	(sort newlist (lambda (a b) (string< (car a) (car b))))
       (reverse newlist))))
 
-;; This bit donated by Farzin Guilak <farzin@protocol.com> but I'm not
-;; sure it's needed with the different sorting method.
-;;
-;(defun speedbar-clean-etags()
-;  "Removes spaces before the ^? character, and removes `#define',
-;return types, etc. preceding tags.  This ensures that the sort operation
-;works on the tags, not the return types."
-;  (save-excursion
-;    (goto-char (point-min))
-;    (while
-;	(re-search-forward "(?[ \t](?\C-?" nil t)
-;      (replace-match "\C-?" nil nil))
-;    (goto-char (point-min))
-;    (while
-;	(re-search-forward "\\(.*[ \t]+\\)\\([^ \t\n]+.*\C-?\\)" nil t)
-;      (delete-region (match-beginning 1) (match-end 1)))))
-
 (defun speedbar-extract-one-symbol (expr)
   "At point, return nil, or one alist in the form (SYMBOL . POSITION).
 The line should contain output from etags.  Parse the output using the
 regular expression EXPR."
+  (declare (obsolete nil "29.1"))
   (let* ((sym (if (stringp expr)
 		  (if (save-excursion
 			(re-search-forward expr (line-end-position) t))
@@ -3668,6 +3653,7 @@ regular expression EXPR."
 
 (defun speedbar-parse-c-or-c++tag ()
   "Parse a C or C++ tag, which tends to be a little complex."
+  (declare (obsolete nil "29.1"))
   (save-excursion
     (let ((bound (line-end-position)))
       (cond ((re-search-forward "\C-?\\([^\C-a]+\\)\C-a" bound t)
@@ -3684,6 +3670,7 @@ regular expression EXPR."
 
 (defun speedbar-parse-tex-string ()
   "Parse a Tex string.  Only find data which is relevant."
+  (declare (obsolete nil "29.1"))
   (save-excursion
     (let ((bound (line-end-position)))
       (cond ((re-search-forward "\\(\\(sub\\)*section\\|chapter\\|cite\\)\\s-*{[^\C-?}]*}?" bound t)

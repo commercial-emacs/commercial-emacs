@@ -105,6 +105,13 @@ also handle ANSI codes for faint, italic and blinking text, displaying
 it with new 'ansi-term-faint/italic/slow-blinking/fast-blinking'
 faces.
 
+** speedbar
+
+---
+*** etags support is now obsolete.
+This was only kept around for XEmacs compatibility, and the imenu
+support is more robust.
+
 
 * New Modes and Packages in Emacs 29.1
 
