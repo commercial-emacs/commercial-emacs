@@ -1082,6 +1082,18 @@ evaluation of BODY."
     (should (= 84 (funcall (intern-soft "f-test4---"))))
     (should (unintern "f-test4---"))))
 
+(ert-deftest elisp-dont-shadow-punctuation-only-symbols ()
+  :expected-result :failed ;  bug#51089
+  (let* ((shorthanded-form '(- 42 (-foo 42)))
+         (expected-longhand-form '(- 42 (fooey-foo 42)))
+         (observed (let ((read-symbol-shorthands
+                          '(("-" . "fooey-"))))
+                     (car (read-from-string
+                           (with-temp-buffer
+                             (print shorthanded-form (current-buffer))
+                             (buffer-string)))))))
+    (should (equal observed expected-longhand-form))))
+
 (ert-deftest test-indentation ()
   (ert-test-erts-file (ert-resource-file "elisp-indents.erts"))
   (ert-test-erts-file (ert-resource-file "flet.erts")
