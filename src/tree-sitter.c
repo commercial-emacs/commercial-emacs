@@ -259,10 +259,16 @@ DEFUN ("tree-sitter-highlight-buffer",
 	ts_highlighter_return_highlights (ts_highlighter, scope, source_code, bytes_read,
 					  ts_highlight_buffer, NULL);
 
+      for (int i=0, z=ts_highlight_event_slice.len; i<z; ++i)
+	{
+	  const TSHighlightEvent *ev = &ts_highlight_event_slice.arr[i];
 
+	}
 
     finally:
       SAFE_FREE ();
+      if (ts_highlight_event_slice.len > 0)
+	ts_highlighter_free_highlights (ts_highlight_event_slice);
       if (ts_highlighter != NULL)
 	ts_highlighter_delete (ts_highlighter);
       if (ts_highlight_buffer != NULL)
