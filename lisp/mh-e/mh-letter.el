@@ -173,7 +173,7 @@
   "\C-c\C-w"            #'mh-check-whom
   "\C-c\C-y"            #'mh-yank-cur-msg
   "\C-c\M-d"            #'mh-insert-auto-fields
-  "\M-\t"               #'mh-letter-complete
+  "\M-\t"               #'completion-at-point
   "\t"                  #'mh-letter-next-header-field-or-indent
   [backtab]             #'mh-letter-previous-header-field)
 
@@ -294,18 +294,18 @@ order).
   (unless mh-letter-tool-bar-map
     (mh-tool-bar-letter-buttons-init))
   (if (boundp 'tool-bar-map)
-      (set (make-local-variable 'tool-bar-map) mh-letter-tool-bar-map))
+      (setq-local tool-bar-map mh-letter-tool-bar-map))
   ;; Set the local value of mh-mail-header-separator according to what is
   ;; present in the buffer...
-  (set (make-local-variable 'mh-mail-header-separator)
-       (save-excursion
-         (goto-char (mh-mail-header-end))
-         (buffer-substring-no-properties (point) (line-end-position))))
+  (setq-local mh-mail-header-separator
+              (save-excursion
+                (goto-char (mh-mail-header-end))
+                (buffer-substring-no-properties (point) (line-end-position))))
   (make-local-variable 'mail-header-separator)
   (setq mail-header-separator mh-mail-header-separator) ;override sendmail.el
   (mh-set-help mh-letter-mode-help-messages)
   (setq buffer-invisibility-spec '((vanish . t) t))
-  (set (make-local-variable 'line-move-ignore-invisible) t)
+  (setq-local line-move-ignore-invisible t)
 
   ;; Enable undo since a show-mode buffer might have been reused.
   (buffer-enable-undo)
@@ -479,29 +479,8 @@ This provides alias and folder completion in header fields according to
         (or (funcall func) #'ignore)
       mh-letter-complete-function)))
 
-;; TODO Now that completion-at-point performs the task of
-;; mh-letter-complete, perhaps mh-letter-complete along with
-;; mh-complete-word should be rewritten as a more general function for
-;; XEmacs, renamed to mh-completion-at-point, and moved to
-;; mh-compat.el.
-(defun-mh mh-letter-complete completion-at-point ()
-  "Perform completion on header field or word preceding point.
-
-If the field contains addresses (for example, \"To:\" or \"Cc:\")
-or folders (for example, \"Fcc:\") then this command will provide
-alias completion. In the body of the message, this command runs
-`mh-letter-complete-function' instead, which is set to
-`ispell-complete-word' by default."
-      (interactive)
-      (let ((data (mh-letter-completion-at-point)))
-        (cond
-         ((functionp data) (funcall data))
-         ((consp data)
-          (let ((start (nth 0 data))
-                (end (nth 1 data))
-                (table (nth 2 data)))
-            (mh-complete-word (buffer-substring-no-properties start end)
-                              table start end))))))
+(define-obsolete-function-alias 'mh-letter-complete
+  #'completion-at-point "29.1")
 
 (defun mh-letter-complete-or-space (arg)
   "Perform completion or insert space.
@@ -521,7 +500,7 @@ one space."
           ((> (point) end-of-prev) (self-insert-command arg))
           ((let ((mh-letter-complete-function nil))
              (mh-letter-completion-at-point))
-           (mh-letter-complete))
+           (completion-at-point))
           (t (self-insert-command arg)))))
 
 (defun mh-letter-confirm-address ()

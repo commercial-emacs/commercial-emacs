@@ -30,11 +30,9 @@
 (autoload 'mail-header-parse-address "mail-parse")
 (autoload 'message-fetch-field "message")
 
-(defvar mh-show-xface-function
-  (cond ((>= emacs-major-version 21)
-         #'mh-face-display-function)
-        (t #'ignore))
+(defvar mh-show-xface-function #'mh-face-display-function
   "Determine at run time what function should be called to display X-Face.")
+(make-obsolete-variable 'mh-show-xface-function nil "29.1")
 
 (defvar mh-uncompface-executable
   (and (fboundp 'executable-find) (executable-find "uncompface")))
@@ -49,7 +47,7 @@
   (when (and window-system mh-show-use-xface-flag
              (or mh-decode-mime-flag mh-mhl-format-file
                  mh-clean-message-header-flag))
-    (funcall mh-show-xface-function)))
+    (mh-face-display-function)))
 
 (defun mh-face-display-function ()
   "Display a Face, X-Face, or X-Image-URL header field.
@@ -285,7 +283,7 @@ If the URL isn't present in the cache then it is fetched with wget."
   (let* ((cache-filename (mh-x-image-url-cache-canonicalize url))
          (state (mh-x-image-get-download-state cache-filename))
          (marker (point-marker)))
-    (set (make-local-variable 'mh-x-image-marker) marker)
+    (setq-local mh-x-image-marker marker)
     (cond ((not (mh-x-image-url-sane-p url)))
           ((eq state 'ok)
            (mh-x-image-display cache-filename marker))
@@ -380,9 +378,9 @@ actual display is carried out by the SENTINEL function."
       (let ((buffer (generate-new-buffer mh-temp-fetch-buffer))
             (filename (make-temp-file "mhe-fetch")))
         (with-current-buffer buffer
-          (set (make-local-variable 'mh-x-image-url-cache-file) cache-file)
-          (set (make-local-variable 'mh-x-image-marker) marker)
-          (set (make-local-variable 'mh-x-image-temp-file) filename))
+          (setq-local mh-x-image-url-cache-file cache-file)
+          (setq-local mh-x-image-marker marker)
+          (setq-local mh-x-image-temp-file filename))
         (set-process-sentinel
          (start-process "*mh-x-image-url-fetch*" buffer
                         mh-wget-executable mh-wget-option filename url)

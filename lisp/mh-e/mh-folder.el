@@ -579,54 +579,54 @@ perform the operation on all messages in that region.
   (unless mh-folder-tool-bar-map
     (mh-tool-bar-folder-buttons-init))
   (if (boundp 'tool-bar-map)
-      (set (make-local-variable 'tool-bar-map) mh-folder-tool-bar-map))
+      (setq-local tool-bar-map mh-folder-tool-bar-map))
   (make-local-variable 'font-lock-defaults)
   (setq font-lock-defaults '(mh-folder-font-lock-keywords t))
   (make-local-variable 'desktop-save-buffer)
   (setq desktop-save-buffer t)
-  (mh-make-local-vars
-   'mh-colors-available-flag (mh-colors-available-p)
+  (setq-local
+   mh-colors-available-flag (mh-colors-available-p)
                                         ; Do we have colors available
-   'mh-current-folder (buffer-name)     ; Name of folder, a string
-   'mh-show-buffer (format "show-%s" (buffer-name)) ; Buffer that displays msgs
-   'mh-folder-filename                  ; e.g. "/usr/foobar/Mail/inbox/"
+   mh-current-folder (buffer-name)      ; Name of folder, a string
+   mh-show-buffer (format "show-%s" (buffer-name)) ; Buffer that displays msgs
+   mh-folder-filename                   ; e.g. "/usr/foobar/Mail/inbox/"
    (file-name-as-directory (mh-expand-file-name (buffer-name)))
-   'mh-display-buttons-for-inline-parts-flag
+   mh-display-buttons-for-inline-parts-flag
    mh-display-buttons-for-inline-parts-flag ; Allow for display of buttons to
                                         ; be  toggled.
-   'mh-arrow-marker (make-marker)       ; Marker where arrow is displayed
-   'overlay-arrow-position nil          ; Allow for simultaneous display in
-   'overlay-arrow-string ">"            ;  different MH-E buffers.
-   'mh-showing-mode nil                 ; Show message also?
-   'mh-refile-list nil                  ; List of folder names in mh-seq-list
-   'mh-delete-list nil                  ; List of msgs nums to delete
-   'mh-blocklist nil                    ; List of messages to process as spam
-   'mh-allowlist nil                    ; List of messages to process as ham
-   'mh-seq-list nil                     ; Alist of (seq . msgs) nums
-   'mh-seen-list nil                    ; List of displayed messages
-   'mh-next-direction 'forward          ; Direction to move to next message
-   'mh-view-ops ()                      ; Stack that keeps track of the order
+   mh-arrow-marker (make-marker)        ; Marker where arrow is displayed
+   overlay-arrow-position nil           ; Allow for simultaneous display in
+   overlay-arrow-string ">"             ;  different MH-E buffers.
+   mh-showing-mode nil                  ; Show message also?
+   mh-refile-list nil                   ; List of folder names in mh-seq-list
+   mh-delete-list nil                   ; List of msgs nums to delete
+   mh-blocklist nil                     ; List of messages to process as spam
+   mh-allowlist nil                     ; List of messages to process as ham
+   mh-seq-list nil                      ; Alist of (seq . msgs) nums
+   mh-seen-list nil                     ; List of displayed messages
+   mh-next-direction 'forward           ; Direction to move to next message
+   mh-view-ops ()                       ; Stack that keeps track of the order
                                         ; in which narrowing/threading has been
                                         ; carried out.
-   'mh-folder-view-stack ()             ; Stack of previous views of the
+   mh-folder-view-stack ()              ; Stack of previous views of the
                                         ; folder.
-   'mh-index-data nil                   ; If the folder was created by a call
+   mh-index-data nil                    ; If the folder was created by a call
                                         ; to mh-search, this contains info
                                         ; about the search results.
-   'mh-index-previous-search nil        ; folder, indexer, search-regexp
-   'mh-index-msg-checksum-map nil       ; msg -> checksum map
-   'mh-index-checksum-origin-map nil    ; checksum -> ( orig-folder, orig-msg )
-   'mh-index-sequence-search-flag nil   ; folder resulted from sequence search
-   'mh-first-msg-num nil                ; Number of first msg in buffer
-   'mh-last-msg-num nil                 ; Number of last msg in buffer
-   'mh-msg-count nil                    ; Number of msgs in buffer
-   'mh-mode-line-annotation nil         ; Indicates message range
-   'mh-sequence-notation-history (make-hash-table)
+   mh-index-previous-search nil         ; folder, indexer, search-regexp
+   mh-index-msg-checksum-map nil        ; msg -> checksum map
+   mh-index-checksum-origin-map nil     ; checksum -> ( orig-folder, orig-msg )
+   mh-index-sequence-search-flag nil    ; folder resulted from sequence search
+   mh-first-msg-num nil                 ; Number of first msg in buffer
+   mh-last-msg-num nil                  ; Number of last msg in buffer
+   mh-msg-count nil                     ; Number of msgs in buffer
+   mh-mode-line-annotation nil          ; Indicates message range
+   mh-sequence-notation-history (make-hash-table)
                                         ; Remember what is overwritten by
                                         ; mh-note-seq.
-   'imenu-create-index-function 'mh-index-create-imenu-index
+   imenu-create-index-function 'mh-index-create-imenu-index
                                         ; Setup imenu support
-   'mh-previous-window-config nil)      ; Previous window configuration
+   mh-previous-window-config nil)       ; Previous window configuration
   (setq truncate-lines t)
   (auto-save-mode -1)
   (setq buffer-offer-save t)
@@ -1545,35 +1545,35 @@ after the commands are processed."
               (append folders-changed (mh-index-execute-commands))))
 
       ;; Then refile messages
-      (mh-mapc #'(lambda (folder-msg-list)
-                   (let* ((dest-folder (symbol-name (car folder-msg-list)))
-                          (last (car (mh-translate-range dest-folder "last")))
-                          (msgs (cdr folder-msg-list)))
-                     (push dest-folder folders-changed)
-                     (setq redraw-needed-flag t)
-                     (apply #'mh-exec-cmd
-                            "refile" "-src" folder dest-folder
-                            (mh-coalesce-msg-list msgs))
-                     (mh-delete-scan-msgs msgs)
-                     ;; Preserve sequences in destination folder...
-                     (when mh-refile-preserves-sequences-flag
-                       (clrhash dest-map)
-                       (cl-loop
-                        for i from (1+ (or last 0))
-                        for msg in (sort (copy-sequence msgs) #'<)
-                        do (cl-loop for seq-name in (gethash msg seq-map)
-                                    do (push i (gethash seq-name dest-map))))
-                       (maphash
-                        #'(lambda (seq msgs)
-                            ;; Can't be run in the background, since the
-                            ;; current folder is changed by mark this could
-                            ;; lead to a race condition with the next refile.
-                            (apply #'mh-exec-cmd "mark"
-                                   "-sequence" (symbol-name seq) dest-folder
-                                   "-add" (mapcar #'(lambda (x) (format "%s" x))
-                                                  (mh-coalesce-msg-list msgs))))
-                        dest-map))))
-               mh-refile-list)
+      (mapc #'(lambda (folder-msg-list)
+                (let* ((dest-folder (symbol-name (car folder-msg-list)))
+                       (last (car (mh-translate-range dest-folder "last")))
+                       (msgs (cdr folder-msg-list)))
+                  (push dest-folder folders-changed)
+                  (setq redraw-needed-flag t)
+                  (apply #'mh-exec-cmd
+                         "refile" "-src" folder dest-folder
+                         (mh-coalesce-msg-list msgs))
+                  (mh-delete-scan-msgs msgs)
+                  ;; Preserve sequences in destination folder...
+                  (when mh-refile-preserves-sequences-flag
+                    (clrhash dest-map)
+                    (cl-loop
+                     for i from (1+ (or last 0))
+                     for msg in (sort (copy-sequence msgs) #'<)
+                     do (cl-loop for seq-name in (gethash msg seq-map)
+                                 do (push i (gethash seq-name dest-map))))
+                    (maphash
+                     #'(lambda (seq msgs)
+                         ;; Can't be run in the background, since the
+                         ;; current folder is changed by mark this could
+                         ;; lead to a race condition with the next refile.
+                         (apply #'mh-exec-cmd "mark"
+                                "-sequence" (symbol-name seq) dest-folder
+                                "-add" (mapcar #'(lambda (x) (format "%s" x))
+                                               (mh-coalesce-msg-list msgs))))
+                     dest-map))))
+            mh-refile-list)
       (setq mh-refile-list ())
 
       ;; Now delete messages
