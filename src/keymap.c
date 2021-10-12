@@ -1180,27 +1180,8 @@ remapping in all currently active keymaps.  */)
   return FIXNUMP (command) ? Qnil : command;
 }
 
-/* Value is number if KEY is too long; nil if valid but has no definition.  */
-/* GC is possible in this function.  */
-
-DEFUN ("lookup-key", Flookup_key, Slookup_key, 2, 3, 0,
-       doc: /* Look up key sequence KEY in KEYMAP.  Return the definition.
-A value of nil means undefined.  See doc of `define-key'
-for kinds of definitions.
-
-A number as value means KEY is "too long";
-that is, characters or symbols in it except for the last one
-fail to be a valid sequence of prefix characters in KEYMAP.
-The number is how many characters at the front of KEY
-it takes to reach a non-prefix key.
-KEYMAP can also be a list of keymaps.
-
-Normally, `lookup-key' ignores bindings for t, which act as default
-bindings, used when nothing else in the keymap applies; this makes it
-usable as a general function for probing keymaps.  However, if the
-third optional argument ACCEPT-DEFAULT is non-nil, `lookup-key' will
-recognize the default bindings, just as `read-key-sequence' does.  */)
-  (Lisp_Object keymap, Lisp_Object key, Lisp_Object accept_default)
+static Lisp_Object
+lookup_key_1 (Lisp_Object keymap, Lisp_Object key, Lisp_Object accept_default)
 {
   bool t_ok = !NILP (accept_default);
 
@@ -1238,6 +1219,93 @@ recognize the default bindings, just as `read-key-sequence' does.  */)
 
       maybe_quit ();
     }
+}
+
+/* Value is number if KEY is too long; nil if valid but has no definition.  */
+/* GC is possible in this function.  */
+
+DEFUN ("lookup-key", Flookup_key, Slookup_key, 2, 3, 0,
+       doc: /* Look up key sequence KEY in KEYMAP.  Return the definition.
+A value of nil means undefined.  See doc of `define-key'
+for kinds of definitions.
+
+A number as value means KEY is "too long";
+that is, characters or symbols in it except for the last one
+fail to be a valid sequence of prefix characters in KEYMAP.
+The number is how many characters at the front of KEY
+it takes to reach a non-prefix key.
+KEYMAP can also be a list of keymaps.
+
+Normally, `lookup-key' ignores bindings for t, which act as default
+bindings, used when nothing else in the keymap applies; this makes it
+usable as a general function for probing keymaps.  However, if the
+third optional argument ACCEPT-DEFAULT is non-nil, `lookup-key' will
+recognize the default bindings, just as `read-key-sequence' does.  */)
+  (Lisp_Object keymap, Lisp_Object key, Lisp_Object accept_default)
+{
+  Lisp_Object found = lookup_key_1 (keymap, key, accept_default);
+
+  if (!NILP (found) && !NUMBERP (found))
+    goto end;
+
+  /* Menu definitions might use mixed case symbols (notably in old
+     versions of `easy-menu-define'), or use " " instead of "-".  */
+  if (VECTORP (key) && EQ (AREF (key, 0), Qmenu_bar))
+    {
+      ptrdiff_t key_len = ASIZE (key);
+      Lisp_Object new_key = make_vector (key_len, Qnil);
+
+      /* First, let's try converting all symbols like "Foo-Bar-Baz" to
+	 "foo-bar-baz".  */
+      for (int i = 0; i < key_len; i++)
+	{
+	  Lisp_Object lc_key = Fdowncase (Fsymbol_name (AREF (key, i)));
+	  ASET (new_key, i, Fintern (lc_key, Qnil));
+	}
+      found = lookup_key_1 (keymap, new_key, accept_default);
+
+      if (!NILP (found) && !NUMBERP (found))
+	goto end;
+
+      /* If we still don't have a match, let's convert any spaces in
+	 our lowercased string into dashes, e.g. "foo bar baz" to
+	 "foo-bar-baz". */
+      for (int i = 0; i < key_len; i++)
+	{
+	  Lisp_Object lc_key = Fdowncase (Fsymbol_name (AREF (key, i)));
+
+	  USE_SAFE_ALLOCA;
+	  ptrdiff_t size = SCHARS (lc_key), n;
+	  if (INT_MULTIPLY_WRAPV (size, MAX_MULTIBYTE_LENGTH, &n))
+	    n = PTRDIFF_MAX;
+	  unsigned char *dst = SAFE_ALLOCA (n);
+	  unsigned char *o = dst;
+	  ptrdiff_t j = 0, j_byte = 0, chars = 0;
+
+	  while (j < SCHARS (lc_key))
+	    {
+	      int ch = fetch_string_char_advance (lc_key, &j, &j_byte);
+	      if (ch == ' ')
+		*o = '-';
+	      else
+		*o = ch;
+	      chars++;
+
+	      int len;
+	      string_char_and_length (o, &len);
+	      o += len;
+	    }
+	  eassert (o <= dst + n);
+	  Lisp_Object
+	    new_it = make_multibyte_string ((char *) dst, chars, o - dst);
+	  ASET (new_key, i, Fintern (new_it, Qnil));
+	  SAFE_FREE ();
+	}
+      found = lookup_key_1 (keymap, new_key, accept_default);
+    }
+
+ end:
+  return found;
 }
 
 /* Make KEYMAP define event C as a keymap (i.e., as a prefix).

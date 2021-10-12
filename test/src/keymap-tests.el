@@ -124,6 +124,17 @@
 ;; (ert-deftest keymap-lookup-key/accept-default ()
 ;;   ...)
 
+(ert-deftest keymap-lookup-key/mixed-case ()
+  (let ((map (make-keymap)))
+    (define-key map [menu-bar foo bar] 'foo)
+    (should (eq (lookup-key map [menu-bar foo bar]) 'foo))
+    (should (eq (lookup-key map [menu-bar Foo Bar]) 'foo))))
+
+(ert-deftest subr-test-lookup-keymap/with-spaces ()
+  (let ((map (make-keymap)))
+    (define-key map [menu-bar foo-bar] 'foo)
+    (should (eq (lookup-key map [menu-bar Foo\ Bar]) 'foo))))
+
 (ert-deftest describe-buffer-bindings/header-in-current-buffer ()
   "Header should be inserted into the current buffer.
 https://debbugs.gnu.org/39149#31"
