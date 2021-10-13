@@ -353,25 +353,6 @@ and @samp{\=\=} puts @samp{\=} into the output.
 @strong{Please note:} Each @samp{\} must be doubled when written in a
 string in Emacs Lisp.
 
-@defopt text-quoting-style
-@cindex curved quotes
-@cindex curly quotes
-The value of this variable is a symbol that specifies the style Emacs
-should use for single quotes in the wording of help and messages.  If
-the variable's value is @code{curve}, the style is @t{‘like this’}
-with curved single quotes.  If the value is @code{straight}, the style
-is @t{'like this'} with straight apostrophes.  If the value is
-@code{grave}, quotes are not translated and the style is @t{`like
-this'} with grave accent and apostrophe, the standard style before
-Emacs version 25.  The default value @code{nil} acts like @code{curve}
-if curved single quotes seem to be displayable, and like @code{grave}
-otherwise.
-
-This option is useful on platforms that have problems with curved
-quotes.  You can customize it freely according to your personal
-preference.
-@end defopt
-
 @defun substitute-command-keys string
 This function scans @var{string} for the above special sequences and
 replaces them by what they stand for, returning the result as a string.
@@ -476,6 +457,12 @@ This option is useful on platforms that have problems with curved
 quotes.  You can customize it freely according to your personal
 preference.
 @end defopt
+
+@defun text-quoting-style
+You should not read the value of the variable
+@code{text-quoting-style} directly.  Instead, use this function with
+the same name to correctly handle the nil case described above.
+@end defun
 
 @node Describing Characters
 @section Describing Characters for Help Messages
