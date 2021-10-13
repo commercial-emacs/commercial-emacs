@@ -5,7 +5,7 @@
 ;; Author: Fabián E. Gallina <fgallina@gnu.org>
 ;; URL: https://github.com/fgallina/python.el
 ;; Version: 0.28
-;; Package-Requires: ((emacs "24.2") (cl-lib "1.0"))
+;; Package-Requires: ((emacs "24.4") (cl-lib "1.0"))
 ;; Maintainer: emacs-devel@gnu.org
 ;; Created: Jul 2010
 ;; Keywords: languages
@@ -2724,16 +2724,12 @@ goes wrong and syntax highlighting in the shell gets messed up."
              (deactivate-mark nil)
              (start-pos prompt-end)
              (buffer-undo-list t)
-             (font-lock-buffer-pos nil)
              (replacement
               (python-shell-font-lock-with-font-lock-buffer
-                (delete-region (line-beginning-position)
-                               (point-max))
-                (setq font-lock-buffer-pos (point))
+                (delete-region (point-min) (point-max))
                 (insert input)
                 (font-lock-ensure)
-                (buffer-substring font-lock-buffer-pos
-                                  (point-max))))
+                (buffer-string)))
              (replacement-length (length replacement))
              (i 0))
         ;; Inject text properties to get input fontified.
