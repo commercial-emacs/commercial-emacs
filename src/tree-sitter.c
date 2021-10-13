@@ -117,47 +117,13 @@ tree_sitter_create (Lisp_Object progmode)
   return tree_sitter;
 }
 
-/* The best approximation of byte_index in tree-sitter space is
-   a one-indexed character position (not a byte position) for a buffer
-   assumed to be utf-8-clean.  */
-static const char*
-tree_sitter_read_buffer (void *payload, uint32_t byte_index,
-			 TSPoint position, uint32_t *bytes_read)
+DEFUN ("tree-sitter-highlights",
+       Ftree_sitter_highlights, Stree_sitter_highlights,
+       2, 2, 0,
+       doc: /* Highlight BEG to END. */)
+  (Lisp_Object beg, Lisp_Object end)
 {
-  static int thread_unsafe_last_scan_characters = -1;
-  static char *thread_unsafe_return_value = NULL;
-  EMACS_INT start = (EMACS_INT) byte_index + 1;
-  struct buffer *bp = (struct buffer *) payload;
-
-  if (thread_unsafe_last_scan_characters != tree_sitter_scan_characters)
-    {
-      if (thread_unsafe_return_value == NULL)
-	thread_unsafe_return_value = xmalloc (tree_sitter_scan_characters + 1);
-      else
-	thread_unsafe_return_value = xrealloc (thread_unsafe_return_value,
-					       tree_sitter_scan_characters + 1);
-    }
-
-  if (! BUFFER_LIVE_P (bp))
-    error ("Selecting deleted buffer");
-
-  sprintf (thread_unsafe_return_value, "%s",
-	   SSDATA (Fbuffer_substring_no_properties
-		   (make_fixnum (start),
-		    make_fixnum (min (start + tree_sitter_scan_characters,
-				      BUF_Z (bp) - BUF_BEG (bp) + 1)))));
-  if (bytes_read)
-    *bytes_read = strlen (thread_unsafe_return_value);
-  return thread_unsafe_return_value;
-}
-
-DEFUN ("tree-sitter-highlight-buffer",
-       Ftree_sitter_highlight_buffer, Stree_sitter_highlight_buffer,
-       0, 1, "",
-       doc: /* Highlight BUFFER. */)
-  (Lisp_Object buffer)
-{
-  Lisp_Object retval = Qnil, sitter;
+  Lisp_Object retval = Qnil, sitter, source_code;
   const char * highlight_names[] = {
     "constant", "type.builtin", "operator", "variable.parameter",
     "function.builtin", "punctuation.delimiter", "attribute",
@@ -167,16 +133,13 @@ DEFUN ("tree-sitter-highlight-buffer",
   };
   const uint32_t highlight_count = sizeof (highlight_names) / sizeof (const char *);
 
-  if (NILP (buffer))
-    buffer = Fcurrent_buffer ();
-
-  CHECK_BUFFER (buffer);
-  sitter = Ftree_sitter (buffer);
+  CHECK_FIXNUM (beg);
+  CHECK_FIXNUM (end);
+  sitter = Ftree_sitter (Fcurrent_buffer ());
 
   if (! NILP (sitter))
     {
       char *scope;
-      uint32_t bytes_read;
       TSHighlightEventSlice ts_highlight_event_slice =
 	(TSHighlightEventSlice) { NULL, 0 };
       TSHighlightError ts_highlight_error = TSHighlightOk;
@@ -252,17 +215,19 @@ DEFUN ("tree-sitter-highlight-buffer",
 	}
 
       ts_highlight_buffer = ts_highlight_buffer_new ();
-      const char *source_code =
-	tree_sitter_read_buffer (current_buffer, 0, (TSPoint) { 0, 0 },
-				 &bytes_read);
+      source_code = Fbuffer_substring_no_properties (beg, end);
       ts_highlight_event_slice =
-	ts_highlighter_return_highlights (ts_highlighter, scope, source_code, bytes_read,
+	ts_highlighter_return_highlights (ts_highlighter, scope,
+					  SSDATA (source_code),
+					  (uint32_t) SBYTES (source_code),
 					  ts_highlight_buffer, NULL);
 
-      for (int i=0, z=ts_highlight_event_slice.len; i<z; ++i)
+      for (int i=ts_highlight_event_slice.len-1; i>=0; --i)
 	{
 	  const TSHighlightEvent *ev = &ts_highlight_event_slice.arr[i];
-
+	  retval = Fcons (list3 (make_fixnum (ev->start),
+				 make_fixnum (ev->end),
+				 make_fixnum (ev->htype)), retval);
 	}
 
     finally:
@@ -304,6 +269,40 @@ DEFUN ("tree-sitter-root-node",
 	retval = build_string (ts_node_string (ts_tree_root_node (tree)));
     }
   return retval;
+}
+
+/* The best approximation of byte_index in tree-sitter space is
+   a one-indexed character position (not a byte position) for a buffer
+   assumed to be utf-8-clean.  */
+static const char*
+tree_sitter_read_buffer (void *payload, uint32_t byte_index,
+                         TSPoint position, uint32_t *bytes_read)
+{
+  static int thread_unsafe_last_scan_characters = -1;
+  static char *thread_unsafe_return_value = NULL;
+  EMACS_INT start = (EMACS_INT) byte_index + 1;
+  struct buffer *bp = (struct buffer *) payload;
+
+  if (thread_unsafe_last_scan_characters != tree_sitter_scan_characters)
+    {
+      if (thread_unsafe_return_value == NULL)
+        thread_unsafe_return_value = xmalloc (tree_sitter_scan_characters + 1);
+      else
+        thread_unsafe_return_value = xrealloc (thread_unsafe_return_value,
+                                               tree_sitter_scan_characters + 1);
+    }
+
+  if (! BUFFER_LIVE_P (bp))
+    error ("Selecting deleted buffer");
+
+  sprintf (thread_unsafe_return_value, "%s",
+           SSDATA (Fbuffer_substring_no_properties
+                   (make_fixnum (start),
+                    make_fixnum (min (start + tree_sitter_scan_characters,
+                                      BUF_Z (bp) - BUF_BEG (bp) + 1)))));
+  if (bytes_read)
+    *bytes_read = strlen (thread_unsafe_return_value);
+  return thread_unsafe_return_value;
 }
 
 DEFUN ("tree-sitter",
@@ -516,7 +515,7 @@ syms_of_tree_sitter (void)
 
   defsubr (&Stree_sitter);
   defsubr (&Stree_sitter_root_node);
-  defsubr (&Stree_sitter_highlight_buffer);
+  defsubr (&Stree_sitter_highlights);
 
   /* defsubr (&Stree_sitter_node_type); */
   /* defsubr (&Stree_sitter_node_start); */

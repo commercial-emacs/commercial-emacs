@@ -593,14 +593,18 @@ This is normally set via `font-lock-defaults'.")
 This is used when turning off Font Lock mode.
 This is normally set via `font-lock-defaults'.")
 
-(defvar font-lock-fontify-region-function #'font-lock-default-fontify-region
+(defcustom font-lock-fontify-region-function 'font-lock-default-fontify-region
   "Function to use for fontifying a region.
 It should take two args, the beginning and end of the region, and an optional
 third arg VERBOSE.  If VERBOSE is non-nil, the function should print status
 messages.  This is normally set via `font-lock-defaults'.
 If it fontifies a larger region, it should ideally return a list of the form
 \(jit-lock-bounds BEG . END) indicating the bounds of the region actually
-fontified.")
+fontified. Alternative `font-lock-fontify-region-function'."
+  :type 'function
+  :options '(font-lock-tree-sitter-fontify-region)
+  :version "29.1"
+  :group 'font-lock)
 
 (defvar font-lock-unfontify-region-function #'font-lock-default-unfontify-region
   "Function to use for unfontifying a region.
@@ -1226,6 +1230,39 @@ Put first the functions more likely to cause a change and cheaper to compute.")
         (setq changed t)))
     changed))
 
+(defun font-lock-tree-sitter-fontify-region (beg end _loudly)
+  "Fontify the text between BEG and END.
+If LOUDLY is non-nil, print status messages while fontifying."
+  (save-buffer-state
+   ;; Use the fontification syntax table, if any.
+   (with-syntax-table (or font-lock-syntax-table (syntax-table))
+     ;; Extend the region to fontify so that it starts and ends at
+     ;; safe places.
+     (let ((funs font-lock-extend-region-functions)
+           (font-lock-beg beg)
+           (font-lock-end end))
+       (while funs
+         (setq funs (if (or (not (funcall (car funs)))
+                            (eq funs font-lock-extend-region-functions))
+                        (cdr funs)
+                      ;; If there's been a change, we should go through
+                      ;; the list again since this new position may
+                      ;; warrant a different answer from one of the fun
+                      ;; we've already seen.
+                      font-lock-extend-region-functions)))
+       (setq beg font-lock-beg end font-lock-end))
+     ;; Now do the fontification.
+     (font-lock-unfontify-region beg end)
+     (pcase-dolist (`(,start ,end ,htype) (tree-sitter-highlights beg end))
+       ;; map htype to face from font-lock-defaults
+       ;; (let ((val (eval (nth 1 highlight))))
+       ;;   (when (eq (car-safe val) 'face)
+       ;;     (add-text-properties start end (cddr val))
+       ;;     (setq val (cadr val)))
+       ;;   (put-text-property start end 'face val))
+       (message "%S %S %S" start end htype))
+     `(jit-lock-bounds ,beg . ,end))))
+
 (defun font-lock-default-fontify-region (beg end loudly)
   "Fontify the text between BEG and END.
 If LOUDLY is non-nil, print status messages while fontifying.
@@ -1792,33 +1829,6 @@ LOUDLY, if non-nil, allows progress-meter bar."
     (set-marker pos nil)))
 
 ;; End of Keyword regexp fontification functions.
-
-(defun font-lock-tree-sitter-fontify-region (start end)
-  "Fontify the region between START and END."
-  (tree-sitter-update-ranges start end)
-  (dolist (setting font-lock-tree-sitter-settings)
-    '
-    (when-let ((language (nth 0 setting))
-               (match-pattern (nth 1 setting))
-               (parser (tree-sitter-get-parser-create language))
-               (node (tree-sitter-node-at start end parser)))
-      (let ((captures (tree-sitter-query-capture
-                       node match-pattern
-                       ;; Specifying the range is important. More
-                       ;; often than not, NODE will be the root
-                       ;; node, and if we don't specify the range,
-                       ;; we are basically querying the whole file.
-                       start end)))
-        (with-silent-modifications
-          (dolist (capture captures)
-            (let* ((face (car capture))
-                   (node (cdr capture))
-                   (start (tree-sitter-node-start node))
-                   (end (tree-sitter-node-end node)))
-              (cond ((facep face)
-                     (put-text-property start end 'face face))
-                    ((functionp face)
-                     (funcall face start end node))))))))))
 
 ;;; Various functions.
 
