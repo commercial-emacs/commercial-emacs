@@ -225,8 +225,6 @@ process_socket (int domain, int type, int protocol)
 
 /* Number of events of change of status of a process.  */
 static EMACS_INT process_tick;
-/* Number of events for which the user or sentinel has been notified.  */
-static EMACS_INT update_tick;
 
 /* Define DATAGRAM_SOCKETS if datagrams can be used safely on
    this system.  We need to read full packets, so we need a
@@ -255,7 +253,7 @@ static void create_process (Lisp_Object, char **, Lisp_Object);
 static bool keyboard_bit_set (fd_set *);
 #endif
 static void deactivate_process (Lisp_Object);
-static int status_notify (struct Lisp_Process *, struct Lisp_Process *);
+static int status_notify (struct Lisp_Process *);
 static int read_process_output (Lisp_Object, int);
 static void create_pty (Lisp_Object);
 static void exec_sentinel (Lisp_Object, Lisp_Object);
@@ -1061,7 +1059,7 @@ nil, indicating the current buffer's process.  */)
     {
       pset_status (p, list2 (Qexit, make_fixnum (0)));
       p->tick = ++process_tick;
-      status_notify (p, NULL);
+      status_notify (p);
       redisplay_preserve_echo_area (13);
     }
   else
@@ -1081,7 +1079,7 @@ nil, indicating the current buffer's process.  */)
 	    pset_status (p, list2 (Qsignal, make_fixnum (SIGKILL)));
 
 	  p->tick = ++process_tick;
-	  status_notify (p, NULL);
+	  status_notify (p);
 	  redisplay_preserve_echo_area (13);
 	}
     }
@@ -5298,44 +5296,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       if (read_kbd < 0)
 	set_waiting_for_input (&timeout);
 
-      /* If status of something has changed, and no input is
-	 available, notify the user of the change right away.  After
-	 this explicit check, we'll let the SIGCHLD handler zap
-	 timeout to get our attention.  */
-      if (update_tick != process_tick)
-	{
-	  fd_set Atemp;
-	  fd_set Ctemp;
-
-          if (kbd_on_hold_p ())
-            FD_ZERO (&Atemp);
-          else
-            compute_input_wait_mask (&Atemp);
-	  compute_write_mask (&Ctemp);
-
-	  /* If a process status has changed, the child signal pipe
-	     will likely be readable.  We want to ignore it for now,
-	     because otherwise we wouldn't run into a timeout
-	     below.  */
-	  int fd = child_signal_read_fd;
-	  eassert (fd < FD_SETSIZE);
-	  if (0 <= fd)
-	    FD_CLR (fd, &Atemp);
-
-	  timeout = make_timespec (0, 0);
-	  if ((thread_select (pselect, max_desc + 1,
-			      &Atemp,
-			      &Ctemp,
-			      NULL, &timeout, NULL)
-	       <= 0))
-	    {
-	      /* It's okay for us to do this and then continue with
-		 the loop, since timeout has already been zeroed out.  */
-	      clear_waiting_for_input ();
-	      got_some_output = status_notify (NULL, wait_proc);
-	      if (do_display) redisplay_preserve_echo_area (13);
-	    }
-	}
+      status_notify (NULL);
 
       /* Don't wait for output from a non-running process.  Just
 	 read whatever data has already been received.  */
@@ -6685,7 +6646,7 @@ process_send_signal (Lisp_Object process, int signo, Lisp_Object current_group,
       p->tick = ++process_tick;
       if (!nomsg)
 	{
-	  status_notify (NULL, NULL);
+	  status_notify (NULL);
 	  redisplay_preserve_echo_area (13);
 	}
     }
@@ -7310,24 +7271,16 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
    This is usually done while Emacs is waiting for keyboard input
    but can be done at other times.
 
-   Return positive if any input was received from WAIT_PROC (or from
-   any process if WAIT_PROC is null), zero if input was attempted but
-   none received, and negative if we didn't even try.  */
+   Return positive if any input was received, zero if input was
+   attempted but none received, and negative if we didn't even
+   try.  */
 
 static int
-status_notify (struct Lisp_Process *deleting_process,
-	       struct Lisp_Process *wait_proc)
+status_notify (struct Lisp_Process *deleting_process)
 {
   Lisp_Object proc;
-  Lisp_Object tail, msg;
+  Lisp_Object tail = Qnil, msg = Qnil;
   int got_some_output = -1;
-
-  tail = Qnil;
-  msg = Qnil;
-
-  /* Set this now, so that if new processes are created by sentinels
-     that we run, we get called again to handle their status changes.  */
-  update_tick = process_tick;
 
   FOR_EACH_PROCESS (tail, proc)
     {
@@ -7336,8 +7289,6 @@ status_notify (struct Lisp_Process *deleting_process,
 
       if (p->tick != p->update_tick)
 	{
-	  p->update_tick = p->tick;
-
 	  /* If process is still active, read any output that remains.  */
 	  while (! EQ (p->filter, Qt)
 		 && ! connecting_status (p->status)
@@ -7348,9 +7299,7 @@ status_notify (struct Lisp_Process *deleting_process,
 		 && p != deleting_process)
 	    {
 	      int nread = read_process_output (proc, p->infd);
-	      if ((!wait_proc || wait_proc == XPROCESS (proc))
-		  && got_some_output < nread)
-		got_some_output = nread;
+	      got_some_output = max(got_some_output, nread);
 	      if (nread <= 0)
 		break;
 	    }
@@ -7374,17 +7323,13 @@ status_notify (struct Lisp_Process *deleting_process,
 		deactivate_process (proc);
 	    }
 
-	  /* The actions above may have further incremented p->tick.
-	     So set p->update_tick again so that an error in the sentinel will
-	     not cause this code to be run again.  */
 	  p->update_tick = p->tick;
-	  /* Now output the message suitably.  */
 	  exec_sentinel (proc, msg);
 	  if (BUFFERP (p->buffer))
 	    /* In case it uses %s in mode-line-format.  */
 	    bset_update_mode_line (XBUFFER (p->buffer));
 	}
-    } /* end for */
+    }
 
   return got_some_output;
 }

@@ -930,6 +930,7 @@ Return nil if FILENAME doesn't exist."
   "Bug#49449: asynchronous TLS connection with delayed completion."
   (skip-unless (and internet-is-working (gnutls-available-p)))
   (let* (status
+         (network-security-level 'low)
          (url-debug t)
          (buf (url-http
                #s(url "https" nil nil "elpa.gnu.org" nil
@@ -944,8 +945,8 @@ Return nil if FILENAME doesn't exist."
                 (throw 'done status))
               (accept-process-output nil 0.1)))
           (should status)
-          (should-not (assq :error status))
-          (should buf)
+          (should-not (plist-get status :error))
+          (should (buffer-live-p buf))
           (should (> (buffer-size buf) 0)))
       (when (buffer-live-p buf)
         (let (kill-buffer-query-functions)

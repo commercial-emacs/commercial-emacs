@@ -322,7 +322,7 @@ check-all: mostlyclean check-no-automated-subdir
 ## logfile is out-of-date with either the test file, or the source
 ## files that the tests depend on.  See test_template.
 .PHONY: check-maybe
-check-maybe: check-no-automated-subdir
+check-maybe: checkclean check-no-automated-subdir
 	@${MAKE} check-doit SELECTOR="${SELECTOR_ACTUAL}"
 
 ## Run the tests.
@@ -346,6 +346,9 @@ endif
 mostlyclean:
 	-@for f in ${LOGFILES}; do test ! -f $$f || mv $$f $$f~; done
 	rm -f ./*.tmp
+
+checkclean:
+	-@for f in ${LOGFILES}; do if test -f $$f && grep -qE "^[0-9]+ unexpected results" $$f; then mv $$f $$f~ ; fi ; done
 
 clean:
 	find . '(' -name '*.log' -o -name '*.log~' ')' $(FIND_DELETE)
