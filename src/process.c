@@ -5287,16 +5287,18 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	    break;
         }
 
-      /* Cause C-g and alarm signals to take immediate action,
-	 and cause input available signals to zero out timeout.
+      /* a signal while waiting_for_input is true aborts! */
+      clear_waiting_for_input ();
+      status_notify (NULL);
 
-	 It is important that we do this before checking for process
-	 activity.  If we get a SIGCHLD after the explicit checks for
-	 process activity, timeout is the only way we will know.  */
+      /* `set_waiting_for_input' is a Blandyism that claims to have emacs
+	 react immediately to C-g and signals.
+	 Passing a writable reference to timeout so that signal handlers
+	 can manipulate timeout out-of-band in the code that follows
+	 is super obtuse and probably makes no discernible difference.
+      */
       if (read_kbd < 0)
 	set_waiting_for_input (&timeout);
-
-      status_notify (NULL);
 
       /* Don't wait for output from a non-running process.  Just
 	 read whatever data has already been received.  */
@@ -5519,7 +5521,8 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #endif
 	  avail = (nfds > 0);
 	}
-      /* Make C-g and alarm signals set flags again.  */
+
+      /* Lift state of "high alert" imposed by `set_waiting_for_input' */
       clear_waiting_for_input ();
 
       /*  If we woke up due to SIGWINCH, actually change size now.  */
