@@ -442,8 +442,10 @@ well."
 
 (defconst diff-hunk-header-re-unified
   "^@@ -\\([0-9]+\\)\\(?:,\\([0-9]+\\)\\)? \\+\\([0-9]+\\)\\(?:,\\([0-9]+\\)\\)? @@")
+(defconst diff-hunk-header-re-context
+  "\\*\\{15\\}\\(?: .*\\)?\n\\*\\*\\* \\(\\([0-9]+\\)\\(?:,\\(-?[0-9]+\\)\\)?\\) \\*\\*\\*\\*")
 (defconst diff-context-mid-hunk-header-re
-  "--- \\([0-9]+\\)\\(?:,\\([0-9]+\\)\\)? ----$")
+  "^--- \\([0-9]+\\)\\(?:,\\([0-9]+\\)\\)? ----$")
 
 (defvar diff-use-changed-face (and (face-differs-from-default-p 'diff-changed)
 				   (not (face-equal 'diff-changed 'diff-added))
@@ -526,7 +528,9 @@ empty lines.  This makes the format less robust, but is tolerated.
 See https://lists.gnu.org/r/emacs-devel/2007-11/msg01990.html")
 
 (defconst diff-hunk-header-re
-  (concat "^\\(?:" diff-hunk-header-re-unified ".*\\|\\*\\{15\\}.*\n\\*\\*\\* .+ \\*\\*\\*\\*\\|[0-9]+\\(,[0-9]+\\)?[acd][0-9]+\\(,[0-9]+\\)?\\)$"))
+  (concat "^\\(?:" diff-hunk-header-re-unified ".*\\|"
+          diff-hunk-header-re-context
+          "\\|[0-9]+\\(,[0-9]+\\)?[acd][0-9]+\\(,[0-9]+\\)?\\)$"))
 (defconst diff-file-header-re (concat "^\\(--- .+\n\\+\\+\\+ \\|\\*\\*\\* .+\n--- \\|[^-+!<>0-9@* \n]\\).+\n" (substring diff-hunk-header-re 1)))
 
 (defconst diff-separator-re "^--+ ?$")
@@ -715,6 +719,46 @@ next hunk if TRY-HARDER is non-nil; otherwise signal an error."
 
 (easy-mmode-define-navigation
  diff-file diff-file-header-re "file" diff-end-of-file)
+
+(defun diff-goto-line (file line column)
+  "Go to the place in this diff producing LINE and COLUMN in FILE.
+If LINE (in the new version of FILE) is included (in the diff
+buffer as +/! line or a context line), move to it and then COLUMN
+characters forward.  If it is absent, go to the first hunk
+starting after LINE, or to the end if none does.  If FILE isn't
+mentioned, go to the beginning of the buffer."
+  (goto-char (point-min))
+  (while (and (re-search-forward diff-file-header-re nil 'move)
+              (not (string-equal (diff-find-file-name) file))))
+  (if (eobp) (goto-char (point-min))
+    (forward-line -1)
+    (while
+        (progn
+          (condition-case nil (diff-hunk-next)
+            (error (goto-char (point-max))))
+          (cond ((eobp) nil)            ; end of the line
+                ((looking-at diff-hunk-header-re-unified)
+                 (let ((start (string-to-number (match-string 3)))
+                       ;; FIXME: assuming that we have the length
+                       (len (string-to-number (match-string 4))))
+                   (cond ((< line start) nil)    ; nothing found
+                         ((< line (+ start len)) ; this is our stop
+                          (dotimes (i (- line start -1))
+                            (while (progn (forward-line 1)
+                                          (eq (char-after) ?-))))
+                          (forward-char (1+ column)))
+                         (t))))         ; keep looking
+                ((looking-at diff-hunk-header-re-context)
+                 (re-search-forward diff-context-mid-hunk-header-re)
+                 (let ((start (string-to-number (match-string 2)))
+                       ;; FIXME: assuming that we have the length
+                       (end (string-to-number (match-string 3))))
+                   (cond ((< line start) nil) ; nothing found
+                         ((<= line end)       ; this is our stop
+                          (forward-line (- line start -1))
+                          (forward-char (+ column 2)))
+                         (t))))         ; keep looking
+                (t (error "Unified or context diffs only")))))))
 
 (defun diff-bounds-of-hunk ()
   "Return the bounds of the diff hunk at point.
@@ -1186,7 +1230,11 @@ With a prefix argument, convert unified format to context format."
           (inhibit-read-only t))
       (save-excursion
         (goto-char start)
-        (while (and (re-search-forward "^\\(\\(\\*\\*\\*\\) .+\n\\(---\\) .+\\|\\*\\{15\\}.*\n\\*\\*\\* \\([0-9]+\\),\\(-?[0-9]+\\) \\*\\*\\*\\*\\)\\(?: \\(.*\\)\\|$\\)" nil t)
+        (while (and (re-search-forward
+                     (concat "^\\(\\(\\*\\*\\*\\) .+\n\\(---\\) .+\\|"
+                             diff-hunk-header-re-context
+                             "\\)\\(?: \\(.*\\)\\|$\\)")
+                     nil t)
                     (< (point) end))
           (combine-after-change-calls
             (if (match-beginning 2)
@@ -1196,15 +1244,15 @@ With a prefix argument, convert unified format to context format."
                   (replace-match "+++" t t nil 3)
                   (replace-match "---" t t nil 2))
               ;; we matched a hunk header
-              (let ((line1s (match-string 4))
-                    (line1e (match-string 5))
+              (let ((line1s (match-string 5))
+                    (line1e (match-string 6))
                     (pt1 (match-beginning 0))
                     ;; Variables to use the special undo function.
                     (old-undo buffer-undo-list)
                     (old-end (marker-position end))
                     ;; We currently throw away the comment that can follow
                     ;; the hunk header.  FIXME: Preserve it instead!
-                    (reversible (not (match-end 6))))
+                    (reversible (not (match-end 7))))
                 (replace-match "")
                 (unless (re-search-forward
                          diff-context-mid-hunk-header-re nil t)
@@ -1282,7 +1330,11 @@ else cover the whole buffer."
 	(inhibit-read-only t))
     (save-excursion
       (goto-char start)
-      (while (and (re-search-forward "^\\(\\([-*][-*][-*] \\)\\(.+\\)\n\\([-+][-+][-+] \\)\\(.+\\)\\|\\*\\{15\\}.*\n\\*\\*\\* \\(.+\\) \\*\\*\\*\\*\\|@@ -\\([0-9,]+\\) \\+\\([0-9,]+\\) @@.*\\)$" nil t)
+      (while (and (re-search-forward
+                   (concat "^\\(\\([-*][-*][-*] \\)\\(.+\\)\n\\([-+][-+][-+] \\)\\(.+\\)\\|"
+                           diff-hunk-header-re-context
+                           "\\|@@ -\\([0-9,]+\\) \\+\\([0-9,]+\\) @@.*\\)$")
+                   nil t)
 		  (< (point) end))
 	(combine-after-change-calls
 	  (cond
@@ -1646,13 +1698,13 @@ Only works for unified diffs."
 
        ;; A context diff.
        ((eq (char-after) ?*)
-        (if (not (looking-at "\\*\\{15\\}\\(?: .*\\)?\n\\*\\*\\* \\([0-9]+\\)\\(?:,\\([0-9]+\\)\\)? \\*\\*\\*\\*"))
+        (if (not (looking-at diff-hunk-header-re-context))
             (error "Unrecognized context diff first hunk header format")
           (forward-line 2)
           (diff-sanity-check-context-hunk-half
-	   (if (match-end 2)
-	       (1+ (- (string-to-number (match-string 2))
-		      (string-to-number (match-string 1))))
+           (if (match-end 3)
+               (1+ (- (string-to-number (match-string 3))
+                      (string-to-number (match-string 2))))
 	     1))
           (if (not (looking-at diff-context-mid-hunk-header-re))
               (error "Unrecognized context diff second hunk header format")
