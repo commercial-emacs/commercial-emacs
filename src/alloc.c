@@ -575,21 +575,29 @@ typedef struct gc_gen_y_bit_iter gc_gen_y_bit_iter;
 
 typedef bool (*gc_heap_enumerator)(void *obj, void *data);
 
+#define BLOCK_SIZE(STRUCT) \
+  (sizeof (STRUCT))
+#define BLOCK_CALC(STRUCT) \
+  gc_block_data_nr_bytes / BLOCK_SIZE(STRUCT)
+
 enum {
   gc_slot_size = GCALIGNMENT,
-  gc_heap_cons_block_count =
-  gc_block_data_nr_bytes / sizeof (struct Lisp_Cons),
-  gc_heap_float_block_count =
-  gc_block_data_nr_bytes / sizeof (struct Lisp_Float),
-  gc_heap_symbol_block_count =
-  gc_block_data_nr_bytes / sizeof (struct Lisp_Symbol),
-  gc_heap_interval_block_count =
-  gc_block_data_nr_bytes / sizeof (struct interval),
-  gc_heap_string_block_count =
-  gc_block_data_nr_bytes / sizeof (struct Lisp_String),
+  gc_heap_cons_block_count = BLOCK_CALC(struct Lisp_Cons),
+  gc_heap_float_block_count = BLOCK_CALC(struct Lisp_Float),
+  gc_heap_symbol_block_count = BLOCK_CALC(struct Lisp_Symbol),
+  gc_heap_interval_block_count = BLOCK_CALC(struct interval),
+  gc_heap_string_block_count = BLOCK_CALC(struct Lisp_String),
   gc_heap_vector_block_count =
   gc_block_data_nr_bytes / gc_slot_size,
   large_vector_min_nr_bytes = gc_block_data_nr_bytes + 1,
+};
+
+enum {
+  gc_heap_cons_slot_size = BLOCK_SIZE(struct Lisp_Cons),
+  gc_heap_float_slot_size = BLOCK_SIZE(struct Lisp_Float),
+  gc_heap_symbol_slot_size = BLOCK_SIZE(struct Lisp_Symbol),
+  gc_heap_interval_slot_size = BLOCK_SIZE(struct interval),
+  gc_heap_string_slot_size = BLOCK_SIZE(struct Lisp_String)
 };
 
 verify (gc_slot_size >= GCALIGNMENT);
@@ -3847,6 +3855,7 @@ gc_igscan_advance_nr_slots_test_dirty (
              &scan->b->meta.card_table[0],
              ARRAYELTS (scan->b->meta.card_table),
              page_nr));
+
   scan->slot_nr = new_slot_nr + at_end;
   return any_byte_dirty;
 }
@@ -3856,16 +3865,20 @@ gc_igscan_scan_object (gc_igscan *const scan,
                        const gc_phase phase,
                        const gc_heap *const h)
 {
-  eassume (scan->slot_nr < gc_heap_nr_slots_per_block (h));
   const gc_cursor c = gc_block_make_cursor (scan->b, scan->slot_nr, h);
-  eassert (gc_cursor_object_starts_here (c, h));
   void *const obj_ptr = gc_cursor_to_object (c, h);
+  const ptrdiff_t obj_nr_slots = gc_cursor_object_nr_slots (c, h);
+
+  eassume (scan->slot_nr < gc_heap_nr_slots_per_block (h));
+  eassert (gc_cursor_object_starts_here (c, h));
+
   if (h->igscan_hook &&
       h->igscan_hook (obj_ptr, phase, scan))
     return;
-  const ptrdiff_t obj_nr_slots = gc_cursor_object_nr_slots (c, h);
-  if (gc_igscan_advance_nr_slots_test_dirty (scan, obj_nr_slots, h))
-    scan_object (obj_ptr, h->lisp_type, phase);
+  // in the case of marking (intergenerational) references, we need to scan everything
+  // when we sweep, it shoud only take place on dirty pages
+  if(gc_igscan_advance_nr_slots_test_dirty (scan, obj_nr_slots, h))
+  scan_object (obj_ptr, h->lisp_type, phase);
 }
 
 ptrdiff_t
@@ -4003,10 +4016,10 @@ gc_block_scan_intergenerational (gc_block *const b,
 {
   eassume (current_gc_phase == phase);
   const ptrdiff_t gen_y_slot_nr = gc_block_gen_y_slot_nr (b, h);
-  const bool first_page_is_dirty = emacs_bitset_bit_set_p (
-    &b->meta.card_table[0],
-    ARRAYELTS (b->meta.card_table),
-    0);
+  const bool first_page_is_dirty = \
+    emacs_bitset_bit_set_p (&b->meta.card_table[0],
+			    ARRAYELTS (b->meta.card_table),
+			    0);
   gc_igscan scan_buf = {
     .b = b,
     .slot_limit = gen_y_slot_nr,
@@ -4293,7 +4306,7 @@ static const gc_heap gc_interval_heap = {
   .lisp_type = Lisp_Int0 /* sic */,
   .aligned_blocks = true,
   .use_moving_gc = true,
-  .homogeneous_object_nr_bytes = sizeof (struct interval),
+  .homogeneous_object_nr_bytes = gc_heap_interval_slot_size,
   GC_HEAP_BITS_CONFIG (interval),
   CONFIG_STANDARD_HEAP_FUNCTIONS (gc_interval_heap),
 };
@@ -4338,7 +4351,7 @@ INTERVAL
 make_interval (void)
 {
   gc_allocation r =
-    gc_heap_allocate_and_zero (&gc_interval_heap, sizeof (struct interval));
+    gc_heap_allocate_and_zero (&gc_interval_heap, gc_heap_interval_slot_size);
   const INTERVAL i = gc_cursor_to_object (r.obj_c, &gc_interval_heap);
   gc_allocation_commit (&r, &gc_interval_heap);
   return i;
@@ -4420,7 +4433,7 @@ static const gc_heap gc_string_heap = {
   .lisp_type = Lisp_String,
   .aligned_blocks = true,
   .use_moving_gc = true,
-  .homogeneous_object_nr_bytes = sizeof (struct Lisp_String),
+  .homogeneous_object_nr_bytes = gc_heap_string_slot_size,
   GC_HEAP_BITS_CONFIG (string),
   CONFIG_STANDARD_HEAP_FUNCTIONS (gc_string_heap),
 };
@@ -4457,7 +4470,7 @@ struct Lisp_String *
 allocate_string (void)
 {
   gc_allocation r =
-    gc_heap_allocate_and_zero (&gc_string_heap, sizeof (struct Lisp_String));
+    gc_heap_allocate_and_zero (&gc_string_heap, gc_heap_string_slot_size);
   gc_allocation_commit (&r, &gc_string_heap);
   struct Lisp_String *const s =
     gc_cursor_to_object (r.obj_c, &gc_string_heap);;
@@ -4976,7 +4989,7 @@ static const gc_heap gc_float_heap = {
   .aligned_blocks = true,
   .use_moving_gc = true,
   .no_lisp_data = true,
-  .homogeneous_object_nr_bytes = sizeof (struct Lisp_Float),
+  .homogeneous_object_nr_bytes = gc_heap_float_slot_size,
   GC_HEAP_BITS_CONFIG (float_),
   CONFIG_STANDARD_HEAP_FUNCTIONS (gc_float_heap),
 };
@@ -4998,7 +5011,7 @@ Lisp_Object
 make_float (const double float_value)
 {
   gc_allocation r =
-    gc_heap_allocate (&gc_float_heap, sizeof (struct Lisp_Float));
+    gc_heap_allocate (&gc_float_heap, gc_heap_float_slot_size);
   struct Lisp_Float *const f = gc_cursor_to_object (r.obj_c, &gc_float_heap);
   f->data = float_value;
   gc_allocation_commit (&r, &gc_float_heap);
@@ -5076,7 +5089,7 @@ static const gc_heap gc_cons_heap = {
   .lisp_type = Lisp_Cons,
   .aligned_blocks = true,
   .use_moving_gc = true,
-  .homogeneous_object_nr_bytes = sizeof (struct Lisp_Cons),
+  .homogeneous_object_nr_bytes = gc_heap_cons_slot_size,
   GC_HEAP_BITS_CONFIG (cons),
   CONFIG_STANDARD_HEAP_FUNCTIONS (gc_cons_heap),
 };
@@ -5112,8 +5125,7 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
        doc: /* Create a new cons, give it CAR and CDR as components, and return it.  */)
   (Lisp_Object car, Lisp_Object cdr)
 {
-  gc_allocation r = gc_heap_allocate (
-    &gc_cons_heap, sizeof (struct Lisp_Cons));
+  gc_allocation r = gc_heap_allocate (&gc_cons_heap, gc_heap_cons_slot_size);
   struct Lisp_Cons *const cons =
     gc_cursor_to_object (r.obj_c, &gc_cons_heap);
   eassume (!stack_cons_p (cons));
@@ -6073,7 +6085,7 @@ static const gc_heap gc_symbol_heap = {
   .lisp_type = Lisp_Symbol,
   .aligned_blocks = true,
   .use_moving_gc = true,
-  .homogeneous_object_nr_bytes = sizeof (struct Lisp_Symbol),
+  .homogeneous_object_nr_bytes = gc_heap_symbol_slot_size,
   .cleanup = symbol_cleanup,
   GC_HEAP_BITS_CONFIG (symbol),
   CONFIG_STANDARD_HEAP_FUNCTIONS (gc_symbol_heap),
@@ -6129,7 +6141,7 @@ Its value is void, and its function definition and property list are nil.  */)
 {
   CHECK_STRING (name);
   gc_allocation r =
-    gc_heap_allocate (&gc_symbol_heap, sizeof (struct Lisp_Symbol));
+    gc_heap_allocate (&gc_symbol_heap, gc_heap_symbol_slot_size);
   struct Lisp_Symbol *const s =
     gc_cursor_to_object (r.obj_c, &gc_symbol_heap);
   const Lisp_Object val = make_lisp_symbol (s);
@@ -8540,7 +8552,7 @@ maybe_garbage_collect (void)
   if (total_nr_bytes_in_use >= gc_major_collection_threshold)
     garbage_collect (/*major=*/true);
   else if (total_nr_bytes_in_use >= gc_minor_collection_threshold)
-    garbage_collect (/*minor=*/true);
+    garbage_collect (false);
   else
     recompute_consing_until_gc ();
 }
