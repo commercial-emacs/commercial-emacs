@@ -134,20 +134,13 @@ struct thread_state
   struct re_registers m_saved_search_regs;
 #define saved_search_regs (current_thread->m_saved_search_regs)
 
-  /* This member is different from waiting_for_input.
-     It is used to communicate to a lisp process-filter/sentinel (via the
+  /* It is used to communicate to a lisp process-filter/sentinel (via the
      function Fwaiting_for_user_input_p) whether Emacs was waiting
      for user-input when that process-filter was called.
-     waiting_for_input cannot be used as that is by definition 0 when
-     lisp code is being evalled.
      For that purpose, this must be 0
      when not inside wait_reading_process_output.  */
   int m_waiting_for_user_input_p;
 #define waiting_for_user_input_p (current_thread->m_waiting_for_user_input_p)
-
-  /* True while doing kbd input.  */
-  bool m_waiting_for_input;
-#define waiting_for_input (current_thread->m_waiting_for_input)
 
   /* For longjmp to where kbd input is being done.  This is per-thread
      so that if more than one thread calls read_char, they don't

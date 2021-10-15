@@ -2657,9 +2657,6 @@ all of which are called before Emacs is actually killed.  */
     sd_notify(0, "STOPPING=1");
 #endif /* HAVE_LIBSYSTEMD */
 
-  /* Fsignal calls emacs_abort () if it sees that waiting_for_input is
-     set.  */
-  waiting_for_input = 0;
   if (!NILP (find_symbol_value (Qkill_emacs_hook)))
     {
       if (noninteractive)

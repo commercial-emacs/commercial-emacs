@@ -7957,14 +7957,11 @@ not_in_argv (NSString *arg)
          within the run loop and for whatever reason processing input
          is dangerous.  This technique was stolen wholesale from
          nsmenu.m and seems to work.  */
-      bool owfi = waiting_for_input;
-      waiting_for_input = 0;
       block_input ();
 
       redisplay ();
 
       unblock_input ();
-      waiting_for_input = owfi;
     }
 }
 #endif

@@ -622,7 +622,7 @@ echo_now (void)
   echo_message_buffer = echo_area_buffer[0];
   echo_kboard = current_kboard;
 
-  if (waiting_for_input && !NILP (Vquit_flag))
+  if (!NILP (Vquit_flag))
     quit_throw_to_read_char (0);
 }
 
@@ -1283,7 +1283,6 @@ command_loop_1 (void)
   kset_prefix_arg (current_kboard, Qnil);
   kset_last_prefix_arg (current_kboard, Qnil);
   Vdeactivate_mark = Qnil;
-  waiting_for_input = false;
   cancel_echoing ();
 
   this_command_key_count = 0;
@@ -1898,8 +1897,7 @@ static struct atimer *poll_timer;
 void
 poll_for_input_1 (void)
 {
-  if (! input_blocked_p ()
-      && !waiting_for_input)
+  if (! input_blocked_p ())
     gobble_input ();
 }
 #endif
@@ -10857,9 +10855,6 @@ set_waiting_for_input (struct timespec *time_to_clear)
 {
   input_available_clear_time = time_to_clear;
 
-  /* Tell handle_interrupt to throw back to read_char,  */
-  waiting_for_input = true;
-
   /* If handle_interrupt was called before and buffered a C-g,
      make it run again now, to avoid timing error.  */
   if (!NILP (Vquit_flag))
@@ -10869,8 +10864,6 @@ set_waiting_for_input (struct timespec *time_to_clear)
 void
 clear_waiting_for_input (void)
 {
-  /* Tell handle_interrupt not to throw back to read_char,  */
-  waiting_for_input = false;
   input_available_clear_time = 0;
 }
 
@@ -11070,8 +11063,6 @@ handle_interrupt (bool in_signal_handler)
   if (in_signal_handler)
     maybe_reacquire_global_lock ();
 #endif
-  if (waiting_for_input && !echoing)
-    quit_throw_to_read_char (in_signal_handler);
 #endif
 }
 

@@ -457,6 +457,7 @@ extern bool requeued_events_pending_p (void);
 extern void bind_polling_period (int);
 extern int make_ctrl_char (int) ATTRIBUTE_CONST;
 extern void stuff_buffered_input (Lisp_Object);
+extern void set_waiting_for_input (struct timespec *time_to_clear);
 extern void clear_waiting_for_input (void);
 extern void swallow_events (bool);
 extern bool lucid_event_type_list_p (Lisp_Object);

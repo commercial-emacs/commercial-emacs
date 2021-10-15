@@ -5287,8 +5287,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	    break;
         }
 
-      /* a signal while waiting_for_input is true aborts! */
-      clear_waiting_for_input ();
       status_notify (NULL);
 
       /* `set_waiting_for_input' is a Blandyism that claims to have emacs
@@ -5309,7 +5307,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  && ! connecting_status (wait_proc->status))
 	{
 	  bool read_some_bytes = false;
-
 	  clear_waiting_for_input ();
 
 	  /* If data can be read from the process, do so until exhausted.  */
@@ -5522,7 +5519,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  avail = (nfds > 0);
 	}
 
-      /* Lift state of "high alert" imposed by `set_waiting_for_input' */
       clear_waiting_for_input ();
 
       /*  If we woke up due to SIGWINCH, actually change size now.  */
@@ -7658,8 +7654,12 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	    }
 	}
 
-      /* Cause C-g and alarm signals to take immediate action,
-	 and cause input available signals to zero out timeout.  */
+      /* `set_waiting_for_input' is a Blandyism that claims to have emacs
+	 react immediately to C-g and signals.
+	 Passing a writable reference to timeout so that signal handlers
+	 can manipulate timeout out-of-band in the code that follows
+	 is super obtuse and probably makes no discernible difference.
+      */
       if (read_kbd < 0)
 	set_waiting_for_input (&timeout);
 
@@ -7686,7 +7686,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
       xerrno = errno;
 
-      /* Make C-g and alarm signals set flags again.  */
       clear_waiting_for_input ();
 
       /*  If we woke up due to SIGWINCH, actually change size now.  */

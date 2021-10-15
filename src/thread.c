@@ -112,6 +112,7 @@ post_acquire_global_lock (struct thread_state *self)
 
       current_thread->error_symbol = Qnil;
       current_thread->error_data = Qnil;
+
       Fsignal (sym, data);
     }
 }

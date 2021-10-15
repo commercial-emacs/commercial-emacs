@@ -384,20 +384,11 @@ run_protected (Lisp_Object (*code) (Lisp_Object), Lisp_Object arg)
 {
   /* FIXME: This works but it doesn't feel right.  Too much fiddling
      with global variables and calling strange looking functions.  Is
-     this really the right way to run Lisp callbacks?  */
-
-  int owfi;
+     this really the right way to run Lisp callbacks?  No.*/
 
   block_input ();
 
-  /* Fsignal calls emacs_abort () if it sees that waiting_for_input is
-     set.  */
-  owfi = waiting_for_input;
-  waiting_for_input = 0;
-
   internal_condition_case_1 (code, arg, Qt, lisp_error_handler);
-
-  waiting_for_input = owfi;
 
   unblock_input ();
 }

@@ -67,9 +67,6 @@ timespec_valid_p (struct timespec t)
   return t.tv_nsec >= 0;
 }
 
-/* defined in keyboard.c */
-extern void set_waiting_for_input (struct timespec *);
-
 /* Emacs uses the integer list (HI LO US PS) to represent the time
    (HI << LO_TIME_BITS) + LO + US / 1e6 + PS / 1e12.  */
 enum { LO_TIME_BITS = 16 };
