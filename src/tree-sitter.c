@@ -123,20 +123,19 @@ DEFUN ("tree-sitter-highlights",
        doc: /* Highlight BEG to END. */)
   (Lisp_Object beg, Lisp_Object end)
 {
-  Lisp_Object retval = Qnil, sitter, source_code;
-  const char * highlight_names[] = {
-    "constant", "type.builtin", "operator", "variable.parameter",
-    "function.builtin", "punctuation.delimiter", "attribute",
-    "punctuation.bracket", "string", "variable.builtin", "comment",
-    "number", "type", "embedded", "function", "keyword", "constructor",
-    "property", "tag", "string.special", "constant.builtin"
-  };
-  const uint32_t highlight_count = sizeof (highlight_names) / sizeof (const char *);
-
+  Lisp_Object retval = Qnil, sitter, source_code,
+    tail = Fsymbol_value (Qtree_sitter_highlight_alist);
+  const EMACS_INT count = XFIXNUM (Flength (tail));
+  const char **highlight_names = xmalloc(sizeof (char *) * count);
+  intptr_t i = 0;
+  FOR_EACH_TAIL (tail)
+    {
+      CHECK_STRING (XCAR (XCAR (tail)));
+      highlight_names[i++] = SSDATA (XCAR (XCAR (tail)));
+    }
   CHECK_FIXNUM (beg);
   CHECK_FIXNUM (end);
   sitter = Ftree_sitter (Fcurrent_buffer ());
-
   if (! NILP (sitter))
     {
       char *scope;
@@ -144,11 +143,10 @@ DEFUN ("tree-sitter-highlights",
 	(TSHighlightEventSlice) { NULL, 0 };
       TSHighlightError ts_highlight_error = TSHighlightOk;
       const char *error = NULL;
-      Lisp_Object suberror = Qnil;
       TSHighlightBuffer *ts_highlight_buffer = NULL;
       TSHighlighter *ts_highlighter =
-	ts_highlighter_new (highlight_names, highlight_names, highlight_count);
-      Lisp_Object language =
+	ts_highlighter_new (highlight_names, highlight_names, (uint32_t) count);
+      Lisp_Object suberror = Qnil, language =
 	Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
 			  Fsymbol_value (Qtree_sitter_mode_alist))),
 	highlights_scm;
@@ -243,7 +241,7 @@ DEFUN ("tree-sitter-highlights",
 		  build_string (error),
 		  suberror);
     }
-
+  xfree (highlight_names);
   return retval;
 }
 
@@ -509,7 +507,7 @@ syms_of_tree_sitter (void)
   tree_sitter_scan_characters = 1024;
 
   DEFSYM (Qtree_sitter_mode_alist, "tree-sitter-mode-alist");
-
+  DEFSYM (Qtree_sitter_highlight_alist, "tree-sitter-highlight-alist");
   DEFSYM (Qtree_sitter_sitter, "tree-sitter-sitter");
   Fmake_variable_buffer_local (Qtree_sitter_sitter);
 

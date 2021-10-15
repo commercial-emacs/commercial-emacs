@@ -38,13 +38,54 @@
     (python-mode . "python")
     (ruby-mode . "ruby"))
   "Map prog-mode to tree-sitter grammar."
+  :group 'tree-sitter
   :type '(alist :key-type (symbol :tag "Prog mode")
                 :value-type (string :tag "Tree-sitter symbol"))
   :risky t
   :version "28.1")
 
-;;; Node API supplement
+(defcustom tree-sitter-highlight-alist
+  '(("constant" . font-lock-constant-face)
+    ("type.builtin" . font-lock-type-face)
+    ("operator" . font-lock-constant-face)
+    ("variable.parameter" . font-lock-constant-face)
+    ("function.builtin" . font-lock-function-name-face)
+    ("punctuation.delimiter" . font-lock-constant-face)
+    ("attribute" . font-lock-constant-face)
+    ("punctuation.bracket" . font-lock-constant-face)
+    ("string" . font-lock-constant-face)
+    ("variable.builtin" . font-lock-constant-face)
+    ("comment" . font-lock-constant-face)
+    ("number" . font-lock-constant-face)
+    ("type" . font-lock-constant-face)
+    ("embedded" . font-lock-constant-face)
+    ("function" . font-lock-constant-face)
+    ("keyword" . font-lock-constant-face)
+    ("constructor" . font-lock-constant-face)
+    ("property" . font-lock-constant-face)
+    ("tag" . font-lock-constant-face)
+    ("string.special" . font-lock-constant-face)
+    ("constant.builtin" . font-lock-constant-face))
+  "Map tree-sitter highlight name to font lock face."
+  :group 'tree-sitter
+  :initialize 'custom-initialize-default
+  :set (lambda (symbol value)
+         (mapc (lambda (x)
+                 (when (listp (cdr x))
+                   (setcdr x (cadr x))))
+               value)
+         (if-let ((problem (seq-find (lambda (x)
+                                       (or (not (stringp (car x)))
+                                           (not (facep (cdr x)))))
+                                     value)))
+             (error "Bad setting %S" problem)
+           (set-default symbol value)))
+  :type '(alist :key-type (string :tag "Tree-sitter highlight")
+                :value-type (symbol :tag "Font lock face"))
+  :risky t
+  :version "28.1")
 
+;;; Node API supplement
 
 ;;; Query API suuplement
 
