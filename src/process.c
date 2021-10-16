@@ -654,6 +654,22 @@ clear_waiting_thread_info (void)
     }
 }
 
+/* Return TRUE if the keyboard descriptor is being monitored by the
+   current thread, FALSE otherwise.  */
+static bool
+kbd_is_ours (void)
+{
+  for (int fd = 0; fd <= max_desc; ++fd)
+    {
+      if (fd_callback_info[fd].waiting_thread != current_thread)
+	continue;
+      if ((fd_callback_info[fd].flags & (FOR_READ | KEYBOARD_FD))
+	  == (FOR_READ | KEYBOARD_FD))
+	return true;
+    }
+  return false;
+}
+
 
 /* Compute the Lisp form of the process status, p->status, from
    the numeric status that was returned by `wait'.  */
@@ -5384,7 +5400,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	{
 	  clear_waiting_for_input ();
 	  redisplay_preserve_echo_area (11);
-	  if (read_kbd < 0)
+	  if (read_kbd < 0 && kbd_is_ours ())
 	    set_waiting_for_input (&timeout);
 	}
 
