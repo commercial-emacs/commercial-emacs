@@ -940,39 +940,50 @@ which is
        (string-match-p "\\`[^ ]+\\( [^ ]+\\)*\\'" keys)
        (save-match-data
          (catch 'exit
-           (dolist (key (split-string keys " "))
-             ;; Every key might have these modifiers, and they should be
-             ;; in this order.
-             (when (string-match
-                    "\\`\\(A-\\)?\\(C-\\)?\\(H-\\)?\\(M-\\)?\\(S-\\)?\\(s-\\)?"
-                    key)
-               (setq key (substring key (match-end 0))))
-             (unless (or (and (= (length key) 1)
-                              ;; Don't accept control characters as keys.
-                              (not (< (aref key 0) ?\s))
-                              ;; Don't accept Meta'd characters as keys.
-                              (or (multibyte-string-p key)
-                                  (not (<= 127 (aref key 0) 255))))
-                         (string-match-p "\\`<[A-Za-z0-9]+>\\'" key)
-                         (string-match-p
-                          "\\`\\(NUL\\|RET\\|TAB\\|LFD\\|ESC\\|SPC\\|DEL\\)\\'"
-                          key))
-               ;; Invalid.
-               (throw 'exit nil)))
-           t))))
+           (let ((prefixes
+                  "\\(A-\\)?\\(C-\\)?\\(H-\\)?\\(M-\\)?\\(S-\\)?\\(s-\\)?"))
+             (dolist (key (split-string keys " "))
+               ;; Every key might have these modifiers, and they should be
+               ;; in this order.
+               (when (string-match (concat "\\`" prefixes) key)
+                 (setq key (substring key (match-end 0))))
+               (unless (or (and (= (length key) 1)
+                                ;; Don't accept control characters as keys.
+                                (not (< (aref key 0) ?\s))
+                                ;; Don't accept Meta'd characters as keys.
+                                (or (multibyte-string-p key)
+                                    (not (<= 127 (aref key 0) 255))))
+                           (and (string-match-p "\\`<[-_A-Za-z0-9]+>\\'" key)
+                                ;; Don't allow <M-C-down>.
+                                (= (progn
+                                     (string-match
+                                      (concat "\\`<" prefixes) key)
+                                     (match-end 0))
+                                   1))
+                           (string-match-p
+                            "\\`\\(NUL\\|RET\\|TAB\\|LFD\\|ESC\\|SPC\\|DEL\\)\\'"
+                            key))
+                 ;; Invalid.
+                 (throw 'exit nil)))
+             t)))))
 
-(defun kbd (keys &optional need-vector)
+(defun kbd (keys)
   "Convert KEYS to the internal Emacs key representation.
 KEYS should be a string in the format returned by commands such
 as `C-h k' (`describe-key').
+
 This is the same format used for saving keyboard macros (see
 `edmacro-mode').
 
-For an approximate inverse of this, see `key-description'.
+Here's some example key sequences:
 
-If NEED-VECTOR is non-nil, always return a vector instead of a
-string.  This is mainly intended for use by `edmacro-parse-keys',
-and should normally not be needed."
+    \"f\"
+    \"C-c C-c\"
+    \"H-<left>\"
+    \"M-RET\"
+    \"C-M-<return>\"
+
+For an approximate inverse of this, see `key-description'."
   (declare (pure t) (side-effect-free t))
   ;; A pure function is expected to preserve the match data.
   (save-match-data
@@ -1070,15 +1081,13 @@ and should normally not be needed."
                                     (setq lres (cdr (cdr lres)))
                                     (nreverse lres)
                                     lres))))
-      (if (and (not need-vector)
-               (not (memq nil (mapcar (lambda (ch)
-                                        (and (numberp ch)
-                                             (<= 0 ch 127)))
-                                      res))))
-          (concat (mapcar (lambda (ch)
-                            (if (= (logand ch ?\M-\^@) 0)
-                                ch (+ ch 128)))
-                          res))
+      (if (not (memq nil (mapcar (lambda (ch)
+                                   (and (numberp ch)
+                                        (<= 0 ch 127)))
+                                 res)))
+          ;; Return a string.
+          (concat (mapcar #'identity res))
+        ;; Return a vector.
         res))))
 
 (defun undefined ()
