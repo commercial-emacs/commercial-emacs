@@ -1220,9 +1220,6 @@ Lisp function does not specify a special indentation."
                                        'lisp-indent-function)
 			 (get (intern-soft function) 'lisp-indent-hook)))
 	(cond ((or (eq method 'defun)
-		   (and (null method)
-			(> (length function) 3)
-			(string-match "\\`def" function))
                    ;; Check whether we are in flet-like form.
                    (lisp--local-defform-body-p state))
 	       (lisp-indent-defform state indent-point))
@@ -1298,6 +1295,13 @@ Lisp function does not specify a special indentation."
 
 (put 'autoload 'lisp-indent-function 'defun) ;Elisp
 (put 'progn 'lisp-indent-function 0)
+(put 'defvar 'lisp-indent-function 'defun)
+(put 'defalias 'lisp-indent-function 'defun)
+(put 'defvaralias 'lisp-indent-function 'defun)
+(put 'defconst 'lisp-indent-function 'defun)
+(put 'define-category 'lisp-indent-function 'defun)
+(put 'define-charset-internal 'lisp-indent-function 'defun)
+(put 'define-fringe-bitmap 'lisp-indent-function 'defun)
 (put 'prog1 'lisp-indent-function 1)
 (put 'save-excursion 'lisp-indent-function 0)      ;Elisp
 (put 'save-restriction 'lisp-indent-function 0)    ;Elisp
