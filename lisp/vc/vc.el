@@ -739,6 +739,7 @@
 (require 'cl-lib)
 
 (declare-function diff-setup-whitespace "diff-mode" ())
+(declare-function diff-goto-line "diff-mode")
 
 (eval-when-compile
   (require 'dired))
@@ -1716,7 +1717,7 @@ to override the value of `vc-diff-switches' and `diff-switches'."
       ;; any switches in diff-switches.
       (when (listp switches) switches))))
 
-(defun vc-diff-finish (buffer messages)
+(defun vc-diff-finish (buffer messages loc)
   ;; The empty sync output case has already been handled, so the only
   ;; possibility of an empty output is for an async process.
   (when (buffer-live-p buffer)
@@ -1730,7 +1731,8 @@ to override the value of `vc-diff-switches' and `diff-switches'."
 	(diff-setup-whitespace)
 	(goto-char (point-min))
 	(when window
-	  (shrink-window-if-larger-than-buffer window)))
+	  (shrink-window-if-larger-than-buffer window))
+        (when loc (apply #'diff-goto-line loc)))
       (when (and messages (not emptyp))
 	(message "%sdone" (car messages))))))
 
@@ -1754,7 +1756,8 @@ Return t if the buffer had changes, nil otherwise."
 	 ;; but the only way to set it for each file included would
 	 ;; be to call the back end separately for each file.
 	 (coding-system-for-read
-	  (if files (vc-coding-system-for-diff (car files)) 'undecided)))
+	  (if files (vc-coding-system-for-diff (car files)) 'undecided))
+	 loc)
     ;; On MS-Windows and MS-DOS, Diff is likely to produce DOS-style
     ;; EOLs, which will look ugly if (car files) happens to have Unix
     ;; EOLs.
@@ -1791,6 +1794,19 @@ Return t if the buffer had changes, nil otherwise."
                      (if async 'async 1) "diff" file
                      (append (vc-switches nil 'diff) `(,(null-device)))))))
         (setq files (nreverse filtered))))
+    (unless rev2    ; remember the position in the current buffer
+      (let ((f files))
+        (while f
+          (let ((buf (find-buffer-visiting (car f))))
+            (when buf
+              (setq loc
+                    (with-current-buffer buf
+                      (save-restriction
+                        (widen)
+                        (list (file-relative-name (car f))
+                              (line-number-at-pos)
+                              (- (point) (line-beginning-position)))))))
+            (setq f (unless (eq buf (current-buffer)) (cdr f)))))))
     (vc-call-backend (car vc-fileset) 'diff files rev1 rev2 buffer async)
     (set-buffer buffer)
     (diff-mode)
@@ -1815,7 +1831,7 @@ Return t if the buffer had changes, nil otherwise."
       ;; after `pop-to-buffer'; the former assumes the diff buffer is
       ;; shown in some window.
       (let ((buf (current-buffer)))
-        (vc-run-delayed (vc-diff-finish buf (when verbose messages))))
+        (vc-run-delayed (vc-diff-finish buf (when verbose messages) loc)))
       ;; In the async case, we return t even if there are no differences
       ;; because we don't know that yet.
       t)))
