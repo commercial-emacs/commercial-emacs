@@ -100,9 +100,9 @@
 (define-minor-mode tree-sitter-mode
   "Tree-sitter minor mode."
   :lighter " TS"
-  (setq tree-sitter-mode
-        (and tree-sitter-mode
-             (not (eq (aref (buffer-name) 0) ?\s)))))
+  (if tree-sitter-mode
+      (tree-sitter)
+    (kill-local-variable 'tree-sitter-sitter)))
 
 (defcustom tree-sitter-global-modes t
   "Modes for which tree-sitter mode is automagically turned on.
@@ -124,7 +124,7 @@ means that tree-sitter mode is turned on for buffers in C and C++ modes only."
 
 (defun turn-on-tree-sitter ()
   (when (cond ((eq tree-sitter-global-modes t)
-	       t)
+	       (memq major-mode (mapcar #'car tree-sitter-mode-alist)))
 	      ((eq (car-safe tree-sitter-global-modes) 'not)
 	       (not (memq major-mode (cdr tree-sitter-global-modes))))
 	      (t

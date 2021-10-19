@@ -124,15 +124,17 @@ DEFUN ("tree-sitter-highlights",
   (Lisp_Object beg, Lisp_Object end)
 {
   Lisp_Object retval = Qnil, sitter, source_code,
-    tail = Fsymbol_value (Qtree_sitter_highlight_alist);
-  const EMACS_INT count = XFIXNUM (Flength (tail));
+    alist = Fsymbol_value (Qtree_sitter_highlight_alist);
+  const EMACS_INT count = XFIXNUM (Flength (alist));
   const char **highlight_names = xmalloc(sizeof (char *) * count);
   intptr_t i = 0;
-  FOR_EACH_TAIL (tail)
+  FOR_EACH_TAIL (alist)
     {
-      CHECK_STRING (XCAR (XCAR (tail)));
-      highlight_names[i++] = SSDATA (XCAR (XCAR (tail)));
+      CHECK_STRING (XCAR (XCAR (alist)));
+      highlight_names[i++] = SSDATA (XCAR (XCAR (alist)));
     }
+  alist = Fsymbol_value (Qtree_sitter_highlight_alist);
+
   CHECK_FIXNUM (beg);
   CHECK_FIXNUM (end);
   sitter = Ftree_sitter (Fcurrent_buffer ());
@@ -153,7 +155,7 @@ DEFUN ("tree-sitter-highlights",
       eassert (! NILP (language));
 
       USE_SAFE_ALLOCA;
-      scope = SAFE_ALLOCA (strlen("scope.") + SCHARS (language) + 1);
+      scope = SAFE_ALLOCA (strlen ("scope.") + SCHARS (language) + 1);
       sprintf (scope, "scope.%s", SSDATA (language));
 
       highlights_scm =
@@ -223,9 +225,20 @@ DEFUN ("tree-sitter-highlights",
       for (int i=ts_highlight_event_slice.len-1; i>=0; --i)
 	{
 	  const TSHighlightEvent *ev = &ts_highlight_event_slice.arr[i];
-	  retval = Fcons (list3 (make_fixnum (ev->start),
-				 make_fixnum (ev->end),
-				 make_fixnum (ev->htype)), retval);
+	  eassert (ev->index < count);
+	  if (ev->index >= TSHighlightEventTypeStartMin) {
+	    Lisp_Object name = make_string (highlight_names[ev->index],
+					    strlen (highlight_names[ev->index]));
+	    retval = Fcons (list3 (make_fixnum (ev->start),
+				   make_fixnum (ev->end),
+				   Fcdr (Fassoc (name, alist, Qnil))),
+			    retval);
+	  } else {
+	    retval = Fcons (list3 (make_fixnum (ev->start),
+				   make_fixnum (ev->end),
+				   make_fixnum (ev->index)),
+			    retval);
+	  }
 	}
 
     finally:
@@ -269,16 +282,14 @@ DEFUN ("tree-sitter-root-node",
   return retval;
 }
 
-/* The best approximation of byte_index in tree-sitter space is
-   a one-indexed character position (not a byte position) for a buffer
-   assumed to be utf-8-clean.  */
+/* TODO buffers not utf-8-clean. */
 static const char*
 tree_sitter_read_buffer (void *payload, uint32_t byte_index,
                          TSPoint position, uint32_t *bytes_read)
 {
   static int thread_unsafe_last_scan_characters = -1;
   static char *thread_unsafe_return_value = NULL;
-  EMACS_INT start = (EMACS_INT) byte_index + 1;
+  EMACS_INT start = BYTE_TO_CHAR ((EMACS_INT) byte_index + 1);
   struct buffer *bp = (struct buffer *) payload;
 
   if (thread_unsafe_last_scan_characters != tree_sitter_scan_characters)
@@ -342,9 +353,6 @@ DEFUN ("tree-sitter",
   return sitter;
 }
 
-/* The best approximation of byte_index in tree-sitter space is
-   a one-indexed character position (not a byte position) for a buffer
-   assumed to be utf-8-clean.  */
 void
 tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 			   ptrdiff_t new_end_char)
@@ -357,14 +365,26 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 	{
 	  static const TSPoint dummy_point = { 0, 0 };
 	  TSInputEdit edit = {
-	    (uint32_t) CHAR_TO_BYTE (start_char),
-	    (uint32_t) CHAR_TO_BYTE (old_end_char),
-	    (uint32_t) CHAR_TO_BYTE (new_end_char),
+	    (uint32_t) CHAR_TO_BYTE (start_char) - 1,
+	    (uint32_t) CHAR_TO_BYTE (old_end_char) - 1,
+	    (uint32_t) CHAR_TO_BYTE (new_end_char) - 1,
 	    dummy_point,
 	    dummy_point,
 	    dummy_point
 	  };
 	  ts_tree_edit (tree, &edit);
+	  XTREE_SITTER (sitter)->tree =
+	    ts_parser_parse (XTREE_SITTER (sitter)->parser,
+			     tree,
+			     (TSInput) {
+			       current_buffer,
+			       tree_sitter_read_buffer,
+			       TSInputEncodingUTF8
+			     });
+	}
+      else
+	{
+	  xsignal1 (Qtree_sitter_error, BVAR (XBUFFER (Fcurrent_buffer ()), name));
 	}
     }
 }
@@ -407,14 +427,6 @@ PATTERN can be
   return CALLN (Fformat, build_pure_c_string("%S"), pattern);
 }
 
-static void
-char_to_byte0 (EMACS_INT start, EMACS_INT end,
-	       uint32_t *start_byte0, uint32_t *end_byte0)
-{
-  *start_byte0 = start;
-  *end_byte0 = end;
-}
-
 DEFUN ("tree-sitter-query-capture",
        Ftree_sitter_query_capture,
        Stree_sitter_query_capture, 4, 4, 0,
@@ -444,6 +456,8 @@ info node for how to read the error message.  */)
     tree_sitter_language_functor (BVAR (current_buffer, major_mode));
 
   validate_region (&beg, &end);
+  start_byte0 = XFIXNUM (beg);
+  end_byte0 = XFIXNUM (end);
 
   if (CONSP (pattern))
     pattern = Ftree_sitter_expand_pattern (pattern);
@@ -456,7 +470,7 @@ info node for how to read the error message.  */)
     xsignal1 (Qtree_sitter_query_error, make_fixnum (error_type));
 
   cursor = ts_query_cursor_new ();
-  char_to_byte0 (XFIXNUM (beg), XFIXNUM (end), &start_byte0, &end_byte0);
+
   ts_query_cursor_set_byte_range (cursor, start_byte0, end_byte0);
   ts_query_cursor_exec (cursor, query, *ts_node);
 
@@ -506,6 +520,7 @@ syms_of_tree_sitter (void)
 	      doc: /* Number of characters to read per tree sitter scan.  */);
   tree_sitter_scan_characters = 1024;
 
+  DEFSYM (Qtree_sitter_mode, "tree-sitter-mode");
   DEFSYM (Qtree_sitter_mode_alist, "tree-sitter-mode-alist");
   DEFSYM (Qtree_sitter_highlight_alist, "tree-sitter-highlight-alist");
   DEFSYM (Qtree_sitter_sitter, "tree-sitter-sitter");
