@@ -225,6 +225,8 @@ DEFUN ("tree-sitter-highlights",
       source_code = Fbuffer_substring_no_properties
 	(make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (node))),
 	 make_fixnum (SITTER_TO_BUFFER (ts_node_end_byte (node))));
+      node.context[0] = 0;
+
       ts_highlight_buffer = ts_highlight_buffer_new ();
       ts_highlight_event_slice =
 	ts_highlighter_return_highlights2 (ts_highlighter, scope,
@@ -302,6 +304,7 @@ tree_sitter_read_buffer (void *payload, uint32_t byte_index,
   static char *thread_unsafe_return_value = NULL;
   EMACS_INT start = SITTER_TO_BUFFER (byte_index);
   struct buffer *bp = (struct buffer *) payload;
+  ptrdiff_t pdl_count = SPECPDL_INDEX ();
 
   if (thread_unsafe_last_scan_characters != tree_sitter_scan_characters)
     {
@@ -315,11 +318,14 @@ tree_sitter_read_buffer (void *payload, uint32_t byte_index,
   if (! BUFFER_LIVE_P (bp))
     error ("Selecting deleted buffer");
 
+  record_unwind_protect (save_restriction_restore, save_restriction_save ());
+  Fwiden ();
   sprintf (thread_unsafe_return_value, "%s",
            SSDATA (Fbuffer_substring_no_properties
                    (make_fixnum (start),
                     make_fixnum (min (start + tree_sitter_scan_characters,
                                       BUF_Z (bp) - BUF_BEG (bp) + 1)))));
+  unbind_to (pdl_count, Qnil);
   if (bytes_read)
     *bytes_read = strlen (thread_unsafe_return_value);
   return thread_unsafe_return_value;
@@ -365,7 +371,6 @@ DEFUN ("tree-sitter",
 }
 
 /* TODO buffers not utf-8-clean. */
-/* TODO buffers widen first (tsc--without-restriction ubolonton). */
 void
 tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 			   ptrdiff_t new_end_char)
