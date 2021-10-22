@@ -24,6 +24,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "tree-sitter.h"
 #include <tree_sitter/highlight.h>
 
+#define BUFFER_TO_SITTER(byte) ((uint32_t) CHAR_TO_BYTE (byte) - 1)
+#define SITTER_TO_BUFFER(byte) (BYTE_TO_CHAR ((EMACS_INT) byte) + 1)
+
 typedef TSLanguage *(*TSLanguageFunctor) (void);
 
 static Lisp_Object
@@ -141,6 +144,7 @@ DEFUN ("tree-sitter-highlights",
   if (! NILP (sitter))
     {
       char *scope;
+      TSNode node;
       TSHighlightEventSlice ts_highlight_event_slice =
 	(TSHighlightEventSlice) { NULL, 0 };
       TSHighlightError ts_highlight_error = TSHighlightOk;
@@ -214,13 +218,20 @@ DEFUN ("tree-sitter-highlights",
 	  goto finally;
 	}
 
+      node = ts_node_descendant_for_byte_range
+	(ts_tree_root_node (XTREE_SITTER (sitter)->tree),
+	 BUFFER_TO_SITTER (XFIXNUM (beg)),
+	 BUFFER_TO_SITTER (XFIXNUM (end)));
+      source_code = Fbuffer_substring_no_properties
+	(make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (node))),
+	 make_fixnum (SITTER_TO_BUFFER (ts_node_end_byte (node))));
       ts_highlight_buffer = ts_highlight_buffer_new ();
-      source_code = Fbuffer_substring_no_properties (beg, end);
       ts_highlight_event_slice =
-	ts_highlighter_return_highlights (ts_highlighter, scope,
-					  SSDATA (source_code),
-					  (uint32_t) SBYTES (source_code),
-					  ts_highlight_buffer, NULL);
+	ts_highlighter_return_highlights2 (ts_highlighter, scope,
+					   SSDATA (source_code),
+					   (uint32_t) SBYTES (source_code),
+					   XTREE_SITTER (sitter)->tree,
+					   ts_highlight_buffer);
 
       for (int i=ts_highlight_event_slice.len-1; i>=0; --i)
 	{
@@ -282,14 +293,13 @@ DEFUN ("tree-sitter-root-node",
   return retval;
 }
 
-/* TODO buffers not utf-8-clean. */
 static const char*
 tree_sitter_read_buffer (void *payload, uint32_t byte_index,
                          TSPoint position, uint32_t *bytes_read)
 {
   static int thread_unsafe_last_scan_characters = -1;
   static char *thread_unsafe_return_value = NULL;
-  EMACS_INT start = BYTE_TO_CHAR ((EMACS_INT) byte_index + 1);
+  EMACS_INT start = SITTER_TO_BUFFER (byte_index);
   struct buffer *bp = (struct buffer *) payload;
 
   if (thread_unsafe_last_scan_characters != tree_sitter_scan_characters)
@@ -353,6 +363,8 @@ DEFUN ("tree-sitter",
   return sitter;
 }
 
+/* TODO buffers not utf-8-clean. */
+/* TODO buffers widen first (tsc--without-restriction ubolonton). */
 void
 tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 			   ptrdiff_t new_end_char)
@@ -365,9 +377,9 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 	{
 	  static const TSPoint dummy_point = { 0, 0 };
 	  TSInputEdit edit = {
-	    (uint32_t) CHAR_TO_BYTE (start_char) - 1,
-	    (uint32_t) CHAR_TO_BYTE (old_end_char) - 1,
-	    (uint32_t) CHAR_TO_BYTE (new_end_char) - 1,
+	    BUFFER_TO_SITTER (start_char),
+	    BUFFER_TO_SITTER (old_end_char),
+	    BUFFER_TO_SITTER (new_end_char),
 	    dummy_point,
 	    dummy_point,
 	    dummy_point
