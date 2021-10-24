@@ -927,12 +927,13 @@ The value of this variable is used when Font Lock mode is turned on."
 (declare-function lazy-lock-after-fontify-buffer "lazy-lock")
 (declare-function lazy-lock-after-unfontify-buffer "lazy-lock")
 (declare-function lazy-lock-mode "lazy-lock")
+(declare-function tree-sitter-font-lock-fontify-region "tree-sitter")
 
 (defun font-lock-turn-on-thing-lock ()
   (pcase (font-lock-value-in-major-mode font-lock-support-mode)
     ('fast-lock-mode (fast-lock-mode t))
     ('lazy-lock-mode (lazy-lock-mode t))
-    ((or 'sitter-lock-mode 'jit-lock-mode)
+    ((and mode (or 'sitter-lock-mode 'jit-lock-mode))
      (remove-hook 'after-change-functions
                   #'font-lock-after-change-function t)
      (setq-local font-lock-flush-function #'jit-lock-refontify)
@@ -942,6 +943,9 @@ The value of this variable is used when Font Lock mode is turned on."
      ;; adds/removes a few keywords and does a refontify (which takes ages on
      ;; large files).
      (setq-local font-lock-fontify-buffer-function #'jit-lock-refontify)
+     (when (eq mode 'sitter-lock-mode)
+       (setq-local font-lock-fontify-region-function
+                   #'tree-sitter-font-lock-fontify-region))
      ;; Don't fontify eagerly (and don't abort if the buffer is large).
      (setq-local font-lock-fontified t)
      ;; Use jit-lock.

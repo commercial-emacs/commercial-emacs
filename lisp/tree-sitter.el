@@ -93,28 +93,9 @@
   (if tree-sitter-mode
       (progn
         (tree-sitter))
+    (when (eq font-lock-support-mode 'sitter-lock-mode)
+      (font-lock-mode -1))
     (kill-local-variable 'tree-sitter-sitter)))
-
-(defun tree-sitter-font-lock-init ()
-  "`define-globalized-minor-mode' says font-lock-mode runs after major
-mode's hook.  This obvi makes a difference since cc-mode configures
-its own font-locking.
-
-cc-mode, idlwave, reftex, mhtml-mode, css-mode, cperl-mode
-explicitly set `font-lock-fontify-region-function', so
-let them have their way."
-  (when (and font-lock-mode
-             (equal font-lock-fontify-region-function
-                    (default-value 'font-lock-fontify-region-function)))
-    (setq-local font-lock-defaults
-	        '(nil ;; keywords
-                  t   ;; keywords-only
-                  nil ;; case-fold
-                  nil ;; syntax modifiers
-                  (font-lock-fontify-region-function
-                   .
-                   #'tree-sitter-font-lock-fontify-region)))
-    (font-lock-set-defaults)))
 
 (defcustom tree-sitter-global-modes t
   "Modes for which tree-sitter mode is automagically turned on.
@@ -150,8 +131,6 @@ means that tree-sitter mode is turned on for buffers in C and C++ modes only."
   :init-value (and (not noninteractive) (not emacs-basic-display))
   :group 'tree-sitter
   :version "28.1")
-
-(add-hook 'font-lock-mode-hook #'tree-sitter-font-lock-init)
 
 (provide 'tree-sitter)
 
