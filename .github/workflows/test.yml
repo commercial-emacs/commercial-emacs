@@ -48,7 +48,7 @@ jobs:
           toolchain: stable
     - run: |
         mkdir -p $HOME/.local
-        cd tree-sitter && make install
+        make -C tree-sitter install
         ./autogen.sh
         LDFLAGS="-L$HOME/.local/lib" CFLAGS="-I$HOME/.local/include/" ./configure --prefix=$HOME/.local --with-tree-sitter --enable-dumping-overwrite
         make -j2 check
