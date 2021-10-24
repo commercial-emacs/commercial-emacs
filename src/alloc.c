@@ -3184,6 +3184,7 @@ cleanup_vector (struct Lisp_Vector *vector)
 	  xfree (subr->native_c_name[0]);
 	}
     }
+#ifdef HAVE_TREE_SITTER
   else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TREE_SITTER))
     {
       struct Lisp_Tree_Sitter *lisp_parser
@@ -3191,6 +3192,7 @@ cleanup_vector (struct Lisp_Vector *vector)
       ts_tree_delete(lisp_parser->tree);
       ts_parser_delete(lisp_parser->parser);
     }
+#endif
 }
 
 /* Reclaim space used by unmarked vectors.  */

@@ -1861,6 +1861,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       }
       break;
 #endif
+#ifdef HAVE_TREE_SITTER
     case PVEC_TREE_SITTER:
       print_c_string ("#<tree-sitter for ", printcharfun);
       print_object (XTREE_SITTER (obj)->progmode, printcharfun, escapeflag);
@@ -1869,6 +1870,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       strout (buf, len, len, printcharfun);
       printchar ('>', printcharfun);
       break;
+#endif
     default:
       emacs_abort ();
     }

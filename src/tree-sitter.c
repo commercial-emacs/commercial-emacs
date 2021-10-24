@@ -229,12 +229,12 @@ DEFUN ("tree-sitter-highlights",
 
       ts_highlight_buffer = ts_highlight_buffer_new ();
       ts_highlight_event_slice =
-	ts_highlighter_return_highlights2 (ts_highlighter, scope,
-					   SSDATA (source_code),
-					   (uint32_t) SBYTES (source_code),
-					   XTREE_SITTER (sitter)->tree,
-					   &node,
-					   ts_highlight_buffer);
+	ts_highlighter_return_highlights (ts_highlighter, scope,
+					  SSDATA (source_code),
+					  (uint32_t) SBYTES (source_code),
+					  XTREE_SITTER (sitter)->tree,
+					  &node,
+					  ts_highlight_buffer);
 
       for (int i=ts_highlight_event_slice.len-1; i>=0; --i)
 	{
