@@ -2552,7 +2552,6 @@ This function is called from `c-common-init', once per mode initialization."
 		       "font-lock-keywords-2" "font-lock-keywords-3")))
 	  nil nil
 	  ,c-identifier-syntax-modifications
-	  c-beginning-of-syntax
 	  (font-lock-mark-block-function
 	   . c-mark-function)))
 

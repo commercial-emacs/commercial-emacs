@@ -593,18 +593,14 @@ This is normally set via `font-lock-defaults'.")
 This is used when turning off Font Lock mode.
 This is normally set via `font-lock-defaults'.")
 
-(defcustom font-lock-fontify-region-function 'font-lock-default-fontify-region
+(defvar font-lock-fontify-region-function #'font-lock-default-fontify-region
   "Function to use for fontifying a region.
 It should take two args, the beginning and end of the region, and an optional
 third arg VERBOSE.  If VERBOSE is non-nil, the function should print status
 messages.  This is normally set via `font-lock-defaults'.
 If it fontifies a larger region, it should ideally return a list of the form
 \(jit-lock-bounds BEG . END) indicating the bounds of the region actually
-fontified. Alternative `font-lock-fontify-region-function'."
-  :type 'function
-  :options '(font-lock-tree-sitter-fontify-region)
-  :version "29.1"
-  :group 'font-lock)
+fontified.")
 
 (defvar font-lock-unfontify-region-function #'font-lock-default-unfontify-region
   "Function to use for unfontifying a region.
@@ -904,6 +900,7 @@ The value of this variable is used when Font Lock mode is turned on."
 		 (const :tag "fast lock" fast-lock-mode)
 		 (const :tag "lazy lock" lazy-lock-mode)
 		 (const :tag "jit lock" jit-lock-mode)
+		 (const :tag "tree sitter" sitter-lock-mode)
 		 (repeat :menu-tag "mode specific" :tag "mode specific"
 			 :value ((t . jit-lock-mode))
 			 (cons :tag "Instance"
@@ -914,14 +911,15 @@ The value of this variable is used when Font Lock mode is turned on."
 				      (const :tag "none" nil)
 				      (const :tag "fast lock" fast-lock-mode)
 				      (const :tag "lazy lock" lazy-lock-mode)
-				      (const :tag "JIT lock" jit-lock-mode)))
-			 ))
+				      (const :tag "JIT lock" jit-lock-mode)
+                                      (const :tag "tree sitter" sitter-lock-mode)))))
   :version "21.1"
   :group 'font-lock)
 
 (defvar fast-lock-mode)
 (defvar lazy-lock-mode)
 (defvar jit-lock-mode)
+(defvar sitter-lock-mode)
 
 (declare-function fast-lock-after-fontify-buffer "fast-lock")
 (declare-function fast-lock-after-unfontify-buffer "fast-lock")
@@ -934,8 +932,7 @@ The value of this variable is used when Font Lock mode is turned on."
   (pcase (font-lock-value-in-major-mode font-lock-support-mode)
     ('fast-lock-mode (fast-lock-mode t))
     ('lazy-lock-mode (lazy-lock-mode t))
-    ('jit-lock-mode
-     ;; Prepare for jit-lock
+    ((or 'sitter-lock-mode 'jit-lock-mode)
      (remove-hook 'after-change-functions
                   #'font-lock-after-change-function t)
      (setq-local font-lock-flush-function #'jit-lock-refontify)
@@ -958,9 +955,11 @@ The value of this variable is used when Font Lock mode is turned on."
 (defun font-lock-turn-off-thing-lock ()
   (cond ((bound-and-true-p fast-lock-mode)
 	 (fast-lock-mode -1))
+        ((bound-and-true-p sitter-lock-mode)
+         (jit-lock-unregister 'font-lock-fontify-region)
+	 (kill-local-variable 'font-lock-fontify-buffer-function))
 	((bound-and-true-p jit-lock-mode)
 	 (jit-lock-unregister 'font-lock-fontify-region)
-	 ;; Reset local vars to the non-jit-lock case.
 	 (kill-local-variable 'font-lock-fontify-buffer-function))
 	((bound-and-true-p lazy-lock-mode)
 	 (lazy-lock-mode -1))))
@@ -991,45 +990,6 @@ The value of this variable is used when Font Lock mode is turned on."
 ;; End of Font Lock Support mode.
 
 ;;; Fontification functions.
-
-;; Rather than the function, e.g., `font-lock-fontify-region' containing the
-;; code to fontify a region, the function runs the function whose name is the
-;; value of the variable, e.g., `font-lock-fontify-region-function'.  Normally,
-;; the value of this variable is, e.g., `font-lock-default-fontify-region'
-;; which does contain the code to fontify a region.  However, the value of the
-;; variable could be anything and thus, e.g., `font-lock-fontify-region' could
-;; do anything.  The indirection of the fontification functions gives major
-;; modes the capability of modifying the way font-lock.el fontifies.  Major
-;; modes can modify the values of, e.g., `font-lock-fontify-region-function',
-;; via the variable `font-lock-defaults'.
-;;
-;; For example, Rmail mode sets the variable `font-lock-defaults' so that
-;; font-lock.el uses its own function for buffer fontification.  This function
-;; makes fontification be on a message-by-message basis and so visiting an
-;; RMAIL file is much faster.  A clever implementation of the function might
-;; fontify the headers differently from the message body.  (It should, and
-;; correspondingly for Mail mode, but I can't be bothered to do the work.  Can
-;; you?)  This hints at a more interesting use...
-;;
-;; Languages that contain text normally contained in different major modes
-;; could define their own fontification functions that treat text differently
-;; depending on its context.  For example, Perl mode could arrange that here
-;; docs are fontified differently from Perl code.  Or Yacc mode could fontify
-;; rules one way and C code another.  Neat!
-;;
-;; A further reason to use the fontification indirection feature is when the
-;; default syntactic fontification, or the default fontification in general,
-;; is not flexible enough for a particular major mode.  For example, perhaps
-;; comments are just too hairy for `font-lock-fontify-syntactically-region' to
-;; cope with.  You need to write your own version of that function, e.g.,
-;; `hairy-fontify-syntactically-region', and make your own version of
-;; `hairy-fontify-region' call that function before calling
-;; `font-lock-fontify-keywords-region' for the normal regexp fontification
-;; pass.  And Hairy mode would set `font-lock-defaults' so that font-lock.el
-;; would call your region fontification function instead of its own.  For
-;; example, TeX modes could fontify {\foo ...} and \bar{...}  etc. multi-line
-;; directives correctly and cleanly.  (It is the same problem as fontifying
-;; multi-line strings and comments; regexps are not appropriate for the job.)
 
 (defvar-local font-lock-extend-after-change-region-function nil
   "A function that determines the region to refontify after a change.
@@ -1977,12 +1937,10 @@ Sets various variables using `font-lock-defaults' and
 	                    '(1 2 3))    ;"." "w" "_"
 	        (setq font-lock--syntax-table-affects-ppss t))
 	      ))))
-      ;; (nth 4 defaults) used to hold `font-lock-beginning-of-syntax-function',
-      ;; but that was removed in 25.1, so if it's a cons cell, we assume that
-      ;; it's part of the variable alist.
-      ;; Variable alist?
-      (dolist (x (nthcdr (if (consp (nth 4 defaults)) 4 5) defaults))
-	(set (make-local-variable (car x)) (cdr x)))
+      ;; rest is (var . val) bindings
+      (dolist (x (nthcdr 4 defaults))
+        (when (consp x)
+	  (set (make-local-variable (car x)) (cdr x))))
       ;; Set up `font-lock-keywords' last because its value might depend
       ;; on other settings.
       (setq-local font-lock-keywords

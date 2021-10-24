@@ -4747,42 +4747,6 @@ initializing CC Mode.  Currently (2020-06) these are `js-mode' and
 		;; level between the safe position and bufpos.
 		(throw 'done (min (1+ elem) bufpos))))
 	  (setq paren-state (cdr paren-state)))))))
-
-(defun c-beginning-of-syntax ()
-  ;; This is used for `font-lock-beginning-of-syntax-function'.  It
-  ;; goes to the closest previous point that is known to be outside
-  ;; any string literal or comment.  `c-state-cache' is used if it has
-  ;; a position in the vicinity.
-  (let* ((paren-state c-state-cache)
-	 elem
-
-	 (pos (catch 'done
-		;; Note: Similar code in `c-safe-position'.  The
-		;; difference is that we accept a safe position at
-		;; the point and don't bother to go forward past open
-		;; parens.
-		(while paren-state
-		  (setq elem (car paren-state))
-		  (if (consp elem)
-		      (cond ((<= (cdr elem) (point))
-			     (throw 'done (cdr elem)))
-			    ((<= (car elem) (point))
-			     (throw 'done (car elem))))
-		    (if (<= elem (point))
-			(throw 'done elem)))
-		  (setq paren-state (cdr paren-state)))
-		(point-min))))
-
-    (if (> pos (- (point) 4000))
-	(goto-char pos)
-      ;; The position is far back.  Try `c-beginning-of-defun-1'
-      ;; (although we can't be entirely sure it will go to a position
-      ;; outside a comment or string in current emacsen).  FIXME:
-      ;; Consult `syntax-ppss' here.
-      (c-beginning-of-defun-1)
-      (if (< (point) pos)
-	  (goto-char pos)))))
-
 
 ;; Tools for scanning identifiers and other tokens.
 
@@ -7329,7 +7293,7 @@ multi-line strings (but not C++, for example)."
 	     (cons (match-beginning 1)
 		   (cons (match-end 1) (match-beginning 2))))
       (goto-char here))))
-	
+
 (defun c-ml-string-opener-intersects-region (&optional start finish)
   ;; If any part of the region [START FINISH] is inside an ml-string opener,
   ;; return a dotted list of the start, end and double-quote position of that

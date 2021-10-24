@@ -943,9 +943,7 @@ casts and declarations are fontified.  Used on level 2 and higher."
 	   pos)
 	 limit 'c-type)))
 
-    ;; Update `c-state-cache' to the beginning of the region.  This will
-    ;; make `c-beginning-of-syntax' go faster when it's used later on,
-    ;; and it's near the point most of the time.
+    ;; Update `c-state-cache' to the beginning of the region.
     (c-parse-state)
 
     ;; Check if the fontified region starts inside a declarator list so
@@ -1937,7 +1935,7 @@ casts and declarations are fontified.  Used on level 2 and higher."
 				 (cons (match-end 1) (match-beginning 2)))
 		string-delims (cons open-delim (c-get-ml-closer open-delim)))
 	  (goto-char (caar string-delims))))
-	
+
        ;; Point is in the body of an ml string.
        ((and string-delims
 	     (>= (point) (cadar string-delims))
