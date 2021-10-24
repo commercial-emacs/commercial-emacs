@@ -43,6 +43,8 @@ jobs:
         repository: commercial-emacs/tree-sitter
         path: tree-sitter
     - uses: actions-rs/toolchain@v1
+      with:
+          toolchain: stable
     - run: |
         mkdir -p $HOME/.local
         cd tree-sitter && make install
