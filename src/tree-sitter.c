@@ -120,26 +120,6 @@ tree_sitter_create (Lisp_Object progmode)
   return tree_sitter;
 }
 
-DEFUN ("tree-sitter-buffer-to-sitter",
-       Ftree_sitter_buffer_to_sitter, Stree_sitter_buffer_to_sitter,
-       1, 1, 0,
-       doc: /* Return POS in sitter space. */)
-  (Lisp_Object pos)
-{
-  CHECK_FIXNUM (pos);
-  return make_fixnum (BUFFER_TO_SITTER (XFIXNUM (pos)));
-}
-
-DEFUN ("tree-sitter-sitter-to-buffer",
-       Ftree_sitter_sitter_to_buffer, Stree_sitter_sitter_to_buffer,
-       1, 1, 0,
-       doc: /* Return POS in buffer space. */)
-  (Lisp_Object pos)
-{
-  CHECK_FIXNUM (pos);
-  return make_fixnum (SITTER_TO_BUFFER (XFIXNUM (pos)));
-}
-
 DEFUN ("tree-sitter-highlights",
        Ftree_sitter_highlights, Stree_sitter_highlights,
        2, 2, 0,
@@ -176,6 +156,7 @@ DEFUN ("tree-sitter-highlights",
 	Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
 			  Fsymbol_value (Qtree_sitter_mode_alist))),
 	highlights_scm;
+      uint32_t restore_start;
 
       eassert (! NILP (language));
 
@@ -246,6 +227,9 @@ DEFUN ("tree-sitter-highlights",
       source_code = Fbuffer_substring_no_properties
 	(make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (node))),
 	 make_fixnum (SITTER_TO_BUFFER (ts_node_end_byte (node))));
+
+      /* source code is relative coords */
+      restore_start = node.context[0];
       node.context[0] = 0;
 
       ts_highlight_buffer = ts_highlight_buffer_new ();
@@ -257,6 +241,9 @@ DEFUN ("tree-sitter-highlights",
 					  &node,
 					  ts_highlight_buffer);
 
+      /* restore to absolute coords */
+      node.context[0] = restore_start;
+
       for (int i=ts_highlight_event_slice.len-1; i>=0; --i)
 	{
 	  const TSHighlightEvent *ev = &ts_highlight_event_slice.arr[i];
@@ -266,7 +253,7 @@ DEFUN ("tree-sitter-highlights",
 					    strlen (highlight_names[ev->index]));
 	    retval = Fcons (Fcdr (Fassoc (name, alist, Qnil)), retval);
 	  } else if (ev->index == TSHighlightEventTypeSource) {
-	    const uint32_t offset = ts_node_start_byte (node);
+	    uint32_t offset = ts_node_start_byte (node);
 	    retval =
 	      Fcons (Fcons
 		     (make_fixnum (SITTER_TO_BUFFER (ev->start + offset)),
@@ -568,8 +555,6 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter);
   defsubr (&Stree_sitter_root_node);
   defsubr (&Stree_sitter_highlights);
-  defsubr (&Stree_sitter_sitter_to_buffer);
-  defsubr (&Stree_sitter_buffer_to_sitter);
 
   /* defsubr (&Stree_sitter_node_type); */
   /* defsubr (&Stree_sitter_node_start); */
