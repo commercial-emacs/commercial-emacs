@@ -2366,6 +2366,7 @@ commands of Compilation major mode are available.  See
     ;; Prevent that message from being recognized as a compilation error.
     (add-text-properties omax (point)
 			 (append '(compilation-handle-exit t) nil))
+    (redisplay)
     (setq mode-line-process
           (list
            (let ((out-string (format ":%s [%s]" process-status (cdr status)))
