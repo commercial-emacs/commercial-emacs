@@ -21,7 +21,8 @@
 
 ;;; Code:
 
-(require 'font-core)
+(require 'font-lock)
+(declare-function tree-sitter-highlights "tree-sitter.c" (beg end))
 
 (defgroup tree-sitter
   nil
@@ -87,50 +88,17 @@
   :risky t
   :version "28.1")
 
-(define-minor-mode tree-sitter-mode
-  "Tree-sitter minor mode."
-  :lighter " TS"
-  (if tree-sitter-mode
-      (progn
-        (tree-sitter))
-    (when (eq font-lock-support-mode 'sitter-lock-mode)
-      (font-lock-mode -1))
-    (kill-local-variable 'tree-sitter-sitter)))
-
-(defcustom tree-sitter-global-modes t
-  "Modes for which tree-sitter mode is automagically turned on.
-If nil, means no modes have tree-sitter mode automatically turned
-on.  If t, all modes that support tree-sitter mode have it
-automatically turned on.  If a list, it should be a list of
-`major-mode' symbol names for which tree-sitter mode should be
-automatically turned on.  The sense of the list is negated if it
-begins with `not'.  For example:
- (c-mode c++-mode)
-means that tree-sitter mode is turned on for buffers in C and C++ modes only."
-  :type '(choice (const :tag "none" nil)
-		 (const :tag "all" t)
-		 (set :menu-tag "mode specific" :tag "modes"
-		      :value (not)
-		      (const :tag "Except" not)
-		      (repeat :inline t (symbol :tag "mode"))))
-  :group 'tree-sitter)
-
-(defun turn-on-tree-sitter ()
-  (when (cond ((eq tree-sitter-global-modes t)
-	       (memq major-mode (mapcar #'car tree-sitter-mode-alist)))
-	      ((eq (car-safe tree-sitter-global-modes) 'not)
-	       (not (memq major-mode (cdr tree-sitter-global-modes))))
-	      (t
-               (memq major-mode tree-sitter-global-modes)))
-    (let (inhibit-quit)
-      (tree-sitter-mode))))
-
-(define-globalized-minor-mode global-tree-sitter-mode
-  tree-sitter-mode turn-on-tree-sitter
-  :initialize 'custom-initialize-delay
-  :init-value (and (not noninteractive) (not emacs-basic-display))
-  :group 'tree-sitter
-  :version "28.1")
+(defun tree-sitter-font-lock-fontify-region (beg end loudly)
+  "Fontify the text between BEG and END.
+If LOUDLY is non-nil, print status messages while fontifying."
+  (let ((inhibit-point-motion-hooks t))
+    (with-silent-modifications
+      (font-lock-unfontify-region beg end)
+      (let ((highlights (tree-sitter-highlights beg end)))
+        (when loudly
+          (message "%s" highlights))
+        (dolist (_highlight highlights)))
+      `(jit-lock-bounds ,beg . ,end))))
 
 (provide 'tree-sitter)
 

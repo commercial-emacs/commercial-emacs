@@ -927,7 +927,7 @@ The value of this variable is used when Font Lock mode is turned on."
 (declare-function lazy-lock-after-fontify-buffer "lazy-lock")
 (declare-function lazy-lock-after-unfontify-buffer "lazy-lock")
 (declare-function lazy-lock-mode "lazy-lock")
-(declare-function tree-sitter-font-lock-fontify-region "tree-sitter")
+(declare-function tree-sitter-fontify-region "tree-sitter")
 
 (defun font-lock-turn-on-thing-lock ()
   (pcase (font-lock-value-in-major-mode font-lock-support-mode)
@@ -945,7 +945,7 @@ The value of this variable is used when Font Lock mode is turned on."
      (setq-local font-lock-fontify-buffer-function #'jit-lock-refontify)
      (when (eq mode 'sitter-lock-mode)
        (setq-local font-lock-fontify-region-function
-                   #'tree-sitter-font-lock-fontify-region))
+                   #'tree-sitter-fontify-region))
      ;; Don't fontify eagerly (and don't abort if the buffer is large).
      (setq-local font-lock-fontified t)
      ;; Use jit-lock.
@@ -1193,39 +1193,6 @@ Put first the functions more likely to cause a change and cheaper to compute.")
                   (setq font-lock-end (line-beginning-position 2)))
         (setq changed t)))
     changed))
-
-(defun font-lock-tree-sitter-fontify-region (beg end _loudly)
-  "Fontify the text between BEG and END.
-If LOUDLY is non-nil, print status messages while fontifying."
-  (save-buffer-state
-   ;; Use the fontification syntax table, if any.
-   (with-syntax-table (or font-lock-syntax-table (syntax-table))
-     ;; Extend the region to fontify so that it starts and ends at
-     ;; safe places.
-     (let ((funs font-lock-extend-region-functions)
-           (font-lock-beg beg)
-           (font-lock-end end))
-       (while funs
-         (setq funs (if (or (not (funcall (car funs)))
-                            (eq funs font-lock-extend-region-functions))
-                        (cdr funs)
-                      ;; If there's been a change, we should go through
-                      ;; the list again since this new position may
-                      ;; warrant a different answer from one of the fun
-                      ;; we've already seen.
-                      font-lock-extend-region-functions)))
-       (setq beg font-lock-beg end font-lock-end))
-     ;; Now do the fontification.
-     (font-lock-unfontify-region beg end)
-     (pcase-dolist (`(,start ,end ,htype) (tree-sitter-highlights beg end))
-       ;; map htype to face from font-lock-defaults
-       ;; (let ((val (eval (nth 1 highlight))))
-       ;;   (when (eq (car-safe val) 'face)
-       ;;     (add-text-properties start end (cddr val))
-       ;;     (setq val (cadr val)))
-       ;;   (put-text-property start end 'face val))
-       (message "%S %S %S" start end htype))
-     `(jit-lock-bounds ,beg . ,end))))
 
 (defun font-lock-default-fontify-region (beg end loudly)
   "Fontify the text between BEG and END.
