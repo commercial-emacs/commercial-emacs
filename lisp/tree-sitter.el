@@ -22,7 +22,6 @@
 ;;; Code:
 
 (require 'font-lock)
-(declare-function tree-sitter-highlights "tree-sitter.c" (beg end))
 
 (defgroup tree-sitter
   nil
@@ -88,17 +87,31 @@
   :risky t
   :version "28.1")
 
-(defun tree-sitter-font-lock-fontify-region (beg end loudly)
-  "Fontify the text between BEG and END.
-If LOUDLY is non-nil, print status messages while fontifying."
-  (let ((inhibit-point-motion-hooks t))
-    (with-silent-modifications
-      (font-lock-unfontify-region beg end)
-      (let ((highlights (tree-sitter-highlights beg end)))
-        (when loudly
-          (message "%s" highlights))
-        (dolist (_highlight highlights)))
-      `(jit-lock-bounds ,beg . ,end))))
+(defun tree-sitter-fontify-region (beg end _loudly)
+  "Presumably widened in `font-lock-fontify-region'."
+  (with-silent-modifications
+    (prog1 `(jit-lock-bounds ,beg . ,end)
+      (let ((inhibit-point-motion-hooks t)
+            (highlights (tree-sitter-highlights beg end))
+            prevailing-face)
+        (font-lock-unfontify-region beg end)
+        (dolist (highlight highlights)
+          (pcase highlight
+            ('nil
+             (setq prevailing-face nil))
+            ((and (pred symbolp) face)
+             (setq prevailing-face face))
+	    (`(,pcase-beg . ,pcase-end)
+	     (when prevailing-face
+               (save-mark-and-excursion
+                 (let ((mark-beg (make-marker))
+                       (mark-end (make-marker))
+                       (highlight (list 0 prevailing-face)))
+                   (set-marker mark-beg (byte-to-position pcase-beg))
+                   (set-marker mark-end (byte-to-position pcase-end))
+                   (save-match-data
+                     (set-match-data (list mark-beg mark-end))
+                     (font-lock-apply-highlight highlight))))))))))))
 
 (provide 'tree-sitter)
 

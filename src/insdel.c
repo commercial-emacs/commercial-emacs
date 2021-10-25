@@ -945,8 +945,7 @@ insert_1_both (const char *string,
 			 Qnil, Qnil, Qnil);
 
 #ifdef HAVE_TREE_SITTER
-  if (! NILP (Fmemq (Qtree_sitter_mode, BVAR (current_buffer, local_minor_modes))))
-    tree_sitter_record_change (PT, PT, PT + nchars);
+  tree_sitter_record_change (PT, PT, PT + nchars);
 #endif
 
   adjust_point (nchars, nbytes);
@@ -1081,8 +1080,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 			       current_buffer, inherit);
 
 #ifdef HAVE_TREE_SITTER
-  if (! NILP (Fmemq (Qtree_sitter_mode, BVAR (current_buffer, local_minor_modes))))
-    tree_sitter_record_change (PT, PT, PT + nchars);
+  tree_sitter_record_change (PT, PT, PT + nchars);
 #endif
 
   adjust_point (nchars, outgoing_nbytes);
@@ -1152,8 +1150,7 @@ insert_from_gap (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
     }
 
 #ifdef HAVE_TREE_SITTER
-  if (! NILP (Fmemq (Qtree_sitter_mode, BVAR (current_buffer, local_minor_modes))))
-    tree_sitter_record_change (ins_charpos, ins_charpos, ins_charpos + nchars);
+  tree_sitter_record_change (ins_charpos, ins_charpos, ins_charpos + nchars);
 #endif
 
   if (ins_charpos < PT)
@@ -1307,8 +1304,7 @@ insert_from_buffer_1 (struct buffer *buf,
   graft_intervals_into_buffer (intervals, PT, nchars, current_buffer, inherit);
 
 #ifdef HAVE_TREE_SITTER
-  if (! NILP (Fmemq (Qtree_sitter_mode, BVAR (current_buffer, local_minor_modes))))
-    tree_sitter_record_change (PT, PT, PT + nchars);
+  tree_sitter_record_change (PT, PT, PT + nchars);
 #endif
 
   adjust_point (nchars, outgoing_nbytes);
@@ -1365,8 +1361,7 @@ adjust_after_replace (ptrdiff_t from, ptrdiff_t from_byte,
   offset_intervals (current_buffer, from, len - nchars_del);
 
 #ifdef HAVE_TREE_SITTER
-  if (! NILP (Fmemq (Qtree_sitter_mode, BVAR (current_buffer, local_minor_modes))))
-    tree_sitter_record_change (from, from + nchars_del, from + len);
+  tree_sitter_record_change (from, from + nchars_del, from + len);
 #endif
   if (from < PT)
     adjust_point (len - nchars_del, len_byte - nbytes_del);
@@ -1564,8 +1559,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
 			       current_buffer, inherit);
 
 #ifdef HAVE_TREE_SITTER
-  if (! NILP (Fmemq (Qtree_sitter_mode, BVAR (current_buffer, local_minor_modes))))
-    tree_sitter_record_change (from, from + nchars_del, from + inschars);
+  tree_sitter_record_change (from, from + nchars_del, from + inschars);
 #endif
 
   /* Relocate point as if it were a marker.  */
@@ -1930,8 +1924,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   evaporate_overlays (from);
 
 #ifdef HAVE_TREE_SITTER
-  if (! NILP (Fmemq (Qtree_sitter_mode, BVAR (current_buffer, local_minor_modes))))
-    tree_sitter_record_change (from, from + nchars_del, from);
+  tree_sitter_record_change (from, from + nchars_del, from);
 #endif
 
   return deletion;
