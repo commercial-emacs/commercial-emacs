@@ -150,9 +150,9 @@ default:
     - docker push ${CI_REGISTRY_IMAGE}:${target}-${BUILD_TAG}
 
 .test-template:
-  # Do not run fast and normal test jobs when scheduled.
+  # Do not run normal test jobs when scheduled.
   rules:
-    - if: '$CI_JOB_STAGE =~ "fast|normal" && $CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_JOB_STAGE =~ "normal" && $CI_PIPELINE_SOURCE == "schedule"'
       when: never
     - when: always
   artifacts:
@@ -211,7 +211,6 @@ default:
 
 stages:
   - build-images
-#  - fast
   - normal
   - platform-images
   - platforms
@@ -225,26 +224,12 @@ build-image-inotify:
   variables:
     target: emacs-inotify
 
-# test-fast-inotify:
-#   stage: fast
-#   extends: [.job-template, .test-template]
-#   variables:
-#     target: emacs-inotify
-#     make_params: "-C test check"
-
-test-lisp-inotify:
+test-inotify:
   stage: normal
   extends: [.job-template, .test-template]
   variables:
     target: emacs-inotify
-    make_params: "-C test check-lisp"
-
-test-lisp-net-inotify:
-  stage: normal
-  extends: [.job-template, .test-template]
-  variables:
-    target: emacs-inotify
-    make_params: "-C test check-lisp-net"
+    make_params: "-C test check"
 
 build-image-filenotify-gio:
   stage: platform-images
