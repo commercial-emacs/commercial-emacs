@@ -3579,7 +3579,7 @@ between 0 and 1, and with faces `completions-common-part',
                 ;; "hole" in the middle of the string is indicated by
                 ;; "-".  Note that there are no "holes" near the edges
                 ;; of the string.  The completion score is a number
-                ;; bound by ]0..1]: the higher the better and only a
+                ;; bound by [0..1]: the higher the better and only a
                 ;; perfect match (pattern equals string) will have
                 ;; score 1.  The formula takes the form of a quotient.
                 ;; For the numerator, we use the number of +, i.e. the
