@@ -240,18 +240,22 @@ the index.html page that image-dired creates."
   :type 'directory)
 
 (defcustom image-dired-gallery-image-root-url
-"https://your.own.server/image-diredpics"
-  "URL where the full size images are to be found.
-Note that this path has to be configured in your web server.  Image-Dired
-expects to find pictures in this directory."
-  :type 'string)
+  "https://example.org/image-diredpics"
+  "URL where the full size images are to be found on your web server.
+Note that this path has to be configured on your web server.
+Image-Dired expects to find pictures in this directory.
+This is used by `image-dired-gallery-generate'."
+  :type 'string
+  :version "29.1")
 
 (defcustom image-dired-gallery-thumb-image-root-url
-"https://your.own.server/image-diredthumbs"
-  "URL where the thumbnail images are to be found.
-Note that this path has to be configured in your web server.  Image-Dired
-expects to find pictures in this directory."
-  :type 'string)
+  "https://example.org/image-diredthumbs"
+  "URL where the thumbnail images are to be found on your web server.
+Note that this path has to be configured on your web server.
+Image-Dired expects to find pictures in this directory.
+This is used by `image-dired-gallery-generate'."
+  :type 'string
+  :version "29.1")
 
 (defcustom image-dired-cmd-create-thumbnail-program
   (if (executable-find "gm") "gm" "convert")
@@ -316,8 +320,8 @@ using the NeuQuant algorithm."
   "Arguments to pass `image-dired-cmd-pngnq-program'.
 Available format specifiers are the same as in
 `image-dired-cmd-create-thumbnail-options'."
-  :version "26.1"
-  :type '(repeat (string :tag "Argument")))
+  :type '(repeat (string :tag "Argument"))
+  :version "29.1")
 
 (defcustom image-dired-cmd-pngcrush-program (executable-find "pngcrush")
   "The file name of the `pngcrush' program.
@@ -576,6 +580,14 @@ If there are more files than this in a selected directory, the
   :type 'integer
   :version "29.1")
 
+(defvar image-dired-debug nil
+  "Non-nil means enable debug messages.")
+
+(defun image-dired-debug-message (&rest args)
+  "Display debug message ARGS when `image-dired-debug' is non-nil."
+  (when image-dired-debug
+    (apply #'message args)))
+
 (defmacro image-dired--with-db-file (&rest body)
   "Run BODY in a temp buffer containing `image-dired-db-file'.
 Return the last form in BODY."
@@ -704,6 +716,9 @@ DIMENSION should be either the symbol `width' or `height'."
         (width image-dired-thumb-width)
         (height image-dired-thumb-height)))))
 
+(defvar image-dired--generate-thumbs-start nil
+  "Time when `display-thumbs' was called.")
+
 (defvar image-dired-queue nil
   "List of items in the queue.
 Each item has the form (ORIGINAL-FILE TARGET-FILE).")
@@ -711,9 +726,12 @@ Each item has the form (ORIGINAL-FILE TARGET-FILE).")
 (defvar image-dired-queue-active-jobs 0
   "Number of active jobs in `image-dired-queue'.")
 
-(defvar image-dired-queue-active-limit 2
+(defvar image-dired-queue-active-limit (min 4 (max 2 (/ (num-processors) 2)))
   "Maximum number of concurrent jobs permitted for generating images.
-Increase at own risk.")
+Increase at own risk.  If you want to experiment with this,
+consider setting `image-dired-debug' to a non-nil value to see
+the time spent on generating thumbnails.  Run `image-clear-cache'
+and remove the cached thumbnail files between each trial run.")
 
 (defvar image-dired-tag-history nil "Variable holding the tag history.")
 
@@ -823,6 +841,12 @@ Increase at own risk.")
             ;; Trigger next in queue once a thumbnail has been created
             (cl-decf image-dired-queue-active-jobs)
             (image-dired-thumb-queue-run)
+            (when (= image-dired-queue-active-jobs 0)
+              (image-dired-debug-message
+               (format-time-string
+                "Generated thumbnails in %s.%3N seconds"
+                (time-subtract (current-time)
+                               image-dired--generate-thumbs-start))))
             (if (not (and (eq (process-status process) 'exit)
                           (zerop (process-exit-status process))))
                 (message "Thumb could not be created for %s: %s"
@@ -1076,6 +1100,7 @@ used or not.  If non-nil, use `display-buffer' instead of
 `image-dired-previous-line-and-display' where we do not want the
 thumbnail buffer to be selected."
   (interactive "P")
+  (setq image-dired--generate-thumbs-start  (current-time))
   (let ((buf (image-dired-create-thumbnail-buffer))
         thumb-name files dired-buf)
     (if arg
