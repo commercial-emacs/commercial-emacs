@@ -4521,10 +4521,6 @@ handle_face_prop (struct it *it)
       /* If the new face has a box, but the old face does not,
 	 this is the start of a run of characters with box face,
 	 i.e. this character has a shadow on the left side.  */
-      if (IT_CHARPOS (*it) == 103)
-	{
-	  fprintf (stderr, "wtf %d\n", new_face_id);
-	}
       it->face_id = new_face_id;
       /* Don't reset the start_of_box_run_p flag, only set it if
 	 needed.  */

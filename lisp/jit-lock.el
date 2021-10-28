@@ -414,7 +414,8 @@ is `jit-lock-mode' (or its little cousin `sitter-lock-mode')."
        (cl-loop for istart = (text-property-any (or istart start) end 'fontified nil)
                 while istart
                 for iend = (or (text-property-any istart end 'fontified t) end)
-                do (pcase-let* ((`(,istart* . ,iend*) (jit-lock--run-functions istart iend)))
+                do (pcase-let* ((`(,istart* . ,iend*)
+                                 (jit-lock--run-functions istart iend)))
                      (put-text-property istart* iend* 'fontified t)
 
                      ;; Make sure the contextual refontification doesn't re-refontify
