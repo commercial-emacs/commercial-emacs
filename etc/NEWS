@@ -73,6 +73,15 @@ Image specifiers can now use ':type webp'.
 *** 'display-buffer' now can set up the body size of the chosen window.
 For example, an alist entry as '(window-width . (body-columns . 40))'
 will make the body of the chosen window 40 columns wide.
+
+** Emacs server and client changes
+
++++
+*** 'server-stop-automatically' can be used to automatically stop the server.
+The Emacs server will be automatically stopped when certain conditions
+are met.  The conditions are given by the argument, which can be
+'empty, 'delete-frame or 'kill-terminal.
+
 
 * Editing Changes in Emacs 29.1
 
