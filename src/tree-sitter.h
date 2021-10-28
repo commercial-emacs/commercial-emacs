@@ -31,6 +31,7 @@ struct Lisp_Tree_Sitter
   union vectorlike_header header;
   Lisp_Object progmode;
   TSParser *parser;
+  TSTree *prev_tree;
   TSTree *tree;
 };
 

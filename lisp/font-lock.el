@@ -650,28 +650,24 @@ be enabled."
 	   (not (eq font-lock-major-mode major-mode)))))
 
 (defun font-lock-initial-fontify ()
-  ;; The first fontification after turning the mode on.  This must
-  ;;  only be called after the mode hooks have been run.
+  "The :after-hook of `font-lock-mode' minor mode."
   (when (and font-lock-mode
-	     (font-lock-specified-p t))
+	     (font-lock-specified-p t)
+             (not font-lock-fontified))
     (let ((max-size (font-lock-value-in-major-mode font-lock-maximum-size)))
-      (cond (font-lock-fontified
-	     nil)
-	    ((or (null max-size) (> max-size (buffer-size)))
-             (with-no-warnings (font-lock-fontify-buffer)))
-	    (font-lock-verbose
-	     (message "Fontifying %s...buffer size greater than font-lock-maximum-size"
-		      (buffer-name)))))))
+      (if (or (not (fixnump max-size)) (<= (buffer-size) max-size))
+          (font-lock-ensure)
+        (when font-lock-verbose
+          (message "Fontifying %s...buffer size greater than font-lock-maximum-size"
+	           (buffer-name)))))))
 
 (defun font-lock-mode-internal (arg)
-  ;; Turn on Font Lock mode.
-  (when arg
-    (add-hook 'after-change-functions #'font-lock-after-change-function t t)
-    (font-lock-set-defaults)
-    (font-lock-turn-on-thing-lock))
-  ;; Turn off Font Lock mode.
-  (unless font-lock-mode
-    (remove-hook 'after-change-functions #'font-lock-after-change-function t)
+  "This was better embedded in a minor mode, obviously."
+  (if arg
+      (progn
+        (cl-assert font-lock-mode)
+        (font-lock-set-defaults)
+        (font-lock-turn-on-thing-lock))
     (font-lock-unfontify-buffer)
     (font-lock-turn-off-thing-lock)))
 
@@ -900,7 +896,7 @@ The value of this variable is used when Font Lock mode is turned on."
 		 (const :tag "fast lock" fast-lock-mode)
 		 (const :tag "lazy lock" lazy-lock-mode)
 		 (const :tag "jit lock" jit-lock-mode)
-		 (const :tag "tree sitter" sitter-lock-mode)
+		 (const :tag "tree sitter" tree-sitter-lock-mode)
 		 (repeat :menu-tag "mode specific" :tag "mode specific"
 			 :value ((t . jit-lock-mode))
 			 (cons :tag "Instance"
@@ -912,14 +908,14 @@ The value of this variable is used when Font Lock mode is turned on."
 				      (const :tag "fast lock" fast-lock-mode)
 				      (const :tag "lazy lock" lazy-lock-mode)
 				      (const :tag "JIT lock" jit-lock-mode)
-                                      (const :tag "tree sitter" sitter-lock-mode)))))
+                                      (const :tag "tree sitter" tree-sitter-lock-mode)))))
   :version "21.1"
   :group 'font-lock)
 
 (defvar fast-lock-mode)
 (defvar lazy-lock-mode)
 (defvar jit-lock-mode)
-(defvar sitter-lock-mode)
+(defvar tree-sitter-lock-mode)
 
 (declare-function fast-lock-after-fontify-buffer "fast-lock")
 (declare-function fast-lock-after-unfontify-buffer "fast-lock")
@@ -928,45 +924,47 @@ The value of this variable is used when Font Lock mode is turned on."
 (declare-function lazy-lock-after-unfontify-buffer "lazy-lock")
 (declare-function lazy-lock-mode "lazy-lock")
 (declare-function tree-sitter-fontify-region "tree-sitter")
+(declare-function tree-sitter-lock-mode "tree-sitter")
 
 (defun font-lock-turn-on-thing-lock ()
   (pcase (font-lock-value-in-major-mode font-lock-support-mode)
-    ('fast-lock-mode (fast-lock-mode t))
-    ('lazy-lock-mode (lazy-lock-mode t))
-    ((and mode (or 'sitter-lock-mode 'jit-lock-mode))
-     (remove-hook 'after-change-functions
-                  #'font-lock-after-change-function t)
-     (setq-local font-lock-flush-function #'jit-lock-refontify)
-     (setq-local font-lock-ensure-function #'jit-lock-fontify-now)
-     ;; Prevent font-lock-fontify-buffer from fontifying eagerly the whole
-     ;; buffer.  This is important for things like CWarn mode which
-     ;; adds/removes a few keywords and does a refontify (which takes ages on
-     ;; large files).
-     (setq-local font-lock-fontify-buffer-function #'jit-lock-refontify)
-     (when (eq mode 'sitter-lock-mode)
-       (setq-local font-lock-fontify-region-function
-                   #'tree-sitter-fontify-region))
-     ;; Don't fontify eagerly (and don't abort if the buffer is large).
-     (setq-local font-lock-fontified t)
-     ;; Use jit-lock.
-     (jit-lock-register #'font-lock-fontify-region
-                        (not font-lock-keywords-only))
-     ;; Tell jit-lock how we extend the region to refontify.
+    ('fast-lock-mode
+     (add-hook 'after-change-functions #'font-lock-after-change-function t t)
+     (fast-lock-mode t))
+    ('lazy-lock-mode
+     (add-hook 'after-change-functions #'font-lock-after-change-function t t)
+     (lazy-lock-mode t))
+    ('tree-sitter-lock-mode
+     (tree-sitter-lock-mode t))
+    ('jit-lock-mode
+     (setq-local font-lock-fontify-buffer-function #'jit-lock-refontify
+                 font-lock-flush-function #'jit-lock-refontify
+                 font-lock-ensure-function #'jit-lock-fontify-now
+                 font-lock-fontified t) ;; ramifies in `font-lock-initial-fontify'
+     (jit-lock-register #'font-lock-fontify-region (not font-lock-keywords-only))
      (add-hook 'jit-lock-after-change-extend-region-functions
                #'font-lock-extend-jit-lock-region-after-change
                nil t))))
 
 (defun font-lock-turn-off-thing-lock ()
+  (mapc #'kill-local-variable
+        '(font-lock-fontify-buffer-function
+          font-lock-fontify-region-function
+          font-lock-flush-function
+          font-lock-ensure-function))
   (cond ((bound-and-true-p fast-lock-mode)
-	 (fast-lock-mode -1))
-        ((bound-and-true-p sitter-lock-mode)
+	 (fast-lock-mode -1)
+         (remove-hook 'after-change-functions #'font-lock-after-change-function t))
+        ((bound-and-true-p lazy-lock-mode)
+	 (lazy-lock-mode -1)
+         (remove-hook 'after-change-functions #'font-lock-after-change-function t))
+        ((bound-and-true-p tree-sitter-lock-mode)
+         (tree-sitter-lock-mode -1))
+        ((bound-and-true-p jit-lock-mode)
          (jit-lock-unregister 'font-lock-fontify-region)
-	 (kill-local-variable 'font-lock-fontify-buffer-function))
-	((bound-and-true-p jit-lock-mode)
-	 (jit-lock-unregister 'font-lock-fontify-region)
-	 (kill-local-variable 'font-lock-fontify-buffer-function))
-	((bound-and-true-p lazy-lock-mode)
-	 (lazy-lock-mode -1))))
+         (remove-hook 'jit-lock-after-change-extend-region-functions
+                      #'font-lock-extend-jit-lock-region-after-change
+                      t))))
 
 (defun font-lock-after-fontify-buffer ()
   (cond ((bound-and-true-p fast-lock-mode)
@@ -1259,9 +1257,9 @@ This function is the default `font-lock-unfontify-region-function'."
   (save-excursion
     (let ((inhibit-point-motion-hooks t)
           (inhibit-quit t)
-          (region (if font-lock-extend-after-change-region-function
-                      (funcall font-lock-extend-after-change-region-function
-                               beg end old-len))))
+          (region (when font-lock-extend-after-change-region-function
+                    (funcall font-lock-extend-after-change-region-function
+                             beg end old-len))))
       (save-match-data
 	(if region
 	    ;; Fontify the region the major mode has specified.

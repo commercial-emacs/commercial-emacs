@@ -3189,8 +3189,12 @@ cleanup_vector (struct Lisp_Vector *vector)
     {
       struct Lisp_Tree_Sitter *lisp_parser
 	= PSEUDOVEC_STRUCT (vector, Lisp_Tree_Sitter);
-      ts_tree_delete(lisp_parser->tree);
-      ts_parser_delete(lisp_parser->parser);
+      if (lisp_parser->tree != NULL)
+	ts_tree_delete(lisp_parser->tree);
+      if (lisp_parser->prev_tree != NULL)
+	ts_tree_delete(lisp_parser->prev_tree);
+      if (lisp_parser->parser != NULL)
+	ts_parser_delete(lisp_parser->parser);
     }
 #endif
 }

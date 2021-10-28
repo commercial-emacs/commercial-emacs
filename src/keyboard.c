@@ -10464,10 +10464,7 @@ requeued_events_pending_p (void)
 
 DEFUN ("input-pending-p", Finput_pending_p, Sinput_pending_p, 0, 1, 0,
        doc: /* Return t if command input is currently available with no wait.
-Actually, the value is nil only if we can be sure that no input is available;
-if there is a doubt, the value is t.
-
-If CHECK-TIMERS is non-nil, timers that are ready to run will do so.  */)
+If CHECK-TIMERS is non-nil, run timers that are ready.  */)
   (Lisp_Object check_timers)
 {
   if (CONSP (Vunread_command_events)

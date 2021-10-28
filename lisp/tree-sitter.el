@@ -87,31 +87,56 @@
   :risky t
   :version "28.1")
 
+(defun tree-sitter-do-fontify (pos)
+  (let ((inhibit-point-motion-hooks t)
+        (end (or (text-property-any pos (point-max) 'fontified t)
+                 (point-max))))
+    (with-silent-modifications
+      (save-excursion
+        (save-match-data
+          (font-lock-fontify-region pos end))))))
+
+(define-minor-mode tree-sitter-lock-mode
+  "Tree-sitter font-lock minor mode."
+  :lighter ""
+  (if tree-sitter-lock-mode
+      (progn
+        (setq-local font-lock-fontify-region-function #'tree-sitter-fontify-region)
+        (add-hook 'fontification-functions #'tree-sitter-do-fontify nil t))
+    (kill-local-variable 'font-lock-fontify-region-function)
+    (remove-hook 'fontification-functions #'tree-sitter-do-fontify t)))
+
 (defun tree-sitter-fontify-region (beg end _loudly)
   "Presumably widened in `font-lock-fontify-region'."
-  (with-silent-modifications
-    (prog1 `(jit-lock-bounds ,beg . ,end)
-      (let ((inhibit-point-motion-hooks t)
-            (highlights (tree-sitter-highlights beg end))
-            prevailing-face)
-        (font-lock-unfontify-region beg end)
-        (dolist (highlight highlights)
-          (pcase highlight
-            ('nil
-             (setq prevailing-face nil))
-            ((and (pred symbolp) face)
-             (setq prevailing-face face))
-	    (`(,pcase-beg . ,pcase-end)
-	     (when prevailing-face
-               (save-mark-and-excursion
-                 (let ((mark-beg (make-marker))
-                       (mark-end (make-marker))
-                       (highlight (list 0 prevailing-face)))
-                   (set-marker mark-beg (byte-to-position pcase-beg))
-                   (set-marker mark-end (byte-to-position pcase-end))
-                   (save-match-data
-                     (set-match-data (list mark-beg mark-end))
-                     (font-lock-apply-highlight highlight))))))))))))
+  (let ((highlights (apply #'tree-sitter-highlights
+                           (or (tree-sitter-changed-range)
+                               (list beg end))))
+        (pos-min beg)
+        (pos-max end)
+        prevailing-face)
+    (dolist (highlight highlights)
+      (pcase highlight
+        ('nil
+         (setq prevailing-face nil))
+        ((and (pred symbolp) face)
+         (setq prevailing-face face))
+	(`(,byte-beg . ,byte-end)
+         (let ((pcase-beg (byte-to-position byte-beg))
+               (pcase-end (byte-to-position byte-end)))
+           (setq pos-min (min pos-min pcase-beg))
+           (setq pos-max (max pos-max pcase-end))
+	   (when prevailing-face
+             (save-excursion
+               (let ((mark-beg (make-marker))
+                     (mark-end (make-marker))
+                     (highlight (list 0 prevailing-face)))
+                 (set-marker mark-beg pcase-beg)
+                 (set-marker mark-end pcase-end)
+                 (save-match-data
+                   (set-match-data (list mark-beg mark-end))
+                   (font-lock-apply-highlight highlight)))))))))
+    (put-text-property pos-min pos-max 'fontified nil)
+    (put-text-property beg end 'fontified t)))
 
 (provide 'tree-sitter)
 

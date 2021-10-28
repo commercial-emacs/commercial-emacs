@@ -4515,13 +4515,16 @@ handle_face_prop (struct it *it)
           && IT_CHARPOS (*it) > BEG)
 	{
 	  const int prev_face_id = face_before_it_pos (it);
-
 	  old_face = FACE_FROM_ID_OR_NULL (it->f, prev_face_id);
 	}
 
       /* If the new face has a box, but the old face does not,
 	 this is the start of a run of characters with box face,
 	 i.e. this character has a shadow on the left side.  */
+      if (IT_CHARPOS (*it) == 103)
+	{
+	  fprintf (stderr, "wtf %d\n", new_face_id);
+	}
       it->face_id = new_face_id;
       /* Don't reset the start_of_box_run_p flag, only set it if
 	 needed.  */
@@ -8903,9 +8906,9 @@ next_element_from_buffer (struct it *it)
 	      success_p = false;
 	    }
 	}
-      else if (!(!it->bidi_p
-		 || BIDI_AT_BASE_LEVEL (it->bidi_it)
-		 || IT_CHARPOS (*it) == it->stop_charpos))
+      else if (it->bidi_p
+	       && ! BIDI_AT_BASE_LEVEL (it->bidi_it)
+	       && IT_CHARPOS (*it) != it->stop_charpos)
 	{
 	  /* With bidi non-linear iteration, we could find ourselves
 	     far beyond the last computed stop_charpos, with several
@@ -35056,6 +35059,9 @@ be let-bound around code that needs to disable messages temporarily. */);
   DEFSYM (QCfile, ":file");
   DEFSYM (Qfontified, "fontified");
   DEFSYM (Qfontification_functions, "fontification-functions");
+
+  Vtext_property_default_nonsticky
+    = Fcons (Fcons (Qfontified, Qt), Vtext_property_default_nonsticky);
 
   /* Name of the symbol which disables Lisp evaluation in 'display'
      properties.  This is used by enriched.el.  */

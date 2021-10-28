@@ -40,6 +40,7 @@ make_tree_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
 
   sitter->progmode = progmode_arg;
   sitter->parser = parser;
+  sitter->prev_tree = NULL;
   sitter->tree = tree;
   return make_lisp_ptr (sitter, Lisp_Vectorlike);
 }
@@ -120,9 +121,10 @@ tree_sitter_create (Lisp_Object progmode)
   return tree_sitter;
 }
 
+
 DEFUN ("tree-sitter-highlights",
        Ftree_sitter_highlights, Stree_sitter_highlights,
-       2, 2, 0,
+       2, 2, "r",
        doc: /* Highlight BEG to END. */)
   (Lisp_Object beg, Lisp_Object end)
 {
@@ -287,7 +289,6 @@ DEFUN ("tree-sitter-root-node",
        doc: /* Return TSNode stash from BUFFER's sitter. */)
   (Lisp_Object buffer)
 {
-  TSTree *tree;
   Lisp_Object retval = Qnil, sitter;
 
   if (NILP (buffer))
@@ -298,9 +299,39 @@ DEFUN ("tree-sitter-root-node",
 
   if (! NILP (sitter))
     {
-      tree = XTREE_SITTER (sitter)->tree;
+      const TSTree *tree = XTREE_SITTER (sitter)->tree;
       if (tree != NULL)
 	retval = build_string (ts_node_string (ts_tree_root_node (tree)));
+    }
+  return retval;
+}
+
+DEFUN ("tree-sitter-changed-range",
+       Ftree_sitter_changed_range, Stree_sitter_changed_range,
+       0, 1, 0,
+       doc: /* Return list of BEG and END of TSRange. */)
+  (Lisp_Object buffer)
+{
+  Lisp_Object retval = Qnil, sitter;
+
+  if (NILP (buffer))
+    buffer = Fcurrent_buffer ();
+
+  CHECK_BUFFER (buffer);
+  sitter = Ftree_sitter (buffer);
+
+  if (! NILP (sitter))
+    {
+      const TSTree *tree = XTREE_SITTER (sitter)->tree,
+	*prev_tree = XTREE_SITTER (sitter)->prev_tree;
+      if (tree != NULL && prev_tree != NULL)
+	{
+	  uint32_t count;
+	  TSRange *range = ts_tree_get_changed_ranges (prev_tree, tree, &count);
+	  retval = list2 (make_fixnum (SITTER_TO_BUFFER (range->start_byte)),
+			  make_fixnum (SITTER_TO_BUFFER (range->end_byte)));
+	  free (range);
+	}
     }
   return retval;
 }
@@ -399,6 +430,10 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 	    dummy_point,
 	    dummy_point
 	  };
+
+	  if (XTREE_SITTER (sitter)->prev_tree != NULL)
+	    ts_tree_delete (XTREE_SITTER (sitter)->prev_tree);
+	  XTREE_SITTER (sitter)->prev_tree = ts_tree_copy (tree);
 	  ts_tree_edit (tree, &edit);
 	  XTREE_SITTER (sitter)->tree =
 	    ts_parser_parse (XTREE_SITTER (sitter)->parser,
@@ -408,6 +443,7 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 			       tree_sitter_read_buffer,
 			       TSInputEncodingUTF8
 			     });
+	  ts_tree_delete (tree);
 	}
       else
 	{
@@ -555,6 +591,7 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter);
   defsubr (&Stree_sitter_root_node);
   defsubr (&Stree_sitter_highlights);
+  defsubr (&Stree_sitter_changed_range);
 
   /* defsubr (&Stree_sitter_node_type); */
   /* defsubr (&Stree_sitter_node_start); */

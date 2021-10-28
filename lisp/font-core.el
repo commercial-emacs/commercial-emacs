@@ -158,25 +158,22 @@ this function onto `change-major-mode-hook'."
 
 (defvar font-lock-set-defaults)
 (defun font-lock-default-function (mode)
-  ;; Turn on Font Lock mode.
-  (when mode
-    (setq-local char-property-alias-alist
-                (copy-tree char-property-alias-alist))
-    ;; Add `font-lock-face' as an alias for the `face' property.
-    (let ((elt (assq 'face char-property-alias-alist)))
-      (if elt
-	  (unless (memq 'font-lock-face (cdr elt))
-	    (setcdr elt (nconc (cdr elt) (list 'font-lock-face))))
-	(push (list 'face 'font-lock-face) char-property-alias-alist))))
-  ;; Turn off Font Lock mode.
-  (unless mode
-    ;; Remove `font-lock-face' as an alias for the `face' property.
+  (if mode
+      (progn
+        (setq-local char-property-alias-alist
+                    (copy-tree char-property-alias-alist))
+        ;; Add `font-lock-face' as an alias for the `face' property.
+        (let ((elt (assq 'face char-property-alias-alist)))
+          (if elt
+	      (unless (memq 'font-lock-face (cdr elt))
+	        (setcdr elt (nconc (cdr elt) (list 'font-lock-face))))
+	    (push (list 'face 'font-lock-face) char-property-alias-alist))))
     (setq-local char-property-alias-alist
                 (copy-tree char-property-alias-alist))
     (let ((elt (assq 'face char-property-alias-alist)))
       (when elt
 	(setcdr elt (remq 'font-lock-face (cdr elt)))
-	(when (null (cdr elt))
+	(unless (cdr elt)
 	  (setq char-property-alias-alist
 		(delq elt char-property-alias-alist))))))
 
@@ -258,13 +255,14 @@ means that Font Lock mode is turned on for buffers in C and C++ modes only."
   :group 'font-lock)
 
 (defun turn-on-font-lock-if-desired ()
-  (when (cond ((eq font-lock-global-modes t)
-	       t)
-	      ((eq (car-safe font-lock-global-modes) 'not)
-	       (not (memq major-mode (cdr font-lock-global-modes))))
-	      (t (memq major-mode font-lock-global-modes)))
-    (let (inhibit-quit)
-      (turn-on-font-lock))))
+  (unless (minibufferp)
+    (when (cond ((eq font-lock-global-modes t)
+	         t)
+	        ((eq (car-safe font-lock-global-modes) 'not)
+	         (not (memq major-mode (cdr font-lock-global-modes))))
+	        (t (memq major-mode font-lock-global-modes)))
+      (let (inhibit-quit)
+        (turn-on-font-lock)))))
 
 (define-globalized-minor-mode global-font-lock-mode
   font-lock-mode turn-on-font-lock-if-desired

@@ -6325,7 +6325,7 @@ If FACE is not a valid face name, use default face."
 		(ps-face-background-name face))))
 
 
-(declare-function jit-lock-fontify-now "jit-lock" (&optional start end))
+(declare-function jit-lock-fontify-now "jit-lock" (start end))
 (declare-function lazy-lock-fontify-region "lazy-lock" (beg end))
 
 ;; to avoid compilation gripes
