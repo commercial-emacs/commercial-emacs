@@ -113,9 +113,7 @@
          (beg* (if changed-range
                    (min beg (cl-first changed-range))
                  beg))
-         (end* (if changed-range
-                   (max end (cl-second changed-range))
-                 end))
+         (end* end)
          (highlights (tree-sitter-highlights beg* end*))
          (leftmost beg*)
          (rightmost end*)
