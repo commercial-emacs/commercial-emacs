@@ -8363,8 +8363,10 @@ gif_close (GifFileType *gif, int *err)
 /* Load GIF image IMG for use on frame F.  Value is true if
    successful.  */
 
+#if GIFLIB_MAJOR < 5
 static const int interlace_start[] = {0, 4, 2, 1};
 static const int interlace_increment[] = {8, 8, 4, 2};
+#endif
 
 #define GIF_LOCAL_DESCRIPTOR_EXTENSION 249
 
@@ -8640,7 +8642,8 @@ gif_load (struct frame *f, struct image *img)
 	  }
 
       /* Apply the pixel values.  */
-      if (GIFLIB_MAJOR < 5 && gif->SavedImages[j].ImageDesc.Interlace)
+#if GIFLIB_MAJOR < 5
+      if (gif->SavedImages[j].ImageDesc.Interlace)
 	{
 	  int row, pass;
 
@@ -8664,6 +8667,7 @@ gif_load (struct frame *f, struct image *img)
 	}
       else
 	{
+#endif
           for (y = 0; y < subimg_height; ++y)
 	    for (x = 0; x < subimg_width; ++x)
 	      {
@@ -8675,7 +8679,9 @@ gif_load (struct frame *f, struct image *img)
                   }
 	      }
 	}
+#if GIFLIB_MAJOR < 5
     }
+#endif
 
 #ifdef COLOR_TABLE_SUPPORT
   img->colors = colors_in_color_table (&img->ncolors);
