@@ -95,7 +95,7 @@
     (with-silent-modifications
       (save-excursion
         (save-match-data
-          (font-lock-fontify-region pos end))))))
+          (font-lock-fontify-region pos end font-lock-verbose))))))
 
 (define-minor-mode tree-sitter-lock-mode
   "Tree-sitter font-lock minor mode."
@@ -107,18 +107,18 @@
     (kill-local-variable 'font-lock-fontify-region-function)
     (remove-hook 'fontification-functions #'tree-sitter-do-fontify t)))
 
-(defun tree-sitter-fontify-region (beg end _loudly)
+(defun tree-sitter-fontify-region (beg end loudly)
   "Presumably widened in `font-lock-fontify-region'."
   (let* ((changed-range (tree-sitter-changed-range))
-         (left (if changed-range
+         (beg* (if changed-range
                    (min beg (cl-first changed-range))
                  beg))
-         (right (if changed-range
-                    (max end (cl-second changed-range))
-                  end))
-         (highlights (tree-sitter-highlights left right))
-         (leftmost left)
-         (rightmost right)
+         (end* (if changed-range
+                   (max end (cl-second changed-range))
+                 end))
+         (highlights (tree-sitter-highlights beg* end*))
+         (leftmost beg*)
+         (rightmost end*)
          prevailing-face)
     (dolist (highlight highlights)
       (pcase highlight
@@ -140,11 +140,12 @@
                (save-match-data
                  (set-match-data (list mark-beg mark-end))
                  (font-lock-apply-highlight highlight))))))))
-    ;; (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
-    ;;                (cl-first (tree-sitter-changed-range))
-    ;;                (cl-second (tree-sitter-changed-range))
-    ;;                beg end leftmost rightmost)
-    ;;        #'external-debugging-output)
+    (when loudly
+      (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
+                     (cl-first (tree-sitter-changed-range))
+                     (cl-second (tree-sitter-changed-range))
+                     beg end leftmost rightmost)
+             #'external-debugging-output))
     (put-text-property leftmost rightmost 'fontified t)
     (set-window-configuration (current-window-configuration) t t)))
 

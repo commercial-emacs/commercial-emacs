@@ -157,8 +157,10 @@ DEFUN ("tree-sitter-highlights",
       Lisp_Object suberror = Qnil, language =
 	Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
 			  Fsymbol_value (Qtree_sitter_mode_alist))),
-	highlights_scm;
+	highlights_scm, node_start, node_end;
       uint32_t restore_start;
+      Lisp_Object font_lock_maximum_size =
+	Fsymbol_value (Fintern_soft (build_string ("font-lock-maximum-size"), Qnil));
 
       eassert (! NILP (language));
 
@@ -226,9 +228,15 @@ DEFUN ("tree-sitter-highlights",
 	(ts_tree_root_node (XTREE_SITTER (sitter)->tree),
 	 BUFFER_TO_SITTER (XFIXNUM (beg)),
 	 BUFFER_TO_SITTER (XFIXNUM (end)));
-      source_code = Fbuffer_substring_no_properties
-	(make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (node))),
-	 make_fixnum (SITTER_TO_BUFFER (ts_node_end_byte (node))));
+
+      node_start = make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (node)));
+      node_end = make_fixnum (SITTER_TO_BUFFER (ts_node_end_byte (node)));
+      if (FIXNUMP (font_lock_maximum_size)
+	  &&
+	  XFIXNUM (font_lock_maximum_size) < XFIXNUM (node_end) - XFIXNUM (node_start))
+	goto finally;
+
+      source_code = Fbuffer_substring_no_properties (node_start, node_end);
 
       /* source code is relative coords */
       restore_start = node.context[0];
