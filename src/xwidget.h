@@ -32,6 +32,7 @@ struct window;
 
 #if defined (USE_GTK)
 #include <gtk/gtk.h>
+#include <X11/Xlib.h>
 #elif defined (NS_IMPL_COCOA) && defined (__OBJC__)
 #import <AppKit/NSView.h>
 #import "nsxwidget.h"
@@ -59,6 +60,7 @@ struct xwidget
 
   int height;
   int width;
+  uint32_t xwidget_id;
 
 #if defined (USE_GTK)
   /* For offscreen widgets, unused if not osr.  */
@@ -98,9 +100,12 @@ struct xwidget_view
   bool hidden;
 
 #if defined (USE_GTK)
-  GtkWidget *widget;
-  GtkWidget *widgetwindow;
-  GtkWidget *emacswindow;
+  Display *dpy;
+  Window wdesc;
+  struct frame *frame;
+
+  cairo_surface_t *cr_surface;
+  cairo_t *cr_context;
 #elif defined (NS_IMPL_COCOA)
 # ifdef __OBJC__
   XvWindow *xvWindow;
@@ -162,6 +167,10 @@ void store_xwidget_download_callback_event (struct xwidget *xw,
 void store_xwidget_js_callback_event (struct xwidget *xw,
                                       Lisp_Object proc,
                                       Lisp_Object argument);
+struct xwidget_view *xwidget_view_from_window (Window wdesc);
+void xwidget_expose (struct xwidget_view *xv);
+
+extern struct xwidget *xwidget_from_id (uint32_t id);
 #else
 INLINE_HEADER_BEGIN
 INLINE void syms_of_xwidget (void) {}

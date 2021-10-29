@@ -4390,6 +4390,88 @@ x_scroll_run (struct window *w, struct run *run)
   /* Cursor off.  Will be switched on again in gui_update_window_end.  */
   gui_clear_cursor (w);
 
+#ifdef HAVE_XWIDGETS
+  /* "Copy" xwidget windows in the area that will be scrolled.  */
+  Display *dpy = FRAME_X_DISPLAY (f);
+  Window window = FRAME_X_WINDOW (f);
+
+  Window root, parent, *children;
+  unsigned int nchildren;
+
+  if (XQueryTree (dpy, window, &root, &parent, &children, &nchildren))
+    {
+      /* Now find xwidget views situated between from_y and to_y, and
+	 attached to w.  */
+      for (unsigned int i = 0; i < nchildren; ++i)
+	{
+	  Window child = children[i];
+	  struct xwidget_view *view = xwidget_view_from_window (child);
+
+	  if (view)
+	    {
+	      int window_y = view->y + view->clip_top;
+	      int window_height = view->clip_bottom - view->clip_top;
+	      int min_y = min (from_y, to_y);
+	      int max_y = max (from_y, to_y);
+
+	      Emacs_Rectangle r1, r2, result;
+	      r1.x = w->pixel_left;
+	      r1.y = min_y;
+	      r1.width = w->pixel_width;
+	      r1.height = max_y - min_y;
+	      r2 = r1;
+	      r2.y = window_y;
+	      r2.height = window_height;
+
+	      /* The window is offscreen, just unmap it.  */
+	      if (window_height == 0)
+		{
+		  view->hidden = true;
+		  XUnmapWindow (dpy, child);
+		  continue;
+		}
+
+	      bool intersects_p =
+		gui_intersect_rectangles (&r1, &r2, &result);
+
+	      if (XWINDOW (view->w) == w && intersects_p)
+		{
+		  int y = view->y + (to_y - from_y);
+		  int text_area_x, text_area_y, text_area_width, text_area_height;
+		  int clip_top, clip_bottom;
+
+		  window_box (w, TEXT_AREA, &text_area_x, &text_area_y,
+			      &text_area_width, &text_area_height);
+
+		  clip_top = max (0, text_area_y - y);
+		  clip_bottom = max (clip_top,
+				     min (XXWIDGET (view->model)->height,
+					  text_area_y + text_area_height - y));
+
+		  view->y = y;
+		  view->clip_top = clip_top;
+		  view->clip_bottom = clip_bottom;
+
+		  /* This means the view has moved offscreen.  Unmap
+		     it and hide it here.  */
+		  if ((view->clip_top - view->clip_bottom) <= 0)
+		    {
+		      view->hidden = true;
+		      XUnmapWindow (dpy, child);
+		    }
+		  else
+		    XMoveResizeWindow (dpy, child, view->x + view->clip_left,
+				       view->y + view->clip_top,
+				       view->clip_right - view->clip_left,
+				       view->clip_top - view->clip_bottom);
+		  XFlush (dpy);
+		}
+            }
+	}
+      XFree (children);
+    }
+#endif
+
 #ifdef USE_CAIRO
   if (FRAME_CR_CONTEXT (f))
     {
@@ -4563,8 +4645,9 @@ x_focus_changed (int type, int state, struct x_display_info *dpyinfo, struct fra
     }
 }
 
-/* Return the Emacs frame-object corresponding to an X window.
-   It could be the frame's main window or an icon window.  */
+/* Return the Emacs frame-object corresponding to an X window.  It
+   could be the frame's main window, an icon window, or an xwidget
+   window.  */
 
 static struct frame *
 x_window_to_frame (struct x_display_info *dpyinfo, int wdesc)
@@ -4574,6 +4657,13 @@ x_window_to_frame (struct x_display_info *dpyinfo, int wdesc)
 
   if (wdesc == None)
     return NULL;
+
+#ifdef HAVE_XWIDGETS
+  struct xwidget_view *xvw = xwidget_view_from_window (wdesc);
+
+  if (xvw && xvw->frame)
+    return xvw->frame;
+#endif
 
   FOR_EACH_FRAME (tail, frame)
     {
@@ -8211,6 +8301,18 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
     case Expose:
       f = x_window_to_frame (dpyinfo, event->xexpose.window);
+#ifdef HAVE_XWIDGETS
+      {
+	struct xwidget_view *xv =
+	  xwidget_view_from_window (event->xexpose.window);
+
+	if (xv)
+	  {
+	    xwidget_expose (xv);
+	    goto OTHER;
+	  }
+      }
+#endif
       if (f)
         {
           if (!FRAME_VISIBLE_P (f))
