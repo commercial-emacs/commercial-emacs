@@ -150,9 +150,10 @@ DEFUN ("tree-sitter-highlights",
       const char *error = NULL;
       TSHighlighter *ts_highlighter =
 	ts_highlighter_new (highlight_names, highlight_names, (uint32_t) count);
-      Lisp_Object suberror = Qnil, language =
-	Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
-			  Fsymbol_value (Qtree_sitter_mode_alist))),
+      Lisp_Object
+	suberror = Qnil,
+	language = Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
+				     Fsymbol_value (Qtree_sitter_mode_alist))),
 	highlights_scm;
 
       eassert (! NILP (language));

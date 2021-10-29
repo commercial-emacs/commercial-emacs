@@ -89,13 +89,9 @@
 
 (defun tree-sitter-do-fontify (pos)
   "Analog to `jit-lock-fontify-now' without all the indirection."
-  (let ((inhibit-point-motion-hooks t)
-        (end (or (text-property-any pos (point-max) 'fontified t)
+  (let ((end (or (text-property-any pos (point-max) 'fontified t)
                  (point-max))))
-    (with-silent-modifications
-      (save-excursion
-        (save-match-data
-          (font-lock-fontify-region pos end font-lock-verbose))))))
+    (font-lock-fontify-region pos end font-lock-verbose)))
 
 (define-minor-mode tree-sitter-lock-mode
   "Tree-sitter font-lock minor mode."
@@ -109,43 +105,50 @@
 
 (defun tree-sitter-fontify-region (beg end loudly)
   "Presumably widened in `font-lock-fontify-region'."
-  (let* ((changed-range (tree-sitter-changed-range))
-         (beg* (if changed-range
-                   (min beg (cl-first changed-range))
-                 beg))
-         (end* end)
-         (highlights (tree-sitter-highlights beg* end*))
-         (leftmost beg*)
-         (rightmost end*)
-         prevailing-face)
-    (dolist (highlight highlights)
-      (pcase highlight
-        ('nil
-         (setq prevailing-face nil))
-        ((and (pred symbolp) face)
-         (setq prevailing-face face))
-	(`(,byte-beg . ,byte-end)
-         (let ((pcase-beg (byte-to-position byte-beg))
-               (pcase-end (byte-to-position byte-end)))
-           (setq leftmost (min leftmost pcase-beg))
-           (setq rightmost (max rightmost pcase-end))
-	   (save-excursion
-             (let ((mark-beg (make-marker))
-                   (mark-end (make-marker))
-                   (highlight (list 0 prevailing-face t)))
-               (set-marker mark-beg pcase-beg)
-               (set-marker mark-end pcase-end)
-               (save-match-data
-                 (set-match-data (list mark-beg mark-end))
-                 (font-lock-apply-highlight highlight))))))))
-    (when loudly
-      (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
-                     (cl-first (tree-sitter-changed-range))
-                     (cl-second (tree-sitter-changed-range))
-                     beg end leftmost rightmost)
-             #'external-debugging-output))
-    (put-text-property leftmost rightmost 'fontified t)
-    (set-window-configuration (current-window-configuration) t t)))
+  (let ((inhibit-point-motion-hooks t))
+    (with-silent-modifications
+      (save-excursion
+        (save-match-data
+          (let* ((changed-range (tree-sitter-changed-range))
+                 (beg* (if changed-range
+                           (min beg (cl-first changed-range))
+                         beg))
+                 (end* (if changed-range
+                           (min (max end (cl-second changed-range))
+                                (+ beg jit-lock-chunk-size))
+                         end))
+                 (highlights (tree-sitter-highlights beg* end*))
+                 (leftmost beg*)
+                 (rightmost end*)
+                 prevailing-face)
+            (dolist (highlight highlights)
+              (pcase highlight
+                ('nil
+                 (setq prevailing-face nil))
+                ((and (pred symbolp) face)
+                 (setq prevailing-face face))
+	        (`(,byte-beg . ,byte-end)
+                 (let ((pcase-beg (byte-to-position byte-beg))
+                       (pcase-end (byte-to-position byte-end)))
+                   (setq leftmost (min leftmost pcase-beg))
+                   (setq rightmost (max rightmost pcase-end))
+	           (save-excursion
+                     (let ((mark-beg (make-marker))
+                           (mark-end (make-marker))
+                           (highlight (list 0 prevailing-face t)))
+                       (set-marker mark-beg pcase-beg)
+                       (set-marker mark-end pcase-end)
+                       (save-match-data
+                         (set-match-data (list mark-beg mark-end))
+                         (font-lock-apply-highlight highlight))))))))
+            (when loudly
+              (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
+                             (cl-first (tree-sitter-changed-range))
+                             (cl-second (tree-sitter-changed-range))
+                             beg end leftmost rightmost)
+                     #'external-debugging-output))
+            (put-text-property leftmost rightmost 'fontified t)
+            (set-window-configuration (current-window-configuration) t t)))))))
 
 (provide 'tree-sitter)
 
