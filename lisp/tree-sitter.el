@@ -111,11 +111,11 @@
   "Presumably widened in `font-lock-fontify-region'."
   (let* ((changed-range (tree-sitter-changed-range))
          (left (if changed-range
-                       (min beg (cl-first changed-range))
-                     beg))
+                   (min beg (cl-first changed-range))
+                 beg))
          (right (if changed-range
-                        (max end (cl-second changed-range))
-                      end))
+                    (max end (cl-second changed-range))
+                  end))
          (highlights (tree-sitter-highlights left right))
          (leftmost left)
          (rightmost right)
@@ -131,23 +131,22 @@
                (pcase-end (byte-to-position byte-end)))
            (setq leftmost (min leftmost pcase-beg))
            (setq rightmost (max rightmost pcase-end))
-	   (when prevailing-face
-             (save-excursion
-               (let ((mark-beg (make-marker))
-                     (mark-end (make-marker))
-                     (highlight (list 0 prevailing-face)))
-                 (set-marker mark-beg pcase-beg)
-                 (set-marker mark-end pcase-end)
-                 (save-match-data
-                   (set-match-data (list mark-beg mark-end))
-                   (font-lock-apply-highlight highlight)))))))))
-    (princ (format "hummina changed [%s %s], initial [%d %d], final [%d %d]\n"
-                   (cl-first (tree-sitter-changed-range))
-                   (cl-second (tree-sitter-changed-range))
-                   beg end leftmost rightmost)
-           #'external-debugging-output)
-    (put-text-property leftmost rightmost 'fontified nil)
-    (put-text-property left right 'fontified t)))
+	   (save-excursion
+             (let ((mark-beg (make-marker))
+                   (mark-end (make-marker))
+                   (highlight (list 0 prevailing-face t)))
+               (set-marker mark-beg pcase-beg)
+               (set-marker mark-end pcase-end)
+               (save-match-data
+                 (set-match-data (list mark-beg mark-end))
+                 (font-lock-apply-highlight highlight))))))))
+    ;; (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
+    ;;                (cl-first (tree-sitter-changed-range))
+    ;;                (cl-second (tree-sitter-changed-range))
+    ;;                beg end leftmost rightmost)
+    ;;        #'external-debugging-output)
+    (put-text-property leftmost rightmost 'fontified t)
+    (set-window-configuration (current-window-configuration) t t)))
 
 (provide 'tree-sitter)
 
