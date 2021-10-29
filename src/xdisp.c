@@ -582,11 +582,10 @@ char_can_wrap_after (struct it *it)
 #undef NOT_AT_EOL
 #undef NOT_AT_BOL
 #undef LINE_BREAKABLE
-#undef LINE_UNBREAKABLE_KIMMY
 
 /* If all the conditions needed to print the fill column indicator are
    met, return the (nonnegative) column number, else return a negative
-   value. */
+   value.  */
 static int
 fill_column_indicator_column (struct it *it, int char_width)
 {
