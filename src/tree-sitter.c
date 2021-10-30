@@ -221,7 +221,7 @@ DEFUN ("tree-sitter-highlights",
       for (TSNode node = ts_node_first_child_for_byte
 	     (ts_tree_root_node (XTREE_SITTER (sitter)->tree),
 	      BUFFER_TO_SITTER (XFIXNUM (beg)));
-	   (! ts_node_is_null(node)
+	   (! ts_node_is_null (node)
 	    && ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end)));
 	   node = ts_node_next_sibling (node))
 	{
@@ -241,7 +241,6 @@ DEFUN ("tree-sitter-highlights",
 	    ts_highlighter_return_highlights (ts_highlighter, scope,
 					      SSDATA (source_code),
 					      (uint32_t) SBYTES (source_code),
-					      XTREE_SITTER (sitter)->tree,
 					      &node,
 					      ts_highlight_buffer);
 
