@@ -33,7 +33,6 @@ struct Lisp_Tree_Sitter
   TSParser *parser;
   TSTree *prev_tree;
   TSTree *tree;
-  TSNode node;
 };
 
 INLINE bool

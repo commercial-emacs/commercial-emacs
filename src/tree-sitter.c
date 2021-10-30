@@ -42,8 +42,6 @@ make_tree_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
   sitter->parser = parser;
   sitter->prev_tree = NULL;
   sitter->tree = tree;
-  sitter->node = (TSNode) { {0, 0, 0, 0}, NULL, NULL };
-
   return make_lisp_ptr (sitter, Lisp_Vectorlike);
 }
 
@@ -123,7 +121,6 @@ tree_sitter_create (Lisp_Object progmode)
   return tree_sitter;
 }
 
-#define LAST_NODE (XTREE_SITTER (sitter)->node)
 
 DEFUN ("tree-sitter-highlights",
        Ftree_sitter_highlights, Stree_sitter_highlights,
@@ -158,8 +155,6 @@ DEFUN ("tree-sitter-highlights",
 	language = Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
 				     Fsymbol_value (Qtree_sitter_mode_alist))),
 	highlights_scm;
-      const TSTree *tree = XTREE_SITTER (sitter)->tree;
-      TSNode node = (TSNode) { {0, 0, 0, 0}, NULL, NULL };
 
       eassert (! NILP (language));
 
@@ -223,19 +218,12 @@ DEFUN ("tree-sitter-highlights",
 	  goto finally;
 	}
 
-      if (ts_node_is_null (LAST_NODE))
-	LAST_NODE = ts_tree_root_node (tree);
-      if (BUFFER_TO_SITTER (XFIXNUM (end)) > ts_node_start_byte (LAST_NODE)
-	  && BUFFER_TO_SITTER (XFIXNUM (beg)) < ts_node_end_byte (LAST_NODE))
-	node = ts_node_descendant_for_byte_range (LAST_NODE,
-						  BUFFER_TO_SITTER (XFIXNUM (beg)),
-						  BUFFER_TO_SITTER (XFIXNUM (end)));
-      if (ts_node_is_null (node))
-	node = ts_node_first_child_for_byte (ts_tree_root_node (tree),
-					     BUFFER_TO_SITTER (XFIXNUM (beg)));
-      LAST_NODE = node;
-      while (! ts_node_is_null (node)
-	     && ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end)))
+      for (TSNode node = ts_node_first_child_for_byte
+	     (ts_tree_root_node (XTREE_SITTER (sitter)->tree),
+	      BUFFER_TO_SITTER (XFIXNUM (beg)));
+	   (! ts_node_is_null (node)
+	    && ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end)));
+	   node = ts_node_next_sibling (node))
 	{
 	  Lisp_Object
 	    node_start = make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (node))),
@@ -259,7 +247,6 @@ DEFUN ("tree-sitter-highlights",
 	  /* restore to absolute coords */
 	  node.context[0] = restore_start;
 
-	  /* TODO Stop consing things that need to be garbage collected. */
 	  for (int i=ts_highlight_event_slice.len-1; i>=0; --i)
 	    {
 	      const TSHighlightEvent *ev = &ts_highlight_event_slice.arr[i];
@@ -282,7 +269,6 @@ DEFUN ("tree-sitter-highlights",
 
 	  ts_highlighter_free_highlights (ts_highlight_event_slice);
 	  ts_highlight_buffer_delete (ts_highlight_buffer);
-	  node = ts_node_next_sibling (node);
 	}
 
     finally:
@@ -450,8 +436,6 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 	    ts_tree_delete (XTREE_SITTER (sitter)->prev_tree);
 	  XTREE_SITTER (sitter)->prev_tree = ts_tree_copy (tree);
 	  ts_tree_edit (tree, &edit);
-	  if (! ts_node_is_null (XTREE_SITTER (sitter)->node))
-	    ts_node_edit (&(XTREE_SITTER (sitter)->node), &edit);
 	  XTREE_SITTER (sitter)->tree =
 	    ts_parser_parse (XTREE_SITTER (sitter)->parser,
 			     tree,
