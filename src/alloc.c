@@ -5311,7 +5311,8 @@ pure_alloc (size_t size, int type)
      because it might get mmap'd and then its address
      might not be usable.  */
   int small_amount = 10000;
-  eassert (size <= small_amount - LISP_ALIGNMENT);
+  if (size > small_amount - LISP_ALIGNMENT)
+    fatal ("large pure space allocation");
   purebeg = xzalloc (small_amount);
   pure_size = small_amount;
   pure_bytes_used_before_overflow += pure_bytes_used - size;
