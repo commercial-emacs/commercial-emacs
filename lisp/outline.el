@@ -944,7 +944,7 @@ Note that this does not hide the lines preceding the first heading line."
   "Hide everything after this heading at deeper levels.
 If non-nil, EVENT should be a mouse event."
   (interactive (list last-nonmenu-event))
-  (when event
+  (when (mouse-event-p event)
     (mouse-set-point event))
   (when (and outline-minor-mode-use-buttons outline-minor-mode)
     (outline--insert-close-button))
@@ -976,6 +976,7 @@ If non-nil, EVENT should be a mouse event."
       (overlay-put o 'help-echo "Click to hide")
       (overlay-put o 'keymap
                    (define-keymap
+                     :parent outline-minor-mode-cycle-map
                      ["RET"] #'outline-hide-subtree
                      ["<follow-link>"] 'mouse-face
                      ["<mouse-2>"] #'outline-hide-subtree)))))
@@ -987,6 +988,7 @@ If non-nil, EVENT should be a mouse event."
       (overlay-put o 'help-echo "Click to show")
       (overlay-put o 'keymap
                    (define-keymap
+                     :parent outline-minor-mode-cycle-map
                      ["RET"] #'outline-show-subtree
                      ["<follow-link>"] 'mouse-face
                      ["<mouse-2>"] #'outline-show-subtree)))))
@@ -1017,7 +1019,7 @@ If non-nil, EVENT should be a mouse event."
 (defun outline-show-subtree (&optional event)
   "Show everything after this heading at deeper levels."
   (interactive (list last-nonmenu-event))
-  (when event
+  (when (mouse-event-p event)
     (mouse-set-point event))
   (when (and outline-minor-mode-use-buttons outline-minor-mode)
     (outline--insert-open-button))
