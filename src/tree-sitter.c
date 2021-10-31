@@ -28,6 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define SITTER_TO_BUFFER(byte) (BYTE_TO_CHAR ((EMACS_INT) byte) + 1)
 
 typedef TSLanguage *(*TSLanguageFunctor) (void);
+typedef Lisp_Object (*HighlightsFunctor) (TSHighlightEventSlice, TSNode, const char **);
 
 static Lisp_Object
 make_tree_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
@@ -121,12 +122,89 @@ tree_sitter_create (Lisp_Object progmode)
   return tree_sitter;
 }
 
+static Lisp_Object
+expensive_list (TSHighlightEventSlice slice, TSNode node, const char **highlight_names)
+{
+  Lisp_Object
+    retval = Qnil,
+    alist = Fsymbol_value (Qtree_sitter_highlight_alist);
+  const EMACS_INT count = XFIXNUM (Flength (alist));
 
-DEFUN ("tree-sitter-highlights",
-       Ftree_sitter_highlights, Stree_sitter_highlights,
-       2, 2, "r",
-       doc: /* Highlight BEG to END. */)
-  (Lisp_Object beg, Lisp_Object end)
+  for (int i=slice.len-1; i>=0; --i)
+    {
+      const TSHighlightEvent *ev = &(slice.arr[i]);
+      eassert (ev->index < count);
+      if (ev->index >= TSHighlightEventTypeStartMin) {
+	Lisp_Object name = make_string (highlight_names[ev->index],
+					strlen (highlight_names[ev->index]));
+	retval = Fcons (Fcdr (Fassoc (name, alist, Qnil)), retval);
+      } else if (ev->index == TSHighlightEventTypeSource) {
+	uint32_t offset = ts_node_start_byte (node);
+	retval =
+	  Fcons (Fcons
+		 (make_fixnum (SITTER_TO_BUFFER (ev->start + offset)),
+		  make_fixnum (SITTER_TO_BUFFER (ev->end + offset))),
+		 retval);
+      } else if (ev->index == TSHighlightEventTypeEnd) {
+	retval = Fcons (Qnil, retval);
+      }
+    }
+  return retval;
+}
+
+
+/* (dolist (highlight highlights) */
+/*               ;; pcase is worse by almost half... hmmm. */
+/*               (if (symbolp highlight) */
+/* 		  (setq prevailing-face highlight) */
+/* 	        (let ((pcase-beg (byte-to-position (car highlight))) */
+/*                       (pcase-end (byte-to-position (cdr highlight)))) */
+/*                   (setq leftmost (min leftmost pcase-beg)) */
+/*                   (setq rightmost (max rightmost pcase-end)) */
+/*                   (let ((mark-beg (make-marker)) */
+/*                         (mark-end (make-marker)) */
+/*                         (highlight (list 0 prevailing-face t))) */
+/*                     (set-marker mark-beg pcase-beg) */
+/*                     (set-marker mark-end pcase-end) */
+/*                     (set-match-data (list mark-beg mark-end)) */
+/*                     (font-lock-apply-highlight highlight))))) */
+
+static Lisp_Object
+highlight_region (TSHighlightEventSlice slice, TSNode node, const char **highlight_names)
+{
+  Lisp_Object
+    alist = Fsymbol_value (Qtree_sitter_highlight_alist),
+    prevailing = Qnil;
+  const EMACS_INT count = XFIXNUM (Flength (alist));
+  const uint32_t offset = ts_node_start_byte (node);
+  ptrdiff_t smallest = PTRDIFF_MAX, biggest = PTRDIFF_MIN;
+
+  for (int i=0; i<slice.len; ++i)
+    {
+      const TSHighlightEvent *ev = &(slice.arr[i]);
+      eassert (ev->index < count);
+      if (ev->index >= TSHighlightEventTypeStartMin) {
+	Lisp_Object name = make_string (highlight_names[ev->index],
+					strlen (highlight_names[ev->index]));
+	prevailing = Fcdr (Fassoc (name, alist, Qnil));
+      } else if (ev->index == TSHighlightEventTypeSource) {
+	ptrdiff_t beg = SITTER_TO_BUFFER (ev->start + offset),
+	  end = SITTER_TO_BUFFER (ev->end + offset);
+	smallest = min (smallest, beg);
+	biggest = max (biggest, end);
+	if (! NILP (prevailing))
+	  Fput_text_property (make_fixnum (beg), make_fixnum (end),
+			      Qface, prevailing, Qnil);
+      } else if (ev->index == TSHighlightEventTypeEnd) {
+	prevailing = Qnil;
+      }
+    }
+  return smallest > biggest
+    ? Qnil : list2 (make_fixnum (smallest), make_fixnum (biggest));
+}
+
+static Lisp_Object
+do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 {
   Lisp_Object retval = Qnil, sitter,
     alist = Fsymbol_value (Qtree_sitter_highlight_alist);
@@ -138,7 +216,7 @@ DEFUN ("tree-sitter-highlights",
       CHECK_STRING (XCAR (XCAR (alist)));
       highlight_names[i++] = SSDATA (XCAR (XCAR (alist)));
     }
-  alist = Fsymbol_value (Qtree_sitter_highlight_alist);
+  alist = Fsymbol_value (Qtree_sitter_highlight_alist); /* FOR_EACH_TAIL mucks */
 
   CHECK_FIXNUM (beg);
   CHECK_FIXNUM (end);
@@ -163,9 +241,16 @@ DEFUN ("tree-sitter-highlights",
       sprintf (scope, "scope.%s", SSDATA (language));
 
       highlights_scm =
-	Flocate_file_internal (concat3 (build_string ("queries/"), language, build_string ("/highlights.scm")),
+	Flocate_file_internal (concat3 (build_string ("queries/"),
+					language, build_string ("/highlights.scm")),
 			       Vload_path, Qnil, Qnil);
-      if (! NILP (highlights_scm))
+
+      if (NILP (highlights_scm))
+	{
+	  suberror = language;
+	  error = "Could not locate highlights scm";
+	}
+      else
 	{
 	  char *highlights_query;
 	  long highlights_query_length;
@@ -210,65 +295,40 @@ DEFUN ("tree-sitter-highlights",
 	  fclose (fp);
 	  if (error != NULL)
 	    goto finally;
-	}
-      else
-	{
-	  suberror = language;
-	  error = "Could not locate highlights scm";
-	  goto finally;
-	}
 
-      for (TSNode node = ts_node_first_child_for_byte
-	     (ts_tree_root_node (XTREE_SITTER (sitter)->tree),
-	      BUFFER_TO_SITTER (XFIXNUM (beg)));
-	   (! ts_node_is_null (node)
-	    && ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end)));
-	   node = ts_node_next_sibling (node))
-	{
-	  Lisp_Object
-	    node_start = make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (node))),
-	    node_end = make_fixnum (SITTER_TO_BUFFER (ts_node_end_byte (node))),
-	    source_code = Fbuffer_substring_no_properties (node_start, node_end);
-	  TSHighlightEventSlice ts_highlight_event_slice =
-	    (TSHighlightEventSlice) { NULL, 0 };
-	  TSHighlightBuffer *ts_highlight_buffer = ts_highlight_buffer_new ();
-
-	  /* source code is relative coords */
-	  uint32_t restore_start = node.context[0];
-	  node.context[0] = 0;
-
-	  ts_highlight_event_slice =
-	    ts_highlighter_return_highlights (ts_highlighter, scope,
-					      SSDATA (source_code),
-					      (uint32_t) SBYTES (source_code),
-					      &node,
-					      ts_highlight_buffer);
-
-	  /* restore to absolute coords */
-	  node.context[0] = restore_start;
-
-	  for (int i=ts_highlight_event_slice.len-1; i>=0; --i)
+	  for (TSNode node = ts_node_first_child_for_byte
+		 (ts_tree_root_node (XTREE_SITTER (sitter)->tree),
+		  BUFFER_TO_SITTER (XFIXNUM (beg)));
+	       (! ts_node_is_null (node)
+		&& ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end)));
+	       node = ts_node_next_sibling (node))
 	    {
-	      const TSHighlightEvent *ev = &ts_highlight_event_slice.arr[i];
-	      eassert (ev->index < count);
-	      if (ev->index >= TSHighlightEventTypeStartMin) {
-		Lisp_Object name = make_string (highlight_names[ev->index],
-						strlen (highlight_names[ev->index]));
-		retval = Fcons (Fcdr (Fassoc (name, alist, Qnil)), retval);
-	      } else if (ev->index == TSHighlightEventTypeSource) {
-		uint32_t offset = ts_node_start_byte (node);
-		retval =
-		  Fcons (Fcons
-			 (make_fixnum (SITTER_TO_BUFFER (ev->start + offset)),
-			  make_fixnum (SITTER_TO_BUFFER (ev->end + offset))),
-			 retval);
-	      } else if (ev->index == TSHighlightEventTypeEnd) {
-		retval = Fcons (Qnil, retval);
-	      }
-	    }
+	      Lisp_Object
+		node_start = make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (node))),
+		node_end = make_fixnum (SITTER_TO_BUFFER (ts_node_end_byte (node))),
+		source_code = Fbuffer_substring_no_properties (node_start, node_end);
+	      TSHighlightEventSlice ts_highlight_event_slice =
+		(TSHighlightEventSlice) { NULL, 0 };
+	      TSHighlightBuffer *ts_highlight_buffer = ts_highlight_buffer_new ();
 
-	  ts_highlighter_free_highlights (ts_highlight_event_slice);
-	  ts_highlight_buffer_delete (ts_highlight_buffer);
+	      /* source code is relative coords */
+	      uint32_t restore_start = node.context[0];
+	      node.context[0] = 0;
+
+	      ts_highlight_event_slice =
+		ts_highlighter_return_highlights (ts_highlighter, scope,
+						  SSDATA (source_code),
+						  (uint32_t) SBYTES (source_code),
+						  &node,
+						  ts_highlight_buffer);
+
+	      /* restore to absolute coords */
+	      node.context[0] = restore_start;
+	      retval = nconc2 (fn (ts_highlight_event_slice, node, highlight_names),
+			       retval);
+	      ts_highlighter_free_highlights (ts_highlight_event_slice);
+	      ts_highlight_buffer_delete (ts_highlight_buffer);
+	    }
 	}
 
     finally:
@@ -305,6 +365,26 @@ DEFUN ("tree-sitter-root-node",
 	retval = build_string (ts_node_string (ts_tree_root_node (tree)));
     }
   return retval;
+}
+
+DEFUN ("tree-sitter-highlights",
+       Ftree_sitter_highlights, Stree_sitter_highlights,
+       2, 2, "r",
+       doc: /* Return list of highlights from BEG to END. */)
+  (Lisp_Object beg, Lisp_Object end)
+{
+  return do_highlights (beg, end, &expensive_list);
+}
+
+DEFUN ("tree-sitter-highlight-region",
+       Ftree_sitter_highlight_region, Stree_sitter_highlight_region,
+       2, 2, "r",
+       doc: /* Highlight BEG to END. */)
+  (Lisp_Object beg, Lisp_Object end)
+{
+  Lisp_Object bounds = do_highlights (beg, end, &highlight_region);
+  return Fcons (apply1 (intern ("min"), bounds),
+		apply1 (intern ("max"), bounds));
 }
 
 DEFUN ("tree-sitter-changed-range",
@@ -592,6 +672,7 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter);
   defsubr (&Stree_sitter_root_node);
   defsubr (&Stree_sitter_highlights);
+  defsubr (&Stree_sitter_highlight_region);
   defsubr (&Stree_sitter_changed_range);
 
   /* defsubr (&Stree_sitter_node_type); */

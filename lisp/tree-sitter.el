@@ -98,7 +98,7 @@
   :lighter ""
   (if tree-sitter-lock-mode
       (progn
-        (setq-local font-lock-fontify-region-function #'tree-sitter-fontify-region)
+        (setq-local font-lock-fontify-region-function #'tree-sitter-faster-fontify-region)
         (add-hook 'fontification-functions #'tree-sitter-do-fontify nil t))
     (kill-local-variable 'font-lock-fontify-region-function)
     (remove-hook 'fontification-functions #'tree-sitter-do-fontify t)))
@@ -122,25 +122,20 @@
                  (rightmost end*)
                  prevailing-face)
             (dolist (highlight highlights)
-              (pcase highlight
-                ('nil
-                 (setq prevailing-face nil))
-                ((and (pred symbolp) face)
-                 (setq prevailing-face face))
-	        (`(,byte-beg . ,byte-end)
-                 (let ((pcase-beg (byte-to-position byte-beg))
-                       (pcase-end (byte-to-position byte-end)))
-                   (setq leftmost (min leftmost pcase-beg))
-                   (setq rightmost (max rightmost pcase-end))
-	           (save-excursion
-                     (let ((mark-beg (make-marker))
-                           (mark-end (make-marker))
-                           (highlight (list 0 prevailing-face t)))
-                       (set-marker mark-beg pcase-beg)
-                       (set-marker mark-end pcase-end)
-                       (save-match-data
-                         (set-match-data (list mark-beg mark-end))
-                         (font-lock-apply-highlight highlight))))))))
+              ;; pcase is worse by almost half... hmmm.
+              (if (symbolp highlight)
+		  (setq prevailing-face highlight)
+	        (let ((pcase-beg (byte-to-position (car highlight)))
+                      (pcase-end (byte-to-position (cdr highlight))))
+                  (setq leftmost (min leftmost pcase-beg))
+                  (setq rightmost (max rightmost pcase-end))
+                  (let ((mark-beg (make-marker))
+                        (mark-end (make-marker))
+                        (highlight (list 0 prevailing-face t)))
+                    (set-marker mark-beg pcase-beg)
+                    (set-marker mark-end pcase-end)
+                    (set-match-data (list mark-beg mark-end))
+                    (font-lock-apply-highlight highlight)))))
             (when loudly
               (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
                              (cl-first (tree-sitter-changed-range))
@@ -148,6 +143,30 @@
                              beg end leftmost rightmost)
                      #'external-debugging-output))
             (put-text-property leftmost rightmost 'fontified t)
+            (set-window-configuration (current-window-configuration) t t)))))))
+
+(defun tree-sitter-faster-fontify-region (beg end loudly)
+  "Presumably widened in `font-lock-fontify-region'."
+  (let ((inhibit-point-motion-hooks t))
+    (with-silent-modifications
+      (save-excursion
+        (save-match-data
+          (let* ((changed-range (tree-sitter-changed-range))
+                 (beg* (if changed-range
+                           (min beg (cl-first changed-range))
+                         beg))
+                 (end* (if changed-range
+                           (min (max end (cl-second changed-range))
+                                (+ beg jit-lock-chunk-size))
+                         end))
+                 (bounds (tree-sitter-highlight-region beg* end*)))
+            (when loudly
+              (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
+                             (cl-first (tree-sitter-changed-range))
+                             (cl-second (tree-sitter-changed-range))
+                             beg end (car bounds) (cdr bounds))
+                     #'external-debugging-output))
+            (put-text-property (car bounds) (cdr bounds) 'fontified t)
             (set-window-configuration (current-window-configuration) t t)))))))
 
 (provide 'tree-sitter)
