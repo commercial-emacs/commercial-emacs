@@ -23,6 +23,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 
 #include <tree_sitter/api.h>
+#include <tree_sitter/highlight.h>
 
 INLINE_HEADER_BEGIN
 
@@ -33,6 +34,9 @@ struct Lisp_Tree_Sitter
   TSParser *parser;
   TSTree *prev_tree;
   TSTree *tree;
+  TSHighlighter *highlighter;
+  const char **highlight_names;
+  char *highlights_query;
 };
 
 INLINE bool

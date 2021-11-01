@@ -114,9 +114,10 @@
                            (min beg (cl-first changed-range))
                          beg))
                  (end* (if changed-range
-                           (max (min (+ beg jit-lock-chunk-size)
-                                     (cl-second changed-range))
-                                end)
+                           (min (point-max)
+                                (max (min (+ beg jit-lock-chunk-size)
+                                          (cl-second changed-range))
+                                     end))
                          end))
                  (bounds (tree-sitter-highlight-region beg* end*))
                  (leftmost (if bounds (min beg* (car bounds)) beg*))

@@ -22,7 +22,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "buffer.h"
 #include "tree-sitter.h"
-#include <tree_sitter/highlight.h>
 
 #define BUFFER_TO_SITTER(byte) ((uint32_t) CHAR_TO_BYTE (byte) - 1)
 #define SITTER_TO_BUFFER(byte) (BYTE_TO_CHAR ((EMACS_INT) byte) + 1)
@@ -43,6 +42,9 @@ make_tree_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
   sitter->parser = parser;
   sitter->prev_tree = NULL;
   sitter->tree = tree;
+  sitter->highlighter = NULL;
+  sitter->highlight_names = NULL;
+  sitter->highlights_query = NULL;
   return make_lisp_ptr (sitter, Lisp_Vectorlike);
 }
 
@@ -130,7 +132,7 @@ list_highlights (const TSHighlightEventSlice *slice, const TSNode *node,
     retval = Qnil,
     alist = Fsymbol_value (Qtree_sitter_highlight_alist);
   const EMACS_INT count = XFIXNUM (Flength (alist));
-  uint32_t offset = ts_node_start_byte (*node);
+  const uint32_t offset = ts_node_start_byte (*node);
 
   for (int i=slice->len-1; i>=0; --i)
     {
@@ -192,42 +194,42 @@ highlight_region (const TSHighlightEventSlice *slice,
     ? Qnil : list2 (make_fixnum (smallest), make_fixnum (biggest));
 }
 
-static Lisp_Object
-do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
+static TSHighlighter *
+ensure_highlighter(Lisp_Object sitter)
 {
-  Lisp_Object retval = Qnil, sitter,
-    alist = Fsymbol_value (Qtree_sitter_highlight_alist);
-  const EMACS_INT count = XFIXNUM (Flength (alist));
-  const char **highlight_names = xmalloc(sizeof (char *) * count);
-  intptr_t i = 0;
-  FOR_EACH_TAIL (alist)
-    {
-      CHECK_STRING (XCAR (XCAR (alist)));
-      highlight_names[i++] = SSDATA (XCAR (XCAR (alist)));
-    }
-  alist = Fsymbol_value (Qtree_sitter_highlight_alist); /* FOR_EACH_TAIL mucks */
-
-  CHECK_FIXNUM (beg);
-  CHECK_FIXNUM (end);
-  sitter = Ftree_sitter (Fcurrent_buffer ());
-  if (! NILP (sitter))
+  TSHighlighter *ret = XTREE_SITTER (sitter)->highlighter;
+  if (ret == NULL)
     {
       char *scope;
-      TSHighlightError ts_highlight_error = TSHighlightOk;
       const char *error = NULL;
-      TSHighlighter *ts_highlighter =
-	ts_highlighter_new (highlight_names, highlight_names, (uint32_t) count);
       Lisp_Object
-	suberror = Qnil,
+	suberror = Qnil, highlights_scm,
+	alist = Fsymbol_value (Qtree_sitter_highlight_alist),
 	language = Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
-				     Fsymbol_value (Qtree_sitter_mode_alist))),
-	highlights_scm;
+				     Fsymbol_value (Qtree_sitter_mode_alist)));
+      const EMACS_INT count = XFIXNUM (Flength (alist));
+      XTREE_SITTER (sitter)->highlight_names = xmalloc(sizeof (char *) * count);
+      intptr_t i = 0;
+      FILE *fp = NULL;
 
-      eassert (! NILP (language));
+      eassert (! NILP (language)); /* by tree_sitter_create() */
+
+      FOR_EACH_TAIL (alist)
+	{
+	  CHECK_STRING (XCAR (XCAR (alist)));
+	  XTREE_SITTER (sitter)->highlight_names[i++] =
+	    SSDATA (XCAR (XCAR (alist)));
+	}
+      alist = Fsymbol_value (Qtree_sitter_highlight_alist); /* FOR_EACH_TAIL mucks */
 
       USE_SAFE_ALLOCA;
       scope = SAFE_ALLOCA (strlen ("scope.") + SCHARS (language) + 1);
       sprintf (scope, "scope.%s", SSDATA (language));
+
+      ret = (XTREE_SITTER (sitter)->highlighter =
+	     ts_highlighter_new (XTREE_SITTER (sitter)->highlight_names,
+				 XTREE_SITTER (sitter)->highlight_names,
+				 (uint32_t) count));
 
       highlights_scm =
 	Flocate_file_internal (concat3 (build_string ("queries/"),
@@ -241,37 +243,38 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 	}
       else
 	{
-	  char *highlights_query;
 	  long highlights_query_length;
-	  FILE *fp = fopen (SSDATA (highlights_scm), "rb");
-	  if (!fp) {
+	  fp = fopen (SSDATA (highlights_scm), "rb");
+	  if (! fp) {
 	      suberror = highlights_scm;
 	      error = "Cannot fopen";
 	      goto finally;
 	  }
 	  fseek (fp, 0L, SEEK_END);
 	  highlights_query_length = ftell (fp);
-	  rewind(fp);
+	  rewind (fp);
 
-	  highlights_query = xzalloc(highlights_query_length + 1);
+	  XTREE_SITTER (sitter)->highlights_query =
+	    xzalloc(highlights_query_length + 1);
 
-	  if (1 != fread (highlights_query, highlights_query_length, 1, fp))
+	  if (1 != fread (XTREE_SITTER (sitter)->highlights_query,
+			  highlights_query_length, 1, fp))
 	    {
 	      suberror = highlights_scm;
 	      error = "Cannot fread";
 	    }
 	  else
 	    {
-	      ts_highlight_error =
+	      TSHighlightError ts_highlight_error =
 		ts_highlighter_add_language
-		(ts_highlighter,
+		(ret,
 		 scope,
 		 NULL,
 		 ts_parser_language (XTREE_SITTER (sitter)->parser),
-		 highlights_query,
+		 XTREE_SITTER (sitter)->highlights_query,
 		 "",
 		 "",
-		 strlen (highlights_query),
+		 strlen (XTREE_SITTER (sitter)->highlights_query),
 		 0,
 		 0);
 	      if (ts_highlight_error != TSHighlightOk)
@@ -280,11 +283,39 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 		  error = "ts_highlighter_add_language non-Ok return";
 		}
 	    }
-	  xfree (highlights_query);
-	  fclose (fp);
-	  if (error != NULL)
-	    goto finally;
+	}
 
+    finally:
+      SAFE_FREE ();
+      if (fp != NULL)
+	fclose (fp);
+      if (error != NULL)
+	xsignal2 (Qtree_sitter_error, build_string (error), suberror);
+    }
+  return ret;
+}
+
+static Lisp_Object
+do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
+{
+  Lisp_Object retval = Qnil, sitter;
+
+  CHECK_FIXNUM (beg);
+  CHECK_FIXNUM (end);
+  sitter = Ftree_sitter (Fcurrent_buffer ());
+  if (! NILP (sitter))
+    {
+      TSHighlighter *ts_highlighter = ensure_highlighter (sitter);
+      Lisp_Object language = Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
+					       Fsymbol_value (Qtree_sitter_mode_alist)));
+      char *scope;
+
+      USE_SAFE_ALLOCA;
+      scope = SAFE_ALLOCA (strlen ("scope.") + SCHARS (language) + 1);
+      sprintf (scope, "scope.%s", SSDATA (language));
+
+      if (ts_highlighter)
+	{
 	  for (TSNode node = ts_node_first_child_for_byte
 		 (ts_tree_root_node (XTREE_SITTER (sitter)->tree),
 		  BUFFER_TO_SITTER (XFIXNUM (beg)));
@@ -313,23 +344,16 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 
 	      /* restore to absolute coords */
 	      node.context[0] = restore_start;
-	      retval = nconc2 (fn (&ts_highlight_event_slice, &node, highlight_names),
+	      retval = nconc2 (fn (&ts_highlight_event_slice, &node,
+				   XTREE_SITTER (sitter)->highlight_names),
 			       retval);
 	      ts_highlighter_free_highlights (ts_highlight_event_slice);
 	      ts_highlight_buffer_delete (ts_highlight_buffer);
 	    }
 	}
 
-    finally:
       SAFE_FREE ();
-      if (ts_highlighter != NULL)
-	ts_highlighter_delete (ts_highlighter);
-      if (error != NULL)
-	xsignal2 (Qtree_sitter_error,
-		  build_string (error),
-		  suberror);
     }
-  xfree (highlight_names);
   return retval;
 }
 
