@@ -105,6 +105,7 @@
 
 (defun tree-sitter-fontify-region (beg end loudly)
   "Presumably widened in `font-lock-fontify-region'."
+  (ignore loudly)
   (let ((inhibit-point-motion-hooks t))
     (with-silent-modifications
       (save-excursion
@@ -122,12 +123,12 @@
                  (bounds (tree-sitter-highlight-region beg* end*))
                  (leftmost (if bounds (min beg* (car bounds)) beg*))
                  (rightmost (if bounds (max end* (cdr bounds)) end*)))
-            (when loudly
-              (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
-                             (cl-first (tree-sitter-changed-range))
-                             (cl-second (tree-sitter-changed-range))
-                             beg end leftmost rightmost)
-                     #'external-debugging-output))
+            ;; (when loudly
+            ;;   (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
+            ;;                  (cl-first (tree-sitter-changed-range))
+            ;;                  (cl-second (tree-sitter-changed-range))
+            ;;                  beg end leftmost rightmost)
+            ;;          #'external-debugging-output))
             (put-text-property leftmost rightmost 'fontified t)))))))
 
 (defsubst tree-sitter-fontify-refresh (start &rest _args)
