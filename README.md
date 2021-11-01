@@ -18,10 +18,9 @@ Roughly every ninety minutes.
 
 ### How has the code diverged thus far?
 
+- Tree-sitter font highlighting
 - Gnus is rewritten to be non-blocking.
 - The module `process.c` is rewritten.
-- The `global-mark-ring`, heretofore useless, has been annexed to
-  provide "jump back" functionality.
 
 Given time, there will be enough improvements that this section of the
 README will migrate to a larger NEWS file.  Or not.
