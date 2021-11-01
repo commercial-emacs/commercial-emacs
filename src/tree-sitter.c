@@ -28,7 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define SITTER_TO_BUFFER(byte) (BYTE_TO_CHAR ((EMACS_INT) byte) + 1)
 
 typedef TSLanguage *(*TSLanguageFunctor) (void);
-typedef Lisp_Object (*HighlightsFunctor) (TSHighlightEventSlice, TSNode, const char **);
+typedef Lisp_Object (*HighlightsFunctor) (const TSHighlightEventSlice *, const TSNode *, const char **);
 
 static Lisp_Object
 make_tree_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
@@ -123,23 +123,24 @@ tree_sitter_create (Lisp_Object progmode)
 }
 
 static Lisp_Object
-list_highlights (TSHighlightEventSlice slice, TSNode node, const char **highlight_names)
+list_highlights (const TSHighlightEventSlice *slice, const TSNode *node,
+		 const char **highlight_names)
 {
   Lisp_Object
     retval = Qnil,
     alist = Fsymbol_value (Qtree_sitter_highlight_alist);
   const EMACS_INT count = XFIXNUM (Flength (alist));
+  uint32_t offset = ts_node_start_byte (*node);
 
-  for (int i=slice.len-1; i>=0; --i)
+  for (int i=slice->len-1; i>=0; --i)
     {
-      const TSHighlightEvent *ev = &(slice.arr[i]);
+      const TSHighlightEvent *ev = &(slice->arr[i]);
       eassert (ev->index < count);
       if (ev->index >= TSHighlightEventTypeStartMin) {
 	Lisp_Object name = make_string (highlight_names[ev->index],
 					strlen (highlight_names[ev->index]));
 	retval = Fcons (Fcdr (Fassoc (name, alist, Qnil)), retval);
       } else if (ev->index == TSHighlightEventTypeSource) {
-	uint32_t offset = ts_node_start_byte (node);
 	retval =
 	  Fcons (Fcons
 		 (make_fixnum (SITTER_TO_BUFFER (ev->start + offset)),
@@ -153,18 +154,19 @@ list_highlights (TSHighlightEventSlice slice, TSNode node, const char **highligh
 }
 
 static Lisp_Object
-highlight_region (TSHighlightEventSlice slice, TSNode node, const char **highlight_names)
+highlight_region (const TSHighlightEventSlice *slice,
+		  const TSNode *node, const char **highlight_names)
 {
   Lisp_Object
     alist = Fsymbol_value (Qtree_sitter_highlight_alist),
     prevailing = Qnil;
   const EMACS_INT count = XFIXNUM (Flength (alist));
-  const uint32_t offset = ts_node_start_byte (node);
+  const uint32_t offset = ts_node_start_byte (*node);
   ptrdiff_t smallest = PTRDIFF_MAX, biggest = PTRDIFF_MIN;
 
-  for (int i=0; i<slice.len; ++i)
+  for (int i=0; i<slice->len; ++i)
     {
-      const TSHighlightEvent *ev = &(slice.arr[i]);
+      const TSHighlightEvent *ev = &(slice->arr[i]);
       eassert (ev->index < count);
       if (ev->index >= TSHighlightEventTypeStartMin) {
 	Lisp_Object name = make_string (highlight_names[ev->index],
@@ -175,9 +177,13 @@ highlight_region (TSHighlightEventSlice slice, TSNode node, const char **highlig
 	  end = SITTER_TO_BUFFER (ev->end + offset);
 	smallest = min (smallest, beg);
 	biggest = max (biggest, end);
-	if (! NILP (prevailing))
+	if (NILP (prevailing))
+	  Fremove_text_properties (make_fixnum (beg), make_fixnum (end),
+				   list2 (Qface, Qt), Qnil);
+	else
 	  Fput_text_property (make_fixnum (beg), make_fixnum (end),
 			      Qface, prevailing, Qnil);
+
       } else if (ev->index == TSHighlightEventTypeEnd) {
 	prevailing = Qnil;
       }
@@ -307,7 +313,7 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 
 	      /* restore to absolute coords */
 	      node.context[0] = restore_start;
-	      retval = nconc2 (fn (ts_highlight_event_slice, node, highlight_names),
+	      retval = nconc2 (fn (&ts_highlight_event_slice, &node, highlight_names),
 			       retval);
 	      ts_highlighter_free_highlights (ts_highlight_event_slice);
 	      ts_highlight_buffer_delete (ts_highlight_buffer);

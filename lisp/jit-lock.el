@@ -367,7 +367,7 @@ Only applies to the current buffer."
 (defun jit-lock-function (start)
   "Workhorse called from handle_fontified_prop() in xdisp.c.
 Registered in `font-lock-turn-on-thing-lock' when `font-lock-support-mode'
-is `jit-lock-mode' (or its little cousin `sitter-lock-mode')."
+is `jit-lock-mode'."
   (when (and jit-lock-mode (not memory-full))
     (if (or (not jit-lock-defer-timer) (zerop jit-lock-defer-time))
 	(jit-lock-fontify-now start (+ start jit-lock-chunk-size))
@@ -624,6 +624,7 @@ will take place when text is fontified stealthily."
        ;; Request refontification.
        (save-restriction
 	 (widen)
+
 	 (put-text-property jit-lock-start jit-lock-end 'fontified nil)))
 
       ;; Mark the change for deferred contextual refontification.

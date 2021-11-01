@@ -99,9 +99,9 @@
   (if tree-sitter-lock-mode
       (progn
         (setq-local font-lock-fontify-region-function #'tree-sitter-fontify-region)
-        (add-hook 'fontification-functions #'tree-sitter-do-fontify nil t))
+        (add-hook 'after-change-functions #'tree-sitter-fontify-refresh nil t))
     (kill-local-variable 'font-lock-fontify-region-function)
-    (remove-hook 'fontification-functions #'tree-sitter-do-fontify t)))
+    (remove-hook 'after-change-functions #'tree-sitter-fontify-refresh t)))
 
 (defun tree-sitter-fontify-region (beg end loudly)
   "Presumably widened in `font-lock-fontify-region'."
@@ -114,8 +114,9 @@
                            (min beg (cl-first changed-range))
                          beg))
                  (end* (if changed-range
-                           (min (max end (cl-second changed-range))
-                                (+ beg jit-lock-chunk-size))
+                           (max (min (+ beg jit-lock-chunk-size)
+                                     (cl-second changed-range))
+                                end)
                          end))
                  (bounds (tree-sitter-highlight-region beg* end*))
                  (leftmost (if bounds (min beg* (car bounds)) beg*))
@@ -126,8 +127,10 @@
                              (cl-second (tree-sitter-changed-range))
                              beg end leftmost rightmost)
                      #'external-debugging-output))
-            (put-text-property leftmost rightmost 'fontified t)
-            (set-window-configuration (current-window-configuration) t t)))))))
+            (put-text-property leftmost rightmost 'fontified t)))))))
+
+(defsubst tree-sitter-fontify-refresh (start &rest _args)
+  (tree-sitter-do-fontify start))
 
 (provide 'tree-sitter)
 
