@@ -357,6 +357,16 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
   return retval;
 }
 
+DEFUN ("tree-sitter--testable",
+       Ftree_sitter__testable, Stree_sitter__testable,
+       1, 1, 0,
+       doc: /* Is the bundled dynamic library readable by my OS. */)
+  (Lisp_Object file)
+{
+  CHECK_STRING (file);
+  return dynlib_open (SSDATA (file)) ? Qt : Qnil;
+}
+
 DEFUN ("tree-sitter-root-node",
        Ftree_sitter_root_node, Stree_sitter_root_node,
        0, 1, 0,
@@ -688,6 +698,7 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_highlights);
   defsubr (&Stree_sitter_highlight_region);
   defsubr (&Stree_sitter_changed_range);
+  defsubr (&Stree_sitter__testable);
 
   /* defsubr (&Stree_sitter_node_type); */
   /* defsubr (&Stree_sitter_node_start); */
