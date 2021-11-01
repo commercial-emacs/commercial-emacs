@@ -3079,7 +3079,7 @@ Move to buffer limit in indicated direction if headings are exhausted."
          (backward (if (< arg 0) (setq arg (* -1 arg))))
 	 (step (if backward -1 1))
          (progress (allout-current-bullet-pos))
-	 prev got)
+	 prev got line-move-visual)
 
     (while (> arg 0)
       (while (and
