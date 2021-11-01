@@ -123,7 +123,7 @@ tree_sitter_create (Lisp_Object progmode)
 }
 
 static Lisp_Object
-expensive_list (TSHighlightEventSlice slice, TSNode node, const char **highlight_names)
+list_highlights (TSHighlightEventSlice slice, TSNode node, const char **highlight_names)
 {
   Lisp_Object
     retval = Qnil,
@@ -151,23 +151,6 @@ expensive_list (TSHighlightEventSlice slice, TSNode node, const char **highlight
     }
   return retval;
 }
-
-
-/* (dolist (highlight highlights) */
-/*               ;; pcase is worse by almost half... hmmm. */
-/*               (if (symbolp highlight) */
-/* 		  (setq prevailing-face highlight) */
-/* 	        (let ((pcase-beg (byte-to-position (car highlight))) */
-/*                       (pcase-end (byte-to-position (cdr highlight)))) */
-/*                   (setq leftmost (min leftmost pcase-beg)) */
-/*                   (setq rightmost (max rightmost pcase-end)) */
-/*                   (let ((mark-beg (make-marker)) */
-/*                         (mark-end (make-marker)) */
-/*                         (highlight (list 0 prevailing-face t))) */
-/*                     (set-marker mark-beg pcase-beg) */
-/*                     (set-marker mark-end pcase-end) */
-/*                     (set-match-data (list mark-beg mark-end)) */
-/*                     (font-lock-apply-highlight highlight))))) */
 
 static Lisp_Object
 highlight_region (TSHighlightEventSlice slice, TSNode node, const char **highlight_names)
@@ -373,7 +356,7 @@ DEFUN ("tree-sitter-highlights",
        doc: /* Return list of highlights from BEG to END. */)
   (Lisp_Object beg, Lisp_Object end)
 {
-  return do_highlights (beg, end, &expensive_list);
+  return do_highlights (beg, end, &list_highlights);
 }
 
 DEFUN ("tree-sitter-highlight-region",
@@ -383,8 +366,9 @@ DEFUN ("tree-sitter-highlight-region",
   (Lisp_Object beg, Lisp_Object end)
 {
   Lisp_Object bounds = do_highlights (beg, end, &highlight_region);
-  return Fcons (apply1 (intern ("min"), bounds),
-		apply1 (intern ("max"), bounds));
+  return NILP (bounds)
+    ? bounds : Fcons (apply1 (intern ("min"), bounds),
+		      apply1 (intern ("max"), bounds));
 }
 
 DEFUN ("tree-sitter-changed-range",

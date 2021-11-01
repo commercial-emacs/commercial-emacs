@@ -1087,7 +1087,8 @@ portion of the buffer."
   (when (font-lock-specified-p t)
     (font-lock-set-defaults)
     (funcall font-lock-ensure-function
-             (or beg (point-min)) (or end (point-max)))))
+             (or beg (point-min)) (or end (point-max)))
+    (setq font-lock-fontified t)))
 
 (defun font-lock-update (&optional arg)
   "Update the syntax highlighting in this buffer.
