@@ -50,6 +50,6 @@ jobs:
         mkdir -p $HOME/.local
         make -C tree-sitter install
         ./autogen.sh
-        LDFLAGS="-L$HOME/.local/lib" CFLAGS="-I$HOME/.local/include/" ./configure --prefix=$HOME/.local --with-tree-sitter --enable-dumping-overwrite
+        LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" ./configure --prefix=$HOME/.local --with-tree-sitter --enable-dumping-overwrite
         make -j2 check
         ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
