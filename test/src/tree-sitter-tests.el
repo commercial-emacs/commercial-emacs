@@ -26,30 +26,35 @@
   (when-let ((dylib (locate-file "bin/c" load-path (split-string ".so"))))
     (tree-sitter--testable dylib)))
 
+(defmacro tree-sitter-tests-with-load-path (&rest body)
+  (declare (indent defun))
+  `(let ((load-path (cons (expand-file-name "src/tree-sitter-resources")
+                          load-path)))
+     (skip-unless (tree-sitter-testable))
+     ,@body))
+
 (defmacro tree-sitter-tests-doit (ext text &rest body)
   "font-lock setup is highly circular, redundant, and difficult to isolate."
   (declare (indent defun))
-  `(let ((dir (make-temp-file "tree-sitter-tests" t))
-         (text (replace-regexp-in-string "^\n" "" ,text))
-         (load-path (cons (expand-file-name "src/tree-sitter-resources")
-                          load-path)))
-     (skip-unless (tree-sitter-testable))
-     (unwind-protect
-         (let ((font-lock-support-mode 'tree-sitter-lock-mode)
-               (file-name (expand-file-name (concat "tree-sitter-tests" ,ext) dir))
-               font-lock-global-modes ;; only works when not interactive
-               enable-dir-local-variables)
-           (with-temp-file file-name (insert text))
-           (find-file file-name)
-           (let (noninteractive)
-             (turn-on-font-lock))
-           (should font-lock-mode)
-           (should tree-sitter-lock-mode)
-           (should-not (text-property-any (point-min) (point-max) 'fontified nil))
-           ,@body)
-       (let (kill-buffer-query-functions)
-         (kill-buffer))
-       (delete-directory dir t))))
+  `(tree-sitter-tests-with-load-path
+     (let ((dir (make-temp-file "tree-sitter-tests" t))
+           (text (replace-regexp-in-string "^\n" "" ,text)))
+       (unwind-protect
+           (let ((font-lock-support-mode 'tree-sitter-lock-mode)
+                 (file-name (expand-file-name (concat "tree-sitter-tests" ,ext) dir))
+                 font-lock-global-modes ;; only works when not interactive
+                 enable-dir-local-variables)
+             (with-temp-file file-name (insert text))
+             (find-file file-name)
+             (let (noninteractive)
+               (turn-on-font-lock))
+             (should font-lock-mode)
+             (should tree-sitter-lock-mode)
+             (should-not (text-property-any (point-min) (point-max) 'fontified nil))
+             ,@body)
+         (let (kill-buffer-query-functions)
+           (kill-buffer))
+         (delete-directory dir t)))))
 
 (ert-deftest tree-sitter-basic-parsing ()
   "Test basic parsing routines."
@@ -66,6 +71,41 @@ void main (void) {
       (insert "\n  printf(\"hello world\");\n")
       (should (equal (tree-sitter-highlights (point-min) (point-max))
                      '(font-lock-type-face (1 . 5) nil (5 . 6) font-lock-function-name-face (6 . 10) nil (10 . 12) font-lock-type-face (12 . 16) nil (16 . 23) font-lock-function-name-face (23 . 29) nil (29 . 30) font-lock-string-face (30 . 43) nil (43 . 48) font-lock-keyword-face (48 . 54) nil (54 . 55) font-lock-constant-face (55 . 56) nil (56 . 59)))))))
+
+(ert-deftest tree-sitter-how-fast ()
+  "How fast can it fontify xdisp.c"
+  (tree-sitter-tests-with-load-path
+    (cl-flet ((bench
+                (file mode reps unfontify fontify)
+	        (save-window-excursion
+	          (find-file-literally file)
+	          (let (font-lock-maximum-size
+		        (font-lock-support-mode mode)
+		        enable-dir-local-variables
+		        font-lock-global-modes
+		        font-lock-fontified)
+	            (set-auto-mode)
+	            (cl-letf (((symbol-function 'font-lock-initial-fontify) #'ignore))
+                      (let (noninteractive)
+		        (turn-on-font-lock)))
+	            (cl-assert (null (text-property-any (point-min) (point-max) 'fontified t)))
+	            (unwind-protect
+                        (benchmark-run reps
+			  (funcall unfontify (point-min) (point-max))
+			  (funcall fontify (point-min) (point-max))
+                          (cl-assert (null (text-property-any (point-min) (point-max) 'fontified nil))))
+	              (let (kill-buffer-query-functions)
+		        (kill-buffer)))))))
+      (let ((fast (car (bench (expand-file-name "src/xdisp.c" "..")
+                              'tree-sitter-lock-mode 1
+                              #'font-lock-unfontify-region
+                              #'font-lock-fontify-region)))
+            (slow (car (bench (expand-file-name "src/xdisp.c" "..")
+                              'jit-lock-mode 1
+                              #'jit-lock-refontify
+                              #'jit-lock-fontify-now))))
+        (message "tree-sitter-how-fast: %s versus %s" fast slow)
+        (should (< fast (/ slow 3)))))))
 
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here
