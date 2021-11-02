@@ -4012,7 +4012,7 @@ To use this automatically, you may add this function to
 	  ;; Add a `message-setup-very-last-hook' here?
 	  ;; Add `gnus-article-highlight-citation' here?
 	  (unless modified
-        (setq message-checksum (message-checksum))))))
+            (setq message-checksum (message-checksum))))))
 
 (defun message-yank-original (&optional arg)
   "Insert the message being replied to, if any.
@@ -4298,8 +4298,7 @@ Instead, just auto-save the buffer and then bury it."
     (let ((actions message-kill-actions)
 	  (draft-article message-draft-article)
 	  (auto-save-file-name buffer-auto-save-file-name)
-	  (file-name buffer-file-name)
-	  (modified (buffer-modified-p)))
+	  (file-name buffer-file-name))
       (setq buffer-file-name nil)
       (kill-buffer (current-buffer))
       (when (and (or (and auto-save-file-name
