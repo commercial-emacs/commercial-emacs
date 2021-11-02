@@ -22,6 +22,8 @@
 ;;; Code:
 
 (require 'font-lock)
+(declare-function tree-sitter-changed-range "tree-sitter.c")
+(declare-function tree-sitter-highlight-region "tree-sitter.c")
 
 (defgroup tree-sitter
   nil

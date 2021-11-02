@@ -3017,6 +3017,7 @@ if test "${with_tree_sitter}" == "yes"; then
   fi
 fi
 
+AC_SUBST(HAVE_TREE_SITTER)
 AC_SUBST(TREE_SITTER_LIBS)
 AC_SUBST(TREE_SITTER_CFLAGS)
 AC_SUBST(TREE_SITTER_OBJ)

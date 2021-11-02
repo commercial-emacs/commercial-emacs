@@ -2426,7 +2426,6 @@ higher."
 (defun c-force-redisplay (start end)
   ;; Force redisplay immediately.  This assumes `font-lock-support-mode' is
   ;; 'jit-lock-mode.  Set the variable `c-re-redisplay-timer' to nil.
-  (jit-lock-force-redisplay (copy-marker start) (copy-marker end))
   (setq c-re-redisplay-timer nil))
 
 (defun c-fontify-new-found-type (type)
