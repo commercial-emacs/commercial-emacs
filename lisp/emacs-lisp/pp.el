@@ -267,8 +267,14 @@ Ignores leading comment characters."
     ;; Get the first entries on the first line.
     (if indent
         (pp--format-definition sexp indent edebug)
-      (while sexp
-        (pp--insert " " (pop sexp))))
+      (let ((prev 0))
+        (while sexp
+          (let ((start (point)))
+            ;; Don't put sexps on the same line as a multi-line sexp
+            ;; preceding it.
+            (pp--insert (if (> prev 1) "\n" " ")
+                        (pop sexp))
+            (setq prev (count-lines start (point)))))))
     (insert ")")))
 
 (defun pp--format-definition (sexp indent edebug)
@@ -327,7 +333,17 @@ Ignores leading comment characters."
       (save-excursion
         (goto-char start)
         (unless (looking-at "[ \t]+$")
-          (insert "\n"))))))
+          (insert "\n"))
+        (pp--indent-buffer)
+        (goto-char (point-max))
+        ;; If we're still too wide, then go up one step and try to
+        ;; insert a newline there.
+        (when (> (current-column) (window-width))
+          (condition-case ()
+              (backward-up-list 1)
+            (:success (when (looking-back " " 2)
+                        (insert "\n")))
+            (error nil)))))))
 
 (defun pp--indent-buffer ()
   (goto-char (point-min))
