@@ -1279,8 +1279,7 @@ If SEND-IF-FORCE, only send authinfo to the server if the
 	  nntp-process-decode decode
 	  nntp-process-callback callback
 	  nntp-process-start-point (point-max))
-    ;; FIXME: We should use add-hook/remove-hook here!
-    (setq after-change-functions (list #'nntp-after-change-function))))
+    (add-hook 'after-change-functions #'nntp-after-change-function nil t)))
 
 (defun nntp-async-stop (proc)
   (setq nntp-async-process-list (delq proc nntp-async-process-list))
@@ -1289,19 +1288,11 @@ If SEND-IF-FORCE, only send authinfo to the server if the
     (setq nntp-async-timer nil)))
 
 (defun nntp-after-change-function (_beg end len)
-  (unwind-protect
-      ;; we only care about insertions at eob
-      (when (and (eq 0 len) (eq (point-max) end))
-	(save-match-data
-	  (let ((proc (get-buffer-process (current-buffer))))
-	    (when proc
-	      (nntp-async-trigger proc)))))
-    ;; any throw from after-change-functions will leave it
-    ;; set to nil.  so we reset it here, if necessary.
-    (when quit-flag
-      ;; FIXME: We shouldn't assume that it had value
-      ;; (nntp-after-change-function)!
-      (setq after-change-functions '(nntp-after-change-function)))))
+  "We only care about insertions at eob"
+  (when (and (zerop len) (eq (point-max) end))
+    (save-match-data
+      (when-let ((proc (get-buffer-process (current-buffer))))
+	(nntp-async-trigger proc)))))
 
 (defun nntp-async-trigger (process)
   (with-current-buffer (process-buffer process)
