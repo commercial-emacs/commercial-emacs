@@ -90,8 +90,10 @@ Output stream is STREAM, or value of `standard-output' (which see)."
   (princ (pp-to-string object) (or stream standard-output)))
 
 ;;;###autoload
-(defun pp-display-expression (expression out-buffer-name)
+(defun pp-display-expression (expression out-buffer-name &optional lisp)
   "Prettify and display EXPRESSION in an appropriate way, depending on length.
+If LISP, format with `pp-emacs-lisp-code'; use `pp' otherwise.
+
 If a temporary buffer is needed for representation, it will be named
 after OUT-BUFFER-NAME."
   (let* ((old-show-function temp-buffer-show-function)
@@ -119,7 +121,10 @@ after OUT-BUFFER-NAME."
                       (message "See buffer %s." out-buffer-name)))
                 (message "%s" (buffer-substring (point-min) (point))))))))
     (with-output-to-temp-buffer out-buffer-name
-      (pp expression)
+      (if lisp
+          (with-current-buffer standard-output
+            (pp-emacs-lisp-code expression))
+        (pp expression))
       (with-current-buffer standard-output
 	(emacs-lisp-mode)
 	(setq buffer-read-only nil)
@@ -194,7 +199,9 @@ Ignores leading comment characters."
       (pp--insert-lisp sexp)
       (insert "\n")
       (goto-char (point-min))
-      (indent-sexp))))
+      (indent-sexp)
+      (while (re-search-forward " +$" nil t)
+        (replace-match "")))))
 
 (defun pp--insert-lisp (sexp)
   (cl-case (type-of sexp)
@@ -203,8 +210,14 @@ Ignores leading comment characters."
            ((consp (cdr sexp))
             (if (and (length= sexp 2)
                      (eq (car sexp) 'quote))
-                (let ((print-quoted t))
-                  (prin1 sexp))
+                (cond
+                 ((symbolp (cadr sexp))
+                  (let ((print-quoted t))
+                    (prin1 sexp)))
+                 ((consp (cadr sexp))
+                  (insert "'")
+                  (pp--format-list (cadr sexp)
+                                   (set-marker (make-marker) (1- (point))))))
               (pp--format-list sexp)))
            (t
             (princ sexp))))
@@ -222,18 +235,33 @@ Ignores leading comment characters."
 (defun pp--format-vector (sexp)
   (prin1 sexp))
 
-(defun pp--format-list (sexp)
+(defun pp--format-list (sexp &optional start)
   (if (and (symbolp (car sexp))
            (not (keywordp (car sexp))))
       (pp--format-function sexp)
-    (prin1 sexp)))
+    (insert "(")
+    (pp--insert start (pop sexp))
+    (while sexp
+      (pp--insert " " (pop sexp)))
+    (insert ")")))
 
 (defun pp--format-function (sexp)
   (let* ((sym (car sexp))
          (edebug (get sym 'edebug-form-spec))
-         (indent (get sym 'lisp-indent-function)))
+         (indent (get sym 'lisp-indent-function))
+         (doc (get sym 'doc-string-elt)))
     (when (eq indent 'defun)
       (setq indent 2))
+    ;; We probably want to keep all the elements before the doc string
+    ;; on a single line.
+    (when doc
+      (setq indent (1- doc)))
+    ;; Special-case closures -- these shouldn't really exist in actual
+    ;; source code, so there's no indentation information.  But make
+    ;; them output slightly better.
+    (when (and (not indent)
+               (eq sym 'closure))
+      (setq indent 0))
     (pp--insert "(" sym)
     (pop sexp)
     ;; Get the first entries on the first line.
@@ -284,7 +312,11 @@ Ignores leading comment characters."
   (insert ")"))
 
 (defun pp--insert (delim &rest things)
-  (let ((start (point)))
+  (let ((start (if (markerp delim)
+                   (prog1
+                       delim
+                     (setq delim nil))
+                 (point-marker))))
     (when delim
       (insert delim))
     (dolist (thing things)
@@ -294,7 +326,8 @@ Ignores leading comment characters."
     (when (> (current-column) (window-width))
       (save-excursion
         (goto-char start)
-        (insert "\n")))))
+        (unless (looking-at "[ \t]+$")
+          (insert "\n"))))))
 
 (defun pp--indent-buffer ()
   (goto-char (point-min))
