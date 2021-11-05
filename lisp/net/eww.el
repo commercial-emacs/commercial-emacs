@@ -364,13 +364,9 @@ killed after rendering."
            (prefix-numeric-value current-prefix-arg))))
   (setq url (eww--dwim-expand-url url))
   (pop-to-buffer-same-window
-   (cond
-    ((eq arg 4)
-     (generate-new-buffer "*eww*"))
-    ((eq major-mode 'eww-mode)
-     (current-buffer))
-    (t
-     (get-buffer-create "*eww*"))))
+   (if (and (eq major-mode 'eww-mode) (null arg))
+       (current-buffer)
+     (generate-new-buffer "*eww*")))
   (eww-setup-buffer)
   ;; Check whether the domain only uses "Highly Restricted" Unicode
   ;; IDNA characters.  If not, transform to punycode to indicate that
