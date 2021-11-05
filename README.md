@@ -35,8 +35,7 @@ acquisition is any indication, the last outcome is most likely.
 
 ### <a name="tree-sitter"></a>How can I try tree-sitter highlighting?
 
-Install rust backend:
-
+Install Rust library:
 ```bash
 git clone https://github.com/commercial-emacs/tree-sitter.git
 make -C tree-sitter install
@@ -44,7 +43,6 @@ pkg-config --exact-version=0.6.3alpha tree-sitter || echo not found
 ```
 
 Then build emacs:
-
 ```bash
 ./autogen.sh
 LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" \
@@ -52,7 +50,7 @@ LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" \
 make -j4 bootstrap
 ldd src/emacs | grep -q tree-sitter || echo not found
 make test/src/tree-sitter-tests.log
-src/emacs -Q --eval '(custom-set-variables (quote (font-lock-support-mode \
-  (quote tree-sitter-lock-mode))) (quote (font-lock-maximum-size nil)))' \
+src/emacs -Q --eval \
+  "(custom-set-variables '(font-lock-support-mode 'tree-sitter-lock-mode))" \
   --visit src/xdisp.c
 ```

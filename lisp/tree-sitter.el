@@ -47,8 +47,8 @@
                                         (point-min) (point-max)))))))))))
       proper-dir
     (or (getenv "XDG_CACHE_HOME")
-        (concat (file-name-as-directory (or (getenv "HOME") ".")) ".cache")))
-  "Follow dirs::cache_dir in the dirs crate.
+        (concat (expand-file-name ".cache/tree-sitter" "~"))))
+  "Follows dirs::cache_dir in the Rust dirs crate.
 On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
   :group 'tree-sitter
   :type 'directory

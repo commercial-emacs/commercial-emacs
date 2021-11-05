@@ -79,8 +79,7 @@ void main (void) {
                 (file mode reps unfontify fontify)
 	        (save-window-excursion
 	          (find-file-literally file)
-	          (let (font-lock-maximum-size
-		        (font-lock-support-mode mode)
+	          (let ((font-lock-support-mode mode)
 		        enable-dir-local-variables
 		        font-lock-global-modes
 		        font-lock-fontified)
