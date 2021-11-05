@@ -47,9 +47,12 @@ Then build emacs:
 
 ```bash
 ./autogen.sh
-LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" ./configure --prefix=$HOME/.local --with-tree-sitter
+LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" \
+  ./configure --prefix=$HOME/.local --with-tree-sitter
 make -j4 bootstrap
 ldd src/emacs | grep -q tree-sitter || echo not found
 make test/src/tree-sitter-tests.log
-src/emacs -Q --eval '(custom-set-variables (quote (font-lock-support-mode (quote tree-sitter-lock-mode))) (quote (font-lock-maximum-size nil)))' --visit src/xdisp.c
+src/emacs -Q --eval '(custom-set-variables (quote (font-lock-support-mode \
+  (quote tree-sitter-lock-mode))) (quote (font-lock-maximum-size nil)))' \
+  --visit src/xdisp.c
 ```
