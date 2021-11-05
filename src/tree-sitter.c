@@ -73,7 +73,7 @@ tree_sitter_language_functor (Lisp_Object progmode)
 	Fcdr_safe (Fassq (progmode, Fsymbol_value (Qtree_sitter_mode_alist)));
       if (! NILP (language))
 	{
-	  Lisp_Object module = concat2 (Ffile_name_directory (Fsymbol_value (Qtree_sitter_resources_dir)), concat3 (build_string ("lib/"), language, Vmodule_file_suffix));
+	  Lisp_Object module = concat2 (Ffile_name_as_directory (Fsymbol_value (Qtree_sitter_resources_dir)), concat3 (build_string ("lib/"), language, Vmodule_file_suffix));
 	  dynlib_handle_ptr handle = dynlib_open (SSDATA (module));
 	  if (handle == NULL)
 	    xsignal2 (Qtree_sitter_language_error,
@@ -221,7 +221,7 @@ ensure_highlighter(Lisp_Object sitter)
 				 XTREE_SITTER (sitter)->highlight_names,
 				 (uint32_t) count));
       highlights_scm =
-	concat2 (Ffile_name_directory (Fsymbol_value (Qtree_sitter_resources_dir)),
+	concat2 (Ffile_name_as_directory (Fsymbol_value (Qtree_sitter_resources_dir)),
 		 concat3 (build_string ("queries/"), language,
 			  build_string ("/highlights.scm")));
 
