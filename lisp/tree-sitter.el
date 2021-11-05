@@ -46,8 +46,10 @@
                     (car (split-string (buffer-substring-no-properties
                                         (point-min) (point-max)))))))))))
       proper-dir
-    (or (getenv "XDG_CACHE_HOME")
-        (concat (expand-file-name ".cache/tree-sitter" "~"))))
+    (concat (file-name-as-directory
+             (or (getenv "XDG_CACHE_HOME")
+                 (expand-file-name ".cache" "~")))
+            "tree-sitter"))
   "Follows dirs::cache_dir in the Rust dirs crate.
 On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
   :group 'tree-sitter
