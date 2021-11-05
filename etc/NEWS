@@ -108,7 +108,7 @@ suspicious and could be malicious.
 +++
 *** New command-line option '-r' for emacsclient.
 With this command-line option, Emacs reuses an existing graphical client
-frame if one exists; otherwise a new frame is created.
+frame if one exists; otherwise it creates a new frame.
 
 * Editing Changes in Emacs 29.1
 
@@ -421,6 +421,11 @@ Use 'exif-parse-file' and 'exif-field' instead.
 
 
 * Lisp Changes in Emacs 29.1
+
+---
+*** New user option 'pp-use-max-width'.
+If non-nil, 'pp' will attempt to limit the line length when formatting
+long lists and vectors.
 
 ---
 *** New function 'pp-emacs-lisp-code'.
