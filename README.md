@@ -2,7 +2,7 @@
 >
 > &mdash; <cite>2021 Maintainer of GNU Emacs, who then proceeded to keep talking</cite>
 
-## Frequently Asked Questions
+## Frequently Anticipated Questions
 
 ### Why?
 
@@ -18,7 +18,7 @@ Roughly every ninety minutes.
 
 ### How has the code diverged thus far?
 
-- Tree-sitter font highlighting
+- [Tree-sitter font highlighting](#tree-sitter)
 - Gnus is rewritten to be non-blocking.
 - The module `process.c` is rewritten.
 
@@ -33,25 +33,23 @@ on a coding frenzy that achieves feature parity, grant myself commit
 rights, or continue not noticing me.  If my history of user
 acquisition is any indication, the last outcome is most likely.
 
-### What do you mean by "commercial"?
+### <a name="tree-sitter"></a>How can I try tree-sitter highlighting?
 
-I would have called this the less invidious-sounding "NonGNU Emacs"
-after "NonGNU Elpa" which, like the present endeavor, was created to
-circumvent FSF strictures thereby giving it the procedural latitude to
-compete with MELPA (for attention, obviously, not dollars).  But
-describing something by what it is **not** breaks some basic marketing
-rule.  Is an abortion rights opponent pro-life or pro-choice?
+Install rust backend:
 
-### Why aren't non-patch bugs being mirrored into Issues?
+```bash
+git clone https://github.com/commercial-emacs/tree-sitter.git
+make -C tree-sitter install
+pkg-config --exact-version=0.6.3alpha tree-sitter || echo not found
+```
 
-An Issues board with more than say 100 open issues is useless, and
-Debbugs (GNU's equivalent of Issues) currently asserts a few thousand of
-them.  Moreover, I am dismissive of bug reports without patches, as
-they're generally:
+Then build emacs:
 
-1. Verbose
-2. Imprecise
-3. Lacking a minimum reproducible example
-
-A bug report accompanied by a patch, on the other hand, is a sure sign
-that the reporter made an effort to understand the problem.
+```bash
+./autogen.sh
+LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" ./configure --prefix=$HOME/.local --with-tree-sitter
+make -j4 bootstrap
+ldd src/emacs | grep -q tree-sitter || echo not found
+make test/src/tree-sitter-tests.log
+src/emacs -Q --eval '(custom-set-variables (quote (font-lock-support-mode (quote tree-sitter-lock-mode))) (quote (font-lock-maximum-size nil)))' --visit src/xdisp.c
+```
