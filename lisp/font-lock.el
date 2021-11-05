@@ -1084,11 +1084,11 @@ locking for a mode, and is not meant to be called from Lisp functions."
   "Make sure the region BEG...END has been fontified.
 If the region is not specified, it defaults to the entire accessible
 portion of the buffer."
-  (when (font-lock-specified-p t)
-    (font-lock-set-defaults)
-    (funcall font-lock-ensure-function
-             (or beg (point-min)) (or end (point-max)))
-    (setq font-lock-fontified t)))
+  (unless font-lock-mode
+    (font-lock-mode))
+  (funcall font-lock-ensure-function
+           (or beg (point-min)) (or end (point-max)))
+  (setq font-lock-fontified t))
 
 (defun font-lock-update (&optional arg)
   "Update the syntax highlighting in this buffer.

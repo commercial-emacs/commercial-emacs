@@ -73,33 +73,23 @@ tree_sitter_language_functor (Lisp_Object progmode)
 	Fcdr_safe (Fassq (progmode, Fsymbol_value (Qtree_sitter_mode_alist)));
       if (! NILP (language))
 	{
-	  Lisp_Object module_stem = concat2 (build_string ("bin/"), language);
-	  Lisp_Object module = Flocate_file_internal (module_stem,
-						      Vload_path,
-						      list1 (Vmodule_file_suffix),
-						      Qnil);
-	  if (NILP (module))
+	  Lisp_Object module = concat2 (Ffile_name_directory (Fsymbol_value (Qtree_sitter_resources_dir)), concat3 (build_string ("lib/"), language, Vmodule_file_suffix));
+	  dynlib_handle_ptr handle = dynlib_open (SSDATA (module));
+	  if (handle == NULL)
 	    xsignal2 (Qtree_sitter_language_error,
-		      module_stem, build_string ("Could not locate module"));
+		      module, build_string (dynlib_error ()));
 	  else
 	    {
-	      dynlib_handle_ptr handle = dynlib_open (SSDATA (module));
-	      if (handle == NULL)
+	      TSLanguageFunctor fn;
+	      dynlib_error ();
+	      fn = dynlib_sym (handle,
+			       SSDATA (concat2 (build_string ("tree_sitter_"),
+						language)));
+	      if (fn == NULL)
 		xsignal2 (Qtree_sitter_language_error,
 			  module, build_string (dynlib_error ()));
 	      else
-		{
-		  TSLanguageFunctor fn;
-		  dynlib_error ();
-		  fn = dynlib_sym (handle,
-				   SSDATA (concat2 (build_string ("tree_sitter_"),
-						    language)));
-		  if (fn == NULL)
-		    xsignal2 (Qtree_sitter_language_error,
-			      module, build_string (dynlib_error ()));
-		  else
-		    i = hash_put (h, progmode, make_misc_ptr (fn), hash);
-		}
+		i = hash_put (h, progmode, make_misc_ptr (fn), hash);
 	    }
 	}
     }
@@ -230,11 +220,10 @@ ensure_highlighter(Lisp_Object sitter)
 	     ts_highlighter_new (XTREE_SITTER (sitter)->highlight_names,
 				 XTREE_SITTER (sitter)->highlight_names,
 				 (uint32_t) count));
-
       highlights_scm =
-	Flocate_file_internal (concat3 (build_string ("queries/"),
-					language, build_string ("/highlights.scm")),
-			       Vload_path, Qnil, Qnil);
+	concat2 (Ffile_name_directory (Fsymbol_value (Qtree_sitter_resources_dir)),
+		 concat3 (build_string ("queries/"), language,
+			  build_string ("/highlights.scm")));
 
       if (NILP (highlights_scm))
 	{
@@ -689,6 +678,7 @@ syms_of_tree_sitter (void)
   tree_sitter_scan_characters = 1024;
 
   DEFSYM (Qtree_sitter_mode_alist, "tree-sitter-mode-alist");
+  DEFSYM (Qtree_sitter_resources_dir, "tree-sitter-resources-dir");
   DEFSYM (Qtree_sitter_highlight_alist, "tree-sitter-highlight-alist");
   DEFSYM (Qtree_sitter_sitter, "tree-sitter-sitter");
   Fmake_variable_buffer_local (Qtree_sitter_sitter);

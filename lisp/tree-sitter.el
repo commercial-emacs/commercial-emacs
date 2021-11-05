@@ -30,6 +30,31 @@
   "Tree-sitter is an incremental parser."
   :group 'tools)
 
+(defcustom tree-sitter-resources-dir
+  (if-let ((interactive (not noninteractive))
+           (proper-dir
+            (ignore-errors
+              (file-name-directory
+               (directory-file-name
+                (with-temp-buffer
+                  (let ((proc (start-process "tree-sitter-resources-dir"
+                                             (current-buffer) "tree-sitter" "dump-libpath")))
+                    (cl-loop repeat 10
+                          while (process-live-p proc)
+                          do (sleep-for 0 100)
+                          finally (when (process-live-p proc) (kill-process proc)))
+                    (car (split-string (buffer-substring-no-properties
+                                        (point-min) (point-max)))))))))))
+      proper-dir
+    (or (getenv "XDG_CACHE_HOME")
+        (concat (file-name-as-directory (or (getenv "HOME") ".")) ".cache")))
+  "Follow dirs::cache_dir in the dirs crate.
+On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
+  :group 'tree-sitter
+  :type 'directory
+  :risky t
+  :version "28.1")
+
 (defcustom tree-sitter-mode-alist
   '((c++-mode . "cpp")
     (rust-mode . "rust")
@@ -122,6 +147,7 @@
                  (bounds (tree-sitter-highlight-region beg* end*))
                  (leftmost (if bounds (min beg* (car bounds)) beg*))
                  (rightmost (if bounds (max end* (cdr bounds)) end*)))
+            (ignore leftmost rightmost)
             ;; (when loudly
             ;;   (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
             ;;                  (cl-first (tree-sitter-changed-range))

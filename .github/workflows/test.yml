@@ -37,7 +37,7 @@ jobs:
       id: cache-tree-sitter
       with:
         path: tree-sitter
-        key: cache-tree-sitter-000
+        key: cache-tree-sitter-001
     - uses: actions/checkout@v2
       if: steps.cache-tree-sitter.outputs.cache-hit != 'true'
       with:
@@ -48,7 +48,7 @@ jobs:
           toolchain: stable
     - run: |
         mkdir -p $HOME/.local
-        make -C tree-sitter install
+        make -C tree-sitter install-ci
         ./autogen.sh
         LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" ./configure --prefix=$HOME/.local --with-tree-sitter --enable-dumping-overwrite
         make -j2 check
