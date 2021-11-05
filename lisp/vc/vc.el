@@ -1700,16 +1700,17 @@ diff only, `diff-switches'.
 If the chosen value is not a string or a list, return nil.
 This is so that you may set, e.g. `vc-svn-diff-switches' to t in order
 to override the value of `vc-diff-switches' and `diff-switches'."
-  (let ((switches
-	 (or (when backend
-	       (let ((sym (vc-make-backend-sym
-			   backend (intern (concat (symbol-name op)
-						   "-switches")))))
-		   (when (boundp sym) (symbol-value sym))))
-	     (let ((sym (intern (format "vc-%s-switches" (symbol-name op)))))
-	       (when (boundp sym) (symbol-value sym)))
-	     (cond
-	      ((eq op 'diff) diff-switches)))))
+  (let* ((buffer (other-buffer (current-buffer) t))
+         (switches
+	  (or (when backend
+	        (let ((sym (vc-make-backend-sym
+			    backend (intern (concat (symbol-name op)
+						    "-switches")))))
+		  (when (boundp sym) (buffer-local-value sym buffer))))
+	      (let ((sym (intern (format "vc-%s-switches" (symbol-name op)))))
+	        (when (boundp sym) (buffer-local-value sym buffer)))
+	      (cond
+	       ((eq op 'diff) diff-switches)))))
     (if (stringp switches) (list switches)
       ;; If not a list, return nil.
       ;; This is so we can set vc-diff-switches to t to override
