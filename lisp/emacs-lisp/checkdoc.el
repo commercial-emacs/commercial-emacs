@@ -339,6 +339,7 @@ See Info node `(elisp) Documentation Tips' for background."
 ;; (setq checkdoc--argument-missing-flag nil)      ; optional
 ;; (setq checkdoc--disambiguate-symbol-flag nil)   ; optional
 ;; (setq checkdoc--interactive-docstring-flag nil) ; optional
+;; (setq checkdoc-verb-check-experimental-flag nil)
 ;; Then use `M-x find-dired' ("-name '*.el'") and `M-x checkdoc-dired'
 
 (defvar checkdoc--argument-missing-flag t
@@ -492,6 +493,9 @@ be re-created.")
 
 (defconst checkdoc--help-buffer "*Checkdoc Help*"
   "Name of buffer used for Checkdoc Help.")
+
+(defvar checkdoc-commentary-header-string "\n;;; Commentary:\n;; \n\n"
+  "String inserted as commentary marker in `checkdoc-file-comments-engine'.")
 
 ;;; User level commands
 ;;
@@ -2125,13 +2129,11 @@ Examples of recognized abbreviations: \"e.g.\", \"i.e.\", \"cf.\"."
                ;; a part of a list.
                (rx letter ".")
              (rx (or
-                  ;; The abbreviations:
+                  ;; The abbreviations (a trailing dot is added below).
                   (seq (any "cC") "f")            ; cf.
                   (seq (any "eE") ".g")           ; e.g.
                   (seq (any "iI") "." (any "eE")) ; i.e.
-                  "a.k.a"                         ; a.k.a.
-                  "etc"                           ; etc.
-                  "vs"                            ; vs.
+                  "a.k.a" "etc" "vs" "N.B"
                   ;; Some non-standard or less common ones that we
                   ;; might as well accept.
                   "Inc" "Univ" "misc" "resp")
@@ -2410,7 +2412,7 @@ Code:, and others referenced in the style guide."
                  nil nil t)))
 	      (if (checkdoc-y-or-n-p
                    "You should have a \";;; Commentary:\", add one?")
-		  (insert "\n;;; Commentary:\n;; \n\n")
+                  (insert checkdoc-commentary-header-string)
 		(checkdoc-create-error
 		 "You should have a section marked \";;; Commentary:\""
 		 nil nil t)))
