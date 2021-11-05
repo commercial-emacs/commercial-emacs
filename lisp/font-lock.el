@@ -1060,7 +1060,7 @@ accessible portion of the current buffer."
 
 (defvar font-lock-ensure-function
   (lambda (beg end)
-    (when (text-property-not-all beg end 'fontified t)
+    (unless font-lock-fontified
       (save-excursion
         (font-lock-fontify-region beg end))))
   "Function to make sure a region has been fontified.

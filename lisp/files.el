@@ -2622,8 +2622,7 @@ Fifth arg NOMODES non-nil means don't alter the file's modes.
 Finishes by calling the functions in `find-file-hook'
 unless NOMODES is non-nil."
   (setq buffer-read-only (not (file-writable-p buffer-file-name)))
-  (if noninteractive
-      nil
+  (unless noninteractive
     (let* (not-serious
 	   (msg
 	    (cond
@@ -2644,7 +2643,7 @@ unless NOMODES is non-nil."
 		  (format "%s has auto save data; consider M-x recover-this-file"
 			  (file-name-nondirectory buffer-file-name))
 		(setq not-serious t)
-		(if error "(New file)" nil)))
+		(when error "(New file)")))
 	     ((not error)
 	      (setq not-serious t)
 	      "Note: file is write protected")
