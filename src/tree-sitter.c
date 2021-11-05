@@ -440,13 +440,14 @@ tree_sitter_read_buffer (void *payload, uint32_t byte_index,
   struct buffer *bp = (struct buffer *) payload;
   ptrdiff_t pdl_count = SPECPDL_INDEX ();
 
-  if (thread_unsafe_last_scan_characters != tree_sitter_scan_characters)
+  if (thread_unsafe_last_scan_characters < tree_sitter_scan_characters)
     {
+      thread_unsafe_last_scan_characters = tree_sitter_scan_characters;
       if (thread_unsafe_return_value == NULL)
-        thread_unsafe_return_value = xmalloc (tree_sitter_scan_characters + 1);
+	thread_unsafe_return_value = xmalloc (tree_sitter_scan_characters + 1);
       else
-        thread_unsafe_return_value = xrealloc (thread_unsafe_return_value,
-                                               tree_sitter_scan_characters + 1);
+	thread_unsafe_return_value = xrealloc (thread_unsafe_return_value,
+					       tree_sitter_scan_characters + 1);
     }
 
   if (! BUFFER_LIVE_P (bp))
