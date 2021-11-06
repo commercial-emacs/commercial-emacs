@@ -161,12 +161,12 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
                  (leftmost (if bounds (min beg* (car bounds)) beg*))
                  (rightmost (if bounds (max end* (cdr bounds)) end*)))
             (ignore leftmost rightmost)
-             (when loudly
-               (princ (format "changed [%s %s], initial [%d], final [%d %d]\n"
-                              (cl-first (tree-sitter-changed-range))
-                              (cl-second (tree-sitter-changed-range))
-                              beg leftmost rightmost)
-                      #'external-debugging-output))
+            ;; (when loudly
+            ;;   (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
+            ;;                  (cl-first (tree-sitter-changed-range))
+            ;;                  (cl-second (tree-sitter-changed-range))
+            ;;                  beg end leftmost rightmost)
+            ;;          #'external-debugging-output))
             ))))))
 
 (defsubst tree-sitter-fontify-refresh (start &rest _args)
