@@ -820,7 +820,7 @@ struct nsfont_info
   XCharStruct max_bounds;
   /* We compute glyph codes and metrics on-demand in blocks of 256 indexed
      by hibyte, lobyte.  */
-  unsigned short **glyphs; /* map Unicode index to glyph */
+  unsigned int **glyphs; /* map Unicode index to glyph */
   struct font_metrics **metrics;
 };
 #endif
@@ -978,6 +978,12 @@ struct ns_output
 
   /* Non-zero if we are doing an animation, e.g. toggling the tool bar.  */
   int in_animation;
+
+#ifdef NS_IMPL_GNUSTEP
+  /* Zero if this is the first time a toolbar has been updated on this
+     frame. */
+  int tool_bar_adjusted;
+#endif
 };
 
 /* This dummy declaration needed to support TTYs.  */

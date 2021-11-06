@@ -13893,7 +13893,6 @@ note_tab_bar_highlight (struct frame *f, int x, int y)
   clear_mouse_face (hlinfo);
 
   bool mouse_down_p = false;
-#ifndef HAVE_NS
   /* Mouse is down, but on different tab-bar item?  Or alternatively,
      the mouse might've been pressed somewhere we don't know about,
      and then have moved onto the tab bar.  In this case,
@@ -13906,7 +13905,6 @@ note_tab_bar_highlight (struct frame *f, int x, int y)
   if (mouse_down_p && f->last_tab_bar_item != prop_idx
       && f->last_tab_bar_item != -1)
     return;
-#endif
   draw = mouse_down_p ? DRAW_IMAGE_SUNKEN : DRAW_IMAGE_RAISED;
 
   /* If tab-bar item is not enabled, don't highlight it.  */
@@ -29305,7 +29303,6 @@ draw_glyphs (struct window *w, int x, struct glyph_row *row,
   for (s = head; s; s = s->next)
     FRAME_RIF (f)->draw_glyph_string (s);
 
-#ifndef HAVE_NS
   /* When focus a sole frame and move horizontally, this clears on_p
      causing a failure to erase prev cursor position. */
   if (area == TEXT_AREA
@@ -29324,7 +29321,6 @@ draw_glyphs (struct window *w, int x, struct glyph_row *row,
       notice_overwritten_cursor (w, TEXT_AREA, x0, x1,
 				 row->y, MATRIX_ROW_BOTTOM_Y (row));
     }
-#endif
 
   /* Value is the x-position up to which drawn, relative to AREA of W.
      This doesn't include parts drawn because of overhangs.  */
