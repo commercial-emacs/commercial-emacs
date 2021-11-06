@@ -2335,11 +2335,11 @@ This is all changing."
 		    "")))
 	 (value
 	  (format
-	   "(OR HEADER REFERENCES %S HEADER Message-Id %S)"
+	   "(OR HEADER REFERENCES \"%s\" HEADER Message-Id \"%s\")"
 	   id id)))
     (dolist (refid refs value)
       (setq value (format
-		   "(OR (OR HEADER Message-Id %S HEADER REFERENCES %S) %s)"
+		   "(OR (OR HEADER Message-Id \"%s\" HEADER REFERENCES \"%s\") %s)"
 		   refid refid value)))))
 
 
