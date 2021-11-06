@@ -4698,42 +4698,44 @@ if only the first line of the docstring is shown."))
   (when (and (null custom-file) init-file-had-error)
     (error "Cannot save customizations; init file was not fully loaded"))
   (let* ((filename (custom-file))
+         (extant (find-buffer-visiting filename))
 	 (recentf-exclude
-	  (if recentf-mode
-	      (cons (concat "\\`"
-			    (regexp-quote
-			     (recentf-expand-file-name (custom-file)))
-			    "\\'")
-		    recentf-exclude)))
-	 (old-buffer (find-buffer-visiting filename))
-	 old-buffer-name)
-
-    (with-current-buffer (let ((find-file-visit-truename t))
-			   (or old-buffer
-                               (let ((delay-mode-hooks t))
-                                 (find-file-noselect filename))))
-      ;; We'll save using file-precious-flag, so avoid destroying
-      ;; symlinks.  (If we're not already visiting the buffer, this is
-      ;; handled by find-file-visit-truename, above.)
-      (when old-buffer
-	(setq old-buffer-name (buffer-file-name))
-	(set-visited-file-name (file-chase-links filename)))
-
-      (unless (eq major-mode 'emacs-lisp-mode)
-        (delay-mode-hooks (emacs-lisp-mode)))
-      (let ((inhibit-read-only t)
-	    (print-length nil)
-	    (print-level nil))
-        (atomic-change-group
-	  (custom-save-variables)
-	  (custom-save-faces)))
-      (let ((file-precious-flag t))
-	(save-buffer))
-      (if old-buffer
-	  (progn
-	    (set-visited-file-name old-buffer-name)
-	    (set-buffer-modified-p nil))
-	(kill-buffer (current-buffer))))))
+	  (when recentf-mode
+	    (cons (concat "\\`"
+			  (regexp-quote
+			   (recentf-expand-file-name (custom-file)))
+			  "\\'")
+		  recentf-exclude)))
+         (buffer (let ((delay-mode-hooks t)
+                       (find-file-visit-truename t))
+                   (find-file-noselect filename)))
+         (restore-extant-name (buffer-file-name buffer))
+         (file-precious-flag t) ;; preserve symlinks
+         (restore-font-lock (buffer-local-value 'font-lock-mode buffer))
+         print-length print-level)
+    (unwind-protect
+        (with-current-buffer buffer
+          (if (and (buffer-modified-p)
+                   (not buffer-save-without-query)
+                   (not (y-or-n-p (format "Save %s?" (buffer-file-name)))))
+              (error "There are unsaved changes")
+            (set-visited-file-name (file-chase-links filename))
+            (save-buffer)
+            (unless (eq major-mode 'emacs-lisp-mode)
+              (delay-mode-hooks (emacs-lisp-mode)))
+            (font-lock-mode -1)
+            (atomic-change-group
+	      (custom-save-variables)
+	      (custom-save-faces))
+            (save-buffer)))
+      (with-current-buffer buffer
+        (with-silent-modifications
+          (font-lock-mode restore-font-lock)
+          (set-visited-file-name restore-extant-name)))
+      (unless extant
+        (when (buffer-live-p buffer)
+          (let (kill-buffer-query-functions)
+            (kill-buffer buffer)))))))
 
 ;;;###autoload
 (defun customize-save-customized ()
