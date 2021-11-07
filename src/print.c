@@ -1525,8 +1525,26 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       printchar ('>', printcharfun);
       break;
 
-    case PVEC_XWIDGET: case PVEC_XWIDGET_VIEW:
-      print_c_string ("#<xwidget ", printcharfun);
+    case PVEC_XWIDGET:
+#ifdef HAVE_XWIDGETS
+      {
+#ifdef USE_GTK
+	int len = sprintf (buf, "#<xwidget %u %p>",
+			   XXWIDGET (obj)->xwidget_id,
+			   XXWIDGET (obj)->widget_osr);
+#else
+	int len = sprintf (buf, "#<xwidget %u %p>",
+			   XXWIDGET (obj)->xwidget_id,
+			   XXWIDGET (obj)->xwWidget);
+#endif
+	strout (buf, len, len, printcharfun);
+	break;
+      }
+#else
+      emacs_abort ();
+#endif
+    case PVEC_XWIDGET_VIEW:
+      print_c_string ("#<xwidget view", printcharfun);
       printchar ('>', printcharfun);
       break;
 

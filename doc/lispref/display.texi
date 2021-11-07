@@ -6784,7 +6784,10 @@ xwidget object, and then use that object as the display specifier
 in a @code{display} text or overlay property (@pxref{Display
 Property}).
 
-@defun make-xwidget type title width height arguments &optional buffer
+  Embedded widgets can send events notifying Lisp code about changes
+occurring within them.  (@pxref{Xwidget Events}).
+
+@defun make-xwidget type title width height arguments &optional buffer related
 This creates and returns an xwidget object.  If
 @var{buffer} is omitted or @code{nil}, it defaults to the current
 buffer.  If @var{buffer} names a buffer that doesn't exist, it will be
@@ -6797,7 +6800,10 @@ The WebKit component.
 @end table
 
 The @var{width} and @var{height} arguments specify the widget size in
-pixels, and @var{title}, a string, specifies its title.
+pixels, and @var{title}, a string, specifies its title.  @var{related}
+is used internally by the WebKit widget, and specifies another WebKit
+widget that the newly created widget should share settings and
+subprocesses with.
 @end defun
 
 @defun xwidgetp object
@@ -6816,6 +6822,10 @@ property list given by @var{plist}.
 
 @defun xwidget-buffer xwidget
 This function returns the buffer of @var{xwidget}.
+@end defun
+
+@defun set-xwidget-buffer xwidget buffer
+This function sets the buffer of @var{xwidget} to @var{buffer}.
 @end defun
 
 @defun get-buffer-xwidgets buffer
@@ -6876,6 +6886,61 @@ Emacs will query the user, otherwise it will not.
 @defun xwidget-query-on-exit-flag xwidget
 This function returns the current setting of @var{xwidget}s
 query-on-exit flag, either @code{t} or @code{nil}.
+@end defun
+
+@defun xwidget-perform-lispy-event xwidget event frame
+Send an input event @var{event} to @var{xwidget}.  The precise action
+performed is platform-specific.  See @ref{Input Events}.
+
+You can optionally pass the frame the event was generated from via
+@var{frame}.  On X11, modifier keys in key events will not be
+considered if @var{frame} is @code{nil}, and the selected frame is not
+an X-Windows frame.
+
+On GTK, only keyboard and function key events are implemented.  Mouse,
+motion, and click events are dispatched to the xwidget without going
+through Lisp code, and as such shouldn't require this function to be
+sent.
+@end defun
+
+@defun xwidget-webkit-search query xwidget &optional case-insensitive backwards wrap-around
+Start an incremental search on the WebKit widget @var{xwidget} with
+the string @var{query} as a query.  @var{case-insensitive} denotes
+whether or not the search is case-insensitive, @var{backwards}
+determines if the search is performed backwards towards the start of
+the document, and @var{wrap-around} determines whether or not the
+search terminates at the end of the document.
+
+If the function is called while a search query is already present,
+then the query specified here will replace the existing query.
+
+To stop a search query, use @code{xwidget-webkit-finish-search}.
+@end defun
+
+@defun xwidget-webkit-next-result xwidget
+Display the next search result in @var{xwidget}.  This function will
+error unless a search query has already been started in @var{xwidget}
+through @code{xwidget-webkit-search}.
+
+If @code{wrap-around} was non-nil when @code{xwidget-webkit-search}
+was called, then the search will restart from the beginning of the
+document if the end is reached.
+@end defun
+
+@defun xwidget-webkit-previous-result xwidget
+Display the previous search result in @var{xwidget}.  This function
+will error unless a search query has already been started in
+@var{xwidget} through @code{xwidget-webkit-search}.
+
+If @code{wrap-around} was non-nil when @code{xwidget-webkit-search}
+was called, then the search will restart from the end of the
+document if the beginning is reached.
+@end defun
+
+@defun xwidget-webkit-finish-search xwidget
+Finish a search operation started with @code{xwidget-webkit-search} in
+@var{xwidget}.  If there is no query currently ongoing, then this
+function will error.
 @end defun
 
 @node Buttons
