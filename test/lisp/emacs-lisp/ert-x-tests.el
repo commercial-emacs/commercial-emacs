@@ -271,6 +271,15 @@ desired effect."
     (cl-loop for x in '(0 1 2 3 4 t) do
              (should (equal (c x) (lisp x))))))
 
+(ert-deftest ert-x-tests--with-temp-file-generate-suffix ()
+  (should (equal (ert--with-temp-file-generate-suffix "foo.el") "-foo"))
+  (should (equal (ert--with-temp-file-generate-suffix "foo-test.el") "-foo"))
+  (should (equal (ert--with-temp-file-generate-suffix "foo-tests.el") "-foo"))
+  (should (equal (ert--with-temp-file-generate-suffix "foo-bar-baz.el")
+                 "-foo-bar-baz"))
+  (should (equal (ert--with-temp-file-generate-suffix "/foo/bar/baz.el")
+                 "-baz")))
+
 (ert-deftest ert-x-tests-with-temp-file ()
   (let (saved)
     (ert-with-temp-file fil
@@ -311,7 +320,8 @@ desired effect."
     (ert-with-temp-directory dir
       (setq saved dir)
       (should (file-exists-p dir))
-      (should (file-directory-p dir)))
+      (should (file-directory-p dir))
+      (should (equal dir (file-name-as-directory dir))))
     (should-not (file-exists-p saved))))
 
 (ert-deftest ert-x-tests-with-temp-directory/text-signals-error ()
