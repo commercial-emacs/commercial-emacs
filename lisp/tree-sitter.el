@@ -163,13 +163,14 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
                  (bounds (tree-sitter-highlight-region beg* end*))
                  (leftmost (if bounds (min beg* (car bounds)) beg*))
                  (rightmost (if bounds (max end* (cdr bounds)) end*)))
-            (put-text-property leftmost rightmost 'fontified t)
-            (when loudly
-              (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
-                             (cl-first (tree-sitter-changed-range))
-                             (cl-second (tree-sitter-changed-range))
-                             beg end leftmost rightmost)
-                     #'external-debugging-output))))))))
+            (prog1 leftmost
+              (put-text-property leftmost rightmost 'fontified t)
+              (when loudly
+                (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
+                               (cl-first (tree-sitter-changed-range))
+                               (cl-second (tree-sitter-changed-range))
+                               beg end leftmost rightmost)
+                       #'external-debugging-output)))))))))
 
 (provide 'tree-sitter)
 

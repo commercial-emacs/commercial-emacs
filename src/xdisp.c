@@ -1088,7 +1088,6 @@ static bool set_message_1 (void *, Lisp_Object);
 static bool display_echo_area_1 (void *, Lisp_Object);
 static bool resize_mini_window_1 (void *, Lisp_Object);
 static void unwind_redisplay (void);
-static void rewind_redisplay (void);
 static void extend_face_to_end_of_line (struct it *);
 static intmax_t message_log_check_duplicate (ptrdiff_t, ptrdiff_t);
 static void push_it (struct it *, struct text_pos *);
@@ -4299,9 +4298,6 @@ handle_fontified_prop (struct it *it)
 
       val = Vfontification_functions;
       specbind (Qfontification_functions, Qnil);
-      record_unwind_protect_void (rewind_redisplay);
-      redisplaying_p = false;
-      unblock_buffer_flips();
 
       eassert (it->end_charpos == ZV);
 
@@ -4343,7 +4339,6 @@ handle_fontified_prop (struct it *it)
 	}
 
       it->f->inhibit_clear_image_cache = saved_inhibit_flag;
-      Fredisplay (Qt);
       unbind_to (count, Qnil);
 
       /* Fontification functions routinely call `save-restriction'.
@@ -4374,7 +4369,10 @@ handle_fontified_prop (struct it *it)
 	 something.  This avoids an endless loop if they failed to
 	 fontify the text for which reason ever.  */
       if (!NILP (Fget_char_property (pos, Qfontified, Qnil)))
-	handled = HANDLED_RECOMPUTE_PROPS;
+	{
+	  it->f->fonts_changed = true;
+	  handled = HANDLED_RECOMPUTE_PROPS;
+	}
     }
 
   return handled;
@@ -16484,13 +16482,6 @@ unwind_redisplay (void)
 {
   redisplaying_p = false;
   unblock_buffer_flips ();
-}
-
-static void
-rewind_redisplay (void)
-{
-  redisplaying_p = true;
-  block_buffer_flips ();
 }
 
 /* Mark the display of leaf window W as accurate or inaccurate.
