@@ -129,7 +129,9 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
 
 (defun tree-sitter-do-fontify (pos)
   "Analog to `jit-lock-fontify-now' without all the indirection."
-  (font-lock-fontify-region pos nil font-lock-verbose))
+  (let ((end (or (text-property-any pos (point-max) 'fontified t)
+                 (point-max))))
+    (font-lock-fontify-region pos end font-lock-verbose)))
 
 (define-minor-mode tree-sitter-lock-mode
   "Tree-sitter font-lock minor mode."
@@ -137,11 +139,11 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
   (if tree-sitter-lock-mode
       (progn
         (setq-local font-lock-fontify-region-function #'tree-sitter-fontify-region)
-        (add-hook 'after-change-functions #'tree-sitter-fontify-refresh nil t))
+        (add-hook 'fontification-functions #'tree-sitter-do-fontify nil t))
     (kill-local-variable 'font-lock-fontify-region-function)
-    (remove-hook 'after-change-functions #'tree-sitter-fontify-refresh t)))
+    (remove-hook 'fontification-functions #'tree-sitter-do-fontify t)))
 
-(defun tree-sitter-fontify-region (beg _end loudly)
+(defun tree-sitter-fontify-region (beg end loudly)
   "Presumably widened in `font-lock-fontify-region'."
   (ignore loudly)
   (let ((inhibit-point-motion-hooks t))
@@ -154,23 +156,20 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
                          beg))
                  (end* (if changed-range
                            (min (point-max)
-                                (min (+ beg jit-lock-chunk-size)
-                                     (cl-second changed-range)))
-                         (point-max)))
+                                (max (min (+ beg jit-lock-chunk-size)
+                                          (cl-second changed-range))
+                                     end))
+                         end))
                  (bounds (tree-sitter-highlight-region beg* end*))
                  (leftmost (if bounds (min beg* (car bounds)) beg*))
                  (rightmost (if bounds (max end* (cdr bounds)) end*)))
-            (ignore leftmost rightmost)
-            ;; (when loudly
-            ;;   (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
-            ;;                  (cl-first (tree-sitter-changed-range))
-            ;;                  (cl-second (tree-sitter-changed-range))
-            ;;                  beg end leftmost rightmost)
-            ;;          #'external-debugging-output))
-            ))))))
-
-(defsubst tree-sitter-fontify-refresh (start &rest _args)
-  (tree-sitter-do-fontify start))
+            (put-text-property leftmost rightmost 'fontified t)
+            (when loudly
+              (princ (format "changed [%s %s], initial [%d %d], final [%d %d]\n"
+                             (cl-first (tree-sitter-changed-range))
+                             (cl-second (tree-sitter-changed-range))
+                             beg end leftmost rightmost)
+                     #'external-debugging-output))))))))
 
 (provide 'tree-sitter)
 

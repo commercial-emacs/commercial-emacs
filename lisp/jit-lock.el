@@ -418,15 +418,10 @@ is `jit-lock-mode'."
                                  (jit-lock--run-functions istart iend)))
                      (put-text-property istart* iend* 'fontified t)
 
-                     ;; Make sure the contextual refontification doesn't re-refontify
-                     ;; what's already been refontified.
+                     ;; Advance context-aware fontifier (obsolete?)
                      (when (and jit-lock-context-unfontify-pos
                                 (< jit-lock-context-unfontify-pos iend*)
                                 (>= jit-lock-context-unfontify-pos istart*)
-                                ;; Don't move boundary forward if we have to
-                                ;; refontify previous text.  Otherwise, we risk moving
-                                ;; it past the end of the multiline property and thus
-                                ;; forget about this multiline region altogether.
                                 (not (get-text-property istart* 'jit-lock-defer-multiline)))
                        (setq jit-lock-context-unfontify-pos iend*)))
                 do (setq istart iend))))))
