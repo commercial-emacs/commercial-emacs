@@ -139,9 +139,17 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
   (if tree-sitter-lock-mode
       (progn
         (setq-local font-lock-fontify-region-function #'tree-sitter-fontify-region)
-        (add-hook 'fontification-functions #'tree-sitter-do-fontify nil t))
+        (add-hook 'fontification-functions #'tree-sitter-do-fontify nil t)
+        (add-hook 'after-change-functions #'tree-sitter-douse-fontify nil t))
     (kill-local-variable 'font-lock-fontify-region-function)
-    (remove-hook 'fontification-functions #'tree-sitter-do-fontify t)))
+    (remove-hook 'fontification-functions #'tree-sitter-do-fontify t)
+    (remove-hook 'after-change-functions #'tree-sitter-douse-fontify t)))
+
+(defun tree-sitter-douse-fontify (beg _end old-len)
+  "As was the case for `jit-lock-after-change', I repeat,
+Make sure we change at least one char (in case of deletions)."
+  (unless (zerop old-len)
+    (put-text-property beg (1+ beg) 'fontified nil)))
 
 (defun tree-sitter-fontify-region (beg end loudly)
   "Presumably widened in `font-lock-fontify-region'."
