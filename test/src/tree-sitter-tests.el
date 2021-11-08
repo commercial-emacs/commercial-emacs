@@ -72,6 +72,50 @@ void main (void) {
       (should (equal (tree-sitter-highlights (point-min) (point-max))
                      '(font-lock-type-face (1 . 5) nil (5 . 6) font-lock-function-name-face (6 . 10) nil (10 . 12) font-lock-type-face (12 . 16) nil (16 . 23) font-lock-function-name-face (23 . 29) nil (29 . 30) font-lock-string-face (30 . 43) nil (43 . 48) font-lock-keyword-face (48 . 54) nil (54 . 55) font-lock-constant-face (55 . 56) nil (56 . 59)))))))
 
+(ert-deftest tree-sitter-bog-customize-option ()
+  "When tree-sitter highlighting was implemented as `after-change-functions',
+customizing an option bogged (because `tree-sitter-highlight-region' was called
+for each change in the insufferable `custom-save-variables.')"
+  (let ((text "
+(custom-set-variables
+ '(c-basic-offset 'set-from-style))
+"))
+    (tree-sitter-tests-doit ".el" text
+      (save-buffer)
+      (should (equal font-lock-fontify-region-function
+                     #'tree-sitter-fontify-region))
+      (let* ((user-init-file (file-truename (buffer-file-name)))
+             (custom-file user-init-file)
+             negative positive
+             (record (lambda (f &rest args)
+                       (cl-letf (((symbol-function 'tree-sitter-fontify-region)
+                                  (lambda (&rest _args) (setq negative t))))
+                         (apply f args)))))
+        (add-hook 'after-change-functions
+                  (lambda (beg end _len)
+                    (when (cl-search "custom-set-variables"
+                                     (buffer-substring-no-properties
+                                      beg end))
+                      (setq positive t)))
+                  nil t)
+        (load-file user-init-file)
+        (unwind-protect
+            (progn
+              (add-function
+               :around
+               (symbol-function 'princ)
+               record)
+              (custom-set-variables '(font-lock-support-mode 'tree-sitter-lock-mode))
+              (custom-save-all)
+              (with-temp-buffer
+                (insert-file-contents user-init-file)
+                (should (cl-search "c-basic-offset" (buffer-substring-no-properties
+                                                     (point-min)
+                                                     (point-max)))))
+              (should positive)
+              (should-not negative))
+          (remove-function (symbol-function 'insert) record))))))
+
 (ert-deftest tree-sitter-how-fast ()
   "How fast can it fontify xdisp.c"
   (tree-sitter-tests-with-resources-dir
