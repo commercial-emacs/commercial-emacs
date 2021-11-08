@@ -149,7 +149,7 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
   "As was the case for `jit-lock-after-change', I repeat,
 Make sure we change at least one char (in case of deletions)."
   (unless (zerop old-len)
-    (put-text-property beg (1+ beg) 'fontified nil)))
+    (put-text-property beg (min (point-max) (1+ beg)) 'fontified nil)))
 
 (defun tree-sitter-fontify-region (beg end loudly)
   "Presumably widened in `font-lock-fontify-region'."
