@@ -2918,7 +2918,7 @@ gc_block_maybe_find_live_object_containing (const gc_block *const b,
   };
   const ptrdiff_t obj_nr_slots = gc_cursor_object_nr_slots (c, h);
   const ptrdiff_t end_slot_nr = c.slot_nr + obj_nr_slots;
-  if (p_slot_nr >= end_slot_nr)
+  if (p_slot_nr > end_slot_nr)
     return NULL;
   return gc_cursor_to_object (c, h);
 }
