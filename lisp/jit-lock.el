@@ -619,9 +619,7 @@ will take place when text is fontified stealthily."
        ;; Request refontification.
        (save-restriction
 	 (widen)
-
 	 (put-text-property jit-lock-start jit-lock-end 'fontified nil)))
-
       ;; Mark the change for deferred contextual refontification.
       (when jit-lock-context-unfontify-pos
         (setq jit-lock-context-unfontify-pos
