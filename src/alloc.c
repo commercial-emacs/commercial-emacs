@@ -3187,20 +3187,44 @@ cleanup_vector (struct Lisp_Vector *vector)
 #ifdef HAVE_TREE_SITTER
   else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TREE_SITTER))
     {
-      struct Lisp_Tree_Sitter *lisp_parser
+      struct Lisp_Tree_Sitter *lisp_ts
 	= PSEUDOVEC_STRUCT (vector, Lisp_Tree_Sitter);
-      if (lisp_parser->highlight_names != NULL)
-	xfree (lisp_parser->highlight_names);
-      if (lisp_parser->highlights_query != NULL)
-	xfree (lisp_parser->highlights_query);
-      if (lisp_parser->highlighter != NULL)
-	ts_highlighter_delete (lisp_parser->highlighter);
-      if (lisp_parser->tree != NULL)
-	ts_tree_delete(lisp_parser->tree);
-      if (lisp_parser->prev_tree != NULL)
-	ts_tree_delete(lisp_parser->prev_tree);
-      if (lisp_parser->parser != NULL)
-	ts_parser_delete(lisp_parser->parser);
+      if (lisp_ts->highlight_names != NULL)
+	{
+	  fprintf (stderr, "alloc.c: before names\n");
+	  xfree (lisp_ts->highlight_names);
+	  fprintf (stderr, "alloc.c: after names\n");
+	}
+      if (lisp_ts->highlights_query != NULL)
+	{
+	  fprintf (stderr, "alloc.c: before query\n");
+	  xfree (lisp_ts->highlights_query);
+	  fprintf (stderr, "alloc.c: after query\n");
+	}
+      if (lisp_ts->highlighter != NULL)
+	{
+	  fprintf (stderr, "alloc.c: before hl\n");
+	  ts_highlighter_delete (lisp_ts->highlighter);
+	  fprintf (stderr, "alloc.c: after hl\n");
+	}
+      if (lisp_ts->tree != NULL)
+	{
+	  fprintf (stderr, "alloc.c: before tree\n");
+	  ts_tree_delete(lisp_ts->tree);
+	  fprintf (stderr, "alloc.c: after tree\n");
+	}
+      if (lisp_ts->prev_tree != NULL)
+	{
+	  fprintf (stderr, "alloc.c: before prev_tree\n");
+	  ts_tree_delete(lisp_ts->prev_tree);
+	  fprintf (stderr, "alloc.c: after prev_tree\n");
+	}
+      if (lisp_ts->parser != NULL)
+	{
+	  fprintf (stderr, "alloc.c: before parser\n");
+	  ts_parser_delete(lisp_ts->parser);
+	  fprintf (stderr, "alloc.c: after parser\n");
+	}
     }
 #endif
 }
