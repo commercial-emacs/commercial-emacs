@@ -763,7 +763,7 @@ xwidget_motion_or_crossing (struct xwidget_view *view, const XEvent *event)
 					  &x, &y);
 
   if (!target)
-    target = model->widgetwindow_osr;
+    target = model->widget_osr;
 
   xg_event->any.window = gtk_widget_get_window (target);
   g_object_ref (xg_event->any.window); /* The window will be unrefed
@@ -2388,7 +2388,8 @@ kill_frame_xwidget_views (struct frame *f)
   for (Lisp_Object tail = Vxwidget_view_list; CONSP (tail);
        tail = XCDR (tail))
     {
-      if (XXWIDGET_VIEW (XCAR (tail))->frame == f)
+      if (XWIDGET_VIEW_P (XCAR (tail))
+	  && XXWIDGET_VIEW (XCAR (tail))->frame == f)
 	rem = Fcons (XCAR (tail), rem);
     }
 
