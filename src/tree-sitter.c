@@ -297,11 +297,15 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
       TSHighlighter *ts_highlighter = ensure_highlighter (sitter);
       Lisp_Object language = Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
 					       Fsymbol_value (Qtree_sitter_mode_alist)));
+      Lisp_Object max_bytes = Fsymbol_value (Qjit_lock_chunk_size);
       char *scope;
 
       USE_SAFE_ALLOCA;
       scope = SAFE_ALLOCA (strlen ("scope.") + SCHARS (language) + 1);
       sprintf (scope, "scope.%s", SSDATA (language));
+
+      if (! NILP (max_bytes) && ! FIXNUMP (max_bytes))
+	max_bytes = make_fixnum (1500);
 
       if (ts_highlighter)
 	{
@@ -309,7 +313,9 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 		 (ts_tree_root_node (XTREE_SITTER (sitter)->tree),
 		  BUFFER_TO_SITTER (XFIXNUM (beg)));
 	       (! ts_node_is_null (node)
-		&& ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end)));
+		&& ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end))
+		&& (NILP (max_bytes)
+		    || ts_node_end_byte (node) - ts_node_start_byte (node) < XFIXNUM (max_bytes)));
 	       node = ts_node_next_sibling (node))
 	    {
 	      Lisp_Object
@@ -665,6 +671,7 @@ syms_of_tree_sitter (void)
   DEFSYM (Qtree_sitter_query_error, "tree-sitter-query-error");
   DEFSYM (Qtree_sitter_language_error, "tree-sitter-language-error");
   DEFSYM (Qtree_sitterp, "tree-sitterp");
+  DEFSYM (Qjit_lock_chunk_size, "jit-lock-chunk-size");
 
   define_error (Qtree_sitter_error, "Generic tree-sitter exception", Qerror);
   define_error (Qtree_sitter_parse_error, "Parse error",

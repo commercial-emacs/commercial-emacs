@@ -629,7 +629,8 @@ be enabled."
   (when (and font-lock-mode
 	     (font-lock-specified-p t)
              (not font-lock-fontified))
-    (font-lock-ensure)))
+    (let (jit-lock-chunk-size)
+      (font-lock-ensure))))
 
 (defun font-lock-mode-internal (arg)
   "This was better embedded in a minor mode, obviously."
