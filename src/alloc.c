@@ -2795,7 +2795,7 @@ gc_block_cleanup_after_all_sweeps (gc_block *const b, void *const hptr)
      tospace addresses during this GC cycle.
      XXX: only bother discarding the young generation
      */
-  //gc_block_write_unprotect(b, h);
+
   if (gc_heap_is_moving_gc_this_cycle (h))
     emacs_discard_memory (gc_block_locators (b, h), h->tospace.nr_bytes);
 
