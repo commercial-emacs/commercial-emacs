@@ -4408,7 +4408,7 @@ x_scroll_run (struct window *w, struct run *run)
 	  Window child = children[i];
 	  struct xwidget_view *view = xwidget_view_from_window (child);
 
-	  if (view)
+	  if (view && !view->hidden)
 	    {
 	      int window_y = view->y + view->clip_top;
 	      int window_height = view->clip_bottom - view->clip_top;
@@ -4442,27 +4442,40 @@ x_scroll_run (struct window *w, struct run *run)
 		  window_box (w, TEXT_AREA, &text_area_x, &text_area_y,
 			      &text_area_width, &text_area_height);
 
-		  clip_top = max (0, text_area_y - y);
-		  clip_bottom = max (clip_top,
-				     min (XXWIDGET (view->model)->height,
-					  text_area_y + text_area_height - y));
-
 		  view->y = y;
+
+		  clip_top = 0;
+		  clip_bottom = XXWIDGET (view->model)->height;
+
+		  if (y < text_area_y)
+		    clip_top = text_area_y - y;
+
+		  if ((y + clip_bottom) > (text_area_y + text_area_height))
+		    {
+		      clip_bottom -= (y + clip_bottom) - (text_area_y + text_area_height);
+		    }
+
 		  view->clip_top = clip_top;
 		  view->clip_bottom = clip_bottom;
 
 		  /* This means the view has moved offscreen.  Unmap
 		     it and hide it here.  */
-		  if ((view->clip_top - view->clip_bottom) <= 0)
+		  if ((view->clip_bottom - view->clip_top) <= 0)
 		    {
 		      view->hidden = true;
 		      XUnmapWindow (dpy, child);
 		    }
 		  else
-		    XMoveResizeWindow (dpy, child, view->x + view->clip_left,
-				       view->y + view->clip_top,
-				       view->clip_right - view->clip_left,
-				       view->clip_top - view->clip_bottom);
+		    {
+		      XMoveResizeWindow (dpy, child, view->x + view->clip_left,
+					 view->y + view->clip_top,
+					 view->clip_right - view->clip_left,
+					 view->clip_bottom - view->clip_top);
+		      cairo_xlib_surface_set_size (view->cr_surface,
+						   view->clip_right - view->clip_left,
+						   view->clip_bottom - view->clip_top);
+		    }
+		  xwidget_expose (view);
 		  XFlush (dpy);
 		}
             }
