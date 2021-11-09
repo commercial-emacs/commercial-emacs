@@ -304,30 +304,41 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
       scope = SAFE_ALLOCA (strlen ("scope.") + SCHARS (language) + 1);
       sprintf (scope, "scope.%s", SSDATA (language));
 
-      if (! NILP (max_bytes) && ! FIXNUMP (max_bytes))
-	max_bytes = make_fixnum (1500);
-
       if (ts_highlighter)
 	{
-	  for (TSNode node = ts_node_first_child_for_byte
-		 (ts_tree_root_node (XTREE_SITTER (sitter)->tree),
-		  BUFFER_TO_SITTER (XFIXNUM (beg)));
-	       (! ts_node_is_null (node)
-		&& ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end))
-		&& (NILP (max_bytes)
-		    || ts_node_end_byte (node) - ts_node_start_byte (node) < XFIXNUM (max_bytes)));
-	       node = ts_node_next_sibling (node))
+	  TSNode node = ts_node_first_child_for_byte
+	    (ts_tree_root_node (XTREE_SITTER (sitter)->tree),
+	     BUFFER_TO_SITTER (XFIXNUM (beg)));
+	  while (! ts_node_is_null (node)
+		 && ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end)))
 	    {
-	      Lisp_Object
-		node_start = make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (node))),
-		node_end = make_fixnum (SITTER_TO_BUFFER (ts_node_end_byte (node))),
-		source_code = Fbuffer_substring_no_properties (node_start, node_end);
+	      Lisp_Object node_start, node_end, source_code;
 	      TSHighlightEventSlice ts_highlight_event_slice =
 		(TSHighlightEventSlice) { NULL, 0 };
-	      TSHighlightBuffer *ts_highlight_buffer = ts_highlight_buffer_new ();
+	      TSHighlightBuffer *ts_highlight_buffer;
+	      uint32_t restore_start;
+
+	      if (FIXNUMP (max_bytes)
+		  && (XFIXNUM (max_bytes) <
+		      ts_node_end_byte (node) - ts_node_start_byte (node)))
+		{
+		  TSNode prosp = ts_node_first_child_for_byte
+		    (node, BUFFER_TO_SITTER (XFIXNUM (beg)));
+		  if (! ts_node_is_null (prosp)
+		      && ts_node_start_byte (prosp) <= BUFFER_TO_SITTER (XFIXNUM (beg)))
+		    {
+		      node = prosp;
+		      continue;
+		    }
+		}
+
+	      node_start = make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (node)));
+	      node_end = make_fixnum (SITTER_TO_BUFFER (ts_node_end_byte (node)));
+	      source_code = Fbuffer_substring_no_properties (node_start, node_end);
+	      ts_highlight_buffer = ts_highlight_buffer_new ();
 
 	      /* source code is relative coords */
-	      uint32_t restore_start = node.context[0];
+	      restore_start = node.context[0];
 	      node.context[0] = 0;
 
 	      ts_highlight_event_slice =
@@ -344,6 +355,7 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 			       retval);
 	      ts_highlighter_free_highlights (ts_highlight_event_slice);
 	      ts_highlight_buffer_delete (ts_highlight_buffer);
+	      node = ts_node_next_sibling (node);
 	    }
 	}
 

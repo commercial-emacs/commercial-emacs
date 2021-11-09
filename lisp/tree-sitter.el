@@ -136,6 +136,8 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
 (define-minor-mode tree-sitter-lock-mode
   "Tree-sitter font-lock minor mode."
   :lighter ""
+  (unless (assq major-mode tree-sitter-mode-alist)
+    (setq tree-sitter-lock-mode nil))
   (if tree-sitter-lock-mode
       (progn
         (setq-local font-lock-fontify-region-function #'tree-sitter-fontify-region)
