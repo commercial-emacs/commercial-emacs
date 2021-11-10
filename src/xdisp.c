@@ -4370,6 +4370,7 @@ handle_fontified_prop (struct it *it)
 	 fontify the text for which reason ever.  */
       if (!NILP (Fget_char_property (pos, Qfontified, Qnil)))
 	{
+	  clear_glyph_matrix (it->w->desired_matrix);
 	  it->f->fonts_changed = true;
 	  handled = HANDLED_RECOMPUTE_PROPS;
 	}
