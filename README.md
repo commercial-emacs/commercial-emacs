@@ -18,7 +18,7 @@ Roughly every ninety minutes.
 
 ### How has the code diverged thus far?
 
-- [Tree-sitter font highlighting](#tree-sitter)
+- [Tree-sitter font highlighting.](#tree-sitter)
 - Gnus is rewritten to be non-blocking.
 - The module `process.c` is rewritten.
 
