@@ -461,11 +461,12 @@ tree_sitter_read_buffer (void *payload, uint32_t byte_index,
   if (thread_unsafe_last_scan_characters < tree_sitter_scan_characters)
     {
       thread_unsafe_last_scan_characters = tree_sitter_scan_characters;
+      /* hyper-conservative estimate of 4 bytes per character. */
       if (thread_unsafe_return_value == NULL)
-	thread_unsafe_return_value = xmalloc (tree_sitter_scan_characters + 1);
+	thread_unsafe_return_value = xmalloc (tree_sitter_scan_characters * 4 + 1);
       else
 	thread_unsafe_return_value = xrealloc (thread_unsafe_return_value,
-					       tree_sitter_scan_characters + 1);
+					       tree_sitter_scan_characters * 4 + 1);
     }
 
   if (! BUFFER_LIVE_P (bp))
@@ -473,6 +474,7 @@ tree_sitter_read_buffer (void *payload, uint32_t byte_index,
 
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
   Fwiden ();
+  /* Fbuffer_substring_no_properties is smart about multibyte and gap. */
   sprintf (thread_unsafe_return_value, "%s",
            SSDATA (Fbuffer_substring_no_properties
                    (make_fixnum (start),
@@ -694,8 +696,8 @@ syms_of_tree_sitter (void)
 		Qtree_sitter_error);
 
   DEFVAR_INT ("tree-sitter-scan-characters", tree_sitter_scan_characters,
-	      doc: /* Number of characters to read per tree sitter scan.  */);
-  tree_sitter_scan_characters = 1024;
+	      doc: /* Number of bytes to read per tree sitter scan.  */);
+  tree_sitter_scan_characters = 2048;
 
   DEFSYM (Qtree_sitter_mode_alist, "tree-sitter-mode-alist");
   DEFSYM (Qtree_sitter_resources_dir, "tree-sitter-resources-dir");
