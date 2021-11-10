@@ -524,6 +524,7 @@ DEFUN ("tree-sitter",
 }
 
 /* TODO buffers not utf-8-clean. */
+#define CURRENT_TREE (XTREE_SITTER (sitter)->tree)
 void
 tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 			   ptrdiff_t new_end_char)
@@ -531,8 +532,7 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
   Lisp_Object sitter = Fbuffer_local_value (Qtree_sitter_sitter, Fcurrent_buffer ());
   if (! NILP (sitter))
     {
-      TSTree *tree = XTREE_SITTER (sitter)->tree;
-      if (tree != NULL)
+      if (CURRENT_TREE != NULL)
 	{
 	  static const TSPoint dummy_point = { 0, 0 };
 	  TSInputEdit edit = {
@@ -546,11 +546,11 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 
 	  if (XTREE_SITTER (sitter)->prev_tree != NULL)
 	    ts_tree_delete (XTREE_SITTER (sitter)->prev_tree);
-	  XTREE_SITTER (sitter)->prev_tree = ts_tree_copy (tree);
-	  ts_tree_edit (tree, &edit);
-	  XTREE_SITTER (sitter)->tree =
+	  XTREE_SITTER (sitter)->prev_tree = ts_tree_copy (CURRENT_TREE);
+	  ts_tree_edit (CURRENT_TREE, &edit);
+	  CURRENT_TREE =
 	    ts_parser_parse (XTREE_SITTER (sitter)->parser,
-			     tree,
+			     CURRENT_TREE,
 			     (TSInput) {
 			       current_buffer,
 			       tree_sitter_read_buffer,
