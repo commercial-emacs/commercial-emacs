@@ -696,7 +696,7 @@ syms_of_tree_sitter (void)
 		Qtree_sitter_error);
 
   DEFVAR_INT ("tree-sitter-scan-characters", tree_sitter_scan_characters,
-	      doc: /* Number of bytes to read per tree sitter scan.  */);
+	      doc: /* Number of characters to read per tree sitter scan.  */);
   tree_sitter_scan_characters = 2048;
 
   DEFSYM (Qtree_sitter_mode_alist, "tree-sitter-mode-alist");
