@@ -556,7 +556,7 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 			       tree_sitter_read_buffer,
 			       TSInputEncodingUTF8
 			     });
-	  ts_tree_delete (tree);
+	  /* ts_tree_delete (tree); */
 	}
       else
 	{
