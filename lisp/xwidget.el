@@ -762,7 +762,8 @@ Return the buffer."
   "Goto URL with xwidget webkit."
   (if (xwidget-webkit-current-session)
       (progn
-        (xwidget-webkit-goto-uri (xwidget-webkit-current-session) url))
+        (xwidget-webkit-goto-uri (xwidget-webkit-current-session) url)
+        (switch-to-buffer (xwidget-buffer (xwidget-webkit-current-session))))
     (xwidget-webkit-new-session url)))
 
 (defun xwidget-webkit-back ()
@@ -982,7 +983,7 @@ Press \\<xwidget-webkit-isearch-mode-map>\\[xwidget-webkit-isearch-exit] to exit
     (xwidget-webkit-finish-search (xwidget-webkit-current-session))))
 
 (defun xwidget-webkit-isearch-yank-kill ()
-  "Pull string from kill ring and append it to the current query."
+  "Append the most recent kill from `kill-ring' to the current query."
   (interactive)
   (unless xwidget-webkit-isearch-mode
     (xwidget-webkit-isearch-mode t))
