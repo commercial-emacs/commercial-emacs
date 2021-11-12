@@ -1580,6 +1580,7 @@ You probably want to use this together with
     (define-key map "R" 'image-dired-rotate-original-right)
 
     (define-key map "D" 'image-dired-thumbnail-set-image-description)
+    (define-key map "S" #'image-dired-slideshow-start)
     (define-key map "\C-d" 'image-dired-delete-char)
     (define-key map " " 'image-dired-display-next-thumbnail-original)
     (define-key map (kbd "DEL") 'image-dired-display-previous-thumbnail-original)
@@ -1612,37 +1613,36 @@ You probably want to use this together with
   '("Image-Dired"
     ["Display image" image-dired-display-thumbnail-original-image]
     ["Display in external viewer" image-dired-thumbnail-display-external]
+    ["Jump to Dired buffer" image-dired-jump-original-dired-buffer]
     "---"
-    ["Mark original" image-dired-mark-thumb-original-file]
-    ["Unmark original" image-dired-unmark-thumb-original-file]
-    ["Flag original for deletion" image-dired-flag-thumb-original-file]
-    "---"
-    ["Track original" image-dired-track-original-file]
-    ["Jump to dired buffer" image-dired-jump-original-dired-buffer]
-    ["Toggle movement tracking on/off" image-dired-toggle-movement-tracking
-     :style toggle
-     :selected image-dired-track-movement]
+    ["Mark image" image-dired-mark-thumb-original-file]
+    ["Unmark image" image-dired-unmark-thumb-original-file]
+    ["Unmark all images" image-dired-unmark-all-marks]
+    ["Flag for deletion" image-dired-flag-thumb-original-file]
+    ["Delete marked images" image-dired-delete-marked]
     "---"
     ["Rotate original right" image-dired-rotate-original-right]
     ["Rotate original left" image-dired-rotate-original-left]
     "---"
-    ["Line up thumbnails" image-dired-line-up]
-    ["Dynamic line up" image-dired-line-up-dynamic]
-    ["Refresh thumb" image-dired-refresh-thumb]
-    "---"
     ["Comment thumbnail" image-dired-comment-thumbnail]
     ["Tag current or marked thumbnails" image-dired-tag-thumbnail]
-    "---"
     ["Remove tag from current or marked thumbnails"
      image-dired-tag-thumbnail-remove]
-    ["Unmark all marks" image-dired-unmark-all-marks]
-    ["Delete marked images" image-dired-delete-marked]
-    ["Delete thumbnail from buffer" image-dired-delete-char]
+    ["Start slideshow" image-dired-slideshow-start]
     "---"
+    ("View Options"
+     ["Toggle movement tracking" image-dired-toggle-movement-tracking
+      :style toggle
+      :selected image-dired-track-movement]
+     "---"
+     ["Line up thumbnails" image-dired-line-up]
+     ["Dynamic line up" image-dired-line-up-dynamic]
+     ["Refresh thumb" image-dired-refresh-thumb])
     ["Quit" quit-window]))
 
 (defvar image-dired-display-image-mode-map
   (let ((map (make-sparse-keymap)))
+    (define-key map "S" #'image-dired-slideshow-start)
     ;; Disable keybindings from `image-mode-map' that doesn't make sense here.
     (define-key map "o" nil) ; image-save
     (define-key map "n" nil) ; image-next-file
@@ -1660,6 +1660,7 @@ You probably want to use this together with
   special-mode "image-dired-thumbnail"
   "Browse and manipulate thumbnail images using Dired.
 Use `image-dired-minor-mode' to get a nice setup."
+  :interactive nil
   (buffer-disable-undo)
   (add-hook 'file-name-at-point-functions 'image-dired-file-name-at-point nil t)
   (setq-local window-resize-pixelwise t)
@@ -1758,44 +1759,60 @@ With prefix argument ARG, create thumbnails even if they already exist
         (image-dired-create-thumb curr-file thumb-name)))))
 
 
-;;; Slideshow.
+;;; Slideshow
 
-(defvar image-dired-slideshow-timer nil
+(defcustom image-dired-slideshow-delay 5.0
+  "Seconds to wait before showing the next image in a slideshow.
+This is used by `image-dired-slideshow-start'."
+  :type 'float
+  :version "29.1")
+
+(define-obsolete-variable-alias 'image-dired-slideshow-timer
+  'image-dired--slideshow-timer "29.1")
+(defvar image-dired--slideshow-timer nil
   "Slideshow timer.")
 
-(defvar image-dired-slideshow-count 0
-  "Keeping track on number of images in slideshow.")
-
-(defvar image-dired-slideshow-times 0
-  "Number of pictures to display in slideshow.")
+(defvar image-dired--slideshow-initial nil)
 
 (defun image-dired-slideshow-step ()
-  "Step to next file, if `image-dired-slideshow-times' has not been reached."
-  (if (< image-dired-slideshow-count image-dired-slideshow-times)
-      (progn
-        (message "%s" (1+ image-dired-slideshow-count))
-        (setq image-dired-slideshow-count (1+ image-dired-slideshow-count))
-        (image-dired-next-line-and-display))
+  "Step to next image in a slideshow."
+  (if-let ((buf (get-buffer image-dired-thumbnail-buffer)))
+      (with-current-buffer buf
+        (image-dired-display-next-thumbnail-original))
     (image-dired-slideshow-stop)))
 
-(defun image-dired-slideshow-start ()
-  "Start slideshow.
-Ask user for number of images to show and the delay in between."
-  (interactive)
-  (setq image-dired-slideshow-count 0)
-  (setq image-dired-slideshow-times (string-to-number (read-string "How many: ")))
-  (let ((repeat (string-to-number
-                 (read-string
-                  "Delay, in seconds. Decimals are accepted : " "1"))))
-    (setq image-dired-slideshow-timer
+(defun image-dired-slideshow-start (&optional arg)
+  "Start a slideshow.
+Wait `image-dired-slideshow-delay' seconds before showing the
+next image.
+
+With prefix argument ARG, wait that many seconds before going to
+the next image.
+
+With a negative prefix argument, prompt user for the delay."
+  (interactive "P" image-dired-thumbnail-mode image-dired-display-image-mode)
+  (let ((delay (if (> arg 0)
+                   arg
+                 (string-to-number
+                  (read-string
+                   (let ((delay (number-to-string image-dired-slideshow-delay)))
+                     (format-prompt "Delay, in seconds. Decimals are accepted" delay) delay))))))
+    (setq image-dired--slideshow-timer
           (run-with-timer
-           0 repeat
-           'image-dired-slideshow-step))))
+           0 delay
+           'image-dired-slideshow-step))
+    (add-hook 'post-command-hook 'image-dired-slideshow-stop)
+    (setq image-dired--slideshow-initial t)
+    (message "Running slideshow; use any command to stop")))
 
 (defun image-dired-slideshow-stop ()
   "Cancel slideshow."
-  (interactive)
-  (cancel-timer image-dired-slideshow-timer))
+  ;; Make sure we don't immediately stop after
+  ;; `image-dired-slideshow-start'.
+  (unless image-dired--slideshow-initial
+    (remove-hook 'post-command-hook 'image-dired-slideshow-stop)
+    (cancel-timer image-dired--slideshow-timer))
+  (setq image-dired--slideshow-initial nil))
 
 
 ;;; Thumbnail mode (cont. 3)
@@ -2977,6 +2994,14 @@ Dired."
           (setcdr image-dired-tag-file-list
                   (cons (list tag file) (cdr image-dired-tag-file-list))))
       (setq image-dired-tag-file-list (list (list tag file))))))
+
+(defvar image-dired-slideshow-count 0
+  "Keeping track on number of images in slideshow.")
+(make-obsolete-variable 'image-dired-slideshow-count "no longer used." "29.1")
+
+(defvar image-dired-slideshow-times 0
+  "Number of pictures to display in slideshow.")
+(make-obsolete-variable 'image-dired-slideshow-times "no longer used." "29.1")
 
 (define-obsolete-function-alias 'image-dired-create-display-image-buffer
   #'ignore "29.1")
