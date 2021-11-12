@@ -4596,6 +4596,7 @@ commands:
       (gnus-article-setup-buffer-ensure summary group name original))))
 
 (defun gnus-article-stop-animations ()
+  (declare (obsolete nil "29.1"))
   (cancel-function-timers 'image-animate-timeout))
 
 (defun gnus-stop-downloads ()
