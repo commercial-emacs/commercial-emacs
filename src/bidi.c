@@ -205,7 +205,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    Some functions of the display engine save copies of 'struct it' in
    local variables, and restore them later.  For examples, see
-   pos_visible_p and move_it_in_display_line_to in xdisp.c, and
+   pos_visible_p and emulate_move_it in xdisp.c, and
    window_scroll_pixel_based in window.c.  When this happens, we need
    to save and restore the bidi cache as well, because conceptually
    the cache is part of the 'struct it' state, and needs to be in
@@ -547,7 +547,7 @@ bidi_copy_it (struct bidi_it *to, struct bidi_it *from)
    could run out of memory for pathologically long bracketed text or
    very long text lines that need to be reordered.  This is aggravated
    when word-wrap is in effect, since then functions display_line and
-   move_it_in_display_line_to need to keep up to 4 copies of the
+   emulate_move_it need to keep up to 4 copies of the
    cache.
 
    This limitation means there can be no more than that amount of
