@@ -636,7 +636,7 @@ guesswork is based on these variables:
 (define-minor-mode bug-reference-mode
   "Toggle hyperlinking bug references in the buffer (Bug Reference mode)."
   :after-hook (bug-reference--run-auto-setup)
-  (if bug-reference-mode
+  (if (and bug-reference-mode (eq font-lock-support-mode 'jit-lock-mode))
       (jit-lock-register #'bug-reference-fontify)
     (jit-lock-unregister #'bug-reference-fontify)
     (save-restriction
@@ -659,7 +659,7 @@ same buffer is re-used for different contexts."
 (define-minor-mode bug-reference-prog-mode
   "Like `bug-reference-mode', but only buttonize in comments and strings."
   :after-hook (bug-reference--run-auto-setup)
-  (if bug-reference-prog-mode
+  (if (and bug-reference-prog-mode (eq font-lock-support-mode 'jit-lock-mode))
       (jit-lock-register #'bug-reference-fontify)
     (jit-lock-unregister #'bug-reference-fontify)
     (save-restriction
