@@ -2745,11 +2745,7 @@ safe_call2 (Lisp_Object fn, Lisp_Object arg1, Lisp_Object arg2)
    DEFAULT_FACE_ID for normal text, MODE_LINE_ACTIVE_FACE_ID,
    MODE_LINE_INACTIVE_FACE_ID, or HEADER_LINE_FACE_ID for displaying
    mode lines, or TOOL_BAR_FACE_ID for displaying the tool-bar.
-
-   If ROW is null and BASE_FACE_ID is equal to MODE_LINE_ACTIVE_FACE_ID,
-   MODE_LINE_INACTIVE_FACE_ID, or HEADER_LINE_FACE_ID, the iterator
-   will be initialized to use the corresponding mode line glyph row of
-   the desired matrix of W.  */
+*/
 
 void
 init_iterator (struct it *it, struct window *w,
@@ -2759,15 +2755,10 @@ init_iterator (struct it *it, struct window *w,
   enum face_id remapped_base_face_id = base_face_id;
   int body_width = 0, body_height = 0;
 
-  /* Some precondition checks.  */
   eassert (w != NULL && it != NULL);
   eassert (charpos < 0 || (charpos >= BUF_BEG (current_buffer)
 			   && charpos <= ZV));
 
-  /* If face attributes have been changed since the last redisplay,
-     free realized faces now because they depend on face definitions
-     that might have changed.  Don't free faces while there might be
-     desired matrices pending which reference these faces.  */
   if (!inhibit_free_realized_faces)
     {
       if (face_change)
@@ -2788,8 +2779,8 @@ init_iterator (struct it *it, struct window *w,
     remapped_base_face_id
       = lookup_basic_face (w, XFRAME (w->frame), base_face_id);
 
-  /* Use one of the mode line rows of W's desired matrix if
-     appropriate.  */
+  /* If ROW is null, use the corresponding mode line glyph row of the
+     desired matrix of W.  */
   if (row == NULL)
     {
       if (base_face_id == MODE_LINE_ACTIVE_FACE_ID
@@ -2805,8 +2796,7 @@ init_iterator (struct it *it, struct window *w,
 	}
     }
 
-  /* Clear IT, and set it->object and other IT's Lisp objects to Qnil.
-     Other parts of redisplay rely on that.  */
+  /* Clear out IT. */
   memclear (it, sizeof *it);
   it->current.overlay_string_index = -1;
   it->current.dpvec_index = -1;
@@ -2944,12 +2934,11 @@ init_iterator (struct it *it, struct window *w,
     }
   else
     {
-      /* When hscrolling only the current line, don't apply the
-	 hscroll here, it will be applied by display_line when it gets
-	 to laying out the line showing point.  However, if the
-	 window's min_hscroll is positive, the user specified a lower
-	 bound for automatic hscrolling, so they expect the
-	 non-current lines to obey that hscroll amount.  */
+      /* Don't apply the hscroll here; it will be applied by
+	 display_line.  However, if the window's min_hscroll is
+	 positive, the user specified a lower bound for automatic
+	 hscrolling, so they expect the non-current lines to obey that
+	 hscroll amount.  */
       if (hscrolling_current_line_p (w))
 	{
 	  if (w->min_hscroll > 0)
@@ -8968,7 +8957,7 @@ next_element_from_composition (struct it *it)
  ***********************************************************************/
 
 /* Check if iterator is at a position corresponding to a valid buffer
-   position after some move_it_ call.  */
+   position after some move_it_* call.  */
 
 #define IT_POS_VALID_AFTER_MOVE_P(it)			\
   ((it)->method != GET_FROM_STRING || IT_STRING_CHARPOS (*it) == 0)
@@ -9759,171 +9748,115 @@ move_it_in_display_line (struct it *it,
 
 unsigned int mit_calls1 = 0, mit_calls2 = 0, mit_calls3 = 0, mit_calls4 = 0, mit_calls5 = 0, mit_calls6 = 0, mit_calls7 = 0, mit_calls8 = 0, mit_calls9 = 0, mit_calls10 = 0, mit_calls11 = 0, mit_calls12 = 0, mit_calls13 = 0, mit_calls14 = 0, mit_calls15 = 0;
 
+#define RESTORE_IT_MODULO_ASCENT(IT, IT_BACKUP, DATA)		\
+	  do {						\
+	    int max_ascent = (IT)->max_ascent,		\
+	      max_descent = (IT)->max_descent;		\
+	    RESTORE_IT ((IT), &(IT_BACKUP), (DATA));	\
+	    (IT)->max_ascent = max_ascent;		\
+	    (IT)->max_descent = max_descent;		\
+	  } while (false)
+
 int
 move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos, int op)
 {
-  enum move_it_result skip, skip2 = MOVE_X_REACHED;
-  int line_height, line_start_x = 0, reached = 0;
-  int max_current_x = 0;
+  int line_start_x = 0, max_current_x = 0;
   void *backup_data = NULL;
-  ptrdiff_t orig_charpos = -1;
-  enum it_method orig_method = NUM_IT_METHODS;
 
   for (;;)
     {
-      orig_charpos = IT_CHARPOS (*it);
-      orig_method = it->method;
+      enum move_it_result skip = MOVE_UNDEFINED;
+      ptrdiff_t orig_charpos = IT_CHARPOS (*it);
+      enum it_method orig_method = it->method;
       if (op & MOVE_TO_VPOS)
 	{
-	  /* If no TO_CHARPOS and no TO_X specified, stop at the
-	     start of the line TO_VPOS.  */
-	  if ((op & (MOVE_TO_X | MOVE_TO_POS)) == 0)
-	    {
-	      if (it->vpos == to_vpos)
-		{
-		  reached = 1;
-		  break;
-		}
-	      else {
-                if (++mit_calls1 == 2000) {
-                  skip = emulate_move_it (it, -1, -1, 0);
-                } else {
-                  skip = emulate_move_it (it, -1, -1, 0);
-                }
-              }
-	    }
-	  else
-	    {
-	      /* TO_VPOS >= 0 means stop at TO_X in the line at
-		 TO_VPOS, or at TO_POS, whichever comes first.  */
-	      if (it->vpos == to_vpos)
-		{
-		  reached = 2;
-		  break;
-		}
+	  if (it->vpos == to_vpos)
+	    goto out;
 
-              mit_calls2++;
+	  if (op & (MOVE_TO_X | MOVE_TO_POS))
+	    {
 	      skip = emulate_move_it (it, to_charpos, to_x, op);
 
+	      /* Reached TO_X but not to the line we want.  */
+	      if (skip == MOVE_X_REACHED && it->vpos != to_vpos)
+		skip = emulate_move_it (it, to_charpos, -1, MOVE_TO_POS);
+
 	      if (skip == MOVE_POS_MATCH_OR_ZV || it->vpos == to_vpos)
-		{
-		  reached = 3;
-		  break;
-		}
-	      else if (skip == MOVE_X_REACHED && it->vpos != to_vpos)
-		{
-		  /* We have reached TO_X but not in the line we want.  */
-                  mit_calls3++;
-		  skip = emulate_move_it (it, to_charpos,
-						     -1, MOVE_TO_POS);
-		  if (skip == MOVE_POS_MATCH_OR_ZV)
-		    {
-		      reached = 4;
-		      break;
-		    }
-		}
+		goto out;
 	    }
+	  else
+	    skip = emulate_move_it (it, -1, -1, 0);
 	}
       else if (op & MOVE_TO_Y)
 	{
 	  struct it it_backup;
+	  bool reached = false;
+	  int line_height = 0;
 
-	  if (it->line_wrap == WORD_WRAP)
-	    SAVE_IT (it_backup, *it, backup_data);
+	  SAVE_IT (it_backup, *it, backup_data);
 
-	  /* TO_Y specified means stop at TO_X in the line containing
-	     TO_Y---or at TO_CHARPOS if this is reached first.  The
-	     problem is that we can't really tell whether the line
-	     contains TO_Y before we have completely scanned it, and
-	     this may skip past TO_X.  What we do is to first scan to
-	     TO_X.
-
-	     If TO_X is not specified, use a TO_X of zero.  The reason
-	     is to make the outcome of this function more predictable.
-	     If we didn't use TO_X == 0, we would stop at the end of
-	     the line which is probably not what a caller would expect
-	     to happen.  */
+	  /* A default TO_X of zero avoids stopping at eol. */
           mit_calls4++;
-	  skip = emulate_move_it
-	    (it, to_charpos, ((op & MOVE_TO_X) ? to_x : 0),
-	     (MOVE_TO_X | (op & MOVE_TO_POS)));
+	  skip = emulate_move_it (it, to_charpos, ((op & MOVE_TO_X) ? to_x : 0),
+				  (MOVE_TO_X | (op & MOVE_TO_POS)));
 
-	  /* If TO_CHARPOS is reached or ZV, we don't have to do more.  */
-	  if (skip == MOVE_POS_MATCH_OR_ZV)
-	    reached = 5;
-	  else if (skip == MOVE_X_REACHED)
+	  switch (skip)
 	    {
-	      /* If TO_X was reached, we want to know whether TO_Y is
-		 in the line.  We know this is the case if the already
-		 scanned glyphs make the line tall enough.  Otherwise,
-		 we must check by scanning the rest of the line.  */
-	      line_height = it->max_ascent + it->max_descent;
-	      if (to_y >= it->current_y
-		  && to_y < it->current_y + line_height)
-		{
-		  reached = 6;
-		  break;
-		}
-	      SAVE_IT (it_backup, *it, backup_data);
-              mit_calls5++;
-	      skip2 = emulate_move_it (it, to_charpos, -1, op & MOVE_TO_POS);
-	      line_height = it->max_ascent + it->max_descent;
-	      if (to_y >= it->current_y
-		  && to_y < it->current_y + line_height)
-		{
-		  /* If TO_Y is in this line and TO_X was reached
-		     above, we scanned too far.  We have to restore
-		     IT's settings to the ones before skipping.  But
-		     keep the more accurate values of max_ascent and
-		     max_descent we've found while skipping the rest
-		     of the line, for the sake of callers, such as
-		     pos_visible_p, that need to know the line
-		     height.  */
-		  int max_ascent = it->max_ascent;
-		  int max_descent = it->max_descent;
+	    case MOVE_POS_MATCH_OR_ZV:
+	      /* Reached TO_CHARPOS */
+	      reached = true;
+	      break;
 
-		  RESTORE_IT (it, &it_backup, backup_data);
-		  it->max_ascent = max_ascent;
-		  it->max_descent = max_descent;
-		  reached = 7;
+	    case MOVE_X_REACHED:
+	      eassert (op & MOVE_TO_X);
+	      line_height = it->max_ascent + it->max_descent;
+	      if (to_y >= it->current_y
+		  && to_y < it->current_y + line_height)
+		{
+		  /* Reached TO_X and TO_Y is within line height.  */
+		  reached = true;
 		}
 	      else
 		{
-		  skip = skip2;
-		  if (skip == MOVE_POS_MATCH_OR_ZV)
+		  /* See if we can also reach TO_CHARPOS or TO_Y.  */
+		  SAVE_IT (it_backup, *it, backup_data);
+		  mit_calls5++;
+		  skip = emulate_move_it (it, to_charpos, -1, op & MOVE_TO_POS);
+		  line_height = it->max_ascent + it->max_descent;
+		  if (to_y >= it->current_y
+		      && to_y < it->current_y + line_height)
 		    {
-		      reached = 8;
-		      /* If the last emulate_move_it call
-			 took us away from TO_CHARPOS, back up to the
-			 previous position, as it is a better
-			 approximation of TO_CHARPOS.  (Note that we
-			 could have both positions after TO_CHARPOS or
-			 both positions before it, due to bidi
-			 reordering.)  */
+		      reached = true;
+		      /* Why did 1999 Gerd eschew the updated skip value? */
+		      skip = MOVE_X_REACHED;
+		      /* `pos_visible_p' wants the most current line height. */
+		      RESTORE_IT_MODULO_ASCENT (it, it_backup, backup_data);
+		    }
+		  else if (skip == MOVE_POS_MATCH_OR_ZV)
+		    {
+		      reached = true;
 		      if (IT_CHARPOS (*it) != to_charpos
 			  && ((IT_CHARPOS (it_backup) > to_charpos)
 			      == (IT_CHARPOS (*it) > to_charpos)))
 			{
-			  int max_ascent = it->max_ascent;
-			  int max_descent = it->max_descent;
-
-			  RESTORE_IT (it, &it_backup, backup_data);
-			  it->max_ascent = max_ascent;
-			  it->max_descent = max_descent;
+			  /* We're now off TO_CHARPOS, but remain on
+			     the same side of it (depending on bidi),
+			     so prefer the saved iterator.
+			     `pos_visible_p' wants the most current
+			     line height. */
+			  RESTORE_IT_MODULO_ASCENT (it, it_backup, backup_data);
 			}
 		    }
 		}
-	    }
-	  else
-	    {
-	      /* Check whether TO_Y is in this line.  */
-	      line_height = it->max_ascent + it->max_descent;
+	      break;
 
+	    default:
+	      line_height = it->max_ascent + it->max_descent;
 	      if (to_y >= it->current_y
 		  && to_y < it->current_y + line_height)
 		{
-		  if (to_y > it->current_y)
-		    max_current_x = max (it->current_x, max_current_x);
+		  /* TO_Y is within line height.  */
+		  reached = true;
 
 		  /* When word-wrap is on, TO_X may lie past the end
 		     of a wrapped line.  Then it->current is the
@@ -9934,31 +9867,27 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		    {
 		      int prev_x = max (it->current_x - 1, 0);
 		      RESTORE_IT (it, &it_backup, backup_data);
-                      mit_calls6++;
-		      skip = emulate_move_it
-			(it, -1, prev_x, MOVE_TO_X);
+		      skip = emulate_move_it (it, -1, prev_x, MOVE_TO_X);
 		    }
-		  reached = 9;
 		}
+	      break;
 	    }
 
 	  if (reached)
 	    {
 	      max_current_x = max (it->current_x, max_current_x);
-	      break;
+	      goto out;
 	    }
 	}
       else if (BUFFERP (it->object)
 	       && (it->method == GET_FROM_BUFFER
 		   || it->method == GET_FROM_STRETCH)
 	       && IT_CHARPOS (*it) >= to_charpos
-	       /* Under bidi iteration, a call to set_iterator_to_next
-		  can scan far beyond to_charpos if the initial
-		  portion of the next line needs to be reordered.  In
-		  that case, give emulate_move_it another
-		  chance below.  */
-	       && !(it->bidi_p
-		    && it->bidi_it.scan_dir == -1))
+	       /* When bidi_it.scan_dir is -1, that means bidi scanned
+		  past to_charpos only to reorder the next line.  We
+		  should keep iterating in that case.  */
+	       && (! it->bidi_p
+		   || it->bidi_it.scan_dir != -1))
         {
           skip = MOVE_POS_MATCH_OR_ZV;
         }
@@ -9973,12 +9902,12 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	{
 	case MOVE_POS_MATCH_OR_ZV:
 	  max_current_x = max (it->current_x, max_current_x);
-	  reached = 10;
 	  goto out;
+	  break;
 
 	case MOVE_NEWLINE_OR_CR:
 	  max_current_x = max (it->current_x, max_current_x);
-	  if (!IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
+	  if (! IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
 	    it->override_ascent = -1;
 	  set_iterator_to_next (it, true);
 	  it->continuation_lines_width = 0;
@@ -10006,7 +9935,6 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 				         >= it->n_overlay_strings - 1))
 			      && IT_STRING_CHARPOS (*it) >= it->end_charpos)))))
 	    {
-	      reached = 11;
 	      goto out;
 	    }
 	  break;
@@ -10021,7 +9949,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	    {
 	      it->continuation_lines_width += it->last_visible_x;
 	      /* When moving by vpos, ensure that the iterator really
-		 advances to the next line (bug#847, bug#969).  Fixme:
+		 advances to the next line (bug#847, bug#969).  FIXME
 		 do we need to do this in other circumstances?  */
 	      if (it->current_x != it->last_visible_x
 		  && (op & MOVE_TO_VPOS)
@@ -10033,44 +9961,38 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		    {
 		      struct face *face = FACE_FROM_ID (it->f, it->face_id);
 		      struct font *face_font = face->font;
-
-		      /* When display_line produces a continued line
-			 that ends in a TAB, it skips a tab stop that
-			 is closer than the font's space character
-			 width (see gui_produce_glyphs where it produces
-			 the stretch glyph which represents a TAB).
-			 We need to reproduce the same logic here.  */
 		      eassert (face_font);
-		      if (face_font)
-			{
-			  if (line_start_x < face_font->space_width)
-			    line_start_x
-			      += it->tab_width * face_font->space_width;
-			}
+
+		      /* Reproduce `gui_produce_glyphs' logic which
+                         inserts a stretch glyph to account for
+			 a tab stop closer than space width. */
+		      if (line_start_x < face_font->space_width)
+			line_start_x += it->tab_width * face_font->space_width;
 		    }
 		  set_iterator_to_next (it, false);
 		}
 	    }
 	  else
 	    {
-	      /* Make sure we do advance, otherwise we might infloop.
-		 This could happen when the first display element is
-		 wider than the window, or if we have a wrap-prefix
-		 that doesn't leave enough space after it to display
-		 even a single character.  We only do this for moving
-		 through buffer text, as with display/overlay strings
-		 we'd need to also compare it->object's, and this is
-		 unlikely to happen in that case anyway.  */
 	      if (IT_CHARPOS (*it) == orig_charpos
 		  && it->method == orig_method
 		  && orig_method == GET_FROM_BUFFER)
-		set_iterator_to_next (it, false);
+		{
+		  /* Explicitly advance iterator under degenerate
+		     geometries, e.g., the first display element is
+		     wider than the window, or a wrap-prefix doesn't
+		     leave enough space to fit even a single
+		     character.  */
+		  set_iterator_to_next (it, false);
+		}
+
 	      it->continuation_lines_width += it->current_x;
 	    }
 	  break;
 
 	default:
 	  emacs_abort ();
+	  break;
 	}
 
       /* Reset/increment for the next run.  */
@@ -10087,12 +10009,11 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 
  out:
 
-  /* On text terminals, we may stop at the end of a line in the middle
-     of a multi-character glyph.  If the glyph itself is continued,
-     i.e. it is actually displayed on the next line, don't treat this
-     stopping point as valid; move to the next line instead (unless
-     that brings us offscreen).  */
-  if (!FRAME_WINDOW_P (it->f)
+  /* On text terminals, we might be at eol in the middle of a
+     multi-character glyph.  If the glyph itself is continued, i.e. it
+     is actually displayed on the next line, move to the next line
+     instead.  */
+  if (! FRAME_WINDOW_P (it->f)
       && op & MOVE_TO_POS
       && IT_CHARPOS (*it) == to_charpos
       && it->what == IT_CHARACTER
@@ -10235,7 +10156,6 @@ move_it_vertically_backward (struct it *it, int dy)
 
 	  dec_both (&cp, &bp);
 	  cp = find_newline_no_quit (cp, bp, -1, NULL);
-          mit_calls15++;
 	  move_it_to (it, cp, -1, -1, -1, MOVE_TO_POS);
 	}
     }
@@ -10404,22 +10324,18 @@ move_it_past_eol (struct it *it)
 }
 
 
-/* Move IT by a specified number DVPOS of screen lines down.  DVPOS
-   negative means move up.  DVPOS == 0 means move to the start of the
-   screen line.
-
-   Optimization idea: If we would know that IT->f doesn't use
-   a face with proportional font, we could be faster for
-   truncate-lines nil.  */
+/* Move IT by DVPOS screen lines down (or up if negative).  DVPOS of
+   zero means move to line start.
+*/
 
 void
 move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 {
   if (dvpos == 0)
     {
-      /* DVPOS == 0 means move to the start of the screen line.  */
+      /* Move to bol when DVPOS is zero.  Defer to next call to
+	 `line_bottom_y' for line height.*/
       move_it_vertically_backward (it, 0);
-      /* Let next call to line_bottom_y calculate real line height.  */
       last_height = 0;
     }
   else if (dvpos > 0)
@@ -10458,19 +10374,13 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
               it->position.charpos, it2.position.charpos);
       /*  *it = it2; */
 
-      if (!IT_POS_VALID_AFTER_MOVE_P (it))
+      if (! IT_POS_VALID_AFTER_MOVE_P (it))
 	{
-	  /* Only move to the next buffer position if we ended up in a
-	     string from display property, not in an overlay string
-	     (before-string or after-string).  That is because the
-	     latter don't conceal the underlying buffer position, so
-	     we can ask to move the iterator to the exact position we
-	     are interested in.  Note that, even if we are already at
-	     IT_CHARPOS (*it), the call below is not a no-op, as it
-	     will detect that we are at the end of the string, pop the
-	     iterator, and compute it->current_x and it->hpos
-	     correctly.  */
-          mit_calls9++;
+	  /* Can happen for a display_prop string, in which case we
+	     move off it, or an overlay string, in which case we
+	     merely invoke `move_it_to' to recalculate it->current_x
+	     and it->hpos.  Overlay strings do not conceal the
+	     underlying buffer position.  */
 	  move_it_to (it, IT_CHARPOS (*it) + it->string_from_display_prop_p,
 		      -1, -1, -1, MOVE_TO_POS);
 	}
@@ -10528,7 +10438,6 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	 are involved.  Scan forward and see if it did.  */
       SAVE_IT (it2, *it, it2data);
       it2.vpos = it2.current_y = 0;
-      mit_calls10++;
       move_it_to (&it2, start_charpos, -1, -1, -1, MOVE_TO_POS);
       it->vpos -= it2.vpos;
       it->current_y -= it2.current_y;
@@ -10541,7 +10450,6 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 
 	  RESTORE_IT (&it2, &it2, it2data);
 	  SAVE_IT (it2, *it, it2data);
-          mit_calls11++;
 	  move_it_to (it, -1, -1, -1, it->vpos + delta, MOVE_TO_VPOS);
 	  /* Move back again if we got too far ahead.  */
 	  if (IT_CHARPOS (*it) >= start_charpos)
