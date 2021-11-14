@@ -1314,7 +1314,7 @@ For the \"inline\" alternatives, also see the variable
   (gnus-inews-insert-gcc)
   (let ((gcc (message-unquote-tokens
 	       (message-tokenize-header (mail-fetch-field "gcc" nil t)
-					" ,")))
+					",")))
 	(self (with-current-buffer gnus-summary-buffer
 		gnus-gcc-self-resent-messages)))
     (message-remove-header "gcc")
@@ -1581,7 +1581,7 @@ this is a reply."
 	  (message-remove-header "gcc")
 	  (widen)
 	  (setq groups (message-unquote-tokens
-			(message-tokenize-header gcc " ,\n\t")))
+			(message-tokenize-header gcc ",\n\t")))
 	  ;; Copy the article over to some group(s).
 	  (while (setq group (pop groups))
 	    (setq method (gnus-inews-group-method group))
