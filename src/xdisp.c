@@ -814,9 +814,8 @@ static bool next_element_from_stretch (struct it *);
 static bool next_element_from_xwidget (struct it *);
 static void load_overlay_strings (struct it *, ptrdiff_t);
 static bool get_next_display_element (struct it *);
-static enum move_it_result
-       emulate_move_it (struct it *, ptrdiff_t, int,
-			     enum move_operation_enum);
+static enum move_it_result emulate_move_it (struct it *, ptrdiff_t, int,
+					    enum move_operation_enum);
 static void get_visually_first_element (struct it *);
 static void compute_stop_pos (struct it *);
 static int face_before_or_after_it_pos (struct it *, bool);
@@ -8999,9 +8998,8 @@ next_element_from_composition (struct it *it)
 static unsigned int miidlt_calls = 0;
 
 static enum move_it_result
-emulate_move_it (struct it *it,
-			    ptrdiff_t to_charpos, int to_x,
-			    enum move_operation_enum op)
+emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
+		 enum move_operation_enum op)
 {
   enum move_it_result result = MOVE_UNDEFINED;
   struct glyph_row *saved_glyph_row;
@@ -9010,11 +9008,35 @@ emulate_move_it (struct it *it,
   void *ppos_data = NULL;
   bool may_wrap = false;
   enum it_method prev_method = it->method;
-  ptrdiff_t closest_pos UNINIT;
   ptrdiff_t prev_pos = IT_CHARPOS (*it);
+  ptrdiff_t closest_pos = ZV;
+  bool ppos_p = it->bidi_p && (op & MOVE_TO_POS);
   bool saw_smaller_pos = prev_pos < to_charpos;
   bool line_number_pending = false;
   unsigned int iterations = 0;
+
+#define BUFFER_POS_REACHED_P()					\
+  ((op & MOVE_TO_POS)						\
+   && BUFFERP (it->object)					\
+   && (IT_CHARPOS (*it) == to_charpos				\
+       || ((!it->bidi_p						\
+	    || BIDI_AT_BASE_LEVEL (it->bidi_it))		\
+	   && IT_CHARPOS (*it) > to_charpos)			\
+       || (it->what == IT_COMPOSITION				\
+	   && ((IT_CHARPOS (*it) > to_charpos			\
+		&& to_charpos >= it->cmp_it.charpos)		\
+	       || (IT_CHARPOS (*it) < to_charpos		\
+		   && to_charpos <= it->cmp_it.charpos))))	\
+   && (it->method == GET_FROM_BUFFER				\
+       || (it->method == GET_FROM_DISPLAY_VECTOR		\
+	   && it->dpvec + it->current.dpvec_index + 1 >= it->dpend)))
+
+#define SET_CLOSEST_PAST_CHARPOS(IT)			\
+  do {								\
+    if (IT_CHARPOS (*(IT)) > to_charpos)			\
+      closest_pos = min (closest_pos, IT_CHARPOS (*(IT)));	\
+  }								\
+  while (false)
 
   miidlt_calls++;
 
@@ -9031,39 +9053,10 @@ emulate_move_it (struct it *it,
   atpos_it.sp = -1;
   atx_it.sp = -1;
 
-  /* Use ppos_it under bidi reordering to save a copy of IT for the
-     initial position.  We restore that position in IT when we have
-     scanned the entire display line without finding a match for
-     TO_CHARPOS and all the character positions are greater than
-     TO_CHARPOS.  We then restart the scan from the initial position,
-     and stop at CLOSEST_POS, which is a position > TO_CHARPOS that is
-     the closest to TO_CHARPOS.  */
-  if (it->bidi_p)
-    {
-      if ((op & MOVE_TO_POS) && IT_CHARPOS (*it) >= to_charpos)
-	{
-	  SAVE_IT (ppos_it, *it, ppos_data);
-	  closest_pos = IT_CHARPOS (*it);
-	}
-      else
-	closest_pos = ZV;
-    }
-
-#define BUFFER_POS_REACHED_P()					\
-  ((op & MOVE_TO_POS) != 0					\
-   && BUFFERP (it->object)					\
-   && (IT_CHARPOS (*it) == to_charpos				\
-       || ((!it->bidi_p						\
-	    || BIDI_AT_BASE_LEVEL (it->bidi_it))		\
-	   && IT_CHARPOS (*it) > to_charpos)			\
-       || (it->what == IT_COMPOSITION				\
-	   && ((IT_CHARPOS (*it) > to_charpos			\
-		&& to_charpos >= it->cmp_it.charpos)		\
-	       || (IT_CHARPOS (*it) < to_charpos		\
-		   && to_charpos <= it->cmp_it.charpos))))	\
-   && (it->method == GET_FROM_BUFFER				\
-       || (it->method == GET_FROM_DISPLAY_VECTOR		\
-	   && it->dpvec + it->current.dpvec_index + 1 >= it->dpend)))
+  /* Under bidi, if we fail to reach TO_CHARPOS, restart from initial IT and
+     stop at a position as close as possible but past TO_CHARPOS.  */
+  SAVE_IT (ppos_it, *it, ppos_data);
+  SET_CLOSEST_PAST_CHARPOS (it);
 
   if (it->hpos == 0)
     {
@@ -9103,7 +9096,7 @@ emulate_move_it (struct it *it,
 
       /* Stop if we move beyond TO_CHARPOS (after an image or a
 	 display string or stretch glyph).  */
-      if ((op & MOVE_TO_POS) != 0
+      if ((op & MOVE_TO_POS)
 	  && BUFFERP (it->object)
 	  && it->method == GET_FROM_BUFFER
 	  && (((!it->bidi_p
@@ -9218,11 +9211,7 @@ emulate_move_it (struct it *it,
 	  if (IT_CHARPOS (*it) < CHARPOS (this_line_min_pos))
 	    SET_TEXT_POS (this_line_min_pos,
 			  IT_CHARPOS (*it), IT_BYTEPOS (*it));
-	  if (it->bidi_p
-	      && (op & MOVE_TO_POS)
-	      && IT_CHARPOS (*it) > to_charpos
-	      && IT_CHARPOS (*it) < closest_pos)
-	    closest_pos = IT_CHARPOS (*it);
+	  SET_CLOSEST_PAST_CHARPOS (it);
 	  goto coda;
 	}
 
@@ -9506,22 +9495,16 @@ emulate_move_it (struct it *it,
       /* Is this a line end?  If yes, we're done.  */
       if (ITERATOR_AT_END_OF_LINE_P (it))
 	{
-	  /* If we are past TO_CHARPOS, but never saw any character
-	     positions smaller than TO_CHARPOS, return
-	     MOVE_POS_MATCH_OR_ZV, like the unidirectional display
-	     did.  */
-	  if (it->bidi_p && (op & MOVE_TO_POS) != 0)
+	  result = MOVE_NEWLINE_OR_CR;
+	  if (it->bidi_p && (op & MOVE_TO_POS))
 	    {
-	      if (!saw_smaller_pos && IT_CHARPOS (*it) > to_charpos)
+	      if (! saw_smaller_pos && IT_CHARPOS (*it) > to_charpos)
 		{
-		  if (closest_pos < ZV)
+		  if (ppos_p)
 		    {
 		      RESTORE_IT (it, &ppos_it, ppos_data);
-		      /* Don't recurse if closest_pos is equal to
-			 to_charpos, since we have just tried that.  */
-		      if (closest_pos != to_charpos)
-			emulate_move_it (it, closest_pos, -1,
-						    MOVE_TO_POS);
+		      if (IT_CHARPOS (*it) != to_charpos)
+			emulate_move_it (it, IT_CHARPOS (*it), -1, MOVE_TO_POS);
 		      result = MOVE_POS_MATCH_OR_ZV;
 		    }
 		  else
@@ -9530,14 +9513,9 @@ emulate_move_it (struct it *it,
 	      else if (it->line_wrap == WORD_WRAP && atpos_it.sp >= 0
 		       && IT_CHARPOS (*it) > to_charpos)
 		goto buffer_pos_reached;
-	      else
-		result = MOVE_NEWLINE_OR_CR;
 	    }
-	  else
-	    result = MOVE_NEWLINE_OR_CR;
-	  /* If we've processed the newline, make sure this flag is
-	     reset, as it must only be set when the newline itself is
-	     processed.  */
+
+	  /* Clear a flag that only makes sense if newline unprocessed. */
 	  if (result == MOVE_NEWLINE_OR_CR)
 	    it->constrain_row_ascent_descent_p = false;
 	  break;
@@ -9568,11 +9546,7 @@ emulate_move_it (struct it *it,
 	SET_TEXT_POS (this_line_min_pos, IT_CHARPOS (*it), IT_BYTEPOS (*it));
       if (IT_CHARPOS (*it) < to_charpos)
 	saw_smaller_pos = true;
-      if (it->bidi_p
-	  && (op & MOVE_TO_POS)
-	  && IT_CHARPOS (*it) >= to_charpos
-	  && IT_CHARPOS (*it) < closest_pos)
-	closest_pos = IT_CHARPOS (*it);
+      SET_CLOSEST_PAST_CHARPOS (it);
 
       /* Stop if lines are truncated and IT's current x-position is
 	 past the right edge of the window now.  */
@@ -9588,43 +9562,37 @@ emulate_move_it (struct it *it,
 	      bool at_eob_p = false;
 
 	      if ((at_eob_p = !get_next_display_element (it))
-		  || BUFFER_POS_REACHED_P ()
-		  /* If we are past TO_CHARPOS, but never saw any
-		     character positions smaller than TO_CHARPOS,
-		     return MOVE_POS_MATCH_OR_ZV, like the
-		     unidirectional display did.  */
-		  || (it->bidi_p && (op & MOVE_TO_POS) != 0
-		      && !saw_smaller_pos
-		      && IT_CHARPOS (*it) > to_charpos))
+		  || BUFFER_POS_REACHED_P ())
 		{
-		  if (it->bidi_p
-		      && !BUFFER_POS_REACHED_P ()
-		      && !at_eob_p && closest_pos < ZV)
+		  result = MOVE_POS_MATCH_OR_ZV;
+		  break;
+		}
+	      else if (ppos_p
+		       && !saw_smaller_pos
+		       && IT_CHARPOS (*it) > to_charpos)
+		{
+		  if (closest_pos < ZV)
 		    {
 		      RESTORE_IT (it, &ppos_it, ppos_data);
-		      if (closest_pos != to_charpos)
-			emulate_move_it (it, closest_pos, -1,
-						    MOVE_TO_POS);
+		      emulate_move_it (it, closest_pos, -1, MOVE_TO_POS);
 		    }
 		  result = MOVE_POS_MATCH_OR_ZV;
 		  break;
 		}
-	      if (ITERATOR_AT_END_OF_LINE_P (it))
+	      else if (ITERATOR_AT_END_OF_LINE_P (it))
 		{
 		  result = MOVE_NEWLINE_OR_CR;
 		  break;
 		}
 	    }
-	  else if (it->bidi_p && (op & MOVE_TO_POS) != 0
+	  else if (ppos_p
 		   && !saw_smaller_pos
 		   && IT_CHARPOS (*it) > to_charpos)
 	    {
 	      if (closest_pos < ZV)
 		{
 		  RESTORE_IT (it, &ppos_it, ppos_data);
-		  if (closest_pos != to_charpos)
-		    emulate_move_it (it, closest_pos, -1,
-						MOVE_TO_POS);
+		  emulate_move_it (it, closest_pos, -1, MOVE_TO_POS);
 		}
 	      result = MOVE_POS_MATCH_OR_ZV;
 	      break;
@@ -10334,53 +10302,22 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
   if (dvpos == 0)
     {
       /* Move to bol when DVPOS is zero.  Defer to next call to
-	 `line_bottom_y' for line height.*/
+	 `line_bottom_y' for line height.  */
       move_it_vertically_backward (it, 0);
       last_height = 0;
     }
   else if (dvpos > 0)
     {
       // HERE
-      clock_t t;
-      struct it it2;
-      struct face *face;
-
-      it2 = *it;
-      face = FACE_FROM_ID (it2.f, it2.face_id);
-      if (face && face->font) {
-        it2.pixel_width = face->font->space_width;
-      }
-      it2.continuation_lines_width = (it2.vpos + dvpos) * it2.last_visible_x;
-      for (int i=0, z=it2.last_visible_x; i<z; ++i)
-        INC_TEXT_POS(it2.current.pos, 1);
-      it2.current_x = it2.current_x;
-      it2.current_y += dvpos;
-      it2.c = FETCH_CHAR (IT_BYTEPOS (it2));
-      it2.position = it2.current.pos;
-
       mit_calls8++;
-      t = clock();
       move_it_to (it, -1, -1, -1, it->vpos + dvpos, MOVE_TO_VPOS);
-      t = clock() - t;
-      fprintf(stderr,
-              "nonbrutal seconds=%f it.y=%d it2.y=%d it.dpvi=%d it2.dpvi=%d it.cw=%d it2.cw=%d it.c=%c it2.c=%c it.x=%d it2.x=%d nlines=%d it.cpos=%ld it2.cpos=%ld\n",
-              ((double)t) / CLOCKS_PER_SEC,
-              it->current_y, it2.current_y,
-              it->current.dpvec_index, it2.current.dpvec_index,
-              it->continuation_lines_width, it2.continuation_lines_width,
-              it->c, it2.c,
-              it->current_x, it2.current_x,
-              (int)dvpos,
-              it->position.charpos, it2.position.charpos);
-      /*  *it = it2; */
-
       if (! IT_POS_VALID_AFTER_MOVE_P (it))
 	{
-	  /* Can happen for a display_prop string, in which case we
-	     move off it, or an overlay string, in which case we
-	     merely invoke `move_it_to' to recalculate it->current_x
-	     and it->hpos.  Overlay strings do not conceal the
-	     underlying buffer position.  */
+	  /* Can happen for a display string, in which case we move
+	     off it, or an overlay string, in which case we merely
+	     invoke `move_it_to' to recalculate it->current_x and
+	     it->hpos.  Overlay strings do not conceal the underlying
+	     buffer position.  */
 	  move_it_to (it, IT_CHARPOS (*it) + it->string_from_display_prop_p,
 		      -1, -1, -1, MOVE_TO_POS);
 	}
@@ -10389,11 +10326,10 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
     {
       struct it it2;
       void *it2data = NULL;
-      ptrdiff_t start_charpos, i;
+      ptrdiff_t start_charpos, i, pos_limit;
       int nchars_per_row
 	= (it->last_visible_x - it->first_visible_x) / FRAME_COLUMN_WIDTH (it->f);
       bool hit_pos_limit = false;
-      ptrdiff_t pos_limit;
 
       /* Start at the beginning of the screen line containing IT's
 	 position.  This may actually move vertically backwards,
@@ -10417,7 +10353,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
       reseat (it, it->current.pos, true);
 
       /* Move further back if we end up in a string or an image.  */
-      while (!IT_POS_VALID_AFTER_MOVE_P (it))
+      while (! IT_POS_VALID_AFTER_MOVE_P (it))
 	{
 	  /* First try to move to start of display line.  */
 	  dvpos += it->vpos;
@@ -10460,14 +10396,11 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
       else if (hit_pos_limit && pos_limit > BEGV
 	       && dvpos < 0 && it2.vpos < -dvpos)
 	{
-	  /* If we hit the limit, but still didn't make it far enough
-	     back, that means there's a display string with a newline
-	     covering a large chunk of text, and that caused
-	     back_to_previous_visible_line_start try to go too far.
-	     Punish those who commit such atrocities by going back
-	     until we've reached DVPOS, after lifting the limit, which
-	     could make it slow for very long lines.  "If it hurts,
-	     don't do that!"  */
+	  /* A display string with a newline spanning a large chunk
+	     caused `back_to_previous_visible_line_start' to
+	     overshoot.  Punish it by scanning back to DVPOS, which
+	     will bog under long lines.  "If it hurts, don't do
+	     that!"  */
 	  dvpos += it2.vpos;
 	  RESTORE_IT (it, it, it2data);
 	  for (i = -dvpos; i > 0; --i)

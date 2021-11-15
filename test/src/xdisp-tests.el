@@ -58,16 +58,16 @@
            (let ((max-mini-window-height 4))
              (dotimes (_ 80) (insert "\nhello"))
              (goto-char (point-min))
-             (redisplay 'force)
+             (redisplay)
              (goto-char (point-max))
              ;; A simple edit like removing the last `o' shouldn't cause
              ;; the rest of the minibuffer's text to move.
              (list
-              (progn (redisplay 'force) (window-start))
+              (progn (redisplay) (window-start))
               (progn (delete-char -1)
-                     (redisplay 'force) (window-start))
-              (progn (goto-char (point-min)) (redisplay 'force)
-                     (goto-char (point-max)) (redisplay 'force)
+                     (redisplay) (window-start))
+              (progn (goto-char (point-min)) (redisplay)
+                     (goto-char (point-max)) (redisplay)
                      (window-start)))))))
     (should (equal (nth 0 posns) (nth 1 posns)))
     (should (equal (nth 1 posns) (nth 2 posns)))))
