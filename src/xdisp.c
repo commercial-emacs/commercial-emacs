@@ -10020,8 +10020,8 @@ void
 move_it_vertically_backward (struct it *it, int dy)
 {
   int nlines, h;
-  struct it it2;
-  void *it2data = NULL;
+  struct it it2, it3;
+  void *it2data = NULL, *it3data = NULL;
   ptrdiff_t start_pos;
   int nchars_per_row
     = (it->last_visible_x - it->first_visible_x) / FRAME_COLUMN_WIDTH (it->f);
@@ -10064,10 +10064,32 @@ move_it_vertically_backward (struct it *it, int dy)
 				   reordering is in effect.  */
   it->continuation_lines_width = 0;
 
+  /* Move forward and see what y-distance we moved.  First move to the
+     start of the next line so that we get its height.  We need this
+     height to be able to tell whether we reached the specified
+     y-distance.  */
   SAVE_IT (it2, *it, it2data);
-  // IT_CHARPOS (it2) = max (pos_limit, IT_CHARPOS (it2));
   it2.max_ascent = it2.max_descent = 0;
-  fprintf(stderr, "wtf1a it2.cy=%d it2.cw=%d\n", it2.current_y, it2.continuation_lines_width);
+
+  do
+    {
+      move_it_to (&it2, start_pos, -1, -1, it2.vpos + 1,
+		  MOVE_TO_POS | MOVE_TO_VPOS);
+    }
+  while (! IT_POS_VALID_AFTER_MOVE_P (&it2)
+	 /* If we are in a display string which starts at START_POS,
+	    and that display string includes a newline, and we are
+	    right after that newline (i.e. at the beginning of a
+	    display line), exit the loop, because otherwise we will
+	    infloop, since move_it_to will see that it is already at
+	    START_POS and will not move.  */
+	 && (it2.method != GET_FROM_STRING
+	     || IT_CHARPOS (it2) != start_pos
+	     || SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) != '\n'));
+  eassert (IT_CHARPOS (*it) >= BEGV);
+  SAVE_IT (it3, it2, it3data);
+
+  fprintf(stderr, "wtf1a it2.current_y=%d it2.continuation_lines_width=%d\n", it2.current_y, it2.continuation_lines_width);
 
   t = clock(); // HERE
   // can I get 7293 without calling get_next_display_element?  No.
@@ -10126,42 +10148,24 @@ move_it_vertically_backward (struct it *it, int dy)
 	  cp = find_newline_no_quit (cp, bp, -1, NULL);
 	  move_it_to (it, cp, -1, -1, -1, MOVE_TO_POS);
 	}
+      bidi_unshelve_cache (it3data, true);
     }
   else
     {
       /* Since IT had H subtracted, the target is merely the original IT
          modulo the centering_position (dy). */
       int target_y = it->current_y + h - dy;
-      int y0, line_height;
+      int y0 = it3.current_y;
+      int y1;
+      int line_height;
+
+      fprintf(stderr, "wtf5 target_y=%d\n", target_y);
+      RESTORE_IT (&it3, &it3, it3data);
+      y1 = line_bottom_y (&it3);
+      line_height = y1 - y0;
+
 
       RESTORE_IT (it, it, it2data);
-
-      /* Move forward and see what y-distance we moved.  First move to the
-	 start of the next line so that we get its height.  We need this
-	 height to be able to tell whether we reached the specified
-	 y-distance.  */
-      SAVE_IT (it2, *it, it2data);
-      y0 = it2.current_y;
-      do
-	{
-	  mit_calls13++;
-	  move_it_to (&it2, start_pos, -1, -1, it2.vpos + 1,
-		      MOVE_TO_POS | MOVE_TO_VPOS);
-	}
-      while (!(IT_POS_VALID_AFTER_MOVE_P (&it2)
-	       /* If we are in a display string which starts at START_POS,
-		  and that display string includes a newline, and we are
-		  right after that newline (i.e. at the beginning of a
-		  display line), exit the loop, because otherwise we will
-		  infloop, since move_it_to will see that it is already at
-		  START_POS and will not move.  */
-	       || (it2.method == GET_FROM_STRING
-		   && IT_CHARPOS (it2) == start_pos
-		   && SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) == '\n')));
-      line_height = line_bottom_y (&it2) - y0;
-      RESTORE_IT (it, it, it2data);
-
-      fprintf(stderr, "wtf5 target_y=%d line_height=%d y0=%d y1=%d\n", target_y, line_height, y0, it2.current_y);
       /* If we did not reach target_y, try to move further backward if
 	 we can.  If we moved too far backward, try to move forward.  */
       if (target_y < it->current_y
