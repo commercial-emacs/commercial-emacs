@@ -467,16 +467,11 @@ struct glyph
      glyphs above or below it.  */
   bool_bf overlaps_vertically_p : 1;
 
-  /* For terminal frames, true means glyph is a padding glyph.  Padding
-     glyphs are used for characters whose visual shape consists of
-     more than one glyph (e.g. Asian characters).  All but the first
-     glyph of such a glyph sequence have the padding_p flag set.  This
-     flag is used only to minimize code changes.  A better way would
-     probably be to use the width field of glyphs to express padding.
+  /* For terminal frames, multi-glyph characters have this set for
+     each glyph after the first.
 
-     For graphic frames, true means the pixel width of the glyph in a
-     font is 0, but 1-pixel is padded on displaying for correct cursor
-     displaying.  The member `pixel_width' above is set to 1.  */
+     For graphic frames, some incomprehensible remark making the
+     important observation that `pixel-width' is 1,  */
   bool_bf padding_p : 1;
 
   /* True means the actual glyph is not available, draw using `struct
