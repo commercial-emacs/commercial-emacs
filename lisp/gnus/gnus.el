@@ -3347,22 +3347,12 @@ that that variable is buffer-local to the summary buffers."
 						       (cadar servers)))))
 		  (pop servers))
 		(car servers))
-	      ;; This could be some sort of foreign server that I
-	      ;; simply haven't opened (yet).  Do a brute-force scan
-	      ;; of the entire gnus-newsrc-alist for the server name
-	      ;; of every method.  As a side-effect, loads the
-	      ;; gnus-server-method-cache so this only happens once,
-	      ;; if at all.
-	      (let ((alist (cdr gnus-newsrc-alist))
-		    method match)
-		(while alist
-		  (setq method (gnus-info-method (pop alist)))
-		  (when (and (not (stringp method))
-			     (equal server
-				    (gnus-method-to-server method nil t)))
-		    (setq match method
-			  alist nil)))
-		match))))
+              (catch 'done
+                (dolist (info (cdr gnus-newsrc-alist))
+                  (when-let ((method (gnus-info-method info))
+                             (other (ignore-errors (gnus-method-to-server method nil t))))
+                    (when (equal server other)
+                      (throw 'done method))))))))
 	(when (and result
 		   (not (assoc server gnus-server-method-cache)))
 	  (push (cons server result) gnus-server-method-cache))
