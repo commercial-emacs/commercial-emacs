@@ -1683,6 +1683,7 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
 				 clip_bottom - clip_top, 0,
 				 CopyFromParent, CopyFromParent,
 				 CopyFromParent, CWEventMask, &a);
+      XLowerWindow (xv->dpy, xv->wdesc);
       XDefineCursor (xv->dpy, xv->wdesc, xv->cursor);
       xv->cr_surface = cairo_xlib_surface_create (xv->dpy,
 						  xv->wdesc,
@@ -2600,11 +2601,11 @@ syms_of_xwidget (void)
   DEFSYM (QCplist, ":plist");
 
   DEFVAR_LISP ("xwidget-list", Vxwidget_list,
-               doc:	/* xwidgets list.  */);
+               doc: /* List of all xwidgets that have not been killed.  */);
   Vxwidget_list = Qnil;
 
   DEFVAR_LISP ("xwidget-view-list", Vxwidget_view_list,
-             doc:	/* xwidget views list.  */);
+	       doc: /* List of all xwidget views.  */);
   Vxwidget_view_list = Qnil;
 
   Fprovide (intern ("xwidget-internal"), Qnil);
