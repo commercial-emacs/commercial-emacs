@@ -367,7 +367,7 @@ does not affect old (already subscribed) newsgroups."
   :type '(choice regexp
 		 (const :tag "none" nil)))
 
-(defcustom gnus-background-get-unread-articles t
+(defcustom gnus-background-get-unread-articles (not noninteractive)
   "Instantiate background thread for `gnus-get-unread-articles' which
 covers most of the network retrieval when `gnus-group-get-new-news' is run."
   :group 'gnus-start
