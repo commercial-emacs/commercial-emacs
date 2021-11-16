@@ -537,6 +537,10 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
       if (tree != NULL)
 	{
 	  static const TSPoint dummy_point = { 0, 0 };
+	  Lisp_Object overwrite = BVAR (current_buffer, overwrite_mode);
+	  if (! NILP (overwrite))
+	    old_end_char = start_char;
+
 	  TSInputEdit edit = {
 	    BUFFER_TO_SITTER (start_char),
 	    BUFFER_TO_SITTER (old_end_char),
