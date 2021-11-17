@@ -442,11 +442,11 @@ and the `should' macro requires idempotent evaluation anyway."
                                   result
                                   (if mh-variant-in-use :passed :failed))))
   (mh-test-folder-completion-1 "+/" "+/" "tmp/" t)
-    ;; case "bb"
-    (with-mh-test-env
-      (should (equal nil
-                     (member (format "+%s/" mh-test-rel-folder)
-                             (mh-folder-completion-function "+/" nil t))))))
+  ;; case "bb"
+  (with-mh-test-env
+    (should (equal nil
+                   (member (format "+%s/" mh-test-rel-folder)
+                           (mh-folder-completion-function "+/" nil t))))))
 
 (ert-deftest mh-folder-completion-function-09-plus-slash-tmp ()
   "Test `mh-folder-completion-function' with `+/tmp'."
