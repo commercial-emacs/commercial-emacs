@@ -7178,7 +7178,7 @@ tty_read_avail_input (struct terminal *terminal,
 static void
 handle_async_input (void)
 {
-#ifdef USABLE_SIGIO
+#ifndef DOS_NT
   while (1)
     {
       int nread = gobble_input ();
