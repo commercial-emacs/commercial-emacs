@@ -211,6 +211,10 @@ The tests use this method if no configured MH variant is found."
              "/abso-folder/bar   has no messages."
              "/abso-folder/foo   has no messages."
              "/abso-folder/food  has no messages."))
+           (("folders" "-noheader" "-norecurse" "-nototal" "+/") .
+            ("/+             has no messages ; (others)."
+             "//abso-folder  has no messages ; (others)."
+             "//tmp          has no messages ; (others)."))
            ))
         (arglist (cons (file-name-base program) args)))
     (let ((response-list-cons (assoc arglist argument-responses)))
