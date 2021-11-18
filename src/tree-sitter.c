@@ -538,8 +538,6 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 	{
 	  static const TSPoint dummy_point = { 0, 0 };
 	  Lisp_Object overwrite = BVAR (current_buffer, overwrite_mode);
-	  if (! NILP (overwrite))
-	    old_end_char = start_char;
 
 	  TSInputEdit edit = {
 	    BUFFER_TO_SITTER (start_char),
@@ -551,8 +549,13 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 	  };
 
 	  if (XTREE_SITTER (sitter)->prev_tree != NULL)
-	    ts_tree_delete (XTREE_SITTER (sitter)->prev_tree);
-	  XTREE_SITTER (sitter)->prev_tree = ts_tree_copy (tree);
+	    {
+	      ts_tree_delete (XTREE_SITTER (sitter)->prev_tree);
+	      XTREE_SITTER (sitter)->prev_tree = NULL;
+	    }
+	  if (NILP (overwrite) && (old_end_char - start_char <= 1 ||
+				   new_end_char - start_char <= 1))
+	    XTREE_SITTER (sitter)->prev_tree = ts_tree_copy (tree);
 	  ts_tree_edit (tree, &edit);
 	  XTREE_SITTER (sitter)->tree =
 	    ts_parser_parse (XTREE_SITTER (sitter)->parser,
