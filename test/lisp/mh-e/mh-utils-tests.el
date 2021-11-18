@@ -444,7 +444,8 @@ and the `should' macro requires idempotent evaluation anyway."
   :expected-result '(satisfies (lambda (result)
                                  (ert-test-result-type-p
                                   result
-                                  (if mh-variant-in-use :passed :failed))))
+                                  (if (cl-search "GNU Mailutils" mh-variant-in-use)
+                                      :failed :passed))))
   (mh-test-folder-completion-1 "+/" "+/" "tmp/" t)
   ;; case "bb"
   (with-mh-test-env
@@ -457,7 +458,8 @@ and the `should' macro requires idempotent evaluation anyway."
   :expected-result '(satisfies (lambda (result)
                                  (ert-test-result-type-p
                                   result
-                                  (if mh-variant-in-use :passed :failed))))
+                                  (if (cl-search "GNU Mailutils" mh-variant-in-use)
+                                      :failed :passed))))
   (mh-test-folder-completion-1 "+/tmp" "+/tmp/" "tmp/" t))
 
 (ert-deftest mh-folder-completion-function-10-plus-slash-abs-folder ()
