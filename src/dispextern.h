@@ -2130,8 +2130,7 @@ struct draw_fringe_bitmap_params
    CAVEAT: Under some circumstances, move_.* functions can be called
    asynchronously, e.g. when computing a buffer position from an x and
    y pixel position.  This means that these functions and functions
-   called from them SHOULD NOT USE xmalloc and alike.  See also the
-   comment at the start of xdisp.c.  */
+   called from them SHOULD NOT USE xmalloc and alike.  */
 
 /* Enumeration describing what kind of display element an iterator is
    loaded with after a call to get_next_display_element.  */
