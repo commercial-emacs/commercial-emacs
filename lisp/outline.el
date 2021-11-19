@@ -226,9 +226,11 @@ in the file it applies to.")
                          (if outline-minor-mode-cycle
                              (if outline-minor-mode-highlight
                                  (list 'face (outline-font-lock-face)
-                                       'keymap outline-minor-mode-cycle-map)
+                                       'outline-cycle-keymap
+                                       outline-minor-mode-cycle-map)
                                (list 'face nil
-                                     'keymap outline-minor-mode-cycle-map))
+                                     'outline-cycle-keymap
+                                     outline-minor-mode-cycle-map))
                            (if outline-minor-mode-highlight
                                (list 'face (outline-font-lock-face))))
                        (outline-font-lock-face))
@@ -428,6 +430,11 @@ See the command `outline-mode' for more information on this mode."
           (if (and global-font-lock-mode (font-lock-specified-p major-mode))
               (progn
                 (font-lock-add-keywords nil outline-font-lock-keywords t)
+                (setq-local char-property-alias-alist
+                            (copy-alist char-property-alias-alist))
+                (cl-pushnew
+                 'outline-cycle-keymap
+                 (alist-get 'keymap char-property-alias-alist))
                 (font-lock-flush))
             (outline-minor-mode-highlight-buffer)))
 	;; Turn off this mode if we change major modes.
@@ -438,8 +445,10 @@ See the command `outline-mode' for more information on this mode."
 	;; Cause use of ellipses for invisible text.
 	(add-to-invisibility-spec '(outline . t)))
     (when (or outline-minor-mode-cycle outline-minor-mode-highlight)
-      (if font-lock-fontified
-          (font-lock-remove-keywords nil outline-font-lock-keywords))
+      (when font-lock-fontified
+        (font-lock-remove-keywords nil outline-font-lock-keywords)
+        (when-let ((as (assq 'keymap char-property-alias-alist)))
+          (setcdr as (remq 'outline-cycle-keymap (cdr as)))))
       (remove-overlays nil nil 'outline-overlay t)
       (font-lock-flush))
     (setq line-move-ignore-invisible nil)
