@@ -112,6 +112,121 @@ Set to nil to disable."
   "The column at which a filled paragraph is broken."
   :type 'integer)
 
+(defun erc-fill--remove-stamp-right ()
+  (goto-char (point-min))
+  (let (changed)
+    (while
+        (when-let* ((nextf (next-single-property-change (point) 'field)))
+          (goto-char (field-end nextf t))
+          ;; Sweep up residual phantom field remants
+          (delete-region nextf (field-end nextf t))
+          (setq changed t)))
+    changed))
+
+(defun erc-fill--remove-stamp-left ()
+  "Remove at most one LEFT or one right timestamp, if any."
+  (goto-char (point-min))
+  ;; FIXME actually, it may be a mistake to blow past white space
+  ;; without checking for intervening intervals that need cleaning up.
+  (when-let* ((beg (save-excursion (skip-syntax-forward ">-") (point)))
+              (nextf (when (eq 'erc-timestamp (field-at-pos beg))
+                       (field-beginning beg t)))
+              ((eq 'erc-timestamp (get-text-property nextf 'field))))
+    (goto-char (field-end nextf t))
+    (skip-syntax-forward "-")
+    (delete-region nextf (point))
+    t))
+
+(defun erc-fill--hack-csf (f)
+  ;; HACK until necessary additions to erc-stamp.el arrive (possibly
+  ;; with erc-v3 in #49860), there's no civilized way of detecting the
+  ;; bounds of a displayed message after initial insertion.
+  ;;
+  ;; These callback closures are used for that purpose, but they also
+  ;; contain the timestamp we need.  An unforeseen benefit of this
+  ;; awkwardness is that it plays well with `text-property-not-all',
+  ;; which needs unique values to match against.  That wouldn't be the
+  ;; case were we to use lisp time objects instead because successive
+  ;; messages might contain the exact same one.
+  (if (byte-code-function-p f) (aref (aref f 2) 0) (alist-get 'ct (cadr f))))
+
+;; Enabling `erc-fill-mode' is ultimately destructive to preformatted
+;; text (like ASCII art and figlets), which degenerate immediately
+;; upon display.  This is permanent because we don't store original
+;; messages (though with IRCv3, it may be possible to request a
+;; replacement from the server).
+(defun erc-fill--refill ()
+  (let ((m (make-marker))
+        (reporter (unless noninteractive
+                    (make-progress-reporter "filling" 0 (point-max))))
+        (inhibit-read-only t)
+        (inhibit-point-motion-hooks t)
+        ;;
+        left-changed right-changed ct) ; cached current time
+    (cl-letf (((symbol-function #'erc-restore-text-properties) #'ignore)
+              ((symbol-function #'current-time) (lambda () ct)))
+      (while
+          (save-excursion
+            (goto-char (or (marker-position m) (set-marker m (point-min))))
+            (when-let*
+                ((beg (if (get-text-property (point) 'cursor-sensor-functions)
+                          (point)
+                        (when-let*
+                            ((max (min (point-max) (+ 512 (point))))
+                             (res (next-single-property-change
+                                   (point) 'cursor-sensor-functions nil max))
+                             ((/= res max))) ; otherwise, we're done.
+                          res)))
+                 (val (get-text-property beg 'cursor-sensor-functions))
+                 (beg (progn ; remove left padding, if any.
+                        (goto-char beg)
+                        (skip-syntax-forward "-")
+                        (delete-region (min (line-beginning-position) beg)
+                                       (point))
+                        (point)))
+                 ;; Don't expect output limited to IRC message length.
+                 (end (text-property-not-all beg (point-max)
+                                             'cursor-sensor-functions val)))
+              (save-restriction
+                (narrow-to-region beg end)
+                (setq left-changed (erc-fill--remove-stamp-left))
+                ;; If NOSQUEEZE seems warranted, see note above.
+                (let ((fill-column (- (point-max) (point-min))))
+                  (fill-region (point-min) (point-max)))
+                (setq right-changed (erc-fill--remove-stamp-right))
+                (erc-fill)
+                (when (setq ct (when (or left-changed right-changed)
+                                 (erc-fill--hack-csf (car val))))
+                  (when left-changed
+                    (setq erc-timestamp-last-inserted-left nil))
+                  (when right-changed
+                    (setq erc-timestamp-last-inserted-right nil))
+                  (erc-add-timestamp))
+                (when reporter
+                  (cl-incf (aref (cdr reporter) 2) ; max += d_new - d_old
+                           (- (point-max) (point-min) end (- beg))))
+                (set-marker m (goto-char (point-max))))))
+        (when reporter
+          (progress-reporter-update reporter (point)))
+        (thread-yield)))))
+
+(defvar-local erc-fill--refill-thread nil
+  "A thread running a buffer-refill job.")
+
+(define-error 'erc-fill-canceled "ERC refill canceled" 'error)
+
+(defun erc-fill-buffer (force)
+  "Refill an ERC buffer.
+With FORCE, cancel an active refill job if one exists."
+  (interactive "P")
+  (when (and erc-fill--refill-thread
+             (thread-live-p erc-fill--refill-thread))
+    (if force
+        (thread-signal erc-fill--refill-thread
+                       'erc-fill-canceled (list (buffer-name)))
+      (user-error "Already refilling.")))
+  (setq erc-fill--refill-thread (make-thread #'erc-fill--refill "erc-fill")))
+
 ;;;###autoload
 (defun erc-fill ()
   "Fill a region using the function referenced in `erc-fill-function'.
