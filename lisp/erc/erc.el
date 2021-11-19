@@ -1521,6 +1521,22 @@ The available choices are:
                  (const :tag "Use current buffer" buffer)
                  (const :tag "Use current buffer" t)))
 
+(defcustom erc-reconnect-buffer nil
+  "How (and whether) to display a channel buffer upon reconnecting.
+
+This only affects automatic reconnections and is ignored when issuing a
+/reconnect command or reinvoking `erc-tls' with the same args (assuming
+success, of course).  See `erc-join-buffer' for a description of
+possible values."
+  :group 'erc-buffers
+  :type '(choice (const :tag "Use value of `erc-join-buffer'" nil)
+                 (const :tag "Split window and select" window)
+                 (const :tag "Split window, don't select" window-noselect)
+                 (const :tag "New frame" frame)
+                 (const :tag "Bury in new buffer" bury)
+                 (const :tag "Use current buffer" buffer)
+                 (const :tag "Use current buffer" t)))
+
 (defcustom erc-frame-alist nil
   "Alist of frame parameters for creating erc frames.
 A value of nil means to use `default-frame-alist'."
@@ -1950,7 +1966,10 @@ removed from the list will be disabled."
 
 (defun erc-setup-buffer (buffer)
   "Consults `erc-join-buffer' to find out how to display `BUFFER'."
-  (pcase erc-join-buffer
+  (pcase (if (zerop (erc-with-server-buffer
+                      erc--server-last-reconnect-count))
+             erc-join-buffer
+           (or erc-reconnect-buffer erc-join-buffer))
     ('window
      (if (active-minibuffer-window)
          (display-buffer buffer)
@@ -4722,7 +4741,8 @@ Set user modes and run `erc-after-connect' hook."
             (nick (car (erc-response.command-args parsed)))
             (buffer (process-buffer proc)))
         (setq erc-server-connected t)
-	(setq erc-server-reconnect-count 0)
+        (setq erc--server-last-reconnect-count erc-server-reconnect-count
+              erc-server-reconnect-count 0)
         (erc-update-mode-line)
         (erc-set-initial-user-mode nick buffer)
         (erc-server-setup-periodical-ping buffer)
