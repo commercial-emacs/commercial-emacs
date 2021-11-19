@@ -1178,7 +1178,7 @@ Value is the height in pixels of the line at point.  */)
     }
   SET_TEXT_POS (pt, PT, PT_BYTE);
   void *itdata = bidi_shelve_cache ();
-  start_display (&it, w, pt);
+  start_move_it (&it, w, pt);
   /* Start from the beginning of the screen line, to make sure we
      traverse all of its display elements, and thus capture the
      correct metrics.  */
@@ -1239,7 +1239,7 @@ default_line_pixel_height (struct window *w)
   return height;
 }
 
-/* Subroutine of pos_visible_p below.  Extracts a display string, if
+/* Subroutine of scroll_into_view below.  Extracts a display string, if
    any, from the display spec given as its argument.  */
 static Lisp_Object
 string_from_display_spec (Lisp_Object spec)
@@ -1299,17 +1299,20 @@ reset_box_start_end_flags (struct it *it)
     }
 }
 
-/* Return true if position CHARPOS is visible in window W.
-   CHARPOS < 0 means return info about WINDOW_END position.
-   If visible, set *X and *Y to pixel coordinates of top left corner.
-   Set *RTOP and *RBOT to pixel height of an invisible area of glyph at POS.
-   Set *ROWH and *VPOS to row's visible height and VPOS (row number).  */
+/* Scroll down to window-start of W, optionally also CHARPOS >= 0.
+
+   Return true if CHARPOS is -1 or becomes visible, and set *X and *Y
+   to pixel coordinates of top left corner, set *RTOP and *RBOT to
+   pixel height of an invisible area of glyph at POS, and set *ROWH and
+   *VPOS to row's visible height and VPOS (row number).
+*/
 
 bool
-pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
-	       int *rtop, int *rbot, int *rowh, int *vpos)
+scroll_into_view (struct window *w, ptrdiff_t charpos, int *x, int *y,
+		  int *rtop, int *rbot, int *rowh, int *vpos)
 {
   struct it it;
+  bool move_to_pos_p = (charpos >= 0);
   void *itdata = bidi_shelve_cache ();
   struct text_pos top;
   bool visible_p = false;
@@ -1326,21 +1329,22 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
     }
 
   SET_TEXT_POS_FROM_MARKER (top, w->start);
-  /* Scrolling a minibuffer window via scroll bar when the echo area
-     shows long text sometimes resets the minibuffer contents behind
-     our backs.  Also, someone might narrow-to-region and immediately
-     call a scroll function.  */
+
   if (CHARPOS (top) > ZV || CHARPOS (top) < BEGV)
+    /* Scrolling a minibuffer window via scroll bar when the echo area
+       shows long text sometimes resets the minibuffer contents behind
+       our backs.  Also, someone might narrow-to-region and immediately
+       call a scroll function.  */
     SET_TEXT_POS (top, BEGV, BEGV_BYTE);
 
   /* If the top of the window is after CHARPOS, the latter is surely
      not visible.  */
-  if (charpos >= 0 && CHARPOS (top) > charpos)
+  if (move_to_pos_p && CHARPOS (top) > charpos)
     return visible_p;
 
-  /* Compute exact mode line heights.  Potential for infloop if
-     concurrent lisp hook relies on W's mode line heights remaining
-     unchanged.  */
+  /* Reset mode line heights.  Note this is a critical section.  A
+     concurrent lisp hook also acting on W's mode line heights would
+     likely infloop.  */
   int prev_mode_line_height = w->mode_line_height;
   int prev_header_line_height = w->header_line_height;
   int prev_tab_line_height = w->tab_line_height;
@@ -1381,21 +1385,21 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 			     : window_header_line_format);
     }
 
-  start_display (&it, w, top);
+  start_move_it (&it, w, top);
   move_it_to (&it, charpos, -1, it.last_visible_y - 1, -1,
-	      (charpos >= 0 ? MOVE_TO_POS : 0) | MOVE_TO_Y);
+	      move_to_pos_p ? (MOVE_TO_Y | MOVE_TO_POS) : MOVE_TO_Y);
 
   /* Adjust for line numbers, if CHARPOS is at or beyond first_visible_x,
      but we didn't yet produce the line-number glyphs.  */
-  if (!NILP (Vdisplay_line_numbers)
+  if (! NILP (Vdisplay_line_numbers)
       && it.current_x >= it.first_visible_x
       && IT_CHARPOS (it) == charpos
-      && !it.line_number_produced_p)
+      && ! it.line_number_produced_p)
     {
       /* If the pixel width of line numbers was not yet known, compute
 	 it now.  This usually happens in the first display line of a
 	 window.  */
-      if (!it.lnum_pixel_width)
+      if (! it.lnum_pixel_width)
 	{
 	  struct it it2;
 	  void *it2data = NULL;
@@ -1408,21 +1412,15 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
       it.current_x += it.lnum_pixel_width;
     }
 
-  if (charpos >= 0
-      && (((!it.bidi_p || it.bidi_it.scan_dir != -1)
+  if (move_to_pos_p
+      && (/* non-bidi or bidi-forward */
+	  ((!it.bidi_p || it.bidi_it.scan_dir != -1)
 	   && IT_CHARPOS (it) >= charpos)
-	  /* When scanning backwards under bidi iteration, move_it_to
-	     stops at or _before_ CHARPOS, because it stops at or to
-	     the _right_ of the character at CHARPOS.  */
+	  /* bidi-backard */
 	  || (it.bidi_p && it.bidi_it.scan_dir == -1
 	      && IT_CHARPOS (it) <= charpos)))
     {
-      /* We have reached CHARPOS, or passed it.  How the call to
-	 move_it_to can overshoot: (i) If CHARPOS is on invisible text
-	 or covered by a display property, move_it_to stops at the end
-	 of the invisible text, to the right of CHARPOS.  (ii) If
-	 CHARPOS is in a display vector, move_it_to stops on its last
-	 glyph.  */
+      /* We have reached or passed CHARPOS.  */
       int top_x = it.current_x;
       int top_y = it.current_y;
       int window_top_y = WINDOW_TAB_LINE_HEIGHT (w) + WINDOW_HEADER_LINE_HEIGHT (w);
@@ -1430,39 +1428,50 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
       struct it save_it;
       void *save_it_data = NULL;
 
-      /* Calling line_bottom_y may change it.method, it.position, etc.  */
-      SAVE_IT (save_it, it, save_it_data);
+      SAVE_IT (save_it, it, save_it_data); /* stash before line_bottom_y */
       last_height = 0;
       bottom_y = line_bottom_y (&it);
+      /* Visible if (i) IT's y-start and y-end straddle window's y-start,
+	 or, (ii) window's y-start and y-end straddle IT's y-start. */
       if (top_y < window_top_y)
 	visible_p = bottom_y > window_top_y;
       else if (top_y < it.last_visible_y)
 	visible_p = true;
+
       if (bottom_y >= it.last_visible_y
 	  && it.bidi_p && it.bidi_it.scan_dir == -1
 	  && IT_CHARPOS (it) < charpos)
 	{
-	  /* Bidi overshot CHARPOS going backwards, or so it seems.
-	     Check if instead `move_it_to' merely stopped short of
-	     CHARPOS because it reached last_visible_y.
+	  /* If move_it_to stopped short for last_visible_y, that
+	     would make it appear as if bidi-backwards reached CHARPOS.
 
 	     Hack: if we can vertically move down ten more lines, then
-	     conclude CHARPOS was merely beyond window end (and thus
-	     visible_p is false).  */
-	  int ten_more_lines = 10 * default_line_pixel_height (w);
+	     conclude CHARPOS was merely beyond last_visible_y, and
+	     thus bidi-backwards didn't actually reach CHARPOS and
+	     visible-p is false.
 
+	     I dunno, this reeks of the classic EZ preference to
+	     minimize impact and maximize obfuscation by fixing things
+	     at the leaf nodes instead of further up the tree.  Look
+	     into fixing move_it_to so "stopping short" doesn't
+	     happen.
+	  */
+	  int ten_more_lines = 10 * default_line_pixel_height (w);
 	  move_it_to (&it, charpos, -1, bottom_y + ten_more_lines, -1,
 		      MOVE_TO_POS | MOVE_TO_Y);
 	  if (it.current_y > top_y)
 	    visible_p = false;
 	}
+
       RESTORE_IT (&it, &save_it, save_it_data);
+
       if (visible_p)
 	{
 	  if (it.method == GET_FROM_DISPLAY_VECTOR)
 	    {
 	      /* We stopped on the last glyph of a display vector.
 		 Try and recompute.  Hack alert!  */
+	      eassert (charpos >= 0);
 	      if (charpos < 2 || top.charpos >= charpos)
 		top_x = it.glyph_row->x;
 	      else
@@ -1474,7 +1483,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		     the previous buffer position is also displayed
 		     from a display vector, we need to consume all of
 		     the glyphs from that display vector.  */
-		  start_display (&it2, w, top);
+		  start_move_it (&it2, w, top);
 		  it2.glyph_row = NULL;
 		  move_it_to (&it2, charpos - 1, -1, -1, -1, MOVE_TO_POS);
 		  /* If we didn't get to CHARPOS - 1, there's some
@@ -1508,32 +1517,25 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	    }
 	  else if (IT_CHARPOS (it) != charpos)
 	    {
-	      /* We overshot CHARPOS; was it for a display property? */
-
-	      Lisp_Object cpos = make_fixnum (charpos);
-	      Lisp_Object spec = Fget_char_property (cpos, Qdisplay, Qnil);
-	      Lisp_Object string = string_from_display_spec (spec);
+	      /* We overshot CHARPOS; if it were for a display property
+		 we need to backtrack to where the property begins.*/
+	      Lisp_Object cpos = make_fixnum (charpos),
+		spec = Fget_char_property (cpos, Qdisplay, Qnil),
+		string = string_from_display_spec (spec);
 	      struct text_pos tpos;
 	      bool newline_in_string
 		= (STRINGP (string)
 		   && memchr (SDATA (string), '\n', SBYTES (string)));
 
 	      SET_TEXT_POS (tpos, charpos, CHAR_TO_BYTE (charpos));
-	      bool replacing_spec_p
-		= (!NILP (spec)
-		   && handle_display_spec (NULL, spec, Qnil, Qnil, &tpos,
-					   charpos, FRAME_WINDOW_P (it.f)));
-	      if (replacing_spec_p)
+	      if (! NILP (spec)
+		  && handle_display_spec (NULL, spec, Qnil, Qnil, &tpos,
+					  charpos, FRAME_WINDOW_P (it.f)))
 		{
-		  /* We overshot CHARPOS due to a display property.
-		     If the display string includes newlines, we are
-		     also in the wrong display line.  Backtrack to the
-		     line where the display property begins.  */
-
-		  /* Long-winded hacks ahead, the unfortunate result
-		     of move_it_to stopping after display strings,
-		     while set_cursor_from_row placing the cursor on
-		     the first glyph of the display string.  */
+		  /* Long-winded hacks ahead "necessitated" by
+		     move_it_to stopping at the end of display strings,
+		     but set_cursor_from_row putting the cursor at
+		     the beginning.  */
 		  Lisp_Object startpos, endpos;
 		  EMACS_INT start, end;
 		  struct it it3;
@@ -1548,7 +1550,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		  end = XFIXNAT (endpos);
 		  /* Move to the last buffer position before the
 		     display property.  */
-		  start_display (&it3, w, top);
+		  start_move_it (&it3, w, top);
 		  if (start > CHARPOS (top))
 		    move_it_to (&it3, start - 1, -1, -1, -1, MOVE_TO_POS);
 		  /* Move forward one more line if the position before
@@ -1560,9 +1562,9 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 			  || FETCH_BYTE (IT_BYTEPOS (it3)) == '\n'))
 		    move_it_by_lines (&it3, 1);
 		  else if (emulate_move_it (&it3, -1,
-						       it3.current_x
-						       + it3.pixel_width,
-						       MOVE_TO_X)
+					    it3.current_x
+					    + it3.pixel_width,
+					    MOVE_TO_X)
 			   == MOVE_LINE_CONTINUED)
 		    {
 		      move_it_by_lines (&it3, 1);
@@ -1583,7 +1585,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 			 display string could be _after_ the display
 			 property in the logical order.  Use the
 			 smallest vertical position of these two.  */
-		      start_display (&it3, w, top);
+		      start_move_it (&it3, w, top);
 		      move_it_to (&it3, end + 1, -1, -1, -1, MOVE_TO_POS);
 		      if (it3.current_y < top_y)
 			top_y = it3.current_y;
@@ -1591,7 +1593,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		  /* Move from the top of the window to the beginning
 		     of the display line where the display string
 		     begins.  */
-		  start_display (&it3, w, top);
+		  start_move_it (&it3, w, top);
 		  it3.glyph_row = NULL;
 		  move_it_to (&it3, -1, 0, top_y, -1, MOVE_TO_X | MOVE_TO_Y);
 		  /* If it3_moved stays false after the 'while' loop
@@ -1672,9 +1674,8 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
     }
   else
     {
-      /* Either we were asked to provide info about WINDOW_END, or
-	 CHARPOS is in the partially visible glyph row at end of
-	 window.  */
+      /* CHARPOS is -1 or we couldn't get there (maybe a partially
+	 visible glyph row at window end).  */
       struct it it2;
       void *it2data = NULL;
 
@@ -1684,6 +1685,8 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
       if (charpos < IT_CHARPOS (it)
 	  || (it.what == IT_EOB && charpos == IT_CHARPOS (it)))
 	{
+	  /* CHARPOS was -1, or within a display line's range, or was
+	     really eob. */
 	  visible_p = true;
 	  RESTORE_IT (&it2, &it2, it2data);
 	  move_it_to (&it2, charpos, -1, -1, -1, MOVE_TO_POS);
@@ -1708,6 +1711,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	    r2l = true;
 	}
       else
+	/* going to leave IT potentially shifted a line down */
 	bidi_unshelve_cache (it2data, true);
     }
   bidi_unshelve_cache (itdata, false);
@@ -1718,8 +1722,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
   if (visible_p)
     {
       if (w->hscroll > 0)
-	*x -=
-	  window_hscroll_limited (w, WINDOW_XFRAME (w))
+	*x -= window_hscroll_limited (w, WINDOW_XFRAME (w))
 	  * WINDOW_FRAME_COLUMN_WIDTH (w);
       /* Replicate blink-and-you-miss-it R2L axis-flip from
 	 `buffer_posn_from_coords.'  */
@@ -1727,7 +1730,6 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	*x = window_box_width (w, TEXT_AREA) - *x - 1;
     }
 
-  /* Restore potentially overwritten values.  */
   w->mode_line_height = prev_mode_line_height;
   w->header_line_height = prev_header_line_height;
   w->tab_line_height = prev_tab_line_height;
@@ -3040,7 +3042,7 @@ init_iterator (struct it *it, struct window *w,
    lines width.  */
 
 void
-start_display (struct it *it, struct window *w, struct text_pos pos)
+start_move_it (struct it *it, struct window *w, struct text_pos pos)
 {
   int first_vpos = window_wants_tab_line (w) + window_wants_header_line (w);
   struct glyph_row *row = w->desired_matrix->rows + first_vpos;
@@ -3053,11 +3055,11 @@ start_display (struct it *it, struct window *w, struct text_pos pos)
       && FETCH_BYTE (BYTEPOS (pos) - 1) != '\n')
     {
       /* POS is not bol.  Calculate continuation lines width. */
-      int first_y = it->current_y;
-      int new_x;
+      int first_y = it->current_y, new_x;
       clock_t t;
 
       reseat_at_previous_visible_line_start (it);
+      eassert (it->line_wrap != TRUNCATE); /* reseat best not change this */
 
       t = clock();
       fprintf (stderr,
@@ -3103,10 +3105,9 @@ start_display (struct it *it, struct window *w, struct text_pos pos)
 	       it->descent);
       new_x = it->current_x + it->pixel_width;
 
-      /* A continued line may end in the middle of a multi-glyph
-	 character (e.g. a control character displayed as \003, or in
-	 the middle of an overlay string).  Move off it.  */
-      eassert (it->line_wrap != TRUNCATE); /* reseat hadn't changed line_wrap */
+      /* Move off a line ending in the middle of a multi-glyph (e.g. a
+	 control character displayed as \003, or in the middle of an
+	 overlay string).  */
       if (it->current_x > 0
 	  && (/* And glyph doesn't fit on the line.  */
 	      new_x > it->last_visible_x
@@ -3403,44 +3404,20 @@ handle_stop (struct it *it)
   /* Here's the description of the semantics of, and the logic behind,
      the various HANDLED_* statuses:
 
-     HANDLED_NORMALLY means the handler did its job, and the loop
-     should proceed to calling the next handler in order.
+     HANDLED_NORMALLY means "nothing to see here, next handler
+     please."
 
-     HANDLED_RECOMPUTE_PROPS means the handler caused a significant
-     change in the properties and overlays at current position, so the
-     loop should be restarted, to re-invoke the handlers that were
-     already called.  This happens when fontification-functions were
-     called by handle_fontified_prop, and actually fontified
-     something.  Another case where HANDLED_RECOMPUTE_PROPS is
-     returned is when we discover overlay strings that need to be
-     displayed right away.  The loop below will continue for as long
-     as the status is HANDLED_RECOMPUTE_PROPS.
+     HANDLED_RECOMPUTE_PROPS means reinvoke all handlers, say, when
+     fontification of IT occurred, or overlay strings need redisplay.
+     It's not clear how useful this since setting it->f->fonts_changed
+     to true triggers frame redisplay.
 
-     HANDLED_RETURN means return immediately to the caller, to
-     continue iteration without calling any further handlers.  This is
-     used when we need to act on some property right away, for example
-     when we need to display the ellipsis or a replacing display
-     property, such as display string or image.
+     HANDLED_RETURN means return immediately.  Perhaps the main loop
+     needs to act on some property right away, for example to display
+     the ellipsis, display string, or image.
 
-     HANDLED_OVERLAY_STRING_CONSUMED means an overlay string was just
-     consumed, and the handler switched to the next overlay string.
-     This signals the loop below to refrain from looking for more
-     overlays before all the overlay strings of the current overlay
-     are processed.
-
-     Some of the handlers called by the loop push the iterator state
-     onto the stack (see 'push_it'), and arrange for the iteration to
-     continue with another object, such as an image, a display string,
-     or an overlay string.  In most such cases, it->stop_charpos is
-     set to the first character of the string, so that when the
-     iteration resumes, this function will immediately be called
-     again, to examine the properties at the beginning of the string.
-
-     When a display or overlay string is exhausted, the iterator state
-     is popped (see 'pop_it'), and iteration continues with the
-     previous object.  Again, in many such cases this function is
-     called again to find the next position where properties might
-     change.  */
+     HANDLED_OVERLAY_STRING_CONSUMED constrains the current cycle to
+     only process overlay strings of the current overlay.  */
 
   do
     {
@@ -3522,148 +3499,98 @@ handle_stop (struct it *it)
 }
 
 
-/* Compute IT->stop_charpos from text property and overlay change
-   information for IT's current position.  */
+/* Compute IT->stop_charpos from text property and overlay changes. */
 
 static void
 compute_stop_pos (struct it *it)
 {
-  register INTERVAL iv, next_iv;
-  Lisp_Object object, limit, position;
+  register INTERVAL interval;
+  Lisp_Object position;
   ptrdiff_t charpos, bytepos;
 
   if (STRINGP (it->string))
     {
-      /* Strings are usually short, so don't limit the search for
-	 properties.  */
-      it->stop_charpos = it->end_charpos;
-      object = it->string;
-      limit = Qnil;
       charpos = IT_STRING_CHARPOS (*it);
       bytepos = IT_STRING_BYTEPOS (*it);
+      it->stop_charpos = it->end_charpos;
     }
   else
     {
-      ptrdiff_t pos;
-
-      /* If end_charpos is out of range for some reason, such as a
-	 misbehaving display function, rationalize it (Bug#5984).  */
-      if (it->end_charpos > ZV)
-	it->end_charpos = ZV;
-      it->stop_charpos = it->end_charpos;
-
-      /* If next overlay change is in front of the current stop pos
-	 (which is IT->end_charpos), stop there.  Note: value of
-	 next_overlay_change is point-max if no overlay change
-	 follows.  */
+      ptrdiff_t propmax = IT_CHARPOS (*it) + TEXT_PROP_DISTANCE_LIMIT;
       charpos = IT_CHARPOS (*it);
       bytepos = IT_BYTEPOS (*it);
-      pos = next_overlay_change (charpos);
-      if (pos < it->stop_charpos)
-	it->stop_charpos = pos;
 
-      /* Set up variables for computing the stop position from text
-         property changes.  */
-      XSETBUFFER (object, current_buffer);
-      pos = charpos + TEXT_PROP_DISTANCE_LIMIT;
-      /* Make sure the above arbitrary limit position is not in the
-	 middle of composable text, so we don't break compositions by
-	 submitting the composable text to the shaper in separate
-	 chunks.  We play safe here by assuming that only SPC, TAB,
-	 FF, and NL cannot be in some composition; in particular, most
-	 ASCII punctuation characters could be composed into ligatures.  */
-      if (!NILP (BVAR (current_buffer, enable_multibyte_characters))
-	  && !NILP (Vauto_composition_mode))
+      /* just-in-time disaster aversion Bug#5984 */
+      it->end_charpos = min (it->end_charpos, ZV);
+
+      it->stop_charpos = min (it->end_charpos, next_overlay_change (charpos));
+
+      /* Constrain search for text prop changes.  */
+      if (propmax < it->stop_charpos)
 	{
-	  ptrdiff_t endpos = charpos + 10 * TEXT_PROP_DISTANCE_LIMIT;
-	  bool found = false;
-
-	  if (pos > ZV)
-	    pos = ZV;
-	  if (endpos > ZV)
-	    endpos = ZV;
-	  ptrdiff_t bpos = CHAR_TO_BYTE (pos);
-	  while (pos < endpos)
+	  if (! NILP (BVAR (current_buffer, enable_multibyte_characters))
+	      && ! NILP (Vauto_composition_mode))
 	    {
-	      int ch = fetch_char_advance_no_check (&pos, &bpos);
-	      if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\f')
+	      /* Move off a ligature.  */
+	      ptrdiff_t pos = propmax,
+		bpos = CHAR_TO_BYTE (pos),
+		ligmax = min (propmax + 10 * TEXT_PROP_DISTANCE_LIMIT, it->stop_charpos);
+	      while (pos < ligmax)
 		{
-		  found = true;
+		  int ch = fetch_char_advance_no_check (&pos, &bpos);
+		  /* Most punctuation characters admit ligatures, so
+		     assume only SPC, TAB, FF, and NL cannot be.  */
+		  if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\f')
+		    {
+		      eassert (pos >= propmax);
+		      eassert (pos < it->stop_charpos);
+		      propmax = --pos;
+		      break;
+		    }
+		}
+	    }
+	  eassert (propmax < it->stop_charpos);
+	  it->stop_charpos = propmax;
+	}
+    }
+
+  position = make_fixnum (charpos);
+  interval = validate_interval_range
+    (STRINGP (it->string) ? it->string : Fcurrent_buffer (),
+     &position, &position, false);
+  if (interval)
+    {
+      Lisp_Object props_here[LAST_PROP_IDX];
+      for (struct props *p = it_props; p->handler; ++p)
+	props_here[p->idx] =
+	  textget (interval->plist, builtin_lisp_symbol (p->name));
+
+      for (INTERVAL i = next_interval (interval);
+	   i && i->position < it->stop_charpos;
+	   i = next_interval (i))
+	{
+	  for (struct props *p = it_props; p->handler; ++p)
+	    {
+	      Lisp_Object prop_there =
+		textget (i->plist, builtin_lisp_symbol (p->name));
+	      if (! EQ (props_here[p->idx], prop_there))
+		{
+		  eassert (i->position < it->stop_charpos);
+		  it->stop_charpos = i->position;
+		  i = NULL;
 		  break;
 		}
 	    }
-	  if (found)
-	    pos--;
-	  else if (it->stop_charpos < endpos)
-	    pos = it->stop_charpos;
-	  else
-	    {
-	      /* Give up and use the original arbitrary limit.  */
-	      pos = charpos + TEXT_PROP_DISTANCE_LIMIT;
-	    }
-	}
-      limit = make_fixnum (pos);
-    }
-
-  /* Get the interval containing IT's position.  Value is a null
-     interval if there isn't such an interval.  */
-  position = make_fixnum (charpos);
-  iv = validate_interval_range (object, &position, &position, false);
-  if (iv)
-    {
-      Lisp_Object values_here[LAST_PROP_IDX];
-      struct props *p;
-
-      /* Get properties here.  */
-      for (p = it_props; p->handler; ++p)
-	values_here[p->idx] = textget (iv->plist,
-				       builtin_lisp_symbol (p->name));
-
-      /* Look for an interval following iv that has different
-	 properties.  */
-      for (next_iv = next_interval (iv);
-	   (next_iv
-	    && (NILP (limit)
-		|| XFIXNAT (limit) > next_iv->position));
-	   next_iv = next_interval (next_iv))
-	{
-	  for (p = it_props; p->handler; ++p)
-	    {
-	      Lisp_Object new_value = textget (next_iv->plist,
-					       builtin_lisp_symbol (p->name));
-	      if (!EQ (values_here[p->idx], new_value))
-		break;
-	    }
-
-	  if (p->handler)
-	    break;
-	}
-
-      if (next_iv)
-	{
-	  if (FIXNUMP (limit)
-	      && next_iv->position >= XFIXNAT (limit))
-	    /* No text property change up to limit.  */
-	    it->stop_charpos = min (XFIXNAT (limit), it->stop_charpos);
-	  else
-	    /* Text properties change in next_iv.  */
-	    it->stop_charpos = min (it->stop_charpos, next_iv->position);
 	}
     }
 
   if (it->cmp_it.id < 0)
     {
-      ptrdiff_t stoppos = it->end_charpos;
-
-      if (it->bidi_p && it->bidi_it.scan_dir < 0)
-	stoppos = -1;
-      composition_compute_stop_pos (&it->cmp_it, charpos, bytepos,
-				    stoppos, it->string);
+      composition_compute_stop_pos
+	(&it->cmp_it, charpos, bytepos,
+	 (it->bidi_p && it->bidi_it.scan_dir < 0) ? -1 : it->end_charpos,
+	 it->string);
     }
-
-  eassert (STRINGP (it->string)
-	   || (it->stop_charpos >= BEGV
-	       && it->stop_charpos >= IT_CHARPOS (*it)));
 }
 
 
@@ -8267,8 +8194,8 @@ get_visually_first_element (struct it *it)
 
 /* Load IT with the next display element from Lisp string IT->string.
    IT->current.string_pos is the current position within the string.
-   If IT->current.overlay_string_index >= 0, the Lisp string is an
-   overlay string.  */
+   Side effects include calling handle_stop and handle_stop_backwards
+   to process text properties.  */
 
 static bool
 next_element_from_string (struct it *it)
@@ -8698,12 +8625,9 @@ next_element_from_buffer (struct it *it)
 	{
 	  if (it->bidi_p)
 	    {
-	      /* Take note of the stop position we just moved across,
-		 for when we will move back across it.  */
+	      /* Stash the stop pos we just moved across for the bidi
+		 return trip.  */
 	      it->prev_stop = it->stop_charpos;
-	      /* If we are at base paragraph embedding level, take
-		 note of the last stop position seen at this
-		 level.  */
 	      if (BIDI_AT_BASE_LEVEL (it->bidi_it))
 		it->base_level_stop = it->stop_charpos;
 	    }
@@ -9600,6 +9524,17 @@ move_it_in_display_line (struct it *it,
     emulate_move_it (it, to_charpos, to_x, op);
 }
 
+unsigned int mit_calls1 = 0, mit_calls2 = 0, mit_calls3 = 0, mit_calls4 = 0, mit_calls5 = 0, mit_calls6 = 0, mit_calls7 = 0, mit_calls8 = 0, mit_calls9 = 0, mit_calls10 = 0, mit_calls11 = 0, mit_calls12 = 0, mit_calls13 = 0, mit_calls14 = 0, mit_calls15 = 0;
+
+/* `scroll_into_view' wants the most current line height. */
+#define RESTORE_IT_MODULO_ASCENT(IT, IT_BACKUP, DATA)	\
+  do {							\
+    int max_ascent = (IT)->max_ascent,			\
+      max_descent = (IT)->max_descent;			\
+    RESTORE_IT ((IT), &(IT_BACKUP), (DATA));		\
+    (IT)->max_ascent = max_ascent;			\
+    (IT)->max_descent = max_descent;			\
+  } while (false)
 
 /* Move IT forward until it satisfies one or more of the criteria in
    TO_CHARPOS, TO_X, TO_Y, and TO_VPOS.
@@ -9609,23 +9544,12 @@ move_it_in_display_line (struct it *it,
    description of enum move_operation_enum.
 
    If TO_CHARPOS is in invisible text, e.g. a truncated part of a
-   screen line, this function will set IT to the next position that is
-   displayed to the right of TO_CHARPOS on the screen.
+   screen line, set IT to the next displayable position right of TO_CHARPOS.
+
+   If TO_CHARPOS is in a display vector, set IT to its last glyph.
 
    Return the maximum pixel length of any line scanned but never more
    than it.last_visible_x.  */
-
-unsigned int mit_calls1 = 0, mit_calls2 = 0, mit_calls3 = 0, mit_calls4 = 0, mit_calls5 = 0, mit_calls6 = 0, mit_calls7 = 0, mit_calls8 = 0, mit_calls9 = 0, mit_calls10 = 0, mit_calls11 = 0, mit_calls12 = 0, mit_calls13 = 0, mit_calls14 = 0, mit_calls15 = 0;
-
-/* `pos_visible_p' wants the most current line height. */
-#define RESTORE_IT_MODULO_ASCENT(IT, IT_BACKUP, DATA)	\
-  do {							\
-    int max_ascent = (IT)->max_ascent,			\
-      max_descent = (IT)->max_descent;			\
-    RESTORE_IT ((IT), &(IT_BACKUP), (DATA));		\
-    (IT)->max_ascent = max_ascent;			\
-    (IT)->max_descent = max_descent;			\
-  } while (false)
 
 int
 move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos, int op)
@@ -10390,7 +10314,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to, Li
     max_y = XFIXNUM (y_limit);
 
   itdata = bidi_shelve_cache ();
-  start_display (&it, w, startp);
+  start_move_it (&it, w, startp);
   int start_y = it.current_y;
   /* It makes no sense to measure dimensions of region of text that
      crosses the point where bidi reordering changes scan direction.
@@ -10469,7 +10393,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to, Li
     start_x = 0;
 
   /* Subtract height of header-line and tab-line which was counted
-     automatically by start_display.  */
+     automatically by start_move_it.  */
   y = it.current_y + it.max_ascent + it.max_descent
     - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
   /* Don't return more than Y-LIMIT.  */
@@ -10663,7 +10587,7 @@ DEFUN ("display--line-is-continued-p", Fdisplay__line_is_continued_p,
       Fvertical_motion (make_fixnum (0), selected_window, Qnil);
       SET_TEXT_POS (startpos, PT, PT_BYTE);
       itdata = bidi_shelve_cache ();
-      start_display (&it, w, startpos);
+      start_move_it (&it, w, startpos);
       /* If lines are truncated, no line is continued.  */
       if (it.line_wrap != TRUNCATE)
 	{
@@ -15578,9 +15502,9 @@ redisplay_internal (void)
 	  struct it it;
 	  int line_height_before = this_line_pixel_height;
 
-	  /* Note that start_display will handle the case that the
+	  /* Note that start_move_it will handle the case that the
 	     line starting at tlbufpos is a continuation line.  */
-	  start_display (&it, w, tlbufpos);
+	  start_move_it (&it, w, tlbufpos);
 
 	  /* Implementation note: It this still necessary?  */
 	  if (it.current_x != this_line_start_x)
@@ -17170,7 +17094,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
       /* Compute the pixel ypos of the scroll margin, then move IT to
 	 either that ypos or PT, whichever comes first.  */
-      start_display (&it, w, startp);
+      start_move_it (&it, w, startp);
       scroll_margin_y = it.last_visible_y - partial_line_height (&it)
         - this_scroll_margin
 	- frame_line_height * extra_scroll_margin_lines;
@@ -17275,7 +17199,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
       if (amount_to_scroll <= 0)
 	return SCROLLING_FAILED;
 
-      start_display (&it, w, startp);
+      start_move_it (&it, w, startp);
       if (arg_scroll_conservatively <= scroll_limit)
 	move_it_vertically (&it, amount_to_scroll);
       else
@@ -17319,7 +17243,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	{
 	  int y_start;
 
-	  start_display (&it, w, startp);
+	  start_move_it (&it, w, startp);
 	  y_start = it.current_y;
 	  move_it_vertically (&it, this_scroll_margin);
 	  scroll_margin_pos = it.current.pos;
@@ -17343,7 +17267,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	     Give up if distance is greater than scroll_max or if we
 	     didn't reach the scroll margin position.  */
 	  SET_TEXT_POS (pos, PT, PT_BYTE);
-	  start_display (&it, w, pos);
+	  start_move_it (&it, w, pos);
 	  y0 = it.current_y;
 	  y_to_move = max (it.last_visible_y,
 			   max (scroll_max, 10 * frame_line_height));
@@ -17359,7 +17283,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	  dy += y_offset;
 
 	  /* Compute new window start.  */
-	  start_display (&it, w, startp);
+	  start_move_it (&it, w, startp);
 
 	  if (arg_scroll_conservatively)
 	    amount_to_scroll = max (dy, frame_line_height
@@ -17962,7 +17886,7 @@ set_horizontal_scroll_bar (struct window *w)
 	}
 
       SET_TEXT_POS_FROM_MARKER (startp, w->start);
-      start_display (&it, w, startp);
+      start_move_it (&it, w, startp);
       it.last_visible_x = INT_MAX;
       whole = move_it_to (&it, -1, INT_MAX, window_box_height (w), -1,
 			  MOVE_TO_X | MOVE_TO_Y);
@@ -18240,7 +18164,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       ptrdiff_t it_charpos;
 
       w->optional_new_start = false;
-      start_display (&it, w, startp);
+      start_move_it (&it, w, startp);
       move_it_to (&it, PT, 0, it.last_visible_y, -1,
 		  MOVE_TO_POS | MOVE_TO_X | MOVE_TO_Y);
       /* Record IT's position now, since line_bottom_y might change
@@ -18522,7 +18446,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  && XMARKER (w->start)->buffer == current_buffer
 	  && compute_window_start_on_continuation_line (w)
 	  /* If PT isn't visible, all bets are off.  See bug#9324.  */
-	  && pos_visible_p (w, PT, &d1, &d2, &rtop, &rbot, &d5, &d6)
+	  && scroll_into_view (w, PT, &d1, &d2, &rtop, &rbot, &d5, &d6)
 	  /* A very tall row could need more than the window height,
 	     in which case we accept that it is partially visible.  */
 	  && (rtop != 0) == (rbot != 0))
@@ -18652,7 +18576,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  void *it1data = NULL;
 
 	  SAVE_IT (it1, it, it1data);
-	  start_display (&it1, w, startp);
+	  start_move_it (&it1, w, startp);
 	  move_it_vertically (&it1, margin * frame_line_height);
 	  margin_pos = IT_CHARPOS (it1);
 	  RESTORE_IT (&it, &it, it1data);
@@ -18782,7 +18706,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  /* If the window starts with a before-string that spans more
 	     than one screen line, using that position to display the
 	     window might fail to bring point into the view, because
-	     start_display will always start by displaying the string,
+	     start_move_it will always start by displaying the string,
 	     whereas the code above determines where to set w->start
 	     by the buffer position of the place where it takes screen
 	     coordinates.  Try to recover by finding the next screen
@@ -19119,7 +19043,7 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
   overlay_arrow_seen = false;
 
   /* Initialize iterator and info to start at POS.  */
-  start_display (&it, w, pos);
+  start_move_it (&it, w, pos);
   it.glyph_row->reversed_p = false;
 
   /* Display all lines of W.  */
@@ -19132,7 +19056,7 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
     }
 
   /* Save the character position of 'it' before we call
-     'start_display' again.  */
+     'start_move_it' again.  */
   ptrdiff_t it_charpos = IT_CHARPOS (it);
 
   /* Don't let the cursor end in the scroll margins.  However, when
@@ -19146,7 +19070,7 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
       int bot_scroll_margin = top_scroll_margin;
       if (window_wants_header_line (w))
 	top_scroll_margin += CURRENT_HEADER_LINE_HEIGHT (w);
-      start_display (&it, w, pos);
+      start_move_it (&it, w, pos);
 
       if ((w->cursor.y >= 0
 	   && w->cursor.y < top_scroll_margin
@@ -19284,7 +19208,7 @@ try_window_reusing_current_matrix (struct window *w)
 	 last_text_row is set to the last row displayed that displays
 	 text.  Note that it.vpos == 0 if or if not there is a
          header-line; it's not the same as the MATRIX_ROW_VPOS!  */
-      start_display (&it, w, new_start);
+      start_move_it (&it, w, new_start);
       w->cursor.vpos = -1;
       last_text_row = last_reused_text_row = NULL;
 
@@ -20281,7 +20205,7 @@ try_window_insdel (struct window *w)
     {
       /* There are no reusable lines at the start of the window.
 	 Start displaying in the first text line.  */
-      start_display (&it, w, start);
+      start_move_it (&it, w, start);
       it.vpos = it.first_vpos;
       start_pos = it.current.pos;
     }
@@ -22194,10 +22118,10 @@ display_count_lines_visually (struct it *it)
 	  to = IT_CHARPOS (*it);
 	}
       /* Need to disable visual mode temporarily, since otherwise the
-	 call to move_it_to below and inside start_display will cause
+	 call to move_it_to below and inside start_move_it will cause
 	 infinite recursion.  */
       specbind (Qdisplay_line_numbers, Qrelative);
-      start_display (&tem_it, it->w, from);
+      start_move_it (&tem_it, it->w, from);
       /* Some redisplay optimizations could invoke us very far from
 	 PT, which will make the caller painfully slow.  There should
 	 be no need to go too far beyond the window's bottom, as any
@@ -23950,7 +23874,7 @@ Value is the new character position of point.  */)
 
       /* Setup the arena.  */
       SET_TEXT_POS (pt, PT, PT_BYTE);
-      start_display (&it, w, pt);
+      start_move_it (&it, w, pt);
       /* When lines are truncated, we could be called with point
 	 outside of the windows edges, in which case move_it_*
 	 functions either prematurely stop at window's edge or jump to
@@ -24049,7 +23973,7 @@ Value is the new character position of point.  */)
 	{
 	  if (pt_x > 0)
 	    {
-	      start_display (&it, w, pt);
+	      start_move_it (&it, w, pt);
 	      if (it.line_wrap == TRUNCATE)
 		it.last_visible_x = DISP_INFINITY;
 	      reseat_at_previous_visible_line_start (&it);
@@ -24222,7 +24146,7 @@ in order to avoid these problems.  */)
   if (NILP (vpos))
     {
       int d1, d2, d3, d4, d5;
-      pos_visible_p (w, PT, &d1, &d2, &d3, &d4, &d5, &nrow);
+      scroll_into_view (w, PT, &d1, &d2, &d3, &d4, &d5, &nrow);
     }
   else
     {
@@ -24687,7 +24611,7 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
   ptrdiff_t count = SPECPDL_INDEX ();
 
   init_iterator (&it, w, -1, -1, NULL, face_id);
-  /* When called from pos_visible_p, prevent extending a previously
+  /* When called from scroll_into_view, prevent extending a previously
      drawn mode-line.  */
   it.glyph_row->enabled_p = false;
   prepare_desired_row (w, it.glyph_row, true);

@@ -205,7 +205,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    Some functions of the display engine save copies of 'struct it' in
    local variables, and restore them later.  For examples, see
-   pos_visible_p and emulate_move_it in xdisp.c, and
+   scroll_into_view and emulate_move_it in xdisp.c, and
    window_scroll_pixel_based in window.c.  When this happens, we need
    to save and restore the bidi cache as well, because conceptually
    the cache is part of the 'struct it' state, and needs to be in

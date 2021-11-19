@@ -1992,7 +1992,7 @@ line_number_display_width (struct window *w, int *width, int *pixel_width)
 	  Fwiden ();
 	  saved_restriction = true;
 	}
-      start_display (&it, w, startpos);
+      start_move_it (&it, w, startpos);
       /* The call to move_it_by_lines below will not generate a line
 	 number if the first line shown in the window is hscrolled
 	 such that all of its display elements are out of view.  So we
@@ -2167,7 +2167,7 @@ whether or not it is currently displayed in some window.  */)
 	line_number_display_width (w, &lnum_width, &lnum_pixel_width);
       SET_TEXT_POS (pt, PT, PT_BYTE);
       itdata = bidi_shelve_cache ();
-      start_display (&it, w, pt);
+      start_move_it (&it, w, pt);
       it.lnum_width = lnum_width;
       first_x = it.first_visible_x;
       it_start = IT_CHARPOS (it);

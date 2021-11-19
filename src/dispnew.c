@@ -5446,7 +5446,7 @@ buffer_posn_from_coords (struct window *w, int *x, int *y, struct display_pos *p
   Fset_buffer (w->contents);
   itdata = bidi_shelve_cache ();
   CLIP_TEXT_POS_FROM_MARKER (startp, w->start);
-  start_display (&it, w, startp);
+  start_move_it (&it, w, startp);
   x0 = *x;
 
   /* First, move to the beginning of the row corresponding to *Y.  We

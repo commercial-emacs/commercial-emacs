@@ -3378,7 +3378,7 @@ void init_iterator (struct it *, struct window *, ptrdiff_t,
                     ptrdiff_t, struct glyph_row *, enum face_id);
 void init_iterator_to_row_start (struct it *, struct window *,
                                  struct glyph_row *);
-void start_display (struct it *, struct window *, struct text_pos);
+void start_move_it (struct it *, struct window *, struct text_pos);
 void move_it_vertically (struct it *, int);
 void move_it_vertically_backward (struct it *, int);
 void move_it_by_lines (struct it *, ptrdiff_t);

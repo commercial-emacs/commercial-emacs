@@ -1792,7 +1792,7 @@ recorded.  */)
       CLIP_TEXT_POS_FROM_MARKER (startp, w->start);
 
       itdata = bidi_shelve_cache ();
-      start_display (&it, w, startp);
+      start_move_it (&it, w, startp);
       move_it_vertically (&it, window_box_height (w));
       if (it.current_y < it.last_visible_y)
 	move_it_past_eol (&it);
@@ -1923,7 +1923,7 @@ POS, ROWH is the visible height of that row, and VPOS is the row number
        || (posint >= CHARPOS (top) && posint <= BUF_ZV (buf)))
       && CHARPOS (top) >= BUF_BEGV (buf)
       && CHARPOS (top) <= BUF_ZV (buf)
-      && pos_visible_p (w, posint, &x, &y, &rtop, &rbot, &rowh, &vpos))
+      && scroll_into_view (w, posint, &x, &y, &rtop, &rbot, &rowh, &vpos))
     {
       fully_p = !rtop && !rbot;
       if (!NILP (partially) || fully_p)
@@ -5573,7 +5573,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
      something like (scroll-down 1) with PT in the line before
      the partially visible one would recenter.  */
 
-  if (!pos_visible_p (w, PT, &x, &y, &rtop, &rbot, &rowh, &vpos))
+  if (!scroll_into_view (w, PT, &x, &y, &rtop, &rbot, &rowh, &vpos))
     {
       itdata = bidi_shelve_cache ();
       /* Move backward half the height of the window.  Performance note:
@@ -5678,7 +5678,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	  || !SYMBOLP (KVAR (current_kboard, Vlast_command))
 	  || NILP (Fget (KVAR (current_kboard, Vlast_command), Qscroll_command)))
 	{
-	  start_display (&it, w, start);
+	  start_move_it (&it, w, start);
 	  move_it_to (&it, PT, -1, -1, -1, MOVE_TO_POS);
 	  window_scroll_pixel_based_preserve_y = it.current_y;
 	  window_scroll_pixel_based_preserve_x = it.current_x;
@@ -5690,7 +5690,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 
   /* Move iterator it from start the specified distance forward or
      backward.  The result is the new window start.  */
-  start_display (&it, w, start);
+  start_move_it (&it, w, start);
   if (whole)
     {
       ptrdiff_t start_pos = IT_CHARPOS (it);
@@ -5981,9 +5981,9 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	  if (goal_y < this_scroll_margin)
 	    goal_y = this_scroll_margin;
 	  SET_TEXT_POS_FROM_MARKER (start, w->start);
-	  start_display (&it, w, start);
+	  start_move_it (&it, w, start);
 	  /* It would be wrong to subtract WINDOW_HEADER_LINE_HEIGHT
-	     here because we called start_display again and did not
+	     here because we called start_move_it again and did not
 	     alter it.current_y this time.  */
 	  move_it_to (&it, -1, window_scroll_pixel_based_preserve_x,
 		      goal_y, -1, MOVE_TO_Y | MOVE_TO_X);
@@ -6443,7 +6443,7 @@ displayed_window_lines (struct window *w)
   CLIP_TEXT_POS_FROM_MARKER (start, w->start);
 
   itdata = bidi_shelve_cache ();
-  start_display (&it, w, start);
+  start_move_it (&it, w, start);
   move_it_vertically (&it, height);
   bottom_y = line_bottom_y (&it);
   bidi_unshelve_cache (itdata, false);
@@ -6546,7 +6546,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 	  void *itdata = bidi_shelve_cache ();
 
 	  SET_TEXT_POS (pt, PT, PT_BYTE);
-	  start_display (&it, w, pt);
+	  start_move_it (&it, w, pt);
 	  move_it_vertically_backward (&it, window_box_height (w) / 2);
 	  charpos = IT_CHARPOS (it);
 	  bytepos = IT_BYTEPOS (it);
@@ -6566,7 +6566,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 				   ht - this_scroll_margin);
 
 	  SET_TEXT_POS (pt, PT, PT_BYTE);
-	  start_display (&it, w, pt);
+	  start_move_it (&it, w, pt);
 
 	  /* Be sure we have the exact height of the full line containing PT.  */
 	  move_it_by_lines (&it, 0);
@@ -6605,7 +6605,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 	    }
 
 	  /* Now find the new top line (starting position) of the window.  */
-	  start_display (&it, w, pt);
+	  start_move_it (&it, w, pt);
 	  it.current_y = 0;
 	  move_it_vertically_backward (&it, h);
 
@@ -6637,7 +6637,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 				   ht - this_scroll_margin - 1);
 
 	  SET_TEXT_POS (pt, PT, PT_BYTE);
-	  start_display (&it, w, pt);
+	  start_move_it (&it, w, pt);
 
 	  /* Move to the beginning of screen line containing PT.  */
 	  move_it_by_lines (&it, 0);
