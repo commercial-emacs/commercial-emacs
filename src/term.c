@@ -1527,30 +1527,22 @@ tty_append_glyph (struct it *it)
 }
 
 
-/* Produce glyphs for the display element described by IT.  *IT
-   specifies what we want to produce a glyph for (character, image, ...),
-   and where in the glyph matrix we currently are (glyph row and hpos).
-   produce_glyphs fills in output fields of *IT with information such as the
-   pixel width and height of a character, and maybe output actual glyphs at
-   the same time if IT->glyph_row is non-null.  For an overview, see
-   the explanation in dispextern.h, before the definition of the
-   display_element_type enumeration.
+/* IT specifies what (character, image, etc), and where (row, hpos)
+   in the desired matrix to render a glyph.
 
-   produce_glyphs also stores the result of glyph width, ascent
-   etc. computations in *IT.
+   Populate IT with important rendering metrics like glyph width and
+   ascent.
 
-   IT->glyph_row may be null, in which case produce_glyphs does not
-   actually fill in the glyphs.  This is used in the move_* functions
-   in xdisp.c for text width and height computations.
+   emulate_move_it sets IT->glyph_row to null, a crucial hack instructing
+   produce_glyphs to "go through the motions" for layout purposes without
+   rendering anything.
 
-   Callers usually don't call produce_glyphs directly;
-   instead they use the macro PRODUCE_GLYPHS.  */
+   This is not gui_produce_glyphs which resides in xdisp.c!
+*/
 
 void
 produce_glyphs (struct it *it)
 {
-  /* If a hook is installed, let it do the work.  */
-
   /* Nothing but characters are supported on terminal frames.  */
   eassert (it->what == IT_CHARACTER
 	   || it->what == IT_COMPOSITION

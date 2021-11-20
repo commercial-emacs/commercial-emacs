@@ -128,6 +128,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    arrived at the window edge without exhausting the buffer's line,
    etc.  The passed-in `struct it' is also suitably updated.
 
+   `emulate_move_it` duplicates with `display_line`.  I know we
+   can merge the two, but it will take a man-year of debugging.
+
    Common tasks like `move_it_by_lines' and `move_it_to' require
    `emulate_move_it'.  The display engine also calls these
    functions when making layout decisions ahead of producing glyphs.
@@ -2894,60 +2897,49 @@ init_iterator (struct it *it, struct window *w,
 	}
     }
 
-  /* Reset these values to zero because the produce_special_glyphs
-     above has changed them.  */
+  /* Reset if produce_special_glyphs mutated IT.  */
   it->pixel_width = it->ascent = it->descent = 0;
   it->phys_ascent = it->phys_descent = 0;
-
-  /* Set this after getting the dimensions of truncation and
-     continuation glyphs, so that we don't produce glyphs when calling
-     produce_special_glyphs, above.  */
   it->glyph_row = row;
   it->area = TEXT_AREA;
 
-  /* Get the dimensions of the display area.  The display area
-     consists of the visible window area plus a horizontally scrolled
-     part to the left of the window.  All x-values are relative to the
-     start of this total display area.  */
+  /* Get the dimensions of the so-called display area.  */
   if (base_face_id != DEFAULT_FACE_ID)
     {
-      /* Mode lines, menu bar in terminal frames.  */
+      /* Mode lines, menu bar, tab bar.  No fringes.  */
+      body_width = WINDOW_PIXEL_WIDTH (w);
       it->first_visible_x = 0;
-      it->last_visible_x = body_width = WINDOW_PIXEL_WIDTH (w);
+      it->last_visible_x = it->first_visible_x + body_width;
     }
   else
     {
-      /* Don't apply the hscroll here; it will be applied by
-	 display_line.  However, if the window's min_hscroll is
-	 positive, the user specified a lower bound for automatic
-	 hscrolling, so they expect the non-current lines to obey that
-	 hscroll amount.  */
+      /* Main editing pane.  Fringes. */
+      it->first_visible_x =
+	FRAME_COLUMN_WIDTH (it->f) * window_hscroll_limited (w, it->f);
+
       if (hscrolling_current_line_p (w))
 	{
-	  if (w->min_hscroll > 0)
-	    it->first_visible_x = w->min_hscroll * FRAME_COLUMN_WIDTH (it->f);
-	  else
-	    it->first_visible_x = 0;
+	  /* User might specify a lower bound for automatic hscrolling.  */
+	  it->first_visible_x =
+	    FRAME_COLUMN_WIDTH (it->f) * max (0, w->min_hscroll);
 	}
-      else
-	it->first_visible_x =
-	  window_hscroll_limited (w, it->f) * FRAME_COLUMN_WIDTH (it->f);
 
       body_width = window_box_width (w, TEXT_AREA);
-      if (!w->pseudo_window_p && !MINI_WINDOW_P (w)
-	  && body_width != w->old_body_pixel_width)
-	FRAME_WINDOW_CHANGE (it->f) = true;
       it->last_visible_x = it->first_visible_x + body_width;
 
-      /* If we truncate lines, leave room for the truncation glyph(s) at
-	 the right margin.  Otherwise, leave room for the continuation
-	 glyph(s).  Done only if the window has no right fringe.  */
+      if (! w->pseudo_window_p
+	  && ! MINI_WINDOW_P (w)
+	  && body_width != w->old_body_pixel_width)
+	FRAME_WINDOW_CHANGE (it->f) = true;
+
       if (WINDOW_RIGHT_FRINGE_WIDTH (it->w) == 0)
 	{
-	  if (it->line_wrap == TRUNCATE)
-	    it->last_visible_x -= it->truncation_pixel_width;
-	  else
-	    it->last_visible_x -= it->continuation_pixel_width;
+	  /* If window has no right fringe, leave room for
+	     truncation and continuation glyphs.  */
+	  it->last_visible_x -=
+	    (it->line_wrap == TRUNCATE)
+	    ? it->truncation_pixel_width
+	    : it->continuation_pixel_width;
 	}
 
       it->tab_line_p = window_wants_tab_line (w);
@@ -2957,13 +2949,13 @@ init_iterator (struct it *it, struct window *w,
     }
 
   /* Leave room for a border glyph.  */
-  if (!FRAME_WINDOW_P (it->f)
-      && !WINDOW_RIGHTMOST_P (it->w))
+  if (! FRAME_WINDOW_P (it->f)
+      && ! WINDOW_RIGHTMOST_P (it->w))
     it->last_visible_x -= 1;
 
   it->last_visible_y = window_text_bottom_y (w);
   body_height += it->last_visible_y;
-  if (!w->pseudo_window_p && !MINI_WINDOW_P (w)
+  if (! w->pseudo_window_p && ! MINI_WINDOW_P (w)
       && body_height != w->old_body_pixel_height)
     FRAME_WINDOW_CHANGE (it->f) = true;
 
@@ -2985,7 +2977,7 @@ init_iterator (struct it *it, struct window *w,
 	}
     }
 
-  /* If CHARPOS was specified, `reseat' there. */
+  /* If CHARPOS was specified, reseat() there. */
   if (charpos >= BUF_BEG (current_buffer))
     {
       it->stop_charpos = charpos;
@@ -2999,8 +2991,8 @@ init_iterator (struct it *it, struct window *w,
       it->bidi_p =
 	/* When we are loading loadup.el, the character property tables
 	   needed for bidi iteration are not yet available.  */
-	!redisplay__inhibit_bidi
-	&& !NILP (BVAR (current_buffer, bidi_display_reordering))
+	! redisplay__inhibit_bidi
+	&& ! NILP (BVAR (current_buffer, bidi_display_reordering))
 	&& it->multibyte_p;
 
       if (it->bidi_p)
@@ -3011,10 +3003,10 @@ init_iterator (struct it *it, struct window *w,
 	      && WINDOW_LEFT_FRINGE_WIDTH (it->w) == 0
 	      && WINDOW_RIGHT_FRINGE_WIDTH (it->w) != 0)
 	    {
-	      if (it->line_wrap == TRUNCATE)
-		it->last_visible_x -= it->truncation_pixel_width;
-	      else
-		it->last_visible_x -= it->continuation_pixel_width;
+	      it->last_visible_x -=
+		(it->line_wrap == TRUNCATE)
+		? it->truncation_pixel_width
+		: it->continuation_pixel_width;
 	    }
 	  /* Note the paragraph direction that this buffer wants to use.  */
 	  if (EQ (BVAR (current_buffer, bidi_paragraph_direction),
@@ -3063,35 +3055,19 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
 
       t = clock();
       fprintf (stderr,
-	       "brutalpre seconds=0 it.y=%d it.dpvi=%d it.cw=%d it.c=%c it.x=%d it.pos=%ld it.asc=%d it.dsc=%d\n",
+	       "brutalpre seconds=0 it.y=%d it.dpvi=%d it.cw=%d it.c=%c it.x=%d it.pos=%ld it.fvx=%d it.lvx=%d\n",
 	       it->current_y,
 	       it->current.dpvec_index,
 	       it->continuation_lines_width,
 	       it->c,
 	       it->current_x,
 	       it->position.charpos,
-	       it->ascent,
-	       it->descent);
+	       it->first_visible_x,
+	       it->last_visible_x);
 
       // HERE
       move_it_to (it, CHARPOS (pos), -1, -1, -1, MOVE_TO_POS);
       t = clock() - t;
-
-      fprintf (stderr,
-	       "glyph_row x=%d y=%d pw=%d ascent=%d height=%d els=%d dps=%ld dpe=%ld minpos=%ld maxpos=%ld contp=%d fwp=%d cw=%d\n",
-	       it->glyph_row->x,
-	       it->glyph_row->y,
-	       it->glyph_row->pixel_width,
-	       it->glyph_row->ascent,
-	       it->glyph_row->height,
-	       it->glyph_row->extra_line_spacing,
-	       it->glyph_row->start.pos.charpos,
-	       it->glyph_row->end.pos.charpos,
-	       it->glyph_row->minpos.charpos,
-	       it->glyph_row->maxpos.charpos,
-	       it->glyph_row->continued_p,
-	       it->glyph_row->full_width_p,
-	       it->glyph_row->continuation_lines_width);
       fprintf (stderr,
 	       "brutalpost seconds=%f it.y=%d it.dpvi=%d it.cw=%d it.c=%c it.x=%d it.pos=%ld it.asc=%d it.dsc=%d\n",
 	       ((double)t) / CLOCKS_PER_SEC,
@@ -8860,9 +8836,12 @@ static unsigned int miidlt_calls = 0;
 /* Move iterator IT to a specified buffer or X position within one
    line on the display without producing glyphs.
 
+   Duplicates code with display_line, the consolidation of which would
+   likely take a man-year.
+
    OP should be a bit mask including some or all of these bits:
-    MOVE_TO_X: Stop upon reaching x-position TO_X.
-    MOVE_TO_POS: Stop upon reaching buffer or string position TO_CHARPOS.
+     MOVE_TO_X: Stop upon reaching x-position TO_X.
+     MOVE_TO_POS: Stop upon reaching buffer or string position TO_CHARPOS.
    Regardless of OP's value, stop upon reaching the end of the display line.
 
    TO_X is normally a value 0 <= TO_X <= IT->last_visible_x.
@@ -8953,10 +8932,8 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  && BUFFERP (it->object)
 	  && it->method == GET_FROM_BUFFER
 	  && (((!it->bidi_p
-		/* When the iterator is at base embedding level, we
-		   are guaranteed that characters are delivered for
-		   display in strictly increasing order of their
-		   buffer positions.  */
+		/* At base embedding level, character delivery is
+		   strictly L2R. */
 		|| BIDI_AT_BASE_LEVEL (it->bidi_it))
 	       && IT_CHARPOS (*it) > to_charpos)
 	      || (it->bidi_p
@@ -8976,9 +8953,7 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 	      break;
 	    }
 	  else if (it->line_wrap == WORD_WRAP && atpos_it.sp < 0)
-	    /* If wrap_it is valid, the current position might be in a
-	       word that is wrapped.  So, save the iterator in
-	       atpos_it and continue to see if wrapping happens.  */
+	    /* Stash iterator in case position is middle of word.  */
 	    SAVE_IT (atpos_it, *it, atpos_data);
 	}
 
@@ -8991,13 +8966,12 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 
       if (it->line_wrap == TRUNCATE)
 	{
-	  /* If it->pixel_width is zero, the last PRODUCE_GLYPHS call
-	     produced something that doesn't consume any screen estate
-	     in the text area, so we don't want to exit the loop at
-	     TO_CHARPOS, before we produce the glyph for that buffer
-	     position.  This happens, e.g., when there's an overlay at
-	     TO_CHARPOS that draws a fringe bitmap.  */
 	  if (BUFFER_POS_REACHED_P ()
+	      /* When an overlay draws a fringe bitmap, pixel width
+		 is zero, and PRODUCE_GLYPHS didn't consume any
+		 screen estate in the text area.  Don't exit
+		 before we produce a glyph for TO_CHARPOS.
+	      */
 	      && (it->pixel_width > 0
 		  || IT_CHARPOS (*it) > to_charpos
 		  || it->area != TEXT_AREA))
@@ -9008,37 +8982,25 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 	}
       else if (it->line_wrap == WORD_WRAP && it->area == TEXT_AREA)
 	{
-	  bool next_may_wrap = may_wrap;
-	  /* Can we wrap after this character?  */
-	  if (char_can_wrap_after (it))
-	    next_may_wrap = true;
-	  else
-	    next_may_wrap = false;
-	  /* Can we wrap here? */
 	  if (may_wrap && char_can_wrap_before (it))
 	    {
-	      /* We have reached a glyph that follows one or more
-		 whitespace characters or characters that allow
-		 wrapping after them.  If this character allows
-		 wrapping before it, save this position as a
-		 wrapping point.  */
 	      if (atpos_it.sp >= 0)
 		{
 		  RESTORE_IT (it, &atpos_it, atpos_data);
 		  result = MOVE_POS_MATCH_OR_ZV;
 		  goto done;
 		}
-	      if (atx_it.sp >= 0)
+	      else if (atx_it.sp >= 0)
 		{
 		  RESTORE_IT (it, &atx_it, atx_data);
 		  result = MOVE_X_REACHED;
 		  goto done;
 		}
-	      /* Otherwise, we can wrap here.  */
-	      SAVE_IT (wrap_it, *it, wrap_data);
+	      else
+		/* Stash position as a wrapping point.  */
+		SAVE_IT (wrap_it, *it, wrap_data);
 	    }
-	  /* Update may_wrap for the next iteration.  */
-	  may_wrap = next_may_wrap;
+	  may_wrap = char_can_wrap_after (it);
 	}
 
       /* Stash fontmetrics and x-coordinate in case IT doesn't fit.  */
@@ -9059,28 +9021,25 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  goto step_next;
 	}
 
-      /* The number of glyphs we get back in IT->nglyphs will normally
-	 be 1 except when IT->c is (i) a TAB, or (ii) a multi-glyph
-	 character on a terminal frame, or (iii) a line end.  For the
-	 second case, IT->nglyphs - 1 padding glyphs will be present.
-	 (On X frames, there is only one glyph produced for a
-	 composite character.)
+      /* IT->nglyphs will normally be 1 except when IT->c is (i) a
+	 TAB, or (ii) a line end, or (iii) a composite character on a
+	 terminal frame (On X frames, only one glyph is produced for a
+	 composite character).  For the last case, IT->nglyphs - 1
+	 padding glyphs will be present.
 
-	 The behavior implemented below means, for continuation lines,
-	 that as many spaces of a TAB as fit on the current line are
-	 displayed there.  For terminal frames, as many glyphs of a
-	 multi-glyph character are displayed in the current line, too.
-	 This is what the old redisplay code did, and we keep it that
-	 way.  Under X, the whole shape of a complex character must
-	 fit on the line or it will be completely displayed in the
-	 next line.
+	 For continuation lines, we display on the current line as
+	 many of a TAB's spaces as will fit.  This is what the old
+	 display code did, so we hew to tradition.
 
-	 Note that both for tabs and padding glyphs, all glyphs have
-	 the same width.  */
+	 For terminal frames, we similarly display on the current line
+	 as many glyphs of a composite character as will fit.  Under
+	 X, the single-glyph composite character must fit on the
+	 current line or be displayed on the next.
+
+	 Note that both for tabs and padded composites, the component
+	 glyphs have the same width.  */
       if (it->nglyphs)
 	{
-	  /* More than one glyph or glyph doesn't fit on line.  All
-	     glyphs have the same width.  */
 	  int single_glyph_width = it->pixel_width / it->nglyphs;
 	  int new_x;
 	  int x_before_this_char = x;
@@ -9090,7 +9049,6 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 	    {
 	      new_x = x + single_glyph_width;
 
-	      /* We want to leave anything reaching TO_X to the caller.  */
 	      if ((op & MOVE_TO_X) && new_x > to_x)
 		{
 		  if (BUFFER_POS_REACHED_P ())
@@ -9123,8 +9081,7 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 		  it->line_wrap != TRUNCATE
 		  && (/* And glyph doesn't fit on the line.  */
 		      new_x > it->last_visible_x
-		      /* Or it fits exactly and we're on a window
-			 system frame.  */
+		      /* Or fits exactly and display-graphic-p. */
 		      || (new_x == it->last_visible_x
 			  && FRAME_WINDOW_P (it->f)
 			  && ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
@@ -9133,17 +9090,17 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 		{
 		  bool moved_forward = false;
 
-		  if (/* IT->hpos == 0 means the very first glyph
-			 doesn't fit on the line, e.g. a wide image.  */
+		  if (/* Very first element doesn't fit */
 		      it->hpos == 0
-		      || (new_x == it->last_visible_x
-			  && FRAME_WINDOW_P (it->f)))
+		      /* Or, arbitrary element fits just so */
+		      || new_x == it->last_visible_x)
 		    {
 		      ++it->hpos;
 		      it->current_x = new_x;
-
-		      /* The character's last glyph just barely fits
-			 in this row.  */
+		      /* overflow-newline-into-fringe accounting only
+			 applies if I'm closing out the character, i.e.,
+			 processing last glyph.
+		      */
 		      if (i == it->nglyphs - 1)
 			{
 			  /* If this is the destination position,
@@ -9151,12 +9108,15 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 			     now that we know it fits in this row.  */
 			  if (BUFFER_POS_REACHED_P ())
 			    {
+			      /* More EZ fixing at the leaf nodes (Bug#23570).
+
+				 may_wrap meant previous character
+				 affirmed char_can_wrap_after(), but
+				 can_wrap belays that order if current
+				 character disaffirms char_can_wrap_before()
+			      */
 			      bool can_wrap = true;
 
-			      /* If the previous character says we can
-				 wrap after it, but the current
-				 character says we can't wrap before
-				 it, then we can't wrap here.  */
 			      if (it->line_wrap == WORD_WRAP
 				  && wrap_it.sp >= 0
 				  && may_wrap
@@ -9168,19 +9128,14 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 				  SAVE_IT (tem_it, *it, tem_data);
 				  set_iterator_to_next (it, true);
 				  if (get_next_display_element (it)
-				      && !char_can_wrap_before (it))
+				      && ! char_can_wrap_before (it))
 				    can_wrap = false;
 				  RESTORE_IT (it, &tem_it, tem_data);
 				}
 			      if (it->line_wrap != WORD_WRAP
 				  || wrap_it.sp < 0
-				  /* If we've just found whitespace
-				     where we can wrap, effectively
-				     ignore the previous wrap point --
-				     it is no longer relevant, but we
-				     won't have an opportunity to
-				     update it, since we've reached
-				     the edge of this screen line.  */
+				  /* Under overflow-newline-into-fringe,
+				     ignore previous wrap point, and break.  */
 				  || (may_wrap && can_wrap
 				      && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it)))
 				{
@@ -9205,21 +9160,19 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 			  if (IT_CHARPOS (*it) < CHARPOS (this_line_min_pos))
 			    SET_TEXT_POS (this_line_min_pos,
 					  IT_CHARPOS (*it), IT_BYTEPOS (*it));
-			  /* On graphical terminals, newlines may
-			     "overflow" into the fringe if
-			     overflow-newline-into-fringe is non-nil.
-			     On text terminals, and on graphical
-			     terminals with no right margin, newlines
-			     may overflow into the last glyph on the
-			     display line.*/
-			  if (!FRAME_WINDOW_P (it->f)
+
+			  /* Newlines may overflow into the last glyph on the
+			     display line when (i) tty (ii) graphical displays
+			     with no fringe, or (iii) overflow-newline-into-fringe
+			     is set.  */
+			  if (! FRAME_WINDOW_P (it->f)
 			      || ((it->bidi_p
 				   && it->bidi_it.paragraph_dir == R2L)
 				  ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
 				  : WINDOW_RIGHT_FRINGE_WIDTH (it->w)) == 0
 			      || IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
 			    {
-			      if (!get_next_display_element (it))
+			      if (! get_next_display_element (it))
 				{
 				  result = MOVE_POS_MATCH_OR_ZV;
 				  break;
@@ -9227,10 +9180,9 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 			      moved_forward = true;
 			      if (BUFFER_POS_REACHED_P ())
 				{
-				  if (ITERATOR_AT_END_OF_LINE_P (it))
-				    result = MOVE_POS_MATCH_OR_ZV;
-				  else
-				    result = MOVE_LINE_CONTINUED;
+				  result = (ITERATOR_AT_END_OF_LINE_P (it))
+				    ? MOVE_POS_MATCH_OR_ZV
+				    : MOVE_LINE_CONTINUED;
 				  break;
 				}
 			      if (ITERATOR_AT_END_OF_LINE_P (it)
@@ -9247,18 +9199,12 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 		  else
 		    IT_RESET_X_ASCENT_DESCENT (it);
 
-		  /* If the screen line ends with whitespace (or
-		     wrap-able character), and we are under word-wrap,
-		     don't use wrap_it: it is no longer relevant, but
-		     we won't have an opportunity to update it, since
-		     we are done with this screen line.  */
+		  /* may_wrap meant previous character affirmed
+		     char_can_wrap_after(), but current character
+		     could disaffirm char_can_wrap_before()
+		  */
 		  if (may_wrap && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it)
-		      /* If the character after the one which set the
-			 may_wrap flag says we can't wrap before it,
-			 we can't wrap here.  Therefore, wrap_it
-			 (previously found wrap-point) _is_ relevant
-			 in that case.  */
-		      && (!moved_forward || char_can_wrap_before (it)))
+		      && (! moved_forward || char_can_wrap_before (it)))
 		    {
 		      /* If we've found TO_X, go back there, as we now
 			 know the last word fits on this screen line.  */
@@ -9274,17 +9220,15 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 		    }
 		  else if (wrap_it.sp >= 0)
 		    {
+		      /* Since we cannot wrap here, the previous wrap
+			 point prevails.  */
 		      RESTORE_IT (it, &wrap_it, wrap_data);
 		      atpos_it.sp = -1;
 		      atx_it.sp = -1;
 		    }
 
-                  /* HERE don't break */
                   result = MOVE_LINE_CONTINUED;
-                  if (op & MOVE_TO_NEWLINE)
-                    goto step_next;
-                  else
-                    break;
+		  break;
 		}
 
 	      if (BUFFER_POS_REACHED_P ())
@@ -9375,8 +9319,8 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
 	saw_smaller_pos = true;
       SET_CLOSEST_PAST_CHARPOS (it);
 
-      /* Stop if lines are truncated and IT's current x-position is
-	 past the right edge of the window now.  */
+      /* Stop if lines are truncated and IT's current x-position got
+	 past the right edge of the window.  */
       if (it->line_wrap == TRUNCATE
 	  && it->current_x >= it->last_visible_x)
 	{
@@ -9443,7 +9387,7 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
             it->current_x = 0;
             it->hpos = 0;
             it->line_number_produced_p = false;
-            it->current_y += it->max_ascent + it->max_descent;
+            it->current_y += (it->max_ascent + it->max_descent);
             ++it->vpos;
             it->max_ascent = it->max_descent = 0;
             it->continuation_lines_width += it->last_visible_x;
@@ -9466,13 +9410,6 @@ emulate_move_it (struct it *it, ptrdiff_t to_charpos, int to_x,
     RESTORE_IT (it, &atx_it, atx_data);
 
  done:
-  /* fprintf(stderr, "emulate miidlt=%u goround=%u term=%s\n", */
-  /*         miidlt_calls, iterations, */
-  /*         (result == MOVE_NEWLINE_OR_CR) ? "newline" : */
-  /*         (result == MOVE_LINE_CONTINUED) ? "continued" : */
-  /*         (result == MOVE_POS_MATCH_OR_ZV) ? "match_or_zv" : */
-  /*         (result == MOVE_X_REACHED) ? "reachedx" : "other"); */
-
   if (atpos_data)
     bidi_unshelve_cache (atpos_data, true);
   if (atx_data)
@@ -9732,17 +9669,16 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	  /* For continued lines ending in a tab, some of the glyphs
 	     associated with the tab are displayed on the current
 	     line.  Since it->current_x does not include these glyphs,
-	     we use it->last_visible_x instead.  */
+	     we use it->last_visible_x instead.  What?  */
 	  if (it->c == '\t')
 	    {
 	      it->continuation_lines_width += it->last_visible_x;
-	      /* When moving by vpos, ensure that the iterator really
-		 advances to the next line (bug#847, bug#969).  FIXME
-		 do we need to do this in other circumstances?  */
 	      if (it->current_x != it->last_visible_x
 		  && (op & MOVE_TO_VPOS)
 		  && ! (op & (MOVE_TO_X | MOVE_TO_POS)))
 		{
+		  /* When MOVE_TO_VPOS, ensure iterator advances to
+		     the next line (Bug#847, Bug#969).  */
 		  line_start_x = it->current_x + it->pixel_width
 		    - it->last_visible_x;
 		  if (FRAME_WINDOW_P (it->f))
@@ -22624,7 +22560,7 @@ display_line (struct it *it, int cursor_vpos)
 
   /* Loop generating characters.  The loop is left with IT on the next
      character to display.  */
-  while (true)
+  for (;;)
     {
       int n_glyphs_before, hpos_before, x_before;
       int x, nglyphs;
@@ -29524,10 +29460,18 @@ produce_glyphless_glyph (struct it *it, bool for_no_font, Lisp_Object acronym)
       }								\
     } while (false)
 
-/* RIF:
-   Produce glyphs/get display metrics for the display element IT is
-   loaded with.  See the description of struct it in dispextern.h
-   for an overview of struct it.  */
+/* Window-capable version of term.c produce_glyphs.
+
+   IT specifies what (character, image, etc), and where (row, hpos)
+   in the desired matrix to render a glyph.
+
+   Populate IT with important rendering metrics like glyph width and
+   ascent.
+
+   emulate_move_it sets IT->glyph_row to null, a crucial hack instructing
+   produce_glyphs to "go through the motions" for layout purposes without
+   rendering anything.
+ */
 
 void
 gui_produce_glyphs (struct it *it)
@@ -30257,7 +30201,7 @@ gui_produce_glyphs (struct it *it)
   it->max_phys_descent = max (it->max_phys_descent, it->phys_descent);
 }
 
-/* EXPORT for RIF:
+/* EXPORT for Redisplay InterFace or RIF:
    Output LEN glyphs starting at START at the nominal cursor position.
    Advance the nominal cursor over the text.  UPDATED_ROW is the glyph row
    being updated, and UPDATED_AREA is the area of that row being updated.  */
@@ -30303,7 +30247,7 @@ gui_write_glyphs (struct window *w, struct glyph_row *updated_row,
 }
 
 
-/* EXPORT for RIF:
+/* EXPORT for Redisplay InterFace or RIF:
    Insert LEN glyphs from START at the nominal cursor position.  */
 
 void
@@ -30355,7 +30299,7 @@ gui_insert_glyphs (struct window *w, struct glyph_row *updated_row,
 }
 
 
-/* EXPORT for RIF:
+/* EXPORT for Redisplay InterFace or RIF:
    Erase the current text line from the nominal cursor position
    (inclusive) to pixel column TO_X (exclusive).  The idea is that
    everything from TO_X onward is already erased.
@@ -30728,7 +30672,7 @@ notice_overwritten_cursor (struct window *w, enum glyph_row_area area,
 
 #ifdef HAVE_WINDOW_SYSTEM
 
-/* EXPORT for RIF:
+/* EXPORT for Redisplay InterFace or RIF:
    Fix the display of area AREA of overlapping row ROW in window W
    with respect to the overlapping part OVERLAPS.  */
 
@@ -33173,7 +33117,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
 }
 
 
-/* EXPORT for RIF:
+/* EXPORT for Redisplay InterFace or RIF:
    Clear any mouse-face on window W.  This function is part of the
    redisplay interface, and is called from try_window_insdel and similar
    functions to ensure the mouse-highlight is off.  */

@@ -2600,29 +2600,23 @@ struct it
   /* Value of the `height' property, if any; nil if none.  */
   Lisp_Object font_height;
 
-  /* Object and position where the current display element came from.
-     Object is normally the buffer which is being rendered, but it can
-     also be a Lisp string in case the current display element comes
-     from an overlay string or from a display string (before- or
-     after-string).  It may also be a zero-valued Lisp integer when a
-     C string is being rendered, e.g., during mode-line or header-line
-     update.  It can also be a cons cell of the form `(space ...)',
-     when we produce a stretch glyph from a `display' specification.
-     Finally, it can be nil, but only temporarily, when we are
-     producing special glyphs for display purposes, like truncation
-     and continuation glyphs, or blanks that extend each line to the
-     edge of the window on a TTY.
+  /* OBJECT can be:
+     .  the current_buffer (next_element_from_buffer)
+     .  an overlay string (next_element_from_string)
+     .  a display string (so-called before- and after- strings)
+     .  a zero-valued Lisp integer (next_element_from_c_string)
+     .  a cons cell of the form `(space ...)' (next_element_from_stretch)
+     .  nil, when we produce truncation and continuation glyphs, or blanks
+        that extend each line to the edge of the window on a TTY.
 
      Do NOT use !BUFFERP (it.object) as a test whether we are
      iterating over a string; use STRINGP (it.string) instead.
-
-     Position is the current iterator position in object.
-
-     The 'position's CHARPOS is copied to glyph->charpos of the glyph
-     produced by PRODUCE_GLYPHS, so any artificial value documented
-     under 'struct glyph's 'charpos' member can also be found in the
-     'position' member here.  */
+    */
   Lisp_Object object;
+
+  /* POSITION is the current iterator position in OBJECT.
+     POSITION's charpos is copied to glyph->charpos, so POSITION could take on any
+     artificial value documented in the glyph struct's charpos slot.  */
   struct text_pos position;
 
   /* Width in pixels of truncation and continuation glyphs.  */
@@ -2777,8 +2771,9 @@ struct it
       && ((IT)->c == '\n'				\
 	  || ((IT)->c == '\r' && (IT)->selective)))
 
-/* Call produce_glyphs or FRAME_RIF->produce_glyphs, if set.  Shortcut
-   to avoid the function call overhead.  */
+/* Call produce_glyphs or FRAME_RIF->produce_glyphs, if set. RIF
+   stands for Redisplay InterFace in termhooks.h.
+*/
 
 #define PRODUCE_GLYPHS(IT)                              \
   do {                                                  \
@@ -2807,10 +2802,7 @@ enum move_operation_enum
   MOVE_TO_VPOS = 0x04,
 
   /* Stop if specified buffer or string position is reached.  */
-  MOVE_TO_POS = 0x08,
-
-  /* Stop after continuation newline. */
-  MOVE_TO_NEWLINE = 0x10
+  MOVE_TO_POS = 0x08
 };
 
 /***********************************************************************
