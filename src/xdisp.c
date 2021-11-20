@@ -10016,41 +10016,11 @@ move_it_vertically_backward (struct it *it, int dy)
 void
 move_it_vertically (struct it *it, int dy)
 {
-  clock_t t;
-  struct it it2;
-  struct face *face;
-
   if (dy <= 0)
     return move_it_vertically_backward (it, -dy);
 
-  it2 = *it;
-  face = FACE_FROM_ID (it2.f, it2.face_id);
-  if (face && face->font)
-    it2.pixel_width = face->font->space_width;
-  it2.continuation_lines_width =
-    (it2.last_visible_x - it2.current_x) + max (0, dy - 1) * it2.last_visible_x;
-  for (int i=0, z=it2.continuation_lines_width; i<z; ++i)
-    INC_TEXT_POS (it2.current.pos, 1);
-  it2.current_x = 0;
-  it2.current_y += dy;
-  it2.c = FETCH_CHAR (IT_BYTEPOS (it2));
-  it2.position = it2.current.pos;
-
   mit_calls12++;
-  t = clock();
   move_it_to (it, ZV, -1, it->current_y + dy, -1, MOVE_TO_POS | MOVE_TO_Y);
-  t = clock() - t;
-  fprintf(stderr,
-	  "brutal3 seconds=%f it.y=%d it2.y=%d it.dpvi=%d it2.dpvi=%d it.cw=%d it2.cw=%d it.c=%c it2.c=%c it.x=%d it2.x=%d nlines=%d it.pos=%ld it2.pos=%ld\n",
-	  ((double)t) / CLOCKS_PER_SEC,
-	  it->current_y, it2.current_y,
-	  it->current.dpvec_index, it2.current.dpvec_index,
-	  it->continuation_lines_width, it2.continuation_lines_width,
-	  it->c, it2.c,
-	  it->current_x, it2.current_x,
-	  dy,
-	  it->position.charpos, it2.position.charpos);
-  // *it = it2;
   if (IT_CHARPOS (*it) == ZV
       && ZV > BEGV
       && FETCH_BYTE (IT_BYTEPOS (*it) - 1) != '\n')
