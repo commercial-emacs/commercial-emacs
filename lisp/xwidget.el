@@ -58,6 +58,7 @@
 (declare-function xwidget-webkit-back-forward-list "xwidget.c" (xwidget &optional limit))
 (declare-function xwidget-webkit-estimated-load-progress "xwidget.c" (xwidget))
 (declare-function xwidget-webkit-set-cookie-storage-file "xwidget.c" (xwidget file))
+(declare-function xwidget-live-p "xwidget.c" (xwidget))
 
 (defgroup xwidget nil
   "Displaying native widgets in Emacs buffers."
@@ -77,12 +78,9 @@ This returns the result of `make-xwidget'."
 
 (defun xwidget-at (pos)
   "Return xwidget at POS."
-  ;; TODO this function is a bit tedious because the C layer isn't well
-  ;; protected yet and xwidgetp apparently doesn't work yet.
   (let* ((disp (get-text-property pos 'display))
-         (xw (car (cdr (cdr  disp)))))
-    ;;(if (xwidgetp  xw) xw nil)
-    (if (equal 'xwidget (car disp)) xw)))
+         (xw (car (cdr (cdr disp)))))
+    (when (xwidget-live-p xw) xw)))
 
 
 
@@ -111,7 +109,8 @@ It can use the following special constructs:
 (defcustom xwidget-webkit-cookie-file nil
   "The name of the file where `xwidget-webkit-browse-url' will store cookies.
 They will be stored as plain text in Mozilla \"cookies.txt\"
-format.  If nil, do not store cookies."
+format.  If nil, do not store cookies.  You must kill all xwidget-webkit
+buffers for this setting to take effect after setting it to nil."
   :type '(choice (const :tag "Do not store cookies" nil) file)
   :version "29.1")
 
@@ -199,7 +198,6 @@ for the actual events that will be sent."
     (define-key map "b" 'xwidget-webkit-back)
     (define-key map "f" 'xwidget-webkit-forward)
     (define-key map "r" 'xwidget-webkit-reload)
-    (define-key map "t" (lambda () (interactive) (message "o"))) ;FIXME: ?!?
     (define-key map "\C-m" 'xwidget-webkit-insert-string)
     (define-key map "w" 'xwidget-webkit-current-url)
     (define-key map "+" 'xwidget-webkit-zoom-in)
