@@ -103,7 +103,11 @@ autojoins immediately at that time."
 If non-nil, and a channel on the server a.b.c is joined, then
 only b.c is used as the server for `erc-autojoin-channels-alist'.
 This is important for networks that redirect you to other
-servers, presumably in the same domain."
+servers, presumably in the same domain.
+
+This treatment will only be applied to so-called \"announced names\",
+like zirconium.libera.chat, but not to \"dialed\" hostnames, like
+my.proxy.localdomain or my.vps.example.com."
   :type 'boolean)
 
 (defvar-local erc--autojoin-timer nil)
@@ -127,9 +131,9 @@ This is called from a timer set up by `erc-autojoin-channels'."
 This should be a key from `erc-autojoin-channels-alist'."
   (or (eq candidate (erc-network))
       (and (stringp candidate)
-	   (string-match-p candidate
-                           (or erc-server-announced-name
-			       erc-session-server)))))
+           (or (and erc-server-announced-name ; unnecessary after #48598
+                    (string-match-p candidate erc-server-announced-name))
+               (string-match-p candidate erc-session-server)))))
 
 (defun erc-autojoin-after-ident (_network _nick)
   "Autojoin channels in `erc-autojoin-channels-alist'.
@@ -184,11 +188,12 @@ This function is run from `erc-nickserv-identified-hook'."
 (defun erc-autojoin-current-server ()
   "Compute the current server for lookup in `erc-autojoin-channels-alist'.
 Respects `erc-autojoin-domain-only'."
-  (let ((server (or erc-server-announced-name erc-session-server)))
-    (if (and erc-autojoin-domain-only
-	     (string-match "[^.\n]+\\.\\([^.\n]+\\.[^.\n]+\\)$" server))
-	(match-string 1 server)
-      server)))
+  (if (and erc-autojoin-domain-only
+           erc-server-announced-name
+           (string-match "[^.\n]+\\.\\([^.\n]+\\.[^.\n]+\\)$"
+                         erc-server-announced-name))
+      (match-string 1 erc-server-announced-name)
+    erc-session-server))
 
 (defun erc-autojoin-add (proc parsed)
   "Add the channel being joined to `erc-autojoin-channels-alist'."
