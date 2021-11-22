@@ -1923,7 +1923,7 @@ POS, ROWH is the visible height of that row, and VPOS is the row number
        || (posint >= CHARPOS (top) && posint <= BUF_ZV (buf)))
       && CHARPOS (top) >= BUF_BEGV (buf)
       && CHARPOS (top) <= BUF_ZV (buf)
-      && scroll_into_view (w, posint, &x, &y, &rtop, &rbot, &rowh, &vpos))
+      && window_start_coordinates (w, posint, &x, &y, &rtop, &rbot, &rowh, &vpos))
     {
       fully_p = !rtop && !rbot;
       if (!NILP (partially) || fully_p)
@@ -5573,7 +5573,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
      something like (scroll-down 1) with PT in the line before
      the partially visible one would recenter.  */
 
-  if (!scroll_into_view (w, PT, &x, &y, &rtop, &rbot, &rowh, &vpos))
+  if (! window_start_coordinates (w, PT, &x, &y, &rtop, &rbot, &rowh, &vpos))
     {
       itdata = bidi_shelve_cache ();
       /* Move backward half the height of the window.  Performance note:

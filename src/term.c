@@ -1533,7 +1533,7 @@ tty_append_glyph (struct it *it)
    Populate IT with important rendering metrics like glyph width and
    ascent.
 
-   emulate_move_it sets IT->glyph_row to null, a crucial hack instructing
+   emulate_display_line sets IT->glyph_row to null, a crucial hack instructing
    produce_glyphs to "go through the motions" for layout purposes without
    rendering anything.
 

@@ -203,16 +203,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    original cache.  See bidi_push_it and bidi_pop_it for how this is
    done.
 
-   Some functions of the display engine save copies of 'struct it' in
-   local variables, and restore them later.  For examples, see
-   scroll_into_view and emulate_move_it in xdisp.c, and
-   window_scroll_pixel_based in window.c.  When this happens, we need
-   to save and restore the bidi cache as well, because conceptually
-   the cache is part of the 'struct it' state, and needs to be in
-   perfect sync with the portion of the buffer/string that is being
-   processed.  This saving and restoring of the cache state is handled
-   by bidi_shelve_cache and bidi_unshelve_cache, and the helper macros
-   SAVE_IT and RESTORE_IT defined on xdisp.c.
+   Stashing (SAVE_IT) and restoring (RESTORE_IT) iterators is a common
+   xdisp.c task which now additionally preserves bidi data using
+   bidi_shelve_cache and bidi_unshelve_cache.
 
    Note that, because reordering is implemented below the level in
    xdisp.c that breaks glyphs into screen lines, we are violating
@@ -547,7 +540,7 @@ bidi_copy_it (struct bidi_it *to, struct bidi_it *from)
    could run out of memory for pathologically long bracketed text or
    very long text lines that need to be reordered.  This is aggravated
    when word-wrap is in effect, since then functions display_line and
-   emulate_move_it need to keep up to 4 copies of the
+   emulate_display_line need to keep up to 4 copies of the
    cache.
 
    This limitation means there can be no more than that amount of
