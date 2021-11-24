@@ -5153,7 +5153,7 @@ find_display_property (Lisp_Object disp, Lisp_Object prop)
 {
   if (NILP (disp))
     return Qnil;
-  /* We have a vector of display specs. */
+  /* We have a vector of display specs.  */
   if (VECTORP (disp))
     {
       for (ptrdiff_t i = 0; i < ASIZE (disp); i++)
@@ -5166,7 +5166,7 @@ find_display_property (Lisp_Object disp, Lisp_Object prop)
 	}
       return Qnil;
     }
-  /* We have a list of display specs. */
+  /* We have a list of display specs.  */
   else if (CONSP (disp)
 	   && CONSP (XCAR (disp)))
     {
@@ -5179,7 +5179,7 @@ find_display_property (Lisp_Object disp, Lisp_Object prop)
 	    return XCAR (XCDR (elem));
 
 	  /* Check that we have a proper list before going to the next
-	     element. */
+	     element.  */
 	  if (CONSP (XCDR (disp)))
 	    disp = XCDR (disp);
 	  else
@@ -5187,7 +5187,7 @@ find_display_property (Lisp_Object disp, Lisp_Object prop)
 	}
       return Qnil;
     }
-  /* A simple display spec. */
+  /* A simple display spec.  */
   else if (CONSP (disp)
 	   && CONSP (XCDR (disp))
 	   && EQ (XCAR (disp), prop))
@@ -5196,11 +5196,11 @@ find_display_property (Lisp_Object disp, Lisp_Object prop)
     return Qnil;
 }
 
-static Lisp_Object get_display_property (ptrdiff_t bufpos, Lisp_Object prop,
-					 Lisp_Object object)
+static
+Lisp_Object get_display_property (ptrdiff_t bufpos, Lisp_Object prop,
+				  Lisp_Object object)
 {
   return find_display_property (Fget_text_property (make_fixnum (bufpos),
-
 						    Qdisplay, object),
 				prop);
 }
@@ -5217,11 +5217,18 @@ display_min_width (struct it *it, ptrdiff_t bufpos,
       if (!it->glyph_row)
 	return;
 
-      /* Check that we're really right after the sequence of
-	 characters covered by this `min-width'.  */
-      if (bufpos > BEGV
-	  && EQ (it->min_width_property,
-		 get_display_property (bufpos - 1, Qmin_width, object)))
+      /* When called form display_string (i.e., the mode line),
+	 we're being called with a string as the object, and we
+	 may be called with many sub-strings belonging to the same
+	 :propertize run. */
+      if ((bufpos == 0
+	   && !EQ (it->min_width_property,
+		   get_display_property (0, Qmin_width, object)))
+	  /* In a buffer -- check that we're really right after the
+	     sequence of characters covered by this `min-width'.  */
+	  || (bufpos > BEGV
+	      && EQ (it->min_width_property,
+		     get_display_property (bufpos - 1, Qmin_width, object))))
 	{
 	  Lisp_Object w = Qnil;
 	  double width;
@@ -5261,6 +5268,11 @@ display_min_width (struct it *it, ptrdiff_t bufpos,
   if (CONSP (width_spec))
     {
       if (bufpos == BEGV
+	  /* Mode line (see above).  */
+	  || (bufpos == 0
+	      && !EQ (it->min_width_property,
+		      get_display_property (0, Qmin_width, object)))
+	  /* Buffer.  */
 	  || (bufpos > BEGV
 	      && !EQ (width_spec,
 		      get_display_property (bufpos - 1, Qmin_width, object))))
@@ -5273,12 +5285,12 @@ display_min_width (struct it *it, ptrdiff_t bufpos,
 
 DEFUN ("get-display-property", Fget_display_property,
        Sget_display_property, 2, 4, 0,
-       doc: /* Get the `display' property PROP at POSITION.
+       doc: /* Get the value of the `display' property PROP at POSITION.
 If OBJECT, this should be a buffer or string where the property is
-fetched from.  This defaults to the current buffer.
+fetched from.  If omitted, OBJECT defaults to the current buffer.
 
-If PROPERTIES, use those properties instead of the properties at
-POSITION.  */)
+If PROPERTIES, look for value of PROP in PROPERTIES instead of the
+properties at POSITION.  */)
   (Lisp_Object position, Lisp_Object prop, Lisp_Object object,
    Lisp_Object properties)
 {
