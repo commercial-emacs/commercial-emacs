@@ -203,9 +203,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    original cache.  See bidi_push_it and bidi_pop_it for how this is
    done.
 
-   Stashing (SAVE_IT) and restoring (RESTORE_IT) iterators is a common
-   xdisp.c task which now additionally preserves bidi data using
-   bidi_shelve_cache and bidi_unshelve_cache.
+   Stashing (SAVE_IT) and restoring (RESTORE_IT) iterators must now
+   additionally preserve bidi data using bidi_shelve_cache and
+   bidi_unshelve_cache.
 
    Note that, because reordering is implemented below the level in
    xdisp.c that breaks glyphs into screen lines, we are violating

@@ -6482,8 +6482,6 @@ back_to_previous_line_start (struct it *it)
    characters into the the wrong glyph row, resulting in wrong cursor motion.
    */
 
-unsigned int bmtvn_calls1 = 0;
-
 static bool
 forward_to_next_line_start (struct it *it, bool *skipped_p,
 			    struct bidi_it *bidi_it_prev)
@@ -6492,7 +6490,6 @@ forward_to_next_line_start (struct it *it, bool *skipped_p,
   bool newline_found_p = false;
   int n;
   const int MAX_NEWLINE_DISTANCE = 500;
-  unsigned int bmtvn_calls = 0;
 
   /* If already on a newline, just consume it to avoid unintended
      skipping over invisible text below.  */
@@ -6570,8 +6567,6 @@ forward_to_next_line_start (struct it *it, bool *skipped_p,
 	      do
 		{
 		  bprev = it->bidi_it;
-		  bmtvn_calls1++;
-		  bmtvn_calls++;
 		  bidi_move_to_visually_next (&it->bidi_it);
 		} while (it->bidi_it.charpos != limit);
 
@@ -7613,7 +7608,6 @@ get_display_element (struct it *it)
 
 static unsigned int sitn_calls = 0;
 static double sitn_seconds = 0.0;
-unsigned int bmtvn_calls2 = 0, bmtvn_calls3 = 0, bmtvn_calls4 = 0, bmtvn_calls5 = 0;
 
 /* Actually increment IT.
    RESEAT_P skips to the next visible line start.  */
@@ -7686,7 +7680,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	{
 	  eassert (it->len != 0);
 
-	  if (!it->bidi_p)
+	  if (! it->bidi_p)
 	    {
 	      IT_BYTEPOS (*it) += it->len;
 	      IT_CHARPOS (*it) += 1;
@@ -7699,7 +7693,6 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	      if (it->bidi_it.new_paragraph)
 		bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it,
 				     false);
-              bmtvn_calls2++;
 	      bidi_move_to_visually_next (&it->bidi_it);
 	      IT_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      IT_CHARPOS (*it) = it->bidi_it.charpos;
@@ -7732,7 +7725,6 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	}
       else
 	{
-          bmtvn_calls3++;
 	  bidi_move_to_visually_next (&it->bidi_it);
 	  IT_BYTEPOS (*it) = it->bidi_it.bytepos;
 	  IT_CHARPOS (*it) = it->bidi_it.charpos;
@@ -7825,7 +7817,6 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	      int i;
 
 	      for (i = 0; i < it->cmp_it.nchars; i++) {
-                bmtvn_calls4++;
 		bidi_move_to_visually_next (&it->bidi_it);
               }
 	      IT_STRING_BYTEPOS (*it) = it->bidi_it.bytepos;
@@ -7890,7 +7881,6 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	    {
 	      int prev_scan_dir = it->bidi_it.scan_dir;
 
-              bmtvn_calls5++;
 	      bidi_move_to_visually_next (&it->bidi_it);
 	      IT_STRING_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      IT_STRING_CHARPOS (*it) = it->bidi_it.charpos;
@@ -8097,8 +8087,6 @@ get_visually_first_element (struct it *it)
     }
   else
     {
-      clock_t t;
-      unsigned int bmtvn_reps;
       ptrdiff_t orig_bytepos = it->bidi_it.bytepos,
         orig_charpos = it->bidi_it.charpos;
       (void) orig_charpos;
@@ -8114,24 +8102,14 @@ get_visually_first_element (struct it *it)
 						    &it->bidi_it.bytepos);
       bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
       /* fprintf(stderr, "brutal6 src=%ld dest=%ld ", it->bidi_it.bytepos, orig_bytepos); */
-      bmtvn_reps = 0;
-      t = clock();
       do
         {
           /* Now return to buffer/string position where we were asked
              to get the next display element, and produce that.  */
           bidi_move_to_visually_next (&it->bidi_it);
-          bmtvn_reps++;
         }
       while (it->bidi_it.bytepos != orig_bytepos
              && it->bidi_it.charpos < eob);
-      /* bidi_move_to_visually_next (&it->bidi_it); */
-      /* it->bidi_it.charpos = orig_charpos; */
-      /* it->bidi_it.bytepos = orig_bytepos; */
-      t = clock() - t;
-      /* fprintf(stderr, "bmtvn_reps=%u seconds=%f oc=%ld nc=%ld\n", */
-      /*         bmtvn_reps, ((double)t) / CLOCKS_PER_SEC, */
-      /*         orig_charpos, it->bidi_it.charpos); */
     }
 
   /*  Adjust IT's position information to where we ended up.  */
@@ -9479,7 +9457,10 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
   int line_start_x = 0, max_current_x = 0;
   void *backup_data = NULL;
   bool behaved_p = BUFFERP (it->object)
+    && (! it->bidi_p || it->bidi_it.scan_dir != -1)
+    && (BIDI_AT_BASE_LEVEL (it->bidi_it))
     && it->method == GET_FROM_BUFFER
+    && to_charpos > IT_CHARPOS (*it)
     && op == MOVE_TO_POS;
 
   for (;;)
@@ -9655,23 +9636,60 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	case MOVE_LINE_CONTINUED:
 	  /* Don't take max, Markovian last_visible_x */
 	  max_current_x = it->last_visible_x;
+	  if (behaved_p && IT_CHARPOS (*it) > 100000) {
+	    fprintf (stderr, "to_charpos=%ld IT_CHARPOS=%ld term=%ld \n",
+		     to_charpos, IT_CHARPOS (*it),
+		     find_newline (IT_CHARPOS (*it), IT_BYTEPOS (*it),
+				   to_charpos, CHAR_TO_BYTE (to_charpos),
+				   1, NULL, NULL, 0));
+	  }
 	  if (behaved_p)
 	    {
-	      ptrdiff_t nchars = to_charpos - orig_charpos;
-	      SET_TEXT_POS (it->position, to_charpos, CHAR_TO_BYTE (to_charpos));
-	      it->current_x = line_start_x;
-	      it->hpos = 0;
-	      it->line_number_produced_p = false;
-	      last_height = it->max_ascent + it->max_descent;
-	      it->continuation_lines_width = nchars * it->pixel_width;
-	      it->vpos = it->continuation_lines_width / window_box_width (it->w, TEXT_AREA);
-	      it->current_y = it->vpos * last_height;
-	      goto out;
-	      break;
+	      ptrdiff_t counted = 0,
+		term = find_newline (IT_CHARPOS (*it), IT_BYTEPOS (*it),
+				     to_charpos, CHAR_TO_BYTE (to_charpos),
+				     1, &counted, NULL, 0);
+	      if (counted == 0)
+		goto move_line_continued_default;
+	      else
+		{
+		  ptrdiff_t npos;
+		  int nchars_per_row =
+		    (it->last_visible_x - it->first_visible_x) /
+		    FRAME_COLUMN_WIDTH (it->f);
+		  /* Subtract one since find_newline includes newline */
+		  ptrdiff_t nchars = term - orig_charpos - 1;
+		  /* Subtract one to ensure getting MOVE_NEWLINE_OR_CR */
+		  int full_rows = (nchars / nchars_per_row) - 1;
+
+		  eassert (counted == 1);
+
+		  if ((nchars % nchars_per_row) == 0)
+		    /* Subtract one for the just-so case */
+		    full_rows--;
+
+		  if (full_rows <= 0)
+		    goto move_line_continued_default;
+
+		  npos = IT_CHARPOS (*it) + full_rows * nchars_per_row;
+		  fprintf (stderr, "to_charpos=%ld term=%ld nchars=%ld full_rows=%d tfr=%ld\n",
+			   to_charpos, term, nchars, full_rows, npos);
+		  it->continuation_lines_width +=
+		    full_rows * (it->last_visible_x - it->first_visible_x);
+		  SET_TEXT_POS (it->position, npos, CHAR_TO_BYTE (npos));
+		  IT_CHARPOS (*it) = npos;
+		  IT_BYTEPOS (*it) = CHAR_TO_BYTE (npos);
+		  move_it_to (it, npos, -1, -1, -1, MOVE_TO_POS);
+		  get_visually_first_element (it);
+		  last_height = it->max_ascent + it->max_descent;
+		  /* Subtract one for the present row */
+		  it->vpos += max (0, full_rows - 1);
+		  it->current_y += max (0, (full_rows - 1) * last_height);
+		}
 	    }
 	  else if (IT_CHARPOS (*it) == orig_charpos
-	      && it->method == orig_method
-	      && orig_method == GET_FROM_BUFFER)
+		   && it->method == orig_method
+		   && orig_method == GET_FROM_BUFFER)
 	    {
 	      /* Explicitly advance iterator under degenerate
 		 geometries, e.g., the first display element is
@@ -9715,6 +9733,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	    }
 	  else
 	    {
+	    move_line_continued_default:
 	      it->continuation_lines_width += it->current_x;
 	    }
 	  break;

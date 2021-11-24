@@ -3381,7 +3381,7 @@ void move_it_in_display_line (struct it *it,
 int partial_line_height (struct it *it_origin);
 bool in_display_vector_p (struct it *);
 int frame_mode_line_height (struct frame *);
-extern unsigned int mit_calls1, mit_calls2, mit_calls3, mit_calls4, mit_calls5, mit_calls6, mit_calls7, mit_calls8, mit_calls9, mit_calls10, mit_calls11, mit_calls12, mit_calls13, mit_calls14, mit_calls15, bmtvn_calls1;
+extern unsigned int mit_calls1, mit_calls2, mit_calls3, mit_calls4, mit_calls5, mit_calls6, mit_calls7, mit_calls8, mit_calls9, mit_calls10, mit_calls11, mit_calls12, mit_calls13, mit_calls14, mit_calls15;
 extern bool redisplaying_p;
 extern bool help_echo_showing_p;
 extern Lisp_Object help_echo_string, help_echo_window;
