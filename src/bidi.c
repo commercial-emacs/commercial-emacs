@@ -1,4 +1,4 @@
-/* Low-level bidirectional buffer/string-scanning functions for GNU Emacs.
+/* Bidirectional buffer and string scanning functions.
 
 Copyright (C) 2000-2001, 2004-2005, 2009-2021 Free Software Foundation,
 Inc.
@@ -20,58 +20,49 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-/* A sequential implementation of the Unicode Bidirectional algorithm,
-   (UBA) as per UAX#9, a part of the Unicode Standard.
+/* From the Unicode Bidirectional algorithm, (UBA) as per UAX#9, a
+   part of the Unicode Standard.
 
-   Unlike the Reference Implementation and most other implementations,
-   this one is designed to be called once for every character in the
-   buffer or string.  That way, we can leave intact the design of the
-   Emacs display engine, whereby an iterator object is used to
-   traverse buffer or string text character by character, and generate
-   the necessary data for displaying each character in 'struct glyph'
-   objects.  (See xdisp.c for the details of that iteration.)  The
-   functions on this file replace the original linear iteration in the
-   logical order of the text with a non-linear iteration in the visual
-   order, i.e. in the order characters should be shown on display.
+   "However, because these right-to-left scripts use digits that are
+   written from left to right, the text is actually bidirectional: a
+   mixture of right-to-left and left-to-right text. In addition to
+   digits, embedded words from English and other scripts are also
+   written from left to right, also producing bidirectional
+   text."
 
-   The main entry point is bidi_move_to_visually_next.  Each time it
-   is called, it finds the next character in the visual order, and
-   returns its information in a special structure.  The caller is then
-   expected to process this character for display or any other
-   purposes, and call bidi_move_to_visually_next for the next
-   character.  See the comments in bidi_move_to_visually_next for more
-   details about its algorithm that finds the next visual-order
-   character by resolving their levels on the fly.
+   LOGICAL order corresponds to order in memory, that is, the
+   direction of increasing address values.  Most programmers visualize
+   ascending values left to right.  Some programmers visualize
+   ascending values top to bottom.  Those programmers need to stop
+   reading books about machine architecture from the 1970s.
 
-   Two other entry points are bidi_paragraph_init and
-   bidi_mirror_char.  The first determines the base direction of a
-   paragraph, while the second returns the mirrored version of its
-   argument character.
+   EMBEDDINGS are "for example, an English quotation in the middle of
+   an Arabic sentence."  They can be arbitrarily nested in LEVELS.
+
+   The incomprehensibility of UAX#9, even for a technical reference,
+   is just asking for an ass kicking.
+
+   The main entry point is bidi_move_to_visually_next, which returns
+   the next character in the visual order along with data important to
+   UAX#9.  There is something called bidi levels.
+
+   Other entry points include bidi_paragraph_init which determines the
+   paragraph direction, and bidi_mirror_char which returns the
+   mirrored version of its argument.
 
    A few auxiliary entry points are used to initialize the bidi
    iterator for iterating an object (buffer or string), push and pop
    the bidi iterator state, and save and restore the state of the bidi
    cache.
 
-   If you want to understand the code, you will have to read it
-   together with the relevant portions of UAX#9.  The comments include
-   references to UAX#9 rules, for that very reason.
+   You will not understand the bidi implementation any better after
+   spending an hour grappling with UAX#9, but if you don't at least do
+   that, you will falsely accuse EZ of being deliberately obfuscatory.
 
-   A note about references to UAX#9 rules: if the reference says
-   something like "X9/Retaining", it means that you need to refer to
-   rule X9 and to its modifications described in the "Implementation
-   Notes" section of UAX#9, under "Retaining Format Codes".
-
-   Here's the overview of the design of the reordering engine
-   implemented by this file.
-
-   Basic implementation structure
+   Overview
    ------------------------------
 
-   The sequential processing steps described by UAX#9 are implemented
-   as recursive levels of processing, all of which examine the next
-   character in the logical order.  This hierarchy of processing looks
-   as follows:
+   This calling sequence is as follows:
 
      bidi_level_of_next_char -- resolve implicit levels
      bidi_resolve_neutral    -- resolve neutral types
@@ -80,152 +71,73 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
      bidi_resolve_explicit   -- resolve explicit levels and directions
      bidi_fetch_char         -- fetch next character
 
-   Unlike all the levels below it, bidi_level_of_next_char can return
-   the information about either the next or previous character in the
-   logical order, depending on the current direction of scanning the
-   buffer or string.  For the next character, it calls all the levels
-   below it; for the previous character, it uses the cache, described
-   below.
+   Depending on the prevailing direction, the top call
+   bidi_level_of_next_char can act on either the logically (in-memory)
+   next or previous character.  For the next character, it proceeds
+   with the calling sequence; for the previous character, it uses the
+   cache, described below.
 
-   Thus, the result of calling bidi_level_of_next_char is the resolved
-   level of the next or the previous character in the logical order.
-   Based on this information, the function bidi_move_to_visually_next
-   finds the next character in the visual order and updates the
-   direction in which the buffer is scanned, either forward or
-   backward, to find the next character to be displayed.  (Text is
-   scanned backwards when it needs to be reversed for display, i.e. if
-   the visual order is the inverse of the logical order.)  This
-   implements the last, reordering steps of the UBA, by successively
-   calling bidi_level_of_next_char until the character of the required
-   embedding level is found; the scan direction is dynamically updated
-   as a side effect.  See the commentary before the 'while' loop in
+   See the commentary before the 'while' loop in
    bidi_move_to_visually_next, for the details.
 
    Fetching characters
    -------------------
 
-   In a nutshell, fetching the next character boils down to calling
-   string_char_and_length, passing it the address of a buffer or
-   string position.  See bidi_fetch_char.  However, if the next
-   character is "covered" by a display property of some kind,
+   If the next character is "covered" by a display property,
    bidi_fetch_char returns the u+FFFC "object replacement character"
-   that represents the entire run of text covered by the display
-   property.  (The ch_len and nchars members of 'struct bidi_it'
-   reflect the length in bytes and characters of that text.)  This is
-   so we reorder text on both sides of the display property as
-   appropriate for an image or embedded string.  Similarly, text
-   covered by a display spec of the form '(space ...)', is replaced
-   with the u+2029 paragraph separator character, so such display
-   specs produce the same effect as a TAB under UBA.  Both these
-   special characters are not actually displayed -- the display
-   property is displayed instead -- but just used to compute the
-   embedding level of the surrounding text so as to produce the
-   required effect.
+   that represents the entire run of covered text.  (The ch_len and
+   nchars members of 'struct bidi_it' reflect the length in bytes and
+   characters of that text.)  Similarly, text covered by a display
+   spec of the form '(space ...)', is replaced with the u+2029
+   paragraph separator character, so such display specs produce the
+   same effect as a TAB under UBA.  Both these replacement
+   characters are not actually displayed -- the display property is
+   displayed instead -- but just used to compute the embedding level
+   required for reordering surrounding text.
 
-   Bidi iterator states
-   --------------------
+   Caching of bidi iterator states
+   -------------------------------
 
-   The UBA is highly context dependent in some of its parts,
-   i.e. results of processing a character can generally depend on
-   characters very far away.  The UAX#9 description of the UBA
-   prescribes a stateful processing of each character, whereby the
-   results of this processing depend on various state variables, such
-   as the current embedding level, level stack, and directional
-   override status.  In addition, the UAX#9 description includes many
-   passages like this (from rule W2 in this case):
+   From rule W2:
 
      Search backward from each instance of a European number until the
      first strong type (R, L, AL, or sos) is found. If an AL is found,
      change the type of the European number to Arabic number.
 
-   To support this, we use a bidi iterator object, 'struct bidi_it',
-   which is a sub-structure of 'struct it' used by xdisp.c (see
-   dispextern.h for the definition of both of these structures).  The
-   bidi iterator holds the entire state of the iteration required by
-   the UBA, and is updated as the text is traversed.  In particular,
-   the embedding level of the current character being resolved is
-   recorded in the iterator state.  To avoid costly searches backward
-   in support of rules like W2 above, the necessary character types
-   are also recorded in the iterator state as they are found during
-   the forward scan, and then used when such rules need to be applied.
-   (Forward scans cannot be avoided in this way; they need to be
-   performed at least once, and the results recorded in the iterator
-   state, to be reused until the forward scan oversteps the recorded
-   position.)
+   To avoid costly searches backward in support of W2, character types
+   are recorded in the bidi iterator during the forward scan.
 
-   In this manner, the iterator state acts as a mini-cache of
-   contextual information required for resolving the level of the
-   current character by various UBA rules.
+   The cache is just a linear array of 'struct bidi_it' objects.  Only
+   levels higher than the base paragraph embedding can change
+   direction.  Therefore, as soon as we return to the base embedding
+   level, we can free the cache; see the calls to bidi_cache_reset and
+   bidi_cache_shrink.
 
-   Caching of bidi iterator states
+   The function bidi_cache_iterator_state and companion function
+   bidi_cache_find record and retrieve states respectively.  Under
+   penalty of aborting, all cached states must correspond 1:1 to a
+   buffer or string region whose processing they reflect.
+
+   When the parent iterator 'struct it' is push_it (pop_it) to iterate
+   over a different object (e.g., a 'display' string that covers some
+   buffer text), the bidi iterator cache needs to be bidi_push_it
+   (bidi_pop_it) as well.
+
+   SAVE_IT and RESTORE_IT of iterators must now additionally preserve
+   bidi data using bidi_shelve_cache and bidi_unshelve_cache.
+
+   The emacs display engine proceeds such that reordering occurs ahead
+   of the breaking of glyphs across screen lines.  This violates
+   paragraph 3.4 of UAX#9. which prescribes reordering resolved levels
+   *after* (emphasis theirs) any line wrapping.  Consequently, some
+   continued lines get split in a run whose direction is opposite to
+   the paragraph's base direction.
+
+   R2L is not your boss
    -------------------------------
 
-   As described above, the reordering engine uses the information
-   recorded in the bidi iterator state in order to resolve the
-   embedding level of the current character.  When the reordering
-   engine needs to process the next character in the logical order, it
-   fetches it and applies to it all the UBA levels, updating the
-   iterator state as it goes.  But when the buffer or string is
-   scanned backwards, i.e. in the reverse order of buffer/string
-   positions, the scanned characters were already processed during the
-   preceding forward scan (see bidi_find_other_level_edge).  To avoid
-   costly re-processing of characters that were already processed
-   during the forward scan, the iterator states computed while
-   scanning forward are cached.
-
-   The cache is just a linear array of 'struct bidi_it' objects, which
-   is dynamically allocated and reallocated as needed, since the size
-   of the cache depends on the text being processed.  We only need the
-   cache while processing embedded levels higher than the base
-   paragraph embedding level, because these higher levels require
-   changes in scan direction.  Therefore, as soon as we are back to
-   the base embedding level, we can free the cache; see the calls to
-   bidi_cache_reset and bidi_cache_shrink, for the conditions to do
-   this.
-
-   The cache maintains the index of the next unused cache slot -- this
-   is where the next iterator state will be cached.  The function
-   bidi_cache_iterator_state saves an instance of the state in the
-   cache and increments the unused slot index.  The companion function
-   bidi_cache_find looks up a cached state that corresponds to a given
-   buffer/string position.  All of the cached states must correspond
-   1:1 to the buffer or string region whose processing they reflect;
-   bidi.c will abort if it finds cache slots that violate this 1:1
-   correspondence.
-
-   When the parent iterator 'struct it' is pushed (see push_it in
-   xdisp.c) to pause the current iteration and start iterating over a
-   different object (e.g., a 'display' string that covers some buffer
-   text), the bidi iterator cache needs to be "pushed" as well, so
-   that a new empty cache could be used while iterating over the new
-   object.  Later, when the new object is exhausted, and xdisp.c calls
-   pop_it, we need to "pop" the bidi cache as well and return to the
-   original cache.  See bidi_push_it and bidi_pop_it for how this is
-   done.
-
-   Stashing (SAVE_IT) and restoring (RESTORE_IT) iterators must now
-   additionally preserve bidi data using bidi_shelve_cache and
-   bidi_unshelve_cache.
-
-   Note that, because reordering is implemented below the level in
-   xdisp.c that breaks glyphs into screen lines, we are violating
-   paragraph 3.4 of UAX#9. which mandates that line breaking shall be
-   done before reordering each screen line separately.  However,
-   following UAX#9 to the letter in this matter goes against the basic
-   design of the Emacs display engine, and so we choose here this
-   minor deviation from the UBA letter in preference to redesign of
-   the display engine.  The effect of this is only seen in continued
-   lines that are broken into screen lines in the middle of a run
-   whose direction is opposite to the paragraph's base direction.
-
-   Important design and implementation note: when the code needs to
-   scan far ahead, be sure to avoid such scans as much as possible
-   when the buffer/string doesn't contain any RTL characters.  Users
-   of left-to-right scripts will never forgive you if you introduce
-   some slow-down due to bidi in situations that don't involve any
-   bidirectional text.  See the large comment near the beginning of
-   bidi_resolve_neutral, for one situation where such shortcut was
-   necessary.  */
+   See comment in bidi_resolve_neutral where work for R2L is bypassed
+   when L2R is assured, which is most of the time.  */
 
 #include <config.h>
 
@@ -3397,18 +3309,16 @@ bidi_move_to_visually_next (struct bidi_it *bidi_it)
     emacs_abort ();
 
   if (bidi_it->scan_dir == 0)
-    {
-      bidi_it->scan_dir = 1;	/* default to logical order */
-    }
+    bidi_it->scan_dir = 1;	/* default to logical order */
 
   /* If we just passed a newline, initialize for the next line.  */
-  if (!bidi_it->first_elt
+  if (! bidi_it->first_elt
       && (bidi_it->ch == '\n' || bidi_it->ch == BIDI_EOB))
     bidi_line_init (bidi_it);
 
-  /* Prepare the sentinel iterator state, and cache it.  When we bump
-     into it, scanning backwards, we'll know that the last non-base
-     level is exhausted.  */
+  /* Cache the iterator state.  When we bump into it on the return
+     trip backwards, we'll know that the last non-base level is
+     exhausted.  */
   if (bidi_cache_idx == bidi_cache_start)
     {
       bidi_copy_it (&sentinel, bidi_it);
@@ -3424,13 +3334,7 @@ bidi_move_to_visually_next (struct bidi_it *bidi_it)
     }
 
   old_level = bidi_it->resolved_level;
-
-  // HERE
-  if (++bmtvn_count == 20000) {
-    new_level = bidi_level_of_next_char (bidi_it);
-  } else {
-    new_level = bidi_level_of_next_char (bidi_it);
-  }
+  new_level = bidi_level_of_next_char (bidi_it);
 
   /* Reordering of resolved levels (clause L2) is implemented by
      jumping to the other edge of the level and flipping direction of
@@ -3443,7 +3347,7 @@ bidi_move_to_visually_next (struct bidi_it *bidi_it)
       int expected_next_level = old_level + incr;
 
       /* Jump (or walk) to the other edge of this level.  */
-      bidi_find_other_level_edge (bidi_it, level_to_search, !ascending);
+      bidi_find_other_level_edge (bidi_it, level_to_search, ! ascending);
       /* Switch scan direction and peek at the next character in the
 	 new direction.  */
       bidi_it->scan_dir = -bidi_it->scan_dir;

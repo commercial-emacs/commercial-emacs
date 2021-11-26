@@ -152,10 +152,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    `bidi_move_to_visually_next' which moves the iterator to the next
    spot in the reading order (left to right, or right to left).
 
-   Bidi poses complications because glyph positions could increase or
-   decrease with their glyph row indices.  Also, accounting for face
-   changes, overlays, etc. must be specially handled because
-   non-sequential iteration skips positions (see
+   Accounting for face changes, overlays, etc. must be handled
+   out-of-band because filling glyphs from the right skips
+   aforementioned stop positions on the left (see
    `handle_stop_backwards').
 
    Bidirectional display and character compositions.
@@ -174,14 +173,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    (is that R2L?), the grapheme cluster get delivered to
    `PRODUCE_GLYPHS' back to front.
 
-   Moving an iterator in bidirectional text
-   without producing glyphs.
+   Moving an iterator in bidirectional text without producing glyphs.
 
-   As far as the iterator is concerned, the geometry of R2L rows is
-   still left to right, i.e. the iterator "thinks" the first character
-   is at the leftmost pixel position.  The iterator does not know (or
-   care) that `PRODUCE_GLYPHS' reversed the delivery order.  The
-   required axis-flip occurs in a blink-and-you-miss-it line in
+   As far as the iterator is concerned, traversal of R2L rows is still
+   left to right.  The iterator does not know (or care) that
+   `PRODUCE_GLYPHS' reversed the delivery order.  The required
+   axis-flip occurs in a blink-and-you-miss-it line in
    `buffer_posn_from_coords'.  */
 
 #include <config.h>
@@ -3087,7 +3084,7 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
       t = clock();
       move_it_to (it, CHARPOS (pos), -1, -1, -1, MOVE_TO_POS);
       fprintf (stderr,
-	       "brutalpost ms=%d it.pw=%d it.y=%d it.vpos=%d it.cw=%d it.c=%c it.x=%d it.pos=%ld\n",
+	       "brutal6 ms=%d it.pw=%d it.y=%d it.vpos=%d it.cw=%d it.c=%c it.x=%d it.pos=%ld\n",
 	       (int)(((double)(clock() - t)) / CLOCKS_PER_SEC * 1000),
 	       it->pixel_width,
 	       it->current_y,
@@ -6910,8 +6907,8 @@ reseat_to_string (struct it *it, const char *s, Lisp_Object string,
      loading loadup.el, as the necessary character property tables are
      not yet available.  */
   it->bidi_p =
-    !redisplay__inhibit_bidi
-    && !NILP (BVAR (&buffer_defaults, bidi_display_reordering));
+    ! redisplay__inhibit_bidi
+    && ! NILP (BVAR (&buffer_defaults, bidi_display_reordering));
 
   if (s == NULL)
     {
@@ -8100,8 +8097,8 @@ get_visually_first_element (struct it *it)
 	it->bidi_it.charpos = find_newline_no_quit (IT_CHARPOS (*it),
 						    IT_BYTEPOS (*it), -1,
 						    &it->bidi_it.bytepos);
+      // fprintf(stderr, "brutal7 src=%ld dest=%ld ", it->bidi_it.bytepos, orig_bytepos);
       bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
-      /* fprintf(stderr, "brutal6 src=%ld dest=%ld ", it->bidi_it.bytepos, orig_bytepos); */
       do
         {
           /* Now return to buffer/string position where we were asked
@@ -9461,7 +9458,8 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
     && (BIDI_AT_BASE_LEVEL (it->bidi_it))
     && it->method == GET_FROM_BUFFER
     && to_charpos > IT_CHARPOS (*it)
-    && op == MOVE_TO_POS;
+    && op == MOVE_TO_POS
+    && true;
 
   for (;;)
     {
@@ -9498,7 +9496,6 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
           mit_calls4++;
 	  skip = emulate_display_line (it, to_charpos, ((op & MOVE_TO_X) ? to_x : 0),
 				       (MOVE_TO_X | (op & MOVE_TO_POS)));
-
 	  switch (skip)
 	    {
 	    case MOVE_POS_MATCH_OR_ZV:
@@ -9636,56 +9633,44 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	case MOVE_LINE_CONTINUED:
 	  /* Don't take max, Markovian last_visible_x */
 	  max_current_x = it->last_visible_x;
-	  if (behaved_p && IT_CHARPOS (*it) > 100000) {
-	    fprintf (stderr, "to_charpos=%ld IT_CHARPOS=%ld term=%ld \n",
-		     to_charpos, IT_CHARPOS (*it),
-		     find_newline (IT_CHARPOS (*it), IT_BYTEPOS (*it),
-				   to_charpos, CHAR_TO_BYTE (to_charpos),
-				   1, NULL, NULL, 0));
-	  }
 	  if (behaved_p)
 	    {
 	      ptrdiff_t counted = 0,
 		term = find_newline (IT_CHARPOS (*it), IT_BYTEPOS (*it),
 				     to_charpos, CHAR_TO_BYTE (to_charpos),
 				     1, &counted, NULL, 0);
-	      if (counted == 0)
-		goto move_line_continued_default;
-	      else
+	      ptrdiff_t npos;
+	      int nchars_per_row =
+		(it->last_visible_x - it->first_visible_x) /
+		FRAME_COLUMN_WIDTH (it->f);
+	      /* Subtract newline if any */
+	      ptrdiff_t nchars = term - IT_CHARPOS (*it) - counted;
+	      /* Subtract newline to ensure getting MOVE_NEWLINE_OR_CR */
+	      int full_rows = (nchars / nchars_per_row) - counted;
+	      if ((nchars % nchars_per_row) == 0)
+		/* Subtract one for the just-so case */
+		full_rows--;
+	      if (full_rows > 0)
 		{
-		  ptrdiff_t npos;
-		  int nchars_per_row =
-		    (it->last_visible_x - it->first_visible_x) /
-		    FRAME_COLUMN_WIDTH (it->f);
-		  /* Subtract one since find_newline includes newline */
-		  ptrdiff_t nchars = term - orig_charpos - 1;
-		  /* Subtract one to ensure getting MOVE_NEWLINE_OR_CR */
-		  int full_rows = (nchars / nchars_per_row) - 1;
-
-		  eassert (counted == 1);
-
-		  if ((nchars % nchars_per_row) == 0)
-		    /* Subtract one for the just-so case */
-		    full_rows--;
-
-		  if (full_rows <= 0)
-		    goto move_line_continued_default;
-
 		  npos = IT_CHARPOS (*it) + full_rows * nchars_per_row;
-		  fprintf (stderr, "to_charpos=%ld term=%ld nchars=%ld full_rows=%d tfr=%ld\n",
-			   to_charpos, term, nchars, full_rows, npos);
+		  fprintf (stderr,
+			   "orig_charpos=%ld it=%ld to_charpos=%ld term=%ld nchars=%ld full_rows=%d tfr=%ld\n",
+			   orig_charpos, IT_CHARPOS (*it), to_charpos, term, nchars,
+			   full_rows, npos);
 		  it->continuation_lines_width +=
 		    full_rows * (it->last_visible_x - it->first_visible_x);
 		  SET_TEXT_POS (it->position, npos, CHAR_TO_BYTE (npos));
 		  IT_CHARPOS (*it) = npos;
 		  IT_BYTEPOS (*it) = CHAR_TO_BYTE (npos);
 		  move_it_to (it, npos, -1, -1, -1, MOVE_TO_POS);
-		  get_visually_first_element (it);
+		  if (it->bidi_p)
+		    get_visually_first_element (it);
 		  last_height = it->max_ascent + it->max_descent;
 		  /* Subtract one for the present row */
-		  it->vpos += max (0, full_rows - 1);
-		  it->current_y += max (0, (full_rows - 1) * last_height);
+		  it->vpos += full_rows;
+		  it->current_y += full_rows * last_height;
 		}
+	      goto move_line_continued_default;
 	    }
 	  else if (IT_CHARPOS (*it) == orig_charpos
 		   && it->method == orig_method
@@ -9801,7 +9786,6 @@ move_it_vertically_backward (struct it *it, int dy)
   int nlines, h, nchars_per_row
     = (it->last_visible_x - it->first_visible_x) / FRAME_COLUMN_WIDTH (it->f);
   clock_t t;
-  struct window *w = XWINDOW (selected_window);
   bool continue_p = false;
 
   eassert (dy >= 0);
@@ -9817,20 +9801,15 @@ move_it_vertically_backward (struct it *it, int dy)
 	pos_limit = BEGV;
       else
 	pos_limit = max (start_pos - nlines * nchars_per_row, BEGV);
-      fprintf(stderr, "wtf0 dy=%d it.vpos=%d guesslines=%d pos_limit=%ld\n", dy, it->vpos, nlines, pos_limit);
 
       /* Move iterator NLINES back.  */
-      fprintf(stderr, "wtf0a it.cpos=%ld\n", IT_CHARPOS(*it));
       for (int i=0; i<nlines && IT_CHARPOS (*it) > pos_limit; ++i)
 	{
 	  back_to_previous_visible_line_start (it);
 	}
-      fprintf(stderr, "wtf0b it.cpos=%ld\n", IT_CHARPOS (*it));
 
       /* `reseat_1' is `reseat' without handling stop position (see header).  */
-      fprintf(stderr, "wtf0c it.cpos=%ld\n", IT_CHARPOS(*it));
       reseat_1 (it, it->current.pos, true);
-      fprintf(stderr, "wtf0d it.cpos=%ld\n", IT_CHARPOS(*it));
 
       /* We are now at a line start.  */
       it->current_x = it->hpos = it->continuation_lines_width = 0;
@@ -9852,35 +9831,22 @@ move_it_vertically_backward (struct it *it, int dy)
 		 || SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) != '\n'));
       SAVE_IT (it3, it2, it3data);
 
-      fprintf(stderr, "wtf1a it2.current_y=%d it2.continuation_lines_width=%d\n", it2.current_y, it2.continuation_lines_width);
-
-      t = clock(); // HERE
-      // can I get 7293 without calling get_display_element?  No.
+      t = clock();
       move_it_to (&it2, start_pos, -1, -1, -1, MOVE_TO_POS);
-      t = clock() - t;
 
-      fprintf(stderr, "brutal4 it2.cy=%d it2.cw=%d seconds=%f manual_nlines=%ld\n",
-	      it2.current_y, it2.continuation_lines_width, ((double)t) / CLOCKS_PER_SEC,
-	      ((start_pos - IT_CHARPOS(*it))) / it2.last_visible_x);
+      fprintf(stderr, "brutal4 it2.y=%d it2.cw=%d ms=%d\n",
+	      it2.current_y, it2.continuation_lines_width,
+	      (int)(((double)(clock() - t)) / CLOCKS_PER_SEC * 1000));
 
-      /* H is the actual vertical distance from the position in *IT
-	 and the starting position.  */
+      /* H is the pixel distance from IT.  */
       h = it2.current_y - it->current_y;
-      fprintf(stderr, "wtf2b [ it2.cy(%d) - it.cy(%d) ] = h(%d)\n",
-	      it2.current_y, it->current_y, h);
 
-      /* NLINES is the distance in number of lines.  */
+      /* NLINES is the lines distance.  */
       nlines = it2.vpos - it->vpos;
-      fprintf(stderr, "wtf3 [ it2.vpos(%d) - it.vpos(%d) ] = nlines(%d)\n",
-	      it2.vpos, it->vpos, nlines);
 
       /* Gets IT relative to the START_POS.  */
       it->vpos -= nlines;
       it->current_y -= h;
-      fprintf(stderr, "wtf4 it.vpos=%d\n", it->vpos);
-      fprintf(stderr, "wtf4 it.cy=%d\n", it->current_y);
-      fprintf(stderr, "wtf4 it.lvy=%d\n", it->last_visible_y);
-      fprintf(stderr, "wtf4 it.wtby=%d\n", window_text_bottom_y (w));
 
       if (dy == 0)
 	{
@@ -9911,8 +9877,6 @@ move_it_vertically_backward (struct it *it, int dy)
 	  int line_height, target_y = it->current_y + h - dy;
 	  RESTORE_IT (&it3, &it3, it3data);
 	  line_height = line_bottom_y (&it3) - it3.current_y;
-
-	  fprintf(stderr, "wtf5 target_y=%d, line_height=%d\n", target_y, line_height);
 
 	  RESTORE_IT (it, it, it2data);
 	  if (target_y < it->current_y
@@ -11821,15 +11785,15 @@ set_message_1 (void *a1, Lisp_Object string)
      unibyte-display-via-language-environment is non-nil and the
      string to display is unibyte, because in that case unibyte
      characters should not be displayed as octal escapes.  */
-  if (!message_enable_multibyte
+  if (! message_enable_multibyte
       && unibyte_display_via_language_environment
-      && !NILP (BVAR (current_buffer, enable_multibyte_characters)))
+      && ! NILP (BVAR (current_buffer, enable_multibyte_characters)))
     Fset_buffer_multibyte (Qnil);
   else if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     Fset_buffer_multibyte (Qt);
 
   bset_truncate_lines (current_buffer, message_truncate_lines ? Qt : Qnil);
-  if (!NILP (BVAR (current_buffer, bidi_display_reordering)))
+  if (! NILP (BVAR (current_buffer, bidi_display_reordering)))
     bset_bidi_paragraph_direction (current_buffer, Qleft_to_right);
 
   /* Insert new message at BEG.  */
@@ -14838,7 +14802,7 @@ text_outside_line_unchanged_p (struct window *w,
 	 require redisplaying the whole paragraph.  It might be worthwhile
 	 to find the paragraph limits and widen the range of redisplayed
 	 lines to that, but for now just give up this optimization.  */
-      if (!NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering))
+      if (! NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering))
 	  && NILP (BVAR (XBUFFER (w->contents), bidi_paragraph_direction)))
 	unchanged_p = false;
     }
@@ -17600,7 +17564,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	      must_scroll = true;
 	    }
 	  else if (rc != CURSOR_MOVEMENT_SUCCESS
-		   && !NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
+		   && ! NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
 	    {
 	      struct glyph_row *row1;
 
@@ -17664,7 +17628,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	  else if (scroll_p)
 	    rc = CURSOR_MOVEMENT_MUST_SCROLL;
 	  else if (rc != CURSOR_MOVEMENT_SUCCESS
-		   && !NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
+		   && ! NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
 	    {
 	      /* With bidi-reordered rows, there could be more than
 		 one candidate row whose start and end positions
@@ -19436,10 +19400,10 @@ try_window_reusing_current_matrix (struct window *w)
 		 bidi-reordered glyph rows.  Let set_cursor_from_row
 		 figure out where to put the cursor, and if it fails,
 		 give up.  */
-	      if (!NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
+	      if (! NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
 		{
-		  if (!set_cursor_from_row (w, row, w->current_matrix,
-					    0, 0, 0, 0))
+		  if (! set_cursor_from_row (w, row, w->current_matrix,
+					     0, 0, 0, 0))
 		    {
 		      clear_glyph_matrix (w->desired_matrix);
 		      return false;
@@ -19908,7 +19872,7 @@ try_window_insdel (struct window *w)
      wrapped line can change the wrap position, altering the line
      above it.  It might be worthwhile to handle this more
      intelligently, but for now just redisplay from scratch.  */
-  if (!NILP (BVAR (XBUFFER (w->contents), word_wrap)))
+  if (! NILP (BVAR (XBUFFER (w->contents), word_wrap)))
     GIVE_UP (21);
 
   /* Under bidi reordering, adding or deleting a character in the
@@ -19919,13 +19883,13 @@ try_window_insdel (struct window *w)
      to find the paragraph limits and widen the range of redisplayed
      lines to that, but for now just give up this optimization and
      redisplay from scratch.  */
-  if (!NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering))
+  if (! NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering))
       && NILP (BVAR (XBUFFER (w->contents), bidi_paragraph_direction)))
     GIVE_UP (22);
 
   /* Give up if the buffer has line-spacing set, as Lisp-level changes
      to that variable require thorough redisplay.  */
-  if (!NILP (BVAR (XBUFFER (w->contents), extra_line_spacing)))
+  if (! NILP (BVAR (XBUFFER (w->contents), extra_line_spacing)))
     GIVE_UP (23);
 
   /* Give up if display-line-numbers is in relative mode, or when the

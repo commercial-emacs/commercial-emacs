@@ -2228,49 +2228,23 @@ whether or not it is currently displayed in some window.  */)
              the display string is a newline, we don't do this, because
              otherwise we will end up in a screen line that is one too
              far back.  */
-          /* this is a brutal call */
-	  int nlines;
           clock_t t;
-          struct it it2;
-          struct face *face;
-          ptrdiff_t target;
-
-          target =
-            (!disp_string_at_start_p ||
-             FETCH_BYTE (IT_BYTEPOS (it)) == '\n')
+          ptrdiff_t target =
+	    (!disp_string_at_start_p ||
+	     FETCH_BYTE (IT_BYTEPOS (it)) == '\n')
             ? PT
             : PT - 1;
 
-          it2 = it;
-          face = FACE_FROM_ID (it2.f, it2.face_id);
-          if (face && face->font) {
-            it2.pixel_width = face->font->space_width;
-          }
-
-          // bol to window start
-          nlines = ((target - IT_CHARPOS (it2))) / it2.last_visible_x;
-          for (int i=0, z=(target - IT_CHARPOS (it2)); i<z; ++i)
-            INC_TEXT_POS(it2.current.pos, 1);
-          it2.current_x = target % it2.last_visible_x - 1;
-          it2.c = FETCH_CHAR (IT_BYTEPOS (it2));
-          it2.continuation_lines_width = nlines * it2.last_visible_x;
-          it2.current_y = nlines;
-          it2.position = it2.current.pos;
-
           t = clock();
           move_it_to (&it, target, -1, -1, -1, MOVE_TO_POS);
-          // it = it2;
-          t = clock() - t;
           fprintf(stderr,
-                  "brutal2 seconds=%f it.y=%d it2.y=%d it.dpvi=%d it2.dpvi=%d it.cw=%d it2.cw=%d it.c=%c it2.c=%c it.x=%d it2.x=%d nlines=%d it.pos=%ld it2.pos=%ld\n",
-                  ((double)t) / CLOCKS_PER_SEC,
-                  it.current_y, it2.current_y,
-                  it.current.dpvec_index, it2.current.dpvec_index,
-                  it.continuation_lines_width, it2.continuation_lines_width,
-                  it.c, it2.c,
-                  it.current_x, it2.current_x,
-                  nlines,
-                  it.position.charpos, it2.position.charpos);
+                  "brutal2 ms=%d it.y=%d it.cw=%d it.c=%c it.x=%d it.pos=%ld\n",
+		  (int)(((double)(clock() - t)) / CLOCKS_PER_SEC * 1000),
+                  it.current_y,
+                  it.continuation_lines_width,
+                  it.c,
+                  it.current_x,
+                  it.position.charpos);
         }
 
       /* IT may move too far if truncate-lines is on and PT lies

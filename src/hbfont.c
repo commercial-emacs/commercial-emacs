@@ -437,13 +437,10 @@ hbfont_shape (Lisp_Object lgstring, Lisp_Object direction)
   hb_buffer_set_cluster_level (hb_buffer,
 			       HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
 
-  /* If the caller didn't provide a meaningful DIRECTION, let HarfBuzz
-     guess it. */
-  if (!NILP (direction)
-      /* If they bind bidi-display-reordering to nil, the DIRECTION
-	 they provide is meaningless, and we should let HarfBuzz guess
-	 the real direction.  */
-      && !NILP (BVAR (current_buffer, bidi_display_reordering)))
+  if (! NILP (direction)
+      /* A caller-furnished DIRECTION is meaningless if bidi is
+	 deactivated */
+      && ! NILP (BVAR (current_buffer, bidi_display_reordering)))
     {
       hb_direction_t dir = HB_DIRECTION_LTR;
       if (EQ (direction, QL2R))
