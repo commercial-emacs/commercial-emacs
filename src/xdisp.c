@@ -8788,8 +8788,6 @@ get_element_from_composition (struct it *it)
    && (IT)->continuation_lines_width > 0				\
    && (IT)->line_wrap == TRUNCATE && (IT)->stack[0].line_wrap != TRUNCATE)
 
-static unsigned int miidlt_calls = 0;
-
 /* Move iterator IT to a specified buffer or X position within one
    line on the display without producing glyphs.
 
@@ -8842,9 +8840,6 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
   bool ppos_p = it->bidi_p && (op & MOVE_TO_POS);
   bool saw_smaller_pos = prev_pos < to_charpos;
   bool line_number_pending = false;
-  unsigned int iterations = 0;
-
-  miidlt_calls++;
 
   /* Stash initial IT.  Should we fail to reach TO_CHARPOS,
      we recurse with a to_charpos just past TO_CHARPOS.  */
@@ -8880,8 +8875,6 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
   for (;;)
     {
       int x, i, ascent = 0, descent = 0;
-
-      iterations++;
 
       /* Stop if we move beyond TO_CHARPOS (after an image or a
 	 display string or stretch glyph).  */
@@ -8969,7 +8962,8 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 
       if (it->area != TEXT_AREA)
 	{
-	  /* Skip display elements in margins. */
+	  /* The remainder of the loop concerns line processing
+	     not relevant to marginal areas. */
 	  set_iterator_to_next (it, true);
 	  if (IT_CHARPOS (*it) < CHARPOS (this_line_min_pos))
 	    SET_TEXT_POS (this_line_min_pos,
@@ -9334,9 +9328,8 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	prev_pos = IT_CHARPOS (*it);
     }
 
-  /* If we scanned beyond TO_POS, restore according to stashed
-     iterators' x-coordinate (since bidi reverses buffer position with
-     respect to screen-coordinate).  */
+  /* Restore to wrap point when atpos/atx position would be displayed
+     on the next screen line due to line-wrap.  (Bug#23570) */
   if (result == MOVE_LINE_CONTINUED
       && it->line_wrap == WORD_WRAP
       && wrap_it.sp >= 0
@@ -29375,7 +29368,7 @@ produce_glyphless_glyph (struct it *it, bool for_no_font, Lisp_Object acronym)
       }								\
     } while (false)
 
-/* Window-capable version of term.c produce_glyphs.
+/* Graphical-display version of term.c produce_glyphs.
 
    IT specifies what (character, image, etc), and where (row, hpos)
    in the desired matrix to render a glyph.
