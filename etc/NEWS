@@ -75,13 +75,19 @@ time.
 
 * Changes in Emacs 29.1
 
++++
+** New face 'mode-line-active'.
+This inherits from the 'mode-line' face, but is the face actually used
+on the mode lines (along with 'mode-line-inactive').
+
 ---
 ** The mode line now uses a proportional font by default.
-To get the old monospaced mode line back, customize the 'mode-line'
-face not to inherit from the 'variable-pitch' face, or add this to
-your ~/.emacs:
+To get the old monospaced mode line back, customize the
+'mode-line-active' and 'mode-line-inactive' faces not to inherit from
+the 'variable-pitch' face, or add this to your ~/.emacs:
 
-  (set-face-attribute 'mode-line nil :inherit 'default)
+  (set-face-attribute 'mode-line-active nil :inherit 'mode-line)
+  (set-face-attribute 'mode-line-inactive nil :inherit 'mode-line)
 
 +++
 ** New function 'buffer-text-pixel-size'.
@@ -94,10 +100,12 @@ This controls the thickness of the external borders of the menu bars
 and pop-up menus.
 
 ---
-** New minor mode 'better-pixel-scroll-mode'.
-When enabled, using this mode with a capable scroll wheel will result
-in the display being scrolled precisely according to the turning of
-that wheel.
+** New minor mode 'pixel-scroll-precision-mode'.
+When enabled, you can scroll the display up or down by individual
+pixels in a way that corresponds with the movement of your mouse
+wheel, if supported by the mouse wheel.  Unlike 'pixel-scroll-mode',
+this mode scrolls the display pixel-by-pixel, as opposed to only
+animating line-by-line scrolls.
 
 ** Terminal Emacs
 
