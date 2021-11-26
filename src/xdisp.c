@@ -9431,13 +9431,9 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 {
   int line_start_x = 0, max_current_x = 0;
   void *backup_data = NULL;
-  bool behaved_p = BUFFERP (it->object)
-    && (! it->bidi_p || it->bidi_it.scan_dir != -1)
-    && (BIDI_AT_BASE_LEVEL (it->bidi_it))
-    && it->method == GET_FROM_BUFFER
-    && to_charpos > IT_CHARPOS (*it)
-    && op == MOVE_TO_POS
-    && true;
+  bool move_to_pos_p = it->method == GET_FROM_BUFFER && op == MOVE_TO_POS;
+
+  eassert (to_charpos >= IT_CHARPOS (*it));
 
   for (;;)
     {
@@ -9611,7 +9607,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	case MOVE_LINE_CONTINUED:
 	  /* Don't take max, Markovian last_visible_x */
 	  max_current_x = it->last_visible_x;
-	  if (behaved_p)
+	  if (move_to_pos_p)
 	    {
 	      ptrdiff_t counted = 0,
 		term = find_newline (IT_CHARPOS (*it), IT_BYTEPOS (*it),
