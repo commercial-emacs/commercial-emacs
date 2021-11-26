@@ -8076,7 +8076,6 @@ get_visually_first_element (struct it *it)
 	it->bidi_it.charpos = find_newline_no_quit (IT_CHARPOS (*it),
 						    IT_BYTEPOS (*it), -1,
 						    &it->bidi_it.bytepos);
-      // fprintf(stderr, "brutal7 src=%ld dest=%ld ", it->bidi_it.bytepos, orig_bytepos);
       bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
       do
         {
