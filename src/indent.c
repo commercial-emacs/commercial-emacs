@@ -2228,23 +2228,13 @@ whether or not it is currently displayed in some window.  */)
              the display string is a newline, we don't do this, because
              otherwise we will end up in a screen line that is one too
              far back.  */
-          clock_t t;
           ptrdiff_t target =
 	    (!disp_string_at_start_p ||
 	     FETCH_BYTE (IT_BYTEPOS (it)) == '\n')
             ? PT
             : PT - 1;
 
-          t = clock();
           move_it_to (&it, target, -1, -1, -1, MOVE_TO_POS);
-          fprintf(stderr,
-                  "brutal2 ms=%d it.y=%d it.cw=%d it.c=%c it.x=%d it.pos=%ld\n",
-		  (int)(((double)(clock() - t)) / CLOCKS_PER_SEC * 1000),
-                  it.current_y,
-                  it.continuation_lines_width,
-                  it.c,
-                  it.current_x,
-                  it.position.charpos);
         }
 
       /* IT may move too far if truncate-lines is on and PT lies

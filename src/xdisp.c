@@ -3076,23 +3076,10 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
     {
       /* POS is not bol.  Calculate continuation lines width. */
       int first_y = it->current_y, new_x;
-      clock_t t;
-
       reseat_at_previous_visible_line_start (it);
       eassert (it->line_wrap != TRUNCATE); /* reseat best not change this */
 
-      t = clock();
       move_it_to (it, CHARPOS (pos), -1, -1, -1, MOVE_TO_POS);
-      fprintf (stderr,
-	       "brutal6 ms=%d it.pw=%d it.y=%d it.vpos=%d it.cw=%d it.c=%c it.x=%d it.pos=%ld\n",
-	       (int)(((double)(clock() - t)) / CLOCKS_PER_SEC * 1000),
-	       it->pixel_width,
-	       it->current_y,
-	       it->vpos,
-	       it->continuation_lines_width,
-	       it->c,
-	       it->current_x,
-	       it->position.charpos);
       new_x = it->current_x + it->pixel_width;
 
       /* Move off a line ending in the middle of a multi-glyph (e.g. a
@@ -7603,18 +7590,12 @@ get_display_element (struct it *it)
 }
 
 
-static unsigned int sitn_calls = 0;
-static double sitn_seconds = 0.0;
-
 /* Actually increment IT.
    RESEAT_P skips to the next visible line start.  */
 
 void
 set_iterator_to_next (struct it *it, bool reseat_p)
 {
-  clock_t t;
-  t = clock();
-  sitn_calls++;
   switch (it->method)
     {
     case GET_FROM_BUFFER:
@@ -7951,8 +7932,6 @@ set_iterator_to_next (struct it *it, bool reseat_p)
   eassert (it->method != GET_FROM_STRING
 	   || (STRINGP (it->string)
 	       && IT_STRING_CHARPOS (*it) >= 0));
-  t = clock() - t;
-  sitn_seconds += ((double)t)/CLOCKS_PER_SEC;
 }
 
 /* Load IT's display element fields with information about the next
@@ -9653,10 +9632,10 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	      if (full_rows > 0)
 		{
 		  npos = IT_CHARPOS (*it) + full_rows * nchars_per_row;
-		  fprintf (stderr,
-			   "orig_charpos=%ld it=%ld to_charpos=%ld term=%ld nchars=%ld full_rows=%d tfr=%ld\n",
-			   orig_charpos, IT_CHARPOS (*it), to_charpos, term, nchars,
-			   full_rows, npos);
+		  /* fprintf (stderr, */
+		  /* 	   "orig_charpos=%ld it=%ld to_charpos=%ld term=%ld nchars=%ld full_rows=%d tfr=%ld\n", */
+		  /* 	   orig_charpos, IT_CHARPOS (*it), to_charpos, term, nchars, */
+		  /* 	   full_rows, npos); */
 		  it->continuation_lines_width +=
 		    full_rows * (it->last_visible_x - it->first_visible_x);
 		  SET_TEXT_POS (it->position, npos, CHAR_TO_BYTE (npos));
@@ -9785,7 +9764,6 @@ move_it_vertically_backward (struct it *it, int dy)
   ptrdiff_t start_pos, pos_limit;
   int nlines, h, nchars_per_row
     = (it->last_visible_x - it->first_visible_x) / FRAME_COLUMN_WIDTH (it->f);
-  clock_t t;
   bool continue_p = false;
 
   eassert (dy >= 0);
@@ -9831,12 +9809,7 @@ move_it_vertically_backward (struct it *it, int dy)
 		 || SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) != '\n'));
       SAVE_IT (it3, it2, it3data);
 
-      t = clock();
       move_it_to (&it2, start_pos, -1, -1, -1, MOVE_TO_POS);
-
-      fprintf(stderr, "brutal4 it2.y=%d it2.cw=%d ms=%d\n",
-	      it2.current_y, it2.continuation_lines_width,
-	      (int)(((double)(clock() - t)) / CLOCKS_PER_SEC * 1000));
 
       /* H is the pixel distance from IT.  */
       h = it2.current_y - it->current_y;
