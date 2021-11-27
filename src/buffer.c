@@ -602,6 +602,7 @@ even if it is dead.  The return value is never nil.  */)
   *(BUF_GPT_ADDR (b)) = *(BUF_Z_ADDR (b)) = 0; /* Put an anchor '\0'.  */
   b->text->inhibit_shrinking = false;
   b->text->redisplay = false;
+  b->text->monospace = true;
 
   b->newline_cache = 0;
   b->width_run_cache = 0;

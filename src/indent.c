@@ -2348,9 +2348,9 @@ whether or not it is currently displayed in some window.  */)
       /* Move to the goal column, if one was specified.  If the window
 	 was originally hscrolled, the goal column is interpreted as
 	 an addition to the hscroll amount.  */
-      if (!NILP (lcols))
+      if (! NILP (lcols))
 	{
-	  move_it_in_display_line (&it, ZV, first_x + to_x, MOVE_TO_X);
+	  move_it_x (&it, first_x + to_x);
 	  /* If we find ourselves in the middle of an overlay string
 	     which includes a newline after current string position,
 	     we need to move by lines until we get out of the string,
@@ -2366,7 +2366,7 @@ whether or not it is currently displayed in some window.  */)
 				SBYTES (it.string) - IT_STRING_BYTEPOS (it)))
 		{
 		  move_it_by_lines (&it, 1);
-		  move_it_in_display_line (&it, ZV, first_x + to_x, MOVE_TO_X);
+		  move_it_x (&it, first_x + to_x);
 		}
 	    }
 	}

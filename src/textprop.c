@@ -154,8 +154,8 @@ validate_interval_range (Lisp_Object object, Lisp_Object *begin,
     {
       register struct buffer *b = XBUFFER (object);
 
-      if (!(BUF_BEGV (b) <= XFIXNUM (*begin) && XFIXNUM (*begin) <= XFIXNUM (*end)
-	    && XFIXNUM (*end) <= BUF_ZV (b)))
+      if (! (BUF_BEGV (b) <= XFIXNUM (*begin) && XFIXNUM (*begin) <= XFIXNUM (*end)
+	     && XFIXNUM (*end) <= BUF_ZV (b)))
 	args_out_of_range (begin0, end0);
       i = buffer_intervals (b);
 
@@ -169,8 +169,9 @@ validate_interval_range (Lisp_Object object, Lisp_Object *begin,
     {
       ptrdiff_t len = SCHARS (object);
 
-      if (! (0 <= XFIXNUM (*begin) && XFIXNUM (*begin) <= XFIXNUM (*end)
-	     && XFIXNUM (*end) <= len))
+      if (0 > XFIXNUM (*begin)
+	  || XFIXNUM (*begin) > XFIXNUM (*end)
+	  || XFIXNUM (*end) > len)
 	args_out_of_range (begin0, end0);
       i = string_intervals (object);
 
@@ -180,7 +181,7 @@ validate_interval_range (Lisp_Object object, Lisp_Object *begin,
       searchpos = XFIXNUM (*begin);
     }
 
-  if (!i)
+  if (! i)
     return (force ? create_root_interval (object) : i);
 
   return find_interval (i, searchpos);
@@ -353,106 +354,87 @@ set_properties (Lisp_Object properties, INTERVAL interval, Lisp_Object object)
   set_interval_plist (interval, Fcopy_sequence (properties));
 }
 
-/* Add the properties of PLIST to the interval I, or set
-   the value of I's property to the value of the property on PLIST
-   if they are different.
+/* Merge PLIST properties into INTERVAL's property list, taking
+   PLIST's when values differ.
 
-   OBJECT should be the string or buffer the interval is in.
+   OBJECT is a string or buffer.
 
-   If DESTRUCTIVE, the function is allowed to reuse list values in the
-   properties.
+   If DESTRUCTIVE, use nconc instead of append.
 
-   Return true if this changes I (i.e., if any members of PLIST
-   are actually added to I's plist) */
+   Return true INTERVAL plist was modified.  */
 
 static bool
-add_properties (Lisp_Object plist, INTERVAL i, Lisp_Object object,
+add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 		enum property_set_type set_type, bool destructive)
 {
-  Lisp_Object tail1, tail2, sym1, val1;
   bool changed = false;
-
-  tail1 = plist;
-  sym1 = Qnil;
-  val1 = Qnil;
-
-  /* Go through each element of PLIST.  */
-  for (tail1 = plist; CONSP (tail1); tail1 = Fcdr (XCDR (tail1)))
+  for (Lisp_Object tail1 = plist; CONSP (tail1); tail1 = Fcdr (XCDR (tail1)))
     {
-      bool found = false;
-      sym1 = XCAR (tail1);
-      val1 = Fcar (XCDR (tail1));
+      Lisp_Object sym1 = XCAR (tail1),
+	val1 = Fcar (XCDR (tail1)),
+	tail2 = interval->plist;
 
-      /* Go through I's plist, looking for sym1 */
-      for (tail2 = i->plist; CONSP (tail2); tail2 = Fcdr (XCDR (tail2)))
-	if (EQ (sym1, XCAR (tail2)))
-	  {
-	    Lisp_Object this_cdr;
-
-	    this_cdr = XCDR (tail2);
-	    /* Found the property.  Now check its value.  */
-	    found = true;
-
-	    /* The properties have the same value on both lists.
-	       Continue to the next property.  */
-	    if (EQ (val1, Fcar (this_cdr)))
-	      break;
-
-	    /* Record this change in the buffer, for undo purposes.  */
-	    if (BUFFERP (object))
-	      {
-		record_property_change (i->position, LENGTH (i),
-					sym1, Fcar (this_cdr), object);
-	      }
-
-	    /* I's property has a different value -- change it */
-	    if (set_type == TEXT_PROPERTY_REPLACE)
-	      Fsetcar (this_cdr, val1);
-	    else {
-	      if (CONSP (Fcar (this_cdr)) &&
-		  /* Special-case anonymous face properties. */
-		  (! EQ (sym1, Qface) ||
-		   NILP (Fkeywordp (Fcar (Fcar (this_cdr))))))
-		/* The previous value is a list, so prepend (or
-		   append) the new value to this list. */
-		if (set_type == TEXT_PROPERTY_PREPEND)
-		  Fsetcar (this_cdr, Fcons (val1, Fcar (this_cdr)));
-		else
-		  {
-		    /* Appending. */
-		    if (destructive)
-		      nconc2 (Fcar (this_cdr), list1 (val1));
-		    else
-		      Fsetcar (this_cdr, CALLN (Fappend,
-						Fcar (this_cdr),
-						list1 (val1)));
-		  }
-	      else {
-		/* The previous value is a single value, so make it
-		   into a list. */
-		if (set_type == TEXT_PROPERTY_PREPEND)
-		  Fsetcar (this_cdr, list2 (val1, Fcar (this_cdr)));
-		else
-		  Fsetcar (this_cdr, list2 (Fcar (this_cdr), val1));
-	      }
-	    }
-	    changed = true;
-	    break;
-	  }
-
-      if (! found)
+      /* Look for sym1 in INTERVAL's plist.  */
+      while (CONSP (tail2))
 	{
-	  /* Record this change in the buffer, for undo purposes.  */
+	  if (EQ (sym1, XCAR (tail2)))
+	    break;
+	  tail2 = Fcdr (XCDR (tail2));
+	}
+
+      Lisp_Object this_cdr = CDR_SAFE (tail2);
+      if (! CONSP (tail2) || ! EQ (val1, Fcar (this_cdr)))
+	{
+	  bool width_changing = EQ (sym1, Qdisplay)
+	    || EQ (sym1, Qinvisible)
+	    || EQ (sym1, Qcomposition);
+
+	  changed = true;
+
 	  if (BUFFERP (object))
 	    {
-	      record_property_change (i->position, LENGTH (i),
-				      sym1, Qnil, object);
+	      /* For undo purposes.  */
+	      record_property_change (interval->position, LENGTH (interval),
+				      sym1, Fcar (this_cdr), object);
+	      if (width_changing)
+		/* Forbid algebraic short-cuts for long lines. */
+		XBUFFER (object)->text->monospace = false;
 	    }
-	  set_interval_plist (i, Fcons (sym1, Fcons (val1, i->plist)));
-	  changed = true;
+	  if (! CONSP (tail2))
+	    /* INTERVAL's plist does not have sym1.  */
+	    set_interval_plist (interval,
+				Fcons (sym1, Fcons (val1, interval->plist)));
+	  else if (set_type == TEXT_PROPERTY_REPLACE)
+	    Fsetcar (this_cdr, val1);
+	  else if (CONSP (Fcar (this_cdr)) &&
+		   /* Special-case anonymous face properties. */
+		   (! EQ (sym1, Qface) ||
+		    NILP (Fkeywordp (Fcar (Fcar (this_cdr))))))
+	    {
+	      /* Previous value is a list, so prepend (or append) */
+	      if (set_type == TEXT_PROPERTY_PREPEND)
+		Fsetcar (this_cdr, Fcons (val1, Fcar (this_cdr)));
+	      else
+		{
+		  /* Appending. */
+		  if (destructive)
+		    nconc2 (Fcar (this_cdr), list1 (val1));
+		  else
+		    Fsetcar (this_cdr, CALLN (Fappend,
+					      Fcar (this_cdr),
+					      list1 (val1)));
+		}
+	    }
+	  else
+	    {
+	      /* Previous value is an atom, so make it a list */
+	      if (set_type == TEXT_PROPERTY_PREPEND)
+		Fsetcar (this_cdr, list2 (val1, Fcar (this_cdr)));
+	      else
+		Fsetcar (this_cdr, list2 (Fcar (this_cdr), val1));
+	    }
 	}
     }
-
   return changed;
 }
 
@@ -1158,12 +1140,15 @@ static Lisp_Object
 add_text_properties_1 (Lisp_Object start, Lisp_Object end,
 		       Lisp_Object properties, Lisp_Object object,
 		       enum property_set_type set_type,
-		       bool destructive) {
-  /* Ensure we run the modification hooks for the right buffer,
-     without switching buffers twice (bug 36190).  FIXME: Switching
-     buffers is slow and often unnecessary.  */
+		       bool destructive)
+{
+  INTERVAL interval, unchanged;
+  ptrdiff_t remaining;
+  bool modified = false, first_time = true;
+
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
+      /* (with-current-buffer OBJECT) (Bug#36190).  */
       ptrdiff_t count = SPECPDL_INDEX ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
@@ -1171,11 +1156,6 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
 						      object, set_type,
 						      destructive));
     }
-
-  INTERVAL i, unchanged;
-  ptrdiff_t s, len;
-  bool modified = false;
-  bool first_time = true;
 
   properties = validate_plist (properties);
   if (NILP (properties))
@@ -1185,98 +1165,82 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
     XSETBUFFER (object, current_buffer);
 
  retry:
-  i = validate_interval_range (object, &start, &end, hard);
-  if (!i)
+  unchanged = validate_interval_range (object, &start, &end, hard);
+  if (! unchanged)
     return Qnil;
 
-  s = XFIXNUM (start);
-  len = XFIXNUM (end) - s;
+  interval = unchanged;
+  eassert (intervals_equal (unchanged, interval));
+  remaining = XFIXNUM (end) - XFIXNUM (start);
 
-  /* If this interval already has the properties, we can skip it.  */
-  if (interval_has_all_properties (properties, i))
+  /* Find the first interval without all the PROPERTIES.  */
+  for (ptrdiff_t got = LENGTH (interval) - (XFIXNUM (start) - interval->position);
+       interval_has_all_properties (properties, interval);
+       got = LENGTH (interval))
     {
-      ptrdiff_t got = LENGTH (i) - (s - i->position);
-
-      do
-	{
-	  if (got >= len)
-	    return Qnil;
-	  len -= got;
-	  i = next_interval (i);
-	  got = LENGTH (i);
-	}
-      while (interval_has_all_properties (properties, i));
+      if (got >= remaining)
+	return Qnil;
+      remaining -= got;
+      interval = next_interval (interval);
+      eassert (! intervals_equal (unchanged, interval));
     }
-  else if (i->position != s)
+
+  if (intervals_equal (unchanged, interval)
+      && interval->position != XFIXNUM (start))
     {
-      /* If we're not starting on an interval boundary, we have to
-	 split this interval.  */
-      unchanged = i;
-      i = split_interval_right (unchanged, s - unchanged->position);
-      copy_properties (unchanged, i);
+      /* Split interval if not starting on boundary.  */
+      interval = split_interval_right (unchanged, XFIXNUM (start) - unchanged->position);
+      copy_properties (unchanged, interval);
     }
 
   if (BUFFERP (object) && first_time)
     {
-      ptrdiff_t prev_total_length = TOTAL_LENGTH (i);
-      ptrdiff_t prev_pos = i->position;
+      ptrdiff_t prev_total_length = TOTAL_LENGTH (interval),
+	prev_pos = interval->position;
 
       modify_text_properties (object, start, end);
-      /* If someone called us recursively as a side effect of
-	 modify_text_properties, and changed the intervals behind our back
-	 (could happen if lock_file, called by prepare_to_modify_buffer,
-	 triggers redisplay, and that calls add-text-properties again
-	 in the same buffer), we cannot continue with I, because its
-	 data changed.  So we restart the interval analysis anew.  */
-      if (TOTAL_LENGTH (i) != prev_total_length
-	  || i->position != prev_pos)
+      if (TOTAL_LENGTH (interval) != prev_total_length
+	  || interval->position != prev_pos)
 	{
+	  /* EZ weak sauce: goto retry if interval pulled from under
+	     us, e.g., prepare_to_modify_buffer -> lock_file -> redisplay ->
+	     add_text_properties, and hope it doesn't happen again.
+	     (Bug#13743)
+	  */
 	  first_time = false;
 	  goto retry;
 	}
     }
 
-  /* We are at the beginning of interval I, with LEN chars to scan.  */
-  for (;;)
+  /* Beginning of interval, with REMAINING chars to scan.  */
+  while (interval && LENGTH (interval) < remaining)
     {
-      eassert (i != 0);
-
-      if (LENGTH (i) >= len)
-	{
-	  if (interval_has_all_properties (properties, i))
-	    {
-	      if (BUFFERP (object))
-		signal_after_change (XFIXNUM (start), XFIXNUM (end) - XFIXNUM (start),
-				     XFIXNUM (end) - XFIXNUM (start));
-
-	      eassert (modified);
-	      return Qt;
-	    }
-
-	  if (LENGTH (i) == len)
-	    {
-	      add_properties (properties, i, object, set_type, destructive);
-	      if (BUFFERP (object))
-		signal_after_change (XFIXNUM (start), XFIXNUM (end) - XFIXNUM (start),
-				     XFIXNUM (end) - XFIXNUM (start));
-	      return Qt;
-	    }
-
-	  /* i doesn't have the properties, and goes past the change limit */
-	  unchanged = i;
-	  i = split_interval_left (unchanged, len);
-	  copy_properties (unchanged, i);
-	  add_properties (properties, i, object, set_type, destructive);
-	  if (BUFFERP (object))
-	    signal_after_change (XFIXNUM (start), XFIXNUM (end) - XFIXNUM (start),
-				 XFIXNUM (end) - XFIXNUM (start));
-	  return Qt;
-	}
-
-      len -= LENGTH (i);
-      modified |= add_properties (properties, i, object, set_type, destructive);
-      i = next_interval (i);
+      remaining -= LENGTH (interval);
+      modified |= add_properties (properties, interval, object, set_type, destructive);
+      interval = next_interval (interval);
     }
+
+  if (interval)
+    {
+      eassert (LENGTH (interval) >= remaining);
+      if (interval_has_all_properties (properties, interval))
+	eassert (modified);
+      else if (LENGTH (interval) == remaining)
+	add_properties (properties, interval, object, set_type, destructive);
+      else
+	{
+	  unchanged = interval;
+	  interval = split_interval_left (unchanged, remaining);
+	  copy_properties (unchanged, interval);
+	  add_properties (properties, interval, object, set_type, destructive);
+	}
+      if (BUFFERP (object))
+	signal_after_change (XFIXNUM (start),
+			     XFIXNUM (end) - XFIXNUM (start),
+			     XFIXNUM (end) - XFIXNUM (start));
+      return Qt;
+    }
+  return Qnil;
 }
 
 /* Callers note, this can GC when OBJECT is a buffer (or nil).  */

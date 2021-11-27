@@ -286,6 +286,14 @@ struct buffer_text
 
     /* True if it needs to be redisplayed.  */
     bool_bf redisplay : 1;
+
+    /* True if glyph widths are uniform.  The width_run_cache of the
+       parent 'struct buffer' is only a 256-value thing, does not
+       operate under `enable-multibyte-characters' (which is most of
+       the time), and is generally not what we need for coping with
+       long lines.
+    */
+    bool_bf monospace : 1;
   };
 
 /* Most code should use this macro to access Lisp fields in struct buffer.  */

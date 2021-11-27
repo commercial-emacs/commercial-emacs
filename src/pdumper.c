@@ -2771,6 +2771,7 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
                             Lisp_Vectorlike, WEIGHT_NORMAL);
       DUMP_FIELD_COPY (out, buffer, own_text.inhibit_shrinking);
       DUMP_FIELD_COPY (out, buffer, own_text.redisplay);
+      DUMP_FIELD_COPY (out, buffer, own_text.monospace);
     }
 
   eassert (ctx->obj_offset > 0);

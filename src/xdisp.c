@@ -20,16 +20,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* New redisplay written by Gerd Moellmann <gerd@gnu.org>.
 
-   The C function `redisplay_internal' is the sole entrypoint.
-
    Redisplay occurs in-band in the interpreter loop, and out-of-band
    in response to mouse or expose events or lisp invocations of
    `sit-for' and the like.
 
-   As in the diagram, redisplay can in turn invoke lisp forms which
-   could confuse logic expecting global lisp state to remain
-   unchanged.  Those sections, e.g., the processing of timers, should
-   be fenced with block_input and unblock_input.
+   Note in the diagram that redisplay can invoke lisp forms which
+   could arbitrarily mutate state that redisplay assumed immutable.
+   Those critical sections, e.g., the processing of timers, should be
+   fenced with block_input and unblock_input.
 
    +--------------+   redisplay     +----------------+
    | Lisp machine |---------------->| Redisplay code |<--+
@@ -46,10 +44,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 			    expose_frame (asynchronous)	 |
 							 |
 				   X expose events  -----+
-
-   In addition to window and buffer structures, some global variables
-   like `beg_unchanged' and `end_unchanged' winnow down what requires
-   redisplay.
 
    A "glyph" represents a discrete display element, usually a character
    or image.  The "current" and "desired" glyph matrices are compared
@@ -81,19 +75,19 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    Glyph rows.
 
-   A "glyph row" is comprised of two (usually empty) margin arrays,
-   and one main text-area array.  Frame glyph matrices, used on
-   text-mode terminals never have marginal areas; they treat the
-   entire frame-wide glyph row as a single large text-area.
+   On graphical displays, a "glyph row" is comprised of two (usually
+   empty) margin arrays, and one main text-area array.  Non-graphical
+   displays lack marginal areas; they treat the entire frame-wide
+   glyph row as a single large text-area.
 
    The stop position.
 
-   The `stop_charpos' field of the iterator signifies the next place
-   the engine must re-assess changes to face, overlays, invisibility,
-   etc.  Upon reaching `stop_charpos', the function `handle_stop'
-   invokes a series of handlers, one for each of the fields in
-   `it_props', and concludes by calling `compute_stop_pos' which
-   determines the next position character composition could change.
+   The `stop_charpos' field of the iterator is the next character
+   position redisplay must assess changes to face, overlays,
+   invisibility, etc.  Upon reaching `stop_charpos', the function
+   `handle_stop' invokes a series of handlers, one for each of the
+   fields in `it_props', and concludes by calling `compute_stop_pos'
+   which determines the next `stop_charpos'.
 
    display_line produces desired glyphs
 
@@ -105,77 +99,66 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    `display_line' handles truncation and continuation, word wrap, and
    cursor positioning (see `set_cursor_from_row').
 
-   Frame glyph matrices.
-
-   Window glyph matrices are not well suited for TTY and text-mode
-   terminals.  To reuse part of the display (scrolling lines up and
-   down), we must instead have a view of the whole screen (??).
-
-   Rows in window glyph matrices are shared slices of the frame
-   matrices, which allow frame-global optimization of what is actually
-   written to the glass (??).
-
    Simulating display.
 
-   To implement C-n, we need the position directly below the cursor.
-   This is not trivial when the buffer includes variable-size elements
-   such as differing fonts, tall images, etc.  The function
-   `display_line' could figure this out, but admits the undesirable
-   side effect of producing glyphs.
+   To implement C-n, for example, we need the buffer index
+   corresponding to the screen position "due south" of the cursor.
+   Determining this is nontrivial when the buffer includes
+   variable-size elements, differing fonts, tall images, etc.
 
-   Enter `emulate_display_line', which returns a status indicating
-   whether it reached the required position, hit the end of line,
-   arrived at the window edge without exhausting the buffer's line,
-   etc.  The passed-in `struct it' is also suitably updated.
-
-   `emulate_display_line` duplicates with `display_line`.  I know we
-   can merge the two, but it will take a man-year of debugging.
-
-   Common tasks like `move_it_by_lines' and `move_it_to' require
-   `emulate_display_line'.  The display engine also calls these
-   functions when making layout decisions ahead of producing glyphs.
-   For example, updating `window-start' for a recenter requires
-   `move_it_by_lines' by half the window height.
+   Enter `emulate_display_line' which, like `display_line', traverses
+   the buffer contents to determine what will and won't fit on the
+   current glyph row, but without touching the glass.
 
    Bidirectional display.
 
+   From the Unicode Bidirectional algorithm, (UBA) as per UAX#9, a
+   part of the Unicode Standard.
+
+   "However, because these right-to-left scripts use digits that are
+   written from left to right, the text is actually bidirectional: a
+   mixture of right-to-left and left-to-right text. In addition to
+   digits, embedded words from English and other scripts are also
+   written from left to right, also producing bidirectional
+   text."
+
+   The bidi code does more to occlude the important bits of redisplay
+   than to facilitate cultural exchange in the Levant.  Emacs is and
+   remains the Ginsu knife of 8-bit ASCII; scholars of Aramaic will
+   find more utility and enjoyment reading or manipulating sacred
+   texts on less programmer-oriented platforms.
+
    R2L glyph rows have `reversed_p' set, prompting `PRODUCE_GLYPHS' to
-   *prepend* additional glyphs.  When the glyph row is complete, the
-   function `extend_face_to_end_of_line' fills the empty space to the
-   left of the leftmost character with special glyphs, which will
-   display as, well, empty.  On text terminals, these special glyphs
-   are simply blank characters.  On graphics terminals, a single
-   stretch glyph is inserted.  Both the blanks and the stretch glyph
-   are assigned the background face.
+   *prepend* additional glyphs.  On text terminals, the function
+   `extend_face_to_end_of_line' prepends blank characters to pad out
+   the glyph row.  On graphics terminals, a single stretch glyph is
+   inserted.  Both the blanks and the stretch glyph are assigned the
+   background face.
 
    The `set_iterator_to_next' function defers to
    `bidi_move_to_visually_next' which moves the iterator to the next
    spot in the reading order (left to right, or right to left).
 
-   Accounting for face changes, overlays, etc. must be handled
-   out-of-band because filling glyphs from the right skips
-   aforementioned stop positions on the left (see
+   Some backtracking is necessary since filling glyphs from the right
+   skips aforementioned stop positions on the left (see
    `handle_stop_backwards').
 
-   Bidirectional display and character compositions.
+   Character compositions.
 
-   Some scripts like Arabic and Indic are context-sensitive meaning
-   a character's adjacent neighbor affects its appearance.
+   Some scripts like Arabic and Indic are context-sensitive, meaning a
+   character's adjacent neighbor affects its appearance.
 
    Emacs supports this via "character compositions", implemented in
    composite.c.  During the buffer scan that delivers characters to
    `PRODUCE_GLYPHS', if the next character to be delivered is a
    composed character, the iteration calls `composition_reseat_it' and
-   `get_element_from_composition'.  The composed sequence or
-   "grapheme cluster" is then recorded in the `cmp_it' field of the
-   iterator struct.  Grapheme clusters are always stored in LGSTRING
-   objects in logical order.  So if bidi currently scans "backwards"
-   (is that R2L?), the grapheme cluster get delivered to
-   `PRODUCE_GLYPHS' back to front.
+   `get_element_from_composition'.  The composed sequence or "grapheme
+   cluster" is then recorded in the `cmp_it' field of the iterator
+   struct.  Grapheme clusters are always stored in LGSTRING objects in
+   so-called logical order where sequentially earlier glyphs are
+   stored in earlier (smaller) memory addresses.
 
-   Moving an iterator in bidirectional text without producing glyphs.
-
-   As far as the iterator is concerned, traversal of R2L rows is still
+   As far as 'struct it' is concerned, traversal of R2L rows is still
    left to right.  The iterator does not know (or care) that
    `PRODUCE_GLYPHS' reversed the delivery order.  The required
    axis-flip occurs in a blink-and-you-miss-it line in
@@ -576,7 +559,7 @@ bset_redisplay (struct buffer *b)
 void
 bset_update_mode_line (struct buffer *b)
 {
-  if (!update_mode_lines)
+  if (! update_mode_lines)
     update_mode_lines = REDISPLAY_SOME;
   b->text->redisplay = true;
 }
@@ -585,12 +568,8 @@ void
 wset_update_mode_line (struct window *w)
 {
   w->update_mode_line = true;
-  /* When a window's mode line needs to be updated, the window's frame's
-     title may also need to be updated, but we don't need to worry about it
-     here.  Instead, `gui_consider_frame_title' is automatically called
-     whenever w->update_mode_line is set for that frame's selected window.
-     But for this to work reliably, we have to make sure the window
-     is considered, so we have to mark it for redisplay.  */
+  /* Ensure `redisplay_window' gets called so that
+     `gui_consider_frame_title' can update the frame title bar.  */
   wset_redisplay (w);
 }
 
@@ -815,7 +794,7 @@ static bool get_element_from_xwidget (struct it *);
 static void load_overlay_strings (struct it *, ptrdiff_t);
 static bool get_display_element (struct it *);
 static enum move_it_result emulate_display_line (struct it *, ptrdiff_t, int,
-					    enum move_operation_enum);
+						 enum move_operation_enum);
 static void get_visually_first_element (struct it *);
 static void compute_stop_pos (struct it *);
 static int face_before_or_after_it_pos (struct it *, bool);
@@ -3493,7 +3472,7 @@ compute_stop_pos (struct it *it)
     }
   else
     {
-      ptrdiff_t propmax = IT_CHARPOS (*it) + TEXT_PROP_DISTANCE_LIMIT;
+      ptrdiff_t toofar = IT_CHARPOS (*it) + TEXT_PROP_DISTANCE_LIMIT;
       charpos = IT_CHARPOS (*it);
       bytepos = IT_BYTEPOS (*it);
 
@@ -3502,32 +3481,31 @@ compute_stop_pos (struct it *it)
 
       it->stop_charpos = min (it->end_charpos, next_overlay_change (charpos));
 
-      /* Constrain search for text prop changes.  */
-      if (propmax < it->stop_charpos)
+      if (toofar < it->stop_charpos)
 	{
+	  /* Constrain search for text prop changes.  */
 	  if (! NILP (BVAR (current_buffer, enable_multibyte_characters))
 	      && ! NILP (Vauto_composition_mode))
 	    {
 	      /* Move off a ligature.  */
-	      ptrdiff_t pos = propmax,
+	      ptrdiff_t pos = toofar,
 		bpos = CHAR_TO_BYTE (pos),
-		ligmax = min (propmax + 10 * TEXT_PROP_DISTANCE_LIMIT, it->stop_charpos);
+		ligmax = min (toofar + 10 * TEXT_PROP_DISTANCE_LIMIT, it->stop_charpos);
 	      while (pos < ligmax)
 		{
 		  int ch = fetch_char_advance_no_check (&pos, &bpos);
-		  /* Most punctuation characters admit ligatures, so
-		     assume only SPC, TAB, FF, and NL cannot be.  */
+		  /* Assume only SPC, TAB, FF, NL cannot admit ligatures.  */
 		  if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\f')
 		    {
-		      eassert (pos >= propmax);
+		      eassert (toofar < pos);
 		      eassert (pos < it->stop_charpos);
-		      propmax = --pos;
+		      toofar = --pos;
 		      break;
 		    }
 		}
 	    }
-	  eassert (propmax < it->stop_charpos);
-	  it->stop_charpos = propmax;
+	  eassert (toofar < it->stop_charpos);
+	  it->stop_charpos = toofar;
 	}
     }
 
@@ -4214,14 +4192,14 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 	      if (it->current_x <= it->first_visible_x)
 		return it->face_id;
 	      SAVE_IT (it_copy, *it, it_copy_data);
-	      /* Implementation note: Since move_it_in_display_line
-		 works in the iterator geometry, and thinks the first
-		 character is always the leftmost, even in R2L lines,
-		 we don't need to distinguish between the R2L and L2R
-		 cases here.  */
+	      /* Implementation note: Since move_it_x works in the
+		 iterator geometry, and thinks the first character is
+		 always the leftmost, even in R2L lines, we don't need
+		 to distinguish between the R2L and L2R cases
+		 here.  */
 	      current_x = it_copy.current_x;
 	      move_it_vertically_backward (&it_copy, 0);
-	      move_it_in_display_line (&it_copy, ZV, current_x - 1, MOVE_TO_X);
+	      move_it_x (&it_copy, current_x - 1);
 	      pos = it_copy.current.pos;
 	      RESTORE_IT (it, it, it_copy_data);
 	    }
@@ -8824,7 +8802,7 @@ get_element_from_composition (struct it *it)
      - when we stopped at a line end, i.e. a newline or a CR and selective
      display is on.  */
 
-static enum move_it_result
+enum move_it_result
 emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 		      enum move_operation_enum op)
 {
@@ -8907,7 +8885,6 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	    SAVE_IT (atpos_it, *it, atpos_data);
 	}
 
-      /* HERE can I avoid all of this */
       if (! get_display_element (it))
 	{
 	  result = MOVE_POS_MATCH_OR_ZV;
@@ -9360,38 +9337,6 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 #undef BUFFER_POS_REACHED_P
 #undef SET_CLOSEST_PAST_CHARPOS
 
-/* For external use.  */
-void
-move_it_in_display_line (struct it *it,
-			 ptrdiff_t to_charpos, int to_x,
-			 enum move_operation_enum op)
-{
-  if (it->line_wrap == WORD_WRAP
-      && (op & MOVE_TO_X))
-    {
-      struct it save_it;
-      void *save_data = NULL;
-      int skip;
-
-      SAVE_IT (save_it, *it, save_data);
-      skip = emulate_display_line (it, to_charpos, to_x, op);
-      /* When word-wrap is on, TO_X may lie past the end
-	 of a wrapped line.  Then it->current is the
-	 character on the next line, so backtrack to the
-	 space before the wrap point.  */
-      if (skip == MOVE_LINE_CONTINUED)
-	{
-	  int prev_x = max (it->current_x - 1, 0);
-	  RESTORE_IT (it, &save_it, save_data);
-	  emulate_display_line (it, -1, prev_x, MOVE_TO_X);
-	}
-      else
-	bidi_unshelve_cache (save_data, true);
-    }
-  else
-    emulate_display_line (it, to_charpos, to_x, op);
-}
-
 unsigned int mit_calls1 = 0, mit_calls2 = 0, mit_calls3 = 0, mit_calls4 = 0, mit_calls5 = 0, mit_calls6 = 0, mit_calls7 = 0, mit_calls8 = 0, mit_calls9 = 0, mit_calls10 = 0, mit_calls11 = 0, mit_calls12 = 0, mit_calls13 = 0, mit_calls14 = 0, mit_calls15 = 0;
 
 /* `window_start_coordinates' wants the most current line height. */
@@ -9424,9 +9369,10 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 {
   int line_start_x = 0, max_current_x = 0;
   void *backup_data = NULL;
-  bool move_to_pos_p = it->method == GET_FROM_BUFFER && op == MOVE_TO_POS;
-
-  eassert (to_charpos >= IT_CHARPOS (*it));
+  bool behaved_p = BUFFERP (it->object)
+    && (it->method == GET_FROM_BUFFER
+	|| it->method == GET_FROM_STRETCH)
+    && XBUFFER (it->object)->text->monospace;
 
   for (;;)
     {
@@ -9437,8 +9383,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	{
 	  if (it->vpos == to_vpos)
 	    goto out;
-
-	  if (op & (MOVE_TO_X | MOVE_TO_POS))
+	  else if (op & (MOVE_TO_X | MOVE_TO_POS))
 	    {
 	      skip = emulate_display_line (it, to_charpos, to_x, op);
 
@@ -9542,8 +9487,9 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
       else if (BUFFERP (it->object)
 	       && (it->method == GET_FROM_BUFFER
 		   || it->method == GET_FROM_STRETCH)
-	       /* seems we ought to reverse inequality for scan_dir == -1 */
+	       /* Surpassed TO_CHARPOS */
 	       && IT_CHARPOS (*it) >= to_charpos
+	       /* And we are not bidi-backwards */
 	       && (! it->bidi_p || it->bidi_it.scan_dir != -1))
         {
           skip = MOVE_POS_MATCH_OR_ZV;
@@ -9551,7 +9497,6 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
       else
         {
           mit_calls7++;
-          /* HERE - compactify */
           skip = emulate_display_line (it, to_charpos, -1, MOVE_TO_POS);
         }
 
@@ -9600,13 +9545,12 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	case MOVE_LINE_CONTINUED:
 	  /* Don't take max, Markovian last_visible_x */
 	  max_current_x = it->last_visible_x;
-	  if (move_to_pos_p)
+	  if (behaved_p)
 	    {
 	      ptrdiff_t counted = 0,
 		term = find_newline (IT_CHARPOS (*it), IT_BYTEPOS (*it),
-				     to_charpos, CHAR_TO_BYTE (to_charpos),
+				     max (to_charpos, 0), -1,
 				     1, &counted, NULL, 0);
-	      ptrdiff_t npos;
 	      int nchars_per_row =
 		(it->last_visible_x - it->first_visible_x) /
 		FRAME_COLUMN_WIDTH (it->f);
@@ -9619,7 +9563,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		full_rows--;
 	      if (full_rows > 0)
 		{
-		  npos = IT_CHARPOS (*it) + full_rows * nchars_per_row;
+		  ptrdiff_t npos = IT_CHARPOS (*it) + full_rows * nchars_per_row;
 		  /* fprintf (stderr, */
 		  /* 	   "orig_charpos=%ld it=%ld to_charpos=%ld term=%ld nchars=%ld full_rows=%d tfr=%ld\n", */
 		  /* 	   orig_charpos, IT_CHARPOS (*it), to_charpos, term, nchars, */
@@ -10044,6 +9988,208 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
       else
 	RESTORE_IT (it, it, it2data);
     }
+}
+
+void
+move_it_x (struct it *it, int to_x)
+{
+  struct it save_it;
+  void *save_data = NULL;
+  int skip;
+
+  SAVE_IT (save_it, *it, save_data);
+  skip = emulate_display_line (it, ZV, to_x, MOVE_TO_X);
+  /* When word-wrap is on, TO_X may lie past the end
+     of a wrapped line.  Then it->current is the
+     character on the next line, so backtrack to the
+     space before the wrap point.  */
+  if (skip == MOVE_LINE_CONTINUED
+      && it->line_wrap == WORD_WRAP)
+    {
+      int prev_x = max (it->current_x - 1, 0);
+      RESTORE_IT (it, &save_it, save_data);
+      emulate_display_line (it, -1, prev_x, MOVE_TO_X);
+    }
+  else
+    bidi_unshelve_cache (save_data, true);
+}
+
+/* Determine what's under window-relative pixel position (*X, *Y).
+   Return the object (string or buffer) that's there.
+   Return in *POS the position in that object.
+   Adjust *X and *Y to character positions.
+   If an image is shown at the specified position, return
+   in *OBJECT its image-spec.
+   Return in *DX and *DY the pixel coordinates of the click,
+   relative to the top left corner of object, or relative to
+   the top left corner of the character glyph at (*X, *Y)
+   if the object at (*X, *Y) is nil.
+   Return WIDTH and HEIGHT of the object at (*X, *Y), or zero
+   if the coordinates point to an empty area of the display.  */
+
+Lisp_Object
+buffer_posn_from_coords (struct window *w, int *x, int *y, struct display_pos *pos, Lisp_Object *object, int *dx, int *dy, int *width, int *height)
+{
+  struct it it;
+  Lisp_Object old_current_buffer = Fcurrent_buffer ();
+  struct text_pos startp;
+  Lisp_Object string;
+  struct glyph_row *row;
+#ifdef HAVE_WINDOW_SYSTEM
+  struct image *img = 0;
+#endif
+  int x0, x1, to_x, it_vpos;
+  void *itdata = NULL;
+
+  /* We used to set current_buffer directly here, but that does the
+     wrong thing with `face-remapping-alist' (bug#2044).  */
+  Fset_buffer (w->contents);
+  itdata = bidi_shelve_cache ();
+  CLIP_TEXT_POS_FROM_MARKER (startp, w->start);
+  start_move_it (&it, w, startp);
+  x0 = *x;
+
+  /* First, move to the beginning of the row corresponding to *Y.  We
+     need to be in that row to get the correct value of base paragraph
+     direction for the text at (*X, *Y).  */
+  move_it_to (&it, -1, 0, *y, -1, MOVE_TO_X | MOVE_TO_Y);
+
+  /* TO_X is the pixel position that the iterator will compute for the
+     glyph at *X.  */
+  to_x = x0;
+  if (it.bidi_it.paragraph_dir == R2L)
+    /* For lines in an R2L paragraph, we need to mirror TO_X wrt the
+       text area.  This is because the iterator, even in R2L
+       paragraphs, delivers glyphs as if they started at the left
+       margin of the window.  (When we actually produce glyphs for
+       display, we reverse their order in PRODUCE_GLYPHS, but the
+       iterator doesn't know about that.)  The following line adjusts
+       the pixel position to the iterator geometry, which is what
+       move_it_* routines use.  (The -1 is because in a window whose
+       text-area width is W, the rightmost pixel position is W-1, and
+       it should be mirrored into zero pixel position.)  */
+    to_x = window_box_width (w, TEXT_AREA) - to_x - 1;
+
+  /* We need to add it.first_visible_x because iterator positions
+     include the hscroll. */
+  to_x += it.first_visible_x;
+
+  /* If we are hscrolling only the current line, and Y is at the line
+     containing point, augment TO_X with the hscroll amount of the
+     current line.  */
+  if (it.line_wrap == TRUNCATE
+      && EQ (automatic_hscrolling, Qcurrent_line) && IT_CHARPOS (it) < PT)
+    {
+      struct it it2 = it;
+      void *it2data = bidi_shelve_cache ();
+      it2.last_visible_x = 1000000;
+      /* If the line at Y shows point, the call below to
+	 move_it_x will succeed in reaching point.  */
+      emulate_display_line (&it2, PT, -1, MOVE_TO_POS);
+      if (IT_CHARPOS (it2) >= PT)
+	{
+	  to_x += (w->hscroll - w->min_hscroll) * FRAME_COLUMN_WIDTH (it.f);
+	  /* We need to pretend the window is hscrolled for move_it_x.  */
+	  it.first_visible_x += w->hscroll * FRAME_COLUMN_WIDTH (it.f);
+	  it.last_visible_x += w->hscroll * FRAME_COLUMN_WIDTH (it.f);
+	}
+      bidi_unshelve_cache (it2data, 0);
+    }
+
+  move_it_x (&it, to_x);
+  bidi_unshelve_cache (itdata, 0);
+
+  Fset_buffer (old_current_buffer);
+
+  *dx = to_x - it.current_x;
+  *dy = *y - it.current_y;
+
+  string = w->contents;
+  if (STRINGP (it.string))
+    string = it.string;
+  *pos = it.current;
+  if (it.what == IT_COMPOSITION
+      && it.cmp_it.nchars > 1
+      && it.cmp_it.reversed_p)
+    {
+      /* The current display element is a grapheme cluster in a
+	 composition.  In that case, we need the position of the first
+	 character of the cluster.  But, as it.cmp_it.reversed_p is 1,
+	 it.current points to the last character of the cluster, thus
+	 we must move back to the first character of the same
+	 cluster.  */
+      CHARPOS (pos->pos) -= it.cmp_it.nchars - 1;
+      if (STRINGP (it.string))
+	BYTEPOS (pos->pos) = string_char_to_byte (string, CHARPOS (pos->pos));
+      else
+	BYTEPOS (pos->pos) = buf_charpos_to_bytepos (XBUFFER (w->contents),
+						     CHARPOS (pos->pos));
+    }
+
+#ifdef HAVE_WINDOW_SYSTEM
+  if (it.what == IT_IMAGE)
+    {
+      /* Note that this ignores images that are fringe bitmaps,
+	 because their image ID is zero, and so IMAGE_OPT_FROM_ID will
+	 return NULL.  This is okay, since fringe bitmaps are not
+	 displayed in the text area, and so are never the object we
+	 are interested in.  */
+      img = IMAGE_OPT_FROM_ID (it.f, it.image_id);
+      if (img && !NILP (img->spec))
+	*object = img->spec;
+    }
+#endif
+
+  /* IT's vpos counts from the glyph row that includes the window's
+     start position, i.e. it excludes the header-line row, but
+     MATRIX_ROW includes the header-line row.  Adjust for a possible
+     header-line row.  */
+  it_vpos = it.vpos + window_wants_header_line (w)
+    + window_wants_tab_line (w);
+  if (it_vpos < w->current_matrix->nrows
+      && (row = MATRIX_ROW (w->current_matrix, it_vpos),
+	  row->enabled_p))
+    {
+      if (it.hpos < row->used[TEXT_AREA])
+	{
+	  struct glyph *glyph = row->glyphs[TEXT_AREA] + it.hpos;
+#ifdef HAVE_WINDOW_SYSTEM
+	  if (img)
+	    {
+	      *dy -= row->ascent - glyph->ascent;
+	      *dx += glyph->slice.img.x;
+	      *dy += glyph->slice.img.y;
+	      /* Image slices positions are still relative to the entire image */
+	      *width = img->width;
+	      *height = img->height;
+	    }
+	  else
+#endif
+	    {
+	      *width = glyph->pixel_width;
+	      *height = glyph->ascent + glyph->descent;
+	    }
+	}
+      else
+	{
+	  *width = 0;
+	  *height = row->height;
+	}
+    }
+  else
+    {
+      *width = *height = 0;
+    }
+
+  /* Add extra (default width) columns if clicked after EOL. */
+  x1 = max (0, it.current_x + it.pixel_width);
+  if (to_x > x1)
+    it.hpos += (to_x - x1) / WINDOW_FRAME_COLUMN_WIDTH (w);
+
+  *x = it.hpos;
+  *y = it.vpos;
+
+  return string;
 }
 
 int
@@ -22942,10 +23088,7 @@ display_line (struct it *it, int cursor_vpos)
 	      else
 		{
 		  /* Glyph is completely off the left margin of the
-		     window.  This should not happen because of the
-		     move_it_in_display_line at the start of this
-		     function, unless the text display area of the
-		     window is empty.  */
+		     window.  Should only happen if TEXT_AREA is empty.  */
 		  eassert (it->first_visible_x <= it->last_visible_x);
 		}
 	    }
@@ -23765,7 +23908,7 @@ Value is the new character position of point.  */)
 	      goto reseat;
 	    }
 	  else if (IT_CHARPOS (it) != PT && !overshoot_expected)
-	    move_it_in_display_line (&it, PT, -1, MOVE_TO_POS);
+	    emulate_display_line (&it, PT, -1, MOVE_TO_POS);
 	}
       pt_x = it.current_x;
       pt_vpos = it.vpos;

@@ -2694,9 +2694,7 @@ struct it
      incremented by move_it_to and display_line.  */
   int vpos;
 
-  /* Horizontal matrix position reached in move_it_in_display_line.
-     Only set there, not in display_line, and only when the X
-     coordinate is past first_visible_x.  */
+  /* Horizontal matrix position set in emulate_display_line,  */
   int hpos;
 
   /* Current line number, zero-based.  */
@@ -3338,7 +3336,6 @@ extern void bidi_unshelve_cache (void *, bool);
 extern ptrdiff_t bidi_find_first_overridden (struct bidi_it *);
 
 /* Defined in xdisp.c */
-
 struct glyph_row *row_containing_pos (struct window *, ptrdiff_t,
                                       struct glyph_row *,
                                       struct glyph_row *, int);
@@ -3375,9 +3372,7 @@ void move_it_vertically (struct it *, int);
 void move_it_vertically_backward (struct it *, int);
 void move_it_by_lines (struct it *, ptrdiff_t);
 void move_it_past_eol (struct it *);
-void move_it_in_display_line (struct it *it,
-			      ptrdiff_t to_charpos, int to_x,
-			      enum move_operation_enum op);
+void move_it_x (struct it *it, int to_x);
 int partial_line_height (struct it *it_origin);
 bool in_display_vector_p (struct it *);
 int frame_mode_line_height (struct frame *);
@@ -3390,6 +3385,11 @@ extern ptrdiff_t help_echo_pos;
 extern int last_tab_bar_item;
 extern int last_tool_bar_item;
 extern void reseat_at_previous_visible_line_start (struct it *);
+extern Lisp_Object buffer_posn_from_coords (struct window *,
+                                            int *, int *,
+                                            struct display_pos *,
+                                            Lisp_Object *,
+                                            int *, int *, int *, int *);
 extern Lisp_Object lookup_glyphless_char_display (int, struct it *);
 extern ptrdiff_t compute_display_string_pos (struct text_pos *,
 					     struct bidi_string_data *,
@@ -3619,11 +3619,6 @@ int popup_activated (void);
 
 /* Defined in dispnew.c.  */
 
-extern Lisp_Object buffer_posn_from_coords (struct window *,
-                                            int *, int *,
-                                            struct display_pos *,
-                                            Lisp_Object *,
-                                            int *, int *, int *, int *);
 extern Lisp_Object mode_line_string (struct window *, enum window_part,
                                      int *, int *, ptrdiff_t *,
                                      Lisp_Object *,
