@@ -4294,9 +4294,6 @@ ring.  */)
      enough to use as the temporary storage?  That would avoid an
      allocation... interesting.  Later, don't fool with it now.  */
 
-  /* Working without memmove, for portability (sigh), so must be
-     careful of overlapping subsections of the array...  */
-
   if (end1 == start2)		/* adjacent regions */
     {
       modify_text (start1, end2);
