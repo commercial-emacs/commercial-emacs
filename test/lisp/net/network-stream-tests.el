@@ -150,14 +150,14 @@
 
 (defmacro network-stream-tests-retry (&rest body)
   `(cl-loop with status
-            repeat 30
+            repeat 10
             when (setq status (condition-case err
                                   (progn ,@body)
                                 (error (prog1 nil
                                          (message "retry: %s"
                                                   (error-message-string err))))))
             return status
-            do (accept-process-output nil 0.3)))
+            do (accept-process-output nil 0.1)))
 
 (defmacro network-stream-tests-echo-server (make-server iport &rest params)
   `(let* ((server ,make-server)
@@ -177,106 +177,43 @@
          (kill-buffer buffer))
        (when (process-live-p server) (delete-process server)))))
 
-  (let* ((server (make-server (system-name)))
-         (port (aref (process-contact server :local) 4))
-         (proc (make-network-process :name "foo"
-                                     :buffer (generate-new-buffer "*foo*")
-                                     :host (system-name)
-                                     :service port)))
-    (with-current-buffer (process-buffer proc)
-      (process-send-string proc "echo foo")
-      (cl-loop repeat 10
-               until (equal (buffer-string) "foo\n")
-               do (accept-process-output nil 0.1)
-               finally (should (equal (buffer-string) "foo\n"))))
-    (delete-process server)))
+(ert-deftest echo-server-with-dns ()
+  (unless (network-stream-tests--resolve-system-name)
+    (ert-skip "Can't test resolver for (system-name)"))
+  (network-stream-tests-echo-server
+   (make-server (system-name)) 4
+   :host (system-name)))
 
 (ert-deftest echo-server-with-localhost ()
-  (let* ((server (make-server 'local))
-         (port (aref (process-contact server :local) 4))
-         (proc (make-network-process :name "foo"
-                                     :buffer (generate-new-buffer "*foo*")
-                                     :host "localhost"
-                                     :service port)))
-    (with-current-buffer (process-buffer proc)
-      (process-send-string proc "echo foo")
-      (cl-loop repeat 10
-               until (equal (buffer-string) "foo\n")
-               do (accept-process-output nil 0.1)
-               finally (should (equal (buffer-string) "foo\n"))))
-    (delete-process server)))
+  (network-stream-tests-echo-server
+   (make-server 'local) 4
+   :host "localhost"))
+
 
 (ert-deftest echo-server-with-local-ipv4 ()
-  (let* ((server (make-server 'local 'ipv4))
-         (port (aref (process-contact server :local) 4))
-         (proc (make-network-process :name "foo"
-                                     :buffer (generate-new-buffer "*foo*")
-                                     :host 'local
-                                     :family 'ipv4
-                                     :service port)))
-    (with-current-buffer (process-buffer proc)
-      (process-send-string proc "echo foo")
-      (cl-loop repeat 10
-               until (equal (buffer-string) "foo\n")
-               do (accept-process-output nil 0.1)
-               finally (should (equal (buffer-string) "foo\n"))))
-    (delete-process server)))
+  (network-stream-tests-echo-server
+   (make-server 'local 'ipv4) 4
+   :host 'local
+   :family 'ipv4))
 
 (ert-deftest echo-server-with-local-ipv6 ()
   (skip-unless (featurep 'make-network-process '(:family ipv6)))
-  (let ((server (ignore-errors (make-server 'local 'ipv6))))
-    (skip-unless server)
-    (let* ((port (aref (process-contact server :local) 8))
-           (proc (make-network-process :name "foo"
-                                       :buffer (generate-new-buffer "*foo*")
-                                       :host 'local
-                                       :family 'ipv6
-                                       :service port)))
-      (with-current-buffer (process-buffer proc)
-        (process-send-string proc "echo foo")
-        (cl-loop repeat 10
-                 until (equal (buffer-string) "foo\n")
-                 do (accept-process-output nil 0.1)
-                 finally (should (equal (buffer-string) "foo\n"))))
-      (delete-process server))))
+  (network-stream-tests-echo-server
+   (make-server 'local 'ipv6) 8
+   :host 'local
+   :family 'ipv6))
 
 (ert-deftest echo-server-with-ip ()
-  (let* ((server (make-server 'local))
-         (port (aref (process-contact server :local) 4))
-         (proc (make-network-process :name "foo"
-                                     :buffer (generate-new-buffer "*foo*")
-                                     :host "127.0.0.1"
-                                     :service port)))
-    (with-current-buffer (process-buffer proc)
-      (process-send-string proc "echo foo")
-      (cl-loop repeat 10
-               until (equal (buffer-string) "foo\n")
-               do (accept-process-output nil 0.1)
-               finally (should (equal (buffer-string) "foo\n"))))
-    (delete-process server)))
+  (network-stream-tests-echo-server
+   (make-server 'local) 4
+   :host "127.0.0.1"))
 
 (ert-deftest echo-server-nowait ()
-  (let* ((server (make-server 'local))
-         (port (aref (process-contact server :local) 4))
-         (proc (make-network-process :name "foo"
-                                     :buffer (generate-new-buffer "*foo*")
-                                     :host "localhost"
-                                     :nowait t
-                                     :family 'ipv4
-                                     :service port))
-         (times 0))
-    (should (eq (process-status proc) 'connect))
-    (while (and (eq (process-status proc) 'connect)
-                (< (cl-incf times) 10))
-      (accept-process-output nil 0.1))
-    (skip-unless (not (eq (process-status proc) 'connect)))
-    (with-current-buffer (process-buffer proc)
-      (process-send-string proc "echo foo")
-      (cl-loop repeat 10
-               until (equal (buffer-string) "foo\n")
-               do (accept-process-output nil 0.1)
-               finally (should (equal (buffer-string) "foo\n"))))
-    (delete-process server)))
+  (network-stream-tests-echo-server
+   (make-server 'local) 4
+   :host "localhost"
+   :nowait t
+   :family 'ipv4))
 
 (defun make-tls-server ()
   (let ((free-port (with-temp-buffer
@@ -299,41 +236,36 @@
                          (ert-resource-file "cert.pem")
                          "--port" (format "%s" free-port)))))
 
-(defmacro network-stream-tests-retry (&rest body)
-  `(cl-loop with status
-            repeat 10
-            when (setq status (condition-case err
-                                  (progn ,@body)
-                                (error (prog1 nil
-                                         (message "retry: %s"
-                                                  (error-message-string err))))))
-            return status
-            do (accept-process-output nil 0.1)))
-
 (defmacro network-stream-tests-make-network-process (negotiate &rest params)
-  `(pcase-let ((`(,port . ,server) (make-tls-server)))
+  `(pcase-let ((`(,port . ,server) (make-tls-server))
+               (buffer (generate-new-buffer "*foo*")))
      (unwind-protect
          (network-stream-tests-doit
           port server
           (make-network-process
            :name "bar"
-           :buffer (generate-new-buffer "*foo*")
+           :buffer buffer
            :service port
            ,@params)
           ,negotiate)
+       (let (kill-buffer-query-functions)
+         (kill-buffer buffer))
        (when (process-live-p server) (delete-process server)))))
 
 (defmacro network-stream-tests-open-stream (func &rest params)
-  `(pcase-let ((`(,port . ,server) (make-tls-server)))
+  `(pcase-let ((`(,port . ,server) (make-tls-server))
+               (buffer (generate-new-buffer "*foo*")))
      (unwind-protect
          (network-stream-tests-doit
           port server
           (,func
            "bar"
-           (generate-new-buffer "*foo*")
+           buffer
            "localhost"
            port
            ,@params))
+       (let (kill-buffer-query-functions)
+         (kill-buffer buffer))
        (when (process-live-p server) (delete-process server)))))
 
 (cl-defmacro network-stream-tests-doit (port server form &optional negotiate)
