@@ -2422,10 +2422,8 @@ struct it
      from a `display' property given by an overlay.  */
   Lisp_Object from_overlay;
 
-  /* Stack of saved values.  New entries are pushed when we begin to
-     process an overlay string or a string from a `glyph' property.
-     Entries are popped when we return to deliver display elements
-     from what we previously had.  */
+  /* Prevailing buffer positions are stashed here before excursing to
+     processing overlay strings and glyph property strings.  */
   struct iterator_stack_entry
   {
     Lisp_Object string;
