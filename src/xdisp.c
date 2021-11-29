@@ -6547,82 +6547,69 @@ forward_to_next_line_start (struct it *it, bool *skipped_p,
 
 
 /* Set IT's current position to the previous visible line start.  Skip
-   invisible text that is so either due to text properties or due to
-   selective display.  Caution: this does not change IT->current_x and
-   IT->hpos.  */
+   invisible text wrought by text properties or selective display.
+   Nota bene, does not change IT->current_x or IT->hpos.  */
 
 static void
 back_to_previous_visible_line_start (struct it *it)
 {
-  while (IT_CHARPOS (*it) > BEGV)
+  if (IT_CHARPOS (*it) <= BEGV)
+    return;
+
+  for (back_to_previous_line_start (it);
+       IT_CHARPOS (*it) > BEGV;
+       back_to_previous_line_start (it))
     {
-      back_to_previous_line_start (it);
-
-      if (IT_CHARPOS (*it) <= BEGV)
-	break;
-
-      /* If selective > 0, then lines indented more than its value are
-	 invisible.  */
       if (it->selective > 0
 	  && indented_beyond_p (IT_CHARPOS (*it), IT_BYTEPOS (*it),
 				it->selective))
+	/* Invisible regime under selective display.  */
 	continue;
 
-      /* Check the newline before point for invisibility.  */
-      {
-	Lisp_Object prop;
-	prop = Fget_char_property (make_fixnum (IT_CHARPOS (*it) - 1),
-				   Qinvisible, it->window);
-	if (TEXT_PROP_MEANS_INVISIBLE (prop) != 0)
-	  continue;
-      }
+      else if (0 != TEXT_PROP_MEANS_INVISIBLE
+	       (Fget_char_property (make_fixnum (IT_CHARPOS (*it) - 1),
+				    Qinvisible, it->window)))
+	/* Invisible preceding newline.  */
+	continue;
+      else
+	{
+	  struct it it2;
+	  void *it2data = NULL;
+	  ptrdiff_t beg, end;
+	  Lisp_Object val, overlay;
 
-      if (IT_CHARPOS (*it) <= BEGV)
-	break;
+	  eassert (IT_CHARPOS (*it) > BEGV); /* Remove this -- Kim Storm */
 
-      {
-	struct it it2;
-	void *it2data = NULL;
-	ptrdiff_t pos;
-	ptrdiff_t beg, end;
-	Lisp_Object val, overlay;
-
-	SAVE_IT (it2, *it, it2data);
-
-	/* If newline is part of a composition, continue from start of composition */
-	if (find_composition (IT_CHARPOS (*it), -1, &beg, &end, &val, Qnil)
-	    && beg < IT_CHARPOS (*it))
-	  goto replaced;
-
-	/* If newline is replaced by a display property, find start of overlay
-	   or interval and continue search from that point.  */
-	pos = --IT_CHARPOS (it2);
-	--IT_BYTEPOS (it2);
-	it2.sp = 0;
-	bidi_unshelve_cache (NULL, false);
-	it2.string_from_display_prop_p = false;
-	it2.from_disp_prop_p = false;
-	if (handle_display_prop (&it2) == HANDLED_RETURN
-	    && !NILP (val = get_char_property_and_overlay
-		      (make_fixnum (pos), Qdisplay, Qnil, &overlay))
-	    && (OVERLAYP (overlay)
-		? (beg = OVERLAY_POSITION (OVERLAY_START (overlay)))
-		: get_property_and_range (pos, Qdisplay, &val, &beg, &end, Qnil)))
-	  {
-	    RESTORE_IT (it, it, it2data);
+	  if (find_composition (IT_CHARPOS (*it), -1, &beg, &end, &val, Qnil)
+	      && beg < IT_CHARPOS (*it))
+	    /* Missed start of composition, go back there. */
 	    goto replaced;
-	  }
 
-	/* Newline is not replaced by anything -- so we are done.  */
-	RESTORE_IT (it, it, it2data);
-	break;
+	  /* Overlays and display strings */
+	  SAVE_IT (it2, *it, it2data);
+	  dec_both (&(IT_CHARPOS (it2)), &(IT_BYTEPOS (it2)));
+	  it2.from_disp_prop_p = it2.string_from_display_prop_p = false;
+	  it2.sp = 0;
+	  bidi_unshelve_cache (NULL, false); /* zero out bidi cache */
+	  if (handle_display_prop (&it2) == HANDLED_RETURN
+	      && ! NILP (val = get_char_property_and_overlay
+			 (make_fixnum (IT_CHARPOS (it2)), Qdisplay, Qnil, &overlay))
+	      && (OVERLAYP (overlay)
+		  ? (beg = OVERLAY_POSITION (OVERLAY_START (overlay)))
+		  : get_property_and_range (IT_CHARPOS (it2), Qdisplay, &val,
+					    &beg, &end, Qnil)))
+	    {
+	      RESTORE_IT (it, it, it2data);
+	      goto replaced;
+	    }
 
-      replaced:
-	if (beg < BEGV)
-	  beg = BEGV;
-	IT_CHARPOS (*it) = beg;
-	IT_BYTEPOS (*it) = buf_charpos_to_bytepos (current_buffer, beg);
-      }
+	  RESTORE_IT (it, it, it2data);
+	  break;
+
+	replaced:
+	  IT_CHARPOS (*it) = max (beg, BEGV);
+	  IT_BYTEPOS (*it) = CHAR_TO_BYTE (IT_CHARPOS (*it));
+	}
     }
 
   it->continuation_lines_width = 0;
@@ -9324,7 +9311,8 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 {
   int line_start_x = 0, max_current_x = 0;
   bool behaved_p = BUFFERP (it->object)
-    && it->method == GET_FROM_BUFFER
+    && (it->method == GET_FROM_BUFFER ||
+	it->method == GET_FROM_STRETCH)
     // && op == MOVE_TO_POS
     && XBUFFER (it->object)->text->monospace;
   ptrdiff_t orig_charpos = IT_CHARPOS (*it);
@@ -9518,6 +9506,11 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	      switch (op)
 		{
 		case MOVE_TO_VPOS:
+		  if (orig_charpos == 72101 && to_vpos == -348)
+		    {
+		      fprintf (stderr, "the fuq\n");
+		    }
+
 		  fprintf (stderr,
 			   "orig_charpos=%ld it=%ld to_charpos=%ld ",
 			   orig_charpos, IT_CHARPOS (*it), to_charpos);
@@ -9572,8 +9565,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		    {
 		      /* Confusion:
 			 I thought it->last_visible_x != it->current_x
-			 could only ever happen under tty.
-		      */
+			 could only ever happen under tty.  */
 		      struct face *face = FACE_FROM_ID (it->f, it->face_id);
 		      struct font *face_font = face->font;
 		      eassert (face_font);
@@ -9645,48 +9637,32 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 }
 
 
-/* If DY > 0, move IT backward at least that many pixels.  This
-   function may move over more than DY pixels if IT->current_y - DY
-   ends up in the middle of a line; in this case IT->current_y will be
-   set to the top of the line moved to.
+/* If DY > 0, move IT backward at least that many pixels, possibly
+   more if we need to get flush with the top edge of the line.
 
-   DY = 0 means move IT backward to the preceding line start or BEGV.
+   DY = 0 means move IT backward to the preceding line start.
 */
 
 void
 move_it_vertically_backward (struct it *it, int dy)
 {
-  struct it it2, it3;
-  void *it2data = NULL, *it3data = NULL;
-  ptrdiff_t start_pos, pos_limit;
-  int nlines, h, nchars_per_row
-    = (it->last_visible_x - it->first_visible_x) / FRAME_COLUMN_WIDTH (it->f);
-  bool continue_p = false;
-
   eassert (dy >= 0);
 
   do
     {
-      continue_p = false;
-      start_pos = IT_CHARPOS (*it);
+      struct it it2, it3;
+      void *it2data = NULL, *it3data = NULL;
+      ptrdiff_t start_pos = IT_CHARPOS (*it);
+      int h, nlines = max (1, dy / default_line_pixel_height (it->w));
 
-      /* Estimate how many newlines we must move back.  */
-      nlines = max (1, dy / default_line_pixel_height (it->w));
-      if (it->line_wrap == TRUNCATE || nchars_per_row == 0)
-	pos_limit = BEGV;
-      else
-	pos_limit = max (start_pos - nlines * nchars_per_row, BEGV);
-
-      /* Move iterator NLINES back.  */
-      for (int i=0; i<nlines && IT_CHARPOS (*it) > pos_limit; ++i)
-	{
-	  back_to_previous_visible_line_start (it);
-	}
+      /* Move iterator estimated NLINES back.  */
+      for (int i=0; i<nlines; ++i)
+	back_to_previous_visible_line_start (it);
 
       /* `reseat_1' is `reseat' without handling stop position (see header).  */
       reseat_1 (it, it->current.pos, true);
 
-      /* We are now at a line start.  */
+      /* reseat puts us at a line start.  */
       it->current_x = it->hpos = it->continuation_lines_width = 0;
 
       /* Throwaway next-line to ascertain line height.  */
@@ -9698,9 +9674,9 @@ move_it_vertically_backward (struct it *it, int dy)
 		      MOVE_TO_POS | MOVE_TO_VPOS);
 	}
       while (! IT_POS_VALID_AFTER_MOVE_P (&it2)
-	     /* So long as we're not after a newline in a display string
-		beginning at START_POS, since `move_it_to` would
-		spin.  Hack.  */
+	     /* Continue so long as we're not after a newline in
+		a display string beginning at START_POS.  Weak sauce
+		hack to avoid infloop in `move_it_to'.  */
 	     && (it2.method != GET_FROM_STRING
 		 || IT_CHARPOS (it2) != start_pos
 		 || SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) != '\n'));
@@ -9757,45 +9733,48 @@ move_it_vertically_backward (struct it *it, int dy)
 	    {
 	      /* Not enough.  Take it from the top with residual DY.  */
 	      dy = it->current_y - target_y;
-	      continue_p = true;
 	    }
-	  else if (target_y >= it->current_y + line_height
-		   && IT_CHARPOS (*it) < ZV)
+	  else
 	    {
-	      /* Overshot.  Scooch forward.  */
-	      if (! FRAME_WINDOW_P (it->f))
+	      dy = 0;
+	      if (target_y >= it->current_y + line_height
+		  && IT_CHARPOS (*it) < ZV)
 		{
-		  /* Apparently, move_it_by_lines is too expensive
-		     on terminal frames in which "compute_motion" is used.
-		     Would be better if `move_it_vertically' applied to
-		     both tty and X, but slow thy roll.
-		  */
-		  move_it_vertically (it, target_y - it->current_y);
-		}
-	      else
-		{
-		  struct text_pos last_pos;
-		  int last_y, last_vpos;
-
-		  do
+		  /* Overshot.  Scooch forward.  */
+		  if (! FRAME_WINDOW_P (it->f))
 		    {
-		      last_pos = it->current.pos;
-		      last_y = it->current_y;
-		      last_vpos = it->vpos;
-		      move_it_by_lines (it, 1);
+		      /* Apparently, move_it_by_lines is too expensive
+			 on terminal frames in which "compute_motion" is used.
+			 Would be better if `move_it_vertically' applied to
+			 both tty and X, but slow thy roll.
+		      */
+		      move_it_vertically (it, target_y - it->current_y);
 		    }
-		  while (target_y > it->current_y && IT_CHARPOS (*it) < ZV);
-
-		  if (it->current_y > target_y)
+		  else
 		    {
-		      reseat (it, last_pos, true);
-		      it->current_y = last_y;
-		      it->vpos = last_vpos;
+		      struct text_pos last_pos;
+		      int last_y, last_vpos;
+
+		      do
+			{
+			  last_pos = it->current.pos;
+			  last_y = it->current_y;
+			  last_vpos = it->vpos;
+			  move_it_by_lines (it, 1);
+			}
+		      while (target_y > it->current_y && IT_CHARPOS (*it) < ZV);
+
+		      if (it->current_y > target_y)
+			{
+			  reseat (it, last_pos, true);
+			  it->current_y = last_y;
+			  it->vpos = last_vpos;
+			}
 		    }
 		}
 	    }
 	}
-    } while (continue_p);
+    } while (dy);
 }
 
 
@@ -9866,10 +9845,10 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
     {
       struct it it2;
       void *it2data = NULL;
-      ptrdiff_t start_charpos, i, pos_limit;
+      ptrdiff_t start_charpos, i, bound_pos;
       int nchars_per_row
 	= (it->last_visible_x - it->first_visible_x) / FRAME_COLUMN_WIDTH (it->f);
-      bool hit_pos_limit = false;
+      bool hit_bound_pos = false;
 
       /* Start at the beginning of the screen line containing IT's
 	 position.  This may actually move vertically backwards,
@@ -9882,14 +9861,14 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	 screen lines, and reseat the iterator there.  */
       start_charpos = IT_CHARPOS (*it);
       if (it->line_wrap == TRUNCATE || nchars_per_row == 0)
-	pos_limit = BEGV;
+	bound_pos = BEGV;
       else
-	pos_limit = max (start_charpos + dvpos * nchars_per_row, BEGV);
+	bound_pos = max (start_charpos + dvpos * nchars_per_row, BEGV);
 
-      for (i = -dvpos; i > 0 && IT_CHARPOS (*it) > pos_limit; --i)
+      for (i = -dvpos; i > 0 && IT_CHARPOS (*it) > bound_pos; --i)
 	back_to_previous_visible_line_start (it);
-      if (i > 0 && IT_CHARPOS (*it) <= pos_limit)
-	hit_pos_limit = true;
+      if (i > 0 && IT_CHARPOS (*it) <= bound_pos)
+	hit_bound_pos = true;
       reseat (it, it->current.pos, true);
 
       /* Move further back if we end up in a string or an image.  */
@@ -9933,7 +9912,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	  else
 	    bidi_unshelve_cache (it2data, true);
 	}
-      else if (hit_pos_limit && pos_limit > BEGV
+      else if (hit_bound_pos && bound_pos > BEGV
 	       && dvpos < 0 && it2.vpos < -dvpos)
 	{
 	  /* A display string with a newline spanning a large chunk

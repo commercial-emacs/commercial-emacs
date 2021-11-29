@@ -1677,6 +1677,7 @@ inc_both (ptrdiff_t *charpos, ptrdiff_t *bytepos)
 INLINE void
 dec_both (ptrdiff_t *charpos, ptrdiff_t *bytepos)
 {
+  eassert (*charpos > BEGV && *bytepos > BEGV_BYTE);
   (*charpos)--;
   (*bytepos) -= (!NILP (BVAR (current_buffer, enable_multibyte_characters))
 		 ? prev_char_len (*bytepos) : 1);
