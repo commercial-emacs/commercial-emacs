@@ -9324,8 +9324,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 {
   int line_start_x = 0, max_current_x = 0;
   bool behaved_p = BUFFERP (it->object)
-    && (it->method == GET_FROM_BUFFER
-	|| it->method == GET_FROM_STRETCH)
+    && it->method == GET_FROM_BUFFER
     // && op == MOVE_TO_POS
     && XBUFFER (it->object)->text->monospace;
   ptrdiff_t orig_charpos = IT_CHARPOS (*it);
