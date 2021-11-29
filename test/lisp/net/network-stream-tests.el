@@ -299,57 +299,18 @@
                          (ert-resource-file "cert.pem")
                          "--port" (format "%s" free-port)))))
 
-(ert-deftest connect-to-tls-ipv4-wait ()
-  :expected-result (if (getenv "CI") t :passed)
-  (skip-unless (executable-find "gnutls-serv"))
-  (skip-unless (gnutls-available-p))
-  (pcase-let ((`(,port . ,server) (make-tls-server))
-              (times 0)
-              (proc nil)
-              (status nil))
-    (unwind-protect
-        (progn
-          (with-current-buffer (process-buffer server)
-            (message "gnutls-serv: %s" (buffer-string)))
-          ;; It takes a while for gnutls-serv to start.
-          (while (and (null (ignore-errors
-                              (setq proc (make-network-process
-                                          :name "bar"
-                                          :buffer (generate-new-buffer "*foo*")
-                                          :host "localhost"
-                                          :service port))))
-                      (< (cl-incf times) 10))
-            (accept-process-output nil 0.1))
-          (should proc)
-          (gnutls-negotiate :process proc
-                            :type 'gnutls-x509pki
-                            :hostname "localhost")
-          (setq status (cl-loop with status
-                                repeat 10
-                                when (setq status (gnutls-peer-status proc))
-                                return status
-                                do (accept-process-output nil 0.3)))
-          (should (consp status))
-          (let ((issuer (plist-get (plist-get status :certificate) :issuer)))
-            (should (stringp issuer))
-            (setq issuer (split-string issuer ","))
-            (should (equal (nth 3 issuer) "O=Emacs Test Servicess LLC"))))
-      (when (process-live-p proc) (delete-process proc))
-      (when (process-live-p server) (delete-process server)))))
-
-
 (defmacro network-stream-tests-retry (&rest body)
   `(cl-loop with status
             repeat 10
             when (setq status (condition-case err
                                   (progn ,@body)
                                 (error (prog1 nil
-                                         (message "confused %s"
+                                         (message "retry: %s"
                                                   (error-message-string err))))))
             return status
             do (accept-process-output nil 0.1)))
 
-(defmacro network-stream-tests-make-network-process (&rest params)
+(defmacro network-stream-tests-make-network-process (negotiate &rest params)
   `(pcase-let ((`(,port . ,server) (make-tls-server)))
      (unwind-protect
          (network-stream-tests-doit
@@ -357,7 +318,9 @@
           (make-network-process
            :name "bar"
            :buffer (generate-new-buffer "*foo*")
-           :service port ,@params))
+           :service port
+           ,@params)
+          ,negotiate)
        (when (process-live-p server) (delete-process server)))))
 
 (defmacro network-stream-tests-open-stream (func &rest params)
@@ -373,7 +336,7 @@
            ,@params))
        (when (process-live-p server) (delete-process server)))))
 
-(defmacro network-stream-tests-doit (port server form)
+(cl-defmacro network-stream-tests-doit (port server form &optional negotiate)
   `(let ((network-security-level 'low)
          proc status)
      (unwind-protect
@@ -381,7 +344,11 @@
            (with-current-buffer (process-buffer ,server)
              (message "gnutls-serv on %s: %s" ,port (buffer-string)))
            (should (setq proc (network-stream-tests-retry ,form)))
-           (network-stream-tests-retry (eq (process-status proc) 'connect))
+           (,(if negotiate 'funcall 'ignore)
+            #'gnutls-negotiate :process proc
+            :type 'gnutls-x509pki
+            :hostname "localhost")
+           (network-stream-tests-retry (not (eq (process-status proc) 'connect)))
            (should (consp (setq status (network-stream-tests-retry
                                         (gnutls-peer-status proc)))))
            (let ((issuer (plist-get (plist-get status :certificate) :issuer)))
@@ -390,10 +357,18 @@
              (should (equal (nth 3 issuer) "O=Emacs Test Servicess LLC"))))
        (when (process-live-p proc) (delete-process proc)))))
 
+(ert-deftest connect-to-tls-ipv4-wait ()
+  (skip-unless (executable-find "gnutls-serv"))
+  (skip-unless (gnutls-available-p))
+  (network-stream-tests-make-network-process
+   t
+   :host "localhost"))
+
 (ert-deftest connect-to-tls-ipv4-nowait ()
   (skip-unless (executable-find "gnutls-serv"))
   (skip-unless (gnutls-available-p))
   (network-stream-tests-make-network-process
+   nil
    :nowait t
    :family 'ipv4
    :tls-parameters
@@ -409,6 +384,7 @@
   (skip-unless (not (eq system-type 'windows-nt)))
   (skip-unless (featurep 'make-network-process '(:family ipv6)))
   (network-stream-tests-make-network-process
+   nil
    :family 'ipv6
    :nowait t
    :tls-parameters
