@@ -6563,14 +6563,15 @@ back_to_previous_visible_line_start (struct it *it)
       if (it->selective > 0
 	  && indented_beyond_p (IT_CHARPOS (*it), IT_BYTEPOS (*it),
 				it->selective))
-	/* Invisible regime under selective display.  */
-	continue;
-
+	{
+	  /* Invisible regime under selective display.  Continue.  */
+	}
       else if (0 != TEXT_PROP_MEANS_INVISIBLE
 	       (Fget_char_property (make_fixnum (IT_CHARPOS (*it) - 1),
 				    Qinvisible, it->window)))
-	/* Invisible preceding newline.  */
-	continue;
+	{
+	  /* Invisible preceding newline.  Continue.  */
+	}
       else
 	{
 	  struct it it2;

@@ -219,8 +219,8 @@
          (times 0))
     (should (eq (process-status proc) 'connect))
     (while (and (eq (process-status proc) 'connect)
-                (< (setq times (1+ times)) 10))
-      (sit-for 0.1))
+                (< (cl-incf times) 10))
+      (accept-process-output nil 0.1))
     (skip-unless (not (eq (process-status proc) 'connect)))
     (with-current-buffer (process-buffer proc)
       (process-send-string proc "echo foo")
@@ -270,14 +270,18 @@
                                           :buffer (generate-new-buffer "*foo*")
                                           :host "localhost"
                                           :service port))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
           (gnutls-negotiate :process proc
                             :type 'gnutls-x509pki
                             :hostname "localhost"))
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     ;; This sleep-for is needed for the native MS-Windows build.  If
@@ -317,15 +321,19 @@
                                           :service port
                                           :sentinel (lambda (&rest _args)
                                                       (setq handshaked t))))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
           (setq times 0)
           (while (and (not handshaked)
-                      (< (setq times (1+ times)) 10))
+                      (< (cl-incf times) 10))
             (accept-process-output nil 0.1))
           (skip-unless (not (eq (process-status proc) 'connect)))
-          (setq status (gnutls-peer-status proc))
+          (setq status (cl-loop with status
+                                repeat 10
+                                when (setq status (gnutls-peer-status proc))
+                                return status
+                                do (accept-process-output nil 0.3)))
           (should (consp status))
           (let ((issuer (plist-get (plist-get status :certificate) :issuer)))
             (should (stringp issuer))
@@ -364,16 +372,20 @@
                                                  :hostname "localhost"))
                                           :host "::1"
                                           :service port))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
           (setq times 0)
           (while (and (eq (process-status proc) 'connect)
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (skip-unless (not (eq (process-status proc) 'connect))))
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     (let ((issuer (plist-get (plist-get status :certificate) :issuer)))
@@ -404,12 +416,16 @@
                                           port
                                           :type 'tls
                                           :nowait nil))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
           (skip-unless (not (eq (process-status proc) 'connect))))
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     ;; This sleep-for is needed for the native MS-Windows build.  If
@@ -444,16 +460,20 @@
                                           port
                                           :type 'tls
                                           :nowait t))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
           (setq times 0)
           (while (and (eq (process-status proc) 'connect)
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (skip-unless (not (eq (process-status proc) 'connect))))
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     ;; This sleep-for is needed for the native MS-Windows build.  If
@@ -487,12 +507,16 @@
                                           "localhost"
                                           port
                                           :type 'tls))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
           (skip-unless (not (eq (process-status proc) 'connect))))
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     ;; This sleep-for is needed for the native MS-Windows build.  If
@@ -527,12 +551,16 @@
                                           port
                                           :type 'tls
                                           :client-certificate nil))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
           (skip-unless (not (eq (process-status proc) 'connect))))
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     ;; This sleep-for is needed for the native MS-Windows build.  If
@@ -564,11 +592,15 @@
                                           (generate-new-buffer "*foo*")
                                           "localhost"
                                           port))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     ;; This sleep-for is needed for the native MS-Windows build.  If
@@ -601,11 +633,15 @@
                                           "localhost"
                                           port
                                           (list :nowait nil)))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     ;; This sleep-for is needed for the native MS-Windows build.  If
@@ -638,11 +674,15 @@
                                           "localhost"
                                           port
                                           nil))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     ;; This sleep-for is needed for the native MS-Windows build.  If
@@ -676,16 +716,20 @@
                                           "localhost"
                                           port
                                           (list :nowait t)))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
           (setq times 0)
           (while (and (eq (process-status proc) 'connect)
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (skip-unless (not (eq (process-status proc) 'connect))))
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     (let ((issuer (plist-get (plist-get status :certificate) :issuer)))
@@ -716,16 +760,20 @@
                                           "localhost"
                                           port
                                           nowait))))
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (should proc)
           (setq times 0)
           (while (and (eq (process-status proc) 'connect)
-                      (< (setq times (1+ times)) 10))
-            (sit-for 0.1))
+                      (< (cl-incf times) 10))
+            (accept-process-output nil 0.1))
           (skip-unless (not (eq (process-status proc) 'connect))))
       (if (process-live-p server) (delete-process server)))
-    (setq status (gnutls-peer-status proc))
+    (setq status (cl-loop with status
+                          repeat 10
+                          when (setq status (gnutls-peer-status proc))
+                          return status
+                          do (accept-process-output nil 0.3)))
     (should (consp status))
     (delete-process proc)
     (let ((issuer (plist-get (plist-get status :certificate) :issuer)))
