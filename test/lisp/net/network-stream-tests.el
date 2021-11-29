@@ -150,14 +150,14 @@
 
 (defmacro network-stream-tests-retry (&rest body)
   `(cl-loop with status
-            repeat 10
+            repeat 30
             when (setq status (condition-case err
                                   (progn ,@body)
                                 (error (prog1 nil
                                          (message "retry: %s"
                                                   (error-message-string err))))))
             return status
-            do (accept-process-output nil 0.1)))
+            do (accept-process-output nil 0.3)))
 
 (defmacro network-stream-tests-echo-server (make-server iport &rest params)
   `(let* ((server ,make-server)
@@ -178,8 +178,7 @@
        (when (process-live-p server) (delete-process server)))))
 
 (ert-deftest echo-server-with-dns ()
-  (unless (network-stream-tests--resolve-system-name)
-    (ert-skip "Can't test resolver for (system-name)"))
+  (skip-unless (network-stream-tests--resolve-system-name))
   (network-stream-tests-echo-server
    (make-server (system-name)) 4
    :host (system-name)))
@@ -290,6 +289,7 @@
        (when (process-live-p proc) (delete-process proc)))))
 
 (ert-deftest connect-to-tls-ipv4-wait ()
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (executable-find "gnutls-serv"))
   (skip-unless (gnutls-available-p))
   (network-stream-tests-make-network-process
@@ -297,6 +297,7 @@
    :host "localhost"))
 
 (ert-deftest connect-to-tls-ipv4-nowait ()
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (executable-find "gnutls-serv"))
   (skip-unless (gnutls-available-p))
   (network-stream-tests-make-network-process
