@@ -359,6 +359,7 @@
 (load "vc/ediff-hook")
 (load "uniquify")
 (load "electric")
+(load "paren")
 
 (load "emacs-lisp/shorthands")
 
