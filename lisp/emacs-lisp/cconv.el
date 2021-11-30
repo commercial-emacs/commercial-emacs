@@ -304,6 +304,23 @@ of converted forms."
             `(,@(nreverse special-forms) ,@(macroexp-unprogn body))))
       funcbody)))
 
+(defun cconv--lifted-arg (var env)
+  "The argument to use for VAR in λ-lifted calls according to ENV."
+  (let ((mapping (cdr (assq var env))))
+    (pcase-exhaustive mapping
+      (`(internal-get-closed-var . ,_)
+       ;; The variable is captured.
+       mapping)
+      (`(car-safe (internal-get-closed-var . ,_))
+       ;; The variable is mutably captured; skip
+       ;; the indirection step because the variable is
+       ;; passed "by reference" to the λ-lifted function.
+       (cadr mapping))
+      ((or '() `(car-safe ,(pred symbolp)))
+       ;; The variable is not captured.  Add a reference to the
+       ;; outside binding and arrange to use that reference.
+       (make-symbol (format "closed-%s" var))))))
+
 (defun cconv-convert (form env extend)
   ;; This function actually rewrites the tree.
   "Return FORM with all its lambdas changed so they are closed.
@@ -425,13 +442,16 @@ places where they originally did not directly appear."
                        (cconv-convert value env extend)))))
 
                (when (and (eq letsym 'let*) (memq var new-extend))
-                 ;; One of the lambda-lifted vars is shadowed, so add
-                 ;; a reference to the outside binding and arrange to use
-                 ;; that reference.
-                 (let ((closedsym (make-symbol (format "closed-%s" var))))
-                   (setq new-env (cconv--remap-llv new-env var closedsym))
-                   (setq new-extend (cons closedsym (remq var new-extend)))
-                   (push `(,closedsym ,var) binders-new)))
+                 ;; One of the lambda-lifted vars is shadowed; if
+                 ;; necessary, add a reference to the outside binding
+                 ;; and arrange to use that reference.
+                 (let* ((lifted-arg (cconv--lifted-arg var env)))
+                   ;; This means that we may add accessors to ENV and EXTEND
+                   ;; passing them off as variables, but it's close enough.
+                   (setq new-env (cconv--remap-llv new-env var lifted-arg))
+                   (setq new-extend (cons lifted-arg (remq var new-extend)))
+                   (when (symbolp lifted-arg)
+                     (push `(,lifted-arg ,var) binders-new))))
 
                ;; We push the element after redefined free variables are
                ;; processed.  This is important to avoid the bug when free
@@ -449,14 +469,13 @@ places where they originally did not directly appear."
          ;; before we know that the var will be in `new-extend' (bug#24171).
          (dolist (binder binders-new)
            (when (memq (car-safe binder) new-extend)
-             ;; One of the lambda-lifted vars is shadowed, so add
-             ;; a reference to the outside binding and arrange to use
-             ;; that reference.
+             ;; One of the lambda-lifted vars is shadowed.
              (let* ((var (car-safe binder))
-                    (closedsym (make-symbol (format "closed-%s" var))))
-               (setq new-env (cconv--remap-llv new-env var closedsym))
-               (setq new-extend (cons closedsym (remq var new-extend)))
-               (push `(,closedsym ,var) binders-new)))))
+                    (lifted-arg (cconv--lifted-arg var env)))
+               (setq new-env (cconv--remap-llv new-env var lifted-arg))
+               (setq new-extend (cons lifted-arg (remq var new-extend)))
+               (when (symbolp lifted-arg)
+                 (push `(,lifted-arg ,var) binders-new))))))
 
        `(,letsym ,(nreverse binders-new)
                  . ,(mapcar (lambda (form)
