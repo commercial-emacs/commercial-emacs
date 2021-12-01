@@ -6400,10 +6400,11 @@ pop_it (struct it *it)
 			  Moving over lines
  ***********************************************************************/
 
-/* Set IT's current position to the previous line start.  */
+/* If IT already at a line start, set IT position to previous line start.
+   Otherwise set IT to line start. */
 
 static void
-line_start (struct it *it)
+preceding_line_start (struct it *it)
 {
   ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
 
@@ -6434,7 +6435,7 @@ line_start (struct it *it)
    */
 
 static bool
-forward_to_next_line_start (struct it *it, bool *skipped_p,
+following_line_start (struct it *it, bool *skipped_p,
 		     struct bidi_it *bidi_it_prev)
 {
   ptrdiff_t old_selective;
@@ -6552,14 +6553,14 @@ forward_to_next_line_start (struct it *it, bool *skipped_p,
    Nota bene, does not change IT->current_x or IT->hpos.  */
 
 static void
-line_start_visible (struct it *it)
+preceding_line_start_visible (struct it *it)
 {
   if (IT_CHARPOS (*it) <= BEGV)
     return;
 
-  for (line_start (it);
+  for (preceding_line_start (it);
        IT_CHARPOS (*it) > BEGV;
-       line_start (it))
+       preceding_line_start (it))
     {
       if (it->selective > 0
 	  && indented_beyond_p (IT_CHARPOS (*it), IT_BYTEPOS (*it),
@@ -6630,7 +6631,7 @@ line_start_visible (struct it *it)
 void
 reseat_line_start (struct it *it)
 {
-  line_start_visible (it);
+  preceding_line_start_visible (it);
   reseat (it, it->current.pos, true);
 }
 
@@ -6648,7 +6649,7 @@ reseat_following_line_start (struct it *it, bool on_newline_p)
   bool skipped_p = false;
   struct bidi_it bidi_it_prev;
   bool newline_found_p
-    = forward_to_next_line_start (it, &skipped_p, &bidi_it_prev);
+    = following_line_start (it, &skipped_p, &bidi_it_prev);
 
   /* Skip over lines that are invisible because they are indented
      more than the value of IT->selective.  */
@@ -6660,7 +6661,7 @@ reseat_following_line_start (struct it *it, bool on_newline_p)
 	eassert (IT_BYTEPOS (*it) == BEGV
 		 || FETCH_BYTE (IT_BYTEPOS (*it) - 1) == '\n');
 	newline_found_p =
-	  forward_to_next_line_start (it, &skipped_p, &bidi_it_prev);
+	  following_line_start (it, &skipped_p, &bidi_it_prev);
       }
 
   /* Position on the newline if that's what's requested.  */
@@ -9670,29 +9671,13 @@ behaved_p (const struct it *it)
 }
 
 /* Need to preserve DY == 0 special behavior, i.e., move IT to line
-   start.
+   start.  Crucial for basic cursor movement.
 */
 
 void
 move_it_vertically (struct it *it, int dy)
 {
-  if (dy == 0)
-    {
-      reseat_line_start (it);
-      it->current_x = it->hpos = it->continuation_lines_width = 0;
-      if (it->bidi_p
-	  && ! STRINGP (it->string)
-	  && FETCH_BYTE (max (BEGV_BYTE, IT_BYTEPOS (*it) - 1)) != '\n')
-	{
-	  /* Preceding character was not newline, i.e., we're in an
-	     R2L regime.  */
-	  ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
-	  dec_both (&cp, &bp);
-	  cp = find_newline_no_quit (cp, bp, -1, NULL);
-	  move_it_to (it, cp, -1, -1, -1, MOVE_TO_POS);
-	}
-    }
-  else if (dy > 0)
+  if (dy > 0)
     {
       mit_calls12++;
       move_it_to (it, ZV, -1, it->current_y + dy, -1, MOVE_TO_POS | MOVE_TO_Y);
@@ -9702,7 +9687,7 @@ move_it_vertically (struct it *it, int dy)
 	/* Annoying buffer without final newline.  Move to bol. */
 	move_it_by_lines (it, 0);
     }
-  else /* dy < 0 */
+  else /* dy <= 0 */
     {
       for (;;)
 	{
@@ -9721,11 +9706,11 @@ move_it_vertically (struct it *it, int dy)
 	     backward, we manually set IT the estimated NLINES back.  Then
 	     from that position, call `move_it_to' on a throwaway IT_FROM to
 	     FROM_POS.  */
-	  for (int i = 0; i < nlines; ++i)
+	  for (int i = 0; i < nlines && IT_CHARPOS (*it) > BEGV; ++i)
 	    {
 	      if (capped == -1)
 		{
-		  line_start_visible (it);
+		  preceding_line_start_visible (it);
 		  it->current_x = it->hpos = it->continuation_lines_width = 0;
 		}
 	      else /* speedups are possible */
@@ -9785,12 +9770,29 @@ move_it_vertically (struct it *it, int dy)
 	  it->vpos -= nlines;
 	  it->current_y -= h;
 
-	  if ((it->current_y - target_y) >
-	      min (window_box_height (it->w), line_height_at (it) * 2 / 3))
+	  if (dy == 0)
+	    {
+	      if (nlines > 0)
+		move_it_by_lines (it, nlines);
+	      if (it->bidi_p
+		  && ! STRINGP (it->string)
+		  && IT_BYTEPOS (*it) > BEGV_BYTE
+		  && FETCH_BYTE (IT_BYTEPOS (*it) - 1) != '\n')
+		{
+		  /* Preceding character was not newline, i.e., we're in an
+		     R2L regime.  */
+		  ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
+		  dec_both (&cp, &bp);
+		  cp = find_newline_no_quit (cp, bp, -1, NULL);
+		  move_it_to (it, cp, -1, -1, -1, MOVE_TO_POS);
+		}
+	    }
+	  else if ((it->current_y - target_y) >
+		   min (window_box_height (it->w), line_height_at (it) * 2 / 3))
 	    {
 	      /* Estimated NLINES comes up short.  Take it from the top.  */
 	      eassert (IT_CHARPOS (*it) > BEGV);
-	      dy = it->current_y - target_y;
+	      dy = target_y - it->current_y;
 	      continue;
 	    }
 	  else if ((target_y - it->current_y) >= line_height_at (it))
@@ -9901,7 +9903,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	bound_pos = max (start_charpos + dvpos * nchars_per_row, BEGV);
 
       for (i = -dvpos; i > 0 && IT_CHARPOS (*it) > bound_pos; --i)
-	line_start_visible (it);
+	preceding_line_start_visible (it);
       if (i > 0 && IT_CHARPOS (*it) <= bound_pos)
 	hit_bound_pos = true;
       reseat (it, it->current.pos, true);
@@ -9917,7 +9919,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	    break;
 	  /* If start of line is still in string or image,
 	     move further back.  */
-	  line_start_visible (it);
+	  preceding_line_start_visible (it);
 	  reseat (it, it->current.pos, true);
 	  dvpos--;
 	}
@@ -9951,7 +9953,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	       && dvpos < 0 && it2.vpos < -dvpos)
 	{
 	  /* A display string with a newline spanning a large chunk
-	     caused `line_start_visible' to
+	     caused `preceding_line_start_visible' to
 	     overshoot.  Punish it by scanning back to DVPOS, which
 	     will bog under long lines.  "If it hurts, don't do
 	     that!"  */
@@ -9959,7 +9961,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	  RESTORE_IT (it, it, it2data);
 	  for (i = -dvpos; i > 0; --i)
 	    {
-	      line_start_visible (it);
+	      preceding_line_start_visible (it);
 	      it->vpos--;
 	    }
 	  reseat_1 (it, it->current.pos, true);
@@ -16287,19 +16289,13 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
      comes from a text property, not from an overlay.  */
   bool string_from_text_prop = false;
 
-  /* Don't even try doing anything if called for a mode-line or
-     header-line or tab-line row, since the rest of the code isn't
-     prepared to deal with such calamities.  */
-  eassert (!row->mode_line_p);
-  if (row->mode_line_p)
-    return false;
+  eassert (! row->mode_line_p);
 
-  /* Skip over glyphs not having an object at the start and the end of
-     the row.  These are special glyphs like truncation marks on
-     terminal frames.  */
+  /* Skip over row start and end glyphs lacking an object, e.g.,
+     truncation marks on terminal frames.  */
   if (MATRIX_ROW_DISPLAYS_TEXT_P (row))
     {
-      if (!row->reversed_p)
+      if (! row->reversed_p)
 	{
 	  while (glyph < end
 		 && NILP (glyph->object)
@@ -16311,7 +16307,7 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	  while (end > glyph
 		 && NILP ((end - 1)->object)
 		 /* CHARPOS is zero for blanks and stretch glyphs
-		    inserted by extend_face_to_end_of_line.  */
+		    inserted by `extend_face_to_end_of_line'.  */
 		 && (end - 1)->charpos <= 0)
 	    --end;
 	  glyph_before = glyph - 1;
@@ -16319,10 +16315,9 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	}
       else
 	{
+	  /* glyph row is reversed, we need to process it back to
+	     front, so swap the edge pointers.  */
 	  struct glyph *g;
-
-	  /* If the glyph row is reversed, we need to process it from back
-	     to front, so swap the edge pointers.  */
 	  glyphs_end = end = glyph - 1;
 	  glyph += row->used[TEXT_AREA] - 1;
 
@@ -16353,22 +16348,20 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
       /* Avoid placing the cursor on the last glyph of the row, where
 	 on terminal frames we hold the vertical border between
 	 adjacent windows.  */
-      if (!FRAME_WINDOW_P (WINDOW_XFRAME (w))
-	  && !WINDOW_RIGHTMOST_P (w)
+      if (! FRAME_WINDOW_P (WINDOW_XFRAME (w))
+	  && ! WINDOW_RIGHTMOST_P (w)
 	  && cursor == row->glyphs[LAST_AREA] - 1)
 	cursor--;
       x = -1;	/* will be computed below, at label compute_x */
     }
 
-  /* Step 1: Try to find the glyph whose character position
-     corresponds to point.  If that's not possible, find 2 glyphs
-     whose character positions are the closest to point, one before
-     point, the other after it.  */
-  if (!row->reversed_p)
+  /* Step 1: Find the glyph at point, or failing that, find the two glyphs
+     straddling point.  */
+  if (! row->reversed_p)
     while (/* not marched to end of glyph row */
 	   glyph < end
 	   /* glyph was not inserted by redisplay for internal purposes */
-	   && !NILP (glyph->object))
+	   && ! NILP (glyph->object))
       {
 	if (BUFFERP (glyph->object))
 	  {
@@ -16378,12 +16371,11 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	      bpos_max = glyph->charpos;
 	    if (glyph->charpos < bpos_min)
 	      bpos_min = glyph->charpos;
-	    if (!glyph->avoid_cursor_p)
+	    if (! glyph->avoid_cursor_p)
 	      {
-		/* If we hit point, we've found the glyph on which to
-		   display the cursor.  */
 		if (dpos == 0)
 		  {
+		    /* Found glyph to display the cursor!  */
 		    match_with_avoid_cursor = false;
 		    break;
 		  }
@@ -16410,18 +16402,11 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 
 	    chprop = Fget_char_property (make_fixnum (glyph_pos), Qcursor,
 					 glyph->object);
-	    if (!NILP (chprop))
+	    if (! NILP (chprop))
 	      {
-		/* If the string came from a `display' text property,
-		   look up the buffer position of that property and
-		   use that position to update bpos_max, as if we
-		   actually saw such a position in one of the row's
-		   glyphs.  This helps with supporting integer values
-		   of `cursor' property on the display string in
-		   situations where most or all of the row's buffer
-		   text is completely covered by display properties,
-		   so that no glyph with valid buffer positions is
-		   ever seen in the row.  */
+		/* Cursor decorator found.  Use the position of the
+		   first character manifesting the display
+		   property.  */
 		ptrdiff_t prop_pos =
 		  string_buffer_position_lim (glyph->object, pos_before,
 					      pos_after, false);
@@ -16432,19 +16417,10 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	    if (FIXNUMP (chprop))
 	      {
 		bpos_covered = bpos_max + XFIXNUM (chprop);
-		/* If the `cursor' property covers buffer positions up
-		   to and including point, we should display cursor on
-		   this glyph.  Note that, if a `cursor' property on one
-		   of the string's characters has an integer value, we
-		   will break out of the loop below _before_ we get to
-		   the position match above.  IOW, integer values of
-		   the `cursor' property override the "exact match for
-		   point" strategy of positioning the cursor.  */
-		/* bpos_max == pt_old when, e.g., we are in an empty
-		   line, where bpos_max is set to
-		   MATRIX_ROW_START_CHARPOS, see above.  */
 		if (bpos_max <= pt_old && bpos_covered >= pt_old)
 		  {
+		    /* The 'cursor' property covers buffer positions up
+		       to and including point.  Display cursor on glyph.  */
 		    cursor = glyph;
 		    break;
 		  }
@@ -16456,7 +16432,7 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	++glyph;
       }
   else if (glyph > end)	/* row is reversed */
-    while (!NILP (glyph->object))
+    while (! NILP (glyph->object))
       {
 	if (BUFFERP (glyph->object))
 	  {
@@ -16494,7 +16470,7 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 
 	    chprop = Fget_char_property (make_fixnum (glyph_pos), Qcursor,
 					 glyph->object);
-	    if (!NILP (chprop))
+	    if (! NILP (chprop))
 	      {
 		ptrdiff_t prop_pos =
 		  string_buffer_position_lim (glyph->object, pos_before,
@@ -16506,9 +16482,6 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	    if (FIXNUMP (chprop))
 	      {
 		bpos_covered = bpos_max + XFIXNUM (chprop);
-		/* If the `cursor' property covers buffer positions up
-		   to and including point, we should display cursor on
-		   this glyph.  */
 		if (bpos_max <= pt_old && bpos_covered >= pt_old)
 		  {
 		    cursor = glyph;
@@ -16520,39 +16493,35 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	--glyph;
 	if (glyph == glyphs_end) /* don't dereference outside TEXT_AREA */
 	  {
-	    x--;		/* can't use any pixel_width */
+	    x--; /* can't use any pixel_width */
 	    break;
 	  }
 	x -= glyph->pixel_width;
     }
 
-  /* Step 2: If we didn't find an exact match for point, we need to
-     look for a proper place to put the cursor among glyphs between
-     GLYPH_BEFORE and GLYPH_AFTER.  */
-  if (!((row->reversed_p ? glyph > glyphs_end : glyph < glyphs_end)
-	&& BUFFERP (glyph->object) && glyph->charpos == pt_old)
-      && !(bpos_max <= pt_old && pt_old <= bpos_covered))
+  /* Step 2: Keep looking if Step 1 failed.  */
+  if (/* No exact match for glyph at point */
+      ! ((row->reversed_p ? glyph > glyphs_end : glyph < glyphs_end)
+	 && BUFFERP (glyph->object) && glyph->charpos == pt_old)
+      /* Integer 'cursor' property did not cover up to and including point.  */
+      && ! (bpos_max <= pt_old && bpos_covered >= pt_old))
     {
       /* An empty line has a single glyph whose OBJECT is nil and
-	 whose CHARPOS is the position of a newline on that line.
-	 Note that on a TTY, there are more glyphs after that, which
-	 were produced by extend_face_to_end_of_line, but their
-	 CHARPOS is zero or negative.  */
+	 whose CHARPOS is the position of a newline on that line.  */
       bool empty_line_p =
 	((row->reversed_p ? glyph > glyphs_end : glyph < glyphs_end)
 	 && NILP (glyph->object) && glyph->charpos > 0
-	 /* On a TTY, continued and truncated rows also have a glyph at
-	    their end whose OBJECT is nil and whose CHARPOS is
-	    positive (the continuation and truncation glyphs), but such
-	    rows are obviously not "empty".  */
-	 && !(row->continued_p || row->truncated_on_right_p));
+	 /* Exclude continued and truncated rows which are inherently
+	    non-empty.  */
+	 && ! row->continued_p
+	 && ! row->truncated_on_right_p);
 
       if (row->ends_in_ellipsis_p && pos_after == last_pos)
 	{
 	  ptrdiff_t ellipsis_pos;
 
 	  /* Scan back over the ellipsis glyphs.  */
-	  if (!row->reversed_p)
+	  if (! row->reversed_p)
 	    {
 	      ellipsis_pos = (glyph - 1)->charpos;
 	      while (glyph > row->glyphs[TEXT_AREA]
@@ -16612,7 +16581,7 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	     POS_AFTER is the opposite of the row's base direction,
 	     these characters will have been reordered for display,
 	     and we need to reverse START and STOP.  */
-	  if (!row->reversed_p)
+	  if (! row->reversed_p)
 	    {
 	      start = min (glyph_before, glyph_after);
 	      stop = max (glyph_before, glyph_after);
@@ -16625,7 +16594,6 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	  for (glyph = start + incr;
 	       row->reversed_p ? glyph > stop : glyph < stop; )
 	    {
-
 	      /* Any glyphs that come from the buffer are here because
 		 of bidi reordering.  Skip them, and only pay
 		 attention to glyphs that came from some string.  */
@@ -16732,7 +16700,7 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	}
       else if ((row->truncated_on_right_p && pt_old > bpos_max)
 	       /* Zero-width characters produce no glyphs.  */
-	       || (!empty_line_p
+	       || (! empty_line_p
 		   && (row->reversed_p
 		       ? glyph_after > glyphs_end
 		       : glyph_after < glyphs_end)))
@@ -16762,9 +16730,8 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
     }
   if (x < 0)
     {
-      struct glyph *g;
-
       /* Need to compute x that corresponds to GLYPH.  */
+      struct glyph *g;
       for (g = row->glyphs[TEXT_AREA], x = row->x; g < glyph; g++)
 	{
 	  if (g >= row->glyphs[TEXT_AREA] + row->used[TEXT_AREA])
@@ -16795,7 +16762,7 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	= MATRIX_ROW_GLYPH_START (matrix, w->cursor.vpos) + w->cursor.hpos;
 
       /* Don't consider glyphs that are outside TEXT_AREA.  */
-      if (!(row->reversed_p ? glyph > glyphs_end : glyph < glyphs_end))
+      if (! (row->reversed_p ? glyph > glyphs_end : glyph < glyphs_end))
 	return false;
       /* Keep the candidate whose buffer position is the closest to
 	 point or has the `cursor' property.  */
@@ -16810,8 +16777,8 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	      /* Previous candidate is a glyph from a string that has
 		 a non-nil `cursor' property.  */
 	      || (STRINGP (g1->object)
-		  && (!NILP (Fget_char_property (make_fixnum (g1->charpos),
-						Qcursor, g1->object))
+		  && (! NILP (Fget_char_property (make_fixnum (g1->charpos),
+						  Qcursor, g1->object))
 		      /* Previous candidate is from the same display
 			 string as this one, and the display string
 			 came from a text property.  */
@@ -16823,14 +16790,14 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 			  && glyph->charpos != pt_old)))))
 	return false;
       /* If this candidate gives an exact match, use that.  */
-      if (!((BUFFERP (glyph->object) && glyph->charpos == pt_old)
-	    /* If this candidate is a glyph created for the
-	       terminating newline of a line, and point is on that
-	       newline, it wins because it's an exact match.  */
-	    || (!row->continued_p
-		&& NILP (glyph->object)
-		&& glyph->charpos == 0
-		&& pt_old == MATRIX_ROW_END_CHARPOS (row) - 1))
+      if (! ((BUFFERP (glyph->object) && glyph->charpos == pt_old)
+	     /* If this candidate is a glyph created for the
+		terminating newline of a line, and point is on that
+		newline, it wins because it's an exact match.  */
+	     || (! row->continued_p
+		 && NILP (glyph->object)
+		 && glyph->charpos == 0
+		 && pt_old == MATRIX_ROW_END_CHARPOS (row) - 1))
 	  /* Otherwise, keep the candidate that comes from a row
 	     spanning less buffer positions.  This may win when one or
 	     both candidate positions are on glyphs that came from
