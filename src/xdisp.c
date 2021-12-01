@@ -396,7 +396,7 @@ static int static_line_start_x;
 
 static struct text_pos static_line_min_pos;
 
-/* Buffer that line_.* variables are referring to.  */
+/* Buffer that static_line_.* variables are referring to.  */
 
 static struct buffer *static_line_buffer;
 
@@ -404,7 +404,7 @@ static struct buffer *static_line_buffer;
 
 static bool overlay_arrow_seen;
 
-/* Vector containing glyphs for an ellipsis `...'.  */
+/* Vector containing glyphs for an ellipsis '...'.  */
 
 static Lisp_Object default_invis_vector[3];
 
@@ -3063,7 +3063,7 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
     {
       /* POS is not bol.  Calculate continuation lines width. */
       int first_y = it->current_y, new_x;
-      reseat_line_start (it);
+      reseat_preceding_line_start (it);
       eassert (it->line_wrap != TRUNCATE); /* reseat best not change this */
 
       move_it_to (it, CHARPOS (pos), -1, -1, -1, MOVE_TO_POS);
@@ -6629,7 +6629,7 @@ preceding_line_start_visible (struct it *it)
    information etc.  */
 
 void
-reseat_line_start (struct it *it)
+reseat_preceding_line_start (struct it *it)
 {
   preceding_line_start_visible (it);
   reseat (it, it->current.pos, true);
@@ -10306,7 +10306,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to, Li
   /* Start at the beginning of the line containing FROM.  Otherwise
      IT.current_x will be incorrectly set to zero at some arbitrary
      non-zero X coordinate.  */
-  reseat_line_start (&it);
+  reseat_preceding_line_start (&it);
   it.current_x = it.hpos = 0;
   if (IT_CHARPOS (it) != start)
     move_it_to (&it, start, -1, -1, -1, MOVE_TO_POS);
@@ -17341,7 +17341,7 @@ compute_window_start_on_continuation_line (struct window *w)
 				    + window_wants_header_line (w);
       init_iterator (&it, w, CHARPOS (start_pos), BYTEPOS (start_pos),
 		     row, DEFAULT_FACE_ID);
-      reseat_line_start (&it);
+      reseat_preceding_line_start (&it);
 
       /* Give up (by not using the code in the block below) and say it
          takes too much time to compute a new window start, if the
@@ -23837,7 +23837,7 @@ Value is the new character position of point.  */)
 	 the logical order (since the move_it_* functions can only
 	 move forward).  */
     reseat:
-      reseat_line_start (&it);
+      reseat_preceding_line_start (&it);
       it.current_x = it.hpos = it.current_y = it.vpos = 0;
       if (IT_CHARPOS (it) != PT)
 	{
@@ -23917,7 +23917,7 @@ Value is the new character position of point.  */)
 	      start_move_it (&it, w, pt);
 	      if (it.line_wrap == TRUNCATE)
 		it.last_visible_x = DISP_INFINITY;
-	      reseat_line_start (&it);
+	      reseat_preceding_line_start (&it);
 	      it.current_x = it.current_y = it.hpos = 0;
 	      if (pt_vpos != 0)
 		move_it_by_lines (&it, pt_vpos);

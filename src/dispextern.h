@@ -3382,7 +3382,7 @@ extern Lisp_Object help_echo_object, previous_help_echo_string;
 extern ptrdiff_t help_echo_pos;
 extern int last_tab_bar_item;
 extern int last_tool_bar_item;
-extern void reseat_line_start (struct it *);
+extern void reseat_preceding_line_start (struct it *);
 extern Lisp_Object buffer_posn_from_coords (struct window *,
                                             int *, int *,
                                             struct display_pos *,
