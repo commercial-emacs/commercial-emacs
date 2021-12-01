@@ -5581,7 +5581,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	 results for variable height lines.  */
       init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
       it.current_y = it.last_visible_y;
-      move_it_vertically_backward (&it, window_box_height (w) / 2);
+      move_it_vertically (&it, window_box_height (w) / -2);
 
       /* The function move_iterator_vertically may move over more than
 	 the specified y-distance.  If it->w is small, e.g. a
@@ -5591,7 +5591,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       if (it.current_y <= 0)
 	{
 	  init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
-	  move_it_vertically_backward (&it, 0);
+	  move_it_vertically (&it, 0);
 	  it.current_y = 0;
 	}
 
@@ -5712,7 +5712,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       if (dy <= 0)
 	{
 	  goal_y = it.current_y + dy;
-	  move_it_vertically_backward (&it, -dy);
+	  move_it_vertically (&it, dy);
 	  /* move_it_vertically_backward above always overshoots if DY
 	     cannot be reached exactly, i.e. if it falls in the middle
 	     of a screen line.  But if that screen line is large
@@ -6547,7 +6547,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 
 	  SET_TEXT_POS (pt, PT, PT_BYTE);
 	  start_move_it (&it, w, pt);
-	  move_it_vertically_backward (&it, window_box_height (w) / 2);
+	  move_it_vertically (&it, window_box_height (w) / -2);
 	  charpos = IT_CHARPOS (it);
 	  bytepos = IT_BYTEPOS (it);
 	  bidi_unshelve_cache (itdata, false);
@@ -6607,7 +6607,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 	  /* Now find the new top line (starting position) of the window.  */
 	  start_move_it (&it, w, pt);
 	  it.current_y = 0;
-	  move_it_vertically_backward (&it, h);
+	  move_it_vertically (&it, -h);
 
 	  /* If extra line spacing is present, we may move too far
 	     back.  This causes the last line to be only partially

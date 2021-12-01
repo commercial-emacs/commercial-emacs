@@ -2211,7 +2211,7 @@ whether or not it is currently displayed in some window.  */)
 	  /* Scan from the start of the line containing PT.  If we don't
 	     do this, we start moving with IT->current_x == 0, while PT is
 	     really at some x > 0.  */
-	  reseat_at_previous_visible_line_start (&it);
+	  reseat_line_start (&it);
 	  it.current_x = it.hpos = 0;
 	}
       if (IT_CHARPOS (it) != PT)

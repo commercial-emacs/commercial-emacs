@@ -118,6 +118,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    the buffer contents to determine what will and won't fit on the
    current glyph row, but without touching the glass.
 
+   `move_it_to' is the workhorse that utilizes `emulate_display_line'
+   to move an iterator FORWARD.  Moving an iterator backward means
+   estimating how far to scroll back, and dialing in the desired
+   y-coordinate from there.
+
    Bidirectional display.
 
    From the Unicode Bidirectional algorithm, (UBA) as per UAX#9, a
@@ -129,12 +134,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    digits, embedded words from English and other scripts are also
    written from left to right, also producing bidirectional
    text."
-
-   The bidi code does more to occlude the important bits of redisplay
-   than to facilitate cultural exchange in the Levant.  Emacs is and
-   remains the Ginsu knife of 8-bit ASCII; scholars of Aramaic will
-   find more utility and enjoyment reading or manipulating sacred
-   texts on less programmer-oriented platforms.
 
    R2L glyph rows have `reversed_p' set, prompting `PRODUCE_GLYPHS' to
    *prepend* additional glyphs.  On text terminals, the function
@@ -373,33 +372,33 @@ static Lisp_Object message_dolog_marker3;
    cursor; <= 0 if not known.  Set by set_cursor_from_row, used for
    redisplay optimization in redisplay_internal.  */
 
-static struct text_pos this_line_start_pos;
+static struct text_pos static_line_start_pos;
 
 /* Number of characters past the end of the line above, including the
    terminating newline.  */
 
-static struct text_pos this_line_end_pos;
+static struct text_pos static_line_end_pos;
 
 /* The vertical positions and the height of this line.  */
 
-static int this_line_vpos;
-static int this_line_y;
-static int this_line_pixel_height;
+static int static_line_vpos;
+static int static_line_y;
+static int static_line_pixel_height;
 
 /* X position at which this display line starts.  Usually zero;
    negative if first character is partially visible.  */
 
-static int this_line_start_x;
+static int static_line_start_x;
 
 /* The smallest character position seen by move_it_* functions as they
    move across display lines.  Used to set MATRIX_ROW_START_CHARPOS of
    hscrolled lines, see display_line.  */
 
-static struct text_pos this_line_min_pos;
+static struct text_pos static_line_min_pos;
 
-/* Buffer that this_line_.* variables are referring to.  */
+/* Buffer that line_.* variables are referring to.  */
 
-static struct buffer *this_line_buffer;
+static struct buffer *static_line_buffer;
 
 /* True if an overlay arrow has been displayed in this window.  */
 
@@ -522,6 +521,7 @@ bool help_echo_showing_p;
     CACHE = NULL;				\
   } while (false)
 
+static int line_height_at (const struct it *it);
 static bool calc_pixel_width_or_height (double *, struct it *, Lisp_Object,
 					struct font *, bool, int *);
 
@@ -732,7 +732,6 @@ static bool cursor_row_p (struct glyph_row *);
 static int redisplay_mode_lines (Lisp_Object, bool);
 
 static void handle_line_prefix (struct it *);
-static int line_height_at (const struct it *it);
 static bool behaved_p (const struct it *it);
 
 static void handle_stop_backwards (struct it *, ptrdiff_t);
@@ -1187,15 +1186,14 @@ Value is the height in pixels of the line at point.  */)
    any extra space required by the line-spacing variable or frame
    parameter.
 
-   Implementation note: this ignores any line-spacing text properties
-   put on the newline characters.  This is because those properties
-   only affect the _screen_ line ending in the newline (i.e., in a
-   continued line, only the last screen line will be affected), which
-   means only a small number of lines in a buffer can ever use this
-   feature.  Since this function is used to compute the default pixel
-   equivalent of text lines in a window, we can safely ignore those
-   few lines.  For the same reasons, we ignore the line-height
-   properties.  */
+   This ignores any line-spacing text properties put on the newline
+   characters.  This is because those properties only affect the
+   _screen_ line ending in the newline (i.e., in a continued line,
+   only the last screen line will be affected), which means only a
+   small number of lines in a buffer can ever use this feature.  Since
+   this function is used to compute the default pixel equivalent of
+   text lines in a window, we can safely ignore those few lines.  For
+   the same reasons, we ignore the line-height properties.  */
 int
 default_line_pixel_height (struct window *w)
 {
@@ -3065,7 +3063,7 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
     {
       /* POS is not bol.  Calculate continuation lines width. */
       int first_y = it->current_y, new_x;
-      reseat_at_previous_visible_line_start (it);
+      reseat_line_start (it);
       eassert (it->line_wrap != TRUNCATE); /* reseat best not change this */
 
       move_it_to (it, CHARPOS (pos), -1, -1, -1, MOVE_TO_POS);
@@ -4202,13 +4200,12 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 	      if (it->current_x <= it->first_visible_x)
 		return it->face_id;
 	      SAVE_IT (it_copy, *it, it_copy_data);
-	      /* Implementation note: Since move_it_x works in the
-		 iterator geometry, and thinks the first character is
-		 always the leftmost, even in R2L lines, we don't need
-		 to distinguish between the R2L and L2R cases
-		 here.  */
+	      /* Since move_it_x works in the iterator geometry, and
+		 thinks the first character is always the leftmost,
+		 even in R2L lines, we don't need to distinguish
+		 between the R2L and L2R cases here.  */
 	      current_x = it_copy.current_x;
-	      move_it_vertically_backward (&it_copy, 0);
+	      move_it_vertically (&it_copy, 0);
 	      move_it_x (&it_copy, current_x - 1);
 	      pos = it_copy.current.pos;
 	      RESTORE_IT (it, it, it_copy_data);
@@ -5517,11 +5514,9 @@ display_prop_intangible_p (Lisp_Object prop, Lisp_Object overlay,
 
 /* Return true if PROP is a display sub-property value containing STRING.
 
-   Implementation note: this and the following function are really
-   special cases of handle_display_spec and
-   handle_single_display_spec, and should ideally use the same code.
-   Until they do, these two pairs must be consistent and must be
-   modified in sync.  */
+   Dupes code with handle_single_display_spec.  Will take a man-year
+   to unify.
+*/
 
 static bool
 single_display_spec_string_p (Lisp_Object prop, Lisp_Object string)
@@ -5565,7 +5560,10 @@ single_display_spec_string_p (Lisp_Object prop, Lisp_Object string)
 }
 
 
-/* Return true if STRING appears in the `display' property PROP.  */
+/* Return true if STRING appears in the `display' property PROP.
+
+   Dupes code with handle_display_spec.  Will take a man-year to unify.
+*/
 
 static bool
 display_prop_string_p (Lisp_Object prop, Lisp_Object string)
@@ -6405,7 +6403,7 @@ pop_it (struct it *it)
 /* Set IT's current position to the previous line start.  */
 
 static void
-back_to_previous_line_start (struct it *it)
+line_start (struct it *it)
 {
   ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
 
@@ -6429,14 +6427,15 @@ back_to_previous_line_start (struct it *it)
    simply use find_newline_no_quit.
 
    Note this function may not skip over invisible text immediately
-   following a newline.  The function reseat_at_next_visible_line_start,
-   when called from set_iterator_to_next, would group such invisible
-   characters into the the wrong glyph row, resulting in wrong cursor motion.
+   following a newline.  The function reseat_following_line_start, when
+   called from set_iterator_to_next, would group such invisible
+   characters into the the wrong glyph row, resulting in wrong cursor
+   motion.
    */
 
 static bool
 forward_to_next_line_start (struct it *it, bool *skipped_p,
-			    struct bidi_it *bidi_it_prev)
+		     struct bidi_it *bidi_it_prev)
 {
   ptrdiff_t old_selective;
   bool newline_found_p = false;
@@ -6548,19 +6547,19 @@ forward_to_next_line_start (struct it *it, bool *skipped_p,
 }
 
 
-/* Set IT's current position to the previous visible line start.  Skip
+/* Set IT's current position to the visible line start.  Skip
    invisible text wrought by text properties or selective display.
    Nota bene, does not change IT->current_x or IT->hpos.  */
 
 static void
-back_to_previous_visible_line_start (struct it *it)
+line_start_visible (struct it *it)
 {
   if (IT_CHARPOS (*it) <= BEGV)
     return;
 
-  for (back_to_previous_line_start (it);
+  for (line_start (it);
        IT_CHARPOS (*it) > BEGV;
-       back_to_previous_line_start (it))
+       line_start (it))
     {
       if (it->selective > 0
 	  && indented_beyond_p (IT_CHARPOS (*it), IT_BYTEPOS (*it),
@@ -6623,28 +6622,28 @@ back_to_previous_visible_line_start (struct it *it)
 }
 
 
-/* Reseat iterator IT at the previous visible line start.  Skip
-   invisible text that is so either due to text properties or due to
-   selective display.  At the end, update IT's overlay information,
-   face information etc.  */
+/* Reseat iterator IT at the visible line start.  Skip invisible text
+   that is so either due to text properties or due to selective
+   display.  At the end, update IT's overlay information, face
+   information etc.  */
 
 void
-reseat_at_previous_visible_line_start (struct it *it)
+reseat_line_start (struct it *it)
 {
-  back_to_previous_visible_line_start (it);
+  line_start_visible (it);
   reseat (it, it->current.pos, true);
 }
 
 
-/* Reseat iterator IT on the next visible line start in the current
-   buffer.  ON_NEWLINE_P means position IT on the newline
-   preceding the line start.  Skip over invisible text that is so
-   because of selective display.  Compute faces, overlays etc at the
-   new position.  Note that this function does not skip over text that
-   is invisible because of text properties.  */
+/* Reseat iterator IT at the following visible line start.
+   ON_NEWLINE_P means position IT on the newline preceding the line
+   start.  Skip over invisible text arising from selective display.
+   Compute faces, overlays etc at the new position.  Note that this
+   function does not skip over invisible text arising from text
+   properties.  */
 
 static void
-reseat_at_next_visible_line_start (struct it *it, bool on_newline_p)
+reseat_following_line_start (struct it *it, bool on_newline_p)
 {
   bool skipped_p = false;
   struct bidi_it bidi_it_prev;
@@ -6924,9 +6923,9 @@ reseat_to_string (struct it *it, const char *s, Lisp_Object string,
      padding with `-' at the end of a mode line.  */
   if (field_width < 0)
     field_width = DISP_INFINITY;
-  /* Implementation note: We deliberately don't enlarge
-     it->bidi_it.string.schars here to fit it->end_charpos, because
-     the bidi iterator cannot produce characters out of thin air.  */
+  /* We deliberately don't enlarge it->bidi_it.string.schars here to
+     fit it->end_charpos, because the bidi iterator cannot produce
+     characters out of thin air.  */
   if (field_width > it->end_charpos - charpos)
     it->end_charpos = charpos + field_width;
 
@@ -7547,7 +7546,7 @@ get_display_element (struct it *it)
 
 
 /* Actually increment IT.
-   RESEAT_P skips to the next visible line start.  */
+   RESEAT_P skips to the visible line end.  */
 
 void
 set_iterator_to_next (struct it *it, bool reseat_p)
@@ -7558,7 +7557,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
       /* Advance in the buffer, possibly skipping invisible lines.  */
       if (ITERATOR_AT_END_OF_LINE_P (it) && reseat_p)
         {
-          reseat_at_next_visible_line_start (it, false);
+          reseat_following_line_start (it, false);
         }
       else if (it->cmp_it.id >= 0)
 	{
@@ -7695,7 +7694,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 
 	  /* Skip over characters which were displayed via IT->dpvec.  */
 	  if (it->dpvec_char_len < 0)
-	    reseat_at_next_visible_line_start (it, true);
+	    reseat_following_line_start (it, true);
 	  else if (it->dpvec_char_len > 0)
 	    {
 	      it->len = it->dpvec_char_len;
@@ -8302,7 +8301,7 @@ get_element_from_ellipsis (struct it *it)
       it->saved_face_id = it->face_id;
       it->method = GET_FROM_BUFFER;
       it->object = it->w->contents;
-      reseat_at_next_visible_line_start (it, true);
+      reseat_following_line_start (it, true);
       it->face_before_selective_p = true;
     }
 
@@ -8724,7 +8723,7 @@ get_element_from_composition (struct it *it)
    line on the display without producing glyphs.
 
    Duplicates code with display_line, the consolidation of which would
-   likely take a man-year.
+   take a man-year.
 
    OP should be a bit mask including some or all of these bits:
      MOVE_TO_X: Stop upon reaching x-position TO_X.
@@ -8799,8 +8798,8 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	handle_line_prefix (it);
     }
 
-  if (IT_CHARPOS (*it) < CHARPOS (this_line_min_pos))
-    SET_TEXT_POS (this_line_min_pos, IT_CHARPOS (*it), IT_BYTEPOS (*it));
+  if (IT_CHARPOS (*it) < CHARPOS (static_line_min_pos))
+    SET_TEXT_POS (static_line_min_pos, IT_CHARPOS (*it), IT_BYTEPOS (*it));
 
   for (int k = 0; ; k++)
     {
@@ -8897,8 +8896,8 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  /* The remainder of the loop concerns line processing
 	     not relevant to marginal areas. */
 	  set_iterator_to_next (it, true);
-	  if (IT_CHARPOS (*it) < CHARPOS (this_line_min_pos))
-	    SET_TEXT_POS (this_line_min_pos,
+	  if (IT_CHARPOS (*it) < CHARPOS (static_line_min_pos))
+	    SET_TEXT_POS (static_line_min_pos,
 			  IT_CHARPOS (*it), IT_BYTEPOS (*it));
 	  SET_CLOSEST_PAST_CHARPOS (it);
 	  continue;
@@ -8925,8 +8924,8 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	{
 	  int single_glyph_width = it->pixel_width / it->nglyphs;
 	  int new_x;
-	  int x_before_this_char = x;
-	  int hpos_before_this_char = it->hpos;
+	  int x_before_char = x;
+	  int hpos_before_char = it->hpos;
 
 	  for (i = 0; i < it->nglyphs; ++i, x = new_x)
 	    {
@@ -9018,8 +9017,8 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 				  || (may_wrap && can_wrap
 				      && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it)))
 				{
-				  it->hpos = hpos_before_this_char;
-				  it->current_x = x_before_this_char;
+				  it->hpos = hpos_before_char;
+				  it->current_x = x_before_char;
 				  result = MOVE_POS_MATCH_OR_ZV;
 				  break;
 				}
@@ -9027,14 +9026,14 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 				  && atpos_it.sp < 0)
 				{
 				  SAVE_IT (atpos_it, *it, atpos_data);
-				  atpos_it.current_x = x_before_this_char;
-				  atpos_it.hpos = hpos_before_this_char;
+				  atpos_it.current_x = x_before_char;
+				  atpos_it.hpos = hpos_before_char;
 				}
 			    }
 
 			  set_iterator_to_next (it, true);
-			  if (IT_CHARPOS (*it) < CHARPOS (this_line_min_pos))
-			    SET_TEXT_POS (this_line_min_pos,
+			  if (IT_CHARPOS (*it) < CHARPOS (static_line_min_pos))
+			    SET_TEXT_POS (static_line_min_pos,
 					  IT_CHARPOS (*it), IT_BYTEPOS (*it));
 
 			  /* Newlines may overflow into the last glyph on the
@@ -9241,8 +9240,8 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  if (i == 0)
 	    {
 	      set_iterator_to_next (it, true);
-	      if (IT_CHARPOS (*it) < CHARPOS (this_line_min_pos))
-		SET_TEXT_POS (this_line_min_pos, IT_CHARPOS (*it), IT_BYTEPOS (*it));
+	      if (IT_CHARPOS (*it) < CHARPOS (static_line_min_pos))
+		SET_TEXT_POS (static_line_min_pos, IT_CHARPOS (*it), IT_BYTEPOS (*it));
 	      if (IT_CHARPOS (*it) < to_charpos)
 		saw_smaller_pos = true;
 	      SET_CLOSEST_PAST_CHARPOS (it);
@@ -9462,7 +9461,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	  /* Don't take max, Markovian last_visible_x */
 	  max_current_x = it->last_visible_x;
 	  it->continuation_lines_width = 0;
-	  reseat_at_next_visible_line_start (it, false);
+	  reseat_following_line_start (it, false);
 	  if ((op & MOVE_TO_POS) != 0
 	      && (IT_CHARPOS (*it) > to_charpos
 		  || (IT_CHARPOS (*it) == to_charpos
@@ -9631,17 +9630,6 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
   return max_current_x;
 }
 
-/* Can we deploy long-line shortcuts? */
-
-static bool
-behaved_p (const struct it *it)
-{
-  return BUFFERP (it->object)
-    && (it->method == GET_FROM_BUFFER ||
-	it->method == GET_FROM_STRETCH)
-    && XBUFFER (it->object)->text->monospace;
-}
-
 
 /* Return pixel height of line at IT.  */
 
@@ -9670,183 +9658,179 @@ line_height_at (const struct it *it)
   return result;
 }
 
-/* If DY > 0, move IT backward at least that many pixels, possibly
-   more if we need to get flush with the top edge of the line.
+/* Can we deploy long-line shortcuts? */
 
-   DY = 0 means move IT backward to the preceding line start.
-*/
-
-void
-move_it_vertically_backward (struct it *it, int dy)
+static bool
+behaved_p (const struct it *it)
 {
-  eassert (dy >= 0);
-
-  for (;;)
-    {
-      struct it it_from;
-      void *itdata = NULL;
-      ptrdiff_t start_pos = IT_CHARPOS (*it), target_y = it->current_y - dy;
-      int h, nlines = max (1, dy / default_line_pixel_height (it->w));
-      int nchars_per_line = (it->last_visible_x - it->first_visible_x) /
-	FRAME_COLUMN_WIDTH (it->f);
-      ptrdiff_t end = behaved_p (it)
-	? max (BEGV, start_pos - nchars_per_line * nlines)
-	: -1;
-
-      /* This is very confusing.  We first shallowly set IT to an
-	 estimated NLINES back.  By "shallowly" we mean we do not call
-	 `move_it_to' on IT, and so its current_y and vpos must be
-	 updated manually.  */
-      for (int i = 0; i < nlines; ++i)
-	{
-	  if (end >= 0)
-	    {
-	      ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
-	      dec_both (&cp, &bp);
-	      IT_CHARPOS (*it) =
-		find_newline (cp, bp, end, CHAR_TO_BYTE (end), -1, NULL,
-			      &IT_BYTEPOS (*it), 0);
-	      if (IT_CHARPOS (*it) <= end)
-		{
-		  ptrdiff_t nchars = (cp - IT_CHARPOS (*it) + 1);
-		  int current_xchar = (it->current_x / FRAME_COLUMN_WIDTH (it->f)),
-		    result_xchar;
-		  if (current_xchar >= nchars)
-		    {
-		      /* e.g., current_xchar=79, nchars=79, nchar_per_line=80,
-			 result_xchar=0 */
-		      result_xchar = current_xchar - nchars;
-		      it->current_x = result_xchar * FRAME_COLUMN_WIDTH (it->f);
-		    }
-		  else
-		    {
-		      /* e.g., current_xchar=79, nchars=160, nchars_per_line=80,
-			 result_xchar=79 */
-		      ptrdiff_t remchars = (nchars - current_xchar) % nchars_per_line;
-		      result_xchar = (nchars_per_line - remchars) % nchars_per_line;
-		      it->current_x = result_xchar * FRAME_COLUMN_WIDTH (it->f);
-		    }
-		  it->hpos = it->current_x;
-		  it->continuation_lines_width = 0; /* sus */
-		  break;
-		}
-	      else
-		it->current_x = it->hpos = it->continuation_lines_width = 0;
-	    }
-	  else
-	    {
-	      back_to_previous_visible_line_start (it);
-	      it->current_x = it->hpos = it->continuation_lines_width = 0;
-	    }
-	}
-
-      /* More shallow assignment */
-      reseat_1 (it, it->current.pos, true);
-
-      /* IT_FROM indicates where IT was before we shallowly moved IT
-	 backwards.  We "deeply" modify IT_FROM, that is, IT_FROM will
-	 account for varying display element heights, continued screen
-	 lines, and sundry.  */
-      SAVE_IT (it_from, *it, itdata);
-      move_it_to (&it_from, start_pos, -1, -1, -1, MOVE_TO_POS);
-      RESTORE_IT (it, it, itdata);
-
-      /* H is the actual pixel distance.  */
-      h = it_from.current_y - it->current_y;
-
-      /* NLINES was an estimate, now actual.  */
-      nlines = it_from.vpos - it->vpos;
-
-      /* Now manually adjust IT's vertical data as promised!  */
-      it->vpos -= nlines;
-      it->current_y -= h;
-
-      if (dy == 0)
-	{
-	  if (nlines > 0)
-	    move_it_by_lines (it, nlines);
-	  if (it->bidi_p
-	      && ! it->continuation_lines_width
-	      && ! STRINGP (it->string)
-	      && IT_CHARPOS (*it) > BEGV
-	      && FETCH_BYTE (IT_BYTEPOS (*it) - 1) != '\n')
-	    {
-	      /* Preceding character was not newline, i.e.,
-		 we're in an R2L regime.  */
-	      ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
-
-	      dec_both (&cp, &bp);
-	      cp = find_newline_no_quit (cp, bp, -1, NULL);
-	      move_it_to (it, cp, -1, -1, -1, MOVE_TO_POS);
-	    }
-	}
-      else if ((it->current_y - target_y) >
-	       min (window_box_height (it->w), line_height_at (it) * 2 / 3))
-	{
-	  /* Estimated NLINES comes up short.  Take it from the top.  */
-	  eassert (IT_CHARPOS (*it) > BEGV);
-	  dy = it->current_y - target_y;
-	  continue;
-	}
-      else if ((target_y - it->current_y) >=
-	       line_height_at (it))
-	{
-	  /* Most common branch where continued lines render
-	     our initial estimate of NLINES too large.  Scooch
-	     forward.  */
-	  eassert (IT_CHARPOS (*it) < ZV);
-
-	  if (! FRAME_WINDOW_P (it->f))
-	    {
-	      /* Apparently, move_it_by_lines is too expensive
-		 on terminal frames in which "compute_motion" is used.
-		 Would be better if `move_it_vertically' applied to
-		 both tty and X, but slow thy roll.
-	      */
-	      move_it_vertically (it, target_y - it->current_y);
-	    }
-	  else
-	    {
-	      while (target_y > it->current_y
-		     && IT_CHARPOS (*it) < ZV)
-		{
-		  struct text_pos last_pos = it->current.pos;
-		  int last_y = it->current_y;
-		  int last_vpos = it->vpos;
-		  move_it_by_lines (it, 1);
-		  if (it->current_y > target_y)
-		    {
-		      reseat (it, last_pos, true);
-		      it->current_y = last_y;
-		      it->vpos = last_vpos;
-		      break;
-		    }
-		}
-	    }
-	}
-      break;
-    }
+  return BUFFERP (it->object)
+    && (it->method == GET_FROM_BUFFER ||
+	it->method == GET_FROM_STRETCH)
+    && XBUFFER (it->object)->text->monospace;
 }
 
-
-/* Apparently, motion is sufficiently asymmetric that
-   `move_it_vertically' needs a separate implementation from
-   `move_it_vertically_backward'.
+/* Need to preserve DY == 0 special behavior, i.e., move IT to line
+   start.
 */
 
 void
 move_it_vertically (struct it *it, int dy)
 {
-  if (dy <= 0)
-    return move_it_vertically_backward (it, -dy);
+  if (dy == 0)
+    {
+      reseat_line_start (it);
+      it->current_x = it->hpos = it->continuation_lines_width = 0;
+      if (it->bidi_p
+	  && ! STRINGP (it->string)
+	  && FETCH_BYTE (max (BEGV_BYTE, IT_BYTEPOS (*it) - 1)) != '\n')
+	{
+	  /* Preceding character was not newline, i.e., we're in an
+	     R2L regime.  */
+	  ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
+	  dec_both (&cp, &bp);
+	  cp = find_newline_no_quit (cp, bp, -1, NULL);
+	  move_it_to (it, cp, -1, -1, -1, MOVE_TO_POS);
+	}
+    }
+  else if (dy > 0)
+    {
+      mit_calls12++;
+      move_it_to (it, ZV, -1, it->current_y + dy, -1, MOVE_TO_POS | MOVE_TO_Y);
+      if (IT_CHARPOS (*it) == ZV
+	  && ZV > BEGV
+	  && FETCH_BYTE (IT_BYTEPOS (*it) - 1) != '\n')
+	/* Annoying buffer without final newline.  Move to bol. */
+	move_it_by_lines (it, 0);
+    }
+  else /* dy < 0 */
+    {
+      for (;;)
+	{
+	  struct it it_from;
+	  void *itdata = NULL;
+	  int abs_dy = abs (dy);
+	  ptrdiff_t from_pos = IT_CHARPOS (*it), target_y = it->current_y - abs_dy;
+	  int h, nlines = max (1, abs_dy / default_line_pixel_height (it->w));
+	  int nchars_per_line = (it->last_visible_x - it->first_visible_x) /
+	    FRAME_COLUMN_WIDTH (it->f);
+	  ptrdiff_t capped = behaved_p (it) && false
+	    ? max (BEGV, from_pos - nchars_per_line * nlines)
+	    : -1;
 
-  mit_calls12++;
-  move_it_to (it, ZV, -1, it->current_y + dy, -1, MOVE_TO_POS | MOVE_TO_Y);
-  if (IT_CHARPOS (*it) == ZV
-      && ZV > BEGV
-      && FETCH_BYTE (IT_BYTEPOS (*it) - 1) != '\n')
-    /* Annoying buffer without final newline.  Move to bol. */
-    move_it_by_lines (it, 0);
+	  /* This is very confusing.  Since `move_it_to' cannot go
+	     backward, we manually set IT the estimated NLINES back.  Then
+	     from that position, call `move_it_to' on a throwaway IT_FROM to
+	     FROM_POS.  */
+	  for (int i = 0; i < nlines; ++i)
+	    {
+	      if (capped == -1)
+		{
+		  line_start_visible (it);
+		  it->current_x = it->hpos = it->continuation_lines_width = 0;
+		}
+	      else /* speedups are possible */
+		{
+		  ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
+		  dec_both (&cp, &bp);
+		  IT_CHARPOS (*it) =
+		    find_newline (cp, bp, capped, CHAR_TO_BYTE (capped), -1, NULL,
+				  &IT_BYTEPOS (*it), 0);
+		  if (IT_CHARPOS (*it) <= capped)
+		    {
+		      ptrdiff_t nchars = (cp - IT_CHARPOS (*it) + 1);
+		      int current_xchar = (it->current_x / FRAME_COLUMN_WIDTH (it->f)),
+			result_xchar;
+		      if (current_xchar >= nchars)
+			{
+			  /* e.g., current_xchar=79, nchars=79, nchar_per_line=80,
+			     result_xchar=0 */
+			  result_xchar = current_xchar - nchars;
+			  it->current_x = result_xchar * FRAME_COLUMN_WIDTH (it->f);
+			}
+		      else
+			{
+			  /* e.g., current_xchar=79, nchars=160, nchars_per_line=80,
+			     result_xchar=79 */
+			  ptrdiff_t remchars = (nchars - current_xchar) % nchars_per_line;
+			  result_xchar = (nchars_per_line - remchars) % nchars_per_line;
+			  it->current_x = result_xchar * FRAME_COLUMN_WIDTH (it->f);
+			}
+		      it->hpos = it->current_x;
+		      it->continuation_lines_width = 0; /* sus */
+		      break;
+		    }
+		  else
+		    it->current_x = it->hpos = it->continuation_lines_width = 0;
+		}
+	    }
+
+	  /* More shallow assignment */
+	  reseat_1 (it, it->current.pos, true);
+
+	  /* "Then from that position, call `move_it_to' on a throwaway
+	     IT_FROM to FROM_POS."  */
+	  SAVE_IT (it_from, *it, itdata);
+	  move_it_to (&it_from, from_pos, -1, -1, -1, MOVE_TO_POS);
+	  RESTORE_IT (it, it, itdata);
+
+	  /* H is the actual pixel distance.  */
+	  h = it_from.current_y - it->current_y;
+
+	  /* NLINES was an estimate, now actual.  */
+	  nlines = it_from.vpos - it->vpos;
+
+	  /* "This is very confusing.  Since `move_it_to' cannot go
+	     backward, we manually set IT..." and we continue
+	     manually setting IT.  */
+	  it->vpos -= nlines;
+	  it->current_y -= h;
+
+	  if ((it->current_y - target_y) >
+	      min (window_box_height (it->w), line_height_at (it) * 2 / 3))
+	    {
+	      /* Estimated NLINES comes up short.  Take it from the top.  */
+	      eassert (IT_CHARPOS (*it) > BEGV);
+	      dy = it->current_y - target_y;
+	      continue;
+	    }
+	  else if ((target_y - it->current_y) >= line_height_at (it))
+	    {
+	      /* Most common branch where continued lines render
+		 our initial estimate of NLINES too large.  Scooch
+		 forward.  */
+	      eassert (IT_CHARPOS (*it) < ZV);
+
+	      if (! FRAME_WINDOW_P (it->f))
+		{
+		  /* Apparently, move_it_by_lines is too expensive
+		     on terminal frames in which "compute_motion" is used.
+		     Would be better if `move_it_vertically' applied to
+		     both tty and X, but slow thy roll.
+		  */
+		  move_it_vertically (it, target_y - it->current_y);
+		}
+	      else
+		{
+		  while (target_y > it->current_y
+			 && IT_CHARPOS (*it) < ZV)
+		    {
+		      struct text_pos last_pos = it->current.pos;
+		      int last_y = it->current_y;
+		      int last_vpos = it->vpos;
+		      move_it_by_lines (it, 1);
+		      if (it->current_y > target_y)
+			{
+			  reseat (it, last_pos, true);
+			  it->current_y = last_y;
+			  it->vpos = last_vpos;
+			  break;
+			}
+		    }
+		}
+	    }
+	  break;
+	}
+    }
 }
 
 /* Move iterator IT past the end of the text line it is in.  */
@@ -9873,7 +9857,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
     {
       /* Move to bol when DVPOS is zero.  Defer to next call to
 	 `line_bottom_y' for line height.  */
-      move_it_vertically_backward (it, 0);
+      move_it_vertically (it, 0);
       last_height = 0;
     }
   else if (dvpos > 0)
@@ -9905,7 +9889,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	 position.  This may actually move vertically backwards,
          in case of overlays, so adjust dvpos accordingly.  */
       dvpos += it->vpos;
-      move_it_vertically_backward (it, 0);
+      move_it_vertically (it, 0);
       dvpos -= it->vpos;
 
       /* Go back -DVPOS buffer lines, but no farther than -DVPOS full
@@ -9917,7 +9901,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	bound_pos = max (start_charpos + dvpos * nchars_per_row, BEGV);
 
       for (i = -dvpos; i > 0 && IT_CHARPOS (*it) > bound_pos; --i)
-	back_to_previous_visible_line_start (it);
+	line_start_visible (it);
       if (i > 0 && IT_CHARPOS (*it) <= bound_pos)
 	hit_bound_pos = true;
       reseat (it, it->current.pos, true);
@@ -9927,13 +9911,13 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	{
 	  /* First try to move to start of display line.  */
 	  dvpos += it->vpos;
-	  move_it_vertically_backward (it, 0);
+	  move_it_vertically (it, 0);
 	  dvpos -= it->vpos;
 	  if (IT_POS_VALID_AFTER_MOVE_P (it))
 	    break;
 	  /* If start of line is still in string or image,
 	     move further back.  */
-	  back_to_previous_visible_line_start (it);
+	  line_start_visible (it);
 	  reseat (it, it->current.pos, true);
 	  dvpos--;
 	}
@@ -9967,7 +9951,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	       && dvpos < 0 && it2.vpos < -dvpos)
 	{
 	  /* A display string with a newline spanning a large chunk
-	     caused `back_to_previous_visible_line_start' to
+	     caused `line_start_visible' to
 	     overshoot.  Punish it by scanning back to DVPOS, which
 	     will bog under long lines.  "If it hurts, don't do
 	     that!"  */
@@ -9975,7 +9959,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	  RESTORE_IT (it, it, it2data);
 	  for (i = -dvpos; i > 0; --i)
 	    {
-	      back_to_previous_visible_line_start (it);
+	      line_start_visible (it);
 	      it->vpos--;
 	    }
 	  reseat_1 (it, it->current.pos, true);
@@ -10320,7 +10304,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to, Li
   /* Start at the beginning of the line containing FROM.  Otherwise
      IT.current_x will be incorrectly set to zero at some arbitrary
      non-zero X coordinate.  */
-  reseat_at_previous_visible_line_start (&it);
+  reseat_line_start (&it);
   it.current_x = it.hpos = 0;
   if (IT_CHARPOS (it) != start)
     move_it_to (&it, start, -1, -1, -1, MOVE_TO_POS);
@@ -10752,7 +10736,7 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
 
       if (nlflag)
 	{
-	  ptrdiff_t this_bol, this_bol_byte, prev_bol, prev_bol_byte;
+	  ptrdiff_t bol, bol_byte, prev_bol, prev_bol_byte;
 	  intmax_t dups;
 
           /* Since we call del_range_both passing false for PREPARE,
@@ -10765,23 +10749,23 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
 	  insert_1_both ("\n", 1, 1, true, false, false);
 
 	  scan_newline (Z, Z_BYTE, BEG, BEG_BYTE, -2, false);
-	  this_bol = PT;
-	  this_bol_byte = PT_BYTE;
+	  bol = PT;
+	  bol_byte = PT_BYTE;
 
 	  /* See if this line duplicates the previous one.
 	     If so, combine duplicates.  */
-	  if (this_bol > BEG)
+	  if (bol > BEG)
 	    {
 	      scan_newline (PT, PT_BYTE, BEG, BEG_BYTE, -2, false);
 	      prev_bol = PT;
 	      prev_bol_byte = PT_BYTE;
 
 	      dups = message_log_check_duplicate (prev_bol_byte,
-                                                  this_bol_byte);
+                                                  bol_byte);
 	      if (dups)
 		{
 		  del_range_both (prev_bol, prev_bol_byte,
-				  this_bol, this_bol_byte, false);
+				  bol, bol_byte, false);
 		  if (dups > 1)
 		    {
 		      char dupstr[sizeof " [ times]"
@@ -10861,13 +10845,13 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
    value N > 1 if we should also append " [N times]".  */
 
 static intmax_t
-message_log_check_duplicate (ptrdiff_t prev_bol_byte, ptrdiff_t this_bol_byte)
+message_log_check_duplicate (ptrdiff_t prev_bol_byte, ptrdiff_t bol_byte)
 {
   ptrdiff_t i;
-  ptrdiff_t len = Z_BYTE - 1 - this_bol_byte;
+  ptrdiff_t len = Z_BYTE - 1 - bol_byte;
   bool seen_dots = false;
   unsigned char *p1 = BUF_BYTE_ADDRESS (current_buffer, prev_bol_byte);
-  unsigned char *p2 = BUF_BYTE_ADDRESS (current_buffer, this_bol_byte);
+  unsigned char *p2 = BUF_BYTE_ADDRESS (current_buffer, bol_byte);
 
   for (i = 0; i < len; i++)
     {
@@ -11666,7 +11650,7 @@ resize_mini_window (struct window *w, bool exact_p)
 	  if (redisplay_adhoc_scroll_in_resize_mini_windows)
 	    {
 	      init_iterator (&it, w, ZV, ZV_BYTE, NULL, DEFAULT_FACE_ID);
-	      move_it_vertically_backward (&it, height - unit);
+	      move_it_vertically (&it, unit - height);
               /* The following move is usually a no-op when the stuff
                  displayed in the mini-window comes entirely from buffer
                  text, but it is needed when some of it comes from overlay
@@ -12091,10 +12075,10 @@ echo_area_display (bool update_frame_p)
   echo_message_buffer = Qnil;
 
   /* Prevent redisplay optimization in redisplay_internal by resetting
-     this_line_start_pos.  This is done because the mini-buffer now
+     static_line_start_pos.  This is done because the mini-buffer now
      displays the message instead of its buffer text.  */
   if (EQ (mini_window, selected_window))
-    CHARPOS (this_line_start_pos) = 0;
+    CHARPOS (static_line_start_pos) = 0;
 
   if (window_height_changed_p)
     {
@@ -15442,11 +15426,11 @@ redisplay_internal (void)
   AINC (Vredisplay__mode_lines_cause, update_mode_lines);
 
   /* Optimize the case that only the line containing the cursor in the
-     selected window has changed.  Variables starting with this_ are
+     selected window has changed.  Variables starting with  are
      set in display_line and record information about the line
      containing the cursor.  */
-  tlbufpos = this_line_start_pos;
-  tlendpos = this_line_end_pos;
+  tlbufpos = static_line_start_pos;
+  tlendpos = static_line_end_pos;
   if (!consider_all_windows_p
       && CHARPOS (tlbufpos) > 0
       && !w->update_mode_line
@@ -15457,7 +15441,7 @@ redisplay_internal (void)
       && !XFRAME (w->frame)->cursor_type_changed
       && !XFRAME (w->frame)->face_change
       /* Make sure recorded data applies to current buffer, etc.  */
-      && this_line_buffer == current_buffer
+      && static_line_buffer == current_buffer
       && match_p
       && !w->force_start
       && !w->optional_new_start
@@ -15493,14 +15477,14 @@ redisplay_internal (void)
 	     optimization.  */
 
 	  struct it it;
-	  int line_height_before = this_line_pixel_height;
+	  int line_height_before = static_line_pixel_height;
 
 	  /* Note that start_move_it will handle the case that the
 	     line starting at tlbufpos is a continuation line.  */
 	  start_move_it (&it, w, tlbufpos);
 
-	  /* Implementation note: It this still necessary?  */
-	  if (it.current_x != this_line_start_x)
+	  /* Still necessary?  */
+	  if (it.current_x != static_line_start_x)
 	    goto cancel;
 
 	  /* Give up on this optimization if the line starts with a
@@ -15511,22 +15495,22 @@ redisplay_internal (void)
 	    goto cancel;
 	  w->cursor.vpos = -1;
 	  overlay_arrow_seen = false;
-	  it.vpos = this_line_vpos;
-	  it.current_y = this_line_y;
-	  it.glyph_row = MATRIX_ROW (w->desired_matrix, this_line_vpos);
+	  it.vpos = static_line_vpos;
+	  it.current_y = static_line_y;
+	  it.glyph_row = MATRIX_ROW (w->desired_matrix, static_line_vpos);
 	  display_line (&it, -1);
 
 	  /* If line contains point, is not continued,
              and ends at same distance from eob as before, we win.  */
 	  if (w->cursor.vpos >= 0
-              /* Line is not continued, otherwise this_line_start_pos
+              /* Line is not continued, otherwise static_line_start_pos
                  would have been set to 0 in display_line.  */
-	      && CHARPOS (this_line_start_pos)
+	      && CHARPOS (static_line_start_pos)
 	      /* Line ends as before.  */
-	      && CHARPOS (this_line_end_pos) == CHARPOS (tlendpos)
+	      && CHARPOS (static_line_end_pos) == CHARPOS (tlendpos)
               /* Line has same height as before.  Otherwise other lines
                  would have to be shifted up or down.  */
-	      && this_line_pixel_height == line_height_before
+	      && static_line_pixel_height == line_height_before
 	      /* Cannot use this optimization if hscrolling current
 		 line and this line is the current one, because
 		 display_line above is not informed about the
@@ -15538,7 +15522,7 @@ redisplay_internal (void)
  	      if (it.current_y < it.last_visible_y)
   		{
  		  struct glyph_row *row
- 		    = MATRIX_ROW (w->current_matrix, this_line_vpos + 1);
+		    = MATRIX_ROW (w->current_matrix, static_line_vpos + 1);
   		  ptrdiff_t delta, delta_bytes;
 
 		  /* We used to distinguish between two cases here,
@@ -15554,7 +15538,7 @@ redisplay_internal (void)
 				 - MATRIX_ROW_START_BYTEPOS (row));
 
   		  increment_matrix_positions (w->current_matrix,
-					      this_line_vpos + 1,
+					      static_line_vpos + 1,
 					      w->current_matrix->nrows,
 					      delta, delta_bytes);
 		}
@@ -15564,12 +15548,12 @@ redisplay_internal (void)
 		 adjusted.  */
 	      if (MATRIX_ROW_DISPLAYS_TEXT_P (it.glyph_row - 1))
 		{
-		  if (w->window_end_vpos < this_line_vpos)
-		    w->window_end_vpos = this_line_vpos;
+		  if (w->window_end_vpos < static_line_vpos)
+		    w->window_end_vpos = static_line_vpos;
 		}
-	      else if (w->window_end_vpos == this_line_vpos
-		       && this_line_vpos > 0)
-		w->window_end_vpos = this_line_vpos - 1;
+	      else if (w->window_end_vpos == static_line_vpos
+		       && static_line_vpos > 0)
+		w->window_end_vpos = static_line_vpos - 1;
 	      w->window_end_valid = false;
 
 	      /* Update hint: No need to try to scroll in update_window.  */
@@ -15620,20 +15604,20 @@ redisplay_internal (void)
 	     next visible position.  */
 	  init_iterator (&it, w, CHARPOS (tlbufpos), BYTEPOS (tlbufpos),
 			 NULL, DEFAULT_FACE_ID);
-	  it.current_x = this_line_start_x;
-	  it.current_y = this_line_y;
-	  it.vpos = this_line_vpos;
+	  it.current_x = static_line_start_x;
+	  it.current_y = static_line_y;
+	  it.vpos = static_line_vpos;
 
 	  /* The call to move_it_to stops in front of PT, but
 	     moves over before-strings.  */
 	  move_it_to (&it, PT, -1, -1, -1, MOVE_TO_POS);
 
-	  if (it.vpos == this_line_vpos
-	      && (row = MATRIX_ROW (w->current_matrix, this_line_vpos),
+	  if (it.vpos == static_line_vpos
+	      && (row = MATRIX_ROW (w->current_matrix, static_line_vpos),
 		  row->enabled_p))
 	    {
-	      eassert (this_line_vpos == it.vpos);
-	      eassert (this_line_y == it.current_y);
+	      eassert (static_line_vpos == it.vpos);
+	      eassert (static_line_y == it.current_y);
 	      set_cursor_from_row (w, row, w->current_matrix, 0, 0, 0, 0);
 	      if (cursor_row_fully_visible_p (w, false, true, false))
 		{
@@ -15648,10 +15632,10 @@ redisplay_internal (void)
 
     cancel:
       /* Text changed drastically or point moved off of line.  */
-      SET_MATRIX_ROW_ENABLED_P (w->desired_matrix, this_line_vpos, false);
+      SET_MATRIX_ROW_ENABLED_P (w->desired_matrix, static_line_vpos, false);
     }
 
-  CHARPOS (this_line_start_pos) = 0;
+  CHARPOS (static_line_start_pos) = 0;
   ++clear_face_cache_count;
 #ifdef HAVE_WINDOW_SYSTEM
   ++clear_image_cache_count;
@@ -15914,7 +15898,7 @@ redisplay_internal (void)
       /* Prevent the optimization at the beginning of
 	 redisplay_internal that tries a single-line update of the
 	 line containing the cursor in the selected window.  */
-      CHARPOS (this_line_start_pos) = 0;
+      CHARPOS (static_line_start_pos) = 0;
 
       /* Let the overlay arrow be updated the next time.  */
       update_overlay_arrows (0);
@@ -16456,8 +16440,8 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 		   the position match above.  IOW, integer values of
 		   the `cursor' property override the "exact match for
 		   point" strategy of positioning the cursor.  */
-		/* Implementation note: bpos_max == pt_old when, e.g.,
-		   we are in an empty line, where bpos_max is set to
+		/* bpos_max == pt_old when, e.g., we are in an empty
+		   line, where bpos_max is set to
 		   MATRIX_ROW_START_CHARPOS, see above.  */
 		if (bpos_max <= pt_old && bpos_covered >= pt_old)
 		  {
@@ -16868,25 +16852,25 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	  && !MATRIX_ROW_CONTINUATION_LINE_P (row)
 	  && row->x == 0)
 	{
-	  this_line_buffer = XBUFFER (w->contents);
+	  static_line_buffer = XBUFFER (w->contents);
 
-	  CHARPOS (this_line_start_pos)
+	  CHARPOS (static_line_start_pos)
 	    = MATRIX_ROW_START_CHARPOS (row) + delta;
-	  BYTEPOS (this_line_start_pos)
+	  BYTEPOS (static_line_start_pos)
 	    = MATRIX_ROW_START_BYTEPOS (row) + delta_bytes;
 
-	  CHARPOS (this_line_end_pos)
+	  CHARPOS (static_line_end_pos)
 	    = Z - (MATRIX_ROW_END_CHARPOS (row) + delta);
-	  BYTEPOS (this_line_end_pos)
+	  BYTEPOS (static_line_end_pos)
 	    = Z_BYTE - (MATRIX_ROW_END_BYTEPOS (row) + delta_bytes);
 
-	  this_line_y = w->cursor.y;
-	  this_line_pixel_height = row->height;
-	  this_line_vpos = w->cursor.vpos;
-	  this_line_start_x = row->x;
+	  static_line_y = w->cursor.y;
+	  static_line_pixel_height = row->height;
+	  static_line_vpos = w->cursor.vpos;
+	  static_line_start_x = row->x;
 	}
       else
-	CHARPOS (this_line_start_pos) = 0;
+	CHARPOS (static_line_start_pos) = 0;
     }
 
   return true;
@@ -16962,8 +16946,8 @@ cursor_row_fully_visible_p (struct window *w, bool force_p,
     {
       Lisp_Object window;
       XSETWINDOW (window, w);
-      /* Implementation note: if the function we call here signals an
-	 error, we will NOT scroll when the cursor is partially-visible.  */
+      /* If the function we call here signals an error, we will NOT
+	 scroll when the cursor is partially-visible.  */
       Lisp_Object val = safe_call1 (mclfv_p, window);
       if (NILP (val))
 	return true;
@@ -17194,7 +17178,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
       start_move_it (&it, w, startp);
       if (arg_scroll_conservatively <= scroll_limit)
-	move_it_vertically (&it, amount_to_scroll);
+	move_it_vertically (&it, -amount_to_scroll);
       else
 	{
 	  /* Extra precision for users who set scroll-conservatively
@@ -17306,7 +17290,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	  if (amount_to_scroll <= 0)
 	    return SCROLLING_FAILED;
 
-	  move_it_vertically_backward (&it, amount_to_scroll);
+	  move_it_vertically (&it, -amount_to_scroll);
 	  startp = it.current.pos;
 	}
     }
@@ -17390,7 +17374,7 @@ compute_window_start_on_continuation_line (struct window *w)
 				    + window_wants_header_line (w);
       init_iterator (&it, w, CHARPOS (start_pos), BYTEPOS (start_pos),
 		     row, DEFAULT_FACE_ID);
-      reseat_at_previous_visible_line_start (&it);
+      reseat_line_start (&it);
 
       /* Give up (by not using the code in the block below) and say it
          takes too much time to compute a new window start, if the
@@ -17530,7 +17514,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	 of redisplaying to replace an echo area message; since in
 	 that case the mini-buffer contents per se are usually
 	 unchanged.  This code is of no real use in the mini-buffer
-	 since the handling of this_line_start_pos, etc., in redisplay
+	 since the handling of static_line_start_pos, etc., in redisplay
 	 handles the same cases.  */
       && !EQ (window, minibuf_window)
       /* When overlay arrow is shown in current buffer, point movement
@@ -18289,7 +18273,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
 	  /* Note: We add an extra FRAME_LINE_HEIGHT, because the loop
 	     below, which finds the row to move point to, advances by
-	     the Y coordinate of the _next_ row, see the definition of
+	     the Y coordinate of the *next* row, see the definition of
 	     MATRIX_ROW_BOTTOM_Y.  */
 	  if (w->cursor.vpos < margin + tab_line + header_line)
 	    {
@@ -18619,19 +18603,19 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	   from point.  */
 	centering_position = window_box_height (w) / 2;
     }
-  move_it_vertically_backward (&it, centering_position);
+  move_it_vertically (&it, -centering_position);
 
   eassert (IT_CHARPOS (it) >= BEGV);
 
-  /* The function move_it_vertically_backward may move over more
-     than the specified y-distance.  If it->w is small, e.g. a
-     mini-buffer window, we may end up in front of the window's
-     display area.  Start displaying at the start of the line
-     containing PT in this case.  */
+  /* The function move_it_vertically may move over more than the
+     specified y-distance.  If it->w is small, e.g. a mini-buffer
+     window, we may end up in front of the window's display area.
+     Start displaying at the start of the line containing PT in this
+     case.  */
   if (it.current_y <= 0)
     {
       init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
-      move_it_vertically_backward (&it, 0);
+      move_it_vertically (&it, 0);
       it.current_y = 0;
     }
 
@@ -21956,7 +21940,7 @@ find_row_edges (struct it *it, struct glyph_row *row,
     row->maxpos = it->current.pos;
   else if (row->used[TEXT_AREA])
     {
-      bool seen_this_string = false;
+      bool seen_string = false;
       struct glyph_row *r1 = row - 1;
 
       /* Did we see the same display string on the previous row?  */
@@ -21986,7 +21970,7 @@ find_row_edges (struct it *it, struct glyph_row *row,
 	      if (end > start)
 		{
 		  if (EQ ((end - 1)->object, it->object))
-		    seen_this_string = true;
+		    seen_string = true;
 		}
 	      else
 		/* If all the glyphs of the previous row were inserted
@@ -21994,7 +21978,7 @@ find_row_edges (struct it *it, struct glyph_row *row,
 		   produced from a single newline, which is only
 		   possible if that newline came from the same string
 		   as the one which produced this ROW.  */
-		seen_this_string = true;
+		seen_string = true;
 	    }
 	  else
 	    {
@@ -22007,16 +21991,16 @@ find_row_edges (struct it *it, struct glyph_row *row,
 	      if (end < start)
 		{
 		  if (EQ ((end + 1)->object, it->object))
-		    seen_this_string = true;
+		    seen_string = true;
 		}
 	      else
-		seen_this_string = true;
+		seen_string = true;
 	    }
 	}
       /* Take note of each display string that covers a newline only
 	 once, the first time we see it.  This is for when a display
 	 string includes more than one newline in it.  */
-      if (row->ends_in_newline_from_string_p && !seen_this_string)
+      if (row->ends_in_newline_from_string_p && !seen_string)
 	{
 	  /* If we were scanning the buffer forward when we displayed
 	     the string, we want to account for at least one buffer
@@ -22050,7 +22034,7 @@ find_row_edges (struct it *it, struct glyph_row *row,
 	    }
 	}
       else if (row->truncated_on_right_p)
-	/* display_line already called reseat_at_next_visible_line_start,
+	/* display_line already called reseat_following_line_start,
 	   which puts the iterator at the beginning of the next line, in
 	   the logical order. */
 	row->maxpos = it->current.pos;
@@ -22500,7 +22484,7 @@ display_line (struct it *it, int cursor_vpos)
   bool pending_handle_line_prefix = false;
   int tab_line = window_wants_tab_line (it->w);
   int header_line = window_wants_header_line (it->w);
-  bool hscroll_this_line = (cursor_vpos >= 0
+  bool hscroll_line = (cursor_vpos >= 0
 			    && it->vpos == cursor_vpos - tab_line - header_line
 			    && hscrolling_current_line_p (it->w));
   int first_visible_x = it->first_visible_x;
@@ -22541,7 +22525,7 @@ display_line (struct it *it, int cursor_vpos)
   /* If we are going to display the cursor's line, account for the
      hscroll of that line.  We subtract the window's min_hscroll,
      because that was already accounted for in init_iterator.  */
-  if (hscroll_this_line)
+  if (hscroll_line)
     x_incr =
       (window_hscroll_limited (it->w, it->f) - it->w->min_hscroll)
       * FRAME_COLUMN_WIDTH (it->f);
@@ -22555,8 +22539,8 @@ display_line (struct it *it, int cursor_vpos)
     {
       enum move_it_result move_result;
 
-      this_line_min_pos = row->start.pos;
-      if (hscroll_this_line)
+      static_line_min_pos = row->start.pos;
+      if (hscroll_line)
 	{
 	  it->first_visible_x += x_incr;
 	  it->last_visible_x  += x_incr;
@@ -22585,8 +22569,8 @@ display_line (struct it *it, int cursor_vpos)
 	 considers positions that are actually displayed, so
 	 RECORD_MAX_MIN_POS will not otherwise record positions that
 	 are hscrolled to the left of the left edge of the window.  */
-      min_pos = CHARPOS (this_line_min_pos);
-      min_bpos = BYTEPOS (this_line_min_pos);
+      min_pos = CHARPOS (static_line_min_pos);
+      min_bpos = BYTEPOS (static_line_min_pos);
 
       /* Produce line number, if needed.  */
       if (line_number_needed)
@@ -23229,7 +23213,7 @@ display_line (struct it *it, int cursor_vpos)
 
 	      row->truncated_on_right_p = true;
 	      it->continuation_lines_width = 0;
-	      reseat_at_next_visible_line_start (it, false);
+	      reseat_following_line_start (it, false);
 	      /* We insist below that IT's position be at ZV because in
 		 bidi-reordered lines the character at visible line start
 		 might not be the character that follows the newline in
@@ -23335,10 +23319,9 @@ done:
   /* Compute pixel dimensions of this line.  */
   compute_line_metrics (it);
 
-  /* Implementation note: No changes in the glyphs of ROW or in their
-     faces can be done past this point, because compute_line_metrics
-     computes ROW's hash value and stores it within the glyph_row
-     structure.  */
+  /* No changes in the glyphs of ROW or in their faces can be done
+     past this point, because compute_line_metrics computes ROW's hash
+     value and stores it within the glyph_row structure.  */
 
   /* Record whether this row ends inside an ellipsis.  */
   row->ends_in_ellipsis_p
@@ -23391,7 +23374,7 @@ done:
   it->current_y += row->height;
   /* Restore the first and last visible X if we adjusted them for
      current-line hscrolling.  */
-  if (hscroll_this_line)
+  if (hscroll_line)
     {
       it->first_visible_x = first_visible_x;
       it->last_visible_x  = last_visible_x;
@@ -23887,7 +23870,7 @@ Value is the new character position of point.  */)
 	 the logical order (since the move_it_* functions can only
 	 move forward).  */
     reseat:
-      reseat_at_previous_visible_line_start (&it);
+      reseat_line_start (&it);
       it.current_x = it.hpos = it.current_y = it.vpos = 0;
       if (IT_CHARPOS (it) != PT)
 	{
@@ -23967,7 +23950,7 @@ Value is the new character position of point.  */)
 	      start_move_it (&it, w, pt);
 	      if (it.line_wrap == TRUNCATE)
 		it.last_visible_x = DISP_INFINITY;
-	      reseat_at_previous_visible_line_start (&it);
+	      reseat_line_start (&it);
 	      it.current_x = it.current_y = it.hpos = 0;
 	      if (pt_vpos != 0)
 		move_it_by_lines (&it, pt_vpos);
@@ -34854,7 +34837,7 @@ and display the most important part of the minibuffer.   */);
 void
 init_xdisp (void)
 {
-  CHARPOS (this_line_start_pos) = 0;
+  CHARPOS (static_line_start_pos) = 0;
 
   echo_area_window = minibuf_window;
 
