@@ -338,6 +338,7 @@ recently executed command not bound to an input event\"."
   "Key that stops the modal repeating of keys in sequence.
 For example, you can set it to <return> like `isearch-exit'."
   :type '(choice (const :tag "No special key to exit repeating sequence" nil)
+                 (string :tag "Kbd string that exits repeating sequence")
                  (key-sequence :tag "Key that exits repeating sequence"))
   :group 'convenience
   :version "28.1")
@@ -463,7 +464,10 @@ See `describe-repeat-maps' for a list of all repeatable commands."
 
               ;; Adding an exit key
               (when repeat-exit-key
-                (define-key map repeat-exit-key 'ignore))
+                (define-key map (if (stringp repeat-exit-key)
+                                    (kbd repeat-exit-key)
+                                  repeat-exit-key)
+                            'ignore))
 
               (when (and repeat-keep-prefix (not prefix-arg))
                 (setq prefix-arg current-prefix-arg))
@@ -502,7 +506,9 @@ See `describe-repeat-maps' for a list of all repeatable commands."
                                keys ", ")
                     (if repeat-exit-key
                         (format ", or exit with %s"
-                                (key-description repeat-exit-key))
+                                (if (stringp repeat-exit-key)
+                                    repeat-exit-key
+                                  (key-description repeat-exit-key)))
                       ""))))
 
 (defun repeat-echo-message (keymap)
