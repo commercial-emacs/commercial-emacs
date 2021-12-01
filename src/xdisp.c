@@ -732,6 +732,8 @@ static bool cursor_row_p (struct glyph_row *);
 static int redisplay_mode_lines (Lisp_Object, bool);
 
 static void handle_line_prefix (struct it *);
+static int line_height_at (const struct it *it);
+static bool behaved_p (const struct it *it);
 
 static void handle_stop_backwards (struct it *, ptrdiff_t);
 static void unwind_with_echo_area_buffer (Lisp_Object);
@@ -9250,7 +9252,7 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
     done:
 
   /* Restore to wrap point when atpos/atx position would be displayed
-     on the next screen line due to line-wrap.  (Bug#23570) */
+     on the next screen line due to line-wrap. (Bug#23570)  */
   if (result == MOVE_LINE_CONTINUED
       && it->line_wrap == WORD_WRAP
       && wrap_it.sp >= 0
@@ -9311,11 +9313,6 @@ int
 move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos, int op)
 {
   int line_start_x = 0, max_current_x = 0;
-  bool behaved_p = BUFFERP (it->object)
-    && (it->method == GET_FROM_BUFFER ||
-	it->method == GET_FROM_STRETCH)
-    // && op == MOVE_TO_POS
-    && XBUFFER (it->object)->text->monospace;
   ptrdiff_t orig_charpos = IT_CHARPOS (*it);
 
   for (;;)
@@ -9349,7 +9346,10 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	  SAVE_IT (it_backup, *it, backup_data);
 
           mit_calls4++;
-	  skip = emulate_display_line (it, to_charpos, ((op & MOVE_TO_X) ? to_x : 0),
+	  skip = emulate_display_line (it, to_charpos,
+				       /* default to_x of zero to avoid stopping at
+					  end of line.  */
+				       ((op & MOVE_TO_X) ? to_x : 0),
 				       (MOVE_TO_X | (op & MOVE_TO_POS)));
 	  switch (skip)
 	    {
@@ -9359,7 +9359,6 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	      break;
 
 	    case MOVE_X_REACHED:
-	      eassert (op & MOVE_TO_X);
 	      line_height = it->max_ascent + it->max_descent;
 	      if (to_y >= it->current_y
 		  && to_y < it->current_y + line_height)
@@ -9488,7 +9487,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	case MOVE_LINE_CONTINUED:
 	  /* Don't take max, Markovian last_visible_x */
 	  max_current_x = it->last_visible_x;
-	  if (behaved_p)
+	  if (behaved_p (it))
 	    {
 	      ptrdiff_t npos = 0, counted = 0,
 		term = find_newline (IT_CHARPOS (*it), IT_BYTEPOS (*it),
@@ -9507,11 +9506,6 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	      switch (op)
 		{
 		case MOVE_TO_VPOS:
-		  if (orig_charpos == 72101 && to_vpos == -348)
-		    {
-		      fprintf (stderr, "the fuq\n");
-		    }
-
 		  fprintf (stderr,
 			   "orig_charpos=%ld it=%ld to_charpos=%ld ",
 			   orig_charpos, IT_CHARPOS (*it), to_charpos);
@@ -9637,6 +9631,44 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
   return max_current_x;
 }
 
+/* Can we deploy long-line shortcuts? */
+
+static bool
+behaved_p (const struct it *it)
+{
+  return BUFFERP (it->object)
+    && (it->method == GET_FROM_BUFFER ||
+	it->method == GET_FROM_STRETCH)
+    && XBUFFER (it->object)->text->monospace;
+}
+
+
+/* Return pixel height of line at IT.  */
+
+static int
+line_height_at (const struct it *it)
+{
+  int result;
+  void *itdata = bidi_shelve_cache();
+  struct it it2 = *it;
+  it2.max_ascent = it2.max_descent = 0;
+  do
+    {
+      move_it_to (&it2, IT_CHARPOS (*it), -1, -1, it2.vpos + 1,
+		  MOVE_TO_POS | MOVE_TO_VPOS);
+    }
+  while (! IT_POS_VALID_AFTER_MOVE_P (&it2)
+	 /* Continue so long as we're not after a newline in
+	    a display string beginning at IT.  Weak sauce
+	    hack to avoid infloop in `move_it_to'.  */
+	 && (it2.method != GET_FROM_STRING
+	     || IT_CHARPOS (it2) != IT_CHARPOS (*it)
+	     || SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) != '\n'));
+  /* store result first since line_bottom_y affects bidi cache */
+  result = line_bottom_y (&it2) - it2.current_y;
+  bidi_unshelve_cache (itdata, false);
+  return result;
+}
 
 /* If DY > 0, move IT backward at least that many pixels, possibly
    more if we need to get flush with the top edge of the line.
@@ -9649,56 +9681,88 @@ move_it_vertically_backward (struct it *it, int dy)
 {
   eassert (dy >= 0);
 
-  do
+  for (;;)
     {
-      struct it it2, it3;
-      void *it2data = NULL, *it3data = NULL;
-      ptrdiff_t start_pos = IT_CHARPOS (*it);
+      struct it it_from;
+      void *itdata = NULL;
+      ptrdiff_t start_pos = IT_CHARPOS (*it), target_y = it->current_y - dy;
       int h, nlines = max (1, dy / default_line_pixel_height (it->w));
+      int nchars_per_line = (it->last_visible_x - it->first_visible_x) /
+	FRAME_COLUMN_WIDTH (it->f);
+      ptrdiff_t end = behaved_p (it)
+	? max (BEGV, start_pos - nchars_per_line * nlines)
+	: -1;
 
-      /* Move iterator estimated NLINES back.  */
-      for (int i=0; i<nlines; ++i)
-	back_to_previous_visible_line_start (it);
+      /* This is very confusing.  We first shallowly set IT to an
+	 estimated NLINES back.  By "shallowly" we mean we do not call
+	 `move_it_to' on IT, and so its current_y and vpos must be
+	 updated manually.  */
+      for (int i = 0; i < nlines; ++i)
+	{
+	  if (end >= 0)
+	    {
+	      ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
+	      dec_both (&cp, &bp);
+	      IT_CHARPOS (*it) =
+		find_newline (cp, bp, end, CHAR_TO_BYTE (end), -1, NULL,
+			      &IT_BYTEPOS (*it), 0);
+	      if (IT_CHARPOS (*it) <= end)
+		{
+		  ptrdiff_t nchars = (cp - IT_CHARPOS (*it) + 1);
+		  int current_xchar = (it->current_x / FRAME_COLUMN_WIDTH (it->f)),
+		    result_xchar;
+		  if (current_xchar >= nchars)
+		    {
+		      /* e.g., current_xchar=79, nchars=79, nchar_per_line=80,
+			 result_xchar=0 */
+		      result_xchar = current_xchar - nchars;
+		      it->current_x = result_xchar * FRAME_COLUMN_WIDTH (it->f);
+		    }
+		  else
+		    {
+		      /* e.g., current_xchar=79, nchars=160, nchars_per_line=80,
+			 result_xchar=79 */
+		      ptrdiff_t remchars = (nchars - current_xchar) % nchars_per_line;
+		      result_xchar = (nchars_per_line - remchars) % nchars_per_line;
+		      it->current_x = result_xchar * FRAME_COLUMN_WIDTH (it->f);
+		    }
+		  it->hpos = it->current_x;
+		  it->continuation_lines_width = 0; /* sus */
+		  break;
+		}
+	      else
+		it->current_x = it->hpos = it->continuation_lines_width = 0;
+	    }
+	  else
+	    {
+	      back_to_previous_visible_line_start (it);
+	      it->current_x = it->hpos = it->continuation_lines_width = 0;
+	    }
+	}
 
-      /* `reseat_1' is `reseat' without handling stop position (see header).  */
+      /* More shallow assignment */
       reseat_1 (it, it->current.pos, true);
 
-      /* reseat puts us at a line start.  */
-      it->current_x = it->hpos = it->continuation_lines_width = 0;
+      /* IT_FROM indicates where IT was before we shallowly moved IT
+	 backwards.  We "deeply" modify IT_FROM, that is, IT_FROM will
+	 account for varying display element heights, continued screen
+	 lines, and sundry.  */
+      SAVE_IT (it_from, *it, itdata);
+      move_it_to (&it_from, start_pos, -1, -1, -1, MOVE_TO_POS);
+      RESTORE_IT (it, it, itdata);
 
-      /* Throwaway next-line to ascertain line height.  */
-      SAVE_IT (it2, *it, it2data);
-      it2.max_ascent = it2.max_descent = 0;
-      do
-	{
-	  move_it_to (&it2, start_pos, -1, -1, it2.vpos + 1,
-		      MOVE_TO_POS | MOVE_TO_VPOS);
-	}
-      while (! IT_POS_VALID_AFTER_MOVE_P (&it2)
-	     /* Continue so long as we're not after a newline in
-		a display string beginning at START_POS.  Weak sauce
-		hack to avoid infloop in `move_it_to'.  */
-	     && (it2.method != GET_FROM_STRING
-		 || IT_CHARPOS (it2) != start_pos
-		 || SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) != '\n'));
-      SAVE_IT (it3, it2, it3data);
+      /* H is the actual pixel distance.  */
+      h = it_from.current_y - it->current_y;
 
-      move_it_to (&it2, start_pos, -1, -1, -1, MOVE_TO_POS);
+      /* NLINES was an estimate, now actual.  */
+      nlines = it_from.vpos - it->vpos;
 
-      /* H is the pixel distance from IT.  */
-      h = it2.current_y - it->current_y;
-
-      /* NLINES is the lines distance.  */
-      nlines = it2.vpos - it->vpos;
-
-      /* Gets IT relative to the START_POS.  */
+      /* Now manually adjust IT's vertical data as promised!  */
       it->vpos -= nlines;
       it->current_y -= h;
 
       if (dy == 0)
 	{
-	  /* DY = 0 means move IT backward to the preceding line start or BEGV.  */
-	  RESTORE_IT (it, it, it2data);
 	  if (nlines > 0)
 	    move_it_by_lines (it, nlines);
 	  if (it->bidi_p
@@ -9715,67 +9779,53 @@ move_it_vertically_backward (struct it *it, int dy)
 	      cp = find_newline_no_quit (cp, bp, -1, NULL);
 	      move_it_to (it, cp, -1, -1, -1, MOVE_TO_POS);
 	    }
-	  bidi_unshelve_cache (it3data, true);
 	}
-      else
+      else if ((it->current_y - target_y) >
+	       min (window_box_height (it->w), line_height_at (it) * 2 / 3))
 	{
-	  /* Since IT had H subtracted, the target is merely the original IT
-	     modulo the centering_position (dy). */
-	  int line_height, target_y = it->current_y + h - dy;
-	  RESTORE_IT (&it3, &it3, it3data);
-	  line_height = line_bottom_y (&it3) - it3.current_y;
+	  /* Estimated NLINES comes up short.  Take it from the top.  */
+	  eassert (IT_CHARPOS (*it) > BEGV);
+	  dy = it->current_y - target_y;
+	  continue;
+	}
+      else if ((target_y - it->current_y) >=
+	       line_height_at (it))
+	{
+	  /* Most common branch where continued lines render
+	     our initial estimate of NLINES too large.  Scooch
+	     forward.  */
+	  eassert (IT_CHARPOS (*it) < ZV);
 
-	  RESTORE_IT (it, it, it2data);
-	  if (target_y < it->current_y
-	      /* Visually discernible shortfall.  */
-	      && (it->current_y - target_y
-		  > min (window_box_height (it->w), line_height * 2 / 3))
-	      && IT_CHARPOS (*it) > BEGV)
+	  if (! FRAME_WINDOW_P (it->f))
 	    {
-	      /* Not enough.  Take it from the top with residual DY.  */
-	      dy = it->current_y - target_y;
+	      /* Apparently, move_it_by_lines is too expensive
+		 on terminal frames in which "compute_motion" is used.
+		 Would be better if `move_it_vertically' applied to
+		 both tty and X, but slow thy roll.
+	      */
+	      move_it_vertically (it, target_y - it->current_y);
 	    }
 	  else
 	    {
-	      dy = 0;
-	      if (target_y >= it->current_y + line_height
-		  && IT_CHARPOS (*it) < ZV)
+	      while (target_y > it->current_y
+		     && IT_CHARPOS (*it) < ZV)
 		{
-		  /* Overshot.  Scooch forward.  */
-		  if (! FRAME_WINDOW_P (it->f))
+		  struct text_pos last_pos = it->current.pos;
+		  int last_y = it->current_y;
+		  int last_vpos = it->vpos;
+		  move_it_by_lines (it, 1);
+		  if (it->current_y > target_y)
 		    {
-		      /* Apparently, move_it_by_lines is too expensive
-			 on terminal frames in which "compute_motion" is used.
-			 Would be better if `move_it_vertically' applied to
-			 both tty and X, but slow thy roll.
-		      */
-		      move_it_vertically (it, target_y - it->current_y);
-		    }
-		  else
-		    {
-		      struct text_pos last_pos;
-		      int last_y, last_vpos;
-
-		      do
-			{
-			  last_pos = it->current.pos;
-			  last_y = it->current_y;
-			  last_vpos = it->vpos;
-			  move_it_by_lines (it, 1);
-			}
-		      while (target_y > it->current_y && IT_CHARPOS (*it) < ZV);
-
-		      if (it->current_y > target_y)
-			{
-			  reseat (it, last_pos, true);
-			  it->current_y = last_y;
-			  it->vpos = last_vpos;
-			}
+		      reseat (it, last_pos, true);
+		      it->current_y = last_y;
+		      it->vpos = last_vpos;
+		      break;
 		    }
 		}
 	    }
 	}
-    } while (dy);
+      break;
+    }
 }
 
 
