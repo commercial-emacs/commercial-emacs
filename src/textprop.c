@@ -1182,7 +1182,6 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
 	return Qnil;
       remaining -= got;
       interval = next_interval (interval);
-      eassert (! intervals_equal (unchanged, interval));
     }
 
   if (intervals_equal (unchanged, interval)

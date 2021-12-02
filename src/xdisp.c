@@ -17437,7 +17437,9 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 {
   struct window *w = XWINDOW (window);
   struct frame *f = XFRAME (w->frame);
+  struct glyph_row *row = NULL;
   int rc = CURSOR_MOVEMENT_CANNOT_BE_USED;
+  int this_scroll_margin, top_scroll_margin;
 
   eassert (w->last_point > 0);
   eassert (! w->window_end_valid
@@ -17445,305 +17447,301 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 
   /* Can we optimize for unchanged text?  */
   if (/* Point may be in this window.  */
-      PT >= CHARPOS (startp)
+      PT < CHARPOS (startp)
       /* Selective display hasn't changed.  */
-      && ! current_buffer->clip_changed
+      || current_buffer->clip_changed
       /* `windows_or_buffers_changed' or 'update__mode_lines' means
 	 `force-mode-line-update' sought a redraw. */
-      && ! update_mode_lines
-      && ! windows_or_buffers_changed
-      && ! f->cursor_type_changed
-      && NILP (Vshow_trailing_whitespace)
+      || update_mode_lines
+      || windows_or_buffers_changed
+      || f->cursor_type_changed
+      || ! NILP (Vshow_trailing_whitespace)
       /* display-line-numbers in relative mode requires redraw.  */
-      && ! EQ (Vdisplay_line_numbers, Qrelative)
-      && ! EQ (Vdisplay_line_numbers, Qvisual)
+      || EQ (Vdisplay_line_numbers, Qrelative)
+      || EQ (Vdisplay_line_numbers, Qvisual)
       /* Cannot also display line number in distinct face.  */
-      && ! (! NILP (Vdisplay_line_numbers)
-	    && NILP (Finternal_lisp_face_equal_p (Qline_number,
-						  Qline_number_current_line,
-						  w->frame)))
+      || (! NILP (Vdisplay_line_numbers)
+	  && NILP (Finternal_lisp_face_equal_p (Qline_number,
+						Qline_number_current_line,
+						w->frame)))
       /* The static_line_* in `redisplay' handles minibuffer.  */
-      && ! EQ (window, minibuf_window)
+      || EQ (window, minibuf_window)
       /* Cannot keep overlay arrow in tow with point.  */
-      && ! overlay_arrow_in_current_buffer_p ())
+      || overlay_arrow_in_current_buffer_p ())
+    return CURSOR_MOVEMENT_CANNOT_BE_USED;
+
+  this_scroll_margin = window_scroll_margin (w, MARGIN_IN_PIXELS);
+  top_scroll_margin = this_scroll_margin;
+  if (window_wants_tab_line (w))
+    top_scroll_margin += CURRENT_TAB_LINE_HEIGHT (w);
+  if (window_wants_header_line (w))
+    top_scroll_margin += CURRENT_HEADER_LINE_HEIGHT (w);
+
+  if (w->last_cursor_vpos < 0
+      || w->last_cursor_vpos >= w->current_matrix->nrows)
+    rc = CURSOR_MOVEMENT_MUST_SCROLL;
+  else
     {
-      int this_scroll_margin, top_scroll_margin;
-      struct glyph_row *row = NULL;
-
-      this_scroll_margin = window_scroll_margin (w, MARGIN_IN_PIXELS);
-
-      top_scroll_margin = this_scroll_margin;
-      if (window_wants_tab_line (w))
-	top_scroll_margin += CURRENT_TAB_LINE_HEIGHT (w);
-      if (window_wants_header_line (w))
-	top_scroll_margin += CURRENT_HEADER_LINE_HEIGHT (w);
-
       /* Start with the row the cursor was displayed during the last
-	 not paused redisplay.  Give up if that row is not valid.  */
-      if (w->last_cursor_vpos < 0
-	  || w->last_cursor_vpos >= w->current_matrix->nrows)
+	 unpaused redisplay.  */
+      row = MATRIX_ROW (w->current_matrix, w->last_cursor_vpos);
+      /* Skip the tab-line and header-line rows, if any.  */
+      if (row->tab_line_p)
+	++row;
+      if (row->mode_line_p)
+	++row;
+      if (! row->enabled_p)
 	rc = CURSOR_MOVEMENT_MUST_SCROLL;
+    }
+
+  if (rc == CURSOR_MOVEMENT_CANNOT_BE_USED)
+    {
+      bool scroll_p = false, must_scroll = false;
+      int last_y = window_text_bottom_y (w) - this_scroll_margin;
+
+      if (PT > w->last_point)
+	{
+	  /* Point has moved forward.  */
+	  while (MATRIX_ROW_END_CHARPOS (row) < PT
+		 && MATRIX_ROW_BOTTOM_Y (row) < last_y)
+	    {
+	      eassert (row->enabled_p);
+	      ++row;
+	    }
+
+	  /* If the end position of a row equals the start
+	     position of the next row, and PT is at that position,
+	     we would rather display cursor in the next line.  */
+	  while (MATRIX_ROW_BOTTOM_Y (row) < last_y
+		 && MATRIX_ROW_END_CHARPOS (row) == PT
+		 && row < MATRIX_MODE_LINE_ROW (w->current_matrix)
+		 && MATRIX_ROW_START_CHARPOS (row+1) == PT
+		 && ! cursor_row_p (row))
+	    ++row;
+
+	  /* If within the scroll margin, scroll.  Note that
+	     MATRIX_ROW_BOTTOM_Y gives the pixel position at which
+	     the next line would be drawn, and that
+	     this_scroll_margin can be zero.  */
+	  if (MATRIX_ROW_BOTTOM_Y (row) > last_y
+	      || PT > MATRIX_ROW_END_CHARPOS (row)
+	      /* Line is completely visible last line in window
+		 and PT is to be set in the next line.  */
+	      || (MATRIX_ROW_BOTTOM_Y (row) == last_y
+		  && PT == MATRIX_ROW_END_CHARPOS (row)
+		  && ! row->ends_at_zv_p
+		  && ! MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (row)))
+	    scroll_p = true;
+	}
+      else if (PT < w->last_point)
+	{
+	  /* Cursor has to be moved backward.  Note that PT >=
+	     CHARPOS (startp) because of the outer if-statement.  */
+	  while (! row->mode_line_p
+		 && (MATRIX_ROW_START_CHARPOS (row) > PT
+		     || (MATRIX_ROW_START_CHARPOS (row) == PT
+			 && (MATRIX_ROW_STARTS_IN_MIDDLE_OF_CHAR_P (row)
+			     || (/* STARTS_IN_MIDDLE_OF_STRING_P (row) */
+				 row > w->current_matrix->rows
+				 && (row-1)->ends_in_newline_from_string_p))))
+		 && (row->y > top_scroll_margin
+		     || CHARPOS (startp) == BEGV))
+	    {
+	      eassert (row->enabled_p);
+	      --row;
+	    }
+
+	  /* Consider the following case: Window starts at BEGV,
+	     there is invisible, intangible text at BEGV, so that
+	     display starts at some point START > BEGV.  It can
+	     happen that we are called with PT somewhere between
+	     BEGV and START.  Try to handle that case.  */
+	  if (row < w->current_matrix->rows
+	      || row->mode_line_p)
+	    {
+	      row = w->current_matrix->rows;
+	      /* Skip the tab-line and header-line rows, if any.  */
+	      if (row->tab_line_p)
+		++row;
+	      if (row->mode_line_p)
+		++row;
+	    }
+
+	  /* Due to newlines in overlay strings, we may have to
+	     skip forward over overlay strings.  */
+	  while (MATRIX_ROW_BOTTOM_Y (row) < last_y
+		 && MATRIX_ROW_END_CHARPOS (row) == PT
+		 && ! cursor_row_p (row))
+	    ++row;
+
+	  /* If within the scroll margin, scroll.  */
+	  if (row->y < top_scroll_margin
+	      && CHARPOS (startp) != BEGV)
+	    scroll_p = true;
+	}
       else
 	{
-	  row = MATRIX_ROW (w->current_matrix, w->last_cursor_vpos);
-	  /* Skip the tab-line and header-line rows, if any.  */
-	  if (row->tab_line_p)
-	    ++row;
-	  if (row->mode_line_p)
-	    ++row;
-	  if (!row->enabled_p)
-	    rc = CURSOR_MOVEMENT_MUST_SCROLL;
+	  /* Cursor did not move.  So don't scroll even if cursor line
+	     is partially visible, as it was so before.  */
+	  rc = CURSOR_MOVEMENT_SUCCESS;
 	}
 
-      if (rc == CURSOR_MOVEMENT_CANNOT_BE_USED)
+      if (PT < MATRIX_ROW_START_CHARPOS (row)
+	  || PT > MATRIX_ROW_END_CHARPOS (row))
 	{
-	  bool scroll_p = false, must_scroll = false;
-	  int last_y = window_text_bottom_y (w) - this_scroll_margin;
+	  /* if PT is not in the glyph row, give up.  */
+	  rc = CURSOR_MOVEMENT_MUST_SCROLL;
+	  must_scroll = true;
+	}
+      else if (rc != CURSOR_MOVEMENT_SUCCESS
+	       && ! NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
+	{
+	  struct glyph_row *row1;
 
-	  if (PT > w->last_point)
+	  /* If rows are bidi-reordered and point moved, back up
+	     until we find a row that does not belong to a
+	     continuation line.  This is because we must consider
+	     all rows of a continued line as candidates for the
+	     new cursor positioning, since row start and end
+	     positions change non-sequentially with vertical position
+	     in such rows.  */
+	  /* FIXME: Revisit this when glyph ``spilling'' in
+	     continuation lines' rows is implemented for
+	     bidi-reordered rows.  */
+	  for (row1 = MATRIX_FIRST_TEXT_ROW (w->current_matrix);
+	       MATRIX_ROW_CONTINUATION_LINE_P (row);
+	       --row)
 	    {
-	      /* Point has moved forward.  */
-	      while (MATRIX_ROW_END_CHARPOS (row) < PT
-		     && MATRIX_ROW_BOTTOM_Y (row) < last_y)
+	      /* If we hit the beginning of the displayed portion
+		 without finding the first row of a continued
+		 line, give up.  */
+	      if (row <= row1)
 		{
-		  eassert (row->enabled_p);
-		  ++row;
+		  rc = CURSOR_MOVEMENT_MUST_SCROLL;
+		  break;
 		}
-
-	      /* If the end position of a row equals the start
-		 position of the next row, and PT is at that position,
-		 we would rather display cursor in the next line.  */
-	      while (MATRIX_ROW_BOTTOM_Y (row) < last_y
-		     && MATRIX_ROW_END_CHARPOS (row) == PT
-		     && row < MATRIX_MODE_LINE_ROW (w->current_matrix)
-		     && MATRIX_ROW_START_CHARPOS (row+1) == PT
-		     && !cursor_row_p (row))
-		++row;
-
-	      /* If within the scroll margin, scroll.  Note that
-		 MATRIX_ROW_BOTTOM_Y gives the pixel position at which
-		 the next line would be drawn, and that
-		 this_scroll_margin can be zero.  */
-	      if (MATRIX_ROW_BOTTOM_Y (row) > last_y
-		  || PT > MATRIX_ROW_END_CHARPOS (row)
-		  /* Line is completely visible last line in window
-		     and PT is to be set in the next line.  */
-		  || (MATRIX_ROW_BOTTOM_Y (row) == last_y
-		      && PT == MATRIX_ROW_END_CHARPOS (row)
-		      && !row->ends_at_zv_p
-		      && !MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (row)))
-		scroll_p = true;
+	      eassert (row->enabled_p);
 	    }
-	  else if (PT < w->last_point)
+	}
+      if (must_scroll)
+	;
+      else if (rc != CURSOR_MOVEMENT_SUCCESS
+	       && MATRIX_ROW_PARTIALLY_VISIBLE_P (w, row)
+	       /* Make sure this isn't a header line nor a tab-line by
+		  any chance, since then MATRIX_ROW_PARTIALLY_VISIBLE_P
+		  might yield true.  */
+	       && ! row->mode_line_p
+	       && ! cursor_row_fully_visible_p (w, true, true, true))
+	{
+	  if (PT == MATRIX_ROW_END_CHARPOS (row)
+	      && ! row->ends_at_zv_p
+	      && ! MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (row))
+	    rc = CURSOR_MOVEMENT_MUST_SCROLL;
+	  else if (row->height > window_box_height (w))
 	    {
-	      /* Cursor has to be moved backward.  Note that PT >=
-		 CHARPOS (startp) because of the outer if-statement.  */
-	      while (!row->mode_line_p
-		     && (MATRIX_ROW_START_CHARPOS (row) > PT
-			 || (MATRIX_ROW_START_CHARPOS (row) == PT
-			     && (MATRIX_ROW_STARTS_IN_MIDDLE_OF_CHAR_P (row)
-				 || (/* STARTS_IN_MIDDLE_OF_STRING_P (row) */
-				     row > w->current_matrix->rows
-				     && (row-1)->ends_in_newline_from_string_p))))
-		     && (row->y > top_scroll_margin
-			 || CHARPOS (startp) == BEGV))
-		{
-		  eassert (row->enabled_p);
-		  --row;
-		}
-
-	      /* Consider the following case: Window starts at BEGV,
-		 there is invisible, intangible text at BEGV, so that
-		 display starts at some point START > BEGV.  It can
-		 happen that we are called with PT somewhere between
-		 BEGV and START.  Try to handle that case.  */
-	      if (row < w->current_matrix->rows
-		  || row->mode_line_p)
-		{
-		  row = w->current_matrix->rows;
-		  /* Skip the tab-line and header-line rows, if any.  */
-		  if (row->tab_line_p)
-		    ++row;
-		  if (row->mode_line_p)
-		    ++row;
-		}
-
-	      /* Due to newlines in overlay strings, we may have to
-		 skip forward over overlay strings.  */
-	      while (MATRIX_ROW_BOTTOM_Y (row) < last_y
-		     && MATRIX_ROW_END_CHARPOS (row) == PT
-		     && !cursor_row_p (row))
-		++row;
-
-	      /* If within the scroll margin, scroll.  */
-	      if (row->y < top_scroll_margin
-		  && CHARPOS (startp) != BEGV)
-		scroll_p = true;
+	      /* If we end up in a partially visible line, let's
+		 make it fully visible, except when it's taller
+		 than the window, in which case we can't do much
+		 about it.  */
+	      *scroll_step = true;
+	      rc = CURSOR_MOVEMENT_MUST_SCROLL;
 	    }
 	  else
 	    {
-	      /* Cursor did not move.  So don't scroll even if cursor line
-		 is partially visible, as it was so before.  */
-		 rc = CURSOR_MOVEMENT_SUCCESS;
-	    }
-
-	  if (PT < MATRIX_ROW_START_CHARPOS (row)
-	      || PT > MATRIX_ROW_END_CHARPOS (row))
-	    {
-	      /* if PT is not in the glyph row, give up.  */
-	      rc = CURSOR_MOVEMENT_MUST_SCROLL;
-	      must_scroll = true;
-	    }
-	  else if (rc != CURSOR_MOVEMENT_SUCCESS
-		   && ! NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
-	    {
-	      struct glyph_row *row1;
-
-	      /* If rows are bidi-reordered and point moved, back up
-		 until we find a row that does not belong to a
-		 continuation line.  This is because we must consider
-		 all rows of a continued line as candidates for the
-		 new cursor positioning, since row start and end
-		 positions change non-sequentially with vertical position
-		 in such rows.  */
-	      /* FIXME: Revisit this when glyph ``spilling'' in
-		 continuation lines' rows is implemented for
-		 bidi-reordered rows.  */
-	      for (row1 = MATRIX_FIRST_TEXT_ROW (w->current_matrix);
-		   MATRIX_ROW_CONTINUATION_LINE_P (row);
-		   --row)
-		{
-		  /* If we hit the beginning of the displayed portion
-		     without finding the first row of a continued
-		     line, give up.  */
-		  if (row <= row1)
-		    {
-		      rc = CURSOR_MOVEMENT_MUST_SCROLL;
-		      break;
-		    }
-		  eassert (row->enabled_p);
-		}
-	    }
-	  if (must_scroll)
-	    ;
-	  else if (rc != CURSOR_MOVEMENT_SUCCESS
-	      && MATRIX_ROW_PARTIALLY_VISIBLE_P (w, row)
-	      /* Make sure this isn't a header line nor a tab-line by
-		 any chance, since then MATRIX_ROW_PARTIALLY_VISIBLE_P
-		 might yield true.  */
-	      && !row->mode_line_p
-	      && !cursor_row_fully_visible_p (w, true, true, true))
-	    {
-	      if (PT == MATRIX_ROW_END_CHARPOS (row)
-		  && !row->ends_at_zv_p
-		  && !MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (row))
+	      set_cursor_from_row (w, row, w->current_matrix, 0, 0, 0, 0);
+	      if (! cursor_row_fully_visible_p (w, false, true, false))
 		rc = CURSOR_MOVEMENT_MUST_SCROLL;
-	      else if (row->height > window_box_height (w))
-		{
-		  /* If we end up in a partially visible line, let's
-		     make it fully visible, except when it's taller
-		     than the window, in which case we can't do much
-		     about it.  */
-		  *scroll_step = true;
-		  rc = CURSOR_MOVEMENT_MUST_SCROLL;
-		}
 	      else
-		{
-		  set_cursor_from_row (w, row, w->current_matrix, 0, 0, 0, 0);
-		  if (!cursor_row_fully_visible_p (w, false, true, false))
-		    rc = CURSOR_MOVEMENT_MUST_SCROLL;
-		  else
-		    rc = CURSOR_MOVEMENT_SUCCESS;
-		}
-	    }
-	  else if (scroll_p)
-	    rc = CURSOR_MOVEMENT_MUST_SCROLL;
-	  else if (rc != CURSOR_MOVEMENT_SUCCESS
-		   && ! NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
-	    {
-	      /* With bidi-reordered rows, there could be more than
-		 one candidate row whose start and end positions
-		 occlude point.  We need to let set_cursor_from_row
-		 find the best candidate.  */
-	      /* FIXME: Revisit this when glyph ``spilling'' in
-		 continuation lines' rows is implemented for
-		 bidi-reordered rows.  */
-	      bool rv = false;
-
-	      do
-		{
-		  bool at_zv_p = false, exact_match_p = false;
-
-		  if (MATRIX_ROW_START_CHARPOS (row) <= PT
-		      && PT <= MATRIX_ROW_END_CHARPOS (row)
-		      && cursor_row_p (row))
-		    rv |= set_cursor_from_row (w, row, w->current_matrix,
-					       0, 0, 0, 0);
-		  /* As soon as we've found the exact match for point,
-		     or the first suitable row whose ends_at_zv_p flag
-		     is set, we are done.  */
-		  if (rv)
-		    {
-		      at_zv_p = MATRIX_ROW (w->current_matrix,
-					    w->cursor.vpos)->ends_at_zv_p;
-		      if (!at_zv_p
-			  && w->cursor.hpos >= 0
-			  && w->cursor.hpos < MATRIX_ROW_USED (w->current_matrix,
-							       w->cursor.vpos))
-			{
-			  struct glyph_row *candidate =
-			    MATRIX_ROW (w->current_matrix, w->cursor.vpos);
-			  struct glyph *g =
-			    candidate->glyphs[TEXT_AREA] + w->cursor.hpos;
-			  ptrdiff_t endpos = MATRIX_ROW_END_CHARPOS (candidate);
-
-			  exact_match_p =
-			    (BUFFERP (g->object) && g->charpos == PT)
-			    || (NILP (g->object)
-				&& (g->charpos == PT
-				    || (g->charpos == 0 && endpos - 1 == PT)));
-			}
-		      if (at_zv_p || exact_match_p)
-			{
-			  rc = CURSOR_MOVEMENT_SUCCESS;
-			  break;
-			}
-		    }
-		  if (MATRIX_ROW_BOTTOM_Y (row) == last_y)
-		    break;
-		  ++row;
-		}
-	      while (((MATRIX_ROW_CONTINUATION_LINE_P (row)
-		       || row->continued_p)
-		      && MATRIX_ROW_BOTTOM_Y (row) <= last_y)
-		     || (MATRIX_ROW_START_CHARPOS (row) == PT
-			 && MATRIX_ROW_BOTTOM_Y (row) < last_y));
-	      /* If we didn't find any candidate rows, or exited the
-		 loop before all the candidates were examined, signal
-		 to the caller that this method failed.  */
-	      if (rc != CURSOR_MOVEMENT_SUCCESS
-		  && !(rv
-		       && !MATRIX_ROW_CONTINUATION_LINE_P (row)
-		       && !row->continued_p))
-		rc = CURSOR_MOVEMENT_MUST_SCROLL;
-	      else if (rv)
 		rc = CURSOR_MOVEMENT_SUCCESS;
 	    }
-	  else
+	}
+      else if (scroll_p)
+	rc = CURSOR_MOVEMENT_MUST_SCROLL;
+      else if (rc != CURSOR_MOVEMENT_SUCCESS
+	       && ! NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
+	{
+	  /* With bidi-reordered rows, there could be more than
+	     one candidate row whose start and end positions
+	     occlude point.  We need to let set_cursor_from_row
+	     find the best candidate.  */
+	  /* FIXME: Revisit this when glyph ``spilling'' in
+	     continuation lines' rows is implemented for
+	     bidi-reordered rows.  */
+	  bool rv = false;
+
+	  do
 	    {
-	      do
+	      bool at_zv_p = false, exact_match_p = false;
+
+	      if (MATRIX_ROW_START_CHARPOS (row) <= PT
+		  && PT <= MATRIX_ROW_END_CHARPOS (row)
+		  && cursor_row_p (row))
+		rv |= set_cursor_from_row (w, row, w->current_matrix,
+					   0, 0, 0, 0);
+	      /* As soon as we've found the exact match for point,
+		 or the first suitable row whose ends_at_zv_p flag
+		 is set, we are done.  */
+	      if (rv)
 		{
-		  if (set_cursor_from_row (w, row, w->current_matrix, 0, 0, 0, 0))
+		  at_zv_p = MATRIX_ROW (w->current_matrix,
+					w->cursor.vpos)->ends_at_zv_p;
+		  if (!at_zv_p
+		      && w->cursor.hpos >= 0
+		      && w->cursor.hpos < MATRIX_ROW_USED (w->current_matrix,
+							   w->cursor.vpos))
+		    {
+		      struct glyph_row *candidate =
+			MATRIX_ROW (w->current_matrix, w->cursor.vpos);
+		      struct glyph *g =
+			candidate->glyphs[TEXT_AREA] + w->cursor.hpos;
+		      ptrdiff_t endpos = MATRIX_ROW_END_CHARPOS (candidate);
+
+		      exact_match_p =
+			(BUFFERP (g->object) && g->charpos == PT)
+			|| (NILP (g->object)
+			    && (g->charpos == PT
+				|| (g->charpos == 0 && endpos - 1 == PT)));
+		    }
+		  if (at_zv_p || exact_match_p)
 		    {
 		      rc = CURSOR_MOVEMENT_SUCCESS;
 		      break;
 		    }
-		  ++row;
 		}
-	      while (MATRIX_ROW_BOTTOM_Y (row) < last_y
-		     && MATRIX_ROW_START_CHARPOS (row) == PT
-		     && cursor_row_p (row));
+	      if (MATRIX_ROW_BOTTOM_Y (row) == last_y)
+		break;
+	      ++row;
 	    }
+	  while (((MATRIX_ROW_CONTINUATION_LINE_P (row)
+		   || row->continued_p)
+		  && MATRIX_ROW_BOTTOM_Y (row) <= last_y)
+		 || (MATRIX_ROW_START_CHARPOS (row) == PT
+		     && MATRIX_ROW_BOTTOM_Y (row) < last_y));
+	  /* If we didn't find any candidate rows, or exited the
+	     loop before all the candidates were examined, signal
+	     to the caller that this method failed.  */
+	  if (rc != CURSOR_MOVEMENT_SUCCESS
+	      && !(rv
+		   && !MATRIX_ROW_CONTINUATION_LINE_P (row)
+		   && !row->continued_p))
+	    rc = CURSOR_MOVEMENT_MUST_SCROLL;
+	  else if (rv)
+	    rc = CURSOR_MOVEMENT_SUCCESS;
+	}
+      else
+	{
+	  do
+	    {
+	      if (set_cursor_from_row (w, row, w->current_matrix, 0, 0, 0, 0))
+		{
+		  rc = CURSOR_MOVEMENT_SUCCESS;
+		  break;
+		}
+	      ++row;
+	    }
+	  while (MATRIX_ROW_BOTTOM_Y (row) < last_y
+		 && MATRIX_ROW_START_CHARPOS (row) == PT
+		 && cursor_row_p (row));
 	}
     }
 
