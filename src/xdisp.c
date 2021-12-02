@@ -89,6 +89,13 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    fields in `it_props', and concludes by calling `compute_stop_pos'
    which determines the next `stop_charpos'.
 
+   Line and wrap prefixes
+
+   The poorly named "prefix" in functions like `handle_line_prefix'
+   and `push_prefix_prop' is either the so-called line-prefix or
+   wrap-prefix, which are respectively the display element preceding a
+   non-continued line or the element preceding a continuation line.
+
    display_line produces desired glyphs
 
    Desired matrices are per window and sparse: only those glyph rows
@@ -98,14 +105,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    is marked as a "continued line".  In addition to producing glyphs,
    `display_line' handles truncation and continuation, word wrap, and
    cursor positioning (see `set_cursor_from_row').
-
-   Line and wrap prefixes
-
-   The poorly named "prefix" in functions like `handle_line_prefix'
-   and `push_prefix_prop' is either the so-called line-prefix or
-   wrap-prefix, which are respectively the display element preceding a
-   non-continued line or the element preceding a continuation line.
-   How does wrap-prefix become the curly arrow thingy?
 
    Simulating display.
 
@@ -121,7 +120,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    `move_it_to' is the workhorse that utilizes `emulate_display_line'
    to move an iterator FORWARD.  Moving an iterator backward means
    estimating how far to scroll back, and dialing in the desired
-   y-coordinate from there.
+   y-coordinate from there (see `move_it_vertically').
 
    Bidirectional display.
 
@@ -166,10 +165,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    stored in earlier (smaller) memory addresses.
 
    As far as 'struct it' is concerned, traversal of R2L rows is still
-   left to right.  The iterator does not know (or care) that
-   `PRODUCE_GLYPHS' reversed the delivery order.  The required
-   axis-flip occurs in a blink-and-you-miss-it line in
-   `buffer_posn_from_coords'.  */
+   left to right.  The iterator does not know that `PRODUCE_GLYPHS'
+   reversed the delivery order.  The required axis-flip occurs in a
+   blink-and-you-miss-it line in `buffer_posn_from_coords'.  */
 
 #include <config.h>
 #include <stdlib.h>
@@ -9643,7 +9641,7 @@ line_height_at (const struct it *it)
   it2.max_ascent = it2.max_descent = 0;
   do
     {
-      move_it_to (&it2, IT_CHARPOS (*it), -1, -1, it2.vpos + 1,
+      move_it_to (&it2, ZV, -1, -1, it2.vpos + 1,
 		  MOVE_TO_POS | MOVE_TO_VPOS);
     }
   while (! IT_POS_VALID_AFTER_MOVE_P (&it2)
@@ -9698,7 +9696,7 @@ move_it_vertically (struct it *it, int dy)
 	  int h, nlines = max (1, abs_dy / default_line_pixel_height (it->w));
 	  int nchars_per_line = (it->last_visible_x - it->first_visible_x) /
 	    FRAME_COLUMN_WIDTH (it->f);
-	  ptrdiff_t capped = behaved_p (it) && false
+	  ptrdiff_t capped = behaved_p (it)
 	    ? max (BEGV, from_pos - nchars_per_line * nlines)
 	    : -1;
 
@@ -9787,21 +9785,20 @@ move_it_vertically (struct it *it, int dy)
 		  move_it_to (it, cp, -1, -1, -1, MOVE_TO_POS);
 		}
 	    }
-	  else if ((it->current_y - target_y) >
-		   min (window_box_height (it->w), line_height_at (it) * 2 / 3))
+	  else if (IT_CHARPOS (*it) > BEGV
+		   && ((it->current_y - target_y) >
+		       min (window_box_height (it->w), line_height_at (it) * 2 / 3)))
 	    {
 	      /* Estimated NLINES comes up short.  Take it from the top.  */
-	      eassert (IT_CHARPOS (*it) > BEGV);
 	      dy = target_y - it->current_y;
 	      continue;
 	    }
-	  else if ((target_y - it->current_y) >= line_height_at (it))
+	  else if (IT_CHARPOS (*it) < ZV
+		   && (target_y - it->current_y) >= line_height_at (it))
 	    {
 	      /* Most common branch where continued lines render
 		 our initial estimate of NLINES too large.  Scooch
 		 forward.  */
-	      eassert (IT_CHARPOS (*it) < ZV);
-
 	      if (! FRAME_WINDOW_P (it->f))
 		{
 		  /* Apparently, move_it_by_lines is too expensive
@@ -17442,52 +17439,33 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
   struct frame *f = XFRAME (w->frame);
   int rc = CURSOR_MOVEMENT_CANNOT_BE_USED;
 
-  /* Previously, there was a check for Lisp integer in the
-     if-statement below. Now, this field is converted to
-     ptrdiff_t, thus zero means invalid position in a buffer.  */
   eassert (w->last_point > 0);
-  /* Likewise there was a check whether window_end_vpos is nil or larger
-     than the window.  Now window_end_vpos is int and so never nil, but
-     let's leave eassert to check whether it fits in the window.  */
-  eassert (!w->window_end_valid
+  eassert (! w->window_end_valid
 	   || w->window_end_vpos < w->current_matrix->nrows);
 
-  /* Handle case where text has not changed, only point, and it has
-     not moved off the frame.  */
+  /* Can we optimize for unchanged text?  */
   if (/* Point may be in this window.  */
       PT >= CHARPOS (startp)
       /* Selective display hasn't changed.  */
-      && !current_buffer->clip_changed
-      /* Function force-mode-line-update is used to force a thorough
-	 redisplay.  It sets either windows_or_buffers_changed or
-	 update_mode_lines.  So don't take a shortcut here for these
-	 cases.  */
-      && !update_mode_lines
-      && !windows_or_buffers_changed
-      && !f->cursor_type_changed
+      && ! current_buffer->clip_changed
+      /* `windows_or_buffers_changed' or 'update__mode_lines' means
+	 `force-mode-line-update' sought a redraw. */
+      && ! update_mode_lines
+      && ! windows_or_buffers_changed
+      && ! f->cursor_type_changed
       && NILP (Vshow_trailing_whitespace)
-      /* When display-line-numbers is in relative mode, moving point
-	 requires to redraw the entire window.  */
-      && !EQ (Vdisplay_line_numbers, Qrelative)
-      && !EQ (Vdisplay_line_numbers, Qvisual)
-      /* When the current line number should be displayed in a
-	 distinct face, moving point cannot be handled in optimized
-	 way as below.  */
-      && !(!NILP (Vdisplay_line_numbers)
-	   && NILP (Finternal_lisp_face_equal_p (Qline_number,
-						 Qline_number_current_line,
-						 w->frame)))
-      /* This code is not used for mini-buffer for the sake of the case
-	 of redisplaying to replace an echo area message; since in
-	 that case the mini-buffer contents per se are usually
-	 unchanged.  This code is of no real use in the mini-buffer
-	 since the handling of static_line_start_pos, etc., in redisplay
-	 handles the same cases.  */
-      && !EQ (window, minibuf_window)
-      /* When overlay arrow is shown in current buffer, point movement
-	 is no longer "simple", as it typically causes the overlay
-	 arrow to move as well.  */
-      && !overlay_arrow_in_current_buffer_p ())
+      /* display-line-numbers in relative mode requires redraw.  */
+      && ! EQ (Vdisplay_line_numbers, Qrelative)
+      && ! EQ (Vdisplay_line_numbers, Qvisual)
+      /* Cannot also display line number in distinct face.  */
+      && ! (! NILP (Vdisplay_line_numbers)
+	    && NILP (Finternal_lisp_face_equal_p (Qline_number,
+						  Qline_number_current_line,
+						  w->frame)))
+      /* The static_line_* in `redisplay' handles minibuffer.  */
+      && ! EQ (window, minibuf_window)
+      /* Cannot keep overlay arrow in tow with point.  */
+      && ! overlay_arrow_in_current_buffer_p ())
     {
       int this_scroll_margin, top_scroll_margin;
       struct glyph_row *row = NULL;
@@ -22452,8 +22430,8 @@ display_line (struct it *it, int cursor_vpos)
   int tab_line = window_wants_tab_line (it->w);
   int header_line = window_wants_header_line (it->w);
   bool hscroll_line = (cursor_vpos >= 0
-			    && it->vpos == cursor_vpos - tab_line - header_line
-			    && hscrolling_current_line_p (it->w));
+		       && it->vpos == cursor_vpos - tab_line - header_line
+		       && hscrolling_current_line_p (it->w));
   int first_visible_x = it->first_visible_x;
   int last_visible_x = it->last_visible_x;
   int x_incr = 0;
