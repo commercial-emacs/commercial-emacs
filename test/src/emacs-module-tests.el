@@ -284,9 +284,10 @@ should nevertheless detect the invalid load."
   "Check that -module-assertions prevents calling Emacs functions
 during garbage collection."
   :tags (if (getenv "EMACS_EMBA_CI") '(:unstable))
-  (skip-unless (or (file-executable-p mod-test-emacs)
-                   (and (eq system-type 'windows-nt)
-                        (file-executable-p (concat mod-test-emacs ".exe")))))
+  (skip-unless (and (not (cl-search "enable-profiling" system-configuration-options))
+                    (or (file-executable-p mod-test-emacs)
+                        (and (eq system-type 'windows-nt)
+                             (file-executable-p (concat mod-test-emacs ".exe"))))))
   (module--test-assertion
       (rx "Module function called during garbage collection\n")
     (mod-test-invalid-finalizer)
