@@ -5672,7 +5672,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		  errno = 0;
 		  nread = read_process_output (proc, channel);
 		  xerrno = errno;
-		  eassert(nread < 0 || xerrno == 0);
 
 		  bool terminate_on_empty_read =
 		    NETCONN_P (proc)

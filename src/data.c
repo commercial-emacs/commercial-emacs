@@ -2067,9 +2067,9 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
   if (sym->u.s.redirect != SYMBOL_LOCALIZED
       || ! SYMBOL_BLV (sym))
     {
-      SET_SYMBOL_BLV (sym, make_blv (sym, sym->u.s.redirect == SYMBOL_FORWARDED,
-				     valcontents));
+      bool forwarded_p = sym->u.s.redirect == SYMBOL_FORWARDED;
       sym->u.s.redirect = SYMBOL_LOCALIZED;
+      SET_SYMBOL_BLV (sym, make_blv (sym, forwarded_p, valcontents));
     }
 
   eassert (sym->u.s.redirect == SYMBOL_LOCALIZED

@@ -1900,6 +1900,10 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
      adjusting the markers that bound the overlays.  */
   adjust_overlays_for_delete (from, nchars_del);
 
+#ifdef HAVE_TREE_SITTER
+  tree_sitter_record_change (from, from + nchars_del, from);
+#endif
+
   GAP_SIZE += nbytes_del;
   ZV_BYTE -= nbytes_del;
   Z_BYTE -= nbytes_del;
@@ -1907,7 +1911,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   Z -= nchars_del;
   GPT = from;
   GPT_BYTE = from_byte;
-  if (GAP_SIZE > 0 && !current_buffer->text->inhibit_shrinking)
+  if (GAP_SIZE > 0 && ! current_buffer->text->inhibit_shrinking)
     /* Put an anchor, unless called from decode_coding_object which
        needs to access the previous gap contents.  */
     *(GPT_ADDR) = 0;
@@ -1922,10 +1926,6 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   check_markers ();
 
   evaporate_overlays (from);
-
-#ifdef HAVE_TREE_SITTER
-  tree_sitter_record_change (from, from + nchars_del, from);
-#endif
 
   return deletion;
 }

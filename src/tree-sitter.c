@@ -24,7 +24,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "tree-sitter.h"
 
 #define BUFFER_TO_SITTER(byte) ((uint32_t) CHAR_TO_BYTE (byte) - 1)
-#define SITTER_TO_BUFFER(byte) (BYTE_TO_CHAR ((EMACS_INT) byte) + 1)
+#define SITTER_TO_BUFFER(byte) (BYTE_TO_CHAR ((EMACS_INT) byte + 1))
 
 typedef TSLanguage *(*TSLanguageFunctor) (void);
 typedef Lisp_Object (*HighlightsFunctor) (const TSHighlightEventSlice *, const TSNode *, const char **);
