@@ -72,6 +72,21 @@ void main (void) {
       (should (equal (tree-sitter-highlights (point-min) (point-max))
                      '(font-lock-type-face (1 . 5) nil (5 . 6) font-lock-function-name-face (6 . 10) nil (10 . 12) font-lock-type-face (12 . 16) nil (16 . 23) font-lock-function-name-face (23 . 29) nil (29 . 30) font-lock-string-face (30 . 43) nil (43 . 48) font-lock-keyword-face (48 . 54) nil (54 . 55) font-lock-constant-face (55 . 56) nil (56 . 59)))))))
 
+(ert-deftest tree-sitter-multibyte ()
+  "Cannot simply -1 or +1 to move between buffer and sitter space."
+  (let ((text "
+void main (void) {
+  printf (\"早晨, 你好\");
+  return 0;
+}
+"))
+    (tree-sitter-tests-doit ".c" text
+      (should t))))
+
+
+
+
+
 (ert-deftest tree-sitter-bog-customize-option ()
   "When tree-sitter highlighting was implemented as `after-change-functions',
 customizing an option bogged (because `tree-sitter-highlight-region' was called

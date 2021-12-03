@@ -3183,6 +3183,7 @@ cleanup_vector (struct Lisp_Vector *vector)
 	  xfree (subr->native_c_name);
 	}
     }
+#endif
 #ifdef HAVE_TREE_SITTER
   else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TREE_SITTER))
     {

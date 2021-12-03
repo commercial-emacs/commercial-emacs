@@ -4788,7 +4788,9 @@ extern void malloc_probe (size_t);
 extern void syms_of_profiler (void);
 
 /* Defined in tree-sitter.c.  */
-extern void tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
+extern void tree_sitter_record_change (ptrdiff_t start_char,
+				       ptrdiff_t old_end_char,
+				       uint32_t old_end_byte,
 				       ptrdiff_t new_end_char);
 extern void syms_of_tree_sitter (void);
 

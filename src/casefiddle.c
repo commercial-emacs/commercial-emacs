@@ -522,24 +522,19 @@ do_casify_multibyte_region (struct casing_context *ctx,
 static ptrdiff_t
 casify_region (enum case_action flag, Lisp_Object b, Lisp_Object e)
 {
-  ptrdiff_t added;
+  ptrdiff_t added, start, end, orig_end;
   struct casing_context ctx;
 
   validate_region (&b, &e);
-  ptrdiff_t start = XFIXNAT (b);
-  ptrdiff_t end = XFIXNAT (e);
+  start = XFIXNAT (b);
+  end = XFIXNAT (e);
   if (start == end)
     /* Not modifying because nothing marked.  */
     return end;
   modify_text (start, end);
   prepare_casing_context (&ctx, flag, true);
 
-#ifdef HAVE_TREE_SITTER
-  ptrdiff_t start_byte = CHAR_TO_BYTE (start);
-  ptrdiff_t old_end_byte = CHAR_TO_BYTE (end);
-#endif
-
-  ptrdiff_t orig_end = end;
+  orig_end = end;
   record_delete (start, make_buffer_string (start, end, true), false);
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     {
@@ -557,9 +552,6 @@ casify_region (enum case_action flag, Lisp_Object b, Lisp_Object e)
     {
       signal_after_change (start, end - start - added, end - start);
       update_compositions (start, end, CHECK_ALL);
-#ifdef HAVE_TREE_SITTER
-      tree_sitter_record_change (start_byte, old_end_byte, CHAR_TO_BYTE (end));
-#endif
     }
 
   return orig_end + added;

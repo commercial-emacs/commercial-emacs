@@ -20,11 +20,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include "lisp.h"
-#include "buffer.h"
 #include "tree-sitter.h"
-
-#define BUFFER_TO_SITTER(byte) ((uint32_t) byte - 1)
-#define SITTER_TO_BUFFER(byte) ((EMACS_INT) byte + 1)
 
 typedef TSLanguage *(*TSLanguageFunctor) (void);
 typedef Lisp_Object (*HighlightsFunctor) (const TSHighlightEventSlice *, const TSNode *, const char **);
@@ -527,7 +523,9 @@ DEFUN ("tree-sitter",
 
 /* TODO buffers not utf-8-clean. */
 void
-tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
+tree_sitter_record_change (ptrdiff_t start_char,
+			   ptrdiff_t old_end_char,
+			   uint32_t old_end_byte,
 			   ptrdiff_t new_end_char)
 {
   Lisp_Object sitter = Fbuffer_local_value (Qtree_sitter_sitter, Fcurrent_buffer ());
@@ -541,7 +539,7 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 
 	  TSInputEdit edit = {
 	    BUFFER_TO_SITTER (start_char),
-	    BUFFER_TO_SITTER (old_end_char),
+	    old_end_byte,
 	    BUFFER_TO_SITTER (new_end_char),
 	    dummy_point,
 	    dummy_point,
@@ -553,6 +551,8 @@ tree_sitter_record_change (ptrdiff_t start_char, ptrdiff_t old_end_char,
 	      ts_tree_delete (XTREE_SITTER (sitter)->prev_tree);
 	      XTREE_SITTER (sitter)->prev_tree = NULL;
 	    }
+
+	  /* Sus: Investigate why simultaneous delete-insert fails. */
 	  if (NILP (overwrite) && (old_end_char - start_char <= 1 ||
 				   new_end_char - start_char <= 1))
 	    XTREE_SITTER (sitter)->prev_tree = ts_tree_copy (tree);

@@ -21,11 +21,15 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define EMACS_TREE_SITTER_H
 
 #include "lisp.h"
+#include "buffer.h"
 
 #include <tree_sitter/api.h>
 #include <tree_sitter/highlight.h>
 
 INLINE_HEADER_BEGIN
+
+#define BUFFER_TO_SITTER(byte) ((uint32_t) CHAR_TO_BYTE (byte) - 1)
+#define SITTER_TO_BUFFER(byte) (BYTE_TO_CHAR ((EMACS_INT) byte + 1))
 
 struct Lisp_Tree_Sitter
 {
