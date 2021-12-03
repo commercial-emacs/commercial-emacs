@@ -1017,7 +1017,7 @@ Responsible for handling and, or, and parenthetical expressions.")
 	  (single-search (gnus-search-single-p query))
 	  (grouplist (or groups (gnus-search-get-active srv)))
 	  q-string artlist group)
-      (message "Opening server %s" server)
+      (gnus-message 7 "Opening server %s" server)
       (gnus-open-server srv)
       ;; We should only be doing this once, in
       ;; `nnimap-open-connection', but it's too frustrating to try to
@@ -1074,7 +1074,7 @@ Responsible for handling and, or, and parenthetical expressions.")
 			      (vector group artn 100))))
 			(cdr (assoc "SEARCH" (cdr result))))
 		       artlist))))
-	    (message "Searching %s...done" group))))
+	    (gnus-message 7 "Searching %s...done" group))))
       (nreverse artlist))))
 
 (cl-defmethod gnus-search-imap-search-command ((engine gnus-search-imap)
@@ -1329,8 +1329,8 @@ Returns a list of [group article score] vectors."
       (erase-buffer)
 
       (if groups
-	  (message "Doing %s query on %s..." program groups)
-	(message "Doing %s query..." program))
+	  (gnus-message 7 "Doing %s query on %s..." program groups)
+	(gnus-message 7 "Doing %s query..." program))
       (setq proc (apply #'start-process (format "search-%s" server)
 			buffer program cp-list))
       (while (process-live-p proc)
@@ -1836,8 +1836,8 @@ Assume \"size\" key is equal to \"larger\"."
      (mapcar (lambda (x)
 	       (let ((group x)
 		     artlist)
-		 (message "Searching %s using find-grep..."
-			  (or group server))
+		 (gnus-message 7 "Searching %s using find-grep..."
+			       (or group server))
 		 (save-window-excursion
 		   (set-buffer buffer)
 		   (if (> gnus-verbose 6)
@@ -1892,8 +1892,8 @@ Assume \"size\" key is equal to \"larger\"."
 			  (vector (gnus-group-full-name group server) art 0)
 			  artlist))
 		       (forward-line 1)))
-		   (message "Searching %s using find-grep...done"
-			    (or group server))
+		   (gnus-message 7 "Searching %s using find-grep...done"
+			         (or group server))
 		   artlist)))
 	     grouplist))))
 
