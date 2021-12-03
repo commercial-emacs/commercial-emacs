@@ -29677,17 +29677,6 @@ gui_produce_glyphs (struct it *it)
               it->phys_ascent = pcm->ascent + boff;
               it->phys_descent = pcm->descent - boff;
               it->pixel_width = pcm->width;
-	      if (align_columns_display)
-		{
-		  int unit_width = get_normal_width (face);
-		  if (unit_width > 0)
-		    {
-		      int ncolumns =
-			(it->pixel_width - 1 + unit_width) / unit_width;
-
-		      it->pixel_width = ncolumns * unit_width;
-		    }
-		}
               /* Don't use font-global values for ascent and descent
                  if they result in an exceedingly large line height.  */
               if (it->override_ascent < 0)
@@ -30126,17 +30115,6 @@ gui_produce_glyphs (struct it *it)
             it->glyph_row->contains_overlapping_glyphs_p = true;
           it->ascent = it->phys_ascent = metrics.ascent;
           it->descent = it->phys_descent = metrics.descent;
-	  if (align_columns_display)
-	    {
-	      int unit_width = get_normal_width (face);
-	      if (unit_width > 0)
-		{
-		  int ncolumns =
-		    (it->pixel_width - 1 + unit_width) / unit_width;
-
-		  it->pixel_width = ncolumns * unit_width;
-		}
-	    }
         }
       IT_APPLY_FACE_BOX(it, face);
 
