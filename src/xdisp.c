@@ -486,7 +486,7 @@ static bool message_cleared_p;
 static struct glyph_row scratch_glyph_row;
 static struct glyph scratch_glyphs[MAX_SCRATCH_GLYPHS];
 
-/* Ascent and height of the last line processed by move_it_to.  */
+/* Height of last line processed by `move_it_to' (problematic global).  */
 
 static int last_height;
 
@@ -7126,32 +7126,26 @@ get_display_element (struct it *it)
 
  get_next:
   success_p = GET_DISPLAY_ELEMENT (it);
-  if (it->what == IT_CHARACTER)
+  if (success_p
+      && it->what == IT_CHARACTER)
     {
-      /* UAX#9, L4: "A character is depicted by a mirrored glyph if
-	 and only if (a) the resolved directionality of that character
-	 is R..."  */
-      /* FIXME: Do we need an exception for characters from display
-	 tables?  */
-      if (it->bidi_p && it->bidi_it.type == STRONG_R
-	  && !inhibit_bidi_mirroring)
+      if (it->bidi_p
+	  && it->bidi_it.type == STRONG_R
+	  && ! inhibit_bidi_mirroring)
+	/* UAX#9, L4: "A character is depicted by a mirrored glyph if
+	   and only if (a) the resolved directionality of that character
+	   is R..."  */
 	it->c = bidi_mirror_char (it->c);
-      /* Map via display table or translate control characters.
-	 IT->c, IT->len etc. have been set to the next character by
-	 the function call above.  If we have a display table, and it
-	 contains an entry for IT->c, translate it.  Don't do this if
-	 IT->c itself comes from a display table, otherwise we could
-	 end up in an infinite recursion.  (An alternative could be to
-	 count the recursion depth of this function and signal an
-	 error when a certain maximum depth is reached.)  Is it worth
-	 it?  */
-      if (success_p && it->dpvec == NULL)
+
+      if (it->dpvec != NULL)
+	it->char_to_display = it->c;
+      else
 	{
 	  Lisp_Object dv;
 	  struct charset *unibyte = CHARSET_FROM_ID (charset_unibyte);
 	  bool nonascii_space_p = false;
 	  bool nonascii_hyphen_p = false;
-	  int c = it->c;	/* This is the character to display.  */
+	  int c = it->c;
 
 	  if (! it->multibyte_p && ! ASCII_CHAR_P (c))
 	    {
@@ -7214,9 +7208,7 @@ get_display_element (struct it *it)
 
 	  /* Translate control characters into `\003' or `^C' form.
 	     Control characters coming from a display table entry are
-	     currently not translated because we use IT->dpvec to hold
-	     the translation.  This could easily be changed but I
-	     don't believe that it is worth doing.
+	     currently not translated.
 
 	     The characters handled by `nobreak-char-display' must be
 	     translated too.
@@ -7225,7 +7217,7 @@ get_display_element (struct it *it)
 	     translated to octal or hexadecimal form.  */
 	  if (((c < ' ' || c == 127) /* ASCII control chars.  */
 	       ? (it->area != TEXT_AREA
-		  /* In mode line, treat \n, \t like other crl chars.  */
+		  /* In mode line, treat \n, \t like other control characters.  */
 		  || (c != '\t'
 		      && it->glyph_row
 		      && (it->glyph_row->mode_line_p || it->avoid_cursor_p))
@@ -7357,10 +7349,6 @@ get_display_element (struct it *it)
 	      goto get_next;
 	    }
 	  it->char_to_display = c;
-	}
-      else if (success_p)
-	{
-	  it->char_to_display = it->c;
 	}
     }
 
@@ -7532,7 +7520,7 @@ get_display_element (struct it *it)
 	}
     }
 
-  if (!success_p && it->sp > 0)
+  if (! success_p && it->sp > 0)
     {
       /* Retry with unprocessed stack. */
       set_iterator_to_next (it, false);
@@ -7552,14 +7540,11 @@ set_iterator_to_next (struct it *it, bool reseat_p)
   switch (it->method)
     {
     case GET_FROM_BUFFER:
-      /* Advance in the buffer, possibly skipping invisible lines.  */
       if (ITERATOR_AT_END_OF_LINE_P (it) && reseat_p)
-        {
-          reseat_following_line_start (it, false);
-        }
+	reseat_following_line_start (it, false);
       else if (it->cmp_it.id >= 0)
 	{
-	  /* Composite character.  */
+	  /* Composite characters.  */
 	  if (! it->bidi_p)
 	    {
 	      IT_CHARPOS (*it) += it->cmp_it.nchars;
@@ -7567,42 +7552,33 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	    }
 	  else
 	    {
-	      int i;
-
 	      /* Update IT's char/byte positions to point to the first
 		 character of the next grapheme cluster, or to the
 		 character visually after the current composition.  */
-	      for (i = 0; i < it->cmp_it.nchars; i++) {
+	      for (int i = 0; i < it->cmp_it.nchars; i++)
 		bidi_move_to_visually_next (&it->bidi_it);
-              }
-	      IT_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      IT_CHARPOS (*it) = it->bidi_it.charpos;
+	      IT_BYTEPOS (*it) = it->bidi_it.bytepos;
 	    }
 
 	  if ((! it->bidi_p || ! it->cmp_it.reversed_p)
 	      && it->cmp_it.to < it->cmp_it.nglyphs)
 	    {
-	      /* Composition created while scanning forward.  Proceed
-		 to the next grapheme cluster.  */
+	      /* Non-bidi or bidi-forward.  Proceed to following cluster.  */
 	      it->cmp_it.from = it->cmp_it.to;
 	    }
-	  else if ((it->bidi_p && it->cmp_it.reversed_p)
+	  else if (it->bidi_p
+		   && it->cmp_it.reversed_p
 		   && it->cmp_it.from > 0)
 	    {
-	      /* Composition created while scanning backward.  Proceed
-		 to the previous grapheme cluster.  */
+	      /* Bidi-backward.  Proceed to preceding cluster.  */
 	      it->cmp_it.to = it->cmp_it.from;
 	    }
 	  else
 	    {
-	      /* No more grapheme clusters in this composition.
-		 Find the next stop position.  */
-	      ptrdiff_t stop = it->end_charpos;
-
-	      if (it->bidi_it.scan_dir < 0)
-		/* Now we are scanning backward and don't know
-		   where to stop.  */
-		stop = -1;
+	      /* No more clusters.  Compute next stop position.
+		 If we're now scanning backward, all bets are off.  */
+	      ptrdiff_t stop = (it->bidi_it.scan_dir < 0) ? -1 : it->end_charpos;
 	      composition_compute_stop_pos (&it->cmp_it, IT_CHARPOS (*it),
 					    IT_BYTEPOS (*it), stop, Qnil);
 	    }
@@ -7613,27 +7589,23 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 
 	  if (! it->bidi_p)
 	    {
+	      ++ (IT_CHARPOS (*it));
 	      IT_BYTEPOS (*it) += it->len;
-	      IT_CHARPOS (*it) += 1;
 	    }
 	  else
 	    {
 	      int prev_scan_dir = it->bidi_it.scan_dir;
-	      /* If this is a new paragraph, determine its base
-		 direction (a.k.a. its base embedding level).  */
 	      if (it->bidi_it.new_paragraph)
-		bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it,
+		bidi_paragraph_init (it->paragraph_embedding,
+				     &it->bidi_it,
 				     false);
 	      bidi_move_to_visually_next (&it->bidi_it);
-	      IT_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      IT_CHARPOS (*it) = it->bidi_it.charpos;
+	      IT_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      if (prev_scan_dir != it->bidi_it.scan_dir)
 		{
-		  /* As the scan direction was changed, we must
-		     re-compute the stop position for composition.  */
-		  ptrdiff_t stop = it->end_charpos;
-		  if (it->bidi_it.scan_dir < 0)
-		    stop = -1;
+		  /* Direction switched; recompute composition stop */
+		  ptrdiff_t stop = (it->bidi_it.scan_dir < 0) ? -1 : it->end_charpos;
 		  composition_compute_stop_pos (&it->cmp_it, IT_CHARPOS (*it),
 						IT_BYTEPOS (*it), stop, Qnil);
 		}
@@ -7643,12 +7615,9 @@ set_iterator_to_next (struct it *it, bool reseat_p)
       break;
 
     case GET_FROM_C_STRING:
-      /* Current display element of IT is from a C string.  */
-      if (!it->bidi_p
-	  /* If the string position is beyond string's end, it means
-	     get_element_from_c_string is padding the string with
-	     blanks, in which case we bypass the bidi iterator,
-	     because it cannot deal with such virtual characters.  */
+      if (! it->bidi_p
+	  /* `get_element_from_c_string' could pad the string with
+	     blanks beyond string end; escape hatch here.  */
 	  || IT_CHARPOS (*it) >= it->bidi_it.string.schars)
 	{
 	  IT_BYTEPOS (*it) += it->len;
@@ -9602,7 +9571,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
  out:
 
   /* On text terminals, move to next line if non-TAB multi-glyph character.
-     Sus -- so many conditions means patchery. */
+     Another EZ min-impact-max-obfuscation exception.  */
   if (! FRAME_WINDOW_P (it->f)
       && op & MOVE_TO_POS
       && IT_CHARPOS (*it) == to_charpos
