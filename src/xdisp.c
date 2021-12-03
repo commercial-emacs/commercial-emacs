@@ -3504,7 +3504,6 @@ compute_stop_pos (struct it *it)
 		  if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\f')
 		    {
 		      eassert (toofar < pos);
-		      eassert (pos < it->stop_charpos);
 		      toofar = --pos;
 		      break;
 		    }
@@ -9556,9 +9555,6 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		    - it->last_visible_x;
 		  if (FRAME_WINDOW_P (it->f))
 		    {
-		      /* Confusion:
-			 I thought it->last_visible_x != it->current_x
-			 could only ever happen under tty.  */
 		      struct face *face = FACE_FROM_ID (it->f, it->face_id);
 		      struct font *face_font = face->font;
 		      eassert (face_font);
