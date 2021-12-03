@@ -1900,10 +1900,6 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
      adjusting the markers that bound the overlays.  */
   adjust_overlays_for_delete (from, nchars_del);
 
-#ifdef HAVE_TREE_SITTER
-  tree_sitter_record_change (from, from + nchars_del, from);
-#endif
-
   GAP_SIZE += nbytes_del;
   ZV_BYTE -= nbytes_del;
   Z_BYTE -= nbytes_del;
@@ -1926,6 +1922,10 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   check_markers ();
 
   evaporate_overlays (from);
+
+#ifdef HAVE_TREE_SITTER
+  tree_sitter_record_change (from, from + nchars_del, from);
+#endif
 
   return deletion;
 }
