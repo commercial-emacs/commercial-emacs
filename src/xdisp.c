@@ -519,7 +519,6 @@ bool help_echo_showing_p;
     CACHE = NULL;				\
   } while (false)
 
-static int line_height_at (const struct it *it);
 static bool calc_pixel_width_or_height (double *, struct it *, Lisp_Object,
 					struct font *, bool, int *);
 
@@ -861,16 +860,16 @@ static void reset_box_start_end_flags (struct it *);
 int
 window_text_bottom_y (struct window *w)
 {
-  int height = WINDOW_PIXEL_HEIGHT (w);
+  int bottom_y = WINDOW_PIXEL_HEIGHT (w);
 
-  height -= WINDOW_BOTTOM_DIVIDER_WIDTH (w);
+  bottom_y -= WINDOW_BOTTOM_DIVIDER_WIDTH (w);
 
   if (window_wants_mode_line (w))
-    height -= CURRENT_MODE_LINE_HEIGHT (w);
+    bottom_y -= CURRENT_MODE_LINE_HEIGHT (w);
 
-  height -= WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
+  bottom_y -= WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
 
-  return height;
+  return bottom_y;
 }
 
 /* Return the pixel width of display area AREA of window W.
@@ -1122,15 +1121,14 @@ line_bottom_y (struct it *it)
       else if (IT_CHARPOS (*it) < ZV)
 	{
 	  move_it_by_lines (it, 1);
-	  line_height = (it->max_ascent || it->max_descent
-			 ? it->max_ascent + it->max_descent
+	  line_height = ((it->max_ascent + it->max_descent)
+			 ? (it->max_ascent + it->max_descent)
 			 : last_height);
 	}
       else
 	{
-	  struct glyph_row *row = it->glyph_row;
-
 	  /* Use the default character height.  */
+	  struct glyph_row *row = it->glyph_row;
 	  it->glyph_row = NULL;
 	  it->what = IT_CHARACTER;
 	  it->c = ' ';
@@ -1145,11 +1143,9 @@ line_bottom_y (struct it *it)
 }
 
 DEFUN ("line-pixel-height", Fline_pixel_height,
-       Sline_pixel_height, 0, 0, 0,
-       doc: /* Return height in pixels of text line in the selected window.
-
-Value is the height in pixels of the line at point.  */)
-  (void)
+       Sline_pixel_height, 0, 1, "",
+       doc: /* Return height in pixels of line at POINT.  */)
+  (Lisp_Object point)
 {
   struct it it;
   struct text_pos pt;
@@ -1157,18 +1153,22 @@ Value is the height in pixels of the line at point.  */)
   struct buffer *old_buffer = NULL;
   Lisp_Object result;
 
+  if (! NILP (point))
+    CHECK_FIXNUM (point);
+
   if (XBUFFER (w->contents) != current_buffer)
     {
       old_buffer = current_buffer;
       set_buffer_internal_1 (XBUFFER (w->contents));
     }
-  SET_TEXT_POS (pt, PT, PT_BYTE);
+  SET_TEXT_POS (pt,
+		NILP (point)
+		? PT : (ptrdiff_t) (XFIXNUM (point)),
+		NILP (point)
+		? PT_BYTE : CHAR_TO_BYTE ((ptrdiff_t) (XFIXNUM (point))));
   void *itdata = bidi_shelve_cache ();
   start_move_it (&it, w, pt);
-  /* Start from the beginning of the screen line, to make sure we
-     traverse all of its display elements, and thus capture the
-     correct metrics.  */
-  move_it_by_lines (&it, 0);
+  move_it_by_lines (&it, 0); /* bol */
   it.vpos = it.current_y = 0;
   last_height = 0;
   result = make_fixnum (line_bottom_y (&it));
@@ -7122,7 +7122,7 @@ forget_escape_and_glyphless_faces (void)
 static bool
 get_display_element (struct it *it)
 {
-  bool success_p; /* found a display element */
+  bool success_p;
 
  get_next:
   success_p = GET_DISPLAY_ELEMENT (it);
@@ -9594,34 +9594,6 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
   return max_current_x;
 }
 
-
-/* Return pixel height of line at IT.  */
-
-static int
-line_height_at (const struct it *it)
-{
-  int result;
-  void *itdata = bidi_shelve_cache();
-  struct it it2 = *it;
-  it2.max_ascent = it2.max_descent = 0;
-  do
-    {
-      move_it_to (&it2, ZV, -1, -1, it2.vpos + 1,
-		  MOVE_TO_POS | MOVE_TO_VPOS);
-    }
-  while (! IT_POS_VALID_AFTER_MOVE_P (&it2)
-	 /* Continue so long as we're not after a newline in
-	    a display string beginning at IT.  Weak sauce
-	    hack to avoid infloop in `move_it_to'.  */
-	 && (it2.method != GET_FROM_STRING
-	     || IT_CHARPOS (it2) != IT_CHARPOS (*it)
-	     || SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) != '\n'));
-  /* store result first since line_bottom_y affects bidi cache */
-  result = line_bottom_y (&it2) - it2.current_y;
-  bidi_unshelve_cache (itdata, false);
-  return result;
-}
-
 /* Can we deploy long-line shortcuts? */
 
 static bool
@@ -9754,14 +9726,16 @@ move_it_vertically (struct it *it, int dy)
 	    }
 	  else if (IT_CHARPOS (*it) > BEGV
 		   && ((it->current_y - target_y) >
-		       min (window_box_height (it->w), line_height_at (it) * 2 / 3)))
+		       min (window_box_height (it->w),
+			    XFIXNUM (Fline_pixel_height (make_fixnum (IT_CHARPOS (*it)))) * 2 / 3)))
 	    {
 	      /* Estimated NLINES comes up short.  Take it from the top.  */
 	      dy = target_y - it->current_y;
 	      continue;
 	    }
 	  else if (IT_CHARPOS (*it) < ZV
-		   && (target_y - it->current_y) >= line_height_at (it))
+		   && ((target_y - it->current_y) >=
+		       XFIXNUM (Fline_pixel_height (make_fixnum (IT_CHARPOS (*it))))))
 	    {
 	      /* Most common branch where continued lines render
 		 our initial estimate of NLINES too large.  Scooch
@@ -11562,7 +11536,7 @@ resize_mini_window (struct window *w, bool exact_p)
     {
       struct it it;
       int unit = FRAME_LINE_HEIGHT (f);
-      int height, max_height;
+      int bottom_y, max_height;
       struct text_pos start;
       struct buffer *old_current_buffer = NULL;
       int windows_height = FRAME_INNER_HEIGHT (f);
@@ -11583,13 +11557,13 @@ resize_mini_window (struct window *w, bool exact_p)
       else
 	max_height = windows_height / 4;
 
-      /* Correct that max. height if it's bogus.  */
+      /* Correct max height if it's bogus.  */
       max_height = clip_to_bounds (unit, max_height, windows_height);
 
       /* Find out the height of the text in the window.  */
       last_height = 0;
       move_it_to (&it, ZV, -1, -1, -1, MOVE_TO_POS);
-      height =
+      bottom_y =
 	it.current_y
 	+ ((it.max_ascent + it.max_descent)
 	   ? (it.max_ascent + it.max_descent)
@@ -11597,13 +11571,13 @@ resize_mini_window (struct window *w, bool exact_p)
 	- min (it.extra_line_spacing, it.max_extra_line_spacing);
 
       /* Compute a suitable window start.  */
-      if (height > max_height)
+      if (bottom_y > max_height)
 	{
-	  height = (max_height / unit) * unit;
+	  bottom_y = (max_height / unit) * unit;
 	  if (redisplay_adhoc_scroll_in_resize_mini_windows)
 	    {
 	      init_iterator (&it, w, ZV, ZV_BYTE, NULL, DEFAULT_FACE_ID);
-	      move_it_vertically (&it, unit - height);
+	      move_it_vertically (&it, unit - bottom_y);
               /* The following move is usually a no-op when the stuff
                  displayed in the mini-window comes entirely from buffer
                  text, but it is needed when some of it comes from overlay
@@ -11631,14 +11605,14 @@ resize_mini_window (struct window *w, bool exact_p)
 	{
 	  /* Let it grow only, until we display an empty message, in which
 	     case the window shrinks again.  */
-	  if (height > old_height)
-	    grow_mini_window (w, height - old_height);
-	  else if (height < old_height && (exact_p || BEGV == ZV))
+	  if (bottom_y > old_height)
+	    grow_mini_window (w, bottom_y - old_height);
+	  else if (bottom_y < old_height && (exact_p || BEGV == ZV))
 	    shrink_mini_window (w);
 	}
-      else if (height != old_height)
+      else if (bottom_y != old_height)
 	/* Always resize to exact size needed.  */
-	grow_mini_window (w, height - old_height);
+	grow_mini_window (w, bottom_y - old_height);
 
       if (old_current_buffer)
 	set_buffer_internal (old_current_buffer);
