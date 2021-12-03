@@ -817,6 +817,7 @@ static int underlying_face_id (const struct it *);
 
 #ifdef HAVE_WINDOW_SYSTEM
 
+static int line_bottom_y (struct it *it, int fallback_height);
 static void update_tool_bar (struct frame *, bool);
 static void gui_draw_bottom_divider (struct window *w);
 static void notice_overwritten_cursor (struct window *,
@@ -1105,25 +1106,22 @@ window_box_edges (struct window *w, int *top_left_x, int *top_left_y,
 			      Utilities
  ***********************************************************************/
 
-/* Return the bottom y-position of the line the iterator IT is in.
-   This can modify IT's settings.  */
-
-int
-line_bottom_y (struct it *it)
+static int
+line_bottom_y (struct it *it, int fallback_height)
 {
   int line_height = it->max_ascent + it->max_descent;
   int line_top_y = it->current_y;
 
   if (line_height == 0)
     {
-      if (last_height)
-	line_height = last_height;
+      if (fallback_height)
+	line_height = fallback_height;
       else if (IT_CHARPOS (*it) < ZV)
 	{
 	  move_it_by_lines (it, 1);
 	  line_height = ((it->max_ascent + it->max_descent)
 			 ? (it->max_ascent + it->max_descent)
-			 : last_height);
+			 : fallback_height);
 	}
       else
 	{
@@ -1140,6 +1138,15 @@ line_bottom_y (struct it *it)
     }
 
   return line_top_y + line_height;
+}
+
+
+/* window.c is buying what line_bottom_y is selling.  */
+
+int
+window_line_bottom_y (struct it *it)
+{
+  return line_bottom_y (it, last_height);
 }
 
 DEFUN ("line-pixel-height", Fline_pixel_height,
@@ -1170,8 +1177,7 @@ DEFUN ("line-pixel-height", Fline_pixel_height,
   start_move_it (&it, w, pt);
   move_it_by_lines (&it, 0); /* bol */
   it.vpos = it.current_y = 0;
-  last_height = 0;
-  result = make_fixnum (line_bottom_y (&it));
+  result = make_fixnum (line_bottom_y (&it, 0));
   if (old_buffer)
     set_buffer_internal_1 (old_buffer);
 
@@ -1416,8 +1422,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
       void *save_it_data = NULL;
 
       SAVE_IT (save_it, it, save_it_data); /* stash before line_bottom_y */
-      last_height = 0;
-      bottom_y = line_bottom_y (&it);
+      bottom_y = line_bottom_y (&it, 0);
       /* Visible if (i) IT's y-start and y-end straddle window's y-start,
 	 or, (ii) window's y-start and y-end straddle IT's y-start. */
       if (top_y < window_top_y)
@@ -9795,10 +9800,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 {
   if (dvpos == 0)
     {
-      /* Move to bol when DVPOS is zero.  Defer to next call to
-	 `line_bottom_y' for line height.  */
       move_it_vertically (it, 0);
-      last_height = 0;
     }
   else if (dvpos > 0)
     {
@@ -11561,7 +11563,6 @@ resize_mini_window (struct window *w, bool exact_p)
       max_height = clip_to_bounds (unit, max_height, windows_height);
 
       /* Find out the height of the text in the window.  */
-      last_height = 0;
       move_it_to (&it, ZV, -1, -1, -1, MOVE_TO_POS);
       bottom_y =
 	it.current_y
@@ -16962,7 +16963,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
       if (PT > CHARPOS (it.current.pos))
 	{
-	  int y0 = line_bottom_y (&it);
+	  int y0 = line_bottom_y (&it, last_height);
 	  /* Compute how many pixels below window bottom to stop searching
 	     for PT.  This avoids costly search for PT that is far away if
 	     the user limited scrolling by a small number of lines, but
@@ -16977,7 +16978,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	     fully visible.  */
 	  move_it_to (&it, PT, -1, y_to_move,
 	  	      -1, MOVE_TO_POS | MOVE_TO_Y);
-	  dy = line_bottom_y (&it) - y0;
+	  dy = line_bottom_y (&it, last_height) - y0;
 
 	  if (dy > scroll_max)
 	    return SCROLLING_FAILED;
@@ -17076,13 +17077,14 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	  int start_y;
 
 	  SAVE_IT (it1, it, it1data);
-	  start_y = line_bottom_y (&it1);
+	  start_y = line_bottom_y (&it1, last_height);
 	  do {
 	    RESTORE_IT (&it, &it, it1data);
 	    move_it_by_lines (&it, 1);
 	    SAVE_IT (it1, it, it1data);
 	  } while (IT_CHARPOS (it) < ZV
-		   && line_bottom_y (&it1) - start_y < amount_to_scroll);
+		   && ((line_bottom_y (&it1, last_height) - start_y) <
+		       amount_to_scroll));
 	  bidi_unshelve_cache (it1data, true);
 	}
 
@@ -18010,7 +18012,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	 will be fully visible.  Otherwise, the code under force_start
 	 label below will try to move point back into view, which is
 	 not what the code which sets optional_new_start wants.  */
-      if ((it.current_y == 0 || line_bottom_y (&it) < it.last_visible_y)
+      if ((it.current_y == 0 || line_bottom_y (&it, last_height) < it.last_visible_y)
 	  && !w->force_start)
 	{
 	  if (it_charpos == PT)

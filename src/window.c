@@ -5722,7 +5722,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	    {
 	      it_data = bidi_shelve_cache ();
 	      struct it it1 = it;
-	      if (line_bottom_y (&it1) - goal_y < goal_y - it.current_y)
+	      if (window_line_bottom_y (&it1) - goal_y < goal_y - it.current_y)
 		move_it_by_lines (&it, 1);
 	      bidi_unshelve_cache (it_data, true);
 	    }
@@ -6445,7 +6445,7 @@ displayed_window_lines (struct window *w)
   itdata = bidi_shelve_cache ();
   start_move_it (&it, w, start);
   move_it_vertically (&it, height);
-  bottom_y = line_bottom_y (&it);
+  bottom_y = window_line_bottom_y (&it);
   bidi_unshelve_cache (itdata, false);
 
   /* Add in empty lines at the bottom of the window.  */
@@ -6583,7 +6583,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 	  else
 	    {
 	      /* Last line has no newline.  */
-	      h -= line_bottom_y (&it);
+	      h -= window_line_bottom_y (&it);
 	      it.vpos++;
 	    }
 
