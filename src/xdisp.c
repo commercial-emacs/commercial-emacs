@@ -9692,6 +9692,7 @@ move_it_vertically (struct it *it, int dy)
 	  struct it it_from;
 	  void *itdata = NULL;
 	  int abs_dy = abs (dy);
+	  int from_x = it->current_x;
 	  ptrdiff_t from_pos = IT_CHARPOS (*it), target_y = it->current_y - abs_dy;
 	  int h, nlines = max (1, abs_dy / default_line_pixel_height (it->w));
 	  int nchars_per_line = (it->last_visible_x - it->first_visible_x) /
@@ -9704,50 +9705,51 @@ move_it_vertically (struct it *it, int dy)
 	     backward, we manually set IT the estimated NLINES back.  Then
 	     from that position, call `move_it_to' on a throwaway IT_FROM to
 	     FROM_POS.  */
-	  for (int i = 0; i < nlines && IT_CHARPOS (*it) > BEGV; ++i)
+	  for (int i = 0, xchar = from_x / FRAME_COLUMN_WIDTH (it->f);
+	       i < nlines && IT_CHARPOS (*it) > BEGV; ++i)
 	    {
 	      if (capped == -1)
 		{
 		  preceding_line_start_visible (it);
-		  it->current_x = it->hpos = it->continuation_lines_width = 0;
 		}
 	      else /* speedups are possible */
 		{
+		  /* IT_OVERFLOW_NEWLINE_INTO_FRINGE(IT) is pain.  */
+		  bool chad = false;
 		  ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
 		  dec_both (&cp, &bp);
+		  chad = ! NILP (Voverflow_newline_into_fringe)
+		    && FRAME_WINDOW_P (it->f)
+		    && FETCH_BYTE (bp) == '\n';
 		  IT_CHARPOS (*it) =
 		    find_newline (cp, bp, capped, CHAR_TO_BYTE (capped), -1, NULL,
 				  &IT_BYTEPOS (*it), 0);
+
+		  ptrdiff_t nchars = cp - IT_CHARPOS (*it) + 1;
+		  if (chad && nchars && nchars % nchars_per_line == 0)
+		    nchars--;
+
+		  if (xchar >= nchars)
+		    /* e.g., current_xchar=79, nchars=79, nchar_per_line=80,
+		       result_xchar=0 */
+		    xchar = xchar - nchars;
+		  else
+		    {
+		      /* e.g., current_xchar=79, nchars=160, nchars_per_line=80,
+			 result_xchar=79 */
+		      ptrdiff_t remchars = (nchars - xchar) % nchars_per_line;
+		      xchar = (nchars_per_line - remchars) % nchars_per_line;
+		    }
 		  if (IT_CHARPOS (*it) <= capped)
 		    {
-		      ptrdiff_t nchars = (cp - IT_CHARPOS (*it) + 1);
-		      int current_xchar = (it->current_x / FRAME_COLUMN_WIDTH (it->f)),
-			result_xchar;
-		      if (current_xchar >= nchars)
-			{
-			  /* e.g., current_xchar=79, nchars=79, nchar_per_line=80,
-			     result_xchar=0 */
-			  result_xchar = current_xchar - nchars;
-			  it->current_x = result_xchar * FRAME_COLUMN_WIDTH (it->f);
-			}
-		      else
-			{
-			  /* e.g., current_xchar=79, nchars=160, nchars_per_line=80,
-			     result_xchar=79 */
-			  ptrdiff_t remchars = (nchars - current_xchar) % nchars_per_line;
-			  result_xchar = (nchars_per_line - remchars) % nchars_per_line;
-			  it->current_x = result_xchar * FRAME_COLUMN_WIDTH (it->f);
-			}
-		      it->hpos = it->current_x;
-		      it->continuation_lines_width = 0; /* sus */
+		      for (int i=0; i<xchar; ++i)
+			dec_both (&IT_CHARPOS (*it), &IT_BYTEPOS (*it));
 		      break;
 		    }
-		  else
-		    it->current_x = it->hpos = it->continuation_lines_width = 0;
 		}
 	    }
-
 	  /* More shallow assignment */
+	  it->current_x = it->hpos = it->continuation_lines_width = 0;
 	  reseat_1 (it, it->current.pos, true);
 
 	  /* "Then from that position, call `move_it_to' on a throwaway
@@ -16243,7 +16245,7 @@ redisplay_window_1 (Lisp_Object window)
 }
 
 
-/* Set cursor position of W.  PT is assumed to be displayed in ROW.
+/* Set cursor position of W.  Point is assumed to be within ROW.
    DELTA and DELTA_BYTES are the numbers of characters and bytes by
    which positions recorded in ROW differ from current buffer
    positions.
@@ -16716,10 +16718,8 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 			? row->glyphs[TEXT_AREA] + row->used[TEXT_AREA] - 1
 			: row->glyphs[TEXT_AREA])->object))
     {
-      /* If all the glyphs of this row came from strings, put the
-	 cursor on the first glyph of the row.  This avoids having the
-	 cursor outside of the text area in this very rare and hard
-	 use case.  */
+      /* All the row's glyphs come from a display string; put the
+	 cursor on the first glyph.  */
       glyph =
 	row->reversed_p
 	? row->glyphs[TEXT_AREA] + row->used[TEXT_AREA] - 1
@@ -16737,22 +16737,14 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	}
     }
 
-  /* ROW could be part of a continued line, which, under bidi
-     reordering, might have other rows whose start and end charpos
-     occlude point.  Only set w->cursor if we found a better
-     approximation to the cursor position than we have from previously
-     examined candidate rows belonging to the same continued line.  */
   if (/* We already have a candidate row.  */
       w->cursor.vpos >= 0
       /* That candidate is not the row we are processing.  */
       && MATRIX_ROW (matrix, w->cursor.vpos) != row
-      /* Make sure cursor.vpos specifies a row whose start and end
-	 charpos occlude point, and it is valid candidate for being a
-	 cursor-row.  This is because some callers of this function
-	 leave cursor.vpos at the row where the cursor was displayed
-	 during the last redisplay cycle.  */
+      /* Make sure candidate row occludes point.  */
       && MATRIX_ROW_START_CHARPOS (MATRIX_ROW (matrix, w->cursor.vpos)) <= pt_old
       && pt_old <= MATRIX_ROW_END_CHARPOS (MATRIX_ROW (matrix, w->cursor.vpos))
+      /* Make sure candidate row is still valid.  */
       && cursor_row_p (MATRIX_ROW (matrix, w->cursor.vpos)))
     {
       struct glyph *g1
@@ -16812,8 +16804,8 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 
   if (w == XWINDOW (selected_window))
     {
-      if (!row->continued_p
-	  && !MATRIX_ROW_CONTINUATION_LINE_P (row)
+      if (! row->continued_p
+	  && ! MATRIX_ROW_CONTINUATION_LINE_P (row)
 	  && row->x == 0)
 	{
 	  static_line_buffer = XBUFFER (w->contents);
@@ -17408,21 +17400,6 @@ compute_window_start_on_continuation_line (struct window *w)
 }
 
 
-/* Try cursor movement in case text has not changed in window WINDOW,
-   with window start STARTP.  Value is
-
-   CURSOR_MOVEMENT_SUCCESS if successful
-
-   CURSOR_MOVEMENT_CANNOT_BE_USED if this method cannot be used
-
-   CURSOR_MOVEMENT_MUST_SCROLL if we know we have to scroll the
-   display.  *SCROLL_STEP is set to true, under certain circumstances, if
-   we want to scroll as if scroll-step were set to 1.  See the code.
-
-   CURSOR_MOVEMENT_NEED_LARGER_MATRICES if we need larger matrices, in
-   which case we have to abort this redisplay, and adjust matrices
-   first.  */
-
 enum
 {
   CURSOR_MOVEMENT_SUCCESS,
@@ -17430,6 +17407,20 @@ enum
   CURSOR_MOVEMENT_MUST_SCROLL,
   CURSOR_MOVEMENT_NEED_LARGER_MATRICES
 };
+
+/* Redisplay optimization when text hasn't changed in window WINDOW
+   with window start STARTP.  Value is
+
+   CURSOR_MOVEMENT_CANNOT_BE_USED if optimization cannot apply
+
+   CURSOR_MOVEMENT_SUCCESS if successful
+
+   CURSOR_MOVEMENT_MUST_SCROLL if scrolling required.  *SCROLL_STEP is
+   assigned true if `scroll-step' (emacs_scroll_step) needs to be
+   assigned 1 for scrolling.
+
+   CURSOR_MOVEMENT_NEED_LARGER_MATRICES, in which case abort this
+   redisplay, and expand matrices first.  */
 
 static int
 try_cursor_movement (Lisp_Object window, struct text_pos startp,
@@ -17470,8 +17461,8 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
       || overlay_arrow_in_current_buffer_p ())
     return CURSOR_MOVEMENT_CANNOT_BE_USED;
 
-  this_scroll_margin = window_scroll_margin (w, MARGIN_IN_PIXELS);
-  top_scroll_margin = this_scroll_margin;
+  top_scroll_margin = this_scroll_margin =
+    window_scroll_margin (w, MARGIN_IN_PIXELS);
   if (window_wants_tab_line (w))
     top_scroll_margin += CURRENT_TAB_LINE_HEIGHT (w);
   if (window_wants_header_line (w))
@@ -17535,8 +17526,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	}
       else if (PT < w->last_point)
 	{
-	  /* Cursor has to be moved backward.  Note that PT >=
-	     CHARPOS (startp) because of the outer if-statement.  */
+	  /* Cursor has to be moved backward.  */
 	  while (! row->mode_line_p
 		 && (MATRIX_ROW_START_CHARPOS (row) > PT
 		     || (MATRIX_ROW_START_CHARPOS (row) == PT
@@ -23303,7 +23293,7 @@ done:
        /* FIXME: Revisit this when glyph ``spilling'' in continuation
 	  lines' rows is implemented for bidi-reordered rows.  */
        || (it->bidi_p
-	   && !MATRIX_ROW (it->w->desired_matrix, cvpos)->ends_at_zv_p))
+	   && ! MATRIX_ROW (it->w->desired_matrix, cvpos)->ends_at_zv_p))
       && PT >= MATRIX_ROW_START_CHARPOS (row)
       && PT <= MATRIX_ROW_END_CHARPOS (row)
       && cursor_row_p (row))
