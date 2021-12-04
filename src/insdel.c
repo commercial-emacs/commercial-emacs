@@ -1574,7 +1574,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
 			       current_buffer, inherit);
 
 #ifdef HAVE_TREE_SITTER
-  tree_sitter_record_change (from, from + nchars_del, old_end_byte, from + inschars);
+  tree_sitter_record_change (from, to, old_end_byte, from + inschars);
 #endif
 
   /* Relocate point as if it were a marker.  */
@@ -1919,7 +1919,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   adjust_overlays_for_delete (from, nchars_del);
 
 #ifdef HAVE_TREE_SITTER
-  tree_sitter_record_change (from, from + nchars_del, from);
+  tree_sitter_record_change (from, from + nchars_del, old_end_byte, from);
 #endif
 
   GAP_SIZE += nbytes_del;
@@ -1946,7 +1946,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   evaporate_overlays (from);
 
 #ifdef HAVE_TREE_SITTER
-  tree_sitter_record_change (from, from + nchars_del, old_end_byte, from);
+  tree_sitter_record_change (from, to, old_end_byte, from);
 #endif
 
   return deletion;

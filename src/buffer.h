@@ -1662,8 +1662,6 @@ prev_char_len (ptrdiff_t pos_byte)
   return buf_prev_char_len (current_buffer, pos_byte);
 }
 
-/* Increment both *CHARPOS and *BYTEPOS, each in the appropriate way.  */
-
 INLINE void
 inc_both (ptrdiff_t *charpos, ptrdiff_t *bytepos)
 {
@@ -1671,8 +1669,6 @@ inc_both (ptrdiff_t *charpos, ptrdiff_t *bytepos)
   (*bytepos) += (!NILP (BVAR (current_buffer, enable_multibyte_characters))
 		 ? next_char_len (*bytepos) : 1);
 }
-
-/* Decrement both *CHARPOS and *BYTEPOS, each in the appropriate way.  */
 
 INLINE void
 dec_both (ptrdiff_t *charpos, ptrdiff_t *bytepos)

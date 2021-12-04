@@ -6619,6 +6619,7 @@ preceding_line_start_visible (struct it *it)
 
   it->continuation_lines_width = 0;
 
+  eassert (IT_POS_VALID_AFTER_MOVE_P (it));
   eassert (IT_CHARPOS (*it) >= BEGV);
   eassert (IT_CHARPOS (*it) == BEGV
 	   || FETCH_BYTE (IT_BYTEPOS (*it) - 1) == '\n');
@@ -8661,7 +8662,7 @@ get_element_from_composition (struct it *it)
 /* Check if iterator is at a position corresponding to a valid buffer
    position after some move_it_* call.  */
 
-#define IT_POS_VALID_AFTER_MOVE_P(it)			\
+#define IT_POS_VALID_AFTER_MOVE_P(it)					\
   ((it)->method != GET_FROM_STRING || IT_STRING_CHARPOS (*it) == 0)
 
 #define BUFFER_POS_REACHED_P()					\
@@ -9607,6 +9608,8 @@ behaved_p (const struct it *it)
   return BUFFERP (it->object)
     && (it->method == GET_FROM_BUFFER ||
 	it->method == GET_FROM_STRETCH)
+    && it->line_wrap != TRUNCATE
+    && it->last_visible_x > it->first_visible_x
     && XBUFFER (it->object)->text->monospace;
 }
 
@@ -9621,6 +9624,7 @@ move_it_vertically (struct it *it, int dy)
     {
       mit_calls12++;
       move_it_to (it, ZV, -1, it->current_y + dy, -1, MOVE_TO_POS | MOVE_TO_Y);
+
       if (IT_CHARPOS (*it) == ZV
 	  && ZV > BEGV
 	  && FETCH_BYTE (IT_BYTEPOS (*it) - 1) != '\n')
@@ -9639,7 +9643,7 @@ move_it_vertically (struct it *it, int dy)
 	  int h, nlines = max (1, abs_dy / default_line_pixel_height (it->w));
 	  int nchars_per_line = (it->last_visible_x - it->first_visible_x) /
 	    FRAME_COLUMN_WIDTH (it->f);
-	  ptrdiff_t capped = behaved_p (it)
+	  ptrdiff_t capped = behaved_p (it) && false
 	    ? max (BEGV, from_pos - nchars_per_line * nlines)
 	    : -1;
 
@@ -9648,7 +9652,8 @@ move_it_vertically (struct it *it, int dy)
 	     from that position, call `move_it_to' on a throwaway IT_FROM to
 	     FROM_POS.  */
 	  for (int i = 0, xchar = from_x / FRAME_COLUMN_WIDTH (it->f);
-	       i < nlines && IT_CHARPOS (*it) > BEGV; ++i)
+	       i < nlines && IT_CHARPOS (*it) > BEGV;
+	       ++i)
 	    {
 	      if (capped == -1)
 		{
@@ -9656,8 +9661,7 @@ move_it_vertically (struct it *it, int dy)
 		}
 	      else /* speedups are possible */
 		{
-		  /* IT_OVERFLOW_NEWLINE_INTO_FRINGE(IT) is pain.  */
-		  bool chad = false;
+		  bool chad = false; /* IT_OVERFLOW_NEWLINE_INTO_FRINGE gotcha.  */
 		  ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
 		  dec_both (&cp, &bp);
 		  chad = ! NILP (Voverflow_newline_into_fringe)
@@ -9669,6 +9673,7 @@ move_it_vertically (struct it *it, int dy)
 
 		  ptrdiff_t nchars = cp - IT_CHARPOS (*it) + 1;
 		  if (chad && nchars && nchars % nchars_per_line == 0)
+		    /* Adjust for IT_OVERFLOW_NEWLINE_INTO_FRINGE gotcha.  */
 		    nchars--;
 
 		  if (xchar >= nchars)
@@ -9715,7 +9720,13 @@ move_it_vertically (struct it *it, int dy)
 	  if (dy == 0)
 	    {
 	      if (nlines > 0)
-		move_it_by_lines (it, nlines);
+		{
+		  int hpos = it->current_x / FRAME_COLUMN_WIDTH (it->f);
+		  fprintf (stderr, "foo %ld %d\n", IT_CHARPOS (*it), hpos);
+		  move_it_by_lines (it, nlines);
+		  hpos = it->current_x / FRAME_COLUMN_WIDTH (it->f);
+		  fprintf (stderr, "foo %ld %d\n", IT_CHARPOS (*it), hpos);
+		}
 	      if (it->bidi_p
 		  && ! STRINGP (it->string)
 		  && IT_BYTEPOS (*it) > BEGV_BYTE
@@ -9732,7 +9743,8 @@ move_it_vertically (struct it *it, int dy)
 	  else if (IT_CHARPOS (*it) > BEGV
 		   && ((it->current_y - target_y) >
 		       min (window_box_height (it->w),
-			    XFIXNUM (Fline_pixel_height (make_fixnum (IT_CHARPOS (*it)))) * 2 / 3)))
+			    XFIXNUM (Fline_pixel_height
+				     (make_fixnum (IT_CHARPOS (*it)))) * 2 / 3)))
 	    {
 	      /* Estimated NLINES comes up short.  Take it from the top.  */
 	      dy = target_y - it->current_y;
@@ -9745,33 +9757,7 @@ move_it_vertically (struct it *it, int dy)
 	      /* Most common branch where continued lines render
 		 our initial estimate of NLINES too large.  Scooch
 		 forward.  */
-	      if (! FRAME_WINDOW_P (it->f))
-		{
-		  /* Apparently, move_it_by_lines is too expensive
-		     on terminal frames in which "compute_motion" is used.
-		     Would be better if `move_it_vertically' applied to
-		     both tty and X, but slow thy roll.
-		  */
-		  move_it_vertically (it, target_y - it->current_y);
-		}
-	      else
-		{
-		  while (target_y > it->current_y
-			 && IT_CHARPOS (*it) < ZV)
-		    {
-		      struct text_pos last_pos = it->current.pos;
-		      int last_y = it->current_y;
-		      int last_vpos = it->vpos;
-		      move_it_by_lines (it, 1);
-		      if (it->current_y > target_y)
-			{
-			  reseat (it, last_pos, true);
-			  it->current_y = last_y;
-			  it->vpos = last_vpos;
-			  break;
-			}
-		    }
-		}
+	      move_it_vertically (it, target_y - it->current_y);
 	    }
 	  break;
 	}
@@ -9791,29 +9777,25 @@ move_it_past_eol (struct it *it)
 }
 
 
-/* Move IT by DVPOS screen lines down (or up if negative).  DVPOS of
-   zero means move to line start.
-*/
+/* Move IT by screen NLINES (or up if negative).
+   Need to preserve NLINES == 0 special behavior, i.e., move IT to line
+   start.  */
 
 void
-move_it_by_lines (struct it *it, ptrdiff_t dvpos)
+move_it_by_lines (struct it *it, ptrdiff_t nlines)
 {
-  if (dvpos == 0)
+  if (nlines == 0)
+    move_it_vertically (it, 0);
+  if (nlines > 0)
     {
-      move_it_vertically (it, 0);
-    }
-  else if (dvpos > 0)
-    {
-      // HERE
       mit_calls8++;
-      move_it_to (it, -1, -1, -1, it->vpos + dvpos, MOVE_TO_VPOS);
+      move_it_to (it, -1, -1, -1, it->vpos + nlines, MOVE_TO_VPOS);
       if (! IT_POS_VALID_AFTER_MOVE_P (it))
 	{
 	  /* Can happen for a display string, in which case we move
 	     off it, or an overlay string, in which case we merely
 	     invoke `move_it_to' to recalculate it->current_x and
-	     it->hpos.  Overlay strings do not conceal the underlying
-	     buffer position.  */
+	     it->hpos.  */
 	  move_it_to (it, IT_CHARPOS (*it) + it->string_from_display_prop_p,
 		      -1, -1, -1, MOVE_TO_POS);
 	}
@@ -9821,93 +9803,53 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
   else
     {
       struct it it2;
-      void *it2data = NULL;
-      ptrdiff_t start_charpos, i, bound_pos;
-      int nchars_per_row
-	= (it->last_visible_x - it->first_visible_x) / FRAME_COLUMN_WIDTH (it->f);
-      bool hit_bound_pos = false;
+      void *itdata = NULL;
+      ptrdiff_t from_pos, capped;
+      int nchars_per_line = ((it->last_visible_x - it->first_visible_x) /
+			    FRAME_COLUMN_WIDTH (it->f));
+      ptrdiff_t abs_nlines = abs (nlines);
 
-      /* Start at the beginning of the screen line containing IT's
-	 position.  This may actually move vertically backwards,
-         in case of overlays, so adjust dvpos accordingly.  */
-      dvpos += it->vpos;
+      /* Overlays can alter vpos just going to bol.  */
+      abs_nlines += it->vpos;
       move_it_vertically (it, 0);
-      dvpos -= it->vpos;
+      abs_nlines -= it->vpos;
 
-      /* Go back -DVPOS buffer lines, but no farther than -DVPOS full
-	 screen lines, and reseat the iterator there.  */
-      start_charpos = IT_CHARPOS (*it);
-      if (it->line_wrap == TRUNCATE || nchars_per_row == 0)
-	bound_pos = BEGV;
-      else
-	bound_pos = max (start_charpos + dvpos * nchars_per_row, BEGV);
+      from_pos = IT_CHARPOS (*it);
+      capped = behaved_p (it)
+	? max (BEGV, from_pos - nchars_per_line * abs_nlines)
+	: 0;
 
-      for (i = -dvpos; i > 0 && IT_CHARPOS (*it) > bound_pos; --i)
-	preceding_line_start_visible (it);
-      if (i > 0 && IT_CHARPOS (*it) <= bound_pos)
-	hit_bound_pos = true;
-      reseat (it, it->current.pos, true);
-
-      /* Move further back if we end up in a string or an image.  */
-      while (! IT_POS_VALID_AFTER_MOVE_P (it))
+      for (int i = 0; i < abs_nlines; ++i)
 	{
-	  /* First try to move to start of display line.  */
-	  dvpos += it->vpos;
-	  move_it_vertically (it, 0);
-	  dvpos -= it->vpos;
-	  if (IT_POS_VALID_AFTER_MOVE_P (it))
+	  if (IT_CHARPOS (*it) <= capped)
 	    break;
-	  /* If start of line is still in string or image,
-	     move further back.  */
 	  preceding_line_start_visible (it);
-	  reseat (it, it->current.pos, true);
-	  dvpos--;
 	}
-
+      reseat (it, IT_CHARPOS (*it), true);
       it->current_x = it->hpos = 0;
 
-      /* Above call may have moved too far if continuation lines
-	 are involved.  Scan forward and see if it did.  */
-      SAVE_IT (it2, *it, it2data);
+      /* Confusing correction.  */
+      SAVE_IT (it2, *it, itdata);
       it2.vpos = it2.current_y = 0;
-      move_it_to (&it2, start_charpos, -1, -1, -1, MOVE_TO_POS);
+      move_it_to (&it2, from_pos, -1, -1, -1, MOVE_TO_POS);
       it->vpos -= it2.vpos;
       it->current_y -= it2.current_y;
       it->current_x = it->hpos = 0;
 
       /* If we moved too far back, move IT some lines forward.  */
-      if (it2.vpos > -dvpos)
+      if (it2.vpos > abs_nlines)
 	{
-	  int delta = it2.vpos + dvpos;
+	  int delta = it2.vpos + nlines;
 
-	  RESTORE_IT (&it2, &it2, it2data);
+	  RESTORE_IT (&it2, &it2, itdata);
 	  SAVE_IT (it2, *it, it2data);
 	  move_it_to (it, -1, -1, -1, it->vpos + delta, MOVE_TO_VPOS);
 	  /* Move back again if we got too far ahead.  */
-	  if (IT_CHARPOS (*it) >= start_charpos)
-	    RESTORE_IT (it, &it2, it2data);
+	  if (IT_CHARPOS (*it) >= from_pos)
+	    RESTORE_IT (it, &it2, itdata);
 	  else
-	    bidi_unshelve_cache (it2data, true);
+	    bidi_unshelve_cache (itdata, true);
 	}
-      else if (hit_bound_pos && bound_pos > BEGV
-	       && dvpos < 0 && it2.vpos < -dvpos)
-	{
-	  /* A display string with a newline spanning a large chunk
-	     caused `preceding_line_start_visible' to
-	     overshoot.  Punish it by scanning back to DVPOS, which
-	     will bog under long lines.  "If it hurts, don't do
-	     that!"  */
-	  dvpos += it2.vpos;
-	  RESTORE_IT (it, it, it2data);
-	  for (i = -dvpos; i > 0; --i)
-	    {
-	      preceding_line_start_visible (it);
-	      it->vpos--;
-	    }
-	  reseat_1 (it, it->current.pos, true);
-	}
-      else
-	RESTORE_IT (it, it, it2data);
     }
 }
 
@@ -11531,15 +11473,13 @@ resize_mini_window (struct window *w, bool exact_p)
 
   if (FRAME_MINIBUF_ONLY_P (f))
     {
-      if (!NILP (resize_mini_frames))
+      if (! NILP (resize_mini_frames))
 	safe_call1 (Qwindow__resize_mini_frame, WINDOW_FRAME (w));
     }
   else
     {
       struct it it;
-      int unit = FRAME_LINE_HEIGHT (f);
-      int bottom_y, max_height;
-      struct text_pos start;
+      int bottom_y, max_y, unit_y = FRAME_LINE_HEIGHT (f);
       struct buffer *old_current_buffer = NULL;
       int windows_height = FRAME_INNER_HEIGHT (f);
 
@@ -11549,20 +11489,16 @@ resize_mini_window (struct window *w, bool exact_p)
 	  set_buffer_internal (XBUFFER (w->contents));
 	}
 
-      init_iterator (&it, w, BEGV, BEGV_BYTE, NULL, DEFAULT_FACE_ID);
-
-      /* Compute the max. number of lines specified by the user.  */
       if (FLOATP (Vmax_mini_window_height))
-	max_height = XFLOAT_DATA (Vmax_mini_window_height) * windows_height;
+	max_y = XFLOAT_DATA (Vmax_mini_window_height) * windows_height;
       else if (FIXNUMP (Vmax_mini_window_height))
-	max_height = XFIXNUM (Vmax_mini_window_height) * unit;
+	max_y = XFIXNUM (Vmax_mini_window_height) * unit_y;
       else
-	max_height = windows_height / 4;
+	max_y = windows_height / 4;
 
-      /* Correct max height if it's bogus.  */
-      max_height = clip_to_bounds (unit, max_height, windows_height);
+      max_y = clip_to_bounds (unit_y, max_y, windows_height);
 
-      /* Find out the height of the text in the window.  */
+      init_iterator (&it, w, BEGV, BEGV_BYTE, NULL, DEFAULT_FACE_ID);
       move_it_to (&it, ZV, -1, -1, -1, MOVE_TO_POS);
       bottom_y =
 	it.current_y
@@ -11572,47 +11508,38 @@ resize_mini_window (struct window *w, bool exact_p)
 	- min (it.extra_line_spacing, it.max_extra_line_spacing);
 
       /* Compute a suitable window start.  */
-      if (bottom_y > max_height)
+      if (bottom_y > max_y)
 	{
-	  bottom_y = (max_height / unit) * unit;
+	  bottom_y = (max_y / unit_y) * unit_y;
 	  if (redisplay_adhoc_scroll_in_resize_mini_windows)
 	    {
+	      int last_line_y = bottom_y - unit_y;
 	      init_iterator (&it, w, ZV, ZV_BYTE, NULL, DEFAULT_FACE_ID);
-	      move_it_vertically (&it, unit - bottom_y);
-              /* The following move is usually a no-op when the stuff
-                 displayed in the mini-window comes entirely from buffer
-                 text, but it is needed when some of it comes from overlay
-                 strings, especially when there's an after-string at ZV.
-                 This happens with some completion packages, like
-                 icomplete, ido-vertical, etc.  With those packages, if we
-                 don't force w->start to be at the beginning of a screen
-                 line, important parts of the stuff in the mini-window,
-                 such as user prompt, will be hidden from view.  */
-              move_it_by_lines (&it, 0);
-              start = it.current.pos;
-              /* Prevent redisplay_window from recentering, and thus from
-                 overriding the window-start point we computed here.  */
+	      move_it_vertically (&it, -1 * last_line_y);
+              /* Prevent `redisplay_window' overriding window-start.  */
               w->start_at_line_beg = false;
-              SET_MARKER_FROM_TEXT_POS (w->start, start);
+              SET_MARKER_FROM_TEXT_POS (w->start, it.position);
             }
 	}
       else
 	{
+	  struct text_pos start;
 	  SET_TEXT_POS (start, BEGV, BEGV_BYTE);
           SET_MARKER_FROM_TEXT_POS (w->start, start);
         }
 
       if (EQ (Vresize_mini_windows, Qgrow_only))
 	{
-	  /* Let it grow only, until we display an empty message, in which
-	     case the window shrinks again.  */
 	  if (bottom_y > old_height)
 	    grow_mini_window (w, bottom_y - old_height);
 	  else if (bottom_y < old_height && (exact_p || BEGV == ZV))
 	    shrink_mini_window (w);
 	}
       else if (bottom_y != old_height)
-	/* Always resize to exact size needed.  */
+	/* Apparently assigning resize-mini-windows to Qgrow_only
+	   means calling shrink_mini_window() instead
+	   of calling grow_mini_window() with a negative
+	   number as we do here. */
 	grow_mini_window (w, bottom_y - old_height);
 
       if (old_current_buffer)
