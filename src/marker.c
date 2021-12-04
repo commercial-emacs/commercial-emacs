@@ -165,12 +165,6 @@ buf_charpos_to_bytepos (struct buffer *b, ptrdiff_t charpos)
   ptrdiff_t best_below, best_below_byte;
   ptrdiff_t distance = BYTECHAR_DISTANCE_INITIAL;
 
-  if (BUF_BEG (b) > charpos)
-    fprintf (stderr, "wtf1 %ld > %ld\n", BUF_BEG (b), charpos);
-
-  if (charpos > BUF_Z (b))
-    fprintf (stderr, "wtf2 %ld > %ld\n", charpos, BUF_Z (b));
-
   eassert (BUF_BEG (b) <= charpos && charpos <= BUF_Z (b));
 
   best_above = BUF_Z (b);
@@ -326,12 +320,6 @@ buf_bytepos_to_charpos (struct buffer *b, ptrdiff_t bytepos)
   ptrdiff_t best_above, best_above_byte;
   ptrdiff_t best_below, best_below_byte;
   ptrdiff_t distance = BYTECHAR_DISTANCE_INITIAL;
-
-  if (BUF_BEG_BYTE (b) > bytepos)
-    fprintf (stderr, "wtf3 %ld > %ld\n", BUF_BEG_BYTE (b), bytepos);
-
-  if (bytepos > BUF_Z_BYTE (b))
-    fprintf (stderr, "wtf4 %ld > %ld\n", bytepos, BUF_Z_BYTE (b));
 
   eassert (BUF_BEG_BYTE (b) <= bytepos && bytepos <= BUF_Z_BYTE (b));
 

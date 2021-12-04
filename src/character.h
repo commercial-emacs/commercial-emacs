@@ -378,15 +378,7 @@ string_char_and_length (unsigned char const *p, int *length)
       *length = 1;
       return c;
     }
-  if (0xC0 > c)
-    {
-      fprintf (stderr, "%d > %d [%s]\n", 0xC0, c, p);
-      eassume (0xC0 <= c);
-    }
-  else
-    {
-      eassume (0xC0 <= c);
-    }
+  eassume (0xC0 <= c);
 
   int d = (c << 6) + p[1] - ((0xC0 << 6) + 0x80);
   if (! (c & 0x20))
