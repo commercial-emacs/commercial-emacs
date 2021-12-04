@@ -1433,7 +1433,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   ptrdiff_t outgoing_insbytes = insbytes;
   Lisp_Object deletion;
 #ifdef HAVE_TREE_SITTER
-  uint32_t old_end_byte;
+  uint32_t old_end_byte = BUFFER_TO_SITTER (to);
 #endif
 
   check_markers ();
@@ -1482,10 +1482,6 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
      combining.  */
   if (! EQ (BVAR (current_buffer, undo_list), Qt))
     deletion = make_buffer_string_both (from, from_byte, to, to_byte, 1);
-
-#ifdef HAVE_TREE_SITTER
-  old_end_byte = BUFFER_TO_SITTER (from + nchars_del);
-#endif
 
   GAP_SIZE += nbytes_del;
   ZV -= nchars_del;
@@ -1871,7 +1867,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   ptrdiff_t nbytes_del, nchars_del;
   Lisp_Object deletion;
 #ifdef HAVE_TREE_SITTER
-  uint32_t old_end_byte;
+  uint32_t old_end_byte = BUFFER_TO_SITTER (to);
 #endif
 
   check_markers ();
@@ -1918,10 +1914,6 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
      adjusting the markers that bound the overlays.  */
   adjust_overlays_for_delete (from, nchars_del);
 
-#ifdef HAVE_TREE_SITTER
-  old_end_byte = BUFFER_TO_SITTER (from + nchars_del);
-#endif
-
   GAP_SIZE += nbytes_del;
   ZV_BYTE -= nbytes_del;
   Z_BYTE -= nbytes_del;
@@ -1946,8 +1938,6 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   evaporate_overlays (from);
 
 #ifdef HAVE_TREE_SITTER
-  /* tree_sitter_read_buffer() needs buffer after deletion,
-     but then old_end_char would extend past new eob. */
   tree_sitter_record_change (from, from + nchars_del, old_end_byte, from);
 #endif
 

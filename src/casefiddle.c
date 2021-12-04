@@ -522,7 +522,8 @@ do_casify_multibyte_region (struct casing_context *ctx,
 static ptrdiff_t
 casify_region (enum case_action flag, Lisp_Object b, Lisp_Object e)
 {
-  ptrdiff_t added, start, end, orig_end;
+  ptrdiff_t added, start, end, old_end;
+  uint32_t old_end_byte;
   struct casing_context ctx;
 
   validate_region (&b, &e);
@@ -534,7 +535,10 @@ casify_region (enum case_action flag, Lisp_Object b, Lisp_Object e)
   modify_text (start, end);
   prepare_casing_context (&ctx, flag, true);
 
-  orig_end = end;
+  old_end = end;
+#ifdef HAVE_TREE_SITTER
+  old_end_byte = BUFFER_TO_SITTER (old_end);
+#endif
   record_delete (start, make_buffer_string (start, end, true), false);
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     {
@@ -552,9 +556,12 @@ casify_region (enum case_action flag, Lisp_Object b, Lisp_Object e)
     {
       signal_after_change (start, end - start - added, end - start);
       update_compositions (start, end, CHECK_ALL);
+#ifdef HAVE_TREE_SITTER
+      tree_sitter_record_change (start, old_end, old_end_byte, end);
+#endif
     }
 
-  return orig_end + added;
+  return old_end + added;
 }
 
 /* Casify a possibly noncontiguous region according to FLAG.  BEG and
