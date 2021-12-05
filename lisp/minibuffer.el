@@ -852,7 +852,51 @@ via `set-message-function'."
         ;; was handled specially by this function.
         t))))
 
-(setq set-message-function 'set-minibuffer-message)
+(setq set-message-function 'set-message-functions)
+
+(defcustom set-message-functions '(set-minibuffer-message)
+  "List of functions to handle display of echo-area messages.
+Each function is called with one argument that is the text of a message.
+If a function returns nil, a previous message string is given to the
+next function in the list, and if the last function returns nil, the
+last message string is displayed in the echo area.
+If a function returns a string, the returned string is given to the
+next function in the list, and if the last function returns a string,
+it's displayed in the echo area.
+If a function returns any other non-nil value, no more functions are
+called from the list, and no message will be displayed in the echo area."
+  :type '(choice (const :tag "No special message handling" nil)
+                 (repeat
+                  (choice (function-item :tag "Inhibit some messages"
+                                         inhibit-message)
+                          (function-item :tag "Accumulate messages"
+                                         set-multi-message)
+                          (function-item :tag "Handle minibuffer"
+                                         set-minibuffer-message)
+                          (function :tag "Custom function"))))
+  :version "29.1")
+
+(defun set-message-functions (message)
+  (run-hook-wrapped 'set-message-functions
+                    (lambda (fun)
+                      (when (stringp message)
+                        (let ((ret (funcall fun message)))
+                          (when ret (setq message ret))))
+                      nil))
+  message)
+
+(defcustom inhibit-message-regexp nil
+  "Regexp to inhibit messages by the function `inhibit-message'."
+  :type '(choice (const :tag "Don't inhibit messages" nil)
+                 (regexp :tag "Inhibit messages that match regexp"))
+  :version "29.1")
+
+(defun inhibit-message (message)
+  "Don't display MESSAGE when it matches the regexp `inhibit-message-regexp'.
+This function is intended to be added to `set-message-functions'."
+  (or (and (stringp inhibit-message-regexp)
+           (string-match-p inhibit-message-regexp message))
+      message))
 
 (defun clear-minibuffer-message ()
   "Clear minibuffer message.
