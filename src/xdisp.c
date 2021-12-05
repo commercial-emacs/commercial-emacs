@@ -10084,6 +10084,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 
   for (;;)
     {
+      bool reached_continued = false;
       orig_charpos = IT_CHARPOS (*it);
       orig_method = it->method;
       if (op & MOVE_TO_VPOS)
@@ -10128,6 +10129,12 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		      break;
 		    }
 		}
+	      else if (skip == MOVE_LINE_CONTINUED
+		       && op & MOVE_TO_POS
+		       && it->method == GET_FROM_STRING
+		       && IT_CHARPOS (*it) == to_charpos)
+		/* TO_CHARPOS reached, now consuming overlay string. */
+		reached_continued = true;
 	    }
 	}
       else if (op & MOVE_TO_Y)
@@ -10380,13 +10387,16 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
       /* Reset/increment for the next run.  */
       recenter_overlay_lists (current_buffer, IT_CHARPOS (*it));
       it->current_x = line_start_x;
-      line_start_x = 0;
-      it->hpos = 0;
-      it->line_number_produced_p = false;
-      it->current_y += it->max_ascent + it->max_descent;
-      ++it->vpos;
       last_height = it->max_ascent + it->max_descent;
-      it->max_ascent = it->max_descent = 0;
+      if (! reached_continued)
+	{
+	  line_start_x = 0;
+	  it->hpos = 0;
+	  it->line_number_produced_p = false;
+	  it->current_y += it->max_ascent + it->max_descent;
+	  ++it->vpos;
+	  it->max_ascent = it->max_descent = 0;
+	}
     }
 
  out:
@@ -10493,11 +10503,11 @@ move_it_vertically_backward (struct it *it, int dy)
 	   || (it2.method == GET_FROM_STRING
 	       && IT_CHARPOS (it2) == start_pos
 	       && SREF (it2.string, IT_STRING_BYTEPOS (it2) - 1) == '\n')));
-  eassert (IT_CHARPOS (*it) >= BEGV);
+  eassert (IT_CHARPOS (it2) >= BEGV);
   SAVE_IT (it3, it2, it3data);
 
   move_it_to (&it2, start_pos, -1, -1, -1, MOVE_TO_POS);
-  eassert (IT_CHARPOS (*it) >= BEGV);
+  eassert (IT_CHARPOS (it2) >= BEGV);
   /* H is the actual vertical distance from the position in *IT
      and the starting position.  */
   h = it2.current_y - it->current_y;
@@ -12221,7 +12231,6 @@ resize_mini_window (struct window *w, bool exact_p)
       struct it it;
       int unit = FRAME_LINE_HEIGHT (f);
       int height, max_height;
-      struct text_pos start;
       struct buffer *old_current_buffer = NULL;
       int windows_height = FRAME_INNER_HEIGHT (f);
 
@@ -12275,25 +12284,15 @@ resize_mini_window (struct window *w, bool exact_p)
 	    {
 	      init_iterator (&it, w, ZV, ZV_BYTE, NULL, DEFAULT_FACE_ID);
 	      move_it_vertically_backward (&it, height - unit);
-              /* The following move is usually a no-op when the stuff
-                 displayed in the mini-window comes entirely from buffer
-                 text, but it is needed when some of it comes from overlay
-                 strings, especially when there's an after-string at ZV.
-                 This happens with some completion packages, like
-                 icomplete, ido-vertical, etc.  With those packages, if we
-                 don't force w->start to be at the beginning of a screen
-                 line, important parts of the stuff in the mini-window,
-                 such as user prompt, will be hidden from view.  */
-              move_it_by_lines (&it, 0);
-              start = it.current.pos;
               /* Prevent redisplay_window from recentering, and thus from
                  overriding the window-start point we computed here.  */
               w->start_at_line_beg = false;
-              SET_MARKER_FROM_TEXT_POS (w->start, start);
+              SET_MARKER_FROM_TEXT_POS (w->start, it.current.pos);
             }
 	}
       else
 	{
+	  struct text_pos start;
 	  SET_TEXT_POS (start, BEGV, BEGV_BYTE);
           SET_MARKER_FROM_TEXT_POS (w->start, start);
         }

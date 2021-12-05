@@ -34,23 +34,19 @@
 
 (ert-deftest xdisp-tests--minibuffer-resizing () ;; bug#43519
   (should
-   (equal
-    t
-    (xdisp-tests--in-minibuffer
-      (insert "hello")
-      (let ((ol (make-overlay (point) (point)))
-            (max-mini-window-height 1)
-            (text "askdjfhaklsjdfhlkasjdfhklasdhflkasdhflkajsdhflkashdfkljahsdlfkjahsdlfkjhasldkfhalskdjfhalskdfhlaksdhfklasdhflkasdhflkasdhflkajsdhklajsdgh"))
-        ;; (save-excursion (insert text))
-        ;; (sit-for 2)
-        ;; (delete-region (point) (point-max))
-        (put-text-property 0 1 'cursor t text)
-        (overlay-put ol 'after-string text)
-        (redisplay 'force)
-        ;; Make sure we do the see "hello" text.
-        (prog1 (equal (window-start) (point-min))
-          ;; (list (window-start) (window-end) (window-width))
-          (delete-overlay ol)))))))
+   (xdisp-tests--in-minibuffer
+    (insert "hello")
+    (let ((ol (make-overlay (point) (point)))
+          (max-mini-window-height 1)
+          (text (let ((s ""))
+                  (dotimes (i 137)
+                    (setq s (concat s (char-to-string (+ (% i 26) ?a)))))
+                  s)))
+      (put-text-property 0 1 'cursor t text)
+      (overlay-put ol 'after-string text)
+      (redisplay)
+      (prog1 (equal (window-start) (point-min))
+        (delete-overlay ol))))))
 
 (ert-deftest xdisp-tests--minibuffer-scroll () ;; bug#44070
   (let ((posns
