@@ -9102,7 +9102,7 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	    }
 
 	  if (result != MOVE_UNDEFINED)
-            goto done;
+	    goto done;
 	}
       else if (BUFFER_POS_REACHED_P ())
 	{
@@ -9474,15 +9474,15 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	      switch (op)
 		{
 		case MOVE_TO_VPOS:
-		  fprintf (stderr,
-			   "orig_charpos=%ld it=%ld to_charpos=%ld ",
-			   orig_charpos, IT_CHARPOS (*it), to_charpos);
-		  fprintf (stderr,
-			   "term=%ld nchars=%ld full_rows=%d ",
-			   term, nchars, full_rows);
-		  fprintf (stderr,
-			   "it->vpos=%d to_vpos=%d ",
-			   it->vpos, to_vpos);
+		  /* fprintf (stderr, */
+		  /* 	   "orig_charpos=%ld it=%ld to_charpos=%ld ", */
+		  /* 	   orig_charpos, IT_CHARPOS (*it), to_charpos); */
+		  /* fprintf (stderr, */
+		  /* 	   "term=%ld nchars=%ld full_rows=%d ", */
+		  /* 	   term, nchars, full_rows); */
+		  /* fprintf (stderr, */
+		  /* 	   "it->vpos=%d to_vpos=%d ", */
+		  /* 	   it->vpos, to_vpos); */
 		  full_rows = min (full_rows, max (0, to_vpos - it->vpos));
 		  /* #pragma GCC diagnostic ignored "-Wimplicit-fallthrough" */
 		  goto move_to_pos;
@@ -9492,9 +9492,9 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		  /* Subtract for the present row */
 		  full_rows = max (0, full_rows - 1);
 		  npos = IT_CHARPOS (*it) + full_rows * nchars_per_row;
-		  fprintf (stderr,
-			   "nfr=%d tfr=%ld\n",
-			   full_rows, npos);
+		  /* fprintf (stderr, */
+		  /* 	   "nfr=%d tfr=%ld\n", */
+		  /* 	   full_rows, npos); */
 		  it->continuation_lines_width +=
 		    full_rows * (it->last_visible_x - it->first_visible_x);
 		  SET_TEXT_POS (it->position, npos, CHAR_TO_BYTE (npos));
@@ -9545,12 +9545,12 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	      it->continuation_lines_width += it->current_x;
 	      if (op == MOVE_TO_VPOS)
 		{
-		  fprintf (stderr,
-			   "orig_charpos=%ld it=%ld to_charpos=%ld",
-			   orig_charpos, IT_CHARPOS (*it), to_charpos);
-		  fprintf (stderr,
-			   " it->vpos=%d to_vpos=%d\n",
-			   it->vpos, to_vpos);
+		  /* fprintf (stderr, */
+		  /* 	   "orig_charpos=%ld it=%ld to_charpos=%ld", */
+		  /* 	   orig_charpos, IT_CHARPOS (*it), to_charpos); */
+		  /* fprintf (stderr, */
+		  /* 	   " it->vpos=%d to_vpos=%d\n", */
+		  /* 	   it->vpos, to_vpos); */
 		}
 	    }
 	  break;
@@ -9560,6 +9560,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	}
 
       recenter_overlay_lists (current_buffer, IT_CHARPOS (*it));
+      it->current_x = 0;
       last_height = it->max_ascent + it->max_descent;
       it->hpos = 0;
       it->line_number_produced_p = false;
@@ -18190,11 +18191,9 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   /* If current starting point was originally the beginning of a line
      but no longer is, find a new starting point.  */
   else if (w->start_at_line_beg
-	   && !(CHARPOS (startp) <= BEGV
-		|| FETCH_BYTE (BYTEPOS (startp) - 1) == '\n'))
-    {
-      goto recenter;
-    }
+	   && CHARPOS (startp) > BEGV
+	   && FETCH_BYTE (BYTEPOS (startp) - 1) != '\n')
+    goto recenter;
 
   /* Try scrolling with try_window_insdel.  Value is > 0 if update has
      been done, it is -1 if we know that the same window start will
@@ -18225,7 +18224,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	 the context of a mouse-down (e.g., extending the
 	 mouse-drag-overlay) since that would result in an
 	 unwanted mouse-movement rather than a simple mouse-click.  */
-      if (!w->start_at_line_beg
+      if (! w->start_at_line_beg
 	  && NILP (track_mouse)
       	  && CHARPOS (startp) > BEGV
 	  && CHARPOS (startp) > BEG + beg_unchanged

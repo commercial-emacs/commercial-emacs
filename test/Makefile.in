@@ -119,9 +119,9 @@ endif
 # The actual Emacs command run in the targets below.
 # Prevent any setting of EMACSLOADPATH in user environment causing problems,
 # and prevent locals to influence the text of the errors we expect to receive.
-emacs = LANG=C EMACSLOADPATH= 		   \
- EMACS_TEST_DIRECTORY=$(abspath $(srcdir)) \
- $(GDB) $(TEST_TIMEOUT) "$(EMACS)" $(MODULES_EMACSOPT) $(EMACSOPT)
+emacs_env = LANG=C EMACSLOADPATH= 		   \
+ EMACS_TEST_DIRECTORY=$(abspath $(srcdir))
+emacs = $(TEST_TIMEOUT) "$(EMACS)" $(MODULES_EMACSOPT) $(EMACSOPT)
 
 # Set HOME to a nonexistent directory to prevent tests from accessing
 # it accidentally (e.g., popping up a gnupg dialog if ~/.authinfo.gpg
@@ -161,7 +161,7 @@ endif
 
 ## Byte-compile all test files to test for errors.
 %.elc: %.el
-	$(AM_V_ELC)$(emacs) --batch -f batch-byte-compile $<
+	$(AM_V_ELC)$(emacs_env) $(emacs) --batch -f batch-byte-compile $<
 
 ## Save logs, and show logs for failed tests.
 ifeq ($(GDB),)
@@ -187,7 +187,7 @@ endif
 
 %.log: %.elc
 	$(AM_V_at)${MKDIR_P} $(dir $@)
-	$(AM_V_GEN)HOME=$(TEST_HOME) $(emacs) \
+	$(AM_V_GEN)HOME=$(TEST_HOME) $(emacs_env) $(GDB) $(emacs) \
 	  -l ert ${ert_opts} -l $(testloadfile) \
 	  $(TEST_RUN_ERT)
 
@@ -338,13 +338,13 @@ check-maybe: checkclean check-no-automated-subdir
 ## summarizing step from running when there is an error.
 check-doit:
 ifeq ($(TEST_INTERACTIVE), yes)
-	HOME=$(TEST_HOME) $(emacs) \
+	HOME=$(TEST_HOME) $(emacs_env) $(GDB) $(emacs) \
 	  -l ert ${ert_opts} \
 	  $(patsubst %,-l %,$(if $(findstring $(TEST_LOAD_EL),yes),$ELFILES,$(ELFILES:.el=))) \
 	  $(TEST_RUN_ERT)
 else
 	-@${MAKE} -k ${LOGFILES}
-	@$(emacs) --batch -l ert --eval \
+	@$(emacs_env) $(GDB) $(emacs) --batch -l ert --eval \
 	"(ert-summarize-tests-batch-and-exit ${SUMMARIZE_TESTS})" ${LOGFILES}
 endif
 
@@ -375,7 +375,7 @@ maintainer-clean: distclean bootstrap-clean
 .PHONY: check-declare
 
 check-declare:
-	$(emacs) --batch -l check-declare \
+	$(emacs_env) $(emacs) --batch -l check-declare \
 	  --eval '(check-declare-directory "$(srcdir)")'
 
 .PHONY: subdirs subdir-targets generate-test-jobs
