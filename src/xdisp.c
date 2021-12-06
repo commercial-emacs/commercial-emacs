@@ -120,7 +120,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    `move_it_to' is the workhorse that utilizes `emulate_display_line'
    to move an iterator FORWARD.  Moving an iterator backward means
    estimating how far to scroll back, and dialing in the desired
-   y-coordinate from there (see `move_it_vertically').
+   y-coordinate from there (see `move_it_y').
 
    Bidirectional display.
 
@@ -216,6 +216,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static Lisp_Object list_of_error;
 
 #ifdef HAVE_WINDOW_SYSTEM
+
+#define IT_POS_VALID_AFTER_MOVE_P(it)					\
+  ((it)->method != GET_FROM_STRING || IT_STRING_CHARPOS (*it) == 0)
 
 /* Test if overflow newline into fringe.  Called with iterator IT
    at or past right window margin, and with IT->current_x set.  */
@@ -1112,29 +1115,25 @@ line_bottom_y (struct it *it, int fallback_height)
   int line_height = it->max_ascent + it->max_descent;
   int line_top_y = it->current_y;
 
-  if (line_height == 0)
+  if (! line_height)
+    line_height = fallback_height;
+  if (! line_height)
+    if (IT_CHARPOS (*it) < ZV)
+      {
+	move_it_vpos (it, 1);
+	line_height = it->max_ascent + it->max_descent;
+      }
+  if (! line_height)
     {
-      if (fallback_height)
-	line_height = fallback_height;
-      else if (IT_CHARPOS (*it) < ZV)
-	{
-	  move_it_by_lines (it, 1);
-	  line_height = ((it->max_ascent + it->max_descent)
-			 ? (it->max_ascent + it->max_descent)
-			 : fallback_height);
-	}
-      else
-	{
-	  /* Use the default character height.  */
-	  struct glyph_row *row = it->glyph_row;
-	  it->glyph_row = NULL;
-	  it->what = IT_CHARACTER;
-	  it->c = ' ';
-	  it->len = 1;
-	  PRODUCE_GLYPHS (it);
-	  line_height = it->ascent + it->descent;
-	  it->glyph_row = row;
-	}
+      /* Use the default character height.  */
+      struct glyph_row *row = it->glyph_row;
+      it->glyph_row = NULL;
+      it->what = IT_CHARACTER;
+      it->c = ' ';
+      it->len = 1;
+      PRODUCE_GLYPHS (it);
+      line_height = it->ascent + it->descent;
+      it->glyph_row = row;
     }
 
   return line_top_y + line_height;
@@ -1168,14 +1167,13 @@ DEFUN ("line-pixel-height", Fline_pixel_height,
       old_buffer = current_buffer;
       set_buffer_internal_1 (XBUFFER (w->contents));
     }
-  SET_TEXT_POS (pt,
-		NILP (point)
-		? PT : (ptrdiff_t) (XFIXNUM (point)),
-		NILP (point)
-		? PT_BYTE : CHAR_TO_BYTE ((ptrdiff_t) (XFIXNUM (point))));
+  SET_TEXT_POS
+    (pt,
+     NILP (point) ? PT : (ptrdiff_t) (XFIXNUM (point)),
+     NILP (point) ? PT_BYTE : CHAR_TO_BYTE ((ptrdiff_t) (XFIXNUM (point))));
   void *itdata = bidi_shelve_cache ();
   start_move_it (&it, w, pt);
-  move_it_by_lines (&it, 0); /* bol */
+  move_it_vpos (&it, 0); /* bol */
   it.vpos = it.current_y = 0;
   result = make_fixnum (line_bottom_y (&it, 0));
   if (old_buffer)
@@ -1398,7 +1396,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	  void *it2data = NULL;
 
 	  SAVE_IT (it2, it, it2data);
-	  move_it_by_lines (&it, 1);
+	  move_it_vpos (&it, 1);
 	  it2.lnum_pixel_width = it.lnum_pixel_width;
 	  RESTORE_IT (&it, &it2, it2data);
 	}
@@ -1548,17 +1546,17 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		      && (it3.c == '\n'
 			  || FETCH_BYTE (IT_BYTEPOS (it3)) == '\n'))
 		    /* Move off a newline */
-		    move_it_by_lines (&it3, 1);
+		    move_it_vpos (&it3, 1);
 		  else if (emulate_display_line
 			   (&it3, -1, it3.current_x + it3.pixel_width,
 			    MOVE_TO_X) == MOVE_LINE_CONTINUED)
 		    {
 		      /* Move off rightmost character on a continued line */
-		      move_it_by_lines (&it3, 1);
-		      /* FIXME Under word-wrap, move_it_by_lines inexplicably
+		      move_it_vpos (&it3, 1);
+		      /* FIXME Under word-wrap, move_it_vpos inexplicably
 			 moves 2 lines.  */
 		      if (it3.line_wrap == WORD_WRAP)
-			move_it_by_lines (&it3, -1);
+			move_it_vpos (&it3, -1);
 		    }
 
 		  top_y = it3.current_y;
@@ -1665,7 +1663,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 
       SAVE_IT (it2, it, it2data);
       if (IT_CHARPOS (it) < ZV && FETCH_BYTE (IT_BYTEPOS (it)) != '\n')
-	move_it_by_lines (&it, 1);
+	move_it_vpos (&it, 1);
       if (charpos < IT_CHARPOS (it)
 	  || (it.what == IT_EOB && charpos == IT_CHARPOS (it)))
 	{
@@ -4207,7 +4205,7 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 		 even in R2L lines, we don't need to distinguish
 		 between the R2L and L2R cases here.  */
 	      current_x = it_copy.current_x;
-	      move_it_vertically (&it_copy, 0);
+	      move_it_y (&it_copy, 0);
 	      move_it_x (&it_copy, current_x - 1);
 	      pos = it_copy.current.pos;
 	      RESTORE_IT (it, it, it_copy_data);
@@ -8662,9 +8660,6 @@ get_element_from_composition (struct it *it)
 /* Check if iterator is at a position corresponding to a valid buffer
    position after some move_it_* call.  */
 
-#define IT_POS_VALID_AFTER_MOVE_P(it)					\
-  ((it)->method != GET_FROM_STRING || IT_STRING_CHARPOS (*it) == 0)
-
 #define BUFFER_POS_REACHED_P()					\
   ((op & MOVE_TO_POS)						\
    && BUFFERP (it->object)					\
@@ -8782,11 +8777,12 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	prev_pos = IT_CHARPOS (prev_it);
       prev_it = *it;
 
-      /* Stop if we move beyond TO_CHARPOS (after an image or a
-	 display string or stretch glyph).  */
       if ((op & MOVE_TO_POS)
 	  && BUFFERP (it->object)
 	  && it->method == GET_FROM_BUFFER
+	  /* TODO: This hack clause from 2010 is almost certainly
+	     wrong.  Why we even bother with prev_method accounting is
+	     super sus.  */
 	  && (((! it->bidi_p
 		/* At base embedding level, strictly L2R. */
 		|| BIDI_AT_BASE_LEVEL (it->bidi_it))
@@ -8805,17 +8801,18 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  if (it->line_wrap != WORD_WRAP || wrap_it.sp < 0)
 	    {
 	      result = MOVE_POS_MATCH_OR_ZV;
-	      break;
+	      goto done;
 	    }
 	  else if (it->line_wrap == WORD_WRAP && atpos_it.sp < 0)
 	    /* Stash iterator in case position is middle of word.  */
 	    SAVE_IT (atpos_it, *it, atpos_data);
 	}
 
+      /* Blink-and-you-miss-it advance step.  */
       if (! get_display_element (it))
 	{
 	  result = MOVE_POS_MATCH_OR_ZV;
-	  break;
+	  goto done;
 	}
 
       if (it->line_wrap == TRUNCATE)
@@ -8831,7 +8828,7 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 		  || it->area != TEXT_AREA))
 	    {
 	      result = MOVE_POS_MATCH_OR_ZV;
-	      break;
+	      goto done;
 	    }
 	}
       else if (it->line_wrap == WORD_WRAP && it->area == TEXT_AREA)
@@ -8864,10 +8861,10 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 
       PRODUCE_GLYPHS (it);
 
-      if (it->area != TEXT_AREA)
+      if (it->area != TEXT_AREA
+	  || it->method == GET_FROM_STRING)
 	{
-	  /* The remainder of the loop concerns line processing
-	     not relevant to marginal areas. */
+	  /* The remainder of the loop concerns visible glyphs.  */
 	  set_iterator_to_next (it, true);
 	  if (IT_CHARPOS (*it) < CHARPOS (static_line_min_pos))
 	    SET_TEXT_POS (static_line_min_pos,
@@ -9092,8 +9089,8 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 
 	      if (new_x > it->first_visible_x)
 		{
-		  /* If we have reached the visible portion of the
-		     screen line, produce the line number if needed.  */
+		  ++it->hpos;
+
 		  if (line_number_pending)
 		    {
 		      line_number_pending = false;
@@ -9101,21 +9098,18 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 		      maybe_produce_line_number (it);
 		      it->current_x += new_x - it->first_visible_x;
 		    }
-		  /* Glyph is visible.  Increment number of glyphs that
-		     would be displayed.  */
-		  ++it->hpos;
 		}
 	    }
 
 	  if (result != MOVE_UNDEFINED)
-            break;
+            goto done;
 	}
       else if (BUFFER_POS_REACHED_P ())
 	{
 	buffer_pos_reached:
 	  IT_RESET_X_ASCENT_DESCENT (it);
 	  result = MOVE_POS_MATCH_OR_ZV;
-	  break;
+	  goto done;
 	}
       else if ((op & MOVE_TO_X) && it->current_x >= to_x)
 	{
@@ -9123,7 +9117,7 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	     be caught here.  Thus this eassert. */
 	  eassert (it->nglyphs == 0);
 	  result = MOVE_X_REACHED;
-	  break;
+	  goto done;
 	}
 
       if (ITERATOR_AT_END_OF_LINE_P (it))
@@ -9153,7 +9147,7 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	    /* Done with this newline, so clear a flag set in
 	       `gui_produce_glyphs'. */
 	    it->constrain_row_ascent_descent_p = false;
-	  break;
+	  goto done;
 	}
 
       /* Proceed with next display element */
@@ -9221,7 +9215,7 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	    }
 	}
     }
-    done:
+ done:
 
   /* Restore to wrap point when atpos/atx position would be displayed
      on the next screen line due to line-wrap. (Bug#23570)  */
@@ -9284,7 +9278,7 @@ unsigned int mit_calls1 = 0, mit_calls2 = 0, mit_calls3 = 0, mit_calls4 = 0, mit
 int
 move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos, int op)
 {
-  int line_start_x = 0, max_current_x = 0;
+  int max_current_x = 0;
   ptrdiff_t orig_charpos = IT_CHARPOS (*it);
 
   for (;;)
@@ -9306,7 +9300,9 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		goto out;
 	    }
 	  else
-	    skip = emulate_display_line (it, -1, -1, 0);
+	    {
+	      skip = emulate_display_line (it, -1, -1, 0);
+	    }
 	}
       else if (op & MOVE_TO_Y)
 	{
@@ -9526,7 +9522,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		{
 		  /* When MOVE_TO_VPOS, ensure iterator advances to
 		     the next line (Bug#847, Bug#969).  */
-		  line_start_x = it->current_x + it->pixel_width
+		  it->current_x = it->current_x + it->pixel_width
 		    - it->last_visible_x;
 		  if (FRAME_WINDOW_P (it->f))
 		    {
@@ -9537,8 +9533,8 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 		      /* Reproduce `gui_produce_glyphs' logic which
                          inserts a stretch glyph to account for
 			 a tab stop closer than space width. */
-		      if (line_start_x < face_font->space_width)
-			line_start_x += it->tab_width * face_font->space_width;
+		      if (it->current_x < face_font->space_width)
+			it->current_x += it->tab_width * face_font->space_width;
 		    }
 		  set_iterator_to_next (it, false);
 		}
@@ -9564,11 +9560,9 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	}
 
       recenter_overlay_lists (current_buffer, IT_CHARPOS (*it));
-      it->current_x = line_start_x;
-      line_start_x = 0;
+      last_height = it->max_ascent + it->max_descent;
       it->hpos = 0;
       it->line_number_produced_p = false;
-      last_height = it->max_ascent + it->max_descent;
       it->current_y += last_height;
       ++it->vpos;
       it->max_ascent = it->max_descent = 0;
@@ -9618,7 +9612,7 @@ behaved_p (const struct it *it)
 */
 
 void
-move_it_vertically (struct it *it, int dy)
+move_it_y (struct it *it, int dy)
 {
   if (dy > 0)
     {
@@ -9629,7 +9623,7 @@ move_it_vertically (struct it *it, int dy)
 	  && ZV > BEGV
 	  && FETCH_BYTE (IT_BYTEPOS (*it) - 1) != '\n')
 	/* Annoying buffer without final newline.  Move to bol. */
-	move_it_by_lines (it, 0);
+	move_it_vpos (it, 0);
     }
   else /* dy <= 0 */
     {
@@ -9720,13 +9714,7 @@ move_it_vertically (struct it *it, int dy)
 	  if (dy == 0)
 	    {
 	      if (nlines > 0)
-		{
-		  int hpos = it->current_x / FRAME_COLUMN_WIDTH (it->f);
-		  fprintf (stderr, "foo %ld %d\n", IT_CHARPOS (*it), hpos);
-		  move_it_by_lines (it, nlines);
-		  hpos = it->current_x / FRAME_COLUMN_WIDTH (it->f);
-		  fprintf (stderr, "foo %ld %d\n", IT_CHARPOS (*it), hpos);
-		}
+		move_it_vpos (it, nlines);
 	      if (it->bidi_p
 		  && ! STRINGP (it->string)
 		  && IT_BYTEPOS (*it) > BEGV_BYTE
@@ -9757,7 +9745,7 @@ move_it_vertically (struct it *it, int dy)
 	      /* Most common branch where continued lines render
 		 our initial estimate of NLINES too large.  Scooch
 		 forward.  */
-	      move_it_vertically (it, target_y - it->current_y);
+	      move_it_y (it, target_y - it->current_y);
 	    }
 	  break;
 	}
@@ -9777,19 +9765,18 @@ move_it_past_eol (struct it *it)
 }
 
 
-/* Move IT by screen NLINES (or up if negative).
-   Need to preserve NLINES == 0 special behavior, i.e., move IT to line
-   start.  */
+/* Move IT by DVPOS screen lines down (or up if negative).  DVPOS of
+   zero means move to line start.  */
 
 void
-move_it_by_lines (struct it *it, ptrdiff_t nlines)
+move_it_vpos (struct it *it, ptrdiff_t dvpos)
 {
-  if (nlines == 0)
-    move_it_vertically (it, 0);
-  if (nlines > 0)
+  if (dvpos == 0)
+    move_it_y (it, 0);
+  else if (dvpos > 0)
     {
       mit_calls8++;
-      move_it_to (it, -1, -1, -1, it->vpos + nlines, MOVE_TO_VPOS);
+      move_it_to (it, -1, -1, -1, it->vpos + dvpos, MOVE_TO_VPOS);
       if (! IT_POS_VALID_AFTER_MOVE_P (it))
 	{
 	  /* Can happen for a display string, in which case we move
@@ -9803,53 +9790,93 @@ move_it_by_lines (struct it *it, ptrdiff_t nlines)
   else
     {
       struct it it2;
-      void *itdata = NULL;
-      ptrdiff_t from_pos, capped;
-      int nchars_per_line = ((it->last_visible_x - it->first_visible_x) /
-			    FRAME_COLUMN_WIDTH (it->f));
-      ptrdiff_t abs_nlines = abs (nlines);
+      void *it2data = NULL;
+      ptrdiff_t start_charpos, i, bound_pos;
+      int nchars_per_row
+	= (it->last_visible_x - it->first_visible_x) / FRAME_COLUMN_WIDTH (it->f);
+      bool hit_bound_pos = false;
 
-      /* Overlays can alter vpos just going to bol.  */
-      abs_nlines += it->vpos;
-      move_it_vertically (it, 0);
-      abs_nlines -= it->vpos;
+      /* Start at the beginning of the screen line containing IT's
+	 position.  This may actually move vertically backwards,
+         in case of overlays, so adjust dvpos accordingly.  */
+      dvpos += it->vpos;
+      move_it_y (it, 0);
+      dvpos -= it->vpos;
 
-      from_pos = IT_CHARPOS (*it);
-      capped = behaved_p (it)
-	? max (BEGV, from_pos - nchars_per_line * abs_nlines)
-	: 0;
+      /* Go back -DVPOS buffer lines, but no farther than -DVPOS full
+	 screen lines, and reseat the iterator there.  */
+      start_charpos = IT_CHARPOS (*it);
+      if (it->line_wrap == TRUNCATE || nchars_per_row == 0)
+	bound_pos = BEGV;
+      else
+	bound_pos = max (start_charpos + dvpos * nchars_per_row, BEGV);
 
-      for (int i = 0; i < abs_nlines; ++i)
+      for (i = -dvpos; i > 0 && IT_CHARPOS (*it) > bound_pos; --i)
+	preceding_line_start_visible (it);
+      if (i > 0 && IT_CHARPOS (*it) <= bound_pos)
+	hit_bound_pos = true;
+      reseat (it, it->current.pos, true);
+
+      /* Move further back if we end up in a string or an image.  */
+      while (! IT_POS_VALID_AFTER_MOVE_P (it))
 	{
-	  if (IT_CHARPOS (*it) <= capped)
+	  /* First try to move to start of display line.  */
+	  dvpos += it->vpos;
+	  move_it_y (it, 0);
+	  dvpos -= it->vpos;
+	  if (IT_POS_VALID_AFTER_MOVE_P (it))
 	    break;
+	  /* If start of line is still in string or image,
+	     move further back.  */
 	  preceding_line_start_visible (it);
+	  reseat (it, it->current.pos, true);
+	  dvpos--;
 	}
-      reseat (it, IT_CHARPOS (*it), true);
+
       it->current_x = it->hpos = 0;
 
-      /* Confusing correction.  */
-      SAVE_IT (it2, *it, itdata);
+      /* Above call may have moved too far if continuation lines
+	 are involved.  Scan forward and see if it did.  */
+      SAVE_IT (it2, *it, it2data);
       it2.vpos = it2.current_y = 0;
-      move_it_to (&it2, from_pos, -1, -1, -1, MOVE_TO_POS);
+      move_it_to (&it2, start_charpos, -1, -1, -1, MOVE_TO_POS);
       it->vpos -= it2.vpos;
       it->current_y -= it2.current_y;
       it->current_x = it->hpos = 0;
 
       /* If we moved too far back, move IT some lines forward.  */
-      if (it2.vpos > abs_nlines)
+      if (it2.vpos > -dvpos)
 	{
-	  int delta = it2.vpos + nlines;
+	  int delta = it2.vpos + dvpos;
 
-	  RESTORE_IT (&it2, &it2, itdata);
+	  RESTORE_IT (&it2, &it2, it2data);
 	  SAVE_IT (it2, *it, it2data);
 	  move_it_to (it, -1, -1, -1, it->vpos + delta, MOVE_TO_VPOS);
 	  /* Move back again if we got too far ahead.  */
-	  if (IT_CHARPOS (*it) >= from_pos)
-	    RESTORE_IT (it, &it2, itdata);
+	  if (IT_CHARPOS (*it) >= start_charpos)
+	    RESTORE_IT (it, &it2, it2data);
 	  else
-	    bidi_unshelve_cache (itdata, true);
+	    bidi_unshelve_cache (it2data, true);
 	}
+      else if (hit_bound_pos && bound_pos > BEGV
+	       && dvpos < 0 && it2.vpos < -dvpos)
+	{
+	  /* A display string with a newline spanning a large chunk
+	     caused `preceding_line_start_visible' to
+	     overshoot.  Punish it by scanning back to DVPOS, which
+	     will bog under long lines.  "If it hurts, don't do
+	     that!"  */
+	  dvpos += it2.vpos;
+	  RESTORE_IT (it, it, it2data);
+	  for (i = -dvpos; i > 0; --i)
+	    {
+	      preceding_line_start_visible (it);
+	      it->vpos--;
+	    }
+	  reseat_1 (it, it->current.pos, true);
+	}
+      else
+	RESTORE_IT (it, it, it2data);
     }
 }
 
@@ -10073,7 +10100,7 @@ partial_line_height (struct it *it_origin)
   else
     {
       int last_line_y = it.current_y;
-      move_it_by_lines (&it, 1);
+      move_it_vpos (&it, 1);
       partial_height = (it.current_y > it.last_visible_y)
         ? it.last_visible_y - last_line_y : 0;
     }
@@ -11515,7 +11542,7 @@ resize_mini_window (struct window *w, bool exact_p)
 	    {
 	      int last_line_y = bottom_y - unit_y;
 	      init_iterator (&it, w, ZV, ZV_BYTE, NULL, DEFAULT_FACE_ID);
-	      move_it_vertically (&it, -1 * last_line_y);
+	      move_it_y (&it, -1 * last_line_y);
               /* Prevent `redisplay_window' overriding window-start.  */
               w->start_at_line_beg = false;
               SET_MARKER_FROM_TEXT_POS (w->start, it.position);
@@ -16988,7 +17015,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
       start_move_it (&it, w, startp);
       if (arg_scroll_conservatively <= scroll_limit)
-	move_it_vertically (&it, -amount_to_scroll);
+	move_it_y (&it, -amount_to_scroll);
       else
 	{
 	  /* Extra precision for users who set scroll-conservatively
@@ -17007,7 +17034,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	  start_y = line_bottom_y (&it1, last_height);
 	  do {
 	    RESTORE_IT (&it, &it, it1data);
-	    move_it_by_lines (&it, 1);
+	    move_it_vpos (&it, 1);
 	    SAVE_IT (it1, it, it1data);
 	  } while (IT_CHARPOS (it) < ZV
 		   && ((line_bottom_y (&it1, last_height) - start_y) <
@@ -17017,7 +17044,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
       /* If STARTP is unchanged, move it down another screen line.  */
       if (IT_CHARPOS (it) == CHARPOS (startp))
-	move_it_by_lines (&it, 1);
+	move_it_vpos (&it, 1);
       startp = it.current.pos;
     }
   else
@@ -17033,7 +17060,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
 	  start_move_it (&it, w, startp);
 	  y_start = it.current_y;
-	  move_it_vertically (&it, this_scroll_margin);
+	  move_it_y (&it, this_scroll_margin);
 	  scroll_margin_pos = it.current.pos;
 	  /* If we didn't move enough before hitting ZV, request
 	     additional amount of scroll, to move point out of the
@@ -17101,7 +17128,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	  if (amount_to_scroll <= 0)
 	    return SCROLLING_FAILED;
 
-	  move_it_vertically (&it, -amount_to_scroll);
+	  move_it_y (&it, -amount_to_scroll);
 	  startp = it.current.pos;
 	}
     }
@@ -17217,11 +17244,11 @@ compute_window_start_on_continuation_line (struct window *w)
 	      pos = it.current.pos;
 	      if (it.line_wrap == WORD_WRAP)
 		{
-		  /* Under WORD_WRAP, move_it_by_lines is likely to
+		  /* Under WORD_WRAP, move_it_vpos is likely to
 		     overshoot and stop not at the first, but the
 		     second character from the left margin.  So in
 		     that case, we need a more tight control on the X
-		     coordinate of the iterator than move_it_by_lines
+		     coordinate of the iterator than move_it_vpos
 		     promises in its contract.  The method is to first
 		     go to the last (rightmost) visible character of a
 		     line, then move to the leftmost character on the
@@ -17234,7 +17261,7 @@ compute_window_start_on_continuation_line (struct window *w)
 		}
 	      else
                 {
-                  move_it_by_lines (&it, 1);
+                  move_it_vpos (&it, 1);
                 }
 	    }
 
@@ -18342,7 +18369,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
 	  SAVE_IT (it1, it, it1data);
 	  start_move_it (&it1, w, startp);
-	  move_it_vertically (&it1, margin * frame_line_height);
+	  move_it_y (&it1, margin * frame_line_height);
 	  margin_pos = IT_CHARPOS (it1);
 	  RESTORE_IT (&it, &it, it1data);
 	}
@@ -18391,11 +18418,11 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	   from point.  */
 	centering_position = window_box_height (w) / 2;
     }
-  move_it_vertically (&it, -centering_position);
+  move_it_y (&it, -centering_position);
 
   eassert (IT_CHARPOS (it) >= BEGV);
 
-  /* The function move_it_vertically may move over more than the
+  /* The function move_it_y may move over more than the
      specified y-distance.  If it->w is small, e.g. a mini-buffer
      window, we may end up in front of the window's display area.
      Start displaying at the start of the line containing PT in this
@@ -18403,7 +18430,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   if (it.current_y <= 0)
     {
       init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
-      move_it_vertically (&it, 0);
+      move_it_y (&it, 0);
       it.current_y = 0;
     }
 
@@ -18454,13 +18481,13 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       if (w->window_end_valid && PT >= Z - w->window_end_pos)
 	{
 	  clear_glyph_matrix (w->desired_matrix);
-	  move_it_by_lines (&it, 1);
+	  move_it_vpos (&it, 1);
 	  try_window (window, it.current.pos, 0);
 	}
       else if (PT < IT_CHARPOS (it))
 	{
 	  clear_glyph_matrix (w->desired_matrix);
-	  move_it_by_lines (&it, -1);
+	  move_it_vpos (&it, -1);
 	  try_window (window, it.current.pos, 0);
 	}
       else if (scroll_conservatively > SCROLL_LIMIT
@@ -18480,7 +18507,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
 	  clear_glyph_matrix (w->desired_matrix);
 	  do {
-	    move_it_by_lines (&it, 1);
+	    move_it_vpos (&it, 1);
 	  } while (IT_CHARPOS (it) == pos0);
 	  try_window (window, it.current.pos, 0);
 	}
@@ -18568,7 +18595,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	    = WINDOW_TOTAL_LINES (w) * FRAME_LINE_HEIGHT (f) / frame_line_height;
 	  bool move_down = w->cursor.vpos >= window_total_lines / 2;
 
-	  move_it_by_lines (&it, move_down ? margin + 1 : -(margin + 1));
+	  move_it_vpos (&it, move_down ? margin + 1 : -(margin + 1));
 	  clear_glyph_matrix (w->desired_matrix);
 	  if (1 == try_window (window, it.current.pos,
 			       TRY_WINDOW_CHECK_MARGINS))
@@ -23741,11 +23768,11 @@ Value is the new character position of point.  */)
 	      reseat_preceding_line_start (&it);
 	      it.current_x = it.current_y = it.hpos = 0;
 	      if (pt_vpos != 0)
-		move_it_by_lines (&it, pt_vpos);
+		move_it_vpos (&it, pt_vpos);
 	    }
 	  else
 	    {
-	      move_it_by_lines (&it, -1);
+	      move_it_vpos (&it, -1);
 	      target_x = it.last_visible_x - !FRAME_WINDOW_P (it.f);
 	      target_is_eol_p = true;
 	      /* Under word-wrap, we don't know the x coordinate of
@@ -23781,8 +23808,8 @@ Value is the new character position of point.  */)
 		  && it.line_wrap != TRUNCATE))
 	    {
 	      if (pt_x > 0)
-		move_it_by_lines (&it, 0);
-	      move_it_by_lines (&it, 1);
+		move_it_vpos (&it, 0);
+	      move_it_vpos (&it, 1);
 	      target_x = 0;
 	    }
 	}

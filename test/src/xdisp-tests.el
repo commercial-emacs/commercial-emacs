@@ -32,43 +32,38 @@
        (let ((executing-kbd-macro t)) ;Force real minibuffer in `read-string'.
          (read-string "toto: ")))))
 
-(ert-deftest xdisp-tests--minibuffer-resizing () ;; bug#43519
-  (should
-   (xdisp-tests--in-minibuffer
-    (insert "hello")
-    (let ((ol (make-overlay (point) (point)))
-          (max-mini-window-height 1)
-          (text "askdjfhaklsjdfhlkasjdfhklasdhflkasdhflkajsdhflkashdfkljahsdlfkjahsdlfkjhasldkfhalskdjfhalskdfhlaksdhfklasdhflkasdhflkasdhflkajsdhklajsdgh"))
-      ;; (save-excursion (insert text))
-      ;; (sit-for 2)
-      ;; (delete-region (point) (point-max))
-      (put-text-property 0 1 'cursor t text)
-      (overlay-put ol 'after-string text)
-      (redisplay)
-      ;; Make sure we do the see "hello" text.
-      (prog1 (equal (window-start) (point-min))
-        ;; (list (window-start) (window-end) (window-width))
-        (delete-overlay ol))))))
+(ert-deftest xdisp-tests--minibuffer-resizing ()
+  "Unvisible overlay string following visible text should not
+scroll up.  (Bug#43519) "
+  (xdisp-tests--in-minibuffer
+   (insert "hello")
+   (let ((ol (make-overlay (point) (point)))
+         (max-mini-window-height 1)
+         (text (let ((s ""))
+                 (dotimes (i 137)
+                   (setq s (concat s (char-to-string (+ (% i 26) ?a)))))
+                 s)))
+     (put-text-property 0 1 'cursor t text)
+     (overlay-put ol 'after-string text)
+     (redisplay)
+     (should (equal (window-start) (point-min)))
+     (delete-overlay ol))))
 
-(ert-deftest xdisp-tests--minibuffer-scroll () ;; bug#44070
-  (let ((posns
-         (xdisp-tests--in-minibuffer
-           (let ((max-mini-window-height 4))
-             (dotimes (_ 80) (insert "\nhello"))
-             (goto-char (point-min))
-             (redisplay)
-             (goto-char (point-max))
-             ;; A simple edit like removing the last `o' shouldn't cause
-             ;; the rest of the minibuffer's text to move.
-             (list
-              (progn (redisplay) (window-start))
-              (progn (delete-char -1)
-                     (redisplay) (window-start))
-              (progn (goto-char (point-min)) (redisplay)
-                     (goto-char (point-max)) (redisplay)
-                     (window-start)))))))
-    (should (equal (nth 0 posns) (nth 1 posns)))
-    (should (equal (nth 1 posns) (nth 2 posns)))))
+(ert-deftest xdisp-tests--minibuffer-scroll ()
+  "Deleting the last character shouldn't cause the text
+to scroll. (Bug#44070) "
+  (xdisp-tests--in-minibuffer
+   (let ((max-mini-window-height 4))
+     (dotimes (_ 80) (insert "\nhello"))
+     (should (equal (progn (goto-char (point-min))
+                           (redisplay) (goto-char (point-max))
+                           (redisplay) (window-start))
+                    (progn (delete-char -1)
+                           (redisplay) (window-start))))
+     (should (equal (window-start)
+                    (progn (goto-char (point-min))
+                           (redisplay) (goto-char (point-max))
+                           (redisplay) (window-start)))))))
 
 (ert-deftest xdisp-tests--window-text-pixel-size () ;; bug#45748
   (with-temp-buffer

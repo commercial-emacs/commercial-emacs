@@ -1993,12 +1993,12 @@ line_number_display_width (struct window *w, int *width, int *pixel_width)
 	  saved_restriction = true;
 	}
       start_move_it (&it, w, startpos);
-      /* The call to move_it_by_lines below will not generate a line
+      /* The call to move_it_vpos below will not generate a line
 	 number if the first line shown in the window is hscrolled
 	 such that all of its display elements are out of view.  So we
 	 pretend the hscroll doesn't exist.  */
       it.first_visible_x = 0;
-      move_it_by_lines (&it, 1);
+      move_it_vpos (&it, 1);
       *width = it.lnum_width;
       *pixel_width = it.lnum_pixel_width;
       if (saved_restriction)
@@ -2275,7 +2275,7 @@ whether or not it is currently displayed in some window.  */)
 	      && it_overshoot_count == 0 && it.vpos > 0)
 	    it_overshoot_count = 1;
 	  if (it_overshoot_count > 0)
-	    move_it_by_lines (&it, -it_overshoot_count);
+	    move_it_vpos (&it, -it_overshoot_count);
 
 	  overshoot_handled = 1;
 	}
@@ -2307,13 +2307,13 @@ whether or not it is currently displayed in some window.  */)
 	     beginning of the current line as we ought.  */
 	  if ((nlines < 0 && IT_CHARPOS (it) > BEGV)
 	      || (nlines == 0 && !(start_x_given && start_x <= to_x)))
-	    move_it_by_lines (&it, max (PTRDIFF_MIN, nlines));
+	    move_it_vpos (&it, max (PTRDIFF_MIN, nlines));
 	}
       else if (overshoot_handled)
 	{
 	  it.vpos = vpos_init;
 	  it.current_y = 0;
-	  move_it_by_lines (&it, min (PTRDIFF_MAX, nlines));
+	  move_it_vpos (&it, min (PTRDIFF_MAX, nlines));
 	}
       else
 	{
@@ -2327,16 +2327,16 @@ whether or not it is currently displayed in some window.  */)
 		{
 		  it.vpos = 0;
 		  it.current_y = 0;
-		  move_it_by_lines (&it, 1);
+		  move_it_vpos (&it, 1);
 		}
 	      if (nlines > 1)
-		move_it_by_lines (&it, min (PTRDIFF_MAX, nlines - 1));
+		move_it_vpos (&it, min (PTRDIFF_MAX, nlines - 1));
 	    }
 	  else	/* it_start = ZV */
 	    {
 	      it.vpos = 0;
 	      it.current_y = 0;
-	      move_it_by_lines (&it, min (PTRDIFF_MAX, nlines));
+	      move_it_vpos (&it, min (PTRDIFF_MAX, nlines));
 	      /* We could have some display or overlay string at ZV,
 		 in which case it.vpos will be nonzero now, while
 		 actually we didn't move vertically at all.  */
@@ -2365,7 +2365,7 @@ whether or not it is currently displayed in some window.  */)
 				'\n',
 				SBYTES (it.string) - IT_STRING_BYTEPOS (it)))
 		{
-		  move_it_by_lines (&it, 1);
+		  move_it_vpos (&it, 1);
 		  move_it_x (&it, first_x + to_x);
 		}
 	    }

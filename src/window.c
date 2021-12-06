@@ -1793,7 +1793,7 @@ recorded.  */)
 
       itdata = bidi_shelve_cache ();
       start_move_it (&it, w, startp);
-      move_it_vertically (&it, window_box_height (w));
+      move_it_y (&it, window_box_height (w));
       if (it.current_y < it.last_visible_y)
 	move_it_past_eol (&it);
       value = make_fixnum (IT_CHARPOS (it));
@@ -5581,7 +5581,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	 results for variable height lines.  */
       init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
       it.current_y = it.last_visible_y;
-      move_it_vertically (&it, window_box_height (w) / -2);
+      move_it_y (&it, window_box_height (w) / -2);
 
       /* The function move_iterator_vertically may move over more than
 	 the specified y-distance.  If it->w is small, e.g. a
@@ -5591,7 +5591,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       if (it.current_y <= 0)
 	{
 	  init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
-	  move_it_vertically (&it, 0);
+	  move_it_y (&it, 0);
 	  it.current_y = 0;
 	}
 
@@ -5706,14 +5706,14 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       int goal_y;
       void *it_data;
 
-      /* Note that move_it_vertically always moves the iterator to the
+      /* Note that move_it_y always moves the iterator to the
          start of a line.  So, if the last line doesn't have a newline,
 	 we would end up at the start of the line ending at ZV.  */
       if (dy <= 0)
 	{
 	  goal_y = it.current_y + dy;
-	  move_it_vertically (&it, dy);
-	  /* move_it_vertically_backward above always overshoots if DY
+	  move_it_y (&it, dy);
+	  /* move_it_y (backward) above always overshoots if DY
 	     cannot be reached exactly, i.e. if it falls in the middle
 	     of a screen line.  But if that screen line is large
 	     (e.g., a tall image), it might make more sense to
@@ -5723,14 +5723,14 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	      it_data = bidi_shelve_cache ();
 	      struct it it1 = it;
 	      if (window_line_bottom_y (&it1) - goal_y < goal_y - it.current_y)
-		move_it_by_lines (&it, 1);
+		move_it_vpos (&it, 1);
 	      bidi_unshelve_cache (it_data, true);
 	    }
 	  /* Ensure we actually do move, e.g. in case we are currently
 	     looking at an image that is taller that the window height.  */
 	  while (start_pos == IT_CHARPOS (it)
 		 && start_pos > BEGV)
-	    move_it_by_lines (&it, -1);
+	    move_it_vpos (&it, -1);
 	}
       else if (dy > 0)
 	{
@@ -5747,7 +5747,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	      it_data = bidi_shelve_cache ();
 	      struct it it2 = it;
 
-	      move_it_by_lines (&it, 1);
+	      move_it_vpos (&it, 1);
 	      if (it.current_y > goal_y + 0.5 * flh)
 		{
 		  it = it2;
@@ -5760,11 +5760,11 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	     looking at an image that is taller that the window height.  */
 	  while (start_pos == IT_CHARPOS (it)
 		 && start_pos < ZV)
-	    move_it_by_lines (&it, 1);
+	    move_it_vpos (&it, 1);
 	}
     }
   else
-    move_it_by_lines (&it, n);
+    move_it_vpos (&it, n);
 
   /* We failed if we find ZV is already on the screen (scrolling up,
      means there's nothing past the end), or if we can't start any
@@ -5887,7 +5887,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	  while (it.current_y < this_scroll_margin)
 	    {
 	      int prev = it.current_y;
-	      move_it_by_lines (&it, 1);
+	      move_it_vpos (&it, 1);
 	      if (prev == it.current_y)
 		break;
 	    }
@@ -5959,7 +5959,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	  - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
       else
 	{
-	  move_it_by_lines (&it, 1);
+	  move_it_vpos (&it, 1);
 	  partial_p =
 	    it.current_y
 	    > it.last_visible_y - this_scroll_margin
@@ -5995,7 +5995,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	    /* The last line was only partially visible, so back up two
 	       lines to make sure we're on a fully visible line.  */
 	    {
-	      move_it_by_lines (&it, -2);
+	      move_it_vpos (&it, -2);
 	      SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
 	    }
 	  else
@@ -6444,7 +6444,7 @@ displayed_window_lines (struct window *w)
 
   itdata = bidi_shelve_cache ();
   start_move_it (&it, w, start);
-  move_it_vertically (&it, height);
+  move_it_y (&it, height);
   bottom_y = window_line_bottom_y (&it);
   bidi_unshelve_cache (itdata, false);
 
@@ -6547,7 +6547,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 
 	  SET_TEXT_POS (pt, PT, PT_BYTE);
 	  start_move_it (&it, w, pt);
-	  move_it_vertically (&it, window_box_height (w) / -2);
+	  move_it_y (&it, window_box_height (w) / -2);
 	  charpos = IT_CHARPOS (it);
 	  bytepos = IT_BYTEPOS (it);
 	  bidi_unshelve_cache (itdata, false);
@@ -6569,14 +6569,14 @@ and redisplay normally--don't erase and redraw the frame.  */)
 	  start_move_it (&it, w, pt);
 
 	  /* Be sure we have the exact height of the full line containing PT.  */
-	  move_it_by_lines (&it, 0);
+	  move_it_vpos (&it, 0);
 
 	  /* The amount of pixels we have to move back is the window
 	     height minus what's displayed in the line containing PT,
 	     and the lines below.  */
 	  it.current_y = 0;
 	  it.vpos = 0;
-	  move_it_by_lines (&it, nlines);
+	  move_it_vpos (&it, nlines);
 
 	  if (it.vpos == nlines)
 	    h -= it.current_y;
@@ -6607,7 +6607,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 	  /* Now find the new top line (starting position) of the window.  */
 	  start_move_it (&it, w, pt);
 	  it.current_y = 0;
-	  move_it_vertically (&it, -h);
+	  move_it_y (&it, -h);
 
 	  /* If extra line spacing is present, we may move too far
 	     back.  This causes the last line to be only partially
@@ -6618,7 +6618,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 	  */
 	  h += extra_line_spacing;
 	  while (-it.current_y > h)
-	    move_it_by_lines (&it, 1);
+	    move_it_vpos (&it, 1);
 
 	  charpos = IT_CHARPOS (it);
 	  bytepos = IT_BYTEPOS (it);
@@ -6640,14 +6640,14 @@ and redisplay normally--don't erase and redraw the frame.  */)
 	  start_move_it (&it, w, pt);
 
 	  /* Move to the beginning of screen line containing PT.  */
-	  move_it_by_lines (&it, 0);
+	  move_it_vpos (&it, 0);
 
 	  /* Move back to find the point which is ARG screen lines above PT.  */
 	  if (nlines > 0)
 	    {
 	      it.current_y = 0;
 	      it.vpos = 0;
-	      move_it_by_lines (&it, -nlines);
+	      move_it_vpos (&it, -nlines);
 	    }
 
 	  charpos = IT_CHARPOS (it);
