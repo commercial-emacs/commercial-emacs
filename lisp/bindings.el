@@ -288,7 +288,7 @@ mnemonics of the following coding systems:
 Value is used for `mode-line-frame-identification', which see."
   (if (or (null window-system)
 	  (eq window-system 'pc))
-      "-%F  "
+      " %F  "
     "  "))
 
 ;; We need to defer the call to mode-line-frame-control to the time
@@ -501,7 +501,7 @@ mouse-1: Display Line and Column Mode Menu"))
 
 (defvar mode-line-position
   `((:propertize
-     (" " mode-line-percent-position)
+     ("" mode-line-percent-position)
      local-map ,mode-line-column-line-number-mode-map
      display (min-width (5.0))
      mouse-face mode-line-highlight
