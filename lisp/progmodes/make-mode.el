@@ -1224,13 +1224,15 @@ definition and conveniently use this command."
 
 (defun makefile-append-backslash (column)
   (end-of-line)
-  ;; Note that "\\\\" is needed to get one backslash.
-  (if (= (preceding-char) ?\\)
-      (progn (forward-char -1)
-             (delete-horizontal-space)
-             (indent-to column (if makefile-backslash-align nil 1)))
-    (indent-to column (if makefile-backslash-align nil 1))
-    (insert "\\")))
+  ;; Ensure `indent-to' will use spaces.
+  (let ((indent-tabs-mode nil))
+    ;; Note that "\\\\" is needed to get one backslash.
+    (if (= (preceding-char) ?\\)
+        (progn (forward-char -1)
+               (delete-horizontal-space)
+               (indent-to column (if makefile-backslash-align nil 1)))
+      (indent-to column (if makefile-backslash-align nil 1))
+      (insert "\\"))))
 
 (defun makefile-delete-backslash ()
   (end-of-line)
