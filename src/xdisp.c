@@ -12889,7 +12889,7 @@ display_tab_bar_line (struct it *it, int height)
       struct it it_before;
 
       /* Get the next display element.  */
-      if (!get_display_element (it))
+      if (! get_display_element (it))
 	{
 	  /* Don't count empty row if we are counting needed tab-bar lines.  */
 	  if (height < 0 && !it->hpos)
@@ -13803,7 +13803,7 @@ display_tool_bar_line (struct it *it, int height)
       struct it it_before;
 
       /* Get the next display element.  */
-      if (!get_display_element (it))
+      if (! get_display_element (it))
 	{
 	  /* Don't count empty row if we are counting needed tool-bar lines.  */
 	  if (height < 0 && !it->hpos)
@@ -22416,7 +22416,7 @@ display_line (struct it *it, int cursor_vpos)
 
       /* Retrieve the next thing to display.  Value is false if end of
 	 buffer reached.  */
-      if (!get_display_element (it))
+      if (! get_display_element (it))
 	{
 	  bool row_has_glyphs = false;
 	  /* Maybe add a space at the end of this line that is used to
@@ -22650,7 +22650,7 @@ display_line (struct it *it, int cursor_vpos)
 			  set_iterator_to_next (it, true);
 			  if (IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
 			    {
-			      if (!get_display_element (it))
+			      if (! get_display_element (it))
 				{
 				  row->exact_window_width_line_p = true;
 				  it->continuation_lines_width = 0;
@@ -23840,7 +23840,7 @@ Value is the new character position of point.  */)
 	  while (IT_CHARPOS (it) == PT)
 	    {
 	      set_iterator_to_next (&it, false);
-	      if (!get_display_element (&it))
+	      if (! get_display_element (&it))
 		break;
 	    }
 	}
@@ -26116,7 +26116,7 @@ display_string (const char *string, Lisp_Object lisp_string, Lisp_Object face_st
       int x_before, x, n_glyphs_before, i, nglyphs;
 
       /* Get the next display element.  */
-      if (!get_display_element (it))
+      if (! get_display_element (it))
 	break;
 
       /* Produce glyphs.  */
