@@ -8791,14 +8791,14 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  goto done;
 	}
 
-      if (BUFFER_POS_REACHED_P ())
+      if (it->line_wrap == TRUNCATE)
 	{
-	  /* Don't exit before producing a glyph at TO_CHARPOS if
-	     we're at the fringe (where pixel_width is zero).  */
+	  /* Under TRUNCATE, we don't produce a glyph at TO_CHARPOS
+	     unless we're at fringe.  I don't make the rules.  */
 	  bool fringe = it->pixel_width <= 0
 	    && IT_CHARPOS (*it) <= to_charpos
 	    && it->area == TEXT_AREA;
-	  if (! fringe)
+	  if (BUFFER_POS_REACHED_P () && ! fringe)
 	    {
 	      result = MOVE_POS_MATCH_OR_ZV;
 	      goto done;
