@@ -8683,6 +8683,18 @@ get_element_from_composition (struct it *it)
   }								\
   while (false)
 
+#define ADVANCE_IT(IT)						\
+  do {								\
+    set_iterator_to_next ((IT), true);				\
+    if (IT_CHARPOS (*(IT)) < CHARPOS (static_line_min_pos))	\
+      SET_TEXT_POS (static_line_min_pos, IT_CHARPOS (*(IT)),	\
+		    IT_BYTEPOS (*(IT)));			\
+    if (IT_CHARPOS (*(IT)) < to_charpos)			\
+      saw_smaller_pos = true;					\
+    SET_CLOSEST_PAST_CHARPOS ((IT));				\
+  }								\
+  while (false)
+
 #define IT_RESET_X_ASCENT_DESCENT(IT)			\
   ((IT)->current_x = x, (IT)->max_ascent = ascent,	\
    (IT)->max_descent = descent)
@@ -8729,11 +8741,11 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 {
   enum move_it_result result = MOVE_UNDEFINED;
   struct glyph_row *saved_glyph_row;
-  struct it wrap_it, atpos_it, atx_it, ppos_it, prev_it;
+  struct it wrap_it, atpos_it, atx_it, ppos_it;
   void *wrap_data = NULL, *atpos_data = NULL,
     *atx_data = NULL, *ppos_data = NULL;
   bool may_wrap = false;
-  ptrdiff_t closest_pos = ZV, prev_pos = -1;
+  ptrdiff_t closest_pos = ZV;
   bool ppos_p = it->bidi_p && (op & MOVE_TO_POS);
   bool saw_smaller_pos = IT_CHARPOS (*it) < to_charpos;
   bool line_number_pending = false;
@@ -8769,69 +8781,31 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
   if (IT_CHARPOS (*it) < CHARPOS (static_line_min_pos))
     SET_TEXT_POS (static_line_min_pos, IT_CHARPOS (*it), IT_BYTEPOS (*it));
 
-  for (int k = 0; ; k++)
+  for (;;)
     {
       int x, i, ascent = 0, descent = 0;
-      enum it_method prev_method = k ? prev_it.method : NUM_IT_METHODS;
-      if (prev_method == GET_FROM_BUFFER)
-	prev_pos = IT_CHARPOS (prev_it);
-      prev_it = *it;
 
-      if ((op & MOVE_TO_POS)
-	  && BUFFERP (it->object)
-	  && it->method == GET_FROM_BUFFER
-	  /* TODO: This hack clause from 2010 is almost certainly
-	     wrong.  Why we even bother with prev_method accounting is
-	     super sus.  */
-	  && (((! it->bidi_p
-		/* At base embedding level, strictly L2R. */
-		|| BIDI_AT_BASE_LEVEL (it->bidi_it))
-	       && IT_CHARPOS (*it) > to_charpos)
-	      || (it->bidi_p
-		  && (prev_method == GET_FROM_IMAGE
-		      || prev_method == GET_FROM_STRETCH
-		      || prev_method == GET_FROM_STRING)
-		  /* Passed TO_CHARPOS from left to right.  */
-		  && ((prev_pos < to_charpos
-		       && IT_CHARPOS (*it) >= to_charpos)
-		      /* Passed TO_CHARPOS from right to left.  */
-		      || (prev_pos > to_charpos
-			  && IT_CHARPOS (*it) <= to_charpos)))))
-	{
-	  if (it->line_wrap != WORD_WRAP || wrap_it.sp < 0)
-	    {
-	      result = MOVE_POS_MATCH_OR_ZV;
-	      goto done;
-	    }
-	  else if (it->line_wrap == WORD_WRAP && atpos_it.sp < 0)
-	    /* Stash iterator in case position is middle of word.  */
-	    SAVE_IT (atpos_it, *it, atpos_data);
-	}
-
-      /* Blink-and-you-miss-it advance step.  */
       if (! get_display_element (it))
 	{
 	  result = MOVE_POS_MATCH_OR_ZV;
 	  goto done;
 	}
 
-      if (it->line_wrap == TRUNCATE)
+      if (BUFFER_POS_REACHED_P ())
 	{
-	  if (BUFFER_POS_REACHED_P ()
-	      /* When an overlay draws a fringe bitmap, pixel width
-		 is zero, and PRODUCE_GLYPHS didn't consume any
-		 screen estate in the text area.  Don't exit
-		 before we produce a glyph for TO_CHARPOS.
-	      */
-	      && (it->pixel_width > 0
-		  || IT_CHARPOS (*it) > to_charpos
-		  || it->area != TEXT_AREA))
+	  /* Don't exit before producing a glyph at TO_CHARPOS if
+	     we're at the fringe (where pixel_width is zero).  */
+	  bool fringe = it->pixel_width <= 0
+	    && IT_CHARPOS (*it) <= to_charpos
+	    && it->area == TEXT_AREA;
+	  if (! fringe)
 	    {
 	      result = MOVE_POS_MATCH_OR_ZV;
 	      goto done;
 	    }
 	}
-      else if (it->line_wrap == WORD_WRAP && it->area == TEXT_AREA)
+
+      if (it->line_wrap == WORD_WRAP && it->area == TEXT_AREA)
 	{
 	  if (may_wrap && char_can_wrap_before (it))
 	    {
@@ -8854,7 +8828,6 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  may_wrap = char_can_wrap_after (it);
 	}
 
-      /* Stash fontmetrics and x-coordinate in case IT doesn't fit.  */
       ascent = it->max_ascent;
       descent = it->max_descent;
       x = it->current_x;
@@ -8865,11 +8838,7 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  || it->method == GET_FROM_STRING)
 	{
 	  /* The remainder of the loop concerns visible glyphs.  */
-	  set_iterator_to_next (it, true);
-	  if (IT_CHARPOS (*it) < CHARPOS (static_line_min_pos))
-	    SET_TEXT_POS (static_line_min_pos,
-			  IT_CHARPOS (*it), IT_BYTEPOS (*it));
-	  SET_CLOSEST_PAST_CHARPOS (it);
+	  ADVANCE_IT (it);
 	  continue;
 	}
 
@@ -9080,8 +9049,9 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 		{
 		  if (it->line_wrap != WORD_WRAP || wrap_it.sp < 0)
 		    goto buffer_pos_reached;
-		  if (it->line_wrap == WORD_WRAP && atpos_it.sp < 0)
+		  else if (atpos_it.sp < 0)
 		    {
+		      eassert (it->line_wrap == WORD_WRAP);
 		      SAVE_IT (atpos_it, *it, atpos_data);
 		      IT_RESET_X_ASCENT_DESCENT (&atpos_it);
 		    }
@@ -9150,7 +9120,14 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  goto done;
 	}
 
-      /* Proceed with next display element */
+      /* Awkward:
+
+	 (i == 0) Goto done if past edge
+	 (i == 0) Advance iterator
+	 (i == 1) Goto done if past edge
+
+	 Look in git history for OVERWIDE_PREFIX how this was
+	 previously done.  */
       for (int i=0; i<2; ++i)
 	{
 	  if (it->line_wrap == TRUNCATE
@@ -9164,7 +9141,7 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 		{
 		  bool at_eob_p = false;
 
-		  if ((at_eob_p = !get_display_element (it))
+		  if ((at_eob_p = ! get_display_element (it))
 		      || BUFFER_POS_REACHED_P ())
 		    {
 		      result = MOVE_POS_MATCH_OR_ZV;
@@ -9204,15 +9181,9 @@ emulate_display_line (struct it *it, ptrdiff_t to_charpos, int to_x,
 	      goto done;
 	    }
 
+	  /* Blink-and-you-miss-it advance step.  */
 	  if (i == 0)
-	    {
-	      set_iterator_to_next (it, true);
-	      if (IT_CHARPOS (*it) < CHARPOS (static_line_min_pos))
-		SET_TEXT_POS (static_line_min_pos, IT_CHARPOS (*it), IT_BYTEPOS (*it));
-	      if (IT_CHARPOS (*it) < to_charpos)
-		saw_smaller_pos = true;
-	      SET_CLOSEST_PAST_CHARPOS (it);
-	    }
+	    ADVANCE_IT (it);
 	}
     }
  done:
@@ -9633,12 +9604,11 @@ move_it_y (struct it *it, int dy)
 	  struct it it_from;
 	  void *itdata = NULL;
 	  int abs_dy = abs (dy);
-	  int from_x = it->current_x;
 	  ptrdiff_t from_pos = IT_CHARPOS (*it), target_y = it->current_y - abs_dy;
 	  int h, nlines = max (1, abs_dy / default_line_pixel_height (it->w));
 	  int nchars_per_line = (it->last_visible_x - it->first_visible_x) /
 	    FRAME_COLUMN_WIDTH (it->f);
-	  ptrdiff_t capped = behaved_p (it) && false
+	  ptrdiff_t capped = behaved_p (it)
 	    ? max (BEGV, from_pos - nchars_per_line * nlines)
 	    : -1;
 
@@ -9646,46 +9616,37 @@ move_it_y (struct it *it, int dy)
 	     backward, we manually set IT the estimated NLINES back.  Then
 	     from that position, call `move_it_to' on a throwaway IT_FROM to
 	     FROM_POS.  */
-	  for (int i = 0, xchar = from_x / FRAME_COLUMN_WIDTH (it->f);
-	       i < nlines && IT_CHARPOS (*it) > BEGV;
-	       ++i)
+	  for (int i = 0; i < nlines && IT_CHARPOS (*it) > BEGV; ++i)
 	    {
 	      if (capped == -1)
-		{
-		  preceding_line_start_visible (it);
-		}
+		preceding_line_start_visible (it);
 	      else /* speedups are possible */
 		{
-		  bool chad = false; /* IT_OVERFLOW_NEWLINE_INTO_FRINGE gotcha.  */
-		  ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
+		  ptrdiff_t cp = IT_CHARPOS (*it),
+		    bp = IT_BYTEPOS (*it),
+		    counted = 0;
 		  dec_both (&cp, &bp);
-		  chad = ! NILP (Voverflow_newline_into_fringe)
-		    && FRAME_WINDOW_P (it->f)
-		    && FETCH_BYTE (bp) == '\n';
-		  IT_CHARPOS (*it) =
-		    find_newline (cp, bp, capped, CHAR_TO_BYTE (capped), -1, NULL,
-				  &IT_BYTEPOS (*it), 0);
 
-		  ptrdiff_t nchars = cp - IT_CHARPOS (*it) + 1;
-		  if (chad && nchars && nchars % nchars_per_line == 0)
-		    /* Adjust for IT_OVERFLOW_NEWLINE_INTO_FRINGE gotcha.  */
-		    nchars--;
+		  cp = find_newline (cp, bp, 0, -1, -1, &counted, &bp, 0);
 
-		  if (xchar >= nchars)
-		    /* e.g., current_xchar=79, nchars=79, nchar_per_line=80,
-		       result_xchar=0 */
-		    xchar = xchar - nchars;
+		  if (cp > capped)
+		    {
+		      /* a newline; easy reset of x-coord.  */
+		      eassert (counted);
+		      eassert (cp > BEGV);
+		      IT_CHARPOS (*it) = cp;
+		      IT_BYTEPOS (*it) = bp;
+		      it->hpos = it->current_x = 0;
+		    }
 		  else
 		    {
-		      /* e.g., current_xchar=79, nchars=160, nchars_per_line=80,
-			 result_xchar=79 */
-		      ptrdiff_t remchars = (nchars - xchar) % nchars_per_line;
-		      xchar = (nchars_per_line - remchars) % nchars_per_line;
-		    }
-		  if (IT_CHARPOS (*it) <= capped)
-		    {
+		      /* CP is one-past newline or BEGV, i.e, line start.  */
+		      int xchar = capped - cp;
+		      IT_CHARPOS (*it) = capped;
+		      IT_BYTEPOS (*it) = CHAR_TO_BYTE (capped);
 		      for (int i=0; i<xchar; ++i)
 			dec_both (&IT_CHARPOS (*it), &IT_BYTEPOS (*it));
+		      it->hpos = it->current_x = 0;
 		      break;
 		    }
 		}
