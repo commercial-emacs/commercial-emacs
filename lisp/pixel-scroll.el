@@ -153,6 +153,12 @@ Nil means to not interpolate such scrolls."
   :type 'float
   :version "29.1")
 
+(defcustom pixel-scroll-precision-interpolation-between-scroll 0.001
+  "The number of seconds between each step of an interpolated scroll."
+  :group 'mouse
+  :type 'float
+  :version "29.1")
+
 (defun pixel-scroll-in-rush-p ()
   "Return non-nil if next scroll should be non-smooth.
 When scrolling request is delivered soon after the previous one,
@@ -453,6 +459,14 @@ the height of the current window."
         (set-window-vscroll nil (+ (window-vscroll nil t)
                                    delta)
                             t)
+      (when (and (or (< (point) next-pos))
+                 (let ((pos-visibility (pos-visible-in-window-p next-pos nil t)))
+                   (and pos-visibility
+                        (or (eq (length pos-visibility) 2)
+                            (when-let* ((posn (posn-at-point next-pos)))
+                              (> (cdr (posn-object-width-height posn))
+                                 usable-height))))))
+        (goto-char next-pos))
       (set-window-start nil (if (zerop (window-hscroll))
                                 desired-start
                               (save-excursion
@@ -460,15 +474,7 @@ the height of the current window."
                                 (beginning-of-visual-line)
                                 (point)))
                         t)
-      (set-window-vscroll nil desired-vscroll t))
-    (if (and (or (< (point) next-pos))
-             (let ((pos-visibility (pos-visible-in-window-p next-pos nil t)))
-               (and pos-visibility
-                    (or (eq (length pos-visibility) 2)
-                        (when-let* ((posn (posn-at-point next-pos)))
-                          (> (cdr (posn-object-width-height posn))
-                             usable-height))))))
-        (goto-char next-pos))))
+      (set-window-vscroll nil desired-vscroll t))))
 
 (defun pixel-scroll-precision-scroll-down (delta)
   "Scroll the current window down by DELTA pixels."
@@ -546,7 +552,7 @@ animation."
         (factor pixel-scroll-precision-interpolation-factor)
         (last-time (float-time))
         (time-elapsed 0.0)
-        (between-scroll 0.001)
+        (between-scroll pixel-scroll-precision-interpolation-between-scroll)
         (rem (window-parameter nil 'interpolated-scroll-remainder))
         (time (window-parameter nil 'interpolated-scroll-remainder-time)))
     (when (and rem time
