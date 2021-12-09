@@ -868,7 +868,7 @@ struct glyph_row
   short used[1 + LAST_AREA];
 
   /* Hash code.  This hash code is available as soon as the row
-     is constructed, i.e. after a call to display_line.  */
+     is constructed, i.e. after a call to display_sline.  */
   unsigned hash;
 
   /* Window-relative x and y-position of the top-left corner of this
@@ -2520,7 +2520,7 @@ struct it
      system.  */
   bool_bf glyph_not_available_p : 1;
 
-  /* True means the next line in display_line continues a character
+  /* True means the next line in display_sline continues a character
      consisting of more than one glyph, and some glyphs of this
      character have been put on the previous line.  */
   bool_bf starts_in_middle_of_char_p : 1;
@@ -2670,7 +2670,7 @@ struct it
 
   /* Accumulated width of continuation lines.  If > 0, this means we
      are currently in a continuation line.  This is initially zero and
-     incremented/reset by display_line, move_it_to etc.  */
+     incremented/reset by display_sline, move_it_to etc.  */
   int continuation_lines_width;
 
   /* Buffer position that ends the buffer text line being iterated.
@@ -2678,21 +2678,21 @@ struct it
      is the last line of the buffer and it doesn't have a newline,
      value is ZV/ZV_BYTE.  Set and used only if IT->bidi_p, for
      setting the end position of glyph rows produced for continuation
-     lines, see display_line.  */
+     lines, see display_sline.  */
   struct text_pos eol_pos;
 
   /* Current y-position.  Automatically incremented by the height of
-     glyph_row in move_it_to and display_line.  */
+     glyph_row in move_it_to and display_sline.  */
   int current_y;
 
   /* Vertical matrix position of first text line in window.  */
   int first_vpos;
 
   /* Current vertical matrix position, or line number.  Automatically
-     incremented by move_it_to and display_line.  */
+     incremented by move_it_to and display_sline.  */
   int vpos;
 
-  /* Horizontal matrix position set in emulate_display_line,  */
+  /* Horizontal matrix position set in emulate_display_sline,  */
   int hpos;
 
   /* Current line number, zero-based.  */
