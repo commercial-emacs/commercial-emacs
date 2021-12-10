@@ -453,7 +453,9 @@ the height of the current window."
                      (goto-char desired-start)
                      (when (zerop (vertical-motion (1+ scroll-margin)))
                        (signal 'end-of-buffer nil))
-                     (point))))
+                     (point)))
+         (scroll-preserve-screen-position nil)
+         (auto-window-vscroll nil))
     (when (and (or (< (point) next-pos))
                (let ((pos-visibility (pos-visible-in-window-p next-pos nil t)))
                  (and pos-visibility
@@ -714,8 +716,6 @@ precisely, according to the turning of the mouse wheel."
   :group 'mouse
   :keymap pixel-scroll-precision-mode-map
   (setq mwheel-coalesce-scroll-events
-        (not pixel-scroll-precision-mode)
-        make-cursor-line-fully-visible
         (not pixel-scroll-precision-mode)))
 
 (provide 'pixel-scroll)
