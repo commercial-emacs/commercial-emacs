@@ -5514,7 +5514,7 @@ window_scroll_margin (struct window *window, enum margin_unit unit)
 {
   if (scroll_margin > 0)
     {
-      int frame_line_height = default_line_pixel_height (window);
+      int frame_line_height = default_line_height (window);
       int window_lines = window_box_height (window) / frame_line_height;
 
       double ratio = 0.25;
@@ -5556,7 +5556,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
   bool vscrolled = false;
   int x, y, rtop, rbot, rowh, vpos;
   void *itdata = NULL;
-  int frame_line_height = default_line_pixel_height (w);
+  int frame_line_height = default_line_height (w);
   bool adjust_old_pointm = !NILP (Fequal (Fwindow_point (window),
 					  Fwindow_old_point (window)));
 

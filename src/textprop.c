@@ -23,6 +23,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "intervals.h"
 #include "buffer.h"
 #include "window.h"
+#include "frame.h"
 
 /* Test for membership, allowing for t (actually any non-cons) to mean the
    universal set.  */
@@ -361,7 +362,9 @@ set_properties (Lisp_Object properties, INTERVAL interval, Lisp_Object object)
 
    If DESTRUCTIVE, use nconc instead of append.
 
-   Return true INTERVAL plist was modified.  */
+   Return true if INTERVAL's plist was modified.  */
+
+#define UNSPECIFIEDP(ATTR) EQ ((ATTR), Qunspecified)
 
 static bool
 add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
@@ -385,10 +388,6 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
       Lisp_Object this_cdr = CDR_SAFE (tail2);
       if (! CONSP (tail2) || ! EQ (val1, Fcar (this_cdr)))
 	{
-	  bool width_changing = EQ (sym1, Qdisplay)
-	    || EQ (sym1, Qinvisible)
-	    || EQ (sym1, Qcomposition);
-
 	  changed = true;
 
 	  if (BUFFERP (object))
@@ -396,9 +395,36 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 	      /* For undo purposes.  */
 	      record_property_change (interval->position, LENGTH (interval),
 				      sym1, Fcar (this_cdr), object);
-	      if (width_changing)
-		/* Forbid algebraic short-cuts for long lines. */
-		XBUFFER (object)->text->monospace = false;
+	      if (NILP (Fminibufferp (object, Qnil))
+		  && XBUFFER (object)->text->monospace)
+		{
+		  bool width_specified = false;
+		  if (EQ (sym1, Qface))
+		    {
+		      struct frame *f = SELECTED_FRAME ();
+		      Lisp_Object lface = Fgethash (val1, f->face_hash_table, Qnil);
+		      if (! NILP (lface))
+			{
+			  Lisp_Object *attrs = xvector_contents (lface);
+			  width_specified =
+			    ! UNSPECIFIEDP (*(attrs + LFACE_HEIGHT_INDEX))
+			    || ! UNSPECIFIEDP (*(attrs + LFACE_FONT_INDEX))
+			    || ! UNSPECIFIEDP (*(attrs + LFACE_SWIDTH_INDEX));
+			  if (width_specified)
+			    fprintf (stderr, "oh snip %s %s %s\n",
+				     SSDATA (Fprin1_to_string (*(attrs + LFACE_HEIGHT_INDEX), Qnil)),
+				     SSDATA (Fprin1_to_string (*(attrs + LFACE_FONT_INDEX), Qnil)),
+				     SSDATA (Fprin1_to_string (*(attrs + LFACE_SWIDTH_INDEX), Qnil)));
+			}
+		    }
+
+		  if (width_specified
+		      || EQ (sym1, Qdisplay)
+		      || EQ (sym1, Qinvisible)
+		      || EQ (sym1, Qcomposition))
+		    /* Forbid algebraic short-cuts for long lines. */
+		    XBUFFER (object)->text->monospace = false;
+		}
 	    }
 	  if (! CONSP (tail2))
 	    /* INTERVAL's plist does not have sym1.  */

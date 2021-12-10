@@ -6603,7 +6603,7 @@ not_in_argv (NSString *arg)
               else
                 {
                   /* FIXME: Use actual line height instead of the default.  */
-                  lineHeight = default_line_pixel_height
+                  lineHeight = default_line_height
                     (XWINDOW (FRAME_SELECTED_WINDOW (emacsframe)));
                 }
 

@@ -395,6 +395,18 @@ nsberror (Lisp_Object spec)
   error ("Invalid buffer argument");
 }
 
+DEFUN ("buffer-monospace-p", Fbuffer_monospace_p, Sbuffer_monospace_p, 0, 1, 0,
+       doc: /* Return t if BUFFER contains only homogenous text.
+By homogenous, we mean only characters of the frame's default font and no
+width-varying glyphs such as invisible text or images.  */)
+  (Lisp_Object buffer)
+{
+  if (NILP (buffer))
+    buffer = Fcurrent_buffer();
+  CHECK_BUFFER (buffer);
+  return XBUFFER (buffer)->text->monospace ? Qt : Qnil;
+}
+
 DEFUN ("buffer-live-p", Fbuffer_live_p, Sbuffer_live_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a buffer which has not been killed.
 Value is nil if OBJECT is not a buffer or if it has been killed.  */)
@@ -6391,6 +6403,7 @@ If `delete-auto-save-files' is nil, any autosave deletion is inhibited.  */);
 This is the default.  If nil, auto-save file deletion is inhibited.  */);
   delete_auto_save_files = 1;
 
+  defsubr (&Sbuffer_monospace_p);
   defsubr (&Sbuffer_live_p);
   defsubr (&Sbuffer_list);
   defsubr (&Sget_buffer);

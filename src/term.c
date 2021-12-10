@@ -1543,106 +1543,111 @@ tty_append_glyph (struct it *it)
 void
 produce_glyphs (struct it *it)
 {
-  /* Nothing but characters are supported on terminal frames.  */
-  eassert (it->what == IT_CHARACTER
-	   || it->what == IT_COMPOSITION
-	   || it->what == IT_STRETCH
-	   || it->what == IT_GLYPHLESS);
+  /* gui_produce_glyphs cannot sustain; so don't do it here either */
+  /* bool monospace_p = */
+  /*   (it->method == GET_FROM_BUFFER) */
+  /*   && BUFFERP (it->object) */
+  /*   && XBUFFER (it->object)->text->monospace; */
 
-  if (it->what == IT_STRETCH)
+  /* if (monospace_p && it->what != IT_CHARACTER) */
+  /*   XBUFFER (it->object)->text->monospace = false; */
+
+  switch (it->what)
     {
+    case IT_STRETCH:
       produce_stretch_glyph (it);
-      goto done;
-    }
-
-  if (it->what == IT_COMPOSITION)
-    {
+      break;
+    case IT_COMPOSITION:
       produce_composite_glyph (it);
-      goto done;
-    }
-
-  if (it->what == IT_GLYPHLESS)
-    {
+      break;
+    case IT_GLYPHLESS:
       produce_glyphless_glyph (it, Qnil);
-      goto done;
-    }
-
-  if (it->char_to_display >= 040 && it->char_to_display < 0177)
-    {
-      it->pixel_width = it->nglyphs = 1;
-      if (it->glyph_row)
-	append_glyph (it);
-    }
-  else if (it->char_to_display == '\n')
-    it->pixel_width = it->nglyphs = 0;
-  else if (it->char_to_display == '\t')
-    {
-      int absolute_x = (it->current_x
-			+ it->continuation_lines_width);
-      int x0 = absolute_x;
-      /* Adjust for line numbers.  */
-      if (!NILP (Vdisplay_line_numbers) && it->line_number_produced_p)
-	absolute_x -= it->lnum_pixel_width;
-      int next_tab_x
-	= (((1 + absolute_x + it->tab_width - 1)
-	    / it->tab_width)
-	   * it->tab_width);
-      if (!NILP (Vdisplay_line_numbers) && it->line_number_produced_p)
-	next_tab_x += it->lnum_pixel_width;
-      int nspaces;
-
-      /* If part of the TAB has been displayed on the previous line
-	 which is continued now, continuation_lines_width will have
-	 been incremented already by the part that fitted on the
-	 continued line.  So, we will get the right number of spaces
-	 here.  */
-      nspaces = next_tab_x - x0;
-
-      if (it->glyph_row)
+      break;
+    case IT_CHARACTER:
+      if (it->char_to_display >= 040 && it->char_to_display < 0177)
 	{
-	  int n = nspaces;
-
-	  it->char_to_display = ' ';
-	  it->pixel_width = it->len = 1;
-
-	  while (n--)
+	  it->pixel_width = it->nglyphs = 1;
+	  if (it->glyph_row)
 	    append_glyph (it);
 	}
-
-      it->pixel_width = nspaces;
-      it->nglyphs = nspaces;
-    }
-  else if (CHAR_BYTE8_P (it->char_to_display))
-    {
-      /* Coming here means that we must send the raw 8-bit byte as is
-	 to the terminal.  Although there's no way to know how many
-	 columns it occupies on a screen, it is a good assumption that
-	 a single byte code has 1-column width.  */
-      it->pixel_width = it->nglyphs = 1;
-      if (it->glyph_row)
-	append_glyph (it);
-    }
-  else
-    {
-      Lisp_Object charset_list = FRAME_TERMINAL (it->f)->charset_list;
-
-      if (char_charset (it->char_to_display, charset_list, NULL))
+      else if (it->char_to_display == '\n')
+	it->pixel_width = it->nglyphs = 0;
+      else if (it->char_to_display == '\t')
 	{
-	  it->pixel_width = CHARACTER_WIDTH (it->char_to_display);
-	  it->nglyphs = it->pixel_width;
+	  int absolute_x = (it->current_x
+			    + it->continuation_lines_width);
+	  int x0 = absolute_x;
+	  /* Adjust for line numbers.  */
+	  if (!NILP (Vdisplay_line_numbers) && it->line_number_produced_p)
+	    absolute_x -= it->lnum_pixel_width;
+	  int next_tab_x
+	    = (((1 + absolute_x + it->tab_width - 1)
+		/ it->tab_width)
+	       * it->tab_width);
+	  if (!NILP (Vdisplay_line_numbers) && it->line_number_produced_p)
+	    next_tab_x += it->lnum_pixel_width;
+	  int nspaces;
+
+	  /* If part of the TAB has been displayed on the previous line
+	     which is continued now, continuation_lines_width will have
+	     been incremented already by the part that fitted on the
+	     continued line.  So, we will get the right number of spaces
+	     here.  */
+	  nspaces = next_tab_x - x0;
+
+	  if (it->glyph_row)
+	    {
+	      int n = nspaces;
+
+	      it->char_to_display = ' ';
+	      it->pixel_width = it->len = 1;
+
+	      while (n--)
+		append_glyph (it);
+	    }
+
+	  it->pixel_width = nspaces;
+	  it->nglyphs = nspaces;
+	}
+      else if (CHAR_BYTE8_P (it->char_to_display))
+	{
+	  /* Coming here means that we must send the raw 8-bit byte as is
+	     to the terminal.  Although there's no way to know how many
+	     columns it occupies on a screen, it is a good assumption that
+	     a single byte code has 1-column width.  */
+	  it->pixel_width = it->nglyphs = 1;
 	  if (it->glyph_row)
 	    append_glyph (it);
 	}
       else
 	{
-	  Lisp_Object acronym = lookup_glyphless_char_display (-1, it);
+	  Lisp_Object charset_list = FRAME_TERMINAL (it->f)->charset_list;
 
-	  eassert (it->what == IT_GLYPHLESS);
-	  produce_glyphless_glyph (it, acronym);
+	  if (char_charset (it->char_to_display, charset_list, NULL))
+	    {
+	      it->pixel_width = CHARACTER_WIDTH (it->char_to_display);
+	      it->nglyphs = it->pixel_width;
+	      if (it->glyph_row)
+		append_glyph (it);
+	    }
+	  else
+	    {
+	      Lisp_Object acronym = lookup_glyphless_char_display (-1, it);
+
+	      eassert (it->what == IT_GLYPHLESS);
+	      produce_glyphless_glyph (it, acronym);
+	    }
 	}
+
+      /* gui_produce_glyphs cannot sustain; so don't do it here either */
+      /* if (monospace_p && it->pixel_width > 1) */
+      /* 	XBUFFER (it->object)->text->monospace = false; */
+      break;
+    default:
+      emacs_abort ();
+      break;
     }
 
- done:
   /* Advance current_x by the pixel width as a convenience for
      the caller.  */
   if (it->area == TEXT_AREA)

@@ -1187,46 +1187,33 @@ DEFUN ("line-pixel-height", Fline_pixel_height,
   return result;
 }
 
-/* Return the default pixel height of text lines in window W.  The
-   value is the canonical height of the W frame's default font, plus
-   any extra space required by the line-spacing variable or frame
-   parameter.
-
-   This ignores any line-spacing text properties put on the newline
-   characters.  This is because those properties only affect the
-   _screen_ line ending in the newline (i.e., in a continued line,
-   only the last screen line will be affected), which means only a
-   small number of lines in a buffer can ever use this feature.  Since
-   this function is used to compute the default pixel equivalent of
-   text lines in a window, we can safely ignore those few lines.  For
-   the same reasons, we ignore the line-height properties.  */
+/* Return the frame's default font height, plus the `line-spacing' defvar or,
+   if that is nil, the equivalent frame parameter.   */
 int
-default_line_pixel_height (struct window *w)
+default_line_height (struct window *w)
 {
   struct frame *f = WINDOW_XFRAME (w);
   int height = FRAME_LINE_HEIGHT (f);
 
-  if (!FRAME_INITIAL_P (f) && BUFFERP (w->contents))
+  if (! FRAME_INITIAL_P (f) && BUFFERP (w->contents))
     {
       struct buffer *b = XBUFFER (w->contents);
-      Lisp_Object val = BVAR (b, extra_line_spacing);
+      Lisp_Object val = ! NILP (BVAR (b, extra_line_spacing))
+	? BVAR (b, extra_line_spacing)
+	: BVAR (&buffer_defaults, extra_line_spacing);
 
       if (NILP (val))
-	val = BVAR (&buffer_defaults, extra_line_spacing);
-      if (!NILP (val))
+	height += f->extra_line_spacing;
+      else
 	{
 	  if (RANGED_FIXNUMP (0, val, INT_MAX))
 	    height += XFIXNAT (val);
 	  else if (FLOATP (val))
 	    {
 	      int addon = XFLOAT_DATA (val) * height + 0.5;
-
-	      if (addon >= 0)
-		height += addon;
+	      height += max (0, addon);
 	    }
 	}
-      else
-	height += f->extra_line_spacing;
     }
 
   return height;
@@ -1450,7 +1437,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	     into fixing move_it_to so "stopping short" doesn't
 	     happen.
 	  */
-	  int ten_more_lines = 10 * default_line_pixel_height (w);
+	  int ten_more_lines = 10 * default_line_height (w);
 	  move_it_to (&it, charpos, -1, bottom_y + ten_more_lines, -1,
 		      MOVE_TO_POS | MOVE_TO_Y);
 	  if (it.current_y > top_y)
@@ -9255,6 +9242,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 {
   int max_current_x = 0;
   ptrdiff_t orig_charpos = IT_CHARPOS (*it);
+  (void) orig_charpos;
 
   for (;;)
     {
@@ -9519,14 +9507,14 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	    {
 	    move_line_continued_default:
 	      it->continuation_lines_width += it->current_x;
-	      if (op == MOVE_TO_VPOS && orig_charpos == 55315)
+	      if (op == MOVE_TO_VPOS)
 		{
-		  fprintf (stderr,
-			   "orig_charpos=%ld it=%ld to_charpos=%ld",
-			   orig_charpos, IT_CHARPOS (*it), to_charpos);
-		  fprintf (stderr,
-			   " it->vpos=%d to_vpos=%d\n",
-			   it->vpos, to_vpos);
+		  /* fprintf (stderr, */
+		  /* 	   "orig_charpos=%ld it=%ld to_charpos=%ld", */
+		  /* 	   orig_charpos, IT_CHARPOS (*it), to_charpos); */
+		  /* fprintf (stderr, */
+		  /* 	   " it->vpos=%d to_vpos=%d\n", */
+		  /* 	   it->vpos, to_vpos); */
 		}
 	    }
 	  break;
@@ -9610,7 +9598,7 @@ move_it_y (struct it *it, int dy)
 	  void *itdata = NULL;
 	  int abs_dy = abs (dy);
 	  ptrdiff_t from_pos = IT_CHARPOS (*it), target_y = it->current_y - abs_dy;
-	  int h, nlines = max (1, abs_dy / default_line_pixel_height (it->w));
+	  int h, nlines = max (1, abs_dy / default_line_height (it->w));
 	  int nchars_per_line = (it->last_visible_x - it->first_visible_x) /
 	    FRAME_COLUMN_WIDTH (it->f);
 	  ptrdiff_t capped = behaved_p (it)
@@ -16834,7 +16822,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
   Lisp_Object aggressive;
   /* We will never try scrolling more than this number of lines.  */
   int scroll_limit = SCROLL_LIMIT;
-  int frame_line_height = default_line_pixel_height (w);
+  int frame_line_height = default_line_height (w);
 
   SET_TEXT_POS_FROM_MARKER (startp, w->start);
 
@@ -17723,9 +17711,8 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   eassert (XMARKER (w->pointm)->buffer == buffer);
 
   reconsider_clip_changes (w);
-  frame_line_height = default_line_pixel_height (w);
+  frame_line_height = default_line_height (w);
   margin = window_scroll_margin (w, MARGIN_IN_LINES);
-
 
   /* Has the mode line to be updated?  */
   update_mode_line = (w->update_mode_line
@@ -29248,6 +29235,14 @@ gui_produce_glyphs (struct it *it)
 
   it->glyph_not_available_p = false;
 
+  /* Problematic: withstand undercounting for now.  */
+  /* bool monospace_p = */
+  /*   (it->method == GET_FROM_BUFFER) */
+  /*   && BUFFERP (it->object) */
+  /*   && XBUFFER (it->object)->text->monospace; */
+  /* if (monospace_p && it->what != IT_CHARACTER) */
+  /*   XBUFFER (it->object)->text->monospace = false; */
+
   if (it->what == IT_CHARACTER)
     {
       unsigned char2b;
@@ -29255,7 +29250,7 @@ gui_produce_glyphs (struct it *it)
       struct font *font = face->font;
       struct font_metrics *pcm = NULL;
       Lisp_Object height, total_height = Qnil;
-      int boff;                 /* Baseline offset.  */
+      int boff;  /* Baseline offset.  */
 
       if (font == NULL)
         {
@@ -29282,11 +29277,11 @@ gui_produce_glyphs (struct it *it)
              don't increase that height.  */
 
           it->override_ascent = -1;
-          it->pixel_width = 0;
-          it->nglyphs = 0;
+          it->pixel_width = it->nglyphs = 0;
 
           height = get_it_property (it, Qline_height);
-          /* Split (line-height total-height) list.  */
+
+	  /* Split (line-height total-height) list.  */
           if (CONSP (height)
               && CONSP (XCDR (height))
               && NILP (XCDR (XCDR (height))))
@@ -29294,6 +29289,7 @@ gui_produce_glyphs (struct it *it)
               total_height = XCAR (XCDR (height));
               height = XCAR (height);
             }
+
           height = calc_line_height_property (it, height, font, boff, true);
 
           if (it->override_ascent >= 0)
@@ -29302,21 +29298,18 @@ gui_produce_glyphs (struct it *it)
               it->descent = it->override_descent;
               boff = it->override_boff;
             }
-          else
-            {
-              if (FONT_TOO_HIGH (font))
-                {
-                  it->ascent = font->pixel_size + boff - 1;
-                  it->descent = -boff + 1;
-                  if (it->descent < 0)
-                    it->descent = 0;
-                }
-              else
-                {
-                  it->ascent = FONT_BASE (font) + boff;
-                  it->descent = FONT_DESCENT (font) - boff;
-                }
-            }
+          else if (FONT_TOO_HIGH (font))
+	    {
+	      it->ascent = font->pixel_size + boff - 1;
+	      it->descent = -boff + 1;
+	      if (it->descent < 0)
+		it->descent = 0;
+	    }
+	  else
+	    {
+	      it->ascent = FONT_BASE (font) + boff;
+	      it->descent = FONT_DESCENT (font) - boff;
+	    }
 
           if (EQ (height, Qt))
             {
@@ -29349,11 +29342,11 @@ gui_produce_glyphs (struct it *it)
                   it->ascent += face->box_horizontal_line_width;
                   it->descent += face->box_horizontal_line_width;
                 }
-              if (!NILP (height)
+              if (! NILP (height)
                   && XFIXNUM (height) > it->ascent + it->descent)
                 it->ascent = XFIXNUM (height) - it->descent;
 
-              if (!NILP (total_height))
+              if (! NILP (total_height))
                 spacing = calc_line_height_property (it, total_height, font,
                                                      boff, false);
               else
@@ -29377,7 +29370,7 @@ gui_produce_glyphs (struct it *it)
               int x = it->current_x + it->continuation_lines_width;
               int x0 = x;
               /* Adjust for line numbers, if needed.   */
-              if (!NILP (Vdisplay_line_numbers) && it->line_number_produced_p)
+              if (! NILP (Vdisplay_line_numbers) && it->line_number_produced_p)
                 {
                   x -= it->lnum_pixel_width;
                   /* Restore the original TAB width, if required.  */
@@ -29392,7 +29385,7 @@ gui_produce_glyphs (struct it *it)
                  tab stop after that.  */
               if (next_tab_x - x < font->space_width)
                 next_tab_x += tab_width;
-              if (!NILP (Vdisplay_line_numbers) && it->line_number_produced_p)
+              if (! NILP (Vdisplay_line_numbers) && it->line_number_produced_p)
                 {
                   next_tab_x += it->lnum_pixel_width;
                   /* If the line is hscrolled, and the TAB starts before
@@ -29575,6 +29568,10 @@ gui_produce_glyphs (struct it *it)
             it->pixel_width = 1;
           break;
         }
+
+      /* if (monospace_p */
+      /* 	  && it->pixel_width != FRAME_COLUMN_WIDTH (it->f)) */
+      /* 	XBUFFER (it->object)->text->monospace = false; */
 
       if (FONT_TOO_HIGH (font))
         {
@@ -29955,8 +29952,8 @@ gui_produce_glyphs (struct it *it)
   if (extra_line_spacing > 0)
     {
       it->descent += extra_line_spacing;
-      if (extra_line_spacing > it->max_extra_line_spacing)
-        it->max_extra_line_spacing = extra_line_spacing;
+      it->max_extra_line_spacing = max (it->max_extra_line_spacing,
+					extra_line_spacing);
     }
 
   it->max_ascent = max (it->max_ascent, it->ascent);
