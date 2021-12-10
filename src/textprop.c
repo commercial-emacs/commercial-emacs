@@ -410,11 +410,6 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 			    ! UNSPECIFIEDP (*(attrs + LFACE_HEIGHT_INDEX))
 			    || ! UNSPECIFIEDP (*(attrs + LFACE_FONT_INDEX))
 			    || ! UNSPECIFIEDP (*(attrs + LFACE_SWIDTH_INDEX));
-			  if (width_specified)
-			    fprintf (stderr, "oh snip %s %s %s\n",
-				     SSDATA (Fprin1_to_string (*(attrs + LFACE_HEIGHT_INDEX), Qnil)),
-				     SSDATA (Fprin1_to_string (*(attrs + LFACE_FONT_INDEX), Qnil)),
-				     SSDATA (Fprin1_to_string (*(attrs + LFACE_SWIDTH_INDEX), Qnil)));
 			}
 		    }
 
