@@ -1150,36 +1150,43 @@ window_line_bottom_y (struct it *it)
 }
 
 DEFUN ("line-pixel-height", Fline_pixel_height,
-       Sline_pixel_height, 0, 1, "",
-       doc: /* Return height in pixels of line at POINT.  */)
-  (Lisp_Object point)
+       Sline_pixel_height, 0, 0, 0,
+       doc: /* Return height in pixels of line at point.  */)
+  (void)
 {
-  struct it it;
   struct text_pos pt;
   struct window *w = XWINDOW (selected_window);
   struct buffer *old_buffer = NULL;
   Lisp_Object result;
-
-  if (! NILP (point))
-    CHECK_FIXNUM (point);
 
   if (XBUFFER (w->contents) != current_buffer)
     {
       old_buffer = current_buffer;
       set_buffer_internal_1 (XBUFFER (w->contents));
     }
-  SET_TEXT_POS
-    (pt,
-     NILP (point) ? PT : (ptrdiff_t) (XFIXNUM (point)),
-     NILP (point) ? PT_BYTE : CHAR_TO_BYTE ((ptrdiff_t) (XFIXNUM (point))));
-  void *itdata = bidi_shelve_cache ();
-  start_move_it (&it, w, pt);
-  move_it_vpos (&it, 0); /* bol */
-  it.vpos = it.current_y = 0;
-  result = make_fixnum (line_bottom_y (&it, 0));
+
+  SET_TEXT_POS (pt, PT, PT_BYTE);
+
+  result = make_fixnum (actual_line_height (w, pt));
+
   if (old_buffer)
     set_buffer_internal_1 (old_buffer);
 
+  return result;
+}
+
+/* Engage move_it_* to get the actual line height.  */
+
+int
+actual_line_height (struct window *w, struct text_pos pt)
+{
+  struct it it;
+  void *itdata = bidi_shelve_cache ();
+  int result;
+  start_move_it (&it, w, pt);
+  move_it_vpos (&it, 0); /* bol */
+  it.vpos = it.current_y = 0;
+  result = line_bottom_y (&it, 0);
   bidi_unshelve_cache (itdata, false);
   return result;
 }
@@ -9216,7 +9223,7 @@ unsigned int mit_calls1 = 0, mit_calls2 = 0, mit_calls3 = 0, mit_calls4 = 0, mit
    (MOVE_TO_Y | MOVE_TO_POS)
    (MOVE_TO_VPOS | MOVE_TO_POS)
 
-   If TO_CHARPOS is in invisible text, e.g. a truncated part of a
+   If TO_CHARPOS is within unvisible text, e.g. a truncated part of a
    screen line, set IT to the next displayable position right of TO_CHARPOS.
 
    If TO_CHARPOS is in a display vector, set IT to its last glyph.
@@ -9485,6 +9492,7 @@ move_it_y (struct it *it, int dy)
       for (;;)
 	{
 	  struct it it_from;
+	  struct text_pos tpos;
 	  void *itdata = NULL;
 	  int abs_dy = abs (dy);
 	  ptrdiff_t from_pos = IT_CHARPOS (*it), target_y = it->current_y - abs_dy;
@@ -9555,6 +9563,7 @@ move_it_y (struct it *it, int dy)
 	     manually setting IT.  */
 	  it->vpos -= nlines;
 	  it->current_y -= h;
+	  SET_TEXT_POS (tpos, IT_CHARPOS (*it), IT_BYTEPOS (*it));
 
 	  if (dy == 0)
 	    {
@@ -9576,8 +9585,7 @@ move_it_y (struct it *it, int dy)
 	  else if (IT_CHARPOS (*it) > BEGV
 		   && ((it->current_y - target_y) >
 		       min (window_box_height (it->w),
-			    XFIXNUM (Fline_pixel_height
-				     (make_fixnum (IT_CHARPOS (*it)))) * 2 / 3)))
+			    2 / 3 * actual_line_height (it->w, tpos))))
 	    {
 	      /* Estimated NLINES comes up short.  Take it from the top.  */
 	      dy = target_y - it->current_y;
@@ -9585,7 +9593,7 @@ move_it_y (struct it *it, int dy)
 	    }
 	  else if (IT_CHARPOS (*it) < ZV
 		   && ((target_y - it->current_y) >=
-		       XFIXNUM (Fline_pixel_height (make_fixnum (IT_CHARPOS (*it))))))
+		       actual_line_height (it->w, tpos)))
 	    {
 	      /* Most common branch where continued lines render
 		 our initial estimate of NLINES too large.  Scooch

@@ -3338,6 +3338,7 @@ struct glyph_row *row_containing_pos (struct window *, ptrdiff_t,
                                       struct glyph_row *,
                                       struct glyph_row *, int);
 int window_line_bottom_y (struct it *);
+int actual_line_height (struct window *, struct text_pos);
 int default_line_height (struct window *);
 bool display_prop_intangible_p (Lisp_Object, Lisp_Object, ptrdiff_t, ptrdiff_t);
 void resize_echo_area_exactly (void);
