@@ -1085,6 +1085,7 @@ enum pvec_type
   PVEC_CONDVAR,
   PVEC_MODULE_FUNCTION,
   PVEC_NATIVE_COMP_UNIT,
+  PVEC_SQLITE,
   PVEC_TREE_SITTER,
 
   /* These should be last, for internal_equal and sxhash_obj.  */
