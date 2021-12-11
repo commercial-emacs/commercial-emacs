@@ -2575,17 +2575,6 @@ xmint_pointer (Lisp_Object a)
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Misc_Ptr)->pointer;
 }
 
-struct Lisp_Sqlite
-{
-  union vectorlike_header header;
-  void *db;
-  void *stmt;
-  char *name;
-  void (*finalizer) (void *);
-  bool eof;
-  bool is_statement;
-} GCALIGNED_STRUCT;
-
 struct Lisp_User_Ptr
 {
   union vectorlike_header header;
@@ -2661,31 +2650,6 @@ XUSER_PTR (Lisp_Object a)
 {
   eassert (USER_PTRP (a));
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_User_Ptr);
-}
-
-INLINE bool
-SQLITEP (Lisp_Object x)
-{
-  return PSEUDOVECTORP (x, PVEC_SQLITE);
-}
-
-INLINE bool
-SQLITE (Lisp_Object a)
-{
-  return PSEUDOVECTORP (a, PVEC_SQLITE);
-}
-
-INLINE void
-CHECK_SQLITE (Lisp_Object x)
-{
-  CHECK_TYPE (SQLITE (x), Qsqlitep, x);
-}
-
-INLINE struct Lisp_Sqlite *
-XSQLITE (Lisp_Object a)
-{
-  eassert (SQLITEP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Sqlite);
 }
 
 INLINE bool

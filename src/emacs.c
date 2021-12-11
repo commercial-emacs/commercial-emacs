@@ -85,6 +85,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "tree-sitter.h"
 #endif /* HAVE_TREE_SITTER */
 
+#ifdef HAVE_SQLITE3
+#include "sqlite.h"
+#endif /* HAVE_SQLITE3 */
+
 #include "bignum.h"
 #include "intervals.h"
 #include "character.h"
@@ -2190,8 +2194,10 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #endif
       syms_of_window ();
       syms_of_xdisp ();
-      syms_of_sqlite ();
       syms_of_font ();
+#ifdef HAVE_SQLITE3
+      syms_of_sqlite ();
+#endif
 #ifdef HAVE_WINDOW_SYSTEM
       syms_of_fringe ();
       syms_of_image ();

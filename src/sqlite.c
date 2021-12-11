@@ -25,8 +25,7 @@ YOSHIDA <syohex@gmail.com>, which can be found at:
 #include <config.h>
 #include "lisp.h"
 #include "coding.h"
-
-#ifdef HAVE_SQLITE3
+#include "sqlite.h"
 
 #include <sqlite3.h>
 
@@ -644,24 +643,17 @@ This will free the resources held by SET.  */)
   return Qt;
 }
 
-#endif /* HAVE_SQLITE3 */
-
 DEFUN ("sqlitep", Fsqlitep, Ssqlitep, 1, 1, 0,
        doc: /* Say whether OBJECT is an SQlite object.  */)
   (Lisp_Object object)
 {
-#ifdef HAVE_SQLITE3
-  return SQLITE (object)? Qt: Qnil;
-#else
-  return Qnil;
-#endif
+  return SQLITEP (object) ? Qt: Qnil;
 }
 
 DEFUN ("sqlite-available-p", Fsqlite_available_p, Ssqlite_available_p, 0, 0, 0,
        doc: /* Return t if sqlite3 support is available in this instance of Emacs.*/)
   (void)
 {
-#ifdef HAVE_SQLITE3
 # ifdef WINDOWSNT
   Lisp_Object found = Fassq (Qsqlite3, Vlibrary_cache);
   if (CONSP (found))
@@ -671,15 +663,11 @@ DEFUN ("sqlite-available-p", Fsqlite_available_p, Ssqlite_available_p, 0, 0, 0,
 # else
   return Qt;
 #endif
-#else
-  return Qnil;
-#endif
 }
 
 void
 syms_of_sqlite (void)
 {
-#ifdef HAVE_SQLITE3
   defsubr (&Ssqlite_open);
   defsubr (&Ssqlite_close);
   defsubr (&Ssqlite_execute);
@@ -696,7 +684,7 @@ syms_of_sqlite (void)
   defsubr (&Ssqlite_finalize);
   DEFSYM (Qset, "set");
   DEFSYM (Qfull, "full");
-#endif
+
   defsubr (&Ssqlitep);
   DEFSYM (Qsqlitep, "sqlitep");
   defsubr (&Ssqlite_available_p);

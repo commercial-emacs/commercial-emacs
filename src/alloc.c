@@ -50,6 +50,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
+#ifdef HAVE_SQLITE3
+#include "sqlite.h"
+#endif
+
 #ifdef HAVE_TREE_SITTER
 #include "tree-sitter.h"
 #endif
@@ -129,7 +133,6 @@ union emacs_align_type
   struct Lisp_Overlay Lisp_Overlay;
   struct Lisp_Sub_Char_Table Lisp_Sub_Char_Table;
   struct Lisp_Subr Lisp_Subr;
-  struct Lisp_Sqlite Lisp_Sqlite;
   struct Lisp_User_Ptr Lisp_User_Ptr;
   struct Lisp_Vector Lisp_Vector;
   struct terminal terminal;
@@ -3202,6 +3205,12 @@ cleanup_vector (struct Lisp_Vector *vector)
 	ts_tree_delete(lisp_parser->prev_tree);
       if (lisp_parser->parser != NULL)
 	ts_parser_delete(lisp_parser->parser);
+    }
+#endif
+#ifdef HAVE_SQLITE3
+  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_SQLITE))
+    {
+      /* clean s___ up.  To be implemented.  */
     }
 #endif
 }

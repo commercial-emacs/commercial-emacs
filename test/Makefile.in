@@ -48,7 +48,6 @@ SO = @MODULES_SUFFIX@
 SEPCHAR = @SEPCHAR@
 
 HAVE_NATIVE_COMP = @HAVE_NATIVE_COMP@
-
 REPLACE_FREE = @REPLACE_FREE@
 
 -include ${top_builddir}/src/verbose.mk

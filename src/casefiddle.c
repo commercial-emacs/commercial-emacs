@@ -523,7 +523,9 @@ static ptrdiff_t
 casify_region (enum case_action flag, Lisp_Object b, Lisp_Object e)
 {
   ptrdiff_t added, start, end, old_end;
+#ifdef HAVE_TREE_SITTER
   uint32_t old_end_byte;
+#endif
   struct casing_context ctx;
 
   validate_region (&b, &e);
