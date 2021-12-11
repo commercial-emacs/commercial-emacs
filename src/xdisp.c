@@ -9212,22 +9212,9 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 
 unsigned int mit_calls1 = 0, mit_calls2 = 0, mit_calls3 = 0, mit_calls4 = 0, mit_calls5 = 0, mit_calls6 = 0, mit_calls7 = 0, mit_calls8 = 0, mit_calls9 = 0, mit_calls10 = 0, mit_calls11 = 0, mit_calls12 = 0, mit_calls13 = 0, mit_calls14 = 0, mit_calls15 = 0;
 
-/* `window_start_coordinates' wants the most current line height. */
-#define RESTORE_IT_MODULO_ASCENT(IT, IT_BACKUP, DATA)	\
-  do {							\
-    int max_ascent = (IT)->max_ascent,			\
-      max_descent = (IT)->max_descent;			\
-    RESTORE_IT ((IT), &(IT_BACKUP), (DATA));		\
-    (IT)->max_ascent = max_ascent;			\
-    (IT)->max_descent = max_descent;			\
-  } while (false)
-
 /* Move IT forward until it satisfies one or more of the criteria in
-   TO_CHARPOS, TO_X, TO_Y, and TO_VPOS.
-
-   OP is a bit-mask that specifies where to stop, and in particular,
-   which of those four position arguments makes a difference.  See the
-   description of enum move_operation_enum.
+   TO_CHARPOS, TO_X, TO_Y, and TO_VPOS.  Not all need be satisfied;
+   the behavior is ad hoc.
 
    If TO_CHARPOS is in invisible text, e.g. a truncated part of a
    screen line, set IT to the next displayable position right of TO_CHARPOS.
@@ -9236,7 +9223,6 @@ unsigned int mit_calls1 = 0, mit_calls2 = 0, mit_calls3 = 0, mit_calls4 = 0, mit
 
    Return the maximum pixel length of any line scanned but never more
    than it.last_visible_x.  */
-
 int
 move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos, int op)
 {
@@ -9269,96 +9255,16 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	}
       else if (op & MOVE_TO_Y)
 	{
-	  struct it it_backup;
-	  void *backup_data = NULL;
-	  bool reached = false;
-	  int line_height = 0;
-
-	  SAVE_IT (it_backup, *it, backup_data);
-
+	  /* Tall glyphs: must go line by line.  */
           mit_calls4++;
-	  skip = emulate_display_sline (it, to_charpos,
-				       /* default to_x of zero to avoid stopping at
-					  end of line.  */
-				       ((op & MOVE_TO_X) ? to_x : 0),
-				       (MOVE_TO_X | (op & MOVE_TO_POS)));
-	  switch (skip)
-	    {
-	    case MOVE_POS_MATCH_OR_ZV:
-	      /* Reached TO_CHARPOS */
-	      reached = true;
-	      break;
+	  skip = emulate_display_sline (it, to_charpos, (op & MOVE_TO_X) ? to_x : 0,
+					(MOVE_TO_X | (op & MOVE_TO_POS)));
+	  if (skip == MOVE_X_REACHED)
+	    skip = emulate_display_sline (it, to_charpos, -1, op & MOVE_TO_POS);
 
-	    case MOVE_X_REACHED:
-	      line_height = it->max_ascent + it->max_descent;
-	      if (to_y >= it->current_y
-		  && to_y < it->current_y + line_height)
-		{
-		  /* Reached TO_X and TO_Y is within line height.  */
-		  reached = true;
-		}
-	      else
-		{
-		  /* See if we can also reach TO_CHARPOS or TO_Y.  */
-		  SAVE_IT (it_backup, *it, backup_data);
-		  mit_calls5++;
-		  skip = emulate_display_sline (it, to_charpos, -1, op & MOVE_TO_POS);
-		  line_height = it->max_ascent + it->max_descent;
-		  if (to_y >= it->current_y
-		      && to_y < it->current_y + line_height)
-		    {
-		      reached = true;
-		      /* Why did 1999 Moellmann eschew the updated skip value? */
-		      skip = MOVE_X_REACHED;
-		      RESTORE_IT_MODULO_ASCENT (it, it_backup, backup_data);
-		    }
-		  else if (skip == MOVE_POS_MATCH_OR_ZV)
-		    {
-		      reached = true;
-		      if (IT_CHARPOS (*it) != to_charpos
-			  && ((IT_CHARPOS (it_backup) > to_charpos)
-			      == (IT_CHARPOS (*it) > to_charpos)))
-			{
-			  /* We're now off TO_CHARPOS, but remain on
-			     the same side of it (depending on bidi),
-			     so prefer the saved iterator.  */
-			  RESTORE_IT_MODULO_ASCENT (it, it_backup, backup_data);
-			}
-		    }
-		}
-	      break;
-
-	    default:
-	      line_height = it->max_ascent + it->max_descent;
-	      if (to_y >= it->current_y
-		  && to_y < it->current_y + line_height)
-		{
-		  /* TO_Y is within line height.  */
-		  reached = true;
-
-		  /* When word-wrap is on, TO_X may lie past the end
-		     of a wrapped line.  Then it->current is the
-		     character on the next line, so backtrack to the
-		     space before the wrap point.  */
-		  if (skip == MOVE_LINE_CONTINUED
-		      && it->line_wrap == WORD_WRAP)
-		    {
-		      int prev_x = max (it->current_x - 1, 0);
-		      RESTORE_IT (it, &it_backup, backup_data);
-		      skip = emulate_display_sline (it, -1, prev_x, MOVE_TO_X);
-		    }
-		}
-	      break;
-	    }
-
-	  if (backup_data)
-	    bidi_unshelve_cache (backup_data, true);
-
-	  if (reached)
-	    {
-	      max_current_x = max (it->current_x, max_current_x);
-	      goto out;
-	    }
+	  if (skip == MOVE_POS_MATCH_OR_ZV
+	      || to_y < it->current_y + it->max_ascent + it->max_descent)
+            goto out;
 	}
       else if (BUFFERP (it->object)
 	       && (it->method == GET_FROM_BUFFER
@@ -9524,13 +9430,11 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 	}
 
       recenter_overlay_lists (current_buffer, IT_CHARPOS (*it));
-      it->current_x = 0;
       last_height = it->max_ascent + it->max_descent;
-      it->hpos = 0;
-      it->line_number_produced_p = false;
       it->current_y += last_height;
       ++it->vpos;
-      it->max_ascent = it->max_descent = 0;
+      it->current_x = it->hpos = it->max_ascent = it->max_descent = 0;
+      it->line_number_produced_p = false;
     }
 
  out:
@@ -9556,7 +9460,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
       last_height = it->max_ascent + it->max_descent;
     }
 
-  return max_current_x;
+  return max (it->current_x, max_current_x);
 }
 
 /* Can we deploy long-line shortcuts? */
