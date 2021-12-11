@@ -3354,7 +3354,7 @@ int window_box_left (struct window *, enum glyph_row_area);
 int window_box_left_offset (struct window *, enum glyph_row_area);
 int window_box_right (struct window *, enum glyph_row_area);
 int estimate_mode_line_height (struct frame *, enum face_id);
-int move_it_to (struct it *, ptrdiff_t, int, int, int, int);
+int move_it_to (struct it *, ptrdiff_t, int, int);
 void pixel_to_glyph_coords (struct frame *, int, int, int *, int *,
                             NativeRectangle *, bool);
 void remember_mouse_glyph (struct frame *, int, int, NativeRectangle *);

@@ -2234,7 +2234,7 @@ whether or not it is currently displayed in some window.  */)
             ? PT
             : PT - 1;
 
-          move_it_to (&it, target, -1, -1, -1, MOVE_TO_POS);
+          move_it_to (&it, target, -1, MOVE_TO_POS);
         }
 
       /* IT may move too far if truncate-lines is on and PT lies
