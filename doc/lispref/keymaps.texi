@@ -2460,7 +2460,20 @@ safely be called at any time.
 
   A menu separator is a kind of menu item that doesn't display any
 text---instead, it divides the menu into subparts with a horizontal line.
-A separator looks like this in the menu keymap:
+To create a basic separator, you can use @code{menu-bar-separator} when
+defining the item:
+
+@example
+(define-key map [@var{foo-separator}] menu-bar-separator)
+@end example
+
+@noindent
+When possible, it's recommended to name the key for the separator with
+the form @var{foo-separator} so that it's clear the underlying object
+is a separator.  For example, @code{region-separator} is preferred
+over @code{separator-region}.
+
+  A separator looks like this in the menu keymap:
 
 @example
 (menu-item @var{separator-type})

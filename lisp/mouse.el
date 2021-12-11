@@ -358,7 +358,7 @@ Some context functions add menu items below the separator."
 (defun context-menu-toolbar (menu _click)
   "Populate MENU with submenus from the tool bar."
   (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
-  (define-key-after menu [separator-toolbar] menu-bar-separator)
+  (define-key-after menu [toolbar-separator] menu-bar-separator)
   (map-keymap (lambda (key binding)
                 (when (consp binding)
                   (define-key-after menu (vector key)
@@ -369,7 +369,7 @@ Some context functions add menu items below the separator."
 (defun context-menu-global (menu _click)
   "Populate MENU with submenus from the global menu."
   (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
-  (define-key-after menu [separator-global] menu-bar-separator)
+  (define-key-after menu [global-separator] menu-bar-separator)
   (map-keymap (lambda (key binding)
                 (when (consp binding)
                   (define-key-after menu (vector key)
@@ -380,7 +380,7 @@ Some context functions add menu items below the separator."
 (defun context-menu-local (menu _click)
   "Populate MENU with submenus provided by major mode."
   (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
-  (define-key-after menu [separator-local] menu-bar-separator)
+  (define-key-after menu [local-separator] menu-bar-separator)
   (let ((keymap (local-key-binding [menu-bar])))
     (when keymap
       (map-keymap (lambda (key binding)
@@ -393,7 +393,7 @@ Some context functions add menu items below the separator."
 (defun context-menu-minor (menu _click)
   "Populate MENU with submenus provided by minor modes."
   (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
-  (define-key-after menu [separator-minor] menu-bar-separator)
+  (define-key-after menu [minor-separator] menu-bar-separator)
   (dolist (mode (reverse (minor-mode-key-binding [menu-bar])))
     (when (and (consp mode) (symbol-value (car mode)))
       (map-keymap (lambda (key binding)
@@ -406,7 +406,7 @@ Some context functions add menu items below the separator."
 (defun context-menu-buffers (menu _click)
   "Populate MENU with the buffer submenus to buffer switching."
   (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
-  (define-key-after menu [separator-buffers] menu-bar-separator)
+  (define-key-after menu [buffers-separator] menu-bar-separator)
   (map-keymap (lambda (key binding)
                 (when (consp binding)
                   (define-key-after menu (vector key)
@@ -416,13 +416,13 @@ Some context functions add menu items below the separator."
 
 (defun context-menu-vc (menu _click)
   "Populate MENU with Version Control commands."
-  (define-key-after menu [separator-vc] menu-bar-separator)
+  (define-key-after menu [vc-separator] menu-bar-separator)
   (define-key-after menu [vc-menu] vc-menu-entry)
   menu)
 
 (defun context-menu-undo (menu _click)
   "Populate MENU with undo commands."
-  (define-key-after menu [separator-undo] menu-bar-separator)
+  (define-key-after menu [undo-separator] menu-bar-separator)
   (when (and (not buffer-read-only)
              (not (eq t buffer-undo-list))
              (if (eq last-command 'undo)
@@ -440,7 +440,7 @@ Some context functions add menu items below the separator."
 
 (defun context-menu-region (menu click)
   "Populate MENU with region commands."
-  (define-key-after menu [separator-region] menu-bar-separator)
+  (define-key-after menu [region-separator] menu-bar-separator)
   (when (and mark-active (not buffer-read-only))
     (define-key-after menu [cut]
       '(menu-item "Cut" kill-region
