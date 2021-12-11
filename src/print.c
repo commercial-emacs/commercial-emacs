@@ -52,6 +52,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "tree-sitter.h"
 #endif
 
+#ifdef HAVE_SQLITE3
+#include <sqlite.h>
+#endif
+
 struct terminal;
 
 /* Avoid actual stack overflow in print.  */
@@ -1887,6 +1891,23 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       int len = sprintf (buf, "%p", XTREE_SITTER (obj));
       strout (buf, len, len, printcharfun);
       printchar ('>', printcharfun);
+      break;
+#endif
+#ifdef HAVE_SQLITE3
+    case PVEC_SQLITE:
+      {
+        print_c_string ("#<sqlite ", printcharfun);
+        int i = sprintf (buf, "db=%p", XSQLITE (obj)->db);
+        strout (buf, i, i, printcharfun);
+        if (XSQLITE (obj)->is_statement)
+          {
+            i = sprintf (buf, " stmt=%p", XSQLITE (obj)->stmt);
+            strout (buf, i, i, printcharfun);
+          }
+        i = sprintf (buf, " name=%s", XSQLITE (obj)->name);
+        strout (buf, i, i, printcharfun);
+        printchar ('>', printcharfun);
+      }
       break;
 #endif
     default:
