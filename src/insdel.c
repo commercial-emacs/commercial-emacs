@@ -1433,7 +1433,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   ptrdiff_t outgoing_insbytes = insbytes;
   Lisp_Object deletion;
 #ifdef HAVE_TREE_SITTER
-  uint32_t old_end_byte = BUFFER_TO_SITTER (to);
+  uint32_t old_end_byte;
 #endif
 
   check_markers ();
@@ -1452,6 +1452,10 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
     from = BEGV;
   if (to > ZV)
     to = ZV;
+
+#ifdef HAVE_TREE_SITTER
+  old_end_byte = BUFFER_TO_SITTER (to);
+#endif
 
   from_byte = CHAR_TO_BYTE (from);
   to_byte = CHAR_TO_BYTE (to);
