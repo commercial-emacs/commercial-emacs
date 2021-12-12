@@ -11305,24 +11305,18 @@ resize_mini_window (struct window *w, bool exact_p)
 
   eassert (MINI_WINDOW_P (w));
 
-  /* Don't resize windows while redisplaying a window; it would
-     confuse redisplay functions when the size of the window they are
-     displaying changes from under them.  Such a resizing can happen,
-     for instance, when which-func prints a long message while
-     we are running fontification-functions.  We're running these
-     functions with safe_call which binds inhibit-redisplay to t.  */
-  if (!NILP (Vinhibit_redisplay))
+  /* Take the cue from safe_call which binds inhibit-redisplay.  */
+  if (! NILP (Vinhibit_redisplay))
     return false;
 
-  /* By default, start display at the beginning.  */
   if (redisplay_adhoc_scroll_in_resize_mini_windows)
+    /* This is the default: start at bob.  */
     set_marker_both (w->start, w->contents,
 		     BUF_BEGV (XBUFFER (w->contents)),
 		     BUF_BEGV_BYTE (XBUFFER (w->contents)));
 
-  /* Nil means don't try to resize.  */
   if ((NILP (Vresize_mini_windows)
-       && (NILP (resize_mini_frames) || !FRAME_MINIBUF_ONLY_P (f)))
+       && (NILP (resize_mini_frames) || ! FRAME_MINIBUF_ONLY_P (f)))
       || (FRAME_X_P (f) && FRAME_OUTPUT_DATA (f) == NULL))
     return false;
 
@@ -11334,6 +11328,7 @@ resize_mini_window (struct window *w, bool exact_p)
   else
     {
       struct it it;
+      struct text_pos tpos;
       int bottom_y, max_y, unit_y = FRAME_LINE_HEIGHT (f);
       struct buffer *old_current_buffer = NULL;
       int windows_height = FRAME_INNER_HEIGHT (f);
@@ -11354,12 +11349,10 @@ resize_mini_window (struct window *w, bool exact_p)
       max_y = clip_to_bounds (unit_y, max_y, windows_height);
 
       init_iterator (&it, w, BEGV, BEGV_BYTE, NULL, DEFAULT_FACE_ID);
-      move_it_to (&it, ZV, -1, MOVE_TO_POS);
+      SET_TEXT_POS (tpos, BEGV, BEGV_BYTE);
       bottom_y =
 	it.current_y
-	+ ((it.max_ascent + it.max_descent)
-	   ? (it.max_ascent + it.max_descent)
-	   : last_height)
+	+ actual_line_height (w, tpos)
 	- min (it.extra_line_spacing, it.max_extra_line_spacing);
 
       /* Compute a suitable window start.  */
@@ -11378,9 +11371,7 @@ resize_mini_window (struct window *w, bool exact_p)
 	}
       else
 	{
-	  struct text_pos start;
-	  SET_TEXT_POS (start, BEGV, BEGV_BYTE);
-          SET_MARKER_FROM_TEXT_POS (w->start, start);
+          SET_MARKER_FROM_TEXT_POS (w->start, tpos);
         }
 
       if (EQ (Vresize_mini_windows, Qgrow_only))
