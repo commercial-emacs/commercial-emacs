@@ -25,7 +25,6 @@
 
 (require 'ert)
 (require 'ert-x)
-(require 'sqlite-mode)
 
 (declare-function sqlite-execute "sqlite.c")
 (declare-function sqlite-close "sqlite.c")

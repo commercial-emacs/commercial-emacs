@@ -11328,7 +11328,6 @@ resize_mini_window (struct window *w, bool exact_p)
   else
     {
       struct it it;
-      struct text_pos tpos;
       int bottom_y, max_y, unit_y = FRAME_LINE_HEIGHT (f);
       struct buffer *old_current_buffer = NULL;
       int windows_height = FRAME_INNER_HEIGHT (f);
@@ -11349,10 +11348,10 @@ resize_mini_window (struct window *w, bool exact_p)
       max_y = clip_to_bounds (unit_y, max_y, windows_height);
 
       init_iterator (&it, w, BEGV, BEGV_BYTE, NULL, DEFAULT_FACE_ID);
-      SET_TEXT_POS (tpos, BEGV, BEGV_BYTE);
+      move_it_to (&it, ZV, -1, MOVE_TO_POS);
       bottom_y =
 	it.current_y
-	+ actual_line_height (w, tpos)
+	+ it.max_ascent + it.max_descent
 	- min (it.extra_line_spacing, it.max_extra_line_spacing);
 
       /* Compute a suitable window start.  */
@@ -11371,6 +11370,8 @@ resize_mini_window (struct window *w, bool exact_p)
 	}
       else
 	{
+	  struct text_pos tpos;
+	  SET_TEXT_POS (tpos, BEGV, BEGV_BYTE);
           SET_MARKER_FROM_TEXT_POS (w->start, tpos);
         }
 
