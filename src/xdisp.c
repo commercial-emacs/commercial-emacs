@@ -6550,13 +6550,12 @@ following_line_start (struct it *it, bool *skipped_p,
 static void
 preceding_line_start_visible (struct it *it)
 {
-  if (IT_CHARPOS (*it) <= BEGV)
-    return;
-
-  for (preceding_line_start (it);
-       IT_CHARPOS (*it) > BEGV;
-       preceding_line_start (it))
+  while (IT_CHARPOS (*it) > BEGV)
     {
+      preceding_line_start (it);
+      if (IT_CHARPOS (*it) <= BEGV)
+	break;
+
       if (it->selective > 0
 	  && indented_beyond_p (IT_CHARPOS (*it), IT_BYTEPOS (*it),
 				it->selective))
@@ -6575,8 +6574,6 @@ preceding_line_start_visible (struct it *it)
 	  void *it2data = NULL;
 	  ptrdiff_t beg, end;
 	  Lisp_Object val, overlay;
-
-	  eassert (IT_CHARPOS (*it) > BEGV); /* Remove this -- Kim Storm */
 
 	  if (find_composition (IT_CHARPOS (*it), -1, &beg, &end, &val, Qnil)
 	      && beg < IT_CHARPOS (*it))
