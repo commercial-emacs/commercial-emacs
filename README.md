@@ -38,7 +38,7 @@ acquisition is any indication, the last outcome is most likely.
 
 Only the C code was changed.  Lisp package code bogs as before.  To
 realize the improvement, one ought to `find-file-literally` and turn
-off showstopping modes like `font-lock-mode`, `hl-line-mode` and
+off showstoppers like `font-lock-mode`, `hl-line-mode` and
 dousing `blink-paren-function`.  We'll likely need a rendition of that
 perennial *hack in flagrante* `so-long-mode` that performs all these
 deactivations for you.
