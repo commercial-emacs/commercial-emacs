@@ -18,7 +18,7 @@ Roughly every hour.
 
 ### How has the code diverged thus far?
 
-- [Reasonably performant long lines.](#long-lines)
+- Long lines that don't suck[... too badly.](#long-lines)
 - [Tree-sitter font highlighting.](#tree-sitter)
 - Gnus is rewritten to be non-blocking.
 - Process management is rewritten.
@@ -34,13 +34,13 @@ on a coding frenzy that achieves feature parity, grant myself commit
 rights, or continue not noticing me.  If my history of user
 acquisition is any indication, the last outcome is most likely.
 
-### <a name="long-lines"></a>Long lines remain slow, what's the deal?
+### <a name="long-lines"></a>Long lines remain dog-slow, what's the deal?
 
-Only the redisplay C code was changed.  Any lisp code, e.g.,
-`font-lock-mode`, `hl-line-mode`, etc. will bog as before.  To realize
-the improvement, one ought to `find-file-literally` and turn off most
-minor modes.  Alas, this solution could be considered just as
-sub-optimal as the prevailing hack du jour `so-long-mode`.
+Only the C code was changed.  Lisp package code bogs as before.  To
+realize the improvement, one ought to `find-file-literally` and turn
+off showstopping modes like `font-lock-mode` and `hl-line-mode`.
+Alas, most will consider having to do this as suboptimal as the
+prevailing hack *du jour* `so-long-mode`.
 
 ### <a name="tree-sitter"></a>How can I try tree-sitter highlighting?
 
