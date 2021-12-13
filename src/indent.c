@@ -2221,7 +2221,7 @@ whether or not it is currently displayed in some window.  */)
              checkin by kfs).  But this does nothing useful that I can
              tell, and it causes Bug#2694 .  -- cyd */
           /* When the position we started from is covered by a display
-             string, move_it_to will overshoot it, while vertical-motion
+             string, move_it_forward will overshoot it, while vertical-motion
              wants to put the cursor _before_ the display string.  So in
              that case, we move to buffer position before the display
              string, and avoid overshooting.  But if the position before
@@ -2234,7 +2234,7 @@ whether or not it is currently displayed in some window.  */)
             ? PT
             : PT - 1;
 
-          move_it_to (&it, target, -1, MOVE_TO_POS);
+          move_it_forward (&it, target, -1, MOVE_TO_POS);
         }
 
       /* IT may move too far if truncate-lines is on and PT lies

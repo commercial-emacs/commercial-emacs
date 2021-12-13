@@ -2670,7 +2670,7 @@ struct it
 
   /* Accumulated width of continuation lines.  If > 0, this means we
      are currently in a continuation line.  This is initially zero and
-     incremented/reset by display_sline, move_it_to etc.  */
+     incremented/reset by display_sline, move_it_forward etc.  */
   int continuation_lines_width;
 
   /* Buffer position that ends the buffer text line being iterated.
@@ -2682,14 +2682,14 @@ struct it
   struct text_pos eol_pos;
 
   /* Current y-position.  Automatically incremented by the height of
-     glyph_row in move_it_to and display_sline.  */
+     glyph_row in move_it_forward and display_sline.  */
   int current_y;
 
   /* Vertical matrix position of first text line in window.  */
   int first_vpos;
 
   /* Current vertical matrix position, or line number.  Automatically
-     incremented by move_it_to and display_sline.  */
+     incremented by move_it_forward and display_sline.  */
   int vpos;
 
   /* Horizontal matrix position set in emulate_display_sline,  */
@@ -2784,7 +2784,7 @@ struct it
     reset_box_start_end_flags ((IT));			\
   } while (false)
 
-/* Bit-flags indicating what operation move_it_to should perform.  */
+/* Bit-flags indicating what operation move_it_forward should perform.  */
 
 enum move_operation_enum
 {
@@ -3355,7 +3355,9 @@ int window_box_left (struct window *, enum glyph_row_area);
 int window_box_left_offset (struct window *, enum glyph_row_area);
 int window_box_right (struct window *, enum glyph_row_area);
 int estimate_mode_line_height (struct frame *, enum face_id);
-int move_it_to (struct it *, ptrdiff_t, int, int);
+void move_it_eob_no_newline (struct it *it);
+int move_it_forward (struct it *, ptrdiff_t, int, int);
+void move_it_backward (struct it *, int, int);
 void pixel_to_glyph_coords (struct frame *, int, int, int *, int *,
                             NativeRectangle *, bool);
 void remember_mouse_glyph (struct frame *, int, int, NativeRectangle *);
