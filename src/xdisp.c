@@ -9551,7 +9551,7 @@ move_it_backward (struct it *it, int op_to, int op)
       void *itdata = NULL;
       ptrdiff_t from_pos = IT_CHARPOS (*it);
       int estimated_slines = (op == MOVE_TO_Y
-			      ? op_to / default_line_height (it->w)
+			      ? max (1, op_to / default_line_height (it->w))
 			      : op_to);
       int op_target = (op == MOVE_TO_Y
 		       ? it->current_y - op_to
@@ -9656,9 +9656,7 @@ move_it_backward (struct it *it, int op_to, int op)
 	  move_it_vpos (it, slines - estimated_slines);
 	}
       else if (op == MOVE_TO_Y
-	       && ((it->current_y - op_target) >
-		   min (window_box_height (it->w),
-			2 / 3 * actual_line_height (it->w, tpos)))
+	       && ((it->current_y - op_target) >= actual_line_height (it->w, tpos))
 	       && IT_CHARPOS (*it) > BEGV)
 	{
 	  /* SLINES comes up short.  Take it from the top.  */
@@ -9666,8 +9664,7 @@ move_it_backward (struct it *it, int op_to, int op)
 	  continue;
 	}
       else if (op == MOVE_TO_Y
-	       && ((op_target - it->current_y) >=
-		   actual_line_height (it->w, tpos))
+	       && ((op_target - it->current_y) >= actual_line_height (it->w, tpos))
 	       && IT_CHARPOS (*it) < ZV)
 	{
 	  /* Common branch where SLINES exceeds estimate (too

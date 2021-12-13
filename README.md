@@ -14,13 +14,14 @@ does not entreat the FSF to enforce its license.
 
 ### How often are you merging commits from GNU?
 
-Roughly every ninety minutes.
+Roughly every hour.
 
 ### How has the code diverged thus far?
 
+- [Reasonably performant long lines.](#long-lines)
 - [Tree-sitter font highlighting.](#tree-sitter)
 - Gnus is rewritten to be non-blocking.
-- The module `process.c` is rewritten.
+- Process management is rewritten.
 
 Given time, there will be enough improvements that this section of the
 README will migrate to a larger NEWS file.  Or not.
@@ -32,6 +33,14 @@ the choices for the FSF are the same as before: enlist RMS to embark
 on a coding frenzy that achieves feature parity, grant myself commit
 rights, or continue not noticing me.  If my history of user
 acquisition is any indication, the last outcome is most likely.
+
+### <a name="long-lines"></a>Long lines remain slow, what's the deal?
+
+Only the redisplay C code was changed.  Any lisp code, e.g.,
+`font-lock-mode`, `hl-line-mode`, etc. will bog as before.  To realize
+the improvement, one ought to `find-file-literally` and turn off most
+minor modes.  Alas, this solution could be considered just as
+sub-optimal as the prevailing hack du jour `so-long-mode`.
 
 ### <a name="tree-sitter"></a>How can I try tree-sitter highlighting?
 
