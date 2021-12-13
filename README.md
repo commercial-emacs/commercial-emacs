@@ -38,9 +38,10 @@ acquisition is any indication, the last outcome is most likely.
 
 Only the C code was changed.  Lisp package code bogs as before.  To
 realize the improvement, one ought to `find-file-literally` and turn
-off showstopping modes like `font-lock-mode` and `hl-line-mode`.
-Alas, most will consider having to do this as suboptimal as the
-prevailing hack *du jour* `so-long-mode`.
+off showstopping modes like `font-lock-mode`, `hl-line-mode` and
+dousing `blink-paren-function`.  We'll likely need a rendition of that
+perennial *hack in flagrante* `so-long-mode` that performs all these
+deactivations for you.
 
 ### <a name="tree-sitter"></a>How can I try tree-sitter highlighting?
 
