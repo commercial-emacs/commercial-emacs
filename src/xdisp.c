@@ -9241,7 +9241,7 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op)
 	{
 	  /* Tall glyphs: must go line by line.  */
           mit_calls4++;
-	  skip = (op_to <= it->vpos)
+	  skip = (op_to <= it->vpos) /* yes, less-than-equal */
 	    ? MOVE_POS_MATCH_OR_ZV
 	    : emulate_display_sline (it, to_charpos, -1, op & MOVE_TO_POS);
 	}
@@ -9249,9 +9249,17 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op)
 	{
 	  /* Tall glyphs: must go line by line.  */
           mit_calls5++;
-	  skip = (op_to <= it->current_y + it->max_ascent + it->max_descent)
-	    ? MOVE_POS_MATCH_OR_ZV
-	    : emulate_display_sline (it, to_charpos, -1, op & MOVE_TO_POS);
+
+	  // Reconnoiter image height with throwaway MOVE_TO_X call.
+	  skip = emulate_display_sline (it, to_charpos, 0,
+					MOVE_TO_X | (op & MOVE_TO_POS));
+	  if (skip != MOVE_POS_MATCH_OR_ZV)
+	    {
+	      skip = (op_to < it->current_y + /* yes, strict inequality */
+		      it->max_ascent + it->max_descent)
+		? MOVE_POS_MATCH_OR_ZV
+		: emulate_display_sline (it, to_charpos, -1, op & MOVE_TO_POS);
+	    }
 	}
       else if (op & MOVE_TO_POS)
         {
