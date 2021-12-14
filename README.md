@@ -23,7 +23,7 @@ make -j4
 src/emacs
 ```
 
-The `make` logic remains broken in the sense that frequently
+The `make` logic remains broken in the sense that frequently,
 incompatible artifacts from a previous build do not get rebuilt.
 Preceding the above with,
 
