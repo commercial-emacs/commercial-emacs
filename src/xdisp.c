@@ -9668,7 +9668,6 @@ move_it_backward (struct it *it, int op_to, int op)
 	     far back).  Scooch forward.  */
 	  move_it_y (it, op_target - it->current_y);
 	}
-      /* assume MOVE_TO_VPOS can't error */
       break;
     }
 }
