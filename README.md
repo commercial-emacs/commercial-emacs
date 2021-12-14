@@ -12,7 +12,7 @@ emacs.  As it is hosted on a site using
 software, the work herein is not the official GNU Emacs source, and
 does not entreat the FSF to enforce its license.
 
-### How to build
+### How to build?
 
 ```
 git clone https://github.com/commercial-emacs/commercial-emacs.git
