@@ -122,7 +122,8 @@ file defaults to the current buffer's file name if it is under VC.
   If you wish to delete a version-controlled file, use the command
 @kbd{M-x vc-delete-file}.  This prompts for the file name, and deletes
 it via the version control system.  The file is removed from the
-working tree, and in the VC Directory buffer
+working tree, and in the VC Directory buffer. If you give a prefix argument,
+the file is not deleted from disk.
 @iftex
 (@pxref{VC Directory Mode,,, emacs, the Emacs Manual}),
 @end iftex

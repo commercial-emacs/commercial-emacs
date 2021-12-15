@@ -372,6 +372,10 @@ info node.  This command only works for the Emacs and Emacs Lisp manuals.
 
 ** vc
 
+*** 'C-x v x' accepts a prefix argument to keep file on disk
+Previously 'C-x v x' always deleted the selected file. Now if you give it
+prefix argument, it will keep the buffer and file on disk intact.
+Currently this is only implemented for vc-git.
 ---
 *** 'C-x v v' on an unregistered file will now use the most specific backend.
 Previously, if you had an SVN-covered "~/" directory, and a Git-covered

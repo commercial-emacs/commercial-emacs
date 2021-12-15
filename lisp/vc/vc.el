@@ -2970,14 +2970,13 @@ backend to NEW-BACKEND, and unregister FILE from the current backend.
       (vc-checkin file new-backend comment (stringp comment)))))
 
 ;;;###autoload
-(defun vc-delete-file (file)
+(defun vc-delete-file (file &optional keep-file)
   "Delete file and mark it as such in the version control system.
 If called interactively, read FILE, defaulting to the current
-buffer's file name if it's under version control."
-  (interactive (list (read-file-name "VC delete file: " nil
-                                     (when (vc-backend buffer-file-name)
-                                       buffer-file-name)
-                                     t)))
+buffer's file name if it's under version control.
+If a prefix argument is given (optional argument KEEP-FILE) then
+don't delete the file from the disk"
+  (interactive "f\nP")
   (setq file (expand-file-name file))
   (let ((buf (get-file-buffer file))
         (backend (vc-backend file)))
@@ -2999,19 +2998,22 @@ buffer's file name if it's under version control."
     (unless (or (file-directory-p file) (null make-backup-files)
                 (not (file-exists-p file)))
       (with-current-buffer (or buf (find-file-noselect file))
-	(let ((backup-inhibited nil))
+	(let ((backup-inhibited nil)
+              ;; if you don't set this, then for some reason, the file is never brought back
+              (backup-by-copying t))
 	  (backup-buffer))))
     ;; Bind `default-directory' so that the command that the backend
     ;; runs to remove the file is invoked in the correct context.
     (let ((default-directory (file-name-directory file)))
       (vc-call-backend backend 'delete-file file))
     ;; If the backend hasn't deleted the file itself, let's do it for him.
-    (when (file-exists-p file) (delete-file file))
+    (when (and (file-exists-p file) (null keep-file))
+      (delete-file file))
     ;; Forget what VC knew about the file.
     (vc-file-clearprops file)
     ;; Make sure the buffer is deleted and the *vc-dir* buffers are
     ;; updated after this.
-    (vc-resynch-buffer file nil t)))
+    (vc-resynch-buffer file keep-file t)))
 
 ;;;###autoload
 (defun vc-rename-file (old new)

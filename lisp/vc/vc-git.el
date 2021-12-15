@@ -1569,8 +1569,8 @@ This requires git 1.8.4 or later, for the \"-L\" option of \"git log\"."
     (or (vc-git-symbolic-commit next-rev) next-rev)))
 
 (defun vc-git-delete-file (file)
-  (vc-git-command nil 0 (vc-git--literal-pathspec file) "rm" "-f" "--"))
-
+  (vc-git-command nil 0 (vc-git--literal-pathspec file) "rm" "-f" "--cached" "--"))
+)
 (defun vc-git-rename-file (old new)
   (vc-git-command nil 0 (list old new) "mv" "-f" "--"))
 
