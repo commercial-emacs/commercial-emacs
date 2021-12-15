@@ -51,8 +51,8 @@ README will migrate to a larger NEWS file.  Or not.
 
 Only the C code was changed.  Lisp package code bogs as before.  To
 realize the improvement, one ought to `find-file-literally` (which
-won't fontify), turn off showstoppers like `hl-line-mode`, and douse
-`blink-paren-function`.
+won't fontify), and turn off showstoppers like `hl-line-mode` and
+`show-paren-mode`.
 
 ### <a name="tree-sitter"></a>How can I try tree-sitter highlighting?
 
