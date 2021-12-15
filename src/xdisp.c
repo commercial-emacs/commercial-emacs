@@ -9250,7 +9250,7 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op)
 	  /* Tall glyphs: must go line by line.  */
           mit_calls5++;
 
-	  // Reconnoiter image height with throwaway MOVE_TO_X call.
+	  /*  Reconnoiter image height with throwaway MOVE_TO_X call.  */
 	  skip = emulate_display_sline (it, to_charpos, 0,
 					MOVE_TO_X | (op & MOVE_TO_POS));
 	  if (skip != MOVE_POS_MATCH_OR_ZV)
