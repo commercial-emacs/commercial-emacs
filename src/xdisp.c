@@ -9475,18 +9475,6 @@ behaved_p (const struct it *it)
 }
 
 
-/* Annoying buffer without final newline.  Move to bol. */
-
-void
-move_it_eob_no_newline (struct it *it)
-{
-  if (IT_CHARPOS (*it) == ZV
-      && ZV > BEGV
-      && FETCH_BYTE (IT_BYTEPOS (*it) - 1) != '\n')
-    move_it_backward (it, 0, MOVE_TO_Y);
-}
-
-
 /* Move IT by DVPOS screen lines down (or up if negative).  DVPOS of
    zero means move to line start.  */
 
@@ -9500,7 +9488,6 @@ move_it_vpos (struct it *it, ptrdiff_t dvpos)
     }
   else
     move_it_backward (it, (int) (-dvpos), MOVE_TO_VPOS);
-  move_it_eob_no_newline (it);
 }
 
 void
@@ -9524,8 +9511,6 @@ move_it_y (struct it *it, int dy)
     }
   else
     move_it_backward (it, -dy, MOVE_TO_Y);
-
-  move_it_eob_no_newline (it);
 }
 
 

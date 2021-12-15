@@ -163,4 +163,23 @@ int main () {
     (should (equal (get-display-property 2 'height) 2.0))
     (should (equal (get-display-property 2 'space-width) 20))))
 
+(ert-deftest xdisp-tests--reconnoiter-image-height ()
+  "C-v on image extending beyond window should not signal
+end-of-buffer."
+  (skip-unless (not noninteractive))
+  (skip-unless (> (window-pixel-height) 300))
+  (switch-to-buffer "xdisp-tests--reconnoiter-image-height")
+  (dotimes (_ (/ (- (window-pixel-height) 100) (line-pixel-height)))
+    (insert "line" "\n"))
+  (insert-image (create-image (expand-file-name
+                               "test/data/image/blank-100x200.png"
+                               source-directory)))
+  (insert "\n")
+  (redisplay)
+  (goto-char (point-min))
+  (scroll-up)
+  (redisplay)
+  (let (kill-buffer-query-functions)
+    (kill-buffer "xdisp-tests--reconnoiter-image-height")))
+
 ;;; xdisp-tests.el ends here
