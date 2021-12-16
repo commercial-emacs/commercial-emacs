@@ -26,6 +26,13 @@
 (require 'ert-x)
 (require 'cl-lib)
 
+(defsubst multi-test--on-conflict-p ()
+  (when (bound-and-true-p multisession--db)
+    (let ((result (with-sqlite-transaction multisession--db
+		    (sqlite-select multisession--db "select sqlite_version()"))))
+      (version-list-<= (version-to-list "3.24.0")
+                       (version-to-list (seq-find #'stringp (cl-first result)))))))
+
 (ert-deftest multi-test-sqlite-simple ()
   (skip-unless (sqlite-available-p))
   (ert-with-temp-file dir
@@ -38,6 +45,7 @@
             (define-multisession-variable foo 0
               ""
               :synchronized t)
+            (skip-unless (multi-test--on-conflict-p))
             (should (= (multisession-value foo) 0))
             (cl-incf (multisession-value foo))
             (should (= (multisession-value foo) 1))
@@ -56,11 +64,12 @@
                               :synchronized t)
                             (cl-incf (multisession-value foo))))))
             (should (= (multisession-value foo) 2)))
-        (sqlite-close multisession--db)
+        (when multisession--db
+          (sqlite-close multisession--db))
         (setq multisession--db nil)))))
 
 (ert-deftest multi-test-sqlite-busy ()
-  (skip-unless (and t (sqlite-available-p)))
+  (skip-unless (sqlite-available-p))
   (ert-with-temp-file dir
     :directory t
     (let ((user-init-file "/tmp/foo.el")
@@ -72,6 +81,7 @@
             (define-multisession-variable bar 0
               ""
               :synchronized t)
+            (skip-unless (multi-test--on-conflict-p))
             (should (= (multisession-value bar) 0))
             (cl-incf (multisession-value bar))
             (should (= (multisession-value bar) 1))
@@ -93,45 +103,53 @@
                                     (cl-incf (multisession-value bar))))))))
             (while (process-live-p proc)
               (ignore-error 'sqlite-locked-error
-                (message "bar %s" (multisession-value bar))
-                ;;(cl-incf (multisession-value bar))
-                )
-              (sleep-for 0.1))
+                (message "bar %s" (multisession-value bar)))
+              (accept-process-output nil 0.1))
             (message "bar ends up as %s" (multisession-value bar))
             (should (< (multisession-value bar) 1003)))
-        (sqlite-close multisession--db)
+        (when (process-live-p proc)
+          (kill-process proc))
+        (when multisession--db
+          (sqlite-close multisession--db))
         (setq multisession--db nil)))))
 
 (ert-deftest multi-test-files-simple ()
+  (skip-unless (sqlite-available-p))
   (ert-with-temp-file dir
     :directory t
     (let ((user-init-file "/tmp/sfoo.el")
           (multisession-storage 'files)
           (multisession-directory dir))
-      (define-multisession-variable sfoo 0
-        ""
-        :synchronized t)
-      (should (= (multisession-value sfoo) 0))
-      (cl-incf (multisession-value sfoo))
-      (should (= (multisession-value sfoo) 1))
-      (call-process
-       (concat invocation-directory invocation-name)
-       nil t nil
-       "-Q" "-batch"
-       "--eval" (prin1-to-string
-                 `(progn
-                    (require 'multisession)
-                    (let ((multisession-directory ,dir)
-                          (multisession-storage 'files)
-                          (user-init-file "/tmp/sfoo.el"))
-                      (define-multisession-variable sfoo 0
-                        ""
-                        :synchronized t)
-                      (cl-incf (multisession-value sfoo))))))
-      (should (= (multisession-value sfoo) 2)))))
+      (unwind-protect
+          (progn
+            (define-multisession-variable sfoo 0
+              ""
+              :synchronized t)
+            (skip-unless (multi-test--on-conflict-p))
+            (should (= (multisession-value sfoo) 0))
+            (cl-incf (multisession-value sfoo))
+            (should (= (multisession-value sfoo) 1))
+            (call-process
+             (concat invocation-directory invocation-name)
+             nil t nil
+             "-Q" "-batch"
+             "--eval" (prin1-to-string
+                       `(progn
+                          (require 'multisession)
+                          (let ((multisession-directory ,dir)
+                                (multisession-storage 'files)
+                                (user-init-file "/tmp/sfoo.el"))
+                            (define-multisession-variable sfoo 0
+                              ""
+                              :synchronized t)
+                            (cl-incf (multisession-value sfoo))))))
+            (should (= (multisession-value sfoo) 2)))
+        (when multisession--db
+          (sqlite-close multisession--db))
+        (setq multisession--db nil)))))
 
 (ert-deftest multi-test-files-busy ()
-  (skip-unless (and t (sqlite-available-p)))
+  (skip-unless (sqlite-available-p))
   (ert-with-temp-file dir
     :directory t
     (let ((user-init-file "/tmp/foo.el")
@@ -168,6 +186,7 @@
       (should (< (multisession-value sbar) 2000)))))
 
 (ert-deftest multi-test-files-some-values ()
+  (skip-unless (sqlite-available-p))
   (ert-with-temp-file dir
     :directory t
     (let ((user-init-file "/tmp/sfoo.el")

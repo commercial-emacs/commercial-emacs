@@ -222,6 +222,8 @@ DOC should be a doc string, and ARGS are keywords as applicable to
       (condition-case nil
           (ignore (read-from-string pvalue))
         (error (error "Unable to store unreadable value: %s" pvalue)))
+      ;; I get near "ON" syntax error with 3.22.0
+      ;; https://stackoverflow.com/a/51531835/5132008
       (sqlite-execute
        multisession--db
        "insert into multisession(package, key, sequence, value) values(?, ?, 1, ?) on conflict(package, key) do update set sequence = sequence + 1, value = ?"
