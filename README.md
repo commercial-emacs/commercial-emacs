@@ -40,7 +40,7 @@ Roughly every hour.
 ### How has the code diverged thus far?
 
 - Long lines that don't suck[... too badly.](#long-lines)
-- [Tree-sitter font highlighting.](#tree-sitter)
+- [Tree-sitter font highlighting](#tree-sitter). <sup id="a1">[1](#f1)</sup>
 - Gnus is rewritten to be non-blocking.
 - Process management is rewritten.
 
@@ -83,3 +83,5 @@ the choices for the FSF are the same as before: enlist RMS to embark
 on a coding frenzy that achieves feature parity, grant myself commit
 rights, or continue not noticing me.  If my history of user
 acquisition is any indication, the last outcome is most likely.
+
+<b id="f1">[1]</b> By Yuan Fu and oldosfan. [↩](#a1)
