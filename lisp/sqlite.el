@@ -30,7 +30,7 @@
         (func-var (gensym)))
     `(let ((,db-var ,db)
            (,func-var (lambda () ,@body)))
-       (if (sqlite-available-p)
+       (if (fboundp 'sqlite-transaction)
            (unwind-protect
                (progn
                  (sqlite-transaction ,db-var)

@@ -17696,14 +17696,14 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   if (w->force_start)
     {
       /* We set this later on if we have to adjust point.  */
-      int new_vpos = -1;
+      int new_y = -1;
 
       w->force_start = false;
       w->vscroll = 0;
       w->window_end_valid = false;
 
       /* Forget any recorded base line for line number display.  */
-      if (!buffer_unchanged_p)
+      if (! buffer_unchanged_p)
 	w->base_line_number = 0;
 
       /* Redisplay the mode line.  Select the buffer properly for that.
@@ -17713,7 +17713,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	 if there's an error, it is better to forget about force_start
 	 than to get into an infinite loop calling the hook functions
 	 and having them get more errors.  */
-      if (!update_mode_line
+      if (! update_mode_line
 	  || ! NILP (Vwindow_scroll_functions))
 	{
 	  update_mode_line = true;
@@ -17732,7 +17732,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	 but this causes scrolling to fail when point begins inside
 	 the scroll margin (bug#148) -- cyd  */
       clear_glyph_matrix (w->desired_matrix);
-      if (!try_window (window, startp, 0))
+      if (! try_window (window, startp, 0))
 	{
 	  w->force_start = true;
 	  clear_glyph_matrix (w->desired_matrix);
@@ -17766,28 +17766,16 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 				      NULL, 0);
 	    }
 	  if (r)
-	    new_vpos = MATRIX_ROW_BOTTOM_Y (r);
+	    new_y = MATRIX_ROW_BOTTOM_Y (r);
 	  else	/* Give up and just move to the middle of the window.  */
-	    new_vpos = window_box_height (w) / 2;
+	    new_y = window_box_height (w) / 2;
 	}
 
-      if (!cursor_row_fully_visible_p (w, false, false, false))
+      if (! cursor_row_fully_visible_p (w, false, false, false))
 	{
 	  /* Point does appear, but on a line partly visible at end of window.
 	     Move it back to a fully-visible line.  */
-	  new_vpos = window_box_height (w);
-	  /* But if window_box_height suggests a Y coordinate that is
-	     not less than we already have, that line will clearly not
-	     be fully visible, so give up and scroll the display.
-	     This can happen when the default face uses a font whose
-	     dimensions are different from the frame's default
-	     font.  */
-	  if (new_vpos >= w->cursor.y)
-	    {
-	      w->cursor.vpos = -1;
-	      clear_glyph_matrix (w->desired_matrix);
-	      goto try_to_scroll;
-	    }
+	  new_y = WINDOW_BOX_HEIGHT_NO_MODE_LINE (w);
 	}
       else if (w->cursor.vpos >= 0)
 	{
@@ -17827,13 +17815,18 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
       /* If we need to move point for either of the above reasons,
 	 now actually do it.  */
-      if (new_vpos >= 0)
+      if (new_y >= 0)
 	{
 	  struct glyph_row *row;
 
-	  row = MATRIX_FIRST_TEXT_ROW (w->desired_matrix);
-	  while (MATRIX_ROW_BOTTOM_Y (row) < new_vpos)
-	    ++row;
+	  for (row = MATRIX_FIRST_TEXT_ROW (w->desired_matrix);
+	       row < MATRIX_BOTTOM_TEXT_ROW (w->desired_matrix, w);
+	       ++row)
+	    if (MATRIX_ROW_BOTTOM_Y (row) - row->extra_line_spacing > new_y)
+	      {
+		row--;
+		break;
+	      }
 
 	  TEMP_SET_PT_BOTH (MATRIX_ROW_START_CHARPOS (row),
 			    MATRIX_ROW_START_BYTEPOS (row));
@@ -17865,12 +17858,12 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 		 under display-line-numbers = relative mode.  We need
 		 another round of redisplay.  */
 	      clear_glyph_matrix (w->desired_matrix);
-	      if (!try_window (window, startp, 0))
+	      if (! try_window (window, startp, 0))
 		goto need_larger_matrices;
 	    }
 	}
       if (w->cursor.vpos < 0
-	  || !cursor_row_fully_visible_p (w, false, false, false))
+	  || ! cursor_row_fully_visible_p (w, false, false, false))
 	{
 	  clear_glyph_matrix (w->desired_matrix);
 	  goto try_to_scroll;
@@ -17955,14 +17948,14 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
       /* Try to redisplay starting at same place as before.
          If point has not moved off frame, accept the results.  */
-      if (!current_matrix_up_to_date_p
+      if (! current_matrix_up_to_date_p
 	  /* Don't use try_window_reusing_current_matrix in this case
 	     because a window scroll function can have changed the
 	     buffer.  */
-	  || !NILP (Vwindow_scroll_functions)
+	  || ! NILP (Vwindow_scroll_functions)
 	  || MINI_WINDOW_P (w)
-	  || !(used_current_matrix_p
-	       = try_window_reusing_current_matrix (w)))
+	  || ! (used_current_matrix_p
+		= try_window_reusing_current_matrix (w)))
 	{
 	  clear_glyph_matrix (w->desired_matrix);
 	  if (try_window (window, startp, TRY_WINDOW_CHECK_MARGINS) < 0)
@@ -17977,7 +17970,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
       if (w->cursor.vpos >= 0)
 	{
-	  if (!just_this_one_p
+	  if (! just_this_one_p
 	      || current_buffer->clip_changed
 	      || BEG_UNCHANGED < CHARPOS (startp))
 	    /* Forget any recorded base line for line number display.  */

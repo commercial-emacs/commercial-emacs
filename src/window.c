@@ -5903,21 +5903,16 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       ptrdiff_t charpos, bytepos;
       bool partial_p;
 
-      /* Save our position, for the
-	 window_scroll_pixel_based_preserve_y case.  */
-      charpos = IT_CHARPOS (it);
-      bytepos = IT_BYTEPOS (it);
-
       /* We moved the window start towards BEGV, so PT may be now
 	 in the scroll margin at the bottom.  */
       move_it_forward (&it, PT,
-		  /* We subtract WINDOW_HEADER_LINE_HEIGHT because
-		     it.y is relative to the bottom of the header
-		     line, see above.  */
-		  (it.last_visible_y - WINDOW_TAB_LINE_HEIGHT (w)
-				     - WINDOW_HEADER_LINE_HEIGHT (w)
-		   - partial_line_height (&it) - this_scroll_margin - 1),
-		  MOVE_TO_POS | MOVE_TO_Y);
+		       /* We subtract WINDOW_HEADER_LINE_HEIGHT because
+			  it.y is relative to the bottom of the header
+			  line, see above.  */
+		       (it.last_visible_y - WINDOW_TAB_LINE_HEIGHT (w)
+			- WINDOW_HEADER_LINE_HEIGHT (w)
+			- partial_line_height (&it) - this_scroll_margin - 1),
+		       MOVE_TO_POS | MOVE_TO_Y);
 
       /* Save our position, in case it's correct.  */
       charpos = IT_CHARPOS (it);
