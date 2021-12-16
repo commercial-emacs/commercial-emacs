@@ -182,4 +182,22 @@ end-of-buffer."
   (let (kill-buffer-query-functions)
     (kill-buffer "xdisp-tests--reconnoiter-image-height")))
 
+(ert-deftest xdisp-tests--scroll-down-leaves-cursor-behind ()
+  "When first line contains accented, and therefore taller
+character, e.g., Óscar, scrolling down (moving window-start up)
+has resulted in a no-op."
+  (skip-unless (not noninteractive))
+  (switch-to-buffer "xdisp-tests--scroll-down-leaves-cursor-behind")
+
+  (insert "Óscar" "\n")
+  (dotimes (_ (/ (1+ (window-pixel-height)) (line-pixel-height)))
+    (insert "line" "\n"))
+  (goto-char (point-max))
+  (redisplay)
+  (scroll-down)
+  (redisplay)
+  (should (= (window-start) 1))
+  (let (kill-buffer-query-functions)
+    (kill-buffer "xdisp-tests--scroll-down-leaves-cursor-behind")))
+
 ;;; xdisp-tests.el ends here
