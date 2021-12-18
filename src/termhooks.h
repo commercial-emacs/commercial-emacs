@@ -61,6 +61,7 @@ enum output_method
   output_msdos_raw,
   output_w32,
   output_ns,
+  output_pgtk,
   output_haiku
 };
 
@@ -268,6 +269,11 @@ enum event_kind
   , FILE_NOTIFY_EVENT
 #endif
 
+#ifdef HAVE_PGTK
+  /* Pre-edit text was changed. */
+  , PGTK_PREEDIT_TEXT_EVENT
+#endif
+
   /* Either the mouse wheel has been released without it being
      clicked, or the user has lifted his finger from a touchpad.
 
@@ -467,6 +473,7 @@ struct terminal
     struct x_display_info *x;         /* xterm.h */
     struct w32_display_info *w32;     /* w32term.h */
     struct ns_display_info *ns;       /* nsterm.h */
+    struct pgtk_display_info *pgtk; /* pgtkterm.h */
     struct haiku_display_info *haiku; /* haikuterm.h */
   } display_info;
 
@@ -541,7 +548,7 @@ struct terminal
      BGCOLOR.  */
   void (*query_frame_background_color) (struct frame *f, Emacs_Color *bgcolor);
 
-#if defined (HAVE_X_WINDOWS) || defined (HAVE_NTGUI)
+#if defined (HAVE_X_WINDOWS) || defined (HAVE_NTGUI) || defined (HAVE_PGTK)
   /* On frame F, translate pixel colors to RGB values for the NCOLORS
      colors in COLORS.  Use cached information, if available.  */
 
@@ -856,6 +863,9 @@ extern struct terminal *terminal_list;
 #elif defined (HAVE_NS)
 #define TERMINAL_FONT_CACHE(t)						\
   (t->type == output_ns ? t->display_info.ns->name_list_element : Qnil)
+#elif defined (HAVE_PGTK)
+#define TERMINAL_FONT_CACHE(t)						\
+  (t->type == output_pgtk ? t->display_info.pgtk->name_list_element : Qnil)
 #elif defined (HAVE_HAIKU)
 #define TERMINAL_FONT_CACHE(t)						\
   (t->type == output_haiku ? t->display_info.haiku->name_list_element : Qnil)

@@ -607,7 +607,12 @@ decode_options (int argc, char **argv)
       alt_display = "be";
 #endif
 
+#ifdef HAVE_PGTK
+      display = egetenv ("WAYLAND_DISPLAY");
+      alt_display = egetenv ("DISPLAY");
+#else
       display = egetenv ("DISPLAY");
+#endif
     }
 
   if (!display)

@@ -6270,6 +6270,15 @@ init_display_interactive (void)
     }
 #endif
 
+#ifdef HAVE_PGTK
+  if (!inhibit_window_system && !will_dump_p ())
+    {
+      Vinitial_window_system = Qpgtk;
+      Vwindow_system_version = make_fixnum (3);
+      return;
+    }
+#endif
+
 #ifdef HAVE_HAIKU
   if (!inhibit_window_system && !will_dump_p ())
     {

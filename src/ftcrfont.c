@@ -24,10 +24,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #ifdef HAVE_X_WINDOWS
 #include "xterm.h"
-#else /* Otherwise, Haiku */
+#elif HAVE_HAIKU
 #include "haikuterm.h"
 #include "haiku_support.h"
 #include "termchar.h"
+#else
+#include "pgtkterm.h"
 #endif
 #include "blockinput.h"
 #include "charset.h"
@@ -526,7 +528,11 @@ ftcrfont_draw (struct glyph_string *s,
   block_input ();
 
 #ifndef USE_BE_CAIRO
+#ifdef HAVE_X_WINDOWS
   cr = x_begin_cr_clip (f, s->gc);
+#else
+  cr = pgtk_begin_cr_clip (f);
+#endif
 #else
   BView_draw_lock (FRAME_HAIKU_VIEW (f));
   EmacsWindow_begin_cr_critical_section (FRAME_HAIKU_WINDOW (f));
@@ -551,7 +557,11 @@ ftcrfont_draw (struct glyph_string *s,
   if (with_background)
     {
 #ifndef USE_BE_CAIRO
+#ifdef HAVE_X_WINDOWS
       x_set_cr_source_with_gc_background (f, s->gc);
+#else
+      pgtk_set_cr_source_with_color (f, s->xgcv.background);
+#endif
 #else
       struct face *face = s->face;
 
@@ -579,7 +589,11 @@ ftcrfont_draw (struct glyph_string *s,
                                                        NULL));
     }
 #ifndef USE_BE_CAIRO
+#ifdef HAVE_X_WINDOWS
   x_set_cr_source_with_gc_foreground (f, s->gc);
+#else
+  pgtk_set_cr_source_with_color (f, s->xgcv.foreground);
+#endif
 #else
   uint32_t col = s->hl == DRAW_CURSOR ?
     FRAME_OUTPUT_DATA (s->f)->cursor_fg : face->foreground;
@@ -591,7 +605,11 @@ ftcrfont_draw (struct glyph_string *s,
   cairo_set_scaled_font (cr, ftcrfont_info->cr_scaled_font);
   cairo_show_glyphs (cr, glyphs, len);
 #ifndef USE_BE_CAIRO
+#ifdef HAVE_X_WINDOWS
   x_end_cr_clip (f);
+#else
+  pgtk_end_cr_clip (f);
+#endif
 #else
   haiku_end_cr_clip (cr);
   EmacsWindow_end_cr_critical_section (FRAME_HAIKU_WINDOW (f));

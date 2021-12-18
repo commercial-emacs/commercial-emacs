@@ -471,6 +471,7 @@ AC_ARG_WITH([ns],[AS_HELP_STRING([--with-ns],
 [use Nextstep (macOS Cocoa or GNUstep) windowing system.
 On by default on macOS.])],[],[with_ns=maybe])
 OPTION_DEFAULT_OFF([w32], [use native MS Windows GUI in a Cygwin build])
+OPTION_DEFAULT_OFF([pgtk], [use pure GTK build without reliance on X libs (Wayland support) (requires cairo) - Experimental])
 
 OPTION_DEFAULT_ON([gpm],[don't use -lgpm for mouse support on a GNU/Linux console])
 OPTION_DEFAULT_ON([dbus],[don't compile with D-Bus support])
@@ -1848,8 +1849,14 @@ AC_SUBST(AUTO_DEPEND)
 ## window-system-specific substs.
 
 window_system=none
+
+if test "${with_pgtk}" = "yes"; then
+  window_system=pgtk
+fi
+
+
 AC_PATH_X
-if test "$no_x" != yes; then
+if test "$no_x" != yes && test "${with_pgtk}" != "yes"; then
   window_system=x11
 fi
 
@@ -2312,6 +2319,11 @@ dnl use the toolkit if we have gtk, or X11R5 or newer.
   w32 )
     term_header=w32term.h
   ;;
+  pgtk )
+    term_header=pgtkterm.h
+    with_gtk3=yes
+    USE_X_TOOLKIT=none
+  ;;
   haiku )
     term_header=haikuterm.h
   ;;
@@ -2647,7 +2659,8 @@ fi
 ### Use -lrsvg-2 if available, unless '--with-rsvg=no' is specified.
 HAVE_RSVG=no
 if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" \
-   || test "${opsys}" = "mingw32" || test "${HAVE_BE_APP}" = "yes"; then
+   || test "${opsys}" = "mingw32" || test "${HAVE_BE_APP}" = "yes" \
+   || test "${window_system}" = "pgtk"; then
   if test "${with_rsvg}" != "no"; then
     RSVG_REQUIRED=2.14.0
     RSVG_MODULE="librsvg-2.0 >= $RSVG_REQUIRED"
@@ -2718,7 +2731,7 @@ AC_SUBST(SQLITE3_OBJ)
 
 HAVE_IMAGEMAGICK=no
 if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${HAVE_W32}" = "yes" || \
-   test "${HAVE_BE_APP}" = "yes"; then
+   test "${HAVE_BE_APP}" = "yes" || test "${window_system}" = "pgtk"; then
   if test "${with_imagemagick}" != "no"; then
     if test -n "$BREW"; then
       # Homebrew doesn't link ImageMagick 6 by default, so make sure
@@ -2800,6 +2813,9 @@ if test "${opsys}" != "mingw32"; then
 	   [Define to 1 to disable GTK+/GDK deprecation warnings.])
 	 AC_DEFINE([GLIB_DISABLE_DEPRECATION_WARNINGS], [1],
 	   [Define to 1 to disable Glib deprecation warnings.])
+       fi
+       if test "$window_system" = pgtk; then
+	  GLIB_GSETTINGS
        fi
     else
        check_gtk2=yes
@@ -2942,6 +2958,17 @@ AC_SUBST(XWIDGETS_OBJ)
 CFLAGS=$OLD_CFLAGS
 LIBS=$OLD_LIBS
 
+PGTK_OBJ=
+PGTK_LIBS=
+if test "$window_system" = "pgtk"; then
+  PGTK_OBJ="pgtkfns.o pgtkterm.o pgtkselect.o pgtkmenu.o pgtkim.o xsettings.o"
+  PGTK_LIBS="$GTK_LIBS"
+  HAVE_PGTK=yes
+  AC_DEFINE([HAVE_PGTK], 1, [Define to 1 if you have pure Gtk+-3.])
+fi
+AC_SUBST(PGTK_OBJ)
+AC_SUBST(PGTK_LIBS)
+
 dnl D-Bus has been tested under GNU/Linux only.  Must be adapted for
 dnl other platforms.
 HAVE_DBUS=no
@@ -2971,7 +2998,7 @@ AC_SUBST(DBUS_OBJ)
 
 dnl GSettings has been tested under GNU/Linux only.
 HAVE_GSETTINGS=no
-if test "${HAVE_X11}" = "yes" && test "${with_gsettings}" = "yes"; then
+if test "${HAVE_X11}" = "yes" -o "${window_system}" = "pgtk" && test "${with_gsettings}" = "yes"; then
    EMACS_CHECK_MODULES([GSETTINGS], [gio-2.0 >= 2.26])
    if test "$HAVE_GSETTINGS" = "yes"; then
       old_CFLAGS=$CFLAGS
@@ -3005,7 +3032,7 @@ fi
 dnl GConf has been tested under GNU/Linux only.
 dnl The version is really arbitrary, it is about the same age as Gtk+ 2.6.
 HAVE_GCONF=no
-if test "${HAVE_X11}" = "yes" && test "${with_gconf}" != "no"; then
+if test "${HAVE_X11}" = "yes" -o "${window_system}" = "pgtk" && test "${with_gconf}" != "no"; then
    EMACS_CHECK_MODULES([GCONF], [gconf-2.0 >= 2.13])
    if test "$HAVE_GCONF" = yes; then
       AC_DEFINE(HAVE_GCONF, 1, [Define to 1 if using GConf.])
@@ -3477,6 +3504,23 @@ if test "${HAVE_X11}" = "yes"; then
     fi
   fi
 fi
+
+if test "$window_system" = "pgtk"; then
+  CAIRO_REQUIRED=1.12.0
+  CAIRO_MODULE="cairo >= $CAIRO_REQUIRED"
+  EMACS_CHECK_MODULES(CAIRO, $CAIRO_MODULE)
+  if test $HAVE_CAIRO = yes; then
+    AC_DEFINE(USE_CAIRO, 1, [Define to 1 if using cairo.])
+  else
+    AC_MSG_ERROR([cairo required but not found.])
+  fi
+
+  CFLAGS="$CFLAGS $CAIRO_CFLAGS"
+  LIBS="$LIBS $CAIRO_LIBS"
+  AC_SUBST(CAIRO_CFLAGS)
+  AC_SUBST(CAIRO_LIBS)
+fi
+
 if test "${HAVE_BE_APP}" = "yes"; then
   if test "${with_be_cairo}" != "no"; then
     CAIRO_REQUIRED=1.8.0
@@ -3613,10 +3657,34 @@ if test "${HAVE_X11}" = "yes"; then
     fi
   fi
 else # "${HAVE_X11}" != "yes"
-  HAVE_XFT=no
-  HAVE_FREETYPE=no
-  HAVE_LIBOTF=no
-  HAVE_M17N_FLT=no
+  if test $window_system = pgtk; then
+    EMACS_CHECK_MODULES([FONTCONFIG], [fontconfig >= 2.2.0])
+    EMACS_CHECK_MODULES([FREETYPE], [freetype2])
+    if test "$HAVE_FONTCONFIG" != yes -o "$HAVE_FREETYPE" != yes; then
+      AC_MSG_ERROR(fontconfig and freetype is required.)
+    fi
+    HAVE_LIBOTF=no
+    AC_DEFINE(HAVE_FREETYPE, 1,
+	      [Define to 1 if using the freetype and fontconfig libraries.])
+    if test "${with_libotf}" != "no"; then
+      EMACS_CHECK_MODULES([LIBOTF], [libotf])
+      if test "$HAVE_LIBOTF" = "yes"; then
+	AC_DEFINE(HAVE_LIBOTF, 1, [Define to 1 if using libotf.])
+	AC_CHECK_LIB(otf, OTF_get_variation_glyphs,
+		     HAVE_OTF_GET_VARIATION_GLYPHS=yes,
+		     HAVE_OTF_GET_VARIATION_GLYPHS=no)
+	if test "${HAVE_OTF_GET_VARIATION_GLYPHS}" = "yes"; then
+	  AC_DEFINE(HAVE_OTF_GET_VARIATION_GLYPHS, 1,
+		    [Define to 1 if libotf has OTF_get_variation_glyphs.])
+	fi
+      fi
+    fi
+  else
+    HAVE_XFT=no
+    HAVE_FREETYPE=no
+    HAVE_LIBOTF=no
+    HAVE_M17N_FLT=no
+  fi
 fi   # "${HAVE_X11}" != "yes"
 
 HAVE_HARFBUZZ=no
@@ -3628,6 +3696,7 @@ else
   harfbuzz_required_ver=0.9.42
 fi
 if test "${HAVE_X11}" = "yes" && test "${HAVE_FREETYPE}" = "yes" \
+        || test "$window_system" = "pgtk" \
         || test "${HAVE_W32}" = "yes"; then
   if test "${with_harfbuzz}" != "no"; then
     EMACS_CHECK_MODULES([HARFBUZZ], [harfbuzz >= $harfbuzz_required_ver])
@@ -3815,7 +3884,8 @@ AC_SUBST(LIBXPM)
 HAVE_JPEG=no
 LIBJPEG=
 if test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes" \
-   || test "${HAVE_NS}" = "yes" || test "${HAVE_BE_APP}" = "yes"; then
+   || test "${HAVE_NS}" = "yes" || test "${HAVE_BE_APP}" = "yes" \
+   || test "$window_system" = "pgtk"; then
   if test "${with_jpeg}" != "no"; then
     AC_CACHE_CHECK([for jpeglib 6b or later],
       [emacs_cv_jpeglib],
@@ -4144,7 +4214,8 @@ if test "${with_png}" != no; then
   if test "$opsys" = mingw32; then
     AC_CHECK_HEADER([png.h], [HAVE_PNG=yes])
   elif test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes" \
-       || test "${HAVE_NS}" = "yes" || test "${HAVE_BE_APP}" = "yes"; then
+       || test "${HAVE_NS}" = "yes" || test "${HAVE_BE_APP}" = "yes" \
+       || test "$window_system" = "pgtk"; then
     EMACS_CHECK_MODULES([PNG], [libpng >= 1.0.0])
     if test $HAVE_PNG = yes; then
       LIBPNG=$PNG_LIBS
@@ -4219,7 +4290,8 @@ if test "${opsys}" = "mingw32"; then
     AC_DEFINE(HAVE_TIFF, 1, [Define to 1 if you have the tiff library (-ltiff).])
   fi
 elif test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes" \
-     || test "${HAVE_NS}" = "yes" || test "${HAVE_BE_APP}" = "yes"; then
+     || test "${HAVE_NS}" = "yes" || test "${HAVE_BE_APP}" = "yes" \
+     || test "$window_system" = "pgtk"; then
   if test "${with_tiff}" != "no"; then
     AC_CHECK_HEADER(tiffio.h,
       [tifflibs="-lz -lm"
@@ -4249,7 +4321,7 @@ if test "${opsys}" = "mingw32"; then
   fi
 elif test "${HAVE_X11}" = "yes" && test "${with_gif}" != "no" \
         || test "${HAVE_W32}" = "yes" || test "${HAVE_NS}" = "yes" \
-	|| test "${HAVE_BE_APP}" = "yes"; then
+	|| test "${HAVE_BE_APP}" = "yes" || test "$window_system" = "pgtk"; then
   AC_CHECK_HEADER(gif_lib.h,
 # EGifPutExtensionLast only exists from version libungif-4.1.0b1.
 # Earlier versions can crash Emacs, but version 5.0 removes EGifPutExtensionLast.
@@ -5755,6 +5827,7 @@ AC_SUBST(prefix)
 AC_SUBST(exec_prefix)
 AC_SUBST(bindir)
 AC_SUBST(datadir)
+AC_SUBST(gsettingsschemadir)
 AC_SUBST(sharedstatedir)
 AC_SUBST(libexecdir)
 AC_SUBST(mandir)
@@ -5818,13 +5891,13 @@ if test "${HAVE_X_WINDOWS}" = "yes" ; then
   fi
 fi
 
+if test "${window_system}" = "pgtk"; then
+   FONT_OBJ="ftfont.o ftcrfont.o"
+fi
+
 if test "${HAVE_BE_APP}" = "yes" ; then
-  if test "${HAVE_FREETYPE}" = "yes" || \
-     test "${HAVE_CAIRO}" = "yes"; then
-     FONT_OBJ="$FONT_OBJ ftfont.o"
-  fi
   if test "${HAVE_CAIRO}" = "yes"; then
-    FONT_OBJ="$FONT_OBJ ftcrfont.o"
+    FONT_OBJ="$FONT_OBJ ftfont.o ftcrfont.o"
   fi
 fi
 
