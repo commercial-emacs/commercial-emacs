@@ -341,6 +341,11 @@ received.
 
 *** New user option 'char-fold-override' omits the default character-folding.
 
++++
+*** New command 'isearch-emoji-by-name'.
+It is bound to 'C-x 8 e RET' during an incremental search and it
+inserts an Emoji character into the search string.
+
 ** New minor mode 'glyphless-display-mode'.
 This allows an easy way to toggle seeing all glyphless characters in
 the current buffer.
