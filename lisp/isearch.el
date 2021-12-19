@@ -2065,7 +2065,7 @@ The command then executes BODY and updates the isearch prompt."
                        #',function))
                (setq isearch-regexp nil)))
          ,@body
-         (setq isearch-success t isearch-adjusted t)
+         (setq isearch-success t isearch-adjusted 'toggle)
          (isearch-update))
        (define-key isearch-mode-map ,key #',command-name)
        ,@(when (and function (symbolp function))
@@ -3419,7 +3419,7 @@ the word mode."
   ;; If currently failing, display no ellipsis.
   (or isearch-success (setq ellipsis nil))
   (let ((m (concat (if isearch-success "" "failing ")
-		   (if isearch-adjusted "pending " "")
+		   (if (eq isearch-adjusted t) "pending " "")
 		   (if (and isearch-wrapped
 			    (not isearch-wrap-function)
 			    (if isearch-forward
@@ -3523,10 +3523,10 @@ Can be changed via `isearch-search-fun-function' for special needs."
           ;; (Bug#35802).
           (regexp
            (cond (isearch-regexp-function
-                  (let ((lax (and (not bound)
+                  (let ((lax (and (not bound) ; not lazy-highlight
                                   (isearch--lax-regexp-function-p))))
                     (when lax
-                      (setq isearch-adjusted t))
+                      (setq isearch-adjusted 'lax))
                     (if (functionp isearch-regexp-function)
                         (funcall isearch-regexp-function string lax)
                       (word-search-regexp string lax))))
