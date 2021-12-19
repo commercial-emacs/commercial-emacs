@@ -21,6 +21,14 @@
 
 (require 'ert)
 
+(defmacro xdisp-tests--visible-buffer (&rest body)
+  (declare (debug t) (indent 0))
+  `(progn
+     (switch-to-buffer (symbol-name (ert-test-name (ert-running-test))))
+     (progn ,@body)
+     (let (kill-buffer-query-functions)
+       (kill-buffer (symbol-name (ert-test-name (ert-running-test)))))))
+
 (defmacro xdisp-tests--in-minibuffer (&rest body)
   (declare (debug t) (indent 0))
   `(catch 'result
@@ -168,36 +176,59 @@ int main () {
 end-of-buffer."
   (skip-unless (not noninteractive))
   (skip-unless (> (window-pixel-height) 300))
-  (switch-to-buffer "xdisp-tests--reconnoiter-image-height")
-  (dotimes (_ (/ (- (window-pixel-height) 100) (line-pixel-height)))
-    (insert "line" "\n"))
-  (insert-image (create-image (expand-file-name
-                               "test/data/image/blank-100x200.png"
-                               source-directory)))
-  (insert "\n")
-  (redisplay)
-  (goto-char (point-min))
-  (scroll-up)
-  (redisplay)
-  (let (kill-buffer-query-functions)
-    (kill-buffer "xdisp-tests--reconnoiter-image-height")))
+  (xdisp-tests--visible-buffer
+    (dotimes (_ (/ (- (window-pixel-height) 100) (line-pixel-height)))
+      (insert "line" "\n"))
+    (insert-image (create-image (expand-file-name
+                                 "test/data/image/blank-100x200.png"
+                                 source-directory)))
+    (insert "\n")
+    (redisplay)
+    (goto-char (point-min))
+    (scroll-up)
+    (redisplay)))
 
 (ert-deftest xdisp-tests--scroll-down-leaves-cursor-behind ()
   "When first line contains accented, and therefore taller
 character, e.g., Óscar, scrolling down (moving window-start up)
 has resulted in a no-op."
   (skip-unless (not noninteractive))
-  (switch-to-buffer "xdisp-tests--scroll-down-leaves-cursor-behind")
+  (xdisp-tests--visible-buffer
+    (insert "Óscar" "\n")
+    (dotimes (_ (/ (1+ (window-pixel-height)) (line-pixel-height)))
+      (insert "line" "\n"))
+    (goto-char (point-max))
+    (redisplay)
+    (scroll-down)
+    (redisplay)
+    (should (= (window-start) 1))))
 
-  (insert "Óscar" "\n")
-  (dotimes (_ (/ (1+ (window-pixel-height)) (line-pixel-height)))
-    (insert "line" "\n"))
-  (goto-char (point-max))
-  (redisplay)
-  (scroll-down)
-  (redisplay)
-  (should (= (window-start) 1))
-  (let (kill-buffer-query-functions)
-    (kill-buffer "xdisp-tests--scroll-down-leaves-cursor-behind")))
+(ert-deftest xdisp-tests--window-text-pixel-size-single-sline ()
+  "Verify `window-text-pixel-size' handles one screen line spanned."
+  (xdisp-tests--visible-buffer
+    (save-excursion
+      (insert "xxxx"))
+    (should (= (* 2 (frame-char-width))
+               (car (window-text-pixel-size
+                     nil
+                     (1+ (point-min)) (1- (point-max))))))))
+
+(ert-deftest xdisp-tests--window-text-pixel-size-display-property ()
+  "Verify `window-text-pixel-size' returns dimensions including
+width of display property."
+  (xdisp-tests--visible-buffer
+    (let ((disp-string "ornery"))
+      (save-excursion
+        (insert "xxxx"))
+      (should
+       (= (+ (1- (length disp-string))
+             (car (window-text-pixel-size nil (line-beginning-position)
+                                          (line-end-position))))
+	  (progn
+	    (put-text-property (1- (line-end-position))
+                               (line-end-position)
+                               'display disp-string)
+	    (car (window-text-pixel-size nil (line-beginning-position)
+                                         (line-end-position)))))))))
 
 ;;; xdisp-tests.el ends here
