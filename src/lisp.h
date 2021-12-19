@@ -592,7 +592,7 @@ enum CHECK_LISP_OBJECT_TYPE { CHECK_LISP_OBJECT_TYPE = false };
 
 /* Defined in this file.  */
 INLINE void set_sub_char_table_contents (Lisp_Object, ptrdiff_t,
-					      Lisp_Object);
+					 Lisp_Object);
 
 /* Defined in bignum.c.  */
 extern int check_int_nonnegative (Lisp_Object);

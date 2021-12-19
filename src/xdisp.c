@@ -9891,22 +9891,22 @@ in_display_vector_p (struct it *it)
 	  && it->dpvec + it->current.dpvec_index != it->dpend);
 }
 
-/* This is like Fwindow_text_pixel_size but assumes that WINDOW's buffer
-   is the current buffer.  Fbuffer_text_pixel_size calls it after it has
-   set WINDOW's buffer to the buffer specified by its BUFFER_OR_NAME
-   argument.  */
+/* Return cons pair of WINDOW's cartesian dimensions.  */
+
 static Lisp_Object
 window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
 			Lisp_Object x_limit, Lisp_Object y_limit,
-			Lisp_Object mode_lines, Lisp_Object ignore_line_at_end)
+			Lisp_Object mode_lines)
 {
   struct window *w = decode_live_window (window);
   struct it it;
   ptrdiff_t start, end, bpos;
-  struct text_pos startp;
+  struct text_pos startpos;
   void *itdata = NULL;
-  int c, max_x = 0, max_y = 0, x = 0, y = 0;
-  int doff = 0;
+  int c, x = 0, y = 0, start_x = 0, start_vpos = 0;
+
+  int max_x = (RANGED_FIXNUMP (0, x_limit, INT_MAX)) ? XFIXNUM (x_limit) : INT_MAX;
+  int max_y = (RANGED_FIXNUMP (0, y_limit, INT_MAX)) ? XFIXNUM (y_limit) : INT_MAX;
 
   if (NILP (from))
     {
@@ -9938,7 +9938,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
       bpos = CHAR_TO_BYTE (start);
     }
 
-  SET_TEXT_POS (startp, start, bpos);
+  SET_TEXT_POS (startpos, start, bpos);
 
   if (NILP (to))
     end = ZV;
@@ -9966,109 +9966,28 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
   else
     end = clip_to_bounds (start, fix_position (to), ZV);
 
-  if (RANGED_FIXNUMP (0, x_limit, INT_MAX))
-    max_x = XFIXNUM (x_limit);
-  else if (!NILP (x_limit))
-    max_x = INT_MAX;
-
-  if (NILP (y_limit))
-    max_y = INT_MAX;
-  else if (RANGED_FIXNUMP (0, y_limit, INT_MAX))
-    max_y = XFIXNUM (y_limit);
-
   itdata = bidi_shelve_cache ();
-  start_move_it (&it, w, startp);
-  int start_y = it.current_y;
-  /* It makes no sense to measure dimensions of region of text that
-     crosses the point where bidi reordering changes scan direction.
-     By using unidirectional movement here we at least support the use
-     case of measuring regions of text that have a uniformly R2L
-     directionality, and regions that begin and end in text of the
-     same directionality.  */
-  it.bidi_p = false;
+  start_move_it (&it, w, startpos);
+  it.last_visible_x = min (it.last_visible_x, max_x);
 
-  /* Start at the beginning of the line containing FROM.  Otherwise
-     IT.current_x will be incorrectly set to zero at some arbitrary
-     non-zero X coordinate.  */
   reseat_preceding_line_start (&it);
   it.current_x = it.hpos = 0;
-  if (IT_CHARPOS (it) != start)
-    move_it_forward (&it, start, -1, MOVE_TO_POS);
+  move_it_forward (&it, start, -1, MOVE_TO_POS);
+  start_x = it.current_x;
+  start_vpos = it.vpos;
 
-  /* Now move to TO.  */
-  int start_x = it.current_x;
-  int move_op = MOVE_TO_POS | MOVE_TO_Y;
-  it.current_y = start_y;
-  /* If FROM is on a newline, pretend that we start at the beginning
-     of the next line, because the newline takes no place on display.  */
-  if (FETCH_BYTE (start) == '\n')
-    it.current_x = 0;
-  if (! NILP (x_limit))
-    {
-      it.last_visible_x = max_x;
-    }
+  x = move_it_forward (&it, end, max_y, MOVE_TO_POS | MOVE_TO_Y);
+  x = min (x, max_x);
 
-  void *it2data = NULL;
-  struct it it2;
-  SAVE_IT (it2, it, it2data);
-
-  x = move_it_forward (&it, end, max_y, move_op);
-
-  /* We could have a display property at END, in which case asking
-     move_it_forward to stop at END will overshoot and stop at position
-     after END.  So we try again, stopping before END, and account for
-     the width of the last buffer position manually.  */
-  if (IT_CHARPOS (it) > end)
-    {
-      end--;
-      RESTORE_IT (&it, &it2, it2data);
-      x = move_it_forward (&it, end, max_y, move_op);
-      /* Add the width of the thing at TO, but only if we didn't
-	 overshoot it; if we did, it is already accounted for.  Also,
-	 account for the height of the thing at TO.  */
-      if (IT_CHARPOS (it) == end)
-	{
-	  x += it.pixel_width;
-
-	  /* DTRT if ignore_line_at_end is t.  */
-	  if (!NILP (ignore_line_at_end))
-	    doff = (max (it.max_ascent, it.ascent)
-		    + max (it.max_descent, it.descent));
-	  else
-	    {
-	      it.max_ascent = max (it.max_ascent, it.ascent);
-	      it.max_descent = max (it.max_descent, it.descent);
-	    }
-	}
-    }
-  else
-    bidi_unshelve_cache (it2data, true);
-
-  if (!NILP (x_limit))
-    {
-      /* Don't return more than X-LIMIT.  */
-      if (x > max_x)
-        x = max_x;
-    }
-
-  /* If text spans more than one screen line, we don't need to adjust
-     the x-span for start_x, since the second and subsequent lines
-     will begin at zero X coordinate.  */
-  if (it.current_y > start_y)
-    start_x = 0;
-
-  /* Subtract height of header-line and tab-line which was counted
-     automatically by start_move_it.  */
+  /* Subtract header- and tab-line included by start_move_it().  */
   y = it.current_y + it.max_ascent + it.max_descent
     - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
-  /* Don't return more than Y-LIMIT.  */
-  if (y > max_y)
-    y = max_y;
+  y = min (y, max_y);
 
   if ((EQ (mode_lines, Qtab_line) || EQ (mode_lines, Qt))
       && window_wants_tab_line (w))
-    /* Add height of tab-line as requested.  */
     {
+      /* Add height of tab-line as requested.  */
       Lisp_Object window_tab_line_format
 	= window_parameter (w, Qtab_line_format);
 
@@ -10104,10 +10023,15 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
 
   bidi_unshelve_cache (itdata, false);
 
-  return Fcons (make_fixnum (x - start_x), make_fixnum (y));
+  /* X is widest line seen by move_it_forwards() */
+  return Fcons (make_fixnum
+		(it.vpos == start_vpos
+		 ? x - start_x /* START to END same sline */
+		 : x),
+		make_fixnum (y));
 }
 
-DEFUN ("window-text-pixel-size", Fwindow_text_pixel_size, Swindow_text_pixel_size, 0, 7, 0,
+DEFUN ("window-text-pixel-size", Fwindow_text_pixel_size, Swindow_text_pixel_size, 0, 6, 0,
        doc: /* Return the size of the text of WINDOW's buffer in pixels.
 WINDOW must be a live window and defaults to the selected one.  The
 return value is a cons of the maximum pixel-width of any text line
@@ -10154,12 +10078,9 @@ Optional argument MODE-LINES nil or omitted means do not include the
 height of the mode-, tab- or header-line of WINDOW in the return value.
 If it is the symbol `mode-line', 'tab-line' or `header-line', include
 only the height of that line, if present, in the return value.  If t,
-include the height of any of these, if present, in the return value.
-
-IGNORE-LINE-AT-END, if non-nil, means to not add the height of the
-screen line that includes TO to the returned height of the text.  */)
+include the height of any of these, if present, in the return value.  */)
   (Lisp_Object window, Lisp_Object from, Lisp_Object to, Lisp_Object x_limit,
-   Lisp_Object y_limit, Lisp_Object mode_lines, Lisp_Object ignore_line_at_end)
+   Lisp_Object y_limit, Lisp_Object mode_lines)
 {
   struct window *w = decode_live_window (window);
   struct buffer *b = XBUFFER (w->contents);
@@ -10172,8 +10093,7 @@ screen line that includes TO to the returned height of the text.  */)
       set_buffer_internal_1 (b);
     }
 
-  value = window_text_pixel_size (window, from, to, x_limit, y_limit, mode_lines,
-				  ignore_line_at_end);
+  value = window_text_pixel_size (window, from, to, x_limit, y_limit, mode_lines);
 
   if (old_b)
     set_buffer_internal_1 (old_b);
@@ -10223,8 +10143,7 @@ WINDOW.  */)
       set_marker_both (w->old_pointm, buffer, BEG, BEG_BYTE);
     }
 
-  value = window_text_pixel_size (window, Qnil, Qnil, x_limit, y_limit, Qnil,
-				  Qnil);
+  value = window_text_pixel_size (window, Qnil, Qnil, x_limit, y_limit, Qnil);
 
   unbind_to (count, Qnil);
 
