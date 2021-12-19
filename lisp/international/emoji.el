@@ -305,6 +305,7 @@ the name is not known."
     (setq emoji--names (make-hash-table :test #'equal))
     (let ((derivations (make-hash-table :test #'equal))
           (case-fold-search t)
+          (glyphs nil)
           group subgroup)
       (while (not (eobp))
         (cond
@@ -318,33 +319,52 @@ the name is not known."
           (let* ((codes (match-string 1))
                  (qualification (match-string 2))
                  (name (match-string 3))
-                 (base (emoji--base-name name derivations))
                  (glyph (mapconcat
                          (lambda (code)
                            (string (string-to-number code 16)))
                          (split-string codes))))
-            ;; Special-case flags.
-            (when (equal base "flag")
-              (setq base name))
-            ;; Register all glyphs to that we can look up their names
-            ;; later.
-            (setf (gethash glyph emoji--names) name)
-            ;; For the interface, we only care about the fully qualified
-            ;; emojis.
-            (when (equal qualification "fully-qualified")
-              (when (equal base name)
-                (emoji--add-to-group group subgroup glyph))
-              ;; Create mapping from base glyph name to name of
-              ;; derived glyphs.
-              (setf (gethash base derivations)
-                    (nconc (gethash base derivations) (list glyph)))))))
+            (push (list name qualification group subgroup glyph) glyphs))))
         (forward-line 1))
+      ;; We sort the data so that the "person foo" variant comes
+      ;; first, so that that becomes the key.
+      (setq glyphs
+            (sort (nreverse glyphs)
+                  (lambda (g1 g2)
+                    (and (equal (nth 2 g1) (nth 2 g2))
+                         (equal (nth 3 g1) (nth 3 g2))
+                         (< (emoji--score (car g1))
+                            (emoji--score (car g2)))))))
+      ;; Get the derivations.
+      (cl-loop for (name qualification group subgroup glyph) in glyphs
+               for base = (emoji--base-name name derivations)
+               do
+               ;; Special-case flags.
+               (when (equal base "flag")
+                 (setq base name))
+               ;; Register all glyphs to that we can look up their names
+               ;; later.
+               (setf (gethash glyph emoji--names) name)
+               ;; For the interface, we only care about the fully qualified
+               ;; emojis.
+               (when (equal qualification "fully-qualified")
+                 (when (equal base name)
+                   (emoji--add-to-group group subgroup glyph))
+                 ;; Create mapping from base glyph name to name of
+                 ;; derived glyphs.
+                 (setf (gethash base derivations)
+                       (nconc (gethash base derivations) (list glyph)))))
       ;; Finally create the mapping from the base glyphs to derived ones.
       (setq emoji--derived (make-hash-table :test #'equal))
       (maphash (lambda (_k v)
                  (setf (gethash (car v) emoji--derived)
                        (cdr v)))
                derivations))))
+
+(defun emoji--score (string)
+  (if (string-match-p "person\\|people"
+                      (replace-regexp-in-string ":.*" "" string))
+      0
+    1))
 
 (defun emoji--add-to-group (group subgroup glyph)
   ;; "People & Body" is very large; split it up.
@@ -412,18 +432,26 @@ the name is not known."
     (write-region (point-min) (point-max) file)))
 
 (defun emoji--base-name (name derivations)
-  (let* ((base (replace-regexp-in-string ":.*" "" name))
-         (non-binary (replace-regexp-in-string "\\`\\(man\\|woman\\) " ""
-                                               base)))
-    ;; If we have (for instance) "person golfing", and we're adding
-    ;; "man golfing", make the latter a derivation of the former.
-    (cond
-     ((gethash (concat "person " non-binary) derivations)
-      (concat "person " non-binary))
-     ((gethash non-binary derivations)
-      non-binary)
-     (t
-      base))))
+  (let* ((base (replace-regexp-in-string ":.*" "" name)))
+    (catch 'found
+      ;; If we have (for instance) "person golfing", and we're adding
+      ;; "man golfing", make the latter a derivation of the former.
+      (let ((non-binary (replace-regexp-in-string
+                         "\\`\\(m[ae]n\\|wom[ae]n\\) " "" base)))
+        (dolist (prefix '("person " "people " ""))
+          (let ((key (concat prefix non-binary)))
+            (when (gethash key derivations)
+              (throw 'found key)))))
+      ;; We can also have the gender at the end of the string, like
+      ;; "merman" and "pregnant woman".
+      (let ((non-binary (replace-regexp-in-string
+                         "\\(m[ae]n\\|wom[ae]n\\|maid\\)\\'" "" base)))
+        (dolist (suffix '(" person" "person" ""))
+          (let ((key (concat non-binary suffix)))
+            (when (gethash key derivations)
+              (throw 'found key)))))
+      ;; Just return the base.
+      base)))
 
 (defun emoji--split-subgroup (subgroup)
   (let ((prefixes '("face" "hand" "person" "animal" "plant"
