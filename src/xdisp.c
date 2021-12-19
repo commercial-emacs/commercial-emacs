@@ -4015,7 +4015,7 @@ handle_face_prop (struct it *it)
 }
 
 
-/* Return the ID of the face ``underlying'' IT's current position,
+/* Return the ID of the face "underlying" IT's current position,
    which is in a string.  If the iterator is associated with a
    buffer, return the face at IT's current buffer position.
    Otherwise, use the iterator's base_face_id.  */
@@ -5921,7 +5921,7 @@ compare_overlay_entries (const void *e1, const void *e2)
    position to consider for taking overlay strings from, if non-zero.
    This position comes into play when the overlay has an `invisible'
    property, and both before and after-strings.  When we've skipped to
-   the end of the overlay, because of its `invisible' property, we
+   the end of the overlay, because of its invisible property, we
    nevertheless want its before-string to appear.
    IT->add_overlay_start will contain the overlay start position
    in this case.
@@ -5991,7 +5991,7 @@ load_overlay_strings (struct it *it, ptrdiff_t charpos)
       if (WINDOWP (window) && XWINDOW (window) != it->w)
 	continue;
 
-      /* If the text ``under'' the overlay is invisible, both before-
+      /* If the text "under" the overlay is invisible, both before-
 	 and after-strings from this overlay are visible; start and
 	 end position are indistinguishable.  */
       Lisp_Object invisible = Foverlay_get (overlay, Qinvisible);
@@ -6033,7 +6033,7 @@ load_overlay_strings (struct it *it, ptrdiff_t charpos)
       if (WINDOWP (window) && XWINDOW (window) != it->w)
 	continue;
 
-      /* If the text ``under'' the overlay is invisible, it has a zero
+      /* If the text "under" the overlay is invisible, it has a zero
 	 dimension, and both before- and after-strings apply.  */
       Lisp_Object invisible = Foverlay_get (overlay, Qinvisible);
       int invis = TEXT_PROP_MEANS_INVISIBLE (invisible);
@@ -17129,7 +17129,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	     new cursor positioning, since row start and end
 	     positions change non-sequentially with vertical position
 	     in such rows.  */
-	  /* FIXME: Revisit this when glyph ``spilling'' in
+	  /* FIXME: Revisit this when glyph "spilling" in
 	     continuation lines' rows is implemented for
 	     bidi-reordered rows.  */
 	  for (row1 = MATRIX_FIRST_TEXT_ROW (w->current_matrix);
@@ -17188,7 +17188,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	     one candidate row whose start and end positions
 	     occlude point.  We need to let set_cursor_from_row
 	     find the best candidate.  */
-	  /* FIXME: Revisit this when glyph ``spilling'' in
+	  /* FIXME: Revisit this when glyph "spilling" in
 	     continuation lines' rows is implemented for
 	     bidi-reordered rows.  */
 	  bool rv = false;
@@ -20591,8 +20591,8 @@ extend_face_to_end_of_line (struct it *it)
   struct frame *f = it->f;
 
   /* If line is already filled, do nothing.  Non window-system frames
-     get a grace of one more ``pixel'' because their characters are
-     1-``pixel'' wide, so they hit the equality too early.  This grace
+     get a grace of one more "pixel" because their characters are
+     1-"pixel" wide, so they hit the equality too early.  This grace
      is needed only for R2L rows that are not continued, to produce
      one extra blank where we could display the cursor.  */
   if ((it->current_x >= it->last_visible_x
@@ -21349,7 +21349,7 @@ find_row_edges (struct it *it, struct glyph_row *row,
 		ptrdiff_t min_pos, ptrdiff_t min_bpos,
 		ptrdiff_t max_pos, ptrdiff_t max_bpos)
 {
-  /* FIXME: Revisit this when glyph ``spilling'' in continuation
+  /* FIXME: Revisit this when glyph "spilling" in continuation
      lines' rows is implemented for bidi-reordered rows.  */
 
   /* ROW->minpos is the value of min_pos, the minimal buffer position
@@ -22804,7 +22804,7 @@ done:
 	  when a line is continued.  One exception: when we are at ZV,
 	  display cursor on the first suitable glyph row, since all
 	  the empty rows after that also have their position set to ZV.  */
-       /* FIXME: Revisit this when glyph ``spilling'' in continuation
+       /* FIXME: Revisit this when glyph "spilling" in continuation
 	  lines' rows is implemented for bidi-reordered rows.  */
        || (it->bidi_p
 	   && ! MATRIX_ROW (it->w->desired_matrix, cvpos)->ends_at_zv_p))
@@ -32518,7 +32518,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
 		if (NILP (help))
 		  {
 		    /* If the string itself doesn't specify a help-echo,
-		       see if the buffer text ``under'' it does.  */
+		       see if the buffer text "under" it does.  */
 		    struct glyph_row *r
 		      = MATRIX_ROW (w->current_matrix, vpos);
 		    ptrdiff_t start = MATRIX_ROW_START_CHARPOS (r);
@@ -32574,7 +32574,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
 		  if (NILP (pointer))
 		    {
 		      /* If the string itself doesn't specify a pointer,
-			 see if the buffer text ``under'' it does.  */
+			 see if the buffer text "under" it does.  */
 		      struct glyph_row *r
 			= MATRIX_ROW (w->current_matrix, vpos);
 		      ptrdiff_t start = MATRIX_ROW_START_CHARPOS (r);
@@ -33174,7 +33174,7 @@ expose_frame (struct frame *f, int x, int y, int w, int h)
      (even tried with SubstructureRedirectMask), only Expose events.
      These expose events will draw text normally, i.e. not
      highlighted.  Which means we must redo the highlight here.
-     Subsume it under ``we love X''.  --gerd 2001-08-15  */
+     Subsume it under "we love X".  --gerd 2001-08-15  */
   /* Included in Windows version because Windows most likely does not
      do the right thing if any third party tool offers
      focus-follows-mouse with delayed raise.  --jason 2001-10-12  */
