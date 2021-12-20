@@ -3652,7 +3652,7 @@ base64_encode_1 (const char *from, char *to, ptrdiff_t length,
 	  c = string_char_and_length ((unsigned char *) from + i, &bytes);
 	  if (CHAR_BYTE8_P (c))
 	    c = CHAR_TO_BYTE8 (c);
-	  else if (c >= 256)
+	  else if (c >= 128)
 	    return -1;
 	  i += bytes;
 	}
@@ -3695,7 +3695,7 @@ base64_encode_1 (const char *from, char *to, ptrdiff_t length,
 	  c = string_char_and_length ((unsigned char *) from + i, &bytes);
 	  if (CHAR_BYTE8_P (c))
 	    c = CHAR_TO_BYTE8 (c);
-	  else if (c >= 256)
+	  else if (c >= 128)
 	    return -1;
 	  i += bytes;
 	}
@@ -3720,7 +3720,7 @@ base64_encode_1 (const char *from, char *to, ptrdiff_t length,
 	  c = string_char_and_length ((unsigned char *) from + i, &bytes);
 	  if (CHAR_BYTE8_P (c))
 	    c = CHAR_TO_BYTE8 (c);
-	  else if (c >= 256)
+	  else if (c >= 128)
 	    return -1;
 	  i += bytes;
 	}
