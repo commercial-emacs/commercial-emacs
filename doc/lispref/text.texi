@@ -2738,16 +2738,6 @@ The quick brown fox jum  @point{}ped.
 @end example
 @end deffn
 
-@deffn Command indent-relative-first-indent-point
-@comment !!SourceFile indent.el
-This command indents the current line like the previous nonblank line,
-by calling @code{indent-relative} with @code{t} as the
-@var{first-only} argument.  The return value is unpredictable.
-
-If the previous nonblank line has no indent points beyond the current
-column, this command does nothing.
-@end deffn
-
 @node Indent Tabs
 @subsection Adjustable Tab Stops
 @cindex tabs stops for indentation

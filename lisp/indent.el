@@ -36,13 +36,9 @@
   :group 'indent
   :type 'integer)
 
-(defvar indent-line-function 'indent-relative
-  "Function to indent the current line.
-This function will be called with no arguments.
-If it is called somewhere where it cannot auto-indent, the function
-should return `noindent' to signal that it didn't.
-Setting this function is all you need to make TAB indent appropriately.
-Don't rebind TAB unless you really need to.")
+(defvar-local indent-line-function 'indent-relative
+  "Variable function indenting the current line.
+Values must return `noindent' to defer back to the caller.")
 
 (defcustom tab-always-indent t
   "Controls the operation of the TAB key.
@@ -83,139 +79,98 @@ This variable has no effect unless `tab-always-indent' is `complete'."
           (const :tag "Unless at a word, parenthesis, or punctuation." 'word-or-paren-or-punct))
   :version "28.1")
 
-(defvar indent-line-ignored-functions '(indent-relative
-                                        indent-relative-maybe
-                                        indent-relative-first-indent-point)
-  "Values that are ignored by `indent-according-to-mode'.")
+(make-obsolete-variable 'indent-line-ignored-functions nil "28.1" 'set)
 
 (defun indent-according-to-mode (&optional inhibit-widen)
-  "Indent line in proper way for current major mode.
-Normally, this is done by calling the function specified by the
-variable `indent-line-function'.  However, if the value of that
-variable is present in the `indent-line-ignored-functions' variable,
-handle it specially (since those functions are used for tabbing);
-in that case, indent by aligning to the previous non-blank line.
-
-Ignore restriction, unless the optional argument INHIBIT-WIDEN is
-non-nil."
+  "A legacy wrapper to `indent-line-function'."
   (interactive)
   (save-restriction
     (unless inhibit-widen
       (widen))
-  (syntax-propertize (line-end-position))
-  (if (memq indent-line-function indent-line-ignored-functions)
-      ;; These functions are used for tabbing, but can't be used for
-      ;; indenting.  Replace with something ad-hoc.
-      (let ((column (save-excursion
-		      (beginning-of-line)
-		      (if (bobp) 0
-                        (beginning-of-line 0)
-                        (if (looking-at "[ \t]*$") 0
-                          (current-indentation))))))
-	(if (<= (current-column) (current-indentation))
-	    (indent-line-to column)
-	  (save-excursion (indent-line-to column))))
-    ;; The normal case.
-    (funcall indent-line-function))))
+    (syntax-propertize (line-end-position))
+    (unless (indent--align-inside-comment)
+      (funcall indent-line-function))))
 
-(defun indent--default-inside-comment ()
-  (unless (or (> (current-column) (current-indentation))
-              (eq this-command last-command))
+(defun indent--align-inside-comment ()
+  "Appears to line up point with comment on preceding line."
+  (when (and (<= (current-column) (current-indentation))
+             (not (eq this-command last-command)))
     (let ((ppss (syntax-ppss)))
       (when (nth 4 ppss)
-        (indent-line-to
-         (save-excursion
-           (forward-line -1)
-           (skip-chars-forward " \t")
-           (when (< (1- (point)) (nth 8 ppss) (line-end-position))
-             (goto-char (nth 8 ppss))
-             (when (looking-at comment-start-skip)
-               (goto-char (match-end 0))))
-           (current-column)))
-        t))))
+        (prog1 t
+          (indent-line-to
+           (save-excursion
+             (forward-line -1)
+             (skip-chars-forward " \t")
+             (when (< (1- (point)) (nth 8 ppss) (line-end-position))
+               (goto-char (nth 8 ppss))
+               (when (looking-at comment-start-skip)
+                 (goto-char (match-end 0))))
+             (current-column))))))))
 
 (defun indent-for-tab-command (&optional arg)
-  "Indent the current line or region, or insert a tab, as appropriate.
-This function either inserts a tab, or indents the current line,
-or performs symbol completion, depending on `tab-always-indent'.
-The function called to actually indent the line or insert a tab
-is given by the variable `indent-line-function'.
+  "DWIM for pressing TAB.
 
-If a prefix argument is given (ARG), after this function indents the
-current line or inserts a tab, it also rigidly indents the entire
-balanced expression which starts at the beginning of the current
-line, to reflect the current line's indentation.
+In a progmode, `indent-line-function' indents the current line
+according to the major mode syntax.
 
-In most major modes, if point was in the current line's
-indentation, it is moved to the first non-whitespace character
-after indenting; otherwise it stays at the same position relative
-to the text.
+If the line is already indented, perhaps we mean to offer completion.
 
-If `transient-mark-mode' is turned on and the region is active,
-this function instead calls `indent-region'.  In this case, any
-prefix argument is ignored."
+Or we could just want to insert a tab character.
+
+Decision is driven by `tab-always-indent' which has evolved
+meaning far exceeding what its variable name would suggest.
+
+With a prefix argument ARG, also indents the entire balanced
+expression starting at the current line.
+
+Under `transient-mark-mode', calls `indent-region' on the active
+region."
   (interactive "P")
   (cond
-   ;; The region is active, indent it.
    ((use-region-p)
     (indent-region (region-beginning) (region-end)))
-   ((or ;; indent-to-left-margin is only meant for indenting,
-	;; so we force it to always insert a tab here.
-	(eq indent-line-function 'indent-to-left-margin)
-	(and (not tab-always-indent)
-	     (or (> (current-column) (current-indentation))
-		 (eq this-command last-command))))
+   ((eq indent-line-function 'indent-to-left-margin) ;; archaic
     (insert-tab arg))
-   (t
-    (let ((old-tick (buffer-chars-modified-tick))
-          (old-point (point))
-	  (old-indent (current-indentation))
+   ((null tab-always-indent)
+    (when (or (> (current-column) (current-indentation))
+	      (eq this-command last-command))
+      (insert-tab arg)))
+   ((eq 'complete tab-always-indent)
+    (let ((old-point (point))
+          (old-tick (buffer-chars-modified-tick))
           (syn `(,(syntax-after (point)))))
-
-      ;; Indent the line.
-      (or (not (eq (indent--funcall-widened indent-line-function) 'noindent))
-          (indent--default-inside-comment)
-          (when (or (<= (current-column) (current-indentation))
-                    (not (eq tab-always-indent 'complete)))
-            (indent--funcall-widened (default-value 'indent-line-function))))
-
-      (cond
-       ;; If the text was already indented right, try completion.
-       ((and (eq tab-always-indent 'complete)
-             (eq old-point (point))
-             (eq old-tick (buffer-chars-modified-tick))
-             (or (null tab-first-completion)
-                 (eq last-command this-command)
-                 (and (equal tab-first-completion 'eol)
-                      (eolp))
-                 (and (member tab-first-completion
-                              '(word word-or-paren word-or-paren-or-punct))
-                      (not (member 2 syn)))
-                 (and (member tab-first-completion
-                              '(word-or-paren word-or-paren-or-punct))
-                      (not (or (member 4 syn)
-                               (member 5 syn))))
-                 (and (equal tab-first-completion 'word-or-paren-or-punct)
-                      (not (member 1 syn)))))
-        (completion-at-point))
-
-       ;; If a prefix argument was given, rigidly indent the following
-       ;; sexp to match the change in the current line's indentation.
-       (arg
-        (let ((end-marker
-               (save-excursion
-                 (forward-line 0) (forward-sexp) (point-marker)))
-              (indentation-change (- (current-indentation) old-indent)))
+      (indent-according-to-mode)
+      (when (and (eq old-point (point))
+                 (eq old-tick (buffer-chars-modified-tick))
+                 (or (null tab-first-completion)
+                     (eq last-command this-command)
+                     (and (eq tab-first-completion 'eol)
+                          (eolp))
+                     (and (memq tab-first-completion
+                                '(word word-or-paren word-or-paren-or-punct))
+                          (not (memq 2 syn)))
+                     (and (memq tab-first-completion
+                                '(word-or-paren word-or-paren-or-punct))
+                          (not (memq 4 syn))
+                          (not (memq 5 syn)))
+                     (and (eq tab-first-completion 'word-or-paren-or-punct)
+                          (not (memq 1 syn)))))
+        (call-interactively #'completion-at-point))))
+   (t
+    (let ((old-indent (current-indentation)))
+      (indent-according-to-mode)
+      (when arg
+        (let ((indentation-change (- (current-indentation) old-indent))
+              (end-marker (save-excursion
+                            (forward-line 0)
+                            (forward-sexp)
+                            (point-marker))))
           (save-excursion
             (forward-line 1)
             (when (and (not (zerop indentation-change))
                        (< (point) end-marker))
-              (indent-rigidly (point) end-marker indentation-change))))))))))
-
-(defun indent--funcall-widened (func)
-  (save-restriction
-    (widen)
-    (funcall func)))
+              (indent-rigidly (point) end-marker indentation-change)))))))))
 
 (defun insert-tab (&optional arg)
   (let ((count (prefix-numeric-value arg)))
@@ -631,57 +586,47 @@ column to indent to; if it is nil, use one of the three methods above."
 (define-obsolete-function-alias 'indent-relative-maybe
   'indent-relative-first-indent-point "26.1")
 
-(defun indent-relative-first-indent-point ()
-  "Indent the current line like the previous nonblank line.
-Indent to the first indentation position in the previous nonblank
-line if that position is greater than the current column.
-
-See also `indent-relative'."
-  (interactive)
-  (indent-relative t))
-
 (defun indent-relative (&optional first-only unindented-ok)
-  "Space out to under next indent point in previous nonblank line.
+  "Go to next indent point of previous nonblank line.
+
 An indent point is a non-whitespace character following whitespace.
 The following line shows the indentation points in this line.
     ^         ^    ^     ^   ^           ^      ^  ^    ^
+
 If FIRST-ONLY is non-nil, then only the first indent point is
 considered.
 
-If the previous nonblank line has no indent points beyond the
-column point starts at, then `tab-to-tab-stop' is done, if both
-FIRST-ONLY and UNINDENTED-OK are nil, otherwise nothing is done.
-If there isn't a previous nonblank line and UNINDENTED-OK is nil,
-call `tab-to-tab-stop'.
-
-See also `indent-relative-first-indent-point'."
+If a previous nonblank line does not exist or does not contain
+indent points, call `tab-to-tab-stop' unless UNINDENTED-OK is
+non-nil."
   (interactive "P")
-  (if (and abbrev-mode
-	   (eq (char-syntax (preceding-char)) ?w))
-      (expand-abbrev))
+  (when (and abbrev-mode
+	     (eq (char-syntax (preceding-char)) ?w))
+    (expand-abbrev))
   (let ((start-column (current-column))
 	indent)
     (save-excursion
       (beginning-of-line)
-      (if (re-search-backward "^[^\n]" nil t)
-	  (let ((end (save-excursion (forward-line 1) (point))))
-	    (move-to-column start-column)
-	    ;; Is start-column inside a tab on this line?
-	    (if (> (current-column) start-column)
-		(backward-char 1))
-	    (or (looking-at "[ \t]")
-		first-only
-		(skip-chars-forward "^ \t" end))
-	    (skip-chars-forward " \t" end)
-	    (or (= (point) end) (setq indent (current-column))))))
-    (cond (indent
-           (let ((opoint (point-marker)))
-             (indent-to indent 0)
-             (if (> opoint (point))
-                 (goto-char opoint))
-             (move-marker opoint nil)))
-          (unindented-ok nil)
-          (t (tab-to-tab-stop)))))
+      (when (re-search-backward "^[^\n]" nil t)
+	(let ((end (save-excursion (forward-line 1) (point))))
+	  (move-to-column start-column)
+	  ;; Is start-column inside a tab on this line?
+	  (when (> (current-column) start-column)
+	    (backward-char 1))
+	  (unless first-only
+            (unless (looking-at "[ \t]")
+	      (skip-chars-forward "^ \t" end)))
+	  (skip-chars-forward " \t" end)
+	  (unless (= (point) end)
+            (setq indent (current-column))))))
+    (if indent
+        (let ((opoint (point-marker)))
+          (indent-to indent 0)
+          (if (> opoint (point))
+              (goto-char opoint))
+          (move-marker opoint nil))
+      (unless unindented-ok
+        (tab-to-tab-stop)))))
 
 (defcustom tab-stop-list nil
   "List of tab stop positions used by `tab-to-tab-stop'.
