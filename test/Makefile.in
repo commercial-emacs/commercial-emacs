@@ -294,8 +294,8 @@ FREE_SOURCE_1 = $(srcdir)/../lib/free.c
 # as source because those are not compiled with -fPIC.  Therefore we
 # use only source files.
 $(test_module): $(test_module:${SO}=.c) ../src/emacs-module.h
-	$(AM_V_at)${MKDIR_P} $(dir $@)
-	$(AM_V_CCLD)$(CC) -shared $(CPPFLAGS) $(MODULE_CFLAGS) $(LDFLAGS) \
+	$(AM_V_CCLD)${MKDIR_P} $(dir $@)
+	$(AM_V_at)$(CC) -shared $(CPPFLAGS) $(MODULE_CFLAGS) $(LDFLAGS) \
 	  -o $@ $< $(LIBGMP) \
 	  $(and $(GMP_H),$(srcdir)/../lib/mini-gmp-gnulib.c) \
 	  $(FREE_SOURCE_$(REPLACE_FREE)) \
