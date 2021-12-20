@@ -66,40 +66,41 @@
 	      :documentation "Detail about amphibian on land and water."))
   "Class A and B combined.")
 
-(defclass class-c ()
-  ((slot-1 :initarg :moose
-           :initform 'moose
-	   :type symbol
-	   :allocation :instance
-	   :documentation "First slot testing slot arguments."
-	   :custom symbol
-	   :label "Wild Animal"
-	   :group borg
-	   :protection :public)
-   (slot-2 :initarg :penguin
-	   :initform "penguin"
-	   :type string
-	   :allocation :instance
-	   :documentation "Second slot testing slot arguments."
-	   :custom string
-	   :label "Wild bird"
-	   :group vorlon
-	   :accessor get-slot-2
-	   :protection :private)
-   (slot-3 :initarg :emu
-           :initform 'emu
-	   :type symbol
-	   :allocation :class
-	   :documentation "Third slot test class allocated accessor"
-	   :custom symbol
-	   :label "Fuzz"
-	   :group tokra
-	   :accessor get-slot-3
-	   :protection :private)
-   )
-  (:custom-groups (foo))
-  "A class for testing slot arguments."
-  )
+(with-no-warnings ; FIXME: Make more specific.
+  (defclass class-c ()
+    ((slot-1 :initarg :moose
+             :initform 'moose
+             :type symbol
+             :allocation :instance
+             :documentation "First slot testing slot arguments."
+             :custom symbol
+             :label "Wild Animal"
+             :group borg
+             :protection :public)
+     (slot-2 :initarg :penguin
+             :initform "penguin"
+             :type string
+             :allocation :instance
+             :documentation "Second slot testing slot arguments."
+             :custom string
+             :label "Wild bird"
+             :group vorlon
+             :accessor get-slot-2
+             :protection :private)
+     (slot-3 :initarg :emu
+             :initform 'emu
+             :type symbol
+             :allocation :class
+             :documentation "Third slot test class allocated accessor"
+             :custom symbol
+             :label "Fuzz"
+             :group tokra
+             :accessor get-slot-3
+             :protection :private)
+     )
+    (:custom-groups (foo))
+    "A class for testing slot arguments."
+    ))
 
 (defclass class-subc (class-c)
   ((slot-1 ;; :initform moose  - don't override this
@@ -137,21 +138,25 @@
 ;;      (error "invalid-slot-type thrown when eieio-error-unsupported-class-tags is nil")
 ;;      )))
 
+;; Silence byte-compiler.
+(defun eitest-subordinate--eieio-childp ())
+(defun class-alloc-initarg--eieio-childp ())
 (ert-deftest eieio-test-01-mix-alloc-initarg ()
   ;; Only run this test if the message framework thingy works.
-  (when (and (message "foo") (string= "foo" (current-message)))
+  (skip-unless (and (message "foo") (string= "foo" (current-message))))
 
-    ;; Defining this class should generate a warning(!) message that
-    ;; you should not mix :initarg with class allocated slots.
+  ;; Defining this class should generate a warning(!) message that
+  ;; you should not mix :initarg with class allocated slots.
+  (with-no-warnings ; FIXME: Make more specific.
     (defclass class-alloc-initarg ()
       ((throwwarning :initarg :throwwarning
-		     :allocation :class))
-      "Throw a warning mixing allocation class and an initarg.")
+                     :allocation :class))
+      "Throw a warning mixing allocation class and an initarg."))
 
-    ;; Check that message is there
-    (should (current-message))
-    (should (string-match "Class allocated slots do not need :initarg"
-			  (current-message)))))
+  ;; Check that message is there
+  (should (current-message))
+  (should (string-match "Class allocated slots do not need :initarg"
+                        (current-message))))
 
 (defclass abstract-class ()
   ((some-slot :initarg :some-slot
@@ -207,6 +212,9 @@ Argument C is the class bound to this static method."
     (if (eieio-object-p c) (setq c (eieio-object-class c)))
     (oset-default c some-slot value)))
 
+;; Silence byte-compiler.
+(defun static-method-class-2 ())
+(defun static-method-class-2--eieio-childp ())
 (ert-deftest eieio-test-04-static-method ()
   ;; Call static method on a class and see if it worked
   (static-method-class-method 'static-method-class 'class)
@@ -536,8 +544,10 @@ METHOD is the method that was attempting to be called."
   (should (eq (oref eitest-pvinit evalval) 2))
   (should (eq (oref eitest-pvinit evalnow) 1)))
 
+;; Silence byte-compiler.
 (defvar eitest-tests nil)
-
+(defun eitest-superior ())
+(defun eitest-superior--eieio-childp ())
 (ert-deftest eieio-test-22-init-forms-dont-match-runnable ()
   ;; Init forms with types that don't match the runnable.
   (defclass eitest-subordinate nil
@@ -585,7 +595,10 @@ METHOD is the method that was attempting to be called."
     (should-not (cl-typep listooa '(list-of class-b)))
     (should-not (cl-typep listoob '(list-of class-a)))))
 
+;; Silence byte-compiler.
 (defvar eitest-t1 nil)
+(defun eieio-tests-initform-not-evaluated-when-initarg-is-present ())
+(defun eieio-tests-initform-not-evaluated-when-initarg-is-present--eieio-childp ())
 (ert-deftest eieio-test-25-slot-tests ()
   (setq eitest-t1 (class-c))
   ;; Slot initialization
@@ -812,25 +825,26 @@ Subclasses to override slot attributes.")
   (let ((obj (slotattr-ok)))
     (should (eq (oref obj initform) 'no-init))))
 
-(defclass slotattr-class-base ()
-  ((initform :allocation :class
-             :initform 'init)
-   (type :allocation :class
-	 :type list)
-   (initarg :allocation :class
-	    :initarg :initarg)
-   (protection :allocation :class
-	       :protection :private)
-   (custom :allocation :class
-	   :custom (repeat string)
-	   :label "Custom Strings"
-	   :group moose)
-   (docstring :allocation :class
-	      :documentation
-	      "Replace the doc-string for this property.")
-   )
-  "Baseclass we will attempt to subclass.
-Subclasses to override slot attributes.")
+(with-no-warnings ; FIXME: Make more specific.
+  (defclass slotattr-class-base ()
+    ((initform :allocation :class
+               :initform 'init)
+     (type :allocation :class
+           :type list)
+     (initarg :allocation :class
+              :initarg :initarg)
+     (protection :allocation :class
+                 :protection :private)
+     (custom :allocation :class
+             :custom (repeat string)
+             :label "Custom Strings"
+             :group moose)
+     (docstring :allocation :class
+                :documentation
+                "Replace the doc-string for this property.")
+     )
+    "Baseclass we will attempt to subclass.
+Subclasses to override slot attributes."))
 
 (defclass slotattr-class-ok (slotattr-class-base)
   ((initform :initform 'no-init)
@@ -956,7 +970,12 @@ Subclasses to override slot attributes.")
 (ert-deftest eieio-test-37-obsolete-name-in-constructor ()
   ;; FIXME repeated intermittent failures on hydra and elsewhere (bug#24503).
   :tags '(:unstable)
-  (should (equal (eieio--testing "toto") '("toto" 2))))
+  ;; Disable byte-compiler "Warning: Obsolete name arg "toto" to
+  ;; constructor eieio--testing".  This could be made more specific
+  ;; with changes to `with-suppressed-warnings', but it's not worth
+  ;; the hassle for just this one test.
+  (with-no-warnings
+    (should (equal (eieio--testing "toto") '("toto" 2)))))
 
 (ert-deftest eieio-autoload ()
   "Tests to see whether reftex-auc has been autoloaded"
