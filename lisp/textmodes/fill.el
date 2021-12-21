@@ -629,17 +629,7 @@ The break position will be always after LINEBEG and generally before point."
   (if (or fill-prefix
 	  (not fill-indent-according-to-mode))
       (fill-indent-to-left-margin)
-    (save-restriction
-      (widen)
-      (let ((column (save-excursion
-		      (beginning-of-line)
-		      (if (bobp) 0
-                        (beginning-of-line 0)
-                        (if (looking-at "[ \t]*$") 0
-                          (current-indentation))))))
-	(if (<= (current-column) (current-indentation))
-	    (indent-line-to column)
-	  (save-excursion (indent-line-to column))))))
+    (indent-according-to-mode))
   ;; Insert the fill prefix after indentation.
   (and fill-prefix (not (equal fill-prefix ""))
        ;; Markers that were after the whitespace are now at point: insert

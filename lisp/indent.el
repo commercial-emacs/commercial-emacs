@@ -36,7 +36,7 @@
   :group 'indent
   :type 'integer)
 
-(defvar-local indent-line-function 'indent-relative
+(defvar-local indent-line-function 'indent-fill
   "Variable function indenting the current line.
 Values must return `noindent' to defer back to the caller.")
 
@@ -80,6 +80,19 @@ This variable has no effect unless `tab-always-indent' is `complete'."
   :version "28.1")
 
 (make-obsolete-variable 'indent-line-ignored-functions nil "28.1" 'set)
+
+(defun indent-fill ()
+  (save-restriction
+    (widen)
+    (let ((column (save-excursion
+		    (beginning-of-line)
+		    (if (bobp) 0
+                      (beginning-of-line 0)
+                      (if (looking-at "[ \t]*$") 0
+                        (current-indentation))))))
+      (if (<= (current-column) (current-indentation))
+	  (indent-line-to column)
+	(save-excursion (indent-line-to column))))))
 
 (defun indent-according-to-mode (&optional inhibit-widen)
   "A legacy wrapper to `indent-line-function'."
