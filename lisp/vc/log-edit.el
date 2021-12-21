@@ -533,9 +533,7 @@ form \"(FUNCTION):\") will be combined into \"(FUNC1, FUNC2):\"
 according to `fill-column'."
   (save-excursion
     (pcase-let ((`(,beg ,end) (log-edit-changelog-paragraph)))
-      (if (= beg end)
-          ;; Not a ChangeLog entry, fill as normal.
-          nil
+      (unless (= beg end)
         (cl-callf copy-marker end)
         (goto-char beg)
         (cl-loop
@@ -558,7 +556,7 @@ according to `fill-column'."
          do (progn (delete-region defuns-beg (point))
                    (log-edit--insert-filled-defuns defuns)
                    (setq beg (point))))
-        t))))
+        (prog1 t)))))
 
 (defun log-edit-hide-buf (&optional buf where)
   (when (setq buf (get-buffer (or buf log-edit-files-buf)))
