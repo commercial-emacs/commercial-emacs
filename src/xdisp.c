@@ -21395,7 +21395,7 @@ find_row_edges (struct it *it, struct glyph_row *row,
 	  /* this is not the first row */
 	  && row > it->w->desired_matrix->rows
 	  /* previous row is not the header line or tab-line */
-	  && !r1->mode_line_p
+	  && ! r1->mode_line_p
 	  /* previous row also ends in a newline from a string */
 	  && r1->ends_in_newline_from_string_p)
 	{
@@ -21405,7 +21405,7 @@ find_row_edges (struct it *it, struct glyph_row *row,
 	     from buffer or string.  Depending on whether the row is
 	     L2R or R2L, we need to process it front to back or the
 	     other way round.  */
-	  if (!r1->reversed_p)
+	  if (! r1->reversed_p)
 	    {
 	      start = r1->glyphs[TEXT_AREA];
 	      end = start + r1->used[TEXT_AREA];
@@ -21447,7 +21447,7 @@ find_row_edges (struct it *it, struct glyph_row *row,
       /* Take note of each display string that covers a newline only
 	 once, the first time we see it.  This is for when a display
 	 string includes more than one newline in it.  */
-      if (row->ends_in_newline_from_string_p && !seen_string)
+      if (row->ends_in_newline_from_string_p && ! seen_string)
 	{
 	  /* If we were scanning the buffer forward when we displayed
 	     the string, we want to account for at least one buffer
@@ -22686,7 +22686,7 @@ done:
     {
       /* Line is hscrolled.  Maybe insert truncation glyphs at the
 	 left window margin.  */
-      if (!FRAME_WINDOW_P (it->f)
+      if (! FRAME_WINDOW_P (it->f)
 	  || (((row->reversed_p
 		? WINDOW_RIGHT_FRINGE_WIDTH (it->w)
 		: WINDOW_LEFT_FRINGE_WIDTH (it->w)) == 0)
@@ -22703,7 +22703,7 @@ done:
      cannot be before the call to find_row_edges below, since that is
      where these positions are determined. */
   row->end = it->current;
-  if (!it->bidi_p)
+  if (! it->bidi_p)
     {
       row->minpos = row->start.pos;
       row->maxpos = row->end.pos;
@@ -22721,7 +22721,7 @@ done:
      mark this glyph row as the one containing the overlay arrow.
      This is clearly a mess with variable size fonts.  It would be
      better to let it be displayed like cursors under X.  */
-  if ((MATRIX_ROW_DISPLAYS_TEXT_P (row) || !overlay_arrow_seen)
+  if ((MATRIX_ROW_DISPLAYS_TEXT_P (row) || ! overlay_arrow_seen)
       && (overlay_arrow_string = overlay_arrow_at_row (it, row),
 	  !NILP (overlay_arrow_string)))
     {
