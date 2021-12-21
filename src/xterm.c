@@ -10329,9 +10329,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #ifdef XIPointerEmulated
 	      /* Ignore emulated scroll events when XI2 native
 		 scroll events are present.  */
-	      if (dpyinfo->xi2_version >= 1
-		  && xev->detail >= 4
-		  && xev->detail <= 8
+	      if (((dpyinfo->xi2_version == 1
+		   && xev->detail >= 4
+		   && xev->detail <= 8)
+		   || (dpyinfo->xi2_version >= 2))
 		  && xev->flags & XIPointerEmulated)
 		{
 		  *finish = X_EVENT_DROP;
@@ -10878,6 +10879,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    {
 	      struct xi_device_t *device;
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
+	      x_display_set_last_user_time (dpyinfo, xev->time);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -10938,6 +10940,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      Lisp_Object arg = Qnil;
 
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
+	      x_display_set_last_user_time (dpyinfo, xev->time);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -10978,6 +10981,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      bool unlinked_p;
 
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
+	      x_display_set_last_user_time (dpyinfo, xev->time);
 
 	      if (!device)
 		goto XI_OTHER;
