@@ -236,7 +236,6 @@ static void
 ns_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   NSColor *col;
-  EmacsCGFloat r, g, b, alpha;
 
   /* Must block_input, because ns_lisp_to_color does block/unblock_input
      which means that col may be deallocated in its unblock_input if there
@@ -253,12 +252,7 @@ ns_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   [f->output_data.ns->foreground_color release];
   f->output_data.ns->foreground_color = col;
 
-  [col getRed: &r green: &g blue: &b alpha: &alpha];
-  FRAME_FOREGROUND_PIXEL (f) =
-    ARGB_TO_ULONG ((unsigned long) (alpha * 0xff),
-                   (unsigned long) (r * 0xff),
-                   (unsigned long) (g * 0xff),
-                   (unsigned long) (b * 0xff));
+  FRAME_FOREGROUND_PIXEL (f) = [col unsignedLong];
 
   if (FRAME_NS_VIEW (f))
     {
@@ -277,7 +271,7 @@ ns_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   struct face *face;
   NSColor *col;
   NSView *view = FRAME_NS_VIEW (f);
-  EmacsCGFloat r, g, b, alpha;
+  EmacsCGFloat alpha;
 
   block_input ();
   if (ns_lisp_to_color (arg, &col))
@@ -291,12 +285,8 @@ ns_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   [f->output_data.ns->background_color release];
   f->output_data.ns->background_color = col;
 
-  [col getRed: &r green: &g blue: &b alpha: &alpha];
-  FRAME_BACKGROUND_PIXEL (f) =
-    ARGB_TO_ULONG ((unsigned long) (alpha * 0xff),
-                   (unsigned long) (r * 0xff),
-                   (unsigned long) (g * 0xff),
-                   (unsigned long) (b * 0xff));
+  FRAME_BACKGROUND_PIXEL (f) = [col unsignedLong];
+  alpha = [col alphaComponent];
 
   if (view != nil)
     {
@@ -310,9 +300,9 @@ ns_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       face = FRAME_DEFAULT_FACE (f);
       if (face)
         {
-          col = ns_lookup_indexed_color (NS_FACE_BACKGROUND (face), f);
-          face->background = ns_index_color
-            ([col colorWithAlphaComponent: alpha], f);
+          col = [NSColor colorWithUnsignedLong:NS_FACE_BACKGROUND (face)];
+          face->background = [[col colorWithAlphaComponent: alpha]
+                               unsignedLong];
 
           update_face_from_frame_parameter (f, Qbackground_color, arg);
         }
@@ -3150,6 +3140,9 @@ all_nonzero_ascii (unsigned char *str, ptrdiff_t n)
    encoded form (e.g. UTF-8).  */
 + (NSString *)stringWithLispString:(Lisp_Object)string
 {
+  if (!STRINGP (string))
+    return nil;
+
   /* Shortcut for the common case.  */
   if (all_nonzero_ascii (SDATA (string), SBYTES (string)))
     return [NSString stringWithCString: SSDATA (string)
