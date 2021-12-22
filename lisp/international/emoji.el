@@ -426,9 +426,9 @@ the name is not known."
 ;; no-update-autoloads: t
 ;; End:
 
-(provide 'emoji-labels)
+\(provide 'emoji-labels)
 
-;;; emoji-labels.el ends here\n")
+\;;; emoji-labels.el ends here\n")
     (write-region (point-min) (point-max) file)))
 
 (defun emoji--base-name (name derivations)
@@ -535,7 +535,7 @@ the name is not known."
                                          t end-function))
                                     ;; Insert the emoji.
                                     (lambda ()
-                                      (interactive)
+                                      (interactive nil not-a-mode)
                                       ;; Allow switching to the correct
                                       ;; buffer.
                                       (when end-function
@@ -548,7 +548,7 @@ the name is not known."
     ;; There's probably a better way to do this...
     (setf (symbol-function name)
           (lambda ()
-            (interactive)
+            (interactive nil not-a-mode)
             (transient-setup name)))
     (pcase-let ((`(,class ,slots ,suffixes ,docstr ,_body)
                  (transient--expand-define-args (list args))))
