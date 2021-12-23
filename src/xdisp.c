@@ -9933,13 +9933,6 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
 	    break;
 	}
     }
-  else if (CONSP (from))
-    {
-      start = clip_to_bounds (BEGV, fix_position (XCAR (from)), ZV);
-      bpos = CHAR_TO_BYTE (start);
-      CHECK_FIXNUM (XCDR (from));
-      vertical_offset = XFIXNUM (XCDR (from));
-    }
   else
     {
       start = clip_to_bounds (BEGV, fix_position (from), ZV);
