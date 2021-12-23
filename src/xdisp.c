@@ -121,10 +121,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    the buffer contents to determine what will and won't fit on the
    current glyph row, but without touching the glass.
 
-   `move_it_forward' is the workhorse that utilizes `emulate_display_sline'
-   to move an iterator FORWARD.  Moving an iterator backward means
-   estimating how far to scroll back, and dialing in the desired
-   y-coordinate from there (see `move_it_y').
+   `move_it_forward' is the trusty mule that utilizes
+   `emulate_display_sline' to move an iterator FORWARD.
+   `move_it_backward' is the prickly hinny that must first estimate
+   how far to scroll back, and dialing in the desired y-coordinate
+   from there.
 
    Bidirectional display.
 
