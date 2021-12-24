@@ -351,68 +351,37 @@ Otherwise it flushes both the ppss cache and the properties
 set by `syntax-propertize'")
 
 (defun syntax-propertize (pos)
-  "Ensure that syntax-table properties are set until POS (a buffer point)."
+  "Ensure that syntax-table properties are set through POS."
   (when (< syntax-propertize--done pos)
-    (if (memq syntax-propertize-function '(nil ignore))
-        (setq syntax-propertize--done (max (point-max) pos))
-      ;; (message "Needs to syntax-propertize from %s to %s"
-      ;;          syntax-propertize--done pos)
-      (setq-local parse-sexp-lookup-properties t)
-      (when (< syntax-propertize--done (point-min))
-        ;; *Usually* syntax-propertize is called via syntax-ppss which
-        ;; takes care of adding syntax-ppss-flush-cache to b-c-f, but this
-        ;; is not *always* the case, so since we share a single "flush" function
-        ;; between syntax-ppss and syntax-propertize, we also have to make
-        ;; sure the flush function is installed here (bug#29767).
-        (add-hook 'before-change-functions
-	          #'syntax-ppss-flush-cache 99 t))
-      (save-excursion
-        (with-silent-modifications
-          (with-syntax-table (or syntax-ppss-table (syntax-table))
-            (make-local-variable 'syntax-propertize--done) ;Just in case!
-            (let* ((start (max (min syntax-propertize--done (point-max))
-                               (point-min)))
-                   (end (max pos
-                             (min (point-max)
-                                  (+ start syntax-propertize-chunk-size))))
-                   (first t)
-                   (repeat t))
-              (while repeat
-                (setq repeat nil)
-                (run-hook-wrapped
-                 'syntax-propertize-extend-region-functions
-                 (lambda (f)
-                   (let ((new (funcall f start end))
-                         ;; Avoid recursion!
-                         (syntax-propertize--done most-positive-fixnum))
-                     (if (or (null new)
-                             (and (>= (car new) start) (<= (cdr new) end)))
-                         nil
-                       (setq start (car new))
-                       (setq end (cdr new))
-                       ;; If there's been a change, we should go through the
-                       ;; list again since this new position may
-                       ;; warrant a different answer from one of the funs we've
-                       ;; already seen.
-                       (unless first (setq repeat t))))
-                   (setq first nil))))
-              ;; Flush ppss cache between the original value of `start' and that
-              ;; set above by syntax-propertize-extend-region-functions.
-              (syntax-ppss-flush-cache start)
-              ;; Move the limit before calling the function, so the function
-              ;; can use syntax-ppss.
-              (setq syntax-propertize--done end)
-              ;; (message "syntax-propertizing from %s to %s" start end)
-              (remove-text-properties start end
-                                      '(syntax-table nil syntax-multiline nil))
-              ;; Make sure we only let-bind it buffer-locally.
-              (make-local-variable 'syntax-propertize--inhibit-flush)
-              ;; Let-bind `syntax-propertize--done' to avoid infinite recursion!
-              (let ((syntax-propertize--done most-positive-fixnum)
-                    ;; Let `syntax-propertize-function' call
-                    ;; `syntax-ppss-flush-cache' without worries.
-                    (syntax-propertize--inhibit-flush t))
-                (funcall syntax-propertize-function start end)))))))))
+    (setq-local parse-sexp-lookup-properties t)
+    (when (< syntax-propertize--done (point-min))
+      ;; `syntax-ppss' usually already added, but not always (bug#29767).
+      (add-hook 'before-change-functions
+	        #'syntax-ppss-flush-cache 99 t))
+    (save-excursion
+      (with-silent-modifications
+        (with-syntax-table (or syntax-ppss-table (syntax-table))
+          (let* ((start (max (min syntax-propertize--done
+                                  (point-max))
+                             (point-min)))
+                 (end (max (min (+ start syntax-propertize-chunk-size)
+                                (point-max))
+                           pos)))
+            (run-hook-wrapped
+             'syntax-propertize-extend-region-functions
+             (lambda (f &rest _args)
+               (when-let ((new (funcall f start end)))
+                 (setq start (min start (car new)))
+                 (setq end (max end (cdr new))))))
+            (syntax-ppss-flush-cache start)
+            (setq syntax-propertize--done end)
+            (remove-text-properties start end
+                                    '(syntax-table nil syntax-multiline nil))
+            ;; Avoid recursing. A null syntax-propertize--inhibit-flush would
+            ;; mutate syntax-propertize--done.
+            (let ((syntax-propertize--done most-positive-fixnum)
+                  (syntax-propertize--inhibit-flush t))
+              (funcall (or syntax-propertize-function #'ignore) start end))))))))
 
 ;;; Link syntax-propertize with syntax.c.
 
