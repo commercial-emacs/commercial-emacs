@@ -352,36 +352,38 @@ set by `syntax-propertize'")
 
 (defun syntax-propertize (pos)
   "Ensure that syntax-table properties are set through POS."
-  (when (< syntax-propertize--done pos)
-    (setq-local parse-sexp-lookup-properties t)
-    (when (< syntax-propertize--done (point-min))
-      ;; `syntax-ppss' usually already added, but not always (bug#29767).
-      (add-hook 'before-change-functions
-	        #'syntax-ppss-flush-cache 99 t))
-    (save-excursion
-      (with-silent-modifications
-        (with-syntax-table (or syntax-ppss-table (syntax-table))
-          (let* ((start (max (min syntax-propertize--done
+  (if (not (functionp syntax-propertize-function))
+      (setq syntax-propertize--done (point-max))
+    (when (< syntax-propertize--done pos)
+      (setq-local parse-sexp-lookup-properties t)
+      (when (< syntax-propertize--done (point-min))
+        ;; `syntax-ppss' usually already added, but not always (bug#29767).
+        (add-hook 'before-change-functions
+	          #'syntax-ppss-flush-cache 99 t))
+      (save-excursion
+        (with-silent-modifications
+          (with-syntax-table (or syntax-ppss-table (syntax-table))
+            (let* ((start (max (min syntax-propertize--done
+                                    (point-max))
+                               (point-min)))
+                   (end (max (min (+ start syntax-propertize-chunk-size)
                                   (point-max))
-                             (point-min)))
-                 (end (max (min (+ start syntax-propertize-chunk-size)
-                                (point-max))
-                           pos)))
-            (run-hook-wrapped
-             'syntax-propertize-extend-region-functions
-             (lambda (f &rest _args)
-               (when-let ((new (funcall f start end)))
-                 (setq start (min start (car new)))
-                 (setq end (max end (cdr new))))))
-            (syntax-ppss-flush-cache start)
-            (setq syntax-propertize--done end)
-            (remove-text-properties start end
-                                    '(syntax-table nil syntax-multiline nil))
-            ;; Avoid recursing. A null syntax-propertize--inhibit-flush would
-            ;; mutate syntax-propertize--done.
-            (let ((syntax-propertize--done most-positive-fixnum)
-                  (syntax-propertize--inhibit-flush t))
-              (funcall (or syntax-propertize-function #'ignore) start end))))))))
+                             pos)))
+              (run-hook-wrapped
+               'syntax-propertize-extend-region-functions
+               (lambda (f &rest _args)
+                 (when-let ((new (funcall f start end)))
+                   (setq start (min start (car new)))
+                   (setq end (max end (cdr new))))))
+              (syntax-ppss-flush-cache start)
+              (setq syntax-propertize--done end)
+              (remove-text-properties start end
+                                      '(syntax-table nil syntax-multiline nil))
+              ;; Avoid recursing. A null syntax-propertize--inhibit-flush would
+              ;; mutate syntax-propertize--done.
+              (let ((syntax-propertize--done most-positive-fixnum)
+                    (syntax-propertize--inhibit-flush t))
+                (funcall syntax-propertize-function start end)))))))))
 
 ;;; Link syntax-propertize with syntax.c.
 
