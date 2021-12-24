@@ -120,7 +120,7 @@ list_highlights (const TSHighlightEventSlice *slice, const TSNode *node,
   const EMACS_INT count = XFIXNUM (Flength (alist));
   const uint32_t offset = ts_node_start_byte (*node);
 
-  for (int i=slice->len-1; i>=0; --i)
+  for (int i = 0; i < slice->len; ++i)
     {
       const TSHighlightEvent *ev = &(slice->arr[i]);
       eassert (ev->index < count);
@@ -399,7 +399,7 @@ DEFUN ("tree-sitter-highlights",
        doc: /* Return list of highlights from BEG to END. */)
   (Lisp_Object beg, Lisp_Object end)
 {
-  return do_highlights (beg, end, &list_highlights);
+  return Fnreverse (do_highlights (beg, end, &list_highlights));
 }
 
 DEFUN ("tree-sitter-highlight-region",
@@ -476,7 +476,7 @@ tree_sitter_read_buffer (void *payload, uint32_t byte_index,
            SSDATA (Fbuffer_substring_no_properties
                    (make_fixnum (start),
                     make_fixnum (min (start + tree_sitter_scan_characters,
-                                      BUF_Z (bp) - BUF_BEG (bp) + 1)))));
+                                      BUF_Z (bp))))));
   unbind_to (pdl_count, Qnil);
   if (bytes_read)
     *bytes_read = strlen (thread_unsafe_return_value);
