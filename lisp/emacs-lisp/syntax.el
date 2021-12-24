@@ -356,10 +356,6 @@ set by `syntax-propertize'")
       (setq syntax-propertize--done (point-max))
     (when (< syntax-propertize--done pos)
       (setq-local parse-sexp-lookup-properties t)
-      (when (< syntax-propertize--done (point-min))
-        ;; `syntax-ppss' usually already added, but not always (bug#29767).
-        (add-hook 'before-change-functions
-	          #'syntax-ppss-flush-cache 99 t))
       (save-excursion
         (with-silent-modifications
           (with-syntax-table (or syntax-ppss-table (syntax-table))
@@ -488,21 +484,6 @@ These are valid when the buffer has no restriction.")
        (setcdr cell cache)))
     ))
 
-;;; FIXME: Explain this variable.  Currently only its last (5th) slot is used.
-;;; Perhaps the other slots should be removed?
-(defvar syntax-ppss-stats
-  [(0 . 0) (0 . 0) (0 . 0) (0 . 0) (0 . 0) (2 . 2500)])
-(defun syntax-ppss-stats ()
-  (mapcar (lambda (x)
-	    (condition-case nil
-		(cons (car x) (/ (cdr x) (car x)))
-	      (error nil)))
-	  syntax-ppss-stats))
-(defun syntax-ppss--update-stats (i old new)
-  (let ((pair (aref syntax-ppss-stats i)))
-    (cl-incf (car pair))
-    (cl-incf (cdr pair) (- new old))))
-
 (defun syntax-ppss--data ()
   (if (eq (point-min) 1)
       (progn
@@ -525,30 +506,20 @@ It is necessary to call `syntax-ppss-flush-cache' explicitly if
 this function is called while `before-change-functions' is
 temporarily let-bound, or if the buffer is modified without
 running the hook."
-  ;; Default values.
   (unless pos (setq pos (point)))
   (syntax-propertize pos)
-  ;;
   (with-syntax-table (or syntax-ppss-table (syntax-table))
-  (let* ((cell (syntax-ppss--data))
+  (let* (ppss
+         (cell (syntax-ppss--data))
          (ppss-last (car cell))
          (ppss-cache (cdr cell))
          (old-ppss (cdr ppss-last))
-         (old-pos (car ppss-last))
-         (ppss nil)
+         (old-pos (when-let ((cand (car ppss-last))) (when (<= cand pos) cand)))
          (pt-min (point-min)))
-    (if (and old-pos (> old-pos pos)) (setq old-pos nil))
-    ;; Use the OLD-POS if usable and close.  Don't update the `last' cache.
     (condition-case nil
-	(if (and old-pos (< (- pos old-pos)
-			    ;; The time to use syntax-begin-function and
-			    ;; find PPSS is assumed to be about 2 * distance.
-			    (let ((pair (aref syntax-ppss-stats 5)))
-			      (/ (* 2 (cdr pair)) (car pair)))))
-	    (progn
-	      (syntax-ppss--update-stats 0 old-pos pos)
-	      (parse-partial-sexp old-pos pos nil nil old-ppss))
-
+	(if (and old-pos (< (- pos old-pos) 2500))
+            ;; Use the OLD-POS if close.
+	    (parse-partial-sexp old-pos pos nil nil old-ppss)
 	  (cond
 	   ;; Use OLD-PPSS if possible and close enough.
 	   ((and (not old-pos) old-ppss
@@ -562,7 +533,6 @@ running the hook."
 		 (setq pt-min (or (syntax-ppss-toplevel-pos old-ppss)
 				  (nth 2 old-ppss)))
 		 (<= pt-min pos) (< (- pos pt-min) syntax-ppss-max-span))
-	    (syntax-ppss--update-stats 1 pt-min pos)
 	    (setq ppss (parse-partial-sexp pt-min pos)))
 	   ;; The OLD-* data can't be used.  Consult the cache.
 	   (t
@@ -580,10 +550,9 @@ running the hook."
 	      (while (and cache (< pos (caar cache)))
 		(setq cache-pred cache)
 		(setq cache (cdr cache)))
-	      (if cache (setq pt-min (caar cache) ppss (cdar cache)))
-
+	      (when cache (setq pt-min (caar cache) ppss (cdar cache)))
 	      ;; Setup the before-change function if necessary.
-	      (unless (or ppss-cache ppss-last)
+	      (when (and (not ppss-cache) (not ppss-last))
                 ;; Note: combine-change-calls-1 needs to be kept in sync
                 ;; with this!
 		(add-hook 'before-change-functions
@@ -596,7 +565,6 @@ running the hook."
 	      ;; Use the best of OLD-POS and CACHE.
 	      (if (or (not old-pos) (< old-pos pt-min))
 		  (setq pt-best pt-min ppss-best ppss)
-		(syntax-ppss--update-stats 4 old-pos pos)
 		(setq pt-best old-pos ppss-best old-ppss))
 
 	      ;; Use the `syntax-begin-function' if available.
@@ -616,19 +584,15 @@ running the hook."
 			 (not (memq (get-text-property (point) 'face)
 				    '(font-lock-string-face font-lock-doc-face
 				      font-lock-comment-face))))
-		(syntax-ppss--update-stats 5 (point) pos)
 		(setq pt-best (point) ppss-best nil))
 
 	      (cond
 	       ;; Quick case when we found a nearby pos.
 	       ((< (- pos pt-best) syntax-ppss-max-span)
-		(syntax-ppss--update-stats 2 pt-best pos)
 		(setq ppss (parse-partial-sexp pt-best pos nil nil ppss-best)))
 	       ;; Slow case: compute the state from some known position and
 	       ;; populate the cache so we won't need to do it again soon.
 	       (t
-		(syntax-ppss--update-stats 3 pt-min pos)
-
 		;; If `pt-min' is too far, add a few intermediate entries.
 		(while (> (- pos pt-min) (* 2 syntax-ppss-max-span))
 		  (setq ppss (parse-partial-sexp
