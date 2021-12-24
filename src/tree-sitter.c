@@ -536,7 +536,6 @@ tree_sitter_record_change (ptrdiff_t start_char,
       if (tree != NULL)
 	{
 	  static const TSPoint dummy_point = { 0, 0 };
-	  Lisp_Object overwrite = BVAR (current_buffer, overwrite_mode);
 
 	  TSInputEdit edit = {
 	    BUFFER_TO_SITTER (start_char),
@@ -553,10 +552,7 @@ tree_sitter_record_change (ptrdiff_t start_char,
 	      XTREE_SITTER (sitter)->prev_tree = NULL;
 	    }
 
-	  /* Sus: Investigate why simultaneous delete-insert fails. */
-	  if (NILP (overwrite) && (old_end_char - start_char <= 1 ||
-				   new_end_char - start_char <= 1))
-	    XTREE_SITTER (sitter)->prev_tree = ts_tree_copy (tree);
+	  XTREE_SITTER (sitter)->prev_tree = ts_tree_copy (tree);
 	  ts_tree_edit (tree, &edit);
 	  XTREE_SITTER (sitter)->tree =
 	    ts_parser_parse (XTREE_SITTER (sitter)->parser,
