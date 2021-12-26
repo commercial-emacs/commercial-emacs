@@ -5246,6 +5246,7 @@ x_detect_focus_change (struct x_display_info *dpyinfo, struct frame *frame,
 	       || xi_event->evtype == XI_Leave)
 	      && (((XIEnterEvent *) xi_event)->detail
 		  != XINotifyInferior)
+	      && ((XIEnterEvent *) xi_event)->focus
 	      && !(focus_state & FOCUS_EXPLICIT))
 	  x_focus_changed ((xi_event->evtype == XI_Enter
 			    ? FocusIn : FocusOut),
@@ -11049,6 +11050,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	  case XI_GesturePinchBegin:
 	  case XI_GesturePinchUpdate:
 	    {
+#ifdef HAVE_USABLE_XI_GESTURE_PINCH_EVENT
 	      XIGesturePinchEvent *pev = (XIGesturePinchEvent *) xi_event;
 	      struct xi_device_t *device = xi_device_from_id (dpyinfo, pev->deviceid);
 
@@ -11069,6 +11071,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 				       make_float (pev->scale),
 				       make_float (pev->delta_angle));
 		}
+#endif
 	      /* Once again GTK seems to crash when confronted by
 		 events it doesn't understand.  */
 	      *finish = X_EVENT_DROP;
