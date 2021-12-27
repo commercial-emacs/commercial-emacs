@@ -436,10 +436,13 @@ DEFUN ("tree-sitter-changed-range",
 	{
 	  uint32_t count;
 	  TSRange *range = ts_tree_get_changed_ranges (prev_tree, tree, &count);
-	  uint32_t sitter_end_byte = min (ZV_BYTE-1, range->end_byte);
-	  retval = list2 (make_fixnum (SITTER_TO_BUFFER (range->start_byte)),
-			  make_fixnum (SITTER_TO_BUFFER (sitter_end_byte)));
-	  free (range);
+	  if (count)
+	    {
+	      uint32_t sitter_end_byte = min (ZV_BYTE-1, range->end_byte);
+	      retval = list2 (make_fixnum (SITTER_TO_BUFFER (range->start_byte)),
+			      make_fixnum (SITTER_TO_BUFFER (sitter_end_byte)));
+	      free (range);
+	    }
 	}
     }
   return retval;
