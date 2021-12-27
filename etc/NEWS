@@ -248,6 +248,11 @@ height use 'window-height' in combination with 'body-lines'.
 ---
 *** 'C-x t RET' creates a new tab when the provided tab name doesn't exist.
 
+---
+*** New keymap 'tab-bar-history-mode-map'.
+By default, it contains 'C-c <left>' and 'C-c <right>' to browse
+the history of tab window configurations back and forward.
+
 ** Better detection of text suspiciously reordered on display.
 The function 'bidi-find-overridden-directionality' has been extended
 to detect reordering effects produced by embeddings and isolates
@@ -292,13 +297,8 @@ case keys.
 This command increases (or decreases) the number of empty lines before
 point.
 
-** The *Completions* buffer can now be automatically selected.
-To enable this behavior, customize the option 'completion-auto-select'
-to t.  Then pressing TAB will switch to the *Completions* buffer when
-it pops up that buffer.
-
 ---
-*** Improved mouse behavior with auto-scrolling modes.
+** Improved mouse behavior with auto-scrolling modes.
 When clicking inside the 'scroll-margin' or 'hscroll-margin' region
 the point is now moved only when releasing the mouse button.  This no
 longer results in a bogus selection, unless the mouse has been
@@ -342,9 +342,22 @@ received.
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
 
+** Minibuffer and Completions
+
+*** The *Completions* buffer can now be automatically selected.
+To enable this behavior, customize the option 'completion-auto-select'
+to t.  Then pressing TAB will switch to the *Completions* buffer when
+it pops up that buffer.
+
+*** New user option 'completion-wrap-movement'.
+When non-nil, the commands 'next-completion' and 'previous-completion'
+automatically wrap around on reaching the beginning or the end of
+the *Completions* buffer.
+
 ** Isearch and Replace
 
-*** New user option 'char-fold-override' omits the default character-folding.
++++
+*** New user option 'char-fold-override' disables default character equivalences.
 
 ** New minor mode 'glyphless-display-mode'.
 This allows an easy way to toggle seeing all glyphless characters in
