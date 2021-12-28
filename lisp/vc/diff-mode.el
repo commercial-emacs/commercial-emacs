@@ -1068,111 +1068,110 @@ else cover the whole buffer."
                            diff-hunk-header-re-unified ".*\\)$")
                    nil t)
 		  (< (point) end))
-	(combine-after-change-calls
-	  (if (match-beginning 2)
-	      ;; we matched a file header
-	      (progn
-		;; use reverse order to make sure the indices are kept valid
-		(replace-match "---" t t nil 3)
-		(replace-match "***" t t nil 2))
-	    ;; we matched a hunk header
-	    (let ((line1 (match-string 4))
-		  (lines1 (or (match-string 5) "1"))
-		  (line2 (match-string 6))
-		  (lines2 (or (match-string 7) "1"))
-		  ;; Variables to use the special undo function.
-		  (old-undo buffer-undo-list)
-		  (old-end (marker-position end))
-		  (start (match-beginning 0))
-		  (reversible t))
-	      (replace-match
-	       (concat "***************\n*** " line1 ","
-		       (number-to-string (+ (string-to-number line1)
-					    (string-to-number lines1)
-					    -1))
-		       " ****"))
-	      (save-restriction
-		(narrow-to-region (line-beginning-position 2)
-                                  ;; Call diff-end-of-hunk from just before
-                                  ;; the hunk header so it can use the hunk
-                                  ;; header info.
-				  (progn (diff-end-of-hunk 'unified) (point)))
-		(let ((hunk (buffer-string)))
-		  (goto-char (point-min))
-		  (if (not (save-excursion (re-search-forward "^-" nil t)))
-		      (delete-region (point) (point-max))
-		    (goto-char (point-max))
-		    (let ((modif nil) last-pt)
-		      (while (progn (setq last-pt (point))
-				    (= (forward-line -1) 0))
-			(pcase (char-after)
-			  (?\s (insert " ") (setq modif nil) (backward-char 1))
-			  (?+ (delete-region (point) last-pt) (setq modif t))
-			  (?- (if (not modif)
-                                  (progn (forward-char 1)
-                                         (insert " "))
-                                (delete-char 1)
-                                (insert "! "))
-                              (backward-char 2))
-			  (?\\ (when (save-excursion (forward-line -1)
-                                                     (= (char-after) ?+))
-                                 (delete-region (point) last-pt)
-                                 (setq modif t)))
-                          ;; diff-valid-unified-empty-line.
-                          (?\n (insert "  ") (setq modif nil)
-                               (backward-char 2))
-			  (_ (setq modif nil))))))
+	(if (match-beginning 2)
+	    ;; we matched a file header
+	    (progn
+	      ;; use reverse order to make sure the indices are kept valid
+	      (replace-match "---" t t nil 3)
+	      (replace-match "***" t t nil 2))
+	  ;; we matched a hunk header
+	  (let ((line1 (match-string 4))
+		(lines1 (or (match-string 5) "1"))
+		(line2 (match-string 6))
+		(lines2 (or (match-string 7) "1"))
+		;; Variables to use the special undo function.
+		(old-undo buffer-undo-list)
+		(old-end (marker-position end))
+		(start (match-beginning 0))
+		(reversible t))
+	    (replace-match
+	     (concat "***************\n*** " line1 ","
+		     (number-to-string (+ (string-to-number line1)
+					  (string-to-number lines1)
+					  -1))
+		     " ****"))
+	    (save-restriction
+	      (narrow-to-region (line-beginning-position 2)
+                                ;; Call diff-end-of-hunk from just before
+                                ;; the hunk header so it can use the hunk
+                                ;; header info.
+				(progn (diff-end-of-hunk 'unified) (point)))
+	      (let ((hunk (buffer-string)))
+		(goto-char (point-min))
+		(if (not (save-excursion (re-search-forward "^-" nil t)))
+		    (delete-region (point) (point-max))
 		  (goto-char (point-max))
-		  (save-excursion
-		    (insert "--- " line2 ","
-			    (number-to-string (+ (string-to-number line2)
-						 (string-to-number lines2)
-						 -1))
-                            " ----\n" hunk))
-		  ;;(goto-char (point-min))
-		  (forward-line 1)
-		  (if (not (save-excursion (re-search-forward "^\\+" nil t)))
-		      (delete-region (point) (point-max))
-		    (let ((modif nil) (delete nil))
-		      (if (save-excursion (re-search-forward "^\\+.*\n-"
-                                                             nil t))
-                          ;; Normally, lines in a substitution come with
-                          ;; first the removals and then the additions, and
-                          ;; the context->unified function follows this
-                          ;; convention, of course.  Yet, other alternatives
-                          ;; are valid as well, but they preclude the use of
-                          ;; context->unified as an undo command.
-			  (setq reversible nil))
-		      (while (not (eobp))
-			(pcase (char-after)
-			  (?\s (insert " ") (setq modif nil) (backward-char 1))
-			  (?- (setq delete t) (setq modif t))
-			  (?+ (if (not modif)
-                                  (progn (forward-char 1)
-                                         (insert " "))
-                                (delete-char 1)
-                                (insert "! "))
-                              (backward-char 2))
-			  (?\\ (when (save-excursion (forward-line 1)
-                                                     (not (eobp)))
-                                 (setq delete t) (setq modif t)))
-                          ;; diff-valid-unified-empty-line.
-                          (?\n (insert "  ") (setq modif nil) (backward-char 2)
-                               (setq reversible nil))
-			  (_ (setq modif nil)))
-			(let ((last-pt (point)))
-			  (forward-line 1)
-			  (when delete
-			    (delete-region last-pt (point))
-			    (setq delete nil)))))))
-		(unless (or (not reversible) (eq buffer-undo-list t))
-                  ;; Drop the many undo entries and replace them with
-                  ;; a single entry that uses diff-context->unified to do
-                  ;; the work.
-		  (setq buffer-undo-list
-			(cons (list 'apply (- old-end end) start (point-max)
-				    'diff-context->unified start (point-max))
-			      old-undo)))))))))))
+		  (let ((modif nil) last-pt)
+		    (while (progn (setq last-pt (point))
+				  (= (forward-line -1) 0))
+		      (pcase (char-after)
+			(?\s (insert " ") (setq modif nil) (backward-char 1))
+			(?+ (delete-region (point) last-pt) (setq modif t))
+			(?- (if (not modif)
+                                (progn (forward-char 1)
+                                       (insert " "))
+                              (delete-char 1)
+                              (insert "! "))
+                            (backward-char 2))
+			(?\\ (when (save-excursion (forward-line -1)
+                                                   (= (char-after) ?+))
+                               (delete-region (point) last-pt)
+                               (setq modif t)))
+                        ;; diff-valid-unified-empty-line.
+                        (?\n (insert "  ") (setq modif nil)
+                             (backward-char 2))
+			(_ (setq modif nil))))))
+		(goto-char (point-max))
+		(save-excursion
+		  (insert "--- " line2 ","
+			  (number-to-string (+ (string-to-number line2)
+					       (string-to-number lines2)
+					       -1))
+                          " ----\n" hunk))
+		;;(goto-char (point-min))
+		(forward-line 1)
+		(if (not (save-excursion (re-search-forward "^\\+" nil t)))
+		    (delete-region (point) (point-max))
+		  (let ((modif nil) (delete nil))
+		    (if (save-excursion (re-search-forward "^\\+.*\n-"
+                                                           nil t))
+                        ;; Normally, lines in a substitution come with
+                        ;; first the removals and then the additions, and
+                        ;; the context->unified function follows this
+                        ;; convention, of course.  Yet, other alternatives
+                        ;; are valid as well, but they preclude the use of
+                        ;; context->unified as an undo command.
+			(setq reversible nil))
+		    (while (not (eobp))
+		      (pcase (char-after)
+			(?\s (insert " ") (setq modif nil) (backward-char 1))
+			(?- (setq delete t) (setq modif t))
+			(?+ (if (not modif)
+                                (progn (forward-char 1)
+                                       (insert " "))
+                              (delete-char 1)
+                              (insert "! "))
+                            (backward-char 2))
+			(?\\ (when (save-excursion (forward-line 1)
+                                                   (not (eobp)))
+                               (setq delete t) (setq modif t)))
+                        ;; diff-valid-unified-empty-line.
+                        (?\n (insert "  ") (setq modif nil) (backward-char 2)
+                             (setq reversible nil))
+			(_ (setq modif nil)))
+		      (let ((last-pt (point)))
+			(forward-line 1)
+			(when delete
+			  (delete-region last-pt (point))
+			  (setq delete nil)))))))
+	      (unless (or (not reversible) (eq buffer-undo-list t))
+                ;; Drop the many undo entries and replace them with
+                ;; a single entry that uses diff-context->unified to do
+                ;; the work.
+		(setq buffer-undo-list
+		      (cons (list 'apply (- old-end end) start (point-max)
+				  'diff-context->unified start (point-max))
+			    old-undo))))))))))
 
 (defun diff-context->unified (start end &optional to-context)
   "Convert context diffs to unified diffs.
@@ -1191,87 +1190,86 @@ With a prefix argument, convert unified format to context format."
         (goto-char start)
         (while (and (re-search-forward "^\\(\\(\\*\\*\\*\\) .+\n\\(---\\) .+\\|\\*\\{15\\}.*\n\\*\\*\\* \\([0-9]+\\),\\(-?[0-9]+\\) \\*\\*\\*\\*\\)\\(?: \\(.*\\)\\|$\\)" nil t)
                     (< (point) end))
-          (combine-after-change-calls
-            (if (match-beginning 2)
-                ;; we matched a file header
-                (progn
-                  ;; use reverse order to make sure the indices are kept valid
-                  (replace-match "+++" t t nil 3)
-                  (replace-match "---" t t nil 2))
-              ;; we matched a hunk header
-              (let ((line1s (match-string 4))
-                    (line1e (match-string 5))
-                    (pt1 (match-beginning 0))
-                    ;; Variables to use the special undo function.
-                    (old-undo buffer-undo-list)
-                    (old-end (marker-position end))
-                    ;; We currently throw away the comment that can follow
-                    ;; the hunk header.  FIXME: Preserve it instead!
-                    (reversible (not (match-end 6))))
-                (replace-match "")
-                (unless (re-search-forward
-                         diff-context-mid-hunk-header-re nil t)
-                  (error "Can't find matching `--- n1,n2 ----' line"))
-                (let ((line2s (match-string 1))
-                      (line2e (match-string 2))
-                      (pt2 (progn
-                             (delete-region (progn (beginning-of-line) (point))
-                                            (progn (forward-line 1) (point)))
-                             (point-marker))))
+          (if (match-beginning 2)
+              ;; we matched a file header
+              (progn
+                ;; use reverse order to make sure the indices are kept valid
+                (replace-match "+++" t t nil 3)
+                (replace-match "---" t t nil 2))
+            ;; we matched a hunk header
+            (let ((line1s (match-string 4))
+                  (line1e (match-string 5))
+                  (pt1 (match-beginning 0))
+                  ;; Variables to use the special undo function.
+                  (old-undo buffer-undo-list)
+                  (old-end (marker-position end))
+                  ;; We currently throw away the comment that can follow
+                  ;; the hunk header.  FIXME: Preserve it instead!
+                  (reversible (not (match-end 6))))
+              (replace-match "")
+              (unless (re-search-forward
+                       diff-context-mid-hunk-header-re nil t)
+                (error "Can't find matching `--- n1,n2 ----' line"))
+              (let ((line2s (match-string 1))
+                    (line2e (match-string 2))
+                    (pt2 (progn
+                           (delete-region (progn (beginning-of-line) (point))
+                                          (progn (forward-line 1) (point)))
+                           (point-marker))))
+                (goto-char pt1)
+                (forward-line 1)
+                (while (< (point) pt2)
+                  (pcase (char-after)
+                    (?! (delete-char 2) (insert "-") (forward-line 1))
+                    (?- (forward-char 1) (delete-char 1) (forward-line 1))
+                    (?\s              ;merge with the other half of the chunk
+                     (let* ((endline2
+                             (save-excursion
+                               (goto-char pt2) (forward-line 1) (point))))
+                       (pcase (char-after pt2)
+                         ((or ?! ?+)
+                          (insert "+"
+                                  (prog1
+                                      (buffer-substring (+ pt2 2) endline2)
+                                    (delete-region pt2 endline2))))
+                         (?\s
+                          (unless (= (- endline2 pt2)
+                                     (- (line-beginning-position 2) (point)))
+                            ;; If the two lines we're merging don't have the
+                            ;; same length (can happen with "diff -b"), then
+                            ;; diff-unified->context will not properly undo
+                            ;; this operation.
+                            (setq reversible nil))
+                          (delete-region pt2 endline2)
+                          (delete-char 1)
+                          (forward-line 1))
+                         (?\\ (forward-line 1))
+                         (_ (setq reversible nil)
+                            (delete-char 1) (forward-line 1)))))
+                    (_ (setq reversible nil) (forward-line 1))))
+                (while (looking-at "[+! ] ")
+                  (if (/= (char-after) ?!) (forward-char 1)
+                    (delete-char 1) (insert "+"))
+                  (delete-char 1) (forward-line 1))
+                (save-excursion
                   (goto-char pt1)
-                  (forward-line 1)
-                  (while (< (point) pt2)
-                    (pcase (char-after)
-                      (?! (delete-char 2) (insert "-") (forward-line 1))
-                      (?- (forward-char 1) (delete-char 1) (forward-line 1))
-                      (?\s              ;merge with the other half of the chunk
-                       (let* ((endline2
-                               (save-excursion
-                                 (goto-char pt2) (forward-line 1) (point))))
-                         (pcase (char-after pt2)
-                           ((or ?! ?+)
-                            (insert "+"
-                                    (prog1
-                                        (buffer-substring (+ pt2 2) endline2)
-                                      (delete-region pt2 endline2))))
-                           (?\s
-                            (unless (= (- endline2 pt2)
-                                       (- (line-beginning-position 2) (point)))
-                              ;; If the two lines we're merging don't have the
-                              ;; same length (can happen with "diff -b"), then
-                              ;; diff-unified->context will not properly undo
-                              ;; this operation.
-                              (setq reversible nil))
-                            (delete-region pt2 endline2)
-                            (delete-char 1)
-                            (forward-line 1))
-                           (?\\ (forward-line 1))
-                           (_ (setq reversible nil)
-                              (delete-char 1) (forward-line 1)))))
-                      (_ (setq reversible nil) (forward-line 1))))
-                  (while (looking-at "[+! ] ")
-                    (if (/= (char-after) ?!) (forward-char 1)
-                      (delete-char 1) (insert "+"))
-                    (delete-char 1) (forward-line 1))
-                  (save-excursion
-                    (goto-char pt1)
-                    (insert "@@ -" line1s ","
-                            (number-to-string (- (string-to-number line1e)
-                                                 (string-to-number line1s)
-                                                 -1))
-                            " +" line2s ","
-                            (number-to-string (- (string-to-number line2e)
-                                                 (string-to-number line2s)
-                                                 -1)) " @@"))
-                  (set-marker pt2 nil)
-                  ;; The whole procedure succeeded, let's replace the myriad
-                  ;; of undo elements with just a single special one.
-                  (unless (or (not reversible) (eq buffer-undo-list t))
-                    (setq buffer-undo-list
-                          (cons (list 'apply (- old-end end) pt1 (point)
-                                      'diff-unified->context pt1 (point))
-                                old-undo)))
-                  )))))))))
+                  (insert "@@ -" line1s ","
+                          (number-to-string (- (string-to-number line1e)
+                                               (string-to-number line1s)
+                                               -1))
+                          " +" line2s ","
+                          (number-to-string (- (string-to-number line2e)
+                                               (string-to-number line2s)
+                                               -1)) " @@"))
+                (set-marker pt2 nil)
+                ;; The whole procedure succeeded, let's replace the myriad
+                ;; of undo elements with just a single special one.
+                (unless (or (not reversible) (eq buffer-undo-list t))
+                  (setq buffer-undo-list
+                        (cons (list 'apply (- old-end end) pt1 (point)
+                                    'diff-unified->context pt1 (point))
+                              old-undo)))
+                ))))))))
 
 (defun diff-reverse-direction (start end)
   "Reverse the direction of the diffs.
@@ -1287,57 +1285,56 @@ else cover the whole buffer."
       (goto-char start)
       (while (and (re-search-forward "^\\(\\([-*][-*][-*] \\)\\(.+\\)\n\\([-+][-+][-+] \\)\\(.+\\)\\|\\*\\{15\\}.*\n\\*\\*\\* \\(.+\\) \\*\\*\\*\\*\\|@@ -\\([0-9,]+\\) \\+\\([0-9,]+\\) @@.*\\)$" nil t)
 		  (< (point) end))
-	(combine-after-change-calls
-	  (cond
-	   ;; a file header
-	   ((match-beginning 2) (replace-match "\\2\\5\n\\4\\3" nil))
-	   ;; a context-diff hunk header
-	   ((match-beginning 6)
-	    (let ((pt-lines1 (match-beginning 6))
-		  (lines1 (match-string 6)))
-	      (replace-match "" nil nil nil 6)
-	      (forward-line 1)
-	      (let ((half1s (point)))
-		(while (looking-at "[-! \\][ \t]\\|#")
-		  (when (= (char-after) ?-) (delete-char 1) (insert "+"))
-		  (forward-line 1))
-		(let ((half1 (delete-and-extract-region half1s (point))))
-		  (unless (looking-at diff-context-mid-hunk-header-re)
-		    (insert half1)
-		    (error "Can't find matching `--- n1,n2 ----' line"))
-		  (let* ((str1end (or (match-end 2) (match-end 1)))
-                         (str1 (buffer-substring (match-beginning 1) str1end)))
-                    (goto-char str1end)
-                    (insert lines1)
-                    (delete-region (match-beginning 1) str1end)
-		    (forward-line 1)
-		    (let ((half2s (point)))
-		      (while (looking-at "[!+ \\][ \t]\\|#")
-			(when (= (char-after) ?+) (delete-char 1) (insert "-"))
-			(forward-line 1))
-		      (let ((half2 (delete-and-extract-region half2s (point))))
-			(insert (or half1 ""))
-			(goto-char half1s)
-			(insert (or half2 ""))))
-		    (goto-char pt-lines1)
-		    (insert str1))))))
-	   ;; a unified-diff hunk header
-	   ((match-beginning 7)
-	    (replace-match "@@ -\\8 +\\7 @@" nil)
+	(cond
+	 ;; a file header
+	 ((match-beginning 2) (replace-match "\\2\\5\n\\4\\3" nil))
+	 ;; a context-diff hunk header
+	 ((match-beginning 6)
+	  (let ((pt-lines1 (match-beginning 6))
+		(lines1 (match-string 6)))
+	    (replace-match "" nil nil nil 6)
 	    (forward-line 1)
-	    (let ((c (char-after)) first last)
-	      (while (pcase (setq c (char-after))
-		       (?- (setq first (or first (point)))
-                           (delete-char 1) (insert "+") t)
-		       (?+ (setq last (or last (point)))
-                           (delete-char 1) (insert "-") t)
-		       ((or ?\\ ?#) t)
-		       (_ (when (and first last (< first last))
-			    (insert (delete-and-extract-region first last)))
-			  (setq first nil last nil)
-			  (memq c (if diff-valid-unified-empty-line
-                                      '(?\s ?\n) '(?\s)))))
-		(forward-line 1))))))))))
+	    (let ((half1s (point)))
+	      (while (looking-at "[-! \\][ \t]\\|#")
+		(when (= (char-after) ?-) (delete-char 1) (insert "+"))
+		(forward-line 1))
+	      (let ((half1 (delete-and-extract-region half1s (point))))
+		(unless (looking-at diff-context-mid-hunk-header-re)
+		  (insert half1)
+		  (error "Can't find matching `--- n1,n2 ----' line"))
+		(let* ((str1end (or (match-end 2) (match-end 1)))
+                       (str1 (buffer-substring (match-beginning 1) str1end)))
+                  (goto-char str1end)
+                  (insert lines1)
+                  (delete-region (match-beginning 1) str1end)
+		  (forward-line 1)
+		  (let ((half2s (point)))
+		    (while (looking-at "[!+ \\][ \t]\\|#")
+		      (when (= (char-after) ?+) (delete-char 1) (insert "-"))
+		      (forward-line 1))
+		    (let ((half2 (delete-and-extract-region half2s (point))))
+		      (insert (or half1 ""))
+		      (goto-char half1s)
+		      (insert (or half2 ""))))
+		  (goto-char pt-lines1)
+		  (insert str1))))))
+	 ;; a unified-diff hunk header
+	 ((match-beginning 7)
+	  (replace-match "@@ -\\8 +\\7 @@" nil)
+	  (forward-line 1)
+	  (let ((c (char-after)) first last)
+	    (while (pcase (setq c (char-after))
+		     (?- (setq first (or first (point)))
+                         (delete-char 1) (insert "+") t)
+		     (?+ (setq last (or last (point)))
+                         (delete-char 1) (insert "-") t)
+		     ((or ?\\ ?#) t)
+		     (_ (when (and first last (< first last))
+			  (insert (delete-and-extract-region first last)))
+			(setq first nil last nil)
+			(memq c (if diff-valid-unified-empty-line
+                                    '(?\s ?\n) '(?\s)))))
+	      (forward-line 1)))))))))
 
 (defun diff-fixup-modifs (start end)
   "Fixup the hunk headers (in case the buffer was modified).
@@ -2953,7 +2950,8 @@ conflict."
 ;; (diff-beginning-of-file, diff-prev-file):  fixed wrong parenthesis.
 ;;
 ;; Revision 1.4  1999/08/31 13:01:44  monnier
-;; use `combine-after-change-calls' to minimize the slowdown of font-lock.
+;; use `combine-after-change-calls' (defunct) to minimize the slowdown
+;; of font-lock.
 ;;
 
 ;;; diff-mode.el ends here

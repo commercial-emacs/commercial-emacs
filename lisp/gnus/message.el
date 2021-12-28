@@ -3195,6 +3195,7 @@ Like `text-mode', but with these additional commands:
   ;; excluding citations and other artifacts.
   ;;
   (setq-local syntax-propertize-function #'message--syntax-propertize)
+  (add-hook 'before-change-functions #'syntax-ppss-flush-cache 99 t)
   (setq-local parse-sexp-ignore-comments t)
   (setq-local message-encoded-mail-cache nil))
 

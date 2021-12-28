@@ -2295,9 +2295,6 @@ Optional argument MINOR indicates this is called from
               (or (file-remote-p default-directory) ""))
   (setq-local compilation-locs
               (make-hash-table :test 'equal :weakness 'value))
-  ;; It's generally preferable to use after-change-functions since they
-  ;; can be subject to combine-after-change-calls, but if we do that, we risk
-  ;; running our hook after font-lock, resulting in incorrect refontification.
   (add-hook 'before-change-functions #'compilation--flush-parse nil t)
   ;; Also for minor mode, since it's not permanent-local.
   (add-hook 'change-major-mode-hook #'compilation--remove-properties nil t)

@@ -371,8 +371,7 @@ the list is a three-string list TAG, KIND, REV."
 	  (save-restriction
 	    (narrow-to-region (point) (point))
 	    ;;(newline)
-	    (combine-after-change-calls
-	      (cvs-tree-print (cvs-tags->tree tags) 'cvs-tag->string 3)))
+	    (cvs-tree-print (cvs-tags->tree tags) 'cvs-tag->string 3))
 	  ;;(cvs-refontify pt (point))
 	  ;;(sit-for 0)
 	  ;;)
@@ -456,8 +455,7 @@ Optional prefix ARG chooses between two representations."
 	  (let* ((first (car tags))
 		 (prev (if (cvs-tag-p first)
 			   (list (car (cvs-tag->vlist first))) nil)))
-	    (combine-after-change-calls
-	      (cvs-tree-tags-insert tags prev))
+	    (cvs-tree-tags-insert tags prev)
 	    ;;(cvs-refontify pt (point))
 	    ;;(sit-for 0)
 	    ))))))

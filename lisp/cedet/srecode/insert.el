@@ -97,8 +97,8 @@ Optional SKIPRESOLVER means to avoid refreshing the tag list,
 or resolving any template arguments.  It is assumed the caller
 has set everything up already."
   ;; Perform the insertion.
-  (let ((standard-output (or stream (current-buffer)))
-	(end-mark nil))
+  (let (end-mark
+        (standard-output (or stream (current-buffer))))
     ;; Merge any template entries into the input dictionary.
     (when (slot-boundp template 'dictionary)
       (srecode-dictionary-merge dictionary (oref template dictionary)))
@@ -121,19 +121,13 @@ has set everything up already."
 	;; idea though.
 	;;
 	;; Borrowed these concepts out of font-lock.
-	;;
-	;; I tried `combine-after-change-calls', but it did not have
-	;; the effect I wanted.
-	(let ((start (point)))
-	  (let ((inhibit-point-motion-hooks t)
-		(inhibit-modification-hooks t)
-		)
-	    (srecode--insert-into-buffer template dictionary)
-	    )
+	(let ((start (point))
+              (inhibit-point-motion-hooks t)
+	      (inhibit-modification-hooks t))
+	  (srecode--insert-into-buffer template dictionary)
 	  ;; Now call those after change functions.
 	  (run-hook-with-args 'after-change-functions
-			      start (point) 0)
-	  )
+			      start (point) 0))
       (srecode-insert-method template dictionary))
     ;; Handle specialization of the POINT inserter.
     (when (bufferp standard-output)
@@ -145,8 +139,7 @@ has set everything up already."
     (oset-default 'srecode-template-inserter-point point nil)
 
     ;; Return the end-mark.
-    (or end-mark (point)))
-  )
+    (or end-mark (point))))
 
 (defun srecode--insert-into-buffer (template dictionary)
   "Insert a TEMPLATE with DICTIONARY into a buffer.

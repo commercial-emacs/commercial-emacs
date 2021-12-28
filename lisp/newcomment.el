@@ -159,13 +159,7 @@ The function has no args.
 Applicable at least in modes for languages like fixed-format Fortran where
 comments always start in column zero.")
 
-(defvar-local comment-combine-change-calls t
-  "If non-nil (the default), use `combine-change-calls' around
-calls of `comment-region-function' and
-`uncomment-region-function'.  This Substitutes a single call to
-each of the hooks `before-change-functions' and
-`after-change-functions' in place of those hooks being called
-for each individual buffer change.")
+(make-obsolete-variable 'comment-combine-change-calls nil "28.1")
 
 (defvar comment-region-function 'comment-region-default
   "Function to comment a region.
@@ -1034,9 +1028,7 @@ This function is the default value of `uncomment-region-function'."
   "Uncomment each line in the BEG .. END region.
 The numeric prefix ARG can specify a number of chars to remove from the
 comment markers."
-  (if comment-combine-change-calls
-      (combine-change-calls beg end (uncomment-region-default-1 beg end arg))
-    (uncomment-region-default-1 beg end arg)))
+  (uncomment-region-default-1 beg end arg))
 
 
 (defun comment-make-bol-ws (len)
@@ -1321,17 +1313,15 @@ out."
 	 indent))))))
 
 (defun comment-region-default (beg end &optional arg)
-  (if comment-combine-change-calls
-      (combine-change-calls beg
-          ;; A new line might get inserted and whitespace deleted
-          ;; after END for line comments.  Ensure the next argument is
-          ;; after any and all changes.
-          (save-excursion
-            (goto-char end)
-            (forward-line)
-            (point))
-        (comment-region-default-1 beg end arg))
-    (comment-region-default-1 beg end arg)))
+  ;; A new line might get inserted and whitespace deleted
+  ;; after END for line comments.  Ensure the next argument is
+  ;; after any and all changes.
+  (save-excursion
+    (goto-char end)
+    (forward-line)
+    (point))
+  (comment-region-default-1 beg end arg)
+  (comment-region-default-1 beg end arg))
 
 ;;;###autoload
 (defun comment-box (beg end &optional arg)

@@ -477,17 +477,6 @@ preferably use the `c-mode-menu' language constant directly."
     (let ((f (symbol-function 'c-populate-syntax-table)))
       (if (byte-code-function-p f) f (byte-compile f)))))
 
-;; CAUTION: Try to avoid installing things on
-;; `before-change-functions'.  The macro `combine-after-change-calls'
-;; is used and it doesn't work if there are things on that hook.  That
-;; can cause font lock functions to run in inconvenient places during
-;; temporary changes in some font lock support modes, causing extra
-;; unnecessary work and font lock glitches due to interactions between
-;; various text properties.
-;;
-;; (2007-02-12): The macro `combine-after-change-calls' ISN'T used any
-;; more.
-
 (defun c-unfind-enclosing-token (pos)
   ;; If POS is wholly inside a token, remove that id from
   ;; `c-found-types', should it be present.  Return t if we were in an
@@ -2174,9 +2163,6 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
   (unless (c-called-from-text-property-change-p)
     (setq c-just-done-before-change nil)
     (c-save-buffer-state (case-fold-search)
-      ;; When `combine-after-change-calls' is used we might get calls
-      ;; with regions outside the current narrowing.  This has been
-      ;; observed in Emacs 20.7.
       (save-restriction
 	(save-match-data	  ; c-recognize-<>-arglists changes match-data
 	  (widen)

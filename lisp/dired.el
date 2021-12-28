@@ -1323,21 +1323,16 @@ wildcards, erases the buffer, and builds the subdir-alist anew
       ;; We used to bind `inhibit-modification-hooks' to try and speed up
       ;; execution, in particular, to prevent the font-lock hook from running
       ;; until the directory is all read in.
-      ;; It's not clear why font-lock would be a significant issue
-      ;; here, but I used `combine-change-calls' which should provide the
-      ;; same performance advantages without the problem of breaking
-      ;; users of after/before-change-functions.
-      (combine-change-calls (point-min) (point-max)
-	(let ((inhibit-read-only t)
-	      ;; Don't make undo entries for readin.
-	      (buffer-undo-list t))
-	  (erase-buffer)
-	  (dired-readin-insert))
-	(goto-char (point-min))
-	;; Must first make alist buffer local and set it to nil because
-	;; dired-build-subdir-alist will call dired-clear-alist first
-	(setq-local dired-subdir-alist nil)
-	(dired-build-subdir-alist))
+      (let ((inhibit-read-only t)
+	    ;; Don't make undo entries for readin.
+	    (buffer-undo-list t))
+	(erase-buffer)
+	(dired-readin-insert))
+      (goto-char (point-min))
+      ;; Must first make alist buffer local and set it to nil because
+      ;; dired-build-subdir-alist will call dired-clear-alist first
+      (setq-local dired-subdir-alist nil)
+      (dired-build-subdir-alist)
       (let ((attributes (file-attributes dirname)))
 	(if (eq (car attributes) t)
 	    (set-visited-file-modtime (file-attribute-modification-time

@@ -41,21 +41,6 @@ static void insert_from_buffer_1 (struct buffer *, ptrdiff_t, ptrdiff_t, bool);
 static void gap_left (ptrdiff_t, ptrdiff_t, bool);
 static void gap_right (ptrdiff_t, ptrdiff_t);
 
-/* List of elements of the form (BEG-UNCHANGED END-UNCHANGED CHANGE-AMOUNT)
-   describing changes which happened while combine_after_change_calls
-   was non-nil.  We use this to decide how to call them
-   once the deferral ends.
-
-   In each element.
-   BEG-UNCHANGED is the number of chars before the changed range.
-   END-UNCHANGED is the number of chars after the changed range,
-   and CHANGE-AMOUNT is the number of characters inserted by the change
-   (negative for a deletion).  */
-static Lisp_Object combine_after_change_list;
-
-/* Buffer which combine_after_change_list is about.  */
-static Lisp_Object combine_after_change_buffer;
-
 static void signal_before_change (ptrdiff_t, ptrdiff_t, ptrdiff_t *);
 
 /* Also used in marker.c to enable expensive marker checks.  */
@@ -2259,31 +2244,10 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
   if (inhibit_modification_hooks)
     return;
 
-  if (! NILP (Vcombine_after_change_calls)
-      && NILP (Vbefore_change_functions)
-      && ! buffer_has_overlays ())
-    {
-      /* `combine-after-change-calls' should probably be excised as it
-	 introduces fud for unclear gains in vc-mode.  */
-      if (! NILP (combine_after_change_list)
-	  && current_buffer != XBUFFER (combine_after_change_buffer))
-	Fcombine_after_change_execute ();
-      combine_after_change_list	=
-	Fcons (list3i (charpos - BEG,
-		       Z - (charpos - lendel + lenins),
-		       lenins - lendel),
-	       combine_after_change_list);
-      combine_after_change_buffer = Fcurrent_buffer ();
-      return;
-    }
-
   /* Save and restore the insert-*-hooks, because after-change-functions
      could clobber them when manipulating text properties.  */
   save_insert_behind_hooks = interval_insert_behind_hooks;
   save_insert_in_from_hooks = interval_insert_in_front_hooks;
-
-  if (! NILP (combine_after_change_list))
-    Fcombine_after_change_execute ();
 
   specbind (Qinhibit_modification_hooks, Qt);
 
@@ -2324,114 +2288,10 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
   unbind_to (count, Qnil);
 }
 
-static void
-Fcombine_after_change_execute_1 (Lisp_Object val)
-{
-  Vcombine_after_change_calls = val;
-}
-
-DEFUN ("combine-after-change-execute", Fcombine_after_change_execute,
-       Scombine_after_change_execute, 0, 0, 0,
-       doc: /* This function is for use internally in the function `combine-after-change-calls'.  */)
-  (void)
-{
-  ptrdiff_t count = SPECPDL_INDEX ();
-  ptrdiff_t beg, end, change;
-  ptrdiff_t begpos, endpos;
-  Lisp_Object tail;
-
-  if (NILP (combine_after_change_list))
-    return Qnil;
-
-  /* It is rare for combine_after_change_buffer to be invalid, but
-     possible.  It can happen when combine-after-change-calls is
-     non-nil, and insertion calls a file name handler (e.g. through
-     lock_file) which scribbles into a temp file -- cyd  */
-  if (!BUFFERP (combine_after_change_buffer)
-      || !BUFFER_LIVE_P (XBUFFER (combine_after_change_buffer)))
-    {
-      combine_after_change_list = Qnil;
-      return Qnil;
-    }
-
-  record_unwind_current_buffer ();
-
-  Fset_buffer (combine_after_change_buffer);
-
-  /* # chars unchanged at beginning of buffer.  */
-  beg = Z - BEG;
-  /* # chars unchanged at end of buffer.  */
-  end = beg;
-  /* Total amount of insertion (negative for deletion).  */
-  change = 0;
-
-  /* Scan the various individual changes,
-     accumulating the range info in BEG, END and CHANGE.  */
-  for (tail = combine_after_change_list; CONSP (tail);
-       tail = XCDR (tail))
-    {
-      Lisp_Object elt;
-      ptrdiff_t thisbeg, thisend, thischange;
-
-      /* Extract the info from the next element.  */
-      elt = XCAR (tail);
-      if (! CONSP (elt))
-	continue;
-      thisbeg = XFIXNUM (XCAR (elt));
-
-      elt = XCDR (elt);
-      if (! CONSP (elt))
-	continue;
-      thisend = XFIXNUM (XCAR (elt));
-
-      elt = XCDR (elt);
-      if (! CONSP (elt))
-	continue;
-      thischange = XFIXNUM (XCAR (elt));
-
-      /* Merge this range into the accumulated range.  */
-      change += thischange;
-      if (thisbeg < beg)
-	beg = thisbeg;
-      if (thisend < end)
-	end = thisend;
-    }
-
-  /* Get the current start and end positions of the range
-     that was changed.  */
-  begpos = BEG + beg;
-  endpos = Z - end;
-
-  /* We are about to handle these, so discard them.  */
-  combine_after_change_list = Qnil;
-
-  /* Now run the after-change functions for real.
-     Turn off the flag that defers them.  */
-  record_unwind_protect (Fcombine_after_change_execute_1,
-			 Vcombine_after_change_calls);
-  signal_after_change (begpos, endpos - begpos - change, endpos - begpos);
-  update_compositions (begpos, endpos, CHECK_ALL);
-
-  return unbind_to (count, Qnil);
-}
-
 void
 syms_of_insdel (void)
 {
-  staticpro (&combine_after_change_list);
-  staticpro (&combine_after_change_buffer);
-  combine_after_change_list = Qnil;
-  combine_after_change_buffer = Qnil;
-
   DEFSYM (Qundo_auto__undoable_change, "undo-auto--undoable-change");
-
-  /* FIXME: Need to make this a primitive */
-  DEFSYM (Qsyntax_ppss_invalidate_cache, "syntax-ppss-invalidate-cache");
-
-  DEFVAR_LISP ("combine-after-change-calls", Vcombine_after_change_calls,
-	       doc: /* Used internally by the function `combine-after-change-calls' macro.  */);
-  Vcombine_after_change_calls = Qnil;
-
   DEFVAR_BOOL ("inhibit-modification-hooks", inhibit_modification_hooks,
 	       doc: /* Non-nil means don't run any of the hooks that respond to buffer changes.
 This affects `before-change-functions' and `after-change-functions',
@@ -2440,13 +2300,7 @@ Setting this variable non-nil also inhibits file locks and checks
 whether files are locked by another Emacs session, as well as
 handling of the active region per `select-active-regions'.
 
-To delay change hooks during a series of changes, use
-`combine-change-calls' or `combine-after-change-calls' instead of
-binding this variable.
-
 See also the info node `(elisp) Change Hooks'.  */);
   inhibit_modification_hooks = 0;
   DEFSYM (Qinhibit_modification_hooks, "inhibit-modification-hooks");
-
-  defsubr (&Scombine_after_change_execute);
 }

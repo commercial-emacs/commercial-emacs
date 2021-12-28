@@ -234,7 +234,6 @@ Redisplay}.
 @itemx resume-tty-functions
 @xref{Suspending Emacs}.
 
-@item syntax-begin-function
 @itemx syntax-propertize-extend-region-functions
 @itemx syntax-propertize-function
 @itemx font-lock-syntactic-face-function

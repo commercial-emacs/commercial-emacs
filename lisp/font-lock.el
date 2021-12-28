@@ -1739,38 +1739,17 @@ Here each COMPILED is of the form (MATCHER HIGHLIGHT ...) as shown in the
 `font-lock-keywords' doc string.
 If SYNTACTIC-KEYWORDS is non-nil, it means these keywords are used for
 `font-lock-syntactic-keywords' rather than for `font-lock-keywords'."
-  (if (not font-lock-set-defaults)
-      ;; This should never happen.  But some external packages sometimes
-      ;; call font-lock in unexpected and incorrect ways.  It's important to
-      ;; stop processing at this point, otherwise we may end up changing the
-      ;; global value of font-lock-keywords and break highlighting in many
-      ;; other buffers.
-      (error "Font-lock trying to use keywords before setting them up"))
+  (unless font-lock-set-defaults
+    ;; This should never happen.  But some external packages sometimes
+    ;; call font-lock in unexpected and incorrect ways.  It's important to
+    ;; stop processing at this point, otherwise we may end up changing the
+    ;; global value of font-lock-keywords and break highlighting in many
+    ;; other buffers.
+    (error "Font-lock trying to use keywords before setting them up"))
   (if (eq (car-safe keywords) t)
       keywords
-    (setq keywords
-	  (cons t (cons keywords
-			(mapcar #'font-lock-compile-keyword keywords))))
-    (if (and (not syntactic-keywords)
-	     (let ((beg-function (with-no-warnings syntax-begin-function)))
-	       (or (eq beg-function #'beginning-of-defun)
-                   (if (symbolp beg-function)
-                       (get beg-function 'font-lock-syntax-paren-check))))
-	     (not beginning-of-defun-function))
-	;; Try to detect when a string or comment contains something that
-	;; looks like a defun and would thus confuse font-lock.
-	(nconc keywords
-	       `((,(if defun-prompt-regexp
-		       (concat "^\\(?:" defun-prompt-regexp "\\)?\\s(")
-		     "^\\s(")
-		  (0
-		   (if (memq (get-text-property (match-beginning 0) 'face)
-			     '(font-lock-string-face font-lock-doc-face
-			                             font-lock-comment-face))
-		       (list 'face font-lock-warning-face
-                             'help-echo "Looks like a toplevel defun: escape the parenthesis"))
-		   prepend)))))
-    keywords))
+    (cons t (cons keywords
+		  (mapcar #'font-lock-compile-keyword keywords)))))
 
 (defun font-lock-compile-keyword (keyword)
   (cond ((or (functionp keyword) (nlistp keyword)) ; MATCHER

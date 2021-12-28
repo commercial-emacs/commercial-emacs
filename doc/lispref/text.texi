@@ -6024,52 +6024,6 @@ region, and the arguments to each successive call of
 changed exactly.  In general, we advise using either the before- or
 the after-change hook, but not both.
 
-@defmac combine-after-change-calls body@dots{}
-The macro executes @var{body} normally, but arranges to call the
-after-change functions just once for a series of several changes---if
-that seems safe.
-
-If a program makes several text changes in the same area of the buffer,
-using the macro @code{combine-after-change-calls} around that part of
-the program can make it run considerably faster when after-change hooks
-are in use.  When the after-change hooks are ultimately called, the
-arguments specify a portion of the buffer including all of the changes
-made within the @code{combine-after-change-calls} body.
-
-@strong{Warning:} You must not alter the values of
-@code{after-change-functions} within
-the body of a @code{combine-after-change-calls} form.
-
-@strong{Warning:} If the changes you combine occur in widely scattered
-parts of the buffer, this will still work, but it is not advisable,
-because it may lead to inefficient behavior for some change hook
-functions.
-@end defmac
-
-@defmac combine-change-calls beg end body@dots{}
-This executes @var{body} normally, except any buffer changes it makes
-do not trigger the calls to @code{before-change-functions} and
-@code{after-change-functions}.  Instead there is a single call of each
-of these hooks for the region enclosed by @var{beg} and @var{end}, the
-parameters supplied to @code{after-change-functions} reflecting the
-changes made to the size of the region by @var{body}.
-
-The result of this macro is the result returned by @var{body}.
-
-This macro is useful when a function makes a possibly large number of
-repetitive changes to the buffer, and the change hooks would otherwise
-take a long time to run, were they to be run for each individual
-buffer modification.  Emacs itself uses this macro, for example, in
-the commands @code{comment-region} and @code{uncomment-region}.
-
-@strong{Warning:} You must not alter the values of
-@code{before-change-functions} or @code{after-change-function} within
-@var{body}.
-
-@strong{Warning:} You must not make any buffer changes outside of the
-region specified by @var{beg} and @var{end}.
-@end defmac
-
 @defvar first-change-hook
 This variable is a normal hook that is run whenever a buffer is changed
 that was previously in the unmodified state.
@@ -6094,8 +6048,5 @@ your hook to do nothing).
 
 We recommend that you only bind this variable for modifications that
 do not result in lasting changes to buffer text contents (for example
-face changes or temporary modifications).  If you need to delay change
-hooks during a series of changes (typically for performance reasons),
-use @code{combine-change-calls} or @code{combine-after-change-calls}
-instead.
+face changes or temporary modifications).
 @end defvar
