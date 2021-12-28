@@ -375,12 +375,12 @@ from each other, to avoid keeping too much useless info.")
 
 (make-obsolete-variable 'syntax-begin-function nil "25.1")
 
-(defvar-local syntax-ppss-wide nil
+(defvar-local syntax-ppss-wide '((nil))
   "((LAST-POS . LAST-PPS) . CACHE)
 LAST-POS and LAST-PPS reflect the last invocation of `syntax-propertize'.
 CACHE is a list of (POS . PPSS) pairs, in decreasing POS order.")
 
-(defvar-local syntax-ppss-narrow nil
+(defvar-local syntax-ppss-narrow '((nil))
   "Same as `syntax-ppss-wide' but for a narrowed buffer.
 This was a bad idea.")
 
@@ -393,30 +393,47 @@ This was a bad idea.")
 (define-obsolete-function-alias 'syntax-ppss-flush-cache
   #'syntax-ppss-invalidate-cache "28.1")
 
+(defsubst syntax-ppss--cached-state (cache pos)
+  "Return cache entry before POS.  Entries sorted descending."
+  (when (fboundp 'cl-position)
+    ;; cl-lib contains a bootstrap clause excluding cl-seq.
+    (when-let ((valid (cl-position pos cache :key #'car :test #'>)))
+      (nthcdr valid cache))))
+
+(defun syntax-ppss--set-data (pos ppss cache)
+  "Hack to accommodate cl-destructuring-bind of specified arguments.
+If CACHE is t, leave cached entries as-is."
+  (let ((valid (if (and (null pos) (null ppss))
+                   (car (default-value 'syntax-ppss-wide))
+                 (cons pos ppss))))
+    (setcar (syntax-ppss--data) valid)
+    (unless (eq cache t)
+      (setcdr (syntax-ppss--data) cache))
+    (syntax-ppss--data)))
+
+(defun syntax-ppss--data ()
+  (if (eq (point-min) 1)
+      syntax-ppss-wide
+    (unless (eq (point-min) syntax-ppss-narrow-start)
+      (setq syntax-ppss-narrow-start (point-min)
+            syntax-ppss-narrow (default-value 'syntax-ppss-narrow)))
+    syntax-ppss-narrow))
+
 (defun syntax-ppss-invalidate-cache (beg &rest _args)
   "Invalidate ppss data after BEG."
   (setq syntax-propertize--done (min beg syntax-propertize--done))
   (cl-destructuring-bind ((last-pos . last-ppss) . cache)
       (syntax-ppss--data)
-    (if (<= beg (or (syntax-ppss-toplevel-pos last-ppss) 0))
-	(setcar (syntax-ppss--data) nil)
-      (when (< beg (or last-pos 0))
-        (setcar (syntax-ppss--data) (cons nil last-ppss))))
-    ;; cl-lib contains a bootstrap (temacs) clause excluding cl-seq.
-    (when (fboundp 'cl-position)
-      (setcdr
-       (syntax-ppss--data)
-       ;; first sorted (desc) cache entry whose pos is less than BEG
-       (when-let ((valid (cl-position beg cache :key #'car :test #'>)))
-         (nthcdr valid cache))))))
+    (let ((after-beg (syntax-ppss--cached-state cache beg)))
+      (if (<= beg (or (syntax-ppss-toplevel-pos last-ppss) 0))
+	  (syntax-ppss--set-data nil nil after-beg)
+        (if (< beg (or last-pos 0))
+            (syntax-ppss--set-data nil last-ppss after-beg)
+          (syntax-ppss--set-data last-pos last-ppss after-beg))))))
 
-(defun syntax-ppss--data ()
-  (if (eq (point-min) 1)
-      (setq syntax-ppss-wide (or syntax-ppss-wide '((nil))))
-    (unless (eq (point-min) syntax-ppss-narrow-start)
-      (setq syntax-ppss-narrow-start (point-min)
-            syntax-ppss-narrow nil))
-    (setq syntax-ppss-narrow (or syntax-ppss-narrow '((nil))))))
+(defmacro syntax-ppss--cache-insert (cache what before)
+`(setf (nthcdr (or ,before (length ,cache)) ,cache)
+       (cons ,what (nthcdr (or ,before (length ,cache)) ,cache))))
 
 (defun syntax-ppss (&optional pos)
   "Parse-Partial-Sexp State at POS, defaulting to point.
@@ -444,7 +461,7 @@ Point is at POS when this function returns."
 				  (nth 2 ppss-last))
                               pos)))
                    (prog1 ppss
-                     (setcar (syntax-ppss--data) (cons pos ppss)))))
+                     (syntax-ppss--set-data pos ppss t))))
 	        (t
 	         (when (and (not ppss-cache) (not ppss-last))
 		   (add-hook 'before-change-functions
@@ -456,9 +473,7 @@ Point is at POS when this function returns."
                                    (point-min)))
                         (ppss-best (when (eq pt-best pt-last)
                                      ppss-last)))
-                   ;; first sorted (desc) cache entry before POS
-	           (when-let ((valid (cl-position pos ppss-cache :key #'car :test #'>))
-                              (elem (nth valid ppss-cache))
+	           (when-let ((elem (syntax-ppss--cached-state ppss-cache pos))
                               (pt-cache (car elem)))
 	             (when (and (fixnump pt-cache) (> pt-cache pt-best))
 		       (setq pt-best pt-cache
@@ -468,20 +483,21 @@ Point is at POS when this function returns."
 	           (if (< (- pos pt-best) syntax-ppss-max-span)
                        (let ((ppss (parse-partial-sexp pt-best pos nil nil ppss-best)))
                          (prog1 ppss
-                           (setcar (syntax-ppss--data) (cons pos ppss))))
+                           (syntax-ppss--set-data pos ppss t)))
                      (let ((new-cache ppss-cache)
                            (ppss ppss-best))
+                       (princ (format "foo: %s\n" new-cache)
+                              #'external-debugging-output)
                        (dotimes (i (/ (- pos pt-best) syntax-ppss-max-span))
                          (let* ((beg (+ pt-best (* i syntax-ppss-max-span)))
                                 (end (+ pt-best (* (1+ i) syntax-ppss-max-span)))
                                 (before (cl-position beg new-cache :key #'car :test #'>)))
 	                   (setq ppss (parse-partial-sexp beg end nil nil ppss))
-                           (if (fixnump before)
-                               (cl-fill new-cache (cons beg ppss) :start before)
-                             (push (cons beg ppss) new-cache))))
+                           (syntax-ppss--cache-insert new-cache (cons beg ppss) before)))
+                       (princ (format "foo: %s\n" new-cache)
+                              #'external-debugging-output)
                        (prog1 ppss
-                         (setcar (syntax-ppss--data) (cons pos ppss))
-                         (setcdr (syntax-ppss--data) new-cache)))))))
+                         (syntax-ppss--set-data pos ppss new-cache)))))))
         (args-out-of-range
          ;; Narrowed buffers; naively parse from point-min.
          (parse-partial-sexp (point-min) pos))))))

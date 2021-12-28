@@ -1313,14 +1313,6 @@ out."
 	 indent))))))
 
 (defun comment-region-default (beg end &optional arg)
-  ;; A new line might get inserted and whitespace deleted
-  ;; after END for line comments.  Ensure the next argument is
-  ;; after any and all changes.
-  (save-excursion
-    (goto-char end)
-    (forward-line)
-    (point))
-  (comment-region-default-1 beg end arg)
   (comment-region-default-1 beg end arg))
 
 ;;;###autoload
