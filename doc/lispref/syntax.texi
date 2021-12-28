@@ -578,8 +578,8 @@ need to use @code{save-excursion} (@pxref{Excursions}).  It is also
 allowed to call @code{syntax-ppss} on any position before @var{end},
 but if a Lisp program calls @code{syntax-ppss} on some position and
 later modifies the buffer at some earlier position, then it is that
-program's responsibility to call @code{syntax-ppss-flush-cache} to
-flush the now obsolete info from the cache.
+program's responsibility to call @code{syntax-ppss-invalidate-cache}
+to flush the now obsolete info from the cache.
 
 @strong{Caution:} When this variable is non-@code{nil}, Emacs removes
 @code{syntax-table} text properties arbitrarily and relies on
@@ -787,16 +787,16 @@ the returned parser state are not meaningful.
 
 This function has a side effect: it adds a buffer-local entry to
 @code{before-change-functions} (@pxref{Change Hooks}) for
-@code{syntax-ppss-flush-cache} (see below).  This entry keeps the
+@code{syntax-ppss-invalidate-cache} (see below).  This entry keeps the
 cache consistent as the buffer is modified.  However, the cache might
 not be updated if @code{syntax-ppss} is called while
 @code{before-change-functions} is temporarily let-bound, or if the
 buffer is modified without running the hook, such as when using
 @code{inhibit-modification-hooks}.  In those cases, it is necessary to
-call @code{syntax-ppss-flush-cache} explicitly.
+call @code{syntax-ppss-invalidate-cache} explicitly.
 @end defun
 
-@defun syntax-ppss-flush-cache beg &rest ignored-args
+@defun syntax-ppss-invalidate-cache beg &rest ignored-args
 This function flushes the cache used by @code{syntax-ppss}, starting
 at position @var{beg}.  The remaining arguments, @var{ignored-args},
 are ignored; this function accepts them so that it can be directly

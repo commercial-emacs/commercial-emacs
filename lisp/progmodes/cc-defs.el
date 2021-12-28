@@ -108,11 +108,8 @@ not known.")
 (put 'c-buffer-is-cc-mode 'permanent-local t)
 
 (defvar c-syntax-table-hwm most-positive-fixnum)
-;; A workaround for `syntax-ppss''s failure to take account of changes in
-;; syntax-table text properties.  This variable gets set to the lowest
-;; position where the syntax-table text property is changed, and that value
-;; gets supplied to `syntax-ppss-flush-cache' just before a font locking is
-;; due to take place.
+;; A high water mark fed into `syntax-ppss-invalidate-cache' to
+;; work around `syntax-ppss' update bug.
 
 
 ;; The following is used below during compilation.

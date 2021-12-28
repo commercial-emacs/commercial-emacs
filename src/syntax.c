@@ -3756,8 +3756,8 @@ See the info node `(elisp)Syntax Properties' for a description of the
   DEFVAR_INT ("syntax-propertize--done", syntax_propertize__done,
 	      doc: /* Position up to which syntax-table properties have been set.  */);
   syntax_propertize__done = -1;
-  DEFSYM (Qinternal__syntax_propertize, "internal--syntax-propertize");
   Fmake_variable_buffer_local (intern ("syntax-propertize--done"));
+  DEFSYM (Qinternal__syntax_propertize, "internal--syntax-propertize");
 
   words_include_escapes = 0;
   DEFVAR_BOOL ("words-include-escapes", words_include_escapes,

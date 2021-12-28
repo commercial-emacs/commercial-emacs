@@ -868,7 +868,7 @@ for the value to use."
                 fill-column fortran-line-length
                 syntax-propertize-function
                 (fortran-make-syntax-propertize-function nchars))
-          (syntax-ppss-flush-cache (point-min))
+          (syntax-ppss-invalidate-cache (point-min))
           (if font-lock-mode (font-lock-mode 1))))))
           (if global
       (setq-default fortran-line-length nchars)))

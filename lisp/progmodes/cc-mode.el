@@ -2224,7 +2224,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
   ;; A workaround for syntax-ppss's failure to notice syntax-table text
   ;; property changes.
   (when (fboundp 'syntax-ppss)
-    (syntax-ppss-flush-cache c-syntax-table-hwm)))
+    (syntax-ppss-invalidate-cache c-syntax-table-hwm)))
 
 (defun c-doc-fl-decl-start (pos)
   ;; If the line containing POS is in a doc comment continued line (as defined

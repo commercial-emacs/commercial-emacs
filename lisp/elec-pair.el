@@ -251,7 +251,7 @@ cache is flushed from position START, defaulting to point."
        (unwind-protect
            (with-syntax-table ,table
              ,@body)
-         (syntax-ppss-flush-cache ,start-var)))))
+         (syntax-ppss-invalidate-cache ,start-var)))))
 
 (defun electric-pair--syntax-ppss (&optional pos where)
   "Like `syntax-ppss', but sometimes fallback to `parse-partial-sexp'.

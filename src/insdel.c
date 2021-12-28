@@ -1986,17 +1986,16 @@ run_undoable_change (void)
 /* Check that it is okay to modify the buffer between START and END,
    which are char positions.
 
-   Run the before-change-function, if any.  If intervals are in use,
+   Run the before-change-functions, if any.  If intervals are in use,
    verify that the text to be modified is not read-only, and call
    any modification properties the text may have.
 
    If PRESERVE_PTR is nonzero, we relocate *PRESERVE_PTR
    by holding its value temporarily in a marker.
 
-   This function runs Lisp, which means it can GC, which means it can
-   compact buffers, including the current buffer being worked on here.
-   So don't you dare calling this function while manipulating the gap,
-   or during some other similar "critical section".  */
+   Avoid calling this function while manipulating the gap since its
+   execution of arbitrary lisp could GC and compact the buffer.
+*/
 
 void
 prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
@@ -2006,7 +2005,7 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
   Lisp_Object temp;
 
   XSETFASTINT (temp, start);
-  if (!NILP (BVAR (current_buffer, read_only)))
+  if (! NILP (BVAR (current_buffer, read_only)))
     Fbarf_if_buffer_read_only (temp);
 
   /* If we're about to modify a buffer the contents of which come from
@@ -2015,7 +2014,7 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
      forever.  */
   if (pdumper_object_p (BEG_ADDR))
     enlarge_buffer_text (current_buffer, 0);
-  eassert (!pdumper_object_p (BEG_ADDR));
+  eassert (! pdumper_object_p (BEG_ADDR));
 
   run_undoable_change();
 
@@ -2035,30 +2034,28 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
 	verify_interval_modification (current_buffer, start, end);
     }
 
-  /* For indirect buffers, use the base buffer to check clashes.  */
-  if (current_buffer->base_buffer != 0)
-    base_buffer = current_buffer->base_buffer;
-  else
-    base_buffer = current_buffer;
-
   if (inhibit_modification_hooks)
     return;
 
-  if (!NILP (BVAR (base_buffer, file_truename))
+  /* For indirect buffers, use the base buffer.  */
+  base_buffer = current_buffer->base_buffer
+    ? current_buffer->base_buffer
+    : current_buffer;
+
+  if (! NILP (BVAR (base_buffer, file_truename))
       /* Make binding buffer-file-name to nil effective.  */
-      && !NILP (BVAR (base_buffer, filename))
+      && ! NILP (BVAR (base_buffer, filename))
       && SAVE_MODIFF >= MODIFF)
     Flock_file (BVAR (base_buffer, file_truename));
 
-  /* If `select-active-regions' is non-nil, save the region text.  */
-  /* FIXME: Move this to Elisp (via before-change-functions).  */
-  if (!NILP (BVAR (current_buffer, mark_active))
+  if (! NILP (BVAR (current_buffer, mark_active))
       && XMARKER (BVAR (current_buffer, mark))->buffer
       && NILP (Vsaved_region_selection)
       && (EQ (Vselect_active_regions, Qonly)
 	  ? EQ (CAR_SAFE (Vtransient_mark_mode), Qonly)
-	  : (!NILP (Vselect_active_regions)
-	     && !NILP (Vtransient_mark_mode))))
+	  : (! NILP (Vselect_active_regions)
+	     && ! NILP (Vtransient_mark_mode))))
+    /* If `select-active-regions' is non-nil, save the region text.  */
     Vsaved_region_selection
       = call1 (Vregion_extract_function, Qnil);
 
@@ -2079,6 +2076,7 @@ prepare_to_modify_buffer (ptrdiff_t start, ptrdiff_t end,
 
 /* Invalidate the caches maintained by the buffer BUF, if any, for the
    region between buffer positions START and END.  */
+
 void
 invalidate_buffer_caches (struct buffer *buf, ptrdiff_t start, ptrdiff_t end)
 {
@@ -2202,9 +2200,9 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
   specbind (Qinhibit_modification_hooks, Qt);
 
   /* If buffer is unmodified, run a special hook for that case.  The
-   check for Vfirst_change_hook is just a minor optimization.  */
+     check for Vfirst_change_hook is just a minor optimization.  */
   if (SAVE_MODIFF >= MODIFF
-      && !NILP (Vfirst_change_hook))
+      && ! NILP (Vfirst_change_hook))
     {
       PRESERVE_VALUE;
       PRESERVE_START_END;
@@ -2212,7 +2210,7 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
     }
 
   /* Now run the before-change-functions if any.  */
-  if (!NILP (Vbefore_change_functions))
+  if (! NILP (Vbefore_change_functions))
     {
       rvoe_arg.location = &Vbefore_change_functions;
       rvoe_arg.errorp = 1;
@@ -2247,66 +2245,49 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
   unbind_to (count, Qnil);
 }
 
-/* Signal a change immediately after it happens.
-   CHARPOS is the character position of the start of the changed text.
-   LENDEL is the number of characters of the text before the change.
-   (Not the whole buffer; just the part that was changed.)
-   LENINS is the number of characters in that part of the text
-   after the change.  */
+/* Signal a change immediately after it happens.  CHARPOS is the
+   position at which LENDEL characters were deleted and LENINS characters
+   inserted.  */
 
 void
 signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
 {
   ptrdiff_t count = SPECPDL_INDEX ();
   struct rvoe_arg rvoe_arg;
-  Lisp_Object tmp, save_insert_behind_hooks, save_insert_in_from_hooks;
+  Lisp_Object save_insert_behind_hooks, save_insert_in_from_hooks;
 
   if (inhibit_modification_hooks)
     return;
 
-  /* If we are deferring calls to the after-change functions
-     and there are no before-change functions,
-     just record the args that we were going to use.  */
   if (! NILP (Vcombine_after_change_calls)
-      /* It's OK to defer after-changes even if syntax-ppss-flush-cache
-       * is on before-change-functions, which is common enough to be worth
-       * adding a special case for it.  */
-      && (NILP (Vbefore_change_functions)
-          || (CONSP (Vbefore_change_functions)
-              && EQ (Qt, XCAR (Vbefore_change_functions))
-              && NILP (Fdefault_value (Qbefore_change_functions))
-              && CONSP (tmp = XCDR (Vbefore_change_functions))
-              && NILP (XCDR (tmp))
-              && EQ (XCAR (tmp), Qsyntax_ppss_flush_cache)))
-      && !buffer_has_overlays ())
+      && NILP (Vbefore_change_functions)
+      && ! buffer_has_overlays ())
     {
-      Lisp_Object elt;
-
-      if (!NILP (combine_after_change_list)
+      /* `combine-after-change-calls' should probably be excised as it
+	 introduces fud for unclear gains in vc-mode.  */
+      if (! NILP (combine_after_change_list)
 	  && current_buffer != XBUFFER (combine_after_change_buffer))
 	Fcombine_after_change_execute ();
-
-      elt = list3i (charpos - BEG, Z - (charpos - lendel + lenins),
-		    lenins - lendel);
-      combine_after_change_list
-	= Fcons (elt, combine_after_change_list);
+      combine_after_change_list	=
+	Fcons (list3i (charpos - BEG,
+		       Z - (charpos - lendel + lenins),
+		       lenins - lendel),
+	       combine_after_change_list);
       combine_after_change_buffer = Fcurrent_buffer ();
-
       return;
     }
 
-  /* Save and restore the insert-*-hooks, because other hooks like
-     after-change-functions, called below, could clobber them if they
-     manipulate text properties.  */
+  /* Save and restore the insert-*-hooks, because after-change-functions
+     could clobber them when manipulating text properties.  */
   save_insert_behind_hooks = interval_insert_behind_hooks;
   save_insert_in_from_hooks = interval_insert_in_front_hooks;
 
-  if (!NILP (combine_after_change_list))
+  if (! NILP (combine_after_change_list))
     Fcombine_after_change_execute ();
 
   specbind (Qinhibit_modification_hooks, Qt);
 
-  if (!NILP (Vafter_change_functions))
+  if (! NILP (Vafter_change_functions))
     {
       rvoe_arg.location = &Vafter_change_functions;
       rvoe_arg.errorp = 1;
@@ -2443,7 +2424,9 @@ syms_of_insdel (void)
   combine_after_change_buffer = Qnil;
 
   DEFSYM (Qundo_auto__undoable_change, "undo-auto--undoable-change");
-  DEFSYM (Qsyntax_ppss_flush_cache, "syntax-ppss-flush-cache");
+
+  /* FIXME: Need to make this a primitive */
+  DEFSYM (Qsyntax_ppss_invalidate_cache, "syntax-ppss-invalidate-cache");
 
   DEFVAR_LISP ("combine-after-change-calls", Vcombine_after_change_calls,
 	       doc: /* Used internally by the function `combine-after-change-calls' macro.  */);

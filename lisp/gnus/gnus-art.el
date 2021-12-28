@@ -4580,7 +4580,6 @@ commands:
         (gnus-assign-former-global 'gnus-summary-buffer
                                    summary-buffer
                                    buffer))
-      (gnus-article-stop-animations)
       (mm-destroy-parts gnus-article-mime-handles)
       (setq gnus-article-mime-handles nil
             gnus-article-mime-handle-alist nil)

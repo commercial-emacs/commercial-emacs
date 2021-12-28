@@ -1046,7 +1046,7 @@ locking for a mode, and is not meant to be called from Lisp functions."
   ;; Make font-lock recalculate all the mode-specific data.
   (setq font-lock-major-mode nil)
   ;; Make the syntax machinery discard all information.
-  (syntax-ppss-flush-cache -1)
+  (syntax-ppss-invalidate-cache -1)
   (font-lock-set-defaults)
   (save-excursion
     (font-lock-fontify-region (point-min) (point-max))))
@@ -1461,7 +1461,7 @@ see `font-lock-syntactic-keywords'."
       ;; Flush the syntax-cache.  I believe this is not necessary for
       ;; font-lock's use of syntax-ppss, but I'm not 100% sure and it can
       ;; still be necessary for other users of syntax-ppss anyway.
-      (syntax-ppss-flush-cache start)
+      (syntax-ppss-invalidate-cache start)
       (cond
        ((not override)
 	;; Cannot override existing fontification.
