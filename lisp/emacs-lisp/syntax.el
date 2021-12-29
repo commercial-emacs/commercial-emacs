@@ -373,6 +373,8 @@ else, nil is returned."
 We try to make sure that cache entries are at least this far apart
 from each other, to avoid keeping too much useless info.")
 
+(defvar syntax-begin-function nil
+  "Defined for third-party packages still pointlessly referring to it.")
 (make-obsolete-variable 'syntax-begin-function nil "25.1")
 
 (defvar-local syntax-ppss--data '((nil))
