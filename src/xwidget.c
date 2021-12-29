@@ -1229,6 +1229,28 @@ xwidget_scroll (struct xwidget_view *view, double x, double y,
 }
 #endif
 
+#ifdef HAVE_XINPUT2
+static GdkNotifyType
+xi_translate_notify_detail (int detail)
+{
+  switch (detail)
+    {
+    case NotifyInferior:
+      return GDK_NOTIFY_INFERIOR;
+    case NotifyAncestor:
+      return GDK_NOTIFY_ANCESTOR;
+    case NotifyVirtual:
+      return GDK_NOTIFY_VIRTUAL;
+    case NotifyNonlinear:
+      return GDK_NOTIFY_NONLINEAR;
+    case NotifyNonlinearVirtual:
+      return GDK_NOTIFY_NONLINEAR_VIRTUAL;
+    default:
+      emacs_abort ();
+    }
+}
+#endif
+
 void
 xwidget_motion_or_crossing (struct xwidget_view *view, const XEvent *event)
 {
@@ -1306,6 +1328,19 @@ xwidget_motion_or_crossing (struct xwidget_view *view, const XEvent *event)
       xg_event->crossing.y_root = (gdouble) xev->root_y;
       xg_event->crossing.time = xev->time;
       xg_event->crossing.focus = xev->focus;
+      xg_event->crossing.detail = xi_translate_notify_detail (xev->detail);
+      xg_event->crossing.state = xev->mods.effective;
+
+      if (xev->buttons.mask_len)
+	{
+	  if (XIMaskIsSet (xev->buttons.mask, 1))
+	    xg_event->crossing.state |= GDK_BUTTON1_MASK;
+	  if (XIMaskIsSet (xev->buttons.mask, 2))
+	    xg_event->crossing.state |= GDK_BUTTON2_MASK;
+	  if (XIMaskIsSet (xev->buttons.mask, 3))
+	    xg_event->crossing.state |= GDK_BUTTON3_MASK;
+	}
+
       gdk_event_set_device (xg_event, find_suitable_pointer (view->frame));
     }
 #endif
@@ -2168,9 +2203,11 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
      covers the entire frame.  Clipping might have changed even if we
      haven't actually moved; try to figure out when we need to reclip
      for real.  */
+#ifndef HAVE_PGTK
   if (xv->clip_right != clip_right
       || xv->clip_bottom != clip_bottom
       || xv->clip_top != clip_top || xv->clip_left != clip_left)
+#endif
     {
 #ifdef USE_GTK
 #ifdef HAVE_X_WINDOWS
