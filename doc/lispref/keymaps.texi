@@ -357,6 +357,100 @@ A full keymap is more efficient than a sparse keymap when it holds
 lots of bindings; for just a few, the sparse keymap is better.
 @end defun
 
+@defun define-keymap &key options... &rest pairs...
+You can create a keymap with the functions described above, and then
+use @code{keymap-set} (@pxref{Changing Key Bindings}) to specify key
+bindings in that map.  When writing modes, however, you frequently
+have to bind a large number of keys at once, and using
+@code{keymap-set} on them all can be tedious and error-prone.  Instead
+you can use @code{define-keymap}, which creates a keymap and binds a
+number of keys.  Here's a very basic example:
+
+@lisp
+(define-keymap
+  "n" #'forward-line
+  "f" #'previous-line
+  "C-c C-c" #'quit-window)
+@end lisp
+
+This function creates a new sparse keymap, defines the two keystrokes
+in @var{pairs}, and returns the new keymap.
+
+@var{pairs} is a list of alternating key bindings and key definitions,
+as accepted by @code{keymap-set}.  In addition the key can be the
+special symbol @code{:menu}, in which case the definition should be a
+menu definition as accepted by @code{easy-menu-define} (@pxref{Easy
+Menu}).  Here's a brief example:
+
+@lisp
+(define-keymap :full t
+  "g" #'eww-reload
+  :menu '("Eww"
+          ["Exit" quit-window t]
+          ["Reload" eww-reload t]))
+@end lisp
+
+A number of keywords can be used before the key/definition pairs to
+changes features of the new keymap.  If the keyword is missing, the
+default value for the feature is @code{nil}.  Here's a list of the
+available keywords:
+
+@table @code
+@item :full
+If non-@code{nil}, create a chartable keymap (as from
+@code{make-keymap}) instead of a sparse keymap (as from
+@code{make-sparse-keymap} (@pxref{Creating Keymaps}).  A sparse keymap
+is the default.
+
+@item :parent
+If non-@code{nil}, this should be a keymap to use as the parent
+(@pxref{Inheritance and Keymaps}).
+
+@item :keymap
+If non-@code{nil}, this should be a keymap.  Instead of creating a new
+keymap, this keymap is modified instead.
+
+@item :suppress
+If non-@code{nil}, the keymap will be suppressed with
+@code{suppress-keymap} (@pxref{Changing Key Bindings}).  If
+@code{nodigits}, treat digits like other chars.
+
+@item :name
+If non-@code{nil}, this should be a string to use as the menu for the
+keymap if you use it as a menu with @code{x-popup-menu} (@pxref{Pop-Up
+Menus}).
+
+@item :prefix
+If non-@code{nil}, this should be a symbol to be used as a prefix
+command (@pxref{Prefix Keys}).  If this is the case, this symbol is
+returned by @code{define-keymap} instead of the map itself.
+@end table
+
+@end defun
+
+@defmac defvar-keymap name &key options... &rest pairs...
+By far, the most common thing to do with a keymap is to bind it to a
+variable.  This is what virtually all modes do---a mode called
+@code{foo} almost always has a variable called @code{foo-mode-map}.
+
+This macro defines @var{name} as a variable, and passes @var{options}
+and @var{pars} to @code{define-keymap}, and uses the result as the
+default value for the variable.
+
+@var{options} is like the keywords in @code{define-keymap}, but adds a
+@code{:doc} keyword that says what the doc string for the @var{name}
+variable should be.
+
+Here's an example:
+
+@lisp
+(defvar-keymap eww-textarea-map
+  :parent text-mode-map
+  "RET" #'forward-line
+  "TAB" #'shr-next-link)
+@end lisp
+@end defmac
+
 @defun copy-keymap keymap
 This function returns a copy of @var{keymap}.  This is almost never
 needed.  If you want a keymap that's like another yet with a few
@@ -1089,22 +1183,18 @@ macro, a symbol that leads to one of them, or @code{nil}.
 
   Here are the functions and variables pertaining to key lookup.
 
-@defun lookup-key keymap key &optional accept-defaults
+@defun keymap-lookup keymap key &optional accept-defaults no-remap position
 This function returns the definition of @var{key} in @var{keymap}.  All
 the other functions described in this chapter that look up keys use
-@code{lookup-key}.  Here are examples:
+@code{keymap-lookup}.  Here are examples:
 
 @example
 @group
-(lookup-key (current-global-map) "\C-x\C-f")
+(keymap-lookup (current-global-map) "C-x C-f")
     @result{} find-file
 @end group
 @group
-(lookup-key (current-global-map) (kbd "C-x C-f"))
-    @result{} find-file
-@end group
-@group
-(lookup-key (current-global-map) "\C-x\C-f12345")
+(keymap-lookup (current-global-map) "C-x C-f 1 2 3 4 5")
     @result{} 2
 @end group
 @end example
@@ -1115,9 +1205,9 @@ and have extra events at the end that do not fit into a single key
 sequence.  Then the value is a number, the number of events at the front
 of @var{key} that compose a complete key.
 
-If @var{accept-defaults} is non-@code{nil}, then @code{lookup-key}
+If @var{accept-defaults} is non-@code{nil}, then @code{keymap-lookup}
 considers default bindings as well as bindings for the specific events
-in @var{key}.  Otherwise, @code{lookup-key} reports only bindings for
+in @var{key}.  Otherwise, @code{keymap-lookup} reports only bindings for
 the specific sequence @var{key}, ignoring default bindings except when
 you explicitly ask about them.  (To do this, supply @code{t} as an
 element of @var{key}; see @ref{Format of Keymaps}.)
@@ -1130,11 +1220,11 @@ the second example.
 
 @example
 @group
-(lookup-key (current-global-map) "\M-f")
+(keymap-lookup (current-global-map) "M-f")
     @result{} forward-word
 @end group
 @group
-(lookup-key (current-global-map) "\ef")
+(keymap-lookup (current-global-map) "ESC f")
     @result{} forward-word
 @end group
 @end example
@@ -1145,6 +1235,19 @@ Unlike @code{read-key-sequence}, this function does not modify the
 specified events in ways that discard information (@pxref{Key Sequence
 Input}).  In particular, it does not convert letters to lower case and
 it does not change drag events to clicks.
+
+Like the normal command loop, @code{keymap-lookup} will remap the
+command resulting from looking up @var{key} by looking up the command
+in the current keymaps.  However, if the optional third argument
+@var{no-remap} is non-@code{nil}, @code{keymap-lookup} returns the
+unmapped command.
+
+If the optional argument @var{position} is non-@code{nil}, it
+specifies a mouse position as returned by @code{event-start} and
+@code{event-end}, and the lookup occurs in the keymaps associated with
+it instead of @var{key}.  It can also be a number or marker, in which
+case the keymap properties at the specified buffer position instead of
+point are used.
 @end defun
 
 @deffn Command undefined
@@ -1157,7 +1260,7 @@ This function returns the binding for @var{key} in the current
 local keymap, or @code{nil} if it is undefined there.
 
 The argument @var{accept-defaults} controls checking for default bindings,
-as in @code{lookup-key} (above).
+as in @code{keymap-lookup} (above).
 @end defun
 
 @defun keymap-global-binding key &optional accept-defaults
@@ -1165,7 +1268,7 @@ This function returns the binding for command @var{key} in the
 current global keymap, or @code{nil} if it is undefined there.
 
 The argument @var{accept-defaults} controls checking for default bindings,
-as in @code{lookup-key} (above).
+as in @code{keymap-lookup} (above).
 @end defun
 
 @defun minor-mode-key-binding key &optional accept-defaults
@@ -1182,7 +1285,7 @@ modes are omitted, since they would be completely shadowed.  Similarly,
 the list omits non-prefix bindings that follow prefix bindings.
 
 The argument @var{accept-defaults} controls checking for default
-bindings, as in @code{lookup-key} (above).
+bindings, as in @code{keymap-lookup} (above).
 @end defun
 
 @defopt meta-prefix-char
@@ -1374,100 +1477,14 @@ changing an entry in @code{ctl-x-map}, and this has the effect of
 changing the bindings of both @kbd{C-p C-f} and @kbd{C-x C-f} in the
 default global map.
 
-@defun define-keymap &key options... &rest pairs...
 @code{keymap-set} is the general work horse for defining a key in a
 keymap.  When writing modes, however, you frequently have to bind a
 large number of keys at once, and using @code{keymap-set} on them all
 can be tedious and error-prone.  Instead you can use
-@code{define-keymap}, which creates a keymaps and binds a number of
-keys.  Here's a very basic example:
+@code{define-keymap}, which creates a keymap and binds a number of
+keys.  @xref{Creating Keymaps} for details.
 
-@lisp
-(define-keymap
-  "n" #'forward-line
-  "f" #'previous-line
-  "C-c C-c" #'quit-window)
-@end lisp
-
-This function creates a new sparse keymap, defines the two keystrokes
-in @var{pairs}, and returns the new keymap.
-
-@var{pairs} is a list of alternating key bindings and key definitions,
-as accepted by @code{keymap-set}.  In addition the key can be the
-special symbol @code{:menu}, in which case the definition should be a
-menu definition as accepted by @code{easy-menu-define} (@pxref{Easy
-Menu}).  Here's a brief example:
-
-@lisp
-(define-keymap :full t
-  "g" #'eww-reload
-  :menu '("Eww"
-          ["Exit" quit-window t]
-          ["Reload" eww-reload t]))
-@end lisp
-
-A number of keywords can be used before the key/definition pairs to
-changes features of the new keymap.  If the keyword is missing, the
-default value for the feature is @code{nil}.  Here's a list of the
-available keywords:
-
-@table @code
-@item :full
-If non-@code{nil}, create a chartable keymap (as from
-@code{make-keymap}) instead of a sparse keymap (as from
-@code{make-sparse-keymap} (@pxref{Creating Keymaps}).  A sparse keymap
-is the default.
-
-@item :parent
-If non-@code{nil}, this should be a keymap to use as the parent
-(@pxref{Inheritance and Keymaps}).
-
-@item :keymap
-If non-@code{nil}, this should be a keymap.  Instead of creating a new
-keymap, this keymap is modified instead.
-
-@item :suppress
-If non-@code{nil}, the keymap will be suppressed with
-@code{suppress-keymap} (@pxref{Changing Key Bindings}).  If
-@code{nodigits}, treat digits like other chars.
-
-@item :name
-If non-@code{nil}, this should be a string to use as the menu for the
-keymap if you use it as a menu with @code{x-popup-menu} (@pxref{Pop-Up
-Menus}).
-
-@item :prefix
-If non-@code{nil}, this should be a symbol to be used as a prefix
-command (@pxref{Prefix Keys}).  If this is the case, this symbol is
-returned by @code{define-keymap} instead of the map itself.
-@end table
-
-@end defun
-
-@defmac defvar-keymap name &key options... &rest pairs...
-By far, the most common thing to do with a keymap is to bind it to a
-variable.  This is what virtually all modes do---a mode called
-@code{foo} almost always has a variable called @code{foo-mode-map}.
-
-This macro defines @var{name} as a variable, and passes @var{options}
-and @var{pars} to @code{define-keymap}, and uses the result as the
-default value for the variable.
-
-@var{options} is like the keywords in @code{define-keymap}, but adds a
-@code{:doc} keyword that says what the doc string for the @var{name}
-variable should be.
-
-Here's an example:
-
-@lisp
-(defvar-keymap eww-textarea-map
-  :parent text-mode-map
-  "RET" #'forward-line
-  "TAB" #'shr-next-link)
-@end lisp
-@end defmac
-
-  The function @code{substitute-key-definition} scans a keymap for
+The function @code{substitute-key-definition} scans a keymap for
 keys that have a certain binding and rebinds them with a different
 binding.  Another feature which is cleaner and can often produce the
 same results is to remap one command into another (@pxref{Remapping
@@ -2274,7 +2291,7 @@ the keymap.  Since @code{define-key} puts new bindings at the front, you
 should define the menu items starting at the bottom of the menu and
 moving to the top, if you care about the order.  When you add an item to
 an existing menu, you can specify its position in the menu using
-@code{define-key-after} (@pxref{Modifying Menus}).
+@code{keymap-set-after} (@pxref{Modifying Menus}).
 
 @menu
 * Simple Menu Items::       A simple kind of menu key binding.
@@ -3028,9 +3045,9 @@ To force recalculation of the tool bar, call
   When you insert a new item in an existing menu, you probably want to
 put it in a particular place among the menu's existing items.  If you
 use @code{define-key} to add the item, it normally goes at the front of
-the menu.  To put it elsewhere in the menu, use @code{define-key-after}:
+the menu.  To put it elsewhere in the menu, use @code{keymap-set-after}:
 
-@defun define-key-after map key binding &optional after
+@defun keymap-set-after map key binding &optional after
 Define a binding in @var{map} for @var{key}, with value @var{binding},
 just like @code{define-key}, but position the binding in @var{map} after
 the binding for the event @var{after}.  The argument @var{key} should be
@@ -3044,7 +3061,7 @@ inherited keymap.
 Here is an example:
 
 @example
-(define-key-after my-menu [drink]
+(keymap-set-after my-menu "<drink>"
   '("Drink" . drink-command) 'eat)
 @end example
 
@@ -3056,7 +3073,7 @@ Here is how to insert an item called @samp{Work} in the @samp{Signals}
 menu of Shell mode, after the item @code{break}:
 
 @example
-(define-key-after shell-mode-map [menu-bar signals work]
+(keymap-set-after shell-mode-map "<menu-bar> <signals> <work>"
   '("Work" . work-command) 'break)
 @end example
 @end defun
