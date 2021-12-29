@@ -43,6 +43,7 @@ Roughly every hour.
 - [Tree-sitter font highlighting](#tree-sitter). <sup id="a1">[1](#f1)</sup>
 - Gnus is rewritten to be non-blocking.
 - Process management is rewritten.
+- Tree-sitter replacement of ersatz PPSS syntactic parser.
 
 Given time, there will be enough improvements that this section of the
 README will migrate to a larger NEWS file.  Or not.
