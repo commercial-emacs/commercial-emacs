@@ -10210,13 +10210,25 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #ifdef HAVE_XWIDGETS
 	      if (xv)
 		{
+		  uint state = xev->mods.effective;
+
+		  if (xev->buttons.mask_len)
+		    {
+		      if (XIMaskIsSet (xev->buttons.mask, 1))
+			state |= Button1Mask;
+		      if (XIMaskIsSet (xev->buttons.mask, 2))
+			state |= Button2Mask;
+		      if (XIMaskIsSet (xev->buttons.mask, 3))
+			state |= Button3Mask;
+		    }
+
 		  if (found_valuator)
 		    xwidget_scroll (xv, xev->event_x, xev->event_y,
-				    xv_total_x, xv_total_y, xev->mods.effective,
+				    xv_total_x, xv_total_y, state,
 				    xev->time, any_stop_p);
 		  else
 		    xwidget_motion_notify (xv, xev->event_x, xev->event_y,
-					   xev->mods.effective, xev->time);
+					   state, xev->time);
 
 		  goto XI_OTHER;
 		}
@@ -10325,6 +10337,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      bool tab_bar_p = false;
 	      bool tool_bar_p = false;
 	      struct xi_device_t *device;
+#ifdef HAVE_XWIDGETS
+	      struct xwidget_view *xvw;
+#endif
 
 #ifdef XIPointerEmulated
 	      /* Ignore emulated scroll events when XI2 native
@@ -10335,6 +10350,25 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		   || (dpyinfo->xi2_version >= 2))
 		  && xev->flags & XIPointerEmulated)
 		{
+		  *finish = X_EVENT_DROP;
+		  goto XI_OTHER;
+		}
+#endif
+
+#ifdef HAVE_XWIDGETS
+	      xvw = xwidget_view_from_window (xev->event);
+	      if (xvw)
+		{
+		  xwidget_button (xvw, xev->evtype == XI_ButtonPress,
+				  lrint (xev->event_x), lrint (xev->event_y),
+				  xev->detail, xev->mods.effective, xev->time);
+
+		  if (!EQ (selected_window, xvw->w) && (xev->detail < 4))
+		    {
+		      inev.ie.kind = SELECT_WINDOW_EVENT;
+		      inev.ie.frame_or_window = xvw->w;
+		    }
+
 		  *finish = X_EVENT_DROP;
 		  goto XI_OTHER;
 		}
