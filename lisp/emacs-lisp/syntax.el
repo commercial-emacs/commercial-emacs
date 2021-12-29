@@ -437,74 +437,58 @@ run from `point-min' to POS except that values at positions 2 and 6
 in the returned list (counting from 0) cannot be relied upon.
 Point is at POS when this function returns."
   (setq pos (or pos (point)))
-  (syntax-propertize pos)
-  (let ((result
-         (save-restriction
-           (widen)
-           (with-syntax-table (or syntax-ppss-table (syntax-table))
-             (cl-destructuring-bind ((pt-last . ppss-last) . ppss-cache)
-                 syntax-ppss--data
-               (cond ((and pt-last
-                           (<= pt-last pos)
-                           (< (- pos pt-last) 2500))
-                      (princ (format "easy %S < %S\n" pt-last pos)
-                             #'external-debugging-output)
-	              (parse-partial-sexp pt-last pos nil nil ppss-last))
-	             ((and ppss-last
-                           (when-let ((pt-top (or (syntax-ppss-toplevel-pos ppss-last)
-				                  (nth 2 ppss-last))))
-		             (and (<= pt-top pos)
-                                  (princ (format "intermediate %S < %S\n" pt-top pos)
-                                         #'external-debugging-output)
-                                  (< (- pos pt-top) syntax-ppss-max-span))))
-	              (let ((ppss (parse-partial-sexp
-                                   (or (syntax-ppss-toplevel-pos ppss-last)
-				       (nth 2 ppss-last))
-                                   pos)))
-                        (prog1 ppss
-                          (syntax-ppss--set-data pos ppss t))))
-	             (t
-	              (when (and (not ppss-cache) (not ppss-last))
-		        (add-hook 'before-change-functions
-                                  #'syntax-ppss-invalidate-cache
-                                  ;; ersatz ordinal range (-100, 100)
-                                  99 t))
-	              (let* ((pt-best (if (and (fixnump pt-last) (<= pt-last pos))
-                                          pt-last
-                                        (point-min)))
-                             (ppss-best (when (eq pt-best pt-last)
-                                          ppss-last)))
-	                (when-let ((elem (syntax-ppss--cached-state ppss-cache pos))
-                                   (pt-cache (car elem)))
-	                  (when (and (fixnump pt-cache) (> pt-cache pt-best))
-                            (princ (format "cache %S < %S\n" pt-best pt-cache)
-                                   #'external-debugging-output)
-		            (setq pt-best pt-cache
-                                  ppss-best (cdr elem))))
-
-                        (cl-assert (<= pt-best pos))
-	                (if (< (- pos pt-best) syntax-ppss-max-span)
-                            (let ((ppss (parse-partial-sexp pt-best pos nil nil ppss-best)))
-                              (princ (format "hard %S < %S\n" pt-best pos)
-                                     #'external-debugging-output)
-                              (prog1 ppss
-                                (syntax-ppss--set-data pos ppss t)))
-                          (let ((new-cache ppss-cache)
-                                (ppss ppss-best))
-                            (princ (format "foo: %s\n" new-cache)
-                                   #'external-debugging-output)
-                            (dotimes (i (/ (- pos pt-best) syntax-ppss-max-span))
-                              (let* ((beg (+ pt-best (* i syntax-ppss-max-span)))
-                                     (end (+ pt-best (* (1+ i) syntax-ppss-max-span)))
-                                     (before (cl-position beg new-cache :key #'car :test #'>)))
-	                        (setq ppss (parse-partial-sexp beg end nil nil ppss))
-                                (syntax-ppss--cache-insert new-cache (cons beg ppss) before)))
-                            (princ (format "foo: %s\n" new-cache)
-                                   #'external-debugging-output)
-                            (prog1 ppss
-                              (syntax-ppss--set-data pos ppss new-cache))))))))))))
-    (prog1 result
-      (princ (format "foo %S %S\n" pos result) #'external-debugging-output))))
+  (save-restriction
+    (widen)
+    (syntax-propertize pos)
+    (with-syntax-table (or syntax-ppss-table (syntax-table))
+      (cl-destructuring-bind ((pt-last . ppss-last) . ppss-cache)
+          syntax-ppss--data
+        (cond ((and pt-last
+                    (<= pt-last pos)
+                    (< (- pos pt-last) 2500))
+	       (parse-partial-sexp pt-last pos nil nil ppss-last))
+	      ((and ppss-last
+                    (when-let ((pt-top (or (syntax-ppss-toplevel-pos ppss-last)
+				           (nth 2 ppss-last))))
+		      (and (<= pt-top pos)
+                           (< (- pos pt-top) syntax-ppss-max-span))))
+	       (let ((ppss (parse-partial-sexp
+                            (or (syntax-ppss-toplevel-pos ppss-last)
+				(nth 2 ppss-last))
+                            pos)))
+                 (prog1 ppss
+                   (syntax-ppss--set-data pos ppss t))))
+	      (t
+	       (when (and (not ppss-cache) (not ppss-last))
+		 (add-hook 'before-change-functions
+                           #'syntax-ppss-invalidate-cache
+                           ;; ersatz ordinal range (-100, 100)
+                           99 t))
+	       (let* ((pt-best (if (and (fixnump pt-last) (<= pt-last pos))
+                                   pt-last
+                                 (point-min)))
+                      (ppss-best (when (eq pt-best pt-last)
+                                   ppss-last)))
+	         (when-let ((elem (syntax-ppss--cached-state ppss-cache pos))
+                            (pt-cache (car elem)))
+	           (when (and (fixnump pt-cache) (> pt-cache pt-best))
+		     (setq pt-best pt-cache
+                           ppss-best (cdr elem))))
+                 (cl-assert (<= pt-best pos))
+	         (if (< (- pos pt-best) syntax-ppss-max-span)
+                     (let ((ppss (parse-partial-sexp pt-best pos nil nil ppss-best)))
+                       (prog1 ppss
+                         (syntax-ppss--set-data pos ppss t)))
+                   (let ((new-cache ppss-cache)
+                         (ppss ppss-best))
+                     (dotimes (i (/ (- pos pt-best) syntax-ppss-max-span))
+                       (let* ((beg (+ pt-best (* i syntax-ppss-max-span)))
+                              (end (+ pt-best (* (1+ i) syntax-ppss-max-span)))
+                              (before (cl-position beg new-cache :key #'car :test #'>)))
+	                 (setq ppss (parse-partial-sexp beg end nil nil ppss))
+                         (syntax-ppss--cache-insert new-cache (cons beg ppss) before)))
+                     (prog1 ppss
+                       (syntax-ppss--set-data pos ppss new-cache)))))))))))
 
 (provide 'syntax)
 
