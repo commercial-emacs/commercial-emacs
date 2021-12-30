@@ -3585,7 +3585,12 @@ Sixth arg COMMENTSTOP non-nil means stop after the start of a comment.
    Lisp_Object stopbefore, Lisp_Object oldstate, Lisp_Object commentstop)
 {
   struct lisp_parse_state state;
+  Lisp_Object ret;
   EMACS_INT target;
+  ptrdiff_t pdl_count = SPECPDL_INDEX ();
+
+  record_unwind_protect (save_restriction_restore, save_restriction_save ());
+  Fwiden ();
 
   if (!NILP (targetdepth))
     {
@@ -3608,7 +3613,7 @@ Sixth arg COMMENTSTOP non-nil means stop after the start of a comment.
 
   SET_PT_BOTH (state.location, state.location_byte);
 
-  return
+  ret =
     Fcons (make_fixnum (state.depth),
 	   Fcons (state.prevlevelstart < 0
 		  ? Qnil : make_fixnum (state.prevlevelstart),
@@ -3636,6 +3641,8 @@ Sixth arg COMMENTSTOP non-nil means stop after the start of a comment.
                                     ? Qnil
                                     : make_fixnum (state.prev_syntax),
                                 Qnil)))))))))));
+  unbind_to (pdl_count, Qnil);
+  return ret;
 }
 
 void
