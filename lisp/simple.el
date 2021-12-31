@@ -8476,7 +8476,7 @@ It is also ignored if `show-paren-mode' is enabled."
   :type 'boolean
   :group 'paren-blinking)
 
-(defcustom blink-matching-paren-distance (* 10 1024)
+(defcustom blink-matching-paren-distance (* 32 1024)
   "If non-nil, maximum distance to search backwards for matching open-paren.
 If nil, search stops at the beginning of the accessible portion of the buffer."
   :version "23.2"
