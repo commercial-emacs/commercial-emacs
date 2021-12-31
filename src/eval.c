@@ -4606,5 +4606,6 @@ alist of active lexical bindings.  */);
   defsubr (&Sbacktrace_eval);
   defsubr (&Sbacktrace__locals);
   defsubr (&Sspecial_variable_p);
+  DEFSYM (Qfunctionp, "functionp");
   defsubr (&Sfunctionp);
 }
