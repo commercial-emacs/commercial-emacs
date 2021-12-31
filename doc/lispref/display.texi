@@ -7828,6 +7828,11 @@ If this variable is @code{nil}, then @code{blink-matching-open} does
 nothing.
 @end defopt
 
+@defopt blink-matching-paren-distance
+This variable specifies the maximum distance to scan for a matching
+parenthesis before giving up.
+@end defopt
+
 @defopt blink-matching-delay
 This variable specifies the number of seconds to keep indicating the
 matching parenthesis.  A fraction of a second often gives good
@@ -7850,7 +7855,9 @@ Here is an example of calling this function explicitly.
   (interactive)
 @end group
 @group
-  (let ((blink-matching-paren t))
+  (let ((blink-matching-paren-distance
+         (buffer-size))
+        (blink-matching-paren t))
     (blink-matching-open)))
 @end group
 @end smallexample
