@@ -208,53 +208,51 @@ Where HERE-BEG..HERE-END is expected to be near point.")
   "Find the opener/closer near point and its match.
 
 It is the default value of `show-paren-data-function'."
-  (let* ((temp (show-paren--locate-near-paren))
-	 (dir (car temp))
-	 (outside (cdr temp))
-	 pos mismatch here-beg here-end)
-    ;;
-    ;; Find the other end of the sexp.
-    (when dir
-      (setq here-beg (if (eq dir 1) outside (1- outside))
-	    here-end (if (eq dir 1) (1+ outside) outside))
+  (when-let ((temp (show-paren--locate-near-paren))
+	     (dir (car temp))
+	     (outside (cdr temp))
+             (here-beg (if (eq dir 1) outside (1- outside)))
+             (here-end (if (eq dir 1) (1+ outside) outside)))
+    (let (pos mismatch)
       (save-restriction
-	;; Determine the range within which to look for a match.
-	(when blink-matching-paren-distance
-	  (narrow-to-region
-	   (max (point-min) (- (point) blink-matching-paren-distance))
-	   (min (point-max) (+ (point) blink-matching-paren-distance))))
-	;; Scan across one sexp within that range.
-	;; Errors or nil mean there is a mismatch.
-	(condition-case ()
+        (narrow-to-region (if (minibufferp)
+                              (minibuffer-prompt-end)
+                            (if noninteractive
+                                (point-min)
+                              (window-start)))
+                          (if noninteractive (point-max) (window-end)))
+        ;; Scan across one sexp within that range.
+        ;; Errors or nil mean there is a mismatch.
+        (condition-case nil
 	    (setq pos (scan-sexps outside dir))
-	  (error (setq pos t mismatch t)))
-	;; Move back the other way and verify we get back to the
-	;; starting point.  If not, these two parens don't really match.
-	;; Maybe the one at point is escaped and doesn't really count,
-	;; or one is inside a comment.
-	(when (integerp pos)
-	  (unless (condition-case ()
+	  (scan-error (setq pos t mismatch t)))
+        ;; Move back the other way and verify we get back to the
+        ;; starting point.  If not, these two parens don't really match.
+        ;; Maybe the one at point is escaped and doesn't really count,
+        ;; or one is inside a comment.
+        (when (integerp pos)
+	  (unless (condition-case nil
 		      (eq outside (scan-sexps pos (- dir)))
-		    (error nil))
+		    (scan-error nil))
 	    (setq pos nil)))
-	;; If found a "matching" paren, see if it is the right
-	;; kind of paren to match the one we started at.
-	(if (not (integerp pos))
+        ;; If found a "matching" paren, see if it is the right
+        ;; kind of paren to match the one we started at.
+        (if (not (integerp pos))
 	    (if mismatch (list here-beg here-end nil nil t))
 	  (let ((beg (min pos outside)) (end (max pos outside)))
 	    (unless (eq (syntax-class (syntax-after beg)) 8)
 	      (setq mismatch
 		    (not (or (eq (char-before end)
-				 ;; This can give nil.
-				 (cdr (syntax-after beg)))
+			         ;; This can give nil.
+			         (cdr (syntax-after beg)))
 			     (eq (char-after beg)
-				 ;; This can give nil.
-				 (cdr (syntax-after (1- end))))
+			         ;; This can give nil.
+			         (cdr (syntax-after (1- end))))
 			     ;; The cdr might hold a new paren-class
 			     ;; info rather than a matching-char info,
 			     ;; in which case the two CDRs should match.
 			     (eq (cdr (syntax-after (1- end)))
-				 (cdr (syntax-after beg)))))))
+			         (cdr (syntax-after beg)))))))
 	    (list here-beg here-end
 		  (if (= dir 1) (1- pos) pos)
 		  (if (= dir 1) pos (1+ pos))

@@ -801,7 +801,6 @@ opening delimiter and closing delimiter are mismatched---such as in
 @samp{[x)}---a warning message is displayed in the echo area.
 
 @vindex blink-matching-paren
-@vindex blink-matching-paren-distance
 @vindex blink-matching-delay
   Three variables control the display of matching parentheses:
 
@@ -818,11 +817,6 @@ make the cursor jump, even if the opening delimiter is off screen.
 the matching opening delimiter.  This may be an integer or
 floating-point number; the default is 1.
 
-@item
-@code{blink-matching-paren-distance} specifies how many characters
-back to search to find the matching opening delimiter.  If the match
-is not found in that distance, Emacs stops scanning and nothing is
-displayed.  The default is 102400.
 @end itemize
 
 @cindex Show Paren mode

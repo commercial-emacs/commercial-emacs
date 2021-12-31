@@ -8479,9 +8479,10 @@ It is also ignored if `show-paren-mode' is enabled."
 (defcustom blink-matching-paren-distance (* 100 1024)
   "If non-nil, maximum distance to search backwards for matching open-paren.
 If nil, search stops at the beginning of the accessible portion of the buffer."
-  :version "23.2"                       ; 25->100k
+  :version "23.2"                       ; 25->100k ; 28->1k
   :type '(choice (const nil) integer)
   :group 'paren-blinking)
+(make-obsolete-variable 'blink-matching-paren-distance nil "28.1")
 
 (defcustom blink-matching-delay 1
   "Time in seconds to delay after showing a matching paren."
@@ -8540,11 +8541,12 @@ The function should return non-nil if the two tokens do not match.")
             (save-excursion
               (save-restriction
 		(syntax-propertize (point))
-                (if blink-matching-paren-distance
-                    (narrow-to-region
-                     (max (minibuffer-prompt-end) ;(point-min) unless minibuf.
-                          (- (point) blink-matching-paren-distance))
-                     oldpos))
+                (narrow-to-region (if (minibufferp)
+                                      (minibuffer-prompt-end)
+                                    (if noninteractive
+                                        (point-min)
+                                      (window-start)))
+                                  (if noninteractive (point-max) (window-end)))
                 (let ((parse-sexp-ignore-comments
                        (and parse-sexp-ignore-comments
                             (not blink-matching-paren-dont-ignore-comments))))
@@ -8603,15 +8605,13 @@ The function should return non-nil if the two tokens do not match.")
     ;; Show what precedes the open in its line, if anything.
     (cond
      ((save-excursion (skip-chars-backward " \t") (not (bolp)))
-      (buffer-substring (line-beginning-position)
-                        (1+ pos)))
+      (buffer-substring (line-beginning-position) (1+ pos)))
      ;; Show what follows the open in its line, if anything.
      ((save-excursion
         (forward-char 1)
         (skip-chars-forward " \t")
         (not (eolp)))
-      (buffer-substring pos
-                        (line-end-position)))
+      (buffer-substring pos (line-end-position)))
      ;; Otherwise show the previous nonblank line,
      ;; if there is one.
      ((save-excursion (skip-chars-backward "\n \t") (not (bobp)))

@@ -118,12 +118,13 @@
                          nil)))))
 
 (ert-deftest paren-tests-open-paren-line ()
-  (cl-flet ((open-paren-line ()
-                             (let* ((data (show-paren--default))
-                                    (here-beg (nth 0 data))
-                                    (there-beg (nth 2 data)))
-                               (blink-paren-open-paren-line-string
-                                (min here-beg there-beg)))))
+  (cl-flet ((open-paren-line
+              ()
+              (let* ((data (show-paren--default))
+                     (here-beg (nth 0 data))
+                     (there-beg (nth 2 data)))
+                (blink-paren-open-paren-line-string
+                 (min here-beg there-beg)))))
     ;; Lisp-like
     (with-temp-buffer
       (insert "(defun foo ()

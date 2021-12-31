@@ -414,8 +414,6 @@ DEFUN ("tree-sitter-ppss",
 	  if (! ts_node_is_null (node))
 	    {
 	      size_t depth = 0;
-	      ts_node_descendant_etc_for_byte
-		(node, BUFFER_TO_SITTER (XFIXNUM (beg)), &depth);
 	      retval = list1 (make_fixnum (depth));
 	    }
 	}

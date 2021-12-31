@@ -961,15 +961,11 @@ See Bug#21722."
 
 (ert-deftest test-undo-region ()
   (with-temp-buffer
-    (insert "This is a test\n")
-    (goto-char (point-min))
-    (setq buffer-undo-list nil)
-    (downcase-word 1)
-    (should (= (length (delq nil (undo-make-selective-list 1 9))) 2))
-    (should (= (length (delq nil (undo-make-selective-list 4 9))) 1))
-    ;; FIXME this is the off-by-one error case.
-    ;;(should (= (length (delq nil (undo-make-selective-list 5 9))) 0))
-    (should (= (length (delq nil (undo-make-selective-list 6 9))) 0))))
+    (save-excursion (insert "This is a test\n"))
+    (let (buffer-undo-list)
+      (downcase-word 1)
+      (should (equal '((1 . 5) ("This" . 1))
+                     (delq nil (undo-make-selective-list (point-min) (point-max))))))))
 
 (provide 'simple-test)
 ;;; simple-tests.el ends here
