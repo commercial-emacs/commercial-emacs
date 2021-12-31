@@ -8476,14 +8476,14 @@ It is also ignored if `show-paren-mode' is enabled."
   :type 'boolean
   :group 'paren-blinking)
 
-(defcustom blink-matching-paren-distance (* 100 1024)
+(defcustom blink-matching-paren-distance (* 10 1024)
   "If non-nil, maximum distance to search backwards for matching open-paren.
 If nil, search stops at the beginning of the accessible portion of the buffer."
-  :version "23.2"                       ; 25->100k
+  :version "23.2"
   :type '(choice (const nil) integer)
   :group 'paren-blinking)
 
-(defcustom blink-matching-delay 1
+(defcustom blink-matching-delay 0.23
   "Time in seconds to delay after showing a matching paren."
   :type 'number
   :group 'paren-blinking)
@@ -8540,11 +8540,11 @@ The function should return non-nil if the two tokens do not match.")
             (save-excursion
               (save-restriction
 		(syntax-propertize (point))
-                (if blink-matching-paren-distance
-                    (narrow-to-region
-                     (max (minibuffer-prompt-end) ;(point-min) unless minibuf.
-                          (- (point) blink-matching-paren-distance))
-                     oldpos))
+                (when blink-matching-paren-distance
+                  (narrow-to-region
+                   (max (minibuffer-prompt-end) ;(point-min) unless minibuf.
+                        (- (point) blink-matching-paren-distance))
+                   oldpos))
                 (let ((parse-sexp-ignore-comments
                        (and parse-sexp-ignore-comments
                             (not blink-matching-paren-dont-ignore-comments))))
