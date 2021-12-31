@@ -23,6 +23,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    Gradually rename things such that:
    "line" refers to textual lines delimited by newline characters.
    "sline" refers to screen lines delimited by window width.
+   "vpos" is a legacy term for "sline".
 
    Redisplay occurs in-band in the interpreter loop, and out-of-band
    in response to mouse or expose events or lisp invocations of
@@ -124,8 +125,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    `move_it_forward' is the trusty mule that utilizes
    `emulate_display_sline' to move an iterator FORWARD.
    `move_it_backward' is the prickly hinny that must first estimate
-   how far to scroll back, and dialing in the desired y-coordinate
-   from there.
+   how far to scroll back, then dial in the desired y-coordinate from
+   there.
 
    Bidirectional display.
 

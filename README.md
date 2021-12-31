@@ -45,9 +45,6 @@ Roughly every hour.
 - Process management is rewritten.
 - Tree-sitter replacement of ersatz PPSS syntactic parser.
 
-Given time, there will be enough improvements that this section of the
-README will migrate to a larger NEWS file.  Or not.
-
 ### <a name="long-lines"></a>Long lines remain dog-slow, what's the deal?
 
 Only the C code was changed.  Lisp package code bogs as before.  To

@@ -3042,7 +3042,7 @@ as an argument limits undo to changes within the current region."
     (let ((list buffer-undo-list))
       ;; Strip any leading undo boundaries there might be, like we do
       ;; above when checking.
-      (while (eq (car list) nil)
+      (while (null (car list))
 	(setq list (cdr list)))
       (puthash list
                (cond
@@ -3059,8 +3059,8 @@ as an argument limits undo to changes within the current region."
 	       undo-equiv-table))
     ;; Don't specify a position in the undo record for the undo command.
     ;; Instead, undoing this should move point to where the change is.
-    (let ((tail buffer-undo-list)
-	  (prev nil))
+    (let (prev
+          (tail buffer-undo-list))
       (while (car tail)
 	(when (integerp (car tail))
 	  (let ((pos (car tail)))
@@ -3082,9 +3082,8 @@ as an argument limits undo to changes within the current region."
     (and modified (not (buffer-modified-p))
 	 (with-current-buffer base-buffer
 	   (delete-auto-save-file-if-necessary recent-save)))
-    ;; Display a message announcing success.
-    (if message
-	(message "%s" message))))
+    (when message
+      (message "%s" message))))
 
 (defun buffer-disable-undo (&optional buffer)
   "Make BUFFER stop keeping undo information.
@@ -3247,9 +3246,9 @@ Return what remains of the list."
                ;; Insert might have invalidated some of the markers
                ;; via modification hooks.  Update only the currently
                ;; valid ones (bug#25599).
-               (if (marker-buffer (car adj))
-                   (set-marker (car adj)
-                               (- (car adj) (cdr adj)))))))
+               (when (marker-buffer (car adj))
+                 (set-marker (car adj)
+                             (- (car adj) (cdr adj)))))))
           ;; (MARKER . OFFSET) means a marker MARKER was adjusted by OFFSET.
           (`(,(and marker (pred markerp)) . ,(and offset (pred integerp)))
            (warn "Encountered %S entry in undo list with no matching (TEXT . POS) entry"

@@ -847,7 +847,6 @@ The return value is the column where the insertion ends.  */)
       if (XFIXNAT (n) != 0)
 	{
 	  Finsert_char (make_fixnum ('\t'), n, Qt);
-
 	  fromcol = (mincol / tab_width) * tab_width;
 	}
     }

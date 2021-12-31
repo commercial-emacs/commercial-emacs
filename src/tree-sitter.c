@@ -393,6 +393,36 @@ DEFUN ("tree-sitter-root-node",
   return retval;
 }
 
+DEFUN ("tree-sitter-ppss",
+       Ftree_sitter_ppss, Stree_sitter_ppss,
+       1, 1, 0,
+       doc: /* Return parsed partial sexp state for BEG. */)
+  (Lisp_Object beg)
+{
+  Lisp_Object retval = Qnil,
+    sitter = Ftree_sitter (Fcurrent_buffer ());
+
+  CHECK_FIXNUM (beg);
+
+  if (! NILP (sitter))
+    {
+      const TSTree *tree = XTREE_SITTER (sitter)->tree;
+      if (tree != NULL)
+	{
+	  TSNode node = ts_node_first_child_for_byte
+	    (ts_tree_root_node (tree), BUFFER_TO_SITTER (XFIXNUM (beg)));
+	  if (! ts_node_is_null (node))
+	    {
+	      size_t depth = 0;
+	      ts_node_descendant_etc_for_byte
+		(node, BUFFER_TO_SITTER (XFIXNUM (beg)), &depth);
+	      retval = list1 (make_fixnum (depth));
+	    }
+	}
+    }
+  return retval;
+}
+
 DEFUN ("tree-sitter-highlights",
        Ftree_sitter_highlights, Stree_sitter_highlights,
        2, 2, "r",
@@ -604,6 +634,7 @@ syms_of_tree_sitter (void)
 
   defsubr (&Stree_sitter);
   defsubr (&Stree_sitter_root_node);
+  defsubr (&Stree_sitter_ppss);
   defsubr (&Stree_sitter_highlights);
   defsubr (&Stree_sitter_highlight_region);
   defsubr (&Stree_sitter_changed_range);

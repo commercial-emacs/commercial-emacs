@@ -823,16 +823,16 @@ function is `common-lisp-indent-function'."
   :group 'lisp)
 
 (defun lisp-ppss (&optional pos)
-  "Return Parse-Partial-Sexp State at POS, defaulting to point.
-Like `syntax-ppss' but includes the character address of the last
-complete sexp in the innermost containing list at position
-2 (counting from 0).  This is important for Lisp indentation."
-  (unless pos (setq pos (point)))
-  (let ((pss (syntax-ppss pos)))
-    (if (nth 9 pss)
-        (let ((sexp-start (car (last (nth 9 pss)))))
-          (parse-partial-sexp sexp-start pos nil nil (syntax-ppss sexp-start)))
-      pss)))
+  "Return parse-partial-sexp state of sexp enclosing POS."
+  (let* ((pos (or pos (point)))
+         (ppss-base (syntax-ppss pos))
+         (sexp-start (nth 1 ppss-base)))
+    (if (null (fixnump sexp-start))
+        ppss-base
+      (let ((ppss-sexp (parse-partial-sexp sexp-start pos nil nil
+                                           (syntax-ppss sexp-start)))
+            (ppss-sitter (tree-sitter-ppss pos)))
+        ppss-sexp))))
 
 (cl-defstruct (lisp-indent-state
                (:constructor nil)

@@ -203,7 +203,7 @@ gap_right (ptrdiff_t charpos, ptrdiff_t bytepos)
   if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
   maybe_quit ();
 }
-
+
 /* If the selected window's old pointm is adjacent or covered by the
    region from FROM to TO, unsuspend auto hscroll in that window.  */
 
@@ -259,7 +259,7 @@ adjust_markers_for_delete (ptrdiff_t from, ptrdiff_t from_byte,
     }
 }
 
-
+
 /* Adjust markers for an insertion that stretches from FROM / FROM_BYTE
    to TO / TO_BYTE.  We have to relocate the charpos of every marker
    that points after the insertion (but not their bytepos).
@@ -327,7 +327,7 @@ adjust_point (ptrdiff_t nchars, ptrdiff_t nbytes)
   /* In a single-byte buffer, the two positions must be equal.  */
   eassert (PT_BYTE >= PT && PT_BYTE - PT <= ZV_BYTE - ZV);
 }
-
+
 /* Adjust markers for a replacement of a text at FROM (FROM_BYTE) of
    length OLD_CHARS (OLD_BYTES) to a new text of length NEW_CHARS
    (NEW_BYTES).  It is assumed that OLD_CHARS > 0, i.e., this is not
@@ -433,7 +433,7 @@ adjust_markers_bytepos (ptrdiff_t from, ptrdiff_t from_byte,
   clear_charpos_cache (current_buffer);
 }
 
-
+
 void
 buffer_overflow (void)
 {
@@ -647,7 +647,7 @@ copy_text (const unsigned char *from_addr, unsigned char *to_addr,
       return to_addr - initial_to_addr;
     }
 }
-
+
 /* Insert a string of specified length before point.
    This function judges multibyteness based on
    enable_multibyte_characters in the current buffer;
@@ -856,7 +856,7 @@ count_combining_after (const unsigned char *string,
 
 #endif
 
-
+
 /* Insert a sequence of NCHARS chars which occupy NBYTES bytes
    starting at STRING.  INHERIT non-zero means inherit the text
    properties from neighboring characters; zero means inserted text
@@ -937,7 +937,7 @@ insert_1_both (const char *string,
 
   check_markers ();
 }
-
+
 /* Insert the part of the text of STRING, a Lisp object assumed to be
    of type string, consisting of the LENGTH characters (LENGTH_BYTE bytes)
    starting at position POS / POS_BYTE.  If the text of STRING has properties,
@@ -1072,7 +1072,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 
   check_markers ();
 }
-
+
 /* Insert a sequence of NCHARS chars which occupy NBYTES bytes
    starting at GAP_END_ADDR - NBYTES (if text_at_gap_tail) and at
    GPT_ADDR (if not text_at_gap_tail).
@@ -1144,7 +1144,7 @@ insert_from_gap (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
 
   check_markers ();
 }
-
+
 /* Insert text from BUF, NCHARS characters starting at CHARPOS, into the
    current buffer.  If the text in BUF has properties, they are absorbed
    into the current buffer.
@@ -1295,7 +1295,7 @@ insert_from_buffer_1 (struct buffer *buf,
 
   adjust_point (nchars, outgoing_nbytes);
 }
-
+
 /* Record undo information and adjust markers and position keepers for
    a replacement of a text PREV_TEXT at FROM to a new text of LEN
    chars (LEN_BYTE bytes) which resides in the gap just after
@@ -1390,7 +1390,7 @@ adjust_after_insert (ptrdiff_t from, ptrdiff_t from_byte,
   Z -= len; Z_BYTE -= len_byte;
   adjust_after_replace (from, from_byte, Qnil, newlen, len_byte);
 }
-
+
 /* Replace the text from character positions FROM to TO with NEW,
    If PREPARE, call prepare_to_modify_buffer.
    If INHERIT, the newly inserted text should inherit text properties
@@ -1579,13 +1579,13 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   if (adjust_match_data)
     update_search_regs (from, to, from + SCHARS (new));
 
-  if (!inhibit_mod_hooks)
+  if (! inhibit_mod_hooks)
     {
       signal_after_change (from, nchars_del, GPT - from);
       update_compositions (from, GPT, CHECK_BORDER);
     }
 }
-
+
 /* Replace the text from character positions FROM to TO with
    the text in INS of length INSCHARS.
    Keep the text properties that applied to the old characters
