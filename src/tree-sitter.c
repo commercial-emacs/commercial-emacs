@@ -409,13 +409,9 @@ DEFUN ("tree-sitter-ppss",
       const TSTree *tree = XTREE_SITTER (sitter)->tree;
       if (tree != NULL)
 	{
-	  TSNode node = ts_node_first_child_for_byte
-	    (ts_tree_root_node (tree), BUFFER_TO_SITTER (XFIXNUM (beg)));
-	  if (! ts_node_is_null (node))
-	    {
-	      size_t depth = 0;
-	      retval = list1 (make_fixnum (depth));
-	    }
+	  retval = list1
+	    (make_fixnum (ts_tree_depth_for_byte
+			  (tree, BUFFER_TO_SITTER (XFIXNUM (beg)))));
 	}
     }
   return retval;
