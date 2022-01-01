@@ -26,6 +26,11 @@
 (require 'ert-x)
 (require 'cl-lib)
 
+(declare-function sqlite-close "sqlite.c")
+(declare-function sqlite-available-p "sqlite.c")
+(declare-function sqlite-commit "sqlite.c")
+(declare-function sqlite-select "sqlite.c")
+
 (defsubst multi-test--on-conflict-p ()
   (when (bound-and-true-p multisession--db)
     (let ((result (with-sqlite-transaction multisession--db
@@ -46,9 +51,9 @@
               ""
               :synchronized t)
             (skip-unless (multi-test--on-conflict-p))
-            (should (= (multisession-value foo) 0))
-            (cl-incf (multisession-value foo))
-            (should (= (multisession-value foo) 1))
+            (should (= (multisession-value multisession--foo) 0))
+            (cl-incf (multisession-value multisession--foo))
+            (should (= (multisession-value multisession--foo) 1))
             (call-process
              (concat invocation-directory invocation-name)
              nil t nil
@@ -62,8 +67,8 @@
                             (define-multisession-variable multisession--foo 0
                               ""
                               :synchronized t)
-                            (cl-incf (multisession-value foo))))))
-            (should (= (multisession-value foo) 2)))
+                            (cl-incf (multisession-value multisession--foo))))))
+            (should (= (multisession-value multisession--foo) 2)))
         (when multisession--db
           (sqlite-close multisession--db))
         (setq multisession--db nil)))))
@@ -82,9 +87,9 @@
               ""
               :synchronized t)
             (skip-unless (multi-test--on-conflict-p))
-            (should (= (multisession-value bar) 0))
-            (cl-incf (multisession-value bar))
-            (should (= (multisession-value bar) 1))
+            (should (= (multisession-value multisession--bar) 0))
+            (cl-incf (multisession-value multisession--bar))
+            (should (= (multisession-value multisession--bar) 1))
             (setq proc
                   (start-process
                    "other-emacs"
@@ -103,10 +108,10 @@
                                     (cl-incf (multisession-value multisession--bar))))))))
             (while (process-live-p proc)
               (ignore-error 'sqlite-locked-error
-                (message "bar %s" (multisession-value bar)))
+                (message "bar %s" (multisession-value multisession--bar)))
               (accept-process-output nil 0.1))
-            (message "bar ends up as %s" (multisession-value bar))
-            (should (< (multisession-value bar) 1003)))
+            (message "bar ends up as %s" (multisession-value multisession--bar))
+            (should (< (multisession-value multisession--bar) 1003)))
         (when (process-live-p proc)
           (kill-process proc))
         (when multisession--db
@@ -122,13 +127,17 @@
           (multisession-directory dir))
       (unwind-protect
           (progn
-            (define-multisession-variable sfoo 0
+            (define-multisession-variable multisession--sfoo 0
               ""
               :synchronized t)
             (skip-unless (multi-test--on-conflict-p))
-            (should (= (multisession-value sfoo) 0))
-            (cl-incf (multisession-value sfoo))
-            (should (= (multisession-value sfoo) 1))
+            (should (= (multisession-value multisession--sfoo) 0))
+            (cl-incf (multisession-value multisession--sfoo))
+            (should (= (multisession-value multisession--sfoo) 1))
+            ;; On Windows and Haiku, we don't have sub-second resolution, so
+            ;; let some time pass to make the "later" logic work.
+            (when (memq system-type '(windows-nt haiku))
+              (sleep-for 0.6))
             (call-process
              (concat invocation-directory invocation-name)
              nil t nil
@@ -139,11 +148,11 @@
                           (let ((multisession-directory ,dir)
                                 (multisession-storage 'files)
                                 (user-init-file "/tmp/sfoo.el"))
-                            (define-multisession-variable sfoo 0
+                            (define-multisession-variable multisession--sfoo 0
                               ""
                               :synchronized t)
-                            (cl-incf (multisession-value sfoo))))))
-            (should (= (multisession-value sfoo) 2)))
+                            (cl-incf (multisession-value multisession--sfoo))))))
+            (should (= (multisession-value multisession--sfoo) 2)))
         (when multisession--db
           (sqlite-close multisession--db))
         (setq multisession--db nil)))))
