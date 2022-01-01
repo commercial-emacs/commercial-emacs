@@ -830,8 +830,7 @@ function is `common-lisp-indent-function'."
     (if (null (fixnump sexp-start))
         ppss-base
       (let ((ppss-sexp (parse-partial-sexp sexp-start pos nil nil
-                                           (syntax-ppss sexp-start)))
-            (ppss-sitter (tree-sitter-ppss pos)))
+                                           (syntax-ppss sexp-start))))
         ppss-sexp))))
 
 (cl-defstruct (lisp-indent-state
