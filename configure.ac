@@ -3134,7 +3134,7 @@ HAVE_TREE_SITTER=no
 TREE_SITTER_OBJ=
 
 if test "${with_tree_sitter}" == "yes"; then
-  EMACS_CHECK_MODULES([TREE_SITTER], [tree-sitter = 0.6.3alpha])
+  EMACS_CHECK_MODULES([TREE_SITTER], [tree-sitter = 0.6.3alpha2])
   if test "${HAVE_TREE_SITTER}" = yes; then
     AC_DEFINE(HAVE_TREE_SITTER, 1, [Define if using tree-sitter.])
     TREE_SITTER_LIBS="-ltree-sitter -ltree_sitter_highlight"
