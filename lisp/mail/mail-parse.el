@@ -1,6 +1,6 @@
 ;;; mail-parse.el --- Interface functions for parsing mail  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; This file is NOT part of GNU Emacs.

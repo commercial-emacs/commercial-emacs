@@ -1,6 +1,6 @@
 /* Record indices of function doc strings stored in a file. -*- coding: utf-8 -*-
 
-Copyright (C) 1985-1986, 1993-1995, 1997-2021 Free Software Foundation,
+Copyright (C) 1985-1986, 1993-1995, 1997-2022 Free Software Foundation,
 Inc.
 
 This file is NOT part of GNU Emacs.

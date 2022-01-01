@@ -1,6 +1,6 @@
 ;;; fileio-tests.el --- unit tests for src/fileio.c      -*- lexical-binding: t; -*-
 
-;; Copyright 2017-2021 Free Software Foundation, Inc.
+;; Copyright 2017-2022 Free Software Foundation, Inc.
 
 ;; This file is NOT part of GNU Emacs.
 

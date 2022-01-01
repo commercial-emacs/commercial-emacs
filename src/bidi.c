@@ -1,6 +1,6 @@
 /* Bidirectional buffer and string scanning functions.
 
-Copyright (C) 2000-2001, 2004-2005, 2009-2021 Free Software Foundation,
+Copyright (C) 2000-2001, 2004-2005, 2009-2022 Free Software Foundation,
 Inc.
 
 Author: Eli Zaretskii <eliz@gnu.org>
