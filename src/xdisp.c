@@ -21345,8 +21345,7 @@ find_row_edges (struct it *it, struct glyph_row *row,
 		ptrdiff_t min_pos, ptrdiff_t min_bpos,
 		ptrdiff_t max_pos, ptrdiff_t max_bpos)
 {
-  /* ROW->minpos is smaller of min_pos, the minimal buffer position
-     recorded in ROW, or ROW->start.pos.  */
+  /* ROW->minpos is smaller of ROW->start.pos and MIN_POS.  */
   if (min_pos <= ZV && min_pos < row->start.pos.charpos)
     SET_TEXT_POS (row->minpos, min_pos, min_bpos);
   else
