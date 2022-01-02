@@ -352,14 +352,13 @@ END) suitable for `syntax-propertize-function'."
                     (quote ,(intern (concat "ppss-" (symbol-name field)))))
                    (syntax-ppss ,pos))))
      (prog1 val
-       (when (featurep 'tree-sitter)
-         (let ((sitter-val
-                (funcall (symbol-function
-                          (quote ,(intern (concat "tree-sitter-ppss-"
-                                                  (symbol-name field))))))))
+       (when-let ((func (symbol-function
+                         (quote ,(intern (concat "tree-sitter-ppss-"
+                                                 (symbol-name field)))))))
+         (let ((sitter-val (funcall func ,pos)))
            (unless (equal val sitter-val)
              (message "syntax-ppss-get %s(%s): %S != %S"
-                      ,field ,pos val sitter-val)))))))
+                      ',field ,pos val sitter-val)))))))
 
 (defun syntax-ppss-depth (ppss)
   (nth 0 ppss))

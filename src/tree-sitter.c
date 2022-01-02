@@ -408,11 +408,8 @@ DEFUN ("tree-sitter-ppss-depth",
     {
       const TSTree *tree = XTREE_SITTER (sitter)->tree;
       if (tree != NULL)
-	{
-	  retval = list1
-	    (make_fixnum (ts_tree_depth_for_byte
-			  (tree, BUFFER_TO_SITTER (XFIXNUM (beg)))));
-	}
+	retval = make_fixnum (ts_tree_depth_for_byte
+			      (tree, BUFFER_TO_SITTER (XFIXNUM (beg))));
     }
   return retval;
 }
