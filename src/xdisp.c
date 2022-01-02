@@ -6486,14 +6486,14 @@ following_line_start (struct it *it, bool *skipped_p,
 
   /* If we didn't find a newline near enough, see if we can use a
      short-cut.  */
-  if (!newline_found_p)
+  if (! newline_found_p)
     {
       ptrdiff_t bytepos, start = IT_CHARPOS (*it);
       ptrdiff_t limit = find_newline_no_quit (start, IT_BYTEPOS (*it),
 					      1, &bytepos);
       Lisp_Object pos;
 
-      eassert (!STRINGP (it->string));
+      eassert (! STRINGP (it->string));
 
       /* If there isn't any `display' property in sight, and no
 	 overlays, we can just use the position of the newline in
@@ -21360,47 +21360,37 @@ unproduce_glyphs (struct it *it, int n)
     glyph[-n] = *glyph;
 }
 
-/* Find the positions in a bidi-reordered ROW to serve as ROW->minpos
-   and ROW->maxpos.  */
+/* Determine ROW->minpos and ROW->maxpos.  */
 static void
 find_row_edges (struct it *it, struct glyph_row *row,
 		ptrdiff_t min_pos, ptrdiff_t min_bpos,
 		ptrdiff_t max_pos, ptrdiff_t max_bpos)
 {
-  /* FIXME: Revisit this when glyph "spilling" in continuation
-     lines' rows is implemented for bidi-reordered rows.  */
-
-  /* ROW->minpos is the value of min_pos, the minimal buffer position
-     we have in ROW, or ROW->start.pos if that is smaller.  */
+  /* ROW->minpos is smaller of min_pos, the minimal buffer position
+     recorded in ROW, or ROW->start.pos.  */
   if (min_pos <= ZV && min_pos < row->start.pos.charpos)
     SET_TEXT_POS (row->minpos, min_pos, min_bpos);
   else
-    /* We didn't find buffer positions smaller than ROW->start, or
-       didn't find _any_ valid buffer positions in any of the glyphs,
-       so we must trust the iterator's computed positions.  */
-      row->minpos = row->start.pos;
+    row->minpos = row->start.pos;
+
   if (max_pos <= 0)
     {
       max_pos = CHARPOS (it->current.pos);
       max_bpos = BYTEPOS (it->current.pos);
     }
 
-  /* Here are the various use-cases for ending the row, and the
-     corresponding values for ROW->maxpos:
+  /* ROW->maxpos is set according to whether:
 
-     Line ends in a newline from buffer       eol_pos + 1
-     Line is continued from buffer            max_pos + 1
-     Line is truncated on right               it->current.pos
-     Line ends in a newline from string       max_pos + 1(*)
+     sline is continued from buffer            max_pos + 1
+     sline is truncated on right               it->current.pos
+     sline ends in a newline from string       max_pos + 1(*)
       (*) + 1 only when line ends in a forward scan
-     Line is continued from string            max_pos
-     Line is continued from display vector    max_pos
-     Line is entirely from a string           min_pos == max_pos
-     Line is entirely from a display vector   min_pos == max_pos
-     Line that ends at ZV                     ZV
-
-     If you discover other use-cases, please add them here as
-     appropriate.  */
+     sline is continued from string            max_pos
+     sline is continued from display vector    max_pos
+     sline is entirely from a string           min_pos == max_pos
+     sline is entirely from a display vector   min_pos == max_pos
+     sline that ends at ZV                     ZV
+     */
   if (row->ends_at_zv_p)
     row->maxpos = it->current.pos;
   else if (row->used[TEXT_AREA])
@@ -21408,7 +21398,7 @@ find_row_edges (struct it *it, struct glyph_row *row,
       bool seen_string = false;
       struct glyph_row *r1 = row - 1;
 
-      /* Did we see the same display string on the previous row?  */
+      /* Determine seen_string, whatever that's supposed to signify.  */
       if (STRINGP (it->object)
 	  /* this is not the first row */
 	  && row > it->w->desired_matrix->rows
@@ -21417,35 +21407,21 @@ find_row_edges (struct it *it, struct glyph_row *row,
 	  /* previous row also ends in a newline from a string */
 	  && r1->ends_in_newline_from_string_p)
 	{
+	  /* Same display string as the previous row.  */
 	  struct glyph *start, *end;
 
-	  /* Search for the last glyph of the previous row that came
-	     from buffer or string.  Depending on whether the row is
-	     L2R or R2L, we need to process it front to back or the
-	     other way round.  */
-	  if (! r1->reversed_p)
+	  if (! r1->reversed_p) /* L2R */
 	    {
 	      start = r1->glyphs[TEXT_AREA];
 	      end = start + r1->used[TEXT_AREA];
-	      /* Glyphs inserted by redisplay have nil as their object.  */
 	      while (end > start
+		     /* Already inserted glyphs have nil objects.  */
 		     && NILP ((end - 1)->object)
 		     && (end - 1)->charpos <= 0)
 		--end;
-	      if (end > start)
-		{
-		  if (EQ ((end - 1)->object, it->object))
-		    seen_string = true;
-		}
-	      else
-		/* If all the glyphs of the previous row were inserted
-		   by redisplay, it means the previous row was
-		   produced from a single newline, which is only
-		   possible if that newline came from the same string
-		   as the one which produced this ROW.  */
-		seen_string = true;
+	      seen_string = (end <= start) || EQ ((end - 1)->object, it->object);
 	    }
-	  else
+	  else /* R2L */
 	    {
 	      end = r1->glyphs[TEXT_AREA] - 1;
 	      start = end + r1->used[TEXT_AREA];
@@ -21453,47 +21429,24 @@ find_row_edges (struct it *it, struct glyph_row *row,
 		     && NILP ((end + 1)->object)
 		     && (end + 1)->charpos <= 0)
 		++end;
-	      if (end < start)
-		{
-		  if (EQ ((end + 1)->object, it->object))
-		    seen_string = true;
-		}
-	      else
-		seen_string = true;
+	      seen_string = end >= start || EQ ((end + 1)->object, it->object);
 	    }
 	}
-      /* Take note of each display string that covers a newline only
-	 once, the first time we see it.  This is for when a display
-	 string includes more than one newline in it.  */
+
       if (row->ends_in_newline_from_string_p && ! seen_string)
 	{
-	  /* If we were scanning the buffer forward when we displayed
-	     the string, we want to account for at least one buffer
-	     position that belongs to this row (position covered by
-	     the display string), so that cursor positioning will
-	     consider this row as a candidate when point is at the end
-	     of the visual line represented by this row.  This is not
-	     required when scanning back, because max_pos will already
-	     have a much larger value.  */
 	  if (CHARPOS (row->end.pos) > max_pos)
 	    inc_both (&max_pos, &max_bpos);
 	  SET_TEXT_POS (row->maxpos, max_pos, max_bpos);
 	}
-      else if (CHARPOS (it->eol_pos) > 0)
-	SET_TEXT_POS (row->maxpos,
-		      CHARPOS (it->eol_pos) + 1, BYTEPOS (it->eol_pos) + 1);
       else if (row->continued_p)
 	{
-	  /* If max_pos is different from IT's current position, it
-	     means IT->method does not belong to the display element
-	     at max_pos.  However, it also means that the display
-	     element at max_pos was displayed in its entirety on this
-	     line, which is equivalent to saying that the next line
-	     starts at the next buffer position.  */
 	  if (IT_CHARPOS (*it) == max_pos && it->method != GET_FROM_BUFFER)
 	    SET_TEXT_POS (row->maxpos, max_pos, max_bpos);
 	  else
 	    {
+	      /* EZ obfuscative remark regarding the case where IT is
+		 not at MAX_POS brooked no assay.  */
 	      inc_both (&max_pos, &max_bpos);
 	      SET_TEXT_POS (row->maxpos, max_pos, max_bpos);
 	    }
@@ -21507,7 +21460,11 @@ find_row_edges (struct it *it, struct glyph_row *row,
 	/* A line that is entirely from a string/image/stretch...  */
 	row->maxpos = row->minpos;
       else
-	emacs_abort ();
+	{
+	  ptrdiff_t nl =
+	    find_newline_no_quit (min_pos, CHAR_TO_BYTE (min_pos), 1, NULL);
+	  SET_TEXT_POS (row->maxpos, nl, CHAR_TO_BYTE (nl));
+	}
     }
   else
     row->maxpos = it->current.pos;
@@ -22257,12 +22214,12 @@ display_sline (struct it *it, int cursor_vpos)
 	      /* When line numbers are displayed, row->x should not be
 		 offset, as the first glyph after the line number can
 		 never be partially visible.  */
-	      && !line_number_needed
+	      && ! line_number_needed
 	      /* In R2L rows, we arrange in extend_face_to_end_of_line
 		 to add a right offset to the line, by a suitable
 		 change to the stretch glyph that is the leftmost
 		 glyph of the line.  */
-	      && !row->reversed_p)
+	      && ! row->reversed_p)
 	    row->x = x - it->first_visible_x;
 	  /* Record the maximum and minimum buffer positions seen so
 	     far in glyphs that will be displayed by this row.  */
@@ -22568,7 +22525,7 @@ display_sline (struct it *it, int cursor_vpos)
 
 	  /* Add a space at the end of the line that is used to
 	     display the cursor there.  */
-	  if (!IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
+	  if (! IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
 	    append_space_for_newline (it, false);
 
 	  /* Extend the face to the end of the line.  */
@@ -22577,10 +22534,6 @@ display_sline (struct it *it, int cursor_vpos)
 	  /* Make sure we have the position.  */
 	  if (used_before == 0)
 	    row->glyphs[TEXT_AREA]->charpos = CHARPOS (it->position);
-
-	  /* Record the position of the newline, for use in
-	     find_row_edges.  */
-	  it->eol_pos = it->current.pos;
 
 	  /* Consume the line end.  This skips over invisible lines.  */
 	  set_iterator_to_next (it, true);
@@ -22844,7 +22797,6 @@ done:
       it->first_visible_x = first_visible_x;
       it->last_visible_x  = last_visible_x;
     }
-  SET_TEXT_POS (it->eol_pos, 0, 0);
   ++it->vpos;
   ++it->glyph_row;
   /* The next row should by default use the same value of the

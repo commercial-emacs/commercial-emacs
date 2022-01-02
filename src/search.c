@@ -258,7 +258,7 @@ compile_pattern (Lisp_Object pattern, struct re_registers *regp,
   return cp;
 }
 
-
+
 static Lisp_Object
 looking_at_1 (Lisp_Object string, bool posix, bool modify_data)
 {
@@ -364,7 +364,7 @@ INHIBIT-MODIFY is non-nil, don't modify the match data.  */)
 {
   return looking_at_1 (regexp, 1, NILP (inhibit_modify));
 }
-
+
 static Lisp_Object
 string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
 		bool posix, bool modify_data)
@@ -579,7 +579,7 @@ fast_looking_at (Lisp_Object regexp, ptrdiff_t pos, ptrdiff_t pos_byte,
   return len;
 }
 
-
+
 /* The newline cache: remembering which sections of text have no newlines.  */
 
 /* If the user has requested the long scans caching, make sure it's on.
@@ -633,12 +633,14 @@ newline_cache_on_off (struct buffer *buf)
     }
 }
 
-
+
 /* Search for COUNT newlines between START/START_BYTE and END/END_BYTE.
 
    If COUNT is positive, search forwards; END must be >= START.
+
    If COUNT is negative, search backwards for the -COUNTth instance;
-      END must be <= START.
+   END must be <= START.
+
    If COUNT is zero, do anything you please; run rogue, for all I care.
 
    If END is zero, use BEGV or ZV instead, as appropriate for the
@@ -667,7 +669,7 @@ find_newline (ptrdiff_t start, ptrdiff_t start_byte, ptrdiff_t end,
   struct region_cache *newline_cache;
   struct buffer *cache_buffer;
 
-  if (!end)
+  if (! end)
     {
       if (count > 0)
 	end = ZV, end_byte = ZV_BYTE;
@@ -936,7 +938,7 @@ find_newline (ptrdiff_t start, ptrdiff_t start_byte, ptrdiff_t end,
     }
   return start;
 }
-
+
 /* Search for COUNT instances of a line boundary.
    Start at START.  If COUNT is negative, search backwards.
 
@@ -1014,7 +1016,7 @@ find_before_next_newline (ptrdiff_t from, ptrdiff_t to,
     }
   return pos;
 }
-
+
 /* Subroutines of Lisp buffer search functions. */
 
 static Lisp_Object
@@ -1090,7 +1092,7 @@ search_command (Lisp_Object string, Lisp_Object bound, Lisp_Object noerror,
 
   return make_fixnum (np);
 }
-
+
 /* Return true if REGEXP it matches just one constant string.  */
 
 static bool
@@ -1524,7 +1526,7 @@ search_buffer (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 
   return pos;
 }
-
+
 /* Do a simple string search N times for the string PAT,
    whose length is LEN/LEN_BYTE,
    from buffer position POS/POS_BYTE until LIM/LIM_BYTE.
@@ -1729,7 +1731,7 @@ simple_search (EMACS_INT n, unsigned char *pat,
   else
     return n;
 }
-
+
 /* Do Boyer-Moore search N times for the string BASE_PAT,
    whose length is LEN_BYTE,
    from buffer position POS_BYTE until LIM_BYTE.
@@ -2189,7 +2191,7 @@ set_search_regs (ptrdiff_t beg_byte, ptrdiff_t nbytes)
   search_regs.end[0] = BYTE_TO_CHAR (beg_byte + nbytes);
   XSETBUFFER (last_thing_searched, current_buffer);
 }
-
+
 DEFUN ("search-backward", Fsearch_backward, Ssearch_backward, 1, 4,
        "MSearch backward: ",
        doc: /* Search backward from point for STRING.
@@ -2343,7 +2345,7 @@ and `replace-match'.  */)
 {
   return search_command (regexp, bound, noerror, count, 1, 1, 1);
 }
-
+
 DEFUN ("replace-match", Freplace_match, Sreplace_match, 1, 5, 0,
        doc: /* Replace text matched by last search with NEWTEXT.
 Leave point at the end of the replacement text.
@@ -2773,7 +2775,7 @@ since only regular expressions have distinguished subexpressions.  */)
 
   return Qnil;
 }
-
+
 static Lisp_Object
 match_limit (Lisp_Object num, bool beginningp)
 {
@@ -3349,7 +3351,6 @@ the buffer.  If the buffer doesn't have a cache, the value is nil.  */)
     set_buffer_internal_1 (old);
   return val;
 }
-
 
 static void syms_of_search_for_pdumper (void);
 

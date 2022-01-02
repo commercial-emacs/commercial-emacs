@@ -393,8 +393,8 @@ DEFUN ("tree-sitter-root-node",
   return retval;
 }
 
-DEFUN ("tree-sitter-ppss",
-       Ftree_sitter_ppss, Stree_sitter_ppss,
+DEFUN ("tree-sitter-ppss-depth",
+       Ftree_sitter_ppss_depth, Stree_sitter_ppss_depth,
        1, 1, 0,
        doc: /* Return parsed partial sexp state for BEG. */)
   (Lisp_Object beg)
@@ -628,7 +628,7 @@ syms_of_tree_sitter (void)
 
   defsubr (&Stree_sitter);
   defsubr (&Stree_sitter_root_node);
-  defsubr (&Stree_sitter_ppss);
+  defsubr (&Stree_sitter_ppss_depth);
   defsubr (&Stree_sitter_highlights);
   defsubr (&Stree_sitter_highlight_region);
   defsubr (&Stree_sitter_changed_range);

@@ -866,8 +866,9 @@ struct glyph_row
      removed some day, so don't use it in new code.  */
   struct glyph *glyphs[1 + LAST_AREA];
 
-  /* Number of glyphs actually filled in areas.  This could have size
-     LAST_AREA, but it's 1 + LAST_AREA to simplify offset calculations.  */
+  /* Number of glyphs actually filled for each area.  This could have
+     size LAST_AREA, but it's 1 + LAST_AREA to simplify offset
+     calculations.  */
   short used[1 + LAST_AREA];
 
   /* Hash code.  This hash code is available as soon as the row
@@ -2678,14 +2679,6 @@ struct it
      are currently in a continuation line.  This is initially zero and
      incremented/reset by display_sline, move_it_forward etc.  */
   int continuation_lines_width;
-
-  /* Buffer position that ends the buffer text line being iterated.
-     This is normally the position after the newline at EOL.  If this
-     is the last line of the buffer and it doesn't have a newline,
-     value is ZV/ZV_BYTE.  Set and used only if IT->bidi_p, for
-     setting the end position of glyph rows produced for continuation
-     lines, see display_sline.  */
-  struct text_pos eol_pos;
 
   /* Current y-position.  Automatically incremented by the height of
      glyph_row in move_it_forward and display_sline.  */

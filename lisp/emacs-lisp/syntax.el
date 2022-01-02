@@ -345,9 +345,23 @@ END) suitable for `syntax-propertize-function'."
   (save-match-data
     (syntax-propertize (min (+ syntax-propertize-chunks charpos) (point-max)))))
 
-;;; Incrementally compute and memoize parser state.
+(defmacro syntax-ppss-get (pos field)
+  "Return FIELD from ppss at POS and from tree-sitter (if loaded)."
+  `(let ((val
+          (funcall (symbol-function
+                    (quote ,(intern (concat "ppss-" (symbol-name field)))))
+                   (syntax-ppss ,pos))))
+     (prog1 val
+       (when (featurep 'tree-sitter)
+         (let ((sitter-val
+                (funcall (symbol-function
+                          (quote ,(intern (concat "tree-sitter-ppss-"
+                                                  (symbol-name field))))))))
+           (unless (equal val sitter-val)
+             (message "syntax-ppss-get %s(%s): %S != %S"
+                      ,field ,pos val sitter-val)))))))
 
-(defsubst syntax-ppss-depth (ppss)
+(defun syntax-ppss-depth (ppss)
   (nth 0 ppss))
 
 (defun syntax-ppss-toplevel-pos (ppss)
@@ -358,7 +372,7 @@ its scan outside any such syntactic grouping."
   (or (car (nth 9 ppss))
       (nth 8 ppss)))
 
-(defsubst syntax-ppss-context (ppss)
+(defun syntax-ppss-context (ppss)
   "Say whether PPSS is a string, a comment, or something else.
 If PPSS is a string, the symbol `string' is returned.  If it's a
 comment, the symbol `comment' is returned.  If it's something
