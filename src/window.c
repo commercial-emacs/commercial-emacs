@@ -6013,11 +6013,6 @@ static void
 window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
 {
   struct window *w = XWINDOW (window);
-  /* Fvertical_motion enters redisplay, which can trigger
-     fontification, which in turn can modify buffer text (e.g., if the
-     fontification functions replace escape sequences with faces, as
-     in `grep-mode-font-lock-keywords').  So we use a marker to record
-     the old point position, to prevent crashes in SET_PT_BOTH.  */
   Lisp_Object opoint_marker = Fpoint_marker ();
   register ptrdiff_t pos, pos_byte;
   register int ht = window_internal_height (w);

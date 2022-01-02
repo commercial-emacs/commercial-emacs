@@ -4622,7 +4622,6 @@ setup_for_ellipsis (struct it *it, int len)
   it->ellipsis_p = true;
 }
 
-
 static Lisp_Object
 find_display_property (Lisp_Object disp, Lisp_Object prop)
 {
@@ -9137,40 +9136,20 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  if (it->line_wrap == TRUNCATE
 	      && it->current_x >= it->last_visible_x)
 	    {
-	      if (!FRAME_WINDOW_P (it->f)
-		  || ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
-		      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-		      : WINDOW_RIGHT_FRINGE_WIDTH (it->w)) == 0
-		  || IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
-		{
-		  bool at_eob_p = false;
+	      bool fringeless =
+		! FRAME_WINDOW_P (it->f)
+		|| 0 == ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
+			 ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
+			 : WINDOW_RIGHT_FRINGE_WIDTH (it->w))
+		|| IT_OVERFLOW_NEWLINE_INTO_FRINGE (it);
 
-		  if ((at_eob_p = ! get_display_element (it))
-		      || BUFFER_POS_REACHED_P ())
-		    {
-		      result = MOVE_POS_MATCH_OR_ZV;
-		      goto done;
-		    }
-		  else if (ppos_p
-			   && !saw_smaller_pos
-			   && IT_CHARPOS (*it) > to_charpos)
-		    {
-		      if (closest_pos < ZV)
-			{
-			  RESTORE_IT (it, &ppos_it, ppos_data);
-			  emulate_display_sline (it, closest_pos, -1, MOVE_TO_POS);
-			}
-		      result = MOVE_POS_MATCH_OR_ZV;
-		      goto done;
-		    }
-		  else if (ITERATOR_AT_END_OF_LINE_P (it))
-		    {
-		      result = MOVE_NEWLINE_OR_CR;
-		      goto done;
-		    }
-		}
+	      if (fringeless &&
+		  (! get_display_element (it) || BUFFER_POS_REACHED_P ()))
+		result = MOVE_POS_MATCH_OR_ZV;
+	      else if (fringeless && ITERATOR_AT_END_OF_LINE_P (it))
+		result = MOVE_NEWLINE_OR_CR;
 	      else if (ppos_p
-		       && !saw_smaller_pos
+		       && ! saw_smaller_pos
 		       && IT_CHARPOS (*it) > to_charpos)
 		{
 		  if (closest_pos < ZV)
@@ -9179,9 +9158,9 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 		      emulate_display_sline (it, closest_pos, -1, MOVE_TO_POS);
 		    }
 		  result = MOVE_POS_MATCH_OR_ZV;
-		  goto done;
 		}
-	      result = MOVE_LINE_TRUNCATED;
+	      else
+		result = MOVE_LINE_TRUNCATED;
 	      goto done;
 	    }
 
@@ -18939,7 +18918,7 @@ try_window_reusing_current_matrix (struct window *w)
 	  for (row = MATRIX_ROW (w->current_matrix, w->cursor.vpos);
 	       row < bottom_row
 		 && PT >= MATRIX_ROW_END_CHARPOS (row)
-		 && !row->ends_at_zv_p;
+		 && ! row->ends_at_zv_p;
 	       row++)
 	    {
 	      w->cursor.vpos++;
@@ -19066,13 +19045,13 @@ find_last_unchanged_at_beg_row (struct window *w)
 	  MATRIX_ROW_END_CHARPOS (row) <= first_changed_pos
 	  /* When row ends in ZV and we write at ZV it is not
              unchanged.  */
-	  && !row->ends_at_zv_p
+	  && ! row->ends_at_zv_p
 	  /* When first_changed_pos is the end of a continued line,
 	     row is not unchanged because it may be no longer
 	     continued.  */
-	  && !(MATRIX_ROW_END_CHARPOS (row) == first_changed_pos
-	       && (row->continued_p
-		   || row->exact_window_width_line_p))
+	  && ! (MATRIX_ROW_END_CHARPOS (row) == first_changed_pos
+		&& (row->continued_p
+		    || row->exact_window_width_line_p))
 	  /* If ROW->end is beyond ZV, then ROW->end is outdated and
 	     needs to be recomputed, so don't consider this row as
 	     unchanged.  This happens when the last line was
@@ -22541,41 +22520,42 @@ display_sline (struct it *it, int cursor_vpos)
 	  goto done;
 	}
 
-      /* Proceed with next display element */
-      for (int i=0; i<2; ++i)
+      /* Awkward:
+
+	 (i == 0) Goto done if past edge
+	 (i == 0) Advance iterator
+	 (i == 1) Goto done if past edge
+
+	 Look in git history for OVERWIDE_PREFIX how this was
+	 previously done.  */
+      for (int k=0; k<2; ++k)
 	{
+	  int fringe_width = (row->reversed_p
+			      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
+			      : WINDOW_RIGHT_FRINGE_WIDTH (it->w));
 	  if (it->line_wrap == TRUNCATE
 	      && ((FRAME_WINDOW_P (it->f)
-		   /* `produce_image_glyph' crops an image glyph such
-		      that it ends precisely at last_visible_x, fringe
-		      or not.  */
-		   && ((row->reversed_p
-			? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-			: WINDOW_RIGHT_FRINGE_WIDTH (it->w))
-		       || it->what == IT_IMAGE))
+		   /* EZ hack: truncate sooner for images. Commit
+		      d34f67d.  */
+		   && (fringe_width || it->what == IT_IMAGE))
 		  ? (it->current_x >= it->last_visible_x)
 		  : (it->current_x > it->last_visible_x)))
 	    {
-	      /* Glyphs reach past the right window edge.  Under
-		 TRUNCATE, we are done.  */
-	      if (!FRAME_WINDOW_P (it->f)
-		  || (row->reversed_p
-		      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-		      : WINDOW_RIGHT_FRINGE_WIDTH (it->w)) == 0)
+	      if (! FRAME_WINDOW_P (it->f) || ! fringe_width)
 		{
-		  int i, n;
-
-		  if (!row->reversed_p)
+		  /* Add truncation glyphs.  */
+		  int i;
+		  if (! row->reversed_p)
 		    {
 		      for (i = row->used[TEXT_AREA] - 1; i > 0; --i)
-			if (!CHAR_GLYPH_PADDING_P (row->glyphs[TEXT_AREA][i]))
-			  goto done;
+			if (! CHAR_GLYPH_PADDING_P (row->glyphs[TEXT_AREA][i]))
+			  break;
 		    }
 		  else
 		    {
 		      for (i = 0; i < row->used[TEXT_AREA]; i++)
-			if (!CHAR_GLYPH_PADDING_P (row->glyphs[TEXT_AREA][i]))
-			  goto done;
+			if (! CHAR_GLYPH_PADDING_P (row->glyphs[TEXT_AREA][i]))
+			  break;
 		      /* Remove any padding glyphs at the front of ROW, to
 			 make room for the truncation glyphs we will be
 			 adding below.  The loop below always inserts at
@@ -22592,9 +22572,9 @@ display_sline (struct it *it, int cursor_vpos)
 		  if (it->current_x > it->last_visible_x)
 		    {
 		      it->current_x = x_before;
-		      if (!FRAME_WINDOW_P (it->f))
+		      if (! FRAME_WINDOW_P (it->f))
 			{
-			  for (n = row->used[TEXT_AREA]; i < n; ++i)
+			  for (int n = row->used[TEXT_AREA]; i < n; ++i)
 			    {
 			      row->used[TEXT_AREA] = i;
 			      produce_special_glyphs (it, IT_TRUNCATION);
@@ -22632,19 +22612,14 @@ display_sline (struct it *it, int cursor_vpos)
 	      row->truncated_on_right_p = true;
 	      it->continuation_lines_width = 0;
 	      reseat_following_line_start (it, false);
-	      /* We insist below that IT's position be at ZV because in
-		 bidi-reordered lines the character at visible line start
-		 might not be the character that follows the newline in
-		 the logical order.  */
-	      if (IT_BYTEPOS (*it) > BEG_BYTE)
-		row->ends_at_zv_p =
-		  IT_BYTEPOS (*it) >= ZV_BYTE
-		  && (ZV_BYTE <= 1 || FETCH_BYTE (ZV_BYTE - 1) != '\n');
-	      else
-		row->ends_at_zv_p = false;
+	      row->ends_at_zv_p =
+		IT_BYTEPOS (*it) >= ZV_BYTE
+		/* dubious concession to R2L:
+		   EZ considers a newline penultimate byte as ambiguous.  */
+		&& (ZV_BYTE <= 1 || FETCH_BYTE (ZV_BYTE - 1) != '\n');
 	      goto done;
 	    }
-	  if (i == 0)
+	  if (k == 0)
 	    set_iterator_to_next (it, true);
 	}
     }
@@ -30867,12 +30842,12 @@ rows_from_pos_range (struct window *w,
 		displayed by a row.  */
 	     || ((start_charpos > MATRIX_ROW_END_CHARPOS (row)
 		  || (start_charpos == MATRIX_ROW_END_CHARPOS (row)
-		      && !row->ends_at_zv_p
-		      && !MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (row)))
+		      && ! row->ends_at_zv_p
+		      && ! MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (row)))
 		 && (end_charpos > MATRIX_ROW_END_CHARPOS (row)
 		     || (end_charpos == MATRIX_ROW_END_CHARPOS (row)
-			 && !row->ends_at_zv_p
-			 && !MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (row))))))
+			 && ! row->ends_at_zv_p
+			 && ! MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (row))))))
 	{
 	  /* Found a candidate row.  Now make sure at least one of the
 	     glyphs it displays has a charpos from the range
@@ -30923,12 +30898,12 @@ rows_from_pos_range (struct window *w,
 	      && end_charpos < next_start)
 	  || ((start_charpos > MATRIX_ROW_END_CHARPOS (next)
 	       || (start_charpos == MATRIX_ROW_END_CHARPOS (next)
-		   && !next->ends_at_zv_p
-		   && !MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (next)))
+		   && ! next->ends_at_zv_p
+		   && ! MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (next)))
 	      && (end_charpos > MATRIX_ROW_END_CHARPOS (next)
 		  || (end_charpos == MATRIX_ROW_END_CHARPOS (next)
-		      && !next->ends_at_zv_p
-		      && !MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (next)))))
+		      && ! next->ends_at_zv_p
+		      && ! MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (next)))))
 	{
 	  *end = row;
 	  break;
@@ -30957,7 +30932,7 @@ rows_from_pos_range (struct window *w,
 			       /* Special case for when NEXT is an
 				  empty line at ZV.  */
 			       || (g->charpos == -1
-				   && !row->ends_at_zv_p
+				   && ! row->ends_at_zv_p
 				   && next_start == end_charpos)))))
 		  /* A glyph that comes from DISP_STRING is by
 		     definition to be highlighted.  */
