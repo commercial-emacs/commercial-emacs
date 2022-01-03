@@ -2806,13 +2806,12 @@ DEFUN ("program-version", Fprogram_version, Sprogram_version, 0, 0, 0,
 				 NILP (tag)
 				 ? build_string ("snapshot")
 				 : Qnil);
-  char annotation[64];
+  char annotation[512]; /* max git branch name length 255 */
   if (STRINGP (sha1) && STRINGP (branch))
     {
-      char commit[8];
-      strncpy (commit, SSDATA (sha1), 7);
-      commit[7] = '\0';
-      sprintf (annotation, " %s in %s", commit, SSDATA (branch));
+      annotation[0] = ' ';
+      strncpy (&annotation[1], SSDATA (sha1), 7);
+      sprintf (&annotation[8], " in %s", SSDATA (branch));
     }
   else
     annotation[0] = '\0';
