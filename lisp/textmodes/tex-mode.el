@@ -28,9 +28,10 @@
 
 ;;; Code:
 
-(require 'compare-w)
-(require 'cl-lib)
-(require 'skeleton)
+(eval-when-compile
+  (require 'compare-w)
+  (require 'cl-lib)
+  (require 'skeleton))
 
 (defvar font-lock-comment-face)
 (defvar font-lock-doc-face)
@@ -484,69 +485,70 @@ An alternative value is \" . \", if you use a font with a narrow period."
 
 ;; Rewritten with the help of Alexandra Bac <abac@welcome.disi.unige.it>.
 (defconst tex-font-lock-keywords-1
-  (let* (;; Names of commands whose arg should be fontified as heading, etc.
-	 (headings (regexp-opt
-		    '("title"  "begin" "end" "chapter" "part"
-		      "section" "subsection" "subsubsection"
-		      "paragraph" "subparagraph" "subsubparagraph"
-		      "newcommand" "renewcommand" "providecommand"
-		      "newenvironment" "renewenvironment"
-		      "newtheorem" "renewtheorem")
-		    t))
-	 (variables (regexp-opt
-		     '("newcounter" "newcounter*" "setcounter" "addtocounter"
-		       "setlength" "addtolength" "settowidth")
-		     t))
-	 (includes (regexp-opt
-		    '("input" "include" "includeonly" "bibliography"
-		      "epsfig" "psfig" "epsf" "nofiles" "usepackage"
-		      "documentstyle" "documentclass" "verbatiminput"
-		      "includegraphics" "includegraphics*")
-		    t))
-         (verbish (regexp-opt '("url" "nolinkurl" "path") t))
-	 ;; Miscellany.
-	 (slash "\\\\")
-	 (opt " *\\(\\[[^]]*\\] *\\)*")
-	 ;; This would allow highlighting \newcommand\CMD but requires
-	 ;; adapting subgroup numbers below.
-	 ;; (arg "\\(?:{\\(\\(?:[^{}\\]+\\|\\\\.\\|{[^}]*}\\)+\\)\\|\\\\[a-z*]+\\)"))
-         (inbraces-re (lambda (re)
-                        (concat "\\(?:[^{}\\]\\|\\\\.\\|" re "\\)")))
-	 (arg (concat "{\\(" (funcall inbraces-re "{[^}]*}") "+\\)")))
-    `( ;; Highlight $$math$$ and $math$.
-      ;; This is done at the very beginning so as to interact with the other
-      ;; keywords in the same way as comments and strings.
-      (,(concat "\\$\\$?\\(?:[^$\\{}]\\|\\\\.\\|{"
-                (funcall inbraces-re
-                         (concat "{" (funcall inbraces-re "{[^}]*}") "*}"))
-                "*}\\)+\\$?\\$")
-       (0 'tex-math))
-      ;; Heading args.
-      (,(concat slash headings "\\*?" opt arg)
-       ;; If ARG ends up matching too much (if the {} don't match, e.g.)
-       ;; jit-lock will do funny things: when updating the buffer
-       ;; the re-highlighting is only done locally so it will just
-       ;; match the local line, but defer-contextually will
-       ;; match more lines at a time, so ARG will end up matching
-       ;; a lot more, which might suddenly include a comment
-       ;; so you get things highlighted bold when you type them
-       ;; but they get turned back to normal a little while later
-       ;; because "there's already a face there".
-       ;; Using `keep' works around this un-intuitive behavior as well
-       ;; as improves the behavior in the very rare case where you do
-       ;; have a comment in ARG.
-       3 font-lock-function-name-face keep)
-      (,(concat slash "\\(?:provide\\|\\(?:re\\)?new\\)command\\** *\\(\\\\[A-Za-z@]+\\)")
-       1 font-lock-function-name-face keep)
-      ;; Variable args.
-      (,(concat slash variables " *" arg) 2 font-lock-variable-name-face)
-      ;; Include args.
-      (,(concat slash includes opt arg) 3 font-lock-builtin-face)
-      ;; Verbatim-like args.
-      (,(concat slash verbish opt arg) 3 'tex-verbatim t)
-      ;; Definitions.  I think.
-      ("^[ \t]*\\\\def *\\\\\\(\\(\\w\\|@\\)+\\)"
-       1 font-lock-function-name-face)))
+  (eval-when-compile
+    (let* (;; Names of commands whose arg should be fontified as heading, etc.
+	   (headings (regexp-opt
+		      '("title"  "begin" "end" "chapter" "part"
+			"section" "subsection" "subsubsection"
+			"paragraph" "subparagraph" "subsubparagraph"
+			"newcommand" "renewcommand" "providecommand"
+			"newenvironment" "renewenvironment"
+			"newtheorem" "renewtheorem")
+		      t))
+	   (variables (regexp-opt
+		       '("newcounter" "newcounter*" "setcounter" "addtocounter"
+			 "setlength" "addtolength" "settowidth")
+		       t))
+	   (includes (regexp-opt
+		      '("input" "include" "includeonly" "bibliography"
+			"epsfig" "psfig" "epsf" "nofiles" "usepackage"
+			"documentstyle" "documentclass" "verbatiminput"
+			"includegraphics" "includegraphics*")
+		      t))
+           (verbish (regexp-opt '("url" "nolinkurl" "path") t))
+	   ;; Miscellany.
+	   (slash "\\\\")
+	   (opt " *\\(\\[[^]]*\\] *\\)*")
+	   ;; This would allow highlighting \newcommand\CMD but requires
+	   ;; adapting subgroup numbers below.
+	   ;; (arg "\\(?:{\\(\\(?:[^{}\\]+\\|\\\\.\\|{[^}]*}\\)+\\)\\|\\\\[a-z*]+\\)"))
+           (inbraces-re (lambda (re)
+                          (concat "\\(?:[^{}\\]\\|\\\\.\\|" re "\\)")))
+	   (arg (concat "{\\(" (funcall inbraces-re "{[^}]*}") "+\\)")))
+      `( ;; Highlight $$math$$ and $math$.
+        ;; This is done at the very beginning so as to interact with the other
+        ;; keywords in the same way as comments and strings.
+        (,(concat "\\$\\$?\\(?:[^$\\{}]\\|\\\\.\\|{"
+                  (funcall inbraces-re
+                           (concat "{" (funcall inbraces-re "{[^}]*}") "*}"))
+                  "*}\\)+\\$?\\$")
+         (0 'tex-math))
+        ;; Heading args.
+        (,(concat slash headings "\\*?" opt arg)
+         ;; If ARG ends up matching too much (if the {} don't match, e.g.)
+         ;; jit-lock will do funny things: when updating the buffer
+         ;; the re-highlighting is only done locally so it will just
+         ;; match the local line, but defer-contextually will
+         ;; match more lines at a time, so ARG will end up matching
+         ;; a lot more, which might suddenly include a comment
+         ;; so you get things highlighted bold when you type them
+         ;; but they get turned back to normal a little while later
+         ;; because "there's already a face there".
+         ;; Using `keep' works around this un-intuitive behavior as well
+         ;; as improves the behavior in the very rare case where you do
+         ;; have a comment in ARG.
+         3 font-lock-function-name-face keep)
+        (,(concat slash "\\(?:provide\\|\\(?:re\\)?new\\)command\\** *\\(\\\\[A-Za-z@]+\\)")
+         1 font-lock-function-name-face keep)
+        ;; Variable args.
+        (,(concat slash variables " *" arg) 2 font-lock-variable-name-face)
+        ;; Include args.
+        (,(concat slash includes opt arg) 3 font-lock-builtin-face)
+        ;; Verbatim-like args.
+        (,(concat slash verbish opt arg) 3 'tex-verbatim t)
+        ;; Definitions.  I think.
+        ("^[ \t]*\\\\def *\\\\\\(\\(\\w\\|@\\)+\\)"
+	 1 font-lock-function-name-face))))
   "Subdued expressions to highlight in TeX modes.")
 
 (defun tex-font-lock-append-prop (prop)
@@ -556,75 +558,76 @@ An alternative value is \" . \", if you use a font with a narrow period."
 
 (defconst tex-font-lock-keywords-2
   (append tex-font-lock-keywords-1
-   (let* (;;
-	  ;; Names of commands whose arg should be fontified with fonts.
-	  (bold (regexp-opt '("textbf" "textsc" "textup"
-			      "boldsymbol" "pmb")
-                            t))
-	  (italic (regexp-opt '("textit" "textsl" "emph") t))
-	  ;; FIXME: unimplemented yet.
-	  ;; (type (regexp-opt '("texttt" "textmd" "textrm" "textsf") t))
-	  ;;
-	  ;; Names of commands whose arg should be fontified as a citation.
-	  (citations (regexp-opt
-		      '("label" "ref" "pageref" "vref" "eqref"
-			"cite" "nocite" "index" "glossary" "bibitem"
-                        ;; natbib's two variants of \cite:
-                        "citep" "citet"
-			;; These are text, rather than citations.
-			;; "caption" "footnote" "footnotemark" "footnotetext"
-			)
-		      t))
-	  ;;
-	  ;; Names of commands that should be fontified.
-	  (specials-1 (regexp-opt '("\\" "\\*") t)) ;; "-"
-	  (specials-2 (regexp-opt
-		       '("linebreak" "nolinebreak" "pagebreak" "nopagebreak"
-			 "newline" "newpage" "clearpage" "cleardoublepage"
-			 "displaybreak" "allowdisplaybreaks"
-			 "enlargethispage")
-                       t))
-	  (general "\\([a-zA-Z@]+\\**\\|[^ \t\n]\\)")
-	  ;;
-	  ;; Miscellany.
-	  (slash "\\\\")
-	  (opt " *\\(\\[[^]]*\\] *\\)*")
-	  (args "\\(\\(?:[^${}&\\]+\\|\\\\.\\|{[^}]*}\\)+\\)")
-	  (arg "{\\(\\(?:[^{}\\]+\\|\\\\.\\|{[^}]*}\\)+\\)"))
-     (list
-      ;;
-      ;; Citation args.
-      (list (concat slash citations opt arg) 3 'font-lock-constant-face)
-      ;;
-      ;; Text between `` quotes ''.
-      (list (concat (regexp-opt '("``" "\"<" "\"`" "<<" "«") t)
-                    "\\(\\(.\\|\n\\)+?\\)"
-                    (regexp-opt `("''" "\">" "\"'" ">>" "»") t))
-            '(1 font-lock-keyword-face)
-            '(2 font-lock-string-face)
-            '(4 font-lock-keyword-face))
-      ;;
-      ;; Command names, special and general.
-      (cons (concat slash specials-1) 'font-lock-warning-face)
-      (list (concat "\\(" slash specials-2 "\\)\\([^a-zA-Z@]\\|\\'\\)")
-	    1 'font-lock-warning-face)
-      (concat slash general)
-      ;;
-      ;; Font environments.  It seems a bit dubious to use `bold' etc. faces
-      ;; since we might not be able to display those fonts.
-      (list (concat slash bold " *" arg) 2
-	    '(tex-font-lock-append-prop 'bold) 'append)
-      (list (concat slash italic " *" arg) 2
-	    '(tex-font-lock-append-prop 'italic) 'append)
-      ;; (list (concat slash type arg) 2 '(quote bold-italic) 'append)
-      ;;
-      ;; Old-style bf/em/it/sl.  Stop at `\\' and un-escaped `&', for tables.
-      (list (concat "\\\\\\(em\\|it\\|sl\\)\\>" args)
-	    2 '(tex-font-lock-append-prop 'italic) 'append)
-      ;; This is separate from the previous one because of cases like
-      ;; {\em foo {\bf bar} bla} where both match.
-      (list (concat "\\\\\\(bf\\(series\\)?\\)\\>" args)
-	    3 '(tex-font-lock-append-prop 'bold) 'append))))
+   (eval-when-compile
+     (let* (;;
+	    ;; Names of commands whose arg should be fontified with fonts.
+	    (bold (regexp-opt '("textbf" "textsc" "textup"
+				"boldsymbol" "pmb")
+                              t))
+	    (italic (regexp-opt '("textit" "textsl" "emph") t))
+	    ;; FIXME: unimplemented yet.
+	    ;; (type (regexp-opt '("texttt" "textmd" "textrm" "textsf") t))
+	    ;;
+	    ;; Names of commands whose arg should be fontified as a citation.
+	    (citations (regexp-opt
+			'("label" "ref" "pageref" "vref" "eqref"
+			  "cite" "nocite" "index" "glossary" "bibitem"
+                          ;; natbib's two variants of \cite:
+                          "citep" "citet"
+			  ;; These are text, rather than citations.
+			  ;; "caption" "footnote" "footnotemark" "footnotetext"
+			  )
+			t))
+	    ;;
+	    ;; Names of commands that should be fontified.
+	    (specials-1 (regexp-opt '("\\" "\\*") t)) ;; "-"
+	    (specials-2 (regexp-opt
+			 '("linebreak" "nolinebreak" "pagebreak" "nopagebreak"
+			   "newline" "newpage" "clearpage" "cleardoublepage"
+			   "displaybreak" "allowdisplaybreaks"
+			   "enlargethispage")
+                         t))
+	    (general "\\([a-zA-Z@]+\\**\\|[^ \t\n]\\)")
+	    ;;
+	    ;; Miscellany.
+	    (slash "\\\\")
+	    (opt " *\\(\\[[^]]*\\] *\\)*")
+	    (args "\\(\\(?:[^${}&\\]+\\|\\\\.\\|{[^}]*}\\)+\\)")
+	    (arg "{\\(\\(?:[^{}\\]+\\|\\\\.\\|{[^}]*}\\)+\\)"))
+       (list
+	;;
+	;; Citation args.
+	(list (concat slash citations opt arg) 3 'font-lock-constant-face)
+	;;
+        ;; Text between `` quotes ''.
+        (list (concat (regexp-opt '("``" "\"<" "\"`" "<<" "«") t)
+                      "\\(\\(.\\|\n\\)+?\\)"
+                      (regexp-opt `("''" "\">" "\"'" ">>" "»") t))
+              '(1 font-lock-keyword-face)
+              '(2 font-lock-string-face)
+              '(4 font-lock-keyword-face))
+	;;
+	;; Command names, special and general.
+	(cons (concat slash specials-1) 'font-lock-warning-face)
+	(list (concat "\\(" slash specials-2 "\\)\\([^a-zA-Z@]\\|\\'\\)")
+	      1 'font-lock-warning-face)
+	(concat slash general)
+	;;
+	;; Font environments.  It seems a bit dubious to use `bold' etc. faces
+	;; since we might not be able to display those fonts.
+	(list (concat slash bold " *" arg) 2
+	      '(tex-font-lock-append-prop 'bold) 'append)
+	(list (concat slash italic " *" arg) 2
+	      '(tex-font-lock-append-prop 'italic) 'append)
+	;; (list (concat slash type arg) 2 '(quote bold-italic) 'append)
+	;;
+	;; Old-style bf/em/it/sl.  Stop at `\\' and un-escaped `&', for tables.
+	(list (concat "\\\\\\(em\\|it\\|sl\\)\\>" args)
+	      2 '(tex-font-lock-append-prop 'italic) 'append)
+	;; This is separate from the previous one because of cases like
+	;; {\em foo {\bf bar} bla} where both match.
+ 	(list (concat "\\\\\\(bf\\(series\\)?\\)\\>" args)
+	      3 '(tex-font-lock-append-prop 'bold) 'append)))))
    "Gaudy expressions to highlight in TeX modes.")
 
 (defun tex-font-lock-suscript (pos)
@@ -672,18 +675,21 @@ An alternative value is \" . \", if you use a font with a narrow period."
 (put 'tex-verbatim-environments 'safe-local-variable
      (lambda (x) (not (memq nil (mapcar #'stringp x)))))
 
-(defconst tex-syntax-propertize-rules
-  '("\\\\verb\\**\\([^a-z@*]\\)"
-    (1 (prog1 "\""
-         (tex-font-lock-verb
-          (match-beginning 0) (char-after (match-beginning 1)))))))
+(eval-when-compile
+  (defconst tex-syntax-propertize-rules
+    (syntax-propertize-precompile-rules
+    ("\\\\verb\\**\\([^a-z@*]\\)"
+      (1 (prog1 "\""
+           (tex-font-lock-verb
+            (match-beginning 0) (char-after (match-beginning 1))))))))
 
-(defconst latex-syntax-propertize-rules
-  '(tex-syntax-propertize-rules
-    ("\\\\\\(?:end\\|begin\\) *\\({[^\n{}]*}\\)"
-     (1 (ignore
-         (tex-env-mark (match-beginning 0)
-                       (match-beginning 1) (match-end 1)))))))
+  (defconst latex-syntax-propertize-rules
+    (syntax-propertize-precompile-rules
+     tex-syntax-propertize-rules
+     ("\\\\\\(?:end\\|begin\\) *\\({[^\n{}]*}\\)"
+      (1 (ignore
+          (tex-env-mark (match-beginning 0)
+                        (match-beginning 1) (match-end 1))))))))
 
 (defun tex-env-mark (cmd start end)
   (when (= cmd (line-beginning-position))
@@ -975,13 +981,14 @@ Inherits `shell-mode-map' with a few additions.")
       (when (and slash (not comment))
 	(setq mode
 	      (if (looking-at
-		   (concat
-		    (regexp-opt '("documentstyle" "documentclass"
-				  "begin" "subsection" "section"
-				  "part" "chapter" "newcommand"
-				  "renewcommand" "RequirePackage")
-				'words)
-		    "\\|NeedsTeXFormat{LaTeX"))
+		   (eval-when-compile
+		     (concat
+		      (regexp-opt '("documentstyle" "documentclass"
+				    "begin" "subsection" "section"
+				    "part" "chapter" "newcommand"
+				    "renewcommand" "RequirePackage")
+				  'words)
+		      "\\|NeedsTeXFormat{LaTeX")))
 		  (if (and (looking-at
 			    "document\\(style\\|class\\)\\(\\[.*\\]\\)?{slides}")
 			   ;; SliTeX is almost never used any more nowadays.
@@ -1238,10 +1245,11 @@ Entering SliTeX mode runs the hook `text-mode-hook', then the hook
               (apply-partially
                #'tildify-foreach-ignore-environments
                `(("\\\\\\\\" . "") ; do not remove this
-                 (,(concat "\\\\begin{\\("
-                           (regexp-opt '("verbatim" "math" "displaymath"
-                                         "equation" "eqnarray" "eqnarray*"))
-                           "\\)}")
+                 (,(eval-when-compile
+                     (concat "\\\\begin{\\("
+                             (regexp-opt '("verbatim" "math" "displaymath"
+                                           "equation" "eqnarray" "eqnarray*"))
+                             "\\)}"))
                   . ("\\\\end{" 1 "}"))
                  ("\\\\verb\\*?\\(.\\)" . (1))
                  ("\\$\\$?" . (0))
@@ -2121,10 +2129,11 @@ If NOT-ALL is non-nil, save the `.dvi' file."
 (defvar tex-compile-history nil)
 
 (defvar tex-input-files-re
-  (concat "\\." (regexp-opt '("tex" "texi" "texinfo"
-			      "bbl" "ind" "sty" "cls") t)
-	  ;; Include files with no dots (for directories).
-	  "\\'\\|\\`[^.]+\\'"))
+  (eval-when-compile
+    (concat "\\." (regexp-opt '("tex" "texi" "texinfo"
+				"bbl" "ind" "sty" "cls") t)
+	    ;; Include files with no dots (for directories).
+	    "\\'\\|\\`[^.]+\\'")))
 
 (defcustom tex-use-reftex t
   "If non-nil, use RefTeX's list of files to determine what command to use."
@@ -3003,10 +3012,12 @@ There might be text before point."
       (tex-font-lock-syntactic-face-function state)
     font-lock-doc-face))
 
-(defconst doctex-syntax-propertize-rules
-  '(latex-syntax-propertize-rules
-    ;; For DocTeX comment-in-doc.
-    ("\\(\\^\\)\\^A" (1 (doctex-font-lock-^^A)))))
+(eval-when-compile
+  (defconst doctex-syntax-propertize-rules
+    (syntax-propertize-precompile-rules
+     latex-syntax-propertize-rules
+     ;; For DocTeX comment-in-doc.
+     ("\\(\\^\\)\\^A" (1 (doctex-font-lock-^^A))))))
 
 (defvar doctex-font-lock-keywords
   (append tex-font-lock-keywords

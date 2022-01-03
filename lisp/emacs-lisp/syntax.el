@@ -22,7 +22,7 @@
 
 ;;; Commentary:
 
-;; Fontification and indentation rely on `syntax-ppss'.
+;; The main exported function is `syntax-ppss'.
 ;; PPSS stands for "parse partial sexp state".
 
 ;;; Code:
@@ -31,8 +31,8 @@
 (declare-function cl-position "cl-seq")
 
 (defvar syntax-propertize-function nil
-  "Mode-specific workhorse of `syntax-propertize'.
-Accepts two arguments START and END delimiting buffer range.")
+  "Mode-specific workhorse of `syntax-propertize', which is called
+by things like font-Lock and indentation.")
 
 (defconst syntax-propertize-chunk-size 500)
 
@@ -129,117 +129,156 @@ see Info node `(elisp) Syntax Properties'."
                                       t t new-re 1)))))
     new-re))
 
-(defun syntax-propertize-rules (rules)
-  "Return a value for assigning to syntax-propertize-function.
+(defmacro syntax-propertize-precompile-rules (&rest rules)
+  "Return a precompiled form of RULES to pass to `syntax-propertize-rules'.
+The arg RULES can be of the same form as in `syntax-propertize-rules'.
+The return value is an object that can be passed as a rule to
+`syntax-propertize-rules'.
+I.e. this is useful only when you want to share rules among several
+`syntax-propertize-function's."
+  (declare (debug syntax-propertize-rules))
+  ;; Precompile?  Yeah, right!
+  ;; Seriously, tho, this is a macro for 2 reasons:
+  ;; - we could indeed do some pre-compilation at some point in the future,
+  ;;   e.g. fi/when we switch to a DFA-based implementation of
+  ;;   syntax-propertize-rules.
+  ;; - this lets Edebug properly annotate the expressions inside RULES.
+  `',rules)
 
-A RULE is a form or a symbol evaluating to a form,
+(defmacro syntax-propertize-rules (&rest rules)
+  "Make a function that applies RULES for use in `syntax-propertize-function'.
+The function will scan the buffer, applying the rules where they match.
+The buffer is scanned a single time, like \"lex\" would, rather than once
+per rule.
 
-\(REGEXP (MATCH_1 PROP_1) ... (MATCH_N PROP_N))
+Each RULE can be a symbol, in which case that symbol's value should be,
+at macro-expansion time, a precompiled set of rules, as returned
+by `syntax-propertize-precompile-rules'.
 
-where 1 <= N <= 9, and where syntax-table property PROP_i gets
-applied to the match group MATCH_i.
+Otherwise, RULE should have the form (REGEXP HIGHLIGHT1 ... HIGHLIGHTn), where
+REGEXP is an expression (evaluated at time of macro-expansion) that returns
+a regexp, and where HIGHLIGHTs have the form (NUMBER SYNTAX) which means to
+apply the property SYNTAX to the chars matched by the subgroup NUMBER
+of the regular expression, if NUMBER did match.
+SYNTAX is an expression that returns a value to apply as `syntax-table'
+property.  Some expressions are handled specially:
+- if SYNTAX is a string, then it is converted with `string-to-syntax';
+- if SYNTAX has the form (prog1 EXP . EXPS) then the value returned by EXP
+  will be applied to the buffer before running EXPS and if EXP is a string it
+  is also converted with `string-to-syntax'.
+The SYNTAX expression is responsible to save the `match-data' if needed
+for subsequent HIGHLIGHTs.
+Also SYNTAX is free to move point, in which case RULES may not be applied to
+some parts of the text or may be applied several times to other parts.
 
-If PROP_i is a string, it is converted by `string-to-syntax'.
-
-If PROP_i has the form (prog1 PROP . EXPRS), then PROP, which may be a
-string convertible by `string-to-syntax', is first applied to the
-buffer before running EXPRS.
-
-The PROP_i expression is responsible for preserving match data necessary
-for subsequent PROP_j, j > i.
-
-PROP_i may move point, which can cause certain rules to be
-applied multiple or zero times."
-  (dotimes (i (length rules))
-    (when (symbolp (elt rules i))
-      (setf (elt rules i) (symbol-value (elt rules i)))))
-  (let* (branches
-         (offset 0)
-         (regex
+Note: There may be at most nine back-references in the REGEXPs of
+all RULES in total."
+  (declare (debug (&rest &or symbolp    ;FIXME: edebug this eval step.
+                         (form &rest
+                               (numberp
+                                [&or stringp ;FIXME: Use &wrap
+                                     ("prog1" [&or stringp def-form] def-body)
+                                     def-form])))))
+  (let ((newrules nil))
+    (while rules
+      (if (symbolp (car rules))
+          (setq rules (append (symbol-value (pop rules)) rules))
+        (push (pop rules) newrules)))
+    (setq rules (nreverse newrules)))
+  (let* ((offset 0)
+         (branches '())
+         ;; We'd like to use a real DFA-based lexer, usually, but since Emacs
+         ;; doesn't have one yet, we fallback on building one large regexp
+         ;; and use groups to determine which branch of the regexp matched.
+         (re
           (mapconcat
            (lambda (rule)
-             (let* (code
-                    (orig-re (eval (car rule) t))
-                    (re orig-re)
-                    (condition
-                     (cond
-                      ((assq 0 rule) (if (zerop offset) t
-                                       `(match-beginning ,offset)))
-                      ((and (cdr rule) (null (cddr rule)))
-                       `(match-beginning ,(+ offset (car (cadr rule)))))
-                      (t
-                       `(or ,@(mapcar
-                               (lambda (case)
-                                 `(match-beginning ,(+ offset (car case))))
-                               (cdr rule))))))
-                    (offset offset))
+             (let* ((orig-re (eval (car rule) t))
+                    (re orig-re))
                (when (and (assq 0 rule) (cdr rules))
-                 ;; With more than one rule, create an umbrella
-                 ;; match group for match 0.
+                 ;; If there's more than 1 rule, and the rule want to apply
+                 ;; highlight to match 0, create an extra group to be able to
+                 ;; tell when *this* match 0 has succeeded.
                  (cl-incf offset)
                  (setq re (concat "\\(" re "\\)")))
                (setq re (syntax-propertize--shift-groups-and-backrefs re offset))
-               (unless (zerop offset)
-                 (when (cl-some (lambda (case) (not (stringp (cadr case))))
-                                (cdr rule))
-                   ;; If some of the subgroup rules include Elisp code, then we
-                   ;; need to set the match-data so it's consistent with what the
-                   ;; code expects.  If not, then we can simply use shifted
-                   ;; offset in our own code.
-                   (push `(let ((md (match-data 'ints)))
-                            ;; Keep match 0 as is, but shift everything else.
-                            (setcdr (cdr md) (nthcdr ,(* (1+ offset) 2) md))
-                            (set-match-data md))
-                         code)
-                   (setq offset 0)))
-               ;; Now construct the code for each subgroup rules.
-               (dolist (case (cdr rule))
-                 (cl-assert (null (cddr case)))
-                 (let* ((gn (+ offset (car case)))
-                        (action (nth 1 case))
-                        (thiscode
-                         (cond
-                          ((stringp action)
-                           `((put-text-property
-                              (match-beginning ,gn) (match-end ,gn)
-                              'syntax-table
-                              ',(string-to-syntax action))))
-                          ((eq (car-safe action) 'ignore)
-                           (cdr action))
-                          ((eq (car-safe action) 'prog1)
-                           (if (stringp (nth 1 action))
-                               `((put-text-property
-                                  (match-beginning ,gn) (match-end ,gn)
-                                  'syntax-table
-                                  ',(string-to-syntax (nth 1 action)))
-                                 ,@(nthcdr 2 action))
+               (let ((code '())
+                     (condition
+                      (cond
+                       ((assq 0 rule) (if (zerop offset) t
+                                        `(match-beginning ,offset)))
+                       ((and (cdr rule) (null (cddr rule)))
+                        `(match-beginning ,(+ offset (car (cadr rule)))))
+                       (t
+                        `(or ,@(mapcar
+                                (lambda (case)
+                                  `(match-beginning ,(+ offset (car case))))
+                                (cdr rule))))))
+                     (nocode t)
+                     (offset offset))
+                 ;; If some of the subgroup rules include Elisp code, then we
+                 ;; need to set the match-data so it's consistent with what the
+                 ;; code expects.  If not, then we can simply use shifted
+                 ;; offset in our own code.
+                 (unless (zerop offset)
+                   (dolist (case (cdr rule))
+                     (unless (stringp (cadr case))
+                       (setq nocode nil)))
+                   (unless nocode
+                     (push `(let ((md (match-data 'ints)))
+                              ;; Keep match 0 as is, but shift everything else.
+                              (setcdr (cdr md) (nthcdr ,(* (1+ offset) 2) md))
+                              (set-match-data md))
+                           code)
+                     (setq offset 0)))
+                 ;; Now construct the code for each subgroup rules.
+                 (dolist (case (cdr rule))
+                   (cl-assert (null (cddr case)))
+                   (let* ((gn (+ offset (car case)))
+                          (action (nth 1 case))
+                          (thiscode
+                           (cond
+                            ((stringp action)
+                             `((put-text-property
+                                (match-beginning ,gn) (match-end ,gn)
+                                'syntax-table
+                                ',(string-to-syntax action))))
+                            ((eq (car-safe action) 'ignore)
+                             (cdr action))
+                            ((eq (car-safe action) 'prog1)
+                             (if (stringp (nth 1 action))
+                                 `((put-text-property
+                                    (match-beginning ,gn) (match-end ,gn)
+                                    'syntax-table
+                                    ',(string-to-syntax (nth 1 action)))
+                                   ,@(nthcdr 2 action))
+                               `((let ((mb (match-beginning ,gn))
+                                       (me (match-end ,gn)))
+                                   ,(macroexp-let2 nil syntax (nth 1 action)
+                                      `(progn
+                                         (if ,syntax
+                                             (put-text-property
+                                              mb me 'syntax-table ,syntax))
+                                         ,@(nthcdr 2 action)))))))
+                            (t
                              `((let ((mb (match-beginning ,gn))
-                                     (me (match-end ,gn)))
-                                 ,(macroexp-let2 nil syntax (nth 1 action)
-                                    `(progn
-                                       (if ,syntax
-                                           (put-text-property
-                                            mb me 'syntax-table ,syntax))
-                                       ,@(nthcdr 2 action)))))))
-                          (t
-                           `((let ((mb (match-beginning ,gn))
-                                   (me (match-end ,gn))
-                                   (syntax ,action))
-                               (if syntax
-                                   (put-text-property
-                                    mb me 'syntax-table syntax))))))))
+                                     (me (match-end ,gn))
+                                     (syntax ,action))
+                                 (if syntax
+                                     (put-text-property
+                                      mb me 'syntax-table syntax))))))))
 
-                   (if (or (not (cddr rule)) (zerop gn))
-                       (setq code (nconc (nreverse thiscode) code))
-                     (push `(if (match-beginning ,gn)
-                                ;; Try and generate clean code with no
-                                ;; extraneous progn.
-                                ,(if (null (cdr thiscode))
-                                     (car thiscode)
-                                   `(progn ,@thiscode)))
-                           code))))
-               (push (cons condition (nreverse code))
-                     branches)
+                     (if (or (not (cddr rule)) (zerop gn))
+                         (setq code (nconc (nreverse thiscode) code))
+                       (push `(if (match-beginning ,gn)
+                                  ;; Try and generate clean code with no
+                                  ;; extraneous progn.
+                                  ,(if (null (cdr thiscode))
+                                       (car thiscode)
+                                     `(progn ,@thiscode)))
+                             code))))
+                 (push (cons condition (nreverse code))
+                       branches))
                (cl-incf offset (regexp-opt-depth orig-re))
                re))
            rules
@@ -247,7 +286,7 @@ applied multiple or zero times."
     `(lambda (start end)
        (goto-char start)
        (while (and (< (point) end)
-                   (re-search-forward ,regex end t))
+                   (re-search-forward ,re end t))
          (cond ,@(nreverse branches))))))
 
 (defun syntax-propertize-via-font-lock (keywords)
@@ -308,10 +347,10 @@ END) suitable for `syntax-propertize-function'."
 
 (defmacro syntax-ppss-get (pos field)
   "Return FIELD from ppss at POS and from tree-sitter (if loaded)."
-  `(let ((val (funcall
-               (symbol-function
-                (quote ,(intern (concat "ppss-" (symbol-name field)))))
-               (syntax-ppss ,pos))))
+  `(let ((val
+          (funcall (symbol-function
+                    (quote ,(intern (concat "ppss-" (symbol-name field)))))
+                   (syntax-ppss ,pos))))
      (prog1 val
        (when-let ((func (symbol-function
                          (quote ,(intern (concat "tree-sitter-ppss-"
