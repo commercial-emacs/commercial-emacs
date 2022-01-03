@@ -2795,6 +2795,31 @@ all of which are called before Emacs is actually killed.  */
   exit (exit_code);
 }
 
+DEFUN ("program-version", Fprogram_version, Sprogram_version, 0, 0, 0,
+       doc: /* Return program version.  */)
+  (void)
+{
+  Lisp_Object tag = Fsymbol_value (intern ("emacs-repository-tag")),
+    sha1 = Fsymbol_value (intern ("emacs-repository-version")),
+    branch = Fsymbol_value (intern ("emacs-repository-branch"));
+  Lisp_Object version = concat2 (build_string (program_version),
+				 NILP (tag)
+				 ? build_string ("snapshot")
+				 : Qnil);
+  char annotation[64];
+  if (STRINGP (sha1) && STRINGP (branch))
+    {
+      char commit[8];
+      strncpy (commit, SSDATA (sha1), 7);
+      commit[7] = '\0';
+      sprintf (annotation, " %s in %s", commit, SSDATA (branch));
+    }
+  else
+    annotation[0] = '\0';
+  return strlen (annotation)
+    ? concat2 (version, build_string (annotation))
+    : version;
+}
 
 /* Perform an orderly shutdown of Emacs.  Autosave any modified
    buffers, kill any child processes, clean up the terminal modes (if
@@ -3312,6 +3337,7 @@ syms_of_emacs (void)
   defsubr (&Sinvocation_directory);
   defsubr (&Sdaemonp);
   defsubr (&Sdaemon_initialized);
+  defsubr (&Sprogram_version);
 
   DEFVAR_LISP ("command-line-args", Vcommand_line_args,
 	       doc: /* Args passed by shell to Emacs, as a list of strings.
@@ -3428,11 +3454,6 @@ and is not especially meaningful.  Prior to Emacs 26.1, an extra final
 component .BUILD is present.  This is now stored separately in
 `emacs-build-number'.  */);
   Vemacs_version = build_string (emacs_version);
-
-  DEFVAR_LISP ("program-version", Vprogram_version,
-	       doc: /* Version numbers of this program.
-This has the form: MAJOR.MINOR[.MICRO], where MAJOR/MINOR/MICRO are integers.  */);
-  Vprogram_version = build_string (program_version);
 
   DEFVAR_LISP ("report-emacs-bug-address", Vreport_emacs_bug_address,
 	       doc: /* Address of mailing list for GNU Emacs bugs.  */);

@@ -36,16 +36,6 @@
          (string-to-number (match-string 1 emacs-version)))
   "Minor version number of this version of Emacs.")
 
-(defconst program-major-version
-  (progn (string-match "^[0-9]+" program-version)
-         (string-to-number (match-string 0 program-version)))
-  "Major version number of this program.")
-
-(defconst program-minor-version
-  (progn (string-match "^[0-9]+\\.\\([0-9]+\\)" program-version)
-         (string-to-number (match-string 1 program-version)))
-  "Minor version number of this program.")
-
 (defconst emacs-build-system (system-name)
   "Name of the system on which Emacs was built, or nil if not available.")
 
@@ -58,13 +48,6 @@ This is an integer that increments each time Emacs is built in a given
 directory (without cleaning).  This is likely to only be relevant when
 developing Emacs.")
 
-(defvar motif-version-string)
-(defvar gtk-version-string)
-(defvar ns-version-string)
-(defvar cairo-version-string)
-
-(declare-function haiku-get-version-string "haikufns.c")
-
 (defun emacs-version (&optional here)
   "Return string describing the version of Emacs that is running.
 If optional argument HERE is non-nil, insert string at point.
@@ -72,36 +55,10 @@ Don't use this function in programs to choose actions according
 to the system configuration; look at `system-configuration' instead."
   (interactive "P")
   (let ((version-string
-         (format "Commercial Emacs %s (upstream %s, %s%s%s%s)%s"
-                 program-version
+         (format "Commercial Emacs %s (upstream %s, %s)"
+                 (program-version)
                  emacs-version
-		 system-configuration
-		 (cond ((featurep 'motif)
-			(concat ", " (substring motif-version-string 4)))
-		       ((featurep 'gtk)
-			(concat ", GTK+ Version " gtk-version-string))
-		       ((featurep 'x-toolkit) ", X toolkit")
-		       ((featurep 'ns)
-			(format ", NS %s" ns-version-string))
-                       ((featurep 'haiku)
-                        (format ", Haiku %s" (haiku-get-version-string)))
-		       (t ""))
-		 (if (featurep 'cairo)
-		     (format ", cairo version %s" cairo-version-string)
-		   "")
-		 (if (and (boundp 'x-toolkit-scroll-bars)
-			  (memq x-toolkit-scroll-bars '(xaw xaw3d)))
-		     (format ", %s scroll bars"
-			     (capitalize (symbol-name x-toolkit-scroll-bars)))
-		   "")
-		 (if emacs-build-time
-		     (format-time-string (concat
-					  (if (called-interactively-p
-					       'interactive)
-					      "" "\n")
-					  " of %Y-%m-%d")
-					 emacs-build-time)
-		   ""))))
+		 system-configuration)))
     (if here
         (insert version-string)
       (if (called-interactively-p 'interactive)
@@ -146,6 +103,20 @@ correspond to the running Emacs.
 Optional argument DIR is a directory to use instead of `source-directory'.
 Optional argument EXTERNAL is ignored."
   (emacs-repository-version-git (or dir source-directory)))
+
+(defvar emacs-repository-tag nil
+  "String giving the repository tag from which this Emacs was built.
+Value is nil if Emacs was not built from a repository checkout,
+or if we could not determine the tag.")
+
+(defun emacs-repository-get-tag (&optional dir)
+  (with-temp-buffer
+    (let* ((dir (or dir source-directory))
+           (default-directory (file-name-as-directory dir)))
+      (and (eq 0
+	       (with-demoted-errors "Error running git describe-parse: %S"
+		 (call-process "git" nil '(t nil) nil "describe" "--tags" "--abbrev=0" "--exact-match")))
+	   (string-trim (buffer-substring-no-properties (point-min) (point-max)))))))
 
 (defvar emacs-repository-branch nil
   "String giving the repository branch from which this Emacs was built.

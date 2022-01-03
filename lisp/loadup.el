@@ -421,7 +421,8 @@ lost after dumping")))
                                 (substring name (length base) exelen)))
 			     files)))
       (setq emacs-repository-version (ignore-errors (emacs-repository-get-version))
-            emacs-repository-branch (ignore-errors (emacs-repository-get-branch)))
+            emacs-repository-branch (ignore-errors (emacs-repository-get-branch))
+            emacs-repository-get-tag (ignore-errors (emacs-repository-get-tag)))
       ;; A constant, so we shouldn't change it with `setq'.
       (defconst emacs-build-number
 	(if versions (1+ (apply #'max versions)) 1))))
