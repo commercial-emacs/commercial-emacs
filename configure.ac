@@ -23,7 +23,7 @@ dnl  along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 AC_PREREQ(2.65)
 dnl Note this is parsed by (at least) make-dist and lisp/cedet/ede/emacs.el.
-AC_INIT(Commercial Emacs, 28.0.50, richard@commandlinesystems.com, , https://github.com/dickmao/commercial-emacs/)
+AC_INIT(Commercial Emacs, 0.2.1, richard@commandlinesystems.com, , https://github.com/commercial-emacs/commercial-emacs/)
 
 dnl Set emacs_config_options to the options of 'configure', quoted for the shell,
 dnl and then quoted again for a C string.  Separate options with spaces.
@@ -4032,6 +4032,8 @@ AC_SUBST(HAVE_MODULES)
 AC_SUBST(MODULES_SUFFIX)
 AC_SUBST(MODULES_SECONDARY_SUFFIX)
 
+upstream_version="29.0.50"
+AC_DEFINE_UNQUOTED([UPSTREAM_VERSION], ["$upstream_version"], [GNU Emacs version])
 AC_CONFIG_FILES([src/emacs-module.h])
 AC_SUBST_FILE([module_env_snippet_25])
 AC_SUBST_FILE([module_env_snippet_26])
@@ -4043,7 +4045,7 @@ module_env_snippet_26="$srcdir/src/module-env-26.h"
 module_env_snippet_27="$srcdir/src/module-env-27.h"
 module_env_snippet_28="$srcdir/src/module-env-28.h"
 module_env_snippet_29="$srcdir/src/module-env-29.h"
-emacs_major_version="${PACKAGE_VERSION%%.*}"
+emacs_major_version="${upstream_version%%.*}"
 AC_SUBST(emacs_major_version)
 
 ### Emacs Lisp native compiler support
@@ -5819,7 +5821,7 @@ fi
 
 version=$PACKAGE_VERSION
 
-copyright="Copyright (C) 2022 Free Software Foundation, Inc."
+copyright="Copyright (C) 2022 The Authors"
 AC_DEFINE_UNQUOTED(COPYRIGHT, ["$copyright"],
   [Short copyright string for this version of Emacs.])
 AC_SUBST(copyright)

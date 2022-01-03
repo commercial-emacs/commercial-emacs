@@ -148,13 +148,14 @@ extern char etext;
 #include "fingerprint.h"
 #include "epaths.h"
 
-static const char emacs_version[] = PACKAGE_VERSION;
+static const char emacs_version[] = UPSTREAM_VERSION;
+static const char program_version[] = PACKAGE_VERSION;
 static const char emacs_copyright[] = COPYRIGHT;
 static const char emacs_bugreport[] = PACKAGE_BUGREPORT;
 
 /* Put version info into the executable in the form that 'ident' uses.  */
 char const EXTERNALLY_VISIBLE RCS_Id[]
-  = "$Id" ": GNU Emacs " PACKAGE_VERSION
+  = "$Id" ": Commercial Emacs " PACKAGE_VERSION
     " (" EMACS_CONFIGURATION " " EMACS_CONFIG_FEATURES ") $";
 
 /* Empty lisp strings.  To avoid having to build any others.  */
@@ -3427,6 +3428,11 @@ and is not especially meaningful.  Prior to Emacs 26.1, an extra final
 component .BUILD is present.  This is now stored separately in
 `emacs-build-number'.  */);
   Vemacs_version = build_string (emacs_version);
+
+  DEFVAR_LISP ("program-version", Vprogram_version,
+	       doc: /* Version numbers of this program.
+This has the form: MAJOR.MINOR[.MICRO], where MAJOR/MINOR/MICRO are integers.  */);
+  Vprogram_version = build_string (program_version);
 
   DEFVAR_LISP ("report-emacs-bug-address", Vreport_emacs_bug_address,
 	       doc: /* Address of mailing list for GNU Emacs bugs.  */);

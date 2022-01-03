@@ -36,6 +36,16 @@
          (string-to-number (match-string 1 emacs-version)))
   "Minor version number of this version of Emacs.")
 
+(defconst program-major-version
+  (progn (string-match "^[0-9]+" program-version)
+         (string-to-number (match-string 0 program-version)))
+  "Major version number of this program.")
+
+(defconst program-minor-version
+  (progn (string-match "^[0-9]+\\.\\([0-9]+\\)" program-version)
+         (string-to-number (match-string 1 program-version)))
+  "Minor version number of this program.")
+
 (defconst emacs-build-system (system-name)
   "Name of the system on which Emacs was built, or nil if not available.")
 
@@ -62,9 +72,9 @@ Don't use this function in programs to choose actions according
 to the system configuration; look at `system-configuration' instead."
   (interactive "P")
   (let ((version-string
-         (format "Commercial Emacs %s (build %s, %s%s%s%s)%s"
+         (format "Commercial Emacs %s (upstream %s, %s%s%s%s)%s"
+                 program-version
                  emacs-version
-                 emacs-build-number
 		 system-configuration
 		 (cond ((featurep 'motif)
 			(concat ", " (substring motif-version-string 4)))
