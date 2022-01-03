@@ -52,9 +52,9 @@
   (goto-char start)
   (funcall
    (syntax-propertize-rules
-    ("\\(<\\)\\([^<>\n]*\\)\\(>\\)"
-     (1 "()  ")
-     (3 ")(  ")))
+    '("\\(<\\)\\([^<>\n]*\\)\\(>\\)"
+      (1 "()  ")
+      (3 ")(  ")))
    start end))
 
 (defmacro faceup-test-define-prog-mode (mode name &rest args)

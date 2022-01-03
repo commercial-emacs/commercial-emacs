@@ -35,10 +35,9 @@
 (require 'dom)
 (require 'seq)
 (require 'facemenu)
-(eval-when-compile (require 'subr-x))
-(eval-when-compile
-  (require 'skeleton)
-  (require 'cl-lib))
+(require 'subr-x)
+(require 'skeleton)
+(require 'cl-lib)
 
 (defgroup sgml nil
   "SGML editing mode."
@@ -367,51 +366,51 @@ Any terminating `>' or `/' is not matched.")
     (setcar sgml--syntax-propertize-ppss pos)
     ppss))
 
-(eval-and-compile
-  (defconst sgml-syntax-propertize-rules
-    (syntax-propertize-precompile-rules
-     ;; Use the `b' style of comments to avoid interference with the -- ... --
-     ;; comments recognized when `sgml-specials' includes ?-.
-     ;; FIXME: beware of <!--> blabla <!--> !!
-     ("\\(<\\)!--" (1 "< b"))
-     ("--[ \t\n]*\\(>\\)" (1 "> b"))
-     ("\\(<\\)[?!]" (1 (prog1 "|>"
-                         (sgml-syntax-propertize-inside end))))
-     ;; Quotes outside of tags should not introduce strings which end up
-     ;; hiding tags.  We used to test every quote and mark it as "."
-     ;; if it's outside of tags, but there are too many quotes and
-     ;; the resulting number of calls to syntax-ppss made it too slow
-     ;; (bug#33887), so we're now careful to leave alone any pair
-     ;; of quotes that doesn't hold a < or > char, which is the vast majority:
-     ;; either they're both within a tag (or a comment), in which case it's
-     ;; indeed correct to leave them as is, or they're both outside of tags, in
-     ;; which case they arguably should have punctuation syntax, but it is
-     ;; harmless to let them have string syntax because they won't "hide" any
-     ;; tag or comment from us (and we use the
-     ;; font-lock-syntactic-face-function to make sure those spurious "strings
-     ;; within text" aren't highlighted as strings).
-     ("\\([\"']\\)[^\"'<>]*"
-      (1 (if (eq (char-after) (char-after (match-beginning 0)))
-             ;; Fast-track case.
-             (forward-char 1)
-           ;; Point has moved to the end of the text we matched after the
-           ;; quote, but this risks overlooking a match to one of the other
-           ;; regexp in the rules.  We could just (goto-char (match-end 1))
-           ;; to solve this, but that would be too easy, so instead we
-           ;; only move back enough to avoid skipping comment ender, which
-           ;; happens to be the only one that we could have overlooked.
-           (when (eq (char-after) ?>)
-             (skip-chars-backward "-"))
-           ;; Be careful to call `syntax-ppss' on a position before the one
-           ;; we're going to change, so as not to need to flush the data we
-           ;; just computed.
-           (if (zerop (save-excursion
-                        (car (sgml--syntax-propertize-ppss
-                              (match-beginning 0)))))
-               (string-to-syntax ".")))))
-     )
-    "Syntax-propertize rules for sgml text.
-These have to be run via `sgml-syntax-propertize'"))
+(defconst sgml-syntax-propertize-rules
+  '(("\\(<\\)!--" (1 "< b"))
+    ("--[ \t\n]*\\(>\\)" (1 "> b"))
+    ("\\(<\\)[?!]" (1 (prog1 "|>"
+                        (sgml-syntax-propertize-inside end))))
+    ("\\([\"']\\)[^\"'<>]*"
+     (1 (if (eq (char-after) (char-after (match-beginning 0)))
+            ;; Fast-track case.
+            (forward-char 1)
+          ;; Point has moved to the end of the text we matched after the
+          ;; quote, but this risks overlooking a match to one of the other
+          ;; regexp in the rules.  We could just (goto-char (match-end 1))
+          ;; to solve this, but that would be too easy, so instead we
+          ;; only move back enough to avoid skipping comment ender, which
+          ;; happens to be the only one that we could have overlooked.
+          (when (eq (char-after) ?>)
+            (skip-chars-backward "-"))
+          ;; Be careful to call `syntax-ppss' on a position before the one
+          ;; we're going to change, so as not to need to flush the data we
+          ;; just computed.
+          (if (zerop (save-excursion
+                       (car (sgml--syntax-propertize-ppss
+                             (match-beginning 0)))))
+              (string-to-syntax ".")))))
+    )
+  "Syntax-propertize rules for sgml text.
+These have to be run via `sgml-syntax-propertize'
+
+Use the `b' style of comments to avoid interference with the --
+... -- comments recognized when `sgml-specials' includes ?-.
+FIXME: beware of <!--> blabla <!--> !!
+
+Quotes outside of tags should not introduce strings which end up
+hiding tags.  We used to test every quote and mark it as \".\"
+if it's outside of tags, but there are too many quotes and
+the resulting number of calls to syntax-ppss made it too slow
+(bug#33887), so we're now careful to leave alone any pair
+of quotes that doesn't hold a < or > char, which is the vast majority:
+either they're both within a tag (or a comment), in which case it's
+indeed correct to leave them as is, or they're both outside of tags, in
+which case they arguably should have punctuation syntax, but it is
+harmless to let them have string syntax because they won't \"hide\" any
+tag or comment from us (and we use the
+font-lock-syntactic-face-function to make sure those spurious \"strings
+within text\" aren't highlighted as strings).")
 
 (defconst sgml--syntax-propertize
   (syntax-propertize-rules sgml-syntax-propertize-rules))
@@ -510,11 +509,10 @@ an optional alist of possible values."
              (string= "xhtml" (file-name-extension (or buffer-file-name ""))))
 	(looking-at "\\s-*<\\?xml")
 	(when (re-search-forward
-	       (eval-when-compile
-		 (mapconcat 'identity
-			    '("<!DOCTYPE" "\\(\\w+\\)" "\\(\\w+\\)"
-			      "\"\\([^\"]+\\)\"" "\"\\([^\"]+\\)\"")
-			    "\\s-+"))
+	       (mapconcat 'identity
+			  '("<!DOCTYPE" "\\(\\w+\\)" "\\(\\w+\\)"
+			    "\"\\([^\"]+\\)\"" "\"\\([^\"]+\\)\"")
+			  "\\s-+")
 	       nil t)
 	  (string-match "X\\(HT\\)?ML" (match-string 3))))))
 
@@ -600,12 +598,11 @@ Do \\[describe-key] on the following bindings to discover what they do.
   (setq-local tildify-foreach-region-function
               (apply-partially
                'tildify-foreach-ignore-environments
-               `((,(eval-when-compile
-                     (concat
-                      "<\\("
-                      (regexp-opt '("pre" "dfn" "code" "samp" "kbd" "var"
-                                    "PRE" "DFN" "CODE" "SAMP" "KBD" "VAR"))
-                      "\\)\\>[^>]*>"))
+               `((,(concat
+                    "<\\("
+                    (regexp-opt '("pre" "dfn" "code" "samp" "kbd" "var"
+                                  "PRE" "DFN" "CODE" "SAMP" "KBD" "VAR"))
+                    "\\)\\>[^>]*>")
                   . ("</" 1 ">"))
                  ("<! *--" . "-- *>")
                  ("<" . ">"))))
