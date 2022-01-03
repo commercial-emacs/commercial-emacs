@@ -22,7 +22,7 @@
 
 ;;; Commentary:
 
-;; The main exported function is `syntax-ppss'.
+;; Fontification and indentation rely on `syntax-ppss'.
 ;; PPSS stands for "parse partial sexp state".
 
 ;;; Code:
@@ -31,8 +31,8 @@
 (declare-function cl-position "cl-seq")
 
 (defvar syntax-propertize-function nil
-  "Mode-specific workhorse of `syntax-propertize', which is called
-by things like font-Lock and indentation.")
+  "Mode-specific workhorse of `syntax-propertize'.
+Accepts two arguments START and END delimiting buffer range.")
 
 (defconst syntax-propertize-chunk-size 500)
 
@@ -130,19 +130,10 @@ see Info node `(elisp) Syntax Properties'."
     new-re))
 
 (defmacro syntax-propertize-precompile-rules (&rest rules)
-  "Return a precompiled form of RULES to pass to `syntax-propertize-rules'.
-The arg RULES can be of the same form as in `syntax-propertize-rules'.
-The return value is an object that can be passed as a rule to
-`syntax-propertize-rules'.
-I.e. this is useful only when you want to share rules among several
-`syntax-propertize-function's."
+  "I cannot figure a way to get rid of this (a5c05e2).
+The tricky backquote-quote essentially allows RULES to make
+sense at compile-time."
   (declare (debug syntax-propertize-rules))
-  ;; Precompile?  Yeah, right!
-  ;; Seriously, tho, this is a macro for 2 reasons:
-  ;; - we could indeed do some pre-compilation at some point in the future,
-  ;;   e.g. fi/when we switch to a DFA-based implementation of
-  ;;   syntax-propertize-rules.
-  ;; - this lets Edebug properly annotate the expressions inside RULES.
   `',rules)
 
 (defmacro syntax-propertize-rules (&rest rules)
@@ -289,6 +280,7 @@ all RULES in total."
                    (re-search-forward ,re end t))
          (cond ,@(nreverse branches))))))
 
+
 (defun syntax-propertize-via-font-lock (keywords)
   "Propertize for syntax using font-lock syntax.
 KEYWORDS obeys the format used in `font-lock-syntactic-keywords'.
@@ -347,10 +339,9 @@ END) suitable for `syntax-propertize-function'."
 
 (defmacro syntax-ppss-get (pos field)
   "Return FIELD from ppss at POS and from tree-sitter (if loaded)."
-  `(let ((val
-          (funcall (symbol-function
-                    (quote ,(intern (concat "ppss-" (symbol-name field)))))
-                   (syntax-ppss ,pos))))
+  `(let ((val (funcall (symbol-function
+                        (quote ,(intern (concat "ppss-" (symbol-name field)))))
+                       (syntax-ppss ,pos))))
      (prog1 val
        (when-let ((func (symbol-function
                          (quote ,(intern (concat "tree-sitter-ppss-"
