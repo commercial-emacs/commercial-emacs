@@ -624,14 +624,6 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
                                     generalizer)
                                    'arg)))
              generalizers))
-           (tag-exp
-            ;; Minor optimization: since this tag-exp is
-            ;; only used to lookup the method-cache, it
-            ;; doesn't matter if the default value is some
-            ;; constant or nil.
-            `(or ,@(if (macroexp-const-p (car (last tagcodes)))
-                       (butlast tagcodes)
-                     tagcodes)))
            (fixedargs '(arg))
            (dispatch-idx dispatch-arg)
            (bindings nil))
@@ -646,19 +638,16 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
       ;; overkill: better just use a `cl-typep' test.
       (byte-compile
        `(lambda (generic dispatches-left methods)
-          ;; FIXME: We should find a way to expand `with-memoize' once
-          ;; and forall so we don't need `subr-x' when we get here.
-          (eval-when-compile (require 'subr-x))
-          (let ((method-cache (make-hash-table :test #'eql)))
-            (lambda (,@fixedargs &rest args)
-              (let ,bindings
-                (apply (with-memoization
-                           (gethash ,tag-exp method-cache)
-                         (cl--generic-cache-miss
-                          generic ',dispatch-arg dispatches-left methods
-                          ,(if (cdr typescodes)
-                               `(append ,@typescodes) (car typescodes))))
-                       ,@fixedargs args)))))))))
+          (apply-partially
+           (lambda (generic* dispatches-left* methods* ,@fixedargs &rest args)
+             (let ,bindings
+               (apply (cl--generic-cache-miss
+                       generic* ',dispatch-arg dispatches-left* methods*
+                       ,(if (cdr typescodes)
+                            `(append ,@typescodes)
+                          (car typescodes)))
+                      ,@fixedargs args)))
+           generic dispatches-left methods))))))
 
 (defun cl--generic-make-function (generic)
   (cl--generic-make-next-function generic

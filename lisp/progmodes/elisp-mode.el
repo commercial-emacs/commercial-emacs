@@ -1102,10 +1102,9 @@ namespace but with lower confidence."
                   ))
 
               (if (and (setq doc (documentation symbol t))
-                       ;; This doc string is created somewhere in
-                       ;; cl--generic-make-function for an implicit
-                       ;; defgeneric.
-                       (string-match "\n\n(fn ARG &rest ARGS)" doc))
+                       ;; Brutal hack fails often with
+                       ;; changes to cl--generic-get-dispatcher
+                       (string-match-p "\n\n(fn \\(ARG \\)?&rest ARGS[0-9]*)" doc))
                   ;; This symbol is an implicitly defined defgeneric, so
                   ;; don't return it.
                   nil
