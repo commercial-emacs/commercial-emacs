@@ -12611,8 +12611,9 @@ display_tab_bar_line (struct it *it, int height)
      so there's no need to check the face here.  */
   it->start_of_box_run_p = true;
 
-  bool enough = false;
-  while (it->current_x < max_x)
+  for ((void) it;
+       it->current_x < max_x;
+       set_iterator_to_next (it, true))
     {
       int x, n_glyphs_before, i, nglyphs;
       struct it it_before;
@@ -12658,12 +12659,11 @@ display_tab_bar_line (struct it *it, int height)
 	  ++i;
 	}
 
-      enough = ITERATOR_AT_END_OF_LINE_P (it);
-      set_iterator_to_next (it, true);
-
-      /* Stop at line end.  */
-      if (enough)
-	break;
+      if (ITERATOR_AT_END_OF_LINE_P (it))
+	{
+	  set_iterator_to_next (it, true); /* consume newline */
+	  break;
+	}
     }
 
  out:
