@@ -27,7 +27,8 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
+(eval-when-compile
+  (require 'cl-lib))
 (declare-function cl-position "cl-seq")
 
 (defvar syntax-propertize-function nil
@@ -137,37 +138,30 @@ sense at compile-time."
   `',rules)
 
 (defmacro syntax-propertize-rules (&rest rules)
-  "Make a function that applies RULES for use in `syntax-propertize-function'.
-The function will scan the buffer, applying the rules where they match.
-The buffer is scanned a single time, like \"lex\" would, rather than once
-per rule.
+  "Return a value for assigning to syntax-propertize-function.
 
-Each RULE can be a symbol, in which case that symbol's value should be,
-at macro-expansion time, a precompiled set of rules, as returned
-by `syntax-propertize-precompile-rules'.
+A RULE is a form or a symbol evaluating to a form,
 
-Otherwise, RULE should have the form (REGEXP HIGHLIGHT1 ... HIGHLIGHTn), where
-REGEXP is an expression (evaluated at time of macro-expansion) that returns
-a regexp, and where HIGHLIGHTs have the form (NUMBER SYNTAX) which means to
-apply the property SYNTAX to the chars matched by the subgroup NUMBER
-of the regular expression, if NUMBER did match.
-SYNTAX is an expression that returns a value to apply as `syntax-table'
-property.  Some expressions are handled specially:
-- if SYNTAX is a string, then it is converted with `string-to-syntax';
-- if SYNTAX has the form (prog1 EXP . EXPS) then the value returned by EXP
-  will be applied to the buffer before running EXPS and if EXP is a string it
-  is also converted with `string-to-syntax'.
-The SYNTAX expression is responsible to save the `match-data' if needed
-for subsequent HIGHLIGHTs.
-Also SYNTAX is free to move point, in which case RULES may not be applied to
-some parts of the text or may be applied several times to other parts.
+\(REGEXP (MATCH_1 PROP_1) ... (MATCH_N PROP_N))
 
-Note: There may be at most nine back-references in the REGEXPs of
-all RULES in total."
-  (declare (debug (&rest &or symbolp    ;FIXME: edebug this eval step.
+where 1 <= N <= 9, and where syntax-table property PROP_i gets
+applied to the match group MATCH_i.
+
+If PROP_i is a string, it is converted by `string-to-syntax'.
+
+If PROP_i has the form (prog1 PROP . EXPRS), then PROP, which may be a
+string convertible by `string-to-syntax', is first applied to the
+buffer before running EXPRS.
+
+The PROP_i expression is responsible for preserving match data necessary
+for subsequent PROP_j, j > i.
+
+PROP_i may move point, which can cause certain rules to be
+applied multiple or zero times."
+  (declare (debug (&rest &or symbolp
                          (form &rest
                                (numberp
-                                [&or stringp ;FIXME: Use &wrap
+                                [&or stringp
                                      ("prog1" [&or stringp def-form] def-body)
                                      def-form])))))
   (let ((newrules nil))
@@ -279,7 +273,6 @@ all RULES in total."
        (while (and (< (point) end)
                    (re-search-forward ,re end t))
          (cond ,@(nreverse branches))))))
-
 
 (defun syntax-propertize-via-font-lock (keywords)
   "Propertize for syntax using font-lock syntax.
