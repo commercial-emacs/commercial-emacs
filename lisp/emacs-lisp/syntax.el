@@ -145,13 +145,16 @@ A RULE is a form or a symbol evaluating to a form,
 \(REGEXP (MATCH_1 PROP_1) ... (MATCH_N PROP_N))
 
 where 1 <= N <= 9, and where syntax-table property PROP_i gets
-applied to the match group MATCH_i.
+applied to the matched text from MATCH_i.
 
-If PROP_i is a string, it is converted by `string-to-syntax'.
+If PROP_i is a string, first convert to a property via
+`string-to-syntax'.
 
-If PROP_i has the form (prog1 PROP . EXPRS), then PROP, which may be a
-string convertible by `string-to-syntax', is first applied to the
-buffer before running EXPRS.
+If PROP_i has the form (prog1 PROP . EXPRS), then PROP, which may
+be a string convertible by `string-to-syntax', is first applied
+to matched text before evaluating EXPRS.
+
+If PROP_i has the form (ignore EXPR), then simply evaluate EXPR.
 
 The PROP_i expression is responsible for preserving match data necessary
 for subsequent PROP_j, j > i.
@@ -172,9 +175,6 @@ applied multiple or zero times."
     (setq rules (nreverse newrules)))
   (let* ((offset 0)
          (branches '())
-         ;; We'd like to use a real DFA-based lexer, usually, but since Emacs
-         ;; doesn't have one yet, we fallback on building one large regexp
-         ;; and use groups to determine which branch of the regexp matched.
          (re
           (mapconcat
            (lambda (rule)
@@ -310,23 +310,17 @@ END) suitable for `syntax-propertize-function'."
                  (when-let ((new (funcall f start end)))
                    (setq start (min start (car new)))
                    (setq end (max end (cdr new))))))
-              (remove-text-properties start end
-                                      '(syntax-table nil syntax-multiline nil))
+              (remove-text-properties
+               start end '(syntax-table nil syntax-multiline nil))
               (syntax-ppss-invalidate-cache start)
               (setq syntax-propertize--done end)
               (funcall syntax-propertize-function start end))))))))
 
-;;; Link syntax-propertize with syntax.c.
-
-(defvar syntax-propertize-chunks
-  ;; We're not sure how far we'll go.  In my tests, using chunks of 2000
-  ;; brings the overhead to something negligible.  Passing ‘charpos’ directly
-  ;; also works (basically works line-by-line) but results in an overhead which
-  ;; I thought was a bit too high (like around 50%).
-  2000)
+(defvar syntax-propertize-chunks 2000
+  "Someone decided 2000 fell within the goldilocks stratum.")
 
 (defun internal--syntax-propertize (charpos)
-  ;; FIXME: Called directly from C.
+  "Called directly from C."
   (save-match-data
     (syntax-propertize (min (+ syntax-propertize-chunks charpos) (point-max)))))
 

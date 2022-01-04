@@ -21431,20 +21431,11 @@ find_row_edges (struct it *it, struct glyph_row *row,
 	      SET_TEXT_POS (row->maxpos, max_pos, max_bpos);
 	    }
 	}
-      else if (row->truncated_on_right_p)
-	/* display_sline already called reseat_following_line_start,
-	   which puts the iterator at the beginning of the next line, in
-	   the logical order. */
-	row->maxpos = it->current.pos;
       else if (max_pos == min_pos && it->method != GET_FROM_BUFFER)
 	/* A line that is entirely from a string/image/stretch...  */
 	row->maxpos = row->minpos;
       else
-	{
-	  ptrdiff_t nl =
-	    find_newline_no_quit (min_pos, CHAR_TO_BYTE (min_pos), 1, NULL);
-	  SET_TEXT_POS (row->maxpos, nl, CHAR_TO_BYTE (nl));
-	}
+	row->maxpos = it->current.pos;
     }
   else
     row->maxpos = it->current.pos;

@@ -577,13 +577,11 @@ form, use the `describe-text-properties' command.  */)
     XSETBUFFER (object, current_buffer);
 
   i = validate_interval_range (object, &position, &position, soft);
-  if (!i)
-    return Qnil;
   /* If POSITION is at the end of the interval,
      it means it's the end of OBJECT.
      There are no properties at the very end,
      since no character follows.  */
-  if (XFIXNUM (position) == LENGTH (i) + i->position)
+  if (! i || XFIXNUM (position) == LENGTH (i) + i->position)
     return Qnil;
 
   return i->plist;

@@ -160,7 +160,7 @@ struct lisp_parse_state
                         of a 2-char construct, i.e. comment delimiter
                         or Sescape, etc.  Smax otherwise. */
   };
-
+
 /* These variables are a cache for finding the start of a defun.
    find_start_pos is the place for which the defun start was found.
    find_start_value is the defun start position found for it.
@@ -193,7 +193,7 @@ bset_syntax_table (struct buffer *b, Lisp_Object val)
 {
   b->syntax_table_ = val;
 }
-
+
 /* Whether the syntax of the character C has the prefix flag set.  */
 bool
 syntax_prefix_flag_p (int c)
@@ -518,7 +518,7 @@ update_syntax_table_forward (ptrdiff_t charpos, bool init,
 	parse_sexp_propertize (charpos);
     }
 }
-
+
 /* Returns true if char at CHARPOS is quoted.
    Global syntax-table data should be set up already to be good at CHARPOS
    or after.  On return global syntax data is good for lookup at CHARPOS.  */
@@ -559,7 +559,7 @@ dec_bytepos (ptrdiff_t bytepos)
 	  - (!NILP (BVAR (current_buffer, enable_multibyte_characters))
 	     ? prev_char_len (bytepos) : 1));
 }
-
+
 /* Return a defun-start position before POS and not too far before.
    It should be the last one before POS, or nearly the last.
 
@@ -655,7 +655,7 @@ find_defun_start (ptrdiff_t pos, ptrdiff_t pos_byte)
 
   return find_start_value;
 }
-
+
 /* Return the SYNTAX_COMEND_FIRST of the character before POS, POS_BYTE.  */
 
 static bool
@@ -973,7 +973,7 @@ back_comment (ptrdiff_t from, ptrdiff_t from_byte, ptrdiff_t stop,
 
   return from != comment_end;
 }
-
+
 DEFUN ("syntax-table-p", Fsyntax_table_p, Ssyntax_table_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a syntax table.
 Currently, any char-table counts as a syntax table.  */)
@@ -1048,7 +1048,7 @@ One argument, a syntax table.  */)
   SET_PER_BUFFER_VALUE_P (current_buffer, idx, 1);
   return table;
 }
-
+
 /* Convert a letter which signifies a syntax code
  into the code it signifies.
  This is used by modify-syntax-entry, and other things.  */
@@ -1087,7 +1087,7 @@ char const syntax_code_spec[16] =
    compact listing.  */
 static Lisp_Object Vsyntax_code_object;
 
-
+
 DEFUN ("char-syntax", Fchar_syntax, Schar_syntax, 1, 1, 0,
        doc: /* Return the syntax code of CHARACTER, described by a character.
 For example, if CHARACTER is a word constituent, the
@@ -1286,7 +1286,7 @@ usage: (modify-syntax-entry CHAR NEWENTRY &optional SYNTAX-TABLE)  */)
 
   return Qnil;
 }
-
+
 /* Dump syntax table to buffer in human-readable format */
 
 DEFUN ("internal-describe-syntax-value", Finternal_describe_syntax_value,
@@ -1442,7 +1442,7 @@ DEFUN ("internal-describe-syntax-value", Finternal_describe_syntax_value,
 
   return syntax;
 }
-
+
 /* Return the position across COUNT words from FROM.
    If that many words cannot be found before the end of the buffer, return 0.
    COUNT negative means scan backward and stop at word beginning.  */
@@ -1601,7 +1601,7 @@ instead.  See Info node `(elisp) Word Motion' for details.  */)
   SET_PT (val);
   return val == orig_val ? Qt : Qnil;
 }
-
+
 DEFUN ("skip-chars-forward", Fskip_chars_forward, Sskip_chars_forward, 1, 2, 0,
        doc: /* Move point forward, stopping before a char not in STRING, or at pos LIM.
 STRING is like the inside of a `[...]' in a regular expression
@@ -2282,7 +2282,7 @@ in_classes (int c, Lisp_Object iso_classes)
 
   return fits_class;
 }
-
+
 /* Jump over a comment, assuming we are at the beginning of one.
    FROM is the current position.
    FROM_BYTE is the bytepos corresponding to FROM.
@@ -2639,7 +2639,7 @@ between them, return t; otherwise return nil.  */)
   SET_PT_BOTH (from, from_byte);
   return Qt;
 }
-
+
 /* Return syntax code of character C if C is an ASCII character
    or if MULTIBYTE_SYMBOL_P is false.  Otherwise, return Ssymbol.  */
 
@@ -3129,7 +3129,7 @@ the prefix syntax flag (p).  */)
 
   return Qnil;
 }
-
+
 
 /* If the character at FROM_BYTE is the second part of a 2-character
    comment opener based on PREV_FROM_SYNTAX, update STATE and return
@@ -3543,15 +3543,8 @@ internalize_parse_state (Lisp_Object external, struct lisp_parse_state *state)
 }
 
 DEFUN ("parse-partial-sexp", Fparse_partial_sexp, Sparse_partial_sexp, 2, 6, 0,
-       doc: /* Parse Lisp syntax starting at FROM until TO; return status of parse at TO.
-Parsing stops at TO or when certain criteria are met;
- point is set to where parsing stops.
-
-If OLDSTATE is omitted or nil, parsing assumes that FROM is the
- beginning of a function.  If not, OLDSTATE should be the state at
- FROM.
-
-Value is a list of elements describing final state of parsing:
+       doc: /* Parse from FROM to TO using prevailing syntax table.
+Return 11-element state consisting of:
  0. depth in parens.
  1. character address of start of innermost containing list; nil if none.
  2. character address of start of last complete sexp terminated.
@@ -3569,45 +3562,41 @@ Value is a list of elements describing final state of parsing:
     (potential) two character construct, the syntax of that position,
     otherwise nil.  That construct can be a two character comment
     delimiter or an Escaped or Char-quoted character.
-11..... Possible further internal information used by `parse-partial-sexp'.
 
-If third arg TARGETDEPTH is non-nil, parsing stops if the depth
-in parentheses becomes equal to TARGETDEPTH.
-Fourth arg STOPBEFORE non-nil means stop when we come to
- any character that starts a sexp.
-Fifth arg OLDSTATE is a list like what this function returns.
- It is used to initialize the state of the parse.  Elements number 1, 2, 6
- are ignored.
-Sixth arg COMMENTSTOP non-nil means stop after the start of a comment.
- If it is the symbol `syntax-table', stop after the start of a comment or a
- string, or after end of a comment or a string.  */)
+TARGETDEPTH if non-nil halts the parse at that depth of parentheses.
+
+STOPBEFORE if non-nil halts the parse at a new sexp.
+
+OLDSTATE is assumed to reflect the state at FROM.  Given a null
+OLDSTATE, the parser assumes a toplevel sexp commences at FROM.
+Elements number 1, 2, 6 of OLDSTATE are ignored.
+
+COMMENTSTOP if non-nil halts the parse upon reaching a comment.
+When assigned the symbol 'syntax-table, COMMENTSTOP halts the parse upon
+reaching a comment or string, or if FROM lay within a comment or string,
+the end of that comment or string.  */)
   (Lisp_Object from, Lisp_Object to, Lisp_Object targetdepth,
    Lisp_Object stopbefore, Lisp_Object oldstate, Lisp_Object commentstop)
 {
   struct lisp_parse_state state;
   Lisp_Object ret;
-  EMACS_INT target;
+  EMACS_INT target = TYPE_MINIMUM (EMACS_INT);
   ptrdiff_t pdl_count = SPECPDL_INDEX ();
 
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
   Fwiden ();
 
-  if (!NILP (targetdepth))
+  validate_region (&from, &to);
+
+  if (! NILP (targetdepth))
     {
       CHECK_FIXNUM (targetdepth);
       target = XFIXNUM (targetdepth);
     }
-  else
-    target = TYPE_MINIMUM (EMACS_INT);	/* We won't reach this depth.  */
 
-  if (fix_position (to) < fix_position (from))
-    error ("End position is smaller than start position");
-
-  validate_region (&from, &to);
   internalize_parse_state (oldstate, &state);
   scan_sexps_forward (&state, XFIXNUM (from), CHAR_TO_BYTE (XFIXNUM (from)),
-		      XFIXNUM (to),
-		      target, !NILP (stopbefore),
+		      XFIXNUM (to), target, ! NILP (stopbefore),
 		      (NILP (commentstop)
 		       ? 0 : (EQ (commentstop, Qsyntax_table) ? -1 : 1)));
 
@@ -3644,7 +3633,7 @@ Sixth arg COMMENTSTOP non-nil means stop after the start of a comment.
   unbind_to (pdl_count, Qnil);
   return ret;
 }
-
+
 void
 init_syntax_once (void)
 {

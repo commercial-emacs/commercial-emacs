@@ -395,21 +395,24 @@ DEFUN ("tree-sitter-root-node",
 
 DEFUN ("tree-sitter-ppss-depth",
        Ftree_sitter_ppss_depth, Stree_sitter_ppss_depth,
-       1, 1, 0,
-       doc: /* Return parsed partial sexp state for BEG. */)
-  (Lisp_Object beg)
+       0, 1, 0,
+       doc: /* Return ppss element 0 at POS. */)
+  (Lisp_Object pos)
 {
   Lisp_Object retval = Qnil,
     sitter = Ftree_sitter (Fcurrent_buffer ());
 
-  CHECK_FIXNUM (beg);
+  if (NILP (pos))
+    pos = Fpoint ();
+
+  CHECK_FIXNUM (pos);
 
   if (! NILP (sitter))
     {
       const TSTree *tree = XTREE_SITTER (sitter)->tree;
       if (tree != NULL)
 	retval = make_fixnum (ts_tree_depth_for_byte
-			      (tree, BUFFER_TO_SITTER (XFIXNUM (beg))));
+			      (tree, BUFFER_TO_SITTER (XFIXNUM (pos))));
     }
   return retval;
 }
@@ -546,6 +549,48 @@ DEFUN ("tree-sitter",
   return sitter;
 }
 
+DEFUN ("tree-sitter-ppss", Ftree_sitter_ppss, Stree_sitter_ppss, 0, 1, 0,
+       doc: /* Emulate `parse-partial-sexp'.  */)
+  (Lisp_Object pos)
+{
+  Lisp_Object sitter = Ftree_sitter (Fcurrent_buffer ());
+  const TSTree *tree = NILP (sitter) ? NULL : XTREE_SITTER (sitter)->tree;
+
+  if (NILP (pos))
+    pos = Fpoint ();
+
+  CHECK_FIXNUM (pos);
+
+  if (tree == NULL)
+    return Qnil;
+
+  return list (make_fixnum (ts_tree_depth_for_byte
+			    (tree, BUFFER_TO_SITTER (XFIXNUM (pos)))));
+  /* make_fixnum (state.prevlevelstart), */
+  /* make_fixnum (state.thislevelstart), */
+  /* state.instring >= 0 */
+  /* ? (state.instring == ST_STRING_STYLE */
+  /* 	  ? Qt : make_fixnum (state.instring)) : Qnil, */
+  /* state.incomment < 0 ? Qt : */
+  /* (state.incomment == 0 ? Qnil : */
+  /* 	make_fixnum (state.incomment)), */
+  /* state.quoted ? Qt : Qnil, */
+  /* make_fixnum (state.mindepth), */
+  /* state.comstyle */
+  /* ? (state.comstyle == ST_COMMENT_STYLE */
+  /* 	  ? Qsyntax_table */
+  /* 	  : make_fixnum (state.comstyle)) */
+  /* : Qnil, */
+  /* (state.incomment || (state.instring >= 0)) */
+  /* ? make_fixnum (state.comstr_start) */
+  /* : Qnil, */
+  /* state.levelstarts, */
+  /* state.prev_syntax == Smax */
+  /* ? Qnil */
+  /* : make_fixnum (state.prev_syntax), */
+  /* Qnil); */
+}
+
 /* TODO buffers not utf-8-clean. */
 void
 tree_sitter_record_change (ptrdiff_t start_char,
@@ -626,6 +671,7 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter);
   defsubr (&Stree_sitter_root_node);
   defsubr (&Stree_sitter_ppss_depth);
+  defsubr (&Stree_sitter_ppss);
   defsubr (&Stree_sitter_highlights);
   defsubr (&Stree_sitter_highlight_region);
   defsubr (&Stree_sitter_changed_range);
