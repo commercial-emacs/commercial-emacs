@@ -542,7 +542,7 @@ decode_options (int argc, char **argv)
 	  break;
 
 	case 'V':
-	  message (false, "emacsclient %s\n", PACKAGE_VERSION);
+	  message (false, "emacsclient %s\n", UPSTREAM_VERSION);
 	  exit (EXIT_SUCCESS);
 	  break;
 
