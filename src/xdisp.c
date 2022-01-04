@@ -12611,6 +12611,7 @@ display_tab_bar_line (struct it *it, int height)
      so there's no need to check the face here.  */
   it->start_of_box_run_p = true;
 
+  bool enough = false;
   while (it->current_x < max_x)
     {
       int x, n_glyphs_before, i, nglyphs;
@@ -12657,11 +12658,12 @@ display_tab_bar_line (struct it *it, int height)
 	  ++i;
 	}
 
-      /* Stop at line end.  */
-      if (ITERATOR_AT_END_OF_LINE_P (it))
-	break;
-
+      enough = ITERATOR_AT_END_OF_LINE_P (it);
       set_iterator_to_next (it, true);
+
+      /* Stop at line end.  */
+      if (enough)
+	break;
     }
 
  out:
@@ -12744,10 +12746,6 @@ tab_bar_height (struct frame *f, int *n_rows, bool pixelwise)
     {
       it.glyph_row = temp_row;
       display_tab_bar_line (&it, -1);
-      /* If the tab-bar string includes newlines, get past it, because
-	 display_tab_bar_line doesn't.  */
-      if (ITERATOR_AT_END_OF_LINE_P (&it))
-	set_iterator_to_next (&it, true);
     }
   clear_glyph_row (temp_row);
 
@@ -12873,10 +12871,6 @@ redisplay_tab_bar (struct frame *f)
 	      extra -= h;
 	    }
 	  display_tab_bar_line (&it, height + h);
-	  /* If the tab-bar string includes newlines, get past it,
-	     because display_tab_bar_line doesn't.  */
-	  if (ITERATOR_AT_END_OF_LINE_P (&it))
-	    set_iterator_to_next (&it, true);
 	}
     }
   else
