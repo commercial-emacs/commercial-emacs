@@ -608,10 +608,9 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
 
 (defun cl--generic-get-dispatcher (dispatch)
   (with-memoization
-      (gethash dispatch cl--generic-dispatchers)
-    (let* ((dispatch-idx (car dispatch))
+      (gethash (cl--generic-dispatcher-key dispatch) cl--generic-dispatchers)
+    (let* ((dispatch-arg (car dispatch))
            (generalizers (cdr dispatch))
-           (lexical-binding t)
            (typescodes
             (mapcar
              (lambda (generalizer)
@@ -622,9 +621,10 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
                                    'arg)))
              generalizers))
            (fixedargs '(arg))
+           (dispatch-idx dispatch-arg)
            bindings)
-      (when (eq '&context (car-safe dispatch-idx))
-        (setq bindings `((arg ,(cdr dispatch-idx))))
+      (when (eq '&context (car-safe dispatch-arg))
+        (setq bindings `((arg ,(cdr dispatch-arg))))
         (setq fixedargs nil)
         (setq dispatch-idx 0))
       (dotimes (i dispatch-idx)
@@ -635,7 +635,7 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
            (lambda (generic* dispatches-left* methods* ,@fixedargs &rest args)
              (let ,bindings
                (apply (cl--generic-cache-miss
-                       generic* ',dispatch-idx dispatches-left* methods*
+                       generic* ',dispatch-arg dispatches-left* methods*
                        ,(if (cdr typescodes)
                             `(append ,@typescodes)
                           (car typescodes)))
@@ -866,7 +866,7 @@ those methods.")
                 ,@(apply #'append
                          (mapcar #'cl-generic-generalizers ',specializers))
                 ,cl--generic-t-generalizer)))
-         (puthash dispatch ',fun cl--generic-dispatchers)
+         (puthash (cl--generic-dispatcher-key dispatch) ',fun cl--generic-dispatchers)
          ))))
 
 (cl-defmethod cl-generic-combine-methods (generic methods)
