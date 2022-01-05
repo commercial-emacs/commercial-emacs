@@ -28,6 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "blockinput.h"
 #include "systime.h"
+#include "process.h"
 
 /* `xg_select' is a `pselect' replacement.  Why do we need a separate function?
    1. Timeouts.  Glib and Gtk rely on timer events.  If we did pselect
