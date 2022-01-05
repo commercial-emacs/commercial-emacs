@@ -602,52 +602,56 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
 
 (defvar cl--generic-dispatchers (make-hash-table :test #'equal))
 
+(defun cl--generic-dispatcher-key (dispatch)
+  (cons (car dispatch) (mapcar (lambda (x) (cl--generic-generalizer-name x))
+                               (cdr dispatch))))
+
 (defun cl--generic-get-dispatcher (dispatch)
   (with-memoization
-      (gethash dispatch cl--generic-dispatchers)
-    ;; (message "cl--generic-get-dispatcher (%S)" dispatch)
-    (let* ((dispatch-arg (car dispatch))
+      (gethash (cl--generic-dispatcher-key dispatch) cl--generic-dispatchers)
+    (let* ((dispatch-idx (car dispatch))
            (generalizers (cdr dispatch))
-           (lexical-binding t)
-           (tagcodes
-            (mapcar (lambda (generalizer)
-                      (funcall (cl--generic-generalizer-tagcode-function
-                                generalizer)
-                               'arg))
-                    generalizers))
-           (typescodes
-            (mapcar
-             (lambda (generalizer)
-               `(funcall ',(cl--generic-generalizer-specializers-function
-                            generalizer)
-                         ,(funcall (cl--generic-generalizer-tagcode-function
-                                    generalizer)
-                                   'arg)))
-             generalizers))
            (fixedargs '(arg))
-           (dispatch-idx dispatch-arg)
-           (bindings nil))
-      (when (eq '&context (car-safe dispatch-arg))
-        (setq bindings `((arg ,(cdr dispatch-arg))))
+           typescodes bindings)
+      (mapc
+       (lambda (generalizer)
+         (push
+          `(funcall ',(cl--generic-generalizer-specializers-function
+                       generalizer)
+                    ,(funcall (cl--generic-generalizer-tagcode-function
+                               generalizer)
+                              'arg))
+          typescodes))
+       (reverse generalizers))
+      (when (eq '&context (car-safe dispatch-idx))
+        (setq bindings `((arg ,(cdr dispatch-idx))))
         (setq fixedargs nil)
         (setq dispatch-idx 0))
       (dotimes (i dispatch-idx)
         (push (make-symbol (format "arg%d" (- dispatch-idx i 1))) fixedargs))
-      ;; FIXME: For generic functions with a single method (or with 2 methods,
-      ;; one of which always matches), using a tagcode + hash-table is
-      ;; overkill: better just use a `cl-typep' test.
-      (byte-compile
-       `(lambda (generic dispatches-left methods)
-          (apply-partially
-           (lambda (generic* dispatches-left* methods* ,@fixedargs &rest args)
-             (let ,bindings
-               (apply (cl--generic-cache-miss
-                       generic* ',dispatch-arg dispatches-left* methods*
-                       ,(if (cdr typescodes)
-                            `(append ,@typescodes)
-                          (car typescodes)))
-                      ,@fixedargs args)))
-           generic dispatches-left methods))))))
+      (princ (format "the fuq %S %S\n"
+                     (cl--generic-dispatcher-key dispatch)
+                     (length typescodes))
+             (function external-debugging-output))
+      `(lambda (generic dispatches-left methods)
+         (apply-partially
+          (lambda (generic* dispatches-left* methods* ,@fixedargs &rest args)
+            (let ,bindings
+              (when (and generic*
+                         (eq 'map-into (cl--generic-name generic*))
+                         methods*)
+                (princ (format "the feq %S %S\n"
+                               (hash-table-count cl--generic-dispatchers)
+                               (cl--generic-dispatcher-key ',dispatch)
+                               )
+                       (function external-debugging-output)))
+              (apply (cl--generic-cache-miss
+                      generic* ',dispatch-idx dispatches-left* methods*
+                      ,(if (cdr typescodes)
+                           `(append ,@typescodes)
+                         (car typescodes)))
+                     ,@fixedargs args)))
+          generic dispatches-left methods)))))
 
 (defun cl--generic-make-function (generic)
   (cl--generic-make-next-function generic
@@ -663,13 +667,10 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
                           (or (null x) (equal x cl--generic-t-generalizer))))
               (setq dispatches (cdr dispatches)))
             (pop dispatches))))
-    (if (not (and dispatch
-                  ;; If there's no method left, there's no point checking
-                  ;; further arguments.
-                  methods))
-        (cl--generic-build-combined-method generic methods)
-      (let ((dispatcher (cl--generic-get-dispatcher dispatch)))
-        (funcall dispatcher generic dispatches methods)))))
+    (if (and dispatch methods)
+        (let ((dispatcher (cl--generic-get-dispatcher dispatch)))
+          (funcall dispatcher generic dispatches methods))
+      (cl--generic-build-combined-method generic methods))))
 
 (defvar cl--generic-combined-method-memoization
   (make-hash-table :test #'equal :weakness 'value)
@@ -787,7 +788,7 @@ FUN is the function that should be called when METHOD calls
 
 (defun cl--generic-cache-miss (generic
                                dispatch-arg dispatches-left methods-left types)
-  (let ((methods '()))
+  (let (methods)
     (dolist (method methods-left)
       (let* ((specializer (cl--generic-arg-specializer method dispatch-arg))
              (m (member specializer types)))
@@ -856,28 +857,28 @@ those methods.")
   ;; able to preload cl-generic without also preloading the byte-compiler,
   ;; So we use `eval-when-compile' so as not keep it available longer than
   ;; strictly needed.
-(defmacro cl--generic-prefill-dispatchers (arg-or-context &rest specializers)
-  (unless (integerp arg-or-context)
-    (setq arg-or-context `(&context . ,arg-or-context)))
-  (unless (fboundp 'cl--generic-get-dispatcher)
-    (require 'cl-generic))
-  (let ((fun (cl--generic-get-dispatcher
-              `(,arg-or-context
+  (defmacro cl--generic-prefill-dispatchers (arg-or-context &rest specializers)
+    (unless (integerp arg-or-context)
+      (setq arg-or-context `(&context . ,arg-or-context)))
+    (unless (fboundp 'cl--generic-get-dispatcher)
+      (require 'cl-generic))
+    (let ((fun (cl--generic-get-dispatcher
+                `(,arg-or-context
+                  ,@(apply #'append
+                           (mapcar #'cl-generic-generalizers specializers))
+                  ,cl--generic-t-generalizer))))
+      ;; Recompute dispatch at run-time, since the generalizers may be slightly
+      ;; different (e.g. byte-compiled rather than interpreted).
+      ;; FIXME: There is a risk that the run-time generalizer is not equivalent
+      ;; to the compile-time one, in which case `fun' may not be correct
+      ;; any more!
+      `(let ((dispatch
+              `(,',arg-or-context
                 ,@(apply #'append
-                         (mapcar #'cl-generic-generalizers specializers))
-                ,cl--generic-t-generalizer))))
-    ;; Recompute dispatch at run-time, since the generalizers may be slightly
-    ;; different (e.g. byte-compiled rather than interpreted).
-    ;; FIXME: There is a risk that the run-time generalizer is not equivalent
-    ;; to the compile-time one, in which case `fun' may not be correct
-    ;; any more!
-    `(let ((dispatch
-            `(,',arg-or-context
-              ,@(apply #'append
-                       (mapcar #'cl-generic-generalizers ',specializers))
-              ,cl--generic-t-generalizer)))
-       ;; (message "Prefilling for %S with \n%S" dispatch ',fun)
-       (puthash dispatch ',fun cl--generic-dispatchers)))))
+                         (mapcar #'cl-generic-generalizers ',specializers))
+                ,cl--generic-t-generalizer)))
+         (puthash (cl--generic-dispatcher-key dispatch) ',fun cl--generic-dispatchers)
+         ))))
 
 (cl-defmethod cl-generic-combine-methods (generic methods)
   "Standard support for :after, :before, :around, and `:extra NAME' qualifiers."
@@ -1230,8 +1231,7 @@ These match if the argument is `eql' to VAL."
 (cl-generic-define-generalizer cl--generic-typeof-generalizer
   ;; FIXME: We could also change `type-of' to return `null' for nil.
   10 (lambda (name &rest _) `(if ,name (type-of ,name) 'null))
-  (lambda (tag &rest _)
-    (and (symbolp tag) (assq tag cl--typeof-types))))
+  (lambda (tag &rest _) (and (symbolp tag) (assq tag cl--typeof-types))))
 
 (cl-defmethod cl-generic-generalizers :extra "typeof" (type)
   "Support for dispatch on builtin types.
@@ -1295,7 +1295,6 @@ Used internally for the (major-mode MODE) context specializers."
              (me (cl--generic-member-method specializers qualifiers mt)))
         (when me
           (setf (cl--generic-method-table generic) (delq (car me) mt)))))))
-
 
 (provide 'cl-generic)
 ;;; cl-generic.el ends here
