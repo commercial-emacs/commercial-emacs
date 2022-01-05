@@ -629,22 +629,10 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
         (setq dispatch-idx 0))
       (dotimes (i dispatch-idx)
         (push (make-symbol (format "arg%d" (- dispatch-idx i 1))) fixedargs))
-      (princ (format "the fuq %S %S\n"
-                     (cl--generic-dispatcher-key dispatch)
-                     (length typescodes))
-             (function external-debugging-output))
       `(lambda (generic dispatches-left methods)
          (apply-partially
           (lambda (generic* dispatches-left* methods* ,@fixedargs &rest args)
             (let ,bindings
-              (when (and generic*
-                         (eq 'map-into (cl--generic-name generic*))
-                         methods*)
-                (princ (format "the feq %S %S\n"
-                               (hash-table-count cl--generic-dispatchers)
-                               (cl--generic-dispatcher-key ',dispatch)
-                               )
-                       (function external-debugging-output)))
               (apply (cl--generic-cache-miss
                       generic* ',dispatch-idx dispatches-left* methods*
                       ,(if (cdr typescodes)
