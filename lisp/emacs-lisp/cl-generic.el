@@ -611,18 +611,17 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
       (gethash (cl--generic-dispatcher-key dispatch) cl--generic-dispatchers)
     (let* ((dispatch-idx (car dispatch))
            (generalizers (cdr dispatch))
+           (typescodes
+            (mapcar
+             (lambda (generalizer)
+               `(funcall ',(cl--generic-generalizer-specializers-function
+                            generalizer)
+                         ,(funcall (cl--generic-generalizer-tagcode-function
+                                    generalizer)
+                                   'arg)))
+             generalizers))
            (fixedargs '(arg))
-           typescodes bindings)
-      (mapc
-       (lambda (generalizer)
-         (push
-          `(funcall ',(cl--generic-generalizer-specializers-function
-                       generalizer)
-                    ,(funcall (cl--generic-generalizer-tagcode-function
-                               generalizer)
-                              'arg))
-          typescodes))
-       (reverse generalizers))
+           bindings)
       (when (eq '&context (car-safe dispatch-idx))
         (setq bindings `((arg ,(cdr dispatch-idx))))
         (setq fixedargs nil)
