@@ -608,9 +608,10 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
 
 (defun cl--generic-get-dispatcher (dispatch)
   (with-memoization
-      (gethash (cl--generic-dispatcher-key dispatch) cl--generic-dispatchers)
+      (gethash dispatch cl--generic-dispatchers)
     (let* ((dispatch-idx (car dispatch))
            (generalizers (cdr dispatch))
+           (lexical-binding t)
            (typescodes
             (mapcar
              (lambda (generalizer)
@@ -628,17 +629,18 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
         (setq dispatch-idx 0))
       (dotimes (i dispatch-idx)
         (push (make-symbol (format "arg%d" (- dispatch-idx i 1))) fixedargs))
-      `(lambda (generic dispatches-left methods)
-         (apply-partially
-          (lambda (generic* dispatches-left* methods* ,@fixedargs &rest args)
-            (let ,bindings
-              (apply (cl--generic-cache-miss
-                      generic* ',dispatch-idx dispatches-left* methods*
-                      ,(if (cdr typescodes)
-                           `(append ,@typescodes)
-                         (car typescodes)))
-                     ,@fixedargs args)))
-          generic dispatches-left methods)))))
+      (byte-compile
+       `(lambda (generic dispatches-left methods)
+          (apply-partially
+           (lambda (generic* dispatches-left* methods* ,@fixedargs &rest args)
+             (let ,bindings
+               (apply (cl--generic-cache-miss
+                       generic* ',dispatch-idx dispatches-left* methods*
+                       ,(if (cdr typescodes)
+                            `(append ,@typescodes)
+                          (car typescodes)))
+                      ,@fixedargs args)))
+           generic dispatches-left methods))))))
 
 (defun cl--generic-make-function (generic)
   (cl--generic-make-next-function generic
@@ -864,7 +866,7 @@ those methods.")
                 ,@(apply #'append
                          (mapcar #'cl-generic-generalizers ',specializers))
                 ,cl--generic-t-generalizer)))
-         (puthash (cl--generic-dispatcher-key dispatch) ',fun cl--generic-dispatchers)
+         (puthash dispatch ',fun cl--generic-dispatchers)
          ))))
 
 (cl-defmethod cl-generic-combine-methods (generic methods)
