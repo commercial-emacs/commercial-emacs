@@ -370,7 +370,85 @@ Please submit bug reports and other feedback to the author, Neil W. Van Dyke
       (concat url "/")
     url))
 
-;;-----------------------------------------------------------------------------
+
+;;; Search engine functionality
+
+(defcustom webjump-default-search-engine "DuckDuckGo"
+  "Search engine to use for `webjump-search' and related commands.
+The string should denote an entry in `webjump-sites', with a
+`simple-query' entry."
+  :type 'string)
+
+(defun webjump-choose-search-engine ()
+  "Choose a search engine to use from `webjump-sites'.
+If no prefix argument was used, the function will return the
+entry for `webjump-default-search-engine'."
+  (assoc-string
+   (if current-prefix-arg
+       (completing-read
+        (format-prompt "Use search engine"
+                       webjump-default-search-engine)
+        webjump-sites
+        (lambda (ent)
+          (and (vectorp (cdr ent))
+               (eq (aref (cdr ent) 0) 'simple-query)))
+        t nil nil webjump-default-search-engine)
+     webjump-default-search-engine)
+   webjump-sites t))
+
+(defun webjump-search-query (string)
+  "Generate an URL query to search for STRING."
+  (let ((engine (cdr (webjump-choose-search-engine))))
+    (webjump-url-fix
+     (concat (aref engine 2)
+             (webjump-url-encode string)
+             (aref engine 3)))))
+
+;;;###autoload
+(defun webjump-search (string)
+  "Search for STRING using a search engine.
+If the optional argument ENGINE may be used to override
+`webjump-default-search-engine'."
+  (interactive (list (if (use-region-p)
+                         (buffer-substring (region-beginning) (region-end))
+                       (read-string "Search: "))))
+  (browse-url (webjump-search-query string)))
+
+;;;###autoload
+(defun webjump-search-at-point ()
+  "Search for symbol at point online.
+See `webjump-search' for more details."
+  (interactive)
+  (let ((query (thing-at-point 'symbol)))
+    (unless query
+      (user-error "Nothing to search for"))
+    (webjump-search query)))
+
+;;;###autoload
+(defun webjump-search-at-mouse (click)
+  "Query an online search engine at CLICK.
+If a region is active, the entire region will be sent, otherwise
+the symbol at point will be used.  See `webjump-search' for more
+details."
+  (interactive "e")
+  (let ((query (if (use-region-p)
+                   (buffer-substring (region-beginning)
+                                     (region-end))
+                 (thing-at-mouse click 'symbol))))
+    (unless (or query (string-match-p "\\`[[:space:]\n]*\\'" query))
+      (user-error "Nothing to search for"))
+    (webjump-search query)))
+
+;;;###autoload
+(defun webjump-search-context-menu (menu click)
+  "Populate MENU with command to search online at CLICK."
+  (save-excursion
+    (mouse-set-point click)
+    (define-key-after menu [webjump-search-separator] menu-bar-separator)
+    (define-key-after menu [webjump-search-at-mouse]
+      '(menu-item "Online search" webjump-search-at-mouse
+                  :help "Search for region or word online")))
+  menu)
 
 (provide 'webjump)
 

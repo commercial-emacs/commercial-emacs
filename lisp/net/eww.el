@@ -33,6 +33,7 @@
 (require 'url)
 (require 'url-queue)
 (require 'xdg)
+(require 'webjump)
 (eval-when-compile (require 'subr-x))
 
 (defgroup eww nil
@@ -55,6 +56,9 @@
   :version "24.4"
   :group 'eww
   :type 'string)
+(make-obsolete-variable 'eww-search-prefix
+                        "webjump-default-search-engine"
+                        "29.1")
 
 (defcustom eww-use-browse-url "\\`mailto:"
   "EWW will use `browse-url' when following links that match this regexp.
@@ -355,7 +359,7 @@ will start Emacs and browse the GNU web site."
 (defun eww (url &optional new-buffer buffer)
   "Fetch URL and render the page.
 If the input doesn't look like an URL or a domain name, the
-word(s) will be searched for via `eww-search-prefix'.
+word(s) will be searched for via `webjump-search'.
 
 If NEW-BUFFER is non-nil (interactively, the prefix arg), use a
 new buffer instead of reusing the default EWW buffer.
@@ -464,9 +468,7 @@ killed after rendering."
                ;; Some sites do not redirect final /
                (when (string= (url-filename (url-generic-parse-url url)) "")
                  (setq url (concat url "/"))))
-           (setq url (concat eww-search-prefix
-                             (mapconcat
-                              #'url-hexify-string (split-string url) "+"))))))
+           (setq url (webjump-search-query url)))))
   url)
 
 (defun eww--preprocess-html (start end)

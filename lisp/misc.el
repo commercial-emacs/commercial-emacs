@@ -27,6 +27,7 @@
 
 (eval-when-compile
   (require 'tabulated-list))
+(require 'cl-lib)
 
 ;;;###autoload
 (defun copy-from-above-command (&optional arg)
