@@ -21,6 +21,7 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
 (require 'font-lock)
 (declare-function tree-sitter-changed-range "tree-sitter.c")
 (declare-function tree-sitter-highlight-region "tree-sitter.c")
@@ -71,6 +72,7 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
     (makefile-gmake-mode . "make")
     (makefile-mode . "make")
     (php-mode . "php")
+    (perl-mode . "perl")
     (ess-mode . "r")
     (sql-mode . "sql")
     (conf-toml-mode . "toml")

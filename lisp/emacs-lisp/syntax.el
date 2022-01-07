@@ -325,22 +325,17 @@ END) suitable for `syntax-propertize-function'."
     (syntax-propertize (min (+ syntax-propertize-chunks charpos) (point-max)))))
 
 (defmacro syntax-ppss-get (pos field)
-  "Return FIELD from ppss at POS and from tree-sitter (if loaded)."
-  `(let ((val (funcall (symbol-function
-                        (quote ,(intern (concat "ppss-" (symbol-name field)))))
-                       (syntax-ppss ,pos))))
+  "Return index FIELD from ppss at POS and from tree-sitter (if loaded)."
+  `(let ((val (nth ,field (syntax-ppss ,pos))))
      (prog1 val
        (when-let ((func (symbol-function
                          (quote ,(intern (concat "tree-sitter-ppss-"
-                                                 (symbol-name field))))))
+                                                 (number-to-string field))))))
                   (sitter (tree-sitter)))
          (let ((sitter-val (funcall func ,pos)))
            (unless (equal val sitter-val)
-             (message "syntax-ppss-get %s(%s): %S != %S"
-                      ',field ,pos val sitter-val)))))))
-
-(defun syntax-ppss-depth (ppss)
-  (nth 0 ppss))
+             (message "syntax-ppss-get %d@%d: %S != %S"
+                      ,field ,pos val sitter-val)))))))
 
 (defun syntax-ppss-toplevel-pos (ppss)
   "Returns the syntactically outermost position from a PPSS state.

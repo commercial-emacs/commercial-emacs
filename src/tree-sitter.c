@@ -393,13 +393,17 @@ DEFUN ("tree-sitter-root-node",
   return retval;
 }
 
-DEFUN ("tree-sitter-ppss-depth",
-       Ftree_sitter_ppss_depth, Stree_sitter_ppss_depth,
+DEFUN ("tree-sitter-ppss",
+       Ftree_sitter_ppss, Stree_sitter_ppss,
        0, 1, 0,
-       doc: /* Return ppss element 0 at POS. */)
+       doc: /* Return ppss at POS. */)
   (Lisp_Object pos)
 {
-  Lisp_Object retval = Qnil,
+  uint32_t depth = 0;
+  const TSTree *tree;
+  TSNode node, parent;
+  Lisp_Object retval =
+    list (Qnil, Qnil, Qnil, Qnil, Qnil, Qnil, Qnil, Qnil, Qnil, Qnil, Qnil),
     sitter = Ftree_sitter (Fcurrent_buffer ());
 
   if (NILP (pos))
@@ -407,13 +411,41 @@ DEFUN ("tree-sitter-ppss-depth",
 
   CHECK_FIXNUM (pos);
 
-  if (! NILP (sitter))
+  if (NILP (sitter))
+    return retval;
+
+  tree = XTREE_SITTER (sitter)->tree;
+  if (tree == NULL)
+    return retval;
+
+  node = ts_tree_node_at (tree, BUFFER_TO_SITTER (XFIXNUM (pos)));
+  if (ts_node_is_null (node))
+    return retval;
+
+  parent = ts_node_parent (node);
+  if (ts_node_is_null (parent))
+    return retval;
+
+  Fsetcar (Fnthcdr (make_fixnum (1), retval),
+	   make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (parent))));
+
+  for (TSNode j = node;
+       ! ts_node_is_null (j);
+       j = ts_node_parent (j), depth++)
     {
-      const TSTree *tree = XTREE_SITTER (sitter)->tree;
-      if (tree != NULL)
-	retval = make_fixnum (ts_tree_depth_for_byte
-			      (tree, BUFFER_TO_SITTER (XFIXNUM (pos))));
+      if (! NILP (Fstring_match (build_string ("\\bstring\\b"),
+				 build_string (ts_node_type (j)), Qnil, Qnil)))
+	/* best efforts regex for strings */
+	Fsetcar (Fnthcdr (make_fixnum (3), retval),
+		 make_fixnum (FETCH_CHAR (SITTER_TO_BUFFER
+					  (ts_node_start_byte (j)))));
+      if (0 == strcmp ("source_file", ts_node_type (j)))
+	{
+	  depth--;
+	  break;
+	}
     }
+  Fsetcar (retval, make_fixnum (max (depth, 0)));
   return retval;
 }
 
@@ -549,48 +581,6 @@ DEFUN ("tree-sitter",
   return sitter;
 }
 
-DEFUN ("tree-sitter-ppss", Ftree_sitter_ppss, Stree_sitter_ppss, 0, 1, 0,
-       doc: /* Emulate `parse-partial-sexp'.  */)
-  (Lisp_Object pos)
-{
-  Lisp_Object sitter = Ftree_sitter (Fcurrent_buffer ());
-  const TSTree *tree = NILP (sitter) ? NULL : XTREE_SITTER (sitter)->tree;
-
-  if (NILP (pos))
-    pos = Fpoint ();
-
-  CHECK_FIXNUM (pos);
-
-  if (tree == NULL)
-    return Qnil;
-
-  return list (make_fixnum (ts_tree_depth_for_byte
-			    (tree, BUFFER_TO_SITTER (XFIXNUM (pos)))));
-  /* make_fixnum (state.prevlevelstart), */
-  /* make_fixnum (state.thislevelstart), */
-  /* state.instring >= 0 */
-  /* ? (state.instring == ST_STRING_STYLE */
-  /* 	  ? Qt : make_fixnum (state.instring)) : Qnil, */
-  /* state.incomment < 0 ? Qt : */
-  /* (state.incomment == 0 ? Qnil : */
-  /* 	make_fixnum (state.incomment)), */
-  /* state.quoted ? Qt : Qnil, */
-  /* make_fixnum (state.mindepth), */
-  /* state.comstyle */
-  /* ? (state.comstyle == ST_COMMENT_STYLE */
-  /* 	  ? Qsyntax_table */
-  /* 	  : make_fixnum (state.comstyle)) */
-  /* : Qnil, */
-  /* (state.incomment || (state.instring >= 0)) */
-  /* ? make_fixnum (state.comstr_start) */
-  /* : Qnil, */
-  /* state.levelstarts, */
-  /* state.prev_syntax == Smax */
-  /* ? Qnil */
-  /* : make_fixnum (state.prev_syntax), */
-  /* Qnil); */
-}
-
 /* TODO buffers not utf-8-clean. */
 void
 tree_sitter_record_change (ptrdiff_t start_char,
@@ -670,7 +660,6 @@ syms_of_tree_sitter (void)
 
   defsubr (&Stree_sitter);
   defsubr (&Stree_sitter_root_node);
-  defsubr (&Stree_sitter_ppss_depth);
   defsubr (&Stree_sitter_ppss);
   defsubr (&Stree_sitter_highlights);
   defsubr (&Stree_sitter_highlight_region);
