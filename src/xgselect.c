@@ -58,6 +58,9 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   bool context_acquired = false;
   int i, nfds, tmo_in_millisec, must_free = 0;
   bool need_to_dispatch;
+#ifdef HAVE_PGTK
+  bool already_has_events;
+#endif
 
   context = g_main_context_default ();
   if (main_thread_p (current_thread))
@@ -66,6 +69,10 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
      because this function handles more than just glib file descriptors.
      Note that, as implemented, this failure is completely silent: there is
      no feedback to the caller.  */
+
+#ifdef HAVE_PGTK
+  already_has_events = g_main_context_pending (context);
+#endif
 
   if (rfds) all_rfds = *rfds;
   else FD_ZERO (&all_rfds);
@@ -115,10 +122,41 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 	tmop = &tmo;
     }
 
+#ifndef HAVE_PGTK
   fds_lim = max_fds + 1;
   nfds = thread_select (pselect, fds_lim,
 			&all_rfds, have_wfds ? &all_wfds : NULL, efds,
 			tmop, sigmask);
+#else
+  /*
+    On PGTK, when you type a key, the key press event are received,
+    and one more key press event seems to be received internally.
+    The second event is not via a socket, so there are weird status:
+      - socket read buffer is empty
+      - a key press event is pending
+    In that case, we should not sleep, and dispatch the event immediately.
+    Bug#52761
+   */
+  if (!already_has_events)
+    {
+      fds_lim = max_fds + 1;
+      nfds = thread_select (pselect, fds_lim,
+			    &all_rfds, have_wfds ? &all_wfds : NULL, efds,
+			    tmop, sigmask);
+    }
+  else
+    {
+      /* Emulate return values */
+      nfds = 1;
+      FD_ZERO (&all_rfds);
+      if (have_wfds)
+	FD_ZERO (&all_wfds);
+      if (efds)
+	FD_ZERO (efds);
+      our_fds++;
+    }
+#endif
+
   if (nfds < 0)
     retval = nfds;
   else if (nfds == 0)
