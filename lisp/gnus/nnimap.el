@@ -36,6 +36,7 @@
 
 (autoload 'auth-source-forget+ "auth-source")
 (autoload 'auth-source-search "auth-source")
+(autoload 'auth-info-password "auth-source")
 
 (declare-function x-server-version "xfns.c" (&optional terminal))
 
@@ -442,10 +443,7 @@ the key of the front-line assoc list to incorporate SERVER."
                                            :create t))))
     (if found
         (list (plist-get found :user)
-	      (let ((secret (plist-get found :secret)))
-		(if (functionp secret)
-		    (funcall secret)
-		  secret))
+	      (auth-info-password found)
 	      (plist-get found :save-function))
       nil)))
 
