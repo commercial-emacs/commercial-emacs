@@ -829,6 +829,7 @@ since it could result in memory overflow and make Emacs crash."
 	     (x-stretch-cursor display boolean "21.1")
 	     (scroll-bar-adjust-thumb-portion windows boolean "24.4")
              (x-scroll-event-delta-factor mouse float "29.1")
+             (x-gtk-use-native-input keyboard boolean "29.1")
 	     ;; xselect.c
 	     (x-select-enable-clipboard-manager killing boolean "24.1")
 	     ;; xsettings.c
@@ -855,6 +856,9 @@ since it could result in memory overflow and make Emacs crash."
 		       (featurep 'ns))
                       ((string-match "\\`haiku-" (symbol-name symbol))
                        (featurep 'haiku))
+                      ((eq symbol 'x-gtk-use-native-input)
+                       (and (featurep 'x)
+                            (featurep 'gtk)))
 		      ((string-match "\\`x-.*gtk" (symbol-name symbol))
 		       (featurep 'gtk))
 		      ((string-match "clipboard-manager" (symbol-name symbol))
