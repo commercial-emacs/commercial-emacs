@@ -244,6 +244,19 @@ wants to replace FROM with TO."
                                    (query-replace-descr
                                     (cdar query-replace-defaults)))))
                   (t (format-prompt prompt nil))))
+           ;; Set up lazy highlighting while reading FROM regexp.
+           ;; TODO: Treat the `region-noncontiguous-p' case by setting
+           ;; `isearch-filter-predicate'.
+           (isearch-lazy-highlight query-replace-highlight)
+           (isearch-regexp regexp-flag)
+           (isearch-regexp-function nil)
+           (isearch-case-fold-search case-fold-search) ;; TODO: the case-folding rule here is complicated...
+           (isearch-read-with-highlight-transform
+            (lambda (string)
+              (let ((from (query-replace--split-string string)))
+                (if (consp from) (car from) from))))
+           (isearch-lazy-count-display-function
+            #'isearch-read-with-highlight-count)
 	   (from
 	    ;; The save-excursion here is in case the user marks and copies
 	    ;; a region in order to specify the minibuffer input.
@@ -251,6 +264,7 @@ wants to replace FROM with TO."
 	    (save-excursion
               (minibuffer-with-setup-hook
                   (lambda ()
+                    (isearch-read-with-highlight-setup)
                     (setq-local text-property-default-nonsticky
                                 (append '((separator . t) (face . t))
                                         text-property-default-nonsticky)))
