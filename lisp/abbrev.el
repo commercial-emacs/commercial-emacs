@@ -67,13 +67,11 @@ be replaced by its expansion."
 
 (define-obsolete-variable-alias 'edit-abbrevs-map
   'edit-abbrevs-mode-map "24.4")
-(defvar edit-abbrevs-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map "\C-x\C-s" 'abbrev-edit-save-buffer)
-    (define-key map "\C-x\C-w" 'abbrev-edit-save-to-file)
-    (define-key map "\C-c\C-c" 'edit-abbrevs-redefine)
-    map)
-  "Keymap used in `edit-abbrevs'.")
+(defvar-keymap edit-abbrevs-mode-map
+  :doc "Keymap used in `edit-abbrevs'."
+  "C-x C-s" #'abbrev-edit-save-buffer
+  "C-x C-w" #'abbrev-edit-save-to-file
+  "C-c C-c" #'edit-abbrevs-redefine)
 
 (defun kill-all-abbrevs ()
   "Undefine all defined abbrevs."
@@ -168,7 +166,7 @@ or may be omitted (it is usually omitted)."
 
 (defun edit-abbrevs-redefine ()
   "Redefine abbrevs according to current buffer contents."
-  (interactive)
+  (interactive nil edit-abbrevs-mode)
   (save-restriction
     (widen)
     (define-abbrevs t)
@@ -269,7 +267,8 @@ have been saved."
    (list (read-file-name "Save abbrevs to file: "
 			 (file-name-directory
 			  (expand-file-name abbrev-file-name))
-			 abbrev-file-name)))
+                         abbrev-file-name))
+   edit-abbrevs-mode)
   (edit-abbrevs-redefine)
   (write-abbrev-file file t))
 
@@ -277,7 +276,7 @@ have been saved."
   "Save all user-level abbrev definitions in current buffer.
 The saved abbrevs are written to the file specified by
 `abbrev-file-name'."
-  (interactive)
+  (interactive nil edit-abbrevs-mode)
   (abbrev-edit-save-to-file abbrev-file-name))
 
 
@@ -1188,7 +1187,8 @@ SORTFUN is passed to `sort' to change the default ordering."
 (define-derived-mode edit-abbrevs-mode fundamental-mode "Edit-Abbrevs"
   "Major mode for editing the list of abbrev definitions.
 This mode is for editing abbrevs in a buffer prepared by `edit-abbrevs',
-which see.")
+which see."
+  :interactive nil)
 
 (provide 'abbrev)
 
