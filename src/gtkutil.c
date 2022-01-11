@@ -1608,6 +1608,7 @@ xg_create_frame_widgets (struct frame *f)
   /* Must use g_strdup because gtk_widget_modify_style does g_free.  */
   style->bg_pixmap_name[GTK_STATE_NORMAL] = g_strdup ("<none>");
   gtk_widget_modify_style (wfixed, style);
+  gtk_widget_set_can_focus (wfixed, TRUE);
 #else
   gtk_widget_set_can_focus (wfixed, TRUE);
 #ifdef HAVE_PGTK
@@ -6123,9 +6124,6 @@ xg_widget_key_press_event_cb (GtkWidget *widget, GdkEvent *event,
   union buffered_input_event inev;
   guint keysym = event->key.keyval;
   unsigned int xstate;
-  gunichar *cb;
-  ptrdiff_t i;
-  glong len;
   gunichar uc;
 
   FOR_EACH_FRAME (tail, tem)
@@ -6235,40 +6233,19 @@ xg_widget_key_press_event_cb (GtkWidget *widget, GdkEvent *event,
       goto done;
     }
 
-  if (event->key.string)
+  uc = gdk_keyval_to_unicode (keysym);
+
+  if (uc)
     {
-      cb = g_utf8_to_ucs4_fast (event->key.string, -1, &len);
-
-      for (i = 0; i < len; ++i)
-	{
-	  inev.ie.kind = (SINGLE_BYTE_CHAR_P (cb[i])
-			  ? ASCII_KEYSTROKE_EVENT
-			  : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
-	  inev.ie.code = cb[i];
-
-	  kbd_buffer_store_buffered_event (&inev, &xg_pending_quit_event);
-	}
-
-      g_free (cb);
-
-      inev.ie.kind = NO_EVENT;
+      inev.ie.kind = (SINGLE_BYTE_CHAR_P (uc)
+		      ? ASCII_KEYSTROKE_EVENT
+		      : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
+      inev.ie.code = uc;
     }
   else
     {
-      uc = gdk_keyval_to_unicode (keysym);
-
-      if (uc)
-	{
-	  inev.ie.kind = (SINGLE_BYTE_CHAR_P (uc)
-			  ? ASCII_KEYSTROKE_EVENT
-			  : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
-	  inev.ie.code = uc;
-	}
-      else
-	{
-	  inev.ie.kind = NON_ASCII_KEYSTROKE_EVENT;
-	  inev.ie.code = keysym;
-	}
+      inev.ie.kind = NON_ASCII_KEYSTROKE_EVENT;
+      inev.ie.code = keysym;
     }
 
  done:
