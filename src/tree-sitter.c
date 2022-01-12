@@ -454,7 +454,8 @@ DEFUN ("tree-sitter-ppss",
 	Fsetcar (Fnthcdr (make_fixnum (4), retval), Qt);
 
       if (! NILP (Fstring_match (build_string ("\\bescape"),
-				 build_string (ts_node_type (j)), Qnil, Qnil)))
+				 build_string (ts_node_type (j)), Qnil, Qnil))
+	  && (BUFFER_TO_SITTER (XFIXNUM (pos)) == ts_node_start_byte (j) + 1))
 	/* best efforts regex for escapes */
 	Fsetcar (Fnthcdr (make_fixnum (5), retval), Qt);
 
