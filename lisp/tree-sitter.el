@@ -72,7 +72,6 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
     (makefile-gmake-mode . "make")
     (makefile-mode . "make")
     (php-mode . "php")
-    (perl-mode . "perl")
     (ess-mode . "r")
     (sql-mode . "sql")
     (conf-toml-mode . "toml")

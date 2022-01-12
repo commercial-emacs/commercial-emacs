@@ -433,12 +433,31 @@ DEFUN ("tree-sitter-ppss",
        ! ts_node_is_null (j);
        j = ts_node_parent (j), depth++)
     {
-      if (! NILP (Fstring_match (build_string ("\\bstring\\b"),
+      if (NILP (Fnth (make_fixnum (2), retval)))
+	{
+	  TSNode sibling = ts_node_prev_sibling (j);
+	  if (! ts_node_is_null (sibling))
+	    Fsetcar (Fnthcdr (make_fixnum (2), retval),
+		     make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (sibling))));
+	}
+
+      if (! NILP (Fstring_match (build_string ("\\bstring"),
 				 build_string (ts_node_type (j)), Qnil, Qnil)))
 	/* best efforts regex for strings */
 	Fsetcar (Fnthcdr (make_fixnum (3), retval),
 		 make_fixnum (FETCH_CHAR (SITTER_TO_BUFFER
 					  (ts_node_start_byte (j)))));
+
+      if (! NILP (Fstring_match (build_string ("\\bcomment"),
+				 build_string (ts_node_type (j)), Qnil, Qnil)))
+	/* best efforts regex for comments */
+	Fsetcar (Fnthcdr (make_fixnum (4), retval), Qt);
+
+      if (! NILP (Fstring_match (build_string ("\\bescape"),
+				 build_string (ts_node_type (j)), Qnil, Qnil)))
+	/* best efforts regex for escapes */
+	Fsetcar (Fnthcdr (make_fixnum (5), retval), Qt);
+
       if (0 == strcmp ("source_file", ts_node_type (j)))
 	{
 	  depth--;

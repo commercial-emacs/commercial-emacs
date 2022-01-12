@@ -58,7 +58,7 @@ Install Rust library:
 ```bash
 git clone https://github.com/commercial-emacs/tree-sitter.git
 make -C tree-sitter install
-pkg-config --exact-version=0.6.3alpha2 tree-sitter || echo not found
+pkg-config --exact-version=0.6.3alpha3 tree-sitter || echo not found
 ```
 
 Then build emacs:
