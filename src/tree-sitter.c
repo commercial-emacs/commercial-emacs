@@ -614,15 +614,13 @@ tree_sitter_record_change (ptrdiff_t start_char,
       TSTree *tree = XTREE_SITTER (sitter)->tree;
       if (tree != NULL)
 	{
-	  static const TSPoint dummy_point = { 0, 0 };
-
 	  TSInputEdit edit = {
 	    BUFFER_TO_SITTER (start_char),
 	    old_end_byte,
 	    BUFFER_TO_SITTER (new_end_char),
-	    dummy_point,
-	    dummy_point,
-	    dummy_point
+	    (TSPoint) { 0, 0 },
+	    (TSPoint) { 0, 0 },
+	    (TSPoint) { 0, new_end_char - start_char } /* black magic */
 	  };
 
 	  if (XTREE_SITTER (sitter)->prev_tree != NULL)
