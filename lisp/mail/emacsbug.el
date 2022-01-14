@@ -355,23 +355,26 @@ usually do not have translators for other languages.\n\n")))
 	(setq report-emacs-bug-send-command
 	      (symbol-name report-emacs-bug-send-command)))
     (unless report-emacs-bug-no-explanations
-      (with-output-to-temp-buffer "*Bug Help*"
-	(princ "While in the mail buffer:\n\n")
-        (if report-emacs-bug-send-command
-            (princ (substitute-command-keys
-                    (format "  Type \\[%s] to send the bug report.\n"
-                            report-emacs-bug-send-command))))
-	(princ (substitute-command-keys
-		"  Type \\[kill-buffer] RET to cancel (don't send it).\n"))
-	(if can-insert-mail
-	    (princ (substitute-command-keys
-		    "  Type \\[report-emacs-bug-insert-to-mailer] to copy text to your preferred mail program.\n")))
-	(terpri)
-	(princ (substitute-command-keys
-		"  Type \\[info-emacs-bug] to visit in Info the Emacs Manual section
+      (let ((display-buffer-base-action
+             (ignore-errors
+               (eval (car (get 'display-buffer-base-action 'standard-value))))))
+        (with-output-to-temp-buffer "*Bug Help*"
+	  (princ "While in the mail buffer:\n\n")
+          (if report-emacs-bug-send-command
+              (princ (substitute-command-keys
+                      (format "  Type \\[%s] to send the bug report.\n"
+                              report-emacs-bug-send-command))))
+	  (princ (substitute-command-keys
+		  "  Type \\[kill-buffer] RET to cancel (don't send it).\n"))
+	  (if can-insert-mail
+	      (princ (substitute-command-keys
+		      "  Type \\[report-emacs-bug-insert-to-mailer] to copy text to your preferred mail program.\n")))
+	  (terpri)
+	  (princ (substitute-command-keys
+		  "  Type \\[info-emacs-bug] to visit in Info the Emacs Manual section
     about when and how to write a bug report, and what
     information you should include to help fix the bug.")))
-      (shrink-window-if-larger-than-buffer (get-buffer-window "*Bug Help*")))
+        (shrink-window-if-larger-than-buffer (get-buffer-window "*Bug Help*"))))
     ;; Make it less likely people will send empty messages.
     (if report-emacs-bug-send-hook
         (add-hook report-emacs-bug-send-hook #'report-emacs-bug-hook nil t))
