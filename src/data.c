@@ -4049,7 +4049,6 @@ syms_of_data (void)
   DEFSYM (Qxwidget, "xwidget");
   DEFSYM (Qxwidget_view, "xwidget-view");
   DEFSYM (Qtree_sitter_parser, "tree-sitter-parser");
-  DEFSYM (Qtree_sitter_node, "tree-sitter-node");
   DEFSYM (Qsqlite, "sqlite");
 
   DEFSYM (Qdefun, "defun");
