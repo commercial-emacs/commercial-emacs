@@ -2529,6 +2529,12 @@ deleting them."
         (if iconify (iconify-frame this) (delete-frame this)))
       (setq this next))))
 
+(defcustom undelete-frame-max 1
+  "Maximum number of frames deleted with `delete-frame'."
+  :type 'integer
+  :group 'frames
+  :version "29.1")
+
 (eval-when-compile (require 'frameset))
 
 (defvar undelete-frame--deleted-frames nil
@@ -2536,7 +2542,7 @@ deleting them."
 
 (defun undelete-frame--handle-delete-frame (frame)
   "Save the configuration of frames deleted with `delete-frame'.
-Only the 16 most recently deleted frames are saved."
+Only the `undelete-frame-max' most recently deleted frames are saved."
   (when (frame-live-p frame)
     (setq undelete-frame--deleted-frames
           (cons
@@ -2555,26 +2561,18 @@ Only the 16 most recently deleted frames are saved."
                         (cons '(display . :never)
                               frameset-filter-alist))))
            undelete-frame--deleted-frames))
-    (if (> (length undelete-frame--deleted-frames) 16)
+    (if (> (length undelete-frame--deleted-frames) undelete-frame-max)
         (setq undelete-frame--deleted-frames
               (butlast undelete-frame--deleted-frames)))))
 
-(define-minor-mode undelete-frame-mode
-  "Enable the `undelete-frame' command."
-  :group 'frames
-  :global t
-  (if undelete-frame-mode
-      (add-hook 'delete-frame-functions
-                #'undelete-frame--handle-delete-frame -75)
-    (remove-hook 'delete-frame-functions
-                 #'undelete-frame--handle-delete-frame)
-    (setq undelete-frame--deleted-frames nil)))
+(add-hook 'delete-frame-functions
+          #'undelete-frame--handle-delete-frame -75)
 
 (defun undelete-frame (&optional arg)
   "Undelete a frame deleted with `delete-frame'.
 Without a prefix argument, undelete the most recently deleted
 frame.
-With a numerical prefix argument ARG between 1 and 16, where 1 is
+With a numerical prefix argument ARG between 1 and `undelete-frame-max', where 1 is
 most recently deleted frame, undelete the ARGth deleted frame.
 When called from Lisp, returns the new frame."
   (interactive "P")
@@ -2586,7 +2584,7 @@ When called from Lisp, returns the new frame."
              (frames (frame-list))
              (frameset (nth (1- number) undelete-frame--deleted-frames))
              (graphic (display-graphic-p)))
-        (if (not (<= 1 number 16))
+        (if (not (<= 1 number undelete-frame-max))
             (user-error "%d is not a valid deleted frame number argument"
                         number)
           (if (not frameset)
