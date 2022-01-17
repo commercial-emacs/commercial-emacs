@@ -37,8 +37,6 @@
 (require 'mm-util)
 (require 'gnus-util)
 (autoload 'gnus-remove-odd-characters "gnus-sum")
-(autoload 'gnus-range-add "gnus-range")
-(autoload 'gnus-remove-from-range "gnus-range")
 ;; FIXME none of these are used explicitly in this file.
 (autoload 'gnus-sorted-intersection "gnus-range")
 (autoload 'gnus-intersection "gnus-range")
@@ -1042,10 +1040,9 @@ See `find-file-noselect' for the arguments."
 	       mark
 	       (cond
 		((eq what 'add)
-		 (gnus-range-add (cdr (assoc mark backend-marks)) range))
+		 (range-concat (cdr (assoc mark backend-marks)) range))
 		((eq what 'del)
-		 (gnus-remove-from-range
-		  (cdr (assoc mark backend-marks)) range))
+		 (range-remove (cdr (assoc mark backend-marks)) range))
 		((eq what 'set)
 		 range))
 	       backend-marks)))))
