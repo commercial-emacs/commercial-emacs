@@ -56,7 +56,8 @@ won't fontify), and turn off showstoppers like `hl-line-mode` and
 
 Install Rust library:
 ```bash
-git clone https://github.com/commercial-emacs/tree-sitter.git
+git clone --depth 1 --branch 0.6.3alpha3 \
+  https://github.com/commercial-emacs/tree-sitter.git
 make -C tree-sitter install
 pkg-config --exact-version=0.6.3alpha3 tree-sitter || echo not found
 ```
