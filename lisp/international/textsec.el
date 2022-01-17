@@ -38,13 +38,15 @@
   (require 'uni-scripts))
 
 (defun textsec-scripts (string)
-  "Return a list of scripts used in STRING."
+  "Return a list of Unicode scripts used in STRING.
+The scripts returned by this function use the Unicode Script property
+as defined by the Unicode Standard Annex 24 (UAX#24)."
   (seq-map (lambda (char)
              (elt textsec--char-scripts char))
            string))
 
 (defun textsec-single-script-p (string)
-  "Return non-nil if STRING is all in a single script.
+  "Return non-nil if STRING is all in a single Unicode script.
 
 Note that the concept of \"single script\" used by this function
 isn't obvious -- some mixtures of scripts count as a \"single
@@ -52,7 +54,8 @@ script\".  See
 
   https://www.unicode.org/reports/tr39/#Mixed_Script_Detection
 
-for details."
+for details.  The Unicode scripts are as defined by the
+Unicode Standard Annex 24 (UAX#24)."
   (let ((scripts (mapcar
                   (lambda (s)
                     (append s
@@ -90,7 +93,8 @@ for details."
 
 (defun textsec-covering-scripts (string)
   "Return a minimal list of scripts used in STRING.
-Not that a string may have several different minimal cover sets."
+Note that a string may have several different minimal cover sets.
+The scripts are as defined by the Unicode Standard Annex 24 (UAX#24)."
   (let* ((scripts (textsec-scripts string))
          (set (car scripts)))
     (dolist (s scripts)
@@ -154,18 +158,19 @@ Levels are (in order of restrictiveness) `ascii-only',
 
 (defun textsec-mixed-numbers-p (string)
   "Return non-nil if there are numbers from different decimal systems in STRING."
-  (> (length
-      (seq-uniq
-       (textsec-scripts
-        (apply #'string
-               (seq-filter (lambda (char)
-                             ;; We're selecting the characters that
-                             ;; have a numeric property.
-                             (eq (get-char-code-property char 'general-category)
-                                 'Nd))
-                           string)))
-       #'equal))
-     1))
+  (>
+   (length
+    (seq-uniq
+     (mapcar
+      (lambda (char)
+        (get-char-code-property char 'numeric-value))
+      (seq-filter (lambda (char)
+                    ;; We're selecting the characters that
+                    ;; have a numeric property.
+                    (eq (get-char-code-property char 'general-category)
+                        'Nd))
+                  string))))
+   1))
 
 (provide 'textsec)
 
