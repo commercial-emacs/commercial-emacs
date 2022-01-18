@@ -1756,6 +1756,10 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   AUTO_STRING (tip, " *tip*");
 
   specbind (Qinhibit_redisplay, Qt);
+  /* FIXME: Why don't re-used tooltip frames update correctly when a
+     menu is active? */
+  if (popup_activated_p)
+    specbind (Qtooltip_reuse_hidden_frame, Qnil);
 
   CHECK_STRING (string);
 
@@ -1903,10 +1907,6 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   tip_last_string = string;
   tip_last_parms = parms;
 
-  /* Block input until the tip has been fully drawn, to avoid crashes
-     when drawing tips in menus.  */
-  block_input ();
-
   if (NILP (tip_frame) || !FRAME_LIVE_P (XFRAME (tip_frame)))
     {
       /* Add default values to frame parameters.  */
@@ -1998,20 +1998,26 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   height = XFIXNUM (Fcdr (size)) + 2 * FRAME_INTERNAL_BORDER_WIDTH (tip_f);
   /* Calculate position of tooltip frame.  */
   compute_tip_xy (tip_f, parms, dx, dy, width, height, &root_x, &root_y);
+
+  block_input ();
+  BWindow_set_offset (FRAME_HAIKU_WINDOW (tip_f),
+		      root_x, root_y);
   BWindow_resize (FRAME_HAIKU_WINDOW (tip_f), width, height);
-  haiku_set_offset (tip_f, root_x, root_y, 1);
+  BView_resize_to (FRAME_HAIKU_VIEW (tip_f), width, height);
+  tip_f->pixel_width = width;
+  tip_f->pixel_height = height;
   BWindow_set_tooltip_decoration (FRAME_HAIKU_WINDOW (tip_f));
-  BView_set_view_cursor (FRAME_HAIKU_VIEW (tip_f),
-			 FRAME_OUTPUT_DATA (XFRAME (frame))->current_cursor);
-  SET_FRAME_VISIBLE (tip_f, 1);
   BWindow_set_visible (FRAME_HAIKU_WINDOW (tip_f), 1);
   BWindow_sync (FRAME_HAIKU_WINDOW (tip_f));
+  SET_FRAME_VISIBLE (tip_f, 1);
+  unblock_input ();
+
   w->must_be_updated_p = true;
-  flush_frame (tip_f);
   update_single_window (w);
+  haiku_clear_under_internal_border (tip_f);
+
   set_buffer_internal_1 (old_buffer);
   unbind_to (count_1, Qnil);
-  unblock_input ();
   windows_or_buffers_changed = old_windows_or_buffers_changed;
 
  start_timer:
@@ -2459,6 +2465,7 @@ syms_of_haikufns (void)
   DEFSYM (Qalways, "always");
   DEFSYM (Qnot_useful, "not-useful");
   DEFSYM (Qwhen_mapped, "when-mapped");
+  DEFSYM (Qtooltip_reuse_hidden_frame, "tooltip-reuse-hidden-frame");
 
   defsubr (&Sx_hide_tip);
   defsubr (&Sxw_display_color_p);
