@@ -24,6 +24,8 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'uni-confusable)
+(require 'ucs-normalize)
 
 (defvar textsec--char-scripts nil)
 
@@ -103,7 +105,7 @@ The scripts are as defined by the Unicode Standard Annex 24 (UAX#24)."
 
 (defun textsec-restriction-level (string)
   "Say what restriction level STRING qualifies for.
-Levels are (in order of restrictiveness) `ascii-only',
+Levels are (in decreasing order of restrictiveness) `ascii-only',
 `single-script', `highly-restrictive', `moderately-restrictive',
 `minimally-restrictive' and `unrestricted'."
   (let ((scripts (textsec-covering-scripts string)))
@@ -171,6 +173,54 @@ Levels are (in order of restrictiveness) `ascii-only',
                         'Nd))
                   string))))
    1))
+
+(defun textsec-ascii-confusable-p (string)
+  "Return non-nil if STRING isn't ASCII, but is confusable with ASCII."
+  (and (not (eq (textsec-restriction-level string) 'ascii-only))
+       (eq (textsec-restriction-level (textsec-unconfuse-string string))
+           'ascii-only)))
+
+(defun textsec-unconfuse-string (string)
+  "Return a de-confused version of STRING.
+This algorithm is described in:
+
+  https://www.unicode.org/reports/tr39/#Confusable_Detection"
+  (ucs-normalize-NFD-string
+   (apply #'concat
+          (seq-map (lambda (char)
+                     (or (gethash char uni-confusable-table)
+                         (string char)))
+                   (ucs-normalize-NFD-string string)))))
+
+(defun textsec-resolved-script-set (string)
+  "Return the resolved script set for STRING.
+This is the minimal covering script set for STRING, but is nil is
+STRING isn't a single script string."
+  (and (textsec-single-script-p string)
+       (textsec-covering-scripts string)))
+
+(defun textsec-single-script-confusable-p (string1 string2)
+  "Say whether STRING1 and STRING2 are single script confusables."
+  (and (equal (textsec-unconfuse-string string1)
+              (textsec-unconfuse-string string2))
+       ;; And they have to have at least one resolved script in
+       ;; common.
+       (seq-intersection (textsec-resolved-script-set string1)
+                         (textsec-resolved-script-set string2))))
+
+(defun textsec-mixed-script-confusable-p (string1 string2)
+  "Say whether STRING1 and STRING2 are mixed script confusables."
+  (and (equal (textsec-unconfuse-string string1)
+              (textsec-unconfuse-string string2))
+       ;; And they have no resolved scripts in common.
+       (null (seq-intersection (textsec-resolved-script-set string1)
+                               (textsec-resolved-script-set string2)))))
+
+(defun textsec-whole-script-confusable-p (string1 string2)
+  "Say whether STRING1 and STRING2 are whole script confusables."
+  (and (textsec-mixed-script-confusable-p string1 string2)
+       (textsec-single-script-p string1)
+       (textsec-single-script-p string2)))
 
 (provide 'textsec)
 
