@@ -113,7 +113,10 @@
 (ert-deftest test-suspiction-domain ()
   (should (textsec-domain-suspicious-p "foo/bar.org"))
   (should-not (textsec-domain-suspicious-p "foo.org"))
-  (should (textsec-domain-suspicious-p "f\N{LEFT-TO-RIGHT ISOLATE}oo.org")))
+  (should (textsec-domain-suspicious-p "f\N{LEFT-TO-RIGHT ISOLATE}oo.org"))
+
+  (should (textsec-domain-suspicious-p "Сгсе.ru"))
+  (should-not (textsec-domain-suspicious-p "фСгсе.ru")))
 
 (ert-deftest test-suspicious-local ()
   (should-not (textsec-local-address-suspicious-p "larsi"))
@@ -146,14 +149,23 @@
 
 (ert-deftest test-suspicious-email ()
   (should-not
-   (textsec-email-suspicious-p "Lars Ingebrigtsen <larsi@gnus.org>"))
+   (textsec-email-address-header-suspicious-p
+    "Lars Ingebrigtsen <larsi@gnus.org>"))
   (should
-   (textsec-email-suspicious-p "LÅrs Ingebrigtsen <larsi@gnus.org>"))
+   (textsec-email-address-header-suspicious-p
+    "LÅrs Ingebrigtsen <larsi@gnus.org>"))
   (should
-   (textsec-email-suspicious-p "Lars Ingebrigtsen <.larsi@gnus.org>"))
+   (textsec-email-address-header-suspicious-p
+    "Lars Ingebrigtsen <.larsi@gnus.org>"))
   (should
-   (textsec-email-suspicious-p "Lars Ingebrigtsen <larsi@gn\N{LEFT-TO-RIGHT ISOLATE}us.org>"))
+   (textsec-email-address-header-suspicious-p
+    "Lars Ingebrigtsen <larsi@gn\N{LEFT-TO-RIGHT ISOLATE}us.org>"))
 
-  (should (textsec-email-suspicious-p "דגבא <foo@bar.com>")))
+  (should (textsec-email-address-header-suspicious-p
+           "דגבא <foo@bar.com>")))
+
+(ert-deftest test-suspicious-url ()
+  (should-not (textsec-url-suspicious-p "http://example.ru/bar"))
+  (should (textsec-url-suspicious-p "http://Сгсе.ru/bar")))
 
 ;;; textsec-tests.el ends here

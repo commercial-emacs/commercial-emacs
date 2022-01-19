@@ -29,6 +29,7 @@
 (require 'idna-mapping)
 (require 'puny)
 (require 'mail-parse)
+(require 'url)
 
 (defvar textsec--char-scripts nil)
 
@@ -245,8 +246,14 @@ or use certain other unusual mixtures of characters."
          (throw 'found (format "Disallowed character: `%s' (#x%x)"
                                (string char) char))))
      domain)
+    ;; Does IDNA allow it?
     (unless (puny-highly-restrictive-domain-p domain)
-      (throw 'found (format "%s is not highly-restrictive" domain)))
+      (throw 'found (format "`%s' is not highly-restrictive" domain)))
+    ;; Check whether any segment of the domain name is confusable with
+    ;; an ASCII-only segment.
+    (dolist (elem (split-string domain "\\."))
+      (when (textsec-ascii-confusable-p elem)
+        (throw 'found (format "`%s' is confusable with ASCII" elem))))
     nil))
 
 (defun textsec-local-address-suspicious-p (local)
@@ -338,7 +345,7 @@ and `textsec-domain-suspicious-p'."
      (textsec-domain-suspicious-p domain)
      (textsec-local-address-suspicious-p local))))
 
-(defun textsec-email-suspicious-p (email)
+(defun textsec-email-address-header-suspicious-p (email)
   "Say whether EMAIL looks suspicious.
 If it isn't, return nil.  If it is, return a string explaining the
 potential problem.
@@ -359,6 +366,15 @@ and `textsec-name-suspicious-p'."
       (or
        (textsec-email-address-suspicious-p  address)
        (and name (textsec-name-suspicious-p name))))))
+
+(defun textsec-url-suspicious-p (url)
+  "Say whether EMAIL looks suspicious.
+If it isn't, return nil.  If it is, return a string explaining the
+potential problem."
+  (let ((parsed (url-generic-parse-url url)))
+    ;; The URL may not have a domain.
+    (and (url-host parsed)
+         (textsec-domain-suspicious-p (url-host parsed)))))
 
 (provide 'textsec)
 
