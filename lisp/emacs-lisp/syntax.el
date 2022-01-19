@@ -395,6 +395,12 @@ If CACHE is not a list, leave cached entries as-is."
                     cache
                   (cdr syntax-ppss--data))))))
 
+(defsubst syntax-ppss--marker-position (pos)
+  (if (and (markerp pos)
+           (not (marker-buffer pos)))
+      (marker-position pos)
+    pos))
+
 (defun syntax-ppss-invalidate-cache (beg &rest _args)
   "Invalidate ppss data after BEG."
   (setq syntax-propertize--done (min beg syntax-propertize--done))
@@ -404,7 +410,7 @@ If CACHE is not a list, leave cached entries as-is."
         syntax-ppss--data
       (let ((before-beg (syntax-ppss--cached-state cache beg)))
         (if (or (<= beg (or (syntax-ppss-toplevel-pos last-ppss) 0))
-                (<= beg (or last-pos 0)))
+                (<= beg (or (syntax-ppss--marker-position last-pos) 0)))
 	    (syntax-ppss--set-data nil nil before-beg)
           (syntax-ppss--set-data last-pos last-ppss before-beg))))))
 
@@ -421,7 +427,7 @@ The returned value is the same as that of `parse-partial-sexp'
 run from `point-min' to POS except that values at positions 2 and 6
 in the returned list (counting from 0) cannot be relied upon.
 Point is at POS when this function returns."
-  (setq pos (or pos (point)))
+  (setq pos (or (syntax-ppss--marker-position pos) (point)))
   (add-hook 'before-change-functions
             #'syntax-ppss-invalidate-cache
             ;; ersatz ordinal range (-100, 100)
@@ -432,7 +438,7 @@ Point is at POS when this function returns."
     (with-syntax-table (or syntax-ppss-table (syntax-table))
       (cl-destructuring-bind ((pt-last . ppss-last) . ppss-cache)
           syntax-ppss--data
-        (if (and pt-last
+        (if (and (syntax-ppss--marker-position pt-last)
                  (<= pt-last pos)
                  (< (- pos pt-last) 2500))
             ;; theoretically unnecessary but cperl-test-heredocs
