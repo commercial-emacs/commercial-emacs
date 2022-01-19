@@ -438,7 +438,8 @@ Point is at POS when this function returns."
     (with-syntax-table (or syntax-ppss-table (syntax-table))
       (cl-destructuring-bind ((pt-last . ppss-last) . ppss-cache)
           syntax-ppss--data
-        (if (and (syntax-ppss--marker-position pt-last)
+        (setq pt-last (syntax-ppss--marker-position pt-last))
+        (if (and pt-last
                  (<= pt-last pos)
                  (< (- pos pt-last) 2500))
             ;; theoretically unnecessary but cperl-test-heredocs
