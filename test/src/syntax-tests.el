@@ -67,6 +67,10 @@
   (should-error (syntax-class-to-char -1))
   (should-error (syntax-class-to-char 200)))
 
+(ert-deftest syntax-ppss-temp-buffer ()
+  (with-temp-buffer
+    (syntax-ppss (make-marker))))
+
 (ert-deftest parse-partial-sexp-paren-comments ()
   "Test syntax parsing with paren comment markers.
 Specifically, where the first character of the comment marker is
