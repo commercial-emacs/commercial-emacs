@@ -2132,7 +2132,11 @@ See also `emacs-lisp-byte-compile-and-load'."
 		     ;; Need to expand in case TARGET-FILE doesn't
 		     ;; include a directory (Bug#45287).
 		     (expand-file-name target-file))))
-              (byte-write-target-file (current-buffer) target-file)
+              (if byte-native-compiling
+                  ;; Defer elc production.
+                  (setf byte-to-native-output-buffer-file
+                        (cons (current-buffer) target-file))
+                (byte-write-target-file (current-buffer) target-file))
 	      (or noninteractive
 		  byte-native-compiling
 		  (message "Wrote %s" target-file)))
@@ -2153,7 +2157,8 @@ See also `emacs-lisp-byte-compile-and-load'."
 				  "Cannot overwrite file"
 			        "Directory not writable or nonexistent")
 			      target-file))))))
-	  (kill-buffer (current-buffer)))
+          (unless byte-native-compiling
+	    (kill-buffer (current-buffer))))
 	(if (and byte-compile-generate-call-tree
 		 (or (eq t byte-compile-generate-call-tree)
 		     (y-or-n-p (format "Report call tree for %s? "
