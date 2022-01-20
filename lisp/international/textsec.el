@@ -252,7 +252,10 @@ or use certain other unusual mixtures of characters."
      domain)
     ;; Does IDNA allow it?
     (unless (puny-highly-restrictive-domain-p domain)
-      (throw 'found (format "`%s' is not highly-restrictive" domain)))
+      (throw
+       'found
+       (format "`%s' mixes characters from different scripts in suspicious ways"
+               domain)))
     ;; Check whether any segment of the domain name is confusable with
     ;; an ASCII-only segment.
     (dolist (elem (split-string domain "\\."))
@@ -296,13 +299,17 @@ other unusual mixtures of characters."
    ((not (equal name (ucs-normalize-NFC-string name)))
     (format "`%s' is not in normalized format `%s'"
             name (ucs-normalize-NFC-string name)))
-   ((seq-find (lambda (char)
-                (and (member char bidi-control-characters)
-                     (not (member char
-                                  '( ?\N{left-to-right mark}
-                                     ?\N{right-to-left mark}
-                                     ?\N{arabic letter mark})))))
-              name)
+   ((and (seq-find (lambda (char)
+                     (and (member char bidi-control-characters)
+                          (not (member char
+                                       '( ?\N{left-to-right mark}
+                                          ?\N{right-to-left mark}
+                                          ?\N{arabic letter mark})))))
+                   name)
+         ;; We have bidirectional formatting characters, but check
+         ;; whether they affect LTR characters.  If not, it's not
+         ;; suspicious.
+         (bidi-find-overridden-directionality 0 (length name) name))
     (format "The string contains bidirectional control characters"))
    ((textsec-suspicious-nonspacing-p name))))
 
@@ -391,9 +398,13 @@ when the link text looks like an URL itself, but doesn't lead to
 the same domain as the URL."
   (let* ((url (car link))
          (text (string-trim (cdr link)))
-         (text-bits (seq-filter (lambda (bit)
-                                  (string-match-p "\\`[^.]+\\.[^.]+.*\\'" bit))
-                                (split-string text))))
+         (text-bits (seq-filter
+                     (lambda (bit)
+                       (and (string-match-p "\\`[^.]+\\.[^.]+.*\\'" bit)
+                            ;; All-numerical texts are probably not
+                            ;; suspicious (but what about IP addresses?).
+                            (not (string-match-p "\\`[0-9.]+\\'" bit))))
+                     (split-string text))))
     (when text-bits
       (setq text-bits (seq-map (lambda (string)
                                  (if (not (string-match-p "\\`[^:]+:" string))
