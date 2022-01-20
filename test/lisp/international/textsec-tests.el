@@ -162,6 +162,10 @@
    (textsec-email-address-header-suspicious-p
     "Lars Ingebrigtsen <larsi@gn\N{LEFT-TO-RIGHT ISOLATE}us.org>"))
 
+  (should
+   (textsec-email-address-header-suspicious-p
+    "Lars Ingebrigtsen <larsi@\N{RIGHT-TO-LEFT OVERRIDE}gnus.org>"))
+
   (should (textsec-email-address-header-suspicious-p
            "דגבא <foo@bar.com>")))
 
@@ -185,6 +189,14 @@
   (should (textsec-link-suspicious-p
            (cons "https://www.gnu.org/" "http://fsf.org/")))
   (should (textsec-link-suspicious-p
-           (cons "https://www.gnu.org/" "fsf.org"))))
+           (cons "https://www.gnu.org/" "fsf.org")))
+
+  (should (textsec-link-suspicious-p
+           (cons "https://www.gnu.org/"
+                 "This is a link that doesn't point to fsf.org")))
+
+  (should (textsec-link-suspicious-p
+           (cons "https://www.gn\N{LEFT-TO-RIGHT ISOLATE}u.org/"
+                 "gn\N{LEFT-TO-RIGHT ISOLATE}u.org"))))
 
 ;;; textsec-tests.el ends here
