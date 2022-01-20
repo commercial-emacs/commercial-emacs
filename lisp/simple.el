@@ -9443,9 +9443,6 @@ PREFIX is the string that represents this modifier in an event type symbol."
 (defvar clone-buffer-hook nil
   "Normal hook to run in the new buffer at the end of `clone-buffer'.")
 
-(defvar clone-indirect-buffer-hook nil
-  "Normal hook to run in the new buffer at the end of `clone-indirect-buffer'.")
-
 (defun clone-process (process &optional newname)
   "Create a twin copy of PROCESS.
 If NEWNAME is nil, it defaults to PROCESS' name;
@@ -9598,8 +9595,6 @@ Returns the newly created indirect buffer."
       (setq newname (substring newname 0 (match-beginning 0))))
   (let* ((name (generate-new-buffer-name newname))
 	 (buffer (make-indirect-buffer (current-buffer) name t)))
-    (with-current-buffer buffer
-      (run-hooks 'clone-indirect-buffer-hook))
     (when display-flag
       (pop-to-buffer buffer nil norecord))
     buffer))
