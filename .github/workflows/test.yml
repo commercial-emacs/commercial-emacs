@@ -9,6 +9,7 @@ on:
     - '**.info'
     - '**.md'
     - 'ChangeLog.**'
+    - 'NEWS'
     branches-ignore:
     - 'master'
     - 'main'
