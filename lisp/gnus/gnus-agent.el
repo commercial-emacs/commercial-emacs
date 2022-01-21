@@ -2060,7 +2060,7 @@ doesn't exist, to valid the overview buffer."
 	      (let (state sequence uncomp)
 		(while alist
 		  (setq state (caar alist)
-			sequence (gnus-uncompress-range (cdar alist))
+			sequence (range-uncompress (cdar alist))
 			alist (cdr alist))
 		  (while sequence
 		    (push (cons (pop sequence) state) uncomp)))

@@ -597,9 +597,6 @@ column to indent to; if it is nil, use one of the three methods above."
       (and pr (progress-reporter-done pr))
       (move-marker end nil))))
 
-(define-obsolete-function-alias 'indent-relative-maybe
-  'indent-relative-first-indent-point "26.1")
-
 (defun indent-relative (&optional first-only unindented-ok)
   "Go to next indent point of previous nonblank line.
 

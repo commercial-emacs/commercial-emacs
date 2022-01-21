@@ -1728,12 +1728,10 @@ LOUDLY, if non-nil, allows progress-meter bar."
 
 ;;; Various functions.
 
-(defun font-lock-compile-keywords (keywords &optional syntactic-keywords)
+(defun font-lock-compile-keywords (keywords &optional _syntactic-keywords)
   "Compile KEYWORDS into the form (t KEYWORDS COMPILED...)
 Here each COMPILED is of the form (MATCHER HIGHLIGHT ...) as shown in the
-`font-lock-keywords' doc string.
-If SYNTACTIC-KEYWORDS is non-nil, it means these keywords are used for
-`font-lock-syntactic-keywords' rather than for `font-lock-keywords'."
+`font-lock-keywords' doc string."
   (unless font-lock-set-defaults
     ;; This should never happen.  But some external packages sometimes
     ;; call font-lock in unexpected and incorrect ways.  It's important to

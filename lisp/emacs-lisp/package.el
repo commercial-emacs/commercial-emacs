@@ -780,8 +780,9 @@ PKG-DESC is a `package-desc' object."
 
 (defun package--reload-previously-loaded (pkg-desc)
   "Force reimportation of files in PKG-DESC already present in `load-history'.
-New editions of files contain macro definitions and redefinitions,
-the overlooking of which would cause byte-compilation of the new package to fail."
+New editions of files contain macro definitions and
+redefinitions, the overlooking of which would cause
+byte-compilation of the new package to fail."
   (with-demoted-errors "Error in package--load-files-for-activation: %s"
     (let* (result
            (dir (package-desc-dir pkg-desc))

@@ -36,12 +36,8 @@
 (require 'mail-utils)
 (require 'mm-util)
 (require 'gnus-util)
+(require 'range)
 (autoload 'gnus-remove-odd-characters "gnus-sum")
-;; FIXME none of these are used explicitly in this file.
-(autoload 'gnus-sorted-intersection "gnus-range")
-(autoload 'gnus-intersection "gnus-range")
-(autoload 'gnus-sorted-complement "gnus-range")
-(autoload 'gnus-sorted-difference "gnus-range")
 
 (defcustom gnus-verbose-backends 7
   "Integer that says how verbose the Gnus backends should be.

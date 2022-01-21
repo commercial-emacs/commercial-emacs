@@ -5853,7 +5853,7 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 (defun gnus-killed-articles (killed articles)
   (let (out)
     (while articles
-      (when (gnus-member-of-range (car articles) killed)
+      (when (range-member-p (car articles) killed)
 	(push (car articles) out))
       (setq articles (cdr articles)))
     out))
