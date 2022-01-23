@@ -17751,13 +17751,13 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       if (new_y >= 0)
 	{
 	  struct glyph_row *row;
-
 	  for (row = MATRIX_FIRST_TEXT_ROW (w->desired_matrix);
 	       row < MATRIX_BOTTOM_TEXT_ROW (w->desired_matrix, w);
 	       ++row)
 	    if (MATRIX_ROW_BOTTOM_Y (row) - row->extra_line_spacing > new_y)
 	      {
-		row--;
+		if (row > MATRIX_FIRST_TEXT_ROW (w->desired_matrix))
+		  row--;
 		break;
 	      }
 
