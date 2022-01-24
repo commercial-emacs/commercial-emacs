@@ -3248,6 +3248,7 @@ extra checks should be done."
                         (let ((case-fold-search t))
                           (assoc-default name alist 'string-match))))))
           (if (and mode
+                   (not (functionp mode))
                    (consp mode)
                    (cadr mode))
               (setq mode (car mode)
