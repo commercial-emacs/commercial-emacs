@@ -138,13 +138,6 @@ backtrace_args (union specbinding *pdl)
   return pdl->bt.args;
 }
 
-static bool
-backtrace_debug_on_exit (union specbinding *pdl)
-{
-  eassert (pdl->kind == SPECPDL_BACKTRACE);
-  return pdl->bt.debug_on_exit;
-}
-
 /* Functions to modify slots of backtrace records.  */
 
 static void
@@ -354,7 +347,7 @@ call_debugger (Lisp_Object arg)
   return unbind_to (count, val);
 }
 
-static void
+void
 do_debug_on_call (Lisp_Object code, ptrdiff_t count)
 {
   debug_on_next_call = 0;
@@ -1744,21 +1737,8 @@ process_quit_flag (void)
   quit ();
 }
 
-/* Check quit-flag and quit if it is non-nil.  Typing C-g does not
-   directly cause a quit; it only sets Vquit_flag.  So the program
-   needs to call maybe_quit at times when it is safe to quit.  Every
-   loop that might run for a long time or might not exit ought to call
-   maybe_quit at least once, at a safe place.  Unless that is
-   impossible, of course.  But it is very desirable to avoid creating
-   loops where maybe_quit is impossible.
-
-   If quit-flag is set to `kill-emacs' the SIGINT handler has received
-   a request to exit Emacs when it is safe to do.
-
-   When not quitting, process any pending signals.  */
-
 void
-maybe_quit (void)
+probably_quit (void)
 {
   if (!NILP (Vquit_flag) && NILP (Vinhibit_quit))
     process_quit_flag ();
@@ -2382,6 +2362,28 @@ alist mapping symbols to their value.  */)
   return unbind_to (count, eval_sub (form));
 }
 
+static void
+grow_specpdl_allocation (void)
+{
+  eassert (specpdl_ptr == specpdl + specpdl_size);
+
+  ptrdiff_t count = SPECPDL_INDEX ();
+  ptrdiff_t max_size = min (max_specpdl_size, PTRDIFF_MAX - 1000);
+  union specbinding *pdlvec = specpdl - 1;
+  ptrdiff_t pdlvecsize = specpdl_size + 1;
+  if (max_size <= specpdl_size)
+    {
+      if (max_specpdl_size < 400)
+	max_size = max_specpdl_size = 400;
+      if (max_size <= specpdl_size)
+	xsignal0 (Qexcessive_variable_binding);
+    }
+  pdlvec = xpalloc (pdlvec, &pdlvecsize, 1, max_size + 1, sizeof *specpdl);
+  specpdl = pdlvec + 1;
+  specpdl_size = pdlvecsize - 1;
+  specpdl_ptr = specpdl + count;
+}
+
 /* Grow the specpdl stack by one entry.
    The caller should have already initialized the entry.
    Signal an error on stack overflow.
@@ -2392,29 +2394,12 @@ alist mapping symbols to their value.  */)
    never-used entry just before the bottom of the stack; sometimes its
    address is taken.  */
 
-static void
+INLINE void
 grow_specpdl (void)
 {
   specpdl_ptr++;
-
   if (specpdl_ptr == specpdl + specpdl_size)
-    {
-      ptrdiff_t count = SPECPDL_INDEX ();
-      ptrdiff_t max_size = min (max_specpdl_size, PTRDIFF_MAX - 1000);
-      union specbinding *pdlvec = specpdl - 1;
-      ptrdiff_t pdlvecsize = specpdl_size + 1;
-      if (max_size <= specpdl_size)
-	{
-	  if (max_specpdl_size < 400)
-	    max_size = max_specpdl_size = 400;
-	  if (max_size <= specpdl_size)
-	    xsignal0 (Qexcessive_variable_binding);
-	}
-      pdlvec = xpalloc (pdlvec, &pdlvecsize, 1, max_size + 1, sizeof *specpdl);
-      specpdl = pdlvec + 1;
-      specpdl_size = pdlvecsize - 1;
-      specpdl_ptr = specpdl + count;
-    }
+    grow_specpdl_allocation ();
 }
 
 ptrdiff_t
@@ -3046,6 +3031,44 @@ FUNCTIONP (Lisp_Object object)
     return false;
 }
 
+Lisp_Object
+funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
+{
+  Lisp_Object original_fun = fun;
+ retry:
+  if (SYMBOLP (fun) && !NILP (fun)
+      && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
+    fun = indirect_function (fun);
+
+  if (SUBRP (fun) && !SUBR_NATIVE_COMPILED_DYNP (fun))
+    return funcall_subr (XSUBR (fun), numargs, args);
+  else if (COMPILEDP (fun)
+	   || SUBR_NATIVE_COMPILED_DYNP (fun)
+	   || MODULE_FUNCTIONP (fun))
+    return funcall_lambda (fun, numargs, args);
+  else
+    {
+      if (NILP (fun))
+	xsignal1 (Qvoid_function, original_fun);
+      if (!CONSP (fun))
+	xsignal1 (Qinvalid_function, original_fun);
+      Lisp_Object funcar = XCAR (fun);
+      if (!SYMBOLP (funcar))
+	xsignal1 (Qinvalid_function, original_fun);
+      if (EQ (funcar, Qlambda)
+	  || EQ (funcar, Qclosure))
+	return funcall_lambda (fun, numargs, args);
+      else if (EQ (funcar, Qautoload))
+	{
+	  Fautoload_do_load (fun, original_fun, Qnil);
+	  fun = original_fun;
+	  goto retry;
+	}
+      else
+	xsignal1 (Qinvalid_function, original_fun);
+    }
+}
+
 DEFUN ("funcall", Ffuncall, Sfuncall, 1, MANY, 0,
        doc: /* Call first argument as a function, passing remaining arguments to it.
 Return the value that function returns.
@@ -3053,10 +3076,6 @@ Thus, (funcall \\='cons \\='x \\='y) returns (x . y).
 usage: (funcall FUNCTION &rest ARGUMENTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object fun, original_fun;
-  Lisp_Object funcar;
-  ptrdiff_t numargs = nargs - 1;
-  Lisp_Object val;
   ptrdiff_t count;
 
   maybe_quit ();
@@ -3076,42 +3095,8 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
   if (debug_on_next_call)
     do_debug_on_call (Qlambda, count);
 
-  original_fun = args[0];
+  Lisp_Object val = funcall_general (args[0], nargs - 1, args + 1);
 
- retry:
-
-  /* Optimize for no indirection.  */
-  fun = original_fun;
-  if (SYMBOLP (fun) && !NILP (fun)
-      && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
-    fun = indirect_function (fun);
-
-  if (SUBRP (fun) && !SUBR_NATIVE_COMPILED_DYNP (fun))
-    val = funcall_subr (XSUBR (fun), numargs, args + 1);
-  else if (COMPILEDP (fun)
-	   || SUBR_NATIVE_COMPILED_DYNP (fun)
-	   || MODULE_FUNCTIONP (fun))
-    val = funcall_lambda (fun, numargs, args + 1);
-  else
-    {
-      if (NILP (fun))
-	xsignal1 (Qvoid_function, original_fun);
-      if (!CONSP (fun))
-	xsignal1 (Qinvalid_function, original_fun);
-      funcar = XCAR (fun);
-      if (!SYMBOLP (funcar))
-	xsignal1 (Qinvalid_function, original_fun);
-      if (EQ (funcar, Qlambda)
-	  || EQ (funcar, Qclosure))
-	val = funcall_lambda (fun, numargs, args + 1);
-      else if (EQ (funcar, Qautoload))
-	{
-	  Fautoload_do_load (fun, original_fun, Qnil);
-	  goto retry;
-	}
-      else
-	xsignal1 (Qinvalid_function, original_fun);
-    }
   lisp_eval_depth--;
   if (backtrace_debug_on_exit (specpdl + count))
     val = call_debugger (list2 (Qexit, val));
@@ -3206,15 +3191,16 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
    bytecode string and constants vector, fetch them from the file first.  */
 
 static Lisp_Object
-fetch_and_exec_byte_code (Lisp_Object fun, Lisp_Object syms_left,
+fetch_and_exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 			  ptrdiff_t nargs, Lisp_Object *args)
 {
   if (CONSP (AREF (fun, COMPILED_BYTECODE)))
     Ffetch_bytecode (fun);
+
   return exec_byte_code (AREF (fun, COMPILED_BYTECODE),
 			 AREF (fun, COMPILED_CONSTANTS),
 			 AREF (fun, COMPILED_STACK_DEPTH),
-			 syms_left, nargs, args);
+			 args_template, nargs, args);
 }
 
 static Lisp_Object
@@ -3292,7 +3278,8 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
 	   argument-binding code below instead (as do all interpreted
 	   functions, even lexically bound ones).  */
 	{
-	  return fetch_and_exec_byte_code (fun, syms_left, nargs, arg_vector);
+	  return fetch_and_exec_byte_code (fun, XFIXNUM (syms_left),
+					   nargs, arg_vector);
 	}
       lexenv = Qnil;
     }
@@ -3378,7 +3365,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
       val = XSUBR (fun)->function.a0 ();
     }
   else
-    val = fetch_and_exec_byte_code (fun, Qnil, 0, NULL);
+    val = fetch_and_exec_byte_code (fun, 0, 0, NULL);
 
   return unbind_to (count, val);
 }

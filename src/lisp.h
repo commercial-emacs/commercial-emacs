@@ -1558,7 +1558,9 @@ struct Lisp_String
     struct
     {
       ptrdiff_t size;           /* MSB is used as the markbit.  */
-      ptrdiff_t size_byte;      /* Set to -1 for unibyte strings.  */
+      ptrdiff_t size_byte;      /* Set to -1 for unibyte strings,
+				   -2 for data in rodata,
+				   -3 for immovable unibyte strings.  */
       INTERVAL intervals;	/* Text properties in this string.  */
       unsigned char *data;
     } s;
@@ -1704,6 +1706,13 @@ CHECK_STRING_NULL_BYTES (Lisp_Object string)
 {
   CHECK_TYPE (memchr (SSDATA (string), '\0', SBYTES (string)) == NULL,
 	      Qfilenamep, string);
+}
+
+/* True if STR is immovable (whose data won't move during GC).  */
+INLINE bool
+string_immovable_p (Lisp_Object str)
+{
+  return XSTRING (str)->u.s.size_byte == -3;
 }
 
 /* A regular vector is just a header plus an array of Lisp_Objects.  */
@@ -3311,6 +3320,13 @@ SPECPDL_INDEX (void)
   return specpdl_ptr - specpdl;
 }
 
+INLINE bool
+backtrace_debug_on_exit (union specbinding *pdl)
+{
+  eassert (pdl->kind == SPECPDL_BACKTRACE);
+  return pdl->bt.debug_on_exit;
+}
+
 /* This structure helps implement the `catch/throw' and `condition-case/signal'
    control structures.  A struct handler contains all the information needed to
    restore the state of the interpreter after a non-local jump.
@@ -3374,11 +3390,33 @@ struct handler
 
 extern Lisp_Object memory_signal_data;
 
-extern void maybe_quit (void);
-
 /* True if ought to quit now.  */
 
 #define QUITP (!NILP (Vquit_flag) && NILP (Vinhibit_quit))
+
+extern bool volatile pending_signals;
+extern void process_pending_signals (void);
+extern void probably_quit (void);
+
+/* Check quit-flag and quit if it is non-nil.  Typing C-g does not
+   directly cause a quit; it only sets Vquit_flag.  So the program
+   needs to call maybe_quit at times when it is safe to quit.  Every
+   loop that might run for a long time or might not exit ought to call
+   maybe_quit at least once, at a safe place.  Unless that is
+   impossible, of course.  But it is very desirable to avoid creating
+   loops where maybe_quit is impossible.
+
+   If quit-flag is set to `kill-emacs' the SIGINT handler has received
+   a request to exit Emacs when it is safe to do.
+
+   When not quitting, process any pending signals.  */
+
+INLINE void
+maybe_quit (void)
+{
+  if (!NILP (Vquit_flag) || pending_signals)
+    probably_quit ();
+}
 
 /* Process a quit rarely, based on a counter COUNT, for efficiency.
    "Rarely" means once per USHRT_MAX + 1 times; this is somewhat
@@ -4009,6 +4047,7 @@ extern Lisp_Object make_specified_string (const char *,
 					  ptrdiff_t, ptrdiff_t, bool);
 extern Lisp_Object make_pure_string (const char *, ptrdiff_t, ptrdiff_t, bool);
 extern Lisp_Object make_pure_c_string (const char *, ptrdiff_t);
+extern void pin_string (Lisp_Object string);
 
 /* Make a string allocated in pure space, use STR as string data.  */
 
@@ -4306,6 +4345,9 @@ extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
 extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
 extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
+void do_debug_on_call (Lisp_Object code, ptrdiff_t count);
+Lisp_Object funcall_general (Lisp_Object fun,
+			     ptrdiff_t numargs, Lisp_Object *args);
 
 /* Defined in unexmacosx.c.  */
 #if defined DARWIN_OS && defined HAVE_UNEXEC
@@ -4648,7 +4690,7 @@ extern int read_bytecode_char (bool);
 /* Defined in bytecode.c.  */
 extern void syms_of_bytecode (void);
 extern Lisp_Object exec_byte_code (Lisp_Object, Lisp_Object, Lisp_Object,
-				   Lisp_Object, ptrdiff_t, Lisp_Object *);
+				   ptrdiff_t, ptrdiff_t, Lisp_Object *);
 extern Lisp_Object get_byte_code_arity (Lisp_Object);
 
 /* Defined in macros.c.  */
