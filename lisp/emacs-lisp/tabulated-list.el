@@ -745,7 +745,16 @@ Interactively, N is the prefix numeric argument, and defaults to
                        (max (setq col-width
                                   (cadr (aref tabulated-list-format
                                               col-nb)))
-                            (string-width (aref entry col-nb)))
+                            (let ((desc (aref entry col-nb)))
+                              (cond
+                               ((stringp desc)
+                                (string-width desc))
+                               ((eq (car desc) 'image)
+                                (car (image-size desc)))
+                               (t (string-width (car desc))
+                                  ;; FIXME: Take into consideration the properties
+                                  ;;        of the button when calculating width
+                                  ))))
                        (or (plist-get (nthcdr 3 (aref tabulated-list-format
                                                       col-nb))
                                       :pad-right)
