@@ -12794,6 +12794,8 @@ redisplay_tab_bar (struct frame *f)
   struct it it;
   struct glyph_row *row;
 
+  f->tab_bar_redisplayed = true;
+
   /* If frame hasn't a tab-bar window or if it is zero-height, don't
      do anything.  This means you must start with tab-bar-lines
      non-zero to get the auto-sizing effect.  Or in other words, you
@@ -12801,9 +12803,16 @@ redisplay_tab_bar (struct frame *f)
   if (!WINDOWP (f->tab_bar_window)
       || (w = XWINDOW (f->tab_bar_window),
           WINDOW_TOTAL_LINES (w) == 0))
-    return false;
+    {
+      /* Even if we do not display a tab bar initially, still pretend
+	 that we have resized it.  This avoids that a later activation
+	 of the tab bar resizes the frame, despite of the fact that the
+	 setting of 'frame-inhibit-implied-resize' should inhibit it
+	 (Bug#52986).  */
+      f->tab_bar_resized = true;
 
-  f->tab_bar_redisplayed = true;
+      return false;
+    }
 
   /* Set up an iterator for the tab-bar window.  */
   init_iterator (&it, w, -1, -1, w->desired_matrix->rows, TAB_BAR_FACE_ID);
@@ -13713,6 +13722,8 @@ redisplay_tool_bar (struct frame *f)
   struct it it;
   struct glyph_row *row;
 
+  f->tool_bar_redisplayed = true;
+
   /* If frame hasn't a tool-bar window or if it is zero-height, don't
      do anything.  This means you must start with tool-bar-lines
      non-zero to get the auto-sizing effect.  Or in other words, you
@@ -13720,9 +13731,16 @@ redisplay_tool_bar (struct frame *f)
   if (!WINDOWP (f->tool_bar_window)
       || (w = XWINDOW (f->tool_bar_window),
           WINDOW_TOTAL_LINES (w) == 0))
-    return false;
+    {
+      /* Even if we do not display a tool bar initially, still pretend
+	 that we have resized it already.  This avoids that a later
+	 activation of the tool bar resizes the frame, despite of the
+	 fact that a setting of 'frame-inhibit-implied-resize' should
+	 inhibit it (Bug#52986).  */
+      f->tool_bar_resized = true;
 
-  f->tool_bar_redisplayed = true;
+      return false;
+    }
 
   /* Set up an iterator for the tool-bar window.  */
   init_iterator (&it, w, -1, -1, w->desired_matrix->rows, TOOL_BAR_FACE_ID);
