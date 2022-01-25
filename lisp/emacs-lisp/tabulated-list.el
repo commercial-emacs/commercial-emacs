@@ -588,7 +588,11 @@ Return the column number after insertion."
                      (propertize label 'help-echo help-echo))))
           ((eq (car col-desc) 'image)
            (insert (propertize " "
-                               'display col-desc
+                               'display `(,col-desc
+                                          (slice 0.0 0.0
+                                                 ,(* (frame-char-width)
+                                                     available-space)
+                                                 1.0))
                                'help-echo help-echo)))
           ((apply 'insert-text-button label (cdr col-desc))))
     (let ((next-x (+ x pad-right width)))
