@@ -745,13 +745,19 @@ Interactively, N is the prefix numeric argument, and defaults to
                        (max (setq col-width
                                   (cadr (aref tabulated-list-format
                                               col-nb)))
-                            (string-width (aref entry col-nb)))
+                            (let ((desc (aref entry col-nb)))
+                              (string-width (if (stringp desc)
+                                                desc
+                                              (car desc)))))
                        (or (plist-get (nthcdr 3 (aref tabulated-list-format
                                                       col-nb))
                                       :pad-right)
                            1))))
           (setq col-nb (1+ col-nb))
         (setq found t)
+        ;; `tabulated-list-format' may be a constant (sharing list
+        ;; structures), so copy it before mutating.
+        (setq tabulated-list-format (copy-tree tabulated-list-format t))
         (setf (cadr (aref tabulated-list-format col-nb))
               (max 1 (+ col-width n)))
         (tabulated-list-print t)
