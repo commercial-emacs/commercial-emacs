@@ -847,8 +847,8 @@ concat_strings (ptrdiff_t nargs, Lisp_Object *args)
 
   if (dest_multibyte && some_unibyte)
     {
-      // Non-ASCII chars in unibyte strings take two bytes when
-      // converted to multibyte -- count them and adjust the total.
+      /* Non-ASCII characters in unibyte strings take two bytes when
+	 converted to multibyte -- count them and adjust the total. */
       for (ptrdiff_t i = 0; i < nargs; i++)
 	{
 	  Lisp_Object arg = args[i];
@@ -923,8 +923,6 @@ concat_strings (ptrdiff_t nargs, Lisp_Object *args)
 	  for (ptrdiff_t j = 0; j < len; j++)
 	    {
 	      int c = XFIXNAT (AREF (arg, j));
-	      ptrdiff_t arg_len_byte = CHAR_BYTES (c);
-
 	      if (dest_multibyte)
 		toindex_byte += CHAR_STRING (c, SDATA (result) + toindex_byte);
 	      else
