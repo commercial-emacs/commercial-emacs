@@ -97,10 +97,10 @@ let-bound variable `args'."
   (declare (debug (form form sexp body)))
   `(let* ((temp-args
            ,(if (memq ':preserve-args (cadr options))
-                macro-args
+                (list 'copy-tree macro-args)
               (list 'eshell-stringify-list
                     (list 'flatten-tree macro-args))))
-          (processed-args (eshell--do-opts ,name ,options temp-args))
+          (processed-args (eshell--do-opts ,name ,options temp-args ,macro-args))
           ,@(delete-dups
              (delq nil (mapcar (lambda (opt)
                                  (and (listp opt) (nth 3 opt)
@@ -117,7 +117,7 @@ let-bound variable `args'."
 ;; Documented part of the interface; see eshell-eval-using-options.
 (defvar eshell--args)
 
-(defun eshell--do-opts (name options args)
+(defun eshell--do-opts (name options args orig-args)
   "Helper function for `eshell-eval-using-options'.
 This code doesn't really need to be macro expanded everywhere."
   (require 'esh-ext)
@@ -135,7 +135,7 @@ This code doesn't really need to be macro expanded everywhere."
                (error "%s" usage-msg))))))
     (if ext-command
         (throw 'eshell-external
-               (eshell-external-command ext-command args))
+               (eshell-external-command ext-command orig-args))
       args)))
 
 (defun eshell-show-usage (name options)
@@ -283,6 +283,9 @@ triggered to say that the switch is unrecognized."
                           (memq :parse-leading-options-only options))))
       (setq arg (nth ai eshell--args))
       (if (not (and (stringp arg)
+                    ;; A string of length 1 can't be an option; (if
+                    ;; it's "-", that generally means stdin).
+                    (> (length arg) 1)
 		    (string-match "^-\\(-\\)?\\(.*\\)" arg)))
           ;; Positional argument found, skip
 	  (setq ai (1+ ai)
@@ -295,9 +298,9 @@ triggered to say that the switch is unrecognized."
 	      (if (> (length switch) 0)
 		  (eshell--process-option name switch 1 ai options opt-vals)
 		(setq ai (length eshell--args)))
-	      (while (> (length switch) 0)
-		(setq switch (eshell--process-option name switch 0
-                                                     ai options opt-vals)))))))
+	    (while (> (length switch) 0)
+	      (setq switch (eshell--process-option name switch 0
+                                                   ai options opt-vals)))))))
     (nconc (mapcar #'cdr opt-vals) eshell--args)))
 
 (provide 'esh-opt)
