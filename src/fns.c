@@ -603,10 +603,10 @@ Do NOT use this function to compare file names for equality.  */)
   return Fstring_equal (s1, s2);
 #endif /* !__STDC_ISO_10646__, !WINDOWSNT */
 }
-
-static Lisp_Object concat (ptrdiff_t nargs, Lisp_Object *args,
-			   Lisp_Object last_tail, bool vector_target);
-static Lisp_Object concat_strings (ptrdiff_t nargs, Lisp_Object *args);
+static Lisp_Object concat_to_list (ptrdiff_t nargs, Lisp_Object *args,
+				   Lisp_Object last_tail);
+static Lisp_Object concat_to_vector (ptrdiff_t nargs, Lisp_Object *args);
+static Lisp_Object concat_to_string (ptrdiff_t nargs, Lisp_Object *args);
 
 Lisp_Object
 concat2 (Lisp_Object s1, Lisp_Object s2)
@@ -1026,15 +1026,9 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
 	memory_full (SIZE_MAX);
     }
 
-  /* When the target is a list, return the tail directly if all other
-     arguments are empty.  */
-  if (!vector_target && result_len == 0)
-    return last_tail;
-
-  /* Create the output object.  */
-  Lisp_Object result = vector_target
-    ? initialize_vector (result_len, Qnil)
-    : Fmake_list (make_fixnum (result_len), Qnil);
+  /* Create the output vector.  */
+  Lisp_Object result = initialize_vector (result_len, Qnil);
+  Lisp_Object *dst = XVECTOR (result)->contents;
 
   /* Copy the contents of the args into the result.  */
 
@@ -1086,8 +1080,7 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
 	  dst += size;
 	}
     }
-  if (! NILP (prev))
-    XSETCDR (prev, last_tail);
+  eassert (dst == XVECTOR (result)->contents + result_len);
 
   return result;
 }
