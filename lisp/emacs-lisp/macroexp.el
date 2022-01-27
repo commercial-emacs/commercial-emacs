@@ -32,6 +32,78 @@
 ;; macros defined by `defmacro'.
 (defvar macroexpand-all-environment nil)
 
+(defvar macroexp--ssp-conses-seen nil
+  "Which conses have been processed in a strip-symbol-positions operation?")
+(defvar macroexp--ssp-vectors-seen nil
+  "Which vectors have been processed in a strip-symbol-positions operation?")
+(defvar macroexp--ssp-records-seen nil
+  "Which records have been processed in a strip-symbol-positions operation?")
+
+(defun macroexp--strip-s-p-2 (arg)
+  "Strip all positions from symbols in ARG, destructively modifying ARG.
+Return the modified ARG."
+  (cond
+   ((symbolp arg)
+    (bare-symbol arg))
+   ((consp arg)
+    (unless (and macroexp--ssp-conses-seen
+                 (gethash arg macroexp--ssp-conses-seen))
+      (if macroexp--ssp-conses-seen
+          (puthash arg t macroexp--ssp-conses-seen))
+      (let ((a arg))
+        (while (consp (cdr a))
+          (setcar a (macroexp--strip-s-p-2 (car a)))
+          (setq a (cdr a)))
+        (setcar a (macroexp--strip-s-p-2 (car a)))
+        ;; (if (cdr a)
+        (unless (bare-symbol-p (cdr a)) ; includes (unpositioned) nil.
+          (setcdr a (macroexp--strip-s-p-2 (cdr a))))))
+    arg)
+   ((vectorp arg)
+    (unless (and macroexp--ssp-vectors-seen
+                 (gethash arg macroexp--ssp-vectors-seen))
+      (if macroexp--ssp-vectors-seen
+          (puthash arg t macroexp--ssp-vectors-seen))
+      (let ((i 0)
+	    (len (length arg)))
+        (while (< i len)
+	  (aset arg i (macroexp--strip-s-p-2 (aref arg i)))
+	  (setq i (1+ i)))))
+    arg)
+   ((recordp arg)
+    (unless (and macroexp--ssp-records-seen
+                 (gethash arg macroexp--ssp-records-seen))
+      (if macroexp--ssp-records-seen
+          (puthash arg t macroexp--ssp-records-seen))
+      (let ((i 0)
+	    (len (length arg)))
+        (while (< i len)
+	  (aset arg i (macroexp--strip-s-p-2 (aref arg i)))
+	  (setq i (1+ i)))))
+    arg)
+   (t arg)))
+
+(defun byte-compile-strip-s-p-1 (arg)
+  "Strip all positions from symbols in ARG, destructively modifying ARG.
+Return the modified ARG."
+  (condition-case err
+      (progn
+        (setq macroexp--ssp-conses-seen nil)
+        (setq macroexp--ssp-vectors-seen nil)
+        (setq macroexp--ssp-records-seen nil)
+        (macroexp--strip-s-p-2 arg))
+    (recursion-error
+     (dolist (tab '(macroexp--ssp-conses-seen macroexp--ssp-vectors-seen
+                                              macroexp--ssp-records-seen))
+       (set tab (make-hash-table :test 'eq)))
+     (macroexp--strip-s-p-2 arg))
+    (error (signal (car err) (cdr err)))))
+
+(defun macroexp-strip-symbol-positions (arg)
+  "Strip all positions from symbols (recursively) in ARG.  Don't modify ARG."
+  (let ((arg1 (copy-tree arg t)))
+    (byte-compile-strip-s-p-1 arg1)))
+
 (defun macroexp--cons (car cdr original-cons)
   "Return ORIGINAL-CONS if the car/cdr of it is `eq' to CAR and CDR, respectively.
 If not, return (CAR . CDR)."
@@ -348,6 +420,7 @@ Assumes the caller has bound `macroexpand-all-environment'."
            (if (null body)
                (macroexp-unprogn
                 (macroexp-warn-and-return
+                 fun
                  (format "Empty %s body" fun)
                  nil nil 'compile-only))
              (macroexp--all-forms body))
@@ -367,18 +440,14 @@ Assumes the caller has bound `macroexpand-all-environment'."
                              form)
 	   (macroexp--expand-all newform))))
 
-      (`(funcall ,exp . ,args)
+      (`(funcall . ,(or `(,exp . ,args) pcase--dontcare))
        (let ((eexp (macroexp--expand-all exp))
              (eargs (macroexp--all-forms args)))
          ;; Rewrite (funcall #'foo bar) to (foo bar), in case `foo'
          ;; has a compiler-macro, or to unfold it.
          (pcase eexp
-           ((and `#',f
-                 (guard (not (or (special-form-p f) (macrop f)))));; bug#46636
-            (macroexp--expand-all `(,f . ,eargs)))
+           (`#',f (macroexp--expand-all `(,f . ,eargs)))
            (_ `(funcall ,eexp . ,eargs)))))
-      (`(funcall . ,_) form)            ;bug#53227
-
       (`(,func . ,_)
        (let ((handler (function-get func 'compiler-macro))
              (funargs (function-get func 'funarg-positions)))
@@ -389,6 +458,7 @@ Assumes the caller has bound `macroexpand-all-environment'."
                         (eq 'lambda (car-safe (cadr arg))))
                (setcar (nthcdr funarg form)
                        (macroexp-warn-and-return
+                        (cadr arg)
                         (format "%S quoted with ' rather than with #'"
                                 (let ((f (cadr arg)))
                                   (if (symbolp f) f `(lambda ,(nth 1 f) ...))))
@@ -709,6 +779,7 @@ test of free variables in the following ways:
 
 (defun internal-macroexpand-for-load (form full-p)
   ;; Called from the eager-macroexpansion in readevalloop.
+  (setq form (macroexp-strip-symbol-positions form))
   (cond
    ;; Don't repeat the same warning for every top-level element.
    ((eq 'skip (car macroexp--pending-eager-loads)) form)
