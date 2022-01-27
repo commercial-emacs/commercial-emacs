@@ -274,6 +274,7 @@ is executed without being compiled first."
       (setq arglist (cdr arglist)))
     (if values
         (macroexp-warn-and-return
+         name
          (format (if (eq values 'too-few)
                      "attempt to open-code `%s' with too few arguments"
                    "attempt to open-code `%s' with too many arguments")

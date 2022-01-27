@@ -242,7 +242,8 @@ This method is obsolete."
 
     `(progn
        ,@(mapcar (lambda (w)
-                   (macroexp-warn-and-return w `(progn ',w) nil 'compile-only))
+                   (macroexp-warn-and-return w ; W is probably a poor choice for a position.
+                    w `(progn ',w) nil 'compile-only))
                  warnings)
        ;; This test must be created right away so we can have self-
        ;; referencing classes.  ei, a class whose slot can contain only

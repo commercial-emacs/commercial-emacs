@@ -1220,15 +1220,34 @@ message buffer `default-directory'."
                                      load-file-name dir)))
 		     (t "")))
 	 (pos (if (and byte-compile-current-file
-		       (integerp byte-compile-read-position))
+		       (integerp byte-compile-read-position)
+                       (or offset (not symbols-with-pos-enabled)))
 		  (with-current-buffer byte-compile-current-buffer
-		    (format "%d:%d:"
-			    (save-excursion
-			      (goto-char byte-compile-last-position)
-			      (1+ (count-lines (point-min) (point-at-bol))))
-			    (save-excursion
-			      (goto-char byte-compile-last-position)
-			      (1+ (current-column)))))
+		    ;; (format "%d:%d:"
+		    ;;         (save-excursion
+		    ;;           (goto-char (if symbols-with-pos-enabled
+                    ;;                          (+ byte-compile-read-position offset)
+                    ;;                        byte-compile-last-position)
+                    ;;                      )
+		    ;;           (1+ (count-lines (point-min) (point-at-bol))))
+		    ;;         (save-excursion
+		    ;;           (goto-char (if symbols-with-pos-enabled
+                    ;;                          (+ byte-compile-read-position offset)
+                    ;;                        byte-compile-last-position)
+                    ;;                      )
+		    ;;           (1+ (current-column))))
+;;;; EXPERIMENTAL STOUGH, 2018-11-22
+                    (let (old-l old-c new-l new-c)
+                      (save-excursion
+                        (goto-char byte-compile-last-position)
+                        (setq old-l (1+ (count-lines (point-min) (point-at-bol)))
+                              old-c (1+ (current-column)))
+                        (goto-char offset)
+                        (setq new-l (1+ (count-lines (point-min) (point-at-bol)))
+                              new-c (1+ (current-column)))
+                        (format "%d:%d:%d:%d:" old-l old-c new-l new-c)))
+;;;; END OF EXPERIMENTAL STOUGH
+                    )
 		""))
 	 (form (if (eq byte-compile-current-form :end) "end of data"
 		 (or byte-compile-current-form "toplevel form"))))
@@ -1311,7 +1330,7 @@ nil.")
 STRING, FILL and LEVEL are as described in
 `byte-compile-log-warning-function', which see."
   (funcall byte-compile-log-warning-function
-           string nil
+           string byte-compile-last-position
            fill
            level))
 
@@ -1471,7 +1490,8 @@ when printing the error message."
 
 (defun byte-compile-emit-callargs-warn (name actual-args min-args max-args)
   (byte-compile-set-symbol-position name)
-  (byte-compile-warn
+  (byte-compile-warn-x
+   name
    "%s called with %d argument%s, but %s %s"
    name actual-args
    (if (= 1 actual-args) "" "s")
@@ -1596,7 +1616,8 @@ extra args."
       (when (or (< min (car sig))
                 (and (cdr sig) (> max (cdr sig))))
         (byte-compile-set-symbol-position name)
-        (byte-compile-warn
+        (byte-compile-warn-x
+         name
          "%s being defined to take %s%s, but was previously called with %s"
          name
          (byte-compile-arglist-signature-string sig)
@@ -1615,7 +1636,8 @@ extra args."
             (sig2 (byte-compile-arglist-signature arglist)))
         (unless (byte-compile-arglist-signatures-congruent-p sig1 sig2)
           (byte-compile-set-symbol-position name)
-          (byte-compile-warn
+          (byte-compile-warn-x
+           name
            "%s %s used to take %s %s, now takes %s"
            (if macrop "macro" "function")
            name
@@ -1704,8 +1726,10 @@ It is too wide if it has any lines longer than the largest of
       (setq name (if name (format " `%s' " name) ""))
       (when (and kind docs (stringp docs)
                  (byte-compile--wide-docstring-p docs col))
-        (byte-compile-warn "%s%sdocstring wider than %s characters"
-                           kind name col))))
+        (byte-compile-warn-x
+         name
+         "%s%s docstring wider than %s characters"
+         kind name col))))
   form)
 
 ;; If we have compiled any calls to functions which are not known to be
@@ -1720,7 +1744,8 @@ It is too wide if it has any lines longer than the largest of
         (let ((f (car urf)))
           (when (not (memq f byte-compile-new-defuns))
             (let ((byte-compile-last-position (cadr urf)))
-              (byte-compile-warn
+              (byte-compile-warn-x
+               f
                (if (fboundp f) "the function `%s' might not be defined at runtime." "the function `%s' is not known to be defined.")
                (car urf))))))))
   nil)
@@ -2200,7 +2225,7 @@ With argument ARG, insert value in current buffer after the form."
 		     (displaying-byte-compile-warnings
 		      (byte-compile-sexp
                        (eval-sexp-add-defvars
-                        (read (current-buffer))
+                        (read-positioning-symbols (current-buffer))
                         byte-compile-read-position))))
                    lexical-binding)))
       (cond (arg
@@ -2693,7 +2718,7 @@ not to take responsibility for the actual compilation of the code."
          (byte-compile-current-form name)) ; For warnings.
 
     (byte-compile-set-symbol-position name)
-    (push name byte-compile-new-defuns)
+    (push bare-name byte-compile-new-defuns)
     ;; When a function or macro is defined, add it to the call tree so that
     ;; we can tell when functions are not used.
     (if byte-compile-generate-call-tree
@@ -2748,8 +2773,8 @@ not to take responsibility for the actual compilation of the code."
                (stringp (car-safe (cdr-safe (cdr-safe body)))))
       ;; FIXME: We've done that already just above, so this looks wrong!
       ;;(byte-compile-set-symbol-position name)
-      (byte-compile-warn "probable `\"' without `\\' in doc string of %s"
-                         name))
+      (byte-compile-warn-x
+       name "probable `\"' without `\\' in doc string of %s" bare-name))
 
     (if (not (listp body))
         ;; The precise definition requires evaluation to find out, so it
@@ -3312,7 +3337,8 @@ for symbols generated by the byte compiler itself."
       (cond ((or (not (symbolp form)) (macroexp--const-symbol-p form))
              (when (symbolp form)
                (byte-compile-set-symbol-position form))
-             (byte-compile-constant form))
+             (byte-compile-constant
+              (if (symbolp form) (bare-symbol form) form)))
             ((and byte-compile--for-effect byte-compile-delete-errors)
              (when (symbolp form)
                (byte-compile-set-symbol-position form))
@@ -3394,7 +3420,8 @@ for symbols generated by the byte compiler itself."
   (when (and byte-compile--for-effect (eq (car form) 'mapcar)
              (byte-compile-warning-enabled-p 'mapcar 'mapcar))
     (byte-compile-set-symbol-position 'mapcar)
-    (byte-compile-warn
+    (byte-compile-warn-x
+     (car form)
      "`mapcar' called for effect; use `mapc' or `dolist' instead"))
   (byte-compile-push-constant (car form))
   (mapc 'byte-compile-form (cdr form))	; wasteful, but faster.
@@ -3625,8 +3652,11 @@ assignment (i.e. `setq')."
 ;; This ignores byte-compile--for-effect.
 (defun byte-compile-push-constant (const)
   (when (symbolp const)
-    (byte-compile-set-symbol-position const))
-  (byte-compile-out 'byte-constant (byte-compile-get-constant const)))
+    (byte-compile-set-symbol-position const)
+    (setq const (bare-symbol const)))
+  (byte-compile-out
+   'byte-constant
+   (byte-compile-get-constant const)))
 
 ;; Compile those primitive ordinary functions
 ;; which have special byte codes just for speed.
@@ -3779,9 +3809,10 @@ If it is nil, then the handler is \"byte-compile-SYMBOL.\""
 
 (defun byte-compile-subr-wrong-args (form n)
   (byte-compile-set-symbol-position (car form))
-  (byte-compile-warn "`%s' called with %d arg%s, but requires %s"
-		     (car form) (length (cdr form))
-		     (if (= 1 (length (cdr form))) "" "s") n)
+  (byte-compile-warn-x (car form)
+                        "`%s' called with %d arg%s, but requires %s"
+                        (car form) (length (cdr form))
+                        (if (= 1 (length (cdr form))) "" "s") n)
   ;; Get run-time wrong-number-of-args error.
   (byte-compile-normal-call form))
 
