@@ -756,51 +756,6 @@ DEFUN ("symbol-name", Fsymbol_name, Ssymbol_name, 1, 1, 0,
   return name;
 }
 
-DEFUN ("bare-symbol", Fbare_symbol, Sbare_symbol, 1, 1, 0,
-       doc: /* Extract, if need be, the bare symbol from SYM, a symbol.  */)
-       (register Lisp_Object sym)
-{
-  if (BARE_SYMBOL_P (sym))
-    return sym;
-  /* Type checking is done in the following macro. */
-  return SYMBOL_WITH_POS_SYM (sym);
-}
-
-DEFUN ("symbol-with-pos-pos", Fsymbol_with_pos_pos, Ssymbol_with_pos_pos, 1, 1, 0,
-       doc: /* Extract the position from a symbol with position.  */)
-       (register Lisp_Object ls)
-{
-  /* Type checking is done in the following macro. */
-  return SYMBOL_WITH_POS_POS (ls);
-}
-
-DEFUN ("position-symbol", Fposition_symbol, Sposition_symbol, 2, 2, 0,
-       doc: /* Create a new symbol with position.
-SYM is a symbol, with or without position, the symbol to position.
-POS, the position, is either a fixnum or a symbol with position from which
-the position will be taken.  */)
-     (register Lisp_Object sym, register Lisp_Object pos)
-{
-  Lisp_Object bare;
-  Lisp_Object position;
-
-  if (BARE_SYMBOL_P (sym))
-    bare = sym;
-  else if (SYMBOL_WITH_POS_P (sym))
-    bare = XSYMBOL_WITH_POS (sym)->sym;
-  else
-    wrong_type_argument (Qsymbolp, sym);
-
-  if (FIXNUMP (pos))
-    position = pos;
-  else if (SYMBOL_WITH_POS_P (pos))
-    position = XSYMBOL_WITH_POS (pos)->pos;
-  else
-    wrong_type_argument (Qfixnum_or_symbol_with_pos_p, pos);
-
-  return build_symbol_with_pos (bare, position);
-}
-
 DEFUN ("fset", Ffset, Sfset, 2, 2, 0,
        doc: /* Set SYMBOL's function definition to DEFINITION, and return DEFINITION.  */)
   (register Lisp_Object symbol, Lisp_Object definition)
@@ -4193,9 +4148,6 @@ syms_of_data (void)
   defsubr (&Sindirect_function);
   defsubr (&Ssymbol_plist);
   defsubr (&Ssymbol_name);
-  defsubr (&Sbare_symbol);
-  defsubr (&Ssymbol_with_pos_pos);
-  defsubr (&Sposition_symbol);
   defsubr (&Smakunbound);
   defsubr (&Sfmakunbound);
   defsubr (&Sboundp);

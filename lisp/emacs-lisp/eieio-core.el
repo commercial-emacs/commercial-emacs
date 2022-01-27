@@ -748,7 +748,6 @@ Argument FN is the function calling this verifier."
                 ((and (or `',name (and name (pred keywordp)))
                       (guard (not (memq name eieio--known-slot-names))))
                  (macroexp-warn-and-return
-                  ;; name
                   (format-message "Unknown slot `%S'" name)
                   exp nil 'compile-only))
                 (_ exp))))

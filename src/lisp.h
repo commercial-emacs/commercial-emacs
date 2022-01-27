@@ -353,32 +353,12 @@ typedef EMACS_INT Lisp_Word;
 # endif
 #endif
 
-#define lisp_h_PSEUDOVECTORP(a,code)                            \
-  (lisp_h_VECTORLIKEP((a)) &&                                   \
-   ((XUNTAG ((a), Lisp_Vectorlike, union vectorlike_header)->size       \
-     & (PSEUDOVECTOR_FLAG | PVEC_TYPE_MASK))                    \
-    == (PSEUDOVECTOR_FLAG | ((code) << PSEUDOVECTOR_AREA_BITS))))
-
 #define lisp_h_CHECK_FIXNUM(x) CHECK_TYPE (FIXNUMP (x), Qfixnump, x)
 #define lisp_h_CHECK_SYMBOL(x) CHECK_TYPE (SYMBOLP (x), Qsymbolp, x)
 #define lisp_h_CHECK_TYPE(ok, predicate, x) \
    ((ok) ? (void) 0 : wrong_type_argument (predicate, x))
 #define lisp_h_CONSP(x) TAGGEDP (x, Lisp_Cons)
-#define lisp_h_BASE_EQ(x, y) (XLI (x) == XLI (y))
-/* #define lisp_h_EQ(x, y) (XLI (x) == XLI (y)) */
-
-#define lisp_h_EQ(x, y) ((XLI ((x)) == XLI ((y)))       \
-  || (symbols_with_pos_enabled    \
-  && (SYMBOL_WITH_POS_P ((x))                        \
-      ? BARE_SYMBOL_P ((y))                               \
-        ? (XSYMBOL_WITH_POS((x)))->sym == (y)          \
-        : SYMBOL_WITH_POS_P((y))                       \
-          && ((XSYMBOL_WITH_POS((x)))->sym                   \
-              == (XSYMBOL_WITH_POS((y)))->sym)               \
-      : (SYMBOL_WITH_POS_P ((y))                     \
-         && BARE_SYMBOL_P ((x))                           \
-         && ((x) == ((XSYMBOL_WITH_POS ((y)))->sym))))))
-
+#define lisp_h_EQ(x, y) (XLI (x) == XLI (y))
 #define lisp_h_FIXNUMP(x) \
    (! (((unsigned) (XLI (x) >> (USE_LSB_TAG ? 0 : FIXNUM_BITS)) \
 	- (unsigned) (Lisp_Int0 >> !USE_LSB_TAG)) \
