@@ -1311,7 +1311,7 @@ nil.")
 STRING, FILL and LEVEL are as described in
 `byte-compile-log-warning-function', which see."
   (funcall byte-compile-log-warning-function
-           string byte-compile-last-position
+           string nil
            fill
            level))
 
