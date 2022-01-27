@@ -150,9 +150,8 @@ Earlier variables shadow later ones with the same name.")
                    (cdr (assq name byte-compile-function-environment)))))
     (pcase fn
       ('nil
-       (byte-compile-warn-x name
-                            "attempt to inline `%s' before it was defined"
-                            name)
+       (byte-compile-warn "attempt to inline `%s' before it was defined"
+                          name)
        form)
       (`(autoload . ,_)
        (error "File `%s' didn't define `%s'" (nth 1 fn) name))
@@ -308,8 +307,8 @@ for speeding up processing.")
         (t form)))
       (`(quote . ,v)
        (if (or (not v) (cdr v))
-	   (byte-compile-warn-x form "malformed quote form: `%s'"
-			        form))
+	   (byte-compile-warn "malformed quote form: `%s'"
+			      (prin1-to-string form)))
        ;; Map (quote nil) to nil to simplify optimizer logic.
        ;; Map quoted constants to nil if for-effect (just because).
        (and (car v)
@@ -327,9 +326,8 @@ for speeding up processing.")
                            (cons
                             (byte-optimize-form (car clause) nil)
                             (byte-optimize-body (cdr clause) for-effect))
-                         (byte-compile-warn-x
-                          clause "malformed cond form: `%s'"
-                          clause)
+                         (byte-compile-warn "malformed cond form: `%s'"
+                                            (prin1-to-string clause))
                          clause))
                      clauses)))
       (`(progn . ,exps)
@@ -405,7 +403,8 @@ for speeding up processing.")
          `(while ,condition . ,body)))
 
       (`(interactive . ,_)
-       (byte-compile-warn-x form "misplaced interactive spec: `%s'" form)
+       (byte-compile-warn "misplaced interactive spec: `%s'"
+			  (prin1-to-string form))
        nil)
 
       (`(function . ,_)
@@ -473,7 +472,7 @@ for speeding up processing.")
          (while args
            (unless (and (consp args)
                         (symbolp (car args)) (consp (cdr args)))
-             (byte-compile-warn-x form "malformed setq form: %S" form))
+             (byte-compile-warn "malformed setq form: %S" form))
            (let* ((var (car args))
                   (expr (cadr args))
                   (lexvar (assq var byte-optimize--lexvars))
@@ -506,7 +505,8 @@ for speeding up processing.")
        (cons fn (mapcar #'byte-optimize-form exps)))
 
       (`(,(pred (not symbolp)) . ,_)
-       (byte-compile-warn-x fn "`%s' is a malformed function" fn)
+       (byte-compile-warn "`%s' is a malformed function"
+			  (prin1-to-string fn))
        form)
 
       ((guard (when for-effect
@@ -514,10 +514,8 @@ for speeding up processing.")
 		    (or byte-compile-delete-errors
 		        (eq tmp 'error-free)
 		        (progn
-			  (byte-compile-warn-x
-                           form
-                           "value returned from %s is unused"
-			   form)
+			  (byte-compile-warn "value returned from %s is unused"
+					     (prin1-to-string form))
 			  nil)))))
        (byte-compile-log "  %s called for effect; deleted" fn)
        ;; appending a nil here might not be necessary, but it can't hurt.
@@ -713,8 +711,7 @@ for speeding up processing.")
 	         (if (symbolp binding)
 		     binding
 	           (when (or (atom binding) (cddr binding))
-		     (byte-compile-warn-x
-                      binding "malformed let binding: `%S'" binding))
+		     (byte-compile-warn "malformed let binding: `%S'" binding))
 	           (list (car binding)
 		         (byte-optimize-form (nth 1 binding) nil))))
 	       (car form))
@@ -1197,7 +1194,7 @@ See Info node `(elisp) Integer Basics'."
 
 (defun byte-optimize-while (form)
   (when (< (length form) 2)
-    (byte-compile-warn-x form "too few arguments for `while'"))
+    (byte-compile-warn "too few arguments for `while'"))
   (if (nth 1 form)
       form))
 
@@ -1235,10 +1232,9 @@ See Info node `(elisp) Integer Basics'."
 		  (let ((butlast (nreverse (cdr (reverse (cdr (cdr form)))))))
 		    (nconc (list 'funcall fn) butlast
 			   (mapcar (lambda (x) (list 'quote x)) (nth 1 last))))
-	        (byte-compile-warn-x
-                 last
+	        (byte-compile-warn
 	         "last arg to apply can't be a literal atom: `%s'"
-	         last)
+	         (prin1-to-string last))
 	        nil))
 	  form))))
 

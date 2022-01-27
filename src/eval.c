@@ -2454,7 +2454,7 @@ eval_sub (Lisp_Object form)
       if (max_lisp_eval_depth < 100)
 	max_lisp_eval_depth = 100;
       if (lisp_eval_depth > max_lisp_eval_depth)
-	xsignal0 (Qexcessive_lisp_nesting);
+	error ("Lisp nesting exceeds `max-lisp-eval-depth'");
     }
 
   Lisp_Object original_fun = XCAR (form);
