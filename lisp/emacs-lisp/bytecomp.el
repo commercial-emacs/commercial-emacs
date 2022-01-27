@@ -468,7 +468,7 @@ Return the compile-time value of FORM."
   ;; 3.2.3.1, "Processing of Top Level Forms".  The semantics are very
   ;; subtle: see test/lisp/emacs-lisp/bytecomp-tests.el for interesting
   ;; cases.
-  (let ((print-symbols-bare t))         ; Possibly redundant binding.
+  (let ((print-symbols-bare t))
     (setf form (macroexp-macroexpand form byte-compile-macro-environment)))
   (if (eq (car-safe form) 'progn)
       (cons 'progn
@@ -510,7 +510,7 @@ Return the compile-time value of FORM."
                               ;; Don't compile here, since we don't know
                               ;; whether to compile as byte-compile-form
                               ;; or byte-compile-file-form.
-                              (let* ((print-symbols-bare t) ; Possibly redundant binding.
+                              (let* ((print-symbols-bare t)
                                      (expanded
                                       (macroexpand--all-toplevel
                                        form
@@ -2226,7 +2226,6 @@ With argument ARG, insert value in current buffer after the form."
 	(case-fold-search nil)
 	(print-length nil)
 	(print-level nil)
-        (print-symbols-bare t)
 	;; Prevent edebug from interfering when we compile
 	;; and put the output into a file.
 ;; 	(edebug-all-defs nil)
@@ -2358,7 +2357,7 @@ Call from the source buffer."
     ;; Spill output for the native compiler here
     (push (make-byte-to-native-top-level :form form :lexical lexical-binding)
           byte-to-native-top-level-forms))
-  (let ((print-symbols-bare t)          ; Possibly redundant binding.
+  (let ((print-symbols-bare t)
         (print-escape-newlines t)
         (print-length nil)
         (print-level nil)
@@ -2395,7 +2394,7 @@ list that represents a doc string reference.
   (let ((dynamic-docstrings byte-compile-dynamic-docstrings))
     (with-current-buffer byte-compile--outbuffer
       (let (position
-            (print-symbols-bare t))     ; Possibly redundant binding.
+            (print-symbols-bare t))
         ;; Insert the doc string, and make it a comment with #@LENGTH.
         (and (>= (nth 1 info) 0)
              dynamic-docstrings
@@ -2505,7 +2504,7 @@ list that represents a doc string reference.
               byte-compile-jump-tables nil))))
 
 (defun byte-compile-preprocess (form &optional _for-effect)
-  (let ((print-symbols-bare t))         ; Possibly redundant binding.
+  (let ((print-symbols-bare t))
     (setq form (macroexpand-all form byte-compile-macro-environment)))
   ;; FIXME: We should run byte-optimize-form here, but it currently does not
   ;; recurse through all the code, so we'd have to fix this first.
@@ -3317,7 +3316,7 @@ lambda-expression."
   (setq byte-compile-noruntime-functions
         (delq fn byte-compile-noruntime-functions))
   ;; Delegate the rest to the normal macro definition.
-  (let ((print-symbols-bare t))         ; Possibly redundant binding.
+  (let ((print-symbols-bare t))
     (macroexpand `(declare-function ,fn ,file ,@args))))
 
 
