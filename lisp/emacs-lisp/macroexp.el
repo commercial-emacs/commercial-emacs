@@ -136,19 +136,17 @@ Other uses risk returning non-nil value that point to the wrong file."
 (defvar macroexp--warned (make-hash-table :test #'equal :weakness 'key))
 
 (defun macroexp--warn-wrap (msg form category)
-  (let ((when-compiled
-	 (lambda ()
-           (when (if (consp category)
-                     (apply #'byte-compile-warning-enabled-p category)
-                   (byte-compile-warning-enabled-p category))
-             (byte-compile-warn "%s" msg)))))
+  (let ((when-compiled (lambda ()
+                         (when (byte-compile-warning-enabled-p category)
+                           (byte-compile-warn-x form "%s" msg)))))
     `(progn
        (macroexp--funcall-if-compiled ',when-compiled)
        ,form)))
 
 (define-obsolete-function-alias 'macroexp--warn-and-return
   #'macroexp-warn-and-return "28.1")
-(defun macroexp-warn-and-return (msg form &optional category compile-only)
+(defun macroexp-warn-and-return (;; _arg
+                                 msg form &optional category compile-only)
   "Return code equivalent to FORM labeled with warning MSG.
 CATEGORY is the category of the warning, like the categories that
 can appear in `byte-compile-warnings'.
@@ -219,6 +217,7 @@ is executed without being compiled first."
         (let* ((fun (car form))
                (obsolete (get fun 'byte-obsolete-info)))
           (macroexp-warn-and-return
+           ;; fun
            (macroexp--obsolete-warning
             fun obsolete
             (if (symbolp (symbol-function fun))
@@ -274,7 +273,6 @@ is executed without being compiled first."
       (setq arglist (cdr arglist)))
     (if values
         (macroexp-warn-and-return
-         name
          (format (if (eq values 'too-few)
                      "attempt to open-code `%s' with too few arguments"
                    "attempt to open-code `%s' with too many arguments")
@@ -340,20 +338,19 @@ Assumes the caller has bound `macroexpand-all-environment'."
       (`(,(or 'function 'quote) . ,_) form)
       (`(,(and fun (or 'let 'let*)) . ,(or `(,bindings . ,body)
                                            pcase--dontcare))
-       (let ((macroexp--dynvars macroexp--dynvars))
-         (macroexp--cons
-          fun
-          (macroexp--cons
-           (macroexp--all-clauses bindings 1)
-           (if (null body)
-               (macroexp-unprogn
-                (macroexp-warn-and-return
-                 fun
-                 (format "Empty %s body" fun)
-                 nil nil 'compile-only))
-             (macroexp--all-forms body))
-           (cdr form))
-          form)))
+       (macroexp--cons
+        fun
+        (macroexp--cons
+         (macroexp--all-clauses bindings 1)
+         (if (null body)
+             (macroexp-unprogn
+              (macroexp-warn-and-return
+               ;; fun
+               (format "Empty %s body" fun)
+               nil nil 'compile-only))
+           (macroexp--all-forms body))
+         (cdr form))
+        form))
       (`(,(and fun `(lambda . ,_)) . ,args)
        ;; Embedded lambda in function position.
        ;; If the byte-optimizer is loaded, try to unfold this,
@@ -386,7 +383,7 @@ Assumes the caller has bound `macroexpand-all-environment'."
                         (eq 'lambda (car-safe (cadr arg))))
                (setcar (nthcdr funarg form)
                        (macroexp-warn-and-return
-                        (cadr arg)
+                        ;; (nth 1 f)
                         (format "%S quoted with ' rather than with #'"
                                 (let ((f (cadr arg)))
                                   (if (symbolp f) f `(lambda ,(nth 1 f) ...))))
