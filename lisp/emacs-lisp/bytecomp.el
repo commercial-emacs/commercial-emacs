@@ -1704,7 +1704,7 @@ It is too wide if it has any lines longer than the largest of
       (setq name (if name (format " `%s' " name) ""))
       (when (and kind docs (stringp docs)
                  (byte-compile--wide-docstring-p docs col))
-        (byte-compile-warn "%s%s docstring wider than %s characters"
+        (byte-compile-warn "%s%sdocstring wider than %s characters"
                            kind name col))))
   form)
 
