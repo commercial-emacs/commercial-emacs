@@ -2406,24 +2406,7 @@ grow_specpdl (void)
 {
   specpdl_ptr++;
   if (specpdl_ptr == specpdl + specpdl_size)
-    {
-      ptrdiff_t count = SPECPDL_INDEX ();
-      ptrdiff_t max_size = min (max_specpdl_size, PTRDIFF_MAX - 1000);
-      union specbinding *pdlvec = specpdl - 1;
-      ptrdiff_t pdlvecsize = specpdl_size + 1;
-      if (max_size <= specpdl_size)
-	{
-	  if (max_specpdl_size < 400)
-	    max_size = max_specpdl_size = 400;
-	  if (max_size <= specpdl_size)
-	    signal_error ("Variable binding depth exceeds max-specpdl-size",
-			  Qnil);
-	}
-      pdlvec = xpalloc (pdlvec, &pdlvecsize, 1, max_size + 1, sizeof *specpdl);
-      specpdl = pdlvec + 1;
-      specpdl_size = pdlvecsize - 1;
-      specpdl_ptr = specpdl + count;
-    }
+    grow_specpdl_allocation ();
 }
 
 ptrdiff_t
@@ -2471,7 +2454,7 @@ eval_sub (Lisp_Object form)
       if (max_lisp_eval_depth < 100)
 	max_lisp_eval_depth = 100;
       if (lisp_eval_depth > max_lisp_eval_depth)
-	error ("Lisp nesting exceeds `max-lisp-eval-depth'");
+	xsignal0 (Qexcessive_lisp_nesting);
     }
 
   Lisp_Object original_fun = XCAR (form);
@@ -3058,31 +3041,7 @@ FUNCTIONP (Lisp_Object object)
 Lisp_Object
 funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
 {
-  Lisp_Object fun, original_fun;
-  Lisp_Object funcar;
-  ptrdiff_t numargs = nargs - 1;
-  Lisp_Object val;
-  ptrdiff_t count;
-
-  maybe_quit ();
-
-  if (++lisp_eval_depth > max_lisp_eval_depth)
-    {
-      if (max_lisp_eval_depth < 100)
-	max_lisp_eval_depth = 100;
-      if (lisp_eval_depth > max_lisp_eval_depth)
-	error ("Lisp nesting exceeds `max-lisp-eval-depth'");
-    }
-
-  count = record_in_backtrace (args[0], &args[1], nargs - 1);
-
-  maybe_gc ();
-
-  if (debug_on_next_call)
-    do_debug_on_call (Qlambda, count);
-
-  original_fun = args[0];
-
+  Lisp_Object original_fun = fun;
  retry:
   if (SYMBOLP (fun) && !NILP (fun)
       && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))

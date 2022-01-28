@@ -1832,9 +1832,7 @@ and the annotation emission."
       (byte-listp auto)
       (byte-eq auto)
       (byte-memq auto)
-      (byte-not
-       (comp-emit-set-call (comp-call 'eq (comp-slot-n (comp-sp))
-                                      (make-comp-mvar :constant nil))))
+      (byte-not null)
       (byte-car auto)
       (byte-cdr auto)
       (byte-cons auto)

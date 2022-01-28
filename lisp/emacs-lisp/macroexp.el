@@ -136,6 +136,17 @@ Other uses risk returning non-nil value that point to the wrong file."
 (defvar macroexp--warned (make-hash-table :test #'equal :weakness 'key))
 
 (defun macroexp--warn-wrap (msg form category)
+  (let ((when-compiled
+	 (lambda ()
+           (when (if (consp category)
+                     (apply #'byte-compile-warning-enabled-p category)
+                   (byte-compile-warning-enabled-p category))
+             (byte-compile-warn "%s" msg)))))
+    `(progn
+       (macroexp--funcall-if-compiled ',when-compiled)
+       ,form)))
+
+(defun macroexp--warn-wrap (msg form category)
   (let ((when-compiled (lambda ()
                          (when (byte-compile-warning-enabled-p category)
                            (byte-compile-warn "%s" msg)))))
@@ -336,18 +347,19 @@ Assumes the caller has bound `macroexpand-all-environment'."
       (`(,(or 'function 'quote) . ,_) form)
       (`(,(and fun (or 'let 'let*)) . ,(or `(,bindings . ,body)
                                            pcase--dontcare))
-       (macroexp--cons
-        fun
-        (macroexp--cons
-         (macroexp--all-clauses bindings 1)
-         (if (null body)
-             (macroexp-unprogn
-              (macroexp-warn-and-return
-               (format "Empty %s body" fun)
-               nil nil 'compile-only))
-           (macroexp--all-forms body))
-         (cdr form))
-        form))
+       (let ((macroexp--dynvars macroexp--dynvars))
+         (macroexp--cons
+          fun
+          (macroexp--cons
+           (macroexp--all-clauses bindings 1)
+           (if (null body)
+               (macroexp-unprogn
+                (macroexp-warn-and-return
+                 (format "Empty %s body" fun)
+                 nil nil 'compile-only))
+             (macroexp--all-forms body))
+           (cdr form))
+          form)))
       (`(,(and fun `(lambda . ,_)) . ,args)
        ;; Embedded lambda in function position.
        ;; If the byte-optimizer is loaded, try to unfold this,
@@ -361,15 +373,17 @@ Assumes the caller has bound `macroexpand-all-environment'."
                              (macroexp--all-forms args)
                              form)
 	   (macroexp--expand-all newform))))
-
-      (`(funcall . ,(or `(,exp . ,args) pcase--dontcare))
+      (`(funcall ,exp . ,args)
        (let ((eexp (macroexp--expand-all exp))
              (eargs (macroexp--all-forms args)))
          ;; Rewrite (funcall #'foo bar) to (foo bar), in case `foo'
          ;; has a compiler-macro, or to unfold it.
          (pcase eexp
-           (`#',f (macroexp--expand-all `(,f . ,eargs)))
+           ((and `#',f
+                 (guard (not (or (special-form-p f) (macrop f))))) ;; bug#46636
+            (macroexp--expand-all `(,f . ,eargs)))
            (_ `(funcall ,eexp . ,eargs)))))
+      (`(funcall . ,_) form)            ;bug#53227
       (`(,func . ,_)
        (let ((handler (function-get func 'compiler-macro))
              (funargs (function-get func 'funarg-positions)))
@@ -409,7 +423,6 @@ Assumes the caller has bound `macroexpand-all-environment'."
                        newform
                      (macroexp--expand-all newform)))
                (macroexp--expand-all newform))))))
-
       (_ form))))
 
 ;; Record which arguments expect functions, so we can warn when those

@@ -181,9 +181,11 @@ and reference them using the function `class-option'."
 
 	;; Is there an initarg, but allocation of class?
 	(when (and initarg (eq alloc :class))
-	  (push (format "Meaningless :initarg for class allocated slot '%S'"
-	                sname)
-	        warnings))
+	  (push
+           (cons sname
+                 (format "Meaningless :initarg for class allocated slot '%S'"
+	                 sname))
+	   warnings))
 
         (let ((init (plist-get soptions :initform)))
           (unless (or (macroexp-const-p init)
@@ -194,8 +196,9 @@ and reference them using the function `class-option'."
             ;; heuristic says and if it disagrees with normal evaluation
             ;; then tweak the initform to make it fit and emit
             ;; a warning accordingly.
-            (push (format "Ambiguous initform needs quoting: %S" init)
-                  warnings)))
+            (push
+             (cons init (format "Ambiguous initform needs quoting: %S" init))
+             warnings)))
 
 	;; Anyone can have an accessor function.  This creates a function
 	;; of the specified name, and also performs a `defsetf' if applicable
