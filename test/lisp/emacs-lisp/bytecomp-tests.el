@@ -828,6 +828,29 @@ byte-compiled.  Run with dynamic binding."
      (ert-info ((prin1-to-string (buffer-string)) :prefix "buffer: ")
        (should (re-search-forward ,(string-replace " " "[ \n]+" re-warning))))))
 
+(defmacro bytecomp--buffer-with-warning-test (re-warning &rest forms)
+  (declare (indent 1))
+  `(with-current-buffer (get-buffer-create "*Compile-Log*")
+     (let ((inhibit-read-only t)) (erase-buffer))
+     (with-temp-buffer
+       (apply (lambda (form) (insert (format "%S\n" form)))
+              ',forms)
+       (byte-compile-from-buffer (current-buffer)))
+     (ert-info ((prin1-to-string (buffer-string)) :prefix "buffer: ")
+       (should (re-search-forward ,(string-replace " " "[ \n]+" re-warning))))))
+
+(ert-deftest bytecomp-warn-absent-require-cl-lib ()
+  (bytecomp--buffer-with-warning-test
+   "cl-member-if. might not be defined"
+   (cl-member-if (function cl-evenp) (list 1 2 3))))
+
+(ert-deftest bytecomp-warn-present-require-cl-lib ()
+  (should-error
+   (bytecomp--buffer-with-warning-test
+    "cl-member-if. might not be defined"
+    (require 'cl-lib)
+    (cl-member-if (function cl-evenp) (list 1 2 3)))))
+
 (ert-deftest bytecomp-warn-wrong-args ()
   (bytecomp--with-warning-test "remq.*3.*2"
     '(remq 1 2 3)))

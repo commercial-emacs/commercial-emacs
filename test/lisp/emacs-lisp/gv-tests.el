@@ -32,7 +32,7 @@
      (let ((,elvar "gv-test-deffoo.el")
            (,elcvar "gv-test-deffoo.elc"))
        (with-temp-file ,elvar
-         (insert ";; -*- lexical-binding: t; -*-\n")
+         (insert ";; -*- lexical-binding: t; -*-\n(require 'gv)\n")
          (dolist (form ',filebody)
            (pp form (current-buffer))))
        ,@body)))
@@ -117,7 +117,8 @@
     (with-temp-buffer
       (call-process (concat invocation-directory invocation-name)
                     nil '(t t) nil
-                    "-Q" "-batch" "--eval" (prin1-to-string `(byte-compile-file ,el))
+                    "-Q" "-batch"
+                    "--eval" (prin1-to-string `(byte-compile-file ,el))
                     "-l" elc
                     "--eval"
                     (prin1-to-string '(progn (setf (gv-test-foo gv-test-pair) 99)
