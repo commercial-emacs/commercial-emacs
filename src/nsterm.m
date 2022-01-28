@@ -5959,6 +5959,22 @@ not_in_argv (NSString *arg)
 {
   NSTRACE ("[EmacsView dealloc]");
 
+  [[NSNotificationCenter defaultCenter]
+      removeObserver: self
+                name: NSApplicationDidHideNotification
+              object: nil];
+  [[NSNotificationCenter defaultCenter]
+      removeObserver: self
+                name: NSApplicationDidUnhideNotification
+              object: nil];
+#if defined(NS_IMPL_COCOA) && \
+  MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+  [[[NSWorkspace sharedWorkspace] notificationCenter]
+    removeObserver: self
+              name: NSWorkspaceActiveSpaceDidChangeNotification
+            object: nil];
+#endif /* NS_IMPL_COCOA && >= MAC_OS_X_VERSION_10_6 */
+
   /* Clear the view resize notification.  */
   [[NSNotificationCenter defaultCenter]
     removeObserver:self
@@ -7214,6 +7230,27 @@ not_in_argv (NSString *arg)
   [NSApp registerServicesMenuSendTypes: ns_send_types
                            returnTypes: [NSArray array]];
 
+  /* Update visibility state on application hide and unhide. */
+  [[NSNotificationCenter defaultCenter]
+      addObserver: self
+         selector: @selector (updateVisibility:)
+             name: NSApplicationDidHideNotification
+           object: nil];
+  [[NSNotificationCenter defaultCenter]
+      addObserver: self
+         selector: @selector (updateVisibility:)
+             name: NSApplicationDidUnhideNotification
+           object: nil];
+
+#if defined(NS_IMPL_COCOA) && \
+  MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+  [[[NSWorkspace sharedWorkspace] notificationCenter]
+    addObserver: self
+       selector: @selector (updateVisibility:)
+           name: NSWorkspaceActiveSpaceDidChangeNotification
+         object: nil];
+#endif /* NS_IMPL_COCOA && >= MAC_OS_X_VERSION_10_6 */
+
   ns_window_num++;
   return self;
 }
@@ -7383,18 +7420,7 @@ not_in_argv (NSString *arg)
 - (void)windowDidDeminiaturize: sender
 {
   NSTRACE ("[EmacsView windowDidDeminiaturize:]");
-  if (!emacsframe->output_data.ns)
-    return;
-
-  SET_FRAME_ICONIFIED (emacsframe, 0);
-  SET_FRAME_VISIBLE (emacsframe, 1);
-  windows_or_buffers_changed = 63;
-
-  if (emacs_event)
-    {
-      emacs_event->kind = DEICONIFY_EVENT;
-      EV_TRAILER ((id)nil);
-    }
+  [self updateVisibility:nil];
 }
 
 
@@ -7415,16 +7441,48 @@ not_in_argv (NSString *arg)
 - (void)windowDidMiniaturize: sender
 {
   NSTRACE ("[EmacsView windowDidMiniaturize:]");
+  [self updateVisibility:nil];
+}
+
+- (void)updateVisibility: (NSNotification *)notification
+{
+  NSTRACE (updateVisibility);
+
   if (!emacsframe->output_data.ns)
     return;
 
-  SET_FRAME_ICONIFIED (emacsframe, 1);
-  SET_FRAME_VISIBLE (emacsframe, 0);
-
-  if (emacs_event)
+  NSWindow *win = [self window];
+  BOOL on_active_space = YES;
+  if ([win respondsToSelector: @selector (isOnActiveSpace)])
+    on_active_space = [win isOnActiveSpace];
+  if (on_active_space && [win isVisible])
     {
-      emacs_event->kind = ICONIFY_EVENT;
-      EV_TRAILER ((id)nil);
+      if (FRAME_VISIBLE_P (emacsframe) && !FRAME_ICONIFIED_P (emacsframe))
+        return;
+
+      SET_FRAME_ICONIFIED (emacsframe, 0);
+      SET_FRAME_VISIBLE (emacsframe, 1);
+      windows_or_buffers_changed = 63;
+
+      if (emacs_event)
+        {
+          emacs_event->kind = DEICONIFY_EVENT;
+          EV_TRAILER ((id)nil);
+        }
+    }
+  else
+    {
+      if (!FRAME_VISIBLE_P (emacsframe) && FRAME_ICONIFIED_P (emacsframe))
+        return;
+
+      SET_FRAME_ICONIFIED (emacsframe, 1);
+      SET_FRAME_VISIBLE (emacsframe, 0);
+
+      if (emacs_event)
+        {
+          emacs_event->kind = ICONIFY_EVENT;
+          EV_TRAILER ((id)nil);
+        }
     }
 }
 
