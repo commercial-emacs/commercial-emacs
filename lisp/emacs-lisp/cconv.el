@@ -367,7 +367,7 @@ places where they originally did not directly appear."
 		(var (if (not (consp binder))
 			 (prog1 binder (setq binder (list binder)))
                        (when (cddr binder)
-                         (byte-compile-warn letsym
+                         (byte-compile-warn
                           "Malformed `%S' binding: %S"
                           letsym binder))
 		       (setq value (cadr binder))
@@ -375,9 +375,9 @@ places where they originally did not directly appear."
            (cond
             ;; Ignore bindings without a valid name.
             ((not (symbolp var))
-             (byte-compile-warn var "attempt to let-bind nonvariable `%S'" var))
+             (byte-compile-warn "attempt to let-bind nonvariable `%S'" var))
             ((or (booleanp var) (keywordp var))
-             (byte-compile-warn var "attempt to let-bind constant `%S'" var))
+             (byte-compile-warn "attempt to let-bind constant `%S'" var))
             (t
              (let ((new-val
 		    (pcase (cconv--var-classification binder form)
@@ -503,7 +503,6 @@ places where they originally did not directly appear."
 
     (`(internal-make-closure . ,_)
      (byte-compile-report-error
-      'internal-make-closure
       "Internal error in compiler: cconv called twice?"))
 
     (`(quote . ,_) form)
@@ -564,7 +563,7 @@ places where they originally did not directly appear."
                      ;; This "should never happen", but for variables which are
                      ;; mutated+captured+unused, we may end up trying to `setq'
                      ;; on a closed-over variable, so just drop the setq.
-                     (_ ;; (byte-compile-report-error sym-new
+                     (_ ;; (byte-compile-report-error
                       ;;  (format "Internal error in cconv of (setq %s ..)"
                       ;;          sym-new))
                       value))
@@ -625,15 +624,15 @@ FORM is the parent form that binds this var."
      ;; FIXME: Convert this warning to use `macroexp--warn-wrap'
      ;; so as to give better position information.
      (when (byte-compile-warning-enabled-p 'not-unused var)
-       (byte-compile-warn var "%s `%S' not left unused" varkind var)))
+       (byte-compile-warn "%s `%S' not left unused" varkind var)))
     ((and (let (or 'let* 'let) (car form))
           `((,var) ;; (or `(,var nil) : Too many false positives: bug#47080
             t nil ,_ ,_))
      ;; FIXME: Convert this warning to use `macroexp--warn-wrap'
      ;; so as to give better position information and obey
      ;; `byte-compile-warnings'.
-     (when (intern-soft var)
-       (byte-compile-warn var "Variable `%S' left uninitialized" var))))
+     (unless (not (intern-soft var))
+       (byte-compile-warn "Variable `%S' left uninitialized" var))))
   (pcase vardata
     (`(,binder nil ,_ ,_ nil)
      (push (cons (cons binder form) :unused) cconv-var-classification))
@@ -662,7 +661,7 @@ FORM is the parent form that binds this var."
     (dolist (arg args)
       (cond
        ((byte-compile-not-lexical-var-p arg)
-        (byte-compile-warn arg
+        (byte-compile-warn
          "Lexical argument shadows the dynamic variable %S"
          arg))
        ((eq ?& (aref (symbol-name arg) 0)) nil) ;Ignore &rest, &optional, ...
@@ -745,7 +744,7 @@ This function does not return anything but instead fills the
        (setq forms (cddr forms))))
 
     (`((lambda . ,_) . ,_)             ; First element is lambda expression.
-     (byte-compile-warn 'lambda
+     (byte-compile-warn
       "Use of deprecated ((lambda %s ...) ...) form" (nth 1 (car form)))
      (dolist (exp `((function ,(car form)) . ,(cdr form)))
        (cconv-analyze-form exp env)))
@@ -754,6 +753,10 @@ This function does not return anything but instead fills the
      (dolist (forms cond-forms)
        (dolist (form forms) (cconv-analyze-form form env))))
 
+    ;; ((and `(quote ,v . ,_) (guard (assq v env)))
+    ;;  (byte-compile-warn
+    ;;   "Possible confusion variable/symbol for `%S'" v))
+
     (`(quote . ,_) nil)                 ; quote form
     (`(function . ,_) nil)              ; same as quote
 
@@ -761,7 +764,6 @@ This function does not return anything but instead fills the
      (cconv-analyze-form protected-form env)
      (when (and var (symbolp var) (byte-compile-not-lexical-var-p var))
        (byte-compile-warn
-        var
         "Lexical variable shadows the dynamic variable %S" var))
      (let* ((varstruct (list var nil nil nil nil)))
        (if var (push varstruct env))

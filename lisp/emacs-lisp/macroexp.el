@@ -141,7 +141,7 @@ Other uses risk returning non-nil value that point to the wrong file."
            (when (if (consp category)
                      (apply #'byte-compile-warning-enabled-p category)
                    (byte-compile-warning-enabled-p category))
-             (byte-compile-warn nil "%s" msg)))))
+             (byte-compile-warn "%s" msg)))))
     `(progn
        (macroexp--funcall-if-compiled ',when-compiled)
        ,form)))

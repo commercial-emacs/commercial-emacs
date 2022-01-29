@@ -2508,7 +2508,6 @@ read_internal_start (Lisp_Object stream, Lisp_Object start, Lisp_Object end)
     read_objects_completed
       = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE, DEFAULT_REHASH_SIZE,
 			 DEFAULT_REHASH_THRESHOLD, Qnil, false);
-  Vread_symbol_positions_list = Qnil;
 
   if (STRINGP (stream)
       || ((CONSP (stream) && STRINGP (XCAR (stream)))))
@@ -3835,10 +3834,6 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		}
 	    }
 
-	  if (BUFFERP (readcharfun))
-	    Vread_symbol_positions_list
-	      = Fcons (Fcons (result, make_fixnum (start_position)),
-		       Vread_symbol_positions_list);
 	  return unbind_to (count, result);
 	}
       }
@@ -5123,17 +5118,6 @@ This variable is obsolete as of Emacs 28.1 and should not be used.  */);
 	       doc: /* Stream for read to get input from.
 See documentation of `read' for possible values.  */);
   Vstandard_input = Qt;
-
-  DEFVAR_LISP ("read-symbol-positions-list", Vread_symbol_positions_list,
-	       doc: /* A list mapping read symbols to their positions.
-Each element takes the form (SYMBOL . CHAR-POSITION), where
-CHAR-POSITION is the character offset from the point at which
-`read' or `read-from-string' was initially called.
-
-A separate entry, with a CHAR-POSITION greater than the last, is added
-each time a particular symbol is read.  */);
-  Vread_symbol_positions_list = Qnil;
-  Fmake_variable_buffer_local (intern ("read-symbol-positions-list"));
 
   DEFVAR_LISP ("read-circle", Vread_circle,
 	       doc: /* Non-nil means read recursive structures using #N= and #N# syntax.  */);

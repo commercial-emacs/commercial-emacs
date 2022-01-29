@@ -1268,13 +1268,12 @@ message buffer `default-directory'."
 (defvar byte-compile-log-warning-function
   #'byte-compile--log-warning-for-byte-compile
   "Function called when encountering a warning or error.
-Called with arguments (SYM STRING POSITION FILL LEVEL).  SYM is
-looked up in `read-symbol-positions-list' to reference a line
-number.  STRING is a message describing the problem.  POSITION is
-a buffer position where the problem was detected.  FILL is a
-prefix as in `warning-fill-prefix'.  LEVEL is the level of the
-problem (`:warning' or `:error').  POSITION, FILL and LEVEL may
-be nil.")
+Called with arguments (IDX STRING POSITION FILL LEVEL).  IDX is a
+line number. STRING is a message describing the problem.
+POSITION is a buffer position where the problem was detected.
+FILL is a prefix as in `warning-fill-prefix'.  LEVEL is the level
+of the problem (`:warning' or `:error').  POSITION, FILL and
+LEVEL may be nil.")
 
 (defun byte-compile-log-warning (sym string &optional fill level)
   "Log a byte-compilation warning.
@@ -3250,26 +3249,24 @@ of the list FUN."
   ;; Delegate the rest to the normal macro definition.
   (macroexpand `(declare-function ,fn ,file ,@args)))
 
-(defun byte-compile--prevailing-position (sym)
-  (cdr (assq sym read-symbol-positions-list)))
-
-;; This is the recursive entry point for compiling each subform of an
-;; expression.
-;; If for-effect is non-nil, byte-compile-form will output a byte-discard
-;; before terminating (ie no value will be left on the stack).
-;; A byte-compile handler may, when byte-compile--for-effect is non-nil, choose
-;; output code which does not leave a value on the stack, and then set
-;; byte-compile--for-effect to nil (to prevent byte-compile-form from
-;; outputting the byte-discard).
-;; If a handler wants to call another handler, it should do so via
-;; byte-compile-form, or take extreme care to handle byte-compile--for-effect
-;; correctly.  (Use byte-compile-form-do-effect to reset the
-;; byte-compile--for-effect flag too.)
-;;
 (defun byte-compile-form (form &optional for-effect)
-  (let ((byte-compile--for-effect for-effect)
-        (read-symbol-positions-list read-symbol-positions-list))
-    (message "\n%S\n%S\n" form read-symbol-positions-list)
+  "Recursive entrypoint for compiling s-exprs.
+
+If FOR-EFFECT is non-nil, byte-compile-form will output a
+byte-discard before terminating, that is, no value will be left
+on the stack.
+
+A byte-compile handler may, when byte-compile--for-effect is
+non-nil, choose output code which does not leave a value on the
+stack, and then set byte-compile--for-effect to nil (to prevent
+byte-compile-form from outputting the byte-discard).
+
+If a handler wants to call another handler, it should do so via
+byte-compile-form, or take extreme care to handle
+byte-compile--for-effect correctly.  Use
+byte-compile-form-do-effect to reset the byte-compile--for-effect
+flag."
+  (let ((byte-compile--for-effect for-effect))
     (cond
      ((not (consp form))
       (cond ((or (not (symbolp form)) (macroexp--const-symbol-p form))
@@ -3341,8 +3338,7 @@ of the list FUN."
       (setq byte-compile--for-effect nil))
      ((byte-compile-normal-call form)))
     (when byte-compile--for-effect
-      (byte-compile-discard))
-    (message "%S\n" read-symbol-positions-list)))
+      (byte-compile-discard))))
 
 (defun byte-compile-normal-call (form)
   (when (and (symbolp (car form))
