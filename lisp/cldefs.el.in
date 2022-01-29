@@ -1,0 +1,17 @@
+(require 'gv)
+
+(defconst cldefs--cl-lib-functions
+  (let (load-history)
+    (require 'cl-lib)
+    (require 'cl-macs)
+    (require 'cl-seq)
+    (mapcan
+     (lambda (defines)
+       (delq nil (mapcar
+                  (lambda (define)
+                    (when (memq (car-safe define) '(defun t))
+                      (cdr define)))
+                  defines)))
+     (mapcar #'cdr load-history)))
+  "Since cl-lib has yet to join loadup.el, we must flag user code which
+does not first require it before using its functions.  (Bug#30635)")

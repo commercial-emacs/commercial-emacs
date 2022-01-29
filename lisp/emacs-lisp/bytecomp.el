@@ -121,6 +121,7 @@
 ;;  o  byte-compiled files now start with the string `;ELC'.
 ;;     Some versions of `file' can be customized to recognize that.
 
+(require 'cldefs)
 (require 'cl-lib)
 (require 'compile)
 (require 'backquote)
@@ -560,29 +561,6 @@ defined with incorrect args.")
   "Alist of functions called that may not be defined when the compiled code is run.
 Used for warnings about calling a function that is defined during compilation
 but won't necessarily be defined when the compiled file is loaded.")
-
-(defconst byte-compile--cl-lib-functions
-  (let ((restore-features features))
-    ;; `features' is not `special-variable-p', so cannot
-    ;; (let (features) ... )
-    (unwind-protect
-        (progn
-          (setq features nil)
-          (let (load-history)
-            (require 'cl-lib)
-            (require 'cl-macs)
-            (require 'cl-seq)
-            (mapcan
-             (lambda (defines)
-               (delq nil (mapcar
-                          (lambda (define)
-                            (when (memq (car-safe define) '(defun t))
-                              (cdr define)))
-                          defines)))
-             (mapcar #'cdr load-history))))
-      (setq features restore-features)))
-  "Since cl-lib has yet to join loadup.el, we must flag user code which
-does not first require it before using its functions.  (Bug#30635)")
 
 (defvar byte-compile-new-defuns nil
   "List of (runtime) functions defined in this compilation run.
@@ -1175,6 +1153,9 @@ message buffer `default-directory'."
         (f2 (file-relative-name file dir)))
     (if (< (length f2) (length f1)) f2 f1)))
 
+(defun byte-compile--prevailing-position (sym)
+  0)
+
 (defun byte-compile-warning-prefix (sym level entry)
   (let* ((inhibit-read-only t)
 	 (dir (or byte-compile-root-dir default-directory))
@@ -1432,7 +1413,7 @@ F is considered resolved if auxiliary DEF includes it."
              (byte-compile-warning-enabled-p 'obsolete f))
     (byte-compile-warn-obsolete f))
   (when (and (or (and (not def) (not (fboundp f)))
-                 (and (memq f byte-compile--cl-lib-functions)
+                 (and (memq f cldefs-cl-lib-functions)
                       ;; `byte-compile-new-defuns' won't
                       ;; pick up autoloads, so consider
                       ;; (require 'cl-lib) as sufficient.
@@ -1687,37 +1668,30 @@ It is too wide if it has any lines longer than the largest of
                            kind name col))))
   form)
 
-;; If we have compiled any calls to functions which are not known to be
-;; defined, issue a warning enumerating them.
-;; `unresolved' in the list `byte-compile-warnings' disables this.
 (defun byte-compile-warn-about-unresolved-functions ()
-  (when (byte-compile-warning-enabled-p 'unresolved)
-    (let ((byte-compile-current-form :end))
-      ;; Separate the functions that will not be available at runtime
-      ;; from the truly unresolved ones.
-      (dolist (urf byte-compile-unresolved-functions)
-        (let ((f (car urf)))
-          (unless (memq f byte-compile-new-defuns)
-            (byte-compile-warn
-             (car urf)
-             (if (fboundp f)
-                 "the function `%s' might not be defined at runtime."
-               "the function `%s' is not known to be defined.")
-             (car urf)))))))
-  nil)
+  "Separate the functions that will not be available at runtime
+from the truly unresolved ones."
+  (prog1 nil
+    (when (byte-compile-warning-enabled-p 'unresolved)
+      (let ((byte-compile-current-form :end))
+        (dolist (urf byte-compile-unresolved-functions)
+          (let ((f (car urf)))
+            (unless (memq f byte-compile-new-defuns)
+              (byte-compile-warn
+               (car urf)
+               (if (fboundp f)
+                   "the function `%s' might not be defined at runtime."
+                 "the function `%s' is not known to be defined.")
+               (car urf)))))))))
 
 
-;; Dynamically bound in byte-compile-from-buffer.
-;; NB also used in cl.el and cl-macs.el.
-(defvar byte-compile--outbuffer)
+(defvar byte-compile--outbuffer
+  "Dynamically bound in byte-compile-from-buffer, and used in cl.el
+and cl-macs.el.")
 
 (defmacro byte-compile-close-variables (&rest body)
   (declare (debug t))
-  `(let (;;
-         ;; Close over these variables to encapsulate the
-         ;; compilation state
-         ;;
-         (byte-compile-macro-environment
+  `(let ((byte-compile-macro-environment
           ;; Copy it because the compiler may patch into the
           ;; macroenvironment.
           (copy-alist byte-compile-initial-macro-environment))
@@ -2531,7 +2505,7 @@ list that represents a doc string reference.
     ;; No doc string, so we can compile this as a normal form.
     (byte-compile-keep-pending form 'byte-compile-normal-call)))
 
-(put 'defvar   'byte-hunk-handler 'byte-compile-file-form-defvar)
+(put 'defvar 'byte-hunk-handler 'byte-compile-file-form-defvar)
 (put 'defconst 'byte-hunk-handler 'byte-compile-file-form-defvar)
 
 (defun byte-compile--check-prefixed-var (sym)
