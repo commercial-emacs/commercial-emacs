@@ -141,15 +141,7 @@ Other uses risk returning non-nil value that point to the wrong file."
            (when (if (consp category)
                      (apply #'byte-compile-warning-enabled-p category)
                    (byte-compile-warning-enabled-p category))
-             (byte-compile-warn "%s" msg)))))
-    `(progn
-       (macroexp--funcall-if-compiled ',when-compiled)
-       ,form)))
-
-(defun macroexp--warn-wrap (msg form category)
-  (let ((when-compiled (lambda ()
-                         (when (byte-compile-warning-enabled-p category)
-                           (byte-compile-warn "%s" msg)))))
+             (byte-compile-warn nil "%s" msg)))))
     `(progn
        (macroexp--funcall-if-compiled ',when-compiled)
        ,form)))

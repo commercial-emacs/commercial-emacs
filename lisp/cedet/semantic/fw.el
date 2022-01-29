@@ -192,6 +192,7 @@ will throw a warning when it encounters this symbol."
 	     )
     (make-obsolete-overload oldfnalias newfn when)
     (byte-compile-warn
+     newfn
      "%s: `%s' obsoletes overload `%s'"
      (macroexp-file-name)
      newfn
@@ -210,6 +211,7 @@ will throw a warning when it encounters this symbol."
      ;; Only throw this warning when byte compiling things.
      (when (macroexp-compiling-p)
        (byte-compile-warn
+        newvar
         "variable `%s' obsoletes, but isn't alias of `%s'"
         newvar oldvaralias)
      ))))

@@ -2116,7 +2116,7 @@ Runs in a batch-mode Emacs.  Interactively use variable
          (byte-compile-dest-file-function #'ignore)
          (collected)
          (byte-compile-log-warning-function
-          (lambda (string &optional position fill level)
+          (lambda (_sym string &optional position fill level)
             (push (list string position fill level)
                   collected)
             t)))

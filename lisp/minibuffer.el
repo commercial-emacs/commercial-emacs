@@ -2442,8 +2442,8 @@ if there was no valid completion, else t."
   (funcall completion-in-region-function start end collection predicate))
 
 (defcustom read-file-name-completion-ignore-case
-  (if (memq system-type '(ms-dos windows-nt darwin cygwin))
-      t nil)
+  (when (memq system-type '(ms-dos windows-nt darwin cygwin))
+    t)
   "Non-nil means when reading a file name completion ignores case."
   :type 'boolean
   :version "22.1")

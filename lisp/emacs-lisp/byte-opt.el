@@ -150,7 +150,8 @@ Earlier variables shadow later ones with the same name.")
                    (cdr (assq name byte-compile-function-environment)))))
     (pcase fn
       ('nil
-       (byte-compile-warn "attempt to inline `%s' before it was defined"
+       (byte-compile-warn name
+                          "attempt to inline `%s' before it was defined"
                           name)
        form)
       (`(autoload . ,_)
@@ -271,16 +272,12 @@ for speeding up processing.")
                 cases)))
 
 (defun byte-optimize-form-code-walker (form for-effect)
-  ;;
-  ;; For normal function calls, We can just mapcar the optimizer the cdr.  But
-  ;; we need to have special knowledge of the syntax of the special forms
-  ;; like let and defun (that's why they're special forms :-).  (Actually,
-  ;; the important aspect is that they are subrs that don't evaluate all of
-  ;; their args.)
-  ;;
-  ;; FIXME: There are a bunch of `byte-compile-warn' here which arguably
-  ;; have no place in an optimizer: the corresponding tests should be
-  ;; performed in `macroexpand-all', or in `cconv', or in `bytecomp'.
+  "For normal functions, mapcar the optimizer the cdr.
+Special functions are case-by-case.
+
+FIXME: There are a bunch of `byte-compile-warn' here which arguably
+have no place in an optimizer: the corresponding tests should be
+performed in `macroexpand-all', or in `cconv', or in `bytecomp'."
   (let ((fn (car-safe form)))
     (byte-optimize--pcase form
       ((pred (not consp))
@@ -306,9 +303,9 @@ for speeding up processing.")
             (t form))))
         (t form)))
       (`(quote . ,v)
-       (if (or (not v) (cdr v))
-	   (byte-compile-warn "malformed quote form: `%s'"
-			      (prin1-to-string form)))
+       (when (or (not v) (cdr v))
+	 (byte-compile-warn 'quote "malformed quote form: `%s'"
+			    (prin1-to-string form)))
        ;; Map (quote nil) to nil to simplify optimizer logic.
        ;; Map quoted constants to nil if for-effect (just because).
        (and (car v)
@@ -326,7 +323,7 @@ for speeding up processing.")
                            (cons
                             (byte-optimize-form (car clause) nil)
                             (byte-optimize-body (cdr clause) for-effect))
-                         (byte-compile-warn "malformed cond form: `%s'"
+                         (byte-compile-warn 'cond "malformed cond form: `%s'"
                                             (prin1-to-string clause))
                          clause))
                      clauses)))
@@ -403,7 +400,7 @@ for speeding up processing.")
          `(while ,condition . ,body)))
 
       (`(interactive . ,_)
-       (byte-compile-warn "misplaced interactive spec: `%s'"
+       (byte-compile-warn 'interactive "misplaced interactive spec: `%s'"
 			  (prin1-to-string form))
        nil)
 
@@ -471,8 +468,9 @@ for speeding up processing.")
        (let ((var-expr-list nil))
          (while args
            (unless (and (consp args)
-                        (symbolp (car args)) (consp (cdr args)))
-             (byte-compile-warn "malformed setq form: %S" form))
+                        (symbolp (car args))
+                        (consp (cdr args)))
+             (byte-compile-warn 'setq "malformed setq form: %S" form))
            (let* ((var (car args))
                   (expr (cadr args))
                   (lexvar (assq var byte-optimize--lexvars))
@@ -505,22 +503,21 @@ for speeding up processing.")
        (cons fn (mapcar #'byte-optimize-form exps)))
 
       (`(,(pred (not symbolp)) . ,_)
-       (byte-compile-warn "`%s' is a malformed function"
+       (byte-compile-warn fn "`%s' is a malformed function"
 			  (prin1-to-string fn))
        form)
 
       ((guard (when for-effect
-		(if-let ((tmp (get fn 'side-effect-free)))
-		    (or byte-compile-delete-errors
-		        (eq tmp 'error-free)
-		        (progn
-			  (byte-compile-warn "value returned from %s is unused"
-					     (prin1-to-string form))
-			  nil)))))
+		(when-let ((tmp (get fn 'side-effect-free)))
+		  (or byte-compile-delete-errors
+		      (eq tmp 'error-free)
+		      (prog1 nil
+			(byte-compile-warn fn "value returned from %s is unused"
+					   (prin1-to-string form)))))))
        (byte-compile-log "  %s called for effect; deleted" fn)
-       ;; appending a nil here might not be necessary, but it can't hurt.
        (byte-optimize-form
-	(cons 'progn (append (cdr form) '(nil))) t))
+        `(prog1 nil ,(cdr form))
+        t))
 
       (_
        ;; Otherwise, no args can be considered to be for-effect,
@@ -711,7 +708,7 @@ for speeding up processing.")
 	         (if (symbolp binding)
 		     binding
 	           (when (or (atom binding) (cddr binding))
-		     (byte-compile-warn "malformed let binding: `%S'" binding))
+		     (byte-compile-warn head "malformed let binding: `%S'" binding))
 	           (list (car binding)
 		         (byte-optimize-form (nth 1 binding) nil))))
 	       (car form))
@@ -1194,9 +1191,9 @@ See Info node `(elisp) Integer Basics'."
 
 (defun byte-optimize-while (form)
   (when (< (length form) 2)
-    (byte-compile-warn "too few arguments for `while'"))
-  (if (nth 1 form)
-      form))
+    (byte-compile-warn 'while "too few arguments for `while'"))
+  (when (nth 1 form)
+    form))
 
 (put 'and   'byte-optimizer #'byte-optimize-and)
 (put 'or    'byte-optimizer #'byte-optimize-or)
@@ -1233,6 +1230,7 @@ See Info node `(elisp) Integer Basics'."
 		    (nconc (list 'funcall fn) butlast
 			   (mapcar (lambda (x) (list 'quote x)) (nth 1 last))))
 	        (byte-compile-warn
+                 last
 	         "last arg to apply can't be a literal atom: `%s'"
 	         (prin1-to-string last))
 	        nil))

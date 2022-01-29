@@ -2181,7 +2181,7 @@ can do the job."
                           ;; FIXME: We should also emit a warning for let-bound
                           ;; variables with dynamic binding.
                           (when (assq sym byte-compile--lexical-environment)
-                            (byte-compile-report-error msg :fill))))
+                            (byte-compile-report-error sym msg :fill))))
                (code
                 (macroexp-let2 macroexp-copyable-p x element
                   `(if ,(if compare-fn
@@ -5183,7 +5183,7 @@ This function is called directly from the C code."
 				       (expand-file-name
 					byte-compile-current-file
 					byte-compile-root-dir)))
-	    (byte-compile-warn "%s" msg)))
+	    (byte-compile-warn nil "%s" msg)))
          (noninteractive (funcall fun msg)) ;; No timer will be run!
 	 (t (run-with-idle-timer 0 nil fun msg))))))
 

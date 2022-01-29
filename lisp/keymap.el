@@ -35,7 +35,7 @@
   (dolist (key keys)
     (when (or (vectorp key)
               (and (stringp key) (not (key-valid-p key))))
-      (byte-compile-warn "Invalid `kbd' syntax: %S" key))))
+      (byte-compile-warn 'kbd "Invalid `kbd' syntax: %S" key))))
 
 (defun keymap-set (keymap key definition)
   "Set KEY to DEFINITION in KEYMAP.
@@ -462,18 +462,19 @@ If MESSAGE (and interactively), message the result."
               (keywordp (car args))
               (not (eq (car args) :menu)))
     (unless (memq (car args) '(:full :keymap :parent :suppress :name :prefix))
-      (byte-compile-warn "Invalid keyword: %s" (car args)))
-    (setq args (cdr args))
-    (when (null args)
-      (byte-compile-warn "Uneven number of keywords in %S" form))
+      (byte-compile-warn (car args) "Invalid keyword: %s" (car args)))
+    (let ((what (car args)))
+      (setq args (cdr args))
+      (unless args
+        (byte-compile-warn what "Uneven number of keywords in %S" form)))
     (setq args (cdr args)))
   ;; Bindings.
   (while args
     (let ((key (pop args)))
       (when (and (stringp key) (not (key-valid-p key)))
-        (byte-compile-warn "Invalid `kbd' syntax: %S" key)))
-    (when (null args)
-      (byte-compile-warn "Uneven number of key bindings in %S" form))
+        (byte-compile-warn key "Invalid `kbd' syntax: %S" key))
+      (unless args
+        (byte-compile-warn key "Uneven number of key bindings in %S" form)))
     (setq args (cdr args)))
   form)
 
