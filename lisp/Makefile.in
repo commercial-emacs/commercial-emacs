@@ -202,7 +202,7 @@ cldefs .PHONY: $(lisp)/cldefs.el
 $(lisp)/cldefs.el: $(lisp)/cldefs.el.in
 	$(AM_V_GEN)$(emacs) -l pp -l "cldefs.el.in" \
 	    --eval "(with-temp-file (expand-file-name (unmsys--file-name \"$@\")) \
-	              (insert \";; Automatically generated from cldefs.el.in.\" \
+	              (insert \";; Automatically generated from cldefs.el.in.  \" \
 	                \"DO NOT EDIT.\n\" \
                         \"(defconst cldefs-cl-lib-functions\n\" \
 	                \"(quote \" \
