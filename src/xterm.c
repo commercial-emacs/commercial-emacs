@@ -874,12 +874,27 @@ x_set_cr_source_with_gc_background (struct frame *f, GC gc)
 {
   XGCValues xgcv;
   XColor color;
+  unsigned int depth;
 
   XGetGCValues (FRAME_X_DISPLAY (f), gc, GCBackground, &xgcv);
   color.pixel = xgcv.background;
+
   x_query_colors (f, &color, 1);
-  cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
-			color.green / 65535.0, color.blue / 65535.0);
+
+  depth = FRAME_DISPLAY_INFO (f)->n_planes;
+
+  if (f->alpha_background < 1.0 && depth == 32)
+    {
+      cairo_set_source_rgba (FRAME_CR_CONTEXT (f), color.red / 65535.0,
+			     color.green / 65535.0, color.blue / 65535.0,
+			     f->alpha_background);
+
+      cairo_set_operator (FRAME_CR_CONTEXT (f), CAIRO_OPERATOR_SOURCE);
+    }
+  else
+    cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
+                          color.green / 65535.0, color.blue / 65535.0);
+
 }
 
 static const cairo_user_data_key_t xlib_surface_key, saved_drawable_key;
@@ -1315,6 +1330,29 @@ x_fill_rectangle (struct frame *f, GC gc, int x, int y, int width, int height)
 #else
   XFillRectangle (FRAME_X_DISPLAY (f), FRAME_X_DRAWABLE (f),
 		  gc, x, y, width, height);
+#endif
+}
+
+
+static void
+x_clear_rectangle (struct frame *f, GC gc, int x, int y, int width, int height)
+{
+#ifdef USE_CAIRO
+  cairo_t *cr;
+
+  cr = x_begin_cr_clip (f, gc);
+  x_set_cr_source_with_gc_background (f, gc);
+  cairo_rectangle (cr, x, y, width, height);
+  cairo_fill (cr);
+  x_end_cr_clip (f);
+#else
+  XGCValues xgcv;
+  Display *dpy = FRAME_X_DISPLAY (f);
+  XGetGCValues (dpy, gc, GCBackground | GCForeground, &xgcv);
+  XSetForeground (dpy, gc, xgcv.background);
+  XFillRectangle (dpy, FRAME_X_DRAWABLE (f),
+		  gc, x, y, width, height);
+  XSetForeground (dpy, gc, xgcv.foreground);
 #endif
 }
 
@@ -1898,9 +1936,9 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fring
       if (face->stipple)
 	XSetFillStyle (display, face->gc, FillOpaqueStippled);
       else
-	XSetForeground (display, face->gc, face->background);
+	XSetBackground (display, face->gc, face->background);
 
-      x_fill_rectangle (f, face->gc, p->bx, p->by, p->nx, p->ny);
+      x_clear_rectangle (f, face->gc, p->bx, p->by, p->nx, p->ny);
 
       if (!face->stipple)
 	XSetForeground (display, face->gc, face->foreground);
@@ -1928,7 +1966,7 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fring
       Drawable drawable = FRAME_X_DRAWABLE (f);
       char *bits;
       Pixmap pixmap, clipmask = (Pixmap) 0;
-      int depth = DefaultDepthOfScreen (FRAME_X_SCREEN (f));
+      int depth = FRAME_DISPLAY_INFO (f)->n_planes;
       XGCValues gcv;
 
       if (p->wd > 8)
@@ -2201,12 +2239,7 @@ x_compute_glyph_string_overhangs (struct glyph_string *s)
 static void
 x_clear_glyph_string_rect (struct glyph_string *s, int x, int y, int w, int h)
 {
-  Display *display = FRAME_X_DISPLAY (s->f);
-  XGCValues xgcv;
-  XGetGCValues (display, s->gc, GCForeground | GCBackground, &xgcv);
-  XSetForeground (display, s->gc, xgcv.background);
-  x_fill_rectangle (s->f, s->gc, x, y, w, h);
-  XSetForeground (display, s->gc, xgcv.foreground);
+  x_clear_rectangle (s->f, s->gc, x, y, w, h);
 }
 
 
@@ -2779,12 +2812,12 @@ void
 x_query_colors (struct frame *f, XColor *colors, int ncolors)
 {
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  int i;
 
   if (dpyinfo->red_bits > 0)
     {
       /* For TrueColor displays, we can decompose the RGB value
 	 directly.  */
-      int i;
       unsigned int rmult, gmult, bmult;
       unsigned int rmask, gmask, bmask;
 
@@ -2821,6 +2854,12 @@ x_query_colors (struct frame *f, XColor *colors, int ncolors)
 	  colors[i].green = (g * gmult) >> 16;
 	  colors[i].blue = (b * bmult) >> 16;
 	}
+
+      if (FRAME_DISPLAY_INFO (f)->n_planes == 32)
+	{
+	  for (i = 0; i < ncolors; ++i)
+	    colors[i].pixel |= ((unsigned long) 0xFF << 24);
+	}
       return;
     }
 
@@ -2838,6 +2877,12 @@ x_query_colors (struct frame *f, XColor *colors, int ncolors)
     }
 
   XQueryColors (FRAME_X_DISPLAY (f), FRAME_X_COLORMAP (f), colors, ncolors);
+
+  if (FRAME_DISPLAY_INFO (f)->n_planes == 32)
+    {
+      for (i = 0; i < ncolors; ++i)
+	colors[i].pixel |= ((unsigned long) 0xFF << 24);
+    }
 }
 
 /* Store F's background color into *BGCOLOR.  */
@@ -3891,8 +3936,7 @@ x_draw_image_glyph_string (struct glyph_string *s)
 	  /* Create a pixmap as large as the glyph string.  Fill it
 	     with the background color.  Copy the image to it, using
 	     its mask.  Copy the temporary pixmap to the display.  */
-	  Screen *screen = FRAME_X_SCREEN (s->f);
-	  int depth = DefaultDepthOfScreen (screen);
+	  int depth = FRAME_DISPLAY_INFO (s->f)->n_planes;
 
 	  /* Create a pixmap as large as the glyph string.  */
           pixmap = XCreatePixmap (display, FRAME_X_DRAWABLE (s->f),
