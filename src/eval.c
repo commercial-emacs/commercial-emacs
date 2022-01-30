@@ -2249,35 +2249,40 @@ this does nothing and returns nil.  */)
       && !AUTOLOADP (XSYMBOL (function)->u.s.function))
     return Qnil;
 
+  ptrdiff_t count = SPECPDL_INDEX ();
+  if (will_dump_p)
+    /* Only add autoload entries after dumping, because the ones before are
+	   not useful and else we get loads of them from the loaddefs.el.  */
+    specbind (Qcurrent_load_list, Qnil);
+
   if (!NILP (Vpurify_flag) && EQ (docstring, make_fixnum (0)))
     /* `read1' in lread.c has found the docstring starting with "\
        and assumed the docstring will be provided by Snarf-documentation, so it
        passed us 0 instead.  But that leads to accidental sharing in purecopy's
        hash-consing, so we use a (hopefully) unique integer instead.  */
     docstring = make_ufixnum (XHASH (function));
-  return Fdefalias (function,
-		    list5 (Qautoload, file, docstring, interactive, type),
-		    Qnil);
+  Lisp_Object tem
+    = Fdefalias (function,
+		 list5 (Qautoload, file, docstring, interactive, type),
+		 Qnil);
+  unbind_to (count, Qnil);
+  return tem;
 }
 
 static void
 un_autoload (Lisp_Object oldqueue)
 {
-  Lisp_Object queue, first, second;
-
   /* Queue to unwind is current value of Vautoload_queue.
      oldqueue is the shadowed value to leave in Vautoload_queue.  */
-  queue = Vautoload_queue;
+  Lisp_Object queue = Vautoload_queue;
   Vautoload_queue = oldqueue;
   while (CONSP (queue))
     {
-      first = XCAR (queue);
-      second = Fcdr (first);
-      first = Fcar (first);
-      if (EQ (first, make_fixnum (0)))
-	Vfeatures = second;
+      Lisp_Object first = XCAR (queue);
+      if (CONSP (first) && EQ (XCAR (first), make_fixnum (0)))
+	Vfeatures = XCDR (first);
       else
-	Ffset (first, second);
+	Ffset (first, Fcar (Fcdr (Fget (first, Qfunction_history))));
       queue = XCDR (queue);
     }
 }
