@@ -189,10 +189,6 @@
   ;; In case loaddefs hasn't been generated yet.
   (file-error (load "ldefs-boot.el")))
 
-(condition-case nil (load "cldefs.el")
-  ;; When cldefs.el hasn't yet been generated.
-  (file-error (load "cldefs-boot.el")))
-
 (let ((new (make-hash-table :test #'equal)))
   ;; Now that loaddefs has populated definition-prefixes, purify its contents.
   (maphash (lambda (k v) (puthash (purecopy k) (purecopy v) new))

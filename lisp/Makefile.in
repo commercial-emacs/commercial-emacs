@@ -72,7 +72,7 @@ LOADDEFS = $(lisp)/calendar/cal-loaddefs.el \
 loaddefs = $(shell find ${srcdir} -name '*loaddefs.el' ! -name '.*')
 # Elisp files auto-generated.
 AUTOGENEL = ${loaddefs} ${srcdir}/cus-load.el ${srcdir}/finder-inf.el \
-  ${srcdir}/subdirs.el ${srcdir}/eshell/esh-groups.el ${srcdir}cldefs.el
+  ${srcdir}/subdirs.el ${srcdir}/eshell/esh-groups.el ${srcdir}/emacs-lisp/cldefs.el
 
 # Set load-prefer-newer for the benefit of the non-bootstrappers.
 BYTE_COMPILE_FLAGS = \
@@ -198,8 +198,8 @@ $(lisp)/loaddefs.el: gen-lisp $(LOADDEFS)
 	    --eval '(setq generated-autoload-file (expand-file-name (unmsys--file-name "$@")))' \
 	    -f batch-update-autoloads ${SUBDIRS_ALMOST}
 
-cldefs .PHONY: $(lisp)/cldefs.el
-$(lisp)/cldefs.el: $(lisp)/cldefs.el.in
+cldefs .PHONY: $(lisp)/emacs-lisp/cldefs.el
+$(lisp)/emacs-lisp/cldefs.el: $(lisp)/emacs-lisp/cldefs.el.in
 	$(AM_V_GEN)$(emacs) -l pp -l "cldefs.el.in" \
 	    --eval "(with-temp-file (expand-file-name (unmsys--file-name \"$@\")) \
 	              (insert \";; Automatically generated from cldefs.el.in.  \" \
@@ -228,9 +228,6 @@ autoloads-force:
 
 ldefs-boot.el: autoloads-force
 	cp  $(lisp)/loaddefs.el $(lisp)/ldefs-boot.el
-
-cldefs-boot.el: $(lisp)/cldefs.el
-	cp  $< $(lisp)/cldefs-boot.el
 
 # This is required by the bootstrap-emacs target in ../src/Makefile, so
 # we know that if we have an emacs executable, we also have a subdirs.el.
@@ -265,7 +262,7 @@ FORCE:
 
 tagsfiles = $(shell find ${srcdir} -name '*.el' \
 	        ! -name '.*' ! -name '*loaddefs.el' ! -name '*cldefs.el')
-tagsfiles := $(filter-out ${srcdir}/%defs-boot.el,${tagsfiles})
+tagsfiles := $(filter-out ${srcdir}/ldefs-boot.el,${tagsfiles})
 tagsfiles := $(filter-out ${srcdir}/eshell/esh-groups.el,${tagsfiles})
 
 ETAGS = ../lib-src/etags${EXEEXT}
@@ -434,7 +431,7 @@ semantic:
 # date.  Some .el files don't get compiled because they set the
 # local variable no-byte-compile.
 # Calling make recursively because suffix rule cannot have prerequisites.
-compile: $(LOADDEFS) autoloads compile-first
+compile: cldefs $(LOADDEFS) autoloads compile-first
 	$(MAKE) compile-main
 
 # Compile all Lisp files.  This is like 'compile' but compiles files
@@ -535,7 +532,7 @@ bootstrap-clean:
 	rm -f $(AUTOGENEL)
 
 distclean:
-	-rm -f ./Makefile $(lisp)/loaddefs.el $(lisp)/cldefs.el
+	-rm -f ./Makefile $(lisp)/loaddefs.el $(lisp)/emacs-lisp/cldefs.el
 
 maintainer-clean: distclean bootstrap-clean
 	rm -f TAGS

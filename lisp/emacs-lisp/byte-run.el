@@ -341,7 +341,7 @@ The return value is undefined.
           (cons 'prog1 (cons def declarations))
           def))))
 
-
+
 ;; Redefined in byte-opt.el.
 ;; This was undocumented and unused for decades.
 (defalias 'inline 'progn
@@ -514,7 +514,7 @@ If you think you need this, you're probably making a mistake somewhere."
   (declare (debug t) (indent 0) (obsolete nil "24.4"))
   (list 'eval (list 'quote (if (cdr body) (cons 'progn body) (car body)))))
 
-
+
 ;; interface to evaluating things at compile time and/or load time
 ;; these macro must come after any uses of them in this file, as their
 ;; definition in the file overrides the magic definitions on the
@@ -589,20 +589,20 @@ the symbol list.  For `suspicious', only `set-buffer' can be used."
            (append warnings byte-compile--suppressed-warnings)))
       (macroexpand-all (macroexp-progn body)
                        macroexpand-all-environment))))
-
+
 (defun byte-run--unescaped-character-literals-warning ()
   "Return a warning about unescaped character literals.
 If there were any unescaped character literals in the last form
 read, return an appropriate warning message as a string.
 Otherwise, return nil.  For internal use only."
   ;; This is called from lread.c and therefore needs to be preloaded.
-  (if lread--unescaped-character-literals
-      (let ((sorted (sort lread--unescaped-character-literals #'<)))
-        (format-message "unescaped character literals %s detected, %s expected!"
-                        (mapconcat (lambda (char) (format "`?%c'" char))
-                                   sorted ", ")
-                        (mapconcat (lambda (char) (format "`?\\%c'" char))
-                                   sorted ", ")))))
+  (let ((sorted (sort lread--unescaped-character-literals #'<)))
+    (when sorted
+      (format-message "unescaped character literals %s detected, %s expected!"
+                      (mapconcat (lambda (char) (format "`?%c'" char))
+                                 sorted ", ")
+                      (mapconcat (lambda (char) (format "`?\\%c'" char))
+                                 sorted ", ")))))
 
 (defun byte-compile-info (string &optional message type)
   "Format STRING in a way that looks pleasing in the compilation output.
@@ -625,7 +625,6 @@ type is.  This defaults to \"INFO\"."
   (declare (obsolete byte-compile-info "28.1"))
   (byte-compile-info (apply #'format args) t))
 
-
 ;; I nuked this because it's not a good idea for users to think of using it.
 ;; These options are a matter of installation preference, and have nothing to
 ;; with particular source files; it's a mistake to suggest to users

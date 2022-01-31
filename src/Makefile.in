@@ -555,7 +555,7 @@ shortlisp := $(filter-out ${shortlisp_filter},${shortlisp})
 ## Place loaddefs.el first, so it gets generated first, since it is on
 ## the critical path (relevant in parallel compilations).
 ## We don't really need to sort, but may as well use it to remove duplicates.
-shortlisp := loaddefs.el cldefs.el loadup.el $(sort ${shortlisp})
+shortlisp := loaddefs.el emacs-lisp/cldefs.el loadup.el $(sort ${shortlisp})
 export LISP_PRELOADED = ${shortlisp}
 lisp = $(addprefix ${lispsource}/,${shortlisp})
 
@@ -661,7 +661,7 @@ endif
 ## for the first time, this prevents any variation between configurations
 ## in the contents of the DOC file.
 ##
-$(etc)/DOC: $(libsrc)/make-docfile$(EXEEXT) $(doc_obj) $(lispsource)/loaddefs.el $(lispsource)/cldefs.el
+$(etc)/DOC: $(libsrc)/make-docfile$(EXEEXT) $(doc_obj) $(lispsource)/loaddefs.el $(lispsource)/emacs-lisp/cldefs.el
 	$(AM_V_GEN)$(MKDIR_P) $(etc)
 	$(AM_V_at)rm -f $(etc)/DOC
 	$(AM_V_at)$(libsrc)/make-docfile -d $(srcdir) \
@@ -906,7 +906,7 @@ $(lispsource)/loaddefs.el: $(VCSWITNESS) | \
 		bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
 	$(MAKE) -C ../lisp autoloads EMACS="$(bootstrap_exe)"
 
-$(lispsource)/cldefs.el: $(VCSWITNESS) | \
+$(lispsource)/emacs-lisp/cldefs.el: $(VCSWITNESS) | \
 		bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
 	$(MAKE) -C ../lisp cldefs EMACS="$(bootstrap_exe)"
 

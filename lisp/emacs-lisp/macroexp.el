@@ -443,7 +443,7 @@ definitions to shadow the loaded ones for use in file byte-compilation."
 ;; This function is like `macroexpand-all' but for use with top-level
 ;; forms.  It does not dynbind `macroexp--dynvars' because we want
 ;; top-level `defvar' declarations to be recorded in that variable.
-(defun macroexpand--all-toplevel (form &optional environment)
+(defun macroexpand--all-top-level (form &optional environment)
   (let ((macroexpand-all-environment environment))
     (macroexp--expand-all form)))
 
@@ -729,7 +729,7 @@ test of free variables in the following ways:
         (let ((macroexp--pending-eager-loads
                (cons load-file-name macroexp--pending-eager-loads)))
           (if full-p
-              (macroexpand--all-toplevel form)
+              (macroexpand--all-top-level form)
             (macroexpand form)))
       (error
        ;; Hopefully this shouldn't happen thanks to the cycle detection,

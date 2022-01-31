@@ -121,9 +121,10 @@
 ;;  o  byte-compiled files now start with the string `;ELC'.
 ;;     Some versions of `file' can be customized to recognize that.
 
-(require 'cldefs)
-(require 'cl-lib)
-(require 'compile)
+(eval-when-compile (require 'compile))
+(eval-when-compile (require 'cl-lib))
+(require 'cldefs nil t) ;; At some point we need to resign ourselves to adding
+                  ;; cl-lib to loadup.el (Bug#30635)
 (require 'backquote)
 (require 'macroexp)
 (require 'cconv)
@@ -458,11 +459,11 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
 
 (defvar byte-compiler-error-flag)
 
-(defun byte-compile-recurse-toplevel (form non-toplevel-case)
+(defun byte-compile-recurse-top-level (form non-top-level-case)
   "Implement `eval-when-compile' and `eval-and-compile'.
 Return the compile-time value of FORM."
-  ;; Macroexpand (not macroexpand-all!) form at toplevel in case it
-  ;; expands into a toplevel-equivalent `progn'.  See CLHS section
+  ;; Macroexpand (not macroexpand-all!) form at top-level in case it
+  ;; expands into a top-level-equivalent `progn'.  See CLHS section
   ;; 3.2.3.1, "Processing of Top Level Forms".  The semantics are very
   ;; subtle: see test/lisp/emacs-lisp/bytecomp-tests.el for interesting
   ;; cases.
@@ -470,10 +471,10 @@ Return the compile-time value of FORM."
   (if (eq (car-safe form) 'progn)
       (cons 'progn
             (mapcar (lambda (subform)
-                      (byte-compile-recurse-toplevel
-                       subform non-toplevel-case))
+                      (byte-compile-recurse-top-level
+                       subform non-top-level-case))
                     (cdr form)))
-    (funcall non-toplevel-case form)))
+    (funcall non-top-level-case form)))
 
 (defconst byte-compile-initial-macro-environment
   `(
@@ -482,7 +483,7 @@ Return the compile-time value of FORM."
     (declare-function . byte-compile-macroexpand-declare-function)
     (eval-when-compile . ,(lambda (&rest body)
                             (let ((result nil))
-                              (byte-compile-recurse-toplevel
+                              (byte-compile-recurse-top-level
                                (macroexp-progn body)
                                (lambda (form)
                                  ;; Insulate the following variables
@@ -501,14 +502,14 @@ Return the compile-time value of FORM."
                                            (byte-compile-preprocess form)))))))
                               (list 'quote result))))
     (eval-and-compile . ,(lambda (&rest body)
-                           (byte-compile-recurse-toplevel
+                           (byte-compile-recurse-top-level
                             (macroexp-progn body)
                             (lambda (form)
                               ;; Don't compile here, since we don't know
                               ;; whether to compile as byte-compile-form
                               ;; or byte-compile-file-form.
                               (let ((expanded
-                                     (macroexpand--all-toplevel
+                                     (macroexpand--all-top-level
                                       form
                                       macroexpand-all-environment)))
                                 (eval expanded lexical-binding)
@@ -1406,7 +1407,8 @@ F is considered resolved if auxiliary DEF includes it."
              (byte-compile-warning-enabled-p 'obsolete f))
     (byte-compile-warn-obsolete f))
   (when (and (or (and (not def) (not (fboundp f)))
-                 (and (memq f cldefs-cl-lib-functions)
+                 (and (boundp 'cldefs-cl-lib-functions)
+                      (memq f cldefs-cl-lib-functions)
                       ;; `byte-compile-new-defuns' won't
                       ;; pick up autoloads, so consider
                       ;; (require 'cl-lib) as sufficient.
@@ -1520,9 +1522,9 @@ extra args."
 			  (custom-declare-variable . defcustom))))
 	     (cadr name)))
 	;; Update the current group, if needed.
-	(if (and byte-compile-current-file ;Only when compiling a whole file.
-		 (eq (car form) 'custom-declare-group))
-	    (setq byte-compile-current-group (cadr name)))))))
+	(when (and byte-compile-current-file ;Only when compiling a whole file.
+		   (eq (car form) 'custom-declare-group))
+	  (setq byte-compile-current-group (cadr name)))))))
 
 (defun byte-compile-arglist-warn (name arglist macrop)
   "Warn if the function or macro is being redefined with a different
@@ -2102,12 +2104,12 @@ See also `emacs-lisp-byte-compile-and-load'."
 			      target-file))))))
           (unless byte-native-compiling
 	    (kill-buffer (current-buffer))))
-	(if (and byte-compile-generate-call-tree
-		 (or (eq t byte-compile-generate-call-tree)
-		     (y-or-n-p (format "Report call tree for %s? "
-                                       filename))))
-	    (save-excursion
-	      (display-call-tree filename)))
+	(when (and byte-compile-generate-call-tree
+		   (or (eq t byte-compile-generate-call-tree)
+		       (y-or-n-p (format "Report call tree for %s? "
+                                         filename))))
+	  (save-excursion
+	    (display-call-tree filename)))
         (let ((gen-dynvars (getenv "EMACS_GENERATE_DYNVARS")))
           (when (and gen-dynvars (not (equal gen-dynvars ""))
                      byte-compile--seen-defvars)
@@ -2117,8 +2119,8 @@ See also `emacs-lisp-byte-compile-and-load'."
                 (dolist (var (delete-dups byte-compile--seen-defvars))
                   (insert (format "%S\n" (cons var filename))))
 	        (write-region (point-min) (point-max) dynvar-file)))))
-	(if load
-            (load target-file))
+	(when load
+          (load target-file))
 	t))))
 
 ;;; compiling a single function
@@ -2206,18 +2208,13 @@ With argument ARG, insert value in current buffer after the form."
           (defvar no-native-compile)
           (push `(no-native-compile . ,no-native-compile)
                 byte-native-qualities))
-
-	;; Compile the forms from the input buffer.
 	(while (progn
 		 (while (progn (skip-chars-forward " \t\n\^l")
 			       (= (following-char) ?\;))
 		   (forward-line 1))
 		 (not (eobp)))
-          (let* ((lread--unescaped-character-literals nil)
-                 (form (read inbuffer))
-                 (warning (byte-run--unescaped-character-literals-warning)))
-            (when warning (byte-compile-warn "%s" warning))
-	    (byte-compile-toplevel-file-form form)))
+          (let ((arr (make-vector 15121 0)))
+            (byte-compile-top-level-file-form (read-annotated inbuffer arr))))
 	;; Compile pending forms at end of file.
 	(byte-compile-flush-pending)
 	(byte-compile-warn-about-unresolved-functions)))
@@ -2409,18 +2406,18 @@ list that represents a doc string reference.
   nil)
 
 (defun byte-compile-flush-pending ()
-  (if byte-compile-output
-      (let ((form (byte-compile-out-toplevel t 'file)))
-	(cond ((eq (car-safe form) 'progn)
-	       (mapc 'byte-compile-output-file-form (cdr form)))
-	      (form
-	       (byte-compile-output-file-form form)))
-	(setq byte-compile-constants nil
-	      byte-compile-variables nil
-	      byte-compile-depth 0
-	      byte-compile-maxdepth 0
-	      byte-compile-output nil
-              byte-compile-jump-tables nil))))
+  (when byte-compile-output
+    (let ((form (byte-compile-out-top-level t 'file)))
+      (cond ((eq (car-safe form) 'progn)
+	     (mapc 'byte-compile-output-file-form (cdr form)))
+	    (form
+	     (byte-compile-output-file-form form)))
+      (setq byte-compile-constants nil
+	    byte-compile-variables nil
+	    byte-compile-depth 0
+	    byte-compile-maxdepth 0
+	    byte-compile-output nil
+            byte-compile-jump-tables nil))))
 
 (defun byte-compile-preprocess (form &optional _for-effect)
   (setq form (macroexpand-all form byte-compile-macro-environment))
@@ -2435,11 +2432,11 @@ list that represents a doc string reference.
    (t form)))
 
 ;; byte-hunk-handlers cannot call this!
-(defun byte-compile-toplevel-file-form (top-level-form)
-  (byte-compile-recurse-toplevel
+(defun byte-compile-top-level-file-form (top-level-form)
+  (byte-compile-recurse-top-level
    top-level-form
    (lambda (form)
-     (let ((byte-compile-current-form nil)) ; close over this for warnings.
+     (let (byte-compile-current-form) ; close over this for warnings.
        (byte-compile-file-form (byte-compile-preprocess form t))))))
 
 ;; byte-hunk-handlers can call this.
@@ -3090,9 +3087,9 @@ of the list FUN."
         (byte-compile-out-tag (byte-compile-make-tag))))
     ;; Now compile FORM
     (byte-compile-form form byte-compile--for-effect)
-    (byte-compile-out-toplevel byte-compile--for-effect output-type)))
+    (byte-compile-out-top-level byte-compile--for-effect output-type)))
 
-(defun byte-compile-out-toplevel (&optional for-effect output-type)
+(defun byte-compile-out-top-level (&optional for-effect output-type)
   ;; OUTPUT-TYPE can be like that of `byte-compile-top-level'.
   (if for-effect
       ;; The stack is empty. Push a value to be returned from (byte-code ..).
@@ -3303,8 +3300,8 @@ flag."
                                      custom-declare-face))
         (byte-compile-nogroup-warn form))
     (byte-compile-callargs-warn form))
-  (if byte-compile-generate-call-tree
-      (byte-compile-annotate-call-tree form))
+  (when byte-compile-generate-call-tree
+    (byte-compile-annotate-call-tree form))
   (when (and byte-compile--for-effect (eq (car form) 'mapcar)
              (byte-compile-warning-enabled-p 'mapcar 'mapcar))
     (byte-compile-warn
@@ -3718,7 +3715,8 @@ These implicitly `and' together a bunch of two-arg bytecodes."
     (cond
      ((< l 3) (byte-compile-form `(progn ,(nth 1 form) t)))
      ((= l 3) (byte-compile-two-args form))
-     ((cl-every #'macroexp-copyable-p (nthcdr 2 form))
+     ((not (memq nil (mapcar #'macroexp-copyable-p (nthcdr 2 form))))
+      ;; cl-every verboten: resign to adding cl-lib to loadup.el (Bug#30635)
       (byte-compile-form `(and (,(car form) ,(nth 1 form) ,(nth 2 form))
 			       (,(car form) ,@(nthcdr 2 form)))))
      (t (byte-compile-normal-call form)))))
@@ -5359,7 +5357,7 @@ and corresponding effects."
 		byte-compile-body
 		;; Inserted some more than necessary, to speed it up.
 		byte-compile-top-level
-		byte-compile-out-toplevel
+		byte-compile-out-top-level
 		byte-compile-constant
 		byte-compile-variable-ref))))
   nil)
