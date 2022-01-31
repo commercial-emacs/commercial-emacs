@@ -122,12 +122,12 @@
 ;;     Some versions of `file' can be customized to recognize that.
 
 (eval-when-compile (require 'compile))
-(eval-when-compile (require 'cl-lib))
-(require 'cldefs nil t) ;; At some point we need to resign ourselves to adding
-                  ;; cl-lib to loadup.el (Bug#30635)
+(require 'cldefs nil t) ;; bootstrap-emacs won't have it
 (require 'backquote)
 (require 'macroexp)
 (require 'cconv)
+
+(autoload 'cl-every "cl-extra")
 
 ;; The feature of compiling in a specific target Emacs version
 ;; has been turned off because compile time options are a bad idea.
@@ -3715,8 +3715,7 @@ These implicitly `and' together a bunch of two-arg bytecodes."
     (cond
      ((< l 3) (byte-compile-form `(progn ,(nth 1 form) t)))
      ((= l 3) (byte-compile-two-args form))
-     ((not (memq nil (mapcar #'macroexp-copyable-p (nthcdr 2 form))))
-      ;; cl-every verboten: resign to adding cl-lib to loadup.el (Bug#30635)
+     ((cl-every #'identity (mapcar #'macroexp-copyable-p (nthcdr 2 form)))
       (byte-compile-form `(and (,(car form) ,(nth 1 form) ,(nth 2 form))
 			       (,(car form) ,@(nthcdr 2 form)))))
      (t (byte-compile-normal-call form)))))

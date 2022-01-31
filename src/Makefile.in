@@ -497,9 +497,9 @@ ALLOBJS = $(FIRSTFILE_OBJ) $(VMLIMIT_OBJ) $(obj) $(otherobj)
 
 # Must be first, before dep inclusion!
 ifneq ($(HAVE_BE_APP),yes)
-all: emacs$(EXEEXT) $(pdmp) $(OTHER_FILES)
+all: emacs$(EXEEXT) $(pdmp) $(lispsource)/emacs-lisp/cldefs.el $(OTHER_FILES)
 else
-all: Emacs Emacs.pdmp $(OTHER_FILES)
+all: Emacs Emacs.pdmp $(lispsource)/emacs-lisp/cldefs.el $(OTHER_FILES)
 endif
 ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
 all: ../native-lisp
@@ -555,7 +555,7 @@ shortlisp := $(filter-out ${shortlisp_filter},${shortlisp})
 ## Place loaddefs.el first, so it gets generated first, since it is on
 ## the critical path (relevant in parallel compilations).
 ## We don't really need to sort, but may as well use it to remove duplicates.
-shortlisp := loaddefs.el emacs-lisp/cldefs.el loadup.el $(sort ${shortlisp})
+shortlisp := loaddefs.el loadup.el $(sort ${shortlisp})
 export LISP_PRELOADED = ${shortlisp}
 lisp = $(addprefix ${lispsource}/,${shortlisp})
 
@@ -884,7 +884,7 @@ elnlisp := $(addprefix ${lispsource}/,${elnlisp}) $(lisp:.elc=.eln)
 ## native-lisp where the *.eln files will be produced, and the exact
 ## names of those *.eln files, cannot be known in advance; we must ask
 ## Emacs to produce them.
-../native-lisp: | $(pdmp)
+../native-lisp: $(lispsource)/emacs-lisp/cldefs.el | $(pdmp)
 	@if test ! -d $@; then \
 	  mkdir $@ && $(MAKE) $(AM_V_NO_PD) $(elnlisp); \
 	  if test $(SYSTEM_TYPE) = cygwin; then \
@@ -906,8 +906,7 @@ $(lispsource)/loaddefs.el: $(VCSWITNESS) | \
 		bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
 	$(MAKE) -C ../lisp autoloads EMACS="$(bootstrap_exe)"
 
-$(lispsource)/emacs-lisp/cldefs.el: $(VCSWITNESS) | \
-		bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
+$(lispsource)/emacs-lisp/cldefs.el: $(pdmp)
 	$(MAKE) -C ../lisp cldefs EMACS="$(bootstrap_exe)"
 
 ## Dump an Emacs executable named bootstrap-emacs containing the
