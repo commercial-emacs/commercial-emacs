@@ -2771,12 +2771,6 @@ SPECIFIC-VARIABLES, or those in `gnus-variable-list'."
       (princ "(setq gnus-newsrc-file-version ")
       (princ (gnus-prin1-to-string gnus-version))
       (princ ")\n"))
-    ;; Sort `gnus-newsrc-alist' according to order in
-    ;; `gnus-group-list'.
-    (setq gnus-newsrc-alist
-	  (mapcar (lambda (g)
-		    (nth 1 (gethash g gnus-newsrc-hashtb)))
-		  (delete "dummy.group" gnus-group-list)))
     (let* ((print-quoted t)
            (print-escape-multibyte nil)
            (print-escape-nonascii t)
@@ -2802,10 +2796,11 @@ SPECIFIC-VARIABLES, or those in `gnus-variable-list'."
 	   ;; this and move the corresponding decode in
 	   ;; `gnus-read-newsrc-file' into a conversion routine.
 	   (gnus-newsrc-alist
-	    (mapcar (lambda (info)
-		      (cons (encode-coding-string (car info) 'utf-8-emacs)
-			    (cdr info)))
-		    gnus-newsrc-alist))
+	    (mapcar (lambda (group)
+		      (cons (encode-coding-string group 'utf-8-emacs)
+			    (cdadr (gethash group
+			    gnus-newsrc-hashtb))))
+		    (remove "dummy.group" gnus-group-list)))
 	   (gnus-topic-alist
 	    (when (memq 'gnus-topic-alist variables)
 	     (mapcar (lambda (elt)
