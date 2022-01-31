@@ -431,7 +431,7 @@ semantic:
 # date.  Some .el files don't get compiled because they set the
 # local variable no-byte-compile.
 # Calling make recursively because suffix rule cannot have prerequisites.
-compile: cldefs $(LOADDEFS) autoloads compile-first
+compile: $(LOADDEFS) autoloads compile-first
 	$(MAKE) compile-main
 
 # Compile all Lisp files.  This is like 'compile' but compiles files

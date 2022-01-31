@@ -661,7 +661,7 @@ endif
 ## for the first time, this prevents any variation between configurations
 ## in the contents of the DOC file.
 ##
-$(etc)/DOC: $(libsrc)/make-docfile$(EXEEXT) $(doc_obj) $(lispsource)/loaddefs.el $(lispsource)/emacs-lisp/cldefs.el
+$(etc)/DOC: $(libsrc)/make-docfile$(EXEEXT) $(doc_obj) $(lispsource)/loaddefs.el
 	$(AM_V_GEN)$(MKDIR_P) $(etc)
 	$(AM_V_at)rm -f $(etc)/DOC
 	$(AM_V_at)$(libsrc)/make-docfile -d $(srcdir) \
