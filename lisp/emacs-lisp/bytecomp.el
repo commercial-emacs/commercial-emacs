@@ -2214,7 +2214,7 @@ With argument ARG, insert value in current buffer after the form."
 		   (forward-line 1))
 		 (not (eobp)))
           (let ((arr (make-vector 15121 0)))
-            (byte-compile-top-level-file-form (read-annotated inbuffer arr))))
+            (byte-compile-top-level-file-form (read inbuffer))))
 	;; Compile pending forms at end of file.
 	(byte-compile-flush-pending)
 	(byte-compile-warn-about-unresolved-functions)))
