@@ -3532,7 +3532,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
       return list2 (Qquote, read0 (readcharfun, Qnil));
 
     case '`':
-      return list2 (Qbackquote, read0 (readcharfun, obarray));
+      return list2 (Qbackquote, read0 (readcharfun, Qnil));
 
     case ',':
       {
@@ -3548,7 +3548,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 	    comma_type = Qcomma;
 	  }
 
-	value = read0 (readcharfun, obarray);
+	value = read0 (readcharfun, Qnil);
 	return list2 (comma_type, value);
       }
     case '?':
@@ -3788,7 +3788,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 	ptrdiff_t nbytes = p - read_buffer;
 	UNREAD (c);
 
-	if (!quoted && q_interned && !skip_shorthand)
+	if (! quoted && q_interned && ! skip_shorthand)
 	  {
 	    result = string_to_number (read_buffer, 10, &nchars);
 	    if (nchars != nbytes)

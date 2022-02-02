@@ -3167,26 +3167,49 @@ of the list FUN."
   (macroexpand `(declare-function ,fn ,file ,@args)))
 
 (defun byte-compile--circular-p (form)
-  (let ((hare form)
-        (tortoise form))
-    (while (progn
-             (setq hare (cdr (cdr hare))
-                   tortoise (cdr tortoise))
-             (and hare (not (eq tortoise hare)))))
-    (and (> (length form) 1) (eq tortoise hare))))
+  (let (seen)
+    (cl-labels
+        ((descend
+           (form*)
+           (cond ((atom form*)
+                  nil)
+                 ((or (eq 'quote (car form*))
+                      (eq 'backquote (car form*)))
+                  nil)
+                 ((cl-tailp nil (cdr form*))
+                  (if (memq form* seen)
+                      t
+                    (add-to-list 'seen form*)
+                    (if (cl-some #'consp form*)
+                        (cl-some #'identity (mapcar #'descend form*))
+                      (let ((hare form*)
+                            (tortoise form*))
+                        (while (progn
+                                 (setq hare (cdr (cdr hare))
+                                       tortoise (cdr tortoise))
+                                 (and hare (not (eq tortoise hare)))))
+                        (and (> (length form*) 1) (eq tortoise hare))))))
+                 (t
+                  (if (memq form* seen)
+                      t
+                    (add-to-list 'seen form*)
+                    (or (descend (car form*))
+                        (descend (cdr form*))))))))
+      (descend form))))
 
 (defun byte-compile--unannotate (form)
-  (cond ((consp form)
-         (cons (byte-compile--unannotate (car form))
-               (if (cl-tailp nil (cdr form))
-                   ;; avoid stack overflow (not the company)
-                   ;; with mapcar if cdr is a list (and not a
-                   ;; dotted pair).
-                   (if (byte-compile--circular-p (cdr form))
-                       ;; data won't have tokenized symbols
-                       (cdr form)
-                     (mapcar #'byte-compile--unannotate (cdr form)))
-                 (byte-compile--unannotate (cdr form)))))
+  (cond ((byte-compile--circular-p form) form)
+        ((consp form)
+         (if (or (eq 'quote (car form))
+                 (eq 'backquote (car form)))
+             form
+           (cons (byte-compile--unannotate (car form))
+                 (if (cl-tailp nil (cdr form))
+                     ;; avoid stack overflow (not the company)
+                     ;; with mapcar if cdr is a list (and not a
+                     ;; dotted pair).
+                     (mapcar #'byte-compile--unannotate (cdr form))
+                   (byte-compile--unannotate (cdr form))))))
         ((symbolp form)
          (intern-soft (replace-regexp-in-string
                        "/[0-9]+$" "" (symbol-name form))))

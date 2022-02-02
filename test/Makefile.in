@@ -160,7 +160,7 @@ SELECTOR_ACTUAL=$(SELECTOR_EXPENSIVE)
 endif
 
 ## Byte-compile all test files to test for errors.
-%.elc: %.el
+%.elc: %.el $(srcdir)/../lisp/emacs-lisp/bytecomp.el
 	$(AM_V_ELC)$(emacs_env) $(emacs) --batch -f batch-byte-compile $<
 
 ## Save logs, and show logs for failed tests.
