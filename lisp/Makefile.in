@@ -338,12 +338,12 @@ ifeq ($(ANCIENT),yes)
 	-l comp -f batch-byte-compile $<
 	touch -t 197101010000 $@
 else
-.el.elc:
+%.elc: %.el $(COMPILE_FIRST:.elc=.el)
 	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) \
 	-l comp -f batch-byte+native-compile $<
 endif
 else
-.el.elc:
+%.elc: %.el $(COMPILE_FIRST:.elc=.el)
 	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile $<
 endif
 
