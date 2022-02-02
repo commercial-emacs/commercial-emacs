@@ -130,6 +130,7 @@
 
 (autoload 'cl-every "cl-extra")
 (autoload 'cl-tailp "cl-extra")
+(autoload 'cl-map "cl-extra")
 
 ;; The feature of compiling in a specific target Emacs version
 ;; has been turned off because compile time options are a bad idea.
@@ -2212,7 +2213,7 @@ With argument ARG, insert value in current buffer after the form."
 		   (forward-line 1))
 		 (not (eobp)))
           (let* ((arr (make-vector (1- (lsh 1 8)) 0))
-                 (annotated-form (read inbuffer))
+                 (annotated-form (read-annotated inbuffer arr))
                  (form (byte-compile--unannotate annotated-form)))
             (byte-compile-top-level-file-form form)))
 	(byte-compile-flush-pending)
@@ -3165,6 +3166,15 @@ of the list FUN."
   ;; Delegate the rest to the normal macro definition.
   (macroexpand `(declare-function ,fn ,file ,@args)))
 
+(defun byte-compile--circular-p (form)
+  (let ((hare form)
+        (tortoise form))
+    (while (progn
+             (setq hare (cdr (cdr hare))
+                   tortoise (cdr tortoise))
+             (and hare (not (eq tortoise hare)))))
+    (and (> (length form) 1) (eq tortoise hare))))
+
 (defun byte-compile--unannotate (form)
   (cond ((consp form)
          (cons (byte-compile--unannotate (car form))
@@ -3172,7 +3182,10 @@ of the list FUN."
                    ;; avoid stack overflow (not the company)
                    ;; with mapcar if cdr is a list (and not a
                    ;; dotted pair).
-                   (mapcar #'byte-compile--unannotate (cdr form))
+                   (if (byte-compile--circular-p (cdr form))
+                       ;; data won't have tokenized symbols
+                       (cdr form)
+                     (mapcar #'byte-compile--unannotate (cdr form)))
                  (byte-compile--unannotate (cdr form)))))
         ((symbolp form)
          (intern-soft (replace-regexp-in-string

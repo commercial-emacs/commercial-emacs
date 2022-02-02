@@ -2984,6 +2984,15 @@ read_integer (Lisp_Object readcharfun, int radix,
 /* If the next token is ')' or ']' or '.', we store that character
    in *PCH and the return value is not interesting.  Else, we store
    zero in *PCH and we read and return one lisp object.
+
+   When OBARRAY is non-nil, we set symbols to their character
+   position to inform compiler warnings of the line number on which
+   they appear.  Since a particular symbol can appear several times in
+   a lisp form, we disambiguate via `cl-gensym' tokenization,
+   e.g., replacing the symbol 'cons with 'cons/42.
+
+   We need not tokenize symbols in plain old data, e.g., vector or hash table symbols,
+   since they would never be anchor points for compiler warnings.
 */
 
 static Lisp_Object
@@ -3010,7 +3019,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
       return read_list (0, readcharfun, obarray);
 
     case '[':
-      return read_vector (readcharfun, 0, obarray);
+      return read_vector (readcharfun, 0, Qnil);
 
     case ')':
     case ']':
@@ -3029,7 +3038,8 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 	      /* Accept extended format for hash tables (extensible to
 		 other types), e.g.
 		 #s(hash-table size 2 test equal data (k1 v1 k2 v2))  */
-	      Lisp_Object tmp = read_list (0, readcharfun, obarray);
+
+	      Lisp_Object tmp = read_list (0, readcharfun, Qnil);
 	      Lisp_Object head = CAR_SAFE (tmp);
 	      Lisp_Object data = Qnil;
 	      Lisp_Object val = Qnil;
@@ -3118,7 +3128,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 	  if (c == '[')
 	    {
 	      Lisp_Object tmp;
-	      tmp = read_vector (readcharfun, 0, obarray);
+	      tmp = read_vector (readcharfun, 0, Qnil);
 	      if (ASIZE (tmp) < CHAR_TABLE_STANDARD_SLOTS)
 		error ("Invalid size char-table");
 	      XSETPVECTYPE (XVECTOR (tmp), PVEC_CHAR_TABLE);
@@ -3131,7 +3141,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 		{
 		  /* Sub char-table can't be read as a regular
 		     vector because of a two C integer fields.  */
-		  Lisp_Object tbl, tmp = read_list (1, readcharfun, obarray);
+		  Lisp_Object tbl, tmp = read_list (1, readcharfun, Qnil);
 		  ptrdiff_t size = list_length (tmp);
 		  int i, depth, min_char;
 		  struct Lisp_Cons *cell;
@@ -3169,7 +3179,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
       if (c == '&')
 	{
 	  Lisp_Object length;
-	  length = read1 (readcharfun, pch, obarray);
+	  length = read1 (readcharfun, pch, Qnil);
 	  c = READCHAR;
 	  if (c == '"')
 	    {
@@ -3178,7 +3188,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 	      unsigned char *data;
 
 	      UNREAD (c);
-	      tmp = read1 (readcharfun, pch, obarray);
+	      tmp = read1 (readcharfun, pch, Qnil);
 	      if (STRING_MULTIBYTE (tmp)
 		  || (size_in_chars != SCHARS (tmp)
 		      /* We used to print 1 char too many
@@ -3206,7 +3216,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 	     build them using function calls.  */
 	  Lisp_Object tmp;
 	  struct Lisp_Vector *vec;
-	  tmp = read_vector (readcharfun, 1, obarray);
+	  tmp = read_vector (readcharfun, 1, Qnil);
 	  vec = XVECTOR (tmp);
 	  if (! (COMPILED_STACK_DEPTH < ASIZE (tmp)
 		 && (FIXNUMP (AREF (tmp, COMPILED_ARGLIST))
@@ -3243,7 +3253,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 	  int ch;
 
 	  /* Read the string itself.  */
-	  tmp = read1 (readcharfun, &ch, obarray);
+	  tmp = read1 (readcharfun, &ch, Qnil);
 	  if (ch != 0 || !STRINGP (tmp))
 	    invalid_syntax ("#", readcharfun);
 	  /* Read the intervals and their properties.  */
@@ -3251,14 +3261,14 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 	    {
 	      Lisp_Object beg, end, plist;
 
-	      beg = read1 (readcharfun, &ch, obarray);
+	      beg = read1 (readcharfun, &ch, Qnil);
 	      end = plist = Qnil;
 	      if (ch == ')')
 		break;
 	      if (ch == 0)
-		end = read1 (readcharfun, &ch, obarray);
+		end = read1 (readcharfun, &ch, Qnil);
 	      if (ch == 0)
-		plist = read1 (readcharfun, &ch, obarray);
+		plist = read1 (readcharfun, &ch, Qnil);
 	      if (ch)
 		invalid_syntax ("Invalid string property list", readcharfun);
 	      Fset_text_properties (beg, end, plist, tmp);
@@ -3369,7 +3379,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
       if (c == '$')
 	return Vload_file_name;
       if (c == '\'')
-	return list2 (Qfunction, read0 (readcharfun, obarray));
+	return list2 (Qfunction, read0 (readcharfun, Qnil));
       /* #:foo is the uninterned symbol named foo.  */
       if (c == ':')
 	{
@@ -3452,7 +3462,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 			hash_put (h, number, placeholder, hash);
 
 		      /* Read the object itself.  */
-		      Lisp_Object tem = read0 (readcharfun, obarray);
+		      Lisp_Object tem = read0 (readcharfun, Qnil);
 
 		      /* If it can be recursive, remember it for
 			 future substitutions.  */
@@ -3519,7 +3529,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
       goto retry;
 
     case '\'':
-      return list2 (Qquote, read0 (readcharfun, obarray));
+      return list2 (Qquote, read0 (readcharfun, Qnil));
 
     case '`':
       return list2 (Qbackquote, read0 (readcharfun, obarray));
@@ -3843,9 +3853,9 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 
 	    if (! NILP (obarray)
 		&& ! NILP (result)
+		&& ! quoted
 		&& SYMBOLP (result))
 	      {
-		/* Reify, say, symbol 'cons to 'cons/42 */
 		Lisp_Object token =
 		  call1 (intern ("gensym"),
 			 concat2 (SYMBOL_NAME (result), build_string ("/")));
