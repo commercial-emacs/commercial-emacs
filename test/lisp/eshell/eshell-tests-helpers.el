@@ -30,6 +30,8 @@
 (require 'esh-mode)
 (require 'eshell)
 
+(defvar eshell-history-file-name nil)
+
 (defvar eshell-test--max-subprocess-time 5
   "The maximum amount of time to wait for a subprocess to finish, in seconds.
 See `eshell-wait-for-subprocess'.")
@@ -53,7 +55,7 @@ See `eshell-wait-for-subprocess'.")
 If this takes longer than `eshell-test--max-subprocess-time',
 raise an error."
   (let ((start (current-time)))
-    (while (eshell-interactive-process)
+    (while (eshell-interactive-process-p)
       (when (> (float-time (time-since start))
                eshell-test--max-subprocess-time)
         (error "timed out waiting for subprocess"))
