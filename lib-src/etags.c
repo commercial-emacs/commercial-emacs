@@ -793,8 +793,12 @@ static const char TeX_help [] =
 "In LaTeX text, the argument of any of the commands '\\chapter',\n\
 '\\section', '\\subsection', '\\subsubsection', '\\eqno', '\\label',\n\
 '\\ref', '\\cite', '\\bibitem', '\\part', '\\appendix', '\\entry',\n\
-'\\index', '\\def', '\\newcommand', '\\renewcommand',\n\
-'\\newenvironment' or '\\renewenvironment' is a tag.\n\
+'\\index', '\\def', '\\edef', '\\gdef', '\\xdef', '\\newcommand',\n\
+'\\renewcommand', '\\newenvironment', '\\renewenvironment',\n\
+'\\DeclareRobustCommand, '\\newrobustcmd', '\\renewrobustcmd',\n\
+'\\let', '\\csdef', '\\csedef', '\\csgdef', '\\csxdef', '\\csletcs',\n\
+or '\\cslet' is a tag.  So is the argument of any of the starred\n\
+variants of these commands, when a starred variant exists.\n\
 \n\
 Other commands can be specified by setting the environment variable\n\
 'TEXTAGS' to a colon-separated list like, for example,\n\
@@ -5673,11 +5677,19 @@ Scheme_functions (FILE *inf)
 static linebuffer *TEX_toktab = NULL; /* Table with tag tokens */
 
 /* Default set of control sequences to put into TEX_toktab.
-   The value of environment var TEXTAGS is prepended to this.  */
+   The value of environment var TEXTAGS is prepended to this.
+   (2021) Add variants of '\def', some additional LaTeX commands,
+   and common variants from the 'etoolbox' package.  Also, add
+   starred variants of the commands if they exist.  Starred
+   variants need to appear before their unstarred versions. */
 static const char *TEX_defenv = "\
-:chapter:section:subsection:subsubsection:eqno:label:ref:cite:bibitem\
-:part:appendix:entry:index:def\
-:newcommand:renewcommand:newenvironment:renewenvironment";
+:chapter*:section*:subsection*:subsubsection*:part*:label:ref\
+:chapter:section:subsection:subsubsection:eqno:cite:bibitem\
+:part:appendix:entry:index:def:edef:gdef:xdef:newcommand*:newcommand\
+:renewcommand*:renewcommand:newenvironment*:newenvironment\
+:renewenvironment*:renewenvironment:DeclareRobustCommand*\
+:DeclareRobustCommand:renewrobustcmd*:renewrobustcmd:newrobustcmd*\
+:newrobustcmd:let:csdef:csedef:csgdef:csxdef:csletcs:cslet";
 
 static void TEX_decode_env (const char *, const char *);
 
@@ -5736,19 +5748,70 @@ TeX_commands (FILE *inf)
 	      {
 		char *p;
 		ptrdiff_t namelen, linelen;
-		bool opgrp = false;
+		bool opgrp = false, one_esc = false;
 
 		cp = skip_spaces (cp + key->len);
+		/* Skip the optional arguments to commands in the tags list so
+		   that these arguments don't end up as the name of the tag.
+		   The name will instead come from the argument in curly braces
+		   that follows the optional ones.  */
+		if (*cp == '[' || *cp == '(')
+		  {
+		    while (*cp != TEX_opgrp && *cp != '\0')
+		      cp++;
+		  }
 		if (*cp == TEX_opgrp)
 		  {
 		    opgrp = true;
 		    cp++;
 		  }
+		/* Jumping to a TeX command definition doesn't work in at
+		   least some of the editors that use ctags.  Changes in
+		   tex-mode.el in GNU Emacs address these issues for etags;
+		   uncomment the following five lines to get a quick & dirty
+		   improvement in programs using ctags as well, though some
+		   parts of the behavior will remain suboptimal.  The
+		   undocumented ctags option '--no-duplicates' may help.  */
+
+		/* if (CTAGS && *cp == TEX_esc) */
+		/*   { */
+		/*     cp++; */
+		/*     one_esc = true; */
+		/*   } */
+
+		/* Add optional argument brackets '(' and '[' so that these
+		   arguments don't appear in tag names.  Also add '=' as it's
+		   relational in the vast majority of cases.  */
 		for (p = cp;
-		     (!c_isspace (*p) && *p != '#' &&
-		      *p != TEX_opgrp && *p != TEX_clgrp);
+		     (!c_isspace (*p) && *p != '#' && *p != '=' &&
+		      *p != '[' && *p != '(' && *p != TEX_opgrp &&
+		      *p != TEX_clgrp);
 		     p++)
-		  continue;
+		  /* Allow only one escape char in a tag name, which
+		     (primarily) enables tagging a TeX command's different,
+		     possibly temporary, '\let' bindings.  */
+		  if (*p == TEX_esc)
+		    {
+		      if (!one_esc)
+			{
+			  one_esc = true;
+			  continue;
+			}
+		      else
+			break;
+		    }
+		  else
+		    continue;
+		/* Re-scan to catch (highly unusual) cases where a
+		   command name is of the form '\('.  */
+		if ((*p == '(' || *p == '[') && (p - cp) < 2)
+		  {
+		    for (p = cp;
+			 (!c_isspace (*p) && *p != '#' &&
+			  *p != TEX_opgrp && *p != TEX_clgrp);
+			 p++)
+		      continue;
+		  }
 		namelen = p - cp;
 		linelen = lb.len;
 		if (!opgrp || *p == TEX_clgrp)

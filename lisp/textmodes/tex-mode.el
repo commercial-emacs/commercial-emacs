@@ -1291,6 +1291,9 @@ Entering SliTeX mode runs the hook `text-mode-hook', then the hook
 	      (syntax-propertize-rules latex-syntax-propertize-rules))
   ;; TABs in verbatim environments don't do what you think.
   (setq-local indent-tabs-mode nil)
+  ;; Set up xref backend in TeX buffers.
+  (add-hook 'xref-backend-functions #'tex--xref-backend nil t)
+  (tex-set-thingatpt-symbol)
   ;; Other vars that should be buffer-local.
   (make-local-variable 'tex-command)
   (make-local-variable 'tex-start-of-header)
@@ -3658,6 +3661,334 @@ There might be text before point."
                    (kill-buffer (process-buffer process)))))))
       (process-send-region tex-chktex--process (point-min) (point-max))
       (process-send-eof tex-chktex--process))))
+
+
+;;; Xref backend
+
+;; Here we define an xref backend for TeX, adapting the default etags
+;; backend so that the main xref user commands (including
+;; `xref-find-definitions', `xref-find-apropos', and
+;; `xref-find-references' [on M-., C-M-., and M-?, respectively]) work
+;; in TeX buffers.  This mostly involves defining a new THING for
+;; `thing-at-point' (texsymbol), then substituting that THING for
+;; `symbol' in TeX buffers, at least by (configurable) default.  The
+;; TeX escape character will by default appear in the resulting string
+;; only when the xref command uses string search and not regexp
+;; search, though this too is configurable.  The new THING type also
+;; improves the accuracy of other commands that use `thing-at-point'
+;; in TeX buffers, like `project-find-regexp'.  TODO: Include commands
+;; that call `bounds-of-thing-at-point' (for example
+;; `isearch-forward-thing-at-point') in the mechanism.
+
+(defvar tex-thingatpt-modes-list
+  '(tex-mode doctex-mode latex-mode plain-tex-mode slitex-mode)
+  "Major modes where `thing-at-point' may use the `texsymbol' type.
+
+When a buffer's `major-mode' is in this list, and when
+`tex-thingatpt-is-texsymbol' is t (the default), any command in
+that buffer that calls `thing-at-point' with a `symbol' argument
+actually uses the `texsymbol' argument, instead.")
+
+(defcustom tex-thingatpt-is-texsymbol t
+  "When non-nil replace `symbol' by `texsymbol' for `thing-at-point'.
+
+This applies only to TeX buffers.  The `texsymbol' \"thing\"
+modifies the standard `symbol' for use in such buffers.
+
+When nil, restore the default behavior of `thing-at-point' in TeX
+buffers.
+
+Custom will automatically apply changes in all TeX buffers, but
+if you set the variable outside of Custom it won't take effect
+until you apply it with \\[tex-set-thingatpt-symbol].  Without a
+prefix argument (\\[universal-argument]) this applies only to the
+current buffer, but with one it applies to all TeX buffers in
+`buffer-list'.  (TeX buffers are those whose `major-mode' is a
+member of `tex-thingatpt-modes-list'.)"
+  :type 'boolean
+  :group 'tex-file
+  :initialize #'custom-initialize-default
+  :set (lambda (var val)
+         (set-default var val)
+         (tex-set-thingatpt-symbol t))
+  :version "29.1")
+
+(defcustom tex-thingatpt-include-escape '(xref-find-definitions
+                                          xref-find-definitions-other-window
+                                          xref-find-definitions-other-frame)
+  "If non-nil, include `tex-escape-char' in `thing-at-point'.
+
+This variable only takes effect when `tex-thingatpt-is-texsymbol'
+is t (the default), changing the argument passed to
+`thing-at-point' from `symbol' to `texsymbol'.  When that is the
+case, the values of this variable act as follows:
+
+When t, `thing-at-point' will always include a
+`tex-escape-char' (usually `\\'), should one be present, in the
+string it returns in TeX buffers.
+
+When nil, `thing-at-point' will never include the
+`tex-escape-char' in the string it returns in TeX buffers.
+
+Otherwise, it's a list of commands for which `thing-at-point'
+will always include the `tex-escape-char' in the string it
+returns.  The three xref commands listed by default may cease to
+function properly in TeX buffers if set to nil, but setting
+`tex-xref-try-alternate-forms' to t will rectify that."
+  :type '(choice (const :tag "Always include tex-escape-char" t)
+                 (const :tag "Never include tex-escape-char" nil)
+                 (set :tag "Include tex-escape-char for these commands"
+		      (repeat :inline t (symbol :tag "command"))))
+  :group 'tex-file
+  :version "29.1")
+
+(defcustom tex-xref-try-alternate-forms nil
+  "Non-nil means find definitions of alternate forms of commands.
+
+If `xref-find-definitions' returns nil for the current form of
+the TeX command name, try the alternative form, which will have
+the `tex-escape-char' (usually `\\') either stripped from or
+prepended to the current form, depending on whether or not the
+current form starts with that character.
+
+This may be particularly useful in documents that mix `\\def' and
+`\\csdef' when defining commands."
+  :type 'boolean
+  :group 'tex-file
+  :version "29.1")
+
+(defvar tex-escape-char ?\\
+  "The current TeX escape character.
+
+The `etags' program only recognizes `\\' (92) and `!' (33) as
+escape characters in TeX documents, and if it detects the latter
+it also uses `<>' as the TeX grouping construct rather than `{}'.
+Setting this variable to anything other than `\\' or `!' will not
+be useful without changes to `etags', at least for commands that
+search tags tables, such as \\[xref-find-definitions] and \
+\\[xref-find-apropos].")
+
+(defvar tex-thingatpt-syntax-table
+  (let* ((ost (if (boundp 'TeX-mode-syntax-table)
+                  TeX-mode-syntax-table
+                tex-mode-syntax-table))
+         (st (make-syntax-table ost)))
+    (modify-syntax-entry ?# "'" st)
+    (modify-syntax-entry ?= "'" st)
+    (modify-syntax-entry ?` "'" st)
+    (modify-syntax-entry ?\" "'" st)
+    (modify-syntax-entry ?' "'" st)
+    st)
+  "Syntax table for delimiting `thing-at-point' in TeX buffers.
+
+When `tex-thingatpt-is-texsymbol' is t, this syntax table helps
+to define what a `texsymbol' is.")
+
+(defun tex--xref-backend () 'tex)
+
+;; Setup AUCTeX modes.  (Should this be in AUCTeX itself?)
+
+(add-hook 'TeX-mode-hook #'tex-set-auctex-xref-backend)
+(add-hook 'TeX-mode-hook #'tex-set-thingatpt-symbol)
+
+(defun tex-set-auctex-xref-backend ()
+  (add-hook 'xref-backend-functions #'tex--xref-backend nil t))
+
+(declare-function xref-item-location "xref")
+(declare-function xref--project-root "xref" (project))
+(declare-function xref--convert-hits "xref" (hits regexp))
+(declare-function apropos-parse-pattern "apropos" (pattern))
+(declare-function semantic-symref-perform-search "semantic/symref")
+(declare-function semantic-symref-instantiate "semantic/symref")
+(declare-function project-external-roots "project")
+(declare-function find-tag--completion-ignore-case "etags")
+(declare-function etags--xref-find-definitions "etags")
+(declare-function etags--xref-apropos-additional "etags" (regexp))
+(declare-function cl-delete-if "cl-seq")
+(defvar etags-xref-prefer-current-file)
+
+(cl-defmethod xref-backend-identifier-at-point ((_backend (eql 'tex)))
+  (require 'etags)
+  (thing-at-point 'symbol t))
+
+(cl-defmethod xref-backend-identifier-completion-table ((_backend
+                                                         (eql 'tex)))
+  (tags-lazy-completion-table))
+
+(cl-defmethod xref-backend-identifier-completion-ignore-case ((_backend
+                                                               (eql 'tex)))
+  (find-tag--completion-ignore-case))
+
+(cl-defmethod xref-backend-definitions ((_backend (eql 'tex)) symbol)
+  (let* ((file (and buffer-file-name (expand-file-name buffer-file-name)))
+         (alt-sym (if (char-equal tex-escape-char (aref symbol 0))
+                      (substring symbol 1)
+                    (concat (string tex-escape-char) symbol)))
+         (prelim-definitions (etags--xref-find-definitions symbol))
+         (definitions (if (or prelim-definitions
+                              (not tex-xref-try-alternate-forms))
+                          prelim-definitions
+                        (etags--xref-find-definitions alt-sym)))
+         same-file-definitions)
+    (when (and etags-xref-prefer-current-file file)
+      (setq definitions
+            (cl-delete-if
+             (lambda (definition)
+               (when (equal file
+                            (xref-location-group
+                             (xref-item-location definition)))
+                 (push definition same-file-definitions)
+                 t))
+             definitions))
+      (setq definitions (nconc (nreverse same-file-definitions)
+                               definitions)))
+    definitions))
+
+(cl-defmethod xref-backend-apropos ((_backend (eql 'tex)) pattern)
+  (let ((regexp (tex-xref-apropos-regexp pattern)))
+    (nconc
+     (or
+      (etags--xref-find-definitions regexp t)
+      (etags--xref-find-definitions pattern t))
+     (etags--xref-apropos-additional regexp))))
+
+(cl-defmethod xref-backend-references ((_backend (eql 'tex)) identifier)
+  (mapcan
+   (lambda (dir)
+     (message "Searching %s..." dir)
+     (redisplay)
+     (prog1
+         (tex-xref-references-in-directory identifier dir)
+       (message "Searching %s... done" dir)))
+   (let ((pr (project-current t)))
+     (cons
+      (xref--project-root pr)
+      (project-external-roots pr)))))
+
+(defun tex-xref-apropos-regexp (pattern)
+  "Return a regexp from PATTERN similar to `apropos'.
+
+Unlike the standard xref function, if `regexp-quote' returns a
+string different from the original PATTERN, the TeX function
+passes that modified string, rather than PATTERN itself, to
+`apropos-parse-pattern'."
+  (let ((re (regexp-quote pattern)))
+    (apropos-parse-pattern
+     (if (string-equal re pattern)
+         ;; Split into words
+         (or (split-string pattern "[ \t]+" t)
+             (user-error "No word list given"))
+       re))))
+
+(defun tex-xref-references-in-directory (symbol dir)
+  "Find all references to SYMBOL in directory DIR.
+Return a list of xref values.
+
+This function uses the Semantic Symbol Reference API.  In TeX
+buffers the value returned when passing SYMBOL to `regexp-quote'
+becomes the default search term.  If this symref instantiation
+finds no matches, a second tries again with the original SYMBOL
+as search term, instead.  Both searches set keyword `searchtype:'
+to \\='regexp instead of xref's \\='symbol.
+
+See `semantic-symref-tool-alist' for details on which tools are
+used, and when.  See also `xref-references-in-directory' and
+comments in its code, the latter copied into the TeX
+implementation for convenience."
+  (cl-assert (directory-name-p dir))
+  (require 'semantic/symref)
+  (defvar semantic-symref-tool)
+  (defvar ede-minor-mode)
+
+  ;; Some symref backends use `ede-project-root-directory' as the root
+  ;; directory for the search, rather than `default-directory'. Since
+  ;; the caller has specified `dir', we bind `ede-minor-mode' to nil
+  ;; to force the backend to use `default-directory'.
+  (let* ((ede-minor-mode nil)
+         (default-directory dir)
+         ;; FIXME: Remove CScope and Global from the recognized tools?
+         ;; The current implementations interpret the symbol search as
+         ;; "find all calls to the given function", but not function
+         ;; definition. And they return nothing when passed a variable
+         ;; name, even a global one.
+         (semantic-symref-tool 'detect)
+         (case-fold-search nil)
+         (texsymbol (regexp-quote symbol))
+         (inst (semantic-symref-instantiate :searchfor texsymbol
+                                            :searchtype 'regexp
+                                            :searchscope 'subdirs
+                                            :resulttype 'line-and-text))
+         (alt-inst (semantic-symref-instantiate :searchfor symbol
+                                                :searchtype 'regexp
+                                                :searchscope 'subdirs
+                                                :resulttype 'line-and-text)))
+    (or
+     (xref--convert-hits (semantic-symref-perform-search inst)
+                         (format "%s" texsymbol))
+     (xref--convert-hits (semantic-symref-perform-search alt-inst)
+                         (format "%s" symbol)))))
+
+(put 'texsymbol 'beginning-op 'tex-thingatpt--beginning-of-texsymbol)
+
+(put 'texsymbol 'end-op 'tex-thingatpt--end-of-texsymbol)
+
+(defun tex-set-thingatpt-symbol (&optional all)
+  "Set meaning of `thing-at-point' `symbol' in (ALL?) TeX buffers.
+
+When `tex-thingatpt-is-texsymbol' is t, set `thing-at-point' to
+use the `texsymbol' \"thing\" instead of `symbol', otherwise
+maintain or restore the default.  Without an optional ALL make
+changes only in current buffer, with ALL make changes in all TeX
+buffers in `buffer-list'."
+  (interactive "P")
+  (require 'thingatpt)
+  (if all
+      (dolist (buf (buffer-list))
+        (with-current-buffer buf
+          (tex--symbol-or-texsymbol)))
+    (tex--symbol-or-texsymbol)))
+
+(defun tex--symbol-or-texsymbol ()
+  (when (memq major-mode tex-thingatpt-modes-list)
+    (if tex-thingatpt-is-texsymbol
+        (setq-local thing-at-point-provider-alist
+                    (add-to-list 'thing-at-point-provider-alist
+                            '(symbol . tex--thing-at-point)))
+      (setq-local thing-at-point-provider-alist
+                  (delete '(symbol . tex--thing-at-point)
+                          thing-at-point-provider-alist)))))
+
+(defun tex--thing-at-point ()
+  "Pass `thing' type `texsymbol' to `bounds-of-thing-at-point'.
+
+When `tex-thingatpt-is-texsymbol' is t, calls in TeX buffers to
+`thing-at-point' with argument `symbol' will use this function."
+  (let* ((sytab (make-syntax-table tex-thingatpt-syntax-table))
+         (bounds (with-syntax-table sytab
+                   (unless (char-equal tex-escape-char ?\\)
+                     (modify-syntax-entry ?\\ "_")
+                     (modify-syntax-entry tex-escape-char "\\")
+                     (modify-syntax-entry ?< "(>")
+                     (modify-syntax-entry ?> ")<"))
+                   (bounds-of-thing-at-point 'texsymbol))))
+    (when bounds
+      (buffer-substring-no-properties (car bounds) (cdr bounds)))))
+
+(defun tex--include-escape-p (command)
+  (or (eq tex-thingatpt-include-escape t)
+      (memq command tex-thingatpt-include-escape)))
+
+(defun tex-thingatpt--beginning-of-texsymbol ()
+  "Move point to the beginning of the current TeX symbol."
+  (and (re-search-backward "\\([][()]\\|\\(\\sw\\|\\s_\\|\\s.\\)+\\)")
+       (skip-syntax-backward "w_.")
+       (when (tex--include-escape-p this-command)
+         (skip-syntax-backward "\\/"))))
+
+(defun tex-thingatpt--end-of-texsymbol ()
+  "Move point to the end of the current TeX symbol."
+  (and (re-search-forward "\\([][()]\\|\\(\\sw\\|\\s_\\|\\s.\\)+\\)")
+       (skip-syntax-forward "w_.")))
 
 (make-obsolete-variable 'tex-mode-load-hook
                         "use `with-eval-after-load' instead." "28.1")

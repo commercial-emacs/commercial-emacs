@@ -2565,8 +2565,13 @@ In @LaTeX{} documents, the arguments for @code{\chapter},
 @code{\section}, @code{\subsection}, @code{\subsubsection},
 @code{\eqno}, @code{\label}, @code{\ref}, @code{\cite},
 @code{\bibitem}, @code{\part}, @code{\appendix}, @code{\entry},
-@code{\index}, @code{\def}, @code{\newcommand}, @code{\renewcommand},
-@code{\newenvironment} and @code{\renewenvironment} are tags.
+@code{\index}, @code{\def}, @code{\edef}, @code{\gdef}, @code{\xdef},
+@code{\newcommand}, @code{\renewcommand}, @code{\newenvironment},
+@code{\renewenvironment}, @code{\DeclareRobustCommand},
+@code{\newrobustcmd}, @code{\renewrobustcmd}, @code{\let},
+@code{\csdef}, @code{\csedef}, @code{\csgdef}, @code{\csxdef},
+@code{\csletcs}, and @code{\cslet} are tags.  So too are the arguments
+of any starred variants of these commands, when such variants exist.
 
 Other commands can make tags as well, if you specify them in the
 environment variable @env{TEXTAGS} before invoking @command{etags}.  The
