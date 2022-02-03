@@ -29,16 +29,10 @@
 (require 'ert-x)
 (require 'esh-mode)
 (require 'eshell)
-(eval-and-compile
-  (load (expand-file-name "eshell-tests-helpers"
-                          (file-name-directory (or load-file-name
-                                                   default-directory)))))
-
-(defvar eshell-history-file-name)
-(defvar eshell-test--max-subprocess-time)
-(declare-function eshell-insert-command "eshell-tests-helpers")
-(declare-function eshell-match-result "eshell-tests-helpers")
-(declare-function eshell-command-result-p "eshell-tests-helpers")
+(require 'eshell-tests-helpers
+         (expand-file-name "eshell-tests-helpers"
+                           (file-name-directory (or load-file-name
+                                                    default-directory))))
 
 ;;; Tests:
 
@@ -128,6 +122,24 @@ e.g. \"{(+ 1 2)} 3\" => 3"
   (with-temp-eshell
    (eshell-command-result-p "echo ${echo hi}-${*echo there}"
                             "hi-there\n")))
+
+(ert-deftest eshell-test/pipe-tailproc ()
+  "Check that piping a process to a non-process command waits for the process"
+  (skip-unless (executable-find "echo"))
+  (with-temp-eshell
+   (eshell-command-result-p "*echo hi | echo bye"
+                            "bye\nhi\n")))
+
+(ert-deftest eshell-test/pipe-headproc-stdin ()
+  "Check that standard input is sent to the head process in a pipeline"
+  (skip-unless (and (executable-find "tr")
+                    (executable-find "rev")))
+  (with-temp-eshell
+   (eshell-insert-command "tr a-z A-Z | rev")
+   (eshell-insert-command "hello")
+   (eshell-send-eof-to-process)
+   (eshell-wait-for-subprocess)
+   (eshell-match-result "OLLEH\n")))
 
 (ert-deftest eshell-test/window-height ()
   "$LINES should equal (window-height)"
