@@ -3854,6 +3854,7 @@ read1 (Lisp_Object readcharfun, int *pch, Lisp_Object obarray)
 	    if (! NILP (obarray)
 		&& ! NILP (result)
 		&& ! quoted
+		&& ! skip_shorthand
 		&& SYMBOLP (result))
 	      {
 		Lisp_Object token =

@@ -320,10 +320,6 @@ endif
 # subdirectories, to make sure require's and load's in the files being
 # compiled find the right files.
 
-.SUFFIXES: .elc .el
-
-# An old-fashioned suffix rule, which, according to the GNU Make manual,
-# cannot have prerequisites.
 ifeq ($(HAVE_NATIVE_COMP),yes)
 ifeq ($(ANCIENT),yes)
 # The first compilation of compile-first, using an interpreted compiler:
@@ -333,7 +329,7 @@ ifeq ($(ANCIENT),yes)
 # using these .elc's.  This is faster than just compiling the native code
 # directly using the interpreted compile-first files.  (Note: 1970-01-01
 # fails on some systems.)
-.el.elc:
+%.elc: %.el $(COMPILE_FIRST:.elc=.el)
 	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) \
 	-l comp -f batch-byte-compile $<
 	touch -t 197101010000 $@

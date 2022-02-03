@@ -462,9 +462,8 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
 
 (defvar byte-compiler-error-flag)
 
-(defun byte-compile-recurse-top-level (form non-top-level-case)
-  "Implement `eval-when-compile' and `eval-and-compile'.
-Return the compile-time value of FORM."
+(defun byte-compile-macroexpand (form arr func)
+  "Deal with progn before calling compilation FUNC on FORM."
   ;; Macroexpand (not macroexpand-all!) form at top-level in case it
   ;; expands into a top-level-equivalent `progn'.  See CLHS section
   ;; 3.2.3.1, "Processing of Top Level Forms".  The semantics are very
@@ -474,10 +473,9 @@ Return the compile-time value of FORM."
   (if (eq (car-safe form) 'progn)
       (cons 'progn
             (mapcar (lambda (subform)
-                      (byte-compile-recurse-top-level
-                       subform non-top-level-case))
+                      (byte-compile-macroexpand subform arr func))
                     (cdr form)))
-    (funcall non-top-level-case form)))
+    (funcall func form arr)))
 
 (defconst byte-compile-initial-macro-environment
   `(
@@ -486,9 +484,10 @@ Return the compile-time value of FORM."
     (declare-function . byte-compile-macroexpand-declare-function)
     (eval-when-compile . ,(lambda (&rest body)
                             (let ((result nil))
-                              (byte-compile-recurse-top-level
+                              (byte-compile-macroexpand
                                (macroexp-progn body)
-                               (lambda (form)
+                               nil
+                               (lambda (form _arr)
                                  ;; Insulate the following variables
                                  ;; against changes made in the
                                  ;; subsidiary compilation.  This
@@ -505,9 +504,10 @@ Return the compile-time value of FORM."
                                            (byte-compile-preprocess form)))))))
                               (list 'quote result))))
     (eval-and-compile . ,(lambda (&rest body)
-                           (byte-compile-recurse-top-level
+                           (byte-compile-macroexpand
                             (macroexp-progn body)
-                            (lambda (form)
+                            nil
+                            (lambda (form _arr)
                               ;; Don't compile here, since we don't know
                               ;; whether to compile as byte-compile-form
                               ;; or byte-compile-file-form.
@@ -1184,7 +1184,8 @@ message buffer `default-directory'."
 			       (list (1+ (count-lines (point-min) (point-at-bol)))
                                      (1+ (current-column))))))
 		  ""))
-	 (form (if (eq byte-compile-current-form :end) "end of data"
+	 (form (if (eq byte-compile-current-form :end)
+                   "end of data"
 		 (or byte-compile-current-form "toplevel form"))))
     (when (or (and byte-compile-current-file
 		   (not (equal byte-compile-current-file
@@ -1302,16 +1303,16 @@ function directly; use `byte-compile-warn' or
                 (not (memq symbol byte-compile-not-obsolete-funcs)))
 	(byte-compile-warn "%s" msg)))))
 
-(defun byte-compile-report-error (error-info &optional fill)
+(defun byte-compile-report-error (err &optional fill)
   "Report Lisp error in compilation.
-ERROR-INFO is the error data, in the form of either (ERROR-SYMBOL . DATA)
+ERR is the error data, in the form of either (ERROR-SYMBOL . DATA)
 or STRING.  If FILL is non-nil, set `warning-fill-prefix' to four spaces
 when printing the error message."
   (setq byte-compiler-error-flag t)
   (byte-compile-log-warning
-   (if (stringp error-info)
-       error-info
-     (error-message-string error-info))
+   (if (stringp err)
+       err
+     (error-message-string err))
    fill :error))
 
 ;;; sanity-checking arglists
@@ -1412,12 +1413,9 @@ F is considered resolved if auxiliary DEF includes it."
   (when (and (or (and (not def) (not (fboundp f)))
                  (and (boundp 'cldefs-cl-lib-functions)
                       (memq f cldefs-cl-lib-functions)
-                      ;; `byte-compile-new-defuns' won't
-                      ;; pick up autoloads, so consider
-                      ;; (require 'cl-lib) as sufficient.
+                      ;; consider defining cl-incf as resolving all cl-lib
                       (not (memq 'cl-incf byte-compile-new-defuns)))
                  (memq f byte-compile-noruntime-functions))
-             ;; `byte-compile-current-form' suspect under recursion
              (not (eq f byte-compile-current-form)))
     (let ((cons (assq f byte-compile-unresolved-functions)))
       (if cons
@@ -1738,18 +1736,18 @@ and cl-macs.el.")
 	     (setq warning-series (or tem 'byte-compile-warning-series)))
 	   (if byte-compile-debug
 	       (funcall --displaying-byte-compile-warnings-fn)
-	     (condition-case error-info
+	     (condition-case err
 		 (funcall --displaying-byte-compile-warnings-fn)
-	       (error (byte-compile-report-error error-info)))))
+	       (error (byte-compile-report-error err)))))
        ;; warning-series does not come from compilation, so bind it.
        (let ((warning-series
 	      ;; Log the file name.  Record position of that text.
 	      (or (byte-compile-log-file) 'byte-compile-warning-series)))
 	 (if byte-compile-debug
 	     (funcall --displaying-byte-compile-warnings-fn)
-	   (condition-case error-info
+	   (condition-case err
 	       (funcall --displaying-byte-compile-warnings-fn)
-	     (error (byte-compile-report-error error-info))))))))
+	     (error (byte-compile-report-error err))))))))
 
 ;;;###autoload
 (defun byte-force-recompile (directory)
@@ -2214,8 +2212,12 @@ With argument ARG, insert value in current buffer after the form."
 		 (not (eobp)))
           (let* ((arr (make-vector (1- (lsh 1 8)) 0))
                  (annotated-form (read-annotated inbuffer arr))
-                 (form (byte-compile--unannotate annotated-form)))
-            (byte-compile-top-level-file-form form)))
+                 (form (byte-compile--unannotate arr annotated-form)))
+            (byte-compile-macroexpand
+             form arr
+             (lambda (form arr)
+               (let (byte-compile-current-form)
+                 (byte-compile-file-form arr (byte-compile-preprocess form t)))))))
 	(byte-compile-flush-pending)
 	(byte-compile-warn-about-unresolved-functions)))
      byte-compile--outbuffer)))
@@ -2376,8 +2378,8 @@ in the input buffer (now current), not in the output buffer."
         (insert (nth 2 info))))))
 
 (defun byte-compile-keep-pending (form &optional handler)
-  (if (memq byte-optimize '(t source))
-      (setq form (byte-optimize-one-form form t)))
+  (when (memq byte-optimize '(t source))
+    (setq form (byte-optimize-one-form form t)))
   (if handler
       (let ((byte-compile--for-effect t))
 	;; To avoid consing up monstrously large forms at load time, we split
@@ -2386,8 +2388,8 @@ in the input buffer (now current), not in the output buffer."
 	     (nthcdr 300 byte-compile-output)
 	     (byte-compile-flush-pending))
 	(funcall handler form)
-	(if byte-compile--for-effect
-	    (byte-compile-discard)))
+	(when byte-compile--for-effect
+	  (byte-compile-discard)))
     (byte-compile-form form t))
   nil)
 
@@ -2418,16 +2420,8 @@ in the input buffer (now current), not in the output buffer."
    (lexical-binding (cconv-closure-convert form))
    (t form)))
 
-;; byte-hunk-handlers cannot call this!
-(defun byte-compile-top-level-file-form (top-level-form)
-  (byte-compile-recurse-top-level
-   top-level-form
-   (lambda (form)
-     (let (byte-compile-current-form) ; close over this for warnings.
-       (byte-compile-file-form (byte-compile-preprocess form t))))))
-
 ;; byte-hunk-handlers can call this.
-(defun byte-compile-file-form (form)
+(defun byte-compile-file-form (_arr form)
   (let (handler)
     (cond ((and (consp form)
                 (symbolp (car form))
@@ -2500,11 +2494,9 @@ in the input buffer (now current), not in the output buffer."
 (defun byte-compile-file-form-defvar (form)
   (let ((sym (nth 1 form)))
     (byte-compile--declare-var sym)
-    (if (eq (car form) 'defconst)
-        (push sym byte-compile-const-variables)))
-  (if (and (null (cddr form))		;No `value' provided.
-           (eq (car form) 'defvar))     ;Just a declaration.
-      nil
+    (when (eq (car form) 'defconst)
+      (push sym byte-compile-const-variables)))
+  (when (or (cddr form) (not (eq (car form) 'defvar)))
     (byte-compile-docstring-length-warn form)
     (cond ((consp (nth 2 form))
            (setq form (copy-sequence form))
@@ -2518,7 +2510,7 @@ in the input buffer (now current), not in the output buffer."
 
 (defun byte-compile-file-form-defvar-function (form)
   (pcase-let (((or `',name (let name nil)) (nth 1 form)))
-    (if name (byte-compile--declare-var name)))
+    (when name (byte-compile--declare-var name)))
   ;; Variable aliases are better declared before the corresponding variable,
   ;; since it makes it more likely that only one of the two vars has a value
   ;; before the `defvaralias' gets executed, which avoids the need to
@@ -2526,9 +2518,9 @@ in the input buffer (now current), not in the output buffer."
   (pcase form
     (`(defvaralias ,_ ',newname . ,_)
      (when (memq newname byte-compile-bound-variables)
-       (if (byte-compile-warning-enabled-p 'suspicious)
-           (byte-compile-warn
-            "Alias for `%S' should be declared before its referent" newname)))))
+       (when (byte-compile-warning-enabled-p 'suspicious)
+         (byte-compile-warn
+          "Alias for `%S' should be declared before its referent" newname)))))
   (byte-compile-docstring-length-warn form)
   (byte-compile-keep-pending form))
 
@@ -2558,17 +2550,14 @@ in the input buffer (now current), not in the output buffer."
 (put 'progn 'byte-hunk-handler 'byte-compile-file-form-progn)
 (put 'prog1 'byte-hunk-handler 'byte-compile-file-form-progn)
 (defun byte-compile-file-form-progn (form)
-  (mapc #'byte-compile-file-form (cdr form))
-  ;; Return nil so the forms are not output twice.
-  nil)
+  (mapc (apply-partially #'byte-compile-file-form nil) (cdr form)))
 
 (put 'with-no-warnings 'byte-hunk-handler
      'byte-compile-file-form-with-no-warnings)
 (defun byte-compile-file-form-with-no-warnings (form)
   ;; cf byte-compile-file-form-progn.
   (let (byte-compile-warnings)
-    (mapc 'byte-compile-file-form (cdr form))
-    nil))
+    (mapc (apply-partially #'byte-compile-file-form nil) (cdr form))))
 
 (put 'internal--with-suppressed-warnings 'byte-hunk-handler
      'byte-compile-file-form-with-suppressed-warnings)
@@ -2576,8 +2565,7 @@ in the input buffer (now current), not in the output buffer."
   ;; cf byte-compile-file-form-progn.
   (let ((byte-compile--suppressed-warnings
          (append (cadadr form) byte-compile--suppressed-warnings)))
-    (mapc 'byte-compile-file-form (cddr form))
-    nil))
+    (mapc (apply-partially #'byte-compile-file-form nil) (cddr form))))
 
 ;; Automatically evaluate define-obsolete-function-alias etc at top-level.
 (put 'make-obsolete 'byte-hunk-handler 'byte-compile-file-form-make-obsolete)
@@ -2600,7 +2588,7 @@ otherwise."
          (this-one (assq name (symbol-value this-kind)))
          (that-one (assq name (symbol-value that-kind)))
          (do-warn (byte-compile-warning-enabled-p 'redefine name))
-         (byte-compile-current-form name)) ; For warnings.
+         (byte-compile-current-form name))
     (push name byte-compile-new-defuns)
     (when byte-compile-generate-call-tree
       (unless (assq name byte-compile-call-tree)
@@ -3018,10 +3006,10 @@ of the list FUN."
 		   (setq other rest))))
     (apply 'vector (nreverse (mapcar 'car ret)))))
 
-;; Given an expression FORM, compile it and return an equivalent byte-code
-;; expression (a call to the function byte-code).
 (defun byte-compile-top-level (form &optional for-effect output-type
                                     lexenv reserved-csts)
+  "Given an expression FORM, compile it and return an equivalent byte-code
+expression (a call to the function byte-code)."
   ;; OUTPUT-TYPE advises about how form is expected to be used:
   ;;	'eval or nil	-> a single form,
   ;;	'lambda		-> body of a lambda,
@@ -3036,8 +3024,8 @@ of the list FUN."
         (byte-compile-reserved-constants (or reserved-csts 0))
 	(byte-compile-output nil)
         (byte-compile-jump-tables nil))
-    (if (memq byte-optimize '(t source))
-	(setq form (byte-optimize-one-form form byte-compile--for-effect)))
+    (when (memq byte-optimize '(t source))
+      (setq form (byte-optimize-one-form form byte-compile--for-effect)))
     (while (and (eq (car-safe form) 'progn) (null (cdr (cdr form))))
       (setq form (nth 1 form)))
     ;; Set up things for a lexically-bound function.
@@ -3197,42 +3185,37 @@ of the list FUN."
                         (descend (cdr form*))))))))
       (descend form))))
 
-(defun byte-compile--unannotate (form)
+(defun byte-compile--unannotate (arr form)
+  "Thinking:
+(defun car/11) would become car/11/0.
+(let (car/11)) would become car/11/0.
+'car/11 is quoted so unannotate leaves alone
+The danger is user car/11 becoming car."
   (cond ((byte-compile--circular-p form) form)
         ((consp form)
          (if (or (eq 'quote (car form))
                  (eq 'backquote (car form)))
              form
-           (cons (byte-compile--unannotate (car form))
+           (cons (byte-compile--unannotate arr (car form))
                  (if (cl-tailp nil (cdr form))
                      ;; avoid stack overflow (not the company)
                      ;; with mapcar if cdr is a list (and not a
                      ;; dotted pair).
-                     (mapcar #'byte-compile--unannotate (cdr form))
-                   (byte-compile--unannotate (cdr form))))))
+                     (mapcar (apply-partially #'byte-compile--unannotate arr)
+                             (cdr form))
+                   (byte-compile--unannotate arr (cdr form))))))
         ((symbolp form)
-         (intern-soft (replace-regexp-in-string
-                       "/[0-9]+$" "" (symbol-name form))))
+         (if (intern-soft (symbol-name form) arr)
+             (intern (replace-regexp-in-string
+                      "/[0-9]+$" "" (symbol-name form)))
+           form))
         (t
          form)))
 
 (defun byte-compile-form (form &optional for-effect)
-  "Recursive entrypoint for compiling s-exprs.
-
-If FOR-EFFECT is non-nil, byte-compile-form will output a
-byte-discard before terminating, that is, no value will be left
-on the stack.
-
-A byte-compile handler may, when byte-compile--for-effect is
-non-nil, choose output code which does not leave a value on the
-stack, and then set byte-compile--for-effect to nil (to prevent
-byte-compile-form from outputting the byte-discard).
-
-If a handler wants to call another handler, it should do so via
-byte-compile-form, or take extreme care to handle
-byte-compile--for-effect correctly.  Use
-byte-compile-form-do-effect to reset the byte-compile--for-effect
-flag."
+  "Compiles FORM.
+FOR-EFFECT is an incomprehensible Blandyism from 1992 which
+empties the stack by leaving a byte-discard."
   (let ((byte-compile--for-effect for-effect))
     (cond
      ((not (consp form))
@@ -3771,12 +3754,9 @@ NUM defaults to 1.
 If PRESERVE-TOS is non-nil, preserve the top-of-stack value, as if it were
 popped before discarding the num values, and then pushed back again after
 discarding."
-  (if (and (null num) (not preserve-tos))
-      ;; common case
+  (if (and (not num) (not preserve-tos))
       (byte-compile-out 'byte-discard)
-    ;; general case
-    (unless num
-      (setq num 1))
+    (setq num (or num 1))
     (when (and preserve-tos (> num 0))
       ;; Preserve the top-of-stack value by writing it directly to the stack
       ;; location which will be at the top-of-stack after popping.
@@ -3806,13 +3786,13 @@ discarding."
 
 (defun byte-compile-make-closure (form)
   "Byte-compile the special `internal-make-closure' form."
-  (if byte-compile--for-effect (setq byte-compile--for-effect nil)
+  (if byte-compile--for-effect
+      (setq byte-compile--for-effect nil)
     (let* ((vars (nth 1 form))
            (env (nth 2 form))
            (docstring-exp (nth 3 form))
            (body (nthcdr 4 form))
-           (fun
-            (byte-compile-lambda `(lambda ,vars . ,body) nil (length env))))
+           (fun (byte-compile-lambda `(lambda ,vars . ,body) nil (length env))))
       (cl-assert (or (> (length env) 0)
 		     docstring-exp))	;Otherwise, we don't need a closure.
       (cl-assert (byte-code-function-p fun))
@@ -3851,7 +3831,8 @@ discarding."
 
 (defun byte-compile-get-closed-var (form)
   "Byte-compile the special `internal-get-closed-var' form."
-  (if byte-compile--for-effect (setq byte-compile--for-effect nil)
+  (if byte-compile--for-effect
+      (setq byte-compile--for-effect nil)
     (byte-compile-out 'byte-constant (nth 1 form))))
 
 ;; Compile a pure function that accepts zero or more numeric arguments
@@ -4919,9 +4900,7 @@ longer need to hew to its rules)."
                . (,prop ,val ,@(alist-get fun overriding-plist-environment)))
              overriding-plist-environment)
        (byte-compile-push-constant val)
-       (byte-compile-out 'byte-call 3)
-       nil))
-
+       (byte-compile-out 'byte-call 3)))
     (_ (byte-compile-keep-pending form))))
 
 
