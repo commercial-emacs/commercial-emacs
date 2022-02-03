@@ -389,7 +389,7 @@ You don't need this.  (See bytecomp.el commentary for more details.)
        (defun ,name ,arglist ,@body)
      (eval-and-compile
        ;; Never native-compile defsubsts as we need the byte
-       ;; definition in `byte-compile-unfold-bcf' to perform the
+       ;; definition in `byte-compile-inline' to perform the
        ;; inlining (Bug#42664, Bug#43280, Bug#44209).
        ,(byte-run--set-speed name nil -1)
        (put ',name 'byte-optimizer 'byte-compile-inline-expand))))

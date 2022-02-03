@@ -123,7 +123,7 @@
 
 (eval-when-compile (require 'compile))
 (eval-when-compile (require 'cl-lib))
-(require 'cldefs nil t) ;; bootstrap-emacs won't have it
+(require 'cldefs nil t) ;; bootstrap-emacs won't have it in time
 (require 'backquote)
 (require 'macroexp)
 (require 'cconv)
@@ -156,15 +156,15 @@ are found in the same directory is hard-coded in various places in Emacs.)"
   :type '(choice (const nil) function)
   :version "23.2")
 
-;; This enables file name handlers such as jka-compr
-;; to remove parts of the file name that should not be copied
-;; through to the output file name.
 (defun byte-compiler-base-file-name (filename)
-  (let ((handler (find-file-name-handler filename
-					 'byte-compiler-base-file-name)))
-    (if handler
-	(funcall handler 'byte-compiler-base-file-name filename)
-      filename)))
+  "This enables file name handlers such as jka-compr
+to remove parts of the file name that should not be copied
+through to the output file name."
+  (if-let ((handler (find-file-name-handler
+                     filename
+		     'byte-compiler-base-file-name)))
+      (funcall handler 'byte-compiler-base-file-name filename)
+    filename))
 
 ;; Sadly automake relies on this misfeature up to at least version 1.15.1.
 (if (fboundp 'byte-compile-dest-file)
@@ -462,7 +462,7 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
 
 (defvar byte-compiler-error-flag)
 
-(defun byte-compile-macroexpand (func form arr)
+(defun byte-compile-maybe-expand (form func)
   "Deal with progn before calling compilation FUNC on FORM."
   ;; Macroexpand (not macroexpand-all!) form at top-level in case it
   ;; expands into a top-level-equivalent `progn'.  See CLHS section
@@ -472,26 +472,20 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
   (setf form (macroexp-macroexpand form byte-compile-macro-environment))
   (if (eq (car-safe form) 'progn)
       (cons 'progn
-            (mapcar (lambda (subform)
-                      (byte-compile-macroexpand func subform arr))
+            (mapcar (lambda (form*)
+                      (byte-compile-maybe-expand form* func))
                     (cdr form)))
-    (funcall func form arr)))
+    (funcall func form)))
 
 (defconst byte-compile-initial-macro-environment
-  `(
-    ;; (byte-compiler-options . (lambda (&rest forms)
-    ;;     		       (apply 'byte-compiler-options-handler forms)))
-    (declare-function . byte-compile-macroexpand-declare-function)
+  `((declare-function . byte-compile-macroexpand-declare-function)
     (eval-when-compile . ,(lambda (&rest body)
-                            (let ((result nil))
-                              (byte-compile-macroexpand
-                               (lambda (form _arr)
-                                 ;; Insulate the following variables
-                                 ;; against changes made in the
-                                 ;; subsidiary compilation.  This
-                                 ;; prevents spurious warning
-                                 ;; messages: "not defined at runtime"
-                                 ;; etc.
+                            (let (result)
+                              (byte-compile-maybe-expand
+                               (macroexp-progn body)
+                               (lambda (form)
+                                 ;; Sandbox these defvars to forestall "not
+                                 ;; defined at runtime" errors
                                  (let ((byte-compile-unresolved-functions
                                         byte-compile-unresolved-functions)
                                        (byte-compile-new-defuns
@@ -499,24 +493,20 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
                                    (setf result
                                          (byte-compile-eval
                                           (byte-compile-top-level
-                                           (byte-compile-preprocess form))))))
-                               (macroexp-progn body)
-                               nil)
+                                           (byte-compile-preprocess form)))))))
                               (list 'quote result))))
     (eval-and-compile . ,(lambda (&rest body)
-                           (byte-compile-macroexpand
-                            (lambda (form _arr)
-                              ;; Don't compile here, since we don't know
-                              ;; whether to compile as byte-compile-form
-                              ;; or byte-compile-file-form.
+                           (byte-compile-maybe-expand
+                            (macroexp-progn body)
+                            (lambda (form)
+                              ;; Don't compile since we don't know
+                              ;; byte-compile-form or byte-compile-file-form.
                               (let ((expanded
                                      (macroexpand--all-top-level
                                       form
                                       macroexpand-all-environment)))
                                 (eval expanded lexical-binding)
-                                expanded))
-                            (macroexp-progn body)
-                            nil)))
+                                expanded)))))
     (with-suppressed-warnings
         . ,(lambda (warnings &rest body)
              ;; We let-bind `byte-compile--suppressed-warnings' here in order
@@ -1318,10 +1308,10 @@ when printing the error message."
 ;;; sanity-checking arglists
 
 (defun byte-compile-fdefinition (name macro-p)
-  ;; If a function has an entry saying (FUNCTION . t).
-  ;; that means we know it is defined but we don't know how.
-  ;; If a function has an entry saying (FUNCTION . nil),
-  ;; that means treat it as not defined.
+  "If a function has an entry saying (FUNCTION . t).
+that means we know it is defined but we don't know how.
+If a function has an entry saying (FUNCTION . nil),
+that means treat it as not defined."
   (let* ((list (if macro-p
 		   byte-compile-macro-environment
 		 byte-compile-function-environment))
@@ -2213,11 +2203,11 @@ With argument ARG, insert value in current buffer after the form."
           (let* ((arr (make-vector (1- (lsh 1 8)) 0))
                  (annotated-form (read-annotated inbuffer arr))
                  (form (byte-compile--unannotate annotated-form arr)))
-            (byte-compile-macroexpand
-             (lambda (form arr)
+            (byte-compile-maybe-expand
+             form
+             (lambda (form)
                (let (byte-compile-current-form)
-                 (byte-compile-file-form (byte-compile-preprocess form t))))
-             form arr)))
+                 (byte-compile-file-form (byte-compile-preprocess form t)))))))
 	(byte-compile-flush-pending)
 	(byte-compile-warn-about-unresolved-functions)))
      byte-compile--outbuffer)))
@@ -2380,25 +2370,24 @@ in the input buffer (now current), not in the output buffer."
 (defun byte-compile-keep-pending (form &optional handler)
   (when (memq byte-optimize '(t source))
     (setq form (byte-optimize-one-form form t)))
-  (if handler
-      (let ((byte-compile--for-effect t))
-	;; To avoid consing up monstrously large forms at load time, we split
-	;; the output regularly.
-	(and (memq (car-safe form) '(fset defalias))
-	     (nthcdr 300 byte-compile-output)
-	     (byte-compile-flush-pending))
-	(funcall handler form)
-	(when byte-compile--for-effect
-	  (byte-compile-discard)))
-    (byte-compile-form form t))
-  nil)
+  (prog1 nil
+    (if handler
+        (let ((byte-compile--for-effect t))
+          (when (and (memq (car-safe form) '(fset defalias))
+                     (nthcdr 300 byte-compile-output))
+            ;; To avoid consing frenzy at load time, split here
+            (byte-compile-flush-pending))
+          (funcall handler form)
+          (when byte-compile--for-effect
+            (byte-compile-discard)))
+      (byte-compile-form form t))))
 
 (defun byte-compile-flush-pending ()
   "Compile pending forms at end of file."
   (when byte-compile-output
     (let ((form (byte-compile-out-top-level t 'file)))
       (cond ((eq (car-safe form) 'progn)
-	     (mapc 'byte-compile-output-file-form (cdr form)))
+	     (mapc #'byte-compile-output-file-form (cdr form)))
 	    (form
 	     (byte-compile-output-file-form form)))
       (setq byte-compile-constants nil
@@ -2556,19 +2545,15 @@ in the input buffer (now current), not in the output buffer."
 (put 'with-no-warnings 'byte-hunk-handler
      'byte-compile-file-form-with-no-warnings)
 (defun byte-compile-file-form-with-no-warnings (form)
-  ;; cf byte-compile-file-form-progn.
-  (prog1 nil
-    (let (byte-compile-warnings)
-     (mapc #'byte-compile-file-form (cdr form)))))
+  (let (byte-compile-warnings)
+    (byte-compile-file-form-progn form)))
 
 (put 'internal--with-suppressed-warnings 'byte-hunk-handler
      'byte-compile-file-form-with-suppressed-warnings)
 (defun byte-compile-file-form-with-suppressed-warnings (form)
-  ;; cf byte-compile-file-form-progn.
-  (prog1 nil
-    (let ((byte-compile--suppressed-warnings
-           (append (cadadr form) byte-compile--suppressed-warnings)))
-      (mapc #'byte-compile-file-form (cddr form)))))
+  (let ((byte-compile--suppressed-warnings
+         (append (cadadr form) byte-compile--suppressed-warnings)))
+    (byte-compile-file-form-progn (cdr form))))
 
 ;; Automatically evaluate define-obsolete-function-alias etc at top-level.
 (put 'make-obsolete 'byte-hunk-handler 'byte-compile-file-form-make-obsolete)
@@ -2643,7 +2628,7 @@ otherwise."
     ;; Final expresssion must inform caller whether we compiled.
     (if (not (listp body))
         (prog1 nil
-          (unless macro-p ; macros can't be known until runtime evaluation
+          (unless macro-p ;; macros undefined until runtime evaluation
             (push (cons name (if (listp arglist) `(declared ,arglist) t))
                   byte-compile-function-environment)))
       (let ((code (byte-compile-lambda (cons arglist body) t)))
@@ -2743,8 +2728,8 @@ FUN should be either a `lambda' value or a `closure' value."
 
 ;;;###autoload
 (defun byte-compile (form)
-  "If FORM is a symbol, byte-compile its function definition.
-If FORM is a lambda or a macro, byte-compile it as a function."
+  "If FORM is a symbol, compile its function definition.
+If FORM is a lambda or a macro, compile into a function."
   (displaying-byte-compile-warnings
    (byte-compile-close-variables
     (let* ((lexical-binding lexical-binding)
@@ -2752,13 +2737,9 @@ If FORM is a lambda or a macro, byte-compile it as a function."
 		    (symbol-function form)
 		  form))
 	   (macro (eq (car-safe fun) 'macro)))
-      (if macro
-	  (setq fun (cdr fun)))
+      (when macro
+	(setq fun (cdr fun)))
       (cond
-       ;; Up until Emacs-24.1, byte-compile silently did nothing when asked to
-       ;; compile something invalid.  So let's tune down the complaint from an
-       ;; error to a simple message for the known case where signaling an error
-       ;; causes problems.
        ((byte-code-function-p fun)
         (message "Function %s is already compiled"
                  (if (symbolp form) form "provided"))
@@ -2766,24 +2747,24 @@ If FORM is a lambda or a macro, byte-compile it as a function."
        (t
         (let (final-eval)
           (when (or (symbolp form) (eq (car-safe fun) 'closure))
-            ;; `fun' is a function *value*, so try to recover its corresponding
-            ;; source code.
+            ;; FUN is a function *value*; recover its source code.
             (setq lexical-binding (eq (car fun) 'closure))
             (setq fun (byte-compile--reify-function fun))
             (setq final-eval t))
           ;; Expand macros.
           (setq fun (byte-compile-preprocess fun))
           (setq fun (byte-compile-top-level fun nil 'eval))
-          (if (symbolp form)
-              ;; byte-compile-top-level returns an *expression* equivalent to the
-              ;; `fun' expression, so we need to evaluate it, tho normally
-              ;; this is not needed because the expression is just a constant
-              ;; byte-code object, which is self-evaluating.
-              (setq fun (eval fun t)))
-          (if final-eval
-              (setq fun (eval fun t)))
-          (if macro (push 'macro fun))
-          (if (symbolp form) (fset form fun))
+          (when (symbolp form)
+            ;; byte-compile-top-level returns an *expression* we need
+            ;; to evaluate, although it's often a constant,
+            ;; self-evaluating byte-code object.
+            (setq fun (eval fun t)))
+          (when final-eval
+            (setq fun (eval fun t)))
+          (when macro
+            (push 'macro fun))
+          (when (symbolp form)
+            (fset form fun))
           fun)))))))
 
 (defun byte-compile-sexp (sexp)
@@ -3303,7 +3284,7 @@ empties the stack by leaving a byte-discard."
     (byte-compile-warn
      "`mapcar' called for effect; use `mapc' or `dolist' instead"))
   (byte-compile-push-constant (car form))
-  (mapc 'byte-compile-form (cdr form))	; wasteful, but faster.
+  (mapc #'byte-compile-form (cdr form))	; wasteful, but faster.
   (byte-compile-out 'byte-call (length (cdr form))))
 
 
@@ -3391,7 +3372,7 @@ empties the stack by leaving a byte-discard."
     ;; instruction.
     (if (assq 'byte-switch lap)
         (byte-compile-normal-call form)
-      (mapc 'byte-compile-form (cdr form))
+      (mapc #'byte-compile-form (cdr form))
       (unless fmax2
         ;; Old-style byte-code.
         (cl-assert (listp fargs))
@@ -3926,18 +3907,18 @@ discarding."
     (cond ((= count 0)
 	   (byte-compile-constant nil))
 	  ((< count 5)
-	   (mapc 'byte-compile-form (cdr form))
+	   (mapc #'byte-compile-form (cdr form))
            (byte-compile-out
             (aref [byte-list1 byte-list2 byte-list3 byte-list4] (1- count)) 0))
 	  ((< count 256)
-	   (mapc 'byte-compile-form (cdr form))
+	   (mapc #'byte-compile-form (cdr form))
 	   (byte-compile-out 'byte-listN count))
 	  (t (byte-compile-normal-call form)))))
 
 (defun byte-compile-concat (form)
   (let ((count (length (cdr form))))
     (cond ((and (< 1 count) (< count 5))
-	   (mapc 'byte-compile-form (cdr form))
+	   (mapc #'byte-compile-form (cdr form))
 	   (byte-compile-out
 	    (aref [byte-concat2 byte-concat3 byte-concat4] (- count 2))
 	    0))
@@ -3945,7 +3926,7 @@ discarding."
 	  ((= count 0)
 	   (byte-compile-form ""))
 	  ((< count 256)
-	   (mapc 'byte-compile-form (cdr form))
+	   (mapc #'byte-compile-form (cdr form))
 	   (byte-compile-out 'byte-concatN count))
 	  ((byte-compile-normal-call form)))))
 
@@ -4023,7 +4004,7 @@ discarding."
   (cond ((null (cdr form))
 	 (byte-compile-constant nil))
 	((<= (length form) 256)
-	 (mapc 'byte-compile-form (cdr form))
+	 (mapc #'byte-compile-form (cdr form))
 	 (if (cdr (cdr form))
 	     (byte-compile-out 'byte-insertN (length (cdr form)))
 	   (byte-compile-out 'byte-insert 0)))
@@ -4470,15 +4451,12 @@ Return (TAIL VAR TEST CASES), where:
 (defun byte-compile-funcall (form)
   (if (cdr form)
       (progn
-        (mapc 'byte-compile-form (cdr form))
+        (mapc #'byte-compile-form (cdr form))
         (byte-compile-out 'byte-call (length (cdr (cdr form)))))
     (byte-compile-report-error
      (format-message "`funcall' called with no arguments"))
     (byte-compile-form '(signal 'wrong-number-of-arguments '(funcall 0))
                        byte-compile--for-effect)))
-
-
-;; let binding
 
 (defun byte-compile-push-binding-init (clause)
   "Emit byte-codes to push the initialization value for CLAUSE on the stack.

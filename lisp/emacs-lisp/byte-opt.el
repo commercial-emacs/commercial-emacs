@@ -158,12 +158,10 @@ Earlier variables shadow later ones with the same name.")
       ((and (pred symbolp) (guard (not (eq fn t)))) ;A function alias.
        (byte-compile-inline-expand (cons fn (cdr form))))
       ((pred byte-code-function-p)
-       ;; (message "Inlining byte-code for %S!" name)
-       ;; The byte-code will be really inlined in byte-compile-unfold-bcf.
        (byte-compile--check-arity-bytecode form fn)
        `(,fn ,@(cdr form)))
       ((or `(lambda . ,_) `(closure . ,_))
-       ;; While byte-compile-unfold-bcf can inline dynbind byte-code into
+       ;; While byte-compile-inline can inline dynbind byte-code into
        ;; letbind byte-code (or any other combination for that matter), we
        ;; can only inline dynbind source into dynbind source or letbind
        ;; source into letbind source.
