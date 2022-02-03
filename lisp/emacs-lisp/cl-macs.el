@@ -748,7 +748,7 @@ The result of the body appears to the compiler as a quoted constant."
   (if (macroexp-compiling-p)
       (let* ((temp (cl-gentemp "--cl-load-time--"))
 	     (set `(setq ,temp ,form)))
-	(if (and (fboundp 'byte-compile-file-form-defmumble)
+	(if (and (fboundp 'byte-compile-file-form-defalias*)
 		 (boundp 'this-kind) (boundp 'that-one))
             ;; Else, we can't output right away, so we have to delay it to the
             ;; next time we're at the top-level.

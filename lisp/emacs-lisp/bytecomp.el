@@ -462,7 +462,7 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
 
 (defvar byte-compiler-error-flag)
 
-(defun byte-compile-macroexpand (form arr func)
+(defun byte-compile-macroexpand (func form arr)
   "Deal with progn before calling compilation FUNC on FORM."
   ;; Macroexpand (not macroexpand-all!) form at top-level in case it
   ;; expands into a top-level-equivalent `progn'.  See CLHS section
@@ -473,7 +473,7 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
   (if (eq (car-safe form) 'progn)
       (cons 'progn
             (mapcar (lambda (subform)
-                      (byte-compile-macroexpand subform arr func))
+                      (byte-compile-macroexpand func subform arr))
                     (cdr form)))
     (funcall func form arr)))
 
@@ -485,8 +485,6 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
     (eval-when-compile . ,(lambda (&rest body)
                             (let ((result nil))
                               (byte-compile-macroexpand
-                               (macroexp-progn body)
-                               nil
                                (lambda (form _arr)
                                  ;; Insulate the following variables
                                  ;; against changes made in the
@@ -501,12 +499,12 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
                                    (setf result
                                          (byte-compile-eval
                                           (byte-compile-top-level
-                                           (byte-compile-preprocess form)))))))
+                                           (byte-compile-preprocess form))))))
+                               (macroexp-progn body)
+                               nil)
                               (list 'quote result))))
     (eval-and-compile . ,(lambda (&rest body)
                            (byte-compile-macroexpand
-                            (macroexp-progn body)
-                            nil
                             (lambda (form _arr)
                               ;; Don't compile here, since we don't know
                               ;; whether to compile as byte-compile-form
@@ -516,7 +514,9 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
                                       form
                                       macroexpand-all-environment)))
                                 (eval expanded lexical-binding)
-                                expanded)))))
+                                expanded))
+                            (macroexp-progn body)
+                            nil)))
     (with-suppressed-warnings
         . ,(lambda (warnings &rest body)
              ;; We let-bind `byte-compile--suppressed-warnings' here in order
@@ -2212,12 +2212,12 @@ With argument ARG, insert value in current buffer after the form."
 		 (not (eobp)))
           (let* ((arr (make-vector (1- (lsh 1 8)) 0))
                  (annotated-form (read-annotated inbuffer arr))
-                 (form (byte-compile--unannotate arr annotated-form)))
+                 (form (byte-compile--unannotate annotated-form arr)))
             (byte-compile-macroexpand
-             form arr
              (lambda (form arr)
                (let (byte-compile-current-form)
-                 (byte-compile-file-form arr (byte-compile-preprocess form t)))))))
+                 (byte-compile-file-form (byte-compile-preprocess form t))))
+             form arr)))
 	(byte-compile-flush-pending)
 	(byte-compile-warn-about-unresolved-functions)))
      byte-compile--outbuffer)))
@@ -2421,7 +2421,7 @@ in the input buffer (now current), not in the output buffer."
    (t form)))
 
 ;; byte-hunk-handlers can call this.
-(defun byte-compile-file-form (_arr form)
+(defun byte-compile-file-form (form)
   (let (handler)
     (cond ((and (consp form)
                 (symbolp (car form))
@@ -2550,28 +2550,31 @@ in the input buffer (now current), not in the output buffer."
 (put 'progn 'byte-hunk-handler 'byte-compile-file-form-progn)
 (put 'prog1 'byte-hunk-handler 'byte-compile-file-form-progn)
 (defun byte-compile-file-form-progn (form)
-  (mapc (apply-partially #'byte-compile-file-form nil) (cdr form)))
+  (prog1 nil
+    (mapc #'byte-compile-file-form (cdr form))))
 
 (put 'with-no-warnings 'byte-hunk-handler
      'byte-compile-file-form-with-no-warnings)
 (defun byte-compile-file-form-with-no-warnings (form)
   ;; cf byte-compile-file-form-progn.
-  (let (byte-compile-warnings)
-    (mapc (apply-partially #'byte-compile-file-form nil) (cdr form))))
+  (prog1 nil
+    (let (byte-compile-warnings)
+     (mapc #'byte-compile-file-form (cdr form)))))
 
 (put 'internal--with-suppressed-warnings 'byte-hunk-handler
      'byte-compile-file-form-with-suppressed-warnings)
 (defun byte-compile-file-form-with-suppressed-warnings (form)
   ;; cf byte-compile-file-form-progn.
-  (let ((byte-compile--suppressed-warnings
-         (append (cadadr form) byte-compile--suppressed-warnings)))
-    (mapc (apply-partially #'byte-compile-file-form nil) (cddr form))))
+  (prog1 nil
+    (let ((byte-compile--suppressed-warnings
+           (append (cadadr form) byte-compile--suppressed-warnings)))
+      (mapc #'byte-compile-file-form (cddr form)))))
 
 ;; Automatically evaluate define-obsolete-function-alias etc at top-level.
 (put 'make-obsolete 'byte-hunk-handler 'byte-compile-file-form-make-obsolete)
 (defun byte-compile-file-form-make-obsolete (form)
   (prog1 (byte-compile-keep-pending form)
-    (apply 'make-obsolete (mapcar 'eval (cdr form)))))
+    (apply #'make-obsolete (mapcar #'eval (cdr form)))))
 
 (defun byte-compile-file-form-defalias* (name macro-p arglist body rest)
   "Rather than have `byte-compile-output-file-form' analyze NAME's
@@ -3185,7 +3188,7 @@ expression (a call to the function byte-code)."
                         (descend (cdr form*))))))))
       (descend form))))
 
-(defun byte-compile--unannotate (arr form)
+(defun byte-compile--unannotate (form arr)
   "Thinking:
 (defun car/11) would become car/11/0.
 (let (car/11)) would become car/11/0.
@@ -3196,14 +3199,15 @@ The danger is user car/11 becoming car."
          (if (or (eq 'quote (car form))
                  (eq 'backquote (car form)))
              form
-           (cons (byte-compile--unannotate arr (car form))
+           (cons (byte-compile--unannotate (car form) arr)
                  (if (cl-tailp nil (cdr form))
                      ;; avoid stack overflow (not the company)
                      ;; with mapcar if cdr is a list (and not a
                      ;; dotted pair).
-                     (mapcar (apply-partially #'byte-compile--unannotate arr)
+                     (mapcar (lambda (form)
+                               (byte-compile--unannotate form arr))
                              (cdr form))
-                   (byte-compile--unannotate arr (cdr form))))))
+                   (byte-compile--unannotate (cdr form) arr)))))
         ((symbolp form)
          (if (intern-soft (symbol-name form) arr)
              (intern (replace-regexp-in-string
