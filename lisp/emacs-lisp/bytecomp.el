@@ -130,7 +130,8 @@
 
 (autoload 'cl-every "cl-extra")
 (autoload 'cl-tailp "cl-extra")
-(autoload 'cl-map "cl-extra")
+(autoload 'cl-loop "cl-macs")
+(autoload 'cl-some "cl-extra")
 
 ;; The feature of compiling in a specific target Emacs version
 ;; has been turned off because compile time options are a bad idea.
@@ -1094,7 +1095,6 @@ message buffer `default-directory'."
   (byte-compile-file emacs-lisp-compilation--current-file))
 
 (defvar byte-compile-current-form nil)
-(defvar-local byte-compile-annotations nil)
 (defvar byte-compile-dest-file nil)
 (defvar byte-compile-current-file nil)
 (defvar byte-compile-current-group nil)
@@ -2201,9 +2201,7 @@ With argument ARG, insert value in current buffer after the form."
 			       (= (following-char) ?\;))
 		   (forward-line 1))
 		 (not (eobp)))
-          (let* ((result (read-annotated inbuffer))
-                 (form (cl-first result))
-                 (byte-compile-annotations (cl-second result)))
+          (let* ((form (read inbuffer)))
             (byte-compile-maybe-expand
              form
              (lambda (form)
@@ -3112,6 +3110,59 @@ OUTPUT-TYPE advises how form will be used,
         (delq fn byte-compile-noruntime-functions))
   ;; Delegate the rest to the normal macro definition.
   (macroexpand `(declare-function ,fn ,file ,@args)))
+
+(defun byte-compile--circular-p (form)
+  (let (seen)
+    (cl-labels
+        ((descend
+           (form*)
+           (cond ((atom form*)
+                  nil)
+                 ((or (eq 'quote (car form*))
+                      (eq 'backquote (car form*))
+                      (eq '\` (car form*)))
+                  nil)
+                 ((cl-tailp nil (cdr form*))
+                  (if (memq form* seen)
+                      t
+                    (add-to-list 'seen form*)
+                    (if (cl-some #'consp form*)
+                        (cl-some #'identity (mapcar #'descend form*))
+                      (let ((hare form*)
+                            (tortoise form*))
+                        (while (progn
+                                 (setq hare (cdr (cdr hare))
+                                       tortoise (cdr tortoise))
+                                 (and hare (not (eq tortoise hare)))))
+                        (and (> (length form*) 1) (eq tortoise hare))))))
+                 (t
+                  (if (memq form* seen)
+                      t
+                    (add-to-list 'seen form*)
+                    (or (descend (car form*))
+                        (descend (cdr form*))))))))
+      (descend form))))
+
+(defsubst byte-compile--unannotate-cell (form)
+  (cond ((atom (car form)) (cdr form))
+        (t (byte-compile--unannotate form))))
+
+(defun byte-compile--unannotate (form)
+  (unless (byte-compile--circular-p form)
+    (if (atom (car form))
+        (byte-compile--unannotate-cell form)
+      (cl-loop with tail = (unless (cl-tailp nil (last form))
+                             (prog1 (last form)
+                               ;; exclude tail from main loop
+                               (cl-loop for lst on form
+                                        unless (listp (car (cdr lst)))
+                                        do (setcdr lst nil)
+                                        finally return form)))
+               for element in form
+               collect (byte-compile--unannotate-cell element) into result
+               finally return (nconc result
+                                     (when tail
+                                       (byte-compile--unannotate-cell tail)))))))
 
 (defun byte-compile-form (form &optional for-effect)
   "Compiles FORM.

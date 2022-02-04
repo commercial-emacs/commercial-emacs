@@ -191,6 +191,8 @@ static int readbyte_from_string (int, Lisp_Object);
 
 /* Same as READCHAR but set *MULTIBYTE to the multibyteness of the source.  */
 #define READCHAR_REPORT_MULTIBYTE(multibyte) readchar (readcharfun, multibyte)
+#define ANNOTATE(atom) \
+  (annotated ? Fcons (make_fixnum (readchar_charpos), atom) : atom)
 
 /* When READCHARFUN is Qget_file_char, Qget_emacs_mule_file_char,
    Qlambda, or a cons, we use this to keep an unread character because
@@ -645,11 +647,11 @@ struct subst
 };
 
 static Lisp_Object read_internal_start (Lisp_Object, Lisp_Object,
-                                        Lisp_Object);
-static Lisp_Object read0 (Lisp_Object);
-static Lisp_Object read1 (Lisp_Object, int *);
+                                        Lisp_Object, bool);
+static Lisp_Object read0 (Lisp_Object, bool);
+static Lisp_Object read1 (Lisp_Object, int *, bool);
 
-static Lisp_Object read_list (bool, Lisp_Object);
+static Lisp_Object read_list (bool, Lisp_Object, bool);
 static Lisp_Object read_vector (Lisp_Object, bool);
 
 static Lisp_Object substitute_object_recurse (struct subst *, Lisp_Object);
@@ -733,12 +735,12 @@ read_filtered_event (bool no_switch_frame, bool ascii_required,
 	{
 	  Lisp_Object tem, tem1;
 	  tem = Fget (val, Qevent_symbol_element_mask);
-	  if (!NILP (tem))
+	  if (! NILP (tem))
 	    {
 	      tem1 = Fget (Fcar (tem), Qascii_character);
 	      /* Merge this symbol's modifier bits
 		 with the ASCII equivalent of its basic code.  */
-	      if (!NILP (tem1))
+	      if (! NILP (tem1))
 		XSETFASTINT (val, XFIXNUM (tem1) | XFIXNUM (Fcar (Fcdr (tem))));
 	    }
 	}
@@ -1231,7 +1233,7 @@ Return t if the file exists and loads successfully.  */)
   /* If file name is magic, call the handler.  */
   /* This shouldn't be necessary any more now that `openp' handles it right.
     handler = Ffind_file_name_handler (file, Qload);
-    if (!NILP (handler))
+    if (! NILP (handler))
       return call5 (handler, Qload, file, noerror, nomessage, nosuffix); */
 
   /* The presence of this call is the result of a historical accident:
@@ -1285,7 +1287,7 @@ Return t if the file exists and loads successfully.  */)
 	    must_suffix = Qnil;
 	}
 
-      if (!NILP (nosuffix))
+      if (! NILP (nosuffix))
 	suffixes = Qnil;
       else
 	{
@@ -1377,7 +1379,7 @@ Return t if the file exists and loads successfully.  */)
     int load_count = 0;
     Lisp_Object tem = Vloads_in_progress;
     FOR_EACH_TAIL_SAFE (tem)
-      if (!NILP (Fequal (found, XCAR (tem))) && (++load_count > 3))
+      if (! NILP (Fequal (found, XCAR (tem))) && (++load_count > 3))
 	signal_error ("Recursive load", Fcons (found, Vloads_in_progress));
     record_unwind_protect (record_load_unwind, Vloads_in_progress);
     Vloads_in_progress = Fcons (found, Vloads_in_progress);
@@ -1447,7 +1449,7 @@ Return t if the file exists and loads successfully.  */)
                   newer = 1;
 
                   /* If we won't print another message, mention this anyway.  */
-                  if (!NILP (nomessage) && !force_load_messages)
+                  if (! NILP (nomessage) && !force_load_messages)
                     {
                       Lisp_Object msg_file;
                       msg_file = Fsubstring (found, make_fixnum (0), make_fixnum (-1));
@@ -1461,7 +1463,7 @@ Return t if the file exists and loads successfully.  */)
   else if (!is_module && !is_native_elisp)
     {
       /* We are loading a source file (*.el).  */
-      if (!NILP (Vload_source_file_function))
+      if (! NILP (Vload_source_file_function))
 	{
 	  Lisp_Object val;
 
@@ -1590,7 +1592,7 @@ Return t if the file exists and loads successfully.  */)
   unbind_to (count, Qnil);
 
   /* Run any eval-after-load forms for this file.  */
-  if (!NILP (Ffboundp (Qdo_after_load_evaluation)))
+  if (! NILP (Ffboundp (Qdo_after_load_evaluation)))
     call1 (Qdo_after_load_evaluation, hist_file_name) ;
 
   xfree (saved_doc_string);
@@ -1721,7 +1723,7 @@ maybe_swap_for_eln (bool no_native, Lisp_Object *filename, int *fd,
       src_name = concat2 (src_name, build_string (".gz"));
       if (NILP (Ffile_exists_p (src_name)))
 	{
-	  if (!NILP (find_symbol_value (
+	  if (! NILP (find_symbol_value (
 		       Qnative_comp_warning_on_missing_source)))
 	    call2 (intern_c_string ("display-warning"),
 		   Qcomp,
@@ -1897,12 +1899,12 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 	else
 	  string = make_string (fn, fnlen);
 	handler = Ffind_file_name_handler (string, Qfile_exists_p);
-	if ((!NILP (handler) || (!NILP (predicate) && !EQ (predicate, Qt)))
+	if ((! NILP (handler) || (! NILP (predicate) && !EQ (predicate, Qt)))
 	    && !FIXNATP (predicate))
 	  {
 	    bool exists;
 	    if (NILP (predicate) || EQ (predicate, Qt))
-	      exists = !NILP (Ffile_readable_p (string));
+	      exists = ! NILP (Ffile_readable_p (string));
 	    else
 	      {
 		Lisp_Object tmp = call1 (predicate, string);
@@ -2062,7 +2064,7 @@ build_load_history (Lisp_Object filename, bool entire)
       tem = XCAR (tail);
 
       /* Find the feature's previous assoc list...  */
-      if (!NILP (Fequal (filename, Fcar (tem))))
+      if (! NILP (Fequal (filename, Fcar (tem))))
 	{
 	  foundit = 1;
 
@@ -2195,7 +2197,7 @@ readevalloop (Lisp_Object readcharfun,
   specbind (Qstandard_input, readcharfun);
   specbind (Qcurrent_load_list, Qnil);
   record_unwind_protect_int (readevalloop_1, load_convert_to_unibyte);
-  load_convert_to_unibyte = !NILP (unibyte);
+  load_convert_to_unibyte = ! NILP (unibyte);
 
   /* If lexical binding is active (either because it was specified in
      the file's header, or via a buffer-local variable), create an empty
@@ -2208,7 +2210,7 @@ readevalloop (Lisp_Object readcharfun,
 
   /* Ensure sourcename is absolute, except whilst preloading.  */
   if (!will_dump_p ()
-      && !NILP (sourcename) && !NILP (Ffile_name_absolute_p (sourcename)))
+      && ! NILP (sourcename) && ! NILP (Ffile_name_absolute_p (sourcename)))
     sourcename = Fexpand_file_name (sourcename, Qnil);
 
   LOADHIST_ATTACH (sourcename);
@@ -2221,7 +2223,7 @@ readevalloop (Lisp_Object readcharfun,
       if (b != 0 && !BUFFER_LIVE_P (b))
 	error ("Reading from killed buffer");
 
-      if (!NILP (start))
+      if (! NILP (start))
 	{
 	  /* Switch to the buffer we are reading from.  */
 	  record_unwind_protect_excursion ();
@@ -2235,7 +2237,7 @@ readevalloop (Lisp_Object readcharfun,
 
 	  /* Set point and ZV around stuff to be read.  */
 	  Fgoto_char (start);
-	  if (!NILP (end))
+	  if (! NILP (end))
 	    Fnarrow_to_region (make_fixnum (BEGV), end);
 
 	  /* Just for cleanliness, convert END to a marker
@@ -2280,14 +2282,14 @@ readevalloop (Lisp_Object readcharfun,
 	  = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
 			     DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
 			     Qnil, false);
-      if (!NILP (Vpurify_flag) && c == '(')
+      if (! NILP (Vpurify_flag) && c == '(')
 	{
-	  val = read_list (0, readcharfun);
+	  val = read_list (0, readcharfun, false);
 	}
       else
 	{
 	  UNREAD (c);
-	  if (!NILP (readfun))
+	  if (! NILP (readfun))
 	    {
 	      val = call1 (readfun, readcharfun);
 
@@ -2304,7 +2306,7 @@ readevalloop (Lisp_Object readcharfun,
 	  else if (! NILP (Vload_read_function))
 	    val = call1 (Vload_read_function, readcharfun);
 	  else
-	    val = read_internal_start (readcharfun, Qnil, Qnil);
+	    val = read_internal_start (readcharfun, Qnil, Qnil, false);
 	}
       /* Empty hashes can be reused; otherwise, reset on next call.  */
       if (HASH_TABLE_P (read_objects_map)
@@ -2314,14 +2316,14 @@ readevalloop (Lisp_Object readcharfun,
 	  && XHASH_TABLE (read_objects_completed)->count > 0)
 	read_objects_completed = Qnil;
 
-      if (!NILP (start) && continue_reading_p)
+      if (! NILP (start) && continue_reading_p)
 	start = Fpoint_marker ();
 
       /* Restore saved point and BEGV.  */
       unbind_to (count1, Qnil);
 
       /* Now eval what we just read.  */
-      if (!NILP (macroexpand))
+      if (! NILP (macroexpand))
         val = readevalloop_eager_expand_eval (val, macroexpand);
       else
         val = eval_sub (val);
@@ -2396,7 +2398,7 @@ This function preserves the position of point.  */)
   specbind (Qlexical_binding, lisp_file_lexically_bound_p (buf) ? Qt : Qnil);
   BUF_TEMP_SET_PT (XBUFFER (buf), BUF_BEGV (XBUFFER (buf)));
   readevalloop (buf, 0, filename,
-		!NILP (printflag), unibyte, Qnil, Qnil, Qnil);
+		! NILP (printflag), unibyte, Qnil, Qnil, Qnil);
   return unbind_to (count, Qnil);
 }
 
@@ -2430,14 +2432,14 @@ This function does not move point.  */)
 
   /* `readevalloop' calls functions which check the type of start and end.  */
   readevalloop (cbuf, 0, BVAR (XBUFFER (cbuf), filename),
-		!NILP (printflag), Qnil, read_function,
+		! NILP (printflag), Qnil, read_function,
 		start, end);
 
   return unbind_to (count, Qnil);
 }
 
 DEFUN ("read-annotated", Fread_annotated, Sread_annotated, 1, 1, 0,
-       doc: /* Return list of (FORM ANNOTATIONS).  */)
+       doc: /* As `read' but each unquoted s-expr consed with its charpos.  */)
   (Lisp_Object buffer)
 {
   Lisp_Object retval, warning;
@@ -2445,14 +2447,14 @@ DEFUN ("read-annotated", Fread_annotated, Sread_annotated, 1, 1, 0,
 
   CHECK_BUFFER (buffer);
   specbind (Qlread_unescaped_character_literals, Qnil);
-  retval = read_internal_start (buffer, Qnil, Qnil);
+  retval = read_internal_start (buffer, Qnil, Qnil, true);
 
   warning = safe_call (1, intern ("byte-run--unescaped-character-literals-warning"));
   if (! NILP (warning))
     call2 (intern ("byte-compile-warn"), build_string ("%s"), warning);
 
   unbind_to (count, Qnil);
-  return list2 (retval, Qnil);
+  return retval;
 }
 
 DEFUN ("read", Fread, Sread, 0, 1, 0,
@@ -2480,7 +2482,7 @@ STREAM or the value of `standard-input' may be:
     return call1 (intern ("read-minibuffer"),
 		  build_string ("Lisp expression: "));
 
-  return read_internal_start (stream, Qnil, Qnil);
+  return read_internal_start (stream, Qnil, Qnil, false);
 }
 
 DEFUN ("read-from-string", Fread_from_string, Sread_from_string, 1, 3, 0,
@@ -2496,14 +2498,15 @@ the end of STRING.  */)
   Lisp_Object ret;
   CHECK_STRING (string);
   /* `read_internal_start' sets `read_from_string_index'.  */
-  ret = read_internal_start (string, start, end);
+  ret = read_internal_start (string, start, end, false);
   return Fcons (ret, make_fixnum (read_from_string_index));
 }
 
 /* Function to set up the global context we need in toplevel read
    calls.  START and END only used when STREAM is a string.  */
 static Lisp_Object
-read_internal_start (Lisp_Object stream, Lisp_Object start, Lisp_Object end)
+read_internal_start (Lisp_Object stream, Lisp_Object start,
+		     Lisp_Object end, bool annotated)
 {
   Lisp_Object retval;
 
@@ -2540,7 +2543,7 @@ read_internal_start (Lisp_Object stream, Lisp_Object start, Lisp_Object end)
       read_from_string_limit = endval;
     }
 
-  retval = read0 (stream);
+  retval = read0 (stream, annotated);
   if (HASH_TABLE_P (read_objects_map)
       && XHASH_TABLE (read_objects_map)->count > 0)
     read_objects_map = Qnil;
@@ -2550,16 +2553,15 @@ read_internal_start (Lisp_Object stream, Lisp_Object start, Lisp_Object end)
   return retval;
 }
 
-
 /* "read0" is merely an error-checked version of "read1". */
 
 static Lisp_Object
-read0 (Lisp_Object readcharfun)
+read0 (Lisp_Object readcharfun, bool annotated)
 {
   register Lisp_Object val;
   int c;
 
-  val = read1 (readcharfun, &c);
+  val = read1 (readcharfun, &c, annotated);
   if (!c)
     return val;
 
@@ -2985,7 +2987,7 @@ read_integer (Lisp_Object readcharfun, int radix,
 */
 
 static Lisp_Object
-read1 (Lisp_Object readcharfun, int *pch)
+read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 {
   int c;
   bool q_interned = true;
@@ -3005,16 +3007,16 @@ read1 (Lisp_Object readcharfun, int *pch)
   switch (c)
     {
     case '(':
-      return read_list (0, readcharfun);
+      return read_list (0, readcharfun, annotated);
 
     case '[':
-      return read_vector (readcharfun, 0);
+      return ANNOTATE (read_vector (readcharfun, 0));
 
     case ')':
     case ']':
       {
 	*pch = c;
-	return Qnil;
+	return ANNOTATE (Qnil);
       }
 
     case '#':
@@ -3028,7 +3030,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 		 other types), e.g.
 		 #s(hash-table size 2 test equal data (k1 v1 k2 v2))  */
 
-	      Lisp_Object tmp = read_list (0, readcharfun);
+	      Lisp_Object tmp = read_list (0, readcharfun, annotated);
 	      Lisp_Object head = CAR_SAFE (tmp);
 	      Lisp_Object data = Qnil;
 	      Lisp_Object val = Qnil;
@@ -3050,7 +3052,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 		      tmp = Fcdr (tmp);
 		      ASET (record, i, Fcar (tmp));
 		    }
-		  return record;
+		  return ANNOTATE (record);
 		}
 
 	      tmp = CDR_SAFE (tmp);
@@ -3058,32 +3060,32 @@ read1 (Lisp_Object readcharfun, int *pch)
 	      /* This is repetitive but fast and simple.  */
 	      params[param_count] = QCsize;
 	      params[param_count + 1] = Fplist_get (tmp, Qsize);
-	      if (!NILP (params[param_count + 1]))
+	      if (! NILP (params[param_count + 1]))
 		param_count += 2;
 
 	      params[param_count] = QCtest;
 	      params[param_count + 1] = Fplist_get (tmp, Qtest);
-	      if (!NILP (params[param_count + 1]))
+	      if (! NILP (params[param_count + 1]))
 		param_count += 2;
 
 	      params[param_count] = QCweakness;
 	      params[param_count + 1] = Fplist_get (tmp, Qweakness);
-	      if (!NILP (params[param_count + 1]))
+	      if (! NILP (params[param_count + 1]))
 		param_count += 2;
 
 	      params[param_count] = QCrehash_size;
 	      params[param_count + 1] = Fplist_get (tmp, Qrehash_size);
-	      if (!NILP (params[param_count + 1]))
+	      if (! NILP (params[param_count + 1]))
 		param_count += 2;
 
 	      params[param_count] = QCrehash_threshold;
 	      params[param_count + 1] = Fplist_get (tmp, Qrehash_threshold);
-	      if (!NILP (params[param_count + 1]))
+	      if (! NILP (params[param_count + 1]))
 		param_count += 2;
 
               params[param_count] = QCpurecopy;
               params[param_count + 1] = Fplist_get (tmp, Qpurecopy);
-              if (!NILP (params[param_count + 1]))
+              if (! NILP (params[param_count + 1]))
                 param_count += 2;
 
 	      /* This is the hash table data.  */
@@ -3103,10 +3105,10 @@ read1 (Lisp_Object readcharfun, int *pch)
 		  last = XCDR (data);
 	      	  Fputhash (key, val, ht);
 		}
-	      if (!NILP (last))
+	      if (! NILP (last))
 		error ("Hash table data is not a list of even length");
 
-	      return ht;
+	      return ANNOTATE (ht);
 	    }
 	  UNREAD (c);
 	  invalid_syntax ("#", readcharfun);
@@ -3121,7 +3123,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	      if (ASIZE (tmp) < CHAR_TABLE_STANDARD_SLOTS)
 		error ("Invalid size char-table");
 	      XSETPVECTYPE (XVECTOR (tmp), PVEC_CHAR_TABLE);
-	      return tmp;
+	      return ANNOTATE (tmp);
 	    }
 	  else if (c == '^')
 	    {
@@ -3130,7 +3132,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 		{
 		  /* Sub char-table can't be read as a regular
 		     vector because of a two C integer fields.  */
-		  Lisp_Object tbl, tmp = read_list (1, readcharfun);
+		  Lisp_Object tbl, tmp = read_list (1, readcharfun, annotated);
 		  ptrdiff_t size = list_length (tmp);
 		  int i, depth, min_char;
 		  struct Lisp_Cons *cell;
@@ -3159,7 +3161,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 		      cell = XCONS (tmp), tmp = XCDR (tmp);
 		      free_cons (cell);
 		    }
-		  return tbl;
+		  return ANNOTATE (tbl);
 		}
 	      invalid_syntax ("#^^", readcharfun);
 	    }
@@ -3168,7 +3170,7 @@ read1 (Lisp_Object readcharfun, int *pch)
       if (c == '&')
 	{
 	  Lisp_Object length;
-	  length = read1 (readcharfun, pch);
+	  length = read1 (readcharfun, pch, false);
 	  c = READCHAR;
 	  if (c == '"')
 	    {
@@ -3177,7 +3179,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	      unsigned char *data;
 
 	      UNREAD (c);
-	      tmp = read1 (readcharfun, pch);
+	      tmp = read1 (readcharfun, pch, false);
 	      if (STRING_MULTIBYTE (tmp)
 		  || (size_in_chars != SCHARS (tmp)
 		      /* We used to print 1 char too many
@@ -3195,7 +3197,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	      if (XFIXNUM (length) != size_in_chars * BOOL_VECTOR_BITS_PER_CHAR)
 		data[size_in_chars - 1]
 		  &= (1 << (XFIXNUM (length) % BOOL_VECTOR_BITS_PER_CHAR)) - 1;
-	      return val;
+	      return ANNOTATE (val);
 	    }
 	  invalid_syntax ("#&...", readcharfun);
 	}
@@ -3234,7 +3236,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	    }
 
 	  XSETPVECTYPE (vec, PVEC_COMPILED);
-	  return tmp;
+	  return ANNOTATE (tmp);
 	}
       if (c == '(')
 	{
@@ -3242,7 +3244,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	  int ch;
 
 	  /* Read the string itself.  */
-	  tmp = read1 (readcharfun, &ch);
+	  tmp = read1 (readcharfun, &ch, false);
 	  if (ch != 0 || !STRINGP (tmp))
 	    invalid_syntax ("#", readcharfun);
 	  /* Read the intervals and their properties.  */
@@ -3250,20 +3252,20 @@ read1 (Lisp_Object readcharfun, int *pch)
 	    {
 	      Lisp_Object beg, end, plist;
 
-	      beg = read1 (readcharfun, &ch);
+	      beg = read1 (readcharfun, &ch, false);
 	      end = plist = Qnil;
 	      if (ch == ')')
 		break;
 	      if (ch == 0)
-		end = read1 (readcharfun, &ch);
+		end = read1 (readcharfun, &ch, false);
 	      if (ch == 0)
-		plist = read1 (readcharfun, &ch);
+		plist = read1 (readcharfun, &ch, false);
 	      if (ch)
 		invalid_syntax ("Invalid string property list", readcharfun);
 	      Fset_text_properties (beg, end, plist, tmp);
 	    }
 
-	  return tmp;
+	  return ANNOTATE (tmp);
 	}
 
       /* #@NUMBER is used to skip NUMBER following bytes.
@@ -3286,7 +3288,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	      if (digits == 2 && nskip == 0)
 		{ /* We've just seen #@00, which means "skip to end".  */
 		  skip_dyn_eof (readcharfun);
-		  return Qnil;
+		  return ANNOTATE (Qnil);
 		}
 	    }
 	  if (nskip > 0)
@@ -3366,9 +3368,9 @@ read1 (Lisp_Object readcharfun, int *pch)
 	  goto retry;
 	}
       if (c == '$')
-	return Vload_file_name;
+	return ANNOTATE (Vload_file_name);
       if (c == '\'')
-	return list2 (Qfunction, read0 (readcharfun));
+	return ANNOTATE (list2 (Qfunction, read0 (readcharfun, false)));
       /* #:foo is the uninterned symbol named foo.  */
       if (c == ':')
 	{
@@ -3383,7 +3385,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	      /* No symbol character follows, this is the empty
 		 symbol.  */
 	      UNREAD (c);
-	      return Fmake_symbol (empty_unibyte_string);
+	      return ANNOTATE (Fmake_symbol (empty_unibyte_string));
 	    }
 	  goto read_symbol;
 	}
@@ -3395,7 +3397,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	}
       /* ## is the empty symbol.  */
       if (c == '#')
-	return Fintern (empty_unibyte_string, Qnil);
+	return ANNOTATE (Fintern (empty_unibyte_string, Qnil));
 
       if (c >= '0' && c <= '9')
 	{
@@ -3415,7 +3417,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 		{
 		  if (! (2 <= n && n <= 36))
 		    invalid_radix_integer (n, stackbuf, readcharfun);
-		  return read_integer (readcharfun, n, stackbuf);
+		  return ANNOTATE (read_integer (readcharfun, n, stackbuf));
 		}
 
 	      if (n <= MOST_POSITIVE_FIXNUM && ! NILP (Vread_circle))
@@ -3451,7 +3453,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 			hash_put (h, number, placeholder, hash);
 
 		      /* Read the object itself.  */
-		      Lisp_Object tem = read0 (readcharfun);
+		      Lisp_Object tem = read0 (readcharfun, false);
 
 		      /* If it can be recursive, remember it for
 			 future substitutions.  */
@@ -3471,7 +3473,7 @@ read1 (Lisp_Object readcharfun, int *pch)
                         {
                           Fsetcar (placeholder, XCAR (tem));
                           Fsetcdr (placeholder, XCDR (tem));
-                          return placeholder;
+                          return ANNOTATE (placeholder);
                         }
                       else
                         {
@@ -3483,7 +3485,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 			  eassert (i >= 0);
 			  set_hash_value_slot (h, i, tem);
 
-		          return tem;
+		          return ANNOTATE (tem);
                         }
 		    }
 
@@ -3494,18 +3496,18 @@ read1 (Lisp_Object readcharfun, int *pch)
 			= XHASH_TABLE (read_objects_map);
 		      ptrdiff_t i = hash_lookup (h, make_fixnum (n), NULL);
 		      if (i >= 0)
-			return HASH_VALUE (h, i);
+			return ANNOTATE (HASH_VALUE (h, i));
 		    }
 		}
 	    }
 	  /* Fall through to error message.  */
 	}
       else if (c == 'x' || c == 'X')
-	return read_integer (readcharfun, 16, stackbuf);
+	return ANNOTATE (read_integer (readcharfun, 16, stackbuf));
       else if (c == 'o' || c == 'O')
-	return read_integer (readcharfun, 8, stackbuf);
+	return ANNOTATE (read_integer (readcharfun, 8, stackbuf));
       else if (c == 'b' || c == 'B')
-	return read_integer (readcharfun, 2, stackbuf);
+	return ANNOTATE (read_integer (readcharfun, 2, stackbuf));
 
       char acm_buf[15];		/* FIXME!!! 2021-11-27. */
       sprintf (acm_buf, "#%c", c);
@@ -3518,10 +3520,10 @@ read1 (Lisp_Object readcharfun, int *pch)
       goto retry;
 
     case '\'':
-      return list2 (Qquote, read0 (readcharfun));
+      return ANNOTATE (list2 (Qquote, read0 (readcharfun, false)));
 
     case '`':
-      return list2 (Qbackquote, read0 (readcharfun));
+      return ANNOTATE (list2 (Qbackquote, read0 (readcharfun, false)));
 
     case ',':
       {
@@ -3537,8 +3539,8 @@ read1 (Lisp_Object readcharfun, int *pch)
 	    comma_type = Qcomma;
 	  }
 
-	value = read0 (readcharfun);
-	return list2 (comma_type, value);
+	value = read0 (readcharfun, false);
+	return ANNOTATE (list2 (comma_type, value));
       }
     case '?':
       {
@@ -3555,7 +3557,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	   Other literal whitespace like NL, CR, and FF are not accepted,
 	   as there are well-established escape sequences for these.  */
 	if (c == ' ' || c == '\t')
-	  return make_fixnum (c);
+	  return ANNOTATE (make_fixnum (c));
 
 	if (c == '(' || c == ')' || c == '[' || c == ']'
             || c == '"' || c == ';')
@@ -3581,7 +3583,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 		  && strchr ("\"';()[]#?`,.", next_char) != NULL));
 	UNREAD (next_char);
 	if (ok)
-	  return make_fixnum (c);
+	  return ANNOTATE (make_fixnum (c));
 
 	invalid_syntax ("?", readcharfun);
       }
@@ -3689,8 +3691,8 @@ read1 (Lisp_Object readcharfun, int *pch)
 	/* If purifying, and string starts with \ newline,
 	   return zero instead.  This is for doc strings
 	   that we are really going to find in etc/DOC.nn.nn.  */
-	if (!NILP (Vpurify_flag) && NILP (Vdoc_file_name) && cancel)
-	  return unbind_to (count, make_fixnum (0));
+	if (! NILP (Vpurify_flag) && NILP (Vdoc_file_name) && cancel)
+	  return ANNOTATE (unbind_to (count, make_fixnum (0)));
 
 	if (! force_multibyte && force_singlebyte)
 	  {
@@ -3705,7 +3707,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	  = make_specified_string (read_buffer, nchars, p - read_buffer,
 				   (force_multibyte
 				    || (p - read_buffer != nchars)));
-	return unbind_to (count, result);
+	return ANNOTATE (unbind_to (count, result));
       }
 
     case '.':
@@ -3718,7 +3720,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 		&& strchr ("\"';([#?`,", next_char) != NULL))
 	  {
 	    *pch = c;
-	    return Qnil;
+	    return ANNOTATE (Qnil);
 	  }
       }
       /* The atom-reading loop below will now loop at least once,
@@ -3841,7 +3843,7 @@ read1 (Lisp_Object readcharfun, int *pch)
 	      }
 	  }
 
-	return unbind_to (count, result);
+	return ANNOTATE (unbind_to (count, result));
       }
     }
 }
@@ -3879,7 +3881,7 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
     return subtree;
 
   /* If we've been to this node before, don't explore it again.  */
-  if (!NILP (Fmemq (subtree, subst->seen)))
+  if (! NILP (Fmemq (subtree, subst->seen)))
     return subtree;
 
   /* If this node can be the entry point to a cycle, remember that
@@ -4094,7 +4096,7 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
 static Lisp_Object
 read_vector (Lisp_Object readcharfun, bool bytecodeflag)
 {
-  Lisp_Object tem = read_list (1, readcharfun);
+  Lisp_Object tem = read_list (1, readcharfun, false);
   ptrdiff_t size = list_length (tem);
   Lisp_Object vector = make_nil_vector (size);
 
@@ -4169,7 +4171,7 @@ read_vector (Lisp_Object readcharfun, bool bytecodeflag)
 /* FLAG means check for ']' to terminate rather than ')' and '.'.  */
 
 static Lisp_Object
-read_list (bool flag, Lisp_Object readcharfun)
+read_list (bool flag, Lisp_Object readcharfun, bool annotated)
 {
   Lisp_Object val = Qnil, tail = Qnil;
   Lisp_Object elt, tem;
@@ -4181,15 +4183,15 @@ read_list (bool flag, Lisp_Object readcharfun)
   while (1)
     {
       int ch;
-      elt = read1 (readcharfun, &ch);
+      elt = read1 (readcharfun, &ch, annotated);
 
       /* While building, if the list starts with #$, treat it specially.  */
       if (EQ (elt, Vload_file_name)
 	  && ! NILP (elt))
 	{
-	  if (!NILP (Vpurify_flag))
+	  if (! NILP (Vpurify_flag))
 	    doc_reference = 0;
-	  else if (load_force_doc_strings)
+	  else if (load_force_doc_strings && ! annotated)
 	    doc_reference = 2;
 	}
       if (ch)
@@ -4204,11 +4206,11 @@ read_list (bool flag, Lisp_Object readcharfun)
 	    return val;
 	  if (ch == '.')
 	    {
-	      if (!NILP (tail))
-		XSETCDR (tail, read0 (readcharfun));
+	      if (! NILP (tail))
+		XSETCDR (tail, read0 (readcharfun, annotated));
 	      else
-		val = read0 (readcharfun);
-	      read1 (readcharfun, &ch);
+		val = read0 (readcharfun, annotated);
+	      read1 (readcharfun, &ch, annotated);
 
 	      if (ch == ')')
 		{
@@ -4281,13 +4283,14 @@ read_list (bool flag, Lisp_Object readcharfun)
 	  invalid_syntax ("] in a list", readcharfun);
 	}
       tem = list1 (elt);
-      if (!NILP (tail))
+      if (! NILP (tail))
 	XSETCDR (tail, tem);
       else
 	val = tem;
       tail = tem;
     }
 }
+#undef ANNOTATE
 
 static Lisp_Object initial_obarray;
 
@@ -4825,7 +4828,7 @@ load_path_check (Lisp_Object lpath)
   /* The only elements that might not exist are those from
      PATH_LOADSEARCH, EMACSLOADPATH.  Anything else is only added if
      it exists.  */
-  for (path_tail = lpath; !NILP (path_tail); path_tail = XCDR (path_tail))
+  for (path_tail = lpath; ! NILP (path_tail); path_tail = XCDR (path_tail))
     {
       Lisp_Object dirfile;
       dirfile = Fcar (path_tail);
@@ -4883,7 +4886,7 @@ load_path_default (void)
 
   lpath = decode_env_path (0, PATH_LOADSEARCH, 0);
 
-  if (!NILP (Vinstallation_directory))
+  if (! NILP (Vinstallation_directory))
     {
       Lisp_Object tem, tem1;
 
@@ -4893,7 +4896,7 @@ load_path_default (void)
       tem = Fexpand_file_name (build_string ("lisp"),
                                Vinstallation_directory);
       tem1 = Ffile_accessible_directory_p (tem);
-      if (!NILP (tem1))
+      if (! NILP (tem1))
         {
           if (NILP (Fmember (tem, lpath)))
             {
@@ -4919,7 +4922,7 @@ load_path_default (void)
           tem = Fexpand_file_name (build_string ("site-lisp"),
                                    Vinstallation_directory);
           tem1 = Ffile_accessible_directory_p (tem);
-          if (!NILP (tem1))
+          if (! NILP (tem1))
             {
               if (NILP (Fmember (tem, lpath)))
                 lpath = Fcons (tem, lpath);
@@ -4945,7 +4948,7 @@ load_path_default (void)
           tem = Fexpand_file_name (build_string ("src/Makefile.in"),
                                    Vinstallation_directory);
           tem2 = Ffile_exists_p (tem);
-          if (!NILP (tem1) && NILP (tem2))
+          if (! NILP (tem1) && NILP (tem2))
             {
               tem = Fexpand_file_name (build_string ("lisp"),
                                        Vsource_directory);
@@ -4958,7 +4961,7 @@ load_path_default (void)
                   tem = Fexpand_file_name (build_string ("site-lisp"),
                                            Vsource_directory);
                   tem1 = Ffile_accessible_directory_p (tem);
-                  if (!NILP (tem1))
+                  if (! NILP (tem1))
                     {
                       if (NILP (Fmember (tem, lpath)))
                         lpath = Fcons (tem, lpath);
