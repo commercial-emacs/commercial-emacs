@@ -1094,6 +1094,8 @@ message buffer `default-directory'."
   (byte-compile-file emacs-lisp-compilation--current-file))
 
 (defvar byte-compile-current-form nil)
+(defvar-local byte-compile-annotated-symbols nil)
+(defvar-local byte-compile-annotated-form nil)
 (defvar byte-compile-dest-file nil)
 (defvar byte-compile-current-file nil)
 (defvar byte-compile-current-group nil)
@@ -2200,14 +2202,16 @@ With argument ARG, insert value in current buffer after the form."
 			       (= (following-char) ?\;))
 		   (forward-line 1))
 		 (not (eobp)))
-          (let* ((arr (make-vector (1- (lsh 1 8)) 0))
-                 (annotated-form (read-annotated inbuffer arr))
-                 (form (byte-compile--unannotate annotated-form arr)))
+          (let* ((byte-compile-annotated-symbols
+                  (make-vector (1- (lsh 1 8)) 0))
+                 (byte-compile-annotated-form
+                  (read-annotated inbuffer byte-compile-annotated-symbols)))
             (byte-compile-maybe-expand
-             form
+             (byte-compile--unannotate byte-compile-annotated-form
+                                       byte-compile-annotated-symbols)
              (lambda (form)
                (let (byte-compile-current-form)
-                 (byte-compile-file-form (byte-compile-preprocess form t)))))))
+                 (byte-compile-file-form (byte-compile-preprocess form)))))))
 	(byte-compile-flush-pending)
 	(byte-compile-warn-about-unresolved-functions)))
      byte-compile--outbuffer)))
@@ -2397,38 +2401,27 @@ in the input buffer (now current), not in the output buffer."
 	    byte-compile-output nil
             byte-compile-jump-tables nil))))
 
-(defun byte-compile-preprocess (form &optional _for-effect)
-  (setq form (macroexpand-all form byte-compile-macro-environment))
-  ;; FIXME: We should run byte-optimize-form here, but it currently does not
-  ;; recurse through all the code, so we'd have to fix this first.
-  ;; Maybe a good fix would be to merge byte-optimize-form into
-  ;; macroexpand-all.
-  ;; (if (memq byte-optimize '(t source))
-  ;;     (setq form (byte-optimize-form form for-effect)))
-  (cond
-   (lexical-binding (cconv-closure-convert form))
-   (t form)))
+(defun byte-compile-preprocess (form)
+  (let ((form* (macroexpand-all form byte-compile-macro-environment)))
+    (if lexical-binding
+        (cconv-closure-convert form*)
+      form*)))
 
 ;; byte-hunk-handlers can call this.
 (defun byte-compile-file-form (form)
-  (let (handler)
-    (cond ((and (consp form)
-                (symbolp (car form))
-		(setq handler (get (car form) 'byte-hunk-handler)))
-	   (when (setq form (funcall handler form))
-	     (byte-compile-flush-pending)
-	     (byte-compile-output-file-form form)))
-	  (t
-	   (byte-compile-keep-pending form)))))
-
-;; Functions and variables with doc strings must be output separately,
-;; so make-docfile can recognize them.  Most other things can be output
-;; as byte-code.
+  (if-let ((handler (and (consp form)
+                         (symbolp (car form))
+		         (get (car form) 'byte-hunk-handler))))
+      (let ((form* (funcall handler form)))
+	(byte-compile-flush-pending)
+	(byte-compile-output-file-form form*))
+    (byte-compile-keep-pending form)))
 
 (put 'autoload 'byte-hunk-handler 'byte-compile-file-form-autoload)
 (defun byte-compile-file-form-autoload (form)
   (and (let ((form form))
-	 (while (if (setq form (cdr form)) (macroexp-const-p (car form))))
+	 (while (when (setq form (cdr form))
+                  (macroexp-const-p (car form))))
 	 (null form))                        ;Constants only
        (memq (eval (nth 5 form)) '(t macro)) ;Macro
        (eval form))                          ;Define the autoload.
@@ -3184,8 +3177,8 @@ The danger is user car/11 becoming car."
 
 (defun byte-compile-form (form &optional for-effect)
   "Compiles FORM.
-FOR-EFFECT is an incomprehensible Blandyism from 1992 which
-empties the stack by leaving a byte-discard."
+FOR-EFFECT means FORM is side-effect-only whose meaningless return
+value should be byte-discard."
   (let ((byte-compile--for-effect for-effect))
     (cond
      ((not (consp form))
@@ -3233,14 +3226,14 @@ empties the stack by leaving a byte-discard."
 				   (t "."))))
         (when (eq (car-safe (symbol-function (car form))) 'macro)
           (byte-compile-report-error
-           (format "Macro `%s' defined after use in %S (missing require?)"
+           (format "macro `%s' defined after use in %S (missing require?)"
                    (car form) form)))
         (if handler
             (funcall handler form)
           (byte-compile-normal-call form))))
      ((and (byte-code-function-p (car form))
            (memq byte-optimize '(t lap)))
-      (byte-compile-inline form))
+      (byte-compile-unfold-byte-code-function form))
      ((and (eq (car-safe (car form)) 'lambda)
            ;; FORM must be different after unfold, else malformed
            (not (eq form (setq form (macroexp--unfold-lambda form)))))
@@ -3265,7 +3258,7 @@ empties the stack by leaving a byte-discard."
     (byte-compile-warn
      "`mapcar' called for effect; use `mapc' or `dolist' instead"))
   (byte-compile-push-constant (car form))
-  (mapc #'byte-compile-form (cdr form))	; wasteful, but faster.
+  (mapc #'byte-compile-form (cdr form))
   (byte-compile-out 'byte-call (length (cdr form))))
 
 
@@ -3334,7 +3327,7 @@ empties the stack by leaving a byte-discard."
         (byte-compile-out (car op) (cdr op)))))
     (byte-compile-out-tag endtag)))
 
-(defun byte-compile-inline (form)
+(defun byte-compile-unfold-byte-code-function (form)
   "Inline call to byte-code-functions."
   (let* ((byte-compile-bound-variables byte-compile-bound-variables)
          (fun (car form))

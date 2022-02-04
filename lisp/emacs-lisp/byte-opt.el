@@ -161,15 +161,15 @@ Earlier variables shadow later ones with the same name.")
        (byte-compile--check-arity-bytecode form fn)
        `(,fn ,@(cdr form)))
       ((or `(lambda . ,_) `(closure . ,_))
-       ;; While byte-compile-inline can inline dynbind byte-code into
-       ;; letbind byte-code (or any other combination for that matter), we
-       ;; can only inline dynbind source into dynbind source or letbind
-       ;; source into letbind source.
-       ;; When the function comes from another file, we byte-compile
-       ;; the inlined function first, and then inline its byte-code.
-       ;; This also has the advantage that the final code does not
-       ;; depend on the order of compilation of ELisp files, making
-       ;; the build more reproducible.
+       ;; While byte-compile-unfold-byte-code-function can inline
+       ;; dynbind byte-code into letbind byte-code (or any other
+       ;; combination for that matter), we can only inline dynbind
+       ;; source into dynbind source or letbind source into letbind
+       ;; source.  When the function comes from another file, we
+       ;; byte-compile the inlined function first, and then inline its
+       ;; byte-code.  This also has the advantage that the final code
+       ;; does not depend on the order of compilation of ELisp files,
+       ;; making the build more reproducible.
        (if (eq fn localfn)
            ;; From the same file => same mode.
            (macroexp--unfold-lambda `(,fn ,@(cdr form)))
