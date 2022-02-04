@@ -1094,8 +1094,7 @@ message buffer `default-directory'."
   (byte-compile-file emacs-lisp-compilation--current-file))
 
 (defvar byte-compile-current-form nil)
-(defvar-local byte-compile-annotated-symbols nil)
-(defvar-local byte-compile-annotated-form nil)
+(defvar-local byte-compile-annotations nil)
 (defvar byte-compile-dest-file nil)
 (defvar byte-compile-current-file nil)
 (defvar byte-compile-current-group nil)
@@ -2202,13 +2201,11 @@ With argument ARG, insert value in current buffer after the form."
 			       (= (following-char) ?\;))
 		   (forward-line 1))
 		 (not (eobp)))
-          (let* ((byte-compile-annotated-symbols
-                  (make-vector (1- (lsh 1 8)) 0))
-                 (byte-compile-annotated-form
-                  (read-annotated inbuffer byte-compile-annotated-symbols)))
+          (let* ((result (read-annotated inbuffer))
+                 (form (cl-first result))
+                 (byte-compile-annotations (cl-second result)))
             (byte-compile-maybe-expand
-             (byte-compile--unannotate byte-compile-annotated-form
-                                       byte-compile-annotated-symbols)
+             form
              (lambda (form)
                (let (byte-compile-current-form)
                  (byte-compile-file-form (byte-compile-preprocess form)))))))
@@ -3115,65 +3112,6 @@ OUTPUT-TYPE advises how form will be used,
         (delq fn byte-compile-noruntime-functions))
   ;; Delegate the rest to the normal macro definition.
   (macroexpand `(declare-function ,fn ,file ,@args)))
-
-(defun byte-compile--circular-p (form)
-  (let (seen)
-    (cl-labels
-        ((descend
-           (form*)
-           (cond ((atom form*)
-                  nil)
-                 ((or (eq 'quote (car form*))
-                      (eq 'backquote (car form*)))
-                  nil)
-                 ((cl-tailp nil (cdr form*))
-                  (if (memq form* seen)
-                      t
-                    (add-to-list 'seen form*)
-                    (if (cl-some #'consp form*)
-                        (cl-some #'identity (mapcar #'descend form*))
-                      (let ((hare form*)
-                            (tortoise form*))
-                        (while (progn
-                                 (setq hare (cdr (cdr hare))
-                                       tortoise (cdr tortoise))
-                                 (and hare (not (eq tortoise hare)))))
-                        (and (> (length form*) 1) (eq tortoise hare))))))
-                 (t
-                  (if (memq form* seen)
-                      t
-                    (add-to-list 'seen form*)
-                    (or (descend (car form*))
-                        (descend (cdr form*))))))))
-      (descend form))))
-
-(defun byte-compile--unannotate (form arr)
-  "Thinking:
-(defun car/11) would become car/11/0.
-(let (car/11)) would become car/11/0.
-'car/11 is quoted so unannotate leaves alone
-The danger is user car/11 becoming car."
-  (cond ((byte-compile--circular-p form) form)
-        ((consp form)
-         (if (or (eq 'quote (car form))
-                 (eq 'backquote (car form)))
-             form
-           (cons (byte-compile--unannotate (car form) arr)
-                 (if (cl-tailp nil (cdr form))
-                     ;; avoid stack overflow (not the company)
-                     ;; with mapcar if cdr is a list (and not a
-                     ;; dotted pair).
-                     (mapcar (lambda (form)
-                               (byte-compile--unannotate form arr))
-                             (cdr form))
-                   (byte-compile--unannotate (cdr form) arr)))))
-        ((symbolp form)
-         (if (intern-soft (symbol-name form) arr)
-             (intern (replace-regexp-in-string
-                      "/[0-9]+$" "" (symbol-name form)))
-           form))
-        (t
-         form)))
 
 (defun byte-compile-form (form &optional for-effect)
   "Compiles FORM.
