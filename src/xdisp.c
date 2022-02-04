@@ -17386,6 +17386,34 @@ set_horizontal_scroll_bar (struct window *w)
       (w, portion, whole, start);
 }
 
+/* Subroutine of redisplay_window, to determine whether a window-start
+   point STARTP of WINDOW should be rejected.  */
+static bool
+window_start_acceptable_p (Lisp_Object window, ptrdiff_t startp)
+{
+  if (!make_window_start_visible)
+    return true;
+
+  struct window *w = XWINDOW (window);
+  struct frame *f = XFRAME (w->frame);
+  Lisp_Object startpos = make_fixnum (startp);
+  Lisp_Object invprop, disp_spec;
+  struct text_pos ignored;
+
+  /* Is STARTP in invisible text?  */
+  if (startp > BEGV
+      && ((invprop = Fget_char_property (startpos, Qinvisible, window)),
+	  TEXT_PROP_MEANS_INVISIBLE (invprop) != 0))
+    return false;
+
+  /* Is STARTP covered by a replacing 'display' property?  */
+  if (!NILP (disp_spec = Fget_char_property (startpos, Qdisplay, window))
+      && handle_display_spec (NULL, disp_spec, Qnil, Qnil, &ignored, startp,
+			      FRAME_WINDOW_P (f)) > 0)
+    return false;
+
+  return true;
+}
 
 /* Redisplay leaf window WINDOW.  JUST_THIS_ONE_P means only
    selected_window is redisplayed.
@@ -17643,9 +17671,8 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
  force_start:
 
   /* Handle case where place to start displaying has been specified,
-     unless the specified location is outside the accessible range, or
-     the buffer wants the window-start point to be always visible.  */
-  if (w->force_start && !make_window_start_visible)
+     unless the specified location is outside the accessible range.  */
+  if (w->force_start)
     {
       /* We set this later on if we have to adjust point.  */
       int new_y = -1;
@@ -17677,6 +17704,11 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	SET_TEXT_POS (startp, BEGV, BEGV_BYTE);
       else if (CHARPOS (startp) > ZV)
 	SET_TEXT_POS (startp, ZV, ZV_BYTE);
+
+      /* Reject the specified start location if it is invisible, and
+	 the buffer wants it always visible.  */
+      if (!window_start_acceptable_p (window, CHARPOS (startp)))
+	goto ignore_start;
 
       /* Redisplay, then check if cursor has been set during the
 	 redisplay.  Give up if new fonts were loaded.  */
@@ -17824,8 +17856,8 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       goto done;
     }
 
-  Lisp_Object iprop, dspec;
-  struct text_pos ignored;
+ ignore_start:
+
   /* Handle case where text has not changed, only point, and it has
      not moved off the frame, and we are not retrying after hscroll.
      (current_matrix_up_to_date_p is true when retrying.)  */
