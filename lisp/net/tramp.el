@@ -2302,8 +2302,6 @@ If VAR is nil, then we bind `v' to the structure and `method', `user',
        (ignore ,@(mapcar #'car bindings))
        ,@body)))
 
-(font-lock-add-keywords 'emacs-lisp-mode '("\\<with-parsed-tramp-file-name\\>"))
-
 (defun tramp-progress-reporter-update (reporter &optional value suffix)
   "Report progress of an operation for Tramp."
   (let* ((parameters (cdr reporter))
@@ -2340,9 +2338,6 @@ without a visible progress reporter."
          (if tm (cancel-timer tm))
          (tramp-message ,vec ,level "%s...%s" ,message cookie)))))
 
-(font-lock-add-keywords
- 'emacs-lisp-mode '("\\<with-tramp-progress-reporter\\>"))
-
 (defmacro with-tramp-file-property (vec file property &rest body)
   "Check in Tramp cache for PROPERTY, otherwise execute BODY and set cache.
 FILE must be a local file name on a connection identified via VEC."
@@ -2359,8 +2354,6 @@ FILE must be a local file name on a connection identified via VEC."
 	 value)
      ,@body))
 
-(font-lock-add-keywords 'emacs-lisp-mode '("\\<with-tramp-file-property\\>"))
-
 (defmacro with-tramp-connection-property (key property &rest body)
   "Check in Tramp for property PROPERTY, otherwise execute BODY and set."
   (declare (indent 2) (debug t))
@@ -2373,9 +2366,6 @@ FILE must be a local file name on a connection identified via VEC."
        (setq value (progn ,@body))
        (tramp-set-connection-property ,key ,property value))
      value))
-
-(font-lock-add-keywords
- 'emacs-lisp-mode '("\\<with-tramp-connection-property\\>"))
 
 (defun tramp-drop-volume-letter (name)
   "Cut off unnecessary drive letter from file NAME.
@@ -2742,6 +2732,8 @@ Falls back to normal file name handler if no Tramp file name handler exists."
       (load "tramp" 'noerror 'nomessage)))
   (apply operation args)))
 
+(put #'tramp-autoload-file-name-handler 'tramp-autoload t)
+
 ;; `tramp-autoload-file-name-handler' must be registered before
 ;; evaluation of site-start and init files, because there might exist
 ;; remote files already, f.e. files kept via recentf-mode.
@@ -2753,6 +2745,7 @@ Falls back to normal file name handler if no Tramp file name handler exists."
 		     #'tramp-autoload-file-name-handler))
   (put #'tramp-autoload-file-name-handler 'safe-magic t)))
 
+(put #'tramp-register-autoload-file-name-handlers 'tramp-autoload t)
 ;;;###autoload (tramp-register-autoload-file-name-handlers)
 
 (defun tramp-use-absolute-autoload-file-names ()
@@ -2866,6 +2859,7 @@ whether HANDLER is to be called.  Add operations defined in
 	       (string-prefix-p "tramp-" (symbol-name (cdr fnh))))
       (setq file-name-handler-alist (delq fnh file-name-handler-alist))))))
 
+(put #'tramp-unload-file-name-handlers 'tramp-autoload t)
 (add-hook 'tramp-unload-hook #'tramp-unload-file-name-handlers)
 
 ;;; File name handler functions for completion mode:
@@ -5023,10 +5017,6 @@ Mostly useful to protect BODY from being interrupted by timers."
 	   ,@body)
        (tramp-flush-connection-property ,proc "locked"))))
 
-;; FIXME: This call is redundant in current Emacsen.
-(font-lock-add-keywords
- 'emacs-lisp-mode '("\\<with-tramp-locked-connection\\>"))
-
 (defun tramp-accept-process-output (proc &optional timeout)
   "Like `accept-process-output' for Tramp processes.
 This is needed in order to hide `last-coding-system-used', which is set
@@ -5965,6 +5955,8 @@ BODY is the backend specific code."
   (interactive)
   ;; Maybe it's not loaded yet.
   (ignore-errors (unload-feature 'tramp 'force))))
+
+(put #'tramp-unload-tramp 'tramp-autoload t)
 
 (provide 'tramp)
 
