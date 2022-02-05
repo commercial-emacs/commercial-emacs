@@ -52,7 +52,7 @@ static void unexpect_property_change (struct prop_location *);
 static void wait_for_property_change (struct prop_location *);
 static Lisp_Object x_get_window_property_as_lisp_data (struct x_display_info *,
                                                        Window, Atom,
-                                                       Lisp_Object, Atom);
+                                                       Lisp_Object, Atom, bool);
 static Lisp_Object selection_data_to_lisp_data (struct x_display_info *,
 						const unsigned char *,
 						ptrdiff_t, Atom, int);
@@ -795,11 +795,12 @@ x_handle_selection_request (struct selection_input_event *event)
       Window requestor = SELECTION_EVENT_REQUESTOR (event);
       Lisp_Object multprop;
       ptrdiff_t j, nselections;
+      struct selection_data cs;
 
       if (property == None) goto DONE;
       multprop
 	= x_get_window_property_as_lisp_data (dpyinfo, requestor, property,
-					      QMULTIPLE, selection);
+					      QMULTIPLE, selection, true);
 
       if (!VECTORP (multprop) || ASIZE (multprop) % 2)
 	goto DONE;
@@ -811,11 +812,19 @@ x_handle_selection_request (struct selection_input_event *event)
 	  Lisp_Object subtarget = AREF (multprop, 2*j);
 	  Atom subproperty = symbol_to_x_atom (dpyinfo,
 					       AREF (multprop, 2*j+1));
+	  bool subsuccess = false;
 
 	  if (subproperty != None)
-	    x_convert_selection (selection_symbol, subtarget,
-				 subproperty, true, dpyinfo);
+	    subsuccess = x_convert_selection (selection_symbol, subtarget,
+					      subproperty, true, dpyinfo);
+	  if (!subsuccess)
+	    ASET (multprop, 2*j+1, Qnil);
 	}
+      /* Save conversion results */
+      lisp_data_to_selection_data (dpyinfo, multprop, &cs);
+      XChangeProperty (dpyinfo->display, requestor, property,
+		       cs.type, cs.format, PropModeReplace,
+		       cs.data, cs.size);
       success = true;
     }
   else
@@ -1210,7 +1219,7 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
   return
     x_get_window_property_as_lisp_data (dpyinfo, requestor_window,
 					target_property, target_type,
-					selection_atom);
+					selection_atom, false);
 }
 
 /* Subroutines of x_get_window_property_as_lisp_data */
@@ -1461,7 +1470,8 @@ static Lisp_Object
 x_get_window_property_as_lisp_data (struct x_display_info *dpyinfo,
 				    Window window, Atom property,
 				    Lisp_Object target_type,
-				    Atom selection_atom)
+				    Atom selection_atom,
+				    bool for_multiple)
 {
   Atom actual_type;
   int actual_format;
@@ -1477,6 +1487,8 @@ x_get_window_property_as_lisp_data (struct x_display_info *dpyinfo,
 			 &actual_type, &actual_format, &actual_size);
   if (! data)
     {
+      if (for_multiple)
+	return Qnil;
       block_input ();
       bool there_is_a_selection_owner
 	= XGetSelectionOwner (display, selection_atom) != 0;
@@ -1499,7 +1511,7 @@ x_get_window_property_as_lisp_data (struct x_display_info *dpyinfo,
 	}
     }
 
-  if (actual_type == dpyinfo->Xatom_INCR)
+  if (!for_multiple && actual_type == dpyinfo->Xatom_INCR)
     {
       /* That wasn't really the data, just the beginning.  */
 
@@ -1515,11 +1527,14 @@ x_get_window_property_as_lisp_data (struct x_display_info *dpyinfo,
 				     &actual_size);
     }
 
-  block_input ();
-  TRACE1 ("  Delete property %s", XGetAtomName (display, property));
-  XDeleteProperty (display, window, property);
-  XFlush (display);
-  unblock_input ();
+  if (!for_multiple)
+    {
+      block_input ();
+      TRACE1 ("  Delete property %s", XGetAtomName (display, property));
+      XDeleteProperty (display, window, property);
+      XFlush (display);
+      unblock_input ();
+    }
 
   /* It's been read.  Now convert it to a lisp object in some semi-rational
      manner.  */
