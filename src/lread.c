@@ -3030,7 +3030,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 		 other types), e.g.
 		 #s(hash-table size 2 test equal data (k1 v1 k2 v2))  */
 
-	      Lisp_Object tmp = read_list (0, readcharfun, annotated);
+	      Lisp_Object tmp = read_list (0, readcharfun, false);
 	      Lisp_Object head = CAR_SAFE (tmp);
 	      Lisp_Object data = Qnil;
 	      Lisp_Object val = Qnil;
@@ -3132,7 +3132,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 		{
 		  /* Sub char-table can't be read as a regular
 		     vector because of a two C integer fields.  */
-		  Lisp_Object tbl, tmp = read_list (1, readcharfun, annotated);
+		  Lisp_Object tbl, tmp = read_list (1, readcharfun, false);
 		  ptrdiff_t size = list_length (tmp);
 		  int i, depth, min_char;
 		  struct Lisp_Cons *cell;
