@@ -2201,7 +2201,8 @@ With argument ARG, insert value in current buffer after the form."
 			       (= (following-char) ?\;))
 		   (forward-line 1))
 		 (not (eobp)))
-          (let* ((form (read inbuffer)))
+          (let* ((annotated (read-annotated inbuffer))
+                 (form (byte-compile--unannotate annotated)))
             (byte-compile-maybe-expand
              form
              (lambda (form)
@@ -3111,44 +3112,12 @@ OUTPUT-TYPE advises how form will be used,
   ;; Delegate the rest to the normal macro definition.
   (macroexpand `(declare-function ,fn ,file ,@args)))
 
-(defun byte-compile--circular-p (form)
-  (let (seen)
-    (cl-labels
-        ((descend
-           (form*)
-           (cond ((atom form*)
-                  nil)
-                 ((or (eq 'quote (car form*))
-                      (eq 'backquote (car form*))
-                      (eq '\` (car form*)))
-                  nil)
-                 ((cl-tailp nil (cdr form*))
-                  (if (memq form* seen)
-                      t
-                    (add-to-list 'seen form*)
-                    (if (cl-some #'consp form*)
-                        (cl-some #'identity (mapcar #'descend form*))
-                      (let ((hare form*)
-                            (tortoise form*))
-                        (while (progn
-                                 (setq hare (cdr (cdr hare))
-                                       tortoise (cdr tortoise))
-                                 (and hare (not (eq tortoise hare)))))
-                        (and (> (length form*) 1) (eq tortoise hare))))))
-                 (t
-                  (if (memq form* seen)
-                      t
-                    (add-to-list 'seen form*)
-                    (or (descend (car form*))
-                        (descend (cdr form*))))))))
-      (descend form))))
-
 (defsubst byte-compile--unannotate-cell (form)
   (cond ((atom (car form)) (cdr form))
         (t (byte-compile--unannotate form))))
 
 (defun byte-compile--unannotate (form)
-  (unless (byte-compile--circular-p form)
+  (unless (circular-list-p form)
     (if (atom (car form))
         (byte-compile--unannotate-cell form)
       (cl-loop with tail = (unless (cl-tailp nil (last form))

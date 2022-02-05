@@ -790,7 +790,7 @@ byte-compiled.  Run with dynamic binding."
       (defun def () (m))))
   (should (equal (funcall 'def) 4)))
 
-
+
 ;;;; Warnings.
 
 (ert-deftest bytecomp-tests--warnings ()
@@ -850,6 +850,47 @@ byte-compiled.  Run with dynamic binding."
     "cl-member-if. might not be defined"
     (require 'cl-lib)
     (cl-member-if (function cl-evenp) (list 1 2 3)))))
+
+(ert-deftest bytecomp-read-annotated-equivalence ()
+  (cl-macrolet
+      ((bytecomp
+         (file &rest body)
+         `(with-temp-buffer
+            (save-excursion (insert-file-contents
+                             (expand-file-name
+                              ,file
+                              (concat (file-name-as-directory
+                                       (or (getenv "EMACS_TEST_DIRECTORY")
+                                           default-directory))
+                                      ".."))))
+            ,@body)))
+    (dolist (file '("lisp/emacs-lisp/cl-generic.el"
+                    "lisp/international/mule-cmds.el"
+                    "test/lisp/emacs-lisp/macroexp-tests.el"))
+      (let ((annotated-read
+             (bytecomp
+              file
+              (cl-loop while (progn
+		               (while (progn (skip-chars-forward " \t\n\^l")
+			                     (= (following-char) ?\;))
+		                 (forward-line 1))
+		               (not (eobp)))
+                       for annotated = (read-annotated (current-buffer))
+                       collect (byte-compile--unannotate annotated))))
+            (just-read
+             (bytecomp
+              file
+              (cl-loop while (progn
+		               (while (progn (skip-chars-forward " \t\n\^l")
+			                     (= (following-char) ?\;))
+		                 (forward-line 1))
+		               (not (eobp)))
+                       collect (read (current-buffer))))))
+        (should
+         (condition-case nil
+             (equal annotated-read just-read)
+           (circular-list (equal (safe-length annotated-read)
+                                 (safe-length just-read)))))))))
 
 (ert-deftest bytecomp-warn-wrong-args ()
   (bytecomp--with-warning-test "remq.*3.*2"
@@ -1046,7 +1087,6 @@ byte-compiled.  Run with dynamic binding."
  "nowarn-inline-after-defvar.el"
  "Lexical argument shadows" 'reverse)
 
-
 ;;;; Macro expansion.
 
 (ert-deftest test-eager-load-macro-expansion ()

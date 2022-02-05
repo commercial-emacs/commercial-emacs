@@ -291,6 +291,21 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil).  */
   return make_fixnum (len);
 }
 
+DEFUN ("circular-list-p", Fcircular_list_p, Scircular_list_p, 1, 1, 0,
+       doc: /* Return t if OBJECT is a circular list, nil otherwise.
+The expression (not (proper-list-p OBJECT)) also returns t if OBJECT
+is circular, but undesirably returns t if OBJECT is a dotted list.  */
+       attributes: const)
+  (Lisp_Object object)
+{
+  Lisp_Object tail = object, circular_p = Qnil;
+  FOR_EACH_TAIL_INTERNAL (tail, (void) ((circular_p) = Qt), false)
+    {
+      (void) 0;
+    }
+  return circular_p;
+}
+
 DEFUN ("string-bytes", Fstring_bytes, Sstring_bytes, 1, 1, 0,
        doc: /* Return the number of bytes in STRING.
 If STRING is multibyte, this may be greater than the length of STRING.  */)
@@ -6111,6 +6126,7 @@ The same variable also affects the function `read-answer'.  */);
   defsubr (&Slength_greater);
   defsubr (&Slength_equal);
   defsubr (&Sproper_list_p);
+  defsubr (&Scircular_list_p);
   defsubr (&Sstring_bytes);
   defsubr (&Sstring_distance);
   defsubr (&Sstring_equal);
