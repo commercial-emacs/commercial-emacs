@@ -4540,13 +4540,19 @@ For backward compatibility, if FORMAT is not a constant string, it
 is assumed to be part of BODY, in which case the message format
 used is \"Error: %S\"."
   (declare (debug t) (indent 1))
-  (let ((err (make-symbol "err"))
-        (format (if (and (stringp format) body) format
-                  (prog1 "Error: %S"
-                    (if format (push format body))))))
-    `(condition-case-unless-debug ,err
-         ,(macroexp-progn body)
-       (error (message ,format ,err) nil))))
+  (let* ((err (make-symbol "err"))
+         (orig-body body)
+         (format (if (and (stringp format) body) format
+                   (prog1 "Error: %S"
+                     (if format (push format body)))))
+         (exp
+          `(condition-case-unless-debug ,err
+               ,(macroexp-progn body)
+             (error (message ,format ,err) nil))))
+    (if (eq orig-body body) exp
+      ;; The use without `format' is obsolete, let's warn when we bump
+      ;; into any such remaining uses.
+      (macroexp-warn-and-return format "Missing format argument" exp))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
