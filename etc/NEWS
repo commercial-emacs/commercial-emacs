@@ -137,8 +137,9 @@ An autoload definition appears just as a (defun . NAME) and the
 
 ---
 ** New user option 'find-library-include-other-files'.
-If non-nil, commands like 'M-x find-library' will only include library
-files in the completion alternatives.
+If set to nil, commands like 'M-x find-library' will only include library
+files in the completion candidates.  The default is t, which preserves
+previous behavior, whereby non-library files could also be included.
 
 ** New command 'sqlite-mode-open-file' for examining an sqlite3 file.
 This uses the new 'sqlite-mode' which allows listing the tables in a
@@ -437,6 +438,11 @@ Customize this option to limit the number of entries in the menu
 When non-nil, if the point is in a closing delimiter and the opening
 delimiter is offscreen, shows some context around the opening
 delimiter in the echo area.  Default nil.
+
+May also be set to the symbol 'child-frame' in which case the context
+is shown in a child frame at the top left of the current window on
+graphical frames.  On non-graphical frames, the context is shown in
+the echo area.
 
 ** Comint
 

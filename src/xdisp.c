@@ -17401,9 +17401,8 @@ window_start_acceptable_p (Lisp_Object window, ptrdiff_t startp)
   struct text_pos ignored;
 
   /* Is STARTP in invisible text?  */
-  if (startp > BEGV
-      && ((invprop = Fget_char_property (startpos, Qinvisible, window)),
-	  TEXT_PROP_MEANS_INVISIBLE (invprop) != 0))
+  if ((invprop = Fget_char_property (startpos, Qinvisible, window)),
+      TEXT_PROP_MEANS_INVISIBLE (invprop) != 0)
     return false;
 
   /* Is STARTP covered by a replacing 'display' property?  */
