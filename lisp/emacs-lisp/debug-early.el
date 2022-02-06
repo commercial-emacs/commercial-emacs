@@ -31,6 +31,8 @@
 ;; 29, before which there was no backtrace available during early
 ;; bootstrap.
 
+;;; Code:
+
 (defalias 'debug-early-backtrace
   #'(lambda ()
   "Print a trace of Lisp function calls currently active.
@@ -47,18 +49,15 @@ of the build process."
 	     (progn
 	       (princ "  ")
 	       (prin1 func)
-	       (princ "(")
-	       (while args
-		 (prin1 (car args))
-		 (setq args (cdr args))
-		 (if args
-		     (princ " ")))
-	       (princ ")\n"))
-	   (while args
-	     (princ "  ")
-	     (prin1 (car args))
-	     (princ "\n")
-	     (setq args (cdr args)))))))))
+	       (princ "("))
+	   (progn
+	     (princ "  (")
+	     (setq args (cons func args))))
+	 (while (progn
+	          (prin1 (car args))
+	          (setq args (cdr args)))
+	   (princ " "))
+	 (princ ")\n"))))))
 
 (defalias 'debug-early
   #'(lambda (&rest args)
