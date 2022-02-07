@@ -132,6 +132,7 @@
 (autoload 'cl-tailp "cl-extra")
 (autoload 'cl-loop "cl-macs")
 (autoload 'cl-some "cl-extra")
+(autoload 'cl-destructuring-bind "cl-macs")
 
 ;; The feature of compiling in a specific target Emacs version
 ;; has been turned off because compile time options are a bad idea.
@@ -464,19 +465,16 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
 (defvar byte-compiler-error-flag)
 
 (defun byte-compile-maybe-expand (form func)
-  "Deal with progn before calling compilation FUNC on FORM."
-  ;; Macroexpand (not macroexpand-all!) form at top-level in case it
-  ;; expands into a top-level-equivalent `progn'.  See CLHS section
-  ;; 3.2.3.1, "Processing of Top Level Forms".  The semantics are very
-  ;; subtle: see test/lisp/emacs-lisp/bytecomp-tests.el for interesting
-  ;; cases.
-  (setf form (macroexp-macroexpand form byte-compile-macro-environment))
-  (if (eq (car-safe form) 'progn)
-      (cons 'progn
-            (mapcar (lambda (form*)
-                      (byte-compile-maybe-expand form* func))
-                    (cdr form)))
-    (funcall func form)))
+  "Macroexpansion of top-level FORM could yield a progn.
+See CLHS section 3.2.3.1, *Processing of Top Level Forms*, and
+bytecomp-tests.el for interesting cases."
+  (let ((form* (macroexp-macroexpand form byte-compile-macro-environment)))
+    (if (eq (car-safe form*) 'progn)
+        (cons 'progn
+              (mapcar (lambda (sexpr)
+                        (byte-compile-maybe-expand sexpr func))
+                      (cdr form*)))
+      (funcall func form*))))
 
 (defconst byte-compile-initial-macro-environment
   `((declare-function . byte-compile-macroexpand-declare-function)
@@ -1094,11 +1092,15 @@ message buffer `default-directory'."
     (error "Only files can be recompiled"))
   (byte-compile-file emacs-lisp-compilation--current-file))
 
+;; Single thread makes global variables possible.
+;; Global variables make programming easy.
 (defvar byte-compile-current-form nil)
 (defvar byte-compile-dest-file nil)
 (defvar byte-compile-current-file nil)
 (defvar byte-compile-current-group nil)
 (defvar byte-compile-current-buffer nil)
+(defvar byte-compile-current-annotations nil)
+(defvar byte-compile-current-charpos nil)
 
 ;; Log something that isn't a warning.
 (defmacro byte-compile-log (format-string &rest args)
@@ -1148,9 +1150,6 @@ message buffer `default-directory'."
         (f2 (file-relative-name file dir)))
     (if (< (length f2) (length f1)) f2 f1)))
 
-(defun byte-compile--prevailing-position (_sym)
-  nil)
-
 (defun byte-compile-warning-prefix (level entry)
   (let* ((inhibit-read-only t)
 	 (dir (or byte-compile-root-dir default-directory))
@@ -1167,7 +1166,7 @@ message buffer `default-directory'."
                                      load-file-name dir)))
 		     (t "")))
 	 (annot (if-let ((byte-compile-current-file byte-compile-current-file)
-                         (where (byte-compile--prevailing-position nil)))
+                         (where byte-compile-current-charpos))
                     (with-current-buffer byte-compile-current-buffer
                       (apply #'format "%d:%d:"
 			     (save-excursion
@@ -1413,7 +1412,7 @@ F is considered resolved if auxiliary DEF includes it."
           (unless (memq nargs (cddr cons))
             ;; flag an inconsistent arity
             (push nargs (cddr cons)))
-        (push (list f (byte-compile--prevailing-position f) nargs)
+        (push (list f byte-compile-current-charpos nargs)
               byte-compile-unresolved-functions)))))
 
 (defun byte-compile-emit-callargs-warn (name actual-args min-args max-args)
@@ -2201,13 +2200,15 @@ With argument ARG, insert value in current buffer after the form."
 			       (= (following-char) ?\;))
 		   (forward-line 1))
 		 (not (eobp)))
-          (let* ((annotated (read-annotated inbuffer))
-                 (form (byte-compile--unannotate annotated)))
-            (byte-compile-maybe-expand
-             form
-             (lambda (form)
-               (let (byte-compile-current-form)
-                 (byte-compile-file-form (byte-compile-preprocess form)))))))
+          (cl-destructuring-bind (form annotations)
+              (read-annotated inbuffer)
+            (let ((byte-compile-current-annotations annotations))
+              (byte-compile-maybe-expand
+               form
+               (lambda (form*)
+                 (let (byte-compile-current-form)
+                   (byte-compile-file-form
+                    (byte-compile-preprocess form*))))))))
 	(byte-compile-flush-pending)
 	(byte-compile-warn-about-unresolved-functions)))
      byte-compile--outbuffer)))
@@ -3112,26 +3113,22 @@ OUTPUT-TYPE advises how form will be used,
   ;; Delegate the rest to the normal macro definition.
   (macroexpand `(declare-function ,fn ,file ,@args)))
 
-(defsubst byte-compile--unannotate-cell (form)
-  (cond ((atom (car form)) (cdr form))
-        (t (byte-compile--unannotate form))))
+(defsubst byte-compile--decouple-cell (form func)
+  (cond ((atom (car form)) (funcall func form))
+        (t (byte-compile--decouple form func))))
 
-(defun byte-compile--unannotate (form)
+(defun byte-compile--decouple (form func)
   (unless (circular-list-p form)
     (if (atom (car form))
-        (byte-compile--unannotate-cell form)
+        (byte-compile--decouple-cell form func)
       (cl-loop with tail = (unless (cl-tailp nil (last form))
-                             (prog1 (last form)
-                               ;; exclude tail from main loop
-                               (cl-loop for lst on form
-                                        unless (listp (car (cdr lst)))
-                                        do (setcdr lst nil)
-                                        finally return form)))
+                             (last form))
                for element in form
-               collect (byte-compile--unannotate-cell element) into result
+               when (or (consp element) (null element))
+               collect (byte-compile--decouple-cell element func) into result
                finally return (nconc result
                                      (when tail
-                                       (byte-compile--unannotate-cell tail)))))))
+                                       (byte-compile--decouple-cell tail func)))))))
 
 (defun byte-compile-form (form &optional for-effect)
   "Compiles FORM.

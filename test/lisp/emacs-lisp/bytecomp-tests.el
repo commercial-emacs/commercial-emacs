@@ -875,8 +875,7 @@ byte-compiled.  Run with dynamic binding."
 			                     (= (following-char) ?\;))
 		                 (forward-line 1))
 		               (not (eobp)))
-                       for annotated = (read-annotated (current-buffer))
-                       collect (byte-compile--unannotate annotated))))
+                       collect (car (read-annotated (current-buffer))))))
             (just-read
              (bytecomp
               file

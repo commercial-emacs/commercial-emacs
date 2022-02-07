@@ -483,7 +483,6 @@ readbyte_for_lambda (int c, Lisp_Object readcharfun)
   return read_bytecode_char (c >= 0);
 }
 
-
 static int
 readbyte_from_stdio (void)
 {
@@ -2439,7 +2438,8 @@ This function does not move point.  */)
 }
 
 DEFUN ("read-annotated", Fread_annotated, Sread_annotated, 1, 1, 0,
-       doc: /* As `read' but each unquoted s-expr consed with its charpos.  */)
+       doc: /* Return (FORM ANNOTATIONS) where ANNOTATIONS are
+	       corresponding character positions.  */)
   (Lisp_Object buffer)
 {
   Lisp_Object retval, warning;
@@ -2454,7 +2454,8 @@ DEFUN ("read-annotated", Fread_annotated, Sread_annotated, 1, 1, 0,
     call2 (intern ("byte-compile-warn"), build_string ("%s"), warning);
 
   unbind_to (count, Qnil);
-  return retval;
+  return list2 (call2 (intern ("byte-compile--decouple"), retval, intern ("cdr")),
+		call2 (intern ("byte-compile--decouple"), retval, intern ("car")));
 }
 
 DEFUN ("read", Fread, Sread, 0, 1, 0,
