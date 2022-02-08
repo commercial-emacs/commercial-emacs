@@ -127,12 +127,15 @@
 (require 'backquote)
 (require 'macroexp)
 (require 'cconv)
+(require 'subr-x)
 
 (autoload 'cl-every "cl-extra")
 (autoload 'cl-tailp "cl-extra")
 (autoload 'cl-loop "cl-macs")
 (autoload 'cl-some "cl-extra")
 (autoload 'cl-destructuring-bind "cl-macs")
+(autoload 'cl-find-if "cl-seq")
+(autoload 'cl-labels "cl-macs")
 
 ;; The feature of compiling in a specific target Emacs version
 ;; has been turned off because compile time options are a bad idea.
@@ -1094,13 +1097,13 @@ message buffer `default-directory'."
 
 ;; Single thread makes global variables possible.
 ;; Global variables make programming easy.
-(defvar byte-compile-current-form nil)
+(defvar byte-compile-current-func nil)
 (defvar byte-compile-dest-file nil)
 (defvar byte-compile-current-file nil)
 (defvar byte-compile-current-group nil)
 (defvar byte-compile-current-buffer nil)
 (defvar byte-compile-current-annotations nil)
-(defvar byte-compile-current-charpos nil)
+(defvar byte-compile-current-form nil)
 
 ;; Log something that isn't a warning.
 (defmacro byte-compile-log (format-string &rest args)
@@ -1140,7 +1143,7 @@ message buffer `default-directory'."
 	(setcdr list (cddr list)))
       total)))
 
-(defvar byte-compile-last-warned-form nil)
+(defvar byte-compile-last-warned-func nil)
 (defvar byte-compile-last-logged-file nil)
 (defvar byte-compile-root-dir nil
   "Directory relative to which file names in error messages are written.")
@@ -1166,28 +1169,28 @@ message buffer `default-directory'."
                                      load-file-name dir)))
 		     (t "")))
 	 (annot (if-let ((byte-compile-current-file byte-compile-current-file)
-                         (where byte-compile-current-charpos))
+                         (charpos (byte-compile-fuzzy-charpos)))
                     (with-current-buffer byte-compile-current-buffer
                       (apply #'format "%d:%d:"
 			     (save-excursion
-			       (goto-char where)
+			       (goto-char charpos)
 			       (list (1+ (count-lines (point-min) (point-at-bol)))
                                      (1+ (current-column))))))
 		  ""))
-	 (form (if (eq byte-compile-current-form :end)
+	 (form (if (eq byte-compile-current-func :end)
                    "end of data"
-		 (or byte-compile-current-form "toplevel form"))))
+		 (or byte-compile-current-func "toplevel form"))))
     (when (or (and byte-compile-current-file
 		   (not (equal byte-compile-current-file
 			       byte-compile-last-logged-file)))
-	      (and byte-compile-current-form
-		   (not (eq byte-compile-current-form
-			    byte-compile-last-warned-form))))
+	      (and byte-compile-current-func
+		   (not (eq byte-compile-current-func
+			    byte-compile-last-warned-func))))
       (insert (format "\nIn %s:\n" form)))
     (when level
       (insert (format "%s%s " file annot))))
   (setq byte-compile-last-logged-file byte-compile-current-file
-	byte-compile-last-warned-form byte-compile-current-form)
+	byte-compile-last-warned-func byte-compile-current-func)
   entry)
 
 ;; This no-op function is used as the value of warning-series
@@ -1233,7 +1236,7 @@ message buffer `default-directory'."
 	       (insert (format-message "Entering directory `%s'\n"
                                        default-directory))))
 	   (setq byte-compile-last-logged-file byte-compile-current-file
-		 byte-compile-last-warned-form nil)
+		 byte-compile-last-warned-func nil)
 	   ;; Do this after setting default-directory.
 	   (unless (derived-mode-p 'compilation-mode)
              (emacs-lisp-compilation-mode))
@@ -1278,7 +1281,7 @@ function directly; use `byte-compile-warn' or
   "Issue a byte compiler warning; use (format-message FORMAT ARGS...) for message."
   (setq format (apply #'format-message format args))
   (if byte-compile-error-on-warn
-      (error "%s" format)		; byte-compile-file catches and logs it
+      (error "%s" format)
     (byte-compile-log-warning format t :warning)))
 
 (defun byte-compile-warn-obsolete (symbol)
@@ -1394,6 +1397,49 @@ that means treat it as not defined."
 	 (format "%d" (car signature)))
 	(t (format "%d-%d" (car signature) (cdr signature)))))
 
+(defun byte-compile-fuzzy-charpos ()
+  "Hack prevailing globals for prevailing charpos."
+  (let ((memo-count (make-hash-table :test #'equal)))
+    (cl-labels ((recurse-count
+                  (form)
+                  (with-memoization
+                      (gethash form memo-count)
+                    (cond ((circular-list-p form) (safe-length form))
+                          ((or (atom form)
+                               (or (eq 'quote (car form))
+                                   (eq 'backquote (car form))
+                                   (eq '\` (car form))
+                                   (eq 'function (car form))))
+                           1)
+                          (t (cl-loop for element in form
+                                      collect (recurse-count element) into result
+                                      finally return (apply #'+ result)))))))
+      (when-let ((list-p (and byte-compile-current-form
+                              (listp byte-compile-current-form)))
+                 (match-count (recurse-count byte-compile-current-form)))
+        (cl-labels ((recurse
+                      (form)
+                      (cl-loop for element in form
+                               for count = (recurse-count
+                                            (byte-compile--decouple element #'cdr))
+                               if (>= match-count count)
+                               collect element
+                               else
+                               append (recurse element)
+                               end)))
+          (cl-loop with result = (car byte-compile-current-annotations)
+                   with best = 0
+                   with matches = (recurse (list byte-compile-current-annotations))
+                   for match in matches
+                   for match* = (byte-compile--decouple match #'cdr)
+                   for score =
+                   (cl-loop for w in (if (atom match*) (list match*) match*)
+                            count (member w byte-compile-current-form))
+                   when (> score best)
+                   do (setq result match)
+                   and do (setq best score)
+                   finally return (car result)))))))
+
 (defun byte-compile-function-warn (f nargs def)
   "Record unresolved F or inconsistent arity NARGS.
 F is considered resolved if auxiliary DEF includes it."
@@ -1406,13 +1452,13 @@ F is considered resolved if auxiliary DEF includes it."
                       ;; consider defining cl-incf as resolving all cl-lib
                       (not (memq 'cl-incf byte-compile-new-defuns)))
                  (memq f byte-compile-noruntime-functions))
-             (not (eq f byte-compile-current-form)))
-    (let ((cons (assq f byte-compile-unresolved-functions)))
-      (if cons
-          (unless (memq nargs (cddr cons))
+             (not (eq f byte-compile-current-func)))
+    (let ((cell (assq f byte-compile-unresolved-functions)))
+      (if cell
+          (unless (memq nargs (cddr cell))
             ;; flag an inconsistent arity
-            (push nargs (cddr cons)))
-        (push (list f byte-compile-current-charpos nargs)
+            (push nargs (cddr cell)))
+        (push (list f (byte-compile-fuzzy-charpos) nargs)
               byte-compile-unresolved-functions)))))
 
 (defun byte-compile-emit-callargs-warn (name actual-args min-args max-args)
@@ -1655,7 +1701,7 @@ It is too wide if it has any lines longer than the largest of
 from the truly unresolved ones."
   (prog1 nil
     (when (byte-compile-warning-enabled-p 'unresolved)
-      (let ((byte-compile-current-form :end))
+      (let ((byte-compile-current-func :end))
         (dolist (urf byte-compile-unresolved-functions)
           (let ((f (car urf)))
             (unless (memq f byte-compile-new-defuns)
@@ -1663,7 +1709,7 @@ from the truly unresolved ones."
                (if (fboundp f)
                    "the function `%s' might not be defined at runtime."
                  "the function `%s' is not known to be defined.")
-               (car urf)))))))))
+               f))))))))
 
 
 (defvar byte-compile--outbuffer
@@ -2127,8 +2173,7 @@ With argument ARG, insert value in current buffer after the form."
     (let* ((byte-compile-current-file (current-buffer))
 	   (byte-compile-current-buffer (current-buffer))
            (point (point))
-	   (byte-compile-last-warned-form 'nothing)
-           (symbols-with-pos-enabled t)
+	   (byte-compile-last-warned-func 'nothing)
 	   (value (eval
 		   (displaying-byte-compile-warnings
 		    (byte-compile-sexp
@@ -2200,15 +2245,15 @@ With argument ARG, insert value in current buffer after the form."
 			       (= (following-char) ?\;))
 		   (forward-line 1))
 		 (not (eobp)))
-          (cl-destructuring-bind (form annotations)
-              (read-annotated inbuffer)
-            (let ((byte-compile-current-annotations annotations))
-              (byte-compile-maybe-expand
-               form
-               (lambda (form*)
-                 (let (byte-compile-current-form)
-                   (byte-compile-file-form
-                    (byte-compile-preprocess form*))))))))
+          (let* ((byte-compile-current-annotations (read-annotated inbuffer))
+                 (form (byte-compile--decouple byte-compile-current-annotations
+                                               #'cdr)))
+            (byte-compile-maybe-expand
+             form
+             (lambda (form*)
+               (let (byte-compile-current-func)
+                 (byte-compile-file-form
+                  (byte-compile-preprocess form*)))))))
 	(byte-compile-flush-pending)
 	(byte-compile-warn-about-unresolved-functions)))
      byte-compile--outbuffer)))
@@ -2409,7 +2454,8 @@ in the input buffer (now current), not in the output buffer."
   (if-let ((handler (and (consp form)
                          (symbolp (car form))
 		         (get (car form) 'byte-hunk-handler))))
-      (let ((form* (funcall handler form)))
+      (let* ((byte-compile-current-form form)
+             (form* (funcall handler form)))
 	(byte-compile-flush-pending)
 	(byte-compile-output-file-form form*))
     (byte-compile-keep-pending form)))
@@ -2566,7 +2612,7 @@ otherwise."
          (this-one (assq name (symbol-value this-kind)))
          (that-one (assq name (symbol-value that-kind)))
          (do-warn (byte-compile-warning-enabled-p 'redefine name))
-         (byte-compile-current-form name))
+         (byte-compile-current-func name))
     (push name byte-compile-new-defuns)
     (when byte-compile-generate-call-tree
       (unless (assq name byte-compile-call-tree)
@@ -3098,7 +3144,8 @@ OUTPUT-TYPE advises how form will be used,
 	    (fn file &optional arglist fileonly) nil))
   (let ((gotargs (and (consp args) (listp (car args))))
 	(unresolved (assq fn byte-compile-unresolved-functions)))
-    (when unresolved	      ; function was called before declaration
+    (when unresolved
+      ;; function was called before declaration
       (if (and gotargs (byte-compile-warning-enabled-p 'callargs))
 	  (byte-compile-arglist-warn fn (car args) nil)
 	(setq byte-compile-unresolved-functions
@@ -3134,7 +3181,8 @@ OUTPUT-TYPE advises how form will be used,
   "Compiles FORM.
 FOR-EFFECT means FORM is side-effect-only whose meaningless return
 value should be byte-discard."
-  (let ((byte-compile--for-effect for-effect))
+  (let ((byte-compile--for-effect for-effect)
+        (byte-compile-current-form form))
     (cond
      ((not (consp form))
       (cond ((or (not (symbolp form)) (macroexp--const-symbol-p form))
@@ -4024,11 +4072,11 @@ and (funcall (function foo)) will lose with autoloads."
     (byte-compile-form arg t))
   (byte-compile-form nil))
 
-;; Return the list of items in CONDITION-PARAM that match PRED-LIST.
-;; Only return items that are not in ONLY-IF-NOT-PRESENT.
 (defun byte-compile-find-bound-condition (condition-param
 					  pred-list
 					  &optional only-if-not-present)
+  "Return the list of items in CONDITION-PARAM that match PRED-LIST.
+Only return items that are not in ONLY-IF-NOT-PRESENT."
   (let ((result nil)
 	(nth-one nil)
 	(cond-list
@@ -4850,19 +4898,19 @@ OP and OPERAND are as passed to `byte-compile-out'."
   (let (entry)
     ;; annotate the current call
     (if (setq entry (assq (car form) byte-compile-call-tree))
-	(or (memq byte-compile-current-form (nth 1 entry)) ;callers
+	(or (memq byte-compile-current-func (nth 1 entry)) ;callers
 	    (setcar (cdr entry)
-		    (cons byte-compile-current-form (nth 1 entry))))
+		    (cons byte-compile-current-func (nth 1 entry))))
       (setq byte-compile-call-tree
-	    (cons (list (car form) (list byte-compile-current-form) nil)
+	    (cons (list (car form) (list byte-compile-current-func) nil)
 		  byte-compile-call-tree)))
     ;; annotate the current function
-    (if (setq entry (assq byte-compile-current-form byte-compile-call-tree))
+    (if (setq entry (assq byte-compile-current-func byte-compile-call-tree))
 	(or (memq (car form) (nth 2 entry)) ;called
 	    (setcar (cdr (cdr entry))
 		    (cons (car form) (nth 2 entry))))
       (setq byte-compile-call-tree
-	    (cons (list byte-compile-current-form nil (list (car form)))
+	    (cons (list byte-compile-current-func nil (list (car form)))
 		  byte-compile-call-tree)))))
 
 ;; Renamed from byte-compile-report-call-tree

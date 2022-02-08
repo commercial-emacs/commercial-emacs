@@ -875,7 +875,9 @@ byte-compiled.  Run with dynamic binding."
 			                     (= (following-char) ?\;))
 		                 (forward-line 1))
 		               (not (eobp)))
-                       collect (car (read-annotated (current-buffer))))))
+                       collect (byte-compile--decouple
+                                (read-annotated (current-buffer))
+                                #'cdr))))
             (just-read
              (bytecomp
               file

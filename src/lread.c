@@ -2438,8 +2438,8 @@ This function does not move point.  */)
 }
 
 DEFUN ("read-annotated", Fread_annotated, Sread_annotated, 1, 1, 0,
-       doc: /* Return (FORM ANNOTATIONS) where ANNOTATIONS are
-	       corresponding character positions.  */)
+       doc: /* Return parsed s-expr as `read' with each atom bundled
+with its charpos as (CHARPOS . ATOM).  */)
   (Lisp_Object buffer)
 {
   Lisp_Object retval, warning;
@@ -2454,8 +2454,7 @@ DEFUN ("read-annotated", Fread_annotated, Sread_annotated, 1, 1, 0,
     call2 (intern ("byte-compile-warn"), build_string ("%s"), warning);
 
   unbind_to (count, Qnil);
-  return list2 (call2 (intern ("byte-compile--decouple"), retval, intern ("cdr")),
-		call2 (intern ("byte-compile--decouple"), retval, intern ("car")));
+  return retval;
 }
 
 DEFUN ("read", Fread, Sread, 0, 1, 0,
