@@ -794,7 +794,7 @@ byte-compiled.  Run with dynamic binding."
 ;;;; Warnings.
 
 (ert-deftest bytecomp-tests--warnings ()
-  (with-current-buffer (get-buffer-create "*Compile-Log*")
+  (with-current-buffer (get-buffer-create byte-compile-log-buffer)
     (let ((inhibit-read-only t)) (erase-buffer)))
   (mapc #'fmakunbound '(my-test0 my--test11 my--test12 my--test2))
   (test-byte-comp-compile-and-load t
@@ -807,7 +807,7 @@ byte-compiled.  Run with dynamic binding."
        (eval-and-compile
          (defmacro my--test12 (arg) (+ arg 1))
          (defun my--test2 (arg) (+ arg 1)))))
-  (with-current-buffer (get-buffer-create "*Compile-Log*")
+  (with-current-buffer (get-buffer-create byte-compile-log-buffer)
     (goto-char (point-min))
     ;; Should warn that mt--test1[12] are first used as functions.
     ;; The second alternative is for when the file name is so long
@@ -822,27 +822,42 @@ byte-compiled.  Run with dynamic binding."
 
 (defmacro bytecomp--with-warning-test (re-warning &rest form)
   (declare (indent 1))
-  `(with-current-buffer (get-buffer-create "*Compile-Log*")
+  `(with-current-buffer (get-buffer-create byte-compile-log-buffer)
      (let ((inhibit-read-only t)) (erase-buffer))
      (byte-compile ,@form)
      (ert-info ((prin1-to-string (buffer-string)) :prefix "buffer: ")
        (should (re-search-forward ,(string-replace " " "[ \n]+" re-warning))))))
 
-(defmacro bytecomp--buffer-with-warning-test (re-warning &rest forms)
+(defmacro bytecomp--buffer-with-warning-test (re-warnings &rest forms)
   (declare (indent 1))
-  `(with-current-buffer (get-buffer-create "*Compile-Log*")
+  `(with-current-buffer (get-buffer-create byte-compile-log-buffer)
      (let ((inhibit-read-only t)) (erase-buffer))
-     (with-temp-buffer
-       (apply (lambda (form) (insert (format "%S\n" form)))
-              ',forms)
-       (byte-compile-from-buffer (current-buffer)))
+     (save-excursion
+       (let ((buffer (generate-new-buffer "*bytecomp-tests*")))
+         (with-current-buffer buffer
+           (mapc (lambda (form) (insert (format "%S\n" form)))
+                 ',forms))
+         (byte-compile-from-buffer buffer)
+         (let (kill-buffer-query-functions)
+           (kill-buffer buffer))))
      (ert-info ((prin1-to-string (buffer-string)) :prefix "buffer: ")
-       (should (re-search-forward ,(string-replace " " "[ \n]+" re-warning))))))
+       (dolist (re-warning (if (atom ,re-warnings)
+                               (list ,re-warnings)
+                             ,re-warnings))
+         (should (re-search-forward (string-replace " " "[ \n]+" re-warning)))))))
 
 (ert-deftest bytecomp-warn-absent-require-cl-lib ()
   (bytecomp--buffer-with-warning-test
    "cl-member-if. might not be defined"
    (cl-member-if (function cl-evenp) (list 1 2 3))))
+
+(ert-deftest bytecomp-warn-coordinates ()
+  (let ((byte-compile-current-file "his-fooness.el"))
+    (bytecomp--buffer-with-warning-test
+     '("his-fooness.el:2:2" "his-fooness.el:2:52")
+     (bytecomp-tests-warn-coordinates-foo)
+     (defsubst bytecomp-tests-warn-coordinates-foo ()
+       (cl-member-if (function cl-evenp) (list 1 2 3))))))
 
 (ert-deftest bytecomp-warn-present-require-cl-lib ()
   (should-error
@@ -917,7 +932,7 @@ byte-compiled.  Run with dynamic binding."
 
 (defmacro bytecomp--define-warning-file-test (file re-warning &optional reverse)
   `(ert-deftest ,(intern (format "bytecomp/%s" file)) ()
-     (with-current-buffer (get-buffer-create "*Compile-Log*")
+     (with-current-buffer (get-buffer-create byte-compile-log-buffer)
        (let ((inhibit-read-only t)) (erase-buffer))
        (byte-compile-file ,(ert-resource-file file))
        (ert-info ((buffer-string) :prefix "buffer: ")
@@ -1177,15 +1192,16 @@ literals (Bug#20852)."
   (defun f ())
   (define-advice f (:around (oldfun &rest args) test)
     (apply oldfun args))
-  (with-current-buffer (get-buffer-create "*Compile-Log*")
+  (with-current-buffer (get-buffer-create byte-compile-log-buffer)
     (let ((inhibit-read-only t)) (erase-buffer)))
   (test-byte-comp-compile-and-load t '(defun f ()))
-  (with-current-buffer (get-buffer-create "*Compile-Log*")
+  (with-current-buffer (get-buffer-create byte-compile-log-buffer)
     (goto-char (point-min))
     (should-not (search-forward "Warning" nil t))))
 
 (ert-deftest bytecomp-test-featurep-warnings ()
-  (let ((byte-compile-log-buffer (generate-new-buffer " *Compile-Log*")))
+  (let ((byte-compile-log-buffer
+         (generate-new-buffer (concat " " byte-compile-log-buffer))))
     (unwind-protect
         (progn
           (with-temp-buffer
@@ -1257,7 +1273,8 @@ literals (Bug#20852)."
 
 (defun test-suppression (form suppress match)
   (let ((lexical-binding t)
-        (byte-compile-log-buffer (generate-new-buffer " *Compile-Log*")))
+        (byte-compile-log-buffer
+         (generate-new-buffer (concat " " byte-compile-log-buffer))))
     ;; Check that we get a warning without suppression.
     (with-current-buffer byte-compile-log-buffer
       (setq-local fill-column 9999)

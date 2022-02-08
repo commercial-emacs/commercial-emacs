@@ -2193,10 +2193,15 @@ With argument ARG, insert value in current buffer after the form."
 	   (byte-compile-last-warned-func 'nothing)
 	   (value (eval
 		   (displaying-byte-compile-warnings
-		    (byte-compile-sexp
-                     (eval-sexp-add-defvars
-                      (read (current-buffer))
-                      point)))
+                    (let* ((byte-compile-current-annotations
+                            (read-annotated (current-buffer)))
+                           (form (byte-compile--decouple
+                                  byte-compile-current-annotations
+                                  #'cdr)))
+		      (byte-compile-sexp
+                       (eval-sexp-add-defvars
+                        form
+                        point))))
                    lexical-binding)))
       (cond (arg
 	     (message "Compiling from buffer... done.")
