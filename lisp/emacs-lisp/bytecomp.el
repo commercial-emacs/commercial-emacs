@@ -1177,6 +1177,7 @@ message buffer `default-directory'."
 			     (save-excursion
 			       (goto-char charpos)
 			       (list (1+ (count-lines (point-min) (point-at-bol)))
+                                     ;; `next-error' uses one-indexed column
                                      (1+ (current-column))))))
 		  ""))
 	 (form (if (eq byte-compile-current-func :end)
@@ -1416,9 +1417,7 @@ that means treat it as not defined."
                           (t (cl-loop for element in form
                                       collect (recurse-count element) into result
                                       finally return (apply #'+ result)))))))
-      (when-let ((list-p (and byte-compile-current-form
-                              (listp byte-compile-current-form)))
-                 (match-count (recurse-count byte-compile-current-form)))
+      (let ((match-count (recurse-count byte-compile-current-form)))
         (cl-labels ((recurse
                       (form)
                       (cl-loop for element in form
@@ -1432,15 +1431,21 @@ that means treat it as not defined."
                     (first-atom
                       (form)
                       (cond ((atom form) form)
-                            (t (cl-some #'first-atom form)))))
+                            (t (cl-some #'first-atom form))))
+                    (listify
+                      (form)
+                      (if (atom form) (list form) form)))
           (cl-loop with result
                    with best = 0
-                   with matches = (recurse (list byte-compile-current-annotations))
+                   with matches =
+                   (sort (recurse (list byte-compile-current-annotations))
+                         (lambda (x y)
+                           (> (safe-length x) (safe-length y))))
                    for match in matches
                    for match* = (byte-compile--decouple match #'cdr)
                    for score =
-                   (cl-loop for w in (if (atom match*) (list match*) match*)
-                            count (member w byte-compile-current-form))
+                   (cl-loop for w in (listify match*)
+                            count (member w (listify byte-compile-current-form)))
                    when (> score best)
                    do (setq result match)
                    and do (setq best score)
@@ -1465,7 +1470,10 @@ F is considered resolved if auxiliary DEF includes it."
           (unless (memq nargs (cddr cell))
             ;; flag an inconsistent arity
             (push nargs (cddr cell)))
-        (push (list f (byte-compile-fuzzy-charpos) nargs)
+        (push (list f
+                    (let ((byte-compile-current-form f))
+                      (byte-compile-fuzzy-charpos))
+                    nargs)
               byte-compile-unresolved-functions)))))
 
 (defun byte-compile-emit-callargs-warn (name actual-args min-args max-args)
@@ -1710,7 +1718,7 @@ from the truly unresolved ones."
     (when (byte-compile-warning-enabled-p 'unresolved)
       (let ((byte-compile-current-func :end))
         (dolist (urf byte-compile-unresolved-functions)
-          (cl-destructuring-bind (f charpos &rest _args)
+          (cl-destructuring-bind (f charpos &rest args)
               urf
             (unless (memq f byte-compile-new-defuns)
               (let ((byte-compile-current-charpos charpos))

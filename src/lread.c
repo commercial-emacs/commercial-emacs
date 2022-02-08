@@ -192,7 +192,7 @@ static int readbyte_from_string (int, Lisp_Object);
 /* Same as READCHAR but set *MULTIBYTE to the multibyteness of the source.  */
 #define READCHAR_REPORT_MULTIBYTE(multibyte) readchar (readcharfun, multibyte)
 #define ANNOTATE(atom) \
-  (annotated ? Fcons (make_fixnum (readchar_charpos), atom) : atom)
+  (annotated ? Fcons (make_fixnum (initial_charpos), atom) : atom)
 
 /* When READCHARFUN is Qget_file_char, Qget_emacs_mule_file_char,
    Qlambda, or a cons, we use this to keep an unread character because
@@ -2990,6 +2990,7 @@ static Lisp_Object
 read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 {
   int c;
+  EMACS_INT initial_charpos = readchar_charpos;
   bool q_interned = true;
   bool skip_shorthand = false;
   bool multibyte;
@@ -3000,6 +3001,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 
  retry:
 
+  initial_charpos = readchar_charpos;
   c = READCHAR_REPORT_MULTIBYTE (&multibyte);
   if (c < 0)
     end_of_file_error ();
