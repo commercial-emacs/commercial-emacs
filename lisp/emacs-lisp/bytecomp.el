@@ -1104,6 +1104,7 @@ message buffer `default-directory'."
 (defvar byte-compile-current-buffer nil)
 (defvar byte-compile-current-annotations nil)
 (defvar byte-compile-current-form nil)
+(defvar byte-compile-current-charpos nil)
 
 ;; Log something that isn't a warning.
 (defmacro byte-compile-log (format-string &rest args)
@@ -1169,7 +1170,8 @@ message buffer `default-directory'."
                                      load-file-name dir)))
 		     (t "")))
 	 (annot (if-let ((byte-compile-current-file byte-compile-current-file)
-                         (charpos (byte-compile-fuzzy-charpos)))
+                         (charpos (or byte-compile-current-charpos
+                                      (byte-compile-fuzzy-charpos))))
                     (with-current-buffer byte-compile-current-buffer
                       (apply #'format "%d:%d:"
 			     (save-excursion
@@ -1426,8 +1428,12 @@ that means treat it as not defined."
                                collect element
                                else
                                append (recurse element)
-                               end)))
-          (cl-loop with result = (car byte-compile-current-annotations)
+                               end))
+                    (first-atom
+                      (form)
+                      (cond ((atom form) form)
+                            (t (cl-some #'first-atom form)))))
+          (cl-loop with result
                    with best = 0
                    with matches = (recurse (list byte-compile-current-annotations))
                    for match in matches
@@ -1438,7 +1444,8 @@ that means treat it as not defined."
                    when (> score best)
                    do (setq result match)
                    and do (setq best score)
-                   finally return (car result)))))))
+                   finally return (or (first-atom result)
+                                      (first-atom byte-compile-current-annotations))))))))
 
 (defun byte-compile-function-warn (f nargs def)
   "Record unresolved F or inconsistent arity NARGS.
@@ -1703,13 +1710,15 @@ from the truly unresolved ones."
     (when (byte-compile-warning-enabled-p 'unresolved)
       (let ((byte-compile-current-func :end))
         (dolist (urf byte-compile-unresolved-functions)
-          (let ((f (car urf)))
+          (cl-destructuring-bind (f charpos &rest _args)
+              urf
             (unless (memq f byte-compile-new-defuns)
-              (byte-compile-warn
-               (if (fboundp f)
-                   "the function `%s' might not be defined at runtime."
-                 "the function `%s' is not known to be defined.")
-               f))))))))
+              (let ((byte-compile-current-charpos charpos))
+                (byte-compile-warn
+                 (if (fboundp f)
+                     "the function `%s' might not be defined at runtime."
+                   "the function `%s' is not known to be defined.")
+                 f)))))))))
 
 
 (defvar byte-compile--outbuffer
