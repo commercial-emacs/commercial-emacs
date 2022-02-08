@@ -127,7 +127,6 @@
 (require 'backquote)
 (require 'macroexp)
 (require 'cconv)
-(require 'subr-x)
 
 (autoload 'cl-every "cl-extra")
 (autoload 'cl-tailp "cl-extra")
