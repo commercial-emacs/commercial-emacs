@@ -14959,7 +14959,8 @@ x_wm_set_size_hint (struct frame *f, long flags, bool user_position)
 #ifdef USE_X_TOOLKIT
   if (f->output_data.x->widget)
     {
-      widget_update_wm_size_hints (f->output_data.x->widget);
+      widget_update_wm_size_hints (f->output_data.x->widget,
+				   f->output_data.x->edit_widget);
       return;
     }
 #endif
@@ -15983,6 +15984,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
       ATOM_REFS_INIT ("WM_CONFIGURE_DENIED", Xatom_wm_configure_denied)
       ATOM_REFS_INIT ("WM_MOVED", Xatom_wm_window_moved)
       ATOM_REFS_INIT ("WM_CLIENT_LEADER", Xatom_wm_client_leader)
+      ATOM_REFS_INIT ("WM_TRANSIENT_FOR", Xatom_wm_transient_for)
       ATOM_REFS_INIT ("Editres", Xatom_editres)
       ATOM_REFS_INIT ("CLIPBOARD", Xatom_CLIPBOARD)
       ATOM_REFS_INIT ("TIMESTAMP", Xatom_TIMESTAMP)
