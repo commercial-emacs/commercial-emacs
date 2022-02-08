@@ -835,7 +835,10 @@ byte-compiled.  Run with dynamic binding."
      (save-excursion
        (let ((buffer (generate-new-buffer "*bytecomp-tests*")))
          (with-current-buffer buffer
-           (mapc (lambda (form) (insert (format "%S\n" form)))
+           (mapc (lambda (form)
+                   (if (stringp form)
+                       (insert form)
+                     (insert (format "%S\n" form))))
                  ',forms))
          (byte-compile-from-buffer buffer)
          (let (kill-buffer-query-functions)
@@ -854,10 +857,53 @@ byte-compiled.  Run with dynamic binding."
 (ert-deftest bytecomp-warn-coordinates ()
   (let ((byte-compile-current-file "his-fooness.el"))
     (bytecomp--buffer-with-warning-test
-     '("his-fooness.el:2:2" "his-fooness.el:2:52")
-     (bytecomp-tests-warn-coordinates-foo)
-     (defsubst bytecomp-tests-warn-coordinates-foo ()
-       (cl-member-if (function cl-evenp) (list 1 2 3))))))
+     '("his-fooness.el:3:2"
+       "his-fooness.el:9:6"
+       "his-fooness.el:16:6"
+       "his-fooness.el:20:6"
+       "his-fooness.el:24:11"
+       "his-fooness.el:24:11"
+       "his-fooness.el:29:2" ;; let special form kicks back to defun
+       "his-fooness.el:31:3"
+       "his-fooness.el:32:2" ;; let special form kicks back to defun
+       "his-fooness.el:34:10"
+       "his-fooness.el:32:2" ;; this one too
+       "his-fooness.el:4:4"  ;; cl-lib might not be defined at runtime.
+       )
+     "
+(bytecomp-tests-warn-coordinates-basic)
+(defsubst bytecomp-tests-warn-coordinates-basic ()
+  (cl-member-if (function cl-evenp) (list 1 2 3)))
+(defun bytecomp-tests-warn-coordinates-roland ()
+  (unwind-protect
+      (let ((foo \"foo\"))
+        (insert foo))
+    (setq foo \"bar\")))
+(defun bytecomp-tests-warn-coordinates-eglen ()
+  \"Fix page breaks in SAS 6 print files.\"
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (if (looking-at \"\f\") (delete-char 1))
+    (replace-regexp \"^\\(.+\\)\f\" \"\\1\n\f\n\")
+    (goto-char (point-min))
+    (replace-regexp \"^\f\\(.+\\)\" \"\f\n\\1\")
+    (goto-char (point-min))))
+(defun bytecomp-tests-warn-coordinates-kenichi (v)
+  (or (= (length v 0))
+      (= (length v) 1)))
+(defun bytecomp-tests-warn-coordinates-ynyaaa (_files)
+  (and t (string-match 1))
+  (and t (string-match 1 2)))
+(defun bytecomp-tests-warn-coordinates-clement ()
+  (let ((a)))
+  a)
+(defun bytecomp-tests-warn-coordinates-not-clement ()
+  (let ((a)))
+  (progn a)
+  (let ((a)))
+  a)
+")))
 
 (ert-deftest bytecomp-warn-present-require-cl-lib ()
   (should-error

@@ -1450,13 +1450,12 @@ that means treat it as not defined."
                    for cand-score =
                    (cl-loop for w in (listify match*)
                             count (member w (listify byte-compile-current-form)))
-                   when (>= cand-score best-score)
-                   do (if (and (= cand-milieu best-milieu)
-                               (= cand-score best-score))
-                          (setq result nil)
-                        (setq result match
-                              best-score cand-score
-                              best-milieu cand-milieu))
+                   when (and (>= cand-score best-score)
+                             (or (not (= cand-milieu best-milieu))
+                                 (not (= cand-score best-score))))
+                   do (setq result match
+                            best-score cand-score
+                            best-milieu cand-milieu)
                    finally return (or (first-atom result)
                                       (first-atom byte-compile-current-annotations))))))))
 
