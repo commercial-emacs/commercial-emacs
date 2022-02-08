@@ -1162,9 +1162,8 @@ message buffer `default-directory'."
 		     ((bufferp byte-compile-current-file)
 		      (format "Buffer %s:"
 			      (buffer-name byte-compile-current-file)))
-		     ;; We might be simply loading a file that
-		     ;; contains explicit calls to byte-compile functions.
 		     ((stringp load-file-name)
+		      ;; a file containing explicit calls to compiled functions.
 		      (format "%s:" (byte-compile-abbreviate-file
                                      load-file-name dir)))
 		     (t "")))
@@ -1249,12 +1248,12 @@ message buffer `default-directory'."
 (defvar byte-compile-log-warning-function
   #'byte-compile--log-warning-for-byte-compile
   "Function called when encountering a warning or error.
-Called with arguments (IDX STRING POSITION FILL LEVEL).  IDX is a
-line number. STRING is a message describing the problem.
-POSITION is a buffer position where the problem was detected.
-FILL is a prefix as in `warning-fill-prefix'.  LEVEL is the level
-of the problem (`:warning' or `:error').  POSITION, FILL and
-LEVEL may be nil.")
+Called with arguments (STRING POSITION FILL LEVEL).  STRING is a
+message describing the problem.  POSITION is a buffer position
+where the problem was detected.  FILL is a prefix as in
+`warning-fill-prefix'.  LEVEL is the level of the
+problem (`:warning' or `:error').  POSITION, FILL and LEVEL may
+be nil.")
 
 (defun byte-compile-log-warning (string &optional fill level)
   "Log a byte-compilation warning.
@@ -1433,21 +1432,31 @@ that means treat it as not defined."
                             (t (cl-some #'first-atom form))))
                     (listify
                       (form)
-                      (if (atom form) (list form) form)))
+                      (if (atom form)
+                          (list form)
+                        (unless (circular-list-p form)
+                          (cl-loop for element in form
+                                   collect element)))))
           (cl-loop with result
-                   with best = 0
+                   with best-score = 0
+                   with best-milieu = 0
                    with matches =
                    (sort (recurse (list byte-compile-current-annotations))
                          (lambda (x y)
                            (> (safe-length x) (safe-length y))))
                    for match in matches
                    for match* = (byte-compile--decouple match #'cdr)
-                   for score =
+                   for cand-milieu = (if (atom match*) 1 (safe-length match*))
+                   for cand-score =
                    (cl-loop for w in (listify match*)
                             count (member w (listify byte-compile-current-form)))
-                   when (> score best)
-                   do (setq result match)
-                   and do (setq best score)
+                   when (>= cand-score best-score)
+                   do (if (and (= cand-milieu best-milieu)
+                               (= cand-score best-score))
+                          (setq result nil)
+                        (setq result match
+                              best-score cand-score
+                              best-milieu cand-milieu))
                    finally return (or (first-atom result)
                                       (first-atom byte-compile-current-annotations))))))))
 
@@ -2197,16 +2206,14 @@ With argument ARG, insert value in current buffer after the form."
                            (form (byte-compile--decouple
                                   byte-compile-current-annotations
                                   #'cdr)))
-		      (byte-compile-sexp
-                       (eval-sexp-add-defvars
-                        form
-                        point))))
+		      (byte-compile-sexp (eval-sexp-add-defvars form point))))
                    lexical-binding)))
       (cond (arg
 	     (message "Compiling from buffer... done.")
 	     (prin1 value (current-buffer))
 	     (insert "\n"))
-	    ((message "%s" (prin1-to-string value)))))))
+	    (t
+             (message "%s" (prin1-to-string value)))))))
 
 (defun byte-compile-from-buffer (inbuffer)
   (let ((byte-compile-current-buffer inbuffer)
@@ -3440,14 +3447,14 @@ value should be byte-discard."
 (defun byte-compile-free-vars-warn (var &optional assignment)
   "Warn if symbol VAR refers to a free variable.
 VAR must not be lexically bound.
-If optional argument ASSIGNMENT is non-nil, this is treated as an
-assignment (i.e. `setq')."
-  (unless (or (not (byte-compile-warning-enabled-p 'free-vars var))
-              (boundp var)
-              (memq var byte-compile-bound-variables)
-              (memq var (if assignment
-                            byte-compile-free-assignments
-                          byte-compile-free-references)))
+The free record for assignment special forms, i.e., setq, is
+kept separately and referenced for non-nil ASSIGNMENT."
+  (when (and (byte-compile-warning-enabled-p 'free-vars var)
+             (not (boundp var))
+             (not (memq var byte-compile-bound-variables))
+             (not (memq var (if assignment
+                                byte-compile-free-assignments
+                              byte-compile-free-references))))
     (let* ((varname (prin1-to-string var))
            (desc (if assignment "assignment" "reference"))
            (suggestions (help-uni-confusable-suggestions varname)))
@@ -3463,9 +3470,7 @@ assignment (i.e. `setq')."
   (byte-compile-check-variable var 'reference)
   (let ((lex-binding (assq var byte-compile--lexical-environment)))
     (if lex-binding
-	;; VAR is lexically bound
         (byte-compile-stack-ref (cdr lex-binding))
-      ;; VAR is dynamically bound
       (byte-compile-free-vars-warn var)
       (byte-compile-dynamic-variable-op 'byte-varref var))))
 
@@ -3474,9 +3479,7 @@ assignment (i.e. `setq')."
   (byte-compile-check-variable var 'assign)
   (let ((lex-binding (assq var byte-compile--lexical-environment)))
     (if lex-binding
-	;; VAR is lexically bound.
         (byte-compile-stack-set (cdr lex-binding))
-      ;; VAR is dynamically bound.
       (byte-compile-free-vars-warn var t)
       (byte-compile-dynamic-variable-op 'byte-varset var))))
 
@@ -4044,8 +4047,6 @@ and (funcall (function foo)) will lose with autoloads."
 
 (defun byte-compile-quote (form)
   (byte-compile-constant (car (cdr form))))
-
-;;; control structures
 
 (defun byte-compile-body (body &optional for-effect)
   (while (cdr body)
@@ -5257,29 +5258,27 @@ and corresponding effects."
 	      (insert (int-to-string n) "\n")))
 	(setq i (1+ i))))))
 
-;; To avoid "lisp nesting exceeds max-lisp-eval-depth" when bytecomp compiles
-;; itself, compile some of its most used recursive functions (at load time).
-;;
+;; Compile at load-time most frequently used recursive methods to
+;; avoid "lisp nesting exceeds max-lisp-eval-depth" errors.
 (eval-when-compile
-  (or (byte-code-function-p (symbol-function 'byte-compile-form))
-      (subr-native-elisp-p (symbol-function 'byte-compile-form))
-      (assq 'byte-code (symbol-function 'byte-compile-form))
-      (let ((byte-optimize nil)		; do it fast
-	    (byte-compile-warnings nil))
-	(mapc (lambda (x)
-                (unless (subr-native-elisp-p x)
-		  (or noninteractive (message "compiling %s..." x))
-		  (byte-compile x)
-		  (or noninteractive (message "compiling %s...done" x))))
-	      '(byte-compile-normal-call
-		byte-compile-form
-		byte-compile-body
-		;; Inserted some more than necessary, to speed it up.
-		byte-compile-top-level
-		byte-compile-out-top-level
-		byte-compile-constant
-		byte-compile-variable-ref))))
-  nil)
+  (prog1 nil
+    (or (byte-code-function-p (symbol-function 'byte-compile-form))
+        (subr-native-elisp-p (symbol-function 'byte-compile-form))
+        (assq 'byte-code (symbol-function 'byte-compile-form))
+        (let ((byte-optimize nil)        ; do it fast
+	      (byte-compile-warnings nil))
+	  (mapc (lambda (x)
+                  (unless (subr-native-elisp-p x)
+		    (or noninteractive (message "compiling %s..." x))
+		    (byte-compile x)
+		    (or noninteractive (message "compiling %s...done" x))))
+	        '(byte-compile-normal-call
+		  byte-compile-form
+		  byte-compile-body
+		  byte-compile-top-level
+		  byte-compile-out-top-level
+		  byte-compile-constant
+		  byte-compile-variable-ref))))))
 
 (make-obsolete-variable 'bytecomp-load-hook
                         "use `with-eval-after-load' instead." "28.1")
