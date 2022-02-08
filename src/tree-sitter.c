@@ -620,7 +620,7 @@ tree_sitter_record_change (ptrdiff_t start_char,
 	    BUFFER_TO_SITTER (new_end_char),
 	    (TSPoint) { 0, 0 },
 	    (TSPoint) { 0, 0 },
-	    (TSPoint) { 0, new_end_char - start_char } /* black magic */
+	    (TSPoint) { 1, new_end_char - start_char } /* black magic */
 	  };
 
 	  if (XTREE_SITTER (sitter)->prev_tree != NULL)
