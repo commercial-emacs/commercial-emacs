@@ -99,7 +99,7 @@ each clause."
       (apply handler form (cdr form))
     (error
      (message "Compiler-macro error for %S: %S" (car form) err)
-           form)))
+     form)))
 
 (defun macroexp--funcall-if-compiled (_form)
   "Pseudo function used internally by macroexp to delay warnings.

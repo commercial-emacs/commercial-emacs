@@ -82,6 +82,7 @@ src/verbose.mk
 # Lisp-level sources built by 'make'.
 *cus-load.el
 *loaddefs.el
+cldefs.el
 lisp/cedet/semantic/bovine/c-by.el
 lisp/cedet/semantic/bovine/make-by.el
 lisp/cedet/semantic/bovine/scm-by.el
