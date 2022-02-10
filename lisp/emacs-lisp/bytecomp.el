@@ -1167,8 +1167,7 @@ message buffer `default-directory'."
 		      (format "%s:" (byte-compile-abbreviate-file
                                      load-file-name dir)))
 		     (t "")))
-	 (annot (if-let ((byte-compile-current-file byte-compile-current-file)
-                         (charpos (or byte-compile-current-charpos
+	 (annot (if-let ((charpos (or byte-compile-current-charpos
                                       (byte-compile-fuzzy-charpos))))
                     (with-current-buffer byte-compile-current-buffer
                       (apply #'format "%d:%d:"
@@ -1770,8 +1769,7 @@ and cl-macs.el.")
          ;; This is used in `macroexp-file-name' to make sure that
          ;; loading file A which does (byte-compile-file B) won't
          ;; cause macro calls in B to think they come from A.
-         (current-load-list (list nil))
-         )
+         (current-load-list (list nil)))
      (prog1
          (progn ,@body)
        (when byte-native-compiling
@@ -1780,34 +1778,26 @@ and cl-macs.el.")
 
 (defmacro displaying-byte-compile-warnings (&rest body)
   (declare (debug (def-body)))
-  `(let* ((--displaying-byte-compile-warnings-fn (lambda () ,@body))
-	  (warning-series-started
-	   (and (markerp warning-series)
-		(eq (marker-buffer warning-series)
-		    (get-buffer byte-compile-log-buffer)))))
-     (if (or (eq warning-series 'byte-compile-warning-series)
-	     warning-series-started)
-	 ;; warning-series does come from compilation,
-	 ;; so don't bind it, but maybe do set it.
-	 (let (tem)
-	   ;; Log the file name.  Record position of that text.
-	   (setq tem (byte-compile-log-file))
-	   (unless warning-series-started
-	     (setq warning-series (or tem 'byte-compile-warning-series)))
-	   (if byte-compile-debug
-	       (funcall --displaying-byte-compile-warnings-fn)
-	     (condition-case err
-		 (funcall --displaying-byte-compile-warnings-fn)
-	       (error (byte-compile-report-error err)))))
-       ;; warning-series does not come from compilation, so bind it.
-       (let ((warning-series
-	      ;; Log the file name.  Record position of that text.
-	      (or (byte-compile-log-file) 'byte-compile-warning-series)))
-	 (if byte-compile-debug
-	     (funcall --displaying-byte-compile-warnings-fn)
-	   (condition-case err
-	       (funcall --displaying-byte-compile-warnings-fn)
-	     (error (byte-compile-report-error err))))))))
+  `(let ((fn (lambda ()
+               (let ((debug-on-error (or debug-on-error byte-compile-debug)))
+	         (condition-case-unless-debug err
+		     (progn ,@body)
+	           (error (byte-compile-report-error err)))))))
+     (if (and (markerp warning-series)
+	      (eq (marker-buffer warning-series)
+		  (get-buffer byte-compile-log-buffer)))
+         ;; warnings already started
+         (funcall fn)
+       (let ((new-warning-series (or (byte-compile-log-file)
+                                     'byte-compile-warning-series)))
+         (if (eq warning-series 'byte-compile-warning-series)
+             ;; `warning-series' comes from compilation; set globally
+             (progn
+               (setq warning-series new-warning-series)
+               (funcall fn))
+           ;; `warning-series' not from compilation; set locally
+           (let ((warning-series new-warning-series))
+             (funcall fn)))))))
 
 ;;;###autoload
 (defun byte-force-recompile (directory)
@@ -1836,9 +1826,9 @@ This command will normally not follow symlinks when compiling
 files.  If FOLLOW-SYMLINKS is non-nil, symlinked `.el' files will
 also be compiled."
   (interactive "DByte recompile directory: \nP")
-  (if arg (setq arg (prefix-numeric-value arg)))
-  (if noninteractive
-      nil
+  (when arg
+    (setq arg (prefix-numeric-value arg)))
+  (unless noninteractive
     (save-some-buffers
      nil (lambda ()
            (let ((file (buffer-file-name)))
@@ -1885,19 +1875,17 @@ also be compiled."
                              ('no-byte-compile skip-count)
                              ('t file-count)
                              (_ fail-count)))
-                          (or noninteractive
-                              (message "Checking %s..." directory))
-                          (if (not (eq last-dir directory))
-                              (setq last-dir directory
-                                    dir-count (1+ dir-count)))
-                          )))))
+                          (unless noninteractive
+                            (message "Checking %s..." directory))
+                          (unless (eq last-dir directory)
+                            (setq last-dir directory
+                                  dir-count (1+ dir-count))))))))
 	 (setq directories (cdr directories))))
       (message "Done (Total of %d file%s compiled%s%s%s)"
 	       file-count (if (= file-count 1) "" "s")
 	       (if (> fail-count 0) (format ", %d failed" fail-count) "")
 	       (if (> skip-count 0) (format ", %d skipped" skip-count) "")
-	       (if (> dir-count 1)
-                   (format " in %d directories" dir-count) "")))))
+	       (if (> dir-count 1) (format " in %d directories" dir-count) "")))))
 
 (defvar no-byte-compile nil
   "Non-nil to prevent byte-compiling of Emacs Lisp code.
@@ -1950,8 +1938,8 @@ If compilation is needed, this functions returns the result of
                        (y-or-n-p (concat "Compile "
                                          filename "? ")))))
             (progn
-              (if (and noninteractive (not byte-compile-verbose))
-                  (message "Compiling %s..." filename))
+              (when (and noninteractive (not byte-compile-verbose))
+                (message "Compiling %s..." filename))
               (byte-compile-file filename))
 	  'no-byte-compile)
       (when load
@@ -2031,13 +2019,11 @@ See also `emacs-lisp-byte-compile-and-load'."
   ;; Expand now so we get the current buffer's defaults
   (setq filename (expand-file-name filename))
 
-  ;; If we're compiling a file that's in a buffer and is modified, offer
-  ;; to save it first.
-  (or noninteractive
-      (let ((b (get-file-buffer (expand-file-name filename))))
-	(if (and b (buffer-modified-p b)
-		 (y-or-n-p (format "Save buffer %s first? " (buffer-name b))))
-	    (with-current-buffer b (save-buffer)))))
+  (unless noninteractive
+    (when-let ((b (get-file-buffer (expand-file-name filename))))
+      (when (and (buffer-modified-p b)
+	         (y-or-n-p (format "Save buffer %s first? " (buffer-name b))))
+	(with-current-buffer b (save-buffer)))))
 
   ;; Force logging of the file name for each file compiled.
   (setq byte-compile-last-logged-file nil)
@@ -2052,32 +2038,21 @@ See also `emacs-lisp-byte-compile-and-load'."
     (setq target-file (byte-compile-dest-file filename))
     (setq byte-compile-dest-file target-file)
     (with-current-buffer
-	;; It would be cleaner to use a temp buffer, but if there was
-	;; an error, we leave this buffer around for diagnostics.
-	;; Its name is documented in the lispref.
 	(setq input-buffer (get-buffer-create
 			    (concat " *Compiler Input*"
 				    (if (zerop byte-compile-level) ""
 				      (format "-%s" byte-compile-level)))))
       (erase-buffer)
       (setq buffer-file-coding-system nil)
-      ;; Always compile an Emacs Lisp file as multibyte
-      ;; unless the file itself forces unibyte with -*-coding: raw-text;-*-
+      ;; File itself can force unibyte with -*-coding: raw-text;-*-
       (set-buffer-multibyte t)
       (insert-file-contents filename)
-      ;; Mimic the way after-insert-file-set-coding can make the
-      ;; buffer unibyte when visiting this file.
+      ;; Mimic `after-insert-file-set-coding' allows unibyte.
       (when (or (eq last-coding-system-used 'no-conversion)
 		(eq (coding-system-type last-coding-system-used) 5))
-	;; For coding systems no-conversion and raw-text...,
-	;; edit the buffer as unibyte.
 	(set-buffer-multibyte nil))
-      ;; Run hooks including the uncompression hook.
-      ;; If they change the file name, then change it for the output also.
       (let ((buffer-file-name filename)
             (dmm (default-value 'major-mode))
-            ;; Ignore unsafe local variables.
-            ;; We only care about a few of them for our purposes.
             (enable-local-variables :safe)
             (enable-local-eval nil))
         (unwind-protect
@@ -2094,95 +2069,82 @@ See also `emacs-lisp-byte-compile-and-load'."
         (setq-local lexical-binding nil))
       ;; Set the default directory, in case an eval-when-compile uses it.
       (setq default-directory (file-name-directory filename)))
-    ;; Check if the file's local variables explicitly specify not to
-    ;; compile this file.
     (if (with-current-buffer input-buffer no-byte-compile)
-	(progn
-	  ;; (message "%s not compiled because of `no-byte-compile: %s'"
-	  ;; 	   (byte-compile-abbreviate-file filename)
-	  ;; 	   (with-current-buffer input-buffer no-byte-compile))
+        ;; -*- no-byte-compile: t -*-
+	(prog1 'no-byte-compile
 	  (when (and target-file (file-exists-p target-file))
 	    (message "%s deleted because of `no-byte-compile: %s'"
 		     (byte-compile-abbreviate-file target-file)
 		     (buffer-local-value 'no-byte-compile input-buffer))
-	    (condition-case nil (delete-file target-file) (error nil)))
-	  ;; We successfully didn't compile this file.
-	  'no-byte-compile)
+	    (ignore-errors (delete-file target-file))))
       (when byte-compile-verbose
 	(message "Compiling %s..." filename))
-      ;; It is important that input-buffer not be current at this call,
-      ;; so that the value of point set in input-buffer
-      ;; within byte-compile-from-buffer lingers in that buffer.
       (setq output-buffer
 	    (save-current-buffer
 	      (let ((byte-compile-level (1+ byte-compile-level)))
                 (byte-compile-from-buffer input-buffer))))
-      (if byte-compiler-error-flag
-	  nil
-	(when byte-compile-verbose
-	  (message "Compiling %s...done" filename))
-	(kill-buffer input-buffer)
-	(with-current-buffer output-buffer
-          (when (and target-file
-                     (or (not byte-native-compiling)
-                         (and byte-native-compiling byte+native-compile)))
-	    (goto-char (point-max))
-	    (insert "\n")			; aaah, unix.
-	    (cond
-	     ((and (file-writable-p target-file)
-		   ;; We attempt to create a temporary file in the
-		   ;; target directory, so the target directory must be
-		   ;; writable.
-		   (file-writable-p
-		    (file-name-directory
-		     ;; Need to expand in case TARGET-FILE doesn't
-		     ;; include a directory (Bug#45287).
-		     (expand-file-name target-file))))
-              (if byte-native-compiling
-                  ;; Defer elc production.
-                  (setf byte-to-native-output-buffer-file
-                        (cons (current-buffer) target-file))
-                (byte-write-target-file (current-buffer) target-file))
-	      (or noninteractive
-		  byte-native-compiling
-		  (message "Wrote %s" target-file)))
-             ((file-writable-p target-file)
-              ;; In case the target directory isn't writable (see e.g. Bug#44631),
-              ;; try writing to the output file directly.  We must disable any
-              ;; code conversion here.
-              (let ((coding-system-for-write 'no-conversion))
-                (with-file-modes (logand (default-file-modes) #o666)
-                  (write-region (point-min) (point-max) target-file nil 1)))
-              (or noninteractive (message "Wrote %s" target-file)))
-	     (t
-	      ;; This is just to give a better error message than write-region
-	      (let ((exists (file-exists-p target-file)))
-	        (signal (if exists 'file-error 'file-missing)
-		        (list "Opening output file"
-			      (if exists
-				  "Cannot overwrite file"
-			        "Directory not writable or nonexistent")
-			      target-file))))))
-          (unless byte-native-compiling
-	    (kill-buffer (current-buffer))))
-	(when (and byte-compile-generate-call-tree
-		   (or (eq t byte-compile-generate-call-tree)
-		       (y-or-n-p (format "Report call tree for %s? "
-                                         filename))))
-	  (save-excursion
-	    (display-call-tree filename)))
-        (let ((gen-dynvars (getenv "EMACS_GENERATE_DYNVARS")))
-          (when (and gen-dynvars (not (equal gen-dynvars ""))
-                     byte-compile--seen-defvars)
-            (let ((dynvar-file (concat target-file ".dynvars")))
-              (message "Generating %s" dynvar-file)
-              (with-temp-buffer
-                (dolist (var (delete-dups byte-compile--seen-defvars))
-                  (insert (format "%S\n" (cons var filename))))
-	        (write-region (point-min) (point-max) dynvar-file)))))
-	(when load
-          (load target-file))
-	t))))
+      (unless byte-compiler-error-flag
+        (prog1 t
+	  (when byte-compile-verbose
+	    (message "Compiling %s...done" filename))
+	  (kill-buffer input-buffer)
+	  (with-current-buffer output-buffer
+            (when (and target-file
+                       (or (not byte-native-compiling)
+                           (and byte-native-compiling byte+native-compile)))
+	      (goto-char (point-max))
+	      (insert "\n")			; aaah, unix.
+	      (cond
+	       ((and (file-writable-p target-file)
+		     ;; We attempt to create a temporary file in the
+		     ;; target directory, so the target directory must be
+		     ;; writable.
+		     (file-writable-p
+		      (file-name-directory
+		       ;; Need to expand in case TARGET-FILE doesn't
+		       ;; include a directory (Bug#45287).
+		       (expand-file-name target-file))))
+                (if byte-native-compiling
+                    ;; Defer elc production.
+                    (setf byte-to-native-output-buffer-file
+                          (cons (current-buffer) target-file))
+                  (byte-write-target-file (current-buffer) target-file))
+	        (or noninteractive
+		    byte-native-compiling
+		    (message "Wrote %s" target-file)))
+               ((file-writable-p target-file)
+                ;; Target file writable but not target directory. (Bug#44631)
+                (let ((coding-system-for-write 'no-conversion))
+                  (with-file-modes (logand (default-file-modes) #o666)
+                    (write-region (point-min) (point-max) target-file nil 1)))
+                (or noninteractive (message "Wrote %s" target-file)))
+	       (t
+	        (let ((exists (file-exists-p target-file)))
+	          (signal (if exists 'file-error 'file-missing)
+		          (list "Opening output file"
+			        (if exists
+				    "Cannot overwrite file"
+			          "Directory not writable or nonexistent")
+			        target-file))))))
+            (unless byte-native-compiling
+	      (kill-buffer (current-buffer))))
+	  (when (and byte-compile-generate-call-tree
+		     (or (eq t byte-compile-generate-call-tree)
+		         (y-or-n-p (format "Report call tree for %s? "
+                                           filename))))
+	    (save-excursion
+	      (display-call-tree filename)))
+          (let ((gen-dynvars (getenv "EMACS_GENERATE_DYNVARS")))
+            (when (and gen-dynvars (not (equal gen-dynvars ""))
+                       byte-compile--seen-defvars)
+              (let ((dynvar-file (concat target-file ".dynvars")))
+                (message "Generating %s" dynvar-file)
+                (with-temp-buffer
+                  (dolist (var (delete-dups byte-compile--seen-defvars))
+                    (insert (format "%S\n" (cons var filename))))
+	          (write-region (point-min) (point-max) dynvar-file)))))
+	  (when load
+            (load target-file)))))))
 
 ;;; compiling a single function
 ;;;###autoload
@@ -2343,8 +2305,8 @@ stupid (and also obsolete)."
         (print-quoted t)
         (print-gensym t)
         (print-circle (not byte-compile-disable-print-circle)))
-    (if (and (memq (car-safe form) '(defvar defvaralias defconst
-                                      autoload custom-declare-variable))
+    (if (and (memq (car-safe form)
+                   '(defvaralias defvar defconst autoload custom-declare-variable))
              (stringp (nth 3 form)))
         (byte-compile-output-docform nil nil '("\n(" 3 ")") form nil
                                      (memq (car form)
@@ -2482,7 +2444,9 @@ in the input buffer (now current), not in the output buffer."
                          (symbolp (car form))
 		         (get (car form) 'byte-hunk-handler))))
       (let* ((byte-compile-current-form form)
-             (form* (funcall handler form)))
+             (form* (condition-case-unless-debug err
+                        (funcall handler form)
+                      (error (byte-compile-report-error err)))))
 	(byte-compile-flush-pending)
 	(byte-compile-output-file-form form*))
     (byte-compile-keep-pending form)))
@@ -5081,8 +5045,6 @@ Use this from the command line, with `-batch';
 it won't work in an interactive Emacs."
   (batch-byte-compile t))
 
-;;; by crl@newton.purdue.edu
-;;;  Only works noninteractively.
 ;;;###autoload
 (defun batch-byte-compile (&optional noforce)
   "Run `byte-compile-file' on the files remaining on the command line.
@@ -5099,67 +5061,49 @@ For example, invoke \"emacs -batch -f batch-byte-compile $emacs/ ~/*.el\".
 
 If NOFORCE is non-nil, don't recompile a file that seems to be
 already up-to-date."
-  ;; command-line-args-left is what is left of the command line, from
-  ;; startup.el.
-  (defvar command-line-args-left)	;Avoid 'free variable' warning
-  (if (not noninteractive)
-      (error "`batch-byte-compile' is to be used only with -batch"))
-  ;; Better crash loudly than attempting to recover from undefined
-  ;; behavior.
+  (defvar command-line-args-left) ;; from startup.el
+  (unless noninteractive
+    (error "`batch-byte-compile' is to be used only with -batch"))
   (setq attempt-stack-overflow-recovery nil
         attempt-orderly-shutdown-on-fatal-signal nil)
-  (let ((error nil))
+  (let (error)
     (while command-line-args-left
       (if (file-directory-p (expand-file-name (car command-line-args-left)))
 	  ;; Directory as argument.
 	  (let (source dest)
 	    (dolist (file (directory-files (car command-line-args-left)))
-	      (if (and (string-match emacs-lisp-file-regexp file)
-		       (not (auto-save-file-name-p file))
-		       (setq source
-                             (expand-file-name file
-                                               (car command-line-args-left)))
-		       (setq dest (byte-compile-dest-file source))
-		       (file-exists-p dest)
-		       (file-newer-than-file-p source dest))
-		  (if (null (batch-byte-compile-file source))
-		      (setq error t)))))
+              (when (and (string-match emacs-lisp-file-regexp file)
+		         (not (auto-save-file-name-p file))
+		         (setq source
+                               (expand-file-name file
+                                                 (car command-line-args-left)))
+		         (setq dest (byte-compile-dest-file source))
+		         (file-exists-p dest)
+		         (file-newer-than-file-p source dest))
+                (let ((ret (batch-byte-compile-file source)))
+                  (unless error (setq error (not ret)))))))
 	;; Specific file argument
-	(if (or (not noforce)
-		(let* ((source (car command-line-args-left))
-		       (dest (byte-compile-dest-file source)))
-		  (or (not (file-exists-p dest))
-		      (file-newer-than-file-p source dest))))
-	    (if (null (batch-byte-compile-file (car command-line-args-left)))
-		(setq error t))))
+	(let* ((source (car command-line-args-left))
+	       (dest (byte-compile-dest-file source)))
+	  (when (or (not noforce)
+                    (not (file-exists-p dest))
+	            (file-newer-than-file-p source dest))
+            (let ((ret (batch-byte-compile-file source)))
+              (unless error (setq error (not ret)))))))
       (setq command-line-args-left (cdr command-line-args-left)))
     (kill-emacs (if error 1 0))))
 
 (defun batch-byte-compile-file (file)
   (let ((byte-compile-root-dir (or byte-compile-root-dir default-directory)))
-    (if debug-on-error
+    (condition-case-unless-debug err
         (byte-compile-file file)
-      (condition-case err
-          (byte-compile-file file)
-        (file-error
-         (message (if (cdr err)
-                      ">>Error occurred processing %s: %s (%s)"
-                    ">>Error occurred processing %s: %s")
-                  file
-                  (get (car err) 'error-message)
-                  (prin1-to-string (cdr err)))
-         (let ((destfile (byte-compile-dest-file file)))
-           (if (file-exists-p destfile)
-               (delete-file destfile)))
-         nil)
-        (error
-         (message (if (cdr err)
-                      ">>Error occurred processing %s: %s (%s)"
-                    ">>Error occurred processing %s: %s")
-                  file
-                  (get (car err) 'error-message)
-                  (prin1-to-string (cdr err)))
-         nil)))))
+      (error
+       (prog1 nil
+         (message "Error processing %s: %s" file (error-message-string err))
+         (when (eq (car err) 'file-error)
+           (let ((destfile (byte-compile-dest-file file)))
+             (when (file-exists-p destfile)
+               (delete-file destfile)))))))))
 
 (defun byte-compile-refresh-preloaded ()
   "Reload any Lisp file that was changed since Emacs was dumped.
@@ -5200,10 +5144,8 @@ Optional argument ARG is passed as second argument ARG to
 and corresponding effects."
   ;; command-line-args-left is what is left of the command line (startup.el)
   (defvar command-line-args-left)	;Avoid 'free variable' warning
-  (if (not noninteractive)
-      (error "batch-byte-recompile-directory is to be used only with -batch"))
-  ;; Better crash loudly than attempting to recover from undefined
-  ;; behavior.
+  (unless noninteractive
+    (error "batch-byte-recompile-directory is to be used only with -batch"))
   (setq attempt-stack-overflow-recovery nil
         attempt-orderly-shutdown-on-fatal-signal nil)
   (or command-line-args-left
@@ -5212,8 +5154,6 @@ and corresponding effects."
     (byte-recompile-directory (car command-line-args-left) arg)
     (setq command-line-args-left (cdr command-line-args-left)))
   (kill-emacs 0))
-
-;;; Core compiler macros.
 
 (put 'featurep 'compiler-macro
      (lambda (form feature &rest _ignore)
