@@ -11759,32 +11759,34 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	  case XI_KeyRelease:
 #if defined HAVE_X_I18N || defined USE_GTK
-	    XKeyPressedEvent xkey;
+	    {
+	      XKeyPressedEvent xkey;
 
-	    memset (&xkey, 0, sizeof xkey);
+	      memset (&xkey, 0, sizeof xkey);
 
-	    xkey.type = KeyRelease;
-	    xkey.serial = xev->serial;
-	    xkey.send_event = xev->send_event;
-	    xkey.display = dpyinfo->display;
-	    xkey.window = xev->event;
-	    xkey.root = xev->root;
-	    xkey.subwindow = xev->child;
-	    xkey.time = xev->time;
-	    xkey.state = ((xev->mods.effective & ~(1 << 13 | 1 << 14))
-			  | (xev->group.effective << 13));
-	    xkey.keycode = xev->detail;
-	    xkey.same_screen = True;
+	      xkey.type = KeyRelease;
+	      xkey.serial = xev->serial;
+	      xkey.send_event = xev->send_event;
+	      xkey.display = dpyinfo->display;
+	      xkey.window = xev->event;
+	      xkey.root = xev->root;
+	      xkey.subwindow = xev->child;
+	      xkey.time = xev->time;
+	      xkey.state = ((xev->mods.effective & ~(1 << 13 | 1 << 14))
+			    | (xev->group.effective << 13));
+	      xkey.keycode = xev->detail;
+	      xkey.same_screen = True;
 
 #ifdef HAVE_X_I18N
-	    if (x_filter_event (dpyinfo, (XEvent *) &xkey))
-	      *finish = X_EVENT_DROP;
+	      if (x_filter_event (dpyinfo, (XEvent *) &xkey))
+		*finish = X_EVENT_DROP;
 #else
-	    f = x_any_window_to_frame (xkey->event);
+	      f = x_any_window_to_frame (xkey->event);
 
-	    if (f && xg_filter_key (f, event))
-	      *finish = X_EVENT_DROP;
+	      if (f && xg_filter_key (f, event))
+		*finish = X_EVENT_DROP;
 #endif
+	    }
 #endif
 
 	    goto XI_OTHER;
@@ -14532,21 +14534,36 @@ x_make_frame_visible (struct frame *f)
 #ifndef USE_GTK
       output = FRAME_X_OUTPUT (f);
 
-      if (output->user_time_window == None)
+      if (!x_wm_supports (f, dpyinfo->Xatom_net_wm_user_time_window))
 	{
-	  XSetWindowAttributes attrs;
-	  memset (&attrs, 0, sizeof attrs);
-
-	  output->user_time_window
-	    = FRAME_OUTER_WINDOW (f);
-
-	  if (x_wm_supports (f, dpyinfo->Xatom_net_wm_user_time_window))
+	  if (output->user_time_window == None)
+	    output->user_time_window = FRAME_OUTER_WINDOW (f);
+	  else if (output->user_time_window != FRAME_OUTER_WINDOW (f))
 	    {
+	      XDestroyWindow (dpyinfo->display,
+			      output->user_time_window);
+	      XDeleteProperty (dpyinfo->display,
+			       FRAME_OUTER_WINDOW (f),
+			       dpyinfo->Xatom_net_wm_user_time_window);
+	      output->user_time_window = FRAME_OUTER_WINDOW (f);
+	    }
+	}
+      else
+	{
+	  if (output->user_time_window == FRAME_OUTER_WINDOW (f)
+	      || output->user_time_window == None)
+	    {
+	      XSetWindowAttributes attrs;
+	      memset (&attrs, 0, sizeof attrs);
+
 	      output->user_time_window
 		= XCreateWindow (dpyinfo->display, FRAME_X_WINDOW (f),
 				 -1, -1, 1, 1, 0, 0, InputOnly,
 				 CopyFromParent, 0, &attrs);
 
+	      XDeleteProperty (dpyinfo->display,
+			       FRAME_OUTER_WINDOW (f),
+			       dpyinfo->Xatom_net_wm_user_time);
 	      XChangeProperty (dpyinfo->display,
 			       FRAME_OUTER_WINDOW (f),
 			       dpyinfo->Xatom_net_wm_user_time_window,
