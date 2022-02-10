@@ -2284,6 +2284,7 @@ higher."
 			 (not c-re-redisplay-timer))
 		(setq c-re-redisplay-timer
 		      (run-with-timer 0 nil #'c-force-redisplay
+				      (current-buffer)
 				      (match-beginning 0) (match-end 0)))))))))))
 
 
