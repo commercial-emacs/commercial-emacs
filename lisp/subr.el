@@ -2181,7 +2181,8 @@ can do the job."
                           ;; FIXME: We should also emit a warning for let-bound
                           ;; variables with dynamic binding.
                           (when (assq sym byte-compile--lexical-environment)
-                            (byte-compile-report-error msg :fill))))
+                            (setq byte-compile-abort-elc t)
+                            (byte-compile-warn "%s" msg))))
                (code
                 (macroexp-let2 macroexp-copyable-p x element
                   `(if ,(if compare-fn

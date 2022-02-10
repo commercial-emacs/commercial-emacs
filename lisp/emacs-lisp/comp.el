@@ -4009,8 +4009,7 @@ the deferred compilation mechanism."
     (let* ((data function-or-file)
            (comp-native-compiling t)
            (byte-native-qualities nil)
-           ;; Have byte compiler signal an error when compilation fails.
-           (byte-compile-debug t)
+           (byte-compile-error-on-warn t)
            (comp-ctxt (make-comp-ctxt :output output
                                       :with-late-load with-late-load)))
       (comp-log "\n\n" 1)

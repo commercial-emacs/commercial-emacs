@@ -117,7 +117,6 @@
 ;;               binders)))
 
 (eval-when-compile (require 'cl-lib))
-
 (defconst cconv-liftwhen 6
   "Try to do lambda lifting if the number of arguments + free variables
 is less than this number.")
@@ -356,12 +355,9 @@ places where they originally did not directly appear."
   ;;(if (listp form) (print (car form)) form)
   (pcase form
     (`(,(and letsym (or 'let* 'let)) ,binders . ,body)
-
-					; let and let* special forms
      (let ((binders-new '())
            (new-env env)
            (new-extend extend))
-
        (dolist (binder binders)
          (let* ((value nil)
 		(var (if (not (consp binder))
@@ -455,8 +451,7 @@ places where they originally did not directly appear."
 
                (when (eq letsym 'let*)
                  (setq env new-env)
-                 (setq extend new-extend))))))
-         )                           ; end of dolist over binders
+                 (setq extend new-extend)))))))
 
        (when (not (eq letsym 'let*))
          ;; We can't do the cconv--remap-llv at the same place for let and
@@ -477,9 +472,7 @@ places where they originally did not directly appear."
                               (cconv-convert
                                form new-env new-extend))
                             body))))
-					;end of let let* forms
 
-                                  ; first element is lambda expression
     (`(,(and `(lambda . ,_) fun) . ,args)
      ;; FIXME: it's silly to create a closure just to call it.
      ;; Running byte-optimize-form earlier will resolve this.
@@ -489,7 +482,7 @@ places where they originally did not directly appear."
                    (cconv-convert form env extend))
                  args)))
 
-    (`(cond . ,cond-forms)              ; cond special form
+    (`(cond . ,cond-forms)
      `(cond . ,(mapcar (lambda (branch)
                          (mapcar (lambda (form)
                                    (cconv-convert form env extend))
@@ -502,13 +495,14 @@ places where they originally did not directly appear."
        (cconv--convert-function args body env form docstring)))
 
     (`(internal-make-closure . ,_)
-     (byte-compile-report-error
-      "Internal error in compiler: cconv called twice?"))
+     (defvar byte-compile-abort-elc)
+     (prog1 nil
+       (setq byte-compile-abort-elc t)
+       (byte-compile-warn "%s" "Internal error in compiler: cconv called twice?")))
 
     (`(quote . ,_) form)
     (`(function . ,_) form)
 
-					;defconst, defvar
     (`(,(and sym (or 'defconst 'defvar)) ,definedsymbol . ,forms)
      `(,sym ,definedsymbol
             . ,(when (consp forms)
@@ -517,7 +511,6 @@ places where they originally did not directly appear."
                        ;; and may be an invalid expression (e.g. ($# . 678)).
                        (cdr forms)))))
 
-                                        ; condition-case
     (`(condition-case ,var ,protected-form . ,handlers)
      (let* ((class (and var (cconv--var-classification (list var) form)))
             (newenv
@@ -548,7 +541,7 @@ places where they originally did not directly appear."
      `(unwind-protect ,(cconv-convert form env extend)
         :fun-body ,(cconv--convert-function () body env form)))
 
-    (`(setq . ,forms)                   ; setq special form
+    (`(setq . ,forms)
      (if (= (logand (length forms) 1) 1)
          ;; With an odd number of args, let bytecomp.el handle the error.
          form
@@ -560,13 +553,11 @@ places where they originally did not directly appear."
              (push (pcase sym-new
                      ((pred symbolp) `(setq ,sym-new ,value))
                      (`(car-safe ,iexp) `(setcar ,iexp ,value))
-                     ;; This "should never happen", but for variables which are
-                     ;; mutated+captured+unused, we may end up trying to `setq'
-                     ;; on a closed-over variable, so just drop the setq.
-                     (_ ;; (byte-compile-report-error
-                      ;;  (format "Internal error in cconv of (setq %s ..)"
-                      ;;          sym-new))
-                      value))
+                     ;; Should never happen but drop setq should we
+                     ;; ever encounter mutated+captured+unused
+                     ;; variables, lest we setq a closed-over
+                     ;; variable.
+                     (_ value))
                    prognlist)))
          (if (cdr prognlist)
              `(progn . ,(nreverse prognlist))
@@ -598,7 +589,7 @@ places where they originally did not directly appear."
                                 (cconv-convert form nil nil))
                               forms)))
 
-    (`(declare . ,_) form)              ;The args don't contain code.
+    (`(declare . ,_) form) ;; args don't contain code.
 
     (`(,func . ,forms)
      ;; First element is function or whatever function-like forms are: or, and,

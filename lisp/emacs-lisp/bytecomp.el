@@ -445,8 +445,6 @@ specify different fields to sort on."
   :type '(choice (const name) (const callers) (const calls)
 		 (const calls+callers) (const nil)))
 
-(defvar byte-compile-debug nil
-  "If non-nil, byte compile errors will be raised as signals instead of logged.")
 (defvar byte-compile-jump-tables nil
   "List of all jump tables used during compilation of this form.")
 (defvar byte-compile-constants nil
@@ -463,8 +461,7 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
   "List of variables declared as constants during compilation of this file.")
 (defvar byte-compile-free-references)
 (defvar byte-compile-free-assignments)
-
-(defvar byte-compiler-error-flag)
+(defvar byte-compile-abort-elc nil)
 
 (defun byte-compile-maybe-expand (form func)
   "Macroexpansion of top-level FORM could yield a progn.
@@ -1270,19 +1267,11 @@ SYM, STRING, FILL and LEVEL are as described in
 Also log the current function and file if not already done.  If
 FILL is non-nil, set `warning-fill-prefix' to four spaces.  LEVEL
 is the warning level (`:warning' or `:error').  Do not call this
-function directly; use `byte-compile-warn' or
-`byte-compile-report-error' instead."
+function directly; use `byte-compile-warn' instead."
   (let* ((warning-prefix-function #'byte-compile-warning-prefix)
 	 (warning-type-format "")
 	 (warning-fill-prefix (when fill "    ")))
     (display-warning 'bytecomp string level byte-compile-log-buffer)))
-
-(defun byte-compile-warn (format &rest args)
-  "Issue a byte compiler warning; use (format-message FORMAT ARGS...) for message."
-  (setq format (apply #'format-message format args))
-  (if byte-compile-error-on-warn
-      (error "%s" format)
-    (byte-compile-log-warning format t :warning)))
 
 (defun byte-compile-warn-obsolete (symbol)
   "Warn that SYMBOL (a variable or function) is obsolete."
@@ -1296,19 +1285,11 @@ function directly; use `byte-compile-warn' or
                 (not (memq symbol byte-compile-not-obsolete-funcs)))
 	(byte-compile-warn "%s" msg)))))
 
-(defun byte-compile-report-error (err &optional fill)
-  "Report Lisp error in compilation.
-ERR is the error data, in the form of either (ERROR-SYMBOL . DATA)
-or STRING.  If FILL is non-nil, set `warning-fill-prefix' to four spaces
-when printing the error message."
-  (setq byte-compiler-error-flag t)
-  (byte-compile-log-warning
-   (if (stringp err)
-       err
-     (error-message-string err))
-   fill :error))
-
-;;; sanity-checking arglists
+(defun byte-compile-warn (format &rest args)
+  (setq format (apply #'format-message format args))
+  (if byte-compile-error-on-warn
+      (error "%s" format)
+    (byte-compile-log-warning format t :warning)))
 
 (defun byte-compile-fdefinition (name macro-p)
   "If a function has an entry saying (FUNCTION . t).
@@ -1717,7 +1698,7 @@ It is too wide if it has any lines longer than the largest of
                            kind name col))))
   form)
 
-(defun byte-compile-warn-about-unresolved-functions ()
+(defun byte-compile-warn-unresolved-functions ()
   "Separate the functions that will not be available at runtime
 from the truly unresolved ones."
   (prog1 nil
@@ -1779,10 +1760,12 @@ and cl-macs.el.")
 (defmacro displaying-byte-compile-warnings (&rest body)
   (declare (debug (def-body)))
   `(let ((fn (lambda ()
-               (let ((debug-on-error (or debug-on-error byte-compile-debug)))
-	         (condition-case-unless-debug err
-		     (progn ,@body)
-	           (error (byte-compile-report-error err)))))))
+               (condition-case-unless-debug err
+		   (progn ,@body)
+	         (error
+                  (prog1 nil
+                    (setq byte-compile-abort-elc t)
+                    (byte-compile-warn "%s" (error-message-string err))))))))
      (if (and (markerp warning-series)
 	      (eq (marker-buffer warning-series)
 		  (get-buffer byte-compile-log-buffer)))
@@ -2033,8 +2016,8 @@ See also `emacs-lisp-byte-compile-and-load'."
         (byte-compile--seen-defvars nil)
         (byte-compile--known-dynamic-vars
          (byte-compile--load-dynvars (getenv "EMACS_DYNVARS_FILE")))
-	target-file input-buffer output-buffer
-	byte-compile-dest-file byte-compiler-error-flag)
+	target-file input-buffer
+	byte-compile-dest-file)
     (setq target-file (byte-compile-dest-file filename))
     (setq byte-compile-dest-file target-file)
     (with-current-buffer
@@ -2079,74 +2062,67 @@ See also `emacs-lisp-byte-compile-and-load'."
 	    (ignore-errors (delete-file target-file))))
       (when byte-compile-verbose
 	(message "Compiling %s..." filename))
-      (setq output-buffer
-	    (save-current-buffer
-	      (let ((byte-compile-level (1+ byte-compile-level)))
-                (byte-compile-from-buffer input-buffer))))
-      (unless byte-compiler-error-flag
-        (prog1 t
-	  (when byte-compile-verbose
-	    (message "Compiling %s...done" filename))
-	  (kill-buffer input-buffer)
-	  (with-current-buffer output-buffer
-            (when (and target-file
-                       (or (not byte-native-compiling)
-                           (and byte-native-compiling byte+native-compile)))
-	      (goto-char (point-max))
-	      (insert "\n")			; aaah, unix.
-	      (cond
-	       ((and (file-writable-p target-file)
-		     ;; We attempt to create a temporary file in the
-		     ;; target directory, so the target directory must be
-		     ;; writable.
-		     (file-writable-p
-		      (file-name-directory
-		       ;; Need to expand in case TARGET-FILE doesn't
-		       ;; include a directory (Bug#45287).
-		       (expand-file-name target-file))))
-                (if byte-native-compiling
-                    ;; Defer elc production.
-                    (setf byte-to-native-output-buffer-file
-                          (cons (current-buffer) target-file))
-                  (byte-write-target-file (current-buffer) target-file))
-	        (or noninteractive
-		    byte-native-compiling
-		    (message "Wrote %s" target-file)))
-               ((file-writable-p target-file)
-                ;; Target file writable but not target directory. (Bug#44631)
-                (let ((coding-system-for-write 'no-conversion))
-                  (with-file-modes (logand (default-file-modes) #o666)
-                    (write-region (point-min) (point-max) target-file nil 1)))
-                (or noninteractive (message "Wrote %s" target-file)))
-	       (t
-	        (let ((exists (file-exists-p target-file)))
-	          (signal (if exists 'file-error 'file-missing)
-		          (list "Opening output file"
-			        (if exists
-				    "Cannot overwrite file"
-			          "Directory not writable or nonexistent")
-			        target-file))))))
-            (unless byte-native-compiling
-	      (kill-buffer (current-buffer))))
-	  (when (and byte-compile-generate-call-tree
-		     (or (eq t byte-compile-generate-call-tree)
-		         (y-or-n-p (format "Report call tree for %s? "
-                                           filename))))
-	    (save-excursion
-	      (display-call-tree filename)))
-          (let ((gen-dynvars (getenv "EMACS_GENERATE_DYNVARS")))
-            (when (and gen-dynvars (not (equal gen-dynvars ""))
-                       byte-compile--seen-defvars)
-              (let ((dynvar-file (concat target-file ".dynvars")))
-                (message "Generating %s" dynvar-file)
-                (with-temp-buffer
-                  (dolist (var (delete-dups byte-compile--seen-defvars))
-                    (insert (format "%S\n" (cons var filename))))
-	          (write-region (point-min) (point-max) dynvar-file)))))
-	  (when load
-            (load target-file)))))))
+      (let* (byte-compile-abort-elc
+             (byte-compile-level (1+ byte-compile-level))
+             (output-buffer (save-current-buffer
+                              (byte-compile-from-buffer input-buffer))))
+        (unless byte-compile-abort-elc
+          (prog1 t
+	    (when byte-compile-verbose
+	      (message "Compiling %s...done" filename))
+	    (kill-buffer input-buffer)
+	    (with-current-buffer output-buffer
+              (when (and target-file
+                         (or (not byte-native-compiling)
+                             (and byte-native-compiling byte+native-compile)))
+	        (goto-char (point-max))
+	        (insert "\n")
+	        (cond
+	         ((and (file-writable-p target-file)
+		       (file-writable-p
+		        (file-name-directory (expand-file-name target-file))))
+                  (if byte-native-compiling
+                      ;; Defer elc production.
+                      (setf byte-to-native-output-buffer-file
+                            (cons (current-buffer) target-file))
+                    (byte-write-target-file (current-buffer) target-file))
+	          (or noninteractive
+		      byte-native-compiling
+		      (message "Wrote %s" target-file)))
+                 ((file-writable-p target-file)
+                  ;; Target file writable but not target directory. (Bug#44631)
+                  (let ((coding-system-for-write 'no-conversion))
+                    (with-file-modes (logand (default-file-modes) #o666)
+                      (write-region (point-min) (point-max) target-file nil 1)))
+                  (or noninteractive (message "Wrote %s" target-file)))
+	         (t
+	          (let ((exists (file-exists-p target-file)))
+	            (signal (if exists 'file-error 'file-missing)
+		            (list "Opening output file"
+			          (if exists
+				      "Cannot overwrite file"
+			            "Directory not writable or nonexistent")
+			          target-file))))))
+              (unless byte-native-compiling
+	        (kill-buffer (current-buffer))))
+	    (when (and byte-compile-generate-call-tree
+		       (or (eq t byte-compile-generate-call-tree)
+		           (y-or-n-p (format "Report call tree for %s? "
+                                             filename))))
+	      (save-excursion
+	        (display-call-tree filename)))
+            (let ((gen-dynvars (getenv "EMACS_GENERATE_DYNVARS")))
+              (when (and gen-dynvars (not (equal gen-dynvars ""))
+                         byte-compile--seen-defvars)
+                (let ((dynvar-file (concat target-file ".dynvars")))
+                  (message "Generating %s" dynvar-file)
+                  (with-temp-buffer
+                    (dolist (var (delete-dups byte-compile--seen-defvars))
+                      (insert (format "%S\n" (cons var filename))))
+	            (write-region (point-min) (point-max) dynvar-file)))))
+	    (when load
+              (load target-file))))))))
 
-;;; compiling a single function
 ;;;###autoload
 (defun compile-defun (&optional arg)
   "Compile and evaluate the current top-level form.
@@ -2244,7 +2220,7 @@ With argument ARG, insert value in current buffer after the form."
                  (byte-compile-file-form
                   (byte-compile-preprocess form*)))))))
 	(byte-compile-flush-pending)
-	(byte-compile-warn-about-unresolved-functions)))
+	(byte-compile-warn-unresolved-functions)))
      byte-compile--outbuffer)))
 
 (defun byte-compile-insert-header (_filename outbuffer)
@@ -2446,7 +2422,10 @@ in the input buffer (now current), not in the output buffer."
       (let* ((byte-compile-current-form form)
              (form* (condition-case-unless-debug err
                         (funcall handler form)
-                      (error (byte-compile-report-error err)))))
+                      (error
+                       (prog1 nil
+                         (setq byte-compile-abort-elc t)
+                         (byte-compile-warn "%s" (error-message-string err)))))))
 	(byte-compile-flush-pending)
 	(byte-compile-output-file-form form*))
     (byte-compile-keep-pending form)))
@@ -2475,7 +2454,7 @@ in the input buffer (now current), not in the output buffer."
      ;; of byte-compile-callargs-warn so as not to warn if the
      ;; autoload comes _after_ the function call.
      ;; Alternatively, similar logic could go in
-     ;; byte-compile-warn-about-unresolved-functions.
+     ;; byte-compile-warn-unresolved-functions.
      (if (memq funsym byte-compile-noruntime-functions)
          (setq byte-compile-noruntime-functions
                (delq funsym byte-compile-noruntime-functions))
@@ -2857,7 +2836,9 @@ If FORM is a lambda or a macro, compile into a function."
     (when arglist
       (setq rest 1))
     (if (> mandatory 127)
-        (byte-compile-report-error "Too many (>127) mandatory arguments")
+        (prog1 nil
+          (setq byte-compile-abort-elc t)
+          (byte-compile-warn "%s" "Too many mandatory arguments"))
       (logior mandatory
               (ash nonrest 8)
               (ash rest 7)))))
@@ -3195,8 +3176,9 @@ value should be byte-discard."
           (pcase (cdr form)
             (`(',var . ,_)
              (when (memq var byte-compile-lexical-variables)
-               (byte-compile-report-error
-                (format-message "%s cannot use lexical var `%s'" fn var))))))
+               (prog1 nil
+                 (setq byte-compile-abort-elc t)
+                 (byte-compile-warn "%s cannot use lexical var `%s'" fn var))))))
         ;; Warn about obsolete hooks.
         (when (memq fn '(add-hook remove-hook))
           (let ((hook (car-safe (cdr form))))
@@ -3219,9 +3201,9 @@ value should be byte-discard."
                                                     interactive-only))
 				   (t "."))))
         (when (eq (car-safe (symbol-function (car form))) 'macro)
-          (byte-compile-report-error
-           (format "macro `%s' defined after use in %S (missing require?)"
-                   (car form) form)))
+          (setq byte-compile-abort-elc t)
+          (byte-compile-warn "macro `%s' defined after use in %S (missing require?)"
+                             (car form) form))
         (if handler
             (funcall handler form)
           (byte-compile-normal-call form))))
@@ -3353,8 +3335,8 @@ value should be byte-discard."
         (dotimes (_ (- (/ (1+ fmax2) 2) alen))
           (byte-compile-push-constant nil)))
        ((zerop (logand fmax2 1))
-        (byte-compile-report-error
-         (format "Too many arguments for inlined function %S" form))
+        (setq byte-compile-abort-elc t)
+        (byte-compile-warn "Too many arguments for inlined function %S" form)
         (byte-compile-discard (- alen (/ fmax2 2))))
        (t
         ;; Turn &rest args into a list.
@@ -3413,7 +3395,8 @@ VAR must not be lexically bound.
 The free record for assignment special forms, i.e., setq, is
 kept separately and referenced for non-nil ASSIGNMENT."
   (when (and (byte-compile-warning-enabled-p 'free-vars var)
-             (not (boundp var))
+             (or (not (symbolp var))
+                 (not (boundp var)))
              (not (memq var byte-compile-bound-variables))
              (not (memq var (if assignment
                                 byte-compile-free-assignments
@@ -3975,12 +3958,11 @@ and (funcall (function foo)) will lose with autoloads."
          (len (length args)))
     (if (= (logand len 1) 1)
         (progn
-          (byte-compile-report-error
-           (format-message
-            "missing value for `%S' at end of setq" (car (last args))))
-          (byte-compile-form
-           `(signal 'wrong-number-of-arguments '(setq ,len))
-           byte-compile--for-effect))
+          (setq byte-compile-abort-elc t)
+          (byte-compile-warn "missing value for `%S' at end of setq"
+                             (car (last args)))
+          (byte-compile-form `(signal 'wrong-number-of-arguments '(setq ,len))
+                             byte-compile--for-effect))
       (if args
           (while args
             (byte-compile-form (car (cdr args)))
@@ -4399,8 +4381,8 @@ Return (TAIL VAR TEST CASES), where:
       (progn
         (mapc #'byte-compile-form (cdr form))
         (byte-compile-out 'byte-call (length (cdr (cdr form)))))
-    (byte-compile-report-error
-     (format-message "`funcall' called with no arguments"))
+    (setq byte-compile-abort-elc t)
+    (byte-compile-warn "%s" "`funcall' called with no arguments")
     (byte-compile-form '(signal 'wrong-number-of-arguments '(funcall 0))
                        byte-compile--for-effect)))
 

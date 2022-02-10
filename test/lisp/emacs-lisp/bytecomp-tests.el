@@ -1198,25 +1198,25 @@ byte-compiled.  Run with dynamic binding."
   "Check that byte compiling warns about unescaped character
 literals (Bug#20852)."
   (should (boundp 'lread--unescaped-character-literals))
-  (let ((byte-compile-error-on-warn t)
-        (byte-compile-debug t))
-    (bytecomp-tests--with-temp-file source
-      (write-region "(list ?) ?( ?; ?\" ?[ ?])" nil source)
-      (bytecomp-tests--with-temp-file destination
-        (let* ((byte-compile-dest-file-function (lambda (_) destination))
-               (err (should-error (byte-compile-file source))))
-          (should (equal (cdr err)
-                         `(,(concat "unescaped character literals "
-                                    "`?\"', `?(', `?)', `?;', `?[', `?]' "
-                                    "detected, "
-                                    "`?\\\"', `?\\(', `?\\)', `?\\;', `?\\[', "
-                                    "`?\\]' expected!")))))))
-    ;; But don't warn in subsequent compilations (Bug#36068).
-    (bytecomp-tests--with-temp-file source
-      (write-region "(list 1 2 3)" nil source)
-      (bytecomp-tests--with-temp-file destination
-        (let ((byte-compile-dest-file-function (lambda (_) destination)))
-          (should (byte-compile-file source)))))))
+  (bytecomp-tests--with-temp-file source
+    (write-region "(list ?) ?( ?; ?\" ?[ ?])" nil source)
+    (bytecomp-tests--with-temp-file destination
+      (let* ((byte-compile-dest-file-function (lambda (_) destination))
+             (byte-compile-error-on-warn t)
+             (debug-on-error nil)
+             (err (should-error (byte-compile-file source))))
+        (should (equal (error-message-string err)
+                       (concat "unescaped character literals "
+                               "`?\"', `?(', `?)', `?;', `?[', `?]' "
+                               "detected, "
+                               "`?\\\"', `?\\(', `?\\)', `?\\;', `?\\[', "
+                               "`?\\]' expected!"))))))
+  ;; But don't warn in subsequent compilations (Bug#36068).
+  (bytecomp-tests--with-temp-file source
+    (write-region "(list 1 2 3)" nil source)
+    (bytecomp-tests--with-temp-file destination
+      (let ((byte-compile-dest-file-function (lambda (_) destination)))
+        (should (byte-compile-file source))))))
 
 (ert-deftest bytecomp-tests-function-put ()
   "Check `function-put' operates during compilation."

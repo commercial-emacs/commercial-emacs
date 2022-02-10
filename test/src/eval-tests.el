@@ -34,8 +34,6 @@
   ;; This should not crash.
   (should-error (funcall '(closure)) :type 'invalid-function))
 
-(defvar byte-compile-debug)
-
 (ert-deftest eval-tests--bugs-24912-and-24913 ()
   "Check that Emacs doesn't accept weird argument lists.
 Bug#24912 and Bug#24913."
@@ -48,13 +46,13 @@ Bug#24912 and Bug#24913."
                         (&optional a &optional b)
                         (&rest &rest) (&rest &rest a)
                         (&rest a &rest b)
-                        (&rest) (&optional &rest)
-                        ))
+                        (&rest) (&optional &rest)))
           (ert-info ((prin1-to-string args) :prefix "args: ")
             (should-error
              (eval `(funcall (lambda ,args)) lb) :type 'invalid-function)
             (should-error (byte-compile-check-lambda-list args))
-            (let ((byte-compile-debug t))
+            (let ((byte-compile-error-on-warn t)
+                  (debug-on-error nil))
               (should-error (eval `(byte-compile (lambda ,args)) lb)))))))))
 
 (ert-deftest eval-tests-accept-empty-optional ()
@@ -71,9 +69,7 @@ Bug#24912."
               (ert-info ("byte comp check")
                 (byte-compile-check-lambda-list args))
               (ert-info ("bytecomp")
-                (let ((byte-compile-debug t))
-                  (should (eq (funcall (byte-compile fun)) 'ok)))))))))))
-
+                (should (eq (funcall (byte-compile fun)) 'ok))))))))))
 
 (dolist (form '(let let*))
   (dolist (arg '(1 "a" [a]))
