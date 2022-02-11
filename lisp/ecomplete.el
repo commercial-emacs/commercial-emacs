@@ -80,6 +80,10 @@ string that was matched."
 		(function-item :tag "Sort by newness" ecomplete-newness)
 		(function :tag "Other")))
 
+(defcustom ecomplete-message-display-abbrev-auto-select t
+  "Whether `message-display-abbrev' should automatically select a sole option."
+  :type 'boolean)
+
 ;;; Internal variables.
 
 (defvar ecomplete-database nil)
@@ -174,6 +178,12 @@ matches."
 	  (define-key local-map (kbd "<down>") next-func)
 	  (define-key local-map (kbd "M-p") prev-func)
 	  (define-key local-map (kbd "<up>") prev-func)
+          ;; Auto-select when there is only a single option.
+          (when ecomplete-message-display-abbrev-auto-select
+            (save-match-data
+              (when-let ((match (string-match "\\`\\(.+\\)\n" matches)))
+                (when (string= (match-string 0 matches) matches)
+                  (setq selected (match-string 1 matches))))))
 	  (let ((overriding-local-map local-map))
 	    (while (and (null selected)
 			(setq command (read-key-sequence highlight))
