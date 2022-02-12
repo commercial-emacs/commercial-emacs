@@ -4115,12 +4115,13 @@ specpdl_unrewind (union specbinding *pdl, int distance, bool vars_only)
                               SET_INTERNAL_THREAD_SWITCH);
 	      }
 	    else
-	      /* FIXME: If the var is not local any more, we failed
-                 to swap the old and new values.  As long as the var remains
-                 non-local, this is fine, but if it ever reverts to being
-                 local we may end up using this entry "in the wrong
-                 direction".  */
-	      ;
+	      {
+		/* FIXME: If the var is not local any more, we failed
+                   to swap the old and new values.  As long as the var remains
+		   non-local, this is fine, but if it ever reverts to being
+		   local we may end up using this entry "in the wrong
+		   direction".  */
+	      }
 	  }
 	  break;
 	}
