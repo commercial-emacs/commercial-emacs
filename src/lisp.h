@@ -3240,10 +3240,102 @@ union specbinding
     } bt;
   };
 
+/* We use 64-bit platforms as a proxy for ones with ABIs that treat
+   small structs efficiently.  */
+#if SIZE_MAX > 0xffffffff
+#define WRAP_SPECPDL_REF 1
+#endif
+
+/* Abstract reference to to a specpdl entry.
+   The number is always a multiple of sizeof (union specbinding).  */
+#ifdef WRAP_SPECPDL_REF
+/* Use a proper type for specpdl_ref if it does not make the code slower,
+   since the type checking is quite useful.  */
+typedef struct { ptrdiff_t bytes; } specpdl_ref;
+#else
+typedef ptrdiff_t specpdl_ref;
+#endif
+
+/* Internal use only.  */
+INLINE specpdl_ref
+wrap_specpdl_ref (ptrdiff_t bytes)
+{
+#ifdef WRAP_SPECPDL_REF
+  return (specpdl_ref){.bytes = bytes};
+#else
+  return bytes;
+#endif
+}
+
+/* Internal use only.  */
 INLINE ptrdiff_t
+unwrap_specpdl_ref (specpdl_ref ref)
+{
+#ifdef WRAP_SPECPDL_REF
+  return ref.bytes;
+#else
+  return ref;
+#endif
+}
+
+INLINE specpdl_ref
+specpdl_count_to_ref (ptrdiff_t count)
+{
+  return wrap_specpdl_ref (count * sizeof (union specbinding));
+}
+
+INLINE ptrdiff_t
+specpdl_ref_to_count (specpdl_ref ref)
+{
+  return unwrap_specpdl_ref (ref) / sizeof (union specbinding);
+}
+
+/* Whether two `specpdl_ref' refer to the same entry.  */
+INLINE bool
+specpdl_ref_eq (specpdl_ref a, specpdl_ref b)
+{
+  return unwrap_specpdl_ref (a) == unwrap_specpdl_ref (b);
+}
+
+/* Whether `a' refers to an earlier entry than `b'.  */
+INLINE bool
+specpdl_ref_lt (specpdl_ref a, specpdl_ref b)
+{
+  return unwrap_specpdl_ref (a) < unwrap_specpdl_ref (b);
+}
+
+INLINE bool
+specpdl_ref_valid_p (specpdl_ref ref)
+{
+  return unwrap_specpdl_ref (ref) >= 0;
+}
+
+INLINE specpdl_ref
+make_invalid_specpdl_ref (void)
+{
+  return wrap_specpdl_ref (-1);
+}
+
+/* Return a reference that is `delta' steps more recent than `ref'.
+   `delta' may be negative or zero.  */
+INLINE specpdl_ref
+specpdl_ref_add (specpdl_ref ref, ptrdiff_t delta)
+{
+  return wrap_specpdl_ref (unwrap_specpdl_ref (ref)
+			   + delta * sizeof (union specbinding));
+}
+
+INLINE union specbinding *
+specpdl_ref_to_ptr (specpdl_ref ref)
+{
+  return (union specbinding *)((char *)specpdl + unwrap_specpdl_ref (ref));
+}
+
+/* Return a reference to the most recent specpdl entry.  */
+INLINE specpdl_ref
 SPECPDL_INDEX (void)
 {
-  return specpdl_ptr - specpdl;
+  return wrap_specpdl_ref ((char *)specpdl_ptr - (char *)specpdl);
 }
 
 INLINE bool
@@ -3309,7 +3401,7 @@ struct handler
      but a few others are handled by storing their value here.  */
   sys_jmp_buf jmp;
   EMACS_INT f_lisp_eval_depth;
-  ptrdiff_t pdlcount;
+  specpdl_ref pdlcount;
   int poll_suppress_count;
   int interrupt_input_blocked;
 };
@@ -4245,10 +4337,11 @@ extern void record_unwind_protect_void (void (*) (void));
 extern void record_unwind_protect_excursion (void);
 extern void record_unwind_protect_nothing (void);
 extern void record_unwind_protect_module (enum specbind_tag, void *);
-extern void clear_unwind_protect (ptrdiff_t);
-extern void set_unwind_protect (ptrdiff_t, void (*) (Lisp_Object), Lisp_Object);
-extern void set_unwind_protect_ptr (ptrdiff_t, void (*) (void *), void *);
-extern Lisp_Object unbind_to (ptrdiff_t, Lisp_Object);
+extern void clear_unwind_protect (specpdl_ref);
+extern void set_unwind_protect (specpdl_ref, void (*) (Lisp_Object),
+				Lisp_Object);
+extern void set_unwind_protect_ptr (specpdl_ref, void (*) (void *), void *);
+extern Lisp_Object unbind_to (specpdl_ref, Lisp_Object);
 extern void rebind_for_thread_switch (void);
 extern void unbind_for_thread_switch (struct thread_state *);
 extern AVOID error (const char *, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
@@ -4267,12 +4360,12 @@ extern Lisp_Object safe_call2 (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void init_eval (void);
 extern void syms_of_eval (void);
 extern void prog_ignore (Lisp_Object);
-extern ptrdiff_t record_in_backtrace (Lisp_Object, Lisp_Object *, ptrdiff_t);
+extern specpdl_ref record_in_backtrace (Lisp_Object, Lisp_Object *, ptrdiff_t);
 extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
 extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
 extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
-void do_debug_on_call (Lisp_Object code, ptrdiff_t count);
+void do_debug_on_call (Lisp_Object code, specpdl_ref count);
 Lisp_Object funcall_general (Lisp_Object fun,
 			     ptrdiff_t numargs, Lisp_Object *args);
 
@@ -4949,7 +5042,7 @@ extern void *record_xmalloc (size_t)
 
 #define USE_SAFE_ALLOCA			\
   ptrdiff_t sa_avail = MAX_ALLOCA;	\
-  ptrdiff_t sa_count = SPECPDL_INDEX ()
+  specpdl_ref sa_count = SPECPDL_INDEX ()
 
 #define AVAIL_ALLOCA(size) (sa_avail -= (size), alloca (size))
 
@@ -4987,9 +5080,9 @@ extern void *record_xmalloc (size_t)
 #define SAFE_FREE() safe_free (sa_count)
 
 INLINE void
-safe_free (ptrdiff_t sa_count)
+safe_free (specpdl_ref sa_count)
 {
-  while (specpdl_ptr != specpdl + sa_count)
+  while (specpdl_ptr != specpdl_ref_to_ptr (sa_count))
     {
       specpdl_ptr--;
       if (specpdl_ptr->kind == SPECPDL_UNWIND_PTR)
@@ -5015,9 +5108,9 @@ safe_free (ptrdiff_t sa_count)
   safe_free_unbind_to (count, sa_count, val)
 
 INLINE Lisp_Object
-safe_free_unbind_to (ptrdiff_t count, ptrdiff_t sa_count, Lisp_Object val)
+safe_free_unbind_to (specpdl_ref count, specpdl_ref sa_count, Lisp_Object val)
 {
-  eassert (count <= sa_count);
+  eassert (!specpdl_ref_lt (sa_count, count));
   return unbind_to (count, val);
 }
 

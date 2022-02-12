@@ -1363,7 +1363,7 @@ bidi_at_paragraph_end (ptrdiff_t charpos, ptrdiff_t bytepos)
 
   /* Prevent quitting inside re_match_2, as redisplay_window could
      have temporarily moved point.  */
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   specbind (Qinhibit_quit, Qt);
 
   val = fast_looking_at (sep_re, charpos, bytepos, ZV, ZV_BYTE, Qnil);
@@ -1453,7 +1453,7 @@ bidi_find_paragraph_start (ptrdiff_t pos, ptrdiff_t pos_byte)
 
   /* Prevent quitting inside re_match_2, as redisplay_window could
      have temporarily moved point.  */
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   specbind (Qinhibit_quit, Qt);
 
   while (pos_byte > BEGV_BYTE

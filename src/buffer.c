@@ -1787,7 +1787,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 
   /* Run hooks with the buffer to be killed as the current buffer.  */
   {
-    ptrdiff_t count = SPECPDL_INDEX ();
+    specpdl_ref count = SPECPDL_INDEX ();
     bool modified;
 
     record_unwind_protect_excursion ();
@@ -2110,7 +2110,6 @@ Use this function before selecting the buffer, since it may need to inspect
 the current buffer's major mode.  */)
   (Lisp_Object buffer)
 {
-  ptrdiff_t count;
   Lisp_Object function;
 
   CHECK_BUFFER (buffer);
@@ -2133,7 +2132,7 @@ the current buffer's major mode.  */)
                           `hack-local-variables' get run. */
     return Qnil;
 
-  count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   /* To select a nonfundamental mode,
      select the buffer temporarily and then call the mode function.  */
@@ -4048,7 +4047,7 @@ buffer.  */)
 {
   struct buffer *b, *ob = 0;
   Lisp_Object obuffer;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   ptrdiff_t n_beg, n_end;
   ptrdiff_t o_beg UNINIT, o_end UNINIT;
 
@@ -4169,7 +4168,7 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
 {
   Lisp_Object buffer;
   struct buffer *b;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   CHECK_OVERLAY (overlay);
 

@@ -682,7 +682,7 @@ add_command_key (Lisp_Object key)
 Lisp_Object
 recursive_edit_1 (void)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object val;
 
   if (command_loop_level > 0)
@@ -774,7 +774,7 @@ throwing to \\='exit:
 This function is called by the editor initialization to begin editing.  */)
   (void)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object buffer;
 
   /* If we enter while input is blocked, don't lock up here.
@@ -937,7 +937,7 @@ static Lisp_Object
 cmd_error (Lisp_Object data)
 {
   Lisp_Object old_level, old_length;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object conditions;
   char macroerror[sizeof "After..kbd macro iterations: "
 		  + INT_STRLEN_BOUND (EMACS_INT)];
@@ -1230,7 +1230,7 @@ DEFUN ("internal--track-mouse", Finternal_track_mouse, Sinternal_track_mouse,
        doc: /* Call BODYFUN with mouse movement events enabled.  */)
   (Lisp_Object bodyfun)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object val;
 
   record_unwind_protect (tracking_off, track_mouse);
@@ -1352,7 +1352,7 @@ command_loop_1 (void)
 	{
 	  /* Bind inhibit-quit to t so that C-g gets read in
 	     rather than quitting back to the minibuffer.  */
-	  ptrdiff_t count = SPECPDL_INDEX ();
+	  specpdl_ref count = SPECPDL_INDEX ();
 	  specbind (Qinhibit_quit, Qt);
 
 	  sit_for (Vminibuffer_message_timeout, 0, 2);
@@ -1484,7 +1484,7 @@ command_loop_1 (void)
 	  /* Here for a command that isn't executed directly.  */
 
 #ifdef HAVE_WINDOW_SYSTEM
-            ptrdiff_t scount = SPECPDL_INDEX ();
+            specpdl_ref scount = SPECPDL_INDEX ();
 
             if (display_hourglass_p
                 && NILP (Vexecuting_kbd_macro))
@@ -1630,7 +1630,7 @@ command_loop_1 (void)
 Lisp_Object
 read_menu_command (void)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   /* We don't want to echo the keystrokes while navigating the
      menus.  */
@@ -1875,7 +1875,7 @@ safe_run_hook_funcall (ptrdiff_t nargs, Lisp_Object *args)
 void
 safe_run_hooks (Lisp_Object hook)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   specbind (Qinhibit_quit, Qt);
   run_hook_with_args (2, ((Lisp_Object []) {hook, hook}), safe_run_hook_funcall);
@@ -2207,7 +2207,7 @@ read_event_from_main_queue (struct timespec *end_time,
     return c;
 
   /* Actually read a character, waiting if necessary.  */
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   save_getcjmp (save_jump);
   record_unwind_protect_ptr (restore_getcjmp, save_jump);
   restore_getcjmp (local_getcjmp);
@@ -2409,7 +2409,6 @@ read_char (int commandflag, Lisp_Object map,
 	   bool *used_mouse_menu, struct timespec *end_time)
 {
   Lisp_Object c;
-  ptrdiff_t jmpcount;
   sys_jmp_buf local_getcjmp;
   sys_jmp_buf save_jump;
   Lisp_Object tem, save;
@@ -2651,7 +2650,7 @@ read_char (int commandflag, Lisp_Object map,
      around any call to sit_for or kbd_buffer_get_event;
      it *must not* be in effect when we call redisplay.  */
 
-  jmpcount = SPECPDL_INDEX ();
+  specpdl_ref jmpcount = SPECPDL_INDEX ();
   if (sys_setjmp (local_getcjmp))
     {
       /* Handle quits while reading the keyboard.  */
@@ -2734,7 +2733,7 @@ read_char (int commandflag, Lisp_Object map,
 	{
 	  Lisp_Object tem0;
 
-	  ptrdiff_t count = SPECPDL_INDEX ();
+	  specpdl_ref count = SPECPDL_INDEX ();
 	  save_getcjmp (save_jump);
 	  record_unwind_protect_ptr (restore_getcjmp, save_jump);
 	  restore_getcjmp (local_getcjmp);
@@ -2811,7 +2810,7 @@ read_char (int commandflag, Lisp_Object map,
 
 	  timeout = min (timeout, MOST_POSITIVE_FIXNUM / delay_level * 4);
 	  timeout = delay_level * timeout / 4;
-	  ptrdiff_t count1 = SPECPDL_INDEX ();
+	  specpdl_ref count1 = SPECPDL_INDEX ();
 	  save_getcjmp (save_jump);
 	  record_unwind_protect_ptr (restore_getcjmp, save_jump);
 	  restore_getcjmp (local_getcjmp);
@@ -3094,7 +3093,7 @@ read_char (int commandflag, Lisp_Object map,
       Lisp_Object keys;
       ptrdiff_t key_count;
       ptrdiff_t command_key_start;
-      ptrdiff_t count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
 
       /* Save the echo status.  */
       bool saved_immediate_echo = current_kboard->immediate_echo;
@@ -3219,7 +3218,7 @@ read_char (int commandflag, Lisp_Object map,
   /* Process the help character specially if enabled.  */
   if (!NILP (Vhelp_form) && help_char_p (c))
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
 
       help_form_saved_window_configs
 	= Fcons (Fcurrent_window_configuration (Qnil),
@@ -4435,7 +4434,7 @@ timer_check_2 (Lisp_Object timers, Lisp_Object idle_timers)
 	{
 	  if (NILP (AREF (chosen_timer, 0)))
 	    {
-	      ptrdiff_t count = SPECPDL_INDEX ();
+	      specpdl_ref count = SPECPDL_INDEX ();
 	      Lisp_Object old_deactivate_mark = Vdeactivate_mark;
 
 	      /* Mark the timer as triggered to prevent problems if the lisp
@@ -7848,7 +7847,7 @@ eval_dyn (Lisp_Object form)
 Lisp_Object
 menu_item_eval_property (Lisp_Object sexpr)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object val;
   specbind (Qinhibit_redisplay, Qt);
   val = internal_condition_case_1 (eval_dyn, sexpr, Qerror,
@@ -9515,7 +9514,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		   bool dont_downcase_last, bool can_return_switch_frame,
 		   bool fix_current_buffer, bool prevent_redisplay)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   /* How many keys there are in the current key sequence.  */
   int t;
@@ -10451,7 +10450,7 @@ read_key_sequence_vs (Lisp_Object prompt, Lisp_Object continue_echo,
 		      Lisp_Object can_return_switch_frame,
 		      Lisp_Object cmd_loop, bool allow_string)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   if (!NILP (prompt))
     CHECK_STRING (prompt);
@@ -10916,7 +10915,7 @@ Some operating systems cannot stop the Emacs process and resume it later.
 On such systems, Emacs starts a subshell instead of suspending.  */)
   (Lisp_Object stuffstring)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   int old_height, old_width;
   int width, height;
 

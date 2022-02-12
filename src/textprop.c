@@ -793,7 +793,7 @@ The property values are compared with `eq'.  */)
   else
     {
       Lisp_Object initial_value, value;
-      ptrdiff_t count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
 
       if (! NILP (object))
 	CHECK_BUFFER (object);
@@ -880,7 +880,7 @@ first valid position in OBJECT.  */)
     }
   else
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
 
       if (! NILP (object))
 	CHECK_BUFFER (object);
@@ -1361,7 +1361,7 @@ set_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object properties,
      buffers is slow and often unnecessary.  */
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
       return unbind_to (count,
@@ -1444,7 +1444,7 @@ set_text_properties_1 (Lisp_Object start, Lisp_Object end,
      buffers is slow and often unnecessary.  */
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
 
@@ -1540,7 +1540,7 @@ Use `set-text-properties' if you want to remove all text properties.  */)
      buffers is slow and often unnecessary.  */
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
       return unbind_to (count,
@@ -1665,7 +1665,7 @@ Return t if any property was actually removed, nil otherwise.  */)
      buffers is slow and often unnecessary.  */
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
       return unbind_to (count,

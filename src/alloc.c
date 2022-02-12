@@ -3908,7 +3908,7 @@ run_finalizer_handler (Lisp_Object args)
 static void
 run_finalizer_function (Lisp_Object function)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 #ifdef HAVE_PDUMPER
   ++number_finalizers_run;
 #endif
@@ -5761,10 +5761,10 @@ allow_garbage_collection (intmax_t consing)
   garbage_collection_inhibited--;
 }
 
-ptrdiff_t
+specpdl_ref
 inhibit_garbage_collection (void)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   record_unwind_protect_intmax (allow_garbage_collection, consing_until_gc);
   garbage_collection_inhibited++;
   consing_until_gc = HI_THRESHOLD;
@@ -6124,7 +6124,7 @@ garbage_collect (void)
   Lisp_Object tail, buffer;
   char stack_top_variable;
   bool message_p;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   struct timespec start;
 
   eassert (weak_hash_tables == NULL);
@@ -6282,7 +6282,7 @@ garbage_collect (void)
 
   if (!NILP (Vpost_gc_hook))
     {
-      ptrdiff_t gc_count = inhibit_garbage_collection ();
+      specpdl_ref gc_count = inhibit_garbage_collection ();
       safe_run_hooks (Qpost_gc_hook);
       unbind_to (gc_count, Qnil);
     }
@@ -7435,7 +7435,7 @@ Lisp_Object
 which_symbols (Lisp_Object obj, EMACS_INT find_max)
 {
    struct symbol_block *sblk;
-   ptrdiff_t gc_count = inhibit_garbage_collection ();
+   specpdl_ref gc_count = inhibit_garbage_collection ();
    Lisp_Object found = Qnil;
 
    if (! deadp (obj))

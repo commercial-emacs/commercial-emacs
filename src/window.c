@@ -2573,7 +2573,7 @@ window_list (void)
   if (!CONSP (Vwindow_list))
     {
       Lisp_Object tail, frame;
-      ptrdiff_t count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
 
       Vwindow_list = Qnil;
       /*  Don't allow quitting in Fnconc.  Otherwise we might end up
@@ -2731,7 +2731,7 @@ static Lisp_Object
 next_window (Lisp_Object window, Lisp_Object minibuf, Lisp_Object all_frames,
 	     bool next_p)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   decode_next_window_args (&window, &minibuf, &all_frames);
 
@@ -2885,7 +2885,7 @@ static Lisp_Object
 window_list_1 (Lisp_Object window, Lisp_Object minibuf, Lisp_Object all_frames)
 {
   Lisp_Object tail, list, rest;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   decode_next_window_args (&window, &minibuf, &all_frames);
   list = Qnil;
@@ -3504,7 +3504,7 @@ select_frame_norecord (Lisp_Object frame)
 static void
 run_window_configuration_change_hook (struct frame *f)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object frame, global_wcch
     = Fdefault_value (Qwindow_configuration_change_hook);
   XSETFRAME (frame, f);
@@ -3537,7 +3537,7 @@ run_window_configuration_change_hook (struct frame *f)
 	if (!NILP (Flocal_variable_p (Qwindow_configuration_change_hook,
 				      buffer)))
 	  {
-	    ptrdiff_t inner_count = SPECPDL_INDEX ();
+	    specpdl_ref inner_count = SPECPDL_INDEX ();
 	    record_unwind_protect (select_window_norecord, selected_window);
 	    select_window_norecord (window);
 	    run_funs (Fbuffer_local_value (Qwindow_configuration_change_hook,
@@ -3574,7 +3574,7 @@ has established the size of the new window.  */)
   (Lisp_Object window)
 {
   struct window *w = decode_live_window (window);
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   record_unwind_current_buffer ();
   Fset_buffer (w->contents);
@@ -3814,7 +3814,7 @@ run_window_change_functions (void)
   Lisp_Object tail, frame;
   bool selected_frame_change = !EQ (selected_frame, old_selected_frame);
   bool run_window_state_change_hook = false;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   window_change_record_frames = false;
   record_unwind_protect_void (window_change_record);
@@ -4011,7 +4011,7 @@ set_window_buffer (Lisp_Object window, Lisp_Object buffer,
 {
   struct window *w = XWINDOW (window);
   struct buffer *b = XBUFFER (buffer);
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   bool samebuf = EQ (buffer, w->contents);
 
   wset_buffer (w, buffer);
@@ -4231,7 +4231,7 @@ temp_output_buffer_show (register Lisp_Object buf)
       /* Run temp-buffer-show-hook, with the chosen window selected
 	 and its buffer current.  */
       {
-        ptrdiff_t count = SPECPDL_INDEX ();
+        specpdl_ref count = SPECPDL_INDEX ();
         Lisp_Object prev_window, prev_buffer;
         prev_window = selected_window;
         XSETBUFFER (prev_buffer, old);
@@ -5485,7 +5485,7 @@ window_internal_height (struct window *w)
 static void
 window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   n = clip_to_bounds (INT_MIN, n, INT_MAX);
 
@@ -6197,7 +6197,7 @@ scroll_command (Lisp_Object window, Lisp_Object n, int direction)
 {
   struct window *w;
   bool other_window;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   eassert (eabs (direction) == 1);
 
@@ -6328,7 +6328,7 @@ It is determined by the function `other-window-for-scrolling',
 which see.  */)
   (Lisp_Object arg)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   scroll_command (Fother_window_for_scrolling (), arg, 1);
   return unbind_to (count, Qnil);
 }
@@ -6339,7 +6339,7 @@ DEFUN ("scroll-other-window-down", Fscroll_other_window_down,
 For more details, see the documentation for `scroll-other-window'.  */)
   (Lisp_Object arg)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   scroll_command (Fother_window_for_scrolling (), arg, -1);
   return unbind_to (count, Qnil);
 }

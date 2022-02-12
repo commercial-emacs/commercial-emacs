@@ -1757,7 +1757,7 @@ usage: (make-process &rest ARGS)  */)
 {
   Lisp_Object buffer, name, command, program, proc, contact, current_dir, tem;
   Lisp_Object xstderr, stderrproc;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   if (nargs == 0)
     return Qnil;
@@ -2178,7 +2178,7 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
       && !EQ (p->filter, Qt))
     add_process_read_fd (inchannel);
 
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   /* This may signal an error.  */
   setup_process_coding_systems (process);
@@ -2345,7 +2345,6 @@ usage:  (make-pipe-process &rest ARGS)  */)
   struct Lisp_Process *p;
   Lisp_Object name, buffer;
   Lisp_Object tem;
-  ptrdiff_t specpdl_count;
   int inchannel, outchannel;
 
   if (nargs == 0)
@@ -2356,7 +2355,7 @@ usage:  (make-pipe-process &rest ARGS)  */)
   name = Fplist_get (contact, QCname);
   CHECK_STRING (name);
   proc = make_process (name);
-  specpdl_count = SPECPDL_INDEX ();
+  specpdl_ref specpdl_count = SPECPDL_INDEX ();
   record_unwind_protect (remove_process, proc);
   p = XPROCESS (proc);
 
@@ -2473,7 +2472,7 @@ usage:  (make-pipe-process &rest ARGS)  */)
   eassert (p->decoding_carryover == 0);
   pset_encoding_buf (p, empty_unibyte_string);
 
-  specpdl_ptr = specpdl + specpdl_count;
+  specpdl_ptr = specpdl_ref_to_ptr (specpdl_count);
 
   return proc;
 }
@@ -3110,7 +3109,6 @@ usage:  (make-serial-process &rest ARGS)  */)
   struct Lisp_Process *p;
   Lisp_Object name, buffer;
   Lisp_Object tem, val;
-  ptrdiff_t specpdl_count;
 
   if (nargs == 0)
     return Qnil;
@@ -3132,7 +3130,7 @@ usage:  (make-serial-process &rest ARGS)  */)
     name = port;
   CHECK_STRING (name);
   proc = make_process (name);
-  specpdl_count = SPECPDL_INDEX ();
+  specpdl_ref specpdl_count = SPECPDL_INDEX ();
   record_unwind_protect (remove_process, proc);
   p = XPROCESS (proc);
 
@@ -3210,7 +3208,7 @@ usage:  (make-serial-process &rest ARGS)  */)
 
   Fserial_process_configure (nargs, args);
 
-  specpdl_ptr = specpdl + specpdl_count;
+  specpdl_ptr = specpdl_ref_to_ptr (specpdl_count);
 
   return proc;
 }
@@ -3417,9 +3415,9 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
   int optbits = 0;
 
   struct sockaddr *sa = NULL;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   record_unwind_protect_nothing ();
-  ptrdiff_t count1 = SPECPDL_INDEX ();
+  specpdl_ref count1 = SPECPDL_INDEX ();
 
   while (!NILP (addrinfos))
     {
@@ -3905,7 +3903,7 @@ usage: (make-network-process &rest ARGS)  */)
 #ifdef HAVE_GETADDRINFO_A
   struct gaicb *dns_request = NULL;
 #endif
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   if (nargs == 0)
     return Qnil;
@@ -4406,7 +4404,6 @@ network_interface_info (Lisp_Object ifname)
   Lisp_Object elt;
   int s;
   bool any = false;
-  ptrdiff_t count;
 #if (! (defined SIOCGIFHWADDR && defined HAVE_STRUCT_IFREQ_IFR_HWADDR)	\
      && defined HAVE_GETIFADDRS && defined LLADDR)
   struct ifaddrs *ifap;
@@ -4421,7 +4418,7 @@ network_interface_info (Lisp_Object ifname)
   s = socket (AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
   if (s < 0)
     return Qnil;
-  count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   record_unwind_protect_int (close_file_unwind, s);
 
   elt = Qnil;
@@ -4858,7 +4855,6 @@ server_accept_connection (Lisp_Object server, int channel)
   int s;
   union u_sockaddr saddr;
   socklen_t len = sizeof saddr;
-  ptrdiff_t count;
 
   s = accept4 (channel, &saddr.sa, &len, SOCK_CLOEXEC);
 
@@ -4880,7 +4876,7 @@ server_accept_connection (Lisp_Object server, int channel)
       return;
     }
 
-  count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   record_unwind_protect_int (close_file_unwind, s);
 
   connect_counter++;
@@ -4999,7 +4995,7 @@ server_accept_connection (Lisp_Object server, int channel)
   eassert (p->pid == 0);
 
   /* Discard the unwind protect for closing S.  */
-  specpdl_ptr = specpdl + count;
+  specpdl_ptr = specpdl_ref_to_ptr (count);
 
   p->open_fd[SUBPROCESS_STDIN] = s;
   p->infd  = s;
@@ -5190,7 +5186,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #if defined HAVE_GETADDRINFO_A
   bool retry_for_async;
 #endif
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   /* Close to the current time if known, an invalid timespec otherwise.  */
   struct timespec now = invalid_timespec ();
@@ -5853,7 +5849,7 @@ read_process_output (Lisp_Object proc, int channel)
   struct coding_system *coding = proc_decode_coding_system[channel];
   int carryover = p->decoding_carryover;
   ptrdiff_t readmax = clip_to_bounds (1, read_process_output_max, PTRDIFF_MAX);
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object odeactivate;
   char *chars;
 
@@ -7237,7 +7233,7 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
 {
   Lisp_Object sentinel, odeactivate;
   struct Lisp_Process *p = XPROCESS (proc);
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   bool outer_running_asynch_code = running_asynch_code;
   int waiting = waiting_for_user_input_p;
 
