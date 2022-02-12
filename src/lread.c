@@ -2443,7 +2443,7 @@ with its charpos as (CHARPOS . ATOM).  */)
   (Lisp_Object buffer)
 {
   Lisp_Object retval, warning;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   CHECK_BUFFER (buffer);
   specbind (Qlread_unescaped_character_literals, Qnil);

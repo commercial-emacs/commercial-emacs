@@ -3582,7 +3582,7 @@ the end of that comment or string.  */)
   struct lisp_parse_state state;
   Lisp_Object ret;
   EMACS_INT target = TYPE_MINIMUM (EMACS_INT);
-  ptrdiff_t pdl_count = SPECPDL_INDEX ();
+  specpdl_ref pdl_count = SPECPDL_INDEX ();
 
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
   Fwiden ();

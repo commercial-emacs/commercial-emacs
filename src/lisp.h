@@ -4157,7 +4157,7 @@ extern struct Lisp_Vector *allocate_pseudovector (int, int, int,
 extern bool gc_in_progress;
 extern Lisp_Object make_float (double);
 extern void display_malloc_warning (void);
-extern ptrdiff_t inhibit_garbage_collection (void);
+extern specpdl_ref inhibit_garbage_collection (void);
 extern Lisp_Object build_overlay (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void free_cons (struct Lisp_Cons *);
 extern void init_alloc_once (void);

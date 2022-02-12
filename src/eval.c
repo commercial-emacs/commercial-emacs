@@ -3597,7 +3597,6 @@ specbind (Lisp_Object symbol, Lisp_Object value)
       specpdl_ptr->let.kind = SPECPDL_LET;
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.old_value = SYMBOL_VAL (sym);
-      specpdl_ptr->let.saved_value = Qnil;
       break;
     case SYMBOL_LOCALIZED:
     case SYMBOL_FORWARDED:
@@ -3707,24 +3706,6 @@ record_unwind_protect_module (enum specbind_tag kind, void *ptr)
   specpdl_ptr->unwind_ptr.func = NULL;
   specpdl_ptr->unwind_ptr.arg = ptr;
   grow_specpdl ();
-}
-
-void
-rebind_for_thread_switch (void)
-{
-  union specbinding *bind;
-
-  for (bind = specpdl; bind != specpdl_ptr; ++bind)
-    {
-      if (bind->kind >= SPECPDL_LET)
-	{
-	  Lisp_Object sym = specpdl_symbol (bind),
-	    value = specpdl_saved_value (bind);
-	  bind->let.saved_value = Qnil;
-          do_specbind (XSYMBOL (sym), bind, value,
-                       SET_INTERNAL_THREAD_SWITCH);
-	}
-    }
 }
 
 static void
@@ -3881,27 +3862,6 @@ unbind_to (specpdl_ref count, Lisp_Object value)
     Vquit_flag = quitf;
 
   return value;
-}
-
-void
-unbind_for_thread_switch (struct thread_state *thr)
-{
-  union specbinding *bind;
-
-  for (bind = thr->m_specpdl_ptr; bind > thr->m_specpdl;)
-    {
-      if ((--bind)->kind >= SPECPDL_LET)
-	{
-	  struct buffer *saved_current_buffer = current_buffer;
-	  Lisp_Object sym = specpdl_symbol (bind);
-	  Lisp_Object buf = bind->kind > SPECPDL_LET ? specpdl_where (bind) : Qnil;
-	  if (BUFFERP (buf))
-	    current_buffer = XBUFFER (buf);
-	  bind->let.saved_value = find_symbol_value (sym);
-	  current_buffer = saved_current_buffer;
-          do_one_unbind (bind, false, SET_INTERNAL_THREAD_SWITCH);
-	}
-    }
 }
 
 DEFUN ("special-variable-p", Fspecial_variable_p, Sspecial_variable_p, 1, 1, 0,

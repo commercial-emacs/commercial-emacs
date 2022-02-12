@@ -874,7 +874,7 @@ usage: (save-excursion &rest BODY)  */)
   (Lisp_Object args)
 {
   register Lisp_Object val, mark_ring;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   mark_ring = Vglobal_mark_ring;
   record_unwind_protect_excursion ();

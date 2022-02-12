@@ -3609,12 +3609,12 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       else
 	{
 	  /* For next addrinfo, reset specpdl.  */
-	  specpdl_ptr = specpdl + count1;
+	  specpdl_ptr = specpdl_ref_to_ptr (count1);
 	  emacs_close (s);
 	  s = -1;
 	}
     }
-  specpdl_ptr = specpdl + count1;
+  specpdl_ptr = specpdl_ref_to_ptr (count1);
 
   if (s < 0)
     report_file_errno (p->is_server
@@ -4232,7 +4232,7 @@ usage: (make-network-process &rest ARGS)  */)
     }
   else
     connect_network_socket (proc, addrinfos, use_external_socket_p);
-  specpdl_ptr = specpdl + count;
+  specpdl_ptr = specpdl_ref_to_ptr (count);
   return proc;
 }
 

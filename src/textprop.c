@@ -1168,7 +1168,7 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
       /* (with-current-buffer OBJECT) (Bug#36190).  */
-      ptrdiff_t count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
       return unbind_to (count, add_text_properties_1 (start, end, properties,

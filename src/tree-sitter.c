@@ -532,7 +532,7 @@ tree_sitter_read_buffer (void *payload, uint32_t byte_index,
   static char *thread_unsafe_return_value = NULL;
   EMACS_INT start = SITTER_TO_BUFFER (byte_index);
   struct buffer *bp = (struct buffer *) payload;
-  ptrdiff_t pdl_count = SPECPDL_INDEX ();
+  specpdl_ref pdl_count = SPECPDL_INDEX ();
 
   if (thread_unsafe_last_scan_characters < tree_sitter_scan_characters)
     {
