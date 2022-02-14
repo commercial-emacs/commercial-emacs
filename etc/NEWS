@@ -152,6 +152,11 @@ An autoload definition appears just as a '(defun . NAME)' and the
 
 * Changes in Emacs 29.1
 
++++
+** New function 'command-query'.
+Commands that are marked with this function will prompt the user
+before executing.
+
 ---
 ** 'count-lines' will now report buffer totals if given a prefix.
 
@@ -986,6 +991,12 @@ Emacs buffers, like indentation and the like.  The new ert function
 
 
 * Incompatible Lisp Changes in Emacs 29.1
+
++++
+** Remapping 'mode-line' no longer works as expected.
+'mode-line' is now the parent face of the new 'mode-line-active' face,
+and remapping parent of basic faces does not work reliably.
+Instead of remapping 'mode-line', you have to remap 'mode-line-active'.
 
 ** User option 'mail-source-ignore-errors' is now obsolete.
 The whole mechanism for prompting users to continue in case of
