@@ -513,6 +513,11 @@ to edit such sequences by allowing point to "enter" the sequence.
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
 
+---
+** 'savehist-additional-variables' can now specify variable lengths.
+Lists that are longer than the specified length will be truncated
+before saving.
+
 ** Minibuffer and Completions
 
 *** The "*Completions*" buffer can now be automatically selected.
@@ -982,6 +987,12 @@ support for pipelines which will move a lot of data.  See section
 Enabling this minor mode turns on hiding header material, like
 'elide-head' does; disabling it shows the header.  The commands
 'elide-head' and 'elide-head-show' are now obsolete.
+
+---
+** The autoarg.el library is now marked obsolete.
+This library provides the 'autoarg-mode' and 'autoarg-kp-mode' minor
+modes to emulate the behavior of the historical editor Twenex Emacs.
+It is believed to no longer be useful.
 
 
 * New Modes and Packages in Emacs 29.1
