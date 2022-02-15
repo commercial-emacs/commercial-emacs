@@ -162,6 +162,7 @@
 	  (radio-button-choice :tag "SOCKS Version"
 			       :format "%t: %v"
 			       (const :tag "SOCKS v4  " :format "%t" :value 4)
+                               (const :tag "SOCKS v4a"  :format "%t" :value 4a)
 			       (const :tag "SOCKS v5"   :format "%t" :value 5))))
 
 
@@ -179,6 +180,9 @@
 ;; Miscellaneous other socks constants
 (defconst socks-authentication-null 0)
 (defconst socks-authentication-failure 255)
+
+;; Extensions
+(defconst socks-resolve-command #xf0)
 
 ;; Response codes
 (defconst socks-response-success               0)
@@ -201,6 +205,12 @@
     "Time-to-live expired"
     "Command not supported"
     "Address type not supported"))
+
+(defconst socks--errors-4
+  '("Granted"
+    "Rejected or failed"
+    "Cannot connect to identd on the client"
+    "Client and identd report differing user IDs"))
 
 ;; The socks v5 address types
 (defconst socks-address-type-v4   1)
@@ -340,6 +350,7 @@
 	  version)
 
       ;; Initialize process and info about the process
+      (set-process-coding-system proc 'binary 'binary)
       (set-process-filter proc #'socks-filter)
       (set-process-query-on-exit-flag proc nil)
       (process-put proc 'socks t)
@@ -400,6 +411,7 @@ When ATYPE indicates an IP, param ADDRESS must be given as raw bytes."
 		(format "%c%s" (length address) address))
 	       (t
 		(error "Unknown address type: %d" atype))))
+        trailing
 	request version)
     (or (process-get proc 'socks)
         (error "socks-send-command called on non-SOCKS connection %S" proc))
@@ -417,6 +429,12 @@ When ATYPE indicates an IP, param ADDRESS must be given as raw bytes."
 			     (t
 			      (error "Unsupported address type for HTTP: %d" atype)))
 			    port)))
+     ((when (eq version '4a)
+        (setf addr "\0\0\0\1"
+              trailing (concat address "\0")
+              version 4 ; done with the "a" part
+              (process-get proc 'socks-server-protocol) 4)
+        nil)) ; fall through
      ((equal version 4)
       (setq request (concat
 		     (unibyte-string
@@ -426,7 +444,8 @@ When ATYPE indicates an IP, param ADDRESS must be given as raw bytes."
 		      (logand port #xff)) ; port, low byte
 		     addr                 ; address
 		     (user-full-name)     ; username
-		     "\0")))              ; terminate username
+                     "\0"                 ; terminate username
+                     trailing)))          ; optional host to look up
      ((equal version 5)
       (setq request (concat
 		     (unibyte-string
@@ -447,7 +466,10 @@ When ATYPE indicates an IP, param ADDRESS must be given as raw bytes."
 	nil				; Sweet sweet success!
       (delete-process proc)
       (error "SOCKS: %s"
-             (nth (or (process-get proc 'socks-reply) 1) socks-errors)))
+             (let ((no (or (process-get proc 'socks-reply) 1)))
+               (if (eq version 5)
+                   (nth no socks-errors)
+                 (nth (+ 90 no) socks--errors-4)))))
     proc))
 
 
@@ -634,6 +656,61 @@ When ATYPE indicates an IP, param ADDRESS must be given as raw bytes."
 	  (kill-buffer (current-buffer)))
 	res)
     host))
+
+(defun socks--extract-resolve-response (proc)
+  "Parse response for PROC and maybe return destination IP address."
+  (let ((response (process-get proc 'socks-response)))
+    (cl-assert response) ; otherwise, msg not received in its entirety
+    (pcase (process-get proc 'socks-server-protocol)
+      (4 ; https://www.openssh.com/txt/socks4a.protocol
+       (when-let (((zerop (process-get proc 'socks-reply)))
+                  ((eq (aref response 1) 90)) ; #x5a request granted
+                  (a (substring response 4)) ; ignore port for now
+                  ((not (string-empty-p a)))
+                  ((not (string= a "\0\0\0\0"))))
+         a))
+      (5 ; https://tools.ietf.org/html/rfc1928
+       (cl-assert (eq 5 (aref response 0)) t)
+       (pcase (aref response 3) ; ATYP
+         (1 (and-let* ((a (substring response 4 8))
+                       ((not (string= a "\0\0\0\0")))
+                       a)))
+         ;; No reason to support RESOLVE_PTR [F1] extension, right?
+         (3 (let ((len (1- (aref response 4))))
+              (substring response 5 (+ 5 len))))
+         (4 (substring response 4 20)))))))
+
+(declare-function puny-encode-domain "puny" (domain))
+
+(defun socks-tor-resolve (name &optional _family)
+  "Return list of one vector IPv4 address for domain NAME.
+Or return nil on failure.  See `network-lookup-address-info' for format
+of return value.  Server must support the Tor RESOLVE command."
+  (let ((socks-password (or socks-password ""))
+        host
+        (port 80)  ; unused for now
+        proc
+        ip)
+    (unless (string-suffix-p ".onion" name)
+      (setq host (if (string-match "\\`[[:ascii:]]+\\'" name)
+                     name
+                   (require 'puny)
+                   (puny-encode-domain name)))
+      ;; "Host unreachable" may be raised when the lookup fails
+      (unwind-protect
+          (progn
+            (setq proc (socks-open-connection (socks-find-route host port)))
+            (socks-send-command proc
+                                socks-resolve-command
+                                socks-address-type-name
+                                host
+                                port)
+            (cl-assert (eq (process-get proc 'socks-state)
+                           socks-state-connected))
+            (setq ip (socks--extract-resolve-response proc)))
+        (when proc
+          (delete-process proc)))
+      (list (vconcat ip [0])))))
 
 (provide 'socks)
 
