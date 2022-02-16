@@ -1922,7 +1922,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #endif /* HAVE_WINDOW_SYSTEM */
     }
 
-  init_alloc ();
   init_bignum ();
   init_threads ();
   init_eval ();

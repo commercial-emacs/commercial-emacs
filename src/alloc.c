@@ -2353,7 +2353,7 @@ usage: (bool-vector &rest OBJECTS)  */)
 
   vector = make_uninit_bool_vector (nargs);
   for (i = 0; i < nargs; i++)
-    bool_vector_set (vector, i, !NILP (args[i]));
+    bool_vector_set (vector, i, ! NILP (args[i]));
 
   return vector;
 }
@@ -3203,7 +3203,7 @@ cleanup_vector (struct Lisp_Vector *vector)
     {
       struct Lisp_Subr *subr =
 	PSEUDOVEC_STRUCT (vector, Lisp_Subr);
-      if (!NILP (subr->native_comp_u))
+      if (! NILP (subr->native_comp_u))
 	{
 	  /* FIXME Alternative and non invasive solution to this
 	     cast?  */
@@ -3888,7 +3888,7 @@ queue_doomed_finalizers (struct Lisp_Finalizer *dest,
     {
       struct Lisp_Finalizer *next = finalizer->next;
       if (!vectorlike_marked_p (&finalizer->header)
-          && !NILP (finalizer->function))
+          && ! NILP (finalizer->function))
         {
           unchain_finalizer (finalizer);
           finalizer_insert (dest, finalizer);
@@ -3929,7 +3929,7 @@ run_finalizers (struct Lisp_Finalizer *finalizers)
       finalizer = finalizers->next;
       unchain_finalizer (finalizer);
       function = finalizer->function;
-      if (!NILP (function))
+      if (! NILP (function))
 	{
 	  finalizer->function = Qnil;
 	  run_finalizer_function (function);
@@ -5652,7 +5652,7 @@ purecopy (Lisp_Object obj)
   if (HASH_TABLE_P (Vpurify_flag)) /* Hash consing.  */
     {
       Lisp_Object tmp = Fgethash (obj, Vpurify_flag, Qnil);
-      if (!NILP (tmp))
+      if (! NILP (tmp))
 	return tmp;
     }
 
@@ -5670,7 +5670,7 @@ purecopy (Lisp_Object obj)
       /* Do not purify hash tables which haven't been defined with
          :purecopy as non-nil or are weak - they aren't guaranteed to
          not change.  */
-      if (!NILP (table->weak) || !table->purecopy)
+      if (! NILP (table->weak) || !table->purecopy)
         {
           /* Instead, add the hash table to the list of pinned objects,
              so that it will be marked during GC.  */
@@ -5840,7 +5840,7 @@ compact_font_cache_entry (Lisp_Object entry)
                   Lisp_Object val = XCAR (objlist);
                   struct font *font = GC_XFONT_OBJECT (val);
 
-                  if (!NILP (AREF (val, FONT_TYPE_INDEX))
+                  if (! NILP (AREF (val, FONT_TYPE_INDEX))
                       && vectorlike_marked_p (&font->header))
                     break;
                 }
@@ -5948,8 +5948,7 @@ visit_vectorlike_root (struct gc_root_visitor visitor,
                        struct Lisp_Vector *ptr,
                        enum gc_root_type type)
 {
-  ptrdiff_t size = ptr->header.size;
-  ptrdiff_t i;
+  ptrdiff_t i, size = ptr->header.size;
 
   if (size & PSEUDOVECTOR_FLAG)
     size &= PSEUDOVECTOR_SIZE_MASK;
@@ -5962,11 +5961,10 @@ visit_buffer_root (struct gc_root_visitor visitor,
                    struct buffer *buffer,
                    enum gc_root_type type)
 {
-  /* Buffers that are roots don't have intervals, an undo list, or
-     other constructs that real buffers have.  */
-  eassert (buffer->base_buffer == NULL);
-  eassert (buffer->overlays_before == NULL);
-  eassert (buffer->overlays_after == NULL);
+  /* Metadata buffers don't have constructs that real buffers have.  */
+  eassert (buffer->base_buffer == NULL
+	   && buffer->overlays_before == NULL
+	   && buffer->overlays_after == NULL);
 
   /* Visit the buffer-locals.  */
   visit_vectorlike_root (visitor, (struct Lisp_Vector *) buffer, type);
@@ -5975,9 +5973,8 @@ visit_buffer_root (struct gc_root_visitor visitor,
 /* Visit GC roots stored in the Emacs data section.  Used by both core
    GC and by the portable dumping code.
 
-   There are other GC roots of course, but these roots are dynamic
-   runtime data structures that pdump doesn't care about and so we can
-   continue to mark those directly in garbage_collect.  */
+   We mark dynamic GC roots which pdumper doesn't care about directly
+   in garbage_collect.  */
 void
 visit_static_gc_roots (struct gc_root_visitor visitor)
 {
@@ -6049,7 +6046,7 @@ static EMACS_INT
 consing_threshold (intmax_t threshold, Lisp_Object percentage,
 		   intmax_t since_gc)
 {
-  if (!NILP (Vmemory_full))
+  if (! NILP (Vmemory_full))
     return memory_full_cons_threshold;
   else
     {
@@ -6113,7 +6110,7 @@ watch_gc_cons_percentage (Lisp_Object symbol, Lisp_Object newval,
 void
 maybe_garbage_collect (void)
 {
-  if (bump_consing_until_gc (gc_cons_threshold, Vgc_cons_percentage) < 0)
+  if (0 > bump_consing_until_gc (gc_cons_threshold, Vgc_cons_percentage))
     garbage_collect ();
 }
 
@@ -6121,6 +6118,7 @@ maybe_garbage_collect (void)
 void
 garbage_collect (void)
 {
+  static struct timespec gc_elapsed = {0, 0}, mark_elapsed = {0, 0};
   Lisp_Object tail, buffer;
   char stack_top_variable;
   bool message_p;
@@ -6201,13 +6199,35 @@ garbage_collect (void)
   /* Mark all the special slots that serve as the roots of accessibility.  */
 
   struct gc_root_visitor visitor = { .visit = mark_object_root_visitor };
-  visit_static_gc_roots (visitor);
+  for (int i = 0; i < staticidx; i++)
+    visitor.visit (staticvec[i], GC_ROOT_STATICPRO, visitor.data);
 
+  mark_elapsed = timespec_add (mark_elapsed,
+			       timespec_sub (current_timespec (), start));
+  Vmark_elapsed = make_float (timespectod (mark_elapsed));
+  mark_object (Vmark_elapsed);
+
+  visit_buffer_root (visitor,
+                     &buffer_local_symbols,
+                     GC_ROOT_BUFFER_LOCAL_NAME);
+
+  visit_buffer_root (visitor,
+                     &buffer_defaults,
+                     GC_ROOT_BUFFER_LOCAL_DEFAULT);
+
+  for (int i = 0; i < ARRAYELTS (lispsym); i++)
+    {
+      Lisp_Object sptr = builtin_lisp_symbol (i);
+      visitor.visit (&sptr, GC_ROOT_C_SYMBOL, visitor.data);
+    }
+
+  // visit_static_gc_roots (visitor);
   mark_pinned_objects ();
   mark_pinned_symbols ();
   mark_terminals ();
   mark_kboards ();
   mark_threads ();
+
 #ifdef HAVE_PGTK
   mark_pgtkterm ();
 #endif
@@ -6240,12 +6260,10 @@ garbage_collect (void)
       mark_object (BVAR (nextb, undo_list));
     }
 
-  /* Now pre-sweep finalizers.  Here, we add any unmarked finalizers
-     to doomed_finalizers so we can run their associated functions
-     after GC.  It's important to scan finalizers at this stage so
-     that we can be sure that unmarked finalizers are really
-     unreachable except for references from their associated functions
-     and from other finalizers.  */
+  /* Now pre-sweep finalizers.  Add unmarked finalizers to
+     doomed_finalizers so their associated functions run after GC.
+     Unmarked finalizers should only be reachable by their associated
+     functions and other finalizers.  */
 
   queue_doomed_finalizers (&doomed_finalizers, &finalizers);
   mark_finalizer_list (&doomed_finalizers);
@@ -6263,8 +6281,7 @@ garbage_collect (void)
   consing_until_gc = gc_threshold
     = consing_threshold (gc_cons_threshold, Vgc_cons_percentage, 0);
 
-  /* Unblock *after* re-setting `consing_until_gc` in case `unblock_input`
-     signals an error (see bug#43389).  */
+  /* Unblock as late as possible since it could signal (Bug#43389).  */
   unblock_input ();
 
   if (garbage_collection_messages && NILP (Vmemory_full))
@@ -6280,7 +6297,7 @@ garbage_collect (void)
   /* GC is complete: now we can run our finalizer callbacks.  */
   run_finalizers (&doomed_finalizers);
 
-  if (!NILP (Vpost_gc_hook))
+  if (! NILP (Vpost_gc_hook))
     {
       specpdl_ref gc_count = inhibit_garbage_collection ();
       safe_run_hooks (Qpost_gc_hook);
@@ -6288,14 +6305,9 @@ garbage_collect (void)
     }
 
   /* Accumulate statistics.  */
-  if (FLOATP (Vgc_elapsed))
-    {
-      static struct timespec gc_elapsed;
-      gc_elapsed = timespec_add (gc_elapsed,
-				 timespec_sub (current_timespec (), start));
-      Vgc_elapsed = make_float (timespectod (gc_elapsed));
-    }
-
+  gc_elapsed = timespec_add (gc_elapsed,
+			     timespec_sub (current_timespec (), start));
+  Vgc_elapsed = make_float (timespectod (gc_elapsed));
   gcs_done++;
 
   /* Collect profiling data.  */
@@ -6445,7 +6457,7 @@ mark_vectorlike (union vectorlike_header *header)
   /* Bool vectors have a different case in mark_object.  */
   eassert (PSEUDOVECTOR_TYPE (ptr) != PVEC_BOOL_VECTOR);
 
-  set_vector_marked (ptr); /* Else mark it.  */
+  set_vector_marked (ptr);
   if (size & PSEUDOVECTOR_FLAG)
     size &= PSEUDOVECTOR_SIZE_MASK;
 
@@ -6816,7 +6828,7 @@ mark_object (Lisp_Object arg)
                next iteration of goto-loop here.  This is done to avoid a few
                recursive calls to mark_object.  */
             obj = mark_compiled (ptr);
-            if (!NILP (obj))
+            if (! NILP (obj))
               goto loop;
             break;
 
@@ -7420,10 +7432,10 @@ symbol_uses_obj (Lisp_Object symbol, Lisp_Object obj)
   Lisp_Object val = find_symbol_value (symbol);
   return (EQ (val, obj)
 	  || EQ (sym->u.s.function, obj)
-	  || (!NILP (sym->u.s.function)
+	  || (! NILP (sym->u.s.function)
 	      && COMPILEDP (sym->u.s.function)
 	      && EQ (AREF (sym->u.s.function, COMPILED_BYTECODE), obj))
-	  || (!NILP (val)
+	  || (! NILP (val)
 	      && COMPILEDP (val)
 	      && EQ (AREF (val, COMPILED_BYTECODE), obj)));
 }
@@ -7631,13 +7643,6 @@ init_alloc_once_for_pdumper (void)
 }
 
 void
-init_alloc (void)
-{
-  Vgc_elapsed = make_float (0.0);
-  gcs_done = 0;
-}
-
-void
 syms_of_alloc (void)
 {
   DEFVAR_INT ("gc-cons-threshold", gc_cons_threshold,
@@ -7731,8 +7736,14 @@ do hash-consing of the objects allocated to pure space.  */);
   DEFVAR_LISP ("gc-elapsed", Vgc_elapsed,
 	       doc: /* Accumulated time elapsed in garbage collections.
 The time is in seconds as a floating point value.  */);
+
+  DEFVAR_LISP ("mark-elapsed", Vmark_elapsed,
+	       doc: /* Accumulated time elapsed in marking for sweep.
+The time is in seconds as a floating point value.  */);
+
   DEFVAR_INT ("gcs-done", gcs_done,
               doc: /* Accumulated number of garbage collections done.  */);
+  gcs_done = 0;
 
   DEFVAR_INT ("integer-width", integer_width,
 	      doc: /* Maximum number N of bits in safely-calculated integers.

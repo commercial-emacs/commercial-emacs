@@ -18,6 +18,24 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
+/* I'm sure 2022 Roland McGrath wouldn't know who 1991 Roland
+   McGrath is.  But I think we'd both agree 1991 Roland McGrath
+   sucked at exposition.
+
+   A slot is a `struct buffer` field.
+
+   A special slot, or per-buffer variable, is one of the first however
+   many slots iterated over by FOR_EACH_PER_BUFFER_OBJECT_AT.  Unlike
+   "normal" buffer-local variables, a special slot does not admit a
+   default value.
+
+   The confusingly named buffer_local_flags maps a slot into the
+   equally poorly named slot index (IDX), which is zero for a slot
+   without a corresponding Lisp variable, -1 for a special slot, or an
+   index into the `local_flags` array indicating which slots are
+   buffer-local.
+  */
+
 #ifndef EMACS_BUFFER_H
 #define EMACS_BUFFER_H
 
@@ -103,7 +121,7 @@ enum { BEG = 1, BEG_BYTE = BEG };
 
 /* Modification count as of last visit or save.  */
 #define SAVE_MODIFF (current_buffer->text->save_modiff)
-
+
 
 /* Position of gap in buffer.  */
 #define BUF_GPT(buf) ((buf)->text->gpt)
@@ -155,7 +173,7 @@ enum { BEG = 1, BEG_BYTE = BEG };
   BUF_OVERLAY_UNCHANGED_MODIFIED (current_buffer)
 #define BEG_UNCHANGED BUF_BEG_UNCHANGED (current_buffer)
 #define END_UNCHANGED BUF_END_UNCHANGED (current_buffer)
-
+
 /* Functions to set PT in the current buffer, or another buffer.  */
 
 extern void set_point (ptrdiff_t);
@@ -191,7 +209,7 @@ BUF_TEMP_SET_PT (struct buffer *buffer, ptrdiff_t position)
 {
   temp_set_point (buffer, position);
 }
-
+
 /* Maximum number of bytes in a buffer.
    A buffer cannot contain more bytes than a 1-origin fixnum can represent,
    nor can it be so large that C pointer arithmetic stops working.
@@ -217,7 +235,7 @@ extern ptrdiff_t advance_to_char_boundary (ptrdiff_t byte_pos);
    Do not check that the position is in range.  */
 
 #define FETCH_BYTE(n) *(BYTE_POS_ADDR ((n)))
-
+
 /* Define the actual buffer data structures.  */
 
 /* This data structure describes the actual text contents of a buffer.
@@ -307,7 +325,8 @@ enum { MAX_PER_BUFFER_VARS = 50 };
 enum { NONEXISTENT_MODTIME_NSECS = -1 };
 enum { UNKNOWN_MODTIME_NSECS = -2 };
 
-/* This is the structure that the buffer Lisp object points to.  */
+/* A PVEC_BUFFER Lisp object.  See FOR_EACH_PER_BUFFER_OBJECT_AT
+   before updating.*/
 
 struct buffer
 {
@@ -617,11 +636,8 @@ struct buffer
      an indirect buffer since it counts as its base buffer.  */
   int window_count;
 
-  /* A non-zero value in slot IDX means that per-buffer variable
-     with index IDX has a local value in this buffer.  The index IDX
-     for a buffer-local variable is stored in that variable's slot
-     in buffer_local_flags as a Lisp integer.  If the index is -1,
-     this means the variable is always local in all buffers.  */
+  /* Boolean array indexed by the so-called "slot index" indicating
+     which slots are buffer-local.  */
   char local_flags[MAX_PER_BUFFER_VARS];
 
   /* Set to the modtime of the visited file when read or written.
@@ -1120,35 +1136,8 @@ BUFFER_CHECK_INDIRECTION (struct buffer *b)
     }
 }
 
-/* This structure holds the default values of the buffer-local variables
-   that have special slots in each buffer.
-   The default value occupies the same slot in this structure
-   as an individual buffer's value occupies in that buffer.
-   Setting the default value also goes through the alist of buffers
-   and stores into each buffer that does not say it has a local value.  */
-
 extern struct buffer buffer_defaults;
-
-/* This structure marks which slots in a buffer have corresponding
-   default values in buffer_defaults.
-   Each such slot has a nonzero value in this structure.
-   The value has only one nonzero bit.
-
-   When a buffer has its own local value for a slot,
-   the entry for that slot (found in the same slot in this structure)
-   is turned on in the buffer's local_flags array.
-
-   If a slot in this structure is zero, then even though there may
-   be a Lisp-level local variable for the slot, it has no default value,
-   and the corresponding slot in buffer_defaults is not used.  */
-
-
 extern struct buffer buffer_local_flags;
-
-/* For each buffer slot, this points to the Lisp symbol name
-   for that slot in the current buffer.  It is 0 for slots
-   that don't have such names.  */
-
 extern struct buffer buffer_local_symbols;
 
 /* verify_interval_modification saves insertion hooks here
@@ -1156,7 +1145,7 @@ extern struct buffer buffer_local_symbols;
 extern Lisp_Object interval_insert_behind_hooks;
 extern Lisp_Object interval_insert_in_front_hooks;
 
-
+
 extern EMACS_INT fix_position (Lisp_Object);
 #define CHECK_FIXNUM_COERCE_MARKER(x) ((x) = make_fixnum (fix_position (x)))
 extern void delete_all_overlays (struct buffer *);
@@ -1266,7 +1255,7 @@ buffer_has_overlays (void)
 {
   return current_buffer->overlays_before || current_buffer->overlays_after;
 }
-
+
 /* Functions for accessing a character or byte,
    or converting between byte positions and addresses,
    in a specified buffer.  */
@@ -1403,16 +1392,21 @@ OVERLAY_POSITION (Lisp_Object p)
   return marker_position (p);
 }
 
-
-/***********************************************************************
-			Buffer-local Variables
- ***********************************************************************/
-
-/* Return the offset in bytes of member VAR of struct buffer
-   from the start of a buffer structure.  */
+/* Return the byte offset of special slot VAR.  */
 
 #define PER_BUFFER_VAR_OFFSET(VAR) \
   offsetof (struct buffer, VAR ## _)
+
+INLINE int
+PER_BUFFER_IDX (ptrdiff_t offset)
+{
+  return XFIXNUM (*(Lisp_Object *) (offset + (char *) &buffer_local_flags));
+}
+
+#define PER_BUFFER_VAR_IDX(VAR) \
+    PER_BUFFER_IDX (PER_BUFFER_VAR_OFFSET (VAR))
+
+extern bool valid_per_buffer_idx (int);
 
 /* Used to iterate over normal Lisp_Object fields of struct buffer (all
    Lisp_Objects except undo_list).  If you add, remove, or reorder
@@ -1423,19 +1417,7 @@ OVERLAY_POSITION (Lisp_Object p)
        offset <= PER_BUFFER_VAR_OFFSET (cursor_in_non_selected_windows); \
        offset += word_size)
 
-/* Return the index of buffer-local variable VAR.  Each per-buffer
-   variable has an index > 0 associated with it, except when it always
-   has buffer-local values, in which case the index is -1.  If this is
-   0, this is a bug and means that the slot of VAR in
-   buffer_local_flags wasn't initialized.  */
-
-#define PER_BUFFER_VAR_IDX(VAR) \
-    PER_BUFFER_IDX (PER_BUFFER_VAR_OFFSET (VAR))
-
-extern bool valid_per_buffer_idx (int);
-
-/* Value is true if the variable with index IDX has a local value
-   in buffer B.  */
+/* Return true if IDX corresponds to a buffer-local variable.  */
 
 INLINE bool
 PER_BUFFER_VALUE_P (struct buffer *b, int idx)
@@ -1444,44 +1426,12 @@ PER_BUFFER_VALUE_P (struct buffer *b, int idx)
   return b->local_flags[idx];
 }
 
-/* Set whether per-buffer variable with index IDX has a buffer-local
-   value in buffer B.  VAL zero means it hasn't.  */
-
 INLINE void
 SET_PER_BUFFER_VALUE_P (struct buffer *b, int idx, bool val)
 {
   eassert (valid_per_buffer_idx (idx));
   b->local_flags[idx] = val;
 }
-
-/* Return the index value of the per-buffer variable at offset OFFSET
-   in the buffer structure.
-
-   If the slot OFFSET has a corresponding default value in
-   buffer_defaults, the index value is positive and has only one
-   nonzero bit.  When a buffer has its own local value for a slot, the
-   bit for that slot (found in the same slot in this structure) is
-   turned on in the buffer's local_flags array.
-
-   If the index value is -1, even though there may be a
-   DEFVAR_PER_BUFFER for the slot, there is no default value for it;
-   and the corresponding slot in buffer_defaults is not used.
-
-   If the index value is -2, then there is no DEFVAR_PER_BUFFER for
-   the slot, but there is a default value which is copied into each
-   new buffer.
-
-   If a slot in this structure corresponding to a DEFVAR_PER_BUFFER is
-   zero, that is a bug.  */
-
-INLINE int
-PER_BUFFER_IDX (ptrdiff_t offset)
-{
-  return XFIXNUM (*(Lisp_Object *) (offset + (char *) &buffer_local_flags));
-}
-
-/* Functions to get and set default value of the per-buffer
-   variable at offset OFFSET in the buffer structure.  */
 
 INLINE Lisp_Object
 per_buffer_default (int offset)
@@ -1494,9 +1444,6 @@ set_per_buffer_default (int offset, Lisp_Object value)
 {
   *(Lisp_Object *)(offset + (char *) &buffer_defaults) = value;
 }
-
-/* Functions to get and set buffer-local value of the per-buffer
-   variable at offset OFFSET in the buffer structure.  */
 
 INLINE Lisp_Object
 per_buffer_value (struct buffer *b, int offset)

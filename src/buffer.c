@@ -50,41 +50,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "w32heap.h"		/* for mmap_* */
 #endif
 
-/* This structure holds the default values of the buffer-local variables
-   defined with DEFVAR_PER_BUFFER, that have special slots in each buffer.
-   The default value occupies the same slot in this structure
-   as an individual buffer's value occupies in that buffer.
-   Setting the default value also goes through the alist of buffers
-   and stores into each buffer that does not say it has a local value.  */
-
 struct buffer buffer_defaults;
-
-/* This structure marks which slots in a buffer have corresponding
-   default values in buffer_defaults.
-   Each such slot has a value in this structure.
-   The value is a positive Lisp integer that must be smaller than
-   MAX_PER_BUFFER_VARS.
-
-   When a buffer has its own local value for a slot,
-   the entry for that slot (found in the same slot in this structure)
-   is turned on in the buffer's local_flags array.
-
-   If a slot in this structure is -1, then even though there may
-   be a DEFVAR_PER_BUFFER for the slot, there is no default value for it;
-   and the corresponding slot in buffer_defaults is not used.
-
-   If a slot in this structure corresponding to a DEFVAR_PER_BUFFER is
-   zero, that is a bug.  */
-
 struct buffer buffer_local_flags;
-
-/* This structure holds the names of symbols whose values may be
-   buffer-local.  It is indexed and accessed in the same way as the above.  */
-
 struct buffer buffer_local_symbols;
-
-/* Return the symbol of the per-buffer variable at offset OFFSET in
-   the buffer structure.  */
 
 #define PER_BUFFER_SYMBOL(OFFSET) \
       (*(Lisp_Object *)((OFFSET) + (char *) &buffer_local_symbols))
@@ -94,8 +62,8 @@ struct buffer buffer_local_symbols;
   ((ptrdiff_t) min (MOST_POSITIVE_FIXNUM,				\
 		    min (PTRDIFF_MAX, SIZE_MAX) / word_size))
 
-/* Flags indicating which built-in buffer-local variables
-   are permanent locals.  */
+/* Flags indicating which built-in buffer-local variables are
+   permanent locals.  */
 static char buffer_permanent_local_flags[MAX_PER_BUFFER_VARS];
 
 /* Number of per-buffer variables used.  */
@@ -394,7 +362,7 @@ nsberror (Lisp_Object spec)
     error ("No buffer named %s", SDATA (spec));
   error ("Invalid buffer argument");
 }
-
+
 DEFUN ("buffer-monospace-p", Fbuffer_monospace_p, Sbuffer_monospace_p, 0, 1, 0,
        doc: /* Return t if BUFFER contains only homogenous text.
 By homogenous, we mean only characters of the frame's default font and no
@@ -1195,7 +1163,7 @@ is first appended to NAME, to speed up finding a non-existent buffer.  */)
     }
 }
 
-
+
 DEFUN ("buffer-name", Fbuffer_name, Sbuffer_name, 0, 1, 0,
        doc: /* Return the name of BUFFER, as a string.
 BUFFER defaults to the current buffer.
@@ -1388,7 +1356,7 @@ No argument or nil as argument means use current buffer as BUFFER.  */)
 
   return result;
 }
-
+
 DEFUN ("buffer-modified-p", Fbuffer_modified_p, Sbuffer_modified_p,
        0, 1, 0,
        doc: /* Return t if BUFFER was modified since its file was last read or saved.
@@ -1528,7 +1496,7 @@ buffer as BUFFER.  */)
 {
   return modiff_to_integer (BUF_CHARS_MODIFF (decode_buffer (buffer)));
 }
-
+
 DEFUN ("rename-buffer", Frename_buffer, Srename_buffer, 1, 2,
        "(list (read-string \"Rename buffer (to new name): \" \
 	      nil 'buffer-name-history (buffer-name (current-buffer))) \
@@ -1684,7 +1652,7 @@ other_buffer_safely (Lisp_Object buffer)
 
   return buf;
 }
-
+
 DEFUN ("buffer-enable-undo", Fbuffer_enable_undo, Sbuffer_enable_undo,
        0, 1, "",
        doc: /* Start keeping undo information for buffer BUFFER.
@@ -2024,7 +1992,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 
   return Qt;
 }
-
+
 /* Move association for BUFFER to the front of buffer (a)lists.  Since
    we do this each time BUFFER is selected visibly, the more recently
    selected buffers are always closer to the front of those lists.  This
@@ -2283,7 +2251,7 @@ set_buffer_if_live (Lisp_Object buffer)
   if (BUFFER_LIVE_P (XBUFFER (buffer)))
     set_buffer_internal (XBUFFER (buffer));
 }
-
+
 DEFUN ("barf-if-buffer-read-only", Fbarf_if_buffer_read_only,
 				   Sbarf_if_buffer_read_only, 0, 1, 0,
        doc: /* Signal a `buffer-read-only' error if the current buffer is read-only.
@@ -2302,7 +2270,7 @@ If the text under POSITION (which defaults to point) has the
     xsignal1 (Qbuffer_read_only, Fcurrent_buffer ());
   return Qnil;
 }
-
+
 DEFUN ("erase-buffer", Ferase_buffer, Serase_buffer, 0, 0, "*",
        doc: /* Delete the entire contents of the current buffer.
 Any narrowing restriction in effect (see `narrow-to-region') is removed,
@@ -2337,7 +2305,7 @@ validate_region (Lisp_Object *b, Lisp_Object *e)
   *b = make_fixnum (beg);
   *e = make_fixnum (end);
 }
-
+
 /* Advance BYTE_POS up to a character boundary
    and return the adjusted position.  */
 
@@ -2822,7 +2790,7 @@ current buffer is cleared.  */)
 
   return flag;
 }
-
+
 DEFUN ("kill-all-local-variables", Fkill_all_local_variables,
        Skill_all_local_variables, 0, 1, 0,
        doc: /* Switch to Fundamental mode by killing current buffer's local variables.
@@ -2857,7 +2825,7 @@ the normal hook `change-major-mode-hook'.  */)
   return Qnil;
 }
 
-
+
 /* Find all the overlays in the current buffer that contain position POS.
    Return the number found, and store them in a vector in *VEC_PTR.
    Store in *LEN_PTR the size allocated for the vector.
@@ -2987,7 +2955,7 @@ overlays_at (EMACS_INT pos, bool extend, Lisp_Object **vec_ptr,
     *prev_ptr = prev;
   return idx;
 }
-
+
 /* Find all the overlays in the current buffer that overlap the range
    BEG-END, or are empty at BEG, or are empty at END provided END
    denotes the position at the end of the current buffer.
@@ -3176,7 +3144,7 @@ disable_line_numbers_overlay_at_eob (void)
   return tem;
 }
 
-
+
 /* Fast function to just test if we're at an overlay boundary.  */
 bool
 overlay_touches_p (ptrdiff_t pos)
@@ -3208,7 +3176,7 @@ overlay_touches_p (ptrdiff_t pos)
     }
   return 0;
 }
-
+
 struct sortvec
 {
   Lisp_Object overlay;
@@ -3319,7 +3287,7 @@ sort_overlays (Lisp_Object *overlay_vec, ptrdiff_t noverlays, struct window *w)
   SAFE_FREE ();
   return (noverlays);
 }
-
+
 struct sortstr
 {
   Lisp_Object string, string2;
@@ -3534,7 +3502,7 @@ overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
     }
   return 0;
 }
-
+
 /* Shift overlays in BUF's overlay lists, to center the lists at POS.  */
 
 void
@@ -3912,7 +3880,7 @@ fix_overlays_before (struct buffer *bp, ptrdiff_t prev, ptrdiff_t pos)
 	break;
     }
 }
-
+
 DEFUN ("overlayp", Foverlayp, Soverlayp, 1, 1, 0,
        doc: /* Return t if OBJECT is an overlay.  */)
   (Lisp_Object object)
@@ -3989,7 +3957,7 @@ for the rear of the overlay advance when text is inserted there
 
   return overlay;
 }
-
+
 /* Mark a section of BUF as needing redisplay because of overlays changes.  */
 
 static void
@@ -4203,7 +4171,7 @@ buffer.  */)
   delete_all_overlays (decode_buffer (buffer));
   return Qnil;
 }
-
+
 /* Overlay dissection functions.  */
 
 DEFUN ("overlay-start", Foverlay_start, Soverlay_start, 1, 1, 0,
@@ -4245,7 +4213,7 @@ OVERLAY.  */)
   return Fcopy_sequence (XOVERLAY (overlay)->plist);
 }
 
-
+
 DEFUN ("overlays-at", Foverlays_at, Soverlays_at, 1, 2, 0,
        doc: /* Return a list of the overlays that contain the character at POS.
 If SORTED is non-nil, then sort them by decreasing priority.
@@ -4400,7 +4368,7 @@ the value is (point-min).  */)
   xfree (overlay_vec);
   return make_fixnum (prevpos);
 }
-
+
 /* These functions are for debugging overlays.  */
 
 DEFUN ("overlay-lists", Foverlay_lists, Soverlay_lists, 0, 0, 0,
@@ -4437,7 +4405,7 @@ for positions far away from POS).  */)
   recenter_overlay_lists (current_buffer, p);
   return Qnil;
 }
-
+
 DEFUN ("overlay-get", Foverlay_get, Soverlay_get, 2, 2, 0,
        doc: /* Get the property of overlay OVERLAY with property name PROP.  */)
   (Lisp_Object overlay, Lisp_Object prop)
@@ -4486,7 +4454,7 @@ VALUE will be returned.*/)
 
   return value;
 }
-
+
 /* Subroutine of report_overlay_modification.  */
 
 /* Lisp vector holding overlay hook functions to call.
@@ -4519,7 +4487,7 @@ add_overlay_mod_hooklist (Lisp_Object functionlist, Lisp_Object overlay)
   ASET (last_overlay_modification_hooks, last_overlay_modification_hooks_used,
 	overlay);      last_overlay_modification_hooks_used++;
 }
-
+
 /* Run the modification-hooks of overlays that include
    any part of the text in START to END.
    If this change is an insertion, also
@@ -4708,10 +4676,6 @@ evaporate_overlays (ptrdiff_t pos)
   for (; CONSP (hit_list); hit_list = XCDR (hit_list))
     Fdelete_overlay (XCAR (hit_list));
 }
-
-/***********************************************************************
-			 Allocation with mmap
- ***********************************************************************/
 
 /* Note: WINDOWSNT implements this stuff on w32heap.c.  */
 #if defined USE_MMAP_FOR_BUFFERS && !defined WINDOWSNT
@@ -5066,12 +5030,6 @@ mmap_realloc (void **var, size_t nbytes)
 
 #endif /* USE_MMAP_FOR_BUFFERS */
 
-
-
-/***********************************************************************
-			    Buffer-text Allocation
- ***********************************************************************/
-
 /* Allocate NBYTES bytes for buffer B's text buffer.  */
 
 static void
@@ -5140,9 +5098,6 @@ enlarge_buffer_text (struct buffer *b, ptrdiff_t delta)
   unblock_input ();
 }
 
-
-/* Free buffer B's text buffer.  */
-
 static void
 free_buffer_text (struct buffer *b)
 {
@@ -5163,25 +5118,9 @@ free_buffer_text (struct buffer *b)
   unblock_input ();
 }
 
-
-
-/***********************************************************************
-			    Initialization
- ***********************************************************************/
 void
 init_buffer_once (void)
 {
-  /* TODO: clean up the buffer-local machinery.  Right now,
-     we have:
-
-     buffer_defaults: default values of buffer-locals
-     buffer_local_flags: metadata
-     buffer_permanent_local_flags: metadata
-     buffer_local_symbols: metadata
-
-     There must be a simpler way to store the metadata.
-  */
-
   int idx;
 
   /* Items flagged permanent get an explicit permanent-local property
@@ -5189,7 +5128,11 @@ init_buffer_once (void)
   PDUMPER_REMEMBER_SCALAR (buffer_permanent_local_flags);
   memset (buffer_permanent_local_flags, 0, sizeof buffer_permanent_local_flags);
 
-  /* 0 means not a lisp var, -1 means always local, else mask.  */
+  /* The confusingly named buffer_local_flags maps a slot into the
+     equally poorly named slot index (IDX), which is zero for a slot
+     without a corresponding Lisp variable, -1 for a special slot, or an
+     index into the `local_flags` array indicating which slots are
+     buffer-local.  */
   memset (&buffer_local_flags, 0, sizeof buffer_local_flags);
   bset_filename (&buffer_local_flags, make_fixnum (-1));
   bset_directory (&buffer_local_flags, make_fixnum (-1));
