@@ -57,6 +57,7 @@ number of repetitions actually used."
       (benchmark--adaptive func repetitions)
     (unless repetitions (setq repetitions 1))
     (let ((gc gc-elapsed)
+          (mark mark-elapsed)
 	  (gcs gcs-done)
 	  (empty-func (lambda () 'empty-func)))
       (list
@@ -66,7 +67,8 @@ number of repetitions actually used."
 	 (- (benchmark-elapse (funcall func))
             (benchmark-elapse (funcall empty-func))))
        (- gcs-done gcs)
-       (- gc-elapsed gc)))))
+       (- gc-elapsed gc)
+       (- mark-elapsed mark)))))
 
 (defun benchmark--adaptive (func time)
   "Measure the run time of FUNC, calling it enough times to last TIME seconds.
