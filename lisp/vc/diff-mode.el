@@ -1593,8 +1593,8 @@ modified lines of the diff."
                   nil)))
   (when (eq diff-buffer-type 'git)
     (setq diff-outline-regexp
-          (concat "\\(^diff --git.*\n\\|" diff-hunk-header-re "\\)"))
-    (setq-local outline-level #'diff--outline-level))
+          (concat "\\(^diff --git.*\n\\|" diff-hunk-header-re "\\)")))
+  (setq-local outline-level #'diff--outline-level)
   (setq-local outline-regexp diff-outline-regexp))
 
 (defun diff-delete-if-empty ()
@@ -2596,7 +2596,8 @@ fixed, visit it in a buffer."
   nil nil 'center)
 
 (defun diff--font-lock-prettify (limit)
-  (when diff-font-lock-prettify
+  (when (and diff-font-lock-prettify
+             (eq diff-buffer-type 'git))
     (save-excursion
       ;; FIXME: Include the first space for context-style hunks!
       (while (re-search-forward "^[-+! ]" limit t)
