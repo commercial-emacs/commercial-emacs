@@ -3195,7 +3195,6 @@ x_xim_text_to_utf8_unix (XIMText *text, ptrdiff_t *length)
   ptrdiff_t wchar_actual_length, i;
   struct coding_system coding;
   struct x_xim_text_conversion_data data;
-  bool was_waiting_for_input_p;
   Lisp_Object arg;
 
   if (text->encoding_is_wchar)
@@ -3214,14 +3213,9 @@ x_xim_text_to_utf8_unix (XIMText *text, ptrdiff_t *length)
   data.coding = &coding;
   data.source = text->string.multi_byte;
 
-  was_waiting_for_input_p = waiting_for_input;
-  /* Otherwise Fsignal will crash.  */
-  waiting_for_input = false;
   arg = make_mint_ptr (&data);
   internal_condition_case_n (x_xim_text_to_utf8_unix_1, 1, &arg,
 			     Qt, x_xim_text_to_utf8_unix_2);
-  waiting_for_input = was_waiting_for_input_p;
-
   *length = coding.produced;
   return (char *) coding.destination;
 }
