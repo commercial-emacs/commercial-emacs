@@ -6123,8 +6123,9 @@ garbage_collect (void)
   global_print_it++;
   int local_marked = global_marked;
   visit_buffer_root (visitor,
-                     &buffer_defaults,
-                     GC_ROOT_BUFFER_LOCAL_DEFAULT);
+                     &buffer_local_symbols,
+                     GC_ROOT_BUFFER_LOCAL_NAME);
+
   fprintf (stderr, "%d: foo1 %d %d\n", global_print_it, local_marked, global_marked);
   global_print_it++;
 
@@ -6137,10 +6138,6 @@ garbage_collect (void)
   visit_buffer_root (visitor,
                      &buffer_defaults,
                      GC_ROOT_BUFFER_LOCAL_DEFAULT);
-
-  visit_buffer_root (visitor,
-                     &buffer_local_symbols,
-                     GC_ROOT_BUFFER_LOCAL_NAME);
 
   for (int i = 0; i < ARRAYELTS (lispsym); i++)
     {
@@ -6736,12 +6733,12 @@ mark_object (Lisp_Object arg)
     case Lisp_Vectorlike:
       {
 	register struct Lisp_Vector *ptr = XVECTOR (obj);
+	enum pvec_type pvectype;
 
 	if (vector_marked_p (ptr))
 	  break;
 
-        enum pvec_type pvectype
-          = PSEUDOVECTOR_TYPE (ptr);
+	pvectype = PSEUDOVECTOR_TYPE (ptr);
 
 #ifdef GC_CHECK_MARKED_OBJECTS
         if (!pdumper_object_p (po) && !SUBRP (obj) && !main_thread_p (po))
@@ -6759,7 +6756,18 @@ mark_object (Lisp_Object arg)
 	switch (pvectype)
 	  {
 	  case PVEC_BUFFER:
-	    mark_buffer ((struct buffer *) ptr);
+	    if (0 == strcmp ("*scratch*",
+			     STRINGP (BVAR ((struct buffer *) ptr, name))
+			     ? SSDATA (BVAR ((struct buffer *) ptr, name))
+			     : "(null)"))
+	      {
+		fprintf (stderr, "break here\n");
+		mark_buffer ((struct buffer *) ptr);
+	      }
+	    else
+	      {
+		mark_buffer ((struct buffer *) ptr);
+	      }
             break;
 
           case PVEC_COMPILED:
