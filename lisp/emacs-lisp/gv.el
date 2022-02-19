@@ -594,7 +594,7 @@ binding mode."
         code
       (macroexp-warn-and-return
        "Use of gv-ref probably requires lexical-binding"
-       code))))
+       code nil nil place))))
 
 (defsubst gv-deref (ref)
   "Dereference REF, returning the referenced value.

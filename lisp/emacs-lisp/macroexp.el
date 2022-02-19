@@ -153,7 +153,9 @@ Other uses risk returning non-nil value that point to the wrong file."
 CATEGORY is the category of the warning, like the categories that
 can appear in `byte-compile-warnings'.
 COMPILE-ONLY non-nil means no warning should be emitted if the code
-is executed without being compiled first."
+is executed without being compiled first.
+ARG is a symbol (or a form) giving the source code position for the message.
+It should normally be a symbol with position and it defaults to FORM."
   (cond
    ((null msg) form)
    ((macroexp-compiling-p)
@@ -223,7 +225,7 @@ is executed without being compiled first."
             fun obsolete
             (if (symbolp (symbol-function fun))
                 "alias" "macro"))
-           new-form (list 'obsolete fun)))
+           new-form (list 'obsolete fun) nil fun))
       new-form)))
 
 (defun macroexp--unfold-lambda (form &optional name)
@@ -278,7 +280,7 @@ is executed without being compiled first."
                      "attempt to open-code `%s' with too few arguments"
                    "attempt to open-code `%s' with too many arguments")
                  name)
-         form)
+         form nil nil arglist)
 
       ;; The following leads to infinite recursion when loading a
       ;; file containing `(defsubst f () (f))', and then trying to
