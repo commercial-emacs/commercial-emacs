@@ -34,16 +34,18 @@
        (when-let ((buf (get-buffer ,buffer)))
          (kill-buffer buf)))))
 
-
-;;;; showing/hiding obsolete options
-
 (defgroup cus-edit-tests nil "Test."
   :group 'test-group)
+
+(defcustom cus-edit-test-foo1 0
+  ""
+  :type 'number)
 
 (defcustom cus-edit-tests--obsolete-option-tag nil
   "This should never be removed; it is obsolete for testing purposes."
   :type 'boolean
   :version "917.10") ; a super high version number
+
 (make-obsolete-variable 'cus-edit-tests--obsolete-option-tag nil "X.X-test")
 (defconst cus-edit-tests--obsolete-option-tag
   (custom-unlispify-tag-name 'cus-edit-tests--obsolete-option-tag))
@@ -77,9 +79,6 @@
       (should (search-forward cus-edit-tests--obsolete-option-tag nil t)))))
 
 (ert-deftest test-setopt ()
-  (defcustom cus-edit-test-foo1 0
-    ""
-    :type 'number)
   (should (= (setopt cus-edit-test-foo1 1) 1))
   (should (= cus-edit-test-foo1 1))
   (should-error (setopt cus-edit-test-foo1 :foo)))
