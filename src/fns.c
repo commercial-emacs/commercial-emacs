@@ -4272,8 +4272,6 @@ cmpfn_user_defined (Lisp_Object key1, Lisp_Object key2,
 static Lisp_Object
 hashfn_eq (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  if (symbols_with_pos_enabled && SYMBOL_WITH_POS_P (key))
-    key = SYMBOL_WITH_POS_SYM (key);
   return make_ufixnum (XHASH (key) ^ XTYPE (key));
 }
 
@@ -4988,8 +4986,6 @@ sxhash_obj (Lisp_Object obj, int depth)
 	    hash = sxhash_combine (hash, sxhash_obj (XOVERLAY (obj)->plist, depth));
 	    return SXHASH_REDUCE (hash);
 	  }
-	else if (symbols_with_pos_enabled && pvec_type == PVEC_SYMBOL_WITH_POS)
-	  return sxhash_obj (XSYMBOL_WITH_POS (obj)->sym, depth + 1);
 	else
 	  /* Others are 'equal' if they are 'eq', so take their
 	     address as hash.  */

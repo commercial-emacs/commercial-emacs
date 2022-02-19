@@ -2867,8 +2867,7 @@ of the list FUN."
   (byte-compile-docstring-length-warn fun)
   (byte-compile-check-lambda-list (nth 1 fun))
   (let* ((arglist (nth 1 fun))
-         (arglistvars (byte-run-strip-symbol-positions
-                       (byte-compile-arglist-vars arglist)))
+         (arglistvars (byte-compile-arglist-vars arglist))
 	 (byte-compile-bound-variables
 	  (append (if (not lexical-binding) arglistvars)
                   byte-compile-bound-variables))
@@ -4854,7 +4853,6 @@ OP and OPERAND are as passed to `byte-compile-out'."
 	(- 1 operand))))
 
 (defun byte-compile-out (op &optional operand)
-  (setq operand (byte-run-strip-symbol-positions operand))
   (push (cons op operand) byte-compile-output)
   (if (eq op 'byte-return)
       ;; Consider abort since byte-return no longer produces ops
