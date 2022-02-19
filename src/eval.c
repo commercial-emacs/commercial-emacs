@@ -664,23 +664,7 @@ default_toplevel_binding (Lisp_Object symbol)
 	    binding = pdl;
 	  break;
 
-	case SPECPDL_UNWIND:
-	case SPECPDL_UNWIND_ARRAY:
-	case SPECPDL_UNWIND_PTR:
-	case SPECPDL_UNWIND_INT:
-	case SPECPDL_UNWIND_INTMAX:
-	case SPECPDL_UNWIND_EXCURSION:
-	case SPECPDL_UNWIND_VOID:
-	case SPECPDL_BACKTRACE:
-#ifdef HAVE_MODULES
-        case SPECPDL_MODULE_RUNTIME:
-        case SPECPDL_MODULE_ENVIRONMENT:
-#endif
-	case SPECPDL_LET_LOCAL:
-	  break;
-
-	default:
-	  emacs_abort ();
+	default: break;
 	}
     }
   return binding;
@@ -707,23 +691,7 @@ lexbound_p (Lisp_Object symbol)
 	    }
 	  break;
 
-	case SPECPDL_UNWIND:
-	case SPECPDL_UNWIND_ARRAY:
-	case SPECPDL_UNWIND_PTR:
-	case SPECPDL_UNWIND_INT:
-	case SPECPDL_UNWIND_INTMAX:
-	case SPECPDL_UNWIND_EXCURSION:
-	case SPECPDL_UNWIND_VOID:
-	case SPECPDL_BACKTRACE:
-#ifdef HAVE_MODULES
-        case SPECPDL_MODULE_RUNTIME:
-        case SPECPDL_MODULE_ENVIRONMENT:
-#endif
-	case SPECPDL_LET_LOCAL:
-	  break;
-
-	default:
-	  emacs_abort ();
+	default: break;
 	}
     }
   return false;
@@ -3735,6 +3703,7 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
 			      this_binding->unwind_excursion.window);
       break;
     case SPECPDL_BACKTRACE:
+    case SPECPDL_NOP:
       break;
 #ifdef HAVE_MODULES
     case SPECPDL_MODULE_RUNTIME:
@@ -4058,17 +4027,6 @@ specpdl_unrewind (union specbinding *pdl, int distance, bool vars_only)
 	    save_excursion_restore (marker, window);
 	  }
 	  break;
-	case SPECPDL_UNWIND_ARRAY:
-	case SPECPDL_UNWIND_PTR:
-	case SPECPDL_UNWIND_INT:
-	case SPECPDL_UNWIND_INTMAX:
-	case SPECPDL_UNWIND_VOID:
-	case SPECPDL_BACKTRACE:
-#ifdef HAVE_MODULES
-        case SPECPDL_MODULE_RUNTIME:
-        case SPECPDL_MODULE_ENVIRONMENT:
-#endif
-	  break;
 	case SPECPDL_LET:
 	  { /* If variable has a trivial value (no forwarding), we can
 	       just set it.  No need to check for constant symbols here,
@@ -4120,6 +4078,8 @@ specpdl_unrewind (union specbinding *pdl, int distance, bool vars_only)
 	      }
 	  }
 	  break;
+
+	default: break;
 	}
     }
 }
@@ -4210,22 +4170,7 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
 	    }
 	    break;
 
-	  case SPECPDL_UNWIND:
-	  case SPECPDL_UNWIND_ARRAY:
-	  case SPECPDL_UNWIND_PTR:
-	  case SPECPDL_UNWIND_INT:
-	  case SPECPDL_UNWIND_INTMAX:
-	  case SPECPDL_UNWIND_EXCURSION:
-	  case SPECPDL_UNWIND_VOID:
-	  case SPECPDL_BACKTRACE:
-#ifdef HAVE_MODULES
-          case SPECPDL_MODULE_RUNTIME:
-          case SPECPDL_MODULE_ENVIRONMENT:
-#endif
-	    break;
-
-	  default:
-	    emacs_abort ();
+	  default: break;
 	  }
       }
   }
@@ -4289,8 +4234,12 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 	case SPECPDL_UNWIND_INT:
 	case SPECPDL_UNWIND_INTMAX:
         case SPECPDL_UNWIND_VOID:
+	case SPECPDL_NOP:
 	  break;
 
+	/* While other loops that scan the specpdl use "default: break;"
+	   for simplicity, here we explicitly list all cases and abort
+	   if we find an unexpected value, as a sanity check.  */
 	default:
 	  emacs_abort ();
 	}
