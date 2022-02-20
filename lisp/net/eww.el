@@ -32,6 +32,7 @@
 (require 'thingatpt)
 (require 'url)
 (require 'url-queue)
+(require 'url-file)
 (require 'xdg)
 (eval-when-compile (require 'subr-x))
 
@@ -487,22 +488,21 @@ killed after rendering."
 (defun eww-open-file (file)
   "Render FILE using EWW."
   (interactive "fFile: ")
-  (eww (concat "file://"
-	       (and (memq system-type '(windows-nt ms-dos))
-		    "/")
-	       (expand-file-name file))
-       nil
-       ;; The file name may be a non-local Tramp file.  The URL
-       ;; library doesn't understand these file names, so use the
-       ;; normal Emacs machinery to load the file.
-       (with-current-buffer (generate-new-buffer " *eww file*")
-         (set-buffer-multibyte nil)
-         (insert "Content-type: " (or (mailcap-extension-to-mime
-			               (url-file-extension file))
-                                      "application/octet-stream")
-                 "\n\n")
-         (insert-file-contents file)
-         (current-buffer))))
+  (let ((url-allow-non-local-files t))
+    (eww (concat "file://"
+	         (and (memq system-type '(windows-nt ms-dos))
+		      "/")
+	         (expand-file-name file)))))
+
+(defun eww--file-buffer (file)
+  (with-current-buffer (generate-new-buffer " *eww file*")
+    (set-buffer-multibyte nil)
+    (insert "Content-type: " (or (mailcap-extension-to-mime
+			          (url-file-extension file))
+                                 "application/octet-stream")
+            "\n\n")
+    (insert-file-contents file)
+    (current-buffer)))
 
 ;;;###autoload
 (defun eww-search-words ()
@@ -1204,7 +1204,8 @@ instead of `browse-url-new-window-flag'."
       (format "*eww-%s*" (url-host (url-generic-parse-url
                                     (eww--dwim-expand-url url))))))
     (eww-mode))
-  (eww url))
+  (let ((url-allow-non-local-files t))
+    (eww url)))
 
 (defun eww-back-url ()
   "Go to the previously displayed page."
@@ -1291,9 +1292,16 @@ just re-display the HTML already fetched."
 	    (error "No current HTML data")
 	  (eww-display-html 'utf-8 url (plist-get eww-data :dom)
 			    (point) (current-buffer)))
-      (let ((url-mime-accept-string eww-accept-content-types))
-        (eww-retrieve url #'eww-render
-		      (list url (point) (current-buffer) encode))))))
+      (let ((parsed (url-generic-parse-url url)))
+        (if (equal (url-type parsed) "file")
+            ;; Use Tramp instead of url.el for files (since url.el
+            ;; doesn't work well with Tramp files).
+            (let ((eww-buffer (current-buffer)))
+              (with-current-buffer (eww--file-buffer (url-filename parsed))
+                (eww-render nil url nil eww-buffer)))
+          (let ((url-mime-accept-string eww-accept-content-types))
+            (eww-retrieve url #'eww-render
+		          (list url (point) (current-buffer) encode))))))))
 
 ;; Form support.
 
