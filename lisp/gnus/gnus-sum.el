@@ -13081,6 +13081,8 @@ BOOKMARK is a bookmark name or a bookmark record."
        (buffer . ,(current-buffer))
        . ,(bookmark-get-bookmark-record bookmark)))))
 
+(put 'gnus-summary-bookmark-jump 'bookmark-handler-type "Gnus")
+
 (gnus-summary-make-all-marking-commands)
 
 (provide 'gnus-sum)
