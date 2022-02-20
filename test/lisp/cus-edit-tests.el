@@ -78,6 +78,10 @@
       (customize-saved)
       (should (search-forward cus-edit-tests--obsolete-option-tag nil t)))))
 
+(defcustom cus-edit-test-foo1 0
+  ""
+  :type 'number)
+
 (ert-deftest test-setopt ()
   (should (= (setopt cus-edit-test-foo1 1) 1))
   (should (= cus-edit-test-foo1 1))
