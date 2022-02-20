@@ -688,7 +688,7 @@ the C sources, too."
     (terpri)))
 
 ;; We could use `symbol-file' but this is a wee bit more efficient.
-(defun help-fns--autoloaded-p (function)
+(defun help-fns--autoloaded-p (function &optional _)
   "Return non-nil if FUNCTION has previously been autoloaded."
   (seq-some #'autoloadp (get function 'function-history)))
 
