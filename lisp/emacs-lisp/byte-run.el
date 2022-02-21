@@ -258,7 +258,7 @@ The return value is undefined.
 			   (format-message
 			    "Unknown macro property %S in %S"
 			    (car x) name)
-			   nil nil nil (car x)))))
+			   nil))))
 		  decls)))
 	   ;; Refresh font-lock if this is a new macro, or it is an
 	   ;; existing macro whose 'no-font-lock-keyword declaration
@@ -330,7 +330,7 @@ The return value is undefined.
                     (macroexp-warn-and-return
                      (format-message "Unknown defun property `%S' in %S"
                                      (car x) name)
-                     nil nil nil (car x))))))
+                     nil)))))
             decls))
           (def (list 'defalias
                      (list 'quote name)

@@ -150,12 +150,12 @@ Other uses risk returning non-nil value that point to the wrong file."
   #'macroexp-warn-and-return "28.1")
 (defun macroexp-warn-and-return (msg form &optional category compile-only)
   "Return code equivalent to FORM labeled with warning MSG.
+ARG is a symbol (or a form) giving the source code position of FORM
+for the message.  It should normally be a symbol with position.
 CATEGORY is the category of the warning, like the categories that
 can appear in `byte-compile-warnings'.
 COMPILE-ONLY non-nil means no warning should be emitted if the code
-is executed without being compiled first.
-ARG is a symbol (or a form) giving the source code position for the message.
-It should normally be a symbol with position and it defaults to FORM."
+is executed without being compiled first."
   (cond
    ((null msg) form)
    ((macroexp-compiling-p)
@@ -225,7 +225,7 @@ It should normally be a symbol with position and it defaults to FORM."
             fun obsolete
             (if (symbolp (symbol-function fun))
                 "alias" "macro"))
-           new-form (list 'obsolete fun) nil fun))
+           new-form (list 'obsolete fun)))
       new-form)))
 
 (defun macroexp--unfold-lambda (form &optional name)
@@ -280,7 +280,7 @@ It should normally be a symbol with position and it defaults to FORM."
                      "attempt to open-code `%s' with too few arguments"
                    "attempt to open-code `%s' with too many arguments")
                  name)
-         form nil nil arglist)
+         form)
 
       ;; The following leads to infinite recursion when loading a
       ;; file containing `(defsubst f () (f))', and then trying to

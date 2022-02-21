@@ -3118,7 +3118,7 @@ To see the documentation for a defined struct type, use
                  (macroexp-warn-and-return
                   (format "Missing value for option `%S' of slot `%s' in struct %s!"
                           (car (last desc)) slot name)
-                  nil nil nil (car (last desc)))
+                  nil)
                  forms)
                 (when (and (keywordp (car defaults))
                            (not (keywordp (car desc))))
@@ -3127,7 +3127,7 @@ To see the documentation for a defined struct type, use
                      (macroexp-warn-and-return
                       (format "  I'll take `%s' to be an option rather than a default value."
                               kw)
-                      nil nil nil kw)
+                      nil)
                      forms)
                     (push kw desc)
                     (setcar defaults nil))))

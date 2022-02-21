@@ -300,8 +300,7 @@ This method is obsolete."
                             ;; Keep the name arg, for backward compatibility,
                             ;; but hide it so we don't trigger indefinitely.
                             `(,(car whole) (identity ,(car slots))
-                              ,@(cdr slots))
-                            nil nil (car slots))))))
+                              ,@(cdr slots)))))))
              (apply #'make-instance ',name slots))))))
 
 

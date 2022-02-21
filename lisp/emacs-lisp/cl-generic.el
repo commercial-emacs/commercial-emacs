@@ -514,7 +514,7 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
                (let* ((obsolete (get name 'byte-obsolete-info)))
                  (macroexp-warn-and-return
                   (macroexp--obsolete-warning name obsolete "generic function")
-                  nil nil nil orig-name)))
+                  nil)))
          ;; You could argue that `defmethod' modifies rather than defines the
          ;; function, so warnings like "not known to be defined" are fair game.
          ;; But in practice, it's common to use `cl-defmethod'

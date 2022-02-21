@@ -749,7 +749,7 @@ Argument FN is the function calling this verifier."
                       (guard (not (memq name eieio--known-slot-names))))
                  (macroexp-warn-and-return
                   (format-message "Unknown slot `%S'" name)
-                  exp nil 'compile-only name))
+                  exp nil 'compile-only))
                 (_ exp))))
            (gv-setter eieio-oset))
   (cl-check-type slot symbol)
@@ -785,12 +785,12 @@ Fills in CLASS's SLOT with its default value."
                       (guard (not (memq name eieio--known-slot-names))))
                  (macroexp-warn-and-return
                   (format-message "Unknown slot `%S'" name)
-                  exp nil 'compile-only name))
+                  exp nil 'compile-only))
                 ((and (or `',name (and name (pred keywordp)))
                       (guard (not (memq name eieio--known-class-slot-names))))
                  (macroexp-warn-and-return
                   (format-message "Slot `%S' is not class-allocated" name)
-                  exp nil 'compile-only name))
+                  exp nil 'compile-only))
                 (_ exp)))))
   (cl-check-type class (or eieio-object class))
   (cl-check-type slot symbol)
@@ -847,12 +847,12 @@ Fills in the default value in CLASS' in SLOT with VALUE."
                       (guard (not (memq name eieio--known-slot-names))))
                  (macroexp-warn-and-return
                   (format-message "Unknown slot `%S'" name)
-                  exp nil 'compile-only name))
+                  exp nil 'compile-only))
                 ((and (or `',name (and name (pred keywordp)))
                       (guard (not (memq name eieio--known-class-slot-names))))
                  (macroexp-warn-and-return
                   (format-message "Slot `%S' is not class-allocated" name)
-                  exp nil 'compile-only name))
+                  exp nil 'compile-only))
                 (_ exp)))))
   (setq class (eieio--class-object class))
   (cl-check-type class eieio--class)

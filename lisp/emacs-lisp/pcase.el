@@ -435,7 +435,7 @@ how many time this CODEGEN is called."
                 (macroexp-warn-and-return
                  (format "pcase pattern %S shadowed by previous pcase pattern"
                          (car case))
-                 main nil nil (car case)))))
+                 main))))
       main)))
 
 (defun pcase--expand (exp cases)
@@ -941,7 +941,7 @@ Otherwise, it defers to REST which is a list of branches of the form
           (if (eq upat '_) code
             (macroexp-warn-and-return
              "Pattern t is deprecated.  Use `_' instead"
-             code nil nil upat))))
+             code))))
        ((eq upat 'pcase--dontcare) :pcase--dontcare)
        ((memq (car-safe upat) '(guard pred))
         (if (eq (car upat) 'pred) (pcase--mark-used sym))
