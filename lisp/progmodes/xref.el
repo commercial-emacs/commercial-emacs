@@ -1,7 +1,7 @@
 ;;; xref.el --- Cross-referencing commands              -*-lexical-binding:t-*-
 
 ;; Copyright (C) 2014-2022 Free Software Foundation, Inc.
-;; Version: 1.3.2
+;; Version: 1.4.0
 ;; Package-Requires: ((emacs "26.1"))
 
 ;; This is a GNU ELPA :core package.  Avoid functionality that is not
@@ -1339,6 +1339,13 @@ definitions."
 (defvar xref--read-identifier-history nil)
 
 (defvar xref--read-pattern-history nil)
+
+;;;###autoload
+(defun xref-show-xrefs (fetcher display-action)
+  "Display some Xref values produced by FETCHER using DISPLAY-ACTION.
+The meanings of both arguments are the same as documented in
+`xref-show-xrefs-function'."
+  (xref--show-xrefs fetcher display-action))
 
 (defun xref--show-xrefs (fetcher display-action &optional _always-show-list)
   (xref--push-markers)
