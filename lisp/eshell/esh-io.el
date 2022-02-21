@@ -150,6 +150,8 @@ not be added to this variable."
   :risky t
   :group 'eshell-io)
 
+(define-error 'eshell-pipe-broken "Pipe broken")
+
 ;;; Internal Variables:
 
 (defvar eshell-current-handles nil)
@@ -375,8 +377,6 @@ it defaults to `insert'."
     (error "Invalid redirection target: %s"
 	   (eshell-stringify target)))))
 
-(defvar grep-null-device)
-
 (defun eshell-set-output-handle (index mode &optional target)
   "Set handle INDEX, using MODE, to point to TARGET."
   (when target
@@ -483,24 +483,31 @@ Returns what was actually sent, or nil if nothing was sent."
 		(goto-char target))))))
 
    ((eshell-processp target)
-    (when (eq (process-status target) 'run)
-      (unless (stringp object)
-       (setq object (eshell-stringify object)))
-      (process-send-string target object)))
+    (unless (stringp object)
+      (setq object (eshell-stringify object)))
+    (condition-case nil
+        (process-send-string target object)
+      ;; If `process-send-string' raises an error, treat it as a broken pipe.
+      (error (signal 'eshell-pipe-broken target))))
 
    ((consp target)
     (apply (car target) object (cdr target))))
   object)
 
 (defun eshell-output-object (object &optional handle-index handles)
-  "Insert OBJECT, using HANDLE-INDEX specifically)."
+  "Insert OBJECT, using HANDLE-INDEX specifically.
+If HANDLE-INDEX is nil, output to `eshell-output-handle'.
+HANDLES is the set of file handles to use; if nil, use
+`eshell-current-handles'."
   (let ((target (car (aref (or handles eshell-current-handles)
 			   (or handle-index eshell-output-handle)))))
-    (if (and target (not (listp target)))
-	(eshell-output-object-to-target object target)
-      (while target
-	(eshell-output-object-to-target object (car target))
-	(setq target (cdr target))))))
+    (if (listp target)
+        (while target
+	  (eshell-output-object-to-target object (car target))
+	  (setq target (cdr target)))
+      (eshell-output-object-to-target object target)
+      ;; Explicitly return nil to match the list case above.
+      nil)))
 
 (provide 'esh-io)
 ;;; esh-io.el ends here
