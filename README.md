@@ -56,10 +56,10 @@ won't fontify), and turn off showstoppers like `hl-line-mode` and
 
 Install Rust library:
 ```bash
-git clone --depth 1 --branch 0.6.3alpha3 \
+git clone --depth 1 --branch 0.6.3alpha4 \
   https://github.com/commercial-emacs/tree-sitter.git
 make -C tree-sitter install
-pkg-config --exact-version=0.6.3alpha3 tree-sitter || echo not found
+pkg-config --exact-version=0.6.3alpha4 tree-sitter || echo not found
 ```
 
 Then build emacs:
