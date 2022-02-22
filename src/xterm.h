@@ -32,6 +32,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <X11/Xatom.h>
 #include <X11/Xresource.h>
 
+#ifdef HAVE_XINPUT2
+#include <X11/extensions/XInput2.h>
+#endif
+
 #ifdef USE_X_TOOLKIT
 #include <X11/StringDefs.h>
 #include <X11/IntrinsicP.h>	/* CoreP.h needs this */
@@ -1464,6 +1468,21 @@ struct xi_device_t *xi_device_from_id (struct x_display_info *, int);
    (nr).y = (ry),					\
    (nr).width = (rwidth),				\
    (nr).height = (rheight))
+
+#ifdef HAVE_XINPUT2
+#if HAVE_XISCROLLCLASSINFO_TYPE && defined XIScrollClass
+#define HAVE_XINPUT2_1
+#endif
+#if HAVE_XITOUCHCLASSINFO_TYPE && defined XITouchClass
+#define HAVE_XINPUT2_2
+#endif
+#if HAVE_XIBARRIERRELEASEPOINTERINFO_DEVICEID && defined XIBarrierPointerReleased
+#define HAVE_XINPUT2_3
+#endif
+#if HAVE_XIGESTURECLASSINFO_TYPE && defined XIGestureClass
+#define HAVE_XINPUT2_4
+#endif
+#endif
 
 INLINE_HEADER_END
 
