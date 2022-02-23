@@ -49,7 +49,7 @@ jobs:
       id: cache-tree-sitter
       with:
         path: tree-sitter
-        key: cache-tree-sitter-003
+        key: cache-tree-sitter-001
     - uses: actions/checkout@v2
       if: steps.cache-tree-sitter.outputs.cache-hit != 'true'
       with:
