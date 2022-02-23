@@ -1913,34 +1913,26 @@ performance impact when running `add-hook' and `remove-hook'."
       (setq hook-value (list hook-value)))
     ;; Do the actual addition if necessary
     (unless (member function hook-value)
-      (let ((depth-sym (get hook 'hook--depth-alist)))
-        ;; While the `member' test above has to use `equal' for historical
-        ;; reasons, `equal' is a performance problem on large/cyclic functions,
-        ;; so we index `hook--depth-alist' with `eql'.  (bug#46326)
-        (unless (zerop depth)
-          (unless depth-sym
-            (setq depth-sym (make-symbol "depth-alist"))
-            (set depth-sym nil)
-            (setf (get hook 'hook--depth-alist) depth-sym))
-          (if local (make-local-variable depth-sym))
-          (setf (alist-get function
-                           (if local (symbol-value depth-sym)
-                             (default-value depth-sym))
-                           0)
-                depth))
-        (setq hook-value
-	      (if (< 0 depth)
-		  (append hook-value (list function))
-		(cons function hook-value)))
-        (when depth-sym
-          (let ((depth-alist (if local (symbol-value depth-sym)
-                               (default-value depth-sym))))
-            (when depth-alist
-              (setq hook-value
-                    (sort (if (< 0 depth) hook-value (copy-sequence hook-value))
-                          (lambda (f1 f2)
-                            (< (alist-get f1 depth-alist 0 nil #'eq)
-                               (alist-get f2 depth-alist 0 nil #'eq))))))))))
+      (when (stringp function)          ;FIXME: Why?
+	(setq function (purecopy function)))
+      ;; All those `equal' tests performed between functions can end up being
+      ;; costly since those functions may be large recursive and even cyclic
+      ;; structures, so we index `hook--depth-alist' with `eq'.  (bug#46326)
+      (when (or (get hook 'hook--depth-alist) (not (zerop depth)))
+        ;; Note: The main purpose of the above `when' test is to avoid running
+        ;; this `setf' before `gv' is loaded during bootstrap.
+        (setf (alist-get function (get hook 'hook--depth-alist) 0) depth))
+      (setq hook-value
+	    (if (< 0 depth)
+		(append hook-value (list function))
+	      (cons function hook-value)))
+      (let ((depth-alist (get hook 'hook--depth-alist)))
+        (when depth-alist
+          (setq hook-value
+                (sort (if (< 0 depth) hook-value (copy-sequence hook-value))
+                      (lambda (f1 f2)
+                        (< (alist-get f1 depth-alist 0 nil #'eq)
+                           (alist-get f2 depth-alist 0 nil #'eq))))))))
     ;; Set the actual variable
     (if local
 	(progn
@@ -2013,14 +2005,9 @@ one will be removed."
       (when old-fun
         ;; Remove auxiliary depth info to avoid leaks (bug#46414)
         ;; and to avoid the list growing too long.
-        (let* ((depth-sym (get hook 'hook--depth-alist))
-               (depth-alist (if depth-sym (if local (symbol-value depth-sym)
-                                            (default-value depth-sym))))
-               (di (assq old-fun depth-alist)))
-          (when di
-            (setf (if local (symbol-value depth-sym)
-                    (default-value depth-sym))
-                  (delq di depth-alist)))))
+        (let* ((depths (get hook 'hook--depth-alist))
+               (di (assq old-fun depths)))
+          (when di (put hook 'hook--depth-alist (delq di depths)))))
       ;; If the function is on the global hook, we need to shadow it locally
       ;;(when (and local (member function (default-value hook))
       ;;	       (not (member (cons 'not function) hook-value)))
