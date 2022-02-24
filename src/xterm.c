@@ -600,7 +600,7 @@ static void x_wm_set_window_state (struct frame *, int);
 static void x_wm_set_icon_pixmap (struct frame *, ptrdiff_t);
 static void x_initialize (void);
 
-static bool x_get_current_wm_state (struct frame *, Window, int *, bool *);
+static bool x_get_current_wm_state (struct frame *, Window, int *, bool *, bool *);
 static void x_update_opaque_region (struct frame *, XEvent *);
 
 /* Flush display of frame F.  */
@@ -780,7 +780,9 @@ x_extension_initialize (struct x_display_info *dpyinfo)
 static void
 x_free_xi_devices (struct x_display_info *dpyinfo)
 {
+#ifdef HAVE_XINPUT2_2
   struct xi_touch_point_t *tem, *last;
+#endif
 
   block_input ();
 
@@ -788,8 +790,11 @@ x_free_xi_devices (struct x_display_info *dpyinfo)
     {
       for (int i = 0; i < dpyinfo->num_devices; ++i)
 	{
+#ifdef HAVE_XINPUT2_1
 	  xfree (dpyinfo->devices[i].valuators);
+#endif
 
+#ifdef HAVE_XINPUT2_2
 	  tem = dpyinfo->devices[i].touchpoints;
 	  while (tem)
 	    {
@@ -797,6 +802,7 @@ x_free_xi_devices (struct x_display_info *dpyinfo)
 	      tem = tem->next;
 	      xfree (last);
 	    }
+#endif
 	}
 
       xfree (dpyinfo->devices);
@@ -866,16 +872,27 @@ x_init_master_valuators (struct x_display_info *dpyinfo)
 
       if (device->enabled)
 	{
+#ifdef HAVE_XINPUT2_1
 	  int actual_valuator_count = 0;
+#endif
+
 	  struct xi_device_t *xi_device = &dpyinfo->devices[actual_devices++];
 	  xi_device->device_id = device->deviceid;
 	  xi_device->grab = 0;
+
+#ifdef HAVE_XINPUT2_1
 	  xi_device->valuators =
 	    xmalloc (sizeof *xi_device->valuators * device->num_classes);
+#endif
+#ifdef HAVE_XINPUT2_2
 	  xi_device->touchpoints = NULL;
+#endif
+
 	  xi_device->master_p = (device->use == XIMasterKeyboard
 				 || device->use == XIMasterPointer);
+#ifdef HAVE_XINPUT2_2
 	  xi_device->direct_p = false;
+#endif
 
 	  for (int c = 0; c < device->num_classes; ++c)
 	    {
@@ -914,7 +931,9 @@ x_init_master_valuators (struct x_display_info *dpyinfo)
 		}
 	    }
 
+#ifdef HAVE_XINPUT2_1
 	  xi_device->scroll_valuator_count = actual_valuator_count;
+#endif
 	}
     }
 
@@ -923,6 +942,7 @@ x_init_master_valuators (struct x_display_info *dpyinfo)
   unblock_input ();
 }
 
+#ifdef HAVE_XINPUT2_1
 /* Return the delta of the scroll valuator VALUATOR_NUMBER under
    DEVICE_ID in the display DPYINFO with VALUE.  The valuator's
    valuator will be set to VALUE afterwards.  In case no scroll
@@ -978,6 +998,8 @@ x_get_scroll_valuator_delta (struct x_display_info *dpyinfo, int device_id,
   unblock_input ();
   return DBL_MAX;
 }
+
+#endif
 
 struct xi_device_t *
 xi_device_from_id (struct x_display_info *dpyinfo, int deviceid)
@@ -1046,7 +1068,9 @@ xi_find_touch_point (struct xi_device_t *device, int detail)
   return NULL;
 }
 
-#endif /* XI_TouchBegin */
+#endif /* HAVE_XINPUT2_2 */
+
+#ifdef HAVE_XINPUT2_1
 
 static void
 xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo, int id,
@@ -1075,6 +1099,8 @@ xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo, int id,
 
   return;
 }
+
+#endif /* HAVE_XINPUT2_1 */
 
 #endif
 
@@ -9328,9 +9354,9 @@ x_net_wm_state (struct frame *f, Window window)
 {
   int value = FULLSCREEN_NONE;
   Lisp_Object lval = Qnil;
-  bool sticky = false;
+  bool sticky = false, shaded = false;
 
-  x_get_current_wm_state (f, window, &value, &sticky);
+  x_get_current_wm_state (f, window, &value, &sticky, &shaded);
 
   switch (value)
     {
@@ -9349,7 +9375,8 @@ x_net_wm_state (struct frame *f, Window window)
     }
 
   store_frame_param (f, Qfullscreen, lval);
-/**   store_frame_param (f, Qsticky, sticky ? Qt : Qnil); **/
+  store_frame_param (f, Qsticky, sticky ? Qt : Qnil);
+  store_frame_param (f, Qshaded, shaded ? Qt : Qnil);
 }
 
 /* Flip back buffers on any frames with undrawn content.  */
@@ -10017,8 +10044,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         {
 	  bool iconified = FRAME_ICONIFIED_P (f);
 	  int value;
-	  bool sticky;
-          bool not_hidden = x_get_current_wm_state (f, event->xmap.window, &value, &sticky);
+	  bool sticky, shaded;
+          bool not_hidden = x_get_current_wm_state (f, event->xmap.window, &value, &sticky,
+						    &shaded);
 
 	  if (CONSP (frame_size_history))
 	    frame_size_history_extra
@@ -11092,9 +11120,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	XIFocusInEvent *focusin = (XIFocusInEvent *) xi_event;
 	XIFocusOutEvent *focusout = (XIFocusOutEvent *) xi_event;
 	XIDeviceChangedEvent *device_changed = (XIDeviceChangedEvent *) xi_event;
+#ifdef HAVE_XINPUT2_1
 	XIValuatorState *states;
 	double *values;
 	bool found_valuator = false;
+#endif
 
 	/* A fake XMotionEvent for x_note_mouse_movement. */
 	XMotionEvent ev;
@@ -11164,8 +11194,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    if (!any)
 	      any = x_any_window_to_frame (dpyinfo, enter->event);
 
+#ifdef HAVE_XINPUT2_1
 	    xi_reset_scroll_valuators_for_device_id (dpyinfo, enter->deviceid,
 						     true);
+#endif
 
 	    {
 #ifdef HAVE_XWIDGETS
@@ -11229,9 +11261,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	       records of each valuator's value whenever the pointer
 	       moves out of a frame (and not into one of its
 	       children, which we know about).  */
+#ifdef HAVE_XINPUT2_1
 	    if (leave->detail != XINotifyInferior && any)
 	      xi_reset_scroll_valuators_for_device_id (dpyinfo,
 						       enter->deviceid, false);
+#endif
 
 #ifdef HAVE_XWIDGETS
 	    {
@@ -11291,8 +11325,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    {
 	      struct xi_device_t *device;
 
+#ifdef HAVE_XINPUT2_1
 	      states = &xev->valuators;
 	      values = states->values;
+#endif
+
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 
 	      if (!device)
@@ -11303,6 +11340,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		goto XI_OTHER;
 #endif
 
+#ifdef HAVE_XINPUT2_1
 #ifdef HAVE_XWIDGETS
 	      struct xwidget_view *xv = xwidget_view_from_window (xev->event);
 	      double xv_total_x = 0.0;
@@ -11464,6 +11502,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #ifdef HAVE_XWIDGETS
 		}
 #endif
+#endif /* HAVE_XINPUT2_1 */
 
 	      ev.x = lrint (xev->event_x);
 	      ev.y = lrint (xev->event_y);
@@ -11565,7 +11604,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      struct xwidget_view *xvw;
 #endif
 
-#ifdef XIPointerEmulated
+#ifdef HAVE_XINPUT2_1
 	      /* Ignore emulated scroll events when XI2 native
 		 scroll events are present.  */
 	      if (xev->flags & XIPointerEmulated)
@@ -12180,7 +12219,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	  case XI_DeviceChanged:
 	    {
 	      struct xi_device_t *device;
+#ifdef HAVE_XINPUT2_2
 	      struct xi_touch_point_t *tem, *last;
+#endif
 	      int c;
 #ifdef HAVE_XINPUT2_1
 	      int i;
@@ -12204,11 +12245,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      /* Free data that we will regenerate from new
 		 information.  */
+#ifdef HAVE_XINPUT2_1
 	      device->valuators = xrealloc (device->valuators,
 					    (device_changed->num_classes
 					     * sizeof *device->valuators));
 	      device->scroll_valuator_count = 0;
+#endif
+#ifdef HAVE_XINPUT2_2
 	      device->direct_p = false;
+#endif
 
 	      for (c = 0; c < device_changed->num_classes; ++c)
 		{
@@ -12278,6 +12323,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		}
 #endif
 
+#ifdef HAVE_XINPUT2_2
 	      /* The device is no longer a DirectTouch device, so
 		 remove any touchpoints that we might have
 		 recorded.  */
@@ -12294,6 +12340,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		  device->touchpoints = NULL;
 		}
+#endif
 
 	      goto XI_OTHER;
 	    }
@@ -14098,6 +14145,18 @@ x_set_sticky (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
                 dpyinfo->Xatom_net_wm_state_sticky, None);
 }
 
+void
+x_set_shaded (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
+{
+  Lisp_Object frame;
+  struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  XSETFRAME (frame, f);
+
+  set_wm_state (frame, !NILP (new_value),
+                dpyinfo->Xatom_net_wm_state_shaded, None);
+}
+
 /**
  * x_set_skip_taskbar:
  *
@@ -14198,7 +14257,8 @@ static bool
 x_get_current_wm_state (struct frame *f,
                         Window window,
                         int *size_state,
-                        bool *sticky)
+                        bool *sticky,
+			bool *shaded)
 {
   unsigned long actual_size;
   int i;
@@ -14222,6 +14282,7 @@ x_get_current_wm_state (struct frame *f,
 
   *sticky = false;
   *size_state = FULLSCREEN_NONE;
+  *shaded = false;
 
   block_input ();
 
@@ -14283,6 +14344,8 @@ x_get_current_wm_state (struct frame *f,
         *size_state = FULLSCREEN_BOTH;
       else if (a == dpyinfo->Xatom_net_wm_state_sticky)
         *sticky = true;
+      else if (a == dpyinfo->Xatom_net_wm_state_shaded)
+	*shaded = true;
     }
 
 #ifdef USE_XCB
@@ -14305,7 +14368,7 @@ do_ewmh_fullscreen (struct frame *f)
   int cur;
   bool dummy;
 
-  x_get_current_wm_state (f, FRAME_OUTER_WINDOW (f), &cur, &dummy);
+  x_get_current_wm_state (f, FRAME_OUTER_WINDOW (f), &cur, &dummy, &dummy);
 
   /* Some window managers don't say they support _NET_WM_STATE, but they do say
      they support _NET_WM_STATE_FULLSCREEN.  Try that also.  */
@@ -14445,8 +14508,10 @@ x_handle_net_wm_state (struct frame *f, const XPropertyEvent *event)
 {
   int value = FULLSCREEN_NONE;
   Lisp_Object lval;
-  bool sticky = false;
-  bool not_hidden = x_get_current_wm_state (f, event->window, &value, &sticky);
+  bool sticky = false, shaded = false;
+  bool not_hidden = x_get_current_wm_state (f, event->window,
+					    &value, &sticky,
+					    &shaded);
 
   lval = Qnil;
   switch (value)
@@ -14467,6 +14532,7 @@ x_handle_net_wm_state (struct frame *f, const XPropertyEvent *event)
 
   store_frame_param (f, Qfullscreen, lval);
   store_frame_param (f, Qsticky, sticky ? Qt : Qnil);
+  store_frame_param (f, Qshaded, shaded ? Qt : Qnil);
 
   return not_hidden;
 }
@@ -16759,6 +16825,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
       ATOM_REFS_INIT ("_NET_WM_STATE_MAXIMIZED_VERT",
 		      Xatom_net_wm_state_maximized_vert)
       ATOM_REFS_INIT ("_NET_WM_STATE_STICKY", Xatom_net_wm_state_sticky)
+      ATOM_REFS_INIT ("_NET_WM_STATE_SHADED", Xatom_net_wm_state_shaded)
       ATOM_REFS_INIT ("_NET_WM_STATE_HIDDEN", Xatom_net_wm_state_hidden)
       ATOM_REFS_INIT ("_NET_WM_WINDOW_TYPE", Xatom_net_window_type)
       ATOM_REFS_INIT ("_NET_WM_WINDOW_TYPE_TOOLTIP",
