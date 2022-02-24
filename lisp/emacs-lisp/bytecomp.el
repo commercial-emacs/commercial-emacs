@@ -4843,7 +4843,7 @@ longer need to hew to its rules)."
 OP and OPERAND are as passed to `byte-compile-out'."
   (if (memq op '(byte-call byte-discardN byte-discardN-preserve-tos))
       ;; For calls, OPERAND is the number of args, so we pop OPERAND + 1
-      ;; elements, and the push the result, for a total of -OPERAND.
+      ;; elements, and then push the result, for a total of -OPERAND.
       ;; For discardN*, of course, we just pop OPERAND elements.
       (- operand)
     (or (aref byte-stack+-info (symbol-value op))
