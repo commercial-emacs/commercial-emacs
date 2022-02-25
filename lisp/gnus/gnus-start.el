@@ -1695,14 +1695,14 @@ Sets up `gnus-get-unread-articles--doit'."
                                  infos-by-method
                                  requested-level)))
       (if gnus-background-get-unread-articles
-          (progn
-            (when gnus-background-get-unread-articles
-              (run-at-time
-               (/ gnus-thread-timeout-seconds 2)
-               nil
-               #'gnus-time-out-thread
-               (current-time)
-               (make-thread doit gnus-thread-group))))
+          (run-at-time
+           (/ gnus-thread-timeout-seconds 2)
+           nil
+           #'gnus-time-out-thread
+           (current-time)
+           (make-thread (lambda () (let ((inhibit-message t))
+                                     (funcall doit)))
+                        gnus-thread-group))
         (funcall doit)))))
 
 (defun gnus-get-unread-articles--doit (infos-by-method requested-level)
