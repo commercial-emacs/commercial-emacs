@@ -1700,9 +1700,7 @@ Sets up `gnus-get-unread-articles--doit'."
            nil
            #'gnus-time-out-thread
            (current-time)
-           (make-thread (lambda () (let ((inhibit-message t))
-                                     (funcall doit)))
-                        gnus-thread-group))
+           (make-thread doit gnus-thread-group))
         (funcall doit)))))
 
 (defun gnus-get-unread-articles--doit (infos-by-method requested-level)
