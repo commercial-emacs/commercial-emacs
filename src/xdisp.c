@@ -9169,21 +9169,12 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 
   /* Restore to wrap point when atpos/atx position would be displayed
      on the next screen line due to line-wrap. (Bug#23570)  */
-  if (result == MOVE_LINE_CONTINUED
-      && it->line_wrap == WORD_WRAP)
-    {
-      if (wrap_it.sp >= 0
-	  && ((atpos_it.sp >= 0 && wrap_it.current_x < atpos_it.current_x)
-	      || (atx_it.sp >= 0 && wrap_it.current_x < atx_it.current_x)))
-	RESTORE_IT (it, &wrap_it, wrap_data);
-      else
-	{
-	  /* A stupid chicken indeed (commit 8ee4117)  */
-	  int prev_x = max (it->current_x - 1, 0);
-	  RESTORE_IT (it, &ppos_it, ppos_data);
-	  emulate_display_sline (it, -1, prev_x, MOVE_TO_X);
-	}
-    }
+  if (it->line_wrap == WORD_WRAP
+      && result == MOVE_LINE_CONTINUED
+      && wrap_it.sp >= 0
+      && ((atpos_it.sp >= 0 && wrap_it.current_x < atpos_it.current_x)
+	  || (atx_it.sp >= 0 && wrap_it.current_x < atx_it.current_x)))
+    RESTORE_IT (it, &wrap_it, wrap_data);
   else if (atpos_it.sp >= 0)
     RESTORE_IT (it, &atpos_it, atpos_data);
   else if (atx_it.sp >= 0)
@@ -9489,7 +9480,22 @@ move_it_vpos (struct it *it, ptrdiff_t dvpos)
 void
 move_it_x (struct it *it, int to_x)
 {
-  emulate_display_sline (it, ZV, to_x, MOVE_TO_X);
+  struct it save_it;
+  void *data = NULL;
+  SAVE_IT (save_it, *it, data);
+
+  int result = emulate_display_sline (it, ZV, to_x, MOVE_TO_X);
+  if (it->line_wrap == WORD_WRAP
+      && result == MOVE_LINE_CONTINUED)
+    {
+      /* A stupid chicken indeed (commit 8ee4117).  Visual line mode
+	 probes first, then backtracks if necessary.  */
+      int epsilon_back = max (it->current_x - 1, 0);
+      RESTORE_IT (it, &save_it, data);
+      emulate_display_sline (it, ZV, epsilon_back, MOVE_TO_X);
+    }
+  else
+    bidi_unshelve_cache (data, true);
 }
 
 
