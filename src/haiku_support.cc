@@ -1557,7 +1557,10 @@ public:
 class EmacsScrollBar : public BScrollBar
 {
 public:
-  void *scroll_bar;
+  int dragging = 0;
+  bool horizontal;
+  enum haiku_scroll_bar_part current_part;
+  float old_value;
 
   EmacsScrollBar (int x, int y, int x1, int y1, bool horizontal_p) :
     BScrollBar (BRect (x, y, x1, y1), NULL, NULL, 0, 0, horizontal_p ?
@@ -1565,6 +1568,7 @@ public:
   {
     BView *vw = (BView *) this;
     vw->SetResizingMode (B_FOLLOW_NONE);
+    horizontal = horizontal_p;
   }
 
   void
@@ -1572,6 +1576,7 @@ public:
   {
     if (msg->what == SCROLL_BAR_UPDATE)
       {
+	old_value = msg->GetInt32 ("emacs:units", 0);
 	this->SetRange (0, msg->GetInt32 ("emacs:range", 0));
 	this->SetValue (msg->GetInt32 ("emacs:units", 0));
       }
@@ -1583,20 +1588,138 @@ public:
   ValueChanged (float new_value)
   {
     struct haiku_scroll_bar_value_event rq;
-    rq.scroll_bar = scroll_bar;
+    struct haiku_scroll_bar_part_event part;
+
+    if (dragging)
+      {
+	if (new_value != old_value)
+	  {
+	    if (dragging > 1)
+	      {
+		SetValue (old_value);
+
+		part.scroll_bar = this;
+		part.window = Window ();
+		part.part = current_part;
+		haiku_write (SCROLL_BAR_PART_EVENT, &part);
+	      }
+	    else
+	      dragging++;
+	  }
+
+	return;
+      }
+
+    rq.scroll_bar = this;
+    rq.window = Window ();
     rq.position = new_value;
 
     haiku_write (SCROLL_BAR_VALUE_EVENT, &rq);
+  }
+
+  BRegion
+  ButtonRegionFor (enum haiku_scroll_bar_part button)
+  {
+    BRegion region;
+    BRect bounds;
+    BRect rect;
+    float button_size;
+    scroll_bar_info info;
+
+    get_scroll_bar_info (&info);
+
+    bounds = Bounds ();
+    bounds.InsetBy (0.0, 0.0);
+
+    if (horizontal)
+      button_size = bounds.Height () + 1.0f;
+    else
+      button_size = bounds.Width () + 1.0f;
+
+    rect = BRect (bounds.left, bounds.top,
+		  bounds.left + button_size - 1.0f,
+		  bounds.top + button_size - 1.0f);
+
+    if (button == HAIKU_SCROLL_BAR_UP_BUTTON)
+      {
+	if (!horizontal)
+	  {
+	    region.Include (rect);
+	    if (info.double_arrows)
+	      region.Include (rect.OffsetToCopy (bounds.left,
+						 bounds.bottom - 2 * button_size + 1));
+	  }
+	else
+	  {
+	    region.Include (rect);
+	    if (info.double_arrows)
+	      region.Include (rect.OffsetToCopy (bounds.right - 2 * button_size,
+						 bounds.top));
+	  }
+      }
+    else
+      {
+	if (!horizontal)
+	  {
+	    region.Include (rect.OffsetToCopy (bounds.left, bounds.bottom - button_size));
+
+	    if (info.double_arrows)
+	      region.Include (rect.OffsetByCopy (0.0, button_size));
+	  }
+	else
+	  {
+	    region.Include (rect.OffsetToCopy (bounds.right - button_size, bounds.top));
+
+	    if (info.double_arrows)
+	      region.Include (rect.OffsetByCopy (button_size, 0.0));
+	  }
+      }
+
+    return region;
   }
 
   void
   MouseDown (BPoint pt)
   {
     struct haiku_scroll_bar_drag_event rq;
+    struct haiku_scroll_bar_part_event part;
+    BRegion r;
+
+    r = ButtonRegionFor (HAIKU_SCROLL_BAR_UP_BUTTON);
+
+    if (r.Contains (pt))
+      {
+	part.scroll_bar = this;
+	part.window = Window ();
+	part.part = HAIKU_SCROLL_BAR_UP_BUTTON;
+	dragging = 1;
+	current_part = HAIKU_SCROLL_BAR_UP_BUTTON;
+
+	haiku_write (SCROLL_BAR_PART_EVENT, &part);
+	goto out;
+      }
+
+    r = ButtonRegionFor (HAIKU_SCROLL_BAR_DOWN_BUTTON);
+
+    if (r.Contains (pt))
+      {
+	part.scroll_bar = this;
+	part.window = Window ();
+	part.part = HAIKU_SCROLL_BAR_DOWN_BUTTON;
+	dragging = 1;
+	current_part = HAIKU_SCROLL_BAR_DOWN_BUTTON;
+
+	haiku_write (SCROLL_BAR_PART_EVENT, &part);
+	goto out;
+      }
+
     rq.dragging_p = 1;
-    rq.scroll_bar = scroll_bar;
+    rq.window = Window ();
+    rq.scroll_bar = this;
 
     haiku_write (SCROLL_BAR_DRAG_EVENT, &rq);
+
+  out:
     BScrollBar::MouseDown (pt);
   }
 
@@ -1605,9 +1728,12 @@ public:
   {
     struct haiku_scroll_bar_drag_event rq;
     rq.dragging_p = 0;
-    rq.scroll_bar = scroll_bar;
+    rq.scroll_bar = this;
+    rq.window = Window ();
 
     haiku_write (SCROLL_BAR_DRAG_EVENT, &rq);
+    dragging = false;
+
     BScrollBar::MouseUp (pt);
   }
 
@@ -2078,10 +2204,9 @@ BScrollBar_make_for_view (void *view, int horizontal_p,
 			  void *scroll_bar_ptr)
 {
   EmacsScrollBar *sb = new EmacsScrollBar (x, y, x1, y1, horizontal_p);
-  sb->scroll_bar = scroll_bar_ptr;
-
   BView *vw = (BView *) view;
   BView *sv = (BView *) sb;
+
   if (!vw->LockLooper ())
     gui_abort ("Failed to lock scrollbar owner");
   vw->AddChild ((BView *) sb);

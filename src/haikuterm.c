@@ -416,6 +416,28 @@ haiku_mouse_or_wdesc_frame (void *window)
     }
 }
 
+static struct scroll_bar *
+haiku_scroll_bar_from_widget (void *scroll_bar, void *window)
+{
+  Lisp_Object tem;
+  struct frame *frame = haiku_window_to_frame (window);
+
+  if (!frame)
+    return NULL;
+
+  if (!NILP (FRAME_SCROLL_BARS (frame)))
+    {
+      for (tem = FRAME_SCROLL_BARS (frame); !NILP (tem);
+	   tem = XSCROLL_BAR (tem)->next)
+	{
+	  if (XSCROLL_BAR (tem)->scroll_bar == scroll_bar)
+	    return XSCROLL_BAR (tem);
+	}
+    }
+
+  return NULL;
+}
+
 /* Unfortunately, NOACTIVATE is not implementable on Haiku.  */
 static void
 haiku_focus_frame (struct frame *frame, bool noactivate)
@@ -3127,7 +3149,11 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	case SCROLL_BAR_VALUE_EVENT:
 	  {
 	    struct haiku_scroll_bar_value_event *b = buf;
-	    struct scroll_bar *bar = b->scroll_bar;
+	    struct scroll_bar *bar
+	      = haiku_scroll_bar_from_widget (b->scroll_bar, b->window);
+
+	    if (!bar)
+	      continue;
 
 	    struct window *w = XWINDOW (bar->window);
 
@@ -3150,10 +3176,48 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	      }
 	    break;
 	  }
+	case SCROLL_BAR_PART_EVENT:
+	  {
+	    struct haiku_scroll_bar_part_event *b = buf;
+	    struct scroll_bar *bar
+	      = haiku_scroll_bar_from_widget (b->scroll_bar, b->window);
+
+	    if (!bar)
+	      continue;
+
+	    inev.kind = (bar->horizontal ? HORIZONTAL_SCROLL_BAR_CLICK_EVENT
+			 : SCROLL_BAR_CLICK_EVENT);
+
+	    bar->dragging = 0;
+
+	    switch (b->part)
+	      {
+	      case HAIKU_SCROLL_BAR_UP_BUTTON:
+		inev.part = (bar->horizontal
+			     ? scroll_bar_left_arrow
+			     : scroll_bar_up_arrow);
+		break;
+	      case HAIKU_SCROLL_BAR_DOWN_BUTTON:
+		inev.part = (bar->horizontal
+			     ? scroll_bar_right_arrow
+			     : scroll_bar_down_arrow);
+		break;
+	      }
+
+	    XSETINT (inev.x, 0);
+	    XSETINT (inev.y, 0);
+	    inev.frame_or_window = bar->window;
+
+	    break;
+	  }
 	case SCROLL_BAR_DRAG_EVENT:
 	  {
 	    struct haiku_scroll_bar_drag_event *b = buf;
-	    struct scroll_bar *bar = b->scroll_bar;
+	    struct scroll_bar *bar
+	      = haiku_scroll_bar_from_widget (b->scroll_bar, b->window);
+
+	    if (!bar)
+	      continue;
 
 	    bar->dragging = b->dragging_p;
 	    if (!b->dragging_p && bar->horizontal)
