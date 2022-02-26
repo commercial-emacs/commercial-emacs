@@ -9170,11 +9170,20 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
   /* Restore to wrap point when atpos/atx position would be displayed
      on the next screen line due to line-wrap. (Bug#23570)  */
   if (result == MOVE_LINE_CONTINUED
-      && it->line_wrap == WORD_WRAP
-      && wrap_it.sp >= 0
-      && ((atpos_it.sp >= 0 && wrap_it.current_x < atpos_it.current_x)
-	  || (atx_it.sp >= 0 && wrap_it.current_x < atx_it.current_x)))
-    RESTORE_IT (it, &wrap_it, wrap_data);
+      && it->line_wrap == WORD_WRAP)
+    {
+      if (wrap_it.sp >= 0
+	  && ((atpos_it.sp >= 0 && wrap_it.current_x < atpos_it.current_x)
+	      || (atx_it.sp >= 0 && wrap_it.current_x < atx_it.current_x)))
+	RESTORE_IT (it, &wrap_it, wrap_data);
+      else
+	{
+	  /* A stupid chicken indeed (commit 8ee4117)  */
+	  int prev_x = max (it->current_x - 1, 0);
+	  RESTORE_IT (it, &ppos_it, ppos_data);
+	  emulate_display_sline (it, -1, prev_x, MOVE_TO_X);
+	}
+    }
   else if (atpos_it.sp >= 0)
     RESTORE_IT (it, &atpos_it, atpos_data);
   else if (atx_it.sp >= 0)
@@ -21999,7 +22008,7 @@ display_sline (struct it *it, int cursor_vpos)
 	  it->last_visible_x  += x_incr;
 	}
       move_result = emulate_display_sline (it, ZV, it->first_visible_x,
-					  MOVE_TO_POS | MOVE_TO_X);
+					   MOVE_TO_POS | MOVE_TO_X);
       /* If we are under a large hscroll, emulate_display_sline
 	 could hit the end of the line without reaching
 	 first_visible_x.  Pretend that we did reach it.  This is
@@ -23426,7 +23435,7 @@ Value is the new character position of point.  */)
 
 		  SAVE_IT (it2, it, it_data);
 		  emulate_display_sline (&it, ZV, target_x,
-					MOVE_TO_POS | MOVE_TO_X);
+					 MOVE_TO_POS | MOVE_TO_X);
 		  /* If we arrived at target_x, that _is_ the last
 		     character on the previous line.  */
 		  if (it.current_x != target_x)
