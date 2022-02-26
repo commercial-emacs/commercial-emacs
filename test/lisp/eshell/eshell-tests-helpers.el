@@ -62,7 +62,7 @@ raise an error."
       (when (> (float-time (time-since start))
                eshell-test--max-subprocess-time)
         (error "timed out waiting for subprocess(es)"))
-      (sit-for 0.1))))
+      (accept-process-output nil 0.1))))
 
 (defun eshell-insert-command (text &optional func)
   "Insert a command at the end of the buffer."

@@ -57,6 +57,10 @@ prompt.  See bug#54136."
    (let ((output-start (eshell-beginning-of-output)))
      (eshell-kill-process)
      (eshell-wait-for-subprocess t)
+     (cl-loop repeat 10
+              until (length (buffer-substring-no-properties
+                             output-start (eshell-end-of-output)))
+              do (accept-process-output nil 0.6))
      (should (string-match-p
               ;; "interrupt\n" is for MS-Windows.
               (rx (or "interrupt\n" "killed\n"))
@@ -76,6 +80,10 @@ write the exit status to the pipe.  See bug#54136."
    (let ((output-start (eshell-beginning-of-output)))
      (kill-process (eshell-head-process))
      (eshell-wait-for-subprocess t)
+     (cl-loop repeat 10
+              until (length (buffer-substring-no-properties
+                             output-start (eshell-end-of-output)))
+              do (accept-process-output nil 0.6))
      (should (equal (buffer-substring-no-properties
                      output-start (eshell-end-of-output))
                     "")))))
