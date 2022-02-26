@@ -921,6 +921,7 @@ Return nil if FILENAME doesn't exist."
 
 (ert-deftest process-async-https-with-delay ()
   "Bug#49449: asynchronous TLS connection with delayed completion."
+  :tags (when (getenv "CI") '(:unstable))
   (skip-unless (and internet-is-working (gnutls-available-p)))
   (let* (status
          (network-security-level 'low)
