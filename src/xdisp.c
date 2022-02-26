@@ -9529,7 +9529,7 @@ move_it_backward (struct it *it, int op_to, int op)
       ptrdiff_t from_pos = IT_CHARPOS (*it);
       int estimated_slines = (op == MOVE_TO_Y
 			      ? max (1, op_to / default_line_height (it->w))
-			      : op_to);
+			      : max (1, op_to));
       int op_target = (op == MOVE_TO_Y
 		       ? it->current_y - op_to
 		       : it->vpos - op_to);
@@ -21378,8 +21378,6 @@ handle_line_prefix (struct it *it)
       it->avoid_cursor_p = true;
     }
 }
-
-
 
 /* Remove N glyphs at the start of a reversed IT->glyph_row.  Called
    only for R2L lines from display_sline and display_string, when they
