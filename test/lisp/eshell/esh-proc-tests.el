@@ -58,8 +58,8 @@ prompt.  See bug#54136."
      (eshell-kill-process)
      (eshell-wait-for-subprocess t)
      (cl-loop repeat 10
-              until (length (buffer-substring-no-properties
-                             output-start (eshell-end-of-output)))
+              while (zerop (length (buffer-substring-no-properties
+                                    output-start (eshell-end-of-output))))
               do (accept-process-output nil 0.6))
      (should (string-match-p
               ;; "interrupt\n" is for MS-Windows.
@@ -81,8 +81,8 @@ write the exit status to the pipe.  See bug#54136."
      (kill-process (eshell-head-process))
      (eshell-wait-for-subprocess t)
      (cl-loop repeat 10
-              until (length (buffer-substring-no-properties
-                             output-start (eshell-end-of-output)))
+              while (zerop (length (buffer-substring-no-properties
+                                    output-start (eshell-end-of-output))))
               do (accept-process-output nil 0.6))
      (should (equal (buffer-substring-no-properties
                      output-start (eshell-end-of-output))
