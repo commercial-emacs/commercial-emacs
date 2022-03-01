@@ -7,38 +7,43 @@
 @cindex mark
 @cindex setting a mark
 @cindex region
+@cindex selecting text
 
-  Many Emacs commands operate on an arbitrary contiguous part of the
-current buffer.  To specify the text for such a command to operate on,
-you set @dfn{the mark} at one end of it, and move point to the other
-end.  The text between point and the mark is called @dfn{the region}.
-The region always extends between point and the mark, no matter which
-one comes earlier in the text; each time you move point, the region
-changes.
+  In Emacs, selected text is called the @dfn{region}.  The region is
+roughly analogous to ``selected text'' in other software, but there
+are some differences.  One important such difference is that there is
+not just a name for the selection itself, but also for the positions
+where it starts and where it ends.
+
+  The region always starts at point, and ends at what is called
+@dfn{the mark}.  You move point with the normal movement commands, but
+you can also move the mark to any position in a buffer; we call this
+@dfn{setting the mark}.  The region always extends between point and
+the mark, no matter which of them comes earlier in the text; each time
+you move point, the region changes.
 
 @cindex active region
 @cindex activating the mark
-  Setting the mark at a position in the text also @dfn{activates} it.
-When the mark is active, we say also that the region is active; Emacs
-indicates its extent by highlighting the text within it, using the
-@code{region} face (@pxref{Face Customization}).
-
-This is one of the few faces that has the @code{:extend t} attribute
-by default, which implies that the same face is used to highlight the
-text and space between end of line and the window border.  To
-highlight only the text you could set this attribute to @code{nil}.
+  Setting the mark also @dfn{activates} it.  When the mark is active,
+we say also that the region is active.  The active region is
+highlighted with the @code{region} face (@pxref{Face Customization}).
 
 @cindex deactivating the mark
-  After certain non-motion commands, including any command that
-changes the text in the buffer, Emacs automatically @dfn{deactivates}
-the mark; this turns off the highlighting.  You can also explicitly
-deactivate the mark at any time, by typing @kbd{C-g}
-(@pxref{Quitting}).
+  After some commands, including any command that changes the text in
+the buffer, Emacs automatically @dfn{deactivates} the mark.  When the
+mark is deactivated, the region is no longer active, and consequently
+any highlighting of it is removed.  You can explicitly deactivate the
+mark at any time by @kbd{C-g} (@pxref{Quitting}).
 
   The above default behavior is known as Transient Mark mode.
 Disabling Transient Mark mode switches Emacs to an alternative
 behavior, in which the region is usually not highlighted.
 @xref{Disabled Transient Mark}.
+
+  The mark is useful even if it is not active.  For example, you can
+move to previous mark locations using the mark ring.  @xref{Mark
+Ring}.  Additionally, some commands will have an effect even on an
+inactive region (for example @dfn{upcase-region}).
 
 @vindex highlight-nonselected-windows
   Setting the mark in one buffer has no effect on the marks in other
