@@ -1398,7 +1398,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 
   if (move_to_pos_p
       && (/* non-bidi or bidi-forward */
-	  ((!it.bidi_p || it.bidi_it.scan_dir != -1)
+	  ((! it.bidi_p || it.bidi_it.scan_dir != -1)
 	   && IT_CHARPOS (it) >= charpos)
 	  /* bidi-backward */
 	  || (it.bidi_p && it.bidi_it.scan_dir == -1
@@ -1433,11 +1433,10 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	     thus bidi-backwards didn't actually reach CHARPOS and
 	     visible-p is false.
 
-	     I dunno, this reeks of the classic EZ preference to
-	     minimize impact and maximize obfuscation by fixing things
-	     at the leaf nodes instead of further up the tree.  Look
-	     into fixing move_it_forward so "stopping short" doesn't
-	     happen.
+	     Classic EZ preference to minimize impact and maximize
+	     obfuscation by fixing things at the leaf nodes instead of
+	     further up the tree.  Look into fixing move_it_forward so
+	     "stopping short" doesn't happen.
 	  */
 	  int ten_more_lines = 10 * default_line_height (w);
 	  move_it_forward (&it, charpos, bottom_y + ten_more_lines,
@@ -1452,45 +1451,52 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	{
 	  if (it.method == GET_FROM_DISPLAY_VECTOR)
 	    {
-	      /* We stopped on the last glyph of a display vector.
-		 Try and recompute.  Hack alert!  */
+	      /* For whatever reason, we're inside the display string.
+
+		 This behavior has been chalked up to move_it_forward
+		 and set_cursor_from_row disagreeing where best
+		 to abandon us.
+
+		 Reseat to last display element at CHARPOS. */
 	      eassert (charpos >= 0);
+
 	      if (charpos < 2 || top.charpos >= charpos)
-		top_x = it.glyph_row->x;
+		{
+		  /* Safety fudge for degenerate CHARPOS.  */
+		  top_x = it.glyph_row->x;
+		}
 	      else
 		{
+		  /* Set IT2_PREV to last display element at CHARPOS.  */
 		  struct it it2, it2_prev;
-		  /* The idea is to get to the previous buffer
-		     position, consume the character there, and use
-		     the pixel coordinates we get after that.  But if
-		     the previous buffer position is also displayed
-		     from a display vector, we need to consume all of
-		     the glyphs from that display vector.  */
 		  start_move_it (&it2, w, top);
-		  it2.glyph_row = NULL;
 		  move_it_forward (&it2, charpos - 1, -1, MOVE_TO_POS);
-		  /* If we didn't get to CHARPOS - 1, there's some
-		     replacing display property at that position, and
-		     we stopped after it.  That is exactly the place
-		     whose coordinates we want.  */
 		  if (IT_CHARPOS (it2) != charpos - 1)
-		    it2_prev = it2;
+		    {
+		      /* Perhaps another display vector at CHARPOS - 1,
+			 in which case, consider close enough.  */
+		      it2_prev = it2;
+		    }
 		  else
 		    {
-		      /* Iterate until we get out of the display
-			 vector that displays the character at
-			 CHARPOS - 1.  */
+		      /* do-while because we're at CHARPOS - 1, and we
+			 need to get to the display vector at
+			 CHARPOS. */
 		      do {
-			get_display_element (&it2);
-			PRODUCE_GLYPHS (&it2);
+			get_display_element (&it2); /* for side effects */
+			it2.glyph_row = NULL;
+			PRODUCE_GLYPHS (&it2); /* for side effects */
 			it2_prev = it2;
 			set_iterator_to_next (&it2, true);
 		      } while (it2.method == GET_FROM_DISPLAY_VECTOR
 			       && IT_CHARPOS (it2) < charpos);
 		    }
+
 		  if (ITERATOR_AT_END_OF_LINE_P (&it2_prev)
 		      || it2_prev.current_x > it2_prev.last_visible_x)
-		    top_x = it.glyph_row->x;
+		    {
+		      top_x = it.glyph_row->x;
+		    }
 		  else
 		    {
 		      top_x = it2_prev.current_x;
@@ -1500,28 +1506,30 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	    }
 	  else if (IT_CHARPOS (it) != charpos)
 	    {
-	      /* We overshot CHARPOS; if it were for a display property
-		 we need to backtrack to where the property begins.*/
+	      /* For whatever reason, we're beyond the display string.
+
+		 This behavior has been chalked up to move_it_forward
+		 and set_cursor_from_row disagreeing where best
+		 to abandon us.
+
+		 Reseat to last display element at CHARPOS.  */
+	      struct text_pos tpos;
 	      Lisp_Object cpos = make_fixnum (charpos),
 		spec = Fget_char_property (cpos, Qdisplay, Qnil),
 		string = string_from_display_spec (spec);
-	      struct text_pos tpos;
-	      bool newline_in_string
-		= (STRINGP (string)
-		   && memchr (SDATA (string), '\n', SBYTES (string)));
+	      bool newline_in_string =
+		(STRINGP (string)
+		 && memchr (SDATA (string), '\n', SBYTES (string)));
 
 	      SET_TEXT_POS (tpos, charpos, CHAR_TO_BYTE (charpos));
 	      if (! NILP (spec)
 		  && handle_display_spec (NULL, spec, Qnil, Qnil, &tpos,
 					  charpos, FRAME_WINDOW_P (it.f)))
 		{
-		  /* Long-winded hacks ahead "necessitated" by
-		     move_it_forward stopping at the end of display strings,
-		     but set_cursor_from_row putting the cursor at
-		     the beginning.  */
 		  Lisp_Object startpos, endpos;
 		  EMACS_INT start, end;
 		  struct it it3;
+		  bool it3_moved = false;
 
 		  endpos =
 		    Fnext_single_char_property_change (cpos, Qdisplay,
@@ -1540,9 +1548,10 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 			  || FETCH_BYTE (IT_BYTEPOS (it3)) == '\n'))
 		    /* Move off a newline */
 		    move_it_vpos (&it3, 1);
-		  else if (emulate_display_sline
-			   (&it3, -1, it3.current_x + it3.pixel_width,
-			    MOVE_TO_X) == MOVE_LINE_CONTINUED)
+		  else if (MOVE_LINE_CONTINUED ==
+			   emulate_display_sline (&it3, -1,
+						  it3.current_x + it3.pixel_width,
+						  MOVE_TO_X))
 		    {
 		      /* Move off rightmost character on a continued line */
 		      move_it_vpos (&it3, 1);
@@ -1569,7 +1578,6 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		     of the display line where the display string
 		     begins.  */
 		  start_move_it (&it3, w, top);
-		  it3.glyph_row = NULL;
 		  move_it_forward (&it3, -1, top_y, MOVE_TO_Y);
 		  /* If it3_moved stays false after the 'while' loop
 		     below, that means we already were at a newline
@@ -1578,7 +1586,6 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		     the last position before the display string,
 		     because PRODUCE_GLYPHS will not produce anything
 		     for a newline.  */
-		  bool it3_moved = false;
 		  int top_x_before_string = it3.current_x;
 		  /* Finally, advance the iterator until we hit the
 		     first display element whose character position is
@@ -1587,8 +1594,9 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		     display line.  */
 		  while (get_display_element (&it3))
 		    {
-		      if (!EQ (it3.object, string))
+		      if (! EQ (it3.object, string))
 			top_x_before_string = it3.current_x;
+		      it3.glyph_row = NULL;
 		      PRODUCE_GLYPHS (&it3);
 		      if (IT_CHARPOS (it3) == charpos
 			  || ITERATOR_AT_END_OF_LINE_P (&it3))
@@ -1600,7 +1608,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		  /* Account for line-number display, if IT3 still
 		     didn't.  This can happen if START - 1 is the
 		     first or the last character on its display line.  */
-		  if (!it3.line_number_produced_p)
+		  if (! it3.line_number_produced_p)
 		    {
 		      if (it3.lnum_pixel_width > 0)
 			{
@@ -3346,13 +3354,12 @@ init_to_row_end (struct it *it, struct window *w, struct glyph_row *row)
 static void
 handle_stop (struct it *it)
 {
-  enum prop_handled handled;
-  bool handle_overlay_change_p;
   struct props *p;
+  enum prop_handled handled;
+  bool handle_overlay_change_p = ! it->ignore_overlay_strings_at_pos_p;
 
   it->dpvec = NULL;
   it->current.dpvec_index = -1;
-  handle_overlay_change_p = !it->ignore_overlay_strings_at_pos_p;
   it->ellipsis_p = false;
 
   /* Use face of preceding text for ellipsis (if invisible) */
@@ -3392,7 +3399,7 @@ handle_stop (struct it *it)
 	    {
 	      /* We still want to show before and after strings from
 		 overlays even if the actual buffer text is replaced.  */
-	      if (!handle_overlay_change_p
+	      if (! handle_overlay_change_p
 		  || it->sp > 1
 		  /* Don't call get_overlay_strings_1 if we already
 		     have overlay strings loaded, because doing so
@@ -3436,9 +3443,8 @@ handle_stop (struct it *it)
 	  if (it->method == GET_FROM_DISPLAY_VECTOR)
 	    handle_overlay_change_p = false;
 
-	  /* Handle overlay changes.
-	     This sets HANDLED to HANDLED_RECOMPUTE_PROPS
-	     if it finds overlays.  */
+	  /* Handle overlay changes.  This sets HANDLED to
+	     HANDLED_RECOMPUTE_PROPS if it finds overlays.  */
 	  if (handle_overlay_change_p)
 	    handled = handle_overlay_change (it);
 	}
@@ -7117,9 +7123,8 @@ forget_escape_and_glyphless_faces (void)
   last_glyphless_glyph_face_id = (1 << FACE_ID_BITS);
 }
 
-/* Load IT's display element fields with information about the next
-   display element from the current position of IT.  Value is false if
-   end of buffer (or C string) is reached.
+/* Load IT's display element fields from the current position of IT.
+   Value is false if end of buffer (or C string) is reached.
   */
 
 static bool
