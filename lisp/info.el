@@ -3372,20 +3372,20 @@ Give an empty topic name to go to the Index node itself."
 	  (Info-complete-menu-buffer (clone-buffer))
 	  (Info-complete-nodes (Info-index-nodes))
 	  (Info-history-list nil))
-      (if (equal Info-current-file "dir")
-	  (error "The Info directory node has no index; use m to select a manual"))
       (unwind-protect
-	  (with-current-buffer Info-complete-menu-buffer
-	    (Info-goto-index)
-	    (completing-read "Index topic: " #'Info-complete-menu-item))
+          (with-current-buffer Info-complete-menu-buffer
+	    (unless (equal Info-current-file "dir")
+              (Info-goto-index)
+	      (completing-read "Index topic: " #'Info-complete-menu-item)))
 	(kill-buffer Info-complete-menu-buffer)))))
-  (if (equal Info-current-file "dir")
-      (error "The Info directory node has no index; use m to select a manual"))
+  (when (equal Info-current-file "dir")
+    (error "The Info directory node has no index; use m to select a manual"))
+  (unless (stringp topic)
+    (signal 'wrong-type-argument topic))
   ;; Strip leading colon in topic; index format does not allow them.
-  (if (and (stringp topic)
-	   (> (length topic) 0)
-	   (= (aref topic 0) ?:))
-      (setq topic (substring topic 1)))
+  (when (and (> (length topic) 0)
+	     (= (aref topic 0) ?:))
+    (setq topic (substring topic 1)))
   (let ((orignode Info-current-node)
 	(pattern (format "\n\\* +\\([^\n]*\\(%s\\)[^\n]*\\):[ \t]+\\([^\n]*\\)\\.\\(?:[ \t\n]*(line +\\([0-9]+\\))\\)?"
 			 (regexp-quote topic)))
