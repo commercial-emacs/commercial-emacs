@@ -229,4 +229,17 @@ width of display property."
 	    (car (window-text-pixel-size
                   nil (line-beginning-position) (line-end-position)))))))))
 
+(ert-deftest xdisp-tests--visual-line-mode ()
+  "A clever test by /u/fragglestickcar0 on /r/emacs."
+  (skip-unless (not noninteractive))
+  (xdisp-tests--visible-buffer
+   (visual-line-mode)
+   (save-excursion
+    (insert (make-string (/ (window-width) 2) ?x) " "
+	    (make-string (window-width) ?x)))
+   (should (zerop (- (window-width)
+                     (save-excursion
+                       (end-of-line)
+                       (- (point) (beginning-of-visual-line))))))))
+
 ;;; xdisp-tests.el ends here
