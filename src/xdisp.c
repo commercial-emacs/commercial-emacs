@@ -8741,7 +8741,7 @@ get_element_from_composition (struct it *it)
 
 enum move_it_result
 emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
-		      enum move_operation_enum op)
+		       enum move_operation_enum op)
 {
   enum move_it_result result = MOVE_UNDEFINED;
   struct glyph_row *saved_glyph_row;
@@ -9487,6 +9487,11 @@ move_it_x (struct it *it, int to_x)
 {
   struct it save_it;
   void *data = NULL;
+  if (it->current_x >= to_x)
+    /* calling emulate_display_sline undesirably advances IT
+       past display strings */
+    return;
+
   SAVE_IT (save_it, *it, data);
 
   int result = emulate_display_sline (it, ZV, to_x, MOVE_TO_X);
@@ -22790,8 +22795,7 @@ done:
 
   /* Record whether this row ends inside an ellipsis.  */
   row->ends_in_ellipsis_p
-    = (it->method == GET_FROM_DISPLAY_VECTOR
-       && it->ellipsis_p);
+    = (it->method == GET_FROM_DISPLAY_VECTOR && it->ellipsis_p);
 
   /* Save fringe bitmaps in this row.  */
   row->left_user_fringe_bitmap = it->left_user_fringe_bitmap;

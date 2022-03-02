@@ -2152,8 +2152,8 @@ whether or not it is currently displayed in some window.  */)
     {
       ptrdiff_t it_start, it_overshoot_count = 0;
       int first_x;
-      bool overshoot_handled = 0;
-      bool disp_string_at_start_p = 0;
+      bool overshoot_handled = false;
+      bool disp_string_at_start_p = false;
       ptrdiff_t nlines = XFIXNUM (lines);
       int vpos_init = 0;
       double start_col UNINIT;
@@ -2182,7 +2182,6 @@ whether or not it is currently displayed in some window.  */)
       first_x = it.first_visible_x;
       it_start = IT_CHARPOS (it);
 
-      /* See comments below for why we calculate this.  */
       if (it.cmp_it.id >= 0)
 	it_overshoot_count = 0;
       else if (it.method == GET_FROM_STRING)
@@ -2191,25 +2190,22 @@ whether or not it is currently displayed in some window.  */)
 	  const char *e = s + SBYTES (it.string);
 
 	  disp_string_at_start_p =
-	  /* If it.area is anything but TEXT_AREA, we need not bother
-	     about the display string, as it doesn't affect cursor
-	     positioning.  */
 	    it.area == TEXT_AREA
 	    && it.string_from_display_prop_p
-	    /* A display string on anything but buffer text (e.g., on
-	       an overlay string) doesn't affect cursor positioning.  */
+	    /* Cursor positioning only affected when display string
+	       originates from buffer text.  */
 	    && (it.sp > 0 && it.stack[it.sp - 1].method == GET_FROM_BUFFER);
 	  while (s < e)
 	    {
 	      if (*s++ == '\n')
 		it_overshoot_count++;
 	    }
-	  if (!it_overshoot_count)
+	  if (! it_overshoot_count)
 	    it_overshoot_count = -1;
 	}
       else
 	it_overshoot_count =
-	  !(it.method == GET_FROM_IMAGE || it.method == GET_FROM_STRETCH);
+	  (it.method != GET_FROM_IMAGE && it.method != GET_FROM_STRETCH);
 
       if (start_x_given)
 	{
@@ -2224,40 +2220,20 @@ whether or not it is currently displayed in some window.  */)
 	  reseat_preceding_line_start (&it);
 	  it.current_x = it.hpos = 0;
 	}
+
       if (IT_CHARPOS (it) != PT)
         {
-          /* We used to temporarily disable selective display here; the
-             comment said this is "so we don't move too far" (2005-01-19
-             checkin by kfs).  But this does nothing useful that I can
-             tell, and it causes Bug#2694 .  -- cyd */
-          /* When the position we started from is covered by a display
-             string, move_it_forward will overshoot it, while vertical-motion
-             wants to put the cursor _before_ the display string.  So in
-             that case, we move to buffer position before the display
-             string, and avoid overshooting.  But if the position before
-             the display string is a newline, we don't do this, because
-             otherwise we will end up in a screen line that is one too
-             far back.  */
           ptrdiff_t target =
-	    (!disp_string_at_start_p ||
-	     FETCH_BYTE (IT_BYTEPOS (it)) == '\n')
-            ? PT
-            : PT - 1;
-
+	    (disp_string_at_start_p && FETCH_BYTE (IT_BYTEPOS (it)) != '\n')
+	    /* Back off to avoid overshooting.  */
+            ? PT - 1
+            : PT;
           move_it_forward (&it, target, -1, MOVE_TO_POS);
         }
 
-      /* IT may move too far if truncate-lines is on and PT lies
-	 beyond the right margin.  IT may also move too far if the
-	 starting point is on a Lisp string that has embedded
-	 newlines, or spans several screen lines.  In these cases,
-	 backtrack.  */
       if (IT_CHARPOS (it) > it_start)
 	{
-	  /* We need to backtrack also if the Lisp string contains no
-	     newlines, but there is a newline right after it.  In this
-	     case, IT overshoots if there is an after-string just
-	     before the newline.  */
+	  /* Update IT_OVERSHOOT_COUNT.  */
 	  if (it_overshoot_count < 0
 	      && it.method == GET_FROM_BUFFER
 	      && it.c == '\n')
@@ -2287,28 +2263,30 @@ whether or not it is currently displayed in some window.  */)
 	  if (it_overshoot_count > 0)
 	    move_it_vpos (&it, -it_overshoot_count);
 
-	  overshoot_handled = 1;
+	  overshoot_handled = true;
 	}
       else if (IT_CHARPOS (it) == PT - 1
 	       && FETCH_BYTE (PT_BYTE - 1) == '\n'
 	       && nlines <= 0)
 	{
-	  /* The position we started from was covered by a display
-	     property, so we moved to position before the string, and
-	     backed up one line, because the character at PT - 1 is
-	     a newline.  So we need one less line to go up (or exactly
+	  /* In the case we backed off to (PT - 1) to avoid
+	     overshooting a display string, and (PT - 1) happens to be
+	     a newline, we'll need one less line to go up (or exactly
 	     one line to go down if nlines == 0).  */
 	  nlines++;
+
 	  /* But we still need to record that one line, in order to
 	     return the correct value to the caller.  */
 	  vpos_init = -1;
 
-	  overshoot_handled = 1;
+	  overshoot_handled = true;
 	}
-      if (!NILP (lcols))
+
+      if (! NILP (lcols))
 	to_x =
 	  window_column_x (w, window, XFLOATINT (lcols), lcols)
 	  + lnum_pixel_width;
+
       if (nlines <= 0)
 	{
 	  it.vpos = vpos_init;
@@ -2370,7 +2348,7 @@ whether or not it is currently displayed in some window.  */)
 	  if (nlines >= 0 && it.area == TEXT_AREA)
 	    {
 	      while (it.method == GET_FROM_STRING
-		     && !it.string_from_display_prop_p
+		     && ! it.string_from_display_prop_p
 		     && memchr (SSDATA (it.string) + IT_STRING_BYTEPOS (it),
 				'\n',
 				SBYTES (it.string) - IT_STRING_BYTEPOS (it)))
