@@ -8838,8 +8838,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 
       PRODUCE_GLYPHS (it);
 
-      if (it->area != TEXT_AREA
-	  || it->method == GET_FROM_STRING)
+      if (it->area != TEXT_AREA)
 	{
 	  /* The remainder of the loop concerns visible glyphs.  */
 	  ADVANCE_IT (it);
@@ -9487,11 +9486,6 @@ move_it_x (struct it *it, int to_x)
 {
   struct it save_it;
   void *data = NULL;
-  if (it->current_x >= to_x)
-    /* calling emulate_display_sline undesirably advances IT
-       past display strings */
-    return;
-
   SAVE_IT (save_it, *it, data);
 
   int result = emulate_display_sline (it, ZV, to_x, MOVE_TO_X);

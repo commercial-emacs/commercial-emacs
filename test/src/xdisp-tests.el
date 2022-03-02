@@ -242,4 +242,27 @@ width of display property."
                        (end-of-line)
                        (- (point) (beginning-of-visual-line))))))))
 
+(ert-deftest xdisp-tests--vertical-motion-display-string ()
+  "Test line-up and line-down in presence of display string."
+  (skip-unless (not noninteractive))
+  (xdisp-tests--visible-buffer
+   (insert (mapconcat #'number-to-string (number-sequence 1 5) "") "\n")
+   (save-excursion (insert "_this\n"))
+   (add-text-properties (point) (1+ (point))
+                        `(display "See " front-sticky nil rear-nonsticky t))
+   (call-interactively #'previous-line)
+   (should (looking-at "1"))
+   (call-interactively #'forward-char)
+   (should (looking-at "2"))
+   (call-interactively #'next-line)
+   (should (looking-at "_"))
+   (call-interactively #'forward-char)
+   (should (looking-at "t"))
+   (call-interactively #'previous-logical-line) ;; sus
+   (should (looking-at "5"))
+   (call-interactively #'next-line)
+   (should (looking-at "t"))
+   (call-interactively #'backward-char)
+   (should (looking-at "_"))))
+
 ;;; xdisp-tests.el ends here
