@@ -4555,7 +4555,7 @@ used is \"Error: %S\"."
     (if (eq orig-body body) exp
       ;; The use without `format' is obsolete, let's warn when we bump
       ;; into any such remaining uses.
-      (macroexp-warn-and-return format "Missing format argument" exp))))
+      (macroexp-warn-and-return "Missing format argument" exp nil nil format))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
