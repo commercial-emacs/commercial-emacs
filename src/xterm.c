@@ -309,12 +309,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
   to X windows, since the toolkit might decide to keep only a
   client-side record of the widgets for performance reasons.
 
-  Because the GtkFixed widget that holds the "edit area" never
-  corresponds to an X window, drawing operations are directly
+  Because the GtkFixed widget that holds the "edit area" might not
+  correspond to an X window, drawing operations may be directly
   performed on the outer window, with special care taken to not
   overwrite the surrounding GTK widgets.  This also means that the
   only important window for most purposes is the outer window, which
-  on GTK builds can also be accessed using the macro
+  on GTK builds can usually be accessed using the macro
   `FRAME_X_WINDOW'.
 
   How `handle_one_xevent' is called also depends on the configuration.
@@ -597,13 +597,15 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <cairo-xlib.h>
 #endif
 
+#ifdef USE_MOTIF
+#include <Xm/Xm.h>
+#endif
+
 #ifdef USE_X_TOOLKIT
 
 /* Include toolkit specific headers for the scroll bar widget.  */
-
 #ifdef USE_TOOLKIT_SCROLL_BARS
 #if defined USE_MOTIF
-#include <Xm/Xm.h>		/* For LESSTIF_VERSION */
 #include <Xm/ScrollBar.h>
 #else /* !USE_MOTIF i.e. use Xaw */
 
@@ -9794,10 +9796,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   inev.ie.kind = NO_EVENT;
   inev.ie.arg = Qnil;
 
-#ifdef HAVE_XKB
-  if (event->type != dpyinfo->xkb_event_type)
+  /* Ignore events coming from various extensions, such as XFIXES and
+     XKB.  */
+  if (event->type < LASTEvent)
     {
-#endif
 #ifdef HAVE_XINPUT2
       if (event->type != GenericEvent)
 #endif
@@ -9806,11 +9808,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       else
 	any = NULL;
 #endif
-#ifdef HAVE_XKB
     }
   else
     any = NULL;
-#endif
 
   if (any && any->wait_event_type == event->type)
     any->wait_event_type = 0; /* Indicates we got it.  */
