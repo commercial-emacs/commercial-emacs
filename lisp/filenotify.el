@@ -457,7 +457,7 @@ FILE is the name of the file whose event is being reported."
 (defun file-notify-rm-watch (descriptor)
   "Remove an existing watch specified by its DESCRIPTOR.
 DESCRIPTOR should be an object returned by `file-notify-add-watch'."
-  (when-let* ((watch (gethash descriptor file-notify-descriptors)))
+  (when-let ((watch (gethash descriptor file-notify-descriptors)))
     ;; If we are called from a `stopped' event, do nothing.
     (when (file-notify--watch-callback watch)
       (let ((handler (find-file-name-handler
@@ -491,7 +491,7 @@ DESCRIPTOR should be an object returned by `file-notify-add-watch'."
 (defun file-notify-valid-p (descriptor)
   "Check a watch specified by its DESCRIPTOR.
 DESCRIPTOR should be an object returned by `file-notify-add-watch'."
-  (when-let* ((watch (gethash descriptor file-notify-descriptors)))
+  (when-let ((watch (gethash descriptor file-notify-descriptors)))
     (let ((handler (find-file-name-handler
                     (file-notify--watch-directory watch)
                     'file-notify-valid-p)))

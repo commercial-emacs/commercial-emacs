@@ -7681,11 +7681,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	    }
 	}
 
-      /* `set_waiting_for_input' is a Blandyism that claims to have emacs
-	 react immediately to C-g and signals.
-	 Passing a writable reference to timeout so that signal handlers
-	 can manipulate timeout out-of-band in the code that follows
-	 is super obtuse and probably makes no discernible difference.
+      /* `set_waiting_for_input' is a Blandyism that claims to have
+	 emacs react immediately to C-g and signals.  Passing a
+	 writable reference to timeout so that signal handlers can
+	 manipulate timeout out-of-band is super obtuse and probably
+	 makes no discernible difference.
       */
       if (read_kbd < 0)
 	set_waiting_for_input (&timeout);
