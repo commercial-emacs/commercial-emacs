@@ -22,6 +22,7 @@
 
 ;;; Commentary:
 
+;; Seems like it should be coalesced with src/thread-tests.el
 
 ;;; Code:
 

@@ -69,7 +69,7 @@ LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" \
   ./configure --prefix=$HOME/.local --with-tree-sitter
 make -j4 bootstrap
 ldd src/emacs | grep -q tree-sitter || echo not found
-make test/src/tree-sitter-tests.log
+make test/src/tree-sitter-tests
 src/emacs -Q --eval \
   "(custom-set-variables '(font-lock-support-mode 'tree-sitter-lock-mode))" \
   --visit src/xdisp.c

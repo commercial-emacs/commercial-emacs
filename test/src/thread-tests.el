@@ -417,35 +417,45 @@
     (should-not (equal th main-thread))))
 
 (ert-deftest threads-test-bug48990 ()
+  "Bug#48990 shows buffer-local and global variables getting clobbered.
+Fixed in b8460fc by transplanting the `backtrace-eval` logic into the context switch
+code, the former having already summited that peak."
   (skip-unless (featurep 'threads))
   (thread-last-error t)
-  (with-temp-buffer
-    (let ((success 0))
-      (with-temp-buffer
-        (dotimes (i 5 (progn
-                        (cl-loop repeat 50
-                                 until (zerop (1- (length (all-threads))))
-                                 do (accept-process-output nil 0.2))
-                        (should-not (thread-last-error))
-                        (should (= success i))
-                        (should (equal threads-test-bug48990 (format "local-%d" (1- i))))))
-          (setq threads-test-bug48990 (format "local-%d" i))
-          (should (equal threads-test-bug48990 (format "local-%d" i)))
-          (make-thread
-           (lambda ()
-             (let ((body (lambda ()
-                           (let ((threads-test-bug48990 "let"))
-                             (sleep-for (1+ (random 2)))
-                             (when (equal threads-test-bug48990 "let")
-                               (cl-incf success)))))
-                   (b (concat "*buffer-" (thread-name (current-thread)) "*")))
-               (unwind-protect
-                   (with-current-buffer (get-buffer-create b)
-                     (funcall body))
-                 (let (kill-buffer-query-functions)
-                   (kill-buffer b)))))
-           (format "%d" i))))))
-  (should (equal threads-test-bug48990 "global")))
+  (cl-flet ((doit (global-p)
+              (with-temp-buffer
+                (let ((success 0))
+                  (with-temp-buffer
+                    (dotimes (i 5 (progn
+                                    (cl-loop repeat 50
+                                             until (zerop (1- (length (all-threads))))
+                                             do (accept-process-output nil 0.2))
+                                    (should-not (thread-last-error))
+                                    (should (= success i))
+                                    (should (equal threads-test-bug48990
+                                                   (format "local-%d" (1- i))))))
+                      (setq threads-test-bug48990 (format "local-%d" i))
+                      (should (equal threads-test-bug48990 (format "local-%d" i)))
+                      (make-thread
+                       (lambda ()
+                         (let ((body (lambda ()
+                                       (let ((threads-test-bug48990 "let"))
+                                         (sleep-for (1+ (random 2)))
+                                         (when (equal threads-test-bug48990 "let")
+                                           (cl-incf success)))))
+                               (b (concat "*buffer-" (thread-name (current-thread)) "*")))
+                           (unwind-protect
+                               (with-current-buffer (if global-p
+                                                        "*scratch*"
+                                                      (get-buffer-create b))
+                                 (funcall body))
+                             (let (kill-buffer-query-functions)
+                               (when (buffer-live-p b)
+                                 (kill-buffer b))))))
+                       (format "%d" i)))))
+                (should (equal threads-test-bug48990 "global")))))
+    (doit t)
+    (doit nil)))
 
 (ert-deftest threads-test-bug36609-signal ()
   "Would only fail under TEST_INTERACTIVE=yes, and not every time.
@@ -541,4 +551,5 @@ The failure manifests only by being unable to exit the interactive emacs."
                        finally return nil)))
     (mapc (lambda (b) (kill-buffer b)) buffers))
   (should-not (thread-last-error)))
+
 ;;; thread-tests.el ends here
