@@ -31,6 +31,12 @@ INLINE_HEADER_BEGIN
 #define BUFFER_TO_SITTER(pos) ((uint32_t) CHAR_TO_BYTE (pos) - 1)
 #define SITTER_TO_BUFFER(byte) (BYTE_TO_CHAR ((EMACS_INT) byte + 1))
 
+struct Lisp_Tree_Sitter_Node
+{
+  union vectorlike_header header;
+  TSNode node;
+} GCALIGNED_STRUCT;
+
 struct Lisp_Tree_Sitter
 {
   union vectorlike_header header;
@@ -41,7 +47,7 @@ struct Lisp_Tree_Sitter
   TSHighlighter *highlighter;
   const char **highlight_names;
   char *highlights_query;
-};
+} GCALIGNED_STRUCT;
 
 INLINE bool
 TREE_SITTERP (Lisp_Object x)
@@ -50,16 +56,35 @@ TREE_SITTERP (Lisp_Object x)
 }
 
 INLINE struct Lisp_Tree_Sitter *
-XTREE_SITTER (Lisp_Object a)
+XTREE_SITTER (Lisp_Object x)
 {
-  eassert (TREE_SITTERP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Tree_Sitter);
+  eassert (TREE_SITTERP (x));
+  return XUNTAG (x, Lisp_Vectorlike, struct Lisp_Tree_Sitter);
 }
 
 INLINE void
-CHECK_TREE_SITTER (Lisp_Object sitter)
+CHECK_TREE_SITTER (Lisp_Object x)
 {
-  CHECK_TYPE (TREE_SITTERP (sitter), Qtree_sitterp, sitter);
+  CHECK_TYPE (TREE_SITTERP (x), Qtree_sitterp, x);
+}
+
+INLINE bool
+TREE_SITTER_NODEP (Lisp_Object x)
+{
+  return PSEUDOVECTORP (x, PVEC_TREE_SITTER_NODE);
+}
+
+INLINE struct Lisp_Tree_Sitter_Node *
+XTREE_SITTER_NODE (Lisp_Object x)
+{
+  eassert (TREE_SITTER_NODEP (x));
+  return XUNTAG (x, Lisp_Vectorlike, struct Lisp_Tree_Sitter_Node);
+}
+
+INLINE void
+CHECK_TREE_SITTER_NODE (Lisp_Object x)
+{
+  CHECK_TYPE (TREE_SITTER_NODEP (x), Qtree_sitter_nodep, x);
 }
 
 INLINE_HEADER_END

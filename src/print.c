@@ -1922,19 +1922,32 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 #endif
 #ifdef HAVE_TREE_SITTER
     case PVEC_TREE_SITTER:
-      print_c_string ("#<tree-sitter for ", printcharfun);
-      print_object (XTREE_SITTER (obj)->progmode, printcharfun, escapeflag);
-      printchar (' ', printcharfun);
-      int len = sprintf (buf, "%p", XTREE_SITTER (obj));
-      strout (buf, len, len, printcharfun);
-      printchar ('>', printcharfun);
+      {
+	int len;
+	print_c_string ("#<tree-sitter for ", printcharfun);
+	print_object (XTREE_SITTER (obj)->progmode, printcharfun, escapeflag);
+	printchar (' ', printcharfun);
+	len = sprintf (buf, "%p", XTREE_SITTER (obj));
+	strout (buf, len, len, printcharfun);
+	printchar ('>', printcharfun);
+      }
+      break;
+    case PVEC_TREE_SITTER_NODE:
+      {
+	int len;
+	print_c_string ("#<tree-sitter-node for ", printcharfun);
+	len = sprintf (buf, "%p", XTREE_SITTER_NODE (obj));
+	strout (buf, len, len, printcharfun);
+	printchar ('>', printcharfun);
+      }
       break;
 #endif
 #ifdef HAVE_SQLITE3
     case PVEC_SQLITE:
       {
+	int i;
         print_c_string ("#<sqlite ", printcharfun);
-        int i = sprintf (buf, "db=%p", XSQLITE (obj)->db);
+        i = sprintf (buf, "db=%p", XSQLITE (obj)->db);
         strout (buf, i, i, printcharfun);
         if (XSQLITE (obj)->is_statement)
           {

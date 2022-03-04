@@ -59,7 +59,17 @@
            (kill-buffer))
          (delete-directory dir t)))))
 
-(ert-deftest tree-sitter-basic-parsing ()
+(ert-deftest tree-sitter-test-node ()
+  (let ((text "
+void main (void) {
+  return 0;
+}
+"))
+    (tree-sitter-tests-doit ".c" text
+      (should (equal "primitive_type" (tree-sitter-node-type (tree-sitter-node-at 1))))
+      (should-not (tree-sitter-node-type (tree-sitter-node-at 5))))))
+
+(ert-deftest tree-sitter-test-basic-parsing ()
   "Test basic parsing routines."
   (let ((text "
 void main (void) {
@@ -75,7 +85,7 @@ void main (void) {
       (should (equal (tree-sitter-highlights (point-min) (point-max))
                      '(font-lock-type-face (1 . 5) nil (5 . 6) font-lock-function-name-face (6 . 10) nil (10 . 12) font-lock-type-face (12 . 16) nil (16 . 23) font-lock-function-name-face (23 . 29) nil (29 . 30) font-lock-string-face (30 . 43) nil (43 . 48) font-lock-keyword-face (48 . 54) nil (54 . 55) font-lock-constant-face (55 . 56) nil (56 . 59)))))))
 
-(ert-deftest tree-sitter-multibyte ()
+(ert-deftest tree-sitter-test-multibyte ()
   "Cannot simply -1 or +1 to move between buffer and sitter space."
   (let ((text "
 void main (void) {

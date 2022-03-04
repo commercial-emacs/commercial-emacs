@@ -262,6 +262,8 @@ for example, (type-of 1) returns `integer'.  */)
           return Qsqlite;
 	case PVEC_TREE_SITTER:
 	  return Qtree_sitter_parser;
+	case PVEC_TREE_SITTER_NODE:
+	  return Qtree_sitter_parser;
         /* "Impossible" cases.  */
 	case PVEC_MISC_PTR:
         case PVEC_OTHER:

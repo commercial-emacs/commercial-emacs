@@ -3230,6 +3230,9 @@ cleanup_vector (struct Lisp_Vector *vector)
       if (lisp_parser->parser != NULL)
 	ts_parser_delete(lisp_parser->parser);
     }
+  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TREE_SITTER_NODE))
+    {
+    }
 #endif
 #ifdef HAVE_SQLITE3
   else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_SQLITE))

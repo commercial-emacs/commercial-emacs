@@ -26,22 +26,33 @@ typedef TSLanguage *(*TSLanguageFunctor) (void);
 typedef Lisp_Object (*HighlightsFunctor) (const TSHighlightEventSlice *, const TSNode *, const char **);
 
 static Lisp_Object
-make_tree_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
+make_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
 {
-  struct Lisp_Tree_Sitter *sitter
-    = ALLOCATE_PSEUDOVECTOR
-    (struct Lisp_Tree_Sitter, progmode, PVEC_TREE_SITTER);
+  struct Lisp_Tree_Sitter *ptr =
+    ALLOCATE_PSEUDOVECTOR (struct Lisp_Tree_Sitter, progmode, PVEC_TREE_SITTER);
 
   CHECK_SYMBOL (progmode_arg);
 
-  sitter->progmode = progmode_arg;
-  sitter->parser = parser;
-  sitter->prev_tree = NULL;
-  sitter->tree = tree;
-  sitter->highlighter = NULL;
-  sitter->highlight_names = NULL;
-  sitter->highlights_query = NULL;
-  return make_lisp_ptr (sitter, Lisp_Vectorlike);
+  ptr->progmode = progmode_arg;
+  ptr->parser = parser;
+  ptr->prev_tree = NULL;
+  ptr->tree = tree;
+  ptr->highlighter = NULL;
+  ptr->highlight_names = NULL;
+  ptr->highlights_query = NULL;
+  return make_lisp_ptr (ptr, Lisp_Vectorlike);
+}
+
+/* I would make this a Lisp_Misc_Ptr or PVEC_OTHER but TSNode are
+   stack-allocated structs and I need CHECK_TREE_SITTER_NODE.  */
+
+static Lisp_Object
+make_node (TSNode node)
+{
+  struct Lisp_Tree_Sitter_Node *ptr =
+    ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Tree_Sitter_Node, PVEC_TREE_SITTER_NODE);
+  ptr->node = node;
+  return make_lisp_ptr (ptr, Lisp_Vectorlike);
 }
 
 static TSLanguageFunctor
@@ -105,7 +116,7 @@ tree_sitter_create (Lisp_Object progmode)
     {
       TSParser *ts_parser = ts_parser_new ();
       ts_parser_set_language (ts_parser, fn ());
-      tree_sitter = make_tree_sitter (ts_parser, NULL, progmode);
+      tree_sitter = make_sitter (ts_parser, NULL, progmode);
     }
   return tree_sitter;
 }
@@ -469,6 +480,87 @@ DEFUN ("tree-sitter-ppss",
   return retval;
 }
 
+DEFUN ("tree-sitter-node-at",
+       Ftree_sitter_node_at, Stree_sitter_node_at,
+       0, 1, 0,
+       doc: /* Return TSNode at POS. */)
+  (Lisp_Object pos)
+{
+  TSNode node;
+  const TSTree *tree;
+  Lisp_Object sitter = Ftree_sitter (Fcurrent_buffer ());
+
+  if (NILP (pos))
+    pos = Fpoint ();
+
+  CHECK_FIXNUM (pos);
+
+  if (NILP (sitter))
+    return Qnil;
+
+  tree = XTREE_SITTER (sitter)->tree;
+  if (tree == NULL)
+    return Qnil;
+
+  node = ts_tree_node_at (tree, BUFFER_TO_SITTER (XFIXNUM (pos)));
+  if (ts_node_is_null (node)
+      || XFIXNUM (pos) < SITTER_TO_BUFFER (ts_node_start_byte (node))
+      || XFIXNUM (pos) >= SITTER_TO_BUFFER (ts_node_end_byte (node)))
+    return Qnil;
+
+  return make_node (node);
+}
+
+DEFUN ("tree-sitter-node-type",
+       Ftree_sitter_node_type, Stree_sitter_node_type,
+       1, 1, 0,
+       doc: /* Return type of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
+    ? Qnil
+    : build_string (ts_node_type (XTREE_SITTER_NODE (node)->node));
+}
+
+DEFUN ("tree-sitter-node-start",
+       Ftree_sitter_node_start, Stree_sitter_node_start,
+       1, 1, 0,
+       doc: /* Return beginning charpos of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
+    ? Qnil
+    : make_fixnum
+    (SITTER_TO_BUFFER (ts_node_start_byte (XTREE_SITTER_NODE (node)->node)));
+}
+
+DEFUN ("tree-sitter-node-end",
+       Ftree_sitter_node_end, Stree_sitter_node_end,
+       1, 1, 0,
+       doc: /* Return one-past charpos of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
+    ? Qnil
+    : make_fixnum
+    (SITTER_TO_BUFFER (ts_node_end_byte (XTREE_SITTER_NODE (node)->node)));
+}
+
 DEFUN ("tree-sitter-highlights",
        Ftree_sitter_highlights, Stree_sitter_highlights,
        2, 2, "r",
@@ -656,6 +748,7 @@ syms_of_tree_sitter (void)
   DEFSYM (Qtree_sitter_query_error, "tree-sitter-query-error");
   DEFSYM (Qtree_sitter_language_error, "tree-sitter-language-error");
   DEFSYM (Qtree_sitterp, "tree-sitterp");
+  DEFSYM (Qtree_sitter_nodep, "tree-sitter-nodep");
   DEFSYM (Qjit_lock_chunk_size, "jit-lock-chunk-size");
 
   define_error (Qtree_sitter_error, "Generic tree-sitter exception", Qerror);
@@ -678,6 +771,10 @@ syms_of_tree_sitter (void)
 
   defsubr (&Stree_sitter);
   defsubr (&Stree_sitter_root_node);
+  defsubr (&Stree_sitter_node_at);
+  defsubr (&Stree_sitter_node_type);
+  defsubr (&Stree_sitter_node_start);
+  defsubr (&Stree_sitter_node_end);
   defsubr (&Stree_sitter_ppss);
   defsubr (&Stree_sitter_highlights);
   defsubr (&Stree_sitter_highlight_region);

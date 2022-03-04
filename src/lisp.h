@@ -1072,6 +1072,7 @@ enum pvec_type
   PVEC_NATIVE_COMP_UNIT,
   PVEC_SQLITE,
   PVEC_TREE_SITTER,
+  PVEC_TREE_SITTER_NODE,
 
   /* These should be last, for internal_equal and sxhash_obj.  */
   PVEC_COMPILED,
@@ -1319,6 +1320,7 @@ dead_object (void)
 #define XSETCONDVAR(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_CONDVAR))
 #define XSETNATIVE_COMP_UNIT(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_NATIVE_COMP_UNIT))
 #define XSETTREE_SITTER(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_TREE_SITTER))
+#define XSETTREE_SITTER_NODE(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_TREE_SITTER_NODE))
 
 /* Efficiently convert a pointer to a Lisp object and back.  The
    pointer is represented as a fixnum, so the garbage collector
