@@ -1077,7 +1077,7 @@ be finished later after the completion of an asynchronous subprocess."
   (cond
    ((not (listp form))
     (list 'quote (eval form)))
-   ((memq (car form) '(quote function))
+   ((memq (car form) '(quote function lambda))
     form)
    (t
     ;; skip past the call to `eshell-do-eval'
