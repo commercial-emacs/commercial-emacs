@@ -2379,24 +2379,21 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
          header line and mode line.  */
       if (x < text_left_x && !s->row->mode_line_p)
 	{
-	  int left_x = WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (s->w);
-	  int right_x = text_left_x;
+	  int background_width = s->background_width;
+	  int x = s->x, text_left_x = window_box_left (s->w, TEXT_AREA);
 
-	  if (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (s->w))
-	    left_x += WINDOW_LEFT_FRINGE_WIDTH (s->w);
-	  else
-	    right_x -= WINDOW_LEFT_FRINGE_WIDTH (s->w);
-
-	  /* Adjust X and BACKGROUND_WIDTH to fit inside the space
-	     between LEFT_X and RIGHT_X.  */
-	  if (x < left_x)
+	  /* Don't draw into left fringe or scrollbar area except for
+	     header line and mode line.  */
+	  if (s->area == TEXT_AREA
+	      && x < text_left_x && !s->row->mode_line_p)
 	    {
-	      background_width -= left_x - x;
-	      x = left_x;
+	      background_width -= text_left_x - x;
+	      x = text_left_x;
 	    }
-	  if (x + background_width > right_x)
-	    background_width = right_x - x;
+	  if (background_width > 0)
+	    x_draw_glyph_string_bg_rect (s, x, s->y, background_width, s->height);
 	}
+
       if (background_width > 0)
 	x_draw_glyph_string_bg_rect (s, x, s->y, background_width, s->height);
     }
@@ -3573,9 +3570,22 @@ pgtk_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
 	}
     }
 
-  if (p->which && p->which < max_fringe_bmp)
+  if (p->which
+      && p->which < max_fringe_bmp
+      && p->which < max_used_fringe_bitmap)
     {
       Emacs_GC gcv;
+
+      if (!fringe_bmp[p->which])
+	{
+	  /* This fringe bitmap is known to fringe.c, but lacks the
+	     cairo_pattern_t pattern which shadows that bitmap.  This
+	     is typical to define-fringe-bitmap being called when the
+	     selected frame was not a GUI frame, for example, when
+	     packages that define fringe bitmaps are loaded by a
+	     daemon Emacs.  Create the missing pattern now.  */
+	  gui_define_fringe_bitmap (f, p->which);
+	}
 
       gcv.foreground = (p->cursor_p
 			? (p->overlay_p ? face->background
