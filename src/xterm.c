@@ -5983,6 +5983,12 @@ x_scroll_run (struct window *w, struct run *run)
     }
 #endif
 
+  /* Some of the following code depends on `normal_gc' being
+     up-to-date on the X server, but doesn't call a routine that will
+     flush it first.  So do this ourselves instead.  */
+  XFlushGC (FRAME_X_DISPLAY (f),
+	    f->output_data.x->normal_gc);
+
 #ifdef USE_CAIRO
   if (FRAME_CR_CONTEXT (f))
     {
@@ -6037,24 +6043,12 @@ x_scroll_run (struct window *w, struct run *run)
     }
   else
 #endif	/* USE_CAIRO */
-    {
-#ifdef HAVE_XRENDER
-      /* Avoid useless NoExpose events.  This way, we only get regular
-	 exposure events when there is actually something to
-	 expose.  */
-      if (FRAME_X_PICTURE (f) != None)
-	XRenderComposite (FRAME_X_DISPLAY (f), PictOpSrc, FRAME_X_PICTURE (f),
-			  None, FRAME_X_PICTURE (f), x, from_y, 0, 0, x, to_y,
-			  width, height);
-      else
-#endif
-	XCopyArea (FRAME_X_DISPLAY (f),
-		   FRAME_X_DRAWABLE (f), FRAME_X_DRAWABLE (f),
-		   f->output_data.x->normal_gc,
-		   x, from_y,
-		   width, height,
-		   x, to_y);
-    }
+    XCopyArea (FRAME_X_DISPLAY (f),
+	       FRAME_X_DRAWABLE (f), FRAME_X_DRAWABLE (f),
+	       f->output_data.x->normal_gc,
+	       x, from_y,
+	       width, height,
+	       x, to_y);
 
   unblock_input ();
 }
@@ -10367,6 +10361,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
     case NoExpose:		/* This occurs when an XCopyArea's
                                    source area was completely
                                    available.  */
+#ifdef USE_X_TOOLKIT
+      *finish = X_EVENT_DROP;
+#endif
       break;
 
     case UnmapNotify:

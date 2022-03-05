@@ -3152,95 +3152,70 @@ list_system_processes (void)
 
 #endif /* !defined (WINDOWSNT) */
 
+#if defined __FreeBSD__ || defined DARWIN_OS || defined __OpenBSD__
+
+static Lisp_Object
+make_lisp_s_us (time_t s, long us)
+{
+  Lisp_Object sec = make_int (s);
+  Lisp_Object usec = make_fixnum (us);
+  Lisp_Object hz = make_fixnum (1000000);
+  Lisp_Object ticks = CALLN (Fplus, CALLN (Ftimes, sec, hz), usec);
+  return Ftime_convert (Fcons (ticks, hz), Qnil);
+}
+
+#endif
 
 #if defined __FreeBSD__ || defined DARWIN_OS
 
-static struct timespec
-timeval_to_timespec (struct timeval t)
-{
-  return make_timespec (t.tv_sec, t.tv_usec * 1000);
-}
 static Lisp_Object
 make_lisp_timeval (struct timeval t)
 {
-  return make_lisp_time (timeval_to_timespec (t));
-}
-
-#elif defined __OpenBSD__
-
-static Lisp_Object
-make_lisp_timeval (long sec, long usec)
-{
-  return make_lisp_time(make_timespec(sec, usec * 1000));
+  return make_lisp_s_us (t.tv_sec, t.tv_usec);
 }
 
 #endif
 
 #ifdef GNU_LINUX
-static struct timespec
-time_from_jiffies (unsigned long long tval, long hz)
+
+static Lisp_Object
+time_from_jiffies (unsigned long long ticks, Lisp_Object hz, Lisp_Object form)
 {
-  unsigned long long s = tval / hz;
-  unsigned long long frac = tval % hz;
-  int ns;
-
-  if (TYPE_MAXIMUM (time_t) < s)
-    time_overflow ();
-  if (LONG_MAX - 1 <= ULLONG_MAX / TIMESPEC_HZ
-      || frac <= ULLONG_MAX / TIMESPEC_HZ)
-    ns = frac * TIMESPEC_HZ / hz;
-  else
-    {
-      /* This is reachable only in the unlikely case that HZ * HZ
-	 exceeds ULLONG_MAX.  It calculates an approximation that is
-	 guaranteed to be in range.  */
-      long hz_per_ns = hz / TIMESPEC_HZ + (hz % TIMESPEC_HZ != 0);
-      ns = frac / hz_per_ns;
-    }
-
-  return make_timespec (s, ns);
+  return Ftime_convert (Fcons (make_uint (ticks), hz), form);
 }
 
 static Lisp_Object
-ltime_from_jiffies (unsigned long long tval, long hz)
+put_jiffies (Lisp_Object attrs, Lisp_Object propname,
+	     unsigned long long ticks, Lisp_Object hz)
 {
-  struct timespec t = time_from_jiffies (tval, hz);
-  return make_lisp_time (t);
+  return Fcons (Fcons (propname, time_from_jiffies (ticks, hz, Qnil)), attrs);
 }
 
-static struct timespec
+static Lisp_Object
 get_up_time (void)
 {
   FILE *fup;
-  struct timespec up = make_timespec (0, 0);
+  Lisp_Object up = Qnil;
 
   block_input ();
   fup = emacs_fopen ("/proc/uptime", "r");
 
   if (fup)
     {
-      unsigned long long upsec, upfrac;
+      unsigned long long upsec;
+      EMACS_UINT upfrac;
       int upfrac_start, upfrac_end;
 
-      if (fscanf (fup, "%llu.%n%llu%n",
+      if (fscanf (fup, "%llu.%n%"pI"u%n",
 		  &upsec, &upfrac_start, &upfrac, &upfrac_end)
 	  == 2)
 	{
-	  if (TYPE_MAXIMUM (time_t) < upsec)
-	    {
-	      upsec = TYPE_MAXIMUM (time_t);
-	      upfrac = TIMESPEC_HZ - 1;
-	    }
-	  else
-	    {
-	      int upfraclen = upfrac_end - upfrac_start;
-	      for (; upfraclen < LOG10_TIMESPEC_HZ; upfraclen++)
-		upfrac *= 10;
-	      for (; LOG10_TIMESPEC_HZ < upfraclen; upfraclen--)
-		upfrac /= 10;
-	      upfrac = min (upfrac, TIMESPEC_HZ - 1);
-	    }
-	  up = make_timespec (upsec, upfrac);
+	  EMACS_INT hz = 1;
+	  for (int i = upfrac_start; i < upfrac_end; i++)
+	    hz *= 10;
+	  Lisp_Object sec = make_uint (upsec);
+	  Lisp_Object subsec = Fcons (make_fixnum (upfrac), make_fixnum (hz));
+	  up = Ftime_add (sec, subsec);
 	}
       fclose (fup);
     }
@@ -3361,7 +3336,6 @@ system_process_attributes (Lisp_Object pid)
   unsigned long long u_time, s_time, cutime, cstime, start;
   long priority, niceness, rss;
   unsigned long minflt, majflt, cminflt, cmajflt, vsize;
-  struct timespec tnow, tstart, tboot, telapsed, us_time;
   double pcpu, pmem;
   Lisp_Object attrs = Qnil;
   Lisp_Object decoded_cmd;
@@ -3449,47 +3423,41 @@ system_process_attributes (Lisp_Object pid)
 	  attrs = Fcons (Fcons (Qmajflt, INT_TO_INTEGER (majflt)), attrs);
 	  attrs = Fcons (Fcons (Qcminflt, INT_TO_INTEGER (cminflt)), attrs);
 	  attrs = Fcons (Fcons (Qcmajflt, INT_TO_INTEGER (cmajflt)), attrs);
+
 	  clocks_per_sec = sysconf (_SC_CLK_TCK);
-	  if (clocks_per_sec < 0)
-	    clocks_per_sec = 100;
-	  attrs = Fcons (Fcons (Qutime,
-				ltime_from_jiffies (u_time, clocks_per_sec)),
-			 attrs);
-	  attrs = Fcons (Fcons (Qstime,
-				ltime_from_jiffies (s_time, clocks_per_sec)),
-			 attrs);
-	  attrs = Fcons (Fcons (Qtime,
-				ltime_from_jiffies (s_time + u_time,
-						    clocks_per_sec)),
-			 attrs);
-	  attrs = Fcons (Fcons (Qcutime,
-				ltime_from_jiffies (cutime, clocks_per_sec)),
-			 attrs);
-	  attrs = Fcons (Fcons (Qcstime,
-				ltime_from_jiffies (cstime, clocks_per_sec)),
-			 attrs);
-	  attrs = Fcons (Fcons (Qctime,
-				ltime_from_jiffies (cstime + cutime,
-						    clocks_per_sec)),
-			 attrs);
+	  if (0 < clocks_per_sec)
+	    {
+	      Lisp_Object hz = make_int (clocks_per_sec);
+	      attrs = put_jiffies (attrs, Qutime, u_time, hz);
+	      attrs = put_jiffies (attrs, Qstime, s_time, hz);
+	      attrs = put_jiffies (attrs, Qtime, s_time + u_time, hz);
+	      attrs = put_jiffies (attrs, Qcutime, cutime, hz);
+	      attrs = put_jiffies (attrs, Qcstime, cstime, hz);
+	      attrs = put_jiffies (attrs, Qctime, cstime + cutime, hz);
+
+	      Lisp_Object uptime = get_up_time ();
+	      if (!NILP (uptime))
+		{
+		  Lisp_Object now = Ftime_convert (Qnil, hz);
+		  Lisp_Object boot = Ftime_subtract (now, uptime);
+		  Lisp_Object tstart = time_from_jiffies (start, hz, hz);
+		  Lisp_Object lstart =
+		    Ftime_convert (Ftime_add (boot, tstart), Qnil);
+		  attrs = Fcons (Fcons (Qstart, lstart), attrs);
+		  Lisp_Object etime =
+		    Ftime_convert (Ftime_subtract (uptime, tstart), Qnil);
+		  attrs = Fcons (Fcons (Qetime, etime), attrs);
+		  pcpu = (100.0 * (s_time + u_time)
+			  / (clocks_per_sec * float_time (etime)));
+		  attrs = Fcons (Fcons (Qpcpu, make_float (pcpu)), attrs);
+		}
+	    }
+
 	  attrs = Fcons (Fcons (Qpri, make_fixnum (priority)), attrs);
 	  attrs = Fcons (Fcons (Qnice, make_fixnum (niceness)), attrs);
 	  attrs = Fcons (Fcons (Qthcount, INT_TO_INTEGER (thcount)), attrs);
-	  tnow = current_timespec ();
-	  telapsed = get_up_time ();
-	  tboot = timespec_sub (tnow, telapsed);
-	  tstart = time_from_jiffies (start, clocks_per_sec);
-	  tstart = timespec_add (tboot, tstart);
-	  attrs = Fcons (Fcons (Qstart, make_lisp_time (tstart)), attrs);
 	  attrs = Fcons (Fcons (Qvsize, INT_TO_INTEGER (vsize / 1024)), attrs);
 	  attrs = Fcons (Fcons (Qrss, INT_TO_INTEGER (4 * rss)), attrs);
-	  telapsed = timespec_sub (tnow, tstart);
-	  attrs = Fcons (Fcons (Qetime, make_lisp_time (telapsed)), attrs);
-	  us_time = time_from_jiffies (u_time + s_time, clocks_per_sec);
-	  pcpu = timespectod (us_time) / timespectod (telapsed);
-	  if (pcpu > 1.0)
-	    pcpu = 1.0;
-	  attrs = Fcons (Fcons (Qpcpu, make_float (100 * pcpu)), attrs);
 	  pmem = 4.0 * 100 * rss / procfs_get_total_memory ();
 	  if (pmem > 100)
 	    pmem = 100;
@@ -3706,7 +3674,6 @@ system_process_attributes (Lisp_Object pid)
   char *ttyname;
   size_t len;
   char args[MAXPATHLEN];
-  struct timespec t, now;
 
   int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID};
   struct kinfo_proc proc;
@@ -3787,35 +3754,30 @@ system_process_attributes (Lisp_Object pid)
   attrs = Fcons (Fcons (Qcminflt, make_fixnum (proc.ki_rusage_ch.ru_minflt)), attrs);
   attrs = Fcons (Fcons (Qcmajflt, make_fixnum (proc.ki_rusage_ch.ru_majflt)), attrs);
 
-  attrs = Fcons (Fcons (Qutime, make_lisp_timeval (proc.ki_rusage.ru_utime)),
-		 attrs);
-  attrs = Fcons (Fcons (Qstime, make_lisp_timeval (proc.ki_rusage.ru_stime)),
-		 attrs);
-  t = timespec_add (timeval_to_timespec (proc.ki_rusage.ru_utime),
-		    timeval_to_timespec (proc.ki_rusage.ru_stime));
-  attrs = Fcons (Fcons (Qtime, make_lisp_time (t)), attrs);
+  Lisp_Object utime = make_lisp_timeval (proc.ki_rusage.ru_utime);
+  attrs = Fcons (Fcons (Qutime, utime), attrs);
+  Lisp_Object stime = make_lisp_timeval (proc.ki_rusage.ru_stime);
+  attrs = Fcons (Fcons (Qstime, stime), attrs);
+  attrs = Fcons (Fcons (Qtime, Ftime_add (utime, stime)), attrs);
 
-  attrs = Fcons (Fcons (Qcutime,
-			make_lisp_timeval (proc.ki_rusage_ch.ru_utime)),
-		 attrs);
-  attrs = Fcons (Fcons (Qcstime,
-			make_lisp_timeval (proc.ki_rusage_ch.ru_utime)),
-		 attrs);
-  t = timespec_add (timeval_to_timespec (proc.ki_rusage_ch.ru_utime),
-		    timeval_to_timespec (proc.ki_rusage_ch.ru_stime));
-  attrs = Fcons (Fcons (Qctime, make_lisp_time (t)), attrs);
+  Lisp_Object cutime = make_lisp_timeval (proc.ki_rusage_ch.ru_utime);
+  attrs = Fcons (Fcons (Qcutime, cutime), attrs);
+  Lisp_Object cstime = make_lisp_timeval (proc.ki_rusage_ch.ru_stime);
+  attrs = Fcons (Fcons (Qcstime, cstime), attrs);
+  attrs = Fcons (Fcons (Qctime, Ftime_add (cutime, cstime)), attrs);
 
   attrs = Fcons (Fcons (Qthcount, INT_TO_INTEGER (proc.ki_numthreads)), attrs);
   attrs = Fcons (Fcons (Qpri,   make_fixnum (proc.ki_pri.pri_native)), attrs);
   attrs = Fcons (Fcons (Qnice,  make_fixnum (proc.ki_nice)), attrs);
-  attrs = Fcons (Fcons (Qstart, make_lisp_timeval (proc.ki_start)), attrs);
+  Lisp_Object start = make_lisp_timeval (proc.ki_start);
+  attrs = Fcons (Fcons (Qstart, start), attrs);
   attrs = Fcons (Fcons (Qvsize, make_fixnum (proc.ki_size >> 10)), attrs);
   attrs = Fcons (Fcons (Qrss,   make_fixnum (proc.ki_rssize * pagesize >> 10)),
 		 attrs);
 
-  now = current_timespec ();
-  t = timespec_sub (now, timeval_to_timespec (proc.ki_start));
-  attrs = Fcons (Fcons (Qetime, make_lisp_time (t)), attrs);
+  Lisp_Object now = Ftime_convert (Qnil, make_fixnum (1000000));
+  Lisp_Object etime = Ftime_convert (Ftime_subtract (now, start), Qnil);
+  attrs = Fcons (Fcons (Qetime, etime), attrs);
 
   len = sizeof fscale;
   if (sysctlbyname ("kern.fscale", &fscale, &len, NULL, 0) == 0)
@@ -3875,7 +3837,6 @@ system_process_attributes (Lisp_Object pid)
   struct kinfo_proc proc;
   struct passwd *pw;
   struct group *gr;
-  struct timespec t;
   struct uvmexp uvmexp;
 
   Lisp_Object attrs = Qnil;
@@ -3957,20 +3918,14 @@ system_process_attributes (Lisp_Object pid)
 
   /* FIXME: missing cminflt, cmajflt. */
 
-  attrs = Fcons (Fcons (Qutime, make_lisp_timeval (proc.p_uutime_sec,
-						   proc.p_uutime_usec)),
-		 attrs);
-  attrs = Fcons (Fcons (Qstime, make_lisp_timeval (proc.p_ustime_sec,
-						   proc.p_ustime_usec)),
-		 attrs);
-  t = timespec_add (make_timespec (proc.p_uutime_sec,
-				   proc.p_uutime_usec * 1000),
-		    make_timespec (proc.p_ustime_sec,
-				   proc.p_ustime_usec * 1000));
-  attrs = Fcons (Fcons (Qtime, make_lisp_time (t)), attrs);
+  Lisp_Object utime = make_lisp_s_us (proc.p_uutime_sec, proc.p_uutime_usec);
+  attrs = Fcons (Fcons (Qutime, utime), attrs);
+  Lisp_Object stime = make_lisp_s_us (proc.p_ustime_sec, proc.p_ustime_usec);
+  attrs = Fcons (Fcons (Qstime, stime), attrs);
+  attrs = Fcons (Fcons (Qtime, Ftime_add (utime, stime)), attrs);
 
-  attrs = Fcons (Fcons (Qcutime, make_lisp_timeval (proc.p_uctime_sec,
-						    proc.p_uctime_usec)),
+  attrs = Fcons (Fcons (Qcutime, make_lisp_s_us (proc.p_uctime_sec,
+						 proc.p_uctime_usec)),
 		 attrs);
 
   /* FIXME: missing cstime and thus ctime. */
@@ -3980,8 +3935,8 @@ system_process_attributes (Lisp_Object pid)
 
   /* FIXME: missing thcount (thread count) */
 
-  attrs = Fcons (Fcons (Qstart, make_lisp_timeval (proc.p_ustart_sec,
-						   proc.p_ustart_usec)),
+  attrs = Fcons (Fcons (Qstart, make_lisp_s_us (proc.p_ustart_sec,
+						proc.p_ustart_usec)),
 		 attrs);
 
   len = (proc.p_vm_tsize + proc.p_vm_dsize + proc.p_vm_ssize) * pagesize >> 10;
@@ -3990,10 +3945,11 @@ system_process_attributes (Lisp_Object pid)
   attrs = Fcons (Fcons (Qrss,   make_fixnum (proc.p_vm_rssize * pagesize >> 10)),
 		 attrs);
 
-  t = make_timespec (proc.p_ustart_sec,
-		     proc.p_ustart_usec * 1000);
-  t = timespec_sub (current_timespec (), t);
-  attrs = Fcons (Fcons (Qetime, make_lisp_time (t)), attrs);
+  Lisp_Object now = Ftime_convert (Qnil, make_fixnum (1000000));
+  Lisp_Object start = make_lisp_s_us (proc.p_ustart_sec,
+				      proc.p_ustart_usec);
+  Lisp_Object etime = Ftime_convert (Ftime_subtract (now, start), Qnil);
+  attrs = Fcons (Fcons (Qetime, etime), attrs);
 
   len = sizeof (fscale);
   mib[0] = CTL_KERN;
@@ -4054,7 +4010,6 @@ system_process_attributes (Lisp_Object pid)
   struct group  *gr;
   char *ttyname;
   struct timeval starttime;
-  struct timespec t, now;
   dev_t tdev;
   uid_t uid;
   gid_t gid;
@@ -4165,11 +4120,12 @@ system_process_attributes (Lisp_Object pid)
 
   starttime = proc.kp_proc.p_starttime;
   attrs = Fcons (Fcons (Qnice,  make_fixnum (proc.kp_proc.p_nice)), attrs);
-  attrs = Fcons (Fcons (Qstart, make_lisp_timeval (starttime)), attrs);
+  Lisp_Object start = make_lisp_timeval (starttime);
+  attrs = Fcons (Fcons (Qstart, start), attrs);
 
-  now = current_timespec ();
-  t = timespec_sub (now, timeval_to_timespec (starttime));
-  attrs = Fcons (Fcons (Qetime, make_lisp_time (t)), attrs);
+  Lisp_Object now = Ftime_convert (Qnil, make_fixnum (1000000));
+  Lisp_Object etime = Ftime_convert (Ftime_subtract (now, start), Qnil);
+  attrs = Fcons (Fcons (Qetime, etime), attrs);
 
   struct proc_taskinfo taskinfo;
   if (proc_pidinfo (proc_id, PROC_PIDTASKINFO, 0, &taskinfo, sizeof (taskinfo)) > 0)
