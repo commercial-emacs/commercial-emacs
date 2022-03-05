@@ -261,9 +261,9 @@ for example, (type-of 1) returns `integer'.  */)
 	case PVEC_SQLITE:
           return Qsqlite;
 	case PVEC_TREE_SITTER:
-	  return Qtree_sitter_parser;
+	  return Qtree_sitter;
 	case PVEC_TREE_SITTER_NODE:
-	  return Qtree_sitter_parser;
+	  return Qtree_sitter_node;
         /* "Impossible" cases.  */
 	case PVEC_MISC_PTR:
         case PVEC_OTHER:
@@ -4105,7 +4105,8 @@ syms_of_data (void)
   DEFSYM (Qterminal, "terminal");
   DEFSYM (Qxwidget, "xwidget");
   DEFSYM (Qxwidget_view, "xwidget-view");
-  DEFSYM (Qtree_sitter_parser, "tree-sitter-parser");
+  DEFSYM (Qtree_sitter, "tree-sitter");
+  DEFSYM (Qtree_sitter_node, "tree-sitter-node");
   DEFSYM (Qsqlite, "sqlite");
 
   DEFSYM (Qdefun, "defun");
