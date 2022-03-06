@@ -215,7 +215,7 @@ add_watch (int wd, Lisp_Object filename,
 
   /* Sort-preserving splice of new watch into the gap at WATCHES.  */
   XSETCDR (watches, Fcons (list4 (make_fixnum (idx), filename, callback, mask),
-			XCDR (watches)));
+			   XCDR (watches)));
 
   return Fcons (descriptor, make_fixnum (idx));
 }
