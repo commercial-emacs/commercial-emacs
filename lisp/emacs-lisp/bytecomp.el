@@ -4856,8 +4856,6 @@ OP and OPERAND are as passed to `byte-compile-out'."
   "Push the operation onto `byte-compile-output'.
 OP is an opcode, a symbol.  OPERAND is either nil or a number or
 a one-element list of a lisp form."
-  (when (and (consp operand) (null (cdr operand)))
-    (setq operand (byte-run-strip-symbol-positions operand)))
   (push (cons op operand) byte-compile-output)
   (if (eq op 'byte-return)
       ;; Consider abort since byte-return no longer produces ops
