@@ -283,6 +283,9 @@ struct x_display_info
   /* The Visual being used for this display.  */
   Visual *visual;
 
+  /* The visual information corresponding to VISUAL.  */
+  XVisualInfo visual_info;
+
 #ifdef HAVE_XRENDER
   /* The picture format for this display.  */
   XRenderPictFormat *pict_format;
@@ -1031,6 +1034,9 @@ extern void x_mark_frame_dirty (struct frame *f);
 /* This is the Visual which frame F is on.  */
 #define FRAME_X_VISUAL(f) FRAME_DISPLAY_INFO (f)->visual
 
+/* And its corresponding visual info.  */
+#define FRAME_X_VISUAL_INFO(f) (&FRAME_DISPLAY_INFO (f)->visual_info)
+
 #ifdef HAVE_XRENDER
 #define FRAME_X_PICTURE_FORMAT(f) FRAME_DISPLAY_INFO (f)->pict_format
 #define FRAME_X_PICTURE(f) ((f)->output_data.x->picture)
@@ -1314,7 +1320,7 @@ extern void x_clear_area (struct frame *f, int, int, int, int);
 extern void x_mouse_leave (struct x_display_info *);
 #endif
 
-#if defined USE_X_TOOLKIT || defined USE_MOTIF
+#ifndef USE_GTK
 extern int x_dispatch_event (XEvent *, Display *);
 #endif
 extern int x_x_to_emacs_modifiers (struct x_display_info *, int);
