@@ -434,13 +434,15 @@ Possible options are:
           (throw 'eshell-incomplete ?\{)
         (forward-char)
         (prog1
-            `(eshell-convert
-              (eshell-command-to-value
-               (eshell-as-subcommand
-                ,(let ((subcmd (or (eshell-parse-inner-double-quote end)
-                                   (cons (point) end)))
-                       (eshell-current-quoted nil))
-                   (eshell-parse-command subcmd)))))
+            `(eshell-apply-indices
+              (eshell-convert
+               (eshell-command-to-value
+                (eshell-as-subcommand
+                 ,(let ((subcmd (or (eshell-unescape-inner-double-quote end)
+                                    (cons (point) end)))
+                        (eshell-current-quoted nil))
+                    (eshell-parse-command subcmd)))))
+              indices)
           (goto-char (1+ end))))))
    ((eq (char-after) ?\<)
     (let ((end (eshell-find-delimiter ?\< ?\>)))
@@ -464,19 +466,23 @@ Possible options are:
                            ;; properly.  See bug#54190.
                            (list (function (lambda ()
                                    (delete-file ,temp))))))
-                   (quote ,temp)))
+                   (eshell-apply-indices ,temp indices)))
             (goto-char (1+ end)))))))
    ((eq (char-after) ?\()
     (condition-case nil
-        `(eshell-command-to-value
-          (eshell-lisp-command
-           ',(read (or (eshell-parse-inner-double-quote (point-max))
-                       (current-buffer)))))
+        `(eshell-apply-indices
+          (eshell-command-to-value
+           (eshell-lisp-command
+            ',(read (or (eshell-unescape-inner-double-quote (point-max))
+                        (current-buffer)))))
+          indices)
       (end-of-file
        (throw 'eshell-incomplete ?\())))
-   ((looking-at (rx (or "'" "\"" "\\\"")))
-    (eshell-with-temp-command (or (eshell-parse-inner-double-quote (point-max))
-                                  (cons (point) (point-max)))
+   ((looking-at (rx-to-string
+                 `(or "'" ,(if eshell-current-quoted "\\\"" "\""))))
+    (eshell-with-temp-command
+        (or (eshell-unescape-inner-double-quote (point-max))
+            (cons (point) (point-max)))
       (let ((name (if (eq (char-after) ?\')
                       (eshell-parse-literal-quote)
                     (eshell-parse-double-quote))))
@@ -506,7 +512,7 @@ For example, \"[0 1][2]\" becomes:
 	(if (not end)
 	    (throw 'eshell-incomplete ?\[)
 	  (forward-char)
-          (eshell-with-temp-command (or (eshell-parse-inner-double-quote end)
+          (eshell-with-temp-command (or (eshell-unescape-inner-double-quote end)
                                         (cons (point) end))
 	    (let (eshell-glob-function (eshell-current-quoted nil))
 	      (setq indices (cons (eshell-parse-arguments
