@@ -5022,7 +5022,7 @@ DEFUN ("xw-display-color-p", Fxw_display_color_p, Sxw_display_color_p, 0, 1, 0,
   if (dpyinfo->n_planes <= 2)
     return Qnil;
 
-  switch (dpyinfo->visual->class)
+  switch (dpyinfo->visual_info.class)
     {
     case StaticColor:
     case PseudoColor:
@@ -5049,7 +5049,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
   if (dpyinfo->n_planes <= 1)
     return Qnil;
 
-  switch (dpyinfo->visual->class)
+  switch (dpyinfo->visual_info.class)
     {
     case StaticColor:
     case PseudoColor:
@@ -5329,7 +5329,7 @@ If omitted or nil, that stands for the selected frame's display.
   struct x_display_info *dpyinfo = check_x_display_info (terminal);
   Lisp_Object result;
 
-  switch (dpyinfo->visual->class)
+  switch (dpyinfo->visual_info.class)
     {
     case StaticGray:
       result = intern ("static-gray");
