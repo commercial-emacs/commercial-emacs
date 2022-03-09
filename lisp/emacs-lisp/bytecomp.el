@@ -135,6 +135,7 @@
 (autoload 'cl-destructuring-bind "cl-macs")
 (autoload 'cl-find-if "cl-seq")
 (autoload 'cl-labels "cl-macs")
+(autoload 'cl-remove-if "cl-seq")
 
 ;; The feature of compiling in a specific target Emacs version
 ;; has been turned off because compile time options are a bad idea.
@@ -282,6 +283,9 @@ Each element is (VAR . FILE), indicating that VAR is declared in FILE.")
 (defvar byte-compile--seen-defvars nil
   "All dynamic variable declarations seen so far.")
 
+(defvar byte-compile--seen-requires nil
+  "All required symbols seen so far.")
+
 (defcustom byte-optimize-log nil
   "If non-nil, the byte-compiler will log its optimizations.
 If this is `source', then only source-level optimizations will be logged.
@@ -313,7 +317,7 @@ The information is logged to `byte-compile-log-buffer'."
 Elements of the list may be:
 
   free-vars   references to variables not in the current lexical scope.
-  unresolved  calls to unknown functions.
+  unresolved  alias for undefined.
   callargs    function calls with args that don't match the definition.
   redefine    function name redefined from a macro to ordinary function or vice
               versa, or redefined to take a different number of arguments.
@@ -463,6 +467,21 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
 (defvar byte-compile-free-assignments)
 (defvar byte-compile-abort-elc nil)
 
+(defvar byte-compile--defined-funcs nil
+  "List of function symbols known to be defined at runtime.")
+
+(defvar byte-compile--undefined-funcs nil
+  "Alist of function symbols known to be undefined at runtime.
+Entries are of the form \(UNDEFINED-FUNC CHARPOS . ARITIES).
+CHARPOS is the best-efforts file position that lread.c first
+found a call.  Each direct call adds its argument count to the
+list ARITIES for the purpose of flagging inconsistent arities.
+ARITIES is the constant t if the function is only called
+indirectly.")
+
+(defvar byte-compile--noruntime-funcs nil
+  "List of function symbols only defined at compile-time.")
+
 (defun byte-compile-maybe-expand (form func)
   "Macroexpansion of top-level FORM could yield a progn.
 See CLHS section 3.2.3.1, *Processing of Top Level Forms*, and
@@ -484,10 +503,10 @@ bytecomp-tests.el for interesting cases."
                                (lambda (form)
                                  ;; Sandbox these defvars to forestall "not
                                  ;; defined at runtime" errors
-                                 (let ((byte-compile-unresolved-functions
-                                        byte-compile-unresolved-functions)
-                                       (byte-compile-new-defuns
-                                        byte-compile-new-defuns))
+                                 (let ((byte-compile--undefined-funcs
+                                        byte-compile--undefined-funcs)
+                                       (byte-compile--defined-funcs
+                                        byte-compile--defined-funcs))
                                    (setf result
                                          (byte-compile-eval
                                           (byte-compile-top-level
@@ -538,26 +557,6 @@ Each element looks like (FUNCTIONNAME . DEFINITION).  It is
 It is \(FUNCTIONNAME . t) when all we know is that it was defined,
 and we don't know the definition.  For an autoloaded function, DEFINITION
 has the form (autoload . FILENAME).")
-
-(defvar byte-compile-unresolved-functions nil
-  "Alist of undefined functions to which calls have been compiled.
-Each element in the list has the form (FUNCTION POSITION . CALLS)
-where CALLS is a list whose elements are integers (indicating the
-number of arguments passed in the function call) or the constant t
-if the function is called indirectly.
-This variable is only significant whilst compiling an entire buffer.
-Used for warnings when a function is not known to be defined or is later
-defined with incorrect args.")
-
-(defvar byte-compile-noruntime-functions nil
-  "Alist of functions called that may not be defined when the compiled code is run.
-Used for warnings about calling a function that is defined during compilation
-but won't necessarily be defined when the compiled file is loaded.")
-
-(defvar byte-compile-new-defuns nil
-  "List of (runtime) functions defined in this compilation run.
-This variable is used to qualify `byte-compile-noruntime-functions' when
-outputting warnings about functions not being defined at runtime.")
 
 ;; Variables for lexical binding
 (defvar byte-compile--lexical-environment nil
@@ -1009,33 +1008,29 @@ CONST2 may be evaluated multiple times."
                  byte-to-native-lambdas-h))
       bytecode)))
 
-
-;;; compile-time evaluation
-
 (defun byte-compile-eval (form)
-  "Eval FORM and mark the functions defined therein.
-Each function's symbol gets added to `byte-compile-noruntime-functions'."
+  "Eval FORM within compile-time `eval-when-compile' block.
+Update byte-compile--noruntime-funcs with new defuns, but not
+byte-compile--defined-funcs since definedness is a runtime
+notion."
   (let ((hist-orig load-history)
 	(hist-nil-orig current-load-list))
     (prog1 (eval form lexical-binding)
       (when (byte-compile-warning-enabled-p 'noruntime)
-	(let* ((hist-new
-	        ;; Get new `current-load-list' for the locally defined funs.
-	        (cons (butlast current-load-list
-	                       (length hist-nil-orig))
-	              load-history)))
-	  ;; Go through load-history, look for newly loaded files
-	  ;; and mark all the functions defined therein.
+	(let ((hist-new
+	       ;; Get new `current-load-list' for the locally defined funs.
+	       (cons (butlast current-load-list (length hist-nil-orig))
+	             load-history)))
 	  (while (and hist-new (not (eq hist-new hist-orig)))
 	    (let ((xs (pop hist-new)))
-	      ;; Make sure the file was not already loaded before.
+	      ;; Ensure file not already loaded.
 	      (unless (assoc (car xs) hist-orig)
 		(dolist (s xs)
 		  (pcase s
 		    (`(defun . ,f)
 		     (unless (seq-some #'autoloadp
 		                       (get (cdr s) 'function-history))
-                       (push f byte-compile-noruntime-functions)))))))))))))
+                       (push f byte-compile--noruntime-funcs)))))))))))))
 
 (defun byte-compile-eval-before-compile (form)
   "Evaluate FORM for `eval-and-compile'."
@@ -1439,29 +1434,40 @@ that means treat it as not defined."
                    finally return (or (first-atom result)
                                       (first-atom byte-compile-current-annotations))))))))
 
-(defun byte-compile-function-warn (f nargs def)
-  "Record unresolved F or inconsistent arity NARGS.
-F is considered resolved if auxiliary DEF includes it."
+(defun byte-compile-function-warn (f nargs &optional _def)
+  "Warn if function F or called with inconsistent NARGS."
   (when (and (get f 'byte-obsolete-info)
              (byte-compile-warning-enabled-p 'obsolete f))
     (byte-compile-warn-obsolete f))
-  (when (and (or (and (not def) (not (fboundp f)))
-                 (and (boundp 'cldefs-cl-lib-functions)
-                      (memq f cldefs-cl-lib-functions)
-                      ;; consider defining cl-incf as resolving all cl-lib
-                      (not (memq 'cl-incf byte-compile-new-defuns)))
-                 (memq f byte-compile-noruntime-functions))
-             (not (eq f byte-compile-current-func)))
-    (let ((cell (assq f byte-compile-unresolved-functions)))
-      (if cell
-          (unless (memq nargs (cddr cell))
-            ;; flag an inconsistent arity
-            (push nargs (cddr cell)))
-        (push (list f
-                    (let ((byte-compile-current-form f))
-                      (byte-compile-fuzzy-charpos))
-                    nargs)
-              byte-compile-unresolved-functions)))))
+  (let* ((compiled-def (or (byte-compile-fdefinition f nil)
+		           (byte-compile-fdefinition f t)))
+         (undefined-p
+          (or
+           ;; typical undefined user function
+           (and (not (memq f byte-compile--defined-funcs))
+                (not (fboundp f))
+                (not compiled-def))
+           ;; function only defined within eval-when-compile block
+           (and (not (memq f byte-compile--defined-funcs))
+                (memq f byte-compile--noruntime-funcs))
+           ;; cl-lib function without require of cl-lib (Bug#30635)
+           (and (boundp 'cldefs-cl-lib-functions)
+                (memq f cldefs-cl-lib-functions)
+                (cl-every (lambda (cl)
+                            (not (memq cl byte-compile--seen-requires)))
+                          '(cl-lib cl-seq cl-macs))))))
+    (when (and undefined-p
+               (not (eq f byte-compile-current-func)))
+      (let ((cell (assq f byte-compile--undefined-funcs)))
+        (if cell
+            (unless (memq nargs (cddr cell))
+              ;; flag an inconsistent arity
+              (push nargs (cddr cell)))
+          (push (list f
+                      (let ((byte-compile-current-form f))
+                        (byte-compile-fuzzy-charpos))
+                      nargs)
+                byte-compile--undefined-funcs))))))
 
 (defun byte-compile-emit-callargs-warn (name actual-args min-args max-args)
   (byte-compile-warn
@@ -1486,7 +1492,6 @@ F is considered resolved if auxiliary DEF includes it."
         (byte-compile-emit-callargs-warn
          (car form) actual-args min-args max-args)))))
 
-;; Warn if the form is calling a function with the wrong number of arguments.
 (defun byte-compile-callargs-warn (form)
   (let* ((def (or (byte-compile-fdefinition (car form) nil)
 		  (byte-compile-fdefinition (car form) t)))
@@ -1494,17 +1499,17 @@ F is considered resolved if auxiliary DEF includes it."
                     ((subrp (symbol-function (car form)))
                      (subr-arity (symbol-function (car form))))))
 	 (ncall (length (cdr form))))
-    ;; Check many or unevalled from subr-arity.
-    (if (and (cdr-safe sig)
-	     (not (numberp (cdr sig))))
-	(setcdr sig nil))
-    (if sig
-	(when (or (< ncall (car sig))
-		  (and (cdr sig) (> ncall (cdr sig))))
-          (byte-compile-emit-callargs-warn
-           (car form) ncall (car sig) (cdr sig))))
+    (when (and (cdr-safe sig)
+	       (not (numberp (cdr sig))))
+      ;; Something about subr-arity from twentieth century.
+      (setcdr sig nil))
+    (when (and sig
+               (or (< ncall (car sig))
+		   (and (cdr sig) (> ncall (cdr sig)))))
+      (byte-compile-emit-callargs-warn
+       (car form) ncall (car sig) (cdr sig)))
     (byte-compile-format-warn form)
-    (byte-compile-function-warn (car form) (length (cdr form)) def)))
+    (byte-compile-function-warn (car form) (length (cdr form)))))
 
 (defun byte-compile-format-warn (form)
   "Warn if FORM is `format'-like with inconsistent args.
@@ -1568,12 +1573,12 @@ extra args."
 (defun byte-compile-arglist-warn (name arglist macrop)
   "Warn if the function or macro is being redefined with a different
 number of arguments."
-  (let ((calls (assq name byte-compile-unresolved-functions))
+  (let ((calls (assq name byte-compile--undefined-funcs))
         nums sig min max)
     (when (and calls macrop)
       (byte-compile-warn "macro `%s' defined too late" name))
-    (setq byte-compile-unresolved-functions
-          (delq calls byte-compile-unresolved-functions))
+    (setq byte-compile--undefined-funcs
+          (delq calls byte-compile--undefined-funcs))
     (setq calls (delq t calls)) ; Ignore higher-order uses of the function.
     (when (cddr calls)
       (when (and (symbolp name)
@@ -1698,23 +1703,22 @@ It is too wide if it has any lines longer than the largest of
                            kind name col))))
   form)
 
-(defun byte-compile-warn-unresolved-functions ()
-  "Separate the functions that will not be available at runtime
-from the truly unresolved ones."
+(defun byte-compile-warn--undefined-funcs ()
   (prog1 nil
     (when (byte-compile-warning-enabled-p 'unresolved)
       (let ((byte-compile-current-func :end))
-        (dolist (urf byte-compile-unresolved-functions)
+        (dolist (entry byte-compile--undefined-funcs)
           (cl-destructuring-bind (f charpos &rest args)
-              urf
-            (unless (memq f byte-compile-new-defuns)
-              (let ((byte-compile-current-charpos charpos))
-                (byte-compile-warn
-                 (if (fboundp f)
-                     "the function `%s' might not be defined at runtime."
-                   "the function `%s' is not known to be defined.")
-                 f)))))))))
-
+              entry
+            (let ((byte-compile-current-charpos charpos))
+              (byte-compile-warn
+               (concat "the function `%s' is not defined"
+                       (if (or (byte-compile-fdefinition f nil)
+		               (byte-compile-fdefinition f t)
+                               (fboundp f))
+                           " at runtime."
+                         "."))
+               f))))))))
 
 (defvar byte-compile--outbuffer
   "Dynamically bound in byte-compile-from-buffer, and used in cl.el
@@ -2186,9 +2190,10 @@ With argument ARG, insert value in current buffer after the form."
 	(goto-char (point-min))
 
 	;; Reset globals from previous byte-compile.
-	(setq byte-compile-unresolved-functions nil)
-        (setq byte-compile-noruntime-functions nil)
-        (setq byte-compile-new-defuns nil)
+	(setq byte-compile--undefined-funcs nil)
+        (setq byte-compile--noruntime-funcs nil)
+        (setq byte-compile--defined-funcs nil)
+        (setq byte-compile--seen-requires nil)
 
         (when byte-native-compiling
           (defvar native-comp-speed)
@@ -2220,7 +2225,7 @@ With argument ARG, insert value in current buffer after the form."
                  (byte-compile-file-form
                   (byte-compile-preprocess form*)))))))
 	(byte-compile-flush-pending)
-	(byte-compile-warn-unresolved-functions)))
+	(byte-compile-warn--undefined-funcs)))
      byte-compile--outbuffer)))
 
 (defun byte-compile-insert-header (_filename outbuffer)
@@ -2432,35 +2437,21 @@ in the input buffer (now current), not in the output buffer."
 
 (put 'autoload 'byte-hunk-handler 'byte-compile-file-form-autoload)
 (defun byte-compile-file-form-autoload (form)
-  (and (let ((form form))
-	 (while (when (setq form (cdr form))
-                  (macroexp-const-p (car form))))
-	 (null form))                        ;Constants only
-       (memq (eval (nth 5 form)) '(t macro)) ;Macro
-       (eval form))                          ;Define the autoload.
-  ;; Avoid undefined function warnings for the autoload.
+  (when (and (cl-every #'macroexp-const-p form)
+             (memq (eval (nth 5 form)) '(t macro)))
+    ;; Define the autoload
+    (eval form))
   (pcase (nth 1 form)
     (`',(and (pred symbolp) funsym)
-     ;; Don't add it if it's already defined.  Otherwise, it might
-     ;; hide the actual definition.  However, do remove any entry from
-     ;; byte-compile-noruntime-functions, in case we have an autoload
-     ;; of foo-func following an (eval-when-compile (require 'foo)).
+     ;; Remove autoloads from undefined lists.
      (unless (fboundp funsym)
        (push (cons funsym (cons 'autoload (cdr (cdr form))))
              byte-compile-function-environment))
-     ;; If an autoload occurs _before_ the first call to a function,
-     ;; byte-compile-callargs-warn does not add an entry to
-     ;; byte-compile-unresolved-functions.  Here we mimic the logic
-     ;; of byte-compile-callargs-warn so as not to warn if the
-     ;; autoload comes _after_ the function call.
-     ;; Alternatively, similar logic could go in
-     ;; byte-compile-warn-unresolved-functions.
-     (if (memq funsym byte-compile-noruntime-functions)
-         (setq byte-compile-noruntime-functions
-               (delq funsym byte-compile-noruntime-functions))
-       (setq byte-compile-unresolved-functions
-             (delq (assq funsym byte-compile-unresolved-functions)
-                   byte-compile-unresolved-functions)))))
+     (setq byte-compile--noruntime-funcs
+           (delq funsym byte-compile--noruntime-funcs))
+     (setq byte-compile--undefined-funcs
+           (delq (assq funsym byte-compile--undefined-funcs)
+                 byte-compile--undefined-funcs))))
   (if (stringp (nth 3 form))
       (prog1 form
         (byte-compile-docstring-length-warn form))
@@ -2528,18 +2519,35 @@ in the input buffer (now current), not in the output buffer."
 
 (put 'require 'byte-hunk-handler 'byte-compile-file-form-require)
 (defun byte-compile-file-form-require (form)
-  "Record functions defined by FORM in `byte-compile-new-defuns'."
+  "Record functions defined by FORM in `byte-compile--defined-funcs'."
   (let* ((args (mapcar #'eval (cdr form)))
-         (hist-new (progn (apply #'require args)
-                          load-history)))
-    (while (and hist-new
-                (not (member (cons 'provide (car args))
-                             (car hist-new))))
-      (setq hist-new (cdr hist-new)))
-    (dolist (x (car hist-new))
-      (when (and (consp x)
-                 (memq (car x) '(defun t)))
-        (push (cdr x) byte-compile-new-defuns))))
+         (to-require (car args)))
+    (apply #'require args)
+    ;; traverse dag of requires, marking defined functions
+    (cl-loop with queue = (cl-remove-if
+                           (lambda (x) (memq x byte-compile--seen-requires))
+                           (list to-require))
+             while queue
+             do (setq byte-compile--seen-requires
+                      (append byte-compile--seen-requires queue))
+             for load-entry = (cl-find-if
+                               (apply-partially #'member (cons 'provide (pop queue)))
+                               load-history)
+             do (mapc
+                 (lambda (entry)
+                   (pcase entry
+                     (`(defun . ,what)
+                      (push what byte-compile--defined-funcs))))
+                 load-entry)
+             for requires = (cl-remove-if
+                             (lambda (x) (memq x byte-compile--seen-requires))
+                             (delq nil
+                                   (mapcar
+                                    (lambda (entry)
+                                      (pcase entry
+                                        (`(require . ,what) what)))
+                                    load-entry)))
+             do (setq queue (append queue requires))))
   (byte-compile-keep-pending form 'byte-compile-normal-call))
 
 (put 'progn 'byte-hunk-handler 'byte-compile-file-form-progn)
@@ -2583,7 +2591,7 @@ otherwise."
          (that-one (assq name (symbol-value that-kind)))
          (do-warn (byte-compile-warning-enabled-p 'redefine name))
          (byte-compile-current-func name))
-    (push name byte-compile-new-defuns)
+    (push name byte-compile--defined-funcs)
     (when byte-compile-generate-call-tree
       (unless (assq name byte-compile-call-tree)
         ;; Add NAME to call tree to later detect unused functions.
@@ -3115,20 +3123,20 @@ OUTPUT-TYPE advises how form will be used,
   (declare (advertised-calling-convention
 	    (fn file &optional arglist fileonly) nil))
   (let ((gotargs (and (consp args) (listp (car args))))
-	(unresolved (assq fn byte-compile-unresolved-functions)))
+	(unresolved (assq fn byte-compile--undefined-funcs)))
     (when unresolved
       ;; function was called before declaration
       (if (and gotargs (byte-compile-warning-enabled-p 'callargs))
 	  (byte-compile-arglist-warn fn (car args) nil)
-	(setq byte-compile-unresolved-functions
-	      (delq unresolved byte-compile-unresolved-functions))))
+	(setq byte-compile--undefined-funcs
+	      (delq unresolved byte-compile--undefined-funcs))))
     (push (cons fn (if gotargs
 		       (list 'declared (car args))
 		     t))
 	  byte-compile-function-environment))
   ;; We are stating that it _will_ be defined at runtime.
-  (setq byte-compile-noruntime-functions
-        (delq fn byte-compile-noruntime-functions))
+  (setq byte-compile--noruntime-funcs
+        (delq fn byte-compile--noruntime-funcs))
   ;; Delegate the rest to the normal macro definition.
   (macroexpand `(declare-function ,fn ,file ,@args)))
 
@@ -3910,13 +3918,13 @@ Is this worth it?  Both -backward and -forward are written in C."
   (byte-compile-two-args form))
 
 (defun byte-compile-function-form (form)
-  "(function foo) must compile like 'foo, not like (symbol-function 'foo).
+  "\(function foo) must compile like 'foo, not like (symbol-function 'foo).
 Otherwise it will be incompatible with the interpreter,
-and (funcall (function foo)) will lose with autoloads."
+and \(funcall (function foo)) will lose with autoloads."
   (let ((f (nth 1 form)))
     (when (and (symbolp f)
                (byte-compile-warning-enabled-p 'callargs f))
-      (byte-compile-function-warn f t (byte-compile-fdefinition f nil)))
+      (byte-compile-function-warn f t))
     (byte-compile-constant (if (eq 'lambda (car-safe f))
                                (byte-compile-lambda f)
                              f))))
@@ -4078,7 +4086,7 @@ that suppresses all warnings during execution of BODY."
   (declare (indent 1) (debug t))
   `(let* ((fbound-list (byte-compile-find-bound-condition
 			,condition '(fboundp functionp)
-			byte-compile-unresolved-functions))
+			byte-compile--undefined-funcs))
 	  (bound-list (byte-compile-find-bound-condition
                        ,condition '(boundp default-boundp local-variable-p)))
           (new-bound-list
@@ -4106,9 +4114,9 @@ that suppresses all warnings during execution of BODY."
        ;; Maybe remove the function symbol from the unresolved list.
        (dolist (fbound fbound-list)
 	 (when fbound
-	   (setq byte-compile-unresolved-functions
-		 (delq (assq fbound byte-compile-unresolved-functions)
-		       byte-compile-unresolved-functions)))))))
+	   (setq byte-compile--undefined-funcs
+		 (delq (assq fbound byte-compile--undefined-funcs)
+		       byte-compile--undefined-funcs)))))))
 
 (defun byte-compile-if (form)
   (byte-compile-form (car (cdr form)))
