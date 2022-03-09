@@ -851,7 +851,7 @@ byte-compiled.  Run with dynamic binding."
 
 (ert-deftest bytecomp-warn-absent-require-cl-lib ()
   (bytecomp--buffer-with-warning-test
-   "cl-member-if. might not be defined"
+   "cl-member-if. is not defined"
    (cl-member-if (function cl-evenp) (list 1 2 3))))
 
 (ert-deftest bytecomp-warn-coordinates ()
