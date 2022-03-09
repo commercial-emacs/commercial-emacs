@@ -1435,7 +1435,7 @@ that means treat it as not defined."
                                       (first-atom byte-compile-current-annotations))))))))
 
 (defun byte-compile-function-warn (f nargs &optional _def)
-  "Warn if function F or called with inconsistent NARGS."
+  "Warn if function F is undefined or called with inconsistent NARGS."
   (when (and (get f 'byte-obsolete-info)
              (byte-compile-warning-enabled-p 'obsolete f))
     (byte-compile-warn-obsolete f))
