@@ -1713,7 +1713,9 @@ It is too wide if it has any lines longer than the largest of
             (let ((byte-compile-current-charpos charpos))
               (byte-compile-warn
                (concat "the function `%s' is not defined"
-                       (if (memq f byte-compile--noruntime-funcs)
+                       (if (or (byte-compile-fdefinition f nil)
+		               (byte-compile-fdefinition f t)
+                               (fboundp f))
                            " at runtime."
                          "."))
                f))))))))
