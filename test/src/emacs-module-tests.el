@@ -337,6 +337,7 @@ Return A + B
 (ert-deftest mod-test-sleep-until ()
   "Check that `mod-test-sleep-until' either returns normally or quits.
 Interactively, you can try hitting \\[keyboard-quit] to quit."
+  (skip-unless (fboundp 'mod-test-sleep-until))
   (dolist (arg '(nil t))
     ;; Guard against some caller setting `inhibit-quit'.
     (with-local-quit
@@ -391,6 +392,7 @@ Interactively, you can try hitting \\[keyboard-quit] to quit."
 
 (ert-deftest mod-test-nanoseconds ()
   "Test truncation when converting to `struct timespec'."
+  (skip-unless (fboundp 'mod-test-nanoseconds))
   (dolist (test-case '((0 . 0)
                        (-1 . -1000000000)
                        ((1 . 1000000000) . 1)
@@ -409,6 +411,7 @@ Interactively, you can try hitting \\[keyboard-quit] to quit."
         (should (= (mod-test-nanoseconds input) expected))))))
 
 (ert-deftest mod-test-double ()
+  (skip-unless (fboundp 'mod-test-double))
   (dolist (input (list 0 1 2 -1 42 12345678901234567890
                        most-positive-fixnum (1+ most-positive-fixnum)
                        most-negative-fixnum (1- most-negative-fixnum)))
