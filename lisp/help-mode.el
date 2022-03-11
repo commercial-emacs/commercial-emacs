@@ -845,7 +845,7 @@ a proper [back] button."
   ;; There is a reference at point.  Follow it.
   (let ((help-xref-following t))
     (apply function (if (eq function 'info)
-                        (append args (list (generate-new-buffer-name "*info*")))
+                        (append args (list "*info*"))
                       args))))
 
 ;; The doc string is meant to explain what buttons do.
