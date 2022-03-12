@@ -32,6 +32,7 @@
 (require 'ert-x) ; ert-with-temp-directory
 (require 'grep)
 (require 'xref)
+(require 'vc)
 
 (ert-deftest project/quoted-directory ()
   "Check that `project-files' and `project-find-regexp' deal with
@@ -109,5 +110,19 @@ When `project-ignores' includes a name matching project dir."
       (should (equal files
                      (list
                       (expand-file-name "some-file" dir)))))))
+
+(ert-deftest project-sparing-backend-discovery ()
+  "Cache results of `vc-responsible-backend`."
+  (skip-unless (eq 'Git (ignore-errors
+                          (vc-responsible-backend default-directory))))
+  (let* ((default-directory (vc-call-backend 'Git 'root default-directory))
+         (project (project-current)))
+    (should (vc-file-getprop default-directory 'project-vc))
+    (should (eq 'Git (vc-file-getprop default-directory 'vc-backend)))
+    (cl-letf (((symbol-function 'vc-responsible-backend)
+               (lambda (&rest _args) (should nil))))
+      (project-files project)
+      (vc-file-clearprops default-directory)
+      (should-error (project-files project)))))
 
 ;;; project-tests.el ends here
