@@ -156,7 +156,7 @@
 
 ;;; Code:
 
-(require 'cl-generic)
+(require 'cl-lib)
 (require 'seq)
 (eval-when-compile (require 'subr-x))
 
@@ -418,33 +418,32 @@ The directory names should be absolute.  Used in the VC project
 backend implementation of `project-external-roots'.")
 
 (defun project-try-vc (dir)
-  (or (vc-file-getprop dir 'project-vc)
-      (let* ((backend (ignore-errors (vc-responsible-backend dir)))
-             (root
-              (pcase backend
-                ('Git
-                 ;; Don't stop at submodule boundary.
-                 (or (vc-file-getprop dir 'project-git-root)
-                     (let ((root (vc-call-backend backend 'root dir)))
-                       (vc-file-setprop
-                        dir 'project-git-root
-                        (if (and
-                             ;; FIXME: Invalidate the cache when the value
-                             ;; of this variable changes.
-                             (project--vc-merge-submodules-p root)
-                             (project--submodule-p root))
-                            (let* ((parent (file-name-directory
-                                            (directory-file-name root))))
-                              (vc-call-backend backend 'root parent))
-                          root)))))
-                ('nil nil)
-                (_ (ignore-errors (vc-call-backend backend 'root dir)))))
-             project)
-        (when root
-          (setq project (list 'vc backend root))
-          ;; FIXME: Cache for a shorter time.
-          (vc-file-setprop dir 'project-vc project)
-          project))))
+  (unless (vc-file-getprop dir 'project-vc)
+    (let* ((backend (ignore-errors (vc-responsible-backend dir)))
+           (root
+            (pcase backend
+              ('Git
+               ;; Don't stop at submodule boundary.
+               (or (vc-file-getprop dir 'project-git-root)
+                   (let ((root (vc-call-backend backend 'root dir)))
+                     (vc-file-setprop
+                      dir 'project-git-root
+                      (if (and
+                           ;; FIXME: Invalidate the cache when the value
+                           ;; of this variable changes.
+                           (project--vc-merge-submodules-p root)
+                           (project--submodule-p root))
+                          (let* ((parent (file-name-directory
+                                          (directory-file-name root))))
+                            (vc-call-backend backend 'root parent))
+                        root)))))
+              ('nil nil)
+              (_ (ignore-errors (vc-call-backend backend 'root dir))))))
+      (when root
+        ;; FIXME: Cache for a shorter time.
+        (vc-file-setprop dir 'project-vc (cons 'vc root))
+        (vc-file-setprop dir 'vc-backend backend))))
+  (vc-file-getprop dir 'project-vc))
 
 (defun project--submodule-p (root)
   ;; XXX: We only support Git submodules for now.
@@ -470,7 +469,7 @@ backend implementation of `project-external-roots'.")
      (t nil))))
 
 (cl-defmethod project-root ((project (head vc)))
-  (nth 2 project))
+  (cdr project))
 
 (cl-defmethod project-external-roots ((project (head vc)))
   (project-subtract-directories
@@ -485,8 +484,9 @@ backend implementation of `project-external-roots'.")
    (lambda (dir)
      (let ((ignores (project--value-in-dir 'project-vc-ignores dir))
            backend)
-       (if (and (file-equal-p dir (nth 2 project))
-                (setq backend (cadr project))
+       (if (and (file-equal-p dir (cdr project))
+                (setq backend (or (vc-file-getprop dir 'vc-backend)
+                                  (vc-responsible-backend dir)))
                 (cond
                  ((eq backend 'Hg))
                  ((and (eq backend 'Git)
@@ -598,11 +598,12 @@ backend implementation of `project-external-roots'.")
     (file-missing nil)))
 
 (cl-defmethod project-ignores ((project (head vc)) dir)
-  (let* ((root (nth 2 project))
+  (let* ((root (cdr project))
          backend)
     (append
      (when (file-equal-p dir root)
-       (setq backend (cadr project))
+       (setq backend (or (vc-file-getprop dir 'vc-backend)
+                         (vc-responsible-backend root)))
        (delq
         nil
         (mapcar
