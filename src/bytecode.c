@@ -186,6 +186,7 @@ DEFINE (Bfollowing_char, 0147)						\
 DEFINE (Bpreceding_char, 0150)						\
 DEFINE (Bcurrent_column, 0151)						\
 DEFINE (Bindent_to, 0152)						\
+/* 0153 was Bscan_buffer in v17.  */                                    \
 DEFINE (Beolp, 0154)							\
 DEFINE (Beobp, 0155)							\
 DEFINE (Bbolp, 0156)							\
@@ -193,6 +194,7 @@ DEFINE (Bbobp, 0157)							\
 DEFINE (Bcurrent_buffer, 0160)						\
 DEFINE (Bset_buffer, 0161)						\
 DEFINE (Bsave_current_buffer_1, 0162) /* Replacing Bsave_current_buffer.  */ \
+/* 0163 was Bset_mark in v17.  */                                       \
 DEFINE (Binteractive_p, 0164) /* Obsolete since Emacs-24.1.  */		\
 									\
 DEFINE (Bforward_char, 0165)						\
@@ -253,11 +255,7 @@ DEFINE (Brem, 0246)							\
 DEFINE (Bnumberp, 0247)							\
 DEFINE (Bintegerp, 0250)						\
 									\
-DEFINE (BRgoto, 0252)							\
-DEFINE (BRgotoifnil, 0253)						\
-DEFINE (BRgotoifnonnil, 0254)						\
-DEFINE (BRgotoifnilelsepop, 0255)					\
-DEFINE (BRgotoifnonnilelsepop, 0256)					\
+/* 0252-0256 were relative jumps, apparently never used.  */            \
 									\
 DEFINE (BlistN, 0257)							\
 DEFINE (BconcatN, 0260)							\
@@ -277,11 +275,6 @@ enum byte_code_op
 #define DEFINE(name, value) name = value,
     BYTE_CODES
 #undef DEFINE
-
-#if BYTE_CODE_SAFE
-    Bscan_buffer = 0153, /* No longer generated as of v18.  */
-    Bset_mark = 0163, /* this loser is no longer generated as of v18 */
-#endif
 };
 
 /* Fetch the next byte from the bytecode stream.  */
@@ -291,7 +284,7 @@ enum byte_code_op
 /* Fetch two bytes from the bytecode stream and make a 16-bit number
    out of them.  */
 
-#define FETCH2 (op = FETCH, op + (FETCH << 8))
+#define FETCH2 (op = FETCH, op | (FETCH << 8))
 
 /* Push X onto the execution stack.  The expression X should not
    contain TOP, to avoid competing side effects.  */
@@ -705,7 +698,6 @@ exec_byte_code (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth,
 	  op = FETCH2;
 	op_branch:
 	  op -= pc - bytestr_data;
-	op_relative_branch:
 	  if (BYTE_CODE_SAFE
 	      && ! (bytestr_data - pc <= op
 		    && op < bytestr_data + bytestr_length - pc))
@@ -737,36 +729,6 @@ exec_byte_code (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth,
 	  op = FETCH2;
 	  if (!NILP (TOP))
 	    goto op_branch;
-	  DISCARD (1);
-	  NEXT;
-
-	CASE (BRgoto):
-	  op = FETCH - 128;
-	  goto op_relative_branch;
-
-	CASE (BRgotoifnil):
-	  op = FETCH - 128;
-	  if (NILP (POP))
-	    goto op_relative_branch;
-	  NEXT;
-
-	CASE (BRgotoifnonnil):
-	  op = FETCH - 128;
-	  if (!NILP (POP))
-	    goto op_relative_branch;
-	  NEXT;
-
-	CASE (BRgotoifnilelsepop):
-	  op = FETCH - 128;
-	  if (NILP (TOP))
-	    goto op_relative_branch;
-	  DISCARD (1);
-	  NEXT;
-
-	CASE (BRgotoifnonnilelsepop):
-	  op = FETCH - 128;
-	  if (!NILP (TOP))
-	    goto op_relative_branch;
 	  DISCARD (1);
 	  NEXT;
 
@@ -1466,19 +1428,6 @@ exec_byte_code (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth,
 	CASE (Bintegerp):
 	  TOP = INTEGERP (TOP) ? Qt : Qnil;
 	  NEXT;
-
-#if BYTE_CODE_SAFE
-	  /* These are intentionally written using 'case' syntax,
-	     because they are incompatible with the threaded
-	     interpreter.  */
-
-	case Bset_mark:
-	  error ("set-mark is an obsolete bytecode");
-	  break;
-	case Bscan_buffer:
-	  error ("scan-buffer is an obsolete bytecode");
-	  break;
-#endif
 
 	CASE_ABORT:
 	  /* Actually this is Bstack_ref with offset 0, but we use Bdup
