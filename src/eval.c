@@ -1233,6 +1233,7 @@ unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
   eassert (handlerlist == catch);
 
   lisp_eval_depth = catch->f_lisp_eval_depth;
+  set_act_rec (current_thread, catch->act_rec);
 
   sys_longjmp (catch->jmp, 1);
 }
@@ -1673,6 +1674,7 @@ push_handler_nosignal (Lisp_Object tag_ch_val, enum handlertype handlertype)
   c->next = handlerlist;
   c->f_lisp_eval_depth = lisp_eval_depth;
   c->pdlcount = SPECPDL_INDEX ();
+  c->act_rec = get_act_rec (current_thread);
   c->poll_suppress_count = poll_suppress_count;
   c->interrupt_input_blocked = interrupt_input_blocked;
   handlerlist = c;
@@ -3118,10 +3120,7 @@ fetch_and_exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
   if (CONSP (AREF (fun, COMPILED_BYTECODE)))
     Ffetch_bytecode (fun);
 
-  return exec_byte_code (AREF (fun, COMPILED_BYTECODE),
-			 AREF (fun, COMPILED_CONSTANTS),
-			 AREF (fun, COMPILED_STACK_DEPTH),
-			 args_template, nargs, args);
+  return exec_byte_code (fun, args_template, nargs, args);
 }
 
 static Lisp_Object
