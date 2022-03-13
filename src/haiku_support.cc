@@ -1565,6 +1565,12 @@ public:
 
   /* True if button events should be passed to the parent.  */
   bool handle_button = false;
+  bool in_overscroll = false;
+  bool can_overscroll = false;
+  BPoint last_overscroll;
+  int last_reported_overscroll_value;
+  int max_value, real_max_value;
+  int overscroll_start_value;
 
   EmacsScrollBar (int x, int y, int x1, int y1, bool horizontal_p) :
     BScrollBar (BRect (x, y, x1, y1), NULL, NULL, 0, 0, horizontal_p ?
@@ -1580,23 +1586,59 @@ public:
   void
   MessageReceived (BMessage *msg)
   {
-    int32 portion, range;
+    int32 portion, range, dragging, value;
     float proportion;
 
     if (msg->what == SCROLL_BAR_UPDATE)
       {
-	old_value = msg->GetInt32 ("emacs:units", 0);
 	portion = msg->GetInt32 ("emacs:portion", 0);
 	range = msg->GetInt32 ("emacs:range", 0);
-	proportion = (float) portion / range;
+	dragging = msg->GetInt32 ("emacs:dragging", 0);
+	proportion = ((range <= 0 || portion <= 0)
+		      ? 1.0f : (float) portion / range);
+	value = msg->GetInt32 ("emacs:units", 0);
+	can_overscroll = msg->GetBool ("emacs:overscroll", false);
 
-	if (!msg->GetBool ("emacs:dragging", false))
+	if (value < 0)
+	  value = 0;
+
+	if (dragging != 1)
 	  {
-	    /* Unlike on Motif, PORTION isn't included in the total
-	       range of the scroll bar.  */
-	    this->SetRange (0, range - portion);
-	    this->SetValue (old_value);
-	    this->SetProportion (proportion);
+	    if (in_overscroll || dragging != -1)
+	      {
+		/* Set the value to the smallest possible one.
+		   Otherwise, the call to SetRange could lead to
+		   spurious updates.  */
+		old_value = 0;
+		SetValue (0);
+
+		/* Unlike on Motif, PORTION isn't included in the total
+		   range of the scroll bar.  */
+
+		SetRange (0, range - portion);
+		SetProportion (proportion);
+		max_value = range - portion;
+		real_max_value = range;
+
+		if (in_overscroll || value > max_value)
+		  value = max_value;
+
+		old_value = roundf (value);
+		SetValue (old_value);
+	      }
+	    else
+	      {
+		value = Value ();
+
+		old_value = 0;
+		SetValue (0);
+		SetRange (0, range - portion);
+		SetProportion (proportion);
+		old_value = value;
+		SetValue (value);
+		max_value = range - portion;
+		real_max_value = range;
+	      }
 	  }
       }
 
@@ -1608,6 +1650,8 @@ public:
   {
     struct haiku_scroll_bar_value_event rq;
     struct haiku_scroll_bar_part_event part;
+
+    new_value = Value ();
 
     if (dragging)
       {
@@ -1781,6 +1825,8 @@ public:
     struct haiku_scroll_bar_drag_event rq;
     BView *parent;
 
+    in_overscroll = false;
+
     if (handle_button)
       {
 	handle_button = false;
@@ -1804,7 +1850,13 @@ public:
   MouseMoved (BPoint point, uint32 transit, const BMessage *msg)
   {
     struct haiku_menu_bar_left_event rq;
+    struct haiku_scroll_bar_value_event value_event;
+    int range, diff, value, trough_size;
+    BRect bounds;
     BPoint conv;
+    uint32 buttons;
+
+    GetMouse (NULL, &buttons, false);
 
     if (transit == B_EXITED_VIEW)
       {
@@ -1821,6 +1873,61 @@ public:
 	  }
       }
 
+    if (in_overscroll)
+      {
+	diff = point.y - last_overscroll.y;
+
+	if (diff < 0)
+	  {
+	    in_overscroll = false;
+	    goto allow;
+	  }
+
+	range = real_max_value;
+	bounds = Bounds ();
+	bounds.InsetBy (1.0, 1.0);
+	value = overscroll_start_value;
+	trough_size = BE_RECT_HEIGHT (bounds);
+	trough_size -= BE_RECT_WIDTH (bounds) / 2;
+	if (info.double_arrows)
+	  trough_size -= BE_RECT_WIDTH (bounds) / 2;
+
+	value += ((double) range / trough_size) * diff;
+
+	if (value != last_reported_overscroll_value)
+	  {
+	    last_reported_overscroll_value = value;
+
+	    value_event.scroll_bar = this;
+	    value_event.window = Window ();
+	    value_event.position = value;
+
+	    haiku_write (SCROLL_BAR_VALUE_EVENT, &value_event);
+	    return;
+	  }
+      }
+    else if (can_overscroll && (buttons == B_PRIMARY_MOUSE_BUTTON))
+      {
+	value = Value ();
+
+	if (value >= max_value)
+	  {
+	    BScrollBar::MouseMoved (point, transit, msg);
+
+	    if (value == Value () && Proportion () < 1.0f)
+	      {
+		overscroll_start_value = value;
+		in_overscroll = true;
+		last_overscroll = point;
+		last_reported_overscroll_value = value;
+
+		MouseMoved (point, transit, msg);
+		return;
+	      }
+	  }
+      }
+
+  allow:
     BScrollBar::MouseMoved (point, transit, msg);
   }
 };
@@ -2314,9 +2421,13 @@ BView_move_frame (void *view, int x, int y, int x1, int y1)
   vw->UnlockLooper ();
 }
 
+/* DRAGGING can either be 0 (which means to update everything), 1
+   (which means to update nothing), or -1 (which means to update only
+   the thumb size and range).  */
+
 void
 BView_scroll_bar_update (void *sb, int portion, int whole, int position,
-			 bool dragging)
+			 int dragging, bool can_overscroll)
 {
   BScrollBar *bar = (BScrollBar *) sb;
   BMessage msg = BMessage (SCROLL_BAR_UPDATE);
@@ -2324,7 +2435,8 @@ BView_scroll_bar_update (void *sb, int portion, int whole, int position,
   msg.AddInt32 ("emacs:range", whole);
   msg.AddInt32 ("emacs:units", position);
   msg.AddInt32 ("emacs:portion", portion);
-  msg.AddBool ("emacs:dragging", dragging);
+  msg.AddInt32 ("emacs:dragging", dragging);
+  msg.AddBool ("emacs:overscroll", can_overscroll);
 
   mr.SendMessage (&msg);
 }
