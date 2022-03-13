@@ -1817,6 +1817,9 @@ public:
     rq.window = Window ();
     rq.scroll_bar = this;
 
+    SetMouseEventMask (B_POINTER_EVENTS, (B_SUSPEND_VIEW_FOCUS
+					  | B_LOCK_WINDOW_FOCUS));
+
     haiku_write (SCROLL_BAR_DRAG_EVENT, &rq);
 
   out:
@@ -1918,7 +1921,7 @@ public:
 	  {
 	    BScrollBar::MouseMoved (point, transit, msg);
 
-	    if (value == Value () && Proportion () < 1.0f)
+	    if (value == Value ())
 	      {
 		overscroll_start_value = value;
 		in_overscroll = true;
