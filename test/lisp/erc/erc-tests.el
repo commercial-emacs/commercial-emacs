@@ -114,6 +114,79 @@
     (should (get-buffer "#spam"))
     (kill-buffer "#spam")))
 
+;; DELETE ME BEG (just a demo, for now)
+(require 'ert-x)
+(defvar erc-modified-channels-alist)
+
+(ert-deftest erc--switch-to-buffer ()
+  (unless (version< "28" emacs-version)
+    (ert-skip "Depends on symbol `minibuffer-quit'"))
+
+  (let ((proc (start-process "aNet" (current-buffer) "true"))
+        (erc-modified-channels-alist `(("fake") (,(messages-buffer))))
+        ;;
+        erc-kill-channel-hook erc-kill-server-hook erc-kill-buffer-hook)
+
+    (with-current-buffer (get-buffer-create "server")
+      (erc-mode)
+      (set-process-buffer (setq erc-server-process proc) (current-buffer))
+      (with-current-buffer (get-buffer-create "#chan")
+        (erc-mode)
+        (setq erc-server-process proc))
+      (with-current-buffer (get-buffer-create "#foo")
+        (erc-mode)
+        (setq erc-server-process proc))
+
+      (ert-info ("Channel #chan selectable from server buffer")
+        (ert-simulate-keys (list ?# ?c ?h ?a ?n ?\C-m)
+          (should (string= "#chan" (erc--switch-to-buffer))))))
+
+    (ert-info ("Channel #foo selectable from non-ERC buffer")
+      (ert-simulate-keys (list ?# ?f ?o ?o ?\C-m)
+        (should (string= "#foo" (erc--switch-to-buffer)))))
+
+    (ert-info ("Default selectable")
+      (ert-simulate-keys (list ?\C-m)
+        (should (string= "*Messages*" (erc--switch-to-buffer)))))
+
+    ;; Can't use `should-error' here because `minibuffer-quit' derives
+    ;; from `quit' instead of `error', and only the latter is trapped.
+    (ert-info ("Extant but non-ERC buffer not selectable")
+      (get-buffer-create "#fake") ; not ours
+      (let (ran)
+        (condition-case s
+            (ert-simulate-keys (list ?# ?f ?a ?k ?e ?\C-m)
+              (erc--switch-to-buffer))
+          (minibuffer-quit (setq ran s)))
+        (should (equal ran '(minibuffer-quit)))))
+
+    (with-current-buffer (get-buffer-create "other")
+      (erc-mode)
+      (setq erc-server-process
+            (start-process "bNet" (current-buffer) "true")))
+
+    (ert-info ("Foreign ERC buffer not selectable")
+      (let (ran)
+        (condition-case s
+            (ert-simulate-keys (list ?o ?t ?h ?e ?r ?\C-m)
+              (with-current-buffer "server"
+                (erc--switch-to-buffer)))
+          (minibuffer-quit (setq ran s)))
+        (should (equal ran '(minibuffer-quit)))))
+
+    (ert-info ("Any ERC-buffer selectable from non-ERC buffer")
+      (should-not (eq major-mode 'erc-mode))
+      (ert-simulate-keys (list ?o ?t ?h ?e ?r ?\C-m)
+        (should (string= "other" (erc--switch-to-buffer)))))
+
+    (kill-buffer "server")
+    (kill-buffer "other")
+    (kill-buffer "#chan")
+    (kill-buffer "#foo")
+    (kill-buffer "#fake")))
+
+;; DELETE ME END (just a demo, for now)
+
 (ert-deftest erc-lurker-maybe-trim ()
   (let (erc-lurker-trim-nicks
         (erc-lurker-ignore-chars "_`"))
