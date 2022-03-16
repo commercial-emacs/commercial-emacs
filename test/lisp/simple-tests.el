@@ -965,7 +965,9 @@ See Bug#21722."
     (let (buffer-undo-list)
       (downcase-word 1)
       (should (equal '((1 . 5) ("This" . 1))
-                     (delq nil (undo-make-selective-list (point-min) (point-max))))))))
+                     (cl-remove-if-not
+                      #'consp
+                      (undo-make-selective-list (point-min) (point-max))))))))
 
 (provide 'simple-test)
 ;;; simple-tests.el ends here
