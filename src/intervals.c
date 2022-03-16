@@ -55,7 +55,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static Lisp_Object merge_properties_sticky (Lisp_Object, Lisp_Object);
 static INTERVAL merge_interval_right (INTERVAL);
 static INTERVAL reproduce_tree (INTERVAL, INTERVAL);
-
+
 /* Utility functions for intervals.  */
 
 /* Use these functions to set pointer slots of struct interval.  */
@@ -228,6 +228,7 @@ intervals_equal (INTERVAL i0, INTERVAL i1)
 {
   return intervals_equal_1 (i0, i1, false);
 }
+
 
 /* Traverse an interval tree TREE, performing FUNCTION on each node.
    No guarantee is made about the order of traversal.
@@ -267,7 +268,7 @@ traverse_intervals (INTERVAL tree, ptrdiff_t position,
       position += LENGTH (tree); tree = tree->right;
     }
 }
-
+
 /* Assuming that a left child exists, perform the following operation:
 
      A		  B
@@ -369,7 +370,7 @@ rotate_left (INTERVAL A)
 
   return B;
 }
-
+
 /* Balance an interval tree with the assumption that the subtrees
    themselves are already balanced.  */
 
@@ -562,7 +563,7 @@ split_interval_left (INTERVAL interval, ptrdiff_t offset)
 
   return new;
 }
-
+
 /* Return the proper position for the first character
    described by the interval tree SOURCE.
    This is 1 if the parent is a buffer,
@@ -645,7 +646,7 @@ find_interval (register INTERVAL tree, register ptrdiff_t position)
 	}
     }
 }
-
+
 /* Find the succeeding interval (lexicographically) to INTERVAL.
    Sets the `position' field based on that of INTERVAL (see
    find_interval).  */
@@ -1152,7 +1153,7 @@ merge_properties_sticky (Lisp_Object pleft, Lisp_Object pright)
   return props;
 }
 
-
+
 /* Delete a node I from its interval tree by merging its subtrees
    into one subtree which is then returned.  Caller is responsible for
    storing the resulting subtree into its parent.  */
@@ -1231,7 +1232,7 @@ delete_interval (register INTERVAL i)
 	set_interval_parent (parent->right, parent);
     }
 }
-
+
 /* Find the interval in TREE corresponding to the relative position
    FROM and delete as much as possible of AMOUNT from that interval.
    Return the amount actually deleted, and if the interval was
@@ -1350,7 +1351,7 @@ adjust_intervals_for_deletion (struct buffer *buffer,
 	}
     }
 }
-
+
 /* Make the adjustments necessary to the interval tree of BUFFER to
    represent an addition or deletion of LENGTH characters starting
    at position START.  Addition or deletion is indicated by the sign
@@ -1368,7 +1369,7 @@ offset_intervals (struct buffer *buffer, ptrdiff_t start, ptrdiff_t length)
   else
     adjust_intervals_for_deletion (buffer, start, -length);
 }
-
+
 /* Merge interval I with its lexicographic successor. The resulting
    interval is returned, and has the properties of the original
    successor.  The properties of I are lost.  I is removed from the
@@ -1426,7 +1427,7 @@ merge_interval_right (register INTERVAL i)
      be merged right.  The caller should have known.  */
   emacs_abort ();
 }
-
+
 /* Merge interval I with its lexicographic predecessor. The resulting
    interval is returned, and has the properties of the original predecessor.
    The properties of I are lost.  Interval node I is removed from the tree.
@@ -1482,7 +1483,7 @@ merge_interval_left (register INTERVAL i)
      be merged left.  The caller should have known.  */
   emacs_abort ();
 }
-
+
 /* Create a copy of SOURCE but with the default value of UP.  */
 
 static INTERVAL
@@ -1526,7 +1527,7 @@ reproduce_tree_obj (INTERVAL source, Lisp_Object parent)
   set_interval_object (target, parent);
   return target;
 }
-
+
 /* Insert the intervals of SOURCE into BUFFER at POSITION.
    LENGTH is the length of the text in SOURCE.
 
@@ -1745,7 +1746,7 @@ lookup_char_property (Lisp_Object plist, Lisp_Object prop, bool textprop)
   return fallback;
 }
 
-
+
 /* Set point in BUFFER "temporarily" to CHARPOS, which corresponds to
    byte position BYTEPOS.  */
 
@@ -2066,7 +2067,7 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
       	       make_fixnum (charpos));
     }
 }
-
+
 /* Move point to POSITION, unless POSITION is inside an intangible
    segment that reaches all the way to point.  */
 
@@ -2125,7 +2126,7 @@ move_if_not_intangible (ptrdiff_t position)
   if (XFIXNUM (pos) != PT)
     SET_PT (position);
 }
-
+
 /* If text at position POS has property PROP, set *VAL to the property
    value, *START and *END to the beginning and end of a region that
    has the same property, and return true.  Otherwise return false.
@@ -2168,7 +2169,7 @@ get_property_and_range (ptrdiff_t pos, Lisp_Object prop, Lisp_Object *val,
 
   return 1;
 }
-
+
 /* Return the proper local keymap TYPE for position POSITION in
    BUFFER; TYPE should be one of `keymap' or `local-map'.  Use the map
    specified by the PROP property, if any.  Otherwise, if TYPE is
@@ -2220,7 +2221,7 @@ get_local_map (ptrdiff_t position, struct buffer *buffer, Lisp_Object type)
   else
     return BVAR (buffer, keymap);
 }
-
+
 /* Produce an interval tree reflecting the intervals in
    TREE from START to START + LENGTH.
    The new interval tree has no parent and has a starting-position of 0.  */
@@ -2277,7 +2278,7 @@ copy_intervals_to_string (Lisp_Object string, struct buffer *buffer,
   set_interval_object (interval_copy, string);
   set_string_intervals (string, interval_copy);
 }
-
+
 /* Return true if strings S1 and S2 have identical properties.
    Assume they have identical characters.  */
 
@@ -2313,7 +2314,7 @@ compare_string_intervals (Lisp_Object s1, Lisp_Object s2)
     }
   return 1;
 }
-
+
 /* Recursively adjust interval I in the current buffer
    for setting enable_multibyte_characters to MULTI_FLAG.
    The range of interval I is START ... END in characters,
