@@ -130,9 +130,23 @@ If TYPE is nil, return \"text/plain\"."
   (interactive "e")
   (let* ((string (caddr event))
 	 (window (posn-window (event-start event))))
-    (with-selected-window window
-      (raise-frame)
-      (dnd-handle-one-url window 'private (concat "file:" string)))))
+    (cond
+     ((assoc "refs" string)
+      (with-selected-window window
+        (raise-frame)
+        (dolist (filename (cddr (assoc "refs" string)))
+          (dnd-handle-one-url window 'private
+                              (concat "file:" filename)))))
+     ((assoc "text/plain" string)
+      (with-selected-window window
+        (raise-frame)
+        (dolist (text (cddr (assoc "text/plain" string)))
+          (goto-char (posn-point (event-start event)))
+          (dnd-insert-text window 'private
+                           (if (multibyte-string-p text)
+                               text
+                             (decode-coding-string text 'undecided))))))
+     (t (message "Don't know how to drop any of: %s" (mapcar #'car string))))))
 
 (define-key special-event-map [drag-n-drop]
             'haiku-dnd-handle-drag-n-drop-event)
