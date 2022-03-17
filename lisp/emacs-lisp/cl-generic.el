@@ -392,9 +392,9 @@ the specializer used will be the one returned by BODY."
                                    . ,(lambda () spec-args))
                                  macroexpand-all-environment)))
       (require 'cl-lib)        ;Needed to expand `cl-flet' and `cl-function'.
-      (when (assq 'interactive (cadr fun))
+      (when (assq 'interactive body)
         (message "Interactive forms not supported in generic functions: %S"
-                 (assq 'interactive (cadr fun))))
+                 (assq 'interactive body)))
       ;; First macroexpand away the cl-function stuff (e.g. &key and
       ;; destructuring args, `declare' and whatnot).
       (pcase (macroexpand fun macroenv)
