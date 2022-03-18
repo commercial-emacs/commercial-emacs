@@ -49,7 +49,7 @@
   ((condition :initarg :condition :type condition-variable)
    (msg-queue :initarg :msg-queue :type ring)))
 
-(cl-defgeneric threads-test-channel-send ((channel threads-test-channel) message)
+(cl-defmethod threads-test-channel-send ((channel threads-test-channel) message)
   (with-slots (condition msg-queue) channel
     (with-mutex (condition-mutex condition)
       (while (<= (ring-size msg-queue) (ring-length msg-queue))
@@ -57,7 +57,7 @@
       (ring-insert msg-queue message)
       (condition-notify condition t))))
 
-(cl-defgeneric threads-test-channel-recv ((channel threads-test-channel))
+(cl-defmethod threads-test-channel-recv ((channel threads-test-channel))
   (with-slots (condition msg-queue) channel
     (with-mutex (condition-mutex condition)
       (while (ring-empty-p msg-queue)
