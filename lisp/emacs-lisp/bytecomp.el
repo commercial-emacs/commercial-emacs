@@ -1899,27 +1899,26 @@ If compilation is needed, this functions returns the result of
 `byte-compile-file'; otherwise it returns `no-byte-compile'."
   (declare (advertised-calling-convention (filename &optional force arg) "28.1"))
   (interactive
-   (let ((file buffer-file-name)
-	 (file-name nil)
-	 (file-dir nil))
-     (and file
-	  (derived-mode-p 'emacs-lisp-mode)
-	  (setq file-name (file-name-nondirectory file)
-		file-dir (file-name-directory file)))
-     (list (read-file-name (if current-prefix-arg
-			       "Byte compile file: "
-			     "Byte recompile file: ")
-			   file-dir file-name nil)
-	   current-prefix-arg)))
+   (list (apply #'read-file-name
+                (concat "Byte "
+                        (if current-prefix-arg
+			    "compile"
+		          "recompile")
+                        " file: ")
+                (when (and (derived-mode-p 'emacs-lisp-mode)
+                           buffer-file-name)
+                  (list (file-name-directory buffer-file-name)
+                        nil
+                        nil
+                        (file-name-nondirectory buffer-file-name))))
+	 current-prefix-arg))
   (let ((dest (byte-compile-dest-file filename))
-        ;; Expand now so we get the current buffer's defaults
         (filename (expand-file-name filename)))
     (prog1
         (if (if (and dest (file-exists-p dest))
                 ;; File was already compiled
                 ;; Compile if forced to, or filename newer
-                (or force
-                    (file-newer-than-file-p filename dest))
+                (or force (file-newer-than-file-p filename dest))
               (and arg
                    (or (eq 0 arg)
                        (y-or-n-p (concat "Compile "
@@ -1991,21 +1990,21 @@ The value is non-nil if there were no errors, nil if errors.
 
 See also `emacs-lisp-byte-compile-and-load'."
   (declare (advertised-calling-convention (filename) "28.1"))
-;;  (interactive "fByte compile file: \nP")
   (interactive
-   (let ((file buffer-file-name)
-	 (file-dir nil))
-     (and file
-	  (derived-mode-p 'emacs-lisp-mode)
-	  (setq file-dir (file-name-directory file)))
-     (list (read-file-name (if current-prefix-arg
-			       "Byte compile and load file: "
-			     "Byte compile file: ")
-			   file-dir buffer-file-name nil)
-	   current-prefix-arg)))
-  ;; Expand now so we get the current buffer's defaults
+   (list (apply #'read-file-name
+                (concat "Byte compile"
+                        (if current-prefix-arg
+			    " and load"
+		          "")
+                        " file: ")
+                (when (and (derived-mode-p 'emacs-lisp-mode)
+                           buffer-file-name)
+                  (list (file-name-directory buffer-file-name)
+                        nil
+                        nil
+                        (file-name-nondirectory buffer-file-name))))
+	 current-prefix-arg))
   (setq filename (expand-file-name filename))
-
   (unless noninteractive
     (when-let ((b (get-file-buffer (expand-file-name filename))))
       (when (and (buffer-modified-p b)
