@@ -257,22 +257,19 @@ DEFAULT-BODY, if present, is used as the body of a default method.
                               lambda-doc
                               def-body)]]
              def-body)))
-  (let* ((doc (if (stringp (car-safe options-and-methods))
-                  (pop options-and-methods)))
-         (declarations nil)
-         (methods ())
-         (options ())
-         (warnings
-          (let ((nonsymargs
-                 (delq nil (mapcar (lambda (arg) (unless (symbolp arg) arg))
-                                   args))))
-            (when nonsymargs
-              (list
-               (macroexp-warn-and-return
-                (format "Non-symbol arguments to cl-defgeneric: %s"
-                        (mapconcat #'prin1-to-string nonsymargs ""))
-                nil nil nil nonsymargs)))))
-         next-head)
+  (let* ((doc (when (stringp (car-safe options-and-methods))
+                (pop options-and-methods)))
+         (nonsymargs (delq nil (mapcar
+                                (lambda (arg)
+                                  (unless (symbolp arg) arg))
+                                args)))
+         (warnings (when nonsymargs
+                     (list
+                      (macroexp-warn-and-return
+                       (format "Non-symbol arguments to cl-defgeneric: %s"
+                               (mapconcat #'prin1-to-string nonsymargs ""))
+                       nil))))
+         declarations methods options next-head)
     (while (progn (setq next-head (car-safe (car options-and-methods)))
                   (or (keywordp next-head)
                       (eq next-head 'declare)))
@@ -613,14 +610,19 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
 
 (defvar cl--generic-dispatchers (make-hash-table :test #'equal))
 
-(defun cl--generic-dispatcher-key (dispatch)
-  (cons (car dispatch) (mapcar (lambda (x) (cl--generic-generalizer-name x))
-                               (cdr dispatch))))
+(defvar cl--generic-compiler
+  (if (consp (lambda (x) (+ x 1)))
+      (lambda (exp) (eval exp t))
+    #'byte-compile)
+  "Don't byte-compile the dispatchers if cl-generic itself is not
+  compiled.  Otherwise the byte-compiler and all the code on
+  which it depends needs to be usable before cl-generic is loaded,
+  which imposes a significant burden on the bootstrap.")
 
 (defun cl--generic-get-dispatcher (dispatch)
   (with-memoization
-      ;; `copy-sequence` because DISPATCH could be side-effected
-      ;; by `cl-generic-define-method' (bug#46722).
+      ;; We need `copy-sequence` here because this `dispatch' object might be
+      ;; modified by side-effect in `cl-generic-define-method' (bug#46722).
       (gethash (copy-sequence dispatch) cl--generic-dispatchers)
     (let* ((dispatch-arg (car dispatch))
            (generalizers (cdr dispatch))
@@ -657,7 +659,11 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
       (dotimes (i dispatch-idx)
         (push (make-symbol (format "arg%d" (- dispatch-idx i 1))) fixedargs))
       (let ((lexical-binding t)) ;; for method-cache
-        (byte-compile
+        ;; FIXME: For generic functions with a single method (or with 2 methods,
+        ;; one of which always matches), using a tagcode + hash-table is
+        ;; overkill: better just use a `cl-typep' test.
+        (funcall
+         cl--generic-compiler
          `(lambda (generic dispatches-left methods)
             (eval-when-compile (require 'subr-x))
             (let ((method-cache (make-hash-table :test #'eql)))
@@ -883,11 +889,20 @@ those methods.")
       (setq arg-or-context `(&context . ,arg-or-context)))
     (unless (fboundp 'cl--generic-get-dispatcher)
       (require 'cl-generic))
-    (let ((fun (cl--generic-get-dispatcher
-                `(,arg-or-context
-                  ,@(apply #'append
-                           (mapcar #'cl-generic-generalizers specializers))
-                  ,cl--generic-t-generalizer))))
+    (let ((fun
+           ;; Let-bind cl--generic-dispatchers so we *re*compute the function
+           ;; from scratch, since the one in the cache may be non-compiled!
+           (let ((cl--generic-dispatchers (make-hash-table))
+                 ;; When compiling `cl-generic' during bootstrap, make sure
+                 ;; we prefill with compiled dispatchers even though the loaded
+                 ;; `cl-generic' is still interpreted.
+                 (cl--generic-compiler
+                  (if (featurep 'bytecomp) #'byte-compile cl--generic-compiler)))
+             (cl--generic-get-dispatcher
+              `(,arg-or-context
+                ,@(apply #'append
+                         (mapcar #'cl-generic-generalizers specializers))
+                ,cl--generic-t-generalizer)))))
       ;; Recompute dispatch at run-time, since the generalizers may be slightly
       ;; different (e.g. byte-compiled rather than interpreted).
       ;; FIXME: There is a risk that the run-time generalizer is not equivalent
@@ -898,8 +913,7 @@ those methods.")
                 ,@(apply #'append
                          (mapcar #'cl-generic-generalizers ',specializers))
                 ,cl--generic-t-generalizer)))
-         (puthash dispatch ',fun cl--generic-dispatchers)
-         ))))
+         (puthash dispatch ',fun cl--generic-dispatchers)))))
 
 (cl-defmethod cl-generic-combine-methods (generic methods)
   "Standard support for :after, :before, :around, and `:extra NAME' qualifiers."
