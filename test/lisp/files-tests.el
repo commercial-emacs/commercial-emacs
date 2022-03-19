@@ -1428,6 +1428,22 @@ renaming only, rather than modified in-place."
             (should (null (save-buffer))))
         (ignore-errors (advice-remove #'write-region advice))))))
 
+(ert-deftest files-tests-prompt-long-lines ()
+  "Long lines should prompt the user for raw, a.k.a literal, mode.
+Unfortunately, prompting is only triggered in interactive mode."
+  (ert-with-temp-file temp-file-name
+    (with-current-buffer (find-file-noselect temp-file-name)
+      (insert "f")
+      (should (null (save-buffer)))
+      (kill-buffer))
+    (let ((find-file-literally-line-length 1)
+          noninteractive prompted-p)
+      (cl-letf (((symbol-function 'y-or-n-p)
+                 (lambda (&rest _args)
+                   (setq prompted-p t))))
+        (find-file-noselect temp-file-name)
+        (should prompted-p)))))
+
 (ert-deftest files-test-file-size-human-readable ()
   (should (equal (file-size-human-readable 13) "13"))
   (should (equal (file-size-human-readable 13 'si) "13"))

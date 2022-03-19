@@ -3284,7 +3284,7 @@ wc_long_lines_p (char const *file, int fd, EMACS_INT threshold)
 		  running = 0;
 		  lines++;
 		}
-	      else if (++running > threshold)
+	      else if (++running >= threshold)
 		{
 		  return true;
 		}
@@ -3298,7 +3298,7 @@ wc_long_lines_p (char const *file, int fd, EMACS_INT threshold)
           while ((p = rawmemchr (p, '\n')) < end)
             {
 	      running += (p - op);
-	      if (running > threshold)
+	      if (running >= threshold)
 		return true;
 	      running = 0;
               ++lines;
@@ -3306,7 +3306,7 @@ wc_long_lines_p (char const *file, int fd, EMACS_INT threshold)
 	      op = p;
             }
 	  running += (p - op);
-	  if (running > threshold)
+	  if (running >= threshold)
 	    return true;
         }
 
