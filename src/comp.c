@@ -515,8 +515,6 @@ typedef struct {
   ptrdiff_t size;
 } f_reloc_t;
 
-sigset_t saved_sigset;
-
 static f_reloc_t freloc;
 
 #define NUM_CAST_TYPES 15
@@ -636,7 +634,7 @@ typedef struct {
 
 static comp_t comp;
 
-FILE *logfile = NULL;
+static FILE *logfile;
 
 /* This is used for serialized objects by the reload mechanism.  */
 typedef struct {
@@ -4701,7 +4699,7 @@ unknown (before GCC version 10).  */)
 /* for laziness. Change this if a performance impact is measured.             */
 /******************************************************************************/
 
-void
+static void
 helper_unwind_protect (Lisp_Object handler)
 {
   /* Support for a function here is new in 24.4.  */
@@ -4709,28 +4707,20 @@ helper_unwind_protect (Lisp_Object handler)
 			 handler);
 }
 
-Lisp_Object
-helper_temp_output_buffer_setup (Lisp_Object x)
-{
-  CHECK_STRING (x);
-  temp_output_buffer_setup (SSDATA (x));
-  return Vstandard_output;
-}
-
-Lisp_Object
+static Lisp_Object
 helper_unbind_n (Lisp_Object n)
 {
   return unbind_to (specpdl_ref_add (SPECPDL_INDEX (), -XFIXNUM (n)), Qnil);
 }
 
-void
+static void
 helper_save_restriction (void)
 {
   record_unwind_protect (save_restriction_restore,
 			 save_restriction_save ());
 }
 
-bool
+static bool
 helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code)
 {
   return PSEUDOVECTOR_TYPEP (XUNTAG (a, Lisp_Vectorlike,
@@ -4749,6 +4739,12 @@ return_nil (Lisp_Object arg)
 {
   return Qnil;
 }
+
+static Lisp_Object
+directory_files_matching (Lisp_Object name, Lisp_Object match)
+{
+  return Fdirectory_files (name, Qt, match, Qnil, Qnil);
+}
 #endif
 
 /* Windows does not let us delete a .eln file that is currently loaded
@@ -4766,11 +4762,11 @@ eln_load_path_final_clean_up (void)
   FOR_EACH_TAIL (dir_tail)
     {
       Lisp_Object files_in_dir =
-	internal_condition_case_5 (Fdirectory_files,
+	internal_condition_case_2 (directory_files_matching,
 				   Fexpand_file_name (Vcomp_native_version_dir,
 						      XCAR (dir_tail)),
-				   Qt, build_string ("\\.eln\\.old\\'"), Qnil,
-				   Qnil, Qt, return_nil);
+				   build_string ("\\.eln\\.old\\'"),
+				   Qt, return_nil);
       FOR_EACH_TAIL (files_in_dir)
 	internal_delete_file (XCAR (files_in_dir));
     }
