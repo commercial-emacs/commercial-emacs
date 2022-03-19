@@ -47,10 +47,8 @@ Roughly every hour.
 
 ### <a name="long-lines"></a>Long lines remain dog-slow, what's the deal?
 
-Only the C code was changed.  Lisp package code bogs as before.  To
-realize the improvement, one ought to `find-file-literally` (which
-won't fontify), and turn off showstoppers like `hl-line-mode` and
-`show-paren-mode`.
+Accede when prompted to open your file in `raw mode`.  Also turn off
+showstoppers like `hl-line-mode` and `show-paren-mode`.
 
 ### <a name="tree-sitter"></a>How can I try tree-sitter highlighting?
 

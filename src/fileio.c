@@ -100,6 +100,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <fsusage.h>
 #include <stat-time.h>
 #include <tempname.h>
+#include <safe-read.h>
 
 #include <binary-io.h>
 
@@ -3245,6 +3246,84 @@ See `file-symlink-p' to distinguish symlinks.  */)
   return stat_result == 0 && S_ISREG (st.st_mode) ? Qt : Qnil;
 }
 
+
+/* In the authors of coreutils/src/wc.c we trust.
+   Copyright (C) 1985-2022 Free Software Foundation, Inc.  */
+
+static bool
+wc_long_lines_p (char const *file, int fd, EMACS_INT threshold)
+{
+#define WC_BUFFER_SIZE (16 * 1024)
+  size_t bytes_read;
+  uintmax_t lines = 0, running = 0;
+  char buf[WC_BUFFER_SIZE + 1];
+  bool shorter_lines = true;
+
+  while ((bytes_read = safe_read (fd, buf, WC_BUFFER_SIZE)) > 0)
+    {
+      char *p, *end;
+      uintmax_t plines;
+
+      if (bytes_read == SAFE_READ_ERROR)
+        {
+	  report_file_errno ("safe_read", build_string (file), errno);
+          return false;
+        }
+
+      p = buf;
+      end = buf + bytes_read;
+      plines = lines;
+
+      if (shorter_lines)
+        {
+          /* Avoid function call overhead for shorter lines.  */
+          while (p != end)
+	    {
+	      if (*p++ == '\n')
+		{
+		  running = 0;
+		  lines++;
+		}
+	      else if (++running > threshold)
+		{
+		  return true;
+		}
+	    }
+        }
+      else
+        {
+          /* rawmemchr is more efficient with longer lines.  */
+	  char *op = p;
+          *end = '\n';
+          while ((p = rawmemchr (p, '\n')) < end)
+            {
+	      running += (p - op);
+	      if (running > threshold)
+		return true;
+	      running = 0;
+              ++lines;
+              ++p;
+	      op = p;
+            }
+	  running += (p - op);
+	  if (running > threshold)
+	    return true;
+        }
+
+      /* If the average line length in the block is >= 15, then use
+          memchr for the next block, where system specific optimizations
+          may outweigh function call overhead.
+          FIXME: This line length was determined in 2015, on both
+          x86_64 and ppc64, but it's worth re-evaluating in future with
+          newer compilers, CPUs, or memchr() implementations etc.  */
+      if (lines - plines <= bytes_read / 15)
+        shorter_lines = false;
+      else
+        shorter_lines = true;
+    }
+  return false;
+}
+
 DEFUN ("find-file-long-lines-p", Ffind_file_long_lines_p, Sfind_file_long_lines_p, 1, 1, 0,
        doc: /* Return t if file FILENAME contains long lines.
 A long line is a run of `find-file-literally-line-length`
@@ -3252,9 +3331,18 @@ non-newline characters.  */)
   (Lisp_Object filename)
 {
   CHECK_STRING (filename);
-  return ! NILP (Qfind_file_literally_line_length)
-    ? Qnil
-    : Qnil;
+  Lisp_Object result = Qnil,
+    threshold = Fsymbol_value (Qfind_file_literally_line_length);
+  if (FIXNUMP (threshold) && XFIXNUM (threshold) > 0)
+    {
+      Lisp_Object absname = Fexpand_file_name (filename, Qnil);
+      int fd = emacs_open (SSDATA (absname), O_RDONLY, 0);
+      if (fd < 0)
+	report_file_error ("Opening input file", absname);
+      result = wc_long_lines_p (SSDATA (filename), fd, XFIXNUM (threshold))
+	? Qt : Qnil;
+    }
+  return result;
 }
 
 DEFUN ("file-selinux-context", Ffile_selinux_context,
