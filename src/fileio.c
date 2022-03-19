@@ -3244,6 +3244,18 @@ See `file-symlink-p' to distinguish symlinks.  */)
 
   return stat_result == 0 && S_ISREG (st.st_mode) ? Qt : Qnil;
 }
+
+DEFUN ("find-file-long-lines-p", Ffind_file_long_lines_p, Sfind_file_long_lines_p, 1, 1, 0,
+       doc: /* Return t if file FILENAME contains long lines.
+A long line is a run of `find-file-literally-line-length`
+non-newline characters.  */)
+  (Lisp_Object filename)
+{
+  CHECK_STRING (filename);
+  return ! NILP (Qfind_file_literally_line_length)
+    ? Qnil
+    : Qnil;
+}
 
 DEFUN ("file-selinux-context", Ffile_selinux_context,
        Sfile_selinux_context, 1, 1, 0,
@@ -6363,6 +6375,7 @@ syms_of_fileio (void)
   DEFSYM (Qfile_modes, "file-modes");
   DEFSYM (Qset_file_modes, "set-file-modes");
   DEFSYM (Qset_file_times, "set-file-times");
+  DEFSYM (Qfind_file_literally_line_length, "find-file-literally-line-length");
   DEFSYM (Qfile_selinux_context, "file-selinux-context");
   DEFSYM (Qset_file_selinux_context, "set-file-selinux-context");
   DEFSYM (Qfile_acl, "file-acl");
@@ -6645,6 +6658,7 @@ This includes interactive calls to `delete-file' and
   defsubr (&Sset_file_modes);
   defsubr (&Sset_file_times);
   defsubr (&Sfile_selinux_context);
+  defsubr (&Sfind_file_long_lines_p);
   defsubr (&Sfile_acl);
   defsubr (&Sset_file_acl);
   defsubr (&Sset_file_selinux_context);

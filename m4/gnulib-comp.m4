@@ -158,6 +158,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module realloc-posix:
   # Code from module regex:
   # Code from module root-uid:
+  # Code from module safe-read:
   # Code from module scratch_buffer:
   # Code from module sig2str:
   # Code from module sigdescr_np:
@@ -467,6 +468,7 @@ AC_DEFUN([gl_INIT],
   AM_COND_IF([GL_COND_OBJ_REGEX], [
     gl_PREREQ_REGEX
   ])
+  gl_MODULE_INDICATOR([safe-read])
   gl_FUNC_SIG2STR
   gl_CONDITIONAL([GL_COND_OBJ_SIG2STR], [test $ac_cv_func_sig2str = no])
   AM_COND_IF([GL_COND_OBJ_SIG2STR], [
@@ -1334,6 +1336,8 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/regex_internal.h
   lib/regexec.c
   lib/root-uid.h
+  lib/safe-read.c
+  lib/safe-read.h
   lib/scratch_buffer.h
   lib/set-permissions.c
   lib/sha1.c
@@ -1480,6 +1484,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/readlinkat.m4
   m4/realloc.m4
   m4/regex.m4
+  m4/safe-read.m4
   m4/sha1.m4
   m4/sha256.m4
   m4/sha512.m4

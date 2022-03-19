@@ -140,6 +140,7 @@
 #  readlink \
 #  readlinkat \
 #  regex \
+#  safe-read \
 #  sig2str \
 #  sigdescr_np \
 #  socklen \
@@ -2686,6 +2687,16 @@ EXTRA_DIST += root-uid.h
 
 endif
 ## end   gnulib module root-uid
+
+## begin gnulib module safe-read
+ifeq (,$(OMIT_GNULIB_MODULE_saferead))
+
+libgnu_a_SOURCES += safe-read.c
+
+EXTRA_DIST += safe-read.h
+
+endif
+## end   gnulib module safe-read
 
 ## begin gnulib module scratch_buffer
 ifeq (,$(OMIT_GNULIB_MODULE_scratch_buffer))

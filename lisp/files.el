@@ -2153,6 +2153,14 @@ suppresses this warning."
   :version "21.1"
   :type 'boolean)
 
+(defcustom find-file-literally-line-length 100000
+  "Shortest run of non-newline characters triggering a raw file read.
+When nil, avoid this potentially time consuming check."
+  :group 'files
+  :group 'find-file
+  :version "29.1"
+  :type '(choice integer (const :tag "Never scan" nil)))
+
 (defcustom large-file-warning-threshold 10000000
   "Maximum size of file above which a confirmation is requested.
 When nil, never request confirmation."
@@ -2323,24 +2331,33 @@ the various files."
 	     (attributes (file-attributes truename))
 	     (number (nthcdr 10 attributes))
 	     ;; Find any buffer for a file that has same truename.
-	     (other (and (not buf) (find-buffer-visiting filename))))
+	     (other (unless buf (find-buffer-visiting filename))))
 	;; Let user know if there is a buffer with the same truename.
-	(if other
-	    (progn
-	      (or nowarn
-		  find-file-suppress-same-file-warnings
-		  (string-equal filename (buffer-file-name other))
-		  (files--message "%s and %s are the same file"
-                                  filename (buffer-file-name other)))
-	      ;; Optionally also find that buffer.
-	      (if (or find-file-existing-other-name find-file-visit-truename)
-		  (setq buf other))))
+	(when other
+	  (or nowarn
+	      find-file-suppress-same-file-warnings
+	      (string-equal filename (buffer-file-name other))
+	      (files--message "%s and %s are the same file"
+                              filename (buffer-file-name other)))
+	  ;; Optionally also find that buffer.
+	  (when (or find-file-existing-other-name find-file-visit-truename)
+	    (setq buf other)))
 	;; Check to see if the file looks uncommonly large.
-	(when (not (or buf nowarn))
-          (when (eq (abort-if-file-too-large
-                     (file-attribute-size attributes) "open" filename
-                     (not rawfile))
-                    'raw)
+	(when (and (not buf) (not nowarn))
+          (when (or (eq 'raw
+                        (abort-if-file-too-large
+                         (file-attribute-size attributes) "open" filename
+                         (not rawfile)))
+                    (and (not noninteractive)
+                         (find-file-long-lines-p filename)
+                         (let ((response
+                                (y-or-n-p
+                                 (format "Open %s in raw mode?"
+                                         (file-name-nondirectory filename)))))
+                           (prog1 response
+                             (unless response
+                               (message "find-file-literally-line-length currently %s"
+                                        find-file-literally-line-length))))))
             (setf rawfile t))
 	  (warn-maybe-out-of-memory (file-attribute-size attributes)))
 	(if buf
