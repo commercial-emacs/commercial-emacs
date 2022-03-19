@@ -1512,7 +1512,7 @@ returned as the :certificate entry.  */)
 /* Initialize global GnuTLS state to defaults.
    Call 'gnutls-global-deinit' when GnuTLS usage is no longer needed.
    Return zero on success.  */
-static Lisp_Object
+Lisp_Object
 emacs_gnutls_global_init (void)
 {
   int ret = GNUTLS_E_SUCCESS;
