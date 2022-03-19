@@ -1767,37 +1767,6 @@ if test "$GCC" = yes && test "$ac_enable_autodepend" = yes; then
 fi
 AC_SUBST([AUTO_DEPEND])
 
-AC_CACHE_CHECK([for old but post-boot file],
-  [emacs_cv_boot_time_file],
-  [AS_CASE([$opsys],
-     [*bsd|darwin|dragonfly],
-       [emacs_cv_boot_time_file='not needed'],
-     [emacs_cv_boot_time_file=unknown
-      AS_IF([test $cross_compiling = no],
-	[# systemd puts it in /var/lib/systemd.
-	 # initscripts puts it in /var/lib/urandom (previously /var/lib).
-	 # Linux drivers/char/random.c before 2022-02-21 suggests /var/run.
-	 for file in \
-	     /var/lib/systemd/random-seed \
-	     /var/lib/urandom/random-seed \
-	     /var/lib/random-seed \
-	     /var/run/random-seed
-	 do
-	   test -f $file && { emacs_cv_boot_time_file=$file; break; }
-	 done])])])
-AS_CASE([$emacs_cv_boot_time_file],
-  [/*|*:*], [BOOT_TIME_FILE=\"$emacs_cv_boot_time_file\"],
-  [NULL|nullptr|0], [BOOT_TIME_FILE=$emacs_cv_boot_time_file],
-  ['not needed'], [BOOT_TIME_FILE=NULL],
-  [# Guess systemd if unknown.
-   # If guess is wrong, Emacs falls back on something else.
-   BOOT_TIME_FILE=\"/var/lib/systemd/random-seed\"])
-AC_DEFINE_UNQUOTED([BOOT_TIME_FILE], [$BOOT_TIME_FILE],
-  [Name of file that, if it exists, postdates boot and predates
-   the first Emacs invocation; or a null pointer if no such file is known.
-   This file is used only on GNU/Linux and other systems
-   that lack the FreeBSD-style sysctl with KERN_BOOTTIME.])
-
 #### Choose a window system.
 
 ## We leave window_system equal to none if
@@ -4074,8 +4043,6 @@ If you really want to try it anyway, use the configure option
 fi
 
 if test "${with_native_compilation}" != "no"; then
-    AC_MSG_ERROR([We don't understand native compilation]);
-
     if test "${HAVE_PDUMPER}" = no; then
        AC_MSG_ERROR(['--with-native-compilation' requires '--with-dumping=pdumper'])
     fi

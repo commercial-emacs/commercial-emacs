@@ -684,13 +684,14 @@ typedef struct {
    Helper functions called by the run-time.
 */
 
-void helper_unwind_protect (Lisp_Object handler);
-Lisp_Object helper_temp_output_buffer_setup (Lisp_Object x);
-Lisp_Object helper_unbind_n (Lisp_Object n);
-void helper_save_restriction (void);
-bool helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code);
+static void helper_unwind_protect (Lisp_Object);
+static Lisp_Object helper_unbind_n (Lisp_Object);
+static void helper_save_restriction (void);
+static bool helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object, enum pvec_type);
 
-void *helper_link_table[] =
+/* Note: helper_link_table must match the list created by
+   `declare_runtime_imported_funcs'.  */
+static void *helper_link_table[] =
   { wrong_type_argument,
     helper_PSEUDOVECTOR_TYPEP_XUNTAG,
     pure_write_error,
@@ -702,7 +703,7 @@ void *helper_link_table[] =
     set_internal,
     helper_unwind_protect,
     specbind,
-    maybe_gc,
+    maybe_garbage_collect,
     maybe_quit };
 
 
@@ -2835,7 +2836,7 @@ declare_runtime_imported_funcs (void)
   args[0] = args[1] = comp.lisp_obj_type;
   ADD_IMPORTED (specbind, comp.void_type, 2, args);
 
-  ADD_IMPORTED (maybe_gc, comp.void_type, 0, NULL);
+  ADD_IMPORTED (maybe_garbage_collect, comp.void_type, 0, NULL);
 
   ADD_IMPORTED (maybe_quit, comp.void_type, 0, NULL);
 
@@ -4799,14 +4800,16 @@ helper_save_restriction (void)
 }
 
 /* For whatever reason, dude needed define_PSEUDOVECTORP() and
-   didn't want to define this using PSEUDOVECTORP().  Too bad?  */
+   didn't want to define this using PSEUDOVECTORP().  */
 static bool
 helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code)
 {
+  /* return PSEUDOVECTOR_TYPEP (XUNTAG (a, Lisp_Vectorlike, */
+  /* 				     union vectorlike_header), */
+  /* 			     code); */
   return PSEUDOVECTORP (a, code);
 }
 
-
 /* `native-comp-eln-load-path' clean-up support code.  */
 
 #ifdef WINDOWSNT
@@ -4898,7 +4901,7 @@ maybe_defer_native_compilation (Lisp_Object function_name,
   if (! load_gccjit_if_necessary (false))
     return;
 
-  if (! native_comp_deferred_compilation
+  if (! native_comp_jit_compilation
       || noninteractive
       || ! NILP (Vloadup_pure_table)
       || ! COMPILEDP (definition)
