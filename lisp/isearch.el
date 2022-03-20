@@ -1814,6 +1814,8 @@ The following additional command keys are active while editing.
 	  (minibuffer-history-symbol)
 	  ;; Search string might have meta information on text properties.
 	  (minibuffer-allow-text-properties t))
+     (when isearch-lazy-highlight
+       (add-hook 'minibuffer-setup-hook #'minibuffer-lazy-highlight-setup))
      (setq isearch-new-string
 	   (read-from-minibuffer
 	    (isearch-message-prefix nil isearch-nonincremental)
@@ -3992,6 +3994,8 @@ since they have special meaning in a regexp."
 (defvar isearch-lazy-count-current nil)
 (defvar isearch-lazy-count-total nil)
 (defvar isearch-lazy-count-hash (make-hash-table))
+(defvar lazy-count-update-hook nil
+  "Hook run after new lazy count results are computed.")
 
 (defun lazy-highlight-cleanup (&optional force procrastinate)
   "Stop lazy highlighting and remove extra highlighting from current buffer.
@@ -4050,7 +4054,7 @@ by other Emacs features."
 			         isearch-lazy-highlight-window-end))))))
     ;; something important did indeed change
     (lazy-highlight-cleanup t (not (equal isearch-string ""))) ;stop old timer
-    (when (and isearch-lazy-count isearch-mode (null isearch-message-function))
+    (when isearch-lazy-count
       (when (or (equal isearch-string "")
                 ;; Check if this place was reached by a condition above
                 ;; other than changed window boundaries (that shouldn't
@@ -4069,7 +4073,10 @@ by other Emacs features."
         (setq isearch-lazy-count-current nil
               isearch-lazy-count-total nil)
         ;; Delay updating the message if possible, to avoid flicker
-        (when (string-equal isearch-string "") (isearch-message))))
+        (when (string-equal isearch-string "")
+          (when (and isearch-mode (null isearch-message-function))
+            (isearch-message))
+          (run-hooks 'lazy-count-update-hook))))
     (setq isearch-lazy-highlight-window-start-changed nil)
     (setq isearch-lazy-highlight-window-end-changed nil)
     (setq isearch-lazy-highlight-error isearch-error)
@@ -4122,13 +4129,15 @@ by other Emacs features."
                                  'isearch-lazy-highlight-start))))
   ;; Update the current match number only in isearch-mode and
   ;; unless isearch-mode is used specially with isearch-message-function
-  (when (and isearch-lazy-count isearch-mode (null isearch-message-function))
+  (when isearch-lazy-count
     ;; Update isearch-lazy-count-current only when it was already set
     ;; at the end of isearch-lazy-highlight-buffer-update
     (when isearch-lazy-count-current
       (setq isearch-lazy-count-current
             (gethash (point) isearch-lazy-count-hash 0))
-      (isearch-message))))
+      (when (and isearch-mode (null isearch-message-function))
+        (isearch-message))
+      (run-hooks 'lazy-count-update-hook))))
 
 (defun isearch-lazy-highlight-search (string bound)
   "Search ahead for the next or previous match, for lazy highlighting.
@@ -4329,16 +4338,81 @@ Attempt to do the search exactly the way the pending Isearch would."
 		    (setq looping nil
 			  nomore  t))))
 	    (if nomore
-		(when (and isearch-lazy-count isearch-mode (null isearch-message-function))
+		(when isearch-lazy-count
 		  (unless isearch-lazy-count-total
 		    (setq isearch-lazy-count-total 0))
 		  (setq isearch-lazy-count-current
 			(gethash opoint isearch-lazy-count-hash 0))
-		  (isearch-message))
+                  (when (and isearch-mode (null isearch-message-function))
+                    (isearch-message))
+		  (run-hooks 'lazy-count-update-hook))
 	      (setq isearch-lazy-highlight-timer
 		    (run-at-time lazy-highlight-interval nil
 				 'isearch-lazy-highlight-buffer-update)))))))))
 
+
+;; Reading from minibuffer with lazy highlight and match count
+
+(defcustom minibuffer-lazy-count-format "%s "
+  "Format of the total number of matches for the prompt prefix."
+  :type '(choice (const :tag "Don't display a count" nil)
+                 (string :tag "Display match count" "%s "))
+  :group 'lazy-count
+  :version "29.1")
+
+(defvar minibuffer-lazy-highlight-transform #'identity
+  "Function to transform minibuffer text into a `isearch-string' for highlighting.")
+
+(defvar minibuffer-lazy-highlight--overlay nil
+  "Overlay for minibuffer prompt updates.")
+
+(defun minibuffer-lazy-highlight--count ()
+  "Display total match count in the minibuffer prompt."
+  (when minibuffer-lazy-highlight--overlay
+    (overlay-put minibuffer-lazy-highlight--overlay
+                 'before-string
+                 (and isearch-lazy-count-total
+                      (not isearch-error)
+                      (format minibuffer-lazy-count-format
+                              isearch-lazy-count-total)))))
+
+(defun minibuffer-lazy-highlight--after-change (_beg _end _len)
+  "Update lazy highlight state in minibuffer selected window."
+  (when isearch-lazy-highlight
+    (let ((inhibit-redisplay t) ;; Avoid cursor flickering
+          (string (minibuffer-contents)))
+      (with-minibuffer-selected-window
+        (setq isearch-string (funcall minibuffer-lazy-highlight-transform string))
+        (isearch-lazy-highlight-new-loop)))))
+
+(defun minibuffer-lazy-highlight--exit ()
+  "Unwind changes from `minibuffer-lazy-highlight-setup'."
+  (remove-hook 'after-change-functions
+               #'minibuffer-lazy-highlight--after-change)
+  (remove-hook 'lazy-count-update-hook #'minibuffer-lazy-highlight--count)
+  (remove-hook 'minibuffer-exit-hook #'minibuffer-lazy-highlight--exit)
+  (setq minibuffer-lazy-highlight--overlay nil)
+  (when lazy-highlight-cleanup
+    (lazy-highlight-cleanup)))
+
+(defun minibuffer-lazy-highlight-setup ()
+  "Set up minibuffer for lazy highlight of matches in the original window.
+
+This function is intended to be added to `minibuffer-setup-hook'.
+Note that several other isearch variables influence the lazy
+highlighting, including `isearch-regexp',
+`isearch-lazy-highlight' and `isearch-lazy-count'."
+  (remove-hook 'minibuffer-setup-hook #'minibuffer-lazy-highlight-setup)
+  (add-hook 'after-change-functions
+            #'minibuffer-lazy-highlight--after-change)
+  (add-hook 'lazy-count-update-hook #'minibuffer-lazy-highlight--count)
+  (add-hook 'minibuffer-exit-hook #'minibuffer-lazy-highlight--exit)
+  (setq minibuffer-lazy-highlight--overlay
+        (and minibuffer-lazy-count-format
+             (make-overlay (point-min) (point-min) (current-buffer) t)))
+  (minibuffer-lazy-highlight--after-change nil nil nil))
+
+
 (defun isearch-resume (string regexp word forward message case-fold)
   "Resume an incremental search.
 STRING is the string or regexp searched for.
