@@ -6614,10 +6614,11 @@ instead.  */)
   int ntargets = 0;
   char *target_names[2048];
   Atom *target_atoms;
-  Lisp_Object lval;
+  Lisp_Object lval, original;
   Atom xaction;
 
   CHECK_LIST (targets);
+  original = targets;
 
   for (; CONSP (targets); targets = XCDR (targets))
     {
@@ -6631,6 +6632,8 @@ instead.  */)
       else
 	error ("Too many targets");
     }
+
+  CHECK_LIST_END (targets, original);
 
   if (NILP (action) || EQ (action, QXdndActionCopy))
     xaction = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionCopy;
