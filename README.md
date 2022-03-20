@@ -39,16 +39,11 @@ Roughly every hour.
 
 ### How has the code diverged thus far?
 
-- Long lines that don't suck[... too badly.](#long-lines)
+- Performant long lines.
 - [Tree-sitter font highlighting](#tree-sitter). <sup id="a1">[1](#f1)</sup>
 - Gnus is rewritten to be non-blocking.
 - Process management is rewritten.
 - Tree-sitter replacement of ersatz PPSS syntactic parser.
-
-### <a name="long-lines"></a>Long lines remain dog-slow, what's the deal?
-
-Accede when prompted to open your file in `raw mode`.  Also turn off
-showstoppers like `hl-line-mode` and `show-paren-mode`.
 
 ### <a name="tree-sitter"></a>How can I try tree-sitter highlighting?
 
