@@ -1433,6 +1433,7 @@ renaming only, rather than modified in-place."
 Unfortunately, prompting is only triggered in interactive mode."
   (ert-with-temp-file temp-file-name
     (with-current-buffer (find-file-noselect temp-file-name)
+      (should show-paren-mode)
       (insert "f")
       (should (null (save-buffer)))
       (kill-buffer))
@@ -1441,7 +1442,8 @@ Unfortunately, prompting is only triggered in interactive mode."
       (cl-letf (((symbol-function 'y-or-n-p)
                  (lambda (&rest _args)
                    (setq prompted-p t))))
-        (find-file-noselect temp-file-name)
+        (with-current-buffer (find-file-noselect temp-file-name)
+          (should-not show-paren-mode))
         (should prompted-p)))))
 
 (ert-deftest files-test-file-size-human-readable ()
