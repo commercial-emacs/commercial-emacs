@@ -2549,7 +2549,24 @@ Do you want to revisit the file normally now? ")))
 	    (set-buffer-multibyte nil)
 	    (setq buffer-file-coding-system 'no-conversion)
 	    (set-buffer-major-mode buf)
-	    (setq-local find-file-literally t))
+	    (setq-local find-file-literally t)
+            (dolist (mode minor-mode-list)
+              (let ((guess-local-version
+                     ;; show-paren-mode -> show-paren-local-mode
+                     (mapconcat #'identity
+                                (append (nbutlast (split-string
+                                                   (symbol-name mode) "-"))
+                                        '("local" "mode"))
+                                "-")))
+                ;; confusing: show-paren-mode is buffer-local-boundp
+                ;; but not local-variable-p (and thus won't
+                ;; foul up our assay of local-variable-if-set-p)
+                (when (and (buffer-local-boundp mode (current-buffer))
+                           (buffer-local-value mode (current-buffer))
+                           (or (local-variable-if-set-p mode)
+                               (setq mode (intern-soft guess-local-version)))
+                           (fboundp mode))
+                  (ignore-errors (funcall mode -1))))))
 	(after-find-file error (not nowarn)))
       (current-buffer))))
 
