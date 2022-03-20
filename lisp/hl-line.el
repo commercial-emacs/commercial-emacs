@@ -66,6 +66,12 @@
   :version "22.1"
   :group 'hl-line)
 
+(defcustom hl-line-highlight-hook nil
+  "After hook for `hl-line-highlight'.
+Currently used in calendar/todo-mode."
+  :type 'hook
+  :group 'hl-line)
+
 ;;;###autoload
 (define-minor-mode hl-line-mode
   "Toggle highlighting of the current line."
@@ -83,19 +89,13 @@
   (unless hl-line-sticky-flag
     (when hl-line--overlay
       (delete-overlay hl-line--overlay)
-      (cl-assert (null hl-line--overlay)))))
-
-(defcustom hl-line-highlight-hook nil
-  "Something calendar/todo-mode needs."
-  :type 'hook
-  :group 'hl-line)
+      (setq hl-line--overlay nil))))
 
 (defun hl-line-highlight ()
   (unless (minibufferp)
     (unless (buffer-local-value 'hl-line--overlay (current-buffer))
       (setq hl-line--overlay
             (let ((ol (make-overlay (point) (point))))
-              (message "made %S %S" (current-buffer) (buffer-name))
               (prog1 ol
                 (overlay-put ol 'priority hl-line-overlay-priority)
                 (overlay-put ol 'face 'hl-line-face)))))
