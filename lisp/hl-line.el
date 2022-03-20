@@ -36,6 +36,12 @@
 (defvar-local hl-line--overlay nil
   "Keep state else scan entire buffer in `post-command-hook'.")
 
+;; 1. define-minor-mode creates buffer-local hl-line--overlay
+;; 2. overlay wiped by kill-all-local-variables
+;; 3. post-command-hook dupes overlay
+;; Solution: prevent step 2.
+(put 'hl-line--overlay 'permanent-local t)
+
 (defgroup hl-line nil
   "Highlight the current line."
   :version "21.1"
@@ -78,8 +84,9 @@ Currently used in calendar/todo-mode."
   :group 'hl-line
   (if hl-line-mode
       (progn
-	(add-hook 'post-command-hook #'hl-line-highlight nil t)
-        (add-hook 'change-major-mode-hook #'hl-line-unhighlight nil t))
+        (hl-line-highlight)
+        (add-hook 'change-major-mode-hook #'hl-line-unhighlight nil t)
+	(add-hook 'post-command-hook #'hl-line-highlight nil t))
     (remove-hook 'post-command-hook #'hl-line-highlight t)
     (remove-hook 'change-major-mode-hook #'hl-line-unhighlight t)
     (let (hl-line-sticky-flag)
@@ -93,7 +100,7 @@ Currently used in calendar/todo-mode."
 
 (defun hl-line-highlight ()
   (unless (minibufferp)
-    (unless (buffer-local-value 'hl-line--overlay (current-buffer))
+    (unless hl-line--overlay
       (setq hl-line--overlay
             (let ((ol (make-overlay (point) (point))))
               (prog1 ol
