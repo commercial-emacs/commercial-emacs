@@ -1236,38 +1236,6 @@ message buffer `default-directory'."
 	   (compilation-forget-errors)
 	   pt))))
 
-(defvar byte-compile-log-warning-function
-  #'byte-compile--log-warning-for-byte-compile
-  "Function called when encountering a warning or error.
-Called with arguments (STRING POSITION FILL LEVEL).  STRING is a
-message describing the problem.  POSITION is a buffer position
-where the problem was detected.  FILL is a prefix as in
-`warning-fill-prefix'.  LEVEL is the level of the
-problem (`:warning' or `:error').  POSITION, FILL and LEVEL may
-be nil.")
-
-(defun byte-compile-log-warning (string &optional fill level)
-  "Log a byte-compilation warning.
-SYM, STRING, FILL and LEVEL are as described in
-`byte-compile-log-warning-function'."
-  (funcall byte-compile-log-warning-function
-           string
-           'unused
-           fill
-           level))
-
-(defun byte-compile--log-warning-for-byte-compile
-    (string &optional _position fill level)
-  "Log a message STRING in `byte-compile-log-buffer'.
-Also log the current function and file if not already done.  If
-FILL is non-nil, set `warning-fill-prefix' to four spaces.  LEVEL
-is the warning level (`:warning' or `:error').  Do not call this
-function directly; use `byte-compile-warn' instead."
-  (let* ((warning-prefix-function #'byte-compile-warning-prefix)
-	 (warning-type-format "")
-	 (warning-fill-prefix (when fill "    ")))
-    (display-warning 'bytecomp string level byte-compile-log-buffer)))
-
 (defun byte-compile-warn-obsolete (symbol)
   "Warn that SYMBOL (a variable or function) is obsolete."
   (when (byte-compile-warning-enabled-p 'obsolete symbol)
@@ -1281,10 +1249,14 @@ function directly; use `byte-compile-warn' instead."
 	(byte-compile-warn "%s" msg)))))
 
 (defun byte-compile-warn (format &rest args)
-  (setq format (apply #'format-message format args))
-  (if byte-compile-error-on-warn
-      (error "%s" format)
-    (byte-compile-log-warning format t :warning)))
+  (let ((missive (apply #'format-message format args))
+        (warning-prefix-function #'byte-compile-warning-prefix)
+        (warning-type-format ""))
+    (if byte-compile-error-on-warn
+        (progn
+          (display-warning 'bytecomp missive :error byte-compile-log-buffer)
+          (signal 'error nil))
+      (display-warning 'bytecomp missive :warning byte-compile-log-buffer))))
 
 (defun byte-compile-fdefinition (name macro-p)
   "If a function has an entry saying (FUNCTION . t).
@@ -1768,8 +1740,7 @@ and cl-macs.el.")
 		   (progn ,@body)
 	         (error
                   (prog1 nil
-                    (setq byte-compile-abort-elc t)
-                    (byte-compile-warn "%s" (error-message-string err))))))))
+                    (setq byte-compile-abort-elc t)))))))
      (if (and (markerp warning-series)
 	      (eq (marker-buffer warning-series)
 		  (get-buffer byte-compile-log-buffer)))
@@ -2428,8 +2399,7 @@ in the input buffer (now current), not in the output buffer."
                         (funcall handler form)
                       (error
                        (prog1 nil
-                         (setq byte-compile-abort-elc t)
-                         (byte-compile-warn "%s" (error-message-string err)))))))
+                         (setq byte-compile-abort-elc t))))))
 	(byte-compile-flush-pending)
 	(byte-compile-output-file-form form*))
     (byte-compile-keep-pending form)))
