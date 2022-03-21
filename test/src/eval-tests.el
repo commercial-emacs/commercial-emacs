@@ -53,7 +53,10 @@ Bug#24912 and Bug#24913."
             (should-error (byte-compile-check-lambda-list args))
             (let ((byte-compile-error-on-warn t)
                   (debug-on-error nil))
-              (should-error (eval `(byte-compile (lambda ,args)) lb)))))))))
+              (should-not byte-compile-abort-elc)
+              (eval `(byte-compile (lambda ,args)) lb)
+              (should byte-compile-abort-elc)
+              (setq byte-compile-abort-elc nil))))))))
 
 (ert-deftest eval-tests-accept-empty-optional ()
   "Check that Emacs accepts empty &optional arglists.

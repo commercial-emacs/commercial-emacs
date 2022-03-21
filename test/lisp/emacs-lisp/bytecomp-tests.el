@@ -1201,16 +1201,21 @@ literals (Bug#20852)."
   (bytecomp-tests--with-temp-file source
     (write-region "(list ?) ?( ?; ?\" ?[ ?])" nil source)
     (bytecomp-tests--with-temp-file destination
-      (let* ((byte-compile-dest-file-function (lambda (_) destination))
-             (byte-compile-error-on-warn t)
-             (debug-on-error nil)
-             (err (should-error (byte-compile-file source))))
-        (should (equal (error-message-string err)
-                       (concat "unescaped character literals "
-                               "`?\"', `?(', `?)', `?;', `?[', `?]' "
-                               "detected, "
-                               "`?\\\"', `?\\(', `?\\)', `?\\;', `?\\[', "
-                               "`?\\]' expected!"))))))
+      (let ((byte-compile-dest-file-function (lambda (_) destination))
+            (byte-compile-error-on-warn t)
+            (debug-on-error nil))
+        (byte-compile-file source)
+        (should (with-current-buffer byte-compile-log-buffer
+                  (save-excursion
+                    (goto-char (point-min))
+                    (re-search-forward
+                     (regexp-quote
+                      (concat "unescaped character literals "
+                              "`?\"', `?(', `?)', `?;', `?[', `?]' "
+                              "detected, "
+                              "`?\\\"', `?\\(', `?\\)', `?\\;', `?\\[', "
+                              "`?\\]' expected!"))
+                     nil t)))))))
   ;; But don't warn in subsequent compilations (Bug#36068).
   (bytecomp-tests--with-temp-file source
     (write-region "(list 1 2 3)" nil source)
