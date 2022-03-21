@@ -75,9 +75,12 @@
   (should-not (find-image '((:type png :file "does-not-exist-foo-bar.png")))))
 
 (ert-deftest image-type-from-file-name ()
-  (should (eq (image-type-from-file-name "foo.jpg") 'jpeg))
-  (should (eq (image-type-from-file-name "foo.png") 'png))
-  (should (eq (image-type-from-file-name "foo.webp") 'webp)))
+  (should (or (not (image-type-available-p 'jpeg))
+              (eq (image-type-from-file-name "foo.jpg") 'jpeg)))
+  (should (or (not (image-type-available-p 'png))
+              (eq (image-type-from-file-name "foo.png") 'png)))
+  (should (or (not (image-type-available-p 'webp))
+              (eq (image-type-from-file-name "foo.webp") 'webp))))
 
 (ert-deftest image-type/from-filename ()
   ;; On emba, `image-types' and `image-load-path' do not exist.
