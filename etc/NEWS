@@ -29,6 +29,7 @@ applies, and please also update docstrings as needed.
 This uses the popular sqlite3 library, and can be disabled by using
 the '--without-sqlite3' option to the 'configure' script.
 
++++
 ** Emacs has been ported to the Haiku operating system.
 The configuration process should automatically detect and build for
 Haiku.  There is also an optional window-system port to Haiku, which
@@ -50,6 +51,7 @@ Unlike X, there is no compile-time option to enable or disable
 double-buffering.  If you wish to disable double-buffering, change the
 frame parameter 'inhibit-double-buffering' instead.
 
+---
 ** Emacs now installs the ".pdmp" file using a unique fingerprint in the name.
 The file is typically installed using a file name akin to
 "...dir/libexec/emacs/29.1/x86_64-pc-linux-gnu/emacs-<fingerprint>.pdmp".
@@ -64,6 +66,7 @@ this support.
 The named feature 'xinput2' can be used to test for the presence of
 XInput 2 support from Lisp programs.
 
++++
 ** Emacs now supports being built with pure GTK.
 To use this option, make sure the GTK 3 and Cairo development files
 are installed, and configure Emacs with the option '--with-pgtk'.
@@ -154,6 +157,7 @@ example, if point is before an Emoji sequence, pressing <Delete> will
 delete the entire sequence, not just a single character at its
 beginning.
 
++++
 ** 'load-history' does not treat autoloads specially any more.
 An autoload definition appears just as a '(defun . NAME)' and the
 '(t . NAME)' entries are not generated any more.
@@ -195,6 +199,7 @@ If set to nil, commands like 'find-library' will only include library
 files in the completion candidates.  The default is t, which preserves
 previous behavior, whereby non-library files could also be included.
 
++++
 ** New command 'sqlite-mode-open-file' for examining an sqlite3 file.
 This uses the new 'sqlite-mode' which allows listing the tables in a
 DB file, and examining and modifying the columns and the contents of
@@ -321,6 +326,7 @@ When environment variable 'EMACS_TEST_JUNIT_REPORT' is set, ERT
 generates a JUnit test report under this file name.  This is useful
 for Emacs integration into CI/CD test environments.
 
+---
 *** Unbound test symbols now signal an 'ert-test-unbound' error.
 This affects the 'ert-select-tests' function and its callers.
 
@@ -354,6 +360,7 @@ inserted.
 This command will tell you the name of the Emoji at point.  (This
 command also works for non-Emoji characters.)
 
+---
 *** New input method 'emoji'.
 
 ** Help
@@ -381,6 +388,7 @@ displayed, if any.
 
 ** Outline Mode
 
++++
 *** Support for customizing the default visibility state of headings.
 Customize the user option 'outline-default-state' to define what
 headings will be visible after Outline mode is turned on.  When equal
@@ -418,7 +426,9 @@ For example, a 'display-buffer-alist' entry of
 will make the body of the chosen window 40 columns wide.  For the
 height use 'window-height' in combination with 'body-lines'.
 
-*** 'other-window-scroll-default' can define the other window to scroll.
+---
+*** You can customize which window 'scroll-other-window' operates on.
+This is controlled by the new 'other-window-scroll-default' user option.
 
 ** Frames
 
@@ -440,6 +450,7 @@ the corresponding deleted frame.
 By default, it contains 'C-c <left>' and 'C-c <right>' to browse
 the history of tab window configurations back and forward.
 
+---
 ** Better detection of text suspiciously reordered on display.
 The function 'bidi-find-overridden-directionality' has been extended
 to detect reordering effects produced by embeddings and isolates
@@ -694,6 +705,26 @@ prefix argument that causes 'eudc-expand-try-all' to return matches
 from all servers instead of just the matches from the first server to
 return any.  This is useful for example, if one wants to search LDAP
 for a name that happens to match a contact in one's BBDB.
+
++++
+*** New behaviour and default for option 'eudc-inline-expansion-format'
+EUDC inline expansion result formatting defaulted to
+
+                 '("%s %s <%s>" firstname name email)
+
+Since email address specifications need to comply with RFC 5322 in
+order to be useful in messages, there was a risk to produce syntax
+which was standard with RFC 822, but is marked as obsolete syntax by
+its successor RFC 5322.  Also, the first and last name part was never
+enclosed in double quotes, potentially producing invalid address
+specifications, which may be rejected by a receiving MTA.  Thus, this
+variable can now additionally be set to nil (the new default), or a
+function.  In both cases, the formatted result will be in compliance
+with RFC 5322.  When set to nil, a default format very similar to the
+old default will be produced.  When set to a function, that function
+is called, and the returned values are used to populate the phrase and
+comment parts (see RFC 5322 for definitions). In both cases, the
+phrase part will be automatically quoted if necessary.
 
 ** eww/shr
 
