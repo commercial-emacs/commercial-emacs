@@ -51,6 +51,15 @@
 ;; Solution: prevent step 2.
 (put 'hl-line--overlay 'permanent-local t)
 
+(defvar hl-line-range-function nil
+  "If non-nil, function to call to return highlight range.
+The function of no args should return a cons cell; its car value
+is the beginning position of highlight and its cdr value is the
+end position of highlight in the buffer.
+It should return nil if there's no region to be highlighted.
+
+This variable is expected to be made buffer-local by modes.")
+
 (defgroup hl-line nil
   "Highlight the current line."
   :version "21.1"
@@ -125,9 +134,11 @@ Currently used in calendar/todo-mode."
               (prog1 ol
                 (overlay-put ol 'priority hl-line-overlay-priority)
                 (overlay-put ol 'face hl-line-face)))))
-    (move-overlay hl-line--overlay
-                  (line-beginning-position)
-                  (line-beginning-position 2))
+    (let* ((user-bounds (when (functionp hl-line-range-function)
+                          (funcall hl-line-range-function)))
+           (beg (or (car-safe user-bounds) (line-beginning-position)))
+           (end (or (cdr-safe user-bounds) (line-beginning-position 2))))
+      (move-overlay hl-line--overlay beg end))
     (when (and (not (eq hl-line--buffer (current-buffer)))
                (not hl-line-sticky-flag)
                (buffer-live-p hl-line--buffer))

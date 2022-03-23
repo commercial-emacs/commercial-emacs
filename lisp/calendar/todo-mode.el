@@ -6674,8 +6674,9 @@ Added to `window-configuration-change-hook' in Todo mode."
 (defun todo-hl-line-range ()
   "Make `todo-toggle-item-highlighting' highlight entire item."
   (save-excursion
-    (when (and (todo-item-end) hl-line--overlay)
-      (move-overlay hl-line--overlay (todo-item-start) (todo-item-end)))))
+    (when (todo-item-end)
+      (cons (todo-item-start)
+            (todo-item-end)))))
 
 (defun todo-modes-set-2 ()
   "Make some settings that apply to multiple Todo modes."
@@ -6683,7 +6684,7 @@ Added to `window-configuration-change-hook' in Todo mode."
   (setq buffer-read-only t)
   (setq-local todo--item-headers-hidden nil)
   (setq-local desktop-save-buffer 'todo-desktop-save-buffer)
-  (add-hook 'hl-line-highlight-hook #'todo-hl-line-range nil t))
+  (setq-local hl-line-range-function #'todo-hl-line-range))
 
 (defun todo-modes-set-3 ()
   "Make some settings that apply to multiple Todo modes."
