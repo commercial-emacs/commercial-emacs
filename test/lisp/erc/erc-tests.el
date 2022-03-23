@@ -197,14 +197,10 @@
 (ert-deftest erc-ring-previous-command ()
   (with-current-buffer (get-buffer-create "*#fake*")
     (erc-mode)
-    (insert "\n\n")
+    (erc-tests--send-prep)
+    (setq-local erc-last-input-time 0)
     (should-not (local-variable-if-set-p 'erc-send-completed-hook))
     (set (make-local-variable 'erc-send-completed-hook) nil) ; skip t (globals)
-    (setq erc-input-marker (make-marker)
-          erc-insert-marker (make-marker))
-    (set-marker erc-insert-marker (point-max))
-    (erc-display-prompt)
-    (should (= (point) erc-input-marker))
     ;; Just in case erc-ring-mode is already on
     (setq-local erc-pre-send-functions nil)
     (add-hook 'erc-pre-send-functions #'erc-add-to-input-ring)
@@ -285,6 +281,198 @@
     (kill-buffer "*erc-protocol*")
     (should-not erc-debug-irc-protocol)))
 
+(ert-deftest erc--input-line-delim-regexp ()
+  (let ((p erc--input-line-delim-regexp))
+    ;; none
+    (should (equal '("a" "b") (split-string "a\r\nb" p)))
+    (should (equal '("a" "b") (split-string "a\nb" p)))
+    (should (equal '("a" "b") (split-string "a\rb" p)))
+
+    ;; one
+    (should (equal '("") (split-string "" p)))
+    (should (equal '("a" "" "b") (split-string "a\r\rb" p)))
+    (should (equal '("a" "" "b") (split-string "a\n\rb" p)))
+    (should (equal '("a" "" "b") (split-string "a\n\nb" p)))
+    (should (equal '("a" "" "b") (split-string "a\r\r\nb" p)))
+    (should (equal '("a" "" "b") (split-string "a\n\r\nb" p)))
+    (should (equal '("a" "") (split-string "a\n" p)))
+    (should (equal '("a" "") (split-string "a\r" p)))
+    (should (equal '("a" "") (split-string "a\r\n" p)))
+    (should (equal '("" "b") (split-string "\nb" p)))
+    (should (equal '("" "b") (split-string "\rb" p)))
+    (should (equal '("" "b") (split-string "\r\nb" p)))
+
+    ;; two
+    (should (equal '("" "") (split-string "\r" p)))
+    (should (equal '("" "") (split-string "\n" p)))
+    (should (equal '("" "") (split-string "\r\n" p)))
+
+    ;; three
+    (should (equal '("" "" "") (split-string "\r\r" p)))
+    (should (equal '("" "" "") (split-string "\n\n" p)))
+    (should (equal '("" "" "") (split-string "\n\r" p)))))
+
+(ert-deftest erc--blank-in-multiline-input-p ()
+  (ert-info ("With `erc-send-whitespace-lines'")
+    (let ((erc-send-whitespace-lines t))
+      (should (erc--blank-in-multiline-input-p ""))
+      (should (erc--blank-in-multiline-input-p "/msg a\n")) ; likely oops
+      (should (erc--blank-in-multiline-input-p "/msg a\n\nb")) ; "" not allowed
+      (should-not (erc--blank-in-multiline-input-p "a\n\nb")) ; "" allowed
+      (should-not (erc--blank-in-multiline-input-p " "))
+      (should-not (erc--blank-in-multiline-input-p "\t"))
+      (should-not (erc--blank-in-multiline-input-p "a\nb"))
+      (should-not (erc--blank-in-multiline-input-p "a\n "))
+      (should-not (erc--blank-in-multiline-input-p "a\n \t"))
+      (should-not (erc--blank-in-multiline-input-p "a\n \f"))
+      (should-not (erc--blank-in-multiline-input-p "a\n \nb"))
+      (should-not (erc--blank-in-multiline-input-p "a\n \t\nb"))
+      (should-not (erc--blank-in-multiline-input-p "a\n \f\nb"))))
+
+  (should (erc--blank-in-multiline-input-p ""))
+  (should (erc--blank-in-multiline-input-p " "))
+  (should (erc--blank-in-multiline-input-p "\t"))
+  (should (erc--blank-in-multiline-input-p "a\n\nb"))
+  (should (erc--blank-in-multiline-input-p "a\n\nb"))
+  (should (erc--blank-in-multiline-input-p "a\n "))
+  (should (erc--blank-in-multiline-input-p "a\n \t"))
+  (should (erc--blank-in-multiline-input-p "a\n \f"))
+  (should (erc--blank-in-multiline-input-p "a\n \nb"))
+  (should (erc--blank-in-multiline-input-p "a\n \t\nb"))
+
+  (should-not (erc--blank-in-multiline-input-p "a\rb"))
+  (should-not (erc--blank-in-multiline-input-p "a\nb"))
+  (should-not (erc--blank-in-multiline-input-p "a\r\nb")))
+
+(defun erc-tests--send-prep ()
+  (erc-mode)
+  (insert "\n\n")
+  (setq erc-input-marker (make-marker)
+        erc-insert-marker (make-marker))
+  (set-marker erc-insert-marker (point-max))
+  (erc-display-prompt)
+  (should (= (point) erc-input-marker)))
+
+(defun erc-tests--set-fake-server-process (&rest args)
+  (setq erc-server-process
+        (apply #'start-process (car args) (current-buffer) args))
+  (set-process-query-on-exit-flag erc-server-process nil))
+
+(defmacro erc-tests--with-process-input-spy (calls-var &rest body)
+  (declare (indent 1))
+  `(with-current-buffer (get-buffer-create "FakeNet")
+     (let ((erc-pre-send-functions
+            (remove #'erc-add-to-input-ring erc-pre-send-functions)) ; for now
+           (inhibit-message noninteractive)
+           (erc-server-current-nick "tester")
+           (erc-last-input-time 0)
+           erc-accidental-paste-threshold-seconds
+           ,calls-var)
+       (cl-letf (((symbol-function 'erc-process-input-line)
+                  (lambda (&rest r) (push r ,calls-var)))
+                 ((symbol-function 'erc-server-buffer)
+                  (lambda () (current-buffer))))
+         (erc-tests--send-prep)
+         ,@body))
+     (when noninteractive (kill-buffer))))
+
+(ert-deftest erc-check-prompt-input-functions ()
+  (erc-tests--with-process-input-spy calls
+
+    (ert-info ("Errors when point not in prompt area") ; actually just dings
+      (insert "/msg #chan hi")
+      (forward-line -1)
+      (let ((e (should-error (erc-send-current-line))))
+        (should (equal "Point is not in the input area" (cadr e))))
+      (goto-char (point-max))
+      (ert-info ("Input remains untouched")
+        (should (save-excursion (erc-bol) (looking-at "/msg #chan hi")))))
+
+    (ert-info ("Errors when no process running")
+      (let ((e (should-error (erc-send-current-line))))
+        (should (equal "ERC: No process running" (cadr e))))
+      (ert-info ("Input remains untouched")
+        (should (save-excursion (erc-bol) (looking-at "/msg #chan hi")))))
+
+    (ert-info ("Errors when line contains empty newline")
+      (erc-bol)
+      (delete-region (point) (point-max))
+      (insert "one\n")
+      (let ((e (should-error (erc-send-current-line))))
+        (should (equal "Blank line - ignoring..." (cadr e))))
+      (goto-char (point-max))
+      (ert-info ("Input remains untouched")
+        (should (save-excursion (goto-char erc-input-marker)
+                                (looking-at "one\n")))))
+
+    (should (= 0 erc-last-input-time))
+    (should-not calls)))
+
+;; These also indirectly tests `erc-send-input'
+
+(ert-deftest erc-send-current-line ()
+  (erc-tests--with-process-input-spy calls
+
+    (erc-tests--set-fake-server-process "sleep" "1")
+    (should (= 0 erc-last-input-time))
+
+    (ert-info ("Simple command")
+      (insert "/msg #chan hi")
+      (erc-send-current-line)
+      (ert-info ("Prompt restored")
+        (forward-line 0)
+        (should (looking-at-p erc-prompt)))
+      (ert-info ("Input cleared")
+        (erc-bol)
+        (should (eq (point) (point-max))))
+      ;; Commands are forced (no flood protection)
+      (should (equal (pop calls) '("/msg #chan hi\n" t nil))))
+
+    (ert-info ("Simple non-command")
+      (insert "hi")
+      (erc-send-current-line)
+      (should (eq (point) (point-max)))
+      (should (save-excursion (forward-line -1)
+                              (search-forward "<tester> hi")))
+      ;; Non-ommands are forced only when `erc-flood-protect' is nil
+      (should (equal (pop calls) '("hi\n" nil t))))
+
+    (should (consp erc-last-input-time))))
+
+(ert-deftest erc-send-whitespace-lines ()
+  (erc-tests--with-process-input-spy calls
+
+    (erc-tests--set-fake-server-process "sleep" "1")
+    (setq-local erc-send-whitespace-lines t)
+
+    (ert-info ("Multiline hunk with blank line correctly split")
+      (insert "one\n\ntwo")
+      (erc-send-current-line)
+      (ert-info ("Prompt restored")
+        (forward-line 0)
+        (should (looking-at-p erc-prompt)))
+      (ert-info ("Input cleared")
+        (erc-bol)
+        (should (eq (point) (point-max))))
+      (should (equal (pop calls) '("two\n" nil t)))
+      (should (equal (pop calls) '("\n" nil t)))
+      (should (equal (pop calls) '("one\n" nil t))))
+
+    (ert-info ("Multiline hunk with trailing blank filtered")
+      (insert "hi\n")
+      (erc-send-current-line)
+      (ert-info ("Input cleared")
+        (erc-bol)
+        (should (eq (point) (point-max))))
+      (should (equal (pop calls) '("hi\n" nil t)))
+      (should-not (pop calls)))
+
+    (ert-info ("Multiline hunk with trailing whitespace not filtered")
+      (insert "there\n ")
+      (erc-send-current-line)
+      (should (equal (pop calls) '(" \n" nil t)))
+      (should (equal (pop calls) '("there\n" nil t)))
+      (should-not (pop calls)))))
 
 ;; The point of this test is to ensure output is handled identically
 ;; regardless of whether a command handler is summoned.
@@ -340,19 +528,19 @@
         (ert-info ("Implicit cmd via `erc-send-input-line-function'")
 
           (ert-info ("Baseline")
-            (erc-process-input-line "hi")
+            (erc-process-input-line "hi\n")
             (should (equal (pop erc-server-flood-queue)
                            '("PRIVMSG #chan :hi\r\n" . utf-8))))
 
           (ert-info ("Spaces preserved")
-            (erc-process-input-line "hi you")
+            (erc-process-input-line "hi you\n")
             (should (equal (pop erc-server-flood-queue)
                            '("PRIVMSG #chan :hi you\r\n" . utf-8))))
 
-          (ert-info ("Empty line transmitted without injected-space kludge")
-            (erc-process-input-line "")
+          (ert-info ("Empty line transmitted with injected-space kludge")
+            (erc-process-input-line "\n")
             (should (equal (pop erc-server-flood-queue)
-                           '("PRIVMSG #chan :\r\n" . utf-8))))
+                           '("PRIVMSG #chan : \r\n" . utf-8))))
 
           (should-not calls))))))
 
