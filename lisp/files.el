@@ -2343,7 +2343,10 @@ the various files."
 	  (when (or find-file-existing-other-name find-file-visit-truename)
 	    (setq buf other)))
 	;; Check to see if the file looks uncommonly large.
-	(when (and (not buf) (not nowarn))
+	(when (and (not buf)
+                   (not nowarn)
+                   attributes
+                   (file-readable-p filename))
           (when (or (eq 'raw
                         (abort-if-file-too-large
                          (file-attribute-size attributes) "open" filename
