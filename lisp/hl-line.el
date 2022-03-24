@@ -89,12 +89,13 @@ This variable is expected to be made buffer-local by modes.")
   :initialize #'custom-initialize-default
   :set (lambda (symbol value)
          (set-default symbol value)
-         (unless value
-           (let ((selected (window-buffer (selected-window))))
-             (dolist (buffer (buffer-list))
-               (unless (eq buffer selected)
-                 (with-current-buffer buffer
-                   (hl-line-unhighlight))))))))
+         (when (featurep 'hl-line)
+           (unless value
+             (let ((selected (window-buffer (selected-window))))
+               (dolist (buffer (buffer-list))
+                 (unless (eq buffer selected)
+                   (with-current-buffer buffer
+                     (hl-line-unhighlight)))))))))
 
 (defcustom hl-line-overlay-priority -50
   "Priority used on the overlay used by hl-line."
