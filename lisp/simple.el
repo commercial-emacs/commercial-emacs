@@ -9147,9 +9147,13 @@ This affects the commands `next-completion' and
   :group 'completion)
 
 (defcustom completion-auto-select nil
-  "Non-nil means to automatically select the *Completions* buffer."
-  :type '(choice (const :tag "Select window" t)
-                 (const :tag "Disabled" nil)
+  "Non-nil means to automatically select the *Completions* buffer.
+When the value is t, then pressing TAB will switch to the completion list
+buffer when it pops up that buffer.  If the value is `second-tab', then the
+first TAB will pop up the completions list buffer, and the second one will
+switch to it."
+  :type '(choice (const :tag "Disabled" nil)
+                 (const :tag "Select window on first tab" t)
                  (const :tag "Select window on second-tab" second-tab))
   :version "29.1"
   :group 'completion)
@@ -9166,6 +9170,13 @@ forward)."
 With prefix argument N, move N items (negative N means move
 backward)."
   (interactive "p")
+  (let ((prev (previous-single-property-change (point) 'mouse-face)))
+    (goto-char (cond
+                ((not prev)
+                 (1- (next-single-property-change (point) 'mouse-face)))
+                ((/= prev (point))
+                 (point))
+                (t prev))))
   (let ((beg (point-min)) (end (point-max)))
     (catch 'bound
       (while (> n 0)
@@ -9183,7 +9194,7 @@ backward)."
         (unless (get-text-property (point) 'mouse-face)
           (goto-char (next-single-property-change (point) 'mouse-face nil end)))
         (setq n (1- n)))
-      (while (< n 0)
+      (while (and (< n 0) (not (bobp)))
         (let ((prop (get-text-property (1- (point)) 'mouse-face)))
           ;; If in a completion, move to the start of it.
           (when (and prop (eq prop (get-text-property (point) 'mouse-face)))
@@ -9415,8 +9426,8 @@ Called from `temp-buffer-show-hook'."
 	(insert (substitute-command-keys
 		 "In this buffer, type \\[choose-completion] to \
 select the completion near point.\n\n")))))
-  (if (eq completion-auto-select t)
-      (switch-to-completions)))
+  (when (eq completion-auto-select t)
+    (switch-to-completions)))
 
 (add-hook 'completion-setup-hook #'completion-setup-function)
 
