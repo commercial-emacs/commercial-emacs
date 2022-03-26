@@ -3472,6 +3472,29 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 		      /* Read the object itself.  */
 		      Lisp_Object tem = read0 (readcharfun, false);
 
+                      if (CONSP (tem))
+                        {
+			  if (BASE_EQ (tem, placeholder))
+			    /* Catch silly games like #1=#1# */
+			    invalid_syntax ("nonsensical self-reference",
+					    readcharfun);
+
+			  /* Optimisation: since the placeholder is already
+			     a cons, repurpose it as the actual value.
+			     This allows us to skip the substition below,
+			     since the placeholder is already referenced
+			     inside TEM at the appropriate places.  */
+                          Fsetcar (placeholder, XCAR (tem));
+                          Fsetcdr (placeholder, XCDR (tem));
+
+			  struct Lisp_Hash_Table *h2
+			    = XHASH_TABLE (read_objects_completed);
+			  ptrdiff_t i = hash_lookup (h2, placeholder, &hash);
+			  eassert (i < 0);
+			  hash_put (h2, placeholder, Qnil, hash);
+			  return placeholder;
+			}
+
 		      /* If it can be recursive, remember it for
 			 future substitutions.  */
 		      if (! SYMBOLP (tem)
@@ -3497,10 +3520,10 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 		          Flread__substitute_object_in_subtree
 			    (tem, placeholder, read_objects_completed);
 
-		          /* ...and #n# will use the real value from now on.  */
-			  i = hash_lookup (h, number, &hash);
-			  eassert (i >= 0);
-			  set_hash_value_slot (h, i, tem);
+		      /* ...and #n# will use the real value from now on.  */
+		      i = hash_lookup (h, number, &hash);
+		      eassert (i >= 0);
+		      set_hash_value_slot (h, i, tem);
 
 		          return ANNOTATE (tem);
                         }
