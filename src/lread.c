@@ -3474,7 +3474,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 
                       if (CONSP (tem))
                         {
-			  if (BASE_EQ (tem, placeholder))
+			  if (EQ (tem, placeholder))
 			    /* Catch silly games like #1=#1# */
 			    invalid_syntax ("nonsensical self-reference",
 					    readcharfun);
