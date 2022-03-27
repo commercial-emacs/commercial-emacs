@@ -1736,7 +1736,7 @@ and cl-macs.el.")
 (defmacro displaying-byte-compile-warnings (&rest body)
   (declare (debug (def-body)))
   `(let ((fn (lambda ()
-               (condition-case-unless-debug err
+               (condition-case-unless-debug nil
 		   (progn ,@body)
 	         (error
                   (prog1 nil
@@ -2395,7 +2395,7 @@ in the input buffer (now current), not in the output buffer."
                          (symbolp (car form))
 		         (get (car form) 'byte-hunk-handler))))
       (let* ((byte-compile-current-form form)
-             (form* (condition-case-unless-debug err
+             (form* (condition-case-unless-debug nil
                         (funcall handler form)
                       (error
                        (prog1 nil
