@@ -58,7 +58,7 @@
   (should
    (condition-case err
        (let ((lexical-binding t)
-             (byte-compile-debug t))
+             (inhibit-debugger t))
          (byte-compile '(lambda ()
                           (let ((inc-fst nil))
                             (oclosure-lambda (oclosure-test (fst 'foo)) ()

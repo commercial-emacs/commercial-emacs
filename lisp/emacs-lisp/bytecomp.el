@@ -465,7 +465,8 @@ Filled in `cconv-analyze-form' but initialized and consulted here.")
   "List of variables declared as constants during compilation of this file.")
 (defvar byte-compile-free-references)
 (defvar byte-compile-free-assignments)
-(defvar byte-compile-abort-elc nil)
+(defvar byte-compile-abort-elc nil
+  "Can be nil, t, or the actual error halting the compilation.")
 
 (defvar byte-compile--defined-funcs nil
   "List of function symbols known to be defined at runtime.")
@@ -1740,7 +1741,7 @@ and cl-macs.el.")
 		   (progn ,@body)
 	         (error
                   (prog1 nil
-                    (setq byte-compile-abort-elc t)))))))
+                    (setq byte-compile-abort-elc err)))))))
      (if (and (markerp warning-series)
 	      (eq (marker-buffer warning-series)
 		  (get-buffer byte-compile-log-buffer)))
@@ -2196,7 +2197,7 @@ With argument ARG, insert value in current buffer after the form."
                      (byte-compile-file-form
                       (byte-compile-preprocess form*)))))
               (error (byte-compile-warn "%s" (error-message-string err))
-                     (setq byte-compile-abort-elc t)))))
+                     (setq byte-compile-abort-elc err)))))
 	(byte-compile-flush-pending)
 	(byte-compile-warn--undefined-funcs)))
      byte-compile--outbuffer)))
@@ -2402,7 +2403,7 @@ in the input buffer (now current), not in the output buffer."
                         (funcall handler form)
                       (error
                        (prog1 nil
-                         (setq byte-compile-abort-elc t))))))
+                         (setq byte-compile-abort-elc err))))))
 	(byte-compile-flush-pending)
 	(byte-compile-output-file-form form*))
     (byte-compile-keep-pending form)))
