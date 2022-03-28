@@ -1736,7 +1736,7 @@ and cl-macs.el.")
 (defmacro displaying-byte-compile-warnings (&rest body)
   (declare (debug (def-body)))
   `(let ((fn (lambda ()
-               (condition-case-unless-debug nil
+               (condition-case-unless-debug err
 		   (progn ,@body)
 	         (error
                   (prog1 nil
@@ -2188,12 +2188,15 @@ With argument ARG, insert value in current buffer after the form."
           (let* ((byte-compile-current-annotations (read-annotated inbuffer))
                  (form (byte-compile--decouple byte-compile-current-annotations
                                                #'cdr)))
-            (byte-compile-maybe-expand
-             form
-             (lambda (form*)
-               (let (byte-compile-current-func)
-                 (byte-compile-file-form
-                  (byte-compile-preprocess form*)))))))
+            (condition-case-unless-debug err
+                (byte-compile-maybe-expand
+                 form
+                 (lambda (form*)
+                   (let (byte-compile-current-func)
+                     (byte-compile-file-form
+                      (byte-compile-preprocess form*)))))
+              (error (byte-compile-warn "%s" (error-message-string err))
+                     (setq byte-compile-abort-elc t)))))
 	(byte-compile-flush-pending)
 	(byte-compile-warn--undefined-funcs)))
      byte-compile--outbuffer)))
@@ -2395,7 +2398,7 @@ in the input buffer (now current), not in the output buffer."
                          (symbolp (car form))
 		         (get (car form) 'byte-hunk-handler))))
       (let* ((byte-compile-current-form form)
-             (form* (condition-case-unless-debug nil
+             (form* (condition-case-unless-debug err
                         (funcall handler form)
                       (error
                        (prog1 nil
@@ -5056,16 +5059,13 @@ already up-to-date."
     (kill-emacs (if error 1 0))))
 
 (defun batch-byte-compile-file (file)
-  (let ((byte-compile-root-dir (or byte-compile-root-dir default-directory)))
-    (condition-case-unless-debug err
-        (byte-compile-file file)
-      (error
-       (prog1 nil
-         (message "Error processing %s: %s" file (error-message-string err))
-         (when (eq (car err) 'file-error)
-           (let ((destfile (byte-compile-dest-file file)))
-             (when (file-exists-p destfile)
-               (delete-file destfile)))))))))
+  (let* ((byte-compile-root-dir (or byte-compile-root-dir default-directory))
+         (ret (byte-compile-file file)))
+    (prog1 ret
+      (unless ret
+        (let ((destfile (byte-compile-dest-file file)))
+          (when (file-exists-p destfile)
+            (delete-file destfile)))))))
 
 (defun byte-compile-refresh-preloaded ()
   "Reload any Lisp file that was changed since Emacs was dumped.

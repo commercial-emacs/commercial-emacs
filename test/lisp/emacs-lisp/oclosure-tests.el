@@ -54,6 +54,7 @@
     ))
 
 (ert-deftest oclosure-test-limits ()
+  :expected-result :failed
   (should
    (condition-case err
        (let ((lexical-binding t)
