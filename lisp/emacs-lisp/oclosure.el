@@ -1,4 +1,4 @@
-;;; oclosure.el --- Open Closures -*- lexical-binding: t; no-byte-compile: t; -*-
+;;; oclosure.el --- Open Closures -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2021-2022  Free Software Foundation, Inc.
 
