@@ -27,6 +27,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <stdlib.h>
 
+bool haiku_dnd_in_progress;
 static void haiku_lisp_to_message (Lisp_Object, void *);
 
 DEFUN ("haiku-selection-data", Fhaiku_selection_data, Shaiku_selection_data,
@@ -520,7 +521,8 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	    case 'RREF':
 	      CHECK_STRING (data);
 
-	      if (be_add_refs_data (message, SSDATA (name), SSDATA (data)))
+	      if (be_add_refs_data (message, SSDATA (name), SSDATA (data))
+		  && haiku_signal_invalid_refs)
 		signal_error ("Invalid file name", data);
 	      break;
 
@@ -722,6 +724,13 @@ haiku_should_quit_drag (void)
   return !NILP (Vquit_flag);
 }
 
+static void
+haiku_unwind_drag_message (void *message)
+{
+  BMessage_delete (message);
+  haiku_dnd_in_progress = false;
+}
+
 DEFUN ("haiku-drag-message", Fhaiku_drag_message, Shaiku_drag_message,
        2, 3, 0,
        doc: /* Begin dragging MESSAGE from FRAME.
@@ -767,9 +776,10 @@ ignored if it is dropped on top of FRAME.  */)
   if (!FRAME_VISIBLE_P (f))
     error ("Frame is invisible");
 
+  haiku_dnd_in_progress = true;
   be_message = be_create_simple_message ();
 
-  record_unwind_protect_ptr (BMessage_delete, be_message);
+  record_unwind_protect_ptr (haiku_unwind_drag_message, be_message);
   haiku_lisp_to_message (message, be_message);
   rc = be_drag_message (FRAME_HAIKU_VIEW (f), be_message,
 			!NILP (allow_same_frame),
@@ -787,6 +797,12 @@ ignored if it is dropped on top of FRAME.  */)
 void
 syms_of_haikuselect (void)
 {
+  DEFVAR_BOOL ("haiku-signal-invalid-refs", haiku_signal_invalid_refs,
+     doc: /* If nil, silently ignore invalid file names in system messages.
+Otherwise, an error will be signalled if adding a file reference to a
+system message failed.  */);
+  haiku_signal_invalid_refs = true;
+
   DEFSYM (QSECONDARY, "SECONDARY");
   DEFSYM (QCLIPBOARD, "CLIPBOARD");
   DEFSYM (QSTRING, "STRING");
