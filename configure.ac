@@ -4323,25 +4323,27 @@ if test "${opsys}" = "mingw32"; then
   if test "${HAVE_GIF}" = "yes"; then
     AC_DEFINE(HAVE_GIF, 1, [Define to 1 if you have a gif (or ungif) library.])
   fi
-elif test "${HAVE_X11}" = "yes" && test "${with_gif}" != "no" \
-        || test "${HAVE_W32}" = "yes" || test "${HAVE_NS}" = "yes" \
-	|| test "${HAVE_BE_APP}" = "yes" || test "$window_system" = "pgtk"; then
-  AC_CHECK_HEADER(gif_lib.h,
-# EGifPutExtensionLast only exists from version libungif-4.1.0b1.
-# Earlier versions can crash Emacs, but version 5.0 removes EGifPutExtensionLast.
-    [AC_CHECK_LIB(gif, GifMakeMapObject, HAVE_GIF=yes,
-        [AC_CHECK_LIB(gif, EGifPutExtensionLast, HAVE_GIF=yes, HAVE_GIF=maybe)])])
+elif test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes" \
+     || test "${HAVE_NS}" = "yes" || test "${HAVE_BE_APP}" = "yes" \
+     || test "$window_system" = "pgtk"; then
+  if test "${with_gif}" != "no"; then
+    AC_CHECK_HEADER(gif_lib.h,
+      # EGifPutExtensionLast only exists from version libungif-4.1.0b1.
+      # Earlier versions can crash Emacs, but version 5.0 removes EGifPutExtensionLast.
+      [AC_CHECK_LIB(gif, GifMakeMapObject, HAVE_GIF=yes,
+          [AC_CHECK_LIB(gif, EGifPutExtensionLast, HAVE_GIF=yes, HAVE_GIF=maybe)])])
 
-  if test "$HAVE_GIF" = yes; then
-    LIBGIF=-lgif
-  elif test "$HAVE_GIF" = maybe; then
-# If gif_lib.h but no libgif, try libungif.
-    AC_CHECK_LIB(ungif, EGifPutExtensionLast, HAVE_GIF=yes, HAVE_GIF=no)
-    test "$HAVE_GIF" = yes && LIBGIF=-lungif
-  fi
+    if test "$HAVE_GIF" = yes; then
+      LIBGIF=-lgif
+    elif test "$HAVE_GIF" = maybe; then
+      # If gif_lib.h but no libgif, try libungif.
+      AC_CHECK_LIB(ungif, EGifPutExtensionLast, HAVE_GIF=yes, HAVE_GIF=no)
+      test "$HAVE_GIF" = yes && LIBGIF=-lungif
+    fi
 
-  if test "${HAVE_GIF}" = "yes"; then
-    AC_DEFINE(HAVE_GIF, 1, [Define to 1 if you have a gif (or ungif) library.])
+    if test "${HAVE_GIF}" = "yes"; then
+      AC_DEFINE(HAVE_GIF, 1, [Define to 1 if you have a gif (or ungif) library.])
+    fi
   fi
 fi
 AC_SUBST(LIBGIF)
