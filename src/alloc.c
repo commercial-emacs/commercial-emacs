@@ -138,6 +138,10 @@ union emacs_align_type
   struct terminal terminal;
   struct thread_state thread_state;
   struct window window;
+#ifdef HAVE_TREE_SITTER
+  struct Lisp_Tree_Sitter tree_sitter;
+  struct Lisp_Tree_Sitter_Node tree_sitter_node;
+#endif
 
   /* Omit the following since they would require including process.h
      etc.  In practice their alignments never exceed that of the
