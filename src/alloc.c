@@ -103,6 +103,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <unistd.h>
 #include <fcntl.h>
+#include <xwidget.h>
+#include <xterm.h>
 
 #ifdef USE_GTK
 # include "gtkutil.h"
@@ -138,35 +140,34 @@ union emacs_align_type
   struct terminal terminal;
   struct thread_state thread_state;
   struct window window;
+  struct scroll_bar scroll_bar;
+#ifdef HAVE_XWIDGETS
+  struct xwidget_view xwidget_view;
+  struct xwidget xwidget;
+#endif
 #ifdef HAVE_TREE_SITTER
   struct Lisp_Tree_Sitter tree_sitter;
   struct Lisp_Tree_Sitter_Node tree_sitter_node;
 #endif
 
-  /* Omit the following since they would require including process.h
-     etc.  In practice their alignments never exceed that of the
-     structs already listed.  */
+  /* Omit some GC_ALIGNED_STRUCT's since they don't exceed the size of
+     those already listed, and they either pull in process.h or
+     they're only defined in .c files.  */
 #if 0
   struct Lisp_Module_Function Lisp_Module_Function;
   struct Lisp_Process Lisp_Process;
   struct save_window_data save_window_data;
-  struct scroll_bar scroll_bar;
-  struct xwidget_view xwidget_view;
-  struct xwidget xwidget;
 #endif
 };
 
-/* MALLOC_SIZE_NEAR (N) is a good number to pass to malloc when
-   allocating a block of memory with size close to N bytes.
-   For best results N should be a power of 2.
+/* Calculate a good number to pass to malloc.
 
-   When calculating how much memory to allocate, GNU malloc (SIZE)
-   adds sizeof (size_t) to SIZE for internal overhead, and then rounds
-   up to a multiple of MALLOC_ALIGNMENT.  Emacs can improve
-   performance a bit on GNU platforms by arranging for the resulting
-   size to be a power of two.  This heuristic is good for glibc 2.26
-   (2017) and later, and does not affect correctness on other
-   platforms.  */
+   This second guesses GNU malloc's adding of sizeof size_t (for
+   internal overhead), followed by its rounding up to a power of two,
+   or equivalently, a multiple of MALLOC_ALIGNMENT.
+
+   This heuristic is good for glibc 2.26 (2017) and later, and does
+   not affect correctness on other platforms.  */
 
 #define MALLOC_SIZE_NEAR(n) \
   (ROUNDUP (max (n, sizeof (size_t)), MALLOC_ALIGNMENT) - sizeof (size_t))
@@ -178,13 +179,12 @@ enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 
 #ifdef DOUG_LEA_MALLOC
 
-/* Specify maximum number of areas to mmap.  It would be nice to use a
-   value that explicitly means "no limit".  */
+/* Effectively unbounded number of areas to mmap.  */
 
 # define MMAP_MAX_AREAS 100000000
 
-/* A pointer to the memory allocated that copies that static data
-   inside glibc's malloc.  */
+/* For malloc_initialize_hook()  */
+
 static void *malloc_state_ptr;
 
 /* Restore the dumped malloc state.  Because malloc can be invoked
@@ -204,7 +204,7 @@ malloc_initialize_hook (void)
     }
   else
     {
-      if (!malloc_using_checking)
+      if (! malloc_using_checking)
 	{
 	  /* Work around a bug in glibc's malloc.  MALLOC_CHECK_ must be
 	     ignored if the heap to be restored was constructed without
@@ -309,8 +309,6 @@ int number_finalizers_run;
 
 /* System byte and object counts reported by GC.  */
 
-/* Assume byte counts fit in uintptr_t and object counts fit into
-   intptr_t.  */
 typedef uintptr_t byte_ct;
 typedef intptr_t object_ct;
 
