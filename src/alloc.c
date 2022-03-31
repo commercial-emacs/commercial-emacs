@@ -1435,7 +1435,7 @@ mark_interval_tree (INTERVAL i)
 
    String data is allocated from sblock structures.  Strings larger
    than LARGE_STRING_BYTES, get their own sblock, data for smaller
-   strings is sub-allocated out of sblocks of size SBLOCK_SIZE.
+   strings are sub-allocated out of sblocks of size SBLOCK_SIZE.
 
    Sblocks consist internally of sdata structures, one for each
    Lisp_String.  The sdata structure points to the Lisp_String it
@@ -1443,11 +1443,10 @@ mark_interval_tree (INTERVAL i)
    its sdata structure.
 
    When a Lisp_String is freed during GC, it is put back on
-   string_free_list, and its `data' member and its sdata's `string'
-   pointer is set to null.  The size of the string is recorded in the
-   `n.nbytes' member of the sdata.  So, sdata structures that are no
-   longer used, can be easily recognized, and it's easy to compact the
-   sblocks of small strings which we do in compact_small_strings.  */
+   string_free_list, and both its `data' and `sdata' fields are
+   invalidated.  The string size is recorded in the `n.nbytes' member
+   of the sdata, facilitating the compacting of sblocks in
+   compact_small_strings.  */
 
 /* Size in bytes of an sblock structure used for small strings.  */
 
@@ -7138,8 +7137,8 @@ sweep_symbols (void)
   gcstat.total_free_symbols = num_free;
 }
 
-/* Remove BUFFER's markers that are due to be swept.  This is needed since
-   we treat BUF_MARKERS and markers's `next' field as weak pointers.  */
+/* Markers are weak pointers.  Invalidate all markers pointing to the
+   swept BUFFER.  */
 static void
 unchain_dead_markers (struct buffer *buffer)
 {
