@@ -5928,9 +5928,6 @@ watch_gc_cons_percentage (Lisp_Object symbol, Lisp_Object newval,
 
 static inline bool mark_stack_empty_p (void);
 
-static int global_marked = 0;
-static int global_print_it = -1;
-
 /* Subroutine of Fgarbage_collect that does most of the work.  */
 void
 garbage_collect (void)
@@ -5982,20 +5979,14 @@ garbage_collect (void)
 
   /* Mark all the special slots that serve as the roots of accessibility.  */
   struct gc_root_visitor visitor = { .visit = mark_object_root_visitor };
-  global_print_it++;
-  int local_marked = global_marked;
   visit_buffer_root (visitor,
                      &buffer_local_symbols,
                      GC_ROOT_BUFFER_LOCAL_NAME);
-
-  fprintf (stderr, "%d: foo1 %d %d\n", global_print_it, local_marked, global_marked);
-  global_print_it++;
 
   mark_elapsed = timespec_add (mark_elapsed,
 			       timespec_sub (current_timespec (), start));
   Vmark_elapsed = make_float (timespectod (mark_elapsed));
   mark_object (Vmark_elapsed);
-  local_marked = global_marked;
 
   visit_buffer_root (visitor,
                      &buffer_defaults,
@@ -6096,7 +6087,6 @@ garbage_collect (void)
   gc_elapsed = timespec_add (gc_elapsed,
 			     timespec_sub (current_timespec (), start));
   Vgc_elapsed = make_float (timespectod (gc_elapsed));
-  fprintf (stderr, "foo2 %d\n", global_marked - local_marked);
   gcs_done++;
 
   /* Collect profiling data.  */
@@ -6106,7 +6096,6 @@ garbage_collect (void)
       if (tot_after < tot_before)
 	malloc_probe (min (tot_before - tot_after, SIZE_MAX));
     }
-  global_marked = 0;
 }
 
 DEFUN ("garbage-collect", Fgarbage_collect, Sgarbage_collect, 0, 0, "",
@@ -6313,19 +6302,9 @@ static void
 mark_buffer (struct buffer *buffer)
 {
   /* This is handled much like other pseudovectors...  */
-  int local_marked = global_marked;
-  if (global_print_it % 2 == 0)
-    fprintf(stderr, "%d: %s %d\n", global_print_it,
-	    STRINGP (BVAR (buffer, name)) ? SSDATA (BVAR (buffer, name)) : "(null)",
-	    local_marked);
   mark_vectorlike (&buffer->header);
-  if (global_print_it % 2 == 0)
-    fprintf(stderr, "%d: %s %d\n", global_print_it,
-	    STRINGP (BVAR (buffer, name)) ? SSDATA (BVAR (buffer, name)) : "(null)",
-	    global_marked);
 
   /* ...but there are some buffer-specific things.  */
-
   mark_interval_tree (buffer_intervals (buffer));
 
   /* For now, we just don't mark the undo_list.  It's done later in
@@ -6832,7 +6811,6 @@ process_mark_stack (ptrdiff_t base_sp)
 #undef CHECK_LIVE
 #undef CHECK_ALLOCATED
 #undef CHECK_ALLOCATED_AND_LIVE
-  global_marked++;
 }
 
 void
