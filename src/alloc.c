@@ -589,10 +589,6 @@ struct Lisp_Finalizer finalizers;
 struct Lisp_Finalizer doomed_finalizers;
 
 
-/************************************************************************
-				Malloc
- ************************************************************************/
-
 #if defined SIGDANGER || (!defined SYSTEM_MALLOC && !defined HYBRID_MALLOC)
 
 /* Function malloc calls this if it finds we are near exhausting storage.  */
@@ -1002,8 +998,6 @@ lisp_free (void *block)
   MALLOC_UNBLOCK_INPUT;
 }
 
-/*****  Allocation of aligned blocks of memory to store Lisp data.  *****/
-
 /* The entry point is lisp_align_malloc which returns blocks of at most
    BLOCK_BYTES and guarantees they are aligned on a BLOCK_ALIGN boundary.  */
 
@@ -1343,10 +1337,6 @@ lrealloc (void *p, size_t size)
 }
 
 
-/***********************************************************************
-			 Interval Allocation
- ***********************************************************************/
-
 /* Number of intervals allocated in an interval_block structure.  */
 
 enum { INTERVAL_BLOCK_SIZE
@@ -1435,10 +1425,6 @@ mark_interval_tree (INTERVAL i)
   if (i && !interval_marked_p (i))
     traverse_intervals_noorder (i, mark_interval_tree_1, NULL);
 }
-
-/***********************************************************************
-			  String Allocation
- ***********************************************************************/
 
 /* Lisp_Strings are allocated in string_block structures.  When a new
    string_block is allocated, all the Lisp_Strings it contains are
@@ -2486,10 +2472,6 @@ pin_string (Lisp_Object string)
 }
 
 
-/***********************************************************************
-			   Float Allocation
- ***********************************************************************/
-
 /* We store float cells inside of float_blocks, allocating a new
    float_block with malloc whenever necessary.  Float cells reclaimed
    by GC are put on a free list to be reallocated before allocating
@@ -2587,12 +2569,6 @@ make_float (double float_value)
   floats_consed++;
   return val;
 }
-
-
-
-/***********************************************************************
-			   Cons Allocation
- ***********************************************************************/
 
 /* We store cons cells inside of cons_blocks, allocating a new
    cons_block with malloc whenever necessary.  Cons cells reclaimed by
@@ -2799,12 +2775,6 @@ DEFUN ("make-list", Fmake_list, Smake_list, 2, 2, 0,
 
   return val;
 }
-
-
-
-/***********************************************************************
-			   Vector Allocation
- ***********************************************************************/
 
 /* Sometimes a vector's contents are merely a pointer internally used
    in vector allocation code.  On the rare platforms where a null
@@ -3557,11 +3527,6 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
   return make_lisp_ptr (v, Lisp_Vectorlike);
 }
 
-
-/***********************************************************************
-			   Symbol Allocation
- ***********************************************************************/
-
 /* Each symbol_block is just under 1020 bytes long, since malloc
    really allocates in units of powers of two and uses 4 bytes for its
    own overhead.  */
@@ -3893,11 +3858,6 @@ FUNCTION.  FUNCTION will be run once per finalizer object.  */)
   return make_lisp_ptr (finalizer, Lisp_Vectorlike);
 }
 
-
-/************************************************************************
-                         Mark bit access functions
- ************************************************************************/
-
 /* With the rare exception of functions implementing block-based
    allocation of various types, you should not directly test or set GC
    mark bits on objects.  Some objects might live in special memory
@@ -4013,12 +3973,6 @@ set_interval_marked (INTERVAL i)
     i->gcmarkbit = true;
 }
 
-
-/************************************************************************
-			   Memory Full Handling
- ************************************************************************/
-
-
 /* Called if malloc (NBYTES) returns zero.  If NBYTES == SIZE_MAX,
    there may have been size_t overflow so that malloc was never
    called, or perhaps malloc was invoked successfully but the
@@ -4103,10 +4057,6 @@ refill_memory_reserve (void)
     Vmemory_full = Qnil;
 #endif
 }
-
-/************************************************************************
-			   C Stack Marking
- ************************************************************************/
 
 /* Conservative C stack marking requires a method to identify possibly
    live Lisp objects given a pointer value.  We do this by keeping
@@ -4908,15 +4858,16 @@ mark_memory (void const *start, void const *end)
 
   for (pp = start; (void const *) pp < end; pp += GC_POINTER_ALIGNMENT)
     {
+      intptr_t ip;
       void *p = *(void *const *) pp;
       mark_maybe_pointer (p, false);
 
       /* Unmask any struct Lisp_Symbol pointer that make_lisp_symbol
-	 previously disguised by adding the address of 'lispsym'.
-	 On a host with 32-bit pointers and 64-bit Lisp_Objects,
-	 a Lisp_Object might be split into registers saved into
-	 non-adjacent words and P might be the low-order word's value.  */
-      intptr_t ip;
+	 previously disguised by adding the address of 'lispsym'.  On
+	 a host with 32-bit pointers and 64-bit Lisp_Objects, a
+	 Lisp_Object might be split into registers saved into
+	 non-adjacent words and P might be the low-order word's
+	 value.  */
       INT_ADD_WRAPV ((intptr_t) p, (intptr_t) lispsym, &ip);
       mark_maybe_pointer ((void *) ip, true);
     }
@@ -5072,8 +5023,7 @@ typedef union
 
    Stack Layout
 
-   Architectures differ in the way their processor stack is organized.
-   For example, the stack might look like this
+   The stack might look like this
 
      +----------------+
      |  Lisp_Object   |  size = 4
@@ -5084,54 +5034,39 @@ typedef union
      +----------------+
      |	...	      |
 
-   In such a case, not every Lisp_Object will be aligned equally.  To
-   find all Lisp_Object on the stack it won't be sufficient to walk
-   the stack in steps of 4 bytes.  Instead, two passes will be
-   necessary, one starting at the start of the stack, and a second
-   pass starting at the start of the stack + 2.  Likewise, if the
-   minimal alignment of Lisp_Objects on the stack is 1, four passes
-   would be necessary, each one starting with one byte more offset
-   from the stack start.  */
+   where not every Lisp_Object is aligned equally.  Walking the stack
+   in 4-byte steps would immediately miss the second Lisp_Object.  We
+   instead issue two passes, one starting at the stack base, and the
+   other starting at the base + 2.  Similarly, if the minimal
+   alignment of Lisp_Objects were 1, four passes would be
+   required.
 
+   We assume the stack is a contiguous in memory.   */
 void
 mark_c_stack (char const *bottom, char const *end)
 {
-  /* This assumes that the stack is a contiguous region in memory.  If
-     that's not the case, something has to be done here to iterate
-     over the stack segments.  */
   mark_memory (bottom, end);
 
-  /* Allow for marking a secondary stack, like the register stack on the
-     ia64.  */
 #ifdef GC_MARK_SECONDARY_STACK
+  /* Allow e.g. marking the register stack on the ia64.  */
   GC_MARK_SECONDARY_STACK ();
 #endif
 }
 
 /* flush_stack_call_func is the trampoline function that flushes
-   registers to the stack, and then calls FUNC.  ARG is passed through
-   to FUNC verbatim.
+   registers to the stack, and then calls FUNC on ARG.
 
-   This function must be called whenever Emacs is about to release the
-   global interpreter lock.  This lets the garbage collector easily
-   find roots in registers on threads that are not actively running
-   Lisp.
+   Must be called before releasing global interpreter lock (e.g.,
+   thread-yield).  This lets the garbage collector easily find roots
+   in registers on threads that are not actively running Lisp.
 
    It is invalid to run any Lisp code or to allocate any GC memory
    from FUNC.
 
-   Note: all register spilling is done in flush_stack_call_func before
-   flush_stack_call_func1 is activated.
-
-   flush_stack_call_func1 is responsible for identifying the stack
-   address range to be scanned.  It *must* be carefully kept as
-   noinline to make sure that registers has been spilled before it is
-   called, otherwise given __builtin_frame_address (0) typically
-   returns the frame pointer (base pointer) and not the stack pointer
-   [1] GC will miss to scan callee-saved registers content
-   (Bug#41357).
-
-   [1] <https://gcc.gnu.org/onlinedocs/gcc/Return-Address.html>.  */
+   Must respect calling convention.  First push callee-saved registers in
+   flush_stack_call_func, then call flush_stack_call_func1 where now ebp
+   would include the pushed-to addresses.  Note NO_INLINE ensures registers
+   are spilled.  (Bug#41357)  */
 
 NO_INLINE void
 flush_stack_call_func1 (void (*func) (void *arg), void *arg)
@@ -5248,10 +5183,6 @@ valid_lisp_object_p (Lisp_Object obj)
 
   return 0;
 }
-
-/***********************************************************************
-		       Pure Storage Management
- ***********************************************************************/
 
 /* Allocate room for SIZE bytes from pure Lisp storage and return a
    pointer to it.  TYPE is the Lisp type for which the memory is
@@ -5652,12 +5583,6 @@ purecopy (Lisp_Object obj)
   return obj;
 }
 
-
-
-/***********************************************************************
-			  Protection from GC
- ***********************************************************************/
-
 /* Put an entry in staticvec, pointing at the variable with address
    VARADDRESS.  */
 
@@ -6003,6 +5928,9 @@ watch_gc_cons_percentage (Lisp_Object symbol, Lisp_Object newval,
 
 static inline bool mark_stack_empty_p (void);
 
+static int global_marked = 0;
+static int global_print_it = -1;
+
 /* Subroutine of Fgarbage_collect that does most of the work.  */
 void
 garbage_collect (void)
@@ -6053,10 +5981,36 @@ garbage_collect (void)
   shrink_regexp_cache ();
 
   /* Mark all the special slots that serve as the roots of accessibility.  */
-
   struct gc_root_visitor visitor = { .visit = mark_object_root_visitor };
-  visit_static_gc_roots (visitor);
+  global_print_it++;
+  int local_marked = global_marked;
+  visit_buffer_root (visitor,
+                     &buffer_local_symbols,
+                     GC_ROOT_BUFFER_LOCAL_NAME);
 
+  fprintf (stderr, "%d: foo1 %d %d\n", global_print_it, local_marked, global_marked);
+  global_print_it++;
+
+  mark_elapsed = timespec_add (mark_elapsed,
+			       timespec_sub (current_timespec (), start));
+  Vmark_elapsed = make_float (timespectod (mark_elapsed));
+  mark_object (Vmark_elapsed);
+  local_marked = global_marked;
+
+  visit_buffer_root (visitor,
+                     &buffer_defaults,
+                     GC_ROOT_BUFFER_LOCAL_DEFAULT);
+
+  for (int i = 0; i < ARRAYELTS (lispsym); i++)
+    {
+      Lisp_Object sptr = builtin_lisp_symbol (i);
+      visitor.visit (&sptr, GC_ROOT_C_SYMBOL, visitor.data);
+    }
+
+  for (int i = 0; i < staticidx; i++)
+    visitor.visit (staticvec[i], GC_ROOT_STATICPRO, visitor.data);
+
+  // visit_static_gc_roots (visitor);
   mark_pinned_objects ();
   mark_pinned_symbols ();
   mark_terminals ();
@@ -6142,6 +6096,7 @@ garbage_collect (void)
   gc_elapsed = timespec_add (gc_elapsed,
 			     timespec_sub (current_timespec (), start));
   Vgc_elapsed = make_float (timespectod (gc_elapsed));
+  fprintf (stderr, "foo2 %d\n", global_marked - local_marked);
   gcs_done++;
 
   /* Collect profiling data.  */
@@ -6151,6 +6106,7 @@ garbage_collect (void)
       if (tot_after < tot_before)
 	malloc_probe (min (tot_before - tot_after, SIZE_MAX));
     }
+  global_marked = 0;
 }
 
 DEFUN ("garbage-collect", Fgarbage_collect, Sgarbage_collect, 0, 0, "",
@@ -6357,7 +6313,16 @@ static void
 mark_buffer (struct buffer *buffer)
 {
   /* This is handled much like other pseudovectors...  */
+  int local_marked = global_marked;
+  if (global_print_it % 2 == 0)
+    fprintf(stderr, "%d: %s %d\n", global_print_it,
+	    STRINGP (BVAR (buffer, name)) ? SSDATA (BVAR (buffer, name)) : "(null)",
+	    local_marked);
   mark_vectorlike (&buffer->header);
+  if (global_print_it % 2 == 0)
+    fprintf(stderr, "%d: %s %d\n", global_print_it,
+	    STRINGP (BVAR (buffer, name)) ? SSDATA (BVAR (buffer, name)) : "(null)",
+	    global_marked);
 
   /* ...but there are some buffer-specific things.  */
 
@@ -6867,6 +6832,7 @@ process_mark_stack (ptrdiff_t base_sp)
 #undef CHECK_LIVE
 #undef CHECK_ALLOCATED
 #undef CHECK_ALLOCATED_AND_LIVE
+  global_marked++;
 }
 
 void
@@ -6948,6 +6914,7 @@ survives_gc_p (Lisp_Object obj)
 
   return survives_p || PURE_P (XPNTR (obj));
 }
+
 
 NO_INLINE /* For better stack traces */
 static void
