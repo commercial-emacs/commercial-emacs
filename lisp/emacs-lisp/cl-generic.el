@@ -305,8 +305,10 @@ DEFAULT-BODY, if present, is used as the body of a default method.
                   `(help-add-fundoc-usage ,doc ',args)
                 (help-add-fundoc-usage doc args)))
            :autoload-end
-           ,@(mapcar (lambda (method) `(cl-defmethod ,name ,@method))
-                     (nreverse methods)))
+           ,(when methods
+              `(with-suppressed-warnings ((obsolete ,name))
+                 ,@(mapcar (lambda (method) `(cl-defmethod ,name ,@method))
+                           (nreverse methods)))))
        ,@(mapcar (lambda (declaration)
                    (let ((f (cdr (assq (car declaration)
                                        defun-declarations-alist))))
@@ -570,7 +572,9 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
          ;; without a previous `cl-defgeneric'.
          ;; The ",'" is a no-op that pacifies check-declare.
          (,'declare-function ,name "")
-         (cl-generic-define-method ',name ',(nreverse qualifiers) ',args
+         ;; We use #' to quote `name' so as to trigger an
+         ;; obsolescence warning when applicable.
+         (cl-generic-define-method #',name ',(nreverse qualifiers) ',args
                                    ',call-con ,fun)))))
 
 (defun cl--generic-member-method (specializers qualifiers methods)
