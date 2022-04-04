@@ -53,7 +53,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define BYTE_CODE_THREADED
 #endif
 
-
 #ifdef BYTE_CODE_METER
 
 #define METER_2(code1, code2) \
@@ -76,7 +75,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 }
 
 #endif /* BYTE_CODE_METER */
-
 
 /*  Byte codes: */
 
@@ -271,13 +269,13 @@ DEFINE (Bswitch, 0267)                                                  \
                                                                         \
 DEFINE (Bconstant, 0300)
 
+#define DEFINE(name, value) name = value,
 enum byte_code_op
 {
-#define DEFINE(name, value) name = value,
-    BYTE_CODES
-#undef DEFINE
+  BYTE_CODES
 };
-
+#undef DEFINE
+
 /* Fetch the next byte from the bytecode stream.  */
 
 #define FETCH (*pc++)
@@ -313,7 +311,7 @@ the third, MAXDEPTH, the maximum stack depth used in this function.
 If the third argument is incorrect, Emacs may crash.  */)
   (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth)
 {
-  if (! (STRINGP (bytestr) && VECTORP (vector) && FIXNATP (maxdepth)))
+  if (! STRINGP (bytestr) || ! VECTORP (vector) || ! FIXNATP (maxdepth))
     error ("Invalid byte-code");
 
   if (STRING_MULTIBYTE (bytestr))
@@ -375,7 +373,7 @@ bcall0 (Lisp_Object f)
 /* bytecode stack frame header (footer, actually) */
 struct bc_frame {
   struct bc_frame *saved_fp;        /* previous frame pointer,
-                                       NULL if bottommost frame */
+                                       Zero if bottommost frame */
 
   /* In a frame called directly from C, the following two members are NULL.  */
   Lisp_Object *saved_top;           /* previous stack pointer */
@@ -391,7 +389,7 @@ init_bc_thread (struct bc_thread_state *bc)
 {
   bc->stack = xmalloc (BC_STACK_SIZE);
   bc->stack_end = bc->stack + BC_STACK_SIZE;
-  /* Put a dummy header at the bottom to indicate the first free location.  */
+  /* Zeroed dummy header to indicate bottom.  */
   bc->fp = (struct bc_frame *)bc->stack;
   memset (bc->fp, 0, sizeof *bc->fp);
 }
@@ -405,22 +403,17 @@ free_bc_thread (struct bc_thread_state *bc)
 void
 mark_bytecode (struct bc_thread_state *bc)
 {
-  struct bc_frame *fp = bc->fp;
-  Lisp_Object *top = NULL;     /* stack pointer of topmost frame not known */
-  for (;;)
+  Lisp_Object *top = NULL;
+  for (struct bc_frame *fp = bc->fp; fp->saved_fp != 0; fp = fp->saved_fp)
     {
-      struct bc_frame *next_fp = fp->saved_fp;
-      /* Only the dummy frame at the bottom has saved_fp = NULL.  */
-      if (!next_fp)
-	break;
+      Lisp_Object *frame_base = fp->saved_fp->next_stack;
       mark_object (fp->fun);
-      Lisp_Object *frame_base = next_fp->next_stack;
       if (top)
 	{
 	  /* The stack pointer of a frame is known: mark the part of the stack
 	     above it conservatively.  This includes any outgoing arguments.  */
 	  mark_memory (top + 1, fp);
-	  /* Mark the rest of the stack precisely.  */
+	  /* Mark the part below it precisely.  */
 	  mark_objects (frame_base, top + 1 - frame_base);
 	}
       else
@@ -429,7 +422,6 @@ mark_bytecode (struct bc_thread_state *bc)
 	  mark_memory (frame_base, fp);
 	}
       top = fp->saved_top;
-      fp = next_fp;
     }
 }
 
@@ -460,10 +452,9 @@ valid_sp (struct bc_thread_state *bc, Lisp_Object *sp)
 }
 
 /* Execute the byte-code in FUN.  ARGS_TEMPLATE is the function arity
-   encoded as an integer (the one in FUN is ignored), and ARGS, of
-   size NARGS, should be a vector of the actual arguments.  The
-   arguments in ARGS are pushed on the stack according to
-   ARGS_TEMPLATE before executing FUN.  */
+   encoded as an integer (the one in FUN is ignored).  ARGS is a
+   vector of NARGS actual arguments pushed onto the stack before
+   executing FUN.  */
 
 Lisp_Object
 exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
@@ -482,7 +473,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
   Lisp_Object bytestr = AREF (fun, COMPILED_BYTECODE);
 
  setup_frame: ;
-  eassert (!STRING_MULTIBYTE (bytestr));
+  eassert (! STRING_MULTIBYTE (bytestr));
   eassert (string_immovable_p (bytestr));
   /* FIXME: in debug mode (!NDEBUG, BYTE_CODE_SAFE or enabled checking),
      save the specpdl index on function entry and check that it is the same
