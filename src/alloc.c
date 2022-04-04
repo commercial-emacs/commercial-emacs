@@ -6861,56 +6861,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      }
 #endif
 
-	switch (pvectype)
-	  {
-	  case PVEC_BUFFER:
-	    mark_buffer ((struct buffer *) ptr);
-            break;
-
-          case PVEC_COMPILED:
-            /* Although we could treat this just like a vector, mark_compiled
-               returns the COMPILED_CONSTANTS element, which is marked at the
-               next iteration of goto-loop here.  This is done to avoid a few
-               recursive calls to mark_object.  */
-            obj = mark_compiled (ptr);
-            if (! NILP (obj))
-              goto loop;
-            break;
-
-          case PVEC_FRAME:
-            mark_frame (ptr);
-            break;
-
-          case PVEC_WINDOW:
-            mark_window (ptr);
-            break;
-
-	  case PVEC_HASH_TABLE:
-            mark_hash_table (ptr);
-	    break;
-
-	  case PVEC_CHAR_TABLE:
-	  case PVEC_SUB_CHAR_TABLE:
-	    mark_char_table (ptr, (enum pvec_type) pvectype);
-	    break;
-
-          case PVEC_BOOL_VECTOR:
-            /* bool vectors in a dump are permanently "marked", since
-               they're in the old section and don't have mark bits.
-               If we're looking at a dumped bool vector, we should
-               have aborted above when we called vector_marked_p, so
-               we should never get here.  */
-            eassert (!pdumper_object_p (ptr));
-            set_vector_marked (ptr);
-            break;
-
-          case PVEC_OVERLAY:
-	    mark_overlay (XOVERLAY (obj));
-	    break;
-
-	  case PVEC_SUBR:
-#ifdef HAVE_NATIVE_COMP
-	    if (SUBR_NATIVE_COMPILEDP (obj))
+	    switch (pvectype)
 	      {
 	      case PVEC_BUFFER:
 		mark_buffer ((struct buffer *) ptr);
@@ -6999,21 +6950,9 @@ process_mark_stack (ptrdiff_t base_sp)
 	  }
 	  break;
 
-    case Lisp_Symbol:
-      {
-	struct Lisp_Symbol *ptr = XSYMBOL (obj);
-      nextsym:
-        if (symbol_marked_p (ptr))
-          break;
-        CHECK_ALLOCATED_AND_LIVE_SYMBOL ();
-        set_symbol_marked (ptr);
-	/* Attempt to catch bogus objects.  */
-	eassert (valid_lisp_object_p (ptr->u.s.function));
-	mark_object (ptr->u.s.function);
-	mark_object (ptr->u.s.plist);
-	switch (ptr->u.s.redirect)
+	case Lisp_Symbol:
 	  {
-	    struct Lisp_Symbol *ptr = XBARE_SYMBOL (obj);
+	    struct Lisp_Symbol *ptr = XSYMBOL (obj);
 	  nextsym:
 	    if (symbol_marked_p (ptr))
 	      break;
