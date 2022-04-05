@@ -410,15 +410,17 @@ mark_bytecode (struct bc_thread_state *bc)
       mark_object (fp->fun);
       if (top)
 	{
-	  /* The stack pointer of a frame is known: mark the part of the stack
-	     above it conservatively.  This includes any outgoing arguments.  */
+	  /* The stack pointer of a frame is known: mark the part of
+	     the stack above it conservatively.  This includes any
+	     outgoing arguments.  */
 	  mark_memory (top + 1, fp);
 	  /* Mark the part below it precisely.  */
 	  mark_objects (frame_base, top + 1 - frame_base);
 	}
       else
 	{
-	  /* The stack pointer is unknown -- mark everything conservatively.  */
+	  /* The stack pointer is unknown -- mark everything
+	     conservatively.  */
 	  mark_memory (frame_base, fp);
 	}
       top = fp->saved_top;

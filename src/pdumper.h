@@ -155,7 +155,7 @@ struct pdumper_loaded_dump
 
 extern struct pdumper_loaded_dump dump_public;
 
-/* Return whether the OBJ points somewhere into the loaded dump image.
+/* Return whether the OBJ points somewhere into the loaded dump file.
    Works even when we have no dump loaded --- in this case, it just
    returns false.  */
 INLINE _GL_ATTRIBUTE_CONST bool
@@ -213,7 +213,7 @@ pdumper_valid_object_type_p (int type)
 }
 
 /* Return whether OBJ points exactly to the start of some object in
-   the loaded dump image.  It is a programming error to call this
+   the loaded dump file.  It is a programming error to call this
    routine for an OBJ for which pdumper_object_p would return
    false.  */
 INLINE _GL_ATTRIBUTE_CONST bool
