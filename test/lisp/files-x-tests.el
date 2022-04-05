@@ -333,16 +333,15 @@
 	 ;; reverse order in `connection-local-variables-alist'.
 	 ;; Since we ha a remote default directory, Tramp's settings
 	 ;; are appended as well.
-         (should
-          (equal
-           connection-local-variables-alist
-	   (append
-	    (nreverse (copy-tree files-x-test--variables3))
-	    (nreverse (copy-tree files-x-test--variables2))
-            (nreverse
-             (copy-tree tramp-connection-local-default-shell-variables))
-            (nreverse
-             (copy-tree tramp-connection-local-default-system-variables)))))
+         (mapc
+          (lambda (variables)
+            (dolist (assign variables)
+              (should (member assign connection-local-variables-alist))))
+          (list
+	   files-x-test--variables3
+	   files-x-test--variables2
+           tramp-connection-local-default-shell-variables
+           tramp-connection-local-default-system-variables))
          ;; The variables exist also as local variables.
          (should (local-variable-p 'remote-shell-file-name))
          (should (local-variable-p 'remote-null-device))
