@@ -386,7 +386,7 @@ https://lwn.net/Articles/250967/
 #include "w32.h"
 #endif
 
-
+
 /* Data type definitions.  */
 
 /* When scanning the C stack for live Lisp objects, Emacs keeps track of
@@ -1028,7 +1028,7 @@ struct large_vector {
   } u;
 };
 
-
+
 /* Prototypes.  */
 
 /* The table of prototypes below lists each static function
@@ -1413,7 +1413,7 @@ GCFN void check_obarray_elem(const Lisp_Object tail, size_t i, size_t obsize);
 
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 
-
+
 /* Macros.  */
 
 #define scan_reference_pointer_to_vectorlike(x, phase)                  \
@@ -1498,7 +1498,7 @@ typedef union
          / word_size),                                                  \
 	MOST_POSITIVE_FIXNUM))
 
-
+
 /* Data.  */
 
 /* Hot data. */
@@ -1639,7 +1639,7 @@ static struct Lisp_Hash_Table *weak_hash_tables;
 /* Captured at start of GC.  */
 static bool inhibit_compacting_font_caches_snapshot;
 
-
+
 /* Code.
 
 Don't define functions here as 'static': instead, put a prototype at
@@ -1667,10 +1667,6 @@ tally_consing_maybe_garbage_collect (const size_t nr_bytes)
     maybe_garbage_collect ();
 }
 
-
-/************************************************************************
-				Malloc
- ************************************************************************/
 
 #if defined SIGDANGER || (!defined SYSTEM_MALLOC && !defined HYBRID_MALLOC)
 
@@ -4293,10 +4289,6 @@ gc_compute_total_live_nr_bytes (void)
   return live_nr_bytes;
 }
 
-
-/***********************************************************************
-			 Interval Allocation
- ***********************************************************************/
 
 static gc_heap_data gc_interval_heap_data;
 static const gc_heap gc_interval_heap = {
@@ -4390,10 +4382,6 @@ point_interval_into_tospace (const INTERVAL i)
   return gc_object_point_into_tospace (i, &gc_interval_heap);
 }
 
-
-/***********************************************************************
-			  String Allocation
- ***********************************************************************/
 
 /* Lisp strings are struct Lisp_String objects (four-words long)
    allocated on the string heap.  These objects contain string
@@ -4796,7 +4784,7 @@ string_identity_hash_code (struct Lisp_String *s)
   return (uintptr_t) s / alignof (struct Lisp_String);
 }
 
-
+
 /* Bool vectors  */
 
 /* Fill A with 1 bits if INIT is non-nil, and with 0 bits otherwise.
@@ -5052,10 +5040,6 @@ point_float_into_tospace (struct Lisp_Float *const f)
   return gc_object_point_into_tospace (f, &gc_float_heap);
 }
 
-
-/***********************************************************************
-			   Cons Allocation
- ***********************************************************************/
 
 static gc_heap_data gc_cons_heap_data;
 static const gc_heap gc_cons_heap = {
@@ -5274,10 +5258,6 @@ point_cons_into_tospace (struct Lisp_Cons *const f)
   return gc_object_point_into_tospace (f, &gc_cons_heap);
 }
 
-
-/***********************************************************************
-			   Vector Allocation
- ***********************************************************************/
 
 static gc_heap_data gc_vector_heap_data;
 static const gc_heap gc_vector_heap = {
@@ -6051,10 +6031,6 @@ gc_vector_object_nr_bytes (const void *const vptr)
   return vectorlike_nbytes (vptr);
 }
 
-
-/***********************************************************************
-			   Symbol Allocation
- ***********************************************************************/
 
 static gc_heap_data gc_symbol_heap_data;
 static const gc_heap gc_symbol_heap = {
@@ -7511,10 +7487,6 @@ DEFUN ("purecopy", Fpurecopy, Spurecopy, 1, 1, 0,
   return obj;
 }
 
-
-/***********************************************************************
-			  Protection from GC
- ***********************************************************************/
 
 /* Put an entry in staticvec, pointing at the variable with address
    VARADDRESS.  */
@@ -7529,10 +7501,6 @@ staticpro (Lisp_Object *varaddress)
   staticvec[staticidx++] = varaddress;
 }
 
-
-/***********************************************************************
-			  Protection from GC
- ***********************************************************************/
 
 void
 inhibit_garbage_collection_undo (const intmax_t old_consing_until_gc)
