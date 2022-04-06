@@ -8595,26 +8595,6 @@ scan_glyph_matrix (struct glyph_matrix *const matrix, const gc_phase phase)
         }
 }
 
-/* Whether to remember a few of the last marked values for debugging.  */
-#define GC_REMEMBER_LAST_MARKED 0
-
-#if GC_REMEMBER_LAST_MARKED
-enum { LAST_MARKED_SIZE = 1 << 9 }; /* Must be a power of 2.  */
-Lisp_Object last_marked[LAST_MARKED_SIZE] EXTERNALLY_VISIBLE;
-static int last_marked_index;
-#endif
-
-/* Whether to enable the mark_object_loop_halt debugging feature.  */
-#define GC_CDR_COUNT 0
-
-#if GC_CDR_COUNT
-/* For debugging--call abort when we cdr down this many
-   links of a list, in mark_object.  In debugging,
-   the call to abort will hit a breakpoint.
-   Normally this is zero and the check never goes off.  */
-ptrdiff_t mark_object_loop_halt EXTERNALLY_VISIBLE;
-#endif
-
 void
 scan_vector_lisp_fields (union vectorlike_header *header, const gc_phase phase)
 {
