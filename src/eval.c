@@ -122,15 +122,8 @@ specpdl_where (union specbinding *pdl)
   return *specpdl_wherep (pdl);
 }
 
-static Lisp_Object *
-specpdl_saved_valuep (union specbinding *pdl)
-{
-  eassert (pdl->kind >= SPECPDL_LET);
-  return &pdl->let.saved_value;
-}
-
 static Lisp_Object
-specpdl_arg (union specbinding *pdl)
+specpdl_argp (union specbinding *pdl)
 {
   eassert (pdl->kind == SPECPDL_UNWIND);
   return &pdl->unwind.arg;
@@ -3310,7 +3303,6 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
 	      bytecode = Fstring_as_unibyte (bytecode);
 	    }
 
-	  pin_string (bytecode);
 	  ASET (object, COMPILED_BYTECODE, bytecode);
 	  ASET (object, COMPILED_CONSTANTS, XCDR (tem));
 	}

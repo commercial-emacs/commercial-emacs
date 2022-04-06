@@ -3252,8 +3252,6 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 		  ASET (tmp, COMPILED_BYTECODE,
 			Fstring_as_unibyte (AREF (tmp, COMPILED_BYTECODE)));
 		}
-	      // Bytecode must be immovable.
-	      pin_string (AREF (tmp, COMPILED_BYTECODE));
 	    }
 
 	  XSETPVECTYPE (vec, PVEC_COMPILED);

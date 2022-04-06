@@ -6554,7 +6554,7 @@ behaves as if file names were encoded in `utf-8'.  */);
   Fput (Qpermission_denied, Qerror_conditions,
 	Fpurecopy (list3 (Qpermission_denied, Qfile_error, Qerror)));
   Fput (Qpermission_denied, Qerror_message,
-	build_pure_c_string ("Cannot access file or directory"));
+	build_c_string ("Cannot access file or directory"));
 
   Fput (Qfile_notify_error, Qerror_conditions,
 	Fpurecopy (list3 (Qfile_notify_error, Qfile_error, Qerror)));

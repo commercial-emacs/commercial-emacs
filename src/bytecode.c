@@ -791,6 +791,9 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  op -= Bcall;
 	docall:
 	  {
+	    ptrdiff_t call_nargs;
+	    Lisp_Object call_fun, *call_args;
+	    specpdl_ref count1;
 	    DISCARD (op);
 #ifdef BYTE_CODE_METER
 	    if (byte_metering_on && SYMBOLP (TOP))
@@ -807,21 +810,16 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 #endif
 	    maybe_quit ();
 
+	    max_lisp_eval_depth = max (max_lisp_eval_depth, 100);
 	    if (++lisp_eval_depth > max_lisp_eval_depth)
-	      {
-		if (max_lisp_eval_depth < 100)
-		  max_lisp_eval_depth = 100;
-		if (lisp_eval_depth > max_lisp_eval_depth)
-		  error ("Lisp nesting exceeds `max-lisp-eval-depth'");
-	      }
+	      error ("Lisp nesting exceeds `max-lisp-eval-depth'");
 
-	    ptrdiff_t call_nargs = op;
-	    Lisp_Object call_fun = TOP;
-	    Lisp_Object *call_args = &TOP + 1;
+	    call_nargs = op;
+	    call_fun = TOP;
+	    call_args = &TOP + 1;
 
-	    specpdl_ref count1 = record_in_backtrace (call_fun,
-						      call_args, call_nargs);
-	    maybe_garbage_collect ();
+	    count1 = record_in_backtrace (call_fun, call_args, call_nargs);
+	    maybe_gc ();
 	    if (debug_on_next_call)
 	      do_debug_on_call (Qlambda, count1);
 

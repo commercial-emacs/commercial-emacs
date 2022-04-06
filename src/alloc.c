@@ -4956,30 +4956,6 @@ make_formatted_string (char *buf, const char *format, ...)
   return make_string (buf, length);
 }
 
-/* Pin a unibyte string in place so that it won't move during GC.  */
-void
-pin_string (Lisp_Object string)
-{
-  eassert (STRINGP (string) && !STRING_MULTIBYTE (string));
-  struct Lisp_String *s = XSTRING (string);
-  ptrdiff_t size = STRING_BYTES (s);
-  unsigned char *data = s->u.s.data;
-
-  if (!(size > LARGE_STRING_BYTES
-	|| PURE_P (data) || pdumper_object_p (data)
-	|| s->u.s.size_byte == -3))
-    {
-      eassert (s->u.s.size_byte == -1);
-      sdata *old_sdata = SDATA_OF_STRING (s);
-      allocate_string_data (s, size, size, false, true);
-      memcpy (s->u.s.data, data, size);
-      old_sdata->string = NULL;
-      SDATA_NBYTES (old_sdata) = size;
-    }
-  s->u.s.size_byte = -3;
-}
-
-
 static gc_heap_data gc_float_heap_data;
 static const gc_heap gc_float_heap = {
   .data = &gc_float_heap_data,
@@ -5387,7 +5363,7 @@ ptrdiff_t
 vectorlike_payload_nr_words (const union vectorlike_header *const hdr)
 {
   const ptrdiff_t size = hdr->size;
-  if (!(size & PSEUDOVECTOR_FLAG))
+  if ((size & PSEUDOVECTOR_FLAG) == 0)
     return size;
   if (PSEUDOVECTOR_TYPEP (hdr, PVEC_BOOL_VECTOR))
     {
@@ -5529,6 +5505,9 @@ vector_cleanup (void *const p)
       return;
     case PVEC_MODULE_FUNCTION:
       module_finalize_function (p);
+      return;
+    case PVEC_SQLITE:
+      //TODO: do what LMG wouldn't do
       return;
     }
   emacs_unreachable ();
@@ -6464,12 +6443,12 @@ vectorlike_marked_p (const union vectorlike_header *const v)
 }
 
 void
-set_vectorlike_marked (union vectorlike_header *const v)
+set_vectorlike_marked (const union vectorlike_header *const v)
 {
-  eassert (!PSEUDOVECTOR_TYPEP (v, PVEC_SUBR));
+  eassert (! PSEUDOVECTOR_TYPEP (v, PVEC_SUBR));
   if (gc_pdumper_object_p (v))
     {
-      eassert (!PSEUDOVECTOR_TYPEP (v, PVEC_BOOL_VECTOR));
+      eassert (! PSEUDOVECTOR_TYPEP (v, PVEC_BOOL_VECTOR));
       pdumper_set_marked (v);
     }
   else if (vectorlike_nbytes (v) >= large_vector_min_nr_bytes)
@@ -9668,10 +9647,8 @@ gc_object_to_cursor (const void *const obj, const gc_heap *const h)
   return c;
 }
 
-
-
-/* Remove BUFFER's markers that are due to be swept.  This is needed since
-   we treat BUF_MARKERS and markers's `next' field as weak pointers.  */
+/* Markers are weak pointers.  Invalidate all markers pointing to the
+   swept BUFFER.  */
 void
 unchain_dead_markers (struct buffer *buffer)
 {

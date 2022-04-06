@@ -2891,7 +2891,7 @@ DEFUN ("program-version", Fprogram_version, Sprogram_version, 0, 0, 0,
   if (STRINGP (sha1) && STRINGP (branch))
     {
       annotation[0] = ' ';
-      strncpy (&annotation[1], SSDATA (sha1), 7);
+      memcpy (&annotation[1], SSDATA (sha1), 7);
       sprintf (&annotation[8], " in %s", SSDATA (branch));
     }
   else

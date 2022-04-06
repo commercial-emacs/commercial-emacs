@@ -5737,7 +5737,10 @@ realize_default_face (struct frame *f)
   /* Realize the face; it must be fully-specified now.  */
   eassert (lface_fully_specified_p (XVECTOR (lface)->contents));
   check_lface (lface);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
   memcpy (attrs, XVECTOR (lface)->contents, sizeof attrs);
+#pragma GCC diagnostic pop
   struct face *face = realize_face (c, f, attrs, DEFAULT_FACE_ID);
 
 #ifndef HAVE_WINDOW_SYSTEM

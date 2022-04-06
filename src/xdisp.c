@@ -33302,7 +33302,7 @@ be let-bound around code that needs to disable messages temporarily. */);
   staticpro (&message_dolog_marker3);
   message_dolog_marker3 = Fmake_marker ();
 
-  staticpro (&this_line_buffer);
+  staticpro (&static_sline_buffer);
 
   /* The default ellipsis glyphs `...'.  */
   for (int i = 0; i < ARRAYELTS (default_invis_vector); ++i)

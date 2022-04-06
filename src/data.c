@@ -1377,7 +1377,7 @@ void
 symval_restore_default (struct Lisp_Symbol *symbol)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
-  eassert (symbol->u.s.redirect == SYMBOL_LOCALIZED);
+  eassert (symbol->u.s.f.redirect == SYMBOL_LOCALIZED);
 
   if (blv->fwd.fwdptr) /* unload the previously loaded binding. */
     set_blv_value (blv, symval_resolve (blv->fwd));
@@ -1396,7 +1396,7 @@ static struct Lisp_Buffer_Local_Value *
 symval_buffer_localize (struct Lisp_Symbol *symbol)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
-  eassert (symbol->u.s.redirect == SYMBOL_LOCALIZED);
+  eassert (symbol->u.s.f.redirect == SYMBOL_LOCALIZED);
 
   if (! BUFFERP (blv->where)
       || current_buffer != XBUFFER (blv->where))
@@ -2095,10 +2095,10 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
   if (sym->u.s.f.trapped_write == SYMBOL_NOWRITE)
     xsignal1 (Qsetting_constant, variable);
 
-  if ((sym->u.s.redirect == SYMBOL_FORWARDED
+  if ((sym->u.s.f.redirect == SYMBOL_FORWARDED
        && BUFFER_OBJFWDP (valcontents.fwd))
       ||
-      (sym->u.s.redirect == SYMBOL_LOCALIZED
+      (sym->u.s.f.redirect == SYMBOL_LOCALIZED
        && SYMBOL_BLV (sym)
        && SYMBOL_BLV (sym)->local_if_set))
     {
@@ -2109,15 +2109,15 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
       return variable;
     }
 
-  if (sym->u.s.redirect != SYMBOL_LOCALIZED
+  if (sym->u.s.f.redirect != SYMBOL_LOCALIZED
       || ! SYMBOL_BLV (sym))
     {
-      bool forwarded_p = sym->u.s.redirect == SYMBOL_FORWARDED;
+      bool forwarded_p = sym->u.s.f.redirect == SYMBOL_FORWARDED;
       sym->u.s.f.redirect = SYMBOL_LOCALIZED;
       SET_SYMBOL_BLV (sym, make_blv (sym, forwarded_p, valcontents));
     }
 
-  eassert (sym->u.s.redirect == SYMBOL_LOCALIZED
+  eassert (sym->u.s.f.redirect == SYMBOL_LOCALIZED
 	   && SYMBOL_BLV (sym));
 
   /* Make sure this buffer has its own value of symbol.  */
@@ -4092,7 +4092,7 @@ syms_of_data (void)
 	     "Arithmetic overflow error");
   PUT_ERROR (Qunderflow_error, Fcons (Qrange_error, arith_tail),
 	     "Arithmetic underflow error");
-  recursion_tail = pure_cons (Qrecursion_error, error_tail);
+  recursion_tail = Fcons (Qrecursion_error, error_tail);
   Fput (Qrecursion_error, Qerror_conditions, recursion_tail);
   Fput (Qrecursion_error, Qerror_message, build_pure_c_string
        ("Excessive recursive calling error"));

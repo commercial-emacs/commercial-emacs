@@ -1420,7 +1420,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	strout (str, len, len, printcharfun);
 	SAFE_FREE ();
       }
-      return true;
+      return;
 
     case PVEC_BOOL_VECTOR:
       {
@@ -1465,7 +1465,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	  print_c_string (" ...", printcharfun);
 	printchar ('\"', printcharfun);
       }
-      return true;
+      return;
 
     case PVEC_HASH_TABLE:
       {
@@ -1533,7 +1533,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 
 	print_c_string ("))", printcharfun);
       }
-      return true;
+      return;
 
     case PVEC_RECORD:
       {
@@ -1554,7 +1554,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	  print_c_string (" ...", printcharfun);
 	printchar (')', printcharfun);
       }
-      return true;
+      return;
 
     case PVEC_SUB_CHAR_TABLE:
     case PVEC_COMPILED:
@@ -1585,7 +1585,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	    size &= PSEUDOVECTOR_SIZE_MASK;
 	  }
 	if (size & PSEUDOVECTOR_FLAG)
-	  return false;
+	  return;
 
 	printchar ('[', printcharfun);
 
@@ -1616,7 +1616,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	  print_c_string (" ...", printcharfun);
 	printchar (']', printcharfun);
       }
-      return true;
+      return;
 
     default:
       break;
@@ -1625,7 +1625,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
   /* Then do all the pseudovector types that don't have a readable
      syntax.  First check whether this is handled by
      `print-unreadable-function'.  */
-  if (!NILP (Vprint_unreadable_function)
+  if (! NILP (Vprint_unreadable_function)
       && FUNCTIONP (Vprint_unreadable_function))
     {
       specpdl_ref count = SPECPDL_INDEX ();
@@ -1642,7 +1642,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	  if (STRINGP (result))
 	    print_string (result, printcharfun);
 	  /* It's handled, so stop processing here.  */
-	  return true;
+	  return;
 	}
     }
 

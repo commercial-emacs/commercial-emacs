@@ -390,7 +390,7 @@ typedef EMACS_INT Lisp_Word;
    (eassume ((sym)->u.s.f.redirect == SYMBOL_PLAINVAL), \
     (sym)->u.s.val.value = (v))
 #define lisp_h_SYMBOL_CONSTANT_P(sym) \
-   (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_NOWRITE)
+   (XSYMBOL (sym)->u.s.f.trapped_write == SYMBOL_NOWRITE)
 #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (XSYMBOL (sym)->u.s.f.trapped_write)
 #define lisp_h_SYMBOL_VALP(sym) \
    (eassert ((sym)->u.s.f.redirect == SYMBOL_PLAINVAL), &(sym)->u.s.val.value)
@@ -1697,13 +1697,6 @@ CHECK_STRING_NULL_BYTES (Lisp_Object string)
 {
   CHECK_TYPE (memchr (SSDATA (string), '\0', SBYTES (string)) == NULL,
 	      Qfilenamep, string);
-}
-
-/* True if STR is immovable (whose data won't move during GC).  */
-INLINE bool
-string_immovable_p (Lisp_Object str)
-{
-  return XSTRING (str)->u.s.size_byte == -3;
 }
 
 /* A regular vector is just a header plus an array of Lisp_Objects.  */
@@ -3699,7 +3692,10 @@ vcopy (Lisp_Object v, ptrdiff_t offset, Lisp_Object const *args,
        ptrdiff_t count)
 {
   eassume (0 <= offset && 0 <= count && offset + count <= ASIZE (v));
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
   memcpy (XVECTOR (v)->contents + offset, args, count * sizeof *args);
+#pragma GCC diagnostic pop
 }
 
 /* Functions to modify hash tables.  */
@@ -4218,7 +4214,6 @@ extern Lisp_Object make_string_from_bytes (const char *, ptrdiff_t, ptrdiff_t);
 extern Lisp_Object make_specified_string (const char *,
 					  ptrdiff_t, ptrdiff_t, bool);
 extern Lisp_Object make_c_string (const char *, ptrdiff_t);
-extern void pin_string (Lisp_Object string);
 
 INLINE Lisp_Object
 build_c_string (const char *str)

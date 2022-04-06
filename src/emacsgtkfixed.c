@@ -94,11 +94,10 @@ emacs_fixed_get_preferred_width (GtkWidget *widget,
                                  gint      *natural)
 {
   EmacsFixed *fixed = EMACS_FIXED (widget);
-  EmacsFixedPrivate *priv = fixed->priv;
 #ifdef HAVE_PGTK
-  int w = priv->f->output_data.pgtk->size_hints.min_width;
+  int w = fixed->f->output_data.pgtk->size_hints.min_width;
   if (minimum) *minimum = w;
-  if (natural) *natural = priv->f->output_data.pgtk->preferred_width;
+  if (natural) *natural = fixed->f->output_data.pgtk->preferred_width;
 #else
   int w = FRAME_X_OUTPUT(fixed->f)->size_hints.min_width;
   if (minimum) *minimum = w;
@@ -112,11 +111,10 @@ emacs_fixed_get_preferred_height (GtkWidget *widget,
                                   gint      *natural)
 {
   EmacsFixed *fixed = EMACS_FIXED (widget);
-  EmacsFixedPrivate *priv = fixed->priv;
 #ifdef HAVE_PGTK
-  int h = priv->f->output_data.pgtk->size_hints.min_height;
+  int h = fixed->f->output_data.pgtk->size_hints.min_height;
   if (minimum) *minimum = h;
-  if (natural) *natural = priv->f->output_data.pgtk->preferred_height;
+  if (natural) *natural = fixed->f->output_data.pgtk->preferred_height;
 #else
   int h = FRAME_X_OUTPUT(fixed->f)->size_hints.min_height;
   if (minimum) *minimum = h;
@@ -124,6 +122,12 @@ emacs_fixed_get_preferred_height (GtkWidget *widget,
 #endif
 }
 
+void
+xg_scan_frame_widget (GtkWidget *const widget, const gc_phase phase)
+{
+  EmacsFixed *fixed = EMACS_FIXED (widget);
+  xscan_reference_pointer_to_vectorlike (&fixed->f, phase);
+}
 
 #ifndef HAVE_PGTK
 
@@ -204,9 +208,4 @@ XSetWMNormalHints (Display *d, Window w, XSizeHints *hints)
   XSetWMSizeHints (d, w, hints, XA_WM_NORMAL_HINTS);
 }
 
-void
-xg_scan_frame_widget (GtkWidget *const widget, const gc_phase phase)
-{
-  EmacsFixed *fixed = EMACS_FIXED (widget);
-  xscan_reference_pointer_to_vectorlike (&fixed->f, phase);
-}
+#endif

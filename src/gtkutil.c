@@ -3033,6 +3033,16 @@ xg_scan_data (const gc_phase phase)
       if (! NILP (cb_data->help))
         xscan_reference (&cb_data->help, phase);
     }
+
+#ifndef HAVE_PGTK
+  if (xg_pending_quit_event.kind != NO_EVENT)
+    {
+      eassert (xg_pending_quit_event.kind == ASCII_KEYSTROKE_EVENT);
+
+      xscan_reference (&xg_pending_quit_event.frame_or_window, phase);
+      xscan_reference (&xg_pending_quit_event.arg, phase);
+    }
+#endif
 }
 
 /* Called by the GC on each frame we scan during GC.  We need to provide
@@ -3042,11 +3052,13 @@ xg_scan_data (const gc_phase phase)
 void
 xg_scan_frame (struct frame *const f, const gc_phase phase)
 {
-  if (FRAME_X_P (f) && FRAME_GTK_OUTER_WIDGET_NOCHECK (f))
+  if ((FRAME_X_P (f) || FRAME_PGTK_P (f))
+      && FRAME_GTK_OUTER_WIDGET_NOCHECK (f))
     {
-      struct frame *f = XFRAME (frame);
-
-      if ((FRAME_X_P (f) || FRAME_PGTK_P (f)) && FRAME_GTK_OUTER_WIDGET (f))
+      struct xg_frame_tb_info *const tbinfo
+        = g_object_get_data (G_OBJECT (FRAME_GTK_OUTER_WIDGET_NOCHECK (f)),
+                             TB_INFO_KEY);
+      if (tbinfo)
         {
           xscan_reference (&tbinfo->last_tool_bar, phase);
           xscan_reference (&tbinfo->style, phase);
@@ -3055,16 +3067,6 @@ xg_scan_frame (struct frame *const f, const gc_phase phase)
       xg_scan_frame_widget (FRAME_GTK_WIDGET_NOCHECK (f), phase);
 #endif
     }
-
-#ifndef HAVE_PGTK
-  if (xg_pending_quit_event.kind != NO_EVENT)
-    {
-      eassert (xg_pending_quit_event.kind == ASCII_KEYSTROKE_EVENT);
-
-      mark_object (xg_pending_quit_event.frame_or_window);
-      mark_object (xg_pending_quit_event.arg);
-    }
-#endif
 }
 
 /* Callback called when a menu item is destroyed.  Used to free data.

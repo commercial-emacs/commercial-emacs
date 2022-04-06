@@ -2064,8 +2064,6 @@ nil.  */)
     memory_full (SIZE_MAX);
   USE_SAFE_ALLOCA;
   buffer = SAFE_ALLOCA (bytes_needed);
-  unsigned char *deletions_insertions = memset (buffer + 2 * diags, 0,
-						del_bytes + ins_bytes);
 
   /* FIXME: It is not documented how to initialize the contents of the
      context structure.  This code cargo-cults from the existing

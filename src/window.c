@@ -23,6 +23,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* Work around GCC bug 102671.  */
 #if 10 <= __GNUC__
 # pragma GCC diagnostic ignored "-Wanalyzer-null-dereference"
+# pragma GCC diagnostic ignored "-Wnull-dereference"
 #endif
 
 #include "lisp.h"
