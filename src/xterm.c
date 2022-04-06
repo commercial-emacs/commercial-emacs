@@ -2787,6 +2787,7 @@ x_dnd_send_unsupported_drop (struct x_display_info *dpyinfo, Window target_windo
   for (i = 0; i < x_dnd_n_targets; ++i)
     {
       if (x_dnd_targets[i] == XA_STRING
+	  || x_dnd_targets[i] == dpyinfo->Xatom_TEXT
 	  || x_dnd_targets[i] == dpyinfo->Xatom_COMPOUND_TEXT
 	  || x_dnd_targets[i] == dpyinfo->Xatom_UTF8_STRING)
 	break;
@@ -2824,7 +2825,10 @@ x_dnd_send_unsupported_drop (struct x_display_info *dpyinfo, Window target_windo
       root_y = dest_y;
     }
 
-  x_own_selection (QPRIMARY, Qnil, frame);
+  x_own_selection (QPRIMARY,
+		   assq_no_quit (QPRIMARY,
+				 dpyinfo->terminal->Vselection_alist),
+		   frame);
 
   event.xbutton.window = child;
   event.xbutton.x = dest_x;
@@ -13826,8 +13830,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	if (x_dnd_in_progress || x_dnd_waiting_for_finish)
 	  {
-	    if (hold_quit)
-	      *hold_quit = inev.ie;
+	    eassert (hold_quit);
+
+	    *hold_quit = inev.ie;
 	    EVENT_INIT (inev.ie);
 	  }
 
