@@ -1311,7 +1311,6 @@ xm_write_targets_table (Display *dpy, Window wdesc,
   rec_buffer = xmalloc (600);
   rec_buffer_size = 600;
 
-  XGrabServer (dpy);
   XChangeProperty (dpy, wdesc, targets_table_atom,
 		   targets_table_atom, 8, PropModeReplace,
 		   (unsigned char *) ptr, 8);
@@ -1334,7 +1333,6 @@ xm_write_targets_table (Display *dpy, Window wdesc,
 		       (unsigned char *) rec_buffer,
 		       2 + recs[i]->n_targets * 4);
     }
-  XUngrabServer (dpy);
 
   xfree (rec_buffer);
 }
@@ -9542,7 +9540,12 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	  x_dnd_movement_frame = NULL;
 
 	  if (!NILP (Vx_dnd_movement_function)
-	      && !FRAME_TOOLTIP_P (XFRAME (frame_object)))
+	      && !FRAME_TOOLTIP_P (XFRAME (frame_object))
+	      && x_dnd_movement_x >= 0
+	      && x_dnd_movement_y >= 0
+	      && x_dnd_frame
+	      && (XFRAME (frame_object) != x_dnd_frame
+		  || x_dnd_allow_current_frame))
 	    {
 	      x_dnd_old_window_attrs = root_window_attrs;
 	      x_dnd_unwind_flag = true;
@@ -13540,6 +13543,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		else
 		  x_dnd_action = None;
 	      }
+
+	    goto done;
 	  }
 
 	if (event->xclient.message_type == dpyinfo->Xatom_XdndFinished
@@ -13554,6 +13559,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    if (x_dnd_waiting_for_finish_proto >= 5
 		&& !(event->xclient.data.l[1] & 1))
 	      x_dnd_action = None;
+
+	    goto done;
 	  }
 
 	if ((event->xclient.message_type
@@ -13579,7 +13586,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    && operation != XM_DRAG_LINK)
 		  {
 		    x_dnd_waiting_for_finish = false;
-		    goto OTHER;
+		    goto done;
 		  }
 
 		if (status != XM_DROP_SITE_VALID
@@ -13587,7 +13594,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			|| action == XM_DROP_ACTION_DROP_HELP))
 		  {
 		    x_dnd_waiting_for_finish = false;
-		    goto OTHER;
+		    goto done;
 		  }
 
 		switch (operation)
@@ -13606,7 +13613,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  }
 
 		x_dnd_waiting_for_motif_finish = 2;
-		goto OTHER;
+		goto done;
 	      }
 	  }
 
