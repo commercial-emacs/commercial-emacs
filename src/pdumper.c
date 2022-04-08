@@ -2006,7 +2006,7 @@ dump_pseudovector_lisp_fields (struct dump_context *ctx,
   struct Lisp_Vector *out = (struct Lisp_Vector *) out_hdr;
   ptrdiff_t size = in->header.size;
   eassert (size & PSEUDOVECTOR_FLAG);
-  size &= PSEUDOVECTOR_SIZE_MASK;
+  size &= PSEUDOVECTOR_LISP_MASK;
   for (ptrdiff_t i = 0; i < size; ++i)
     dump_field_lv (ctx, out, in, &in->contents[i], WEIGHT_STRONG);
 }
@@ -2548,7 +2548,7 @@ dump_vectorlike_generic (struct dump_context *ctx,
          */
       eassert ((size & PSEUDOVECTOR_REST_MASK) >> PSEUDOVECTOR_REST_BITS
 	       <= (sizeof (Lisp_Object) < GCALIGNMENT));
-      size &= PSEUDOVECTOR_SIZE_MASK;
+      size &= PSEUDOVECTOR_LISP_MASK;
     }
 
   dump_align_output (ctx, DUMP_ALIGNMENT);
@@ -2557,10 +2557,9 @@ dump_vectorlike_generic (struct dump_context *ctx,
   dump_off skip;
   if (pvectype == PVEC_SUB_CHAR_TABLE)
     {
-      /* PVEC_SUB_CHAR_TABLE has a special case because it's a
-         variable-length vector (unlike other pseudovectors, which is
-         why we handle it here) and has its non-Lisp data _before_ the
-         variable-length Lisp part.  */
+      /* PVEC_SUB_CHAR_TABLE precedes its variable-length Lisp array
+	 with the non-Lisp sizing of that array, and thus breaks
+	 the type punning assumption cf. lisp.h.  */
       const struct Lisp_Sub_Char_Table *sct =
         (const struct Lisp_Sub_Char_Table *) header;
       struct Lisp_Sub_Char_Table out;
@@ -2964,7 +2963,7 @@ fill_pseudovec (union vectorlike_header *header, Lisp_Object item)
 {
   struct Lisp_Vector *v = (struct Lisp_Vector *) header;
   eassert (v->header.size & PSEUDOVECTOR_FLAG);
-  ptrdiff_t size = v->header.size & PSEUDOVECTOR_SIZE_MASK;
+  ptrdiff_t size = v->header.size & PSEUDOVECTOR_LISP_MASK;
   for (ptrdiff_t idx = 0; idx < size; idx++)
     v->contents[idx] = item;
 }
@@ -2995,8 +2994,8 @@ dump_vectorlike (struct dump_context *ctx,
          harmless data carriers that we can dump like other Lisp
          objects.  Fonts themselves are window-system-specific and
          need to be recreated on each startup.  */
-      if ((v->header.size & PSEUDOVECTOR_SIZE_MASK) != FONT_SPEC_MAX
-	  && (v->header.size & PSEUDOVECTOR_SIZE_MASK) != FONT_ENTITY_MAX)
+      if ((v->header.size & PSEUDOVECTOR_LISP_MASK) != FONT_SPEC_MAX
+	  && (v->header.size & PSEUDOVECTOR_LISP_MASK) != FONT_ENTITY_MAX)
         error_unsupported_dump_object(ctx, lv, "font");
       FALLTHROUGH;
     case PVEC_NORMAL_VECTOR:

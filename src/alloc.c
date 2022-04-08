@@ -21,10 +21,19 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /*
 
-This file contains the implementation of the Emacs garbage collector:
-it's a mostly-copying, mostly-generational, mostly-concurrent,
-mostly-bug-free memory alllocation system written with modern virtual
-memory and cache architectures in mind.
+The mark-and-sweep-to-free-lists garbage collector was modified by
+Colascione et al to be mostly copying, mostly generational, and
+mostly concurrent.
+
+The core task is marking Lisp objects in so-called vectorlikes, an
+unfortunate umbrella term for Emacs's various structs (buffers,
+windows, frames, etc.). "Vectorlikes" is meant to capture their
+function as containers of heterogenous Lisp objects.
+
+Not content with just one confusing moniker, Emacs also coined
+"pseudovector" as a synonym for vectorlike, emphasizing that
+vectorlikes also contain non-Lisp member data (which a "pure"
+Lisp_Vector would not).
 
 Basic organization
 ==================
@@ -1050,7 +1059,7 @@ struct large_vector {
    However, we don't inline these functions in non-optimized builds:
    without optimization, we get all the code bloat of forced inlining
    and none of the gains from specialization, so in this mode, just
-   turn off the inling.  */
+   turn off the inlining.  */
 
 #ifdef __OPTIMIZE__
 # define GCFN static inline ALWAYS_INLINE
@@ -1171,8 +1180,8 @@ NRML Lisp_Object gc_interval_smuggle (INTERVAL);
 NRML INTERVAL gc_interval_unsmuggle (Lisp_Object);
 NRML bool gc_mark_drain_one (Lisp_Object *);
 NRML void gc_mark_drain_queue (void);
-NRML void gc_mark_enqueue_1 (Lisp_Object);
-NRML void gc_mark_or_enqueue (Lisp_Object);
+NRML void gc_mark_enqueue (Lisp_Object);
+NRML void gc_mark (Lisp_Object);
 NRML bool gc_mark_queue_block_try_add (gc_block *, Lisp_Object);
 NRML bool gc_mark_queue_block_try_remove (gc_block *, Lisp_Object *);
 GCFN bool gc_object_is_marked (const void *, const gc_heap *);
@@ -1230,8 +1239,6 @@ GCFN bool gc_heap_has_separate_tospace (const gc_heap *);
 NOIL void gc_heap_prepare (const gc_heap *, bool);
 NRML void gc_heap_init (const gc_heap *);
 GCFN void scan_object (void *, enum Lisp_Type, gc_phase);
-NRML void scan_object_for_marking_ool (void *, enum Lisp_Type);
-NRML void scan_object_for_sweeping_ool (void *, enum Lisp_Type);
 
 DECLARE_STANDARD_HEAP_FUNCTIONS (gc_cons_heap);
 NRML bool cons_marked_p (const struct Lisp_Cons *);
@@ -1239,7 +1246,7 @@ NRML void set_cons_marked (struct Lisp_Cons *);
 NRML void set_cons_pinned (struct Lisp_Cons *);
 NRML EMACS_INT cons_identity_hash_code (struct Lisp_Cons *);
 NRML Lisp_Object live_cons_holding (const struct mem_node *, const void *);
-NOIL void gc_mark_or_enqueue_cons (struct Lisp_Cons *);
+NOIL void gc_mark_cons (struct Lisp_Cons *);
 NRML bool live_cons_p (const struct mem_node *, const void *);
 GCFN void scan_cons (struct Lisp_Cons *, gc_phase);
 NRML struct Lisp_Cons *point_cons_into_tospace (struct Lisp_Cons *);
@@ -1253,7 +1260,7 @@ NRML EMACS_INT float_identity_hash_code (struct Lisp_Float *);
 NRML Lisp_Object live_float_holding (const struct mem_node *, const void *);
 NRML bool live_float_p (const struct mem_node *, const void *);
 NRML struct Lisp_Float *point_float_into_tospace (struct Lisp_Float *);
-NOIL void gc_mark_or_enqueue_float (struct Lisp_Float *);
+NOIL void gc_mark_float (struct Lisp_Float *);
 
 DECLARE_STANDARD_HEAP_FUNCTIONS (gc_symbol_heap);
 NRML bool symbol_marked_p (const struct Lisp_Symbol *);
@@ -1267,7 +1274,7 @@ GCFN void scan_localized_symbol (struct Lisp_Symbol *, gc_phase);
 NRML struct Lisp_Symbol *point_symbol_into_tospace (struct Lisp_Symbol *);
 NRML bool symbol_uses_obj (Lisp_Object, Lisp_Object);
 NRML bool which_symbols_callback (void *, void *);
-NOIL void gc_mark_or_enqueue_symbol (struct Lisp_Symbol *);
+NOIL void gc_mark_symbol (struct Lisp_Symbol *);
 
 DECLARE_STANDARD_HEAP_FUNCTIONS (gc_interval_heap);
 NRML bool interval_marked_p (const struct interval *);
@@ -1276,7 +1283,7 @@ NRML void set_interval_pinned (INTERVAL);
 NRML INTERVAL live_interval_holding (const struct mem_node *, const void *);
 GCFN void scan_interval (INTERVAL, gc_phase);
 NRML INTERVAL point_interval_into_tospace (INTERVAL);
-NOIL void gc_mark_or_enqueue_interval (INTERVAL);
+NOIL void gc_mark_interval (INTERVAL);
 
 DECLARE_STANDARD_HEAP_FUNCTIONS (gc_string_heap);
 NRML bool string_marked_p (const struct Lisp_String *);
@@ -1295,7 +1302,7 @@ NRML struct Lisp_String *allocate_string (void);
 NRML struct Lisp_String *point_string_into_tospace (struct Lisp_String *);
 NRML void init_strings (void);
 NRML void allocate_string_data (struct Lisp_String *, EMACS_INT, EMACS_INT, bool);
-NOIL void gc_mark_or_enqueue_string (struct Lisp_String *s);
+NOIL void gc_mark_string (struct Lisp_String *s);
 NRML ptrdiff_t sdata_size (ptrdiff_t);
 
 DECLARE_STANDARD_HEAP_FUNCTIONS (gc_vector_heap);
@@ -1329,8 +1336,6 @@ NRML void marker_cleanup (struct Lisp_Marker *);
 NRML void user_ptr_cleanup (struct Lisp_User_Ptr *);
 GCFN void scan_marker (struct Lisp_Marker *, gc_phase);
 GCFN void scan_overlay (struct Lisp_Overlay *, gc_phase);
-GCFN void scan_vector_lisp_fields (union vectorlike_header *, gc_phase);
-GCFN void scan_pseudovector_empty (union vectorlike_header *, gc_phase);
 GCFN void *point_vectorlike_into_tospace (union vectorlike_header *);
 GCFN void scan_buffer (struct buffer *, gc_phase);
 NRML void init_vectors (void);
@@ -1352,7 +1357,7 @@ GCFN void scan_terminal_display_info (struct terminal *, gc_phase);
 GCFN void scan_terminal (struct terminal *, gc_phase);
 NRML void visit_vectorlike_root (struct gc_root_visitor, struct Lisp_Vector *, enum gc_root_type);
 NRML void visit_buffer_root (struct gc_root_visitor, struct buffer *, enum gc_root_type);
-NOIL void gc_mark_or_enqueue_vectorlike (union vectorlike_header *);
+NOIL void gc_mark_vectorlike (union vectorlike_header *);
 GCFN bool vector_igscan_hook(void *, gc_phase, gc_igscan *);
 NRML void sweep_one_large_vector (large_vector_meta *);
 
@@ -1407,14 +1412,9 @@ GCFN void gc_gen_y_bit_iter_next (gc_gen_y_bit_iter *);
 GCFN ptrdiff_t gc_gen_y_bit_iter_slot_nr (const gc_gen_y_bit_iter *);
 GCFN emacs_bitset_word gc_gen_y_bit_iter_get (const gc_gen_y_bit_iter *, const emacs_bitset_word *);
 GCFN void gc_gen_y_bit_iter_set (const gc_gen_y_bit_iter *, emacs_bitset_word *, emacs_bitset_word);
-
-
 GCFN void check_obarray_elem(const Lisp_Object tail, size_t i, size_t obsize);
 
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
-
-
-/* Macros.  */
 
 #define scan_reference_pointer_to_vectorlike(x, phase)                  \
   scan_reference_pointer_to_vectorlike_1 ((x), &(*(x))->header, phase)
@@ -1425,8 +1425,7 @@ extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
     VECSIZE (type), 0, tag, /*clearit=*/false),                  \
    (type *) gc_vector_allocation_vector(*vr))
 
-/* Allocate zerod initialized pseudovector with a prefix of Lisp
-   object slots.  */
+/* Allocate zeroed pseudovector with Lisp object slots up to FIELD.  */
 #define UNSAFE_ALLOCATE_PSEUDOVECTOR_UNINIT(vr, type, field, tag)   \
   ((*vr) = allocate_pseudovector (                                  \
     VECSIZE (type),                                                 \
@@ -1461,10 +1460,10 @@ typedef union
    environment.  It is not inside a do-while so that its storage
    survives the macro.  Callers should be declared NO_INLINE.  */
 #ifdef HAVE___BUILTIN_UNWIND_INIT
-# define SET_STACK_TOP_ADDRESS(p)	\
-   stacktop_sentry sentry;		\
-   __builtin_unwind_init ();		\
-   *(p) = NEAR_STACK_TOP (&sentry)
+# define SET_STACK_TOP_ADDRESS(p)		\
+  stacktop_sentry sentry;			\
+  __builtin_unwind_init ();			\
+  *(p) = NEAR_STACK_TOP (&sentry)
 #else
 # define SET_STACK_TOP_ADDRESS(p)		\
    stacktop_sentry sentry;			\
@@ -1485,7 +1484,7 @@ typedef union
     const uintptr_t stack_size = sb_la - fp_la;                         \
     if (eunlikely (stack_size > gc_mark_maximum_stack))                 \
       {                                                                 \
-        gc_mark_enqueue_1 (objexpr);                                    \
+        gc_mark_enqueue (objexpr);					\
         return;                                                         \
       }                                                                 \
   } while (false)
@@ -4306,13 +4305,14 @@ static const gc_heap gc_interval_heap = {
 DEFINE_STANDARD_HEAP_FUNCTIONS (gc_interval_heap);
 
 void
-gc_mark_or_enqueue_interval (const INTERVAL i)
+gc_mark_interval (const INTERVAL i)
 {
-  if (interval_marked_p (i))
-    return;  /* Already on mark queue or marked.  */
-  set_interval_marked (i);
-  ENQUEUE_AND_RETURN_IF_TOO_DEEP (gc_interval_smuggle (i));
-  scan_interval (i, GC_PHASE_MARK);
+  if (! interval_marked_p (i))
+    {
+      set_interval_marked (i);
+      ENQUEUE_AND_RETURN_IF_TOO_DEEP (gc_interval_smuggle (i));
+      scan_interval (i, GC_PHASE_MARK);
+    }
 }
 
 bool
@@ -4335,7 +4335,7 @@ set_interval_marked (const INTERVAL i)
 void
 set_interval_pinned (const INTERVAL i)
 {
-  if (!gc_pdumper_object_p (i))
+  if (! gc_pdumper_object_p (i))
     gc_object_set_pinned (i, &gc_interval_heap);
 }
 
@@ -4429,13 +4429,14 @@ static const gc_heap gc_string_heap = {
 DEFINE_STANDARD_HEAP_FUNCTIONS (gc_string_heap);
 
 void
-gc_mark_or_enqueue_string (struct Lisp_String *const s)
+gc_mark_string (struct Lisp_String *const s)
 {
-  if (string_marked_p (s))
-    return;  /* Already on mark queue or marked.  */
-  set_string_marked (s);
-  ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (s, Lisp_String));
-  scan_string (s, GC_PHASE_MARK);
+  if (! string_marked_p (s))
+    {
+      set_string_marked (s);
+      ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (s, Lisp_String));
+      scan_string (s, GC_PHASE_MARK);
+    }
 }
 
 /* Return the size of an sdata structure large enough to hold N bytes
@@ -4501,7 +4502,7 @@ scan_string (struct Lisp_String *const s, const gc_phase phase)
          we have to mark it specially.  */
       sdata *const v = sdata_from_string (s);
       if (phase == GC_PHASE_MARK)
-        gc_mark_or_enqueue_vectorlike (&v->header);
+        gc_mark_vectorlike (&v->header);
       else if (phase == GC_PHASE_SWEEP)
         {
           sdata *const v_tospace =
@@ -4961,12 +4962,10 @@ static const gc_heap gc_float_heap = {
 DEFINE_STANDARD_HEAP_FUNCTIONS (gc_float_heap);
 
 void
-gc_mark_or_enqueue_float (struct Lisp_Float *const f)
+gc_mark_float (struct Lisp_Float *const f)
 {
-  if (float_marked_p (f))
-    return;  /* Already on mark queue or marked.  */
-  set_float_marked (f);
-  /* Nothing to scan.  */
+  if (! float_marked_p (f))
+    set_float_marked (f);
 }
 
 /* Return a new float object with value FLOAT_VALUE.  */
@@ -5056,29 +5055,19 @@ static const gc_heap gc_cons_heap = {
 
 DEFINE_STANDARD_HEAP_FUNCTIONS (gc_cons_heap);
 
-/* Mark and maybe scan a cons.  */
 void
-gc_mark_or_enqueue_cons (struct Lisp_Cons *c)
+gc_mark_cons (struct Lisp_Cons *c)
 {
-  bool checked_stack_depth = false;
-  do {
-    if (cons_marked_p (c))
-      return;  /* Already on mark queue or marked.  */
-    set_cons_marked (c);
-    if (!checked_stack_depth)
-      {
-	checked_stack_depth = true;
-	ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (c, Lisp_Cons));
-      }
-    scan_cons (c, GC_PHASE_MARK);
-    /* Try looping over the CDR of the cons if it's also a cons ----
-       this way, we avoid some recursion.  Note that we don't have to
-       check the stack depth again.  */
-    if (CONSP(c->u.s.cdr))
-      c = XCONS (c->u.s.cdr);
-    else
-      break;
-  } while (c);
+  if (! cons_marked_p (c))
+    {
+      set_cons_marked (c);
+      ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (c, Lisp_Cons));
+      while (c != NULL)
+	{
+	  scan_cons (c, GC_PHASE_MARK);
+	  c = CONSP (c->u.s.cdr) ? XCONS (c->u.s.cdr) : NULL;
+	}
+    }
 }
 
 DEFUN ("cons", Fcons, Scons, 2, 2, 0,
@@ -5278,13 +5267,14 @@ static const gc_heap gc_vector_heap = {
 DEFINE_STANDARD_HEAP_FUNCTIONS (gc_vector_heap);
 
 void
-gc_mark_or_enqueue_vectorlike (union vectorlike_header *const v)
+gc_mark_vectorlike (union vectorlike_header *const v)
 {
-  if (vectorlike_marked_p (v))
-    return;  /* Already on mark queue or marked.  */
-  set_vectorlike_marked (v);
-  ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (v, Lisp_Vectorlike));
-  scan_vectorlike (v, GC_PHASE_MARK);
+  if (! vectorlike_marked_p (v))
+    {
+      set_vectorlike_marked (v);
+      ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (v, Lisp_Vectorlike));
+      scan_vectorlike (v, GC_PHASE_MARK);
+    }
 }
 
 /* Provide special support for scanning parts of large vectors that
@@ -5342,6 +5332,9 @@ init_vectors (void)
 ptrdiff_t
 vectorlike_payload_nr_words (const union vectorlike_header *const hdr)
 {
+  /* confusing: HEADER_SIZE is byte offset of Lisp_Object fields, and
+     SIZE is number of Lisp_Object fields (equivalently the Lisp_Word
+     width of those fields).  */
   const ptrdiff_t size = hdr->size;
   if ((size & PSEUDOVECTOR_FLAG) == 0)
     return size;
@@ -5356,18 +5349,18 @@ vectorlike_payload_nr_words (const union vectorlike_header *const hdr)
     }
   if (PSEUDOVECTOR_TYPEP (hdr, PVEC_STRING_DATA))
     {
-      eassume ((size & PSEUDOVECTOR_SIZE_MASK) == 0);
+      eassume ((size & PSEUDOVECTOR_LISP_MASK) == 0);
       const ptrdiff_t nr_words =
-        (size & PSEUDOVECTOR_REST_MASK) >> PSEUDOVECTOR_SIZE_BITS;
+        (size & PSEUDOVECTOR_REST_MASK) >> PSEUDOVECTOR_LISP_BITS;
       if (nr_words == 0)
         {
           const sdata *const sd = (const sdata *) hdr;
           return sd->u.large.len;
         }
     }
-  return ((size & PSEUDOVECTOR_SIZE_MASK)
+  return ((size & PSEUDOVECTOR_LISP_MASK)
           + ((size & PSEUDOVECTOR_REST_MASK)
-             >> PSEUDOVECTOR_SIZE_BITS));
+             >> PSEUDOVECTOR_LISP_BITS));
 }
 
 /* Return the memory footprint of V in bytes.  */
@@ -5397,7 +5390,7 @@ font_cleanup (struct font *const font)
 {
   /* Different object types use PVEC_FONT for some reason; we care
      only about actual struct font objects.  */
-  if ((font->header.size & PSEUDOVECTOR_SIZE_MASK) != FONT_OBJECT_MAX)
+  if ((font->header.size & PSEUDOVECTOR_LISP_MASK) != FONT_OBJECT_MAX)
     return;
 
   struct font_driver const *drv = font->driver;
@@ -5709,7 +5702,7 @@ allocate_pseudovector (const int memlen,
                        bool clearit)
 {
   /* Catch bogus values.  */
-  enum { size_max = (1 << PSEUDOVECTOR_SIZE_BITS) - 1 };
+  enum { size_max = (1 << PSEUDOVECTOR_LISP_BITS) - 1 };
   enum { rest_max = (1 << PSEUDOVECTOR_REST_BITS) - 1 };
   verify (size_max + rest_max <= VECTOR_ELTS_MAX);
   eassume (0 <= tag && tag <= PVEC_FONT);
@@ -5717,7 +5710,7 @@ allocate_pseudovector (const int memlen,
   eassume (lisplen <= size_max);
   eassume (memlen <= size_max + rest_max);
   gc_vector_allocation vr = allocate_vectorlike (memlen, clearit);
-  /* Only the first LISPLEN slots will be traced normally by the GC.  */
+  /* Only the first LISPLEN slots will be marked by the GC.  */
   XSETPVECTYPESIZE (gc_vector_allocation_vector (vr),
                     tag, lisplen, memlen - lisplen);
   return vr;
@@ -5758,9 +5751,9 @@ allocate_buffer (void)
 gc_vector_allocation
 allocate_record (const EMACS_INT count)
 {
-  if (count > PSEUDOVECTOR_SIZE_MASK)
+  if (count > PSEUDOVECTOR_LISP_MASK)
     error ("Attempt to allocate a record of %"pI"d slots; max is %d",
-	   count, PSEUDOVECTOR_SIZE_MASK);
+	   count, PSEUDOVECTOR_LISP_MASK);
   return allocate_pseudovector (
     count, count, PVEC_RECORD, /*clearit=*/false);
 }
@@ -6050,7 +6043,7 @@ DEFINE_STANDARD_HEAP_FUNCTIONS (gc_symbol_heap);
 
 /* Mark and maybe scan a symbol.  */
 void
-gc_mark_or_enqueue_symbol (struct Lisp_Symbol *s)
+gc_mark_symbol (struct Lisp_Symbol *s)
 {
   bool checked_stack_depth = false;
   do {
@@ -7600,10 +7593,10 @@ scan_object_root_visitor_mark (Lisp_Object *root_ptr,
                                void *data)
 {
   (void) data;
-  if (type != GC_ROOT_C_SYMBOL)
-    scan_reference (root_ptr, GC_PHASE_MARK);
+  if (type == GC_ROOT_C_SYMBOL)
+    scan_object (XPNTR (*root_ptr), XTYPE (*root_ptr), GC_PHASE_MARK);
   else
-    scan_object_for_marking_ool (XPNTR (*root_ptr), XTYPE (*root_ptr));
+    scan_reference (root_ptr, GC_PHASE_MARK);
 }
 
 static inline bool mark_stack_empty_p (void);
@@ -7615,10 +7608,10 @@ scan_object_root_visitor_sweep (Lisp_Object *root_ptr,
                                 void *data)
 {
   (void) data;
-  if (type != GC_ROOT_C_SYMBOL)
-    scan_reference (root_ptr, GC_PHASE_SWEEP);
+  if (type == GC_ROOT_C_SYMBOL)
+    scan_object (XPNTR (*root_ptr), XTYPE (*root_ptr), GC_PHASE_SWEEP);
   else
-    scan_object_for_sweeping_ool (XPNTR (*root_ptr), XTYPE (*root_ptr));
+    scan_reference (root_ptr, GC_PHASE_SWEEP);
 }
 
 /* Called from pdumper to walk over objects in the pdumper image that
@@ -7634,7 +7627,7 @@ sweep_pdumper_object (void *const obj, const enum Lisp_Type type)
   eassume (current_gc_phase == GC_PHASE_SWEEP);
   eassert (gc_pdumper_object_p (obj));
   eassert (pdumper_object_p_precise (obj));
-  scan_object_for_sweeping_ool (obj, type);
+  scan_object (obj, type, GC_PHASE_SWEEP);
 }
 
 void
@@ -7686,12 +7679,12 @@ mark_strong_references_on_reachable_weak_list (
   for (; CONSP (tail); tail = XCDR (tail))
     if (entry_survives_gc_p (XCAR (tail)) && !survives_gc_p (XCAR (tail)))
       {
-        gc_mark_or_enqueue (XCAR (tail));
+        gc_mark (XCAR (tail));
         marked = true;
       }
   if (!survives_gc_p (tail))
     {
-      gc_mark_or_enqueue (tail);
+      gc_mark (tail);
       marked = true;
     }
   return marked;
@@ -7929,7 +7922,7 @@ mark_strong_references_of_reachable_font_caches (void)
       if (!survives_gc_p (*cachep))
         {
           marked = true;
-          gc_mark_or_enqueue (*cachep);
+          gc_mark (*cachep);
         }
     }
   return marked;
@@ -7946,7 +7939,7 @@ mark_strong_references_of_reachable_finalizers (void)
       if (survives_gc_p (fin) && !survives_gc_p (finalizer->function))
         {
           marked = true;
-          gc_mark_or_enqueue (finalizer->function);
+          gc_mark (finalizer->function);
         }
       fin = finalizer->next;
     }
@@ -8100,8 +8093,7 @@ gc_phase_prepare (const bool major)
   gc_hot.pdumper_start = (uintptr_t) dump_public.start;
   /* Cache the major-collection flag.  */
   gc_hot.major = major;
-  eassume ((uintptr_t) dump_public.end
-           - gc_hot.pdumper_start <= INT32_MAX);
+  eassume ((uintptr_t) dump_public.end - gc_hot.pdumper_start <= INT32_MAX);
   gc_hot.pdumper_size = (uintptr_t) dump_public.end - gc_hot.pdumper_start;
   /* Cache so we don't have to constantly consult current_thread.  */
   gc_hot.gc_phase_mark_stack_bottom_la = (uintptr_t) stack_bottom;
@@ -8595,60 +8587,12 @@ scan_glyph_matrix (struct glyph_matrix *const matrix, const gc_phase phase)
         }
 }
 
-void
-scan_vector_lisp_fields (union vectorlike_header *header, const gc_phase phase)
-{
-  struct Lisp_Vector *ptr = (struct Lisp_Vector *) header;
-  const ptrdiff_t size = vectorlike_lisp_size (&ptr->header);
-  ptrdiff_t i;
-
-  /* Note that this size is not the memory-footprint size, but only
-     the number of Lisp_Object fields that we should trace.
-     The distinction is used e.g. by Lisp_Process which places extra
-     non-Lisp_Object fields at the end of the structure...  */
-  for (i = 0; i < size; i++) /* ...and then mark its elements.  */
-    scan_reference (&ptr->contents[i], phase);
-}
-
-/* Scan a pseudovector with no lisp slots.  Does nothing excep assert
-   that we have no lisp slots.  */
-void
-scan_pseudovector_empty (union vectorlike_header *header, const gc_phase phase)
-{
-  eassume (header->size & PSEUDOVECTOR_FLAG);
-  eassume ((header->size & PSEUDOVECTOR_SIZE_MASK) == 0);
-  (void) phase;
-}
-
 ptrdiff_t
 vectorlike_lisp_size (const union vectorlike_header *const header)
 {
   return (header->size & PSEUDOVECTOR_FLAG)
-    ? header->size & PSEUDOVECTOR_SIZE_MASK
+    ? header->size & PSEUDOVECTOR_LISP_MASK
     : header->size;
-}
-
-void
-xscan_vector_lisp_fields (union vectorlike_header *const header,
-                          const gc_phase phase)
-{
-  return scan_vector_lisp_fields (header, phase);
-}
-
-
-/* Like scan_vector_lisp_fields but optimized for char-tables (and
-   sub-char-tables) assuming that the contents are mostly integers or
-   symbols.  */
-void
-scan_char_table (struct Lisp_Vector *const ptr,
-                 const enum pvec_type pvectype,
-                 const gc_phase phase)
-{
-  int size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
-  /* Consult the Lisp_Sub_Char_Table layout before changing this.  */
-  int i, idx = (pvectype == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_OFFSET : 0);
-  for (i = idx; i < size; i++)
-    scan_reference (&ptr->contents[i], phase);
 }
 
 void
@@ -8664,7 +8608,6 @@ scan_overlay (struct Lisp_Overlay *const ptr, const gc_phase phase)
 void
 scan_buffer (struct buffer *const buffer, const gc_phase phase)
 {
-  scan_vector_lisp_fields (&buffer->header, phase);
   scan_reference_pointer_to_vectorlike (&buffer->overlays_before, phase);
   scan_reference_pointer_to_vectorlike (&buffer->overlays_after, phase);
   scan_reference_pointer_to_vectorlike (&buffer->base_buffer, phase);
@@ -8716,7 +8659,6 @@ scan_face_cache (struct face_cache *const c,
 void
 scan_frame (struct frame *const f, const gc_phase phase)
 {
-  scan_vector_lisp_fields (&f->header, phase);
   scan_face_cache (f->face_cache, f, phase);
   scan_reference_pointer_to_vectorlike (&f->terminal, phase);
 #ifdef HAVE_WINDOW_SYSTEM
@@ -8752,13 +8694,95 @@ discard_killed_buffers (Lisp_Object *const buffer_list)
     }
 }
 
-/* Entry of the mark stack.  */
 struct mark_entry
+{
+  ptrdiff_t n;                 /* number of values, or 0 if a single value */
+  union {
+    Lisp_Object value;         /* when n = 0 */
+    Lisp_Object *values;       /* when n > 0 */
+  } u;
+};
+
+struct mark_stack
+{
+  struct mark_entry *stack;    /* base of stack */
+  ptrdiff_t size;              /* allocated size in entries */
+  ptrdiff_t sp;                /* current number of entries */
+};
+
+/* Avoid recursing in C to effect a call stack we can administer
+   manually (for greater control and efficiency).  */
+
+static struct mark_stack mark_stk = {NULL, 0, 0};
+
+static inline bool
+mark_stack_empty_p (void)
+{
+  return mark_stk.sp <= 0;
+}
+
+static inline Lisp_Object
+mark_stack_pop (void)
+{
+  eassume (! mark_stack_empty_p ());
+  struct mark_entry *e = &mark_stk.stack[mark_stk.sp - 1];
+  if (e->n == 0)               /* single value */
+    {
+      --mark_stk.sp;
+      return e->u.value;
+    }
+  /* Array of values: pop them left to right, which seems to be slightly
+     faster than right to left.  */
+  e->n--;
+  if (e->n == 0)
+    --mark_stk.sp;             /* last value consumed */
+  return (++e->u.values)[-1];
+}
+
+NO_INLINE static void
+grow_mark_stack (void)
+{
+  struct mark_stack *ms = &mark_stk;
+  eassert (ms->sp == ms->size);
+  ptrdiff_t min_incr = ms->sp == 0 ? 8192 : 1;
+  ptrdiff_t oldsize = ms->size;
+  ms->stack = xpalloc (ms->stack, &ms->size, min_incr, -1, sizeof *ms->stack);
+  eassert (ms->sp < ms->size);
+}
+
+static inline void
+mark_stack_push_value (Lisp_Object value)
+{
+  if (mark_stk.sp >= mark_stk.size)
+    grow_mark_stack ();
+  mark_stk.stack[mark_stk.sp++] = (struct mark_entry){.n = 0, .u.value = value};
+}
+
+static inline void
+mark_stack_push_values (Lisp_Object *values, ptrdiff_t n)
+{
+  eassume (n >= 0);
+  if (n == 0)
+    return;
+  if (mark_stk.sp >= mark_stk.size)
+    grow_mark_stack ();
+  mark_stk.stack[mark_stk.sp++] = (struct mark_entry){.n = n,
+						      .u.values = values};
+}
+
+/* Traverse and mark objects on the mark stack above BASE_SP.
+
+   Traversal is depth-first using the mark stack for most common
+   object types.  Recursion is used for other types, in the hope that
+   they are rare enough that C stack usage is kept low.  */
+static void
+process_mark_stack (ptrdiff_t base_sp)
+{
+}
+
 void
 scan_window (struct window *const w, const gc_phase phase)
 {
-  scan_vector_lisp_fields (&w->header, phase);
-
   /* Scan glyph matrices, if any.  Marking window matrices is
      sufficient because frame matrices use the same glyph memory.  */
   if (w->current_matrix)
@@ -8880,7 +8904,6 @@ maybe_resize_hash_table (struct Lisp_Hash_Table *h)
 void
 scan_hash_table (struct Lisp_Hash_Table *const h, const gc_phase phase)
 {
-  scan_vector_lisp_fields (&h->header, phase);
   scan_reference (&h->test.name, phase);
   scan_reference (&h->test.user_hash_function, phase);
   scan_reference (&h->test.user_cmp_function, phase);
@@ -8976,7 +8999,6 @@ scan_terminal_display_info (struct terminal *const t, const gc_phase phase)
 void
 scan_terminal (struct terminal *const t, const gc_phase phase)
 {
-  scan_vector_lisp_fields (&t->header, phase);
   scan_reference_pointer_to_vectorlike (&t->next_terminal, phase);
   scan_terminal_display_info (t, phase);
   if (phase == GC_PHASE_SWEEP && TERMINAL_FONT_CACHEP (t))
@@ -8986,19 +9008,43 @@ scan_terminal (struct terminal *const t, const gc_phase phase)
 #endif /* HAVE_WINDOW_SYSTEM */
 }
 
+/* Type punning of PTR relies on layout assumption cf. lisp.h  */
+
 void
 scan_vectorlike (union vectorlike_header *const ptr, const gc_phase phase)
 {
-  const enum pvec_type pvectype =
-    PSEUDOVECTOR_TYPE ((struct Lisp_Vector *) ptr);
+  const enum pvec_type pvectype = PSEUDOVECTOR_TYPE (ptr);
+  for (ptrdiff_t i = (pvectype == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_OFFSET : 0);
+       i < vectorlike_lisp_size (ptr->header);
+       ++i)
+    scan_reference (&ptr->contents[i], phase);
 
-  /* All pseudovectors get their lisp slots scanned.  */
-
-  /* Some pseudovectors need special treatment.  */
   switch (pvectype)
     {
+    case PVEC_MISC_PTR:
+    case PVEC_USER_PTR:
+    case PVEC_BIGNUM:
+    case PVEC_STRING_DATA:
+    case PVEC_SUBR:
+      eassume (vectorlike_lisp_size (ptr) == 0);
+      FALLTHROUGH;
+    case PVEC_PROCESS:
+    case PVEC_FINALIZER:
     case PVEC_NORMAL_VECTOR:
-      scan_vector_lisp_fields (ptr, phase);
+    case PVEC_BOOL_VECTOR:
+    case PVEC_WINDOW_CONFIGURATION:
+    case PVEC_OTHER:
+    case PVEC_XWIDGET:
+    case PVEC_XWIDGET_VIEW:
+    case PVEC_MUTEX:
+    case PVEC_CONDVAR:
+    case PVEC_MODULE_FUNCTION:
+    case PVEC_COMPILED:
+    case PVEC_RECORD:
+    case PVEC_FONT:
+    case PVEC_NATIVE_COMP_UNIT:
+    case PVEC_CHAR_TABLE:
+    case PVEC_SUB_CHAR_TABLE:
       return;
 
     case PVEC_MARKER:
@@ -9009,30 +9055,12 @@ scan_vectorlike (union vectorlike_header *const ptr, const gc_phase phase)
       scan_overlay ((struct Lisp_Overlay *) ptr, phase);
       return;
 
-    case PVEC_FINALIZER:
-      scan_vector_lisp_fields (ptr, phase);
-      return;
-
-    case PVEC_MISC_PTR:
-    case PVEC_USER_PTR:
-    case PVEC_BIGNUM:
-    case PVEC_STRING_DATA:
-      scan_pseudovector_empty (ptr, phase);
-      return;
-
-    case PVEC_PROCESS:
-      scan_vector_lisp_fields (ptr, phase);
-      return;
-
     case PVEC_FRAME:
       scan_frame ((struct frame *) ptr, phase);
       return;
 
     case PVEC_WINDOW:
       scan_window ((struct window *) ptr, phase);
-      return;
-
-    case PVEC_BOOL_VECTOR:
       return;
 
     case PVEC_BUFFER:
@@ -9047,48 +9075,17 @@ scan_vectorlike (union vectorlike_header *const ptr, const gc_phase phase)
       scan_terminal ((struct terminal *) ptr, phase);
       return;
 
-    case PVEC_WINDOW_CONFIGURATION:
-      scan_vector_lisp_fields (ptr, phase);
-      return;
-
-    case PVEC_SUBR:
-      return;
-
-    case PVEC_OTHER:
-    case PVEC_XWIDGET:
-    case PVEC_XWIDGET_VIEW:
-      scan_vector_lisp_fields (ptr, phase);
-      return;
-
     case PVEC_THREAD:
       /* The main thread lives in the data section, not the heap. It has no
          mark bit.  We scan it as a root.  */
-      eassume (!main_thread_p (ptr));
+      eassume (! main_thread_p (ptr));
       scan_thread ((struct thread_state *) ptr, phase);
       return;
 
-    case PVEC_MUTEX:
-    case PVEC_CONDVAR:
-    case PVEC_MODULE_FUNCTION:
-    case PVEC_COMPILED:
-      scan_vector_lisp_fields (ptr, phase);
-      return;
-
-    case PVEC_CHAR_TABLE:
-    case PVEC_SUB_CHAR_TABLE:
-      /* Can't use scan_vector_lisp_fields here due to non-zero offset.  */
-      scan_char_table ((struct Lisp_Vector *) ptr, pvectype, phase);
-      return;
-
-    case PVEC_RECORD:
-    case PVEC_FONT:
-      scan_vector_lisp_fields (ptr, phase);
-      return;
-
-    case PVEC_NATIVE_COMP_UNIT:
+    default:
+      emacs_unreachable ();
       return;
     }
-  emacs_unreachable ();
 }
 
 void
@@ -9118,39 +9115,32 @@ scan_object (void *const obj,
       scan_interval (obj, phase);
       return;
 
-    case Lisp_Int1:
-      emacs_unreachable ();
-
     case Lisp_Float:
       return;  /* Nothing to scan.  */
 
+    case Lisp_Int1:
     case Lisp_Type_Unused0:
+    default:
       emacs_unreachable ();
+      return;
     }
-  emacs_unreachable ();
-}
-
-void
-scan_object_for_marking_ool (void *const obj, const enum Lisp_Type type)
-{
-  scan_object (obj, type, GC_PHASE_MARK);
-}
-
-void
-scan_object_for_sweeping_ool (void *const obj, const enum Lisp_Type type)
-{
-  scan_object (obj, type, GC_PHASE_SWEEP);
 }
 
 void
 scan_reference (Lisp_Object *const refp, const gc_phase phase)
 {
   eassume (phase == current_gc_phase);
-  eassume (phase == GC_PHASE_MARK || phase == GC_PHASE_SWEEP);
-  if (phase == GC_PHASE_MARK)
-    gc_mark_or_enqueue (*refp);
-  if (phase == GC_PHASE_SWEEP)
-    gc_any_object_point_into_tospace (refp);
+  switch (phase)
+    {
+    case GC_PHASE_MARK:
+      gc_mark (*refp);
+      break;
+    case GC_PHASE_SWEEP:
+      gc_any_object_point_into_tospace (refp);
+      break;
+    default:
+      emacs_unreachable ();
+    }
 }
 
 void
@@ -9166,7 +9156,7 @@ scan_reference_pinned (const Lisp_Object ref, const gc_phase phase)
   eassume (phase == GC_PHASE_MARK || phase == GC_PHASE_SWEEP);
   if (phase == GC_PHASE_MARK)
     {
-      gc_mark_or_enqueue (ref);
+      gc_mark (ref);
       gc_any_object_pin (ref);
     }
 }
@@ -9184,7 +9174,7 @@ scan_reference_interval_pinned (const INTERVAL i, const gc_phase phase)
   eassume (phase == GC_PHASE_MARK || phase == GC_PHASE_SWEEP);
   if (i && phase == GC_PHASE_MARK)
     {
-      gc_mark_or_enqueue_interval (i);
+      gc_mark_interval (i);
       set_interval_pinned (i);
     }
 }
@@ -9197,7 +9187,7 @@ scan_reference_pointer_to_interval (INTERVAL *const ip, const gc_phase phase)
   if (!*ip)
     return;
   if (phase == GC_PHASE_MARK)
-    gc_mark_or_enqueue_interval (*ip);
+    gc_mark_interval (*ip);
   if (phase == GC_PHASE_SWEEP)
     *ip = point_interval_into_tospace (*ip);
 }
@@ -9212,7 +9202,7 @@ scan_reference_pointer_to_symbol (struct Lisp_Symbol **const s,
   if (!*s)
     return;
   if (phase == GC_PHASE_MARK)
-    gc_mark_or_enqueue_symbol (*s);
+    gc_mark_symbol (*s);
   if (phase == GC_PHASE_SWEEP)
     gc_any_object_point_into_tospace_pointer (s, Lisp_Symbol);
 }
@@ -9236,7 +9226,7 @@ scan_reference_pointer_to_vectorlike_2 (union vectorlike_header **const hptr,
     return;
 
   if (phase == GC_PHASE_MARK)
-    gc_mark_or_enqueue_vectorlike (*hptr);
+    gc_mark_vectorlike (*hptr);
   if (phase == GC_PHASE_SWEEP)
     gc_any_object_point_into_tospace_pointer (hptr, Lisp_Vectorlike);
 }
@@ -9454,7 +9444,7 @@ gc_mark_queue_block_try_remove (gc_block *const b,
 }
 
 void
-gc_mark_enqueue_1 (const Lisp_Object obj)
+gc_mark_enqueue (const Lisp_Object obj)
 {
   for (emacs_list_link *bl = gc_mark_queue.link.prev;
        bl != &gc_mark_queue.link;
@@ -9471,12 +9461,12 @@ gc_mark_enqueue_1 (const Lisp_Object obj)
 }
 
 void
-gc_mark_or_enqueue (Lisp_Object obj)
+gc_mark (Lisp_Object obj)
 {
   switch (XTYPE (obj))
     {
     case Lisp_Symbol:
-      gc_mark_or_enqueue_symbol (XSYMBOL (obj));
+      gc_mark_symbol (XSYMBOL (obj));
       return;
     case Lisp_Type_Unused0:
       emacs_unreachable ();
@@ -9484,16 +9474,16 @@ gc_mark_or_enqueue (Lisp_Object obj)
     case Lisp_Int1:
       return;
     case Lisp_String:
-      gc_mark_or_enqueue_string (XSTRING (obj));
+      gc_mark_string (XSTRING (obj));
       return;
     case Lisp_Vectorlike:
-      gc_mark_or_enqueue_vectorlike (&XVECTOR (obj)->header);
+      gc_mark_vectorlike (&XVECTOR (obj)->header);
       return;
     case Lisp_Cons:
-      gc_mark_or_enqueue_cons (XCONS (obj));
+      gc_mark_cons (XCONS (obj));
       return;
     case Lisp_Float:
-      gc_mark_or_enqueue_float (XFLOAT (obj));
+      gc_mark_float (XFLOAT (obj));
       return;
     }
   emacs_unreachable ();
@@ -9526,7 +9516,7 @@ gc_mark_drain_queue (void)
       void *const ptr = (type == Lisp_Int0)
         ? gc_interval_unsmuggle (obj)
         : XPNTR (obj);
-      scan_object_for_marking_ool (ptr, type);
+      scan_object (ptr, type, GC_PHASE_MARK);
     }
 }
 
@@ -10006,14 +9996,14 @@ N should be nonnegative.  */);
   Lisp_Object watcher;
 
   static union Aligned_Lisp_Subr Swatch_gc_cons_threshold =
-     {{{ PSEUDOVECTOR_FLAG | (PVEC_SUBR << PSEUDOVECTOR_AREA_BITS) },
+     {{{ PSEUDOVECTOR_FLAG | (PVEC_SUBR << PSEUDOVECTOR_SIZE_BITS) },
        { .a4 = watch_gc_cons_threshold },
        4, 4, "watch_gc_cons_threshold", {0}, lisp_h_Qnil}};
   XSETSUBR (watcher, &Swatch_gc_cons_threshold.s);
   Fadd_variable_watcher (Qgc_cons_threshold, watcher);
 
   static union Aligned_Lisp_Subr Swatch_gc_cons_percentage =
-     {{{ PSEUDOVECTOR_FLAG | (PVEC_SUBR << PSEUDOVECTOR_AREA_BITS) },
+     {{{ PSEUDOVECTOR_FLAG | (PVEC_SUBR << PSEUDOVECTOR_SIZE_BITS) },
        { .a4 = watch_gc_cons_percentage },
        4, 4, "watch_gc_cons_percentage", {0}, lisp_h_Qnil}};
   XSETSUBR (watcher, &Swatch_gc_cons_percentage.s);

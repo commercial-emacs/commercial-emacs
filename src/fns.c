@@ -2607,11 +2607,11 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	   are sensible to compare, so eliminate the others now.  */
 	if (o1_size & PSEUDOVECTOR_FLAG)
 	  {
-	    if (((o1_size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_AREA_BITS)
+	    if (((o1_size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_SIZE_BITS)
 		< PVEC_COMPILED)
 	      return false;
 	  }
-	for (ptrdiff_t i = 0; i < (o1_size & PSEUDOVECTOR_SIZE_MASK); i++)
+	for (ptrdiff_t i = 0; i < (o1_size & PSEUDOVECTOR_LISP_MASK); i++)
 	  {
             const Lisp_Object v1 = AREF (o1, i);
             const Lisp_Object v2 = AREF (o2, i);

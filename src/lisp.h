@@ -203,7 +203,7 @@ extern bool suppress_checking EXTERNALLY_VISIBLE;
 enum { enable_checking = 1 };
 #endif /* ENABLE_CHECKING */
 
-
+
 /* Use the configure flag --enable-check-lisp-object-type to make
    Lisp_Object use a struct type instead of the default int.  The flag
    causes CHECK_LISP_OBJECT_TYPE to be defined.  */
@@ -593,7 +593,7 @@ typedef Lisp_Word Lisp_Object;
 # define LISP_INITIALLY(w) (w)
 enum CHECK_LISP_OBJECT_TYPE { CHECK_LISP_OBJECT_TYPE = false };
 #endif
-
+
 /* Forward declarations.  */
 
 /* Defined in this file.  */
@@ -728,7 +728,7 @@ definitely_will_not_unexec_p (void)
 /* Defined in floatfns.c.  */
 extern double extract_float (Lisp_Object);
 
-
+
 /* Low-level conversion and type checking.  */
 
 /* Convert among various types use to implement Lisp_Object.  At the
@@ -794,7 +794,7 @@ INLINE void
    Lisp_Intfwd, etc.).  The pointer is packaged inside a struct to
    help static checking.  */
 typedef struct { void const *fwdptr; } lispfwd;
-
+
 /* Interned state of a symbol.  */
 
 enum symbol_interned
@@ -1000,7 +1000,7 @@ union vectorlike_header
        - If PSEUDOVECTOR_FLAG is 1, the rest is subdivided into three fields:
 	 - a) pseudovector subtype held in PVEC_TYPE_MASK field;
 	 - b) number of Lisp_Objects slots at the beginning of the object
-	   held in PSEUDOVECTOR_SIZE_MASK field.  These objects are always
+	   held in PSEUDOVECTOR_LISP_MASK field.  These objects are always
 	   traced by the GC;
 	 - c) size of the rest fields held in PSEUDOVECTOR_REST_MASK and
 	   measured in word_size units.  Rest fields may also include
@@ -1120,25 +1120,21 @@ enum pvec_type
 
 enum More_Lisp_Bits
   {
-    /* For convenience, we also store the number of elements in these bits.
-       Note that this size is not necessarily the memory-footprint size, but
-       only the number of Lisp_Object fields (that need to be traced by GC).
-       The distinction is used, e.g., by Lisp_Process, which places extra
-       non-Lisp_Object fields at the end of the structure.  */
-    PSEUDOVECTOR_SIZE_BITS = 12,
-    PSEUDOVECTOR_SIZE_MASK = (1 << PSEUDOVECTOR_SIZE_BITS) - 1,
+    /* The number of Lisp_Object fields, equivalently the Lisp_Word
+       width of those fields.  */
+    PSEUDOVECTOR_LISP_BITS = 12,
+    PSEUDOVECTOR_LISP_MASK = (1 << PSEUDOVECTOR_LISP_BITS) - 1,
 
-    /* To calculate the memory footprint of the pseudovector, it's useful
-       to store the size of non-Lisp area in word_size units here.  */
+    /* Word width of data after Lisp_Object fields.  */
     PSEUDOVECTOR_REST_BITS = 12,
     PSEUDOVECTOR_REST_MASK = (((1 << PSEUDOVECTOR_REST_BITS) - 1)
-			      << PSEUDOVECTOR_SIZE_BITS),
+			      << PSEUDOVECTOR_LISP_BITS),
 
     /* Used to extract pseudovector subtype information.  */
-    PSEUDOVECTOR_AREA_BITS = PSEUDOVECTOR_SIZE_BITS + PSEUDOVECTOR_REST_BITS,
-    PVEC_TYPE_MASK = 0x7f << PSEUDOVECTOR_AREA_BITS
+    PSEUDOVECTOR_SIZE_BITS = PSEUDOVECTOR_LISP_BITS + PSEUDOVECTOR_REST_BITS,
+    PVEC_TYPE_MASK = 0x7f << PSEUDOVECTOR_SIZE_BITS
   };
-
+
 /* These functions extract various sorts of values from a Lisp_Object.
    For example, if tem is a Lisp_Object whose type is Lisp_Cons,
    XCONS (tem) is the struct Lisp_Cons * pointing to the memory for
@@ -1303,7 +1299,7 @@ clip_to_bounds (intmax_t lower, intmax_t num, intmax_t upper)
 {
   return num < lower ? lower : num <= upper ? num : upper;
 }
-
+
 /* Construct a Lisp_Object from a value or address.  */
 
 INLINE Lisp_Object
@@ -1334,10 +1330,10 @@ dead_object (void)
 /* Pseudovector types.  */
 
 #define XSETPVECTYPE(v, code)						\
-  ((v)->header.size |= PSEUDOVECTOR_FLAG | ((code) << PSEUDOVECTOR_AREA_BITS))
+  ((v)->header.size |= PSEUDOVECTOR_FLAG | ((code) << PSEUDOVECTOR_SIZE_BITS))
 #define PVECHEADERSIZE(code, lispsize, restsize) \
-  (PSEUDOVECTOR_FLAG | ((code) << PSEUDOVECTOR_AREA_BITS) \
-   | ((restsize) << PSEUDOVECTOR_SIZE_BITS) | (lispsize))
+  (PSEUDOVECTOR_FLAG | ((code) << PSEUDOVECTOR_SIZE_BITS) \
+   | ((restsize) << PSEUDOVECTOR_LISP_BITS) | (lispsize))
 #define XSETPVECTYPESIZE(v, code, lispsize, restsize)		\
   ((v)->header.size = PVECHEADERSIZE (code, lispsize, restsize))
 
@@ -1351,7 +1347,7 @@ dead_object (void)
 #define XSETTYPED_PSEUDOVECTOR(a, b, size, code)			\
   (XSETVECTOR (a, b),							\
    eassume ((size & (PSEUDOVECTOR_FLAG | PVEC_TYPE_MASK))		\
-	    == (PSEUDOVECTOR_FLAG | (code << PSEUDOVECTOR_AREA_BITS))))
+	    == (PSEUDOVECTOR_FLAG | (code << PSEUDOVECTOR_SIZE_BITS))))
 
 #define XSETWINDOW_CONFIGURATION(a, b) \
   (XSETPSEUDOVECTOR (a, b, PVEC_WINDOW_CONFIGURATION))
@@ -1733,7 +1729,7 @@ PVSIZE (Lisp_Object pv)
 {
   ptrdiff_t size = XVECTOR (pv)->header.size;
   eassume ((size & PSEUDOVECTOR_FLAG));
-  return size & PSEUDOVECTOR_SIZE_MASK;
+  return size & PSEUDOVECTOR_LISP_MASK;
 }
 
 INLINE ptrdiff_t
@@ -1762,7 +1758,7 @@ PVTYPE (const union vectorlike_header *const a)
 {
   const ptrdiff_t size = a->size;
   return (size & PSEUDOVECTOR_FLAG
-          ? (size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_AREA_BITS
+          ? (size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_SIZE_BITS
           : PVEC_NORMAL_VECTOR);
 }
 
@@ -1780,7 +1776,7 @@ PSEUDOVECTOR_TYPEP (const union vectorlike_header *const a,
   /* We don't use PSEUDOVECTOR_TYPE here so as to avoid a shift
    * operation when `code' is known.  */
   return ((a->size & (PSEUDOVECTOR_FLAG | PVEC_TYPE_MASK))
-	  == (PSEUDOVECTOR_FLAG | (code << PSEUDOVECTOR_AREA_BITS)));
+	  == (PSEUDOVECTOR_FLAG | (code << PSEUDOVECTOR_SIZE_BITS)));
 }
 
 /* True if A is a pseudovector whose code is CODE.  */
@@ -1814,17 +1810,18 @@ struct Lisp_Bool_Vector
     bits_word data[FLEXIBLE_ARRAY_MEMBER];
   } GCALIGNED_STRUCT;
 
-/* Some handy constants for calculating sizes
-   and offsets, mostly of vectorlike objects.
+/* Lisp_Vector type punning:
 
-   The garbage collector assumes that the initial part of any struct
-   that starts with a union vectorlike_header followed by N
-   Lisp_Objects (some possibly in arrays and/or a trailing flexible
-   array) will be laid out like a struct Lisp_Vector with N
-   Lisp_Objects.  This assumption is true in practice on known Emacs
-   targets even though the C standard does not guarantee it.  This
-   header contains a few sanity checks that should suffice to detect
-   violations of this assumption on plausible practical hosts.  */
+   Emacs type structs starting with a union vectorlike_header followed
+   by N Lisp_Objects can be cast to a struct Lisp_Vector of N
+   Lisp_Objects.
+
+   The C standard does not guarantee this property, and thus the
+   header runs a few checks to verify it on plausible target hosts.
+
+   The glaring exception is PVEC_SUB_CHAR_TABLE which precedes its
+   variable-length Lisp array with the non-Lisp sizing of that array,
+   leading to unfortunate special-casing.  */
 
 enum
   {
@@ -1956,6 +1953,7 @@ enum { NIL_IS_ZERO = iQnil == 0 && Lisp_Symbol == 0 };
 
 /* Clear the object addressed by P, with size NBYTES, so that all its
    bytes are zero and all its Lisp values are nil.  */
+
 INLINE void
 memclear (void *p, ptrdiff_t nbytes)
 {
@@ -1965,15 +1963,14 @@ memclear (void *p, ptrdiff_t nbytes)
   memset (p, 0, nbytes);
 }
 
-/* If a struct is made to look like a vector, this macro returns the length
-   of the shortest vector that would hold that struct.  */
+/* If TYPE (e.g., struct Lisp_Char_Table) is cast to Lisp_Vector,
+   return its Lisp_Word width.  */
 
 #define VECSIZE(type)						\
   ((sizeof (type) - header_size + word_size - 1) / word_size)
 
-/* Like VECSIZE, but used when the pseudo-vector has non-Lisp_Object fields
-   at the end and we need to compute the number of Lisp_Object fields (the
-   ones that the GC needs to trace).  */
+/* Like VECSIZE, but return Lisp_Word width up to LASTLISPFIELD, i.e.,
+   return the number of Lisp_Object fields that GC needs to mark.  */
 
 #define PSEUDOVECSIZE(type, lastlispfield)				\
   (offsetof (type, lastlispfield) + word_size < header_size		\
@@ -2209,7 +2206,7 @@ verify (offsetof (struct Lisp_Sub_Char_Table, contents)
 INLINE int
 CHAR_TABLE_EXTRA_SLOTS (struct Lisp_Char_Table *ct)
 {
-  return ((ct->header.size & PSEUDOVECTOR_SIZE_MASK)
+  return ((ct->header.size & PSEUDOVECTOR_LISP_MASK)
 	  - CHAR_TABLE_STANDARD_SLOTS);
 }
 
@@ -2351,7 +2348,7 @@ INLINE int
    definition is done by lread.c's define_symbol.  */
 #define DEFSYM(sym, name) /* empty */
 
-
+
 /***********************************************************************
 			     Hash Tables
  ***********************************************************************/
@@ -2771,7 +2768,7 @@ make_uint (uintmax_t n)
 #define INT_TO_INTEGER(expr) \
   (EXPR_SIGNED (expr) ? make_int (expr) : make_uint (expr))
 
-
+
 /* Forwarding pointer to an int variable.
    This is allowed only in the value cell of a symbol,
    and it means that the symbol's value really lives in the
@@ -2882,7 +2879,7 @@ XBUFFER_OBJFWD (lispfwd a)
   eassume (BUFFER_OBJFWDP (a));
   return a.fwdptr;
 }
-
+
 /* Lisp floating point type.  */
 struct Lisp_Float
   {
@@ -2950,7 +2947,7 @@ enum char_bits
        itself.  */
     CHARACTERBITS = 22
   };
-
+
 /* Data type checking.  */
 
 INLINE bool
@@ -3039,7 +3036,7 @@ ARRAYP (Lisp_Object x)
 {
   return VECTORP (x) || STRINGP (x) || CHAR_TABLE_P (x) || BOOL_VECTOR_P (x);
 }
-
+
 INLINE void
 CHECK_LIST (Lisp_Object x)
 {
@@ -3109,7 +3106,7 @@ CHECK_SUBR (Lisp_Object x)
 {
   CHECK_TYPE (SUBRP (x), Qsubrp, x);
 }
-
+
 
 /* If we're not dumping using the legacy dumper and we might be using
    the portable dumper, try to bunch all the subr structures together
@@ -3151,12 +3148,12 @@ CHECK_SUBR (Lisp_Object x)
 
 /* This version of DEFUN declares a function prototype with the right
    arguments, so we can catch errors with maxargs at compile-time.  */
-#define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc) \
-  SUBR_SECTION_ATTRIBUTE                                            \
-  static union Aligned_Lisp_Subr sname =                            \
-     {{{ PVEC_SUBR << PSEUDOVECTOR_AREA_BITS },			    \
-       { .a ## maxargs = fnname },				    \
-       minargs, maxargs, lname, {intspec}, lisp_h_Qnil}};	    \
+#define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
+  SUBR_SECTION_ATTRIBUTE                                                \
+  static union Aligned_Lisp_Subr sname =                                \
+     {{{ PVEC_SUBR << PSEUDOVECTOR_SIZE_BITS },				\
+       { .a ## maxargs = fnname },					\
+       minargs, maxargs, lname, {intspec}, lisp_h_Qnil}};				\
    Lisp_Object fnname
 
 /* defsubr (Sname);
@@ -3299,7 +3296,7 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
     defvar_kboard (&ko_fwd, lname);				\
   } while (false)
 
-
+
 /* Elisp uses multiple stacks:
    - The C stack.
    - The specpdl stack keeps track of backtraces, unwind-protects and
@@ -3636,10 +3633,10 @@ rarely_quit (unsigned short int count)
   if (! count)
     maybe_quit ();
 }
-
+
 extern Lisp_Object Vascii_downcase_table;
 extern Lisp_Object Vascii_canon_table;
-
+
 /* Call staticpro (&var) to protect static variable `var'.  */
 
 void staticpro (Lisp_Object *);
@@ -3648,7 +3645,7 @@ enum { NSTATICS = 2048 };
 extern Lisp_Object *staticvec[NSTATICS];
 extern int staticidx;
 
-
+
 /* Forward declarations for prototypes.  */
 struct window;
 struct frame;

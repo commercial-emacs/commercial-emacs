@@ -1565,7 +1565,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	if (COMPILEDP (obj))
 	  {
 	    printchar ('#', printcharfun);
-	    size &= PSEUDOVECTOR_SIZE_MASK;
+	    size &= PSEUDOVECTOR_LISP_MASK;
 	  }
 	if (CHAR_TABLE_P (obj) || SUB_CHAR_TABLE_P (obj))
 	  {
@@ -1582,7 +1582,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	    print_c_string ("#^", printcharfun);
 	    if (SUB_CHAR_TABLE_P (obj))
 	      printchar ('^', printcharfun);
-	    size &= PSEUDOVECTOR_SIZE_MASK;
+	    size &= PSEUDOVECTOR_LISP_MASK;
 	  }
 	if (size & PSEUDOVECTOR_FLAG)
 	  return;
