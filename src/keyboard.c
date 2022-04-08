@@ -2461,6 +2461,7 @@ read_char (int commandflag, Lisp_Object map,
   else
     reread = false;
 
+  Vlast_event_device = Qnil;
 
   if (CONSP (Vunread_command_events))
     {
@@ -2520,8 +2521,6 @@ read_char (int commandflag, Lisp_Object map,
       reread = true;
       goto reread_for_input_method;
     }
-
-  Vlast_event_device = Qnil;
 
   if (!NILP (Vexecuting_kbd_macro))
     {
