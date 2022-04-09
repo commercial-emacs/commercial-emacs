@@ -696,6 +696,33 @@ Conditionally try to reconnect and take appropriate action."
       ;; unexpected disconnect
       (erc-process-sentinel-2 event buffer))))
 
+(defun erc--unhide-prompt ()
+  (remove-hook 'pre-command-hook #'erc--unhide-prompt-on-self-insert t)
+  (when (and (marker-position erc-insert-marker)
+             (marker-position erc-input-marker))
+    (with-silent-modifications
+      (remove-text-properties erc-insert-marker erc-input-marker
+                              '(display nil)))))
+
+(defun erc--unhide-prompt-on-self-insert ()
+  (when (and (eq this-command #'self-insert-command)
+             (or (eobp) (= (point) erc-input-marker)))
+    (erc--unhide-prompt)))
+
+(defun erc--hide-prompt (proc)
+  (erc-with-all-buffers-of-server
+      proc nil ; sorta wish this was indent 2
+      (when (and erc-hide-prompt
+                 (memq erc-hide-prompt
+                       (list t (if (erc-default-target) 'target 'server)))
+                 (marker-position erc-insert-marker)
+                 (marker-position erc-input-marker)
+                 (get-text-property erc-insert-marker 'erc-prompt))
+        (with-silent-modifications
+          (add-text-properties erc-insert-marker
+                               erc-input-marker `(display ,erc-prompt-hidden)))
+        (add-hook 'pre-command-hook #'erc--unhide-prompt-on-self-insert 0 t))))
+
 (defun erc-process-sentinel (cproc event)
   "Sentinel function for ERC process."
   (let ((buf (process-buffer cproc)))
@@ -718,11 +745,8 @@ Conditionally try to reconnect and take appropriate action."
           (dolist (buf (erc-buffer-filter (lambda () (boundp 'erc-channel-users)) cproc))
             (with-current-buffer buf
               (setq erc-channel-users (make-hash-table :test 'equal))))
-          ;; Remove the prompt
-          (goto-char (or (marker-position erc-input-marker) (point-max)))
-          (forward-line 0)
-          (erc-remove-text-properties-region (point) (point-max))
-          (delete-region (point) (point-max))
+          ;; Hide the prompt
+          (erc--hide-prompt cproc)
           ;; Decide what to do with the buffer
           ;; Restart if disconnected
           (erc-process-sentinel-1 event buf))))))
@@ -1470,6 +1494,7 @@ add things to `%s' instead."
         (setq buffer (erc-get-buffer (if privp nick tgt) proc))
         (when buffer
           (with-current-buffer buffer
+            (when privp (erc--unhide-prompt))
             ;; update the chat partner info.  Add to the list if private
             ;; message.  We will accumulate private identities indefinitely
             ;; at this point.
