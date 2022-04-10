@@ -2703,6 +2703,9 @@ if test "${with_webp}" != "no"; then
       WEBP_MODULE="libwebp >= $WEBP_REQUIRED"
 
       EMACS_CHECK_MODULES([WEBP], [$WEBP_MODULE])
+      if test "$HAVE_WEBP" = "yes"; then
+        WEBP_LIBS="-lwebp -lwebpdemux"
+      fi
       AC_SUBST(WEBP_CFLAGS)
       AC_SUBST(WEBP_LIBS)
    fi
