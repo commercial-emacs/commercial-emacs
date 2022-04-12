@@ -3887,8 +3887,10 @@ gc_mark_interval (const INTERVAL i)
   if (! interval_marked_p (i))
     {
       set_interval_marked (i);
-      ENQUEUE_AND_RETURN_IF_TOO_DEEP (gc_interval_wrap (i));
-      scan_interval (i, GC_PHASE_MARK);
+      if (eunlikely (false))
+	gc_mark_enqueue (gc_interval_wrap (i));
+      else
+	scan_interval (i, GC_PHASE_MARK);
     }
 }
 
@@ -4011,8 +4013,10 @@ gc_mark_string (struct Lisp_String *const s)
   if (! string_marked_p (s))
     {
       set_string_marked (s);
-      ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (s, Lisp_String));
-      scan_string (s, GC_PHASE_MARK);
+      if (eunlikely (false))
+	gc_mark_enqueue (make_lisp_ptr (s, Lisp_String));
+      else
+	scan_string (s, GC_PHASE_MARK);
     }
 }
 
@@ -4638,12 +4642,14 @@ gc_mark_cons (struct Lisp_Cons *c)
   if (! cons_marked_p (c))
     {
       set_cons_marked (c);
-      ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (c, Lisp_Cons));
-      while (c != NULL)
-	{
-	  scan_cons (c, GC_PHASE_MARK);
-	  c = CONSP (c->u.s.cdr) ? XCONS (c->u.s.cdr) : NULL;
-	}
+      if (eunlikely (false))
+	gc_mark_enqueue (make_lisp_ptr (c, Lisp_Cons));
+      else
+	while (c != NULL)
+	  {
+	    scan_cons (c, GC_PHASE_MARK);
+	    c = CONSP (c->u.s.cdr) ? XCONS (c->u.s.cdr) : NULL;
+	  }
     }
 }
 
@@ -4849,8 +4855,10 @@ gc_mark_vectorlike (union vectorlike_header *const v)
   if (! vectorlike_marked_p (v))
     {
       set_vectorlike_marked (v);
-      ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_ptr (v, Lisp_Vectorlike));
-      scan_vectorlike (v, GC_PHASE_MARK);
+      if (eunlikely (false))
+	gc_mark_enqueue (make_lisp_ptr (v, Lisp_Vectorlike));
+      else
+	scan_vectorlike (v, GC_PHASE_MARK);
     }
 }
 
@@ -5644,29 +5652,19 @@ static const gc_heap gc_symbol_heap = {
 
 DEFINE_STANDARD_HEAP_FUNCTIONS (gc_symbol_heap);
 
-/* Mark and maybe scan a symbol.  */
 void
 gc_mark_symbol (struct Lisp_Symbol *s)
 {
-  bool checked_stack_depth = false;
-  do {
-    if (symbol_marked_p (s))
-      return;  /* Already on mark queue or marked.  */
-    set_symbol_marked (s);
-    if (!checked_stack_depth)
-      {
-	checked_stack_depth = true;
-	ENQUEUE_AND_RETURN_IF_TOO_DEEP (make_lisp_symbol (s));
-      }
-    scan_symbol (s, GC_PHASE_MARK);
-    /* Try marking the rest of the symbol chain.  We don't need to check
-       the stack depth again.  */
-    s = s->u.s.next;
-  } while(s);
-    /* if (s->u.s.next) */
-    /*   { */
-    /* 	goto again; */
-    /*   } */
+  if (symbol_marked_p (s))
+    return;
+  if (eunlikely (false))
+    gc_mark_enqueue (make_lisp_symbol (s));
+  else
+    while (s) {
+      set_symbol_marked (s);
+      scan_symbol (s, GC_PHASE_MARK);
+      s = s->u.s.next;
+    }
 }
 
 void
@@ -6755,9 +6753,8 @@ test_setjmp (void)
 
   sys_setjmp (jbuf);
   if (longjmps_done == 1 && x != 1)
-    {
-      emacs_abort ();
-    }
+    /* X wasn't preserved after the longjmp.  all bets are off */
+    emacs_abort ();
 
   ++longjmps_done;
   x = 2;
@@ -7747,7 +7744,6 @@ garbage_collect (const bool major)
   current_gc_phase = GC_PHASE_CLEANUP;
   gc_phase_cleanup (major);
 
-  // visit_static_gc_roots (visitor);
   mark_pinned_objects ();
   mark_pinned_symbols ();
   mark_terminals ();
@@ -8201,14 +8197,192 @@ mark_stack_push_values (Lisp_Object *values, ptrdiff_t n)
 						      .u.values = values};
 }
 
-/* Traverse and mark objects on the mark stack above BASE_SP.
+/* Use goto statement to avoid recursing over regular lisp types.
+   (irregular types continue to leverage C recursion).  */
 
-   Traversal is depth-first using the mark stack for most common
-   object types.  Recursion is used for other types, in the hope that
-   they are rare enough that C stack usage is kept low.  */
 static void
 process_mark_stack (ptrdiff_t base_sp)
 {
+  eassume (mark_stk.sp >= base_sp && base_sp >= 0);
+
+  while (mark_stk.sp > base_sp)
+    {
+      Lisp_Object obj = mark_stack_pop ();
+
+    mark_obj: ;
+      void *po = XPNTR (obj);
+      if (PURE_P (po))
+	continue;
+
+      switch (XTYPE (obj))
+	{
+	case Lisp_String:
+	  {
+	    register struct Lisp_String *ptr = XSTRING (obj);
+	    if (string_marked_p (ptr))
+	      break;
+	    set_string_marked (ptr);
+	    mark_interval_tree (ptr->u.s.intervals);
+	  }
+	  break;
+	case Lisp_Vectorlike:
+	  {
+	    register struct Lisp_Vector *ptr = XVECTOR (obj);
+	    if (vector_marked_p (ptr))
+	      break;
+	    enum pvec_type pvectype
+	      = PSEUDOVECTOR_TYPE (ptr);
+	    switch (pvectype)
+	      {
+	      case PVEC_BUFFER:
+		mark_buffer ((struct buffer *) ptr);
+		break;
+	      case PVEC_FRAME:
+		mark_frame (ptr);
+		break;
+	      case PVEC_WINDOW:
+		mark_window (ptr);
+		break;
+	      case PVEC_HASH_TABLE:
+		{
+		  struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
+		  ptrdiff_t size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
+		  set_vector_marked (ptr);
+		  mark_stack_push_values (ptr->contents, size);
+		  mark_stack_push_value (h->test.name);
+		  mark_stack_push_value (h->test.user_hash_function);
+		  mark_stack_push_value (h->test.user_cmp_function);
+		  if (NILP (h->weak))
+		    mark_stack_push_value (h->key_and_value);
+		  else
+		    {
+		      /* For weak tables, mark only the vector and not its
+			 contents --- that's what makes it weak.  */
+		      eassert (h->next_weak == NULL);
+		      h->next_weak = weak_hash_tables;
+		      weak_hash_tables = h;
+		      set_vector_marked (XVECTOR (h->key_and_value));
+		    }
+		  break;
+		}
+	      case PVEC_CHAR_TABLE:
+	      case PVEC_SUB_CHAR_TABLE:
+		mark_char_table (ptr, (enum pvec_type) pvectype);
+		break;
+	      case PVEC_BOOL_VECTOR:
+		/* bool vectors in a dump are permanently "marked", since
+		   they're in the old section and don't have mark bits.
+		   If we're looking at a dumped bool vector, we should
+		   have aborted above when we called vector_marked_p, so
+		   we should never get here.  */
+		eassert (! pdumper_object_p (ptr));
+		set_vector_marked (ptr);
+		break;
+	      case PVEC_OVERLAY:
+		mark_overlay (XOVERLAY (obj));
+		break;
+	      case PVEC_SUBR:
+#ifdef HAVE_NATIVE_COMP
+		if (SUBR_NATIVE_COMPILEDP (obj))
+		  {
+		    set_vector_marked (ptr);
+		    struct Lisp_Subr *subr = XSUBR (obj);
+		    mark_stack_push_value (subr->native_intspec);
+		    mark_stack_push_value (subr->command_modes);
+		    mark_stack_push_value (subr->native_comp_u);
+		    mark_stack_push_value (subr->lambda_list);
+		    mark_stack_push_value (subr->type);
+		  }
+#endif
+		break;
+	      case PVEC_FREE:
+		emacs_abort ();
+	      default:
+		{
+		  /* A regular vector or pseudovector needing no special
+		     treatment.  */
+		  ptrdiff_t size = ptr->header.size;
+		  if (size & PSEUDOVECTOR_FLAG)
+		    size &= PSEUDOVECTOR_SIZE_MASK;
+		  set_vector_marked (ptr);
+		  mark_stack_push_values (ptr->contents, size);
+		}
+		break;
+	      }
+	  }
+	  break;
+	case Lisp_Symbol:
+	  {
+	    struct Lisp_Symbol *ptr = XSYMBOL (obj);
+	  nextsym:
+	    if (symbol_marked_p (ptr))
+	      break;
+	    set_symbol_marked (ptr);
+	    /* Attempt to catch bogus objects.  */
+	    eassert (valid_lisp_object_p (ptr->u.s.function));
+	    mark_stack_push_value (ptr->u.s.function);
+	    mark_stack_push_value (ptr->u.s.plist);
+	    switch (ptr->u.s.redirect)
+	      {
+	      case SYMBOL_PLAINVAL:
+		mark_stack_push_value (SYMBOL_VAL (ptr));
+		break;
+	      case SYMBOL_VARALIAS:
+		{
+		  Lisp_Object tem;
+		  XSETSYMBOL (tem, SYMBOL_ALIAS (ptr));
+		  mark_stack_push_value (tem);
+		  break;
+		}
+	      case SYMBOL_LOCALIZED:
+		mark_localized_symbol (ptr);
+		break;
+	      case SYMBOL_FORWARDED:
+		/* If the value is forwarded to a buffer or keyboard field,
+		   these are marked when we see the corresponding object.
+		   And if it's forwarded to a C variable, either it's not
+		   a Lisp_Object var, or it's staticpro'd already.  */
+		break;
+	      default: emacs_abort ();
+	      }
+	    if (! PURE_P (XSTRING (ptr->u.s.name)))
+	      set_string_marked (XSTRING (ptr->u.s.name));
+	    mark_interval_tree (string_intervals (ptr->u.s.name));
+	    /* Inner loop to mark next symbol in this bucket, if any.  */
+	    po = ptr = ptr->u.s.next;
+	    if (ptr)
+	      goto nextsym;
+	  }
+	  break;
+	case Lisp_Cons:
+	  {
+	    struct Lisp_Cons *ptr = XCONS (obj);
+	    if (cons_marked_p (ptr))
+	      break;
+	    set_cons_marked (ptr);
+	    /* Avoid growing the stack if the cdr is nil.
+	       In any case, make sure the car is expanded first.  */
+	    if (! NILP (ptr->u.s.u.cdr))
+	      mark_stack_push_value (ptr->u.s.u.cdr);
+
+	    /* Speedup hack for the common case (successive list elements).  */
+	    obj = ptr->u.s.car;
+	    goto mark_obj;
+	  }
+	case Lisp_Float:
+	  /* Do not mark floats stored in a dump image: these floats are
+	     "cold" and do not have mark bits.  */
+	  if (pdumper_object_p (XFLOAT (obj)))
+	    eassert (pdumper_cold_object_p (XFLOAT (obj)));
+	  else if (!XFLOAT_MARKED_P (XFLOAT (obj)))
+	    XFLOAT_MARK (XFLOAT (obj));
+	  break;
+	case_Lisp_Int:
+	  break;
+	default:
+	  emacs_abort ();
+	}
+    }
 }
 
 void
