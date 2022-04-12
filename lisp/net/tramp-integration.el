@@ -430,6 +430,93 @@ See `tramp-process-attributes-ps-format'.")
  'tramp-connection-local-busybox-ps-profile
  tramp-connection-local-busybox-ps-variables)
 
+;; Darwin (macOS).
+(defconst tramp-darwin-process-attributes-ps-args
+  `("-acxww"
+    "-o"
+    ,(mapconcat
+      #'identity
+      '("pid"
+        "uid"
+        "user"
+        "gid"
+        "comm=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+      ",")
+    "-o" "state=abcde"
+    "-o"
+    ,(mapconcat
+      #'identity
+      '("ppid"
+        "pgid"
+        "sess"
+        "tty"
+        "tpgid"
+        "minflt"
+        "majflt"
+        "time"
+        "pri"
+        "nice"
+        "vsz"
+        "rss"
+        "etime"
+        "pcpu"
+        "pmem"
+        "args")
+      ","))
+  "List of arguments for \"ps\".
+See `tramp-process-attributes-ps-args'.")
+
+(defconst tramp-darwin-process-attributes-ps-format
+  '((pid . number)
+    (euid . number)
+    (user . string)
+    (egid . number)
+    (comm . 52)
+    (state . 5)
+    (ppid . number)
+    (pgrp . number)
+    (sess . number)
+    (ttname . string)
+    (tpgid . number)
+    (minflt . number)
+    (majflt . number)
+    (time . tramp-ps-time)
+    (pri . number)
+    (nice . number)
+    (vsize . number)
+    (rss . number)
+    (etime . tramp-ps-time)
+    (pcpu . number)
+    (pmem . number)
+    (args . nil))
+  "Alist of formats for \"ps\".
+See `tramp-process-attributes-ps-format'.")
+
+(defconst tramp-connection-local-darwin-ps-variables
+  `((tramp-process-attributes-ps-args
+     . ,tramp-darwin-process-attributes-ps-args)
+    (tramp-process-attributes-ps-format
+     . ,tramp-darwin-process-attributes-ps-format))
+  "Default connection-local ps variables for remote Darwin connections.")
+
+(connection-local-set-profile-variables
+ 'tramp-connection-local-darwin-ps-profile
+ tramp-connection-local-darwin-ps-variables)
+
+;; Preset default "ps" profile for local hosts, based on system type.
+
+(when-let ((local-profile
+	    (cond ((eq system-type 'darwin)
+		   'tramp-connection-local-darwin-ps-profile)
+		  ;; ... Add other system types here.
+		  )))
+  (connection-local-set-profiles
+   `(:application tramp :machine ,(system-name))
+   local-profile)
+  (connection-local-set-profiles
+   '(:application tramp :machine "localhost")
+   local-profile))
+
 (add-hook 'tramp-unload-hook
 	  (lambda () (unload-feature 'tramp-integration 'force)))
 
