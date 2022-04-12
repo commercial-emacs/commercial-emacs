@@ -9115,6 +9115,14 @@ gif_load (struct frame *f, struct image *img)
       if (disposal == DISPOSAL_UNSPECIFIED)
 	disposal = DISPOSE_DO_NOT;
 
+      /* This is not quite correct -- the specification is unclear,
+	 but I think we're supposed to restore to the frame before the
+	 previous frame?  And we don't have that data at this point.
+	 But DISPOSE_DO_NOT is less wrong than substituting the
+	 background, so do that for now.  */
+      if (disposal == DISPOSE_PREVIOUS)
+	disposal = DISPOSE_DO_NOT;
+
       gif_color_map = subimage->ImageDesc.ColorMap;
       if (!gif_color_map)
 	gif_color_map = gif->SColorMap;
@@ -9525,7 +9533,19 @@ webp_load (struct frame *f, struct image *img)
 	    WebPAnimDecoderDelete (cache->handle);
 
 	  WebPData webp_data;
-	  webp_data.bytes = contents;
+	  if (NILP (specified_data))
+	    /* If we got the data from a file, then we don't need to
+	       copy the data. */
+	    webp_data.bytes = cache->temp = contents;
+	  else
+	    /* We got the data from a string, so copy it over so that
+	       it doesn't get garbage-collected.  */
+	    {
+	      webp_data.bytes = xmalloc (size);
+	      memcpy ((void*) webp_data.bytes, contents, size);
+	    }
+	  /* In any case, we release the allocated memory when we
+	     purge the anim cache.  */
 	  webp_data.size = size;
 
 	  /* Get the width/height of the total image.  */
@@ -9662,7 +9682,7 @@ webp_load (struct frame *f, struct image *img)
   /* Clean up.  */
   if (!anim)
     WebPFree (decoded);
-  if (NILP (specified_data))
+  if (NILP (specified_data) && !anim)
     xfree (contents);
   return true;
 
