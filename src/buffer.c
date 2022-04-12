@@ -1139,7 +1139,7 @@ is first appended to NAME, to speed up finding a non-existent buffer.  */)
     genbase = name;
   else
     {
-      char number[sizeof "-999999"];
+      char number[INT_BUFSIZE_BOUND (int)];
       EMACS_INT r = get_random ();
       eassume (0 <= r);
       int i = r % 1000000;

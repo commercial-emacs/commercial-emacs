@@ -5520,9 +5520,8 @@ x_get_net_workarea (struct x_display_info *dpyinfo, XRectangle *rect)
   xcb_get_property_cookie_t current_desktop_cookie;
   xcb_get_property_cookie_t workarea_cookie;
   xcb_get_property_reply_t *reply;
-  xcb_generic_error_t *error;
-  bool rc;
   uint32_t current_workspace, *values;
+  bool rc = true;
 
   current_desktop_cookie
     = xcb_get_property (dpyinfo->xcb_connection, 0,
@@ -5537,11 +5536,10 @@ x_get_net_workarea (struct x_display_info *dpyinfo, XRectangle *rect)
 			XCB_ATOM_CARDINAL, 0, UINT32_MAX);
 
   reply = xcb_get_property_reply (dpyinfo->xcb_connection,
-				  current_desktop_cookie, &error);
-  rc = true;
+				  current_desktop_cookie, NULL);
 
-  if (!reply)
-    free (error), rc = false;
+  if (! reply)
+    rc = false;
   else
     {
       if (xcb_get_property_value_length (reply) != 4
@@ -5549,34 +5547,29 @@ x_get_net_workarea (struct x_display_info *dpyinfo, XRectangle *rect)
 	rc = false;
       else
 	current_workspace = *(uint32_t *) xcb_get_property_value (reply);
-
       free (reply);
     }
 
   reply = xcb_get_property_reply (dpyinfo->xcb_connection,
-				  workarea_cookie, &error);
+				  workarea_cookie, NULL);
 
-  if (!reply)
-    free (error), rc = false;
-  else
+  if (reply
+      && reply->type == XCB_ATOM_CARDINAL && reply->format == 32
+      && (xcb_get_property_value_length (reply) / sizeof (uint32_t)
+	  >= current_workspace + 4))
     {
-      if (rc && reply->type == XCB_ATOM_CARDINAL && reply->format == 32
-	  && (xcb_get_property_value_length (reply) / sizeof (uint32_t)
-	      >= current_workspace + 4))
-	{
-	  values = xcb_get_property_value (reply);
+      values = xcb_get_property_value (reply);
 
-	  rect->x = values[current_workspace];
-	  rect->y = values[current_workspace + 1];
-	  rect->width = values[current_workspace + 2];
-	  rect->height = values[current_workspace + 3];
-	}
-      else
-	rc = false;
-
-      free (reply);
+      rect->x = values[current_workspace];
+      rect->y = values[current_workspace + 1];
+      rect->width = values[current_workspace + 2];
+      rect->height = values[current_workspace + 3];
     }
+  else
+    rc = false;
 
+  if (reply)
+    free (reply);
   return rc;
 #endif
 }
@@ -5774,7 +5767,6 @@ x_get_monitor_attributes_xrandr (struct x_display_info *dpyinfo)
 #ifdef USE_XCB
   xcb_get_atom_name_cookie_t *atom_name_cookies;
   xcb_get_atom_name_reply_t *reply;
-  xcb_generic_error_t *error;
   int length;
 #endif
 
@@ -5843,12 +5835,11 @@ x_get_monitor_attributes_xrandr (struct x_display_info *dpyinfo)
       for (int i = 0; i < n_monitors; ++i)
 	{
 	  reply = xcb_get_atom_name_reply (dpyinfo->xcb_connection,
-					   atom_name_cookies[i], &error);
+					   atom_name_cookies[i], NULL);
 
-	  if (!reply)
+	  if (! reply)
 	    {
 	      monitors[i].name = xstrdup ("Unknown monitor");
-	      free (error);
 	    }
 	  else
 	    {
@@ -7182,8 +7173,6 @@ If WINDOW-ID is non-nil, change the property of that window instead
   xcb_intern_atom_cookie_t prop_atom_cookie;
   xcb_intern_atom_cookie_t target_type_cookie;
   xcb_intern_atom_reply_t *reply;
-  xcb_generic_error_t *generic_error;
-  bool rc;
 #endif
 
   CHECK_STRING (prop);
@@ -7256,37 +7245,19 @@ If WINDOW-ID is non-nil, change the property of that window instead
       target_type = XInternAtom (FRAME_X_DISPLAY (f), SSDATA (type), False);
     }
 #else
-  rc = true;
   prop_atom_cookie
     = xcb_intern_atom (FRAME_DISPLAY_INFO (f)->xcb_connection,
 		       0, SBYTES (prop), SSDATA (prop));
 
-  if (!NILP (type))
+  if (! NILP (type))
     {
       CHECK_STRING (type);
       target_type_cookie
 	= xcb_intern_atom (FRAME_DISPLAY_INFO (f)->xcb_connection,
 			   0, SBYTES (type), SSDATA (type));
-    }
 
-  reply = xcb_intern_atom_reply (FRAME_DISPLAY_INFO (f)->xcb_connection,
-				 prop_atom_cookie, &generic_error);
-
-  if (reply)
-    {
-      prop_atom = (Atom) reply->atom;
-      free (reply);
-    }
-  else
-    {
-      free (generic_error);
-      rc = false;
-    }
-
-  if (!NILP (type))
-    {
       reply = xcb_intern_atom_reply (FRAME_DISPLAY_INFO (f)->xcb_connection,
-				     target_type_cookie, &generic_error);
+				     target_type_cookie, NULL);
 
       if (reply)
 	{
@@ -7294,14 +7265,19 @@ If WINDOW-ID is non-nil, change the property of that window instead
 	  free (reply);
 	}
       else
-	{
-	  free (generic_error);
-	  rc = false;
-	}
+	error ("Failed to intern type");
     }
 
-  if (!rc)
-    error ("Failed to intern type or property atom");
+  reply = xcb_intern_atom_reply (FRAME_DISPLAY_INFO (f)->xcb_connection,
+				 prop_atom_cookie, NULL);
+
+  if (reply)
+    {
+      prop_atom = (Atom) reply->atom;
+      free (reply);
+    }
+  else
+    error ("Failed to intern property atom");
 #endif
 
   XChangeProperty (FRAME_X_DISPLAY (f), target_window,

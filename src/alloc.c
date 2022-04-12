@@ -6105,7 +6105,7 @@ static inline bool mark_stack_empty_p (void);
 void
 garbage_collect (void)
 {
-  static struct timespec gc_elapsed = {0, 0}, mark_elapsed = {0, 0};
+  static struct timespec gc_elapsed = {0, 0};
   Lisp_Object tail, buffer;
   char stack_top_variable;
   bool message_p;
@@ -6188,29 +6188,8 @@ garbage_collect (void)
   /* Mark all the special slots that serve as the roots of accessibility.  */
 
   struct gc_root_visitor visitor = { .visit = mark_object_root_visitor };
-  for (int i = 0; i < staticidx; i++)
-    visitor.visit (staticvec[i], GC_ROOT_STATICPRO, visitor.data);
+  visit_static_gc_roots (visitor);
 
-  mark_elapsed = timespec_add (mark_elapsed,
-			       timespec_sub (current_timespec (), start));
-  Vmark_elapsed = make_float (timespectod (mark_elapsed));
-  mark_object (Vmark_elapsed);
-
-  visit_buffer_root (visitor,
-                     &buffer_local_symbols,
-                     GC_ROOT_BUFFER_LOCAL_NAME);
-
-  visit_buffer_root (visitor,
-                     &buffer_defaults,
-                     GC_ROOT_BUFFER_LOCAL_DEFAULT);
-
-  for (int i = 0; i < ARRAYELTS (lispsym); i++)
-    {
-      Lisp_Object sptr = builtin_lisp_symbol (i);
-      visitor.visit (&sptr, GC_ROOT_C_SYMBOL, visitor.data);
-    }
-
-  // visit_static_gc_roots (visitor);
   mark_pinned_objects ();
   mark_pinned_symbols ();
   mark_terminals ();
@@ -7812,10 +7791,6 @@ do hash-consing of the objects allocated to pure space.  */);
 
   DEFVAR_LISP ("gc-elapsed", Vgc_elapsed,
 	       doc: /* Accumulated time elapsed in garbage collections.
-The time is in seconds as a floating point value.  */);
-
-  DEFVAR_LISP ("mark-elapsed", Vmark_elapsed,
-	       doc: /* Accumulated time elapsed in marking for sweep.
 The time is in seconds as a floating point value.  */);
 
   DEFVAR_INT ("gcs-done", gcs_done,
