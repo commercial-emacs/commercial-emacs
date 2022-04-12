@@ -798,30 +798,31 @@ typedef struct { void const *fwdptr; } lispfwd;
 /* Interned state of a symbol.  */
 
 enum symbol_interned
-{
-  SYMBOL_UNINTERNED = 0,
-  SYMBOL_INTERNED = 1,
-  SYMBOL_INTERNED_IN_INITIAL_OBARRAY = 2
-};
+  {
+    SYMBOL_UNINTERNED = 0,
+    SYMBOL_INTERNED = 1,
+    SYMBOL_INTERNED_IN_INITIAL_OBARRAY = 2
+  };
 
 enum symbol_redirect
-{
-  SYMBOL_PLAINVAL  = 4,
-  SYMBOL_VARALIAS  = 1,
-  SYMBOL_LOCALIZED = 2,
-  SYMBOL_FORWARDED = 3
-};
+  {
+    SYMBOL_PLAINVAL  = 4,
+    SYMBOL_VARALIAS  = 1,
+    SYMBOL_LOCALIZED = 2,
+    SYMBOL_FORWARDED = 3
+  };
 
 enum symbol_trapped_write
-{
-  SYMBOL_UNTRAPPED_WRITE = 0,
-  SYMBOL_NOWRITE = 1,
-  SYMBOL_TRAPPED_WRITE = 2
-};
+  {
+    SYMBOL_UNTRAPPED_WRITE = 0,
+    SYMBOL_NOWRITE = 1,
+    SYMBOL_TRAPPED_WRITE = 2
+  };
 
-enum {
-  symbol_identity_hash_code_nr_bits =
-  sizeof (Lisp_Object) * CHAR_BIT - (3 + 2 + 2 + 1) };
+enum
+  {
+    SYMBOL_HASH_CODE_BITS = sizeof (Lisp_Object) * CHAR_BIT - (3 + 2 + 2 + 1)
+  };
 
 struct Lisp_Symbol
 {
@@ -861,7 +862,7 @@ struct Lisp_Symbol
            general GC perma-pinning mechanism because the vast
            majority of hash table keys in eq-style hash tables
            are symbols.  */
-        size_t identity_hash_code : symbol_identity_hash_code_nr_bits;
+        size_t identity_hash_code : SYMBOL_HASH_CODE_BITS;
       } f;
 
       /* The symbol's name, as a Lisp string.  */
@@ -1080,43 +1081,43 @@ DEFINE_GDB_SYMBOL_END (PSEUDOVECTOR_FLAG)
    PSEUDOVECTOR_FLAG bit set, and one of the following values extracted
    with PVEC_TYPE_MASK to indicate the actual type.  */
 enum pvec_type
-{
-  PVEC_NORMAL_VECTOR,	/* Should be first, for sxhash_obj.  */
-  PVEC_BIGNUM,
-  PVEC_MARKER,
-  PVEC_OVERLAY,
-  PVEC_FINALIZER,
-  PVEC_MISC_PTR,
-  PVEC_USER_PTR,
-  PVEC_PROCESS,
-  PVEC_FRAME,
-  PVEC_WINDOW,
-  PVEC_BOOL_VECTOR,
-  PVEC_BUFFER,
-  PVEC_HASH_TABLE,
-  PVEC_TERMINAL,
-  PVEC_WINDOW_CONFIGURATION,
-  PVEC_SUBR,
-  PVEC_OTHER,            /* Should never be visible to Elisp code.  */
-  PVEC_XWIDGET,
-  PVEC_XWIDGET_VIEW,
-  PVEC_THREAD,
-  PVEC_MUTEX,
-  PVEC_CONDVAR,
-  PVEC_MODULE_FUNCTION,
-  PVEC_NATIVE_COMP_UNIT,
-  PVEC_SQLITE,
-  PVEC_TREE_SITTER,
-  PVEC_TREE_SITTER_NODE,
-  PVEC_STRING_DATA,
+  {
+    PVEC_NORMAL_VECTOR,	/* Should be first, for sxhash_obj.  */
+    PVEC_BIGNUM,
+    PVEC_MARKER,
+    PVEC_OVERLAY,
+    PVEC_FINALIZER,
+    PVEC_MISC_PTR,
+    PVEC_USER_PTR,
+    PVEC_PROCESS,
+    PVEC_FRAME,
+    PVEC_WINDOW,
+    PVEC_BOOL_VECTOR,
+    PVEC_BUFFER,
+    PVEC_HASH_TABLE,
+    PVEC_TERMINAL,
+    PVEC_WINDOW_CONFIGURATION,
+    PVEC_SUBR,
+    PVEC_OTHER,            /* Should never be visible to Elisp code.  */
+    PVEC_XWIDGET,
+    PVEC_XWIDGET_VIEW,
+    PVEC_THREAD,
+    PVEC_MUTEX,
+    PVEC_CONDVAR,
+    PVEC_MODULE_FUNCTION,
+    PVEC_NATIVE_COMP_UNIT,
+    PVEC_SQLITE,
+    PVEC_TREE_SITTER,
+    PVEC_TREE_SITTER_NODE,
+    PVEC_STRING_DATA,
 
-  /* These should be last, for internal_equal and sxhash_obj.  */
-  PVEC_COMPILED,
-  PVEC_CHAR_TABLE,
-  PVEC_SUB_CHAR_TABLE,
-  PVEC_RECORD,
-  PVEC_FONT /* Should be last because it's used for range checking.  */
-};
+    /* These should be last, for internal_equal and sxhash_obj.  */
+    PVEC_COMPILED,
+    PVEC_CHAR_TABLE,
+    PVEC_SUB_CHAR_TABLE,
+    PVEC_RECORD,
+    PVEC_FONT /* Should be last because it's used for range checking.  */
+  };
 
 enum More_Lisp_Bits
   {

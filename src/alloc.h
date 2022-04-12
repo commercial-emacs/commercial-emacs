@@ -36,7 +36,6 @@ INLINE void xscan_reference_pointer_to_vectorlike_1 (
 #define xscan_reference_pointer_to_vectorlike(x, phase)                  \
   xscan_reference_pointer_to_vectorlike_1 ((x), &(*(x))->header, phase)
 
-extern void xscan_vector_lisp_fields (union vectorlike_header *, gc_phase phase);
 extern void sweep_pdumper_object (void *, enum Lisp_Type);
 
 extern bool gc_object_limit_try_increase (size_t delta);

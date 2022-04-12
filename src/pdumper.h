@@ -155,9 +155,7 @@ struct pdumper_loaded_dump
 
 extern struct pdumper_loaded_dump dump_public;
 
-/* Return whether the OBJ points somewhere into the loaded dump file.
-   Works even when we have no dump loaded --- in this case, it just
-   returns false.  */
+/* Return true if OBJ falls within dump file address range.  */
 INLINE _GL_ATTRIBUTE_CONST bool
 pdumper_object_p (const void *obj)
 {

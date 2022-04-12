@@ -24061,13 +24061,13 @@ mark_xterm (void)
   if (x_dnd_return_frame_object)
     {
       XSETFRAME (val, x_dnd_return_frame_object);
-      mark_object (val);
+      xscan_reference (&val, GC_PHASE_MARK);
     }
 
   if (x_dnd_movement_frame)
     {
       XSETFRAME (val, x_dnd_movement_frame);
-      mark_object (val);
+      xscan_reference (&val, GC_PHASE_MARK);
     }
 
 #if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS

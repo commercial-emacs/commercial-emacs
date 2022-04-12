@@ -18,7 +18,7 @@ verify (sizeof (emacs_bitset_word) == sizeof (unsigned long long) ||
         sizeof (emacs_bitset_word) == sizeof (char));
 verify ((size_t) PTRDIFF_MAX < SIZE_MAX);
 
-#define EMACS_BITSET_NR_NEEDED_WORDS(nr_bits)                           \
+#define EMACS_BITSET_WORDS_OF_BITS(nr_bits)                           \
   (((nr_bits) + (emacs_bitset_bits_per_word - 1))                       \
    / emacs_bitset_bits_per_word)
 
