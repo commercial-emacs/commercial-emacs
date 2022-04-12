@@ -2847,7 +2847,7 @@ anim_create_cache (Lisp_Object spec)
   cache->handle = NULL;
   cache->temp = NULL;
 
-  cache->index = 0;
+  cache->index = -1;
   cache->next = NULL;
   cache->spec = spec;
   return cache;
@@ -8825,15 +8825,14 @@ gif_load (struct frame *f, struct image *img)
     {
       /* If this is an animated image, create a cache for it.  */
       cache = anim_get_animation_cache (img->spec);
+      /* We have an old cache entry, so use it.  */
       if (cache->handle)
 	{
-	  /* We have an old cache entry, and it looks correct, so use
-	     it.  */
-	  if (cache->index == idx - 1)
-	    {
-	      gif = cache->handle;
-	      pixmap = cache->temp;
-	    }
+	  gif = cache->handle;
+	  pixmap = cache->temp;
+	  /* We're out of sync, so start from the beginning.  */
+	  if (cache->index != idx - 1)
+	    cache->index = -1;
 	}
     }
 
@@ -9209,11 +9208,11 @@ gif_load (struct frame *f, struct image *img)
 	    }
 	}
       img->lisp_data = list2 (Qextension_data, img->lisp_data);
-      if (delay)
-	img->lisp_data
-	  = Fcons (Qdelay,
-		   Fcons (make_float (delay / 100.0),
-			  img->lisp_data));
+      img->lisp_data
+	= Fcons (Qdelay,
+		 /* Default GIF delay is 1/15th of a second.  */
+		 Fcons (make_float (delay? delay / 100.0: 1.0 / 15),
+			img->lisp_data));
     }
 
   if (gif->ImageCount > 1)
