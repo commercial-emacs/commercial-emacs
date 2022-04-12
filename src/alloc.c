@@ -616,30 +616,6 @@ struct sdata {
   } u;
 } GCALIGNED_STRUCT;
 
-/* Data we access frequently during garbage collection, all colocated
-   on the same cache line.
-
-   N.B. order the fields to eliminate padding.
-
-   TODO: look into plumbing this information through GC as function
-   parameters instead, at least on machines that aren't
-   register-starved.  */
-struct {
-  /* Start of the pdumper image.  */
-  uintptr_t pdumper_start;
-  /* Stack address at which we begin the mark phase of garbage
-     collection.  We use this value to check whether we've recursively
-     marked too deeply and should enqueue an object in the mark buffer
-     instead.  */
-  uintptr_t gc_phase_mark_stack_bottom_la;
-  /* Size of the pdumper image.  Store the size (int32_t) instead of
-     the end pointer (pointer size) so that we can free up 32 bits of
-     the cache line on 64-bit systems.  */
-  int32_t pdumper_size;
-  /* Whether we're performing a major collection.  */
-  bool major;
-} gc_hot;
-
 /* Context information for igscan --- scanning old-generation objects
    in the heap that might have pointers to new-generation objects.  */
 struct gc_igscan {
@@ -886,7 +862,6 @@ NOIL void gc_phase_plan_sweep (void);
 NOIL void gc_phase_sweep (void);
 NOIL void gc_phase_cleanup (bool);
 NRML void init_alloc_once_for_pdumper (void);
-GCFN bool gc_pdumper_object_p (const void *) _GL_ATTRIBUTE_CONST;
 NRML size_t gc_compute_total_live_nbytes (void);
 NRML void compact_all_buffers (void);
 NRML void recompute_consing_until_gc (void);
@@ -1135,22 +1110,6 @@ typedef union
    *(p) = NEAR_STACK_TOP (&sentry + (stack_bottom < &sentry.c))
 #endif
 
-#define ENQUEUE_AND_RETURN_IF_TOO_DEEP(objexpr)                         \
-  do {                                                                  \
-    stacktop_sentry sentry;                                             \
-    const void *const fp = NEAR_STACK_TOP (&sentry);                    \
-    const uintptr_t fp_la = (uintptr_t) fp;                             \
-    const uintptr_t sb_la =                                             \
-      gc_hot.gc_phase_mark_stack_bottom_la;                             \
-    eassume (fp_la < sb_la);  /* Stacks grow down everywhere.  */       \
-    const uintptr_t stack_size = sb_la - fp_la;                         \
-    if (eunlikely (stack_size > gc_mark_maximum_stack))                 \
-      {                                                                 \
-        gc_mark_enqueue (objexpr);					\
-        return;                                                         \
-      }                                                                 \
-  } while (false)
-
 /* Maximum number of elements in a vector.  */
 #define VECTOR_ELTS_MAX                                                 \
   ((ptrdiff_t)                                                          \
@@ -1177,17 +1136,6 @@ static size_t gc_nr_lisp_objects_upper_bound = 0;
 static emacs_list_head gc_aux_blocks =
   EMACS_LIST_HEAD_INITIALIZER (gc_aux_blocks);
 static size_t gc_aux_nr_blocks;
-
-/* Maximum size, in bytes, to which we allow the marking thread's
-   stack to grow while doing recursive marking.  If we recurse past
-   this point, switch to enqueuing objects to be marked in the mark
-   ring buffer.
-
-   The size is measured from the actual start of the thread stack and
-   not the stack at the point that gc_phase_mark() is called --- this
-   way, we don't overflow the stack if gc_phase_mark() happens to be
-   called deep inside some call tree.  */
-static const uintptr_t gc_mark_maximum_stack = 2 * 1024*1024;
 
 /* Mark queue.  Each entry in the queue is a GC aux block being used
   as a mark queue ring buffer.  */
@@ -1286,10 +1234,6 @@ Lisp_Object zero_vector;
 /* List of weak hash tables we found during marking the Lisp heap.
    NULL on entry to garbage_collect and after it returns.  */
 static struct Lisp_Hash_Table *weak_hash_tables;
-
-/* Captured at start of GC.  */
-static bool inhibit_compacting_font_caches_snapshot;
-
 
 /* Code.
 
@@ -1659,7 +1603,7 @@ lisp_malloc (const size_t nbytes,
 void
 lisp_free (void *const block, const ptrdiff_t mem_node_offset)
 {
-  eassert (!gc_pdumper_object_p (block));
+  eassert (! pdumper_object_p (block));
   mem_start_modification ();
   mem_remove (mem_node_from_struct (block, mem_node_offset));
   mem_end_modification ();
@@ -3951,7 +3895,7 @@ gc_mark_interval (const INTERVAL i)
 bool
 interval_marked_p (const struct interval *const i)
 {
-  return gc_pdumper_object_p (i)
+  return pdumper_object_p (i)
     ? pdumper_marked_p (i)
     : gc_object_is_marked (i, &gc_interval_heap);
 }
@@ -3959,7 +3903,7 @@ interval_marked_p (const struct interval *const i)
 void
 set_interval_marked (const INTERVAL i)
 {
-  if (gc_pdumper_object_p (i))
+  if (pdumper_object_p (i))
     pdumper_set_marked (i);
   else
     gc_object_set_marked (i, &gc_interval_heap);
@@ -3968,7 +3912,7 @@ set_interval_marked (const INTERVAL i)
 void
 set_interval_pinned (const INTERVAL i)
 {
-  if (! gc_pdumper_object_p (i))
+  if (! pdumper_object_p (i))
     gc_object_set_pinned (i, &gc_interval_heap);
 }
 
@@ -4010,9 +3954,9 @@ scan_interval (const INTERVAL i, const gc_phase phase)
 INTERVAL
 point_interval_into_tospace (const INTERVAL i)
 {
-  if (gc_pdumper_object_p (i))
-    return i;
-  return gc_object_point_into_tospace (i, &gc_interval_heap);
+  return pdumper_object_p (i)
+    ? i
+    : gc_object_point_into_tospace (i, &gc_interval_heap);
 }
 
 
@@ -4154,9 +4098,9 @@ scan_string (struct Lisp_String *const s, const gc_phase phase)
 struct Lisp_String *
 point_string_into_tospace (struct Lisp_String *const s)
 {
-  if (gc_pdumper_object_p (s))
-    return s;
-  return gc_object_point_into_tospace (s, &gc_string_heap);
+  return pdumper_object_p (s)
+    ? s
+    : gc_object_point_into_tospace (s, &gc_string_heap);
 }
 
 /* Initialize string allocation.  Called from init_alloc_once.  */
@@ -4384,7 +4328,7 @@ make_c_string (const char *data, ptrdiff_t nchars)
 bool
 string_marked_p (const struct Lisp_String *s)
 {
-  return gc_pdumper_object_p (s)
+  return pdumper_object_p (s)
     ? pdumper_marked_p (s)
     : eunlikely (stack_string_p (s))
     ? true /* conservative GC scans contents */
@@ -4394,11 +4338,11 @@ string_marked_p (const struct Lisp_String *s)
 void
 set_string_marked (struct Lisp_String *s)
 {
-  if (gc_pdumper_object_p (s))
+  if (pdumper_object_p (s))
     pdumper_set_marked (s);
   else
     {
-      eassume (!stack_string_p (s));
+      eassume (! stack_string_p (s));
       gc_object_set_marked (s, &gc_string_heap);
     }
 }
@@ -4406,14 +4350,14 @@ set_string_marked (struct Lisp_String *s)
 void
 set_string_pinned (struct Lisp_String *s)
 {
-  if (!gc_pdumper_object_p (s) && !stack_string_p (s))
+  if (! pdumper_object_p (s) && ! stack_string_p (s))
     gc_object_set_pinned (s, &gc_string_heap);
 }
 
 EMACS_INT
 string_identity_hash_code (struct Lisp_String *s)
 {
-  if (!gc_pdumper_object_p (s) && !stack_string_p (s))
+  if (! pdumper_object_p (s) && ! stack_string_p (s))
     gc_object_perma_pin (s, &gc_string_heap);
   return (uintptr_t) s / alignof (struct Lisp_String);
 }
@@ -4617,7 +4561,7 @@ make_float (const double float_value)
 bool
 float_marked_p (const struct Lisp_Float *f)
 {
-  return gc_pdumper_object_p (f)
+  return pdumper_object_p (f)
     ? true  /* pdumper floats are cold and always marked */
     : gc_object_is_marked (f, &gc_float_heap);
 }
@@ -4625,21 +4569,21 @@ float_marked_p (const struct Lisp_Float *f)
 void
 set_float_marked (struct Lisp_Float *f)
 {
-  eassert (!gc_pdumper_object_p (f));
+  eassert (! pdumper_object_p (f));
   gc_object_set_marked (f, &gc_float_heap);
 }
 
 void
 set_float_pinned (struct Lisp_Float *f)
 {
-  if (!gc_pdumper_object_p (f))
+  if (! pdumper_object_p (f))
     gc_object_set_pinned (f, &gc_float_heap);
 }
 
 EMACS_INT
 float_identity_hash_code (struct Lisp_Float *f)
 {
-  if (!gc_pdumper_object_p (f))
+  if (! pdumper_object_p (f))
     gc_object_perma_pin (f, &gc_float_heap);
   return (uintptr_t) f / alignof (struct Lisp_Float);
 }
@@ -4667,9 +4611,9 @@ live_float_p (const struct mem_node *const m, const void *const p)
 struct Lisp_Float *
 point_float_into_tospace (struct Lisp_Float *const f)
 {
-  if (gc_pdumper_object_p (f))
-    return f;
-  return gc_object_point_into_tospace (f, &gc_float_heap);
+  return pdumper_object_p (f)
+    ? f
+    : gc_object_point_into_tospace (f, &gc_float_heap);
 }
 
 
@@ -4720,7 +4664,7 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
 bool
 cons_marked_p (const struct Lisp_Cons *c)
 {
-  return gc_pdumper_object_p (c)
+  return pdumper_object_p (c)
     ? pdumper_marked_p (c)
     : eunlikely (stack_cons_p (c))
     ? true  /* conservative GC scans stack cons contents */
@@ -4730,11 +4674,11 @@ cons_marked_p (const struct Lisp_Cons *c)
 void
 set_cons_marked (struct Lisp_Cons *c)
 {
-  if (gc_pdumper_object_p (c))
+  if (pdumper_object_p (c))
     pdumper_set_marked (c);
   else
     {
-      eassume (!stack_cons_p (c));
+      eassume (! stack_cons_p (c));
       gc_object_set_marked (c, &gc_cons_heap);
     }
 }
@@ -4742,14 +4686,14 @@ set_cons_marked (struct Lisp_Cons *c)
 void
 set_cons_pinned (struct Lisp_Cons *c)
 {
-  if (!gc_pdumper_object_p (c) && !stack_cons_p (c))
+  if (! pdumper_object_p (c) && ! stack_cons_p (c))
     gc_object_set_pinned (c, &gc_cons_heap);
 }
 
 EMACS_INT
 cons_identity_hash_code (struct Lisp_Cons *c)
 {
-  if (!gc_pdumper_object_p (c) && !stack_cons_p (c))
+  if (! pdumper_object_p (c) && ! stack_cons_p (c))
     gc_object_perma_pin (c, &gc_cons_heap);
   return (uintptr_t) c / alignof (struct Lisp_Cons);
 }
@@ -4875,9 +4819,9 @@ DEFUN ("make-list", Fmake_list, Smake_list, 2, 2, 0,
 struct Lisp_Cons *
 point_cons_into_tospace (struct Lisp_Cons *const f)
 {
-  if (gc_pdumper_object_p (f))
-    return f;
-  return gc_object_point_into_tospace (f, &gc_cons_heap);
+  return pdumper_object_p (f)
+    ? f
+    : gc_object_point_into_tospace (f, &gc_cons_heap);
 }
 
 
@@ -5169,7 +5113,7 @@ sweep_one_large_vector (large_vector_meta *const lvm)
       /* This vector is part of the old generation.  Scan only the
          parts of the vector that the card table tells us have been
          modified.  */
-      eassume (! gc_hot.major);
+      /* eassume (! gc_hot.major); */
     }
 
   if (normal_scan)
@@ -5760,7 +5704,7 @@ Its value is void, and its function definition and property list are nil.  */)
 bool
 symbol_marked_p (const struct Lisp_Symbol *s)
 {
-  return gc_pdumper_object_p (s)
+  return pdumper_object_p (s)
     ? pdumper_marked_p (s)
     : c_symbol_p (s)
     ? true /* C symbols are always marked */
@@ -5770,7 +5714,7 @@ symbol_marked_p (const struct Lisp_Symbol *s)
 void
 set_symbol_marked (struct Lisp_Symbol *s)
 {
-  if (gc_pdumper_object_p (s))
+  if (pdumper_object_p (s))
     pdumper_set_marked (s);
   else if (c_symbol_p (s))
     emacs_unreachable ();
@@ -5781,15 +5725,15 @@ set_symbol_marked (struct Lisp_Symbol *s)
 struct Lisp_Symbol *
 point_symbol_into_tospace (struct Lisp_Symbol *const s)
 {
-  if (gc_pdumper_object_p (s) || c_symbol_p (s))
-    return s;
-  return gc_object_point_into_tospace (s, &gc_symbol_heap);
+  return (pdumper_object_p (s) || c_symbol_p (s))
+    ? s
+    : gc_object_point_into_tospace (s, &gc_symbol_heap);
 }
 
 void
 set_symbol_pinned (struct Lisp_Symbol *s)
 {
-  if (!gc_pdumper_object_p (s) && !c_symbol_p (s))
+  if (! pdumper_object_p (s) && ! c_symbol_p (s))
     gc_object_set_pinned (s, &gc_symbol_heap);
 }
 
@@ -6046,7 +5990,7 @@ becomes unreachable or only reachable from other finalizers.  */)
 bool
 vectorlike_marked_p (const union vectorlike_header *const v)
 {
-  if (gc_pdumper_object_p (v))
+  if (pdumper_object_p (v))
     {
       /* Look at cold_start first so that we don't have to fault in
          the vector header just to tell that it's a bool vector.  */
@@ -6071,7 +6015,7 @@ void
 set_vectorlike_marked (const union vectorlike_header *const v)
 {
   eassert (! PSEUDOVECTOR_TYPEP (v, PVEC_SUBR));
-  if (gc_pdumper_object_p (v))
+  if (pdumper_object_p (v))
     {
       eassert (! PSEUDOVECTOR_TYPEP (v, PVEC_BOOL_VECTOR));
       pdumper_set_marked (v);
@@ -6086,7 +6030,7 @@ bool
 vectorlike_always_pinned_p (const union vectorlike_header *const v)
 {
   /* FIXME: we shouldn't have to read the heap here.  */
-  return gc_pdumper_object_p (v) ||
+  return pdumper_object_p (v) ||
     PSEUDOVECTOR_TYPEP (v, PVEC_SUBR) ||
     vectorlike_nbytes (v) >= LARGE_VECTOR_LO_SIZE ||
     (PSEUDOVECTOR_TYPEP (v, PVEC_THREAD) && main_thread_p (v));
@@ -6676,11 +6620,11 @@ scan_maybe_pointer (void *const p)
   VALGRIND_MAKE_MEM_DEFINED (&p, sizeof (p));
 #endif
 
-  if (gc_pdumper_object_p (p))
+  if (pdumper_object_p (p))
     {
       /* XXX: fix pdumper interior pointer stuff */
       int type = pdumper_find_object_type (p);
-      if (!pdumper_valid_object_type_p (type))
+      if (! pdumper_valid_object_type_p (type))
 	{
 	  /* False alarm.  */
 	}
@@ -6784,53 +6728,16 @@ scan_memory (void const *start, void const *end, const gc_phase phase)
 }
 
 #ifndef HAVE___BUILTIN_UNWIND_INIT
-
 # ifdef GC_SETJMP_WORKS
 static void
 test_setjmp (void)
 {
 }
 # else
-
+/* For alien systems, check if conservative stack marking could possibly
+   work, that is, if setjmp saves registers in a jmp_buf.  */
 static bool setjmp_tested_p;
 static int longjmps_done;
-
-#  define SETJMP_WILL_LIKELY_WORK "\
-\n\
-Emacs garbage collector has been changed to use conservative stack\n\
-marking.  Emacs has determined that the method it uses to do the\n\
-marking will likely work on your system, but this isn't sure.\n\
-\n\
-If you are a system-programmer, or can get the help of a local wizard\n\
-who is, please take a look at the function mark_c_stack in alloc.c, and\n\
-verify that the methods used are appropriate for your system.\n\
-\n\
-Please mail the result to <emacs-devel@gnu.org>.\n\
-"
-
-#  define SETJMP_WILL_NOT_WORK "\
-\n\
-Emacs garbage collector has been changed to use conservative stack\n\
-marking.  Emacs has determined that the default method it uses to do the\n\
-marking will not work on your system.  We will need a system-dependent\n\
-solution for your system.\n\
-\n\
-Please take a look at the function mark_c_stack in alloc.c, and\n\
-try to find a way to make it work on your system.\n\
-\n\
-Note that you may get false negatives, depending on the compiler.\n\
-In particular, you need to use -O with GCC for this test.\n\
-\n\
-Please mail the result to <emacs-devel@gnu.org>.\n\
-"
-
-
-/* Perform a quick check if it looks like setjmp saves registers in a
-   jmp_buf.  Print a message to stderr saying so.  When this test
-   succeeds, this is _not_ a proof that setjmp is sufficient for
-   conservative stack marking.  Only the sources or a disassembly
-   can prove that.  */
-
 static void
 test_setjmp (void)
 {
@@ -6847,25 +6754,9 @@ test_setjmp (void)
   x = 2 * x - 1;
 
   sys_setjmp (jbuf);
-  if (longjmps_done == 1)
+  if (longjmps_done == 1 && x != 1)
     {
-      /* Came here after the longjmp at the end of the function.
-
-         If x == 1, the longjmp has restored the register to its
-         value before the setjmp, and we can hope that setjmp
-         saves all such registers in the jmp_buf, although that
-	 isn't sure.
-
-         For other values of X, either something really strange is
-         taking place, or the setjmp just didn't save the register.  */
-
-      if (x == 1)
-	fputs (SETJMP_WILL_LIKELY_WORK, stderr);
-      else
-	{
-	  fputs (SETJMP_WILL_NOT_WORK, stderr);
-	  exit (1);
-	}
+      emacs_abort ();
     }
 
   ++longjmps_done;
@@ -6915,7 +6806,8 @@ test_setjmp (void)
 
    Stack Layout
 
-   The stack might look like this
+   Architectures differ in the way their processor stack is organized.
+   For example, the stack might look like this
 
      +----------------+
      |  Lisp_Object   |  size = 4
@@ -6926,14 +6818,14 @@ test_setjmp (void)
      +----------------+
      |	...	      |
 
-   where not every Lisp_Object is aligned equally.  Walking the stack
-   in 4-byte steps would immediately miss the second Lisp_Object.  We
-   instead issue two passes, one starting at the stack base, and the
-   other starting at the base + 2.  Similarly, if the minimal
-   alignment of Lisp_Objects were 1, four passes would be
-   required.
-
-   We assume the stack is a contiguous in memory.   */
+   In such a case, not every Lisp_Object will be aligned equally.  To
+   find all Lisp_Object on the stack it won't be sufficient to walk
+   the stack in steps of 4 bytes.  Instead, two passes will be
+   necessary, one starting at the start of the stack, and a second
+   pass starting at the start of the stack + 2.  Likewise, if the
+   minimal alignment of Lisp_Objects on the stack is 1, four passes
+   would be necessary, each one starting with one byte more offset
+   from the stack start.  */
 void
 xscan_stack (char const *bottom, char const *end, const gc_phase phase)
 {
@@ -7024,7 +6916,7 @@ valid_lisp_object_p (Lisp_Object obj)
   if (p == &buffer_defaults || p == &buffer_local_symbols)
     return 2;
 
-  if (gc_pdumper_object_p (p))
+  if (pdumper_object_p (p))
     return pdumper_object_p_precise (p) ? 1 : 0;
 
   struct mem_node *m = mem_find (p);
@@ -7200,7 +7092,7 @@ void
 sweep_pdumper_object (void *const obj, const enum Lisp_Type type)
 {
   eassume (current_gc_phase == GC_PHASE_SWEEP);
-  eassert (gc_pdumper_object_p (obj));
+  eassert (pdumper_object_p (obj));
   eassert (pdumper_object_p_precise (obj));
   scan_object (obj, type, GC_PHASE_SWEEP);
 }
@@ -7470,35 +7362,33 @@ font_cache_entry_survives_gc_p (const Lisp_Object obj)
 bool
 mark_strong_references_of_reachable_font_cache (const Lisp_Object cache)
 {
-  return mark_strong_references_on_reachable_weak_list (
-    cache, font_cache_entry_survives_gc_p);
+  return mark_strong_references_on_reachable_weak_list
+    (cache, font_cache_entry_survives_gc_p);
 }
 
 bool
 mark_strong_references_of_reachable_font_caches (void)
 {
   bool marked = false;
-  struct terminal *t;
-  for (t = terminal_list; t; t = t->next_terminal)
+  for (struct terminal *t = terminal_list; t; t = t->next_terminal)
     {
       Lisp_Object *cachep = TERMINAL_FONT_CACHEP (t);
-      /* Inhibit compacting the caches if the user so wishes.  Some of
-	 the users don't mind a larger memory footprint, but do mind
-	 slower redisplay.  */
-      if (!cachep)
-        continue;
-      if (!inhibit_compacting_font_caches_snapshot)
-        while (CONSP (*cachep))
-          {
-            marked |= mark_strong_references_of_reachable_font_cache (
-              XCAR (*cachep));
-            cachep = xcdr_addr (*cachep);
-          }
-      if (!survives_gc_p (*cachep))
-        {
-          marked = true;
-          gc_mark (*cachep);
-        }
+      if (cachep)
+	{
+	  if (! inhibit_compacting_font_caches)
+	    while (CONSP (*cachep))
+	      {
+		if (! marked)
+		  marked = mark_strong_references_of_reachable_font_cache
+		    (XCAR (*cachep));
+		cachep = xcdr_addr (*cachep);
+	      }
+	  if (! survives_gc_p (*cachep))
+	    {
+	      marked = true;
+	      gc_mark (*cachep);
+	    }
+	}
     }
   return marked;
 }
@@ -7639,35 +7529,10 @@ gc_is_in_progress (void)
   return current_gc_phase != GC_PHASE_NOT_IN_PROGRESS;
 }
 
-/* Same as pdumper_object_p() but consults gc cache.  */
-bool
-gc_pdumper_object_p (const void *const ptr)
-{
-  const uintptr_t la = (uintptr_t) ptr;
-  const bool result =
-    gc_hot.pdumper_start <= la &&
-    (la - gc_hot.pdumper_start <
-     gc_hot.pdumper_size);
-  eassert (result == pdumper_object_p (ptr));
-  return result;
-}
-
 void
 gc_phase_prepare (const bool major)
 {
   eassume (current_gc_phase == GC_PHASE_PREPARE);
-  /* Snapshot things that may change across GC.  */
-  inhibit_compacting_font_caches_snapshot = inhibit_compacting_font_caches;
-  /* Cache pdumper's dump location information.  */
-  gc_hot.pdumper_start = (uintptr_t) dump_public.start;
-  /* Cache the major-collection flag.  */
-  gc_hot.major = major;
-  eassume ((uintptr_t) dump_public.end - gc_hot.pdumper_start <= INT32_MAX);
-  gc_hot.pdumper_size = (uintptr_t) dump_public.end - gc_hot.pdumper_start;
-  /* Cache so we don't have to constantly consult current_thread.  */
-  gc_hot.gc_phase_mark_stack_bottom_la = (uintptr_t) stack_bottom;
-  /* Reset all the variables that we want to regenerate for each
-     collection cycle.  */
   for (int i = 0; i < ARRAYELTS (gc_heaps); ++i)
     gc_heap_prepare (gc_heaps[i], major);
 }
@@ -9132,11 +8997,11 @@ gc_object_perma_pin (void *const obj, const gc_heap *const h)
 void *
 gc_object_point_into_tospace (void *const obj, const gc_heap *h)
 {
-  eassert (!gc_pdumper_object_p (obj));
-  if (!h->use_moving_gc)
+  eassert (! pdumper_object_p (obj));
+  if (! h->use_moving_gc)
     return obj;
   const gc_cursor c = gc_object_to_cursor (obj, h);
-  if (!gc_cursor_is_gen_y (c, h))
+  if (! gc_cursor_is_gen_y (c, h))
     return gc_cursor_to_object (c, h);
   const gc_locator tospace = gc_cursor_get_object_tospace_locator (c, h);
   const gc_cursor new_c = gc_locator_to_cursor (tospace, h);
@@ -9149,8 +9014,8 @@ gc_object_point_into_tospace (void *const obj, const gc_heap *h)
 gc_cursor
 gc_object_to_cursor (const void *const obj, const gc_heap *const h)
 {
-  eassert (!gc_pdumper_object_p (obj));
-  eassert (!main_thread_p (obj));
+  eassert (! pdumper_object_p (obj));
+  eassert (! main_thread_p (obj));
   const uintptr_t obj_la = (uintptr_t) obj;
   const uintptr_t block_la = h->aligned_blocks
     ? (obj_la / GC_BLOCK_SIZE) * GC_BLOCK_SIZE
