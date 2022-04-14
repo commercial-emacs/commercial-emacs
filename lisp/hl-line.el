@@ -126,6 +126,9 @@ Currently used in calendar/todo-mode."
     (delete-overlay hl-line--overlay)
     (setq hl-line--overlay nil)))
 
+(define-obsolete-function-alias 'global-hl-line-unhighlight
+  'hl-line-unhighlight "29.1")
+
 (defun hl-line-highlight ()
   (unless (minibufferp)
     (unless hl-line--overlay
@@ -146,6 +149,9 @@ Currently used in calendar/todo-mode."
         (hl-line-unhighlight)))
     (setq hl-line--buffer (current-buffer))
     (run-hooks 'hl-line-highlight-hook)))
+
+(define-obsolete-function-alias 'global-hl-line-highlight
+  'hl-line-highlight "29.1")
 
 (defun hl-line-turn-on ()
   (unless (minibufferp)
