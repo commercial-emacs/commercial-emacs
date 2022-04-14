@@ -1869,20 +1869,15 @@ stack_overflow (siginfo_t *siginfo)
 static void
 handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
 {
-  if (gc_try_handle_sigsegv (siginfo->si_addr))
+  if (! gc_try_handle_sigsegv (siginfo->si_addr))
     return;
 
-  bool fatal = gc_is_in_progress ();
-
-#ifdef FORWARD_SIGNAL_TO_MAIN_THREAD
-  if (!fatal && !pthread_equal (pthread_self (), main_thread_id))
-    fatal = true;
+#ifdef HAVE_PTHREAD
+  if (pthread_equal (pthread_self (), main_thread_id))
 #endif
+    if (stack_overflow (siginfo))
+      siglongjmp (return_to_command_loop, 1);
 
-  if (!fatal && stack_overflow (siginfo))
-    siglongjmp (return_to_command_loop, 1);
-
-  /* Otherwise we can't do anything with this.  */
   deliver_fatal_thread_signal (SIGABRT);
 }
 

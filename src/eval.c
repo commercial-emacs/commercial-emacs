@@ -371,7 +371,7 @@ do_debug_on_call (Lisp_Object code, specpdl_ref count)
   set_backtrace_debug_on_exit (specpdl_ref_to_ptr (count), true);
   call_debugger (list1 (code));
 }
-
+
 
 DEFUN ("or", For, Sor, 0, UNEVALLED, 0,
        doc: /* Eval args until one of them yields non-nil, then return that value.
@@ -907,7 +907,7 @@ DEFUN ("internal-make-var-non-special", Fmake_var_non_special,
   return Qnil;
 }
 
-
+
 DEFUN ("let*", FletX, SletX, 1, UNEVALLED, 0,
        doc: /* Bind variables according to VARLIST then eval BODY.
 The value of the last form in BODY is returned.
@@ -1166,7 +1166,7 @@ definitions to shadow the loaded ones for use in file byte-compilation.  */)
     }
   return form;
 }
-
+
 DEFUN ("catch", Fcatch, Scatch, 1, UNEVALLED, 0,
        doc: /* Eval BODY allowing nonlocal exits using `throw'.
 TAG is evalled to get the tag to use; it must not be nil.
@@ -1302,7 +1302,7 @@ usage: (unwind-protect BODYFORM UNWINDFORMS...)  */)
   val = eval_sub (XCAR (args));
   return unbind_to (count, val);
 }
-
+
 DEFUN ("condition-case", Fcondition_case, Scondition_case, 2, UNEVALLED, 0,
        doc: /* Regain control when an error is signaled.
 Executes BODYFORM and returns its value if no error happens.
@@ -1626,7 +1626,7 @@ push_handler_nosignal (Lisp_Object tag_ch_val, enum handlertype handlertype)
   return c;
 }
 
-
+
 static Lisp_Object signal_or_quit (Lisp_Object, Lisp_Object, bool);
 static Lisp_Object find_handler_clause (Lisp_Object, Lisp_Object);
 static bool maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig,
@@ -2051,7 +2051,7 @@ error (const char *m, ...)
   va_start (ap, m);
   verror (m, ap);
 }
-
+
 DEFUN ("commandp", Fcommandp, Scommandp, 1, 2, 0,
        doc: /* Non-nil if FUNCTION makes provisions for interactive calling.
 This means it contains a description for how to read arguments to give it.
@@ -2264,7 +2264,7 @@ it defines a macro.  */)
     }
 }
 
-
+
 DEFUN ("eval", Feval, Seval, 1, 2, 0,
        doc: /* Evaluate FORM and return its value.
 If LEXICAL is t, evaluate using lexical scoping.
@@ -2517,7 +2517,7 @@ eval_sub (Lisp_Object form)
 
   return val;
 }
-
+
 DEFUN ("apply", Fapply, Sapply, 1, MANY, 0,
        doc: /* Call FUNCTION with our remaining args, using our last arg as list of args.
 Then return the value FUNCTION returns.
@@ -2588,7 +2588,7 @@ usage: (apply FUNCTION &rest ARGUMENTS)  */)
   SAFE_FREE ();
   return retval;
 }
-
+
 /* Run hook variables in various ways.  */
 
 static Lisp_Object
@@ -2912,7 +2912,7 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
   specpdl_ptr--;
   return val;
 }
-
+
 
 /* Apply a C subroutine SUBR to the NUMARGS evaluated arguments in ARG_VECTOR
    and return the result of evaluation.  */
@@ -3309,7 +3309,7 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
     }
   return object;
 }
-
+
 /* Return true if SYMBOL currently has a let-binding
    which was made in the buffer that is now current.  */
 
@@ -3689,7 +3689,7 @@ context where binding is lexical by default.  */)
    return XSYMBOL (symbol)->u.s.f.declared_special ? Qt : Qnil;
 }
 
-
+
 static union specbinding *
 get_backtrace_starting_at (Lisp_Object base)
 {
@@ -4031,7 +4031,7 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
   return result;
 }
 
-
+
 void
 scan_specpdl (union specbinding *const first,
               union specbinding *const ptr,
@@ -4048,9 +4048,9 @@ scan_specpdl (union specbinding *const first,
 
 	case SPECPDL_UNWIND_ARRAY:
           /* Used for overflow stack in exec_byte_code.  */
-	  xscan_maybe_objects (pdl->unwind_array.array,
-                               pdl->unwind_array.nelts,
-                               phase);
+	  if (phase == GC_PHASE_MARK)
+	    mark_objects (pdl->unwind_array.array,
+			  pdl->unwind_array.nelts);
 	  break;
 
 	case SPECPDL_UNWIND_EXCURSION:

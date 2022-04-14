@@ -4257,7 +4257,6 @@ ATTRIBUTE_MALLOC extern void *allocate_pseudovector_and_zero (int, int, enum pve
   ((type *) allocate_pseudovector_and_zero (                           \
     VECSIZE (type), PSEUDOVECSIZE (type, field), tag))
 
-extern bool gc_is_in_progress (void) ATTRIBUTE_PURE;
 extern bool gc_try_handle_sigsegv (void *);
 
 extern Lisp_Object make_float (double);

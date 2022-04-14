@@ -409,7 +409,7 @@ merge_markmem (void *arg)
   if (ms->reloc.size != NULL && *ms->reloc.size > 0)
     {
       eassume (ms->reloc.src != NULL);
-      xscan_maybe_objects (*ms->reloc.src, *ms->reloc.size);
+      mark_objects (*ms->reloc.src, *ms->reloc.size);
     }
 }
 

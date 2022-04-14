@@ -8131,7 +8131,7 @@ open_channel_for_module (Lisp_Object process)
 #endif
 }
 
-
+
 
 void
 scan_process_roots (const gc_phase phase)
@@ -8140,7 +8140,7 @@ scan_process_roots (const gc_phase phase)
      There's no sense in bloating the staticpro array.  Just scan
      these values manually.  */
   for (int i = 0; i < ARRAYELTS (chan_process); ++i)
-    if (!NILP (chan_process[i]))
+    if (! NILP (chan_process[i]))
       xscan_reference (&chan_process[i], phase);
 }
 

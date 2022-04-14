@@ -832,9 +832,9 @@ GCFN void gc_object_perma_pin (void *, const gc_heap *);
 GCFN void *gc_object_point_into_tospace (void *, const gc_heap *);
 GCFN gc_cursor gc_object_to_cursor (const void *, const gc_heap *);
 GCFN void scan_reference (Lisp_Object *, gc_phase);
-GCFN void scan_reference_pinned (Lisp_Object, gc_phase);
+GCFN void mark_reference_pinned (Lisp_Object);
 GCFN void scan_reference_pointer_to_interval (INTERVAL *, gc_phase);
-GCFN void scan_reference_interval_pinned (INTERVAL, gc_phase);
+GCFN void mark_reference_interval_pinned (INTERVAL);
 GCFN void scan_reference_pointer_to_symbol (struct Lisp_Symbol **, gc_phase);
 GCFN gc_cursor gc_locator_to_cursor (gc_locator, const gc_heap *);
 GCFN bool gc_locator_invalid_p (gc_locator, const gc_heap *);
@@ -850,10 +850,8 @@ GCFN ptrdiff_t gc_igscan_get_next_dirty_slot_nr (const gc_igscan *, const gc_hea
 GCFN void gc_block_plan_sweep (gc_block *, gc_cursor *, const gc_heap *);
 GCFN void scan_reference_pointer_to_vectorlike_1 (void *, union vectorlike_header *, gc_phase);
 GCFN void scan_reference_pointer_to_vectorlike_2 (union vectorlike_header **, gc_phase);
-NRML void scan_maybe_pointer (void *);
-NRML void scan_maybe_object (Lisp_Object);
-NRML void scan_memory (void const *, void const *, gc_phase);
-NRML void scan_object_root_visitor_mark (Lisp_Object *, enum gc_root_type, void *);
+NRML void mark_pointer (void *);
+NRML void mark_object (Lisp_Object);
 NRML void scan_object_root_visitor_sweep (Lisp_Object *, enum gc_root_type, void *);
 NRML void scan_roots (gc_phase);
 NOIL void gc_phase_prepare (bool);
@@ -985,7 +983,6 @@ GCFN gc_vector_allocation larger_vecalloc (const struct Lisp_Vector *, ptrdiff_t
 NRML size_t gc_vector_object_nbytes (const void *);
 NRML bool mark_or_sweep_weak_table (struct Lisp_Hash_Table *, bool);
 GCFN void scan_glyph_matrix (struct glyph_matrix *, gc_phase);
-GCFN void scan_char_table (struct Lisp_Vector *, enum pvec_type, gc_phase);
 GCFN void scan_face_cache (struct face_cache *const, struct frame *const, const gc_phase);
 GCFN void scan_frame (struct frame *const, const gc_phase);
 NRML void discard_killed_buffers (Lisp_Object *);
@@ -1083,6 +1080,27 @@ typedef union
 #endif
 } stacktop_sentry;
 
+/* Force callee-saved registers and register windows onto the stack.
+   Use the platform-defined __builtin_unwind_init if available,
+   obviating the need for machine dependent methods.  */
+#ifndef HAVE___BUILTIN_UNWIND_INIT
+# ifdef __sparc__
+   /* This trick flushes the register windows so that all the state of
+      the process is contained in the stack.
+      FreeBSD does not have a ta 3 handler, so handle it specially.
+      FIXME: Code in the Boehm GC suggests flushing (with 'flushrs') is
+      needed on ia64 too.  See mach_dep.c, where it also says inline
+      assembler doesn't work with relevant proprietary compilers.  */
+#  if defined __sparc64__ && defined __FreeBSD__
+#   define __builtin_unwind_init() asm ("flushw")
+#  else
+#   define __builtin_unwind_init() asm ("ta 3")
+#  endif
+# else
+#  define __builtin_unwind_init() ((void) 0)
+# endif
+#endif
+
 /* Yield an address close enough to the top of the stack that the
    garbage collector need not scan above it.  Callers should be
    declared NO_INLINE.  */
@@ -1172,9 +1190,6 @@ static ptrdiff_t consing_until_gc = PTRDIFF_MAX;
    generating garbage.  */
 size_t number_finalizers_run;
 #endif
-
-/* Current garbage collection phase.  */
-static gc_phase current_gc_phase = GC_PHASE_NOT_IN_PROGRESS;
 
 /* Total number of bytes of GC heap used for live objects at the end
    of the last garbage collection, major or minor.  */
@@ -1771,7 +1786,6 @@ gc_block_check (const gc_block *const b)
 void
 gc_heap_flip_next_tospace_block (const gc_heap *const h)
 {
-  eassume (current_gc_phase == GC_PHASE_SWEEP);
   eassume (h->data->per_cycle.sweep.next_tospace_flip_block_nr <
            h->data->block_array_size);
   const size_t block_nr = h->data->per_cycle.sweep.next_tospace_flip_block_nr++;
@@ -1783,7 +1797,6 @@ gc_heap_flip_next_tospace_block (const gc_heap *const h)
 void
 gc_block_sweep_inplace (gc_block *const b, const gc_heap *const h)
 {
-  eassume (current_gc_phase == GC_PHASE_SWEEP);
   gc_block_write_unprotect (b, h);
   gc_block_scan_intergenerational (b, GC_PHASE_SWEEP, h);
 
@@ -1858,7 +1871,6 @@ gc_block_plan_sweep (gc_block *const b,
                      gc_cursor *const tospace_tip_inout,
                      const gc_heap *const h)
 {
-  eassume (current_gc_phase == GC_PHASE_PLAN_SWEEP);
   eassume (b->meta.u.heap.per_cycle.tospace == NULL);
   eassume (h->use_moving_gc);
   eassert (gc_heap_is_moving_gc_this_cycle (h));
@@ -2055,7 +2067,6 @@ gc_tospace_placer_flush (gc_tospace_placer *const p, const gc_heap *const h)
 void
 gc_block_sweep_compact (gc_block *const b, const gc_heap *const h)
 {
-  eassume (current_gc_phase == GC_PHASE_SWEEP);
   gc_block_write_unprotect (b, h);
   gc_block_scan_intergenerational (b, GC_PHASE_SWEEP, h);
 
@@ -2225,7 +2236,6 @@ ptrdiff_t
 gc_block_gen_y_slot_nr (gc_block *const b, const gc_heap *const h)
 {
   /* We set up the per-block slot number in the prepare phase.  */
-  eassume (current_gc_phase > GC_PHASE_PREPARE);
   const ptrdiff_t gen_y_slot_nr = b->meta.u.heap.per_cycle.gen_y_slot_nr;
   eassume (0 <= gen_y_slot_nr);
   eassume (gen_y_slot_nr <= gc_heap_nslots_per_block (h));
@@ -2297,7 +2307,6 @@ gc_block_flip_tospace_to_fromspace (gc_block *const b, const gc_heap *const h)
 void
 gc_block_write_unprotect (gc_block *const b, const gc_heap *const h)
 {
-  eassume ((current_gc_phase == GC_PHASE_SWEEP) || ( current_gc_phase == GC_PHASE_CLEANUP));
   const ptrdiff_t gen_y_slot_nr = gc_block_gen_y_slot_nr (b, h);
   const size_t gen_y_byte_offset =
     gen_y_slot_nr * gc_heap_nbytes_per_slot (h);
@@ -2308,8 +2317,7 @@ gc_block_write_unprotect (gc_block *const b, const gc_heap *const h)
   const size_t nbytes =
     //XXX nr_pure_gen_o_pages * EMACS_PAGE_SIZE_MIN;
     GC_BLOCK_SIZE;
-  emacs_set_memory_protection (
-    &b->u.data[0], nbytes, EMACS_MEMORY_ACCESS_READWRITE);
+  emacs_set_memory_protection (&b->u.data[0], nbytes, EMACS_MEMORY_ACCESS_READWRITE);
 }
 
 /* Clear the card table for block B and start recording page
@@ -2355,11 +2363,8 @@ gc_block_write_protect_gen_o (gc_block *const b, const gc_heap *const h)
      share the page.  */
   const size_t nr_pure_gen_o_pages = gen_y_byte_offset / page_size;
   (void) nr_pure_gen_o_pages;
-  const size_t nbytes =
-    // XXX nr_pure_gen_o_pages * page_size;
-    GC_BLOCK_SIZE;
-  emacs_set_memory_protection (
-    &b->u.data[0], nbytes, EMACS_MEMORY_ACCESS_READ);
+  const size_t nbytes = GC_BLOCK_SIZE; // XXX nr_pure_gen_o_pages * page_size;
+  emacs_set_memory_protection (&b->u.data[0], nbytes, EMACS_MEMORY_ACCESS_READ);
   if (nbytes % page_size)
     emacs_bitset_set_bit (&b->meta.card_table[0],
                           ARRAYELTS (b->meta.card_table),
@@ -2370,15 +2375,12 @@ void
 gc_block_cleanup_after_all_sweeps (gc_block *const b, void *const hptr)
 {
   const gc_heap *const h = hptr;
-  eassume (current_gc_phase == GC_PHASE_CLEANUP);
   /* We no longer need to be able to translate fromspace addresses to
      tospace addresses during this GC cycle.
      XXX: only bother discarding the young generation
      */
-
   if (gc_heap_is_moving_gc_this_cycle (h))
     emacs_discard_memory (gc_block_locators (b, h), h->tospace.nbytes);
-
 }
 
 bool
@@ -2395,13 +2397,12 @@ gc_block_mark_card_table (gc_block *const b,
   eassume (offset_nbytes < GC_BLOCK_SIZE);
   const ptrdiff_t page_bit_nr = offset_nbytes / EMACS_PAGE_SIZE_MIN;
   verify (EMACS_PAGE_SIZE_MIN+0 == EMACS_PAGE_SIZE_MAX+0 /* FIXME */);
-  eassert (!emacs_bitset_bit_set_p (&b->meta.card_table[0],
-                                    ARRAYELTS (b->meta.card_table),
-                                    page_bit_nr));
-  emacs_bitset_set_bit (
-    &b->meta.card_table[0],
-    ARRAYELTS (b->meta.card_table),
-    page_bit_nr);
+  eassert (! emacs_bitset_bit_set_p (&b->meta.card_table[0],
+				     ARRAYELTS (b->meta.card_table),
+				     page_bit_nr));
+  emacs_bitset_set_bit (&b->meta.card_table[0],
+			ARRAYELTS (b->meta.card_table),
+			page_bit_nr);
   const uintptr_t page_start_la =
     b_la + page_bit_nr * EMACS_PAGE_SIZE_MIN;
   emacs_set_memory_protection ((void *) page_start_la,
@@ -2524,9 +2525,8 @@ gc_aux_pop (void)
     (emacs_list_pop_first (&gc_aux_blocks));
   if (enable_checking)
     {
-      emacs_set_memory_protection
-	(&b->u.data, sizeof (b->u.data),
-	 EMACS_MEMORY_ACCESS_READWRITE);
+      emacs_set_memory_protection (&b->u.data, sizeof (b->u.data),
+				   EMACS_MEMORY_ACCESS_READWRITE);
       memset (&b->u.data, 0xFA, sizeof (b->u.data));
     }
   return b;
@@ -2539,9 +2539,8 @@ gc_aux_push (gc_block *b)
   gc_aux_nr_blocks += 1;
   emacs_list_insert_first (&gc_aux_blocks, &b->meta.link);
   if (enable_checking)
-    emacs_set_memory_protection
-      (&b->u.data, sizeof (b->u.data),
-       EMACS_MEMORY_ACCESS_NONE);
+    emacs_set_memory_protection (&b->u.data, sizeof (b->u.data),
+				 EMACS_MEMORY_ACCESS_NONE);
 }
 
 bool
@@ -2716,7 +2715,6 @@ gc_block_prepare (gc_block *const b, void *const hptr)
 void
 gc_heap_prepare (const gc_heap *const h, const bool major)
 {
-  eassume (current_gc_phase == GC_PHASE_PREPARE);
   memset (&h->data->per_cycle, 0, sizeof (h->data->per_cycle));
   /* A major GC treats the whole heap as Gen Y.  */
   if (major)
@@ -2854,7 +2852,6 @@ gc_cursor_set_object_pinned (const gc_cursor c, const gc_heap *const h)
   gc_cursor_check (c, h);
   eassert (gc_cursor_object_starts_here (c, h));
   eassert (gc_cursor_is_object_marked (c, h));
-  eassert (current_gc_phase == GC_PHASE_MARK);
   if (gc_heap_is_moving_gc_this_cycle (h) && gc_cursor_is_gen_y (c, h))
     {
       emacs_bitset_word *restrict const words =
@@ -2872,7 +2869,6 @@ gc_cursor_perma_pin_object (const gc_cursor c, const gc_heap *const h)
 {
   gc_cursor_check (c, h);
   eassert (gc_cursor_object_starts_here (c, h));
-  eassert (current_gc_phase == GC_PHASE_NOT_IN_PROGRESS);
   emacs_bitset_word *restrict const words =
     gc_block_perma_pinned_bits (c.block, h);
   emacs_bitset_set_bit (words, gc_heap_nwords_per_bitset (h), c.slot_nr);
@@ -2897,7 +2893,6 @@ gc_cursor_get_object_tospace_locator (const gc_cursor c,
                                       const gc_heap *const h)
 {
   gc_locator tospace_loc = gc_locator_invalid;
-  eassume (current_gc_phase == GC_PHASE_SWEEP);
   gc_cursor_check (c, h);
   gc_locator *restrict const locators = gc_block_locators (c.block, h);
   tospace_loc = locators[c.slot_nr];
@@ -3301,7 +3296,6 @@ gc_gen_y_bit_iter_set (const gc_gen_y_bit_iter *const yit,
 void
 gc_block_preprocess_perma_pins (gc_block *const b, const gc_heap *const h)
 {
-  eassume (current_gc_phase == GC_PHASE_PLAN_SWEEP);
   if (gc_heap_is_moving_gc_this_cycle (h))
     return;
   const emacs_bitset_word *restrict const start_bit_words =
@@ -3587,7 +3581,6 @@ gc_block_scan_intergenerational (gc_block *const b,
                                  const gc_phase phase,
                                  const gc_heap *const h)
 {
-  eassume (current_gc_phase == phase);
   const ptrdiff_t gen_y_slot_nr = gc_block_gen_y_slot_nr (b, h);
   const bool first_page_is_dirty = \
     emacs_bitset_bit_set_p (&b->meta.card_table[0],
@@ -3620,11 +3613,9 @@ gc_block_scan_intergenerational (gc_block *const b,
 void
 gc_heap_plan_sweep (const gc_heap *const h)
 {
-  eassume (current_gc_phase == GC_PHASE_PLAN_SWEEP);
-
-  if (!h->use_moving_gc)
+  if (! h->use_moving_gc)
     emacs_abort ();             /* XXX: wtf? */
-  if (!gc_heap_is_moving_gc_this_cycle (h))
+  if (! gc_heap_is_moving_gc_this_cycle (h))
     emacs_abort ();             /* XXX: use identity mapping???  */
 
   /* Start allocating tospace at the start of the generation we're
@@ -3647,7 +3638,6 @@ gc_heap_plan_sweep (const gc_heap *const h)
 void
 gc_heap_sweep (const gc_heap *const h)
 {
-  eassume (current_gc_phase == GC_PHASE_SWEEP);
   if (gc_heap_is_moving_gc_this_cycle (h))
     gc_heap_for_each_block (h, h->block_sweep_compact, NULL);
   else
@@ -4075,7 +4065,6 @@ string_data_pointer (struct Lisp_String *s, sdata *const v)
 void
 scan_string (struct Lisp_String *const s, const gc_phase phase)
 {
-  eassume (phase == GC_PHASE_MARK || phase == GC_PHASE_SWEEP);
   if (string_has_sdata (s) && STRING_DATA (s))
     {
       /* The string data field is a direct pointer to the character
@@ -4094,7 +4083,6 @@ scan_string (struct Lisp_String *const s, const gc_phase phase)
     }
   scan_reference_pointer_to_interval (&s->u.s.intervals, phase);
   /* TODO: just keep intervals always balanced? */
-  eassume (phase == current_gc_phase);
   if (false /* XXX!!!! */ && phase == GC_PHASE_SWEEP && s->u.s.intervals)
     s->u.s.intervals = balance_intervals (s->u.s.intervals);
 }
@@ -5769,7 +5757,6 @@ scan_localized_symbol (struct Lisp_Symbol *const ptr,
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (ptr);
   /* If the value is set up for a killed buffer restore its global binding.  */
-  eassume (phase == current_gc_phase);
   if (phase == GC_PHASE_MARK &&
       (BUFFERP (blv->where) && !BUFFER_LIVE_P (XBUFFER (blv->where))))
     swap_in_global_binding (ptr);
@@ -6492,7 +6479,7 @@ mem_remove (struct mem_node *const z)
 struct mem_node *
 mem_node_from_struct (void *const b, const ptrdiff_t offset)
 {
-  return (struct mem_node *)((char *)b + offset);
+  return (struct mem_node *) ((char *) b + offset);
 }
 
 /* If P is a pointer into a live Lisp string object on the heap,
@@ -6501,7 +6488,7 @@ mem_node_from_struct (void *const b, const ptrdiff_t offset)
 Lisp_Object
 live_string_holding (const struct mem_node *m, const void *p)
 {
-  if (!m || m->type != MEM_TYPE_STRING)
+  if (! m || m->type != MEM_TYPE_STRING)
     return Qnil;
   gc_block *const b = gc_block_from_mem_node (m);
   struct Lisp_String *const s =
@@ -6512,168 +6499,121 @@ live_string_holding (const struct mem_node *m, const void *p)
 bool
 live_string_p (const struct mem_node *const m, const void *const p)
 {
-  return !NILP (live_string_holding (m, p));
+  return ! NILP (live_string_holding (m, p));
 }
 
 /* Return VECTOR if P points within it, NULL otherwise.  */
-
 void
-scan_maybe_object (const Lisp_Object obj)
+mark_object (const Lisp_Object obj)
 {
 #if USE_VALGRIND
   VALGRIND_MAKE_MEM_DEFINED (&obj, sizeof (obj));
 #endif
-
-  /* Mark P if it's an identifiable pdumper object, i.e., P falls
-     within the dump file address range, and aligns with a reloc
-     instance.
-
-     FIXME: This code assumes that every reachable pdumper object
-     is addressed either by a pointer to the object start, or by
-     the same pointer with an LSB-style tag.  This assumption
-     fails if a pdumper object is reachable only via machine
-     addresses of non-initial object components.  Although such
-     addressing is rare in machine code generated by C compilers
-     from Emacs source code, it can occur in some cases.  To fix
-     this problem, the pdumper code should grok non-initial
-     addresses, as the non-pdumper code does.  */
-  if (pdumper_object_p (p))
+  void *const po = XPNTR (obj);
+  bool mark_p = false;
+  if (pdumper_object_p (po))
     {
-      uintptr_t mask = VALMASK & UINTPTR_MAX;
-      uintptr_t masked_p = (uintptr_t) p & mask;
-      void *po = (void *) masked_p;
-      char *cp = p;
-      char *cpo = po;
-      /* Don't use pdumper_object_p_precise here! It doesn't check the
-         tag bits. OBJ here might be complete garbage, so we need to
-         verify both the pointer and the tag.  */
-      int type = pdumper_find_object_type (po);
-      if (pdumper_valid_object_type_p (type)
-	  && (! USE_LSB_TAG || p == po || cp - cpo == type))
-	{
-	  if (type == Lisp_Symbol)
-	    mark_object (make_lisp_symbol (po));
-	  else if (! symbol_only)
-	    mark_object (make_lisp_ptr (po, type));
-	}
-      return;
+      /* Verify OBJ pointer and tag, which pdumper_object_p_precise()
+	 does not do.  */
+      mark_p = (XTYPE (obj) == pdumper_find_object_type (po));
     }
-
-  struct mem_node *const m = mem_find (po);
-
-  if (m != NULL)
+  else
     {
-      bool mark_p = false;
-
-      switch (XTYPE (obj))
+      struct mem_node *const m = mem_find (po);
+      if (m != NULL)
 	{
-	case Lisp_String:
-	  mark_p = EQ (obj, live_string_holding (m, po));
-	  break;
-
-	case Lisp_Cons:
-	  mark_p = EQ (obj, live_cons_holding (m, po));
-	  break;
-
-	case Lisp_Symbol:
-	  mark_p = EQ (obj, live_symbol_holding (m, po));
-	  break;
-
-	case Lisp_Float:
-	  mark_p = EQ (obj, live_float_holding (m, po));
-	  break;
-
-	case Lisp_Vectorlike:
-	  mark_p = (EQ (obj, live_vector_holding (m, po)));
-	  break;
-
-        case Lisp_Type_Unused0:
-        case Lisp_Int0:
-        case Lisp_Int1:
-          break;
+	  switch (XTYPE (obj))
+	    {
+	    case Lisp_String:
+	      mark_p = EQ (obj, live_string_holding (m, po));
+	      break;
+	    case Lisp_Cons:
+	      mark_p = EQ (obj, live_cons_holding (m, po));
+	      break;
+	    case Lisp_Symbol:
+	      mark_p = EQ (obj, live_symbol_holding (m, po));
+	      break;
+	    case Lisp_Float:
+	      mark_p = EQ (obj, live_float_holding (m, po));
+	      break;
+	    case Lisp_Vectorlike:
+	      mark_p = EQ (obj, live_vector_holding (m, po));
+	      break;
+	    case Lisp_Type_Unused0:
+	    case Lisp_Int0:
+	    case Lisp_Int1:
+	      break;
+	    }
 	}
-
-      if (mark_p)
-	scan_reference_pinned (obj, phase);
     }
+  if (mark_p)
+    mark_reference_pinned (obj);
 }
 
 void
-xscan_maybe_objects (Lisp_Object const *array,
-                     const ptrdiff_t nelts,
-                     const gc_phase phase)
+mark_objects (Lisp_Object const *array, const ptrdiff_t nelts)
 {
-  eassume (current_gc_phase == phase);
-  if (phase == GC_PHASE_MARK)
-    for (Lisp_Object const *const lim = array + nelts; array < lim; array++)
-      scan_maybe_object (*array);
+  for (Lisp_Object const *const lim = array + nelts; array < lim; ++array)
+    mark_object (*array);
 }
 
-/* If P points to Lisp data, mark that as live if it isn't already
-   marked.  */
+/* Mark Lisp data pointed to by P.  */
 void
-scan_maybe_pointer (void *const p)
+mark_pointer (void *const p)
 {
 #ifdef USE_VALGRIND
   VALGRIND_MAKE_MEM_DEFINED (&p, sizeof (p));
 #endif
-
   if (pdumper_object_p (p))
     {
-      /* XXX: fix pdumper interior pointer stuff */
       int type = pdumper_find_object_type (p);
-      if (! pdumper_valid_object_type_p (type))
+      switch (type)
 	{
-	  /* False alarm.  */
-	}
-      else if (type == Lisp_Int0)
-	{
+	case PDUMPER_NO_OBJECT:
+	  break;
+	case Lisp_Int0:
 	  /* See dump_interval_tree() in pdumper.c.  */
-	  scan_reference_interval_pinned (p);
+	  mark_reference_interval_pinned (p);
+	  break;
+	case Lisp_Symbol:
+	  mark_reference_pinned (make_lisp_symbol (p));
+	  break;
+	default:
+	  mark_reference_pinned (make_lisp_ptr (p, type));
+	  break;
 	}
-      else if (type == Lisp_Symbol)
-	scan_reference_pinned (make_lisp_symbol (p));
-      else
-	scan_reference_pinned (make_lisp_ptr (p, type));
-      /* See scan_maybe_object for why we can confidently return.  */
-      return;
     }
-
-  const struct mem_node *m = mem_find (p);
-  if (m != NULL)
+  else
     {
-      Lisp_Object obj = Qnil;
-
-      switch (m->type)
+      const struct mem_node *m = mem_find (p);
+      if (m != NULL)
 	{
-	case MEM_TYPE_CONS:
-	  obj = live_cons_holding (m, p);
-	  break;
-
-	case MEM_TYPE_STRING:
-	  obj = live_string_holding (m, p);
-	  break;
-
-	case MEM_TYPE_SYMBOL:
-	  obj = live_symbol_holding (m, p);
-	  break;
-
-	case MEM_TYPE_FLOAT:
-	  obj = live_float_holding (m, p);
-	  break;
-
-	case MEM_TYPE_LARGE_VECTOR:
-	case MEM_TYPE_VECTOR:
-	  obj = live_vector_holding (m, p);
-	  break;
-
-	case MEM_TYPE_INTERVAL:
-	  scan_reference_interval_pinned (live_interval_holding (m, p));
-	  break;
+	  Lisp_Object obj = Qnil;
+	  switch (m->type)
+	    {
+	    case MEM_TYPE_CONS:
+	      obj = live_cons_holding (m, p);
+	      break;
+	    case MEM_TYPE_STRING:
+	      obj = live_string_holding (m, p);
+	      break;
+	    case MEM_TYPE_SYMBOL:
+	      obj = live_symbol_holding (m, p);
+	      break;
+	    case MEM_TYPE_FLOAT:
+	      obj = live_float_holding (m, p);
+	      break;
+	    case MEM_TYPE_LARGE_VECTOR:
+	    case MEM_TYPE_VECTOR:
+	      obj = live_vector_holding (m, p);
+	      break;
+	    case MEM_TYPE_INTERVAL:
+	      mark_reference_interval_pinned (live_interval_holding (m, p));
+	      break;
+	    }
+	  if (! NILP (obj))
+	    mark_reference_pinned (obj);
 	}
-
-      if (! NILP (obj))
-	scan_reference_pinned (obj);
     }
 }
 
@@ -6682,46 +6622,79 @@ scan_maybe_pointer (void *const p)
    miss objects if __alignof__ were used.  */
 #define GC_POINTER_ALIGNMENT alignof (void *)
 
-/* Mark Lisp objects referenced from the address range START..END
-   or END..START.  */
+/* Mark live Lisp objects on the C stack.
 
+   There are several system-dependent problems to consider when
+   porting this to new architectures:
+
+   Processor Registers
+
+   We have to mark Lisp objects in CPU registers that can hold local
+   variables or are used to pass parameters.
+
+   If __builtin_unwind_init is available, it should suffice to save
+   registers.
+
+   Otherwise, assume that calling setjmp saves registers we need
+   to see in a jmp_buf which itself lies on the stack.  This doesn't
+   have to be true!  It must be verified for each system, possibly
+   by taking a look at the source code of setjmp.
+
+   Stack Layout
+
+   Architectures differ in the way their processor stack is organized.
+   For example, the stack might look like this
+
+     +----------------+
+     |  Lisp_Object   |  size = 4
+     +----------------+
+     | something else |  size = 2
+     +----------------+
+     |  Lisp_Object   |  size = 4
+     +----------------+
+     |	...	      |
+
+   In such a case, not every Lisp_Object will be aligned equally.  To
+   find all Lisp_Object on the stack it won't be sufficient to walk
+   the stack in steps of 4 bytes.  Instead, two passes will be
+   necessary, one starting at the start of the stack, and a second
+   pass starting at the start of the stack + 2.  Likewise, if the
+   minimal alignment of Lisp_Objects on the stack is 1, four passes
+   would be necessary, each one starting with one byte more offset
+   from the stack start.  */
 void ATTRIBUTE_NO_SANITIZE_ADDRESS
-scan_memory (void const *start, void const *end, const gc_phase phase)
+mark_c_stack (void const *start, void const *end)
 {
-  eassume (current_gc_phase == phase);
-  if (phase == GC_PHASE_MARK)
+  char const *pp;
+
+  /* Make START the pointer to the start of the memory region,
+     if it isn't already.  */
+  if (end < start)
     {
-      char const *pp;
+      void const *tem = start;
+      start = end;
+      end = tem;
+    }
 
-      /* Make START the pointer to the start of the memory region,
-	 if it isn't already.  */
-      if (end < start)
-	{
-	  void const *tem = start;
-	  start = end;
-	  end = tem;
-	}
+  eassert (((uintptr_t) start) % GC_POINTER_ALIGNMENT == 0);
 
-      eassert (((uintptr_t) start) % GC_POINTER_ALIGNMENT == 0);
+  for (pp = start; (void const *) pp < end; pp += GC_POINTER_ALIGNMENT)
+    {
+      char *p = *(char *const *) pp;
+      mark_pointer (p);
 
-      for (pp = start; (void const *) pp < end; pp += GC_POINTER_ALIGNMENT)
-	{
-	  char *p = *(char *const *) pp;
-	  scan_maybe_pointer (p);
+      /* Unmask any struct Lisp_Symbol pointer that make_lisp_symbol
+	 previously disguised by adding the address of 'lispsym'.
+	 On a host with 32-bit pointers and 64-bit Lisp_Objects,
+	 a Lisp_Object might be split into registers saved into
+	 non-adjacent words and P might be the low-order word's value.  */
+      p += (intptr_t) lispsym;
+      mark_pointer (*(void *const *) pp);
 
-	  /* Unmask any struct Lisp_Symbol pointer that make_lisp_symbol
-	     previously disguised by adding the address of 'lispsym'.
-	     On a host with 32-bit pointers and 64-bit Lisp_Objects,
-	     a Lisp_Object might be split into registers saved into
-	     non-adjacent words and P might be the low-order word's value.  */
-	  p += (intptr_t) lispsym;
-	  scan_maybe_pointer (*(void *const *) pp);
-
-	  verify (alignof (Lisp_Object) % GC_POINTER_ALIGNMENT == 0);
-	  if (alignof (Lisp_Object) == GC_POINTER_ALIGNMENT
-	      || (uintptr_t) pp % alignof (Lisp_Object) == 0)
-	    scan_maybe_object (*(Lisp_Object const *) pp);
-	}
+      verify (alignof (Lisp_Object) % GC_POINTER_ALIGNMENT == 0);
+      if (alignof (Lisp_Object) == GC_POINTER_ALIGNMENT
+	  || (uintptr_t) pp % alignof (Lisp_Object) == 0)
+	mark_object (*(Lisp_Object const *) pp);
     }
 }
 
@@ -6764,6 +6737,7 @@ test_setjmp (void)
 # endif /* ! GC_SETJMP_WORKS */
 #endif /* ! HAVE___BUILTIN_UNWIND_INIT */
 
+<<<<<<< HEAD
 /* Force callee-saved registers and register windows onto the stack.
    Use the platform-defined __builtin_unwind_init if available,
    obviating the need for machine dependent methods.  */
@@ -6832,6 +6806,79 @@ xscan_stack (char const *bottom, char const *end, const gc_phase phase)
   scan_memory (bottom, end, phase);
 }
 
+||||||| parent of 3d361855319 (need to isolate mark-sweep bifurcation)
+/* Force callee-saved registers and register windows onto the stack.
+   Use the platform-defined __builtin_unwind_init if available,
+   obviating the need for machine dependent methods.  */
+#ifndef HAVE___BUILTIN_UNWIND_INIT
+# ifdef __sparc__
+   /* This trick flushes the register windows so that all the state of
+      the process is contained in the stack.
+      FreeBSD does not have a ta 3 handler, so handle it specially.
+      FIXME: Code in the Boehm GC suggests flushing (with 'flushrs') is
+      needed on ia64 too.  See mach_dep.c, where it also says inline
+      assembler doesn't work with relevant proprietary compilers.  */
+#  if defined __sparc64__ && defined __FreeBSD__
+#   define __builtin_unwind_init() asm ("flushw")
+#  else
+#   define __builtin_unwind_init() asm ("ta 3")
+#  endif
+# else
+#  define __builtin_unwind_init() ((void) 0)
+# endif
+#endif
+
+/* Mark live Lisp objects on the C stack.
+
+   There are several system-dependent problems to consider when
+   porting this to new architectures:
+
+   Processor Registers
+
+   We have to mark Lisp objects in CPU registers that can hold local
+   variables or are used to pass parameters.
+
+   If __builtin_unwind_init is available, it should suffice to save
+   registers.
+
+   Otherwise, assume that calling setjmp saves registers we need
+   to see in a jmp_buf which itself lies on the stack.  This doesn't
+   have to be true!  It must be verified for each system, possibly
+   by taking a look at the source code of setjmp.
+
+   Stack Layout
+
+   Architectures differ in the way their processor stack is organized.
+   For example, the stack might look like this
+
+     +----------------+
+     |  Lisp_Object   |  size = 4
+     +----------------+
+     | something else |  size = 2
+     +----------------+
+     |  Lisp_Object   |  size = 4
+     +----------------+
+     |	...	      |
+
+   In such a case, not every Lisp_Object will be aligned equally.  To
+   find all Lisp_Object on the stack it won't be sufficient to walk
+   the stack in steps of 4 bytes.  Instead, two passes will be
+   necessary, one starting at the start of the stack, and a second
+   pass starting at the start of the stack + 2.  Likewise, if the
+   minimal alignment of Lisp_Objects on the stack is 1, four passes
+   would be necessary, each one starting with one byte more offset
+   from the stack start.  */
+void
+xscan_stack (char const *bottom, char const *end, const gc_phase phase)
+{
+  /* This assumes that the stack is a contiguous region in memory.  If
+     that's not the case, something has to be done here to iterate
+     over the stack segments.  */
+  scan_memory (bottom, end, phase);
+}
+
+=======
+>>>>>>> 3d361855319 (need to isolate mark-sweep bifurcation)
 /* flush_stack_call_func is the trampoline function that flushes
    registers to the stack, and then calls FUNC on ARG.
 
@@ -6846,9 +6893,8 @@ xscan_stack (char const *bottom, char const *end, const gc_phase phase)
    flush_stack_call_func, then call flush_stack_call_func1 where now ebp
    would include the pushed-to addresses.  Note NO_INLINE ensures registers
    are spilled.  (Bug#41357)  */
-
 NO_INLINE void
-flush_stack_call_func/* 1 */ (void (*func) (void *arg), void *arg)
+flush_stack_call_func (void (*func) (void *arg), void *arg)
 {
   void *end;
   struct thread_state *self = current_thread;
@@ -7052,59 +7098,46 @@ visit_static_gc_roots (const struct gc_root_visitor visitor)
 }
 
 void
-scan_object_root_visitor_mark (Lisp_Object *root_ptr,
-                               enum gc_root_type type,
-                               void *data)
+mark_root_visitor (Lisp_Object *root_ptr,
+		   enum gc_root_type type,
+		   void *data)
 {
-  (void) data;
-  if (type == GC_ROOT_C_SYMBOL)
-    scan_object (XPNTR (*root_ptr), XTYPE (*root_ptr), GC_PHASE_MARK);
-  else
-    scan_reference (root_ptr, GC_PHASE_MARK);
 }
-
-static inline bool mark_stack_empty_p (void);
 
 /* Subroutine of Fgarbage_collect that does most of the work.  */
 void
-scan_object_root_visitor_sweep (Lisp_Object *root_ptr,
-                                enum gc_root_type type,
-                                void *data)
+sweep_root_visitor (Lisp_Object *root_ptr,
+		    enum gc_root_type type,
+		    void *data)
 {
-  (void) data;
-  if (type == GC_ROOT_C_SYMBOL)
-    scan_object (XPNTR (*root_ptr), XTYPE (*root_ptr), GC_PHASE_SWEEP);
-  else
-    scan_reference (root_ptr, GC_PHASE_SWEEP);
+  switch (type)
+    {
+    case GC_ROOT_C_SYMBOL:
+      scan_object (XPNTR (*root_ptr), XTYPE (*root_ptr), GC_PHASE_SWEEP);
+      break;
+    default:
+      scan_reference (root_ptr, GC_PHASE_SWEEP);
+      break;
+    }
 }
 
 /* Called from pdumper to walk over objects in the pdumper image that
-   might point to runtime heap objects.
-
-   (TODO: right now, pdumper conservatively approximates this set by
-   calling sweep_pdumper_object on every object in the pdumper image
-   that's marked.  We really should be more selective, especially in
-   the generational case.)  */
+   might point to runtime heap objects.  */
 void
 sweep_pdumper_object (void *const obj, const enum Lisp_Type type)
 {
-  eassume (current_gc_phase == GC_PHASE_SWEEP);
   eassert (pdumper_object_p (obj));
   eassert (pdumper_object_p_precise (obj));
   scan_object (obj, type, GC_PHASE_SWEEP);
 }
 
+/* Akin to dump_roots in pdumper.c.  */
 void
-scan_roots (const gc_phase phase)
+scan_roots (gc_phase phase)
 {
-  eassume (phase == GC_PHASE_MARK || phase == GC_PHASE_SWEEP);
-  struct gc_root_visitor visitor = {.visit = (
-      phase == GC_PHASE_MARK
-      ? scan_object_root_visitor_mark
-      : scan_object_root_visitor_sweep),
-  };
+  struct gc_root_visitor visitor = { .visit = scan_root_visitor,
+				     .data = &phase };
   visit_static_gc_roots (visitor);
-
   scan_reference_pointer_to_vectorlike (&terminal_list, phase);
   scan_reference_pointer_to_vectorlike (&initial_terminal, phase);
   scan_kboards (phase);
@@ -7416,7 +7449,6 @@ mark_strong_references_of_reachable_finalizers (void)
 bool
 mark_strong_references_of_reachable_weak_objects (void)
 {
-  eassert (current_gc_phase == GC_PHASE_MARK);
   bool marked = false;
   marked |= mark_strong_references_of_reachable_weak_hash_tables ();
   marked |= mark_strong_references_of_reachable_undo_list_entries ();
@@ -7520,16 +7552,9 @@ gc_phase_clear_weak_references (void)
   /* Weak finalizers are handled before the mark phase ends.  */
 }
 
-bool
-gc_is_in_progress (void)
-{
-  return current_gc_phase != GC_PHASE_NOT_IN_PROGRESS;
-}
-
 void
 gc_phase_prepare (const bool major)
 {
-  eassume (current_gc_phase == GC_PHASE_PREPARE);
   for (int i = 0; i < ARRAYELTS (gc_heaps); ++i)
     gc_heap_prepare (gc_heaps[i], major);
 }
@@ -7594,7 +7619,6 @@ gc_phase_sweep (void)
 void
 gc_phase_cleanup (const bool major)
 {
-  eassume (current_gc_phase == GC_PHASE_CLEANUP);
   /* Restore heap invariants after tospace move.  */
   for (int i = 0; i < ARRAYELTS (gc_heaps); ++i)
     gc_heap_cleanup_after_all_sweeps (gc_heaps[i]);
@@ -7688,10 +7712,6 @@ garbage_collect (const bool major)
   if (gc_inhibited || gc_in_progress)
     return;
 
-  gc_in_progress = true;
-
-  eassert (mark_stack_empty_p ());
-
   /* Record this function, so it appears on the profiler's backtraces.  */
   record_in_backtrace (QAutomatic_GC, 0, 0);
   compact_all_buffers ();
@@ -7723,25 +7743,18 @@ garbage_collect (const bool major)
 
   XXX_check_obarray ();
 
-  eassume (current_gc_phase == GC_PHASE_NOT_IN_PROGRESS);
-  current_gc_phase = GC_PHASE_PREPARE;
   gc_phase_prepare (major);
-
-  current_gc_phase = GC_PHASE_MARK;
   gc_phase_mark ();
   gc_phase_clear_weak_references ();
+
   /* N.B. the bitset and locator arrays corresponding to the part of
      the heap before the start of the current generation are at this
      point untouched by the mark phase and zero or unspecified,
      respectively.  */
 
-  current_gc_phase = GC_PHASE_PLAN_SWEEP;
   gc_phase_plan_sweep ();
-
-  current_gc_phase = GC_PHASE_SWEEP;
   gc_phase_sweep ();
 
-  current_gc_phase = GC_PHASE_CLEANUP;
   gc_phase_cleanup (major);
 
   mark_pinned_objects ();
@@ -7792,18 +7805,14 @@ garbage_collect (const bool major)
   mark_and_sweep_weak_table_contents ();
   eassert (weak_hash_tables == NULL);
 
-  eassert (mark_stack_empty_p ());
-
   gc_sweep ();
 
   unmark_main_thread ();
 
-  bytes_since_gc = 0;
-
-  update_bytes_between_gc ();
+  consing_until_gc = gc_threshold
+    = consing_threshold (gc_cons_threshold, Vgc_cons_percentage, 0);
 
   /* Unblock as late as possible since it could signal (Bug#43389).  */
-  current_gc_phase = GC_PHASE_NOT_IN_PROGRESS;
   unblock_input ();
 
   if (garbage_collection_messages && NILP (Vmemory_full))
@@ -8023,6 +8032,15 @@ vectorlike_lisp_size (const union vectorlike_header *const header)
 }
 
 void
+scan_marker (struct Lisp_Marker *const ptr, const gc_phase phase)
+{
+  scan_pseudovector_empty (&ptr->header, phase);
+  scan_reference_pointer_to_vectorlike (&ptr->buffer, phase);
+  if (phase == GC_PHASE_SWEEP)  /* The marker reference chain is weak.  */
+    scan_reference_pointer_to_vectorlike (&ptr->next, phase);
+}
+
+void
 scan_overlay (struct Lisp_Overlay *const ptr, const gc_phase phase)
 {
   scan_reference (&ptr->start, phase);
@@ -8048,7 +8066,7 @@ scan_buffer (struct buffer *const buffer, const gc_phase phase)
      technically a lisp reference, so let's mark it anyway.  We also
      scan the reference normally when in a non-marking phase of GC
      because the special behavior above applies only to marking.  */
-  if (phase == GC_PHASE_SWEEP || !BUFFER_LIVE_P (buffer))
+  if (phase == GC_PHASE_SWEEP || ! BUFFER_LIVE_P (buffer))
     scan_reference (&BVAR (buffer, undo_list), phase);
 
   if (!buffer->base_buffer && buffer->text)
@@ -8142,16 +8160,11 @@ struct mark_stack
 
 static struct mark_stack mark_stk = {NULL, 0, 0};
 
-static inline bool
-mark_stack_empty_p (void)
-{
-  return mark_stk.sp <= 0;
-}
-
 static inline Lisp_Object
 mark_stack_pop (void)
 {
-  eassume (! mark_stack_empty_p ());
+  eassume (mark_stk.sp > 0); /* not empty */
+
   struct mark_entry *e = &mark_stk.stack[mark_stk.sp - 1];
   if (e->n == 0)               /* single value */
     {
@@ -8395,7 +8408,6 @@ scan_window (struct window *const w, const gc_phase phase)
   if (w->desired_matrix)
     scan_glyph_matrix (w->desired_matrix, phase);
 
-  eassume (phase == current_gc_phase);
   if (phase == GC_PHASE_MARK)
     {
       /* Filter out killed buffers from both buffer lists in attempt
@@ -8703,26 +8715,20 @@ scan_object (void *const obj,
     case Lisp_String:
       scan_string (obj, phase);
       return;
-
     case Lisp_Vectorlike:
       scan_vectorlike (obj, phase);
       return;
-
     case Lisp_Symbol:
       scan_symbol (obj, phase);
       return;
-
     case Lisp_Cons:
       scan_cons (obj, phase);
       return;
-
     case Lisp_Int0:
       scan_interval (obj, phase);
       return;
-
     case Lisp_Float:
       return;  /* Nothing to scan.  */
-
     case Lisp_Int1:
     case Lisp_Type_Unused0:
     default:
@@ -8734,7 +8740,6 @@ scan_object (void *const obj,
 void
 scan_reference (Lisp_Object *const refp, const gc_phase phase)
 {
-  eassume (phase == current_gc_phase);
   switch (phase)
     {
     case GC_PHASE_MARK:
@@ -8755,38 +8760,22 @@ xscan_reference (Lisp_Object *const refp, const gc_phase phase)
 }
 
 void
-scan_reference_pinned (const Lisp_Object ref, const gc_phase phase)
+mark_reference_pinned (const Lisp_Object ref)
 {
-  eassume (phase == current_gc_phase);
-  eassume (phase == GC_PHASE_MARK || phase == GC_PHASE_SWEEP);
-  if (phase == GC_PHASE_MARK)
-    {
-      gc_mark (ref);
-      gc_any_object_pin (ref);
-    }
+  gc_mark (ref);
+  gc_any_object_pin (ref);
 }
 
 void
-xscan_reference_pinned (const Lisp_Object ref, const gc_phase phase)
+mark_reference_interval_pinned (INTERVAL i)
 {
-  scan_reference_pinned (ref, phase);
-}
-
-void
-scan_reference_interval_pinned (const INTERVAL i, const gc_phase phase)
-{
-  eassume (phase == current_gc_phase);
-  if (i && phase == GC_PHASE_MARK)
-    {
-      gc_mark_interval (i);
-      set_interval_pinned (i);
-    }
+  gc_mark_interval (i);
+  set_interval_pinned (i);
 }
 
 void
 scan_reference_pointer_to_interval (INTERVAL *const ip, const gc_phase phase)
 {
-  eassume (phase == current_gc_phase);
   if (ip != NULL && *ip != NULL)
     {
       switch (phase)
@@ -8808,7 +8797,6 @@ void
 scan_reference_pointer_to_symbol (struct Lisp_Symbol **const s,
                                   const gc_phase phase)
 {
-  eassume (phase == current_gc_phase);
   if (s != NULL && *s != NULL)
     {
       switch (phase)
@@ -8838,7 +8826,6 @@ void
 scan_reference_pointer_to_vectorlike_2 (union vectorlike_header **const hptr,
                                         const gc_phase phase)
 {
-  eassume (phase == current_gc_phase);
   if (hptr != NULL && *hptr != NULL)
     {
       switch (phase)
@@ -8966,7 +8953,6 @@ void
 gc_any_object_point_into_tospace (Lisp_Object *const objp)
 {
   /* Compiler will optimize out the writes for mark-sweep heaps.  */
-  eassume (current_gc_phase == GC_PHASE_SWEEP);
   switch (XTYPE (*objp))
     {
     case Lisp_Symbol:
@@ -9004,7 +8990,6 @@ gc_any_object_point_into_tospace_pointer (void *const ptrpx,
                                           const enum Lisp_Type type)
 {
   /* Compilerswill optimize out the writes for mark-sweep heaps.  */
-  eassume (current_gc_phase == GC_PHASE_SWEEP);
   void **const ptrp = ptrpx;
   void *const ptr = *ptrp;
   switch (type)

@@ -23,8 +23,6 @@ enum gc_phase {
 };
 
 extern void xscan_reference (Lisp_Object *, gc_phase);
-extern void xscan_reference_pinned (Lisp_Object, gc_phase);
-
 extern void xscan_reference_pointer_to_vectorlike_2 (union vectorlike_header **, gc_phase);
 INLINE void xscan_reference_pointer_to_vectorlike_1 (
   void *const ptr, union vectorlike_header *const hdr, const gc_phase phase)
@@ -39,10 +37,10 @@ INLINE void xscan_reference_pointer_to_vectorlike_1 (
 extern void sweep_pdumper_object (void *, enum Lisp_Type);
 
 extern bool gc_object_limit_try_increase (size_t delta);
-extern void xscan_maybe_objects (Lisp_Object const *, ptrdiff_t, gc_phase);
-extern void xscan_stack (char const *, char const *, gc_phase);
+extern void mark_objects (Lisp_Object const *, ptrdiff_t);
+extern void mark_c_stack (void const *, void const *);
 extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
-extern void flush_stack_call_func1 (void (*func) (void *arg), void *arg);
+
 
 extern void scan_kboards (gc_phase);
 extern void scan_thread (struct thread_state *, gc_phase);

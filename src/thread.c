@@ -669,7 +669,8 @@ scan_thread_1 (void *const scanp)
 
   scan_specpdl (thread->m_specpdl, thread->m_specpdl_ptr, phase);
 
-  xscan_stack (thread->m_stack_bottom, stack_top, phase);
+  if (phase == GC_PHASE_MARK)
+    mark_c_stack (thread->m_stack_bottom, stack_top);
 
   for (struct handler *handler = thread->m_handlerlist;
        handler; handler = handler->next)
