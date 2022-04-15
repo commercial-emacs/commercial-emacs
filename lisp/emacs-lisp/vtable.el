@@ -145,8 +145,8 @@ See info node `(vtable)Top' for vtable documentation."
           :ellipsis ellipsis)))
     ;; Compute missing column data.
     (setf (vtable-columns table) (vtable--compute-columns table))
-    ;; Compute colors if we have to mix them.
-    (when (and row-colors column-colors)
+    ;; Compute the colors.
+    (when (or row-colors column-colors)
       (setf (slot-value table '-cached-colors)
             (vtable--compute-colors row-colors column-colors)))
     ;; Compute the divider.
@@ -175,9 +175,41 @@ See info node `(vtable)Top' for vtable documentation."
     table))
 
 (defun vtable--compute-colors (row-colors column-colors)
-  (cl-loop for row in row-colors
-           collect (cl-loop for column in column-colors
-                            collect (vtable--color-blend row column))))
+  (cond
+   ((null column-colors)
+    (mapcar #'vtable--make-color-face row-colors))
+   ((null row-colors)
+    (mapcar #'vtable--make-color-face column-colors))
+   (t
+    (cl-loop for row in row-colors
+             collect (cl-loop for column in column-colors
+                              collect (vtable--face-blend
+                                       (vtable--make-color-face row)
+                                       (vtable--make-color-face column)))))))
+
+(defun vtable--make-color-face (object)
+  (if (stringp object)
+      (list :background object)
+    object))
+
+(defun vtable--face-blend (face1 face2)
+  (let ((foreground (vtable--face-color face1 face2 #'face-foreground
+                                        :foreground))
+        (background (vtable--face-color face1 face2 #'face-background
+                                        :background)))
+    `(,@(and foreground (list :foreground foreground))
+      ,@(and background (list :background background)))))
+
+(defun vtable--face-color (face1 face2 accessor slot)
+  (let ((col1 (if (facep face1)
+                  (funcall accessor face1)
+                (plist-get face1 slot)))
+        (col2 (if (facep face2)
+                  (funcall accessor face2)
+                (plist-get face2 slot))))
+    (if (and col1 col2)
+        (vtable--color-blend col1 col2)
+      (or col1 col2))))
 
 ;;; FIXME: This is probably not the right way to blend two colors, is
 ;;; it?
@@ -441,10 +473,11 @@ This also updates the displayed table."
   (let ((start (point))
         (columns (vtable-columns table))
         (column-colors
-         (if (vtable-row-colors table)
-             (elt (slot-value table '-cached-colors)
-                  (mod line-number (length (vtable-row-colors table))))
-           (vtable-column-colors table)))
+         (and (vtable-column-colors table)
+              (if (vtable-row-colors table)
+                  (elt (slot-value table '-cached-colors)
+                       (mod line-number (length (vtable-row-colors table))))
+                (slot-value table '-cached-colors))))
         (divider (vtable-divider table))
         (keymap (slot-value table '-cached-keymap)))
     (seq-do-indexed
@@ -517,8 +550,7 @@ This also updates the displayed table."
            (when column-colors
              (add-face-text-property
               start (point)
-              (list :background
-                    (elt column-colors (mod index (length column-colors))))))
+              (elt column-colors (mod index (length column-colors)))))
            (when (and divider (not last))
              (insert divider)
              (setq start (point))))))
@@ -526,11 +558,10 @@ This also updates the displayed table."
     (insert "\n")
     (put-text-property start (point) 'vtable-object (car line))
     (unless column-colors
-      (when-let ((row-colors (vtable-row-colors table)))
+      (when-let ((row-colors (slot-value table '-cached-colors)))
         (add-face-text-property
          start (point)
-         (list :background
-               (elt row-colors (mod line-number (length row-colors)))))))))
+         (elt row-colors (mod line-number (length row-colors))))))))
 
 (defun vtable--cache-key ()
   (cons (frame-terminal) (window-width)))
@@ -604,22 +635,52 @@ This also updates the displayed table."
               (indicator-width (string-pixel-width indicator))
               (last (= index (1- (length (vtable-columns table)))))
               displayed)
-         (insert
-          (setq displayed
-                (concat
-                 (if (> (string-pixel-width name)
-                        (- (elt widths index) indicator-width))
-                     (vtable--limit-string
-                      name (- (elt widths index) indicator-width))
-                   name)
-                 indicator))
-          (propertize " " 'display
-                      (list 'space :width
-                            (list (+ (- (elt widths index)
-                                        (string-pixel-width displayed))
-                                     (if last 0 spacer))))))
+         (setq displayed
+               (if (> (string-pixel-width name)
+                      (- (elt widths index) indicator-width))
+                   (vtable--limit-string
+                    name (- (elt widths index) indicator-width))
+                 name))
+         (let ((fill-width
+                (+ (- (elt widths index)
+                      (string-pixel-width displayed)
+                      indicator-width
+                      (vtable-separator-width table)
+                      ;; We want the indicator to not be quite flush
+                      ;; right.
+                      (/ (vtable--char-width table) 2.0))
+                   (if last 0 spacer))))
+           (if (or (not last)
+                   (zerop indicator-width)
+                   (< (seq-reduce #'+ widths 0) (window-width nil t)))
+               ;; Normal case.
+               (insert
+                displayed
+                (propertize " " 'display
+                            (list 'space :width (list fill-width)))
+                indicator)
+             ;; This is the final column, and we have a sorting
+             ;; indicator, and the table is too wide for the window.
+             (let* ((pre-indicator (string-pixel-width
+                                    (buffer-substring (point-min) (point))))
+                    (pre-fill
+                     (- (window-width nil t)
+                        pre-indicator
+                        (string-pixel-width displayed))))
+               (insert
+                displayed
+                (propertize " " 'display
+                            (list 'space :width (list pre-fill)))
+                indicator
+                (propertize " " 'display
+                            (list 'space :width
+                                  (list (- fill-width pre-fill))))))))
          (when (and divider (not last))
            (insert (propertize divider 'keymap dmap)))
+         (insert (propertize
+                  " " 'display
+                  (list 'space :width (list
+                                       (/ (vtable--char-width table) 2.0)))))
          (put-text-property start (point) 'vtable-column index)))
      (vtable-columns table))
     (insert "\n")
