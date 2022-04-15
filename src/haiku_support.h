@@ -221,19 +221,21 @@ struct haiku_menu_bar_help_event
 struct haiku_zoom_event
 {
   void *window;
-
   bool zoomed;
 };
 
-#define FSPEC_FAMILY 1
-#define FSPEC_STYLE (1 << 1)
-#define FSPEC_SLANT (1 << 2)
-#define FSPEC_WEIGHT (1 << 3)
-#define FSPEC_SPACING (1 << 4)
-#define FSPEC_WANTED (1 << 5)
-#define FSPEC_NEED_ONE_OF (1 << 6)
-#define FSPEC_WIDTH (1 << 7)
-#define FSPEC_LANGUAGE (1 << 8)
+enum haiku_font_specification
+  {
+    FSPEC_FAMILY      = 1,
+    FSPEC_STYLE	      = 1 << 1,
+    FSPEC_SLANT	      = 1 << 2,
+    FSPEC_WEIGHT      = 1 << 3,
+    FSPEC_SPACING     = 1 << 4,
+    FSPEC_WANTED      = 1 << 5,
+    FSPEC_NEED_ONE_OF = 1 << 6,
+    FSPEC_WIDTH	      = 1 << 7,
+    FSPEC_LANGUAGE    = 1 << 8,
+  };
 
 typedef char haiku_font_family_or_style[64];
 
@@ -395,11 +397,8 @@ extern "C"
 #ifdef __cplusplus
 typedef void *haiku;
 
-extern void
-haiku_put_pixel (haiku, int, int, unsigned long);
-
-extern unsigned long
-haiku_get_pixel (haiku, int, int);
+extern void haiku_put_pixel (haiku, int, int, unsigned long);
+extern unsigned long haiku_get_pixel (haiku, int, int);
 #endif
 
 extern port_id port_application_to_emacs;
@@ -632,49 +631,11 @@ extern bool be_drag_message (void *, void *, bool, void (*) (void),
 extern bool be_drag_and_drop_in_progress (void);
 
 #ifdef __cplusplus
-extern void *find_appropriate_view_for_draw (void *vw);
+extern void *find_appropriate_view_for_draw (void *);
 }
 
-extern _Noreturn void gui_abort (const char *msg);
+extern _Noreturn void gui_abort (const char *);
 #endif /* _cplusplus */
-
-/* Borrowed from X.Org keysymdef.h */
-#define XK_BackSpace                     0xff08  /* Back space, back char */
-#define XK_Tab                           0xff09
-#define XK_Linefeed                      0xff0a  /* Linefeed, LF */
-#define XK_Clear                         0xff0b
-#define XK_Return                        0xff0d  /* Return, enter */
-#define XK_Pause                         0xff13  /* Pause, hold */
-#define XK_Scroll_Lock                   0xff14
-#define XK_Sys_Req                       0xff15
-#define XK_Escape                        0xff1b
-#define XK_Delete                        0xffff  /* Delete, rubout */
-#define XK_Home                          0xff50
-#define XK_Left                          0xff51  /* Move left, left arrow */
-#define XK_Up                            0xff52  /* Move up, up arrow */
-#define XK_Right                         0xff53  /* Move right, right arrow */
-#define XK_Down                          0xff54  /* Move down, down arrow */
-#define XK_Prior                         0xff55  /* Prior, previous */
-#define XK_Page_Up                       0xff55
-#define XK_Next                          0xff56  /* Next */
-#define XK_Page_Down                     0xff56
-#define XK_End                           0xff57  /* EOL */
-#define XK_Begin                         0xff58  /* BOL */
-#define XK_Select                        0xff60  /* Select, mark */
-#define XK_Print                         0xff61
-#define XK_Execute                       0xff62  /* Execute, run, do */
-#define XK_Insert                        0xff63  /* Insert, insert here */
-#define XK_Undo                          0xff65
-#define XK_Redo                          0xff66  /* Redo, again */
-#define XK_Menu                          0xff67
-#define XK_Find                          0xff68  /* Find, search */
-#define XK_Cancel                        0xff69  /* Cancel, stop, abort, exit */
-#define XK_Help                          0xff6a  /* Help */
-#define XK_Break                         0xff6b
-#define XK_Mode_switch                   0xff7e  /* Character set switch */
-#define XK_script_switch                 0xff7e  /* Alias for mode_switch */
-#define XK_Num_Lock                      0xff7f
-#define XK_F1                            0xffbe
 
 #endif /* _HAIKU_SUPPORT_H_ */
 

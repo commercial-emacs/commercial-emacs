@@ -158,6 +158,7 @@ See info node `(vtable)Top' for vtable documentation."
                   " " 'display
                   (list 'space :width
                         (list (vtable--compute-width table divider-width)))))
+             'mouse-face 'highlight
              'keymap
              (define-keymap
                "<drag-mouse-1>" #'vtable--drag-resize-column
@@ -521,8 +522,7 @@ This also updates the displayed table."
                        ellipsis)
                     value))))
                (start (point))
-               ;; Don't insert the separator and the divider after the
-               ;; final column.
+               ;; Don't insert the separator after the final column.
                (last (= index (- (length line) 2))))
            (if (eq (vtable-column-align column) 'left)
                (progn
@@ -551,7 +551,7 @@ This also updates the displayed table."
              (add-face-text-property
               start (point)
               (elt column-colors (mod index (length column-colors)))))
-           (when (and divider (not last))
+           (when divider
              (insert divider)
              (setq start (point))))))
      (cdr line))
@@ -629,6 +629,7 @@ This also updates the displayed table."
        (let* ((name (propertize
                      (vtable-column-name column)
                      'face (list 'header-line (vtable-face table))
+                     'mouse-face 'header-line-highlight
                      'keymap cmap))
               (start (point))
               (indicator (vtable--indicator table index))
