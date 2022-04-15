@@ -5494,7 +5494,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
       /* For clicks in the text area, fringes, margins, or vertical
 	 scroll bar, call buffer_posn_from_coords to extract TEXTPOS,
 	 the buffer position nearest to the click.  */
-      if (!textpos)
+      if (! textpos)
 	{
 	  Lisp_Object string2, object2 = Qnil;
 	  struct display_pos p;

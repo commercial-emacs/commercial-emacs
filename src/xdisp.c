@@ -23,7 +23,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    Gradually rename things such that:
    "line" refers to textual lines delimited by newline characters.
    "sline" refers to screen lines delimited by window width.
-   "vpos" is a legacy term for "sline".
+
+   Generally, "x" and "y" refer to pixel positions, and
+   "hpos" and "vpos" refer to character positions.  We often
+   use "vpos" and "sline" interchangeably.
 
    Redisplay occurs in-band in the interpreter loop, and out-of-band
    in response to mouse or expose events or lisp invocations of
@@ -9202,8 +9205,6 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 #undef BUFFER_POS_REACHED_P
 #undef SET_CLOSEST_PAST_CHARPOS
 
-unsigned int mit_calls1 = 0, mit_calls2 = 0, mit_calls3 = 0, mit_calls4 = 0, mit_calls5 = 0, mit_calls6 = 0, mit_calls7 = 0, mit_calls8 = 0, mit_calls9 = 0, mit_calls10 = 0, mit_calls11 = 0, mit_calls12 = 0, mit_calls13 = 0, mit_calls14 = 0, mit_calls15 = 0;
-
 /* Move IT forward until it satisfies OP, which can be one of
    MOVE_TO_POS
    MOVE_TO_Y
@@ -9222,16 +9223,12 @@ int
 move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op)
 {
   int max_current_x = 0;
-  ptrdiff_t orig_charpos = IT_CHARPOS (*it);
-  (void) orig_charpos;
-
   for (;;)
     {
       enum move_it_result skip = MOVE_UNDEFINED;
       if (op & MOVE_TO_VPOS)
 	{
 	  /* Tall glyphs: must go line by line.  */
-          mit_calls4++;
 	  skip = (op_to <= it->vpos) /* yes, less-than-equal */
 	    ? MOVE_POS_MATCH_OR_ZV
 	    : emulate_display_sline (it, to_charpos, -1, op & MOVE_TO_POS);
@@ -9239,8 +9236,6 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op)
       else if (op & MOVE_TO_Y)
 	{
 	  /* Tall glyphs: must go line by line.  */
-          mit_calls5++;
-
 	  /*  Reconnoiter image height with throwaway MOVE_TO_X call.  */
 	  skip = emulate_display_sline (it, to_charpos, 0,
 					MOVE_TO_X | (op & MOVE_TO_POS));
@@ -9254,7 +9249,6 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op)
 	}
       else if (op & MOVE_TO_POS)
         {
-          mit_calls7++;
 	  skip = (IT_CHARPOS (*it) >= to_charpos
 		  /* And we are not bidi-backwards */
 		  && (! it->bidi_p || it->bidi_it.scan_dir != -1))
@@ -9323,31 +9317,13 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op)
 		full_rows--;
 	      if (op & MOVE_TO_VPOS)
 		{
-		  /* fprintf (stderr, */
-		  /* 	   "orig_charpos=%ld it=%ld to_charpos=%ld ", */
-		  /* 	   orig_charpos, IT_CHARPOS (*it), to_charpos); */
-		  /* fprintf (stderr, */
-		  /* 	   "term=%ld nchars=%ld full_rows=%d ", */
-		  /* 	   term, nchars, full_rows); */
-		  /* fprintf (stderr, */
-		  /* 	   "it->vpos=%d op_to=%d ", */
-		  /* 	   it->vpos, op_to); */
 		  full_rows = min (full_rows, max (0, op_to - it->vpos));
 		}
 	      else if (op & MOVE_TO_Y)
 		{
-		  /* fprintf (stderr, */
-		  /* 	   "orig_charpos=%ld it=%ld to_charpos=%ld ", */
-		  /* 	   orig_charpos, IT_CHARPOS (*it), to_charpos); */
-		  /* fprintf (stderr, */
-		  /* 	   "term=%ld nchars=%ld full_rows=%d ", */
-		  /* 	   term, nchars, full_rows); */
 		  int dy = op_to - it->current_y;
 		  int nlines = dy / default_line_height (it->w);
 		  full_rows = min (full_rows, max (0, nlines));
-		  /* fprintf (stderr, */
-		  /* 	   "it->vpos=%d nlines=%d ", */
-		  /* 	   it->vpos, nlines); */
 		}
 
 	      if (op & (MOVE_TO_VPOS | MOVE_TO_POS | MOVE_TO_Y))
@@ -9402,15 +9378,6 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op)
 	    {
 	    move_it_forward_continued:
 	      it->continuation_lines_width += it->current_x;
-	      /* if (op & (MOVE_TO_Y)) */
-	      /* 	{ */
-	      /* 	  fprintf (stderr, */
-	      /* 		   "orig_charpos=%ld it=%ld to_charpos=%ld", */
-	      /* 		   orig_charpos, IT_CHARPOS (*it), to_charpos); */
-	      /* 	  fprintf (stderr, */
-	      /* 		   " it->vpos=%d op_to=%d\n", */
-	      /* 		   it->vpos, op_to); */
-	      /* 	} */
 	    }
 	  break;
 	default:
@@ -9473,10 +9440,7 @@ void
 move_it_vpos (struct it *it, ptrdiff_t dvpos)
 {
   if (dvpos > 0)
-    {
-      mit_calls8++;
-      move_it_forward (it, -1, it->vpos + dvpos, MOVE_TO_VPOS);
-    }
+    move_it_forward (it, -1, it->vpos + dvpos, MOVE_TO_VPOS);
   else
     move_it_backward (it, (int) (-dvpos), MOVE_TO_VPOS);
 }
@@ -9511,10 +9475,7 @@ void
 move_it_y (struct it *it, int dy)
 {
   if (dy > 0)
-    {
-      mit_calls12++;
-      move_it_forward (it, -1, it->current_y + dy, MOVE_TO_Y);
-    }
+    move_it_forward (it, -1, it->current_y + dy, MOVE_TO_Y);
   else
     move_it_backward (it, -dy, MOVE_TO_Y);
 }
@@ -9684,82 +9645,65 @@ move_it_past_eol (struct it *it)
 }
 
 
-/* Determine what's under window-relative pixel position (*X, *Y).
-   Return the object (string or buffer) that's there.
-   Return in *POS the position in that object.
-   Adjust *X and *Y to character positions.
-   If an image is shown at the specified position, return
-   in *OBJECT its image-spec.
-   Return in *DX and *DY the pixel coordinates of the click,
-   relative to the top left corner of object, or relative to
-   the top left corner of the character glyph at (*X, *Y)
-   if the object at (*X, *Y) is nil.
-   Return WIDTH and HEIGHT of the object at (*X, *Y), or zero
-   if the coordinates point to an empty area of the display.  */
+/* Return window object ("target") under pixel position (*X, *Y).  This
+   is usually the buffer itself unless the target happens to be a
+   display or overlay string.
+
+   Return in *POS the display_pos data (enhanced position data).
+
+   Return in (*WIDTH, *HEIGHT) the nearest glyph (character or image)
+   dimensions.
+
+   Return in (*DX, *DY) the pixel coordinates relative to the top left
+   corner of the glyph.
+
+   If glyph is an image, return in *OBJECT its image-spec.
+   */
 
 Lisp_Object
-buffer_posn_from_coords (struct window *w, int *x, int *y, struct display_pos *pos, Lisp_Object *object, int *dx, int *dy, int *width, int *height)
+buffer_posn_from_coords (struct window *w, int *x, int *y,
+			 struct display_pos *pos, Lisp_Object *object,
+			 int *dx, int *dy, int *width, int *height)
 {
   struct it it;
-  Lisp_Object old_current_buffer = Fcurrent_buffer ();
+  void *itdata;
+  Lisp_Object target, old_current_buffer = Fcurrent_buffer ();
   struct text_pos startp;
-  Lisp_Object string;
   struct glyph_row *row;
+  int to_x, sline;
 #ifdef HAVE_WINDOW_SYSTEM
   struct image *img = 0;
 #endif
-  int x0, x1, to_x, it_vpos;
-  void *itdata = NULL;
 
-  /* We used to set current_buffer directly here, but that does the
-     wrong thing with `face-remapping-alist' (bug#2044).  */
   Fset_buffer (w->contents);
   itdata = bidi_shelve_cache ();
   CLIP_TEXT_POS_FROM_MARKER (startp, w->start);
   start_move_it (&it, w, startp);
-  x0 = *x;
 
-  /* First, move to the beginning of the row corresponding to *Y.  We
-     need to be in that row to get the correct value of base paragraph
-     direction for the text at (*X, *Y).  */
+  /* First move to glyph row to ascertain base paragraph direction.  */
   move_it_forward (&it, -1, *y, MOVE_TO_Y);
 
-  /* TO_X is the pixel position that the iterator will compute for the
-     glyph at *X.  */
-  to_x = x0;
-  if (it.bidi_it.paragraph_dir == R2L)
-    /* For lines in an R2L paragraph, we need to mirror TO_X wrt the
-       text area.  This is because the iterator, even in R2L
-       paragraphs, delivers glyphs as if they started at the left
-       margin of the window.  (When we actually produce glyphs for
-       display, we reverse their order in PRODUCE_GLYPHS, but the
-       iterator doesn't know about that.)  The following line adjusts
-       the pixel position to the iterator geometry, which is what
-       move_it_* routines use.  (The -1 is because in a window whose
-       text-area width is W, the rightmost pixel position is W-1, and
-       it should be mirrored into zero pixel position.)  */
-    to_x = window_box_width (w, TEXT_AREA) - to_x - 1;
+  /* The axis-flip mentioned in xdisp.c header.
+     -1 since window_box_width() is one-indexed.  */
+  to_x = (it.bidi_it.paragraph_dir == R2L)
+    ? window_box_width (w, TEXT_AREA) - 1 - *x
+    : *x;
 
-  /* We need to add it.first_visible_x because iterator positions
-     include the hscroll. */
   to_x += it.first_visible_x;
 
-  /* If we are hscrolling only the current line, and Y is at the line
-     containing point, augment TO_X with the hscroll amount of the
-     current line.  */
+  /* Horizontal snap to point of *just* the current line: an obscure,
+     untested setting that complicates the code.  */
   if (it.line_wrap == TRUNCATE
-      && EQ (automatic_hscrolling, Qcurrent_line) && IT_CHARPOS (it) < PT)
+      && hscrolling_current_line_p (w)
+      && IT_CHARPOS (it) < PT)
     {
       struct it it2 = it;
       void *it2data = bidi_shelve_cache ();
-      it2.last_visible_x = 1000000;
-      /* If the line at Y shows point, the call below to
-	 move_it_x will succeed in reaching point.  */
+      it2.last_visible_x = DISP_INFINITY;
       emulate_display_sline (&it2, PT, -1, MOVE_TO_POS);
       if (IT_CHARPOS (it2) >= PT)
 	{
 	  to_x += (w->hscroll - w->min_hscroll) * FRAME_COLUMN_WIDTH (it.f);
-	  /* We need to pretend the window is hscrolled for move_it_x.  */
 	  it.first_visible_x += w->hscroll * FRAME_COLUMN_WIDTH (it.f);
 	  it.last_visible_x += w->hscroll * FRAME_COLUMN_WIDTH (it.f);
 	}
@@ -9774,9 +9718,9 @@ buffer_posn_from_coords (struct window *w, int *x, int *y, struct display_pos *p
   *dx = to_x - it.current_x;
   *dy = *y - it.current_y;
 
-  string = w->contents;
+  target = w->contents;
   if (STRINGP (it.string))
-    string = it.string;
+    target = it.string;
   *pos = it.current;
   if (it.what == IT_COMPOSITION
       && it.cmp_it.nchars > 1
@@ -9790,7 +9734,7 @@ buffer_posn_from_coords (struct window *w, int *x, int *y, struct display_pos *p
 	 cluster.  */
       CHARPOS (pos->pos) -= it.cmp_it.nchars - 1;
       if (STRINGP (it.string))
-	BYTEPOS (pos->pos) = string_char_to_byte (string, CHARPOS (pos->pos));
+	BYTEPOS (pos->pos) = string_char_to_byte (target, CHARPOS (pos->pos));
       else
 	BYTEPOS (pos->pos) = buf_charpos_to_bytepos (XBUFFER (w->contents),
 						     CHARPOS (pos->pos));
@@ -9805,7 +9749,7 @@ buffer_posn_from_coords (struct window *w, int *x, int *y, struct display_pos *p
 	 displayed in the text area, and so are never the object we
 	 are interested in.  */
       img = IMAGE_OPT_FROM_ID (it.f, it.image_id);
-      if (img && !NILP (img->spec))
+      if (img && ! NILP (img->spec))
 	*object = img->spec;
     }
 #endif
@@ -9814,10 +9758,10 @@ buffer_posn_from_coords (struct window *w, int *x, int *y, struct display_pos *p
      start position, i.e. it excludes the header-line row, but
      MATRIX_ROW includes the header-line row.  Adjust for a possible
      header-line row.  */
-  it_vpos = it.vpos + window_wants_header_line (w)
+  sline = it.vpos + window_wants_header_line (w)
     + window_wants_tab_line (w);
-  if (it_vpos < w->current_matrix->nrows
-      && (row = MATRIX_ROW (w->current_matrix, it_vpos),
+  if (sline < w->current_matrix->nrows
+      && (row = MATRIX_ROW (w->current_matrix, sline),
 	  row->enabled_p))
     {
       if (it.hpos < row->used[TEXT_AREA])
@@ -9851,15 +9795,16 @@ buffer_posn_from_coords (struct window *w, int *x, int *y, struct display_pos *p
       *width = *height = 0;
     }
 
-  /* Add extra (default width) columns if clicked after EOL. */
-  x1 = max (0, it.current_x + it.pixel_width);
-  if (to_x > x1)
-    it.hpos += (to_x - x1) / WINDOW_FRAME_COLUMN_WIDTH (w);
+  /* Shift hpos if TO_X greater than nominal width, i.e., we clicked
+     past EOL.  */
+  it.hpos +=
+    max (0, (to_x - max (0, it.current_x + it.pixel_width))) /
+    WINDOW_FRAME_COLUMN_WIDTH (w);
 
   *x = it.hpos;
   *y = it.vpos;
 
-  return string;
+  return target;
 }
 
 int
@@ -17383,7 +17328,7 @@ set_horizontal_scroll_bar (struct window *w)
 
       SET_TEXT_POS_FROM_MARKER (startp, w->start);
       start_move_it (&it, w, startp);
-      it.last_visible_x = INT_MAX;
+      it.last_visible_x = DISP_INFINITY;
       whole = move_it_forward (&it, -1, window_box_height (w), MOVE_TO_Y);
 
       start = w->hscroll * FRAME_COLUMN_WIDTH (WINDOW_XFRAME (w));
