@@ -632,6 +632,7 @@ value.
 
 ** Minibuffer and Completions
 
++++
 *** New commands for navigating completions from the minibuffer.
 When the minibuffer is the current buffer, typing 'M-<up>' or
 'M-<down>' selects a previous/next completion candidate from the
@@ -652,11 +653,13 @@ To enable this behavior, customize the user option
 'second-tab', then the first 'TAB' will display "*Completions*", and
 the second one will switch to the "*Completions*" buffer.
 
+---
 *** New user option 'completion-wrap-movement'.
 When non-nil, the commands 'next-completion' and 'previous-completion'
 automatically wrap around on reaching the beginning or the end of
 the "*Completions*" buffer.
 
++++
 *** New user option 'completions-sort'.
 This option controls the sorting of the completion candidates in
 the "*Completions*" buffer.  Available styles are no sorting,
@@ -688,6 +691,7 @@ When this user option names a face, the current
 candidate in the "*Completions*" buffer is highlighted with that face.
 The nil value disables this highlighting.
 
+---
 *** Choosing a completion with a prefix argument doesn't exit the minibuffer.
 This means that typing 'C-u RET' on a completion candidate in the
 "*Completions*" buffer inserts the completion to the minibuffer,
@@ -705,6 +709,7 @@ command accepts the Unicode name of an Emoji (for example, "smiling
 face" or "heart with arrow"), like 'C-x 8 e e', with minibuffer
 completion, and adds the Emoji into the search string.
 
++++
 ** New minor mode 'glyphless-display-mode'.
 This allows an easy way to toggle seeing all glyphless characters in
 the current buffer.
@@ -881,6 +886,7 @@ default, no automatic renaming is performed.
 
 ** Help
 
+---
 *** New user option 'help-link-key-to-documentation'.
 When this option is non-nil (which is the default), key bindings
 displayed in the "*Help*" buffer will be linked to the documentation
@@ -917,9 +923,11 @@ it with new 'term-{faint,italic,slow-blink,fast-blink}' faces.
 
 ** Xref
 
++++
 *** 'project-find-file' and 'project-or-external-find-file' now accept
 a prefix argument which is interpreted to mean "include all files".
 
++++
 *** 'project-kill-buffers' can display the list of buffers to kill.
 Customize the user option 'project-kill-buffers-display-buffer-list'
 to enable the display of the buffer list.
@@ -970,6 +978,7 @@ The keybinding for 'image-transform-fit-to-width' is now 's i'.
 *** User option 'image-auto-resize' can now be set to 'fit-window'.
 This works like 'image-transform-fit-to-window'.
 
+---
 *** New user option 'image-auto-resize-max-scale-percent'.
 The new 'fit-window' option will never scale an image more than this
 much (in percent).  It is nil by default, which means no limit.
@@ -1089,6 +1098,7 @@ If non-nil, dragging file names with the mouse in a Dired buffer will
 initiate a drag-and-drop session allowing them to be opened in other
 programs.
 
++++
 *** New user option 'dired-free-space'.
 Dired will now, by default, include the free space in the first line
 instead of having it on a separate line.  To get the previous behavior
@@ -1104,6 +1114,7 @@ the buffer will take you to that directory.
 
 ** Exif
 
+---
 *** New function 'exif-field'.
 This is a convenience function to extract the field data from
 'exif-parse-file' and 'exif-parse-buffer'.
@@ -1183,6 +1194,7 @@ the Galeon web browser was released in September, 2008.
 
 ** Ruby Mode
 
+---
 *** New user option 'ruby-toggle-block-space-before-parameters'.
 
 ** Eshell
@@ -1278,6 +1290,7 @@ they will still be escaped, so the '.foo' symbol is still printed as
 and remapping parent of basic faces does not work reliably.
 Instead of remapping 'mode-line', you have to remap 'mode-line-active'.
 
+---
 ** User option 'mail-source-ignore-errors' is now obsolete.
 The whole mechanism for prompting users to continue in case of
 mail-source errors has been removed, so this option is no longer
