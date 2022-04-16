@@ -822,7 +822,8 @@ static int underlying_face_id (const struct it *);
 
 #ifdef HAVE_WINDOW_SYSTEM
 
-static int line_bottom_y (struct it *it, int fallback_height);
+static int advancing_bottom_y (struct it *it);
+static int line_bottom_y (struct it it, int fallback_height);
 static void update_tool_bar (struct frame *, bool);
 static void gui_draw_bottom_divider (struct window *w);
 static void notice_overwritten_cursor (struct window *,
@@ -1111,18 +1112,24 @@ window_box_edges (struct window *w, int *top_left_x, int *top_left_y,
 			      Utilities
  ***********************************************************************/
 
-static int
-line_bottom_y (struct it *it, int fallback_height)
-{
-  int line_top_y = it->current_y;
-  int line_height = 0;
+/* This was formerly called line_bottom_y(), which was grossly
+   misleading since it often advanced its argument iterator
+   as a side effect.  */
 
-  if (IT_CHARPOS (*it) < ZV)
-    {
-      move_it_dvpos (it, 1);
-      line_height = it->current_y - line_top_y;
-    }
-  else
+static int
+advancing_bottom_y (struct it *it)
+{
+  int line_height = it->max_ascent + it->max_descent;
+  int line_top_y = it->current_y;
+
+  if (! line_height)
+    if (IT_CHARPOS (*it) < ZV)
+      {
+	move_it_dvpos (it, 1);
+	line_height = it->max_ascent + it->max_descent;
+      }
+
+  if (! line_height)
     {
       /* Use the default character height.  */
       struct glyph_row *row = it->glyph_row;
@@ -1131,12 +1138,44 @@ line_bottom_y (struct it *it, int fallback_height)
       it->c = ' ';
       it->len = 1;
       PRODUCE_GLYPHS (it);
-      it->glyph_row = row;
       line_height = it->ascent + it->descent;
+      it->glyph_row = row;
+    }
+
+  return line_top_y + line_height;
+}
+
+static int
+line_bottom_y (struct it it, int fallback_height)
+{
+  int line_top_y = it.current_y;
+  int line_height = it.max_ascent + it.max_descent;
+
+  if (! line_height)
+    {
+      if (IT_CHARPOS (it) < ZV)
+	{
+	  move_it_dvpos (&it, 1);
+	  line_height = it.current_y - line_top_y;
+	}
+    }
+
+  if (! line_height)
+    {
+      /* Use the default character height.  */
+      struct glyph_row *row = it.glyph_row;
+      it.glyph_row = NULL;
+      it.what = IT_CHARACTER;
+      it.c = ' ';
+      it.len = 1;
+      PRODUCE_GLYPHS (&it);
+      it.glyph_row = row;
+      line_height = it.ascent + it.descent;
     }
 
   if (! line_height)
     line_height = fallback_height;
+
   return line_height;
 }
 
@@ -1144,7 +1183,7 @@ line_bottom_y (struct it *it, int fallback_height)
 /* window.c is buying what line_bottom_y is selling.  */
 
 int
-window_line_bottom_y (struct it *it)
+window_line_bottom_y (struct it it)
 {
   return line_bottom_y (it, last_height);
 }
@@ -1184,7 +1223,7 @@ actual_line_height (struct window *w, struct text_pos pt)
   void *itdata = bidi_shelve_cache ();
   int result;
   start_move_it (&it, w, pt);
-  result = line_bottom_y (&it, 0);
+  result = line_bottom_y (it, last_height);
   bidi_unshelve_cache (itdata, false);
   return result;
 }
@@ -1404,12 +1443,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
       int top_x = it.current_x;
       int top_y = it.current_y;
       int window_top_y = WINDOW_TAB_LINE_HEIGHT (w) + WINDOW_HEADER_LINE_HEIGHT (w);
-      int bottom_y;
-      struct it save_it;
-      void *save_it_data = NULL;
-
-      SAVE_IT (save_it, it, save_it_data); /* stash before line_bottom_y */
-      bottom_y = line_bottom_y (&it, 0);
+      int bottom_y = line_bottom_y (it, last_height);
       /* Visible if (i) IT's y-start and y-end straddle window's y-start,
 	 or, (ii) window's y-start and y-end straddle IT's y-start. */
       if (top_y < window_top_y)
@@ -1440,8 +1474,6 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	  if (it.current_y > top_y)
 	    visible_p = false;
 	}
-
-      RESTORE_IT (&it, &save_it, save_it_data);
 
       if (visible_p)
 	{
@@ -16601,7 +16633,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
       if (PT > CHARPOS (it.current.pos))
 	{
-	  int y0 = line_bottom_y (&it, last_height);
+	  int y0 = advancing_bottom_y (&it);
 	  /* Compute how many pixels below window bottom to stop searching
 	     for PT.  This avoids costly search for PT that is far away if
 	     the user limited scrolling by a small number of lines, but
@@ -16615,7 +16647,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	     include the height of the cursor line, to make that line
 	     fully visible.  */
 	  move_it_forward (&it, PT, y_to_move, MOVE_TO_POS | MOVE_TO_Y);
-	  dy = line_bottom_y (&it, last_height) - y0;
+	  dy = advancing_bottom_y (&it) - y0;
 
 	  if (dy > scroll_max)
 	    return SCROLLING_FAILED;
@@ -16714,13 +16746,13 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	  int start_y;
 
 	  SAVE_IT (it1, it, it1data);
-	  start_y = line_bottom_y (&it1, last_height);
+	  start_y = line_bottom_y (it1, last_height);
 	  do {
 	    RESTORE_IT (&it, &it, it1data);
 	    move_it_dvpos (&it, 1);
 	    SAVE_IT (it1, it, it1data);
 	  } while (IT_CHARPOS (it) < ZV
-		   && ((line_bottom_y (&it1, last_height) - start_y) <
+		   && ((advancing_bottom_y (&it1) - start_y) <
 		       amount_to_scroll));
 	  bidi_unshelve_cache (it1data, true);
 	}
@@ -17625,14 +17657,13 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       w->optional_new_start = false;
       start_move_it (&it, w, startp);
       move_it_forward (&it, PT, it.last_visible_y, MOVE_TO_POS | MOVE_TO_Y);
-      /* Record IT's position now, since line_bottom_y might change
-	 that.  */
       it_charpos = IT_CHARPOS (it);
       /* Make sure we set the force_start flag only if the cursor row
 	 will be fully visible.  Otherwise, the code under force_start
 	 label below will try to move point back into view, which is
 	 not what the code which sets optional_new_start wants.  */
-      if ((it.current_y == 0 || line_bottom_y (&it, last_height) < it.last_visible_y)
+      if ((it.current_y == 0
+	   || line_bottom_y (it, last_height) < it.last_visible_y)
 	  && !w->force_start)
 	{
 	  if (it_charpos == PT)
