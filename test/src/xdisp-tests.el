@@ -265,4 +265,57 @@ width of display property."
    (call-interactively #'backward-char)
    (should (looking-at "_"))))
 
+(ert-deftest xdisp-tests--xy-to-charpos ()
+  "Truncated portions of lines shouldn't affect iterator geometry."
+  (skip-unless (not noninteractive))
+  (xdisp-tests--visible-buffer
+    (cl-flet ((test-it
+                (where oblivious-y nlines)
+                (save-excursion
+                  (goto-char where)
+                  (end-of-line)
+                  (should (= nlines (line-number-at-pos)))
+                  (redisplay)
+                  ;; confusing: `posn-at-point' calls window_start_coordinates()
+                  ;; producing a Y as if all glyphs were visible.
+                  (cl-destructuring-bind
+                      (_w _area (x . y) &rest args)
+                      (posn-at-point)
+                    ;; now emulate a mouse-click on a window whose contents are
+                    ;; oblivious to tall glyphs (due to non-nil truncate-lines).
+                    (cl-destructuring-bind
+                        (_w _area (x2 . y2) &rest args)
+                        (posn-at-x-y x oblivious-y)
+                      (should (= x x2))
+                      (should (= y y2)))))))
+      (let ((tall (propertize
+                   "tall words"
+                   'face `(:height ,(* 3 (face-attribute 'default :height)))))
+            (long (make-string (* (window-width) 2) ?x))
+            (nlines 3)
+            final oblivious-y)
+        (text-mode)
+        (toggle-truncate-lines 1)
+        (erase-buffer)
+        (dotimes (_i nlines)
+          (insert ?x ?\n))
+        (forward-line -1)
+        (redisplay)
+        (setq oblivious-y (cl-destructuring-bind
+                              (_w _area (_x . y) &rest args)
+                              (posn-at-point)
+                            y))
+        (erase-buffer)
+        (dotimes (_i (1- nlines))
+          (insert tall ?\n))
+        (setq final (point))
+        (insert long ?\n)
+        (test-it final oblivious-y nlines)
+        (erase-buffer)
+        (insert tall long tall ?\n)
+        (insert tall ?\n)
+        (setq final (point))
+        (insert long ?\n)
+        (test-it final oblivious-y nlines)))))
+
 ;;; xdisp-tests.el ends here

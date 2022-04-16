@@ -5512,13 +5512,14 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 	    ? (mx - window_box_left (w, TEXT_AREA))
 	    : 0;
 	  int y2 = wy;
-
-	  string2 = buffer_posn_from_coords (w, &x2, &y2, &p,
+	  int col2, row2;
+	  string2 = buffer_posn_from_coords (w, x2, y2, &p,
 					     &object2, &dx2, &dy2,
-					     &width2, &height2);
+					     &width2, &height2,
+					     &col2, &row2);
 	  textpos = CHARPOS (p.pos);
-	  if (col < 0) col = x2;
-	  if (row < 0) row = y2;
+	  if (col < 0) col = col2;
+	  if (row < 0) row = row2;
 	  if (dx < 0) dx = dx2;
 	  if (dy < 0) dy = dy2;
 	  if (width < 0) width = width2;
@@ -6083,7 +6084,6 @@ make_lispy_event (struct input_event *event)
 		    else if (new_y
 			     >= XFIXNUM (Fcar (Fcdr (Fcdr (Fcdr (edges))))))
 		      new_y = XFIXNUM (Fcar (Fcdr (Fcdr (Fcdr (edges))))) - 1;
-
 		    position = make_lispy_position
 		      (XFRAME (event->frame_or_window),
 		       make_fixnum (new_x), make_fixnum (new_y),

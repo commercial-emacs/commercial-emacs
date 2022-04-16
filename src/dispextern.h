@@ -3376,8 +3376,8 @@ void init_iterator (struct it *, struct window *, ptrdiff_t,
 void init_iterator_to_row_start (struct it *, struct window *,
                                  struct glyph_row *);
 void start_move_it (struct it *, struct window *, struct text_pos);
-void move_it_y (struct it *, int);
-void move_it_vpos (struct it *, ptrdiff_t);
+void move_it_dy (struct it *, int);
+void move_it_dvpos (struct it *, ptrdiff_t);
 void move_it_past_eol (struct it *);
 void move_it_x (struct it *it, int to_x);
 int partial_line_height (struct it *it_origin);
@@ -3393,10 +3393,11 @@ extern int last_tab_bar_item;
 extern int last_tool_bar_item;
 extern void reseat_preceding_line_start (struct it *);
 extern Lisp_Object buffer_posn_from_coords (struct window *,
-                                            int *, int *,
+                                            int, int,
                                             struct display_pos *,
                                             Lisp_Object *,
-                                            int *, int *, int *, int *);
+                                            int *, int *, int *, int *,
+					    int *, int *);
 extern Lisp_Object lookup_glyphless_char_display (int, struct it *);
 extern ptrdiff_t compute_display_string_pos (struct text_pos *,
 					     struct bidi_string_data *,
