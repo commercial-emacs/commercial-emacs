@@ -406,6 +406,12 @@ command also works for non-Emoji characters.)
 ** Help
 
 ---
+*** New user option 'help-enable-variable-value-editing'.
+If enabled, 'e' on a value in *Help* will pop you to a new buffer
+where you can edit the value.  This is not enabled by default, because
+it's easy to make an edit that yields an invalid result.
+
+---
 *** 'C-h b' uses outlining by default.
 Set 'describe-bindings-outline' to nil to get the old behavior.
 
@@ -616,7 +622,8 @@ This uses the Tai Tham script, whose support has been enhanced.
 
 *** New language environment "Brahmi".
 This language environment supports Brahmi, which is a historical
-script that was used in ancient South Asia.
+script that was used in ancient South Asia.  A new input method,
+'brahmi', is provided to type text in this script.
 
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
