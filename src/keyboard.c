@@ -1057,7 +1057,7 @@ Default value of `command-error-function'.  */)
       print_error_message (data, Qexternal_debugging_output,
 			   SSDATA (context), signal);
       Fterpri (Qexternal_debugging_output, Qnil);
-      Fkill_emacs (make_fixnum (-1));
+      Fkill_emacs (make_fixnum (-1), Qnil);
     }
   else
     {
@@ -1120,7 +1120,7 @@ command_loop (void)
 
 	/* End of file in -batch run causes exit here.  */
 	if (noninteractive)
-	  Fkill_emacs (Qt);
+	  Fkill_emacs (Qt, Qnil);
       }
 }
 
@@ -1328,7 +1328,7 @@ command_loop_1 (void)
       Lisp_Object cmd;
 
       if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-	Fkill_emacs (Qnil);
+	Fkill_emacs (Qnil, Qnil);
 
       /* Make sure the current window's buffer is selected.  */
       set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
@@ -1399,7 +1399,7 @@ command_loop_1 (void)
 
       /* A filter may have run while we were reading the input.  */
       if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-	Fkill_emacs (Qnil);
+	Fkill_emacs (Qnil, Qnil);
       set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
 
       ++num_input_keys;
@@ -1657,7 +1657,7 @@ read_menu_command (void)
   unbind_to (count, Qnil);
 
   if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-    Fkill_emacs (Qnil);
+    Fkill_emacs (Qnil, Qnil);
   if (i == 0 || i == -1)
     return Qt;
 
@@ -2255,7 +2255,7 @@ read_event_from_main_queue (struct timespec *end_time,
 
   /* Terminate Emacs in batch mode if at eof.  */
   if (noninteractive && FIXNUMP (c) && XFIXNUM (c) < 0)
-    Fkill_emacs (make_fixnum (1));
+    Fkill_emacs (make_fixnum (1), Qnil);
 
   if (FIXNUMP (c))
     {
@@ -10035,7 +10035,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	      if (fix_current_buffer)
 		{
 		  if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-		    Fkill_emacs (Qnil);
+		    Fkill_emacs (Qnil, Qnil);
 		  if (XBUFFER (XWINDOW (selected_window)->contents)
 		      != current_buffer)
 		    Fset_buffer (XWINDOW (selected_window)->contents);
@@ -10159,7 +10159,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		      record_unwind_current_buffer ();
 
 		      if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-			Fkill_emacs (Qnil);
+			Fkill_emacs (Qnil, Qnil);
 		      set_buffer_internal (XBUFFER (XWINDOW (window)->contents));
 		      goto replay_sequence;
 		    }
@@ -11379,7 +11379,7 @@ quit_throw_to_read_char (bool from_signal)
   /* When not called from a signal handler it is safe to call
      Lisp.  */
   if (!from_signal && EQ (Vquit_flag, Qkill_emacs))
-    Fkill_emacs (Qnil);
+    Fkill_emacs (Qnil, Qnil);
 
   /* Prevent another signal from doing this before we finish.  */
   clear_waiting_for_input ();
