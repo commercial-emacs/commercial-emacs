@@ -942,14 +942,19 @@ to enable the display of the buffer list.
 It is bound to 'C-M-,' and jumps to the location where 'xref-go-back'
 ('M-,', also known as 'xref-pop-marker-stack') was invoked previously.
 
-*** 'xref-query-replace-in-results' does not prompt for FROM when
-called without prefix argument, to make the most common case faster:
-replacing entire matches.
++++
+*** 'xref-query-replace-in-results' prompting change.
+This command no longer prompts for FROM when called without prefix
+argument.  This makes the most common case faster: replacing entire
+matches.
 
++++
 *** New command 'xref-find-references-and-replace' to rename one identifier.
 
+---
 *** New variable 'xref-current-item' (renamed from a private version).
 
+---
 *** New function 'xref-show-xrefs'.
 
 ** File notifications
@@ -1445,8 +1450,8 @@ compliant.
 
 +++
 ** New macro 'setopt'.
-This is like 'setq', but uses 'customize-set-variable' to set the
-variable(s).
+This is like 'setq', but is meant to be used for user options instead
+of plain variables, and uses 'custom-set'/'set-default' to set them.
 
 +++
 ** New utility predicate 'mode-line-window-selected-p'.
