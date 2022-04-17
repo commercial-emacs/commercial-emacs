@@ -1176,7 +1176,7 @@ line_bottom_y (struct it it, int fallback_height)
   if (! line_height)
     line_height = fallback_height;
 
-  return line_height;
+  return line_top_y + line_height;
 }
 
 
