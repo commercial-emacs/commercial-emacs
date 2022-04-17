@@ -68,7 +68,7 @@ ordinary strings."
 (defcustom eshell-predicate-alist
   '((?/ . (eshell-pred-file-type ?d))   ; directories
     (?. . (eshell-pred-file-type ?-))   ; regular files
-    (?s . (eshell-pred-file-type ?s))   ; sockets
+    (?= . (eshell-pred-file-type ?s))   ; sockets
     (?p . (eshell-pred-file-type ?p))   ; named pipes
     (?@ . (eshell-pred-file-type ?l))   ; symbolic links
     (?% . (eshell-pred-file-type ?%))   ; allow user to specify (c def.)
@@ -88,17 +88,17 @@ ordinary strings."
             (if (file-exists-p file)
                 (= (file-attribute-user-id (file-attributes file))
                    (user-uid)))))
-    ;; (?G . (lambda (file)               ; owned by effective gid
-    ;;         (if (file-exists-p file)
-    ;;             (= (file-attribute-user-id (file-attributes file))
-    ;;                (user-uid)))))
+    (?G . (lambda (file)               ; owned by effective gid
+            (if (file-exists-p file)
+                (= (file-attribute-group-id (file-attributes file))
+                   (group-gid)))))
     (?* . (lambda (file)
             (and (file-regular-p file)
                  (not (file-symlink-p file))
                  (file-executable-p file))))
     (?l . (eshell-pred-file-links))
-    (?u . (eshell-pred-user-or-group ?u "user" 2 'eshell-user-id))
-    (?g . (eshell-pred-user-or-group ?g "group" 3 'eshell-group-id))
+    (?u . (eshell-pred-user-or-group ?u "user" 2 #'eshell-user-id))
+    (?g . (eshell-pred-user-or-group ?g "group" 3 #'eshell-group-id))
     (?a . (eshell-pred-file-time ?a "access" 4))
     (?m . (eshell-pred-file-time ?m "modification" 5))
     (?c . (eshell-pred-file-time ?c "change" 6))
@@ -111,12 +111,7 @@ The format of each entry is
   :risky t)
 
 (defcustom eshell-modifier-alist
-  '((?E . (lambda (lst)
-            (mapcar
-             (lambda (str)
-               (eshell-stringify
-                (car (eshell-parse-argument str))))
-             lst)))
+  '((?E . (lambda (lst) (mapcar #'eshell-eval-argument lst)))
     (?L . (lambda (lst) (mapcar #'downcase lst)))
     (?U . (lambda (lst) (mapcar #'upcase lst)))
     (?C . (lambda (lst) (mapcar #'capitalize lst)))
@@ -129,10 +124,10 @@ The format of each entry is
     (?q . (lambda (lst) (mapcar #'eshell-escape-arg lst)))
     (?u . (lambda (lst) (seq-uniq lst)))
     (?o . (lambda (lst) (sort lst #'string-lessp)))
-    (?O . (lambda (lst) (nreverse (sort lst #'string-lessp))))
+    (?O . (lambda (lst) (sort lst #'string-greaterp)))
     (?j . (eshell-join-members))
     (?S . (eshell-split-members))
-    (?R . 'reverse)
+    (?R . #'reverse)
     (?g . (progn
 	    (forward-char)
 	    (if (eq (char-before) ?s)
@@ -142,7 +137,7 @@ The format of each entry is
   "A list of modifiers than can be applied to an argument expansion.
 The format of each entry is
 
-  (CHAR ENTRYWISE-P MODIFIER-FUNC-SEXP)"
+  (CHAR . MODIFIER-FUNC-SEXP)"
   :type '(repeat (cons character sexp))
   :risky t)
 
@@ -166,6 +161,7 @@ PERMISSION BITS (for owner/group/world):
 
 OWNERSHIP:
   U               owned by effective uid
+  G               owned by effective gid
   u(UID|\\='user\\=')   owned by UID/user
   g(GID|\\='group\\=')  owned by GID/group
 
@@ -217,8 +213,8 @@ FOR LISTS OF ARGUMENTS:
   i/PAT/  exclude all members not matching PAT
   x/PAT/  exclude all members matching PAT
 
-  s/pat/match/  substitute PAT with MATCH
-  g/pat/match/  substitute PAT with MATCH for all occurrences
+  s/pat/match/   substitute PAT with MATCH
+  gs/pat/match/  substitute PAT with MATCH for all occurrences
 
 EXAMPLES:
   *.c(:o)  sorted list of .c files")
@@ -534,18 +530,14 @@ that `ls -l' will show in the first column of its display."
 	(lambda (lst)
 	  (mapcar
            (lambda (str)
-             (let ((i 0))
-               (while (setq i (string-match match str i))
-                 (setq str (replace-match replace t nil str))))
-             str)
+             (replace-regexp-in-string match replace str t))
            lst))
       (lambda (lst)
 	(mapcar
          (lambda (str)
            (if (string-match match str)
-               (setq str (replace-match replace t nil str))
-             (error (concat str ": substitution failed")))
-           str)
+               (replace-match replace t nil str)
+             (error (concat str ": substitution failed"))))
          lst)))))
 
 (defun eshell-include-members (&optional invert-p)
@@ -568,7 +560,7 @@ that `ls -l' will show in the first column of its display."
   (let ((delim (char-after))
 	str end)
     (if (not (memq delim '(?' ?/)))
-	(setq delim " ")
+	(setq str " ")
       (forward-char)
       (setq end (eshell-find-delimiter delim delim nil nil t)
 	    str (buffer-substring-no-properties (point) end))
