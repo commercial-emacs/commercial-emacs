@@ -154,12 +154,12 @@ struct haiku_output
   haiku view;
   haiku menubar;
 
-  int menu_up_to_date_p;
-  int zoomed_p;
-  int hourglass_p;
-  int menu_bar_open_p;
   int fontset;
   int baseline_offset;
+
+  bool_bf zoomed_p : 1;
+  bool_bf hourglass_p : 1;
+  bool_bf menu_bar_open_p : 1;
 
   /* Whether or not there is data in a back buffer that hasn't been
      displayed yet.  */
@@ -176,6 +176,12 @@ struct haiku_output
 
   /* The default cursor foreground color.  */
   uint32_t cursor_fg;
+
+  /* If non-NULL, the last menu bar click event received.  */
+  struct haiku_menu_bar_click_event *saved_menu_event;
+
+  /* The type of any event that's being waited for.  */
+  int wait_for_event_type;
 };
 
 struct x_output
@@ -291,6 +297,8 @@ extern void haiku_put_pixel (haiku, int, int, unsigned long);
 extern Lisp_Object haiku_menu_show (struct frame *, int, int, int,
 				    Lisp_Object, const char **);
 extern Lisp_Object haiku_popup_dialog (struct frame *, Lisp_Object, Lisp_Object);
+extern void haiku_activate_menubar (struct frame *);
+extern void haiku_wait_for_event (struct frame *, int);
 extern void haiku_note_drag_motion (void);
 
 extern void initialize_frame_menubar (struct frame *);

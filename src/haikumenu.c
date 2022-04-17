@@ -521,8 +521,15 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
   if (!mbar)
     {
+      block_input ();
       mbar = FRAME_HAIKU_MENU_BAR (f) = BMenuBar_new (view);
       first_time_p = 1;
+
+      /* Now wait for the MENU_BAR_RESIZE event informing us of the
+	 initial dimensions of that menu bar.  */
+      if (FRAME_VISIBLE_P (f))
+	haiku_wait_for_event (f, MENU_BAR_RESIZE);
+      unblock_input ();
     }
 
   Lisp_Object items;
@@ -541,7 +548,6 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
   if (!deep_p)
     {
-      FRAME_OUTPUT_DATA (f)->menu_up_to_date_p = 0;
       items = FRAME_MENU_BAR_ITEMS (f);
       Lisp_Object string;
 
@@ -654,8 +660,6 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
       set_buffer_internal_1 (prev);
 
-      FRAME_OUTPUT_DATA (f)->menu_up_to_date_p = 1;
-
       /* If there has been no change in the Lisp-level contents
 	 of the menu bar, skip redisplaying it.  Just exit.  */
 
@@ -705,19 +709,11 @@ set_frame_menubar (struct frame *f, bool deep_p)
 void
 run_menu_bar_help_event (struct frame *f, int mb_idx)
 {
-  Lisp_Object frame;
-  Lisp_Object vec;
-  Lisp_Object help;
-
-  block_input ();
-  if (!FRAME_OUTPUT_DATA (f)->menu_up_to_date_p)
-    {
-      unblock_input ();
-      return;
-    }
+  Lisp_Object frame, vec, help;
 
   XSETFRAME (frame, f);
 
+  block_input ();
   if (mb_idx < 0)
     {
       kbd_buffer_store_help_event (frame, Qnil);
@@ -772,6 +768,39 @@ the position of the last non-menu event instead.  */)
 		  last_nonmenu_event);
 
   return Qnil;
+}
+
+void
+haiku_activate_menubar (struct frame *f)
+{
+  int rc;
+
+  if (!FRAME_HAIKU_MENU_BAR (f))
+    return;
+
+  set_frame_menubar (f, true);
+
+  if (FRAME_OUTPUT_DATA (f)->saved_menu_event)
+    {
+      block_input ();
+      be_replay_menu_bar_event (FRAME_HAIKU_MENU_BAR (f),
+				FRAME_OUTPUT_DATA (f)->saved_menu_event);
+      xfree (FRAME_OUTPUT_DATA (f)->saved_menu_event);
+      FRAME_OUTPUT_DATA (f)->saved_menu_event = NULL;
+      unblock_input ();
+    }
+  else
+    {
+      block_input ();
+      rc = BMenuBar_start_tracking (FRAME_HAIKU_MENU_BAR (f));
+      unblock_input ();
+
+      if (!rc)
+	return;
+
+      FRAME_OUTPUT_DATA (f)->menu_bar_open_p = 1;
+      popup_activated_p += 1;
+    }
 }
 
 void
