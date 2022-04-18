@@ -263,7 +263,7 @@ form.")
                 nil))
              (kill-emacs-args nil)
              ((symbol-function #'kill-emacs)
-              (lambda (&optional arg arg) (push arg kill-emacs-args)))
+              (lambda (&rest args) (push (car args) kill-emacs-args)))
              (process
               (make-process
                :name "sleep"
@@ -448,10 +448,10 @@ unquoted file names."
            `((,files-tests--special-file-name-regexp
               . files-tests--special-file-name-handler)
              . ,file-name-handler-alist))
-           (,name (concat
+          (,name (concat
                   (make-temp-file "files-tests" ,dir-flag)
                   files-tests--special-file-name-extension))
-           (,non-special-name (file-name-quote ,name)))
+          (,non-special-name (file-name-quote ,name)))
      (unwind-protect
          (progn ,@body)
        (when (file-exists-p ,name)
