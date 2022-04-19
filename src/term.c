@@ -1543,15 +1543,6 @@ tty_append_glyph (struct it *it)
 void
 produce_glyphs (struct it *it)
 {
-  /* gui_produce_glyphs cannot sustain; so don't do it here either */
-  /* bool monospace_p = */
-  /*   (it->method == GET_FROM_BUFFER) */
-  /*   && BUFFERP (it->object) */
-  /*   && XBUFFER (it->object)->text->monospace; */
-
-  /* if (monospace_p && it->what != IT_CHARACTER) */
-  /*   XBUFFER (it->object)->text->monospace = false; */
-
   switch (it->what)
     {
     case IT_STRETCH:
