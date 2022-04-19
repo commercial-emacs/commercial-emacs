@@ -3783,7 +3783,6 @@ x_toolkit_position (struct frame *f, int x, int y,
 static void
 x_update_opaque_region (struct frame *f, XEvent *configure)
 {
-#ifndef HAVE_GTK3
   unsigned long opaque_region[] = {0, 0,
 				   (configure
 				    ? configure->xconfigure.width
@@ -3791,6 +3790,9 @@ x_update_opaque_region (struct frame *f, XEvent *configure)
 				   (configure
 				    ? configure->xconfigure.height
 				    : FRAME_PIXEL_HEIGHT (f))};
+#ifdef HAVE_GTK3
+  GObjectClass *object_class;
+  GtkWidgetClass *class;
 #endif
 
   if (!FRAME_DISPLAY_INFO (f)->alpha_bits)
@@ -3810,6 +3812,21 @@ x_update_opaque_region (struct frame *f, XEvent *configure)
 		     FRAME_DISPLAY_INFO (f)->Xatom_net_wm_opaque_region,
 		     XA_CARDINAL, 32, PropModeReplace,
 		     (unsigned char *) &opaque_region, 4);
+#else
+  else if (FRAME_TOOLTIP_P (f))
+    XChangeProperty (FRAME_X_DISPLAY (f),
+		     FRAME_X_WINDOW (f),
+		     FRAME_DISPLAY_INFO (f)->Xatom_net_wm_opaque_region,
+		     XA_CARDINAL, 32, PropModeReplace,
+		     (unsigned char *) &opaque_region, 4);
+  else
+    {
+      object_class = G_OBJECT_GET_CLASS (FRAME_GTK_OUTER_WIDGET (f));
+      class = GTK_WIDGET_CLASS (object_class);
+
+      if (class->style_updated)
+	class->style_updated (FRAME_GTK_OUTER_WIDGET (f));
+    }
 #endif
   unblock_input ();
 }
