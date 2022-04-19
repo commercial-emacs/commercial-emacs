@@ -5123,12 +5123,10 @@ typedef union
    variables or are used to pass parameters.
 
    If __builtin_unwind_init is available, it should suffice to save
-   registers.
-
-   Otherwise, assume that calling setjmp saves registers we need
-   to see in a jmp_buf which itself lies on the stack.  This doesn't
-   have to be true!  It must be verified for each system, possibly
-   by taking a look at the source code of setjmp.
+   registers in flush_stack_call_func().  This presumably is always
+   the case for platforms of interest to Commercial Emacs.  We
+   preserve the legacy else-branch that calls test_setjmp() to verify
+   the sys_jmp_buf saves registers.
 
    Stack Layout
 
@@ -6089,9 +6087,6 @@ watch_gc_cons_percentage (Lisp_Object symbol, Lisp_Object newval,
   return Qnil;
 }
 
-/* It may be time to collect garbage.  Recalculate consing_until_gc,
-   since it might depend on current usage, and do the garbage
-   collection if the recalculation says so.  */
 void
 maybe_garbage_collect (void)
 {

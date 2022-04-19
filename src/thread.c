@@ -59,13 +59,13 @@ static sys_mutex_t global_lock;
 
 extern volatile int interrupt_input_blocked;
 
-
+
 
 /* m_specpdl is set when the thread is created and cleared when the
    thread dies.  */
 #define thread_live_p(STATE) ((STATE)->m_specpdl != NULL)
 
-
+
 
 static void
 release_global_lock (void)
@@ -163,7 +163,7 @@ maybe_reacquire_global_lock (void)
     }
 }
 
-
+
 
 static void
 lisp_mutex_init (lisp_mutex_t *mutex)
@@ -278,7 +278,7 @@ lisp_mutex_owned_p (lisp_mutex_t *mutex)
   return mutex->owner == current_thread;
 }
 
-
+
 
 DEFUN ("make-mutex", Fmake_mutex, Smake_mutex, 0, 1, 0,
        doc: /* Create a mutex.
@@ -392,7 +392,7 @@ finalize_one_mutex (struct Lisp_Mutex *mutex)
   lisp_mutex_destroy (&mutex->mutex);
 }
 
-
+
 
 DEFUN ("make-condition-variable",
        Fmake_condition_variable, Smake_condition_variable,
@@ -574,7 +574,7 @@ finalize_one_condvar (struct Lisp_CondVar *condvar)
   sys_cond_destroy (&condvar->cond);
 }
 
-
+
 
 struct select_args
 {
@@ -634,7 +634,7 @@ thread_select (select_func *func, int max_fds, fd_set *rfds,
   return sa.result;
 }
 
-
+
 
 static void
 mark_one_thread (struct thread_state *thread)
@@ -693,7 +693,7 @@ unmark_main_thread (void)
   main_thread.s.header.size &= ~ARRAY_MARK_FLAG;
 }
 
-
+
 
 static void
 yield_callback (void *ignore)
@@ -1078,7 +1078,7 @@ If CLEANUP is non-nil, remove this error form from history.  */)
   return result;
 }
 
-
+
 
 bool
 thread_check_current_buffer (struct buffer *buffer)
@@ -1097,7 +1097,7 @@ thread_check_current_buffer (struct buffer *buffer)
   return false;
 }
 
-
+
 
 bool
 main_thread_p (const void *ptr)
