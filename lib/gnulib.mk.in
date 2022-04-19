@@ -114,6 +114,7 @@
 #  getopt-gnu \
 #  getrandom \
 #  gettime \
+#  gettime-res \
 #  gettimeofday \
 #  gitlog-to-changelog \
 #  ieee754-h \
@@ -2188,6 +2189,14 @@ libgnu_a_SOURCES += gettime.c
 
 endif
 ## end   gnulib module gettime
+
+## begin gnulib module gettime-res
+ifeq (,$(OMIT_GNULIB_MODULE_gettime-res))
+
+libgnu_a_SOURCES += gettime-res.c
+
+endif
+## end   gnulib module gettime-res
 
 ## begin gnulib module gettimeofday
 ifeq (,$(OMIT_GNULIB_MODULE_gettimeofday))

@@ -4664,8 +4664,8 @@ PSEC is a multiple of the system clock resolution.  */)
   (void)
 {
   if (timespec_valid_p (timer_idleness_start_time))
-    return make_lisp_time (timespec_sub (current_timespec (),
-					 timer_idleness_start_time));
+    return make_lisp_realtime (timespec_sub (current_timespec (),
+					     timer_idleness_start_time));
 
   return Qnil;
 }

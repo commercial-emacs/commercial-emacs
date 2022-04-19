@@ -112,6 +112,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module getrandom:
   # Code from module gettext-h:
   # Code from module gettime:
+  # Code from module gettime-res:
   # Code from module gettimeofday:
   # Code from module gitlog-to-changelog:
   # Code from module group-member:
@@ -372,6 +373,7 @@ AC_DEFUN([gl_INIT],
                  [test $HAVE_GETRANDOM = 0 || test $REPLACE_GETRANDOM = 1])
   gl_SYS_RANDOM_MODULE_INDICATOR([getrandom])
   gl_GETTIME
+  gl_GETTIME_RES
   gl_FUNC_GETTIMEOFDAY
   gl_CONDITIONAL([GL_COND_OBJ_GETTIMEOFDAY],
                  [test $HAVE_GETTIMEOFDAY = 0 || test $REPLACE_GETTIMEOFDAY = 1])
@@ -1272,6 +1274,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/getopt_int.h
   lib/getrandom.c
   lib/gettext.h
+  lib/gettime-res.c
   lib/gettime.c
   lib/gettimeofday.c
   lib/gl_openssl.h

@@ -5940,7 +5940,10 @@ in `current-time' or an integer flag as returned by `visited-file-modtime'.  */)
 	  mtime = make_timespec (0, UNKNOWN_MODTIME_NSECS - flag);
 	}
       else
-	mtime = lisp_time_argument (time_flag);
+	{
+	  mtime = lisp_time_argument (time_flag);
+	  /* FIXME: Do not assume mtime resolution is 1 ns.  */
+	}
 
       current_buffer->modtime = mtime;
       current_buffer->modtime_size = -1;

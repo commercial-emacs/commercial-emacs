@@ -1899,6 +1899,10 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
   init_signals ();
 
+  /* This calls putenv and so must precede init_process_emacs.
+     It must also precede init_window_once, which creates timestamps.  */
+  init_timefns ();
+
   noninteractive1 = noninteractive;
 
   /* Perform basic initializations (not merely interning symbols).  */
@@ -2391,9 +2395,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
     }
 
   init_charset ();
-
-  /* This calls putenv and so must precede init_process_emacs.  */
-  init_timefns ();
 
   init_editfns ();
 

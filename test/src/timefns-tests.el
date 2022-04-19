@@ -128,7 +128,7 @@
 (ert-deftest format-time-string-padding-minimal-deletes-unneeded-zeros ()
   (let ((ref-time (encode-time '((123450 . 1000000) 0 0 15 2 2000 - - t))))
     (should (equal (format-time-string "%-:::z" ref-time "FJT-12") "+12"))
-    (should (equal (format-time-string "%-N" ref-time t) "12345"))
+    (should (equal (format-time-string "%-N" ref-time t) "123450"))
     (should (equal (format-time-string "%-6N" ref-time t) "12345"))
     (should (equal (format-time-string "%-m" ref-time t) "2")))) ;not "02"
 
@@ -137,7 +137,7 @@
     (should (equal (format-time-string "%-z" ref-time "IST-5:30") "+530"))
     (should (equal (format-time-string "%-4z" ref-time "IST-5:30") "+530"))
     (should (equal (format-time-string "%4z" ref-time "IST-5:30") "+530"))
-    (should (equal (format-time-string "%-N" ref-time t) "00345"))
+    (should (equal (format-time-string "%-N" ref-time t) "003450"))
     (should (equal (format-time-string "%-3N" ref-time t) "003"))
     (should (equal (format-time-string "%3N" ref-time t) "003"))
     (should (equal (format-time-string "%-m" ref-time t) "10")) ;not "1"
@@ -165,6 +165,14 @@ a fixed place on the right and are padded on the left."
     (should (equal (format-time-string "%9N" ref-time t) "123000000"))
     (should (equal (format-time-string "%6N" ref-time t) "123000"))))
 
+(ert-deftest format-time-string-%-N ()
+  (should (equal (format-time-string "%-N" '(0 . 10)) "0"))
+  (should (equal (format-time-string "%-N" '(0 . 11)) "00"))
+  (should (equal (format-time-string "%-N" '(0 . 100)) "00"))
+  (should (equal (format-time-string "%-N" '(0 . 101)) "000"))
+  (should (equal (format-time-string "%-N" '(0 . 100000000)) "00000000"))
+  (should (equal (format-time-string "%-N" '(0 . 100000001)) "000000000"))
+  (should (equal (format-time-string "%-N" '(0 . 1000000000)) "000000000")))
 
 (ert-deftest time-equal-p-nil-nil ()
   (should (time-equal-p nil nil)))
@@ -224,6 +232,15 @@ a fixed place on the right and are padded on the left."
     (should (time-equal-p
              (encode-time '(29 31 17 30 4 2019 2 t 7200))
              '(23752 27217))))
+
+(ert-deftest encode-time-alternate-apis ()
+  (let* ((time '(30 30 12 15 6 1970))
+	 (time-1 (append time '(nil -1 nil)))
+	 (etime (encode-time time)))
+    (should (time-equal-p etime (encode-time time-1)))
+    (should (time-equal-p etime (apply #'encode-time time)))
+    (should (time-equal-p etime (apply #'encode-time time-1)))
+    (should (time-equal-p etime (apply #'encode-time (append time '(nil)))))))
 
 (ert-deftest float-time-precision ()
   (should (= (float-time '(0 1 0 4025)) 1.000000004025))

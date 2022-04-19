@@ -3169,16 +3169,14 @@ list_system_processes (void)
 
 #endif /* !defined (WINDOWSNT) */
 
-#if defined __FreeBSD__ || defined DARWIN_OS || defined __OpenBSD__
+#if (defined HAVE_GETRUSAGE \
+     || defined __FreeBSD__ || defined DARWIN_OS || defined __OpenBSD__)
 
 static Lisp_Object
 make_lisp_s_us (time_t s, long us)
 {
-  Lisp_Object sec = make_int (s);
-  Lisp_Object usec = make_fixnum (us);
-  Lisp_Object hz = make_fixnum (1000000);
-  Lisp_Object ticks = CALLN (Fplus, CALLN (Ftimes, sec, hz), usec);
-  return Ftime_convert (Fcons (ticks, hz), Qnil);
+  return make_lisp_time_clockres (make_timespec (s, us * 1000),
+				  make_fixnum (1000000), 1000000, 1000);
 }
 
 #endif
@@ -4238,7 +4236,7 @@ does the same thing as `current-time'.  */)
 #ifdef HAVE_GETRUSAGE
   struct rusage usage;
   time_t secs;
-  int usecs;
+  long int usecs;
 
   if (getrusage (RUSAGE_SELF, &usage) < 0)
     /* This shouldn't happen.  What action is appropriate?  */
@@ -4252,7 +4250,7 @@ does the same thing as `current-time'.  */)
       usecs -= 1000000;
       secs++;
     }
-  return make_lisp_time (make_timespec (secs, usecs * 1000));
+  return make_lisp_s_us (secs, usecs);
 #else /* ! HAVE_GETRUSAGE  */
 #ifdef WINDOWSNT
   return w32_get_internal_run_time ();

@@ -202,6 +202,14 @@ speakers of the Tamil language.  To get back the previous behavior,
 use the new 'tamil-itrans-digits' and 'tamil-inscript-digits' input
 methods instead.
 
++++
+** current-time and related functions now yield (TICKS . HZ) timestamps.
+Previously they yielded timestamps of the forms (HI LO US PS), (HI LO
+US) or (HI LO), which were less regular and less efficient and which
+lacked information about clock resolution.  This long-planned change
+was documented in Emacs 27.  To convert a timestamp X to the old
+4-element list form, you can use (time-convert X 'list).
+
 
 * Changes in Emacs 29.1
 
@@ -1949,6 +1957,22 @@ This variable is bound to t during the preparation of a "*Help*" buffer.
 For example, '(time-add nil '(1 . 1000))' no longer warns that the
 '(1 . 1000)' acts like '(1000 . 1000000)'.  This warning, which was a
 temporary transition aid for Emacs 27, has served its purpose.
+
++++
+** (TICKS . HZ) timestamps now report system clock resolution.
+For example, the macOS system clock resolution is 1 μs so
+(time-convert nil t) now acts like (time-convert nil 1000000).
+Formerly, time-convert used a clock resolution of 1 ns regardless.
+
++++
+** 'format-time-string' no longer pads %-N excessively.
+Insteads, it pads to the resolution of the timestamp when the
+timestamp resolution is greater than 1 ns.
+
++++
+** 'encode-time' now also accepts a 6-element list with just time and date.
+(encode-time (list SECOND MINUTE HOUR DAY MONTH YEAR)) is now short for
+(encode-time (list SECOND MINUTE HOUR DAY MONTH YEAR nil -1 nil)).
 
 +++
 ** 'date-to-time' now assumes earliest values if its argument lacks
