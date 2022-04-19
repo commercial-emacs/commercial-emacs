@@ -250,7 +250,7 @@ typedef struct gc_allocation gc_allocation;
 typedef struct gc_vector_allocation gc_vector_allocation;
 typedef struct gc_tospace_placer gc_tospace_placer;
 typedef struct sdata sdata;
-typedef struct gc_igscan gc_igscan;
+typedef struct intergen intergen;
 typedef struct gc_gen_y_bit_iter gc_gen_y_bit_iter;
 typedef bool (*gc_heap_enumerator)(void *obj, void *data);
 
@@ -504,10 +504,10 @@ struct gc_heap {
      Required if homogeneous_object_nbytes is zero.  Must be NULL if
      homogeneous_object_nbytes is supplied; must be non-NULL
      otherwise.  */
-  size_t (*object_nbytes)(const void * p);
+  size_t (*object_nbytes)(const void *p);
   /* Hook to use with intergenerational scanning.  Return true to take
      over scanning duties from the regular loop.  */
-  bool (*igscan_hook)(void *obj_ptr, gc_phase phase, gc_igscan *scan);
+  bool (*intergen_hook)(void *obj_ptr, gc_phase phase, intergen *scan);
   /* Heap-specific phase-implementing functions.  GC core calls
      through these in order to generate better specializations and
      stack traces.  */
@@ -616,9 +616,9 @@ struct sdata {
   } u;
 } GCALIGNED_STRUCT;
 
-/* Context information for igscan --- scanning old-generation objects
+/* Context information for intergen --- scanning old-generation objects
    in the heap that might have pointers to new-generation objects.  */
-struct gc_igscan {
+struct intergen {
   /* Block we're searching.  */
   gc_block *const b;
   /* Don't search beyond this slot.  SLOT_NR below may go beyond this
@@ -842,11 +842,11 @@ GCFN ptrdiff_t gc_locator_slot_nr (gc_locator, const gc_heap *);
 GCFN size_t gc_locator_block_nr (gc_locator, const gc_heap *);
 GCFN void gc_block_preprocess_perma_pins (gc_block *, const gc_heap *);
 GCFN void gc_block_scan_intergenerational (gc_block *, gc_phase, const gc_heap *);
-GCFN bool gc_igscan_advance_nr_slots_test_dirty (gc_igscan *, ptrdiff_t, const gc_heap *);
-GCFN void gc_igscan_scan_object (gc_igscan *, gc_phase, const gc_heap *);
-GCFN void gc_igscan_skip_clean_pages (gc_igscan *, const gc_heap *);
-GCFN void gc_igscan_skip_to_object_start (gc_igscan *, const gc_heap *);
-GCFN ptrdiff_t gc_igscan_get_next_dirty_slot_nr (const gc_igscan *, const gc_heap *);
+GCFN bool intergen_advance_nr_slots_test_dirty (intergen *, ptrdiff_t, const gc_heap *);
+GCFN void intergen_scan_object (intergen *, gc_phase, const gc_heap *);
+GCFN void intergen_skip_clean_pages (intergen *, const gc_heap *);
+GCFN void intergen_skip_to_object_start (intergen *, const gc_heap *);
+GCFN ptrdiff_t intergen_get_next_dirty_slot_nr (const intergen *, const gc_heap *);
 GCFN void gc_block_plan_sweep (gc_block *, gc_cursor *, const gc_heap *);
 GCFN void scan_reference_pointer_to_vectorlike_1 (void *, union vectorlike_header *, gc_phase);
 GCFN void scan_reference_pointer_to_vectorlike_2 (union vectorlike_header **, gc_phase);
@@ -992,7 +992,7 @@ GCFN void scan_terminal (struct terminal *, gc_phase);
 NRML void visit_vectorlike_root (struct gc_root_visitor, struct Lisp_Vector *, enum gc_root_type);
 NRML void visit_buffer_root (struct gc_root_visitor, struct buffer *, enum gc_root_type);
 NOIL void gc_mark_vectorlike (union vectorlike_header *);
-GCFN bool vector_igscan_hook(void *, gc_phase, gc_igscan *);
+GCFN bool vector_intergen_hook(void *, gc_phase, intergen *);
 NRML void sweep_one_large_vector (large_vector_meta *);
 
 NRML void mem_insert (struct mem_node *, void *, void *, enum mem_type);
@@ -3341,8 +3341,8 @@ gc_block_preprocess_perma_pins (gc_block *const b, const gc_heap *const h)
 }
 
 bool
-gc_igscan_advance_nr_slots_test_dirty (
-  gc_igscan *const scan,
+intergen_advance_nr_slots_test_dirty (
+  intergen *const scan,
   ptrdiff_t nr_slots_to_move,
   const gc_heap *const h)
 {
@@ -3364,7 +3364,7 @@ gc_igscan_advance_nr_slots_test_dirty (
       eassume (nr_slots_to_move > 0);
       nr_slots_to_move -= 1;
       at_end = true;
-      /* Make sure a subsequent call to gc_igscan_skip_to_object_start
+      /* Make sure a subsequent call to intergen_skip_to_object_start
          doesn't think we have another object to scan.  */
       scan->start_word = 0;
     }
@@ -3428,7 +3428,7 @@ gc_igscan_advance_nr_slots_test_dirty (
 }
 
 void
-gc_igscan_scan_object (gc_igscan *const scan,
+intergen_scan_object (intergen *const scan,
                        const gc_phase phase,
                        const gc_heap *const h)
 {
@@ -3439,17 +3439,17 @@ gc_igscan_scan_object (gc_igscan *const scan,
   eassume (scan->slot_nr < gc_heap_nslots_per_block (h));
   eassert (gc_cursor_object_starts_here (c, h));
 
-  if (h->igscan_hook &&
-      h->igscan_hook (obj_ptr, phase, scan))
+  if (h->intergen_hook &&
+      h->intergen_hook (obj_ptr, phase, scan))
     return;
   // in the case of marking (intergenerational) references, we need to scan everything
   // when we sweep, it shoud only take place on dirty pages
-  if(gc_igscan_advance_nr_slots_test_dirty (scan, obj_nr_slots, h))
+  if(intergen_advance_nr_slots_test_dirty (scan, obj_nr_slots, h))
   scan_object (obj_ptr, h->lisp_type, phase);
 }
 
 ptrdiff_t
-gc_igscan_get_next_dirty_slot_nr (const gc_igscan *const scan,
+intergen_get_next_dirty_slot_nr (const intergen *const scan,
                                   const gc_heap *const h)
 {
   if (scan->page_is_dirty)
@@ -3501,11 +3501,11 @@ gc_igscan_get_next_dirty_slot_nr (const gc_igscan *const scan,
 }
 
 void
-gc_igscan_skip_clean_pages (gc_igscan *const scan,
+intergen_skip_clean_pages (intergen *const scan,
                             const gc_heap *const h)
 {
   const ptrdiff_t slot_nr = scan->slot_nr;
-  const ptrdiff_t new_slot_nr = gc_igscan_get_next_dirty_slot_nr (scan, h);
+  const ptrdiff_t new_slot_nr = intergen_get_next_dirty_slot_nr (scan, h);
   eassume (0 <= slot_nr);
   eassume (slot_nr <= new_slot_nr);
   eassume (new_slot_nr <= gc_heap_nslots_per_block (h));
@@ -3517,15 +3517,15 @@ gc_igscan_skip_clean_pages (gc_igscan *const scan,
       scan->slot_nr = scan->slot_limit;
     }
   else
-    gc_igscan_advance_nr_slots_test_dirty (scan, new_slot_nr - slot_nr, h);
+    intergen_advance_nr_slots_test_dirty (scan, new_slot_nr - slot_nr, h);
 }
 
 void
-gc_igscan_skip_to_object_start (gc_igscan *const scan,
+intergen_skip_to_object_start (intergen *const scan,
                                 const gc_heap *const h)
 {
   /* If we have non-zero start bits, we can find an object by shifting
-     the start bit word.  gc_igscan_advance_nr_slots_test_dirty()
+     the start bit word.  intergen_advance_nr_slots_test_dirty()
      takes care of tracking whether we've moved to a dirty page.  */
   eassume (scan->slot_nr >= scan->slot_limit ||
            scan->start_word ==
@@ -3535,7 +3535,7 @@ gc_igscan_skip_to_object_start (gc_igscan *const scan,
   if (scan->start_word)
     {
       const int tz = emacs_ctz_bw (scan->start_word);
-      gc_igscan_advance_nr_slots_test_dirty (scan, tz, h);
+      intergen_advance_nr_slots_test_dirty (scan, tz, h);
       return;
     }
   const ptrdiff_t slot_limit = scan->slot_limit;
@@ -3551,7 +3551,7 @@ gc_igscan_skip_to_object_start (gc_igscan *const scan,
           scan->slot_nr = slot_limit;
           return;
         }
-      gc_igscan_advance_nr_slots_test_dirty (scan, bits_left_in_word, h);
+      intergen_advance_nr_slots_test_dirty (scan, bits_left_in_word, h);
     }
   eassume ((scan->slot_nr % emacs_bitset_bits_per_word) == 0);
   /* If we don't have an object start immediately available, we have
@@ -3559,17 +3559,17 @@ gc_igscan_skip_to_object_start (gc_igscan *const scan,
      currently on a clean page, however, we can accelerate the bitset
      scan by using the card table to skip a large number of start bit
      words.  */
-  gc_igscan_skip_clean_pages (scan, h);
+  intergen_skip_clean_pages (scan, h);
   eassume (0 <= slot_limit && slot_limit <=
            gc_heap_nslots_per_block (h));
   while (scan->slot_nr < slot_limit && scan->start_word == 0)
-    gc_igscan_advance_nr_slots_test_dirty (
+    intergen_advance_nr_slots_test_dirty (
       scan, emacs_bitset_bits_per_word, h);
   if (scan->slot_nr < slot_limit)
     {
       eassume (scan->start_word);
       const int tz = emacs_ctz_bw (scan->start_word);
-      gc_igscan_advance_nr_slots_test_dirty (scan, tz, h);
+      intergen_advance_nr_slots_test_dirty (scan, tz, h);
     }
 }
 
@@ -3586,24 +3586,24 @@ gc_block_scan_intergenerational (gc_block *const b,
     emacs_bitset_bit_set_p (&b->meta.card_table[0],
 			    ARRAYELTS (b->meta.card_table),
 			    0);
-  gc_igscan scan_buf = {
+  intergen scan_buf = {
     .b = b,
     .slot_limit = gen_y_slot_nr,
     .slot_nr = 0,
     .page_is_dirty = first_page_is_dirty,
     /* If the first page isn't dirty, we're not going to read the
        initial start bits anyway, so we can skip the memory load and
-       use zero instead.  gc_igscan_skip_to_object_start() will read a
+       use zero instead.  intergen_skip_to_object_start() will read a
        different start bit word in this case anyway.  */
     .start_word = gc_block_start_bits (b, h)[0],
   };
-  gc_igscan *const scan = &scan_buf;
+  intergen *const scan = &scan_buf;
   for (;;)
     {
-      gc_igscan_skip_to_object_start (scan, h);
+      intergen_skip_to_object_start (scan, h);
       if (scan->slot_nr >= gen_y_slot_nr)
         break;
-      gc_igscan_scan_object (scan, phase, h);
+      intergen_scan_object (scan, phase, h);
     }
 }
 
@@ -3877,10 +3877,7 @@ gc_mark_interval (const INTERVAL i)
   if (! interval_marked_p (i))
     {
       set_interval_marked (i);
-      if (eunlikely (false))
-	gc_mark_enqueue (gc_interval_wrap (i));
-      else
-	scan_interval (i, GC_PHASE_MARK);
+      scan_interval (i, GC_PHASE_MARK);
     }
 }
 
@@ -4003,10 +4000,7 @@ gc_mark_string (struct Lisp_String *const s)
   if (! string_marked_p (s))
     {
       set_string_marked (s);
-      if (eunlikely (false))
-	gc_mark_enqueue (make_lisp_ptr (s, Lisp_String));
-      else
-	scan_string (s, GC_PHASE_MARK);
+      scan_string (s, GC_PHASE_MARK);
     }
 }
 
@@ -4082,9 +4076,6 @@ scan_string (struct Lisp_String *const s, const gc_phase phase)
         }
     }
   scan_reference_pointer_to_interval (&s->u.s.intervals, phase);
-  /* TODO: just keep intervals always balanced? */
-  if (false /* XXX!!!! */ && phase == GC_PHASE_SWEEP && s->u.s.intervals)
-    s->u.s.intervals = balance_intervals (s->u.s.intervals);
 }
 
 struct Lisp_String *
@@ -4630,14 +4621,11 @@ gc_mark_cons (struct Lisp_Cons *c)
   if (! cons_marked_p (c))
     {
       set_cons_marked (c);
-      if (eunlikely (false))
-	gc_mark_enqueue (make_lisp_ptr (c, Lisp_Cons));
-      else
-	while (c != NULL)
-	  {
-	    scan_cons (c, GC_PHASE_MARK);
-	    c = CONSP (c->u.s.cdr) ? XCONS (c->u.s.cdr) : NULL;
-	  }
+      while (c != NULL)
+	{
+	  scan_cons (c, GC_PHASE_MARK);
+	  c = CONSP (c->u.s.cdr) ? XCONS (c->u.s.cdr) : NULL;
+	}
     }
 }
 
@@ -4830,7 +4818,7 @@ static const gc_heap gc_vector_heap = {
   .preserve_fromspace_across_sweeps = true,
   .object_nbytes = gc_vector_object_nbytes,
   .cleanup = vector_cleanup,
-  .igscan_hook = vector_igscan_hook,
+  .intergen_hook = vector_intergen_hook,
   GC_HEAP_BITS_CONFIG (vector),
   CONFIG_STANDARD_HEAP_FUNCTIONS (gc_vector_heap),
 };
@@ -4843,10 +4831,7 @@ gc_mark_vectorlike (union vectorlike_header *const v)
   if (! vectorlike_marked_p (v))
     {
       set_vectorlike_marked (v);
-      if (eunlikely (false))
-	gc_mark_enqueue (make_lisp_ptr (v, Lisp_Vectorlike));
-      else
-	scan_vectorlike (v, GC_PHASE_MARK);
+      scan_vectorlike (v, GC_PHASE_MARK);
     }
 }
 
@@ -4855,9 +4840,9 @@ gc_mark_vectorlike (union vectorlike_header *const v)
    any page containing the vector were marked as dirty --- that's
    wasteful.  */
 bool
-vector_igscan_hook(void *const obj_ptr,
-                   const gc_phase phase,
-                   gc_igscan *const scan)
+vector_intergen_hook(void *const obj_ptr,
+		     const gc_phase phase,
+		     intergen *const scan)
 {
   struct Lisp_Vector *const v = obj_ptr;
   if (PVTYPE (&v->header) != PVEC_NORMAL_VECTOR)
@@ -4867,11 +4852,11 @@ vector_igscan_hook(void *const obj_ptr,
   const ptrdiff_t header_nr_slots =
     header_size / gc_heap_nbytes_per_slot (h);
   eassume (sizeof (v->contents[0]) == gc_heap_nbytes_per_slot (h));
-  gc_igscan_advance_nr_slots_test_dirty (scan, header_nr_slots, h);
+  intergen_advance_nr_slots_test_dirty (scan, header_nr_slots, h);
   const ptrdiff_t vecsize = v->header.size;
   eassume (vecsize >= 0);
   for (ptrdiff_t i = 0; i < vecsize; ++i)
-    if (gc_igscan_advance_nr_slots_test_dirty (scan, 1, h))
+    if (intergen_advance_nr_slots_test_dirty (scan, 1, h))
       scan_reference (&v->contents[i], phase);
   return true;  /* We handled this object.  */
 }
@@ -5645,14 +5630,11 @@ gc_mark_symbol (struct Lisp_Symbol *s)
 {
   if (symbol_marked_p (s))
     return;
-  if (eunlikely (false))
-    gc_mark_enqueue (make_lisp_symbol (s));
-  else
-    while (s) {
-      set_symbol_marked (s);
-      scan_symbol (s, GC_PHASE_MARK);
-      s = s->u.s.next;
-    }
+  while (s) {
+    set_symbol_marked (s);
+    scan_symbol (s, GC_PHASE_MARK);
+    s = s->u.s.next;
+  }
 }
 
 void
