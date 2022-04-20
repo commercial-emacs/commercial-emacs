@@ -616,8 +616,8 @@ struct sdata {
   } u;
 } GCALIGNED_STRUCT;
 
-/* Context information for intergen --- scanning old-generation objects
-   in the heap that might have pointers to new-generation objects.  */
+/* Context information for intergen.  Scan old-generation objects in
+   the heap that might have pointers to new-generation objects.  */
 struct intergen {
   /* Block we're searching.  */
   gc_block *const b;
@@ -742,8 +742,8 @@ NRML void garbage_collect (bool);
 NRML Lisp_Object gc_make_heap_info (const gc_heap *);
 NRML bool survives_gc_p (Lisp_Object) ATTRIBUTE_PURE;
 NRML void gc_any_object_pin (Lisp_Object);
-NRML void gc_any_object_point_into_tospace (Lisp_Object *);
-GCFN void gc_any_object_point_into_tospace_pointer (void *, enum Lisp_Type);
+NRML void gc_flip_tagged_pointer (Lisp_Object *);
+GCFN void gc_flip_pointer (void *, enum Lisp_Type);
 GCFN gc_tospace_placer gc_tospace_placer_init (gc_cursor, const gc_heap *);
 GCFN void * gc_tospace_placer_place (gc_tospace_placer *, gc_locator, ptrdiff_t, const gc_heap *);
 GCFN void gc_tospace_placer_flush (gc_tospace_placer *, const gc_heap *);
@@ -829,7 +829,7 @@ GCFN bool gc_object_is_marked (const void *, const gc_heap *);
 GCFN void gc_object_set_marked (void *, const gc_heap *);
 GCFN void gc_object_set_pinned (void *, const gc_heap *);
 GCFN void gc_object_perma_pin (void *, const gc_heap *);
-GCFN void *gc_object_point_into_tospace (void *, const gc_heap *);
+GCFN void *gc_flip_subroutine (void *, const gc_heap *);
 GCFN gc_cursor gc_object_to_cursor (const void *, const gc_heap *);
 GCFN void scan_reference (Lisp_Object *, gc_phase);
 GCFN void mark_reference_pinned (Lisp_Object);
@@ -848,8 +848,7 @@ GCFN void intergen_skip_clean_pages (intergen *, const gc_heap *);
 GCFN void intergen_skip_to_object_start (intergen *, const gc_heap *);
 GCFN ptrdiff_t intergen_get_next_dirty_slot_nr (const intergen *, const gc_heap *);
 GCFN void gc_block_plan_sweep (gc_block *, gc_cursor *, const gc_heap *);
-GCFN void scan_reference_pointer_to_vectorlike_1 (void *, union vectorlike_header *, gc_phase);
-GCFN void scan_reference_pointer_to_vectorlike_2 (union vectorlike_header **, gc_phase);
+GCFN void scan_reference_pointer_to_vectorlike (union vectorlike_header **, gc_phase);
 NRML void mark_pointer (void *);
 NRML void mark_object (Lisp_Object);
 NRML void scan_object_root_visitor_sweep (Lisp_Object *, enum gc_root_type, void *);
@@ -1049,9 +1048,6 @@ GCFN void gc_gen_y_bit_iter_set (const gc_gen_y_bit_iter *, emacs_bitset_word *,
 GCFN void check_obarray_elem(const Lisp_Object tail, size_t i, size_t obsize);
 
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
-
-#define scan_reference_pointer_to_vectorlike(x, phase)                  \
-  scan_reference_pointer_to_vectorlike_1 ((x), &(*(x))->header, phase)
 
 /* Allocate zeroed pseudovector with no Lisp_Object slots.  */
 #define UNSAFE_ALLOCATE_PLAIN_PSEUDOVECTOR_UNINIT(vr, type, tag) \
@@ -3513,7 +3509,7 @@ intergen_skip_clean_pages (intergen *const scan,
   if (new_slot_nr >= scan->slot_limit)
     {
       /* Don't bother maintaining the invariants if we're going to the
-         scan boundary --- we'll be terminating the loop anyway.  */
+         scan boundary.  We'll be terminating the loop anyway.  */
       scan->slot_nr = scan->slot_limit;
     }
   else
@@ -3790,7 +3786,7 @@ gc_heap_allocate_tospace (const gc_heap *h,
     {
       /* We can't get here: the allocation cursor always points to
          valid free space, and compacting GC always moves that cursor
-         to a place earlier in the heap or leaves it in place --- so
+         to a place earlier in the heap or leaves it in place -- so
          moving the cursor past the end of the last tospace object
          should always succeed.  In the worst case, every object in
          the heap is live, GC doesn't free any objects at all, and the
@@ -3945,13 +3941,13 @@ point_interval_into_tospace (const INTERVAL i)
 {
   return pdumper_object_p (i)
     ? i
-    : gc_object_point_into_tospace (i, &gc_interval_heap);
+    : gc_flip_subroutine (i, &gc_interval_heap);
 }
 
 
 /* Lisp strings are struct Lisp_String objects (four-words long)
    allocated on the string heap.  These objects contain string
-   metadata --- size (in bytes), size (in characters), a pointer to
+   metadata -- size (in bytes), size (in characters), a pointer to
    the interval tree, and string data.  Actual string data lives in
    one of a few different places:
 
@@ -4083,7 +4079,7 @@ point_string_into_tospace (struct Lisp_String *const s)
 {
   return pdumper_object_p (s)
     ? s
-    : gc_object_point_into_tospace (s, &gc_string_heap);
+    : gc_flip_subroutine (s, &gc_string_heap);
 }
 
 /* Initialize string allocation.  Called from init_alloc_once.  */
@@ -4596,7 +4592,7 @@ point_float_into_tospace (struct Lisp_Float *const f)
 {
   return pdumper_object_p (f)
     ? f
-    : gc_object_point_into_tospace (f, &gc_float_heap);
+    : gc_flip_subroutine (f, &gc_float_heap);
 }
 
 
@@ -4803,7 +4799,7 @@ point_cons_into_tospace (struct Lisp_Cons *const f)
 {
   return pdumper_object_p (f)
     ? f
-    : gc_object_point_into_tospace (f, &gc_cons_heap);
+    : gc_flip_subroutine (f, &gc_cons_heap);
 }
 
 
@@ -4837,7 +4833,7 @@ gc_mark_vectorlike (union vectorlike_header *const v)
 
 /* Provide special support for scanning parts of large vectors that
    have changed.  Without this function, we'd scan the whole vector if
-   any page containing the vector were marked as dirty --- that's
+   any page containing the vector were marked as dirty -- that's
    wasteful.  */
 bool
 vector_intergen_hook(void *const obj_ptr,
@@ -5695,7 +5691,7 @@ point_symbol_into_tospace (struct Lisp_Symbol *const s)
 {
   return (pdumper_object_p (s) || c_symbol_p (s))
     ? s
-    : gc_object_point_into_tospace (s, &gc_symbol_heap);
+    : gc_flip_subroutine (s, &gc_symbol_heap);
 }
 
 void
@@ -6023,7 +6019,7 @@ point_vectorlike_into_tospace (union vectorlike_header *const v)
 {
   if (vectorlike_always_pinned_p (v))
     return v;
-  return gc_object_point_into_tospace (v, &gc_vector_heap);
+  return gc_flip_subroutine (v, &gc_vector_heap);
 }
 
 /* Called if malloc (NBYTES) returns zero.  If NBYTES == SIZE_MAX,
@@ -7113,41 +7109,46 @@ sweep_pdumper_object (void *const obj, const enum Lisp_Type type)
   scan_object (obj, type, GC_PHASE_SWEEP);
 }
 
-/* Akin to dump_roots in pdumper.c.  */
-void
-scan_roots (gc_phase phase)
-{
-  struct gc_root_visitor visitor = { .visit = scan_root_visitor,
-				     .data = &phase };
-  visit_static_gc_roots (visitor);
-  scan_reference_pointer_to_vectorlike (&terminal_list, phase);
-  scan_reference_pointer_to_vectorlike (&initial_terminal, phase);
-  scan_kboards (phase);
-  scan_thread_roots (phase);
-  scan_doomed_finalizers (phase);
+/* Akin to dump_roots in pdumper.c.
 
-  scan_dispnew_roots (phase);
-  scan_marker_roots (phase);
-  scan_xdisp_roots (phase);
-  scan_syntax_roots (phase);
-  scan_process_roots (phase);
-
-#ifdef HAVE_NTGUI
-  scan_reference_pointer_to_vectorlike (&w32_system_caret_window, phase);
-#endif
-
-#ifdef USE_GTK
-  xg_scan_data (phase);
-#endif
-
-#ifdef HAVE_WINDOW_SYSTEM
-  scan_fringe_data (phase);
-#endif
-
-#ifdef HAVE_MODULES
-  //  scan_modules (NULL, phase);
-#endif
+   This needs to be a massive macro substitution
+   to emulate the Effective C++ template method.
+*/
+#define DEFINE_SCAN_ROOTS(phase)					\
+void									\
+phase ## _roots ()							\
+{									\
+  struct gc_root_visitor visitor = { .visit = phase ## _root_visitor, }; \
+  visit_static_gc_roots (visitor);					\
+  phase ## _vectorlike (&terminal_list);		\
+  phase ## _kboards ();							\
+  phase ## _thread_roots ();						\
+  phase ## _doomed_finalizers ();					\
+  phase ## _dispnew_roots ();						\
+  phase ## _marker_roots ();						\
+  phase ## _xdisp_roots ();						\
+  phase ## _syntax_roots ();						\
+  phase ## _process_roots ();						\
+									\
+  #ifdef HAVE_NTGUI							\
+  phase ## _reference_pointer_to_vectorlike (&w32_system_caret_window); \
+  #endif								\
+									\
+  #ifdef USE_GTK							\
+  xg_ ## phase ## _data ();						\
+  #endif								\
+									\
+  #ifdef HAVE_WINDOW_SYSTEM						\
+  phase ## _fringe_data ();						\
+  #endif								\
+									\
+  #ifdef HAVE_MODULES							\
+  //  phase ## _modules (NULL);						\
+  #endif								\
 }
+
+DEFINE_SCAN_ROOTS(mark);
+DEFINE_SCAN_ROOTS(sweep);
 
 bool
 mark_strong_references_on_reachable_weak_list (
@@ -7156,12 +7157,13 @@ mark_strong_references_on_reachable_weak_list (
 {
   bool marked = false;
   for (; CONSP (tail); tail = XCDR (tail))
-    if (entry_survives_gc_p (XCAR (tail)) && !survives_gc_p (XCAR (tail)))
+    if (entry_survives_gc_p (XCAR (tail))
+	&& ! survives_gc_p (XCAR (tail)))
       {
         gc_mark (XCAR (tail));
         marked = true;
       }
-  if (!survives_gc_p (tail))
+  if ( !survives_gc_p (tail))
     {
       gc_mark (tail);
       marked = true;
@@ -7590,7 +7592,7 @@ gc_phase_sweep (void)
   pdumper_sweep ();
 
   /* A heap might keep its fromspace around until after all sweeps are
-     done --- we need to do that when we need to read an object on
+     done -- we need to do that when we need to read an object on
      that heap to figure out whether it's on the GC heap or stored
      somewhere else, e.g., inside the Emacs image.  Now we can finish
      the work.  */
@@ -8252,7 +8254,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		  else
 		    {
 		      /* For weak tables, mark only the vector and not its
-			 contents --- that's what makes it weak.  */
+			 contents -- that's what makes it weak.  */
 		      eassert (h->next_weak == NULL);
 		      h->next_weak = weak_hash_tables;
 		      weak_hash_tables = h;
@@ -8507,7 +8509,7 @@ scan_hash_table (struct Lisp_Hash_Table *const h, const gc_phase phase)
   scan_reference (&h->test.user_hash_function, phase);
   scan_reference (&h->test.user_cmp_function, phase);
   /* If hash table is not weak, mark all keys and values.  For weak
-     tables, mark only the vector and not its contents --- that's what
+     tables, mark only the vector and not its contents -- that's what
      makes it weak.  */
   if (NILP (h->weak))
     scan_reference (&h->key_and_value, phase);
@@ -8728,7 +8730,7 @@ scan_reference (Lisp_Object *const refp, const gc_phase phase)
       gc_mark (*refp);
       break;
     case GC_PHASE_SWEEP:
-      gc_any_object_point_into_tospace (refp);
+      gc_flip_tagged_pointer (refp);
       break;
     default:
       emacs_unreachable ();
@@ -8787,7 +8789,7 @@ scan_reference_pointer_to_symbol (struct Lisp_Symbol **const s,
 	  gc_mark_symbol (*s);
 	  break;
 	case GC_PHASE_SWEEP:
-	  gc_any_object_point_into_tospace_pointer (s, Lisp_Symbol);
+	  gc_flip_pointer (s, Lisp_Symbol);
 	  break;
 	default:
 	  emacs_unreachable ();
@@ -8797,16 +8799,8 @@ scan_reference_pointer_to_symbol (struct Lisp_Symbol **const s,
 }
 
 void
-scan_reference_pointer_to_vectorlike_1 (
-  void *const ptr, union vectorlike_header *const hdr, const gc_phase phase)
-{
-  (void) hdr;
-  scan_reference_pointer_to_vectorlike_2 (ptr, phase);
-}
-
-void
-scan_reference_pointer_to_vectorlike_2 (union vectorlike_header **const hptr,
-                                        const gc_phase phase)
+scan_reference_pointer_to_vectorlike (union vectorlike_header **const hptr,
+				      const gc_phase phase)
 {
   if (hptr != NULL && *hptr != NULL)
     {
@@ -8816,7 +8810,7 @@ scan_reference_pointer_to_vectorlike_2 (union vectorlike_header **const hptr,
 	  gc_mark_vectorlike (*hptr);
 	  break;
 	case GC_PHASE_SWEEP:
-	  gc_any_object_point_into_tospace_pointer (hptr, Lisp_Vectorlike);
+	  gc_flip_pointer (hptr, Lisp_Vectorlike);
 	  break;
 	default:
 	  emacs_unreachable ();
@@ -8930,73 +8924,92 @@ gc_any_object_pin (const Lisp_Object obj)
   emacs_unreachable ();
 }
 
-/* Make the object reference at *OBJP point into tospace.  */
 void
-gc_any_object_point_into_tospace (Lisp_Object *const objp)
+gc_flip_tagged_pointer (Lisp_Object *const objp)
 {
-  /* Compiler will optimize out the writes for mark-sweep heaps.  */
   switch (XTYPE (*objp))
     {
-    case Lisp_Symbol:
-      *objp = make_lisp_symbol (
-        point_symbol_into_tospace (XSYMBOL (*objp)));
-      return;
-    case Lisp_Type_Unused0:
-      emacs_unreachable ();
     case Lisp_Int0:
     case Lisp_Int1:
-      return;
+      break;
+    case Lisp_Symbol:
+      {
+	const struct Lisp_Symbol *ptr = XSYMBOL (*objp);
+	gc_flip_pointer (&ptr, Lisp_Symbol);
+	*objp = make_lisp_symbol (ptr);
+      }
+      break;
     case Lisp_String:
-      *objp = make_lisp_ptr (
-        point_string_into_tospace (XSTRING (*objp)), Lisp_String);
-      return;
+      {
+	const struct Lisp_String *ptr = XSTRING (*objp);
+	gc_flip_pointer (&ptr, Lisp_String);
+	*objp = make_lisp_ptr (ptr, Lisp_String);
+      }
+      break;
     case Lisp_Vectorlike:
-      *objp = make_lisp_ptr (
-        point_vectorlike_into_tospace (&XVECTOR (*objp)->header),
-        Lisp_Vectorlike);
-      return;
+      {
+	const union vectorlike_header *ptr = &XVECTOR (*objp)->header;
+	gc_flip_pointer (&ptr, Lisp_Vectorlike);
+	*objp = make_lisp_ptr (ptr, Lisp_Vectorlike);
+      }
+      break;
     case Lisp_Cons:
-      *objp = make_lisp_ptr (
-        point_cons_into_tospace (XCONS (*objp)), Lisp_Cons);
-      return;
+      {
+	const struct Lisp_Cons *ptr = XCONS (*objp);
+	gc_flip_pointer (&ptr, Lisp_Cons);
+	*objp = make_lisp_ptr (ptr, Lisp_Cons);
+      }
+      break;
     case Lisp_Float:
-      *objp = make_lisp_ptr (
-        point_float_into_tospace (XFLOAT (*objp)), Lisp_Float);
-      return;
+      {
+	const struct Lisp_Float *ptr = XFLOAT (*objp);
+	gc_flip_pointer (&ptr, Lisp_Float);
+	*objp = make_lisp_ptr (ptr, Lisp_Float);
+      }
+      break;
+    default:
+      emacs_unreachable ();
     }
-  emacs_unreachable ();
 }
 
 void
-gc_any_object_point_into_tospace_pointer (void *const ptrpx,
-                                          const enum Lisp_Type type)
+gc_flip_pointer (void *const ptrpx, const enum Lisp_Type type)
 {
-  /* Compilerswill optimize out the writes for mark-sweep heaps.  */
-  void **const ptrp = ptrpx;
-  void *const ptr = *ptrp;
   switch (type)
     {
     case Lisp_Symbol:
-      *ptrp = point_symbol_into_tospace (ptr);
-      return;
-    case Lisp_Type_Unused0:
-    case Lisp_Int0:
-    case Lisp_Int1:
-      emacs_unreachable ();
+      {
+	struct Lisp_Symbol **const ptrp = (struct Lisp_Symbol **const) ptrpx;
+	*ptrp = point_symbol_into_tospace ((struct Lisp_Symbol *const) *ptrp);
+      }
+      break;
     case Lisp_String:
-      *ptrp = point_string_into_tospace (ptr);
-      return;
+      {
+	struct Lisp_String **const ptrp = (struct Lisp_String **const) ptrpx;
+	*ptrp = point_string_into_tospace ((struct Lisp_String *const) *ptrp);
+      }
+      break;
     case Lisp_Vectorlike:
-      *ptrp = point_vectorlike_into_tospace (ptr);
-      return;
+      {
+	union vectorlike_header **const ptrp = (union vectorlike_header **const) ptrpx;
+	*ptrp = point_vectorlike_into_tospace ((union vectorlike_header *const) *ptrp);
+      }
+      break;
     case Lisp_Cons:
-      *ptrp = point_cons_into_tospace (ptr);
-      return;
+      {
+	struct Lisp_Cons **const ptrp = (struct Lisp_Cons **const) ptrpx;
+	*ptrp = point_cons_into_tospace ((struct Lisp_Cons *const) *ptrp);
+      }
+      break;
     case Lisp_Float:
-      *ptrp = point_float_into_tospace (ptr);
-      return;
+      {
+	struct Lisp_Float **const ptrp = (struct Lisp_Float **const) ptrpx;
+	*ptrp = point_float_into_tospace ((struct Lisp_Float *const) *ptrp);
+      }
+      break;
+    default:
+      emacs_unreachable ();
     }
-  emacs_unreachable ();
 }
 
 bool
@@ -9136,7 +9149,7 @@ gc_object_perma_pin (void *const obj, const gc_heap *const h)
 }
 
 void *
-gc_object_point_into_tospace (void *const obj, const gc_heap *h)
+gc_flip_subroutine (void *const obj, const gc_heap *h)
 {
   eassert (! pdumper_object_p (obj));
   if (! h->use_moving_gc)
