@@ -274,7 +274,7 @@ form.")
     (save-buffers-kill-emacs)
     (kill-process process)
     (should-not yes-or-no-p-prompts)
-    (should (equal kill-emacs-args '(nil)))))
+    (should (equal kill-emacs-args '((nil nil))))))
 
 (ert-deftest files-tests-read-file-in-~ ()
   "Test file prompting in directory named `~'.
