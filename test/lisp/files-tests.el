@@ -261,9 +261,9 @@ form.")
               (lambda (prompt)
                 (push prompt yes-or-no-p-prompts)
                 nil))
-             (kill-emacs-args nil)
+             (kill-emacs-p nil)
              ((symbol-function #'kill-emacs)
-              (lambda (&rest args) (push (car args) kill-emacs-args)))
+              (lambda (&rest _args) (setq kill-emacs-p t)))
              (process
               (make-process
                :name "sleep"
@@ -274,7 +274,7 @@ form.")
     (save-buffers-kill-emacs)
     (kill-process process)
     (should-not yes-or-no-p-prompts)
-    (should (equal kill-emacs-args '((nil nil))))))
+    (should kill-emacs-p)))
 
 (ert-deftest files-tests-read-file-in-~ ()
   "Test file prompting in directory named `~'.
