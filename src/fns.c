@@ -4389,7 +4389,7 @@ maybe_resize_hash_table (struct Lisp_Hash_Table *h)
 	  }
 
 #ifdef ENABLE_CHECKING
-      if (HASH_TABLE_P (Vpurify_flag) && XHASH_TABLE (Vpurify_flag) == h)
+      if (HASH_TABLE_P (Vloadup_pure_table) && XHASH_TABLE (Vloadup_pure_table) == h)
 	message ("Growing hash table to: %"pD"d", next_size);
 #endif
     }

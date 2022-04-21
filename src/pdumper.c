@@ -700,7 +700,7 @@ error_unsupported_dump_object (struct dump_context *ctx,
 static uintptr_t
 emacs_basis (void)
 {
-  return (uintptr_t) &Vpurify_flag;
+  return (uintptr_t) &Vloadup_pure_table;
 }
 
 static void *
@@ -3627,7 +3627,7 @@ dump_unwind_cleanup (void *data)
   if (ctx->blocked_ralloc)
     r_alloc_inhibit_buffer_relocation (0);
 #endif
-  Vpurify_flag = ctx->old_purify_flag;
+  Vloadup_pure_table = ctx->old_purify_flag;
   Vpost_gc_hook = ctx->old_post_gc_hook;
   Vprocess_environment = ctx->old_process_environment;
 }
@@ -4108,8 +4108,8 @@ types.  */)
   ctx->blocked_ralloc = true;
 #endif
 
-  ctx->old_purify_flag = Vpurify_flag;
-  Vpurify_flag = Qnil;
+  ctx->old_purify_flag = Vloadup_pure_table;
+  Vloadup_pure_table = Qnil;
 
   /* Make sure various weird things are less likely to happen.  */
   ctx->old_post_gc_hook = Vpost_gc_hook;

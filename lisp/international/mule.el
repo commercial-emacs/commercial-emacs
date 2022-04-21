@@ -325,7 +325,7 @@ Return t if file exists."
 	(if source
 	    (message "Loading %s (source)..." file)
 	  (message "Loading %s..." file)))
-      (when purify-flag
+      (when loadup-pure-table
 	(push (purecopy file) preloaded-file-list))
       (unwind-protect
 	  (let ((load-true-file-name fullname)

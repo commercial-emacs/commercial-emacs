@@ -565,8 +565,8 @@ Third argument TYPE is the custom option type."
 (defun custom-handle-keyword (symbol keyword value type)
   "For customization option SYMBOL, handle KEYWORD with VALUE.
 Fourth argument TYPE is the custom option type."
-  (if purify-flag
-      (setq value (purecopy value)))
+  (when loadup-pure-table
+    (setq value (purecopy value)))
   (cond ((eq keyword :group)
 	 (custom-add-to-group value symbol type))
 	((eq keyword :version)

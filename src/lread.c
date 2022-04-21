@@ -1410,7 +1410,7 @@ Return t if the file exists and loads successfully.  */)
     ? compute_found_effective (found)
     : found;
 
-  hist_file_name = (! NILP (Vpurify_flag)
+  hist_file_name = (! NILP (Vloadup_pure_table)
                     ? concat2 (Ffile_name_directory (file),
                                Ffile_name_nondirectory (found_eff))
                     : found_eff);
@@ -1538,7 +1538,7 @@ Return t if the file exists and loads successfully.  */)
       unread_char = -1;
     }
 
-  if (! NILP (Vpurify_flag))
+  if (! NILP (Vloadup_pure_table))
     Vpreloaded_file_list = Fcons (Fpurecopy (file), Vpreloaded_file_list);
 
   if (NILP (nomessage) || force_load_messages)
@@ -2296,7 +2296,7 @@ readevalloop (Lisp_Object readcharfun,
 	  = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
 			     DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
 			     Qnil, false);
-      if (! NILP (Vpurify_flag) && c == '(')
+      if (! NILP (Vloadup_pure_table) && c == '(')
 	{
 	  val = read_list (0, readcharfun, false);
 	}
@@ -3731,7 +3731,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 	/* If purifying, and string starts with \ newline,
 	   return zero instead.  This is for doc strings
 	   that we are really going to find in etc/DOC.nn.nn.  */
-	if (! NILP (Vpurify_flag) && NILP (Vdoc_file_name) && cancel)
+	if (! NILP (Vloadup_pure_table) && NILP (Vdoc_file_name) && cancel)
 	  return ANNOTATE (unbind_to (count, make_fixnum (0)));
 
 	if (! force_multibyte && force_singlebyte)
@@ -3835,7 +3835,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 	    if (! q_interned)
 	      {
 		Lisp_Object name
-		  = ((! NILP (Vpurify_flag)
+		  = ((! NILP (Vloadup_pure_table)
 		      ? make_pure_string : make_specified_string)
 		     (read_buffer, nchars, nbytes, multibyte));
 		result = Fmake_symbol (name);
@@ -4229,7 +4229,7 @@ read_list (bool flag, Lisp_Object readcharfun, bool annotated)
       if (EQ (elt, Vload_file_name)
 	  && ! NILP (elt))
 	{
-	  if (! NILP (Vpurify_flag))
+	  if (! NILP (Vloadup_pure_table))
 	    doc_reference = 0;
 	  else if (load_force_doc_strings && ! annotated)
 	    doc_reference = 2;
@@ -4419,7 +4419,7 @@ intern_c_string_1 (const char *str, ptrdiff_t len)
     {
       Lisp_Object string;
 
-      if (NILP (Vpurify_flag))
+      if (NILP (Vloadup_pure_table))
 	string = make_string (str, len);
       else
 	string = make_pure_c_string (str, len);
@@ -4477,7 +4477,7 @@ it defaults to the value of `obarray'.  */)
 	  xfree (longhand);
 	}
       else
-	tem = intern_driver (NILP (Vpurify_flag) ? string : Fpurecopy (string),
+	tem = intern_driver (NILP (Vloadup_pure_table) ? string : Fpurecopy (string),
 			     obarray, tem);
     }
   return tem;
@@ -4772,8 +4772,8 @@ init_obarray_once (void)
   make_symbol_constant (Qt);
   XSYMBOL (Qt)->u.s.declared_special = true;
 
-  /* Qt is correct even if not dumping.  loadup.el will set to nil at end.  */
-  Vpurify_flag = Qt;
+  /* Correct even if not dumping.  loadup.el will set to nil at end.  */
+  Vloadup_pure_table = CALLN (Fmake_hash_table, QCtest, Qequal);
 
   DEFSYM (Qvariable_documentation, "variable-documentation");
 }

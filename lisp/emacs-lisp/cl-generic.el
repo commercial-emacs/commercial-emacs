@@ -648,7 +648,7 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
             ;; BEWARE!  Don't purify this function definition, since that leads
             ;; to memory corruption if the hash-tables it holds are modified
             ;; (the GC doesn't trace those pointers).
-            (purify-flag nil))
+            loadup-pure-table)
         ;; But do use `defalias', so that it interacts properly with nadvice,
         ;; e.g. for tracing/debug-on-entry.
         (defalias sym gfun)))))

@@ -746,7 +746,7 @@ value.  */)
   XSYMBOL (symbol)->u.s.declared_special = true;
   if (!NILP (doc))
     {
-      if (!NILP (Vpurify_flag))
+      if (! NILP (Vloadup_pure_table))
 	doc = Fpurecopy (doc);
       Fput (symbol, Qvariable_documentation, doc);
     }
@@ -855,7 +855,7 @@ usage: (defconst SYMBOL INITVALUE [DOCSTRING])  */)
   sym = XCAR (args);
   CHECK_SYMBOL (sym);
   Lisp_Object docstring = Qnil;
-  if (!NILP (XCDR (XCDR (args))))
+  if (! NILP (XCDR (XCDR (args))))
     {
       if (!NILP (XCDR (XCDR (XCDR (args)))))
 	error ("Too many arguments");
@@ -864,7 +864,7 @@ usage: (defconst SYMBOL INITVALUE [DOCSTRING])  */)
 
   Finternal__define_uninitialized_variable (sym, docstring);
   tem = eval_sub (XCAR (XCDR (args)));
-  if (!NILP (Vpurify_flag))
+  if (! NILP (Vloadup_pure_table))
     tem = Fpurecopy (tem);
   Fset_default (sym, tem);      /* FIXME: set-default-toplevel-value? */
   Fput (sym, Qrisky_local_variable, Qt); /* FIXME: Why?  */
@@ -2134,7 +2134,7 @@ this does nothing and returns nil.  */)
       && !AUTOLOADP (XSYMBOL (function)->u.s.function))
     return Qnil;
 
-  if (!NILP (Vpurify_flag) && EQ (docstring, make_fixnum (0)))
+  if (! NILP (Vloadup_pure_table) && EQ (docstring, make_fixnum (0)))
     /* `read1' in lread.c has found the docstring starting with "\
        and assumed the docstring will be provided by Snarf-documentation, so it
        passed us 0 instead.  But that leads to accidental sharing in purecopy's

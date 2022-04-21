@@ -121,7 +121,7 @@ in case you use it as a menu with `x-popup-menu'.  */)
 {
   if (!NILP (string))
     {
-      if (!NILP (Vpurify_flag))
+      if (! NILP (Vloadup_pure_table))
 	string = Fpurecopy (string);
       return list2 (Qkeymap, string);
     }

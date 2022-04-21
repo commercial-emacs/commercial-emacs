@@ -522,7 +522,7 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 	}
     }
 
-  if (!NILP (Vinvocation_directory)
+  if (! NILP (Vinvocation_directory)
       && NILP (Ffile_name_absolute_p (Vinvocation_directory)))
     /* Emacs was started with relative path, like ./emacs.
        Make it absolute.  */
@@ -535,7 +535,7 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 
   Vinstallation_directory = Qnil;
 
-  if (!NILP (Vinvocation_directory))
+  if (! NILP (Vinvocation_directory))
     {
       dir = Vinvocation_directory;
 #ifdef WINDOWSNT
@@ -546,10 +546,10 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 	  && 0 == strcmp (SSDATA (dir) + SBYTES (dir) - sizeof ("/i386/") + 1,
 			  "/i386/"))
 	{
-	  if (NILP (Vpurify_flag))
+	  if (NILP (Vloadup_pure_table))
 	    {
 	      Lisp_Object file_truename = intern ("file-truename");
-	      if (!NILP (Ffboundp (file_truename)))
+	      if (! NILP (Ffboundp (file_truename)))
 		dir = call1 (file_truename, dir);
 	    }
 	  dir = Fexpand_file_name (build_string ("../.."), dir);
@@ -577,11 +577,11 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 	  info_exists = Qnil;
 #endif
 
-	  if (!NILP (lib_src_exists) || !NILP (info_exists))
+	  if (! NILP (lib_src_exists) || ! NILP (info_exists))
 	    {
 	      tem = Fexpand_file_name (build_string ("etc"), dir);
 	      etc_exists = Ffile_exists_p (tem);
-	      if (!NILP (etc_exists))
+	      if (! NILP (etc_exists))
 		{
                   Vinstallation_directory = Ffile_name_as_directory (dir);
 		  break;
@@ -601,11 +601,11 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 	  info_exists = Qnil;
 #endif
 
-	  if (!NILP (lib_src_exists) || !NILP (info_exists))
+	  if (! NILP (lib_src_exists) || ! NILP (info_exists))
 	    {
 	      tem = Fexpand_file_name (build_string ("../etc"), dir);
 	      etc_exists = Ffile_exists_p (tem);
-	      if (!NILP (etc_exists))
+	      if (! NILP (etc_exists))
 		{
 		  tem = Fexpand_file_name (build_string (".."), dir);
                   Vinstallation_directory = Ffile_name_as_directory (tem);
@@ -616,7 +616,7 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 	  /* If the Emacs executable is actually a link,
 	     next try the dir that the link points into.  */
 	  tem = Ffile_symlink_p (name);
-	  if (!NILP (tem))
+	  if (! NILP (tem))
 	    {
 	      name = Fexpand_file_name (tem, dir);
 	      dir = Ffile_name_directory (name);
@@ -696,7 +696,7 @@ argmatch (char **argv, int argc, const char *sstr, const char *lstr,
     }
   arglen = (valptr != NULL && (p = strchr (arg, '=')) != NULL
 	    ? p - arg : strlen (arg));
-  if (!lstr)
+  if (! lstr)
     return 0;
   if (arglen < minlen || strncmp (arg, lstr, arglen) != 0)
     return 0;
@@ -765,7 +765,7 @@ find_emacs_executable (char const *argv0, ptrdiff_t *candidate_size)
   ptrdiff_t argv0_length = strlen (argv0);
 
   const char *path = getenv ("PATH");
-  if (!path)
+  if (! path)
     {
       /* Default PATH is implementation-defined, so we don't know how
          to conduct the search.  */
@@ -907,7 +907,7 @@ load_pdump (int argc, char **argv)
 
   /* If we couldn't find our executable, go straight to looking for
      the dump in the hardcoded location.  */
-  if (!(emacs_executable && *emacs_executable))
+  if (! (emacs_executable && *emacs_executable))
     goto hardcoded;
 
   if (dump_file)
@@ -932,8 +932,8 @@ load_pdump (int argc, char **argv)
       ptrdiff_t strip_suffix_length = strlen (strip_suffix);
       ptrdiff_t prefix_length = exenamelen - strip_suffix_length;
       if (0 <= prefix_length
-	  && !memcmp (&emacs_executable[prefix_length], strip_suffix,
-		      strip_suffix_length))
+	  && ! memcmp (&emacs_executable[prefix_length], strip_suffix,
+		       strip_suffix_length))
 	exenamelen = prefix_length;
     }
   ptrdiff_t needed = exenamelen + strlen (suffix) + 1;
@@ -1182,9 +1182,8 @@ load_seccomp (const char *file)
   prctl (PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
   /* Install the filter.  Make sure that potential other threads can't
      escape it.  */
-  if (emacs_seccomp (SECCOMP_SET_MODE_FILTER,
-                     SECCOMP_FILTER_FLAG_TSYNC, &program)
-      != 0)
+  if (0 != emacs_seccomp (SECCOMP_SET_MODE_FILTER,
+			  SECCOMP_FILTER_FLAG_TSYNC, &program)))
     {
       emacs_perror ("seccomp");
       goto out;
@@ -1266,7 +1265,7 @@ main (int argc, char **argv)
 
   /* Look for this argument first, before any heap allocation, so we
      can set heap flags properly if we're going to unexec.  */
-  if (!initialized && temacs)
+  if (! initialized && temacs)
     {
 #ifdef HAVE_UNEXEC
       if (strcmp (temacs, "dump") == 0 ||
@@ -1288,7 +1287,7 @@ main (int argc, char **argv)
       if (will_dump_p ())
         dump_mode = temacs;
 #endif
-      if (!dump_mode)
+      if (! dump_mode)
         fatal ("Invalid temacs mode '%s'", temacs);
     }
   else if (temacs)
@@ -1297,18 +1296,18 @@ main (int argc, char **argv)
     }
   else
     {
-      eassert (!temacs);
+      eassert (! temacs);
 #ifndef HAVE_UNEXEC
-      eassert (!initialized);
+      eassert (! initialized);
 #endif
 #ifdef HAVE_PDUMPER
-      if (!initialized)
+      if (! initialized)
 	attempt_load_pdump = true;
 #endif
     }
 
 #ifdef HAVE_UNEXEC
-  if (!will_dump_with_unexec_p ())
+  if (! will_dump_with_unexec_p ())
     gflags.will_not_unexec_ = true;
 #endif
 
@@ -1366,7 +1365,7 @@ main (int argc, char **argv)
   argc = maybe_disable_address_randomization (argc, argv);
 
 #if defined GNU_LINUX && defined HAVE_UNEXEC
-  if (!initialized)
+  if (! initialized)
     {
       char *heap_start = my_heap_start ();
       heap_bss_diff = heap_start - max (my_endbss, my_endbss_static);
@@ -1380,7 +1379,7 @@ main (int argc, char **argv)
 
 /* If using unexmacosx.c (set by s/darwin.h), we must do this. */
 #if defined DARWIN_OS && defined HAVE_UNEXEC
-  if (!initialized)
+  if (! initialized)
     unexec_init_emacs_zone ();
 #endif
 
@@ -1433,12 +1432,12 @@ main (int argc, char **argv)
 	  Lisp_Object tem, tem2;
 	  tem = Fsymbol_value (intern_c_string ("emacs-version"));
 	  tem2 = Fsymbol_value (intern_c_string ("emacs-copyright"));
-	  if (!STRINGP (tem))
+	  if (! STRINGP (tem))
 	    {
 	      fputs ("Invalid value of 'emacs-version'\n", stderr);
 	      exit (1);
 	    }
-	  if (!STRINGP (tem2))
+	  if (! STRINGP (tem2))
 	    {
 	      fputs ("Invalid value of 'emacs-copyright'\n", stderr);
 	      exit (1);
@@ -1541,7 +1540,7 @@ main (int argc, char **argv)
          frames.  */
       int extra = (30 * 1000) * 50;
 
-      bool try_to_grow_stack = !noninteractive || initialized;
+      bool try_to_grow_stack = ! noninteractive || initialized;
 
       if (try_to_grow_stack)
 	{
@@ -1783,7 +1782,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
           f = fork ();
 #else /* DAEMON_MUST_EXEC */
-          if (!dname_arg || !strchr (dname_arg, '\n'))
+          if (! dname_arg || ! strchr (dname_arg, '\n'))
             f = fork ();  /* in orig */
           else
             f = 0;  /* in exec'd */
@@ -1826,7 +1825,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #ifdef DAEMON_MUST_EXEC
           {
             /* In orig process, forked as child, OR in exec'd. */
-            if (!dname_arg || !strchr (dname_arg, '\n'))
+            if (! dname_arg || ! strchr (dname_arg, '\n'))
               {  /* In orig, child: now exec w/special daemon name. */
                 char fdStr[80];
                 int fdStrlen =
@@ -1850,8 +1849,8 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
               }
 
             /* In exec'd: parse special dname into pipe and name info. */
-            if (!dname_arg || !*dname_arg || strnlen (dname_arg, 71) == 71
-		|| !strchr (dname_arg, '\n'))
+            if (! dname_arg || ! *dname_arg || strnlen (dname_arg, 71) == 71
+		|| ! strchr (dname_arg, '\n'))
 	      {
 		fputs ("emacs daemon: daemon name absent or too long\n",
 		       stderr);
@@ -1893,7 +1892,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
      that causes an infinite recursive loop with FreeBSD.  See
      Bug#14569.  The part of this bug involving Cygwin is no longer
      relevant, now that Cygwin defines HYBRID_MALLOC.  */
-  if (!noninteractive || !will_dump_p ())
+  if (! noninteractive || ! will_dump_p ())
     malloc_enable_thread ();
 #endif
 
@@ -1903,7 +1902,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
   /* Perform basic initializations (not merely interning symbols).  */
 
-  if (!initialized)
+  if (! initialized)
     {
       init_alloc_once ();
       init_pdumper_once ();
@@ -1970,7 +1969,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_json ();
 #endif
 
-  if (!initialized)
+  if (! initialized)
     syms_of_comp ();
 
   no_loadup
@@ -1995,23 +1994,23 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #endif
 
 #ifdef HAVE_NS
-  if (!noninteractive)
+  if (! noninteractive)
     {
 #ifdef NS_IMPL_COCOA
       /* Started from GUI? */
-      bool go_home = (!ch_to_dir && !inhibit_window_system
-		      && !isatty (STDIN_FILENO));
+      bool go_home = (! ch_to_dir && ! inhibit_window_system
+		      && ! isatty (STDIN_FILENO));
       if (skip_args < argc)
         {
-          if (!strncmp (argv[skip_args], "-psn", 4))
+          if (! strncmp (argv[skip_args], "-psn", 4))
             {
               skip_args += 1;
-	      go_home |= !ch_to_dir;
+	      go_home |= ! ch_to_dir;
             }
-          else if (skip_args+1 < argc && !strncmp (argv[skip_args+1], "-psn", 4))
+          else if (skip_args + 1 < argc && ! strncmp (argv[skip_args+1], "-psn", 4))
             {
               skip_args += 2;
-	      go_home |= !ch_to_dir;
+	      go_home |= ! ch_to_dir;
             }
         }
       if (go_home)
@@ -2121,12 +2120,12 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   /* Initialize and GC-protect Vinitial_environment and
      Vprocess_environment before set_initial_environment fills them
      in.  */
-  if (!initialized)
+  if (! initialized)
     syms_of_callproc ();
   /* egetenv is a pretty low-level facility, which may get called in
      many circumstances; it seems flimsy to put off initializing it
      until calling init_callproc.  Do not do it when dumping.  */
-  if (!will_dump_p ())
+  if (! will_dump_p ())
     set_initial_environment ();
 
   /* Has to run after the environment is set up. */
@@ -2184,7 +2183,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   /* Intern the names of all standard functions and variables;
      define standard keys.  */
 
-  if (!initialized)
+  if (! initialized)
     {
       /* The basic levels of Lisp must come first.  Note that
 	 syms_of_data and some others have already been called.  */
@@ -2424,7 +2423,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_window ();
   init_font ();
 
-  if (!initialized)
+  if (! initialized)
     {
       char *file;
       /* Handle -l loadup, args passed by Makefile.  */
@@ -2446,7 +2445,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       /* If we are going to load stuff in a non-initialized Emacs,
 	 update the value of native-comp-eln-load-path, so that the
 	 *.eln files will be found if they are there.  */
-      if (!NILP (Vtop_level) && !temacs)
+      if (! NILP (Vtop_level) && ! temacs)
 	Vnative_comp_eln_load_path =
 	  Fcons (Fexpand_file_name (XCAR (Vnative_comp_eln_load_path),
 				    Vinvocation_directory),
@@ -2667,7 +2666,7 @@ sort_args (int argc, char **argv)
 
 	  /* Look for a match with a known old-fashioned option.  */
 	  for (i = 0; i < ARRAYELTS (standard_args); i++)
-	    if (!strcmp (argv[from], standard_args[i].name))
+	    if (! strcmp (argv[from], standard_args[i].name))
 	      {
 		options[from] = standard_args[i].nargs;
 		priority[from] = standard_args[i].priority;
@@ -2690,8 +2689,8 @@ sort_args (int argc, char **argv)
 
 	      for (i = 0; i < ARRAYELTS (standard_args); i++)
 		if (standard_args[i].longname
-		    && !strncmp (argv[from], standard_args[i].longname,
-				 thislen))
+		    && ! strncmp (argv[from], standard_args[i].longname,
+				  thislen))
 		  {
 		    if (match == -1)
 		      match = i;
@@ -2802,7 +2801,7 @@ killed.  */
 #ifndef WINDOWSNT
   /* Do some checking before shutting down Emacs, because errors
      can't be meaningfully reported afterwards.  */
-  if (!NILP (restart))
+  if (! NILP (restart))
     {
       /* This is very unlikely, but it's possible to execute a binary
 	 (on some systems) with no argv.  */
@@ -2810,10 +2809,10 @@ killed.  */
 	error ("No command line arguments known; unable to re-execute Emacs");
 
       /* Check that the binary hasn't gone away.  */
-      if (!initial_emacs_executable)
+      if (! initial_emacs_executable)
 	error ("Unknown Emacs executable");
 
-      if (!file_access_p (initial_emacs_executable, F_OK))
+      if (! file_access_p (initial_emacs_executable, F_OK))
 	error ("Emacs executable \"%s\" can't be found", initial_argv[0]);
     }
 #endif
@@ -2825,7 +2824,7 @@ killed.  */
     sd_notify(0, "STOPPING=1");
 #endif /* HAVE_LIBSYSTEMD */
 
-  if (!NILP (find_symbol_value (Qkill_emacs_hook)))
+  if (! NILP (find_symbol_value (Qkill_emacs_hook)))
     {
       if (noninteractive)
 	safe_run_hooks (Qkill_emacs_hook);
@@ -2838,7 +2837,7 @@ killed.  */
   x_clipboard_manager_save_all ();
 #endif
 
-  shut_down_emacs (0, (STRINGP (arg) && !feof (stdin)) ? arg : Qnil);
+  shut_down_emacs (0, (STRINGP (arg) && ! feof (stdin)) ? arg : Qnil);
 
 #ifdef HAVE_NS
   ns_release_autorelease_pool (ns_pool);
@@ -2858,7 +2857,7 @@ killed.  */
   eln_load_path_final_clean_up ();
 #endif
 
-  if (!NILP (restart))
+  if (! NILP (restart))
     {
 #ifdef WINDOWSNT
       if (w32_reexec_emacs (initial_cmdline, initial_wd) < 0)
@@ -3049,7 +3048,7 @@ You must run Emacs in batch mode in order to dump it.  */)
   CHECK_STRING (filename);
   filename = Fexpand_file_name (filename, Qnil);
   filename = ENCODE_FILE (filename);
-  if (!NILP (symfile))
+  if (! NILP (symfile))
     {
       CHECK_STRING (symfile);
       if (SCHARS (symfile))
@@ -3059,8 +3058,8 @@ You must run Emacs in batch mode in order to dump it.  */)
 	}
     }
 
-  tem = Vpurify_flag;
-  Vpurify_flag = Qnil;
+  tem = Vloadup_pure_table;
+  Vloadup_pure_table = Qnil;
 
 # ifdef HYBRID_MALLOC
   {
@@ -3089,7 +3088,7 @@ You must run Emacs in batch mode in order to dump it.  */)
 
   alloc_unexec_pre ();
 
-  unexec (SSDATA (filename), !NILP (symfile) ? SSDATA (symfile) : 0);
+  unexec (SSDATA (filename), ! NILP (symfile) ? SSDATA (symfile) : 0);
 
   alloc_unexec_post ();
 
@@ -3099,7 +3098,7 @@ You must run Emacs in batch mode in order to dump it.  */)
   Vlibrary_cache = Qnil;
 # endif
 
-  Vpurify_flag = tem;
+  Vloadup_pure_table = tem;
 
   return unbind_to (count, Qnil);
 }
@@ -3207,7 +3206,7 @@ decode_env_path (const char *evarname, const char *defalt, bool empty)
     path = getenv (evarname);
   else
     path = 0;
-  if (!path)
+  if (! path)
     {
 #ifdef NS_SELF_CONTAINED
       path = ns_relocate (defalt);
@@ -3267,7 +3266,7 @@ decode_env_path (const char *evarname, const char *defalt, bool empty)
   while (1)
     {
       p = strchr (path, SEPCHAR);
-      if (!p)
+      if (! p)
 	p = path + strlen (path);
       element = ((p - path) ? make_unibyte_string (path, p - path)
 		 : empty_element);
@@ -3337,10 +3336,10 @@ from the parent process and its tty file descriptors.  */)
 {
   bool err = 0;
 
-  if (!IS_DAEMON)
+  if (! IS_DAEMON)
     error ("This function can only be called if emacs is run as a daemon");
 
-  if (!DAEMON_RUNNING)
+  if (! DAEMON_RUNNING)
     error ("The daemon has already been initialized");
 
   if (NILP (Vafter_init_time))

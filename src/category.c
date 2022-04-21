@@ -118,9 +118,9 @@ the current buffer's category table.  */)
   CHECK_STRING (docstring);
   table = check_category_table (table);
 
-  if (!NILP (CATEGORY_DOCSTRING (table, XFIXNAT (category))))
+  if (! NILP (CATEGORY_DOCSTRING (table, XFIXNAT (category))))
     error ("Category `%c' is already defined", (int) XFIXNAT (category));
-  if (!NILP (Vpurify_flag))
+  if (! NILP (Vloadup_pure_table))
     docstring = Fpurecopy (docstring);
   SET_CATEGORY_DOCSTRING (table, XFIXNAT (category), docstring);
 

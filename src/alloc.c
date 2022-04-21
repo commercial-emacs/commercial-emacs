@@ -456,9 +456,10 @@ static void compact_small_strings (void);
 static void free_large_strings (void);
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 
-static bool vector_marked_p (struct Lisp_Vector const *);
 static bool vectorlike_marked_p (union vectorlike_header const *);
 static void set_vectorlike_marked (union vectorlike_header *);
+static bool vector_marked_p (struct Lisp_Vector const *);
+static void set_vector_marked (struct Lisp_Vector *v)
 static bool interval_marked_p (INTERVAL);
 static void set_interval_marked (INTERVAL);
 
@@ -565,7 +566,7 @@ static struct mem_node *mem_find (void *);
 
 Lisp_Object const *staticvec[NSTATICS]
 #ifdef HAVE_UNEXEC
-= {&Vpurify_flag}
+= {&Vloadup_pure_table}
 #endif
   ;
 
@@ -3565,7 +3566,7 @@ usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INT
 
   pin_string (args[COMPILED_BYTECODE]);  // Bytecode must be immovable.
 
-  /* We used to purecopy everything here, if purify-flag was set.  This worked
+  /* We used to purecopy everything here, if loadup-pure-table was set.  This worked
      OK for Emacs-23, but with Emacs-24's lexical binding code, it can be
      dangerous, since make-byte-code is used during execution to build
      closures, so any closure built during the preload phase would end up
@@ -5604,7 +5605,7 @@ Recursively copies contents of vectors and cons cells.
 Does not copy symbols.  Copies strings without text properties.  */)
   (register Lisp_Object obj)
 {
-  if (NILP (Vpurify_flag))
+  if (NILP (Vloadup_pure_table))
     return obj;
   else if (MARKERP (obj) || OVERLAYP (obj) || SYMBOLP (obj))
     /* Can't purify those.  */
@@ -5632,9 +5633,9 @@ purecopy (Lisp_Object obj)
     message_with_string ("Dropping text-properties while making string `%s' pure",
 			 obj, true);
 
-  if (HASH_TABLE_P (Vpurify_flag)) /* Hash consing.  */
+  if (! NILP (Vloadup_pure_table)) /* Hash consing.  */
     {
-      Lisp_Object tmp = Fgethash (obj, Vpurify_flag, Qnil);
+      Lisp_Object tmp = Fgethash (obj, Vloadup_pure_table, Qnil);
       if (! NILP (tmp))
 	return tmp;
     }
@@ -5704,8 +5705,8 @@ purecopy (Lisp_Object obj)
       Fsignal (Qerror, list1 (CALLN (Fformat, fmt, obj)));
     }
 
-  if (HASH_TABLE_P (Vpurify_flag)) /* Hash consing.  */
-    Fputhash (obj, obj, Vpurify_flag);
+  if (! NILP (Vloadup_pure_table)) /* Hash consing.  */
+    Fputhash (obj, obj, Vloadup_pure_table);
 
   return obj;
 }
@@ -6145,7 +6146,7 @@ garbage_collect (void)
 
   /* Save a copy of the contents of the stack, for debugging.  */
 #if MAX_SAVE_STACK > 0
-  if (NILP (Vpurify_flag))
+  if (NILP (Vloadup_pure_table))
     {
       char const *stack;
       ptrdiff_t stack_size;
@@ -6220,7 +6221,7 @@ garbage_collect (void)
   FOR_EACH_LIVE_BUFFER (tail, buffer)
     {
       struct buffer *nextb = XBUFFER (buffer);
-      if (!EQ (BVAR (nextb, undo_list), Qt))
+      if (! EQ (BVAR (nextb, undo_list), Qt))
 	bset_undo_list (nextb, compact_undo_list (BVAR (nextb, undo_list)));
       /* Now that we have stripped the elements that need not be
 	 in the undo_list any more, we can finally mark the list.  */
@@ -6430,20 +6431,15 @@ mark_vectorlike (union vectorlike_header *header)
 {
   struct Lisp_Vector *ptr = (struct Lisp_Vector *) header;
   ptrdiff_t size = ptr->header.size;
-
-  eassert (!vector_marked_p (ptr));
-
-  /* Bool vectors have a different case in mark_object.  */
-  eassert (PSEUDOVECTOR_TYPE (ptr) != PVEC_BOOL_VECTOR);
-
-  set_vector_marked (ptr);
   if (size & PSEUDOVECTOR_FLAG)
-    size &= PSEUDOVECTOR_SIZE_MASK;
-
-  /* Note that this size is not the memory-footprint size, but only
-     the number of Lisp_Object fields that we should trace.
-     The distinction is used e.g. by Lisp_Process which places extra
-     non-Lisp_Object fields at the end of the structure...  */
+    {
+      /* Bool vectors have a different case in mark_object.  */
+      eassert (PSEUDOVECTOR_TYPE (ptr) != PVEC_BOOL_VECTOR);
+      /* Number of Lisp_Object fields.  */
+      size &= PSEUDOVECTOR_SIZE_MASK;
+    }
+  eassert (! vectorlike_marked_p (header));
+  set_vectorlike_marked (header);
   mark_objects (ptr->contents, size);
 }
 
@@ -6685,26 +6681,25 @@ grow_mark_stack (void)
   eassert (ms->sp < ms->size);
 }
 
-/* Push VALUE onto the mark stack.  */
 static inline void
-mark_stack_push_value (Lisp_Object value)
+mark_stack_push (Lisp_Object value)
 {
   if (mark_stk.sp >= mark_stk.size)
     grow_mark_stack ();
-  mark_stk.stack[mark_stk.sp++] = (struct mark_entry){.n = 0, .u.value = value};
+  mark_stk.stack[mark_stk.sp++] =
+    (struct mark_entry) {.n = 0, .u.value = value};
 }
 
-/* Push the N values at VALUES onto the mark stack.  */
 static inline void
-mark_stack_push_values (Lisp_Object *values, ptrdiff_t n)
+mark_stack_push_n (Lisp_Object *values, ptrdiff_t n)
 {
-  eassume (n >= 0);
-  if (n == 0)
-    return;
-  if (mark_stk.sp >= mark_stk.size)
-    grow_mark_stack ();
-  mark_stk.stack[mark_stk.sp++] = (struct mark_entry){.n = n,
-						      .u.values = values};
+  if (n > 0)
+    {
+      if (mark_stk.sp >= mark_stk.size)
+	grow_mark_stack ();
+      mark_stk.stack[mark_stk.sp++] =
+	(struct mark_entry) {.n = n, .u.values = values};
+    }
 }
 
 /* Traverse and mark objects on the mark stack above BASE_SP.
@@ -6744,17 +6739,17 @@ process_mark_stack (ptrdiff_t base_sp)
 
       /* Check that the object pointed to by PO is known to be a Lisp
 	 structure allocated from the heap.  */
-#define CHECK_ALLOCATED()			\
-      do {					\
-	if (pdumper_object_p (po))		\
-	  {					\
-	    if (!pdumper_object_p_precise (po))	\
-	      emacs_abort ();			\
-	    break;				\
-	  }					\
-	m = mem_find (po);			\
-	if (m == MEM_NIL)			\
-	  emacs_abort ();			\
+#define CHECK_ALLOCATED()				\
+      do {						\
+	if (pdumper_object_p (po))			\
+	  {						\
+	    if (! pdumper_object_p_precise (po))	\
+	      emacs_abort ();				\
+	    break;					\
+	  }						\
+	m = mem_find (po);				\
+	if (m == MEM_NIL)				\
+	  emacs_abort ();				\
       } while (0)
 
       /* Check that the object pointed to by PO is live, using predicate
@@ -6777,7 +6772,7 @@ process_mark_stack (ptrdiff_t base_sp)
       /* Check both of the above conditions, for symbols.  */
 #define CHECK_ALLOCATED_AND_LIVE_SYMBOL()			\
       do {							\
-	if (!c_symbol_p (ptr))					\
+	if (! c_symbol_p (ptr))					\
 	  {							\
 	    CHECK_ALLOCATED ();					\
 	    CHECK_LIVE (live_symbol_p, MEM_TYPE_SYMBOL);	\
@@ -6816,11 +6811,10 @@ process_mark_stack (ptrdiff_t base_sp)
 	    if (vector_marked_p (ptr))
 	      break;
 
-	    enum pvec_type pvectype
-	      = PSEUDOVECTOR_TYPE (ptr);
+	    enum pvec_type pvectype = PSEUDOVECTOR_TYPE (ptr);
 
 #ifdef GC_CHECK_MARKED_OBJECTS
-	    if (!pdumper_object_p (po) && !SUBRP (obj) && !main_thread_p (po))
+	    if (! pdumper_object_p (po) && ! SUBRP (obj) && ! main_thread_p (po))
 	      {
 		m = mem_find (po);
 		if (m == MEM_NIL)
@@ -6851,12 +6845,12 @@ process_mark_stack (ptrdiff_t base_sp)
 		  struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
 		  ptrdiff_t size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
 		  set_vector_marked (ptr);
-		  mark_stack_push_values (ptr->contents, size);
-		  mark_stack_push_value (h->test.name);
-		  mark_stack_push_value (h->test.user_hash_function);
-		  mark_stack_push_value (h->test.user_cmp_function);
+		  mark_stack_push_n (ptr->contents, size);
+		  mark_stack_push (h->test.name);
+		  mark_stack_push (h->test.user_hash_function);
+		  mark_stack_push (h->test.user_cmp_function);
 		  if (NILP (h->weak))
-		    mark_stack_push_value (h->key_and_value);
+		    mark_stack_push (h->key_and_value);
 		  else
 		    {
 		      /* For weak tables, mark only the vector and not its
@@ -6880,7 +6874,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		   If we're looking at a dumped bool vector, we should
 		   have aborted above when we called vector_marked_p, so
 		   we should never get here.  */
-		eassert (!pdumper_object_p (ptr));
+		eassert (! pdumper_object_p (ptr));
 		set_vector_marked (ptr);
 		break;
 
@@ -6894,11 +6888,11 @@ process_mark_stack (ptrdiff_t base_sp)
 		  {
 		    set_vector_marked (ptr);
 		    struct Lisp_Subr *subr = XSUBR (obj);
-		    mark_stack_push_value (subr->intspec.native);
-		    mark_stack_push_value (subr->command_modes);
-		    mark_stack_push_value (subr->native_comp_u);
-		    mark_stack_push_value (subr->lambda_list);
-		    mark_stack_push_value (subr->type);
+		    mark_stack_push (subr->intspec.native);
+		    mark_stack_push (subr->command_modes);
+		    mark_stack_push (subr->native_comp_u);
+		    mark_stack_push (subr->lambda_list);
+		    mark_stack_push (subr->type);
 		  }
 #endif
 		break;
@@ -6908,13 +6902,13 @@ process_mark_stack (ptrdiff_t base_sp)
 
 	      default:
 		{
-		  /* A regular vector or pseudovector needing no special
-		     treatment.  */
+		  /* Same as mark_vectorlike() except stack push
+		     versus recursive call to mark_objects().  */
 		  ptrdiff_t size = ptr->header.size;
 		  if (size & PSEUDOVECTOR_FLAG)
 		    size &= PSEUDOVECTOR_SIZE_MASK;
 		  set_vector_marked (ptr);
-		  mark_stack_push_values (ptr->contents, size);
+		  mark_stack_push_n (ptr->contents, size);
 		}
 		break;
 	      }
@@ -6931,18 +6925,18 @@ process_mark_stack (ptrdiff_t base_sp)
 	    set_symbol_marked (ptr);
 	    /* Attempt to catch bogus objects.  */
 	    eassert (valid_lisp_object_p (ptr->u.s.function));
-	    mark_stack_push_value (ptr->u.s.function);
-	    mark_stack_push_value (ptr->u.s.plist);
+	    mark_stack_push (ptr->u.s.function);
+	    mark_stack_push (ptr->u.s.plist);
 	    switch (ptr->u.s.redirect)
 	      {
 	      case SYMBOL_PLAINVAL:
-		mark_stack_push_value (SYMBOL_VAL (ptr));
+		mark_stack_push (SYMBOL_VAL (ptr));
 		break;
 	      case SYMBOL_VARALIAS:
 		{
 		  Lisp_Object tem;
 		  XSETSYMBOL (tem, SYMBOL_ALIAS (ptr));
-		  mark_stack_push_value (tem);
+		  mark_stack_push (tem);
 		  break;
 		}
 	      case SYMBOL_LOCALIZED:
@@ -6977,7 +6971,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	       In any case, make sure the car is expanded first.  */
 	    if (!NILP (ptr->u.s.u.cdr))
 	      {
-		mark_stack_push_value (ptr->u.s.u.cdr);
+		mark_stack_push (ptr->u.s.u.cdr);
 #if GC_CDR_COUNT
 		cdr_count++;
 		if (cdr_count == mark_object_loop_halt)
@@ -7016,7 +7010,7 @@ void
 mark_object (Lisp_Object obj)
 {
   ptrdiff_t sp = mark_stk.sp;
-  mark_stack_push_value (obj);
+  mark_stack_push (obj);
   process_mark_stack (sp);
 }
 
@@ -7024,7 +7018,7 @@ void
 mark_objects (Lisp_Object *objs, ptrdiff_t n)
 {
   ptrdiff_t sp = mark_stk.sp;
-  mark_stack_push_values (objs, n);
+  mark_stack_push_n (objs, n);
   process_mark_stack (sp);
 }
 
@@ -7034,17 +7028,15 @@ mark_objects (Lisp_Object *objs, ptrdiff_t n)
 static void
 mark_terminals (void)
 {
-  struct terminal *t;
-  for (t = terminal_list; t; t = t->next_terminal)
+  for (struct terminal *t = terminal_list;
+       t != NULL;
+       t = t->next_terminal)
     {
       eassert (t->name != NULL);
 #ifdef HAVE_WINDOW_SYSTEM
-      /* If a terminal object is reachable from a stacpro'ed object,
-	 it might have been marked already.  Make sure the image cache
-	 gets marked.  */
       mark_image_cache (t->image_cache);
 #endif /* HAVE_WINDOW_SYSTEM */
-      if (!vectorlike_marked_p (&t->header))
+      if (! vectorlike_marked_p (&t->header))
 	mark_vectorlike (&t->header);
     }
 }
@@ -7657,8 +7649,8 @@ void
 init_alloc_once (void)
 {
   gc_cons_threshold = GC_DEFAULT_THRESHOLD;
-  /* Even though Qt's contents are not set up, its address is known.  */
-  Vpurify_flag = Qt;
+  Vloadup_pure_table = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize,
+                              make_fixed_natnum (80000));
 
   PDUMPER_REMEMBER_SCALAR (buffer_defaults.header);
   PDUMPER_REMEMBER_SCALAR (buffer_local_symbols.header);
@@ -7739,11 +7731,9 @@ If this portion is smaller than `gc-cons-threshold', this is ignored.  */);
   DEFVAR_INT ("strings-consed", strings_consed,
 	      doc: /* Number of strings that have been consed so far.  */);
 
-  DEFVAR_LISP ("purify-flag", Vpurify_flag,
-	       doc: /* Non-nil means loading Lisp code in order to dump an executable.
-This means that certain objects should be allocated in shared (pure) space.
-It can also be set to a hash-table, in which case this table is used to
-do hash-consing of the objects allocated to pure space.  */);
+  DEFVAR_LISP ("loadup-pure-table", Vloadup_pure_table,
+	       doc: /* Allocate objects in pure space during loadup.el.  */);
+  Vloadup_pure_table = Qnil;
 
   DEFVAR_BOOL ("garbage-collection-messages", garbage_collection_messages,
 	       doc: /* Non-nil means display messages at start and end of garbage collection.  */);

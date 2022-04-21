@@ -302,18 +302,11 @@ close to the total amount of pure storage available---if it were not,
 we would preallocate less.
 @end defvar
 
-@defvar purify-flag
-This variable determines whether @code{defun} should make a copy of the
-function definition in pure storage.  If it is non-@code{nil}, then the
-function definition is copied into pure storage.
-
-This flag is @code{t} while loading all of the basic functions for
-building Emacs initially (allowing those functions to be shareable and
-non-collectible).  Dumping Emacs as an executable always writes
-@code{nil} in this variable, regardless of the value it actually has
-before and after dumping.
-
-You should not change this flag in a running Emacs.
+@defvar loadup-pure-table
+This should not be exposed to the user.  It is temporarily assigned
+non-@code{nil} during loadup.el initialization for tracking purespace
+(shareable and non-collectible) object allocations when building
+bootstrapped Emacs.
 @end defvar
 
 @node Garbage Collection
