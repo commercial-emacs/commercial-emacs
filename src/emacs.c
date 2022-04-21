@@ -1183,7 +1183,7 @@ load_seccomp (const char *file)
   /* Install the filter.  Make sure that potential other threads can't
      escape it.  */
   if (0 != emacs_seccomp (SECCOMP_SET_MODE_FILTER,
-			  SECCOMP_FILTER_FLAG_TSYNC, &program)))
+			  SECCOMP_FILTER_FLAG_TSYNC, &program))
     {
       emacs_perror ("seccomp");
       goto out;

@@ -744,7 +744,7 @@ value.  */)
     error ("Defining as dynamic an already lexical var");
 
   XSYMBOL (symbol)->u.s.declared_special = true;
-  if (!NILP (doc))
+  if (! NILP (doc))
     {
       if (! NILP (Vloadup_pure_table))
 	doc = Fpurecopy (doc);

@@ -4772,9 +4772,6 @@ init_obarray_once (void)
   make_symbol_constant (Qt);
   XSYMBOL (Qt)->u.s.declared_special = true;
 
-  /* Correct even if not dumping.  loadup.el will set to nil at end.  */
-  Vloadup_pure_table = CALLN (Fmake_hash_table, QCtest, Qequal);
-
   DEFSYM (Qvariable_documentation, "variable-documentation");
 }
 

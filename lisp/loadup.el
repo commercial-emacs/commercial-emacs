@@ -59,66 +59,65 @@
 
 (message "Dump mode: %s" dump-mode)
 
-(define-obsolete-variable-alias 'purify-flag 'loadup-pure-table "29.1")
-
 ;; Add subdirectories to the load-path for files that might get
 ;; autoloaded when bootstrapping or running Emacs normally.
 ;; This is because PATH_DUMPLOADSEARCH is just "../lisp".
-(when (or (member dump-mode '("bootstrap" "pbootstrap"))
-	  ;; FIXME this is irritatingly fragile.
-          (and (stringp (nth 4 command-line-args))
-               (string-match "^unidata-gen\\(\\.elc?\\)?$"
-                             (nth 4 command-line-args)))
-          (member (nth 7 command-line-args) '("unidata-gen-file"
-                                              "unidata-gen-charprop"))
-          (null dump-mode))
+(if (or (member dump-mode '("bootstrap" "pbootstrap"))
+	;; FIXME this is irritatingly fragile.
+        (and (stringp (nth 4 command-line-args))
+             (string-match "^unidata-gen\\(\\.elc?\\)?$"
+                           (nth 4 command-line-args)))
+        (member (nth 7 command-line-args) '("unidata-gen-file"
+                                            "unidata-gen-charprop"))
+        (null dump-mode))
   ;; Find the entry in load-path that contains Emacs elisp and
   ;; splice some additional directories in there for the benefit
   ;; of autoload and regular Emacs use.
-  (let ((subdirs '("emacs-lisp"
-                   "progmodes"
-                   "language"
-                   "international"
-                   "textmodes"
-                   "vc"))
-        (iter load-path))
-    (while iter
-      (let ((dir (car iter))
-            (subdirs subdirs)
-            esubdirs esubdir)
-        (while subdirs
-          (setq esubdir (expand-file-name (car subdirs) dir))
-          (setq subdirs (cdr subdirs))
-          (if (file-directory-p esubdir)
-              (setq esubdirs (cons esubdir esubdirs))
-            (setq subdirs nil esubdirs nil)))
-        (if esubdirs
-            (progn
-              (setcdr iter (nconc (nreverse esubdirs) (cdr iter)))
-              (setq iter nil))
-          (setq iter (cdr iter))
-          (if (null iter)
-              (signal
-               'error (list
-                       (format-message
-                        "Could not find elisp load-path: searched %S"
-                        load-path))))))))
-  ;; We'll probably overflow the pure space.
-  (setq loadup-pure-table nil)
-  ;; Value of max-lisp-eval-depth when compiling initially.
-  ;; During bootstrapping the byte-compiler is run interpreted
-  ;; when compiling itself, which uses a lot more stack
-  ;; than usual.
-  (setq max-lisp-eval-depth 2200))
+    (progn
+      (let ((subdirs '("emacs-lisp"
+                       "progmodes"
+                       "language"
+                       "international"
+                       "textmodes"
+                       "vc"))
+            (iter load-path))
+        (while iter
+          (let ((dir (car iter))
+                (subdirs subdirs)
+                esubdirs esubdir)
+            (while subdirs
+              (setq esubdir (expand-file-name (car subdirs) dir))
+              (setq subdirs (cdr subdirs))
+              (if (file-directory-p esubdir)
+                  (setq esubdirs (cons esubdir esubdirs))
+                (setq subdirs nil esubdirs nil)))
+            (if esubdirs
+                (progn
+                  (setcdr iter (nconc (nreverse esubdirs) (cdr iter)))
+                  (setq iter nil))
+              (setq iter (cdr iter))
+              (unless iter
+                (signal
+                 'error (list
+                         (format-message
+                          "Could not find elisp load-path: searched %S"
+                          load-path))))))))
+      ;; We'll probably overflow the pure space.
+      (setq loadup-pure-table nil)
+      ;; Value of max-lisp-eval-depth when compiling initially.
+      ;; During bootstrapping the byte-compiler is run interpreted
+      ;; when compiling itself, which uses a lot more stack
+      ;; than usual.
+      (setq max-lisp-eval-depth 2200)))
 
 (message "Using load-path %s" load-path)
 
-(when dump-mode
+(if dump-mode
   ;; To reduce the size of dumped Emacs, we avoid making huge char-tables.
-  (setq inhibit-load-charset-map t)
-  ;; --eval gets handled too late.
-  (defvar load--prefer-newer load-prefer-newer)
-  (setq load-prefer-newer t))
+    (progn (setq inhibit-load-charset-map t)
+           ;; --eval gets handled too late.
+           (defvar load--prefer-newer load-prefer-newer)
+           (setq load-prefer-newer t)))
 
 ;; We don't want to have any undo records in the dumped Emacs.
 (set-buffer "*scratch*")
@@ -129,6 +128,8 @@
 (load "emacs-lisp/backquote")
 (load "subr")
 (load "keymap")
+
+(define-obsolete-variable-alias 'purify-flag 'loadup-pure-table "29.1")
 
 ;; Do it after subr, since both after-load-functions and add-hook are
 ;; implemented in subr.el.
@@ -425,7 +426,6 @@
     (defconst emacs-build-number
       (if versions (1+ (apply #'max versions)) 1))))
 
-
 (message "Finding pointers to doc strings...")
 (if (and (or (and (fboundp 'dump-emacs)
                   (equal dump-mode "dump"))
@@ -521,9 +521,8 @@ lost after dumping")))
                 (t           (setq others  (1+ others)))))
              loadup-pure-table)
     (message "Pure-hashed: %d strings, %d vectors, %d conses, %d bytecodes, %d others"
-             strings vectors conses bytecodes others)))
-
-(setq loadup-pure-table nil)
+             strings vectors conses bytecodes others))
+  (setq loadup-pure-table nil))
 
 (unless (garbage-collect)
   (setq pure-space-overflow t))

@@ -459,7 +459,7 @@ extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 static bool vectorlike_marked_p (union vectorlike_header const *);
 static void set_vectorlike_marked (union vectorlike_header *);
 static bool vector_marked_p (struct Lisp_Vector const *);
-static void set_vector_marked (struct Lisp_Vector *v)
+static void set_vector_marked (struct Lisp_Vector *v);
 static bool interval_marked_p (INTERVAL);
 static void set_interval_marked (INTERVAL);
 
@@ -7649,8 +7649,6 @@ void
 init_alloc_once (void)
 {
   gc_cons_threshold = GC_DEFAULT_THRESHOLD;
-  Vloadup_pure_table = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize,
-                              make_fixed_natnum (80000));
 
   PDUMPER_REMEMBER_SCALAR (buffer_defaults.header);
   PDUMPER_REMEMBER_SCALAR (buffer_local_symbols.header);
@@ -7659,6 +7657,9 @@ init_alloc_once (void)
      Keep in mind that when we reload from a dump, we'll run _only_
      init_alloc_once_for_pdumper and not init_alloc_once at all.  */
   pdumper_do_now_and_after_load (init_alloc_once_for_pdumper);
+
+  Vloadup_pure_table = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize,
+                              make_fixed_natnum (80000));
 
   verify_alloca ();
 
