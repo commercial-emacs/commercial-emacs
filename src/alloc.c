@@ -410,39 +410,6 @@ static void detect_suspicious_free (void *ptr);
 # define detect_suspicious_free(ptr) ((void) 0)
 #endif
 
-/* Maximum amount of C stack to save when a GC happens.  */
-
-#ifndef MAX_SAVE_STACK
-#define MAX_SAVE_STACK 16000
-#endif
-
-/* Buffer in which we save a copy of the C stack at each GC.  */
-
-#if MAX_SAVE_STACK > 0
-static char *stack_copy;
-static ptrdiff_t stack_copy_size;
-
-/* Copy to DEST a block of memory from SRC of size SIZE bytes,
-   avoiding any address sanitization.  */
-
-static void * ATTRIBUTE_NO_SANITIZE_ADDRESS
-no_sanitize_memcpy (void *dest, void const *src, size_t size)
-{
-  if (! ADDRESS_SANITIZER)
-    return memcpy (dest, src, size);
-  else
-    {
-      size_t i;
-      char *d = dest;
-      char const *s = src;
-      for (i = 0; i < size; i++)
-	d[i] = s[i];
-      return dest;
-    }
-}
-
-#endif /* MAX_SAVE_STACK > 0 */
-
 static void unchain_finalizer (struct Lisp_Finalizer *);
 static void mark_terminals (void);
 static void gc_sweep (void);
@@ -6103,8 +6070,7 @@ garbage_collect (void)
 {
   static struct timespec gc_elapsed = {0, 0};
   Lisp_Object tail, buffer;
-  char stack_top_variable;
-  bool message_p;
+  bool message_p = false;
   specpdl_ref count = SPECPDL_INDEX ();
   struct timespec start;
 
@@ -6141,36 +6107,6 @@ garbage_collect (void)
       message_p = push_message ();
       record_unwind_protect_void (pop_message_unwind);
     }
-  else
-    message_p = false;
-
-  /* Save a copy of the contents of the stack, for debugging.  */
-#if MAX_SAVE_STACK > 0
-  if (NILP (Vloadup_pure_table))
-    {
-      char const *stack;
-      ptrdiff_t stack_size;
-      if (&stack_top_variable < stack_bottom)
-	{
-	  stack = &stack_top_variable;
-	  stack_size = stack_bottom - &stack_top_variable;
-	}
-      else
-	{
-	  stack = stack_bottom;
-	  stack_size = &stack_top_variable - stack_bottom;
-	}
-      if (stack_size <= MAX_SAVE_STACK)
-	{
-	  if (stack_copy_size < stack_size)
-	    {
-	      stack_copy = xrealloc (stack_copy, stack_size);
-	      stack_copy_size = stack_size;
-	    }
-	  no_sanitize_memcpy (stack_copy, stack, stack_size);
-	}
-    }
-#endif /* MAX_SAVE_STACK > 0 */
 
   if (garbage_collection_messages)
     message1_nolog ("Garbage collecting...");
