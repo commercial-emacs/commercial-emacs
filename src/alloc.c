@@ -1823,8 +1823,7 @@ gc_block_sweep_inplace (gc_block *const b, const gc_heap *const h)
           start_bits >>= lz;
           mark_bits >>= lz;
           eassume (start_bits & 1);
-          const gc_cursor c = gc_block_make_cursor (
-            b, word_slot_nr + pos, h);
+          const gc_cursor c = gc_block_make_cursor (b, word_slot_nr + pos, h);
           eassert (gc_cursor_object_starts_here (c, h));
           const bool is_marked = mark_bits & 1;
           eassert (is_marked == gc_cursor_is_object_marked (c, h));
@@ -2010,8 +2009,7 @@ gc_tospace_placer_place (gc_tospace_placer *const p,
   if (eunlikely (tospace_locator.i != p->next_tospace_locator.i))
     {
       gc_tospace_placer_flush (p, h);
-      *p = gc_tospace_placer_init (
-        gc_locator_to_cursor (tospace_locator, h), h);
+      *p = gc_tospace_placer_init (gc_locator_to_cursor (tospace_locator, h), h);
     }
   eassume (tospace_locator.i == p->next_tospace_locator.i);
   void *const old_tospace = p->tospace;
@@ -2113,8 +2111,7 @@ gc_block_sweep_compact (gc_block *const b, const gc_heap *const h)
           start_bits >>= lz;
           mark_bits >>= lz;
           eassume (start_bits & 1);
-          const gc_cursor c = gc_block_make_cursor (
-            b, word_slot_nr + pos, h);
+          const gc_cursor c = gc_block_make_cursor (b, word_slot_nr + pos, h);
           eassert (gc_cursor_object_starts_here (c, h));
           const bool is_marked = mark_bits & 1;
           eassert (is_marked == gc_cursor_is_object_marked (c, h));
@@ -2137,16 +2134,15 @@ gc_block_sweep_compact (gc_block *const b, const gc_heap *const h)
                        (tospace_block_nr == block_nr
                         && tospace_slot_nr <= c.slot_nr));
               void *const tospace_obj_ptr =
-                gc_tospace_placer_place (
-                  &placer, tospace_locator,
-                  object_nbytes / gc_heap_nbytes_per_slot (h),
-                  h);
+                gc_tospace_placer_place (&placer, tospace_locator,
+					 object_nbytes / gc_heap_nbytes_per_slot (h),
+					 h);
               if (gc_heap_has_separate_tospace (h) ||
                   fromspace_obj_ptr != tospace_obj_ptr)
-              (objects_may_overlap ? memmove : memcpy)(
-                tospace_obj_ptr,
-                fromspace_obj_ptr,
-                object_nbytes);
+              (objects_may_overlap ? memmove : memcpy)
+		(tospace_obj_ptr,
+		 fromspace_obj_ptr,
+		 object_nbytes);
               scan_object (tospace_obj_ptr, h->lisp_type, GC_PHASE_SWEEP);
             }
           else if (h->cleanup)
@@ -2289,8 +2285,7 @@ gc_block_flip_tospace_to_fromspace (gc_block *const b, const gc_heap *const h)
               GC_BLOCK_SIZE - gen_y_byte_offset);
       gc_aux_push (b->meta.u.heap.per_cycle.tospace);
       b->meta.u.heap.per_cycle.tospace = NULL;
-      gc_block_copy_gen_y_slot_bitset (
-        b, start_bit_words, pinned_bit_words, h);
+      gc_block_copy_gen_y_slot_bitset (b, start_bit_words, pinned_bit_words, h);
       gc_block_zero_gen_y_slot_bitset (b, pinned_bit_words, h);
     }
 
@@ -2480,11 +2475,9 @@ gc_block_maybe_find_live_object_containing (const gc_block *const b,
      limit the backward search.  */
   const ptrdiff_t limit =
     max (p_slot_nr - gc_heap_maximum_object_nslots (h), -1);
-  const ptrdiff_t found_start_slot_nr = emacs_bitset_scan_backward (
-    gc_block_start_bits (b, h),
-    gc_heap_nwords_per_bitset (h),
-    p_slot_nr,
-    limit);
+  const ptrdiff_t found_start_slot_nr = emacs_bitset_scan_backward
+    (gc_block_start_bits (b, h), gc_heap_nwords_per_bitset (h),
+     p_slot_nr, limit);
   eassume (found_start_slot_nr >= limit);
   eassume (found_start_slot_nr <= p_slot_nr);
   if (found_start_slot_nr <= limit)
@@ -2773,9 +2766,8 @@ gc_heap_init (const gc_heap *const h)
 gc_cursor
 gc_heap_make_start_cursor (const gc_heap *const h)
 {
-  return gc_block_make_cursor (
-    gc_block_from_link (emacs_list_first (&h->data->blocks)),
-    0, h);
+  return gc_block_make_cursor
+    (gc_block_from_link (emacs_list_first (&h->data->blocks)), 0, h);
 }
 
 /* Return whether C (which must point into heap H) is currently
@@ -2785,10 +2777,10 @@ gc_cursor_object_starts_here (const gc_cursor c,
                               const gc_heap *const h)
 {
   gc_cursor_check (c, h);
-  return emacs_bitset_bit_set_p (
-    gc_block_start_bits (c.block, h),
-    gc_heap_nwords_per_bitset (h),
-    c.slot_nr);
+  return emacs_bitset_bit_set_p
+    (gc_block_start_bits (c.block, h),
+     gc_heap_nwords_per_bitset (h),
+     c.slot_nr);
 }
 
 /* Mark the heap as having a live object at the current position.  */
@@ -2798,10 +2790,10 @@ gc_cursor_make_object_start_here (const gc_cursor c,
 {
   gc_cursor_check (c, h);
   eassert (!gc_cursor_object_starts_here (c, h));
-  emacs_bitset_set_bit (
-    gc_block_start_bits (c.block, h),
-    gc_heap_nwords_per_bitset (h),
-    c.slot_nr);
+  emacs_bitset_set_bit
+    (gc_block_start_bits (c.block, h),
+     gc_heap_nwords_per_bitset (h),
+     c.slot_nr);
 }
 
 /* Return whether cursor C, which must be in heap H, points into the
@@ -2820,10 +2812,10 @@ gc_cursor_is_object_marked (const gc_cursor c, const gc_heap *const h)
 {
   if (!gc_cursor_is_gen_y (c, h))
     return true;
-  return emacs_bitset_bit_set_p (
-    gc_block_mark_bits (c.block, h),
-    gc_heap_nwords_per_bitset (h),
-    c.slot_nr);
+  return emacs_bitset_bit_set_p
+    (gc_block_mark_bits (c.block, h),
+     gc_heap_nwords_per_bitset (h),
+     c.slot_nr);
 }
 
 /* Set the mark flag for the object at cursor C, which must be in heap
@@ -2852,8 +2844,8 @@ gc_cursor_set_object_pinned (const gc_cursor c, const gc_heap *const h)
     {
       emacs_bitset_word *restrict const words =
         gc_block_pinned_bits (c.block, h);
-      emacs_bitset_set_bit (
-        words, gc_heap_nwords_per_bitset (h), c.slot_nr);
+      emacs_bitset_set_bit
+	(words, gc_heap_nwords_per_bitset (h), c.slot_nr);
     }
 }
 
@@ -2937,10 +2929,10 @@ gc_cursor_advance_to_object_start_in_block (gc_cursor *const c_inout,
   gc_cursor_check (c, h);
   const ptrdiff_t limit = min (c.slot_nr + max_distance,
                                gc_heap_nslots_per_block (h));
-  const ptrdiff_t found = emacs_bitset_scan_forward (
-    gc_block_start_bits (c.block, h),
-    gc_heap_nwords_per_bitset (h),
-    c.slot_nr, limit);
+  const ptrdiff_t found = emacs_bitset_scan_forward
+    (gc_block_start_bits (c.block, h),
+     gc_heap_nwords_per_bitset (h),
+     c.slot_nr, limit);
   if (found == limit)
     return false;
   c.slot_nr = found;
@@ -2965,10 +2957,10 @@ gc_cursor_advance_to_object_pin_in_block (gc_cursor *const c_inout,
   gc_cursor_check (c, h);
   const ptrdiff_t limit = min (c.slot_nr + max_distance,
                                gc_heap_nslots_per_block (h));
-  const ptrdiff_t found = emacs_bitset_scan_forward (
-    gc_block_pinned_bits (c.block, h),
-    gc_heap_nwords_per_bitset (h),
-    c.slot_nr, limit);
+  const ptrdiff_t found = emacs_bitset_scan_forward
+    (gc_block_pinned_bits (c.block, h),
+     gc_heap_nwords_per_bitset (h),
+     c.slot_nr, limit);
   if (found == limit)
     return false;
   c.slot_nr = found;
@@ -3023,8 +3015,7 @@ gc_cursor_to_locator (const gc_cursor c, const gc_heap *const h)
 
 /* Return the number of slots remaining in C's block.  */
 ptrdiff_t
-gc_cursor_nr_slots_left_in_block (
-  const gc_cursor c, const gc_heap *const h)
+gc_cursor_nr_slots_left_in_block (const gc_cursor c, const gc_heap *const h)
 {
   gc_cursor_check (c, h);
   return gc_heap_nslots_per_block (h) - c.slot_nr;
@@ -3063,8 +3054,7 @@ gc_heap_nslots_spanning (const gc_heap *const h, const size_t nbytes)
    of the next block if such a block exists or return NULL if *C_INOUT
    is at the last block.  */
 bool
-gc_cursor_advance_next_block (
-  gc_cursor *const c_inout, const gc_heap *const h)
+gc_cursor_advance_next_block (gc_cursor *const c_inout, const gc_heap *const h)
 {
   gc_cursor c = *c_inout;
   gc_cursor_check (c, h);
@@ -3081,8 +3071,8 @@ gc_cursor_advance_next_block (
    allocate a new block and make C point to its start.  If allocating
    the new block fails, raise memory_full.  */
 void
-gc_cursor_advance_next_block_allocate_if_needed (
-  gc_cursor *const c_inout, const gc_heap *const h)
+gc_cursor_advance_next_block_allocate_if_needed (gc_cursor *const c_inout,
+						 const gc_heap *const h)
 {
   if (!gc_cursor_advance_next_block (c_inout, h))
     {
@@ -3097,10 +3087,9 @@ gc_cursor_advance_next_block_allocate_if_needed (
    blocks so it doesn't.  If allocating a needed block fails, raise
    memory_full.  */
 void
-gc_cursor_advance_nr_slots_allocate_if_needed (
-  gc_cursor *const c_inout,
-  ptrdiff_t nr_slots,
-  const gc_heap *const h)
+gc_cursor_advance_nr_slots_allocate_if_needed (gc_cursor *const c_inout,
+					       ptrdiff_t nr_slots,
+					       const gc_heap *const h)
 {
   eassume (nr_slots >= 0);
   gc_cursor c = *c_inout;
@@ -3331,16 +3320,14 @@ gc_block_preprocess_perma_pins (gc_block *const b, const gc_heap *const h)
       pinned_bits |= new_perma_pinned_bits;
       gc_gen_y_bit_iter_set (&yit, pinned_bit_words, pinned_bits);
       if (new_perma_pinned_bits != perma_pinned_bits)
-        gc_gen_y_bit_iter_set (
-          &yit, perma_pinned_bit_words, new_perma_pinned_bits);
+        gc_gen_y_bit_iter_set (&yit, perma_pinned_bit_words, new_perma_pinned_bits);
     }
 }
 
 bool
-intergen_advance_nr_slots_test_dirty (
-  intergen *const scan,
-  ptrdiff_t nr_slots_to_move,
-  const gc_heap *const h)
+intergen_advance_nr_slots_test_dirty (intergen *const scan,
+				      ptrdiff_t nr_slots_to_move,
+				      const gc_heap *const h)
 {
   /* Basically, we advance bytes and slots independently, using the
      former to check for dirtiness and the latter to check for
@@ -3389,10 +3376,10 @@ intergen_advance_nr_slots_test_dirty (
         {
           page_nr += 1;
           nbytes_left_in_page = page_size;
-          page_is_dirty = emacs_bitset_bit_set_p (
-            &scan->b->meta.card_table[0],
-            ARRAYELTS (scan->b->meta.card_table),
-            page_nr);
+          page_is_dirty =
+	    emacs_bitset_bit_set_p (&scan->b->meta.card_table[0],
+				    ARRAYELTS (scan->b->meta.card_table),
+				    page_nr);
         }
       nbytes_left_to_move -= n;
     }
@@ -3414,10 +3401,9 @@ intergen_advance_nr_slots_test_dirty (
   eassert (((new_slot_nr * gc_heap_nbytes_per_slot (h))
             / page_size) == page_nr);
   eassert (scan->page_is_dirty ==
-           emacs_bitset_bit_set_p (
-             &scan->b->meta.card_table[0],
-             ARRAYELTS (scan->b->meta.card_table),
-             page_nr));
+           emacs_bitset_bit_set_p (&scan->b->meta.card_table[0],
+				   ARRAYELTS (scan->b->meta.card_table),
+				   page_nr));
 
   scan->slot_nr = new_slot_nr + at_end;
   return any_byte_dirty;
@@ -3479,10 +3465,10 @@ intergen_get_next_dirty_slot_nr (const intergen *const scan,
     h->homogeneous_object_nbytes == 0 ||
     (h->homogeneous_object_nbytes % page_size) != 0;
   void *obj_start;
-  if (objects_can_span_pages &&
-      (obj_start = gc_block_maybe_find_live_object_containing (
-        scan->b, new_page_ptr, h)) &&
-      obj_start != new_page_ptr)
+  if (objects_can_span_pages
+      && (obj_start = gc_block_maybe_find_live_object_containing
+	  (scan->b, new_page_ptr, h))
+      && obj_start != new_page_ptr)
     {
       /* An object is straddling the dirty page boundary.
          Start scanning from the object's start.  */
@@ -3559,8 +3545,7 @@ intergen_skip_to_object_start (intergen *const scan,
   eassume (0 <= slot_limit && slot_limit <=
            gc_heap_nslots_per_block (h));
   while (scan->slot_nr < slot_limit && scan->start_word == 0)
-    intergen_advance_nr_slots_test_dirty (
-      scan, emacs_bitset_bits_per_word, h);
+    intergen_advance_nr_slots_test_dirty (scan, emacs_bitset_bits_per_word, h);
   if (scan->slot_nr < slot_limit)
     {
       eassume (scan->start_word);
@@ -3698,11 +3683,10 @@ gc_heap_allocate (const gc_heap *const h, const size_t nbytes)
          allocation tip.  If we do find an object start, skip to the
          found object's end (allocating a new block if needed) and try
          again.  */
-      if (!gc_cursor_advance_to_object_start_in_block(
-            &c, nslots, h))
+      if (! gc_cursor_advance_to_object_start_in_block(&c, nslots, h))
         break;
-      gc_cursor_advance_nr_slots_allocate_if_needed (
-        &c, gc_cursor_object_nslots (c, h), h);
+      gc_cursor_advance_nr_slots_allocate_if_needed
+	(&c, gc_cursor_object_nslots (c, h), h);
     }
 
   const gc_cursor obj_c = c;
@@ -3773,8 +3757,7 @@ gc_heap_allocate_tospace (const gc_heap *h,
          only reason we couldn't fit the object here would be that the
          proposed tospace allocation object collides with a pinned
          fromspace object: in this case, skip past the pin.  */
-      if (!gc_cursor_advance_to_object_pin_in_block(
-            &c, nslots, h))
+      if (! gc_cursor_advance_to_object_pin_in_block (&c, nslots, h))
         break /* Found a pin-free hole.  */;
       eassert (gc_cursor_object_starts_here (c, h));
       const ptrdiff_t nr_pinned_slots = gc_cursor_object_nslots (c, h);
@@ -3920,8 +3903,7 @@ live_interval_holding (const struct mem_node *const m, const void *const p)
   if (!m || m->type != MEM_TYPE_INTERVAL)
     return NULL;
   gc_block *const b = gc_block_from_mem_node (m);
-  return gc_block_maybe_find_live_object_containing (
-    b, p, &gc_interval_heap);
+  return gc_block_maybe_find_live_object_containing (b, p, &gc_interval_heap);
 }
 
 void
@@ -5122,14 +5104,14 @@ large_vector_allocate (const size_t nbytes, const bool clearit)
   eassume (nbytes >= LARGE_VECTOR_LO_SIZE);
   const size_t large_vector_offset =
     offsetof (struct large_vector, u.header);
-  eassert (!INT_ADD_OVERFLOW (nbytes, large_vector_offset));
+  eassert (! INT_ADD_OVERFLOW (nbytes, large_vector_offset));
   const size_t total_nbytes = nbytes + large_vector_offset;
   tally_consing_maybe_garbage_collect (total_nbytes);
-  struct large_vector *const lv = lisp_malloc (
-    total_nbytes,
-    clearit, MEM_TYPE_LARGE_VECTOR,
-    offsetof (struct large_vector_meta, mem));
-  if (!gc_object_limit_try_increase (1))
+  struct large_vector *const lv =
+    lisp_malloc (total_nbytes,
+		 clearit, MEM_TYPE_LARGE_VECTOR,
+		 offsetof (struct large_vector_meta, mem));
+  if (! gc_object_limit_try_increase (1))
     {
       lisp_free (lv, offsetof (struct large_vector_meta, mem));
       memory_full (GC_AUX_SIZE);
@@ -5314,9 +5296,10 @@ allocate_pseudovector_and_zero (int memlen,
 struct buffer *
 allocate_buffer (void)
 {
-  struct buffer *const b
-    = ALLOCATE_PSEUDOVECTOR_AND_ZERO (
-      struct buffer, cursor_in_non_selected_windows_, PVEC_BUFFER);
+  struct buffer *const b =
+    ALLOCATE_PSEUDOVECTOR_AND_ZERO (struct buffer,
+				    cursor_in_non_selected_windows_,
+				    PVEC_BUFFER);
   if (enable_checking)
     {
       const ptrdiff_t old_header = b->header.size;
@@ -5334,8 +5317,7 @@ allocate_record (const EMACS_INT count)
   if (count > PSEUDOVECTOR_LISP_MASK)
     error ("Attempt to allocate a record of %"pI"d slots; max is %d",
 	   count, PSEUDOVECTOR_LISP_MASK);
-  return allocate_pseudovector (
-    count, count, PVEC_RECORD, /*clearit=*/false);
+  return allocate_pseudovector (count, count, PVEC_RECORD, /*clearit=*/false);
 }
 
 DEFUN ("make-record", Fmake_record, Smake_record, 3, 3, 0,
@@ -5783,8 +5765,8 @@ make_misc_ptr (void *a)
 {
   gc_vector_allocation vr;
   struct Lisp_Misc_Ptr *const p =
-    UNSAFE_ALLOCATE_PLAIN_PSEUDOVECTOR_UNINIT (
-      &vr, struct Lisp_Misc_Ptr, PVEC_MISC_PTR);
+    UNSAFE_ALLOCATE_PLAIN_PSEUDOVECTOR_UNINIT
+    (&vr, struct Lisp_Misc_Ptr, PVEC_MISC_PTR);
   p->pointer = a;
   return gc_vector_allocation_commit (&vr);
 }
@@ -5796,8 +5778,8 @@ build_overlay (Lisp_Object start, Lisp_Object end, Lisp_Object plist)
 {
   gc_vector_allocation vr;
   struct Lisp_Overlay *const p =
-    UNSAFE_ALLOCATE_PSEUDOVECTOR_UNINIT (
-      &vr, struct Lisp_Overlay, plist, PVEC_OVERLAY);
+    UNSAFE_ALLOCATE_PSEUDOVECTOR_UNINIT
+    (&vr, struct Lisp_Overlay, plist, PVEC_OVERLAY);
   p->start = start;
   p->end = end;
   p->plist = plist;
@@ -5827,8 +5809,9 @@ build_marker (struct buffer *buf, ptrdiff_t charpos, ptrdiff_t bytepos)
   eassert (charpos <= bytepos);
 
   gc_vector_allocation vr;
-  struct Lisp_Marker *m = UNSAFE_ALLOCATE_PLAIN_PSEUDOVECTOR_UNINIT (
-    &vr, struct Lisp_Marker, PVEC_MARKER);
+  struct Lisp_Marker *m =
+    UNSAFE_ALLOCATE_PLAIN_PSEUDOVECTOR_UNINIT
+    (&vr, struct Lisp_Marker, PVEC_MARKER);
   m->buffer = buf;
   m->charpos = charpos;
   m->bytepos = bytepos;
@@ -5882,9 +5865,9 @@ make_event_array (ptrdiff_t nargs, Lisp_Object *args)
 Lisp_Object
 make_user_ptr (void (*finalizer) (void *), void *p)
 {
-  struct Lisp_User_Ptr *uptr
-    = ALLOCATE_PLAIN_PSEUDOVECTOR_AND_ZERO (
-      struct Lisp_User_Ptr, PVEC_USER_PTR);
+  struct Lisp_User_Ptr *uptr =
+    ALLOCATE_PLAIN_PSEUDOVECTOR_AND_ZERO
+    (struct Lisp_User_Ptr, PVEC_USER_PTR);
   uptr->finalizer = finalizer;
   uptr->p = p;
   return make_lisp_ptr (uptr, Lisp_Vectorlike);
@@ -5932,8 +5915,7 @@ becomes unreachable or only reachable from other finalizers.  */)
   (Lisp_Object function)
 {
   struct Lisp_Finalizer *finalizer =
-    ALLOCATE_PSEUDOVECTOR_AND_ZERO (
-      struct Lisp_Finalizer, function, PVEC_FINALIZER);
+    ALLOCATE_PSEUDOVECTOR_AND_ZERO (struct Lisp_Finalizer, function, PVEC_FINALIZER);
   finalizer->function = function;
   const Lisp_Object fl = make_lisp_ptr (finalizer, Lisp_Vectorlike);
   if (! NILP (function))  /* nil function means not on a list */
@@ -7020,8 +7002,7 @@ inhibit_garbage_collection (void)
      recurse forever below if it happens to be time to GC.  */
   garbage_collection_inhibited++;
   const ptrdiff_t count = SPECPDL_INDEX ();
-  record_unwind_protect_intmax (
-    inhibit_garbage_collection_undo, consing_until_gc);
+  record_unwind_protect_intmax (inhibit_garbage_collection_undo, consing_until_gc);
   consing_until_gc = gc_hi_threshold;
   return count;
 }
@@ -7109,51 +7090,16 @@ sweep_pdumper_object (void *const obj, const enum Lisp_Type type)
   scan_object (obj, type, GC_PHASE_SWEEP);
 }
 
-/* Akin to dump_roots in pdumper.c.
+void
+mark_roots ()
+{
 
-   This needs to be a massive macro substitution
-   to emulate the Effective C++ template method.
-*/
-#define DEFINE_SCAN_ROOTS(phase)					\
-void									\
-phase ## _roots ()							\
-{									\
-  struct gc_root_visitor visitor = { .visit = phase ## _root_visitor, }; \
-  visit_static_gc_roots (visitor);					\
-  phase ## _vectorlike (&terminal_list);		\
-  phase ## _kboards ();							\
-  phase ## _thread_roots ();						\
-  phase ## _doomed_finalizers ();					\
-  phase ## _dispnew_roots ();						\
-  phase ## _marker_roots ();						\
-  phase ## _xdisp_roots ();						\
-  phase ## _syntax_roots ();						\
-  phase ## _process_roots ();						\
-									\
-  #ifdef HAVE_NTGUI							\
-  phase ## _reference_pointer_to_vectorlike (&w32_system_caret_window); \
-  #endif								\
-									\
-  #ifdef USE_GTK							\
-  xg_ ## phase ## _data ();						\
-  #endif								\
-									\
-  #ifdef HAVE_WINDOW_SYSTEM						\
-  phase ## _fringe_data ();						\
-  #endif								\
-									\
-  #ifdef HAVE_MODULES							\
-  //  phase ## _modules (NULL);						\
-  #endif								\
 }
 
-DEFINE_SCAN_ROOTS(mark);
-DEFINE_SCAN_ROOTS(sweep);
-
 bool
-mark_strong_references_on_reachable_weak_list (
-  Lisp_Object tail,
-  bool (*const entry_survives_gc_p)(Lisp_Object car))
+mark_strong_references_on_reachable_weak_list (Lisp_Object tail,
+					       bool (*const entry_survives_gc_p)
+					       (Lisp_Object car))
 {
   bool marked = false;
   for (; CONSP (tail); tail = XCDR (tail))
@@ -7314,8 +7260,8 @@ mark_strong_references_of_reachable_undo_list_entries (void)
     {
       const Lisp_Object undo_list = BVAR (XBUFFER (buffer), undo_list);
       if (!EQ (undo_list, Qt))
-        marked |= mark_strong_references_on_reachable_weak_list (
-          undo_list, undo_list_entry_survives_gc_p);
+        marked |= mark_strong_references_on_reachable_weak_list
+	  (undo_list, undo_list_entry_survives_gc_p);
     }
   return marked;
 }
@@ -7341,8 +7287,7 @@ font_cache_entry_survives_gc_p (const Lisp_Object obj)
         {
           Lisp_Object objlist;
 
-          if (vectorlike_marked_p (
-                &XFONT_ENTITY (AREF (obj_cdr, i))->header))
+          if (vectorlike_marked_p (&XFONT_ENTITY (AREF (obj_cdr, i))->header))
             break;
 
           objlist = AREF (AREF (obj_cdr, i), FONT_OBJLIST_INDEX);
@@ -7459,8 +7404,8 @@ clear_weak_undo_list_entries (void)
   static struct timespec gc_elapsed = {0, 0};
   Lisp_Object tail, buffer;
   FOR_EACH_LIVE_BUFFER (tail, buffer)
-    clear_weak_references_on_reachable_weak_list (
-      &BVAR (XBUFFER (buffer), undo_list));
+    clear_weak_references_on_reachable_weak_list
+    (&BVAR (XBUFFER (buffer), undo_list));
 }
 
 void
@@ -7633,23 +7578,17 @@ gc_try_handle_sigsegv (void *const fault_address)
   switch (mem->type)
     {
     case MEM_TYPE_CONS:
-      return gc_block_mark_card_table (
-        mem->start, fault_address, &gc_cons_heap);
+      return gc_block_mark_card_table (mem->start, fault_address, &gc_cons_heap);
     case MEM_TYPE_STRING:
-      return gc_block_mark_card_table (
-        mem->start, fault_address, &gc_string_heap);
+      return gc_block_mark_card_table (mem->start, fault_address, &gc_string_heap);
     case MEM_TYPE_SYMBOL:
-      return gc_block_mark_card_table (
-        mem->start, fault_address, &gc_symbol_heap);
+      return gc_block_mark_card_table (mem->start, fault_address, &gc_symbol_heap);
     case MEM_TYPE_FLOAT:
-      return gc_block_mark_card_table (
-        mem->start, fault_address, &gc_float_heap);
+      return gc_block_mark_card_table (mem->start, fault_address, &gc_float_heap);
     case MEM_TYPE_VECTOR:
-      return gc_block_mark_card_table (
-        mem->start, fault_address, &gc_vector_heap);
+      return gc_block_mark_card_table (mem->start, fault_address, &gc_vector_heap);
     case MEM_TYPE_INTERVAL:
-      return gc_block_mark_card_table (
-        mem->start, fault_address, &gc_interval_heap);
+      return gc_block_mark_card_table (mem->start, fault_address, &gc_interval_heap);
     case MEM_TYPE_LARGE_VECTOR:
       emacs_abort ();  // XXX FIXME
     }
@@ -7919,15 +7858,13 @@ maybe_garbage_collect (void)
 Lisp_Object
 gc_make_heap_info (const gc_heap *const h)
 {
-  return list5 (
-    make_lisp_symbol (&lispsym[h->heap_symbol_index]),
-    make_uint (h->data->stats.nr_objects),
-    make_uint (h->data->stats.nr_slots
-               * gc_heap_nbytes_per_slot (h)),
-    make_uint (h->data->stats.nr_objects_pinned),
-    make_uint (h->data->stats.nr_slots_pinned
-               * gc_heap_nbytes_per_slot (h)));
-
+  return list5 (make_lisp_symbol (&lispsym[h->heap_symbol_index]),
+		make_uint (h->data->stats.nr_objects),
+		make_uint (h->data->stats.nr_slots
+			   * gc_heap_nbytes_per_slot (h)),
+		make_uint (h->data->stats.nr_objects_pinned),
+		make_uint (h->data->stats.nr_slots_pinned
+			   * gc_heap_nbytes_per_slot (h)));
 }
 
 DEFUN ("garbage-collect", Fgarbage_collect, Sgarbage_collect, 0, 1, "",
@@ -8098,10 +8035,10 @@ scan_frame (struct frame *const f, const gc_phase phase)
   if (FRAME_WINDOW_P (f) && FRAME_OUTPUT_DATA_NOCHECK (f))
     {
       if (FRAME_FONT_NOCHECK (f))
-        scan_reference_pointer_to_vectorlike (
-          &FRAME_FONT_NOCHECK (f), phase);
-      scan_reference_pointer_to_vectorlike (
-        &FRAME_OUTPUT_DATA_NOCHECK (f)->frame, phase);
+        scan_reference_pointer_to_vectorlike
+	  (&FRAME_FONT_NOCHECK (f), phase);
+      scan_reference_pointer_to_vectorlike
+	(&FRAME_OUTPUT_DATA_NOCHECK (f)->frame, phase);
     }
 #endif
 #ifdef USE_GTK
