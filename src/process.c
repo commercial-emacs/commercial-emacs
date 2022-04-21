@@ -147,7 +147,7 @@ extern int sys_select (int, fd_set *, fd_set *, fd_set *,
 #if GNUC_PREREQ (4, 3, 0) && ! GNUC_PREREQ (5, 1, 0)
 # pragma GCC diagnostic ignored "-Wstrict-overflow"
 #endif
-
+
 /* True if keyboard input is on hold, zero otherwise.  */
 
 static bool kbd_is_on_hold;
@@ -404,7 +404,7 @@ pset_stderrproc (struct Lisp_Process *p, Lisp_Object val)
   p->stderrproc = val;
 }
 
-
+
 static Lisp_Object
 make_lisp_proc (struct Lisp_Process *p)
 {
@@ -672,7 +672,7 @@ kbd_is_ours (void)
   return false;
 }
 
-
+
 /* Compute the Lisp form of the process status, p->status, from
    the numeric status that was returned by `wait'.  */
 
@@ -795,7 +795,7 @@ status_message (struct Lisp_Process *p)
   else
     return Fcopy_sequence (Fsymbol_name (symbol));
 }
-
+
 enum { PTY_NAME_SIZE = 24 };
 
 /* Open an available pty, returning a file descriptor.
@@ -963,7 +963,7 @@ free_dns_request (Lisp_Object proc)
 }
 #endif
 
-
+
 DEFUN ("processp", Fprocessp, Sprocessp, 1, 1, 0,
        doc: /* Return t if OBJECT is a process.  */)
   (Lisp_Object object)
@@ -1104,7 +1104,7 @@ nil, indicating the current buffer's process.  */)
   remove_process (process);
   return Qnil;
 }
-
+
 DEFUN ("process-status", Fprocess_status, Sprocess_status, 1, 1, 0,
        doc: /* Return the status of PROCESS.
 The returned value is one of the following symbols:
@@ -1692,7 +1692,7 @@ DEFUN ("process-list", Fprocess_list, Sprocess_list, 0, 0, 0,
 {
   return Fmapcar (Qcdr, Vprocess_alist);
 }
-
+
 
 /* Starting asynchronous inferior processes.  */
 
@@ -2477,7 +2477,7 @@ usage:  (make-pipe-process &rest ARGS)  */)
   return proc;
 }
 
-
+
 /* Convert an internal struct sockaddr to a lisp object (vector or string).
    The address family of sa is not included in the result.  */
 
@@ -2740,7 +2740,7 @@ set up yet, this function will block until socket setup has completed.  */)
   return address;
 }
 #endif
-
+
 
 static const struct socket_options {
   /* The name of this option.  Should be lowercase version of option
@@ -2942,7 +2942,7 @@ set up yet, this function will block until socket setup has completed. */)
   return Qnil;
 }
 
-
+
 DEFUN ("serial-process-configure",
        Fserial_process_configure,
        Sserial_process_configure,
@@ -4236,7 +4236,7 @@ usage: (make-network-process &rest ARGS)  */)
   return proc;
 }
 
-
+
 
 #ifdef HAVE_GETIFADDRS
 static Lisp_Object
@@ -4744,7 +4744,7 @@ deactivate_process (Lisp_Object proc)
     }
 }
 
-
+
 DEFUN ("accept-process-output", Faccept_process_output, Saccept_process_output,
        0, 4, 0,
        doc: /* Allow any pending output from subprocesses to be read by Emacs.
@@ -5804,7 +5804,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
   return got_some_output;
 }
-
+
 /* Given a list (FUNCTION ARGS...), apply FUNCTION to the ARGS.  */
 
 static Lisp_Object
@@ -6114,7 +6114,7 @@ Otherwise it discards the output.  */)
     }
   return Qnil;
 }
-
+
 /* Sending data to subprocess.  */
 
 /* In send_process, when a write fails temporarily,
@@ -6482,7 +6482,7 @@ set up yet, this function will block until socket setup has completed.  */)
 		SBYTES (string), string);
   return Qnil;
 }
-
+
 /* Return the foreground process group for the tty/pty that
    the process P uses.  */
 static pid_t
@@ -6537,7 +6537,7 @@ process group.  */)
     return make_fixnum (gid);
   return Qt;
 }
-
+
 /* Send a signal number SIGNO to PROCESS.
    If CURRENT_GROUP is t, that means send to the process group
    that currently owns the terminal being used to communicate with PROCESS.
@@ -6989,7 +6989,7 @@ process has been transmitted to the serial port.  */)
     }
   return process;
 }
-
+
 /* The main Emacs thread records child processes in three places:
 
    - Vprocess_alist, for asynchronous subprocesses, which are child
@@ -7218,7 +7218,7 @@ deliver_child_signal (int sig)
 {
   deliver_process_signal (sig, handle_child_signal);
 }
-
+
 
 static Lisp_Object
 exec_sentinel_error_handler (Lisp_Object error_val)
@@ -7433,7 +7433,7 @@ This inserts a status message into the process's buffer, if there is one.  */)
   return Qnil;
 }
 
-
+
 DEFUN ("set-process-coding-system", Fset_process_coding_system,
        Sset_process_coding_system, 1, 3, 0,
        doc: /* Set coding systems of PROCESS to DECODING and ENCODING.
@@ -7512,7 +7512,7 @@ DEFUN ("process-filter-multibyte-p", Fprocess_filter_multibyte_p,
 }
 
 
-
+
 
 # ifdef HAVE_GPM
 
@@ -7973,7 +7973,7 @@ kbd_on_hold_p (void)
   return kbd_is_on_hold;
 }
 
-
+
 /* Enumeration of and access to system processes a-la ps(1).  */
 
 DEFUN ("list-system-processes", Flist_system_processes, Slist_system_processes,
@@ -8129,7 +8129,7 @@ open_channel_for_module (Lisp_Object process)
 #endif
 }
 
-
+
 /* This is not called "init_process" because that is the name of a
    Mach system call, so it would cause problems on Darwin systems.  */
 void

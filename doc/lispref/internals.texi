@@ -312,91 +312,70 @@ bootstrapped Emacs.
 @node Garbage Collection
 @section Garbage Collection
 
-@cindex memory allocation
-  When a program creates a list or the user defines a new function
-(such as by loading a library), that data is placed in normal storage.
-If normal storage runs low, then Emacs asks the operating system to
-allocate more memory.  Different types of Lisp objects, such as
-symbols, cons cells, small vectors, markers, etc., are segregated in
-distinct blocks in memory.  (Large vectors, long strings, buffers and
-certain other editing types, which are fairly large, are allocated in
-individual blocks, one per object; small strings are packed into blocks
-of 8k bytes, and small vectors are packed into blocks of 4k bytes).
-
-@cindex vector-like objects, storage
-@cindex storage of vector-like Lisp objects
-  Beyond the basic vector, a lot of objects like markers, overlays and
-buffers are managed as if they were vectors.  The corresponding C data
-structures include the @code{union vectorlike_header} field whose
-@code{size} member contains the subtype enumerated by @code{enum pvec_type}
-and an information about how many @code{Lisp_Object} fields this structure
-contains and what the size of the rest data is.  This information is
-needed to calculate the memory footprint of an object, and used
-by the vector allocation code while iterating over the vector blocks.
-
 @cindex garbage collection
-  It is quite common to use some storage for a while, then release it
-by (for example) killing a buffer or deleting the last pointer to an
-object.  Emacs provides a @dfn{garbage collector} to reclaim this
-abandoned storage.  The garbage collector operates, in essence, by
-finding and marking all Lisp objects that are still accessible to Lisp
-programs.  To begin with, it assumes all the symbols, their values and
-associated function definitions, and any data presently on the stack,
-are accessible.  Any objects that can be reached indirectly through
-other accessible objects are also accessible, but this calculation is
-done ``conservatively'', so it may slightly overestimate how many
-objects that are accessible.
+  When say the user opens a buffer, Emacs requests normal storage
+(versus @pxref{Pure Storage}) for Lisp objects to manage it.
+Emacs later releases that storage when the user kills the buffer.  A
+@dfn{garbage collector} manages the ongoing reclamation of abandoned
+storage.  Emacs employs a mark-and-sweep collector which tags
+still-referenced Lisp objects in the mark phase, and reclaims untagged
+objects in the sweep phase.  The collection algorithm is
+@dfn{conservative} in that it errs on the side of mistaking numerical
+non-object data for a pointer, and so unnecessarily preserves some
+disposable data.
 
-  When marking is finished, all objects still unmarked are garbage.  No
-matter what the Lisp program or the user does, it is impossible to refer
-to them, since there is no longer a way to reach them.  Their space
-might as well be reused, since no one will miss them.  The second
-(sweep) phase of the garbage collector arranges to reuse them.  (But
-since the marking was done ``conservatively'', not all unused objects
-are guaranteed to be garbage-collected by any one sweep.)
-
-@c ??? Maybe add something describing weak hash tables here?
-
+@cindex memory allocation
 @cindex free list
-  The sweep phase puts unused cons cells onto a @dfn{free list}
-for future allocation; likewise for symbols and markers.  It compacts
-the accessible strings so they occupy fewer 8k blocks; then it frees the
-other 8k blocks.  Unreachable vectors from vector blocks are coalesced
-to create largest possible free areas; if a free area spans a complete
-4k block, that block is freed.  Otherwise, the free area is recorded
-in a free list array, where each entry corresponds to a free list
-of areas of the same size.  Large vectors, buffers, and other large
-objects are allocated and freed individually.
+  Reclaimed storage blocks are appended to @dfn{free lists}, one for
+each object type following a buddy allocation scheme.  Only types
+arbitrarily considered small -- symbols, cons cells, markers, short
+strings, small vectors -- assert a free list.  Large vectors, long
+strings, buffers, and other large editing types are allocated and freed
+individually.
 
 @cindex CL note---allocate more storage
 @quotation
-@b{Common Lisp note:} Unlike other Lisps, GNU Emacs Lisp does not
-call the garbage collector when the free list is empty.  Instead, it
-simply requests the operating system to allocate more storage, and
-processing continues until @code{gc-cons-threshold} bytes have been
-used.
-
-This means that you can make sure that the garbage collector will not
-run during a certain portion of a Lisp program by calling the garbage
-collector explicitly just before it (provided that portion of the
-program does not use so much space as to force a second garbage
-collection).
+@b{Common Lisp note:} Unlike other Lisps, Emacs Lisp will not call the
+garbage collector when the free list is empty, thus admitting a
+degenerate case of unbounded consumption.
 @end quotation
 
-@deffn Command garbage-collect
-This command runs a garbage collection, and returns information on
-the amount of space in use.  (Garbage collection can also occur
-spontaneously if you use more than @code{gc-cons-threshold} bytes of
-Lisp data since the previous garbage collection.)
+  Short strings are packed into 8KB blocks.  Small vectors are packed
+into 4KB blocks.  The sweep phase coalesces blocks to reduce their
+total number.  Reclaimed vector space coalesced to a complete 4KB
+block is freed back to the operating system.  Otherwise the so-called
+@dfn{free area} is buddied with blocks of the same size in the free
+list array.
 
-@code{garbage-collect} returns a list with information on amount of space in
-use, where each entry has the form @samp{(@var{name} @var{size} @var{used})}
-or @samp{(@var{name} @var{size} @var{used} @var{free})}.  In the entry,
-@var{name} is a symbol describing the kind of objects this entry represents,
-@var{size} is the number of bytes used by each one, @var{used} is the number
-of those objects that were found live in the heap, and optional @var{free} is
-the number of those objects that are not live but that Emacs keeps around for
-future allocations.  So an overall result is:
+  Conservative, as opposed to @dfn{accurate}, collectors generally ease
+but do not completely remove the onus of explicit object tracking.
+
+@cindex vector-like objects, storage
+@cindex storage of vector-like Lisp objects
+  An editing type such as a marker, overlay, or buffer contains a mix
+of Lisp and non-Lisp objects.  Such types are implemented as
+@dfn{pseudovectors} in contrast to proper Lisp vectors which only
+contain Lisp objects.  A pseudovector is implemented as a C struct
+whose first field is always a header of type @code{union
+vectorlike_header}, immediately followed by @code{Lisp_Object} member
+data.  The @code{union vectorlike_header} packs the pseudovector's
+@code{enum pvec_type}, the number of @code{Lisp_Object} fields, and
+the size of the non-Lisp member data.
+
+@deffn Command garbage-collect
+Calling this explicitly trigger a collection cycle.  One can prevent
+garbage collection within a fenced off Lisp block with a call to
+@code{garbage-collect} just before it -- provided the block does not
+itself require so much storage as to trigger another collection.
+
+The return value is a list of entries of the form @samp{(@var{name}
+@var{size} @var{used})} or @samp{(@var{name} @var{size} @var{used}
+@var{free})}.  In the entry, @var{name} is a symbol describing the
+kind of objects this entry represents, @var{size} is the number of
+bytes used by each one, @var{used} is the number of those objects that
+were found live in the heap, and optional @var{free} is the number of
+those objects that are not live but that Emacs keeps around for future
+allocations.  So an overall result is:
 
 @example
 ((@code{conses} @var{cons-size} @var{used-conses} @var{free-conses})
@@ -540,51 +519,25 @@ careful writing them.
 @end defvar
 
 @defopt gc-cons-threshold
-The value of this variable is the number of bytes of storage that must
-be allocated for Lisp objects after one garbage collection in order to
-trigger another garbage collection.  You can use the result returned by
-@code{garbage-collect} to get an information about size of the particular
-object type; space allocated to the contents of buffers does not count.
+This is the minimum number of allocated bytes since the previous cycle
+required to trigger the next cycle.
 
-The initial threshold value is @code{GC_DEFAULT_THRESHOLD}, defined in
-@file{alloc.c}.  Since it's defined in @code{word_size} units, the value
-is 400,000 for the default 32-bit configuration and 800,000 for the 64-bit
-one.  If you specify a larger value, garbage collection will happen less
-often.  This reduces the amount of time spent garbage collecting, but
-increases total memory use.  You may want to do this when running a program
-that creates lots of Lisp data.
+The default threshold is 131,072 machine words, or 1MB on a 64-bit
+machine.
 
-You can make collections more frequent by specifying a smaller value, down
-to 1/10th of @code{GC_DEFAULT_THRESHOLD}.  A value less than this minimum
-will remain in effect only until the subsequent garbage collection, at which
-time @code{garbage-collect} will set the threshold back to the minimum.
+Emacs sets a floor on the threshold to 16,384 machine words.
 @end defopt
 
 @defopt gc-cons-percentage
-The value of this variable specifies the amount of consing before a
-garbage collection occurs, as a fraction of the current heap size.
-This criterion and @code{gc-cons-threshold} apply in parallel, and
-garbage collection occurs only when both criteria are satisfied.
+In addition to the raw @code{gc-cons-threshold} byte threshold, a new
+cycle also requires allocated bytes since the previous cycle reach
+@code{gc-cons-percentage} of the heap measured at the time of the
+previous cycle.  Thus for typically monotonically increasing memory
+consumption, each subsequent threshold gets slightly larger.
 
-As the heap size increases, the time to perform a garbage collection
-increases.  Thus, it can be desirable to do them less frequently in
-proportion.
+Setting high thresholds reduces the frequency of collections but
+increases the duration of a collection.
 @end defopt
-
-  Control over the garbage collector via @code{gc-cons-threshold} and
-@code{gc-cons-percentage} is only approximate.  Although Emacs checks
-for threshold exhaustion regularly, for efficiency reasons it does not
-do so immediately after every change to the heap or to
-@code{gc-cons-threshold} or @code{gc-cons-percentage}, so exhausting
-the threshold does not immediately trigger garbage collection.  Also,
-for efficiency in threshold calculations Emacs approximates the heap
-size, which counts the bytes used by currently-accessible objects in
-the heap.
-
-  The value returned by @code{garbage-collect} describes the amount of
-memory used by Lisp data, broken down by data type.  By contrast, the
-function @code{memory-limit} provides information on the total amount of
-memory Emacs is currently using.
 
 @defun memory-limit
 This function returns an estimate of the total amount of bytes of
@@ -593,10 +546,10 @@ You can use this to get a general idea of how your actions affect the
 memory usage.
 @end defun
 
-@defvar memory-full
-This variable is @code{t} if Emacs is nearly out of memory for Lisp
+@defun memory-full
+This function returns @code{t} if Emacs is nearly out of memory for Lisp
 objects, and @code{nil} otherwise.
-@end defvar
+@end defun
 
 @defun memory-use-counts
 This returns a list of numbers that count the number of objects

@@ -3734,7 +3734,7 @@ define_maybe_gc_or_quit (void)
       if (quitcounter >> 14) goto maybe_do_it else goto pass;
      maybe_do_it:
           quitcounter = 0;
-          maybe_gc ();
+          maybe_garbage_collect ();
           maybe_quit ();
           return;
      pass:
@@ -3798,7 +3798,7 @@ define_maybe_gc_or_quit (void)
 					 comp.unsigned_type,
 					 0));
   gcc_jit_block_add_eval (comp.block, NULL,
-			  emit_call (intern_c_string ("maybe_gc"),
+			  emit_call (intern_c_string ("maybe_garbage_collect"),
 				     comp.void_type, 0, NULL, false));
   gcc_jit_block_add_eval (comp.block, NULL,
 			  emit_call (intern_c_string ("maybe_quit"),

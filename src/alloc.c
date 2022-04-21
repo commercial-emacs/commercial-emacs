@@ -287,26 +287,25 @@ my_heap_start (void)
 #define XUNMARK_VECTOR(V)	((V)->header.size &= ~ARRAY_MARK_FLAG)
 #define XVECTOR_MARKED_P(V)	(((V)->header.size & ARRAY_MARK_FLAG) != 0)
 
-/* Default value of gc_cons_threshold (see below).  */
-
-#define GC_DEFAULT_THRESHOLD (100000 * word_size)
+/* Arbitrarily set in 2012 in commit 0dd6d66.  */
+#define GC_DEFAULT_THRESHOLD ((1 << 17) * word_size)
 
 /* Global variables.  */
 struct emacs_globals globals;
 
-/* maybe_gc collects garbage if this goes negative.  */
+/* Exposed to lisp.h to inline maybe_garbage_collect() */
+EMACS_INT bytes_since_gc;
+EMACS_INT bytes_between_gc;
+Lisp_Object Vmemory_full;
+bool gc_in_progress;
 
-EMACS_INT consing_until_gc;
+static bool gc_inhibited;
 
 #ifdef HAVE_PDUMPER
 /* Number of finalizers run: used to loop over GC until we stop
    generating garbage.  */
 int number_finalizers_run;
 #endif
-
-/* True during GC.  */
-
-bool gc_in_progress;
 
 /* System byte and object counts reported by GC.  */
 
@@ -315,10 +314,8 @@ bool gc_in_progress;
 typedef uintptr_t byte_ct;
 typedef intptr_t object_ct;
 
-/* Large-magnitude value for a threshold count, which fits in EMACS_INT.
-   Using only half the EMACS_INT range avoids overflow hassles.
-   There is no need to fit these counts into fixnums.  */
-#define HI_THRESHOLD (EMACS_INT_MAX / 2)
+/* Halved from EMACS_INT_MAX to avoid overflow issues */
+#define GC_INFINITY (EMACS_INT_MAX >> 1)
 
 /* Number of live and free conses etc. counted by the most-recent GC.  */
 
@@ -371,14 +368,6 @@ static ptrdiff_t pure_bytes_used_lisp;
 /* Number of bytes allocated for non-Lisp objects in pure storage.  */
 
 static ptrdiff_t pure_bytes_used_non_lisp;
-
-/* If positive, garbage collection is inhibited.  Otherwise, zero.  */
-
-static intptr_t garbage_collection_inhibited;
-
-/* The GC threshold in bytes, the last time it was calculated
-   from gc-cons-threshold and gc-cons-percentage.  */
-static EMACS_INT gc_threshold;
 
 /* If nonzero, this is a warning delivered by malloc and not yet
    displayed.  */
@@ -573,7 +562,7 @@ XFLOAT_INIT (Lisp_Object f, double n)
 static void
 tally_consing (ptrdiff_t nbytes)
 {
-  consing_until_gc -= nbytes;
+  bytes_since_gc += nbytes;
 }
 
 #ifdef DOUG_LEA_MALLOC
@@ -2645,11 +2634,6 @@ struct cons_block
 #define XUNMARK_CONS(fptr) \
   UNSETMARKBIT (CONS_BLOCK (fptr), CONS_INDEX ((fptr)))
 
-/* Minimum number of bytes of consing since GC before next GC,
-   when memory is full.  */
-
-enum { memory_full_cons_threshold = sizeof (struct cons_block) };
-
 /* Current cons_block.  */
 
 static struct cons_block *cons_block;
@@ -2707,7 +2691,7 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
   XSETCAR (val, car);
   XSETCDR (val, cdr);
   eassert (!XCONS_MARKED_P (XCONS (val)));
-  consing_until_gc -= sizeof (struct Lisp_Cons);
+  bytes_since_gc += sizeof (struct Lisp_Cons);
   cons_cells_consed++;
   return val;
 }
@@ -3843,18 +3827,17 @@ static void
 queue_doomed_finalizers (struct Lisp_Finalizer *dest,
                          struct Lisp_Finalizer *src)
 {
-  struct Lisp_Finalizer *finalizer = src->next;
-  while (finalizer != src)
+  for (struct Lisp_Finalizer *current = src->next,
+	 *next = current->next;
+       current != src;
+       current = next, next = current->next)
     {
-      struct Lisp_Finalizer *next = finalizer->next;
-      if (!vectorlike_marked_p (&finalizer->header)
-          && ! NILP (finalizer->function))
+      if (! vectorlike_marked_p (&current->header)
+          && ! NILP (current->function))
         {
-          unchain_finalizer (finalizer);
-          finalizer_insert (dest, finalizer);
+          unchain_finalizer (current);
+          finalizer_insert (dest, current);
         }
-
-      finalizer = next;
     }
 }
 
@@ -4051,7 +4034,7 @@ set_interval_marked (INTERVAL i)
 void
 memory_full (size_t nbytes)
 {
-  if (!initialized)
+  if (! initialized)
     fatal ("memory exhausted");
 
   /* Do not go into hysterics merely because a large request failed.  */
@@ -4073,10 +4056,8 @@ memory_full (size_t nbytes)
   if (! enough_free_memory)
     {
       Vmemory_full = Qt;
-      consing_until_gc = min (consing_until_gc, memory_full_cons_threshold);
-
       /* The first time we get here, free the spare memory.  */
-      for (int i = 0; i < ARRAYELTS (spare_memory); i++)
+      for (int i = 0; i < ARRAYELTS (spare_memory); ++i)
 	if (spare_memory[i])
 	  {
 	    if (i == 0)
@@ -4089,8 +4070,6 @@ memory_full (size_t nbytes)
 	  }
     }
 
-  /* This used to call error, but if we've run out of memory, we could
-     get infinite recursion trying to build the string.  */
   xsignal (Qnil, Vmemory_signal_data);
 }
 
@@ -4127,6 +4106,7 @@ refill_memory_reserve (void)
 				   false, MEM_TYPE_SPARE);
   if (spare_memory[0] && spare_memory[1] && spare_memory[5])
     Vmemory_full = Qnil;
+
 #endif
 }
 
@@ -5331,7 +5311,7 @@ pure_alloc (size_t size, int type)
 
   /* Can't GC if pure storage overflowed because we can't determine
      if something is a pure object or not.  */
-  garbage_collection_inhibited++;
+  gc_inhibited = true;
   goto again;
 }
 
@@ -5702,23 +5682,18 @@ staticpro (Lisp_Object const *varaddress)
 			  Protection from GC
  ***********************************************************************/
 
-/* Temporarily prevent garbage collection.  Temporarily bump
-   consing_until_gc to speed up maybe_gc when GC is inhibited.  */
-
 static void
-allow_garbage_collection (intmax_t consing)
+allow_garbage_collection (void)
 {
-  consing_until_gc = consing - (HI_THRESHOLD - consing_until_gc);
-  garbage_collection_inhibited--;
+  gc_inhibited = false;
 }
 
 specpdl_ref
 inhibit_garbage_collection (void)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-  record_unwind_protect_intmax (allow_garbage_collection, consing_until_gc);
-  garbage_collection_inhibited++;
-  consing_until_gc = HI_THRESHOLD;
+  record_unwind_protect_void (allow_garbage_collection);
+  gc_inhibited = true;
   return count;
 }
 
@@ -5989,77 +5964,47 @@ mark_and_sweep_weak_table_contents (void)
     }
 }
 
-/* Return the number of bytes to cons between GCs, given THRESHOLD and
-   PERCENTAGE.  When calculating a threshold based on PERCENTAGE,
-   assume SINCE_GC bytes have been allocated since the most recent GC.
-   The returned value is positive and no greater than HI_THRESHOLD.  */
-static EMACS_INT
-consing_threshold (intmax_t threshold, Lisp_Object percentage,
-		   intmax_t since_gc)
+/* The looser of the threshold and percentage constraints prevails.  */
+static void
+update_bytes_between_gc (void)
 {
-  if (! NILP (Vmemory_full))
-    return memory_full_cons_threshold;
-  else
-    {
-      threshold = max (threshold, GC_DEFAULT_THRESHOLD / 10);
-      if (FLOATP (percentage))
-	{
-	  double tot = (XFLOAT_DATA (percentage)
-			* (total_bytes_of_live_objects () + since_gc));
-	  if (threshold < tot)
-	    {
-	      if (tot < HI_THRESHOLD)
-		return tot;
-	      else
-		return HI_THRESHOLD;
-	    }
-	}
-      return min (threshold, HI_THRESHOLD);
-    }
+  intmax_t threshold0 = gc_cons_threshold;
+  intmax_t threshold1 = FLOATP (Vgc_cons_percentage)
+    ? XFLOAT_DATA (Vgc_cons_percentage) * total_bytes_of_live_objects ()
+    : threshold0;
+  bytes_between_gc = min (max (threshold0, threshold1), GC_INFINITY);
 }
 
-/* Adjust consing_until_gc and gc_threshold, given THRESHOLD and PERCENTAGE.
-   Return the updated consing_until_gc.  */
-
-static EMACS_INT
-bump_consing_until_gc (intmax_t threshold, Lisp_Object percentage)
-{
-  /* Guesstimate that half the bytes allocated since the most
-     recent GC are still in use.  */
-  EMACS_INT since_gc = (gc_threshold - consing_until_gc) >> 1;
-  EMACS_INT new_gc_threshold = consing_threshold (threshold, percentage,
-						  since_gc);
-  consing_until_gc += new_gc_threshold - gc_threshold;
-  gc_threshold = new_gc_threshold;
-  return consing_until_gc;
-}
-
-/* Watch changes to gc-cons-threshold.  */
+/* Immediately adjust bytes_between_gc for changes to
+   gc-cons-threshold.  */
 static Lisp_Object
 watch_gc_cons_threshold (Lisp_Object symbol, Lisp_Object newval,
 			 Lisp_Object operation, Lisp_Object where)
 {
-  intmax_t threshold;
-  if (! (INTEGERP (newval) && integer_to_intmax (newval, &threshold)))
-    return Qnil;
-  bump_consing_until_gc (threshold, Vgc_cons_percentage);
+  if (INTEGERP (newval))
+    {
+      intmax_t threshold;
+      if (integer_to_intmax (newval, &threshold))
+	{
+	  gc_cons_threshold = max (threshold, GC_DEFAULT_THRESHOLD >> 3);
+	  update_bytes_between_gc ();
+	}
+    }
   return Qnil;
 }
 
-/* Watch changes to gc-cons-percentage.  */
+/* Immediately adjust bytes_between_gc for changes to
+   gc-cons-percentage.  */
 static Lisp_Object
 watch_gc_cons_percentage (Lisp_Object symbol, Lisp_Object newval,
 			  Lisp_Object operation, Lisp_Object where)
 {
-  bump_consing_until_gc (gc_cons_threshold, newval);
+  if (FLOATP (newval))
+    {
+      Vgc_cons_percentage = newval;
+      update_bytes_between_gc ();
+    }
   return Qnil;
-}
-
-void
-maybe_garbage_collect (void)
-{
-  if (0 > bump_consing_until_gc (gc_cons_threshold, Vgc_cons_percentage))
-    garbage_collect ();
 }
 
 static inline bool mark_stack_empty_p (void);
@@ -6076,10 +6021,12 @@ garbage_collect (void)
 
   eassert (weak_hash_tables == NULL);
 
-  if (garbage_collection_inhibited)
+  if (gc_inhibited || gc_in_progress)
     return;
 
-  eassert(mark_stack_empty_p ());
+  gc_in_progress = true;
+
+  eassert (mark_stack_empty_p ());
 
   /* Record this function, so it appears on the profiler's backtraces.  */
   record_in_backtrace (QAutomatic_GC, 0, 0);
@@ -6094,10 +6041,6 @@ garbage_collect (void)
 			: (byte_ct) -1);
 
   start = current_timespec ();
-
-  /* In case user calls debug_print during GC,
-     don't let that cause a recursive GC.  */
-  consing_until_gc = HI_THRESHOLD;
 
   /* Save what's currently displayed in the echo area.  Don't do that
      if we are GC'ing because we've run out of memory, since
@@ -6114,8 +6057,6 @@ garbage_collect (void)
   block_input ();
 
   shrink_regexp_cache ();
-
-  gc_in_progress = 1;
 
   /* Mark all the special slots that serve as the roots of accessibility.  */
 
@@ -6148,26 +6089,20 @@ garbage_collect (void)
   mark_xterm ();
 #endif
 
-  /* Everything is now marked, except for the data in font caches,
-     undo lists, and finalizers.  The first two are compacted by
-     removing an items which aren't reachable otherwise.  */
+  /* Everything is now marked, except for font caches, undo lists, and
+     finalizers.  The first two admit compaction before marking.
+     All finalizers, even unmarked ones, need to run after sweep,
+     so survive the unmarked ones in doomed_finalizers.  */
 
   compact_font_caches ();
 
   FOR_EACH_LIVE_BUFFER (tail, buffer)
     {
-      struct buffer *nextb = XBUFFER (buffer);
-      if (! EQ (BVAR (nextb, undo_list), Qt))
-	bset_undo_list (nextb, compact_undo_list (BVAR (nextb, undo_list)));
-      /* Now that we have stripped the elements that need not be
-	 in the undo_list any more, we can finally mark the list.  */
-      mark_object (BVAR (nextb, undo_list));
+      struct buffer *b = XBUFFER (buffer);
+      if (! EQ (BVAR (b, undo_list), Qt))
+	bset_undo_list (b, compact_undo_list (BVAR (b, undo_list)));
+      mark_object (BVAR (b, undo_list));
     }
-
-  /* Now pre-sweep finalizers.  Add unmarked finalizers to
-     doomed_finalizers so their associated functions run after GC.
-     Unmarked finalizers should only be reachable by their associated
-     functions and other finalizers.  */
 
   queue_doomed_finalizers (&doomed_finalizers, &finalizers);
   mark_finalizer_list (&doomed_finalizers);
@@ -6182,10 +6117,9 @@ garbage_collect (void)
 
   unmark_main_thread ();
 
-  gc_in_progress = 0;
+  bytes_since_gc = 0;
 
-  consing_until_gc = gc_threshold
-    = consing_threshold (gc_cons_threshold, Vgc_cons_percentage, 0);
+  update_bytes_between_gc ();
 
   /* Unblock as late as possible since it could signal (Bug#43389).  */
   unblock_input ();
@@ -6210,7 +6144,7 @@ garbage_collect (void)
       unbind_to (gc_count, Qnil);
     }
 
-  /* Accumulate statistics.  */
+  gc_in_progress = false;
   gc_elapsed = timespec_add (gc_elapsed,
 			     timespec_sub (current_timespec (), start));
   Vgc_elapsed = make_float (timespectod (gc_elapsed));
@@ -6250,7 +6184,7 @@ collecting objects in some circumstances.
 For further details, see Info node `(elisp)Garbage Collection'.  */)
   (void)
 {
-  if (garbage_collection_inhibited)
+  if (gc_inhibited)
     return Qnil;
 
   garbage_collect ();
@@ -6306,8 +6240,7 @@ Returns non-nil if GC happened, and nil otherwise.  */)
   CHECK_FIXNAT (factor);
   EMACS_INT fact = XFIXNAT (factor);
 
-  EMACS_INT since_gc = gc_threshold - consing_until_gc;
-  if (fact >= 1 && since_gc > gc_threshold / fact)
+  if (fact >= 1 && bytes_since_gc > bytes_between_gc / fact)
     {
       garbage_collect ();
       return Qt;
@@ -7316,6 +7249,14 @@ gc_sweep (void)
   check_string_bytes (!noninteractive);
 }
 
+DEFUN ("memory-full", Fmemory_full, Smemory_full, 0, 0, 0,
+       doc: /* Non-nil means Emacs cannot get much more Lisp memory.  */)
+  (void)
+{
+  return Vmemory_full;
+}
+
+
 DEFUN ("memory-info", Fmemory_info, Smemory_info, 0, 0, 0,
        doc: /* Return a list of (TOTAL-RAM FREE-RAM TOTAL-SWAP FREE-SWAP).
 All values are in Kbytes.  If there is no swap space,
@@ -7584,6 +7525,7 @@ static void init_alloc_once_for_pdumper (void);
 void
 init_alloc_once (void)
 {
+  gc_inhibited = false;
   gc_cons_threshold = GC_DEFAULT_THRESHOLD;
 
   PDUMPER_REMEMBER_SCALAR (buffer_defaults.header);
@@ -7596,6 +7538,7 @@ init_alloc_once (void)
 
   Vloadup_pure_table = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize,
                               make_fixed_natnum (80000));
+  update_bytes_between_gc ();
 
   verify_alloca ();
 
@@ -7625,6 +7568,12 @@ init_alloc_once_for_pdumper (void)
 void
 syms_of_alloc (void)
 {
+  static struct Lisp_Objfwd const o_fwd
+    = {Lisp_Fwd_Obj, &Vmemory_full};
+  staticpro (&Vmemory_full);
+  Vmemory_full = Qnil;
+  defvar_lisp (&o_fwd, "memory-full");
+
   DEFVAR_INT ("gc-cons-threshold", gc_cons_threshold,
 	      doc: /* Number of bytes of consing between garbage collections.
 Garbage collection can happen automatically once this many bytes have been
@@ -7691,10 +7640,6 @@ If this portion is smaller than `gc-cons-threshold', this is ignored.  */);
 				      " M-x save-some-buffers then"
 				      " exit and restart Emacs"));
 
-  DEFVAR_LISP ("memory-full", Vmemory_full,
-	       doc: /* Non-nil means Emacs cannot get much more Lisp memory.  */);
-  Vmemory_full = Qnil;
-
   DEFSYM (Qconses, "conses");
   DEFSYM (Qsymbols, "symbols");
   DEFSYM (Qstrings, "strings");
@@ -7724,6 +7669,10 @@ The time is in seconds as a floating point value.  */);
 Integers with absolute values less than 2**N do not signal a range error.
 N should be nonnegative.  */);
 
+  DEFVAR_LISP ("memory-full", Vmemory_full_deprecated,
+	       doc: /* A memory indicator that should not be exposed.
+Call the function `memory-full' instead.  */);
+
   defsubr (&Scons);
   defsubr (&Slist);
   defsubr (&Svector);
@@ -7743,6 +7692,7 @@ N should be nonnegative.  */);
   defsubr (&Sgarbage_collect);
   defsubr (&Sgarbage_collect_maybe);
   defsubr (&Smemory_info);
+  defsubr (&Smemory_full);
   defsubr (&Smemory_use_counts);
 #if defined GNU_LINUX && defined __GLIBC__ && \
   (__GLIBC__ > 2 || __GLIBC_MINOR__ >= 10)

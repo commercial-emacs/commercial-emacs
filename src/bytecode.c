@@ -772,7 +772,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 
 	    specpdl_ref count1 = record_in_backtrace (call_fun,
 						      call_args, call_nargs);
-	    maybe_gc ();
+	    maybe_garbage_collect ();
 	    if (debug_on_next_call)
 	      do_debug_on_call (Qlambda, count1);
 
@@ -843,7 +843,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  if (!quitcounter)
 	    {
 	      quitcounter = 1;
-	      maybe_gc ();
+	      maybe_garbage_collect ();
 	      maybe_quit ();
 	    }
 	  pc += op;

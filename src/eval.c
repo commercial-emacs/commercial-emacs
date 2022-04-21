@@ -2298,7 +2298,7 @@ eval_sub (Lisp_Object form)
 
   maybe_quit ();
 
-  maybe_gc ();
+  maybe_garbage_collect ();
 
   if (++lisp_eval_depth > max_lisp_eval_depth)
     {
@@ -2878,7 +2878,7 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
 
   count = record_in_backtrace (args[0], &args[1], nargs - 1);
 
-  maybe_gc ();
+  maybe_garbage_collect ();
 
   if (debug_on_next_call)
     do_debug_on_call (Qlambda, count);

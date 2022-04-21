@@ -311,7 +311,7 @@ like `debug-on-error' and Edebug can be used."
 (defun jit-lock--debug-fontify ()
   "Fontify what was deferred for debugging."
   (when (and (not jit-lock--debug-fontifying)
-             jit-lock-defer-buffers (not memory-full))
+             jit-lock-defer-buffers (not (memory-full)))
     (let ((jit-lock--debug-fontifying t)
           (inhibit-debugger nil))       ;FIXME: Not sufficient!
       ;; Mark the deferred regions back to `fontified = nil'
@@ -368,7 +368,7 @@ Only applies to the current buffer."
   "Workhorse called from handle_fontified_prop() in xdisp.c.
 Registered in `font-lock-turn-on-thing-lock' when `font-lock-support-mode'
 is `jit-lock-mode'."
-  (when (and jit-lock-mode (not memory-full))
+  (when (and jit-lock-mode (not (memory-full)))
     (if (or (not jit-lock-defer-timer) (zerop jit-lock-defer-time))
 	(jit-lock-fontify-now start (+ start jit-lock-chunk-size))
       ;; Record the buffer for later fontification.
@@ -477,7 +477,7 @@ non-nil in a repeated invocation of this function."
   (unless repeat
     (cancel-timer jit-lock-stealth-repeat-timer))
   (unless (or executing-kbd-macro
-	      memory-full
+	      (memory-full)
 	      (window-minibuffer-p)
 	      ;; For first invocation set up `jit-lock-stealth-buffers'.
 	      ;; In repeated invocations it's already been set up.
@@ -526,7 +526,7 @@ non-nil in a repeated invocation of this function."
 
 (defun jit-lock-deferred-fontify ()
   "Fontify what was deferred."
-  (when (and jit-lock-defer-buffers (not memory-full))
+  (when (and jit-lock-defer-buffers (not (memory-full)))
     ;; Mark the deferred regions back to `fontified = nil'
     (dolist (buffer jit-lock-defer-buffers)
       (when (buffer-live-p buffer)
@@ -556,7 +556,7 @@ non-nil in a repeated invocation of this function."
 
 (defun jit-lock-context-fontify ()
   "Refresh fontification to take new context into account."
-  (unless memory-full
+  (unless (memory-full)
     (dolist (buffer (buffer-list))
       (with-current-buffer buffer
 	(when jit-lock-context-unfontify-pos
@@ -608,7 +608,7 @@ is the pre-change length.
 This function ensures that lines following the change will be refontified
 in case the syntax of those lines has changed.  Refontification
 will take place when text is fontified stealthily."
-  (when (and jit-lock-mode (not memory-full))
+  (when (and jit-lock-mode (not (memory-full)))
     (let ((jit-lock-start start)
           (jit-lock-end end))
       (with-buffer-prepared-for-jit-lock

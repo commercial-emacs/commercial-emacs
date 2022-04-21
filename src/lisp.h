@@ -3518,7 +3518,7 @@ struct handler
   int interrupt_input_blocked;
 };
 
-extern Lisp_Object memory_signal_data;
+extern Lisp_Object Vmemory_full;
 
 /* True if ought to quit now.  */
 
@@ -4084,11 +4084,11 @@ flush_stack_call_func (void (*func) (void *arg), void *arg)
 }
 
 extern void garbage_collect (void);
-extern void maybe_garbage_collect (void);
 extern bool maybe_garbage_collect_eagerly (EMACS_INT factor);
 extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
-extern EMACS_INT consing_until_gc;
+extern EMACS_INT bytes_since_gc;
+extern EMACS_INT bytes_between_gc;
 #ifdef HAVE_PDUMPER
 extern int number_finalizers_run;
 #endif
@@ -5412,13 +5412,12 @@ struct for_each_tail_internal
        (CONSP (list_var) && ((value_var) = XCDR (XCAR (list_var)), true)); \
        (list_var) = XCDR (list_var))
 
-/* Check whether it's time for GC, and run it if so.  */
-
 INLINE void
-maybe_gc (void)
+maybe_garbage_collect (void)
 {
-  if (consing_until_gc < 0)
-    maybe_garbage_collect ();
+  if (! NILP (Vmemory_full)
+      || bytes_since_gc >= bytes_between_gc)
+    garbage_collect ();
 }
 
 /* Simplified version of 'define-error' that works with pure
