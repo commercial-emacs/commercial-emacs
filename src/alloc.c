@@ -4106,7 +4106,6 @@ refill_memory_reserve (void)
 				   false, MEM_TYPE_SPARE);
   if (spare_memory[0] && spare_memory[1] && spare_memory[5])
     Vmemory_full = Qnil;
-
 #endif
 }
 
