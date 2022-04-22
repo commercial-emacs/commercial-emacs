@@ -857,10 +857,7 @@ NOIL void gc_phase_prepare (bool);
 NOIL void gc_phase_mark (void);
 NOIL void gc_phase_plan_sweep (void);
 NOIL void gc_phase_sweep (void);
-NOIL void gc_phase_cleanup (bool);
 NRML void init_alloc_once_for_pdumper (void);
-NRML size_t gc_compute_total_live_nbytes (void);
-NRML void compact_all_buffers (void);
 NRML void recompute_consing_until_gc (void);
 
 NRML void scan_doomed_finalizers (gc_phase);
@@ -1007,7 +1004,6 @@ NRML void mem_start_modification (void);
 NRML void mem_end_modification (void);
 
 GCFN ATTRIBUTE_NO_SANITIZE_UNDEFINED void *XPNTR (Lisp_Object);
-NRML void tally_consing_maybe_garbage_collect (size_t);
 
 NRML void *lmalloc (size_t, bool) ATTRIBUTE_MALLOC_SIZE ((1));
 NRML void *lrealloc (void *, size_t);
@@ -1174,39 +1170,20 @@ static const gc_heap *const gc_heaps[] = {
 
 struct emacs_globals globals;
 
-/* The number of bytes we can allocate until we call maybe_gc(), which
-   does further checks and, as the name suggests, may perform a
-   garbage collection.  The name of this variable is a historical
-   artifact: it applies to all lisp allocation, not just cons
-   cells.  */
-static ptrdiff_t consing_until_gc = PTRDIFF_MAX;
-
 #ifdef HAVE_PDUMPER
 /* Number of finalizers run: used to loop over GC until we stop
    generating garbage.  */
 size_t number_finalizers_run;
 #endif
 
-/* Total number of bytes of GC heap used for live objects at the end
-   of the last garbage collection, major or minor.  */
-static size_t gc_heap_size_at_end_of_last_gc;
-
-/* Total number of bytes of GC heap used for live objects at the end
-   of the last major garbage collection cycle.  */
-static size_t gc_heap_size_at_end_of_last_major_gc;
-
-/* Run a major collection if the total heap size exceeds
-   this number.  Set in recompute_consing_until_gc().  */
-static size_t gc_major_collection_threshold;
-
-/* Run a minor collection if the total heap size exceeds
-   this number.  Set in recompute_consing_until_gc().  */
-static size_t gc_minor_collection_threshold;
+static size_t gc_latest_heaps_bytes;
+static size_t gc_major_threshold;
+static size_t gc_minor_threshold;
 
 /* If positive, garbage collection is inhibited.  Otherwise, zero.
    Starts off as one so that we don't attempt any GC until we finish
    initializing the heap.  */
-static intptr_t garbage_collection_inhibited = 1;
+static intptr_t gc_inhibited = 1;
 
 /* If nonzero, this is a warning delivered by malloc and not yet
    displayed.  */
@@ -1260,19 +1237,6 @@ XPNTR (const Lisp_Object a)
 	  ? (char *) lispsym + (XLI (a) - LISP_WORD_TAG (Lisp_Symbol))
 	  : (char *) XLP (a) - (XLI (a) & ~VALMASK));
 }
-
-/* Note that we've allowed NBYTES of lisp heap data and maybe
-   perform a garbage collection pass.
-   */
-void
-tally_consing_maybe_garbage_collect (const size_t nbytes)
-{
-  eassume (nbytes <= PTRDIFF_MAX);
-  consing_until_gc -= nbytes;
-  if (consing_until_gc <= 0)
-    maybe_garbage_collect ();
-}
-
 
 #if defined SIGDANGER || (!defined SYSTEM_MALLOC && !defined HYBRID_MALLOC)
 
@@ -3669,7 +3633,7 @@ gc_heap_allocate (const gc_heap *const h, const size_t nbytes)
     gc_heap_nslots_spanning (h, nbytes);
   eassume (nslots > 0);
   eassume (nslots <= gc_heap_nslots_per_block (h));
-  tally_consing_maybe_garbage_collect (nbytes);
+  maybe_garbage_collect ();
   gc_cursor c = h->data->allocation_tip;
   for (;;)
     {
@@ -3815,24 +3779,6 @@ gc_locator_slot_nr (const gc_locator locator, const gc_heap *const h)
   const ptrdiff_t slot_nr = locator.i & mask;
   eassume (slot_nr >= 0);
   return slot_nr;
-}
-
-size_t
-gc_compute_total_live_nbytes (void)
-{
-  size_t live_nbytes = 0;
-  for (int i = 0; i < ARRAYELTS (gc_heaps); ++i)
-    {
-      const size_t nr_slots = gc_heaps[i]->data->stats.nr_slots;
-      size_t heap_nbytes;
-      if (INT_ADD_WRAPV (nr_slots,
-                         gc_heap_nbytes_per_slot (gc_heaps[i]),
-                         &heap_nbytes))
-        emacs_unreachable ();
-      if (INT_ADD_WRAPV (live_nbytes, heap_nbytes, &live_nbytes))
-        emacs_unreachable ();
-    }
-  return live_nbytes;
 }
 
 static gc_heap_data gc_interval_heap_data;
@@ -5106,7 +5052,7 @@ large_vector_allocate (const size_t nbytes, const bool clearit)
     offsetof (struct large_vector, u.header);
   eassert (! INT_ADD_OVERFLOW (nbytes, large_vector_offset));
   const size_t total_nbytes = nbytes + large_vector_offset;
-  tally_consing_maybe_garbage_collect (total_nbytes);
+  maybe_garbage_collect ();
   struct large_vector *const lv =
     lisp_malloc (total_nbytes,
 		 clearit, MEM_TYPE_LARGE_VECTOR,
@@ -6849,16 +6795,16 @@ inhibit_garbage_collection_undo (const intmax_t old_consing_until_gc)
                           since_inhibit,
                           &consing_until_gc))
     consing_until_gc = -1;
-  garbage_collection_inhibited--;
+  gc_inhibited--;
 }
 
 /* Temporarily inhibit garbage collection using a specpdl entry.  */
 ptrdiff_t
 inhibit_garbage_collection (void)
 {
-  /* Bump garbage_collection_inhibited first so that we don't
+  /* Bump gc_inhibited first so that we don't
      recurse forever below if it happens to be time to GC.  */
-  garbage_collection_inhibited++;
+  gc_inhibited++;
   const ptrdiff_t count = SPECPDL_INDEX ();
   record_unwind_protect_intmax (inhibit_garbage_collection_undo, consing_until_gc);
   consing_until_gc = gc_hi_threshold;
@@ -6885,7 +6831,6 @@ visit_buffer_root (const struct gc_root_visitor visitor,
 	   && buffer->overlays_before == NULL
 	   && buffer->overlays_after == NULL);
 
-  /* Visit the buffer-locals.  */
   visit_vectorlike_root (visitor, (struct Lisp_Vector *) buffer, type);
 }
 
@@ -6914,15 +6859,15 @@ visit_static_gc_roots (const struct gc_root_visitor visitor)
     visitor.visit (staticvec[i], GC_ROOT_STATICPRO, visitor.data);
 }
 
-void
-mark_root_visitor (Lisp_Object *root_ptr,
+static void
+mark_root_visitor (Lisp_Object *const root_ptr,
 		   enum gc_root_type type,
 		   void *data)
 {
+  mark_object (*root_ptr);
 }
 
-/* Subroutine of Fgarbage_collect that does most of the work.  */
-void
+static void
 sweep_root_visitor (Lisp_Object *root_ptr,
 		    enum gc_root_type type,
 		    void *data)
@@ -6930,10 +6875,10 @@ sweep_root_visitor (Lisp_Object *root_ptr,
   switch (type)
     {
     case GC_ROOT_C_SYMBOL:
-      scan_object (XPNTR (*root_ptr), XTYPE (*root_ptr), GC_PHASE_SWEEP);
+      sweep_object (XPNTR (*root_ptr), XTYPE (*root_ptr));
       break;
     default:
-      scan_reference (root_ptr, GC_PHASE_SWEEP);
+      sweep_reference (root_ptr);
       break;
     }
 }
@@ -6951,7 +6896,39 @@ sweep_pdumper_object (void *const obj, const enum Lisp_Type type)
 void
 mark_roots ()
 {
+  struct gc_root_visitor visitor = { .visit = mark_root_visitor,
+				     .data = NULL };
+  visit_static_gc_roots (visitor);
 
+  mark_pinned_objects ();
+  mark_pinned_symbols ();
+  mark_terminals ();
+  mark_kboards ();
+  mark_threads ();
+
+  scan_doomed_finalizers (phase);
+
+  scan_dispnew_roots (phase);
+  scan_marker_roots (phase);
+  scan_xdisp_roots (phase);
+  scan_syntax_roots (phase);
+  scan_process_roots (phase);
+
+#ifdef HAVE_NTGUI
+  scan_reference_pointer_to_vectorlike (&w32_system_caret_window, phase);
+#endif
+
+#ifdef USE_GTK
+  xg_scan_data (phase);
+#endif
+
+#ifdef HAVE_WINDOW_SYSTEM
+  scan_fringe_data (phase);
+#endif
+
+#ifdef HAVE_MODULES
+  //  scan_modules (NULL, phase);
+#endif
 }
 
 bool
@@ -7403,28 +7380,6 @@ gc_phase_sweep (void)
     gc_heap_finalize_tospace (gc_heaps[i]);
 }
 
-void
-gc_phase_cleanup (const bool major)
-{
-  /* Restore heap invariants after tospace move.  */
-  for (int i = 0; i < ARRAYELTS (gc_heaps); ++i)
-    gc_heap_cleanup_after_all_sweeps (gc_heaps[i]);
-  gc_heap_size_at_end_of_last_gc = gc_compute_total_live_nbytes ();
-  if (major)
-    gc_heap_size_at_end_of_last_major_gc = gc_heap_size_at_end_of_last_gc;
-  recompute_consing_until_gc ();
-}
-
-void
-compact_all_buffers (void)
-{
-  Lisp_Object tail, buffer;
-  /* Don't keep undo information around forever.
-     Do this early on, so it is no problem if the user quits.  */
-  FOR_EACH_LIVE_BUFFER (tail, buffer)
-    compact_buffer (XBUFFER (buffer));
-}
-
 bool
 gc_try_handle_sigsegv (void *const fault_address)
 {
@@ -7489,15 +7444,21 @@ void
 garbage_collect (const bool major)
 {
   eassert (weak_hash_tables == NULL);
+  eassert (mark_stack_empty_p ());
 
   if (gc_inhibited || gc_in_progress)
     return;
 
-  /* Record this function, so it appears on the profiler's backtraces.  */
-  record_in_backtrace (QAutomatic_GC, 0, 0);
-  compact_all_buffers ();
+  const ptrdiff_t count = SPECPDL_INDEX ();
 
-  const size_t tot_before = gc_heap_size_at_end_of_last_gc;
+  /* Show up in profiler.  */
+  record_in_backtrace (QAutomatic_GC, 0, 0);
+
+  /* Do this early in case user quits.  */
+  FOR_EACH_LIVE_BUFFER (tail, buffer)
+    compact_buffer (XBUFFER (buffer));
+
+  const size_t tot_before = gc_latest_heaps_bytes;
 
   const struct timespec start = current_timespec ();
 
@@ -7536,64 +7497,26 @@ garbage_collect (const bool major)
   gc_phase_plan_sweep ();
   gc_phase_sweep ();
 
-  gc_phase_cleanup (major);
 
-  mark_pinned_objects ();
-  mark_pinned_symbols ();
-  mark_terminals ();
-  mark_kboards ();
-  mark_threads ();
 
-#ifdef HAVE_PGTK
-  mark_pgtkterm ();
-#endif
+  /* Tally */
+  for (int i = 0; i < ARRAYELTS (gc_heaps); ++i)
+    gc_heap_cleanup_after_all_sweeps (gc_heaps[i]);
 
-#ifdef USE_GTK
-  xg_mark_data ();
-#endif
-
-#ifdef HAVE_HAIKU
-  mark_haiku_display ();
-#endif
-
-#ifdef HAVE_WINDOW_SYSTEM
-  mark_fringe_data ();
-#endif
-
-#ifdef HAVE_X_WINDOWS
-  mark_xterm ();
-#endif
-
-  /* Everything is now marked, except for font caches, undo lists, and
-     finalizers.  The first two admit compaction before marking.
-     All finalizers, even unmarked ones, need to run after sweep,
-     so survive the unmarked ones in doomed_finalizers.  */
-
-  compact_font_caches ();
-
-  FOR_EACH_LIVE_BUFFER (tail, buffer)
+  gc_latest_heaps_bytes = 0;
+  for (int i = 0; i < ARRAYELTS (gc_heaps); ++i)
     {
-      struct buffer *b = XBUFFER (buffer);
-      if (! EQ (BVAR (b, undo_list), Qt))
-	bset_undo_list (b, compact_undo_list (BVAR (b, undo_list)));
-      mark_object (BVAR (b, undo_list));
+      size_t heap_nbytes;
+      INT_ADD_WRAPV (gc_heaps[i]->data->stats.nr_slots,
+		     gc_heap_nbytes_per_slot (gc_heaps[i]),
+		     &heap_nbytes);
+      INT_ADD_WRAPV (gc_latest_heaps_bytes,
+		     heap_nbytes,
+		     &gc_latest_heaps_bytes);
     }
 
-  queue_doomed_finalizers (&doomed_finalizers, &finalizers);
-  mark_finalizer_list (&doomed_finalizers);
+  recompute_consing_until_gc ();
 
-  /* Must happen after all other marking and before gc_sweep.  */
-  mark_and_sweep_weak_table_contents ();
-  eassert (weak_hash_tables == NULL);
-
-  gc_sweep ();
-
-  unmark_main_thread ();
-
-  consing_until_gc = gc_threshold
-    = consing_threshold (gc_cons_threshold, Vgc_cons_percentage, 0);
-
-  /* Unblock as late as possible since it could signal (Bug#43389).  */
   unblock_input ();
 
   if (garbage_collection_messages && NILP (Vmemory_full))
@@ -7626,18 +7549,17 @@ garbage_collect (const bool major)
 
   /* Collect profiling data.  */
   if (profiler_memory_running &&
-      gc_heap_size_at_end_of_last_gc < tot_before)
+      gc_latest_heaps_bytes < tot_before)
     {
       size_t shrinkage =
-        tot_before - gc_heap_size_at_end_of_last_gc;
+        tot_before - gc_latest_heaps_bytes;
       if (shrinkage > INTPTR_MAX)
         shrinkage = INTPTR_MAX;
       malloc_probe (-(ptrdiff_t) shrinkage);
     }
 }
 
-/* Update consing_until_gc and the major and minor garbage collection
-   thresholds.  */
+/* Update consing_until_gc thresholds  */
 void
 recompute_consing_until_gc (void)
 {
@@ -7662,21 +7584,15 @@ recompute_consing_until_gc (void)
     ? XFLOAT_DATA (Vgc_cons_percentage)
     : 0.1;
   const double max_minor_percentage =
-    (double) gc_heap_size_at_end_of_last_gc /
+    (double) gc_latest_heaps_bytes /
     (double) SIZE_MAX;
   minor_percentage = min (minor_percentage, max_minor_percentage);
   minor_percentage = max (minor_percentage, 0.0);
-  const size_t min_minor_growth =
-    (gc_cons_threshold > SIZE_MAX)
-    ? SIZE_MAX
-    : gc_cons_threshold > 0
-    ? gc_cons_threshold
-    : 0;
   const size_t minor_growth =
-    max (min_minor_growth,
-         (size_t) gc_heap_size_at_end_of_last_gc * minor_percentage);
+    max (min (max (gc_cons_threshold, 0), SIZE_MAX),
+         (size_t) gc_latest_heaps_bytes * minor_percentage);
   size_t new_minor_threshold;
-  if (INT_ADD_WRAPV (gc_heap_size_at_end_of_last_gc,
+  if (INT_ADD_WRAPV (gc_latest_heaps_bytes,
                      minor_growth,
                      &new_minor_threshold) ||
       new_minor_threshold > gc_hi_threshold)
@@ -7684,30 +7600,27 @@ recompute_consing_until_gc (void)
   if (new_major_threshold < new_minor_threshold)
     new_major_threshold = new_minor_threshold;
 
-  gc_major_collection_threshold = new_major_threshold;
-  gc_minor_collection_threshold = new_minor_threshold;
+  gc_major_threshold = new_major_threshold;
+  gc_minor_threshold = new_minor_threshold;
   eassume (new_minor_threshold <= PTRDIFF_MAX);
   consing_until_gc = new_minor_threshold;
 }
 
-/* It may be time to collect garbage.  Recalculate consing_until_gc,
-   since it might depend on current usage, and do the garbage
-   collection if the recalculation says so.  */
 void
 maybe_garbage_collect (void)
 {
   const ptrdiff_t nbytes_allocated_since_last_gc =
-    gc_minor_collection_threshold - consing_until_gc;
+    gc_minor_threshold - consing_until_gc;
   eassume (nbytes_allocated_since_last_gc >= 0);
   eassume (! INT_ADD_OVERFLOW (gc_heap_size_at_end_of_last_major_gc,
                               (size_t) nbytes_allocated_since_last_gc));
   const size_t total_nbytes_in_use =
-    gc_heap_size_at_end_of_last_gc + nbytes_allocated_since_last_gc;
-  eassume (gc_heap_size_at_end_of_last_gc >=
+    gc_latest_heaps_bytes + nbytes_allocated_since_last_gc;
+  eassume (gc_latest_heaps_bytes >=
            gc_heap_size_at_end_of_last_major_gc);
-  if (total_nbytes_in_use >= gc_major_collection_threshold)
+  if (total_nbytes_in_use >= gc_major_threshold)
     garbage_collect (/*major=*/true);
-  else if (total_nbytes_in_use >= gc_minor_collection_threshold)
+  else if (total_nbytes_in_use >= gc_minor_threshold)
     garbage_collect (false);
   else
     recompute_consing_until_gc ();
@@ -7938,6 +7851,12 @@ struct mark_stack
    manually (for greater control and efficiency).  */
 
 static struct mark_stack mark_stk = {NULL, 0, 0};
+
+static inline bool
+mark_stack_empty_p (void)
+{
+  return mark_stk.sp <= 0;
+}
 
 static inline Lisp_Object
 mark_stack_pop (void)
@@ -9246,8 +9165,8 @@ init_alloc_once_for_pdumper (void)
      XXX: allow GC later, after all initialization done
      */
   recompute_consing_until_gc ();
-  eassume (garbage_collection_inhibited >= 0);
-  garbage_collection_inhibited -= 1;
+  eassume (gc_inhibited >= 0);
+  gc_inhibited -= 1;
 }
 
 void
