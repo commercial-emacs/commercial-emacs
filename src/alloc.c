@@ -7669,10 +7669,6 @@ The time is in seconds as a floating point value.  */);
 Integers with absolute values less than 2**N do not signal a range error.
 N should be nonnegative.  */);
 
-  DEFVAR_LISP ("memory-full", Vmemory_full_deprecated,
-	       doc: /* A memory indicator that should not be exposed.
-Call the function `memory-full' instead.  */);
-
   defsubr (&Scons);
   defsubr (&Slist);
   defsubr (&Svector);
