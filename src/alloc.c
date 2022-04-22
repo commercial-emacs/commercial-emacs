@@ -5060,7 +5060,8 @@ typedef union
    flush_stack_call_func, then call flush_stack_call_func1 where now ebp
    would include the pushed-to addresses.  Note NO_INLINE ensures registers
    are spilled.  (Bug#41357)  */
-NO_INLINE void
+NO_INLINE /* Ensures registers are spilled.  */
+void
 flush_stack_call_func1 (void (*func) (void *arg), void *arg)
 {
   void *end;
@@ -5854,7 +5855,6 @@ mark_object_root_visitor (Lisp_Object const *root_ptr,
    NULL on entry to garbage_collect and after it returns.  */
 static struct Lisp_Hash_Table *weak_hash_tables;
 
-NO_INLINE /* For better stack traces */
 static void
 mark_and_sweep_weak_table_contents (void)
 {
@@ -6875,7 +6875,6 @@ survives_gc_p (Lisp_Object obj)
   return survives_p || PURE_P (XPNTR (obj));
 }
 
-NO_INLINE /* For better stack traces */
 static void
 sweep_conses (void)
 {
@@ -6952,7 +6951,6 @@ sweep_conses (void)
   gcstat.total_free_conses = num_free;
 }
 
-NO_INLINE /* For better stack traces */
 static void
 sweep_floats (void)
 {
@@ -7001,7 +6999,6 @@ sweep_floats (void)
   gcstat.total_free_floats = num_free;
 }
 
-NO_INLINE /* For better stack traces */
 static void
 sweep_intervals (void)
 {
@@ -7050,7 +7047,6 @@ sweep_intervals (void)
   gcstat.total_free_intervals = num_free;
 }
 
-NO_INLINE /* For better stack traces */
 static void
 sweep_symbols (void)
 {
@@ -7136,7 +7132,6 @@ unchain_dead_markers (struct buffer *buffer)
       }
 }
 
-NO_INLINE /* For better stack traces */
 static void
 sweep_buffers (void)
 {
@@ -7419,7 +7414,8 @@ die (const char *msg, const char *file, int line)
 /* Stress alloca with inconveniently sized requests and check
    whether all allocated areas may be used for Lisp_Object.  */
 
-NO_INLINE static void
+NO_INLINE
+static void
 verify_alloca (void)
 {
   int i;
