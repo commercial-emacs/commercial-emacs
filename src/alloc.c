@@ -1939,7 +1939,6 @@ resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
 
 /* Sweep and compact strings.  */
 
-NO_INLINE /* For better stack traces */
 static void
 sweep_strings (void)
 {
@@ -3182,7 +3181,6 @@ cleanup_vector (struct Lisp_Vector *vector)
 
 /* Reclaim space used by unmarked vectors.  */
 
-NO_INLINE /* For better stack traces */
 static void
 sweep_vectors (void)
 {
@@ -4877,16 +4875,51 @@ mark_maybe_pointer (void *p, bool symbol_only)
    miss objects if __alignof__ were used.  */
 #define GC_POINTER_ALIGNMENT alignof (void *)
 
-/* Mark Lisp objects referenced from the address range START..END
-   or END..START.  */
+/* Mark live Lisp objects on the C stack.
+
+   There are several system-dependent problems to consider when
+   porting this to new architectures:
+
+   Processor Registers
+
+   We have to mark Lisp objects in CPU registers that can hold local
+   variables or are used to pass parameters.
+
+   If __builtin_unwind_init is available, it should suffice to save
+   registers in flush_stack_call_func().  This presumably is always
+   the case for platforms of interest to Commercial Emacs.  We
+   preserve the legacy else-branch that calls test_setjmp() to verify
+   the sys_jmp_buf saves registers.
+
+   Stack Layout
+
+   Architectures differ in the way their processor stack is organized.
+   For example, the stack might look like this
+
+     +----------------+
+     |  Lisp_Object   |  size = 4
+     +----------------+
+     | something else |  size = 2
+     +----------------+
+     |  Lisp_Object   |  size = 4
+     +----------------+
+     |	...	      |
+
+   In such a case, not every Lisp_Object will be aligned equally.  To
+   find all Lisp_Object on the stack it won't be sufficient to walk
+   the stack in steps of 4 bytes.  Instead, two passes will be
+   necessary, one starting at the start of the stack, and a second
+   pass starting at the start of the stack + 2.  Likewise, if the
+   minimal alignment of Lisp_Objects on the stack is 1, four passes
+   would be necessary, each one starting with one byte more offset
+   from the stack start.  */
 
 void ATTRIBUTE_NO_SANITIZE_ADDRESS
 mark_memory (void const *start, void const *end)
 {
   char const *pp;
 
-  /* Make START the pointer to the start of the memory region,
-     if it isn't already.  */
+  /* Allow inverted arguments.  */
   if (end < start)
     {
       void const *tem = start;
@@ -4936,36 +4969,6 @@ test_setjmp (void)
 static bool setjmp_tested_p;
 static int longjmps_done;
 
-#  define SETJMP_WILL_LIKELY_WORK "\
-\n\
-Emacs garbage collector has been changed to use conservative stack\n\
-marking.  Emacs has determined that the method it uses to do the\n\
-marking will likely work on your system, but this isn't sure.\n\
-\n\
-If you are a system-programmer, or can get the help of a local wizard\n\
-who is, please take a look at the function mark_c_stack in alloc.c, and\n\
-verify that the methods used are appropriate for your system.\n\
-\n\
-Please mail the result to <emacs-devel@gnu.org>.\n\
-"
-
-#  define SETJMP_WILL_NOT_WORK "\
-\n\
-Emacs garbage collector has been changed to use conservative stack\n\
-marking.  Emacs has determined that the default method it uses to do the\n\
-marking will not work on your system.  We will need a system-dependent\n\
-solution for your system.\n\
-\n\
-Please take a look at the function mark_c_stack in alloc.c, and\n\
-try to find a way to make it work on your system.\n\
-\n\
-Note that you may get false negatives, depending on the compiler.\n\
-In particular, you need to use -O with GCC for this test.\n\
-\n\
-Please mail the result to <emacs-devel@gnu.org>.\n\
-"
-
-
 /* Perform a quick check if it looks like setjmp saves registers in a
    jmp_buf.  Print a message to stderr saying so.  When this test
    succeeds, this is _not_ a proof that setjmp is sufficient for
@@ -4990,23 +4993,10 @@ test_setjmp (void)
   sys_setjmp (jbuf);
   if (longjmps_done == 1)
     {
-      /* Came here after the longjmp at the end of the function.
-
-         If x == 1, the longjmp has restored the register to its
-         value before the setjmp, and we can hope that setjmp
-         saves all such registers in the jmp_buf, although that
-	 isn't sure.
-
-         For other values of X, either something really strange is
-         taking place, or the setjmp just didn't save the register.  */
-
-      if (x == 1)
-	fputs (SETJMP_WILL_LIKELY_WORK, stderr);
-      else
-	{
-	  fputs (SETJMP_WILL_NOT_WORK, stderr);
-	  exit (1);
-	}
+      /* Gets here after the sys_longjmp().  */
+      if (x != 1)
+	/* Didn't restore the register before the setjmp!  */
+	emacs_abort ();
     }
 
   ++longjmps_done;
@@ -5056,85 +5046,20 @@ typedef union
    *(p) = NEAR_STACK_TOP (&sentry + (stack_bottom < &sentry.c))
 #endif
 
-/* Mark live Lisp objects on the C stack.
-
-   There are several system-dependent problems to consider when
-   porting this to new architectures:
-
-   Processor Registers
-
-   We have to mark Lisp objects in CPU registers that can hold local
-   variables or are used to pass parameters.
-
-   If __builtin_unwind_init is available, it should suffice to save
-   registers in flush_stack_call_func().  This presumably is always
-   the case for platforms of interest to Commercial Emacs.  We
-   preserve the legacy else-branch that calls test_setjmp() to verify
-   the sys_jmp_buf saves registers.
-
-   Stack Layout
-
-   Architectures differ in the way their processor stack is organized.
-   For example, the stack might look like this
-
-     +----------------+
-     |  Lisp_Object   |  size = 4
-     +----------------+
-     | something else |  size = 2
-     +----------------+
-     |  Lisp_Object   |  size = 4
-     +----------------+
-     |	...	      |
-
-   In such a case, not every Lisp_Object will be aligned equally.  To
-   find all Lisp_Object on the stack it won't be sufficient to walk
-   the stack in steps of 4 bytes.  Instead, two passes will be
-   necessary, one starting at the start of the stack, and a second
-   pass starting at the start of the stack + 2.  Likewise, if the
-   minimal alignment of Lisp_Objects on the stack is 1, four passes
-   would be necessary, each one starting with one byte more offset
-   from the stack start.  */
-
-void
-mark_c_stack (char const *bottom, char const *end)
-{
-  /* This assumes that the stack is a contiguous region in memory.  If
-     that's not the case, something has to be done here to iterate
-     over the stack segments.  */
-  mark_memory (bottom, end);
-
-  /* Allow for marking a secondary stack, like the register stack on the
-     ia64.  */
-#ifdef GC_MARK_SECONDARY_STACK
-  GC_MARK_SECONDARY_STACK ();
-#endif
-}
-
 /* flush_stack_call_func is the trampoline function that flushes
-   registers to the stack, and then calls FUNC.  ARG is passed through
-   to FUNC verbatim.
+   registers to the stack, and then calls FUNC on ARG.
 
-   This function must be called whenever Emacs is about to release the
-   global interpreter lock.  This lets the garbage collector easily
-   find roots in registers on threads that are not actively running
-   Lisp.
+   Must be called before releasing global interpreter lock (e.g.,
+   thread-yield).  This lets the garbage collector easily find roots
+   in registers on threads that are not actively running Lisp.
 
    It is invalid to run any Lisp code or to allocate any GC memory
    from FUNC.
 
-   Note: all register spilling is done in flush_stack_call_func before
-   flush_stack_call_func1 is activated.
-
-   flush_stack_call_func1 is responsible for identifying the stack
-   address range to be scanned.  It *must* be carefully kept as
-   noinline to make sure that registers has been spilled before it is
-   called, otherwise given __builtin_frame_address (0) typically
-   returns the frame pointer (base pointer) and not the stack pointer
-   [1] GC will miss to scan callee-saved registers content
-   (Bug#41357).
-
-   [1] <https://gcc.gnu.org/onlinedocs/gcc/Return-Address.html>.  */
-
+   Must respect calling convention.  First push callee-saved registers in
+   flush_stack_call_func, then call flush_stack_call_func1 where now ebp
+   would include the pushed-to addresses.  Note NO_INLINE ensures registers
+   are spilled.  (Bug#41357)  */
 NO_INLINE void
 flush_stack_call_func1 (void (*func) (void *arg), void *arg)
 {

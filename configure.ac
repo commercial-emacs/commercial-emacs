@@ -5620,9 +5620,7 @@ case $opsys in
 #ifndef __ia64__
 # error "not ia64"
 #endif
-      ]], [[]])], AC_DEFINE(GC_MARK_SECONDARY_STACK(),
-        [do { extern void *__libc_ia64_register_backing_store_base; __builtin_ia64_flushrs (); mark_memory (__libc_ia64_register_backing_store_base, __builtin_ia64_bsp ());} while (false)],
-        [Mark a secondary stack, like the register stack on the ia64.]), [])
+      ]], [[]])], AC_MSG_ERROR([No longer supporting GC_MARK_SECONDARY_STACK.]), [])
     ;;
 
   hpux*)
