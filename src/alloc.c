@@ -858,7 +858,7 @@ NOIL void gc_phase_mark (void);
 NOIL void gc_phase_plan_sweep (void);
 NOIL void gc_phase_sweep (void);
 NRML void init_alloc_once_for_pdumper (void);
-NRML void recompute_consing_until_gc (void);
+GCFN void update_bytes_between_gc (void);
 
 NRML void scan_doomed_finalizers (gc_phase);
 GCFN void gc_heap_check_field (const gc_heap *, const gc_field_specifier *, size_t, size_t);
@@ -1175,6 +1175,12 @@ struct emacs_globals globals;
    generating garbage.  */
 size_t number_finalizers_run;
 #endif
+
+/* Exposed to lisp.h to inline maybe_garbage_collect() */
+EMACS_INT bytes_since_gc;
+EMACS_INT bytes_between_gc;
+Lisp_Object Vmemory_full;
+bool gc_in_progress;
 
 static size_t gc_latest_heaps_bytes;
 static size_t gc_major_threshold;
@@ -7515,7 +7521,7 @@ garbage_collect (const bool major)
 		     &gc_latest_heaps_bytes);
     }
 
-  recompute_consing_until_gc ();
+  update_bytes_between_gc ();
 
   unblock_input ();
 
@@ -7560,19 +7566,13 @@ garbage_collect (const bool major)
 }
 
 /* Update consing_until_gc thresholds  */
-void
-recompute_consing_until_gc (void)
+static void
+update_bytes_between_gc (void)
 {
   double major_percentage = FLOATP (Vgc_cons_percentage_major)
     ? XFLOAT_DATA (Vgc_cons_percentage_major)
     : 0.3;
-  const double max_major_percentage =
-    (double) gc_heap_size_at_end_of_last_major_gc /
-    (double) SIZE_MAX;
-  major_percentage = min (major_percentage, max_major_percentage);
-  major_percentage = max (major_percentage, 0.0);
-  const size_t major_growth =
-    gc_heap_size_at_end_of_last_major_gc * major_percentage;
+  const size_t major_growth = gc_heap_size_at_end_of_last_major_gc * major_percentage;
   size_t new_major_threshold;
   if (INT_ADD_WRAPV (gc_heap_size_at_end_of_last_major_gc,
                      major_growth,
@@ -7583,14 +7583,9 @@ recompute_consing_until_gc (void)
   double minor_percentage = FLOATP (Vgc_cons_percentage)
     ? XFLOAT_DATA (Vgc_cons_percentage)
     : 0.1;
-  const double max_minor_percentage =
-    (double) gc_latest_heaps_bytes /
-    (double) SIZE_MAX;
-  minor_percentage = min (minor_percentage, max_minor_percentage);
   minor_percentage = max (minor_percentage, 0.0);
   const size_t minor_growth =
-    max (min (max (gc_cons_threshold, 0), SIZE_MAX),
-         (size_t) gc_latest_heaps_bytes * minor_percentage);
+    max (gc_cons_threshold, (size_t) gc_latest_heaps_bytes * minor_percentage);
   size_t new_minor_threshold;
   if (INT_ADD_WRAPV (gc_latest_heaps_bytes,
                      minor_growth,
@@ -7623,7 +7618,7 @@ maybe_garbage_collect (void)
   else if (total_nbytes_in_use >= gc_minor_threshold)
     garbage_collect (false);
   else
-    recompute_consing_until_gc ();
+    update_bytes_between_gc ();
 }
 
 Lisp_Object
@@ -9164,7 +9159,7 @@ init_alloc_once_for_pdumper (void)
 
      XXX: allow GC later, after all initialization done
      */
-  recompute_consing_until_gc ();
+  update_bytes_between_gc ();
   eassume (gc_inhibited >= 0);
   gc_inhibited -= 1;
 }
