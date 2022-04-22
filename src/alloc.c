@@ -6024,11 +6024,10 @@ garbage_collect (void)
 
   eassert (mark_stack_empty_p ());
 
-  /* Record this function, so it appears on the profiler's backtraces.  */
+  /* Show up in profiler.  */
   record_in_backtrace (QAutomatic_GC, 0, 0);
 
-  /* Don't keep undo information around forever.
-     Do this early on, so it is no problem if the user quits.  */
+  /* Do this early in case user quits.  */
   FOR_EACH_LIVE_BUFFER (tail, buffer)
     compact_buffer (XBUFFER (buffer));
 
