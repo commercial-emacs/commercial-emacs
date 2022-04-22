@@ -314,9 +314,6 @@ int number_finalizers_run;
 typedef uintptr_t byte_ct;
 typedef intptr_t object_ct;
 
-/* Halved from EMACS_INT_MAX to avoid overflow issues */
-#define GC_INFINITY (EMACS_INT_MAX >> 1)
-
 /* Number of live and free conses etc. counted by the most-recent GC.  */
 
 static struct gcstat
@@ -5971,7 +5968,7 @@ update_bytes_between_gc (void)
   intmax_t threshold1 = FLOATP (Vgc_cons_percentage)
     ? XFLOAT_DATA (Vgc_cons_percentage) * total_bytes_of_live_objects ()
     : threshold0;
-  bytes_between_gc = min (max (threshold0, threshold1), GC_INFINITY);
+  bytes_between_gc = max (threshold0, threshold1);
 }
 
 /* Immediately adjust bytes_between_gc for changes to
