@@ -4062,10 +4062,7 @@ extern void mark_memory (void const *start, void const *end);
 # ifdef __sparc__
    /* This trick flushes the register windows so that all the state of
       the process is contained in the stack.
-      FreeBSD does not have a ta 3 handler, so handle it specially.
-      FIXME: Code in the Boehm GC suggests flushing (with 'flushrs') is
-      needed on ia64 too.  See mach_dep.c, where it also says inline
-      assembler doesn't work with relevant proprietary compilers.  */
+      FreeBSD does not have a ta 3 handler, so handle it specially.  */
 #  if defined __sparc64__ && defined __FreeBSD__
 #   define __builtin_unwind_init() asm ("flushw")
 #  else
