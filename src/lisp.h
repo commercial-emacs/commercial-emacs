@@ -4056,8 +4056,19 @@ extern void alloc_unexec_post (void);
 extern void flush_stack_call_func1 (void (*func) (void *arg), void *arg);
 extern void mark_memory (void const *start, void const *end);
 
-/* Force callee-saved registers and register windows onto the stack,
-   so that conservative garbage collection can see their values.  */
+/* flush_stack_call_func is the trampoline function that flushes
+   registers to the stack, and then calls FUNC on ARG.
+
+   Must be called before releasing global interpreter lock (e.g.,
+   thread-yield).  This lets the garbage collector easily find roots
+   in registers on threads that are not actively running Lisp.
+
+   It is invalid to run any Lisp code or to allocate any GC memory
+   from FUNC.
+
+   Must respect calling convention.  First push callee-saved registers in
+   flush_stack_call_func, then call flush_stack_call_func1 where now ebp
+   would include the pushed-to addresses.  (Bug#41357)  */
 #ifndef HAVE___BUILTIN_UNWIND_INIT
 # ifdef __sparc__
    /* This trick flushes the register windows so that all the state of

@@ -5045,22 +5045,7 @@ typedef union
    sys_setjmp (sentry.j);			\
    *(p) = NEAR_STACK_TOP (&sentry + (stack_bottom < &sentry.c))
 #endif
-
-/* flush_stack_call_func is the trampoline function that flushes
-   registers to the stack, and then calls FUNC on ARG.
-
-   Must be called before releasing global interpreter lock (e.g.,
-   thread-yield).  This lets the garbage collector easily find roots
-   in registers on threads that are not actively running Lisp.
-
-   It is invalid to run any Lisp code or to allocate any GC memory
-   from FUNC.
-
-   Must respect calling convention.  First push callee-saved registers in
-   flush_stack_call_func, then call flush_stack_call_func1 where now ebp
-   would include the pushed-to addresses.  Note NO_INLINE ensures registers
-   are spilled.  (Bug#41357)  */
-NO_INLINE /* Ensures registers are spilled.  */
+NO_INLINE /* Ensures registers are spilled. (Bug#41357)  */
 void
 flush_stack_call_func1 (void (*func) (void *arg), void *arg)
 {
