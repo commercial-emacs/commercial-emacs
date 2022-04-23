@@ -6309,7 +6309,6 @@ mark_buffer (struct buffer *buffer)
 
 /* Mark Lisp faces in the face cache C.  */
 
-NO_INLINE /* To reduce stack depth in mark_object.  */
 static void
 mark_face_cache (struct face_cache *c)
 {
@@ -6330,7 +6329,6 @@ mark_face_cache (struct face_cache *c)
     }
 }
 
-NO_INLINE /* To reduce stack depth in mark_object.  */
 static void
 mark_localized_symbol (struct Lisp_Symbol *ptr)
 {
@@ -6460,7 +6458,7 @@ mark_stack_pop (void)
   return (++e->u.values)[-1];
 }
 
-NO_INLINE static void
+static void
 grow_mark_stack (void)
 {
   struct mark_stack *ms = &mark_stk;
@@ -7414,7 +7412,6 @@ die (const char *msg, const char *file, int line)
 /* Stress alloca with inconveniently sized requests and check
    whether all allocated areas may be used for Lisp_Object.  */
 
-NO_INLINE
 static void
 verify_alloca (void)
 {
