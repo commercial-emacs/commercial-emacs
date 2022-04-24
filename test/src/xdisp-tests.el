@@ -188,6 +188,15 @@ end-of-buffer."
     (scroll-up)
     (redisplay)))
 
+(ert-deftest xdisp-tests--unibyte-echo-area-resize ()
+  "When echo area needs to show a unibyte blob, don't think it's bidi."
+  (skip-unless (not noninteractive))
+  (with-temp-buffer
+    (set-buffer-multibyte nil)
+    (insert-file-contents-literally
+     (expand-file-name "test/data/decompress/compat.tar.gz" source-directory))
+    (buffer-string)))
+
 (ert-deftest xdisp-tests--scroll-down-leaves-cursor-behind ()
   "When first line contains accented, and therefore taller
 character, e.g., Óscar, scrolling down (moving window-start up)
