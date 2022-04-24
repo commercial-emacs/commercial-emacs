@@ -1332,6 +1332,10 @@ errors signaled by ERROR-FORM or by BODY).
               ;; except it calls `url-insert' because we want the contents
               ;; literally (but there's no url-insert-file-contents-literally).
               (let ((buffer (url-retrieve-synchronously url)))
+                (when (equal url "https://elpa.gnu.org/packages/compat-28.1.1.0.tar")
+                  (princ (format "bull johnson %S\n" (with-current-buffer buffer
+                                                       (point-max)))
+                         #'external-debugging-output))
                 (unless buffer (signal 'file-error (list url "No Data")))
                 (when (fboundp 'url-http--insert-file-helper)
                   ;; XXX: This is HTTP/S specific and should be moved

@@ -47,6 +47,7 @@
 (defvar url-http-extra-headers)
 (defvar url-http-noninteractive)
 (defvar url-http-method)
+(defvar url-http-no-retry)
 (defvar url-http-process)
 (defvar url-http-proxy)
 (defvar url-http-response-status)
@@ -1004,12 +1005,30 @@ should be shown to the user."
   (url-http-debug "url-http-end-of-document-sentinel in buffer (%s)"
 		  (process-buffer proc))
   (url-http-idle-sentinel proc why)
-  (when (buffer-live-p (process-buffer proc))
+  (when (buffer-name (process-buffer proc))
     (with-current-buffer (process-buffer proc)
       (goto-char (point-min))
-      (when (looking-at "HTTP/")
-        (url-http-parse-headers))
-      (url-http-activate-callback))))
+      (cond ((not (looking-at "HTTP/"))
+	     (if url-http-no-retry
+		 ;; HTTP/0.9 just gets passed back no matter what
+		 (url-http-activate-callback)
+	       ;; Call `url-http' again if our connection expired.
+	       (erase-buffer)
+               (let ((url-request-method url-http-method)
+                     (url-request-extra-headers url-http-extra-headers)
+                     (url-request-data url-http-data)
+                     (url-using-proxy (url-find-proxy-for-url
+                                       url-current-object
+                                       (url-host url-current-object))))
+                 (when url-using-proxy
+                   (setq url-using-proxy
+                         (url-generic-parse-url url-using-proxy)))
+                 (url-http url-current-object url-callback-function
+                           url-callback-arguments (current-buffer)
+                           (and (string= "https" (url-type url-current-object))
+                                'tls)))))
+	    ((url-http-parse-headers)
+	     (url-http-activate-callback))))))
 
 (defun url-http-simple-after-change-function (_st _nd _length)
   ;; Function used when we do NOT know how long the document is going to be
@@ -1350,6 +1369,7 @@ The return value of this function is the retrieval buffer."
 		       url-http-noninteractive
 		       url-http-data
 		       url-http-target-url
+		       url-http-no-retry
 		       url-http-connection-opened
                        url-mime-accept-string
 		       url-http-proxy
@@ -1369,6 +1389,7 @@ The return value of this function is the retrieval buffer."
 	      url-callback-arguments cbargs
 	      url-http-after-change-function 'url-http-wait-for-headers-change-function
 	      url-http-target-url url-current-object
+	      url-http-no-retry retry-buffer
 	      url-http-connection-opened nil
               url-mime-accept-string mime-accept-string
 	      url-http-proxy url-using-proxy
@@ -1462,10 +1483,11 @@ The return value of this function is the retrieval buffer."
 (defun url-http-async-sentinel (proc why)
   ;; We are performing an asynchronous connection, and a status change
   ;; has occurred.
-  (when (buffer-live-p (process-buffer proc))
+  (when (buffer-name (process-buffer proc))
     (with-current-buffer (process-buffer proc)
       (cond
        (url-http-connection-opened
+	(setq url-http-no-retry t)
 	(url-http-end-of-document-sentinel proc why))
        ((string= (substring why 0 4) "open")
 	(setq url-http-connection-opened t)

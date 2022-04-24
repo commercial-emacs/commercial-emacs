@@ -154,7 +154,7 @@ take effect.
 If SILENT, then don't message progress reports and the like.
 If INHIBIT-COOKIES, cookies will neither be stored nor sent to
 the server.
-TIMEOUT is an optional list of seconds and microseconds.
+TIMEOUT is optional seconds.
 If URL is a multibyte string, it will be encoded as utf-8 and
 URL-encoded before it's used."
   ;; XXX: There is code in Emacs that does dynamic binding
@@ -182,7 +182,7 @@ of `url-retrieve' (if in doubt, specify nil).
 If SILENT, don't message progress reports and the like.
 If INHIBIT-COOKIES, cookies will neither be stored nor sent to
 the server.
-Key argument TIMEOUT is list of seconds and microseconds.
+Key argument TIMEOUT is in seconds.
 If URL is a multibyte string, it will be encoded as utf-8 and
 URL-encoded before it's used."
   (url-do-setup)
