@@ -202,6 +202,14 @@ speakers of the Tamil language.  To get back the previous behavior,
 use the new 'tamil-itrans-digits' and 'tamil-inscript-digits' input
 methods instead.
 
++++
+** current-time and related functions now yield (TICKS . HZ) timestamps.
+Previously they yielded timestamps of the forms (HI LO US PS), (HI LO
+US) or (HI LO), which were less regular and less efficient and which
+lacked information about clock resolution.  This long-planned change
+was documented in Emacs 27.  To convert a timestamp X to the old
+4-element list form, you can use (time-convert X 'list).
+
 
 * Changes in Emacs 29.1
 
@@ -415,6 +423,18 @@ command also works for non-Emoji characters.)
 *** New input method 'emoji'.
 
 ** Help
+
+---
+*** Commands like 'C-h f' have changed how they describe menu bindings.
+For instance, previously a command might be described as having the
+following bindings:
+
+  It is bound to <open>, C-x C-f, <menu-bar> <file> <new-file>.
+
+This has been changed to:
+
+  It is bound to <open> and C-x C-f.
+  It can also be invoked from the menu: File → Visit New File....
 
 +++
 *** The 'C-h .' command now accepts a prefix argument.
@@ -1998,6 +2018,11 @@ This variable is bound to t during the preparation of a "*Help*" buffer.
 For example, '(time-add nil '(1 . 1000))' no longer warns that the
 '(1 . 1000)' acts like '(1000 . 1000000)'.  This warning, which was a
 temporary transition aid for Emacs 27, has served its purpose.
+
++++
+** 'encode-time' now also accepts a 6-element list with just time and date.
+(encode-time (list SECOND MINUTE HOUR DAY MONTH YEAR)) is now short for
+(encode-time (list SECOND MINUTE HOUR DAY MONTH YEAR nil -1 nil)).
 
 +++
 ** 'date-to-time' now assumes earliest values if its argument lacks
