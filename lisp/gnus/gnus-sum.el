@@ -3841,9 +3841,10 @@ Input should look like this: \"Sun, 14 Oct 2001 13:34:39 +0200\"."
 		 (set (make-local-variable (car elem)) (eval (nth 1 elem) t))
 	       (eval (nth 1 elem) t)))))))
 
-(defun gnus-summary-read-group (group &optional show-all no-article
-				      kill-buffer no-display backward
-				      select-articles)
+(defun gnus-summary-read-group (group
+                                &optional
+                                show-all no-article kill-buffer no-display
+                                backward select-articles)
   "Start reading news in newsgroup GROUP.
 If SHOW-ALL is non-nil, already read articles are also listed.
 If NO-ARTICLE is non-nil, no article is selected initially.
@@ -3869,9 +3870,9 @@ If SELECT-ARTICLES, only select those articles from GROUP."
       ;; if we are searching for the previous group.
       (when backward
 	(gnus-group-prev-unread-group 2))
-      (if (not (equal group (gnus-group-group-name)))
-	  (setq group (gnus-group-group-name))
-	(setq group nil)))
+      (if (equal group (gnus-group-group-name))
+          (setq group nil)
+	(setq group (gnus-group-group-name))))
     result))
 
 (defun gnus-summary-read-group-1 (group show-all no-article
@@ -3991,13 +3992,11 @@ effects."
                           (not no-display)
                           gnus-newsgroup-unreads
                           gnus-auto-select-first)
-                     (progn
-                       (let ((art (gnus-summary-article-number)))
-                         (when (and art
-                                    gnus-plugged
-                                    (not (memq art gnus-newsgroup-undownloaded))
-                                    (not (memq art gnus-newsgroup-downloadable)))
-                           (gnus-summary-goto-article art))))
+                     (when-let ((art (gnus-summary-article-number)))
+                       (when (and gnus-plugged
+                                  (not (memq art gnus-newsgroup-undownloaded))
+                                  (not (memq art gnus-newsgroup-downloadable)))
+                         (gnus-summary-goto-article art)))
                    ;; Don't select any articles.
                    (gnus-summary-position-point)
                    (gnus-set-mode-line 'summary)
@@ -5543,8 +5542,7 @@ If SELECT-ARTICLES, only select those articles from GROUP."
       (when (derived-mode-p 'gnus-summary-mode)
 	(gnus-kill-buffer (current-buffer)))
       (error "Couldn't request group %s: %s" group (gnus-status-message group)))
-    (when (and gnus-agent
-	       (gnus-active group))
+    (when (and gnus-agent (gnus-active group))
       (gnus-agent-possibly-alter-active group (gnus-active group) info)
 
       (setq gnus-summary-use-undownloaded-faces
@@ -5655,10 +5653,6 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 	    (and (gnus-group-auto-expirable-p group)
 		 (not (gnus-group-read-only-p group))))
       ;; Set up the article buffer now, if necessary.
-      (let ((single-article-p (and gnus-single-article-buffer
-                                   (equal gnus-article-buffer "*Article*"))))
-        (when (and (not single-article-p)
-                   (gnus-buffer-live-p gnus-summary-buffer))))
       (gnus-article-setup-buffer)
       ;; First and last article in this newsgroup.
       (when gnus-newsgroup-headers

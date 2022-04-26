@@ -4688,13 +4688,17 @@ commands:
 (defun gnus-article-prepare (article &optional all-headers _header)
   "Prepare ARTICLE in article mode buffer.
 ARTICLE should either be an article number or a Message-ID.
-If ARTICLE is an id, HEADER should be the article headers.
 If ALL-HEADERS is non-nil, no headers are hidden."
   (gnus-summary-assume-in-summary
     (gnus-article-setup-buffer)
-    (let ((group gnus-newsgroup-name)
-          (summary (current-buffer))
-          result)
+    (let* ((summary (current-buffer))
+           (group gnus-newsgroup-name)
+           (name (if gnus-single-article-buffer "*Article*"
+                   (concat "*Article " group "*")))
+           (gnus-window-to-buffer
+            (cons (cons 'article name)
+                  (assoc-delete-all 'article gnus-window-to-buffer)))
+           result)
       (with-current-buffer gnus-article-buffer
         ;; Deactivate active regions.
         (when transient-mark-mode
@@ -4794,10 +4798,9 @@ If ALL-HEADERS is non-nil, no headers are hidden."
                (set-window-point (get-buffer-window (current-buffer)) (point))
                (gnus-configure-windows 'article)
                ;; Make sure the article begins with the top of the header.
-               (let ((window (get-buffer-window gnus-article-buffer)))
-                 (when window
-                   (with-current-buffer (window-buffer window)
-                     (set-window-point window (point-min)))))
+               (when-let ((window (get-buffer-window gnus-article-buffer)))
+                 (with-current-buffer (window-buffer window)
+                   (set-window-point window (point-min))))
                (gnus-run-hooks 'gnus-article-prepare-hook)
                t))))))
 

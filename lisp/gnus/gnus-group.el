@@ -2024,7 +2024,8 @@ and with point over the group in question."
 
 ;; Selecting groups.
 
-(defun gnus-group-read-group (&optional all no-article group select-articles)
+(cl-defun gnus-group-read-group (&optional all no-article group select-articles
+                                 &aux (no-display (and (numberp all) (zerop all))))
   "Read news in this newsgroup.
 If the prefix argument ALL is non-nil, already read articles become
 readable.
@@ -2037,11 +2038,10 @@ If the optional argument NO-ARTICLE is non-nil, no article will
 be auto-selected upon group entry.  If GROUP is non-nil, fetch
 that group."
   (interactive "P" gnus-group-mode)
-  (let ((no-display (eq all 0))
-	(group (or group (gnus-group-group-name)))
+  (when no-display
+    (setq all nil))
+  (let ((group (or group (gnus-group-group-name)))
 	number active marked entry)
-    (when (eq all 0)
-      (setq all nil))
     (unless group
       (error "No group on current line"))
     (setq marked (gnus-info-marks
@@ -2190,12 +2190,11 @@ handle COLLECTION as a list, hash table, or vector."
   "Start Gnus if necessary and enter GROUP.
 If ARTICLES, display those articles.
 Returns whether the fetching was successful or not."
-  (interactive (list (gnus-group-completing-read nil
-						 nil nil
-						 (gnus-group-name-at-point))))
+  (interactive (list (gnus-group-completing-read
+                      nil nil nil (gnus-group-name-at-point))))
   (unless (gnus-alive-p)
     (gnus-no-server))
-  (gnus-group-read-group (if articles nil t) nil group articles))
+  (gnus-group-read-group (not articles) nil group articles))
 
 ;;;###autoload
 (defun gnus-fetch-group-other-frame (group)

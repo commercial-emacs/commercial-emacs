@@ -223,7 +223,7 @@ See the Gnus manual for an explanation of the syntax used.")
 
 (defvar gnus-frame-list nil)
 
-(defun gnus-window-to-buffer-helper (obj)
+(defsubst gnus-window--eval (obj)
   (cond ((not (symbolp obj))
 	 obj)
 	((boundp obj)
@@ -241,7 +241,7 @@ and `gnus-buffer-configuration'."
   (gnus-configure--frame
    (progn
      (when-let* ((what (cdr (assq (car split) gnus-window-to-buffer)))
-                 (buf (gnus-window-to-buffer-helper what))
+                 (buf (gnus-window--eval what))
                  (dead-buf (and (bufferp buf) (not (buffer-live-p buf)))))
        (if-let* ((live-buf (gnus-buffer-live-p gnus-group-buffer))
                  (group (with-current-buffer live-buf
@@ -280,32 +280,22 @@ Formerly `gnus-configure-frame'.  Wasn't thread-safe."
 	(and (memq 'point split) window))
        ;; This is a buffer to be selected.
        ((not (memq type '(frame horizontal vertical)))
-	(let ((buffer (cond ((stringp type) type)
-                            (t (cdr (assq type gnus-window-to-buffer))))))
-	  (unless buffer
-	    (error "Invalid buffer type: %s" type))
-	  (let ((buf (gnus-get-buffer-create
-		      (gnus-window-to-buffer-helper buffer))))
-            (when (buffer-live-p buf)
-	      (cond
-               ((eq buf (window-buffer (selected-window)))
-                (set-buffer buf))
-               ((eq t (window-dedicated-p))
-                ;; If the window is hard-dedicated, we have a problem because
-                ;; we just can't do what we're asked.  But signaling an error,
-                ;; like `switch-to-buffer' would do, is not an option because
-                ;; it would prevent things like "^" (to jump to the *Servers*)
-                ;; in a dedicated *Group*.
-                ;; FIXME: Maybe a better/additional fix would be to change
-                ;; gnus-configure-windows so that when called
-                ;; from a hard-dedicated frame, it creates (and
-                ;; configures) a new frame, leaving the dedicated frame alone.
-                (pop-to-buffer buf))
-               (t (pop-to-buffer-same-window buf)))))
+	(when-let ((name (if (stringp type)
+                             type
+                           (cdr (assq type gnus-window-to-buffer))))
+                   (buffer (gnus-get-buffer-create (gnus-window--eval name))))
+	  (cond
+           ((eq buffer (window-buffer (selected-window)))
+            (set-buffer buffer))
+           ((eq t (window-dedicated-p))
+            ;; Best efforts handling of "hard-dedicated" window.
+            (pop-to-buffer buffer))
+           (t
+            (pop-to-buffer-same-window buffer)))
 	  (when (memq 'frame-focus split)
 	    (setq gnus-window-frame-focus window))
-	  ;; We return the window if it has the `point' spec.
-	  (and (memq 'point split) window)))
+	  ;; Return WINDOW if it has the "point" spec.
+	  (when (memq 'point split) window)))
        ;; This is a frame split.
        ((eq type 'frame)
 	(unless gnus-frame-list
@@ -433,13 +423,13 @@ Formerly `gnus-configure-frame'.  Wasn't thread-safe."
           (unwind-protect
               (if gnus-use-full-window
                   ;; We want to remove all other windows.
-                  (if (not gnus-frame-split-p)
-                      ;; This is not a `frame' split, so we ignore the
-                      ;; other frames.
-                      (delete-other-windows)
-                    ;; This is a `frame' split, so we delete all windows
-                    ;; on all frames.
-                    (gnus-delete-windows-in-gnusey-frames))
+                  (if gnus-frame-split-p
+                      ;; This is a `frame' split, so we delete all windows
+                      ;; on all frames.
+                      (gnus-delete-windows-in-gnusey-frames)
+                    ;; This is not a `frame' split, so we ignore the
+                    ;; other frames.
+                    (delete-other-windows))
                 ;; Just remove some windows.
                 (gnus-remove-some-windows)
                 (set-buffer nntp-server-buffer))
@@ -495,15 +485,16 @@ should have point."
        ((null split) t)
        ;; A buffer.
        ((not (memq type '(horizontal vertical frame)))
-	(setq buffer (cond ((stringp type) type)
-			   (t (cdr (assq type gnus-window-to-buffer)))))
+	(setq buffer (if (stringp type)
+                         type
+		       (cdr (assq type gnus-window-to-buffer))))
 	(unless buffer
 	  (error "Invalid buffer type: %s" type))
-	(if (and (setq buf (get-buffer (gnus-window-to-buffer-helper buffer)))
+	(if (and (setq buf (get-buffer (gnus-window--eval buffer)))
 		 (buffer-live-p buf)
 		 (setq win (gnus-get-buffer-window buf t)))
-	    (if (memq 'point split)
-		(setq all-visible win))
+	    (when (memq 'point split)
+	      (setq all-visible win))
 	  (setq all-visible nil)))
        (t
 	(when (eq type 'frame)

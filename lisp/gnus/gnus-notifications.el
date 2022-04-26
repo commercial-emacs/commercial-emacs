@@ -70,19 +70,17 @@ not get notifications."
   "Map notifications ids to messages.")
 
 (defun gnus-notifications-action (id key)
-  (let ((group-article (assoc id gnus-notifications-id-to-msg)))
-    (when group-article
-      (let ((group (cadr group-article))
-            (article (nth 2 group-article)))
-        (cond ((string= key "read")
-               (gnus-fetch-group group (list article))
-               (select-frame-set-input-focus (selected-frame)))
-              ((string= key "mark-read")
-               (gnus-update-read-articles
-                group
-                (delq article (gnus-list-of-unread-articles group)))
-               ;; gnus-group-refresh-group
-               (gnus-group-update-group group)))))))
+  (when-let ((group-article (assoc id gnus-notifications-id-to-msg))
+             (group (cadr group-article))
+             (article (nth 2 group-article)))
+    (cond ((string= key "read")
+           (gnus-fetch-group group (list article))
+           (select-frame-set-input-focus (selected-frame)))
+          ((string= key "mark-read")
+           (gnus-update-read-articles
+            group
+            (delq article (gnus-list-of-unread-articles group)))
+           (gnus-group-update-group group)))))
 
 (defun gnus-notifications-notify (from subject photo-file)
   "Send a notification about a new mail.
@@ -153,8 +151,7 @@ This is typically a function to add in
       ;; messages.
       (when (and (<= (gnus-group-level group) gnus-notifications-minimum-level)
                  (let ((unread (gnus-group-unread group)))
-                   (and (numberp unread)
-                        (> unread 0))))
+                   (and (numberp unread) (> unread 0))))
         ;; Each group should have an entry in the `gnus-notifications-sent'
         ;; alist. If not, we add one at this time.
         (let ((group-notifications (or (assoc group gnus-notifications-sent)
