@@ -4038,6 +4038,7 @@ syms_of_data (void)
 
   DEFSYM (Qchar_table_p, "char-table-p");
   DEFSYM (Qvector_or_char_table_p, "vector-or-char-table-p");
+  DEFSYM (Qoclosure_interactive_form, "oclosure-interactive-form");
 
   DEFSYM (Qsubrp, "subrp");
   DEFSYM (Qunevalled, "unevalled");
