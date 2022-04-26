@@ -4697,7 +4697,7 @@ If ALL-HEADERS is non-nil, no headers are hidden."
                    (concat "*Article " group "*")))
            (gnus-window-to-buffer
             (cons (cons 'article name)
-                  (assoc-delete-all 'article gnus-window-to-buffer)))
+                  (assoc-delete-all 'article (copy-sequence gnus-window-to-buffer))))
            result)
       (with-current-buffer gnus-article-buffer
         ;; Deactivate active regions.
