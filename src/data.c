@@ -998,6 +998,7 @@ Value, if non-nil, is a list (interactive SPEC).  */)
   (Lisp_Object cmd)
 {
   Lisp_Object fun = indirect_function (cmd); /* Check cycles.  */
+  bool genfun = false;
 
   if (NILP (fun))
     return Qnil;
@@ -1030,15 +1031,17 @@ Value, if non-nil, is a list (interactive SPEC).  */)
       if (PVSIZE (fun) > COMPILED_INTERACTIVE)
 	{
 	  Lisp_Object form = AREF (fun, COMPILED_INTERACTIVE);
-	  if (VECTORP (form))
-	    /* The vector form is the new form, where the first
-	       element is the interactive spec, and the second is the
-	       command modes. */
-	    return list2 (Qinteractive, AREF (form, 0));
-	  else
-	    /* Old form -- just the interactive spec. */
-	    return list2 (Qinteractive, form);
+	  /* The vector form is the new form, where the first
+	     element is the interactive spec, and the second is the
+	     command modes. */
+	  return list2 (Qinteractive, VECTORP (form) ? AREF (form, 0) : form);
 	}
+      else if (PVSIZE (fun) > COMPILED_DOC_STRING)
+        {
+          Lisp_Object doc = AREF (fun, COMPILED_DOC_STRING);
+          /* An invalid "docstring" is a sign that we have an OClosure.  */
+          genfun = !(NILP (doc) || VALID_DOCSTRING_P (doc));
+        }
     }
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (fun))
@@ -1061,13 +1064,21 @@ Value, if non-nil, is a list (interactive SPEC).  */)
 	  if (EQ (funcar, Qclosure))
 	    form = Fcdr (form);
 	  Lisp_Object spec = Fassq (Qinteractive, form);
-	  if (NILP (Fcdr (Fcdr (spec))))
+	  if (NILP (spec) && VALID_DOCSTRING_P (CAR_SAFE (form)))
+            /* A "docstring" is a sign that we may have an OClosure.  */
+	    genfun = true;
+	  else if (NILP (Fcdr (Fcdr (spec))))
 	    return spec;
 	  else
 	    return list2 (Qinteractive, Fcar (Fcdr (spec)));
 	}
     }
-  return Qnil;
+  if (genfun
+      /* Avoid burping during bootstrap.  */
+      && !NILP (Fsymbol_function (Qoclosure_interactive_form)))
+    return call1 (Qoclosure_interactive_form, fun);
+  else
+    return Qnil;
 }
 
 DEFUN ("command-modes", Fcommand_modes, Scommand_modes, 1, 1, 0,
