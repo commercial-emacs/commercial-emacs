@@ -100,12 +100,12 @@ typedef bool bool_bf;
 #ifdef emacs
 /* We include stdlib.h here, because Gnulib's stdlib.h might redirect
    'free' to its replacement, and we want to avoid that in unexec
-   builds.  Inclduing it here will render its inclusion after config.h
+   builds.  Including it here will render its inclusion after config.h
    a no-op.  */
 # if (defined DARWIN_OS && defined HAVE_UNEXEC) || defined HYBRID_MALLOC
 #  include <stdlib.h>
 # endif
-#endif
+#endif	/* emacs */
 
 #if defined DARWIN_OS && defined emacs && defined HAVE_UNEXEC
 # undef malloc
@@ -268,6 +268,14 @@ extern void _DebPrint (const char *fmt, ...);
 #define RE_TRANSLATE_TYPE Lisp_Object
 #define RE_TRANSLATE(TBL, C) char_table_translate (TBL, C)
 #define RE_TRANSLATE_P(TBL) (!EQ (TBL, make_fixnum (0)))
+#endif
+
+#ifdef emacs
+/* Let libgnu.a freely include gnulib xalloc.h (for bitset.h).
+   But don't let xalloc.h counterfeit glibc malloc when compiling emacs.
+*/
+# undef GNULIB_XALLOC
+# undef GNULIB_XALLOC_DIE
 #endif
 
 /* Tell time_rz.c to use Emacs's getter and setter for TZ.

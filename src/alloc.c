@@ -46,6 +46,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "pdumper.h"
 #include "termhooks.h"		/* For struct terminal.  */
+#include "bitset.h"
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
@@ -271,6 +272,11 @@ my_heap_start (void)
   if (! start)
     start = sbrk (0);
   return start;
+  bitset bset = bitset_create (100, BITSET_VARIABLE);
+  bitset_set (bset, 2);
+  bitset_toggle (bset, 2);
+  eassume (bitset_test (bset, 2));
+  bitset_free (bset);
 }
 # endif
 

@@ -70,6 +70,7 @@
 #  --avoid=wctype-h \
 #  alloca-opt \
 #  binary-io \
+#  bitset \
 #  byteswap \
 #  c-ctype \
 #  c-strcase \
@@ -243,6 +244,7 @@ EXECINFO_H = @EXECINFO_H@
 EXEEXT = @EXEEXT@
 FIND_DELETE = @FIND_DELETE@
 FIRSTFILE_OBJ = @FIRSTFILE_OBJ@
+FLOAT_H = @FLOAT_H@
 FONTCONFIG_CFLAGS = @FONTCONFIG_CFLAGS@
 FONTCONFIG_LIBS = @FONTCONFIG_LIBS@
 FONT_OBJ = @FONT_OBJ@
@@ -263,6 +265,7 @@ GL_COND_OBJ_CANONICALIZE_LGPL_CONDITION = @GL_COND_OBJ_CANONICALIZE_LGPL_CONDITI
 GL_COND_OBJ_COPY_FILE_RANGE_CONDITION = @GL_COND_OBJ_COPY_FILE_RANGE_CONDITION@
 GL_COND_OBJ_DIRFD_CONDITION = @GL_COND_OBJ_DIRFD_CONDITION@
 GL_COND_OBJ_DUP2_CONDITION = @GL_COND_OBJ_DUP2_CONDITION@
+GL_COND_OBJ_ERROR_CONDITION = @GL_COND_OBJ_ERROR_CONDITION@
 GL_COND_OBJ_EUIDACCESS_CONDITION = @GL_COND_OBJ_EUIDACCESS_CONDITION@
 GL_COND_OBJ_EXECINFO_CONDITION = @GL_COND_OBJ_EXECINFO_CONDITION@
 GL_COND_OBJ_EXPLICIT_BZERO_CONDITION = @GL_COND_OBJ_EXPLICIT_BZERO_CONDITION@
@@ -270,6 +273,9 @@ GL_COND_OBJ_FACCESSAT_CONDITION = @GL_COND_OBJ_FACCESSAT_CONDITION@
 GL_COND_OBJ_FCHMODAT_CONDITION = @GL_COND_OBJ_FCHMODAT_CONDITION@
 GL_COND_OBJ_FCNTL_CONDITION = @GL_COND_OBJ_FCNTL_CONDITION@
 GL_COND_OBJ_FDOPENDIR_CONDITION = @GL_COND_OBJ_FDOPENDIR_CONDITION@
+GL_COND_OBJ_FFSL_CONDITION = @GL_COND_OBJ_FFSL_CONDITION@
+GL_COND_OBJ_FFS_CONDITION = @GL_COND_OBJ_FFS_CONDITION@
+GL_COND_OBJ_FLOAT_CONDITION = @GL_COND_OBJ_FLOAT_CONDITION@
 GL_COND_OBJ_FPENDING_CONDITION = @GL_COND_OBJ_FPENDING_CONDITION@
 GL_COND_OBJ_FREE_CONDITION = @GL_COND_OBJ_FREE_CONDITION@
 GL_COND_OBJ_FSTATAT_CONDITION = @GL_COND_OBJ_FSTATAT_CONDITION@
@@ -283,6 +289,7 @@ GL_COND_OBJ_GETOPT_CONDITION = @GL_COND_OBJ_GETOPT_CONDITION@
 GL_COND_OBJ_GETRANDOM_CONDITION = @GL_COND_OBJ_GETRANDOM_CONDITION@
 GL_COND_OBJ_GETTIMEOFDAY_CONDITION = @GL_COND_OBJ_GETTIMEOFDAY_CONDITION@
 GL_COND_OBJ_GROUP_MEMBER_CONDITION = @GL_COND_OBJ_GROUP_MEMBER_CONDITION@
+GL_COND_OBJ_ITOLD_CONDITION = @GL_COND_OBJ_ITOLD_CONDITION@
 GL_COND_OBJ_LCHMOD_CONDITION = @GL_COND_OBJ_LCHMOD_CONDITION@
 GL_COND_OBJ_LSTAT_CONDITION = @GL_COND_OBJ_LSTAT_CONDITION@
 GL_COND_OBJ_MEMPCPY_CONDITION = @GL_COND_OBJ_MEMPCPY_CONDITION@
@@ -290,6 +297,7 @@ GL_COND_OBJ_MEMRCHR_CONDITION = @GL_COND_OBJ_MEMRCHR_CONDITION@
 GL_COND_OBJ_MINI_GMP_GNULIB_CONDITION = @GL_COND_OBJ_MINI_GMP_GNULIB_CONDITION@
 GL_COND_OBJ_MKOSTEMP_CONDITION = @GL_COND_OBJ_MKOSTEMP_CONDITION@
 GL_COND_OBJ_NANOSLEEP_CONDITION = @GL_COND_OBJ_NANOSLEEP_CONDITION@
+GL_COND_OBJ_OBSTACK_CONDITION = @GL_COND_OBJ_OBSTACK_CONDITION@
 GL_COND_OBJ_OPEN_CONDITION = @GL_COND_OBJ_OPEN_CONDITION@
 GL_COND_OBJ_PSELECT_CONDITION = @GL_COND_OBJ_PSELECT_CONDITION@
 GL_COND_OBJ_PTHREAD_SIGMASK_CONDITION = @GL_COND_OBJ_PTHREAD_SIGMASK_CONDITION@
@@ -297,12 +305,15 @@ GL_COND_OBJ_RAWMEMCHR_CONDITION = @GL_COND_OBJ_RAWMEMCHR_CONDITION@
 GL_COND_OBJ_READLINKAT_CONDITION = @GL_COND_OBJ_READLINKAT_CONDITION@
 GL_COND_OBJ_READLINK_CONDITION = @GL_COND_OBJ_READLINK_CONDITION@
 GL_COND_OBJ_READ_CONDITION = @GL_COND_OBJ_READ_CONDITION@
+GL_COND_OBJ_REALLOCARRAY_CONDITION = @GL_COND_OBJ_REALLOCARRAY_CONDITION@
 GL_COND_OBJ_REGEX_CONDITION = @GL_COND_OBJ_REGEX_CONDITION@
 GL_COND_OBJ_SIG2STR_CONDITION = @GL_COND_OBJ_SIG2STR_CONDITION@
 GL_COND_OBJ_SIGDESCR_NP_CONDITION = @GL_COND_OBJ_SIGDESCR_NP_CONDITION@
 GL_COND_OBJ_STDIO_READ_CONDITION = @GL_COND_OBJ_STDIO_READ_CONDITION@
 GL_COND_OBJ_STDIO_WRITE_CONDITION = @GL_COND_OBJ_STDIO_WRITE_CONDITION@
 GL_COND_OBJ_STPCPY_CONDITION = @GL_COND_OBJ_STPCPY_CONDITION@
+GL_COND_OBJ_STRERROR_CONDITION = @GL_COND_OBJ_STRERROR_CONDITION@
+GL_COND_OBJ_STRERROR_OVERRIDE_CONDITION = @GL_COND_OBJ_STRERROR_OVERRIDE_CONDITION@
 GL_COND_OBJ_STRNLEN_CONDITION = @GL_COND_OBJ_STRNLEN_CONDITION@
 GL_COND_OBJ_STRTOIMAX_CONDITION = @GL_COND_OBJ_STRTOIMAX_CONDITION@
 GL_COND_OBJ_STRTOLL_CONDITION = @GL_COND_OBJ_STRTOLL_CONDITION@
@@ -315,6 +326,7 @@ GL_GENERATE_ALLOCA_H_CONDITION = @GL_GENERATE_ALLOCA_H_CONDITION@
 GL_GENERATE_BYTESWAP_H_CONDITION = @GL_GENERATE_BYTESWAP_H_CONDITION@
 GL_GENERATE_ERRNO_H_CONDITION = @GL_GENERATE_ERRNO_H_CONDITION@
 GL_GENERATE_EXECINFO_H_CONDITION = @GL_GENERATE_EXECINFO_H_CONDITION@
+GL_GENERATE_FLOAT_H_CONDITION = @GL_GENERATE_FLOAT_H_CONDITION@
 GL_GENERATE_GETOPT_CDEFS_H_CONDITION = @GL_GENERATE_GETOPT_CDEFS_H_CONDITION@
 GL_GENERATE_GETOPT_H_CONDITION = @GL_GENERATE_GETOPT_H_CONDITION@
 GL_GENERATE_GMP_GMP_H_CONDITION = @GL_GENERATE_GMP_GMP_H_CONDITION@
@@ -364,6 +376,7 @@ GL_GNULIB_FDATASYNC = @GL_GNULIB_FDATASYNC@
 GL_GNULIB_FDOPEN = @GL_GNULIB_FDOPEN@
 GL_GNULIB_FDOPENDIR = @GL_GNULIB_FDOPENDIR@
 GL_GNULIB_FFLUSH = @GL_GNULIB_FFLUSH@
+GL_GNULIB_FFS = @GL_GNULIB_FFS@
 GL_GNULIB_FFSL = @GL_GNULIB_FFSL@
 GL_GNULIB_FFSLL = @GL_GNULIB_FFSLL@
 GL_GNULIB_FGETC = @GL_GNULIB_FGETC@
@@ -687,6 +700,7 @@ HAVE_DECL_SETSTATE = @HAVE_DECL_SETSTATE@
 HAVE_DECL_SNPRINTF = @HAVE_DECL_SNPRINTF@
 HAVE_DECL_STRDUP = @HAVE_DECL_STRDUP@
 HAVE_DECL_STRERROR_R = @HAVE_DECL_STRERROR_R@
+HAVE_DECL_STRNCASECMP = @HAVE_DECL_STRNCASECMP@
 HAVE_DECL_STRNDUP = @HAVE_DECL_STRNDUP@
 HAVE_DECL_STRNLEN = @HAVE_DECL_STRNLEN@
 HAVE_DECL_STRSIGNAL = @HAVE_DECL_STRSIGNAL@
@@ -710,6 +724,7 @@ HAVE_FCHOWNAT = @HAVE_FCHOWNAT@
 HAVE_FCNTL = @HAVE_FCNTL@
 HAVE_FDATASYNC = @HAVE_FDATASYNC@
 HAVE_FDOPENDIR = @HAVE_FDOPENDIR@
+HAVE_FFS = @HAVE_FFS@
 HAVE_FFSL = @HAVE_FFSL@
 HAVE_FFSLL = @HAVE_FFSLL@
 HAVE_FSEEKO = @HAVE_FSEEKO@
@@ -818,9 +833,11 @@ HAVE_SQLITE3 = @HAVE_SQLITE3@
 HAVE_STDINT_H = @HAVE_STDINT_H@
 HAVE_STPCPY = @HAVE_STPCPY@
 HAVE_STPNCPY = @HAVE_STPNCPY@
+HAVE_STRCASECMP = @HAVE_STRCASECMP@
 HAVE_STRCASESTR = @HAVE_STRCASESTR@
 HAVE_STRCHRNUL = @HAVE_STRCHRNUL@
 HAVE_STRERRORNAME_NP = @HAVE_STRERRORNAME_NP@
+HAVE_STRINGS_H = @HAVE_STRINGS_H@
 HAVE_STRPBRK = @HAVE_STRPBRK@
 HAVE_STRPTIME = @HAVE_STRPTIME@
 HAVE_STRSEP = @HAVE_STRSEP@
@@ -959,6 +976,7 @@ MODULES_SUFFIX = @MODULES_SUFFIX@
 NEXT_AS_FIRST_DIRECTIVE_DIRENT_H = @NEXT_AS_FIRST_DIRECTIVE_DIRENT_H@
 NEXT_AS_FIRST_DIRECTIVE_ERRNO_H = @NEXT_AS_FIRST_DIRECTIVE_ERRNO_H@
 NEXT_AS_FIRST_DIRECTIVE_FCNTL_H = @NEXT_AS_FIRST_DIRECTIVE_FCNTL_H@
+NEXT_AS_FIRST_DIRECTIVE_FLOAT_H = @NEXT_AS_FIRST_DIRECTIVE_FLOAT_H@
 NEXT_AS_FIRST_DIRECTIVE_GETOPT_H = @NEXT_AS_FIRST_DIRECTIVE_GETOPT_H@
 NEXT_AS_FIRST_DIRECTIVE_INTTYPES_H = @NEXT_AS_FIRST_DIRECTIVE_INTTYPES_H@
 NEXT_AS_FIRST_DIRECTIVE_LIMITS_H = @NEXT_AS_FIRST_DIRECTIVE_LIMITS_H@
@@ -967,6 +985,7 @@ NEXT_AS_FIRST_DIRECTIVE_STDDEF_H = @NEXT_AS_FIRST_DIRECTIVE_STDDEF_H@
 NEXT_AS_FIRST_DIRECTIVE_STDINT_H = @NEXT_AS_FIRST_DIRECTIVE_STDINT_H@
 NEXT_AS_FIRST_DIRECTIVE_STDIO_H = @NEXT_AS_FIRST_DIRECTIVE_STDIO_H@
 NEXT_AS_FIRST_DIRECTIVE_STDLIB_H = @NEXT_AS_FIRST_DIRECTIVE_STDLIB_H@
+NEXT_AS_FIRST_DIRECTIVE_STRINGS_H = @NEXT_AS_FIRST_DIRECTIVE_STRINGS_H@
 NEXT_AS_FIRST_DIRECTIVE_STRING_H = @NEXT_AS_FIRST_DIRECTIVE_STRING_H@
 NEXT_AS_FIRST_DIRECTIVE_SYS_RANDOM_H = @NEXT_AS_FIRST_DIRECTIVE_SYS_RANDOM_H@
 NEXT_AS_FIRST_DIRECTIVE_SYS_SELECT_H = @NEXT_AS_FIRST_DIRECTIVE_SYS_SELECT_H@
@@ -978,6 +997,7 @@ NEXT_AS_FIRST_DIRECTIVE_UNISTD_H = @NEXT_AS_FIRST_DIRECTIVE_UNISTD_H@
 NEXT_DIRENT_H = @NEXT_DIRENT_H@
 NEXT_ERRNO_H = @NEXT_ERRNO_H@
 NEXT_FCNTL_H = @NEXT_FCNTL_H@
+NEXT_FLOAT_H = @NEXT_FLOAT_H@
 NEXT_GETOPT_H = @NEXT_GETOPT_H@
 NEXT_INTTYPES_H = @NEXT_INTTYPES_H@
 NEXT_LIMITS_H = @NEXT_LIMITS_H@
@@ -986,6 +1006,7 @@ NEXT_STDDEF_H = @NEXT_STDDEF_H@
 NEXT_STDINT_H = @NEXT_STDINT_H@
 NEXT_STDIO_H = @NEXT_STDIO_H@
 NEXT_STDLIB_H = @NEXT_STDLIB_H@
+NEXT_STRINGS_H = @NEXT_STRINGS_H@
 NEXT_STRING_H = @NEXT_STRING_H@
 NEXT_SYS_RANDOM_H = @NEXT_SYS_RANDOM_H@
 NEXT_SYS_SELECT_H = @NEXT_SYS_SELECT_H@
@@ -1092,6 +1113,7 @@ REPLACE_GETTIMEOFDAY = @REPLACE_GETTIMEOFDAY@
 REPLACE_GMTIME = @REPLACE_GMTIME@
 REPLACE_INITSTATE = @REPLACE_INITSTATE@
 REPLACE_ISATTY = @REPLACE_ISATTY@
+REPLACE_ITOLD = @REPLACE_ITOLD@
 REPLACE_LCHOWN = @REPLACE_LCHOWN@
 REPLACE_LINK = @REPLACE_LINK@
 REPLACE_LINKAT = @REPLACE_LINKAT@
@@ -1309,24 +1331,22 @@ gl_GNULIB_ENABLED_03e0aaad4cb89ca757653bd367a6ccb7_CONDITION = @gl_GNULIB_ENABLE
 gl_GNULIB_ENABLED_260941c0e5dc67ec9e87d1fb321c300b_CONDITION = @gl_GNULIB_ENABLED_260941c0e5dc67ec9e87d1fb321c300b_CONDITION@
 gl_GNULIB_ENABLED_5264294aa0a5557541b53c8c741f7f31_CONDITION = @gl_GNULIB_ENABLED_5264294aa0a5557541b53c8c741f7f31_CONDITION@
 gl_GNULIB_ENABLED_6099e9737f757db36c47fa9d9f02e88c_CONDITION = @gl_GNULIB_ENABLED_6099e9737f757db36c47fa9d9f02e88c_CONDITION@
-gl_GNULIB_ENABLED_61bcaca76b3e6f9ae55d57a1c3193bc4_CONDITION = @gl_GNULIB_ENABLED_61bcaca76b3e6f9ae55d57a1c3193bc4_CONDITION@
 gl_GNULIB_ENABLED_682e609604ccaac6be382e4ee3a4eaec_CONDITION = @gl_GNULIB_ENABLED_682e609604ccaac6be382e4ee3a4eaec_CONDITION@
 gl_GNULIB_ENABLED_925677f0343de64b89a9f0c790b4104c_CONDITION = @gl_GNULIB_ENABLED_925677f0343de64b89a9f0c790b4104c_CONDITION@
 gl_GNULIB_ENABLED_a9786850e999ae65a836a6041e8e5ed1_CONDITION = @gl_GNULIB_ENABLED_a9786850e999ae65a836a6041e8e5ed1_CONDITION@
-gl_GNULIB_ENABLED_be453cec5eecf5731a274f2de7f2db36_CONDITION = @gl_GNULIB_ENABLED_be453cec5eecf5731a274f2de7f2db36_CONDITION@
 gl_GNULIB_ENABLED_cloexec_CONDITION = @gl_GNULIB_ENABLED_cloexec_CONDITION@
-gl_GNULIB_ENABLED_d3b2383720ee0e541357aa2aac598e2b_CONDITION = @gl_GNULIB_ENABLED_d3b2383720ee0e541357aa2aac598e2b_CONDITION@
+gl_GNULIB_ENABLED_dbb57f49352be8fb86869629a254fb72_CONDITION = @gl_GNULIB_ENABLED_dbb57f49352be8fb86869629a254fb72_CONDITION@
 gl_GNULIB_ENABLED_dirfd_CONDITION = @gl_GNULIB_ENABLED_dirfd_CONDITION@
 gl_GNULIB_ENABLED_dynarray_CONDITION = @gl_GNULIB_ENABLED_dynarray_CONDITION@
-gl_GNULIB_ENABLED_e80bf6f757095d2e5fc94dafb8f8fc8b_CONDITION = @gl_GNULIB_ENABLED_e80bf6f757095d2e5fc94dafb8f8fc8b_CONDITION@
-gl_GNULIB_ENABLED_ef455225c00f5049c808c2eda3e76866_CONDITION = @gl_GNULIB_ENABLED_ef455225c00f5049c808c2eda3e76866_CONDITION@
 gl_GNULIB_ENABLED_euidaccess_CONDITION = @gl_GNULIB_ENABLED_euidaccess_CONDITION@
+gl_GNULIB_ENABLED_ffs_CONDITION = @gl_GNULIB_ENABLED_ffs_CONDITION@
 gl_GNULIB_ENABLED_getdtablesize_CONDITION = @gl_GNULIB_ENABLED_getdtablesize_CONDITION@
 gl_GNULIB_ENABLED_getgroups_CONDITION = @gl_GNULIB_ENABLED_getgroups_CONDITION@
 gl_GNULIB_ENABLED_lchmod_CONDITION = @gl_GNULIB_ENABLED_lchmod_CONDITION@
-gl_GNULIB_ENABLED_open_CONDITION = @gl_GNULIB_ENABLED_open_CONDITION@
 gl_GNULIB_ENABLED_rawmemchr_CONDITION = @gl_GNULIB_ENABLED_rawmemchr_CONDITION@
 gl_GNULIB_ENABLED_scratch_buffer_CONDITION = @gl_GNULIB_ENABLED_scratch_buffer_CONDITION@
+gl_GNULIB_ENABLED_strerror_CONDITION = @gl_GNULIB_ENABLED_strerror_CONDITION@
+gl_GNULIB_ENABLED_strings_CONDITION = @gl_GNULIB_ENABLED_strings_CONDITION@
 gl_GNULIB_ENABLED_strtoll_CONDITION = @gl_GNULIB_ENABLED_strtoll_CONDITION@
 gl_GNULIB_ENABLED_utimens_CONDITION = @gl_GNULIB_ENABLED_utimens_CONDITION@
 gl_LIBOBJDEPS = @gl_LIBOBJDEPS@
@@ -1411,6 +1431,15 @@ EXTRA_libgnu_a_SOURCES += acl_entries.c
 endif
 ## end   gnulib module acl-permissions
 
+## begin gnulib module alignof
+ifeq (,$(OMIT_GNULIB_MODULE_alignof))
+
+
+EXTRA_DIST += alignof.h
+
+endif
+## end   gnulib module alignof
+
 ## begin gnulib module alloca-opt
 ifeq (,$(OMIT_GNULIB_MODULE_alloca-opt))
 
@@ -1464,6 +1493,16 @@ EXTRA_DIST += attribute.h
 endif
 ## end   gnulib module attribute
 
+## begin gnulib module basename-lgpl
+ifeq (,$(OMIT_GNULIB_MODULE_basename-lgpl))
+
+libgnu_a_SOURCES += basename-lgpl.c
+
+EXTRA_DIST += basename-lgpl.h
+
+endif
+## end   gnulib module basename-lgpl
+
 ## begin gnulib module binary-io
 ifeq (,$(OMIT_GNULIB_MODULE_binary-io))
 
@@ -1471,6 +1510,16 @@ libgnu_a_SOURCES += binary-io.h binary-io.c
 
 endif
 ## end   gnulib module binary-io
+
+## begin gnulib module bitset
+ifeq (,$(OMIT_GNULIB_MODULE_bitset))
+
+libgnu_a_SOURCES += bitset.c bitset/array.c bitset/stats.c    bitset/table.c bitset/list.c bitset/vector.c
+
+EXTRA_DIST += bitset.h bitset/array.h bitset/base.h bitset/list.h bitset/stats.h bitset/table.h bitset/vector.h
+
+endif
+## end   gnulib module bitset
 
 ## begin gnulib module byteswap
 ifeq (,$(OMIT_GNULIB_MODULE_byteswap))
@@ -1509,6 +1558,28 @@ libgnu_a_SOURCES += c-strcase.h c-strcasecmp.c c-strncasecmp.c
 
 endif
 ## end   gnulib module c-strcase
+
+## begin gnulib module calloc-gnu
+ifeq (,$(OMIT_GNULIB_MODULE_calloc-gnu))
+
+
+EXTRA_DIST += calloc.c
+
+EXTRA_libgnu_a_SOURCES += calloc.c
+
+endif
+## end   gnulib module calloc-gnu
+
+## begin gnulib module calloc-posix
+ifeq (,$(OMIT_GNULIB_MODULE_calloc-posix))
+
+
+EXTRA_DIST += calloc.c
+
+EXTRA_libgnu_a_SOURCES += calloc.c
+
+endif
+## end   gnulib module calloc-posix
 
 ## begin gnulib module canonicalize-lgpl
 ifeq (,$(OMIT_GNULIB_MODULE_canonicalize-lgpl))
@@ -1820,6 +1891,18 @@ EXTRA_DIST += errno.in.h
 endif
 ## end   gnulib module errno
 
+## begin gnulib module error
+ifeq (,$(OMIT_GNULIB_MODULE_error))
+
+ifneq (,$(GL_COND_OBJ_ERROR_CONDITION))
+libgnu_a_SOURCES += error.c
+endif
+
+EXTRA_DIST += error.h
+
+endif
+## end   gnulib module error
+
 ## begin gnulib module euidaccess
 ifeq (,$(OMIT_GNULIB_MODULE_euidaccess))
 
@@ -1857,6 +1940,16 @@ EXTRA_DIST += execinfo.in.h
 
 endif
 ## end   gnulib module execinfo
+
+## begin gnulib module exitfail
+ifeq (,$(OMIT_GNULIB_MODULE_exitfail))
+
+libgnu_a_SOURCES += exitfail.c
+
+EXTRA_DIST += exitfail.h
+
+endif
+## end   gnulib module exitfail
 
 ## begin gnulib module explicit_bzero
 ifeq (,$(OMIT_GNULIB_MODULE_explicit_bzero))
@@ -1955,6 +2048,30 @@ endif
 endif
 ## end   gnulib module fdopendir
 
+## begin gnulib module ffs
+ifeq (,$(OMIT_GNULIB_MODULE_ffs))
+
+ifneq (,$(gl_GNULIB_ENABLED_ffs_CONDITION))
+ifneq (,$(GL_COND_OBJ_FFS_CONDITION))
+libgnu_a_SOURCES += ffs.c
+endif
+
+endif
+endif
+## end   gnulib module ffs
+
+## begin gnulib module ffsl
+ifeq (,$(OMIT_GNULIB_MODULE_ffsl))
+
+ifneq (,$(GL_COND_OBJ_FFSL_CONDITION))
+libgnu_a_SOURCES += ffsl.c
+endif
+
+EXTRA_DIST += ffsl.h
+
+endif
+## end   gnulib module ffsl
+
 ## begin gnulib module file-has-acl
 ifeq (,$(OMIT_GNULIB_MODULE_file-has-acl))
 
@@ -2002,6 +2119,64 @@ EXTRA_DIST += flexmember.h
 
 endif
 ## end   gnulib module flexmember
+
+## begin gnulib module float
+ifeq (,$(OMIT_GNULIB_MODULE_float))
+
+BUILT_SOURCES += $(FLOAT_H)
+
+# We need the following in order to create <float.h> when the system
+# doesn't have one that works with the given compiler.
+ifneq (,$(GL_GENERATE_FLOAT_H_CONDITION))
+float.h: float.in.h $(top_builddir)/config.status
+	$(gl_V_at)$(SED_HEADER_STDOUT) \
+	      -e 's|@''GUARD_PREFIX''@|GL|g' \
+	      -e 's|@''INCLUDE_NEXT''@|$(INCLUDE_NEXT)|g' \
+	      -e 's|@''PRAGMA_SYSTEM_HEADER''@|@PRAGMA_SYSTEM_HEADER@|g' \
+	      -e 's|@''PRAGMA_COLUMNS''@|@PRAGMA_COLUMNS@|g' \
+	      -e 's|@''NEXT_FLOAT_H''@|$(NEXT_FLOAT_H)|g' \
+	      -e 's|@''REPLACE_ITOLD''@|$(REPLACE_ITOLD)|g' \
+	      $(srcdir)/float.in.h > $@-t
+	$(AM_V_at)mv $@-t $@
+else
+float.h: $(top_builddir)/config.status
+	rm -f $@
+endif
+MOSTLYCLEANFILES += float.h float.h-t
+
+ifneq (,$(GL_COND_OBJ_FLOAT_CONDITION))
+libgnu_a_SOURCES += float.c
+endif
+ifneq (,$(GL_COND_OBJ_ITOLD_CONDITION))
+libgnu_a_SOURCES += itold.c
+endif
+
+EXTRA_DIST += float.in.h
+
+endif
+## end   gnulib module float
+
+## begin gnulib module fopen
+ifeq (,$(OMIT_GNULIB_MODULE_fopen))
+
+
+EXTRA_DIST += fopen.c
+
+EXTRA_libgnu_a_SOURCES += fopen.c
+
+endif
+## end   gnulib module fopen
+
+## begin gnulib module fopen-gnu
+ifeq (,$(OMIT_GNULIB_MODULE_fopen-gnu))
+
+
+EXTRA_DIST += fopen.c
+
+EXTRA_libgnu_a_SOURCES += fopen.c
+
+endif
+## end   gnulib module fopen-gnu
 
 ## begin gnulib module fpending
 ifeq (,$(OMIT_GNULIB_MODULE_fpending))
@@ -2172,6 +2347,14 @@ EXTRA_DIST += getopt-cdefs.in.h getopt-core.h getopt-ext.h getopt-pfx-core.h get
 endif
 ## end   gnulib module getopt-posix
 
+## begin gnulib module getprogname
+ifeq (,$(OMIT_GNULIB_MODULE_getprogname))
+
+libgnu_a_SOURCES += getprogname.h getprogname.c
+
+endif
+## end   gnulib module getprogname
+
 ## begin gnulib module getrandom
 ifeq (,$(OMIT_GNULIB_MODULE_getrandom))
 
@@ -2185,10 +2368,8 @@ endif
 ## begin gnulib module gettext-h
 ifeq (,$(OMIT_GNULIB_MODULE_gettext-h))
 
-ifneq (,$(gl_GNULIB_ENABLED_be453cec5eecf5731a274f2de7f2db36_CONDITION))
 libgnu_a_SOURCES += gettext.h
 
-endif
 endif
 ## end   gnulib module gettext-h
 
@@ -2231,6 +2412,16 @@ endif
 endif
 ## end   gnulib module group-member
 
+## begin gnulib module ialloc
+ifeq (,$(OMIT_GNULIB_MODULE_ialloc))
+
+libgnu_a_SOURCES += ialloc.c
+
+EXTRA_DIST += ialloc.h
+
+endif
+## end   gnulib module ialloc
+
 ## begin gnulib module idx
 ifeq (,$(OMIT_GNULIB_MODULE_idx))
 
@@ -2271,6 +2462,26 @@ EXTRA_DIST += ignore-value.h
 
 endif
 ## end   gnulib module ignore-value
+
+## begin gnulib module integer_length
+ifeq (,$(OMIT_GNULIB_MODULE_integer_length))
+
+libgnu_a_SOURCES += integer_length.c
+
+EXTRA_DIST += float+.h integer_length.h
+
+endif
+## end   gnulib module integer_length
+
+## begin gnulib module integer_length_l
+ifeq (,$(OMIT_GNULIB_MODULE_integer_length_l))
+
+libgnu_a_SOURCES += integer_length_l.c
+
+EXTRA_DIST += integer_length.h
+
+endif
+## end   gnulib module integer_length_l
 
 ## begin gnulib module intprops
 ifeq (,$(OMIT_GNULIB_MODULE_intprops))
@@ -2421,9 +2632,7 @@ endif
 ## begin gnulib module malloc-gnu
 ifeq (,$(OMIT_GNULIB_MODULE_malloc-gnu))
 
-ifneq (,$(gl_GNULIB_ENABLED_e80bf6f757095d2e5fc94dafb8f8fc8b_CONDITION))
 
-endif
 EXTRA_DIST += malloc.c
 
 EXTRA_libgnu_a_SOURCES += malloc.c
@@ -2434,9 +2643,7 @@ endif
 ## begin gnulib module malloc-posix
 ifeq (,$(OMIT_GNULIB_MODULE_malloc-posix))
 
-ifneq (,$(gl_GNULIB_ENABLED_ef455225c00f5049c808c2eda3e76866_CONDITION))
 
-endif
 EXTRA_DIST += malloc.c
 
 EXTRA_libgnu_a_SOURCES += malloc.c
@@ -2547,15 +2754,25 @@ EXTRA_DIST += strftime.h
 endif
 ## end   gnulib module nstrftime
 
+## begin gnulib module obstack
+ifeq (,$(OMIT_GNULIB_MODULE_obstack))
+
+ifneq (,$(GL_COND_OBJ_OBSTACK_CONDITION))
+libgnu_a_SOURCES += obstack.c
+endif
+
+EXTRA_DIST += obstack.h
+
+endif
+## end   gnulib module obstack
+
 ## begin gnulib module open
 ifeq (,$(OMIT_GNULIB_MODULE_open))
 
-ifneq (,$(gl_GNULIB_ENABLED_open_CONDITION))
 ifneq (,$(GL_COND_OBJ_OPEN_CONDITION))
 libgnu_a_SOURCES += open.c
 endif
 
-endif
 endif
 ## end   gnulib module open
 
@@ -2666,9 +2883,7 @@ endif
 ## begin gnulib module realloc-gnu
 ifeq (,$(OMIT_GNULIB_MODULE_realloc-gnu))
 
-ifneq (,$(gl_GNULIB_ENABLED_d3b2383720ee0e541357aa2aac598e2b_CONDITION))
 
-endif
 EXTRA_DIST += realloc.c
 
 EXTRA_libgnu_a_SOURCES += realloc.c
@@ -2679,15 +2894,23 @@ endif
 ## begin gnulib module realloc-posix
 ifeq (,$(OMIT_GNULIB_MODULE_realloc-posix))
 
-ifneq (,$(gl_GNULIB_ENABLED_61bcaca76b3e6f9ae55d57a1c3193bc4_CONDITION))
 
-endif
 EXTRA_DIST += realloc.c
 
 EXTRA_libgnu_a_SOURCES += realloc.c
 
 endif
 ## end   gnulib module realloc-posix
+
+## begin gnulib module reallocarray
+ifeq (,$(OMIT_GNULIB_MODULE_reallocarray))
+
+ifneq (,$(GL_COND_OBJ_REALLOCARRAY_CONDITION))
+libgnu_a_SOURCES += reallocarray.c
+endif
+
+endif
+## end   gnulib module reallocarray
 
 ## begin gnulib module regex
 ifeq (,$(OMIT_GNULIB_MODULE_regex))
@@ -3288,6 +3511,32 @@ endif
 endif
 ## end   gnulib module stpcpy
 
+## begin gnulib module strerror
+ifeq (,$(OMIT_GNULIB_MODULE_strerror))
+
+ifneq (,$(gl_GNULIB_ENABLED_strerror_CONDITION))
+ifneq (,$(GL_COND_OBJ_STRERROR_CONDITION))
+libgnu_a_SOURCES += strerror.c
+endif
+
+endif
+endif
+## end   gnulib module strerror
+
+## begin gnulib module strerror-override
+ifeq (,$(OMIT_GNULIB_MODULE_strerror-override))
+
+ifneq (,$(gl_GNULIB_ENABLED_dbb57f49352be8fb86869629a254fb72_CONDITION))
+ifneq (,$(GL_COND_OBJ_STRERROR_OVERRIDE_CONDITION))
+libgnu_a_SOURCES += strerror-override.c
+endif
+
+endif
+EXTRA_DIST += strerror-override.h
+
+endif
+## end   gnulib module strerror-override
+
 ## begin gnulib module string
 ifeq (,$(OMIT_GNULIB_MODULE_string))
 
@@ -3400,6 +3649,39 @@ EXTRA_DIST += string.in.h
 
 endif
 ## end   gnulib module string
+
+## begin gnulib module strings
+ifeq (,$(OMIT_GNULIB_MODULE_strings))
+
+ifneq (,$(gl_GNULIB_ENABLED_strings_CONDITION))
+BUILT_SOURCES += strings.h
+
+# We need the following in order to create <strings.h> when the system
+# doesn't have one that works with the given compiler.
+strings.h: strings.in.h $(top_builddir)/config.status $(CXXDEFS_H) $(WARN_ON_USE_H) $(ARG_NONNULL_H)
+	$(gl_V_at)$(SED_HEADER_STDOUT) \
+	      -e 's|@''GUARD_PREFIX''@|GL|g' \
+	      -e 's|@''HAVE_STRINGS_H''@|$(HAVE_STRINGS_H)|g' \
+	      -e 's|@''INCLUDE_NEXT''@|$(INCLUDE_NEXT)|g' \
+	      -e 's|@''PRAGMA_SYSTEM_HEADER''@|@PRAGMA_SYSTEM_HEADER@|g' \
+	      -e 's|@''PRAGMA_COLUMNS''@|@PRAGMA_COLUMNS@|g' \
+	      -e 's|@''NEXT_STRINGS_H''@|$(NEXT_STRINGS_H)|g' \
+	      -e 's/@''GNULIB_FFS''@/$(GL_GNULIB_FFS)/g' \
+	      -e 's|@''HAVE_FFS''@|$(HAVE_FFS)|g' \
+	      -e 's|@''HAVE_STRCASECMP''@|$(HAVE_STRCASECMP)|g' \
+	      -e 's|@''HAVE_DECL_STRNCASECMP''@|$(HAVE_DECL_STRNCASECMP)|g' \
+	      -e '/definitions of _GL_FUNCDECL_RPL/r $(CXXDEFS_H)' \
+	      -e '/definition of _GL_ARG_NONNULL/r $(ARG_NONNULL_H)' \
+	      -e '/definition of _GL_WARN_ON_USE/r $(WARN_ON_USE_H)' \
+	      $(srcdir)/strings.in.h > $@-t
+	$(AM_V_at)mv $@-t $@
+MOSTLYCLEANFILES += strings.h strings.h-t
+
+endif
+EXTRA_DIST += strings.in.h
+
+endif
+## end   gnulib module strings
 
 ## begin gnulib module strnlen
 ifeq (,$(OMIT_GNULIB_MODULE_strnlen))
@@ -4056,6 +4338,26 @@ EXTRA_DIST += vla.h
 
 endif
 ## end   gnulib module vla
+
+## begin gnulib module xalloc
+ifeq (,$(OMIT_GNULIB_MODULE_xalloc))
+
+libgnu_a_SOURCES += xmalloc.c
+
+EXTRA_DIST += xalloc.h
+
+endif
+## end   gnulib module xalloc
+
+## begin gnulib module xalloc-die
+ifeq (,$(OMIT_GNULIB_MODULE_xalloc-die))
+
+libgnu_a_SOURCES += xalloc-die.c
+
+EXTRA_DIST += xalloc.h
+
+endif
+## end   gnulib module xalloc-die
 
 ## begin gnulib module xalloc-oversized
 ifeq (,$(OMIT_GNULIB_MODULE_xalloc-oversized))
