@@ -26,7 +26,7 @@
 GNULIB_URL=git://git.savannah.gnu.org/gnulib.git
 
 GNULIB_MODULES='
-  alloca-opt binary-io byteswap c-ctype c-strcase
+  alloca-opt binary-io bitset byteswap c-ctype c-strcase
   canonicalize-lgpl
   careadlinkat close-stream copy-file-range
   count-leading-zeros count-one-bits count-trailing-zeros
