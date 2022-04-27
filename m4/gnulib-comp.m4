@@ -152,6 +152,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module pthread_sigmask:
   # Code from module qcopy-acl:
   # Code from module rawmemchr:
+  # Code from module read:
   # Code from module readlink:
   # Code from module readlinkat:
   # Code from module realloc-gnu:
@@ -452,6 +453,12 @@ AC_DEFUN([gl_INIT],
     gl_PREREQ_PTHREAD_SIGMASK
   ])
   gl_SIGNAL_MODULE_INDICATOR([pthread_sigmask])
+  gl_FUNC_READ
+  gl_CONDITIONAL([GL_COND_OBJ_READ], [test $REPLACE_READ = 1])
+  AM_COND_IF([GL_COND_OBJ_READ], [
+    gl_PREREQ_READ
+  ])
+  gl_UNISTD_MODULE_INDICATOR([read])
   gl_FUNC_READLINK
   gl_CONDITIONAL([GL_COND_OBJ_READLINK],
                  [test $HAVE_READLINK = 0 || test $REPLACE_READLINK = 1])
@@ -468,7 +475,7 @@ AC_DEFUN([gl_INIT],
   AM_COND_IF([GL_COND_OBJ_REGEX], [
     gl_PREREQ_REGEX
   ])
-  gl_MODULE_INDICATOR([safe-read])
+  gl_PREREQ_SAFE_READ
   gl_FUNC_SIG2STR
   gl_CONDITIONAL([GL_COND_OBJ_SIG2STR], [test $ac_cv_func_sig2str = no])
   AM_COND_IF([GL_COND_OBJ_SIG2STR], [
@@ -1326,6 +1333,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/qcopy-acl.c
   lib/rawmemchr.c
   lib/rawmemchr.valgrind
+  lib/read.c
   lib/readlink.c
   lib/readlinkat.c
   lib/realloc.c
@@ -1369,6 +1377,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/strtol.c
   lib/strtoll.c
   lib/symlink.c
+  lib/sys-limits.h
   lib/sys_random.in.h
   lib/sys_select.in.h
   lib/sys_stat.in.h
@@ -1480,6 +1489,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/pselect.m4
   m4/pthread_sigmask.m4
   m4/rawmemchr.m4
+  m4/read.m4
   m4/readlink.m4
   m4/readlinkat.m4
   m4/realloc.m4
