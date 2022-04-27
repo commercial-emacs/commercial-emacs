@@ -11999,6 +11999,20 @@ gui_consider_frame_title (Lisp_Object frame)
    && (update_mode_lines == 0				\
        || update_mode_lines == REDISPLAY_SOME))
 
+static bool
+needs_no_redisplay (struct window *w)
+{
+  struct buffer *buffer = XBUFFER (w->contents);
+  struct frame *f = XFRAME (w->frame);
+  return (REDISPLAY_SOME_P ()
+          && !w->redisplay
+          && !w->update_mode_line
+          && !f->face_change
+          && !f->redisplay
+          && !buffer->text->redisplay
+          && window_point (w) == w->last_point);
+}
+
 /* Prepare for redisplay by updating menu-bar item lists when
    appropriate.  This can call eval.  */
 
@@ -12020,13 +12034,8 @@ prepare_menu_bars (void)
 	      struct window *w = XWINDOW (this);
 	      /* Cf. conditions for redisplaying a window at the
 		 beginning of redisplay_window.  */
-	      if (w->redisplay
-		  || XFRAME (w->frame)->redisplay
-		  || XBUFFER (w->contents)->text->redisplay
-		  || BUF_PT (XBUFFER (w->contents)) != w->last_point)
-		{
-		  windows = Fcons (this, windows);
-		}
+	      if (!needs_no_redisplay (w))
+		windows = Fcons (this, windows);
 	    }
 	}
       safe__call1 (true, Vpre_redisplay_function, windows);
