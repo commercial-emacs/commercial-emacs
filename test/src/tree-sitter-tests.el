@@ -26,6 +26,7 @@
 (declare-function tree-sitter--testable "tree-sitter.c")
 
 (defsubst tree-sitter-testable ()
+  "Won't test osx since we don't bundle c.dylib into repo."
   (when-let ((dylib (expand-file-name "lib/c.so" tree-sitter-resources-dir)))
     (tree-sitter--testable dylib)))
 

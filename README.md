@@ -18,7 +18,7 @@ does not entreat the FSF to enforce its license.
 git clone https://github.com/commercial-emacs/commercial-emacs.git
 cd commercial-emacs
 ./autogen.sh
-./configure --prefix=$HOME/.local --enable-dumping-overwrite
+./configure --prefix=$HOME/.local
 make -j4
 src/emacs
 ```
@@ -60,7 +60,7 @@ Then build emacs:
 ./autogen.sh
 LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" \
   ./configure --prefix=$HOME/.local --with-tree-sitter
-make -j4 bootstrap
+make -j4
 ldd src/emacs | grep -q tree-sitter || echo not found
 make test/src/tree-sitter-tests
 src/emacs -Q --eval \

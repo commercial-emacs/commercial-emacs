@@ -680,7 +680,8 @@ DUMPING_OVERWRITE=
 AC_ARG_ENABLE([dumping-overwrite],
   [AS_HELP_STRING([--enable-dumping-overwrite],
 		  [Overwrite pdumper artifacts to conserve disk space.])],
-  [test "$enableval" = yes && DUMPING_OVERWRITE=--dumping-overwrite])
+  [test "$enableval" = yes && DUMPING_OVERWRITE=--dumping-overwrite],
+  [DUMPING_OVERWRITE=--dumping-overwrite])
 AC_SUBST([DUMPING_OVERWRITE])
 
 dnl This used to use changequote, but, apart from 'changequote is evil'

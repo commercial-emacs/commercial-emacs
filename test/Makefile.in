@@ -188,6 +188,12 @@ else
 maybe_exclude_module_tests := -name emacs-module-tests.el -prune -o
 endif
 
+ifeq ($(GITHUB_ACTIONS),true)
+ifeq (@SYSTEM_TYPE@, darwin)
+maybe_exclude_module_tests := -name emacs-module-tests.el -prune -o
+endif
+endif
+
 ## Optional list of .el files to exclude from testing.
 ## Intended for use in automated testing where one or more files
 ## has some problem and needs to be excluded.

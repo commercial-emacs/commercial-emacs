@@ -20,9 +20,9 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest,macos-latest]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: paths
       run: |
         echo "$HOME/local/bin" >> $GITHUB_PATH
@@ -35,22 +35,29 @@ jobs:
       run: |
         sudo apt-get -yq update
         DEBIAN_FRONTEND=noninteractive sudo apt-get -yq install gnutls-bin sharutils dirmngr libreadline-dev libcurl4-openssl-dev libxml2-dev libssl-dev libcairo2-dev libdbus-1-dev libfreetype6-dev libgif-dev libgio3.0-cil-dev libglib2.0-dev libgmp-dev libgnutls28-dev libharfbuzz-dev libjpeg-dev libjansson-dev liblcms2-dev libselinux1-dev libxml2-dev libpng-dev librsvg2-dev libtiff-dev libx11-dev libxext-dev libxpm-dev libgtk-3-dev zlib1g-dev
-    - uses: actions/cache@v2
+    - name: brew-haha
+      if: startsWith(runner.os, 'macOS')
+      run: |
+        brew install libxml2 texinfo
+        # github doc (unintelligible as of 20220428) suggests ">>" prepends to PATH.
+        echo "`brew --prefix texinfo`/bin" >> $GITHUB_PATH
+        echo "PKG_CONFIG_PATH=`brew --prefix libxml2`/lib/pkgconfig:$HOME/.local/lib/pkgconfig" >> $GITHUB_ENV
+    - uses: actions/cache@v3
       id: cache-elisp-benchmarks
       with:
         path: elisp-benchmarks
         key: cache-elisp-benchmarks-000
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       if: steps.cache-elisp-benchmarks.outputs.cache-hit != 'true'
       with:
         repository: emacs-straight/elisp-benchmarks
         path: elisp-benchmarks
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       id: cache-tree-sitter
       with:
         path: tree-sitter
-        key: cache-tree-sitter-001
-    - uses: actions/checkout@v2
+        key: cache-tree-sitter-${{ runner.os }}-000
+    - uses: actions/checkout@v3
       if: steps.cache-tree-sitter.outputs.cache-hit != 'true'
       with:
         repository: commercial-emacs/tree-sitter
@@ -64,12 +71,12 @@ jobs:
         mkdir -p $HOME/.local
         make -C tree-sitter install-ci
         ./autogen.sh
-        LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" ./configure --prefix=$HOME/.local --with-tree-sitter --enable-dumping-overwrite
+        LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" ./configure --prefix=$HOME/.local --with-tree-sitter
         make -j2
     - name: test
       run: |
         make -j2 check
-        ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
     - name: elisp-benchmarks
+      if: startsWith(runner.os, 'Linux')
       run: |
         src/emacs -batch -l ./elisp-benchmarks/elisp-benchmarks.el --eval "(custom-set-variables (quote (elb-runs 1)))" -f elisp-benchmarks-run
