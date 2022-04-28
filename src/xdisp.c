@@ -17448,14 +17448,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   SET_TEXT_POS (lpoint, PT, PT_BYTE);
   opoint = lpoint;
 
-  if (!just_this_one_p
-      && REDISPLAY_SOME_P ()
-      && !w->redisplay
-      && !w->update_mode_line
-      && !f->face_change
-      && !f->redisplay
-      && !buffer->text->redisplay
-      && BUF_PT (buffer) == w->last_point)
+  if (!just_this_one_p && needs_no_redisplay (w))
     return;
 
   /* Make sure that both W's markers are valid.  */
