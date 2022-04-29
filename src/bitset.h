@@ -1,84 +1,75 @@
-#ifndef EMACS_BITSET_H
-#define EMACS_BITSET_H 1
+#ifndef BITSET_H
+#define BITSET_H 1
 
 #include <config.h>
 #include <stdint.h>
 #include "lisp.h"
 
-typedef uint_fast32_t emacs_bitset_word;
-enum { emacs_bitset_bits_per_word = sizeof (emacs_bitset_word) * CHAR_BIT };
+// *At least* 32 bits with "best performance".  It's 64 bits for me.
+typedef uint_fast32_t bitset_word;
+enum { bitset_word_nbits = sizeof (bitset_word) * CHAR_BIT };
 
-verify (sizeof (size_t) == sizeof (unsigned long long) ||
-        sizeof (size_t) == sizeof (unsigned long) ||
-        sizeof (size_t) == sizeof (int));
-verify (sizeof (emacs_bitset_word) == sizeof (unsigned long long) ||
-        sizeof (emacs_bitset_word) == sizeof (unsigned long) ||
-        sizeof (emacs_bitset_word) == sizeof (int) ||
-        sizeof (emacs_bitset_word) == sizeof (short) ||
-        sizeof (emacs_bitset_word) == sizeof (char));
-verify ((size_t) PTRDIFF_MAX < SIZE_MAX);
+#define BITSET_WORDS_OF_BITS(nr_bits)                           \
+  (((nr_bits) + (bitset_word_nbits - 1))                       \
+   / bitset_word_nbits)
 
-#define EMACS_BITSET_WORDS_OF_BITS(nr_bits)                           \
-  (((nr_bits) + (emacs_bitset_bits_per_word - 1))                       \
-   / emacs_bitset_bits_per_word)
-
-INLINE emacs_bitset_word *
-emacs_bitset__bit_slot (const emacs_bitset_word *const words,
+INLINE bitset_word *
+bitset_bit_nr (const bitset_word *const words,
                         const size_t nr_words,
                         const ptrdiff_t bitno)
 {
   eassume (bitno >= 0);
-  const size_t word_nr = bitno / emacs_bitset_bits_per_word;
+  const size_t word_nr = bitno / bitset_word_nbits;
   eassume (word_nr < nr_words);
-  return (emacs_bitset_word *) &words[word_nr];
+  return (bitset_word *) &words[word_nr];
 }
 
 /* Return whether the bit set identified by WORDS and NR_WORDS has
    a bit set at BITNO.  */
 INLINE bool
-emacs_bitset_bit_set_p (const emacs_bitset_word *const words,
+bitset_bit_set_p (const bitset_word *const words,
                         const size_t nr_words,
                         const ptrdiff_t bitno)
 {
-  const emacs_bitset_word bit = ((emacs_bitset_word) 1) <<
-    (bitno % emacs_bitset_bits_per_word);
-  return *emacs_bitset__bit_slot (words, nr_words, bitno) & bit;
+  const bitset_word bit = ((bitset_word) 1) <<
+    (bitno % bitset_word_nbits);
+  return *bitset_bit_nr (words, nr_words, bitno) & bit;
 }
 
 INLINE void
-emacs_bitset__set_bit_value (emacs_bitset_word *const words,
+bitset_set_bit_value (bitset_word *const words,
                              const size_t nr_words,
                              const ptrdiff_t bitno,
                              const bool bit_is_set)
 {
-  emacs_bitset_word *const slot = emacs_bitset__bit_slot (
+  bitset_word *const bit_nr = bitset_bit_nr (
     words, nr_words, bitno);
-  const emacs_bitset_word bit = ((emacs_bitset_word) 1) <<
-    (bitno % emacs_bitset_bits_per_word);
+  const bitset_word bit = ((bitset_word) 1) <<
+    (bitno % bitset_word_nbits);
   if (bit_is_set)
-    *slot = *slot | bit;
+    *bit_nr = *bit_nr | bit;
   else
-    *slot = *slot & ~bit;
+    *bit_nr = *bit_nr & ~bit;
 }
 
 /* Set a bit in the bitset identified by WORDS and NR_WORDS.
    BITNO is the number of the bit to set.  */
 INLINE void
-emacs_bitset_set_bit (emacs_bitset_word *const words,
+bitset_set_bit (bitset_word *const words,
                       const size_t nr_words,
                       const ptrdiff_t bitno)
 {
-  emacs_bitset__set_bit_value (words, nr_words, bitno, true);
+  bitset_set_bit_value (words, nr_words, bitno, true);
 }
 
 /* Clear a bit in the bitset identified by WORDS and NR_WORDS.
    BITNO is the number of the bit to clear.  */
 INLINE void
-emacs_bitset_clear_bit (emacs_bitset_word *const words,
+bitset_clear_bit (bitset_word *const words,
                         const size_t nr_words,
                         const ptrdiff_t bitno)
 {
-  emacs_bitset__set_bit_value (words, nr_words, bitno, false);
+  bitset_set_bit_value (words, nr_words, bitno, false);
 }
 
 /* emacs_clz_*: return the number of leading zero bits in VALUE.
@@ -115,7 +106,7 @@ emacs_clz_z (const size_t value)
 }
 
 INLINE int
-emacs_clz_bw (const emacs_bitset_word value)
+emacs_clz_bw (const bitset_word value)
 {
   if (sizeof (value) == sizeof (unsigned long long))
     return emacs_clz_ll ((unsigned long long) value);
@@ -123,7 +114,7 @@ emacs_clz_bw (const emacs_bitset_word value)
     return emacs_clz_l ((unsigned long) value);
   if (sizeof (value) <= sizeof (unsigned int))
     return emacs_clz (value)
-      - ((sizeof (unsigned int) - sizeof (emacs_bitset_word))
+      - ((sizeof (unsigned int) - sizeof (bitset_word))
        * CHAR_BIT);
 }
 
@@ -160,7 +151,7 @@ emacs_ctz_z (const size_t value)
 }
 
 INLINE int
-emacs_ctz_bw (const emacs_bitset_word value)
+emacs_ctz_bw (const bitset_word value)
 {
   if (sizeof (value) == sizeof (unsigned long long))
     return emacs_ctz_ll ((unsigned long long) value);
@@ -206,7 +197,7 @@ emacs_popcount_z (const size_t value)
 }
 
 INLINE int
-emacs_popcount_bw (const emacs_bitset_word value)
+emacs_popcount_bw (const bitset_word value)
 {
   if (sizeof (value) == sizeof (unsigned long long))
     return emacs_popcount_ll ((unsigned long long) value);
@@ -222,12 +213,12 @@ emacs_popcount_bw (const emacs_bitset_word value)
 /* Bitset scans.  */
 
 INLINE
-emacs_bitset_word
-emacs_bitset__mask (int nr_set_low_bits)
+bitset_word
+bitset_mask (int nr_set_low_bits)
 {
   eassume (0 <= nr_set_low_bits);
-  eassume (nr_set_low_bits < emacs_bitset_bits_per_word);
-  return (((emacs_bitset_word) 1) << nr_set_low_bits) - 1;
+  eassume (nr_set_low_bits < bitset_word_nbits);
+  return (((bitset_word) 1) << nr_set_low_bits) - 1;
 }
 
 /* Find the first set bit in the range [START_BITNO, LIMIT_BITNO) in
@@ -237,39 +228,39 @@ emacs_bitset__mask (int nr_set_low_bits)
    Return LIMIT_BITNO if we don't find a set bit.  */
 INLINE
 ptrdiff_t
-emacs_bitset_scan_forward (const emacs_bitset_word *const words,
+bitset_scan_forward (const bitset_word *const words,
                            const size_t nr_words,
                            const ptrdiff_t start_bitno,
                            const ptrdiff_t limit_bitno)
 {
   eassume (nr_words < (size_t) PTRDIFF_MAX);
-  eassume (!INT_MULTIPLY_OVERFLOW ((ptrdiff_t) emacs_bitset_bits_per_word,
+  eassume (!INT_MULTIPLY_OVERFLOW ((ptrdiff_t) bitset_word_nbits,
                                    (ptrdiff_t) nr_words));
   const ptrdiff_t last_bit =
-    emacs_bitset_bits_per_word * (ptrdiff_t) nr_words;
+    bitset_word_nbits * (ptrdiff_t) nr_words;
   eassume (0 <= start_bitno
            && start_bitno <= limit_bitno
            && limit_bitno <= last_bit);
   if (start_bitno == limit_bitno)
     return limit_bitno;
-  const ptrdiff_t first_wordno = start_bitno / emacs_bitset_bits_per_word;
+  const ptrdiff_t first_wordno = start_bitno / bitset_word_nbits;
   const ptrdiff_t start_bitno_in_first_word =
-    start_bitno % emacs_bitset_bits_per_word;
+    start_bitno % bitset_word_nbits;
   const ptrdiff_t last_wordno =
-    (limit_bitno - 1) / emacs_bitset_bits_per_word;
+    (limit_bitno - 1) / bitset_word_nbits;
   const ptrdiff_t limit_bitno_in_last_word =
-    limit_bitno % emacs_bitset_bits_per_word;
+    limit_bitno % bitset_word_nbits;
   for (ptrdiff_t wordno = first_wordno; wordno <= last_wordno; ++wordno)
     {
-      emacs_bitset_word word = words[wordno];
+      bitset_word word = words[wordno];
       /* First word: mask off the bits before the start.  */
       if (wordno == first_wordno)
-        word &= ~emacs_bitset__mask (start_bitno_in_first_word);
+        word &= ~bitset_mask (start_bitno_in_first_word);
       /* Last word: mask off bits at the limit_bitno and above.  */
       if (wordno == last_wordno && limit_bitno_in_last_word)
-        word &= emacs_bitset__mask (limit_bitno_in_last_word);
+        word &= bitset_mask (limit_bitno_in_last_word);
       if (word)
-        return (ptrdiff_t) wordno * emacs_bitset_bits_per_word
+        return (ptrdiff_t) wordno * bitset_word_nbits
           + emacs_ctz_bw (word);
     }
   return limit_bitno;
@@ -282,41 +273,41 @@ emacs_bitset_scan_forward (const emacs_bitset_word *const words,
    set bit.  */
 INLINE
 ptrdiff_t
-emacs_bitset_scan_backward (const emacs_bitset_word *const words,
+bitset_scan_backward (const bitset_word *const words,
                             const size_t nr_words,
                             const ptrdiff_t start_bitno,
                             const ptrdiff_t limit_bitno)
 {
   eassume (nr_words < (size_t) PTRDIFF_MAX);
-  eassume (!INT_MULTIPLY_OVERFLOW ((ptrdiff_t) emacs_bitset_bits_per_word,
+  eassume (!INT_MULTIPLY_OVERFLOW ((ptrdiff_t) bitset_word_nbits,
                                    (ptrdiff_t) nr_words));
   const ptrdiff_t last_bit =
-    emacs_bitset_bits_per_word * (ptrdiff_t) nr_words;
+    bitset_word_nbits * (ptrdiff_t) nr_words;
   eassume (-1 <= limit_bitno
            && limit_bitno <= start_bitno
            && start_bitno < last_bit);
   if (start_bitno == limit_bitno)
     return limit_bitno;
-  const ptrdiff_t first_wordno = start_bitno / emacs_bitset_bits_per_word;
+  const ptrdiff_t first_wordno = start_bitno / bitset_word_nbits;
   const ptrdiff_t start_bitno_in_first_word =
-    start_bitno % emacs_bitset_bits_per_word;
+    start_bitno % bitset_word_nbits;
   const ptrdiff_t last_wordno =
-    (limit_bitno + 1) / emacs_bitset_bits_per_word;
+    (limit_bitno + 1) / bitset_word_nbits;
   const ptrdiff_t limit_bitno_in_last_word =
-    (limit_bitno + 1) % emacs_bitset_bits_per_word;
+    (limit_bitno + 1) % bitset_word_nbits;
   for (ptrdiff_t wordno = first_wordno; wordno >= last_wordno; --wordno)
     {
-      emacs_bitset_word word = words[wordno];
+      bitset_word word = words[wordno];
       /* First word: mask off the bits after the start.  */
       if (wordno == first_wordno &&
-          start_bitno_in_first_word < (emacs_bitset_bits_per_word - 1))
-        word &= emacs_bitset__mask (start_bitno_in_first_word + 1);
+          start_bitno_in_first_word < (bitset_word_nbits - 1))
+        word &= bitset_mask (start_bitno_in_first_word + 1);
       /* Last word: mask off bits below the search limit.  */
       if (wordno == last_wordno)
-        word &= ~emacs_bitset__mask (limit_bitno_in_last_word);
+        word &= ~bitset_mask (limit_bitno_in_last_word);
       if (word)
-        return (ptrdiff_t) wordno * emacs_bitset_bits_per_word
-          + emacs_bitset_bits_per_word - emacs_clz_bw (word) - 1;
+        return (ptrdiff_t) wordno * bitset_word_nbits
+          + bitset_word_nbits - emacs_clz_bw (word) - 1;
     }
   return limit_bitno;
 }

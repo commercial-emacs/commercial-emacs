@@ -254,11 +254,10 @@ typedef struct gc_gen_y_bit_iter gc_gen_y_bit_iter;
 typedef bool (*gc_heap_enumerator)(void *obj, void *data);
 
 enum {
-  GC_SLOT_SIZE = GCALIGNMENT,
+  GC_OBJREF_SIZE = GCALIGNMENT,
 
   GC_BLOCK_SIZE = (1 << 18),
-  GC_BLOCK_NSLOTS = GC_BLOCK_SIZE / GC_SLOT_SIZE,
-  GC_BLOCK_PAGES = GC_BLOCK_SIZE / EMACS_PAGE_SIZE_MIN,
+  GC_BLOCK_NOBJREFS = GC_BLOCK_SIZE / GC_OBJREF_SIZE,
 
   GC_HEAP_CONS_SIZE = sizeof (struct Lisp_Cons),
   GC_HEAP_CONS_NSLOTS = GC_BLOCK_SIZE / GC_HEAP_CONS_SIZE,
@@ -276,13 +275,10 @@ enum {
   LARGE_VECTOR_LO_SIZE = GC_BLOCK_SIZE + 1,
 };
 
-verify (POWER_OF_2 (GC_BLOCK_SIZE));
-verify (POWER_OF_2 (GC_BLOCK_NSLOTS));
-
 /* Standard heap iterator.  Always points to a valid object slot.  */
 struct gc_cursor {
   gc_block *block;
-  ptrdiff_t slot_nr;
+  ptrdiff_t bit_nr;
 };
 
 /* gc_locator packs a block and slot number in a size_t, with the
@@ -298,7 +294,7 @@ struct gc_cursor {
 
 /* log2 of slots cardinality */
 #define GC_LOCATOR_SLOT_BITS ((1 << LLONG_WIDTH) - 1 - \
-			      emacs_clz_ll (GC_BLOCK_SIZE / GC_SLOT_SIZE))
+			      emacs_clz_ll (GC_BLOCK_SIZE / GC_OBJREF_SIZE))
 
 #define GC_LOCATOR_BLOCK_BITS (sizeof (size_t) * CHAR_BIT - GC_LOCATOR_SLOT_BITS)
 
@@ -316,12 +312,12 @@ struct gc_block_meminfo {
   struct emacs_memory_map map;
 };
 
-#define GC_HEAP_BITS(name, nbits)					\
+#define GC_HEAP_FLAGS(name, nbits)					\
   struct {                                                              \
-    emacs_bitset_word mark[EMACS_BITSET_WORDS_OF_BITS (nbits)];	\
-    emacs_bitset_word start[EMACS_BITSET_WORDS_OF_BITS (nbits)];	\
-    emacs_bitset_word pinned[EMACS_BITSET_WORDS_OF_BITS (nbits)];	\
-    emacs_bitset_word perma_pinned[EMACS_BITSET_WORDS_OF_BITS (nbits)]; \
+    bitset_word mark[BITSET_WORDS_OF_BITS (nbits)];	\
+    bitset_word start[BITSET_WORDS_OF_BITS (nbits)];	\
+    bitset_word pinned[BITSET_WORDS_OF_BITS (nbits)];	\
+    bitset_word perma_pinned[BITSET_WORDS_OF_BITS (nbits)]; \
     gc_locator tospace[nbits];						\
   } name
 
@@ -331,7 +327,7 @@ struct gc_block_meminfo {
     .nbytes = sizeof (((gc_block *)NULL)->field),       \
   }
 
-#define GC_HEAP_BITS_CONFIG(name)				\
+#define GC_HEAP_FLAGS_CONFIG(name)				\
   .block_size = EMACS_SIZE_THROUGH_FIELD (gc_block, u2.name),	\
   .mark = GC_FIELD_SPECIFIER (u2.name.mark),			\
   .start = GC_FIELD_SPECIFIER (u2.name.start),		        \
@@ -382,7 +378,7 @@ struct gc_block {
   /* Actual Lisp object storage.  */
   union {
     uint8_t data[GC_BLOCK_SIZE];
-    Lisp_Object mark_queue[GC_BLOCK_NSLOTS];
+    Lisp_Object mark_queue[GC_BLOCK_NOBJREFS];
   } u;
 
   /* Block metadata: on its own page.  */
@@ -401,7 +397,7 @@ struct gc_block {
         struct {
           /* To avoid bitmasking, we set the Gen O/Y divide on a word,
 	     not bit, boundary in gc_heap_prepare().  */
-          ptrdiff_t gen_y_slot_nr;
+          ptrdiff_t gen_y_bit_nr;
 
           /* The tospace we've allocated for this block.  The tospace
              is an aux block.  */
@@ -427,26 +423,26 @@ struct gc_block {
     /* Track modified pages for generational GC -- one bit per
        operating system page, with each bit set in
        gc_try_handle_sigsegv().  */
-    emacs_bitset_word card_table [EMACS_BITSET_WORDS_OF_BITS (GC_BLOCK_PAGES)];
+    bitset_word *card_table;
   } meta;
 
   union {
     struct {
       char dummy[0];
     } aux;
-    GC_HEAP_BITS (cons, GC_HEAP_CONS_NSLOTS);
-    GC_HEAP_BITS (float_, GC_HEAP_FLOAT_NSLOTS);
+    GC_HEAP_FLAGS (cons, GC_HEAP_CONS_NSLOTS);
+    GC_HEAP_FLAGS (float_, GC_HEAP_FLOAT_NSLOTS);
     /* TODO: avoid providing perma-pinned bits for symbols */
-    GC_HEAP_BITS (symbol, GC_HEAP_SYMBOL_NSLOTS);
-    GC_HEAP_BITS (interval, GC_HEAP_INTERVAL_NSLOTS);
-    GC_HEAP_BITS (string, GC_HEAP_STRING_NSLOTS);
-    GC_HEAP_BITS (vector, GC_HEAP_VECTOR_NSLOTS);
+    GC_HEAP_FLAGS (symbol, GC_HEAP_SYMBOL_NSLOTS);
+    GC_HEAP_FLAGS (interval, GC_HEAP_INTERVAL_NSLOTS);
+    GC_HEAP_FLAGS (string, GC_HEAP_STRING_NSLOTS);
+    GC_HEAP_FLAGS (vector, GC_HEAP_VECTOR_NSLOTS);
   } u2;
 };
 
 static const size_t gc_block_nr_invalid = -1;
 
-verify (offsetof (gc_block, meta) % EMACS_PAGE_SIZE_MAX == 0);
+verify (offsetof (gc_block, meta) % getpagesize () == 0);
 
 enum { GC_AUX_SIZE = EMACS_SIZE_THROUGH_FIELD (gc_block, u2.aux) };
 
@@ -509,7 +505,7 @@ struct gc_heap_data {
 
      Set by gc_heap_plan_sweep() which herds Gen O.
 
-     Used by gc_heap_prepare() to set each block's gen_y_slot_nr.
+     Used by gc_heap_prepare() to set each block's gen_y_bit_nr.
 
      It is used by gc_heap_plan_sweep() as the starting position for
      Gen Y objects in tospace.  */
@@ -590,18 +586,18 @@ struct sdata {
 struct intergen {
   /* Block we're searching.  */
   gc_block *const b;
-  /* Don't search beyond this slot.  SLOT_NR below may go beyond this
+  /* Don't search beyond this slot.  BIT_NR below may go beyond this
      limit if an object straddles the slot_limit.  */
   const ptrdiff_t slot_limit;
   /* Current slot number: may be the last slot.  May be at most
      gc_heap_nslots_per_block(H).  */
-  ptrdiff_t slot_nr;
-  /* Start bits of the current word to which slot_nr belongs shifted
-     so that the bit corresponding to slot_nr is the LSB.  Unspecified
-     if slot_nr >= slot_limit.  */
-  emacs_bitset_word start_word;
-  /* Cache of the dirty state of the page to which SLOT_NR points.
-     Unspecified if slot_nr >= slot_limit.  */
+  ptrdiff_t bit_nr;
+  /* Start bits of the current word to which bit_nr belongs shifted
+     so that the bit corresponding to bit_nr is the LSB.  Unspecified
+     if bit_nr >= slot_limit.  */
+  bitset_word start_word;
+  /* Cache of the dirty state of the page to which BIT_NR points.
+     Unspecified if bit_nr >= slot_limit.  */
   bool page_is_dirty;
 };
 
@@ -610,7 +606,7 @@ struct intergen {
 struct gc_gen_y_bit_iter {
   const size_t first_word_nr;
   const size_t word_nr_limit;
-  const emacs_bitset_word first_word_gen_y_mask;
+  const bitset_word first_word_gen_y_mask;
   size_t word_nr;
 };
 
@@ -632,7 +628,7 @@ struct large_vector_meta {
   bool gen_x;
   /* Per-page modification flags used to track intergenerational
      pointers.  */
-  emacs_bitset_word card_table[];
+  bitset_word card_table[];
 };
 
 /* This internal type is used to maintain the list of large vectors
@@ -697,17 +693,17 @@ NRML bool gc_aux_adjust (void);
 NRML gc_block *gc_aux_pop (void);
 NRML void gc_aux_push (gc_block *);
 COLD gc_block *gc_block_allocate (const gc_heap *);
-GCFN bool gc_block_is_any_bit_set (const emacs_bitset_word *, const gc_heap *);
+GCFN bool gc_block_is_any_bit_set (const bitset_word *, const gc_heap *);
 COLD void gc_block_free (gc_block *, const gc_heap *);
 NRML gc_block *gc_block_from_link (emacs_list_link *);
 NRML gc_block *gc_block_from_mem_node (const struct mem_node *);
 GCFN gc_cursor gc_block_make_cursor (const gc_block *, ptrdiff_t, const gc_heap *);
-GCFN emacs_bitset_word *gc_block_mark_bits (const gc_block *, const gc_heap *);
+GCFN bitset_word *gc_block_mark_bits (const gc_block *, const gc_heap *);
 GCFN gc_locator *gc_block_locators (const gc_block *, const gc_heap *);
 GCFN void *gc_block_maybe_find_live_object_containing (const gc_block *, const void *, const gc_heap *);
-GCFN void gc_block_zero_gen_y_slot_bitset (gc_block *, emacs_bitset_word *, const gc_heap *);
-GCFN void gc_block_copy_gen_y_slot_bitset (gc_block *, emacs_bitset_word *, const emacs_bitset_word *, const gc_heap *);
-GCFN emacs_bitset_word *gc_block_start_bits (const gc_block *, const gc_heap *);
+GCFN void gc_block_zero_gen_y_slot_bitset (gc_block *, bitset_word *, const gc_heap *);
+GCFN void gc_block_copy_gen_y_slot_bitset (gc_block *, bitset_word *, const bitset_word *, const gc_heap *);
+GCFN bitset_word *gc_block_start_bits (const gc_block *, const gc_heap *);
 NRML void gc_block_prepare (gc_block *, void *);
 GCFN void gc_block_sweep_compact (gc_block *, const gc_heap *);
 GCFN void gc_block_sweep_inplace (gc_block *, const gc_heap *);
@@ -716,7 +712,7 @@ GCFN void gc_block_cleanup_after_all_sweeps (gc_block *, void *);
 NRML bool gc_block_mark_card_table (gc_block *, void *, const gc_heap *);
 NRML void gc_block_write_protect_gen_x (gc_block *, const gc_heap *);
 NRML void gc_block_write_unprotect (gc_block *, const gc_heap *);
-GCFN ptrdiff_t gc_block_gen_y_slot_nr (gc_block *, const gc_heap *);
+GCFN ptrdiff_t gc_block_gen_y_bit_nr (gc_block *, const gc_heap *);
 GCFN bool gc_block_has_any_gen_y (gc_block *, const gc_heap *);
 GCFN gc_block *gc_block_check (const gc_block *);
 GCFN void gc_cursor_advance_next_block_allocate_if_needed (gc_cursor *, const gc_heap *);
@@ -753,8 +749,8 @@ GCFN ptrdiff_t gc_heap_maximum_object_nslots (const gc_heap *);
 GCFN size_t gc_heap_nbytes_per_slot (const gc_heap *);
 GCFN ptrdiff_t gc_heap_nslots_per_block (const gc_heap *);
 GCFN size_t gc_heap_nwords_per_bitset (const gc_heap *);
-GCFN emacs_bitset_word *gc_block_pinned_bits (const gc_block *, const gc_heap *);
-GCFN emacs_bitset_word *gc_block_perma_pinned_bits (const gc_block *, const gc_heap *);
+GCFN bitset_word *gc_block_pinned_bits (const gc_block *, const gc_heap *);
+GCFN bitset_word *gc_block_perma_pinned_bits (const gc_block *, const gc_heap *);
 GCFN ptrdiff_t gc_heap_nslots_spanning (const gc_heap *, size_t);
 GCFN void gc_heap_flip_next_tospace_block (const gc_heap *);
 NOIL void gc_heap_sweep (const gc_heap *);
@@ -782,7 +778,7 @@ GCFN void mark_reference_interval_pinned (INTERVAL);
 GCFN void scan_reference_pointer_to_symbol (struct Lisp_Symbol **, gc_phase);
 GCFN gc_cursor gc_locator_to_cursor (gc_locator, const gc_heap *);
 GCFN bool gc_locator_invalid_p (gc_locator, const gc_heap *);
-GCFN ptrdiff_t gc_locator_slot_nr (gc_locator, const gc_heap *);
+GCFN ptrdiff_t gc_locator_bit_nr (gc_locator, const gc_heap *);
 GCFN size_t gc_locator_block_nr (gc_locator, const gc_heap *);
 GCFN void gc_block_preprocess_perma_pins (gc_block *, const gc_heap *);
 GCFN void gc_block_scan_intergenerational (gc_block *, gc_phase, const gc_heap *);
@@ -790,7 +786,7 @@ GCFN bool intergen_advance_nr_slots_test_dirty (intergen *, ptrdiff_t, const gc_
 GCFN void intergen_scan_object (intergen *, gc_phase, const gc_heap *);
 GCFN void intergen_skip_clean_pages (intergen *, const gc_heap *);
 GCFN void intergen_skip_to_object_start (intergen *, const gc_heap *);
-GCFN ptrdiff_t intergen_get_next_dirty_slot_nr (const intergen *, const gc_heap *);
+GCFN ptrdiff_t intergen_get_next_dirty_bit_nr (const intergen *, const gc_heap *);
 GCFN void gc_block_plan_sweep (gc_block *, gc_cursor *, const gc_heap *);
 GCFN void scan_reference_pointer_to_vectorlike (union vectorlike_header **, gc_phase);
 NRML void mark_pointer (void *);
@@ -974,9 +970,9 @@ NOIL void gc_phase_clear_weak_references (void);
 GCFN gc_gen_y_bit_iter gc_gen_y_bit_iter_init (gc_block *, const gc_heap *);
 GCFN bool gc_gen_y_bit_iter_at_end (const gc_gen_y_bit_iter *);
 GCFN void gc_gen_y_bit_iter_next (gc_gen_y_bit_iter *);
-GCFN ptrdiff_t gc_gen_y_bit_iter_slot_nr (const gc_gen_y_bit_iter *);
-GCFN emacs_bitset_word gc_gen_y_bit_iter_get (const gc_gen_y_bit_iter *, const emacs_bitset_word *);
-GCFN void gc_gen_y_bit_iter_set (const gc_gen_y_bit_iter *, emacs_bitset_word *, emacs_bitset_word);
+GCFN ptrdiff_t gc_gen_y_bit_iter_bit_nr (const gc_gen_y_bit_iter *);
+GCFN bitset_word gc_gen_y_bit_iter_get (const gc_gen_y_bit_iter *, const bitset_word *);
+GCFN void gc_gen_y_bit_iter_set (const gc_gen_y_bit_iter *, bitset_word *, bitset_word);
 GCFN void check_obarray_elem(const Lisp_Object tail, size_t i, size_t obsize);
 
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
@@ -1628,7 +1624,7 @@ gc_block_allocate (const gc_heap *const h)
 }
 
 bool
-gc_block_is_any_bit_set (const emacs_bitset_word *const words,
+gc_block_is_any_bit_set (const bitset_word *const words,
                          const gc_heap *const h)
 {
   const size_t nr_bitset_words = gc_heap_nwords_per_bitset (h);
@@ -1638,19 +1634,19 @@ gc_block_is_any_bit_set (const emacs_bitset_word *const words,
   return false;
 }
 
-/* Make a cursor for block B (which must be in heap H) at SLOT_NR
+/* Make a cursor for block B (which must be in heap H) at BIT_NR
    within the block.  */
 gc_cursor
 gc_block_make_cursor (const gc_block *const b,
-                      const ptrdiff_t slot_nr,
+                      const ptrdiff_t bit_nr,
                       const gc_heap *const h)
 {
   eassume (b->meta.parent_heap == h);
-  eassume (slot_nr >= 0);
-  eassume (slot_nr < gc_heap_nslots_per_block (h));
+  eassume (bit_nr >= 0);
+  eassume (bit_nr < gc_heap_nslots_per_block (h));
   return (gc_cursor){
     .block = (gc_block *) b,
-    .slot_nr = slot_nr,
+    .bit_nr = bit_nr,
   };
 }
 
@@ -1665,11 +1661,11 @@ gc_block_free (gc_block *const b, const gc_heap *const h)
 
 /* Return a pointer to the start bits for block B, which must be in
    heap H.  */
-emacs_bitset_word *
+bitset_word *
 gc_block_start_bits (const gc_block *const b, const gc_heap *const h)
 {
   eassume (h->start.offset);
-  return (emacs_bitset_word *) ((uintptr_t) b + h->start.offset);
+  return (bitset_word *) ((uintptr_t) b + h->start.offset);
 }
 
 /* In debug builds, check that the block is a pointer to a valid
@@ -1703,21 +1699,21 @@ gc_block_sweep_inplace (gc_block *const b, const gc_heap *const h)
   int32_t block_nr_objects = 0;
   int32_t block_nr_slots = 0;
 
-  emacs_bitset_word *restrict const start_bit_words =
+  bitset_word *restrict const start_bit_words =
     gc_block_start_bits (b, h);
-  emacs_bitset_word *restrict const mark_bit_words =
+  bitset_word *restrict const mark_bit_words =
     gc_block_mark_bits (b, h);
   for (gc_gen_y_bit_iter yit = gc_gen_y_bit_iter_init (b, h);
        ! gc_gen_y_bit_iter_at_end (&yit);
        gc_gen_y_bit_iter_next (&yit))
     {
-      const ptrdiff_t word_slot_nr = gc_gen_y_bit_iter_slot_nr (&yit);
-      emacs_bitset_word start_bits =
+      const ptrdiff_t word_bit_nr = gc_gen_y_bit_iter_bit_nr (&yit);
+      bitset_word start_bits =
         gc_gen_y_bit_iter_get (&yit, start_bit_words);
-      emacs_bitset_word mark_bits =
+      bitset_word mark_bits =
         gc_gen_y_bit_iter_get (&yit, mark_bit_words);
       eassume ((mark_bits & ~start_bits) == 0);
-      const emacs_bitset_word orig_mark_bits = mark_bits;
+      const bitset_word orig_mark_bits = mark_bits;
       block_nr_objects += emacs_popcount_bw (mark_bits);
       int pos = 0;
       while (start_bits)
@@ -1727,7 +1723,7 @@ gc_block_sweep_inplace (gc_block *const b, const gc_heap *const h)
           start_bits >>= lz;
           mark_bits >>= lz;
           eassume (start_bits & 1);
-          const gc_cursor c = gc_block_make_cursor (b, word_slot_nr + pos, h);
+          const gc_cursor c = gc_block_make_cursor (b, word_bit_nr + pos, h);
           eassert (gc_cursor_object_starts_here (c, h));
           const bool is_marked = mark_bits & 1;
           eassert (is_marked == gc_cursor_is_object_marked (c, h));
@@ -1791,22 +1787,22 @@ gc_block_plan_sweep (gc_block *const b,
     ? tospace_tip.block->meta.block_nr
     : b->meta.block_nr;
 
-  const emacs_bitset_word *restrict const start_bit_words =
+  const bitset_word *restrict const start_bit_words =
     gc_block_start_bits (b, h);
-  const emacs_bitset_word *restrict const mark_bit_words =
+  const bitset_word *restrict const mark_bit_words =
     gc_block_mark_bits (b, h);
-  const emacs_bitset_word *restrict pinned_bit_words =
+  const bitset_word *restrict pinned_bit_words =
     gc_block_pinned_bits (b, h);
   for (gc_gen_y_bit_iter yit = gc_gen_y_bit_iter_init (b, h);
        ! gc_gen_y_bit_iter_at_end (&yit);
        gc_gen_y_bit_iter_next (&yit))
     {
-      const ptrdiff_t word_slot_nr = gc_gen_y_bit_iter_slot_nr (&yit);
-      emacs_bitset_word start_bits =
+      const ptrdiff_t word_bit_nr = gc_gen_y_bit_iter_bit_nr (&yit);
+      bitset_word start_bits =
         gc_gen_y_bit_iter_get (&yit, start_bit_words);
-      emacs_bitset_word mark_bits =
+      bitset_word mark_bits =
         gc_gen_y_bit_iter_get (&yit, mark_bit_words);
-      emacs_bitset_word pinned_bits =
+      bitset_word pinned_bits =
         gc_gen_y_bit_iter_get (&yit, pinned_bit_words);
       eassume ((mark_bits & ~start_bits) == 0);
       eassume ((pinned_bits & ~mark_bits) == 0);
@@ -1824,7 +1820,7 @@ gc_block_plan_sweep (gc_block *const b,
           pinned_bits >>= lz;
           eassume (start_bits & 1);
           eassume (mark_bits & 1);
-          const gc_cursor c = gc_block_make_cursor (b, word_slot_nr + pos, h);
+          const gc_cursor c = gc_block_make_cursor (b, word_bit_nr + pos, h);
           eassert (gc_cursor_object_starts_here (c, h));
           const ptrdiff_t nr_slots = gc_cursor_object_nslots (c, h);
           const bool pinned = pinned_bits & 1;
@@ -1874,19 +1870,19 @@ gc_tospace_placer_place (gc_tospace_placer *const p,
                          const gc_heap *const h)
 {
   void *const old_tospace = p->tospace;
-  const ptrdiff_t old_slot_nr = c.slot_nr;
-  const size_t old_word_nr = old_slot_nr / emacs_bitset_bits_per_word;
-  const size_t old_bitno = old_slot_nr % emacs_bitset_bits_per_word;
+  const ptrdiff_t old_bit_nr = c.bit_nr;
+  const size_t old_word_nr = old_bit_nr / bitset_word_nbits;
+  const size_t old_bitno = old_bit_nr % bitset_word_nbits;
   const size_t nbytes = obj_slots * gc_heap_nbytes_per_slot (h);
-  const emacs_bitset_word new_start_bit = ((emacs_bitset_word) 1) << old_bitno;
+  const bitset_word new_start_bit = ((bitset_word) 1) << old_bitno;
   gc_block_pinned_bits (c.block, h)[old_word_nr] |= new_start_bit;
 
   /* N.B. don't assert that the new start bit is not already set: for
      pinned objects, we're re-setting the existing bit!  */
   p->tospace += nbytes;
-  const ptrdiff_t new_slot_nr = old_slot_nr + obj_slots;
-  const size_t new_word_nr = new_slot_nr / emacs_bitset_bits_per_word;
-  const bool at_block_end = new_slot_nr >= gc_heap_nslots_per_block (h);
+  const ptrdiff_t new_bit_nr = old_bit_nr + obj_slots;
+  const size_t new_word_nr = new_bit_nr / bitset_word_nbits;
+  const bool at_block_end = new_bit_nr >= gc_heap_nslots_per_block (h);
   eassume (old_word_nr <= new_word_nr);
   if (eunlikely (at_block_end))
     {
@@ -1921,19 +1917,19 @@ gc_block_sweep_compact (gc_block *const b, const gc_heap *const h)
   /* If we're compacting in-place and we have a variable object size,
      we might be copying objects to themselves, forcing us to use
      memmove.  */
-  const emacs_bitset_word *restrict const start_bit_words =
+  const bitset_word *restrict const start_bit_words =
     gc_block_start_bits (b, h);
-  emacs_bitset_word *restrict const mark_bit_words =
+  bitset_word *restrict const mark_bit_words =
     gc_block_mark_bits (b, h);
   gc_tospace_placer placer = (gc_tospace_placer) { .tospace = NULL, };
   for (gc_gen_y_bit_iter yit = gc_gen_y_bit_iter_init (b, h);
        ! gc_gen_y_bit_iter_at_end (&yit);
        gc_gen_y_bit_iter_next (&yit))
     {
-      const ptrdiff_t word_slot_nr = gc_gen_y_bit_iter_slot_nr (&yit);
-      emacs_bitset_word start_bits =
+      const ptrdiff_t word_bit_nr = gc_gen_y_bit_iter_bit_nr (&yit);
+      bitset_word start_bits =
         gc_gen_y_bit_iter_get (&yit, start_bit_words);
-      emacs_bitset_word mark_bits =
+      bitset_word mark_bits =
         gc_gen_y_bit_iter_get (&yit, mark_bit_words);
       eassume ((mark_bits & ~start_bits) == 0);
       int pos = 0;
@@ -1944,7 +1940,7 @@ gc_block_sweep_compact (gc_block *const b, const gc_heap *const h)
           start_bits >>= lz;
           mark_bits >>= lz;
           eassume (start_bits & 1);
-          const gc_cursor c = gc_block_make_cursor (b, word_slot_nr + pos, h);
+          const gc_cursor c = gc_block_make_cursor (b, word_bit_nr + pos, h);
           eassert (gc_cursor_object_starts_here (c, h));
           const bool is_marked = mark_bits & 1;
           eassert (is_marked == gc_cursor_is_object_marked (c, h));
@@ -1955,16 +1951,16 @@ gc_block_sweep_compact (gc_block *const b, const gc_heap *const h)
 		c.block->meta.u.heap.per_cycle.tospace = gc_aux_pop ();
 	      uint8_t *const tospace =
 		c.block->meta.u.heap.per_cycle.tospace->u.data
-		+ c.slot_nr * gc_heap_nbytes_per_slot (h);
+		+ c.bit_nr * gc_heap_nbytes_per_slot (h);
 	      {
-		size_t whole_words = c.slot_nr / emacs_bitset_bits_per_word;
-		size_t residual_bits = c.slot_nr % emacs_bitset_bits_per_word;
+		size_t whole_words = c.bit_nr / bitset_word_nbits;
+		size_t residual_bits = c.bit_nr % bitset_word_nbits;
 		// gnulib bitset?
 		gc_block_pinned_bits (c.block, h)[whole_words] |=
 		  1 << residual_bits;
 	      }
-	      const emacs_bitset_word new_start_bit =
-		((emacs_bitset_word) 1) << old_bitno;
+	      const bitset_word new_start_bit =
+		((bitset_word) 1) << old_bitno;
 	      gc_block_pinned_bits (c.block, h)[old_word_nr] |= new_start_bit;
 
 	      tospace += gc_cursor_object_nbytes (c, h);
@@ -1990,85 +1986,85 @@ gc_block_sweep_compact (gc_block *const b, const gc_heap *const h)
 
 void
 gc_block_zero_gen_y_slot_bitset (gc_block *const b,
-                                 emacs_bitset_word *const bitset_words,
+                                 bitset_word *const bitset_words,
                                  const gc_heap *const h)
 {
-  ptrdiff_t gen_y_slot_nr = gc_block_gen_y_slot_nr (b, h);
-  if (gen_y_slot_nr % emacs_bitset_bits_per_word)
+  ptrdiff_t gen_y_bit_nr = gc_block_gen_y_bit_nr (b, h);
+  if (gen_y_bit_nr % bitset_word_nbits)
     {
       const size_t first_word_nr =
-        gen_y_slot_nr / emacs_bitset_bits_per_word;
-      emacs_bitset_word first_word = bitset_words[first_word_nr];
+        gen_y_bit_nr / bitset_word_nbits;
+      bitset_word first_word = bitset_words[first_word_nr];
       const size_t first_word_gen_x_bits =
-        gen_y_slot_nr % emacs_bitset_bits_per_word;
-      const emacs_bitset_word first_word_gen_x_mask =
-        (((emacs_bitset_word) 1) << first_word_gen_x_bits) - 1;
+        gen_y_bit_nr % bitset_word_nbits;
+      const bitset_word first_word_gen_x_mask =
+        (((bitset_word) 1) << first_word_gen_x_bits) - 1;
       first_word &= first_word_gen_x_mask;
       bitset_words[first_word_nr] = first_word;
       const size_t first_word_gen_y_bits =
-        emacs_bitset_bits_per_word - first_word_gen_x_bits;
-      gen_y_slot_nr += first_word_gen_y_bits;
+        bitset_word_nbits - first_word_gen_x_bits;
+      gen_y_bit_nr += first_word_gen_y_bits;
     }
-  eassume ((gen_y_slot_nr % emacs_bitset_bits_per_word) == 0);
-  const size_t gen_y_word_nr = gen_y_slot_nr / emacs_bitset_bits_per_word;
+  eassume ((gen_y_bit_nr % bitset_word_nbits) == 0);
+  const size_t gen_y_word_nr = gen_y_bit_nr / bitset_word_nbits;
   const size_t nr_bitset_words = gc_heap_nwords_per_bitset (h);
   const size_t gen_y_nr_words = nr_bitset_words - gen_y_word_nr;
-  const size_t gen_y_nbytes = gen_y_nr_words * sizeof (emacs_bitset_word);
+  const size_t gen_y_nbytes = gen_y_nr_words * sizeof (bitset_word);
   emacs_zero_memory (&bitset_words[gen_y_word_nr], gen_y_nbytes);
 }
 
 void
 gc_block_copy_gen_y_slot_bitset (gc_block *const b,
-                                 emacs_bitset_word *const to,
-                                 const emacs_bitset_word *const from,
+                                 bitset_word *const to,
+                                 const bitset_word *const from,
                                  const gc_heap *h)
 {
-  ptrdiff_t gen_y_slot_nr = gc_block_gen_y_slot_nr (b, h);
-  if (gen_y_slot_nr % emacs_bitset_bits_per_word)
+  ptrdiff_t gen_y_bit_nr = gc_block_gen_y_bit_nr (b, h);
+  if (gen_y_bit_nr % bitset_word_nbits)
     {
       const size_t first_word_gen_x_bits =
-        gen_y_slot_nr % emacs_bitset_bits_per_word;
-      const emacs_bitset_word first_word_gen_x_mask =
-        (((emacs_bitset_word) 1) << first_word_gen_x_bits) - 1;
-      const emacs_bitset_word first_word_gen_y_mask =
+        gen_y_bit_nr % bitset_word_nbits;
+      const bitset_word first_word_gen_x_mask =
+        (((bitset_word) 1) << first_word_gen_x_bits) - 1;
+      const bitset_word first_word_gen_y_mask =
         ~first_word_gen_x_mask;
       const size_t first_word_nr =
-        gen_y_slot_nr / emacs_bitset_bits_per_word;
-      const emacs_bitset_word first_word_to = to[first_word_nr];
-      const emacs_bitset_word first_word_from = from[first_word_nr];
+        gen_y_bit_nr / bitset_word_nbits;
+      const bitset_word first_word_to = to[first_word_nr];
+      const bitset_word first_word_from = from[first_word_nr];
       eassume ((first_word_from & first_word_gen_x_mask) == 0);
-      const emacs_bitset_word first_word_new =
+      const bitset_word first_word_new =
         (first_word_to & first_word_gen_x_mask) |
         (first_word_from & first_word_gen_y_mask);
       to[first_word_nr] = first_word_new;
       const size_t first_word_gen_y_bits =
-        emacs_bitset_bits_per_word - first_word_gen_x_bits;
-      gen_y_slot_nr += first_word_gen_y_bits;
+        bitset_word_nbits - first_word_gen_x_bits;
+      gen_y_bit_nr += first_word_gen_y_bits;
     }
-  eassume ((gen_y_slot_nr % emacs_bitset_bits_per_word) == 0);
-  const size_t gen_y_word_nr = gen_y_slot_nr / emacs_bitset_bits_per_word;
+  eassume ((gen_y_bit_nr % bitset_word_nbits) == 0);
+  const size_t gen_y_word_nr = gen_y_bit_nr / bitset_word_nbits;
   const size_t nr_bitset_words = gc_heap_nwords_per_bitset (h);
   const size_t gen_y_nr_words = nr_bitset_words - gen_y_word_nr;
-  const size_t gen_y_nbytes = gen_y_nr_words * sizeof (emacs_bitset_word);
+  const size_t gen_y_nbytes = gen_y_nr_words * sizeof (bitset_word);
   memcpy (&to[gen_y_word_nr],
           &from[gen_y_word_nr],
           gen_y_nbytes);
 }
 
 ptrdiff_t
-gc_block_gen_y_slot_nr (gc_block *const b, const gc_heap *const h)
+gc_block_gen_y_bit_nr (gc_block *const b, const gc_heap *const h)
 {
   /* We set up the per-block slot number in the prepare phase.  */
-  const ptrdiff_t gen_y_slot_nr = b->meta.u.heap.per_cycle.gen_y_slot_nr;
-  eassume (0 <= gen_y_slot_nr);
-  eassume (gen_y_slot_nr <= gc_heap_nslots_per_block (h));
-  return gen_y_slot_nr;
+  const ptrdiff_t gen_y_bit_nr = b->meta.u.heap.per_cycle.gen_y_bit_nr;
+  eassume (0 <= gen_y_bit_nr);
+  eassume (gen_y_bit_nr <= gc_heap_nslots_per_block (h));
+  return gen_y_bit_nr;
 }
 
 bool
 gc_block_has_any_gen_y (gc_block *const b, const gc_heap *const h)
 {
-  return gc_block_gen_y_slot_nr (b, h) != gc_heap_nslots_per_block (h);
+  return gc_block_gen_y_bit_nr (b, h) != gc_heap_nslots_per_block (h);
 }
 
 void
@@ -2077,13 +2073,13 @@ gc_block_flip_tospace_to_fromspace (gc_block *const b, const gc_heap *const h)
   /* We've been using the pinned bits as the start bits for the
      tospace.  Now we're making the tospace the primary space, move
      the pinned bits to the start bits.  */
-  emacs_bitset_word *restrict const start_bit_words =
+  bitset_word *restrict const start_bit_words =
     gc_block_start_bits (b, h);
-  emacs_bitset_word *restrict const pinned_bit_words =
+  bitset_word *restrict const pinned_bit_words =
     gc_block_pinned_bits (b, h);
-  const ptrdiff_t gen_y_slot_nr = gc_block_gen_y_slot_nr (b, h);
+  const ptrdiff_t gen_y_bit_nr = gc_block_gen_y_bit_nr (b, h);
   const size_t gen_y_byte_offset =
-    gen_y_slot_nr * gc_heap_nbytes_per_slot (h);
+    gen_y_bit_nr * gc_heap_nbytes_per_slot (h);
   eassume (gen_y_byte_offset <= GC_BLOCK_SIZE);
 
   if (gen_y_byte_offset == GC_BLOCK_SIZE)
@@ -2124,15 +2120,15 @@ gc_block_flip_tospace_to_fromspace (gc_block *const b, const gc_heap *const h)
 void
 gc_block_write_unprotect (gc_block *const b, const gc_heap *const h)
 {
-  const ptrdiff_t gen_y_slot_nr = gc_block_gen_y_slot_nr (b, h);
+  const ptrdiff_t gen_y_bit_nr = gc_block_gen_y_bit_nr (b, h);
   const size_t gen_y_byte_offset =
-    gen_y_slot_nr * gc_heap_nbytes_per_slot (h);
+    gen_y_bit_nr * gc_heap_nbytes_per_slot (h);
   eassume (gen_y_byte_offset <= GC_BLOCK_SIZE);
   const size_t nr_pure_gen_x_pages =
-    gen_y_byte_offset / EMACS_PAGE_SIZE_MIN;
+    gen_y_byte_offset / getpagesize ();
   (void) nr_pure_gen_x_pages;
   const size_t nbytes =
-    //XXX nr_pure_gen_x_pages * EMACS_PAGE_SIZE_MIN;
+    //XXX nr_pure_gen_x_pages * getpagesize ();
     GC_BLOCK_SIZE;
   emacs_set_memory_protection (&b->u.data[0], nbytes, EMACS_MEMORY_ACCESS_READWRITE);
 }
@@ -2159,7 +2155,7 @@ gc_block_write_protect_gen_x (gc_block *const b, const gc_heap *const h)
       eassert (b == h->data->tospace_tip.block);
       h->data->per_cycle.sweep.saw_new_tospace_tip = true;
       gen_y_byte_offset =
-        h->data->tospace_tip.slot_nr *
+        h->data->tospace_tip.bit_nr *
         gc_heap_nbytes_per_slot (h);
     }
   else
@@ -2170,7 +2166,7 @@ gc_block_write_protect_gen_x (gc_block *const b, const gc_heap *const h)
     }
 
   eassume (gen_y_byte_offset <= GC_BLOCK_SIZE);
-  const size_t page_size = EMACS_PAGE_SIZE_MIN;
+  const size_t page_size = getpagesize ();
 
   /* If the generation boundary falls in the middle of the page, we
      end the write-protection region one page early, but set the
@@ -2183,9 +2179,9 @@ gc_block_write_protect_gen_x (gc_block *const b, const gc_heap *const h)
   const size_t nbytes = GC_BLOCK_SIZE; // XXX nr_pure_gen_x_pages * page_size;
   emacs_set_memory_protection (&b->u.data[0], nbytes, EMACS_MEMORY_ACCESS_READ);
   if (nbytes % page_size)
-    emacs_bitset_set_bit (&b->meta.card_table[0],
-                          ARRAYELTS (b->meta.card_table),
-                          nbytes / page_size);
+    bitset_set_bit (&b->meta.card_table[0],
+		    ARRAYELTS (b->meta.card_table),
+		    nbytes / page_size);
 }
 
 void
@@ -2211,18 +2207,18 @@ gc_block_mark_card_table (gc_block *const b,
   eassert (fault_addr_la >= b_la);
   const uintptr_t offset_nbytes = fault_addr_la - b_la;
   eassume (offset_nbytes < GC_BLOCK_SIZE);
-  const ptrdiff_t page_bit_nr = offset_nbytes / EMACS_PAGE_SIZE_MIN;
-  verify (EMACS_PAGE_SIZE_MIN+0 == EMACS_PAGE_SIZE_MAX+0 /* FIXME */);
-  eassert (! emacs_bitset_bit_set_p (&b->meta.card_table[0],
-				     ARRAYELTS (b->meta.card_table),
-				     page_bit_nr));
-  emacs_bitset_set_bit (&b->meta.card_table[0],
-			ARRAYELTS (b->meta.card_table),
-			page_bit_nr);
+  const ptrdiff_t page_bit_nr = offset_nbytes / getpagesize ();
+  verify (getpagesize ()+0 == getpagesize ()+0 /* FIXME */);
+  eassert (! bitset_bit_set_p (&b->meta.card_table[0],
+			       ARRAYELTS (b->meta.card_table),
+			       page_bit_nr));
+  bitset_set_bit (&b->meta.card_table[0],
+		  ARRAYELTS (b->meta.card_table),
+		  page_bit_nr);
   const uintptr_t page_start_la =
-    b_la + page_bit_nr * EMACS_PAGE_SIZE_MIN;
+    b_la + page_bit_nr * getpagesize ();
   emacs_set_memory_protection ((void *) page_start_la,
-                               EMACS_PAGE_SIZE_MIN,
+                               getpagesize (),
                                EMACS_MEMORY_ACCESS_READWRITE);
   return true;
 }
@@ -2233,35 +2229,35 @@ gc_heap_nwords_per_bitset (const gc_heap *const h)
 {
   /* We could use any of the current four; we choose "start" */
   eassume (h->start.nbytes);
-  eassume (h->start.nbytes % sizeof (emacs_bitset_word) == 0);
-  return h->start.nbytes / sizeof (emacs_bitset_word);
+  eassume (h->start.nbytes % sizeof (bitset_word) == 0);
+  return h->start.nbytes / sizeof (bitset_word);
 }
 
 /* Return a pointer to the pinned bits for block B, which must be in
    heap H.  */
-emacs_bitset_word *
+bitset_word *
 gc_block_pinned_bits (const gc_block *const b, const gc_heap *const h)
 {
   eassume (h->pinned.offset);
-  return (emacs_bitset_word *) ((uintptr_t) b + h->pinned.offset);
+  return (bitset_word *) ((uintptr_t) b + h->pinned.offset);
 }
 
 /* Return a pointer to the permanently-pinned bits for block B, which
    must be in heap H.  */
-emacs_bitset_word *
+bitset_word *
 gc_block_perma_pinned_bits (const gc_block *const b, const gc_heap *const h)
 {
   eassume (h->perma_pinned.offset);
-  return (emacs_bitset_word *) ((uintptr_t) b + h->perma_pinned.offset);
+  return (bitset_word *) ((uintptr_t) b + h->perma_pinned.offset);
 }
 
 /* Return a pointer to the mark bits for block B, which must be in
    heap H.  */
-emacs_bitset_word *
+bitset_word *
 gc_block_mark_bits (const gc_block *const b, const gc_heap *const h)
 {
   eassume (h->mark.offset);
-  return (emacs_bitset_word *) ((uintptr_t) b + h->mark.offset);
+  return (bitset_word *) ((uintptr_t) b + h->mark.offset);
 }
 
 /* Return the object locators for block B, which must be in heap H.  */
@@ -2292,27 +2288,27 @@ gc_block_maybe_find_live_object_containing (const gc_block *const b,
     return NULL;
   if (p_la < b_la || p_la >= b_la + GC_BLOCK_SIZE)
     return NULL;
-  const ptrdiff_t p_slot_nr =
+  const ptrdiff_t p_bit_nr =
     (ptrdiff_t) ((p_la - b_la) / gc_heap_nbytes_per_slot (h));
-  eassume (0 <= p_slot_nr && p_slot_nr < gc_heap_nslots_per_block (h));
+  eassume (0 <= p_bit_nr && p_bit_nr < gc_heap_nslots_per_block (h));
   /* If this heap tells us its maximum object size, we can
      limit the backward search.  */
   const ptrdiff_t limit =
-    max (p_slot_nr - gc_heap_maximum_object_nslots (h), -1);
-  const ptrdiff_t found_start_slot_nr = emacs_bitset_scan_backward
+    max (p_bit_nr - gc_heap_maximum_object_nslots (h), -1);
+  const ptrdiff_t found_start_bit_nr = bitset_scan_backward
     (gc_block_start_bits (b, h), gc_heap_nwords_per_bitset (h),
-     p_slot_nr, limit);
-  eassume (found_start_slot_nr >= limit);
-  eassume (found_start_slot_nr <= p_slot_nr);
-  if (found_start_slot_nr <= limit)
+     p_bit_nr, limit);
+  eassume (found_start_bit_nr >= limit);
+  eassume (found_start_bit_nr <= p_bit_nr);
+  if (found_start_bit_nr <= limit)
     return NULL;
   const gc_cursor c = {
     .block = gc_block_check ((gc_block *) b),
-    .slot_nr = found_start_slot_nr,
+    .bit_nr = found_start_bit_nr,
   };
   const ptrdiff_t obj_nr_slots = gc_cursor_object_nslots (c, h);
-  const ptrdiff_t end_slot_nr = c.slot_nr + obj_nr_slots;
-  if (p_slot_nr > end_slot_nr)
+  const ptrdiff_t end_bit_nr = c.bit_nr + obj_nr_slots;
+  if (p_bit_nr > end_bit_nr)
     return NULL;
   return gc_cursor_to_object (c, h);
 }
@@ -2374,11 +2370,11 @@ gc_aux_adjust (void)
 {
   size_t nr_objects_plus_fudge;
   if (INT_ADD_WRAPV (gc_nr_lisp_objects_upper_bound,
-                     GC_BLOCK_NSLOTS,
+                     GC_BLOCK_NOBJREFS,
                      &nr_objects_plus_fudge))
     return false;
   const size_t nr_aux_blocks_needed_for_mark =
-    (nr_objects_plus_fudge - 1) / GC_BLOCK_NSLOTS;
+    (nr_objects_plus_fudge - 1) / GC_BLOCK_NOBJREFS;
   size_t nr_aux_blocks_needed_for_sweep_per_heap = 0;
   size_t nr_aux_blocks_needed_during_whole_sweep = 0;
   for (int i = 0; i < ARRAYELTS (gc_heaps); ++i)
@@ -2466,9 +2462,9 @@ gc_heap_check_bitset (const gc_heap *const h,
 {
   const size_t nr_slots = gc_heap_nslots_per_block (h);
   const size_t nr_bitset_words =
-    (nr_slots + emacs_bitset_bits_per_word - 1) / emacs_bitset_bits_per_word;
-  const size_t nbytes = nr_bitset_words * sizeof (emacs_bitset_word);
-  gc_heap_check_field (h, spec, alignof (emacs_bitset_word), nbytes);
+    (nr_slots + bitset_word_nbits - 1) / bitset_word_nbits;
+  const size_t nbytes = nr_bitset_words * sizeof (bitset_word);
+  gc_heap_check_field (h, spec, alignof (bitset_word), nbytes);
 }
 
 void
@@ -2485,29 +2481,29 @@ gc_block_prepare (gc_block *const b, void *const hptr)
   if (enable_checking)
     b->meta.u.heap.per_cycle.smallest_tospace_block_nr = SIZE_MAX;
 
-  /* Set each block's gen_y_slot_nr field to the first
+  /* Set each block's gen_y_bit_nr field to the first
      bitset word number in that block that's part of the new
      generation.  When we're doing a major GC, every slot is part
      of the new generation. */
   if (! h->data->per_cycle.prepare.saw_tospace_tip
       && b != tospace_tip.block)
     {
-      /* A block without any Gen Y objects sets gen_y_slot_nr to
+      /* A block without any Gen Y objects sets gen_y_bit_nr to
 	 an invalid slot-bitset word number.  */
       eassume (b->meta.block_nr < tospace_tip.block->meta.block_nr);
-      b->meta.u.heap.per_cycle.gen_y_slot_nr = gc_heap_nslots_per_block (h);
+      b->meta.u.heap.per_cycle.gen_y_bit_nr = gc_heap_nslots_per_block (h);
     }
   else if (! h->data->per_cycle.prepare.saw_tospace_tip)
     {
       h->data->per_cycle.prepare.saw_tospace_tip = true;
-      const ptrdiff_t slot_nr = tospace_tip.slot_nr;
-      eassume (0 <= slot_nr && slot_nr < gc_heap_nslots_per_block (h));
-      b->meta.u.heap.per_cycle.gen_y_slot_nr = slot_nr;
+      const ptrdiff_t bit_nr = tospace_tip.bit_nr;
+      eassume (0 <= bit_nr && bit_nr < gc_heap_nslots_per_block (h));
+      b->meta.u.heap.per_cycle.gen_y_bit_nr = bit_nr;
     }
   else
     {
       eassume (b->meta.block_nr > tospace_tip.block->meta.block_nr);
-      eassume (b->meta.u.heap.per_cycle.gen_y_slot_nr == 0);
+      eassume (b->meta.u.heap.per_cycle.gen_y_bit_nr == 0);
     }
 }
 
@@ -2566,10 +2562,10 @@ gc_cursor_object_starts_here (const gc_cursor c,
                               const gc_heap *const h)
 {
   gc_cursor_check (c, h);
-  return emacs_bitset_bit_set_p
+  return bitset_bit_set_p
     (gc_block_start_bits (c.block, h),
      gc_heap_nwords_per_bitset (h),
-     c.slot_nr);
+     c.bit_nr);
 }
 
 /* Mark the heap as having a live object at the current position.  */
@@ -2579,10 +2575,10 @@ gc_cursor_make_object_start_here (const gc_cursor c,
 {
   gc_cursor_check (c, h);
   eassert (! gc_cursor_object_starts_here (c, h));
-  emacs_bitset_set_bit
+  bitset_set_bit
     (gc_block_start_bits (c.block, h),
      gc_heap_nwords_per_bitset (h),
-     c.slot_nr);
+     c.bit_nr);
 }
 
 /* Return whether cursor C, which must be in heap H, points into the
@@ -2591,7 +2587,7 @@ bool
 gc_cursor_is_gen_y (const gc_cursor c, const gc_heap *const h)
 {
   gc_cursor_check (c, h);
-  return c.slot_nr >= gc_block_gen_y_slot_nr (c.block, h);
+  return c.bit_nr >= gc_block_gen_y_bit_nr (c.block, h);
 }
 
 /* Return whether the cursor C, which must be in heap H,
@@ -2601,10 +2597,10 @@ gc_cursor_is_object_marked (const gc_cursor c, const gc_heap *const h)
 {
   if (! gc_cursor_is_gen_y (c, h))
     return true;
-  return emacs_bitset_bit_set_p
+  return bitset_bit_set_p
     (gc_block_mark_bits (c.block, h),
      gc_heap_nwords_per_bitset (h),
-     c.slot_nr);
+     c.bit_nr);
 }
 
 /* Set the mark flag for the object at cursor C, which must be in heap
@@ -2615,9 +2611,9 @@ gc_cursor_set_object_marked (const gc_cursor c, const gc_heap *const h)
   gc_cursor_check (c, h);
   eassert (gc_cursor_object_starts_here (c, h));
   eassert (gc_cursor_is_gen_y (c, h));
-  emacs_bitset_word *restrict const words =
+  bitset_word *restrict const words =
     gc_block_mark_bits (c.block, h);
-  emacs_bitset_set_bit (words, gc_heap_nwords_per_bitset (h), c.slot_nr);
+  bitset_set_bit (words, gc_heap_nwords_per_bitset (h), c.bit_nr);
 }
 
 /* Set the pinned flag for the object at cursor C, which must be in
@@ -2631,10 +2627,10 @@ gc_cursor_set_object_pinned (const gc_cursor c, const gc_heap *const h)
   eassert (gc_cursor_is_object_marked (c, h));
   if (gc_cursor_is_gen_y (c, h))
     {
-      emacs_bitset_word *restrict const words =
+      bitset_word *restrict const words =
         gc_block_pinned_bits (c.block, h);
-      emacs_bitset_set_bit
-	(words, gc_heap_nwords_per_bitset (h), c.slot_nr);
+      bitset_set_bit
+	(words, gc_heap_nwords_per_bitset (h), c.bit_nr);
     }
 }
 
@@ -2646,9 +2642,9 @@ gc_cursor_perma_pin_object (const gc_cursor c, const gc_heap *const h)
 {
   gc_cursor_check (c, h);
   eassert (gc_cursor_object_starts_here (c, h));
-  emacs_bitset_word *restrict const words =
+  bitset_word *restrict const words =
     gc_block_perma_pinned_bits (c.block, h);
-  emacs_bitset_set_bit (words, gc_heap_nwords_per_bitset (h), c.slot_nr);
+  bitset_set_bit (words, gc_heap_nwords_per_bitset (h), c.bit_nr);
 }
 
 /* Set the tospace location of the fromspace object at fromspace
@@ -2661,8 +2657,8 @@ gc_cursor_set_object_tospace_locator (const gc_cursor c,
   gc_cursor_check (c, h);
   eassert (gc_cursor_object_starts_here (c, h));
   gc_locator *restrict const locators = gc_block_locators (c.block, h);
-  eassert (gc_locator_invalid_p (locators[c.slot_nr], h));
-  locators[c.slot_nr] = t;
+  eassert (gc_locator_invalid_p (locators[c.bit_nr], h));
+  locators[c.bit_nr] = t;
 }
 
 gc_locator
@@ -2672,7 +2668,7 @@ gc_cursor_get_object_tospace_locator (const gc_cursor c,
   gc_locator tospace_loc = gc_locator_invalid;
   gc_cursor_check (c, h);
   gc_locator *restrict const locators = gc_block_locators (c.block, h);
-  tospace_loc = locators[c.slot_nr];
+  tospace_loc = locators[c.bit_nr];
 
   eassert(! gc_locator_invalid_p(tospace_loc, h));
   return tospace_loc;
@@ -2688,8 +2684,8 @@ gc_cursor_object_nslots (const gc_cursor c, const gc_heap *const h)
     return 1;
   const size_t object_nbytes =
     h->object_nbytes (gc_cursor_to_object (c, h));
-  eassume (object_nbytes % GC_SLOT_SIZE == 0);
-  return object_nbytes / GC_SLOT_SIZE;
+  eassume (object_nbytes % GC_OBJREF_SIZE == 0);
+  return object_nbytes / GC_OBJREF_SIZE;
 }
 
 /* Return the number of bytes that the object at cursor C (which must
@@ -2716,15 +2712,15 @@ gc_cursor_advance_to_object_start_in_block (gc_cursor *const c_inout,
   eassume (max_distance <= gc_heap_nslots_per_block (h));
   gc_cursor c = *c_inout;
   gc_cursor_check (c, h);
-  const ptrdiff_t limit = min (c.slot_nr + max_distance,
+  const ptrdiff_t limit = min (c.bit_nr + max_distance,
                                gc_heap_nslots_per_block (h));
-  const ptrdiff_t found = emacs_bitset_scan_forward
+  const ptrdiff_t found = bitset_scan_forward
     (gc_block_start_bits (c.block, h),
      gc_heap_nwords_per_bitset (h),
-     c.slot_nr, limit);
+     c.bit_nr, limit);
   if (found == limit)
     return false;
-  c.slot_nr = found;
+  c.bit_nr = found;
   *c_inout = c;
   return true;
 }
@@ -2743,15 +2739,15 @@ gc_cursor_advance_to_object_pin_in_block (gc_cursor *const c_inout,
   eassume (max_distance <= gc_heap_nslots_per_block (h));
   gc_cursor c = *c_inout;
   gc_cursor_check (c, h);
-  const ptrdiff_t limit = min (c.slot_nr + max_distance,
+  const ptrdiff_t limit = min (c.bit_nr + max_distance,
                                gc_heap_nslots_per_block (h));
-  const ptrdiff_t found = emacs_bitset_scan_forward
+  const ptrdiff_t found = bitset_scan_forward
     (gc_block_pinned_bits (c.block, h),
      gc_heap_nwords_per_bitset (h),
-     c.slot_nr, limit);
+     c.bit_nr, limit);
   if (found == limit)
     return false;
-  c.slot_nr = found;
+  c.bit_nr = found;
   *c_inout = c;
   return true;
 }
@@ -2780,7 +2776,7 @@ void *
 gc_cursor_to_object (const gc_cursor c, const gc_heap *const h)
 {
   gc_cursor_check (c, h);
-  return &c.block->u.data[c.slot_nr * gc_heap_nbytes_per_slot (h)];
+  return &c.block->u.data[c.bit_nr * gc_heap_nbytes_per_slot (h)];
 }
 
 /* Make a locator pointing to the same place as cursor C, which
@@ -2792,12 +2788,12 @@ gc_cursor_to_locator (const gc_cursor c, const gc_heap *const h)
   const size_t block_nr = c.block->meta.block_nr;
   eassume (block_nr != gc_block_nr_invalid);
   eassume (block_nr <= GC_BLOCK_MAX);
-  const ptrdiff_t slot_nr = c.slot_nr;
+  const ptrdiff_t bit_nr = c.bit_nr;
   const gc_locator locator = {
-    .i = (block_nr << GC_LOCATOR_SLOT_BITS) + slot_nr,
+    .i = (block_nr << GC_LOCATOR_SLOT_BITS) + bit_nr,
   };
   eassume (gc_locator_block_nr (locator, h) == block_nr);
-  eassume (gc_locator_slot_nr (locator, h) == slot_nr);
+  eassume (gc_locator_bit_nr (locator, h) == bit_nr);
   return locator;
 }
 
@@ -2806,7 +2802,7 @@ ptrdiff_t
 gc_cursor_nr_slots_left_in_block (const gc_cursor c, const gc_heap *const h)
 {
   gc_cursor_check (c, h);
-  return gc_heap_nslots_per_block (h) - c.slot_nr;
+  return gc_heap_nslots_per_block (h) - c.bit_nr;
 }
 
 size_t
@@ -2814,7 +2810,7 @@ gc_heap_nbytes_per_slot (const gc_heap *const h)
 {
   return h->elem_nbytes
     ? h->elem_nbytes
-    : GC_SLOT_SIZE;
+    : GC_OBJREF_SIZE;
 }
 
 ptrdiff_t
@@ -2834,8 +2830,8 @@ gc_heap_nslots_spanning (const gc_heap *const h, const size_t nbytes)
       eassume (nbytes == h->elem_nbytes);
       return 1;
     }
-  eassume (nbytes % GC_SLOT_SIZE == 0);
-  return (ptrdiff_t) (nbytes / GC_SLOT_SIZE);
+  eassume (nbytes % GC_OBJREF_SIZE == 0);
+  return (ptrdiff_t) (nbytes / GC_OBJREF_SIZE);
 }
 
 /* Advance cursor *C_INOUT (which must point into heap H) to the start
@@ -2849,7 +2845,7 @@ gc_cursor_advance_next_block (gc_cursor *const c_inout, const gc_heap *const h)
   if (emacs_list_last_p (&h->data->blocks, &c.block->meta.link))
     return false;
   c.block = gc_block_from_link (c.block->meta.link.next);
-  c.slot_nr = 0;
+  c.bit_nr = 0;
   *c_inout = c;
   return true;
 }
@@ -2887,7 +2883,7 @@ gc_cursor_advance_nr_slots_allocate_if_needed (gc_cursor *const c_inout,
       nr_slots -= gc_cursor_nr_slots_left_in_block (c, h);
       gc_cursor_advance_next_block_allocate_if_needed (&c, h);
     }
-  c.slot_nr += nr_slots;
+  c.bit_nr += nr_slots;
   *c_inout = c;
 }
 
@@ -2908,7 +2904,7 @@ gc_cursor_advance_nr_slots (gc_cursor *const c_inout,
       if (! gc_cursor_advance_next_block (&c, h))
         return false;
     }
-  c.slot_nr += nr_slots;
+  c.bit_nr += nr_slots;
   *c_inout = c;
   return true;
 }
@@ -2917,8 +2913,8 @@ void
 gc_cursor_check (const gc_cursor c, const gc_heap *const h)
 {
   eassume (c.block->meta.parent_heap == h);
-  eassume (c.slot_nr >= 0);
-  eassume (c.slot_nr < gc_heap_nslots_per_block (h));
+  eassume (c.bit_nr >= 0);
+  eassume (c.bit_nr < gc_heap_nslots_per_block (h));
 }
 
 /* Return the maximum number of objects we can store in each block of
@@ -2930,7 +2926,7 @@ gc_heap_maximum_objects_per_block (const gc_heap *const h)
   // we configure a minimum object size.
   return h->elem_nbytes
     ? GC_BLOCK_SIZE / h->elem_nbytes
-    : GC_BLOCK_SIZE / GC_SLOT_SIZE;
+    : GC_BLOCK_SIZE / GC_OBJREF_SIZE;
 }
 
 /* Return the maximum size of an object in this heap, in slots.  */
@@ -2994,13 +2990,13 @@ gc_gen_y_bit_iter
 gc_gen_y_bit_iter_init (gc_block *const b, const gc_heap *const h)
 {
   eassume (b->meta.parent_heap == h);
-  const ptrdiff_t gen_y_slot_nr = gc_block_gen_y_slot_nr (b, h);
+  const ptrdiff_t gen_y_bit_nr = gc_block_gen_y_bit_nr (b, h);
   const size_t first_word_nr =
-    gen_y_slot_nr / emacs_bitset_bits_per_word;
+    gen_y_bit_nr / bitset_word_nbits;
   const size_t first_word_gen_x_bits =
-    gen_y_slot_nr % emacs_bitset_bits_per_word;
-  const emacs_bitset_word first_word_gen_x_mask =
-    (((emacs_bitset_word) 1) << first_word_gen_x_bits) - 1;
+    gen_y_bit_nr % bitset_word_nbits;
+  const bitset_word first_word_gen_x_mask =
+    (((bitset_word) 1) << first_word_gen_x_bits) - 1;
   return (gc_gen_y_bit_iter){
     .first_word_nr = first_word_nr,
     .word_nr_limit = gc_heap_nwords_per_bitset (h),
@@ -3024,17 +3020,17 @@ gc_gen_y_bit_iter_next (gc_gen_y_bit_iter *const yit)
 }
 
 ptrdiff_t
-gc_gen_y_bit_iter_slot_nr (const gc_gen_y_bit_iter *const yit)
+gc_gen_y_bit_iter_bit_nr (const gc_gen_y_bit_iter *const yit)
 {
-  return yit->word_nr * emacs_bitset_bits_per_word;
+  return yit->word_nr * bitset_word_nbits;
 }
 
-emacs_bitset_word
+bitset_word
 gc_gen_y_bit_iter_get (const gc_gen_y_bit_iter *const yit,
-                       const emacs_bitset_word *const words)
+                       const bitset_word *const words)
 {
   eassume (! gc_gen_y_bit_iter_at_end (yit));
-  emacs_bitset_word word = words[yit->word_nr];
+  bitset_word word = words[yit->word_nr];
   if (yit->word_nr == yit->first_word_nr)
     word &= yit->first_word_gen_y_mask;
   return word;
@@ -3042,13 +3038,13 @@ gc_gen_y_bit_iter_get (const gc_gen_y_bit_iter *const yit,
 
 void
 gc_gen_y_bit_iter_set (const gc_gen_y_bit_iter *const yit,
-                       emacs_bitset_word *restrict const words,
-                       emacs_bitset_word new_word)
+                       bitset_word *restrict const words,
+                       bitset_word new_word)
 {
   eassume (! gc_gen_y_bit_iter_at_end (yit));
   if (yit->word_nr == yit->first_word_nr)
     {
-      const emacs_bitset_word first_word_gen_x_mask =
+      const bitset_word first_word_gen_x_mask =
         ~yit->first_word_gen_y_mask;
       eassume ((new_word & first_word_gen_x_mask) == 0);
       new_word |= (words[yit->word_nr] & first_word_gen_x_mask);
@@ -3065,19 +3061,19 @@ gc_gen_y_bit_iter_set (const gc_gen_y_bit_iter *const yit,
 void
 gc_block_preprocess_perma_pins (gc_block *const b, const gc_heap *const h)
 {
-  const emacs_bitset_word *restrict const start_bit_words =
+  const bitset_word *restrict const start_bit_words =
     gc_block_start_bits (b, h);
-  const emacs_bitset_word *restrict const mark_bit_words =
+  const bitset_word *restrict const mark_bit_words =
     gc_block_mark_bits (b, h);
-  emacs_bitset_word *restrict const pinned_bit_words =
+  bitset_word *restrict const pinned_bit_words =
     gc_block_pinned_bits (b, h);
-  emacs_bitset_word *restrict const perma_pinned_bit_words =
+  bitset_word *restrict const perma_pinned_bit_words =
     gc_block_perma_pinned_bits (b, h);
   for (gc_gen_y_bit_iter yit = gc_gen_y_bit_iter_init (b, h);
        ! gc_gen_y_bit_iter_at_end (&yit);
        gc_gen_y_bit_iter_next (&yit))
     {
-      const emacs_bitset_word perma_pinned_bits =
+      const bitset_word perma_pinned_bits =
         gc_gen_y_bit_iter_get (&yit, perma_pinned_bit_words);
       /* We expect the perma-pin bitset to be very sparse, so fetch
          the other bitset words only when we actually find a
@@ -3090,14 +3086,14 @@ gc_block_preprocess_perma_pins (gc_block *const b, const gc_heap *const h)
          be marked, so when pinning, filter the pin bits to the ones
          corresponding to marked objects and throw out perma-pins for
          objects we know to be dead.  */
-      const emacs_bitset_word start_bits =
+      const bitset_word start_bits =
         gc_gen_y_bit_iter_get (&yit, start_bit_words);
-      const emacs_bitset_word mark_bits =
+      const bitset_word mark_bits =
         gc_gen_y_bit_iter_get (&yit, mark_bit_words);
-      emacs_bitset_word pinned_bits =
+      bitset_word pinned_bits =
         gc_gen_y_bit_iter_get (&yit, pinned_bit_words);
       eassume ((perma_pinned_bits & ~start_bits) == 0);
-      const emacs_bitset_word new_perma_pinned_bits =
+      const bitset_word new_perma_pinned_bits =
         perma_pinned_bits & mark_bits;
       pinned_bits |= new_perma_pinned_bits;
       gc_gen_y_bit_iter_set (&yit, pinned_bit_words, pinned_bits);
@@ -3116,15 +3112,15 @@ intergen_advance_nr_slots_test_dirty (intergen *const scan,
      startness.  The current position of the scan is encoded entirely
      in the current slot number, however.  */
   const size_t nr_slots_per_block = gc_heap_nslots_per_block (h);
-  const ptrdiff_t slot_nr = scan->slot_nr;
+  const ptrdiff_t bit_nr = scan->bit_nr;
   bool at_end = false;
-  eassume (slot_nr >= 0);
-  eassume (slot_nr <= nr_slots_per_block);
+  eassume (bit_nr >= 0);
+  eassume (bit_nr <= nr_slots_per_block);
   eassume (nr_slots_to_move >= 0);
-  eassume (nr_slots_to_move <= nr_slots_per_block - slot_nr);
+  eassume (nr_slots_to_move <= nr_slots_per_block - bit_nr);
 
   /* Make sure we don't index anything past the end.  */
-  if (slot_nr + nr_slots_to_move == nr_slots_per_block)
+  if (bit_nr + nr_slots_to_move == nr_slots_per_block)
     {
       eassume (nr_slots_to_move > 0);
       nr_slots_to_move -= 1;
@@ -3133,13 +3129,13 @@ intergen_advance_nr_slots_test_dirty (intergen *const scan,
          doesn't think we have another object to scan.  */
       scan->start_word = 0;
     }
-  eassume (slot_nr + nr_slots_to_move < nr_slots_per_block);
+  eassume (bit_nr + nr_slots_to_move < nr_slots_per_block);
 
   /* TODO: make the code work with runtime-variable page sizes.  */
-  verify (EMACS_PAGE_SIZE_MIN + 0 == EMACS_PAGE_SIZE_MAX + 0);
+  verify (getpagesize () + 0 == getpagesize () + 0);
 
-  const size_t page_size = EMACS_PAGE_SIZE_MIN;
-  const size_t byte_offset = slot_nr * gc_heap_nbytes_per_slot (h);
+  const size_t page_size = getpagesize ();
+  const size_t byte_offset = bit_nr * gc_heap_nbytes_per_slot (h);
   size_t nbytes_left_to_move = nr_slots_to_move *
     gc_heap_nbytes_per_slot (h);
   size_t nbytes_left_in_page = (byte_offset % page_size)
@@ -3159,35 +3155,35 @@ intergen_advance_nr_slots_test_dirty (intergen *const scan,
           page_nr += 1;
           nbytes_left_in_page = page_size;
           page_is_dirty =
-	    emacs_bitset_bit_set_p (&scan->b->meta.card_table[0],
+	    bitset_bit_set_p (&scan->b->meta.card_table[0],
 				    ARRAYELTS (scan->b->meta.card_table),
 				    page_nr);
         }
       nbytes_left_to_move -= n;
     }
   const size_t bits_left_in_word =
-    emacs_bitset_bits_per_word
-    - (slot_nr % emacs_bitset_bits_per_word);
-  const ptrdiff_t new_slot_nr = slot_nr + nr_slots_to_move;
+    bitset_word_nbits
+    - (bit_nr % bitset_word_nbits);
+  const ptrdiff_t new_bit_nr = bit_nr + nr_slots_to_move;
   if (nr_slots_to_move < bits_left_in_word)
     scan->start_word >>= nr_slots_to_move;
   else
     {
-      const size_t new_word_nr = new_slot_nr / emacs_bitset_bits_per_word;
+      const size_t new_word_nr = new_bit_nr / bitset_word_nbits;
       scan->start_word = gc_block_start_bits (scan->b, h)[new_word_nr];
-      scan->start_word >>= new_slot_nr % emacs_bitset_bits_per_word;
+      scan->start_word >>= new_bit_nr % bitset_word_nbits;
     }
   if (start_page_nr != page_nr)
     scan->page_is_dirty = page_is_dirty;
 
-  eassert (((new_slot_nr * gc_heap_nbytes_per_slot (h))
+  eassert (((new_bit_nr * gc_heap_nbytes_per_slot (h))
             / page_size) == page_nr);
   eassert (scan->page_is_dirty ==
-           emacs_bitset_bit_set_p (&scan->b->meta.card_table[0],
+           bitset_bit_set_p (&scan->b->meta.card_table[0],
 				   ARRAYELTS (scan->b->meta.card_table),
 				   page_nr));
 
-  scan->slot_nr = new_slot_nr + at_end;
+  scan->bit_nr = new_bit_nr + at_end;
   return any_byte_dirty;
 }
 
@@ -3196,11 +3192,11 @@ intergen_scan_object (intergen *const scan,
 		      const gc_phase phase,
 		      const gc_heap *const h)
 {
-  const gc_cursor c = gc_block_make_cursor (scan->b, scan->slot_nr, h);
+  const gc_cursor c = gc_block_make_cursor (scan->b, scan->bit_nr, h);
   void *const obj_ptr = gc_cursor_to_object (c, h);
   const ptrdiff_t obj_nr_slots = gc_cursor_object_nslots (c, h);
 
-  eassume (scan->slot_nr < gc_heap_nslots_per_block (h));
+  eassume (scan->bit_nr < gc_heap_nslots_per_block (h));
   eassert (gc_cursor_object_starts_here (c, h));
 
   if (h->intergen_hook &&
@@ -3213,27 +3209,27 @@ intergen_scan_object (intergen *const scan,
 }
 
 ptrdiff_t
-intergen_get_next_dirty_slot_nr (const intergen *const scan,
+intergen_get_next_dirty_bit_nr (const intergen *const scan,
                                   const gc_heap *const h)
 {
   if (scan->page_is_dirty)
-    return scan->slot_nr;
-  const ptrdiff_t slot_nr = scan->slot_nr;
+    return scan->bit_nr;
+  const ptrdiff_t bit_nr = scan->bit_nr;
   const ptrdiff_t slot_limit = scan->slot_limit;
-  eassume (0 <= slot_nr);
-  eassume (slot_nr <= slot_limit);
+  eassume (0 <= bit_nr);
+  eassume (bit_nr <= slot_limit);
   eassume (slot_limit <= gc_heap_nslots_per_block (h));
   const size_t slot_limit_byte_offset =
     slot_limit * gc_heap_nbytes_per_slot (h);
   eassume (slot_limit_byte_offset <= GC_BLOCK_SIZE);
-  verify ((GC_BLOCK_SIZE % EMACS_PAGE_SIZE_MIN) == 0);
-  const size_t page_size = EMACS_PAGE_SIZE_MIN;
+  verify ((GC_BLOCK_SIZE % getpagesize ()) == 0);
+  const size_t page_size = getpagesize ();
   const ptrdiff_t page_limit =
     (slot_limit_byte_offset + page_size - 1) / page_size;
-  const size_t byte_offset = slot_nr * gc_heap_nbytes_per_slot (h);
+  const size_t byte_offset = bit_nr * gc_heap_nbytes_per_slot (h);
   const ptrdiff_t page_nr = byte_offset / page_size;
   const ptrdiff_t next_dirty_page =
-    emacs_bitset_scan_forward (&scan->b->meta.card_table[0],
+    bitset_scan_forward (&scan->b->meta.card_table[0],
                                ARRAYELTS (scan->b->meta.card_table),
                                page_nr, page_limit);
   if (next_dirty_page == page_limit)
@@ -3256,7 +3252,7 @@ intergen_get_next_dirty_slot_nr (const intergen *const scan,
          Start scanning from the object's start.  */
       const gc_cursor c = gc_object_to_cursor (obj_start, h);
       eassert (gc_cursor_object_starts_here (c, h));
-      return c.slot_nr;
+      return c.bit_nr;
     }
   /* No object is straddling the page boundary, but slot boundaries
      don't necessarily line up with page boundaries, so go to the
@@ -3268,20 +3264,20 @@ void
 intergen_skip_clean_pages (intergen *const scan,
                             const gc_heap *const h)
 {
-  const ptrdiff_t slot_nr = scan->slot_nr;
-  const ptrdiff_t new_slot_nr = intergen_get_next_dirty_slot_nr (scan, h);
-  eassume (0 <= slot_nr);
-  eassume (slot_nr <= new_slot_nr);
-  eassume (new_slot_nr <= gc_heap_nslots_per_block (h));
+  const ptrdiff_t bit_nr = scan->bit_nr;
+  const ptrdiff_t new_bit_nr = intergen_get_next_dirty_bit_nr (scan, h);
+  eassume (0 <= bit_nr);
+  eassume (bit_nr <= new_bit_nr);
+  eassume (new_bit_nr <= gc_heap_nslots_per_block (h));
   eassume (scan->slot_limit <= gc_heap_nslots_per_block (h));
-  if (new_slot_nr >= scan->slot_limit)
+  if (new_bit_nr >= scan->slot_limit)
     {
       /* Don't bother maintaining the invariants if we're going to the
          scan boundary.  We'll be terminating the loop anyway.  */
-      scan->slot_nr = scan->slot_limit;
+      scan->bit_nr = scan->slot_limit;
     }
   else
-    intergen_advance_nr_slots_test_dirty (scan, new_slot_nr - slot_nr, h);
+    intergen_advance_nr_slots_test_dirty (scan, new_bit_nr - bit_nr, h);
 }
 
 void
@@ -3291,11 +3287,11 @@ intergen_skip_to_object_start (intergen *const scan,
   /* If we have non-zero start bits, we can find an object by shifting
      the start bit word.  intergen_advance_nr_slots_test_dirty()
      takes care of tracking whether we've moved to a dirty page.  */
-  eassume (scan->slot_nr >= scan->slot_limit ||
+  eassume (scan->bit_nr >= scan->slot_limit ||
            scan->start_word ==
            gc_block_start_bits (scan->b, h)
-           [scan->slot_nr / emacs_bitset_bits_per_word]
-           >> scan->slot_nr % emacs_bitset_bits_per_word);
+           [scan->bit_nr / bitset_word_nbits]
+           >> scan->bit_nr % bitset_word_nbits);
   if (scan->start_word)
     {
       const int tz = emacs_ctz_bw (scan->start_word);
@@ -3305,19 +3301,19 @@ intergen_skip_to_object_start (intergen *const scan,
   const ptrdiff_t slot_limit = scan->slot_limit;
   /* Advance to the next word boundary, being careful not to do past
      scan_limit.  */
-  if (scan->slot_nr % emacs_bitset_bits_per_word)
+  if (scan->bit_nr % bitset_word_nbits)
     {
       const size_t bits_left_in_word =
-        emacs_bitset_bits_per_word
-        - (scan->slot_nr % emacs_bitset_bits_per_word);
-      if (slot_limit - scan->slot_nr <= bits_left_in_word)
+        bitset_word_nbits
+        - (scan->bit_nr % bitset_word_nbits);
+      if (slot_limit - scan->bit_nr <= bits_left_in_word)
         {
-          scan->slot_nr = slot_limit;
+          scan->bit_nr = slot_limit;
           return;
         }
       intergen_advance_nr_slots_test_dirty (scan, bits_left_in_word, h);
     }
-  eassume ((scan->slot_nr % emacs_bitset_bits_per_word) == 0);
+  eassume ((scan->bit_nr % bitset_word_nbits) == 0);
   /* If we don't have an object start immediately available, we have
      to go find one by scanning forward in the bitset.  If we're
      currently on a clean page, however, we can accelerate the bitset
@@ -3326,9 +3322,9 @@ intergen_skip_to_object_start (intergen *const scan,
   intergen_skip_clean_pages (scan, h);
   eassume (0 <= slot_limit && slot_limit <=
            gc_heap_nslots_per_block (h));
-  while (scan->slot_nr < slot_limit && scan->start_word == 0)
-    intergen_advance_nr_slots_test_dirty (scan, emacs_bitset_bits_per_word, h);
-  if (scan->slot_nr < slot_limit)
+  while (scan->bit_nr < slot_limit && scan->start_word == 0)
+    intergen_advance_nr_slots_test_dirty (scan, bitset_word_nbits, h);
+  if (scan->bit_nr < slot_limit)
     {
       eassume (scan->start_word);
       const int tz = emacs_ctz_bw (scan->start_word);
@@ -3344,15 +3340,15 @@ gc_block_scan_intergenerational (gc_block *const b,
                                  const gc_phase phase,
                                  const gc_heap *const h)
 {
-  const ptrdiff_t gen_y_slot_nr = gc_block_gen_y_slot_nr (b, h);
+  const ptrdiff_t gen_y_bit_nr = gc_block_gen_y_bit_nr (b, h);
   const bool first_page_is_dirty =
-    emacs_bitset_bit_set_p (&b->meta.card_table[0],
+    bitset_bit_set_p (&b->meta.card_table[0],
 			    ARRAYELTS (b->meta.card_table),
 			    0);
   intergen scan_buf = {
     .b = b,
-    .slot_limit = gen_y_slot_nr,
-    .slot_nr = 0,
+    .slot_limit = gen_y_bit_nr,
+    .bit_nr = 0,
     .page_is_dirty = first_page_is_dirty,
     /* If the first page isn't dirty, we're not going to read the
        initial start bits anyway, so we can skip the memory load and
@@ -3364,7 +3360,7 @@ gc_block_scan_intergenerational (gc_block *const b,
   for (;;)
     {
       intergen_skip_to_object_start (scan, h);
-      if (scan->slot_nr >= gen_y_slot_nr)
+      if (scan->bit_nr >= gen_y_bit_nr)
         break;
       intergen_scan_object (scan, phase, h);
     }
@@ -3558,7 +3554,7 @@ gc_locator_to_cursor (const gc_locator locator, const gc_heap *const h)
   eassert (! gc_locator_invalid_p (locator, h));
   const gc_cursor c = {
     .block = h->data->block_array[gc_locator_block_nr (locator, h)],
-    .slot_nr = gc_locator_slot_nr (locator, h),
+    .bit_nr = gc_locator_bit_nr (locator, h),
   };
   gc_cursor_check (c, h);
   return c;
@@ -3579,13 +3575,13 @@ gc_locator_block_nr (const gc_locator locator, const gc_heap *const h)
 }
 
 ptrdiff_t
-gc_locator_slot_nr (const gc_locator locator, const gc_heap *const h)
+gc_locator_bit_nr (const gc_locator locator, const gc_heap *const h)
 {
   (void) h;
   const size_t mask = (((size_t) 1) << GC_LOCATOR_SLOT_BITS) - 1;
-  const ptrdiff_t slot_nr = locator.i & mask;
-  eassume (slot_nr >= 0);
-  return slot_nr;
+  const ptrdiff_t bit_nr = locator.i & mask;
+  eassume (bit_nr >= 0);
+  return bit_nr;
 }
 
 static gc_heap_data gc_interval_heap_data;
@@ -3595,7 +3591,7 @@ static const gc_heap gc_interval_heap = {
   .mem_type = MEM_TYPE_INTERVAL,
   .lisp_type = Lisp_Int0 /* sic */,
   .elem_nbytes = GC_HEAP_INTERVAL_SIZE,
-  GC_HEAP_BITS_CONFIG (interval),
+  GC_HEAP_FLAGS_CONFIG (interval),
 };
 
 void
@@ -3712,7 +3708,7 @@ static const gc_heap gc_string_heap = {
   .mem_type = MEM_TYPE_STRING,
   .lisp_type = Lisp_String,
   .elem_nbytes = GC_HEAP_STRING_SIZE,
-  GC_HEAP_BITS_CONFIG (string),
+  GC_HEAP_FLAGS_CONFIG (string),
 };
 
 void
@@ -3738,7 +3734,7 @@ sdata_size (const ptrdiff_t n)
     : offsetof (struct sdata, u.medium.data);
   /* Add one for terminating NUL.  */
   const ptrdiff_t unaligned_size = data_offset + n + 1;
-  return ROUNDUP (unaligned_size, GC_SLOT_SIZE);
+  return ROUNDUP (unaligned_size, GC_OBJREF_SIZE);
 }
 
 struct Lisp_String *
@@ -4233,7 +4229,7 @@ static const gc_heap gc_float_heap = {
   .mem_type = MEM_TYPE_FLOAT,
   .lisp_type = Lisp_Float,
   .elem_nbytes = GC_HEAP_FLOAT_SIZE,
-  GC_HEAP_BITS_CONFIG (float_),
+  GC_HEAP_FLAGS_CONFIG (float_),
 };
 
 void
@@ -4322,7 +4318,7 @@ static const gc_heap gc_cons_heap = {
   .mem_type = MEM_TYPE_CONS,
   .lisp_type = Lisp_Cons,
   .elem_nbytes = GC_HEAP_CONS_SIZE,
-  GC_HEAP_BITS_CONFIG (cons),
+  GC_HEAP_FLAGS_CONFIG (cons),
 };
 
 void
@@ -4526,7 +4522,7 @@ static const gc_heap gc_vector_heap = {
   .object_nbytes = gc_vector_object_nbytes,
   .cleanup = vector_cleanup,
   .intergen_hook = vector_intergen_hook,
-  GC_HEAP_BITS_CONFIG (vector),
+  GC_HEAP_FLAGS_CONFIG (vector),
 };
 
 void
@@ -5320,7 +5316,7 @@ static const gc_heap gc_symbol_heap = {
   .lisp_type = Lisp_Symbol,
   .elem_nbytes = GC_HEAP_SYMBOL_SIZE,
   .cleanup = symbol_cleanup,
-  GC_HEAP_BITS_CONFIG (symbol),
+  GC_HEAP_FLAGS_CONFIG (symbol),
 };
 
 void
@@ -8496,12 +8492,11 @@ gc_mark_queue_block_try_add (gc_block *const b, const Lisp_Object obj)
            b->meta.u.aux.mark_queue.nwrites);
   const size_t size = b->meta.u.aux.mark_queue.nwrites -
     b->meta.u.aux.mark_queue.nreads;
-  eassume (size <= GC_BLOCK_NSLOTS);
-  const size_t free = GC_BLOCK_NSLOTS - size;
+  eassume (size <= GC_BLOCK_NOBJREFS);
+  const size_t free = GC_BLOCK_NOBJREFS - size;
   if (free == 0)
     return false;
-  const size_t slot = b->meta.u.aux.mark_queue.nwrites %
-    GC_BLOCK_NSLOTS;
+  const size_t slot = b->meta.u.aux.mark_queue.nwrites % GC_BLOCK_NOBJREFS;
   b->u.mark_queue[slot] = obj;
   b->meta.u.aux.mark_queue.nwrites += 1;
   return true;
@@ -8515,10 +8510,10 @@ gc_mark_queue_block_try_remove (gc_block *const b,
            b->meta.u.aux.mark_queue.nwrites);
   const size_t size = b->meta.u.aux.mark_queue.nwrites -
     b->meta.u.aux.mark_queue.nreads;
-  eassume (size <= GC_BLOCK_NSLOTS);
+  eassume (size <= GC_BLOCK_NOBJREFS);
   if (size == 0)
     return false;
-  const size_t slot = b->meta.u.aux.mark_queue.nreads % GC_BLOCK_NSLOTS;
+  const size_t slot = b->meta.u.aux.mark_queue.nreads % GC_BLOCK_NOBJREFS;
   *out = b->u.mark_queue[slot];
   b->meta.u.aux.mark_queue.nreads += 1;
   return true;
@@ -8656,7 +8651,7 @@ gc_object_to_cursor (const void *const obj, const gc_heap *const h)
            offset % h->elem_nbytes == 0);
   const gc_cursor c = {
     .block = gc_block_check ((gc_block *) block_la),
-    .slot_nr = offset / gc_heap_nbytes_per_slot (h),
+    .bit_nr = offset / gc_heap_nbytes_per_slot (h),
   };
   gc_cursor_check (c, h);
   return c;

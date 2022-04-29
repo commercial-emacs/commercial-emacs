@@ -1,3 +1,4 @@
+#include "getpagesize.h"
 #include "sysmem.h"
 #include <errno.h>
 #include <stdlib.h>
@@ -408,9 +409,9 @@ emacs_zero_or_discard_memory (void *const mem,
   eassume (!INT_ADD_OVERFLOW (pos, size));
   void *head;
   size_t head_size;
-  if (pos % EMACS_PAGE_SIZE_MAX != 0)
+  if (pos % getpagesize () != 0)
     {
-      const size_t gap = EMACS_PAGE_SIZE_MAX - (pos % EMACS_PAGE_SIZE_MAX);
+      const size_t gap = getpagesize () - (pos % getpagesize ());
       head = (void *) pos;
       head_size = min (gap, size);
     }
@@ -419,9 +420,9 @@ emacs_zero_or_discard_memory (void *const mem,
       head = NULL;
       head_size = 0;
     }
-  const size_t nr_middle_pages = (size - head_size) / EMACS_PAGE_SIZE_MAX;
-  const size_t middle_size = nr_middle_pages * EMACS_PAGE_SIZE_MAX;
-  eassume (middle_size == 0 || (pos + head_size) % EMACS_PAGE_SIZE_MAX == 0);
+  const size_t nr_middle_pages = (size - head_size) / getpagesize ();
+  const size_t middle_size = nr_middle_pages * getpagesize ();
+  eassume (middle_size == 0 || (pos + head_size) % getpagesize () == 0);
   void *const middle = (void *) (pos + head_size);
   tail = (void *) (pos + head_size + middle_size);
   tail_size = size - head_size - middle_size;
@@ -635,22 +636,22 @@ emacs_mmap_contiguous_vm_1 (struct emacs_memory_map *const maps,
                             size_t alloc_size, size_t alignment)
 {
   bool success = false;
-  if (!try_round_up (alloc_size, EMACS_ALLOCATION_GRANULARITY, &alloc_size))
+  if (!try_round_up (alloc_size, getpagesize (), &alloc_size))
     return false;
-  if (alignment < EMACS_ALLOCATION_GRANULARITY)
-    alignment = EMACS_ALLOCATION_GRANULARITY;
+  if (alignment < getpagesize ())
+    alignment = getpagesize ();
   size_t resv_size;
   if (!try_round_up (alloc_size, alignment, &resv_size))
     return false;
   eassert (resv_size % alignment == 0);
-  if (alignment > EMACS_ALLOCATION_GRANULARITY)
+  if (alignment > getpagesize ())
     {
       if (INT_MULTIPLY_WRAPV (resv_size, 2, &resv_size))
         {
           errno = ERANGE;
           return false;
         }
-      resv_size -= EMACS_ALLOCATION_GRANULARITY;
+      resv_size -= getpagesize ();
     }
   void *resv = emacs_anonymous_allocate (
     NULL,
@@ -661,7 +662,7 @@ emacs_mmap_contiguous_vm_1 (struct emacs_memory_map *const maps,
     return false;
   const uintptr_t resv_la = (uintptr_t) resv;
   const uintptr_t resv_end_la = resv_la + resv_size;
-  eassume (resv_la % EMACS_ALLOCATION_GRANULARITY == 0);
+  eassume (resv_la % getpagesize () == 0);
 
   if (!mmap_is_atomic ())
     {
@@ -681,7 +682,7 @@ emacs_mmap_contiguous_vm_1 (struct emacs_memory_map *const maps,
     ? resv_la + (alignment - (resv_la % alignment)) : resv_la;
 
   eassume (alloc_start_la >= resv_la);
-  eassume ((alloc_start_la - resv_la) % EMACS_ALLOCATION_GRANULARITY == 0);
+  eassume ((alloc_start_la - resv_la) % getpagesize () == 0);
 
   uintptr_t alloc_end_la = alloc_start_la;
   for (int i = 0; i < nr_maps; ++i)
@@ -692,7 +693,7 @@ emacs_mmap_contiguous_vm_1 (struct emacs_memory_map *const maps,
         continue;
       const bool is_last_mapping = (i == nr_maps - 1);
       const size_t spec_size = is_last_mapping
-        ? ROUNDUP (spec.size, EMACS_ALLOCATION_GRANULARITY)
+        ? ROUNDUP (spec.size, getpagesize ())
         : spec.size;
       eassume (spec_size == spec.size || is_last_mapping);
 
@@ -715,7 +716,7 @@ emacs_mmap_contiguous_vm_1 (struct emacs_memory_map *const maps,
   success = true;
  out:
   eassume (alloc_end_la <= resv_end_la);
-  eassume ((resv_end_la - alloc_end_la) % EMACS_ALLOCATION_GRANULARITY == 0);
+  eassume ((resv_end_la - alloc_end_la) % getpagesize () == 0);
 
   const int saved_errno = errno;
   if (resv)
@@ -753,7 +754,7 @@ emacs_mmap_contiguous_vm (struct emacs_memory_map *const maps,
    MAPS[N-1].size.
 
    Each mapping SIZE (except for the last mapping) must be a multiple
-   of the system allocation granularity EMACS_ALLOCATION_GRANULARITY.
+   of the system allocation granularity getpagesize ().
    (N.B.  the allocation granularity can be larger than the page size
    on some systems, but is always a multiple of the page size.)
    Return true on success or false on failure with errno set.
@@ -778,7 +779,7 @@ emacs_mmap_contiguous (struct emacs_memory_map *maps,
       eassert (maps[i].unmap == NULL);
       eassert (maps[i].private == NULL);
       if (i != nr_maps - 1)
-        eassert (maps[i].spec.size % EMACS_ALLOCATION_GRANULARITY == 0);
+        eassert (maps[i].spec.size % getpagesize () == 0);
       if (INT_ADD_OVERFLOW (total_size, maps[i].spec.size))
         {
           errno = ERANGE;

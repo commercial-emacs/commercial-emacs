@@ -4,17 +4,6 @@
 #include <config.h>
 #include "lisp.h"
 
-/* XXX: work with bigger page sizes */
-enum { EMACS_PAGE_SIZE_MIN = 4096 };
-enum { EMACS_PAGE_SIZE_MAX = 4096 };
-
-/* Coarseness of mmap.  */
-#if defined (WINDOWSNT) || defined (CYGWIN)
-enum { EMACS_ALLOCATION_GRANULARITY = 64 * 1024 };
-#else
-enum { EMACS_ALLOCATION_GRANULARITY = EMACS_PAGE_SIZE_MAX };
-#endif
-
 enum emacs_memory_protection
 {
   EMACS_MEMORY_ACCESS_NONE = 1,

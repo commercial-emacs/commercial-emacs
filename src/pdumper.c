@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "getpagesize.h"
 #include "blockinput.h"
 #include "buffer.h"
 #include "charset.h"
@@ -5629,7 +5630,7 @@ pdumper_load (const char *dump_filename, char *argv0)
   err = PDUMPER_LOAD_OOM;
 
   adj_discardable_start = header->discardable_start;
-  dump_page_size = EMACS_ALLOCATION_GRANULARITY;
+  dump_page_size = getpagesize ();
   /* Snap to next page boundary.  */
   adj_discardable_start = ROUNDUP (adj_discardable_start, dump_page_size);
   eassert (adj_discardable_start % dump_page_size == 0);
