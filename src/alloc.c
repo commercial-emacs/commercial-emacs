@@ -1635,8 +1635,6 @@ static ptrdiff_t const STRING_BYTES_MAX =
 	 - SDATA_DATA_OFFSET)
 	& ~(sizeof (EMACS_INT) - 1)));
 
-/* Initialize string allocation.  Called from init_alloc_once.  */
-
 static void
 init_strings (void)
 {
@@ -7394,9 +7392,14 @@ verify_alloca (void)
 
 #endif /* ENABLE_CHECKING && USE_STACK_LISP_OBJECTS */
 
-/* Initialization.  */
+static void init_runtime (void);
 
-static void init_alloc_once_for_pdumper (void);
+/* Like all init_*_once(), we should only ever call this in the
+   bootstrap.
+
+   Via pdumper_do_now_and_after_load(), the initialization
+   of the runtime alloc infra happens in init_runtime().
+*/
 
 void
 init_alloc_once (void)
@@ -7407,10 +7410,8 @@ init_alloc_once (void)
   PDUMPER_REMEMBER_SCALAR (buffer_defaults.header);
   PDUMPER_REMEMBER_SCALAR (buffer_local_symbols.header);
 
-  /* Call init_alloc_once_for_pdumper now so we run mem_init early.
-     Keep in mind that when we reload from a dump, we'll run _only_
-     init_alloc_once_for_pdumper and not init_alloc_once at all.  */
-  pdumper_do_now_and_after_load (init_alloc_once_for_pdumper);
+  /* Nothing can be malloc'ed until init_runtime.  */
+  pdumper_do_now_and_after_load (init_runtime);
 
   Vloadup_pure_table = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize,
                               make_fixed_natnum (80000));
@@ -7432,7 +7433,7 @@ init_alloc_once (void)
 }
 
 static void
-init_alloc_once_for_pdumper (void)
+init_runtime (void)
 {
   purebeg = PUREBEG;
   pure_size = PURESIZE;

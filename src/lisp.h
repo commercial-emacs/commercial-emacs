@@ -3854,7 +3854,6 @@ extern void syms_of_cmds (void);
 /* Defined in coding.c.  */
 extern Lisp_Object detect_coding_system (const unsigned char *, ptrdiff_t,
                                          ptrdiff_t, bool, bool, Lisp_Object);
-extern void init_coding (void);
 extern void init_coding_once (void);
 extern void syms_of_coding (void);
 extern bool string_ascii_p (Lisp_Object);
@@ -4294,7 +4293,6 @@ extern specpdl_ref inhibit_garbage_collection (void);
 extern Lisp_Object build_overlay (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void free_cons (struct Lisp_Cons *);
 extern void init_alloc_once (void);
-extern void init_alloc (void);
 extern void syms_of_alloc (void);
 extern struct buffer *allocate_buffer (void) ATTRIBUTE_RETURNS_NONNULL;
 extern int valid_lisp_object_p (Lisp_Object);

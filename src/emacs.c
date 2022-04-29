@@ -1357,6 +1357,7 @@ main (int argc, char **argv)
 #ifdef HAVE_PDUMPER
   if (attempt_load_pdump)
     initial_emacs_executable = load_pdump (argc, argv);
+  /* Now INITIALIZED should be true.  */
 #else
   ptrdiff_t bufsize;
   initial_emacs_executable = find_emacs_executable (argv[0], &bufsize);
