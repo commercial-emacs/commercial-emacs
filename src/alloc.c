@@ -272,11 +272,6 @@ my_heap_start (void)
   if (! start)
     start = sbrk (0);
   return start;
-  bitset bset = bitset_create (100, BITSET_VARIABLE);
-  bitset_set (bset, 2);
-  bitset_toggle (bset, 2);
-  eassume (bitset_test (bset, 2));
-  bitset_free (bset);
 }
 # endif
 
@@ -4125,8 +4120,6 @@ refill_memory_reserve (void)
    tree, and use that to determine if the pointer points into a Lisp
    object or not.  */
 
-/* Initialize this part of alloc.c.  */
-
 static void
 mem_init (void)
 {
@@ -4138,8 +4131,7 @@ mem_init (void)
 }
 
 
-/* Value is a pointer to the mem_node containing START.  Value is
-   MEM_NIL if there is no node in the tree containing START.  */
+/* Return mem_node containing START or failing that, MEM_NIL.  */
 
 static struct mem_node *
 mem_find (void *start)
@@ -4160,9 +4152,8 @@ mem_find (void *start)
 }
 
 
-/* Insert a new node into the tree for a block of memory with start
-   address START, end address END, and type TYPE.  Value is a
-   pointer to the node that was inserted.  */
+/* Insert node representing mem block of TYPE spanning START and END.
+   Return the inserted node.  */
 
 static struct mem_node *
 mem_insert (void *start, void *end, enum mem_type type)
@@ -4219,8 +4210,7 @@ mem_insert (void *start, void *end, enum mem_type type)
 }
 
 
-/* Re-establish the red-black properties of the tree, and thereby
-   balance the tree, after node X has been inserted; X is always red.  */
+/* Insert node X, then rebalance red-black tree.  X is always red.  */
 
 static void
 mem_insert_fixup (struct mem_node *x)
@@ -4366,8 +4356,6 @@ mem_rotate_right (struct mem_node *x)
 }
 
 
-/* Delete node Z from the tree.  If Z is null or MEM_NIL, do nothing.  */
-
 static void
 mem_delete (struct mem_node *z)
 {
@@ -4419,8 +4407,7 @@ mem_delete (struct mem_node *z)
 }
 
 
-/* Re-establish the red-black properties of the tree, after a
-   deletion.  */
+/* Delete X, then rebalance red-black tree.  */
 
 static void
 mem_delete_fixup (struct mem_node *x)
@@ -4500,14 +4487,8 @@ mem_delete_fixup (struct mem_node *x)
 }
 
 
-/* If P is a pointer into a live Lisp string object on the heap,
-   return the object's address.  Otherwise, return NULL.  M points to the
-   mem_block for P.
-
-   This and other *_holding functions look for a pointer anywhere into
-   the object, not merely for a pointer to the start of the object,
-   because some compilers sometimes optimize away the latter.  See
-   Bug#28213.  */
+/* Return P "made whole" as a Lisp_String if P's mem_block M
+   corresponds to a Lisp_String data field.  */
 
 static struct Lisp_String *
 live_string_holding (struct mem_node *m, void *p)
@@ -4522,6 +4503,8 @@ live_string_holding (struct mem_node *m, void *p)
   if (0 <= offset && offset < sizeof b->strings)
     {
       ptrdiff_t off = offset % sizeof b->strings[0];
+      /* Since compilers can optimize away struct fields, scan all
+	 offsets.  See Bug#28213.  */
       if (off == Lisp_String
 	  || off == 0
 	  || off == offsetof (struct Lisp_String, u.s.size_byte)
@@ -4542,9 +4525,8 @@ live_string_p (struct mem_node *m, void *p)
   return live_string_holding (m, p) == p;
 }
 
-/* If P is a pointer into a live Lisp cons object on the heap, return
-   the object's address.  Otherwise, return NULL.  M points to the
-   mem_block for P.  */
+/* Return P "made whole" as a Lisp_Cons if P's mem_block M
+   corresponds to a Lisp_Cons data field.  */
 
 static struct Lisp_Cons *
 live_cons_holding (struct mem_node *m, void *p)
@@ -4567,7 +4549,7 @@ live_cons_holding (struct mem_node *m, void *p)
 	  || off == offsetof (struct Lisp_Cons, u.s.u.cdr))
 	{
 	  struct Lisp_Cons *s = p = cp -= off;
-	  if (!deadp (s->u.s.car))
+	  if (! deadp (s->u.s.car))
 	    return s;
 	}
     }
@@ -4581,9 +4563,8 @@ live_cons_p (struct mem_node *m, void *p)
 }
 
 
-/* If P is a pointer into a live Lisp symbol object on the heap,
-   return the object's address.  Otherwise, return NULL.  M points to the
-   mem_block for P.  */
+/* Return P "made whole" as a Lisp_Symbol if P's mem_block M
+   corresponds to a Lisp_Symbol data field.  */
 
 static struct Lisp_Symbol *
 live_symbol_holding (struct mem_node *m, void *p)
@@ -4628,9 +4609,8 @@ live_symbol_p (struct mem_node *m, void *p)
 }
 
 
-/* If P is a (possibly-tagged) pointer to a live Lisp_Float on the
-   heap, return the address of the Lisp_Float.  Otherwise, return NULL.
-   M is a pointer to the mem_block for P.  */
+/* Return P "made whole" as a Lisp_Float if P's mem_block M
+   corresponds to a Lisp_Float data field.  */
 
 static struct Lisp_Float *
 live_float_holding (struct mem_node *m, void *p)
@@ -4694,9 +4674,7 @@ live_vector_pointer (struct Lisp_Vector *vector, void *p)
 	  ? vector : NULL);
 }
 
-/* If P is a pointer to a live, large vector-like object, return the object.
-   Otherwise, return nil.
-   M is a pointer to the mem_block for P.  */
+/* Return M "made whole" as a large Lisp_Vector if P points within it.  */
 
 static struct Lisp_Vector *
 live_large_vector_holding (struct mem_node *m, void *p)
@@ -4711,9 +4689,7 @@ live_large_vector_p (struct mem_node *m, void *p)
   return live_large_vector_holding (m, p) == p;
 }
 
-/* If P is a pointer to a live, small vector-like object, return the object.
-   Otherwise, return NULL.
-   M is a pointer to the mem_block for P.  */
+/* Return M "made whole" as a non-large Lisp_Vector if P points within it.  */
 
 static struct Lisp_Vector *
 live_small_vector_holding (struct mem_node *m, void *p)
@@ -4731,7 +4707,7 @@ live_small_vector_holding (struct mem_node *m, void *p)
   while (VECTOR_IN_BLOCK (vector, block) && vector <= vp)
     {
       struct Lisp_Vector *next = ADVANCE (vector, vector_nbytes (vector));
-      if (vp < next && !PSEUDOVECTOR_TYPEP (&vector->header, PVEC_FREE))
+      if (vp < next && ! PSEUDOVECTOR_TYPEP (&vector->header, PVEC_FREE))
 	return live_vector_pointer (vector, vp);
       vector = next;
     }
@@ -4744,8 +4720,7 @@ live_small_vector_p (struct mem_node *m, void *p)
   return live_small_vector_holding (m, p) == p;
 }
 
-/* If P points to Lisp data, mark that as live if it isn't already
-   marked.  */
+/* Mark P if it points to Lisp data.  */
 
 static void
 mark_maybe_pointer (void *p, bool symbol_only)
@@ -5809,11 +5784,10 @@ visit_buffer_root (struct gc_root_visitor visitor,
   visit_vectorlike_root (visitor, (struct Lisp_Vector *) buffer, type);
 }
 
-/* Visit GC roots stored in the Emacs data section.  Used by both core
-   GC and by the portable dumping code.
+/* GC and the bootstrap dump need to traverse the same static objects.
 
-   We mark dynamic GC roots which pdumper doesn't care about directly
-   in garbage_collect.  */
+   GC traverses non-static objects, which bootstrap dump doesn't care
+   about, in garbage_collect().  */
 void
 visit_static_gc_roots (struct gc_root_visitor visitor)
 {
@@ -5968,8 +5942,6 @@ garbage_collect (void)
   block_input ();
 
   shrink_regexp_cache ();
-
-  /* Mark all the special slots that serve as the roots of accessibility.  */
 
   struct gc_root_visitor visitor = { .visit = mark_object_root_visitor };
   visit_static_gc_roots (visitor);
@@ -6483,8 +6455,8 @@ mark_stack_push_n (Lisp_Object *values, ptrdiff_t n)
 /* Traverse and mark objects on the mark stack above BASE_SP.
 
    Traversal is depth-first using the mark stack for most common
-   object types.  Recursion is used for other types, in the hope that
-   they are rare enough that C stack usage is kept low.  */
+   object types.  Recursion is used for other types whose object
+   depths presumably wouldn't overwhelm the call stack.  */
 static void
 process_mark_stack (ptrdiff_t base_sp)
 {
@@ -7444,6 +7416,15 @@ init_alloc_once (void)
                               make_fixed_natnum (80000));
   update_bytes_between_gc ();
 
+  bitset bset = bitset_create (4, BITSET_VARIABLE);
+  bitset_set (bset, 101);
+  if (! bitset_test (bset, 101))
+    emacs_abort ();
+  bitset_toggle (bset, 101);
+  if (bitset_test (bset, 101))
+    emacs_abort ();
+  bitset_free (bset);
+
   verify_alloca ();
 
   init_strings ();
@@ -7462,7 +7443,6 @@ init_alloc_once_for_pdumper (void)
   mallopt (M_MMAP_THRESHOLD, 64 * 1024);  /* Mmap threshold.  */
   mallopt (M_MMAP_MAX, MMAP_MAX_AREAS);   /* Max. number of mmap'ed areas.  */
 #endif
-
 
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);
