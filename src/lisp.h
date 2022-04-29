@@ -4129,12 +4129,12 @@ enum gc_root_type
   GC_ROOT_C_SYMBOL
 };
 
-struct gc_root_visitor
+struct gc_root_functor
 {
-  void (*visit) (Lisp_Object const *, enum gc_root_type, void *);
+  void (*operate) (Lisp_Object const *, enum gc_root_type, void *);
   void *data;
 };
-extern void visit_static_gc_roots (struct gc_root_visitor visitor);
+extern void scan_pdumper_roots (struct gc_root_functor);
 
 /* Build a frequently used 1/2/3/4-integer lists.  */
 

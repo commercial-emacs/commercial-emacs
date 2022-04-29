@@ -1706,8 +1706,8 @@ dump_remember_fixup_ptr_raw (struct dump_context *ctx,
 }
 
 static void
-dump_root_visitor (Lisp_Object const *root_ptr, enum gc_root_type type,
-		   void *data)
+dump_root_processor (Lisp_Object const *root_ptr, enum gc_root_type type,
+		     void *data)
 {
   struct dump_context *ctx = data;
   Lisp_Object value = *root_ptr;
@@ -1742,9 +1742,9 @@ dump_root_visitor (Lisp_Object const *root_ptr, enum gc_root_type type,
 static void
 dump_roots (struct dump_context *ctx)
 {
-  struct gc_root_visitor visitor = { .visit = dump_root_visitor,
+  struct gc_root_functor functor = { .operate = dump_root_processor,
 				     .data = ctx };
-  visit_static_gc_roots (visitor);
+  scan_pdumper_roots (functor);
 }
 
 enum { PDUMPER_MAX_OBJECT_SIZE = 2048 };

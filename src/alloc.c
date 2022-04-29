@@ -1424,7 +1424,7 @@ static void
 mark_interval_tree_1 (INTERVAL i, void *dummy)
 {
   /* Intervals should never be shared.  So, if extra internal checking is
-     enabled, GC aborts if it seems to have visited an interval twice.  */
+     enabled, GC aborts if it seems to have processed an interval twice.  */
   eassert (!interval_marked_p (i));
   set_interval_marked (i);
   mark_object (i->plist);
@@ -5756,30 +5756,29 @@ mark_pinned_symbols (void)
 }
 
 static void
-visit_vectorlike_root (struct gc_root_visitor visitor,
-                       struct Lisp_Vector *ptr,
-                       enum gc_root_type type)
+process_vectorlike_root (struct gc_root_functor functor,
+			 struct Lisp_Vector *ptr,
+			 enum gc_root_type type)
 {
   ptrdiff_t i, size = ptr->header.size;
 
   if (size & PSEUDOVECTOR_FLAG)
     size &= PSEUDOVECTOR_SIZE_MASK;
   for (i = 0; i < size; i++)
-    visitor.visit (&ptr->contents[i], type, visitor.data);
+    functor.operate (&ptr->contents[i], type, functor.data);
 }
 
 static void
-visit_buffer_root (struct gc_root_visitor visitor,
-                   struct buffer *buffer,
-                   enum gc_root_type type)
+process_buffer_root (struct gc_root_functor functor,
+		     struct buffer *buffer,
+		     enum gc_root_type type)
 {
   /* Metadata buffers don't have constructs that real buffers have.  */
   eassert (buffer->base_buffer == NULL
 	   && buffer->overlays_before == NULL
 	   && buffer->overlays_after == NULL);
 
-  /* Visit the buffer-locals.  */
-  visit_vectorlike_root (visitor, (struct Lisp_Vector *) buffer, type);
+  process_vectorlike_root (functor, (struct Lisp_Vector *) buffer, type);
 }
 
 /* GC and the bootstrap dump need to traverse the same static objects.
@@ -5787,27 +5786,28 @@ visit_buffer_root (struct gc_root_visitor visitor,
    GC traverses non-static objects, which bootstrap dump doesn't care
    about, in garbage_collect().  */
 void
-visit_static_gc_roots (struct gc_root_visitor visitor)
+scan_pdumper_roots (struct gc_root_functor functor)
 {
-  visit_buffer_root (visitor,
-                     &buffer_defaults,
-                     GC_ROOT_BUFFER_LOCAL_DEFAULT);
-  visit_buffer_root (visitor,
-                     &buffer_local_symbols,
-                     GC_ROOT_BUFFER_LOCAL_NAME);
+  process_buffer_root (functor,
+		       &buffer_defaults,
+		       GC_ROOT_BUFFER_LOCAL_DEFAULT);
+
+  process_buffer_root (functor,
+		       &buffer_local_symbols,
+		       GC_ROOT_BUFFER_LOCAL_NAME);
 
   for (int i = 0; i < ARRAYELTS (lispsym); i++)
     {
       Lisp_Object sptr = builtin_lisp_symbol (i);
-      visitor.visit (&sptr, GC_ROOT_C_SYMBOL, visitor.data);
+      functor.operate (&sptr, GC_ROOT_C_SYMBOL, functor.data);
     }
 
   for (int i = 0; i < staticidx; i++)
-    visitor.visit (staticvec[i], GC_ROOT_STATICPRO, visitor.data);
+    functor.operate (staticvec[i], GC_ROOT_STATICPRO, functor.data);
 }
 
 static void
-mark_object_root_visitor (Lisp_Object const *root_ptr,
+mark_object_root_processor (Lisp_Object const *root_ptr,
                           enum gc_root_type type,
                           void *data)
 {
@@ -5941,8 +5941,8 @@ garbage_collect (void)
 
   shrink_regexp_cache ();
 
-  struct gc_root_visitor visitor = { .visit = mark_object_root_visitor };
-  visit_static_gc_roots (visitor);
+  struct gc_root_functor functor = { .operate = mark_object_root_processor };
+  scan_pdumper_roots (functor);
 
   mark_pinned_objects ();
   mark_pinned_symbols ();
@@ -7410,7 +7410,7 @@ init_alloc_once (void)
   PDUMPER_REMEMBER_SCALAR (buffer_defaults.header);
   PDUMPER_REMEMBER_SCALAR (buffer_local_symbols.header);
 
-  /* Nothing can be malloc'ed until init_runtime.  */
+  /* Nothing can be malloc'ed until init_runtime().  */
   pdumper_do_now_and_after_load (init_runtime);
 
   Vloadup_pure_table = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize,
