@@ -14077,6 +14077,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	if (event->xclient.message_type == dpyinfo->Xatom_XdndFinished
 	    && (x_dnd_waiting_for_finish && !x_dnd_waiting_for_motif_finish)
+	    /* Also check that the display is correct, since
+	       `x_dnd_pending_finish_target' could still be valid on
+	       another X server.  */
+	    && dpyinfo->display == x_dnd_finish_display
 	    && event->xclient.data.l[0] == x_dnd_pending_finish_target)
 	  {
 	    x_dnd_waiting_for_finish = false;
@@ -15473,10 +15477,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #else
       f = x_top_window_to_frame (dpyinfo, event->xcrossing.window);
 #endif
-#if defined USE_X_TOOLKIT && defined HAVE_XINPUT2
+#if defined USE_X_TOOLKIT && defined HAVE_XINPUT2 && !defined USE_MOTIF
       /* The XI2 event mask is set on the frame widget, so this event
 	 likely originates from the shell widget, which we aren't
-	 interested in.  */
+	 interested in.  (But don't ignore this on Motif, since we
+	 want to clear the mouse face when a popup is active.)  */
       if (dpyinfo->supports_xi2)
 	f = NULL;
 #endif
