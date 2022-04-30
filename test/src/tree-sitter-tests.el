@@ -23,6 +23,8 @@
 (require 'tree-sitter)
 
 (declare-function tree-sitter-highlights "tree-sitter.c")
+(declare-function tree-sitter-node-at "tree-sitter.c")
+(declare-function tree-sitter-node-type "tree-sitter.c")
 (declare-function tree-sitter--testable "tree-sitter.c")
 
 (defsubst tree-sitter-testable ()
