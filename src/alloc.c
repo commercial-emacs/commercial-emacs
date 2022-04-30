@@ -5789,7 +5789,7 @@ mark_object_root_processor (Lisp_Object const *root_ptr,
 }
 
 static void
-mark_pdumper_roots (void)
+mark_most_objects (void)
 {
   struct gc_root_functor functor = { .operate = mark_object_root_processor,
                                      .data = NULL };
@@ -5923,7 +5923,7 @@ garbage_collect (void)
 
   shrink_regexp_cache ();
 
-  mark_pdumper_roots ();
+  mark_most_objects ();
   mark_pinned_objects ();
   mark_pinned_symbols ();
   mark_terminals ();
