@@ -9,7 +9,7 @@
 typedef uint_fast32_t bitset_word;
 enum { bitset_word_nbits = sizeof (bitset_word) * CHAR_BIT };
 
-#define BITSET_WORDS_OF_BITS(nr_bits)                           \
+#define BITSET_WORDS(nr_bits)                           \
   (((nr_bits) + (bitset_word_nbits - 1))                       \
    / bitset_word_nbits)
 

@@ -302,22 +302,16 @@ typedef struct gc_locator { size_t i; } gc_locator;
 
 static const gc_locator gc_locator_invalid = { .i = (size_t) (-1) };
 
-/* -1 for zero-index.  -1 for gc_locator_invalid.  */
-#define GC_BLOCK_MAX = ((1 << GC_LOCATOR_BLOCK_BITS) - 1 - 1)
-
-eassume (GC_LOCATOR_SLOT_BITS <= INT32_WIDTH);
-eassume (GC_BLOCK_MAX <= PTRDIFF_MAX);
-
 struct gc_block_meminfo {
   struct emacs_memory_map map;
 };
 
 #define GC_HEAP_FLAGS(name, nbits)					\
   struct {                                                              \
-    bitset_word mark[BITSET_WORDS_OF_BITS (nbits)];	\
-    bitset_word start[BITSET_WORDS_OF_BITS (nbits)];	\
-    bitset_word pinned[BITSET_WORDS_OF_BITS (nbits)];	\
-    bitset_word perma_pinned[BITSET_WORDS_OF_BITS (nbits)]; \
+    bitset_word mark[BITSET_WORDS (nbits)];	\
+    bitset_word start[BITSET_WORDS (nbits)];	\
+    bitset_word pinned[BITSET_WORDS (nbits)];	\
+    bitset_word perma_pinned[BITSET_WORDS (nbits)]; \
     gc_locator tospace[nbits];						\
   } name
 
@@ -2787,7 +2781,6 @@ gc_cursor_to_locator (const gc_cursor c, const gc_heap *const h)
   gc_cursor_check (c, h);
   const size_t block_nr = c.block->meta.block_nr;
   eassume (block_nr != gc_block_nr_invalid);
-  eassume (block_nr <= GC_BLOCK_MAX);
   const ptrdiff_t bit_nr = c.bit_nr;
   const gc_locator locator = {
     .i = (block_nr << GC_LOCATOR_SLOT_BITS) + bit_nr,
@@ -2959,7 +2952,6 @@ gc_heap_grow_block_array (const gc_heap *const h)
 void
 gc_heap_add_block (const gc_heap *const h)
 {
-  eassume (h->data->block_array_size <= GC_BLOCK_MAX);
   if (h->data->block_array_size >= h->data->block_array_capacity)
     gc_heap_grow_block_array (h);
   eassume (h->data->block_array_size < h->data->block_array_capacity);
@@ -3136,8 +3128,7 @@ intergen_advance_nr_slots_test_dirty (intergen *const scan,
 
   const size_t page_size = getpagesize ();
   const size_t byte_offset = bit_nr * gc_heap_nbytes_per_slot (h);
-  size_t nbytes_left_to_move = nr_slots_to_move *
-    gc_heap_nbytes_per_slot (h);
+  size_t nbytes_left_to_move = nr_slots_to_move * gc_heap_nbytes_per_slot (h);
   size_t nbytes_left_in_page = (byte_offset % page_size)
     ? page_size - (byte_offset % page_size)
     : page_size;
@@ -3156,8 +3147,8 @@ intergen_advance_nr_slots_test_dirty (intergen *const scan,
           nbytes_left_in_page = page_size;
           page_is_dirty =
 	    bitset_bit_set_p (&scan->b->meta.card_table[0],
-				    ARRAYELTS (scan->b->meta.card_table),
-				    page_nr);
+			      ARRAYELTS (scan->b->meta.card_table),
+			      page_nr);
         }
       nbytes_left_to_move -= n;
     }
