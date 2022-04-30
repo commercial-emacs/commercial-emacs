@@ -5782,10 +5782,18 @@ scan_pdumper_roots (struct gc_root_functor functor)
 
 static void
 mark_object_root_processor (Lisp_Object const *root_ptr,
-                          enum gc_root_type type,
-                          void *data)
+			    enum gc_root_type type,
+			    void *data)
 {
   mark_object (*root_ptr);
+}
+
+static void
+mark_pdumper_roots (void)
+{
+  struct gc_root_functor functor = { .operate = mark_object_root_processor,
+                                     .data = NULL };
+  scan_pdumper_roots (functor);
 }
 
 /* List of weak hash tables we found during marking the Lisp heap.
@@ -5915,10 +5923,7 @@ garbage_collect (void)
 
   shrink_regexp_cache ();
 
-  struct gc_root_functor functor = { .operate = mark_object_root_processor,
-                                     .data = NULL };
-  scan_pdumper_roots (functor);
-
+  mark_pdumper_roots ();
   mark_pinned_objects ();
   mark_pinned_symbols ();
   mark_terminals ();
