@@ -3580,7 +3580,7 @@ extern Lisp_Object Vascii_canon_table;
 
 void staticpro (Lisp_Object const *);
 
-enum { NSTATICS = 2048 };
+enum { NSTATICS = (1 << 11) };
 extern Lisp_Object const *staticvec[NSTATICS];
 extern int staticidx;
 
@@ -4124,21 +4124,6 @@ extern Lisp_Object pure_listn (ptrdiff_t, Lisp_Object, ...);
   listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
 #define pure_list(...) \
   pure_listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
-
-enum gc_root_type
-{
-  GC_ROOT_STATICPRO,
-  GC_ROOT_BUFFER_LOCAL_DEFAULT,
-  GC_ROOT_BUFFER_LOCAL_NAME,
-  GC_ROOT_C_SYMBOL
-};
-
-struct gc_root_functor
-{
-  void (*operate) (Lisp_Object const *, enum gc_root_type, void *);
-  void *data;
-};
-extern void scan_pdumper_roots (struct gc_root_functor);
 
 /* Build a frequently used 1/2/3/4-integer lists.  */
 

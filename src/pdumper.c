@@ -520,11 +520,6 @@ struct dump_context
   /* Hash mapping objects we've already dumped to their offsets.  */
   Lisp_Object objects_dumped;
 
-  /* Hash mapping objects to where we got them.  Used for debugging.  */
-  Lisp_Object referrers;
-  Lisp_Object current_referrer;
-  bool have_current_referrer;
-
   /* Queue of objects to dump.  */
   struct dump_queue dump_queue;
 
@@ -629,60 +624,6 @@ dump_pop (Lisp_Object *where)
   return ret;
 }
 
-static bool
-dump_tracking_referrers_p (struct dump_context *ctx)
-{
-  return !NILP (ctx->referrers);
-}
-
-static void
-dump_set_have_current_referrer (struct dump_context *ctx, bool have)
-{
-#ifdef ENABLE_CHECKING
-  ctx->have_current_referrer = have;
-#endif
-}
-
-/* Return true if objects should be enqueued in CTX to refer to an
-   object that the caller should store into CTX->current_referrer.
-
-   Until dump_clear_referrer is called, any objects enqueued are being
-   enqueued because the object refers to them.  It is not valid to
-   enqueue objects without a referrer set.  We check this constraint
-   at runtime.
-
-   It is invalid to call dump_set_referrer twice without an
-   intervening call to dump_clear_referrer.  */
-static bool
-dump_set_referrer (struct dump_context *ctx)
-{
-  eassert (!ctx->have_current_referrer);
-  dump_set_have_current_referrer (ctx, true);
-  return dump_tracking_referrers_p (ctx);
-}
-
-/* Unset the referrer that dump_set_referrer prepared for.  */
-static void
-dump_clear_referrer (struct dump_context *ctx)
-{
-  eassert (ctx->have_current_referrer);
-  dump_set_have_current_referrer (ctx, false);
-  if (dump_tracking_referrers_p (ctx))
-    ctx->current_referrer = Qnil;
-}
-
-static Lisp_Object
-dump_ptr_referrer (const char *label, void const *address)
-{
-  char buf[128];
-  buf[0] = '\0';
-  sprintf (buf, "%s @ %p", label, address);
-  return build_string (buf);
-}
-
-static void
-print_paths_to_root (struct dump_context *ctx, Lisp_Object object);
-
 static void dump_remember_cold_op (struct dump_context *ctx,
                                    enum cold_op op,
                                    Lisp_Object arg);
@@ -692,8 +633,6 @@ error_unsupported_dump_object (struct dump_context *ctx,
                                Lisp_Object object,
 			       const char *msg)
 {
-  if (dump_tracking_referrers_p (ctx))
-    print_paths_to_root (ctx, object);
   error ("unsupported object type in dump: %s", msg);
 }
 
@@ -915,24 +854,12 @@ dump_remember_object (struct dump_context *ctx,
             ctx->objects_dumped);
 }
 
-static void
-dump_note_reachable (struct dump_context *ctx, Lisp_Object object)
-{
-  eassert (ctx->have_current_referrer);
-  if (!dump_tracking_referrers_p (ctx))
-    return;
-  Lisp_Object referrer = ctx->current_referrer;
-  Lisp_Object obj_referrers = Fgethash (object, ctx->referrers, Qnil);
-  if (NILP (Fmemq (referrer, obj_referrers)))
-    Fputhash (object, Fcons (referrer, obj_referrers), ctx->referrers);
-}
-
 /* If this object lives in the Emacs image and not on the heap, return
    a pointer to the object data.  Otherwise, return NULL.  */
 static void *
 dump_object_emacs_ptr (Lisp_Object lv)
 {
-  if (SUBRP (lv) && !SUBR_NATIVE_COMPILEDP (lv))
+  if (SUBRP (lv) && ! SUBR_NATIVE_COMPILEDP (lv))
     return XSUBR (lv);
   if (dump_builtin_symbol_p (lv))
     return XSYMBOL (lv);
@@ -1102,7 +1029,7 @@ dump_queue_compute_score (struct dump_queue *dump_queue,
     Fgethash (object, dump_queue->link_weights, Qnil);
   if (EQ (object_link_weights, Qt))
     object_link_weights = Qnil;
-  while (!NILP (object_link_weights))
+  while (! NILP (object_link_weights))
     {
       Lisp_Object basis_weight_pair = dump_pop (&object_link_weights);
       dump_off link_basis = dump_off_from_lisp (XCAR (basis_weight_pair));
@@ -1133,7 +1060,7 @@ dump_queue_scan_fancy (struct dump_queue *dump_queue,
   float highest_score = -INFINITY;
   bool first = true;
 
-  while (!NILP (*cons_ptr))
+  while (! NILP (*cons_ptr))
     {
       Lisp_Object queued_object = XCAR (*cons_ptr);
       float score = dump_queue_compute_score (dump_queue, queued_object, basis);
@@ -1307,7 +1234,7 @@ dump_queue_dequeue (struct dump_queue *dump_queue, dump_off basis)
 
   {
     Lisp_Object weights = Fgethash (result, dump_queue->link_weights, Qnil);
-    while (!NILP (weights) && CONSP (weights))
+    while (! NILP (weights) && CONSP (weights))
       {
         Lisp_Object basis_weight_pair = dump_pop (&weights);
         dump_off link_basis =
@@ -1328,31 +1255,19 @@ dump_queue_dequeue (struct dump_queue *dump_queue, dump_off basis)
   return result;
 }
 
-/* Return whether we need to write OBJECT to the dump file.  */
-static bool
-dump_object_needs_dumping_p (Lisp_Object object)
-{
-  /* Some objects, like symbols, are self-representing because they
-     have invariant bit patterns, but sometimes these objects have
-     associated data too, and these data-carrying objects need to be
-     included in the dump despite all references to them being
-     bitwise-invariant.  */
-  return (!dump_object_self_representing_p (object)
-	  || dump_object_emacs_ptr (object));
-}
-
 static void
 dump_enqueue_object (struct dump_context *ctx,
                      Lisp_Object object,
                      struct link_weight weight)
 {
-  if (dump_object_needs_dumping_p (object))
+  /*  Fixnums are bit-invariant, and don't need dumping. */
+  if (! FIXNUMP (object))
     {
       dump_off state = dump_recall_object (ctx, object);
       bool already_dumped_object = state > DUMP_OBJECT_NOT_SEEN;
       if (ctx->flags.assert_already_seen)
         eassert (already_dumped_object);
-      if (!already_dumped_object)
+      if (! already_dumped_object)
         {
           if (state == DUMP_OBJECT_NOT_SEEN)
             {
@@ -1369,33 +1284,6 @@ dump_enqueue_object (struct dump_context *ctx,
                                 weight);
         }
     }
-  /* Always remember the path to this object.  */
-  dump_note_reachable (ctx, object);
-}
-
-static void
-print_paths_to_root_1 (struct dump_context *ctx,
-                       Lisp_Object object,
-                       int level)
-{
-  Lisp_Object referrers = Fgethash (object, ctx->referrers, Qnil);
-  while (!NILP (referrers))
-    {
-      Lisp_Object referrer = XCAR (referrers);
-      referrers = XCDR (referrers);
-      Lisp_Object repr = Fprin1_to_string (referrer, Qnil);
-      for (int i = 0; i < level; ++i)
-	putc (' ', stderr);
-      fwrite (SDATA (repr), 1, SBYTES (repr), stderr);
-      putc ('\n', stderr);
-      print_paths_to_root_1 (ctx, referrer, level + 1);
-    }
-}
-
-static void
-print_paths_to_root (struct dump_context *ctx, Lisp_Object object)
-{
-  print_paths_to_root_1 (ctx, object, 0);
 }
 
 static void
@@ -1599,11 +1487,10 @@ dump_emacs_reloc_to_dump_ptr_raw (struct dump_context *ctx,
    automatically queues the value for dumping if necessary.  */
 static void
 dump_emacs_reloc_to_lv (struct dump_context *ctx,
-			Lisp_Object const *emacs_ptr,
-                        Lisp_Object value)
+			Lisp_Object const *emacs_ptr)
 {
-  if (dump_object_self_representing_p (value))
-    dump_emacs_reloc_immediate_lv (ctx, emacs_ptr, value);
+  if (dump_object_self_representing_p (*emacs_ptr))
+    dump_emacs_reloc_immediate_lv (ctx, emacs_ptr, *emacs_ptr);
   else
     {
       if (ctx->flags.dump_object_contents)
@@ -1614,12 +1501,12 @@ dump_emacs_reloc_to_lv (struct dump_context *ctx,
            that the types on ctx->emacs_relocs correspond to the types
            of emacs_relocs we actually emit.  */
 	dump_push (&ctx->emacs_relocs,
-		   list3 (make_fixnum (dump_object_emacs_ptr (value)
+		   list3 (make_fixnum (dump_object_emacs_ptr (*emacs_ptr)
 				       ? RELOC_EMACS_EMACS_LV
 				       : RELOC_EMACS_DUMP_LV),
 			  dump_off_to_lisp (emacs_offset (emacs_ptr)),
-			  value));
-      dump_enqueue_object (ctx, value, WEIGHT_NONE);
+			  *emacs_ptr));
+      dump_enqueue_object (ctx, *emacs_ptr, WEIGHT_NONE);
     }
 }
 
@@ -1706,45 +1593,29 @@ dump_remember_fixup_ptr_raw (struct dump_context *ctx,
 }
 
 static void
-dump_root_processor (Lisp_Object const *root_ptr, enum gc_root_type type,
-		     void *data)
-{
-  struct dump_context *ctx = data;
-  Lisp_Object value = *root_ptr;
-  if (type == GC_ROOT_C_SYMBOL)
-    {
-      eassert (dump_builtin_symbol_p (value));
-      /* Remember to dump the object itself later along with all the
-         rest of the copied-to-Emacs objects.  */
-      if (dump_set_referrer (ctx))
-	ctx->current_referrer = build_string ("built-in symbol list");
-      dump_enqueue_object (ctx, value, WEIGHT_NONE);
-      dump_clear_referrer (ctx);
-    }
-  else
-    {
-      if (type == GC_ROOT_STATICPRO)
-        Fputhash (dump_off_to_lisp (emacs_offset (root_ptr)),
-                  Qt,
-                  ctx->staticpro_table);
-      if (root_ptr != &Vinternal_interpreter_environment)
-        {
-	  if (dump_set_referrer (ctx))
-	    ctx->current_referrer
-	      = dump_ptr_referrer ("emacs root", root_ptr);
-          dump_emacs_reloc_to_lv (ctx, root_ptr, *root_ptr);
-          dump_clear_referrer (ctx);
-        }
-    }
-}
-
-/* Kick off the dump process by queuing up the static GC roots.  */
-static void
 dump_roots (struct dump_context *ctx)
 {
-  struct gc_root_functor functor = { .operate = dump_root_processor,
-				     .data = ctx };
-  scan_pdumper_roots (functor);
+  const struct Lisp_Vector *vbuffer_defaults =
+    (struct Lisp_Vector *) &buffer_defaults;
+  const struct Lisp_Vector *vbuffer_local_symbols =
+    (struct Lisp_Vector *) &buffer_local_symbols;
+
+  for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
+    {
+      dump_emacs_reloc_to_lv (ctx, vbuffer_defaults->contents + i);
+      dump_emacs_reloc_to_lv (ctx, vbuffer_local_symbols->contents + i);
+    }
+
+  for (int i = 0; i < ARRAYELTS (lispsym); ++i)
+    dump_enqueue_object (ctx, builtin_lisp_symbol (i), WEIGHT_NONE);
+
+  for (int i = 0; i < staticidx; ++i)
+    {
+      Fputhash (dump_off_to_lisp (emacs_offset (staticvec[i])),
+		Qt, ctx->staticpro_table);
+      if (staticvec[i] != &Vinternal_interpreter_environment)
+	dump_emacs_reloc_to_lv (ctx, staticvec[i]);
+    }
 }
 
 enum { PDUMPER_MAX_OBJECT_SIZE = 2048 };
@@ -2271,7 +2142,7 @@ dump_fwd_obj (struct dump_context *ctx, const struct Lisp_Objfwd *objfwd)
   if (NILP (Fgethash (dump_off_to_lisp (emacs_offset (objfwd->objvar)),
                       ctx->staticpro_table,
                       Qnil)))
-    dump_emacs_reloc_to_lv (ctx, objfwd->objvar, *objfwd->objvar);
+    dump_emacs_reloc_to_lv (ctx, objfwd->objvar);
   struct Lisp_Objfwd out;
   dump_object_start (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, objfwd, type);
@@ -2389,8 +2260,6 @@ dump_pre_dump_symbol (struct dump_context *ctx, struct Lisp_Symbol *symbol)
 {
   Lisp_Object symbol_lv = make_lisp_symbol (symbol);
   eassert (!dump_recall_symbol_aux (ctx, symbol_lv));
-  if (dump_set_referrer (ctx))
-    ctx->current_referrer = symbol_lv;
   switch (symbol->u.s.redirect)
     {
     case SYMBOL_LOCALIZED:
@@ -2404,7 +2273,6 @@ dump_pre_dump_symbol (struct dump_context *ctx, struct Lisp_Symbol *symbol)
     default:
       break;
     }
-  dump_clear_referrer (ctx);
 }
 
 static dump_off
@@ -2425,15 +2293,11 @@ dump_symbol (struct dump_context *ctx,
         {
 	  eassert (offset == DUMP_OBJECT_ON_NORMAL_QUEUE
 		   || offset == DUMP_OBJECT_NOT_SEEN);
-	  dump_clear_referrer (ctx);
           struct dump_flags old_flags = ctx->flags;
           ctx->flags.dump_object_contents = false;
           ctx->flags.defer_symbols = false;
           dump_object (ctx, object);
           ctx->flags = old_flags;
-	  if (dump_set_referrer (ctx))
-	    ctx->current_referrer = object;
-
           offset = DUMP_OBJECT_ON_SYMBOL_QUEUE;
           dump_remember_object (ctx, object, offset);
           dump_push (&ctx->deferred_symbols, object);
@@ -2616,7 +2480,7 @@ hash_table_contents (struct Lisp_Hash_Table *h)
      relies on it by expecting hash table indices to stay constant
      across the dump.  */
   for (ptrdiff_t i = 0; i < size; i++)
-    if (!NILP (HASH_HASH (h, i)))
+    if (! NILP (HASH_HASH (h, i)))
       {
 	ASET (key_and_value, n++, HASH_KEY (h, i));
 	ASET (key_and_value, n++, HASH_VALUE (h, i));
@@ -2634,7 +2498,7 @@ hash_table_contents (struct Lisp_Hash_Table *h)
 static dump_off
 dump_hash_table_list (struct dump_context *ctx)
 {
-  if (!NILP (ctx->hash_tables))
+  if (! NILP (ctx->hash_tables))
     return dump_object (ctx, CALLN (Fapply, Qvector, ctx->hash_tables));
   else
     return 0;
@@ -2861,7 +2725,7 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
   dump_object_start (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, subr, header.size);
 #ifdef HAVE_NATIVE_COMP
-  bool native_comp = !NILP (subr->native_comp_u);
+  bool native_comp = ! NILP (subr->native_comp_u);
 #else
   bool native_comp = false;
 #endif
@@ -2889,7 +2753,7 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
   DUMP_FIELD_COPY (&out, subr, doc);
 #ifdef HAVE_NATIVE_COMP
   dump_field_lv (ctx, &out, subr, &subr->native_comp_u, WEIGHT_NORMAL);
-  if (!NILP (subr->native_comp_u))
+  if (! NILP (subr->native_comp_u))
     dump_field_fixup_later (ctx, &out, subr, &subr->native_c_name);
 
   dump_field_lv (ctx, &out, subr, &subr->lambda_list, WEIGHT_NORMAL);
@@ -3112,8 +2976,6 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
     }
 
   /* Object needs to be dumped.  */
-  if (dump_set_referrer (ctx))
-    ctx->current_referrer = object;
   switch (XTYPE (object))
     {
     case Lisp_String:
@@ -3137,7 +2999,6 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
     default:
       emacs_abort ();
     }
-  dump_clear_referrer (ctx);
 
   /* offset can be < 0 if we've deferred an object.  */
   if (ctx->flags.dump_object_contents && offset > DUMP_OBJECT_NOT_SEEN)
@@ -3280,7 +3141,7 @@ static void
 dump_hot_parts_of_discardable_objects (struct dump_context *ctx)
 {
   Lisp_Object copied_queue = ctx->copied_queue;
-  while (!NILP (copied_queue))
+  while (! NILP (copied_queue))
     {
       Lisp_Object copied = dump_pop (&copied_queue);
       if (SYMBOLP (copied))
@@ -3320,7 +3181,7 @@ dump_drain_copied_objects (struct dump_context *ctx)
      The overall result is that to the greatest extent possible while
      maintaining strictly increasing address order, we copy into Emacs
      in nice big chunks.  */
-  while (!NILP (copied_queue))
+  while (! NILP (copied_queue))
     {
       Lisp_Object copied = dump_pop (&copied_queue);
       void *optr = dump_object_emacs_ptr (copied);
@@ -3451,7 +3312,7 @@ dump_drain_cold_data (struct dump_context *ctx)
   /* Actually dump cold objects instead of deferring them.  */
   ctx->flags.defer_cold_objects = false;
 
-  while (!NILP (cold_queue))
+  while (! NILP (cold_queue))
     {
       Lisp_Object item = dump_pop (&cold_queue);
       enum cold_op op = (enum cold_op) XFIXNUM (XCAR (item));
@@ -3533,12 +3394,7 @@ dump_drain_user_remembered_data_hot (struct dump_context *ctx)
           Lisp_Object lv;
           read_ptr_raw_and_lv (mem, type, &value, &lv);
           if (value != NULL)
-            {
-	      if (dump_set_referrer (ctx))
-		ctx->current_referrer = dump_ptr_referrer ("user data", mem);
-              dump_enqueue_object (ctx, lv, WEIGHT_NONE);
-	      dump_clear_referrer (ctx);
-            }
+	    dump_enqueue_object (ctx, lv, WEIGHT_NONE);
         }
     }
 }
@@ -3606,7 +3462,7 @@ dump_drain_user_remembered_data_cold (struct dump_context *ctx)
                 }
               else
                 {
-                  eassert (!dump_object_self_representing_p (lv));
+                  eassert (! dump_object_self_representing_p (lv));
                   dump_off dump_offset = dump_recall_object (ctx, lv);
                   if (dump_offset <= 0)
                     error ("raw-pointer object not dumped?!");
@@ -3739,7 +3595,7 @@ decode_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
            dump_emacs_reloc_to_lv didn't do its job.
            dump_emacs_reloc_to_lv should have added a
            RELOC_EMACS_IMMEDIATE relocation instead.  */
-        eassert (!dump_object_self_representing_p (target_value));
+        eassert (! dump_object_self_representing_p (target_value));
         int tag_type = XTYPE (target_value);
         reloc.length = tag_type;
         eassert (reloc.length == tag_type);
@@ -3765,7 +3621,7 @@ decode_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
       }
       break;
     default:
-      eassume (!"not reached");
+      emacs_abort ();
     }
 
   /* We should have consumed the whole relocation descriptor.  */
@@ -3845,13 +3701,13 @@ drain_reloc_list (struct dump_context *ctx,
 			       alignof (struct emacs_reloc)));
   struct dump_table_locator locator = {0};
   locator.offset = ctx->offset;
-  for (; !NILP (relocs); locator.nr_entries += 1)
+  for (; ! NILP (relocs); locator.nr_entries += 1)
     {
       Lisp_Object reloc = dump_pop (&relocs);
       Lisp_Object merged;
       while (merger != NULL
-	     && !NILP (relocs)
-	     && (merged = merger (reloc, XCAR (relocs)), !NILP (merged)))
+	     && ! NILP (relocs)
+	     && (merged = merger (reloc, XCAR (relocs)), ! NILP (merged)))
         {
           reloc = merged;
           relocs = XCDR (relocs);
@@ -3871,7 +3727,7 @@ dump_do_fixup (struct dump_context *ctx,
     (enum dump_fixup_type) XFIXNUM (dump_pop (&fixup));
   dump_off dump_fixup_offset = dump_off_from_lisp (dump_pop (&fixup));
 #ifdef ENABLE_CHECKING
-  if (!NILP (prev_fixup))
+  if (! NILP (prev_fixup))
     {
       dump_off prev_dump_fixup_offset =
         dump_off_from_lisp (XCAR (XCDR (prev_fixup)));
@@ -3964,7 +3820,7 @@ dump_do_fixups (struct dump_context *ctx)
                               Qdump_emacs_portable__sort_predicate);
   Lisp_Object prev_fixup = Qnil;
   ctx->fixups = Qnil;
-  while (!NILP (fixups))
+  while (! NILP (fixups))
     {
       Lisp_Object fixup = dump_pop (&fixups);
       dump_do_fixup (ctx, fixup, prev_fixup);
@@ -3990,7 +3846,7 @@ dump_drain_deferred_hash_tables (struct dump_context *ctx)
 
   Lisp_Object deferred_hash_tables = Fnreverse (ctx->deferred_hash_tables);
   ctx->deferred_hash_tables = Qnil;
-  while (!NILP (deferred_hash_tables))
+  while (! NILP (deferred_hash_tables))
     dump_object (ctx, dump_pop (&deferred_hash_tables));
   ctx->flags = old_flags;
 }
@@ -4005,7 +3861,7 @@ dump_drain_deferred_symbols (struct dump_context *ctx)
 
   Lisp_Object deferred_symbols = Fnreverse (ctx->deferred_symbols);
   ctx->deferred_symbols = Qnil;
-  while (!NILP (deferred_symbols))
+  while (! NILP (deferred_symbols))
     dump_object (ctx, dump_pop (&deferred_symbols));
   ctx->flags = old_flags;
 }
@@ -4013,13 +3869,11 @@ dump_drain_deferred_symbols (struct dump_context *ctx)
 DEFUN ("dump-emacs-portable",
        Fdump_emacs_portable, Sdump_emacs_portable,
        1, 2, 0,
-       doc: /* Dump current state of Emacs into dump file FILENAME.
-If TRACK-REFERRERS is non-nil, keep additional debugging information
-that can help track down the provenance of unsupported object
-types.  */)
-     (Lisp_Object filename, Lisp_Object track_referrers)
+       doc: /* Dump current state of Emacs into dump file FILENAME.  */)
+     (Lisp_Object filename, Lisp_Object unused)
 {
   eassert (initialized);
+  (void) unused;
 
   if (! noninteractive)
     error ("Dumping Emacs currently works only in batch mode.  "
@@ -4035,7 +3889,7 @@ types.  */)
   if (!main_thread_p (current_thread))
     error ("This function can be called only in the main thread");
 
-  if (!NILP (XCDR (Fall_threads ())))
+  if (! NILP (XCDR (Fall_threads ())))
     error ("No other Lisp threads can be running when this function is called");
 
   /* Clear out any detritus in memory.  */
@@ -4093,10 +3947,6 @@ types.  */)
   /* These objects go into special sections.  */
   ctx->flags.defer_cold_objects = true;
   ctx->flags.defer_copied_objects = true;
-
-  ctx->current_referrer = Qnil;
-  if (!NILP (track_referrers))
-    ctx->referrers = make_eq_hash_table ();
 
   ctx->dump_filename = filename;
 
@@ -4168,8 +4018,8 @@ types.  */)
       dump_drain_normal_queue (ctx);
     }
   while (!dump_queue_empty_p (&ctx->dump_queue)
-	 || !NILP (ctx->deferred_hash_tables)
-	 || !NILP (ctx->deferred_symbols));
+	 || ! NILP (ctx->deferred_hash_tables)
+	 || ! NILP (ctx->deferred_symbols));
 
   ctx->header.hash_list = ctx->offset;
   dump_hash_table_list (ctx);
@@ -4181,8 +4031,8 @@ types.  */)
       dump_drain_normal_queue (ctx);
     }
   while (!dump_queue_empty_p (&ctx->dump_queue)
-	 || !NILP (ctx->deferred_hash_tables)
-	 || !NILP (ctx->deferred_symbols));
+	 || ! NILP (ctx->deferred_hash_tables)
+	 || ! NILP (ctx->deferred_symbols));
 
   dump_sort_copied_objects (ctx);
 
@@ -5385,7 +5235,7 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 	subr->function.a0 = func;
 	Lisp_Object lambda_data_idx =
 	  Fgethash (build_string (c_name), comp_u->lambda_c_name_idx_h, Qnil);
-	if (!NILP (lambda_data_idx))
+	if (! NILP (lambda_data_idx))
 	  {
 	    /* This is an anonymous lambda.
 	       We must fixup d_reloc_imp so the lambda can be referenced

@@ -202,15 +202,11 @@ In the unlikely event that you need a more general functionality than
 @code{custom-initialize-delay} provides, you can use
 @code{before-init-hook} (@pxref{Startup Summary}).
 
-@defun dump-emacs-portable to-file &optional track-referrers
+@defun dump-emacs-portable to-file
 This function dumps the current state of Emacs into a dump
 file @var{to-file}, using the @code{pdump} method.  Normally, the
 dump file is called @file{@var{emacs-name}.dmp}, where
-@var{emacs-name} is the name of the Emacs executable file.  The
-optional argument @var{track-referrers}, if non-@code{nil}, causes the
-portable dumper to keep additional information to help track
-down the provenance of object types that are not yet supported by the
-@code{pdump} method.
+@var{emacs-name} is the name of the Emacs executable file.
 
 Although the portable dumper code can run on many platforms, the dump
 files that it produces are not portable---they can be loaded only by

@@ -5755,45 +5755,25 @@ mark_pinned_symbols (void)
     }
 }
 
-/* GC and the bootstrap dump need to traverse the same static objects.
-
-   GC traverses non-static objects, which bootstrap dump doesn't care
-   about, in garbage_collect().  */
-void
-scan_pdumper_roots (struct gc_root_functor functor)
-{
-  for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
-    functor.operate (((struct Lisp_Vector *) &buffer_defaults)->contents + i,
-		     GC_ROOT_BUFFER_LOCAL_DEFAULT, functor.data);
-
-  for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
-    functor.operate (((struct Lisp_Vector *) &buffer_local_symbols)->contents + i,
-		     GC_ROOT_BUFFER_LOCAL_NAME, functor.data);
-
-  for (int i = 0; i < ARRAYELTS (lispsym); ++i)
-    {
-      Lisp_Object sptr = builtin_lisp_symbol (i);
-      functor.operate (&sptr, GC_ROOT_C_SYMBOL, functor.data);
-    }
-
-  for (int i = 0; i < staticidx; ++i)
-    functor.operate (staticvec[i], GC_ROOT_STATICPRO, functor.data);
-}
-
-static void
-mark_object_root_processor (Lisp_Object const *root_ptr,
-			    enum gc_root_type type,
-			    void *data)
-{
-  mark_object (*root_ptr);
-}
-
 static void
 mark_most_objects (void)
 {
-  struct gc_root_functor functor = { .operate = mark_object_root_processor,
-                                     .data = NULL };
-  scan_pdumper_roots (functor);
+  const struct Lisp_Vector *vbuffer_defaults =
+    (struct Lisp_Vector *) &buffer_defaults;
+  const struct Lisp_Vector *vbuffer_local_symbols =
+    (struct Lisp_Vector *) &buffer_local_symbols;
+
+  for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
+    {
+      mark_object (vbuffer_defaults->contents[i]);
+      mark_object (vbuffer_local_symbols->contents[i]);
+    }
+
+  for (int i = 0; i < ARRAYELTS (lispsym); ++i)
+    mark_object (builtin_lisp_symbol (i));
+
+  for (int i = 0; i < staticidx; ++i)
+    mark_object (*staticvec[i]);
 }
 
 /* List of weak hash tables we found during marking the Lisp heap.
@@ -7435,9 +7415,8 @@ syms_of_alloc (void)
 {
   static struct Lisp_Objfwd const o_fwd
     = {Lisp_Fwd_Obj, &Vmemory_full};
-  staticpro (&Vmemory_full);
   Vmemory_full = Qnil;
-  defvar_lisp (&o_fwd, "memory-full");
+  defvar_lisp (&o_fwd, "memory-full"); // calls staticpro
 
   DEFVAR_INT ("gc-cons-threshold", gc_cons_threshold,
 	      doc: /* Number of bytes of consing between garbage collections.

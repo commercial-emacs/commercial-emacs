@@ -1534,9 +1534,10 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   Atom *targets_sorted, actual_type;
   unsigned char *tmp_data = NULL;
   unsigned long nitems, bytes_remaining;
-  int rc, actual_format, idx;
+  int actual_format, idx;
+  bool rc;
   xm_targets_table_header header;
-  xm_targets_table_rec **recs;
+  xm_targets_table_rec **recs = NULL;
   xm_byte_order byteorder;
   uint8_t *data;
   ptrdiff_t total_bytes, total_items, i;
@@ -1554,14 +1555,15 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	 sizeof (Atom), x_atoms_compare);
 
   XGrabServer (dpyinfo->display);
-  rc = XGetWindowProperty (dpyinfo->display, drag_window,
-			   dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
-			   0L, LONG_MAX, False,
-			   dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
-			   &actual_type, &actual_format, &nitems,
-			   &bytes_remaining, &tmp_data) == Success;
-
-  if (rc && tmp_data && !bytes_remaining
+  if (Success ==
+      XGetWindowProperty (dpyinfo->display, drag_window,
+			  dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
+			  0L, LONG_MAX, False,
+			  dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
+			  &actual_type, &actual_format, &nitems,
+			  &bytes_remaining, &tmp_data)
+      && tmp_data
+      && !bytes_remaining
       && actual_type == dpyinfo->Xatom_MOTIF_DRAG_TARGETS
       && actual_format == 8)
     {
@@ -1599,21 +1601,18 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	      for (i = 0; i < total_items; ++i)
 		{
 		  if (recs[i])
-		      xfree (recs[i]);
+		    xfree (recs[i]);
 		  else
 		    break;
 		}
 
 	      xfree (recs);
-
-	      rc = false;
+	      recs = NULL;
 	    }
 	}
-      else
-	rc = false;
     }
-  else
-    rc = false;
+
+  rc = (recs != NULL);
 
   if (tmp_data)
     XFree (tmp_data);
@@ -1621,7 +1620,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   /* Now rc means whether or not the target lists weren't updated and
      shouldn't be written to the drag window.  */
 
-  if (!rc)
+  if (! rc)
     {
       header.byte_order = XM_BYTE_ORDER_CUR_FIRST;
       header.protocol = 0;
@@ -1699,7 +1698,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	}
     }
 
-  if (!rc)
+  if (! rc)
     {
       /* Some implementations of Motif DND set the protocol version of
 	 just the targets table to 1 without actually changing the
