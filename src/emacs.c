@@ -1901,10 +1901,11 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
   noninteractive1 = noninteractive;
 
-  /* Perform basic initializations (not merely interning symbols).  */
-
   if (! initialized)
     {
+      /* Under HAVE_PDUMPER, which is most platforms, we only get here
+	 during the build-time bootstrap run.  Thus the "_once"
+	 qualifier on the init_* function names.  */
       init_alloc_once ();
       init_pdumper_once ();
       init_obarray_once ();

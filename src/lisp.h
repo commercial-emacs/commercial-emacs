@@ -191,7 +191,7 @@ extern bool suppress_checking EXTERNALLY_VISIBLE;
     : die (# cond, __FILE__, __LINE__))
 #endif /* ENABLE_CHECKING */
 
-
+
 /* Use the configure flag --enable-check-lisp-object-type to make
    Lisp_Object use a struct type instead of the default int.  The flag
    causes CHECK_LISP_OBJECT_TYPE to be defined.  */
@@ -574,7 +574,7 @@ typedef Lisp_Word Lisp_Object;
 # define LISP_INITIALLY(w) (w)
 enum CHECK_LISP_OBJECT_TYPE { CHECK_LISP_OBJECT_TYPE = false };
 #endif
-
+
 /* Forward declarations.  */
 
 /* Defined in this file.  */
@@ -709,7 +709,7 @@ definitely_will_not_unexec_p (void)
 /* Defined in floatfns.c.  */
 extern double extract_float (Lisp_Object);
 
-
+
 /* Low-level conversion and type checking.  */
 
 /* Convert among various types use to implement Lisp_Object.  At the
@@ -775,7 +775,7 @@ INLINE void
    Lisp_Intfwd, etc.).  The pointer is packaged inside a struct to
    help static checking.  */
 typedef struct { void const *fwdptr; } lispfwd;
-
+
 /* Interned state of a symbol.  */
 
 enum symbol_interned
@@ -1088,16 +1088,14 @@ enum pvec_type
 
 enum More_Lisp_Bits
   {
-    /* For convenience, we also store the number of elements in these bits.
-       Note that this size is not necessarily the memory-footprint size, but
-       only the number of Lisp_Object fields (that need to be traced by GC).
-       The distinction is used, e.g., by Lisp_Process, which places extra
-       non-Lisp_Object fields at the end of the structure.  */
+    /* Recall the clumsily named pseudovector contains Lisp_Object
+       fields followed by non-Lisp fields.
+
+       The number of Lisp_Object fields (that GC must trace).  */
     PSEUDOVECTOR_SIZE_BITS = 12,
     PSEUDOVECTOR_SIZE_MASK = (1 << PSEUDOVECTOR_SIZE_BITS) - 1,
 
-    /* To calculate the memory footprint of the pseudovector, it's useful
-       to store the size of non-Lisp area in word_size units here.  */
+    /* The non-Lisp fields in word_size units.  */
     PSEUDOVECTOR_REST_BITS = 12,
     PSEUDOVECTOR_REST_MASK = (((1 << PSEUDOVECTOR_REST_BITS) - 1)
 			      << PSEUDOVECTOR_SIZE_BITS),
@@ -1106,7 +1104,7 @@ enum More_Lisp_Bits
     PSEUDOVECTOR_AREA_BITS = PSEUDOVECTOR_SIZE_BITS + PSEUDOVECTOR_REST_BITS,
     PVEC_TYPE_MASK = 0x3f << PSEUDOVECTOR_AREA_BITS
   };
-
+
 /* These functions extract various sorts of values from a Lisp_Object.
    For example, if tem is a Lisp_Object whose type is Lisp_Cons,
    XCONS (tem) is the struct Lisp_Cons * pointing to the memory for
@@ -1259,7 +1257,7 @@ clip_to_bounds (intmax_t lower, intmax_t num, intmax_t upper)
 {
   return num < lower ? lower : num <= upper ? num : upper;
 }
-
+
 /* Construct a Lisp_Object from a value or address.  */
 
 INLINE Lisp_Object
@@ -1912,15 +1910,21 @@ memclear (void *p, ptrdiff_t nbytes)
   memset (p, 0, nbytes);
 }
 
-/* If a struct is made to look like a vector, this macro returns the length
-   of the shortest vector that would hold that struct.  */
+/* Returns the length of the shortest vector that would hold struct TYPE
+   cast as a Lisp_Vector.  */
 
 #define VECSIZE(type)						\
   ((sizeof (type) - header_size + word_size - 1) / word_size)
 
-/* Like VECSIZE, but used when the pseudo-vector has non-Lisp_Object fields
-   at the end and we need to compute the number of Lisp_Object fields (the
-   ones that the GC needs to trace).  */
+/* Like VECSIZE, but lops off the non-Lisp portion of struct TYPE.
+
+   This is a programmer-level method requiring knowledge of TYPE's
+   last lisp field.  In runtime-level code, the same result is normally
+   calculated from masking the struct's header.size with PSEUDOVECTOR_SIZE_MASK.
+
+   Both methods date back to 1995, so it's not clear who stepped on
+   whose toes with the redundancy.
+*/
 
 #define PSEUDOVECSIZE(type, lastlispfield)				\
   (offsetof (type, lastlispfield) + word_size < header_size		\
@@ -2295,7 +2299,7 @@ INLINE int
    definition is done by lread.c's define_symbol.  */
 #define DEFSYM(sym, name) /* empty */
 
-
+
 /***********************************************************************
 			     Hash Tables
  ***********************************************************************/
@@ -2691,7 +2695,7 @@ make_uint (uintmax_t n)
 #define INT_TO_INTEGER(expr) \
   (EXPR_SIGNED (expr) ? make_int (expr) : make_uint (expr))
 
-
+
 /* Forwarding pointer to an int variable.
    This is allowed only in the value cell of a symbol,
    and it means that the symbol's value really lives in the
@@ -2802,7 +2806,7 @@ XBUFFER_OBJFWD (lispfwd a)
   eassert (BUFFER_OBJFWDP (a));
   return a.fwdptr;
 }
-
+
 /* Lisp floating point type.  */
 struct Lisp_Float
   {
@@ -2876,7 +2880,7 @@ enum char_bits
        itself.  */
     CHARACTERBITS = 22
   };
-
+
 /* Data type checking.  */
 
 INLINE bool
@@ -2965,7 +2969,7 @@ ARRAYP (Lisp_Object x)
 {
   return VECTORP (x) || STRINGP (x) || CHAR_TABLE_P (x) || BOOL_VECTOR_P (x);
 }
-
+
 INLINE void
 CHECK_LIST (Lisp_Object x)
 {
@@ -3035,7 +3039,7 @@ CHECK_SUBR (Lisp_Object x)
 {
   CHECK_TYPE (SUBRP (x), Qsubrp, x);
 }
-
+
 
 /* If we're not dumping using the legacy dumper and we might be using
    the portable dumper, try to bunch all the subr structures together
@@ -3231,7 +3235,7 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
     defvar_kboard (&ko_fwd, lname);				\
   } while (false)
 
-
+
 /* Elisp uses multiple stacks:
    - The C stack.
    - The specpdl stack keeps track of backtraces, unwind-protects and
@@ -3568,10 +3572,10 @@ rarely_quit (unsigned short int count)
   if (! count)
     maybe_quit ();
 }
-
+
 extern Lisp_Object Vascii_downcase_table;
 extern Lisp_Object Vascii_canon_table;
-
+
 /* Call staticpro (&var) to protect static variable `var'.  */
 
 void staticpro (Lisp_Object const *);
@@ -3580,7 +3584,7 @@ enum { NSTATICS = 2048 };
 extern Lisp_Object const *staticvec[NSTATICS];
 extern int staticidx;
 
-
+
 /* Forward declarations for prototypes.  */
 struct window;
 struct frame;

@@ -109,7 +109,7 @@ fix_position (Lisp_Object pos)
   if (MARKERP (pos))
     return marker_position (pos);
   CHECK_TYPE (BIGNUMP (pos), Qinteger_or_marker_p, pos);
-  return !NILP (Fnatnump (pos)) ? MOST_POSITIVE_FIXNUM : MOST_NEGATIVE_FIXNUM;
+  return ! NILP (Fnatnump (pos)) ? MOST_POSITIVE_FIXNUM : MOST_NEGATIVE_FIXNUM;
 }
 
 /* These setters are used only in this file, so they can be private.
@@ -5227,8 +5227,8 @@ init_buffer_once (void)
   last_per_buffer_idx = idx;
   PDUMPER_REMEMBER_SCALAR (last_per_buffer_idx);
 
-  /* Make sure all markable slots in buffer_defaults
-     are initialized reasonably, so mark_buffer won't choke.  */
+  /* Make sure all markable slots in buffer_defaults are initialized
+     reasonably, so mark_buffer won't choke.  */
   reset_buffer (&buffer_defaults);
   eassert (NILP (BVAR (&buffer_defaults, name)));
   reset_buffer_local_variables (&buffer_defaults, 1);

@@ -242,77 +242,77 @@ extern ptrdiff_t advance_to_char_boundary (ptrdiff_t byte_pos);
    It is shared between indirect buffers and their base buffer.  */
 
 struct buffer_text
-  {
-    /* Actual address of buffer contents.  If REL_ALLOC is defined,
-       this address might change when blocks are relocated which can
-       e.g. happen when malloc is called.  So, don't pass a pointer
-       into a buffer's text to functions that malloc.  */
-    unsigned char *beg;
+{
+  /* Actual address of buffer contents.  If REL_ALLOC is defined,
+     this address might change when blocks are relocated which can
+     e.g. happen when malloc is called.  So, don't pass a pointer
+     into a buffer's text to functions that malloc.  */
+  unsigned char *beg;
 
-    ptrdiff_t gpt;		/* Char pos of gap in buffer.  */
-    ptrdiff_t z;		/* Char pos of end of buffer.  */
-    ptrdiff_t gpt_byte;		/* Byte pos of gap in buffer.  */
-    ptrdiff_t z_byte;		/* Byte pos of end of buffer.  */
-    ptrdiff_t gap_size;		/* Size of buffer's gap.  */
-    modiff_count modiff;	/* This counts buffer-modification events
-				   for this buffer.  It is incremented for
-				   each such event, and never otherwise
-				   changed.  */
-    modiff_count chars_modiff;	/* This is modified with character change
-				   events for this buffer.  It is set to
-				   modiff for each such event, and never
-				   otherwise changed.  */
-    modiff_count save_modiff;	/* Previous value of modiff, as of last
-				   time buffer visited or saved a file.  */
+  ptrdiff_t gpt;                /* Char pos of gap in buffer.  */
+  ptrdiff_t z;                  /* Char pos of end of buffer.  */
+  ptrdiff_t gpt_byte;           /* Byte pos of gap in buffer.  */
+  ptrdiff_t z_byte;             /* Byte pos of end of buffer.  */
+  ptrdiff_t gap_size;           /* Size of buffer's gap.  */
+  modiff_count modiff;  /* This counts buffer-modification events
+                           for this buffer.  It is incremented for
+                           each such event, and never otherwise
+                           changed.  */
+  modiff_count chars_modiff;    /* This is modified with character change
+                                   events for this buffer.  It is set to
+                                   modiff for each such event, and never
+                                   otherwise changed.  */
+  modiff_count save_modiff;     /* Previous value of modiff, as of last
+                                   time buffer visited or saved a file.  */
 
-    modiff_count overlay_modiff; /* Counts modifications to overlays.  */
+  modiff_count overlay_modiff; /* Counts modifications to overlays.  */
 
-    modiff_count compact;	/* Set to modiff each time when compact_buffer
-				   is called for this buffer.  */
+  modiff_count compact; /* Set to modiff each time when compact_buffer
+                           is called for this buffer.  */
 
-    /* Minimum value of GPT - BEG since last redisplay that finished.  */
-    ptrdiff_t beg_unchanged;
+  /* Minimum value of GPT - BEG since last redisplay that finished.  */
+  ptrdiff_t beg_unchanged;
 
-    /* Minimum value of Z - GPT since last redisplay that finished.  */
-    ptrdiff_t end_unchanged;
+  /* Minimum value of Z - GPT since last redisplay that finished.  */
+  ptrdiff_t end_unchanged;
 
-    /* MODIFF as of last redisplay that finished; if it matches MODIFF,
-       beg_unchanged and end_unchanged contain no useful information.  */
-    modiff_count unchanged_modified;
+  /* MODIFF as of last redisplay that finished; if it matches MODIFF,
+     beg_unchanged and end_unchanged contain no useful information.  */
+  modiff_count unchanged_modified;
 
-    /* BUF_OVERLAY_MODIFF of current buffer, as of last redisplay that
-       finished; if it matches BUF_OVERLAY_MODIFF, beg_unchanged and
-       end_unchanged contain no useful information.  */
-    modiff_count overlay_unchanged_modified;
+  /* BUF_OVERLAY_MODIFF of current buffer, as of last redisplay that
+     finished; if it matches BUF_OVERLAY_MODIFF, beg_unchanged and
+     end_unchanged contain no useful information.  */
+  modiff_count overlay_unchanged_modified;
 
-    /* Properties of this buffer's text.  */
-    INTERVAL intervals;
+  /* Properties of this buffer's text.  */
+  INTERVAL intervals;
 
-    /* The markers that refer to this buffer.
-       This is actually a single marker ---
-       successive elements in its marker `chain'
-       are the other markers referring to this buffer.
-       This is a singly linked unordered list, which means that it's
-       very cheap to add a marker to the list and it's also very cheap
-       to move a marker within a buffer.  */
-    struct Lisp_Marker *markers;
+  /* The markers that refer to this buffer.
+     This is actually a single marker ---
+     successive elements in its marker `chain'
+     are the other markers referring to this buffer.
+     This is a singly linked unordered list, which means that it's
+     very cheap to add a marker to the list and it's also very cheap
+     to move a marker within a buffer.  */
+  struct Lisp_Marker *markers;
 
-    /* Usually false.  Temporarily true in decode_coding_gap to
-       prevent Fgarbage_collect from shrinking the gap and losing
-       not-yet-decoded bytes.  */
-    bool_bf inhibit_shrinking : 1;
+  /* Usually false.  Temporarily true in decode_coding_gap to
+     prevent Fgarbage_collect from shrinking the gap and losing
+     not-yet-decoded bytes.  */
+  bool_bf inhibit_shrinking : 1;
 
-    /* True if it needs to be redisplayed.  */
-    bool_bf redisplay : 1;
+  /* True if it needs to be redisplayed.  */
+  bool_bf redisplay : 1;
 
-    /* True if glyph widths are uniform.  The width_run_cache of the
-       parent 'struct buffer' is only a 256-value thing, does not
-       operate under `enable-multibyte-characters' (which is most of
-       the time), and is generally not what we need for coping with
-       long lines.
-    */
-    bool_bf monospace : 1;
-  };
+  /* True if glyph widths are uniform.  The width_run_cache of the
+     parent 'struct buffer' is only a 256-value thing, does not
+     operate under `enable-multibyte-characters' (which is most of
+     the time), and is generally not what we need for coping with
+     long lines.
+  */
+  bool_bf monospace : 1;
+};
 
 /* Most code should use this macro to access Lisp fields in struct buffer.  */
 
@@ -1107,7 +1107,7 @@ BUFFER_PVEC_INIT (struct buffer *b)
 INLINE bool
 BUFFER_LIVE_P (struct buffer *b)
 {
-  return !NILP (BVAR (b, name));
+  return ! NILP (BVAR (b, name));
 }
 
 /* Convenient check whether buffer B is hidden (i.e. its name
@@ -1291,7 +1291,7 @@ BUF_FETCH_MULTIBYTE_CHAR (struct buffer *buf, ptrdiff_t pos)
 INLINE int
 FETCH_CHAR_AS_MULTIBYTE (ptrdiff_t pos)
 {
-  return (!NILP (BVAR (current_buffer, enable_multibyte_characters))
+  return (! NILP (BVAR (current_buffer, enable_multibyte_characters))
 	  ? FETCH_MULTIBYTE_CHAR (pos)
 	  : UNIBYTE_TO_CHAR (FETCH_BYTE (pos)));
 }
@@ -1302,7 +1302,7 @@ FETCH_CHAR_AS_MULTIBYTE (ptrdiff_t pos)
 INLINE int
 FETCH_CHAR (ptrdiff_t pos)
 {
-  return (!NILP (BVAR (current_buffer, enable_multibyte_characters))
+  return (! NILP (BVAR (current_buffer, enable_multibyte_characters))
 	  ? FETCH_MULTIBYTE_CHAR (pos)
 	  : FETCH_BYTE (pos));
 }
@@ -1525,7 +1525,7 @@ CHARACTER_WIDTH (int c)
 			(XFIXNUM (CHAR_TABLE_REF (Vchar_width_table, c))))
 	  : c == '\t' ? SANE_TAB_WIDTH (current_buffer)
 	  : c == '\n' ? 0
-	  : !NILP (BVAR (current_buffer, ctl_arrow)) ? 2 : 4);
+	  : ! NILP (BVAR (current_buffer, ctl_arrow)) ? 2 : 4);
 }
 
 
@@ -1539,7 +1539,7 @@ fetch_char_advance (ptrdiff_t *charidx, ptrdiff_t *byteidx)
   ptrdiff_t c = *charidx, b = *byteidx;
   c++;
   unsigned char *chp = BYTE_POS_ADDR (b);
-  if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
+  if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
     {
       int chlen;
       output = string_char_and_length (chp, &chlen);
@@ -1613,7 +1613,7 @@ INLINE void
 inc_both (ptrdiff_t *charpos, ptrdiff_t *bytepos)
 {
   (*charpos)++;
-  (*bytepos) += (!NILP (BVAR (current_buffer, enable_multibyte_characters))
+  (*bytepos) += (! NILP (BVAR (current_buffer, enable_multibyte_characters))
 		 ? next_char_len (*bytepos) : 1);
 }
 
@@ -1622,7 +1622,7 @@ dec_both (ptrdiff_t *charpos, ptrdiff_t *bytepos)
 {
   eassert (*charpos > BEGV && *bytepos > BEGV_BYTE);
   (*charpos)--;
-  (*bytepos) -= (!NILP (BVAR (current_buffer, enable_multibyte_characters))
+  (*bytepos) -= (! NILP (BVAR (current_buffer, enable_multibyte_characters))
 		 ? prev_char_len (*bytepos) : 1);
 }
 

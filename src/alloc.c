@@ -5755,32 +5755,6 @@ mark_pinned_symbols (void)
     }
 }
 
-static void
-process_vectorlike_root (struct gc_root_functor functor,
-			 struct Lisp_Vector *ptr,
-			 enum gc_root_type type)
-{
-  ptrdiff_t i, size = ptr->header.size;
-
-  if (size & PSEUDOVECTOR_FLAG)
-    size &= PSEUDOVECTOR_SIZE_MASK;
-  for (i = 0; i < size; i++)
-    functor.operate (&ptr->contents[i], type, functor.data);
-}
-
-static void
-process_buffer_root (struct gc_root_functor functor,
-		     struct buffer *buffer,
-		     enum gc_root_type type)
-{
-  /* Metadata buffers don't have constructs that real buffers have.  */
-  eassert (buffer->base_buffer == NULL
-	   && buffer->overlays_before == NULL
-	   && buffer->overlays_after == NULL);
-
-  process_vectorlike_root (functor, (struct Lisp_Vector *) buffer, type);
-}
-
 /* GC and the bootstrap dump need to traverse the same static objects.
 
    GC traverses non-static objects, which bootstrap dump doesn't care
@@ -5788,21 +5762,21 @@ process_buffer_root (struct gc_root_functor functor,
 void
 scan_pdumper_roots (struct gc_root_functor functor)
 {
-  process_buffer_root (functor,
-		       &buffer_defaults,
-		       GC_ROOT_BUFFER_LOCAL_DEFAULT);
+  for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
+    functor.operate (((struct Lisp_Vector *) &buffer_defaults)->contents + i,
+		     GC_ROOT_BUFFER_LOCAL_DEFAULT, functor.data);
 
-  process_buffer_root (functor,
-		       &buffer_local_symbols,
-		       GC_ROOT_BUFFER_LOCAL_NAME);
+  for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
+    functor.operate (((struct Lisp_Vector *) &buffer_local_symbols)->contents + i,
+		     GC_ROOT_BUFFER_LOCAL_NAME, functor.data);
 
-  for (int i = 0; i < ARRAYELTS (lispsym); i++)
+  for (int i = 0; i < ARRAYELTS (lispsym); ++i)
     {
       Lisp_Object sptr = builtin_lisp_symbol (i);
       functor.operate (&sptr, GC_ROOT_C_SYMBOL, functor.data);
     }
 
-  for (int i = 0; i < staticidx; i++)
+  for (int i = 0; i < staticidx; ++i)
     functor.operate (staticvec[i], GC_ROOT_STATICPRO, functor.data);
 }
 
@@ -5941,7 +5915,8 @@ garbage_collect (void)
 
   shrink_regexp_cache ();
 
-  struct gc_root_functor functor = { .operate = mark_object_root_processor };
+  struct gc_root_functor functor = { .operate = mark_object_root_processor,
+                                     .data = NULL };
   scan_pdumper_roots (functor);
 
   mark_pinned_objects ();
