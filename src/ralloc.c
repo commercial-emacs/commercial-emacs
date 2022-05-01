@@ -921,8 +921,6 @@ r_alloc_free (void **ptr)
 
   free_bloc (dead_bloc);
   *ptr = 0;
-
-  refill_memory_reserve ();
 }
 
 /* Given a pointer at address PTR to relocatable data, resize it to SIZE.

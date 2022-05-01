@@ -555,7 +555,7 @@ even if it is dead.  The return value is never nil.  */)
   alloc_buffer_text (b, BUF_GAP_SIZE (b) + 1);
   unblock_input ();
   if (! BUF_BEG_ADDR (b))
-    buffer_memory_full (BUF_GAP_SIZE (b) + 1);
+    memory_full (BUF_GAP_SIZE (b) + 1);
 
   b->pt = BEG;
   b->begv = BEG;

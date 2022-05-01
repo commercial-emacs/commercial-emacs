@@ -18,6 +18,18 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
+/*
+The core task is marking Lisp objects in so-called vectorlikes, an
+unfortunate umbrella term for Emacs's various structs (buffers,
+windows, frames, etc.). "Vectorlikes" is meant to capture their
+function as containers of heterogenous Lisp objects.
+
+Not content with just one confusing moniker, Emacs also coined
+"pseudovector" as a synonym for vectorlike, emphasizing that
+vectorlikes also contain non-Lisp member data (which a "pure"
+Lisp_Vector would not).
+*/
+
 #include <config.h>
 
 #include <errno.h>
@@ -329,17 +341,6 @@ static struct gcstat
   object_ct total_buffers;
 } gcstat;
 
-/* Points to memory space allocated as "spare", to be freed if we run
-   out of memory.  We keep one large block, four cons-blocks, and
-   two string blocks.  */
-
-static char *spare_memory[7];
-
-/* Amount of spare memory to keep in large reserve block, or to see
-   whether this much is available when malloc fails on a larger request.  */
-
-#define SPARE_MEMORY (1 << 14)
-
 /* Initialize it to a nonzero value to force it into data space
    (rather than bss space).  That way unexec will remap it into text
    space (pure), on some systems.  We have not implemented the
@@ -403,9 +404,6 @@ static void gc_sweep (void);
 static Lisp_Object make_pure_vector (ptrdiff_t);
 static void mark_buffer (struct buffer *);
 
-#if !defined REL_ALLOC || defined SYSTEM_MALLOC || defined HYBRID_MALLOC
-static void refill_memory_reserve (void);
-#endif
 static void compact_small_strings (void);
 static void free_large_strings (void);
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
@@ -434,8 +432,6 @@ enum mem_type
   MEM_TYPE_VECTORLIKE,
   /* Special type to denote vector blocks.  */
   MEM_TYPE_VECTOR_BLOCK,
-  /* Special type to denote reserved memory.  */
-  MEM_TYPE_SPARE
 };
 
 static bool
@@ -450,29 +446,23 @@ enum mem_type allocated_mem_type;
 
 #endif /* GC_MALLOC_CHECK */
 
-/* A node in the red-black tree describing allocated memory containing
-   Lisp data.  Each such block is recorded with its start and end
-   address when it is allocated, and removed from the tree when it
-   is freed.
+/* Conservative stack scanning (the requirement that gc knows when a C
+   pointer points to Lisp data) relies on lisp_malloc() registering
+   allocations to a red-black tree.
 
-   A red-black tree is a balanced binary tree with the following
-   properties:
+   A red-black tree is a binary tree "fixed" after every insertion or
+   deletion such that:
 
    1. Every node is either red or black.
    2. Every leaf is black.
-   3. If a node is red, then both of its children are black.
+   3. If a node is red, then both its children are black.
    4. Every simple path from a node to a descendant leaf contains
-   the same number of black nodes.
+      the same number of black nodes.
    5. The root is always black.
 
-   When nodes are inserted into the tree, or deleted from the tree,
-   the tree is "fixed" so that these properties are always true.
-
-   A red-black tree with N internal nodes has height at most 2
-   log(N+1).  Searches, insertions and deletions are done in O(log N).
-   Please see a text book about data structures for a detailed
-   description of red-black trees.  Any book worth its salt should
-   describe them.  */
+   These invariants balance the tree so that its height can be no
+   greater than 2 log(N+1), where N is the number of internal nodes.
+   Searches, insertions and deletions are done in O(log N).  */
 
 struct mem_node
 {
@@ -592,10 +582,6 @@ struct Lisp_Finalizer finalizers;
 struct Lisp_Finalizer doomed_finalizers;
 
 
-/************************************************************************
-				Malloc
- ************************************************************************/
-
 #if defined SIGDANGER || (!defined SYSTEM_MALLOC && !defined HYBRID_MALLOC)
 
 /* Function malloc calls this if it finds we are near exhausting storage.  */
@@ -620,37 +606,22 @@ display_malloc_warning (void)
   pending_malloc_warning = 0;
 }
 
-/* Called if we can't allocate relocatable space for a buffer.  */
-
-void
-buffer_memory_full (ptrdiff_t nbytes)
-{
-  /* If buffers use the relocating allocator, no need to free
-     spare_memory, because we may have plenty of malloc space left
-     that we could get, and if we don't, the malloc that fails will
-     itself cause spare_memory to be freed.  If buffers don't use the
-     relocating allocator, treat this like any other failing
-     malloc.  */
-
-#ifndef REL_ALLOC
-  memory_full (nbytes);
-#else
-  /* This used to call error, but if we've run out of memory, we could
-     get infinite recursion trying to build the string.  */
-  xsignal (Qnil, Vmemory_signal_data);
-#endif
-}
-
 /* A common multiple of the positive integers A and B.  Ideally this
    would be the least common multiple, but there's no way to do that
    as a constant expression in C, so do the best that we can easily do.  */
 #define COMMON_MULTIPLE(a, b) \
   ((a) % (b) == 0 ? (a) : (b) % (a) == 0 ? (b) : (a) * (b))
 
-/* Alignment needed for memory blocks that are allocated via malloc
-   and that contain Lisp objects.  On typical hosts malloc already
-   aligns sufficiently, but extra work is needed on oddball hosts
-   where Emacs would crash if malloc returned a non-GCALIGNED pointer.  */
+/* Colascione: LISP_ALIGNMENT is the alignment of Lisp objects.  It
+   must be at least GCALIGNMENT so that pointers can be tagged.  It
+   also must be at least as strict as the alignment of all the C types
+   used to implement Lisp objects; since pseudovectors can contain any
+   C type, this is max_align_t.  On recent GNU/Linux x86 and x86-64
+   this can often waste up to 8 bytes, since alignof (max_align_t) is
+   16 but typical vectors need only an alignment of 8.  Although
+   shrinking the alignment to 8 would save memory, it cost a 20% hit
+   to Emacs CPU performance on Fedora 28 x86-64 when compiled with gcc
+   -m32.  */
 enum { LISP_ALIGNMENT = alignof (union { union emacs_align_type x;
 					 GCALIGNED_UNION_MEMBER }) };
 verify (LISP_ALIGNMENT % GCALIGNMENT == 0);
@@ -717,7 +688,7 @@ xmalloc (size_t size)
   val = lmalloc (size, false);
   MALLOC_UNBLOCK_INPUT;
 
-  if (!val)
+  if (! val)
     memory_full (size);
   MALLOC_PROBE (size);
   return val;
@@ -734,7 +705,7 @@ xzalloc (size_t size)
   val = lmalloc (size, true);
   MALLOC_UNBLOCK_INPUT;
 
-  if (!val)
+  if (! val)
     memory_full (size);
   MALLOC_PROBE (size);
   return val;
@@ -756,7 +727,7 @@ xrealloc (void *block, size_t size)
     val = lrealloc (block, size);
   MALLOC_UNBLOCK_INPUT;
 
-  if (!val)
+  if (! val)
     memory_full (size);
   MALLOC_PROBE (size);
   return val;
@@ -775,16 +746,12 @@ xfree (void *block)
   MALLOC_BLOCK_INPUT;
   free (block);
   MALLOC_UNBLOCK_INPUT;
-  /* We don't call refill_memory_reserve here
-     because in practice the call in r_alloc_free seems to suffice.  */
 }
-
 
 /* Other parts of Emacs pass large int values to allocator functions
    expecting ptrdiff_t.  This is portable in practice, but check it to
    be safe.  */
 verify (INT_MAX <= PTRDIFF_MAX);
-
 
 /* Allocate an array of NITEMS items, each of size ITEM_SIZE.
    Signal an error on memory exhaustion, and block interrupt input.  */
@@ -798,7 +765,6 @@ xnmalloc (ptrdiff_t nitems, ptrdiff_t item_size)
     memory_full (SIZE_MAX);
   return xmalloc (nbytes);
 }
-
 
 /* Reallocate an array PA to make it of NITEMS items, each of size ITEM_SIZE.
    Signal an error on memory exhaustion, and block interrupt input.  */
@@ -982,7 +948,7 @@ lisp_malloc (size_t nbytes, bool clearit, enum mem_type type)
 #endif
 
   MALLOC_UNBLOCK_INPUT;
-  if (!val)
+  if (! val)
     memory_full (nbytes);
   MALLOC_PROBE (nbytes);
   return val;
@@ -1346,10 +1312,6 @@ lrealloc (void *p, size_t size)
 }
 
 
-/***********************************************************************
-			 Interval Allocation
- ***********************************************************************/
-
 /* Number of intervals allocated in an interval_block structure.  */
 
 enum { INTERVAL_BLOCK_SIZE
@@ -1438,10 +1400,6 @@ mark_interval_tree (INTERVAL i)
   if (i && !interval_marked_p (i))
     traverse_intervals_noorder (i, mark_interval_tree_1, NULL);
 }
-
-/***********************************************************************
-			  String Allocation
- ***********************************************************************/
 
 /* Lisp_Strings are allocated in string_block structures.  When a new
    string_block is allocated, all the Lisp_Strings it contains are
@@ -2331,7 +2289,6 @@ make_unibyte_string (const char *contents, ptrdiff_t length)
   return val;
 }
 
-
 /* Make a multibyte string from NCHARS characters occupying NBYTES
    bytes at CONTENTS.  */
 
@@ -2344,7 +2301,6 @@ make_multibyte_string (const char *contents,
   memcpy (SDATA (val), contents, nbytes);
   return val;
 }
-
 
 /* Make a string from NCHARS characters occupying NBYTES bytes at
    CONTENTS.  It is a multibyte string if NBYTES != NCHARS.  */
@@ -2486,10 +2442,6 @@ pin_string (Lisp_Object string)
 }
 
 
-/***********************************************************************
-			   Float Allocation
- ***********************************************************************/
-
 /* We store float cells inside of float_blocks, allocating a new
    float_block with malloc whenever necessary.  Float cells reclaimed
    by GC are put on a free list to be reallocated before allocating
@@ -2587,12 +2539,6 @@ make_float (double float_value)
   floats_consed++;
   return val;
 }
-
-
-
-/***********************************************************************
-			   Cons Allocation
- ***********************************************************************/
 
 /* We store cons cells inside of cons_blocks, allocating a new
    cons_block with malloc whenever necessary.  Cons cells reclaimed by
@@ -2783,7 +2729,6 @@ usage: (list &rest OBJECTS)  */)
   return val;
 }
 
-
 DEFUN ("make-list", Fmake_list, Smake_list, 2, 2, 0,
        doc: /* Return a newly created list of length LENGTH, with each element being INIT.  */)
   (Lisp_Object length, Lisp_Object init)
@@ -2799,12 +2744,6 @@ DEFUN ("make-list", Fmake_list, Smake_list, 2, 2, 0,
 
   return val;
 }
-
-
-
-/***********************************************************************
-			   Vector Allocation
- ***********************************************************************/
 
 /* Sometimes a vector's contents are merely a pointer internally used
    in vector allocation code.  On the rare platforms where a null
@@ -3875,12 +3814,9 @@ run_finalizers (struct Lisp_Finalizer *finalizers)
 }
 
 DEFUN ("make-finalizer", Fmake_finalizer, Smake_finalizer, 1, 1, 0,
-       doc: /* Make a finalizer that will run FUNCTION.
-FUNCTION will be called after garbage collection when the returned
-finalizer object becomes unreachable.  If the finalizer object is
-reachable only through references from finalizer objects, it does not
-count as reachable for the purpose of deciding whether to run
-FUNCTION.  FUNCTION will be run once per finalizer object.  */)
+       doc: /* Wrap FUNCTION in a finalizer (similar to destructor).
++FUNCTION is called in an end-run around gc once its finalizer object
++becomes unreachable or only reachable from other finalizers.  */)
   (Lisp_Object function)
 {
   CHECK_TYPE (FUNCTIONP (function), Qfunctionp, function);
@@ -4012,111 +3948,30 @@ set_interval_marked (INTERVAL i)
     i->gcmarkbit = true;
 }
 
-
-/************************************************************************
-			   Memory Full Handling
- ************************************************************************/
-
-
-/* Called if malloc (NBYTES) returns zero.  If NBYTES == SIZE_MAX,
-   there may have been size_t overflow so that malloc was never
-   called, or perhaps malloc was invoked successfully but the
-   resulting pointer had problems fitting into a tagged EMACS_INT.  In
-   either case this counts as memory being full even though malloc did
-   not fail.  */
-
 void
 memory_full (size_t nbytes)
 {
+  const size_t enough = (1 << 14);
+
   if (! initialized)
     fatal ("memory exhausted");
 
-  /* Do not go into hysterics merely because a large request failed.  */
-  bool enough_free_memory = false;
-  if (SPARE_MEMORY < nbytes)
+  Vmemory_full = Qt;
+  if (nbytes > enough)
     {
       void *p;
-
       MALLOC_BLOCK_INPUT;
-      p = malloc (SPARE_MEMORY);
+      p = malloc (enough);
       if (p)
 	{
+	  Vmemory_full = Qnil;
 	  free (p);
-	  enough_free_memory = true;
 	}
       MALLOC_UNBLOCK_INPUT;
     }
 
-  if (! enough_free_memory)
-    {
-      Vmemory_full = Qt;
-      /* The first time we get here, free the spare memory.  */
-      for (int i = 0; i < ARRAYELTS (spare_memory); ++i)
-	if (spare_memory[i])
-	  {
-	    if (i == 0)
-	      free (spare_memory[i]);
-	    else if (i >= 1 && i <= 4)
-	      lisp_align_free (spare_memory[i]);
-	    else
-	      lisp_free (spare_memory[i]);
-	    spare_memory[i] = 0;
-	  }
-    }
-
   xsignal (Qnil, Vmemory_signal_data);
 }
-
-/* If we released our reserve (due to running out of memory),
-   and we have a fair amount free once again,
-   try to set aside another reserve in case we run out once more.
-
-   This is called when a relocatable block is freed in ralloc.c,
-   and also directly from this file, in case we're not using ralloc.c.  */
-
-void
-refill_memory_reserve (void)
-{
-#if !defined SYSTEM_MALLOC && !defined HYBRID_MALLOC
-  if (spare_memory[0] == 0)
-    spare_memory[0] = malloc (SPARE_MEMORY);
-  if (spare_memory[1] == 0)
-    spare_memory[1] = lisp_align_malloc (sizeof (struct cons_block),
-						  MEM_TYPE_SPARE);
-  if (spare_memory[2] == 0)
-    spare_memory[2] = lisp_align_malloc (sizeof (struct cons_block),
-					 MEM_TYPE_SPARE);
-  if (spare_memory[3] == 0)
-    spare_memory[3] = lisp_align_malloc (sizeof (struct cons_block),
-					 MEM_TYPE_SPARE);
-  if (spare_memory[4] == 0)
-    spare_memory[4] = lisp_align_malloc (sizeof (struct cons_block),
-					 MEM_TYPE_SPARE);
-  if (spare_memory[5] == 0)
-    spare_memory[5] = lisp_malloc (sizeof (struct string_block),
-				   false, MEM_TYPE_SPARE);
-  if (spare_memory[6] == 0)
-    spare_memory[6] = lisp_malloc (sizeof (struct string_block),
-				   false, MEM_TYPE_SPARE);
-  if (spare_memory[0] && spare_memory[1] && spare_memory[5])
-    Vmemory_full = Qnil;
-#endif
-}
-
-/************************************************************************
-			   C Stack Marking
- ************************************************************************/
-
-/* Conservative C stack marking requires a method to identify possibly
-   live Lisp objects given a pointer value.  We do this by keeping
-   track of blocks of Lisp data that are allocated in a red-black tree
-   (see also the comment of mem_node which is the type of nodes in
-   that tree).  Function lisp_malloc adds information for an allocated
-   block to the red-black tree with calls to mem_insert, and function
-   lisp_free removes it with mem_delete.  Functions live_string_p etc
-   call mem_find to lookup information about a given pointer in the
-   tree, and use that to determine if the pointer points into a Lisp
-   object or not.  */
 
 static void
 mem_init (void)
@@ -4772,7 +4627,6 @@ mark_maybe_pointer (void *p, bool symbol_only)
       switch (m->type)
 	{
 	case MEM_TYPE_NON_LISP:
-	case MEM_TYPE_SPARE:
 	  /* Nothing to do; not a pointer to Lisp memory.  */
 	  return;
 
@@ -5113,7 +4967,6 @@ valid_lisp_object_p (Lisp_Object obj)
   switch (m->type)
     {
     case MEM_TYPE_NON_LISP:
-    case MEM_TYPE_SPARE:
       return 0;
 
     case MEM_TYPE_CONS:
@@ -5546,10 +5399,6 @@ purecopy (Lisp_Object obj)
 
 
 
-/***********************************************************************
-			  Protection from GC
- ***********************************************************************/
-
 /* Put an entry in staticvec, pointing at the variable with address
    VARADDRESS.  */
 
@@ -5562,11 +5411,6 @@ staticpro (Lisp_Object const *varaddress)
     fatal ("NSTATICS too small; try increasing and recompiling Emacs.");
   staticvec[staticidx++] = varaddress;
 }
-
-
-/***********************************************************************
-			  Protection from GC
- ***********************************************************************/
 
 static void
 allow_garbage_collection (void)
@@ -7034,8 +6878,8 @@ sweep_symbols (void)
   gcstat.total_free_symbols = num_free;
 }
 
-/* Remove BUFFER's markers that are due to be swept.  This is needed since
-   we treat BUF_MARKERS and markers's `next' field as weak pointers.  */
+/* Markers are weak pointers.  Invalidate all markers pointing to the
+   swept BUFFER.  */
 static void
 unchain_dead_markers (struct buffer *buffer)
 {
@@ -7438,7 +7282,6 @@ init_runtime (void)
 
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);
-  refill_memory_reserve ();
 }
 
 void

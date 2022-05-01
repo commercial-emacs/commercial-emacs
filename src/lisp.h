@@ -600,14 +600,8 @@ extern Lisp_Object default_value (Lisp_Object symbol);
 extern void defalias (Lisp_Object symbol, Lisp_Object definition);
 extern char *fixnum_to_string (EMACS_INT number, char *buffer, char *end);
 
-
 /* Defined in emacs.c.  */
-
-/* Set after Emacs has started up the first time.
-   Prevents reinitialization of the Lisp world and keymaps on
-   subsequent starts.  */
 extern bool initialized;
-
 extern struct gflags
 {
   /* True means this Emacs instance was born to dump.  */
@@ -4057,13 +4051,9 @@ extern void check_pure_size (void);
 unsigned char *resize_string_data (Lisp_Object, ptrdiff_t, int, int);
 extern void malloc_warning (const char *);
 extern AVOID memory_full (size_t);
-extern AVOID buffer_memory_full (ptrdiff_t);
 extern bool survives_gc_p (Lisp_Object);
 extern void mark_object (Lisp_Object);
 extern void mark_objects (Lisp_Object *, ptrdiff_t);
-#if defined REL_ALLOC && !defined SYSTEM_MALLOC && !defined HYBRID_MALLOC
-extern void refill_memory_reserve (void);
-#endif
 extern void alloc_unexec_pre (void);
 extern void alloc_unexec_post (void);
 extern void flush_stack_call_func1 (void (*func) (void *arg), void *arg);
