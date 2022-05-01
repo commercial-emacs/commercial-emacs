@@ -88,12 +88,10 @@
   (should-not (image-supported-file-p "foo.some-unsupported-format")))
 
 (ert-deftest image-type-from-file-name ()
-  (should (or (not (image-type-available-p 'jpeg))
-              (eq (image-type-from-file-name "foo.jpg") 'jpeg)))
-  (should (or (not (image-type-available-p 'png))
-              (eq (image-type-from-file-name "foo.png") 'png)))
-  (should (or (not (image-type-available-p 'webp))
-              (eq (image-type-from-file-name "foo.webp") 'webp))))
+  (with-suppressed-warnings ((obsolete image-type-from-file-name))
+    (should (eq (image-type-from-file-name "foo.jpg") 'jpeg))
+    (should (eq (image-type-from-file-name "foo.png") 'png))
+    (should (eq (image-type-from-file-name "foo.webp") 'webp))))
 
 (ert-deftest image-type/from-filename ()
   ;; On emba, `image-types' and `image-load-path' do not exist.
