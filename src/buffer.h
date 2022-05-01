@@ -18,23 +18,10 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-/* I'm sure 2022 Roland McGrath wouldn't know who 1991 Roland
-   McGrath is.  But I think we'd both agree 1991 Roland McGrath
-   sucked at exposition.
-
-   A slot is a `struct buffer` field.
-
-   A special slot, or per-buffer variable, is one of the first however
-   many slots iterated over by FOR_EACH_PER_BUFFER_OBJECT_AT.  Unlike
-   "normal" buffer-local variables, a special slot does not admit a
-   default value.
-
-   The confusingly named buffer_local_flags maps a slot into the
-   equally poorly named slot index (IDX), which is zero for a slot
-   without a corresponding Lisp variable, -1 for a special slot, or an
-   index into the `local_flags` array indicating which slots are
-   buffer-local.
-  */
+/* A slot is a Lisp_Object field in struct buffer, more specifically,
+   one of the fields over which FOR_EACH_PER_BUFFER_OBJECT_AT iterates,
+   (and excludes `undo_list_`).
+*/
 
 #ifndef EMACS_BUFFER_H
 #define EMACS_BUFFER_H
@@ -319,7 +306,7 @@ struct buffer_text
 #define BVAR(buf, field) ((buf)->field ## _)
 
 /* Max number of builtin per-buffer variables.  */
-enum { MAX_PER_BUFFER_VARS = 50 };
+enum { MAX_PER_BUFFER_VARS = (1 << 6) };
 
 /* Special values for struct buffer.modtime.  */
 enum { NONEXISTENT_MODTIME_NSECS = -1 };
@@ -637,7 +624,7 @@ struct buffer
   int window_count;
 
   /* Boolean array indexed by the so-called "slot index" indicating
-     which slots are buffer-local.  */
+     which slots became buffer-local.  */
   char local_flags[MAX_PER_BUFFER_VARS];
 
   /* Set to the modtime of the visited file when read or written.
@@ -1137,7 +1124,7 @@ BUFFER_CHECK_INDIRECTION (struct buffer *b)
 }
 
 extern struct buffer buffer_defaults;
-extern struct buffer buffer_local_flags;
+extern struct buffer buffer_slot_map;
 extern struct buffer buffer_local_symbols;
 
 /* verify_interval_modification saves insertion hooks here
@@ -1392,15 +1379,13 @@ OVERLAY_POSITION (Lisp_Object p)
   return marker_position (p);
 }
 
-/* Return the byte offset of special slot VAR.  */
-
 #define PER_BUFFER_VAR_OFFSET(VAR) \
   offsetof (struct buffer, VAR ## _)
 
 INLINE int
 PER_BUFFER_IDX (ptrdiff_t offset)
 {
-  return XFIXNUM (*(Lisp_Object *) (offset + (char *) &buffer_local_flags));
+  return XFIXNUM (*(Lisp_Object *) (offset + (char *) &buffer_slot_map));
 }
 
 #define PER_BUFFER_VAR_IDX(VAR) \

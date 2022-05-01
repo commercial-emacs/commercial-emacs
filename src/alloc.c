@@ -23,16 +23,16 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    windows, frames, etc.). "Vectorlikes" is meant to capture their
    function as containers of heterogenous Lisp objects.
 
-   Not content with just one confusing moniker, Emacs also refer to
+   Not content with just one confusing moniker, Emacs also refers to
    vectorlikes as "pseudovectors", emphasizing their containing
-   non-Lisp member data (which a "pure" Lisp_Vector could not).
+   non-Lisp member data (which an "authentic" Lisp_Vector could not).
 
    Except for special cases (struct buffer), vectorlikes are relied upon
    to consist of a header, Lisp_Object fields, then non-Lisp fields,
    in that precise order.  Pervasive in the GC code is casting
    the vectorlike as a (struct Lisp_Vector *), then iterating
    over its N Lisp objects, say to mark them from reclamation,
-   where N is masked off (PSEUDOVECTOR_SIZE_MASK) from the header.
+   where N is masked off from the header (PSEUDOVECTOR_SIZE_MASK).
 
    Eggert: The C standard does not guarantee memory layout to hew to
    our fast-and-loose casting assumption.  So the header contains

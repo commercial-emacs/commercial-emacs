@@ -51,11 +51,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif
 
 struct buffer buffer_defaults;
-struct buffer buffer_local_flags;
+struct buffer buffer_slot_map;
 struct buffer buffer_local_symbols;
 
 #define PER_BUFFER_SYMBOL(OFFSET) \
-      (*(Lisp_Object *)((OFFSET) + (char *) &buffer_local_symbols))
+  (*(Lisp_Object *)((OFFSET) + (char *) &buffer_local_symbols))
 
 /* Maximum length of an overlay vector.  */
 #define OVERLAY_COUNT_MAX						\
@@ -945,12 +945,7 @@ delete_all_overlays (struct buffer *b)
   set_buffer_overlays_after (b, NULL);
 }
 
-/* Reinitialize everything about a buffer except its name and contents
-   and local variables.
-   If called on an already-initialized buffer, the list of overlays
-   should be deleted before calling this function, otherwise we end up
-   with overlays that claim to belong to the buffer but the buffer
-   claims it doesn't belong to it.  */
+/* Reinitialize all except name, contents, and local variables.  */
 
 void
 reset_buffer (register struct buffer *b)
@@ -990,12 +985,9 @@ reset_buffer (register struct buffer *b)
 }
 
 /* Reset buffer B's local variables info.
-   Don't use this on a buffer that has already been in use;
-   it does not treat permanent locals consistently.
-   Instead, use Fkill_all_local_variables.
 
    If PERMANENT_TOO, reset permanent buffer-local variables.
-   If not, preserve those.  */
+*/
 
 static void
 reset_buffer_local_variables (struct buffer *b, bool permanent_too)
@@ -1334,18 +1326,15 @@ No argument or nil as argument means use current buffer as BUFFER.  */)
   struct buffer *buf = decode_buffer (buffer);
   Lisp_Object result = buffer_lisp_local_variables (buf, 0);
   Lisp_Object tem;
+  int offset;
 
-  /* Add on all the variables stored in special slots.  */
-  {
-    int offset;
-
-    FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
-      {
-        tem = buffer_local_variables_1 (buf, offset, Qnil);
-        if (!NILP (tem))
-          result = Fcons (tem, result);
-      }
-  }
+  /* Add all slots.  */
+  FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
+    {
+      tem = buffer_local_variables_1 (buf, offset, Qnil);
+      if (! NILP (tem))
+	result = Fcons (tem, result);
+    }
 
   tem = buffer_local_variables_1 (buf, PER_BUFFER_VAR_OFFSET (undo_list),
 				  intern ("buffer-undo-list"));
@@ -5126,136 +5115,135 @@ init_buffer_once (void)
   PDUMPER_REMEMBER_SCALAR (buffer_permanent_local_flags);
   memset (buffer_permanent_local_flags, 0, sizeof buffer_permanent_local_flags);
 
-  /* The confusingly named buffer_local_flags maps a slot into the
-     equally poorly named slot index (IDX), which is zero for a slot
-     without a corresponding Lisp variable, -1 for a special slot, or an
-     index into the `local_flags` array indicating which slots are
-     buffer-local.  */
-  memset (&buffer_local_flags, 0, sizeof buffer_local_flags);
-  bset_filename (&buffer_local_flags, make_fixnum (-1));
-  bset_directory (&buffer_local_flags, make_fixnum (-1));
-  bset_backed_up (&buffer_local_flags, make_fixnum (-1));
-  bset_save_length (&buffer_local_flags, make_fixnum (-1));
-  bset_auto_save_file_name (&buffer_local_flags, make_fixnum (-1));
-  bset_read_only (&buffer_local_flags, make_fixnum (-1));
-  bset_major_mode (&buffer_local_flags, make_fixnum (-1));
-  bset_local_minor_modes (&buffer_local_flags, make_fixnum (-1));
-  bset_mode_name (&buffer_local_flags, make_fixnum (-1));
-  bset_undo_list (&buffer_local_flags, make_fixnum (-1));
-  bset_mark_active (&buffer_local_flags, make_fixnum (-1));
-  bset_point_before_scroll (&buffer_local_flags, make_fixnum (-1));
-  bset_file_truename (&buffer_local_flags, make_fixnum (-1));
-  bset_invisibility_spec (&buffer_local_flags, make_fixnum (-1));
-  bset_last_selected_window (&buffer_local_flags, make_fixnum (-1));
-  bset_file_format (&buffer_local_flags, make_fixnum (-1));
-  bset_auto_save_file_format (&buffer_local_flags, make_fixnum (-1));
-  bset_display_count (&buffer_local_flags, make_fixnum (-1));
-  bset_display_time (&buffer_local_flags, make_fixnum (-1));
-  bset_enable_multibyte_characters (&buffer_local_flags, make_fixnum (-1));
+  /* By virtue of being a struct buffer, buffer_slot_map is a
+     natural map of slots to the following values:
+
+     -1, a private slot whose value does not admit user mangling by
+     special logic in data.c.
+
+     0, a slot without a user-exposed Lisp variable.
+
+     Within interval [1, MAX_PER_BUFFER_VARS), slot's index in the
+     per-buffer `local_flags` array.
+  */
+  memset (&buffer_slot_map, 0, sizeof buffer_slot_map);
+  bset_filename (&buffer_slot_map, make_fixnum (-1));
+  bset_directory (&buffer_slot_map, make_fixnum (-1));
+  bset_backed_up (&buffer_slot_map, make_fixnum (-1));
+  bset_save_length (&buffer_slot_map, make_fixnum (-1));
+  bset_auto_save_file_name (&buffer_slot_map, make_fixnum (-1));
+  bset_read_only (&buffer_slot_map, make_fixnum (-1));
+  bset_major_mode (&buffer_slot_map, make_fixnum (-1));
+  bset_local_minor_modes (&buffer_slot_map, make_fixnum (-1));
+  bset_mode_name (&buffer_slot_map, make_fixnum (-1));
+  bset_undo_list (&buffer_slot_map, make_fixnum (-1));
+  bset_mark_active (&buffer_slot_map, make_fixnum (-1));
+  bset_point_before_scroll (&buffer_slot_map, make_fixnum (-1));
+  bset_file_truename (&buffer_slot_map, make_fixnum (-1));
+  bset_invisibility_spec (&buffer_slot_map, make_fixnum (-1));
+  bset_last_selected_window (&buffer_slot_map, make_fixnum (-1));
+  bset_file_format (&buffer_slot_map, make_fixnum (-1));
+  bset_auto_save_file_format (&buffer_slot_map, make_fixnum (-1));
+  bset_display_count (&buffer_slot_map, make_fixnum (-1));
+  bset_display_time (&buffer_slot_map, make_fixnum (-1));
+  bset_enable_multibyte_characters (&buffer_slot_map, make_fixnum (-1));
 
   /* These used to be stuck at 0 by default, but now that the all-zero value
      means Qnil, we have to initialize them explicitly.  */
-  bset_name (&buffer_local_flags, make_fixnum (0));
-  bset_mark (&buffer_local_flags, make_fixnum (0));
-  bset_local_var_alist (&buffer_local_flags, make_fixnum (0));
-  bset_keymap (&buffer_local_flags, make_fixnum (0));
-  bset_downcase_table (&buffer_local_flags, make_fixnum (0));
-  bset_upcase_table (&buffer_local_flags, make_fixnum (0));
-  bset_case_canon_table (&buffer_local_flags, make_fixnum (0));
-  bset_case_eqv_table (&buffer_local_flags, make_fixnum (0));
-  bset_width_table (&buffer_local_flags, make_fixnum (0));
-  bset_pt_marker (&buffer_local_flags, make_fixnum (0));
-  bset_begv_marker (&buffer_local_flags, make_fixnum (0));
-  bset_zv_marker (&buffer_local_flags, make_fixnum (0));
+  bset_name (&buffer_slot_map, make_fixnum (0));
+  bset_mark (&buffer_slot_map, make_fixnum (0));
+  bset_local_var_alist (&buffer_slot_map, make_fixnum (0));
+  bset_keymap (&buffer_slot_map, make_fixnum (0));
+  bset_downcase_table (&buffer_slot_map, make_fixnum (0));
+  bset_upcase_table (&buffer_slot_map, make_fixnum (0));
+  bset_case_canon_table (&buffer_slot_map, make_fixnum (0));
+  bset_case_eqv_table (&buffer_slot_map, make_fixnum (0));
+  bset_width_table (&buffer_slot_map, make_fixnum (0));
+  bset_pt_marker (&buffer_slot_map, make_fixnum (0));
+  bset_begv_marker (&buffer_slot_map, make_fixnum (0));
+  bset_zv_marker (&buffer_slot_map, make_fixnum (0));
 
   idx = 1;
-  XSETFASTINT (BVAR (&buffer_local_flags, mode_line_format), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, abbrev_mode), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, overwrite_mode), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, case_fold_search), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, auto_fill_function), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, selective_display), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, selective_display_ellipses), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, tab_width), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, truncate_lines), idx);
+  XSETFASTINT (BVAR (&buffer_slot_map, mode_line_format), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, abbrev_mode), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, overwrite_mode), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, case_fold_search), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, auto_fill_function), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, selective_display), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, selective_display_ellipses), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, tab_width), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, truncate_lines), idx);
   /* Make this one a permanent local.  */
   buffer_permanent_local_flags[idx++] = 1;
-  XSETFASTINT (BVAR (&buffer_local_flags, word_wrap), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, ctl_arrow), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, fill_column), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, left_margin), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, abbrev_table), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, display_table), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, syntax_table), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, cache_long_scans), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, category_table), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, bidi_display_reordering), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, bidi_paragraph_direction), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, bidi_paragraph_separate_re), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, bidi_paragraph_start_re), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, buffer_file_coding_system), idx);
+  XSETFASTINT (BVAR (&buffer_slot_map, word_wrap), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, ctl_arrow), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, fill_column), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, left_margin), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, abbrev_table), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, display_table), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, syntax_table), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, cache_long_scans), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, category_table), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, bidi_display_reordering), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, bidi_paragraph_direction), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, bidi_paragraph_separate_re), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, bidi_paragraph_start_re), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, buffer_file_coding_system), idx);
   /* Make this one a permanent local.  */
   buffer_permanent_local_flags[idx++] = 1;
-  XSETFASTINT (BVAR (&buffer_local_flags, left_margin_cols), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, right_margin_cols), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, left_fringe_width), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, right_fringe_width), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, fringes_outside_margins), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, scroll_bar_width), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, scroll_bar_height), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, vertical_scroll_bar_type), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, horizontal_scroll_bar_type), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, indicate_empty_lines), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, indicate_buffer_boundaries), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, fringe_indicator_alist), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, fringe_cursor_alist), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, scroll_up_aggressively), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, scroll_down_aggressively), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, header_line_format), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, tab_line_format), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, cursor_type), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, extra_line_spacing), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, cursor_in_non_selected_windows), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, left_margin_cols), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, right_margin_cols), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, left_fringe_width), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, right_fringe_width), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, fringes_outside_margins), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, scroll_bar_width), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, scroll_bar_height), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, vertical_scroll_bar_type), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, horizontal_scroll_bar_type), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, indicate_empty_lines), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, indicate_buffer_boundaries), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, fringe_indicator_alist), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, fringe_cursor_alist), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, scroll_up_aggressively), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, scroll_down_aggressively), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, header_line_format), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, tab_line_format), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, cursor_type), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, extra_line_spacing), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, cursor_in_non_selected_windows), idx); ++idx;
 
-  /* buffer_local_flags contains no pointers, so it's safe to treat it
+  /* buffer_slot_map contains no pointers, so it's safe to treat it
      as a blob for pdumper.  */
-  PDUMPER_REMEMBER_SCALAR (buffer_local_flags);
+  PDUMPER_REMEMBER_SCALAR (buffer_slot_map);
 
-  /* Need more room? */
   if (idx >= MAX_PER_BUFFER_VARS)
     emacs_abort ();
   last_per_buffer_idx = idx;
   PDUMPER_REMEMBER_SCALAR (last_per_buffer_idx);
 
-  /* Make sure all markable slots in buffer_defaults are initialized
-     reasonably, so mark_buffer won't choke.  */
   reset_buffer (&buffer_defaults);
   eassert (NILP (BVAR (&buffer_defaults, name)));
   reset_buffer_local_variables (&buffer_defaults, 1);
   eassert (NILP (BVAR (&buffer_local_symbols, name)));
   reset_buffer (&buffer_local_symbols);
   reset_buffer_local_variables (&buffer_local_symbols, 1);
-  /* Prevent GC from getting confused.  */
   buffer_defaults.text = &buffer_defaults.own_text;
   buffer_local_symbols.text = &buffer_local_symbols.own_text;
-  /* No one will share the text with these buffers, but let's play it safe.  */
   buffer_defaults.indirections = 0;
   buffer_local_symbols.indirections = 0;
-  /* Likewise no one will display them.  */
   buffer_defaults.window_count = 0;
   buffer_local_symbols.window_count = 0;
   set_buffer_intervals (&buffer_defaults, NULL);
   set_buffer_intervals (&buffer_local_symbols, NULL);
-  /* This is not strictly necessary, but let's make them initialized.  */
   bset_name (&buffer_defaults, build_pure_c_string (" *buffer-defaults*"));
   bset_name (&buffer_local_symbols, build_pure_c_string (" *buffer-local-symbols*"));
   BUFFER_PVEC_INIT (&buffer_defaults);
   BUFFER_PVEC_INIT (&buffer_local_symbols);
 
-  /* Set up the default values of various buffer slots.  */
-  /* Must do these before making the first buffer! */
-
-  /* real setup is done in bindings.el */
+  /* Set up the default values of various buffer slots.
+     Must do these before making the first buffer!
+     Real setup is done in bindings.el
+  */
   bset_mode_line_format (&buffer_defaults, build_pure_c_string ("%-"));
   bset_header_line_format (&buffer_defaults, Qnil);
   bset_tab_line_format (&buffer_defaults, Qnil);
@@ -5311,13 +5299,7 @@ init_buffer_once (void)
   bset_scroll_down_aggressively (&buffer_defaults, Qnil);
   bset_display_time (&buffer_defaults, Qnil);
 
-  /* Assign the local-flags to the slots that have default values.
-     The local flag is a bit that is used in the buffer
-     to say that it has its own local value for the slot.
-     The local flag bits are in the local_var_flags slot of the buffer.  */
-
-  /* Nothing can work if this isn't true.  */
-  { verify (sizeof (EMACS_INT) == word_size); }
+  verify (sizeof (EMACS_INT) == word_size);
 
   Vbuffer_alist = Qnil;
   current_buffer = 0;
@@ -5335,9 +5317,7 @@ init_buffer_once (void)
   DEFSYM (Qkill_buffer_hook, "kill-buffer-hook");
   Fput (Qkill_buffer_hook, Qpermanent_local, Qt);
 
-  /* Super-magic invisible buffer.  */
-  Vprin1_to_string_buffer =
-    Fget_buffer_create (build_pure_c_string (" prin1"), Qt);
+  Vprin1_to_string_buffer = Fget_buffer_create (build_pure_c_string (" prin1"), Qt);
   Vbuffer_alist = Qnil;
 
   Fset_buffer (Fget_buffer_create (build_pure_c_string ("*scratch*"), Qnil));
@@ -5473,8 +5453,8 @@ defvar_per_buffer (struct Lisp_Buffer_Objfwd *bo_fwd, const char *namestring,
   XSETSYMBOL (PER_BUFFER_SYMBOL (offset), sym);
 
   if (PER_BUFFER_IDX (offset) == 0)
-    /* Did a DEFVAR_PER_BUFFER without initializing the corresponding
-       slot of buffer_local_flags.  */
+    /* A DEFVAR_PER_BUFFER for a slot explicitly designated
+       outside Lisp-space.  */
     emacs_abort ();
 }
 
