@@ -94,7 +94,7 @@ CHAR_HAS_CATEGORY (int ch, int category)
 
 /* The standard category table is stored where it will automatically
    be used in all new buffers.  */
-#define Vstandard_category_table BVAR (&buffer_defaults, category_table)
+#define Vstandard_category_table BVAR (&buffer_slot_defaults, category_table)
 
 /* Return the doc string of CATEGORY in category table TABLE.  */
 #define CATEGORY_DOCSTRING(table, category)				\

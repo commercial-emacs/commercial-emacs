@@ -2427,7 +2427,7 @@ usage:  (make-pipe-process &rest ARGS)  */)
     else if (!NILP (Vcoding_system_for_read))
       val = Vcoding_system_for_read;
     else if ((!NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
-	     || (NILP (buffer) && NILP (BVAR (&buffer_defaults, enable_multibyte_characters))))
+	     || (NILP (buffer) && NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))))
       /* We dare not decode end-of-line format by setting VAL to
 	 Qraw_text, because the existing Emacs Lisp libraries
 	 assume that they receive bare code including a sequence of
@@ -3181,7 +3181,7 @@ usage:  (make-serial-process &rest ARGS)  */)
   else if (!NILP (Vcoding_system_for_read))
     val = Vcoding_system_for_read;
   else if ((!NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
-	   || (NILP (buffer) && NILP (BVAR (&buffer_defaults, enable_multibyte_characters))))
+	   || (NILP (buffer) && NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))))
     val = Qnil;
   pset_decode_coding_system (p, val);
 
@@ -3195,7 +3195,7 @@ usage:  (make-serial-process &rest ARGS)  */)
   else if (!NILP (Vcoding_system_for_write))
     val = Vcoding_system_for_write;
   else if ((!NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
-	   || (NILP (buffer) && NILP (BVAR (&buffer_defaults, enable_multibyte_characters))))
+	   || (NILP (buffer) && NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))))
     val = Qnil;
   pset_encode_coding_system (p, val);
 
@@ -3239,7 +3239,7 @@ set_network_socket_coding_system (Lisp_Object proc, Lisp_Object host,
   else if ((!NILP (p->buffer)
 	    && NILP (BVAR (XBUFFER (p->buffer), enable_multibyte_characters)))
 	   || (NILP (p->buffer)
-	       && NILP (BVAR (&buffer_defaults, enable_multibyte_characters))))
+	       && NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))))
     /* We dare not decode end-of-line format by setting VAL to
        Qraw_text, because the existing Emacs Lisp libraries
        assume that they receive bare code including a sequence of

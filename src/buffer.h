@@ -1123,9 +1123,9 @@ BUFFER_CHECK_INDIRECTION (struct buffer *b)
     }
 }
 
-extern struct buffer buffer_defaults;
+extern struct buffer buffer_slot_defaults;
 extern struct buffer buffer_slot_map;
-extern struct buffer buffer_local_symbols;
+extern struct buffer buffer_slot_symbols;
 
 /* verify_interval_modification saves insertion hooks here
    to be run later by report_interval_modification.  */
@@ -1421,13 +1421,13 @@ SET_PER_BUFFER_VALUE_P (struct buffer *b, int idx, bool val)
 INLINE Lisp_Object
 per_buffer_default (int offset)
 {
-  return *(Lisp_Object *)(offset + (char *) &buffer_defaults);
+  return *(Lisp_Object *)(offset + (char *) &buffer_slot_defaults);
 }
 
 INLINE void
 set_per_buffer_default (int offset, Lisp_Object value)
 {
-  *(Lisp_Object *)(offset + (char *) &buffer_defaults) = value;
+  *(Lisp_Object *)(offset + (char *) &buffer_slot_defaults) = value;
 }
 
 INLINE Lisp_Object

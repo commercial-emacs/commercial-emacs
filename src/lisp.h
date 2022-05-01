@@ -3174,7 +3174,7 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
 /* Macros we use to define forwarded Lisp variables.
    These are used in the syms_of_FILENAME functions.
 
-   An ordinary (not in buffer_defaults, per-buffer, or per-keyboard)
+   An ordinary (not in buffer_slot_defaults, per-buffer, or per-keyboard)
    lisp variable is actually a field in `struct emacs_globals'.  The
    field's name begins with "f_", which is a convention enforced by
    these macros.  Each such global has a corresponding #define in

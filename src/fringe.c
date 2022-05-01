@@ -711,9 +711,9 @@ get_logical_cursor_bitmap (struct window *w, Lisp_Object cursor)
 	  return lookup_fringe_bitmap (bm);
 	}
     }
-  if (EQ (cmap, BVAR (&buffer_defaults, fringe_cursor_alist)))
+  if (EQ (cmap, BVAR (&buffer_slot_defaults, fringe_cursor_alist)))
     return NO_FRINGE_BITMAP;
-  bm = Fassq (cursor, BVAR (&buffer_defaults, fringe_cursor_alist));
+  bm = Fassq (cursor, BVAR (&buffer_slot_defaults, fringe_cursor_alist));
   if (!CONSP (bm) || ((bm = XCDR (bm)), NILP (bm)))
     return NO_FRINGE_BITMAP;
   return lookup_fringe_bitmap (bm);
@@ -772,10 +772,10 @@ get_logical_fringe_bitmap (struct window *w, Lisp_Object bitmap, int right_p, in
 	}
     }
 
-  if (!EQ (cmap, BVAR (&buffer_defaults, fringe_indicator_alist))
-      && !NILP (BVAR (&buffer_defaults, fringe_indicator_alist)))
+  if (!EQ (cmap, BVAR (&buffer_slot_defaults, fringe_indicator_alist))
+      && !NILP (BVAR (&buffer_slot_defaults, fringe_indicator_alist)))
     {
-      bm2 = Fassq (bitmap, BVAR (&buffer_defaults, fringe_indicator_alist));
+      bm2 = Fassq (bitmap, BVAR (&buffer_slot_defaults, fringe_indicator_alist));
       if (CONSP (bm2))
 	{
 	  if ((bm2 = XCDR (bm2)), !NILP (bm2))

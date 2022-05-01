@@ -4953,7 +4953,7 @@ valid_lisp_object_p (Lisp_Object obj)
   if (SYMBOLP (obj) && c_symbol_p (p))
     return ((char *) p - (char *) lispsym) % sizeof lispsym[0] == 0;
 
-  if (p == &buffer_defaults || p == &buffer_local_symbols)
+  if (p == &buffer_slot_defaults || p == &buffer_slot_symbols)
     return 2;
 
   if (pdumper_object_p (p))
@@ -5611,15 +5611,15 @@ mark_pinned_symbols (void)
 static void
 mark_most_objects (void)
 {
-  const struct Lisp_Vector *vbuffer_defaults =
-    (struct Lisp_Vector *) &buffer_defaults;
-  const struct Lisp_Vector *vbuffer_local_symbols =
-    (struct Lisp_Vector *) &buffer_local_symbols;
+  const struct Lisp_Vector *vbuffer_slot_defaults =
+    (struct Lisp_Vector *) &buffer_slot_defaults;
+  const struct Lisp_Vector *vbuffer_slot_symbols =
+    (struct Lisp_Vector *) &buffer_slot_symbols;
 
   for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
     {
-      mark_object (vbuffer_defaults->contents[i]);
-      mark_object (vbuffer_local_symbols->contents[i]);
+      mark_object (vbuffer_slot_defaults->contents[i]);
+      mark_object (vbuffer_slot_symbols->contents[i]);
     }
 
   for (int i = 0; i < ARRAYELTS (lispsym); ++i)
@@ -6107,9 +6107,8 @@ static void
 mark_localized_symbol (struct Lisp_Symbol *ptr)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (ptr);
-  Lisp_Object where = blv->where;
   /* If the value is set up for a killed buffer restore its global binding.  */
-  if (BUFFERP (where) && ! BUFFER_LIVE_P (XBUFFER (where)))
+  if (BUFFERP (blv->where) && ! BUFFER_LIVE_P (XBUFFER (blv->where)))
     symval_restore_default (ptr);
   mark_object (blv->where);
   mark_object (blv->valcell);
@@ -7251,8 +7250,8 @@ init_alloc_once (void)
   gc_inhibited = false;
   gc_cons_threshold = GC_DEFAULT_THRESHOLD;
 
-  PDUMPER_REMEMBER_SCALAR (buffer_defaults.header);
-  PDUMPER_REMEMBER_SCALAR (buffer_local_symbols.header);
+  PDUMPER_REMEMBER_SCALAR (buffer_slot_defaults.header);
+  PDUMPER_REMEMBER_SCALAR (buffer_slot_symbols.header);
 
   /* Nothing can be malloc'ed until init_runtime().  */
   pdumper_do_now_and_after_load (init_runtime);

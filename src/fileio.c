@@ -5206,7 +5206,7 @@ choose_write_coding_system (Lisp_Object start, Lisp_Object end, Lisp_Object file
 	 format, we use that of `buffer-file-coding-system'.  */
       if (! using_default_coding)
 	{
-	  Lisp_Object dflt = BVAR (&buffer_defaults, buffer_file_coding_system);
+	  Lisp_Object dflt = BVAR (&buffer_slot_defaults, buffer_file_coding_system);
 
 	  if (! NILP (dflt))
 	    val = coding_inherit_eol_type (val, dflt);

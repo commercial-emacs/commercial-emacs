@@ -229,7 +229,7 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
   /* Windows users want case-insensitive wildcards.  */
   Lisp_Object case_table = Qnil;
 #ifdef WINDOWSNT
-  case_table = BVAR (&buffer_defaults, case_canon_table);
+  case_table = BVAR (&buffer_slot_defaults, case_canon_table);
 #endif
 
   /* Read directory entries and accumulate them into LIST.  */

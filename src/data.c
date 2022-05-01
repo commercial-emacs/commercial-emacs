@@ -1321,11 +1321,11 @@ symval_update (lispfwd valcontents, Lisp_Object newval, struct buffer *buf)
 	 in the buffer itself, such as default-fill-column,
 	 find the buffers that don't have local values for it
 	 and update them.  */
-      if (XOBJFWD (valcontents)->objvar > (Lisp_Object *) &buffer_defaults
-	  && XOBJFWD (valcontents)->objvar < (Lisp_Object *) (&buffer_defaults + 1))
+      if (XOBJFWD (valcontents)->objvar > (Lisp_Object *) &buffer_slot_defaults
+	  && XOBJFWD (valcontents)->objvar < (Lisp_Object *) (&buffer_slot_defaults + 1))
 	{
 	  int offset = ((char *) XOBJFWD (valcontents)->objvar
-			- (char *) &buffer_defaults);
+			- (char *) &buffer_slot_defaults);
 	  int idx = PER_BUFFER_IDX (offset);
 
 	  Lisp_Object tail, buffer;

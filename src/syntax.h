@@ -31,7 +31,7 @@ extern void update_syntax_table_forward (ptrdiff_t, bool, Lisp_Object);
 
 /* The standard syntax table is stored where it will automatically
    be used in all new buffers.  */
-#define Vstandard_syntax_table BVAR (&buffer_defaults, syntax_table)
+#define Vstandard_syntax_table BVAR (&buffer_slot_defaults, syntax_table)
 
 /* A syntax table is a chartable whose elements are cons cells
    (CODE+FLAGS . MATCHING-CHAR).  MATCHING-CHAR can be nil if the char

@@ -1595,15 +1595,15 @@ dump_remember_fixup_ptr_raw (struct dump_context *ctx,
 static void
 dump_roots (struct dump_context *ctx)
 {
-  const struct Lisp_Vector *vbuffer_defaults =
-    (struct Lisp_Vector *) &buffer_defaults;
-  const struct Lisp_Vector *vbuffer_local_symbols =
-    (struct Lisp_Vector *) &buffer_local_symbols;
+  const struct Lisp_Vector *vbuffer_slot_defaults =
+    (struct Lisp_Vector *) &buffer_slot_defaults;
+  const struct Lisp_Vector *vbuffer_slot_symbols =
+    (struct Lisp_Vector *) &buffer_slot_symbols;
 
   for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
     {
-      dump_emacs_reloc_to_lv (ctx, vbuffer_defaults->contents + i);
-      dump_emacs_reloc_to_lv (ctx, vbuffer_local_symbols->contents + i);
+      dump_emacs_reloc_to_lv (ctx, vbuffer_slot_defaults->contents + i);
+      dump_emacs_reloc_to_lv (ctx, vbuffer_slot_symbols->contents + i);
     }
 
   for (int i = 0; i < ARRAYELTS (lispsym); ++i)

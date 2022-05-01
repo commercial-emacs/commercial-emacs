@@ -50,12 +50,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "w32heap.h"		/* for mmap_* */
 #endif
 
-struct buffer buffer_defaults;
+struct buffer buffer_slot_defaults;
 struct buffer buffer_slot_map;
-struct buffer buffer_local_symbols;
+struct buffer buffer_slot_symbols;
 
 #define PER_BUFFER_SYMBOL(OFFSET) \
-  (*(Lisp_Object *)((OFFSET) + (char *) &buffer_local_symbols))
+  (*(Lisp_Object *)((OFFSET) + (char *) &buffer_slot_symbols))
 
 /* Maximum length of an overlay vector.  */
 #define OVERLAY_COUNT_MAX						\
@@ -977,9 +977,9 @@ reset_buffer (register struct buffer *b)
   bset_display_count (b, make_fixnum (0));
   bset_display_time (b, Qnil);
   bset_enable_multibyte_characters
-    (b, BVAR (&buffer_defaults, enable_multibyte_characters));
-  bset_cursor_type (b, BVAR (&buffer_defaults, cursor_type));
-  bset_extra_line_spacing (b, BVAR (&buffer_defaults, extra_line_spacing));
+    (b, BVAR (&buffer_slot_defaults, enable_multibyte_characters));
+  bset_cursor_type (b, BVAR (&buffer_slot_defaults, cursor_type));
+  bset_extra_line_spacing (b, BVAR (&buffer_slot_defaults, extra_line_spacing));
 
   b->display_error_modiff = 0;
 }
@@ -2076,7 +2076,7 @@ the current buffer's major mode.  */)
     function = find_symbol_value (intern ("initial-major-mode"));
   else
     {
-      function = BVAR (&buffer_defaults, major_mode);
+      function = BVAR (&buffer_slot_defaults, major_mode);
       if (NILP (function)
 	  && NILP (Fget (BVAR (current_buffer, major_mode), Qmode_class)))
 	function = BVAR (current_buffer, major_mode);
@@ -5221,83 +5221,83 @@ init_buffer_once (void)
   last_per_buffer_idx = idx;
   PDUMPER_REMEMBER_SCALAR (last_per_buffer_idx);
 
-  reset_buffer (&buffer_defaults);
-  eassert (NILP (BVAR (&buffer_defaults, name)));
-  reset_buffer_local_variables (&buffer_defaults, 1);
-  eassert (NILP (BVAR (&buffer_local_symbols, name)));
-  reset_buffer (&buffer_local_symbols);
-  reset_buffer_local_variables (&buffer_local_symbols, 1);
-  buffer_defaults.text = &buffer_defaults.own_text;
-  buffer_local_symbols.text = &buffer_local_symbols.own_text;
-  buffer_defaults.indirections = 0;
-  buffer_local_symbols.indirections = 0;
-  buffer_defaults.window_count = 0;
-  buffer_local_symbols.window_count = 0;
-  set_buffer_intervals (&buffer_defaults, NULL);
-  set_buffer_intervals (&buffer_local_symbols, NULL);
-  bset_name (&buffer_defaults, build_pure_c_string (" *buffer-defaults*"));
-  bset_name (&buffer_local_symbols, build_pure_c_string (" *buffer-local-symbols*"));
-  BUFFER_PVEC_INIT (&buffer_defaults);
-  BUFFER_PVEC_INIT (&buffer_local_symbols);
+  reset_buffer (&buffer_slot_defaults);
+  eassert (NILP (BVAR (&buffer_slot_defaults, name)));
+  reset_buffer_local_variables (&buffer_slot_defaults, 1);
+  eassert (NILP (BVAR (&buffer_slot_symbols, name)));
+  reset_buffer (&buffer_slot_symbols);
+  reset_buffer_local_variables (&buffer_slot_symbols, 1);
+  buffer_slot_defaults.text = &buffer_slot_defaults.own_text;
+  buffer_slot_symbols.text = &buffer_slot_symbols.own_text;
+  buffer_slot_defaults.indirections = 0;
+  buffer_slot_symbols.indirections = 0;
+  buffer_slot_defaults.window_count = 0;
+  buffer_slot_symbols.window_count = 0;
+  set_buffer_intervals (&buffer_slot_defaults, NULL);
+  set_buffer_intervals (&buffer_slot_symbols, NULL);
+  bset_name (&buffer_slot_defaults, build_pure_c_string (" *buffer-defaults*"));
+  bset_name (&buffer_slot_symbols, build_pure_c_string (" *buffer-local-symbols*"));
+  BUFFER_PVEC_INIT (&buffer_slot_defaults);
+  BUFFER_PVEC_INIT (&buffer_slot_symbols);
 
   /* Set up the default values of various buffer slots.
      Must do these before making the first buffer!
      Real setup is done in bindings.el
   */
-  bset_mode_line_format (&buffer_defaults, build_pure_c_string ("%-"));
-  bset_header_line_format (&buffer_defaults, Qnil);
-  bset_tab_line_format (&buffer_defaults, Qnil);
-  bset_abbrev_mode (&buffer_defaults, Qnil);
-  bset_overwrite_mode (&buffer_defaults, Qnil);
-  bset_case_fold_search (&buffer_defaults, Qt);
-  bset_auto_fill_function (&buffer_defaults, Qnil);
-  bset_selective_display (&buffer_defaults, Qnil);
-  bset_selective_display_ellipses (&buffer_defaults, Qt);
-  bset_abbrev_table (&buffer_defaults, Qnil);
-  bset_display_table (&buffer_defaults, Qnil);
-  bset_undo_list (&buffer_defaults, Qnil);
-  bset_mark_active (&buffer_defaults, Qnil);
-  bset_file_format (&buffer_defaults, Qnil);
-  bset_auto_save_file_format (&buffer_defaults, Qt);
-  set_buffer_overlays_before (&buffer_defaults, NULL);
-  set_buffer_overlays_after (&buffer_defaults, NULL);
-  buffer_defaults.overlay_center = BEG;
+  bset_mode_line_format (&buffer_slot_defaults, build_pure_c_string ("%-"));
+  bset_header_line_format (&buffer_slot_defaults, Qnil);
+  bset_tab_line_format (&buffer_slot_defaults, Qnil);
+  bset_abbrev_mode (&buffer_slot_defaults, Qnil);
+  bset_overwrite_mode (&buffer_slot_defaults, Qnil);
+  bset_case_fold_search (&buffer_slot_defaults, Qt);
+  bset_auto_fill_function (&buffer_slot_defaults, Qnil);
+  bset_selective_display (&buffer_slot_defaults, Qnil);
+  bset_selective_display_ellipses (&buffer_slot_defaults, Qt);
+  bset_abbrev_table (&buffer_slot_defaults, Qnil);
+  bset_display_table (&buffer_slot_defaults, Qnil);
+  bset_undo_list (&buffer_slot_defaults, Qnil);
+  bset_mark_active (&buffer_slot_defaults, Qnil);
+  bset_file_format (&buffer_slot_defaults, Qnil);
+  bset_auto_save_file_format (&buffer_slot_defaults, Qt);
+  set_buffer_overlays_before (&buffer_slot_defaults, NULL);
+  set_buffer_overlays_after (&buffer_slot_defaults, NULL);
+  buffer_slot_defaults.overlay_center = BEG;
 
-  XSETFASTINT (BVAR (&buffer_defaults, tab_width), 8);
-  bset_truncate_lines (&buffer_defaults, Qnil);
-  bset_word_wrap (&buffer_defaults, Qnil);
-  bset_ctl_arrow (&buffer_defaults, Qt);
-  bset_bidi_display_reordering (&buffer_defaults, Qt);
-  bset_bidi_paragraph_direction (&buffer_defaults, Qnil);
-  bset_bidi_paragraph_start_re (&buffer_defaults, Qnil);
-  bset_bidi_paragraph_separate_re (&buffer_defaults, Qnil);
-  bset_cursor_type (&buffer_defaults, Qt);
-  bset_extra_line_spacing (&buffer_defaults, Qnil);
-  bset_cursor_in_non_selected_windows (&buffer_defaults, Qt);
+  XSETFASTINT (BVAR (&buffer_slot_defaults, tab_width), 8);
+  bset_truncate_lines (&buffer_slot_defaults, Qnil);
+  bset_word_wrap (&buffer_slot_defaults, Qnil);
+  bset_ctl_arrow (&buffer_slot_defaults, Qt);
+  bset_bidi_display_reordering (&buffer_slot_defaults, Qt);
+  bset_bidi_paragraph_direction (&buffer_slot_defaults, Qnil);
+  bset_bidi_paragraph_start_re (&buffer_slot_defaults, Qnil);
+  bset_bidi_paragraph_separate_re (&buffer_slot_defaults, Qnil);
+  bset_cursor_type (&buffer_slot_defaults, Qt);
+  bset_extra_line_spacing (&buffer_slot_defaults, Qnil);
+  bset_cursor_in_non_selected_windows (&buffer_slot_defaults, Qt);
 
-  bset_enable_multibyte_characters (&buffer_defaults, Qt);
-  bset_buffer_file_coding_system (&buffer_defaults, Qnil);
-  XSETFASTINT (BVAR (&buffer_defaults, fill_column), 70);
-  XSETFASTINT (BVAR (&buffer_defaults, left_margin), 0);
-  bset_cache_long_scans (&buffer_defaults, Qt);
-  bset_file_truename (&buffer_defaults, Qnil);
-  XSETFASTINT (BVAR (&buffer_defaults, display_count), 0);
-  XSETFASTINT (BVAR (&buffer_defaults, left_margin_cols), 0);
-  XSETFASTINT (BVAR (&buffer_defaults, right_margin_cols), 0);
-  bset_left_fringe_width (&buffer_defaults, Qnil);
-  bset_right_fringe_width (&buffer_defaults, Qnil);
-  bset_fringes_outside_margins (&buffer_defaults, Qnil);
-  bset_scroll_bar_width (&buffer_defaults, Qnil);
-  bset_scroll_bar_height (&buffer_defaults, Qnil);
-  bset_vertical_scroll_bar_type (&buffer_defaults, Qt);
-  bset_horizontal_scroll_bar_type (&buffer_defaults, Qt);
-  bset_indicate_empty_lines (&buffer_defaults, Qnil);
-  bset_indicate_buffer_boundaries (&buffer_defaults, Qnil);
-  bset_fringe_indicator_alist (&buffer_defaults, Qnil);
-  bset_fringe_cursor_alist (&buffer_defaults, Qnil);
-  bset_scroll_up_aggressively (&buffer_defaults, Qnil);
-  bset_scroll_down_aggressively (&buffer_defaults, Qnil);
-  bset_display_time (&buffer_defaults, Qnil);
+  bset_enable_multibyte_characters (&buffer_slot_defaults, Qt);
+  bset_buffer_file_coding_system (&buffer_slot_defaults, Qnil);
+  XSETFASTINT (BVAR (&buffer_slot_defaults, fill_column), 70);
+  XSETFASTINT (BVAR (&buffer_slot_defaults, left_margin), 0);
+  bset_cache_long_scans (&buffer_slot_defaults, Qt);
+  bset_file_truename (&buffer_slot_defaults, Qnil);
+  XSETFASTINT (BVAR (&buffer_slot_defaults, display_count), 0);
+  XSETFASTINT (BVAR (&buffer_slot_defaults, left_margin_cols), 0);
+  XSETFASTINT (BVAR (&buffer_slot_defaults, right_margin_cols), 0);
+  bset_left_fringe_width (&buffer_slot_defaults, Qnil);
+  bset_right_fringe_width (&buffer_slot_defaults, Qnil);
+  bset_fringes_outside_margins (&buffer_slot_defaults, Qnil);
+  bset_scroll_bar_width (&buffer_slot_defaults, Qnil);
+  bset_scroll_bar_height (&buffer_slot_defaults, Qnil);
+  bset_vertical_scroll_bar_type (&buffer_slot_defaults, Qt);
+  bset_horizontal_scroll_bar_type (&buffer_slot_defaults, Qt);
+  bset_indicate_empty_lines (&buffer_slot_defaults, Qnil);
+  bset_indicate_buffer_boundaries (&buffer_slot_defaults, Qnil);
+  bset_fringe_indicator_alist (&buffer_slot_defaults, Qnil);
+  bset_fringe_cursor_alist (&buffer_slot_defaults, Qnil);
+  bset_scroll_up_aggressively (&buffer_slot_defaults, Qnil);
+  bset_scroll_down_aggressively (&buffer_slot_defaults, Qnil);
+  bset_display_time (&buffer_slot_defaults, Qnil);
 
   verify (sizeof (EMACS_INT) == word_size);
 
@@ -5308,7 +5308,7 @@ init_buffer_once (void)
   QSFundamental = build_pure_c_string ("Fundamental");
 
   DEFSYM (Qfundamental_mode, "fundamental-mode");
-  bset_major_mode (&buffer_defaults, Qfundamental_mode);
+  bset_major_mode (&buffer_slot_defaults, Qfundamental_mode);
 
   DEFSYM (Qmode_class, "mode-class");
   DEFSYM (Qprotected_field, "protected-field");
@@ -5373,7 +5373,7 @@ init_buffer (void)
 
   AUTO_STRING (scratch, "*scratch*");
   Fset_buffer (Fget_buffer_create (scratch, Qnil));
-  if (NILP (BVAR (&buffer_defaults, enable_multibyte_characters)))
+  if (NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters)))
     Fset_buffer_multibyte (Qnil);
 
   char const *pwd = emacs_wd;

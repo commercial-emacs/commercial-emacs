@@ -461,7 +461,7 @@ print_string (Lisp_Object string, Lisp_Object printcharfun)
 	chars = SCHARS (string);
       else if (! print_escape_nonascii
 	       && (EQ (printcharfun, Qt)
-		   ? ! NILP (BVAR (&buffer_defaults, enable_multibyte_characters))
+		   ? ! NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))
 		   : ! NILP (BVAR (current_buffer, enable_multibyte_characters))))
 	{
 	  /* If unibyte string STRING contains 8-bit codes, we must
@@ -581,7 +581,7 @@ temp_output_buffer_setup (const char *bufname)
   eassert (current_buffer->overlays_before == NULL);
   eassert (current_buffer->overlays_after == NULL);
   bset_enable_multibyte_characters
-    (current_buffer, BVAR (&buffer_defaults, enable_multibyte_characters));
+    (current_buffer, BVAR (&buffer_slot_defaults, enable_multibyte_characters));
   specbind (Qinhibit_read_only, Qt);
   specbind (Qinhibit_modification_hooks, Qt);
   Ferase_buffer ();

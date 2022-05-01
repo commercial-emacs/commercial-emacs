@@ -1207,7 +1207,7 @@ default_line_height (struct window *w)
       struct buffer *b = XBUFFER (w->contents);
       Lisp_Object val = ! NILP (BVAR (b, extra_line_spacing))
 	? BVAR (b, extra_line_spacing)
-	: BVAR (&buffer_defaults, extra_line_spacing);
+	: BVAR (&buffer_slot_defaults, extra_line_spacing);
 
       if (NILP (val))
 	height += f->extra_line_spacing;
@@ -6851,7 +6851,7 @@ reseat_to_string (struct it *it, const char *s, Lisp_Object string,
      not yet available.  */
   it->bidi_p =
     ! redisplay__inhibit_bidi
-    && ! NILP (BVAR (&buffer_defaults, bidi_display_reordering));
+    && ! NILP (BVAR (&buffer_slot_defaults, bidi_display_reordering));
 
   if (s == NULL)
     {
