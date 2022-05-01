@@ -7179,6 +7179,37 @@ arenas.  */)
 }
 #endif
 
+#ifdef HAVE_MALLOC_TRIM
+DEFUN ("malloc-trim", Fmalloc_trim, Smalloc_trim, 0, 1, "",
+       doc: /* Release free heap memory to the OS.
+This function asks libc to return unused heap memory back to the operating
+system.  This function isn't guaranteed to do anything, and is mainly
+meant as a debugging tool.
+
+If LEAVE_PADDING is given, ask the system to leave that much unused
+space in the heap of the Emacs process.  This should be an integer, and if
+not given, it defaults to 0.
+
+This function returns nil if no memory could be returned to the
+system, and non-nil if some memory could be returned.  */)
+  (Lisp_Object leave_padding)
+{
+  int pad = 0;
+
+  if (! NILP (leave_padding))
+    {
+      CHECK_FIXNAT (leave_padding);
+      pad = XFIXNUM (leave_padding);
+    }
+
+  /* 1 means that memory was released to the system.  */
+  if (malloc_trim (pad) == 1)
+    return Qt;
+  else
+    return Qnil;
+}
+#endif
+
 static bool
 symbol_uses_obj (Lisp_Object symbol, Lisp_Object obj)
 {
@@ -7538,6 +7569,9 @@ N should be nonnegative.  */);
   (__GLIBC__ > 2 || __GLIBC_MINOR__ >= 10)
 
   defsubr (&Smalloc_info);
+#endif
+#ifdef HAVE_MALLOC_TRIM
+  defsubr (&Smalloc_trim);
 #endif
   defsubr (&Ssuspicious_object);
 
