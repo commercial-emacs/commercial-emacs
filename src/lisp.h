@@ -1747,17 +1747,8 @@ struct Lisp_Bool_Vector
     bits_word data[FLEXIBLE_ARRAY_MEMBER];
   } GCALIGNED_STRUCT;
 
-/* Some handy constants for calculating sizes
-   and offsets, mostly of vectorlike objects.
-
-   The garbage collector assumes that the initial part of any struct
-   that starts with a union vectorlike_header followed by N
-   Lisp_Objects (some possibly in arrays and/or a trailing flexible
-   array) will be laid out like a struct Lisp_Vector with N
-   Lisp_Objects.  This assumption is true in practice on known Emacs
-   targets even though the C standard does not guarantee it.  This
-   header contains a few sanity checks that should suffice to detect
-   violations of this assumption on plausible practical hosts.  */
+/* Some handy constants for calculating sizes and offsets, mostly of
+   vectorlike objects.  */
 
 enum
   {

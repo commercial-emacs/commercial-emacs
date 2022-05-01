@@ -18,16 +18,25 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-/*
-The core task is marking Lisp objects in so-called vectorlikes, an
-unfortunate umbrella term for Emacs's various structs (buffers,
-windows, frames, etc.). "Vectorlikes" is meant to capture their
-function as containers of heterogenous Lisp objects.
+/* The core gc task is marking Lisp objects in so-called vectorlikes, an
+   unfortunate umbrella term for Emacs's various structs (buffers,
+   windows, frames, etc.). "Vectorlikes" is meant to capture their
+   function as containers of heterogenous Lisp objects.
 
-Not content with just one confusing moniker, Emacs also coined
-"pseudovector" as a synonym for vectorlike, emphasizing that
-vectorlikes also contain non-Lisp member data (which a "pure"
-Lisp_Vector would not).
+   Not content with just one confusing moniker, Emacs also refer to
+   vectorlikes as "pseudovectors", emphasizing their containing
+   non-Lisp member data (which a "pure" Lisp_Vector could not).
+
+   Except for special cases (struct buffer), vectorlikes are relied upon
+   to consist of a header, Lisp_Object fields, then non-Lisp fields,
+   in that precise order.  Pervasive in the GC code is casting
+   the vectorlike as a (struct Lisp_Vector *), then iterating
+   over its N Lisp objects, say to mark them from reclamation,
+   where N is masked off (PSEUDOVECTOR_SIZE_MASK) from the header.
+
+   Eggert: The C standard does not guarantee memory layout to hew to
+   our fast-and-loose casting assumption.  So the header contains
+   checks to detect fractious architectures.
 */
 
 #include <config.h>
