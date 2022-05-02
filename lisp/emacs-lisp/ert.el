@@ -64,6 +64,7 @@
 (require 'find-func)
 (require 'pp)
 (require 'map)
+(require 'help-mode)
 
 (autoload 'xml-escape-string "xml.el")
 
@@ -128,41 +129,31 @@ mode.")
   (documentation nil)
   (body (cl-assert nil))
   (most-recent-result nil)
-  (expected-result-type ':passed)
-  (tags '())
+  (expected-result-type :passed)
+  (tags nil)
   (file-name nil))
 
 (defun ert-test-boundp (symbol)
   "Return non-nil if SYMBOL names a test."
-  (and (get symbol 'ert--test) t))
+  (get symbol 'ert--test))
 
 (defun ert-get-test (symbol)
   "If SYMBOL names a test, return that.  Signal an error otherwise."
-  (unless (ert-test-boundp symbol) (error "No test named `%S'" symbol))
-  (get symbol 'ert--test))
+  (or (ert-test-boundp symbol) (error "No test named `%S'" symbol)))
 
 (defun ert-set-test (symbol definition)
   "Make SYMBOL name the test DEFINITION, and return DEFINITION."
-  (when (eq symbol 'nil)
-    ;; We disallow nil since `ert-test-at-point' and related functions
-    ;; want to return a test name, but also need an out-of-band value
-    ;; on failure.  Nil is the most natural out-of-band value; using 0
-    ;; or "" or signaling an error would be too awkward.
-    ;;
-    ;; Note that nil is still a valid value for the `name' slot in
-    ;; ert-test objects.  It designates an anonymous test.
-    (error "Attempt to define a test named nil"))
-  (when (and noninteractive (get symbol 'ert--test))
-    ;; Make sure duplicated tests are discovered since the older test would
-    ;; be ignored silently otherwise.
-    (error "Test `%s' redefined" symbol))
-  (define-symbol-prop symbol 'ert--test definition)
-  definition)
+  (prog1 definition
+    (unless symbol
+      (error "Attempt to define a test named nil"))
+    (when (and noninteractive (ert-test-boundp symbol))
+      (error "Test `%s' redefined" symbol))
+    (define-symbol-prop symbol 'ert--test definition)))
 
 (defun ert-make-test-unbound (symbol)
   "Make SYMBOL name no test.  Return SYMBOL."
-  (cl-remprop symbol 'ert--test)
-  symbol)
+  (prog1 symbol
+    (cl-remprop symbol 'ert--test)))
 
 (defun ert--parse-keys-and-body (keys-and-body)
   "Split KEYS-AND-BODY into keyword-and-value pairs and the remaining body.
@@ -174,7 +165,7 @@ keyword.
 
 Returns a two-element list containing the keys-and-values plist
 and the body."
-  (let ((extracted-key-accu '())
+  (let (extracted-key-accu
         (remaining keys-and-body))
     (while (keywordp (car-safe remaining))
       (let ((keyword (pop remaining)))
@@ -559,10 +550,8 @@ Return nil if they are."
   "Explainer function for `equal'."
   ;; Do a quick comparison in C to avoid running our expensive
   ;; comparison when possible.
-  (if (equal a b)
-      nil
+  (unless (equal a b)
     (ert--explain-equal-rec a b)))
-(put 'equal 'ert-explainer 'ert--explain-equal)
 
 (defun ert--explain-string-equal (a b)
   "Explainer function for `string-equal'."
@@ -572,7 +561,6 @@ Return nil if they are."
     (let ((as (if (symbolp a) (symbol-name a) a))
           (bs (if (symbolp b) (symbol-name b) b)))
       (ert--explain-equal-rec as bs))))
-(put 'string-equal 'ert-explainer 'ert--explain-string-equal)
 
 (defun ert--significant-plist-keys (plist)
   "Return the keys of PLIST that have non-null values, in order."
@@ -659,14 +647,12 @@ Return nil if they are."
   (if (equal-including-properties a b)
       nil
     (ert--explain-equal-including-properties-rec a b)))
-(put 'equal-including-properties 'ert-explainer
-     'ert--explain-equal-including-properties)
 
 ;;; Implementation of `ert-info'.
 
 ;; TODO(ohler): The name `info' clashes with
 ;; `ert--test-execution-info'.  One or both should be renamed.
-(defvar ert--infos '()
+(defvar ert--infos nil
   "The stack of `ert-info' infos that currently apply.
 
 Bound dynamically.  This is a list of (PREFIX . MESSAGE) pairs.")
@@ -812,7 +798,7 @@ This mainly sets up debugger-related bindings."
               ;; FIXME: Do we need to store the old binding of this
               ;; and consider it in `ert--run-test-debugger'?
               (debug-ignored-errors nil)
-              (ert--infos '()))
+              ert--infos)
           (funcall (ert-test-body (ert--test-execution-info-test
                                    test-execution-info))))))
     (ert-pass))
@@ -991,13 +977,13 @@ contained in UNIVERSE."
               `(satisfies ,(lambda (test)
                              (ert-test-result-type-p
                               (ert-test-most-recent-result test)
-                              ':failed)))
+                              :failed)))
               universe))
     (:passed (ert-select-tests
               `(satisfies ,(lambda (test)
                              (ert-test-result-type-p
                               (ert-test-most-recent-result test)
-                              ':passed)))
+                              :passed)))
               universe))
     (:expected (ert-select-tests
                 `(satisfies
@@ -2851,27 +2837,13 @@ To be used in the ERT results buffer."
   (interactive nil ert-results-mode)
   (ert-describe-test (ert--results-test-at-point-no-redefinition t)))
 
-
-;;; Actions on load/unload.
-
-(require 'help-mode)
-(add-to-list 'describe-symbol-backends
-             `("ERT test" ,#'ert-test-boundp
-               ,(lambda (s _b _f) (ert-describe-test s))))
-
-(add-to-list 'find-function-regexp-alist '(ert--test . ert--find-test-regexp))
-(add-to-list 'minor-mode-alist '(ert--current-run-stats
-                                 (:eval
-                                  (ert--tests-running-mode-line-indicator))))
-(add-hook 'emacs-lisp-mode-hook #'ert--activate-font-lock-keywords)
-
 (defun ert--unload-function ()
   "Unload function to undo the side-effects of loading ert.el."
-  (ert--remove-from-list 'find-function-regexp-alist 'ert-deftest :key #'car)
-  (ert--remove-from-list 'minor-mode-alist 'ert--current-run-stats :key #'car)
-  (ert--remove-from-list 'emacs-lisp-mode-hook
-                         'ert--activate-font-lock-keywords)
-  nil)
+  (prog1 nil
+    (ert--remove-from-list 'find-function-regexp-alist 'ert-deftest :key #'car)
+    (ert--remove-from-list 'minor-mode-alist 'ert--current-run-stats :key #'car)
+    (ert--remove-from-list 'emacs-lisp-mode-hook
+                           'ert--activate-font-lock-keywords)))
 
 (defun ert-test-erts-file (file &optional transform)
   "Parse FILE as a file containing before/after parts.
@@ -2899,10 +2871,7 @@ TRANSFORM will be called to get from before to after."
          after after-point)
     (unless name
       (error "No name for test case"))
-    (if (and skip
-             (eval (car (read-from-string skip))))
-        ;; Skipping this test.
-        ()
+    (unless (and skip (eval (car (read-from-string skip))))
       ;; Do the test.
       (goto-char end-after)
       ;; We have a separate after section.
@@ -2993,15 +2962,25 @@ TRANSFORM will be called to get from before to after."
           (forward-line 1)))
       (nreverse specs))))
 
-(defvar ert-unload-hook ())
+(defvar ert-unload-hook)
 (add-hook 'ert-unload-hook #'ert--unload-function)
 
-;;; Obsolete
+(put 'equal 'ert-explainer 'ert--explain-equal)
+(put 'string-equal 'ert-explainer 'ert--explain-string-equal)
+(put 'equal-including-properties 'ert-explainer 'ert--explain-equal-including-properties)
+(put 'ert-equal-including-properties 'ert-explainer 'ert--explain-equal-including-properties)
+
+(add-to-list 'describe-symbol-backends
+             `("ERT test" ,(function ert-test-boundp)
+               ,(lambda (s _b _f) (ert-describe-test s))))
+
+(add-to-list 'find-function-regexp-alist '(ert--test . ert--find-test-regexp))
+(add-to-list 'minor-mode-alist '(ert--current-run-stats
+                                 (:eval (ert--tests-running-mode-line-indicator))))
+(add-hook 'emacs-lisp-mode-hook #'ert--activate-font-lock-keywords)
 
 (define-obsolete-function-alias 'ert-equal-including-properties
   #'equal-including-properties "29.1")
-(put 'ert-equal-including-properties 'ert-explainer
-     'ert--explain-equal-including-properties)
 
 (provide 'ert)
 
