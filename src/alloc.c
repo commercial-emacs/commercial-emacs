@@ -203,8 +203,6 @@ enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 /* Specify maximum number of areas to mmap.  It would be nice to use a
    value that explicitly means "no limit".  */
 
-# define MMAP_MAX_AREAS 100000000
-
 /* A pointer to the memory allocated that copies that static data
    inside glibc's malloc.  */
 static void *malloc_state_ptr;
@@ -1094,6 +1092,10 @@ struct ablocks
 /* The list of free ablock.   */
 static struct ablock *free_ablock;
 
+#ifdef DOUG_LEA_MALLOC
+#define RESTORE_M_MMAP_MAX (1 << 16)
+#endif
+
 /* Allocate an aligned block of nbytes.
    Alignment is on a multiple of BLOCK_ALIGN and `nbytes' has to be
    smaller or equal to BLOCK_BYTES.  */
@@ -1117,7 +1119,7 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
       bool aligned;
 
 #ifdef DOUG_LEA_MALLOC
-      if (!mmap_lisp_allowed_p ())
+      if (! mmap_lisp_allowed_p ())
         mallopt (M_MMAP_MAX, 0);
 #endif
 
@@ -1140,8 +1142,8 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
 	((void **) abase)[-1] = base;
 
 #ifdef DOUG_LEA_MALLOC
-      if (!mmap_lisp_allowed_p ())
-          mallopt (M_MMAP_MAX, MMAP_MAX_AREAS);
+      if (! mmap_lisp_allowed_p ())
+	mallopt (M_MMAP_MAX, RESTORE_M_MMAP_MAX);
 #endif
 
 #if ! USE_LSB_TAG
@@ -1789,15 +1791,15 @@ allocate_string_data (struct Lisp_String *s,
       size_t size = FLEXSIZEOF (struct sblock, data, needed);
 
 #ifdef DOUG_LEA_MALLOC
-      if (!mmap_lisp_allowed_p ())
+      if (! mmap_lisp_allowed_p ())
         mallopt (M_MMAP_MAX, 0);
 #endif
 
       b = lisp_malloc (size + GC_STRING_EXTRA, clearit, MEM_TYPE_NON_LISP);
 
 #ifdef DOUG_LEA_MALLOC
-      if (!mmap_lisp_allowed_p ())
-        mallopt (M_MMAP_MAX, MMAP_MAX_AREAS);
+      if (! mmap_lisp_allowed_p ())
+        mallopt (M_MMAP_MAX, RESTORE_M_MMAP_MAX);
 #endif
 
       data = b->data;
@@ -3266,8 +3268,8 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
     }
 
 #ifdef DOUG_LEA_MALLOC
-  if (!mmap_lisp_allowed_p ())
-    mallopt (M_MMAP_MAX, MMAP_MAX_AREAS);
+  if (! mmap_lisp_allowed_p ())
+    mallopt (M_MMAP_MAX, RESTORE_M_MMAP_MAX);
 #endif
 
   if (find_suspicious_object_in_range (p, (char *) p + nbytes))
@@ -3518,7 +3520,7 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
 
 struct symbol_block
 {
-  /* Place `symbols' first, to preserve alignment.  */
+  /* Place SYMBOLS array first, to preserve alignment.  */
   struct Lisp_Symbol symbols[SYMBOL_BLOCK_SIZE];
   struct symbol_block *next;
 };
@@ -3532,7 +3534,7 @@ static int symbol_block_index = SYMBOL_BLOCK_SIZE;
    Tests for 24.4 showed that at dump-time, Emacs contains about 15K symbols,
    10K of which are pinned (and all but 250 of them are interned in obarray),
    whereas a "typical session" has in the order of 30K symbols.
-   `symbol_block_pinned' lets mark_pinned_symbols scan only 15K symbols rather
+   symbol_block_pinned lets mark_pinned_symbols scan only 15K symbols rather
    than 30K to find the 10K symbols we need to mark.  */
 static struct symbol_block *symbol_block_pinned;
 
@@ -5383,7 +5385,7 @@ purecopy (Lisp_Object obj)
     }
   else if (SYMBOLP (obj))
     {
-      if (!XSYMBOL (obj)->u.s.pinned && !c_symbol_p (XSYMBOL (obj)))
+      if (! XSYMBOL (obj)->u.s.pinned && ! c_symbol_p (XSYMBOL (obj)))
 	{ /* We can't purify them, but they appear in many pure objects.
 	     Mark them as `pinned' so we know to mark them at every GC cycle.  */
 	  XSYMBOL (obj)->u.s.pinned = true;
@@ -5625,6 +5627,7 @@ mark_most_objects (void)
   for (int i = 0; i < ARRAYELTS (lispsym); ++i)
     mark_object (builtin_lisp_symbol (i));
 
+  // defvar_lisp calls staticpro.
   for (int i = 0; i < staticidx; ++i)
     mark_object (*staticvec[i]);
 }
@@ -7283,9 +7286,9 @@ init_runtime (void)
   mem_init ();
 
 #ifdef DOUG_LEA_MALLOC
-  mallopt (M_TRIM_THRESHOLD, 128 * 1024); /* Trim threshold.  */
-  mallopt (M_MMAP_THRESHOLD, 64 * 1024);  /* Mmap threshold.  */
-  mallopt (M_MMAP_MAX, MMAP_MAX_AREAS);   /* Max. number of mmap'ed areas.  */
+  mallopt (M_TRIM_THRESHOLD, 128 * 1024);   /* Trim threshold.  */
+  mallopt (M_MMAP_THRESHOLD, 64 * 1024);    /* Mmap threshold.  */
+  mallopt (M_MMAP_MAX, RESTORE_M_MMAP_MAX); /* Max. number of mmap'ed areas.  */
 #endif
 
   init_finalizer_list (&finalizers);
