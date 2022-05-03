@@ -6102,7 +6102,7 @@ ns_font_desc_to_font_spec (NSFontDescriptor *desc, NSFont *font)
       if (tem != nil)
 	lwidth = ([tem floatValue] > 0
 		  ? Qexpanded : ([tem floatValue] < 0
-				 ? Qnormal : Qcondensed));
+				 ? Qcondensed : Qnormal));
     }
 
   lheight = make_float ([font pointSize]);
@@ -6110,7 +6110,9 @@ ns_font_desc_to_font_spec (NSFontDescriptor *desc, NSFont *font)
   return CALLN (Ffont_spec,
 		QCwidth, lwidth, QCslant, lslant,
 		QCweight, lweight, QCsize, lheight,
-		QCfamily, [family lispString]);
+		QCfamily, (family
+			   ? [family lispString]
+			   : Qnil));
 }
 
 /* ==========================================================================
@@ -6180,6 +6182,19 @@ ns_font_desc_to_font_spec (NSFontDescriptor *desc, NSFont *font)
 - (void) noteUserSelectedFont
 {
   font_panel_active = NO;
+
+  /* If no font was previously selected, use the currently selected
+     font.  */
+
+  if (!font_panel_result && FRAME_FONT (emacsframe))
+    {
+      font_panel_result
+	= macfont_get_nsctfont (FRAME_FONT (emacsframe));
+
+      if (font_panel_result)
+	[font_panel_result retain];
+    }
+
   [NSApp stop: self];
 }
 #endif
