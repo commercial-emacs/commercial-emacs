@@ -27,16 +27,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    vectorlikes as "pseudovectors", emphasizing their containing
    non-Lisp member data (which an "authentic" Lisp_Vector could not).
 
-   Except for special cases (struct buffer), vectorlikes are relied upon
+   Except for special cases (`struct buffer`), vectorlikes are relied upon
    to consist of a header, Lisp_Object fields, then non-Lisp fields,
-   in that precise order.  Pervasive in the GC code is casting
-   the vectorlike as a (struct Lisp_Vector *), then iterating
+   in that precise order.  Pervasive in the GC code is casting [1]
+   the vectorlike as a `struct Lisp_Vector *`, then iterating
    over its N Lisp objects, say to mark them from reclamation,
    where N is masked off from the header (PSEUDOVECTOR_SIZE_MASK).
-
-   Eggert: The C standard does not guarantee memory layout to hew to
-   our fast-and-loose casting assumption.  So the header contains
-   checks to detect fractious architectures.
 */
 
 #include <config.h>
@@ -46,6 +42,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <stdlib.h>
 #include <limits.h>		/* For CHAR_BIT.  */
 #include <signal.h>		/* For SIGABRT, SIGDANGER.  */
+#include <sys/mman.h>
 
 #ifdef HAVE_PTHREAD
 #include <pthread.h>
@@ -68,6 +65,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "pdumper.h"
 #include "termhooks.h"		/* For struct terminal.  */
 #include "bitset.h"
+#include "getpagesize.h"
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
@@ -978,14 +976,33 @@ lisp_free (void *block)
   MALLOC_UNBLOCK_INPUT;
 }
 
-/*****  Allocation of aligned blocks of memory to store Lisp data.  *****/
+enum
+{
+  BLOCK_NBITS = 10,
+  BLOCK_ALIGN = (1 << BLOCK_NBITS),
+  BLOCK_NBYTES = BLOCK_ALIGN - sizeof (uintptr_t),
+  BLOCK_NINTERVALS = (BLOCK_NBYTES) / sizeof (struct interval),
+  BLOCK_NSTRINGS = (BLOCK_NBYTES) / sizeof (struct Lisp_String),
+  BLOCK_NSYMBOLS = (BLOCK_NBYTES) / sizeof (struct Lisp_Symbol),
+  /* For float blocks (contains gcmarkbits), solve for y in:
 
-/* The entry point is lisp_align_malloc which returns blocks of at most
-   BLOCK_BYTES and guarantees they are aligned on a BLOCK_ALIGN boundary.  */
+     BLOCK_ALIGN > y * sizeof (Lisp_Float) + sizeof (bits_word) * (y /
+a     BITS_PER_BITS_WORD + 1) + sizeof (struct float_block *)
 
-/* Byte alignment of storage blocks.  */
-#define BLOCK_ALIGN (1 << 10)
-verify (POWER_OF_2 (BLOCK_ALIGN));
+     Similarly for cons blocks.
+  */
+
+  BLOCK_NFLOATS = ((BITS_PER_BITS_WORD / sizeof (bits_word))
+		   * (BLOCK_NBYTES - sizeof (bits_word))
+		   / ((BITS_PER_BITS_WORD / sizeof (bits_word))
+		      * sizeof (struct Lisp_Float)
+		      + 1)),
+  BLOCK_NCONS = ((BITS_PER_BITS_WORD / sizeof (bits_word))
+		 * (BLOCK_NBYTES - sizeof (bits_word))
+		 / ((BITS_PER_BITS_WORD / sizeof (bits_word))
+		    * sizeof (struct Lisp_Cons)
+		    + 1)),
+};
 
 /* Use aligned_alloc if it or a simple substitute is available.
    Aligned allocation is incompatible with unexmacosx.c, so don't use
@@ -1011,7 +1028,7 @@ aligned_alloc (size_t alignment, size_t size)
 	  || (LISP_ALIGNMENT % sizeof (void *) == 0
 	      && POWER_OF_2 (LISP_ALIGNMENT / sizeof (void *))));
   eassert (alignment == BLOCK_ALIGN
-	   || (!MALLOC_IS_LISP_ALIGNED && alignment == LISP_ALIGNMENT));
+	   || (! MALLOC_IS_LISP_ALIGNED && alignment == LISP_ALIGNMENT));
 
   void *p;
   return posix_memalign (&p, alignment, size) == 0 ? p : 0;
@@ -1019,30 +1036,12 @@ aligned_alloc (size_t alignment, size_t size)
 # endif
 #endif
 
-/* Padding to leave at the end of a malloc'd block.  This is to give
-   malloc a chance to minimize the amount of memory wasted to alignment.
-   It should be tuned to the particular malloc library used.
-   On glibc-2.3.2, malloc never tries to align, so a padding of 0 is best.
-   aligned_alloc on the other hand would ideally prefer a value of 4
-   because otherwise, there's 1020 bytes wasted between each ablocks.
-   In Emacs, testing shows that those 1020 can most of the time be
-   efficiently used by malloc to place other objects, so a value of 0 can
-   still preferable unless you have a lot of aligned blocks and virtually
-   nothing else.  */
-#define BLOCK_PADDING 0
-#define BLOCK_BYTES \
-  (BLOCK_ALIGN - sizeof (struct ablocks *) - BLOCK_PADDING)
-
-/* Internal data structures and constants.  */
-
-#define ABLOCKS_SIZE 16
-
 /* An aligned block of memory.  */
 struct ablock
 {
   union
   {
-    char payload[BLOCK_BYTES];
+    char payload[BLOCK_NBYTES];
     struct ablock *next_free;
   } x;
 
@@ -1054,31 +1053,25 @@ struct ablock
      The first ablock has a "busy" ABASE, and the others have an
      ordinary pointer ABASE.  To tell the difference, the code assumes
      that pointers, when cast to uintptr_t, are at least 2 *
-     ABLOCKS_SIZE + 1.  */
+     ABLOCKS_NBLOCKS + 1.  */
   struct ablocks *abase;
-
-  /* The padding of all but the last ablock is unused.  The padding of
-     the last ablock in an ablocks is not allocated.  */
-#if BLOCK_PADDING
-  char padding[BLOCK_PADDING];
-#endif
 };
+verify (sizeof (struct ablock) % BLOCK_ALIGN == 0);
 
-/* A bunch of consecutive aligned blocks.  */
+#define ABLOCKS_NBLOCKS (1 << 4)
+
 struct ablocks
 {
-  struct ablock blocks[ABLOCKS_SIZE];
+  struct ablock blocks[ABLOCKS_NBLOCKS];
 };
-
-/* Size of the block requested from malloc or aligned_alloc.  */
-#define ABLOCKS_BYTES (sizeof (struct ablocks) - BLOCK_PADDING)
+verify (sizeof (struct ablocks) % BLOCK_ALIGN == 0);
 
 #define ABLOCK_ABASE(block) \
-  (((uintptr_t) (block)->abase) <= (1 + 2 * ABLOCKS_SIZE)	\
+  (((uintptr_t) (block)->abase) <= (1 + 2 * ABLOCKS_NBLOCKS)	\
    ? (struct ablocks *) (block)					\
    : (block)->abase)
 
-/* Virtual `busy' field.  */
+/* Virtual "busy" field.  */
 #define ABLOCKS_BUSY(a_base) ((a_base)->blocks[0].abase)
 
 /* Pointer to the (not necessarily aligned) malloc block.  */
@@ -1089,23 +1082,20 @@ struct ablocks
   (1 & (intptr_t) ABLOCKS_BUSY (abase) ? abase : ((void **) (abase))[-1])
 #endif
 
-/* The list of free ablock.   */
 static struct ablock *free_ablock;
 
 #ifdef DOUG_LEA_MALLOC
 #define RESTORE_M_MMAP_MAX (1 << 16)
 #endif
 
-/* Allocate an aligned block of nbytes.
-   Alignment is on a multiple of BLOCK_ALIGN and `nbytes' has to be
-   smaller or equal to BLOCK_BYTES.  */
+/* Allocate an aligned block of NBYTES.  */
 static void *
 lisp_align_malloc (size_t nbytes, enum mem_type type)
 {
   void *base, *val;
   struct ablocks *abase;
 
-  eassert (nbytes <= BLOCK_BYTES);
+  eassert (nbytes < BLOCK_ALIGN);
 
   MALLOC_BLOCK_INPUT;
 
@@ -1113,7 +1103,7 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
   allocated_mem_type = type;
 #endif
 
-  if (!free_ablock)
+  if (! free_ablock)
     {
       int i;
       bool aligned;
@@ -1124,21 +1114,20 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
 #endif
 
 #ifdef USE_ALIGNED_ALLOC
-      verify (ABLOCKS_BYTES % BLOCK_ALIGN == 0);
-      abase = base = aligned_alloc (BLOCK_ALIGN, ABLOCKS_BYTES);
+      abase = base = aligned_alloc (BLOCK_ALIGN, sizeof (struct ablocks));
 #else
-      base = malloc (ABLOCKS_BYTES);
+      base = malloc (sizeof (struct ablocks));
       abase = pointer_align (base, BLOCK_ALIGN);
 #endif
 
-      if (base == 0)
+      if (! base)
 	{
 	  MALLOC_UNBLOCK_INPUT;
-	  memory_full (ABLOCKS_BYTES);
+	  memory_full (sizeof (struct ablocks));
 	}
 
       aligned = (base == abase);
-      if (!aligned)
+      if (! aligned)
 	((void **) abase)[-1] = base;
 
 #ifdef DOUG_LEA_MALLOC
@@ -1153,7 +1142,7 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
       if (type != MEM_TYPE_NON_LISP)
 	{
 	  Lisp_Object tem;
-	  char *end = (char *) base + ABLOCKS_BYTES - 1;
+	  char *end = (char *) base + sizeof (struct ablocks) - 1;
 	  XSETCONS (tem, end);
 	  if ((char *) XCONS (tem) != end)
 	    {
@@ -1166,8 +1155,8 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
 #endif
 
       /* Initialize the blocks and put them on the free list.
-	 If `base' was not properly aligned, we can't use the last block.  */
-      for (i = 0; i < (aligned ? ABLOCKS_SIZE : ABLOCKS_SIZE - 1); i++)
+	 If BASE was not properly aligned, we can't use the last block.  */
+      for (i = 0; i < (aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1); ++i)
 	{
 	  abase->blocks[i].abase = abase;
 	  abase->blocks[i].x.next_free = free_ablock;
@@ -1217,7 +1206,7 @@ lisp_align_free (void *block)
   free_ablock = ablock;
   /* Update busy count.  */
   intptr_t busy = (intptr_t) ABLOCKS_BUSY (abase) - 2;
-  eassume (0 <= busy && busy <= 2 * ABLOCKS_SIZE - 1);
+  eassume (0 <= busy && busy <= 2 * ABLOCKS_NBLOCKS - 1);
   ABLOCKS_BUSY (abase) = (struct ablocks *) busy;
 
   if (busy < 2)
@@ -1225,7 +1214,7 @@ lisp_align_free (void *block)
       int i = 0;
       bool aligned = busy;
       struct ablock **tem = &free_ablock;
-      struct ablock *atop = &abase->blocks[aligned ? ABLOCKS_SIZE : ABLOCKS_SIZE - 1];
+      struct ablock *atop = &abase->blocks[aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1];
 
       while (*tem)
 	{
@@ -1238,7 +1227,7 @@ lisp_align_free (void *block)
 	    tem = &(*tem)->x.next_free;
 	}
       eassert ((aligned & 1) == aligned);
-      eassert (i == (aligned ? ABLOCKS_SIZE : ABLOCKS_SIZE - 1));
+      eassert (i == (aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1));
 #ifdef USE_POSIX_MEMALIGN
       eassert ((uintptr_t) ABLOCKS_BASE (abase) % BLOCK_ALIGN == 0);
 #endif
@@ -1322,38 +1311,16 @@ lrealloc (void *p, size_t size)
     }
 }
 
-
-/* Number of intervals allocated in an interval_block structure.  */
-
-enum { INTERVAL_BLOCK_SIZE
-         = ((MALLOC_SIZE_NEAR (1024) - sizeof (struct interval_block *))
-	    / sizeof (struct interval)) };
-
-/* Intervals are allocated in chunks in the form of an interval_block
-   structure.  */
-
 struct interval_block
 {
-  /* Place `intervals' first, to preserve alignment.  */
-  struct interval intervals[INTERVAL_BLOCK_SIZE];
+  /* Place INTERVALS first, to preserve alignment.  */
+  struct interval intervals[BLOCK_NINTERVALS];
   struct interval_block *next;
 };
 
-/* Current interval block.  Its `next' pointer points to older
-   blocks.  */
-
 static struct interval_block *interval_block;
-
-/* Index in interval_block above of the next unused interval
-   structure.  */
-
-static int interval_block_index = INTERVAL_BLOCK_SIZE;
-
-/* List of free intervals.  */
-
+static int interval_block_index = BLOCK_NINTERVALS;
 static INTERVAL interval_free_list;
-
-/* Return a new interval.  */
 
 INTERVAL
 make_interval (void)
@@ -1369,7 +1336,7 @@ make_interval (void)
     }
   else
     {
-      if (interval_block_index == INTERVAL_BLOCK_SIZE)
+      if (interval_block_index == BLOCK_NINTERVALS)
 	{
 	  struct interval_block *newi
 	    = lisp_malloc (sizeof *newi, false, MEM_TYPE_NON_LISP);
@@ -1390,15 +1357,12 @@ make_interval (void)
   return val;
 }
 
-
-/* Mark Lisp objects in interval I.  */
+/* Correct functional form for traverse_intervals_noorder().  */
 
 static void
 mark_interval_tree_1 (INTERVAL i, void *dummy)
 {
-  /* Intervals should never be shared.  So, if extra internal checking is
-     enabled, GC aborts if it seems to have processed an interval twice.  */
-  eassert (!interval_marked_p (i));
+  eassert (! interval_marked_p (i));
   set_interval_marked (i);
   mark_object (i->plist);
 }
@@ -1408,13 +1372,13 @@ mark_interval_tree_1 (INTERVAL i, void *dummy)
 static void
 mark_interval_tree (INTERVAL i)
 {
-  if (i && !interval_marked_p (i))
+  if (i && ! interval_marked_p (i))
     traverse_intervals_noorder (i, mark_interval_tree_1, NULL);
 }
 
 /* Lisp_Strings are allocated in string_block structures.  When a new
    string_block is allocated, all the Lisp_Strings it contains are
-   added to a free-list string_free_list.  When a new Lisp_String is
+   added to a free list string_free_list.  When a new Lisp_String is
    needed, it is taken from that list.  During the sweep phase of GC,
    string_blocks that are entirely free are freed, except two which
    we keep.
@@ -1429,22 +1393,19 @@ mark_interval_tree (INTERVAL i)
    its sdata structure.
 
    When a Lisp_String is freed during GC, it is put back on
-   string_free_list, and its `data' member and its sdata's `string'
-   pointer is set to null.  The size of the string is recorded in the
-   `n.nbytes' member of the sdata.  So, sdata structures that are no
+   string_free_list, and its DATA member and its sdata's STRING
+   pointer are set to null.  The size of the string is recorded in the
+   N.NBYTES member of the sdata.  So, sdata structures that are no
    longer used, can be easily recognized, and it's easy to compact the
    sblocks of small strings which we do in compact_small_strings.  */
 
 /* Size in bytes of an sblock structure used for small strings.  */
 
-enum { SBLOCK_SIZE = MALLOC_SIZE_NEAR (8192) };
+#define SBLOCK_SIZE (MALLOC_SIZE_NEAR(1 << 13))
 
-/* Strings larger than this are considered large strings.  String data
-   for large strings is allocated from individual sblocks.  */
+/* Large string are allocated from individual sblocks.  */
 
-#define LARGE_STRING_BYTES 1024
-
-/* The layout of a nonnull string.  */
+#define LARGE_STRING_BYTES (1 << 10)
 
 struct sdata
 {
@@ -1512,19 +1473,10 @@ struct sblock
   sdata data[FLEXIBLE_ARRAY_MEMBER];
 };
 
-/* Number of Lisp strings in a string_block structure.  */
-
-enum { STRING_BLOCK_SIZE
-         = ((MALLOC_SIZE_NEAR (1024) - sizeof (struct string_block *))
-	    / sizeof (struct Lisp_String)) };
-
-/* Structure describing a block from which Lisp_String structures
-   are allocated.  */
-
 struct string_block
 {
   /* Place `strings' first, to preserve alignment.  */
-  struct Lisp_String strings[STRING_BLOCK_SIZE];
+  struct Lisp_String strings[BLOCK_NSTRINGS];
   struct string_block *next;
 };
 
@@ -1533,22 +1485,12 @@ struct string_block
    in the sblock structures go from oldest_sblock to current_sblock.  */
 
 static struct sblock *oldest_sblock, *current_sblock;
-
-/* List of sblocks for large strings.  */
-
 static struct sblock *large_sblocks;
-
-/* List of string_block structures.  */
-
 static struct string_block *string_blocks;
-
-/* Free-list of Lisp_Strings.  */
-
 static struct Lisp_String *string_free_list;
 
-/* Given a pointer to a Lisp_String S which is on the free-list
-   string_free_list, return a pointer to its successor in the
-   free-list.  */
+/* Given a pointer to a Lisp_String S which is on string_free_list,
+   return a pointer to its successor in the free list.  */
 
 #define NEXT_FREE_LISP_STRING(S) ((S)->u.next)
 
@@ -1691,11 +1633,11 @@ check_string_free_list (void)
 {
   struct Lisp_String *s;
 
-  /* Pop a Lisp_String off the free-list.  */
+  /* Pop a Lisp_String off the free list.  */
   s = string_free_list;
   while (s != NULL)
     {
-      if ((uintptr_t) s < 1024)
+      if ((uintptr_t) s < BLOCK_ALIGN)
 	emacs_abort ();
       s = NEXT_FREE_LISP_STRING (s);
     }
@@ -1713,8 +1655,8 @@ allocate_string (void)
 
   MALLOC_BLOCK_INPUT;
 
-  /* If the free-list is empty, allocate a new string_block, and
-     add all the Lisp_Strings in it to the free-list.  */
+  /* If the free list is empty, allocate a new string_block, and
+     add all the Lisp_Strings in it to the free list.  */
   if (string_free_list == NULL)
     {
       struct string_block *b = lisp_malloc (sizeof *b, false, MEM_TYPE_STRING);
@@ -1723,7 +1665,7 @@ allocate_string (void)
       b->next = string_blocks;
       string_blocks = b;
 
-      for (i = STRING_BLOCK_SIZE - 1; i >= 0; --i)
+      for (i = BLOCK_NSTRINGS - 1; i >= 0; --i)
 	{
 	  s = b->strings + i;
 	  /* Every string on a free list should have NULL data pointer.  */
@@ -1735,7 +1677,7 @@ allocate_string (void)
 
   check_string_free_list ();
 
-  /* Pop a Lisp_String off the free-list.  */
+  /* Pop a Lisp_String off the free list.  */
   s = string_free_list;
   string_free_list = NEXT_FREE_LISP_STRING (s);
 
@@ -1925,13 +1867,13 @@ sweep_strings (void)
 
       next = b->next;
 
-      for (i = 0; i < STRING_BLOCK_SIZE; ++i)
+      for (i = 0; i < BLOCK_NSTRINGS; ++i)
 	{
 	  struct Lisp_String *s = b->strings + i;
 
 	  if (s->u.s.data)
 	    {
-	      /* String was not on free-list before.  */
+	      /* String was not on free list before.  */
 	      if (XSTRING_MARKED_P (s))
 		{
 		  /* String is live; unmark it and its intervals.  */
@@ -1945,7 +1887,7 @@ sweep_strings (void)
 		}
 	      else
 		{
-		  /* String is dead.  Put it on the free-list.  */
+		  /* String is dead.  Put it on the free list.  */
 		  sdata *data = SDATA_OF_STRING (s);
 
 		  /* Save the size of S in its sdata so that we know
@@ -1963,7 +1905,7 @@ sweep_strings (void)
 		     know it's free.  */
 		  s->u.s.data = NULL;
 
-		  /* Put the string on the free-list.  */
+		  /* Put the string on the free list.  */
 		  NEXT_FREE_LISP_STRING (s) = string_free_list;
 		  string_free_list = s;
 		  ++nfree;
@@ -1971,7 +1913,7 @@ sweep_strings (void)
 	    }
 	  else
 	    {
-	      /* S was on the free-list before.  Put it there again.  */
+	      /* S was on the free list before.  Put it there again.  */
 	      NEXT_FREE_LISP_STRING (s) = string_free_list;
 	      string_free_list = s;
 	      ++nfree;
@@ -1980,8 +1922,8 @@ sweep_strings (void)
 
       /* Free blocks that contain free Lisp_Strings only, except
 	 the first two of them.  */
-      if (nfree == STRING_BLOCK_SIZE
-	  && gcstat.total_free_strings > STRING_BLOCK_SIZE)
+      if (nfree == BLOCK_NSTRINGS
+	  && gcstat.total_free_strings > BLOCK_NSTRINGS)
 	{
 	  lisp_free (b);
 	  string_free_list = free_list_before;
@@ -2002,9 +1944,6 @@ sweep_strings (void)
 
   check_string_free_list ();
 }
-
-
-/* Free dead large strings.  */
 
 static void
 free_large_strings (void)
@@ -2027,7 +1966,6 @@ free_large_strings (void)
 
   large_sblocks = live_blocks;
 }
-
 
 /* Compact data of small strings.  Free sblocks that don't contain
    data of live strings after compaction.  */
@@ -2328,7 +2266,6 @@ make_string_from_bytes (const char *contents,
   return val;
 }
 
-
 /* Make a string from NCHARS characters occupying NBYTES bytes at
    CONTENTS.  The argument MULTIBYTE controls whether to label the
    string as multibyte.  If NCHARS is negative, it counts the number of
@@ -2355,7 +2292,6 @@ make_specified_string (const char *contents,
   return val;
 }
 
-
 /* Return a unibyte Lisp_String set up to hold LENGTH characters
    occupying LENGTH bytes.  If CLEARIT, clear its contents to null
    bytes; otherwise, the contents are uninitialized.  */
@@ -2380,7 +2316,6 @@ make_uninit_string (EMACS_INT length)
 {
   return make_clear_string (length, false);
 }
-
 
 /* Return a multibyte Lisp_String set up to hold NCHARS characters
    which occupy NBYTES bytes.  If CLEARIT, clear its contents to null
@@ -2452,18 +2387,6 @@ pin_string (Lisp_Object string)
   s->u.s.size_byte = -3;
 }
 
-
-/* We store float cells inside of float_blocks, allocating a new
-   float_block with malloc whenever necessary.  Float cells reclaimed
-   by GC are put on a free list to be reallocated before allocating
-   any new float cells from the latest float_block.  */
-
-#define FLOAT_BLOCK_SIZE					\
-  (((BLOCK_BYTES - sizeof (struct float_block *)		\
-     /* The compiler might add padding at the end.  */		\
-     - (sizeof (struct Lisp_Float) - sizeof (bits_word))) * CHAR_BIT) \
-   / (sizeof (struct Lisp_Float) * CHAR_BIT + 1))
-
 #define GETMARKBIT(block,n)				\
   (((block)->gcmarkbits[(n) / BITS_PER_BITS_WORD]	\
     >> ((n) % BITS_PER_BITS_WORD))			\
@@ -2478,7 +2401,7 @@ pin_string (Lisp_Object string)
    &= ~((bits_word) 1 << ((n) % BITS_PER_BITS_WORD)))
 
 #define FLOAT_BLOCK(fptr) \
-  (eassert (!pdumper_object_p (fptr)),                                  \
+  (eassert (! pdumper_object_p (fptr)),                                  \
    ((struct float_block *) (((uintptr_t) (fptr)) & ~(BLOCK_ALIGN - 1))))
 
 #define FLOAT_INDEX(fptr) \
@@ -2486,9 +2409,9 @@ pin_string (Lisp_Object string)
 
 struct float_block
 {
-  /* Place `floats' at the beginning, to ease up FLOAT_INDEX's job.  */
-  struct Lisp_Float floats[FLOAT_BLOCK_SIZE];
-  bits_word gcmarkbits[1 + FLOAT_BLOCK_SIZE / BITS_PER_BITS_WORD];
+  /* FLOAT_INDEX needs FLOATS first.  */
+  struct Lisp_Float floats[BLOCK_NFLOATS];
+  bits_word gcmarkbits[1 + BLOCK_NFLOATS / BITS_PER_BITS_WORD];
   struct float_block *next;
 };
 
@@ -2501,19 +2424,9 @@ struct float_block
 #define XFLOAT_UNMARK(fptr) \
   UNSETMARKBIT (FLOAT_BLOCK (fptr), FLOAT_INDEX ((fptr)))
 
-/* Current float_block.  */
-
 static struct float_block *float_block;
-
-/* Index of first unused Lisp_Float in the current float_block.  */
-
-static int float_block_index = FLOAT_BLOCK_SIZE;
-
-/* Free-list of Lisp_Floats.  */
-
+static int float_block_index = BLOCK_NFLOATS;
 static struct Lisp_Float *float_free_list;
-
-/* Return a new float object with value FLOAT_VALUE.  */
 
 Lisp_Object
 make_float (double float_value)
@@ -2529,7 +2442,7 @@ make_float (double float_value)
     }
   else
     {
-      if (float_block_index == FLOAT_BLOCK_SIZE)
+      if (float_block_index == BLOCK_NFLOATS)
 	{
 	  struct float_block *new
 	    = lisp_align_malloc (sizeof *new, MEM_TYPE_FLOAT);
@@ -2551,19 +2464,8 @@ make_float (double float_value)
   return val;
 }
 
-/* We store cons cells inside of cons_blocks, allocating a new
-   cons_block with malloc whenever necessary.  Cons cells reclaimed by
-   GC are put on a free list to be reallocated before allocating
-   any new cons cells from the latest cons_block.  */
-
-#define CONS_BLOCK_SIZE						\
-  (((BLOCK_BYTES - sizeof (struct cons_block *)			\
-     /* The compiler might add padding at the end.  */		\
-     - (sizeof (struct Lisp_Cons) - sizeof (bits_word))) * CHAR_BIT)	\
-   / (sizeof (struct Lisp_Cons) * CHAR_BIT + 1))
-
 #define CONS_BLOCK(fptr) \
-  (eassert (!pdumper_object_p (fptr)),                                  \
+  (eassert (! pdumper_object_p (fptr)),                                  \
    ((struct cons_block *) ((uintptr_t) (fptr) & ~(BLOCK_ALIGN - 1))))
 
 #define CONS_INDEX(fptr) \
@@ -2571,9 +2473,9 @@ make_float (double float_value)
 
 struct cons_block
 {
-  /* Place `conses' at the beginning, to ease up CONS_INDEX's job.  */
-  struct Lisp_Cons conses[CONS_BLOCK_SIZE];
-  bits_word gcmarkbits[1 + CONS_BLOCK_SIZE / BITS_PER_BITS_WORD];
+  /* CONS_INDEX needs CONSES first. */
+  struct Lisp_Cons conses[BLOCK_NCONS];
+  bits_word gcmarkbits[1 + BLOCK_NCONS / BITS_PER_BITS_WORD];
   struct cons_block *next;
 };
 
@@ -2586,19 +2488,11 @@ struct cons_block
 #define XUNMARK_CONS(fptr) \
   UNSETMARKBIT (CONS_BLOCK (fptr), CONS_INDEX ((fptr)))
 
-/* Current cons_block.  */
-
 static struct cons_block *cons_block;
-
-/* Index of first unused Lisp_Cons in the current block.  */
-
-static int cons_block_index = CONS_BLOCK_SIZE;
-
-/* Free-list of Lisp_Cons structures.  */
-
+static int cons_block_index = BLOCK_NCONS;
 static struct Lisp_Cons *cons_free_list;
 
-/* Explicitly free a cons cell by putting it on the free-list.  */
+/* Explicitly free a cons cell by putting it on the free list.  */
 
 void
 free_cons (struct Lisp_Cons *ptr)
@@ -2625,7 +2519,7 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
     }
   else
     {
-      if (cons_block_index == CONS_BLOCK_SIZE)
+      if (cons_block_index == BLOCK_NCONS)
 	{
 	  struct cons_block *new
 	    = lisp_align_malloc (sizeof *new, MEM_TYPE_CONS);
@@ -2642,9 +2536,10 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
 
   XSETCAR (val, car);
   XSETCDR (val, cdr);
-  eassert (!XCONS_MARKED_P (XCONS (val)));
+  eassert (! XCONS_MARKED_P (XCONS (val)));
   bytes_since_gc += sizeof (struct Lisp_Cons);
   cons_cells_consed++;
+
   return val;
 }
 
@@ -2777,14 +2672,14 @@ set_next_vector (struct Lisp_Vector *v, struct Lisp_Vector *p)
    for the most common cases; it's not required to be a power of two, but
    it's expected to be a mult-of-ROUNDUP_SIZE (see below).  */
 
-enum { VECTOR_BLOCK_SIZE = 4096 };
+enum { VECTOR_BLOCK_ALIGN = (1 << 12) };
 
 /* Vector size requests are a multiple of this.  */
 enum { roundup_size = COMMON_MULTIPLE (LISP_ALIGNMENT, word_size) };
 
 /* Verify assumptions described above.  */
-verify (VECTOR_BLOCK_SIZE % roundup_size == 0);
-verify (VECTOR_BLOCK_SIZE <= (1 << PSEUDOVECTOR_SIZE_BITS));
+verify (VECTOR_BLOCK_ALIGN % roundup_size == 0);
+verify (VECTOR_BLOCK_ALIGN <= (1 << PSEUDOVECTOR_SIZE_BITS));
 
 /* Round up X to nearest mult-of-ROUNDUP_SIZE --- use at compile time.  */
 #define vroundup_ct(x) ROUNDUP (x, roundup_size)
@@ -2793,7 +2688,7 @@ verify (VECTOR_BLOCK_SIZE <= (1 << PSEUDOVECTOR_SIZE_BITS));
 
 /* Rounding helps to maintain alignment constraints if USE_LSB_TAG.  */
 
-enum {VECTOR_BLOCK_BYTES = VECTOR_BLOCK_SIZE - vroundup_ct (sizeof (void *))};
+enum {VECTOR_BLOCK_NBYTES = VECTOR_BLOCK_ALIGN - vroundup_ct (sizeof (void *))};
 
 /* Size of the minimal vector allocated from block.  */
 
@@ -2801,13 +2696,13 @@ enum { VBLOCK_BYTES_MIN = vroundup_ct (header_size + sizeof (Lisp_Object)) };
 
 /* Size of the largest vector allocated from block.  */
 
-enum { VBLOCK_BYTES_MAX = vroundup_ct ((VECTOR_BLOCK_BYTES / 2) - word_size) };
+enum { VBLOCK_BYTES_MAX = vroundup_ct ((VECTOR_BLOCK_NBYTES / 2) - word_size) };
 
 /* We maintain one free list for each possible block-allocated
    vector size, and this is the number of free lists we have.  */
 
 enum { VECTOR_MAX_FREE_LIST_INDEX =
-       (VECTOR_BLOCK_BYTES - VBLOCK_BYTES_MIN) / roundup_size + 1 };
+       (VECTOR_BLOCK_NBYTES - VBLOCK_BYTES_MIN) / roundup_size + 1 };
 
 /* Common shortcut to advance vector pointer over a block data.  */
 
@@ -2860,7 +2755,7 @@ large_vector_vec (struct large_vector *p)
 
 struct vector_block
 {
-  char data[VECTOR_BLOCK_BYTES];
+  char data[VECTOR_BLOCK_NBYTES];
   struct vector_block *next;
 };
 
@@ -2881,7 +2776,7 @@ static struct large_vector *large_vectors;
 
 Lisp_Object zero_vector;
 
-/* Common shortcut to setup vector on a free list.  */
+/* Common shortcut to set up vector on a free list.  */
 
 static void
 setup_on_free_list (struct Lisp_Vector *v, ptrdiff_t nbytes)
@@ -2904,7 +2799,7 @@ allocate_vector_block (void)
   struct vector_block *block = xmalloc (sizeof *block);
 
 #ifndef GC_MALLOC_CHECK
-  mem_insert (block->data, block->data + VECTOR_BLOCK_BYTES,
+  mem_insert (block->data, block->data + VECTOR_BLOCK_NBYTES,
 	      MEM_TYPE_VECTOR_BLOCK);
 #endif
 
@@ -2971,7 +2866,7 @@ allocate_vector_from_block (ptrdiff_t nbytes)
 
   /* If the rest of space from this block is large enough
      for one-slot vector at least, set up it on a free list.  */
-  restbytes = VECTOR_BLOCK_BYTES - nbytes;
+  restbytes = VECTOR_BLOCK_NBYTES - nbytes;
   if (restbytes >= VBLOCK_BYTES_MIN)
     {
       eassert (restbytes % roundup_size == 0);
@@ -2984,7 +2879,7 @@ allocate_vector_from_block (ptrdiff_t nbytes)
 
 #define VECTOR_IN_BLOCK(vector, block)		\
   ((char *) (vector) <= (block)->data		\
-   + VECTOR_BLOCK_BYTES - VBLOCK_BYTES_MIN)
+   + VECTOR_BLOCK_NBYTES - VBLOCK_BYTES_MIN)
 
 /* Return the memory footprint of V in bytes.  */
 
@@ -3506,22 +3401,10 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
   return make_lisp_ptr (v, Lisp_Vectorlike);
 }
 
-
-/***********************************************************************
-			   Symbol Allocation
- ***********************************************************************/
-
-/* Each symbol_block is just under 1020 bytes long, since malloc
-   really allocates in units of powers of two and uses 4 bytes for its
-   own overhead.  */
-
-#define SYMBOL_BLOCK_SIZE \
-  ((1020 - sizeof (struct symbol_block *)) / sizeof (struct Lisp_Symbol))
-
 struct symbol_block
 {
   /* Place SYMBOLS array first, to preserve alignment.  */
-  struct Lisp_Symbol symbols[SYMBOL_BLOCK_SIZE];
+  struct Lisp_Symbol symbols[BLOCK_NSYMBOLS];
   struct symbol_block *next;
 };
 
@@ -3529,7 +3412,7 @@ struct symbol_block
    structure in it.  */
 
 static struct symbol_block *symbol_block;
-static int symbol_block_index = SYMBOL_BLOCK_SIZE;
+static int symbol_block_index = BLOCK_NSYMBOLS;
 /* Pointer to the first symbol_block that contains pinned symbols.
    Tests for 24.4 showed that at dump-time, Emacs contains about 15K symbols,
    10K of which are pinned (and all but 250 of them are interned in obarray),
@@ -3583,7 +3466,7 @@ Its value is void, and its function definition and property list are nil.  */)
     }
   else
     {
-      if (symbol_block_index == SYMBOL_BLOCK_SIZE)
+      if (symbol_block_index == BLOCK_NSYMBOLS)
 	{
 	  struct symbol_block *new
 	    = lisp_malloc (sizeof *new, false, MEM_TYPE_SYMBOL);
@@ -3839,10 +3722,6 @@ DEFUN ("make-finalizer", Fmake_finalizer, Smake_finalizer, 1, 1, 0,
   return make_lisp_ptr (finalizer, Lisp_Vectorlike);
 }
 
-
-/************************************************************************
-                         Mark bit access functions
- ************************************************************************/
 
 /* With the rare exception of functions implementing block-based
    allocation of various types, you should not directly test or set GC
@@ -4363,7 +4242,7 @@ live_string_holding (struct mem_node *m, void *p)
   ptrdiff_t offset = cp - (char *) &b->strings[0];
 
   /* P must point into a Lisp_String structure, and it
-     must not be on the free-list.  */
+     must not be on the free list.  */
   if (0 <= offset && offset < sizeof b->strings)
     {
       ptrdiff_t off = offset % sizeof b->strings[0];
@@ -4402,7 +4281,7 @@ live_cons_holding (struct mem_node *m, void *p)
 
   /* P must point into a Lisp_Cons, not be
      one of the unused cells in the current cons block,
-     and not be on the free-list.  */
+     and not be on the free list.  */
   if (0 <= offset && offset < sizeof b->conses
       && (b != cons_block
 	  || offset / sizeof b->conses[0] < cons_block_index))
@@ -4440,7 +4319,7 @@ live_symbol_holding (struct mem_node *m, void *p)
 
   /* P must point into the Lisp_Symbol, not be
      one of the unused cells in the current symbol block,
-     and not be on the free-list.  */
+     and not be on the free list.  */
   if (0 <= offset && offset < sizeof b->symbols
       && (b != symbol_block
 	  || offset / sizeof b->symbols[0] < symbol_block_index))
@@ -5004,10 +4883,6 @@ valid_lisp_object_p (Lisp_Object obj)
 
   return 0;
 }
-
-/***********************************************************************
-		       Pure Storage Management
- ***********************************************************************/
 
 /* Allocate room for SIZE bytes from pure Lisp storage and return a
    pointer to it.  TYPE is the Lisp type for which the memory is
@@ -5597,7 +5472,7 @@ mark_pinned_symbols (void)
 {
   struct symbol_block *sblk;
   int lim = (symbol_block_pinned == symbol_block
-	     ? symbol_block_index : SYMBOL_BLOCK_SIZE);
+	     ? symbol_block_index : BLOCK_NSYMBOLS);
 
   for (sblk = symbol_block_pinned; sblk; sblk = sblk->next)
     {
@@ -5606,7 +5481,7 @@ mark_pinned_symbols (void)
 	if (sym->u.s.pinned)
 	  mark_object (make_lisp_symbol (sym));
 
-      lim = SYMBOL_BLOCK_SIZE;
+      lim = BLOCK_NSYMBOLS;
     }
 }
 
@@ -5915,9 +5790,9 @@ For further details, see Info node `(elisp)Garbage Collection'.  */)
 	   make_int (gcst.total_buffers)),
 
 #ifdef DOUG_LEA_MALLOC
-    list4 (Qheap, make_fixnum (1024),
-	   make_int ((mallinfo ().uordblks + 1023) >> 10),
-	   make_int ((mallinfo ().fordblks + 1023) >> 10)),
+    list4 (Qheap, make_fixnum (BLOCK_ALIGN),
+	   make_int ((mallinfo ().uordblks + (BLOCK_ALIGN - 1)) >> BLOCK_NBITS),
+	   make_int ((mallinfo ().fordblks + (BLOCK_ALIGN - 1)) >> BLOCK_NBITS)),
 #endif
   };
   return CALLMANY (Flist, total);
@@ -6704,11 +6579,11 @@ sweep_conses (void)
             }
         }
 
-      lim = CONS_BLOCK_SIZE;
+      lim = BLOCK_NCONS;
       /* If this block contains only free conses and we have already
          seen more than two blocks worth of free conses then deallocate
          this block.  */
-      if (this_free == CONS_BLOCK_SIZE && num_free > CONS_BLOCK_SIZE)
+      if (this_free == BLOCK_NCONS && num_free > BLOCK_NCONS)
         {
           *cprev = cblk->next;
           /* Unhook from the free list.  */
@@ -6752,11 +6627,11 @@ sweep_floats (void)
 	      XFLOAT_UNMARK (afloat);
 	    }
 	}
-      lim = FLOAT_BLOCK_SIZE;
+      lim = BLOCK_NFLOATS;
       /* If this block contains only free floats and we have already
          seen more than two blocks worth of free floats then deallocate
          this block.  */
-      if (this_free == FLOAT_BLOCK_SIZE && num_free > FLOAT_BLOCK_SIZE)
+      if (this_free == BLOCK_NFLOATS && num_free > BLOCK_NFLOATS)
         {
           *fprev = fblk->next;
           /* Unhook from the free list.  */
@@ -6800,11 +6675,11 @@ sweep_intervals (void)
               iblk->intervals[i].gcmarkbit = 0;
             }
         }
-      lim = INTERVAL_BLOCK_SIZE;
+      lim = BLOCK_NINTERVALS;
       /* If this block contains only free intervals and we have already
          seen more than two blocks worth of free intervals then
          deallocate this block.  */
-      if (this_free == INTERVAL_BLOCK_SIZE && num_free > INTERVAL_BLOCK_SIZE)
+      if (this_free == BLOCK_NINTERVALS && num_free > BLOCK_NINTERVALS)
         {
           *iprev = iblk->next;
           /* Unhook from the free list.  */
@@ -6868,11 +6743,11 @@ sweep_symbols (void)
             }
         }
 
-      lim = SYMBOL_BLOCK_SIZE;
+      lim = BLOCK_NSYMBOLS;
       /* If this block contains only free symbols and we have already
          seen more than two blocks worth of free symbols then deallocate
          this block.  */
-      if (this_free == SYMBOL_BLOCK_SIZE && num_free > SYMBOL_BLOCK_SIZE)
+      if (this_free == BLOCK_NSYMBOLS && num_free > BLOCK_NSYMBOLS)
         {
           *sprev = sblk->next;
           /* Unhook from the free list.  */
@@ -6922,6 +6797,23 @@ sweep_buffers (void)
     }
 }
 
+bool
+gc_handle_sigsegv (void *const fault_address)
+{
+  if (! NILP (Vgc__protect_p))
+    {
+      Vgc__protect_p = Qnil;
+      if (mem_find (fault_address))
+	{
+	  int pagesize = getpagesize ();
+	  char *page_start = (char *) ((uintptr_t) fault_address & ~(pagesize - 1));
+	  mprotect (page_start, pagesize, PROT_READ | PROT_WRITE);
+	  return true;
+	}
+    }
+  return false;
+}
+
 /* Sweep: find all structures not marked, and free them.  */
 static void
 gc_sweep (void)
@@ -6945,6 +6837,19 @@ DEFUN ("memory-full", Fmemory_full, Smemory_full, 0, 0, 0,
   return Vmemory_full;
 }
 
+DEFUN ("gc--protect-now", Fgc_protect_now, Sgc_protect_now, 0, 0, "",
+       doc: /* Call mprotect().  */)
+  (void)
+{
+  if (CONSP (Vgc__protect_p))
+    {
+      int pagesize = getpagesize ();
+      char *page_start =
+	(char *) ((uintptr_t) (XLP (Vgc__protect_p)) & ~(pagesize - 1));
+      mprotect (page_start, pagesize, PROT_READ);
+    }
+  return Vgc__protect_p;
+}
 
 DEFUN ("memory-info", Fmemory_info, Smemory_info, 0, 0, 0,
        doc: /* Return a list of (TOTAL-RAM FREE-RAM TOTAL-SWAP FREE-SWAP).
@@ -6964,28 +6869,28 @@ or memory information can't be obtained, return nil.  */)
 #else
   units = 1;
 #endif
-  return list4i ((uintmax_t) si.totalram * units / 1024,
-		 (uintmax_t) si.freeram * units / 1024,
-		 (uintmax_t) si.totalswap * units / 1024,
-		 (uintmax_t) si.freeswap * units / 1024);
+  return list4i ((uintmax_t) si.totalram * units / BLOCK_ALIGN,
+		 (uintmax_t) si.freeram * units / BLOCK_ALIGN,
+		 (uintmax_t) si.totalswap * units / BLOCK_ALIGN,
+		 (uintmax_t) si.freeswap * units / BLOCK_ALIGN);
 #elif defined WINDOWSNT
   unsigned long long totalram, freeram, totalswap, freeswap;
 
   if (w32_memory_info (&totalram, &freeram, &totalswap, &freeswap) == 0)
-    return list4i ((uintmax_t) totalram / 1024,
-		   (uintmax_t) freeram / 1024,
-		   (uintmax_t) totalswap / 1024,
-		   (uintmax_t) freeswap / 1024);
+    return list4i ((uintmax_t) totalram / BLOCK_ALIGN,
+		   (uintmax_t) freeram / BLOCK_ALIGN,
+		   (uintmax_t) totalswap / BLOCK_ALIGN,
+		   (uintmax_t) freeswap / BLOCK_ALIGN);
   else
     return Qnil;
 #elif defined MSDOS
   unsigned long totalram, freeram, totalswap, freeswap;
 
   if (dos_memory_info (&totalram, &freeram, &totalswap, &freeswap) == 0)
-    return list4i ((uintmax_t) totalram / 1024,
-		   (uintmax_t) freeram / 1024,
-		   (uintmax_t) totalswap / 1024,
-		   (uintmax_t) freeswap / 1024);
+    return list4i ((uintmax_t) totalram / BLOCK_ALIGN,
+		   (uintmax_t) freeram / BLOCK_ALIGN,
+		   (uintmax_t) totalswap / BLOCK_ALIGN,
+		   (uintmax_t) freeswap / BLOCK_ALIGN);
   else
     return Qnil;
 #else /* not HAVE_LINUX_SYSINFO, not WINDOWSNT, not MSDOS */
@@ -7108,7 +7013,7 @@ which_symbols (Lisp_Object obj, EMACS_INT find_max)
 	   struct Lisp_Symbol *asym = sblk->symbols;
 	   int bn;
 
-	   for (bn = 0; bn < SYMBOL_BLOCK_SIZE; bn++, asym++)
+	   for (bn = 0; bn < BLOCK_NSYMBOLS; bn++, asym++)
 	     {
 	       if (sblk == symbol_block && bn >= symbol_block_index)
 		 break;
@@ -7286,9 +7191,9 @@ init_runtime (void)
   mem_init ();
 
 #ifdef DOUG_LEA_MALLOC
-  mallopt (M_TRIM_THRESHOLD, 128 * 1024);   /* Trim threshold.  */
-  mallopt (M_MMAP_THRESHOLD, 64 * 1024);    /* Mmap threshold.  */
-  mallopt (M_MMAP_MAX, RESTORE_M_MMAP_MAX); /* Max. number of mmap'ed areas.  */
+  mallopt (M_TRIM_THRESHOLD, 128 * BLOCK_ALIGN);
+  mallopt (M_MMAP_THRESHOLD, 64 * BLOCK_ALIGN);
+  mallopt (M_MMAP_MAX, RESTORE_M_MMAP_MAX);
 #endif
 
   init_finalizer_list (&finalizers);
@@ -7369,6 +7274,10 @@ If this portion is smaller than `gc-cons-threshold', this is ignored.  */);
 				      " M-x save-some-buffers then"
 				      " exit and restart Emacs"));
 
+  DEFVAR_LISP ("gc--protect-p", Vgc__protect_p,
+	       doc: /* How does mprotect work?  */);
+  Vgc__protect_p = Qnil;
+
   DEFSYM (Qconses, "conses");
   DEFSYM (Qsymbols, "symbols");
   DEFSYM (Qstrings, "strings");
@@ -7419,6 +7328,7 @@ N should be nonnegative.  */);
   defsubr (&Smemory_info);
   defsubr (&Smemory_full);
   defsubr (&Smemory_use_counts);
+  defsubr (&Sgc_protect_now);
 #if defined GNU_LINUX && defined __GLIBC__ && \
   (__GLIBC__ > 2 || __GLIBC_MINOR__ >= 10)
 
