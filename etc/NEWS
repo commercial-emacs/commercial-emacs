@@ -515,6 +515,9 @@ minor modes are listed after the major mode.
 The apropos commands will now select the apropos window if
 'help-window-select' is non-nil.
 
+---
+*** New Ukrainian translation of the Emacs Tutorial.
+
 ** Outline Mode
 
 +++
