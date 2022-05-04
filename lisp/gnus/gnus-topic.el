@@ -674,7 +674,7 @@ articles in the topic and its subtopics."
 
 (defun gnus-topic-update-topics-containing-group (group)
   "Update all topics that have GROUP as a member."
-  (when (and (eq major-mode 'gnus-topic-mode)
+  (when (and (derived-mode-p 'gnus-group-mode)
 	     gnus-topic-mode)
     (save-excursion
       (let ((alist gnus-topic-alist))
@@ -690,7 +690,7 @@ articles in the topic and its subtopics."
 
 (defun gnus-topic-update-topic ()
   "Update all parent topics to the current group."
-  (when (and (eq major-mode 'gnus-topic-mode)
+  (when (and (derived-mode-p 'gnus-group-mode)
 	     gnus-topic-mode)
     (let ((group (gnus-group-group-name))
 	  (m (point-marker))
