@@ -104,7 +104,7 @@ See Info node `(elisp)Random Numbers' for more details.  */)
 
   return make_ufixnum (get_random ());
 }
-
+
 /* Random data-structure functions.  */
 
 /* Return LIST's length.  Signal an error if LIST is not a proper list.  */
@@ -603,7 +603,7 @@ Do NOT use this function to compare file names for equality.  */)
   return Fstring_equal (s1, s2);
 #endif /* !__STDC_ISO_10646__, !WINDOWSNT */
 }
-
+
 static Lisp_Object concat (ptrdiff_t nargs, Lisp_Object *args,
 			   Lisp_Object last_tail, bool vector_target);
 static Lisp_Object concat_strings (ptrdiff_t nargs, Lisp_Object *args);
@@ -1034,7 +1034,7 @@ concat (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail,
 
   return result;
 }
-
+
 static Lisp_Object string_char_byte_cache_string;
 static ptrdiff_t string_char_byte_cache_charpos;
 static ptrdiff_t string_char_byte_cache_bytepos;
@@ -1104,7 +1104,7 @@ string_char_to_byte (Lisp_Object string, ptrdiff_t char_index)
 
   return i_byte;
 }
-
+
 /* Return the character index corresponding to BYTE_INDEX in STRING.  */
 
 ptrdiff_t
@@ -1168,7 +1168,7 @@ string_byte_to_char (Lisp_Object string, ptrdiff_t byte_index)
 
   return i;
 }
-
+
 /* Convert STRING to a multibyte string.  */
 
 static Lisp_Object
@@ -1392,7 +1392,7 @@ an error is signaled.  */)
   return string;
 }
 
-
+
 DEFUN ("copy-alist", Fcopy_alist, Scopy_alist, 1, 1, 0,
        doc: /* Return a copy of ALIST.
 This is an alist which represents the same mapping from objects to objects,
@@ -1546,7 +1546,7 @@ substring_both (Lisp_Object string, ptrdiff_t from, ptrdiff_t from_byte,
 
   return res;
 }
-
+
 DEFUN ("nthcdr", Fnthcdr, Snthcdr, 2, 2, 0,
        doc: /* Take cdr N times on LIST, return the result.  */)
   (Lisp_Object n, Lisp_Object list)
@@ -1851,7 +1851,7 @@ The value is actually the first element of ALIST whose cdr equals KEY.  */)
   CHECK_LIST_END (tail, alist);
   return Qnil;
 }
-
+
 DEFUN ("delq", Fdelq, Sdelq, 2, 2, 0,
        doc: /* Delete members of LIST which are `eq' to ELT, and return the result.
 More precisely, this function skips any members `eq' to ELT at the
@@ -2288,7 +2288,7 @@ merge_c (Lisp_Object org_l1, Lisp_Object org_l2, bool (*less) (Lisp_Object, Lisp
     }
 }
 
-
+
 /* This does not check for quits.  That is safe since it must terminate.  */
 
 DEFUN ("plist-get", Fplist_get, Splist_get, 2, 2, 0,
@@ -2376,7 +2376,7 @@ It can be retrieved with `(get SYMBOL PROPNAME)'.  */)
     (symbol, Fplist_put (XSYMBOL (symbol)->u.s.plist, propname, value));
   return value;
 }
-
+
 DEFUN ("lax-plist-get", Flax_plist_get, Slax_plist_get, 2, 2, 0,
        doc: /* Extract a value from a property list, comparing with `equal'.
 This function is otherwise like `plist-get', but may signal an error
@@ -2430,7 +2430,7 @@ The PLIST is modified by side effects.  */)
   Fsetcdr (XCDR (prev), newcell);
   return plist;
 }
-
+
 DEFUN ("eql", Feql, Seql, 2, 2, 0,
        doc: /* Return t if the two args are `eq' or are indistinguishable numbers.
 Integers with the same value are `eql'.
@@ -2507,13 +2507,14 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	ht = CALLN (Fmake_hash_table, QCtest, Qeq);
       switch (XTYPE (o1))
 	{
-	case Lisp_Cons: case Lisp_Vectorlike:
+	case Lisp_Cons:
+	case Lisp_Vectorlike:
 	  {
 	    struct Lisp_Hash_Table *h = XHASH_TABLE (ht);
 	    Lisp_Object hash;
 	    ptrdiff_t i = hash_lookup (h, o1, &hash);
 	    if (i >= 0)
-	      { /* `o1' was seen already.  */
+	      { /* O1 was seen already.  */
 		Lisp_Object o2s = HASH_VALUE (h, i);
 		if (!NILP (Fmemq (o2, o2s)))
 		  return true;
@@ -2638,7 +2639,7 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 
   return false;
 }
-
+
 
 DEFUN ("fillarray", Ffillarray, Sfillarray, 2, 2, 0,
        doc: /* Store each element of ARRAY with ITEM.
@@ -2715,7 +2716,7 @@ This makes STRING unibyte and may change its length.  */)
     }
   return Qnil;
 }
-
+
 Lisp_Object
 nconc2 (Lisp_Object s1, Lisp_Object s2)
 {
@@ -2754,7 +2755,7 @@ usage: (nconc &rest LISTS)  */)
 
   return val;
 }
-
+
 /* This is the guts of all mapping functions.
    Apply FN to each element of SEQ, one by one, storing the results
    into elements of VALS, a C vector of Lisp_Objects.  LENI is the
@@ -2902,7 +2903,7 @@ SEQUENCE may be a list, a vector, a bool-vector, or a string. */)
   SAFE_FREE ();
   return ret;
 }
-
+
 /* This is how C code calls `yes-or-no-p' and allows the user
    to redefine it.  */
 
@@ -2971,7 +2972,7 @@ if `last-nonmenu-event' is nil, and `use-dialog-box' is non-nil.  */)
       Fsleep_for (make_fixnum (2), Qnil);
     }
 }
-
+
 DEFUN ("load-average", Fload_average, Sload_average, 0, 1, 0,
        doc: /* Return list of 1 minute, 5 minute and 15 minute load averages.
 
@@ -3007,7 +3008,7 @@ advisable.  */)
 
   return ret;
 }
-
+
 DEFUN ("featurep", Ffeaturep, Sfeaturep, 1, 2, 0,
        doc: /* Return t if FEATURE is present in this Emacs.
 
@@ -3052,7 +3053,7 @@ particular subfeatures supported in this version of FEATURE.  */)
 
   return feature;
 }
-
+
 /* `require' and its subroutines.  */
 
 /* List of features currently being require'd, innermost first.  */
@@ -3168,7 +3169,7 @@ FILENAME are suppressed.  */)
 
   return feature;
 }
-
+
 /* Primitives for work of the "widget" library.
    In an ideal world, this section would not have been necessary.
    However, lisp function calls being as slow as they are, it turns
@@ -3335,7 +3336,7 @@ The data read from the system are decoded using `locale-coding-system'.  */)
 #endif	/* HAVE_LANGINFO_CODESET*/
   return Qnil;
 }
-
+
 /* base64 encode/decode functions (RFC 2045).
    Based on code from GNU recode. */
 
@@ -3933,7 +3934,7 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
 }
 
 
-
+
 /***********************************************************************
  *****                                                             *****
  *****			     Hash Tables                           *****
@@ -3955,7 +3956,7 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
    if a `:linear-search t' argument is given to make-hash-table.  */
 
 
-
+
 /***********************************************************************
 			       Utilities
  ***********************************************************************/
@@ -4565,7 +4566,7 @@ hash_clear (struct Lisp_Hash_Table *h)
 }
 
 
-
+
 /************************************************************************
 			   Weak Hash Tables
  ************************************************************************/
@@ -4660,7 +4661,7 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
   return marked;
 }
 
-
+
 /***********************************************************************
 			Hash Code Computation
  ***********************************************************************/
@@ -4888,7 +4889,7 @@ sxhash_obj (Lisp_Object obj, int depth)
 }
 
 
-
+
 /***********************************************************************
 			    Lisp Interface
  ***********************************************************************/
@@ -5248,7 +5249,7 @@ returns nil, then (funcall TEST x1 x2) also returns nil.  */)
 }
 
 
-
+
 /************************************************************************
 			MD5, SHA-1, and SHA-2
  ************************************************************************/
@@ -5878,7 +5879,7 @@ from the absolute start of the buffer, disregarding the narrowing.  */)
 
   return make_int (count_lines (start, CHAR_TO_BYTE (pos)) + 1);
 }
-
+
 
 void
 syms_of_fns (void)

@@ -803,10 +803,10 @@ struct Lisp_Symbol
       bool_bf gcmarkbit : 1;
 
       /* Indicates where the value can be found:
-	 0 : it's a plain var, the value is in the `value' field.
-	 1 : it's a varalias, the value is really in the `alias' symbol.
-	 2 : it's a localized var, the value is in the `blv' object.
-	 3 : it's a forwarding variable, the value is in `forward'.  */
+	 0 : plain var, value in `value' field
+	 1 : varalias, value in `alias' symbol
+	 2 : localized var, value in `blv' object
+	 3 : forwarding variable, value in `forward'  */
       ENUM_BF (symbol_redirect) redirect : 3;
 
       /* 0 : normal case, just set the value
@@ -814,22 +814,20 @@ struct Lisp_Symbol
 	 2 : trap the write, call watcher functions.  */
       ENUM_BF (symbol_trapped_write) trapped_write : 2;
 
-      /* Interned state of the symbol.  This is an enumerator from
-	 enum symbol_interned.  */
+      /* Value among enum symbol_interned.  */
       unsigned interned : 2;
 
-      /* True means that this variable has been explicitly declared
-	 special (with `defvar' etc), and shouldn't be lexically bound.  */
+      /* Declared by defvar or similar, and thus dynamically scoped.  */
       bool_bf declared_special : 1;
 
-      /* True if pointed to from purespace and hence can't be GC'd.  */
+      /* Pointed to from purespace and hence can't be GC'd.  */
       bool_bf pinned : 1;
 
       /* The symbol's name, as a Lisp string.  */
       Lisp_Object name;
 
       /* Value of the symbol or Qunbound if unbound.  Which alternative of the
-	 union is used depends on the `redirect' field above.  */
+	 union is used depends on the REDIRECT field above.  */
       union {
 	Lisp_Object value;
 	struct Lisp_Symbol *alias;

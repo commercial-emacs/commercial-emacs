@@ -1,4 +1,4 @@
-/* Storage allocation and gc for GNU Emacs Lisp interpreter.
+/* Allocator and garbage collector.
 
 Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2022 Free Software
 Foundation, Inc.
@@ -222,23 +222,18 @@ malloc_initialize_hook (void)
     }
   else
     {
-      if (!malloc_using_checking)
-	{
-	  /* Work around a bug in glibc's malloc.  MALLOC_CHECK_ must be
-	     ignored if the heap to be restored was constructed without
-	     malloc checking.  Can't use unsetenv, since that calls malloc.  */
-	  char **p = environ;
-	  if (p)
-	    for (; *p; p++)
-	      if (strncmp (*p, "MALLOC_CHECK_=", 14) == 0)
-		{
-		  do
-		    *p = p[1];
-		  while (*++p);
-
-		  break;
-		}
-	}
+      if (! malloc_using_checking)
+	/* Work around a bug in glibc's malloc.  MALLOC_CHECK_ must be
+	   ignored if the heap to be restored was constructed without
+	   malloc checking.  Can't use unsetenv, since that calls malloc.  */
+	for (char **p = environ; p && *p; p++)
+	  if (strncmp (*p, "MALLOC_CHECK_=", 14) == 0)
+	    {
+	      do
+		*p = p[1];
+	      while (*++p);
+	      break;
+	    }
 
       if (malloc_set_state (malloc_state_ptr) != 0)
 	emacs_abort ();
@@ -246,7 +241,7 @@ malloc_initialize_hook (void)
     }
 }
 
-/* Declare the malloc initialization hook, which runs before 'main' starts.
+/* Declare the malloc initialization hook, which runs before main() starts.
    EXTERNALLY_VISIBLE works around Bug#22522.  */
 typedef void (*voidfuncptr) (void);
 # ifndef __MALLOC_HOOK_VOLATILE
@@ -255,11 +250,9 @@ typedef void (*voidfuncptr) (void);
 voidfuncptr __MALLOC_HOOK_VOLATILE __malloc_initialize_hook EXTERNALLY_VISIBLE
   = malloc_initialize_hook;
 
-#endif
+#endif /* DOUG_LEA_MALLOC */
 
 #if defined DOUG_LEA_MALLOC || defined HAVE_UNEXEC
-
-/* Allocator-related actions to do just before and after unexec.  */
 
 void
 alloc_unexec_pre (void)
@@ -292,7 +285,7 @@ my_heap_start (void)
 }
 # endif
 
-#endif
+#endif /* defined DOUG_LEA_MALLOC || defined HAVE_UNEXEC */
 
 /* Mark, unmark, query mark bit of a Lisp string.  S must be a pointer
    to a struct Lisp_String.  */
@@ -311,7 +304,7 @@ my_heap_start (void)
 /* Global variables.  */
 struct emacs_globals globals;
 
-/* Exposed to lisp.h to inline maybe_garbage_collect() */
+/* Exposed to lisp.h so that maybe_garbage_collect() can inline.  */
 EMACS_INT bytes_since_gc;
 EMACS_INT bytes_between_gc;
 Lisp_Object Vmemory_full;
@@ -738,8 +731,7 @@ xrealloc (void *block, size_t size)
   return val;
 }
 
-
-/* Like free but block interrupt input.  */
+/* Like free() but block interrupt input.  */
 
 void
 xfree (void *block)
@@ -783,7 +775,6 @@ xnrealloc (void *pa, ptrdiff_t nitems, ptrdiff_t item_size)
     memory_full (SIZE_MAX);
   return xrealloc (pa, nbytes);
 }
-
 
 /* Grow PA, which points to an array of *NITEMS items, and return the
    location of the reallocated array, updating *NITEMS to reflect its
@@ -853,8 +844,7 @@ xpalloc (void *pa, ptrdiff_t *nitems, ptrdiff_t nitems_incr_min,
   return pa;
 }
 
-
-/* Like strdup, but uses xmalloc.  */
+/* Like strdup(), but uses xmalloc().  */
 
 char *
 xstrdup (const char *s)
@@ -887,7 +877,6 @@ dupstring (char **ptr, char const *string)
   xfree (old);
 }
 
-
 /* Like putenv, but (1) use the equivalent of xmalloc and (2) the
    argument is a const pointer.  */
 
@@ -907,7 +896,6 @@ record_xmalloc (size_t size)
   record_unwind_protect_ptr (xfree, p);
   return p;
 }
-
 
 /* Like malloc but used for allocating Lisp data.  NBYTES is the
    number of bytes to allocate, TYPE describes the intended use of the
@@ -976,6 +964,21 @@ lisp_free (void *block)
   MALLOC_UNBLOCK_INPUT;
 }
 
+/* The allocator malloc's blocks of BLOCK_ALIGN bytes.
+
+   Structs for blocks are statically defined, so calculate (at compile-time)
+   how many of each type will fit into its respective block.
+
+   For simpler blocks consisting only of an object array and a next pointer,
+   the numerator need only subtract off the size of the next pointer.
+
+   For blocks with an additional gcmarkbits array, say float_block, we
+   solve for y in the inequality:
+
+     BLOCK_ALIGN > y * sizeof (Lisp_Float) + sizeof (bits_word) * (y /
+     BITS_PER_BITS_WORD + 1) + sizeof (struct float_block *)
+*/
+
 enum
 {
   BLOCK_NBITS = 10,
@@ -984,14 +987,6 @@ enum
   BLOCK_NINTERVALS = (BLOCK_NBYTES) / sizeof (struct interval),
   BLOCK_NSTRINGS = (BLOCK_NBYTES) / sizeof (struct Lisp_String),
   BLOCK_NSYMBOLS = (BLOCK_NBYTES) / sizeof (struct Lisp_Symbol),
-  /* For float blocks (contains gcmarkbits), solve for y in:
-
-     BLOCK_ALIGN > y * sizeof (Lisp_Float) + sizeof (bits_word) * (y /
-a     BITS_PER_BITS_WORD + 1) + sizeof (struct float_block *)
-
-     Similarly for cons blocks.
-  */
-
   BLOCK_NFLOATS = ((BITS_PER_BITS_WORD / sizeof (bits_word))
 		   * (BLOCK_NBYTES - sizeof (bits_word))
 		   / ((BITS_PER_BITS_WORD / sizeof (bits_word))
@@ -1247,25 +1242,18 @@ laligned (void *p, size_t size)
 	  || size % LISP_ALIGNMENT != 0);
 }
 
-/* Like malloc and realloc except return null only on failure,
-   the result is Lisp-aligned if SIZE is, and lrealloc's pointer
-   argument must be nonnull.  Code allocating C heap memory
-   for a Lisp object should use one of these functions to obtain a
-   pointer P; that way, if T is an enum Lisp_Type value and L ==
-   make_lisp_ptr (P, T), then XPNTR (L) == P and XTYPE (L) == T.
+/* Request at least SIZE bytes from malloc, increasing the request by
+   LISP_ALIGNMENT until it returns a Lisp-aligned pointer.
 
-   If CLEARIT, arrange for the allocated memory to be cleared.
-   This might use calloc, as calloc can be faster than malloc+memset.
+   If T is an enum Lisp_Type and L = make_lisp_ptr (P, T), then
+   code seeking P such that XPNTR (L) == P and XTYPE (L) == T, or,
+   in less formal terms, seeking to allocate a Lisp object, should
+   call lmalloc().
 
-   On typical modern platforms these functions' loops do not iterate.
-   On now-rare (and perhaps nonexistent) platforms, the code can loop,
-   reallocating (typically with larger and larger sizes) until the
-   allocator returns a Lisp-aligned pointer.  This loop in
-   theory could repeat forever.  If an infinite loop is possible on a
-   platform, a build would surely loop and the builder can then send
-   us a bug report.  Adding a counter to try to detect any such loop
-   would complicate the code (and possibly introduce bugs, in code
-   that's never really exercised) for little benefit.  */
+   CLEARIT uses calloc() instead of malloc().
+
+   Can theoretically spin on unusual platforms, never receiving
+   a Lisp-aligned return value from the allocator.  */
 
 static void *
 lmalloc (size_t size, bool clearit)
@@ -1580,9 +1568,7 @@ string_bytes (struct Lisp_String *s)
 static void
 check_sblock (struct sblock *b)
 {
-  sdata *end = b->next_free;
-
-  for (sdata *from = b->data; from < end; )
+  for (sdata *from = b->data, end =  b->next_free; from < end; )
     {
       ptrdiff_t nbytes = sdata_size (from->string
 				     ? string_bytes (from->string)
@@ -3420,9 +3406,6 @@ static int symbol_block_index = BLOCK_NSYMBOLS;
    symbol_block_pinned lets mark_pinned_symbols scan only 15K symbols rather
    than 30K to find the 10K symbols we need to mark.  */
 static struct symbol_block *symbol_block_pinned;
-
-/* List of free symbols.  */
-
 static struct Lisp_Symbol *symbol_free_list;
 
 static void
@@ -6717,29 +6700,24 @@ sweep_symbols (void)
 
       for (; sym < end; ++sym)
         {
-          if (!sym->u.s.gcmarkbit)
+          if (sym->u.s.gcmarkbit)
+            {
+              ++num_used;
+              sym->u.s.gcmarkbit = 0;
+              eassert (valid_lisp_object_p (sym->u.s.function));
+            }
+	  else
             {
               if (sym->u.s.redirect == SYMBOL_LOCALIZED)
 		{
                   xfree (SYMBOL_BLV (sym));
-                  /* At every GC we sweep all symbol_blocks and rebuild the
-                     symbol_free_list, so those symbols which stayed unused
-                     between the two will be re-swept.
-                     So we have to make sure we don't re-free this blv next
-                     time we sweep this symbol_block (bug#29066).  */
+                  /* Avoid re-free (bug#29066).  */
                   sym->u.s.redirect = SYMBOL_PLAINVAL;
                 }
               sym->u.s.next = symbol_free_list;
               symbol_free_list = sym;
               symbol_free_list->u.s.function = dead_object ();
               ++this_free;
-            }
-          else
-            {
-              ++num_used;
-              sym->u.s.gcmarkbit = 0;
-              /* Attempt to catch bogus objects.  */
-              eassert (valid_lisp_object_p (sym->u.s.function));
             }
         }
 
