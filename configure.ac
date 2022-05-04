@@ -342,28 +342,13 @@ this option's value should be 'yes' or 'no'.]) ;;
     ],
     [with_pdumper=auto])
 
-AC_ARG_WITH([unexec],
-  AS_HELP_STRING(
-    [--with-unexec=VALUE],
-    [enable unexec support unconditionally
-      ('yes', 'no', or 'auto': default 'auto')]),
-    [ case "${withval}" in
-        yes|no|auto) val=$withval ;;
-        *) AC_MSG_ERROR(
-           ['--with-unexec=$withval' is invalid;
-this option's value should be 'yes' or 'no'.]) ;;
-      esac
-      with_unexec=$val
-    ],
-    [with_unexec=auto])
-
 AC_ARG_WITH([dumping],[AS_HELP_STRING([--with-dumping=VALUE],
     [kind of dumping to use for initial Emacs build
-(VALUE one of: pdumper, unexec, none; default pdumper)])],
+(VALUE one of: pdumper, none; default pdumper)])],
     [ case "${withval}" in
-        pdumper|unexec|none) val=$withval ;;
+        pdumper|none) val=$withval ;;
         *) AC_MSG_ERROR(['--with-dumping=$withval is invalid;
-this option's value should be 'pdumper', 'unexec', or 'none'.])
+this option's value should be 'pdumper', or 'none'.])
         ;;
       esac
       with_dumping=$val
@@ -378,20 +363,8 @@ if test "$with_pdumper" = "auto"; then
   fi
 fi
 
-if test "$with_unexec" = "auto"; then
-  if test "$with_dumping" = "unexec"; then
-    with_unexec=yes
-  else
-    with_unexec=no
-  fi
-fi
-
 if test "$with_dumping" = "pdumper" && test "$with_pdumper" = "no"; then
   AC_MSG_ERROR(['--with-dumping=pdumper' requires pdumper support])
-fi
-
-if test "$with_dumping" = "unexec" && test "$with_unexec" = "no"; then
-  AC_MSG_ERROR(['--with-dumping=unexec' requires unexec support])
 fi
 
 if test "$with_pdumper" = "yes"; then
@@ -1299,10 +1272,6 @@ AC_PATH_PROG(GZIP_PROG, gzip)
 test $with_compress_install != yes && test -n "$GZIP_PROG" && \
    GZIP_PROG=" # $GZIP_PROG # (disabled by configure --without-compress-install)"
 
-if test "$with_dumping" = "unexec" && test "$opsys" = "nacl"; then
-  AC_MSG_ERROR([nacl is not compatible with --with-dumping=unexec])
-fi
-
 AC_CACHE_CHECK([for 'find' args to delete a file],
   [emacs_cv_find_delete],
   [if touch conftest.tmp && find conftest.tmp -delete 2>/dev/null &&
@@ -1312,54 +1281,6 @@ AC_CACHE_CHECK([for 'find' args to delete a file],
    fi])
 FIND_DELETE=$emacs_cv_find_delete
 AC_SUBST([FIND_DELETE])
-
-PAXCTL_dumped=
-PAXCTL_notdumped=
-if test $with_unexec = yes && test $opsys = gnu-linux; then
-  if test "${SETFATTR+set}" != set; then
-    AC_CACHE_CHECK([for setfattr],
-      [emacs_cv_prog_setfattr],
-      [touch conftest.tmp
-       if (setfattr -n user.pax.flags conftest.tmp) >/dev/null 2>&1; then
-	 emacs_cv_prog_setfattr=yes
-       else
-	 emacs_cv_prog_setfattr=no
-       fi])
-    if test "$emacs_cv_prog_setfattr" = yes; then
-      PAXCTL_notdumped='$(SETFATTR) -n user.pax.flags -v er'
-      SETFATTR=setfattr
-    else
-      SETFATTR=
-    fi
-  fi
-  case $opsys,$PAXCTL_notdumped,$emacs_uname_r in
-    gnu-linux,,* | netbsd,,[0-7].*)
-      AC_PATH_PROG([PAXCTL], [paxctl], [],
-	[$PATH$PATH_SEPARATOR/sbin$PATH_SEPARATOR/usr/sbin])
-      if test -n "$PAXCTL"; then
-	if test "$opsys" = netbsd; then
-	  PAXCTL_dumped='$(PAXCTL) +a'
-	  PAXCTL_notdumped=$PAXCTL_dumped
-	else
-	  AC_MSG_CHECKING([whether binaries have a PT_PAX_FLAGS header])
-	  AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
-	    [if $PAXCTL -v conftest$EXEEXT >/dev/null 2>&1; then
-	       AC_MSG_RESULT([yes])
-	     else
-	       AC_MSG_RESULT([no])
-	       PAXCTL=
-	     fi])
-	  if test -n "$PAXCTL"; then
-	    PAXCTL_dumped='$(PAXCTL) -zex'
-	    PAXCTL_notdumped='$(PAXCTL) -r'
-	  fi
-	fi
-      fi;;
-  esac
-fi
-AC_SUBST([PAXCTL_dumped])
-AC_SUBST([PAXCTL_notdumped])
-AC_SUBST([SETFATTR])
 
 # Makeinfo on macOS is ancient, check whether there is a more recent
 # version installed by Homebrew.
@@ -1423,37 +1344,6 @@ else
     ac_link="$ac_link $NON_GCC_LINK_TEST_OPTIONS"
 fi
 
-dnl On some platforms using GNU ld, linking temacs needs -znocombreloc.
-dnl Although this has something to do with dumping, the details are unknown.
-dnl If the flag is used but not needed,
-dnl Emacs should still work (albeit a bit more slowly),
-dnl so use the flag everywhere that it is supported.
-dnl When testing whether the flag works, treat GCC specially
-dnl since it just gives a non-fatal 'unrecognized option'
-dnl if not built to support GNU ld.
-if test "$GCC" = yes; then
-  LDFLAGS_NOCOMBRELOC="-Wl,-znocombreloc"
-else
-  LDFLAGS_NOCOMBRELOC="-znocombreloc"
-fi
-
-AC_CACHE_CHECK([for -znocombreloc], [emacs_cv_znocombreloc],
-  [if test $with_unexec = no; then
-     emacs_cv_znocombreloc='not needed'
-   else
-     save_LDFLAGS=$LDFLAGS
-     LDFLAGS="$LDFLAGS $LDFLAGS_NOCOMBRELOC"
-     AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
-       [emacs_cv_znocombreloc=yes], [emacs_cv_znocombreloc=no])
-     LDFLAGS=$save_LDFLAGS
-   fi])
-
-case $emacs_cv_znocombreloc in
-  no*)
-    LDFLAGS_NOCOMBRELOC= ;;
-esac
-
-
 AC_CACHE_CHECK([whether addresses are sanitized],
   [emacs_cv_sanitize_address],
   [AC_COMPILE_IFELSE(
@@ -1469,77 +1359,10 @@ AC_CACHE_CHECK([whether addresses are sanitized],
      [emacs_cv_sanitize_address=yes],
      [emacs_cv_sanitize_address=no])])
 
-if test $with_unexec = yes; then
-  AC_DEFINE([HAVE_UNEXEC], 1, [Define if Emacs supports unexec.])
-  if test "$emacs_cv_sanitize_address" = yes; then
-    AC_MSG_WARN([[Addresses are sanitized; suggest --without-unexec]])
-  fi
-fi
-
-
 UNEXEC_OBJ=
-test $with_unexec = yes &&
-case "$opsys" in
-  # MSDOS uses unexcoff.o
-  aix4-2)
-   UNEXEC_OBJ=unexaix.o
-   ;;
-  cygwin)
-   UNEXEC_OBJ=unexcw.o
-   ;;
-  darwin)
-   UNEXEC_OBJ=unexmacosx.o
-   ;;
-  hpux10-20 | hpux11)
-   UNEXEC_OBJ=unexhp9k800.o
-   ;;
-  mingw32)
-   UNEXEC_OBJ=unexw32.o
-   ;;
-  solaris)
-   # Use the Solaris dldump() function, called from unexsol.c, to dump
-   # emacs, instead of the generic ELF dump code found in unexelf.c.
-   # The resulting binary has a complete symbol table, and is better
-   # for debugging and other observability tools (debuggers, pstack, etc).
-   UNEXEC_OBJ=unexsol.o
-   ;;
-  *)
-   UNEXEC_OBJ=unexelf.o
-   ;;
-esac
 AC_SUBST(UNEXEC_OBJ)
 
-LD_SWITCH_SYSTEM=
-test "$with_unexec" = no || case "$opsys" in
-  freebsd|dragonfly)
-   ## Let 'ld' find image libs and similar things in /usr/local/lib.
-   ## The system compiler, GCC, has apparently been modified to not
-   ## look there, contrary to what a stock GCC would do.
-### It's not our place to do this.  See bug#10313#17.
-###   LD_SWITCH_SYSTEM=-L/usr/local/lib
-      :
-   ;;
-
-  gnu-linux)
-   ## cpp test was "ifdef __mips__", but presumably this is equivalent...
-   case $host_cpu in mips*) LD_SWITCH_SYSTEM="-G 0";; esac
-   ;;
-
-  netbsd)
-### It's not our place to do this.  See bug#10313#17.
-###   LD_SWITCH_SYSTEM="-Wl,-rpath,/usr/pkg/lib -L/usr/pkg/lib -Wl,-rpath,/usr/local/lib -L/usr/local/lib"
-      :
-   ;;
-
-  openbsd)
-   ## Han Boetes <han@boetes.org> says this is necessary,
-   ## otherwise Emacs dumps core on elf systems.
-   LD_SWITCH_SYSTEM="-Z"
-   ;;
-esac
-AC_SUBST(LD_SWITCH_SYSTEM)
-
-ac_link="$ac_link $LD_SWITCH_SYSTEM"
+ac_link="$ac_link"
 
 ## This setting of LD_SWITCH_SYSTEM references LD_SWITCH_X_SITE_RPATH,
 ## which has not been defined yet.  When this was handled with cpp,
@@ -1551,28 +1374,14 @@ ac_link="$ac_link $LD_SWITCH_SYSTEM"
 ## Compare with the gnu-linux case below, which added to the end
 ## of LD_SWITCH_SYSTEM, and so can instead go at the front of
 ## LD_SWITCH_SYSTEM_TEMACS.
+LD_SWITCH_SYSTEM=
 case "$opsys" in
   netbsd|openbsd)
    LD_SWITCH_SYSTEM="\$(LD_SWITCH_X_SITE_RPATH) $LD_SWITCH_SYSTEM" ;;
 esac
+AC_SUBST(LD_SWITCH_SYSTEM)
 
 C_SWITCH_MACHINE=
-
-test $with_unexec = yes &&
-case $canonical in
- alpha*)
-    ## With ELF, make sure that all common symbols get allocated to in the
-    ## data section.  Otherwise, the dump of temacs may miss variables in
-    ## the shared library that have been initialized.  For example, with
-    ## GNU libc, __malloc_initialized would normally be resolved to the
-    ## shared library's .bss section, which is fatal.
-    if test "x$GCC" = "xyes"; then
-      C_SWITCH_MACHINE="-fno-common"
-    else
-      AC_MSG_ERROR([Non-GCC compilers are not supported.])
-    fi
-  ;;
-esac
 AC_SUBST(C_SWITCH_MACHINE)
 
 C_SWITCH_SYSTEM=
@@ -1618,7 +1427,7 @@ AC_SUBST(LIBS_SYSTEM)
 if test x"${OVERRIDE_CPPFLAGS}" != x; then
   CPPFLAGS="${OVERRIDE_CPPFLAGS}"
 else
-  CPPFLAGS="$C_SWITCH_SYSTEM $C_SWITCH_MACHINE $CPPFLAGS"
+  CPPFLAGS="$C_SWITCH_SYSTEM $CPPFLAGS"
 fi
 
 # Suppress obsolescent Autoconf test for size_t; Emacs assumes C99 or better.
@@ -2367,43 +2176,11 @@ fi
 # Assume not, until told otherwise.
 GNU_MALLOC=yes
 
-AC_CACHE_CHECK(
-  [whether malloc is Doug Lea style],
-  [emacs_cv_var_doug_lea_malloc],
-  [emacs_cv_var_doug_lea_malloc=no
-   dnl Hooks do not work with address sanitization.
-   if test "$emacs_cv_sanitize_address" != yes; then
-     AC_LINK_IFELSE(
-       [AC_LANG_PROGRAM(
-	  [[#include <malloc.h>
-	    static void hook (void) {}]],
-	  [[malloc_set_state (malloc_get_state ());
-	    __after_morecore_hook = hook;
-	    __malloc_initialize_hook = hook;]])],
-       [emacs_cv_var_doug_lea_malloc=yes])
-   fi])
-doug_lea_malloc=$emacs_cv_var_doug_lea_malloc
-
 hybrid_malloc=
 system_malloc=yes
 
 dnl This must be before the test of $ac_cv_func_sbrk below.
 AC_CHECK_FUNCS_ONCE([sbrk])
-
-test $with_unexec = yes &&
-case "$opsys" in
-  ## darwin ld insists on the use of malloc routines in the System framework.
-  darwin | mingw32 | nacl | solaris) ;;
-  cygwin | qnxnto | freebsd)
-	  hybrid_malloc=yes
-          system_malloc= ;;
-  *) test "$ac_cv_func_sbrk" = yes && system_malloc=$emacs_cv_sanitize_address;;
-esac
-
-if test "${system_malloc}" != yes && test "${doug_lea_malloc}" != yes \
-   && test "${UNEXEC_OBJ}" = unexelf.o; then
-  hybrid_malloc=yes
-fi
 
 GMALLOC_OBJ=
 HYBRID_MALLOC=
@@ -2424,7 +2201,7 @@ elif test "$hybrid_malloc" = yes; then
   GMALLOC_OBJ=gmalloc.o
   VMLIMIT_OBJ=
 else
-  test "$doug_lea_malloc" != "yes" && GMALLOC_OBJ=gmalloc.o
+  test GMALLOC_OBJ=gmalloc.o
   VMLIMIT_OBJ=vm-limit.o
 
   AC_CHECK_HEADERS([sys/vlimit.h])
@@ -2444,24 +2221,6 @@ fi
 AC_SUBST([HYBRID_MALLOC])
 AC_SUBST(GMALLOC_OBJ)
 AC_SUBST(VMLIMIT_OBJ)
-
-if test "$doug_lea_malloc" = "yes" && test "$hybrid_malloc" != yes; then
-  if test "$GNU_MALLOC" = yes ; then
-    GNU_MALLOC_reason="
-      (Using Doug Lea's new malloc from the GNU C Library.)"
-  fi
-  AC_DEFINE(DOUG_LEA_MALLOC, 1,
-    [Define to 1 if the system memory allocator is Doug Lea style,
-     with malloc hooks and malloc_set_state.])
-
-  ## Use mmap directly for allocating larger buffers.
-  ## FIXME this comes from src/s/{gnu,gnu-linux}.h:
-  ## #ifdef DOUG_LEA_MALLOC; #undef REL_ALLOC; #endif
-  ## Does the AC_FUNC_MMAP test below make this check unnecessary?
-  case "$opsys" in
-    mingw32|gnu*) REL_ALLOC=no ;;
-  esac
-fi
 
 if test x"${REL_ALLOC}" = x; then
   REL_ALLOC=${GNU_MALLOC}
@@ -2506,8 +2265,6 @@ if test "$ac_cv_header_pthread_h" && test "$opsys" != "mingw32"; then
 	      status += pthread_create (&th, 0, 0, 0);
 	      status += pthread_sigmask (SIG_BLOCK, &new_mask, &old_mask);
 	      status += pthread_kill (th, 0);
-	      #if ! (defined SYSTEM_MALLOC || defined HYBRID_MALLOC \
-		     || defined DOUG_LEA_MALLOC)
 	      /* Test for pthread_atfork only if gmalloc uses it,
 		 as older-style hosts like MirBSD 10 lack it.  */
 	      status += pthread_atfork (noop, noop, noop);
@@ -4842,19 +4599,6 @@ dnl No need to check for posix_memalign if aligned_alloc works.
 AC_CHECK_FUNCS([aligned_alloc posix_memalign], [break])
 AC_CHECK_DECLS([aligned_alloc], [], [], [[#include <stdlib.h>]])
 
-case $with_unexec,$canonical in
-  yes,alpha*)
-    AC_CHECK_DECL([__ELF__], [],
-      [AC_MSG_ERROR([Non-ELF systems are not supported on this platform.])]);;
-esac
-
-if test "$with_unexec" = yes && test "$opsys" = "haiku"; then
-  dnl A serious attempt was actually made to port unexec to Haiku.
-  dnl Something in libstdc++ seems to prevent it from working.
-  AC_MSG_ERROR([Haiku is not supported by the legacy unexec dumper.
-Please use the portable dumper instead.])
-fi
-
 # Dump loading
 AC_CHECK_FUNCS([posix_madvise])
 
@@ -6211,9 +5955,6 @@ case "$opsys" in
    ## about 14 to about 34. Setting it high gets us plenty of slop and
    ## only costs about 1.5K of wasted binary space.
    headerpad_extra=1000
-   if test "$with_unexec" = yes; then
-     LD_SWITCH_SYSTEM_TEMACS="-fno-pie $LD_SWITCH_SYSTEM_TEMACS -Xlinker -headerpad -Xlinker $headerpad_extra"
-   fi
 
    ## This is here because src/Makefile.in did some extra fiddling around
    ## with LD_SWITCH_SYSTEM.  It seems cleaner to put this in
@@ -6237,47 +5978,9 @@ case "$opsys" in
      x86_64-*-*) LD_SWITCH_SYSTEM_TEMACS="-Wl,-stack,0x00800000 -Wl,-heap,0x00100000 -Wl,-image-base,0x400000000 -Wl,-entry,__start -Wl,-Map,./temacs.map" ;;
      *) LD_SWITCH_SYSTEM_TEMACS="-Wl,-stack,0x00800000 -Wl,-heap,0x00100000 -Wl,-image-base,0x01000000 -Wl,-entry,__start -Wl,-Map,./temacs.map" ;;
    esac
-   ## If they want unexec, disable Windows ASLR for the Emacs binary
-   if test "$with_dumping" = "unexec"; then
-      case "$canonical" in
-        x86_64-*-*) LD_SWITCH_SYSTEM_TEMACS="$LD_SWITCH_SYSTEM_TEMACS -Wl,-disable-dynamicbase -Wl,-disable-high-entropy-va -Wl,-default-image-base-low" ;;
-        *) LD_SWITCH_SYSTEM_TEMACS="$LD_SWITCH_SYSTEM_TEMACS -Wl,-disable-dynamicbase" ;;
-      esac
-   fi
    ;;
 
   *) LD_SWITCH_SYSTEM_TEMACS= ;;
-esac
-
-# -no-pie or -nopie fixes a temacs segfault on Gentoo, OpenBSD,
-# Ubuntu, and other systems with "hardened" GCC configurations for
-# some reason (Bug#18784).  We don't know why this works, but not
-# segfaulting is better than segfaulting.  Use ac_c_werror_flag=yes
-# when trying the option, otherwise clang keeps warning that it does
-# not understand it, and pre-4.6 GCC has a similar problem
-# (Bug#20338).  Prefer -no-pie to -nopie, as -no-pie is the
-# spelling used by GCC 6.1.0 and later (Bug#24682).
-AC_CACHE_CHECK(
-  [for $CC option to disable position independent executables],
-  [emacs_cv_prog_cc_no_pie],
-  [if test $with_unexec = no; then
-     emacs_cv_prog_cc_no_pie='not needed'
-   else
-     emacs_save_c_werror_flag=$ac_c_werror_flag
-     emacs_save_LDFLAGS=$LDFLAGS
-     ac_c_werror_flag=yes
-     for emacs_cv_prog_cc_no_pie in -no-pie -nopie no; do
-       test $emacs_cv_prog_cc_no_pie = no && break
-       LDFLAGS="$emacs_save_LDFLAGS $emacs_cv_prog_cc_no_pie"
-       AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])], [break])
-     done
-     ac_c_werror_flag=$emacs_save_c_werror_flag
-     LDFLAGS=$emacs_save_LDFLAGS
-   fi])
-case $emacs_cv_prog_cc_no_pie in
-  -*)
-    LD_SWITCH_SYSTEM_TEMACS="$LD_SWITCH_SYSTEM_TEMACS $emacs_cv_prog_cc_no_pie"
-    ;;
 esac
 
 if test x$ac_enable_profiling != x ; then
@@ -6287,7 +5990,7 @@ if test x$ac_enable_profiling != x ; then
   esac
 fi
 
-LD_SWITCH_SYSTEM_TEMACS="$LDFLAGS_NOCOMBRELOC $LD_SWITCH_SYSTEM_TEMACS"
+LD_SWITCH_SYSTEM_TEMACS="$LD_SWITCH_SYSTEM_TEMACS"
 
 AC_SUBST(LD_SWITCH_SYSTEM_TEMACS)
 
@@ -6380,12 +6083,11 @@ for opt in ACL BE_APP CAIRO DBUS FREETYPE GCONF GIF GLIB GMP GNUTLS GPM GSETTING
  HARFBUZZ IMAGEMAGICK JPEG JSON TREE_SITTER LCMS2 LIBOTF LIBSELINUX LIBSYSTEMD LIBXML2 \
  M17N_FLT MODULES NATIVE_COMP NOTIFY NS OLDXMENU PDUMPER PGTK PNG RSVG SECCOMP \
  SOUND SQLITE3 THREADS TIFF TOOLKIT_SCROLL_BARS \
- UNEXEC WEBP X11 XAW3D XDBE XFT XIM XINPUT2 XPM XWIDGETS X_TOOLKIT \
+ WEBP X11 XAW3D XDBE XFT XIM XINPUT2 XPM XWIDGETS X_TOOLKIT \
  ZLIB; do
 
     case $opt in
       PDUMPER) val=${with_pdumper} ;;
-      UNEXEC) val=${with_unexec} ;;
       GLIB) val=${emacs_cv_links_glib} ;;
       NOTIFY|ACL) eval val=\${${opt}_SUMMARY} ;;
       TOOLKIT_SCROLL_BARS|X_TOOLKIT) eval val=\${USE_$opt} ;;
@@ -6456,7 +6158,6 @@ AS_ECHO(["  Does Emacs use -lXaw3d?                                 ${HAVE_XAW3D
   Does Emacs support Xwidgets?                            ${HAVE_XWIDGETS}
   Does Emacs have threading support in lisp?              ${threads_enabled}
   Does Emacs support the portable dumper?                 ${with_pdumper}
-  Does Emacs support legacy unexec dumping?               ${with_unexec}
   Which dumping strategy does Emacs use?                  ${with_dumping}
   Does Emacs have native lisp compiler?                   ${HAVE_NATIVE_COMP}
   Does Emacs use version 2 of the the X Input Extension?  ${HAVE_XINPUT2}

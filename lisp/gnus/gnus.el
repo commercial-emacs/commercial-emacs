@@ -748,7 +748,10 @@ be used directly.")
   "Colors used for the Gnus logo.")
 
 (defvar image-load-path)
+
 (declare-function image-size "image.c" (spec &optional pixels frame))
+(declare-function thread-name "thread.c")
+(declare-function current-thread "thread.c")
 
 (defun gnus-group-startup-message (&optional x y)
   "Insert startup message in current buffer."

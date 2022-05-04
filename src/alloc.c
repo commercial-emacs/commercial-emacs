@@ -116,8 +116,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    memory.  Can do this only if using gmalloc.c and if not checking
    marked objects.  */
 
-#if (defined SYSTEM_MALLOC || defined DOUG_LEA_MALLOC \
-     || defined HYBRID_MALLOC || GC_CHECK_MARKED_OBJECTS)
+#if (defined SYSTEM_MALLOC || defined HYBRID_MALLOC || GC_CHECK_MARKED_OBJECTS)
 #undef GC_MALLOC_CHECK
 #endif
 
@@ -195,97 +194,6 @@ enum { MALLOC_ALIGNMENT = 16 };
 #else
 enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 #endif
-
-#ifdef DOUG_LEA_MALLOC
-
-/* Specify maximum number of areas to mmap.  It would be nice to use a
-   value that explicitly means "no limit".  */
-
-/* A pointer to the memory allocated that copies that static data
-   inside glibc's malloc.  */
-static void *malloc_state_ptr;
-
-/* Restore the dumped malloc state.  Because malloc can be invoked
-   even before main (e.g. by the dynamic linker), the dumped malloc
-   state must be restored as early as possible using this special hook.  */
-static void
-malloc_initialize_hook (void)
-{
-  static bool malloc_using_checking;
-
-  if (! initialized)
-    {
-# ifdef GNU_LINUX
-      my_heap_start ();
-# endif
-      malloc_using_checking = getenv ("MALLOC_CHECK_") != NULL;
-    }
-  else
-    {
-      if (! malloc_using_checking)
-	/* Work around a bug in glibc's malloc.  MALLOC_CHECK_ must be
-	   ignored if the heap to be restored was constructed without
-	   malloc checking.  Can't use unsetenv, since that calls malloc.  */
-	for (char **p = environ; p && *p; p++)
-	  if (strncmp (*p, "MALLOC_CHECK_=", 14) == 0)
-	    {
-	      do
-		*p = p[1];
-	      while (*++p);
-	      break;
-	    }
-
-      if (malloc_set_state (malloc_state_ptr) != 0)
-	emacs_abort ();
-      alloc_unexec_post ();
-    }
-}
-
-/* Declare the malloc initialization hook, which runs before main() starts.
-   EXTERNALLY_VISIBLE works around Bug#22522.  */
-typedef void (*voidfuncptr) (void);
-# ifndef __MALLOC_HOOK_VOLATILE
-#  define __MALLOC_HOOK_VOLATILE
-# endif
-voidfuncptr __MALLOC_HOOK_VOLATILE __malloc_initialize_hook EXTERNALLY_VISIBLE
-  = malloc_initialize_hook;
-
-#endif /* DOUG_LEA_MALLOC */
-
-#if defined DOUG_LEA_MALLOC || defined HAVE_UNEXEC
-
-void
-alloc_unexec_pre (void)
-{
-# ifdef DOUG_LEA_MALLOC
-  malloc_state_ptr = malloc_get_state ();
-  if (!malloc_state_ptr)
-    fatal ("malloc_get_state: %s", strerror (errno));
-# endif
-}
-
-void
-alloc_unexec_post (void)
-{
-# ifdef DOUG_LEA_MALLOC
-  free (malloc_state_ptr);
-# endif
-}
-
-# ifdef GNU_LINUX
-
-/* The address where the heap starts.  */
-void *
-my_heap_start (void)
-{
-  static void *start;
-  if (! start)
-    start = sbrk (0);
-  return start;
-}
-# endif
-
-#endif /* defined DOUG_LEA_MALLOC || defined HAVE_UNEXEC */
 
 /* Mark, unmark, query mark bit of a Lisp string.  S must be a pointer
    to a struct Lisp_String.  */
@@ -550,25 +458,6 @@ tally_consing (ptrdiff_t nbytes)
 {
   bytes_since_gc += nbytes;
 }
-
-#ifdef DOUG_LEA_MALLOC
-static bool
-pointers_fit_in_lispobj_p (void)
-{
-  return (UINTPTR_MAX <= VAL_MAX) || USE_LSB_TAG;
-}
-
-static bool
-mmap_lisp_allowed_p (void)
-{
-  /* If we can't store all memory addresses in our lisp objects, it's
-     risky to let the heap use mmap and give us addresses from all
-     over our address space.  We also can't use mmap for lisp objects
-     if we might dump: unexec doesn't preserve the contents of mmapped
-     regions.  */
-  return pointers_fit_in_lispobj_p () && !will_dump_with_unexec_p ();
-}
-#endif
 
 /* Head of a circularly-linked list of extant finalizers. */
 struct Lisp_Finalizer finalizers;
@@ -999,19 +888,14 @@ enum
 		    + 1)),
 };
 
-/* Use aligned_alloc if it or a simple substitute is available.
-   Aligned allocation is incompatible with unexmacosx.c, so don't use
-   it on Darwin if HAVE_UNEXEC.  */
-
-#if ! (defined DARWIN_OS && defined HAVE_UNEXEC)
-# if (defined HAVE_ALIGNED_ALLOC					\
-      || (defined HYBRID_MALLOC						\
-	  ? defined HAVE_POSIX_MEMALIGN					\
-	  : !defined SYSTEM_MALLOC && !defined DOUG_LEA_MALLOC))
-#  define USE_ALIGNED_ALLOC 1
-# elif !defined HYBRID_MALLOC && defined HAVE_POSIX_MEMALIGN
-#  define USE_ALIGNED_ALLOC 1
-#  define aligned_alloc my_aligned_alloc /* Avoid collision with lisp.h.  */
+#if (defined HAVE_ALIGNED_ALLOC			\
+     || (defined HYBRID_MALLOC			\
+	 ? defined HAVE_POSIX_MEMALIGN		\
+	 : !defined SYSTEM_MALLOC))
+# define USE_ALIGNED_ALLOC 1
+#elif !defined HYBRID_MALLOC && defined HAVE_POSIX_MEMALIGN
+# define USE_ALIGNED_ALLOC 1
+# define aligned_alloc my_aligned_alloc /* Avoid collision with lisp.h.  */
 static void *
 aligned_alloc (size_t alignment, size_t size)
 {
@@ -1028,7 +912,6 @@ aligned_alloc (size_t alignment, size_t size)
   void *p;
   return posix_memalign (&p, alignment, size) == 0 ? p : 0;
 }
-# endif
 #endif
 
 /* An aligned block of memory.  */
@@ -1079,10 +962,6 @@ verify (sizeof (struct ablocks) % BLOCK_ALIGN == 0);
 
 static struct ablock *free_ablock;
 
-#ifdef DOUG_LEA_MALLOC
-#define RESTORE_M_MMAP_MAX (1 << 16)
-#endif
-
 /* Allocate an aligned block of NBYTES.  */
 static void *
 lisp_align_malloc (size_t nbytes, enum mem_type type)
@@ -1103,11 +982,6 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
       int i;
       bool aligned;
 
-#ifdef DOUG_LEA_MALLOC
-      if (! mmap_lisp_allowed_p ())
-        mallopt (M_MMAP_MAX, 0);
-#endif
-
 #ifdef USE_ALIGNED_ALLOC
       abase = base = aligned_alloc (BLOCK_ALIGN, sizeof (struct ablocks));
 #else
@@ -1124,11 +998,6 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
       aligned = (base == abase);
       if (! aligned)
 	((void **) abase)[-1] = base;
-
-#ifdef DOUG_LEA_MALLOC
-      if (! mmap_lisp_allowed_p ())
-	mallopt (M_MMAP_MAX, RESTORE_M_MMAP_MAX);
-#endif
 
 #if ! USE_LSB_TAG
       /* If the memory just allocated cannot be addressed thru a Lisp
@@ -1717,19 +1586,7 @@ allocate_string_data (struct Lisp_String *s,
   if (nbytes > LARGE_STRING_BYTES || immovable)
     {
       size_t size = FLEXSIZEOF (struct sblock, data, needed);
-
-#ifdef DOUG_LEA_MALLOC
-      if (! mmap_lisp_allowed_p ())
-        mallopt (M_MMAP_MAX, 0);
-#endif
-
       b = lisp_malloc (size + GC_STRING_EXTRA, clearit, MEM_TYPE_NON_LISP);
-
-#ifdef DOUG_LEA_MALLOC
-      if (! mmap_lisp_allowed_p ())
-        mallopt (M_MMAP_MAX, RESTORE_M_MMAP_MAX);
-#endif
-
       data = b->data;
       b->next = large_sblocks;
       b->next_free = data;
@@ -3128,11 +2985,6 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
 
   MALLOC_BLOCK_INPUT;
 
-#ifdef DOUG_LEA_MALLOC
-  if (!mmap_lisp_allowed_p ())
-    mallopt (M_MMAP_MAX, 0);
-#endif
-
   if (nbytes <= VBLOCK_BYTES_MAX)
     {
       p = allocate_vector_from_block (vroundup (nbytes));
@@ -3147,11 +2999,6 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
       large_vectors = lv;
       p = large_vector_vec (lv);
     }
-
-#ifdef DOUG_LEA_MALLOC
-  if (! mmap_lisp_allowed_p ())
-    mallopt (M_MMAP_MAX, RESTORE_M_MMAP_MAX);
-#endif
 
   if (find_suspicious_object_in_range (p, (char *) p + nbytes))
     emacs_abort ();
@@ -4321,7 +4168,7 @@ live_symbol_holding (struct mem_node *m, void *p)
 	  || off == offsetof (struct Lisp_Symbol, u.s.next))
 	{
 	  struct Lisp_Symbol *s = p = cp -= off;
-	  if (!deadp (s->u.s.function))
+	  if (! deadp (s->u.s.function))
 	    return s;
 	}
     }
@@ -5771,12 +5618,6 @@ For further details, see Info node `(elisp)Garbage Collection'.  */)
 	   make_int (gcst.total_free_intervals)),
     list3 (Qbuffers, make_fixnum (sizeof (struct buffer)),
 	   make_int (gcst.total_buffers)),
-
-#ifdef DOUG_LEA_MALLOC
-    list4 (Qheap, make_fixnum (BLOCK_ALIGN),
-	   make_int ((mallinfo ().uordblks + (BLOCK_ALIGN - 1)) >> BLOCK_NBITS),
-	   make_int ((mallinfo ().fordblks + (BLOCK_ALIGN - 1)) >> BLOCK_NBITS)),
-#endif
   };
   return CALLMANY (Flist, total);
 }
@@ -7167,13 +7008,6 @@ init_runtime (void)
   purebeg = PUREBEG;
   pure_size = PURESIZE;
   mem_init ();
-
-#ifdef DOUG_LEA_MALLOC
-  mallopt (M_TRIM_THRESHOLD, 128 * BLOCK_ALIGN);
-  mallopt (M_MMAP_THRESHOLD, 64 * BLOCK_ALIGN);
-  mallopt (M_MMAP_MAX, RESTORE_M_MMAP_MAX);
-#endif
-
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);
 }
