@@ -42,13 +42,6 @@
 
 (declare-function gnus-group-decoded-name "gnus-group" (string))
 (declare-function gnus-group-default-level "gnus-group")
-(declare-function thread-name "thread.c")
-(declare-function current-thread "thread.c")
-(declare-function make-thread "thread.c")
-(declare-function thread-yield "thread.c")
-(declare-function thread-signal "thread.c")
-(declare-function thread-live-p "thread.c")
-(declare-function all-threads "thread.c")
 
 (defvar gnus-agent-covered-methods)
 (defvar gnus-agent-file-loading-local)

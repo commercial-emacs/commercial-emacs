@@ -2265,6 +2265,7 @@ if test "$ac_cv_header_pthread_h" && test "$opsys" != "mingw32"; then
 	      status += pthread_create (&th, 0, 0, 0);
 	      status += pthread_sigmask (SIG_BLOCK, &new_mask, &old_mask);
 	      status += pthread_kill (th, 0);
+	      #if ! (defined SYSTEM_MALLOC || defined HYBRID_MALLOC)
 	      /* Test for pthread_atfork only if gmalloc uses it,
 		 as older-style hosts like MirBSD 10 lack it.  */
 	      status += pthread_atfork (noop, noop, noop);
