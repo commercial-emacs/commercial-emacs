@@ -18036,16 +18036,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      if (f /* Gtk+ menus only react to the first three buttons. */
 		  && xev->detail < 3)
 		{
-		  /* What is done with Core Input ButtonPressed is not
-		     possible here, because GenericEvents cannot be saved.  */
-		  bool was_waiting_for_input = waiting_for_input;
-		  /* This hack was adopted from the NS port.  Whether
-		     or not it is actually safe is a different story
-		     altogether.  */
-		  if (waiting_for_input)
-		    waiting_for_input = 0;
 		  set_frame_menubar (f, true);
-		  waiting_for_input = was_waiting_for_input;
 		}
 #endif
 	      goto XI_OTHER;
@@ -18970,14 +18961,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      else
 		{
 #ifdef HAVE_GTK3
-		  bool was_waiting_for_input = waiting_for_input;
-		  /* This hack was adopted from the NS port.  Whether
-		     or not it is actually safe is a different story
-		     altogether.  */
-		  if (waiting_for_input)
-		    waiting_for_input = 0;
 		  set_frame_menubar (f, true);
-		  waiting_for_input = was_waiting_for_input;
 #endif
 		}
 
