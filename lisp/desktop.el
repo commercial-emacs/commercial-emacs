@@ -1269,7 +1269,12 @@ being set (usually, by reading it from the desktop)."
 		      :cleanup-frames (not (eq desktop-restore-reuses-frames 'keep))
 		      :force-display desktop-restore-in-current-display
 		      :force-onscreen (and desktop-restore-forces-onscreen
-                                           (display-graphic-p)))))
+                                           (display-graphic-p)))
+    (when (seq-some
+           (lambda (frame)
+             (menu-bar-positive-p (frame-parameter frame 'tab-bar-lines)))
+           (frame-list))
+      (tab-bar-mode 1))))
 
 ;; Just to silence the byte compiler.
 ;; Dynamically bound in `desktop-read'.
