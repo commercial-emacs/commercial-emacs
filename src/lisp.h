@@ -191,9 +191,24 @@ extern bool suppress_checking EXTERNALLY_VISIBLE;
     : die (# cond, __FILE__, __LINE__))
 #endif /* ENABLE_CHECKING */
 
+
 /* Use the configure flag --enable-check-lisp-object-type to make
    Lisp_Object use a struct type instead of the default int.  The flag
    causes CHECK_LISP_OBJECT_TYPE to be defined.  */
+
+/***** Select the tagging scheme.  *****/
+/* The following option controls the tagging scheme:
+   - USE_LSB_TAG means that we can assume the least 3 bits of pointers are
+     always 0, and we can thus use them to hold tag bits, without
+     restricting our addressing space.
+
+   If ! USE_LSB_TAG, then use the top 3 bits for tagging, thus
+   restricting our possible address range.
+
+   USE_LSB_TAG not only requires the least 3 bits of pointers returned by
+   malloc to be 0 but also needs to be able to impose a mult-of-8 alignment
+   on some non-GC Lisp_Objects, all of which are aligned via
+   GCALIGNED_UNION_MEMBER.  */
 
 enum Lisp_Bits
   {
@@ -215,13 +230,10 @@ DEFINE_GDB_SYMBOL_END (INTTYPEBITS)
    expression involving VAL_MAX.  */
 #define VAL_MAX (EMACS_INT_MAX >> (GCTYPEBITS - 1))
 
-/* Since lmalloc() respects LISP_ALIGNMENT, we cannibalize the least
-   three bits of an lmalloc'd Lisp_Object for tagging.  On hosts where
-   pointers-as-ints do not exceed VAL_MAX / 2, however, this is:
-
-     1. unnecessary, because the top bits of an EMACS_INT are unused, and
-     2. slower, because it typically requires extra masking.
-
+/* Whether the least-significant bits of an EMACS_INT contain the tag.
+   On hosts where pointers-as-ints do not exceed VAL_MAX / 2, USE_LSB_TAG is:
+    a. unnecessary, because the top bits of an EMACS_INT are unused, and
+    b. slower, because it typically requires extra masking.
    So, USE_LSB_TAG is true only on hosts where it might be useful.  */
 DEFINE_GDB_SYMBOL_BEGIN (bool, USE_LSB_TAG)
 #define USE_LSB_TAG (VAL_MAX / 2 < INTPTR_MAX)
@@ -4251,7 +4263,6 @@ extern void free_cons (struct Lisp_Cons *);
 extern bool gc_handle_sigsegv (void *);
 extern void init_alloc_once (void);
 extern void syms_of_alloc (void);
-extern void syms_of_calloc (void);
 extern struct buffer *allocate_buffer (void) ATTRIBUTE_RETURNS_NONNULL;
 extern int valid_lisp_object_p (Lisp_Object);
 

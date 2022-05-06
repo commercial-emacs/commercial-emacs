@@ -548,8 +548,6 @@ enabled."
   ;; The implementation for the interpreter is basically trivial.
   (car (last body)))
 
-;; Note during compilation, this definition is overridden in
-;; byte-compile-initial-macro-environment.
 (defmacro with-suppressed-warnings (warnings &rest body)
   "Like `progn', but prevents compiler WARNINGS in BODY.
 
@@ -575,23 +573,29 @@ types.  The types that can be suppressed with this macro are
 
 For the `mapcar' case, only the `mapcar' function can be used in
 the symbol list.  For `suspicious', only `set-buffer' can be used."
+  ;; Note: during compilation, this definition is overridden by the one in
+  ;; byte-compile-initial-macro-environment.
   (declare (debug (sexp body)) (indent 1))
-  (if (boundp 'byte-compile--suppressed-warnings)
-      (let ((byte-compile--suppressed-warnings
-             (append warnings byte-compile--suppressed-warnings)))
-        (macroexpand-all (macroexp-progn body) macroexpand-all-environment))
-    ;; Since our intent relies completely on
-    ;; byte-compile--suppressed-warnings being defined, one wonders
-    ;; why this macro isn't defined in the same module as that
-    ;; variable in bytecomp.el.  Answer: bytecomp.el breaks bootstrap.
-    `(progn ,@body)))
+  (if (not (and (featurep 'macroexp)
+                (boundp 'byte-compile--suppressed-warnings)))
+      ;; If `macroexp' is not yet loaded, we're in the middle of
+      ;; bootstrapping, so better risk emitting too many warnings
+      ;; than risk breaking the bootstrap.
+      `(progn ,@body)
+    ;; We need to let-bind byte-compile--suppressed-warnings here, so as to
+    ;; silence warnings emitted during macro-expansion performed outside of
+    ;; byte-compilation.
+    (let ((byte-compile--suppressed-warnings
+           (append warnings byte-compile--suppressed-warnings)))
+      (macroexpand-all (macroexp-progn body)
+                       macroexpand-all-environment))))
 
-;; Called from lread.c and therefore needs to be preloaded.
 (defun byte-run--unescaped-character-literals-warning ()
   "Return a warning about unescaped character literals.
 If there were any unescaped character literals in the last form
 read, return an appropriate warning message as a string.
 Otherwise, return nil.  For internal use only."
+  ;; This is called from lread.c and therefore needs to be preloaded.
   (let ((sorted (sort lread--unescaped-character-literals #'<)))
     (when sorted
       (format-message "unescaped character literals %s detected, %s expected!"

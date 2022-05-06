@@ -527,10 +527,11 @@ bytecomp-tests.el for interesting cases."
                                 expanded)))))
     (with-suppressed-warnings
         . ,(lambda (warnings &rest body)
-             ;; Bind `byte-compile--suppressed-warnings' here to
-             ;; affect the macroexpansion.  The byte-hunk-handler of
-             ;; `internal--with-suppressed-warnings' binds it again
-             ;; for the compilation itself.
+             ;; We let-bind `byte-compile--suppressed-warnings' here in order
+             ;; to affect warnings emitted during macroexpansion.
+             ;; Later `internal--with-suppressed-warnings' binds it again, this
+             ;; time in order to affect warnings emitted during the
+             ;; compilation itself.
              (let ((byte-compile--suppressed-warnings
                     (append warnings byte-compile--suppressed-warnings)))
                ;; This function doesn't exist, but is just a placeholder
