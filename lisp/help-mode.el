@@ -415,7 +415,9 @@ Commands:
               help-mode-tool-bar-map)
   (setq-local help-mode--current-data nil)
   (setq-local bookmark-make-record-function
-              #'help-bookmark-make-record))
+              #'help-bookmark-make-record)
+  (unless search-default-mode
+    (isearch-fold-quotes-mode)))
 
 ;;;###autoload
 (defun help-mode-setup ()
