@@ -156,20 +156,19 @@
 ;; Load-time macro-expansion can only take effect after setting
 ;; load-source-file-function because of where it is called in lread.c.
 (load "emacs-lisp/macroexp")
-(if (or (byte-code-function-p (symbol-function 'macroexpand-all))
-        (subr-native-elisp-p (symbol-function 'macroexpand-all)))
-    nil
-  ;; Since loaddefs is not yet loaded, macroexp's uses of pcase will simply
-  ;; fail until pcase is explicitly loaded.  This also means that we have to
-  ;; disable eager macro-expansion while loading pcase.
-  (let ((macroexp--pending-eager-loads '(skip))) (load "emacs-lisp/pcase"))
-  ;; Re-load macroexp so as to eagerly macro-expand its uses of pcase.
-  (let ((max-lisp-eval-depth (* 2 max-lisp-eval-depth)))
-    (load "emacs-lisp/macroexp")))
+(if (and (not (byte-code-function-p (symbol-function 'macroexpand-all)))
+         (not (subr-native-elisp-p (symbol-function 'macroexpand-all))))
+    (progn
+      ;; Since loaddefs is not yet loaded, macroexp's uses of pcase will simply
+      ;; fail until pcase is explicitly loaded.  This also means that we have to
+      ;; disable eager macro-expansion while loading pcase.
+      (let ((macroexp--pending-eager-loads '(skip))) (load "emacs-lisp/pcase"))
+      ;; Re-load macroexp so as to eagerly macro-expand its uses of pcase.
+      (let ((max-lisp-eval-depth (* 2 max-lisp-eval-depth)))
+        (load "emacs-lisp/macroexp"))))
 
 (load "cus-face")
 (load "faces")  ; after here, `defface' may be used.
-
 
 ;; We don't want to store loaddefs.el in the repository because it is
 ;; a generated file; but it is required in order to compile the lisp files.
