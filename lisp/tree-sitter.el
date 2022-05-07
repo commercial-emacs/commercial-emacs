@@ -156,7 +156,6 @@ Make sure we change at least one char (in case of deletions)."
 
 (defun tree-sitter-fontify-region (beg end loudly)
   "Presumably widened in `font-lock-fontify-region'."
-  (ignore loudly)
   (let ((inhibit-point-motion-hooks t))
     (with-silent-modifications
       (save-excursion

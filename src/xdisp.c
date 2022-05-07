@@ -3736,125 +3736,81 @@ compute_display_string_end (ptrdiff_t charpos, struct bidi_string_data *string)
 			    Fontification
  ***********************************************************************/
 
-/* Handle changes in the `fontified' property of the current buffer by
-   calling hook functions from Qfontification_functions to fontify
-   regions of text.  */
-
 static enum prop_handled
 handle_fontified_prop (struct it *it)
 {
   Lisp_Object prop, pos;
   enum prop_handled handled = HANDLED_NORMALLY;
 
-  if (!NILP (Vmemory_full))
-    return handled;
-
-  /* Get the value of the `fontified' property at IT's current buffer
-     position.  (The `fontified' property doesn't have a special
-     meaning in strings.)  If the value is nil, call functions from
-     Qfontification_functions.  */
-  if (!STRINGP (it->string)
+  if (! STRINGP (it->string)
       && it->s == NULL
-      && !NILP (Vfontification_functions)
-      && !(input_was_pending && redisplay_skip_fontification_on_input)
-      && !NILP (Vrun_hooks)
+      && ! NILP (Vfontification_functions)
+      && ! (input_was_pending && redisplay_skip_fontification_on_input)
+      && ! NILP (Vrun_hooks)
       && (pos = make_fixnum (IT_CHARPOS (*it)),
 	  prop = Fget_char_property (pos, Qfontified, Qnil),
-	  /* Ignore the special cased nil value always present at EOB since
-	     no amount of fontifying will be able to change it.  */
 	  NILP (prop) && IT_CHARPOS (*it) < Z))
     {
+      /* We're not in string context, and Qfontified property was nil;
+	 run hooks from Qfontification_functions.  */
       specpdl_ref count = SPECPDL_INDEX ();
-      Lisp_Object val;
       struct buffer *obuf = current_buffer;
-      ptrdiff_t begv = BEGV, zv = ZV;
       bool old_clip_changed = current_buffer->clip_changed;
       bool saved_inhibit_flag = it->f->inhibit_clear_image_cache;
+      Lisp_Object funs = Vfontification_functions;
 
-      val = Vfontification_functions;
       specbind (Qfontification_functions, Qnil);
-
       eassert (it->end_charpos == ZV);
 
-      /* Don't allow Lisp that runs from 'fontification-functions'
-	 clear our face and image caches behind our back.  */
+      /* Prevent arbitrary lisp in Qfontification_functions from
+	 modifying faces or image caches.  */
       it->f->inhibit_clear_image_cache = true;
 
-      if (!CONSP (val) || EQ (XCAR (val), Qlambda))
-	safe_call1 (val, pos);
+      if (! CONSP (funs) || EQ (XCAR (funs), Qlambda))
+	/* FUNS is a scalar function binding or lambda expression.  */
+	safe_call1 (funs, pos);
       else
-	{
-	  Lisp_Object fns, fn;
-
-	  fns = Qnil;
-
-	  for (; CONSP (val); val = XCDR (val))
-	    {
-	      fn = XCAR (val);
-
-	      if (EQ (fn, Qt))
-		{
-		  /* A value of t indicates this hook has a local
-		     binding; it means to run the global binding too.
-		     In a global value, t should not occur.  If it
-		     does, we must ignore it to avoid an endless
-		     loop.  */
-		  for (fns = Fdefault_value (Qfontification_functions);
-		       CONSP (fns);
-		       fns = XCDR (fns))
-		    {
-		      fn = XCAR (fns);
-		      if (!EQ (fn, Qt))
-			safe_call1 (fn, pos);
-		    }
-		}
-	      else
-		safe_call1 (fn, pos);
-	    }
-	}
+	FOR_EACH_TAIL (funs)
+	  {
+	    if (EQ (XCAR (funs), Qt))
+	      {
+		/* Qt opaquely means run-hooks the global binding.  */
+		Lisp_Object gfuns = Fdefault_value (Qfontification_functions);
+		FOR_EACH_TAIL (gfuns)
+		  {
+		    if (! EQ (XCAR (gfuns), Qt))
+		      safe_call1 (XCAR (gfuns), pos);
+		  }
+	      }
+	    else
+	      safe_call1 (XCAR (funs), pos);
+	  }
 
       it->f->inhibit_clear_image_cache = saved_inhibit_flag;
+      if (obuf != current_buffer && BUFFER_LIVE_P (obuf))
+	/* Fontification stultifyingly switched buffers!  */
+	set_buffer_internal_1 (obuf);
+      if (obuf == current_buffer)
+	/* Bug#6671.  */
+	current_buffer->clip_changed = old_clip_changed;
       unbind_to (count, Qnil);
 
-      /* Fontification functions routinely call `save-restriction'.
-	 Normally, this tags clip_changed, which can confuse redisplay
-	 (see discussion in Bug#6671).  Since we don't perform any
-	 special handling of fontification changes in the case where
-	 `save-restriction' isn't called, there's no point doing so in
-	 this case either.  So, if the buffer's restrictions are
-	 actually left unchanged, reset clip_changed.  */
-      if (obuf == current_buffer)
-      	{
-      	  if (begv == BEGV && zv == ZV)
-	    current_buffer->clip_changed = old_clip_changed;
-      	}
-      /* There isn't much we can reasonably do to protect against
-      	 misbehaving fontification, but here's a fig leaf.  */
-      else if (BUFFER_LIVE_P (obuf))
-      	set_buffer_internal_1 (obuf);
-
-      /* The fontification code may have added/removed text.
-	 It could do even a lot worse, but let's at least protect against
-	 the most obvious case where only the text past `pos' gets changed',
-	 as is/was done in grep.el where some escapes sequences are turned
-	 into face properties (bug#7876).  */
+      /* Protect against text modifications beyond POS, as in grep.el
+	 which turned escape sequences face properties (bug#7876).  */
       it->end_charpos = ZV;
 
-      /* Return HANDLED_RECOMPUTE_PROPS only if function fontified
-	 something.  This avoids an endless loop if they failed to
-	 fontify the text for which reason ever.  */
-      if (!NILP (Fget_char_property (pos, Qfontified, Qnil)))
+      if (! NILP (Fget_char_property (pos, Qfontified, Qnil)))
 	{
 	  clear_glyph_matrix (it->w->desired_matrix);
 	  it->f->fonts_changed = true;
+	  /* HANDLED_RECOMPUTE_PROPS tells the caller to reinvoke all
+	     handlers in the presence of new fontification.  */
 	  handled = HANDLED_RECOMPUTE_PROPS;
 	}
     }
 
   return handled;
 }
-
-
 
 /***********************************************************************
 				Faces
