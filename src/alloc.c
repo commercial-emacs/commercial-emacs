@@ -209,9 +209,6 @@ enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 /* Arbitrarily set in 2012 in commit 0dd6d66.  */
 #define GC_DEFAULT_THRESHOLD ((1 << 17) * word_size)
 
-/* Global variables.  */
-struct emacs_globals globals;
-
 /* Exposed to lisp.h so that maybe_garbage_collect() can inline.  */
 EMACS_INT bytes_since_gc;
 EMACS_INT bytes_between_gc;

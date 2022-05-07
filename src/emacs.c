@@ -170,6 +170,7 @@ static char *initial_cmdline;
 static const char *initial_wd;
 #endif
 
+struct emacs_globals globals;
 struct gflags gflags;
 bool initialized;
 
