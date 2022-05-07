@@ -30,7 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    Redisplay occurs in-band in the interpreter loop, and out-of-band
    in response to mouse or expose events or lisp invocations of
-   `sit-for' and the like.
+   sit-for and the like.
 
    Note in the diagram that redisplay can invoke lisp forms which
    could arbitrarily mutate state that redisplay assumed immutable.
@@ -55,7 +55,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    A "glyph" represents a discrete display element, usually a character
    or image.  The "current" and "desired" glyph matrices are compared
-   in `update_window' to efficiently update the display.
+   in update_window() to efficiently update the display.
 
    Some redisplay optimizations include:
 
@@ -90,17 +90,17 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    The stop position.
 
-   The `stop_charpos' field of the iterator is the next character
+   The STOP_CHARPOS field of the iterator is the next character
    position redisplay must assess changes to face, overlays,
-   invisibility, etc.  Upon reaching `stop_charpos', the function
-   `handle_stop' invokes a series of handlers, one for each of the
-   fields in `it_props', and concludes by calling `compute_stop_pos'
-   which determines the next `stop_charpos'.
+   invisibility, etc.  Upon reaching STOP_CHARPOS, handle_stop()
+   invokes a series of handlers, one for each of the fields in
+   IT_PROPS, and concludes by calling compute_stop_pos() which
+   determines the next STOP_CHARPOS.
 
    Line and wrap prefixes
 
-   The poorly named "prefix" in functions like `handle_line_prefix'
-   and `push_prefix_prop' is either the so-called line-prefix or
+   The poorly named "prefix" in functions like handle_line_prefix()
+   and push_prefix_pop() is either the so-called line-prefix or
    wrap-prefix, which are respectively the display element preceding a
    non-continued line or the element preceding a continuation line.
 
@@ -108,11 +108,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    Desired matrices are per window and sparse: only those glyph rows
    needing updates are "enabled."  The workhorse function
-   `display_sline' iteratively calls `get_display_element' and
-   `PRODUCE_GLYPHS'.  If the next element does not fit, the glyph row
+   display_sline() iteratively calls get_display_element() and
+   PRODUCE_GLYPHS().  If the next element does not fit, the glyph row
    is marked as a "continued line".  In addition to producing glyphs,
-   `display_sline' handles truncation and continuation, word wrap, and
-   cursor positioning (see `set_cursor_from_row').
+   display_sline() handles truncation and continuation, word wrap, and
+   cursor positioning (see set_cursor_from_row()).
 
    Simulating display.
 
@@ -121,13 +121,13 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    Determining this is nontrivial when the buffer includes
    variable-size elements, differing fonts, tall images, etc.
 
-   Enter `emulate_display_sline' which, like `display_sline', traverses
+   Enter emulate_display_sline() which, like display_sline(), traverses
    the buffer contents to determine what will and won't fit on the
    current glyph row, but without touching the glass.
 
-   `move_it_forward' is the trusty mule that utilizes
-   `emulate_display_sline' to move an iterator FORWARD.
-   `move_it_backward' is the prickly hinny that must first estimate
+   move_it_forward() is the trusty mule that utilizes
+   emulate_display_sline() to move an iterator FORWARD.
+   move_it_backward() is the prickly hinny that must first estimate
    how far to scroll back, then dial in the desired y-coordinate from
    there.
 
@@ -140,20 +140,20 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    written from left to right, the text is actually bidirectional: a
    mixture of right-to-left and left-to-right text."
 
-   R2L glyph rows have `reversed_p' set, prompting `PRODUCE_GLYPHS' to
+   R2L glyph rows have reversed_p set, prompting PRODUCE_GLYPHS() to
    *prepend* additional glyphs.  On text terminals, the function
-   `extend_face_to_end_of_line' prepends blank characters to pad out
+   extend_face_to_end_of_line() prepends blank characters to pad out
    the glyph row.  On graphics terminals, a single stretch glyph is
    inserted.  Both the blanks and the stretch glyph are assigned the
    background face.
 
-   The `set_iterator_to_next' function defers to
-   `bidi_move_to_visually_next' which moves the iterator to the next
+   The set_iterator_to_next() function defers to
+   bidi_move_to_visually_next() which moves the iterator to the next
    spot in the reading order (left to right, or right to left).
 
    Some backtracking is necessary since filling glyphs from the right
    skips aforementioned stop positions on the left (see
-   `handle_stop_backwards').
+   handle_stop_backwards()).
 
    Character compositions.
 
@@ -162,18 +162,18 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    Emacs supports this via "character compositions", implemented in
    composite.c.  During the buffer scan that delivers characters to
-   `PRODUCE_GLYPHS', if the next character to be delivered is a
-   composed character, the iteration calls `composition_reseat_it' and
-   `get_element_from_composition'.  The composed sequence or "grapheme
-   cluster" is then recorded in the `cmp_it' field of the iterator
+   PRODUCE_GLYPHS(), if the next character to be delivered is a
+   composed character, the iteration calls composition_reseat_it() and
+   get_element_from_composition().  The composed sequence or "grapheme
+   cluster" is then recorded in the cmp_it field of the iterator
    struct.  Grapheme clusters are always stored in LGSTRING objects in
    so-called logical order where sequentially earlier glyphs are
    stored in earlier (smaller) memory addresses.
 
    As far as 'struct it' is concerned, traversal of R2L rows is still
-   left to right.  The iterator does not know that `PRODUCE_GLYPHS'
+   left to right.  The iterator does not know that PRODUCE_GLYPHS()
    reversed the delivery order.  The required axis-flip occurs in a
-   blink-and-you-miss-it line in `buffer_posn_from_coords'.  */
+   blink-and-you-miss-it line in buffer_posn_from_coords().  */
 
 #include <config.h>
 #include <stdlib.h>
@@ -434,8 +434,8 @@ static bool message_enable_multibyte;
 
 enum { REDISPLAY_SOME = 2};	/* Arbitrary choice.  */
 
-/* Every buffer, window, and frame admits a `redisplay' bit, which if
-   true warrants redisplay.  A `windows_or_buffers_changed' of 0,
+/* Every buffer, window, and frame admits a REDISPLAY bit, which if
+   true warrants redisplay.  A windows_or_buffers_changed of 0,
    however, allows us to call off that search.  Apparently, some
    non-zero values which are not the default (REDISPLAY_SOME) also
    allow us to short-circuit the search (but has the opposite effect
@@ -444,7 +444,7 @@ enum { REDISPLAY_SOME = 2};	/* Arbitrary choice.  */
 
 int windows_or_buffers_changed;
 
-/* Same semantics as `window_or_buffers_changed' but for the mode lines.
+/* Same semantics as window_or_buffers_changed but for the mode lines.
    Largely redundant with the window redisplay bit since redisplaying
    the window would redisplay the mode line.
  */
@@ -851,12 +851,6 @@ static void show_mouse_face (Mouse_HLInfo *, enum draw_glyphs_face);
 static bool coords_in_mouse_face_p (struct window *, int, int);
 static void reset_box_start_end_flags (struct it *);
 
-
-
-/***********************************************************************
-		      Window display dimensions
- ***********************************************************************/
-
 /* Return the bottom boundary y-position for text lines in window W.
    This is the first y position at which a line cannot start.
    It is relative to the top of the window.
@@ -1106,10 +1100,6 @@ window_box_edges (struct window *w, int *top_left_x, int *top_left_y,
 }
 
 #endif /* HAVE_WINDOW_SYSTEM */
-
-/***********************************************************************
-			      Utilities
- ***********************************************************************/
 
 static int
 line_bottom_y (struct it it, int fallback_height)
@@ -2583,10 +2573,6 @@ hscrolling_current_line_p (struct window *w)
 		 Qcurrent_line));
 }
 
-/***********************************************************************
-			Lisp form evaluation
- ***********************************************************************/
-
 /* Error handler for safe_eval and safe_call.  */
 
 static Lisp_Object
@@ -2687,10 +2673,6 @@ safe_call2 (Lisp_Object fn, Lisp_Object arg1, Lisp_Object arg2)
   return safe_call (3, fn, arg1, arg2);
 }
 
-
-/***********************************************************************
-		       Iterator initialization
- ***********************************************************************/
 
 /* Initialize IT for displaying current_buffer in window W, starting
    at character position CHARPOS.  CHARPOS < 0 means that no buffer
@@ -3334,13 +3316,6 @@ init_to_row_end (struct it *it, struct window *w, struct glyph_row *row)
   return success;
 }
 
-
-
-
-/***********************************************************************
-			   Text properties
- ***********************************************************************/
-
 /* Called when IT reaches IT->stop_charpos.  Handle text property and
    overlay changes.  Set IT->stop_charpos to the next position where
    to stop.  */
@@ -3688,53 +3663,31 @@ compute_display_string_pos (struct text_pos *position,
   return CHARPOS (tpos);
 }
 
-/* Return the character position of the end of the display string that
-   started at CHARPOS.  If there's no display string at CHARPOS,
-   return -1.  A display string is either an overlay with `display'
-   property whose value is a string or a `display' text property whose
-   value is a string.  */
+/* Return the ending charpos of display string (either an overlay or a
+   text property) starting at CHARPOS, or -1 for no such display
+   string.  */
+
 ptrdiff_t
 compute_display_string_end (ptrdiff_t charpos, struct bidi_string_data *string)
 {
-  /* OBJECT = nil means current buffer.  */
-  Lisp_Object object =
-    (string && STRINGP (string->lstring)) ? string->lstring : Qnil;
   Lisp_Object pos = make_fixnum (charpos);
-  ptrdiff_t eob =
-    (STRINGP (object) || (string && string->s)) ? string->schars : ZV;
+  Lisp_Object object = (string && STRINGP (string->lstring))
+    ? string->lstring
+    : Qnil;
+  ptrdiff_t eob = (STRINGP (object) || (string && string->s))
+    ? string->schars
+    : ZV;
 
-  if (charpos >= eob || (string->s && !STRINGP (object)))
+  if (charpos >= eob || (string->s && ! STRINGP (object)))
     return eob;
 
-  /* It could happen that the display property or overlay was removed
-     since we found it in compute_display_string_pos above.  One way
-     this can happen is if JIT font-lock was called (through
-     handle_fontified_prop), and jit-lock-functions remove text
-     properties or overlays from the portion of buffer that includes
-     CHARPOS.  Muse mode is known to do that, for example.  In this
-     case, we return -1 to the caller, to signal that no display
-     string is actually present at CHARPOS.  See bidi_fetch_char for
-     how this is handled.
-
-     An alternative would be to never look for display properties past
-     it->stop_charpos.  But neither compute_display_string_pos nor
-     bidi_fetch_char that calls it know or care where the next
-     stop_charpos is.  */
+  /* handle_fontified_prop() has in the past removed display strings
+     found in compute_display_string_pos(), i.e., muse-mode. */
   if (NILP (Fget_char_property (pos, Qdisplay, object)))
     return -1;
 
-  /* Look forward for the first character where the `display' property
-     changes.  */
-  pos = Fnext_single_char_property_change (pos, Qdisplay, object, Qnil);
-
-  return XFIXNAT (pos);
+  return XFIXNAT (Fnext_single_char_property_change (pos, Qdisplay, object, Qnil));
 }
-
-
-
-/***********************************************************************
-			    Fontification
- ***********************************************************************/
 
 static enum prop_handled
 handle_fontified_prop (struct it *it)
@@ -3755,7 +3708,7 @@ handle_fontified_prop (struct it *it)
 	 run hooks from Qfontification_functions.  */
       specpdl_ref count = SPECPDL_INDEX ();
       struct buffer *obuf = current_buffer;
-      bool old_clip_changed = current_buffer->clip_changed;
+      bool saved_clip_changed = current_buffer->clip_changed;
       bool saved_inhibit_flag = it->f->inhibit_clear_image_cache;
       Lisp_Object funs = Vfontification_functions;
 
@@ -3792,7 +3745,7 @@ handle_fontified_prop (struct it *it)
 	set_buffer_internal_1 (obuf);
       if (obuf == current_buffer)
 	/* Bug#6671.  */
-	current_buffer->clip_changed = old_clip_changed;
+	current_buffer->clip_changed = saved_clip_changed;
       unbind_to (count, Qnil);
 
       /* Protect against text modifications beyond POS, as in grep.el
@@ -3811,10 +3764,6 @@ handle_fontified_prop (struct it *it)
 
   return handled;
 }
-
-/***********************************************************************
-				Faces
- ***********************************************************************/
 
 static int
 face_at_pos (const struct it *it, enum lface_attribute_index attr_filter)
@@ -4200,12 +4149,6 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 
   return face_id;
 }
-
-
-
-/***********************************************************************
-			    Invisible text
- ***********************************************************************/
 
 /* Set up iterator IT from invisible properties at its current
    position.  Called from handle_stop.  */
@@ -4726,12 +4669,6 @@ properties at POSITION.  */)
 
   return find_display_property (properties, prop);
 }
-
-
-
-/***********************************************************************
-			    'display' property
- ***********************************************************************/
 
 /* Set up iterator IT from `display' property at its current position.
    Called from handle_stop.
@@ -5614,12 +5551,6 @@ string_buffer_position (Lisp_Object string, ptrdiff_t around_charpos)
   return found;
 }
 
-
-
-/***********************************************************************
-			`composition' property
- ***********************************************************************/
-
 /* Set up iterator IT from `composition' property at its current
    position.  Called from handle_stop.  */
 
@@ -5679,12 +5610,6 @@ handle_composition_prop (struct it *it)
 
   return HANDLED_NORMALLY;
 }
-
-
-
-/***********************************************************************
-			   Overlay strings
- ***********************************************************************/
 
 /* The following structure is used to record overlay strings for
    later sorting in load_overlay_strings.  */
@@ -6110,12 +6035,6 @@ get_overlay_strings (struct it *it, ptrdiff_t charpos)
   return STRINGP (it->string);
 }
 
-
-
-/***********************************************************************
-		      Saving and restoring state
- ***********************************************************************/
-
 /* Save current settings of IT on IT->stack.  Called, for example,
    before setting up IT for an overlay string, to be able to restore
    IT's settings to what they were after the overlay string has been
@@ -6351,12 +6270,6 @@ pop_it (struct it *it)
   if (from_display_prop && it->sp == 0 && CHARPOS (it->position) != prev_pos)
     it->ignore_overlay_strings_at_pos_p = false;
 }
-
-
-
-/***********************************************************************
-			  Moving over lines
- ***********************************************************************/
 
 /* If IT already at a line start, set IT position to previous line start.
    Otherwise set IT to line start. */
@@ -6665,12 +6578,6 @@ reseat_following_line_start (struct it *it, bool on_newline_p)
     reseat (it, it->current.pos, false);
 }
 
-
-
-/***********************************************************************
-		   Changing an iterator's position
-***********************************************************************/
-
 /* Change IT's current position to POS in current_buffer.
    If FORCE_P, always check for text properties at the new position.
    Otherwise, text properties are only looked up if POS >=
@@ -6908,12 +6815,6 @@ reseat_to_string (struct it *it, const char *s, Lisp_Object string,
 				    it->string);
     }
 }
-
-
-
-/***********************************************************************
-			      Iteration
-***********************************************************************/
 
 /* Someone decided the speedup over an if-statement warranted a map of
    function pointers.  */
@@ -8605,12 +8506,6 @@ get_element_from_composition (struct it *it)
   return true;
 }
 
-
-
-/***********************************************************************
-	     Moving an iterator without producing glyphs
- ***********************************************************************/
-
 /* Check if iterator is at a position corresponding to a valid buffer
    position after some move_it_* call.  */
 
@@ -10097,11 +9992,6 @@ DEFUN ("display--line-is-continued-p", Fdisplay__line_is_continued_p,
 
   return rc == MOVE_LINE_CONTINUED ? Qt : Qnil;
 }
-
-
-/***********************************************************************
-			       Messages
- ***********************************************************************/
 
 /* Return the number of arguments the format string FORMAT needs.  */
 
@@ -11630,10 +11520,6 @@ window_frozen_p (struct window *w)
   return false;
 }
 
-/***********************************************************************
-		     Mode Lines and Frame Titles
- ***********************************************************************/
-
 /* A buffer for constructing non-propertized mode-line strings and
    frame titles in it; allocated from the heap in init_xdisp and
    resized as needed in store_mode_line_noprop_char.  */
@@ -11843,10 +11729,6 @@ store_mode_line_noprop (const char *string, int field_width, int precision)
   return n;
 }
 
-/***********************************************************************
-			     Frame Titles
- ***********************************************************************/
-
 #ifdef HAVE_WINDOW_SYSTEM
 
 /* Set the title of FRAME, if it has changed.  The title format is
@@ -11942,11 +11824,6 @@ gui_consider_frame_title (Lisp_Object frame)
 }
 
 #endif /* not HAVE_WINDOW_SYSTEM */
-
-
-/***********************************************************************
-			      Menu Bars
- ***********************************************************************/
 
 /* True if we will not redisplay all visible windows.  */
 #define REDISPLAY_SOME_P()				\
@@ -12195,12 +12072,6 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 
   return hooks_run;
 }
-
-
-
-/***********************************************************************
-			       Tab-bars
- ***********************************************************************/
 
 /* Restore WINDOW as the selected window and its frame as the selected
    frame.  If WINDOW is dead but the selected frame is live, make the
@@ -13175,12 +13046,6 @@ tty_handle_tab_bar_click (struct frame *f, int x, int y, bool down_p,
   return Fcons (Qtab_bar, Fcons (caption, make_fixnum (0)));
 }
 
-
-
-/***********************************************************************
-			       Tool-bars
- ***********************************************************************/
-
 #ifdef HAVE_WINDOW_SYSTEM
 
 /* Update the tool-bar item list for frame F.  This has to be done
@@ -14054,12 +13919,6 @@ note_tool_bar_highlight (struct frame *f, int x, int y)
 
 #endif /* HAVE_WINDOW_SYSTEM */
 
-
-
-/************************************************************************
-			 Horizontal scrolling
- ************************************************************************/
-
 /* For all leaf windows in the window tree rooted at WINDOW, set their
    hscroll value so that PT is (i) visible in the window, and (ii) so
    that it is not within a certain margin at the window's left and
@@ -14355,12 +14214,6 @@ hscroll_windows (Lisp_Object window)
     clear_desired_matrices (XFRAME (WINDOW_FRAME (XWINDOW (window))));
   return hscrolled_p;
 }
-
-
-
-/************************************************************************
-				Redisplay
- ************************************************************************/
 
 /* Value is true if all changes in window W, which displays
    current_buffer, are in the text between START and END.  START is a
@@ -15725,11 +15578,6 @@ buffer_flipping_blocked_p (void)
 {
   return buffer_flip_blocked_depth > 0;
 }
-
-
-/***********************************************************************
-			   Window Redisplay
- ***********************************************************************/
 
 /* Redisplay all leaf windows in the window tree rooted at WINDOW.  */
 
@@ -18518,12 +18366,6 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
   return 1;
 }
 
-
-
-/************************************************************************
-    Window redisplay reusing current matrix when buffer has not changed
- ************************************************************************/
-
 /* Try redisplay of window W showing an unchanged buffer with a
    different window start than the last time it was displayed by
    reusing its current matrix.  Value is true if successful.
@@ -18954,12 +18796,6 @@ try_window_reusing_current_matrix (struct window *w)
 
   return false;
 }
-
-
-
-/************************************************************************
-   Window redisplay reusing current matrix when buffer has changed
- ************************************************************************/
 
 static struct glyph_row *find_last_unchanged_at_beg_row (struct window *);
 static struct glyph_row *find_first_unchanged_at_end_row (struct window *,
@@ -20013,11 +19849,6 @@ try_window_insdel (struct window *w)
 
 #undef GIVE_UP
 }
-
-
-/***********************************************************************
-		     Building Desired Matrix Rows
- ***********************************************************************/
 
 /* Return a temporary glyph row holding the glyphs of an overlay arrow.
    Used for non-window-redisplay windows, and for windows w/o left fringe.  */
@@ -23554,12 +23385,6 @@ in order to avoid these problems.  */)
     return Qnil;
 }
 
-
-
-/***********************************************************************
-			       Menu Bar
- ***********************************************************************/
-
 /* Redisplay the menu bar in the frame for window W.
 
    The menu bar of X frames that don't have X toolkit support is
@@ -23794,10 +23619,6 @@ display_tty_menu_item (const char *item_text, int width, int face_id,
   row->full_width_p = saved_width;
   row->reversed_p = saved_reversed;
 }
-
-/***********************************************************************
-			      Mode Line
- ***********************************************************************/
 
 /* Redisplay mode lines in the window tree whose root is WINDOW.
    If FORCE, redisplay mode lines unconditionally.
@@ -25601,12 +25422,6 @@ display_count_lines (ptrdiff_t start_byte,
 
 }
 
-
-
-/***********************************************************************
-			 Displaying strings
- ***********************************************************************/
-
 /* Display a NUL-terminated string, starting with index START.
 
    If STRING is non-null, display that C string.  Otherwise, the Lisp
@@ -26236,11 +26051,6 @@ get_font_ascent_descent (struct font *font, int *ascent, int *descent)
   *descent = 0;
 #endif
 }
-
-
-/***********************************************************************
-			     Glyph Display
- ***********************************************************************/
 
 #ifdef HAVE_WINDOW_SYSTEM
 
@@ -29823,12 +29633,6 @@ gui_clear_end_of_line (struct window *w, struct glyph_row *updated_row,
 
 #endif /* HAVE_WINDOW_SYSTEM */
 
-
-
-/***********************************************************************
-			     Cursor types
- ***********************************************************************/
-
 /* Value is the internal representation of the specified cursor type
    ARG.  If type is BAR_CURSOR, return in *WIDTH the specified width
    of the bar cursor.  */
@@ -30113,11 +29917,6 @@ notice_overwritten_cursor (struct window *w, enum glyph_row_area area,
 }
 
 #endif /* HAVE_WINDOW_SYSTEM */
-
-
-/************************************************************************
-			      Mouse Face
- ************************************************************************/
 
 #ifdef HAVE_WINDOW_SYSTEM
 
@@ -32601,12 +32400,6 @@ cancel_mouse_face (struct frame *f)
     reset_mouse_highlight (hlinfo);
 }
 
-
-
-/***********************************************************************
-			   Exposure Events
- ***********************************************************************/
-
 #ifdef HAVE_WINDOW_SYSTEM
 
 /* Redraw the part of glyph row area AREA of glyph row ROW on window W
@@ -33210,11 +33003,6 @@ gui_intersect_rectangles (const Emacs_Rectangle *r1, const Emacs_Rectangle *r2,
 }
 
 #endif /* HAVE_WINDOW_SYSTEM */
-
-
-/***********************************************************************
-			    Initialization
- ***********************************************************************/
 
 void
 syms_of_xdisp (void)
