@@ -663,13 +663,15 @@ compare_globals (const void *a, const void *b)
 static void
 close_emacs_globals (ptrdiff_t num_symbols)
 {
-  printf (("};\n"
-	   "extern struct emacs_globals globals;\n"
-	   "\n"
+  printf (("};\n\n"
 	   "#ifndef DEFINE_SYMBOLS\n"
 	   "extern\n"
 	   "#endif\n"
-	   "struct Lisp_Symbol lispsym[%td];\n"),
+	   "struct Lisp_Symbol lispsym[%td];\n"
+	   "#ifndef DEFINE_SYMBOLS\n"
+	   "extern\n"
+	   "#endif\n"
+	   "struct emacs_globals globals;\n"),
 	  num_symbols);
 }
 
