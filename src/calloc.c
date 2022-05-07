@@ -256,16 +256,16 @@ syms_of_calloc (void)
 	       doc: /* How does mprotect work?  */);
   Vmemory__protect_p = Qnil;
 
-  DEFSYM (Qcconses, "conses");
-  DEFSYM (Qcsymbols, "symbols");
-  DEFSYM (Qcstrings, "strings");
-  DEFSYM (Qcvectors, "vectors");
-  DEFSYM (Qcfloats, "floats");
-  DEFSYM (Qcintervals, "intervals");
-  DEFSYM (Qcbuffers, "buffers");
-  DEFSYM (Qcstring_bytes, "string-bytes");
-  DEFSYM (Qcvector_slots, "vector-slots");
-  DEFSYM (Qcheap, "heap");
+  DEFSYM (Qcconses, "cconses");
+  DEFSYM (Qcsymbols, "csymbols");
+  DEFSYM (Qcstrings, "cstrings");
+  DEFSYM (Qcvectors, "cvectors");
+  DEFSYM (Qcfloats, "cfloats");
+  DEFSYM (Qcintervals, "cintervals");
+  DEFSYM (Qcbuffers, "cbuffers");
+  DEFSYM (Qcstring_bytes, "cstring-bytes");
+  DEFSYM (Qcvector_slots, "cvector-slots");
+  DEFSYM (Qcheap, "cheap");
 
   defsubr (&Sccons);
   defsubr (&Sclist);

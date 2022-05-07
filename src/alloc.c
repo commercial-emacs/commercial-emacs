@@ -4349,7 +4349,7 @@ mark_memory (void const *start, void const *end)
       mark_maybe_pointer (p, false);
 
       /* Unmask any struct Lisp_Symbol pointer that make_lisp_symbol
-	 previously disguised by adding the address of 'lispsym'.
+	 previously disguised by adding the address of LISPSYM.
 	 On a host with 32-bit pointers and 64-bit Lisp_Objects,
 	 a Lisp_Object might be split into registers saved into
 	 non-adjacent words and P might be the low-order word's value.  */
