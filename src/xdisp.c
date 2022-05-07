@@ -608,19 +608,10 @@ enum prop_handled
   HANDLED_RETURN
 };
 
-/* A description of text properties that redisplay is interested
-   in.  */
-
 struct props
 {
-  /* The symbol index of the name of the property.  */
   short name;
-
-  /* A unique index for the property.  */
   enum prop_idx idx;
-
-  /* A handler function called to set up iterator IT from the property
-     at IT's current position.  Value is used to steer handle_stop.  */
   enum prop_handled (*handler) (struct it *it);
 };
 
@@ -631,10 +622,9 @@ static enum prop_handled handle_composition_prop (struct it *);
 static enum prop_handled handle_overlay_change (struct it *);
 static enum prop_handled handle_fontified_prop (struct it *);
 
-/* Properties handled by iterators.  Order matters! */
-
 static struct props it_props[] =
   {
+    /* Order matters! */
     {SYMBOL_INDEX (Qfontified),   FONTIFIED_PROP_IDX,     handle_fontified_prop},
     {SYMBOL_INDEX (Qface),        FACE_PROP_IDX,          handle_face_prop},
     {SYMBOL_INDEX (Qdisplay),     DISPLAY_PROP_IDX,       handle_display_prop},
@@ -8209,18 +8199,18 @@ compute_stop_pos_backwards (struct it *it)
   it->end_charpos = save_end_pos;
 }
 
-/* Scan forward from CHARPOS in the current buffer/string, until we
-   find a stop position > current IT's position.  Then handle the stop
-   position before that.  This is called when we bump into a stop
-   position while reordering bidirectional text.  CHARPOS should be
-   the last previously processed stop_pos (or BEGV/0, if none were
-   processed yet) whose position is less than IT's current
-   position.  */
+/* CHARPOS should be the last processed STOP_POS preceding IT.
+   Forcibly call handle_stop() on the STOP_POS immediately preceding
+   IT.
+
+   This is called when we bump into a STOP_POS while reordering
+   bidirectional text.
+*/
 
 static void
 handle_stop_backwards (struct it *it, ptrdiff_t charpos)
 {
-  bool bufp = !STRINGP (it->string);
+  bool bufp = ! STRINGP (it->string);
   ptrdiff_t where_we_are = (bufp ? IT_CHARPOS (*it) : IT_STRING_CHARPOS (*it));
   struct display_pos save_current = it->current;
   struct text_pos save_position = it->position;
@@ -8242,9 +8232,7 @@ handle_stop_backwards (struct it *it, ptrdiff_t charpos)
       else
 	it->current.string_pos = string_pos (charpos, it->string);
       compute_stop_pos (it);
-      /* We must advance forward, right?  */
-      if (it->stop_charpos <= it->prev_stop)
-	emacs_abort ();
+      eassert (it->stop_charpos > it->prev_stop);
       charpos = it->stop_charpos;
     }
   while (charpos <= where_we_are);
@@ -11220,7 +11208,6 @@ set_message (Lisp_Object string)
   if (NILP (message))
     {
       message_enable_multibyte = STRING_MULTIBYTE (string);
-
       with_echo_area_buffer (0, -1, set_message_1, 0, string);
       message_buf_print = false;
       help_echo_showing_p = false;
@@ -11231,7 +11218,6 @@ set_message (Lisp_Object string)
       && fast_string_match (Vdebug_on_message, string) >= 0)
     call_debugger (list2 (Qerror, string));
 }
-
 
 /* Helper function for set_message.  First argument is ignored and second
    argument has the same meaning as for set_message.

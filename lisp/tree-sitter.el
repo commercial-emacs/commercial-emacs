@@ -150,8 +150,12 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
 
 (defun tree-sitter-douse-fontify (beg _end old-len)
   "As was the case for `jit-lock-after-change', I repeat,
-Make sure we change at least one char (in case of deletions)."
-  (unless (zerop old-len)
+Make sure we change at least one char (in case of deletions).
+
+Undo, because it restores a non-nil Qfontified prop, requires
+similar goosing so that handle_fontified_prop() sees the
+NILP(prop) it needs to proceed."
+  (when (or (> old-len 0) undo-in-progress)
     (put-text-property beg (min (point-max) (1+ beg)) 'fontified nil)))
 
 (defun tree-sitter-fontify-region (beg end loudly)

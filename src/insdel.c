@@ -1512,7 +1512,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
      the deletion will be undone first.  Thus, undo
      will insert before deleting, and thus will keep
      the markers before and after this text separate.  */
-  if (!NILP (deletion))
+  if (! NILP (deletion))
     {
       record_insert (from + SCHARS (deletion), inschars);
       record_delete (from, deletion, false);
