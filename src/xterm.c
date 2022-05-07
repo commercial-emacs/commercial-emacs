@@ -16908,7 +16908,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 #ifdef USE_X_TOOLKIT
 	      if (popup_activated ()
-		  && leave->mode == XINotifyPassiveUngrab)
+		  && (leave->mode == XINotifyPassiveUngrab
+		      || leave->mode == XINotifyUngrab))
 		any = x_any_window_to_frame (dpyinfo, leave->event);
 #endif
 
