@@ -7963,6 +7963,9 @@ If PIXELS-P is non-nil, the return value is VSCROLL.  */)
 
 	  /* Prevent redisplay shortcuts.  */
 	  XBUFFER (w->contents)->prevent_redisplay_optimizations_p = true;
+
+	  /* Mark W for redisplay.  (bug#55299) */
+	  wset_redisplay (w);
 	}
     }
 
