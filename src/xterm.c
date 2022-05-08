@@ -5761,15 +5761,19 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fring
 	 mono-displays, the fill style may have been changed to
 	 FillSolid in x_draw_glyph_string_background.  */
       if (face->stipple)
-	XSetFillStyle (display, face->gc, FillOpaqueStippled);
+	{
+	  XSetFillStyle (display, face->gc, FillOpaqueStippled);
+	  x_fill_rectangle (f, face->gc, p->bx, p->by, p->nx, p->ny,
+			    true);
+	  XSetFillStyle (display, face->gc, FillSolid);
+	}
       else
-	XSetBackground (display, face->gc, face->background);
-
-      x_clear_rectangle (f, face->gc, p->bx, p->by, p->nx, p->ny,
-			 true);
-
-      if (!face->stipple)
-	XSetForeground (display, face->gc, face->foreground);
+	{
+	  XSetBackground (display, face->gc, face->background);
+	  x_clear_rectangle (f, face->gc, p->bx, p->by, p->nx, p->ny,
+			   true);
+	  XSetForeground (display, face->gc, face->foreground);
+	}
     }
 
 #ifdef USE_CAIRO
@@ -8051,6 +8055,9 @@ x_draw_image_glyph_string (struct glyph_string *s)
       || s->img->pixmap == 0
       || s->width != s->background_width)
     {
+      if (s->stippled_p)
+	s->row->stipple_p = true;
+
 #ifndef USE_CAIRO
       if (s->img->mask)
 	{
@@ -8231,6 +8238,8 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
 	      XSetFillStyle (display, gc, FillOpaqueStippled);
 	      x_fill_rectangle (s->f, gc, x, y, w, h, true);
 	      XSetFillStyle (display, gc, FillSolid);
+
+	      s->row->stipple_p = true;
 	    }
 	  else
 	    {
@@ -8257,8 +8266,13 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
 	  background_width -= text_left_x - x;
 	  x = text_left_x;
 	}
+
+      if (!s->row->stipple_p)
+	s->row->stipple_p = s->stippled_p;
+
       if (background_width > 0)
-	x_draw_glyph_string_bg_rect (s, x, s->y, background_width, s->height);
+	x_draw_glyph_string_bg_rect (s, x, s->y,
+				     background_width, s->height);
     }
 
   s->background_filled_p = true;
@@ -8707,6 +8721,14 @@ x_draw_glyph_string (struct glyph_string *s)
   /* Reset clipping.  */
   x_reset_clip_rectangles (s->f, s->gc);
   s->num_clips = 0;
+
+  /* Set the stippled flag that tells redisplay whether or not a
+     stipple was actually draw.  */
+
+  if (s->first_glyph->type != STRETCH_GLYPH
+      && s->first_glyph->type != IMAGE_GLYPH
+      && !s->row->stipple_p)
+    s->row->stipple_p = s->stippled_p;
 }
 
 /* Shift display to make room for inserted glyphs.   */
