@@ -139,7 +139,7 @@ union emacs_align_type
   struct xwidget_view xwidget_view;
   struct xwidget xwidget;
 #endif
-}
+};
 
 /* LISP_ALIGNMENT must be at least GCALIGNMENT to allow USE_LSB_TAG.
    Further, it must also be as wide as the widest C field in

@@ -153,12 +153,12 @@ struct mem_node mem_z;
 #define MEM_NIL &mem_z
 
 /* True if malloc (N) is known to return storage suitably aligned for
-   Lisp objects whenever N is a multiple of LISP_ALIGNMENT.  In
-   practice this is true whenever alignof (max_align_t) is also a
-   multiple of LISP_ALIGNMENT.  This works even for buggy platforms
-   like MinGW circa 2020, where alignof (max_align_t) is 16 even though
-   the malloc alignment is only 8, and where Emacs still works because
-   it never does anything that requires an alignment of 16.  */
+   Lisp objects whenever N is a multiple of LISP_ALIGNMENT, or,
+   equivalently when alignof (max_align_t) is a multiple of
+   LISP_ALIGNMENT.  This works even for buggy platforms like MinGW
+   circa 2020, where alignof (max_align_t) is 16 even though the
+   malloc alignment is only 8, and where Emacs still works because it
+   never does anything that requires an alignment of 16.  */
 enum { MALLOC_IS_LISP_ALIGNED = alignof (max_align_t) % LISP_ALIGNMENT == 0 };
 
 #define MALLOC_PROBE(size)			\
@@ -389,63 +389,6 @@ laligned (void *p, size_t size)
   return (MALLOC_IS_LISP_ALIGNED
 	  || (intptr_t) p % LISP_ALIGNMENT == 0
 	  || size % LISP_ALIGNMENT != 0);
-}
-
-/* Request at least SIZE bytes from malloc, increasing the request by
-   LISP_ALIGNMENT until it returns a Lisp-aligned pointer.
-
-   If T is an enum Lisp_Type and L = make_lisp_ptr (P, T), then
-   code seeking P such that XPNTR (L) == P and XTYPE (L) == T, or,
-   in less formal terms, seeking to allocate a Lisp object, should
-   call lmalloc().
-
-   CLEARIT uses calloc() instead of malloc().
-
-   Can theoretically spin on unusual platforms, never receiving
-   a Lisp-aligned return value from the allocator.  */
-
-void *
-lmalloc (size_t size, bool clearit)
-{
-#ifdef USE_ALIGNED_ALLOC
-  if (! MALLOC_IS_LISP_ALIGNED && size % LISP_ALIGNMENT == 0)
-    {
-      void *p = aligned_alloc (LISP_ALIGNMENT, size);
-      if (p)
-	{
-	  if (clearit)
-	    memclear (p, size);
-	}
-      else if (! (MALLOC_0_IS_NONNULL || size))
-	return aligned_alloc (LISP_ALIGNMENT, LISP_ALIGNMENT);
-      return p;
-    }
-#endif
-
-  while (true)
-    {
-      void *p = clearit ? calloc (1, size) : malloc (size);
-      if (laligned (p, size) && (MALLOC_0_IS_NONNULL || size || p))
-	return p;
-      free (p);
-      size_t bigger = size + LISP_ALIGNMENT;
-      if (size < bigger)
-	size = bigger;
-    }
-}
-
-void *
-lrealloc (void *p, size_t size)
-{
-  while (true)
-    {
-      p = realloc (p, size);
-      if (laligned (p, size) && (size || p))
-	return p;
-      size_t bigger = size + LISP_ALIGNMENT;
-      if (size < bigger)
-	size = bigger;
-    }
 }
 
 /* Like malloc but check for no memory and block interrupt input.  */
@@ -783,20 +726,94 @@ enum
 static void *
 aligned_alloc (size_t alignment, size_t size)
 {
-  /* POSIX says the alignment must be a power-of-2 multiple of sizeof (void *).
-     Verify this for all arguments this function is given.  */
+  /* Permit suspect assumption that ALIGNMENT is either BLOCK_ALIGN or
+     LISP_ALIGNMENT since we'll rarely get here.  */
+  eassume (alignment == BLOCK_ALIGN
+	   || (! MALLOC_IS_LISP_ALIGNED && alignment == LISP_ALIGNMENT));
+
+  /* Verify POSIX invariant ALIGNMENT = (2^x) * sizeof (void *).  */
   verify (BLOCK_ALIGN % sizeof (void *) == 0
 	  && POWER_OF_2 (BLOCK_ALIGN / sizeof (void *)));
   verify (MALLOC_IS_LISP_ALIGNED
 	  || (LISP_ALIGNMENT % sizeof (void *) == 0
 	      && POWER_OF_2 (LISP_ALIGNMENT / sizeof (void *))));
-  eassert (alignment == BLOCK_ALIGN
-	   || (! MALLOC_IS_LISP_ALIGNED && alignment == LISP_ALIGNMENT));
 
   void *p;
   return posix_memalign (&p, alignment, size) == 0 ? p : 0;
 }
 #endif
+
+/* Request at least SIZE bytes from malloc, ensuring returned
+   pointer is Lisp-aligned.
+
+   If T is an enum Lisp_Type and L = make_lisp_ptr (P, T), then
+   code seeking P such that XPNTR (L) == P and XTYPE (L) == T, or,
+   in less formal terms, seeking to allocate a Lisp object, should
+   call lmalloc().
+
+   CLEARIT uses calloc() instead of malloc().
+   */
+
+void *
+lmalloc (size_t size, bool clearit)
+{
+  /* xrealloc() relies on lmalloc() returning non-NULL even for SIZE
+     == 0.  So, if (! MALLOC_0_IS_NONNULL), must avoid malloc'ing 0.  */
+  size_t adjsize = MALLOC_0_IS_NONNULL ? size : max (size, LISP_ALIGNMENT);
+
+  /* Prefer malloc() but if ! MALLOC_IS_LISP_ALIGNED (unusual), then
+     prefer aligned_alloc(), provided SIZE is a multiple of ALIGNMENT
+     which aligned_alloc() requires.
+  */
+#ifdef USE_ALIGNED_ALLOC
+  if (! MALLOC_IS_LISP_ALIGNED)
+    {
+      if (adjsize % LISP_ALIGNMENT == 0)
+	{
+	  void *p = aligned_alloc (LISP_ALIGNMENT, adjsize);
+	  if (clearit && p && adjsize)
+	    memclear (p, adjsize);
+	  return p;
+	}
+      else
+	{
+	  /* Otherwise resign ourselves to loop that may never
+	     terminate.  */
+	}
+    }
+#endif
+  void *p = NULL;
+  for (;;)
+    {
+      p = clearit ? calloc (1, adjsize) : malloc (adjsize);
+      if (! p || MALLOC_IS_LISP_ALIGNED || laligned (p, adjsize))
+	break;
+      free (p);
+      adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
+    }
+  eassert (! p || laligned (p, adjsize));
+  return p;
+}
+
+void *
+lrealloc (void *p, size_t size)
+{
+  /* MALLOC_0_IS_NONNULL does not mean REALLOC_0_IS_NONNULL.
+     xrealloc() relies on lrealloc() returning non-NULL
+     even for size == 0.
+  */
+  void *newp = p;
+  size_t adjsize = max (size, LISP_ALIGNMENT);
+  for (;;)
+    {
+      newp = realloc (newp, adjsize);
+      if (! adjsize || ! newp || MALLOC_IS_LISP_ALIGNED || laligned (newp, adjsize))
+	break;
+      adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
+    }
+  eassert (! newp || laligned (newp, adjsize));
+  return newp;
+}
 
 /* An aligned block of memory.  */
 struct ablock

@@ -25,7 +25,8 @@ realloc_semispace (gc_semispace *space)
 {
   /* If realloc() fails, the original block is left un-touched; it is
      not freed or moved. -- MALLOC(3) */
-  void *resized = lrealloc ((void *) space->objects, space->length + BLOCK_ALIGN);
+  void *resized = lrealloc ((void *) space->objects,
+			    space->length * sizeof (Lisp_Aligned) + BLOCK_ALIGN);
   if (resized)
     {
       if (resized != (void *)space->objects)
@@ -33,7 +34,7 @@ realloc_semispace (gc_semispace *space)
 	  // uh oh
 	}
       space->objects = (Lisp_Aligned *) resized;
-      space->length += BLOCK_ALIGN;
+      space->length += BLOCK_ALIGN / sizeof (Lisp_Aligned);
       if (! space->alloc_ptr)
 	space->alloc_ptr = space->objects;
       if (! space->scan_ptr)
@@ -42,35 +43,13 @@ realloc_semispace (gc_semispace *space)
   return space;
 }
 
-static void *
+static Lisp_Aligned *
 bump_alloc_ptr (gc_semispace *space)
 {
-  intptr_t alloc_ptr = (intptr_t) space->alloc_ptr;
-
-#define BAP_CASE(xtype)				\
-  case xtype:					\
-    INT_ADD_WRAPV (alloc_ptr,			\
-		   (intptr_t) sizeof (xtype),	\
-		   &alloc_ptr);			\
-    break;
-
-  switch (XTYPE ((Lisp_Object) space->alloc_ptr))
-    {
-      BAP_CASE(Lisp_Int0);
-      BAP_CASE(Lisp_Int1);
-      BAP_CASE(Lisp_Symbol);
-      BAP_CASE(Lisp_String);
-      BAP_CASE(Lisp_Vectorlike);
-      BAP_CASE(Lisp_Cons);
-      BAP_CASE(Lisp_Float);
-      default:
-	emacs_abort ();
-    }
-#undef BAP_CASE
-
-  intptr_t length;
-  INT_SUBTRACT_WRAPV (alloc_ptr, (intptr_t) space->objects, &length);
-  if (space->length < LISP_ALIGNMENT)
+  ++space->alloc_ptr;
+  ptrdiff_t ptr_index = space->alloc_ptr - space->objects;
+  eassert (ptr_index <= space->length);
+  if (ptr_index == space->length)
     realloc_semispace (space);
   return space->alloc_ptr;
 }
