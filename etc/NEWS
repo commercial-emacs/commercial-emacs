@@ -638,6 +638,9 @@ available options can be restored by enabling this option.
 
 +++
 ** 'imenu' is now bound to 'M-g i' globally.
+** A new translation of the Emacs tutorial is available in Greek
+Type 'C-u C-h t' to select it in case your language setup does not do
+so automatically.
 
 * Editing Changes in Emacs 29.1
 
