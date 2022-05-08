@@ -1,5 +1,80 @@
 #include <alloc.h>
 
+/* struct Lisp_Symbol symbols[BLOCK_NSYMBOLS]; */
+// Subtraction of pointers is only defined when they both point into
+// the same array and a void pointer can't point into any array
+// because you can't have an array with void elements.
+typedef struct gc_semispace {
+  Lisp_Aligned *objects;
+  Lisp_Aligned *alloc_ptr;
+  Lisp_Aligned *scan_ptr;
+  ptrdiff_t length;
+} gc_semispace;
+
+static gc_semispace space0;
+static gc_semispace space1;
+
+enum
+{
+  BLOCK_NBITS = 13,
+  BLOCK_ALIGN = (1 << BLOCK_NBITS),
+};
+
+static gc_semispace *
+realloc_semispace (gc_semispace *space)
+{
+  /* If realloc() fails, the original block is left un-touched; it is
+     not freed or moved. -- MALLOC(3) */
+  void *resized = lrealloc ((void *) space->objects, space->length + BLOCK_ALIGN);
+  if (resized)
+    {
+      if (resized != (void *)space->objects)
+	{
+	  // uh oh
+	}
+      space->objects = (Lisp_Aligned *) resized;
+      space->length += BLOCK_ALIGN;
+      if (! space->alloc_ptr)
+	space->alloc_ptr = space->objects;
+      if (! space->scan_ptr)
+	space->scan_ptr = space->alloc_ptr;
+    }
+  return space;
+}
+
+static void *
+bump_alloc_ptr (gc_semispace *space)
+{
+  intptr_t alloc_ptr = (intptr_t) space->alloc_ptr;
+
+#define BAP_CASE(xtype)				\
+  case xtype:					\
+    INT_ADD_WRAPV (alloc_ptr,			\
+		   (intptr_t) sizeof (xtype),	\
+		   &alloc_ptr);			\
+    break;
+
+  switch (XTYPE ((Lisp_Object) space->alloc_ptr))
+    {
+      BAP_CASE(Lisp_Int0);
+      BAP_CASE(Lisp_Int1);
+      BAP_CASE(Lisp_Symbol);
+      BAP_CASE(Lisp_String);
+      BAP_CASE(Lisp_Vectorlike);
+      BAP_CASE(Lisp_Cons);
+      BAP_CASE(Lisp_Float);
+      default:
+	emacs_abort ();
+    }
+#undef BAP_CASE
+
+  intptr_t length;
+  INT_SUBTRACT_WRAPV (alloc_ptr, (intptr_t) space->objects, &length);
+  if (space->length < LISP_ALIGNMENT)
+    realloc_semispace (space);
+  return space->alloc_ptr;
+}
+
 DEFUN ("ccons", Fccons, Sccons, 2, 2, 0,
        doc: /* Create a new cons, give it CAR and CDR as components,
 	       and return it.  */)
@@ -15,9 +90,9 @@ DEFUN ("ccons", Fccons, Sccons, 2, 2, 0,
 }
 
 DEFUN ("clist", Fclist, Sclist, 0, MANY, 0,
-       doc: /* Return a newly created list with specified arguments as elements.
-Allows any number of arguments, including zero.
-usage: (list &rest OBJECTS)  */)
+       doc: /* Return a newly created list with specified arguments as
+elements.  Allows any number of arguments, including zero.  usage:
+(list &rest OBJECTS) */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   register Lisp_Object val;
@@ -32,7 +107,8 @@ usage: (list &rest OBJECTS)  */)
 }
 
 DEFUN ("cmake-list", Fcmake_list, Scmake_list, 2, 2, 0,
-       doc: /* Return a newly created list of length LENGTH, with each element being INIT.  */)
+       doc: /* Return a newly created list of length LENGTH, with each
+	       element being INIT.  */)
   (Lisp_Object length, Lisp_Object init)
 {
   Lisp_Object val = Qnil;
@@ -48,8 +124,8 @@ DEFUN ("cmake-list", Fcmake_list, Scmake_list, 2, 2, 0,
 }
 
 DEFUN ("cmake-vector", Fcmake_vector, Scmake_vector, 2, 2, 0,
-       doc: /* Return a newly created vector of length LENGTH, with each element being INIT.
-See also the function `vector'.  */)
+       doc: /* Return a newly created vector of length LENGTH, with
+each element being INIT.  See also the function `vector'.  */)
   (Lisp_Object length, Lisp_Object init)
 {
   CHECK_TYPE (FIXNATP (length) && XFIXNAT (length) <= PTRDIFF_MAX,
@@ -280,4 +356,10 @@ syms_of_calloc (void)
   defsubr (&Scgarbage_collect);
   defsubr (&Scmemory_protect_now);
   defsubr (&Scmemory_use_counts);
+}
+
+void test_me (void)
+{
+  (void) space1;
+  bump_alloc_ptr (&space0);
 }

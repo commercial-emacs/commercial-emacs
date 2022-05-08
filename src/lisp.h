@@ -543,10 +543,9 @@ enum Lisp_Fwd_Type
    You also need to add the new type to the constant
    `cl--typeof-types' in lisp/emacs-lisp/cl-preloaded.el.  */
 
-
 /* A Lisp_Object is a tagged pointer or integer.  Ordinarily it is a
    Lisp_Word.  However, if CHECK_LISP_OBJECT_TYPE, it is a wrapper
-   around Lisp_Word, to help catch thinkos like 'Lisp_Object x = 0;'.
+   around Lisp_Word, to catch conflations like 'Lisp_Object x = 0;'.
 
    LISP_INITIALLY (W) initializes a Lisp object with a tagged value
    that is a Lisp_Word W.  It can be used in a static initializer.  */
@@ -5060,6 +5059,10 @@ extern char my_edata[];
 extern char my_endbss[];
 extern char *my_endbss_static;
 
+extern void *lmalloc (size_t size, bool clearit)
+  ATTRIBUTE_MALLOC_SIZE ((1)) ATTRIBUTE_RETURNS_NONNULL;
+extern void *lrealloc (void *p, size_t size)
+  ATTRIBUTE_ALLOC_SIZE ((2)) ATTRIBUTE_RETURNS_NONNULL;
 extern void *xmalloc (size_t)
   ATTRIBUTE_MALLOC_SIZE ((1)) ATTRIBUTE_RETURNS_NONNULL;
 extern void *xzalloc (size_t)

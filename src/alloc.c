@@ -86,50 +86,6 @@ EMACS_INT bytes_between_gc;
 Lisp_Object Vmemory_full;
 bool gc_in_progress;
 
-/* A type with alignment at least as large as any object that Emacs
-   allocates.  This is not max_align_t because some platforms (e.g.,
-   mingw) have buggy malloc implementations that do not align for
-   max_align_t.  This union contains types of all GCALIGNED_STRUCT
-   components visible here.  */
-union emacs_align_type
-{
-  struct frame frame;
-  struct Lisp_Bignum Lisp_Bignum;
-  struct Lisp_Bool_Vector Lisp_Bool_Vector;
-  struct Lisp_Char_Table Lisp_Char_Table;
-  struct Lisp_CondVar Lisp_CondVar;
-  struct Lisp_Finalizer Lisp_Finalizer;
-  struct Lisp_Float Lisp_Float;
-  struct Lisp_Hash_Table Lisp_Hash_Table;
-  struct Lisp_Marker Lisp_Marker;
-  struct Lisp_Misc_Ptr Lisp_Misc_Ptr;
-  struct Lisp_Mutex Lisp_Mutex;
-  struct Lisp_Overlay Lisp_Overlay;
-  struct Lisp_Sub_Char_Table Lisp_Sub_Char_Table;
-  struct Lisp_Subr Lisp_Subr;
-  struct Lisp_User_Ptr Lisp_User_Ptr;
-  struct Lisp_Vector Lisp_Vector;
-  struct terminal terminal;
-  struct thread_state thread_state;
-  struct window window;
-#ifdef HAVE_TREE_SITTER
-  struct Lisp_Tree_Sitter tree_sitter;
-  struct Lisp_Tree_Sitter_Node tree_sitter_node;
-#endif
-
-  /* Omit the following since they would require including process.h
-     etc.  In practice their alignments never exceed that of the
-     structs already listed.  */
-#if 0
-  struct Lisp_Module_Function Lisp_Module_Function;
-  struct Lisp_Process Lisp_Process;
-  struct save_window_data save_window_data;
-  struct scroll_bar scroll_bar;
-  struct xwidget_view xwidget_view;
-  struct xwidget xwidget;
-#endif
-};
-
 /* Last recorded live and free-list counts.  */
 static struct
 {
@@ -195,13 +151,6 @@ struct mem_node
 
 struct mem_node mem_z;
 #define MEM_NIL &mem_z
-
-/* LISP_ALIGNMENT must be at least GCALIGNMENT to allow USE_LSB_TAG.
-   Further, it must also be as wide as the widest C field in
-   pseudovector structs, which alignof (emacs_align_type)
-   is guaranteed to be.  */
-enum { LISP_ALIGNMENT = alignof (union { union emacs_align_type x;
-					 GCALIGNED_UNION_MEMBER }) };
 
 /* True if malloc (N) is known to return storage suitably aligned for
    Lisp objects whenever N is a multiple of LISP_ALIGNMENT.  In
@@ -455,7 +404,7 @@ laligned (void *p, size_t size)
    Can theoretically spin on unusual platforms, never receiving
    a Lisp-aligned return value from the allocator.  */
 
-static ATTRIBUTE_MALLOC_SIZE ((1)) void *
+void *
 lmalloc (size_t size, bool clearit)
 {
 #ifdef USE_ALIGNED_ALLOC
@@ -485,7 +434,7 @@ lmalloc (size_t size, bool clearit)
     }
 }
 
-static void *
+void *
 lrealloc (void *p, size_t size)
 {
   while (true)
