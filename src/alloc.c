@@ -758,13 +758,12 @@ void *
 lmalloc (size_t size, bool clearit)
 {
   /* xrealloc() relies on lmalloc() returning non-NULL even for SIZE
-     == 0.  So, if (! MALLOC_0_IS_NONNULL), must avoid malloc'ing 0.  */
+     == 0.  So, if ! MALLOC_0_IS_NONNULL, must avoid malloc'ing 0.  */
   size_t adjsize = MALLOC_0_IS_NONNULL ? size : max (size, LISP_ALIGNMENT);
 
-  /* Prefer malloc() but if ! MALLOC_IS_LISP_ALIGNED (unusual), then
-     prefer aligned_alloc(), provided SIZE is a multiple of ALIGNMENT
-     which aligned_alloc() requires.
-  */
+  /* Prefer malloc() but if ! MALLOC_IS_LISP_ALIGNED, an exceptional
+     case, then prefer aligned_alloc(), provided SIZE is a multiple of
+     ALIGNMENT which aligned_alloc() requires.  */
 #ifdef USE_ALIGNED_ALLOC
   if (! MALLOC_IS_LISP_ALIGNED)
     {
@@ -798,12 +797,10 @@ lmalloc (size_t size, bool clearit)
 void *
 lrealloc (void *p, size_t size)
 {
-  /* MALLOC_0_IS_NONNULL does not mean REALLOC_0_IS_NONNULL.
-     xrealloc() relies on lrealloc() returning non-NULL
-     even for size == 0.
-  */
-  void *newp = p;
+  /* xrealloc() relies on lrealloc() returning non-NULL even for size
+     == 0.  MALLOC_0_IS_NONNULL does not mean REALLOC_0_IS_NONNULL.  */
   size_t adjsize = max (size, LISP_ALIGNMENT);
+  void *newp = p;
   for (;;)
     {
       newp = realloc (newp, adjsize);
