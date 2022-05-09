@@ -5,10 +5,10 @@
 // the same array and a void pointer can't point into any array
 // because you can't have an array with void elements.
 typedef struct gc_semispace {
-  Lisp_Aligned *objects;
-  Lisp_Aligned *alloc_ptr;
-  Lisp_Aligned *scan_ptr;
-  ptrdiff_t length;
+  void *objects;
+  void *alloc_ptr;
+  void *scan_ptr;
+  size_t words_total, words_used;
 } gc_semispace;
 
 static gc_semispace space0;
@@ -17,7 +17,8 @@ static gc_semispace space1;
 enum
 {
   BLOCK_NBITS = 13,
-  BLOCK_ALIGN = (1 << BLOCK_NBITS),
+  BLOCK_NBYTES = (1 << BLOCK_NBITS),
+  BLOCK_NWORDS = (BLOCK_NBYTES / word_size),
 };
 
 static gc_semispace *
@@ -26,15 +27,15 @@ realloc_semispace (gc_semispace *space)
   /* If realloc() fails, the original block is left un-touched; it is
      not freed or moved. -- MALLOC(3) */
   void *resized = lrealloc ((void *) space->objects,
-			    space->length * sizeof (Lisp_Aligned) + BLOCK_ALIGN);
+			    space->words_total * word_size + BLOCK_NBYTES);
   if (resized)
     {
-      if (resized != (void *)space->objects)
+      if (resized != (void *) space->objects)
 	{
 	  // uh oh
 	}
-      space->objects = (Lisp_Aligned *) resized;
-      space->length += BLOCK_ALIGN / sizeof (Lisp_Aligned);
+      space->objects = resized;
+      space->words_total += BLOCK_NWORDS;
       if (! space->alloc_ptr)
 	space->alloc_ptr = space->objects;
       if (! space->scan_ptr)
@@ -43,14 +44,13 @@ realloc_semispace (gc_semispace *space)
   return space;
 }
 
-static Lisp_Aligned *
-bump_alloc_ptr (gc_semispace *space)
+static void *
+bump_alloc_ptr (gc_semispace *space, size_t nbytes)
 {
-  ++space->alloc_ptr;
-  ptrdiff_t ptr_index = space->alloc_ptr - space->objects;
-  eassert (ptr_index <= space->length);
-  if (ptr_index == space->length)
+  space->words_used += nbytes / word_size;
+  if (space->words_used > space->words_total)
     realloc_semispace (space);
+  INT_ADD_WRAPV ((intptr_t) space->alloc_ptr, nbytes, (intptr_t *) &space->alloc_ptr);
   return space->alloc_ptr;
 }
 
@@ -340,5 +340,8 @@ syms_of_calloc (void)
 void test_me (void)
 {
   (void) space1;
-  bump_alloc_ptr (&space0);
+  bump_alloc_ptr (&space0, sizeof (struct Lisp_Symbol));
+  bump_alloc_ptr (&space0, sizeof (struct Lisp_Float));
+  struct Lisp_Symbol *p = (struct Lisp_Symbol *) space0.objects;
+  p->u.s.pinned = false;
 }

@@ -346,39 +346,6 @@ display_malloc_warning (void)
 #define COMMON_MULTIPLE(a, b) \
   ((a) % (b) == 0 ? (a) : (b) % (a) == 0 ? (b) : (a) * (b))
 
-/* If compiled with XMALLOC_BLOCK_INPUT_CHECK, define a symbol
-   BLOCK_INPUT_IN_MEMORY_ALLOCATORS that is visible to the debugger.
-   If that variable is set, block input while in one of Emacs's memory
-   allocation functions.  There should be no need for this debugging
-   option, since signal handlers do not allocate memory, but Emacs
-   formerly allocated memory in signal handlers and this compile-time
-   option remains as a way to help debug the issue should it rear its
-   ugly head again.  */
-#ifdef XMALLOC_BLOCK_INPUT_CHECK
-bool block_input_in_memory_allocators EXTERNALLY_VISIBLE;
-static void
-malloc_block_input (void)
-{
-  if (block_input_in_memory_allocators)
-    block_input ();
-}
-static void
-malloc_unblock_input (void)
-{
-  if (block_input_in_memory_allocators)
-    {
-      int err = errno;
-      unblock_input ();
-      errno = err;
-    }
-}
-# define MALLOC_BLOCK_INPUT malloc_block_input ()
-# define MALLOC_UNBLOCK_INPUT malloc_unblock_input ()
-#else
-# define MALLOC_BLOCK_INPUT ((void) 0)
-# define MALLOC_UNBLOCK_INPUT ((void) 0)
-#endif
-
 /* True if a malloc-returned pointer P is suitably aligned for SIZE,
    where Lisp object alignment may be needed if SIZE is a multiple of
    LISP_ALIGNMENT.  */
@@ -396,12 +363,7 @@ laligned (void *p, size_t size)
 void *
 xmalloc (size_t size)
 {
-  void *val;
-
-  MALLOC_BLOCK_INPUT;
-  val = lmalloc (size, false);
-  MALLOC_UNBLOCK_INPUT;
-
+  void *val = lmalloc (size, false);
   if (! val)
     memory_full (size);
   MALLOC_PROBE (size);
@@ -413,12 +375,7 @@ xmalloc (size_t size)
 void *
 xzalloc (size_t size)
 {
-  void *val;
-
-  MALLOC_BLOCK_INPUT;
-  val = lmalloc (size, true);
-  MALLOC_UNBLOCK_INPUT;
-
+  void *val = lmalloc (size, true);
   if (! val)
     memory_full (size);
   MALLOC_PROBE (size);
@@ -430,35 +387,21 @@ xzalloc (size_t size)
 void *
 xrealloc (void *block, size_t size)
 {
-  void *val;
-
-  MALLOC_BLOCK_INPUT;
-  /* Call lmalloc when BLOCK is null, for the benefit of long-obsolete
-     platforms lacking support for realloc (NULL, size).  */
-  if (! block)
-    val = lmalloc (size, false);
-  else
-    val = lrealloc (block, size);
-  MALLOC_UNBLOCK_INPUT;
-
+  /* We can but won't assume realloc (NULL, size) works.  */
+  void *val = block ? lrealloc (block, size) : lmalloc (size, false);
   if (! val)
     memory_full (size);
   MALLOC_PROBE (size);
   return val;
 }
 
-/* Like free() but block interrupt input.  */
+/* Like free() but check pdumper_object_p().  */
 
 void
 xfree (void *block)
 {
-  if (!block)
-    return;
-  if (pdumper_object_p (block))
-    return;
-  MALLOC_BLOCK_INPUT;
-  free (block);
-  MALLOC_UNBLOCK_INPUT;
+  if (block && ! pdumper_object_p (block))
+    free (block);
 }
 
 /* Other parts of Emacs pass large int values to allocator functions
@@ -626,8 +569,6 @@ lisp_malloc (size_t nbytes, bool clearit, enum mem_type type)
 {
   register void *val;
 
-  MALLOC_BLOCK_INPUT;
-
 #ifdef GC_MALLOC_CHECK
   allocated_mem_type = type;
 #endif
@@ -656,7 +597,6 @@ lisp_malloc (size_t nbytes, bool clearit, enum mem_type type)
     mem_insert (val, (char *) val + nbytes, type);
 #endif
 
-  MALLOC_UNBLOCK_INPUT;
   if (! val)
     memory_full (nbytes);
   MALLOC_PROBE (nbytes);
@@ -669,15 +609,13 @@ lisp_malloc (size_t nbytes, bool clearit, enum mem_type type)
 static void
 lisp_free (void *block)
 {
-  if (pdumper_object_p (block))
-    return;
-
-  MALLOC_BLOCK_INPUT;
-  free (block);
+  if (block && ! pdumper_object_p (block))
+    {
+      free (block);
 #ifndef GC_MALLOC_CHECK
-  mem_delete (mem_find (block));
+      mem_delete (mem_find (block));
 #endif
-  MALLOC_UNBLOCK_INPUT;
+    }
 }
 
 /* The allocator malloc's blocks of BLOCK_ALIGN bytes.
@@ -869,8 +807,6 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
 
   eassert (nbytes < BLOCK_ALIGN);
 
-  MALLOC_BLOCK_INPUT;
-
 #ifdef GC_MALLOC_CHECK
   allocated_mem_type = type;
 #endif
@@ -888,10 +824,7 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
 #endif
 
       if (! base)
-	{
-	  MALLOC_UNBLOCK_INPUT;
-	  memory_full (sizeof (struct ablocks));
-	}
+	memory_full (sizeof (struct ablocks));
 
       aligned = (base == abase);
       if (! aligned)
@@ -910,7 +843,6 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
 	    {
 	      lisp_malloc_loser = base;
 	      free (base);
-	      MALLOC_UNBLOCK_INPUT;
 	      memory_full (SIZE_MAX);
 	    }
 	}
@@ -945,8 +877,6 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
     mem_insert (val, (char *) val + nbytes, type);
 #endif
 
-  MALLOC_UNBLOCK_INPUT;
-
   MALLOC_PROBE (nbytes);
 
   eassert (0 == ((uintptr_t) val) % BLOCK_ALIGN);
@@ -959,7 +889,6 @@ lisp_align_free (void *block)
   struct ablock *ablock = block;
   struct ablocks *abase = ABLOCK_ABASE (ablock);
 
-  MALLOC_BLOCK_INPUT;
 #ifndef GC_MALLOC_CHECK
   mem_delete (mem_find (block));
 #endif
@@ -995,7 +924,6 @@ lisp_align_free (void *block)
 #endif
       free (ABLOCKS_BASE (abase));
     }
-  MALLOC_UNBLOCK_INPUT;
 }
 
 struct interval_block
@@ -1013,8 +941,6 @@ INTERVAL
 make_interval (void)
 {
   INTERVAL val;
-
-  MALLOC_BLOCK_INPUT;
 
   if (interval_free_list)
     {
@@ -1034,8 +960,6 @@ make_interval (void)
 	}
       val = &interval_block->intervals[interval_block_index++];
     }
-
-  MALLOC_UNBLOCK_INPUT;
 
   bytes_since_gc += sizeof (struct interval);
   intervals_consed++;
@@ -1327,8 +1251,6 @@ allocate_string (void)
 {
   struct Lisp_String *s;
 
-  MALLOC_BLOCK_INPUT;
-
   /* If the free list is empty, allocate a new string_block, and
      add all the Lisp_Strings in it to the free list.  */
   if (string_free_list == NULL)
@@ -1354,8 +1276,6 @@ allocate_string (void)
   /* Pop a Lisp_String off the free list.  */
   s = string_free_list;
   string_free_list = NEXT_FREE_LISP_STRING (s);
-
-  MALLOC_UNBLOCK_INPUT;
 
   ++strings_consed;
   bytes_since_gc += sizeof *s;
@@ -1399,8 +1319,6 @@ allocate_string_data (struct Lisp_String *s,
      of string data.  */
   ptrdiff_t needed = sdata_size (nbytes);
 
-  MALLOC_BLOCK_INPUT;
-
   if (nbytes > LARGE_STRING_BYTES || immovable)
     {
       size_t size = FLEXSIZEOF (struct sblock, data, needed);
@@ -1439,8 +1357,6 @@ allocate_string_data (struct Lisp_String *s,
   data->string = s;
   b->next_free = (sdata *) ((char *) data + needed + GC_STRING_EXTRA);
   eassert ((uintptr_t) b->next_free % alignof (sdata) == 0);
-
-  MALLOC_UNBLOCK_INPUT;
 
   s->u.s.data = SDATA_DATA (data);
 #ifdef GC_CHECK_STRING_BYTES
@@ -2094,8 +2010,6 @@ make_float (double float_value)
 {
   register Lisp_Object val;
 
-  MALLOC_BLOCK_INPUT;
-
   if (float_free_list)
     {
       XSETFLOAT (val, float_free_list);
@@ -2115,8 +2029,6 @@ make_float (double float_value)
       XSETFLOAT (val, &float_block->floats[float_block_index]);
       float_block_index++;
     }
-
-  MALLOC_UNBLOCK_INPUT;
 
   XFLOAT_INIT (val, float_value);
   eassert (! XFLOAT_MARKED_P (XFLOAT (val)));
@@ -2171,8 +2083,6 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
 {
   register Lisp_Object val;
 
-  MALLOC_BLOCK_INPUT;
-
   if (cons_free_list)
     {
       XSETCONS (val, cons_free_list);
@@ -2192,8 +2102,6 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
       XSETCONS (val, &cons_block->conses[cons_block_index]);
       cons_block_index++;
     }
-
-  MALLOC_UNBLOCK_INPUT;
 
   XSETCAR (val, car);
   XSETCDR (val, cdr);
@@ -2801,8 +2709,6 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
   ptrdiff_t nbytes = header_size + len * word_size;
   struct Lisp_Vector *p;
 
-  MALLOC_BLOCK_INPUT;
-
   if (nbytes <= VBLOCK_BYTES_MAX)
     {
       p = allocate_vector_from_block (vroundup (nbytes));
@@ -2823,8 +2729,6 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
 
   bytes_since_gc += nbytes;
   vector_cells_consed += len;
-
-  MALLOC_UNBLOCK_INPUT;
 
   return p;
 }
@@ -3102,8 +3006,6 @@ DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
 
   CHECK_STRING (name);
 
-  MALLOC_BLOCK_INPUT;
-
   if (symbol_free_list)
     {
       XSETSYMBOL (val, symbol_free_list);
@@ -3122,8 +3024,6 @@ DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
       XSETSYMBOL (val, &symbol_block->symbols[symbol_block_index]);
       symbol_block_index++;
     }
-
-  MALLOC_UNBLOCK_INPUT;
 
   init_symbol (val, name);
   bytes_since_gc += sizeof (struct Lisp_Symbol);
@@ -3492,15 +3392,12 @@ memory_full (size_t nbytes)
   Vmemory_full = Qt;
   if (nbytes > enough)
     {
-      void *p;
-      MALLOC_BLOCK_INPUT;
-      p = malloc (enough);
+      void *p = malloc (enough);
       if (p)
 	{
 	  Vmemory_full = Qnil;
 	  free (p);
 	}
-      MALLOC_UNBLOCK_INPUT;
     }
 
   xsignal (Qnil, Vmemory_signal_data);
