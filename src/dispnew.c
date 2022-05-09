@@ -2698,32 +2698,23 @@ set_frame_matrix_frame (struct frame *f)
   frame_matrix_frame = f;
 }
 
-
-/* Make sure glyph row ROW in CURRENT_MATRIX is up to date.
-   DESIRED_MATRIX is the desired matrix corresponding to
-   CURRENT_MATRIX.  The update is done by exchanging glyph pointers
-   between rows in CURRENT_MATRIX and DESIRED_MATRIX.  If
-   frame_matrix_frame is non-null, this indicates that the exchange is
-   done in frame matrices, and that we have to perform analogous
-   operations in window matrices of frame_matrix_frame.  */
+/* Update glyph ROW in CURRENT_MATRIX by exchanging its pointers with
+   DESIRED_MATRIX (see assign_row()).  */
 
 static void
-make_current (struct glyph_matrix *desired_matrix, struct glyph_matrix *current_matrix, int row)
+make_current (struct glyph_matrix *desired_matrix,
+	      struct glyph_matrix *current_matrix, int row)
 {
   struct glyph_row *current_row = MATRIX_ROW (current_matrix, row);
   struct glyph_row *desired_row = MATRIX_ROW (desired_matrix, row);
-  bool mouse_face_p = current_row->mouse_face_p;
+  bool restore_mouse_face_p = current_row->mouse_face_p;
 
-  /* Do current_row = desired_row.  This exchanges glyph pointers
-     between both rows, and does a structure assignment otherwise.  */
   assign_row (current_row, desired_row);
 
-  /* Enable current_row to mark it as valid.  */
-  current_row->enabled_p = true;
-  current_row->mouse_face_p = mouse_face_p;
+  current_row->enabled_p = true; /* marks row as valid.  */
+  current_row->mouse_face_p = restore_mouse_face_p;
 
-  /* If we are called on frame matrices, perform analogous operations
-     for window matrices.  */
+  /* Propagate updates to window matrices of FRAME_MATRIX_FRAME.  */
   if (frame_matrix_frame)
     mirror_make_current (XWINDOW (frame_matrix_frame->root_window), row);
 }
@@ -3907,35 +3898,30 @@ update_marginal_area (struct window *w, struct glyph_row *updated_row,
    Value is true if display has changed.  */
 
 static bool
-update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
-		  bool *partial_p)
+update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
 {
   struct glyph_row *current_row = MATRIX_ROW (w->current_matrix, vpos);
   struct glyph_row *desired_row = MATRIX_ROW (w->desired_matrix, vpos);
   struct redisplay_interface *rif = FRAME_RIF (XFRAME (WINDOW_FRAME (w)));
-  bool changed_p = 0;
+
+  /* Classic CYD: We want to avoid redrawing the mode line as it
+     produces flicker.  However, header lines (a variety of mode line
+     distinguishable by their lower VPOS) must be redrawn.  */
+  bool header_line_p = current_row->mode_line_p
+    && (vpos <= (w->current_matrix->tab_line_p ? 1 : 0));
+  bool mode_line_p = current_row->mode_line_p && ! header_line_p;
+  bool changed_p = false;
 
   /* If rows are at different X or Y, or rows have different height,
-     or the current row is marked invalid, write the entire line.  */
-  if (!current_row->enabled_p
+     or the current row is marked invalid, redraw the entire line.  */
+  if (! current_row->enabled_p
       || desired_row->y != current_row->y
       || desired_row->ascent != current_row->ascent
       || desired_row->phys_ascent != current_row->phys_ascent
       || desired_row->phys_height != current_row->phys_height
       || desired_row->visible_height != current_row->visible_height
       || current_row->overlapped_p
-      /* This next line is necessary for correctly redrawing
-	 mouse-face areas after scrolling and other operations.
-	 However, it causes excessive flickering when mouse is moved
-	 across the mode line.  Luckily, turning it off for the mode
-	 line doesn't seem to hurt anything. -- cyd.
-         But it is still needed for the header line. -- kfs.
-         The header line vpos is 1 if a tab line is enabled.  (18th
-         Apr 2022) */
-      || (current_row->mouse_face_p
-	  && !(current_row->mode_line_p
-	       && (vpos > (w->current_matrix->tab_line_p
-			   && w->current_matrix->header_line_p))))
+      || (current_row->mouse_face_p && ! mode_line_p)
       || current_row->x != desired_row->x)
     {
       output_cursor_to (w, vpos, 0, desired_row->y, desired_row->x);
@@ -3946,7 +3932,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
 
       /* Clear to end of window.  */
       rif->clear_end_of_line (w, updated_row, TEXT_AREA, -1);
-      changed_p = 1;
+      changed_p = true;
 
       /* This erases the cursor.  We do this here because
          notice_overwritten_cursor cannot easily check this, which
@@ -3965,7 +3951,8 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
       struct glyph *desired_glyph = desired_row->glyphs[TEXT_AREA];
       bool overlapping_glyphs_p = current_row->contains_overlapping_glyphs_p;
       int desired_stop_pos = desired_row->used[TEXT_AREA];
-      bool abort_skipping = 0;
+      bool abort_skipping = false;
+      bool partial_p = false;
 
       /* If the desired row extends its face to the text area end, and
 	 unless the current row also does so at the same position,
@@ -3974,7 +3961,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
       if (MATRIX_ROW_EXTENDS_FACE_P (desired_row)
 	  && (desired_stop_pos < current_row->used[TEXT_AREA]
 	      || (desired_stop_pos == current_row->used[TEXT_AREA]
-		  && !MATRIX_ROW_EXTENDS_FACE_P (current_row))))
+		  && ! MATRIX_ROW_EXTENDS_FACE_P (current_row))))
 	--desired_stop_pos;
 
       stop = min (current_row->used[TEXT_AREA], desired_stop_pos);
@@ -3985,7 +3972,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
 	 in common.  */
       while (i < stop)
 	{
-	  bool can_skip_p = !abort_skipping;
+	  bool can_skip_p = ! abort_skipping;
 
 	  /* Skip over glyphs that both rows have in common.  These
 	     don't have to be written.  We can't skip if the last
@@ -4002,7 +3989,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
 
 	      rif->get_glyph_overhangs (glyph, XFRAME (w->frame),
 					&left, &right);
-	      can_skip_p = (right == 0 && !abort_skipping);
+	      can_skip_p = (right == 0 && ! abort_skipping);
 	    }
 
 	  if (can_skip_p)
@@ -4014,13 +4001,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
 		{
 		  x += desired_glyph->pixel_width;
 		  ++desired_glyph, ++current_glyph, ++i;
-
-		  /* Say that only a partial update was performed of
-		     the current row (i.e. not all the glyphs were
-		     drawn).  This is used to preserve the stipple_p
-		     flag of the current row inside
-		     update_window_line.  */
-		  *partial_p = true;
+		  partial_p = true;
 		}
 
 	      /* Consider the case that the current row contains "xxx
@@ -4066,7 +4047,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
 	      int start_x = x, start_hpos = i;
 	      struct glyph *start = desired_glyph;
 	      int current_x = x;
-	      bool skip_first_p = !can_skip_p;
+	      bool skip_first_p = ! can_skip_p;
 
 	      /* Find the next glyph that's equal again.  */
 	      while (i < stop
@@ -4091,15 +4072,14 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
 	      output_cursor_to (w, vpos, start_hpos, desired_row->y, start_x);
 	      rif->write_glyphs (w, updated_row, start,
 				 TEXT_AREA, i - start_hpos);
-	      changed_p = 1;
-	      *partial_p = true;
+	      changed_p = true;
+	      partial_p = true;
 	    }
 	}
 
-      /* This means we will draw from the start, so no partial update
-	 is being performed.  */
-      if (!i)
-	*partial_p = false;
+      if (i == 0)
+	/* Cannot be partial if drawing from the start. */
+	partial_p = false;
 
       /* Write the rest.  */
       if (i < desired_row->used[TEXT_AREA])
@@ -4107,7 +4087,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
 	  output_cursor_to (w, vpos, i, desired_row->y, x);
 	  rif->write_glyphs (w, updated_row, desired_glyph,
 			     TEXT_AREA, desired_row->used[TEXT_AREA] - i);
-	  changed_p = 1;
+	  changed_p = true;
 	}
 
       /* Maybe clear to end of line.  */
@@ -4129,7 +4109,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
 	    output_cursor_to (w, vpos, i, desired_row->y,
 			      desired_row->pixel_width);
 	  rif->clear_end_of_line (w, updated_row, TEXT_AREA, -1);
-	  changed_p = 1;
+	  changed_p = true;
 	}
       else if (desired_row->pixel_width < current_row->pixel_width)
 	{
@@ -4157,13 +4137,17 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos,
 	  else
 	    xlim = current_row->pixel_width;
 	  rif->clear_end_of_line (w, updated_row, TEXT_AREA, xlim);
-	  changed_p = 1;
+	  changed_p = true;
 	}
+      if (changed_p)
+	if (current_row->stipple_p && partial_p)
+	  /* When playing fast and loose with scrolling optimizations,
+	     avoid stippling non-linearity.  */
+	  updated_row->stipple_p = current_row->stipple_p;
     }
 
   return changed_p;
 }
-
 
 /* Update row VPOS in window W.  Value is true if display has been changed.  */
 
@@ -4173,9 +4157,7 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
   struct glyph_row *current_row = MATRIX_ROW (w->current_matrix, vpos);
   struct glyph_row *desired_row = MATRIX_ROW (w->desired_matrix, vpos);
   struct redisplay_interface *rif = FRAME_RIF (XFRAME (WINDOW_FRAME (w)));
-
-  /* partial_p is true if not all of desired_row was drawn.  */
-  bool changed_p = 0, partial_p = 0, was_stipple;
+  bool changed_p = false;
 
   /* A row can be completely invisible in case a desired matrix was
      built with a vscroll and then make_cursor_line_fully_visible shifts
@@ -4187,9 +4169,9 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
       eassert (desired_row->enabled_p);
 
       /* Update display of the left margin area, if there is one.  */
-      if (!desired_row->full_width_p && w->left_margin_cols > 0)
+      if (! desired_row->full_width_p && w->left_margin_cols > 0)
 	{
-	  changed_p = 1;
+	  changed_p = true;
 	  update_marginal_area (w, desired_row, LEFT_MARGIN_AREA, vpos);
 	  /* Setting this flag will ensure the vertical border, if
 	     any, between this window and the one on its left will be
@@ -4199,22 +4181,22 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
 	}
 
       /* Update the display of the text area.  */
-      if (update_text_area (w, desired_row, vpos, &partial_p))
+      if (update_text_area (w, desired_row, vpos))
 	{
-	  changed_p = 1;
+	  changed_p = true;
 	  if (current_row->mouse_face_p)
 	    *mouse_face_overwritten_p = 1;
 	}
 
-      /* Update display of the right margin area, if there is one.  */
-      if (!desired_row->full_width_p && w->right_margin_cols > 0)
+      /* Update display of the right margin area.  */
+      if (! desired_row->full_width_p && w->right_margin_cols > 0)
 	{
-	  changed_p = 1;
+	  changed_p = true;
 	  update_marginal_area (w, desired_row, RIGHT_MARGIN_AREA, vpos);
 	}
 
       /* Draw truncation marks etc.  */
-      if (!current_row->enabled_p
+      if (! current_row->enabled_p
 	  || desired_row->y != current_row->y
 	  || desired_row->visible_height != current_row->visible_height
 	  || desired_row->cursor_in_fringe_p != current_row->cursor_in_fringe_p
@@ -4228,16 +4210,7 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
     }
 
   /* Update current_row from desired_row.  */
-  was_stipple = current_row->stipple_p;
   make_current (w->desired_matrix, w->current_matrix, vpos);
-
-  /* If only a partial update was performed, any stipple already
-     displayed in MATRIX_ROW (w->current_matrix, vpos) might still be
-     there, so don't hurry to clear that flag if it's not in
-     desired_row.  */
-
-  if (partial_p && was_stipple)
-    current_row->stipple_p = true;
 
   return changed_p;
 }

@@ -29623,7 +29623,7 @@ gui_clear_end_of_line (struct window *w, struct glyph_row *updated_row,
       FRAME_RIF (f)->clear_frame_area (f, from_x, from_y,
                                        to_x - from_x, to_y - from_y);
 
-      if (face && !updated_row->stipple_p)
+      if (face && ! updated_row->stipple_p)
 	updated_row->stipple_p = face->stipple;
       unblock_input ();
     }
