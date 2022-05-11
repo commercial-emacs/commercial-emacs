@@ -650,10 +650,10 @@ enum
   VBLOCK_ALIGN = (1 << PSEUDOVECTOR_SIZE_BITS),
   VBLOCK_NBYTES = VBLOCK_ALIGN - sizeof (uintptr_t), // subtract next ptr
   VBLOCK_BYTES_MIN = header_size + sizeof (Lisp_Object), // vector of one
-  VBLOCK_BYTES_MAX = (VBLOCK_NBYTES >> 1),
+  VBLOCK_BYTES_MAX = (VBLOCK_NBYTES >> 1) - word_size,
 
   /* Amazingly, free list per vector word-length.  */
-  VBLOCK_NFREE_LISTS = VBLOCK_BYTES_MAX / word_size,
+  VBLOCK_NFREE_LISTS = 1 + (VBLOCK_NBYTES - VBLOCK_BYTES_MIN) / word_size,
 };
 // should someone decide to muck with VBLOCK_ALIGN...
 verify (VBLOCK_ALIGN % LISP_ALIGNMENT == 0);
@@ -2257,7 +2257,8 @@ ADVANCE (struct Lisp_Vector *v, ptrdiff_t nbytes)
 static ptrdiff_t
 VINDEX (ptrdiff_t nbytes)
 {
-  return nbytes / word_size;
+  eassume (VBLOCK_BYTES_MIN <= nbytes);
+  return (nbytes - VBLOCK_BYTES_MIN) / word_size;
 }
 
 /* So-called large vectors are managed outside vector blocks.
@@ -2348,6 +2349,51 @@ init_vectors (void)
 {
   zero_vector = make_pure_vector (0);
   staticpro (&zero_vector);
+}
+
+static struct Lisp_Vector *
+allocate_vector_from_block (ptrdiff_t nbytes)
+{
+  struct Lisp_Vector *vector = NULL;
+  ptrdiff_t restbytes = 0;
+
+  eassume (VBLOCK_BYTES_MIN <= nbytes && nbytes <= VBLOCK_BYTES_MAX);
+  eassume (nbytes % word_size == 0);
+
+  for (ptrdiff_t exact = VINDEX (nbytes), index = exact;
+       index < VBLOCK_NFREE_LISTS; ++index)
+    {
+      restbytes = index * word_size + VBLOCK_BYTES_MIN - nbytes;
+      if (! restbytes || restbytes >= VBLOCK_BYTES_MIN)
+	/* We must either leave no residual or one big enough to
+	   sustain a non-degenerate vector.
+	   A hanging chad of MEM_TYPE_VBLOCK triggers all manner
+	   of GC_MALLOC_CHECK failures.  */
+	if (vector_free_lists[index])
+	  {
+	    vector = vector_free_lists[index];
+	    vector_free_lists[index] = next_vector (vector);
+	    if (index == exact)
+	      eassert (! restbytes);
+	    break;
+	  }
+    }
+
+  if (! vector)
+    {
+      /* Need new block */
+      vector = (struct Lisp_Vector *) allocate_vector_block ()->data;
+      restbytes = VBLOCK_NBYTES - nbytes;
+    }
+
+  if (restbytes)
+    {
+      /* Add to free list corresponding to VINDEX(RESTBYTES).  */
+      eassert (restbytes % word_size == 0);
+      eassert (restbytes >= VBLOCK_BYTES_MIN);
+      setup_on_free_list (ADVANCE (vector, nbytes), restbytes);
+    }
+  return vector;
 }
 
 /* Nonzero if VECTOR pointer is valid pointer inside BLOCK.  */
@@ -2548,7 +2594,7 @@ sweep_vectors (void)
 	      eassert (total_bytes % word_size == 0);
 
 	      if (vector == (struct Lisp_Vector *) block->data
-		  && !VECTOR_IN_BLOCK (next, block))
+		  && ! VECTOR_IN_BLOCK (next, block))
 		/* This block should be freed because all of its
 		   space was coalesced into the only free vector.  */
 		free_this_block = true;
@@ -2604,58 +2650,17 @@ sweep_vectors (void)
 	 / word_size), \
 	MOST_POSITIVE_FIXNUM))
 
-static struct Lisp_Vector *
-allocate_vector_from_block (ptrdiff_t nbytes)
-{
-  struct Lisp_Vector *vector = NULL;
-  ptrdiff_t restbytes = 0;
-
-  eassume (VBLOCK_BYTES_MIN <= nbytes && nbytes <= VBLOCK_BYTES_MAX);
-  eassume (nbytes % word_size == 0);
-
-  for (ptrdiff_t exact = VINDEX (nbytes), index = exact;
-       index < VBLOCK_NFREE_LISTS; ++index)
-    {
-      if (vector_free_lists[index])
-	{
-	  vector = vector_free_lists[index];
-	  vector_free_lists[index] = next_vector (vector);
-	  restbytes = index * word_size - nbytes;
-	  if (index == exact)
-	    eassert (! restbytes);
-	  break;
-	}
-    }
-
-  if (! vector)
-    {
-      /* Need new block */
-      vector = (struct Lisp_Vector *) allocate_vector_block ()->data;
-      restbytes = VBLOCK_NBYTES - nbytes;
-    }
-
-  if (restbytes >= VBLOCK_BYTES_MIN)
-    {
-      /* Recall we maintain a free list per vector word-length.  Do
-	 this for RESTBYTES.  */
-      eassert (restbytes % word_size == 0);
-      setup_on_free_list (ADVANCE (vector, nbytes), restbytes);
-    }
-  return vector;
-}
-
 /* Return a newly allocated Lisp_Vector.
 
-   For whatever reason, we assume average object size = 2^4 bytes, so
-   if LEN = 2^7 objects consumes (VBLOCK_NBYTES >> 1) = (2^12 >> 1) =
-   2^11, then it's "large."
+   For whatever reason, LEN words consuming more than half VBLOCK_NBYTES
+   is considered "large."
   */
 
 static struct Lisp_Vector *
 allocate_vectorlike (ptrdiff_t len, bool clearit)
 {
   eassume (0 < len && len <= VECTOR_ELTS_MAX);
-  ptrdiff_t nbytes = len * word_size;
+  ptrdiff_t nbytes = header_size + len * word_size;
   struct Lisp_Vector *p;
 
   if (nbytes <= VBLOCK_BYTES_MAX)
