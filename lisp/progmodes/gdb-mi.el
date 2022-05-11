@@ -105,6 +105,7 @@
 ;; at toplevel, so the compiler doesn't know under which circumstances
 ;; they're defined.
 (declare-function gud-until  "gud" (arg))
+(declare-function gud-go     "gud" (arg))
 (declare-function gud-print  "gud" (arg))
 (declare-function gud-down   "gud" (arg))
 (declare-function gud-up     "gud" (arg))
@@ -955,12 +956,16 @@ detailed description of this mode.
 			  (forward-char 2)
 			  (gud-call "-exec-until *%a" arg)))
 	   "\C-u" "Continue to current line or address.")
-  ;; TODO Why arg here?
   (gud-def
-   gud-go (gud-call (if gdb-active-process
-                        (gdb-gud-context-command "-exec-continue")
-                      "-exec-run") arg)
-   nil "Start or continue execution.")
+   gud-go (progn
+            (when arg
+              (gud-call (concat "-exec-arguments "
+                                (read-string "Arguments to exec-run: "))))
+            (gud-call
+             (if gdb-active-process
+                 (gdb-gud-context-command "-exec-continue")
+               "-exec-run")))
+   "C-v" "Start or continue execution.  Use a prefix to specify arguments.")
 
   ;; For debugging Emacs only.
   (gud-def gud-pp
