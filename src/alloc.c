@@ -649,11 +649,11 @@ enum
   /* Size `struct vector_block` */
   VBLOCK_ALIGN = (1 << PSEUDOVECTOR_SIZE_BITS),
   VBLOCK_NBYTES = VBLOCK_ALIGN - sizeof (uintptr_t), // subtract next ptr
-  VBLOCK_BYTES_MIN = header_size + sizeof (Lisp_Object), // vector of one
-  VBLOCK_BYTES_MAX = (VBLOCK_NBYTES >> 1) - word_size,
+  LISP_VECTOR_MIN = header_size + sizeof (Lisp_Object), // vector of one
+  LARGE_VECTOR_THRESH = (VBLOCK_NBYTES >> 1) - word_size,
 
   /* Amazingly, free list per vector word-length.  */
-  VBLOCK_NFREE_LISTS = 1 + (VBLOCK_NBYTES - VBLOCK_BYTES_MIN) / word_size,
+  VBLOCK_NFREE_LISTS = 1 + (VBLOCK_NBYTES - LISP_VECTOR_MIN) / word_size,
 };
 // should someone decide to muck with VBLOCK_ALIGN...
 verify (VBLOCK_ALIGN % LISP_ALIGNMENT == 0);
@@ -1081,7 +1081,7 @@ struct sblock
 
 struct string_block
 {
-  /* Place `strings' first, to preserve alignment.  */
+  /* Data first, to preserve alignment.  */
   struct Lisp_String strings[BLOCK_NSTRINGS];
   struct string_block *next;
 };
@@ -1992,7 +1992,7 @@ pin_string (Lisp_Object string)
 
 struct float_block
 {
-  /* FLOAT_INDEX needs FLOATS first.  */
+  /* Data first, to preserve alignment.  */
   struct Lisp_Float floats[BLOCK_NFLOATS];
   bits_word gcmarkbits[1 + BLOCK_NFLOATS / BITS_PER_BITS_WORD];
   struct float_block *next;
@@ -2052,7 +2052,7 @@ make_float (double float_value)
 
 struct cons_block
 {
-  /* CONS_INDEX needs CONSES first. */
+  /* Data first, to preserve alignment.  */
   struct Lisp_Cons conses[BLOCK_NCONS];
   bits_word gcmarkbits[1 + BLOCK_NCONS / BITS_PER_BITS_WORD];
   struct cons_block *next;
@@ -2257,8 +2257,8 @@ ADVANCE (struct Lisp_Vector *v, ptrdiff_t nbytes)
 static ptrdiff_t
 VINDEX (ptrdiff_t nbytes)
 {
-  eassume (VBLOCK_BYTES_MIN <= nbytes);
-  return (nbytes - VBLOCK_BYTES_MIN) / word_size;
+  eassume (LISP_VECTOR_MIN <= nbytes);
+  return (nbytes - LISP_VECTOR_MIN) / word_size;
 }
 
 /* So-called large vectors are managed outside vector blocks.
@@ -2310,10 +2310,8 @@ static struct large_vector *large_vectors;
 
 Lisp_Object zero_vector;
 
-/* Common shortcut to set up vector on a free list.  */
-
 static void
-setup_on_free_list (struct Lisp_Vector *v, ptrdiff_t nbytes)
+add_vector_free_lists (struct Lisp_Vector *v, ptrdiff_t nbytes)
 {
   eassume (header_size <= nbytes);
   ptrdiff_t nwords = (nbytes - header_size) / word_size;
@@ -2324,8 +2322,6 @@ setup_on_free_list (struct Lisp_Vector *v, ptrdiff_t nbytes)
   set_next_vector (v, vector_free_lists[vindex]);
   vector_free_lists[vindex] = v;
 }
-
-/* Get a new vector block.  */
 
 static struct vector_block *
 allocate_vector_block (void)
@@ -2342,8 +2338,6 @@ allocate_vector_block (void)
   return block;
 }
 
-/* Called once to initialize vector allocation.  */
-
 static void
 init_vectors (void)
 {
@@ -2357,18 +2351,18 @@ allocate_vector_from_block (ptrdiff_t nbytes)
   struct Lisp_Vector *vector = NULL;
   ptrdiff_t restbytes = 0;
 
-  eassume (VBLOCK_BYTES_MIN <= nbytes && nbytes <= VBLOCK_BYTES_MAX);
+  eassume (LISP_VECTOR_MIN <= nbytes && nbytes <= LARGE_VECTOR_THRESH);
   eassume (nbytes % word_size == 0);
 
   for (ptrdiff_t exact = VINDEX (nbytes), index = exact;
        index < VBLOCK_NFREE_LISTS; ++index)
     {
-      restbytes = index * word_size + VBLOCK_BYTES_MIN - nbytes;
+      restbytes = index * word_size + LISP_VECTOR_MIN - nbytes;
       eassert (restbytes || index == exact);
-      if (! restbytes || restbytes >= VBLOCK_BYTES_MIN)
-	/* Either leave no residual or one big enough to sustain a
-	   non-degenerate vector.  A hanging chad of MEM_TYPE_VBLOCK
-	   triggers all manner of GC_MALLOC_CHECK failures.  */
+      /* Either leave no residual or one big enough to sustain a
+	 non-degenerate vector.  A hanging chad of MEM_TYPE_VBLOCK
+	 triggers all manner of GC_MALLOC_CHECK failures.  */
+      if (! restbytes || restbytes >= LISP_VECTOR_MIN)
 	if (vector_free_lists[index])
 	  {
 	    vector = vector_free_lists[index];
@@ -2386,10 +2380,10 @@ allocate_vector_from_block (ptrdiff_t nbytes)
 
   if (restbytes)
     {
-      /* Add to free list corresponding to VINDEX(RESTBYTES).  */
+      /* Tack onto free list corresponding to VINDEX(RESTBYTES).  */
       eassert (restbytes % word_size == 0);
-      eassert (restbytes >= VBLOCK_BYTES_MIN);
-      setup_on_free_list (ADVANCE (vector, nbytes), restbytes);
+      eassert (restbytes >= LISP_VECTOR_MIN);
+      add_vector_free_lists (ADVANCE (vector, nbytes), restbytes);
     }
   return vector;
 }
@@ -2398,9 +2392,9 @@ allocate_vector_from_block (ptrdiff_t nbytes)
 
 #define VECTOR_IN_BLOCK(vector, block)		\
   ((char *) (vector) <= (block)->data		\
-   + VBLOCK_NBYTES - VBLOCK_BYTES_MIN)
+   + VBLOCK_NBYTES - LISP_VECTOR_MIN)
 
-/* Return the memory footprint of V in bytes.  */
+/* Return nbytes of vector with HDR.  */
 
 ptrdiff_t
 vectorlike_nbytes (const union vectorlike_header *hdr)
@@ -2430,19 +2424,19 @@ vectorlike_nbytes (const union vectorlike_header *hdr)
 }
 
 /* Convert a pseudovector pointer P to its underlying struct T pointer.
-   Verify that the struct is small, since cleanup_vector is called
+   Verify that the struct is small, since free_by_pvtype() is called
    only on small vector-like objects.  */
 
 #define PSEUDOVEC_STRUCT(p, t) \
   verify_expr ((header_size + VECSIZE (struct t) * word_size \
-		<= VBLOCK_BYTES_MAX), \
+		<= LARGE_VECTOR_THRESH), \
 	       (struct t *) (p))
 
 /* Release extra resources still in use by VECTOR, which may be any
    small vector-like object.  */
 
 static void
-cleanup_vector (struct Lisp_Vector *vector)
+free_by_pvtype (struct Lisp_Vector *vector)
 {
   detect_suspicious_free (vector);
 
@@ -2547,65 +2541,57 @@ cleanup_vector (struct Lisp_Vector *vector)
 static void
 sweep_vectors (void)
 {
-  struct vector_block *block, **bprev = &vector_blocks;
-  struct large_vector *lv, **lvprev = &large_vectors;
-  struct Lisp_Vector *vector, *next;
-
-  gcstat.total_vectors = 0;
-  gcstat.total_vector_slots = gcstat.total_free_vector_slots = 0;
   memset (vector_free_lists, 0, sizeof (vector_free_lists));
 
-  /* Looking through vector blocks.  */
+  gcstat.total_vectors =
+    gcstat.total_vector_slots =
+    gcstat.total_free_vector_slots = 0;
 
-  for (block = vector_blocks; block; block = *bprev)
+  /* Non-large vectors in VECTOR_BLOCKS.  */
+  for (struct vector_block *block = vector_blocks,
+	 **bprev = &vector_blocks;
+       block != NULL;
+       block = *bprev)
     {
-      bool free_this_block = false;
-
-      for (vector = (struct Lisp_Vector *) block->data;
-	   VECTOR_IN_BLOCK (vector, block); vector = next)
+      ptrdiff_t run_bytes = 0;
+      struct Lisp_Vector *run_vector = NULL;
+      for (struct Lisp_Vector *vector = (struct Lisp_Vector *) block->data;
+	   VECTOR_IN_BLOCK (vector, block);
+	   (void) vector)
 	{
-	  if (XVECTOR_MARKED_P (vector))
+	  ptrdiff_t nbytes = vector_nbytes (vector);
+	  if (vector_marked_p (vector))
 	    {
+	      if (run_vector)
+		{
+		  eassume (run_bytes && run_bytes % word_size == 0);
+		  add_vector_free_lists (run_vector, run_bytes);
+		  gcstat.total_free_vector_slots += run_bytes / word_size;
+		  run_bytes = 0;
+		  run_vector = NULL;
+		}
 	      XUNMARK_VECTOR (vector);
 	      gcstat.total_vectors++;
-	      ptrdiff_t nbytes = vector_nbytes (vector);
 	      gcstat.total_vector_slots += nbytes / word_size;
-	      next = ADVANCE (vector, nbytes);
 	    }
 	  else
 	    {
-	      ptrdiff_t total_bytes = 0;
-
-	      /* While NEXT is not marked, try to coalesce with VECTOR,
-		 thus making VECTOR of the largest possible size.  */
-
-	      next = vector;
-	      do
+	      free_by_pvtype (vector);
+	      if (run_vector == NULL)
 		{
-		  cleanup_vector (next);
-		  ptrdiff_t nbytes = vector_nbytes (next);
-		  total_bytes += nbytes;
-		  next = ADVANCE (next, nbytes);
+		  eassert (run_bytes == 0);
+		  run_vector = vector;
 		}
-	      while (VECTOR_IN_BLOCK (next, block) && !vector_marked_p (next));
-
-	      eassert (total_bytes % word_size == 0);
-
-	      if (vector == (struct Lisp_Vector *) block->data
-		  && ! VECTOR_IN_BLOCK (next, block))
-		/* This block should be freed because all of its
-		   space was coalesced into the only free vector.  */
-		free_this_block = true;
-	      else
-		{
-		  setup_on_free_list (vector, total_bytes);
-		  gcstat.total_free_vector_slots += total_bytes / word_size;
-		}
+	      run_bytes += nbytes;
 	    }
+	  vector = ADVANCE (vector, nbytes);
 	}
 
-      if (free_this_block)
+      if (run_vector == (struct Lisp_Vector *) block->data)
 	{
+	  /* If RUN_VECTOR never wavered from its initial
+	     assignment, then nothing in the block was marked.
+	     Harvest it back to OS.  */
 	  *bprev = block->next;
 #ifndef GC_MALLOC_CHECK
 	  mem_delete (mem_find (block->data));
@@ -2613,14 +2599,24 @@ sweep_vectors (void)
 	  xfree (block);
 	}
       else
-	bprev = &block->next;
+	{
+	  bprev = &block->next;
+	  if (run_vector)
+	    {
+	      /* block ended in an unmarked vector */
+	      add_vector_free_lists (run_vector, run_bytes);
+	      gcstat.total_free_vector_slots += run_bytes / word_size;
+	    }
+	}
     }
 
-  /* Sweep large vectors.  */
-
-  for (lv = large_vectors; lv; lv = *lvprev)
+  /* Free floating large vectors.  */
+  for (struct large_vector *lv = large_vectors,
+	 **lvprev = &large_vectors;
+       lv != NULL;
+       lv = *lvprev)
     {
-      vector = large_vector_contents (lv);
+      struct Lisp_Vector *vector = large_vector_contents (lv);
       if (XVECTOR_MARKED_P (vector))
 	{
 	  XUNMARK_VECTOR (vector);
@@ -2661,7 +2657,7 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
   ptrdiff_t nbytes = header_size + len * word_size;
   struct Lisp_Vector *p;
 
-  if (nbytes <= VBLOCK_BYTES_MAX)
+  if (nbytes <= LARGE_VECTOR_THRESH)
     {
       p = allocate_vector_from_block (nbytes);
       if (clearit)
@@ -2908,7 +2904,7 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
 
 struct symbol_block
 {
-  /* Place SYMBOLS array first, to preserve alignment.  */
+  /* Data first, to preserve alignment.  */
   struct Lisp_Symbol symbols[BLOCK_NSYMBOLS];
   struct symbol_block *next;
 };
