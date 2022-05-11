@@ -13,6 +13,7 @@ typedef struct gc_semispace {
 
 static gc_semispace space0;
 static gc_semispace space1;
+static gc_semispace *space_in_use = &space0;
 
 enum
 {
@@ -47,11 +48,13 @@ realloc_semispace (gc_semispace *space)
 static void *
 bump_alloc_ptr (gc_semispace *space, size_t nbytes)
 {
+  void *retval;
   space->words_used += nbytes / word_size;
   if (space->words_used > space->words_total)
     realloc_semispace (space);
+  retval = space->alloc_ptr;
   INT_ADD_WRAPV ((intptr_t) space->alloc_ptr, nbytes, (intptr_t *) &space->alloc_ptr);
-  return space->alloc_ptr;
+  return retval;
 }
 
 DEFUN ("ccons", Fccons, Sccons, 2, 2, 0,
@@ -59,57 +62,13 @@ DEFUN ("ccons", Fccons, Sccons, 2, 2, 0,
 	       and return it.  */)
   (Lisp_Object car, Lisp_Object cdr)
 {
-  Lisp_Object val = Qnil;
-
-  /* XSETCAR (val, car); */
-  /* XSETCDR (val, cdr); */
-  bytes_since_gc += sizeof (struct Lisp_Cons);
-
+  Lisp_Object val;
+  size_t nbytes = sizeof (struct Lisp_Cons);
+  XSETCONS (val, bump_alloc_ptr (space_in_use, nbytes));
+  XSETCAR (val, car);
+  XSETCDR (val, cdr);
+  bytes_since_gc += nbytes;
   return val;
-}
-
-DEFUN ("clist", Fclist, Sclist, 0, MANY, 0,
-       doc: /* Return a newly created list with specified arguments as
-elements.  Allows any number of arguments, including zero.  usage:
-(list &rest OBJECTS) */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  register Lisp_Object val;
-  val = Qnil;
-
-  while (nargs > 0)
-    {
-      nargs--;
-      val = Fcons (args[nargs], val);
-    }
-  return val;
-}
-
-DEFUN ("cmake-list", Fcmake_list, Scmake_list, 2, 2, 0,
-       doc: /* Return a newly created list of length LENGTH, with each
-	       element being INIT.  */)
-  (Lisp_Object length, Lisp_Object init)
-{
-  Lisp_Object val = Qnil;
-  CHECK_FIXNAT (length);
-
-  for (EMACS_INT size = XFIXNAT (length); 0 < size; size--)
-    {
-      val = Fcons (init, val);
-      rarely_quit (size);
-    }
-
-  return val;
-}
-
-DEFUN ("cmake-vector", Fcmake_vector, Scmake_vector, 2, 2, 0,
-       doc: /* Return a newly created vector of length LENGTH, with
-each element being INIT.  See also the function `vector'.  */)
-  (Lisp_Object length, Lisp_Object init)
-{
-  CHECK_TYPE (FIXNATP (length) && XFIXNAT (length) <= PTRDIFF_MAX,
-	      Qwholenump, length);
-  return make_vector (XFIXNAT (length), init);
 }
 
 DEFUN ("cvector", Fcvector, Scvector, 0, MANY, 0,
@@ -169,12 +128,13 @@ DEFUN ("cmake-symbol", Fcmake_symbol, Scmake_symbol, 1, 1, 0,
        doc: /* Return an uninterned, unbound symbol whose name is NAME. */)
   (Lisp_Object name)
 {
-  Lisp_Object val = Qnil;
+  Lisp_Object val;
+  size_t nbytes = sizeof (struct Lisp_Symbol);
 
   CHECK_STRING (name);
-
+  XSETSYMBOL (val, bump_alloc_ptr (space_in_use, nbytes));
   init_symbol (val, name);
-  bytes_since_gc += sizeof (struct Lisp_Symbol);
+  bytes_since_gc += nbytes;
   return val;
 }
 
@@ -311,21 +271,7 @@ syms_of_calloc (void)
 	       doc: /* How does mprotect work?  */);
   Vmemory__protect_p = Qnil;
 
-  DEFSYM (Qcconses, "cconses");
-  DEFSYM (Qcsymbols, "csymbols");
-  DEFSYM (Qcstrings, "cstrings");
-  DEFSYM (Qcvectors, "cvectors");
-  DEFSYM (Qcfloats, "cfloats");
-  DEFSYM (Qcintervals, "cintervals");
-  DEFSYM (Qcbuffers, "cbuffers");
-  DEFSYM (Qcstring_bytes, "cstring-bytes");
-  DEFSYM (Qcvector_slots, "cvector-slots");
-  DEFSYM (Qcheap, "cheap");
-
   defsubr (&Sccons);
-  defsubr (&Sclist);
-  defsubr (&Scmake_list);
-  defsubr (&Scmake_vector);
   defsubr (&Scvector);
   defsubr (&Scmake_byte_code);
   defsubr (&Scmake_bool_vector);
@@ -340,8 +286,8 @@ syms_of_calloc (void)
 void test_me (void)
 {
   (void) space1;
-  bump_alloc_ptr (&space0, sizeof (struct Lisp_Symbol));
-  bump_alloc_ptr (&space0, sizeof (struct Lisp_Float));
-  struct Lisp_Symbol *p = (struct Lisp_Symbol *) space0.objects;
+  bump_alloc_ptr (space_in_use, sizeof (struct Lisp_Symbol));
+  bump_alloc_ptr (space_in_use, sizeof (struct Lisp_Float));
+  struct Lisp_Symbol *p = (struct Lisp_Symbol *) space_in_use->objects;
   p->u.s.pinned = false;
 }

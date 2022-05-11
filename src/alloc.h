@@ -142,9 +142,8 @@ union emacs_align_type
 };
 
 /* LISP_ALIGNMENT must be at least GCALIGNMENT to allow USE_LSB_TAG.
-   Further, it must also be as wide as the widest C field in
-   pseudovector structs, which alignof (emacs_align_type)
-   is guaranteed to be.  */
+   Further, it must also be as wide as alignof (emacs_align_type)
+   which encompasses all pseudovector lisp fields.  */
 
 typedef union {
   union emacs_align_type x;
