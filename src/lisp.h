@@ -4170,7 +4170,7 @@ build_string (const char *str)
 
 extern Lisp_Object pure_cons (Lisp_Object, Lisp_Object);
 extern Lisp_Object make_vector (ptrdiff_t, Lisp_Object);
-extern struct Lisp_Vector *allocate_nil_vector (ptrdiff_t)
+extern struct Lisp_Vector *allocate_vectorlike (ptrdiff_t, bool)
   ATTRIBUTE_RETURNS_NONNULL;
 
 /* Make an uninitialized vector for SIZE objects.  NOTE: you must
@@ -4184,13 +4184,10 @@ extern struct Lisp_Vector *allocate_nil_vector (ptrdiff_t)
 
    allocate_vector has a similar problem.  */
 
-extern struct Lisp_Vector *allocate_vector (ptrdiff_t)
-  ATTRIBUTE_RETURNS_NONNULL;
-
 INLINE Lisp_Object
 make_uninit_vector (ptrdiff_t size)
 {
-  return make_lisp_ptr (allocate_vector (size), Lisp_Vectorlike);
+  return make_lisp_ptr (allocate_vectorlike (size, false), Lisp_Vectorlike);
 }
 
 /* Like above, but special for sub char-tables.  */
@@ -4213,11 +4210,10 @@ make_uninit_sub_char_table (int depth, int min_char)
 INLINE Lisp_Object
 make_nil_vector (ptrdiff_t size)
 {
-  return make_lisp_ptr (allocate_nil_vector (size), Lisp_Vectorlike);
+  return make_lisp_ptr (allocate_vectorlike (size, true), Lisp_Vectorlike);
 }
 
-extern struct Lisp_Vector *allocate_pseudovector (int, int, int,
-						  enum pvec_type)
+extern struct Lisp_Vector *allocate_pseudovector (int, int, int, enum pvec_type)
   ATTRIBUTE_RETURNS_NONNULL;
 
 /* Allocate uninitialized pseudovector with no Lisp_Object slots.  */

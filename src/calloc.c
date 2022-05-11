@@ -77,9 +77,26 @@ Allows any number of arguments, including zero.
 usage: (vector &rest OBJECTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object val = make_uninit_vector (nargs);
-  struct Lisp_Vector *p = XVECTOR (val);
+  struct Lisp_Vector *p;
+  Lisp_Object val;
+
+  if (nargs > min (MOST_POSITIVE_FIXNUM,
+		   (min (PTRDIFF_MAX, SIZE_MAX) - header_size) / word_size))
+    memory_full (SIZE_MAX);
+
+  if (nargs == 0)
+    val = make_lisp_ptr (XVECTOR (zero_vector), Lisp_Vectorlike);
+  else
+    {
+      ptrdiff_t nbytes = nargs * sizeof (Lisp_Object);
+      XSETVECTOR (val, bump_alloc_ptr (space_in_use, nbytes));
+      bytes_since_gc += header_size + nbytes;
+      vector_cells_consed += nargs;
+    }
+  p = XVECTOR (val);
+  p->header.size = nargs;
   memcpy (p->contents, args, nargs * sizeof *args);
+
   return val;
 }
 

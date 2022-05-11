@@ -4053,7 +4053,7 @@ larger_vecalloc (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
   if (incr_max < incr)
     memory_full (SIZE_MAX);
   new_size = old_size + incr;
-  v = allocate_vector (new_size);
+  v = allocate_vectorlike (new_size, false);
   memcpy (v->contents, XVECTOR (vec)->contents, old_size * sizeof *v->contents);
   XSETVECTOR (vec, v);
   return vec;
