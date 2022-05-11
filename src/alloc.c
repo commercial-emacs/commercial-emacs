@@ -2364,17 +2364,15 @@ allocate_vector_from_block (ptrdiff_t nbytes)
        index < VBLOCK_NFREE_LISTS; ++index)
     {
       restbytes = index * word_size + VBLOCK_BYTES_MIN - nbytes;
+      eassert (restbytes || index == exact);
       if (! restbytes || restbytes >= VBLOCK_BYTES_MIN)
-	/* We must either leave no residual or one big enough to
-	   sustain a non-degenerate vector.
-	   A hanging chad of MEM_TYPE_VBLOCK triggers all manner
-	   of GC_MALLOC_CHECK failures.  */
+	/* Either leave no residual or one big enough to sustain a
+	   non-degenerate vector.  A hanging chad of MEM_TYPE_VBLOCK
+	   triggers all manner of GC_MALLOC_CHECK failures.  */
 	if (vector_free_lists[index])
 	  {
 	    vector = vector_free_lists[index];
 	    vector_free_lists[index] = next_vector (vector);
-	    if (index == exact)
-	      eassert (! restbytes);
 	    break;
 	  }
     }
