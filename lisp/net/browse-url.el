@@ -1270,7 +1270,9 @@ currently selected window instead."
         (func (if same-window 'find-file 'find-file-other-window)))
     (if (equal (url-type parsed) "file")
         ;; It's a file; just open it.
-        (let ((file (url-unhex-string (url-filename parsed))))
+        (let ((file (url-unhex-string
+                     (concat (url-host parsed)
+                             (url-filename parsed)))))
           (when-let ((coding (browse-url--file-name-coding-system)))
             (setq file (decode-coding-string file 'utf-8)))
           (funcall func file))
