@@ -2611,11 +2611,12 @@ struct Lisp_Vector *
 allocate_vectorlike (ptrdiff_t len, bool q_clear)
 {
   ptrdiff_t nbytes = header_size + len * word_size;
-  struct Lisp_Vector *p;
+  struct Lisp_Vector *p = NULL;
 
   if (len == 0)
     return XVECTOR (zero_vector);
-  if (VECTOR_ELTS_MAX < len)
+
+  if (len > VECTOR_ELTS_MAX)
     memory_full (SIZE_MAX);
 
   if (nbytes > LARGE_VECTOR_THRESH)
