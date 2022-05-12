@@ -68,9 +68,6 @@ enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 #define XUNMARK_VECTOR(V)	((V)->header.size &= ~ARRAY_MARK_FLAG)
 #define XVECTOR_MARKED_P(V)	(((V)->header.size & ARRAY_MARK_FLAG) != 0)
 
-/* Arbitrarily set in 2012 in commit 0dd6d66.  */
-#define GC_DEFAULT_THRESHOLD ((1 << 17) * word_size)
-
 static bool gc_inhibited;
 
 #ifdef HAVE_PDUMPER
@@ -629,8 +626,11 @@ lisp_free (void *block)
 
 enum
 {
+  /* Arbitrarily set in 2012 in commit 0dd6d66.  */
+  GC_DEFAULT_THRESHOLD = (1 << 17) * word_size,
+
   BLOCK_NBITS = 10,
-  BLOCK_ALIGN = (1 << BLOCK_NBITS),
+  BLOCK_ALIGN = 1 << BLOCK_NBITS,
   BLOCK_NBYTES = BLOCK_ALIGN - sizeof (uintptr_t), // subtract next ptr
   BLOCK_NINTERVALS = (BLOCK_NBYTES) / sizeof (struct interval),
   BLOCK_NSTRINGS = (BLOCK_NBYTES) / sizeof (struct Lisp_String),
@@ -654,6 +654,10 @@ enum
 
   /* Amazingly, free list per vector word-length.  */
   VBLOCK_NFREE_LISTS = 1 + (VBLOCK_NBYTES - LISP_VECTOR_MIN) / word_size,
+
+  SBLOCK_NBITS = 13,
+  SBLOCK_NBYTES = MALLOC_SIZE_NEAR(1 << SBLOCK_NBITS),
+  LARGE_STRING_THRESH = (SBLOCK_NBYTES >> 3),
 };
 // should someone decide to muck with VBLOCK_ALIGN...
 verify (VBLOCK_ALIGN % LISP_ALIGNMENT == 0);
@@ -1001,8 +1005,8 @@ mark_interval_tree (INTERVAL i)
    we keep.
 
    String data is allocated from sblock structures.  Strings larger
-   than LARGE_STRING_BYTES, get their own sblock, data for smaller
-   strings is sub-allocated out of sblocks of size SBLOCK_SIZE.
+   than LARGE_STRING_THRESH, get their own sblock, data for smaller
+   strings is sub-allocated out of sblocks of size SBLOCK_NBYTES.
 
    Sblocks consist internally of sdata structures, one for each
    Lisp_String.  The sdata structure points to the Lisp_String it
@@ -1015,14 +1019,6 @@ mark_interval_tree (INTERVAL i)
    N.NBYTES member of the sdata.  So, sdata structures that are no
    longer used, can be easily recognized, and it's easy to compact the
    sblocks of small strings which we do in compact_small_strings.  */
-
-/* Size in bytes of an sblock structure used for small strings.  */
-
-#define SBLOCK_SIZE (MALLOC_SIZE_NEAR(1 << 13))
-
-/* Large string are allocated from individual sblocks.  */
-
-#define LARGE_STRING_BYTES (1 << 10)
 
 struct sdata
 {
@@ -1063,7 +1059,7 @@ enum { SDATA_DATA_OFFSET = offsetof (struct sdata, data) };
 
 /* Structure describing a block of memory which is sub-allocated to
    obtain string data memory for strings.  Blocks for small strings
-   are of fixed size SBLOCK_SIZE.  Blocks for large strings are made
+   are of fixed size SBLOCK_NBYTES.  Blocks for large strings are made
    as large as needed.  */
 
 struct sblock
@@ -1325,7 +1321,7 @@ allocate_string_data (struct Lisp_String *s,
      of string data.  */
   ptrdiff_t needed = sdata_size (nbytes);
 
-  if (nbytes > LARGE_STRING_BYTES || immovable)
+  if (nbytes > LARGE_STRING_THRESH || immovable)
     {
       size_t size = FLEXSIZEOF (struct sblock, data, needed);
       b = lisp_malloc (size + GC_STRING_EXTRA, q_clear, MEM_TYPE_NON_LISP);
@@ -1339,11 +1335,11 @@ allocate_string_data (struct Lisp_String *s,
       b = current_sblock;
 
       if (b == NULL
-	  || (SBLOCK_SIZE - GC_STRING_EXTRA
+	  || (SBLOCK_NBYTES - GC_STRING_EXTRA
 	      < (char *) b->next_free - (char *) b + needed))
 	{
 	  /* Not enough room in the current sblock.  */
-	  b = lisp_malloc (SBLOCK_SIZE, false, MEM_TYPE_NON_LISP);
+	  b = lisp_malloc (SBLOCK_NBYTES, false, MEM_TYPE_NON_LISP);
 	  data = b->data;
 	  b->next = NULL;
 	  b->next_free = data;
@@ -1561,7 +1557,7 @@ compact_small_strings (void)
   struct sblock *tb = oldest_sblock;
   if (tb)
     {
-      sdata *tb_end = (sdata *) ((char *) tb + SBLOCK_SIZE);
+      sdata *tb_end = (sdata *) ((char *) tb + SBLOCK_NBYTES);
       sdata *to = tb->data;
 
       /* Step through the blocks from the oldest to the youngest.  We
@@ -1571,7 +1567,7 @@ compact_small_strings (void)
       do
 	{
 	  sdata *end = b->next_free;
-	  eassert ((char *) end <= (char *) b + SBLOCK_SIZE);
+	  eassert ((char *) end <= (char *) b + SBLOCK_NBYTES);
 
 	  for (sdata *from = b->data; from < end; )
 	    {
@@ -1588,7 +1584,7 @@ compact_small_strings (void)
 #endif /* GC_CHECK_STRING_BYTES */
 
 	      nbytes = s ? STRING_BYTES (s) : SDATA_NBYTES (from);
-	      eassert (nbytes <= LARGE_STRING_BYTES);
+	      eassert (nbytes <= LARGE_STRING_THRESH);
 
 	      ptrdiff_t size = sdata_size (nbytes);
 	      sdata *from_end = (sdata *) ((char *) from
@@ -1611,7 +1607,7 @@ compact_small_strings (void)
 		    {
 		      tb->next_free = to;
 		      tb = tb->next;
-		      tb_end = (sdata *) ((char *) tb + SBLOCK_SIZE);
+		      tb_end = (sdata *) ((char *) tb + SBLOCK_NBYTES);
 		      to = tb->data;
 		      to_end = (sdata *) ((char *) to + size + GC_STRING_EXTRA);
 		    }
@@ -1956,7 +1952,7 @@ pin_string (Lisp_Object string)
   ptrdiff_t size = STRING_BYTES (s);
   unsigned char *data = s->u.s.data;
 
-  if (!(size > LARGE_STRING_BYTES
+  if (!(size > LARGE_STRING_THRESH
 	|| PURE_P (data) || pdumper_object_p (data)
 	|| s->u.s.size_byte == -3))
     {
@@ -2685,7 +2681,7 @@ allocate_pseudovector (int memlen, int lisplen,
 		       int zerolen, enum pvec_type tag)
 {
   /* Catch bogus values.  */
-  enum { size_max = (1 << PSEUDOVECTOR_SIZE_BITS) - 1 };
+  enum { size_max = VBLOCK_ALIGN - 1 };
   enum { rest_max = (1 << PSEUDOVECTOR_REST_BITS) - 1 };
   verify (size_max + rest_max <= VECTOR_ELTS_MAX);
   eassert (0 <= tag && tag <= PVEC_FONT);
