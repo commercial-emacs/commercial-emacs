@@ -1028,8 +1028,7 @@ notion."
 		(dolist (s xs)
 		  (pcase s
 		    (`(defun . ,f)
-		     (unless (seq-some #'autoloadp
-		                       (get (cdr s) 'function-history))
+		     (unless (get f 'function-history)
                        (push f byte-compile--noruntime-funcs)))))))))))))
 
 (defun byte-compile-eval-before-compile (form)
