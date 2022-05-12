@@ -10251,7 +10251,7 @@ w32_delayed_load (Lisp_Object library_id)
 		found = Fcons (dll,
 			       (res > 0)
 			       /* Possibly truncated */
-			       ? make_specified_string (name, -1, len, 1)
+			       ? make_multibyte_string (name, -1, len)
 			       : Qnil);
 		/* This prevents thread start and end notifications
 		   from being sent to the DLL, for every thread we

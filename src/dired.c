@@ -258,12 +258,12 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
 	    continue;
 	}
 
-      if (!NILP (full))
+      if (! NILP (full))
 	{
 	  ptrdiff_t name_nbytes = SBYTES (name);
 	  ptrdiff_t nbytes = directory_nbytes + needsep + name_nbytes;
 	  ptrdiff_t nchars = SCHARS (directory) + needsep + SCHARS (name);
-	  finalname = make_uninit_multibyte_string (nchars, nbytes);
+	  finalname = make_multibyte_string (NULL, nchars, nbytes);
 	  if (nchars == nbytes)
 	    STRING_SET_UNIBYTE (finalname);
 	  memcpy (SDATA (finalname), SDATA (directory), directory_nbytes);

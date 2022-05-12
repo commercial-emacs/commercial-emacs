@@ -71,7 +71,7 @@ conv_filename_to_w32_unicode (Lisp_Object in, int absolute_p)
   if (converted_len < 2)
     error ("cygwin_conv_path: %s", strerror (errno));
 
-  converted = make_uninit_string (converted_len - 1);
+  converted = make_unibyte_string (NULL, converted_len - 1);
   if (cygwin_conv_path (flags, SDATA (in),
                         SDATA (converted), converted_len))
     error ("cygwin_conv_path: %s", strerror (errno));
@@ -98,7 +98,7 @@ conv_filename_from_w32_unicode (const wchar_t* in, int absolute_p)
   if (converted_len < 1)
     error ("cygwin_conv_path: %s", strerror (errno));
 
-  converted = make_uninit_string (converted_len - 1 /*subtract terminator*/);
+  converted = make_unibyte_string (NULL, converted_len - 1 /*subtract terminator*/);
   if (cygwin_conv_path (flags, in, SDATA (converted), converted_len))
     error ("cygwin_conv_path: %s", strerror (errno));
 

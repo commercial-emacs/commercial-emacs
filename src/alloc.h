@@ -153,8 +153,6 @@ typedef union {
 enum { LISP_ALIGNMENT = alignof (Lisp_Aligned) };
 
 struct mem_node *mem_find (void *start);
-Lisp_Object make_clear_string (EMACS_INT, bool);
-Lisp_Object make_clear_multibyte_string (EMACS_INT, EMACS_INT, bool);
 
 void test_me (void);
 

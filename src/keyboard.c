@@ -6693,8 +6693,8 @@ apply_modifiers_uncached (int modifiers, char *base, int base_len, int base_len_
   {
     Lisp_Object new_name;
 
-    new_name = make_uninit_multibyte_string (mod_len + base_len,
-					     mod_len + base_len_byte);
+    new_name = make_multibyte_string (NULL, mod_len + base_len,
+				      mod_len + base_len_byte);
     memcpy (SDATA (new_name), new_mods, mod_len);
     memcpy (SDATA (new_name) + mod_len, base, base_len_byte);
 

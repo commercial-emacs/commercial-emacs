@@ -6016,7 +6016,7 @@ read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
   if (coding->carryover_bytes > 0)
     {
       if (SCHARS (p->decoding_buf) < coding->carryover_bytes)
-	pset_decoding_buf (p, make_uninit_string (coding->carryover_bytes));
+	pset_decoding_buf (p, make_unibyte_string (NULL, coding->carryover_bytes));
       memcpy (SDATA (p->decoding_buf), coding->carryover,
 	      coding->carryover_bytes);
       p->decoding_carryover = coding->carryover_bytes;
@@ -7819,8 +7819,11 @@ remove_slash_colon (Lisp_Object name)
 {
   return
     (SREF (name, 0) == '/' && SREF (name, 1) == ':'
-     ? make_specified_string (SSDATA (name) + 2, SCHARS (name) - 2,
-			      SBYTES (name) - 2, STRING_MULTIBYTE (name))
+     ? (STRING_MULTIBYTE (name)
+	? make_multibyte_string (SSDATA (name) + 2,
+				 SCHARS (name) - 2,
+				 SBYTES (name) - 2)
+	: make_unibyte_string (SSDATA (name) + 2, SBYTES (name) - 2))
      : name);
 }
 

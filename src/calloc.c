@@ -141,63 +141,6 @@ usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INT
   return val;
 }
 
-DEFUN ("cmake-string", Fcmake_string, Scmake_string, 2, 3, 0,
-       doc: /* Return a newly created string of LENGTH copies of INIT.
-INIT must be an integer representing a character, e.g., ?x.  The
-return value is unibyte unless INIT is not ASCII or MULTIBYTE is
-non-nil.  */)
-  (Lisp_Object length, Lisp_Object init, Lisp_Object multibyte)
-{
-  Lisp_Object val;
-  EMACS_INT nbytes;
-
-  CHECK_FIXNAT (length);
-  CHECK_CHARACTER (init);
-
-  int c = XFIXNAT (init);
-  bool q_clear = ! c;
-
-  if (ASCII_CHAR_P (c) && NILP (multibyte))
-    {
-      nbytes = XFIXNUM (length);
-      val = make_clear_string (nbytes, q_clear);
-      if (nbytes && ! q_clear)
-	{
-	  memset (SDATA (val), c, nbytes);
-	  SDATA (val)[nbytes] = 0;
-	}
-    }
-  else
-    {
-      unsigned char str[MAX_MULTIBYTE_LENGTH];
-      ptrdiff_t len = CHAR_STRING (c, str);
-      EMACS_INT string_len = XFIXNUM (length);
-
-      if (INT_MULTIPLY_WRAPV (len, string_len, &nbytes))
-	string_overflow ();
-      val = make_clear_multibyte_string (string_len, nbytes, q_clear);
-      if (! q_clear)
-	{
-	  unsigned char *beg = SDATA (val), *end = beg + nbytes;
-	  for (unsigned char *p = beg; p < end; p += len)
-	    {
-	      /* First time we just copy STR to the data of VAL.  */
-	      if (p == beg)
-		memcpy (p, str, len);
-	      else
-		{
-		  /* Next time we copy largest possible chunk from
-		     initialized to uninitialized part of VAL.  */
-		  len = min (p - beg, end - p);
-		  memcpy (p, beg, len);
-		}
-	    }
-	}
-    }
-
-  return val;
-}
-
 DEFUN ("cmake-symbol", Fcmake_symbol, Scmake_symbol, 1, 1, 0,
        doc: /* Return an uninterned, unbound symbol whose name is NAME. */)
   (Lisp_Object name)
@@ -351,7 +294,6 @@ syms_of_calloc (void)
   defsubr (&Scmake_bool_vector);
   defsubr (&Scbool_vector);
   defsubr (&Scmake_symbol);
-  defsubr (&Scmake_string);
   defsubr (&Scmake_marker);
   defsubr (&Scgarbage_collect);
   defsubr (&Scmemory_protect_now);

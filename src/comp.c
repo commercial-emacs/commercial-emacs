@@ -694,7 +694,7 @@ format_string (const char *format, ...)
 static Lisp_Object
 comp_hash_string (Lisp_Object string)
 {
-  Lisp_Object digest = make_uninit_string (MD5_DIGEST_SIZE * 2);
+  Lisp_Object digest = make_unibyte_string (NULL, MD5_DIGEST_SIZE * 2);
   md5_buffer (SSDATA (string), SCHARS (string), SSDATA (digest));
   hexbuf_digest (SSDATA (digest), SDATA (digest), MD5_DIGEST_SIZE);
 
@@ -719,7 +719,7 @@ comp_hash_source_file (Lisp_Object filename)
   if (!f)
     report_file_error ("Opening source file", filename);
 
-  Lisp_Object digest = make_uninit_string (MD5_DIGEST_SIZE * 2);
+  Lisp_Object digest = make_unibyte_string (NULL, MD5_DIGEST_SIZE * 2);
 
 #ifdef HAVE_ZLIB
   int res = is_gz
@@ -771,9 +771,10 @@ hash_native_abi (void)
      directory names under the Contents/Frameworks directory, so
      convert them to underscores.  */
   version = STRING_MULTIBYTE (Vemacs_version)
-    ? make_uninit_multibyte_string (SCHARS (Vemacs_version),
-				    SBYTES (Vemacs_version))
-    : make_uninit_string (SBYTES (Vemacs_version));
+    ? make_multibyte_string (NULL,
+			     SCHARS (Vemacs_version),
+			     SBYTES (Vemacs_version))
+    : make_unibyte_string (NULL, SBYTES (Vemacs_version));
 
   const unsigned char *from = SDATA (Vemacs_version);
   unsigned char *to = SDATA (version);

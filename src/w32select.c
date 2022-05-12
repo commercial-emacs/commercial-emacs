@@ -955,7 +955,7 @@ DEFUN ("w32-get-clipboard-data", Fw32_get_clipboard_data,
 	    dst++;
 	  }
 
-	ret = make_uninit_string (truelen);
+	ret = make_unibyte_string (NULL, truelen);
 
 	/* Convert CRLF line endings (the standard CF_TEXT clipboard
 	   format) to LF endings as used internally by Emacs.  */

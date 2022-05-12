@@ -151,7 +151,7 @@ usage: (char-to-string CHAR)  */)
   c = XFIXNAT (character);
 
   len = CHAR_STRING (c, str);
-  return make_string_from_bytes ((char *) str, 1, len);
+  return make_multibyte_string ((char *) str, 1, len);
 }
 
 DEFUN ("byte-to-string", Fbyte_to_string, Sbyte_to_string, 1, 1, 0,
@@ -163,7 +163,7 @@ DEFUN ("byte-to-string", Fbyte_to_string, Sbyte_to_string, 1, 1, 0,
   if (XFIXNUM (byte) < 0 || XFIXNUM (byte) > 255)
     error ("Invalid byte");
   b = XFIXNUM (byte);
-  return make_string_from_bytes ((char *) &b, 1, 1);
+  return make_unibyte_string ((char *) &b, 1);
 }
 
 DEFUN ("string-to-char", Fstring_to_char, Sstring_to_char, 1, 1, 0,
@@ -1584,7 +1584,7 @@ from adjoining text, if those properties are sticky.  */)
    have them, if PROPS is true.
 
    We don't want to use plain old make_string here, because it calls
-   make_uninit_string, which can cause the buffer arena to be
+   make_unibyte_string, which can cause the buffer arena to be
    compacted.  make_string has no way of knowing that the data has
    been moved, and thus copies the wrong data into the string.  This
    doesn't affect most of the other users of make_string, so it should
@@ -1608,7 +1608,7 @@ make_buffer_string (ptrdiff_t start, ptrdiff_t end, bool props)
    have them, if PROPS is true.
 
    We don't want to use plain old make_string here, because it calls
-   make_uninit_string, which can cause the buffer area to be
+   make_unibyte_string, which can cause the buffer area to be
    compacted.  make_string has no way of knowing that the data has
    been moved, and thus copies the wrong data into the string.  This
    doesn't effect most of the other users of make_string, so it should
@@ -1640,9 +1640,9 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
     }
 
   if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
-    result = make_uninit_multibyte_string (end - start, end_byte - start_byte);
+    result = make_multibyte_string (NULL, end - start, end_byte - start_byte);
   else
-    result = make_uninit_string (end - start);
+    result = make_unibyte_string (NULL, end - start);
 
   size = end0 - beg0;
   memcpy (SDATA (result), BYTE_POS_ADDR (beg0), size);
@@ -3934,7 +3934,9 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 
   if (maybe_combine_byte)
     nchars = multibyte_chars_in_text ((unsigned char *) buf, p - buf);
-  val = make_specified_string (buf, nchars, p - buf, multibyte);
+  val = (multibyte
+	 ? make_multibyte_string (buf, nchars, p - buf)
+	 : make_unibyte_string (buf, p - buf));
 
   /* If the format string has text properties, or any of the string
      arguments has text properties, set up text properties of the

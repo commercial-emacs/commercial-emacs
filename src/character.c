@@ -819,14 +819,14 @@ string_escape_byte8 (Lisp_Object string)
       if (INT_ADD_WRAPV (nchars, thrice_byte8_count, &uninit_nchars)
 	  || INT_ADD_WRAPV (nbytes, 2 * byte8_count, &uninit_nbytes))
 	string_overflow ();
-      val = make_uninit_multibyte_string (uninit_nchars, uninit_nbytes);
+      val = make_multibyte_string (NULL, uninit_nchars, uninit_nbytes);
     }
   else
     {
       /* Convert 1-byte sequence of byte8 chars to 4-byte octal.  */
       if (INT_ADD_WRAPV (thrice_byte8_count, nbytes, &uninit_nbytes))
 	string_overflow ();
-      val = make_uninit_string (uninit_nbytes);
+      val = make_unibyte_string (NULL, uninit_nbytes);
     }
 
   src = SDATA (string);
@@ -874,7 +874,7 @@ usage: (string &rest CHARACTERS)  */)
     }
   if (nbytes == n)
     return Funibyte_string (n, args);
-  Lisp_Object str = make_uninit_multibyte_string (n, nbytes);
+  Lisp_Object str = make_multibyte_string (NULL, n, nbytes);
   unsigned char *p = SDATA (str);
   for (ptrdiff_t i = 0; i < n; i++)
     {
@@ -890,7 +890,7 @@ DEFUN ("unibyte-string", Funibyte_string, Sunibyte_string, 0, MANY, 0,
 usage: (unibyte-string &rest BYTES)  */)
   (ptrdiff_t n, Lisp_Object *args)
 {
-  Lisp_Object str = make_uninit_string (n);
+  Lisp_Object str = make_unibyte_string (NULL, n);
   unsigned char *p = SDATA (str);
   for (ptrdiff_t i = 0; i < n; i++)
     *p++ = check_integer_range (args[i], 0, 255);

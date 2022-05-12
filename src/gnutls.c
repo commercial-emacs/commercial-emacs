@@ -1065,7 +1065,7 @@ gnutls_hex_string (unsigned char *buf, ptrdiff_t buf_size, const char *prefix)
   if (INT_MULTIPLY_WRAPV (buf_size, 3, &retlen)
       || INT_ADD_WRAPV (prefix_length - (buf_size != 0), retlen, &retlen))
     string_overflow ();
-  Lisp_Object ret = make_uninit_string (retlen);
+  Lisp_Object ret = make_unibyte_string (NULL, retlen);
   char *string = SSDATA (ret);
   strcpy (string, prefix);
 
@@ -1604,8 +1604,7 @@ string representation.  */)
 	     emacs_gnutls_strerror (err));
     }
 
-  Lisp_Object result = make_string_from_bytes ((char *) out.data, out.size,
-					       out.size);
+  Lisp_Object result = make_unibyte_string ((char *) out.data, out.size);
   gnutls_free (out.data);
   gnutls_x509_crt_deinit (crt);
 
@@ -2420,7 +2419,7 @@ gnutls_symmetric (bool encrypting, Lisp_Object cipher,
   /* GnuTLS docs: "For the supported ciphers the encrypted data length
      will equal the plaintext size."  */
   ptrdiff_t storage_length = iend_byte - istart_byte;
-  Lisp_Object storage = make_uninit_string (storage_length);
+  Lisp_Object storage = make_unibyte_string (NULL, storage_length);
 
   ret = ((encrypting ? gnutls_cipher_encrypt2 : gnutls_cipher_decrypt2)
 	 (hcipher, idata, iend_byte - istart_byte,
@@ -2645,7 +2644,7 @@ itself. */)
   if (idata == NULL)
     error ("GnuTLS MAC input extraction failed");
 
-  Lisp_Object digest = make_uninit_string (digest_length);
+  Lisp_Object digest = make_unibyte_string (NULL, digest_length);
 
   ret = gnutls_hmac (hmac, idata + istart_byte, iend_byte - istart_byte);
 
@@ -2724,7 +2723,7 @@ the number itself. */)
     error ("GnuTLS digest initialization failed: %s",
 	   emacs_gnutls_strerror (ret));
 
-  Lisp_Object digest = make_uninit_string (digest_length);
+  Lisp_Object digest = make_unibyte_string (NULL, digest_length);
 
   ptrdiff_t istart_byte, iend_byte;
   const char *idata

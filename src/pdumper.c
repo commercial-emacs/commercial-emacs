@@ -5169,7 +5169,7 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 	   in the startup, and we will crash at least on WINDOWSNT.  */
 	if (installation_state == UNKNOWN)
 	  {
-	    eln_fname = make_uninit_string (execdir_len + fn1_len);
+	    eln_fname = make_unibyte_string (NULL, execdir_len + fn1_len);
 	    fndata = SSDATA (eln_fname);
 	    memcpy (fndata, emacs_execdir, execdir_len);
 	    memcpy (fndata + execdir_len, SSDATA (cu_file1), fn1_len);
@@ -5177,7 +5177,7 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 	      installation_state = INSTALLED;
 	    else
 	      {
-		eln_fname = make_uninit_string (execdir_len + fn2_len);
+		eln_fname = make_unibyte_string (NULL, execdir_len + fn2_len);
 		fndata = SSDATA (eln_fname);
 		memcpy (fndata, emacs_execdir, execdir_len);
 		memcpy (fndata + execdir_len, SSDATA (cu_file2), fn2_len);
@@ -5191,7 +5191,7 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 	      installation_state == INSTALLED ? fn1_len : fn2_len;
 	    Lisp_Object cu_file =
 	      installation_state == INSTALLED ? cu_file1 : cu_file2;
-	    eln_fname = make_uninit_string (execdir_len + fn_len);
+	    eln_fname = make_unibyte_string (NULL, execdir_len + fn_len);
 	    fndata = SSDATA (eln_fname);
 	    memcpy (fndata, emacs_execdir, execdir_len);
 	    memcpy (fndata + execdir_len, SSDATA (cu_file), fn_len);

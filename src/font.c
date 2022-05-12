@@ -294,8 +294,9 @@ font_intern_prop (const char *str, ptrdiff_t len, bool force_symbol)
 		  (len == nchars || len != nbytes) ? len : nchars, len);
   if (SYMBOLP (tem))
     return tem;
-  name = make_specified_string (str, nchars, len,
-				len != nchars && len == nbytes);
+  name = (len != nchars && len == nbytes
+	  ? make_multibyte_string (str, nchars, len)
+	  : make_unibyte_string (str, len));
   return intern_driver (name, obarray, tem);
 }
 

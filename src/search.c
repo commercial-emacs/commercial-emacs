@@ -2737,8 +2737,7 @@ since only regular expressions have distinguished subexpressions.  */)
 	}
 
       if (really_changed)
-	newtext = make_specified_string ((const char *) substed, -1,
-					 substed_len, buf_multibyte);
+	newtext = make_specified_string ((char *) substed, substed_len, buf_multibyte);
       xfree (substed);
     }
 
@@ -3181,10 +3180,11 @@ DEFUN ("regexp-quote", Fregexp_quote, Sregexp_quote, 1, 1, 0,
 
   Lisp_Object result
     = (backslashes_added > 0
-       ? make_specified_string (temp,
-                                SCHARS (string) + backslashes_added,
-                                out - temp,
-                                STRING_MULTIBYTE (string))
+       ? (STRING_MULTIBYTE (string)
+	  ? make_multibyte_string (temp,
+				   SCHARS (string) + backslashes_added,
+				   out - temp)
+	  : make_unibyte_string (temp, out - temp))
        : string);
   SAFE_FREE ();
   return result;

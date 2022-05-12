@@ -3742,11 +3742,9 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 				     p - read_buffer);
 	    p = read_buffer + nchars;
 	  }
-
-	Lisp_Object result
-	  = make_specified_string (read_buffer, nchars, p - read_buffer,
-				   (force_multibyte
-				    || (p - read_buffer != nchars)));
+	Lisp_Object result = (force_multibyte || (nchars != p - read_buffer))
+	  ? make_multibyte_string (read_buffer, nchars, p - read_buffer)
+	  : make_unibyte_string (read_buffer, p - read_buffer);
 	return ANNOTATE (unbind_to (count, result));
       }
 
@@ -3835,9 +3833,9 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 	    if (! q_interned)
 	      {
 		Lisp_Object name
-		  = ((! NILP (Vloadup_pure_table)
-		      ? make_pure_string : make_specified_string)
-		     (read_buffer, nchars, nbytes, multibyte));
+		  = (NILP (Vloadup_pure_table)
+		     ? make_specified_string (read_buffer, nbytes, multibyte)
+		     : make_pure_string (read_buffer, nchars, nbytes, multibyte));
 		result = Fmake_symbol (name);
 	      }
 	    else
@@ -3868,16 +3866,18 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 		else if (longhand)
 		  {
 		    Lisp_Object name
-		      = make_specified_string (longhand, longhand_chars,
-					       longhand_bytes, multibyte);
+		      = (multibyte
+			 ? make_multibyte_string (longhand, longhand_chars, longhand_bytes)
+			 : make_unibyte_string (longhand, longhand_bytes));
 		    xfree (longhand);
 		    result = intern_driver (name, Vobarray, tem);
 		  }
 		else
 		  {
 		    Lisp_Object name
-		      = make_specified_string (read_buffer, nchars, nbytes,
-					       multibyte);
+		      = (multibyte
+			 ? make_multibyte_string (read_buffer, nchars, nbytes)
+			 : make_unibyte_string (read_buffer, nbytes));
 		    result = intern_driver (name, Vobarray, tem);
 		  }
 	      }
@@ -4471,8 +4471,9 @@ it defaults to the value of `obarray'.  */)
     {
       if (longhand)
 	{
-	  tem = intern_driver (make_specified_string (longhand, longhand_chars,
-						      longhand_bytes, true),
+	  eassert (longhand_chars >= 0);
+	  tem = intern_driver (make_multibyte_string
+			       (longhand, longhand_chars, longhand_bytes),
 			       obarray, tem);
 	  xfree (longhand);
 	}

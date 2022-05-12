@@ -151,9 +151,9 @@ bool print_output_debug_flag EXTERNALLY_VISIBLE = 1;
          specbind (Qprint_escape_nonascii, Qt);				\
        if (print_buffer != 0)						\
 	 {								\
-	   string = make_string_from_bytes (print_buffer,		\
-					    print_buffer_pos,		\
-					    print_buffer_pos_byte);	\
+	   string = make_multibyte_string (print_buffer,		\
+					   print_buffer_pos,		\
+					   print_buffer_pos_byte);	\
 	   record_unwind_protect (print_unwind, string);		\
 	 }								\
        else								\
@@ -474,7 +474,7 @@ print_string (Lisp_Object string, Lisp_Object printcharfun)
 	  bytes = count_size_as_multibyte (SDATA (string), chars);
 	  if (chars < bytes)
 	    {
-	      newstr = make_uninit_multibyte_string (chars, bytes);
+	      newstr = make_multibyte_string (NULL, chars, bytes);
 	      memcpy (SDATA (newstr), SDATA (string), chars);
 	      str_to_multibyte (SDATA (newstr), bytes, chars);
 	      string = newstr;

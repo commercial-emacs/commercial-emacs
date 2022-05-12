@@ -2317,7 +2317,7 @@ See `text-char-description' for describing character codes.  */)
       char tem[KEY_DESCRIPTION_SIZE];
       char *p = push_key_description (XFIXNUM (key), tem);
       *p = 0;
-      return make_specified_string (tem, -1, p - tem, 1);
+      return make_specified_string (tem, p - tem, 1);
     }
   else if (SYMBOLP (key))	/* Function key or event-symbol.  */
     {

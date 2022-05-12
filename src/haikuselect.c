@@ -296,7 +296,7 @@ haiku_message_to_lisp (void *message)
 	      break;
 
 	    default:
-	      t1 = make_uninit_string (buf_size);
+	      t1 = make_unibyte_string (NULL, buf_size);
 	      memcpy (SDATA (t1), buf, buf_size);
 	    }
 

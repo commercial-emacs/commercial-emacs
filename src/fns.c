@@ -687,8 +687,8 @@ the same empty object instead of its copy.  */)
       ptrdiff_t bytes = SBYTES (arg);
       ptrdiff_t chars = SCHARS (arg);
       Lisp_Object val = STRING_MULTIBYTE (arg)
-	? make_uninit_multibyte_string (chars, bytes)
-	: make_uninit_string (bytes);
+	? make_multibyte_string (NULL, chars, bytes)
+	: make_unibyte_string (NULL, bytes);
       memcpy (SDATA (val), SDATA (arg), bytes);
       INTERVAL ivs = string_intervals (arg);
       if (ivs)
@@ -832,8 +832,8 @@ concat_strings (ptrdiff_t nargs, Lisp_Object *args)
 
   /* Create the output object.  */
   Lisp_Object result = dest_multibyte
-    ? make_uninit_multibyte_string (result_len, result_len_byte)
-    : make_uninit_string (result_len);
+    ? make_multibyte_string (NULL, result_len, result_len_byte)
+    : make_unibyte_string (NULL, result_len);
 
   /* Copy the contents of the args into the result.  */
   ptrdiff_t toindex = 0;
@@ -1336,7 +1336,7 @@ If you're not sure, whether to use `string-as-multibyte' or
       parse_str_as_multibyte (SDATA (string),
 			      SBYTES (string),
 			      &nchars, &nbytes);
-      new_string = make_uninit_multibyte_string (nchars, nbytes);
+      new_string = make_multibyte_string (NULL, nchars, nbytes);
       memcpy (SDATA (new_string), SDATA (string), SBYTES (string));
       if (nbytes != SBYTES (string))
 	str_as_multibyte (SDATA (new_string), nbytes,
@@ -1482,9 +1482,11 @@ With one argument, just copy STRING (with properties, if any).  */)
 	= !ifrom ? 0 : string_char_to_byte (string, ifrom);
       ptrdiff_t to_byte
 	= ito == size ? SBYTES (string) : string_char_to_byte (string, ito);
-      res = make_specified_string (SSDATA (string) + from_byte,
-				   ito - ifrom, to_byte - from_byte,
-				   STRING_MULTIBYTE (string));
+
+      res = STRING_MULTIBYTE (string)
+	? make_multibyte_string (SSDATA (string) + from_byte,
+				 ito - ifrom, to_byte - from_byte)
+	: make_unibyte_string (SSDATA (string) + from_byte, to_byte - from_byte);
       copy_text_properties (make_fixnum (ifrom), make_fixnum (ito),
 			    string, make_fixnum (0), res, Qnil);
     }
@@ -1515,9 +1517,10 @@ With one argument, just copy STRING without its properties.  */)
   from_byte = !from_char ? 0 : string_char_to_byte (string, from_char);
   to_byte =
     to_char == size ? SBYTES (string) : string_char_to_byte (string, to_char);
-  return make_specified_string (SSDATA (string) + from_byte,
-				to_char - from_char, to_byte - from_byte,
-				STRING_MULTIBYTE (string));
+  return STRING_MULTIBYTE (string)
+    ? make_multibyte_string (SSDATA (string) + from_byte,
+			     to_char - from_char, to_byte - from_byte)
+    : make_unibyte_string (SSDATA (string) + from_byte, to_byte - from_byte);
 }
 
 /* Extract a substring of STRING, giving start and end positions
@@ -1535,9 +1538,10 @@ substring_both (Lisp_Object string, ptrdiff_t from, ptrdiff_t from_byte,
 
   if (STRINGP (string))
     {
-      res = make_specified_string (SSDATA (string) + from_byte,
-				   to - from, to_byte - from_byte,
-				   STRING_MULTIBYTE (string));
+      res = STRING_MULTIBYTE (string)
+	? make_multibyte_string (SSDATA (string) + from_byte,
+				 to - from, to_byte - from_byte)
+	: make_unibyte_string (SSDATA (string) + from_byte, to_byte - from_byte);
       copy_text_properties (make_fixnum (from), make_fixnum (to),
 			    string, make_fixnum (0), res, Qnil);
     }
@@ -1952,7 +1956,7 @@ does not modify the argument.  */)
 	{
 	  Lisp_Object tem;
 
-	  tem = make_uninit_multibyte_string (nchars, nbytes);
+	  tem = make_multibyte_string (NULL, nchars, nbytes);
 	  if (!STRING_MULTIBYTE (seq))
 	    STRING_SET_UNIBYTE (tem);
 
@@ -2105,7 +2109,7 @@ See also the function `nreverse', which is used more often.  */)
 	{
 	  ptrdiff_t i;
 
-	  new = make_uninit_string (size);
+	  new = make_unibyte_string (NULL, size);
 	  for (i = 0; i < size; i++)
 	    SSET (new, i, SREF (seq, size - i - 1));
 	}
@@ -2113,7 +2117,7 @@ See also the function `nreverse', which is used more often.  */)
 	{
 	  unsigned char *p, *q;
 
-	  new = make_uninit_multibyte_string (size, bytes);
+	  new = make_multibyte_string (NULL, size, bytes);
 	  p = SDATA (seq), q = SDATA (new) + bytes;
 	  while (q > SDATA (new))
 	    {
@@ -5452,7 +5456,7 @@ extract_data_from_object (Lisp_Object spec,
       else
         {
 	  EMACS_INT start_hold = XFIXNAT (start);
-          object = make_uninit_string (start_hold);
+          object = make_unibyte_string (NULL, start_hold);
 	  char *lim = SSDATA (object) + start_hold;
 	  for (char *p = SSDATA (object); p < lim; p++)
 	    {
@@ -5531,7 +5535,7 @@ secure_hash (Lisp_Object algorithm, Lisp_Object object, Lisp_Object start,
 
   /* allocate 2 x digest_size so that it can be re-used to hold the
      hexified value */
-  digest = make_uninit_string (digest_size * 2);
+  digest = make_unibyte_string (NULL, digest_size * 2);
 
   hash_func (input + start_byte,
 	     end_byte - start_byte,
@@ -5644,7 +5648,7 @@ It should not be used for anything security-related.  See
 			BUF_Z_ADDR (b) - BUF_GAP_END_ADDR (b),
 			&ctx);
 
-  Lisp_Object digest = make_uninit_string (SHA1_DIGEST_SIZE * 2);
+  Lisp_Object digest = make_unibyte_string (NULL, SHA1_DIGEST_SIZE * 2);
   sha1_finish_ctx (&ctx, SSDATA (digest));
   return make_digest_string (digest, SHA1_DIGEST_SIZE);
 }

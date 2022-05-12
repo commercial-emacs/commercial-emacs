@@ -417,16 +417,14 @@ file_name_directory (Lisp_Object filename)
 	  beg = res;
 	  p = beg + strlen (beg);
 	  dostounix_filename (beg);
-	  tem_fn = make_specified_string (beg, -1, p - beg,
-					  STRING_MULTIBYTE (filename));
+	  tem_fn = make_specified_string (beg, p - beg, STRING_MULTIBYTE (filename));
 	}
       else
-	tem_fn = make_specified_string (beg - 2, -1, p - beg + 2,
-					STRING_MULTIBYTE (filename));
+	tem_fn = make_specified_string (beg - 2, p - beg + 2, STRING_MULTIBYTE (filename));
     }
   else if (STRING_MULTIBYTE (filename))
     {
-      tem_fn = make_specified_string (beg, -1, p - beg, 1);
+      tem_fn = make_specified_string (beg, p - beg, 1);
       dostounix_filename (SSDATA (tem_fn));
 #ifdef WINDOWSNT
       if (!NILP (Vw32_downcase_file_names))
@@ -436,12 +434,12 @@ file_name_directory (Lisp_Object filename)
   else
     {
       dostounix_filename (beg);
-      tem_fn = make_specified_string (beg, -1, p - beg, 0);
+      tem_fn = make_specified_string (beg, p - beg, 0);
     }
   SAFE_FREE ();
   return tem_fn;
 #else  /* DOS_NT */
-  return make_specified_string (beg, -1, p - beg, STRING_MULTIBYTE (filename));
+  return make_specified_string (beg, p - beg, STRING_MULTIBYTE (filename));
 #endif	/* DOS_NT */
 }
 
@@ -483,7 +481,7 @@ or the entire name if it contains no slash.  */)
 	 )
     p--;
 
-  return make_specified_string (p, -1, end - p, STRING_MULTIBYTE (filename));
+  return make_specified_string (p, end - p, STRING_MULTIBYTE (filename));
 }
 
 DEFUN ("unhandled-file-name-directory", Funhandled_file_name_directory,
@@ -582,7 +580,7 @@ is already present.  */)
   buf = SAFE_ALLOCA (SBYTES (file) + file_name_as_directory_slop + 1);
   length = file_name_as_directory (buf, SSDATA (file), SBYTES (file),
 				   STRING_MULTIBYTE (file));
-  val = make_specified_string (buf, -1, length, STRING_MULTIBYTE (file));
+  val = make_specified_string (buf, length, STRING_MULTIBYTE (file));
   SAFE_FREE ();
   return val;
 }
@@ -673,7 +671,7 @@ In Unix-syntax, this function just removes the final slash.  */)
   buf = SAFE_ALLOCA (SBYTES (directory) + 1);
   length = directory_file_name (buf, SSDATA (directory), SBYTES (directory),
 				STRING_MULTIBYTE (directory));
-  val = make_specified_string (buf, -1, length, STRING_MULTIBYTE (directory));
+  val = make_specified_string (buf, length, STRING_MULTIBYTE (directory));
   SAFE_FREE ();
   return val;
 }
@@ -703,7 +701,7 @@ This function does not grok magic file names.  */)
   if (INT_MAX < suffix_len)
     args_out_of_range (prefix, suffix);
   int nX = 6;
-  Lisp_Object val = make_uninit_string (prefix_len + nX + suffix_len);
+  Lisp_Object val = make_unibyte_string (NULL, prefix_len + nX + suffix_len);
   char *data = SSDATA (val);
   memcpy (data, SSDATA (encoded_prefix), prefix_len);
   memset (data + prefix_len, 'X', nX);
@@ -838,9 +836,9 @@ usage: (record DIRECTORY &rest COMPONENTS) */)
 
   /* Allocate an empty string. */
   if (multibytes == 0)
-    result = make_uninit_string (chars);
+    result = make_unibyte_string (NULL, chars);
   else
-    result = make_uninit_multibyte_string (chars, bytes);
+    result = make_multibyte_string (NULL, chars, bytes);
   /* Null-terminate the string. */
   *(SSDATA (result) + SBYTES (result)) = 0;
 
@@ -1250,14 +1248,14 @@ the root directory.  */)
 	  if (IS_DIRECTORY_SEP (nm[1]))
 	    {
 	      if (strcmp (nm, SSDATA (name)) != 0)
-		name = make_specified_string (nm, -1, nmlim - nm, multibyte);
+		name = make_specified_string (nm, nmlim - nm, multibyte);
 	    }
 	  else
 #endif
 	  /* Drive must be set, so this is okay.  */
 	  if (strcmp (nm - 2, SSDATA (name)) != 0)
 	    {
-	      name = make_specified_string (nm, -1, p - nm, multibyte);
+	      name = make_specified_string (nm, p - nm, multibyte);
 	      char temp[] = { DRIVE_LETTER (drive), ':', 0 };
 	      AUTO_STRING_WITH_LEN (drive_prefix, temp, 2);
 	      name = concat2 (drive_prefix, name);
@@ -1268,7 +1266,7 @@ the root directory.  */)
 #endif
 #else /* not DOS_NT */
 	  if (strcmp (nm, SSDATA (name)) != 0)
-	    name = make_specified_string (nm, -1, nmlim - nm, multibyte);
+	    name = make_specified_string (nm, nmlim - nm, multibyte);
 #endif /* not DOS_NT */
 	  SAFE_FREE ();
 	  return name;
@@ -1637,14 +1635,14 @@ the root directory.  */)
 	target[0] = '/';
 	target[1] = ':';
       }
-    result = make_specified_string (target, -1, o - target, multibyte);
+    result = make_specified_string (target, o - target, multibyte);
     dostounix_filename (SSDATA (result));
 #ifdef WINDOWSNT
     if (!NILP (Vw32_downcase_file_names))
       result = Fdowncase (result);
 #endif
 #else  /* !DOS_NT */
-    result = make_specified_string (target, -1, o - target, multibyte);
+    result = make_specified_string (target, o - target, multibyte);
 #endif /* !DOS_NT */
   }
 
@@ -2000,7 +1998,7 @@ those `/' is discarded.  */)
     {
       Lisp_Object result
 	= (Fsubstitute_in_file_name
-	   (make_specified_string (p, -1, endp - p, multibyte)));
+	   (make_specified_string (p, endp - p, multibyte)));
       SAFE_FREE ();
       return result;
     }
@@ -2011,7 +2009,7 @@ those `/' is discarded.  */)
     {
       Lisp_Object name
 	= (!substituted ? filename
-	   : make_specified_string (nm, -1, endp - nm, multibyte));
+	   : make_specified_string (nm, endp - nm, multibyte));
       Lisp_Object tmp = call1 (Qsubstitute_env_in_file_name, name);
       CHECK_STRING (tmp);
       if (!EQ (tmp, name))
@@ -2042,14 +2040,13 @@ those `/' is discarded.  */)
 #ifdef WINDOWSNT
   if (!NILP (Vw32_downcase_file_names))
     {
-      Lisp_Object xname = make_specified_string (xnm, -1, x - xnm, multibyte);
-
+      Lisp_Object xname = make_specified_string (xnm, x - xnm, multibyte);
       filename = Fdowncase (xname);
     }
   else
 #endif
   if (xnm != SSDATA (filename))
-    filename = make_specified_string (xnm, -1, x - xnm, multibyte);
+    filename = make_specified_string (xnm, x - xnm, multibyte);
   SAFE_FREE ();
   return filename;
 }

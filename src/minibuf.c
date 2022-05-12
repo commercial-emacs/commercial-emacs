@@ -1524,9 +1524,7 @@ function, instead of the usual behavior.  */)
 		len = len - 2;
 	      else if (len >= 1 && (s[len - 1] == ':' || s[len - 1] == ' '))
 		len--;
-
-	      prompt = make_specified_string (s, -1, len,
-					      STRING_MULTIBYTE (prompt));
+	      prompt = make_specified_string (s, len, STRING_MULTIBYTE (prompt));
 	    }
 
 	  prompt = CALLN (Ffuncall, intern("format-prompt"),

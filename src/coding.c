@@ -2879,7 +2879,7 @@ setup_iso_safe_charsets (Lisp_Object attrs)
 	max_charset_id = id;
     }
 
-  safe_charsets = make_uninit_string (max_charset_id + 1);
+  safe_charsets = make_unibyte_string (NULL, max_charset_id + 1);
   memset (SDATA (safe_charsets), 255, max_charset_id + 1);
   request = AREF (attrs, coding_attr_iso_request);
   reg_usage = AREF (attrs, coding_attr_iso_usage);
@@ -5816,7 +5816,7 @@ setup_coding_system (Lisp_Object coding_system, struct coding_system *coding)
 	       tail = XCDR (tail))
 	    if (max_charset_id < XFIXNAT (XCAR (tail)))
 	      max_charset_id = XFIXNAT (XCAR (tail));
-	  safe_charsets = make_uninit_string (max_charset_id + 1);
+	  safe_charsets = make_unibyte_string (NULL, max_charset_id + 1);
 	  memset (SDATA (safe_charsets), 255, max_charset_id + 1);
 	  for (tail = Vemacs_mule_charset_list; CONSP (tail);
 	       tail = XCDR (tail))
@@ -6346,30 +6346,7 @@ utf8_string_p (Lisp_Object string)
 Lisp_Object
 make_string_from_utf8 (const char *text, ptrdiff_t nbytes)
 {
-#if 0
-  /* This method is on average 2 times slower than if we use
-     decode_string_utf_8.  However, please leave the slower
-     implementation in the code for now, in case it needs to be reused
-     in some situations.  */
-  ptrdiff_t chars, bytes;
-  parse_str_as_multibyte ((const unsigned char *) text, nbytes,
-			  &chars, &bytes);
-  /* If TEXT is a valid UTF-8 string, we can convert it to a Lisp
-     string directly.  Otherwise, we need to decode it.  */
-  if (chars == nbytes || bytes == nbytes)
-    return make_specified_string (text, chars, nbytes, true);
-  else
-    {
-      struct coding_system coding;
-      setup_coding_system (Qutf_8_unix, &coding);
-      coding.mode |= CODING_MODE_LAST_BLOCK;
-      coding.source = (const unsigned char *) text;
-      decode_coding_object (&coding, Qnil, 0, 0, nbytes, nbytes, Qt);
-      return coding.dst_object;
-    }
-#else
   return decode_string_utf_8 (Qnil, text, nbytes, Qnil, false, Qt, Qt);
-#endif
 }
 
 /* Detect how end-of-line of a text of length SRC_BYTES pointed by
@@ -8528,7 +8505,7 @@ to_unicode (Lisp_Object str, Lisp_Object *buf)
      terminated by two zero bytes and one utf-16le null character.
      Because strings are already terminated with a single zero byte,
      we just add one additional zero. */
-  str = make_uninit_string (SBYTES (*buf) + 1);
+  str = make_unibyte_string (NULL, SBYTES (*buf) + 1);
   memcpy (SDATA (str), SDATA (*buf), SBYTES (*buf));
   SDATA (str) [SBYTES (*buf)] = '\0';
   *buf = str;
@@ -9905,7 +9882,7 @@ encode_string_utf_8 (Lisp_Object string, Lisp_Object buffer,
 	    {
 	      if (nocopy && (num_8_bit + num_over_4 + num_over_5) == 0)
 		return string;
-	      val = make_uninit_string (outbytes);
+	      val = make_unibyte_string (NULL, outbytes);
 	      dst = SDATA (val);
 	    }
 	  p = src = SDATA (string);
@@ -10079,7 +10056,7 @@ decode_string_utf_8 (Lisp_Object string, const char *str, ptrdiff_t str_len,
     {
       if (nocopy && STRINGP (string))
 	return string;
-      val = make_uninit_multibyte_string (outchars, outbytes);
+      val = make_multibyte_string (NULL, outchars, outbytes);
       memcpy (SDATA (val), str_orig, pend - str_orig);
       return val;
     }
@@ -10154,7 +10131,7 @@ decode_string_utf_8 (Lisp_Object string, const char *str, ptrdiff_t str_len,
       if (nocopy && (num_8_bit + num_over_4 + num_over_5) == 0
 	  && STRINGP (string))
 	return string;
-      val = make_uninit_multibyte_string (outchars, outbytes);
+      val = make_multibyte_string (NULL, outchars, outbytes);
       dst = SDATA (val);
     }
 
@@ -11005,7 +10982,7 @@ usage: (define-coding-system-internal ...)  */)
     }
   ASET (attrs, coding_attr_charset_list, charset_list);
 
-  Lisp_Object safe_charsets = make_uninit_string (max_charset_id + 1);
+  Lisp_Object safe_charsets = make_unibyte_string (NULL, max_charset_id + 1);
   memset (SDATA (safe_charsets), 255, max_charset_id + 1);
   for (Lisp_Object tail = charset_list; CONSP (tail); tail = XCDR (tail))
     SSET (safe_charsets, XFIXNAT (XCAR (tail)), 0);

@@ -2227,8 +2227,10 @@ usage: (ccl-execute-on-string CCL-PROGRAM STATUS STRING &optional CONTINUE UNIBY
     ASET (status, i, make_int (ccl.reg[i]));
   ASET (status, 8, make_int (ccl.ic));
 
-  val = make_specified_string ((const char *) outbuf, produced_chars,
-			       outp - outbuf, NILP (unibyte_p));
+  val = (NILP (unibyte_p)
+	 ? make_multibyte_string ((const char *) outbuf, produced_chars, outp - outbuf)
+	 : make_unibyte_string ((const char *) outbuf, outp - outbuf));
+
   xfree (outbuf);
 
   return val;

@@ -9062,9 +9062,9 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
           ptrdiff_t range = BUF_ZV (curbuf) - BUF_BEGV (curbuf);
 
           if (! NILP (BVAR (curbuf, enable_multibyte_characters)))
-            str = make_uninit_multibyte_string (range, byte_range);
+            str = make_multibyte_string (NULL, range, byte_range);
           else
-            str = make_uninit_string (range);
+            str = make_unibyte_string (NULL, range);
           /* To check: This returns emacs-utf-8, which is a superset of utf-8.
              Is this a problem?  */
           memcpy (SDATA (str), BYTE_POS_ADDR (start_byte), byte_range);

@@ -277,9 +277,9 @@ Invalid data in documentation file -- %c followed by code %03o",
 	= multibyte_chars_in_text (((unsigned char *) get_doc_string_buffer
 				    + offset),
 				   to - (get_doc_string_buffer + offset));
-      return make_string_from_bytes (get_doc_string_buffer + offset,
-				     nchars,
-				     to - (get_doc_string_buffer + offset));
+      return make_multibyte_string (get_doc_string_buffer + offset,
+				    nchars,
+				    to - (get_doc_string_buffer + offset));
     }
 }
 

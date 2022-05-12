@@ -138,7 +138,7 @@ static Lisp_Object
 cfdata_to_lisp (CFDataRef data)
 {
   CFIndex len = CFDataGetLength (data);
-  Lisp_Object result = make_uninit_string (len);
+  Lisp_Object result = make_unibyte_string (NULL, len);
 
   CFDataGetBytes (data, CFRangeMake (0, len), SDATA (result));
 
