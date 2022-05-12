@@ -1313,17 +1313,16 @@ allocate_string_data (struct Lisp_String *s,
 {
   sdata *data;
   struct sblock *b;
+  ptrdiff_t sdata_nbytes;
 
-  if (STRING_BYTES_MAX < nbytes)
-    string_overflow ();
+  if (nbytes > STRING_BYTES_MAX)
+    error ("Requested %ld bytes exceeds %ld", nbytes, STRING_BYTES_MAX);
 
-  /* Determine the number of bytes needed to store NBYTES bytes
-     of string data.  */
-  ptrdiff_t needed = sdata_size (nbytes);
+  sdata_nbytes = sdata_size (nbytes);
 
   if (nbytes > LARGE_STRING_THRESH || immovable)
     {
-      size_t size = FLEXSIZEOF (struct sblock, data, needed);
+      size_t size = FLEXSIZEOF (struct sblock, data, sdata_nbytes);
       b = lisp_malloc (size + GC_STRING_EXTRA, q_clear, MEM_TYPE_NON_LISP);
       data = b->data;
       b->next = large_sblocks;
@@ -1336,7 +1335,7 @@ allocate_string_data (struct Lisp_String *s,
 
       if (b == NULL
 	  || (SBLOCK_NBYTES - GC_STRING_EXTRA
-	      < (char *) b->next_free - (char *) b + needed))
+	      < (char *) b->next_free - (char *) b + sdata_nbytes))
 	{
 	  /* Not enough room in the current sblock.  */
 	  b = lisp_malloc (SBLOCK_NBYTES, false, MEM_TYPE_NON_LISP);
@@ -1357,7 +1356,7 @@ allocate_string_data (struct Lisp_String *s,
     }
 
   data->string = s;
-  b->next_free = (sdata *) ((char *) data + needed + GC_STRING_EXTRA);
+  b->next_free = (sdata *) ((char *) data + sdata_nbytes + GC_STRING_EXTRA);
   eassert ((uintptr_t) b->next_free % alignof (sdata) == 0);
 
   s->u.s.data = SDATA_DATA (data);
@@ -1368,11 +1367,11 @@ allocate_string_data (struct Lisp_String *s,
   s->u.s.size_byte = nbytes;
   s->u.s.data[nbytes] = '\0';
 #ifdef GC_CHECK_STRING_OVERRUN
-  memcpy ((char *) data + needed, string_overrun_cookie,
+  memcpy ((char *) data + sdata_nbytes, string_overrun_cookie,
 	  GC_STRING_OVERRUN_COOKIE_SIZE);
 #endif
 
-  bytes_since_gc += needed;
+  bytes_since_gc += sdata_nbytes;
 }
 
 /* Reallocate multibyte STRING data when a single character is replaced.
@@ -1645,15 +1644,6 @@ compact_small_strings (void)
   current_sblock = tb;
 }
 
-void
-string_overflow (void)
-{
-  error ("Maximum string size exceeded");
-}
-
-static Lisp_Object make_clear_string (EMACS_INT, bool);
-static Lisp_Object make_clear_multibyte_string (EMACS_INT, EMACS_INT, bool);
-
 DEFUN ("make-string", Fmake_string, Smake_string, 2, 3, 0,
        doc: /* Return a newly created string of length LENGTH, with INIT in each element.
 LENGTH must be an integer.
@@ -1688,9 +1678,10 @@ a multibyte string even if INIT is an ASCII character.  */)
       EMACS_INT string_len = XFIXNUM (length);
 
       if (INT_MULTIPLY_WRAPV (len, string_len, &nbytes))
-	string_overflow ();
+	error ("Product of %ld * %ld overflows", len, string_len);
+
       val = make_clear_multibyte_string (string_len, nbytes, q_clear);
-      if (!q_clear)
+      if (! q_clear)
 	{
 	  unsigned char *beg = SDATA (val), *end = beg + nbytes;
 	  for (unsigned char *p = beg; p < end; p += len)
@@ -1875,12 +1866,12 @@ make_specified_string (const char *contents,
    occupying LENGTH bytes.  If Q_CLEAR, clear its contents to null
    bytes; otherwise, the contents are uninitialized.  */
 
-static Lisp_Object
+Lisp_Object
 make_clear_string (EMACS_INT length, bool q_clear)
 {
   Lisp_Object val;
 
-  if (!length)
+  if (! length)
     return empty_unibyte_string;
   val = make_clear_multibyte_string (length, length, q_clear);
   STRING_SET_UNIBYTE (val);
@@ -1900,7 +1891,7 @@ make_uninit_string (EMACS_INT length)
    which occupy NBYTES bytes.  If Q_CLEAR, clear its contents to null
    bytes; otherwise, the contents are uninitialized.  */
 
-static Lisp_Object
+Lisp_Object
 make_clear_multibyte_string (EMACS_INT nchars, EMACS_INT nbytes, bool q_clear)
 {
   Lisp_Object string;
@@ -1908,7 +1899,7 @@ make_clear_multibyte_string (EMACS_INT nchars, EMACS_INT nbytes, bool q_clear)
 
   if (nchars < 0)
     emacs_abort ();
-  if (!nbytes)
+  if (! nbytes)
     return empty_multibyte_string;
 
   s = allocate_string ();
@@ -2613,7 +2604,7 @@ allocate_vectorlike (ptrdiff_t len, bool q_clear)
     return XVECTOR (zero_vector);
 
   if (len > VECTOR_ELTS_MAX)
-    memory_full (SIZE_MAX);
+    error ("Requested %ld > %ld vector elements", len, VECTOR_ELTS_MAX);
 
   if (nbytes > LARGE_VECTOR_THRESH)
     {
