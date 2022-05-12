@@ -256,6 +256,12 @@ startup.  Previously, these functions ignored
 
 * Changes in Emacs 29.1
 
++++
+*** New user option 'switch-to-prev-buffer-skip-regexp'.
+This should be a regexp or a list of regexps, and buffers with names
+matching this will be ignored by 'switch-to-prev-buffer' and
+'switch-to-next-buffer'.
+
 ** Menus
 
 ---
@@ -799,7 +805,7 @@ the run/continue command.
 ** Customize
 
 ---
-*** New command 'custom-toggle-hide-all-variables'.
+*** New command 'custom-toggle-hide-all-widgets'.
 This is bound to 'H' and toggles whether to hide or show the widget
 contents.
 
