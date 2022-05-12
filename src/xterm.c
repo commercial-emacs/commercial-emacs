@@ -5318,7 +5318,6 @@ x_set_frame_alpha (struct frame *f)
 #else
   xcb_get_property_cookie_t opacity_cookie;
   xcb_get_property_reply_t *opacity_reply;
-  xcb_generic_error_t *error;
 #endif
 
   if (dpyinfo->highlight_frame == f)
@@ -5393,20 +5392,18 @@ x_set_frame_alpha (struct frame *f)
 			  (xcb_atom_t) dpyinfo->Xatom_net_wm_window_opacity,
 			  XCB_ATOM_CARDINAL, 0, 1);
     opacity_reply
-      = xcb_get_property_reply (dpyinfo->xcb_connection,
-				opacity_cookie, &error);
-    if (! opacity_reply)
-      free (error);
-    else if (opacity_reply->format == 32
-	     && opacity_reply->type == XCB_ATOM_CARDINAL
-	     && (xcb_get_property_value_length (opacity_reply) >= 4)
-	     && opac == *(uint32_t *) xcb_get_property_value (opacity_reply))
+      = xcb_get_property_reply (dpyinfo->xcb_connection, opacity_cookie, NULL);
+    if (opacity_reply)
       {
+	bool opaque_p =
+	  (opacity_reply->format == 32
+	   && opacity_reply->type == XCB_ATOM_CARDINAL
+	   && (xcb_get_property_value_length (opacity_reply) >= 4)
+	   && opac == *(uint32_t *) xcb_get_property_value (opacity_reply));
 	free (opacity_reply);
-	return;
+	if (opaque_p)
+	  return;
       }
-    else
-      free (opacity_reply);
 #endif
   }
 
