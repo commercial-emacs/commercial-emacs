@@ -49,6 +49,7 @@ static void *
 bump_alloc_ptr (gc_semispace *space, size_t nbytes)
 {
   void *retval;
+  eassert (nbytes > word_size);
   space->words_used += nbytes / word_size;
   if (space->words_used > space->words_total)
     realloc_semispace (space);
@@ -98,6 +99,34 @@ usage: (vector &rest OBJECTS)  */)
   memcpy (p->contents, args, nargs * sizeof *args);
 
   return val;
+}
+
+static void
+restore_string_allocator (void *ptr)
+{
+  static_string_allocator = ptr;
+}
+
+static struct Lisp_String *
+allocate_string (void)
+{
+  struct Lisp_String *s =
+    bump_alloc_ptr (space_in_use, sizeof (struct Lisp_String));
+  ++strings_consed;
+  bytes_since_gc += sizeof *s;
+  return s;
+}
+
+DEFUN ("cmake-string", Fcmake_string, Scmake_string, 2, 3, 0,
+       doc: /* Return a newly created string of LENGTH instances of
+INIT, an integer representing a character, e.g., ?x.  The return value
+is unibyte unless INIT is not ASCII or MULTIBYTE is non-nil.  */)
+  (Lisp_Object length, Lisp_Object init, Lisp_Object multibyte)
+{
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (restore_string_allocator, static_string_allocator);
+  static_string_allocator = &allocate_string;
+  return unbind_to (count, Fmake_string (length, init, multibyte));
 }
 
 DEFUN ("cmake-byte-code", Fcmake_byte_code, Scmake_byte_code, 4, MANY, 0,
@@ -290,6 +319,7 @@ syms_of_calloc (void)
 
   defsubr (&Sccons);
   defsubr (&Scvector);
+  defsubr (&Scmake_string);
   defsubr (&Scmake_byte_code);
   defsubr (&Scmake_bool_vector);
   defsubr (&Scbool_vector);

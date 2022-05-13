@@ -69,6 +69,7 @@ enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 #define XVECTOR_MARKED_P(V)	(((V)->header.size & ARRAY_MARK_FLAG) != 0)
 
 static bool gc_inhibited;
+struct Lisp_String *(*static_string_allocator) (void);
 
 #ifdef HAVE_PDUMPER
 /* Number of finalizers run: used to loop over GC until we stop
@@ -1830,7 +1831,7 @@ new_lisp_string (EMACS_INT nchars, EMACS_INT nbytes, bool multibyte)
   if (nbytes == 0)
     return multibyte ? empty_multibyte_string : empty_unibyte_string;
 
-  s = allocate_string ();
+  s = static_string_allocator ();
   s->u.s.intervals = NULL;
   allocate_string_data (s, nchars, nbytes, false);
   XSETSTRING (string, s);
@@ -6450,6 +6451,7 @@ init_runtime (void)
 {
   purebeg = PUREBEG;
   pure_size = PURESIZE;
+  static_string_allocator = &allocate_string;
   mem_init ();
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);

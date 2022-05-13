@@ -150,6 +150,8 @@ typedef union {
   GCALIGNED_UNION_MEMBER
 } Lisp_Aligned;
 
+extern struct Lisp_String *(*static_string_allocator) (void);
+
 enum { LISP_ALIGNMENT = alignof (Lisp_Aligned) };
 
 struct mem_node *mem_find (void *start);
