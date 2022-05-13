@@ -1061,6 +1061,9 @@ AS_IF([test $gl_gcc_warnings = no],
   # option problematic.
   nw="$nw -Wsuggest-attribute=pure"
 
+  # Emacs doesn't need this paranoia.
+  nw="$nw -Wbidi-chars=any,ucn"
+
   if test "$emacs_cv_clang" = yes; then
     nw="$nw -Wdouble-promotion"
   fi
@@ -1082,6 +1085,7 @@ AS_IF([test $gl_gcc_warnings = no],
   gl_WARN_ADD([-Wno-type-limits])      # Too many warnings for now
   gl_WARN_ADD([-Wno-unused-parameter]) # Too many warnings for now
   gl_WARN_ADD([-Wno-format-nonliteral])
+  gl_WARN_ADD([-Wno-bidi-chars])
 
   # clang is unduly picky about some things.
   if test "$emacs_cv_clang" = yes; then
