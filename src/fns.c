@@ -713,7 +713,7 @@ the same empty object instead of its copy.  */)
     {
       EMACS_INT nbits = bool_vector_size (arg);
       ptrdiff_t nbytes = bool_vector_bytes (nbits);
-      Lisp_Object val = make_uninit_bool_vector (nbits);
+      Lisp_Object val = make_bool_vector (nbits);
       memcpy (bool_vector_data (val), bool_vector_data (arg), nbytes);
       return val;
     }
@@ -954,7 +954,7 @@ concat (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail,
 
   /* Create the output object.  */
   Lisp_Object result = vector_target
-    ? make_nil_vector (result_len)
+    ? initialize_vector (result_len, Qnil)
     : Fmake_list (make_fixnum (result_len), Qnil);
 
   /* Copy the contents of the args into the result.  */
@@ -2088,7 +2088,7 @@ See also the function `nreverse', which is used more often.  */)
     {
       ptrdiff_t i, size = ASIZE (seq);
 
-      new = make_uninit_vector (size);
+      new = make_vector (size);
       for (i = 0; i < size; i++)
 	ASET (new, i, AREF (seq, size - i - 1));
     }
@@ -2097,7 +2097,7 @@ See also the function `nreverse', which is used more often.  */)
       ptrdiff_t i;
       EMACS_INT nbits = bool_vector_size (seq);
 
-      new = make_uninit_bool_vector (nbits);
+      new = make_bool_vector (nbits);
       for (i = 0; i < nbits; i++)
 	bool_vector_set (new, i, bool_vector_bitref (seq, nbits - i - 1));
     }
@@ -3293,7 +3293,7 @@ The data read from the system are decoded using `locale-coding-system'.  */)
 # ifdef DAY_1
   if (EQ (item, Qdays))  /* E.g., for calendar-day-name-array.  */
     {
-      Lisp_Object v = make_nil_vector (7);
+      Lisp_Object v = initialize_vector (7, Qnil);
       const int days[7] = {DAY_1, DAY_2, DAY_3, DAY_4, DAY_5, DAY_6, DAY_7};
       int i;
       synchronize_system_time_locale ();
@@ -3312,7 +3312,7 @@ The data read from the system are decoded using `locale-coding-system'.  */)
 # ifdef MON_1
   if (EQ (item, Qmonths))  /* E.g., for calendar-month-name-array.  */
     {
-      Lisp_Object v = make_nil_vector (12);
+      Lisp_Object v = initialize_vector (12, Qnil);
       const int months[12] = {MON_1, MON_2, MON_3, MON_4, MON_5, MON_6, MON_7,
 			      MON_8, MON_9, MON_10, MON_11, MON_12};
       synchronize_system_time_locale ();
@@ -4285,10 +4285,10 @@ make_hash_table (struct hash_table_test test, EMACS_INT size,
   h->rehash_threshold = rehash_threshold;
   h->rehash_size = rehash_size;
   h->count = 0;
-  h->key_and_value = make_vector (2 * size, Qunbound);
-  h->hash = make_nil_vector (size);
-  h->next = make_vector (size, make_fixnum (-1));
-  h->index = make_vector (hash_index_size (h, size), make_fixnum (-1));
+  h->key_and_value = initialize_vector (2 * size, Qunbound);
+  h->hash = initialize_vector (size, Qnil);
+  h->next = initialize_vector (size, make_fixnum (-1));
+  h->index = initialize_vector (hash_index_size (h, size), make_fixnum (-1));
   h->next_weak = NULL;
   h->purecopy = purecopy;
   h->mutable = true;
@@ -4376,7 +4376,7 @@ maybe_resize_hash_table (struct Lisp_Hash_Table *h)
       Lisp_Object hash = larger_vector (h->hash, next_size - old_size,
 					next_size);
       ptrdiff_t index_size = hash_index_size (h, next_size);
-      h->index = make_vector (index_size, make_fixnum (-1));
+      h->index = initialize_vector (index_size, make_fixnum (-1));
       h->key_and_value = key_and_value;
       h->hash = hash;
       h->next = next;

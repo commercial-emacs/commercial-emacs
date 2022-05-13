@@ -70,7 +70,7 @@ make_log (void)
      with the vectors we'll use as keys.  */
   ptrdiff_t i = ASIZE (h->key_and_value) >> 1;
   while (i > 0)
-    set_hash_value_slot (h, --i, make_nil_vector (max_stack_depth));
+    set_hash_value_slot (h, --i, initialize_vector (max_stack_depth, Qnil));
   return log;
 }
 
@@ -423,7 +423,7 @@ Before returning, a new log is allocated for future samples.  */)
      more for our use afterwards since we can't rely on its special
      pre-allocated keys anymore.  So we have to allocate a new one.  */
   cpu_log = profiler_cpu_running ? make_log () : Qnil;
-  Fputhash (make_vector (1, QAutomatic_GC),
+  Fputhash (initialize_vector (1, QAutomatic_GC),
 	    make_fixnum (cpu_gc_count),
 	    result);
   cpu_gc_count = 0;

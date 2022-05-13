@@ -3171,7 +3171,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 		  cell = XCONS (tmp), tmp = XCDR (tmp), size--;
 		  free_cons (cell);
 
-		  tbl = make_uninit_sub_char_table (depth, min_char);
+		  tbl = make_sub_char_table (depth, min_char);
 		  for (i = 0; i < size; i++)
 		    {
 		      XSUB_CHAR_TABLE (tbl)->contents[i] = XCAR (tmp);
@@ -3207,7 +3207,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool annotated)
 			    == (SCHARS (tmp) - 1) * BOOL_VECTOR_BITS_PER_CHAR)))
 		invalid_syntax ("#&...", readcharfun);
 
-	      val = make_uninit_bool_vector (XFIXNAT (length));
+	      val = make_bool_vector (XFIXNAT (length));
 	      data = bool_vector_uchar_data (val);
 	      memcpy (data, SDATA (tmp), size_in_chars);
 	      /* Clear the extraneous bits in the last byte.  */
@@ -4138,7 +4138,7 @@ read_vector (Lisp_Object readcharfun, bool bytecodeflag)
 {
   Lisp_Object tem = read_list (1, readcharfun, false);
   ptrdiff_t size = list_length (tem);
-  Lisp_Object vector = make_nil_vector (size);
+  Lisp_Object vector = initialize_vector (size, Qnil);
 
   /* Avoid accessing past the end of a vector if the vector is too
      small to be valid for bytecode.  */
@@ -4754,7 +4754,7 @@ OBARRAY defaults to the value of `obarray'.  */)
 void
 init_obarray_once (void)
 {
-  Vobarray = make_vector (OBARRAY_SIZE, make_fixnum (0));
+  Vobarray = initialize_vector (OBARRAY_SIZE, make_fixnum (0));
   initial_obarray = Vobarray;
   staticpro (&initial_obarray);
 

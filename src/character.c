@@ -1119,7 +1119,7 @@ syms_of_character (void)
 Vector recording all translation tables ever defined.
 Each element is a pair (SYMBOL . TABLE) relating the table to the
 symbol naming it.  The ID of a translation table is an index into this vector.  */);
-  Vtranslation_table_vector = make_nil_vector (16);
+  Vtranslation_table_vector = initialize_vector (16, Qnil);
 
   DEFVAR_LISP ("auto-fill-chars", Vauto_fill_chars,
 	       doc: /*

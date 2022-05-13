@@ -1862,11 +1862,10 @@ gc_aset (Lisp_Object array, ptrdiff_t idx, Lisp_Object val)
   XVECTOR (array)->contents[idx] = val;
 }
 
-/* True, since Qnil's representation is zero.  Every place in the code
-   that assumes Qnil is zero should verify (NIL_IS_ZERO), to make it easy
-   to find such assumptions later if we change Qnil to be nonzero.
-   Test iQnil and Lisp_Symbol instead of Qnil directly, since the latter
-   is not suitable for use in an integer constant expression.  */
+/* At this point, I would just as soon consider Qnil taking on a
+   nonzero value, as I would NULL.  Test iQnil and Lisp_Symbol instead
+   of Qnil directly, since Qnil cannot be used in an enum constant
+   expression.  */
 enum { NIL_IS_ZERO = iQnil == 0 && Lisp_Symbol == 0 };
 
 /* Clear the object addressed by P, with size NBYTES, so that all its
@@ -4117,7 +4116,7 @@ list4i (intmax_t a, intmax_t b, intmax_t c, intmax_t d)
   return list4 (make_int (a), make_int (b), make_int (c), make_int (d));
 }
 
-extern Lisp_Object make_uninit_bool_vector (EMACS_INT);
+extern Lisp_Object make_bool_vector (EMACS_INT);
 extern Lisp_Object bool_vector_fill (Lisp_Object, Lisp_Object);
 extern Lisp_Object make_string (const char *, ptrdiff_t);
 extern Lisp_Object make_formatted_string (char *, const char *, ...)
@@ -4170,48 +4169,34 @@ build_string (const char *str)
 }
 
 extern Lisp_Object pure_cons (Lisp_Object, Lisp_Object);
-extern Lisp_Object make_vector (ptrdiff_t, Lisp_Object);
+extern Lisp_Object initialize_vector (ptrdiff_t, Lisp_Object);
 extern struct Lisp_Vector *allocate_vectorlike (ptrdiff_t, bool)
   ATTRIBUTE_RETURNS_NONNULL;
 
-/* Make an uninitialized vector for SIZE objects.  NOTE: you must
-   be sure that GC cannot happen until the vector is completely
-   initialized.  E.g. the following code is likely to crash:
-
-   v = make_uninit_vector (3);
-   ASET (v, 0, obj0);
-   ASET (v, 1, Ffunction_can_gc ());
-   ASET (v, 2, obj1);
-
-   allocate_vector has a similar problem.  */
-
 INLINE Lisp_Object
-make_uninit_vector (ptrdiff_t size)
+make_vector (ptrdiff_t size)
 {
+  /* Callers cannot gc before fully assigning the return value,
+     e.g. the following code is likely to crash:
+
+     v = make_vector (3);
+     ASET (v, 0, obj0);
+     ASET (v, 1, Ffunction_can_gc ());
+     ASET (v, 2, obj1);
+  */
   return make_lisp_ptr (allocate_vectorlike (size, false), Lisp_Vectorlike);
 }
 
-/* Like above, but special for sub char-tables.  */
-
 INLINE Lisp_Object
-make_uninit_sub_char_table (int depth, int min_char)
+make_sub_char_table (int depth, int min_char)
 {
   int slots = SUB_CHAR_TABLE_OFFSET + chartab_size[depth];
-  Lisp_Object v = make_uninit_vector (slots);
+  Lisp_Object v = make_vector (slots);
 
   XSETPVECTYPE (XVECTOR (v), PVEC_SUB_CHAR_TABLE);
   XSUB_CHAR_TABLE (v)->depth = depth;
   XSUB_CHAR_TABLE (v)->min_char = min_char;
   return v;
-}
-
-/* Make a vector of SIZE nils - faster than make_vector (size, Qnil)
-   if the OS already cleared the new memory.  */
-
-INLINE Lisp_Object
-make_nil_vector (ptrdiff_t size)
-{
-  return make_lisp_ptr (allocate_vectorlike (size, true), Lisp_Vectorlike);
 }
 
 extern struct Lisp_Vector *allocate_pseudovector (int, int, int, enum pvec_type)

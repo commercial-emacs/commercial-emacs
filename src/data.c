@@ -3626,7 +3626,7 @@ bool_vector_binop_driver (Lisp_Object a,
 
   if (NILP (dest))
     {
-      dest = make_uninit_bool_vector (nr_bits);
+      dest = make_bool_vector (nr_bits);
       destdata = bool_vector_data (dest);
     }
   else
@@ -3844,7 +3844,7 @@ Return the destination vector.  */)
   nr_bits = bool_vector_size (a);
 
   if (NILP (b))
-    b = make_uninit_bool_vector (nr_bits);
+    b = make_bool_vector (nr_bits);
   else
     {
       CHECK_BOOL_VECTOR (b);

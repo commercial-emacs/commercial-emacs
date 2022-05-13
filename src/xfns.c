@@ -5739,7 +5739,7 @@ x_make_monitor_attribute_list (struct MonitorInfo *monitors,
                                struct x_display_info *dpyinfo,
                                const char *source)
 {
-  Lisp_Object monitor_frames = make_nil_vector (n_monitors);
+  Lisp_Object monitor_frames = initialize_vector (n_monitors, Qnil);
   Lisp_Object frame, rest;
 
   FOR_EACH_FRAME (rest, frame)
@@ -6195,7 +6195,7 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
   mm_height_per_pixel = ((double) HeightMMOfScreen (dpyinfo->screen)
 			 / x_display_pixel_height (dpyinfo));
 #endif
-  monitor_frames = make_nil_vector (n_monitors);
+  monitor_frames = initialize_vector (n_monitors, Qnil);
   monitors = xzalloc (n_monitors * sizeof *monitors);
 
   FOR_EACH_FRAME (rest, frame)

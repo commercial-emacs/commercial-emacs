@@ -6944,7 +6944,7 @@ modify_event_symbol (ptrdiff_t symbol_num, int modifiers, Lisp_Object symbol_kin
     {
       if (! VECTORP (*symbol_table)
 	  || ASIZE (*symbol_table) != table_size)
-	*symbol_table = make_nil_vector (table_size);
+	*symbol_table = initialize_vector (table_size, Qnil);
 
       value = AREF (*symbol_table, symbol_num);
     }
@@ -7809,7 +7809,7 @@ menu_bar_items (Lisp_Object old)
   if (!NILP (old))
     menu_bar_items_vector = old;
   else
-    menu_bar_items_vector = make_nil_vector (24);
+    menu_bar_items_vector = initialize_vector (24, Qnil);
   menu_bar_items_index = 0;
 
   /* Build our list of keymaps.
@@ -8052,7 +8052,7 @@ parse_menu_item (Lisp_Object item, int inmenubar)
 
   /* Create item_properties vector if necessary.  */
   if (NILP (item_properties))
-    item_properties = make_nil_vector (ITEM_PROPERTY_ENABLE + 1);
+    item_properties = initialize_vector (ITEM_PROPERTY_ENABLE + 1, Qnil);
 
   /* Initialize optional entries.  */
   for (i = ITEM_PROPERTY_DEF; i < ITEM_PROPERTY_ENABLE; i++)
@@ -8548,7 +8548,7 @@ parse_tab_bar_item (Lisp_Object key, Lisp_Object item)
 	set_prop_tab_bar (i, Qnil);
     }
   else
-    tab_bar_item_properties = make_nil_vector (TAB_BAR_ITEM_NSLOTS);
+    tab_bar_item_properties = initialize_vector (TAB_BAR_ITEM_NSLOTS, Qnil);
 
   /* Set defaults.  */
   set_prop_tab_bar (TAB_BAR_ITEM_KEY, key);
@@ -8670,7 +8670,7 @@ init_tab_bar_items (Lisp_Object reuse)
   if (VECTORP (reuse))
     tab_bar_items_vector = reuse;
   else
-    tab_bar_items_vector = make_nil_vector (64);
+    tab_bar_items_vector = initialize_vector (64, Qnil);
   ntab_bar_items = 0;
 }
 
@@ -8933,7 +8933,7 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
 	set_prop (i, Qnil);
     }
   else
-    tool_bar_item_properties = make_nil_vector (TOOL_BAR_ITEM_NSLOTS);
+    tool_bar_item_properties = initialize_vector (TOOL_BAR_ITEM_NSLOTS, Qnil);
 
   /* Set defaults.  */
   set_prop (TOOL_BAR_ITEM_KEY, key);
@@ -9147,7 +9147,7 @@ init_tool_bar_items (Lisp_Object reuse)
   if (VECTORP (reuse))
     tool_bar_items_vector = reuse;
   else
-    tool_bar_items_vector = make_nil_vector (64);
+    tool_bar_items_vector = initialize_vector (64, Qnil);
   ntool_bar_items = 0;
 }
 
@@ -10813,7 +10813,7 @@ update_recent_keys (int new_size, int kept_keys)
   int osize = ASIZE (recent_keys);
   eassert (recent_keys_index < osize);
   eassert (kept_keys <= min (osize, new_size));
-  Lisp_Object v = make_nil_vector (new_size);
+  Lisp_Object v = initialize_vector (new_size, Qnil);
   int i, idx;
   for (i = 0; i < kept_keys; ++i)
     {
@@ -12182,32 +12182,32 @@ syms_of_keyboard (void)
 
   DEFSYM (Qpreedit_text, "preedit-text");
 
-  button_down_location = make_nil_vector (5);
+  button_down_location = initialize_vector (5, Qnil);
   staticpro (&button_down_location);
   staticpro (&frame_relative_event_pos);
-  mouse_syms = make_nil_vector (5);
+  mouse_syms = initialize_vector (5, Qnil);
   staticpro (&mouse_syms);
-  wheel_syms = make_nil_vector (ARRAYELTS (lispy_wheel_names));
+  wheel_syms = initialize_vector (ARRAYELTS (lispy_wheel_names), Qnil);
   staticpro (&wheel_syms);
 
   {
     int i;
     int len = ARRAYELTS (modifier_names);
 
-    modifier_symbols = make_nil_vector (len);
+    modifier_symbols = initialize_vector (len, Qnil);
     for (i = 0; i < len; i++)
       if (modifier_names[i])
 	ASET (modifier_symbols, i, intern_c_string (modifier_names[i]));
     staticpro (&modifier_symbols);
   }
 
-  recent_keys = make_nil_vector (lossage_limit);
+  recent_keys = initialize_vector (lossage_limit, Qnil);
   staticpro (&recent_keys);
 
-  this_command_keys = make_nil_vector (40);
+  this_command_keys = initialize_vector (40, Qnil);
   staticpro (&this_command_keys);
 
-  raw_keybuf = make_nil_vector (30);
+  raw_keybuf = initialize_vector (30, Qnil);
   staticpro (&raw_keybuf);
 
   DEFSYM (Qcommand_execute, "command-execute");

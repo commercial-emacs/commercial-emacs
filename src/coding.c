@@ -10894,7 +10894,7 @@ make_subsidiaries (Lisp_Object base)
   char *buf = SAFE_ALLOCA (base_name_len + 6);
 
   memcpy (buf, SDATA (SYMBOL_NAME (base)), base_name_len);
-  Lisp_Object subsidiaries = make_nil_vector (3);
+  Lisp_Object subsidiaries = initialize_vector (3, Qnil);
   for (int i = 0; i < 3; i++)
     {
       strcpy (buf + base_name_len, suffixes[i]);
@@ -10917,7 +10917,7 @@ usage: (define-coding-system-internal ...)  */)
   if (nargs < coding_arg_max)
     goto short_args;
 
-  Lisp_Object attrs = make_nil_vector (coding_attr_last_index);
+  Lisp_Object attrs = initialize_vector (coding_attr_last_index, Qnil);
 
   Lisp_Object name = args[coding_arg_name];
   CHECK_SYMBOL (name);
@@ -11038,7 +11038,7 @@ usage: (define-coding-system-internal ...)  */)
 	 If Nth element is a list of charset IDs, N is the first byte
 	 of one of them.  The list is sorted by dimensions of the
 	 charsets.  A charset of smaller dimension comes first. */
-      val = make_nil_vector (256);
+      val = initialize_vector (256, Qnil);
 
       for (Lisp_Object tail = charset_list; CONSP (tail); tail = XCDR (tail))
 	{
@@ -11390,7 +11390,7 @@ usage: (define-coding-system-internal ...)  */)
 	  this_name = AREF (eol_type, i);
 	  this_aliases = list1 (this_name);
 	  this_eol_type = (i == 0 ? Qunix : i == 1 ? Qdos : Qmac);
-	  this_spec = make_uninit_vector (3);
+	  this_spec = make_vector (3);
 	  ASET (this_spec, 0, attrs);
 	  ASET (this_spec, 1, this_aliases);
 	  ASET (this_spec, 2, this_eol_type);
@@ -11404,7 +11404,7 @@ usage: (define-coding-system-internal ...)  */)
 	}
     }
 
-  Lisp_Object spec_vec = make_uninit_vector (3);
+  Lisp_Object spec_vec = make_vector (3);
   ASET (spec_vec, 0, attrs);
   ASET (spec_vec, 1, aliases);
   ASET (spec_vec, 2, eol_type);
@@ -11751,7 +11751,7 @@ syms_of_coding (void)
   DEFSYM (QCpre_write_conversion, ":pre-write-conversion");
   DEFSYM (QCascii_compatible_p, ":ascii-compatible-p");
 
-  Vcoding_category_table = make_nil_vector (coding_category_max);
+  Vcoding_category_table = initialize_vector (coding_category_max, Qnil);
   staticpro (&Vcoding_category_table);
   /* Followings are target of code detection.  */
   ASET (Vcoding_category_table, coding_category_iso_7,
@@ -12063,7 +12063,7 @@ a coding system of ISO 2022 variant which has a flag
 `accept-latin-extra-code' t (e.g. iso-latin-1) on reading a file
 or reading output of a subprocess.
 Only 128th through 159th elements have a meaning.  */);
-  Vlatin_extra_code_table = make_nil_vector (256);
+  Vlatin_extra_code_table = initialize_vector (256, Qnil);
 
   DEFVAR_LISP ("select-safe-coding-system-function",
 	       Vselect_safe_coding_system_function,

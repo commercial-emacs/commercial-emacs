@@ -129,47 +129,6 @@ is unibyte unless INIT is not ASCII or MULTIBYTE is non-nil.  */)
   return unbind_to (count, Fmake_string (length, init, multibyte));
 }
 
-DEFUN ("cmake-byte-code", Fcmake_byte_code, Scmake_byte_code, 4, MANY, 0,
-       doc: /* Create a byte-code object with specified arguments as elements.
-The arguments should be the ARGLIST, bytecode-string BYTE-CODE, constant
-vector CONSTANTS, maximum stack size DEPTH, (optional) DOCSTRING,
-and (optional) INTERACTIVE-SPEC.
-The first four arguments are required; at most six have any
-significance.
-The ARGLIST can be either like the one of `lambda', in which case the arguments
-will be dynamically bound before executing the byte code, or it can be an
-integer of the form NNNNNNNRMMMMMMM where the 7bit MMMMMMM specifies the
-minimum number of arguments, the 7-bit NNNNNNN specifies the maximum number
-of arguments (ignoring &rest) and the R bit specifies whether there is a &rest
-argument to catch the left-over arguments.  If such an integer is used, the
-arguments will not be dynamically bound but will be instead pushed on the
-stack before executing the byte-code.
-usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INTERACTIVE-SPEC &rest ELEMENTS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (! ((FIXNUMP (args[COMPILED_ARGLIST])
-	  || CONSP (args[COMPILED_ARGLIST])
-	  || NILP (args[COMPILED_ARGLIST]))
-	 && STRINGP (args[COMPILED_BYTECODE])
-	 && !STRING_MULTIBYTE (args[COMPILED_BYTECODE])
-	 && VECTORP (args[COMPILED_CONSTANTS])
-	 && FIXNATP (args[COMPILED_STACK_DEPTH])))
-    error ("Invalid byte-code object");
-
-  pin_string (args[COMPILED_BYTECODE]);  // Bytecode must be immovable.
-
-  /* We used to purecopy everything here, if loadup-pure-table was set.  This worked
-     OK for Emacs-23, but with Emacs-24's lexical binding code, it can be
-     dangerous, since make-byte-code is used during execution to build
-     closures, so any closure built during the preload phase would end up
-     copied into pure space, including its free variables, which is sometimes
-     just wasteful and other times plainly wrong (e.g. those free vars may want
-     to be setcar'd).  */
-  Lisp_Object val = Fvector (nargs, args);
-  XSETPVECTYPE (XVECTOR (val), PVEC_COMPILED);
-  return val;
-}
-
 DEFUN ("cmake-symbol", Fcmake_symbol, Scmake_symbol, 1, 1, 0,
        doc: /* Return an uninterned, unbound symbol whose name is NAME. */)
   (Lisp_Object name)
@@ -290,7 +249,7 @@ LENGTH must be a number.  INIT matters only in whether it is t or nil.  */)
   Lisp_Object val;
 
   CHECK_FIXNAT (length);
-  val = make_uninit_bool_vector (XFIXNAT (length));
+  val = make_bool_vector (XFIXNAT (length));
   return bool_vector_fill (val, init);
 }
 
@@ -303,7 +262,7 @@ usage: (bool-vector &rest OBJECTS)  */)
   ptrdiff_t i;
   Lisp_Object vector;
 
-  vector = make_uninit_bool_vector (nargs);
+  vector = make_bool_vector (nargs);
   for (i = 0; i < nargs; i++)
     bool_vector_set (vector, i, ! NILP (args[i]));
 
@@ -320,7 +279,6 @@ syms_of_calloc (void)
   defsubr (&Sccons);
   defsubr (&Scvector);
   defsubr (&Scmake_string);
-  defsubr (&Scmake_byte_code);
   defsubr (&Scmake_bool_vector);
   defsubr (&Scbool_vector);
   defsubr (&Scmake_symbol);

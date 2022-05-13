@@ -10692,7 +10692,7 @@ with_echo_area_buffer_unwind_data (struct window *w)
   Vwith_echo_area_save_vector = Qnil;
 
   if (NILP (vector))
-    vector = make_nil_vector (11);
+    vector = initialize_vector (11, Qnil);
 
   XSETBUFFER (tmp, current_buffer); ASET (vector, i, tmp); ++i;
   ASET (vector, i, Vdeactivate_mark); ++i;
@@ -11557,7 +11557,7 @@ format_mode_line_unwind_data (struct frame *target_frame,
   Vmode_line_unwind_vector = Qnil;
 
   if (NILP (vector))
-    vector = make_nil_vector (12);
+    vector = initialize_vector (12, Qnil);
 
   ASET (vector, 0, make_fixnum (mode_line_target));
   ASET (vector, 1, make_fixnum (MODE_LINE_NOPROP_LEN (0)));
@@ -23361,7 +23361,7 @@ in order to avoid these problems.  */)
 	    nglyphs++;
 
 	  /* Create and fill the array.  */
-	  levels = make_uninit_vector (nglyphs);
+	  levels = make_vector (nglyphs);
 	  for (i = 0; g1 < g; i++, g1++)
 	    ASET (levels, i, make_fixnum (g1->resolved_level));
 	}
@@ -23376,7 +23376,7 @@ in order to avoid these problems.  */)
 	  g1 = g;
 	  for (nglyphs = 0; g > e && !NILP (g->object); g--)
 	    nglyphs++;
-	  levels = make_uninit_vector (nglyphs);
+	  levels = make_vector (nglyphs);
 	  for (i = 0; g1 > g; i++, g1--)
 	    ASET (levels, i, make_fixnum (g1->resolved_level));
 	}

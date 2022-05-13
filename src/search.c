@@ -3318,7 +3318,7 @@ the buffer.  If the buffer doesn't have a cache, the value is nil.  */)
 		TYPE_MAXIMUM (ptrdiff_t), &nl_count_cache, NULL, true);
 
   /* Create vector and populate it.  */
-  cache_newlines = make_vector (nl_count_cache, make_fixnum (-1));
+  cache_newlines = initialize_vector (nl_count_cache, make_fixnum (-1));
 
   if (nl_count_cache)
     {
@@ -3337,7 +3337,7 @@ the buffer.  If the buffer doesn't have a cache, the value is nil.  */)
   /* Now do the same, but without using the cache.  */
   find_newline1 (BEGV, BEGV_BYTE, ZV, ZV_BYTE,
 		 TYPE_MAXIMUM (ptrdiff_t), &nl_count_buf, NULL, true);
-  buf_newlines = make_vector (nl_count_buf, make_fixnum (-1));
+  buf_newlines = initialize_vector (nl_count_buf, make_fixnum (-1));
   if (nl_count_buf)
     {
       for (from = BEGV, found = from, i = 0; from < ZV; from = found, i++)

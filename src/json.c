@@ -817,7 +817,7 @@ json_to_lisp (json_t *json, const struct json_configuration *conf)
           {
           case json_array_array:
             {
-              result = make_vector (size, Qunbound);
+              result = initialize_vector (size, Qunbound);
               for (ptrdiff_t i = 0; i < size; ++i)
                 {
                   rarely_quit (i);

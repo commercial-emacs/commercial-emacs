@@ -1358,7 +1358,7 @@ term_get_fkeys_1 (void)
       char *sequence = tgetstr (keys[i].cap, address);
       if (sequence)
 	Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (sequence),
-		     make_vector (1, intern (keys[i].name)), Qnil);
+		     initialize_vector (1, intern (keys[i].name)), Qnil);
     }
 
   /* The uses of the "k0" capability are inconsistent; sometimes it
@@ -1377,13 +1377,13 @@ term_get_fkeys_1 (void)
 	  /* Define f0 first, so that f10 takes precedence in case the
 	     key sequences happens to be the same.  */
 	  Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (k0),
-		       make_vector (1, intern ("f0")), Qnil);
+		       initialize_vector (1, intern ("f0")), Qnil);
 	Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (k_semi),
-		     make_vector (1, intern ("f10")), Qnil);
+		     initialize_vector (1, intern ("f10")), Qnil);
       }
     else if (k0)
       Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (k0),
-		   make_vector (1, intern (k0_name)), Qnil);
+		   initialize_vector (1, intern (k0_name)), Qnil);
   }
 
   /* Set up cookies for numbered function keys above f10. */
@@ -1407,7 +1407,7 @@ term_get_fkeys_1 (void)
 	      sprintf (fkey, "f%d", i);
 	      Fdefine_key (KVAR (kboard, Vinput_decode_map),
 			   build_string (sequence),
-			   make_vector (1, intern (fkey)),
+			   initialize_vector (1, intern (fkey)),
 			   Qnil);
 	    }
 	}
@@ -1419,13 +1419,13 @@ term_get_fkeys_1 (void)
    */
   {
 #define CONDITIONAL_REASSIGN(cap1, cap2, sym)				\
-      if (!tgetstr (cap1, address))					\
-	{								\
-	  char *sequence = tgetstr (cap2, address);			\
-	  if (sequence)                                                 \
-	    Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (sequence), \
-			 make_vector (1, intern (sym)), Qnil);		\
-	}
+    if (!tgetstr (cap1, address))					\
+      {									\
+	char *sequence = tgetstr (cap2, address);			\
+	if (sequence)							\
+	  Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (sequence), \
+		       initialize_vector (1, intern (sym)), Qnil);	\
+      }
 
       /* if there's no key_next keycap, map key_npage to `next' keysym */
       CONDITIONAL_REASSIGN ("%5", "kN", "next");

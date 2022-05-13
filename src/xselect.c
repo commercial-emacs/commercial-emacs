@@ -1666,7 +1666,7 @@ selection_data_to_lisp_data (struct x_display_info *dpyinfo,
 	return x_atom_to_symbol (dpyinfo, (Atom) idata[0]);
       else
 	{
-	  Lisp_Object v = make_nil_vector (size / sizeof (int));
+	  Lisp_Object v = initialize_vector (size / sizeof (int), Qnil);
 
 	  for (i = 0; i < size / sizeof (int); i++)
 	    ASET (v, i, x_atom_to_symbol (dpyinfo, (Atom) idata[i]));
@@ -1702,7 +1702,7 @@ selection_data_to_lisp_data (struct x_display_info *dpyinfo,
   else if (format == 16)
     {
       ptrdiff_t i;
-      Lisp_Object v = make_uninit_vector (size / 2);
+      Lisp_Object v = make_vector (size / 2);
 
       if (type == XA_INTEGER)
         {
@@ -1725,7 +1725,7 @@ selection_data_to_lisp_data (struct x_display_info *dpyinfo,
   else
     {
       ptrdiff_t i;
-      Lisp_Object v = make_nil_vector (size / X_LONG_SIZE);
+      Lisp_Object v = initialize_vector (size / X_LONG_SIZE, Qnil);
 
       if (type == XA_INTEGER)
         {
@@ -1932,7 +1932,7 @@ clean_local_selection_data (Lisp_Object obj)
       Lisp_Object copy;
       if (size == 1)
 	return clean_local_selection_data (AREF (obj, 0));
-      copy = make_nil_vector (size);
+      copy = initialize_vector (size, Qnil);
       for (i = 0; i < size; i++)
 	ASET (copy, i, clean_local_selection_data (AREF (obj, i)));
       return copy;
@@ -2551,7 +2551,7 @@ x_handle_dnd_message (struct frame *f, const XClientMessageEvent *event,
       data = (unsigned char *) idata;
     }
 
-  vec = make_nil_vector (4);
+  vec = initialize_vector (4, Qnil);
   ASET (vec, 0, SYMBOL_NAME (x_atom_to_symbol (FRAME_DISPLAY_INFO (f),
 					       event->message_type)));
   ASET (vec, 1, frame);

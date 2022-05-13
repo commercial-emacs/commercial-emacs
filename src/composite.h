@@ -299,7 +299,7 @@ enum lglyph_indices
    LGLYPH_CHAR is one of the characters, usually the first one, that
    contributed to the glyph (since there isn't a 1:1 correspondence
    between composed characters and the font glyphs).  */
-#define LGLYPH_NEW() make_nil_vector (LGLYPH_SIZE)
+#define LGLYPH_NEW() initialize_vector (LGLYPH_SIZE, Qnil)
 #define LGLYPH_FROM(g) XFIXNUM (AREF ((g), LGLYPH_IX_FROM))
 #define LGLYPH_TO(g) XFIXNUM (AREF ((g), LGLYPH_IX_TO))
 #define LGLYPH_CHAR(g) XFIXNUM (AREF ((g), LGLYPH_IX_CHAR))

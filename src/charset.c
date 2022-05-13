@@ -261,7 +261,7 @@ load_charset_map (struct charset *charset, struct charset_map_entries *entries, 
 		{
 		  int n = CODE_POINT_TO_INDEX (charset, max_code) + 1;
 
-		  vec = make_vector (n, make_fixnum (-1));
+		  vec = initialize_vector (n, make_fixnum (-1));
 		  set_charset_attr (charset, charset_decoder, vec);
 		}
 	      else
@@ -865,7 +865,7 @@ usage: (define-charset-internal ...)  */)
 	     Fcons (intern ("define-charset-internal"),
 		    make_fixnum (nargs)));
 
-  attrs = make_nil_vector (charset_attr_max);
+  attrs = initialize_vector (charset_attr_max, Qnil);
 
   CHECK_SYMBOL (args[charset_arg_name]);
   ASET (attrs, charset_name, args[charset_arg_name]);
@@ -1242,7 +1242,7 @@ define_charset_internal (Lisp_Object name,
 
   args[charset_arg_name] = name;
   args[charset_arg_dimension] = make_fixnum (dimension);
-  val = make_uninit_vector (8);
+  val = make_vector (8);
   for (i = 0; i < 8; i++)
     ASET (val, i, make_fixnum (code_space[i]));
   args[charset_arg_code_space] = val;
@@ -1549,7 +1549,7 @@ only `ascii', `eight-bit-control', and `eight-bit-graphic'.  */)
 
   from_byte = CHAR_TO_BYTE (from);
 
-  charsets = make_nil_vector (charset_table_used);
+  charsets = initialize_vector (charset_table_used, Qnil);
   while (1)
     {
       find_charsets_in_text (BYTE_POS_ADDR (from_byte), stop - from,
@@ -1582,7 +1582,7 @@ only `ascii', `eight-bit-control', and `eight-bit-graphic'. */)
 {
   CHECK_STRING (str);
 
-  Lisp_Object charsets = make_nil_vector (charset_table_used);
+  Lisp_Object charsets = initialize_vector (charset_table_used, Qnil);
   find_charsets_in_text (SDATA (str), SCHARS (str), SBYTES (str),
 			 charsets, table,
 			 STRING_MULTIBYTE (str));

@@ -383,10 +383,10 @@ font_style_to_value (enum font_property_index prop, Lisp_Object val,
       if (! noerror)
 	return -1;
       eassert (len < 255);
-      elt = make_vector (2, make_fixnum (100));
+      elt = initialize_vector (2, make_fixnum (100));
       ASET (elt, 1, val);
       ASET (font_style_table, prop - FONT_WEIGHT_INDEX,
-	    CALLN (Fvconcat, table, make_vector (1, elt)));
+	    CALLN (Fvconcat, table, initialize_vector (1, elt)));
       return (100 << 8) | (i << 4);
     }
   else
@@ -2087,7 +2087,7 @@ font_otf_DeviceTable (OTF_DeviceTable *device_table)
 Lisp_Object
 font_otf_ValueRecord (int value_format, OTF_ValueRecord *value_record)
 {
-  Lisp_Object val = make_nil_vector (8);
+  Lisp_Object val = initialize_vector (8, Qnil);
 
   if (value_format & OTF_XPlacement)
     ASET (val, 0, make_fixnum (value_record->XPlacement));
@@ -2111,7 +2111,7 @@ font_otf_ValueRecord (int value_format, OTF_ValueRecord *value_record)
 Lisp_Object
 font_otf_Anchor (OTF_Anchor *anchor)
 {
-  Lisp_Object val = make_nil_vector (anchor->AnchorFormat + 1);
+  Lisp_Object val = initialize_vector (anchor->AnchorFormat + 1, Qnil);
   ASET (val, 0, make_fixnum (anchor->XCoordinate));
   ASET (val, 1, make_fixnum (anchor->YCoordinate));
   if (anchor->AnchorFormat == 2)
@@ -5161,7 +5161,7 @@ character.  */)
   else
     wrong_type_argument (Qarrayp, object);
 
-  Lisp_Object vec = make_nil_vector (len);
+  Lisp_Object vec = initialize_vector (len, Qnil);
   for (ptrdiff_t i = 0; i < len; i++)
     {
       Lisp_Object g;
@@ -5409,13 +5409,13 @@ If the named font cannot be opened and loaded, return nil.  */)
 static Lisp_Object
 build_style_table (const struct table_entry *entry, int nelement)
 {
-  Lisp_Object table = make_nil_vector (nelement);
+  Lisp_Object table = initialize_vector (nelement, Qnil);
   for (int i = 0; i < nelement; i++)
     {
       int j;
       for (j = 0; entry[i].names[j]; j++)
 	continue;
-      Lisp_Object elt = make_nil_vector (j + 1);
+      Lisp_Object elt = initialize_vector (j + 1, Qnil);
       ASET (elt, 0, make_fixnum (entry[i].numeric));
       for (j = 0; entry[i].names[j]; j++)
 	ASET (elt, j + 1, intern_c_string (entry[i].names[j]));
@@ -5604,7 +5604,7 @@ syms_of_font (void)
   scratch_font_prefer = Ffont_spec (0, NULL);
   staticpro (&scratch_font_prefer);
 
-  Vfont_log_deferred = make_nil_vector (3);
+  Vfont_log_deferred = initialize_vector (3, Qnil);
   staticpro (&Vfont_log_deferred);
 
 #if 0

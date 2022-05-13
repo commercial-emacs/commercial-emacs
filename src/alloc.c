@@ -1644,9 +1644,11 @@ compact_small_strings (void)
 static Lisp_Object new_lisp_string (EMACS_INT, EMACS_INT, bool);
 
 DEFUN ("make-string", Fmake_string, Smake_string, 2, 3, 0,
-       doc: /* Return a newly created string of LENGTH instances of
-INIT, an integer representing a character, e.g., ?x.  The return value
-is unibyte unless INIT is not ASCII or MULTIBYTE is non-nil.  */)
+       doc: /* Make a string.
+Return a string of LENGTH instances of INIT, which should
+be a numeric character code, e.g., ?x.
+The string is unibyte unless INIT is not ASCII or MULTIBYTE is non-nil.
+*/)
   (Lisp_Object length, Lisp_Object init, Lisp_Object multibyte)
 {
   Lisp_Object val;
@@ -1712,7 +1714,7 @@ bool_vector_fill (Lisp_Object a, Lisp_Object init)
 /* Return a newly allocated, uninitialized bool vector of size NBITS.  */
 
 Lisp_Object
-make_uninit_bool_vector (EMACS_INT nbits)
+make_bool_vector (EMACS_INT nbits)
 {
   Lisp_Object val;
   EMACS_INT words = bool_vector_words (nbits);
@@ -1743,7 +1745,7 @@ LENGTH must be a number.  INIT matters only in whether it is t or nil.  */)
   Lisp_Object val;
 
   CHECK_FIXNAT (length);
-  val = make_uninit_bool_vector (XFIXNAT (length));
+  val = make_bool_vector (XFIXNAT (length));
   return bool_vector_fill (val, init);
 }
 
@@ -1756,7 +1758,7 @@ usage: (bool-vector &rest OBJECTS)  */)
   ptrdiff_t i;
   Lisp_Object vector;
 
-  vector = make_uninit_bool_vector (nargs);
+  vector = make_bool_vector (nargs);
   for (i = 0; i < nargs; i++)
     bool_vector_set (vector, i, ! NILP (args[i]));
 
@@ -2666,77 +2668,62 @@ usage: (record TYPE &rest SLOTS) */)
 }
 
 DEFUN ("make-vector", Fmake_vector, Smake_vector, 2, 2, 0,
-       doc: /* Return a newly created vector of length LENGTH, with each element being INIT.
-See also the function `vector'.  */)
+       doc: /* Return a new vector of LENGTH instances of INIT.  */)
   (Lisp_Object length, Lisp_Object init)
 {
   CHECK_TYPE (FIXNATP (length) && XFIXNAT (length) <= PTRDIFF_MAX,
 	      Qwholenump, length);
-  return make_vector (XFIXNAT (length), init);
+  return initialize_vector (XFIXNAT (length), init);
 }
 
-/* Return a new vector of length LENGTH with each element being INIT.  */
-
 Lisp_Object
-make_vector (ptrdiff_t length, Lisp_Object init)
+initialize_vector (ptrdiff_t length, Lisp_Object init)
 {
-  bool q_clear = NIL_IS_ZERO && NILP (init);
-  struct Lisp_Vector *p = allocate_vectorlike (length, q_clear);
-  if (! q_clear)
-    for (ptrdiff_t i = 0; i < length; i++)
+  struct Lisp_Vector *p = allocate_vectorlike (length, NILP (init));
+  if (! NILP (init))
+    for (ptrdiff_t i = 0; i < length; ++i)
       p->contents[i] = init;
   return make_lisp_ptr (p, Lisp_Vectorlike);
 }
 
 DEFUN ("vector", Fvector, Svector, 0, MANY, 0,
-       doc: /* Return a newly created vector with specified arguments as elements.
-Allows any number of arguments, including zero.
-usage: (vector &rest OBJECTS)  */)
+       doc: /* Return a new vector containing the specified ARGS.
+ARGS can be empty, yielding the empty vector.  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object val = make_uninit_vector (nargs);
+  Lisp_Object val = make_vector (nargs);
   struct Lisp_Vector *p = XVECTOR (val);
   memcpy (p->contents, args, nargs * sizeof *args);
   return val;
 }
 
 DEFUN ("make-byte-code", Fmake_byte_code, Smake_byte_code, 4, MANY, 0,
-       doc: /* Create a byte-code object with specified arguments as elements.
-The arguments should be the ARGLIST, bytecode-string BYTE-CODE, constant
-vector CONSTANTS, maximum stack size DEPTH, (optional) DOCSTRING,
-and (optional) INTERACTIVE-SPEC.
-The first four arguments are required; at most six have any
-significance.
-The ARGLIST can be either like the one of `lambda', in which case the arguments
-will be dynamically bound before executing the byte code, or it can be an
-integer of the form NNNNNNNRMMMMMMM where the 7bit MMMMMMM specifies the
-minimum number of arguments, the 7-bit NNNNNNN specifies the maximum number
-of arguments (ignoring &rest) and the R bit specifies whether there is a &rest
-argument to catch the left-over arguments.  If such an integer is used, the
-arguments will not be dynamically bound but will be instead pushed on the
-stack before executing the byte-code.
-usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INTERACTIVE-SPEC &rest ELEMENTS)  */)
+       doc: /* Create a byte-code object.
+usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INTERACTIVE-SPEC &rest ELEMENTS)
+
+ARGLIST is either a list of formal args to be dynamically bound
+(congruent to that of a lambda expresssion), or a short-length bit
+sequence NNNNNNNRMMMMMMM instructing the runtime how to interpret the
+object's static arguments.  The 7 bits MMMMMMM specify the minimum
+arity, the 7 bits NNNNNNN specify the maximum arity (ignoring &rest),
+and the R bit flags the presence of &rest arguments.
+*/)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
+  Lisp_Object val;
   if (! ((FIXNUMP (args[COMPILED_ARGLIST])
 	  || CONSP (args[COMPILED_ARGLIST])
 	  || NILP (args[COMPILED_ARGLIST]))
 	 && STRINGP (args[COMPILED_BYTECODE])
-	 && !STRING_MULTIBYTE (args[COMPILED_BYTECODE])
+	 && ! STRING_MULTIBYTE (args[COMPILED_BYTECODE])
 	 && VECTORP (args[COMPILED_CONSTANTS])
 	 && FIXNATP (args[COMPILED_STACK_DEPTH])))
     error ("Invalid byte-code object");
 
-  pin_string (args[COMPILED_BYTECODE]);  // Bytecode must be immovable.
+  pin_string (args[COMPILED_BYTECODE]); /* Bytecode is immovable. */
 
-  /* We used to purecopy everything here, if loadup-pure-table was set.  This worked
-     OK for Emacs-23, but with Emacs-24's lexical binding code, it can be
-     dangerous, since make-byte-code is used during execution to build
-     closures, so any closure built during the preload phase would end up
-     copied into pure space, including its free variables, which is sometimes
-     just wasteful and other times plainly wrong (e.g. those free vars may want
-     to be setcar'd).  */
-  Lisp_Object val = Fvector (nargs, args);
+  /* Under lexical binding, closures can no longer be pure copied. */
+  val = Fvector (nargs, args);
   XSETPVECTYPE (XVECTOR (val), PVEC_COMPILED);
   return val;
 }
@@ -2759,7 +2746,7 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
   ptrdiff_t nvars = nargs - 1;
   if (nvars > constsize)
     error ("Closure vars do not fit in constvec");
-  Lisp_Object constvec = make_uninit_vector (constsize);
+  Lisp_Object constvec = make_vector (constsize);
   memcpy (XVECTOR (constvec)->contents, args + 1, nvars * word_size);
   memcpy (XVECTOR (constvec)->contents + nvars,
 	  XVECTOR (proto_constvec)->contents + nvars,

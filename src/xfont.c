@@ -1151,7 +1151,7 @@ syms_of_xfont (void)
   staticpro (&xfont_scripts_cache);
   xfont_scripts_cache = CALLN (Fmake_hash_table, QCtest, Qequal);
   staticpro (&xfont_scratch_props);
-  xfont_scratch_props = make_nil_vector (8);
+  xfont_scratch_props = initialize_vector (8, Qnil);
   pdumper_do_now_and_after_load (syms_of_xfont_for_pdumper);
 }
 

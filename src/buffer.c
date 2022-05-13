@@ -5478,7 +5478,7 @@ void
 syms_of_buffer (void)
 {
   staticpro (&last_overlay_modification_hooks);
-  last_overlay_modification_hooks = make_nil_vector (10);
+  last_overlay_modification_hooks = initialize_vector (10, Qnil);
 
   staticpro (&QSFundamental);
   staticpro (&Vbuffer_alist);

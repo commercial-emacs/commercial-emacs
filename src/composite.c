@@ -214,14 +214,14 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
      COMPONENTS (converted to a vector COMPONENTS-VEC) or, if it is
      nil, vector of characters in the composition range.  */
   if (FIXNUMP (components))
-    key = make_vector (1, components);
+    key = initialize_vector (1, components);
   else if (STRINGP (components) || CONSP (components))
     key = Fvconcat (1, &components);
   else if (VECTORP (components))
     key = components;
   else if (NILP (components))
     {
-      key = make_uninit_vector (nchars);
+      key = make_vector (nchars);
       if (STRINGP (string))
 	for (ptrdiff_t i = 0; i < nchars; i++)
 	  {
@@ -660,7 +660,7 @@ composition_gstring_put_cache (Lisp_Object gstring, ptrdiff_t len)
 	  break;
     }
 
-  Lisp_Object copy = make_nil_vector (len + 2);
+  Lisp_Object copy = initialize_vector (len + 2, Qnil);
   LGSTRING_SET_HEADER (copy, Fcopy_sequence (header));
   for (ptrdiff_t i = 0; i < len; i++)
     LGSTRING_SET_GLYPH (copy, i, Fcopy_sequence (LGSTRING_GLYPH (gstring, i)));
@@ -812,7 +812,7 @@ fill_gstring_header (ptrdiff_t from, ptrdiff_t from_byte,
   eassume (0 < len);
   Lisp_Object header = (len <= 8
 			? AREF (gstring_work_headers, len - 1)
-			: make_uninit_vector (len + 1));
+			: make_vector (len + 1));
 
   ASET (header, 0, font_object);
   for (ptrdiff_t i = 0; i < len; i++)
@@ -1895,7 +1895,7 @@ should be ignored.  */)
     return gstring;
 
   if (LGSTRING_GLYPH_LEN (gstring_work) < topos - frompos)
-    gstring_work = make_nil_vector (topos - frompos + 2);
+    gstring_work = initialize_vector (topos - frompos + 2, Qnil);
   LGSTRING_SET_HEADER (gstring_work, header);
   LGSTRING_SET_ID (gstring_work, Qnil);
   fill_gstring_body (gstring_work);
@@ -2051,11 +2051,11 @@ syms_of_composite (void)
   staticpro (&gstring_hash_table);
 
   staticpro (&gstring_work_headers);
-  gstring_work_headers = make_nil_vector (8);
+  gstring_work_headers = initialize_vector (8, Qnil);
   for (i = 0; i < 8; i++)
-    ASET (gstring_work_headers, i, make_nil_vector (i + 2));
+    ASET (gstring_work_headers, i, initialize_vector (i + 2, Qnil));
   staticpro (&gstring_work);
-  gstring_work = make_nil_vector (10);
+  gstring_work = initialize_vector (10, Qnil);
 
   /* Text property `composition' should be nonsticky by default.  */
   Vtext_property_default_nonsticky

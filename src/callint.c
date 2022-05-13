@@ -602,7 +602,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	case 'U':		/* Up event from last k or K.  */
 	  if (!NILP (up_event))
 	    {
-	      args[i] = make_vector (1, up_event);
+	      args[i] = initialize_vector (1, up_event);
 	      up_event = Qnil;
 	      visargs[i] = Fkey_description (args[i], Qnil);
 	    }

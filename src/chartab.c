@@ -128,7 +128,7 @@ the char-table has no extra slot.  */)
     }
 
   size = CHAR_TABLE_STANDARD_SLOTS + n_extras;
-  vector = make_vector (size, init);
+  vector = initialize_vector (size, init);
   XSETPVECTYPE (XVECTOR (vector), PVEC_CHAR_TABLE);
   set_char_table_parent (vector, Qnil);
   set_char_table_purpose (vector, purpose);
@@ -137,10 +137,10 @@ the char-table has no extra slot.  */)
 }
 
 static Lisp_Object
-make_sub_char_table (int depth, int min_char, Lisp_Object defalt)
+initialize_sub_char_table (int depth, int min_char, Lisp_Object defalt)
 {
   int i;
-  Lisp_Object table = make_uninit_sub_char_table (depth, min_char);
+  Lisp_Object table = make_sub_char_table (depth, min_char);
 
   for (i = 0; i < chartab_size[depth]; i++)
     XSUB_CHAR_TABLE (table)->contents[i] = defalt;
@@ -169,7 +169,7 @@ copy_sub_char_table (Lisp_Object table)
 {
   int depth = XSUB_CHAR_TABLE (table)->depth;
   int min_char = XSUB_CHAR_TABLE (table)->min_char;
-  Lisp_Object copy = make_sub_char_table (depth, min_char, Qnil);
+  Lisp_Object copy = initialize_sub_char_table (depth, min_char, Qnil);
   int i;
 
   /* Recursively copy any sub char-tables.  */
@@ -188,7 +188,7 @@ Lisp_Object
 copy_char_table (Lisp_Object table)
 {
   int size = PVSIZE (table);
-  Lisp_Object copy = make_nil_vector (size);
+  Lisp_Object copy = initialize_vector (size, Qnil);
   XSETPVECTYPE (XVECTOR (copy), PVEC_CHAR_TABLE);
   set_char_table_defalt (copy, XCHAR_TABLE (table)->defalt);
   set_char_table_parent (copy, XCHAR_TABLE (table)->parent);
@@ -387,7 +387,7 @@ sub_char_table_set (Lisp_Object table, int c, Lisp_Object val, bool is_uniprop)
 	    sub = uniprop_table_uncompress (table, i);
 	  else
 	    {
-	      sub = make_sub_char_table (depth + 1,
+	      sub = initialize_sub_char_table (depth + 1,
 					 min_char + i * chartab_chars[depth],
 					 sub);
 	      set_sub_char_table_contents (table, i, sub);
@@ -413,7 +413,7 @@ char_table_set (Lisp_Object table, int c, Lisp_Object val)
       sub = tbl->contents[i];
       if (! SUB_CHAR_TABLE_P (sub))
 	{
-	  sub = make_sub_char_table (1, i * chartab_chars[0], sub);
+	  sub = initialize_sub_char_table (1, i * chartab_chars[0], sub);
 	  set_char_table_contents (table, i, sub);
 	}
       sub_char_table_set (sub, c, val, UNIPROP_TABLE_P (table));
@@ -450,7 +450,7 @@ sub_char_table_set_range (Lisp_Object table, int from, int to, Lisp_Object val,
 		sub = uniprop_table_uncompress (table, i);
 	      else
 		{
-		  sub = make_sub_char_table (depth + 1, c, sub);
+		  sub = initialize_sub_char_table (depth + 1, c, sub);
 		  set_sub_char_table_contents (table, i, sub);
 		}
 	    }
@@ -485,7 +485,7 @@ char_table_set_range (Lisp_Object table, int from, int to, Lisp_Object val)
 	      Lisp_Object sub = tbl->contents[i];
 	      if (! SUB_CHAR_TABLE_P (sub))
 		{
-		  sub = make_sub_char_table (1, i * chartab_chars[0], sub);
+		  sub = initialize_sub_char_table (1, i * chartab_chars[0], sub);
 		  set_char_table_contents (table, i, sub);
 		}
 	      sub_char_table_set_range (sub, from, to, val, is_uniprop);
@@ -1092,7 +1092,7 @@ uniprop_table_uncompress (Lisp_Object table, int idx)
 {
   Lisp_Object val = XSUB_CHAR_TABLE (table)->contents[idx];
   int min_char = XSUB_CHAR_TABLE (table)->min_char + chartab_chars[2] * idx;
-  Lisp_Object sub = make_sub_char_table (3, min_char, Qnil);
+  Lisp_Object sub = initialize_sub_char_table (3, min_char, Qnil);
   const unsigned char *p, *pend;
 
   set_sub_char_table_contents (table, idx, sub);
@@ -1230,7 +1230,7 @@ uniprop_encode_value_numeric (Lisp_Object table, Lisp_Object value)
     set_char_table_extras (table, 4,
 			   CALLN (Fvconcat,
 				  XCHAR_TABLE (table)->extras[4],
-				  make_vector (1, value)));
+				  initialize_vector (1, value)));
   return make_fixnum (i);
 }
 

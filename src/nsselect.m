@@ -120,7 +120,7 @@ clean_local_selection_data (Lisp_Object obj)
 
       if (size == 1)
         return clean_local_selection_data (AREF (obj, 0));
-      copy = make_nil_vector (size);
+      copy = initialize_vector (size, Qnil);
       for (i = 0; i < size; i++)
         ASET (copy, i, clean_local_selection_data (AREF (obj, i)));
       return copy;

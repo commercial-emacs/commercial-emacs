@@ -2056,7 +2056,7 @@ version after that.  */);
   defsubr (&Scurrent_time_zone);
   defsubr (&Sset_time_zone_rule);
 
-  flt_radix_power = make_nil_vector (flt_radix_power_size);
+  flt_radix_power = initialize_vector (flt_radix_power_size, Qnil);
   staticpro (&flt_radix_power);
 
 #ifdef NEED_ZTRILLION_INIT

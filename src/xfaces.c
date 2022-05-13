@@ -2884,7 +2884,7 @@ Value is a vector of face attributes.  */)
       Fput (face, Qface, face_id);
       ++next_lface_id;
 
-      global_lface = make_vector (LFACE_VECTOR_SIZE, Qunspecified);
+      global_lface = initialize_vector (LFACE_VECTOR_SIZE, Qunspecified);
       ASET (global_lface, 0, Qface);
       Fputhash (face, Fcons (face_id, global_lface), Vface_new_frame_defaults);
     }
@@ -2897,7 +2897,7 @@ Value is a vector of face attributes.  */)
     {
       if (NILP (lface))
 	{
-	  lface = make_vector (LFACE_VECTOR_SIZE, Qunspecified);
+	  lface = initialize_vector (LFACE_VECTOR_SIZE, Qunspecified);
 	  ASET (lface, 0, Qface);
           Fputhash (face, lface, f->face_hash_table);
 	}
@@ -5064,7 +5064,7 @@ DEFUN ("face-attributes-as-vector", Fface_attributes_as_vector,
        doc: /* Return a vector of face attributes corresponding to PLIST.  */)
   (Lisp_Object plist)
 {
-  Lisp_Object lface = make_vector (LFACE_VECTOR_SIZE, Qunspecified);
+  Lisp_Object lface = initialize_vector (LFACE_VECTOR_SIZE, Qunspecified);
   merge_face_ref (NULL, XFRAME (selected_frame),
                   plist, XVECTOR (lface)->contents,
                   true, NULL, 0);
