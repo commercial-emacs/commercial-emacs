@@ -4167,6 +4167,7 @@ xi_populate_device_from_info (struct xi_device_t *xi_device,
    about the device and also touchscreen tracking information, instead
    of just scroll valuators.  */
 
+/* Free all XI2 devices on dpyinfo.  */
 static void
 x_init_master_valuators (struct x_display_info *dpyinfo)
 {
@@ -4364,7 +4365,6 @@ x_cr_destroy_frame_context (struct frame *f)
       cairo_destroy (FRAME_CR_CONTEXT (f));
       FRAME_CR_CONTEXT (f) = NULL;
     }
-}
 
 void
 x_cr_update_surface_desired_size (struct frame *f, int width, int height)
@@ -4702,6 +4702,8 @@ x_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
       cairo_clip (cr);
       cairo_mask (cr, image);
     }
+  cairo_save (cr);
+  x_cr_gc_clip (cr, f, gc);
 
   x_end_cr_clip (f);
 }
@@ -5355,6 +5357,7 @@ x_set_frame_alpha (struct frame *f)
 			 XA_CARDINAL, 32, PropModeReplace,
 			 (unsigned char *) &opac, 1);
     }
+#endif
 
   /* return unless necessary */
   {
@@ -5972,6 +5975,7 @@ static void x_scroll_bar_clear (struct frame *);
 static void x_check_font (struct frame *, struct font *);
 #endif
 
+#ifdef HAVE_XDBE
 static void
 x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
 {
