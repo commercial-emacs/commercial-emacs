@@ -2170,6 +2170,7 @@ to install it but still mark it as selected."
     (if (not updateable)
         (message "No packages to update")
       (when (and (not inhibit-queries)
+                 (not noninteractive)
                  (not (yes-or-no-p
                        (if (length= updateable 1)
                            "One package to update.  Do it? "
@@ -2177,6 +2178,14 @@ to install it but still mark it as selected."
                                  (length updateable))))))
         (user-error "Updating aborted"))
       (mapc #'package-update updateable))))
+
+(defun package--dependencies (pkg)
+  "Return a list of all dependencies PKG has.
+This is done recursively."
+  ;; Can we have circular dependencies?  Assume "nope".
+  (when-let* ((desc (cadr (assq pkg package-archive-contents)))
+              (deps (mapcar #'car (package-desc-reqs desc))))
+    (delete-dups (apply #'nconc deps (mapcar #'package--dependencies deps)))))
 
 (defun package-strip-rcs-id (str)
   "Strip RCS version ID from the version string STR.
@@ -3570,17 +3579,34 @@ immediately."
     (setq package-menu--mark-upgrades-pending t)
     (message "Waiting for refresh to finish...")))
 
-(defun package-menu--list-to-prompt (packages)
+(defun package-menu--list-to-prompt (packages &optional include-dependencies)
   "Return a string listing PACKAGES that's usable in a prompt.
 PACKAGES is a list of `package-desc' objects.
 Formats the returned string to be usable in a minibuffer
-prompt (see `package-menu--prompt-transaction-p')."
+prompt (see `package-menu--prompt-transaction-p').
+
+If INCLUDE-DEPENDENCIES, also include the number of uninstalled
+dependencies."
   ;; The case where `package' is empty is handled in
   ;; `package-menu--prompt-transaction-p' below.
-  (format "%d (%s)"
+  (format "%d (%s)%s"
           (length packages)
-          (mapconcat #'package-desc-full-name packages " ")))
-
+          (mapconcat #'package-desc-full-name packages " ")
+          (let ((deps
+                 (seq-remove
+                  #'package-installed-p
+                  (delete-dups
+                   (apply
+                    #'nconc
+                    (mapcar (lambda (package)
+                              (package--dependencies
+                               (package-desc-name package)))
+                            packages))))))
+            (if (and include-dependencies deps)
+                (if (length= deps 1)
+                    (format " plus 1 dependency")
+                  (format " plus %d dependencies" (length deps)))
+              ""))))
 
 (defun package-menu--prompt-transaction-p (delete install upgrade)
   "Prompt the user about DELETE, INSTALL, and UPGRADE.
@@ -3589,11 +3615,14 @@ Either may be nil, but not all."
   (y-or-n-p
    (concat
     (when delete
-      (format "Packages to delete: %s.  " (package-menu--list-to-prompt delete)))
+      (format "Packages to delete: %s.  "
+              (package-menu--list-to-prompt delete)))
     (when install
-      (format "Packages to install: %s.  " (package-menu--list-to-prompt install)))
+      (format "Packages to install: %s.  "
+              (package-menu--list-to-prompt install t)))
     (when upgrade
-      (format "Packages to upgrade: %s.  " (package-menu--list-to-prompt upgrade)))
+      (format "Packages to upgrade: %s.  "
+              (package-menu--list-to-prompt upgrade)))
     "Proceed? ")))
 
 
