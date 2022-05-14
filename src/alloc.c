@@ -111,9 +111,8 @@ enum mem_type
   MEM_TYPE_VBLOCK,
 };
 
-/* Conservative stack scanning (the requirement that gc knows when a C
-   pointer points to Lisp data) relies on lisp_malloc() registering
-   allocations to a red-black tree.
+/* ENABLE_CHECKING relies on lisp_malloc() registering allocations to
+   a red-black tree.
 
    A red-black tree is a binary tree "fixed" after every insertion or
    deletion such that:
@@ -283,7 +282,7 @@ pointer_align (void *ptr, int alignment)
   return (void *) ROUNDUP ((uintptr_t) ptr, alignment);
 }
 
-/* Extract the pointer hidden within O.  */
+/* Extract the lisp struct payload of A.  */
 
 static ATTRIBUTE_NO_SANITIZE_UNDEFINED void *
 XPNTR (Lisp_Object a)
@@ -3215,7 +3214,6 @@ mem_find (void *start)
   return p;
 }
 
-
 /* Insert node representing mem block of TYPE spanning START and END.
    Return the inserted node.  */
 
@@ -3266,7 +3264,6 @@ mem_insert (void *start, void *end, enum mem_type type)
 
   return x;
 }
-
 
 /* Insert node X, then rebalance red-black tree.  X is always red.  */
 
@@ -3341,7 +3338,6 @@ mem_insert_fixup (struct mem_node *x)
   mem_root->color = MEM_BLACK;
 }
 
-
 /*   (x)                   (y)
      / \                   / \
     a   (y)      ===>    (x)  c
@@ -3380,7 +3376,6 @@ mem_rotate_left (struct mem_node *x)
     x->parent = y;
 }
 
-
 /*     (x)                (Y)
        / \                / \
      (y)  c      ===>    a  (x)
@@ -3412,7 +3407,6 @@ mem_rotate_right (struct mem_node *x)
   if (x != MEM_NIL)
     x->parent = y;
 }
-
 
 static void
 mem_delete (struct mem_node *z)
@@ -3459,7 +3453,6 @@ mem_delete (struct mem_node *z)
 
   xfree (y);
 }
-
 
 /* Delete X, then rebalance red-black tree.  */
 
@@ -3539,7 +3532,6 @@ mem_delete_fixup (struct mem_node *x)
 
   x->color = MEM_BLACK;
 }
-
 
 /* Return P "made whole" as a Lisp_String if P's mem_block M
    corresponds to a Lisp_String data field.  */
@@ -5432,13 +5424,11 @@ process_mark_stack (ptrdiff_t base_sp)
       last_marked_index &= LAST_MARKED_SIZE - 1;
 #endif
 
-      /* Perform some sanity checks on the objects marked here.  Abort if
-	 we encounter an object we know is bogus.  This increases GC time
-	 by ~80%.  */
 #if GC_CHECK_MARKED_OBJECTS
 
-      /* Check that the object pointed to by PO is known to be a Lisp
-	 structure allocated from the heap.  */
+      /* Under ENABLE_CHECKING, ensure OBJ's xpntr, e.g., struct
+         Lisp_Symbol *, points to a block previously registered with
+         MEM_ROOT via lisp_malloc().  */
 #define CHECK_ALLOCATED()				\
       do {						\
 	if (pdumper_object_p (po))			\
@@ -5447,16 +5437,23 @@ process_mark_stack (ptrdiff_t base_sp)
 	      emacs_abort ();				\
 	    break;					\
 	  }						\
+	if (calloc_object_p (po))			\
+	  break;					\
 	m = mem_find (po);				\
 	if (m == MEM_NIL)				\
 	  emacs_abort ();				\
       } while (0)
 
-      /* Check that the object pointed to by PO is live, using predicate
-	 function LIVEP.  */
+      /* Under ENABLE_CHECKING, ensure OBJ's xpntr, e.g., struct
+         Lisp_Symbol *, points within a block of the appropriate
+         mem_type (a struct Lisp_String should come from a
+         MEM_TYPE_STRING block), and is also not a free-list cell, as
+         determined by argument function LIVEP.  */
 #define CHECK_LIVE(LIVEP, MEM_TYPE)			\
       do {						\
 	if (pdumper_object_p (po))			\
+	  break;					\
+	if (calloc_object_p (po))			\
 	  break;					\
 	if (! (m->type == MEM_TYPE && LIVEP (m, po)))	\
 	  emacs_abort ();				\

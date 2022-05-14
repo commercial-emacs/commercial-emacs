@@ -30,7 +30,7 @@ realloc_semispace (gc_semispace *space)
 {
   void *new_addr, *resized =
     realloc (space->block_addrs, (1 + space->nblocks) * sizeof (uintptr_t));
-  if (resized && (new_addr = xmalloc (BLOCK_NBYTES)))
+  if (resized && (new_addr = xmalloc (BLOCK_NBYTES))) // laligned, dhill.
     {
       space->block_addrs = resized;
       space->block_addrs[space->nblocks++] = new_addr;
@@ -65,8 +65,8 @@ bump_alloc_ptr (gc_semispace *space, size_t nbytes)
   if (retval)
     {
       space->words_used += nwords;
-      INT_ADD_WRAPV ((intptr_t) space->alloc_ptr, nbytes,
-		     (intptr_t *) &space->alloc_ptr);
+      INT_ADD_WRAPV ((uintptr_t) space->alloc_ptr, nbytes,
+		     (uintptr_t *) &space->alloc_ptr);
     }
   return retval;
 }
@@ -338,4 +338,17 @@ void test_me (void)
   bump_alloc_ptr (space_in_use, sizeof (struct Lisp_Float));
   struct Lisp_Symbol *p = (struct Lisp_Symbol *) space_in_use->block_addrs[0];
   p->u.s.pinned = false;
+}
+
+bool calloc_object_p (const void *obj)
+{
+  uintptr_t oaddr = (uintptr_t) obj;
+  for (size_t i = 0; i < space_in_use->nblocks; ++i)
+    {
+      uintptr_t start = (uintptr_t) space_in_use->block_addrs[i], end;
+      INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
+      if (start <= oaddr && oaddr < end)
+	return true;
+    }
+  return false;
 }
