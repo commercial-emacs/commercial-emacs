@@ -1993,7 +1993,8 @@ workarea attribute."
 (declare-function x-frame-list-z-order "xfns.c" (&optional display))
 (declare-function w32-frame-list-z-order "w32fns.c" (&optional display))
 (declare-function ns-frame-list-z-order "nsfns.m" (&optional display))
-(declare-function pgtk-frame-list-z-order "pgtkfns.c" (&optional display))
+;; TODO: implement this on PGTK.
+;; (declare-function pgtk-frame-list-z-order "pgtkfns.c" (&optional display))
 (declare-function haiku-frame-list-z-order "haikufns.c" (&optional display))
 
 (defun frame-list-z-order (&optional display)
@@ -2016,7 +2017,9 @@ Return nil if DISPLAY contains no Emacs frame."
      ((eq frame-type 'ns)
       (ns-frame-list-z-order display))
      ((eq frame-type 'pgtk)
-      (pgtk-frame-list-z-order display))
+      ;; This is currently not supported on PGTK.
+      ;; (pgtk-frame-list-z-order display)
+      nil)
      ((eq frame-type 'haiku)
       (haiku-frame-list-z-order display)))))
 
@@ -2433,8 +2436,8 @@ monitors."
 		       ,(display-mm-height display)))
 	   (frames . ,(frames-on-display-list display)))))))))
 
-(declare-function x-device-class (name) "x-win.el")
-(declare-function pgtk-device-class (name) "pgtk-win.el")
+(declare-function x-device-class "term/x-win.el" (name))
+(declare-function pgtk-device-class "term/pgtk-win.el" (name))
 
 (defun device-class (frame name)
   "Return the class of the device NAME for an event generated on FRAME.
