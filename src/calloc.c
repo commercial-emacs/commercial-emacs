@@ -23,7 +23,9 @@ enum
   BLOCK_NWORDS = (BLOCK_NBYTES / word_size),
 };
 
-static gc_semispace *
+/* Return new allocation pointer, or NULL for failed realloc().  */
+
+static void *
 realloc_semispace (gc_semispace *space)
 {
   void *new_addr, *resized =
@@ -33,26 +35,39 @@ realloc_semispace (gc_semispace *space)
       space->block_addrs = resized;
       space->block_addrs[space->nblocks++] = new_addr;
       space->alloc_ptr = new_addr;
+      space->words_used = 0;
       if (! space->scan_ptr)
 	space->scan_ptr = space->alloc_ptr;
+      return space->alloc_ptr;
     }
-  return space;
+  return NULL;
 }
+
+/* Before: SPACE->alloc_ptr points to ready-for-use slot X.
+           SPACE->words_used does not include slot X.
+
+   After: SPACE->words_used includes slot X.
+          SPACE->alloc_ptr points to next ready-for-use slot Y.
+
+   Returns slot X, or NULL if failed.
+*/
 
 static void *
 bump_alloc_ptr (gc_semispace *space, size_t nbytes)
 {
   void *retval = space->alloc_ptr;
+  size_t nwords = nbytes / word_size;
   eassert (nbytes > word_size);
-  space->words_used += nbytes / word_size;
-  if (! retval || space->words_used > BLOCK_NWORDS)
-    {
-      realloc_semispace (space);
-      retval = (retval == space->alloc_ptr) ? NULL : space->alloc_ptr;
-    }
+
+  if (! retval || space->words_used + nwords > BLOCK_NWORDS)
+    retval = realloc_semispace (space);
+
   if (retval)
-    INT_ADD_WRAPV ((intptr_t) space->alloc_ptr, nbytes,
-		   (intptr_t *) &space->alloc_ptr);
+    {
+      space->words_used += nwords;
+      INT_ADD_WRAPV ((intptr_t) space->alloc_ptr, nbytes,
+		     (intptr_t *) &space->alloc_ptr);
+    }
   return retval;
 }
 
