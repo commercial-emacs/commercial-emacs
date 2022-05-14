@@ -4170,8 +4170,8 @@ build_string (const char *str)
 
 extern Lisp_Object pure_cons (Lisp_Object, Lisp_Object);
 extern Lisp_Object initialize_vector (ptrdiff_t, Lisp_Object);
-extern struct Lisp_Vector *allocate_vectorlike (ptrdiff_t, bool)
-  ATTRIBUTE_RETURNS_NONNULL;
+extern struct Lisp_String *(*static_string_allocator) (void);
+extern struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t, bool);
 
 INLINE Lisp_Object
 make_vector (ptrdiff_t size)
@@ -4184,7 +4184,7 @@ make_vector (ptrdiff_t size)
      ASET (v, 1, Ffunction_can_gc ());
      ASET (v, 2, obj1);
   */
-  return make_lisp_ptr (allocate_vectorlike (size, false), Lisp_Vectorlike);
+  return make_lisp_ptr (static_vector_allocator (size, false), Lisp_Vectorlike);
 }
 
 INLINE Lisp_Object

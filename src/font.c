@@ -4183,7 +4183,7 @@ copy_font_spec (Lisp_Object font)
   CHECK_FONT (font);
 
   /* Make an uninitialized font-spec object.  */
-  spec = (struct font_spec *) allocate_vectorlike (font_spec_size, false);
+  spec = (struct font_spec *) static_vector_allocator (font_spec_size, false);
   XSETPVECTYPESIZE (spec, PVEC_FONT, FONT_SPEC_MAX,
 		    font_spec_size - FONT_SPEC_MAX);
 

@@ -377,7 +377,7 @@ js_to_lisp (id value)
       NSArray *nsarr = (NSArray *) value;
       EMACS_INT n = nsarr.count;
       Lisp_Object obj;
-      struct Lisp_Vector *p = allocate_vectorlike (n, true);
+      struct Lisp_Vector *p = static_vector_allocator (n, true);
 
       for (ptrdiff_t i = 0; i < n; ++i)
         p->contents[i] = js_to_lisp ([nsarr objectAtIndex:i]);
@@ -390,7 +390,7 @@ js_to_lisp (id value)
       NSArray *keys = nsdict.allKeys;
       ptrdiff_t n = keys.count;
       Lisp_Object obj;
-      struct Lisp_Vector *p = allocate_vectorlike (n, true);
+      struct Lisp_Vector *p = static_vector_allocator (n, true);
 
       for (ptrdiff_t i = 0; i < n; ++i)
         {

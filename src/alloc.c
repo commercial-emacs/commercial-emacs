@@ -70,6 +70,7 @@ enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 
 static bool gc_inhibited;
 struct Lisp_String *(*static_string_allocator) (void);
+struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t len, bool q_clear);
 
 #ifdef HAVE_PDUMPER
 /* Number of finalizers run: used to loop over GC until we stop
@@ -1725,7 +1726,7 @@ make_bool_vector (EMACS_INT nbits)
   if (PTRDIFF_MAX < needed_elements)
     memory_full (SIZE_MAX);
   struct Lisp_Bool_Vector *p
-    = (struct Lisp_Bool_Vector *) allocate_vectorlike (needed_elements, false);
+    = (struct Lisp_Bool_Vector *) static_vector_allocator (needed_elements, false);
   XSETVECTOR (val, p);
   XSETPVECTYPESIZE (XVECTOR (val), PVEC_BOOL_VECTOR, 0, 0);
   p->size = nbits;
@@ -2518,8 +2519,8 @@ sweep_vectors (void)
    is considered "large."
   */
 
-struct Lisp_Vector *
-allocate_vectorlike (ptrdiff_t len, bool q_clear)
+static struct Lisp_Vector *
+allocate_vector (ptrdiff_t len, bool q_clear)
 {
   ptrdiff_t nbytes = header_size + len * word_size;
   struct Lisp_Vector *p = NULL;
@@ -2604,11 +2605,11 @@ allocate_pseudovector (int memlen, int lisplen,
   eassert (lisplen <= size_max);
   eassert (memlen <= size_max + rest_max);
 
-  struct Lisp_Vector *v = allocate_vectorlike (memlen, false);
+  struct Lisp_Vector *vec = static_vector_allocator (memlen, false);
   /* Only the first LISPLEN slots will be traced normally by the GC.  */
-  memclear (v->contents, zerolen * word_size);
-  XSETPVECTYPESIZE (v, tag, lisplen, memlen - lisplen);
-  return v;
+  memclear (vec->contents, zerolen * word_size);
+  XSETPVECTYPESIZE (vec, tag, lisplen, memlen - lisplen);
+  return vec;
 }
 
 struct buffer *
@@ -2631,7 +2632,7 @@ allocate_record (EMACS_INT count)
   if (count > PSEUDOVECTOR_SIZE_MASK)
     error ("Attempt to allocate a record of %"pI"d slots; max is %d",
 	   count, PSEUDOVECTOR_SIZE_MASK);
-  struct Lisp_Vector *p = allocate_vectorlike (count, false);
+  struct Lisp_Vector *p = static_vector_allocator (count, false);
   p->header.size = count;
   XSETPVECTYPE (p, PVEC_RECORD);
   return p;
@@ -2679,7 +2680,7 @@ DEFUN ("make-vector", Fmake_vector, Smake_vector, 2, 2, 0,
 Lisp_Object
 initialize_vector (ptrdiff_t length, Lisp_Object init)
 {
-  struct Lisp_Vector *p = allocate_vectorlike (length, NILP (init));
+  struct Lisp_Vector *p = static_vector_allocator (length, NILP (init));
   if (! NILP (init))
     for (ptrdiff_t i = 0; i < length; ++i)
       p->contents[i] = init;
@@ -2754,11 +2755,11 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
 
   /* Return a copy of the prototype function with the new constant vector. */
   ptrdiff_t protosize = PVSIZE (protofun);
-  struct Lisp_Vector *v = allocate_vectorlike (protosize, false);
-  v->header = XVECTOR (protofun)->header;
-  memcpy (v->contents, XVECTOR (protofun)->contents, protosize * word_size);
-  v->contents[COMPILED_CONSTANTS] = constvec;
-  return make_lisp_ptr (v, Lisp_Vectorlike);
+  struct Lisp_Vector *vec = static_vector_allocator (protosize, false);
+  vec->header = XVECTOR (protofun)->header;
+  memcpy (vec->contents, XVECTOR (protofun)->contents, protosize * word_size);
+  vec->contents[COMPILED_CONSTANTS] = constvec;
+  return make_lisp_ptr (vec, Lisp_Vectorlike);
 }
 
 struct symbol_block
@@ -3059,8 +3060,8 @@ run_finalizers (struct Lisp_Finalizer *finalizers)
 
 DEFUN ("make-finalizer", Fmake_finalizer, Smake_finalizer, 1, 1, 0,
        doc: /* Wrap FUNCTION in a finalizer (similar to destructor).
-+FUNCTION is called in an end-run around gc once its finalizer object
-+becomes unreachable or only reachable from other finalizers.  */)
+FUNCTION is called in an end-run around gc once its finalizer object
+becomes unreachable or only reachable from other finalizers.  */)
   (Lisp_Object function)
 {
   CHECK_TYPE (FUNCTIONP (function), Qfunctionp, function);
@@ -6439,6 +6440,7 @@ init_runtime (void)
   purebeg = PUREBEG;
   pure_size = PURESIZE;
   static_string_allocator = &allocate_string;
+  static_vector_allocator = &allocate_vector;
   mem_init ();
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);

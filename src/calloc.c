@@ -5,10 +5,11 @@
 // the same array and a void pointer can't point into any array
 // because you can't have an array with void elements.
 typedef struct gc_semispace {
-  void *objects;
+  void **block_addrs;
   void *alloc_ptr;
   void *scan_ptr;
-  size_t words_total, words_used;
+  size_t nblocks;
+  size_t words_used;
 } gc_semispace;
 
 static gc_semispace space0;
@@ -25,20 +26,13 @@ enum
 static gc_semispace *
 realloc_semispace (gc_semispace *space)
 {
-  /* If realloc() fails, the original block is left un-touched; it is
-     not freed or moved. -- MALLOC(3) */
-  void *resized = lrealloc ((void *) space->objects,
-			    space->words_total * word_size + BLOCK_NBYTES);
-  if (resized)
+  void *new_addr, *resized =
+    realloc (space->block_addrs, (1 + space->nblocks) * sizeof (uintptr_t));
+  if (resized && (new_addr = xmalloc (BLOCK_NBYTES)))
     {
-      if (resized != (void *) space->objects)
-	{
-	  // uh oh
-	}
-      space->objects = resized;
-      space->words_total += BLOCK_NWORDS;
-      if (! space->alloc_ptr)
-	space->alloc_ptr = space->objects;
+      space->block_addrs = resized;
+      space->block_addrs[space->nblocks++] = new_addr;
+      space->alloc_ptr = new_addr;
       if (! space->scan_ptr)
 	space->scan_ptr = space->alloc_ptr;
     }
@@ -48,13 +42,17 @@ realloc_semispace (gc_semispace *space)
 static void *
 bump_alloc_ptr (gc_semispace *space, size_t nbytes)
 {
-  void *retval;
+  void *retval = space->alloc_ptr;
   eassert (nbytes > word_size);
   space->words_used += nbytes / word_size;
-  if (space->words_used > space->words_total)
-    realloc_semispace (space);
-  retval = space->alloc_ptr;
-  INT_ADD_WRAPV ((intptr_t) space->alloc_ptr, nbytes, (intptr_t *) &space->alloc_ptr);
+  if (! retval || space->words_used > BLOCK_NWORDS)
+    {
+      realloc_semispace (space);
+      retval = (retval == space->alloc_ptr) ? NULL : space->alloc_ptr;
+    }
+  if (retval)
+    INT_ADD_WRAPV ((intptr_t) space->alloc_ptr, nbytes,
+		   (intptr_t *) &space->alloc_ptr);
   return retval;
 }
 
@@ -72,33 +70,55 @@ DEFUN ("ccons", Fccons, Sccons, 2, 2, 0,
   return val;
 }
 
-DEFUN ("cvector", Fcvector, Scvector, 0, MANY, 0,
-       doc: /* Return a newly created vector with specified arguments as elements.
-Allows any number of arguments, including zero.
-usage: (vector &rest OBJECTS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
+static void
+restore_vector_allocator (void *ptr)
 {
-  struct Lisp_Vector *p;
-  Lisp_Object val;
+  static_vector_allocator = ptr;
+}
+
+static struct Lisp_Vector *
+allocate_vector (ptrdiff_t nargs, bool q_clear)
+{
+  struct Lisp_Vector *ret = NULL;
+  eassert (nargs >= 0);
 
   if (nargs > min (MOST_POSITIVE_FIXNUM,
 		   (min (PTRDIFF_MAX, SIZE_MAX) - header_size) / word_size))
     memory_full (SIZE_MAX);
-
-  if (nargs == 0)
-    val = make_lisp_ptr (XVECTOR (zero_vector), Lisp_Vectorlike);
+  else if (nargs == 0)
+    ret = XVECTOR (zero_vector);
   else
     {
-      ptrdiff_t nbytes = nargs * sizeof (Lisp_Object);
-      XSETVECTOR (val, bump_alloc_ptr (space_in_use, nbytes));
-      bytes_since_gc += header_size + nbytes;
+      ptrdiff_t nbytes = header_size + nargs * sizeof (Lisp_Object);
+      ret = bump_alloc_ptr (space_in_use, nbytes);
+      ret->header.size = nargs;
+      bytes_since_gc += nbytes;
       vector_cells_consed += nargs;
     }
-  p = XVECTOR (val);
-  p->header.size = nargs;
-  memcpy (p->contents, args, nargs * sizeof *args);
+  return ret;
+}
 
-  return val;
+DEFUN ("cmake-vector", Fcmake_vector, Scmake_vector, 2, 2, 0,
+       doc: /* Return a new vector of LENGTH instances of INIT.  */)
+  (Lisp_Object length, Lisp_Object init)
+{
+  specpdl_ref count = SPECPDL_INDEX ();
+  CHECK_TYPE (FIXNATP (length) && XFIXNAT (length) <= PTRDIFF_MAX,
+	      Qwholenump, length);
+  record_unwind_protect_ptr (restore_vector_allocator, static_vector_allocator);
+  static_vector_allocator = &allocate_vector;
+  return unbind_to (count, initialize_vector (XFIXNAT (length), init));
+}
+
+DEFUN ("cvector", Fcvector, Scvector, 0, MANY, 0,
+       doc: /* Return a new vector containing the specified ARGS.
+ARGS can be empty, yielding the empty vector.  */)
+  (ptrdiff_t nargs, Lisp_Object *args)
+{
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (restore_vector_allocator, static_vector_allocator);
+  static_vector_allocator = &allocate_vector;
+  return unbind_to (count, Fvector (nargs, args));
 }
 
 static void
@@ -112,8 +132,11 @@ allocate_string (void)
 {
   struct Lisp_String *s =
     bump_alloc_ptr (space_in_use, sizeof (struct Lisp_String));
-  ++strings_consed;
-  bytes_since_gc += sizeof *s;
+  if (s)
+    {
+      ++strings_consed;
+      bytes_since_gc += sizeof *s;
+    }
   return s;
 }
 
@@ -247,9 +270,12 @@ LENGTH must be a number.  INIT matters only in whether it is t or nil.  */)
   (Lisp_Object length, Lisp_Object init)
 {
   Lisp_Object val;
+  specpdl_ref count = SPECPDL_INDEX ();
 
   CHECK_FIXNAT (length);
-  val = make_bool_vector (XFIXNAT (length));
+  record_unwind_protect_ptr (restore_vector_allocator, static_vector_allocator);
+  static_vector_allocator = &allocate_vector;
+  val = unbind_to (count, make_bool_vector(XFIXNAT (length)));
   return bool_vector_fill (val, init);
 }
 
@@ -259,14 +285,15 @@ Allows any number of arguments, including zero.
 usage: (bool-vector &rest OBJECTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  ptrdiff_t i;
-  Lisp_Object vector;
+  Lisp_Object val;
+  specpdl_ref count = SPECPDL_INDEX ();
 
-  vector = make_bool_vector (nargs);
-  for (i = 0; i < nargs; i++)
-    bool_vector_set (vector, i, ! NILP (args[i]));
-
-  return vector;
+  record_unwind_protect_ptr (restore_vector_allocator, static_vector_allocator);
+  static_vector_allocator = &allocate_vector;
+  val = unbind_to (count, make_bool_vector (nargs));
+  for (ptrdiff_t i = 0; i < nargs; i++)
+    bool_vector_set (val, i, ! NILP (args[i]));
+  return val;
 }
 
 void
@@ -278,6 +305,7 @@ syms_of_calloc (void)
 
   defsubr (&Sccons);
   defsubr (&Scvector);
+  defsubr (&Scmake_vector);
   defsubr (&Scmake_string);
   defsubr (&Scmake_bool_vector);
   defsubr (&Scbool_vector);
@@ -293,6 +321,6 @@ void test_me (void)
   (void) space1;
   bump_alloc_ptr (space_in_use, sizeof (struct Lisp_Symbol));
   bump_alloc_ptr (space_in_use, sizeof (struct Lisp_Float));
-  struct Lisp_Symbol *p = (struct Lisp_Symbol *) space_in_use->objects;
+  struct Lisp_Symbol *p = (struct Lisp_Symbol *) space_in_use->block_addrs[0];
   p->u.s.pinned = false;
 }
