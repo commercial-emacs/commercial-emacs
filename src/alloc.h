@@ -78,14 +78,6 @@
 # define GC_CHECK_MARKED_OBJECTS 1
 #endif
 
-/* GC_MALLOC_CHECK defined means perform validity checks of malloc'd
-   memory.  Can do this only if using gmalloc.c and if not checking
-   marked objects.  */
-
-#if (defined SYSTEM_MALLOC || defined HYBRID_MALLOC || GC_CHECK_MARKED_OBJECTS)
-#undef GC_MALLOC_CHECK
-#endif
-
 #include <unistd.h>
 #include <fcntl.h>
 

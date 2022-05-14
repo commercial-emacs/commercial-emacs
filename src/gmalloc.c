@@ -357,7 +357,7 @@ size_t __malloc_extra_blocks;
 /* Number of info entries.  */
 static size_t heapsize;
 
-#if defined GC_MALLOC_CHECK && defined GC_PROTECT_MALLOC_STATE
+#if 0
 
 /* Some code for hunting a bug writing into _heapinfo.
 
@@ -750,10 +750,7 @@ _malloc_internal_nolock (size_t size)
 	{
 	  /* No free fragments of the desired size, so get a new block
 	     and break it into fragments, returning the first.  */
-#ifdef GC_MALLOC_CHECK
-	  result = _malloc_internal_nolock (BLOCKSIZE);
-	  PROTECT_MALLOC_STATE (0);
-#elif defined (USE_PTHREAD)
+#if defined (USE_PTHREAD)
 	  result = _malloc_internal_nolock (BLOCKSIZE);
 #else
 	  result = malloc (BLOCKSIZE);
@@ -1175,7 +1172,7 @@ _free_internal_nolock (void *ptr)
 	  _chunks_free -= BLOCKSIZE >> type;
 	  _bytes_free -= BLOCKSIZE;
 
-#if defined (GC_MALLOC_CHECK) || defined (USE_PTHREAD)
+#if defined (USE_PTHREAD)
 	  _free_internal_nolock (ADDRESS (block));
 #else
 	  free (ADDRESS (block));

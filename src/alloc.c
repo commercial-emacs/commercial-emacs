@@ -246,12 +246,6 @@ deadp (Lisp_Object x)
   return EQ (x, dead_object ());
 }
 
-#ifdef GC_MALLOC_CHECK
-
-enum mem_type allocated_mem_type;
-
-#endif /* GC_MALLOC_CHECK */
-
 /* Root of the tree describing allocated Lisp memory.  */
 
 static struct mem_node *mem_root;
@@ -561,11 +555,6 @@ static void *
 lisp_malloc (size_t nbytes, bool q_clear, enum mem_type type)
 {
   register void *val;
-
-#ifdef GC_MALLOC_CHECK
-  allocated_mem_type = type;
-#endif
-
   val = lmalloc (nbytes, q_clear);
 
 #if ! USE_LSB_TAG
@@ -585,10 +574,8 @@ lisp_malloc (size_t nbytes, bool q_clear, enum mem_type type)
     }
 #endif
 
-#ifndef GC_MALLOC_CHECK
   if (val && type != MEM_TYPE_NON_LISP)
     mem_insert (val, (char *) val + nbytes, type);
-#endif
 
   if (! val)
     memory_full (nbytes);
@@ -605,9 +592,7 @@ lisp_free (void *block)
   if (block && ! pdumper_object_p (block))
     {
       free (block);
-#ifndef GC_MALLOC_CHECK
       mem_delete (mem_find (block));
-#endif
     }
 }
 
@@ -819,10 +804,6 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
 
   eassert (nbytes < BLOCK_ALIGN);
 
-#ifdef GC_MALLOC_CHECK
-  allocated_mem_type = type;
-#endif
-
   if (! free_ablock)
     {
       int i;
@@ -884,10 +865,8 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
   val = free_ablock;
   free_ablock = free_ablock->x.next_free;
 
-#ifndef GC_MALLOC_CHECK
   if (type != MEM_TYPE_NON_LISP)
     mem_insert (val, (char *) val + nbytes, type);
-#endif
 
   MALLOC_PROBE (nbytes);
 
@@ -901,9 +880,8 @@ lisp_align_free (void *block)
   struct ablock *ablock = block;
   struct ablocks *abase = ABLOCK_ABASE (ablock);
 
-#ifndef GC_MALLOC_CHECK
   mem_delete (mem_find (block));
-#endif
+
   /* Put on free list.  */
   ablock->x.next_free = free_ablock;
   free_ablock = ablock;
@@ -2240,10 +2218,8 @@ allocate_vector_block (void)
 {
   struct vector_block *block = xmalloc (sizeof *block);
 
-#ifndef GC_MALLOC_CHECK
   mem_insert (block->data, block->data + VBLOCK_NBYTES,
 	      MEM_TYPE_VBLOCK);
-#endif
 
   block->next = vector_blocks;
   vector_blocks = block;
@@ -2462,9 +2438,7 @@ sweep_vectors (void)
 	     assignment, then nothing in the block was marked.
 	     Harvest it back to OS.  */
 	  *bprev = block->next;
-#ifndef GC_MALLOC_CHECK
 	  mem_delete (mem_find (block->data));
-#endif
 	  xfree (block);
 	}
       else
@@ -2553,7 +2527,7 @@ allocate_vector (ptrdiff_t len, bool q_clear)
 	  eassert (restbytes || index == exact);
 	  /* Either leave no residual or one big enough to sustain a
 	     non-degenerate vector.  A hanging chad of MEM_TYPE_VBLOCK
-	     triggers all manner of GC_MALLOC_CHECK failures.  */
+	     triggers all manner of ENABLE_CHECKING failures.  */
 	  if (! restbytes || restbytes >= LISP_VECTOR_MIN)
 	    if (vector_free_lists[index])
 	      {
@@ -3268,13 +3242,7 @@ mem_insert (void *start, void *end, enum mem_type type)
     }
 
   /* Create a new node.  */
-#ifdef GC_MALLOC_CHECK
-  x = malloc (sizeof *x);
-  if (x == NULL)
-    emacs_abort ();
-#else
   x = xmalloc (sizeof *x);
-#endif
   x->start = start;
   x->end = end;
   x->type = type;
@@ -3489,11 +3457,7 @@ mem_delete (struct mem_node *z)
   if (y->color == MEM_BLACK)
     mem_delete_fixup (x);
 
-#ifdef GC_MALLOC_CHECK
-  free (y);
-#else
   xfree (y);
-#endif
 }
 
 

@@ -253,13 +253,13 @@ Frames, windows, buffers, and subprocesses count as vectors
   (but the contents of a buffer's text do not count here).  */)
   (void)
 {
-  return  list (make_int (cons_cells_consed),
-		make_int (floats_consed),
-		make_int (vector_cells_consed),
-		make_int (symbols_consed),
-		make_int (string_chars_consed),
-		make_int (intervals_consed),
-		make_int (strings_consed));
+  return list (make_int (cons_cells_consed),
+	       make_int (floats_consed),
+	       make_int (vector_cells_consed),
+	       make_int (symbols_consed),
+	       make_int (string_chars_consed),
+	       make_int (intervals_consed),
+	       make_int (strings_consed));
 }
 
 bool
