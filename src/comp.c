@@ -745,7 +745,7 @@ For internal use.  */)
   (Lisp_Object subr)
 {
   return concat2 (Fsubr_name (subr),
-		  Fprin1_to_string (Fsubr_arity (subr), Qnil));
+		  Fprin1_to_string (Fsubr_arity (subr), Qnil, Qnil));
 }
 
 /* Produce a key hashing Vcomp_subr_list.  */
@@ -1589,7 +1589,7 @@ static gcc_jit_lvalue *
 emit_lisp_obj_reloc_lval (Lisp_Object obj)
 {
   emit_comment (format_string ("l-value for lisp obj: %s",
-			       SSDATA (Fprin1_to_string (obj, Qnil))));
+			       SSDATA (Fprin1_to_string (obj, Qnil, Qnil))));
 
   imm_reloc_t reloc = obj_to_reloc (obj);
   return gcc_jit_context_new_array_access (comp.ctxt,
@@ -1602,7 +1602,7 @@ static gcc_jit_rvalue *
 emit_lisp_obj_rval (Lisp_Object obj)
 {
   emit_comment (format_string ("const lisp obj: %s",
-			       SSDATA (Fprin1_to_string (obj, Qnil))));
+			       SSDATA (Fprin1_to_string (obj, Qnil, Qnil))));
 
   if (NILP (obj))
     {
@@ -1827,7 +1827,7 @@ emit_mvar_rval (Lisp_Object mvar)
 	    SSDATA (
 	      Fprin1_to_string (
 		NILP (func) ? value : CALL1I (comp-func-c-name, func),
-		Qnil)));
+		Qnil, Qnil)));
 	}
       if (FIXNUMP (value))
 	{
@@ -2324,7 +2324,7 @@ emit_limple_insn (Lisp_Object insn)
   else if (EQ (op, Qsetimm))
     {
       /* Ex: (setimm #s(comp-mvar 9 1 t 3 nil) a).  */
-      emit_comment (SSDATA (Fprin1_to_string (arg[1], Qnil)));
+      emit_comment (SSDATA (Fprin1_to_string (arg[1], Qnil, Qnil)));
       imm_reloc_t reloc = obj_to_reloc (arg[1]);
       emit_frame_assignment (
 	arg[0],
@@ -2500,7 +2500,7 @@ emit_static_object (const char *name, Lisp_Object obj)
   specbind (intern_c_string ("print-quoted"), Qt);
   specbind (intern_c_string ("print-gensym"), Qt);
   specbind (intern_c_string ("print-circle"), Qt);
-  Lisp_Object str = Fprin1_to_string (obj, Qnil);
+  Lisp_Object str = Fprin1_to_string (obj, Qnil, Qnil);
   unbind_to (count, Qnil);
 
   ptrdiff_t len = SBYTES (str);
