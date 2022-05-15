@@ -30,7 +30,7 @@ realloc_semispace (gc_semispace *space)
 {
   void *new_addr, *resized =
     realloc (space->block_addrs, (1 + space->nblocks) * sizeof (uintptr_t));
-  if (resized && (new_addr = xmalloc (BLOCK_NBYTES))) // laligned, dhill.
+  if (resized && (new_addr = xmalloc (BLOCK_NBYTES))) // laligned, chill.
     {
       space->block_addrs = resized;
       space->block_addrs[space->nblocks++] = new_addr;
