@@ -49,17 +49,16 @@ Roughly every hour.
 
 Install Rust library:
 ```bash
-git clone --depth 1 --branch 0.6.3alpha4 \
+git clone --depth 1 --branch 0.6.3alpha5 \
   https://github.com/commercial-emacs/tree-sitter.git
 make -C tree-sitter install
-pkg-config --exact-version=0.6.3alpha4 tree-sitter || echo not found
+pkg-config --exact-version=0.6.3alpha5 tree-sitter || echo not found
 ```
 
 Then build emacs:
 ```bash
 ./autogen.sh
-LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" \
-  ./configure --prefix=$HOME/.local --with-tree-sitter
+./configure --prefix=$HOME/.local --with-tree-sitter
 make -j4
 ldd src/emacs | grep -q tree-sitter || echo not found
 make test/src/tree-sitter-tests
