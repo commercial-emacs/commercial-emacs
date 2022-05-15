@@ -976,37 +976,18 @@ mark_interval_tree (INTERVAL i)
     traverse_intervals_noorder (i, mark_interval_tree_1, NULL);
 }
 
-/* Lisp_Strings are allocated in string_block structures.  When a new
-   string_block is allocated, all the Lisp_Strings it contains are
-   added to a free list string_free_list.  When a new Lisp_String is
-   needed, it is taken from that list.  During the sweep phase of GC,
-   string_blocks that are entirely free are freed, except two which
-   we keep.
+/* Lisp_Strings are doled from `struct string_block`s, and hold no
+   actual data.
 
-   String data is allocated from sblock structures.  Strings larger
-   than LARGE_STRING_THRESH, get their own sblock, data for smaller
-   strings is sub-allocated out of sblocks of size SBLOCK_NBYTES.
+   Storage for actual data is doled from `struct sblock`s.  Strings
+   larger than LARGE_STRING_THRESH, get their own sblock.
 
-   Sblocks consist internally of sdata structures, one for each
-   Lisp_String.  The sdata structure points to the Lisp_String it
-   belongs to.  The Lisp_String points back to the `u.data' member of
-   its sdata structure.
-
-   When a Lisp_String is freed during GC, it is put back on
-   string_free_list, and its DATA member and its sdata's STRING
-   pointer are set to null.  The size of the string is recorded in the
-   N.NBYTES member of the sdata.  So, sdata structures that are no
-   longer used, can be easily recognized, and it's easy to compact the
-   sblocks of small strings which we do in compact_small_strings.  */
+   But the indirection does not end there.
+*/
 
 struct sdata
 {
-  /* Back-pointer to the string this sdata belongs to.  If null, this
-     structure is free, and NBYTES (in this structure or in the union below)
-     contains the string's byte size (the same value that STRING_BYTES
-     would return if STRING were non-null).  If non-null, STRING_BYTES
-     (STRING) is the size of the data, and DATA contains the string's
-     contents.  */
+  /* Back-pointer to the Lisp_String whose u.s.data points to DATA.  */
   struct Lisp_String *string;
 
 #ifdef GC_CHECK_STRING_BYTES
@@ -1016,14 +997,16 @@ struct sdata
   unsigned char data[FLEXIBLE_ARRAY_MEMBER];
 };
 
-/* A union describing string memory sub-allocated from an sblock.
-   This is where the contents of Lisp strings are stored.  */
+/* Eggert needed a common interface to an element in sblock.DATA
+   which could either hold a Lisp_String *
+
+  */
 
 typedef union
 {
   struct Lisp_String *string;
 
-  /* When STRING is null.  */
+
   struct
   {
     struct Lisp_String *string;
@@ -1031,26 +1014,13 @@ typedef union
   } n;
 } sdata;
 
-#define SDATA_NBYTES(S)	(S)->n.nbytes
-#define SDATA_DATA(S)	((struct sdata *) (S))->data
-
-enum { SDATA_DATA_OFFSET = offsetof (struct sdata, data) };
-
-/* Structure describing a block of memory which is sub-allocated to
-   obtain string data memory for strings.  Blocks for small strings
-   are of fixed size SBLOCK_NBYTES.  Blocks for large strings are made
-   as large as needed.  */
-
 struct sblock
 {
-  /* Next in list.  */
   struct sblock *next;
 
-  /* Pointer to the next free sdata block.  This points past the end
-     of the sblock if there isn't any space left in this block.  */
+  /* Points to next available sdata in DATA.
+     Points past end of sblock of none available.  */
   sdata *next_free;
-
-  /* String data.  */
   sdata data[FLEXIBLE_ARRAY_MEMBER];
 };
 
@@ -1061,27 +1031,27 @@ struct string_block
   struct string_block *next;
 };
 
-/* Head and tail of the list of sblock structures holding Lisp string
-   data.  We always allocate from current_sblock.  The NEXT pointers
-   in the sblock structures go from oldest_sblock to current_sblock.  */
+/* The NEXT pointers point in the direction of oldest_sblock to
+   current_sblock.  We always allocate from current_sblock.  */
 
 static struct sblock *oldest_sblock, *current_sblock;
 static struct sblock *large_sblocks;
 static struct string_block *string_blocks;
 static struct Lisp_String *string_free_list;
 
+#define SDATA_NBYTES(S)	(S)->n.nbytes
+#define SDATA_DATA(S)	((struct sdata *) (S))->data
+
+enum { SDATA_DATA_OFFSET = offsetof (struct sdata, data) };
+
 /* Given a pointer to a Lisp_String S which is on string_free_list,
    return a pointer to its successor in the free list.  */
 
 #define NEXT_FREE_LISP_STRING(S) ((S)->u.next)
 
-/* Return a pointer to the sdata structure belonging to Lisp string S.
-   S must be live, i.e. S->data must not be null.  S->data is actually
-   a pointer to the `u.data' member of its sdata structure; the
-   structure starts at a constant offset in front of that.  */
+/* Return a pointer to the sdata union.  */
 
 #define SDATA_OF_STRING(S) ((sdata *) ((S)->u.s.data - SDATA_DATA_OFFSET))
-
 
 #ifdef GC_CHECK_STRING_OVERRUN
 
@@ -1141,7 +1111,7 @@ init_strings (void)
 
 static int check_string_bytes_count;
 
-/* Like STRING_BYTES, but with debugging check.  Can be
+/* Like macro STRING_BYTES, but with debugging check.  Can be
    called during GC, so pay attention to the mark bit.  */
 
 ptrdiff_t
@@ -1161,7 +1131,7 @@ string_bytes (struct Lisp_String *s)
 static void
 check_sblock (struct sblock *b)
 {
-  for (sdata *from = b->data, end =  b->next_free; from < end; )
+  for (sdata *from = b->data, end = b->next_free; from < end; )
     {
       ptrdiff_t nbytes = sdata_size (from->string
 				     ? string_bytes (from->string)
@@ -1232,21 +1202,23 @@ allocate_string (void)
 {
   struct Lisp_String *s;
 
-  /* If the free list is empty, allocate a new string_block, and
-     add all the Lisp_Strings in it to the free list.  */
+  /* Our normal scheme: chunks begin life on a newly allocated block,
+     then get reclaimed as links in the free list.
+
+     For strings, however, chunks begin life on the free list.
+
+     It's largely a bureacratic distinction since in either scheme, we
+     only allocate new blocks when all the free list is spoken for.  */
   if (string_free_list == NULL)
     {
       struct string_block *b = lisp_malloc (sizeof *b, false, MEM_TYPE_STRING);
-      int i;
-
       b->next = string_blocks;
       string_blocks = b;
 
-      for (i = BLOCK_NSTRINGS - 1; i >= 0; --i)
+      for (int i = BLOCK_NSTRINGS - 1; i >= 0; --i)
 	{
 	  s = b->strings + i;
-	  /* Every string on a free list should have NULL data pointer.  */
-	  s->u.s.data = NULL;
+	  s->u.s.data = NULL; /* invariant for free-list strings */
 	  NEXT_FREE_LISP_STRING (s) = string_free_list;
 	  string_free_list = s;
 	}
@@ -1277,11 +1249,10 @@ allocate_string (void)
   return s;
 }
 
-/* Set up Lisp_String S for holding NCHARS characters, NBYTES bytes,
-   plus a NUL byte at the end.  Allocate an sdata structure DATA for
-   S, and set S->u.s.data to SDATA->u.data.  Store a NUL byte at the
-   end of S->u.s.data.  Set S->u.s.size to NCHARS and S->u.s.size_byte
-   to NBYTES.  Free S->u.s.data if it were initially non-null.  */
+/* Populate S with the next free `struct sdata` in CURRENT_SBLOCK.
+
+   Large strings get their own sblock in LARGE_SBLOCKS.
+*/
 
 static void
 allocate_string_data (struct Lisp_String *s,
@@ -1291,6 +1262,8 @@ allocate_string_data (struct Lisp_String *s,
   sdata *data;
   struct sblock *b;
   ptrdiff_t sdata_nbytes;
+
+  eassert (nbytes >= nchars);
 
   if (nbytes > STRING_BYTES_MAX)
     error ("Requested %ld bytes exceeds %ld", nbytes, STRING_BYTES_MAX);
@@ -1340,7 +1313,7 @@ allocate_string_data (struct Lisp_String *s,
 #endif
   s->u.s.size = nchars;
   s->u.s.size_byte = nbytes;
-  s->u.s.data[nbytes] = '\0';
+  s->u.s.data[nbytes] = '\0'; /* NBYTES is exclusive of the NUL terminator. */
 #ifdef GC_CHECK_STRING_OVERRUN
   memcpy ((char *) data + sdata_nbytes, string_overrun_cookie,
 	  GC_STRING_OVERRUN_COOKIE_SIZE);
@@ -1405,31 +1378,31 @@ resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
 static void
 sweep_strings (void)
 {
-  struct string_block *b, *next;
   struct string_block *live_blocks = NULL;
 
-  string_free_list = NULL;
-  gcstat.total_string_bytes = gcstat.total_strings
-    = gcstat.total_free_strings = 0;
+  gcstat.total_string_bytes
+    = gcstat.total_strings
+    = gcstat.total_free_strings
+    = 0;
 
-  /* Scan strings_blocks, free Lisp_Strings that aren't marked.  */
-  for (b = string_blocks; b; b = next)
+  string_free_list = NULL;
+
+  for (struct string_block *next, *b = string_blocks; b != NULL; b = next)
     {
       int i, nfree = 0;
-      struct Lisp_String *free_list_before = string_free_list;
+      struct Lisp_String *restore_free_list = string_free_list;
 
-      next = b->next;
+      next = b->next; /* B might not exist later, so store NEXT now.  */
 
       for (i = 0; i < BLOCK_NSTRINGS; ++i)
 	{
 	  struct Lisp_String *s = b->strings + i;
 
-	  if (s->u.s.data)
+	  if (s->u.s.data != NULL) /* means S not on free list.  */
 	    {
-	      /* String was not on free list before.  */
 	      if (XSTRING_MARKED_P (s))
 		{
-		  /* String is live; unmark it and its intervals.  */
+		  /* String is live; unmark for next cycle.  */
 		  XUNMARK_STRING (s);
 
 		  /* Do not use string_(set|get)_intervals here.  */
@@ -1440,46 +1413,46 @@ sweep_strings (void)
 		}
 	      else
 		{
-		  /* String is dead.  Put it on the free list.  */
+		  /* String is dead.  */
 		  sdata *data = SDATA_OF_STRING (s);
 
-		  /* Save the size of S in its sdata so that we know
-		     how large that is.  Reset the sdata's string
-		     back-pointer so that we know it's free.  */
 #ifdef GC_CHECK_STRING_BYTES
 		  if (string_bytes (s) != SDATA_NBYTES (data))
 		    emacs_abort ();
 #else
+		  /* Save we'll need to easily iterate over this
+		     reclaimed sdatum in compact_small_strings().  */
 		  data->n.nbytes = STRING_BYTES (s);
 #endif
+		  /* Reset string back-pointer so we know it's free.  */
 		  data->string = NULL;
 
-		  /* Reset the strings's `data' member so that we
-		     know it's free.  */
+		  /* Invariant of free-list strings.  */
 		  s->u.s.data = NULL;
 
-		  /* Put the string on the free list.  */
+		  /* Put on free list.  */
 		  NEXT_FREE_LISP_STRING (s) = string_free_list;
 		  string_free_list = s;
 		  ++nfree;
 		}
 	    }
-	  else
+	  else /* s->u.s.data == NULL */
 	    {
-	      /* S was on the free list before.  Put it there again.  */
+	      /* S inexplicably not already on free list.  */
 	      NEXT_FREE_LISP_STRING (s) = string_free_list;
 	      string_free_list = s;
 	      ++nfree;
 	    }
-	}
+	} /* for each Lisp_String in block B.  */
 
-      /* Free blocks that contain free Lisp_Strings only, except
-	 the first two of them.  */
-      if (nfree == BLOCK_NSTRINGS
+      if (/* B contains only free-list entries...  */
+	  nfree >= BLOCK_NSTRINGS
+	  /* ... and B not among first two such reclaimed blocks.  */
 	  && gcstat.total_free_strings > BLOCK_NSTRINGS)
 	{
+	  /* Harvest B back to OS.  */
 	  lisp_free (b);
-	  string_free_list = free_list_before;
+	  string_free_list = restore_free_list;
 	}
       else
 	{
@@ -1487,7 +1460,7 @@ sweep_strings (void)
 	  b->next = live_blocks;
 	  live_blocks = b;
 	}
-    }
+    } /* for each string block B.  */
 
   check_string_free_list ();
 
@@ -1572,7 +1545,7 @@ compact_small_strings (void)
 #endif
 
 	      /* Non-NULL S means it's alive.  Copy its data.  */
-	      if (s)
+	      if (s != NULL)
 		{
 		  /* If TB is full, proceed with the next sblock.  */
 		  sdata *to_end = (sdata *) ((char *) to
@@ -5394,11 +5367,14 @@ mark_stack_push_n (Lisp_Object *values, ptrdiff_t n)
     }
 }
 
-/* Traverse and mark objects on the mark stack above BASE_SP.
+/* Mark the MARK_STK above BASE_SP.
 
-   Traversal is depth-first using the mark stack for most common
-   object types.  Recursion is used for other types whose object
-   depths presumably wouldn't overwhelm the call stack.  */
+   Until commit 7a8798d, recursively calling mark_object() could
+   easily overwhelm the call stack, which MARK_STK deftly circumvents.
+   However, we still recursively mark_object() less common Lisp types
+   like pseudovectors whose object depths presumably wouldn't trigger
+   our pre-7a8798d problems.  */
+
 static void
 process_mark_stack (ptrdiff_t base_sp)
 {
@@ -5494,8 +5470,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	    set_string_marked (ptr);
 	    mark_interval_tree (ptr->u.s.intervals);
 #ifdef GC_CHECK_STRING_BYTES
-	    /* Check that the string size recorded in the string is the
-	       same as the one recorded in the sdata structure.  */
+	    /* Check string and sdata recorded sizes match.  */
 	    string_bytes (ptr);
 #endif /* GC_CHECK_STRING_BYTES */
 	  }
@@ -5647,7 +5622,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		break;
 	      default: emacs_abort ();
 	      }
-	    if (!PURE_P (XSTRING (ptr->u.s.name)))
+	    if (! PURE_P (XSTRING (ptr->u.s.name)))
 	      set_string_marked (XSTRING (ptr->u.s.name));
 	    mark_interval_tree (string_intervals (ptr->u.s.name));
 	    /* Inner loop to mark next symbol in this bucket, if any.  */

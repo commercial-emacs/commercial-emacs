@@ -1468,7 +1468,7 @@ struct Lisp_String
     struct
     {
       ptrdiff_t size;           /* MSB is used as the markbit.  */
-      ptrdiff_t size_byte;      /* Set to -1 for unibyte strings,
+      ptrdiff_t size_byte;      /* -1 for unibyte strings,
 				   -2 for data in rodata,
 				   -3 for immovable unibyte strings.  */
       INTERVAL intervals;	/* Text properties in this string.  */
