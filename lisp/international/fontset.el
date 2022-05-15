@@ -184,6 +184,8 @@
 	(runic #x16A0)
 	(khmer #x1780)
 	(mongolian #x1826)
+        (tai-le #x1950)
+        (tai-lue #x1980)
         (tai-tham #x1A20 #x1A55 #x1A61 #x1A80)
 	(symbol . [#x201C #x2200 #x2500])
 	(braille #x2800)
@@ -194,6 +196,7 @@
 	(kanbun #x319D)
 	(han #x5B57)
 	(yi #xA288)
+        (syloti-nagri #xA807 #xA823 #xA82C)
 	(javanese #xA980)
 	(cham #xAA00)
 	(tai-viet #xAA80)
@@ -438,7 +441,7 @@
 	(syrc . syriac)
 	(tglg . tagalog)
 	(tagb . tagbanwa)
-	(tale . tai_le)
+	(tale . tai-le)
 	(talu . tai-lue)
 	(lana . tai-tham)
 	(tavt . tai-viet)
@@ -748,6 +751,7 @@
 		    symbol
 		    braille
 		    yi
+                    syloti-nagri
                     javanese
 		    tai-viet
 		    aegean-number
