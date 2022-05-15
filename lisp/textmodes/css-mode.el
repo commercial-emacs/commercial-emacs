@@ -269,6 +269,10 @@
     ("resize" "none" "both" "horizontal" "vertical")
     ("text-overflow" "clip" "ellipsis" string)
 
+    ;; CSS Cascading and Inheritance Level 3
+    ;; (https://www.w3.org/TR/css-cascade-3/#property-index)
+    ("all")
+
     ;; CSS Color Module Level 3
     ;; (https://www.w3.org/TR/css3-color/#property)
     ("color" color)
@@ -304,27 +308,27 @@
 
     ;; CSS Box Alignment Module Level 3
     ;; (https://www.w3.org/TR/css-align-3/#property-index)
-    ("align-content"
-     baseline-position content-distribution overflow-position content-position)
-    ("align-items"
-     "normal" "stretch" baseline-position overflow-position self-position)
-    ("align-self"
-     "auto" "normal" "stretch"
-     baseline-position overflow-position self-position)
-    ("justify-content" "normal"
-     content-distribution overflow-position content-position "left" "right")
-    ("justify-items"
-     "normal" "stretch" baseline-position overflow-position self-position
-     "left" "right" "legacy")
-    ("justify-self"
-     "auto" "normal" "stretch" baseline-position overflow-position self-position
-     "left" "right")
+    ("align-content" baseline-position content-distribution
+     overflow-position content-position)
+    ("align-items" "normal" "stretch" baseline-position
+     overflow-position self-position)
+    ("align-self" "auto" "normal" "stretch" baseline-position
+     overflow-position self-position)
+    ("column-gap" "normal" length-percentage)
+    ("gap" row-gap column-gap)
+    ("justify-content" "normal" content-distribution overflow-position
+     content-position "left" "right")
+    ("justify-items" "normal" "stretch" baseline-position
+     overflow-position self-position "left" "right" "legacy" "center")
+    ("justify-self" "auto" "normal" "stretch" baseline-position
+     overflow-position self-position "left" "right")
     ("place-content" align-content justify-content)
     ("place-items" align-items justify-items)
     ("place-self" justify-self align-self)
+    ("row-gap" "normal" length-percentage)
 
-    ;; CSS Flexible Box Layout Module Level 2
-    ;; (https://www.w3.org/TR/css-flexbox-2/#property-index)
+    ;; CSS Flexible Box Layout Module Level 1
+    ;; (https://www.w3.org/TR/css-flexbox-1/#property-index)
     ("flex" "none" flex-grow flex-shrink flex-basis)
     ("flex-basis" "auto" "content" width)
     ("flex-direction" "row" "row-reverse" "column" "column-reverse")
@@ -413,21 +417,20 @@
     ("mask-type" "luminance" "alpha")
     ("clip" "rect()" "auto")
 
-    ;; CSS Multi-column Layout Module
+    ;; CSS Multi-column Layout Module Level 1
     ;; (https://www.w3.org/TR/css3-multicol/#property-index)
     ;; "break-after", "break-before", and "break-inside" are left out
     ;; below, because they're already included in CSS Fragmentation
     ;; Module Level 3.
-    ("column-count" integer "auto")
-    ("column-fill" "auto" "balance")
-    ("column-gap" length "normal")
+    ("column-count" "auto" integer)
+    ("column-fill" "auto" "balance" "balance-all")
     ("column-rule" column-rule-width column-rule-style
-     column-rule-color "transparent")
+     column-rule-color)
     ("column-rule-color" color)
-    ("column-rule-style" border-style)
-    ("column-rule-width" border-width)
+    ("column-rule-style" line-style)
+    ("column-rule-width" line-width)
     ("column-span" "none" "all")
-    ("column-width" length "auto")
+    ("column-width" "auto" length)
     ("columns" column-width column-count)
 
     ;; CSS Overflow Module Level 3
