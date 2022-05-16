@@ -228,8 +228,7 @@ static void gc_sweep (void);
 static Lisp_Object make_pure_vector (ptrdiff_t);
 static void mark_buffer (struct buffer *);
 
-static void compact_small_strings (void);
-static void free_large_strings (void);
+static void sweep_sdata (void);
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 
 static bool vectorlike_marked_p (union vectorlike_header const *);
@@ -982,7 +981,9 @@ mark_interval_tree (INTERVAL i)
    Storage for actual data is doled from `struct sblock`s.  Strings
    larger than LARGE_STRING_THRESH, get their own sblock.
 
-   But the indirection does not end there.
+   Rename functions and variables so that "string" means Lisp_String, and
+   "sdata" means the actual data.  Right now, everything is called "string"
+   and it's impossible to know what's being acted upon.
 */
 
 typedef struct sdata
@@ -1381,8 +1382,8 @@ sweep_strings (void)
 		  if (string_bytes (s) != data->nbytes)
 		    emacs_abort ();
 #else
-		  /* Save we'll need to easily iterate over this
-		     reclaimed sdatum in compact_small_strings().  */
+		  /* Save length so that sweep_sdata() knows how far
+		     to move the hare-tortoise pointers.  */
 		  data->nbytes = STRING_BYTES (s);
 #endif
 		  /* Reset string back-pointer so we know it's free.  */
@@ -1426,19 +1427,17 @@ sweep_strings (void)
   check_string_free_list ();
 
   string_blocks = live_blocks;
-  free_large_strings ();
-  compact_small_strings ();
+  sweep_sdata ();
 
   check_string_free_list ();
 }
 
 static void
-free_large_strings (void)
+sweep_sdata (void)
 {
-  struct sblock *b, *next;
-  struct sblock *live_blocks = NULL;
-
-  for (b = large_sblocks; b; b = next)
+  /* Simple sweep of large sblocks.  Side effect: reverses list.  */
+  struct sblock *swept_large_sblocks = NULL;
+  for (struct sblock *next, *b = large_sblocks; b != NULL; b = next)
     {
       next = b->next;
 
@@ -1446,25 +1445,30 @@ free_large_strings (void)
 	lisp_free (b);
       else
 	{
-	  b->next = live_blocks;
-	  live_blocks = b;
+	  b->next = swept_large_sblocks;
+	  swept_large_sblocks = b;
 	}
     }
+  large_sblocks = swept_large_sblocks;
 
-  large_sblocks = live_blocks;
-}
+  /* Less simple compaction of non-large sblocks.
 
-static void
-compact_small_strings (void)
-{
-  /* TB is the sblock we copy to.  */
+     TB is the "to block", or the prevailing memmove destination sblock.
+     B is the "from block", or the current memmove source sblock.
+
+     The TO sdata tortoise lags with TB.
+     The FROM sdata hare iterates over current B.
+
+     We memmove FROM to TO for all B in the sblock list
+     (oldest_sblock...current_sblock), and therein lies the
+     compaction.
+  */
   struct sblock *tb = oldest_sblock;
   if (tb)
     {
       sdata *end_tb = (sdata *) ((char *) tb + SBLOCK_NBYTES);
       sdata *to = tb->data;
 
-      /* FROM is hare, TO is tortoise.  And therein lies the compaction.  */
       for (struct sblock *b = tb; b != NULL; b = b->next)
 	{
 	  eassert ((char *) b->next_free <= (char *) b + SBLOCK_NBYTES);
@@ -1530,7 +1534,6 @@ compact_small_strings (void)
       tb->next_free = to;
       tb->next = NULL;
     }
-
   current_sblock = tb;
 }
 
