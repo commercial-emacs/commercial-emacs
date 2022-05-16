@@ -1257,7 +1257,10 @@ Note: does not update the layout."
   "Save treeview group settings."
   (interactive)
   (let ((coding-system-for-write 'utf-8)
-        (buf (find-file-noselect (concat newsticker-dir "/groups"))))
+        (buf (find-file-noselect (expand-file-name "groups"
+                                                    newsticker-dir)))
+        (print-length nil)
+        (print-level nil))
     (when buf
       (with-current-buffer buf
         (setq buffer-undo-list t)
@@ -1270,7 +1273,8 @@ Note: does not update the layout."
 (defun newsticker--treeview-load ()
   "Load treeview settings."
   (let* ((coding-system-for-read 'utf-8)
-         (filename (concat newsticker-dir "/groups"))
+         (filename (concat (file-name-as-directory newsticker-dir)
+                           "groups"))
          (buf (and (file-exists-p filename)
                    (find-file-noselect filename))))
     (when buf
