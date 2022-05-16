@@ -1,6 +1,5 @@
 #include <alloc.h>
 
-/* struct Lisp_Symbol symbols[BLOCK_NSYMBOLS]; */
 // Subtraction of pointers is only defined when they both point into
 // the same array and a void pointer can't point into any array
 // because you can't have an array with void elements.

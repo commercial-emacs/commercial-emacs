@@ -1336,9 +1336,6 @@ resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
   return new_charaddr;
 }
 
-
-/* Sweep and compact strings.  */
-
 static void
 sweep_strings (void)
 {
@@ -1362,11 +1359,11 @@ sweep_strings (void)
 	{
 	  struct Lisp_String *s = b->strings + i;
 
-	  if (s->u.s.data != NULL) /* means S not on free list.  */
+	  if (s->u.s.data != NULL) /* means S is live but is it marked?  */
 	    {
 	      if (XSTRING_MARKED_P (s))
 		{
-		  /* String is live; unmark for next cycle.  */
+		  /* S shall remain in live state.  */
 		  XUNMARK_STRING (s);
 
 		  /* Do not use string_(set|get)_intervals here.  */
@@ -1377,7 +1374,7 @@ sweep_strings (void)
 		}
 	      else
 		{
-		  /* String is dead.  */
+		  /* S goes to dead state.  */
 		  sdata *data = SDATA_OF_LISP_STRING (s);
 
 #ifdef GC_CHECK_STRING_BYTES
@@ -1457,35 +1454,28 @@ free_large_strings (void)
   large_sblocks = live_blocks;
 }
 
-/* Compact data of small strings.  Free sblocks that don't contain
-   data of live strings after compaction.  */
-
 static void
 compact_small_strings (void)
 {
-  /* TB is the sblock we copy to, TO is the sdata within TB we copy
-     to, and TB_END is the end of TB.  */
+  /* TB is the sblock we copy to.  */
   struct sblock *tb = oldest_sblock;
   if (tb)
     {
-      sdata *tb_end = (sdata *) ((char *) tb + SBLOCK_NBYTES);
+      sdata *end_tb = (sdata *) ((char *) tb + SBLOCK_NBYTES);
       sdata *to = tb->data;
 
-      /* Step through the blocks from the oldest to the youngest.  We
-	 expect that old blocks will stabilize over time, so that less
-	 copying will happen this way.  */
-      struct sblock *b = tb;
-      do
+      /* FROM is hare, TO is tortoise.  And therein lies the compaction.  */
+      for (struct sblock *b = tb; b != NULL; b = b->next)
 	{
-	  sdata *end = b->next_free;
-	  eassert ((char *) end <= (char *) b + SBLOCK_NBYTES);
-
-	  for (sdata *from = b->data; from < end; )
+	  eassert ((char *) b->next_free <= (char *) b + SBLOCK_NBYTES);
+	  for (sdata *next_from, *end_from = b->next_free, *from = b->data;
+	       from < end_from;
+	       from = next_from)
 	    {
-	      /* Compute the next FROM here because copying below may
-		 overwrite data we need to compute it.  */
-	      ptrdiff_t nbytes;
 	      struct Lisp_String *s = from->string;
+	      const ptrdiff_t nbytes = s ? STRING_BYTES (s) : from->nbytes;
+	      const ptrdiff_t step = sdata_size (nbytes) + GC_STRING_EXTRA;
+	      eassert (nbytes <= LARGE_STRING_THRESH);
 
 #ifdef GC_CHECK_STRING_BYTES
 	      /* Check that the string size recorded in the string is the
@@ -1494,55 +1484,43 @@ compact_small_strings (void)
 		emacs_abort ();
 #endif /* GC_CHECK_STRING_BYTES */
 
-	      nbytes = s ? STRING_BYTES (s) : from->nbytes;
-	      eassert (nbytes <= LARGE_STRING_THRESH);
-
-	      ptrdiff_t size = sdata_size (nbytes);
-	      sdata *from_end = (sdata *) ((char *) from
-					   + size + GC_STRING_EXTRA);
+	      /* Compute NEXT_FROM now before FROM can mutate.  */
+	      next_from = (sdata *) ((char *) from + step);
 
 #ifdef GC_CHECK_STRING_OVERRUN
 	      if (memcmp (string_overrun_cookie,
-			  (char *) from_end - GC_STRING_OVERRUN_COOKIE_SIZE,
+			  (char *) next_from - GC_STRING_OVERRUN_COOKIE_SIZE,
 			  GC_STRING_OVERRUN_COOKIE_SIZE))
 		emacs_abort ();
 #endif
 
-	      /* Non-NULL S means it's alive.  Copy its data.  */
-	      if (s != NULL)
+	      if (s != NULL) /* a live string to be compacted */
 		{
-		  /* If TB is full, proceed with the next sblock.  */
-		  sdata *to_end = (sdata *) ((char *) to
-					     + size + GC_STRING_EXTRA);
-		  if (to_end > tb_end)
+		  sdata *next_to = (sdata *) ((char *) to + step);
+		  if (next_to > end_tb)
 		    {
+		      /* TB is full, proceed with the next sblock.  */
 		      tb->next_free = to;
 		      tb = tb->next;
-		      tb_end = (sdata *) ((char *) tb + SBLOCK_NBYTES);
+		      end_tb = (sdata *) ((char *) tb + SBLOCK_NBYTES);
 		      to = tb->data;
-		      to_end = (sdata *) ((char *) to + size + GC_STRING_EXTRA);
+		      next_to = (sdata *) ((char *) to + step);
 		    }
 
-		  /* Copy, and update the string's `data' pointer.  */
 		  if (from != to)
 		    {
 		      eassert (tb != b || to < from);
-		      memmove (to, from, size + GC_STRING_EXTRA);
+		      memmove (to, from, step);
 		      to->string->u.s.data = to->data;
 		    }
 
-		  /* Advance past the sdata we copied to.  */
-		  to = to_end;
+		  to = next_to;
 		}
-	      from = from_end;
 	    }
-	  b = b->next;
 	}
-      while (b);
 
-      /* The rest of the sblocks following TB don't contain live data, so
-	 we can free them.  */
-      for (b = tb->next; b; )
+      /* Any sblocks following TB can be free'd.  */
+      for (struct sblock *b = tb->next; b != NULL; )
 	{
 	  struct sblock *next = b->next;
 	  lisp_free (b);
@@ -1782,9 +1760,9 @@ pin_string (Lisp_Object string)
   ptrdiff_t size = STRING_BYTES (s);
   unsigned char *data = s->u.s.data;
 
-  if (!(size > LARGE_STRING_THRESH
-	|| PURE_P (data) || pdumper_object_p (data)
-	|| s->u.s.size_byte == -3))
+  if (size <= LARGE_STRING_THRESH
+      && ! PURE_P (data) && ! pdumper_object_p (data)
+      && s->u.s.size_byte != -3)
     {
       eassert (s->u.s.size_byte == -1);
       sdata *old_sdata = SDATA_OF_LISP_STRING (s);
