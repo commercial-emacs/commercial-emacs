@@ -456,7 +456,7 @@ syms_of_calloc (void)
   defsubr (&Scmemory_use_counts);
 }
 
-bool calloc_object_p (const void *obj)
+bool calloc_xpntr_p (const void *obj)
 {
   uintptr_t oaddr = (uintptr_t) obj;
   for (size_t i = 0; i < space_in_use->nblocks; ++i)

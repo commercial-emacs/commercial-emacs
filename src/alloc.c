@@ -5043,7 +5043,7 @@ static void
 cmark_object (Lisp_Object obj)
 {
   mark_object (obj);
-  if (STRINGP (obj) && calloc_object_p (XSTRING (obj)))
+  if (STRINGP (obj) && calloc_xpntr_p (XSTRING (obj)))
     XSETSTRING (obj, gc_flip_xpntr (XSTRING (obj), sizeof (struct Lisp_String),
 				    Lisp_String));
 }
@@ -5344,7 +5344,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      emacs_abort ();				\
 	    break;					\
 	  }						\
-	if (calloc_object_p (po))			\
+	if (calloc_xpntr_p (po))			\
 	  break;					\
 	m = mem_find (po);				\
 	if (m == MEM_NIL)				\
@@ -5360,7 +5360,7 @@ process_mark_stack (ptrdiff_t base_sp)
       do {						\
 	if (pdumper_object_p (po))			\
 	  break;					\
-	if (calloc_object_p (po))			\
+	if (calloc_xpntr_p (po))			\
 	  break;					\
 	if (! (m->type == MEM_TYPE && LIVEP (m, po)))	\
 	  emacs_abort ();				\
