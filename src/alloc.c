@@ -2571,6 +2571,7 @@ initialize_vector (ptrdiff_t length, Lisp_Object init)
 
 DEFUN ("vector", Fvector, Svector, 0, MANY, 0,
        doc: /* Return a new vector containing the specified ARGS.
+usage: (vector &rest ARGS)
 ARGS can be empty, yielding the empty vector.  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
@@ -3029,10 +3030,22 @@ string_marked_p (const struct Lisp_String *s)
 }
 
 static void
-set_string_marked (struct Lisp_String *s)
+set_string_marked (struct Lisp_String *s, Lisp_Object *obj)
 {
   if (pdumper_object_p (s))
     pdumper_set_marked (s);
+  else if (calloc_xpntr_p (s))
+    {
+      /* Do not use string_(set|get)_intervals here.  */
+      s->u.s.intervals = balance_intervals (s->u.s.intervals);
+      XSETSTRING (*obj, gc_flip_xpntr (s, sizeof (struct Lisp_String),
+				       Lisp_String));
+      sdata *data = SDATA_OF_LISP_STRING (s);
+      if (data->string != s)
+	eassert (data->string == XSTRING (*obj));
+      else
+	data->string = XSTRING (*obj);
+    }
   else
     XMARK_STRING (s);
 }
@@ -5050,15 +5063,6 @@ mark_vectorlike (union vectorlike_header *header)
    symbols.  */
 
 static void
-cmark_object (Lisp_Object obj)
-{
-  mark_object (obj);
-  if (STRINGP (obj) && calloc_xpntr_p (XSTRING (obj)))
-    XSETSTRING (obj, gc_flip_xpntr (XSTRING (obj), sizeof (struct Lisp_String),
-				    Lisp_String));
-}
-
-static void
 mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
 {
   eassert (! vector_marked_p (ptr));
@@ -5075,7 +5079,7 @@ mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
           (! SYMBOLP (val) || ! symbol_marked_p (XSYMBOL (val))))
 	{
 	  if (! SUB_CHAR_TABLE_P (val))
-	    cmark_object (val);
+	    mark_object (val);
 	  else if (! vector_marked_p (XVECTOR (val)))
 	    mark_char_table (XVECTOR (val), PVEC_SUB_CHAR_TABLE);
 	}
@@ -5408,7 +5412,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	    if (string_marked_p (ptr))
 	      break;
 	    CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
-	    set_string_marked (ptr);
+	    set_string_marked (ptr, &obj);
 	    mark_interval_tree (ptr->u.s.intervals);
 #ifdef GC_CHECK_STRING_BYTES
 	    /* Check string and sdata recorded sizes match.  */
@@ -5564,7 +5568,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      default: emacs_abort ();
 	      }
 	    if (! PURE_P (XSTRING (ptr->u.s.name)))
-	      set_string_marked (XSTRING (ptr->u.s.name));
+	      set_string_marked (XSTRING (ptr->u.s.name), &obj);
 	    mark_interval_tree (string_intervals (ptr->u.s.name));
 	    /* Inner loop to mark next symbol in this bucket, if any.  */
 	    po = ptr = ptr->u.s.next;

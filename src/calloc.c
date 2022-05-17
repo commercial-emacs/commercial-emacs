@@ -27,6 +27,19 @@ static gc_semispace space0;
 static gc_semispace space1;
 static gc_semispace *space_in_use = &space0;
 
+static const uintptr_t term_block_magic = 0xDEADBEEF;
+static const uintptr_t next_fwd_magic = 0xF00DF4CE;
+
+#define TERM_BLOCK(addr) (*(uintptr_t *) addr = term_block_magic)
+#define TERM_BLOCK_P(addr) (*(uintptr_t *)addr == term_block_magic)
+#define FORWARD_XPNTR_SET(from,to)			\
+  do {						\
+    *(uintptr_t *) from = next_fwd_magic;	\
+    *((uintptr_t *) from+1) = (uintptr_t) to;	\
+  } while (0);
+#define FORWARD_XPNTR_P(addr) (*(uintptr_t *)addr == next_fwd_magic)
+#define FORWARD_XPNTR_GET(addr)					\
+  (FORWARD_XPNTR_P (addr) ? (void *)(*((uintptr_t *)addr+1)) : NULL)
 
 /* Return new allocation pointer, or NULL for failed realloc().  */
 static void *
@@ -96,14 +109,14 @@ bump_alloc_ptr (gc_semispace *space, size_t nbytes, enum Lisp_Type objtype)
 {
   void *retval = space->alloc_ptr;
   size_t nwords = nbytes / word_size;
-  eassert (nbytes > word_size);
+  eassert (nbytes >= 2 * word_size);
 
   /* knock off a word so we've room to add a NUL sentinel.  */
   if (! retval || space->words_used + nwords > (BLOCK_NWORDS - 1))
     {
       /* Terminate current block, then add new block.  */
       if (retval)
-	*(char *) retval = '\0';
+	TERM_BLOCK (retval);
       retval = realloc_semispace (space);
     }
 
@@ -138,9 +151,16 @@ bump_alloc_ptr (gc_semispace *space, size_t nbytes, enum Lisp_Type objtype)
 void *
 gc_flip_xpntr (void *xpntr, size_t nbytes, enum Lisp_Type objtype)
 {
-  gc_semispace *to = (space_in_use == &space0) ? &space1 : &space0;
-  void *ret = bump_alloc_ptr (to, nbytes, objtype);
-  memcpy (ret, xpntr, nbytes);
+  gc_semispace *from = space_in_use,
+    *to = (from == &space0) ? &space1 : &space0;
+  void *ret = FORWARD_XPNTR_GET (xpntr);
+  if (! ret)
+    {
+      ret = bump_alloc_ptr (to, nbytes, objtype);
+      memcpy (ret, xpntr, nbytes);
+      FORWARD_XPNTR_SET (xpntr, ret);
+      eassert (FORWARD_XPNTR_GET (xpntr) == ret);
+    }
   return ret;
 }
 
@@ -153,38 +173,27 @@ gc_flip_space (void)
     {
       enum Lisp_Type objtype;
       for (void *obj = from->block_addrs[b];
-	   obj != from->alloc_ptr && *(char *) obj;
+	   obj != from->alloc_ptr && ! TERM_BLOCK_P (obj);
 	   INT_ADD_WRAPV ((uintptr_t) obj, nbytes_of (objtype, obj),
 			  (uintptr_t *) &obj))
 	{
 	  objtype = from->flatmap[i++];
-	  if (objtype == Lisp_String)
+	  if (objtype == Lisp_String && ! FORWARD_XPNTR_P (obj))
 	    {
 	      struct Lisp_String *s = (struct Lisp_String *) obj;
 
-	      if (XSTRING_MARKED_P (s))
-		{
-		  /* S shall remain in live state.  */
-		  XUNMARK_STRING (s);
+	      /* S goes to dead state.  */
+	      sdata *data = SDATA_OF_LISP_STRING (s);
 
-		  /* Do not use string_(set|get)_intervals here.  */
-		  s->u.s.intervals = balance_intervals (s->u.s.intervals);
-		}
-	      else
-		{
-		  /* S goes to dead state.  */
-		  sdata *data = SDATA_OF_LISP_STRING (s);
+	      /* Save length so that sweep_sdata() knows how far
+		 to move the hare-tortoise pointers.  */
+	      eassert (data->nbytes == STRING_BYTES (s));
 
-		  /* Save length so that sweep_sdata() knows how far
-		     to move the hare-tortoise pointers.  */
-		  eassert (data->nbytes == STRING_BYTES (s));
+	      /* sweep_sdata() needs this for compaction.  */
+	      data->string = NULL;
 
-		  /* sweep_sdata() needs this for compaction.  */
-		  data->string = NULL;
-
-		  /* Invariant of free-list Lisp_String.  */
-		  s->u.s.data = NULL;
-		}
+	      /* Invariant of free-list Lisp_String.  */
+	      s->u.s.data = NULL;
 	    }
 	}
     }
@@ -252,6 +261,7 @@ DEFUN ("cmake-vector", Fcmake_vector, Scmake_vector, 2, 2, 0,
 
 DEFUN ("cvector", Fcvector, Scvector, 0, MANY, 0,
        doc: /* Return a new vector containing the specified ARGS.
+usage: (cvector &rest ARGS)
 ARGS can be empty, yielding the empty vector.  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
@@ -458,13 +468,17 @@ syms_of_calloc (void)
 
 bool calloc_xpntr_p (const void *obj)
 {
+  static gc_semispace *arr[2] = { &space0, &space1 };
   uintptr_t oaddr = (uintptr_t) obj;
-  for (size_t i = 0; i < space_in_use->nblocks; ++i)
+  for (int space = 0; space < 2; ++space)
     {
-      uintptr_t start = (uintptr_t) space_in_use->block_addrs[i], end;
-      INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
-      if (start <= oaddr && oaddr < end)
-	return true;
+      for (size_t i = 0; i < arr[space]->nblocks; ++i)
+	{
+	  uintptr_t start = (uintptr_t) arr[space]->block_addrs[i], end;
+	  INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
+	  if (start <= oaddr && oaddr < end)
+	    return true;
+	}
     }
   return false;
 }

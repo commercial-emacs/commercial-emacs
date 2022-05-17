@@ -30,7 +30,6 @@
 #include "blockinput.h"
 #include "pdumper.h"
 #include "termhooks.h"		/* For struct terminal.  */
-#include "bitset.h"
 #include "getpagesize.h"
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
