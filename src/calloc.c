@@ -18,7 +18,7 @@ typedef struct gc_semispace
   void *scan_ptr;
   size_t nblocks;
   size_t words_used;
-  unsigned char *flatmap;
+  enum Lisp_Type *flatmap;
   size_t flatidx;
   size_t flatsize;
 } gc_semispace;
@@ -111,10 +111,10 @@ bump_alloc_ptr (gc_semispace *space, size_t nbytes, enum Lisp_Type objtype)
     {
       if (space->flatidx >= space->flatsize)
 	{
-	  unsigned char *resized = realloc (space->flatmap,
-					    (space->flatsize + 1)
-					    * BLOCK_NWORDS // arbitrary
-					    * sizeof (unsigned char));
+	  enum Lisp_Type *resized = realloc (space->flatmap,
+					     (space->flatsize + 1)
+					     * BLOCK_NWORDS // arbitrary
+					     * sizeof (enum Lisp_Type));
 	  if (resized)
 	    {
 	      space->flatmap = resized;

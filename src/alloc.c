@@ -5967,7 +5967,6 @@ sweep_buffers (void)
     }
 }
 
-/* Sweep: find all structures not marked, and free them.  */
 static void
 gc_sweep (void)
 {

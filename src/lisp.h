@@ -456,8 +456,7 @@ typedef EMACS_INT Lisp_Word;
 #define ENUM_BF(TYPE) enum TYPE
 #endif
 
-
-enum Lisp_Type
+enum _GL_ATTRIBUTE_PACKED Lisp_Type
   {
     /* Symbol.  XSYMBOL (object) points to a struct Lisp_Symbol.  */
     Lisp_Symbol = 0,
@@ -489,7 +488,7 @@ enum Lisp_Type
 /* These are the types of forwarding objects used in the value slot
    of symbols for special built-in variables whose value is stored in
    C variables.  */
-enum Lisp_Fwd_Type
+enum _GL_ATTRIBUTE_PACKED Lisp_Fwd_Type
   {
     Lisp_Fwd_Int,		/* Fwd to a C `int' variable.  */
     Lisp_Fwd_Bool,		/* Fwd to a C boolean var.  */
