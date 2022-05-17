@@ -206,6 +206,11 @@ struct xsettings
   unsigned seen;
 };
 
+#ifdef HAVE_PGTK
+/* The cairo font_options as obtained using gsettings.  */
+static cairo_font_options_t *font_options;
+#endif
+
 #ifdef HAVE_GSETTINGS
 #define GSETTINGS_SCHEMA         "org.gnome.desktop.interface"
 #define GSETTINGS_TOOL_BAR_STYLE "toolbar-style"
@@ -225,10 +230,7 @@ struct xsettings
 
 static GSettings *gsettings_client;
 
-#ifdef HAVE_PGTK
-
-/* The cairo font_options as obtained using gsettings.  */
-static cairo_font_options_t *font_options;
+#if defined HAVE_PGTK && defined HAVE_GSETTINGS
 
 static bool
 xg_settings_key_valid_p (GSettings *settings, const char *key)
@@ -253,6 +255,9 @@ xg_settings_key_valid_p (GSettings *settings, const char *key)
 #endif
 }
 
+#endif
+
+#ifdef HAVE_PGTK
 /* Store an event for re-rendering of the fonts.  */
 static void
 store_font_options_changed (void)
@@ -1206,7 +1211,11 @@ xsettings_get_system_normal_font (void)
 cairo_font_options_t *
 xsettings_get_font_options (void)
 {
-  return cairo_font_options_copy (font_options);
+  if (font_options != NULL)
+    return cairo_font_options_copy (font_options);
+  else
+    /* GSettings is not configured.  */
+    return cairo_font_options_create ();
 }
 #endif
 
