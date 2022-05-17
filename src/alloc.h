@@ -144,6 +144,19 @@ typedef union {
 
 enum { LISP_ALIGNMENT = alignof (Lisp_Aligned) };
 
+typedef struct sdata
+{
+  /* Back-pointer to the Lisp_String whose u.s.data points to DATA.  */
+  struct Lisp_String *string;
+  ptrdiff_t nbytes;
+  unsigned char data[FLEXIBLE_ARRAY_MEMBER];
+} sdata;
+
+/* confusing: SDATA() in lisp.h refers to "Lisp_String data", but
+   here refers to `struct sdata`.  */
+#define SDATA_OF_LISP_STRING(S) \
+  ((sdata *) ((S)->u.s.data - FLEXSIZEOF (struct sdata, data, 0)))
+
 struct mem_node *mem_find (void *start);
 
 /* Analogous to pdumper_object_p().  Return whether the OBJ points
@@ -151,6 +164,6 @@ struct mem_node *mem_find (void *start);
    GC_CHECK_MARKED_OBJECTS.  */
 _GL_ATTRIBUTE_CONST bool calloc_object_p (const void *obj);
 
-void test_me (void);
+void flip (void);
 
 #endif  /* EMACS_ALLOC_H */

@@ -986,14 +986,6 @@ mark_interval_tree (INTERVAL i)
    and it's impossible to know what's being acted upon.
 */
 
-typedef struct sdata
-{
-  /* Back-pointer to the Lisp_String whose u.s.data points to DATA.  */
-  struct Lisp_String *string;
-  ptrdiff_t nbytes;
-  unsigned char data[FLEXIBLE_ARRAY_MEMBER];
-} sdata;
-
 struct sblock
 {
   struct sblock *next;
@@ -1020,9 +1012,6 @@ static struct sblock *oldest_sblock, *current_sblock;
 static struct sblock *large_sblocks;
 static struct string_block *string_blocks;
 static struct Lisp_String *string_free_list;
-
-#define SDATA_OF_LISP_STRING(S) \
-  ((sdata *) ((S)->u.s.data - FLEXSIZEOF (struct sdata, data, 0)))
 
 #ifdef GC_CHECK_STRING_OVERRUN
 
@@ -1058,7 +1047,7 @@ sdata_size (ptrdiff_t n)
 /* Exact bound on the number of bytes in a string, not counting the
    terminating null.  A string cannot contain more bytes than
    STRING_BYTES_BOUND, nor can it be so long that the size_t
-   arithmetic in allocate_string_data would overflow while it is
+   arithmetic in allocate_sdata would overflow while it is
    calculating a value to be passed to malloc.  */
 static ptrdiff_t const STRING_BYTES_MAX =
   min (STRING_BYTES_BOUND,
@@ -1224,9 +1213,9 @@ allocate_string (void)
 */
 
 static void
-allocate_string_data (struct Lisp_String *s,
-		      EMACS_INT nchars, EMACS_INT nbytes,
-		      bool immovable)
+allocate_sdata (struct Lisp_String *s,
+		EMACS_INT nchars, EMACS_INT nbytes,
+		bool immovable)
 {
   sdata *the_data;
   struct sblock *b;
@@ -1319,7 +1308,7 @@ resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
     }
   else
     {
-      allocate_string_data (XSTRING (string), nchars, new_nbytes, false);
+      allocate_sdata (XSTRING (string), nchars, new_nbytes, false);
       unsigned char *new_data = SDATA (string);
       new_charaddr = new_data + cidx_byte;
       memcpy (new_charaddr + new_clen, data + cidx_byte + clen,
@@ -1378,14 +1367,10 @@ sweep_strings (void)
 		  /* S goes to dead state.  */
 		  sdata *data = SDATA_OF_LISP_STRING (s);
 
-#ifdef GC_CHECK_STRING_BYTES
-		  if (string_bytes (s) != data->nbytes)
-		    emacs_abort ();
-#else
 		  /* Save length so that sweep_sdata() knows how far
 		     to move the hare-tortoise pointers.  */
-		  data->nbytes = STRING_BYTES (s);
-#endif
+		  eassert (data->nbytes == STRING_BYTES (s));
+
 		  /* Reset string back-pointer so we know it's free.  */
 		  data->string = NULL;
 
@@ -1731,7 +1716,7 @@ new_lisp_string (EMACS_INT nchars, EMACS_INT nbytes, bool multibyte)
 
   s = static_string_allocator ();
   s->u.s.intervals = NULL;
-  allocate_string_data (s, nchars, nbytes, false);
+  allocate_sdata (s, nchars, nbytes, false);
   XSETSTRING (string, s);
   string_chars_consed += nbytes;
   if (! multibyte)
@@ -1769,7 +1754,7 @@ pin_string (Lisp_Object string)
     {
       eassert (s->u.s.size_byte == -1);
       sdata *old_sdata = SDATA_OF_LISP_STRING (s);
-      allocate_string_data (s, size, size, true);
+      allocate_sdata (s, size, size, true);
       memcpy (s->u.s.data, data, size);
       old_sdata->string = NULL;
       old_sdata->nbytes = size;
@@ -4811,9 +4796,7 @@ garbage_collect (void)
 
   start = current_timespec ();
 
-  /* Save what's currently displayed in the echo area.  Don't do that
-     if we are GC'ing because we've run out of memory, since
-     push_message will cons, and we might have no memory for that.  */
+  /* Restore what's currently displayed in the echo area.  */
   if (NILP (Vmemory_full))
     {
       message_p = push_message ();
@@ -5072,17 +5055,14 @@ mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
   for (i = idx; i < size; i++)
     {
       Lisp_Object val = ptr->contents[i];
-
-      if (FIXNUMP (val) ||
-          (SYMBOLP (val) && symbol_marked_p (XSYMBOL (val))))
-	continue;
-      if (SUB_CHAR_TABLE_P (val))
+      if (! FIXNUMP (val) &&
+          (! SYMBOLP (val) || ! symbol_marked_p (XSYMBOL (val))))
 	{
-	  if (! vector_marked_p (XVECTOR (val)))
+	  if (! SUB_CHAR_TABLE_P (val))
+	    mark_object (val);
+	  else if (! vector_marked_p (XVECTOR (val)))
 	    mark_char_table (XVECTOR (val), PVEC_SUB_CHAR_TABLE);
 	}
-      else
-	mark_object (val);
     }
 }
 
@@ -5586,7 +5566,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	    set_cons_marked (ptr);
 	    /* Avoid growing the stack if the cdr is nil.
 	       In any case, make sure the car is expanded first.  */
-	    if (!NILP (ptr->u.s.u.cdr))
+	    if (! NILP (ptr->u.s.u.cdr))
 	      {
 		mark_stack_push (ptr->u.s.u.cdr);
 #if GC_CDR_COUNT
@@ -5975,6 +5955,7 @@ sweep_buffers (void)
 static void
 gc_sweep (void)
 {
+  flip ();
   sweep_strings ();
   check_string_bytes (!noninteractive);
   sweep_conses ();

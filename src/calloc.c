@@ -3,17 +3,6 @@
 // Subtraction of pointers is only defined when they both point into
 // the same array and a void pointer can't point into any array
 // because you can't have an array with void elements.
-typedef struct gc_semispace {
-  void **block_addrs;
-  void *alloc_ptr;
-  void *scan_ptr;
-  size_t nblocks;
-  size_t words_used;
-} gc_semispace;
-
-static gc_semispace space0;
-static gc_semispace space1;
-static gc_semispace *space_in_use = &space0;
 
 enum
 {
@@ -22,16 +11,33 @@ enum
   BLOCK_NWORDS = (BLOCK_NBYTES / word_size),
 };
 
-/* Return new allocation pointer, or NULL for failed realloc().  */
+typedef struct gc_semispace
+{
+  void **block_addrs;
+  void *alloc_ptr;
+  void *scan_ptr;
+  size_t nblocks;
+  size_t words_used;
+  unsigned char *flatmap;
+  size_t flatidx;
+  size_t flatsize;
+} gc_semispace;
 
+static gc_semispace space0;
+static gc_semispace space1;
+static gc_semispace *space_in_use = &space0;
+
+
+/* Return new allocation pointer, or NULL for failed realloc().  */
 static void *
 realloc_semispace (gc_semispace *space)
 {
-  void *new_addr, *resized =
+  void *new_addr, **resized_addrs =
     realloc (space->block_addrs, (1 + space->nblocks) * sizeof (uintptr_t));
-  if (resized && (new_addr = xmalloc (BLOCK_NBYTES))) // laligned, chill.
+  if (resized_addrs
+      && (new_addr = xmalloc (BLOCK_NBYTES))) // laligned, chill.
     {
-      space->block_addrs = resized;
+      space->block_addrs = resized_addrs;
       space->block_addrs[space->nblocks++] = new_addr;
       space->alloc_ptr = new_addr;
       space->words_used = 0;
@@ -42,30 +48,129 @@ realloc_semispace (gc_semispace *space)
   return NULL;
 }
 
+static size_t
+nbytes_of (enum Lisp_Type objtype, const void *obj)
+{
+  size_t result = 0;
+  switch (objtype)
+    {
+    case Lisp_Symbol:
+      result = sizeof (struct Lisp_Symbol);
+      break;
+    case Lisp_String:
+      result = sizeof (struct Lisp_String);
+      break;
+    case Lisp_Vectorlike:
+      result = FLEXSIZEOF (struct Lisp_Vector, contents,
+			   sizeof (Lisp_Object)
+			   * (PSEUDOVECTOR_SIZE_MASK
+			      & ((const struct Lisp_Vector *) obj)->header.size));
+      break;
+    case Lisp_Cons:
+      result = sizeof (struct Lisp_Cons);
+      break;
+    case Lisp_Float:
+      result = sizeof (struct Lisp_Float);
+      break;
+    default:
+      break;
+    }
+  if (! result)
+    emacs_abort ();
+  return result;
+}
+
+void
+flip (void)
+{
+  gc_semispace *from = space_in_use,
+    *to = (from == &space0) ? &space1 : &space0;
+  for (size_t b = 0, i = 0; b < from->nblocks; ++b)
+    {
+      enum Lisp_Type objtype;
+      for (void *obj = from->block_addrs[b];
+	   obj != from->alloc_ptr && *(char *) obj;
+	   INT_ADD_WRAPV ((uintptr_t) obj, nbytes_of (objtype, obj),
+			  (uintptr_t *) &obj))
+	{
+	  objtype = from->flatmap[i++];
+	  if (objtype == Lisp_String)
+	    {
+	      struct Lisp_String *s = (struct Lisp_String *) obj;
+
+	      /* S goes to dead state.  */
+	      sdata *data = SDATA_OF_LISP_STRING (s);
+
+	      /* Save length so that sweep_sdata() knows how far
+		 to move the hare-tortoise pointers.  */
+	      eassert (data->nbytes == STRING_BYTES (s));
+
+	      /* Reset string back-pointer so we know it's free.  */
+	      data->string = NULL;
+
+	      /* Invariant of free-list strings.  */
+	      s->u.s.data = NULL;
+	    }
+	}
+    }
+  to->alloc_ptr = NULL;
+  to->scan_ptr = NULL;
+  to->words_used = 0;
+  to->flatidx = 0;
+  space_in_use = to;
+}
+
 /* Before: SPACE->alloc_ptr points to ready-for-use slot X.
            SPACE->words_used does not include slot X.
+	   SPACE->flatidx awaits OBJTYPE.
 
    After: SPACE->words_used includes slot X.
           SPACE->alloc_ptr points to next ready-for-use slot Y.
+	  SPACE->flatidx awaits next OBJTYPE.
 
    Returns slot X, or NULL if failed.
 */
 
 static void *
-bump_alloc_ptr (gc_semispace *space, size_t nbytes)
+bump_alloc_ptr (gc_semispace *space, size_t nbytes, enum Lisp_Type objtype)
 {
   void *retval = space->alloc_ptr;
   size_t nwords = nbytes / word_size;
   eassert (nbytes > word_size);
 
-  if (! retval || space->words_used + nwords > BLOCK_NWORDS)
-    retval = realloc_semispace (space);
+  /* knock off a word so we've room to add a NUL sentinel.  */
+  if (! retval || space->words_used + nwords > (BLOCK_NWORDS - 1))
+    {
+      /* Terminate current block, then add new block.  */
+      if (retval)
+	*(char *) retval = '\0';
+      retval = realloc_semispace (space);
+    }
 
   if (retval)
     {
-      space->words_used += nwords;
-      INT_ADD_WRAPV ((uintptr_t) space->alloc_ptr, nbytes,
-		     (uintptr_t *) &space->alloc_ptr);
+      if (space->flatidx >= space->flatsize)
+	{
+	  unsigned char *resized = realloc (space->flatmap,
+					    (space->flatsize + 1)
+					    * BLOCK_NWORDS // arbitrary
+					    * sizeof (unsigned char));
+	  if (resized)
+	    {
+	      space->flatmap = resized;
+	      space->flatsize += BLOCK_NWORDS;
+	    }
+	}
+
+      if (space->flatidx >= space->flatsize)
+	retval = NULL;
+      else
+	{
+	  space->flatmap[space->flatidx++] = objtype;
+	  space->words_used += nwords;
+	  INT_ADD_WRAPV ((uintptr_t) space->alloc_ptr, nbytes,
+			 (uintptr_t *) &space->alloc_ptr);
+	}
     }
   return retval;
 }
@@ -77,7 +182,7 @@ DEFUN ("ccons", Fccons, Sccons, 2, 2, 0,
 {
   Lisp_Object val;
   size_t nbytes = sizeof (struct Lisp_Cons);
-  XSETCONS (val, bump_alloc_ptr (space_in_use, nbytes));
+  XSETCONS (val, bump_alloc_ptr (space_in_use, nbytes, Lisp_Cons));
   XSETCAR (val, car);
   XSETCDR (val, cdr);
   bytes_since_gc += nbytes;
@@ -103,8 +208,9 @@ allocate_vector (ptrdiff_t nargs, bool q_clear)
     ret = XVECTOR (zero_vector);
   else
     {
-      ptrdiff_t nbytes = header_size + nargs * sizeof (Lisp_Object);
-      ret = bump_alloc_ptr (space_in_use, nbytes);
+      ptrdiff_t nbytes = FLEXSIZEOF (struct Lisp_Vector, contents,
+				     nargs * sizeof (Lisp_Object));
+      ret = bump_alloc_ptr (space_in_use, nbytes, Lisp_Vectorlike);
       ret->header.size = nargs;
       bytes_since_gc += nbytes;
       vector_cells_consed += nargs;
@@ -145,7 +251,7 @@ static struct Lisp_String *
 allocate_string (void)
 {
   struct Lisp_String *s =
-    bump_alloc_ptr (space_in_use, sizeof (struct Lisp_String));
+    bump_alloc_ptr (space_in_use, sizeof (struct Lisp_String), Lisp_String);
   if (s)
     {
       ++strings_consed;
@@ -174,7 +280,7 @@ DEFUN ("cmake-symbol", Fcmake_symbol, Scmake_symbol, 1, 1, 0,
   size_t nbytes = sizeof (struct Lisp_Symbol);
 
   CHECK_STRING (name);
-  XSETSYMBOL (val, bump_alloc_ptr (space_in_use, nbytes));
+  XSETSYMBOL (val, bump_alloc_ptr (space_in_use, nbytes, Lisp_Symbol));
   init_symbol (val, name);
   bytes_since_gc += nbytes;
   return val;
@@ -328,15 +434,6 @@ syms_of_calloc (void)
   defsubr (&Scgarbage_collect);
   defsubr (&Scmemory_protect_now);
   defsubr (&Scmemory_use_counts);
-}
-
-void test_me (void)
-{
-  (void) space1;
-  bump_alloc_ptr (space_in_use, sizeof (struct Lisp_Symbol));
-  bump_alloc_ptr (space_in_use, sizeof (struct Lisp_Float));
-  struct Lisp_Symbol *p = (struct Lisp_Symbol *) space_in_use->block_addrs[0];
-  p->u.s.pinned = false;
 }
 
 bool calloc_object_p (const void *obj)
