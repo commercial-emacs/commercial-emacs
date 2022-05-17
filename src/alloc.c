@@ -18,21 +18,42 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-/* The core gc task is marking Lisp objects in so-called vectorlikes, an
-   unfortunate umbrella term for Emacs's various structs (buffers,
+/* The core gc task is marking Lisp objects in so-called vectorlikes,
+   an unfortunate umbrella term for Emacs's various structs (buffers,
    windows, frames, etc.). "Vectorlikes" is meant to capture their
-   function as containers of heterogenous Lisp objects.
+   role as containers of both Lisp_Objects (the "vector" part) and
+   non-Lisp fields (the "like" part).  Not content with just one
+   confusing moniker, Emacs also refers to vectorlikes as
+   "pseudovectors".
 
-   Not content with just one confusing moniker, Emacs also refers to
-   vectorlikes as "pseudovectors", emphasizing their containing
-   non-Lisp member data (which an "authentic" Lisp_Vector could not).
+   Pervasive in the GC code is casting the vectorlike as a `struct
+   Lisp_Vector *`, then iterating over its N Lisp objects, say to mark
+   them from reclamation, where N is masked off from a specialized
+   header (PSEUDOVECTOR_SIZE_MASK).
 
-   Except for special cases (`struct buffer`), vectorlikes are relied upon
-   to consist of a header, Lisp_Object fields, then non-Lisp fields,
-   in that precise order.  Pervasive in the GC code is casting [1]
-   the vectorlike as a `struct Lisp_Vector *`, then iterating
-   over its N Lisp objects, say to mark them from reclamation,
-   where N is masked off from the header (PSEUDOVECTOR_SIZE_MASK).
+   The vectorlike is an obfuscator, yes, but also a mnemonic to remind
+   us that it must be so cast-able, that is, led by the word-sized
+   header, then immediately followed by a variable number of
+   Lisp_Objects.  Non-lisp fields must be placed at the end, and
+   are cleaned up outside the gc in free_by_pvtype().
+
+   The confabulation of Lisp_String and `struct sdata`.
+
+   Lisp_Strings are doled from `struct string_block`s, and hold no
+   actual data.
+
+   Storage for actual data is doled from `struct sblock`s in units of
+   `struct sdata`.  Strings larger than LARGE_STRING_THRESH, get their
+   own sblock.
+
+   A back-pointer from sdata points to its parent Lisp_String.  The
+   Lisp_String, sadly, does not point to its sdata, but rather its
+   sdata's DATA member field.  This necessitates the obfuscatory macro
+   SDATA_OF_LISP_STRING() which performs an offset calculation to
+   recover the whole sdata.  Sadly, again, SDATA_OF_LISP_STRING() is
+   easily confused with SDATA() and SSDATA(), the latter two taking
+   Lisp_Object (not `struct Lisp_String`) as the argument and
+   returning its sdata's DATA member field (not the whole sdata).
 */
 
 #include "alloc.h"
@@ -971,17 +992,6 @@ mark_interval_tree (INTERVAL i)
     traverse_intervals_noorder (i, mark_interval_tree_1, NULL);
 }
 
-/* Lisp_Strings are doled from `struct string_block`s, and hold no
-   actual data.
-
-   Storage for actual data is doled from `struct sblock`s.  Strings
-   larger than LARGE_STRING_THRESH, get their own sblock.
-
-   Rename functions and variables so that "string" means Lisp_String, and
-   "sdata" means the actual data.  Right now, everything is called "string"
-   and it's impossible to know what's being acted upon.
-*/
-
 struct sblock
 {
   struct sblock *next;
@@ -1367,10 +1377,10 @@ sweep_strings (void)
 		     to move the hare-tortoise pointers.  */
 		  eassert (data->nbytes == STRING_BYTES (s));
 
-		  /* Reset string back-pointer so we know it's free.  */
+		  /* sweep_sdata() needs this for compaction.  */
 		  data->string = NULL;
 
-		  /* Invariant of free-list strings.  */
+		  /* Invariant of free-list Lisp_Strings.  */
 		  s->u.s.data = NULL;
 
 		  /* Put on free list.  */

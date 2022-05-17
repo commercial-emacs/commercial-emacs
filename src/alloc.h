@@ -156,8 +156,6 @@ typedef struct sdata
   unsigned char data[FLEXIBLE_ARRAY_MEMBER];
 } sdata;
 
-/* confusing: SDATA() in lisp.h refers to "Lisp_String data", but
-   here refers to `struct sdata`.  */
 #define SDATA_OF_LISP_STRING(S) \
   ((sdata *) ((S)->u.s.data - FLEXSIZEOF (struct sdata, data, 0)))
 
