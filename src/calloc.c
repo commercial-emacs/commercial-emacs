@@ -179,10 +179,10 @@ gc_flip_space (void)
 		     to move the hare-tortoise pointers.  */
 		  eassert (data->nbytes == STRING_BYTES (s));
 
-		  /* Reset string back-pointer so we know it's free.  */
+		  /* sweep_sdata() needs this for compaction.  */
 		  data->string = NULL;
 
-		  /* Invariant of free-list strings.  */
+		  /* Invariant of free-list Lisp_String.  */
 		  s->u.s.data = NULL;
 		}
 	    }
