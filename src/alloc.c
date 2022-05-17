@@ -60,10 +60,6 @@ enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 /* Mark, unmark, query mark bit of a Lisp string.  S must be a pointer
    to a struct Lisp_String.  */
 
-#define XMARK_STRING(S)		((S)->u.s.size |= ARRAY_MARK_FLAG)
-#define XUNMARK_STRING(S)	((S)->u.s.size &= ~ARRAY_MARK_FLAG)
-#define XSTRING_MARKED_P(S)	(((S)->u.s.size & ARRAY_MARK_FLAG) != 0)
-
 #define XMARK_VECTOR(V)		((V)->header.size |= ARRAY_MARK_FLAG)
 #define XUNMARK_VECTOR(V)	((V)->header.size &= ~ARRAY_MARK_FLAG)
 #define XVECTOR_MARKED_P(V)	(((V)->header.size & ARRAY_MARK_FLAG) != 0)
@@ -5044,22 +5040,32 @@ mark_vectorlike (union vectorlike_header *header)
    symbols.  */
 
 static void
+cmark_object (Lisp_Object obj)
+{
+  mark_object (obj);
+  if (STRINGP (obj) && calloc_object_p (XSTRING (obj)))
+    XSETSTRING (obj, gc_flip_xpntr (XSTRING (obj), sizeof (struct Lisp_String),
+				    Lisp_String));
+}
+
+static void
 mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
 {
-  int size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
-  /* Consult the Lisp_Sub_Char_Table layout before changing this.  */
-  int i, idx = (pvectype == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_OFFSET : 0);
-
-  eassert (!vector_marked_p (ptr));
+  eassert (! vector_marked_p (ptr));
   set_vector_marked (ptr);
-  for (i = idx; i < size; i++)
+
+  for (int size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK,
+	 /* Consult Lisp_Sub_Char_Table layout before changing this.  */
+	 i = (pvectype == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_OFFSET : 0);
+       i < size;
+       ++i)
     {
       Lisp_Object val = ptr->contents[i];
       if (! FIXNUMP (val) &&
           (! SYMBOLP (val) || ! symbol_marked_p (XSYMBOL (val))))
 	{
 	  if (! SUB_CHAR_TABLE_P (val))
-	    mark_object (val);
+	    cmark_object (val);
 	  else if (! vector_marked_p (XVECTOR (val)))
 	    mark_char_table (XVECTOR (val), PVEC_SUB_CHAR_TABLE);
 	}
@@ -5955,7 +5961,7 @@ sweep_buffers (void)
 static void
 gc_sweep (void)
 {
-  flip ();
+  gc_flip_space ();
   sweep_strings ();
   check_string_bytes (!noninteractive);
   sweep_conses ();

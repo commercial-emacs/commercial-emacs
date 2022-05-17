@@ -80,46 +80,6 @@ nbytes_of (enum Lisp_Type objtype, const void *obj)
   return result;
 }
 
-void
-flip (void)
-{
-  gc_semispace *from = space_in_use,
-    *to = (from == &space0) ? &space1 : &space0;
-  for (size_t b = 0, i = 0; b < from->nblocks; ++b)
-    {
-      enum Lisp_Type objtype;
-      for (void *obj = from->block_addrs[b];
-	   obj != from->alloc_ptr && *(char *) obj;
-	   INT_ADD_WRAPV ((uintptr_t) obj, nbytes_of (objtype, obj),
-			  (uintptr_t *) &obj))
-	{
-	  objtype = from->flatmap[i++];
-	  if (objtype == Lisp_String)
-	    {
-	      struct Lisp_String *s = (struct Lisp_String *) obj;
-
-	      /* S goes to dead state.  */
-	      sdata *data = SDATA_OF_LISP_STRING (s);
-
-	      /* Save length so that sweep_sdata() knows how far
-		 to move the hare-tortoise pointers.  */
-	      eassert (data->nbytes == STRING_BYTES (s));
-
-	      /* Reset string back-pointer so we know it's free.  */
-	      data->string = NULL;
-
-	      /* Invariant of free-list strings.  */
-	      s->u.s.data = NULL;
-	    }
-	}
-    }
-  to->alloc_ptr = NULL;
-  to->scan_ptr = NULL;
-  to->words_used = 0;
-  to->flatidx = 0;
-  space_in_use = to;
-}
-
 /* Before: SPACE->alloc_ptr points to ready-for-use slot X.
            SPACE->words_used does not include slot X.
 	   SPACE->flatidx awaits OBJTYPE.
@@ -173,6 +133,66 @@ bump_alloc_ptr (gc_semispace *space, size_t nbytes, enum Lisp_Type objtype)
 	}
     }
   return retval;
+}
+
+void *
+gc_flip_xpntr (void *xpntr, size_t nbytes, enum Lisp_Type objtype)
+{
+  gc_semispace *to = (space_in_use == &space0) ? &space1 : &space0;
+  void *ret = bump_alloc_ptr (to, nbytes, objtype);
+  memcpy (ret, xpntr, nbytes);
+  return ret;
+}
+
+void
+gc_flip_space (void)
+{
+  gc_semispace *from = space_in_use,
+    *to = (from == &space0) ? &space1 : &space0;
+  for (size_t b = 0, i = 0; b < from->nblocks; ++b)
+    {
+      enum Lisp_Type objtype;
+      for (void *obj = from->block_addrs[b];
+	   obj != from->alloc_ptr && *(char *) obj;
+	   INT_ADD_WRAPV ((uintptr_t) obj, nbytes_of (objtype, obj),
+			  (uintptr_t *) &obj))
+	{
+	  objtype = from->flatmap[i++];
+	  if (objtype == Lisp_String)
+	    {
+	      struct Lisp_String *s = (struct Lisp_String *) obj;
+
+	      if (XSTRING_MARKED_P (s))
+		{
+		  /* S shall remain in live state.  */
+		  XUNMARK_STRING (s);
+
+		  /* Do not use string_(set|get)_intervals here.  */
+		  s->u.s.intervals = balance_intervals (s->u.s.intervals);
+		}
+	      else
+		{
+		  /* S goes to dead state.  */
+		  sdata *data = SDATA_OF_LISP_STRING (s);
+
+		  /* Save length so that sweep_sdata() knows how far
+		     to move the hare-tortoise pointers.  */
+		  eassert (data->nbytes == STRING_BYTES (s));
+
+		  /* Reset string back-pointer so we know it's free.  */
+		  data->string = NULL;
+
+		  /* Invariant of free-list strings.  */
+		  s->u.s.data = NULL;
+		}
+	    }
+	}
+    }
+  from->alloc_ptr = NULL;
+  from->scan_ptr = NULL;
+  from->words_used = 0;
+  from->flatidx = 0;
+  space_in_use = to;
 }
 
 DEFUN ("ccons", Fccons, Sccons, 2, 2, 0,

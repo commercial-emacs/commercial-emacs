@@ -144,6 +144,10 @@ typedef union {
 
 enum { LISP_ALIGNMENT = alignof (Lisp_Aligned) };
 
+#define XMARK_STRING(S)		((S)->u.s.size |= ARRAY_MARK_FLAG)
+#define XUNMARK_STRING(S)	((S)->u.s.size &= ~ARRAY_MARK_FLAG)
+#define XSTRING_MARKED_P(S)	(((S)->u.s.size & ARRAY_MARK_FLAG) != 0)
+
 typedef struct sdata
 {
   /* Back-pointer to the Lisp_String whose u.s.data points to DATA.  */
@@ -164,6 +168,8 @@ struct mem_node *mem_find (void *start);
    GC_CHECK_MARKED_OBJECTS.  */
 _GL_ATTRIBUTE_CONST bool calloc_object_p (const void *obj);
 
-void flip (void);
+void gc_flip_space (void);
+
+void *gc_flip_xpntr (void *xpntr, size_t nbytes, enum Lisp_Type objtype);
 
 #endif  /* EMACS_ALLOC_H */
