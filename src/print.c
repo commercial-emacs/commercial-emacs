@@ -2130,7 +2130,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
       if (print_depth >= PRINT_CIRCLE)
 	error ("Apparently circular structure being printed");
 
-      for (i = 0; i < print_depth; i++)
+      for (int i = 0; i < print_depth; i++)
 	if (EQ (obj, being_printed[i]))
 	  {
 	    int len = sprintf (buf, "#%d", i);
@@ -2611,7 +2611,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 		    e->u.list.n = e->u.list.m;
 		    e->u.list.tortoise = next;
 		  }
-		else if (BASE_EQ (next, e->u.list.tortoise))
+		else if (EQ (next, e->u.list.tortoise))
 		  {
 		    /* FIXME: This #N tail index is bug-compatible with
 		       previous implementations but actually nonsense;
@@ -2684,7 +2684,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	    {
 	      Lisp_Object key;
 	      ptrdiff_t idx = e->u.hash.idx;
-	      while (BASE_EQ ((key = HASH_KEY (h, idx)), Qunbound))
+	      while (EQ ((key = HASH_KEY (h, idx)), Qunbound))
 		idx++;
 	      e->u.hash.idx = idx;
 	      obj = key;

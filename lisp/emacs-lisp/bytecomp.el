@@ -3706,33 +3706,24 @@ discarding."
                                     (number-sequence 4 (1- (length fun)))))
                   (proto-fun
                    (apply #'make-byte-code
-                          (aref fun 0)  ; The arglist is always the 15-bit
-                                        ; form, never the list of symbols.
-                          (aref fun 1)  ; The byte-code.
+                          (aref fun 0) (aref fun 1)
                           ;; Prepend dummy cells to the constant vector,
                           ;; to get the indices right when disassembling.
                           (vconcat dummy-vars (aref fun 2))
-                          (aref fun 3)  ; Stack depth of function
+                          (aref fun 3)
                           (if docstring-exp
-                              (cons
-                               (eval (byte-run-strip-symbol-positions
-                                      docstring-exp)
-                                     t)
-                               (cdr opt-args)) ; The interactive spec will
-                                               ; have been stripped in
-                                               ; `byte-compile-lambda'.
+                              (cons (eval docstring-exp t) (cdr opt-args))
                             opt-args))))
              `(make-closure ,proto-fun ,@env))
          ;; Nontrivial doc string expression: create a bytecode object
          ;; from small pieces at run time.
          `(make-byte-code
-           ',(aref fun 0)         ; 15-bit form of arglist descriptor.
-           ',(aref fun 1)         ; The byte-code.
-           (vconcat (vector . ,env) ',(aref fun 2)) ; constant vector.
+           ',(aref fun 0) ',(aref fun 1)
+           (vconcat (vector . ,env) ',(aref fun 2))
            ,@(let ((rest (nthcdr 3 (mapcar (lambda (x) `',x) fun))))
                (if docstring-exp
                    `(,(car rest)
-                     ,(byte-run-strip-symbol-positions docstring-exp)
+                     ,docstring-exp
                      ,@(cddr rest))
                  rest))))
          ))))
