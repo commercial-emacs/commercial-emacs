@@ -115,7 +115,7 @@ static struct
   size_t total_buffers;
 } gcstat;
 
-enum mem_type
+enum _GL_ATTRIBUTE_PACKED mem_type
 {
   MEM_TYPE_NON_LISP,
   MEM_TYPE_CONS,
@@ -126,6 +126,13 @@ enum mem_type
   MEM_TYPE_VECTORLIKE,
   /* Non-bool vectorlikes.  */
   MEM_TYPE_VBLOCK,
+};
+
+enum _GL_ATTRIBUTE_PACKED sdata_type
+{
+  Sdata_Unibyte = -1,
+  Sdata_Pure = -2,
+  Sdata_Pinned = -3,
 };
 
 /* ENABLE_CHECKING relies on lisp_malloc() registering allocations to
@@ -1749,23 +1756,23 @@ make_formatted_string (char *buf, const char *format, ...)
 void
 pin_string (Lisp_Object string)
 {
-  eassert (STRINGP (string) && !STRING_MULTIBYTE (string));
+  eassert (STRINGP (string) && ! STRING_MULTIBYTE (string));
   struct Lisp_String *s = XSTRING (string);
   ptrdiff_t size = STRING_BYTES (s);
   unsigned char *data = s->u.s.data;
 
   if (size <= LARGE_STRING_THRESH
       && ! PURE_P (data) && ! pdumper_object_p (data)
-      && s->u.s.size_byte != -3)
+      && s->u.s.size_byte != Sdata_Pinned)
     {
-      eassert (s->u.s.size_byte == -1);
+      eassert (s->u.s.size_byte == Sdata_Unibyte);
       sdata *old_sdata = SDATA_OF_LISP_STRING (s);
       allocate_sdata (s, size, size, true);
       memcpy (s->u.s.data, data, size);
       old_sdata->string = NULL;
-      old_sdata->nbytes = size;
+      eassert (old_sdata->nbytes == size);
     }
-  s->u.s.size_byte = -3;
+  s->u.s.size_byte = Sdata_Pinned;
 }
 
 #define GETMARKBIT(block,n)				\
@@ -3022,40 +3029,52 @@ set_cons_marked (struct Lisp_Cons *c)
 }
 
 static bool
-string_marked_p (const struct Lisp_String *s, Lisp_Object *obj)
+string_marked_p (const struct Lisp_String *s)
 {
-  if (calloc_xpntr_p (s))
-    {
-      void *fwd = gc_fwd_xpntr (s);
-      if (fwd)
-	{
-	  XSETSTRING (*obj, fwd);
-	  s = XSTRING (*obj);
-	  eassert (! XSTRING_MARKED_P (s));
-	}
-    }
-  return pdumper_object_p (s) ? pdumper_marked_p (s) : XSTRING_MARKED_P (s);
+  bool ret;
+  if (pdumper_object_p (s))
+    ret = pdumper_marked_p (s);
+  else if (calloc_xpntr_p (s))
+    ret = (gc_fwd_xpntr (s) != NULL); // flipped
+  else
+    ret = XSTRING_MARKED_P (s);
+  return ret;
 }
 
 static void
-set_string_marked (struct Lisp_String *s, Lisp_Object *obj)
+set_string_marked (Lisp_Object *obj)
 {
-  if (pdumper_object_p (s))
-    pdumper_set_marked (s);
+  struct Lisp_String *s = XSTRING (*obj);
+  if (! string_marked_p (s))
+    {
+      if (pdumper_object_p (s))
+	pdumper_set_marked (s);
+      else if (calloc_xpntr_p (s))
+	{
+	  /* Do not use string_(set|get)_intervals here.  */
+	  s->u.s.intervals = balance_intervals (s->u.s.intervals);
+	  XSETSTRING (*obj, gc_flip_xpntr (s, sizeof (struct Lisp_String),
+					   Lisp_String));
+	  sdata *data = SDATA_OF_LISP_STRING (s);
+	  if (data->string != s)
+	    eassert (data->string == XSTRING (*obj));
+	  else
+	    data->string = XSTRING (*obj);
+	}
+      else
+	XMARK_STRING (s);
+
+      mark_interval_tree (s->u.s.intervals);
+#ifdef GC_CHECK_STRING_BYTES
+      string_bytes (s);
+#endif
+    }
   else if (calloc_xpntr_p (s))
     {
-      /* Do not use string_(set|get)_intervals here.  */
-      s->u.s.intervals = balance_intervals (s->u.s.intervals);
-      XSETSTRING (*obj, gc_flip_xpntr (s, sizeof (struct Lisp_String),
-				       Lisp_String));
-      sdata *data = SDATA_OF_LISP_STRING (s);
-      if (data->string != s)
-	eassert (data->string == XSTRING (*obj));
-      else
-	data->string = XSTRING (*obj);
+      eassert (gc_fwd_xpntr (s));
+      XSETSTRING (*obj, gc_fwd_xpntr (s));
+      eassert (! XSTRING_MARKED_P (XSTRING (*obj)));
     }
-  else
-    XMARK_STRING (s);
 }
 
 static bool
@@ -3472,13 +3491,13 @@ live_string_holding (struct mem_node *m, void *p)
   eassert (m->type == MEM_TYPE_STRING);
   struct string_block *b = m->start;
   char *cp = p;
-  ptrdiff_t offset = cp - (char *) &b->strings[0];
+  ptrdiff_t distance = cp - (char *) &b->strings[0];
 
   /* P must point into a Lisp_String structure, and it
      must not be on the free list.  */
-  if (0 <= offset && offset < sizeof b->strings)
+  if (0 <= distance && distance < sizeof b->strings)
     {
-      ptrdiff_t off = offset % sizeof b->strings[0];
+      ptrdiff_t off = distance % sizeof b->strings[0];
       /* Since compilers can optimize away struct fields, scan all
 	 offsets.  See Bug#28213.  */
       if (off == Lisp_String
@@ -3510,16 +3529,16 @@ live_cons_holding (struct mem_node *m, void *p)
   eassert (m->type == MEM_TYPE_CONS);
   struct cons_block *b = m->start;
   char *cp = p;
-  ptrdiff_t offset = cp - (char *) &b->conses[0];
+  ptrdiff_t distance = cp - (char *) &b->conses[0];
 
   /* P must point into a Lisp_Cons, not be
      one of the unused cells in the current cons block,
      and not be on the free list.  */
-  if (0 <= offset && offset < sizeof b->conses
+  if (0 <= distance && distance < sizeof b->conses
       && (b != cons_block
-	  || offset / sizeof b->conses[0] < cons_block_index))
+	  || distance / sizeof b->conses[0] < cons_block_index))
     {
-      ptrdiff_t off = offset % sizeof b->conses[0];
+      ptrdiff_t off = distance % sizeof b->conses[0];
       if (off == Lisp_Cons
 	  || off == 0
 	  || off == offsetof (struct Lisp_Cons, u.s.u.cdr))
@@ -3548,16 +3567,16 @@ live_symbol_holding (struct mem_node *m, void *p)
   eassert (m->type == MEM_TYPE_SYMBOL);
   struct symbol_block *b = m->start;
   char *cp = p;
-  ptrdiff_t offset = cp - (char *) &b->symbols[0];
+  ptrdiff_t distance = cp - (char *) &b->symbols[0];
 
   /* P must point into the Lisp_Symbol, not be
      one of the unused cells in the current symbol block,
      and not be on the free list.  */
-  if (0 <= offset && offset < sizeof b->symbols
+  if (0 <= distance && distance < sizeof b->symbols
       && (b != symbol_block
-	  || offset / sizeof b->symbols[0] < symbol_block_index))
+	  || distance / sizeof b->symbols[0] < symbol_block_index))
     {
-      ptrdiff_t off = offset % sizeof b->symbols[0];
+      ptrdiff_t off = distance % sizeof b->symbols[0];
       if (off == Lisp_Symbol
 
 	  /* Plain '|| off == 0' would run afoul of GCC 10.2
@@ -3594,17 +3613,17 @@ live_float_holding (struct mem_node *m, void *p)
   eassert (m->type == MEM_TYPE_FLOAT);
   struct float_block *b = m->start;
   char *cp = p;
-  ptrdiff_t offset = cp - (char *) &b->floats[0];
+  ptrdiff_t distance = cp - (char *) &b->floats[0];
 
   /* P must point to (or be a tagged pointer to) the start of a
      Lisp_Float and not be one of the unused cells in the current
      float block.  */
-  if (0 <= offset && offset < sizeof b->floats)
+  if (0 <= distance && distance < sizeof b->floats)
     {
-      int off = offset % sizeof b->floats[0];
+      int off = distance % sizeof b->floats[0];
       if ((off == Lisp_Float || off == 0)
 	  && (b != float_block
-	      || offset / sizeof b->floats[0] < float_block_index))
+	      || distance / sizeof b->floats[0] < float_block_index))
 	{
 	  p = cp - off;
 	  return p;
@@ -3627,23 +3646,23 @@ live_vector_pointer (struct Lisp_Vector *vector, void *p)
   void *vvector = vector;
   char *cvector = vvector;
   char *cp = p;
-  ptrdiff_t offset = cp - cvector;
-  return ((offset == Lisp_Vectorlike
-	   || offset == 0
-	   || (sizeof vector->header <= offset
-	       && offset < vector_nbytes (vector)
+  ptrdiff_t distance = cp - cvector;
+  return ((distance == Lisp_Vectorlike
+	   || distance == 0
+	   || (sizeof vector->header <= distance
+	       && distance < vector_nbytes (vector)
 	       && (! (vector->header.size & PSEUDOVECTOR_FLAG)
-		   ? (offsetof (struct Lisp_Vector, contents) <= offset
-		      && (((offset - offsetof (struct Lisp_Vector, contents))
+		   ? (offsetof (struct Lisp_Vector, contents) <= distance
+		      && (((distance - offsetof (struct Lisp_Vector, contents))
 			   % word_size)
 			  == 0))
 		   /* For non-bool-vector pseudovectors, treat any pointer
 		      past the header as valid since it's too much of a pain
 		      to write special-case code for every pseudovector.  */
 		   : (! PSEUDOVECTOR_TYPEP (&vector->header, PVEC_BOOL_VECTOR)
-		      || offset == offsetof (struct Lisp_Bool_Vector, size)
-		      || (offsetof (struct Lisp_Bool_Vector, data) <= offset
-			  && (((offset
+		      || distance == offsetof (struct Lisp_Bool_Vector, size)
+		      || (offsetof (struct Lisp_Bool_Vector, data) <= distance
+			  && (((distance
 				- offsetof (struct Lisp_Bool_Vector, data))
 			       % sizeof (bits_word))
 			      == 0))))))
@@ -4261,7 +4280,7 @@ make_pure_string (const char *data,
       s->u.s.data[nbytes] = '\0';
     }
   s->u.s.size = nchars;
-  s->u.s.size_byte = multibyte ? nbytes : -1;
+  s->u.s.size_byte = multibyte ? nbytes : Sdata_Unibyte;
   s->u.s.intervals = NULL;
   XSETSTRING (string, s);
   return string;
@@ -4276,7 +4295,7 @@ make_pure_c_string (const char *data, ptrdiff_t nchars)
   Lisp_Object string;
   struct Lisp_String *s = pure_alloc (sizeof *s, Lisp_String);
   s->u.s.size = nchars;
-  s->u.s.size_byte = -2;
+  s->u.s.size_byte = Sdata_Pure;
   s->u.s.data = (unsigned char *) data;
   s->u.s.intervals = NULL;
   XSETSTRING (string, s);
@@ -5022,8 +5041,7 @@ mark_glyph_matrix (struct glyph_matrix *matrix)
 	    struct glyph *end_glyph = glyph + row->used[area];
 
 	    for (; glyph < end_glyph; ++glyph)
-	      if (STRINGP (glyph->object)
-		  && ! string_marked_p (XSTRING (glyph->object), &glyph->object))
+	      if (STRINGP (glyph->object))
 		mark_object (glyph->object);
 	  }
       }
@@ -5416,16 +5434,8 @@ process_mark_stack (ptrdiff_t base_sp)
 	{
 	case Lisp_String:
 	  {
-	    register struct Lisp_String *ptr = XSTRING (obj);
-	    if (string_marked_p (ptr, &obj))
-	      break;
 	    CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
-	    set_string_marked (ptr, &obj);
-	    mark_interval_tree (ptr->u.s.intervals);
-#ifdef GC_CHECK_STRING_BYTES
-	    /* Check string and sdata recorded sizes match.  */
-	    string_bytes (ptr);
-#endif /* GC_CHECK_STRING_BYTES */
+	    set_string_marked (&obj);
 	  }
 	  break;
 
@@ -5576,8 +5586,15 @@ process_mark_stack (ptrdiff_t base_sp)
 	      default: emacs_abort ();
 	      }
 	    if (! PURE_P (XSTRING (ptr->u.s.name)))
-	      set_string_marked (XSTRING (ptr->u.s.name), &obj);
-	    mark_interval_tree (string_intervals (ptr->u.s.name));
+	      {
+		if (calloc_xpntr_p (XSTRING (ptr->u.s.name)))
+		  {
+		    set_string_marked (&ptr->u.s.name);
+		    eassert (wrong_xpntr_p (XSTRING (ptr->u.s.name)));
+		  }
+		else
+		  set_string_marked (&ptr->u.s.name);
+	      }
 	    /* Inner loop to mark next symbol in this bucket, if any.  */
 	    po = ptr = ptr->u.s.next;
 	    if (ptr)
@@ -5685,7 +5702,7 @@ survives_gc_p (Lisp_Object obj)
       break;
 
     case Lisp_String:
-      survives_p = string_marked_p (XSTRING (obj), &obj);
+      survives_p = string_marked_p (XSTRING (obj));
       break;
 
     case Lisp_Vectorlike:

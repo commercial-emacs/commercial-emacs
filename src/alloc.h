@@ -164,6 +164,7 @@ struct mem_node *mem_find (void *start);
    into a copy-collector block for getting a reprieve from
    GC_CHECK_MARKED_OBJECTS.  */
 _GL_ATTRIBUTE_CONST bool calloc_xpntr_p (const void *obj);
+_GL_ATTRIBUTE_CONST bool wrong_xpntr_p (const void *obj);
 
 void gc_flip_space (void);
 

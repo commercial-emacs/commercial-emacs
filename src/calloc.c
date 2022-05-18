@@ -476,17 +476,27 @@ syms_of_calloc (void)
 
 bool calloc_xpntr_p (const void *obj)
 {
-  static gc_semispace *arr[2] = { &space0, &space1 };
   uintptr_t oaddr = (uintptr_t) obj;
-  for (int space = 0; space < 2; ++space)
+  for (size_t i = 0; i < space_in_use->nblocks; ++i)
     {
-      for (size_t i = 0; i < arr[space]->nblocks; ++i)
-	{
-	  uintptr_t start = (uintptr_t) arr[space]->block_addrs[i], end;
-	  INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
-	  if (start <= oaddr && oaddr < end)
-	    return true;
-	}
+      uintptr_t start = (uintptr_t) space_in_use->block_addrs[i], end;
+      INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
+      if (start <= oaddr && oaddr < end)
+	return true;
+    }
+  return false;
+}
+
+bool wrong_xpntr_p (const void *obj)
+{
+  gc_semispace *wrong = (space_in_use == &space0) ? &space1 : &space0;
+  uintptr_t oaddr = (uintptr_t) obj;
+  for (size_t i = 0; i < wrong->nblocks; ++i)
+    {
+      uintptr_t start = (uintptr_t) wrong->block_addrs[i], end;
+      INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
+      if (start <= oaddr && oaddr < end)
+	return true;
     }
   return false;
 }
