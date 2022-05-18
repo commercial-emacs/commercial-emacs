@@ -3022,11 +3022,19 @@ set_cons_marked (struct Lisp_Cons *c)
 }
 
 static bool
-string_marked_p (const struct Lisp_String *s)
+string_marked_p (const struct Lisp_String *s, Lisp_Object *obj)
 {
-  return pdumper_object_p (s)
-    ? pdumper_marked_p (s)
-    : XSTRING_MARKED_P (s);
+  if (calloc_xpntr_p (s))
+    {
+      void *fwd = gc_fwd_xpntr (s);
+      if (fwd)
+	{
+	  XSETSTRING (*obj, fwd);
+	  s = XSTRING (*obj);
+	  eassert (! XSTRING_MARKED_P (s));
+	}
+    }
+  return pdumper_object_p (s) ? pdumper_marked_p (s) : XSTRING_MARKED_P (s);
 }
 
 static void
@@ -5015,7 +5023,7 @@ mark_glyph_matrix (struct glyph_matrix *matrix)
 
 	    for (; glyph < end_glyph; ++glyph)
 	      if (STRINGP (glyph->object)
-		  && !string_marked_p (XSTRING (glyph->object)))
+		  && ! string_marked_p (XSTRING (glyph->object), &glyph->object))
 		mark_object (glyph->object);
 	  }
       }
@@ -5409,7 +5417,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_String:
 	  {
 	    register struct Lisp_String *ptr = XSTRING (obj);
-	    if (string_marked_p (ptr))
+	    if (string_marked_p (ptr, &obj))
 	      break;
 	    CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
 	    set_string_marked (ptr, &obj);
@@ -5677,7 +5685,7 @@ survives_gc_p (Lisp_Object obj)
       break;
 
     case Lisp_String:
-      survives_p = string_marked_p (XSTRING (obj));
+      survives_p = string_marked_p (XSTRING (obj), &obj);
       break;
 
     case Lisp_Vectorlike:

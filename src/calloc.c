@@ -27,19 +27,27 @@ static gc_semispace space0;
 static gc_semispace space1;
 static gc_semispace *space_in_use = &space0;
 
-static const uintptr_t term_block_magic = 0xDEADBEEF;
+/* i.e., next word is the forwarded address in to-space */
 static const uintptr_t next_fwd_magic = 0xF00DF4CE;
+static const uintptr_t term_block_magic = 0xDEADBEEF;
 
 #define TERM_BLOCK(addr) (*(uintptr_t *) addr = term_block_magic)
 #define TERM_BLOCK_P(addr) (*(uintptr_t *)addr == term_block_magic)
-#define FORWARD_XPNTR_SET(from,to)			\
+#define FORWARD_XPNTR_SET(from,to)		\
   do {						\
     *(uintptr_t *) from = next_fwd_magic;	\
-    *((uintptr_t *) from+1) = (uintptr_t) to;	\
+    *((uintptr_t *) from + 1) = (uintptr_t) to;	\
   } while (0);
-#define FORWARD_XPNTR_P(addr) (*(uintptr_t *)addr == next_fwd_magic)
-#define FORWARD_XPNTR_GET(addr)					\
-  (FORWARD_XPNTR_P (addr) ? (void *)(*((uintptr_t *)addr+1)) : NULL)
+#define FORWARD_XPNTR_GET(addr)			\
+  ((*(uintptr_t *)addr == next_fwd_magic)	\
+   ? (void *)(*((uintptr_t *)addr + 1))		\
+   : NULL)
+
+void *
+gc_fwd_xpntr (const void *addr)
+{
+  return FORWARD_XPNTR_GET (addr);
+}
 
 /* Return new allocation pointer, or NULL for failed realloc().  */
 static void *
@@ -178,7 +186,7 @@ gc_flip_space (void)
 			  (uintptr_t *) &obj))
 	{
 	  objtype = from->flatmap[i++];
-	  if (objtype == Lisp_String && ! FORWARD_XPNTR_P (obj))
+	  if (objtype == Lisp_String && ! FORWARD_XPNTR_GET (obj))
 	    {
 	      struct Lisp_String *s = (struct Lisp_String *) obj;
 

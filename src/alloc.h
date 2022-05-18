@@ -169,4 +169,6 @@ void gc_flip_space (void);
 
 void *gc_flip_xpntr (void *xpntr, size_t nbytes, enum Lisp_Type objtype);
 
+void *gc_fwd_xpntr (const void *addr);
+
 #endif  /* EMACS_ALLOC_H */
