@@ -135,11 +135,12 @@ enum _GL_ATTRIBUTE_PACKED sdata_type
   Sdata_Pinned = -3,
 };
 
-/* ENABLE_CHECKING relies on lisp_malloc() registering allocations to
-   a red-black tree.
+/* Conservative stack scanning (mark_maybe_pointer) needs to
+   trace an arbitrary address back to its respective memory block.
 
-   A red-black tree is a binary tree "fixed" after every insertion or
-   deletion such that:
+   To make these searches efficient, new blocks are stored in a global
+   red-black tree which is "fixed" after every insertion or deletion
+   such that:
 
    1. Every node is either red or black.
    2. Every leaf is black.
@@ -150,7 +151,8 @@ enum _GL_ATTRIBUTE_PACKED sdata_type
 
    These invariants balance the tree so that its height can be no
    greater than 2 log(N+1), where N is the number of internal nodes.
-   Searches, insertions and deletions are done in O(log N).  */
+   Searches, insertions and deletions are done in O(log N).
+  */
 
 struct mem_node
 {
@@ -581,8 +583,8 @@ lisp_malloc (size_t nbytes, bool q_clear, enum mem_type type)
 
 #if ! USE_LSB_TAG
   /* If the memory just allocated cannot be addressed thru a Lisp
-     object's pointer, and it needs to be,
-     that's equivalent to running out of memory.  */
+     object's pointer, and it needs to be, that's equivalent to
+     running out of memory.  */
   if (val && type != MEM_TYPE_NON_LISP)
     {
       Lisp_Object tem;
@@ -3726,22 +3728,19 @@ mark_maybe_pointer (void *p)
   uintptr_t mask = VALMASK & UINTPTR_MAX;
   struct mem_node *m;
 
-  /* On 32-bit --with-wide-int systems, the two halves of a
-     Lisp_Object may be stored non-contiguously.  Therefore, we
-     need to recognize the lower 32 bits of a Lisp_Object encoding
-     a symbol, and since Qnil is binary zero, that requires adding
-     &lispsym.  Bug#41321.  */
+  /* Research Bug#41321 so we can suitably #ifdef treatment of
+     Lisp_Symbol pointers being split across non-contiguous registers.
+  */
   void *p_sym;
-  INT_ADD_WRAPV ((intptr_t) p, (intptr_t) lispsym, (intptr_t *) &p_sym);
+  INT_ADD_WRAPV ((uintptr_t) p, (uintptr_t) lispsym, (uintptr_t *) &p_sym);
 
 #if USE_VALGRIND
   VALGRIND_MAKE_MEM_DEFINED (&p, sizeof (p));
 #endif
 
-  /* FIXME: In rare instances, pdumper objects are not addressed by
-     their object start, causing the below to fail.  The pdumper code
-     should grok non-start addresses, as the non-pdumper code
-     does.
+  /* FIXME: On unusual platforms, pdumper objects are not addressed by
+     their object start.  The pdumper code should grok non-start
+     addresses, as the non-pdumper code did.
   */
   if (pdumper_object_p (p))
     {

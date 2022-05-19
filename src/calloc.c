@@ -119,7 +119,7 @@ bump_alloc_ptr (gc_semispace *space, size_t nbytes, enum Lisp_Type objtype)
   size_t nwords = nbytes / word_size;
   eassert (nbytes >= 2 * word_size);
 
-  /* knock off a word so we've room to add a NUL sentinel.  */
+  /* knock off a word so we've room for term_block_magic.  */
   if (! retval || space->words_used + nwords > (BLOCK_NWORDS - 1))
     {
       /* Terminate current block, then add new block.  */
