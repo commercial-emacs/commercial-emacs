@@ -115,19 +115,6 @@ static struct
   size_t total_buffers;
 } gcstat;
 
-enum _GL_ATTRIBUTE_PACKED mem_type
-{
-  MEM_TYPE_NON_LISP,
-  MEM_TYPE_CONS,
-  MEM_TYPE_STRING,
-  MEM_TYPE_SYMBOL,
-  MEM_TYPE_FLOAT,
-  /* Includes vectors but not non-bool vectorlikes. */
-  MEM_TYPE_VECTORLIKE,
-  /* Non-bool vectorlikes.  */
-  MEM_TYPE_VBLOCK,
-};
-
 enum _GL_ATTRIBUTE_PACKED sdata_type
 {
   Sdata_Unibyte = -1,
@@ -3738,21 +3725,15 @@ mark_maybe_pointer (void *p)
   VALGRIND_MAKE_MEM_DEFINED (&p, sizeof (p));
 #endif
 
-  /* FIXME: On unusual platforms, pdumper objects are not addressed by
-     their object start.  The pdumper code should grok non-start
-     addresses, as the non-pdumper code did.
-  */
   if (pdumper_object_p (p))
     {
       uintptr_t masked_p = (uintptr_t) p & mask;
       void *po = (void *) masked_p;
       char *cp = p;
       char *cpo = po;
-      /* Don't use pdumper_object_p_precise here! It doesn't check the
-         tag bits. OBJ here might be complete garbage, so we need to
-         verify both the pointer and the tag.  */
       int type = pdumper_find_object_type (po);
       ret = (pdumper_valid_object_type_p (type)
+	     // Verify P’s tag, if any, matches pdumper-reported type.
 	     && (! USE_LSB_TAG || p == po || cp - cpo == type));
       if (ret)
 	{
@@ -3769,6 +3750,7 @@ mark_maybe_pointer (void *p)
       char *cp = p_sym;
       char *cpo = po;
       ret = (pdumper_find_object_type (po) == Lisp_Symbol
+	     // Verify P’s tag, if any, matches pdumper-reported type.
 	     && (! USE_LSB_TAG || p_sym == po || cp - cpo == Lisp_Symbol));
       if (ret)
 	mark_object (make_lisp_symbol (po));
@@ -3778,7 +3760,6 @@ mark_maybe_pointer (void *p)
       switch (m->type)
 	{
 	case MEM_TYPE_NON_LISP:
-	  /* Nothing to do; not a pointer to Lisp memory.  */
 	  break;
 
 	case MEM_TYPE_CONS:
