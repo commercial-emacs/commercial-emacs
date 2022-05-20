@@ -3709,7 +3709,7 @@ live_small_vector_p (struct mem_node *m, void *p)
    If P looks like it points to Lisp data, mark it and return true.  */
 
 static bool
-mark_maybe_pointer (void *p)
+mark_maybe_pointer (void *const * p)
 {
   bool ret = false;
   uintptr_t mask = VALMASK & UINTPTR_MAX;
@@ -3721,22 +3721,22 @@ mark_maybe_pointer (void *p)
      Lisp_Symbol pointers being split across non-contiguous registers.
   */
   void *p_sym;
-  INT_ADD_WRAPV ((uintptr_t) p, (uintptr_t) lispsym, (uintptr_t *) &p_sym);
+  INT_ADD_WRAPV ((uintptr_t) *p, (uintptr_t) lispsym, (uintptr_t *) &p_sym);
 
 #if USE_VALGRIND
-  VALGRIND_MAKE_MEM_DEFINED (&p, sizeof (p));
+  VALGRIND_MAKE_MEM_DEFINED (p, sizeof (*p));
 #endif
 
-  if (pdumper_object_p (p))
+  if (pdumper_object_p (*p))
     {
-      uintptr_t masked_p = (uintptr_t) p & mask;
+      uintptr_t masked_p = (uintptr_t) *p & mask;
       void *po = (void *) masked_p;
-      char *cp = p;
+      char *cp = *p;
       char *cpo = po;
       int type = pdumper_find_object_type (po);
       ret = (pdumper_valid_object_type_p (type)
 	     // Verify P’s tag, if any, matches pdumper-reported type.
-	     && (! USE_LSB_TAG || p == po || cp - cpo == type));
+	     && (! USE_LSB_TAG || *p == po || cp - cpo == type));
       if (ret)
 	{
 	  if (type == Lisp_Symbol)
@@ -3757,12 +3757,21 @@ mark_maybe_pointer (void *p)
       if (ret)
 	mark_object (make_lisp_symbol (po));
     }
-  else if ((xpntr_type = space_find_xpntr (p, &xpntr)) != Lisp_Type_Unused0)
+  else if ((xpntr_type = space_find_xpntr (*p, &xpntr)) != Lisp_Type_Unused0)
     {
-      mark_object (make_lisp_ptr (xpntr, xpntr_type));
-      ret = true;
+      /* analogous logic to set_string_marked() */
+      void *forwarded = gc_fwd_xpntr (xpntr);
+      if (! forwarded)
+	{
+	  mark_object (make_lisp_ptr (xpntr, xpntr_type));
+	  ret = true;
+	  forwarded = gc_fwd_xpntr (xpntr);
+	}
+      ptrdiff_t offset;
+      INT_SUBTRACT_WRAPV ((uintptr_t) *p, (uintptr_t) xpntr, &offset);
+      INT_ADD_WRAPV ((uintptr_t) forwarded, offset, (uintptr_t *) p);
     }
-  else if ((m = mem_find (p)) != MEM_NIL)
+  else if ((m = mem_find (*p)) != MEM_NIL)
     {
       switch (m->type)
 	{
@@ -3771,7 +3780,7 @@ mark_maybe_pointer (void *p)
 
 	case MEM_TYPE_CONS:
 	  {
-	    struct Lisp_Cons *h = live_cons_holding (m, p);
+	    struct Lisp_Cons *h = live_cons_holding (m, *p);
 	    if (h)
 	      {
 		mark_object (make_lisp_ptr (h, Lisp_Cons));
@@ -3782,7 +3791,7 @@ mark_maybe_pointer (void *p)
 
 	case MEM_TYPE_STRING:
 	  {
-	    struct Lisp_String *h = live_string_holding (m, p);
+	    struct Lisp_String *h = live_string_holding (m, *p);
 	    if (h)
 	      {
 		mark_object (make_lisp_ptr (h, Lisp_String));
@@ -3793,7 +3802,7 @@ mark_maybe_pointer (void *p)
 
 	case MEM_TYPE_SYMBOL:
 	  {
-	    struct Lisp_Symbol *h = live_symbol_holding (m, p);
+	    struct Lisp_Symbol *h = live_symbol_holding (m, *p);
 	    if (h)
 	      {
 		mark_object (make_lisp_symbol (h));
@@ -3804,7 +3813,7 @@ mark_maybe_pointer (void *p)
 
 	case MEM_TYPE_FLOAT:
 	  {
-	    struct Lisp_Float *h = live_float_holding (m, p);
+	    struct Lisp_Float *h = live_float_holding (m, *p);
 	    if (h)
 	      {
 		mark_object (make_lisp_ptr (h, Lisp_Float));
@@ -3815,7 +3824,7 @@ mark_maybe_pointer (void *p)
 
 	case MEM_TYPE_VECTORLIKE:
 	  {
-	    struct Lisp_Vector *h = live_large_vector_holding (m, p);
+	    struct Lisp_Vector *h = live_large_vector_holding (m, *p);
 	    if (h)
 	      {
 		mark_object (make_lisp_ptr (h, Lisp_Vectorlike));
@@ -3826,7 +3835,7 @@ mark_maybe_pointer (void *p)
 
 	case MEM_TYPE_VBLOCK:
 	  {
-	    struct Lisp_Vector *h = live_small_vector_holding (m, p);
+	    struct Lisp_Vector *h = live_small_vector_holding (m, *p);
 	    if (h)
 	      {
 		mark_object (make_lisp_ptr (h, Lisp_Vectorlike));
@@ -3924,8 +3933,8 @@ mark_memory (void const *start, void const *end)
 
   for (pp = start; (void const *) pp < end; pp += GC_POINTER_ALIGNMENT)
     {
-      void *p = *(void *const *) pp;
-      mark_maybe_pointer (p);
+      // void *p = *(void *const *) pp;
+      mark_maybe_pointer ((void *const *) pp);
     }
 }
 

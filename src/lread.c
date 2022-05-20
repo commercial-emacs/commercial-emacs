@@ -1890,23 +1890,9 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 	memcpy (fn + baselen, SDATA (suffix), lsuffix + 1);
 	fnlen = baselen + lsuffix;
 
-	/* Check that the file exists and is not a directory.  */
-	/* We used to only check for handlers on non-absolute file names:
-	   if (absolute)
-	   handler = Qnil;
-	   else
-	   handler = Ffind_file_name_handler (filename, Qfile_exists_p);
-	   It's not clear why that was the case and it breaks things like
-	   (load "/bar.el") where the file is actually "/bar.el.gz".  */
-	/* make_string has its own ideas on when to return a unibyte
-	   string and when a multibyte string, but we know better.
-	   We must have a unibyte string when dumping, since
-	   file-name encoding is shaky at best at that time, and in
-	   particular default-file-name-coding-system is reset
-	   several times during loadup.  We therefore don't want to
-	   encode the file before passing it to file I/O library
-	   functions.  */
-	if (!STRING_MULTIBYTE (filename) && !STRING_MULTIBYTE (suffix))
+	if (! STRING_MULTIBYTE (filename) && ! STRING_MULTIBYTE (suffix))
+	  /* Strongly prefer raw unibyte to let loadup decide (loadup
+	     switches between several default-file-name-coding-system).  */
 	  string = make_unibyte_string (fn, fnlen);
 	else
 	  string = make_string (fn, fnlen);

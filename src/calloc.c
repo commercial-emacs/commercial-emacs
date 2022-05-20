@@ -104,25 +104,25 @@ xpntr_at (const gc_semispace *space, size_t block, ptrdiff_t word, void **xpntr)
   if (bitset_test (map->bitsets[MEM_TYPE_CONS], (bitset_bindex) word))
     {
       ret = Lisp_Cons;
-      modulus = sizeof (struct Lisp_Cons);
+      modulus = sizeof (struct Lisp_Cons) / word_size;
       mem_i = MEM_TYPE_CONS;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_STRING], (bitset_bindex) word))
     {
       ret = Lisp_String;
-      modulus = sizeof (struct Lisp_String);
+      modulus = sizeof (struct Lisp_String) / word_size;
       mem_i = MEM_TYPE_STRING;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_SYMBOL], (bitset_bindex) word))
     {
       ret = Lisp_Symbol;
-      modulus = sizeof (struct Lisp_Symbol);
+      modulus = sizeof (struct Lisp_Symbol) / word_size;
       mem_i = MEM_TYPE_SYMBOL;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_FLOAT], (bitset_bindex) word))
     {
       ret = Lisp_Float;
-      modulus = sizeof (struct Lisp_Float);
+      modulus = sizeof (struct Lisp_Float) / word_size;
       mem_i = MEM_TYPE_FLOAT;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_VECTORLIKE], (bitset_bindex) word))
@@ -142,11 +142,6 @@ xpntr_at (const gc_semispace *space, size_t block, ptrdiff_t word, void **xpntr)
       void *block_addr = space->block_addrs[block];
       INT_ADD_WRAPV ((uintptr_t) block_addr, presumed_start * word_size,
 		     (uintptr_t *) xpntr);
-      if (gc_fwd_xpntr (*xpntr))
-	{
-	  *xpntr = NULL;
-	  ret = Lisp_Type_Unused0;
-	}
     }
 
   return ret;
