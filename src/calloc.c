@@ -23,8 +23,9 @@ typedef struct gc_semispace
   block_typemap *block_typemaps;
   void *alloc_ptr;
   void *scan_ptr;
-  size_t nblocks; // block_idx
-  size_t block_words_used; // word_idx
+  size_t nblocks;
+  size_t block_words_used;
+  size_t current_block;
 } gc_semispace;
 
 static gc_semispace space0;
@@ -54,7 +55,7 @@ gc_fwd_xpntr (const void *addr)
 }
 
 /* Return new allocation pointer, or NULL for failed realloc().  */
-static void *
+static bool
 realloc_semispace (gc_semispace *space)
 {
   void *new_addr;
@@ -69,38 +70,85 @@ realloc_semispace (gc_semispace *space)
       && (new_addr = xmalloc (BLOCK_NBYTES))) // laligned, chill.
     {
       space->block_typemaps = resized_typemaps;
-      for (int i=0; i<MEM_TYPE_NTYPES; ++i)
-	space->block_typemaps[space->nblocks].bitsets[i] =
-	  bitset_create (BLOCK_NWORDS, BITSET_FIXED);
+      memset (&space->block_typemaps[space->nblocks], 0, sizeof (block_typemap));
       space->block_addrs = resized_addrs;
       space->block_addrs[space->nblocks++] = new_addr;
-      space->alloc_ptr = new_addr;
-      space->block_words_used = 0;
-      if (! space->scan_ptr)
-	space->scan_ptr = space->alloc_ptr;
-      return space->alloc_ptr;
+      return true;
     }
-  return NULL;
+  return false;
+}
+
+static
+size_t block_of_xpntr (const void *obj)
+{
+  uintptr_t oaddr = (uintptr_t) obj;
+  for (size_t i = 0; i < space_in_use->nblocks; ++i)
+    {
+      uintptr_t start = (uintptr_t) space_in_use->block_addrs[i], end;
+      INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
+      if (start <= oaddr && oaddr < end)
+	return i;
+    }
+  return BLOCK_NOT_FOUND;
 }
 
 static enum Lisp_Type
-xpntr_type_of (const gc_semispace *space, size_t block, size_t word)
+xpntr_at (const gc_semispace *space, size_t block, ptrdiff_t word, void **xpntr)
 {
-  eassert (word < BLOCK_NWORDS - 1); // -1 for term_block_magic
   enum Lisp_Type ret = Lisp_Type_Unused0;
+  size_t mem_i, modulus;
   block_typemap *map = &space->block_typemaps[block];
+
+  eassert (word < BLOCK_NWORDS - 1); // -1 for term_block_magic
+
   if (bitset_test (map->bitsets[MEM_TYPE_CONS], (bitset_bindex) word))
-    ret = Lisp_Cons;
+    {
+      ret = Lisp_Cons;
+      modulus = sizeof (struct Lisp_Cons);
+      mem_i = MEM_TYPE_CONS;
+    }
   else if (bitset_test (map->bitsets[MEM_TYPE_STRING], (bitset_bindex) word))
-    ret = Lisp_String;
+    {
+      ret = Lisp_String;
+      modulus = sizeof (struct Lisp_String);
+      mem_i = MEM_TYPE_STRING;
+    }
   else if (bitset_test (map->bitsets[MEM_TYPE_SYMBOL], (bitset_bindex) word))
-    ret = Lisp_Symbol;
+    {
+      ret = Lisp_Symbol;
+      modulus = sizeof (struct Lisp_Symbol);
+      mem_i = MEM_TYPE_SYMBOL;
+    }
   else if (bitset_test (map->bitsets[MEM_TYPE_FLOAT], (bitset_bindex) word))
-    ret = Lisp_Float;
+    {
+      ret = Lisp_Float;
+      modulus = sizeof (struct Lisp_Float);
+      mem_i = MEM_TYPE_FLOAT;
+    }
   else if (bitset_test (map->bitsets[MEM_TYPE_VECTORLIKE], (bitset_bindex) word))
-    ret = Lisp_Vectorlike;
+    {
+      ret = Lisp_Vectorlike;
+      modulus = 0;
+      mem_i = MEM_TYPE_VECTORLIKE;
+    }
   else
     emacs_abort ();
+
+  if (xpntr != NULL)
+    {
+      bitset_bindex i = word;
+      for ((void) i; i >= 0 && bitset_test (map->bitsets[mem_i], i); --i);
+      ptrdiff_t presumed_start = word - ((word - (i + 1)) % modulus);
+      void *block_addr = space->block_addrs[block];
+      INT_ADD_WRAPV ((uintptr_t) block_addr, presumed_start * word_size,
+		     (uintptr_t *) xpntr);
+      if (gc_fwd_xpntr (*xpntr))
+	{
+	  *xpntr = NULL;
+	  ret = Lisp_Type_Unused0;
+	}
+    }
+
   return ret;
 }
 
@@ -136,6 +184,72 @@ nbytes_of (enum Lisp_Type xpntr_type, const void *obj)
   return result;
 }
 
+enum Lisp_Type
+space_find_xpntr (void *p, void **xpntr)
+{
+  size_t block = block_of_xpntr (p);
+  if (block != BLOCK_NOT_FOUND)
+    {
+      char *block_start = space_in_use->block_addrs[block];
+      ptrdiff_t word = ((char *) p - block_start) / word_size;
+      return xpntr_at (space_in_use, block, word, xpntr);
+    }
+  return Lisp_Type_Unused0;
+}
+
+static void
+reset_space (gc_semispace *space)
+{
+  space->alloc_ptr = NULL;
+  space->scan_ptr = NULL;
+  space->block_words_used = 0;
+  space->current_block = -1;
+}
+
+void
+gc_initialize_spaces (void)
+{
+  reset_space (&space0);
+  reset_space (&space1);
+}
+
+static void *
+next_block (gc_semispace *space)
+{
+  bool q_error = false;
+  size_t restore_current_block = space->current_block;
+
+  if (space->alloc_ptr)
+    TERM_BLOCK (space->alloc_ptr);
+  else
+    eassert ((int) space->current_block < 0);
+
+  eassert ((int) space->current_block <= (int) space->nblocks);
+
+  if (++space->current_block == space->nblocks)
+    q_error = ! realloc_semispace (space);
+
+  if (! q_error)
+    {
+      space->alloc_ptr = space->block_addrs[space->current_block];
+      if (! space->scan_ptr)
+	space->scan_ptr = space->alloc_ptr;
+      space->block_words_used = 0;
+      for (int i=0; i<MEM_TYPE_NTYPES; ++i)
+	{
+	  bitset *ptr = &space->block_typemaps[space->current_block].bitsets[i];
+	  if (*ptr)
+	    bitset_zero (*ptr);
+	  else
+	    *ptr = bitset_create (BLOCK_NWORDS, BITSET_FIXED);
+	}
+      return space->alloc_ptr;
+    }
+
+  space->current_block = restore_current_block;
+  return NULL;
+}
+
 /* Before: SPACE->alloc_ptr points to ready-for-use slot X.
            SPACE->block_words_used does not include slot X.
 	   SPACE->flat_idx awaits XPNTR_TYPE.
@@ -153,15 +267,12 @@ bump_alloc_ptr (gc_semispace *space, size_t nbytes, enum Lisp_Type xpntr_type)
   void *retval = space->alloc_ptr;
   size_t nwords = nbytes / word_size;
   eassert (nbytes >= 2 * word_size);
+  eassert ((int) space->current_block <= (int) space->nblocks);
 
-  /* knock off a word so we've room for term_block_magic.  */
-  if (! retval || space->block_words_used + nwords > (BLOCK_NWORDS - 1))
-    {
-      /* Terminate current block, then add new block.  */
-      if (retval)
-	TERM_BLOCK (retval);
-      retval = realloc_semispace (space);
-    }
+  if (! retval
+      /* -1 so we've room for term_block_magic.  */
+      || space->block_words_used + nwords > (BLOCK_NWORDS - 1))
+    retval = next_block (space);
 
   if (retval)
     {
@@ -188,7 +299,7 @@ bump_alloc_ptr (gc_semispace *space, size_t nbytes, enum Lisp_Type xpntr_type)
 	  break;
 	}
       for (size_t w = 0; w < nwords; ++w)
-	bitset_set (space->block_typemaps[space->nblocks - 1].bitsets[mem_i],
+	bitset_set (space->block_typemaps[space->current_block].bitsets[mem_i],
 		    (bitset_bindex) (space->block_words_used + w));
       space->block_words_used += nwords;
       INT_ADD_WRAPV ((uintptr_t) space->alloc_ptr, nbytes,
@@ -225,7 +336,8 @@ gc_flip_space (void)
 	   obj != from->alloc_ptr && ! TERM_BLOCK_P (obj);
 	   (void) obj)
 	{
-	  enum Lisp_Type xpntr_type = xpntr_type_of (from, b, w);
+	  enum Lisp_Type xpntr_type = xpntr_at (from, b, w, NULL);
+	  eassert (xpntr_type != Lisp_Type_Unused0);
 	  size_t bytespan = nbytes_of (xpntr_type, obj);
 	  if (xpntr_type == Lisp_String && ! FORWARD_XPNTR_GET (obj))
 	    {
@@ -248,9 +360,7 @@ gc_flip_space (void)
 	  INT_ADD_WRAPV ((uintptr_t) obj, bytespan, (uintptr_t *) &obj);
 	}
     }
-  from->alloc_ptr = NULL;
-  from->scan_ptr = NULL;
-  from->block_words_used = 0;
+  reset_space (from);
   space_in_use = to;
 }
 
@@ -518,15 +628,7 @@ syms_of_calloc (void)
 
 bool calloc_xpntr_p (const void *obj)
 {
-  uintptr_t oaddr = (uintptr_t) obj;
-  for (size_t i = 0; i < space_in_use->nblocks; ++i)
-    {
-      uintptr_t start = (uintptr_t) space_in_use->block_addrs[i], end;
-      INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
-      if (start <= oaddr && oaddr < end)
-	return true;
-    }
-  return false;
+  return block_of_xpntr (obj) != BLOCK_NOT_FOUND;
 }
 
 bool wrong_xpntr_p (const void *obj)

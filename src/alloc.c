@@ -3706,7 +3706,7 @@ live_small_vector_p (struct mem_node *m, void *p)
 
 /* Workhorse of conservative stack scanning.
 
-   Mark P and return true if P points to Lisp data.  */
+   If P looks like it points to Lisp data, mark it and return true.  */
 
 static bool
 mark_maybe_pointer (void *p)
@@ -3714,6 +3714,8 @@ mark_maybe_pointer (void *p)
   bool ret = false;
   uintptr_t mask = VALMASK & UINTPTR_MAX;
   struct mem_node *m;
+  enum Lisp_Type xpntr_type;
+  void *xpntr;
 
   /* Research Bug#41321 so we can suitably #ifdef treatment of
      Lisp_Symbol pointers being split across non-contiguous registers.
@@ -3754,6 +3756,11 @@ mark_maybe_pointer (void *p)
 	     && (! USE_LSB_TAG || p_sym == po || cp - cpo == Lisp_Symbol));
       if (ret)
 	mark_object (make_lisp_symbol (po));
+    }
+  else if ((xpntr_type = space_find_xpntr (p, &xpntr)) != Lisp_Type_Unused0)
+    {
+      mark_object (make_lisp_ptr (xpntr, xpntr_type));
+      ret = true;
     }
   else if ((m = mem_find (p)) != MEM_NIL)
     {
@@ -5386,14 +5393,14 @@ process_mark_stack (ptrdiff_t base_sp)
          mem_type (a struct Lisp_String should come from a
          MEM_TYPE_STRING block), and is also not a free-list cell, as
          determined by argument function LIVEP.  */
-#define CHECK_LIVE(LIVEP, MEM_TYPE)			\
-      do {						\
-	if (pdumper_object_p (po))			\
-	  break;					\
-	if (calloc_xpntr_p (po))			\
-	  break;					\
-	if (! (m->type == MEM_TYPE && LIVEP (m, po)))	\
-	  emacs_abort ();				\
+#define CHECK_LIVE(LIVEP, MEM_TYPE)				\
+      do {							\
+	if (pdumper_object_p (po))				\
+	  break;						\
+	if (calloc_xpntr_p (po))				\
+	  break;						\
+	if (! (m->type == MEM_TYPE && LIVEP (m, po)))		\
+	  emacs_abort ();					\
       } while (0)
 
       /* Check both of the above conditions, for non-symbols.  */
@@ -6340,6 +6347,7 @@ init_runtime (void)
   mem_init ();
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);
+  gc_initialize_spaces ();
 }
 
 void

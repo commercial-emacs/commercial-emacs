@@ -174,6 +174,8 @@ typedef struct sdata
 
 struct mem_node *mem_find (void *start);
 
+enum { BLOCK_NOT_FOUND = EMACS_INT_MAX };
+
 /* Analogous to pdumper_object_p().  Return whether the OBJ points
    into a copy-collector block for getting a reprieve from
    GC_CHECK_MARKED_OBJECTS.  */
@@ -185,5 +187,9 @@ void gc_flip_space (void);
 void *gc_flip_xpntr (void *xpntr, size_t nbytes, enum Lisp_Type objtype);
 
 void *gc_fwd_xpntr (const void *addr);
+
+void gc_initialize_spaces (void);
+
+enum Lisp_Type space_find_xpntr (void *p, void **xpntr);
 
 #endif  /* EMACS_ALLOC_H */
