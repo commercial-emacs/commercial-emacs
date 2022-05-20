@@ -969,5 +969,39 @@ See Bug#21722."
                       #'consp
                       (undo-make-selective-list (point-min) (point-max))))))))
 
+(ert-deftest test-yank-in-context ()
+  (should
+   (equal
+    (with-temp-buffer
+      (sh-mode)
+      (insert "echo \"foo\"")
+      (kill-new "\"bar\"")
+      (goto-char 8)
+      (yank-in-context)
+      (buffer-string))
+    "echo \"f\\\"bar\\\"oo\""))
+
+  (should
+   (equal
+    (with-temp-buffer
+      (sh-mode)
+      (insert "echo \"foo\"")
+      (kill-new "'bar'")
+      (goto-char 8)
+      (yank-in-context)
+      (buffer-string))
+    "echo \"f'bar'oo\""))
+
+  (should
+   (equal
+    (with-temp-buffer
+      (sh-mode)
+      (insert "echo 'foo'")
+      (kill-new "'bar'")
+      (goto-char 8)
+      (yank-in-context)
+      (buffer-string))
+    "echo 'f'\\''bar'\\''oo'")))
+
 (provide 'simple-test)
 ;;; simple-tests.el ends here
