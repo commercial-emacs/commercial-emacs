@@ -16599,6 +16599,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
       if (configureEvent.xconfigure.window == dpyinfo->root_window)
 	{
+#ifdef HAVE_XRANDR
+	  /* This function is OK to call even if the X server doesn't
+	     support RandR.  */
+	  XRRUpdateConfiguration (&configureEvent);
+#endif
+
 	  dpyinfo->screen_width = configureEvent.xconfigure.width;
 	  dpyinfo->screen_height = configureEvent.xconfigure.height;
 	}
@@ -20072,6 +20078,42 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  break;
 		}
 	    }
+	}
+#endif
+#ifdef HAVE_XRANDR
+      if (dpyinfo->xrandr_supported_p
+	  && (event->type == (dpyinfo->xrandr_event_base
+			      + RRScreenChangeNotify)
+	      || event->type == (dpyinfo->xrandr_event_base
+				 + RRNotify)))
+	{
+	  union buffered_input_event *ev;
+	  Time timestamp;
+
+	  if (event->type == (dpyinfo->xrandr_event_base
+			      + RRScreenChangeNotify))
+	    XRRUpdateConfiguration (event);
+
+	  if (event->type == (dpyinfo->xrandr_event_base
+			      + RRScreenChangeNotify))
+	    timestamp = ((XRRScreenChangeNotifyEvent *) event)->timestamp;
+	  else
+	    timestamp = 0;
+
+	  ev = (kbd_store_ptr == kbd_buffer
+		? kbd_buffer + KBD_BUFFER_SIZE - 1
+		: kbd_store_ptr - 1);
+
+	  if (kbd_store_ptr != kbd_fetch_ptr
+	      && ev->ie.kind == MONITORS_CHANGED_EVENT
+	      && XTERMINAL (ev->ie.arg) == dpyinfo->terminal)
+	    /* Don't store a MONITORS_CHANGED_EVENT if there is
+	       already an undelivered event on the queue.  */
+	    goto OTHER;
+
+	  inev.ie.kind = MONITORS_CHANGED_EVENT;
+	  inev.ie.timestamp = timestamp;
+	  XSETTERMINAL (inev.ie.arg, dpyinfo->terminal);
 	}
 #endif
     OTHER:
@@ -24375,13 +24417,25 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #endif
 
 #ifdef HAVE_XRANDR
-  int xrr_event_base, xrr_error_base;
-  bool xrr_ok = false;
-  xrr_ok = XRRQueryExtension (dpy, &xrr_event_base, &xrr_error_base);
-  if (xrr_ok)
+  dpyinfo->xrandr_supported_p
+    = XRRQueryExtension (dpy, &dpyinfo->xrandr_event_base,
+			 &dpyinfo->xrandr_error_base);
+  if (dpyinfo->xrandr_supported_p)
     {
       XRRQueryVersion (dpy, &dpyinfo->xrandr_major_version,
 		       &dpyinfo->xrandr_minor_version);
+
+      if (dpyinfo->xrandr_major_version == 1
+	  && dpyinfo->xrandr_minor_version >= 2)
+	XRRSelectInput (dpyinfo->display,
+			dpyinfo->root_window,
+			(RRScreenChangeNotifyMask
+			 | RRCrtcChangeNotifyMask
+			 | RROutputChangeNotifyMask
+			 /* Emacs doesn't actually need this, but GTK
+			    selects for it when the display is
+			    initialized.  */
+			 | RROutputPropertyNotifyMask));
     }
 #endif
 
