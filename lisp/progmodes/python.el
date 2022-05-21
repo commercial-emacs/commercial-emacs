@@ -606,7 +606,10 @@ builtins.")
 Search for next occurrence if REGEXP matched within a `paren'
 context (to avoid, e.g., default values for arguments or passing
 arguments by name being treated as assignments) or is followed by
-an '=' sign (to avoid '==' being treated as an assignment."
+an '=' sign (to avoid '==' being treated as an assignment.  Set
+point to the position one character before the end of the
+occurrence found so that subsequent searches can detect the '='
+sign in chained assignment."
   (lambda (limit)
     (cl-loop while (re-search-forward regexp limit t)
              unless (or (python-syntax-context 'paren)
