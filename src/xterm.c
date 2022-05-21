@@ -2760,8 +2760,6 @@ x_dnd_get_target_window_2 (XRectangle *rects, int nrects,
   return false;
 }
 #endif
-	}
-    }
 
 static Window
 x_dnd_get_target_window_1 (struct x_display_info *dpyinfo,
@@ -3829,7 +3827,6 @@ x_dnd_cleanup_drag_and_drop (void *frame)
 
   x_dnd_frame = NULL;
 }
-#endif
 
 /* Flush display of frame F.  */
 
@@ -4353,7 +4350,6 @@ x_get_scroll_valuator_delta (struct x_display_info *dpyinfo,
 	    }
 	}
     }
-}
 
   *valuator_return = NULL;
   return DBL_MAX;
@@ -5240,15 +5236,6 @@ x_draw_rectangle (struct frame *f, GC gc, int x, int y, int width, int height)
 #endif
 }
 
-enum corners
-  {
-    CORNER_BOTTOM_RIGHT,	/* 0 -> pi/2 */
-    CORNER_BOTTOM_LEFT,		/* pi/2 -> pi */
-    CORNER_TOP_LEFT,		/* pi -> 3pi/2 */
-    CORNER_TOP_RIGHT,		/* 3pi/2 -> 2pi */
-    CORNER_LAST
-  };
-
 static void
 x_clear_window (struct frame *f)
 {
@@ -5364,11 +5351,6 @@ x_draw_horizontal_wave (struct frame *f, GC gc, int x, int y,
       y += height - 1;
       dy = -dy;
     }
-  cairo_set_line_width (cr, 1);
-  cairo_stroke (cr);
-  x_end_cr_clip (f);
-}
-#endif
 
   cairo_move_to (cr, x - xoffset + 0.5, y + 0.5);
   while (--n >= 0)
@@ -5573,7 +5555,6 @@ x_draw_vertical_window_border (struct window *w, int x, int y0, int y1)
 	     f->output_data.x->normal_gc, x, y0, x, y1);
 #endif
 }
-#endif
 
 /* Draw a window divider from (x0,y0) to (x1,y1)  */
 
@@ -6187,9 +6168,6 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
 #endif
 }
 
-      mask = (GCForeground | GCBackground
-	      | GCGraphicsExposures
-	      | GCLineWidth);
 
 /* Set S->gc to a suitable GC for drawing glyph string S in cursor
    face.  */
@@ -6463,8 +6441,6 @@ x_draw_glyph_string_background (struct glyph_string *s, bool force_p)
 	}
     }
 }
-
-#ifdef USE_X_TOOLKIT
 
 /* Draw the foreground of glyph string S.  */
 
@@ -7561,7 +7537,6 @@ x_setup_relief_colors (struct glyph_string *s)
 			    BLACK_PIX_DEFAULT (s->f));
     }
 }
-#endif
 
 #ifndef USE_CAIRO
 static void
