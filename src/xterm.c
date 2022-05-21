@@ -1975,7 +1975,6 @@ xm_read_drag_receiver_info (struct x_display_info *dpyinfo,
   int rc, actual_format;
   unsigned long nitems, bytes_remaining;
   unsigned char *tmp_data = NULL;
-  uint8_t *data;
 
   x_catch_errors (dpyinfo->display);
   rc = XGetWindowProperty (dpyinfo->display, wdesc,
@@ -1994,7 +1993,7 @@ xm_read_drag_receiver_info (struct x_display_info *dpyinfo,
 
   if (rc)
     {
-      data = (uint8_t *) tmp_data;
+      uint8_t *data = tmp_data;
 
       rec->byteorder = data[0];
       rec->protocol = data[1];
@@ -2012,10 +2011,9 @@ xm_read_drag_receiver_info (struct x_display_info *dpyinfo,
 	}
 
       rec->byteorder = XM_BYTE_ORDER_CUR_FIRST;
+      if (data[1] > XM_DRAG_PROTOCOL_VERSION)
+	rc = 0;
     }
-
-  if (data[1] > XM_DRAG_PROTOCOL_VERSION)
-    rc = 0;
 
   if (tmp_data)
     XFree (tmp_data);
