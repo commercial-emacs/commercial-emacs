@@ -252,7 +252,7 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil).  */
       rarely_quit (len);
       last_tail = XCDR (tail);
     }
-  if (!NILP (last_tail))
+  if (! NILP (last_tail))
     return Qnil;
   return make_fixnum (len);
 }
@@ -295,8 +295,8 @@ Letter-case is significant, but text properties are ignored. */)
   CHECK_STRING (string2);
 
   bool use_byte_compare =
-    !NILP (bytecompare)
-    || (!STRING_MULTIBYTE (string1) && !STRING_MULTIBYTE (string2));
+    ! NILP (bytecompare)
+    || (! STRING_MULTIBYTE (string1) && ! STRING_MULTIBYTE (string2));
   ptrdiff_t len1 = use_byte_compare ? SBYTES (string1) : SCHARS (string1);
   ptrdiff_t len2 = use_byte_compare ? SBYTES (string2) : SCHARS (string2);
   ptrdiff_t x, y, lastdiag, olddiag;
@@ -464,7 +464,7 @@ Symbols are also allowed; their print names are used instead.  */)
     CHECK_STRING (string2);
 
   ptrdiff_t n = min (SCHARS (string1), SCHARS (string2));
-  if (!STRING_MULTIBYTE (string1) && !STRING_MULTIBYTE (string2))
+  if (! STRING_MULTIBYTE (string1) && ! STRING_MULTIBYTE (string2))
     {
       /* Both arguments are unibyte (hot path).  */
       int d = memcmp (SSDATA (string1), SSDATA (string2), n);
@@ -546,7 +546,7 @@ behaves like `string-lessp'.  */)
     s2 = SYMBOL_NAME (s2);
   CHECK_STRING (s1);
   CHECK_STRING (s2);
-  if (!NILP (locale))
+  if (! NILP (locale))
     CHECK_STRING (locale);
 
   return (str_collate (s1, s2, locale, ignore_case) < 0) ? Qt : Qnil;
@@ -594,7 +594,7 @@ Do NOT use this function to compare file names for equality.  */)
     s2 = SYMBOL_NAME (s2);
   CHECK_STRING (s1);
   CHECK_STRING (s2);
-  if (!NILP (locale))
+  if (! NILP (locale))
     CHECK_STRING (locale);
 
   return (str_collate (s1, s2, locale, ignore_case) == 0) ? Qt : Qnil;
@@ -813,7 +813,7 @@ concat_strings (ptrdiff_t nargs, Lisp_Object *args)
       for (ptrdiff_t i = 0; i < nargs; i++)
 	{
 	  Lisp_Object arg = args[i];
-	  if (STRINGP (arg) && !STRING_MULTIBYTE (arg))
+	  if (STRINGP (arg) && ! STRING_MULTIBYTE (arg))
 	    {
 	      ptrdiff_t bytes = SCHARS (arg);
 	      const unsigned char *s = SDATA (arg);
@@ -892,7 +892,7 @@ concat_strings (ptrdiff_t nargs, Lisp_Object *args)
 	    }
 	}
       else
-	for (Lisp_Object tail = arg; !NILP (tail); tail = XCDR (tail))
+	for (Lisp_Object tail = arg; ! NILP (tail); tail = XCDR (tail))
 	  {
 	    int c = XFIXNAT (XCAR (tail));
 	    if (dest_multibyte)
@@ -1029,7 +1029,7 @@ concat (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail,
 	    }
 	}
     }
-  if (!NILP (prev))
+  if (! NILP (prev))
     XSETCDR (prev, last_tail);
 
   return result;
@@ -1405,7 +1405,7 @@ Elements of ALIST that are not conses are also shared.  */)
   if (NILP (alist))
     return alist;
   alist = Fcopy_sequence (alist);
-  for (Lisp_Object tem = alist; !NILP (tem); tem = XCDR (tem))
+  for (Lisp_Object tem = alist; ! NILP (tem); tem = XCDR (tem))
     {
       Lisp_Object car = XCAR (tem);
       if (CONSP (car))
@@ -1798,9 +1798,9 @@ TESTFN is called with 2 arguments: a car of an alist element and KEY.  */)
       Lisp_Object car = XCAR (tail);
       if (CONSP (car)
 	  && (NILP (testfn)
-	      ? (EQ (XCAR (car), key) || !NILP (Fequal
+	      ? (EQ (XCAR (car), key) || ! NILP (Fequal
 						(XCAR (car), key)))
-	      : !NILP (call2 (testfn, XCAR (car), key))))
+	      : ! NILP (call2 (testfn, XCAR (car), key))))
 	return car;
     }
   CHECK_LIST_END (tail, alist);
@@ -1849,7 +1849,7 @@ The value is actually the first element of ALIST whose cdr equals KEY.  */)
     {
       Lisp_Object car = XCAR (tail);
       if (CONSP (car)
-	  && (EQ (XCDR (car), key) || !NILP (Fequal (XCDR (car), key))))
+	  && (EQ (XCDR (car), key) || ! NILP (Fequal (XCDR (car), key))))
 	return car;
     }
   CHECK_LIST_END (tail, alist);
@@ -1957,7 +1957,7 @@ does not modify the argument.  */)
 	  Lisp_Object tem;
 
 	  tem = make_multibyte_string (NULL, nchars, nbytes);
-	  if (!STRING_MULTIBYTE (seq))
+	  if (! STRING_MULTIBYTE (seq))
 	    STRING_SET_UNIBYTE (tem);
 
 	  for (i = nchars = nbytes = ibyte = 0;
@@ -1998,7 +1998,7 @@ does not modify the argument.  */)
 
       FOR_EACH_TAIL (tail)
 	{
-	  if (!NILP (Fequal (elt, XCAR (tail))))
+	  if (! NILP (Fequal (elt, XCAR (tail))))
 	    {
 	      if (NILP (prev))
 		seq = XCDR (tail);
@@ -2195,7 +2195,7 @@ the second.  */)
     seq = sort_list (seq, predicate);
   else if (VECTORP (seq))
     sort_vector (seq, predicate);
-  else if (!NILP (seq))
+  else if (! NILP (seq))
     wrong_type_argument (Qlist_or_vector_p, seq);
   return seq;
 }
@@ -2226,7 +2226,7 @@ merge (Lisp_Object org_l1, Lisp_Object org_l2, Lisp_Object pred)
 	}
 
       Lisp_Object tem;
-      if (!NILP (call2 (pred, Fcar (l1), Fcar (l2))))
+      if (! NILP (call2 (pred, Fcar (l1), Fcar (l2))))
 	{
 	  tem = l1;
 	  l1 = Fcdr (l1);
@@ -2328,7 +2328,7 @@ This is the last value stored with `(put SYMBOL PROPNAME VALUE)'.  */)
   CHECK_SYMBOL (symbol);
   Lisp_Object propval = Fplist_get (CDR (Fassq (symbol, Voverriding_plist_environment)),
                                     propname);
-  if (!NILP (propval))
+  if (! NILP (propval))
     return propval;
   return Fplist_get (XSYMBOL (symbol)->u.s.plist, propname);
 }
@@ -2476,9 +2476,9 @@ of strings.  (`equal' ignores text properties.)  */)
 	  ? Qt : Qnil);
 }
 
-/* Return true if O1 and O2 are equal.  Do not quit or check for cycles.
-   Use this only on arguments that are cycle-free and not too large and
-   are not window configurations.  */
+/* Return true if O1 and O2 are equal.  Do not quit or check for
+   cycles.  Preferable for objects that are stack-friendly (cycle-free
+   and small) and are not window configurations.  */
 
 bool
 equal_no_quit (Lisp_Object o1, Lisp_Object o2)
@@ -2486,16 +2486,12 @@ equal_no_quit (Lisp_Object o1, Lisp_Object o2)
   return internal_equal (o1, o2, EQUAL_NO_QUIT, 0, Qnil);
 }
 
-/* Return true if O1 and O2 are equal.  EQUAL_KIND specifies what kind
-   of equality test to use: if it is EQUAL_NO_QUIT, do not check for
-   cycles or large arguments or quits; if EQUAL_PLAIN, do ordinary
-   Lisp equality; and if EQUAL_INCLUDING_PROPERTIES, do
-   equal-including-properties.
+/* EQUAL_KIND is one of:
+   - EQUAL_NO_QUIT, do not check for cycles or excessive recursion;
+   - EQUAL_PLAIN, do ordinary Lisp equality;
+   - EQUAL_INCLUDING_PROPERTIES, do equal-including-properties.
 
-   If DEPTH is the current depth of recursion; signal an error if it
-   gets too deep.  HT is a hash table used to detect cycles; if nil,
-   it has not been allocated yet.  But ignore the last two arguments
-   if EQUAL_KIND == EQUAL_NO_QUIT.  */
+   DEPTH and HT are used to detect cycles or excessive recursion.  */
 
 static bool
 internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
@@ -2520,7 +2516,7 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	    if (i >= 0)
 	      { /* O1 was seen already.  */
 		Lisp_Object o2s = HASH_VALUE (h, i);
-		if (!NILP (Fmemq (o2, o2s)))
+		if (! NILP (Fmemq (o2, o2s)))
 		  return true;
 		else
 		  set_hash_value_slot (h, i, Fcons (o2, o2s));
@@ -2572,17 +2568,15 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
     case Lisp_Vectorlike:
       {
 	ptrdiff_t size = ASIZE (o1);
-	/* Pseudovectors have the type encoded in the size field, so this test
-	   actually checks that the objects have the same type as well as the
-	   same size.  */
+	/* The pvtype of a vector is PVEC_NORMAL_VECTOR.  */
+	ptrdiff_t pvtype = PSEUDOVECTOR_TYPE (XVECTOR (o1));
+	ptrdiff_t true_size = VECTORP (o1) ? size : PVSIZE (o1);
+
 	if (ASIZE (o2) != size)
 	  return false;
-
-	/* Compare bignums, overlays, markers, and boolvectors
-	   specially, by comparing their values.  */
-	if (BIGNUMP (o1))
+	else if (BIGNUMP (o1))
 	  return mpz_cmp (*xbignum_val (o1), *xbignum_val (o2)) == 0;
-	if (OVERLAYP (o1))
+	else if (OVERLAYP (o1))
 	  {
 	    if (!internal_equal (OVERLAY_START (o1), OVERLAY_START (o2),
 				 equal_kind, depth + 1, ht)
@@ -2594,36 +2588,28 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	    depth++;
 	    goto tail_recurse;
 	  }
-	if (MARKERP (o1))
+	else if (MARKERP (o1))
 	  {
 	    return (XMARKER (o1)->buffer == XMARKER (o2)->buffer
 		    && (XMARKER (o1)->buffer == 0
 			|| XMARKER (o1)->bytepos == XMARKER (o2)->bytepos));
 	  }
-	if (BOOL_VECTOR_P (o1))
+	else if (BOOL_VECTOR_P (o1))
 	  {
 	    EMACS_INT size = bool_vector_size (o1);
 	    return (size == bool_vector_size (o2)
 		    && !memcmp (bool_vector_data (o1), bool_vector_data (o2),
 			        bool_vector_bytes (size)));
 	  }
+	else if (! SX_ADMITS_COMPARISON (pvtype))
+	  return false;
 
-	/* Aside from them, only true vectors, char-tables, compiled
-	   functions, and fonts (font-spec, font-entity, font-object)
-	   are sensible to compare, so eliminate the others now.  */
-	if (size & PSEUDOVECTOR_FLAG)
-	  {
-	    if (((size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_AREA_BITS)
-		< PVEC_COMPILED)
-	      return false;
-	    size &= PSEUDOVECTOR_SIZE_MASK;
-	  }
-	for (ptrdiff_t i = 0; i < size; i++)
+	for (ptrdiff_t i = 0; i < true_size; i++)
 	  {
 	    Lisp_Object v1, v2;
 	    v1 = AREF (o1, i);
 	    v2 = AREF (o2, i);
-	    if (!internal_equal (v1, v2, equal_kind, depth + 1, ht))
+	    if (! internal_equal (v1, v2, equal_kind, depth + 1, ht))
 	      return false;
 	  }
 	return true;
@@ -3026,7 +3012,7 @@ SUBFEATURE can be used to check a specific subfeature of FEATURE.  */)
   register Lisp_Object tem;
   CHECK_SYMBOL (feature);
   tem = Fmemq (feature, Vfeatures);
-  if (!NILP (tem) && !NILP (subfeature))
+  if (! NILP (tem) && ! NILP (subfeature))
     tem = Fmember (subfeature, Fget (feature, Qsubfeatures));
   return (NILP (tem)) ? Qnil : Qt;
 }
@@ -3040,13 +3026,13 @@ particular subfeatures supported in this version of FEATURE.  */)
   register Lisp_Object tem;
   CHECK_SYMBOL (feature);
   CHECK_LIST (subfeatures);
-  if (!NILP (Vautoload_queue))
+  if (! NILP (Vautoload_queue))
     Vautoload_queue = Fcons (Fcons (make_fixnum (0), Vfeatures),
 			     Vautoload_queue);
   tem = Fmemq (feature, Vfeatures);
   if (NILP (tem))
     Vfeatures = Fcons (feature, Vfeatures);
-  if (!NILP (subfeatures))
+  if (! NILP (subfeatures))
     Fput (feature, Qsubfeatures, subfeatures);
   LOADHIST_ATTACH (Fcons (Qprovide, feature));
 
@@ -3499,7 +3485,7 @@ base64_encode_region_1 (Lisp_Object beg, Lisp_Object end, bool line_break,
   encoded_length = base64_encode_1 ((char *) BYTE_POS_ADDR (ibeg),
 				    encoded, length, line_break,
 				    pad, base64url,
-				    !NILP (BVAR (current_buffer, enable_multibyte_characters)));
+				    ! NILP (BVAR (current_buffer, enable_multibyte_characters)));
   if (encoded_length > allength)
     emacs_abort ();
 
@@ -3715,7 +3701,7 @@ of the base 64 encoding, as defined in RFC 4648.  */)
   ptrdiff_t old_pos = PT;
   ptrdiff_t decoded_length;
   ptrdiff_t inserted_chars;
-  bool multibyte = !NILP (BVAR (current_buffer, enable_multibyte_characters));
+  bool multibyte = ! NILP (BVAR (current_buffer, enable_multibyte_characters));
   USE_SAFE_ALLOCA;
 
   validate_region (&beg, &end);
@@ -3733,7 +3719,7 @@ of the base 64 encoding, as defined in RFC 4648.  */)
 
   move_gap_both (XFIXNAT (beg), ibeg);
   decoded_length = base64_decode_1 ((char *) BYTE_POS_ADDR (ibeg),
-				    decoded, length, !NILP (base64url),
+				    decoded, length, ! NILP (base64url),
 				    multibyte, &inserted_chars);
   if (decoded_length > allength)
     emacs_abort ();
@@ -3787,7 +3773,7 @@ the base 64 encoding, as defined in RFC 4648.  */)
   /* The decoded result should be unibyte. */
   ptrdiff_t decoded_chars;
   decoded_length = base64_decode_1 (SSDATA (string), decoded, length,
-				    !NILP (base64url), 0, &decoded_chars);
+				    ! NILP (base64url), 0, &decoded_chars);
   if (decoded_length > length)
     emacs_abort ();
   else if (decoded_length >= 0)
@@ -3796,7 +3782,7 @@ the base 64 encoding, as defined in RFC 4648.  */)
     decoded_string = Qnil;
 
   SAFE_FREE ();
-  if (!STRINGP (decoded_string))
+  if (! STRINGP (decoded_string))
     error ("Invalid base64 data");
 
   return decoded_string;
@@ -4384,7 +4370,7 @@ maybe_resize_hash_table (struct Lisp_Hash_Table *h)
 
       /* Rehash.  */
       for (ptrdiff_t i = 0; i < old_size; i++)
-	if (!NILP (HASH_HASH (h, i)))
+	if (! NILP (HASH_HASH (h, i)))
 	  {
 	    EMACS_UINT hash_code = XUFIXNUM (HASH_HASH (h, i));
 	    ptrdiff_t start_of_bucket = hash_code % ASIZE (h->index);
@@ -4428,9 +4414,8 @@ hash_table_rehash (Lisp_Object hash)
     set_hash_next_slot (h, i, i + 1);
 }
 
-/* Lookup KEY in hash table H.  If HASH is non-null, return in *HASH
-   the hash code of KEY.  Value is the index of the entry in H
-   matching KEY, or -1 if not found.  */
+/* Return index of KEY in H, or -1 if not found.
+   Also, if HASH is not NULL, return in *HASH the value of KEY in H.  */
 
 ptrdiff_t
 hash_lookup (struct Lisp_Hash_Table *h, Lisp_Object key, Lisp_Object *hash)
@@ -4443,11 +4428,11 @@ hash_lookup (struct Lisp_Hash_Table *h, Lisp_Object key, Lisp_Object *hash)
 
   start_of_bucket = XUFIXNUM (hash_code) % ASIZE (h->index);
 
-  for (i = HASH_INDEX (h, start_of_bucket); 0 <= i; i = HASH_NEXT (h, i))
+  for (i = HASH_INDEX (h, start_of_bucket); i >= 0; i = HASH_NEXT (h, i))
     if (EQ (key, HASH_KEY (h, i))
 	|| (h->test.cmpfn
 	    && EQ (hash_code, HASH_HASH (h, i))
-	    && !NILP (h->test.cmpfn (key, HASH_KEY (h, i), h))))
+	    && ! NILP (h->test.cmpfn (key, HASH_KEY (h, i), h))))
       break;
 
   return i;
@@ -4458,7 +4443,7 @@ check_mutable_hash_table (Lisp_Object obj, struct Lisp_Hash_Table *h)
 {
   if (!h->mutable)
     signal_error ("hash table test modifies table", obj);
-  eassert (!PURE_P (h));
+  eassert (! PURE_P (h));
 }
 
 static void
@@ -4519,7 +4504,7 @@ hash_remove_from_table (struct Lisp_Hash_Table *h, Lisp_Object key)
       if (EQ (key, HASH_KEY (h, i))
 	  || (h->test.cmpfn
 	      && EQ (hash_code, HASH_HASH (h, i))
-	      && !NILP (h->test.cmpfn (key, HASH_KEY (h, i), h))))
+	      && ! NILP (h->test.cmpfn (key, HASH_KEY (h, i), h))))
 	{
 	  /* Take entry out of collision chain.  */
 	  if (prev < 0)
@@ -4629,7 +4614,7 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 		  /* Clear key, value, and hash.  */
 		  set_hash_key_slot (h, i, Qunbound);
 		  set_hash_value_slot (h, i, Qnil);
-                  if (!NILP (h->hash))
+                  if (! NILP (h->hash))
                     set_hash_hash_slot (h, i, Qnil);
 
                   eassert (h->count != 0);
@@ -4752,7 +4737,7 @@ sxhash_list (Lisp_Object list, int depth)
 	hash = sxhash_combine (hash, hash2);
       }
 
-  if (!NILP (list))
+  if (! NILP (list))
     {
       EMACS_UINT hash2 = sxhash_obj (list, depth + 1);
       hash = sxhash_combine (hash, hash2);
@@ -4813,8 +4798,7 @@ sxhash_bignum (Lisp_Object bignum)
 }
 
 
-/* Return a hash code for OBJ.  DEPTH is the current depth in the Lisp
-   structure.  Value is an unsigned integer clipped to INTMASK.  */
+/* Return OBJ's hash code clipped to INTMASK.  */
 
 EMACS_UINT
 sxhash (Lisp_Object obj)
@@ -4842,19 +4826,13 @@ sxhash_obj (Lisp_Object obj, int depth)
     case Lisp_Vectorlike:
       {
 	enum pvec_type pvec_type = PSEUDOVECTOR_TYPE (XVECTOR (obj));
-	if (! (PVEC_NORMAL_VECTOR < pvec_type && pvec_type < PVEC_COMPILED))
-	  {
-	    /* According to the CL HyperSpec, two arrays are equal only if
-	       they are 'eq', except for strings and bit-vectors.  In
-	       Emacs, this works differently.  We have to compare element
-	       by element.  Same for pseudovectors that internal_equal
-	       examines the Lisp contents of.  */
-	    return (SUB_CHAR_TABLE_P (obj)
-	            /* 'sxhash_vector' can't be applies to a sub-char-table and
-	              it's probably not worth looking into them anyway!  */
-	            ? 42
-	            : sxhash_vector (obj, depth));
-	  }
+	/* temporary to verify rewriting of a4610c3 */
+	eassert (pvec_type == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_P (obj) : true);
+
+	if (! SX_ADMITS_ANYTHING (pvec_type)) /* a4610c3: sub_char_tables crash. */
+	  return 42;
+	else if (SX_ADMITS_COMPARISON (pvec_type))
+	  return sxhash_vector (obj, depth);
 	else if (pvec_type == PVEC_BIGNUM)
 	  return sxhash_bignum (obj);
 	else if (pvec_type == PVEC_MARKER)
@@ -5027,7 +5005,7 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
 
   /* See if there's a `:purecopy PURECOPY' argument.  */
   i = get_key_arg (QCpurecopy, nargs, args, used);
-  purecopy = i && !NILP (args[i]);
+  purecopy = i && ! NILP (args[i]);
   /* See if there's a `:size SIZE' argument.  */
   i = get_key_arg (QCsize, nargs, args, used);
   Lisp_Object size_arg = i ? args[i] : Qnil;
@@ -5064,7 +5042,7 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
   weak = i ? args[i] : Qnil;
   if (EQ (weak, Qt))
     weak = Qkey_and_value;
-  if (!NILP (weak)
+  if (! NILP (weak)
       && !EQ (weak, Qkey)
       && !EQ (weak, Qvalue)
       && !EQ (weak, Qkey_or_value)
@@ -5334,7 +5312,7 @@ extract_data_from_object (Lisp_Object spec,
 	{
 	  /* Invalid coding system.  */
 
-	  if (!NILP (noerror))
+	  if (! NILP (noerror))
 	    coding_system = Qraw_text;
 	  else
 	    xsignal1 (Qcoding_system_error, coding_system);
@@ -5362,8 +5340,8 @@ extract_data_from_object (Lisp_Object spec,
       struct buffer *bp = XBUFFER (object);
       set_buffer_internal (bp);
 
-      b = !NILP (start) ? fix_position (start) : BEGV;
-      e = !NILP (end) ? fix_position (end) : ZV;
+      b = ! NILP (start) ? fix_position (start) : BEGV;
+      e = ! NILP (end) ? fix_position (end) : ZV;
       if (b > e)
 	{
 	  EMACS_INT temp = b;
@@ -5379,7 +5357,7 @@ extract_data_from_object (Lisp_Object spec,
 	  /* Decide the coding-system to encode the data with.
 	     See fileio.c:Fwrite-region */
 
-	  if (!NILP (Vcoding_system_for_write))
+	  if (! NILP (Vcoding_system_for_write))
 	    coding_system = Vcoding_system_for_write;
 	  else
 	    {
@@ -5394,19 +5372,19 @@ extract_data_from_object (Lisp_Object spec,
 		    force_raw_text = true;
 		}
 
-	      if (NILP (coding_system) && !NILP (Fbuffer_file_name (object)))
+	      if (NILP (coding_system) && ! NILP (Fbuffer_file_name (object)))
 		{
 		  /* Check file-coding-system-alist.  */
 		  Lisp_Object val = CALLN (Ffind_operation_coding_system,
 					   Qwrite_region,
 					   make_fixnum (b), make_fixnum (e),
 					   Fbuffer_file_name (object));
-		  if (CONSP (val) && !NILP (XCDR (val)))
+		  if (CONSP (val) && ! NILP (XCDR (val)))
 		    coding_system = XCDR (val);
 		}
 
 	      if (NILP (coding_system)
-		  && !NILP (BVAR (XBUFFER (object), buffer_file_coding_system)))
+		  && ! NILP (BVAR (XBUFFER (object), buffer_file_coding_system)))
 		{
 		  /* If we still have not decided a coding system, use the
 		     default value of buffer-file-coding-system.  */
@@ -5414,7 +5392,7 @@ extract_data_from_object (Lisp_Object spec,
 		}
 
 	      if (!force_raw_text
-		  && !NILP (Ffboundp (Vselect_safe_coding_system_function)))
+		  && ! NILP (Ffboundp (Vselect_safe_coding_system_function)))
 		/* Confirm that VAL can surely encode the current region.  */
 		coding_system = call4 (Vselect_safe_coding_system_function,
 				       make_fixnum (b), make_fixnum (e),
@@ -5428,7 +5406,7 @@ extract_data_from_object (Lisp_Object spec,
 	    {
 	      /* Invalid coding system.  */
 
-	      if (!NILP (noerror))
+	      if (! NILP (noerror))
 		coding_system = Qraw_text;
 	      else
 		xsignal1 (Qcoding_system_error, coding_system);
@@ -5472,7 +5450,7 @@ extract_data_from_object (Lisp_Object spec,
         }
     }
 
-  if (!STRINGP (object))
+  if (! STRINGP (object))
     signal_error ("Invalid object argument",
 		  NILP (object) ? build_string ("nil") : object);
   return SSDATA (object);
@@ -5756,7 +5734,7 @@ Case is always significant and text properties are ignored. */)
   CHECK_STRING (needle);
   CHECK_STRING (haystack);
 
-  if (!NILP (start_pos))
+  if (! NILP (start_pos))
     {
       CHECK_FIXNUM (start_pos);
       start = XFIXNUM (start_pos);
@@ -5778,7 +5756,7 @@ Case is always significant and text properties are ignored. */)
   if (STRING_MULTIBYTE (haystack)
       ? (STRING_MULTIBYTE (needle)
          || SCHARS (haystack) == SBYTES (haystack) || string_ascii_p (needle))
-      : (!STRING_MULTIBYTE (needle)
+      : (! STRING_MULTIBYTE (needle)
          || SCHARS (needle) == SBYTES (needle)))
     {
       if (STRING_MULTIBYTE (haystack) && STRING_MULTIBYTE (needle)
@@ -5873,7 +5851,7 @@ from the absolute start of the buffer, disregarding the narrowing.  */)
       pos = XFIXNUM (position);
     }
 
-  if (!NILP (absolute))
+  if (! NILP (absolute))
     start = BEG_BYTE;
 
   /* Check that POSITION is in the accessible range of the buffer. */

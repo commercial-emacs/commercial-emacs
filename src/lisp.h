@@ -1027,7 +1027,7 @@ DEFINE_GDB_SYMBOL_END (PSEUDOVECTOR_FLAG)
    with PVEC_TYPE_MASK to indicate the actual type.  */
 enum pvec_type
 {
-  PVEC_NORMAL_VECTOR,	/* Should be first, for sxhash_obj.  */
+  PVEC_NORMAL_VECTOR,	/* Must be first, for sx_hash.  */
   PVEC_FREE,
   PVEC_BIGNUM,
   PVEC_MARKER,
@@ -1056,13 +1056,18 @@ enum pvec_type
   PVEC_TREE_SITTER,
   PVEC_TREE_SITTER_NODE,
 
-  /* These should be last, for internal_equal and sxhash_obj.  */
+  /* These must be last, for sx_hash.  */
   PVEC_COMPILED,
   PVEC_CHAR_TABLE,
   PVEC_SUB_CHAR_TABLE,
   PVEC_RECORD,
-  PVEC_FONT /* Should be last because it's used for range checking.  */
+  PVEC_FONT              /* Must be very last for range checking . */
 };
+#define SX_ADMITS_ANYTHING(pvec_type) \
+  (pvec_type != PVEC_SUB_CHAR_TABLE)
+#define SX_ADMITS_COMPARISON(pvec_type)				\
+  (SX_ADMITS_ANYTHING (pvec_type) && \
+       (pvec_type <= PVEC_NORMAL_VECTOR || pvec_type >= PVEC_COMPILED))
 
 enum More_Lisp_Bits
   {
