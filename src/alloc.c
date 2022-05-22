@@ -78,13 +78,6 @@ enum { MALLOC_ALIGNMENT = 16 };
 enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 #endif
 
-/* Mark, unmark, query mark bit of a Lisp string.  S must be a pointer
-   to a struct Lisp_String.  */
-
-#define XMARK_VECTOR(V)		((V)->header.size |= ARRAY_MARK_FLAG)
-#define XUNMARK_VECTOR(V)	((V)->header.size &= ~ARRAY_MARK_FLAG)
-#define XVECTOR_MARKED_P(V)	(((V)->header.size & ARRAY_MARK_FLAG) != 0)
-
 static bool gc_inhibited;
 struct Lisp_String *(*static_string_allocator) (void);
 struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t len, bool q_clear);
@@ -1464,8 +1457,9 @@ sweep_sdata (void)
 	       from = next_from)
 	    {
 	      struct Lisp_String *s = from->string;
-	      const ptrdiff_t nbytes = s ? STRING_BYTES (s) : from->nbytes;
+	      const ptrdiff_t nbytes = from->nbytes;
 	      const ptrdiff_t step = sdata_size (nbytes) + GC_STRING_EXTRA;
+	      eassert (!s || ! XSTRING_MARKED_P (s));
 	      eassert (nbytes <= LARGE_STRING_THRESH);
 
 #ifdef GC_CHECK_STRING_BYTES
@@ -5295,22 +5289,28 @@ mark_stack_empty_p (void)
 }
 
 /* Pop and return a value from the mark stack (which must be nonempty).  */
-static inline Lisp_Object
+static inline Lisp_Object *
 mark_stack_pop (void)
 {
-  eassume (!mark_stack_empty_p ());
-  struct mark_entry *e = &mark_stk.stack[mark_stk.sp - 1];
-  if (e->n == 0)		/* single value */
+  Lisp_Object *ret;
+  struct mark_entry *entry;
+  eassume (! mark_stack_empty_p ());
+
+  entry = &mark_stk.stack[mark_stk.sp - 1];
+  if (entry->n == 0)
     {
+      /* single value */
       --mark_stk.sp;
-      return e->u.value;
+      ret = &entry->u.value;
     }
-  /* Array of values: pop them left to right, which seems to be slightly
-     faster than right to left.  */
-  e->n--;
-  if (e->n == 0)
-    --mark_stk.sp;		/* last value consumed */
-  return (++e->u.values)[-1];
+  else
+    {
+      /* multiple values */
+      if (--entry->n == 0)
+	--mark_stk.sp;
+      ret = &(++entry->u.values)[-1];
+    }
+  return ret;
 }
 
 static void
@@ -5339,8 +5339,11 @@ mark_stack_push_n (Lisp_Object *values, ptrdiff_t n)
     {
       if (mark_stk.sp >= mark_stk.size)
 	grow_mark_stack ();
-      mark_stk.stack[mark_stk.sp++] =
-	(struct mark_entry) {.n = n, .u.values = values};
+      mark_stk.stack[mark_stk.sp++] = (struct mark_entry)
+	{
+	  .n = n,
+	  .u.values = values,
+	};
     }
 }
 
@@ -5366,14 +5369,15 @@ process_mark_stack (ptrdiff_t base_sp)
 
   while (mark_stk.sp > base_sp)
     {
-      Lisp_Object obj = mark_stack_pop ();
+      Lisp_Object *objp = mark_stack_pop ();
+
     mark_obj: ;
-      void *po = XPNTR (obj);
+      void *po = XPNTR (*objp);
       if (PURE_P (po))
 	continue;
 
 #if GC_REMEMBER_LAST_MARKED
-      last_marked[last_marked_index++] = obj;
+      last_marked[last_marked_index++] = *objp;
       last_marked_index &= LAST_MARKED_SIZE - 1;
 #endif
 
@@ -5436,18 +5440,23 @@ process_mark_stack (ptrdiff_t base_sp)
 
 #endif /* not GC_CHECK_MARKED_OBJECTS */
 
-      switch (XTYPE (obj))
+      switch (XTYPE (*objp))
 	{
 	case Lisp_String:
 	  {
+	    bool got_here = ((uintptr_t) *objp == (uintptr_t) 0x555555f86c24);
 	    CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
-	    set_string_marked (&obj);
+	    if (got_here)
+	      fprintf (stderr, "got here a %p\n", (void *) *objp);
+	    set_string_marked (objp);
+	    if (got_here)
+	      fprintf (stderr, "got here b %p\n", (void *) *objp);
 	  }
 	  break;
 
 	case Lisp_Vectorlike:
 	  {
-	    register struct Lisp_Vector *ptr = XVECTOR (obj);
+	    register struct Lisp_Vector *ptr = XVECTOR (*objp);
 
 	    if (vector_marked_p (ptr))
 	      break;
@@ -5455,7 +5464,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	    enum pvec_type pvectype = PSEUDOVECTOR_TYPE (ptr);
 
 #ifdef GC_CHECK_MARKED_OBJECTS
-	    if (! pdumper_object_p (po) && ! SUBRP (obj) && ! main_thread_p (po))
+	    if (! pdumper_object_p (po) && ! SUBRP (*objp) && ! main_thread_p (po))
 	      {
 		m = mem_find (po);
 		if (m == MEM_NIL)
@@ -5520,15 +5529,15 @@ process_mark_stack (ptrdiff_t base_sp)
 		break;
 
 	      case PVEC_OVERLAY:
-		mark_overlay (XOVERLAY (obj));
+		mark_overlay (XOVERLAY (*objp));
 		break;
 
 	      case PVEC_SUBR:
 #ifdef HAVE_NATIVE_COMP
-		if (SUBR_NATIVE_COMPILEDP (obj))
+		if (SUBR_NATIVE_COMPILEDP (*objp))
 		  {
 		    set_vector_marked (ptr);
-		    struct Lisp_Subr *subr = XSUBR (obj);
+		    struct Lisp_Subr *subr = XSUBR (*objp);
 		    mark_stack_push (subr->intspec.native);
 		    mark_stack_push (subr->command_modes);
 		    mark_stack_push (subr->native_comp_u);
@@ -5558,7 +5567,7 @@ process_mark_stack (ptrdiff_t base_sp)
 
 	case Lisp_Symbol:
 	  {
-	    struct Lisp_Symbol *ptr = XSYMBOL (obj);
+	    struct Lisp_Symbol *ptr = XSYMBOL (*objp);
 	  nextsym:
 	    if (symbol_marked_p (ptr))
 	      break;
@@ -5610,7 +5619,7 @@ process_mark_stack (ptrdiff_t base_sp)
 
 	case Lisp_Cons:
 	  {
-	    struct Lisp_Cons *ptr = XCONS (obj);
+	    struct Lisp_Cons *ptr = XCONS (*objp);
 	    if (cons_marked_p (ptr))
 	      break;
 	    CHECK_ALLOCATED_AND_LIVE (live_cons_p, MEM_TYPE_CONS);
@@ -5627,7 +5636,7 @@ process_mark_stack (ptrdiff_t base_sp)
 #endif
 	      }
 	    /* Speedup hack for the common case (successive list elements).  */
-	    obj = ptr->u.s.car;
+	    objp = &ptr->u.s.car;
 	    goto mark_obj;
 	  }
 
@@ -5635,10 +5644,10 @@ process_mark_stack (ptrdiff_t base_sp)
 	  CHECK_ALLOCATED_AND_LIVE (live_float_p, MEM_TYPE_FLOAT);
 	  /* Do not mark floats stored in a dump image: these floats are
 	     "cold" and do not have mark bits.  */
-	  if (pdumper_object_p (XFLOAT (obj)))
-	    eassert (pdumper_cold_object_p (XFLOAT (obj)));
-	  else if (!XFLOAT_MARKED_P (XFLOAT (obj)))
-	    XFLOAT_MARK (XFLOAT (obj));
+	  if (pdumper_object_p (XFLOAT (*objp)))
+	    eassert (pdumper_cold_object_p (XFLOAT (*objp)));
+	  else if (! XFLOAT_MARKED_P (XFLOAT (*objp)))
+	    XFLOAT_MARK (XFLOAT (*objp));
 	  break;
 
 	case_Lisp_Int:

@@ -4685,9 +4685,8 @@ hash_string (char const *ptr, ptrdiff_t len)
       p += step;
       hash = sxhash_combine (hash, c);
     }
-  /* A few last bytes may remain (smaller than an EMACS_UINT).  */
-  /* FIXME: We could do this without a loop, but it'd require
-     endian-dependent code :-(  */
+  /* This may leave a residual (smaller than an EMACS_UINT).
+     A loopless calculation would not be endian-agnostic.  */
   while (p < end)
     {
       unsigned char c = *p++;

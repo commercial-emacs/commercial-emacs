@@ -157,6 +157,10 @@ enum _GL_ATTRIBUTE_PACKED mem_type
   MEM_TYPE_NTYPES,
 };
 
+#define XMARK_VECTOR(V)		((V)->header.size |= ARRAY_MARK_FLAG)
+#define XUNMARK_VECTOR(V)	((V)->header.size &= ~ARRAY_MARK_FLAG)
+#define XVECTOR_MARKED_P(V)	(((V)->header.size & ARRAY_MARK_FLAG) != 0)
+
 #define XMARK_STRING(S)		((S)->u.s.size |= ARRAY_MARK_FLAG)
 #define XUNMARK_STRING(S)	((S)->u.s.size &= ~ARRAY_MARK_FLAG)
 #define XSTRING_MARKED_P(S)	(((S)->u.s.size & ARRAY_MARK_FLAG) != 0)
