@@ -1995,6 +1995,9 @@ xm_read_drag_receiver_info (struct x_display_info *dpyinfo,
     {
       uint8_t *data = tmp_data;
 
+      if (data[1] > XM_DRAG_PROTOCOL_VERSION)
+	return 1;
+
       rec->byteorder = data[0];
       rec->protocol = data[1];
       rec->protocol_style = data[2];
