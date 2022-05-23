@@ -1343,7 +1343,7 @@ sweep_strings (void)
       for (i = 0; i < BLOCK_NSTRINGS; ++i)
 	{
 	  struct Lisp_String *s = b->strings + i;
-
+	  eassert (! calloc_xpntr_p (s));
 	  if (s->u.s.data != NULL) /* means S is live but is it marked?  */
 	    {
 	      if (XSTRING_MARKED_P (s))
@@ -3039,14 +3039,11 @@ set_string_marked (Lisp_Object *obj)
 	  s->u.s.intervals = balance_intervals (s->u.s.intervals);
 	  XSETSTRING (*obj, gc_flip_xpntr (s, sizeof (struct Lisp_String),
 					   Lisp_String));
-	  if (s->u.s.data != NULL)
-	    {
-	      sdata *data = SDATA_OF_LISP_STRING (s);
-	      if (data->string != s)
-		eassert (data->string == XSTRING (*obj));
-	      else
-		data->string = XSTRING (*obj);
-	    }
+	  sdata *data = SDATA_OF_LISP_STRING (s);
+	  if (data->string != s)
+	    eassert (data->string == XSTRING (*obj));
+	  else
+	    data->string = XSTRING (*obj);
 	}
       else
 	XMARK_STRING (s);

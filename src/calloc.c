@@ -336,13 +336,11 @@ gc_flip_space (void)
 	  size_t bytespan = nbytes_of (xpntr_type, obj);
 	  if (xpntr_type == Lisp_String && ! FORWARD_XPNTR_GET (obj))
 	    {
-	      struct Lisp_String *s = (struct Lisp_String *) obj;
-
 	      /* S goes to dead state.  */
-	      sdata *data = SDATA_OF_LISP_STRING (s);
-
-	      if (data)
+	      struct Lisp_String *s = (struct Lisp_String *) obj;
+	      if (s->u.s.data != NULL)
 		{
+		  sdata *data = SDATA_OF_LISP_STRING (s);
 		  /* Save length so that sweep_sdata() knows how far
 		     to move the hare-tortoise pointers.  */
 		  eassert (data->nbytes == STRING_BYTES (s));
