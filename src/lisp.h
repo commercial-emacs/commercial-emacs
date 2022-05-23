@@ -3422,8 +3422,7 @@ void grow_specpdl_allocation (void);
 INLINE void
 grow_specpdl (void)
 {
-  specpdl_ptr++;
-  if (specpdl_ptr == specpdl_end)
+  if (++specpdl_ptr == specpdl_end)
     grow_specpdl_allocation ();
 }
 
@@ -4031,12 +4030,23 @@ unsigned char *resize_string_data (Lisp_Object, ptrdiff_t, int, int);
 extern void malloc_warning (const char *);
 extern AVOID memory_full (size_t);
 extern bool survives_gc_p (Lisp_Object);
-extern void mark_object (Lisp_Object);
 extern void mark_objects (Lisp_Object *, ptrdiff_t);
 extern void alloc_unexec_pre (void);
 extern void alloc_unexec_post (void);
 extern void flush_stack_call_func1 (void (*func) (void *arg), void *arg);
 extern void mark_memory (void const *start, void const *end);
+
+INLINE void
+mark_object (Lisp_Object *obj)
+{
+  mark_objects (obj, 1);
+}
+
+INLINE void
+mark_automatic_object (Lisp_Object obj)
+{
+  mark_objects (&obj, 1);
+}
 
 /* flush_stack_call_func is the trampoline function that flushes
    registers to the stack, and then calls FUNC on ARG.

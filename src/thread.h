@@ -103,15 +103,15 @@ struct thread_state
   struct handler *m_handlerlist_sentinel;
 #define handlerlist_sentinel (current_thread->m_handlerlist_sentinel)
 
-  /* Pointer to beginning of specpdl.  */
+  /* Bottom of specpdl.  */
   union specbinding *m_specpdl;
 #define specpdl (current_thread->m_specpdl)
 
-  /* End of specpld (just beyond the last element).  */
+  /* Sentinel just beyond specpdl capacity for grow_specpdl().  */
   union specbinding *m_specpdl_end;
 #define specpdl_end (current_thread->m_specpdl_end)
 
-  /* Pointer to first unused element in specpdl.  */
+  /* Top of specpdl.  */
   union specbinding *m_specpdl_ptr;
 #define specpdl_ptr (current_thread->m_specpdl_ptr)
 

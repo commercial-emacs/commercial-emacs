@@ -3923,14 +3923,6 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
     }
 }
 
-
-
-/***********************************************************************
- *****                                                             *****
- *****			     Hash Tables                           *****
- *****                                                             *****
- ***********************************************************************/
-
 /* Implemented by gerd@gnu.org.  This hash table implementation was
    inspired by CMUCL hash tables.  */
 
@@ -3944,12 +3936,6 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
    not to hash.  Instead, we could just do a linear search in the
    key_and_value vector of the hash table.  This could be done
    if a `:linear-search t' argument is given to make-hash-table.  */
-
-
-
-/***********************************************************************
-			       Utilities
- ***********************************************************************/
 
 static void
 CHECK_HASH_TABLE (Lisp_Object x)
@@ -4061,11 +4047,6 @@ larger_vector (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
 	    (new_size - old_size) * word_size);
   return v;
 }
-
-
-/***********************************************************************
-			 Low-level Functions
- ***********************************************************************/
 
 /* Return the index of the next entry in H following the one at IDX,
    or -1 if none.  */
@@ -4553,12 +4534,6 @@ hash_clear (struct Lisp_Hash_Table *h)
     }
 }
 
-
-
-/************************************************************************
-			   Weak Hash Tables
- ************************************************************************/
-
 /* Sweep weak hash table H.  REMOVE_ENTRIES_P means remove
    entries from the table that don't survive the current GC.
    !REMOVE_ENTRIES_P means mark entries that are in use.  Value is
@@ -4583,13 +4558,13 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 	  bool remove_p;
 
 	  if (EQ (h->weak, Qkey))
-	    remove_p = !key_known_to_survive_p;
+	    remove_p = ! key_known_to_survive_p;
 	  else if (EQ (h->weak, Qvalue))
-	    remove_p = !value_known_to_survive_p;
+	    remove_p = ! value_known_to_survive_p;
 	  else if (EQ (h->weak, Qkey_or_value))
-	    remove_p = !(key_known_to_survive_p || value_known_to_survive_p);
+	    remove_p = ! (key_known_to_survive_p || value_known_to_survive_p);
 	  else if (EQ (h->weak, Qkey_and_value))
-	    remove_p = !(key_known_to_survive_p && value_known_to_survive_p);
+	    remove_p = ! (key_known_to_survive_p && value_known_to_survive_p);
 	  else
 	    emacs_abort ();
 
@@ -4597,7 +4572,7 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 
 	  if (remove_entries_p)
 	    {
-              eassert (!remove_p
+              eassert (! remove_p
                        == (key_known_to_survive_p && value_known_to_survive_p));
 	      if (remove_p)
 		{
@@ -4627,18 +4602,20 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 	    }
 	  else
 	    {
-	      if (!remove_p)
+	      if (! remove_p)
 		{
 		  /* Make sure key and value survive.  */
-		  if (!key_known_to_survive_p)
+		  if (! key_known_to_survive_p)
 		    {
-		      mark_object (HASH_KEY (h, i));
+		      /* Like HASH_KEY but gets its address.  */
+		      mark_object (aref_addr (h->key_and_value, 2 * i));
                       marked = true;
 		    }
 
-		  if (!value_known_to_survive_p)
+		  if (! value_known_to_survive_p)
 		    {
-		      mark_object (HASH_VALUE (h, i));
+		      /* Like HASH_VALUE but get its address.  */
+		      mark_object (aref_addr (h->key_and_value, 2 * i + 1));
                       marked = true;
 		    }
 		}
@@ -4648,11 +4625,6 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 
   return marked;
 }
-
-
-/***********************************************************************
-			Hash Code Computation
- ***********************************************************************/
 
 /* Maximum depth up to which to dive into Lisp structures.  */
 
@@ -4867,12 +4839,6 @@ sxhash_obj (Lisp_Object obj, int depth)
       emacs_abort ();
     }
 }
-
-
-
-/***********************************************************************
-			    Lisp Interface
- ***********************************************************************/
 
 DEFUN ("sxhash-eq", Fsxhash_eq, Ssxhash_eq, 1, 1, 0,
        doc: /* Return an integer hash code for OBJ suitable for `eq'.
@@ -5227,12 +5193,6 @@ returns nil, then (funcall TEST x1 x2) also returns nil.  */)
 {
   return Fput (name, Qhash_table_test, list2 (test, hash));
 }
-
-
-
-/************************************************************************
-			MD5, SHA-1, and SHA-2
- ************************************************************************/
 
 #include "md5.h"
 #include "sha1.h"

@@ -342,11 +342,11 @@ mark_pgtkterm (void)
   for (i = 0; i < n; i++)
     {
       union buffered_input_event *ev = &evq->q[i];
-      mark_object (ev->ie.x);
-      mark_object (ev->ie.y);
-      mark_object (ev->ie.frame_or_window);
-      mark_object (ev->ie.arg);
-      mark_object (ev->ie.device);
+      mark_object (&ev->ie.x);
+      mark_object (&ev->ie.y);
+      mark_object (&ev->ie.frame_or_window);
+      mark_object (&ev->ie.arg);
+      mark_object (&ev->ie.device);
     }
 
   for (dpyinfo = x_display_list; dpyinfo;
@@ -354,7 +354,7 @@ mark_pgtkterm (void)
     {
       for (device = dpyinfo->devices; device;
 	   device = device->next)
-	mark_object (device->name);
+	mark_object (&device->name);
     }
 }
 

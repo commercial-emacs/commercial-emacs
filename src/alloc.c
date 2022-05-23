@@ -969,7 +969,7 @@ mark_interval_tree_1 (INTERVAL i, void *dummy)
 {
   eassert (! interval_marked_p (i));
   set_interval_marked (i);
-  mark_object (i->plist);
+  mark_object (&i->plist);
 }
 
 /* Mark the interval tree rooted in I.  */
@@ -2866,7 +2866,7 @@ mark_finalizer_list (struct Lisp_Finalizer *head)
        finalizer = finalizer->next)
     {
       set_vectorlike_marked (&finalizer->header);
-      mark_object (finalizer->function);
+      mark_object (&finalizer->function);
     }
 }
 
@@ -3734,9 +3734,9 @@ mark_maybe_pointer (void *const * p)
       if (ret)
 	{
 	  if (type == Lisp_Symbol)
-	    mark_object (make_lisp_symbol (po));
+	    mark_automatic_object (make_lisp_symbol (po));
 	  else
-	    mark_object (make_lisp_ptr (po, type));
+	    mark_automatic_object (make_lisp_ptr (po, type));
 	}
     }
   else if (pdumper_object_p (p_sym))
@@ -3749,7 +3749,7 @@ mark_maybe_pointer (void *const * p)
 	     // Verify P’s tag, if any, matches pdumper-reported type.
 	     && (! USE_LSB_TAG || p_sym == po || cp - cpo == Lisp_Symbol));
       if (ret)
-	mark_object (make_lisp_symbol (po));
+	mark_automatic_object (make_lisp_symbol (po));
     }
   else if ((xpntr_type = space_find_xpntr (*p, &xpntr)) != Lisp_Type_Unused0)
     {
@@ -3757,7 +3757,7 @@ mark_maybe_pointer (void *const * p)
       void *forwarded = gc_fwd_xpntr (xpntr);
       if (! forwarded)
 	{
-	  mark_object (make_lisp_ptr (xpntr, xpntr_type));
+	  mark_automatic_object (make_lisp_ptr (xpntr, xpntr_type));
 	  ret = true;
 	  forwarded = gc_fwd_xpntr (xpntr);
 	}
@@ -3777,7 +3777,7 @@ mark_maybe_pointer (void *const * p)
 	    struct Lisp_Cons *h = live_cons_holding (m, *p);
 	    if (h)
 	      {
-		mark_object (make_lisp_ptr (h, Lisp_Cons));
+		mark_automatic_object (make_lisp_ptr (h, Lisp_Cons));
 		ret = true;
 	      }
 	  }
@@ -3788,7 +3788,7 @@ mark_maybe_pointer (void *const * p)
 	    struct Lisp_String *h = live_string_holding (m, *p);
 	    if (h)
 	      {
-		mark_object (make_lisp_ptr (h, Lisp_String));
+		mark_automatic_object (make_lisp_ptr (h, Lisp_String));
 		ret = true;
 	      }
 	  }
@@ -3799,7 +3799,7 @@ mark_maybe_pointer (void *const * p)
 	    struct Lisp_Symbol *h = live_symbol_holding (m, *p);
 	    if (h)
 	      {
-		mark_object (make_lisp_symbol (h));
+		mark_automatic_object (make_lisp_symbol (h));
 		ret = true;
 	      }
 	  }
@@ -3810,7 +3810,7 @@ mark_maybe_pointer (void *const * p)
 	    struct Lisp_Float *h = live_float_holding (m, *p);
 	    if (h)
 	      {
-		mark_object (make_lisp_ptr (h, Lisp_Float));
+		mark_automatic_object (make_lisp_ptr (h, Lisp_Float));
 		ret = true;
 	      }
 	  }
@@ -3821,7 +3821,7 @@ mark_maybe_pointer (void *const * p)
 	    struct Lisp_Vector *h = live_large_vector_holding (m, *p);
 	    if (h)
 	      {
-		mark_object (make_lisp_ptr (h, Lisp_Vectorlike));
+		mark_automatic_object (make_lisp_ptr (h, Lisp_Vectorlike));
 		ret = true;
 	      }
 	  }
@@ -3832,7 +3832,7 @@ mark_maybe_pointer (void *const * p)
 	    struct Lisp_Vector *h = live_small_vector_holding (m, *p);
 	    if (h)
 	      {
-		mark_object (make_lisp_ptr (h, Lisp_Vectorlike));
+		mark_automatic_object (make_lisp_ptr (h, Lisp_Vectorlike));
 		ret = true;
 	      }
 	  }
@@ -3847,7 +3847,7 @@ mark_maybe_pointer (void *const * p)
       struct Lisp_Symbol *h = live_symbol_holding (m, p_sym);
       if (h)
 	{
-	  mark_object (make_lisp_symbol (h));
+	  mark_automatic_object (make_lisp_symbol (h));
 	  ret = true;
 	}
     }
@@ -4654,7 +4654,7 @@ compact_font_caches (void)
 	  for (entry = XCDR (cache); CONSP (entry); entry = XCDR (entry))
 	    XSETCAR (entry, compact_font_cache_entry (XCAR (entry)));
 	}
-      mark_object (cache);
+      mark_object (&cache);
     }
 }
 
@@ -4688,7 +4688,7 @@ static void
 mark_pinned_objects (void)
 {
   for (struct pinned_object *pobj = pinned_objects; pobj; pobj = pobj->next)
-    mark_object (pobj->object);
+    mark_object (&pobj->object);
 }
 
 static void
@@ -4703,7 +4703,7 @@ mark_pinned_symbols (void)
       struct Lisp_Symbol *sym = sblk->symbols, *end = sym + lim;
       for (; sym < end; ++sym)
 	if (sym->u.s.pinned)
-	  mark_object (make_lisp_symbol (sym));
+	  mark_automatic_object (make_lisp_symbol (sym));
 
       lim = BLOCK_NSYMBOLS;
     }
@@ -4712,23 +4712,23 @@ mark_pinned_symbols (void)
 static void
 mark_most_objects (void)
 {
-  const struct Lisp_Vector *vbuffer_slot_defaults =
+  struct Lisp_Vector *vbuffer_slot_defaults =
     (struct Lisp_Vector *) &buffer_slot_defaults;
-  const struct Lisp_Vector *vbuffer_slot_symbols =
+  struct Lisp_Vector *vbuffer_slot_symbols =
     (struct Lisp_Vector *) &buffer_slot_symbols;
 
   for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
     {
-      mark_object (vbuffer_slot_defaults->contents[i]);
-      mark_object (vbuffer_slot_symbols->contents[i]);
+      mark_object (&vbuffer_slot_defaults->contents[i]);
+      mark_object (&vbuffer_slot_symbols->contents[i]);
     }
 
   for (int i = 0; i < ARRAYELTS (lispsym); ++i)
-    mark_object (builtin_lisp_symbol (i));
+    mark_automatic_object (builtin_lisp_symbol (i));
 
   // defvar_lisp calls staticpro.
   for (int i = 0; i < staticidx; ++i)
-    mark_object (*staticvec[i]);
+    mark_object ((Lisp_Object *)staticvec[i]);
 }
 
 /* List of weak hash tables we found during marking the Lisp heap.
@@ -4895,7 +4895,7 @@ garbage_collect (void)
       struct buffer *b = XBUFFER (buffer);
       if (! EQ (BVAR (b, undo_list), Qt))
 	bset_undo_list (b, compact_undo_list (BVAR (b, undo_list)));
-      mark_object (BVAR (b, undo_list));
+      mark_object (&BVAR (b, undo_list));
     }
 
   queue_doomed_finalizers (&doomed_finalizers, &finalizers);
@@ -5042,7 +5042,7 @@ mark_glyph_matrix (struct glyph_matrix *matrix)
 
 	    for (; glyph < end_glyph; ++glyph)
 	      if (STRINGP (glyph->object))
-		mark_object (glyph->object);
+		mark_object (&glyph->object);
 	  }
       }
 }
@@ -5105,7 +5105,7 @@ mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
           (! SYMBOLP (val) || ! symbol_marked_p (XSYMBOL (val))))
 	{
 	  if (! SUB_CHAR_TABLE_P (val))
-	    mark_object (val);
+	    mark_object (&val);
 	  else if (! vector_marked_p (XVECTOR (val)))
 	    mark_char_table (XVECTOR (val), PVEC_SUB_CHAR_TABLE);
 	}
@@ -5123,7 +5123,7 @@ mark_overlay (struct Lisp_Overlay *ptr)
       /* These two are always markers and can be marked fast.  */
       set_vectorlike_marked (&XMARKER (ptr->start)->header);
       set_vectorlike_marked (&XMARKER (ptr->end)->header);
-      mark_object (ptr->plist);
+      mark_object (&ptr->plist);
     }
 }
 
@@ -5145,8 +5145,8 @@ mark_buffer (struct buffer *buffer)
      Note: this later processing is only done for live buffers, so
      for dead buffers, the undo_list should be nil (set by Fkill_buffer),
      but just to be on the safe side, we mark it here.  */
-  if (!BUFFER_LIVE_P (buffer))
-      mark_object (BVAR (buffer, undo_list));
+  if (! BUFFER_LIVE_P (buffer))
+      mark_object (&BVAR (buffer, undo_list));
 
   mark_overlay (buffer->overlays_before);
   mark_overlay (buffer->overlays_after);
@@ -5186,9 +5186,9 @@ mark_localized_symbol (struct Lisp_Symbol *ptr)
   /* If the value is set up for a killed buffer restore its global binding.  */
   if (BUFFERP (blv->where) && ! BUFFER_LIVE_P (XBUFFER (blv->where)))
     symval_restore_default (ptr);
-  mark_object (blv->where);
-  mark_object (blv->valcell);
-  mark_object (blv->defcell);
+  mark_object (&blv->where);
+  mark_object (&blv->valcell);
+  mark_object (&blv->defcell);
 }
 
 /* Remove killed buffers or items whose car is a killed buffer from
@@ -5199,22 +5199,22 @@ mark_discard_killed_buffers (Lisp_Object list)
 {
   Lisp_Object tail, *prev = &list;
 
-  for (tail = list; CONSP (tail) && !cons_marked_p (XCONS (tail));
+  for (tail = list; CONSP (tail) && ! cons_marked_p (XCONS (tail));
        tail = XCDR (tail))
     {
       Lisp_Object tem = XCAR (tail);
       if (CONSP (tem))
 	tem = XCAR (tem);
-      if (BUFFERP (tem) && !BUFFER_LIVE_P (XBUFFER (tem)))
+      if (BUFFERP (tem) && ! BUFFER_LIVE_P (XBUFFER (tem)))
 	*prev = XCDR (tail);
       else
 	{
 	  set_cons_marked (XCONS (tail));
-	  mark_object (XCAR (tail));
+	  mark_automatic_object (XCAR (tail));
 	  prev = xcdr_addr (tail);
 	}
     }
-  mark_object (tail);
+  mark_automatic_object (tail);
   return list;
 }
 
@@ -5264,11 +5264,8 @@ mark_window (struct Lisp_Vector *ptr)
 /* Entry of the mark stack.  */
 struct mark_entry
 {
-  ptrdiff_t n;		        /* number of values, or 0 if a single value */
-  union {
-    Lisp_Object value;		/* when n = 0 */
-    Lisp_Object *values;	/* when n > 0 */
-  } u;
+  ptrdiff_t n;
+  Lisp_Object *values;
 };
 
 /* This stack is used during marking for traversing data structures without
@@ -5297,19 +5294,10 @@ mark_stack_pop (void)
   eassume (! mark_stack_empty_p ());
 
   entry = &mark_stk.stack[mark_stk.sp - 1];
-  if (entry->n == 0)
-    {
-      /* single value */
-      --mark_stk.sp;
-      ret = &entry->u.value;
-    }
-  else
-    {
-      /* multiple values */
-      if (--entry->n == 0)
-	--mark_stk.sp;
-      ret = &(++entry->u.values)[-1];
-    }
+  eassert (entry->n > 0);
+  if (--entry->n == 0)
+    --mark_stk.sp;
+  ret = entry->values++;
   return ret;
 }
 
@@ -5324,17 +5312,9 @@ grow_mark_stack (void)
 }
 
 static inline void
-mark_stack_push (Lisp_Object value)
-{
-  if (mark_stk.sp >= mark_stk.size)
-    grow_mark_stack ();
-  mark_stk.stack[mark_stk.sp++] =
-    (struct mark_entry) {.n = 0, .u.value = value};
-}
-
-static inline void
 mark_stack_push_n (Lisp_Object *values, ptrdiff_t n)
 {
+  eassert (n >= 0);
   if (n > 0)
     {
       if (mark_stk.sp >= mark_stk.size)
@@ -5342,9 +5322,15 @@ mark_stack_push_n (Lisp_Object *values, ptrdiff_t n)
       mark_stk.stack[mark_stk.sp++] = (struct mark_entry)
 	{
 	  .n = n,
-	  .u.values = values,
+	  .values = values,
 	};
     }
+}
+
+static inline void
+mark_stack_push (Lisp_Object *value)
+{
+  return mark_stack_push_n (value, 1);
 }
 
 /* Mark the MARK_STK above BASE_SP.
@@ -5372,8 +5358,8 @@ process_mark_stack (ptrdiff_t base_sp)
       Lisp_Object *objp = mark_stack_pop ();
 
     mark_obj: ;
-      void *po = XPNTR (*objp);
-      if (PURE_P (po))
+      void *xpntr = XPNTR (*objp);
+      if (PURE_P (xpntr))
 	continue;
 
 #if GC_REMEMBER_LAST_MARKED
@@ -5388,15 +5374,15 @@ process_mark_stack (ptrdiff_t base_sp)
          MEM_ROOT via lisp_malloc().  */
 #define CHECK_ALLOCATED()				\
       do {						\
-	if (pdumper_object_p (po))			\
+	if (pdumper_object_p (xpntr))			\
 	  {						\
-	    if (! pdumper_object_p_precise (po))	\
+	    if (! pdumper_object_p_precise (xpntr))	\
 	      emacs_abort ();				\
 	    break;					\
 	  }						\
-	if (calloc_xpntr_p (po))			\
+	if (calloc_xpntr_p (xpntr))			\
 	  break;					\
-	m = mem_find (po);				\
+	m = mem_find (xpntr);				\
 	if (m == MEM_NIL)				\
 	  emacs_abort ();				\
       } while (0)
@@ -5408,11 +5394,11 @@ process_mark_stack (ptrdiff_t base_sp)
          determined by argument function LIVEP.  */
 #define CHECK_LIVE(LIVEP, MEM_TYPE)				\
       do {							\
-	if (pdumper_object_p (po))				\
+	if (pdumper_object_p (xpntr))				\
 	  break;						\
-	if (calloc_xpntr_p (po))				\
+	if (calloc_xpntr_p (xpntr))				\
 	  break;						\
-	if (! (m->type == MEM_TYPE && LIVEP (m, po)))		\
+	if (! (m->type == MEM_TYPE && LIVEP (m, xpntr)))		\
 	  emacs_abort ();					\
       } while (0)
 
@@ -5444,13 +5430,9 @@ process_mark_stack (ptrdiff_t base_sp)
 	{
 	case Lisp_String:
 	  {
-	    bool got_here = ((uintptr_t) *objp == (uintptr_t) 0x555555f86c24);
-	    CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
-	    if (got_here)
-	      fprintf (stderr, "got here a %p\n", (void *) *objp);
+	    if (! gc_fwd_xpntr (xpntr))
+	      CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
 	    set_string_marked (objp);
-	    if (got_here)
-	      fprintf (stderr, "got here b %p\n", (void *) *objp);
 	  }
 	  break;
 
@@ -5464,9 +5446,9 @@ process_mark_stack (ptrdiff_t base_sp)
 	    enum pvec_type pvectype = PSEUDOVECTOR_TYPE (ptr);
 
 #ifdef GC_CHECK_MARKED_OBJECTS
-	    if (! pdumper_object_p (po) && ! SUBRP (*objp) && ! main_thread_p (po))
+	    if (! pdumper_object_p (xpntr) && ! SUBRP (*objp) && ! main_thread_p (xpntr))
 	      {
-		m = mem_find (po);
+		m = mem_find (xpntr);
 		if (m == MEM_NIL)
 		  emacs_abort ();
 		if (m->type == MEM_TYPE_VECTORLIKE)
@@ -5496,11 +5478,11 @@ process_mark_stack (ptrdiff_t base_sp)
 		  ptrdiff_t size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
 		  set_vector_marked (ptr);
 		  mark_stack_push_n (ptr->contents, size);
-		  mark_stack_push (h->test.name);
-		  mark_stack_push (h->test.user_hash_function);
-		  mark_stack_push (h->test.user_cmp_function);
+		  mark_stack_push (&h->test.name);
+		  mark_stack_push (&h->test.user_hash_function);
+		  mark_stack_push (&h->test.user_cmp_function);
 		  if (NILP (h->weak))
-		    mark_stack_push (h->key_and_value);
+		    mark_stack_push (&h->key_and_value);
 		  else
 		    {
 		      /* For weak tables, mark only the vector and not its
@@ -5538,11 +5520,11 @@ process_mark_stack (ptrdiff_t base_sp)
 		  {
 		    set_vector_marked (ptr);
 		    struct Lisp_Subr *subr = XSUBR (*objp);
-		    mark_stack_push (subr->intspec.native);
-		    mark_stack_push (subr->command_modes);
-		    mark_stack_push (subr->native_comp_u);
-		    mark_stack_push (subr->lambda_list);
-		    mark_stack_push (subr->type);
+		    mark_stack_push (&subr->intspec.native);
+		    mark_stack_push (&subr->command_modes);
+		    mark_stack_push (&subr->native_comp_u);
+		    mark_stack_push (&subr->lambda_list);
+		    mark_stack_push (&subr->type);
 		  }
 #endif
 		break;
@@ -5575,18 +5557,18 @@ process_mark_stack (ptrdiff_t base_sp)
 	    set_symbol_marked (ptr);
 	    /* Attempt to catch bogus objects.  */
 	    eassert (valid_lisp_object_p (ptr->u.s.function));
-	    mark_stack_push (ptr->u.s.function);
-	    mark_stack_push (ptr->u.s.plist);
+	    mark_stack_push (&ptr->u.s.function);
+	    mark_stack_push (&ptr->u.s.plist);
 	    switch (ptr->u.s.redirect)
 	      {
 	      case SYMBOL_PLAINVAL:
-		mark_stack_push (SYMBOL_VAL (ptr));
+		mark_stack_push (&ptr->u.s.val.value);
 		break;
 	      case SYMBOL_VARALIAS:
 		{
 		  Lisp_Object tem;
 		  XSETSYMBOL (tem, SYMBOL_ALIAS (ptr));
-		  mark_stack_push (tem);
+		  mark_stack_push (&tem);
 		  break;
 		}
 	      case SYMBOL_LOCALIZED:
@@ -5611,7 +5593,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		  set_string_marked (&ptr->u.s.name);
 	      }
 	    /* Inner loop to mark next symbol in this bucket, if any.  */
-	    po = ptr = ptr->u.s.next;
+	    xpntr = ptr = ptr->u.s.next;
 	    if (ptr)
 	      goto nextsym;
 	  }
@@ -5628,7 +5610,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	       In any case, make sure the car is expanded first.  */
 	    if (! NILP (ptr->u.s.u.cdr))
 	      {
-		mark_stack_push (ptr->u.s.u.cdr);
+		mark_stack_push (&ptr->u.s.u.cdr);
 #if GC_CDR_COUNT
 		cdr_count++;
 		if (cdr_count == mark_object_loop_halt)
@@ -5661,14 +5643,6 @@ process_mark_stack (ptrdiff_t base_sp)
 #undef CHECK_LIVE
 #undef CHECK_ALLOCATED
 #undef CHECK_ALLOCATED_AND_LIVE
-}
-
-void
-mark_object (Lisp_Object obj)
-{
-  ptrdiff_t sp = mark_stk.sp;
-  mark_stack_push (obj);
-  process_mark_stack (sp);
 }
 
 void

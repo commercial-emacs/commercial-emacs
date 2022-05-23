@@ -407,7 +407,7 @@ mark_bytecode (struct bc_thread_state *bc)
   for (struct bc_frame *fp = bc->fp; fp->saved_fp != 0; fp = fp->saved_fp)
     {
       Lisp_Object *frame_base = fp->saved_fp->next_stack;
-      mark_object (fp->fun);
+      mark_object (&fp->fun);
       if (top)
 	{
 	  /* The stack pointer of a frame is known: mark the part of

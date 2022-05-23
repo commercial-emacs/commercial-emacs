@@ -25340,13 +25340,13 @@ mark_xterm (void)
   if (x_dnd_return_frame_object)
     {
       XSETFRAME (val, x_dnd_return_frame_object);
-      mark_object (val);
+      mark_object (&val);
     }
 
   if (x_dnd_movement_frame)
     {
       XSETFRAME (val, x_dnd_movement_frame);
-      mark_object (val);
+      mark_object (&val);
     }
 
 #if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS \
@@ -25355,14 +25355,14 @@ mark_xterm (void)
     {
 #ifdef HAVE_XINPUT2
       for (i = 0; i < dpyinfo->num_devices; ++i)
-	mark_object (dpyinfo->devices[i].name);
+	mark_object (&dpyinfo->devices[i].name);
 #endif
 #ifdef USE_TOOLKIT_SCROLL_BARS
       for (i = 0; i < dpyinfo->n_protected_windows; ++i)
-	mark_object (dpyinfo->protected_windows[i]);
+	mark_object (&dpyinfo->protected_windows[i]);
 #endif
 #if defined HAVE_XRANDR || defined USE_GTK
-      mark_object (dpyinfo->last_monitor_attributes_list);
+      mark_object (&dpyinfo->last_monitor_attributes_list);
 #endif
     }
 #endif

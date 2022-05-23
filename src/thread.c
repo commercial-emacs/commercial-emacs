@@ -653,15 +653,15 @@ mark_one_thread (struct thread_state *thread)
   for (struct handler *handler = thread->m_handlerlist;
        handler; handler = handler->next)
     {
-      mark_object (handler->tag_or_ch);
-      mark_object (handler->val);
+      mark_object (&handler->tag_or_ch);
+      mark_object (&handler->val);
     }
 
   if (thread->m_current_buffer)
     {
       Lisp_Object tem;
       XSETBUFFER (tem, thread->m_current_buffer);
-      mark_object (tem);
+      mark_object (&tem);
     }
 
   mark_bytecode (&thread->bc);
@@ -680,7 +680,7 @@ mark_threads_callback (void *ignore)
       Lisp_Object thread_obj;
 
       XSETTHREAD (thread_obj, iter);
-      mark_object (thread_obj);
+      mark_object (&thread_obj);
       mark_one_thread (iter);
     }
 }
@@ -859,10 +859,11 @@ If NAME is given, it must be a string; it names the new thread.  */)
   new_thread->m_current_buffer = current_thread->m_current_buffer;
 
   ptrdiff_t size = 50;
+  /* 1+ for unreachable dummy entry */
   union specbinding *pdlvec = xmalloc ((1 + size) * sizeof (union specbinding));
   new_thread->m_specpdl = pdlvec + 1;  /* Skip the dummy entry.  */
-  new_thread->m_specpdl_end = new_thread->m_specpdl + size;
   new_thread->m_specpdl_ptr = new_thread->m_specpdl;
+  new_thread->m_specpdl_end = new_thread->m_specpdl + size;
 
   init_bc_thread (&new_thread->bc);
 

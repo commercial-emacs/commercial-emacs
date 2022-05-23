@@ -3051,11 +3051,11 @@ anim_get_animation_cache (Lisp_Object spec)
 static void
 mark_image (struct image *img)
 {
-  mark_object (img->spec);
-  mark_object (img->dependencies);
+  mark_object (&img->spec);
+  mark_object (&img->dependencies);
 
-  if (!NILP (img->lisp_data))
-    mark_object (img->lisp_data);
+  if (! NILP (img->lisp_data))
+    mark_object (&img->lisp_data);
 }
 
 
@@ -3072,7 +3072,7 @@ mark_image_cache (struct image_cache *c)
 
 #if defined HAVE_WEBP || defined HAVE_GIF
   for (struct anim_cache *cache = anim_cache; cache; cache = cache->next)
-    mark_object (cache->spec);
+    mark_object (&cache->spec);
 #endif
 }
 

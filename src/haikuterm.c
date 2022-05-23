@@ -4369,8 +4369,8 @@ mark_haiku_display (void)
 {
   if (x_display_list)
     {
-      mark_object (x_display_list->color_map);
-      mark_object (x_display_list->default_name);
+      mark_object (&x_display_list->color_map);
+      mark_object (&x_display_list->default_name);
     }
 }
 

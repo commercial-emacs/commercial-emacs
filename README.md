@@ -44,6 +44,7 @@ Roughly every hour.
 - Gnus is rewritten to be non-blocking.
 - Process management is rewritten.
 - Tree-sitter replacement of ersatz PPSS syntactic parser.
+- [Moving garbage collector rudiments](#moving-collector).
 
 ### <a name="tree-sitter"></a>How can I try tree-sitter highlighting?
 
@@ -66,6 +67,25 @@ src/emacs -Q --eval \
   "(custom-set-variables '(font-lock-support-mode 'tree-sitter-lock-mode))" \
   --visit src/xdisp.c
 ```
+
+### <a name="moving-collector"></a>What is a moving garbage collector?
+
+Moving collectors relocate Lisp values in memory, in contrast to the
+GNU Emacs collector, which upon allocating say a cons cell, will let
+it remain at its birth address in perpetuity.
+
+GNU Emacs's mark-sweep-free-list collector has been unfairly maligned,
+generally by undergraduates who just implemented a toy moving
+collector for their PL class.  They might be surprised to know that
+the Cheney moving collector predates Emacs's Boehm collector by twenty
+years.
+
+But one thing moving collectors can do that non-moving ones can't is
+*generational* sequestration, that is, keeping the youngest cohort of
+Lisp values separated from older ones.  This allows faster
+intermediary mark phases which only collect the "nursery" generation.
+A non-moving collector must traverse the full set on each cycle since
+its allocations are interleaved.
 
 ### Isn't this xemacs all over again?
 

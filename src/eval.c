@@ -68,11 +68,17 @@ static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
 static Lisp_Object apply_lambda (Lisp_Object, Lisp_Object, specpdl_ref);
 static Lisp_Object lambda_arity (Lisp_Object);
 
+static Lisp_Object *
+specpdl_symbol_addr (union specbinding *pdl)
+{
+  eassert (pdl->kind >= SPECPDL_LET);
+  return &pdl->let.symbol;
+}
+
 static Lisp_Object
 specpdl_symbol (union specbinding *pdl)
 {
-  eassert (pdl->kind >= SPECPDL_LET);
-  return pdl->let.symbol;
+  return *specpdl_symbol_addr (pdl);
 }
 
 static enum specbind_tag
@@ -82,11 +88,17 @@ specpdl_kind (union specbinding *pdl)
   return pdl->let.kind;
 }
 
+static Lisp_Object *
+specpdl_old_value_addr (union specbinding *pdl)
+{
+  eassert (pdl->kind >= SPECPDL_LET);
+  return &pdl->let.old_value;
+}
+
 static Lisp_Object
 specpdl_old_value (union specbinding *pdl)
 {
-  eassert (pdl->kind >= SPECPDL_LET);
-  return pdl->let.old_value;
+  return *specpdl_old_value_addr (pdl);
 }
 
 static void
@@ -96,25 +108,37 @@ set_specpdl_old_value (union specbinding *pdl, Lisp_Object val)
   pdl->let.old_value = val;
 }
 
-static Lisp_Object
-specpdl_where (union specbinding *pdl)
+static Lisp_Object *
+specpdl_where_addr (union specbinding *pdl)
 {
   eassert (pdl->kind > SPECPDL_LET);
-  return pdl->let.where;
+  return &pdl->let.where;
 }
 
 static Lisp_Object
-specpdl_arg (union specbinding *pdl)
+specpdl_where (union specbinding *pdl)
+{
+  return *specpdl_where_addr (pdl);
+}
+
+static Lisp_Object *
+specpdl_arg_addr (union specbinding *pdl)
 {
   eassert (pdl->kind == SPECPDL_UNWIND);
-  return pdl->unwind.arg;
+  return &pdl->unwind.arg;
+}
+
+static Lisp_Object *
+backtrace_function_addr (union specbinding *pdl)
+{
+  eassert (pdl->kind == SPECPDL_BACKTRACE);
+  return &pdl->bt.function;
 }
 
 Lisp_Object
 backtrace_function (union specbinding *pdl)
 {
-  eassert (pdl->kind == SPECPDL_BACKTRACE);
-  return pdl->bt.function;
+  return *backtrace_function_addr (pdl);
 }
 
 static ptrdiff_t
@@ -346,7 +370,7 @@ do_debug_on_call (Lisp_Object code, specpdl_ref count)
   set_backtrace_debug_on_exit (specpdl_ref_to_ptr (count), true);
   call_debugger (list1 (code));
 }
-
+
 
 DEFUN ("or", For, Sor, 0, UNEVALLED, 0,
        doc: /* Eval args until one of them yields non-nil, then return that value.
@@ -884,7 +908,7 @@ DEFUN ("internal-make-var-non-special", Fmake_var_non_special,
   return Qnil;
 }
 
-
+
 DEFUN ("let*", FletX, SletX, 1, UNEVALLED, 0,
        doc: /* Bind variables according to VARLIST then eval BODY.
 The value of the last form in BODY is returned.
@@ -1143,7 +1167,7 @@ definitions to shadow the loaded ones for use in file byte-compilation.  */)
     }
   return form;
 }
-
+
 DEFUN ("catch", Fcatch, Scatch, 1, UNEVALLED, 0,
        doc: /* Eval BODY allowing nonlocal exits using `throw'.
 TAG is evalled to get the tag to use; it must not be nil.
@@ -1279,7 +1303,7 @@ usage: (unwind-protect BODYFORM UNWINDFORMS...)  */)
   val = eval_sub (XCAR (args));
   return unbind_to (count, val);
 }
-
+
 DEFUN ("condition-case", Fcondition_case, Scondition_case, 2, UNEVALLED, 0,
        doc: /* Regain control when an error is signaled.
 Executes BODYFORM and returns its value if no error happens.
@@ -1603,7 +1627,7 @@ push_handler_nosignal (Lisp_Object tag_ch_val, enum handlertype handlertype)
   return c;
 }
 
-
+
 static Lisp_Object signal_or_quit (Lisp_Object, Lisp_Object, bool);
 static Lisp_Object find_handler_clause (Lisp_Object, Lisp_Object);
 static bool maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig,
@@ -2020,7 +2044,7 @@ error (const char *m, ...)
   va_start (ap, m);
   verror (m, ap);
 }
-
+
 DEFUN ("commandp", Fcommandp, Scommandp, 1, 2, 0,
        doc: /* Non-nil if FUNCTION makes provisions for interactive calling.
 This means it contains a description for how to read arguments to give it.
@@ -2269,7 +2293,7 @@ it defines a macro.  */)
     }
 }
 
-
+
 DEFUN ("eval", Feval, Seval, 1, 2, 0,
        doc: /* Evaluate FORM and return its value.
 If LEXICAL is t, evaluate using lexical scoping.
@@ -2524,7 +2548,7 @@ eval_sub (Lisp_Object form)
 
   return val;
 }
-
+
 DEFUN ("apply", Fapply, Sapply, 1, MANY, 0,
        doc: /* Call FUNCTION with our remaining args, using our last arg as list of args.
 Then return the value FUNCTION returns.
@@ -2595,7 +2619,7 @@ usage: (apply FUNCTION &rest ARGUMENTS)  */)
   SAFE_FREE ();
   return retval;
 }
-
+
 /* Run hook variables in various ways.  */
 
 static Lisp_Object
@@ -2927,7 +2951,7 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
   specpdl_ptr--;
   return val;
 }
-
+
 
 /* Apply a C subroutine SUBR to the NUMARGS evaluated arguments in ARG_VECTOR
    and return the result of evaluation.  */
@@ -3325,7 +3349,7 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
     }
   return object;
 }
-
+
 /* Return true if SYMBOL currently has a let-binding
    which was made in the buffer that is now current.  */
 
@@ -3449,14 +3473,13 @@ specbind (Lisp_Object symbol, Lisp_Object value)
   do_specbind (sym, specpdl_ptr - 1, value, SET_INTERNAL_BIND);
 }
 
-/* Push unwind-protect entries of various types.  */
-
 void
 record_unwind_protect (void (*function) (Lisp_Object), Lisp_Object arg)
 {
   specpdl_ptr->unwind.kind = SPECPDL_UNWIND;
   specpdl_ptr->unwind.func = function;
   specpdl_ptr->unwind.arg = arg;
+
   specpdl_ptr->unwind.eval_depth = lisp_eval_depth;
   grow_specpdl ();
 }
@@ -3705,7 +3728,7 @@ context where binding is lexical by default.  */)
    return XSYMBOL (symbol)->u.s.declared_special ? Qt : Qnil;
 }
 
-
+
 static union specbinding *
 get_backtrace_starting_at (Lisp_Object base)
 {
@@ -4047,7 +4070,7 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
   return result;
 }
 
-
+
 void
 mark_specpdl (union specbinding *first, union specbinding *ptr)
 {
@@ -4057,7 +4080,7 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
       switch (pdl->kind)
         {
 	case SPECPDL_UNWIND:
-	  mark_object (specpdl_arg (pdl));
+	  mark_object (specpdl_arg_addr (pdl));
 	  break;
 
 	case SPECPDL_UNWIND_ARRAY:
@@ -4065,14 +4088,14 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 	  break;
 
 	case SPECPDL_UNWIND_EXCURSION:
-	  mark_object (pdl->unwind_excursion.marker);
-	  mark_object (pdl->unwind_excursion.window);
+	  mark_object (&pdl->unwind_excursion.marker);
+	  mark_object (&pdl->unwind_excursion.window);
 	  break;
 
 	case SPECPDL_BACKTRACE:
 	  {
 	    ptrdiff_t nargs = backtrace_nargs (pdl);
-	    mark_object (backtrace_function (pdl));
+	    mark_object (backtrace_function_addr (pdl));
 	    if (nargs == UNEVALLED)
 	      nargs = 1;
 	    mark_objects (backtrace_args (pdl), nargs);
@@ -4089,11 +4112,11 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 
 	case SPECPDL_LET_DEFAULT:
 	case SPECPDL_LET_LOCAL:
-	  mark_object (specpdl_where (pdl));
+	  mark_object (specpdl_where_addr (pdl));
 	  FALLTHROUGH;
 	case SPECPDL_LET:
-	  mark_object (specpdl_symbol (pdl));
-	  mark_object (specpdl_old_value (pdl));
+	  mark_object (specpdl_symbol_addr (pdl));
+	  mark_object (specpdl_old_value_addr (pdl));
 	  break;
 
 	case SPECPDL_UNWIND_PTR:

@@ -13094,24 +13094,24 @@ mark_kboards (void)
       if (kb->kbd_macro_buffer)
 	mark_objects (kb->kbd_macro_buffer,
 		      kb->kbd_macro_ptr - kb->kbd_macro_buffer);
-      mark_object (KVAR (kb, Voverriding_terminal_local_map));
-      mark_object (KVAR (kb, Vlast_command));
-      mark_object (KVAR (kb, Vreal_last_command));
-      mark_object (KVAR (kb, Vkeyboard_translate_table));
-      mark_object (KVAR (kb, Vlast_repeatable_command));
-      mark_object (KVAR (kb, Vprefix_arg));
-      mark_object (KVAR (kb, Vlast_prefix_arg));
-      mark_object (KVAR (kb, kbd_queue));
-      mark_object (KVAR (kb, defining_kbd_macro));
-      mark_object (KVAR (kb, Vlast_kbd_macro));
-      mark_object (KVAR (kb, Vsystem_key_alist));
-      mark_object (KVAR (kb, system_key_syms));
-      mark_object (KVAR (kb, Vwindow_system));
-      mark_object (KVAR (kb, Vinput_decode_map));
-      mark_object (KVAR (kb, Vlocal_function_key_map));
-      mark_object (KVAR (kb, Vdefault_minibuffer_frame));
-      mark_object (KVAR (kb, echo_string));
-      mark_object (KVAR (kb, echo_prompt));
+      mark_object (&KVAR (kb, Voverriding_terminal_local_map));
+      mark_object (&KVAR (kb, Vlast_command));
+      mark_object (&KVAR (kb, Vreal_last_command));
+      mark_object (&KVAR (kb, Vkeyboard_translate_table));
+      mark_object (&KVAR (kb, Vlast_repeatable_command));
+      mark_object (&KVAR (kb, Vprefix_arg));
+      mark_object (&KVAR (kb, Vlast_prefix_arg));
+      mark_object (&KVAR (kb, kbd_queue));
+      mark_object (&KVAR (kb, defining_kbd_macro));
+      mark_object (&KVAR (kb, Vlast_kbd_macro));
+      mark_object (&KVAR (kb, Vsystem_key_alist));
+      mark_object (&KVAR (kb, system_key_syms));
+      mark_object (&KVAR (kb, Vwindow_system));
+      mark_object (&KVAR (kb, Vinput_decode_map));
+      mark_object (&KVAR (kb, Vlocal_function_key_map));
+      mark_object (&KVAR (kb, Vdefault_minibuffer_frame));
+      mark_object (&KVAR (kb, echo_string));
+      mark_object (&KVAR (kb, echo_prompt));
     }
 
   for (union buffered_input_event *event = kbd_fetch_ptr;
@@ -13121,16 +13121,16 @@ mark_kboards (void)
       if (event->kind != SELECTION_REQUEST_EVENT
 	  && event->kind != SELECTION_CLEAR_EVENT)
 	{
-	  mark_object (event->ie.x);
-	  mark_object (event->ie.y);
-	  mark_object (event->ie.frame_or_window);
-	  mark_object (event->ie.arg);
+	  mark_object (&event->ie.x);
+	  mark_object (&event->ie.y);
+	  mark_object (&event->ie.frame_or_window);
+	  mark_object (&event->ie.arg);
 
 	  /* This should never be allocated for a single event, but
 	     mark it anyway in the situation where the list of devices
 	     changed but an event with an old device is still present
 	     in the queue.  */
-	  mark_object (event->ie.device);
+	  mark_object (&event->ie.device);
 	}
     }
 }

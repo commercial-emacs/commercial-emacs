@@ -706,22 +706,18 @@ line and recenter window line accordingly."
 
 (defun backtrace-print-to-string (obj &optional limit)
   "Return a printed representation of OBJ formatted for backtraces.
-Attempt to get the length of the returned string under LIMIT
-characters with appropriate settings of `print-level' and
-`print-length.'  LIMIT defaults to `backtrace-line-length'."
+If LIMIT is unspecified, the result is capped to
+`backtrace-line-length' characters."
   (backtrace--with-output-variables backtrace-view
     (backtrace--print-to-string obj limit)))
 
 (defun backtrace--print-to-string (sexp &optional limit)
-  ;; This is for use by callers who wrap the call with
-  ;; backtrace--with-output-variables.
   (setq limit (or limit backtrace-line-length))
   (with-temp-buffer
     (insert (cl-print-to-string-with-limit #'backtrace--print sexp limit))
     ;; Add a unique backtrace-form property.
     (put-text-property (point-min) (point) 'backtrace-form (gensym))
-    ;; Make buttons from all the "..."s.  Since there might be many of
-    ;; them, use text property buttons.
+    ;; Make text property buttons from all the ellipsises.
     (goto-char (point-min))
     (while (< (point) (point-max))
       (let ((end (next-single-property-change (point) 'cl-print-ellipsis

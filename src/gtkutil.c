@@ -3030,14 +3030,14 @@ xg_mark_data (void)
   Lisp_Object rest, frame;
 
   for (iter = xg_menu_cb_list.next; iter; iter = iter->next)
-    mark_object (((xg_menu_cb_data *) iter)->menu_bar_vector);
+    mark_object (&((xg_menu_cb_data *) iter)->menu_bar_vector);
 
   for (iter = xg_menu_item_cb_list.next; iter; iter = iter->next)
     {
       xg_menu_item_cb_data *cb_data = (xg_menu_item_cb_data *) iter;
 
       if (! NILP (cb_data->help))
-        mark_object (cb_data->help);
+        mark_object (&cb_data->help);
     }
 
   FOR_EACH_FRAME (rest, frame)
@@ -3051,8 +3051,8 @@ xg_mark_data (void)
                                  TB_INFO_KEY);
           if (tbinfo)
             {
-              mark_object (tbinfo->last_tool_bar);
-              mark_object (tbinfo->style);
+              mark_object (&tbinfo->last_tool_bar);
+              mark_object (&tbinfo->style);
             }
         }
     }
@@ -3062,8 +3062,8 @@ xg_mark_data (void)
     {
       eassert (xg_pending_quit_event.kind == ASCII_KEYSTROKE_EVENT);
 
-      mark_object (xg_pending_quit_event.frame_or_window);
-      mark_object (xg_pending_quit_event.arg);
+      mark_object (&xg_pending_quit_event.frame_or_window);
+      mark_object (&xg_pending_quit_event.arg);
     }
 #endif
 }

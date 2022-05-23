@@ -1427,7 +1427,7 @@ mark_module_environment (void *ptr)
   for (struct emacs_value_frame *frame = &priv->storage.initial; frame != NULL;
        frame = frame->next)
     for (int i = 0; i < frame->offset; ++i)
-      mark_object (frame->objects[i].v);
+      mark_object (&frame->objects[i].v);
 }
 
 
