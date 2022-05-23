@@ -1749,6 +1749,7 @@ pin_string (Lisp_Object string)
       && s->u.s.size_byte != Sdata_Pinned)
     {
       eassert (s->u.s.size_byte == Sdata_Unibyte);
+      eassert (s->u.s.data != NULL);
       sdata *old_sdata = SDATA_OF_LISP_STRING (s);
       allocate_sdata (s, size, size, true);
       memcpy (s->u.s.data, data, size);
@@ -3038,11 +3039,14 @@ set_string_marked (Lisp_Object *obj)
 	  s->u.s.intervals = balance_intervals (s->u.s.intervals);
 	  XSETSTRING (*obj, gc_flip_xpntr (s, sizeof (struct Lisp_String),
 					   Lisp_String));
-	  sdata *data = SDATA_OF_LISP_STRING (s);
-	  if (data->string != s)
-	    eassert (data->string == XSTRING (*obj));
-	  else
-	    data->string = XSTRING (*obj);
+	  if (s->u.s.data != NULL)
+	    {
+	      sdata *data = SDATA_OF_LISP_STRING (s);
+	      if (data->string != s)
+		eassert (data->string == XSTRING (*obj));
+	      else
+		data->string = XSTRING (*obj);
+	    }
 	}
       else
 	XMARK_STRING (s);

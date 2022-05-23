@@ -174,7 +174,7 @@ typedef struct sdata
 } sdata;
 
 #define SDATA_OF_LISP_STRING(S) \
-  ((sdata *) ((S)->u.s.data - FLEXSIZEOF (struct sdata, data, 0)))
+  ((sdata *) (S)->u.s.data - FLEXSIZEOF (struct sdata, data, 0))
 
 struct mem_node *mem_find (void *start);
 

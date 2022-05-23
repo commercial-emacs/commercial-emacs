@@ -341,15 +341,18 @@ gc_flip_space (void)
 	      /* S goes to dead state.  */
 	      sdata *data = SDATA_OF_LISP_STRING (s);
 
-	      /* Save length so that sweep_sdata() knows how far
-		 to move the hare-tortoise pointers.  */
-	      eassert (data->nbytes == STRING_BYTES (s));
+	      if (data)
+		{
+		  /* Save length so that sweep_sdata() knows how far
+		     to move the hare-tortoise pointers.  */
+		  eassert (data->nbytes == STRING_BYTES (s));
 
-	      /* sweep_sdata() needs this for compaction.  */
-	      data->string = NULL;
+		  /* sweep_sdata() needs this for compaction.  */
+		  data->string = NULL;
 
-	      /* Invariant of free-list Lisp_String.  */
-	      s->u.s.data = NULL;
+		  /* Invariant of free-list Lisp_String.  */
+		  s->u.s.data = NULL;
+		}
 	    }
 	  w += bytespan / word_size;
 	  INT_ADD_WRAPV ((uintptr_t) obj, bytespan, (uintptr_t *) &obj);
