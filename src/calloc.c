@@ -324,7 +324,7 @@ gc_flip_space (void)
 {
   gc_semispace *from = space_in_use,
     *to = (from == &space0) ? &space1 : &space0;
-  for (size_t b = 0; b < from->nblocks; ++b)
+  for (size_t b = 0; b <= from->current_block; ++b)
     {
       size_t w = 0;
       for (void *obj = from->block_addrs[b];
