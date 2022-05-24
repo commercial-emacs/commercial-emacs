@@ -550,7 +550,7 @@ usage: (bool-vector &rest OBJECTS)  */)
   return val;
 }
 
-DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, "",
+DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
        doc: /* Return alist of Lisp types and their current counts.
 Note pseudovectors like frames, windows, buffers (but not their
 contents), etc. contribute to VECTOR-CELLS.  */)
