@@ -1,6 +1,6 @@
 > Talking never moves anything in Emacs, never did, never will.
 >
-> &mdash; <cite>2021 Maintainer of GNU Emacs, who then proceeded to keep talking</cite>
+> &mdash; <cite>2021 Maintainer of GNU Emacs, who then proceeded to keep talking.</cite>
 
 ## Frequently Anticipated Questions
 
