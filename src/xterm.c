@@ -17498,7 +17498,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      if (f && x_mouse_click_focus_ignore_position)
 		{
-		  ignore_next_mouse_click_timeout = xev->time + 200;
+		  ignore_next_mouse_click_timeout = enter->time + 200;
 		  mouse_click_timeout_display = dpyinfo;
 		}
 
