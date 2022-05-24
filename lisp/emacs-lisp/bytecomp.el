@@ -335,7 +335,8 @@ Elements of the list may be:
   constants   let-binding of, or assignment to, constants/nonvariables.
   docstrings  docstrings that are too wide (longer than
               `byte-compile-docstring-max-column' or
-              `fill-column' characters, whichever is bigger).
+              `fill-column' characters, whichever is bigger) or
+              have other stylistic issues.
   suspicious  constructs that usually don't do what the coder wanted.
 
 If the list begins with `not', then the remaining elements specify warnings to
@@ -1647,8 +1648,12 @@ value, it will override this variable."
   :safe #'integerp
   :version "28.1")
 
-(defun byte-compile-docstring-length-warn (form)
-  "Warn if documentation string of FORM is too wide.
+(define-obsolete-function-alias 'byte-compile-docstring-length-warn
+  'byte-compile-docstring-style-warn "29.1")
+
+(defun byte-compile-docstring-style-warn (form)
+  "Warn if there are stylistic problems with the docstring in FORM.
+Warn if documentation string of FORM is too wide.
 It is too wide if it has any lines longer than the largest of
 `fill-column' and `byte-compile-docstring-max-column'."
   (when (byte-compile-warning-enabled-p 'docstrings)
@@ -2843,7 +2848,7 @@ of the list FUN."
       (setq fun (cons 'lambda fun))
     (unless (eq 'lambda (car-safe fun))
       (error "Not a lambda list: %S" fun)))
-  (byte-compile-docstring-length-warn fun)
+  (byte-compile-docstring-style-warn fun)
   (byte-compile-check-lambda-list (nth 1 fun))
   (let* ((arglist (nth 1 fun))
          (arglistvars (byte-compile-arglist-vars arglist))
@@ -4704,7 +4709,7 @@ longer need to hew to its rules)."
       ;; - `arg' is the expression to which it is defined.
       ;; - `rest' is the rest of the arguments.
       (`(,_ ',name ,arg . ,rest)
-       (byte-compile-docstring-length-warn form)
+       (byte-compile-docstring-style-warn form)
        (pcase-let*
            ;; `macro' is non-nil if it defines a macro.
            ;; `fun' is the function part of `arg' (defaults to `arg').
