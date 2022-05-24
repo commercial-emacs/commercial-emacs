@@ -1316,21 +1316,22 @@ removed; see the variable `c-cleanup-list'.
 Also, if `c-electric-flag' and `c-auto-newline' are both non-nil, some
 newline cleanups are done if appropriate; see the variable `c-cleanup-list'."
   (interactive "*P")
-  (c-with-string-fences
-   (let ((literal (c-save-buffer-state () (c-in-literal)))
-	 ;; shut this up
-	 (c-echo-syntactic-information-p nil)
-	 case-fold-search)
-     (let (post-self-insert-hook) ; The only way to get defined functionality
+  (let ((literal (c-save-buffer-state ()
+		   (c-with-string-fences (c-in-literal))))
+	;; shut this up
+	(c-echo-syntactic-information-p nil)
+	case-fold-search)
+    (let (post-self-insert-hook) ; The only way to get defined functionality
 					; from `self-insert-command'.
-       (self-insert-command (prefix-numeric-value arg)))
+      (self-insert-command (prefix-numeric-value arg)))
 
-     (if (and (not arg) (not literal))
-	 (let* (;; We want to inhibit blinking the paren since this will
-		;; be most disruptive.  We'll blink it ourselves
-		;; afterwards.
-		(old-blink-paren blink-paren-function)
-		blink-paren-function)
+    (if (and (not arg) (not literal))
+	(let* (;; We want to inhibit blinking the paren since this will
+	       ;; be most disruptive.  We'll blink it ourselves
+	       ;; afterwards.
+	       (old-blink-paren blink-paren-function)
+	       blink-paren-function)
+	  (c-with-string-fences
 	   (if (and c-syntactic-indentation c-electric-flag)
 	       (indent-according-to-mode))
 
@@ -1370,14 +1371,15 @@ newline cleanups are done if appropriate; see the variable `c-cleanup-list'."
 		       nil t)
 		      (not  (c-save-buffer-state () (c-in-literal))))
 	       (delete-region (match-beginning 0) (match-end 0))
-	       (insert-and-inherit "} catch (")))
+	       (insert-and-inherit "} catch ("))))
 
-	   ;; Apply `electric-pair-mode' stuff.
-	   (when (and (boundp 'electric-pair-mode)
-		      electric-pair-mode)
-	     (let (post-self-insert-hook)
-	       (electric-pair-post-self-insert-function)))
+	  ;; Apply `electric-pair-mode' stuff.
+	  (when (and (boundp 'electric-pair-mode)
+		     electric-pair-mode)
+	    (let (post-self-insert-hook)
+	      (electric-pair-post-self-insert-function)))
 
+	  (c-with-string-fences
 	   ;; Check for clean-ups at function calls.  These two DON'T need
 	   ;; `c-electric-flag' or `c-syntactic-indentation' set.
 	   ;; Point is currently just after the inserted paren.
@@ -1412,17 +1414,17 @@ newline cleanups are done if appropriate; see the variable `c-cleanup-list'."
 			  (skip-chars-backward " \t")
 			  (setq beg (point))
 			  (c-on-identifier)))))
-	       (delete-region beg end))))
-	   (and (eq last-input-event ?\))
-		(not executing-kbd-macro)
-		old-blink-paren
-		(funcall old-blink-paren)))
+	       (delete-region beg end)))))
+	  (and (eq last-input-event ?\))
+	       (not executing-kbd-macro)
+	       old-blink-paren
+	       (funcall old-blink-paren)))
 
-       ;; Apply `electric-pair-mode' stuff inside a string or comment.
-       (when (and (boundp 'electric-pair-mode) electric-pair-mode)
-	 (let (post-self-insert-hook)
-	   (electric-pair-post-self-insert-function))))
-     (c--call-post-self-insert-hook-more-safely))))
+      ;; Apply `electric-pair-mode' stuff inside a string or comment.
+      (when (and (boundp 'electric-pair-mode) electric-pair-mode)
+	(let (post-self-insert-hook)
+	  (electric-pair-post-self-insert-function)))))
+  (c--call-post-self-insert-hook-more-safely))
 
 (defun c-electric-continued-statement ()
   "Reindent the current line if appropriate.
