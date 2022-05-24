@@ -5583,16 +5583,10 @@ process_mark_stack (ptrdiff_t base_sp)
 		break;
 	      default: emacs_abort ();
 	      }
+
 	    if (! PURE_P (XSTRING (ptr->u.s.name)))
-	      {
-		if (mgc_xpntr_p (XSTRING (ptr->u.s.name)))
-		  {
-		    set_string_marked (&ptr->u.s.name);
-		    eassert (wrong_xpntr_p (XSTRING (ptr->u.s.name)));
-		  }
-		else
-		  set_string_marked (&ptr->u.s.name);
-	      }
+	      set_string_marked (&ptr->u.s.name);
+
 	    /* Inner loop to mark next symbol in this bucket, if any.  */
 	    xpntr = ptr = ptr->u.s.next;
 	    if (ptr)
@@ -6057,29 +6051,23 @@ or memory information can't be obtained, return nil.  */)
 #endif /* HAVE_LINUX_SYSINFO, not WINDOWSNT, not MSDOS */
 }
 
-/* Debugging aids.  */
-
 DEFUN ("memory-use-counts", Fmemory_use_counts, Smemory_use_counts, 0, 0, 0,
-       doc: /* Return a list of counters that measure how much consing there has been.
-Each of these counters increments for a certain kind of object.
-The counters wrap around from the largest positive integer to zero.
-Garbage collection does not decrease them.
-The elements of the value are as follows:
-  (CONSES FLOATS VECTOR-CELLS SYMBOLS STRING-CHARS INTERVALS STRINGS)
-All are in units of 1 = one object consed
-except for VECTOR-CELLS and STRING-CHARS, which count the total length of
-objects consed.
-Frames, windows, buffers, and subprocesses count as vectors
-  (but the contents of a buffer's text do not count here).  */)
+       doc: /* Return list of consing tallies.
+Elements are
+  (CONSES FLOATS VECTOR-CELLS SYMBOLS STRING-CHARS INTERVALS STRINGS).
+
+Tallies count across the process's lifetime, and only increment.  Note
+pseudovectors like frames, windows, buffers (but not their contents),
+etc. contribute to VECTOR-CELLS.  */)
   (void)
 {
-  return  list (make_int (cons_cells_consed),
-		make_int (floats_consed),
-		make_int (vector_cells_consed),
-		make_int (symbols_consed),
-		make_int (string_chars_consed),
-		make_int (intervals_consed),
-		make_int (strings_consed));
+  return list (make_int (cons_cells_consed),
+	       make_int (floats_consed),
+	       make_int (vector_cells_consed),
+	       make_int (symbols_consed),
+	       make_int (string_chars_consed),
+	       make_int (intervals_consed),
+	       make_int (strings_consed));
 }
 
 #if defined GNU_LINUX && defined __GLIBC__ && \

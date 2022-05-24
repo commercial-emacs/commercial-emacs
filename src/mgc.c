@@ -230,7 +230,7 @@ next_block (mgc_semispace *space)
       if (! space->scan_ptr)
 	space->scan_ptr = space->alloc_ptr;
       space->block_words_used = 0;
-      for (int i=0; i<MEM_TYPE_NTYPES; ++i)
+      for (int i = 0; i < MEM_TYPE_NTYPES; ++i)
 	{
 	  bitset *ptr = &space->block_typemaps[space->current_block].bitsets[i];
 	  if (*ptr)
@@ -550,6 +550,40 @@ usage: (bool-vector &rest OBJECTS)  */)
   return val;
 }
 
+DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, "",
+       doc: /* Return alist of Lisp types and their current counts.
+Note pseudovectors like frames, windows, buffers (but not their
+contents), etc. contribute to VECTOR-CELLS.  */)
+  (void)
+{
+  size_t tally[Lisp_Type_Max] = {0};
+  for (int b = 0; b <= (int) space_in_use->current_block; ++b)
+    {
+      size_t w = 0;
+      for (void *obj = space_in_use->block_addrs[b];
+	   obj != space_in_use->alloc_ptr && ! TERM_BLOCK_P (obj);
+	   (void) obj)
+	{
+	  enum Lisp_Type xpntr_type = xpntr_at (space_in_use, b, w, NULL);
+	  eassert (xpntr_type != Lisp_Type_Unused0);
+	  tally[xpntr_type]++;
+	  size_t bytespan = nbytes_of (xpntr_type, obj);
+	  w += bytespan / word_size;
+	  INT_ADD_WRAPV ((uintptr_t) obj, bytespan, (uintptr_t *) &obj);
+	}
+    }
+  return list5 (Fcons (Fmake_symbol (build_string ("symbol")),
+		       make_fixnum (tally[Lisp_Symbol])),
+		Fcons (Fmake_symbol (build_string ("string")),
+		       make_fixnum (tally[Lisp_String])),
+		Fcons (Fmake_symbol (build_string ("vectorlike")),
+		       make_fixnum (tally[Lisp_Vectorlike])),
+		Fcons (Fmake_symbol (build_string ("cons")),
+		       make_fixnum (tally[Lisp_Cons])),
+		Fcons (Fmake_symbol (build_string ("float")),
+		       make_fixnum (tally[Lisp_Float])));
+}
+
 void
 syms_of_mgc (void)
 {
@@ -565,6 +599,7 @@ syms_of_mgc (void)
   defsubr (&Smgc_bool_vector);
   defsubr (&Smgc_make_symbol);
   defsubr (&Smgc_make_marker);
+  defsubr (&Smgc_counts);
   defsubr (&Smemory_protect_now);
 }
 

@@ -482,7 +482,9 @@ enum _GL_ATTRIBUTE_PACKED Lisp_Type
     Lisp_Cons = USE_LSB_TAG ? 3 : 6,
 
     /* Must be last entry in Lisp_Type enumeration.  */
-    Lisp_Float = 7
+    Lisp_Float = 7,
+
+    Lisp_Type_Max,
   };
 
 /* These are the types of forwarding objects used in the value slot
