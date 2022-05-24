@@ -527,7 +527,8 @@ function to control that."
 
 (defmacro c--call-post-self-insert-hook-more-safely ()
   ;; Call post-self-insert-hook, if such exists.  See comment for
-  ;; `c--call-post-self-insert-hook-more-safely-1'.
+  ;; `c--call-post-self-insert-hook-more-safely-1'.  This macro should be
+  ;; invoked OUTSIDE of `c-with-string-fences'.
   (if (boundp 'post-self-insert-hook)
       '(c--call-post-self-insert-hook-more-safely-1)
     '(progn)))
@@ -561,9 +562,8 @@ inside a literal or a macro, nothing special happens."
        (delete-horizontal-space)
        (insert (c-last-command-char))
        (and (not bolp)
-	    (goto-char (- (point-max) pos)))
-       ))
-   (c--call-post-self-insert-hook-more-safely)))
+	    (goto-char (- (point-max) pos))))))
+  (c--call-post-self-insert-hook-more-safely))
 
 (defun c-point-syntax ()
   ;; Return the syntactic context of the construct at point.  (This is NOT
@@ -891,16 +891,16 @@ reindented unless `c-syntactic-indentation' is nil.
 settings of `c-cleanup-list' are done."
 
   (interactive "*P")
-  (c-with-string-fences
-   (let (safepos literal
-		 ;; We want to inhibit blinking the paren since this would be
-		 ;; most disruptive.  We'll blink it ourselves later on.
-		 (old-blink-paren blink-paren-function)
-		 blink-paren-function case-fold-search
-		 (at-eol (looking-at "[ \t]*\\\\?$"))
-		 (active-region (and (fboundp 'use-region-p) (use-region-p)))
-		 got-pair-} electric-pair-deletion)
+  (let (safepos literal
+		;; We want to inhibit blinking the paren since this would be
+		;; most disruptive.  We'll blink it ourselves later on.
+		(old-blink-paren blink-paren-function)
+		blink-paren-function case-fold-search
+		(at-eol (looking-at "[ \t]*\\\\?$"))
+		(active-region (and (fboundp 'use-region-p) (use-region-p)))
+		got-pair-} electric-pair-deletion)
 
+    (c-with-string-fences
      (c-save-buffer-state ()
        (setq safepos (c-safe-position (point) (c-parse-state))
 	     literal (c-in-literal safepos)))
@@ -909,19 +909,20 @@ settings of `c-cleanup-list' are done."
      ;; the line here if there's a preceding "else" or something.
      (let (post-self-insert-hook)  ; the only way to get defined functionality
 					; from `self-insert-command'.
-       (self-insert-command (prefix-numeric-value arg)))
+       (self-insert-command (prefix-numeric-value arg))))
 
-     ;; Emulate `electric-pair-mode'.
-     (when (and (boundp 'electric-pair-mode)
-		electric-pair-mode)
-       (let ((size (buffer-size))
-	     post-self-insert-hook)
-	 (electric-pair-post-self-insert-function)
-	 (setq got-pair-} (and at-eol
-			       (eq (c-last-command-char) ?{)
-			       (eq (char-after) ?}))
-	       electric-pair-deletion (< (buffer-size) size))))
+    ;; Emulate `electric-pair-mode', outside of `c-with-string-fences'.
+    (when (and (boundp 'electric-pair-mode)
+	       electric-pair-mode)
+      (let ((size (buffer-size))
+	    post-self-insert-hook)
+	(electric-pair-post-self-insert-function)
+	(setq got-pair-} (and at-eol
+			      (eq (c-last-command-char) ?{)
+			      (eq (char-after) ?}))
+	      electric-pair-deletion (< (buffer-size) size))))
 
+    (c-with-string-fences
      ;; Perform any required CC Mode electric actions.
      (cond
       ((or literal arg (not c-electric-flag) active-region))
@@ -944,8 +945,8 @@ settings of `c-cleanup-list' are done."
 	  (save-excursion
 	    (c-save-buffer-state nil
 	      (c-backward-syntactic-ws safepos))
-	    (funcall old-blink-paren)))
-     (c--call-post-self-insert-hook-more-safely))))
+	    (funcall old-blink-paren)))))
+  (c--call-post-self-insert-hook-more-safely))
 
 (defun c-electric-slash (arg)
   "Insert a slash character.
@@ -998,8 +999,8 @@ is inhibited."
      (let (post-self-insert-hook)	; Disable random functionality.
        (self-insert-command (prefix-numeric-value arg)))
      (if indentp
-	 (indent-according-to-mode))
-     (c--call-post-self-insert-hook-more-safely))))
+	 (indent-according-to-mode))))
+  (c--call-post-self-insert-hook-more-safely))
 
 (defun c-electric-star (arg)
   "Insert a star character.
@@ -1029,8 +1030,8 @@ this indentation is inhibited."
 		(skip-chars-backward " \t")
 		(bolp))))
        (let (c-echo-syntactic-information-p) ; shut this up
-	 (indent-according-to-mode)))
-   (c--call-post-self-insert-hook-more-safely)))
+	 (indent-according-to-mode))))
+  (c--call-post-self-insert-hook-more-safely))
 
 (defun c-electric-semi&comma (arg)
   "Insert a comma or semicolon.
@@ -1103,8 +1104,8 @@ settings of `c-cleanup-list'."
 		 (setq add-newline-p (not (eq answer 'stop)))
 		 ))
 	     (if add-newline-p
-		 (c-newline-and-indent)))))
-     (c--call-post-self-insert-hook-more-safely))))
+		 (c-newline-and-indent)))))))
+  (c--call-post-self-insert-hook-more-safely))
 
 (defun c-electric-colon (arg)
   "Insert a colon.
@@ -1207,8 +1208,8 @@ reindented unless `c-syntactic-indentation' is nil.
 	   ;; does a newline go after the colon?
 	   (if (and (memq 'after (cdr-safe newlines))
 		    (not is-scope-op))
-	       (c-newline-and-indent))))
-     (c--call-post-self-insert-hook-more-safely))))
+	       (c-newline-and-indent))))))
+  (c--call-post-self-insert-hook-more-safely))
 
 (defun c-electric-lt-gt (arg)
   "Insert a \"<\" or \">\" character.
@@ -1222,12 +1223,11 @@ finishes a C++ style stream operator in C++ mode.  Exceptions are when a
 numeric argument is supplied, or the point is inside a literal."
 
   (interactive "*P")
-  (c-with-string-fences
-   (let ((literal (c-save-buffer-state () (c-in-literal)))
-	 template-delim include-delim
-	 (c-echo-syntactic-information-p nil)
-	 final-pos found-delim case-fold-search)
+  (let (template-delim include-delim
+	(c-echo-syntactic-information-p nil)
+	final-pos found-delim case-fold-search)
 
+    (c-with-string-fences
      (let (post-self-insert-hook)	; Disable random functionality.
        (self-insert-command (prefix-numeric-value arg)))
      (setq final-pos (point))
@@ -1236,7 +1236,8 @@ numeric argument is supplied, or the point is inside a literal."
 ;;;;  property on the new < or > and its mate (if any) when they are template
 ;;;;  parens.  This is now done in an after-change function.
 
-     (when (and (not arg) (not literal))
+     (when (and (not arg)
+		(not (c-save-buffer-state () (c-in-literal))))
        ;; Have we got a delimiter on a #include directive?
        (beginning-of-line)
        (setq include-delim
@@ -1283,24 +1284,24 @@ numeric argument is supplied, or the point is inside a literal."
 	 (goto-char final-pos)
 
 	 (when found-delim
-	   (indent-according-to-mode)))
+	   (indent-according-to-mode)))))
 
-       ;; On the off chance that < and > are configured as pairs in
-       ;; electric-pair-mode.
-       (when (and (boundp 'electric-pair-mode) electric-pair-mode
-		  (or template-delim include-delim))
-	 (let (post-self-insert-hook)
-	   (electric-pair-post-self-insert-function))))
+    ;; On the off chance that < and > are configured as pairs in
+    ;; electric-pair-mode.
+    (when (and (boundp 'electric-pair-mode) electric-pair-mode
+	       (or template-delim include-delim))
+      (let (post-self-insert-hook)
+	(electric-pair-post-self-insert-function)))
 
-     (when found-delim
-       (when (and (eq (char-before) ?>)
-		  (not executing-kbd-macro)
-		  blink-paren-function)
-	 ;; From now (2016-01-01), the syntax-table text properties on < and >
-	 ;; are applied in an after-change function, not during redisplay.  Hence
-	 ;; we no longer need to call (sit-for 0) for blink paren to work.
-	 (funcall blink-paren-function))))
-   (c--call-post-self-insert-hook-more-safely)))
+    (when found-delim
+      (when (and (eq (char-before) ?>)
+		 (not executing-kbd-macro)
+		 blink-paren-function)
+	;; From now (2016-01-01), the syntax-table text properties on < and >
+	;; are applied in an after-change function, not during redisplay.  Hence
+	;; we no longer need to call (sit-for 0) for blink paren to work.
+	(funcall blink-paren-function))))
+  (c--call-post-self-insert-hook-more-safely))
 
 (defun c-electric-paren (arg)
   "Insert a parenthesis.
