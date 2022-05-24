@@ -74,18 +74,21 @@ Moving collectors relocate Lisp values in memory, in contrast to the
 GNU Emacs collector, which upon allocating say a cons cell, will let
 it remain at its birth address in perpetuity.
 
-GNU Emacs's mark-sweep-free-list collector has been unfairly maligned,
-generally by undergraduates who just implemented a toy moving
-collector for their PL class.  They might be surprised to know that
-the Cheney moving collector predates Emacs's Boehm collector by twenty
-years.
+GNU Emacs's mark-sweep-free-list collector has been unfairly maligned
+as antiquated, generally by undergraduates who just implemented a toy
+moving collector for their PL class.  They might be surprised to know
+that the Boehm paper on which Emacs's collector is based was published
+twenty years *after* Cheney's paper on moving collection.
 
 But one thing moving collectors can do that non-moving ones can't is
 *generational* sequestration, that is, keeping the youngest cohort of
-Lisp values separated from older ones.  This allows faster
-intermediary mark phases which only collect the "nursery" generation.
-A non-moving collector must traverse the full set on each cycle since
-its allocations are interleaved.
+Lisp values separated from older ones.  This allows fast, intermediary
+cycles which only scan the "nursery" generation (the rationale being
+old objects are very likely to still be referenced).  A non-moving
+collector must traverse the full set on each cycle since its
+allocations are interleaved.  This is why Emacs bros are as eager to
+raise collection thresholds as motherboard jockeys are to overclock
+their BIOS.
 
 ### Isn't this xemacs all over again?
 

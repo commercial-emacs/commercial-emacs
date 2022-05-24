@@ -17,7 +17,7 @@ typedef struct block_typemap
   bitset bitsets[MEM_TYPE_NTYPES];
 } block_typemap;
 
-typedef struct gc_semispace
+typedef struct mgc_semispace
 {
   void **block_addrs;
   block_typemap *block_typemaps;
@@ -26,11 +26,11 @@ typedef struct gc_semispace
   size_t nblocks;
   size_t block_words_used;
   size_t current_block;
-} gc_semispace;
+} mgc_semispace;
 
-static gc_semispace space0;
-static gc_semispace space1;
-static gc_semispace *space_in_use = &space0;
+static mgc_semispace space0;
+static mgc_semispace space1;
+static mgc_semispace *space_in_use = &space0;
 
 /* i.e., next word is the forwarded address in to-space */
 static const uintptr_t next_fwd_magic = 0xF00DF4CE;
@@ -49,14 +49,14 @@ static const uintptr_t term_block_magic = 0xDEADBEEF;
    : NULL)
 
 void *
-gc_fwd_xpntr (const void *addr)
+mgc_fwd_xpntr (const void *addr)
 {
   return FORWARD_XPNTR_GET (addr);
 }
 
 /* Return new allocation pointer, or NULL for failed realloc().  */
 static bool
-realloc_semispace (gc_semispace *space)
+realloc_semispace (mgc_semispace *space)
 {
   void *new_addr;
   void **resized_addrs =
@@ -93,7 +93,7 @@ size_t block_of_xpntr (const void *obj)
 }
 
 static enum Lisp_Type
-xpntr_at (const gc_semispace *space, size_t block, ptrdiff_t word, void **xpntr)
+xpntr_at (const mgc_semispace *space, size_t block, ptrdiff_t word, void **xpntr)
 {
   enum Lisp_Type ret = Lisp_Type_Unused0;
   size_t mem_i, modulus;
@@ -180,7 +180,7 @@ nbytes_of (enum Lisp_Type xpntr_type, const void *obj)
 }
 
 enum Lisp_Type
-space_find_xpntr (void *p, void **xpntr)
+mgc_find_xpntr (void *p, void **xpntr)
 {
   size_t block = block_of_xpntr (p);
   if (block != BLOCK_NOT_FOUND)
@@ -193,7 +193,7 @@ space_find_xpntr (void *p, void **xpntr)
 }
 
 static void
-reset_space (gc_semispace *space)
+reset_space (mgc_semispace *space)
 {
   space->alloc_ptr = NULL;
   space->scan_ptr = NULL;
@@ -202,14 +202,14 @@ reset_space (gc_semispace *space)
 }
 
 void
-gc_initialize_spaces (void)
+mgc_initialize_spaces (void)
 {
   reset_space (&space0);
   reset_space (&space1);
 }
 
 static void *
-next_block (gc_semispace *space)
+next_block (mgc_semispace *space)
 {
   bool q_error = false;
   size_t restore_current_block = space->current_block;
@@ -257,7 +257,7 @@ next_block (gc_semispace *space)
 */
 
 static void *
-bump_alloc_ptr (gc_semispace *space, size_t nbytes, enum Lisp_Type xpntr_type)
+bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Lisp_Type xpntr_type)
 {
   void *retval = space->alloc_ptr;
   size_t nwords = nbytes / word_size;
@@ -304,9 +304,9 @@ bump_alloc_ptr (gc_semispace *space, size_t nbytes, enum Lisp_Type xpntr_type)
 }
 
 void *
-gc_flip_xpntr (void *xpntr, size_t nbytes, enum Lisp_Type xpntr_type)
+mgc_flip_xpntr (void *xpntr, size_t nbytes, enum Lisp_Type xpntr_type)
 {
-  gc_semispace *from = space_in_use,
+  mgc_semispace *from = space_in_use,
     *to = (from == &space0) ? &space1 : &space0;
   void *ret = FORWARD_XPNTR_GET (xpntr);
   if (! ret)
@@ -320,9 +320,9 @@ gc_flip_xpntr (void *xpntr, size_t nbytes, enum Lisp_Type xpntr_type)
 }
 
 void
-gc_flip_space (void)
+mgc_flip_space (void)
 {
-  gc_semispace *from = space_in_use,
+  mgc_semispace *from = space_in_use,
     *to = (from == &space0) ? &space1 : &space0;
   for (int b = 0; b <= (int) from->current_block; ++b)
     {
@@ -360,7 +360,7 @@ gc_flip_space (void)
   space_in_use = to;
 }
 
-DEFUN ("ccons", Fccons, Sccons, 2, 2, 0,
+DEFUN ("mgc-cons", Fmgc_cons, Smgc_cons, 2, 2, 0,
        doc: /* Create a new cons, give it CAR and CDR as components,
 	       and return it.  */)
   (Lisp_Object car, Lisp_Object cdr)
@@ -403,7 +403,7 @@ allocate_vector (ptrdiff_t nargs, bool q_clear)
   return ret;
 }
 
-DEFUN ("cmake-vector", Fcmake_vector, Scmake_vector, 2, 2, 0,
+DEFUN ("mgc-make-vector", Fmgc_make_vector, Smgc_make_vector, 2, 2, 0,
        doc: /* Return a new vector of LENGTH instances of INIT.  */)
   (Lisp_Object length, Lisp_Object init)
 {
@@ -415,7 +415,7 @@ DEFUN ("cmake-vector", Fcmake_vector, Scmake_vector, 2, 2, 0,
   return unbind_to (count, initialize_vector (XFIXNAT (length), init));
 }
 
-DEFUN ("cvector", Fcvector, Scvector, 0, MANY, 0,
+DEFUN ("mgc-vector", Fmgc_vector, Smgc_vector, 0, MANY, 0,
        doc: /* Return a new vector containing the specified ARGS.
 usage: (cvector &rest ARGS)
 ARGS can be empty, yielding the empty vector.  */)
@@ -446,7 +446,7 @@ allocate_string (void)
   return s;
 }
 
-DEFUN ("cmake-string", Fcmake_string, Scmake_string, 2, 3, 0,
+DEFUN ("mgc-make-string", Fmgc_make_string, Smgc_make_string, 2, 3, 0,
        doc: /* Return a newly created string of LENGTH instances of
 INIT, an integer representing a character, e.g., ?x.  The return value
 is unibyte unless INIT is not ASCII or MULTIBYTE is non-nil.  */)
@@ -458,7 +458,7 @@ is unibyte unless INIT is not ASCII or MULTIBYTE is non-nil.  */)
   return unbind_to (count, Fmake_string (length, init, multibyte));
 }
 
-DEFUN ("cmake-symbol", Fcmake_symbol, Scmake_symbol, 1, 1, 0,
+DEFUN ("mgc-make-symbol", Fmgc_make_symbol, Smgc_make_symbol, 1, 1, 0,
        doc: /* Return an uninterned, unbound symbol whose name is NAME. */)
   (Lisp_Object name)
 {
@@ -472,7 +472,7 @@ DEFUN ("cmake-symbol", Fcmake_symbol, Scmake_symbol, 1, 1, 0,
   return val;
 }
 
-DEFUN ("cmake-marker", Fcmake_marker, Scmake_marker, 0, 0, 0,
+DEFUN ("mgc-make-marker", Fmgc_make_marker, Smgc_make_marker, 0, 0, 0,
        doc: /* Return a newly allocated marker which does not point at any place.  */)
   (void)
 {
@@ -487,36 +487,7 @@ DEFUN ("cmake-marker", Fcmake_marker, Scmake_marker, 0, 0, 0,
   return make_lisp_ptr (p, Lisp_Vectorlike);
 }
 
-DEFUN ("cgarbage-collect", Fcgarbage_collect, Scgarbage_collect, 0, 0, "",
-       doc: /* Reclaim storage for Lisp objects no longer needed.
-Garbage collection happens automatically if you cons more than
-`gc-cons-threshold' bytes of Lisp data since previous garbage collection.
-`garbage-collect' normally returns a list with info on amount of space in use,
-where each entry has the form (NAME SIZE USED FREE), where:
-- NAME is a symbol describing the kind of objects this entry represents,
-- SIZE is the number of bytes used by each one,
-- USED is the number of those objects that were found live in the heap,
-- FREE is the number of those objects that are not live but that Emacs
-  keeps around for future allocations (maybe because it does not know how
-  to return them to the OS).
-
-However, if there was overflow in pure space, and Emacs was dumped
-using the 'unexec' method, `garbage-collect' returns nil, because
-real GC can't be done.
-
-Note that calling this function does not guarantee that absolutely all
-unreachable objects will be garbage-collected.  Emacs uses a
-mark-and-sweep garbage collector, but is conservative when it comes to
-collecting objects in some circumstances.
-
-For further details, see Info node `(elisp)Garbage Collection'.  */)
-  (void)
-{
-  garbage_collect ();
-  return Qnil;
-}
-
-DEFUN ("cmemory-protect-now", Fcmemory_protect_now, Scmemory_protect_now, 0, 0, "",
+DEFUN ("memory-protect-now", Fmemory_protect_now, Smemory_protect_now, 0, 0, "",
        doc: /* Call mprotect().  */)
   (void)
 {
@@ -530,31 +501,8 @@ DEFUN ("cmemory-protect-now", Fcmemory_protect_now, Scmemory_protect_now, 0, 0, 
   return Vmemory__protect_p;
 }
 
-DEFUN ("cmemory-use-counts", Fcmemory_use_counts, Scmemory_use_counts, 0, 0, 0,
-       doc: /* Return a list of counters that measure how much consing there has been.
-Each of these counters increments for a certain kind of object.
-The counters wrap around from the largest positive integer to zero.
-Garbage collection does not decrease them.
-The elements of the value are as follows:
-  (CONSES FLOATS VECTOR-CELLS SYMBOLS STRING-CHARS INTERVALS STRINGS)
-All are in units of 1 = one object consed
-except for VECTOR-CELLS and STRING-CHARS, which count the total length of
-objects consed.
-Frames, windows, buffers, and subprocesses count as vectors
-  (but the contents of a buffer's text do not count here).  */)
-  (void)
-{
-  return list (make_int (cons_cells_consed),
-	       make_int (floats_consed),
-	       make_int (vector_cells_consed),
-	       make_int (symbols_consed),
-	       make_int (string_chars_consed),
-	       make_int (intervals_consed),
-	       make_int (strings_consed));
-}
-
 bool
-gc_handle_sigsegv (void *const fault_address)
+mgc_handle_sigsegv (void *const fault_address)
 {
   if (! NILP (Vmemory__protect_p))
     {
@@ -570,7 +518,7 @@ gc_handle_sigsegv (void *const fault_address)
   return false;
 }
 
-DEFUN ("cmake-bool-vector", Fcmake_bool_vector, Scmake_bool_vector, 2, 2, 0,
+DEFUN ("mgc-make-bool-vector", Fmgc_make_bool_vector, Smgc_make_bool_vector, 2, 2, 0,
        doc: /* Return a new bool-vector of length LENGTH, using INIT for each element.
 LENGTH must be a number.  INIT matters only in whether it is t or nil.  */)
   (Lisp_Object length, Lisp_Object init)
@@ -585,7 +533,7 @@ LENGTH must be a number.  INIT matters only in whether it is t or nil.  */)
   return bool_vector_fill (val, init);
 }
 
-DEFUN ("cbool-vector", Fcbool_vector, Scbool_vector, 0, MANY, 0,
+DEFUN ("mgc-bool-vector", Fmgc_bool_vector, Smgc_bool_vector, 0, MANY, 0,
        doc: /* Return a new bool-vector with specified arguments as elements.
 Allows any number of arguments, including zero.
 usage: (bool-vector &rest OBJECTS)  */)
@@ -603,33 +551,31 @@ usage: (bool-vector &rest OBJECTS)  */)
 }
 
 void
-syms_of_calloc (void)
+syms_of_mgc (void)
 {
   DEFVAR_LISP ("memory--protect-p", Vmemory__protect_p,
 	       doc: /* How does mprotect work?  */);
   Vmemory__protect_p = Qnil;
 
-  defsubr (&Sccons);
-  defsubr (&Scvector);
-  defsubr (&Scmake_vector);
-  defsubr (&Scmake_string);
-  defsubr (&Scmake_bool_vector);
-  defsubr (&Scbool_vector);
-  defsubr (&Scmake_symbol);
-  defsubr (&Scmake_marker);
-  defsubr (&Scgarbage_collect);
-  defsubr (&Scmemory_protect_now);
-  defsubr (&Scmemory_use_counts);
+  defsubr (&Smgc_cons);
+  defsubr (&Smgc_vector);
+  defsubr (&Smgc_make_vector);
+  defsubr (&Smgc_make_string);
+  defsubr (&Smgc_make_bool_vector);
+  defsubr (&Smgc_bool_vector);
+  defsubr (&Smgc_make_symbol);
+  defsubr (&Smgc_make_marker);
+  defsubr (&Smemory_protect_now);
 }
 
-bool calloc_xpntr_p (const void *obj)
+bool mgc_xpntr_p (const void *obj)
 {
   return block_of_xpntr (obj) != BLOCK_NOT_FOUND;
 }
 
 bool wrong_xpntr_p (const void *obj)
 {
-  gc_semispace *wrong = (space_in_use == &space0) ? &space1 : &space0;
+  mgc_semispace *wrong = (space_in_use == &space0) ? &space1 : &space0;
   uintptr_t oaddr = (uintptr_t) obj;
   for (size_t i = 0; i < wrong->nblocks; ++i)
     {

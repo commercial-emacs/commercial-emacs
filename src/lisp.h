@@ -4243,10 +4243,10 @@ extern void display_malloc_warning (void);
 extern specpdl_ref inhibit_garbage_collection (void);
 extern Lisp_Object build_overlay (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void free_cons (struct Lisp_Cons *);
-extern bool gc_handle_sigsegv (void *);
+extern bool mgc_handle_sigsegv (void *);
 extern void init_alloc_once (void);
 extern void syms_of_alloc (void);
-extern void syms_of_calloc (void);
+extern void syms_of_mgc (void);
 extern struct buffer *allocate_buffer (void) ATTRIBUTE_RETURNS_NONNULL;
 extern int valid_lisp_object_p (Lisp_Object);
 

@@ -1343,7 +1343,7 @@ sweep_strings (void)
       for (i = 0; i < BLOCK_NSTRINGS; ++i)
 	{
 	  struct Lisp_String *s = b->strings + i;
-	  eassert (! calloc_xpntr_p (s));
+	  eassert (! mgc_xpntr_p (s));
 	  if (s->u.s.data != NULL) /* means S is live but is it marked?  */
 	    {
 	      if (XSTRING_MARKED_P (s))
@@ -3018,8 +3018,8 @@ string_marked_p (const struct Lisp_String *s)
   bool ret;
   if (pdumper_object_p (s))
     ret = pdumper_marked_p (s);
-  else if (calloc_xpntr_p (s))
-    ret = (gc_fwd_xpntr (s) != NULL); // flipped
+  else if (mgc_xpntr_p (s))
+    ret = (mgc_fwd_xpntr (s) != NULL); // flipped
   else
     ret = XSTRING_MARKED_P (s);
   return ret;
@@ -3033,12 +3033,12 @@ set_string_marked (Lisp_Object *obj)
     {
       if (pdumper_object_p (s))
 	pdumper_set_marked (s);
-      else if (calloc_xpntr_p (s))
+      else if (mgc_xpntr_p (s))
 	{
 	  /* Do not use string_(set|get)_intervals here.  */
 	  s->u.s.intervals = balance_intervals (s->u.s.intervals);
-	  XSETSTRING (*obj, gc_flip_xpntr (s, sizeof (struct Lisp_String),
-					   Lisp_String));
+	  XSETSTRING (*obj, mgc_flip_xpntr (s, sizeof (struct Lisp_String),
+					    Lisp_String));
 	  sdata *data = SDATA_OF_LISP_STRING (s);
 	  if (data->string != s)
 	    eassert (data->string == XSTRING (*obj));
@@ -3053,10 +3053,10 @@ set_string_marked (Lisp_Object *obj)
       string_bytes (s);
 #endif
     }
-  else if (calloc_xpntr_p (s))
+  else if (mgc_xpntr_p (s))
     {
-      eassert (gc_fwd_xpntr (s));
-      XSETSTRING (*obj, gc_fwd_xpntr (s));
+      eassert (mgc_fwd_xpntr (s));
+      XSETSTRING (*obj, mgc_fwd_xpntr (s));
       eassert (! XSTRING_MARKED_P (XSTRING (*obj)));
     }
 }
@@ -3752,15 +3752,15 @@ mark_maybe_pointer (void *const * p)
       if (ret)
 	mark_automatic_object (make_lisp_symbol (po));
     }
-  else if ((xpntr_type = space_find_xpntr (*p, &xpntr)) != Lisp_Type_Unused0)
+  else if ((xpntr_type = mgc_find_xpntr (*p, &xpntr)) != Lisp_Type_Unused0)
     {
       /* analogous logic to set_string_marked() */
-      void *forwarded = gc_fwd_xpntr (xpntr);
+      void *forwarded = mgc_fwd_xpntr (xpntr);
       if (! forwarded)
 	{
 	  mark_automatic_object (make_lisp_ptr (xpntr, xpntr_type));
 	  ret = true;
-	  forwarded = gc_fwd_xpntr (xpntr);
+	  forwarded = mgc_fwd_xpntr (xpntr);
 	}
       ptrdiff_t offset;
       INT_SUBTRACT_WRAPV ((uintptr_t) *p, (uintptr_t) xpntr, &offset);
@@ -5381,7 +5381,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      emacs_abort ();				\
 	    break;					\
 	  }						\
-	if (calloc_xpntr_p (xpntr))			\
+	if (mgc_xpntr_p (xpntr))			\
 	  break;					\
 	m = mem_find (xpntr);				\
 	if (m == MEM_NIL)				\
@@ -5397,7 +5397,7 @@ process_mark_stack (ptrdiff_t base_sp)
       do {							\
 	if (pdumper_object_p (xpntr))				\
 	  break;						\
-	if (calloc_xpntr_p (xpntr))				\
+	if (mgc_xpntr_p (xpntr))				\
 	  break;						\
 	if (! (m->type == MEM_TYPE && LIVEP (m, xpntr)))		\
 	  emacs_abort ();					\
@@ -5431,7 +5431,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	{
 	case Lisp_String:
 	  {
-	    if (! gc_fwd_xpntr (xpntr))
+	    if (! mgc_fwd_xpntr (xpntr))
 	      CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
 	    set_string_marked (objp);
 	  }
@@ -5585,7 +5585,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      }
 	    if (! PURE_P (XSTRING (ptr->u.s.name)))
 	      {
-		if (calloc_xpntr_p (XSTRING (ptr->u.s.name)))
+		if (mgc_xpntr_p (XSTRING (ptr->u.s.name)))
 		  {
 		    set_string_marked (&ptr->u.s.name);
 		    eassert (wrong_xpntr_p (XSTRING (ptr->u.s.name)));
@@ -5989,7 +5989,7 @@ sweep_buffers (void)
 static void
 gc_sweep (void)
 {
-  gc_flip_space ();
+  mgc_flip_space ();
   sweep_strings ();
   check_string_bytes (!noninteractive);
   sweep_conses ();
@@ -6340,7 +6340,7 @@ init_runtime (void)
   mem_init ();
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);
-  gc_initialize_spaces ();
+  mgc_initialize_spaces ();
 }
 
 void

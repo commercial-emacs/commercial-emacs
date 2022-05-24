@@ -1869,7 +1869,7 @@ stack_overflow (siginfo_t *siginfo)
 static void
 handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
 {
-  if (gc_handle_sigsegv (siginfo->si_addr))
+  if (mgc_handle_sigsegv (siginfo->si_addr))
     return;
 
   /* Hard GC error may lead to stack overflow caused by
