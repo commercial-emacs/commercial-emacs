@@ -551,9 +551,7 @@ usage: (bool-vector &rest OBJECTS)  */)
 }
 
 DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
-       doc: /* Return alist of Lisp types and their current counts.
-Note pseudovectors like frames, windows, buffers (but not their
-contents), etc. contribute to VECTOR-CELLS.  */)
+       doc: /* Return alist of Lisp types and their current counts.  */)
   (void)
 {
   size_t tally[Lisp_Type_Max] = {0};

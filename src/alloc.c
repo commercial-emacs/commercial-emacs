@@ -5715,63 +5715,53 @@ survives_gc_p (Lisp_Object obj)
 static void
 sweep_conses (void)
 {
-  struct cons_block **cprev = &cons_block;
-  int lim = cons_block_index;
-  size_t num_free = 0, num_used = 0;
+  size_t cum_free = 0, cum_used = 0;
+  int cblk_end = cons_block_index;
 
   cons_free_list = 0;
 
-  for (struct cons_block *cblk; (cblk = *cprev); )
+  /* CONS_BLOCK is the last one.  The first iteration processes conses
+     through the prevailing CONS_BLOCK_INDEX.  Subsequent iterations
+     process whole blocks of BLOCK_NCONS cells.  */
+  for (struct cons_block **cprev = &cons_block, *cblk = *cprev;
+       cblk != NULL;
+       cblk = *cprev, cblk_end = BLOCK_NCONS)
     {
-      int i = 0;
-      int this_free = 0;
-      int ilim = (lim + BITS_PER_BITS_WORD - 1) / BITS_PER_BITS_WORD;
+      size_t num_free = 0;
 
-      /* Scan the mark bits an int at a time.  */
-      for (i = 0; i < ilim; i++)
+      /* Currently BLOCK_NCONS < BITS_PER_BITS_WORD (gcmarkbits needs
+	 but one word to describe all conses in the block), so the
+	 WEND assignment effectively rounds up to 1.  */
+
+      int wend = (cblk_end + BITS_PER_BITS_WORD - 1) / BITS_PER_BITS_WORD;
+      for (int w = 0; w < wend; ++w)
         {
-          if (cblk->gcmarkbits[i] == BITS_WORD_MAX)
-            {
-              /* Fast path - all cons cells for this int are marked.  */
-              cblk->gcmarkbits[i] = 0;
-              num_used += BITS_PER_BITS_WORD;
-            }
-          else
-            {
-              /* Some cons cells for this int are not marked.
-                 Find which ones, and free them.  */
-              int start, pos, stop;
+	  // Verify RMS's "fast path" branch is never exercised.
+          eassume (cblk->gcmarkbits[w] != BITS_WORD_MAX);
 
-              start = i * BITS_PER_BITS_WORD;
-              stop = lim - start;
-              if (stop > BITS_PER_BITS_WORD)
-                stop = BITS_PER_BITS_WORD;
-              stop += start;
-
-              for (pos = start; pos < stop; pos++)
-                {
-		  struct Lisp_Cons *acons = &cblk->conses[pos];
-		  if (!XCONS_MARKED_P (acons))
-                    {
-                      this_free++;
-                      cblk->conses[pos].u.s.u.chain = cons_free_list;
-                      cons_free_list = &cblk->conses[pos];
-                      cons_free_list->u.s.car = dead_object ();
-                    }
-                  else
-                    {
-                      num_used++;
-		      XUNMARK_CONS (acons);
-                    }
-                }
-            }
+	  for (int start = w * BITS_PER_BITS_WORD, c = start;
+	       c < start + min (cblk_end - start, BITS_PER_BITS_WORD);
+	       ++c)
+	    {
+	      struct Lisp_Cons *acons = &cblk->conses[c];
+	      if (! XCONS_MARKED_P (acons))
+		{
+		  num_free++;
+		  cblk->conses[c].u.s.u.chain = cons_free_list;
+		  cons_free_list = &cblk->conses[c];
+		  cons_free_list->u.s.car = dead_object ();
+		}
+	      else
+		{
+		  cum_used++;
+		  XUNMARK_CONS (acons);
+		}
+	    }
         }
 
-      lim = BLOCK_NCONS;
-      /* If this block contains only free conses and we have already
-         seen more than two blocks worth of free conses then deallocate
-         this block.  */
-      if (this_free == BLOCK_NCONS && num_free > BLOCK_NCONS)
+      /* If CBLK contains only free conses and we've already seen more
+         than two such blocks, then deallocate CBLK.  */
+      if (num_free == BLOCK_NCONS && cum_free > BLOCK_NCONS)
         {
           *cprev = cblk->next;
           /* Unhook from the free list.  */
@@ -5780,12 +5770,12 @@ sweep_conses (void)
         }
       else
         {
-          num_free += this_free;
+          cum_free += num_free;
           cprev = &cblk->next;
         }
     }
-  gcstat.total_conses = num_used;
-  gcstat.total_free_conses = num_free;
+  gcstat.total_conses = cum_used;
+  gcstat.total_free_conses = cum_free;
 }
 
 static void
@@ -5985,7 +5975,7 @@ gc_sweep (void)
 {
   mgc_flip_space ();
   sweep_strings ();
-  check_string_bytes (!noninteractive);
+  check_string_bytes (! noninteractive);
   sweep_conses ();
   sweep_floats ();
   sweep_intervals ();
@@ -5993,7 +5983,7 @@ gc_sweep (void)
   sweep_buffers ();
   sweep_vectors ();
   pdumper_clear_marks ();
-  check_string_bytes (!noninteractive);
+  check_string_bytes (! noninteractive);
 }
 
 DEFUN ("memory-full", Fmemory_full, Smemory_full, 0, 0, 0,
