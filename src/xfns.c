@@ -7265,8 +7265,6 @@ property.  */)
   int nelements;
   Window target_window;
 #ifdef USE_XCB
-  bool intern_prop;
-  bool intern_target;
   xcb_intern_atom_cookie_t prop_atom_cookie;
   xcb_intern_atom_cookie_t target_type_cookie;
   xcb_intern_atom_reply_t *reply;
