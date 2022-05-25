@@ -3124,6 +3124,8 @@ x_dnd_get_wm_state_and_proto (struct x_display_info *dpyinfo,
      free (reply);
    }
 #endif
+	}
+    }
 
   return rc;
 }
@@ -3959,6 +3961,7 @@ x_dnd_cleanup_drag_and_drop (void *frame)
 
   x_dnd_frame = NULL;
 }
+#endif
 
 /* Flush display of frame F.  */
 
@@ -5483,6 +5486,11 @@ x_draw_horizontal_wave (struct frame *f, GC gc, int x, int y,
       y += height - 1;
       dy = -dy;
     }
+  cairo_set_line_width (cr, 1);
+  cairo_stroke (cr);
+  x_end_cr_clip (f);
+}
+#endif
 
   cairo_move_to (cr, x - xoffset + 0.5, y + 0.5);
   while (--n >= 0)
@@ -5666,6 +5674,7 @@ x_update_begin (struct frame *f)
 {
   /* Nothing to do.  */
 }
+#endif
 
 /* Draw a vertical window border from (x,y0) to (x,y1)  */
 
@@ -6300,6 +6309,9 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
 #endif
 }
 
+      mask = (GCForeground | GCBackground
+	      | GCGraphicsExposures
+	      | GCLineWidth);
 
 /* Set S->gc to a suitable GC for drawing glyph string S in cursor
    face.  */
@@ -7669,6 +7681,7 @@ x_setup_relief_colors (struct glyph_string *s)
 			    BLACK_PIX_DEFAULT (s->f));
     }
 }
+#endif
 
 #ifndef USE_CAIRO
 static void
@@ -7919,6 +7932,7 @@ x_draw_relief_rect (struct frame *f, int left_x, int top_y, int right_x,
   x_reset_clip_rectangles (f, black_gc);
 #endif
 }
+#endif	/* !USE_CAIRO */
 
 
 /* Draw a box on frame F inside the rectangle given by LEFT_X, TOP_Y,
@@ -8265,6 +8279,9 @@ x_draw_image_relief (struct glyph_string *s)
       else if (FIXNUMP (Vtool_bar_button_margin))
 	extra_x = extra_y = XFIXNUM (Vtool_bar_button_margin);
     }
+  else
+#endif	/* ! USE_CAIRO */
+    x_draw_image_foreground (s);
 
   top_p = bot_p = left_p = right_p = false;
 
@@ -8663,6 +8680,10 @@ x_get_scale_factor (Display *disp, int *scale_x, int *scale_y)
       if (dpyinfo->resy > base_res)
 	*scale_y = floor (dpyinfo->resy / base_res);
     }
+
+  /* Restore previous clipping rectangle(s) */
+  XSetClipRectangles (display, s->gc, 0, 0, s->clip, s->num_clips, Unsorted);
+#endif	/* not USE_CAIRO */
 }
 
 /*
@@ -8775,6 +8796,16 @@ x_draw_glyph_string (struct glyph_string *s)
 	    next->num_clips = 0;
 	  }
     }
+  else if (!s->clip_head /* draw_glyphs didn't specify a clip mask. */
+	   && !s->clip_tail
+	   && ((s->prev && s->prev->hl != s->hl && s->left_overhang)
+	       || (s->next && s->next->hl != s->hl && s->right_overhang)))
+    /* We must clip just this glyph.  left_overhang part has already
+       drawn when s->prev was drawn, and right_overhang part will be
+       drawn later when s->next is drawn. */
+    x_set_glyph_string_clipping_exactly (s, s);
+  else
+    x_set_glyph_string_clipping (s);
 
   /* Set up S->gc, set clipping and draw S.  */
   x_set_glyph_string_gc (s);
