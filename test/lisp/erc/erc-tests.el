@@ -48,6 +48,27 @@
   (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "1d")))
     (should (equal (erc--read-time-period "foo: ") 86400))))
 
+(ert-deftest erc--meta--backend-dependencies ()
+  (with-temp-buffer
+    (insert-file-contents-literally
+     (concat (file-name-sans-extension (symbol-file 'erc)) ".el"))
+    (let ((beg (search-forward ";; Defined in erc-backend"))
+          (end (search-forward "\n\n"))
+          vars)
+      (save-excursion
+        (save-restriction
+          (narrow-to-region beg end)
+          (goto-char (point-min))
+          (with-syntax-table lisp-data-mode-syntax-table
+            (condition-case _
+                (while (push (cadr (read (current-buffer))) vars))
+              (end-of-file)))))
+      (should (= (point) end))
+      (dolist (var vars)
+        (setq var (concat "\\_<" (symbol-name var) "\\_>"))
+        (ert-info (var)
+          (should (save-excursion (search-forward-regexp var nil t))))))))
+
 (ert-deftest erc-with-all-buffers-of-server ()
   (let (proc-exnet
         proc-onet
@@ -113,6 +134,150 @@
     (should-not (get-buffer "#bar"))
     (should (get-buffer "#spam"))
     (kill-buffer "#spam")))
+
+(defun erc-tests--send-prep ()
+  ;; Caller should probably shadow `erc-insert-modify-hook' or
+  ;; populate user tables for erc-button.
+  (erc-mode)
+  (insert "\n\n")
+  (setq erc-input-marker (make-marker)
+        erc-insert-marker (make-marker))
+  (set-marker erc-insert-marker (point-max))
+  (erc-display-prompt)
+  (should (= (point) erc-input-marker)))
+
+(defun erc-tests--set-fake-server-process (&rest args)
+  (setq erc-server-process
+        (apply #'start-process (car args) (current-buffer) args))
+  (set-process-query-on-exit-flag erc-server-process nil))
+
+(ert-deftest erc-hide-prompt ()
+  (let (erc-kill-channel-hook erc-kill-server-hook erc-kill-buffer-hook)
+
+    (with-current-buffer (get-buffer-create "ServNet")
+      (erc-tests--send-prep)
+      (goto-char erc-insert-marker)
+      (should (looking-at-p (regexp-quote erc-prompt)))
+      (erc-tests--set-fake-server-process "sleep" "1")
+      (set-process-sentinel erc-server-process #'ignore)
+      (setq erc-network 'ServNet)
+      (set-process-query-on-exit-flag erc-server-process nil))
+
+    (with-current-buffer (get-buffer-create "#chan")
+      (erc-tests--send-prep)
+      (goto-char erc-insert-marker)
+      (should (looking-at-p (regexp-quote erc-prompt)))
+      (setq erc-server-process (buffer-local-value 'erc-server-process
+                                                   (get-buffer "ServNet"))
+            erc-default-recipients '("#chan")))
+
+    (with-current-buffer (get-buffer-create "bob")
+      (erc-tests--send-prep)
+      (goto-char erc-insert-marker)
+      (should (looking-at-p (regexp-quote erc-prompt)))
+      (setq erc-server-process (buffer-local-value 'erc-server-process
+                                                   (get-buffer "ServNet"))
+            erc-default-recipients '("bob")))
+
+    (ert-info ("Value: t (default)")
+      (should (eq erc-hide-prompt t))
+      (with-current-buffer "ServNet"
+        (should (= (point) erc-insert-marker))
+        (erc--hide-prompt erc-server-process)
+        (should (string= ">" (get-text-property (point) 'display))))
+
+      (with-current-buffer "#chan"
+        (goto-char erc-insert-marker)
+        (should (string= ">" (get-text-property (point) 'display)))
+        (should (memq #'erc--unhide-prompt-on-self-insert pre-command-hook))
+        (goto-char erc-input-marker)
+        (ert-simulate-command '(self-insert-command 1 ?/))
+        (goto-char erc-insert-marker)
+        (should-not (get-text-property (point) 'display))
+        (should-not (memq #'erc--unhide-prompt-on-self-insert
+                          pre-command-hook)))
+
+      (with-current-buffer "bob"
+        (goto-char erc-insert-marker)
+        (should (string= ">" (get-text-property (point) 'display)))
+        (should (memq #'erc--unhide-prompt-on-self-insert pre-command-hook))
+        (goto-char erc-input-marker)
+        (ert-simulate-command '(self-insert-command 1 ?/))
+        (goto-char erc-insert-marker)
+        (should-not (get-text-property (point) 'display))
+        (should-not (memq #'erc--unhide-prompt-on-self-insert
+                          pre-command-hook)))
+
+      (with-current-buffer "ServNet"
+        (should (get-text-property erc-insert-marker 'display))
+        (should (memq #'erc--unhide-prompt-on-self-insert pre-command-hook))
+        (erc--unhide-prompt)
+        (should-not (memq #'erc--unhide-prompt-on-self-insert
+                          pre-command-hook))
+        (should-not (get-text-property erc-insert-marker 'display))))
+
+    (ert-info ("Value: server")
+      (setq erc-hide-prompt '(server))
+      (with-current-buffer "ServNet"
+        (erc--hide-prompt erc-server-process)
+        (should (string= ">" (get-text-property erc-insert-marker 'display))))
+
+      (with-current-buffer "#chan"
+        (should-not (get-text-property erc-insert-marker 'display)))
+
+      (with-current-buffer "bob"
+        (should-not (get-text-property erc-insert-marker 'display)))
+
+      (with-current-buffer "ServNet"
+        (erc--unhide-prompt)
+        (should-not (get-text-property erc-insert-marker 'display))))
+
+    (ert-info ("Value: channel")
+      (setq erc-hide-prompt '(channel))
+      (with-current-buffer "ServNet"
+        (erc--hide-prompt erc-server-process)
+        (should-not (get-text-property erc-insert-marker 'display)))
+
+      (with-current-buffer "bob"
+        (should-not (get-text-property erc-insert-marker 'display)))
+
+      (with-current-buffer "#chan"
+        (should (string= ">" (get-text-property erc-insert-marker 'display)))
+        (erc--unhide-prompt)
+        (should-not (get-text-property erc-insert-marker 'display))))
+
+    (ert-info ("Value: query")
+      (setq erc-hide-prompt '(query))
+      (with-current-buffer "ServNet"
+        (erc--hide-prompt erc-server-process)
+        (should-not (get-text-property erc-insert-marker 'display)))
+
+      (with-current-buffer "bob"
+        (should (string= ">" (get-text-property erc-insert-marker 'display)))
+        (erc--unhide-prompt)
+        (should-not (get-text-property erc-insert-marker 'display)))
+
+      (with-current-buffer "#chan"
+        (should-not (get-text-property erc-insert-marker 'display))))
+
+    (ert-info ("Value: nil")
+      (setq erc-hide-prompt nil)
+      (with-current-buffer "ServNet"
+        (erc--hide-prompt erc-server-process)
+        (should-not (get-text-property erc-insert-marker 'display)))
+
+      (with-current-buffer "bob"
+        (should-not (get-text-property erc-insert-marker 'display)))
+
+      (with-current-buffer "#chan"
+        (should-not (get-text-property erc-insert-marker 'display))
+        (erc--unhide-prompt) ; won't blow up when prompt already showing
+        (should-not (get-text-property erc-insert-marker 'display))))
+
+    (when noninteractive
+      (kill-buffer "#chan")
+      (kill-buffer "bob")
+      (kill-buffer "ServNet"))))
 
 (ert-deftest erc--switch-to-buffer ()
   (defvar erc-modified-channels-alist) ; lisp/erc/erc-track.el
@@ -184,6 +349,149 @@
     (setq erc-lurker-ignore-chars "_-`") ; set of chars, not character alts
     (should (string= "nick" (erc-lurker-maybe-trim "nick-_`")))))
 
+(ert-deftest erc--parse-isupport-value ()
+  (should (equal (erc--parse-isupport-value "a,b") '("a" "b")))
+  (should (equal (erc--parse-isupport-value "a,b,c") '("a" "b" "c")))
+
+  (should (equal (erc--parse-isupport-value "abc") '("abc")))
+  (should (equal (erc--parse-isupport-value "\\x20foo") '(" foo")))
+  (should (equal (erc--parse-isupport-value "foo\\x20") '("foo ")))
+  (should (equal (erc--parse-isupport-value "a\\x20b\\x20c") '("a b c")))
+  (should (equal (erc--parse-isupport-value "a\\x20b\\x20c\\x20") '("a b c ")))
+  (should (equal (erc--parse-isupport-value "\\x20a\\x20b\\x20c") '(" a b c")))
+  (should (equal (erc--parse-isupport-value "a\\x20\\x20c") '("a  c")))
+  (should (equal (erc--parse-isupport-value "\\x20\\x20\\x20") '("   ")))
+  (should (equal (erc--parse-isupport-value "\\x5Co/") '("\\o/")))
+  (should (equal (erc--parse-isupport-value "\\x7F,\\x19") '("\\x7F" "\\x19")))
+  (should (equal (erc--parse-isupport-value "a\\x2Cb,c") '("a,b" "c"))))
+
+(ert-deftest erc--get-isupport-entry ()
+  (let ((erc--isupport-params (make-hash-table))
+        (erc-server-parameters '(("FOO" . "1") ("BAR") ("BAZ" . "A,B,C")))
+        (items (lambda ()
+                 (cl-loop for k being the hash-keys of erc--isupport-params
+                          using (hash-values v) collect (cons k v)))))
+
+    (should-not (erc--get-isupport-entry 'FAKE))
+    (should-not (erc--get-isupport-entry 'FAKE 'single))
+    (should (zerop (hash-table-count erc--isupport-params)))
+
+    (should (equal (erc--get-isupport-entry 'BAR) '(BAR)))
+    (should-not (erc--get-isupport-entry 'BAR 'single))
+    (should (= 1 (hash-table-count erc--isupport-params)))
+
+    (should (equal (erc--get-isupport-entry 'BAZ) '(BAZ "A" "B" "C")))
+    (should (equal (erc--get-isupport-entry 'BAZ 'single) "A"))
+    (should (= 2 (hash-table-count erc--isupport-params)))
+
+    (should (equal (erc--get-isupport-entry 'FOO 'single) "1"))
+    (should (equal (erc--get-isupport-entry 'FOO) '(FOO "1")))
+
+    (should (equal (funcall items)
+                   '((BAR . --empty--) (BAZ "A" "B" "C") (FOO "1"))))))
+
+(ert-deftest erc-server-005 ()
+  (let* ((erc-server-005-functions (copy-sequence erc-server-005-functions))
+         (hooked 0)
+         (verify #'ignore)
+         (hook (lambda (_ _) (funcall verify) (cl-incf hooked)))
+         erc-server-parameters
+         erc--isupport-params
+         erc-timer-hook
+         calls
+         args
+         parsed)
+    (add-hook 'erc-server-005-functions hook 90)
+    (should (eq (cadr erc-server-005-functions) hook))
+    (cl-letf (((symbol-function 'erc-display-message)
+               (lambda (_ _ _ line) (push line calls))))
+
+      (ert-info ("Baseline")
+        (setq args '("tester" "BOT=B" "EXCEPTS" "PREFIX=(ov)@+" "are supp...")
+              parsed (make-erc-response :command-args args :command "005"))
+
+        (setq verify
+              (lambda ()
+                (should (equal erc-server-parameters
+                               '(("PREFIX" . "(ov)@+") ("EXCEPTS")
+                                 ("BOT" . "B"))))
+                (should (zerop (hash-table-count erc--isupport-params)))
+                (should (equal "(ov)@+" (erc--get-isupport-entry 'PREFIX t)))
+                (should (equal '(EXCEPTS) (erc--get-isupport-entry 'EXCEPTS)))
+                (should (equal "B" (erc--get-isupport-entry 'BOT t)))
+                (should (string= (pop calls)
+                                 "BOT=B EXCEPTS PREFIX=(ov)@+ are supp..."))
+                (should (equal args (erc-response.command-args parsed)))))
+
+        (erc-call-hooks nil parsed))
+
+      (ert-info ("Negated, updated")
+        (setq args '("tester" "-EXCEPTS" "-FAKE" "PREFIX=(ohv)@%+" "are su...")
+              parsed (make-erc-response :command-args args :command "005"))
+
+        (setq verify
+              (lambda ()
+                (should (equal erc-server-parameters
+                               '(("PREFIX" . "(ohv)@%+") ("BOT" . "B"))))
+                (should (string= (pop calls)
+                                 "-EXCEPTS -FAKE PREFIX=(ohv)@%+ are su..."))
+                (should (equal "(ohv)@%+" (erc--get-isupport-entry 'PREFIX t)))
+                (should (equal "B" (erc--get-isupport-entry 'BOT t)))
+                (should-not (erc--get-isupport-entry 'EXCEPTS))
+                (should (equal args (erc-response.command-args parsed)))))
+
+        (erc-call-hooks nil parsed))
+      (should (= hooked 2))))
+  (should-not (cadr erc-server-005-functions)))
+
+(ert-deftest erc-downcase ()
+  (let ((erc--isupport-params (make-hash-table)))
+
+    (puthash 'PREFIX '("(ov)@+") erc--isupport-params)
+    (puthash 'BOT '("B") erc--isupport-params)
+
+    (ert-info ("ascii")
+      (puthash 'CASEMAPPING  '("ascii") erc--isupport-params)
+      (should (equal (erc-downcase "Bob[m]`") "bob[m]`"))
+      (should (equal (erc-downcase "Tilde~") "tilde~" ))
+      (should (equal (erc-downcase "\\O/") "\\o/" )))
+
+    (ert-info ("rfc1459")
+      (puthash 'CASEMAPPING  '("rfc1459") erc--isupport-params)
+      (should (equal (erc-downcase "Bob[m]`") "bob{m}`" ))
+      (should (equal (erc-downcase "Tilde~") "tilde^" ))
+      (should (equal (erc-downcase "\\O/") "|o/" )))
+
+    (ert-info ("rfc1459-strict")
+      (puthash 'CASEMAPPING  '("rfc1459-strict") erc--isupport-params)
+      (should (equal (erc-downcase "Bob[m]`") "bob{m}`"))
+      (should (equal (erc-downcase "Tilde~") "tilde~" ))
+      (should (equal (erc-downcase "\\O/") "|o/" )))))
+
+(ert-deftest erc--valid-local-channel-p ()
+  (ert-info ("Local channels not supported")
+    (let ((erc--isupport-params (make-hash-table)))
+      (puthash 'CHANTYPES  '("#") erc--isupport-params)
+      (should-not (erc--valid-local-channel-p "#chan"))
+      (should-not (erc--valid-local-channel-p "&local"))))
+  (ert-info ("Local channels supported")
+    (let ((erc--isupport-params (make-hash-table)))
+      (puthash 'CHANTYPES  '("&#") erc--isupport-params)
+      (should-not (erc--valid-local-channel-p "#chan"))
+      (should (erc--valid-local-channel-p "&local")))))
+
+(ert-deftest erc--target-from-string ()
+  (should (equal (erc--target-from-string "#chan")
+                 #s(erc--target-channel "#chan" \#chan)))
+
+  (should (equal (erc--target-from-string "Bob")
+                 #s(erc--target "Bob" bob)))
+
+  (let ((erc--isupport-params (make-hash-table)))
+    (puthash 'CHANTYPES  '("&#") erc--isupport-params)
+    (should (equal (erc--target-from-string "&Bitlbee")
+                   #s(erc--target-channel-local "&Bitlbee" &bitlbee)))))
+
 (ert-deftest erc-ring-previous-command-base-case ()
   (ert-info ("Create ring when nonexistent and do nothing")
     (let (erc-input-ring
@@ -197,14 +505,10 @@
 (ert-deftest erc-ring-previous-command ()
   (with-current-buffer (get-buffer-create "*#fake*")
     (erc-mode)
-    (insert "\n\n")
+    (erc-tests--send-prep)
+    (setq-local erc-last-input-time 0)
     (should-not (local-variable-if-set-p 'erc-send-completed-hook))
     (set (make-local-variable 'erc-send-completed-hook) nil) ; skip t (globals)
-    (setq erc-input-marker (make-marker)
-          erc-insert-marker (make-marker))
-    (set-marker erc-insert-marker (point-max))
-    (erc-display-prompt)
-    (should (= (point) erc-input-marker))
     ;; Just in case erc-ring-mode is already on
     (setq-local erc-pre-send-functions nil)
     (add-hook 'erc-pre-send-functions #'erc-add-to-input-ring)
@@ -264,8 +568,9 @@
       (erc-log-irc-protocol ":irc.gnu.org 001 tester :Welcome")
       (erc-log-irc-protocol ":irc.gnu.org 002 tester :Your host is irc.gnu.org")
       (setq erc-network 'FooNet)
+      (setq erc-networks--id (erc-networks--id-create nil))
       (erc-log-irc-protocol ":irc.gnu.org 422 tester :MOTD missing")
-      (setq erc-network 'BarNet)
+      (setq erc-networks--id (erc-networks--id-create 'BarNet))
       (erc-log-irc-protocol ":irc.gnu.org 221 tester +i")
       (set-process-query-on-exit-flag erc-server-process nil)))
   (with-current-buffer "*erc-protocol*"
