@@ -5712,6 +5712,7 @@ survives_gc_p (Lisp_Object obj)
   return survives_p || PURE_P (XPNTR (obj));
 }
 
+/* Needs to be unified with sweep_floats().  */
 static void
 sweep_conses (void)
 {
@@ -5732,7 +5733,6 @@ sweep_conses (void)
       /* Currently BLOCK_NCONS < BITS_PER_BITS_WORD (gcmarkbits needs
 	 but one word to describe all conses in the block), so the
 	 WEND assignment effectively rounds up to 1.  */
-
       int wend = (cblk_end + BITS_PER_BITS_WORD - 1) / BITS_PER_BITS_WORD;
       for (int w = 0; w < wend; ++w)
         {
@@ -5761,7 +5761,7 @@ sweep_conses (void)
 
       /* If CBLK contains only free conses and we've already seen more
          than two such blocks, then deallocate CBLK.  */
-      if (num_free == BLOCK_NCONS && cum_free > BLOCK_NCONS)
+      if (num_free >= BLOCK_NCONS && cum_free > BLOCK_NCONS)
         {
           *cprev = cblk->next;
           /* Unhook from the free list.  */
@@ -5774,42 +5774,56 @@ sweep_conses (void)
           cprev = &cblk->next;
         }
     }
+
   gcstat.total_conses = cum_used;
   gcstat.total_free_conses = cum_free;
 }
 
+/* Needs to be unified with sweep_conses().  */
 static void
 sweep_floats (void)
 {
-  struct float_block **fprev = &float_block;
-  int lim = float_block_index;
-  size_t num_free = 0, num_used = 0;
+  size_t cum_free = 0, cum_used = 0;
+  int fblk_end = float_block_index;
 
   float_free_list = 0;
 
-  for (struct float_block *fblk; (fblk = *fprev); )
+  /* FLOAT_BLOCK is the last one.  The first iteration processes floats
+     through the prevailing FLOAT_BLOCK_INDEX.  Subsequent iterations
+     process whole blocks of BLOCK_NFLOATS cells.  */
+  for (struct float_block **fprev = &float_block, *fblk = *fprev;
+       fblk != NULL;
+       fblk = *fprev, fblk_end = BLOCK_NFLOATS)
     {
-      int this_free = 0;
-      for (int i = 0; i < lim; i++)
+      size_t num_free = 0;
+      /* Currently BLOCK_NFLOATS < BITS_PER_BITS_WORD (gcmarkbits needs
+	 but one word to describe all floats in the block), so the
+	 WEND assignment effectively rounds up to 1.  */
+      int wend = (fblk_end + BITS_PER_BITS_WORD - 1) / BITS_PER_BITS_WORD;
+      for (int w = 0; w < wend; ++w)
 	{
-	  struct Lisp_Float *afloat = &fblk->floats[i];
-	  if (!XFLOAT_MARKED_P (afloat))
+	  for (int start = w * BITS_PER_BITS_WORD, c = start;
+	       c < start + min (fblk_end - start, BITS_PER_BITS_WORD);
+	       ++c)
 	    {
-	      this_free++;
-	      fblk->floats[i].u.chain = float_free_list;
-	      float_free_list = &fblk->floats[i];
-	    }
-	  else
-	    {
-	      num_used++;
-	      XFLOAT_UNMARK (afloat);
+	      struct Lisp_Float *afloat = &fblk->floats[c];
+	      if (! XFLOAT_MARKED_P (afloat))
+		{
+		  num_free++;
+		  fblk->floats[c].u.chain = float_free_list;
+		  float_free_list = &fblk->floats[c];
+		}
+	      else
+		{
+		  cum_used++;
+		  XFLOAT_UNMARK (afloat);
+		}
 	    }
 	}
-      lim = BLOCK_NFLOATS;
-      /* If this block contains only free floats and we have already
-         seen more than two blocks worth of free floats then deallocate
-         this block.  */
-      if (this_free == BLOCK_NFLOATS && num_free > BLOCK_NFLOATS)
+
+      /* If FBLK contains only free floats and we've already seen more
+         than two such blocks, then deallocate FBLK.  */
+      if (num_free >= BLOCK_NFLOATS && cum_free > BLOCK_NFLOATS)
         {
           *fprev = fblk->next;
           /* Unhook from the free list.  */
@@ -5818,12 +5832,13 @@ sweep_floats (void)
         }
       else
         {
-          num_free += this_free;
+          cum_free += num_free;
           fprev = &fblk->next;
         }
     }
-  gcstat.total_floats = num_used;
-  gcstat.total_free_floats = num_free;
+
+  gcstat.total_floats = cum_used;
+  gcstat.total_free_floats = cum_free;
 }
 
 static void
