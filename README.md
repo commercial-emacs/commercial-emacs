@@ -74,8 +74,8 @@ Moving collectors relocate Lisp values in memory, in contrast to the
 GNU Emacs collector, which upon allocating say a cons cell, will let
 it remain at its birth address in perpetuity.
 
-GNU Emacs's mark-sweep-free-list collector has been unfairly maligned
-as antiquated, generally by undergraduates who just implemented a toy
+GNU Emacs's non-moving collector has been unfairly maligned as
+antiquated, generally by undergraduates who just implemented a toy
 moving collector for their PL class.  They might be surprised to know
 that the Boehm paper on which Emacs's collector is based was published
 twenty years *after* Cheney's paper on moving collection.
