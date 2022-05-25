@@ -4956,20 +4956,22 @@ garbage_collect (void)
 
 DEFUN ("garbage-collect", Fgarbage_collect, Sgarbage_collect, 0, 0, "",
        doc: /* Reclaim storage for no longer referenced objects.
-Return a list of entries of the form (NAME SIZE USED FREE), where:
+For further details, see Info node `(elisp)Garbage Collection'.  */)
+  (void)
+{
+  garbage_collect ();
+  return Fgc_counts ();
+}
+
+DEFUN ("gc-counts", Fgc_counts, Sgc_counts, 0, 0, 0,
+       doc: /* Return a list of entries of the form (NAME SIZE USED FREE), where:
 - NAME is the Lisp data type, e.g., "conses".
 - SIZE is per-object bytes.
 - USED is the live count.
 - FREE is the free-list count, i.e., reclaimed and redeployable objects.
-
-For further details, see Info node `(elisp)Garbage Collection'.  */)
+*/)
   (void)
 {
-  if (gc_inhibited)
-    return Qnil;
-
-  garbage_collect ();
-
   Lisp_Object total[] = {
     list4 (Qconses, make_fixnum (sizeof (struct Lisp_Cons)),
 	   make_int (gcstat.total_conses),
@@ -5019,8 +5021,7 @@ Returns non-nil if GC happened, and nil otherwise.  */)
       garbage_collect ();
       return Qt;
     }
-  else
-    return Qnil;
+  return Qnil;
 }
 
 /* Mark Lisp objects in glyph matrix MATRIX.  Currently the
@@ -6457,6 +6458,7 @@ N should be nonnegative.  */);
   defsubr (&Spurecopy);
   defsubr (&Sgarbage_collect);
   defsubr (&Sgarbage_collect_maybe);
+  defsubr (&Sgc_counts);
   defsubr (&Smemory_info);
   defsubr (&Smemory_full);
   defsubr (&Smemory_use_counts);
