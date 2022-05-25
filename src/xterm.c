@@ -23585,6 +23585,35 @@ x_intern_cached_atom (struct x_display_info *dpyinfo,
   char *ptr;
   Atom *atom;
 
+  /* Special atoms that depend on the screen number.  */
+  char xsettings_atom_name[sizeof "_XSETTINGS_S%d" - 2
+			   + INT_STRLEN_BOUND (int)];
+  char cm_atom_name[sizeof "_NET_WM_CM_S%d" - 2
+		    + INT_STRLEN_BOUND (int)];
+
+  sprintf (xsettings_atom_name, "_XSETTINGS_S%d",
+	   XScreenNumberOfScreen (dpyinfo->screen));
+  sprintf (cm_atom_name, "_NET_WM_CM_S%d",
+	   XScreenNumberOfScreen (dpyinfo->screen));
+
+  if (!strcmp (name, xsettings_atom_name))
+    return dpyinfo->Xatom_xsettings_sel;
+
+  if (!strcmp (name, cm_atom_name))
+    return dpyinfo->Xatom_NET_WM_CM_Sn;
+
+  /* Now do some common predefined atoms.  */
+  if (!strcmp (name, "PRIMARY"))
+    return XA_PRIMARY;
+  if (!strcmp (name, "SECONDARY"))
+    return XA_SECONDARY;
+  if (!strcmp (name, "STRING"))
+    return XA_STRING;
+  if (!strcmp (name, "INTEGER"))
+    return XA_INTEGER;
+  if (!strcmp (name, "ATOM"))
+    return XA_ATOM;
+
   for (i = 0; i < ARRAYELTS (x_atom_refs); ++i)
     {
       ptr = (char *) dpyinfo;
@@ -24656,17 +24685,20 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   ;
 #endif
 
-#ifdef HAVE_XRANDR
+#if defined HAVE_XRANDR || defined USE_GTK
   Lisp_Object term;
 
-#ifndef USE_GTK
-  dpyinfo->last_monitor_attributes_list = Qnil;
+  XSETTERMINAL (term, terminal);
 #endif
+
+#ifdef HAVE_XRANDR
   dpyinfo->xrandr_supported_p
     = XRRQueryExtension (dpy, &dpyinfo->xrandr_event_base,
 			 &dpyinfo->xrandr_error_base);
 
-  XSETTERMINAL (term, terminal);
+#ifndef USE_GTK
+  dpyinfo->last_monitor_attributes_list = Qnil;
+#endif
 
   if (dpyinfo->xrandr_supported_p)
     {
