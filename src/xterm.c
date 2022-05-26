@@ -2145,8 +2145,6 @@ xm_read_drag_receiver_info (struct x_display_info *dpyinfo,
 	}
 
       rec->byteorder = XM_BYTE_ORDER_CUR_FIRST;
-      if (data[1] > XM_DRAG_PROTOCOL_VERSION)
-	rc = 0;
     }
 
   if (tmp_data)
@@ -3124,8 +3122,6 @@ x_dnd_get_wm_state_and_proto (struct x_display_info *dpyinfo,
      free (reply);
    }
 #endif
-	}
-    }
 
   return rc;
 }
@@ -3748,8 +3744,6 @@ x_dnd_send_position (struct frame *f, Window target, int supported,
   x_uncatch_errors ();
 }
 
-/* Flush display of frame F.  */
-
 static void
 x_dnd_send_leave (struct frame *f, Window target)
 {
@@ -3961,7 +3955,6 @@ x_dnd_cleanup_drag_and_drop (void *frame)
 
   x_dnd_frame = NULL;
 }
-#endif
 
 /* Flush display of frame F.  */
 
@@ -5486,11 +5479,6 @@ x_draw_horizontal_wave (struct frame *f, GC gc, int x, int y,
       y += height - 1;
       dy = -dy;
     }
-  cairo_set_line_width (cr, 1);
-  cairo_stroke (cr);
-  x_end_cr_clip (f);
-}
-#endif
 
   cairo_move_to (cr, x - xoffset + 0.5, y + 0.5);
   while (--n >= 0)
@@ -5674,7 +5662,6 @@ x_update_begin (struct frame *f)
 {
   /* Nothing to do.  */
 }
-#endif
 
 /* Draw a vertical window border from (x,y0) to (x,y1)  */
 
@@ -6210,8 +6197,6 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
 	  XChangeGC (display, gc, GCClipMask, &gcv);
 	  XFreePixmap (display, clipmask);
 	}
-
-      dpyinfo->last_user_check_time = time;
     }
 #endif  /* not USE_CAIRO */
 
@@ -6308,10 +6293,6 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
     }
 #endif
 }
-
-      mask = (GCForeground | GCBackground
-	      | GCGraphicsExposures
-	      | GCLineWidth);
 
 /* Set S->gc to a suitable GC for drawing glyph string S in cursor
    face.  */
@@ -6937,8 +6918,6 @@ static XtConvertArgRec cvt_string_to_pixel_args[] =
     {XtWidgetBaseOffset, (XtPointer) offsetof (WidgetRec, core.colormap),
      sizeof (Colormap)}
   };
-
-   APP is the application context in which we work.
 
 /* The address of this variable is returned by
    cvt_string_to_pixel.  */
@@ -7681,7 +7660,6 @@ x_setup_relief_colors (struct glyph_string *s)
 			    BLACK_PIX_DEFAULT (s->f));
     }
 }
-#endif
 
 #ifndef USE_CAIRO
 static void
@@ -7932,7 +7910,6 @@ x_draw_relief_rect (struct frame *f, int left_x, int top_y, int right_x,
   x_reset_clip_rectangles (f, black_gc);
 #endif
 }
-#endif	/* !USE_CAIRO */
 
 
 /* Draw a box on frame F inside the rectangle given by LEFT_X, TOP_Y,
@@ -8279,9 +8256,6 @@ x_draw_image_relief (struct glyph_string *s)
       else if (FIXNUMP (Vtool_bar_button_margin))
 	extra_x = extra_y = XFIXNUM (Vtool_bar_button_margin);
     }
-  else
-#endif	/* ! USE_CAIRO */
-    x_draw_image_foreground (s);
 
   top_p = bot_p = left_p = right_p = false;
 
@@ -8680,10 +8654,6 @@ x_get_scale_factor (Display *disp, int *scale_x, int *scale_y)
       if (dpyinfo->resy > base_res)
 	*scale_y = floor (dpyinfo->resy / base_res);
     }
-
-  /* Restore previous clipping rectangle(s) */
-  XSetClipRectangles (display, s->gc, 0, 0, s->clip, s->num_clips, Unsorted);
-#endif	/* not USE_CAIRO */
 }
 
 /*
@@ -8796,16 +8766,6 @@ x_draw_glyph_string (struct glyph_string *s)
 	    next->num_clips = 0;
 	  }
     }
-  else if (!s->clip_head /* draw_glyphs didn't specify a clip mask. */
-	   && !s->clip_tail
-	   && ((s->prev && s->prev->hl != s->hl && s->left_overhang)
-	       || (s->next && s->next->hl != s->hl && s->right_overhang)))
-    /* We must clip just this glyph.  left_overhang part has already
-       drawn when s->prev was drawn, and right_overhang part will be
-       drawn later when s->next is drawn. */
-    x_set_glyph_string_clipping_exactly (s, s);
-  else
-    x_set_glyph_string_clipping (s);
 
   /* Set up S->gc, set clipping and draw S.  */
   x_set_glyph_string_gc (s);
@@ -23682,19 +23642,21 @@ x_intern_cached_atom (struct x_display_info *dpyinfo,
   return XInternAtom (dpyinfo->display, name, False);
 }
 
-/* Whether or not a request to the X server happened is placed in
-   NEED_SYNC.  */
+/* Get the name of ATOM, but try not to make a request to the X
+   server.  Whether or not a request to the X server happened is
+   placed in NEED_SYNC.  */
 char *
 x_get_atom_name (struct x_display_info *dpyinfo, Atom atom,
 		 bool *need_sync)
 {
-  char *dpyinfo_pointer, *name, *value;
+  char *dpyinfo_pointer, *name, *value, *buffer;
   int i;
   Atom ref_atom;
 
   dpyinfo_pointer = (char *) dpyinfo;
   value = NULL;
   *need_sync = false;
+  buffer = alloca (45 + INT_STRLEN_BOUND (int));
 
   switch (atom)
     {
@@ -23717,6 +23679,20 @@ x_get_atom_name (struct x_display_info *dpyinfo, Atom atom,
       return xstrdup ("WINDOW");
 
     default:
+      if (atom == dpyinfo->Xatom_xsettings_sel)
+	{
+	  sprintf (buffer, "_XSETTINGS_S%d",
+		   XScreenNumberOfScreen (dpyinfo->screen));
+	  return xstrdup (buffer);
+	}
+
+      if (atom == dpyinfo->Xatom_NET_WM_CM_Sn)
+	{
+	  sprintf (buffer, "_NET_WM_CM_S%d",
+		   XScreenNumberOfScreen (dpyinfo->screen));
+	  return xstrdup (buffer);
+	}
+
       for (i = 0; i < ARRAYELTS (x_atom_refs); ++i)
 	{
 	  ref_atom = *(Atom *) (dpyinfo_pointer
