@@ -4081,7 +4081,7 @@ valid_lisp_object_p (Lisp_Object obj)
     return 1;
 
   void *p = XPNTR (obj);
-  if (PURE_P (p))
+  if (PURE_P (p) || mgc_xpntr_p (p))
     return 1;
 
   if (SYMBOLP (obj) && c_symbol_p (p))
@@ -5448,7 +5448,10 @@ process_mark_stack (ptrdiff_t base_sp)
 	    enum pvec_type pvectype = PSEUDOVECTOR_TYPE (ptr);
 
 #ifdef GC_CHECK_MARKED_OBJECTS
-	    if (! pdumper_object_p (xpntr) && ! SUBRP (*objp) && ! main_thread_p (xpntr))
+	    if (! pdumper_object_p (xpntr)
+		&& ! SUBRP (*objp)
+		&& ! main_thread_p (xpntr)
+		&& ! mgc_xpntr_p (xpntr))
 	      {
 		m = mem_find (xpntr);
 		if (m == MEM_NIL)
