@@ -1772,7 +1772,8 @@ Also see `elisp-eldoc-var-docstring-with-value'."
 (defun elisp-eldoc-var-docstring-with-value (callback &rest _)
   "Document variable at point.
 Intended for `eldoc-documentation-functions' (which see).
-Also see `elisp-eldoc-var-docstring-with-value'."
+Compared to `elisp-eldoc-var-docstring', this also includes the
+current variable value and a bigger chunk of the docstring."
   (when-let ((cs (elisp--current-symbol)))
     (when (and (boundp cs)
 	       ;; nil and t are boundp!
