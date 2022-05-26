@@ -188,7 +188,7 @@ _GL_ATTRIBUTE_CONST bool wrong_xpntr_p (const void *obj);
 
 void mgc_flip_space (void);
 
-void *mgc_flip_xpntr (void *xpntr, size_t nbytes, enum Lisp_Type objtype);
+void *mgc_flip_xpntr (void *xpntr, enum Lisp_Type objtype);
 
 void *mgc_fwd_xpntr (const void *addr);
 

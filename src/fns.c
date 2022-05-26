@@ -4548,9 +4548,9 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
     {
       /* Follow collision chain, removing entries that don't survive
          this garbage collection.  */
-      ptrdiff_t prev = -1;
-      ptrdiff_t next;
-      for (ptrdiff_t i = HASH_INDEX (h, bucket); 0 <= i; i = next)
+      for (ptrdiff_t next, prev = -1, i = HASH_INDEX (h, bucket);
+	   i >= 0;
+	   i = next)
         {
 	  bool key_known_to_survive_p = survives_gc_p (HASH_KEY (h, i));
 	  bool value_known_to_survive_p = survives_gc_p (HASH_VALUE (h, i));

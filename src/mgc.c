@@ -79,14 +79,14 @@ realloc_semispace (mgc_semispace *space)
 }
 
 static
-size_t block_of_xpntr (const void *obj)
+size_t block_of_xpntr (const void *xpntr)
 {
-  uintptr_t oaddr = (uintptr_t) obj;
+  uintptr_t xaddr = (uintptr_t) xpntr;
   for (size_t i = 0; i < space_in_use->nblocks; ++i)
     {
       uintptr_t start = (uintptr_t) space_in_use->block_addrs[i], end;
       INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
-      if (start <= oaddr && oaddr < end)
+      if (start <= xaddr && xaddr < end)
 	return i;
     }
   return BLOCK_NOT_FOUND;
@@ -148,7 +148,7 @@ xpntr_at (const mgc_semispace *space, size_t block, ptrdiff_t word, void **xpntr
 }
 
 static size_t
-nbytes_of (enum Lisp_Type xpntr_type, const void *obj)
+nbytes_of (enum Lisp_Type xpntr_type, const void *xpntr)
 {
   size_t result = 0;
   switch (xpntr_type)
@@ -163,7 +163,7 @@ nbytes_of (enum Lisp_Type xpntr_type, const void *obj)
       result = FLEXSIZEOF (struct Lisp_Vector, contents,
 			   sizeof (Lisp_Object)
 			   * (PSEUDOVECTOR_SIZE_MASK
-			      & ((const struct Lisp_Vector *) obj)->header.size));
+			      & ((const struct Lisp_Vector *) xpntr)->header.size));
       break;
     case Lisp_Cons:
       result = sizeof (struct Lisp_Cons);
@@ -304,13 +304,14 @@ bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Lisp_Type xpntr_type)
 }
 
 void *
-mgc_flip_xpntr (void *xpntr, size_t nbytes, enum Lisp_Type xpntr_type)
+mgc_flip_xpntr (void *xpntr, enum Lisp_Type xpntr_type)
 {
   mgc_semispace *from = space_in_use,
     *to = (from == &space0) ? &space1 : &space0;
   void *ret = FORWARD_XPNTR_GET (xpntr);
   if (! ret)
     {
+      size_t nbytes = nbytes_of (xpntr_type, xpntr);
       ret = bump_alloc_ptr (to, nbytes, xpntr_type);
       memcpy (ret, xpntr, nbytes);
       FORWARD_XPNTR_SET (xpntr, ret);
@@ -327,19 +328,19 @@ mgc_flip_space (void)
   for (int b = 0; b <= (int) from->current_block; ++b)
     {
       size_t w = 0;
-      for (void *obj = from->block_addrs[b];
+      for (void *xpntr = from->block_addrs[b];
 	   (w < space_in_use->block_words_used
-	    && obj != from->alloc_ptr
-	    && ! TERM_BLOCK_P (obj));
-	   (void) obj)
+	    && xpntr != from->alloc_ptr
+	    && ! TERM_BLOCK_P (xpntr));
+	   (void) xpntr)
 	{
 	  enum Lisp_Type xpntr_type = xpntr_at (from, b, w, NULL);
 	  eassert (xpntr_type != Lisp_Type_Unused0);
-	  size_t bytespan = nbytes_of (xpntr_type, obj);
-	  if (xpntr_type == Lisp_String && ! FORWARD_XPNTR_GET (obj))
+	  size_t bytespan = nbytes_of (xpntr_type, xpntr);
+	  if (xpntr_type == Lisp_String && ! FORWARD_XPNTR_GET (xpntr))
 	    {
 	      /* S goes to dead state.  */
-	      struct Lisp_String *s = (struct Lisp_String *) obj;
+	      struct Lisp_String *s = (struct Lisp_String *) xpntr;
 	      if (s->u.s.data != NULL)
 		{
 		  sdata *data = SDATA_OF_LISP_STRING (s);
@@ -355,7 +356,7 @@ mgc_flip_space (void)
 		}
 	    }
 	  w += bytespan / word_size;
-	  INT_ADD_WRAPV ((uintptr_t) obj, bytespan, (uintptr_t *) &obj);
+	  INT_ADD_WRAPV ((uintptr_t) xpntr, bytespan, (uintptr_t *) &xpntr);
 	}
     }
   reset_space (from);
@@ -561,18 +562,18 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
   for (int b = 0; b <= (int) space_in_use->current_block; ++b)
     {
       size_t w = 0;
-      for (void *obj = space_in_use->block_addrs[b];
+      for (void *xpntr = space_in_use->block_addrs[b];
 	   (w < space_in_use->block_words_used
-	    && obj != space_in_use->alloc_ptr
-	    && ! TERM_BLOCK_P (obj));
-	   (void) obj)
+	    && xpntr != space_in_use->alloc_ptr
+	    && ! TERM_BLOCK_P (xpntr));
+	   (void) xpntr)
 	{
 	  enum Lisp_Type xpntr_type = xpntr_at (space_in_use, b, w, NULL);
 	  eassert (xpntr_type != Lisp_Type_Unused0);
 	  tally[xpntr_type]++;
-	  size_t bytespan = nbytes_of (xpntr_type, obj);
+	  size_t bytespan = nbytes_of (xpntr_type, xpntr);
 	  w += bytespan / word_size;
-	  INT_ADD_WRAPV ((uintptr_t) obj, bytespan, (uintptr_t *) &obj);
+	  INT_ADD_WRAPV ((uintptr_t) xpntr, bytespan, (uintptr_t *) &xpntr);
 	}
     }
   return list5 (Fcons (Fmake_symbol (build_string ("symbol")),
@@ -606,20 +607,20 @@ syms_of_mgc (void)
   defsubr (&Smemory_protect_now);
 }
 
-bool mgc_xpntr_p (const void *obj)
+bool mgc_xpntr_p (const void *xpntr)
 {
-  return block_of_xpntr (obj) != BLOCK_NOT_FOUND;
+  return block_of_xpntr (xpntr) != BLOCK_NOT_FOUND;
 }
 
-bool wrong_xpntr_p (const void *obj)
+bool wrong_xpntr_p (const void *xpntr)
 {
   mgc_semispace *wrong = (space_in_use == &space0) ? &space1 : &space0;
-  uintptr_t oaddr = (uintptr_t) obj;
+  uintptr_t xaddr = (uintptr_t) xpntr;
   for (size_t i = 0; i < wrong->nblocks; ++i)
     {
       uintptr_t start = (uintptr_t) wrong->block_addrs[i], end;
       INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
-      if (start <= oaddr && oaddr < end)
+      if (start <= xaddr && xaddr < end)
 	return true;
     }
   return false;

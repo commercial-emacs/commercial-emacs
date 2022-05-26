@@ -240,7 +240,7 @@ extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 static bool vectorlike_marked_p (union vectorlike_header const *);
 static void set_vectorlike_marked (union vectorlike_header *);
 static bool vector_marked_p (struct Lisp_Vector const *);
-static void set_vector_marked (struct Lisp_Vector *v);
+static void set_vector_marked (Lisp_Object *obj);
 static bool interval_marked_p (INTERVAL);
 static void set_interval_marked (INTERVAL);
 
@@ -2968,30 +2968,47 @@ becomes unreachable or only reachable from other finalizers.  */)
 static bool
 vector_marked_p (const struct Lisp_Vector *v)
 {
+  bool ret;
   if (pdumper_object_p (v))
     {
-      /* Look at cold_start first so that we don't have to fault in
-         the vector header just to tell that it's a bool vector.  */
+      /* Checking cold for bool vectors saves faulting in vector header.  */
       if (pdumper_cold_object_p (v))
         {
           eassert (PVTYPE (v) == PVEC_BOOL_VECTOR);
-          return true;
+          ret = true;
         }
-      return pdumper_marked_p (v);
+      else
+	ret = pdumper_marked_p (v);
     }
-  return XVECTOR_MARKED_P (v);
+  else if (mgc_xpntr_p (v))
+    ret = (mgc_fwd_xpntr (v) != NULL); // flipped
+  else
+    ret = XVECTOR_MARKED_P (v);
+  return ret;
 }
 
 static void
-set_vector_marked (struct Lisp_Vector *v)
+set_vector_marked (Lisp_Object *obj)
 {
-  if (pdumper_object_p (v))
+  struct Lisp_Vector *v = XVECTOR (*obj);
+  if (! vector_marked_p (v))
     {
-      eassert (PVTYPE (v) != PVEC_BOOL_VECTOR);
-      pdumper_set_marked (v);
+      if (pdumper_object_p (v))
+	{
+	  eassert (PVTYPE (v) != PVEC_BOOL_VECTOR);
+	  pdumper_set_marked (v);
+	}
+      else if (mgc_xpntr_p (v))
+	XSETVECTOR (*obj, mgc_flip_xpntr (v, Lisp_Vectorlike));
+      else
+	XMARK_VECTOR (v);
     }
-  else
-    XMARK_VECTOR (v);
+  else if (mgc_xpntr_p (v))
+    {
+      eassume (mgc_fwd_xpntr (v));
+      XSETVECTOR (*obj, mgc_fwd_xpntr (v));
+      eassert (! XVECTOR_MARKED_P (XVECTOR (*obj)));
+    }
 }
 
 static bool
@@ -3003,7 +3020,8 @@ vectorlike_marked_p (const union vectorlike_header *header)
 static void
 set_vectorlike_marked (union vectorlike_header *header)
 {
-  set_vector_marked ((struct Lisp_Vector *) header);
+  Lisp_Object temp = make_lisp_ptr (header, Lisp_Vectorlike);
+  set_vector_marked (&temp);
 }
 
 static bool
@@ -3048,8 +3066,7 @@ set_string_marked (Lisp_Object *obj)
 	{
 	  /* Do not use string_(set|get)_intervals here.  */
 	  s->u.s.intervals = balance_intervals (s->u.s.intervals);
-	  XSETSTRING (*obj, mgc_flip_xpntr (s, sizeof (struct Lisp_String),
-					    Lisp_String));
+	  XSETSTRING (*obj, mgc_flip_xpntr (s, Lisp_String));
 	  sdata *data = SDATA_OF_LISP_STRING (s);
 	  if (data->string != s)
 	    eassert (data->string == XSTRING (*obj));
@@ -3058,15 +3075,11 @@ set_string_marked (Lisp_Object *obj)
 	}
       else
 	XMARK_STRING (s);
-
       mark_interval_tree (s->u.s.intervals);
-#ifdef GC_CHECK_STRING_BYTES
-      string_bytes (s);
-#endif
     }
   else if (mgc_xpntr_p (s))
     {
-      eassert (mgc_fwd_xpntr (s));
+      eassume (mgc_fwd_xpntr (s));
       XSETSTRING (*obj, mgc_fwd_xpntr (s));
       eassert (! XSTRING_MARKED_P (XSTRING (*obj)));
     }
@@ -4748,27 +4761,25 @@ static struct Lisp_Hash_Table *weak_hash_tables;
 static void
 mark_and_sweep_weak_table_contents (void)
 {
-  struct Lisp_Hash_Table *h;
-  bool marked;
-
   /* Mark all keys and values that are in use.  Keep on marking until
      there is no more change.  This is necessary for cases like
      value-weak table A containing an entry X -> Y, where Y is used in a
      key-weak table B, Z -> Y.  If B comes after A in the list of weak
      tables, X -> Y might be removed from A, although when looking at B
      one finds that it shouldn't.  */
-  do
+  for (bool marked = true; marked; )
     {
       marked = false;
-      for (h = weak_hash_tables; h; h = h->next_weak)
+      for (struct Lisp_Hash_Table *h = weak_hash_tables;
+	   h != NULL;
+	   h = h->next_weak)
         marked |= sweep_weak_table (h, false);
     }
-  while (marked);
 
   /* Remove hash table entries that aren't used.  */
   while (weak_hash_tables)
     {
-      h = weak_hash_tables;
+      struct Lisp_Hash_Table *h = weak_hash_tables;
       weak_hash_tables = h->next_weak;
       h->next_weak = NULL;
       sweep_weak_table (h, true);
@@ -5097,25 +5108,26 @@ mark_vectorlike (union vectorlike_header *header)
    symbols.  */
 
 static void
-mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
+mark_char_table (Lisp_Object *objp, enum pvec_type pvectype)
 {
+  struct Lisp_Vector *ptr = XVECTOR (*objp);
   if (! vector_marked_p (ptr))
     {
-      set_vector_marked (ptr);
+      set_vector_marked (objp);
       for (int size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK,
 	     /* Consult Lisp_Sub_Char_Table layout before changing this.  */
 	     i = (pvectype == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_OFFSET : 0);
 	   i < size;
 	   ++i)
 	{
-	  Lisp_Object val = ptr->contents[i];
-	  if (! FIXNUMP (val) &&
-	      (! SYMBOLP (val) || ! symbol_marked_p (XSYMBOL (val))))
+	  Lisp_Object *val = &ptr->contents[i];
+	  if (! FIXNUMP (*val) &&
+	      (! SYMBOLP (*val) || ! symbol_marked_p (XSYMBOL (*val))))
 	    {
-	      if (SUB_CHAR_TABLE_P (val))
-		mark_char_table (XVECTOR (val), PVEC_SUB_CHAR_TABLE);
+	      if (SUB_CHAR_TABLE_P (*val))
+		mark_char_table (val, PVEC_SUB_CHAR_TABLE);
 	      else
-		mark_object (&val);
+		mark_object (val);
 	    }
 	}
     }
@@ -5442,7 +5454,7 @@ process_mark_stack (ptrdiff_t base_sp)
 
 	case Lisp_Vectorlike:
 	  {
-	    register struct Lisp_Vector *ptr = XVECTOR (*objp);
+	    struct Lisp_Vector *ptr = XVECTOR (*objp);
 
 	    if (vector_marked_p (ptr))
 	      break;
@@ -5483,7 +5495,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		{
 		  struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
 		  ptrdiff_t size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
-		  set_vector_marked (ptr);
+		  set_vector_marked (objp);
 		  mark_stack_push_n (ptr->contents, size);
 		  mark_stack_push (&h->test.name);
 		  mark_stack_push (&h->test.user_hash_function);
@@ -5497,14 +5509,14 @@ process_mark_stack (ptrdiff_t base_sp)
 		      eassert (h->next_weak == NULL);
 		      h->next_weak = weak_hash_tables;
 		      weak_hash_tables = h;
-		      set_vector_marked (XVECTOR (h->key_and_value));
+		      set_vector_marked (&h->key_and_value);
 		    }
 		  break;
 		}
 
 	      case PVEC_CHAR_TABLE:
 	      case PVEC_SUB_CHAR_TABLE:
-		mark_char_table (ptr, (enum pvec_type) pvectype);
+		mark_char_table (objp, (enum pvec_type) pvectype);
 		break;
 
 	      case PVEC_BOOL_VECTOR:
@@ -5514,7 +5526,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		   have aborted above when we called vector_marked_p, so
 		   we should never get here.  */
 		eassert (! pdumper_object_p (ptr));
-		set_vector_marked (ptr);
+		set_vector_marked (objp);
 		break;
 
 	      case PVEC_OVERLAY:
@@ -5525,7 +5537,7 @@ process_mark_stack (ptrdiff_t base_sp)
 #ifdef HAVE_NATIVE_COMP
 		if (SUBR_NATIVE_COMPILEDP (*objp))
 		  {
-		    set_vector_marked (ptr);
+		    set_vector_marked (objp);
 		    struct Lisp_Subr *subr = XSUBR (*objp);
 		    mark_stack_push (&subr->intspec.native);
 		    mark_stack_push (&subr->command_modes);
@@ -5546,7 +5558,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		  ptrdiff_t size = ptr->header.size;
 		  if (size & PSEUDOVECTOR_FLAG)
 		    size &= PSEUDOVECTOR_SIZE_MASK;
-		  set_vector_marked (ptr);
+		  set_vector_marked (objp);
 		  mark_stack_push_n (ptr->contents, size);
 		}
 		break;
