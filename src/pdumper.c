@@ -864,7 +864,7 @@ dump_object_emacs_ptr (Lisp_Object lv)
   if (dump_builtin_symbol_p (lv))
     return XSYMBOL (lv);
   if (XTYPE (lv) == Lisp_Vectorlike
-      && PSEUDOVECTOR_TYPEP (&XVECTOR (lv)->header, PVEC_THREAD)
+      && PSEUDOVECTOR_TYPE (XVECTOR (lv)) == PVEC_THREAD
       && main_thread_p (XTHREAD (lv)))
     return XTHREAD (lv);
   return NULL;

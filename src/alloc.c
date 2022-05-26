@@ -2143,27 +2143,31 @@ init_vectors (void)
 ptrdiff_t
 vectorlike_nbytes (const union vectorlike_header *hdr)
 {
-  ptrdiff_t size = hdr->size & ~ARRAY_MARK_FLAG;
   ptrdiff_t nwords;
+  ptrdiff_t size = hdr->size & ~ARRAY_MARK_FLAG;
 
-  if (size & PSEUDOVECTOR_FLAG)
+  switch (PSEUDOVECTOR_TYPE ((const struct Lisp_Vector *) hdr))
     {
-      if (PSEUDOVECTOR_TYPEP (hdr, PVEC_BOOL_VECTOR))
-        {
-          struct Lisp_Bool_Vector *bv = (struct Lisp_Bool_Vector *) hdr;
-	  ptrdiff_t word_bytes = (bool_vector_words (bv->size)
-				  * sizeof (bits_word));
-	  ptrdiff_t boolvec_bytes = bool_header_size + word_bytes;
-	  verify (header_size <= bool_header_size);
-	  nwords = (boolvec_bytes - header_size + word_size - 1) / word_size;
-        }
-      else
-	nwords = ((size & PSEUDOVECTOR_SIZE_MASK)
-		  + ((size & PSEUDOVECTOR_REST_MASK)
-		     >> PSEUDOVECTOR_SIZE_BITS));
+    case PVEC_NORMAL_VECTOR:
+      nwords = size;
+      break;
+    case PVEC_BOOL_VECTOR:
+      {
+	struct Lisp_Bool_Vector *bv = (struct Lisp_Bool_Vector *) hdr;
+	ptrdiff_t word_bytes = (bool_vector_words (bv->size)
+				* sizeof (bits_word));
+	ptrdiff_t boolvec_bytes = bool_header_size + word_bytes;
+	verify (header_size <= bool_header_size);
+	nwords = (boolvec_bytes - header_size + word_size - 1) / word_size;
+      }
+      break;
+    default:
+      eassert (size & PSEUDOVECTOR_FLAG);
+      nwords = ((size & PSEUDOVECTOR_SIZE_MASK)
+		+ ((size & PSEUDOVECTOR_REST_MASK)
+		   >> PSEUDOVECTOR_SIZE_BITS));
+      break;
     }
-  else
-    nwords = size;
   return header_size + word_size * nwords;
 }
 
@@ -2184,100 +2188,107 @@ free_by_pvtype (struct Lisp_Vector *vector)
 {
   detect_suspicious_free (vector);
 
-  if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_BIGNUM))
-    mpz_clear (PSEUDOVEC_STRUCT (vector, Lisp_Bignum)->value);
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_FINALIZER))
-    unchain_finalizer (PSEUDOVEC_STRUCT (vector, Lisp_Finalizer));
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_FONT))
+  switch (PSEUDOVECTOR_TYPE (vector))
     {
-      if ((vector->header.size & PSEUDOVECTOR_SIZE_MASK) == FONT_OBJECT_MAX)
+    case PVEC_BIGNUM:
+      mpz_clear (PSEUDOVEC_STRUCT (vector, Lisp_Bignum)->value);
+      break;
+    case PVEC_FINALIZER:
+      unchain_finalizer (PSEUDOVEC_STRUCT (vector, Lisp_Finalizer));
+      break;
+    case PVEC_FONT:
+      if (FONT_OBJECT_MAX == (vector->header.size & PSEUDOVECTOR_SIZE_MASK))
 	{
 	  struct font *font = PSEUDOVEC_STRUCT (vector, font);
 	  struct font_driver const *drv = font->driver;
 
-	  /* The font driver might sometimes be NULL, e.g. if Emacs was
-	     interrupted before it had time to set it up.  */
+	  /* DRV could be NULL for interrupts on startup. Bug#16140  */
 	  if (drv)
 	    {
-	      /* Attempt to catch subtle bugs like Bug#16140.  */
-	      eassert (valid_font_driver (drv));
+	      eassume (valid_font_driver (drv));
 	      drv->close_font (font);
 	    }
 	}
-    }
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_THREAD))
-    finalize_one_thread (PSEUDOVEC_STRUCT (vector, thread_state));
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_MUTEX))
-    finalize_one_mutex (PSEUDOVEC_STRUCT (vector, Lisp_Mutex));
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_CONDVAR))
-    finalize_one_condvar (PSEUDOVEC_STRUCT (vector, Lisp_CondVar));
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_MARKER))
-    {
-      /* sweep_buffer should already have unchained this from its buffer.  */
+      break;
+    case PVEC_THREAD:
+      finalize_one_thread (PSEUDOVEC_STRUCT (vector, thread_state));
+      break;
+    case PVEC_MUTEX:
+      finalize_one_mutex (PSEUDOVEC_STRUCT (vector, Lisp_Mutex));
+      break;
+    case PVEC_CONDVAR:
+      finalize_one_condvar (PSEUDOVEC_STRUCT (vector, Lisp_CondVar));
+      break;
+    case PVEC_MARKER:
+      /* sweep_buffer() ought to have unchained it.  */
       eassert (! PSEUDOVEC_STRUCT (vector, Lisp_Marker)->buffer);
-    }
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_USER_PTR))
-    {
-      struct Lisp_User_Ptr *uptr = PSEUDOVEC_STRUCT (vector, Lisp_User_Ptr);
-      if (uptr->finalizer)
-	uptr->finalizer (uptr->p);
-    }
+      break;
+    case PVEC_USER_PTR:
+      {
+	struct Lisp_User_Ptr *uptr = PSEUDOVEC_STRUCT (vector, Lisp_User_Ptr);
+	if (uptr->finalizer)
+	  uptr->finalizer (uptr->p);
+      }
+      break;
 #ifdef HAVE_MODULES
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_MODULE_FUNCTION))
-    {
-      ATTRIBUTE_MAY_ALIAS struct Lisp_Module_Function *function
-        = (struct Lisp_Module_Function *) vector;
-      module_finalize_function (function);
-    }
+    case PVEC_MODULE_FUNCTION:
+      {
+	ATTRIBUTE_MAY_ALIAS struct Lisp_Module_Function *function
+	  = (struct Lisp_Module_Function *) vector;
+	module_finalize_function (function);
+      }
+      break;
 #endif
 #ifdef HAVE_NATIVE_COMP
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_NATIVE_COMP_UNIT))
-    {
-      struct Lisp_Native_Comp_Unit *cu =
-	PSEUDOVEC_STRUCT (vector, Lisp_Native_Comp_Unit);
-      unload_comp_unit (cu);
-    }
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_SUBR))
-    {
-      struct Lisp_Subr *subr =
-	PSEUDOVEC_STRUCT (vector, Lisp_Subr);
-      if (! NILP (subr->native_comp_u))
-	{
-	  /* FIXME Alternative and non invasive solution to this
-	     cast?  */
-	  xfree ((char *)subr->symbol_name);
-	  xfree (subr->native_c_name);
-	}
-    }
+    case PVEC_NATIVE_COMP_UNIT:
+      {
+	struct Lisp_Native_Comp_Unit *cu
+	  = PSEUDOVEC_STRUCT (vector, Lisp_Native_Comp_Unit);
+	unload_comp_unit (cu);
+      }
+      break;
+    case PVEC_SUBR:
+      {
+	struct Lisp_Subr *subr = PSEUDOVEC_STRUCT (vector, Lisp_Subr);
+	if (! NILP (subr->native_comp_u))
+	  {
+	    xfree ((char *) subr->symbol_name);
+	    xfree (subr->native_c_name);
+	  }
+      }
+      break;
 #endif
 #ifdef HAVE_TREE_SITTER
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TREE_SITTER))
-    {
-      struct Lisp_Tree_Sitter *lisp_parser
-	= PSEUDOVEC_STRUCT (vector, Lisp_Tree_Sitter);
-      if (lisp_parser->highlight_names != NULL)
-	xfree (lisp_parser->highlight_names);
-      if (lisp_parser->highlights_query != NULL)
-	xfree (lisp_parser->highlights_query);
-      if (lisp_parser->highlighter != NULL)
-	ts_highlighter_delete (lisp_parser->highlighter);
-      if (lisp_parser->tree != NULL)
-	ts_tree_delete(lisp_parser->tree);
-      if (lisp_parser->prev_tree != NULL)
-	ts_tree_delete(lisp_parser->prev_tree);
-      if (lisp_parser->parser != NULL)
-	ts_parser_delete(lisp_parser->parser);
-    }
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_TREE_SITTER_NODE))
-    {
-    }
+    case PVEC_TREE_SITTER:
+      {
+	struct Lisp_Tree_Sitter *lisp_parser
+	  = PSEUDOVEC_STRUCT (vector, Lisp_Tree_Sitter);
+	if (lisp_parser->highlight_names != NULL)
+	  xfree (lisp_parser->highlight_names);
+	if (lisp_parser->highlights_query != NULL)
+	  xfree (lisp_parser->highlights_query);
+	if (lisp_parser->highlighter != NULL)
+	  ts_highlighter_delete (lisp_parser->highlighter);
+	if (lisp_parser->tree != NULL)
+	  ts_tree_delete(lisp_parser->tree);
+	if (lisp_parser->prev_tree != NULL)
+	  ts_tree_delete(lisp_parser->prev_tree);
+	if (lisp_parser->parser != NULL)
+	  ts_parser_delete(lisp_parser->parser);
+      }
+      break;
+    case PVEC_TREE_SITTER_NODE:
+      /* currently nothing to clean up.  */
+      break;
 #endif
 #ifdef HAVE_SQLITE3
-  else if (PSEUDOVECTOR_TYPEP (&vector->header, PVEC_SQLITE))
-    {
+    case PVEC_SQLITE:
       /* clean s___ up.  To be implemented.  */
-    }
+      break;
 #endif
+    default:
+      break;
+    }
 }
 
 /* Reclaim space used by unmarked vectors.  */
@@ -3643,7 +3654,7 @@ live_vector_pointer (struct Lisp_Vector *vector, void *p)
 		   /* For non-bool-vector pseudovectors, treat any pointer
 		      past the header as valid since it's too much of a pain
 		      to write special-case code for every pseudovector.  */
-		   : (! PSEUDOVECTOR_TYPEP (&vector->header, PVEC_BOOL_VECTOR)
+		   : (PSEUDOVECTOR_TYPE (vector) != PVEC_BOOL_VECTOR
 		      || distance == offsetof (struct Lisp_Bool_Vector, size)
 		      || (offsetof (struct Lisp_Bool_Vector, data) <= distance
 			  && (((distance
@@ -3686,7 +3697,7 @@ live_small_vector_holding (struct mem_node *m, void *p)
   while (VECTOR_IN_BLOCK (vector, block) && vector <= vp)
     {
       struct Lisp_Vector *next = ADVANCE (vector, vector_nbytes (vector));
-      if (vp < next && ! PSEUDOVECTOR_TYPEP (&vector->header, PVEC_FREE))
+      if (vp < next && PSEUDOVECTOR_TYPE (vector) != PVEC_FREE)
 	return live_vector_pointer (vector, vp);
       vector = next;
     }
@@ -5074,13 +5085,10 @@ mark_vectorlike (union vectorlike_header *header)
 {
   struct Lisp_Vector *ptr = (struct Lisp_Vector *) header;
   ptrdiff_t size = ptr->header.size;
+
   if (size & PSEUDOVECTOR_FLAG)
-    {
-      /* Bool vectors have a different case in mark_object.  */
-      eassert (PSEUDOVECTOR_TYPE (ptr) != PVEC_BOOL_VECTOR);
-      /* Number of Lisp_Object fields.  */
-      size &= PSEUDOVECTOR_SIZE_MASK;
-    }
+    size &= PSEUDOVECTOR_SIZE_MASK;
+
   eassert (! vectorlike_marked_p (header));
   set_vectorlike_marked (header);
   mark_objects (ptr->contents, size);
@@ -5119,7 +5127,7 @@ mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
 static void
 mark_overlay (struct Lisp_Overlay *ptr)
 {
-  for (; ptr && !vectorlike_marked_p (&ptr->header); ptr = ptr->next)
+  for (; ptr && ! vectorlike_marked_p (&ptr->header); ptr = ptr->next)
     {
       set_vectorlike_marked (&ptr->header);
       /* These two are always markers and can be marked fast.  */
@@ -5244,8 +5252,7 @@ mark_window (struct Lisp_Vector *ptr)
 
   mark_vectorlike (&ptr->header);
 
-  /* Mark glyph matrices, if any.  Marking window
-     matrices is sufficient because frame matrices
+  /* Marking just window matrices is sufficient since frame matrices
      use the same glyph memory.  */
   if (w->current_matrix)
     {
@@ -5253,10 +5260,6 @@ mark_window (struct Lisp_Vector *ptr)
       mark_glyph_matrix (w->desired_matrix);
     }
 
-  /* Filter out killed buffers from both buffer lists
-     in attempt to help GC to reclaim killed buffers faster.
-     We can do it elsewhere for live windows, but this is the
-     best place to do it for dead windows.  */
   wset_prev_buffers
     (w, mark_discard_killed_buffers (w->prev_buffers));
   wset_next_buffers

@@ -4720,12 +4720,12 @@ helper_save_restriction (void)
 			 save_restriction_save ());
 }
 
+/* For whatever reason, dude needed define_PSEUDOVECTORP() and
+   didn't want to define this using PSEUDOVECTORP().  Too bad?  */
 static bool
 helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code)
 {
-  return PSEUDOVECTOR_TYPEP (XUNTAG (a, Lisp_Vectorlike,
-				     union vectorlike_header),
-			     code);
+  return PSEUDOVECTORP (a, code);
 }
 
 

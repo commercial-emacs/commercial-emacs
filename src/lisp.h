@@ -1685,9 +1685,6 @@ CHECK_VECTOR (Lisp_Object x)
   CHECK_TYPE (VECTORP (x), Qvectorp, x);
 }
 
-
-/* A pseudovector is like a vector, but has other non-Lisp components.  */
-
 INLINE enum pvec_type
 PSEUDOVECTOR_TYPE (const struct Lisp_Vector *v)
 {
@@ -1697,29 +1694,10 @@ PSEUDOVECTOR_TYPE (const struct Lisp_Vector *v)
           : PVEC_NORMAL_VECTOR);
 }
 
-/* Can't be used with PVEC_NORMAL_VECTOR.  */
 INLINE bool
-PSEUDOVECTOR_TYPEP (const union vectorlike_header *a, enum pvec_type code)
+PSEUDOVECTORP (Lisp_Object a, enum pvec_type code)
 {
-  /* We don't use PSEUDOVECTOR_TYPE here so as to avoid a shift
-   * operation when `code' is known.  */
-  return ((a->size & (PSEUDOVECTOR_FLAG | PVEC_TYPE_MASK))
-	  == (PSEUDOVECTOR_FLAG | (code << PSEUDOVECTOR_AREA_BITS)));
-}
-
-/* True if A is a pseudovector whose code is CODE.  */
-INLINE bool
-PSEUDOVECTORP (Lisp_Object a, int code)
-{
-  if (! VECTORLIKEP (a))
-    return false;
-  else
-    {
-      /* Converting to union vectorlike_header * avoids aliasing issues.  */
-      return PSEUDOVECTOR_TYPEP (XUNTAG (a, Lisp_Vectorlike,
-					 union vectorlike_header),
-				 code);
-    }
+  return VECTORLIKEP (a) && PSEUDOVECTOR_TYPE (XVECTOR (a)) == code;
 }
 
 /* A boolvector is a kind of vectorlike, with contents like a string.  */
