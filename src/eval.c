@@ -916,7 +916,6 @@ More specifically, behaves like (defconst SYM 'INITVALUE DOCSTRING).  */)
   CHECK_SYMBOL (sym);
   Lisp_Object tem = initvalue;
   Finternal__define_uninitialized_variable (sym, docstring);
-  tem = eval_sub (XCAR (XCDR (args)));
   if (! NILP (Vloadup_pure_table))
     tem = Fpurecopy (tem);
   Fset_default (sym, tem);      /* FIXME: set-default-toplevel-value? */
@@ -3991,11 +3990,12 @@ specpdl_unrewind (union specbinding *pdl, int distance, bool vars_only)
 		   non-local, this is fine, but if it ever reverts to being
 		   local we may end up using this entry "in the wrong
 		   direction".  */
+		tmp->kind = SPECPDL_NOP;
 	      }
 	  }
 	  break;
-
-	default: break;
+	default:
+	  break;
 	}
     }
 }
