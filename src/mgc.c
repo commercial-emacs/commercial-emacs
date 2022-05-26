@@ -328,7 +328,9 @@ mgc_flip_space (void)
     {
       size_t w = 0;
       for (void *obj = from->block_addrs[b];
-	   obj != from->alloc_ptr && ! TERM_BLOCK_P (obj);
+	   (w < space_in_use->block_words_used
+	    && obj != from->alloc_ptr
+	    && ! TERM_BLOCK_P (obj));
 	   (void) obj)
 	{
 	  enum Lisp_Type xpntr_type = xpntr_at (from, b, w, NULL);
