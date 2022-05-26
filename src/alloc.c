@@ -5817,9 +5817,10 @@ sweep_void (void **free_list,
 	      }
 	  }
 
+      void *block_next = (void *) ((uintptr_t) blk + offset_next);
+
       /* If BLK contains only free items and we've already seen more
          than two such blocks, then deallocate BLK.  */
-      void *block_next = (void *) ((uintptr_t) blk + offset_next);
       if (num_free >= block_nitems && cum_free > block_nitems)
         {
 	  void *free_next = (void *) ((uintptr_t) blk + offset_items
