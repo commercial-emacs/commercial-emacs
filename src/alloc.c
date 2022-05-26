@@ -5713,10 +5713,10 @@ survives_gc_p (Lisp_Object obj)
   return survives_p || PURE_P (XPNTR (obj));
 }
 
-/* Formally two functions sweep_conses() and sweep_floats() which
+/* Formerly two functions sweep_conses() and sweep_floats() which
    did the same thing modulo epsilon.
 
-   A probably un-portable and certanly incomprehensible foray into
+   A probably un-portable and certainly incomprehensible foray into
    void-star-star gymnastics.
 */
 static void
