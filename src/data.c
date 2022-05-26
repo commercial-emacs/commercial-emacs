@@ -211,7 +211,7 @@ for example, (type-of 1) returns `integer'.  */)
 
     case Lisp_Vectorlike:
       /* WARNING!!  Keep 'cl--typeof-types' in sync with this code!!  */
-      switch (PSEUDOVECTOR_TYPE (XVECTOR (object)))
+      switch (PVTYPE (XVECTOR (object)))
         {
         case PVEC_NORMAL_VECTOR: return Qvector;
 	case PVEC_BIGNUM: return Qinteger;
@@ -2467,16 +2467,11 @@ or a byte-code object.  IDX starts at 0.  */)
       CHECK_CHARACTER (idx);
       return CHAR_TABLE_REF (array, idxval);
     }
+  else if (! VECTORP (array) && ! COMPILEDP (array) && ! RECORDP (array))
+    wrong_type_argument (Qarrayp, array);
   else
     {
-      ptrdiff_t size = 0;
-      if (VECTORP (array))
-	size = ASIZE (array);
-      else if (COMPILEDP (array) || RECORDP (array))
-	size = PVSIZE (array);
-      else
-	wrong_type_argument (Qarrayp, array);
-
+      ptrdiff_t size = PVSIZE (array);
       if (idxval < 0 || idxval >= size)
 	args_out_of_range (array, idx);
       return AREF (array, idxval);

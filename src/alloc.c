@@ -2146,7 +2146,7 @@ vectorlike_nbytes (const union vectorlike_header *hdr)
   ptrdiff_t nwords;
   ptrdiff_t size = hdr->size & ~ARRAY_MARK_FLAG;
 
-  switch (PSEUDOVECTOR_TYPE ((const struct Lisp_Vector *) hdr))
+  switch (PVTYPE ((const struct Lisp_Vector *) hdr))
     {
     case PVEC_NORMAL_VECTOR:
       nwords = size;
@@ -2188,7 +2188,7 @@ free_by_pvtype (struct Lisp_Vector *vector)
 {
   detect_suspicious_free (vector);
 
-  switch (PSEUDOVECTOR_TYPE (vector))
+  switch (PVTYPE (vector))
     {
     case PVEC_BIGNUM:
       mpz_clear (PSEUDOVEC_STRUCT (vector, Lisp_Bignum)->value);
@@ -2974,7 +2974,7 @@ vector_marked_p (const struct Lisp_Vector *v)
          the vector header just to tell that it's a bool vector.  */
       if (pdumper_cold_object_p (v))
         {
-          eassert (PSEUDOVECTOR_TYPE (v) == PVEC_BOOL_VECTOR);
+          eassert (PVTYPE (v) == PVEC_BOOL_VECTOR);
           return true;
         }
       return pdumper_marked_p (v);
@@ -2987,7 +2987,7 @@ set_vector_marked (struct Lisp_Vector *v)
 {
   if (pdumper_object_p (v))
     {
-      eassert (PSEUDOVECTOR_TYPE (v) != PVEC_BOOL_VECTOR);
+      eassert (PVTYPE (v) != PVEC_BOOL_VECTOR);
       pdumper_set_marked (v);
     }
   else
@@ -3654,7 +3654,7 @@ live_vector_pointer (struct Lisp_Vector *vector, void *p)
 		   /* For non-bool-vector pseudovectors, treat any pointer
 		      past the header as valid since it's too much of a pain
 		      to write special-case code for every pseudovector.  */
-		   : (PSEUDOVECTOR_TYPE (vector) != PVEC_BOOL_VECTOR
+		   : (PVTYPE (vector) != PVEC_BOOL_VECTOR
 		      || distance == offsetof (struct Lisp_Bool_Vector, size)
 		      || (offsetof (struct Lisp_Bool_Vector, data) <= distance
 			  && (((distance
@@ -3697,7 +3697,7 @@ live_small_vector_holding (struct mem_node *m, void *p)
   while (VECTOR_IN_BLOCK (vector, block) && vector <= vp)
     {
       struct Lisp_Vector *next = ADVANCE (vector, vector_nbytes (vector));
-      if (vp < next && PSEUDOVECTOR_TYPE (vector) != PVEC_FREE)
+      if (vp < next && PVTYPE (vector) != PVEC_FREE)
 	return live_vector_pointer (vector, vp);
       vector = next;
     }
@@ -4591,14 +4591,12 @@ compact_font_cache_entry (Lisp_Object entry)
       Lisp_Object obj = XCAR (tail);
 
       /* Consider OBJ if it is (font-spec . [font-entity font-entity ...]).  */
-      if (CONSP (obj) && GC_FONT_SPEC_P (XCAR (obj))
-	  && !vectorlike_marked_p (&GC_XFONT_SPEC (XCAR (obj))->header)
-	  /* Don't use VECTORP here, as that calls ASIZE, which could
-	     hit assertion violation during GC.  */
-	  && (VECTORLIKEP (XCDR (obj))
-	      && ! (gc_asize (XCDR (obj)) & PSEUDOVECTOR_FLAG)))
+      if (CONSP (obj)
+	  && GC_FONT_SPEC_P (XCAR (obj))
+	  && ! vectorlike_marked_p (&GC_XFONT_SPEC (XCAR (obj))->header)
+	  && VECTORP (XCDR (obj)))
 	{
-	  ptrdiff_t i, size = gc_asize (XCDR (obj));
+	  ptrdiff_t i, size = ASIZE (XCDR (obj));
 	  Lisp_Object obj_cdr = XCDR (obj);
 
 	  /* If font-spec is not marked, most likely all font-entities
@@ -5449,7 +5447,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	    if (vector_marked_p (ptr))
 	      break;
 
-	    enum pvec_type pvectype = PSEUDOVECTOR_TYPE (ptr);
+	    enum pvec_type pvectype = PVTYPE (ptr);
 
 #ifdef GC_CHECK_MARKED_OBJECTS
 	    if (! pdumper_object_p (xpntr)

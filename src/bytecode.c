@@ -1094,10 +1094,12 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  {
 	    Lisp_Object idxval = POP;
 	    Lisp_Object arrayval = TOP;
-	    ptrdiff_t size;
+	    ptrdiff_t size
+	      = ((VECTORP (arrayval) || RECORDP (arrayval))
+		 ? PVSIZE (arrayval)
+		 : -1);
 	    ptrdiff_t idx;
-	    if (((VECTORP (arrayval) && (size = ASIZE (arrayval), true))
-		 || (RECORDP (arrayval) && (size = PVSIZE (arrayval), true)))
+	    if (size >= 0
 		&& FIXNUMP (idxval)
 		&& (idx = XFIXNUM (idxval),
 		    idx >= 0 && idx < size))
@@ -1112,10 +1114,12 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	    Lisp_Object newelt = POP;
 	    Lisp_Object idxval = POP;
 	    Lisp_Object arrayval = TOP;
-	    ptrdiff_t size;
+	    ptrdiff_t size
+	      = ((VECTORP (arrayval) || RECORDP (arrayval))
+		 ? PVSIZE (arrayval)
+		 : -1);
 	    ptrdiff_t idx;
-	    if (((VECTORP (arrayval) && (size = ASIZE (arrayval), true))
-		 || (RECORDP (arrayval) && (size = PVSIZE (arrayval), true)))
+	    if (size >= 0
 		&& FIXNUMP (idxval)
 		&& (idx = XFIXNUM (idxval),
 		    idx >= 0 && idx < size))

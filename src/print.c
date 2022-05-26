@@ -1588,7 +1588,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 		  char *buf)
 {
   /* First do all the vectorlike types that have a readable syntax.  */
-  switch (PSEUDOVECTOR_TYPE (XVECTOR (obj)))
+  switch (PVTYPE (XVECTOR (obj)))
     {
     case PVEC_BIGNUM:
       {
@@ -1675,7 +1675,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
     }
 
   /* Not handled; print unreadable object.  */
-  switch (PSEUDOVECTOR_TYPE (XVECTOR (obj)))
+  switch (PVTYPE (XVECTOR (obj)))
     {
     case PVEC_MARKER:
       print_c_string ("#<marker ", printcharfun);
@@ -2444,7 +2444,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 
     case Lisp_Vectorlike:
       /* First do all the vectorlike types that have a readable syntax.  */
-      switch (PSEUDOVECTOR_TYPE (XVECTOR (obj)))
+      switch (PVTYPE (XVECTOR (obj)))
 	{
 	case PVEC_NORMAL_VECTOR:
 	  {

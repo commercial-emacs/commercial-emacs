@@ -864,7 +864,7 @@ dump_object_emacs_ptr (Lisp_Object lv)
   if (dump_builtin_symbol_p (lv))
     return XSYMBOL (lv);
   if (XTYPE (lv) == Lisp_Vectorlike
-      && PSEUDOVECTOR_TYPE (XVECTOR (lv)) == PVEC_THREAD
+      && PVTYPE (XVECTOR (lv)) == PVEC_THREAD
       && main_thread_p (XTHREAD (lv)))
     return XTHREAD (lv);
   return NULL;
@@ -2378,7 +2378,7 @@ dump_vectorlike_generic (struct dump_context *ctx,
 #endif
   const struct Lisp_Vector *v = (const struct Lisp_Vector *) header;
   ptrdiff_t size = header->size;
-  enum pvec_type pvectype = PSEUDOVECTOR_TYPE (v);
+  enum pvec_type pvectype = PVTYPE (v);
   dump_off offset;
 
   if (size & PSEUDOVECTOR_FLAG)
@@ -2818,7 +2818,7 @@ dump_vectorlike (struct dump_context *ctx,
 # error "pvec_type changed. See CHECK_STRUCTS comment in config.h."
 #endif
   const struct Lisp_Vector *v = XVECTOR (lv);
-  switch (PSEUDOVECTOR_TYPE (v))
+  switch (PVTYPE (v))
     {
     case PVEC_FONT:
       /* There are three kinds of font objects that all use PVEC_FONT,

@@ -468,7 +468,7 @@ store_function_docstring (Lisp_Object obj, EMACS_INT offset)
 	 docstring, since we've found a docstring for it.  */
       if (PVSIZE (fun) > COMPILED_DOC_STRING
 	  /* Don't overwrite a non-docstring value placed there,
-           * such as the symbols used for Oclosures.  */
+             such as the symbols used for Oclosures.  */
 	  && VALID_DOCSTRING_P (AREF (fun, COMPILED_DOC_STRING)))
 	ASET (fun, COMPILED_DOC_STRING, make_fixnum (offset));
       else

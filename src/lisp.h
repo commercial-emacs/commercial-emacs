@@ -1064,11 +1064,12 @@ enum More_Lisp_Bits
     /* Recall the clumsily named pseudovector contains Lisp_Object
        fields followed by non-Lisp fields.
 
-       The number of Lisp_Object fields (that GC must trace).  */
+       The number of Lisp_Object fields (that GC must trace).
+       Yes, "size" instead of "count" was a bad naming choice.  */
     PSEUDOVECTOR_SIZE_BITS = 12,
     PSEUDOVECTOR_SIZE_MASK = (1 << PSEUDOVECTOR_SIZE_BITS) - 1,
 
-    /* The non-Lisp fields in word_size units.  */
+    /* The size of non-Lisp fields in machine words.  */
     PSEUDOVECTOR_REST_BITS = 12,
     PSEUDOVECTOR_REST_MASK = (((1 << PSEUDOVECTOR_REST_BITS) - 1)
 			      << PSEUDOVECTOR_SIZE_BITS),
@@ -1640,25 +1641,21 @@ XVECTOR (Lisp_Object a)
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Vector);
 }
 
+/* "array" size, before "vector" came to subsume "array".  */
 INLINE ptrdiff_t
 ASIZE (Lisp_Object array)
 {
-  ptrdiff_t size = XVECTOR (array)->header.size;
+  ptrdiff_t size = XVECTOR (array)->header.size & ~ARRAY_MARK_FLAG;
   eassume (0 <= size);
   return size;
 }
 
-INLINE ptrdiff_t
-gc_asize (Lisp_Object array)
-{
-  /* Like ASIZE, but also can be used in the garbage collector.  */
-  return XVECTOR (array)->header.size & ~ARRAY_MARK_FLAG;
-}
-
+/* "pseudovector" size, before "pseudovector" came to subsume "vector".  */
 INLINE ptrdiff_t
 PVSIZE (Lisp_Object pv)
 {
-  return ASIZE (pv) & PSEUDOVECTOR_SIZE_MASK;
+  ptrdiff_t size = ASIZE (pv);
+  return (size & PSEUDOVECTOR_FLAG) ? (size & PSEUDOVECTOR_SIZE_MASK) : size;
 }
 
 INLINE bool
@@ -1674,7 +1671,7 @@ CHECK_VECTOR (Lisp_Object x)
 }
 
 INLINE enum pvec_type
-PSEUDOVECTOR_TYPE (const struct Lisp_Vector *v)
+PVTYPE (const struct Lisp_Vector *v)
 {
   ptrdiff_t size = v->header.size;
   return (size & PSEUDOVECTOR_FLAG
@@ -1685,7 +1682,7 @@ PSEUDOVECTOR_TYPE (const struct Lisp_Vector *v)
 INLINE bool
 PSEUDOVECTORP (Lisp_Object a, enum pvec_type code)
 {
-  return VECTORLIKEP (a) && PSEUDOVECTOR_TYPE (XVECTOR (a)) == code;
+  return VECTORLIKEP (a) && PVTYPE (XVECTOR (a)) == code;
 }
 
 struct Lisp_Bool_Vector
@@ -1797,14 +1794,14 @@ bool_vector_set (Lisp_Object a, EMACS_INT i, bool b)
 INLINE Lisp_Object
 AREF (Lisp_Object array, ptrdiff_t idx)
 {
-  eassert (0 <= idx && idx < gc_asize (array));
+  eassert (0 <= idx && idx < ASIZE (array));
   return XVECTOR (array)->contents[idx];
 }
 
 INLINE Lisp_Object *
 aref_addr (Lisp_Object array, ptrdiff_t idx)
 {
-  eassert (0 <= idx && idx <= gc_asize (array));
+  eassert (0 <= idx && idx <= ASIZE (array));
   return & XVECTOR (array)->contents[idx];
 }
 
@@ -1820,7 +1817,7 @@ gc_aset (Lisp_Object array, ptrdiff_t idx, Lisp_Object val)
 {
   /* Like ASET, but also can be used in the garbage collector:
      sweep_weak_table calls set_hash_key etc. while the table is marked.  */
-  eassert (0 <= idx && idx < gc_asize (array));
+  eassert (0 <= idx && idx < ASIZE (array));
   XVECTOR (array)->contents[idx] = val;
 }
 

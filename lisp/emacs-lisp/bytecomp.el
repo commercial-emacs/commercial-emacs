@@ -2430,7 +2430,7 @@ in the input buffer (now current), not in the output buffer."
                  byte-compile--undefined-funcs))))
   (if (stringp (nth 3 form))
       (prog1 form
-        (byte-compile-docstring-length-warn form))
+        (byte-compile-docstring-style-warn form))
     ;; No doc string, so we can compile this as a normal form.
     (byte-compile-keep-pending form 'byte-compile-normal-call)))
 
@@ -2459,7 +2459,7 @@ in the input buffer (now current), not in the output buffer."
     (when (eq (car form) 'defconst)
       (push sym byte-compile-const-variables)))
   (when (or (cddr form) (not (eq (car form) 'defvar)))
-    (byte-compile-docstring-length-warn form)
+    (byte-compile-docstring-style-warn form)
     (cond ((consp (nth 2 form))
            (setq form (copy-sequence form))
            (setcar (cdr (cdr form))
@@ -2483,7 +2483,7 @@ in the input buffer (now current), not in the output buffer."
        (when (byte-compile-warning-enabled-p 'suspicious)
          (byte-compile-warn
           "Alias for `%S' should be declared before its referent" newname)))))
-  (byte-compile-docstring-length-warn form)
+  (byte-compile-docstring-style-warn form)
   (byte-compile-keep-pending form))
 
 (put 'custom-declare-variable 'byte-hunk-handler
@@ -4647,7 +4647,7 @@ binding slots have been popped."
              (byte-compile-warning-enabled-p 'lexical (nth 1 form)))
     (byte-compile-warn "global/dynamic var `%s' lacks a prefix"
                        (nth 1 form)))
-  (byte-compile-docstring-length-warn form)
+  (byte-compile-docstring-style-warn form)
   (let ((fun (nth 0 form))
 	(var (nth 1 form))
 	(value (nth 2 form))

@@ -2569,8 +2569,7 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
       {
 	ptrdiff_t size = ASIZE (o1);
 	/* The pvtype of a vector is PVEC_NORMAL_VECTOR.  */
-	ptrdiff_t pvtype = PSEUDOVECTOR_TYPE (XVECTOR (o1));
-	ptrdiff_t true_size = VECTORP (o1) ? size : PVSIZE (o1);
+	ptrdiff_t pvtype = PVTYPE (XVECTOR (o1));
 
 	if (ASIZE (o2) != size)
 	  return false;
@@ -2604,7 +2603,7 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	else if (! SX_ADMITS_COMPARISON (pvtype))
 	  return false;
 
-	for (ptrdiff_t i = 0; i < true_size; i++)
+	for (ptrdiff_t i = 0; i < PVSIZE (o1); i++)
 	  {
 	    Lisp_Object v1, v2;
 	    v1 = AREF (o1, i);
@@ -4542,7 +4541,7 @@ hash_clear (struct Lisp_Hash_Table *h)
 bool
 sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 {
-  ptrdiff_t n = gc_asize (h->index);
+  ptrdiff_t n = ASIZE (h->index);
   bool marked = false;
 
   for (ptrdiff_t bucket = 0; bucket < n; ++bucket)
@@ -4727,7 +4726,7 @@ sxhash_vector (Lisp_Object vec, int depth)
   EMACS_UINT hash = ASIZE (vec);
   int i, n;
 
-  n = min (SXHASH_MAX_LEN, hash & PSEUDOVECTOR_FLAG ? PVSIZE (vec) : hash);
+  n = min (SXHASH_MAX_LEN, PVSIZE (vec));
   for (i = 0; i < n; ++i)
     {
       EMACS_UINT hash2 = sxhash_obj (AREF (vec, i), depth + 1);
@@ -4796,7 +4795,7 @@ sxhash_obj (Lisp_Object obj, int depth)
 
     case Lisp_Vectorlike:
       {
-	enum pvec_type pvec_type = PSEUDOVECTOR_TYPE (XVECTOR (obj));
+	enum pvec_type pvec_type = PVTYPE (XVECTOR (obj));
 	/* temporary to verify rewriting of a4610c3 */
 	eassert (pvec_type == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_P (obj) : true);
 

@@ -2089,7 +2089,7 @@ then strings and vectors are not accepted.  */)
         {
           Lisp_Object doc = AREF (fun, COMPILED_DOC_STRING);
           /* An invalid "docstring" is a sign that we have an OClosure.  */
-          genfun = !(NILP (doc) || VALID_DOCSTRING_P (doc));
+          genfun = ! (NILP (doc) || VALID_DOCSTRING_P (doc));
         }
     }
 

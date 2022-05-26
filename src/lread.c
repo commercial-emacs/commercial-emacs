@@ -3929,10 +3929,8 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 	  return subtree;		/* No sub-objects anyway.  */
 	else if (CHAR_TABLE_P (subtree) || SUB_CHAR_TABLE_P (subtree)
 		 || COMPILEDP (subtree) || HASH_TABLE_P (subtree)
-		 || RECORDP (subtree))
+		 || RECORDP (subtree) || VECTORP (subtree))
 	  length = PVSIZE (subtree);
-	else if (VECTORP (subtree))
-	  length = ASIZE (subtree);
 	else
 	  /* An unknown pseudovector may contain non-Lisp fields, so we
 	     can't just blindly traverse all its fields.  We used to call
@@ -4609,7 +4607,7 @@ oblookup (Lisp_Object obarray, register const char *ptr, ptrdiff_t size, ptrdiff
 
   obarray = check_obarray (obarray);
   /* This is sometimes needed in the middle of GC.  */
-  obsize = gc_asize (obarray);
+  obsize = ASIZE (obarray);
   hash = hash_string (ptr, size_byte) % obsize;
   bucket = AREF (obarray, hash);
   oblookup_last_bucket_number = hash;
