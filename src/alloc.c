@@ -922,7 +922,7 @@ lisp_align_free (void *block)
 
 struct interval_block
 {
-  /* Place INTERVALS first, to preserve alignment.  */
+  /* Data first, to preserve alignment.  */
   struct interval intervals[BLOCK_NINTERVALS];
   struct interval_block *next;
 };
@@ -5713,133 +5713,150 @@ survives_gc_p (Lisp_Object obj)
   return survives_p || PURE_P (XPNTR (obj));
 }
 
-/* Needs to be unified with sweep_floats().  */
 static void
-sweep_conses (void)
+sweep_void (void **free_list,
+	    int block_index,
+	    void **current_block,
+	    enum Lisp_Type xtype,
+	    size_t block_nitems,
+	    ptrdiff_t offset_items,
+	    ptrdiff_t offset_chain_from_item,
+	    ptrdiff_t offset_next,
+	    size_t xsize,
+	    size_t *tally_used,
+	    size_t *tally_free)
 {
   size_t cum_free = 0, cum_used = 0;
-  int cblk_end = cons_block_index;
+  int blk_end = block_index;
 
-  cons_free_list = 0;
+  eassume (offset_items == 0);
+  *free_list = NULL;
 
-  /* CONS_BLOCK is the last one.  The first iteration processes conses
-     through the prevailing CONS_BLOCK_INDEX.  Subsequent iterations
-     process whole blocks of BLOCK_NCONS cells.  */
-  for (struct cons_block **cprev = &cons_block, *cblk = *cprev;
-       cblk != NULL;
-       cblk = *cprev, cblk_end = BLOCK_NCONS)
+  /* NEXT pointers point from CURRENT_BLOCK into the past.  The first
+     iteration processes items through the prevailing BLOCK_INDEX.
+     Subsequent iterations process whole blocks of BLOCK_NITEMS items.  */
+  for (void **prev = current_block, *blk = *prev;
+       blk != NULL;
+       blk = *prev, blk_end = block_nitems)
     {
       size_t num_free = 0;
 
-      /* Currently BLOCK_NCONS < BITS_PER_BITS_WORD (gcmarkbits needs
-	 but one word to describe all conses in the block), so the
-	 WEND assignment effectively rounds up to 1.  */
-      int wend = (cblk_end + BITS_PER_BITS_WORD - 1) / BITS_PER_BITS_WORD;
-      for (int w = 0; w < wend; ++w)
-        {
-	  // Verify RMS's "fast path" branch is never exercised.
-          eassume (cblk->gcmarkbits[w] != BITS_WORD_MAX);
-
-	  for (int start = w * BITS_PER_BITS_WORD, c = start;
-	       c < start + min (cblk_end - start, BITS_PER_BITS_WORD);
-	       ++c)
-	    {
-	      struct Lisp_Cons *acons = &cblk->conses[c];
-	      if (! XCONS_MARKED_P (acons))
-		{
-		  num_free++;
-		  cblk->conses[c].u.s.u.chain = cons_free_list;
-		  cons_free_list = &cblk->conses[c];
-		  cons_free_list->u.s.car = dead_object ();
-		}
-	      else
-		{
-		  cum_used++;
-		  XUNMARK_CONS (acons);
-		}
-	    }
-        }
-
-      /* If CBLK contains only free conses and we've already seen more
-         than two such blocks, then deallocate CBLK.  */
-      if (num_free >= BLOCK_NCONS && cum_free > BLOCK_NCONS)
-        {
-          *cprev = cblk->next;
-          /* Unhook from the free list.  */
-          cons_free_list = cblk->conses[0].u.s.u.chain;
-          lisp_align_free (cblk);
-        }
-      else
-        {
-          cum_free += num_free;
-          cprev = &cblk->next;
-        }
-    }
-
-  gcstat.total_conses = cum_used;
-  gcstat.total_free_conses = cum_free;
-}
-
-/* Needs to be unified with sweep_conses().  */
-static void
-sweep_floats (void)
-{
-  size_t cum_free = 0, cum_used = 0;
-  int fblk_end = float_block_index;
-
-  float_free_list = 0;
-
-  /* FLOAT_BLOCK is the last one.  The first iteration processes floats
-     through the prevailing FLOAT_BLOCK_INDEX.  Subsequent iterations
-     process whole blocks of BLOCK_NFLOATS cells.  */
-  for (struct float_block **fprev = &float_block, *fblk = *fprev;
-       fblk != NULL;
-       fblk = *fprev, fblk_end = BLOCK_NFLOATS)
-    {
-      size_t num_free = 0;
-      /* Currently BLOCK_NFLOATS < BITS_PER_BITS_WORD (gcmarkbits needs
+      /* Currently BLOCK_NITEMS < BITS_PER_BITS_WORD (gcmarkbits needs
 	 but one word to describe all floats in the block), so the
 	 WEND assignment effectively rounds up to 1.  */
-      int wend = (fblk_end + BITS_PER_BITS_WORD - 1) / BITS_PER_BITS_WORD;
+      int wend = (blk_end + BITS_PER_BITS_WORD - 1) / BITS_PER_BITS_WORD;
       for (int w = 0; w < wend; ++w)
-	{
-	  for (int start = w * BITS_PER_BITS_WORD, c = start;
-	       c < start + min (fblk_end - start, BITS_PER_BITS_WORD);
-	       ++c)
-	    {
-	      struct Lisp_Float *afloat = &fblk->floats[c];
-	      if (! XFLOAT_MARKED_P (afloat))
-		{
-		  num_free++;
-		  fblk->floats[c].u.chain = float_free_list;
-		  float_free_list = &fblk->floats[c];
-		}
-	      else
-		{
-		  cum_used++;
-		  XFLOAT_UNMARK (afloat);
-		}
-	    }
-	}
+	for (int start = w * BITS_PER_BITS_WORD, c = start;
+	     c < start + min (blk_end - start, BITS_PER_BITS_WORD);
+	     ++c)
+	  {
+	    void *xpntr = (void *) ((uintptr_t) blk + offset_items + c * xsize);
+	    bool marked = false;
 
-      /* If FBLK contains only free floats and we've already seen more
-         than two such blocks, then deallocate FBLK.  */
-      if (num_free >= BLOCK_NFLOATS && cum_free > BLOCK_NFLOATS)
+	    switch (xtype)
+	      {
+	      case Lisp_Float:
+		marked = XFLOAT_MARKED_P (xpntr);
+		break;
+	      case Lisp_Cons:
+		marked = XCONS_MARKED_P (xpntr);
+		break;
+	      default:
+		emacs_abort ();
+		break;
+	      }
+
+	    if (marked)
+	      {
+		cum_used++;
+		switch (xtype)
+		  {
+		  case Lisp_Float:
+		    XFLOAT_UNMARK (xpntr);
+		    break;
+		  case Lisp_Cons:
+		    XUNMARK_CONS (xpntr);
+		    break;
+		  default:
+		    emacs_abort ();
+		    break;
+		  }
+	      }
+	    else
+	      {
+		num_free++;
+
+		/* splice RECLAIM into free list. */
+		void *reclaim = (void *) ((uintptr_t) blk + offset_items + c * xsize),
+		  *reclaim_next = (void *) ((uintptr_t) reclaim + offset_chain_from_item);
+		switch (xtype)
+		  {
+		  case Lisp_Cons:
+		    {
+		      struct Lisp_Cons *reclaimed_cons
+			= (struct Lisp_Cons *) reclaim;
+		      *(struct Lisp_Cons **) reclaim_next
+			= *(struct Lisp_Cons **) free_list;
+		      *(struct Lisp_Cons **) free_list
+			= reclaimed_cons;
+		      reclaimed_cons->u.s.car = dead_object ();
+		    }
+		    break;
+		  case Lisp_Float:
+		    {
+		      *(struct Lisp_Float **) reclaim_next
+			= *(struct Lisp_Float **) free_list;
+		      *(struct Lisp_Float **) free_list
+			= (struct Lisp_Float *) reclaim;
+		    }
+		    break;
+		  default:
+		    emacs_abort ();
+		    break;
+		  }
+	      }
+	  }
+
+      /* If BLK contains only free items and we've already seen more
+         than two such blocks, then deallocate BLK.  */
+      void *block_next = (void *) ((uintptr_t) blk + offset_next);
+      if (num_free >= block_nitems && cum_free > block_nitems)
         {
-          *fprev = fblk->next;
-          /* Unhook from the free list.  */
-          float_free_list = fblk->floats[0].u.chain;
-          lisp_align_free (fblk);
+	  void *free_next = (void *) ((uintptr_t) blk + offset_items
+				      + 0 * xsize + offset_chain_from_item);
+	  switch (xtype)
+	    {
+	    case Lisp_Cons:
+	      {
+		*(struct Lisp_Cons **) prev
+		  = *(struct Lisp_Cons **) block_next;
+		*(struct Lisp_Cons **) free_list
+		  = *(struct Lisp_Cons **) free_next;
+	      }
+	      break;
+	    case Lisp_Float:
+	      {
+		*(struct Lisp_Float **) prev
+		  = *(struct Lisp_Float **) block_next;
+		*(struct Lisp_Float **) free_list
+		  = *(struct Lisp_Float **) free_next;
+	      }
+	      break;
+	    default:
+	      emacs_abort ();
+	      break;
+	    }
+	  lisp_align_free (blk);
         }
       else
         {
-          cum_free += num_free;
-          fprev = &fblk->next;
+          prev = block_next;
+	  cum_free += num_free;
         }
     }
 
-  gcstat.total_floats = cum_used;
-  gcstat.total_free_floats = cum_free;
+  *tally_used = cum_used;
+  *tally_free = cum_free;
 }
 
 static void
@@ -5857,7 +5874,7 @@ sweep_intervals (void)
 
       for (int i = 0; i < lim; i++)
         {
-          if (!iblk->intervals[i].gcmarkbit)
+          if (! iblk->intervals[i].gcmarkbit)
             {
               set_interval_parent (&iblk->intervals[i], interval_free_list);
               interval_free_list = &iblk->intervals[i];
@@ -5873,7 +5890,7 @@ sweep_intervals (void)
       /* If this block contains only free intervals and we have already
          seen more than two blocks worth of free intervals then
          deallocate this block.  */
-      if (this_free == BLOCK_NINTERVALS && num_free > BLOCK_NINTERVALS)
+      if (this_free >= BLOCK_NINTERVALS && num_free > BLOCK_NINTERVALS)
         {
           *iprev = iblk->next;
           /* Unhook from the free list.  */
@@ -5992,8 +6009,22 @@ gc_sweep (void)
   mgc_flip_space ();
   sweep_strings ();
   check_string_bytes (! noninteractive);
-  sweep_conses ();
-  sweep_floats ();
+  sweep_void ((void **) &cons_free_list, cons_block_index,
+	      (void **) &cons_block, Lisp_Cons, BLOCK_NCONS,
+	      offsetof (struct cons_block, conses),
+	      offsetof (struct Lisp_Cons, u.s.u.chain),
+	      offsetof (struct cons_block, next),
+	      sizeof (struct Lisp_Cons),
+	      &gcstat.total_conses,
+	      &gcstat.total_free_conses);
+  sweep_void ((void **) &float_free_list, float_block_index,
+	      (void **) &float_block, Lisp_Float, BLOCK_NFLOATS,
+	      offsetof (struct float_block, floats),
+	      offsetof (struct Lisp_Float, u.chain),
+	      offsetof (struct float_block, next),
+	      sizeof (struct Lisp_Float),
+	      &gcstat.total_floats,
+	      &gcstat.total_free_floats);
   sweep_intervals ();
   sweep_symbols ();
   sweep_buffers ();
