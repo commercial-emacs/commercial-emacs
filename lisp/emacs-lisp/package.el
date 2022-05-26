@@ -1628,7 +1628,9 @@ The variable `package-load-list' controls which packages to load."
          (qs (if (file-readable-p elc) elc
                (if (file-readable-p package-quickstart-file)
                    package-quickstart-file))))
-    (if qs
+    ;; The quickstart file presumes that it has a blank slate,
+    ;; so don't use it if we already activated some packages.
+    (if (and qs (not (bound-and-true-p package-activated-list)))
         ;; Skip load-source-file-function which would slow us down by a factor
         ;; 2 when loading the .el file (this assumes we were careful to
         ;; save this file so it doesn't need any decoding).
@@ -4294,8 +4296,9 @@ activations need to be changed, such as when `package-load-list' is modified."
           (insert ")\n")))
       (pp `(defvar package-activated-list) (current-buffer))
       (pp `(setq package-activated-list
-                 (append ',(mapcar #'package-desc-name package--quickstart-pkgs)
-                         package-activated-list))
+                 (delete-dups
+                  (append ',(mapcar #'package-desc-name package--quickstart-pkgs)
+                          package-activated-list)))
           (current-buffer))
       (let ((info-dirs (butlast Info-directory-list)))
         (when info-dirs
