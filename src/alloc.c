@@ -5101,23 +5101,24 @@ mark_vectorlike (union vectorlike_header *header)
 static void
 mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
 {
-  eassert (! vector_marked_p (ptr));
-  set_vector_marked (ptr);
-
-  for (int size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK,
-	 /* Consult Lisp_Sub_Char_Table layout before changing this.  */
-	 i = (pvectype == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_OFFSET : 0);
-       i < size;
-       ++i)
+  if (! vector_marked_p (ptr))
     {
-      Lisp_Object val = ptr->contents[i];
-      if (! FIXNUMP (val) &&
-          (! SYMBOLP (val) || ! symbol_marked_p (XSYMBOL (val))))
+      set_vector_marked (ptr);
+      for (int size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK,
+	     /* Consult Lisp_Sub_Char_Table layout before changing this.  */
+	     i = (pvectype == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_OFFSET : 0);
+	   i < size;
+	   ++i)
 	{
-	  if (! SUB_CHAR_TABLE_P (val))
-	    mark_object (&val);
-	  else if (! vector_marked_p (XVECTOR (val)))
-	    mark_char_table (XVECTOR (val), PVEC_SUB_CHAR_TABLE);
+	  Lisp_Object val = ptr->contents[i];
+	  if (! FIXNUMP (val) &&
+	      (! SYMBOLP (val) || ! symbol_marked_p (XSYMBOL (val))))
+	    {
+	      if (SUB_CHAR_TABLE_P (val))
+		mark_char_table (XVECTOR (val), PVEC_SUB_CHAR_TABLE);
+	      else
+		mark_object (&val);
+	    }
 	}
     }
 }

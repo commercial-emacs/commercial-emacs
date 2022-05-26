@@ -927,36 +927,24 @@ typedef EMACS_UINT Lisp_Word_tag;
 
 #include <globals.h>
 
-/* Header of vector-like objects.  This documents the layout constraints on
-   vectors and pseudovectors (objects of PVEC_xxx subtype).  It also prevents
-   compilers from being fooled by Emacs's type punning: XSETPSEUDOVECTOR
-   and PSEUDOVECTORP cast their pointers to union vectorlike_header *,
-   because when two such pointers potentially alias, a compiler won't
-   incorrectly reorder loads and stores to their size fields.  See
-   Bug#8546.  This union formerly contained more members, and there's
-   no compelling reason to change it to a struct merely because the
-   number of members has been reduced to one.  */
+/* Introduced in Bug#8546 to stave off compiler ambiguities brought on
+   by the type punning of pseudovectors.  See alloc.c header comment
+   for general overview.  */
 union vectorlike_header
   {
-    /* The main member contains various pieces of information:
-       - The MSB (ARRAY_MARK_FLAG) holds the gcmarkbit.
-       - The next bit (PSEUDOVECTOR_FLAG) indicates whether this is a plain
-         vector (0) or a pseudovector (1).
-       - If PSEUDOVECTOR_FLAG is 0, the rest holds the size (number
-         of slots) of the vector.
-       - If PSEUDOVECTOR_FLAG is 1, the rest is subdivided into three fields:
-	 - a) pseudovector subtype held in PVEC_TYPE_MASK field;
-	 - b) number of Lisp_Objects slots at the beginning of the object
-	   held in PSEUDOVECTOR_SIZE_MASK field.  These objects are always
-	   traced by the GC;
-	 - c) size of the rest fields held in PSEUDOVECTOR_REST_MASK and
-	   measured in word_size units.  Rest fields may also include
-	   Lisp_Objects, but these objects usually needs some special treatment
-	   during GC.
-	 There are some exceptions.  For PVEC_FREE, b) is always zero.  For
-	 PVEC_BOOL_VECTOR and PVEC_SUBR, both b) and c) are always zero.
-	 Current layout limits the pseudovectors to 63 PVEC_xxx subtypes,
-	 4095 Lisp_Objects in GC-ed area and 4095 word-sized other slots.  */
+    /* The grossly misnamed SIZE contains (starting from msb).
+       - ARRAY_MARK_FLAG is the gc mark bit.
+       - PSEUDOVECTOR_FLAG is 1 for pseudovector and 0 for normal vector.
+       - If normal vector, remainder holds number of slots.
+       - If pseudovector, remainder subdivided into:
+         - a) pvtype (e.g. PVEC_BUFFER) masked by PVEC_TYPE_MASK;
+         - b) pvsize, or the number of Lisp Objects, masked by
+              PSEUDOVECTOR_SIZE_MASK;
+         - c) size in words of non-Lisp fields, masked by PSEUDOVECTOR_REST_MASK.
+       There are some exceptions.  For PVEC_FREE, b) is zero.  For
+       PVEC_BOOL_VECTOR and PVEC_SUBR, both b) and c) are zero.
+       On current machines, this caps (a) to 63, (b) to 4095,
+       and (c) to 4095.  */
     ptrdiff_t size;
   };
 
@@ -1700,33 +1688,23 @@ PSEUDOVECTORP (Lisp_Object a, enum pvec_type code)
   return VECTORLIKEP (a) && PSEUDOVECTOR_TYPE (XVECTOR (a)) == code;
 }
 
-/* A boolvector is a kind of vectorlike, with contents like a string.  */
-
 struct Lisp_Bool_Vector
   {
-    /* HEADER.SIZE is the vector's size field.  It doesn't have the real size,
-       just the subtype information.  */
+    /* HEADER.SIZE is the word width (not the number of booleans).  */
     union vectorlike_header header;
-    /* This is the size in bits.  */
+    /* Number of booleans.  */
     EMACS_INT size;
-    /* The actual bits, packed into bytes.
-       Zeros fill out the last word if needed.
-       The bits are in little-endian order in the bytes, and
-       the bytes are in little-endian order in the words.  */
+    /* The bits_word type may have predated gnulib bitset.  */
     bits_word data[FLEXIBLE_ARRAY_MEMBER];
   } GCALIGNED_STRUCT;
 
-/* Some handy constants for calculating sizes and offsets, mostly of
-   vectorlike objects.  */
-
 enum
   {
+    /* Blink-and-you-miss-it, un-namespaced, redundant legacy globals.  */
     header_size = offsetof (struct Lisp_Vector, contents),
     bool_header_size = offsetof (struct Lisp_Bool_Vector, data),
     word_size = sizeof (Lisp_Object)
   };
-
-/* The number of data words and bytes in a bool vector with SIZE bits.  */
 
 INLINE EMACS_INT
 bool_vector_words (EMACS_INT size)
