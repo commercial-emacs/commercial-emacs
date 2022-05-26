@@ -5713,6 +5713,12 @@ survives_gc_p (Lisp_Object obj)
   return survives_p || PURE_P (XPNTR (obj));
 }
 
+/* Formally two functions sweep_conses() and sweep_floats() which
+   did the same thing modulo epsilon.
+
+   A probably un-portable and certanly incomprehensible foray into
+   void-star-star gymnastics.
+*/
 static void
 sweep_void (void **free_list,
 	    int block_index,
@@ -5742,7 +5748,7 @@ sweep_void (void **free_list,
       size_t num_free = 0;
 
       /* Currently BLOCK_NITEMS < BITS_PER_BITS_WORD (gcmarkbits needs
-	 but one word to describe all floats in the block), so the
+	 but one word to describe all items in the block), so the
 	 WEND assignment effectively rounds up to 1.  */
       int wend = (blk_end + BITS_PER_BITS_WORD - 1) / BITS_PER_BITS_WORD;
       for (int w = 0; w < wend; ++w)
@@ -5954,7 +5960,7 @@ sweep_symbols (void)
       /* If this block contains only free symbols and we have already
          seen more than two blocks worth of free symbols then deallocate
          this block.  */
-      if (this_free == BLOCK_NSYMBOLS && num_free > BLOCK_NSYMBOLS)
+      if (this_free >= BLOCK_NSYMBOLS && num_free > BLOCK_NSYMBOLS)
         {
           *sprev = sblk->next;
           /* Unhook from the free list.  */

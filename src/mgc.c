@@ -384,6 +384,7 @@ static struct Lisp_Vector *
 allocate_vector (ptrdiff_t nargs, bool q_clear)
 {
   struct Lisp_Vector *ret = NULL;
+  (void) q_clear;
   eassert (nargs >= 0);
 
   if (nargs > min (MOST_POSITIVE_FIXNUM,
@@ -559,7 +560,9 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
     {
       size_t w = 0;
       for (void *obj = space_in_use->block_addrs[b];
-	   obj != space_in_use->alloc_ptr && ! TERM_BLOCK_P (obj);
+	   (w < space_in_use->block_words_used
+	    && obj != space_in_use->alloc_ptr
+	    && ! TERM_BLOCK_P (obj));
 	   (void) obj)
 	{
 	  enum Lisp_Type xpntr_type = xpntr_at (space_in_use, b, w, NULL);
