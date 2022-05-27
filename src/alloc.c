@@ -239,8 +239,8 @@ extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 
 static bool vectorlike_marked_p (const union vectorlike_header *);
 static void set_vectorlike_marked (union vectorlike_header *);
-static bool vector_marked_p (struct Lisp_Vector const *);
-static void set_vector_marked (Lisp_Object *obj);
+static bool vector_marked_p (const struct Lisp_Vector *);
+static void set_vector_marked (struct Lisp_Vector *);
 static bool interval_marked_p (INTERVAL);
 static void set_interval_marked (INTERVAL);
 
@@ -2969,6 +2969,7 @@ static bool
 vector_marked_p (const struct Lisp_Vector *v)
 {
   bool ret;
+  eassert (! mgc_xpntr_p (v));
   if (pdumper_object_p (v))
     {
       /* Checking cold for bool vectors saves faulting in vector header.  */
@@ -2980,35 +2981,22 @@ vector_marked_p (const struct Lisp_Vector *v)
       else
 	ret = pdumper_marked_p (v);
     }
-  else if (mgc_xpntr_p (v))
-    ret = (mgc_fwd_xpntr (v) != NULL); // flipped
   else
     ret = XVECTOR_MARKED_P (v);
   return ret;
 }
 
 static void
-set_vector_marked (Lisp_Object *obj)
+set_vector_marked (struct Lisp_Vector *v)
 {
-  struct Lisp_Vector *v = XVECTOR (*obj);
-  if (! vector_marked_p (v))
+  eassert (! vector_marked_p (v));
+  if (pdumper_object_p (v))
     {
-      if (pdumper_object_p (v))
-	{
-	  eassert (PVTYPE (v) != PVEC_BOOL_VECTOR);
-	  pdumper_set_marked (v);
-	}
-      else if (mgc_xpntr_p (v))
-	XSETVECTOR (*obj, mgc_flip_xpntr (v, Lisp_Vectorlike));
-      else
-	XMARK_VECTOR (v);
+      eassert (PVTYPE (v) != PVEC_BOOL_VECTOR);
+      pdumper_set_marked (v);
     }
-  else if (mgc_xpntr_p (v))
-    {
-      eassume (mgc_fwd_xpntr (v));
-      XSETVECTOR (*obj, mgc_fwd_xpntr (v));
-      eassert (! XVECTOR_MARKED_P (XVECTOR (*obj)));
-    }
+  else
+    XMARK_VECTOR (v);
 }
 
 static bool
@@ -3020,8 +3008,7 @@ vectorlike_marked_p (const union vectorlike_header *header)
 static void
 set_vectorlike_marked (union vectorlike_header *header)
 {
-  Lisp_Object temp = make_lisp_ptr (header, Lisp_Vectorlike);
-  set_vector_marked (&temp);
+  set_vector_marked ((struct Lisp_Vector *) header);
 }
 
 static bool
@@ -3045,44 +3032,22 @@ static bool
 string_marked_p (const struct Lisp_String *s)
 {
   bool ret;
+  eassert (! mgc_xpntr_p (s));
   if (pdumper_object_p (s))
     ret = pdumper_marked_p (s);
-  else if (mgc_xpntr_p (s))
-    ret = (mgc_fwd_xpntr (s) != NULL); // flipped
   else
     ret = XSTRING_MARKED_P (s);
   return ret;
 }
 
 static void
-set_string_marked (Lisp_Object *obj)
+set_string_marked (struct Lisp_String *s)
 {
-  struct Lisp_String *s = XSTRING (*obj);
-  if (! string_marked_p (s))
-    {
-      if (pdumper_object_p (s))
-	pdumper_set_marked (s);
-      else if (mgc_xpntr_p (s))
-	{
-	  /* Do not use string_(set|get)_intervals here.  */
-	  s->u.s.intervals = balance_intervals (s->u.s.intervals);
-	  XSETSTRING (*obj, mgc_flip_xpntr (s, Lisp_String));
-	  sdata *data = SDATA_OF_LISP_STRING (s);
-	  if (data->string != s)
-	    eassert (data->string == XSTRING (*obj));
-	  else
-	    data->string = XSTRING (*obj);
-	}
-      else
-	XMARK_STRING (s);
-      mark_interval_tree (s->u.s.intervals);
-    }
-  else if (mgc_xpntr_p (s))
-    {
-      eassume (mgc_fwd_xpntr (s));
-      XSETSTRING (*obj, mgc_fwd_xpntr (s));
-      eassert (! XSTRING_MARKED_P (XSTRING (*obj)));
-    }
+  eassert (! string_marked_p (s));
+  if (pdumper_object_p (s))
+    pdumper_set_marked (s);
+  else
+    XMARK_STRING (s);
 }
 
 static bool
@@ -5063,7 +5028,8 @@ mark_glyph_matrix (struct glyph_matrix *matrix)
 	    struct glyph *end_glyph = glyph + row->used[area];
 
 	    for (; glyph < end_glyph; ++glyph)
-	      if (STRINGP (glyph->object))
+	      if (STRINGP (glyph->object)
+		  && ! string_marked_p (XSTRING (glyph->object)))
 		mark_object (&glyph->object);
 	  }
       }
@@ -5108,27 +5074,26 @@ mark_vectorlike (union vectorlike_header *header)
    symbols.  */
 
 static void
-mark_char_table (Lisp_Object *objp, enum pvec_type pvectype)
+mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
 {
-  struct Lisp_Vector *ptr = XVECTOR (*objp);
-  if (! vector_marked_p (ptr))
+  set_vector_marked (ptr);
+  for (int size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK,
+	 /* Consult Lisp_Sub_Char_Table layout before changing this.  */
+	 i = (pvectype == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_OFFSET : 0);
+       i < size;
+       ++i)
     {
-      set_vector_marked (objp);
-      for (int size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK,
-	     /* Consult Lisp_Sub_Char_Table layout before changing this.  */
-	     i = (pvectype == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_OFFSET : 0);
-	   i < size;
-	   ++i)
+      Lisp_Object *val = &ptr->contents[i];
+      if (! FIXNUMP (*val) &&
+	  (! SYMBOLP (*val) || ! symbol_marked_p (XSYMBOL (*val))))
 	{
-	  Lisp_Object *val = &ptr->contents[i];
-	  if (! FIXNUMP (*val) &&
-	      (! SYMBOLP (*val) || ! symbol_marked_p (XSYMBOL (*val))))
+	  if (SUB_CHAR_TABLE_P (*val))
 	    {
-	      if (SUB_CHAR_TABLE_P (*val))
-		mark_char_table (val, PVEC_SUB_CHAR_TABLE);
-	      else
-		mark_object (val);
+	      if (! vector_marked_p (XVECTOR (*val)))
+		mark_char_table (XVECTOR (*val), PVEC_SUB_CHAR_TABLE);
 	    }
+	  else
+	    mark_object (val);
 	}
     }
 }
@@ -5349,6 +5314,35 @@ mark_stack_push (Lisp_Object *value)
   return mark_stack_push_n (value, 1);
 }
 
+static void
+gc_process_string (Lisp_Object *objp)
+{
+  struct Lisp_String *s = XSTRING (*objp);
+  void *forwarded = mgc_fwd_xpntr (s);
+  if (forwarded)
+    {
+      XSETSTRING (*objp, forwarded);
+      eassert (! XSTRING_MARKED_P (s));
+    }
+  else if (mgc_xpntr_p (s))
+    {
+      /* Do not use string_(set|get)_intervals here.  */
+      s->u.s.intervals = balance_intervals (s->u.s.intervals);
+      XSETSTRING (*objp, mgc_flip_xpntr (s, Lisp_String));
+      sdata *data = SDATA_OF_LISP_STRING (s);
+      if (data->string != s)
+	eassert (data->string == XSTRING (*objp));
+      else
+	data->string = XSTRING (*objp);
+      mark_interval_tree (s->u.s.intervals);
+    }
+  else if (! string_marked_p (s))
+    {
+      set_string_marked (s);
+      mark_interval_tree (s->u.s.intervals);
+    }
+}
+
 /* Mark the MARK_STK above BASE_SP.
 
    Until commit 7a8798d, recursively calling mark_object() could
@@ -5396,7 +5390,8 @@ process_mark_stack (ptrdiff_t base_sp)
 	      emacs_abort ();				\
 	    break;					\
 	  }						\
-	if (mgc_xpntr_p (xpntr))			\
+	if (mgc_fwd_xpntr (xpntr)			\
+	    || mgc_xpntr_p (xpntr))			\
 	  break;					\
 	m = mem_find (xpntr);				\
 	if (m == MEM_NIL)				\
@@ -5412,9 +5407,10 @@ process_mark_stack (ptrdiff_t base_sp)
       do {							\
 	if (pdumper_object_p (xpntr))				\
 	  break;						\
-	if (mgc_xpntr_p (xpntr))				\
+	if (mgc_fwd_xpntr (xpntr)				\
+	    || mgc_xpntr_p (xpntr))				\
 	  break;						\
-	if (! (m->type == MEM_TYPE && LIVEP (m, xpntr)))		\
+	if (! (m->type == MEM_TYPE && LIVEP (m, xpntr)))	\
 	  emacs_abort ();					\
       } while (0)
 
@@ -5445,123 +5441,130 @@ process_mark_stack (ptrdiff_t base_sp)
       switch (XTYPE (*objp))
 	{
 	case Lisp_String:
-	  {
-	    if (! mgc_fwd_xpntr (xpntr))
-	      CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
-	    set_string_marked (objp);
-	  }
+	  CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
+	  gc_process_string (objp);
 	  break;
 
 	case Lisp_Vectorlike:
 	  {
 	    struct Lisp_Vector *ptr = XVECTOR (*objp);
-
-	    if (vector_marked_p (ptr))
-	      break;
-
-	    enum pvec_type pvectype = PVTYPE (ptr);
-
-#ifdef GC_CHECK_MARKED_OBJECTS
-	    if (! pdumper_object_p (xpntr)
-		&& ! SUBRP (*objp)
-		&& ! main_thread_p (xpntr)
-		&& ! mgc_xpntr_p (xpntr))
+	    void *forwarded = mgc_fwd_xpntr (ptr);
+	    if (forwarded)
 	      {
-		m = mem_find (xpntr);
-		if (m == MEM_NIL)
-		  emacs_abort ();
-		if (m->type == MEM_TYPE_VECTORLIKE)
-		  CHECK_LIVE (live_large_vector_p, MEM_TYPE_VECTORLIKE);
-		else
-		  CHECK_LIVE (live_small_vector_p, MEM_TYPE_VBLOCK);
+		XSETVECTOR (*objp, forwarded);
+		eassert (! XVECTOR_MARKED_P (ptr));
 	      }
-#endif
-
-	    switch (pvectype)
+	    else if (mgc_xpntr_p (ptr))
 	      {
-	      case PVEC_BUFFER:
-		mark_buffer ((struct buffer *) ptr);
-		break;
-
-	      case PVEC_FRAME:
-		mark_frame (ptr);
-		break;
-
-	      case PVEC_WINDOW:
-		mark_window (ptr);
-		break;
-
-	      case PVEC_HASH_TABLE:
-		{
-		  struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
-		  ptrdiff_t size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
-		  set_vector_marked (objp);
-		  mark_stack_push_n (ptr->contents, size);
-		  mark_stack_push (&h->test.name);
-		  mark_stack_push (&h->test.user_hash_function);
-		  mark_stack_push (&h->test.user_cmp_function);
-		  if (NILP (h->weak))
-		    mark_stack_push (&h->key_and_value);
-		  else
-		    {
-		      /* For weak tables, mark only the vector and not its
-			 contents --- that's what makes it weak.  */
-		      eassert (h->next_weak == NULL);
-		      h->next_weak = weak_hash_tables;
-		      weak_hash_tables = h;
-		      set_vector_marked (&h->key_and_value);
-		    }
-		  break;
-		}
-
-	      case PVEC_CHAR_TABLE:
-	      case PVEC_SUB_CHAR_TABLE:
-		mark_char_table (objp, (enum pvec_type) pvectype);
-		break;
-
-	      case PVEC_BOOL_VECTOR:
-		/* bool vectors in a dump are permanently "marked", since
-		   they're in the old section and don't have mark bits.
-		   If we're looking at a dumped bool vector, we should
-		   have aborted above when we called vector_marked_p, so
-		   we should never get here.  */
-		eassert (! pdumper_object_p (ptr));
-		set_vector_marked (objp);
-		break;
-
-	      case PVEC_OVERLAY:
-		mark_overlay (XOVERLAY (*objp));
-		break;
-
-	      case PVEC_SUBR:
-#ifdef HAVE_NATIVE_COMP
-		if (SUBR_NATIVE_COMPILEDP (*objp))
+		XSETVECTOR (*objp, mgc_flip_xpntr (ptr, Lisp_Vectorlike));
+		ptr = XVECTOR (*objp);
+		ptrdiff_t size = ptr->header.size;
+		if (size & PSEUDOVECTOR_FLAG)
+		  size &= PSEUDOVECTOR_SIZE_MASK;
+		mark_stack_push_n (ptr->contents, size);
+	      }
+	    else if (! vector_marked_p (ptr))
+	      {
+#ifdef GC_CHECK_MARKED_OBJECTS
+		if (! pdumper_object_p (xpntr)
+		    && ! SUBRP (*objp)
+		    && ! main_thread_p (xpntr))
 		  {
-		    set_vector_marked (objp);
-		    struct Lisp_Subr *subr = XSUBR (*objp);
-		    mark_stack_push (&subr->intspec.native);
-		    mark_stack_push (&subr->command_modes);
-		    mark_stack_push (&subr->native_comp_u);
-		    mark_stack_push (&subr->lambda_list);
-		    mark_stack_push (&subr->type);
+		    m = mem_find (xpntr);
+		    if (m == MEM_NIL)
+		      emacs_abort ();
+		    if (m->type == MEM_TYPE_VECTORLIKE)
+		      CHECK_LIVE (live_large_vector_p, MEM_TYPE_VECTORLIKE);
+		    else
+		      CHECK_LIVE (live_small_vector_p, MEM_TYPE_VBLOCK);
 		  }
 #endif
-		break;
 
-	      case PVEC_FREE:
-		emacs_abort ();
+		switch (PVTYPE (ptr))
+		  {
+		  case PVEC_BUFFER:
+		    mark_buffer ((struct buffer *) ptr);
+		    break;
 
-	      default:
-		{
-		  /* Same as mark_vectorlike() except stack push
-		     versus recursive call to mark_objects().  */
-		  ptrdiff_t size = ptr->header.size;
-		  if (size & PSEUDOVECTOR_FLAG)
-		    size &= PSEUDOVECTOR_SIZE_MASK;
-		  set_vector_marked (objp);
-		  mark_stack_push_n (ptr->contents, size);
-		}
-		break;
+		  case PVEC_FRAME:
+		    mark_frame (ptr);
+		    break;
+
+		  case PVEC_WINDOW:
+		    mark_window (ptr);
+		    break;
+
+		  case PVEC_HASH_TABLE:
+		    {
+		      struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
+		      ptrdiff_t size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
+		      set_vector_marked (ptr);
+		      mark_stack_push_n (ptr->contents, size);
+		      mark_stack_push (&h->test.name);
+		      mark_stack_push (&h->test.user_hash_function);
+		      mark_stack_push (&h->test.user_cmp_function);
+		      if (NILP (h->weak))
+			mark_stack_push (&h->key_and_value);
+		      else
+			{
+			  /* For weak tables, mark only the vector and not its
+			     contents --- that's what makes it weak.  */
+			  eassert (h->next_weak == NULL);
+			  h->next_weak = weak_hash_tables;
+			  weak_hash_tables = h;
+			  set_vector_marked (XVECTOR (h->key_and_value));
+			}
+		      break;
+		    }
+
+		  case PVEC_CHAR_TABLE:
+		  case PVEC_SUB_CHAR_TABLE:
+		    mark_char_table (ptr, PVTYPE (ptr));
+		    break;
+
+		  case PVEC_BOOL_VECTOR:
+		    /* Assert if dumped bool vector since they're
+		       always marked (they're in the old section
+		       and don't have mark bits), vector_marked_p
+		       is false.  */
+		    eassert (! pdumper_object_p (ptr));
+		    set_vector_marked (ptr);
+		    break;
+
+		  case PVEC_OVERLAY:
+		    mark_overlay (XOVERLAY (*objp));
+		    break;
+
+		  case PVEC_SUBR:
+#ifdef HAVE_NATIVE_COMP
+		    if (SUBR_NATIVE_COMPILEDP (*objp))
+		      {
+			set_vector_marked (ptr);
+			struct Lisp_Subr *subr = XSUBR (*objp);
+			mark_stack_push (&subr->intspec.native);
+			mark_stack_push (&subr->command_modes);
+			mark_stack_push (&subr->native_comp_u);
+			mark_stack_push (&subr->lambda_list);
+			mark_stack_push (&subr->type);
+		      }
+#endif
+		    break;
+
+		  case PVEC_FREE:
+		    emacs_abort ();
+
+		  default:
+		    {
+		      /* Same as mark_vectorlike() except stack push
+			 versus recursive call to mark_objects().  */
+		      ptrdiff_t size = ptr->header.size;
+		      if (size & PSEUDOVECTOR_FLAG)
+			size &= PSEUDOVECTOR_SIZE_MASK;
+		      set_vector_marked (ptr);
+		      mark_stack_push_n (ptr->contents, size);
+		    }
+		    break;
+		  }
 	      }
 	  }
 	  break;
@@ -5569,6 +5572,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_Symbol:
 	  {
 	    struct Lisp_Symbol *ptr = XSYMBOL (*objp);
+
 	  nextsym:
 	    if (symbol_marked_p (ptr))
 	      break;
@@ -5603,7 +5607,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      }
 
 	    if (! PURE_P (XSTRING (ptr->u.s.name)))
-	      set_string_marked (&ptr->u.s.name);
+	      gc_process_string (&ptr->u.s.name);
 
 	    /* Inner loop to mark next symbol in this bucket, if any.  */
 	    xpntr = ptr = ptr->u.s.next;
@@ -5704,7 +5708,8 @@ survives_gc_p (Lisp_Object obj)
       break;
 
     case Lisp_String:
-      survives_p = string_marked_p (XSTRING (obj));
+      survives_p = string_marked_p (XSTRING (obj))
+	|| mgc_fwd_xpntr (XSTRING (obj));
       break;
 
     case Lisp_Vectorlike:

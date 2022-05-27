@@ -303,30 +303,30 @@ bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Lisp_Type xpntr_type)
 
   if (retval)
     {
-      enum mem_type mem_i;
+      enum mem_type mem_w;
       switch (xpntr_type)
 	{
 	case Lisp_Cons:
-	  mem_i = MEM_TYPE_CONS;
+	  mem_w = MEM_TYPE_CONS;
 	  break;
 	case Lisp_String:
-	  mem_i = MEM_TYPE_STRING;
+	  mem_w = MEM_TYPE_STRING;
 	  break;
 	case Lisp_Symbol:
-	  mem_i = MEM_TYPE_SYMBOL;
+	  mem_w = MEM_TYPE_SYMBOL;
 	  break;
 	case Lisp_Float:
-	  mem_i = MEM_TYPE_FLOAT;
+	  mem_w = MEM_TYPE_FLOAT;
 	  break;
 	case Lisp_Vectorlike:
-	  mem_i = MEM_TYPE_VECTORLIKE;
+	  mem_w = MEM_TYPE_VECTORLIKE;
 	  break;
 	default:
 	  emacs_abort ();
 	  break;
 	}
       for (size_t w = 0; w < nwords; ++w)
-	bitset_set (space->block_typemaps[space->current_block].bitsets[mem_i],
+	bitset_set (space->block_typemaps[space->current_block].bitsets[mem_w],
 		    (bitset_bindex) (space->block_words_used + w));
       space->block_words_used += nwords;
       INT_ADD_WRAPV ((uintptr_t) space->alloc_ptr, nbytes,
