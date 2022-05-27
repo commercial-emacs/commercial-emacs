@@ -160,10 +160,7 @@ nbytes_of (enum Lisp_Type xpntr_type, const void *xpntr)
       result = sizeof (struct Lisp_String);
       break;
     case Lisp_Vectorlike:
-      result = FLEXSIZEOF (struct Lisp_Vector, contents,
-			   sizeof (Lisp_Object)
-			   * (PSEUDOVECTOR_SIZE_MASK
-			      & ((const struct Lisp_Vector *) xpntr)->header.size));
+      result = vectorlike_nbytes ((const union vectorlike_header *) xpntr);
       break;
     case Lisp_Cons:
       result = sizeof (struct Lisp_Cons);
