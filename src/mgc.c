@@ -96,7 +96,7 @@ static enum Lisp_Type
 xpntr_at (const mgc_semispace *space, size_t block, ptrdiff_t word, void **xpntr)
 {
   enum Lisp_Type ret = Lisp_Type_Unused0;
-  size_t mem_i, modulus;
+  size_t mem_w, modulus;
   block_typemap *map = &space->block_typemaps[block];
 
   eassert (word < BLOCK_NWORDS - 1); // -1 for term_block_magic
@@ -105,43 +105,78 @@ xpntr_at (const mgc_semispace *space, size_t block, ptrdiff_t word, void **xpntr
     {
       ret = Lisp_Cons;
       modulus = sizeof (struct Lisp_Cons) / word_size;
-      mem_i = MEM_TYPE_CONS;
+      mem_w = MEM_TYPE_CONS;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_STRING], (bitset_bindex) word))
     {
       ret = Lisp_String;
       modulus = sizeof (struct Lisp_String) / word_size;
-      mem_i = MEM_TYPE_STRING;
+      mem_w = MEM_TYPE_STRING;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_SYMBOL], (bitset_bindex) word))
     {
       ret = Lisp_Symbol;
       modulus = sizeof (struct Lisp_Symbol) / word_size;
-      mem_i = MEM_TYPE_SYMBOL;
+      mem_w = MEM_TYPE_SYMBOL;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_FLOAT], (bitset_bindex) word))
     {
       ret = Lisp_Float;
       modulus = sizeof (struct Lisp_Float) / word_size;
-      mem_i = MEM_TYPE_FLOAT;
+      mem_w = MEM_TYPE_FLOAT;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_VECTORLIKE], (bitset_bindex) word))
     {
       ret = Lisp_Vectorlike;
       modulus = 0;
-      mem_i = MEM_TYPE_VECTORLIKE;
+      mem_w = MEM_TYPE_VECTORLIKE;
     }
   else
     emacs_abort ();
 
   if (xpntr != NULL)
     {
-      bitset_bindex i = word;
-      for ((void) i; i >= 0 && bitset_test (map->bitsets[mem_i], i); --i);
-      ptrdiff_t presumed_start = word - ((word - (i + 1)) % modulus);
+      /* Caller wants the item corresponding to WORD in BLOCK.
+
+	 For fixed-size items, i.e., non-vectors, march back to the
+	 first on-bit in the typemap bitset.  In the case several
+	 items of the same type were allocated consecutively, we're
+	 now at the first.  Then march forward a whole multiple of
+	 MODULUS until WORD.
+
+	 For variable-sized items, i.e., vectors, we must examine
+	 headers for element counts.
+      */
       void *block_addr = space->block_addrs[block];
-      INT_ADD_WRAPV ((uintptr_t) block_addr, presumed_start * word_size,
-		     (uintptr_t *) xpntr);
+      bitset_bindex w = word;
+      for ((void) w; w >= 0 && bitset_test (map->bitsets[mem_w], w); --w);
+      ptrdiff_t presumed_start;
+      if (modulus)
+	{
+	  presumed_start = word - ((word - (w + 1)) % modulus);
+	  INT_ADD_WRAPV ((uintptr_t) block_addr, presumed_start * word_size,
+			 (uintptr_t *) xpntr);
+	}
+      else
+	{
+	  uintptr_t hdr, end_hdr;
+	  INT_ADD_WRAPV ((uintptr_t) block_addr, (w + 1) * word_size, &hdr);
+	  INT_ADD_WRAPV ((uintptr_t) block_addr, word * word_size, &end_hdr);
+	  for (;;)
+	    {
+	      uintptr_t next_hdr;
+	      ptrdiff_t straddle
+		= vectorlike_nbytes ((const union vectorlike_header *) hdr);
+	      INT_ADD_WRAPV (hdr, straddle, &next_hdr);
+	      if (next_hdr > end_hdr)
+		{
+		  *(uintptr_t *)xpntr = hdr;
+		  break;
+		}
+	      hdr = next_hdr;
+	    }
+	}
+      eassert (*xpntr);
     }
 
   return ret;

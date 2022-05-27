@@ -237,7 +237,7 @@ static void mark_buffer (struct buffer *);
 static void sweep_sdata (void);
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 
-static bool vectorlike_marked_p (union vectorlike_header const *);
+static bool vectorlike_marked_p (const union vectorlike_header *);
 static void set_vectorlike_marked (union vectorlike_header *);
 static bool vector_marked_p (struct Lisp_Vector const *);
 static void set_vector_marked (Lisp_Object *obj);
