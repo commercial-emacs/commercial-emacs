@@ -3008,7 +3008,8 @@ vectorlike_marked_p (const union vectorlike_header *header)
 static void
 set_vectorlike_marked (union vectorlike_header *header)
 {
-  set_vector_marked ((struct Lisp_Vector *) header);
+  if (! vectorlike_marked_p (header))
+    set_vector_marked ((struct Lisp_Vector *) header);
 }
 
 static bool
