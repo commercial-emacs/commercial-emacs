@@ -361,9 +361,10 @@ mgc_flip_space (void)
     {
       size_t w = 0;
       for (void *xpntr = from->block_addrs[b];
-	   (w < space_in_use->block_words_used
-	    && xpntr != from->alloc_ptr
-	    && ! TERM_BLOCK_P (xpntr));
+	   (xpntr != from->alloc_ptr
+	    && ! TERM_BLOCK_P (xpntr)
+	    && (b != (int) from->current_block
+		|| w < from->block_words_used));
 	   (void) xpntr)
 	{
 	  enum Lisp_Type xpntr_type = xpntr_at (from, b, w, NULL);
@@ -595,9 +596,10 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
     {
       size_t w = 0;
       for (void *xpntr = space_in_use->block_addrs[b];
-	   (w < space_in_use->block_words_used
-	    && xpntr != space_in_use->alloc_ptr
-	    && ! TERM_BLOCK_P (xpntr));
+	   (xpntr != space_in_use->alloc_ptr
+	    && ! TERM_BLOCK_P (xpntr)
+	    && (b != (int) space_in_use->current_block
+		|| w < space_in_use->block_words_used));
 	   (void) xpntr)
 	{
 	  enum Lisp_Type xpntr_type = xpntr_at (space_in_use, b, w, NULL);
