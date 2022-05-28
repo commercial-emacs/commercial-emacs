@@ -1011,11 +1011,16 @@ unsigned x_dnd_unsupported_event_level;
 /* The frame where the drag-and-drop operation originated.  */
 struct frame *x_dnd_frame;
 
+/* That frame, but set when x_dnd_waiting_for_finish is true.  Used to
+   prevent the frame from being deleted inside selection handlers and
+   other callbacks.  */
+struct frame *x_dnd_finish_frame;
+
 /* Flag that indicates if a drag-and-drop operation is no longer in
    progress, but the nested event loop should continue to run, because
    handle_one_xevent is waiting for the drop target to return some
    important information.  */
-static bool x_dnd_waiting_for_finish;
+bool x_dnd_waiting_for_finish;
 
 /* The display the drop target that is supposed to send information is
    on.  */
@@ -3277,7 +3282,7 @@ x_dnd_send_unsupported_drop (struct x_display_info *dpyinfo, Window target_windo
     }
 
   name = x_get_atom_name (dpyinfo, x_dnd_wanted_action,
-			  false);
+			  NULL);
 
   if (name)
     {
@@ -3842,7 +3847,7 @@ x_dnd_send_drop (struct frame *f, Window target, Time timestamp,
 
 	  lval = Qnil;
 	  atom_names = alloca (x_dnd_n_targets * sizeof *atom_names);
-	  name = x_get_atom_name (dpyinfo, x_dnd_wanted_action, false);
+	  name = x_get_atom_name (dpyinfo, x_dnd_wanted_action, NULL);
 
 	  if (!XGetAtomNames (dpyinfo->display, x_dnd_targets,
 			      x_dnd_n_targets, atom_names))
@@ -10621,7 +10626,11 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
       if (event_display == FRAME_DISPLAY_INFO (f))
 	{
 #endif
-	  if (x_dnd_movement_frame)
+	  if (x_dnd_movement_frame
+	      /* FIXME: how come this can end up with movement frames
+		 from other displays on GTK builds?  */
+	      && (FRAME_X_DISPLAY (x_dnd_movement_frame)
+		  == FRAME_X_DISPLAY (f)))
 	    {
 	      XSETFRAME (frame_object, x_dnd_movement_frame);
 	      XSETINT (x, x_dnd_movement_x);
@@ -17206,6 +17215,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  {
 		    x_dnd_end_window = x_dnd_last_seen_window;
 		    x_dnd_in_progress = false;
+		    x_dnd_finish_frame = x_dnd_frame;
 
 		    if (x_dnd_last_seen_window != None
 			&& x_dnd_last_protocol_version != -1)
@@ -18510,6 +18520,14 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			{
 			  x_dnd_end_window = x_dnd_last_seen_window;
 			  x_dnd_in_progress = false;
+
+			  /* This doesn't have to be marked since it
+			     is only accessed if
+			     x_dnd_waiting_for_finish is true, which
+			     is only possible inside the DND event
+			     loop where that frame is on the
+			     stack.  */
+			  x_dnd_finish_frame = x_dnd_frame;
 
 			  if (x_dnd_last_seen_window != None
 			      && x_dnd_last_protocol_version != -1)
@@ -23794,7 +23812,10 @@ x_get_atom_name (struct x_display_info *dpyinfo, Atom atom,
 
   dpyinfo_pointer = (char *) dpyinfo;
   value = NULL;
-  *need_sync = false;
+
+  if (need_sync)
+    *need_sync = false;
+
   buffer = alloca (45 + INT_STRLEN_BOUND (int));
 
   switch (atom)
@@ -23842,7 +23863,9 @@ x_get_atom_name (struct x_display_info *dpyinfo, Atom atom,
 	}
 
       name = XGetAtomName (dpyinfo->display, atom);
-      *need_sync = true;
+
+      if (need_sync)
+	*need_sync = true;
 
       if (name)
 	{
@@ -25911,7 +25934,7 @@ operation, and TIME is the X server time when the drop happened.  */);
   Vx_dnd_unsupported_drop_function = Qnil;
 
   DEFVAR_INT ("x-color-cache-bucket-size", x_color_cache_bucket_size,
-    doc: /* Most buckets allowed per display in the internal color cache.
+    doc: /* Max number of buckets allowed per display in the internal color cache.
 Values less than 1 mean 128.  This option is for debugging only.  */);
   x_color_cache_bucket_size = 128;
 }
