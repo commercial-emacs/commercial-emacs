@@ -6777,8 +6777,9 @@ buttons are released, then return the action chosen by the target, or
 starts when the mouse is pressed on FRAME, and the contents of the
 selection `XdndSelection' will be sent to the X window underneath the
 mouse pointer (the drop target) when the mouse button is released.
-ACTION is a symbol which tells the target what the source will do, and
-can be one of the following:
+
+ACTION is a symbol which tells the target what it should do, and can
+be one of the following:
 
  - `XdndActionCopy', which means to copy the contents from the drag
    source (FRAME) to the drop target.
@@ -6789,6 +6790,10 @@ can be one of the following:
 
 `XdndActionPrivate' is also a valid return value, and means that the
 drop target chose to perform an unspecified or unknown action.
+
+The source is also expected to cooperate with the target to perform
+the action chosen by the target.  For example, callers should delete
+the buffer text that was dragged if `XdndActionMove' is returned.
 
 There are also some other valid values of ACTION that depend on
 details of both the drop target's implementation details and that of
@@ -6815,9 +6820,9 @@ is allowed to be FRAME.  Otherwise, no action will be taken if the
 mouse buttons are released on top of FRAME.
 
 This function will sometimes return immediately if no mouse buttons
-are currently held down, and should only be called in situations where
-it is known that some are being held down down, such as immediately
-after a `down-mouse-1' event.  */)
+are currently held down.  It should only be called when it is known
+that mouse buttons are being held down, such as immediately after a
+`down-mouse-1' (or similar) event.  */)
   (Lisp_Object targets, Lisp_Object action, Lisp_Object frame,
    Lisp_Object return_frame, Lisp_Object allow_current_frame)
 {
