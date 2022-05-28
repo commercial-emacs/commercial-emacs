@@ -59,4 +59,9 @@
       (aset s 0 c)
       (should (equal s (make-string 1 c))))))
 
+(ert-deftest flood-mgc-strings ()
+  "Should error but not crash."
+  (should-error
+   (mgc-make-string 100 "not-a-numeric")))
+
 ;;; alloc-tests.el ends here
