@@ -369,10 +369,9 @@ mgc_flip_space (void)
 	{
 	  void *forwarded = mgc_fwd_xpntr (xpntr);
 	  enum Lisp_Type xpntr_type = xpntr_at (from, b, w, NULL);
-	  eassert (forwarded);
 	  eassert (xpntr_type != Lisp_Type_Unused0);
-	  size_t bytespan = nbytes_of (xpntr_type, forwarded);
-	  if (xpntr_type == Lisp_String && ! FORWARD_XPNTR_GET (xpntr))
+	  size_t bytespan = nbytes_of (xpntr_type, forwarded ? forwarded : xpntr);
+	  if (xpntr_type == Lisp_String && ! forwarded)
 	    {
 	      /* S goes to dead state.  */
 	      struct Lisp_String *s = (struct Lisp_String *) xpntr;
