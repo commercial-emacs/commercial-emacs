@@ -25,18 +25,17 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    to surfacing the new data into a first-class Lisp type like
    Lisp_Cons.  So consider Lisp_Misc_Ptr first.
 
-   Often, however, we'll desire some user visibility or handling at
-   the Lisp level.  So-called pseudovectors (see alloc.c) institute a
+   Often, however, we'll desire some visibility or handling at
+   the user level.  So-called pseudovectors (see alloc.c) institute a
    class pattern which commingles the raw pointer with first-class
    Lisp objects to manage it.  Consider genericizing your type as a
    PVEC_OTHER (see xterm.c for an example) before expanding the
    pvec_type enumeration.
 
-   For a new pvec_type, limit its size to VBLOCK_BYTES_MAX bytes
-   (alloc.c).  Otherwise you will need to change sweep_vectors()
-   (alloc.c). Then add a switch case to print_object() and possibly
-   also print_preprocess(), free_by_pvtype(), and Ftype_of().  Then
-   update `cl--typeof-types'.
+   For a new pvec_type, limit its size to VBLOCK_BYTES_MAX bytes.
+   Otherwise you will need to change sweep_vectors(). Then add a
+   switch case to print_object() and possibly also print_preprocess(),
+   free_by_pvtype(), and Ftype_of().  Then update `cl--typeof-types'.
 */
 
 #ifndef EMACS_LISP_H
@@ -471,8 +470,8 @@ enum _GL_ATTRIBUTE_PACKED Lisp_Type
 
     Lisp_Type_Unused0 = 1,
 
-    /* 2de9f71 Fixnums use 2 tags, to give them one extra bit, thus
-       extending their range from, e.g., -2^28..2^28-1 to -2^29..2^29-1.  */
+    /* 2de9f71 Two slots afford fixnums an extra bit, thus extending
+       their range from, e.g., -2^28..2^28-1 to -2^29..2^29-1.  */
     Lisp_Int0 = 2,
     Lisp_Int1 = USE_LSB_TAG ? 6 : 3,
 

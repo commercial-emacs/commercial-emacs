@@ -3699,7 +3699,7 @@ mark_maybe_pointer (void *const * p)
   bool ret = false;
   uintptr_t mask = VALMASK & UINTPTR_MAX;
   struct mem_node *m;
-  enum Lisp_Type xpntr_type;
+  enum Space_Type xpntr_type;
   void *xpntr;
 
   /* Research Bug#41321 so we can suitably #ifdef treatment of
@@ -3742,13 +3742,15 @@ mark_maybe_pointer (void *const * p)
       if (ret)
 	mark_automatic_object (make_lisp_symbol (po));
     }
-  else if ((xpntr_type = mgc_find_xpntr (*p, &xpntr)) != Lisp_Type_Unused0)
+  else if ((xpntr_type = mgc_find_xpntr (*p, &xpntr)) != Space_Type_Max)
     {
       /* analogous logic to set_string_marked() */
       void *forwarded = mgc_fwd_xpntr (xpntr);
       if (! forwarded)
 	{
-	  mark_automatic_object (make_lisp_ptr (xpntr, xpntr_type));
+	  if ((enum Lisp_Type) xpntr_type >= Lisp_Type_Max)
+	    emacs_abort ();
+	  mark_automatic_object (make_lisp_ptr (xpntr, (enum Lisp_Type) xpntr_type));
 	  ret = true;
 	  forwarded = mgc_fwd_xpntr (xpntr);
 	}
@@ -5329,7 +5331,7 @@ gc_process_string (Lisp_Object *objp)
     {
       /* Do not use string_(set|get)_intervals here.  */
       s->u.s.intervals = balance_intervals (s->u.s.intervals);
-      XSETSTRING (*objp, mgc_flip_xpntr (s, Lisp_String));
+      XSETSTRING (*objp, mgc_flip_xpntr (s, Space_String));
       sdata *data = SDATA_OF_LISP_STRING (s);
       if (data->string != s)
 	eassert (data->string == XSTRING (*objp));
@@ -5457,7 +5459,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      }
 	    else if (mgc_xpntr_p (ptr))
 	      {
-		XSETVECTOR (*objp, mgc_flip_xpntr (ptr, Lisp_Vectorlike));
+		XSETVECTOR (*objp, mgc_flip_xpntr (ptr, Space_Vectorlike));
 		ptr = XVECTOR (*objp);
 		ptrdiff_t size = ptr->header.size;
 		if (size & PSEUDOVECTOR_FLAG)

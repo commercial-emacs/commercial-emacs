@@ -2,11 +2,11 @@
 #include "bitset.h"
 
 enum
-{
-  BLOCK_NBITS = 13,
-  BLOCK_NBYTES = (1 << BLOCK_NBITS),
-  BLOCK_NWORDS = (BLOCK_NBYTES / word_size),
-};
+  {
+    BLOCK_NBITS = 13,
+    BLOCK_NBYTES = (1 << BLOCK_NBITS),
+    BLOCK_NWORDS = (BLOCK_NBYTES / word_size),
+  };
 
 typedef struct block_typemap
 {
@@ -88,10 +88,10 @@ size_t block_of_xpntr (const void *xpntr)
   return BLOCK_NOT_FOUND;
 }
 
-static enum Lisp_Type
+static enum Space_Type
 xpntr_at (const mgc_semispace *space, size_t block, ptrdiff_t word, void **xpntr)
 {
-  enum Lisp_Type ret = Lisp_Type_Unused0;
+  enum Space_Type ret = Space_Type_Max;
   size_t mem_w, modulus;
   block_typemap *map = &space->block_typemaps[block];
 
@@ -99,31 +99,31 @@ xpntr_at (const mgc_semispace *space, size_t block, ptrdiff_t word, void **xpntr
 
   if (bitset_test (map->bitsets[MEM_TYPE_CONS], (bitset_bindex) word))
     {
-      ret = Lisp_Cons;
+      ret = Space_Cons;
       modulus = sizeof (struct Lisp_Cons) / word_size;
       mem_w = MEM_TYPE_CONS;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_STRING], (bitset_bindex) word))
     {
-      ret = Lisp_String;
+      ret = Space_String;
       modulus = sizeof (struct Lisp_String) / word_size;
       mem_w = MEM_TYPE_STRING;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_SYMBOL], (bitset_bindex) word))
     {
-      ret = Lisp_Symbol;
+      ret = Space_Symbol;
       modulus = sizeof (struct Lisp_Symbol) / word_size;
       mem_w = MEM_TYPE_SYMBOL;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_FLOAT], (bitset_bindex) word))
     {
-      ret = Lisp_Float;
+      ret = Space_Float;
       modulus = sizeof (struct Lisp_Float) / word_size;
       mem_w = MEM_TYPE_FLOAT;
     }
   else if (bitset_test (map->bitsets[MEM_TYPE_VECTORLIKE], (bitset_bindex) word))
     {
-      ret = Lisp_Vectorlike;
+      ret = Space_Vectorlike;
       modulus = 0;
       mem_w = MEM_TYPE_VECTORLIKE;
     }
@@ -179,24 +179,24 @@ xpntr_at (const mgc_semispace *space, size_t block, ptrdiff_t word, void **xpntr
 }
 
 static size_t
-nbytes_of (enum Lisp_Type xpntr_type, const void *xpntr)
+nbytes_of (enum Space_Type xpntr_type, const void *xpntr)
 {
   size_t result = 0;
   switch (xpntr_type)
     {
-    case Lisp_Symbol:
+    case Space_Symbol:
       result = sizeof (struct Lisp_Symbol);
       break;
-    case Lisp_String:
+    case Space_String:
       result = sizeof (struct Lisp_String);
       break;
-    case Lisp_Vectorlike:
+    case Space_Vectorlike:
       result = vectorlike_nbytes ((const union vectorlike_header *) xpntr);
       break;
-    case Lisp_Cons:
+    case Space_Cons:
       result = sizeof (struct Lisp_Cons);
       break;
-    case Lisp_Float:
+    case Space_Float:
       result = sizeof (struct Lisp_Float);
       break;
     default:
@@ -207,7 +207,7 @@ nbytes_of (enum Lisp_Type xpntr_type, const void *xpntr)
   return result;
 }
 
-enum Lisp_Type
+enum Space_Type
 mgc_find_xpntr (void *p, void **xpntr)
 {
   size_t block = block_of_xpntr (p);
@@ -217,7 +217,7 @@ mgc_find_xpntr (void *p, void **xpntr)
       ptrdiff_t word = ((char *) p - block_start) / word_size;
       return xpntr_at (space_in_use, block, word, xpntr);
     }
-  return Lisp_Type_Unused0;
+  return Space_Type_Max;
 }
 
 static void
@@ -285,7 +285,7 @@ next_block (mgc_semispace *space)
 */
 
 static void *
-bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Lisp_Type xpntr_type)
+bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Space_Type xpntr_type)
 {
   void *retval = space->alloc_ptr;
   size_t nwords = nbytes / word_size;
@@ -302,19 +302,19 @@ bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Lisp_Type xpntr_type)
       enum mem_type mem_w;
       switch (xpntr_type)
 	{
-	case Lisp_Cons:
+	case Space_Cons:
 	  mem_w = MEM_TYPE_CONS;
 	  break;
-	case Lisp_String:
+	case Space_String:
 	  mem_w = MEM_TYPE_STRING;
 	  break;
-	case Lisp_Symbol:
+	case Space_Symbol:
 	  mem_w = MEM_TYPE_SYMBOL;
 	  break;
-	case Lisp_Float:
+	case Space_Float:
 	  mem_w = MEM_TYPE_FLOAT;
 	  break;
-	case Lisp_Vectorlike:
+	case Space_Vectorlike:
 	  mem_w = MEM_TYPE_VECTORLIKE;
 	  break;
 	default:
@@ -332,7 +332,7 @@ bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Lisp_Type xpntr_type)
 }
 
 void *
-mgc_flip_xpntr (void *xpntr, enum Lisp_Type xpntr_type)
+mgc_flip_xpntr (void *xpntr, enum Space_Type xpntr_type)
 {
   mgc_semispace *from = space_in_use,
     *to = (from == &space0) ? &space1 : &space0;
@@ -364,10 +364,10 @@ mgc_flip_space (void)
 	   (void) xpntr)
 	{
 	  void *forwarded = mgc_fwd_xpntr (xpntr);
-	  enum Lisp_Type xpntr_type = xpntr_at (from, b, w, NULL);
-	  eassert (xpntr_type != Lisp_Type_Unused0);
+	  enum Space_Type xpntr_type = xpntr_at (from, b, w, NULL);
+	  eassert (xpntr_type != Space_Type_Max);
 	  size_t bytespan = nbytes_of (xpntr_type, forwarded ? forwarded : xpntr);
-	  if (xpntr_type == Lisp_String && ! forwarded)
+	  if (xpntr_type == Space_String && ! forwarded)
 	    {
 	      /* S goes to dead state.  */
 	      struct Lisp_String *s = (struct Lisp_String *) xpntr;
@@ -400,7 +400,7 @@ DEFUN ("mgc-cons", Fmgc_cons, Smgc_cons, 2, 2, 0,
 {
   Lisp_Object val;
   size_t nbytes = sizeof (struct Lisp_Cons);
-  XSETCONS (val, bump_alloc_ptr (space_in_use, nbytes, Lisp_Cons));
+  XSETCONS (val, bump_alloc_ptr (space_in_use, nbytes, Space_Cons));
   XSETCAR (val, car);
   XSETCDR (val, cdr);
   bytes_since_gc += nbytes;
@@ -429,7 +429,7 @@ allocate_vector (ptrdiff_t nargs, bool q_clear)
     {
       ptrdiff_t nbytes = FLEXSIZEOF (struct Lisp_Vector, contents,
 				     nargs * sizeof (Lisp_Object));
-      ret = bump_alloc_ptr (space_in_use, nbytes, Lisp_Vectorlike);
+      ret = bump_alloc_ptr (space_in_use, nbytes, Space_Vectorlike);
       ret->header.size = nargs;
       bytes_since_gc += nbytes;
       vector_cells_consed += nargs;
@@ -471,7 +471,7 @@ static struct Lisp_String *
 allocate_string (void)
 {
   struct Lisp_String *s =
-    bump_alloc_ptr (space_in_use, sizeof (struct Lisp_String), Lisp_String);
+    bump_alloc_ptr (space_in_use, sizeof (struct Lisp_String), Space_String);
   if (s)
     {
       ++strings_consed;
@@ -500,7 +500,7 @@ DEFUN ("mgc-make-symbol", Fmgc_make_symbol, Smgc_make_symbol, 1, 1, 0,
   size_t nbytes = sizeof (struct Lisp_Symbol);
 
   CHECK_STRING (name);
-  XSETSYMBOL (val, bump_alloc_ptr (space_in_use, nbytes, Lisp_Symbol));
+  XSETSYMBOL (val, bump_alloc_ptr (space_in_use, nbytes, Space_Symbol));
   init_symbol (val, name);
   bytes_since_gc += nbytes;
   return val;
@@ -588,7 +588,7 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
        doc: /* Return alist of Lisp types and their current counts.  */)
   (void)
 {
-  size_t tally[Lisp_Type_Max] = {0};
+  size_t tally[Space_Type_Max] = {0};
   for (int b = 0; b <= (int) space_in_use->current_block; ++b)
     {
       size_t w = 0;
@@ -599,8 +599,8 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
 		|| w < space_in_use->block_words_used));
 	   (void) xpntr)
 	{
-	  enum Lisp_Type xpntr_type = xpntr_at (space_in_use, b, w, NULL);
-	  eassert (xpntr_type != Lisp_Type_Unused0);
+	  enum Space_Type xpntr_type = xpntr_at (space_in_use, b, w, NULL);
+	  eassert (xpntr_type != Space_Type_Max);
 	  tally[xpntr_type]++;
 	  size_t bytespan = nbytes_of (xpntr_type, xpntr);
 	  w += bytespan / word_size;
@@ -608,15 +608,15 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
 	}
     }
   return list5 (Fcons (Qsymbols,
-		       make_fixnum (tally[Lisp_Symbol])),
+		       make_fixnum (tally[Space_Symbol])),
 		Fcons (Qstrings,
-		       make_fixnum (tally[Lisp_String])),
+		       make_fixnum (tally[Space_String])),
 		Fcons (Qvectors,
-		       make_fixnum (tally[Lisp_Vectorlike])),
+		       make_fixnum (tally[Space_Vectorlike])),
 		Fcons (Qconses,
-		       make_fixnum (tally[Lisp_Cons])),
+		       make_fixnum (tally[Space_Cons])),
 		Fcons (Qfloats,
-		       make_fixnum (tally[Lisp_Float])));
+		       make_fixnum (tally[Space_Float])));
 }
 
 void

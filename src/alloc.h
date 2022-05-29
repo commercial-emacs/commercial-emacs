@@ -157,6 +157,17 @@ enum _GL_ATTRIBUTE_PACKED mem_type
   MEM_TYPE_NTYPES,
 };
 
+enum _GL_ATTRIBUTE_PACKED Space_Type
+  {
+    Space_Symbol = Lisp_Symbol,
+    Space_String = Lisp_String,
+    Space_Vectorlike = Lisp_Vectorlike,
+    Space_Cons = Lisp_Cons,
+    Space_Float = Lisp_Float,
+    Space_Interval,
+    Space_Type_Max,
+  };
+
 #define XMARK_VECTOR(V)		((V)->header.size |= ARRAY_MARK_FLAG)
 #define XUNMARK_VECTOR(V)	((V)->header.size &= ~ARRAY_MARK_FLAG)
 #define XVECTOR_MARKED_P(V)	(((V)->header.size & ARRAY_MARK_FLAG) != 0)
@@ -188,12 +199,12 @@ _GL_ATTRIBUTE_CONST bool wrong_xpntr_p (const void *obj);
 
 void mgc_flip_space (void);
 
-void *mgc_flip_xpntr (void *xpntr, enum Lisp_Type objtype);
+void *mgc_flip_xpntr (void *xpntr, enum Space_Type objtype);
 
 void *mgc_fwd_xpntr (const void *addr);
 
 void mgc_initialize_spaces (void);
 
-enum Lisp_Type mgc_find_xpntr (void *p, void **xpntr);
+enum Space_Type mgc_find_xpntr (void *p, void **xpntr);
 
 #endif  /* EMACS_ALLOC_H */
