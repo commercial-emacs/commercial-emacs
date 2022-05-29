@@ -5508,8 +5508,8 @@ process_mark_stack (ptrdiff_t base_sp)
 			mark_stack_push (&h->key_and_value);
 		      else
 			{
-			  /* For weak tables, mark only the vector and not its
-			     contents --- that's what makes it weak.  */
+			  /* A weak table marks only the vector, not
+			     its contents.  */
 			  eassert (h->next_weak == NULL);
 			  h->next_weak = weak_hash_tables;
 			  weak_hash_tables = h;
@@ -5524,11 +5524,12 @@ process_mark_stack (ptrdiff_t base_sp)
 		    break;
 
 		  case PVEC_BOOL_VECTOR:
-		    /* Assert if dumped bool vector since they're
+		    /* Can't be dumped bool vector since they're
 		       always marked (they're in the old section
-		       and don't have mark bits), vector_marked_p
-		       is false.  */
-		    eassert (! pdumper_object_p (ptr));
+		       and don't have mark bits), and we're in a
+		       ! vector_marked_p() block */
+		    eassert (! vector_marked_p (ptr)
+			     && ! pdumper_object_p (ptr));
 		    set_vector_marked (ptr);
 		    break;
 
@@ -5917,9 +5918,8 @@ sweep_intervals (void)
             }
         }
       lim = BLOCK_NINTERVALS;
-      /* If this block contains only free intervals and we have already
-         seen more than two blocks worth of free intervals then
-         deallocate this block.  */
+      /* If BLK contains only free items and we've already seen more
+         than two such blocks, then deallocate BLK.  */
       if (this_free >= BLOCK_NINTERVALS && num_free > BLOCK_NINTERVALS)
         {
           *iprev = iblk->next;
@@ -5980,9 +5980,8 @@ sweep_symbols (void)
         }
 
       lim = BLOCK_NSYMBOLS;
-      /* If this block contains only free symbols and we have already
-         seen more than two blocks worth of free symbols then deallocate
-         this block.  */
+      /* If BLK contains only free items and we've already seen more
+         than two such blocks, then deallocate BLK.  */
       if (this_free >= BLOCK_NSYMBOLS && num_free > BLOCK_NSYMBOLS)
         {
           *sprev = sblk->next;

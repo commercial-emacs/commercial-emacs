@@ -1,10 +1,6 @@
 #include <alloc.h>
 #include "bitset.h"
 
-// Subtraction of pointers is only defined when they both point into
-// the same array and a void pointer can't point into any array
-// because you can't have an array with void elements.
-
 enum
 {
   BLOCK_NBITS = 13,
