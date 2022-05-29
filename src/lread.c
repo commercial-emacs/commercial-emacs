@@ -662,7 +662,7 @@ static Lisp_Object read_list (bool, Lisp_Object, bool);
 static Lisp_Object read_vector (Lisp_Object, bool);
 
 static Lisp_Object substitute_object_recurse (struct subst *, Lisp_Object);
-static void substitute_in_interval (INTERVAL, void *);
+static void substitute_in_interval (INTERVAL *, void *);
 
 
 /* Get a character from the tty.  */
@@ -3957,7 +3957,7 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 	   substitute_in_interval contains part of the logic.  */
 
 	INTERVAL root_interval = string_intervals (subtree);
-	traverse_intervals_noorder (root_interval,
+	traverse_intervals_noorder (&root_interval,
 				    substitute_in_interval, subst);
 	return subtree;
       }
@@ -3970,10 +3970,10 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 
 /*  Helper function for substitute_object_recurse.  */
 static void
-substitute_in_interval (INTERVAL interval, void *arg)
+substitute_in_interval (INTERVAL *interval, void *arg)
 {
-  set_interval_plist (interval,
-		      substitute_object_recurse (arg, interval->plist));
+  set_interval_plist (*interval,
+		      substitute_object_recurse (arg, (*interval)->plist));
 }
 
 

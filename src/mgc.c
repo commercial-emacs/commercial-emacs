@@ -127,6 +127,12 @@ xpntr_at (const mgc_semispace *space, size_t block, ptrdiff_t word, void **xpntr
       modulus = 0;
       mem_w = MEM_TYPE_VECTORLIKE;
     }
+  else if (bitset_test (map->bitsets[MEM_TYPE_INTERVAL], (bitset_bindex) word))
+    {
+      ret = Space_Interval;
+      modulus = 0;
+      mem_w = MEM_TYPE_INTERVAL;
+    }
   else
     emacs_abort ();
 
@@ -198,6 +204,9 @@ nbytes_of (enum Space_Type xpntr_type, const void *xpntr)
       break;
     case Space_Float:
       result = sizeof (struct Lisp_Float);
+      break;
+    case Space_Interval:
+      result = sizeof (struct interval);
       break;
     default:
       break;
@@ -316,6 +325,9 @@ bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Space_Type xpntr_type)
 	  break;
 	case Space_Vectorlike:
 	  mem_w = MEM_TYPE_VECTORLIKE;
+	  break;
+	case Space_Interval:
+	  mem_w = MEM_TYPE_INTERVAL;
 	  break;
 	default:
 	  emacs_abort ();
@@ -510,7 +522,9 @@ is unibyte unless INIT is not ASCII or MULTIBYTE is non-nil.  */)
   record_unwind_protect_ptr (restore_string_allocator, static_string_allocator);
   record_unwind_protect_ptr (restore_interval_allocator, static_interval_allocator);
   static_string_allocator = &allocate_string;
-  static_interval_allocator = &allocate_interval;
+  /* FIXME: a'int ready for primetime */
+  /* static_interval_allocator = &allocate_interval; */
+  (void) &allocate_interval;
   return unbind_to (count, Fmake_string (length, init, multibyte));
 }
 

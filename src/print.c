@@ -596,7 +596,7 @@ temp_output_buffer_setup (const char *bufname)
 
 static void print (Lisp_Object, Lisp_Object, bool);
 static void print_preprocess (Lisp_Object);
-static void print_preprocess_string (INTERVAL, void *);
+static void print_preprocess_string (INTERVAL *, void *);
 static void print_object (Lisp_Object, Lisp_Object, bool);
 
 DEFUN ("terpri", Fterpri, Sterpri, 0, 2, 0,
@@ -1380,26 +1380,26 @@ pp_stack_pop (void)
 static void
 print_preprocess (Lisp_Object obj)
 {
-  eassert (!NILP (Vprint_circle));
+  eassert (! NILP (Vprint_circle));
   ptrdiff_t base_sp = ppstack.sp;
 
   for (;;)
     {
       if (PRINT_CIRCLE_CANDIDATE_P (obj))
 	{
-	  if (!HASH_TABLE_P (Vprint_number_table))
+	  if (! HASH_TABLE_P (Vprint_number_table))
 	    Vprint_number_table = CALLN (Fmake_hash_table, QCtest, Qeq);
 
 	  Lisp_Object num = Fgethash (obj, Vprint_number_table, Qnil);
-	  if (!NILP (num)
+	  if (! NILP (num)
 	      /* If Vprint_continuous_numbering is non-nil and OBJ is a gensym,
 		 always print the gensym with a number.  This is a special for
 		 the lisp function byte-compile-output-docform.  */
-	      || (!NILP (Vprint_continuous_numbering)
+	      || (! NILP (Vprint_continuous_numbering)
 		  && SYMBOLP (obj)
 		  && !SYMBOL_INTERNED_P (obj)))
 	    { /* OBJ appears more than once.  Let's remember that.  */
-	      if (!FIXNUMP (num))
+	      if (! FIXNUMP (num))
 		{
 		  print_number_index++;
 		  /* Negative number indicates it hasn't been printed yet.  */
@@ -1417,12 +1417,15 @@ print_preprocess (Lisp_Object obj)
 		case Lisp_String:
 		  /* A string may have text properties,
 		     which can be circular. */
-		  traverse_intervals_noorder (string_intervals (obj),
-					      print_preprocess_string, NULL);
+		  {
+		    INTERVAL interval = string_intervals (obj);
+		    traverse_intervals_noorder (&interval,
+						print_preprocess_string, NULL);
+		  }
 		  break;
 
 		case Lisp_Cons:
-		  if (!NILP (XCDR (obj)))
+		  if (! NILP (XCDR (obj)))
 		    pp_stack_push_value (XCDR (obj));
 		  obj = XCAR (obj);
 		  continue;
@@ -1472,9 +1475,9 @@ if `print-circle' is nil.  */)
 }
 
 static void
-print_preprocess_string (INTERVAL interval, void *arg)
+print_preprocess_string (INTERVAL *interval, void *arg)
 {
-  print_preprocess (interval->plist);
+  print_preprocess ((*interval)->plist);
 }
 
 static void print_check_string_charset_prop (INTERVAL interval, Lisp_Object string);

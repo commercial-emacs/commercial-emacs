@@ -232,19 +232,18 @@ intervals_equal (INTERVAL i0, INTERVAL i1)
    Pass FUNCTION two args: an interval, and ARG.  */
 
 void
-traverse_intervals_noorder (INTERVAL tree, void (*function) (INTERVAL, void *),
+traverse_intervals_noorder (INTERVAL *tree, void (*function) (INTERVAL *, void *),
 			    void *arg)
 {
-  /* Minimize stack usage.  */
-  while (tree)
+  for (INTERVAL *it = tree; *it != NULL; )
     {
-      (*function) (tree, arg);
-      if (!tree->right)
-	tree = tree->left;
+      (*function) (it, arg);
+      if ((*it)->right == NULL)
+	it = &(*it)->left;
       else
 	{
-	  traverse_intervals_noorder (tree->left, function, arg);
-	  tree = tree->right;
+	  traverse_intervals_noorder (&(*it)->left, function, arg);
+	  it = &(*it)->right;
 	}
     }
 }

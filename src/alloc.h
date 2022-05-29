@@ -154,6 +154,7 @@ enum _GL_ATTRIBUTE_PACKED mem_type
   MEM_TYPE_VECTORLIKE,
   /* Non-bool vectorlikes.  */
   MEM_TYPE_VBLOCK,
+  MEM_TYPE_INTERVAL,
   MEM_TYPE_NTYPES,
 };
 

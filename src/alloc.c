@@ -963,23 +963,33 @@ allocate_interval (void)
   return val;
 }
 
-/* Correct functional form for traverse_intervals_noorder().  */
+static void
+mark_interval_tree_functor (INTERVAL *i, void *dummy)
+{
+  eassert (! interval_marked_p (*i));
+  set_interval_marked (*i);
+  mark_object (&(*i)->plist);
+}
 
 static void
-mark_interval_tree_1 (INTERVAL i, void *dummy)
+mark_interval_tree_functor_mgc (INTERVAL *i, void *dummy)
 {
-  eassert (! interval_marked_p (i));
-  set_interval_marked (i);
-  mark_object (&i->plist);
+  eassert (! interval_marked_p (*i));
+  *i = mgc_flip_xpntr (*i, Space_Interval);
+  mark_object (&(*i)->plist);
 }
 
 /* Mark the interval tree rooted in I.  */
 
 static void
-mark_interval_tree (INTERVAL i)
+mark_interval_tree (INTERVAL *i)
 {
-  if (i && ! interval_marked_p (i))
-    traverse_intervals_noorder (i, mark_interval_tree_1, NULL);
+  if (! *i)
+    return;
+  if (mgc_xpntr_p (*i))
+    traverse_intervals_noorder (i, mark_interval_tree_functor_mgc, NULL);
+  else if (! interval_marked_p (*i))
+    traverse_intervals_noorder (i, mark_interval_tree_functor, NULL);
 }
 
 struct sblock
@@ -3752,7 +3762,7 @@ mark_maybe_pointer (void *const * p)
 	  if ((enum Lisp_Type) xpntr_type < Lisp_Type_Max)
 	    mark_automatic_object (make_lisp_ptr (xpntr, (enum Lisp_Type) xpntr_type));
 	  else if (xpntr_type == Space_Interval)
-	    mark_interval_tree ((INTERVAL) xpntr);
+	    mark_interval_tree ((INTERVAL *) &xpntr);
 	  else
 	    emacs_abort ();
 	  forwarded = mgc_fwd_xpntr (xpntr);
@@ -5130,7 +5140,7 @@ mark_buffer (struct buffer *buffer)
 
   /* ...but there are some buffer-specific things.  */
 
-  mark_interval_tree (buffer_intervals (buffer));
+  mark_interval_tree (&buffer->text->intervals);
 
   /* For now, we just don't mark the undo_list.  It's done later in
      a special way just before the sweep phase, and after stripping
@@ -5334,19 +5344,23 @@ gc_process_string (Lisp_Object *objp)
   else if (mgc_xpntr_p (s))
     {
       /* Do not use string_(set|get)_intervals here.  */
-      s->u.s.intervals = balance_intervals (s->u.s.intervals);
       XSETSTRING (*objp, mgc_flip_xpntr (s, Space_String));
-      sdata *data = SDATA_OF_LISP_STRING (s);
-      if (data->string != s)
-	eassert (data->string == XSTRING (*objp));
+      forwarded = mgc_fwd_xpntr (s);
+      if (! forwarded)
+	memory_full (SIZE_MAX);
       else
-	data->string = XSTRING (*objp);
-      mark_interval_tree (s->u.s.intervals);
+	{
+	  eassert ((void *) XSTRING (*objp) == forwarded);
+	  struct Lisp_String *s = (struct Lisp_String *) forwarded;
+	  SDATA_OF_LISP_STRING (s)->string = s;
+	  s->u.s.intervals = balance_intervals (s->u.s.intervals);
+	  mark_interval_tree (&s->u.s.intervals);
+	}
     }
   else if (! string_marked_p (s))
     {
       set_string_marked (s);
-      mark_interval_tree (s->u.s.intervals);
+      mark_interval_tree (&s->u.s.intervals);
     }
 }
 
