@@ -235,10 +235,6 @@ set_interval_plist (INTERVAL i, Lisp_Object plist)
    ? !NILP (prop)							\
    : invisible_prop (prop, BVAR (current_buffer, invisibility_spec)))
 
-/* Declared in alloc.c.  */
-
-extern INTERVAL make_interval (void) ATTRIBUTE_RETURNS_NONNULL;
-
 /* Declared in intervals.c.  */
 
 extern INTERVAL create_root_interval (Lisp_Object);

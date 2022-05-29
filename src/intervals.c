@@ -87,9 +87,7 @@ copy_interval_parent (INTERVAL d, INTERVAL s)
 INTERVAL
 create_root_interval (Lisp_Object parent)
 {
-  INTERVAL new;
-
-  new = make_interval ();
+  INTERVAL new = static_interval_allocator ();
 
   if (! STRINGP (parent))
     {
@@ -491,7 +489,7 @@ buffer_balance_intervals (struct buffer *b)
 INTERVAL
 split_interval_right (INTERVAL interval, ptrdiff_t offset)
 {
-  INTERVAL new = make_interval ();
+  INTERVAL new = static_interval_allocator ();
   ptrdiff_t position = interval->position;
   ptrdiff_t new_length = LENGTH (interval) - offset;
 
@@ -535,7 +533,7 @@ split_interval_right (INTERVAL interval, ptrdiff_t offset)
 INTERVAL
 split_interval_left (INTERVAL interval, ptrdiff_t offset)
 {
-  INTERVAL new = make_interval ();
+  INTERVAL new = static_interval_allocator ();
   ptrdiff_t new_length = offset;
 
   new->position = interval->position;
@@ -1488,7 +1486,7 @@ merge_interval_left (register INTERVAL i)
 static INTERVAL
 reproduce_interval (INTERVAL source)
 {
-  register INTERVAL target = make_interval ();
+  INTERVAL target = static_interval_allocator ();
 
   eassert (LENGTH (source) > 0);
 
@@ -2242,7 +2240,7 @@ copy_intervals (INTERVAL tree, ptrdiff_t start, ptrdiff_t length)
       && DEFAULT_INTERVAL_P (i))
     return NULL;
 
-  new = make_interval ();
+  new = static_interval_allocator ();
   new->position = 0;
   got = (LENGTH (i) - (start - i->position));
   new->total_length = length;

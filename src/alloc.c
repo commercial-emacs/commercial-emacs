@@ -81,6 +81,7 @@ enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 static bool gc_inhibited;
 struct Lisp_String *(*static_string_allocator) (void);
 struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t len, bool q_clear);
+INTERVAL (*static_interval_allocator) (void);
 
 #ifdef HAVE_PDUMPER
 /* Number of finalizers run: used to loop over GC until we stop
@@ -931,8 +932,8 @@ static struct interval_block *interval_block;
 static int interval_block_index = BLOCK_NINTERVALS;
 static INTERVAL interval_free_list;
 
-INTERVAL
-make_interval (void)
+static INTERVAL
+allocate_interval (void)
 {
   INTERVAL val;
 
@@ -6401,6 +6402,7 @@ init_runtime (void)
   pure_size = PURESIZE;
   static_string_allocator = &allocate_string;
   static_vector_allocator = &allocate_vector;
+  static_interval_allocator = &allocate_interval;
   mem_init ();
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);

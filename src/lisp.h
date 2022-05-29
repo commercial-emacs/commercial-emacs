@@ -4089,6 +4089,7 @@ extern Lisp_Object pure_cons (Lisp_Object, Lisp_Object);
 extern Lisp_Object initialize_vector (ptrdiff_t, Lisp_Object);
 extern struct Lisp_String *(*static_string_allocator) (void);
 extern struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t, bool);
+extern INTERVAL (*static_interval_allocator) (void);
 
 INLINE Lisp_Object
 make_vector (ptrdiff_t size)
