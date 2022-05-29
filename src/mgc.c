@@ -393,6 +393,20 @@ mgc_flip_space (void)
   space_in_use = to;
 }
 
+static INTERVAL
+allocate_interval (void)
+{
+  INTERVAL ret = bump_alloc_ptr (space_in_use, sizeof *ret, Space_Interval);
+  if (ret)
+    {
+      intervals_consed++;
+      bytes_since_gc += sizeof *ret;
+      RESET_INTERVAL (ret);
+      ret->gcmarkbit = 0;
+    }
+  return ret;
+}
+
 DEFUN ("mgc-cons", Fmgc_cons, Smgc_cons, 2, 2, 0,
        doc: /* Create a new cons, give it CAR and CDR as components,
 	       and return it.  */)
@@ -467,6 +481,12 @@ restore_string_allocator (void *ptr)
   static_string_allocator = ptr;
 }
 
+static void
+restore_interval_allocator (void *ptr)
+{
+  static_interval_allocator = ptr;
+}
+
 static struct Lisp_String *
 allocate_string (void)
 {
@@ -488,7 +508,9 @@ is unibyte unless INIT is not ASCII or MULTIBYTE is non-nil.  */)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   record_unwind_protect_ptr (restore_string_allocator, static_string_allocator);
+  record_unwind_protect_ptr (restore_interval_allocator, static_interval_allocator);
   static_string_allocator = &allocate_string;
+  static_interval_allocator = &allocate_interval;
   return unbind_to (count, Fmake_string (length, init, multibyte));
 }
 

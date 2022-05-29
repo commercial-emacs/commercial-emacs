@@ -959,7 +959,7 @@ allocate_interval (void)
   bytes_since_gc += sizeof (struct interval);
   intervals_consed++;
   RESET_INTERVAL (val);
-  val->gcmarkbit = 0;
+  val->gcmarkbit = false;
   return val;
 }
 
@@ -1344,7 +1344,6 @@ sweep_strings (void)
       for (i = 0; i < BLOCK_NSTRINGS; ++i)
 	{
 	  struct Lisp_String *s = b->strings + i;
-	  eassert (! mgc_xpntr_p (s));
 	  if (s->u.s.data != NULL) /* means S is live but is it marked?  */
 	    {
 	      if (XSTRING_MARKED_P (s))
@@ -3749,12 +3748,16 @@ mark_maybe_pointer (void *const * p)
       void *forwarded = mgc_fwd_xpntr (xpntr);
       if (! forwarded)
 	{
-	  if ((enum Lisp_Type) xpntr_type >= Lisp_Type_Max)
-	    emacs_abort ();
-	  mark_automatic_object (make_lisp_ptr (xpntr, (enum Lisp_Type) xpntr_type));
 	  ret = true;
+	  if ((enum Lisp_Type) xpntr_type < Lisp_Type_Max)
+	    mark_automatic_object (make_lisp_ptr (xpntr, (enum Lisp_Type) xpntr_type));
+	  else if (xpntr_type == Space_Interval)
+	    mark_interval_tree ((INTERVAL) xpntr);
+	  else
+	    emacs_abort ();
 	  forwarded = mgc_fwd_xpntr (xpntr);
 	}
+      eassert (forwarded);
       ptrdiff_t offset;
       INT_SUBTRACT_WRAPV ((uintptr_t) *p, (uintptr_t) xpntr, &offset);
       INT_ADD_WRAPV ((uintptr_t) forwarded, offset, (uintptr_t *) p);
@@ -5772,7 +5775,7 @@ sweep_void (void **free_list,
        blk != NULL;
        blk = *prev, blk_end = block_nitems)
     {
-      size_t num_free = 0;
+      size_t blk_free = 0;
 
       /* Currently BLOCK_NITEMS < BITS_PER_BITS_WORD (gcmarkbits needs
 	 but one word to describe all items in the block), so the
@@ -5817,7 +5820,7 @@ sweep_void (void **free_list,
 	      }
 	    else
 	      {
-		num_free++;
+		blk_free++;
 
 		/* splice RECLAIM into free list. */
 		void *reclaim = (void *) ((uintptr_t) blk + offset_items + c * xsize),
@@ -5854,7 +5857,7 @@ sweep_void (void **free_list,
 
       /* If BLK contains only free items and we've already seen more
          than two such blocks, then deallocate BLK.  */
-      if (num_free >= block_nitems && cum_free > block_nitems)
+      if (blk_free >= block_nitems && cum_free > block_nitems)
         {
 	  void *free_next = (void *) ((uintptr_t) blk + offset_items
 				      + 0 * xsize + offset_chain_from_item);
@@ -5885,7 +5888,7 @@ sweep_void (void **free_list,
       else
         {
           prev = block_next;
-	  cum_free += num_free;
+	  cum_free += blk_free;
         }
     }
 
@@ -5903,7 +5906,7 @@ sweep_intervals (void)
 
   for (struct interval_block *iblk; (iblk = *iprev); )
     {
-      int num_free = 0;
+      int blk_free = 0;
       for (int i = 0;
 	   /* For first block, process up to prevailing
 	      INTERVAL_BLOCK_INDEX.  Subsequent blocks should contain
@@ -5917,18 +5920,18 @@ sweep_intervals (void)
             {
               set_interval_parent (&iblk->intervals[i], interval_free_list);
               interval_free_list = &iblk->intervals[i];
-              num_free++;
+              blk_free++;
             }
           else
             {
               cum_used++;
-              iblk->intervals[i].gcmarkbit = 0;
+              iblk->intervals[i].gcmarkbit = false;
             }
         }
 
       /* If BLK contains only free items and we've already seen more
          than two such blocks, then deallocate BLK.  */
-      if (num_free >= BLOCK_NINTERVALS && cum_free > BLOCK_NINTERVALS)
+      if (blk_free >= BLOCK_NINTERVALS && cum_free > BLOCK_NINTERVALS)
         {
           *iprev = iblk->next;
           /* Unhook from the free list.  */
@@ -5937,7 +5940,7 @@ sweep_intervals (void)
         }
       else
         {
-          cum_free += num_free;
+          cum_free += blk_free;
           iprev = &iblk->next;
         }
     }
@@ -5955,11 +5958,11 @@ sweep_symbols (void)
   symbol_free_list = NULL;
 
   for (int i = 0; i < ARRAYELTS (lispsym); i++)
-    lispsym[i].u.s.gcmarkbit = 0;
+    lispsym[i].u.s.gcmarkbit = false;
 
   for (sblk = symbol_block; sblk; sblk = *sprev)
     {
-      int num_free = 0;
+      int blk_free = 0;
       struct Lisp_Symbol *sym = sblk->symbols;
 
       /* First iteration processes up to prevailing
@@ -5973,7 +5976,7 @@ sweep_symbols (void)
           if (sym->u.s.gcmarkbit)
             {
               ++cum_used;
-              sym->u.s.gcmarkbit = 0;
+              sym->u.s.gcmarkbit = false;
               eassert (valid_lisp_object_p (sym->u.s.function));
             }
 	  else
@@ -5987,13 +5990,13 @@ sweep_symbols (void)
               sym->u.s.next = symbol_free_list;
               symbol_free_list = sym;
               symbol_free_list->u.s.function = dead_object ();
-              ++num_free;
+              ++blk_free;
             }
         }
 
       /* If BLK contains only free items and we've already seen more
          than two such blocks, then deallocate BLK.  */
-      if (num_free >= BLOCK_NSYMBOLS && cum_free > BLOCK_NSYMBOLS)
+      if (blk_free >= BLOCK_NSYMBOLS && cum_free > BLOCK_NSYMBOLS)
         {
           *sprev = sblk->next;
           /* Unhook from the free list.  */
@@ -6002,7 +6005,7 @@ sweep_symbols (void)
         }
       else
         {
-          cum_free += num_free;
+          cum_free += blk_free;
           sprev = &sblk->next;
         }
     }
