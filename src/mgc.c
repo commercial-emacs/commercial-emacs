@@ -367,9 +367,11 @@ mgc_flip_space (void)
 		|| w < from->block_words_used));
 	   (void) xpntr)
 	{
+	  void *forwarded = mgc_fwd_xpntr (xpntr);
 	  enum Lisp_Type xpntr_type = xpntr_at (from, b, w, NULL);
+	  eassert (forwarded);
 	  eassert (xpntr_type != Lisp_Type_Unused0);
-	  size_t bytespan = nbytes_of (xpntr_type, xpntr);
+	  size_t bytespan = nbytes_of (xpntr_type, forwarded);
 	  if (xpntr_type == Lisp_String && ! FORWARD_XPNTR_GET (xpntr))
 	    {
 	      /* S goes to dead state.  */
@@ -610,15 +612,15 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
 	  INT_ADD_WRAPV ((uintptr_t) xpntr, bytespan, (uintptr_t *) &xpntr);
 	}
     }
-  return list5 (Fcons (Fmake_symbol (build_string ("symbol")),
+  return list5 (Fcons (Qsymbols,
 		       make_fixnum (tally[Lisp_Symbol])),
-		Fcons (Fmake_symbol (build_string ("string")),
+		Fcons (Qstrings,
 		       make_fixnum (tally[Lisp_String])),
-		Fcons (Fmake_symbol (build_string ("vectorlike")),
+		Fcons (Qvectors,
 		       make_fixnum (tally[Lisp_Vectorlike])),
-		Fcons (Fmake_symbol (build_string ("cons")),
+		Fcons (Qconses,
 		       make_fixnum (tally[Lisp_Cons])),
-		Fcons (Fmake_symbol (build_string ("float")),
+		Fcons (Qfloats,
 		       make_fixnum (tally[Lisp_Float])));
 }
 

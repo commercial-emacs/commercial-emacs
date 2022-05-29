@@ -64,4 +64,12 @@
   (should-error
    (mgc-make-string 100 "not-a-numeric")))
 
+(ert-deftest flip_one_vector ()
+  (let* ((ocount (assq 'vectors (mgc-counts)))
+         (bar (mgc-vector 1)))
+    (garbage-collect)
+    ())
+  (should-error
+   (mgc-make-string 100 "not-a-numeric")))
+
 ;;; alloc-tests.el ends here
