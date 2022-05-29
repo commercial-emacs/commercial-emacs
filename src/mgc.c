@@ -357,22 +357,22 @@ mgc_flip_space (void)
 {
   mgc_semispace *from = space_in_use,
     *to = (from == &space0) ? &space1 : &space0;
-  for (int b = 0; b <= (int) from->current_block; ++b)
+  reset_space (from);
+  space_in_use = to;
+  for (int b = 0; b <= (int) space_in_use->current_block; ++b)
     {
       size_t w = 0;
-      for (void *xpntr = from->block_addrs[b];
-	   (xpntr != from->alloc_ptr
+      for (void *xpntr = space_in_use->block_addrs[b];
+	   (xpntr != space_in_use->alloc_ptr
 	    && ! TERM_BLOCK_P (xpntr)
-	    && (b != (int) from->current_block
-		|| w < from->block_words_used));
+	    && (b != (int) space_in_use->current_block
+		|| w < space_in_use->block_words_used));
 	   (void) xpntr)
 	{
-	  void *forwarded = mgc_fwd_xpntr (xpntr);
-	  enum Lisp_Type xpntr_type = xpntr_at (from, b, w, NULL);
-	  eassert (forwarded);
+	  enum Lisp_Type xpntr_type = xpntr_at (space_in_use, b, w, NULL);
 	  eassert (xpntr_type != Lisp_Type_Unused0);
-	  size_t bytespan = nbytes_of (xpntr_type, forwarded);
-	  if (xpntr_type == Lisp_String && ! FORWARD_XPNTR_GET (xpntr))
+	  size_t bytespan = nbytes_of (xpntr_type, xpntr);
+	  if (xpntr_type == Lisp_String)
 	    {
 	      /* S goes to dead state.  */
 	      struct Lisp_String *s = (struct Lisp_String *) xpntr;
@@ -394,8 +394,6 @@ mgc_flip_space (void)
 	  INT_ADD_WRAPV ((uintptr_t) xpntr, bytespan, (uintptr_t *) &xpntr);
 	}
     }
-  reset_space (from);
-  space_in_use = to;
 }
 
 DEFUN ("mgc-cons", Fmgc_cons, Smgc_cons, 2, 2, 0,
