@@ -18,6 +18,27 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
+/* Defining new Lisp types.
+
+   When integrating outside libraries into Lisp-space, we sometimes
+   only need to stash a C pointer in a Lisp_Object handle as opposed
+   to surfacing the new data into a first-class Lisp type like
+   Lisp_Cons.  So consider Lisp_Misc_Ptr first.
+
+   Often, however, we'll desire some user visibility or handling at
+   the Lisp level.  So-called pseudovectors (see alloc.c) institute a
+   class pattern which commingles the raw pointer with first-class
+   Lisp objects to manage it.  Consider genericizing your type as a
+   PVEC_OTHER (see xterm.c for an example) before expanding the
+   pvec_type enumeration.
+
+   For a new pvec_type, limit its size to VBLOCK_BYTES_MAX bytes
+   (alloc.c).  Otherwise you will need to change sweep_vectors()
+   (alloc.c). Then add a switch case to print_object() and possibly
+   also print_preprocess(), free_by_pvtype(), and Ftype_of().  Then
+   update `cl--typeof-types'.
+*/
+
 #ifndef EMACS_LISP_H
 #define EMACS_LISP_H
 
@@ -190,10 +211,6 @@ extern bool suppress_checking EXTERNALLY_VISIBLE;
     ? (void) 0							\
     : die (# cond, __FILE__, __LINE__))
 #endif /* ENABLE_CHECKING */
-
-/* Use the configure flag --enable-check-lisp-object-type to make
-   Lisp_Object use a struct type instead of the default int.  The flag
-   causes CHECK_LISP_OBJECT_TYPE to be defined.  */
 
 enum Lisp_Bits
   {
@@ -435,15 +452,6 @@ typedef EMACS_INT Lisp_Word;
 # endif
 #endif
 
-
-/* Define the fundamental Lisp data structures.  */
-
-/* This is the set of Lisp data types.  If you want to define a new
-   data type, read the comments after Lisp_Fwd_Type definition
-   below.  */
-
-/* Fixnums use 2 tags, to give them one extra bit, thus
-   extending their range from, e.g., -2^28..2^28-1 to -2^29..2^29-1.  */
 #define INTMASK (EMACS_INT_MAX >> (INTTYPEBITS - 1))
 #define case_Lisp_Int case Lisp_Int0: case Lisp_Int1
 
@@ -458,38 +466,25 @@ typedef EMACS_INT Lisp_Word;
 
 enum _GL_ATTRIBUTE_PACKED Lisp_Type
   {
-    /* Symbol.  XSYMBOL (object) points to a struct Lisp_Symbol.  */
+    /* bc78ff2 First so that Qnil can be zero.  Bug#15880. */
     Lisp_Symbol = 0,
 
-    /* Type 1 is currently unused.  */
     Lisp_Type_Unused0 = 1,
 
-    /* Fixnum.  XFIXNUM (obj) is the integer value.  */
+    /* 2de9f71 Fixnums use 2 tags, to give them one extra bit, thus
+       extending their range from, e.g., -2^28..2^28-1 to -2^29..2^29-1.  */
     Lisp_Int0 = 2,
     Lisp_Int1 = USE_LSB_TAG ? 6 : 3,
 
-    /* String.  XSTRING (object) points to a struct Lisp_String.
-       The length of the string, and its contents, are stored therein.  */
     Lisp_String = 4,
-
-    /* Vector of Lisp objects, or something resembling it.
-       XVECTOR (object) points to a struct Lisp_Vector, which contains
-       the size and contents.  The size field also contains the type
-       information, if it's not a real vector object.  */
     Lisp_Vectorlike = 5,
-
-    /* Cons.  XCONS (object) points to a struct Lisp_Cons.  */
     Lisp_Cons = USE_LSB_TAG ? 3 : 6,
-
-    /* Must be last entry in Lisp_Type enumeration.  */
     Lisp_Float = 7,
-
     Lisp_Type_Max,
   };
 
-/* These are the types of forwarding objects used in the value slot
-   of symbols for special built-in variables whose value is stored in
-   C variables.  */
+/* The value slot of a symbol asserting one of these faux types
+   indicates the true value is stored in an auxiliary C variable.  */
 enum _GL_ATTRIBUTE_PACKED Lisp_Fwd_Type
   {
     Lisp_Fwd_Int,		/* Fwd to a C `int' variable.  */
@@ -499,58 +494,14 @@ enum _GL_ATTRIBUTE_PACKED Lisp_Fwd_Type
     Lisp_Fwd_Kboard_Obj		/* Fwd to a Lisp_Object field of kboards.  */
   };
 
-/* If you want to define a new Lisp data type, here are some
-   instructions.
+/* Ordinarily Lisp_Object and Lisp_Word are the same type, which
+   allows programmer errors like `Lisp_Object x = 0`.
 
-   First, there are already a couple of Lisp types that can be used if
-   your new type does not need to be exposed to Lisp programs nor
-   displayed to users.  These are Lisp_Misc_Ptr and PVEC_OTHER,
-   which are both vectorlike objects.  The former
-   is suitable for stashing a pointer in a Lisp object; the pointer
-   might be to some low-level C object that contains auxiliary
-   information.  The latter is useful for vector-like Lisp objects
-   that need to be used as part of other objects, but which are never
-   shown to users or Lisp code (search for PVEC_OTHER in xterm.c for
-   an example).
-
-   These two types don't look pretty when printed, so they are
-   unsuitable for Lisp objects that can be exposed to users.
-
-   To define a new data type, add a pseudovector subtype by extending
-   the pvec_type enumeration.  A pseudovector provides one or more
-   slots for Lisp objects, followed by struct members that are
-   accessible only from C.
-
-   There is no way to explicitly free a Lisp Object; only the garbage
-   collector frees them.
-
-   For a new pseudovector, it's highly desirable to limit the size
-   of your data type by VBLOCK_BYTES_MAX bytes (defined in alloc.c).
-   Otherwise you will need to change sweep_vectors (also in alloc.c).
-
-   Then you will need to add switch branches in print.c (in
-   print_object, to print your object, and possibly also in
-   print_preprocess) and to alloc.c, to mark your object (in
-   mark_object) and to free it (in gc_sweep).  The latter is also the
-   right place to call any code specific to your data type that needs
-   to run when the object is recycled -- e.g., free any additional
-   resources allocated for it that are not Lisp objects.  You can even
-   make a pointer to the function that frees the resources a slot in
-   your object -- this way, the same object could be used to represent
-   several disparate C structures.
-
-   In addition, you need to add switch branches in data.c for Ftype_of.
-
-   You also need to add the new type to the constant
-   `cl--typeof-types' in lisp/emacs-lisp/cl-preloaded.el.  */
-
-/* A Lisp_Object is a tagged pointer or integer.  Ordinarily it is a
-   Lisp_Word.  However, if CHECK_LISP_OBJECT_TYPE, it is a wrapper
-   around Lisp_Word, to catch conflations like 'Lisp_Object x = 0;'.
+   Setting the configure flag `--enable-check-lisp-object-type`
+   catches this error at the minimal cost of a struct indirection.
 
    LISP_INITIALLY (W) initializes a Lisp object with a tagged value
-   that is a Lisp_Word W.  It can be used in a static initializer.  */
-
+   that is a Lisp_Word W.  It can be used in a static initializer. */
 #ifdef CHECK_LISP_OBJECT_TYPE
 typedef struct Lisp_Object { Lisp_Word i; } Lisp_Object;
 # define LISP_OBJECT_IS_STRUCT
@@ -562,8 +513,6 @@ typedef Lisp_Word Lisp_Object;
 # define LISP_INITIALLY(w) (w)
 enum CHECK_LISP_OBJECT_TYPE { CHECK_LISP_OBJECT_TYPE = false };
 #endif
-
-/* Forward declarations.  */
 
 /* Defined in this file.  */
 INLINE void set_sub_char_table_contents (Lisp_Object, ptrdiff_t,

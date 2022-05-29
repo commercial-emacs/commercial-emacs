@@ -3508,7 +3508,7 @@ dump_decode_dump_reloc (Lisp_Object lreloc)
   struct dump_reloc reloc;
   dump_reloc_set_type (&reloc,
 		       (enum dump_reloc_type) XFIXNUM (dump_pop (&lreloc)));
-  eassert (reloc.type <= RELOC_DUMP_TO_EMACS_LV + Lisp_Float);
+  eassert (reloc.type < RELOC_DUMP_TO_EMACS_LV + Lisp_Type_Max);
   dump_reloc_set_offset (&reloc, dump_off_from_lisp (dump_pop (&lreloc)));
   eassert (NILP (lreloc));
   return reloc;
@@ -5316,8 +5316,7 @@ dump_do_emacs_relocation (const uintptr_t dump_base,
     case RELOC_EMACS_DUMP_LV:
     case RELOC_EMACS_EMACS_LV:
       {
-        /* Lisp_Float is the maximum lisp type.  */
-        eassume (reloc.length <= Lisp_Float);
+        eassume (reloc.length < Lisp_Type_Max);
         void *obj_ptr = reloc.type == RELOC_EMACS_DUMP_LV
           ? dump_ptr (dump_base, reloc.u.dump_offset)
           : emacs_ptr_at (reloc.u.emacs_offset2);
