@@ -56,7 +56,7 @@ jobs:
       id: cache-tree-sitter
       with:
         path: tree-sitter
-        key: cache-tree-sitter-${{ runner.os }}-000
+        key: cache-tree-sitter-${{ runner.os }}-001
     - uses: actions/checkout@v3
       if: steps.cache-tree-sitter.outputs.cache-hit != 'true'
       with:
@@ -71,7 +71,7 @@ jobs:
         mkdir -p $HOME/.local
         make -C tree-sitter install-ci
         ./autogen.sh
-        LDFLAGS="-L$HOME/.local/lib" CFLAGS="-g3 -O2 -I$HOME/.local/include/" ./configure --prefix=$HOME/.local --with-tree-sitter
+        ./configure --prefix=$HOME/.local --with-tree-sitter
         make -j2
     - name: test
       run: |
