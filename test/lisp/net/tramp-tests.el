@@ -5091,6 +5091,7 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
   :tags '(:expensive-test :tramp-asynchronous-processes :unstable)
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-windows-nt-p)))
   (skip-unless (not (tramp--test-crypt-p)))
   ;; Since Emacs 27.1.
   (skip-unless (macrop 'with-connection-local-variables))
