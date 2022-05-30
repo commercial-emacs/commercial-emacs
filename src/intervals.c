@@ -235,6 +235,9 @@ void
 traverse_intervals_noorder (INTERVAL *tree, void (*function) (INTERVAL *, void *),
 			    void *arg)
 {
+  /* In 19d4e9a, monnier iterates right, and recurses left (or just
+     iterates left if right's NULL), thus saving half the call
+     stack it otherwise would have incurred.  */
   for (INTERVAL *it = tree; *it != NULL; )
     {
       (*function) (it, arg);
