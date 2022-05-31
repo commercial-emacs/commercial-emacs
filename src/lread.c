@@ -191,12 +191,6 @@ static int readbyte_from_string (int, Lisp_Object);
 
 /* Same as READCHAR but set *MULTIBYTE to the multibyteness of the source.  */
 #define READCHAR_REPORT_MULTIBYTE(multibyte) readchar (readcharfun, multibyte)
-#define ANNOTATE(atom)							\
-  (annotated && ! special_count && ! vector_count && ! byte_code_count	\
-   && ! char_table_code_count && ! sub_char_table_code_count		\
-   && ! string_props_count						\
-   ? Fcons (make_fixnum (initial_charpos), atom)			\
-   : atom)
 
 /* When READCHARFUN is Qget_file_char, Qget_emacs_mule_file_char,
    Qlambda, or a cons, we use this to keep an unread character because
@@ -3499,10 +3493,6 @@ skip_space_and_comments (Lisp_Object readcharfun)
 enum read_entry_type
 {
 				/* preceding syntactic context */
-  RE_list_start,		/* "(" */
-
-  RE_list,			/* "(" (+ OBJECT) */
-  RE_list_dot,			/* "(" (+ OBJECT) "." */
 
   RE_vector,			/* "[" (* OBJECT) */
   RE_record,			/* "#s(" (* OBJECT) */
@@ -3510,8 +3500,13 @@ enum read_entry_type
   RE_sub_char_table,		/* "#^^[" (* OBJECT) */
   RE_byte_code,			/* "#[" (* OBJECT) */
   RE_string_props,		/* "#(" (* OBJECT) */
-
   RE_special,			/* "'" | "#'" | "`" | "," | ",@" */
+  RE_quoted_max,                /* preclude ANNOTATE for earlier types */
+
+  RE_list_start,		/* "(" */
+
+  RE_list,			/* "(" (+ OBJECT) */
+  RE_list_dot,			/* "(" (+ OBJECT) "." */
 
   RE_numbered,			/* "#" (+ DIGIT) "=" */
 };
@@ -3554,6 +3549,22 @@ struct read_stack
 
 static struct read_stack rdstack = {NULL, 0, 0};
 
+static size_t quoted_counts[RE_quoted_max];
+
+static inline bool
+quoted_parse_state (void)
+{
+  for (int i = 0; i < RE_quoted_max; ++i)
+    if (quoted_counts[i])
+      return true;
+  return false;
+}
+
+#define ANNOTATE(atom)					\
+  (annotated && ! quoted_parse_state()			\
+   ? Fcons (make_fixnum (initial_charpos), atom)	\
+   : atom)
+
 void
 mark_lread (void)
 {
@@ -3585,6 +3596,8 @@ mark_lread (void)
 	  mark_object (&e->u.numbered.number);
 	  mark_object (&e->u.numbered.placeholder);
 	  break;
+	default:
+	  emacs_abort ();
 	}
     }
 }
@@ -3596,39 +3609,13 @@ read_stack_top (void)
   return &rdstack.stack[rdstack.sp - 1];
 }
 
-static size_t special_count = 0;
-static size_t vector_count = 0;
-static size_t byte_code_count = 0;
-static size_t char_table_code_count = 0;
-static size_t sub_char_table_code_count = 0;
-static size_t string_props_count = 0;
 static inline struct read_stack_entry *
 read_stack_pop (void)
 {
   eassume (rdstack.sp > 0);
-  switch (read_stack_top ()->type)
-    {
-    case RE_special:
-      special_count--;
-      break;
-    case RE_vector:
-      vector_count--;
-      break;
-    case RE_byte_code:
-      byte_code_count--;
-      break;
-    case RE_char_table:
-      char_table_code_count--;
-      break;
-    case RE_sub_char_table:
-      sub_char_table_code_count--;
-      break;
-    case RE_string_props:
-      string_props_count--;
-      break;
-    default:
-      break;
-    }
+  ptrdiff_t quote_type = read_stack_top ()->type;
+  if (quote_type < RE_quoted_max)
+    quoted_counts[quote_type]--;
   return &rdstack.stack[--rdstack.sp];
 }
 
@@ -3653,29 +3640,9 @@ read_stack_push (struct read_stack_entry e)
   if (rdstack.sp >= rdstack.size)
     grow_read_stack ();
   rdstack.stack[rdstack.sp++] = e;
-  switch (read_stack_top ()->type)
-    {
-    case RE_special:
-      special_count++;
-      break;
-    case RE_vector:
-      vector_count++;
-      break;
-    case RE_byte_code:
-      byte_code_count++;
-      break;
-    case RE_char_table:
-      char_table_code_count++;
-      break;
-    case RE_sub_char_table:
-      sub_char_table_code_count++;
-      break;
-    case RE_string_props:
-      string_props_count++;
-      break;
-    default:
-      break;
-    }
+  ptrdiff_t quote_type = read_stack_top ()->type;
+  if (quote_type < RE_quoted_max)
+    quoted_counts[quote_type]++;
 }
 
 /* Read a Lisp object.  */
