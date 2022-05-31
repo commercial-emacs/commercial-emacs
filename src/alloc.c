@@ -244,6 +244,7 @@ static bool vector_marked_p (const struct Lisp_Vector *);
 static void set_vector_marked (struct Lisp_Vector *);
 static bool interval_marked_p (INTERVAL);
 static void set_interval_marked (INTERVAL);
+static void mark_interval_tree (INTERVAL *i);
 
 static bool
 deadp (Lisp_Object x)
@@ -975,8 +976,15 @@ static void
 mark_interval_tree_functor_mgc (INTERVAL *i, void *dummy)
 {
   eassert (! interval_marked_p (*i));
-  *i = mgc_flip_xpntr (*i, Space_Interval);
-  mark_object (&(*i)->plist);
+  if (mgc_xpntr_p (*i) && ! mgc_fwd_xpntr (*i))
+    {
+      *i = mgc_flip_xpntr (*i, Space_Interval);
+      if (INTERVAL_HAS_OBJECT (*i))
+	mark_object (&(*i)->up.obj);
+      else if (INTERVAL_HAS_PARENT (*i))
+	mark_interval_tree (&(*i)->up.interval);
+      mark_object (&(*i)->plist);
+    }
 }
 
 /* Mark the interval tree rooted in I.  */
@@ -987,7 +995,12 @@ mark_interval_tree (INTERVAL *i)
   if (! *i)
     return;
   if (mgc_xpntr_p (*i))
-    traverse_intervals_noorder (i, mark_interval_tree_functor_mgc, NULL);
+    {
+      /* INTERVAL *root = i; */
+      /* for ( ; ! NULL_PARENT (*root); root = &(*root)->up.interval); */
+      /* eassert (mgc_xpntr_p (*root)); */
+      traverse_intervals_noorder (i, mark_interval_tree_functor_mgc, NULL);
+    }
   else if (! interval_marked_p (*i))
     traverse_intervals_noorder (i, mark_interval_tree_functor, NULL);
 }
@@ -5339,11 +5352,11 @@ gc_process_string (Lisp_Object *objp)
 	memory_full (SIZE_MAX);
       else
 	{
-	  eassert ((void *) XSTRING (*objp) == forwarded);
-	  struct Lisp_String *s = (struct Lisp_String *) forwarded;
-	  SDATA_OF_LISP_STRING (s)->string = s;
-	  s->u.s.intervals = balance_intervals (s->u.s.intervals);
-	  mark_interval_tree (&s->u.s.intervals);
+	  struct Lisp_String *s1 = (struct Lisp_String *) forwarded;
+	  eassert ((void *) XSTRING (*objp) == (void *) s1);
+	  SDATA_OF_LISP_STRING (s1)->string = s1;
+	  s1->u.s.intervals = balance_intervals (s1->u.s.intervals);
+	  mark_interval_tree (&s1->u.s.intervals);
 	}
     }
   else if (! string_marked_p (s))
