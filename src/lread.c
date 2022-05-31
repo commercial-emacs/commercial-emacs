@@ -194,6 +194,7 @@ static int readbyte_from_string (int, Lisp_Object);
 #define ANNOTATE(atom)							\
   (annotated && ! special_count && ! vector_count && ! byte_code_count	\
    && ! char_table_code_count && ! sub_char_table_code_count		\
+   && ! string_props_count						\
    ? Fcons (make_fixnum (initial_charpos), atom)			\
    : atom)
 
@@ -3600,6 +3601,7 @@ static size_t vector_count = 0;
 static size_t byte_code_count = 0;
 static size_t char_table_code_count = 0;
 static size_t sub_char_table_code_count = 0;
+static size_t string_props_count = 0;
 static inline struct read_stack_entry *
 read_stack_pop (void)
 {
@@ -3620,6 +3622,9 @@ read_stack_pop (void)
       break;
     case RE_sub_char_table:
       sub_char_table_code_count--;
+      break;
+    case RE_string_props:
+      string_props_count--;
       break;
     default:
       break;
@@ -3664,6 +3669,9 @@ read_stack_push (struct read_stack_entry e)
       break;
     case RE_sub_char_table:
       sub_char_table_code_count++;
+      break;
+    case RE_string_props:
+      string_props_count++;
       break;
     default:
       break;
@@ -3727,8 +3735,9 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	    break;
 	  }
 	case RE_string_props:
-	  obj = ANNOTATE (string_props_from_rev_list (read_stack_pop () ->u.vector.elems,
-						      readcharfun));
+	  obj = string_props_from_rev_list (read_stack_pop ()->u.vector.elems,
+					    readcharfun);
+	  obj = ANNOTATE (obj);
 	  break;
 	default:
 	  invalid_syntax (")", readcharfun);
