@@ -2297,6 +2297,11 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
   struct frame *f = NULL;
   struct ns_display_info *dpyinfo;
   bool return_no_frame_flag = false;
+#ifdef NS_IMPL_COCOA
+  NSPoint screen_position;
+  NSInteger window_number;
+  NSWindow *w;
+#endif
 
   NSTRACE ("ns_mouse_position");
 
@@ -2323,18 +2328,19 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
      This doesn't work on GNUstep, although in recent versions there
      is compatibility code that makes it a noop.  */
 
-  NSPoint screen_position = [NSEvent mouseLocation];
-  NSInteger window_number = 0;
+  screen_position = [NSEvent mouseLocation];
+  window_number = 0;
+
   do
     {
-      NSWindow *w;
+      window_number = [NSWindow windowNumberAtPoint: screen_position
+                        belowWindowWithWindowNumber: window_number];
+      w = [NSApp windowWithWindowNumber: window_number];
 
-      window_number = [NSWindow windowNumberAtPoint:screen_position
-                        belowWindowWithWindowNumber:window_number];
-      w = [NSApp windowWithWindowNumber:window_number];
-
-      if (w && [[w delegate] isKindOfClass:[EmacsView class]])
-        f = ((EmacsView *)[w delegate])->emacsframe;
+      if (w && [[w delegate] isKindOfClass: [EmacsView class]])
+        f = ((EmacsView *) [w delegate])->emacsframe;
+      else if (EQ (track_mouse, Qdrag_source))
+	break;
     }
   while (window_number > 0 && !f);
 #endif
@@ -4523,11 +4529,14 @@ check_native_fs ()
 
 
 static int
-ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
+ns_read_socket_1 (struct terminal *terminal, struct input_event *hold_quit,
+		  BOOL no_release)
 /* --------------------------------------------------------------------------
      External (hook): Post an event to ourself and keep reading events until
      we read it back again.  In effect process all events which were waiting.
      From 21+ we have to manage the event buffer ourselves.
+
+     NO_RELEASE means not to touch the global autorelease pool.
    -------------------------------------------------------------------------- */
 {
   struct input_event ev;
@@ -4558,11 +4567,14 @@ ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
       ns_init_events (&ev);
       q_event_ptr = hold_quit;
 
-      /* We manage autorelease pools by allocate/reallocate each time around
-         the loop; strict nesting is occasionally violated but seems not to
-         matter... earlier methods using full nesting caused major memory leaks.  */
-      [outerpool release];
-      outerpool = [[NSAutoreleasePool alloc] init];
+      if (!no_release)
+	{
+	  /* We manage autorelease pools by allocate/reallocate each time around
+	     the loop; strict nesting is occasionally violated but seems not to
+	     matter... earlier methods using full nesting caused major memory leaks.  */
+	  [outerpool release];
+	  outerpool = [[NSAutoreleasePool alloc] init];
+	}
 
       /* If have pending open-file requests, attend to the next one of those.  */
       if (ns_pending_files && [ns_pending_files count] != 0
@@ -4599,6 +4611,12 @@ ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
     return -1;
 
   return nevents;
+}
+
+static int
+ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
+{
+  return ns_read_socket_1 (terminal, hold_quit, NO);
 }
 
 
@@ -5185,19 +5203,10 @@ ns_update_window_end (struct window *w, bool cursor_on_p,
 static void
 ns_flush_display (struct frame *f)
 {
-  NSAutoreleasePool *ap;
+  struct input_event ie;
 
-  ap = [[NSAutoreleasePool alloc] init];
-
-  /* Called from some of the minibuffer code.  Run the event loop once
-     to make the toolkit make changes that were made to the back
-     buffer visible again.  */
-
-  send_appdefined = YES;
-  ns_send_appdefined (-1);
-
-  [NSApp run];
-  [ap release];
+  EVENT_INIT (ie);
+  ns_read_socket_1 (FRAME_TERMINAL (f), &ie, YES);
 }
 
 /* This and next define (many of the) public functions in this
@@ -8620,6 +8629,12 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 #endif
   NSPoint position;
   int x, y;
+  NSAutoreleasePool *ap;
+  specpdl_ref count;
+
+  ap = [[NSAutoreleasePool alloc] init];
+  count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (ns_release_autorelease_pool, ap);
 
 #ifdef NS_IMPL_GNUSTEP
   EVENT_INIT (ie);
@@ -8653,6 +8668,7 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   redisplay ();
 #endif
 
+  unbind_to (count, Qnil);
   return NSDragOperationGeneric;
 }
 
@@ -9563,14 +9579,51 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
   selected_op = operation;
 }
 
+#ifdef NS_IMPL_COCOA
+- (void) draggedImage: (NSImage *) dragged_image
+	      movedTo: (NSPoint) screen_point
+{
+  NSInteger window_number;
+  NSWindow *w;
+
+  if (dnd_mode == RETURN_FRAME_NEVER)
+    return;
+
+  window_number = [NSWindow windowNumberAtPoint: [NSEvent mouseLocation]
+		    belowWindowWithWindowNumber: 0];
+  w = [NSApp windowWithWindowNumber: window_number];
+
+  if (!w || w != self)
+    dnd_mode = RETURN_FRAME_NOW;
+
+  if (dnd_mode != RETURN_FRAME_NOW
+      || ![[w delegate] isKindOfClass: [EmacsView class]])
+    return;
+
+  dnd_return_frame = ((EmacsView *) [w delegate])->emacsframe;
+
+  /* FIXME: there must be a better way to leave the event loop.  */
+  [NSException raise: @""
+	      format: @"Must return DND frame"];
+}
+#endif
+
 - (NSDragOperation) beginDrag: (NSDragOperation) op
 		forPasteboard: (NSPasteboard *) pasteboard
+		     withMode: (enum ns_return_frame_mode) mode
+		returnFrameTo: (struct frame **) frame_return
 {
   NSImage *image;
+#ifdef NS_IMPL_COCOA
+  NSInteger window_number;
+  NSWindow *w;
+#endif
 
   drag_op = op;
   selected_op = NSDragOperationNone;
   image = [[NSImage alloc] initWithSize: NSMakeSize (1.0, 1.0)];
+  dnd_mode = mode;
+  dnd_return_frame = NULL;
 
   /* Now draw transparency onto the image.  */
   [image lockFocus];
@@ -9579,17 +9632,48 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
 			    NSCompositingOperationCopy);
   [image unlockFocus];
 
-  if (last_drag_event)
-    [self dragImage: image
-		 at: NSMakePoint (0, 0)
-	     offset: NSMakeSize (0, 0)
-	      event: last_drag_event
-	 pasteboard: pasteboard
-	     source: self
-	  slideBack: NO];
+  block_input ();
+#ifdef NS_IMPL_COCOA
+  if (mode == RETURN_FRAME_NOW)
+    {
+      window_number = [NSWindow windowNumberAtPoint: [NSEvent mouseLocation]
+			belowWindowWithWindowNumber: 0];
+      w = [NSApp windowWithWindowNumber: window_number];
+
+      if (w && [[w delegate] isKindOfClass: [EmacsView class]])
+	{
+	  *frame_return = ((EmacsView *) [w delegate])->emacsframe;
+	  [image release];
+	  unblock_input ();
+
+	  return NSDragOperationNone;
+	}
+    }
+
+  @try
+    {
+#endif
+      if (last_drag_event)
+	[self dragImage: image
+		     at: NSMakePoint (0, 0)
+		 offset: NSMakeSize (0, 0)
+		  event: last_drag_event
+	     pasteboard: pasteboard
+		 source: self
+	      slideBack: NO];
+#ifdef NS_IMPL_COCOA
+    }
+  @catch (NSException *e)
+    {
+      /* Ignore.  This is probably the wrong way to leave the
+	 drag-and-drop run loop.  */
+    }
+#endif
+  unblock_input ();
 
   [image release];
 
+  *frame_return = dnd_return_frame;
   return selected_op;
 }
 
