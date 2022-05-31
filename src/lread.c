@@ -3599,6 +3599,7 @@ mark_lread (void)
 	  break;
 	default:
 	  emacs_abort ();
+	  break;
 	}
     }
 }
@@ -3709,6 +3710,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	  break;
 	default:
 	  invalid_syntax (")", readcharfun);
+	  break;
 	}
       break;
 
@@ -3972,6 +3974,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	      }
 	    else
 	      invalid_syntax ("#", readcharfun);
+	    break;
 	  }
 	break;
       }
