@@ -522,8 +522,7 @@ is unibyte unless INIT is not ASCII or MULTIBYTE is non-nil.  */)
   record_unwind_protect_ptr (restore_string_allocator, static_string_allocator);
   record_unwind_protect_ptr (restore_interval_allocator, static_interval_allocator);
   static_string_allocator = &allocate_string;
-  /* FIXME: a'int ready for primetime */
-  /* static_interval_allocator = &allocate_interval; */
+  static_interval_allocator = &allocate_interval;
   (void) &allocate_interval;
   return unbind_to (count, Fmake_string (length, init, multibyte));
 }

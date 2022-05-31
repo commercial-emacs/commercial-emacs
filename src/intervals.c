@@ -55,7 +55,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static Lisp_Object merge_properties_sticky (Lisp_Object, Lisp_Object);
 static INTERVAL merge_interval_right (INTERVAL);
 static INTERVAL reproduce_tree (INTERVAL, INTERVAL);
-
+
 /* Utility functions for intervals.  */
 
 /* Use these functions to set pointer slots of struct interval.  */
@@ -225,7 +225,7 @@ intervals_equal (INTERVAL i0, INTERVAL i1)
 {
   return intervals_equal_1 (i0, i1, false);
 }
-
+
 
 /* Traverse an interval tree TREE, performing FUNCTION on each node.
    No guarantee is made about the order of traversal.
@@ -236,7 +236,7 @@ traverse_intervals_noorder (INTERVAL *tree, void (*function) (INTERVAL *, void *
 			    void *arg)
 {
   /* In 19d4e9a, monnier iterates right, and recurses left (or just
-     iterates left if right's NULL), thus saving half the call
+     iterates left if right is NULL), thus saving half the call
      stack it otherwise would have incurred.  */
   for (INTERVAL *it = tree; *it != NULL; )
     {
@@ -267,7 +267,7 @@ traverse_intervals (INTERVAL tree, ptrdiff_t position,
       position += LENGTH (tree); tree = tree->right;
     }
 }
-
+
 /* Assuming that a left child exists, perform the following operation:
 
      A		  B
@@ -369,7 +369,7 @@ rotate_left (INTERVAL A)
 
   return B;
 }
-
+
 /* Balance an interval tree with the assumption that the subtrees
    themselves are already balanced.  */
 
@@ -562,7 +562,7 @@ split_interval_left (INTERVAL interval, ptrdiff_t offset)
 
   return new;
 }
-
+
 /* Return the proper position for the first character
    described by the interval tree SOURCE.
    This is 1 if the parent is a buffer,
@@ -645,7 +645,7 @@ find_interval (register INTERVAL tree, register ptrdiff_t position)
 	}
     }
 }
-
+
 /* Find the succeeding interval (lexicographically) to INTERVAL.
    Sets the `position' field based on that of INTERVAL (see
    find_interval).  */
@@ -804,9 +804,8 @@ static INTERVAL
 adjust_intervals_for_insertion (INTERVAL tree,
 				ptrdiff_t position, ptrdiff_t length)
 {
-  INTERVAL i;
-  INTERVAL temp;
-  bool eobp = 0;
+  INTERVAL i, temp;
+  bool eobp = false;
   Lisp_Object parent;
   ptrdiff_t offset;
 
@@ -815,82 +814,67 @@ adjust_intervals_for_insertion (INTERVAL tree,
   GET_INTERVAL_OBJECT (parent, tree);
   offset = (BUFFERP (parent) ? BUF_BEG (XBUFFER (parent)) : 0);
 
-  /* If inserting at point-max of a buffer, that position will be out
-     of range.  Remember that buffer positions are 1-based.  */
+  /* Cap at point-max.  Recall buffer positions start at 1.  */
   if (position >= TOTAL_LENGTH (tree) + offset)
     {
       position = TOTAL_LENGTH (tree) + offset;
-      eobp = 1;
+      eobp = true;
     }
 
   i = find_interval (tree, position);
 
-  /* If in middle of an interval which is not sticky either way,
-     we must not just give its properties to the insertion.
-     So split this interval at the insertion point.
-
-     Originally, the if condition here was this:
-	(! (position == i->position || eobp)
-	 && END_NONSTICKY_P (i)
-	 && FRONT_NONSTICKY_P (i))
-     But, these macros are now unreliable because of introduction of
-     Vtext_property_default_nonsticky.  So, we always check properties
-     one by one if POSITION is in middle of an interval.  */
-  if (! (position == i->position || eobp))
+  /* If within an interval which is neither rear- nor front-sticky,
+     split it at the insertion point to avoid propagating its
+     properties.  */
+  if (position != i->position && ! eobp)
     {
-      Lisp_Object tail;
-      Lisp_Object front, rear;
+      Lisp_Object tail = i->plist,
+	front = textget (i->plist, Qfront_sticky),
+	rear = textget (i->plist, Qrear_nonsticky);
 
-      tail = i->plist;
-
-      /* Properties font-sticky and rear-nonsticky override
-         Vtext_property_default_nonsticky.  So, if they are t, we can
-         skip one by one checking of properties.  */
-      rear = textget (i->plist, Qrear_nonsticky);
       if (! CONSP (rear) && ! NILP (rear))
+	  /* All properties nonsticky, so split the interval.  */
+	goto check_done;
+      else if (! CONSP (front) && ! NILP (front))
 	{
-	  /* All properties are nonsticky.  We split the interval.  */
-	  goto check_done;
-	}
-      front = textget (i->plist, Qfront_sticky);
-      if (! CONSP (front) && ! NILP (front))
-	{
-	  /* All properties are sticky.  We don't split the interval.  */
+	  /* All properties sticky, so don't split the interval.  */
 	  tail = Qnil;
 	  goto check_done;
 	}
-
-      /* Does any actual property pose an actual problem?  We break
-         the loop if we find a nonsticky property.  */
-      for (; CONSP (tail); tail = Fcdr (XCDR (tail)))
+      else
 	{
-	  Lisp_Object prop, tmp;
-	  prop = XCAR (tail);
-
-	  /* Is this particular property front-sticky?  */
-	  if (CONSP (front) && ! NILP (Fmemq (prop, front)))
-	    continue;
-
-	  /* Is this particular property rear-nonsticky?  */
-	  if (CONSP (rear) && ! NILP (Fmemq (prop, rear)))
-	    break;
-
-	  /* Is this particular property recorded as sticky or
-             nonsticky in Vtext_property_default_nonsticky?  */
-	  tmp = Fassq (prop, Vtext_property_default_nonsticky);
-	  if (CONSP (tmp))
+	  /* Check one by one for nonsticky PROP. */
+	  for (; CONSP (tail); tail = Fcdr (XCDR (tail)))
 	    {
-	      if (NILP (tmp))
-		continue;
-	      break;
-	    }
+	      Lisp_Object tmp, prop = XCAR (tail);
 
-	  /* By default, a text property is rear-sticky, thus we
-	     continue the loop.  */
+	      /* Is PROP front-sticky?  */
+	      if (CONSP (front) && ! NILP (Fmemq (prop, front)))
+		continue;
+
+	      /* Is PROP rear-nonsticky?  */
+	      if (CONSP (rear) && ! NILP (Fmemq (prop, rear)))
+		break;
+
+	      /* Is PROP in Vtext_property_default_nonsticky?  */
+	      tmp = Fassq (prop, Vtext_property_default_nonsticky);
+	      if (CONSP (tmp))
+		{
+		  if (NILP (tmp))
+		    {
+		      eassert (false); // temporary
+		      continue;
+		    }
+		  break;
+		}
+	      else
+		{
+		  /* Text property is default rear-sticky, so continue.  */
+		}
+	    }
 	}
 
     check_done:
-      /* If any property is a real problem, split the interval.  */
       if (! NILP (tail))
 	{
 	  temp = split_interval_right (i, position - i->position);
@@ -899,11 +883,19 @@ adjust_intervals_for_insertion (INTERVAL tree,
 	}
     }
 
-  /* If we are positioned between intervals, check the stickiness of
-     both of them.  We have to do this too, if we are at BEG or Z.  */
-  if (position == i->position || eobp)
+  if (position != i->position && ! eobp)
     {
-      register INTERVAL prev;
+      /* Just extend the interval.  */
+      for (temp = i; temp; temp = INTERVAL_PARENT_OR_NULL (temp))
+	{
+	  temp->total_length += length;
+	  temp = balance_possible_root_interval (temp);
+	}
+    }
+  else
+    {
+      /* We're between intervals or at BEG/Z.  */
+      INTERVAL prev;
 
       if (position == BEG)
 	prev = 0;
@@ -925,58 +917,29 @@ adjust_intervals_for_insertion (INTERVAL tree,
 	}
 
       /* If at least one interval has sticky properties,
-	 we check the stickiness property by property.
+	 we check the stickiness property by property.  */
+      Lisp_Object pleft, pright;
+      struct interval newi;
 
-	 Originally, the if condition here was this:
-		(END_NONSTICKY_P (prev) || FRONT_STICKY_P (i))
-	 But, these macros are now unreliable because of introduction
-	 of Vtext_property_default_nonsticky.  So, we always have to
-	 check stickiness of properties one by one.  If cache of
-	 stickiness is implemented in the future, we may be able to
-	 use those macros again.  */
-      if (1)
+      RESET_INTERVAL (&newi);
+      pleft = prev ? prev->plist : Qnil;
+      pright = i ? i->plist : Qnil;
+      set_interval_plist (&newi, merge_properties_sticky (pleft, pright));
+
+      if (! prev) /* i.e. position == BEG */
 	{
-	  Lisp_Object pleft, pright;
-	  struct interval newi;
-
-	  RESET_INTERVAL (&newi);
-	  pleft = prev ? prev->plist : Qnil;
-	  pright = i ? i->plist : Qnil;
-	  set_interval_plist (&newi, merge_properties_sticky (pleft, pright));
-
-	  if (! prev) /* i.e. position == BEG */
+	  if (! intervals_equal (i, &newi))
 	    {
-	      if (! intervals_equal (i, &newi))
-		{
-		  i = split_interval_left (i, length);
-		  set_interval_plist (i, newi.plist);
-		}
+	      i = split_interval_left (i, length);
+	      set_interval_plist (i, newi.plist);
 	    }
-	  else if (! intervals_equal (prev, &newi))
-	    {
-	      prev = split_interval_right (prev, position - prev->position);
-	      set_interval_plist (prev, newi.plist);
-	      if (i && intervals_equal (prev, i))
-		merge_interval_right (prev);
-	    }
-
-	  /* We will need to update the cache here later.  */
 	}
-      else if (! prev && ! NILP (i->plist))
-        {
-	  /* Just split off a new interval at the left.
-	     Since I wasn't front-sticky, the empty plist is ok.  */
-	  i = split_interval_left (i, length);
-        }
-    }
-
-  /* Otherwise just extend the interval.  */
-  else
-    {
-      for (temp = i; temp; temp = INTERVAL_PARENT_OR_NULL (temp))
+      else if (! intervals_equal (prev, &newi))
 	{
-	  temp->total_length += length;
-	  temp = balance_possible_root_interval (temp);
+	  prev = split_interval_right (prev, position - prev->position);
+	  set_interval_plist (prev, newi.plist);
+	  if (i && intervals_equal (prev, i))
+	    merge_interval_right (prev);
 	}
     }
 
@@ -1152,7 +1115,7 @@ merge_properties_sticky (Lisp_Object pleft, Lisp_Object pright)
   return props;
 }
 
-
+
 /* Delete a node I from its interval tree by merging its subtrees
    into one subtree which is then returned.  Caller is responsible for
    storing the resulting subtree into its parent.  */
@@ -1231,7 +1194,7 @@ delete_interval (register INTERVAL i)
 	set_interval_parent (parent->right, parent);
     }
 }
-
+
 /* Find the interval in TREE corresponding to the relative position
    FROM and delete as much as possible of AMOUNT from that interval.
    Return the amount actually deleted, and if the interval was
@@ -1350,7 +1313,7 @@ adjust_intervals_for_deletion (struct buffer *buffer,
 	}
     }
 }
-
+
 /* Make the adjustments necessary to the interval tree of BUFFER to
    represent an addition or deletion of LENGTH characters starting
    at position START.  Addition or deletion is indicated by the sign
@@ -1368,7 +1331,7 @@ offset_intervals (struct buffer *buffer, ptrdiff_t start, ptrdiff_t length)
   else
     adjust_intervals_for_deletion (buffer, start, -length);
 }
-
+
 /* Merge interval I with its lexicographic successor. The resulting
    interval is returned, and has the properties of the original
    successor.  The properties of I are lost.  I is removed from the
@@ -1426,7 +1389,7 @@ merge_interval_right (register INTERVAL i)
      be merged right.  The caller should have known.  */
   emacs_abort ();
 }
-
+
 /* Merge interval I with its lexicographic predecessor. The resulting
    interval is returned, and has the properties of the original predecessor.
    The properties of I are lost.  Interval node I is removed from the tree.
@@ -1482,7 +1445,7 @@ merge_interval_left (register INTERVAL i)
      be merged left.  The caller should have known.  */
   emacs_abort ();
 }
-
+
 /* Create a copy of SOURCE but with the default value of UP.  */
 
 static INTERVAL
@@ -1526,7 +1489,7 @@ reproduce_tree_obj (INTERVAL source, Lisp_Object parent)
   set_interval_object (target, parent);
   return target;
 }
-
+
 /* Insert the intervals of SOURCE into BUFFER at POSITION.
    LENGTH is the length of the text in SOURCE.
 
@@ -1745,7 +1708,7 @@ lookup_char_property (Lisp_Object plist, Lisp_Object prop, bool textprop)
   return fallback;
 }
 
-
+
 /* Set point in BUFFER "temporarily" to CHARPOS, which corresponds to
    byte position BYTEPOS.  */
 
@@ -2066,7 +2029,7 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
       	       make_fixnum (charpos));
     }
 }
-
+
 /* Move point to POSITION, unless POSITION is inside an intangible
    segment that reaches all the way to point.  */
 
@@ -2125,7 +2088,7 @@ move_if_not_intangible (ptrdiff_t position)
   if (XFIXNUM (pos) != PT)
     SET_PT (position);
 }
-
+
 /* If text at position POS has property PROP, set *VAL to the property
    value, *START and *END to the beginning and end of a region that
    has the same property, and return true.  Otherwise return false.
@@ -2168,7 +2131,7 @@ get_property_and_range (ptrdiff_t pos, Lisp_Object prop, Lisp_Object *val,
 
   return 1;
 }
-
+
 /* Return the proper local keymap TYPE for position POSITION in
    BUFFER; TYPE should be one of `keymap' or `local-map'.  Use the map
    specified by the PROP property, if any.  Otherwise, if TYPE is
@@ -2220,7 +2183,7 @@ get_local_map (ptrdiff_t position, struct buffer *buffer, Lisp_Object type)
   else
     return BVAR (buffer, keymap);
 }
-
+
 /* Produce an interval tree reflecting the intervals in
    TREE from START to START + LENGTH.
    The new interval tree has no parent and has a starting-position of 0.  */
@@ -2277,7 +2240,7 @@ copy_intervals_to_string (Lisp_Object string, struct buffer *buffer,
   set_interval_object (interval_copy, string);
   set_string_intervals (string, interval_copy);
 }
-
+
 /* Return true if strings S1 and S2 have identical properties.
    Assume they have identical characters.  */
 
@@ -2313,7 +2276,7 @@ compare_string_intervals (Lisp_Object s1, Lisp_Object s2)
     }
   return 1;
 }
-
+
 /* Recursively adjust interval I in the current buffer
    for setting enable_multibyte_characters to MULTI_FLAG.
    The range of interval I is START ... END in characters,
