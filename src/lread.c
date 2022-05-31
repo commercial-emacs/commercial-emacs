@@ -191,9 +191,10 @@ static int readbyte_from_string (int, Lisp_Object);
 
 /* Same as READCHAR but set *MULTIBYTE to the multibyteness of the source.  */
 #define READCHAR_REPORT_MULTIBYTE(multibyte) readchar (readcharfun, multibyte)
-#define ANNOTATE(atom) \
-  (annotated && ! special_count && ! vector_count && ! byte_code_count \
-   ? Fcons (make_fixnum (initial_charpos), atom) \
+#define ANNOTATE(atom)							\
+  (annotated && ! special_count && ! vector_count && ! byte_code_count	\
+   && ! char_table_code_count && ! sub_char_table_code_count		\
+   ? Fcons (make_fixnum (initial_charpos), atom)			\
    : atom)
 
 /* When READCHARFUN is Qget_file_char, Qget_emacs_mule_file_char,
@@ -3598,6 +3599,7 @@ static size_t special_count = 0;
 static size_t vector_count = 0;
 static size_t byte_code_count = 0;
 static size_t char_table_code_count = 0;
+static size_t sub_char_table_code_count = 0;
 static inline struct read_stack_entry *
 read_stack_pop (void)
 {
@@ -3615,6 +3617,9 @@ read_stack_pop (void)
       break;
     case RE_char_table:
       char_table_code_count--;
+      break;
+    case RE_sub_char_table:
+      sub_char_table_code_count--;
       break;
     default:
       break;
@@ -3656,6 +3661,9 @@ read_stack_push (struct read_stack_entry e)
       break;
     case RE_char_table:
       char_table_code_count++;
+      break;
+    case RE_sub_char_table:
+      sub_char_table_code_count++;
       break;
     default:
       break;
@@ -3740,24 +3748,25 @@ read0 (Lisp_Object readcharfun, bool annotated)
       switch (read_stack_top ()->type)
 	{
 	case RE_vector:
-	  obj = ANNOTATE (vector_from_rev_list (read_stack_pop ()->u.vector.elems));
+	  obj = vector_from_rev_list (read_stack_pop ()->u.vector.elems);
 	  break;
 	case RE_byte_code:
-	  obj = ANNOTATE (bytecode_from_rev_list (read_stack_pop ()->u.vector.elems,
-						  readcharfun));
+	  obj = bytecode_from_rev_list (read_stack_pop ()->u.vector.elems,
+					readcharfun);
 	  break;
 	case RE_char_table:
-	  obj = ANNOTATE (char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
-						    readcharfun));
+	  obj = char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
+					  readcharfun);
 	  break;
 	case RE_sub_char_table:
-	  obj = ANNOTATE (sub_char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
-							readcharfun));
+	  obj = sub_char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
+					      readcharfun);
 	  break;
 	default:
 	  invalid_syntax ("]", readcharfun);
 	  break;
 	}
+      obj = ANNOTATE (obj);
       break;
 
     case '#':
