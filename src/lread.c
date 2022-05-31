@@ -3555,7 +3555,7 @@ static size_t quoted_counts[RE_quoted_max];
 static inline bool
 quoted_parse_state (void)
 {
-  for (int i = 0; i < RE_quoted_max; ++i)
+  for (ptrdiff_t i = 0; i < RE_quoted_max; ++i)
     if (quoted_counts[i])
       return true;
   return false;
