@@ -1434,6 +1434,11 @@ main (int argc, char **argv)
       if (initialized)
 	{
 	  Lisp_Object tem, tem2;
+
+	  /* Fformat_time_string below manipulates bignums, so we need
+	     this initialization.  */
+	  init_bignum ();
+
 	  tem = Fsymbol_value (intern_c_string ("emacs-version"));
 	  tem2 = Fsymbol_value (intern_c_string ("emacs-copyright"));
 	  if (! STRINGP (tem))
