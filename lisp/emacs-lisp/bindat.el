@@ -165,12 +165,12 @@
     (if (stringp s) s
       (apply #'unibyte-string s))))
 
-(defun bindat--unpack-strz (len)
+(defun bindat--unpack-strz (&optional len)
   (let ((i 0) s)
     (while (and (if len (< i len) t) (/= (aref bindat-raw (+ bindat-idx i)) 0))
       (setq i (1+ i)))
     (setq s (substring bindat-raw bindat-idx (+ bindat-idx i)))
-    (setq bindat-idx (+ bindat-idx len))
+    (setq bindat-idx (+ bindat-idx (or len (1+ i))))
     (if (stringp s) s
       (apply #'unibyte-string s))))
 
@@ -439,11 +439,19 @@ e.g. corresponding to STRUCT.FIELD1[INDEX2].FIELD3..."
     (aset bindat-raw (+ bindat-idx i) (aref v i)))
   (setq bindat-idx (+ bindat-idx len)))
 
-(defun bindat--pack-strz (v)
-  (let ((len (length v)))
-    (dotimes (i len)
-      (aset bindat-raw (+ bindat-idx i) (aref v i)))
-    (setq bindat-idx (+ bindat-idx len 1))))
+(defun bindat--pack-strz (len v)
+  (if (numberp len)
+      (progn
+        ;; Same as the str type, except always leave room for the null
+        ;; terminator. This assumes that `len' > 0.
+        (bindat--pack-str (1- len) v)
+        ;; "Write" the null terminator. This assumes that `bindat-raw' was
+        ;; initialized with zeroes.
+        (setq bindat-idx (1+ bindat-idx)))
+    (let ((len (length v)))
+      (dotimes (i len)
+        (aset bindat-raw (+ bindat-idx i) (aref v i)))
+      (setq bindat-idx (+ bindat-idx len 1)))))
 
 (defun bindat--pack-bits (len v)
   (let ((bnum (1- (* 8 len))) j m)
@@ -472,7 +480,8 @@ e.g. corresponding to STRUCT.FIELD1[INDEX2].FIELD3..."
    ('u24r (bindat--pack-u24r v))
    ('u32r (bindat--pack-u32r v))
    ('bits (bindat--pack-bits len v))
-   ((or 'str 'strz) (bindat--pack-str len v))
+   ('str (bindat--pack-str len v))
+   ('strz (bindat--pack-strz len v))
    ('vec
     (let ((l (length v)) (vlen 1))
       (if (consp vectype)
@@ -688,18 +697,10 @@ is the name of a variable that will hold the value we need to pack.")
     ('unpack `(bindat--unpack-strz ,len))
     (`(length ,val)
      `(cl-incf bindat-idx ,(cond
-                            ((null len) `(length ,val))
+                            ((null len) `(1+ (length ,val)))
                             ((numberp len) len)
-                            (t `(or ,len (length ,val))))))
-    (`(pack . ,args)
-     (macroexp-let2 nil len len
-       `(if ,len
-            ;; Same as non-zero terminated strings since we don't actually add
-            ;; the terminating zero anyway (because we rely on the fact that
-            ;; `bindat-raw' was presumably initialized with all-zeroes before
-            ;; we started).
-            (bindat--pack-str ,len . ,args)
-          (bindat--pack-strz . ,args))))))
+                            (t `(or ,len (1+ (length ,val)))))))
+    (`(pack . ,args) `(bindat--pack-strz ,len . ,args))))
 
 (cl-defmethod bindat--type (op (_ (eql 'bits))  len)
   (bindat--pcase op
