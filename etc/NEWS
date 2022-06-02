@@ -1707,6 +1707,10 @@ Enabling this minor mode turns on hiding header material, like
 'elide-head' does; disabling it shows the header.  The commands
 'elide-head' and 'elide-head-show' are now obsolete.
 
++++
+*** New user option 'project-vc-include-untracked'.
+When non-nil, the VC project backend includes the untracked files.
+
 ---
 ** The autoarg.el library is now marked obsolete.
 This library provides the 'autoarg-mode' and 'autoarg-kp-mode' minor
