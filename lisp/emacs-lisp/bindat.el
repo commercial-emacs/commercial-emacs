@@ -165,12 +165,12 @@
     (if (stringp s) s
       (apply #'unibyte-string s))))
 
-(defun bindat--unpack-strz (len)
+(defun bindat--unpack-strz (&optional len)
   (let ((i 0) s)
     (while (and (if len (< i len) t) (/= (aref bindat-raw (+ bindat-idx i)) 0))
       (setq i (1+ i)))
     (setq s (substring bindat-raw bindat-idx (+ bindat-idx i)))
-    (setq bindat-idx (+ bindat-idx len))
+    (setq bindat-idx (+ bindat-idx (or len (1+ i))))
     (if (stringp s) s
       (apply #'unibyte-string s))))
 
@@ -688,12 +688,12 @@ is the name of a variable that will hold the value we need to pack.")
     ('unpack `(bindat--unpack-strz ,len))
     (`(length ,val)
      `(cl-incf bindat-idx ,(cond
-                            ((null len) `(length ,val))
+                            ((null len) `(1+ (length ,val)))
                             ((numberp len) len)
-                            (t `(or ,len (length ,val))))))
+                            (t `(or ,len (1+ (length ,val)))))))
     (`(pack . ,args)
      (macroexp-let2 nil len len
-       `(if ,len
+       `(if (numberp ,len)
             ;; Same as non-zero terminated strings since we don't actually add
             ;; the terminating zero anyway (because we rely on the fact that
             ;; `bindat-raw' was presumably initialized with all-zeroes before
