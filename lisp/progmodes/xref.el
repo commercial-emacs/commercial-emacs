@@ -427,7 +427,35 @@ or earlier: it can break `dired-do-find-regexp-and-replace'."
   :version "28.1"
   :package-version '(xref . "1.2.0"))
 
+(defcustom xref-prefer-source-directory t
+  "If non-nil, jump to the file in `source-directory' that
+corresponds to the target."
+  :type 'boolean
+  :version "29.1")
+
 (make-obsolete-variable 'xref--marker-ring 'xref--history "29.1")
+
+(defalias 'xref-preferred-message
+  (let (messaged-p)
+    (lambda (file)
+      "Heads-up to user that xref result may not reflect loaded definition."
+      (unless messaged-p
+        (setq messaged-p t)
+        (message "Showing result from %s" file)))))
+
+(defsubst xref-preferred-source (file)
+  (if-let ((preferred-p xref-prefer-source-directory)
+           (prefix (file-name-as-directory installed-directory))
+           ;; :end2 says PREFIX matches beginning of LIBRARY
+           (installed-p (cl-search prefix file
+                                   :end2 (length prefix)))
+           (preferred (expand-file-name
+                       (cl-subseq file (length prefix))
+                       source-directory))
+           (readable-p (file-readable-p preferred)))
+      (prog1 preferred
+        (funcall (symbol-function 'xref-preferred-message) preferred))
+    file))
 
 (defun xref-set-marker-ring-length (_var _val)
   (declare (obsolete nil "29.1"))
@@ -1194,19 +1222,14 @@ Return an alist of the form ((GROUP . (XREF ...)) ...)."
 (defun xref-show-definitions-buffer (fetcher alist)
   "Show the definitions list in a regular window.
 When only one definition found, jump to it right away instead."
-  (let ((xrefs (funcall fetcher))
-        buf)
-    (cond
-     ((not (cdr xrefs))
-      (xref-pop-to-location (car xrefs)
-                            (assoc-default 'display-action alist)))
-     (t
-      (setq buf
-            (xref--show-xref-buffer fetcher
-                                    (cons (cons 'fetched-xrefs xrefs)
-                                          alist)))
-      (xref--auto-jump-first buf (assoc-default 'auto-jump alist))
-      buf))))
+  (when-let ((xrefs (funcall fetcher)))
+    (if (= 1 (length xrefs))
+        (xref-pop-to-location (car xrefs)
+                              (assoc-default 'display-action alist))
+      (let ((buf (xref--show-xref-buffer
+                  fetcher (cons (cons 'fetched-xrefs xrefs) alist))))
+        (prog1 buf
+          (xref--auto-jump-first buf (assoc-default 'auto-jump alist)))))))
 
 (define-obsolete-function-alias
   'xref--show-defs-buffer #'xref-show-definitions-buffer "28.1")
@@ -1458,10 +1481,8 @@ the xref backend method indicated by KIND and passes ARG to it."
         (when (buffer-live-p orig-buffer)
           (set-buffer orig-buffer)
           (ignore-errors (goto-char orig-position)))
-        (let ((xrefs (funcall method backend arg)))
-          (unless xrefs
-            (xref--not-found-error kind input))
-          xrefs)))))
+        (or (funcall method backend arg)
+            (xref--not-found-error kind input))))))
 
 (defun xref--not-found-error (kind input)
   (user-error "No %s found for: %s" (symbol-name kind) input))

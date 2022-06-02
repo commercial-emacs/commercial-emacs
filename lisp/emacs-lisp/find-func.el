@@ -391,14 +391,11 @@ See `find-library' for more details."
 
 ;;;###autoload
 (defun find-function-search-for-symbol (symbol type library)
-  "Search for SYMBOL's definition of type TYPE in LIBRARY.
-Visit the library in a buffer, and return a cons cell (BUFFER . POSITION),
-or just (BUFFER . nil) if the definition can't be found in the file.
-
-If TYPE is nil, look for a function definition.
-Otherwise, TYPE specifies the kind of definition,
-and it is interpreted via `find-function-regexp-alist'.
-The search is done in the source for library LIBRARY."
+  "Find SYMBOL's defun, or other definitional TYPE, in LIBRARY.
+When TYPE is a non-nil key in `find-function-regexp-alist',
+interpret SYMBOL according to the corresponding definitional,
+e.g., defvar or defface.
+LIBRARY can be an absolute or relative path."
   (if (null library)
       (error "Don't know where `%s' is defined" symbol))
   ;; Some functions are defined as part of the construct

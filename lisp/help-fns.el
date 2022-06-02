@@ -439,10 +439,10 @@ the C sources, too."
       ;; An autoloaded variable or face.  Visit loaddefs.el in a buffer
       ;; and try to extract the defining file.  The following form is
       ;; from `describe-function-1' and `describe-variable'.
-      (let ((location
-	     (condition-case nil
-		 (find-function-search-for-symbol object nil file-name)
-	       (error nil))))
+      (let* ((prefer-file (xref-preferred-source file-name))
+             (location
+	      (ignore-errors
+	        (find-function-search-for-symbol object nil prefer-file))))
 	(when (cdr location)
 	  (with-current-buffer (car location)
 	    (goto-char (cdr location))
