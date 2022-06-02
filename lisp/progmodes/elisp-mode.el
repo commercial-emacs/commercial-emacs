@@ -1017,11 +1017,10 @@ namespace but with lower confidence."
                collect d))))
 
 (defun elisp--xref-find-definitions (symbol)
-  ;; The file name is not known when `symbol' is defined via interactive eval.
+  ;; The file name is not known when SYMBOL is defined via interactive eval.
   (let (xrefs)
     (let ((temp elisp-xref-find-def-functions))
-      (while (and (null xrefs)
-                  temp)
+      (while (and temp (null xrefs))
         (setq xrefs (append xrefs (funcall (pop temp) symbol)))))
 
     (unless xrefs
@@ -1049,113 +1048,99 @@ namespace but with lower confidence."
             (push (elisp--xref-make-xref 'defalias alias-symbol alias-file) xrefs))))
 
       (when (facep symbol)
-        (let ((file (find-lisp-object-file-name symbol 'defface)))
-          (when file
-            (push (elisp--xref-make-xref 'defface symbol file) xrefs))))
+        (when-let ((file (find-lisp-object-file-name symbol 'defface)))
+          (push (elisp--xref-make-xref 'defface symbol file) xrefs)))
 
       (when (fboundp symbol)
         (let ((file (find-lisp-object-file-name symbol (symbol-function symbol)))
               generic doc)
-          (when file
-            (cond
-             ((eq file 'C-source)
-              ;; First call to find-lisp-object-file-name for an object
-              ;; defined in C; the doc strings from the C source have
-              ;; not been loaded yet.  Second call will return "src/*.c"
-              ;; in file; handled by t case below.
-              (push (elisp--xref-make-xref nil symbol (help-C-file-name (symbol-function symbol) 'subr)) xrefs))
+          (cond
+           ((not file))
+           ((eq file 'C-source)
+            ;; First call to find-lisp-object-file-name for an object
+            ;; defined in C; the doc strings from the C source have
+            ;; not been loaded yet.  Second call will return "src/*.c"
+            ;; in file; handled by t case below.
+            (push (elisp--xref-make-xref
+                   nil symbol (help-C-file-name (symbol-function symbol) 'subr))
+                  xrefs))
 
-             ((and (setq doc (documentation symbol t))
-                   ;; This doc string is defined in cl-macs.el cl-defstruct
-                   (string-match "Constructor for objects of type `\\(.*\\)'" doc))
-              ;; `symbol' is a name for the default constructor created by
-              ;; cl-defstruct, so return the location of the cl-defstruct.
-              (let* ((type-name (match-string 1 doc))
-                     (type-symbol (intern type-name))
-                     (file (find-lisp-object-file-name type-symbol 'define-type))
-                     (summary (format elisp--xref-format-extra
-                                      'cl-defstruct
-                                      (concat "(" type-name)
-                                      (concat "(:constructor " (symbol-name symbol) "))"))))
-                (push (elisp--xref-make-xref 'define-type type-symbol file summary) xrefs)
-                ))
+           ((and (setq doc (documentation symbol t))
+                 ;; This doc string is defined in cl-macs.el cl-defstruct
+                 (string-match "Constructor for objects of type `\\(.*\\)'" doc))
+            ;; SYMBOL is a name for the default constructor created by
+            ;; cl-defstruct, so return the location of the cl-defstruct.
+            (let* ((type-name (match-string 1 doc))
+                   (type-symbol (intern type-name))
+                   (file (find-lisp-object-file-name type-symbol 'define-type))
+                   (summary (format elisp--xref-format-extra
+                                    'cl-defstruct
+                                    (concat "(" type-name)
+                                    (concat "(:constructor " (symbol-name symbol) "))"))))
+              (push (elisp--xref-make-xref 'define-type type-symbol file summary) xrefs)))
 
-             ((setq generic (cl--generic symbol))
-              ;; FIXME: move this to elisp-xref-find-def-functions, in cl-generic.el
-              ;; XXX: How are we going to support using newer xref
-              ;; with older versions of Emacs, though?
+           ((setq generic (cl--generic symbol))
+            ;; FIXME: move this to elisp-xref-find-def-functions, in cl-generic.el
+            ;; XXX: How are we going to support using newer xref
+            ;; with older versions of Emacs, though?
 
-              ;; A generic function. If there is a default method, it
-              ;; will appear in the method table, with no
-              ;; specializers.
-              ;;
-              ;; If the default method is declared by the cl-defgeneric
-              ;; declaration, it will have the same location as the
-              ;; cl-defgeneric, so we want to exclude it from the
-              ;; result. In this case, it will have a null doc
-              ;; string. User declarations of default methods may also
-              ;; have null doc strings, but we hope that is
-              ;; rare. Perhaps this heuristic will discourage that.
-              (dolist (method (cl--generic-method-table generic))
-                (let* ((info (cl--generic-method-info method));; qual-string combined-args doconly
-                       (specializers (cl--generic-method-specializers method))
-                       (non-default nil)
-                       (met-name (cl--generic-load-hist-format
-                                  symbol
-                                  (cl--generic-method-qualifiers method)
-                                  specializers))
-                       (file (find-lisp-object-file-name met-name 'cl-defmethod)))
-                  (dolist (item specializers)
-                    ;; Default method has all t in specializers.
-                    (setq non-default (or non-default (not (equal t item)))))
+            ;; A generic function. If there is a default method, it
+            ;; will appear in the method table, with no
+            ;; specializers.
+            ;;
+            ;; If the default method is declared by the cl-defgeneric
+            ;; declaration, it will have the same location as the
+            ;; cl-defgeneric, so we want to exclude it from the
+            ;; result. In this case, it will have a null doc
+            ;; string. User declarations of default methods may also
+            ;; have null doc strings, but we hope that is
+            ;; rare. Perhaps this heuristic will discourage that.
+            (dolist (method (cl--generic-method-table generic))
+              (let* ((info (cl--generic-method-info method));; qual-string combined-args doconly
+                     (specializers (cl--generic-method-specializers method))
+                     (non-default nil)
+                     (met-name (cl--generic-load-hist-format
+                                symbol
+                                (cl--generic-method-qualifiers method)
+                                specializers))
+                     (file (find-lisp-object-file-name met-name 'cl-defmethod)))
+                (dolist (item specializers)
+                  ;; Default method has all t in specializers.
+                  (setq non-default (or non-default (not (equal t item)))))
 
-                  (when (and file
-                             (or non-default
-                                 (nth 2 info))) ;; assuming only co-located default has null doc string
-                    (if specializers
-                        (let ((summary (format elisp--xref-format-extra 'cl-defmethod symbol (nth 1 info))))
-                          (push (elisp--xref-make-xref 'cl-defmethod met-name file summary) xrefs))
+                (when (and file
+                           ;; only co-located default has null doc string
+                           (or non-default (nth 2 info)))
+                  (if specializers
+                      (let ((summary (format elisp--xref-format-extra 'cl-defmethod symbol (nth 1 info))))
+                        (push (elisp--xref-make-xref 'cl-defmethod met-name file summary) xrefs))
 
-                      (let ((summary (format elisp--xref-format-extra 'cl-defmethod symbol "()")))
-                        (push (elisp--xref-make-xref 'cl-defmethod met-name file summary) xrefs))))
-                  ))
+                    (let ((summary (format elisp--xref-format-extra 'cl-defmethod symbol "()")))
+                      (push (elisp--xref-make-xref 'cl-defmethod met-name file summary) xrefs))))))
 
-              (if (and (setq doc (documentation symbol t))
-                       ;; Brutal hack fails often with
-                       ;; changes to cl--generic-get-dispatcher
-                       (string-match-p "\n\n(fn \\(ARG \\)?&rest ARGS[0-9]*)" doc))
-                  ;; This symbol is an implicitly defined defgeneric, so
-                  ;; don't return it.
-                  nil
-                (push (elisp--xref-make-xref 'cl-defgeneric symbol file) xrefs))
-              )
+            (unless (and (setq doc (documentation symbol t))
+                         ;; Fails when cl--generic-get-dispatcher changed.
+                         (string-match-p "\n\n(fn \\(ARG \\)?&rest ARGS[0-9]*)" doc))
+              ;; symbol is explicit defgeneric
+              (push (elisp--xref-make-xref 'cl-defgeneric symbol file) xrefs)))
 
-             (t
-              (push (elisp--xref-make-xref nil symbol file) xrefs))
-             ))))
+           (t
+            (push (elisp--xref-make-xref nil symbol file) xrefs)))))
 
       (when (boundp symbol)
-        ;; A variable
-        (let ((file (find-lisp-object-file-name symbol 'defvar)))
-          (when file
-            (cond
-             ((eq file 'C-source)
-              ;; The doc strings from the C source have not been loaded
-              ;; yet; help-C-file-name does that.  Second call will
-              ;; return "src/*.c" in file; handled below.
-              (push (elisp--xref-make-xref 'defvar symbol (help-C-file-name symbol 'var)) xrefs))
-
-             (t
-              (push (elisp--xref-make-xref 'defvar symbol file) xrefs))
-
-             ))))
+        (when-let ((file (find-lisp-object-file-name symbol 'defvar)))
+          (if (eq file 'C-source)
+           ;; The doc strings from the C source have not been loaded
+           ;; yet; help-C-file-name does that.  Second call will
+           ;; return "src/*.c" in file; handled below.
+              (push (elisp--xref-make-xref 'defvar symbol
+                                           (help-C-file-name symbol 'var)) xrefs)
+            (push (elisp--xref-make-xref 'defvar symbol file) xrefs))))
 
       (when (featurep symbol)
-        (let ((file (ignore-errors
-                      (find-library-name (symbol-name symbol)))))
-          (when file
-            (push (elisp--xref-make-xref 'feature symbol file) xrefs))))
-      );; 'unless xrefs'
+        (when-let ((file (ignore-errors
+                           (find-library-name (symbol-name symbol)))))
+          (push (elisp--xref-make-xref 'feature symbol file) xrefs))))
 
     xrefs))
 

@@ -1193,7 +1193,6 @@ Return an alist of the form ((GROUP . (XREF ...)) ...)."
 
 (defun xref-show-definitions-buffer (fetcher alist)
   "Show the definitions list in a regular window.
-
 When only one definition found, jump to it right away instead."
   (let ((xrefs (funcall fetcher))
         buf)

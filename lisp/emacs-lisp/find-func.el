@@ -257,7 +257,7 @@ LIBRARY should be a string (the name of the library)."
 
 (defvar find-function-C-source-directory
   (let ((dir (expand-file-name "src" source-directory)))
-    (if (file-accessible-directory-p dir) dir))
+    (when (file-accessible-directory-p dir) dir))
   "Directory where the C source files of Emacs can be found.
 If nil, do not try to find the source code of functions and variables
 defined in C.")
@@ -283,8 +283,8 @@ TYPE should be nil to find a function, or `defvar' to find a variable."
                  (read-directory-name "Emacs C source dir: " nil nil t))))
     (setq file (expand-file-name file dir))
     (if (file-readable-p file)
-        (if (null find-function-C-source-directory)
-            (setq find-function-C-source-directory dir))
+        (unless find-function-C-source-directory
+          (setq find-function-C-source-directory dir))
       (error "The C source file %s is not available"
              (file-name-nondirectory file))))
   (unless type
