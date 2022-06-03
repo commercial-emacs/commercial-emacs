@@ -1055,7 +1055,7 @@ namespace but with lower confidence."
         (let ((file (find-lisp-object-file-name symbol (symbol-function symbol)))
               generic doc)
           (cond
-           ((not file))
+           ((not file) nil)
            ((eq file 'C-source)
             ;; First call to find-lisp-object-file-name for an object
             ;; defined in C; the doc strings from the C source have

@@ -44,7 +44,7 @@
              :key #'xref-location-group)))
 
 (ert-deftest xref-matches-in-directory-finds-none-for-some-regexp ()
-  (should (null (xref-tests--matches-in-data-dir "zzz"))))
+  (should-not (xref-tests--matches-in-data-dir "zzz")))
 
 (ert-deftest xref-matches-in-directory-finds-some-for-bar ()
   (let ((locs (xref-tests--locations-in-data-dir "bar")))
@@ -99,7 +99,7 @@
   (let* ((xrefs (xref-tests--matches-in-data-dir "foo"))
          (iter (xref--buf-pairs-iterator xrefs))
          (cons (funcall iter :next)))
-    (should (null (funcall iter :next)))
+    (should-not (funcall iter :next))
     (should (string-match "file1\\.txt\\'" (buffer-file-name (car cons))))
     (should (= 2 (length (cdr cons))))))
 
@@ -108,7 +108,7 @@
          (iter (xref--buf-pairs-iterator xrefs))
          (cons1 (funcall iter :next))
          (cons2 (funcall iter :next)))
-    (should (null (funcall iter :next)))
+    (should-not (funcall iter :next))
     (should-not (equal (car cons1) (car cons2)))
     (should (= 1 (length (cdr cons1))))
     (should (= 1 (length (cdr cons2))))))
@@ -119,10 +119,10 @@
          (cons1 (funcall iter :next))
          (cons2 (funcall iter :next)))
     (funcall iter :cleanup)
-    (should (null (marker-position (car (nth 0 (cdr cons1))))))
-    (should (null (marker-position (cdr (nth 0 (cdr cons1))))))
-    (should (null (marker-position (car (nth 0 (cdr cons2))))))
-    (should (null (marker-position (cdr (nth 0 (cdr cons2))))))))
+    (should-not (marker-position (car (nth 0 (cdr cons1)))))
+    (should-not (marker-position (cdr (nth 0 (cdr cons1)))))
+    (should-not (marker-position (car (nth 0 (cdr cons2)))))
+    (should-not (marker-position (cdr (nth 0 (cdr cons2)))))))
 
 (ert-deftest xref--xref-file-name-display-is-abs ()
   (let ((xref-file-name-display 'abs))

@@ -227,7 +227,7 @@ The directory name must be absolute.")
 (cl-defmethod project-root (project
                             &context (project--within-roots-fallback
                                       (eql nil)))
-  (car (project-roots project)))
+  (cl-call-next-method project))
 
 (cl-defgeneric project-roots (project)
   "Return the list containing the current project root.

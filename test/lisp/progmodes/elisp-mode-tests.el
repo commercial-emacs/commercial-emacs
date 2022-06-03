@@ -1116,5 +1116,43 @@ evaluation of BODY."
                         (emacs-lisp-mode)
                         (indent-region (point-min) (point-max)))))
 
+(ert-deftest xref-tests-prefer-source ()
+  "Jump to the file in `source-directory' that corresponds to the target."
+  (let* ((xref-show-definitions-function 'xref-show-definitions-buffer)
+         (xref-prefer-source-directory t)
+         (what "xref-backend-definitions")
+         (ert-directory (file-name-directory
+                         (ert-resource-file "simple-shorthand-test.el")))
+         (installed-path (find-lisp-object-file-name (intern what) 'defun))
+         (preferred-path (string-replace (file-name-as-directory
+                                          source-directory)
+                                         (file-name-as-directory
+                                          ert-directory)
+                                         installed-path))
+         (installed-directory source-directory)
+         (source-directory ert-directory)
+         (buf (with-temp-buffer
+                (emacs-lisp-mode)
+                (xref-find-definitions what))))
+    (unwind-protect
+        (with-current-buffer buf
+          (mkdir (file-name-directory preferred-path) t)
+          (copy-file installed-path preferred-path t)
+          (save-excursion
+            (should (re-search-forward
+                     (regexp-quote (format "cl-defmethod %s" what))
+                     nil t)))
+          (should (re-search-forward
+                   (regexp-quote (regexp-quote (format "cl-defgeneric %s" what)))
+                   nil t))
+          (call-interactively #'xref-goto-xref)
+          (should (equal (buffer-file-name) preferred-path)))
+      (let (kill-buffer-query-functions)
+        (delete-directory (file-name-directory preferred-path) t)
+        (when (buffer-live-p (get-buffer preferred-path))
+          (kill-buffer (get-buffer preferred-path)))
+        (when (buffer-live-p buf)
+          (kill-buffer buf))))))
+
 (provide 'elisp-mode-tests)
 ;;; elisp-mode-tests.el ends here
