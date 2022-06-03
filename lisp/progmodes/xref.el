@@ -428,8 +428,7 @@ or earlier: it can break `dired-do-find-regexp-and-replace'."
   :package-version '(xref . "1.2.0"))
 
 (defcustom xref-prefer-source-directory t
-  "If non-nil, jump to the file in `source-directory' that
-corresponds to the target."
+  "Prefer file in `source-directory' corresponding to target."
   :type 'boolean
   :version "29.1")
 
