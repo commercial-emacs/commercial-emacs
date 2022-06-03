@@ -973,17 +973,16 @@ namespace but with lower confidence."
 
 (cl-defmethod xref-backend-definitions ((_backend (eql 'elisp)) identifier)
   (require 'find-func)
-  (let ((sym (intern-soft identifier)))
-    (when sym
-      (let* ((pos (get-text-property 0 'pos identifier))
-             (namespace (if pos
-                            (elisp--xref-infer-namespace pos)
-                          'any))
-             (defs (elisp--xref-find-definitions sym)))
-        (if (eq namespace 'maybe-variable)
-            (or (elisp--xref-filter-definitions defs 'variable sym)
-                (elisp--xref-filter-definitions defs 'any sym))
-          (elisp--xref-filter-definitions defs namespace sym))))))
+  (when-let ((sym (intern-soft identifier)))
+    (let* ((pos (get-text-property 0 'pos identifier))
+           (namespace (if pos
+                          (elisp--xref-infer-namespace pos)
+                        'any))
+           (defs (elisp--xref-find-definitions sym)))
+      (if (eq namespace 'maybe-variable)
+          (or (elisp--xref-filter-definitions defs 'variable sym)
+              (elisp--xref-filter-definitions defs 'any sym))
+        (elisp--xref-filter-definitions defs namespace sym)))))
 
 (defun elisp--xref-filter-definitions (definitions namespace symbol)
   (if (eq namespace 'any)
