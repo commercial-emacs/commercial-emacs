@@ -862,6 +862,12 @@ so automatically.
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
 
+** Battery
+
++++
+*** New user option 'battery-update-functions'.
+This can be used to trigger actions based on the battery status.
+
 ** Enriched Mode
 
 +++
@@ -2021,12 +2027,6 @@ available only when Emacs was built with glibc as the C library.
 The new 'x-show-tooltip-timeout' variable allows the user to alter
 this for packages that don't use 'tooltip-show', but instead call the
 lower level function directly.
-
-+++
-** New function 'window-max-characters-per-line'.
-
-+++
-** New function 'window-char-pixel-width'.
 
 ---
 ** New function 'current-cpu-time'.
