@@ -1148,7 +1148,11 @@ evaluation of BODY."
           (call-interactively #'xref-goto-xref)
           (should (equal (buffer-file-name) preferred-path)))
       (let (kill-buffer-query-functions)
-        (delete-directory (file-name-directory preferred-path) t)
+        (delete-directory (expand-file-name
+                           (reverse (file-name-nondirectory
+                                     (reverse (string-replace ert-directory
+                                                              "" preferred-path))))
+                           ert-directory) t)
         (when (buffer-live-p (get-buffer preferred-path))
           (kill-buffer (get-buffer preferred-path)))
         (when (buffer-live-p buf)
