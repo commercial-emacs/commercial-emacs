@@ -57,8 +57,7 @@
   "Prefer file in `source-directory' corresponding to target."
   :type 'boolean
   :version "29.1"
-  :group 'find-function
-  :version "21.1")
+  :group 'find-function)
 
 (defcustom find-function-regexp
   ;; Match things like (defun foo ...), (defmacro foo ...),
@@ -697,12 +696,12 @@ See `find-function' for more details."
 Finds the library containing the definition of VARIABLE in a buffer and
 the point of the definition.  The buffer is not selected.
 If the variable's definition can't be found in the buffer, return (BUFFER)."
-  (if (not variable)
-      (error "You didn't specify a variable")
-    (let* ((library (or file
-                        (symbol-file variable 'defvar)
-                        (help-C-file-name variable 'var))))
-      (find-function-search-for-symbol variable 'defvar library))))
+  (if variable
+      (let ((library (or file
+                         (symbol-file variable 'defvar)
+                         (help-C-file-name variable 'var))))
+        (find-function-search-for-symbol variable 'defvar library))
+    (error "You didn't specify a variable")))
 
 ;;;###autoload
 (defun find-variable (variable)

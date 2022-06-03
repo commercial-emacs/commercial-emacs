@@ -266,8 +266,7 @@ The format is (FUNCTION ARGS...).")
             (help-C-file-name (indirect-function fun) 'fun)))
     ;; Don't use find-function-noselect because it follows
     ;; aliases (which fails for built-in functions).
-    (let* ((location
-            (find-function-search-for-symbol fun type file))
+    (let* ((location (find-function-search-for-symbol fun type file))
            (position (cdr location)))
       (if help-window-keep-selected
           (pop-to-buffer-same-window (car location))
@@ -339,8 +338,7 @@ The format is (FUNCTION ARGS...).")
 		   (require 'find-func)
 		   ;; Don't use find-function-noselect because it follows
 		   ;; aliases (which fails for built-in functions).
-		   (let* ((location
-			   (find-function-search-for-symbol fun 'defface file))
+		   (let* ((location (find-function-search-for-symbol fun 'defface file))
                           (position (cdr location)))
                      (if help-window-keep-selected
                          (pop-to-buffer-same-window (car location))
