@@ -53,6 +53,13 @@
 
 (defconst find-function-space-re "\\(?:\\s-\\|\n\\|;.*\n\\)+")
 
+(defcustom find-function-prefer-source-directory t
+  "Prefer file in `source-directory' corresponding to target."
+  :type 'boolean
+  :version "29.1"
+  :group 'find-function
+  :version "21.1")
+
 (defcustom find-function-regexp
   ;; Match things like (defun foo ...), (defmacro foo ...),
   ;; (define-skeleton foo ...), (define-generic-mode 'foo ...),
@@ -196,6 +203,28 @@ for completion."
   :group 'find-function)
 
 ;;; Functions:
+
+(defalias 'find-function-preferred-message
+  (let (messaged-p)
+    (lambda (file)
+      "find-function result may not reflect loaded definition."
+      (unless messaged-p
+        (setq messaged-p t)
+        (message "Showing result from %s" file)))))
+
+(defsubst find-function-preferred-source (file)
+  (if-let ((preferred-p find-function-prefer-source-directory)
+           (prefix (file-name-as-directory installed-directory))
+           ;; :end2 says PREFIX matches beginning of FILE
+           (installed-p (cl-search prefix file
+                                   :end2 (length prefix)))
+           (preferred (expand-file-name
+                       (cl-subseq file (length prefix))
+                       source-directory))
+           (readable-p (file-readable-p preferred)))
+      (prog1 preferred
+        (funcall (symbol-function 'find-function-preferred-message) preferred))
+    file))
 
 (defun find-library-suffixes ()
   (let ((suffixes nil))
@@ -416,8 +445,9 @@ LIBRARY can be an absolute or relative file name."
     ;; .emacs too.
     (when (string-match "\\.emacs\\(.el\\)" library)
       (setq library (substring library 0 (match-beginning 1))))
-    (let ((filename (find-library-name library))
-	  (regexp-symbol (cdr (assq type find-function-regexp-alist))))
+    (let* ((prefer-library (find-function-preferred-source library))
+           (filename (find-library-name prefer-library))
+	   (regexp-symbol (cdr (assq type find-function-regexp-alist))))
       (cond ((not filename)
              (error "Could not find '%s'" library))
             ((not regexp-symbol)
@@ -669,9 +699,9 @@ the point of the definition.  The buffer is not selected.
 If the variable's definition can't be found in the buffer, return (BUFFER)."
   (if (not variable)
       (error "You didn't specify a variable")
-    (let ((library (or file
-                       (symbol-file variable 'defvar)
-                       (help-C-file-name variable 'var))))
+    (let* ((library (or file
+                        (symbol-file variable 'defvar)
+                        (help-C-file-name variable 'var))))
       (find-function-search-for-symbol variable 'defvar library))))
 
 ;;;###autoload

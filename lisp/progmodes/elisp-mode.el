@@ -1174,8 +1174,7 @@ namespace but with lower confidence."
 
 (cl-defmethod xref-location-marker ((l xref-elisp-location))
   (pcase-let (((cl-struct xref-elisp-location symbol type file) l))
-    (let* ((prefer-file (xref-preferred-source file))
-           (buffer-point (find-function-search-for-symbol symbol type prefer-file)))
+    (let ((buffer-point (find-function-search-for-symbol symbol type file)))
       (with-current-buffer (car buffer-point)
         (save-excursion
           (save-restriction

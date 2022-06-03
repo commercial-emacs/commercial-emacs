@@ -1119,7 +1119,7 @@ evaluation of BODY."
 (ert-deftest xref-tests-prefer-source ()
   "Jump to the file in `source-directory' that corresponds to the target."
   (let* ((xref-show-definitions-function 'xref-show-definitions-buffer)
-         (xref-prefer-source-directory t)
+         (find-function-prefer-source-directory t)
          (what "xref-backend-definitions")
          (ert-directory (file-name-directory
                          (ert-resource-file "simple-shorthand-test.el")))
@@ -1146,15 +1146,14 @@ evaluation of BODY."
                    (regexp-quote (regexp-quote (format "cl-defgeneric %s" what)))
                    nil t))
           (call-interactively #'xref-goto-xref)
-          (should (equal (buffer-file-name) preferred-path)))
+          (should (equal (buffer-file-name) preferred-path))
+          (kill-buffer))
       (let (kill-buffer-query-functions)
         (delete-directory (expand-file-name
                            (reverse (file-name-nondirectory
                                      (reverse (string-replace ert-directory
                                                               "" preferred-path))))
                            ert-directory) t)
-        (when (buffer-live-p (get-buffer preferred-path))
-          (kill-buffer (get-buffer preferred-path)))
         (when (buffer-live-p buf)
           (kill-buffer buf))))))
 

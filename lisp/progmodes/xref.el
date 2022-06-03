@@ -427,34 +427,7 @@ or earlier: it can break `dired-do-find-regexp-and-replace'."
   :version "28.1"
   :package-version '(xref . "1.2.0"))
 
-(defcustom xref-prefer-source-directory t
-  "Prefer file in `source-directory' corresponding to target."
-  :type 'boolean
-  :version "29.1")
-
 (make-obsolete-variable 'xref--marker-ring 'xref--history "29.1")
-
-(defalias 'xref-preferred-message
-  (let (messaged-p)
-    (lambda (file)
-      "Heads-up to user that xref result may not reflect loaded definition."
-      (unless messaged-p
-        (setq messaged-p t)
-        (message "Showing result from %s" file)))))
-
-(defsubst xref-preferred-source (file)
-  (if-let ((preferred-p xref-prefer-source-directory)
-           (prefix (file-name-as-directory installed-directory))
-           ;; :end2 says PREFIX matches beginning of LIBRARY
-           (installed-p (cl-search prefix file
-                                   :end2 (length prefix)))
-           (preferred (expand-file-name
-                       (cl-subseq file (length prefix))
-                       source-directory))
-           (readable-p (file-readable-p preferred)))
-      (prog1 preferred
-        (funcall (symbol-function 'xref-preferred-message) preferred))
-    file))
 
 (defun xref-set-marker-ring-length (_var _val)
   (declare (obsolete nil "29.1"))
