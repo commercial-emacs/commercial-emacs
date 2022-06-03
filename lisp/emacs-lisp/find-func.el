@@ -401,7 +401,7 @@ After visiting file LIBRARY, return a cons cell (BUFFER
 . POS), where POS is the character position of the definition,
 or nil if not found.
 
-LIBRARY can be an absolute or relative path."
+LIBRARY can be an absolute or relative file name."
   (unless library
     (error "Don't know where `%s' is defined" symbol))
   ;; Some functions are defined as part of the construct
