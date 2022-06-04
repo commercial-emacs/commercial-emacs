@@ -8721,7 +8721,7 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   Lisp_Object type_sym;
   struct input_event ie;
 
-  NSTRACE ("[EmacsView performDragOperation:]");
+  NSTRACE (@"[EmacsView performDragOperation:]");
 
   source = [sender draggingSource];
 
@@ -8749,7 +8749,7 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 
   if (!type)
     return NO;
-#if NS_USE_NSPasteboardTypeFileURL != 0
+#if NS_USE_NSPasteboardTypeFileURL
   else if ([type isEqualToString: NSPasteboardTypeFileURL])
     {
       type_sym = Qfile;
@@ -8764,18 +8764,29 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 #else  // !NS_USE_NSPasteboardTypeFileURL
   else if ([type isEqualToString: NSFilenamesPboardType])
     {
-      NSArray *files;
+      id files;
       NSEnumerator *fenum;
       NSString *file;
 
-      if (!(files = [pb propertyListForType: type]))
+      files = [pb propertyListForType: type];
+
+      if (!files)
         return NO;
 
       type_sym = Qfile;
 
-      fenum = [files objectEnumerator];
-      while ( (file = [fenum nextObject]) )
-        strings = Fcons ([file lispString], strings);
+      /* On GNUstep, files might be a string.  */
+
+      if ([files respondsToSelector: @selector (objectEnumerator:)])
+	{
+	  fenum = [files objectEnumerator];
+
+	  while ((file = [fenum nextObject]))
+	    strings = Fcons ([file lispString], strings);
+	}
+      else
+	/* Then `files' is an NSString.  */
+	strings = list1 ([files lispString]);
     }
 #endif   // !NS_USE_NSPasteboardTypeFileURL
   else if ([type isEqualToString: NSPasteboardTypeURL])
@@ -8792,11 +8803,12 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
     {
       NSString *data;
 
-      if (! (data = [pb stringForType: type]))
+      data = [pb stringForType: type];
+
+      if (!data)
         return NO;
 
       type_sym = Qnil;
-
       strings = list1 ([data lispString]);
     }
   else
@@ -8804,7 +8816,8 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 
   EVENT_INIT (ie);
   ie.kind = DRAG_N_DROP_EVENT;
-  ie.arg = Fcons (type_sym, Fcons (operations, strings));
+  ie.arg = Fcons (type_sym, Fcons (operations,
+				   strings));
   XSETINT (ie.x, x);
   XSETINT (ie.y, y);
   XSETFRAME (ie.frame_or_window, emacsframe);
@@ -9659,7 +9672,6 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
   NSInteger window_number;
   NSWindow *w;
 #endif
-
   drag_op = op;
   selected_op = NSDragOperationNone;
   image = [[NSImage alloc] initWithSize: NSMakeSize (1.0, 1.0)];
@@ -9712,6 +9724,11 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
     }
 #endif
   unblock_input ();
+
+  /* Assume all buttons have been released since the drag-and-drop
+     operation is now over.  */
+  if (!dnd_return_frame)
+    x_display_list->grabbed = 0;
 
   [image release];
 
