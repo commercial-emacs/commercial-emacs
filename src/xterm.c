@@ -17006,6 +17006,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    xm_top_level_enter_message emsg;
 	    xm_drag_motion_message dmsg;
 
+	    /* Always clear mouse face.  */
+	    clear_mouse_face (hlinfo);
+	    hlinfo->mouse_face_hidden = true;
+
 	    /* Sometimes the drag-and-drop operation starts with the
 	       pointer of a frame invisible due to input.  Since
 	       motion events are ignored during that, make the pointer
@@ -18640,6 +18644,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		{
 		  Window target, toplevel;
 		  int target_proto, motif_style;
+
+		  /* Always clear mouse face.  */
+		  clear_mouse_face (hlinfo);
+		  hlinfo->mouse_face_hidden = true;
 
 		  /* Sometimes the drag-and-drop operation starts with the
 		     pointer of a frame invisible due to input.  Since
