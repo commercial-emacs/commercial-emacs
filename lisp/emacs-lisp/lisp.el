@@ -856,7 +856,7 @@ The option `delete-pair-blink-delay' can disable blinking."
       (delete-char 1))))
 
 (defun raise-sexp (&optional arg)
-  "Raise ARG sexps higher up the tree."
+  "Replace the enclosing parenthesis structure with ARG sexps from point."
   (interactive "p")
   (let ((s (if (and transient-mark-mode mark-active)
                (buffer-substring (region-beginning) (region-end))
