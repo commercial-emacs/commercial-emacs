@@ -382,6 +382,12 @@ you might have to restart Emacs to see the effect."
   :package-version '(project . "0.2.0")
   :safe #'booleanp)
 
+(defcustom project-vc-include-untracked t
+  "When non-nil, the VC project backend includes untracked files."
+  :type 'boolean
+  :version "29.1"
+  :safe #'booleanp)
+
 ;; FIXME: Using the current approach, major modes are supposed to set
 ;; this variable to a buffer-local value.  So we don't have access to
 ;; the "external roots" of language A from buffers of language B, which
@@ -512,8 +518,9 @@ backend implementation of `project-external-roots'.")
            (args '("-z"))
            (vc-git-use-literal-pathspecs nil)
            files)
-       ;; Include unregistered.
-       (setq args (append args '("-c" "-o" "--exclude-standard")))
+       (setq args (append args
+                          '("-c" "--exclude-standard")
+                          (and project-vc-include-untracked '("-o"))))
        (when extra-ignores
          (setq args (append args
                             (cons "--"
@@ -565,9 +572,9 @@ backend implementation of `project-external-roots'.")
        (delete-consecutive-dups files)))
     (`Hg
      (let ((default-directory (expand-file-name (file-name-as-directory dir)))
-           args)
-       ;; Include unregistered.
-       (setq args (nconc args '("-mcardu" "--no-status" "-0")))
+           (args (list (concat "-mcard" (and project-vc-include-untracked "u"))
+                       "--no-status"
+                       "-0")))
        (when extra-ignores
          (setq args (nconc args
                            (mapcan
@@ -1093,7 +1100,12 @@ If you exit the `query-replace', you can later continue the
                   (query-replace-read-args "Query replace (regexp)" t t)))
        (list from to))))
   (fileloop-initialize-replace
-   from to (project-files (project-current t)) 'default)
+   from to
+   ;; XXX: Filter out Git submodules, which are not regular files.
+   ;; `project-files' can return those, which is arguably suboptimal,
+   ;; but removing them eagerly has performance cost.
+   (cl-delete-if-not #'file-regular-p (project-files (project-current t)))
+   'default)
   (fileloop-continue))
 
 (defvar compilation-read-command)
