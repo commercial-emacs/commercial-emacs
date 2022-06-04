@@ -5451,6 +5451,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	    CHECK_ALLOCATED ();					\
 	    CHECK_LIVE (live_symbol_p, MEM_TYPE_SYMBOL);	\
 	  }							\
+	eassert (valid_lisp_object_p (ptr->u.s.function));	\
       } while (false)
 
 #else /* not GC_CHECK_MARKED_OBJECTS */
@@ -5595,17 +5596,10 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_Symbol:
 	  {
 	    struct Lisp_Symbol *ptr = XSYMBOL (*objp);
+	    void *forwarded = mgc_fwd_xpntr (ptr);
 
 	  nextsym:
-	    if (symbol_marked_p (ptr))
-	      break;
-	    CHECK_ALLOCATED_AND_LIVE_SYMBOL ();
-	    set_symbol_marked (ptr);
-	    /* Attempt to catch bogus objects.  */
-	    eassert (valid_lisp_object_p (ptr->u.s.function));
-	    mark_stack_push (&ptr->u.s.function);
-	    mark_stack_push (&ptr->u.s.plist);
-	    switch (ptr->u.s.redirect)
+	    if (forwarded)
 	      {
 	      case SYMBOL_PLAINVAL:
 		mark_stack_push (&ptr->u.s.val.value);
@@ -5640,9 +5634,47 @@ process_mark_stack (ptrdiff_t base_sp)
 		emacs_abort ();
 		break;
 	      }
+	    else if (mgc_xpntr_p (ptr))
+	      {
+		XSETVECTOR (*objp, mgc_flip_xpntr (ptr, Space_Vectorlike));
+		ptr = XVECTOR (*objp);
+		mark_stack_push (&ptr->u.s.function);
+		mark_stack_push (&ptr->u.s.plist);
+	      }
+	    else if (! symbol_marked_p (ptr))
+	      {
+		CHECK_ALLOCATED_AND_LIVE_SYMBOL ();
+		set_symbol_marked (ptr);
+		mark_stack_push (&ptr->u.s.function);
+		mark_stack_push (&ptr->u.s.plist);
+		switch (ptr->u.s.redirect)
+		  {
+		  case SYMBOL_PLAINVAL:
+		    mark_stack_push (&ptr->u.s.val.value);
+		    break;
+		  case SYMBOL_VARALIAS:
+		    {
+		      Lisp_Object tem;
+		      XSETSYMBOL (tem, SYMBOL_ALIAS (ptr));
+		      mark_stack_push (&tem);
+		      break;
+		    }
+		  case SYMBOL_LOCALIZED:
+		    mark_localized_symbol (ptr);
+		    break;
+		  case SYMBOL_FORWARDED:
+		    /* If the value is forwarded to a buffer or keyboard field,
+		       these are marked when we see the corresponding object.
+		       And if it's forwarded to a C variable, either it's not
+		       a Lisp_Object var, or it's staticpro'd already.  */
+		    break;
+		  default:
+		    emacs_abort ();
+		    break;
+		  }
 
-	    if (! PURE_P (XSTRING (ptr->u.s.name)))
-	      gc_process_string (&ptr->u.s.name);
+		if (! PURE_P (XSTRING (ptr->u.s.name)))
+		  gc_process_string (&ptr->u.s.name);
 
 	    /* Inner loop to mark next symbol in this bucket, if any.  */
 	    xpntr = ptr = ptr->u.s.next;
