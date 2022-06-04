@@ -266,25 +266,18 @@ DEFINE_GDB_SYMBOL_END (VALMASK)
 # define GCALIGNMENT 1
 #endif
 
-/* To cause a union to have alignment of at least GCALIGNMENT, put
-   GCALIGNED_UNION_MEMBER in its member list.
+/* To gc-align something is to ensure mark_memory() can find Lisp
+   objects on the C stack.
 
-   If a struct is always GC-aligned (either by the GC, or via
-   allocation in a containing union that has GCALIGNED_UNION_MEMBER)
-   and does not contain a GC-aligned struct or union, putting
-   GCALIGNED_STRUCT after its closing '}' can help the compiler
-   generate better code.  Also, such structs should be added to the
-   emacs_align_type union in alloc.c.
+   Put GCALIGNED_UNION_MEMBER in a union's member list.
 
-   Although these macros are reasonably portable, they are not
-   guaranteed on non-GCC platforms, as C11 does not require support
-   for alignment to GCALIGNMENT and older compilers may ignore
-   alignment requests.  For any type T where garbage collection
-   requires alignment, use verify (GCALIGNED (T)) to verify the
-   requirement on the current platform.  Types need this check if
-   their objects can be allocated outside the garbage collector.  For
-   example, struct Lisp_Symbol needs the check because of lispsym and
-   struct Lisp_Cons needs it because of STACK_CONS.  */
+   Put GCALIGNED_STRUCT after a struct's closing brace.  Additionally,
+   add the struct to `emacs_align_type`.
+
+   These macros are not guaranteed on non-GCC platforms.  C11 does not
+   require support for alignment strictures and older compilers may
+   simply ignore such directives.  Calling `verify (GCALIGNED (T))`
+   heads off surprises.  */
 
 #define GCALIGNED_UNION_MEMBER char alignas (GCALIGNMENT) gcaligned;
 #if HAVE_STRUCT_ATTRIBUTE_ALIGNED
@@ -306,33 +299,26 @@ typedef struct Lisp_X *Lisp_Word;
 typedef EMACS_INT Lisp_Word;
 #endif
 
-/* Some operations are so commonly executed that they are implemented
-   as macros, not functions, because otherwise runtime performance would
-   suffer too much when compiling with GCC without optimization.
-   There's no need to inline everything, just the operations that
-   would otherwise cause a serious performance problem.
-
-   For each such operation OP, define a macro lisp_h_OP that contains
-   the operation's implementation.  That way, OP can be implemented
-   via a macro definition like this:
+/* With lisp_h_OP containing the core implementation, OP is exposed as
+   a macro for un-optimized builds which disable function inlining,
 
      #define OP(x) lisp_h_OP (x)
 
-   and/or via a function definition like this:
+   or an inlined function otherwise,
 
      Lisp_Object (OP) (Lisp_Object x) { return lisp_h_OP (x); }
 
-   without worrying about the implementations diverging, since
-   lisp_h_OP defines the actual implementation.  The lisp_h_OP macros
-   are intended to be private to this include file, and should not be
-   used elsewhere.
-
-   FIXME: Remove the lisp_h_OP macros, and define just the inline OP
-   functions, once "gcc -Og" (new to GCC 4.8) or equivalent works well
-   enough for Emacs developers.  Maybe in the year 2025.  See Bug#11935.
-
-   For the macros that have corresponding functions (defined later),
-   see these functions for commentary.  */
+   FIXME: Now that "gcc -Og" (new to GCC 4.8) works well enough, we
+   no longer need this indirection.  See Bug#11935.
+*/
+#ifndef DEFINE_KEY_OPS_AS_MACROS
+# if (defined __NO_INLINE__ \
+      && ! defined __OPTIMIZE__ && ! defined __OPTIMIZE_SIZE__)
+#  define DEFINE_KEY_OPS_AS_MACROS true
+# else
+#  define DEFINE_KEY_OPS_AS_MACROS false
+# endif
+#endif
 
 /* Convert among the various Lisp-related types: I for EMACS_INT, L
    for Lisp_Object, P for void *.  */
@@ -404,21 +390,6 @@ typedef EMACS_INT Lisp_Word;
 # endif
 # define lisp_h_XFIXNUM_RAW(a) (XLI (a) >> INTTYPEBITS)
 # define lisp_h_XTYPE(a) ((enum Lisp_Type) (XLI (a) & ~VALMASK))
-#endif
-
-/* When DEFINE_KEY_OPS_AS_MACROS, define key operations as macros to
-   cajole the compiler into inlining them; otherwise define them as
-   inline functions as this is cleaner and can be more efficient.
-   The default is true if the compiler is GCC-like and if function
-   inlining is disabled because the compiler is not optimizing or is
-   optimizing for size.  Otherwise the default is false.  */
-#ifndef DEFINE_KEY_OPS_AS_MACROS
-# if (defined __NO_INLINE__ \
-      && ! defined __OPTIMIZE__ && ! defined __OPTIMIZE_SIZE__)
-#  define DEFINE_KEY_OPS_AS_MACROS true
-# else
-#  define DEFINE_KEY_OPS_AS_MACROS false
-# endif
 #endif
 
 #if DEFINE_KEY_OPS_AS_MACROS
@@ -1271,8 +1242,6 @@ make_pointer_integer (void *p)
   eassert (FIXNUMP (a) && XFIXNUMPTR (a) == p);
   return a;
 }
-
-/* See the macros in intervals.h.  */
 
 typedef struct interval *INTERVAL;
 

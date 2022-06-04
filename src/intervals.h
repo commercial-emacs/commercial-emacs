@@ -63,7 +63,8 @@ struct interval
 				       before this interval goes into it.  */
   bool_bf rear_sticky : 1;	    /* Likewise for just after it.  */
   Lisp_Object plist;		    /* Other properties.  */
-};
+} GCALIGNED_STRUCT;
+verify (GCALIGNED (struct interval));
 
 /* These are macros for dealing with the interval tree.  */
 

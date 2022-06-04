@@ -226,7 +226,6 @@ intervals_equal (INTERVAL i0, INTERVAL i1)
   return intervals_equal_1 (i0, i1, false);
 }
 
-
 /* Traverse an interval tree TREE, performing FUNCTION on each node.
    No guarantee is made about the order of traversal.
    Pass FUNCTION two args: an interval, and ARG.  */
