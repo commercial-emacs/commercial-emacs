@@ -996,9 +996,11 @@ mark_interval_tree (INTERVAL *i)
     return;
   if (mgc_xpntr_p (*i))
     {
-      /* INTERVAL *root = i; */
-      /* for ( ; ! NULL_PARENT (*root); root = &(*root)->up.interval); */
-      /* eassert (mgc_xpntr_p (*root)); */
+      /* INTERVAL *root = i;
+	 for ( ; ! NULL_PARENT (*root); root = &(*root)->up.interval);
+	 eassert (mgc_xpntr_p (*root));
+	 traverse_intervals_noorder (i, mark_interval_tree_functor_mgc, NULL)
+      */
       traverse_intervals_noorder (i, mark_interval_tree_functor_mgc, NULL);
     }
   else if (! interval_marked_p (*i))
@@ -5596,10 +5598,28 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_Symbol:
 	  {
 	    struct Lisp_Symbol *ptr = XSYMBOL (*objp);
-	    void *forwarded = mgc_fwd_xpntr (ptr);
-
 	  nextsym:
-	    if (forwarded)
+	    if (mgc_xpntr_p (ptr))
+	      {
+		void *forwarded = mgc_fwd_xpntr (ptr);
+                if (forwarded)
+                  {
+                    XSETSYMBOL (*objp, forwarded);
+                    eassert (! symbol_marked_p (ptr));
+                    break; /* !!! */
+                  }
+                XSETSYMBOL (*objp, mgc_flip_xpntr (ptr, Space_Symbol));
+	      }
+	    else
+	      {
+		if (symbol_marked_p (ptr))
+		  break; /* !!! */
+		CHECK_ALLOCATED_AND_LIVE_SYMBOL ();
+		set_symbol_marked (ptr);
+	      }
+	    mark_stack_push (&ptr->u.s.function);
+	    mark_stack_push (&ptr->u.s.plist);
+	    switch (ptr->u.s.redirect)
 	      {
 	      case SYMBOL_PLAINVAL:
 		mark_stack_push (&ptr->u.s.val.value);
@@ -5634,47 +5654,9 @@ process_mark_stack (ptrdiff_t base_sp)
 		emacs_abort ();
 		break;
 	      }
-	    else if (mgc_xpntr_p (ptr))
-	      {
-		XSETVECTOR (*objp, mgc_flip_xpntr (ptr, Space_Vectorlike));
-		ptr = XVECTOR (*objp);
-		mark_stack_push (&ptr->u.s.function);
-		mark_stack_push (&ptr->u.s.plist);
-	      }
-	    else if (! symbol_marked_p (ptr))
-	      {
-		CHECK_ALLOCATED_AND_LIVE_SYMBOL ();
-		set_symbol_marked (ptr);
-		mark_stack_push (&ptr->u.s.function);
-		mark_stack_push (&ptr->u.s.plist);
-		switch (ptr->u.s.redirect)
-		  {
-		  case SYMBOL_PLAINVAL:
-		    mark_stack_push (&ptr->u.s.val.value);
-		    break;
-		  case SYMBOL_VARALIAS:
-		    {
-		      Lisp_Object tem;
-		      XSETSYMBOL (tem, SYMBOL_ALIAS (ptr));
-		      mark_stack_push (&tem);
-		      break;
-		    }
-		  case SYMBOL_LOCALIZED:
-		    mark_localized_symbol (ptr);
-		    break;
-		  case SYMBOL_FORWARDED:
-		    /* If the value is forwarded to a buffer or keyboard field,
-		       these are marked when we see the corresponding object.
-		       And if it's forwarded to a C variable, either it's not
-		       a Lisp_Object var, or it's staticpro'd already.  */
-		    break;
-		  default:
-		    emacs_abort ();
-		    break;
-		  }
 
-		if (! PURE_P (XSTRING (ptr->u.s.name)))
-		  gc_process_string (&ptr->u.s.name);
+	    if (! PURE_P (XSTRING (ptr->u.s.name)))
+	      gc_process_string (&ptr->u.s.name);
 
 	    /* Inner loop to mark next symbol in this bucket, if any.  */
 	    xpntr = ptr = ptr->u.s.next;

@@ -522,7 +522,7 @@ is unibyte unless INIT is not ASCII or MULTIBYTE is non-nil.  */)
   record_unwind_protect_ptr (restore_string_allocator, static_string_allocator);
   record_unwind_protect_ptr (restore_interval_allocator, static_interval_allocator);
   static_string_allocator = &allocate_string;
-  static_interval_allocator = &allocate_interval;
+  // FIXME: static_interval_allocator = &allocate_interval;
   (void) &allocate_interval;
   return unbind_to (count, Fmake_string (length, init, multibyte));
 }
@@ -642,7 +642,8 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
 	  INT_ADD_WRAPV ((uintptr_t) xpntr, bytespan, (uintptr_t *) &xpntr);
 	}
     }
-  return list5 (Fcons (Qsymbols,
+  return listn (6,
+		Fcons (Qsymbols,
 		       make_fixnum (tally[Space_Symbol])),
 		Fcons (Qstrings,
 		       make_fixnum (tally[Space_String])),
@@ -651,7 +652,9 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
 		Fcons (Qconses,
 		       make_fixnum (tally[Space_Cons])),
 		Fcons (Qfloats,
-		       make_fixnum (tally[Space_Float])));
+		       make_fixnum (tally[Space_Float])),
+		Fcons (Qintervals,
+		       make_fixnum (tally[Space_Interval])));
 }
 
 void
