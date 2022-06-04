@@ -11,7 +11,7 @@ on:
     - '**.info'
     - '**.md'
     - ChangeLog.*
-    - 'NEWS'
+    - NEWS
   push:
     paths-ignore:
     - '**.rst'
@@ -20,10 +20,10 @@ on:
     - '**.info'
     - '**.md'
     - ChangeLog.*
-    - 'NEWS'
+    - NEWS
     branches-ignore:
-    - 'master'
-    - 'main'
+    - master
+    - main
 
 jobs:
   build:
