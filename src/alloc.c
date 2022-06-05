@@ -5663,18 +5663,33 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_Cons:
 	  {
 	    struct Lisp_Cons *ptr = XCONS (*objp);
-	    if (cons_marked_p (ptr))
-	      break;
-	    CHECK_ALLOCATED_AND_LIVE (live_cons_p, MEM_TYPE_CONS);
-	    set_cons_marked (ptr);
+
+	    if (mgc_xpntr_p (ptr))
+	      {
+		void *forwarded = mgc_fwd_xpntr (ptr);
+                if (forwarded)
+                  {
+                    XSETCONS (*objp, forwarded);
+                    eassert (! cons_marked_p (ptr));
+                    break; /* !!! */
+                  }
+                XSETCONS (*objp, mgc_flip_xpntr (ptr, Space_Cons));
+		ptr = XCONS (*objp);
+	      }
+	    else
+	      {
+		if (cons_marked_p (ptr))
+		  break; /* !!! */
+		CHECK_ALLOCATED_AND_LIVE (live_cons_p, MEM_TYPE_CONS);
+		set_cons_marked (ptr);
+	      }
 
 	    /* Put cdr, then car onto stack.  */
 	    if (! NILP (ptr->u.s.u.cdr))
 	      {
 		mark_stack_push (&ptr->u.s.u.cdr);
 #if GC_CDR_COUNT
-		cdr_count++;
-		if (cdr_count == mark_object_loop_halt)
+		if (++cdr_count >= mark_object_loop_halt)
 		  emacs_abort ();
 #endif
 	      }

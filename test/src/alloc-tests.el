@@ -73,4 +73,13 @@
     (garbage-collect)
     (should (= (1+ ocount) (alist-get 'vectors (mgc-counts))))))
 
+(ert-deftest flip-one-cons ()
+  (let* ((gc-cons-threshold most-positive-fixnum)
+         (ocount (alist-get 'conses (mgc-counts)))
+         (bar (mgc-cons 1 2)))
+    (ignore bar)
+    (should (= (1+ ocount) (alist-get 'conses (mgc-counts))))
+    (garbage-collect)
+    (should (= (1+ ocount) (alist-get 'conses (mgc-counts))))))
+
 ;;; alloc-tests.el ends here
