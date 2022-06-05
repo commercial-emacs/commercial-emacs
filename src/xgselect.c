@@ -64,7 +64,7 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 
   context = g_main_context_default ();
   if (main_thread_p (current_thread))
-      context_acquired = g_main_context_acquire (context);
+    context_acquired = g_main_context_acquire (context);
   /* FIXME: If we couldn't acquire the context, we just silently proceed
      because this function handles more than just glib file descriptors.
      Note that, as implemented, this failure is completely silent: there is

@@ -693,7 +693,7 @@ aligned_alloc (size_t alignment, size_t size)
    call lmalloc().
 
    Q_CLEAR uses calloc() instead of malloc().
-   */
+*/
 
 void *
 lmalloc (size_t size, bool q_clear)
@@ -5350,16 +5350,11 @@ gc_process_string (Lisp_Object *objp)
       /* Do not use string_(set|get)_intervals here.  */
       XSETSTRING (*objp, mgc_flip_xpntr (s, Space_String));
       forwarded = mgc_fwd_xpntr (s);
-      if (! forwarded)
-	memory_full (SIZE_MAX);
-      else
-	{
-	  struct Lisp_String *s1 = (struct Lisp_String *) forwarded;
-	  eassert ((void *) XSTRING (*objp) == (void *) s1);
-	  SDATA_OF_LISP_STRING (s1)->string = s1;
-	  s1->u.s.intervals = balance_intervals (s1->u.s.intervals);
-	  mark_interval_tree (&s1->u.s.intervals);
-	}
+      struct Lisp_String *s1 = (struct Lisp_String *) forwarded;
+      eassert ((void *) XSTRING (*objp) == (void *) s1);
+      SDATA_OF_LISP_STRING (s1)->string = s1;
+      s1->u.s.intervals = balance_intervals (s1->u.s.intervals);
+      mark_interval_tree (&s1->u.s.intervals);
     }
   else if (! string_marked_p (s))
     {

@@ -275,7 +275,7 @@ DEFINE_GDB_SYMBOL_END (VALMASK)
    add the struct to `emacs_align_type`.
 
    These macros are not guaranteed on non-GCC platforms.  C11 does not
-   require support for alignment strictures and older compilers may
+   require support for alignment strictures, and older compilers may
    simply ignore such directives.  Calling `verify (GCALIGNED (T))`
    heads off surprises.  */
 
