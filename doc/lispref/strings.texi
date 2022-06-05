@@ -466,9 +466,11 @@ described in this section.  @xref{Mutability}.
   The most basic way to alter the contents of an existing string is with
 @code{aset} (@pxref{Array Functions}).  @code{(aset @var{string}
 @var{idx} @var{char})} stores @var{char} into @var{string} at index
-@var{idx}.  Each character occupies one or more bytes, and if @var{char}
-needs a different number of bytes from the character already present at
-that index, @code{aset} signals an error.
+@var{idx}.  Unibyte strings are converted to multibyte if necessary
+(@pxref{Text Representations}).  If the size of the internal encoding
+of @var{char} differs from that of the character already present at
+@var{idx}, the string's representation is adjusted to accommodate the
+change.
 
   A more powerful function is @code{store-substring}:
 
@@ -478,9 +480,7 @@ storing @var{obj} starting at index @var{idx}.  The argument @var{obj}
 may be either a character or a (smaller) string.
 
 Since it is impossible to change the length of an existing string, it is
-an error if @var{obj} doesn't fit within @var{string}'s actual length,
-or if any new character requires a different number of bytes from the
-character currently present at that point in @var{string}.
+an error if @var{obj} doesn't fit within @var{string}'s actual length.
 @end defun
 
   To clear out a string that contained a password, use
