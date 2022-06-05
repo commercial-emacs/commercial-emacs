@@ -423,6 +423,8 @@ If CACHE is not a list, leave cached entries as-is."
 
 (defun syntax-ppss (&optional pos)
   "Parse-Partial-Sexp State at POS, defaulting to point.
+If POS is given, this function moves point to POS.
+
 The returned value is the same as that of `parse-partial-sexp'
 run from `point-min' to POS except that values at positions 2 and 6
 in the returned list (counting from 0) cannot be relied upon.
