@@ -5183,18 +5183,6 @@ mark_face_cache (struct face_cache *c)
     }
 }
 
-static void
-mark_localized_symbol (struct Lisp_Symbol *ptr)
-{
-  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (ptr);
-  /* If the value is set up for a killed buffer restore its global binding.  */
-  if (BUFFERP (blv->where) && ! BUFFER_LIVE_P (XBUFFER (blv->where)))
-    symval_restore_default (ptr);
-  mark_object (&blv->where);
-  mark_object (&blv->valcell);
-  mark_object (&blv->defcell);
-}
-
 /* Remove killed buffers or items whose car is a killed buffer from
    LIST, and mark other items.  Return changed LIST, which is marked.  */
 
@@ -5618,7 +5606,17 @@ process_mark_stack (ptrdiff_t base_sp)
 		  break;
 		}
 	      case SYMBOL_LOCALIZED:
-		mark_localized_symbol (ptr);
+		{
+		  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (ptr);
+		  /* If the value is set up for a killed buffer
+		     restore its global binding.  */
+		  if (BUFFERP (blv->where)
+		      && ! BUFFER_LIVE_P (XBUFFER (blv->where)))
+		    symval_restore_default (ptr);
+		  mark_stack_push (&blv->where);
+		  mark_stack_push (&blv->valcell);
+		  mark_stack_push (&blv->defcell);
+		}
 		break;
 	      case SYMBOL_FORWARDED:
 		/* If the value is forwarded to a buffer or keyboard field,
@@ -5626,7 +5624,9 @@ process_mark_stack (ptrdiff_t base_sp)
 		   And if it's forwarded to a C variable, either it's not
 		   a Lisp_Object var, or it's staticpro'd already.  */
 		break;
-	      default: emacs_abort ();
+	      default:
+		emacs_abort ();
+		break;
 	      }
 
 	    if (! PURE_P (XSTRING (ptr->u.s.name)))
