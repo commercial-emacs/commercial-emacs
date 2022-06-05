@@ -5595,6 +5595,8 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_Symbol:
 	  {
 	    struct Lisp_Symbol *ptr = XSYMBOL (*objp);
+
+	  nextsym:
 	    if (symbol_marked_p (ptr))
 	      break;
 	    CHECK_ALLOCATED_AND_LIVE_SYMBOL ();
@@ -5630,8 +5632,10 @@ process_mark_stack (ptrdiff_t base_sp)
 	    if (! PURE_P (XSTRING (ptr->u.s.name)))
 	      gc_process_string (&ptr->u.s.name);
 
-	    if (ptr->u.s.next)
-	      mark_automatic_object (make_lisp_symbol (ptr->u.s.next));
+	    /* Inner loop to mark next symbol in this bucket, if any.  */
+	    xpntr = ptr = ptr->u.s.next;
+	    if (ptr)
+	      goto nextsym;
 	  }
 	  break;
 
