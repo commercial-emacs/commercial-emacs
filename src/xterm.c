@@ -10265,13 +10265,22 @@ x_window_to_frame (struct x_display_info *dpyinfo, int wdesc)
   return 0;
 }
 
-/* Like x_any_window_to_frame but only try to find tooltip frames.  */
+/* Like x_any_window_to_frame but only try to find tooltip frames.
+
+   If wdesc is a toolkit tooltip without an associated frame, set
+   UNRELATED_TOOLTIP_P to true.  Otherwise, set it to false.  */
 static struct frame *
 x_tooltip_window_to_frame (struct x_display_info *dpyinfo,
-			   Window wdesc)
+			   Window wdesc, bool *unrelated_tooltip_p)
 {
   Lisp_Object tail, frame;
   struct frame *f;
+#ifdef USE_GTK
+  GtkWidget *widget;
+  GdkWindow *tooltip_window;
+#endif
+
+  *unrelated_tooltip_p = false;
 
   FOR_EACH_FRAME (tail, frame)
     {
@@ -10281,6 +10290,34 @@ x_tooltip_window_to_frame (struct x_display_info *dpyinfo,
 	  && FRAME_DISPLAY_INFO (f) == dpyinfo
 	  && FRAME_X_WINDOW (f) == wdesc)
 	return f;
+
+#ifdef USE_GTK
+      if (FRAME_X_OUTPUT (f)->ttip_window)
+	widget = GTK_WIDGET (FRAME_X_OUTPUT (f)->ttip_window);
+      else
+	widget = NULL;
+
+      if (widget)
+	tooltip_window = gtk_widget_get_window (widget);
+      else
+	tooltip_window = NULL;
+
+#ifdef HAVE_GTK3
+      if (tooltip_window
+	  && (gdk_x11_window_get_xid (tooltip_window) == wdesc))
+	{
+	  *unrelated_tooltip_p = true;
+	  break;
+	}
+#else
+      if (tooltip_window
+	  && (GDK_WINDOW_XID (tooltip_window) == wdesc))
+	{
+	  *unrelated_tooltip_p = true;
+	  break;
+	}
+#endif
+#endif
     }
 
   return NULL;
@@ -11766,6 +11803,7 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 {
   struct frame *f1, *maybe_tooltip;
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (*fp);
+  bool unrelated_tooltip;
 
   block_input ();
 
@@ -11866,9 +11904,10 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 		    && (EQ (track_mouse, Qdrag_source)
 			|| EQ (track_mouse, Qdropping)))
 		  {
-		    maybe_tooltip = x_tooltip_window_to_frame (dpyinfo, child);
+		    maybe_tooltip = x_tooltip_window_to_frame (dpyinfo, child,
+							       &unrelated_tooltip);
 
-		    if (maybe_tooltip)
+		    if (maybe_tooltip || unrelated_tooltip)
 		      child = x_get_window_below (dpyinfo->display, child,
 						  parent_x, parent_y, &win_x,
 						  &win_y);
@@ -17499,15 +17538,14 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 	    x_net_wm_state (f, configureEvent.xconfigure.window);
 
-#ifdef USE_X_TOOLKIT
+#if defined USE_X_TOOLKIT || defined USE_GTK
           /* Tip frames are pure X window, set size for them.  */
           if (FRAME_TOOLTIP_P (f))
             {
               if (FRAME_PIXEL_HEIGHT (f) != configureEvent.xconfigure.height
                   || FRAME_PIXEL_WIDTH (f) != configureEvent.xconfigure.width)
-                {
-                  SET_FRAME_GARBAGED (f);
-                }
+		SET_FRAME_GARBAGED (f);
+
               FRAME_PIXEL_HEIGHT (f) = configureEvent.xconfigure.height;
               FRAME_PIXEL_WIDTH (f) = configureEvent.xconfigure.width;
             }
