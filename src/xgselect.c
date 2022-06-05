@@ -62,6 +62,9 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   bool already_has_events;
 #endif
 
+  if (xg_select_suppress_count)
+    return pselect (fds_lim, rfds, wfds, efds, timeout, sigmask);
+
   context = g_main_context_default ();
   if (main_thread_p (current_thread))
       context_acquired = g_main_context_acquire (context);
