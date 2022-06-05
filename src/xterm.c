@@ -2453,7 +2453,6 @@ x_dnd_compute_toplevels (struct x_display_info *dpyinfo)
       XFree (data);
       return 1;
     }
-#endif
 
   toplevels = (Window *) data;
 
@@ -4250,31 +4249,6 @@ record_event (char *locus, int type)
   event_record[event_record_index].type = type;
   event_record_index++;
 }
-#endif
-
-static void
-x_toolkit_position (struct frame *f, int x, int y,
-		    bool *menu_bar_p, bool *tool_bar_p)
-{
-#ifdef USE_GTK
-  GdkRectangle test_rect;
-  int scale;
-
-  y += (FRAME_MENUBAR_HEIGHT (f)
-	+ FRAME_TOOLBAR_TOP_HEIGHT (f));
-  x += FRAME_TOOLBAR_LEFT_WIDTH (f);
-
-  if (FRAME_EXTERNAL_MENU_BAR (f))
-    *menu_bar_p = (x >= 0 && x < FRAME_PIXEL_WIDTH (f)
-		   && y >= 0 && y < FRAME_MENUBAR_HEIGHT (f));
-
-  if (FRAME_X_OUTPUT (f)->toolbar_widget)
-    {
-      scale = xg_get_scale (f);
-      test_rect.x = x / scale;
-      test_rect.y = y / scale;
-      test_rect.width = 1;
-      test_rect.height = 1;
 
 #endif
 
@@ -4379,11 +4353,16 @@ x_update_opaque_region (struct frame *f, XEvent *configure)
 		     (unsigned char *) &opaque_region, 4);
   else
     {
-      object_class = G_OBJECT_GET_CLASS (FRAME_GTK_OUTER_WIDGET (f));
-      class = GTK_WIDGET_CLASS (object_class);
+      /* This causes child frames to not update correctly for an
+	 unknown reason.  (bug#55779) */
+      if (!FRAME_PARENT_FRAME (f))
+	{
+	  object_class = G_OBJECT_GET_CLASS (FRAME_GTK_OUTER_WIDGET (f));
+	  class = GTK_WIDGET_CLASS (object_class);
 
-      if (class->style_updated)
-	class->style_updated (FRAME_GTK_OUTER_WIDGET (f));
+	  if (class->style_updated)
+	    class->style_updated (FRAME_GTK_OUTER_WIDGET (f));
+	}
     }
 #endif
   unblock_input ();
@@ -4412,10 +4391,6 @@ x_gc_get_ext_data (struct frame *f, GC gc, int create_if_not_found_p)
 	  ext_data->private_data = xzalloc (sizeof (struct x_gc_ext_data));
 	  XAddToExtensionList (head, ext_data);
 	}
-
-      xfree (dpyinfo->devices);
-      dpyinfo->devices = NULL;
-      dpyinfo->num_devices = 0;
     }
   return (struct x_gc_ext_data *) ext_data->private_data;
 }
@@ -6917,6 +6892,7 @@ x_draw_glyph_string_foreground (struct glyph_string *s)
 	}
 #endif	/* USE_CAIRO */
     }
+}
 
 /* Draw the foreground of composite glyph string S.  */
 
@@ -10312,10 +10288,6 @@ x_tooltip_window_to_frame (struct x_display_info *dpyinfo,
   GtkWidget *widget;
   GdkWindow *tooltip_window;
 #endif
-    wdesc = event->xany.window;
-  Lisp_Object tail, frame;
-  struct frame *f;
-  struct x_output *x;
 
   *unrelated_tooltip_p = false;
 
@@ -12403,8 +12375,6 @@ x_send_scroll_bar_event (Lisp_Object window, enum scroll_bar_part part,
   unblock_input ();
 }
 
-/* Transform a horizontal scroll bar ClientMessage EVENT to an Emacs
-   input event in *IEVENT.  */
 
 /* Transform a scroll bar ClientMessage EVENT to an Emacs input event
    in *IEVENT.  */
@@ -12564,8 +12534,6 @@ xm_scroll_callback (Widget widget, XtPointer client_data, XtPointer call_data)
       x_send_scroll_bar_event (bar->window, part, portion, whole,
 			       bar->horizontal);
     }
-
-  return false;
 }
 
 #elif defined USE_GTK
@@ -12731,10 +12699,6 @@ xaw_jump_callback (Widget widget, XtPointer client_data, XtPointer call_data)
   x_send_scroll_bar_event (bar->window, part, portion, whole, bar->horizontal);
 }
 
-static void
-x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
-{
-  const char *scroll_bar_name = SCROLL_BAR_HORIZONTAL_NAME;
 
 /* Xaw scroll bar callback.  Invoked for incremental scrolling.,
    i.e. line or page up or down.  WIDGET is the Xaw scroll bar
@@ -13072,8 +13036,7 @@ x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
   const char *scroll_bar_name = SCROLL_BAR_HORIZONTAL_NAME;
   unsigned long pixel;
 
-  widget = XmCreateScrollBar (f->output_data.x->edit_widget,
-			      (char *) scroll_bar_name, av, ac);
+  block_input ();
 
 #ifdef USE_MOTIF
   /* Set resources.  Create the widget.  */
