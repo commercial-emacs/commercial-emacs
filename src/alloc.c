@@ -5377,7 +5377,6 @@ process_mark_stack (ptrdiff_t base_sp)
     {
       Lisp_Object *objp = mark_stack_pop ();
 
-    mark_obj: ;
       void *xpntr = XPNTR (*objp);
       if (PURE_P (xpntr))
 	continue;
@@ -5646,8 +5645,8 @@ process_mark_stack (ptrdiff_t base_sp)
 	      break;
 	    CHECK_ALLOCATED_AND_LIVE (live_cons_p, MEM_TYPE_CONS);
 	    set_cons_marked (ptr);
-	    /* Avoid growing the stack if the cdr is nil.
-	       In any case, make sure the car is expanded first.  */
+
+	    /* Put cdr, then car onto stack.  */
 	    if (! NILP (ptr->u.s.u.cdr))
 	      {
 		mark_stack_push (&ptr->u.s.u.cdr);
@@ -5657,10 +5656,9 @@ process_mark_stack (ptrdiff_t base_sp)
 		  emacs_abort ();
 #endif
 	      }
-	    /* Speedup hack for the common case (successive list elements).  */
-	    objp = &ptr->u.s.car;
-	    goto mark_obj;
+	    mark_stack_push (&ptr->u.s.car);
 	  }
+	  break;
 
 	case Lisp_Float:
 	  CHECK_ALLOCATED_AND_LIVE (live_float_p, MEM_TYPE_FLOAT);
