@@ -10748,13 +10748,6 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   if (x_dnd_toplevels)
     x_dnd_free_toplevels (true);
 
-#ifdef USE_GTK
-  /* Prevent GTK+ timeouts from being run, since they can call
-     handle_one_xevent behind our back.  */
-  suppress_xg_select ();
-  record_unwind_protect_void (release_xg_select);
-#endif
-
   x_dnd_in_progress = true;
   x_dnd_frame = f;
   x_dnd_last_seen_window = None;

@@ -30,65 +30,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "systime.h"
 #include "process.h"
 
-static ptrdiff_t threads_holding_glib_lock;
-static GMainContext *glib_main_context;
-
-/* The depth of xg_select suppression.  */
-static int xg_select_suppress_count;
-
-void
-release_select_lock (void)
-{
-#if GNUC_PREREQ (4, 7, 0)
-  if (__atomic_sub_fetch (&threads_holding_glib_lock, 1, __ATOMIC_ACQ_REL) == 0)
-    g_main_context_release (glib_main_context);
-#else
-  if (--threads_holding_glib_lock == 0)
-    g_main_context_release (glib_main_context);
-#endif
-}
-
-static void
-acquire_select_lock (GMainContext *context)
-{
-#if GNUC_PREREQ (4, 7, 0)
-  if (__atomic_fetch_add (&threads_holding_glib_lock, 1, __ATOMIC_ACQ_REL) == 0)
-    {
-      glib_main_context = context;
-      while (!g_main_context_acquire (context))
-	{
-	  /* Spin. */
-	}
-    }
-#else
-  if (threads_holding_glib_lock++ == 0)
-    {
-      glib_main_context = context;
-      while (!g_main_context_acquire (context))
-	{
-	  /* Spin. */
-	}
-    }
-#endif
-}
-
-/* Call this to not use xg_select when using it would be a bad idea,
-   i.e. during drag-and-drop.  */
-void
-suppress_xg_select (void)
-{
-  ++xg_select_suppress_count;
-}
-
-void
-release_xg_select (void)
-{
-  if (!xg_select_suppress_count)
-    emacs_abort ();
-
-  --xg_select_suppress_count;
-}
-
 /* `xg_select' is a `pselect' replacement.  Why do we need a separate function?
    1. Timeouts.  Glib and Gtk rely on timer events.  If we did pselect
       with a greater timeout then the one scheduled by Glib, we would
@@ -120,9 +61,6 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 #ifdef USE_GTK
   bool already_has_events;
 #endif
-
-  if (xg_select_suppress_count)
-    return pselect (fds_lim, rfds, wfds, efds, timeout, sigmask);
 
   context = g_main_context_default ();
   if (main_thread_p (current_thread))
