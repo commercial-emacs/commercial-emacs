@@ -259,7 +259,6 @@ handling of autoloaded functions."
   (let ((describe-function-orig-buffer
          (or describe-function-orig-buffer
              (current-buffer)))
-        (key-buffer (current-buffer))
         (help-buffer-under-preparation t))
 
     (help-setup-xref
@@ -278,7 +277,7 @@ handling of autoloaded functions."
         ;; Use " is " instead of a colon so that
         ;; it is easier to get out the function name using forward-sexp.
         (princ " is ")
-        (describe-function-1 function key-buffer)
+        (describe-function-1 function)
         (with-current-buffer standard-output
           ;; Return the text we displayed.
           (buffer-string))))))
@@ -1024,7 +1023,7 @@ Returns a list of the form (REAL-FUNCTION DEF ALIASED REAL-DEF)."
   (unless (eq ?\n (char-before (1- (point)))) (insert "\n")))
 
 ;;;###autoload
-(defun describe-function-1 (function &optional key-bindings-buffer)
+(defun describe-function-1 (function)
   (let ((pt1 (with-current-buffer standard-output (point))))
     (help-fns-function-description-header function)
     (with-current-buffer standard-output
@@ -1045,8 +1044,7 @@ Returns a list of the form (REAL-FUNCTION DEF ALIASED REAL-DEF)."
                             ;; for invalid functions i.s.o. signaling an error.
                             (documentation function t)
                           ;; E.g. an alias for a not yet defined function.
-                          ((invalid-function void-function) nil)))
-               (key-bindings-buffer (or key-bindings-buffer (current-buffer))))
+                          ((invalid-function void-function) nil))))
 
     ;; If the function is autoloaded, and its docstring has
     ;; key substitution constructs, load the library.
@@ -1063,7 +1061,7 @@ Returns a list of the form (REAL-FUNCTION DEF ALIASED REAL-DEF)."
                      (help-fns--signature
                       function doc-raw
                       (if (subrp def) (indirect-function real-def) real-def)
-                      real-function key-bindings-buffer)
+                      real-function describe-function-orig-buffer)
                    ;; E.g. an alias for a not yet defined function.
                    ((invalid-function void-function) doc-raw))))
         (help-fns--ensure-empty-line)
