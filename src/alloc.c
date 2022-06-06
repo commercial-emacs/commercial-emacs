@@ -314,7 +314,6 @@ struct Lisp_Finalizer finalizers;
    running finalizers.  */
 struct Lisp_Finalizer doomed_finalizers;
 
-
 #if defined SIGDANGER || (!defined SYSTEM_MALLOC && !defined HYBRID_MALLOC)
 
 /* Function malloc calls this if it finds we are near exhausting storage.  */
