@@ -5604,6 +5604,7 @@ process_mark_stack (ptrdiff_t base_sp)
                     break; /* !!! */
                   }
                 XSETSYMBOL (*objp, mgc_flip_xpntr (ptr, Space_Symbol));
+		ptr = XSYMBOL (*objp);
 	      }
 	    else
 	      {

@@ -82,4 +82,13 @@
     (garbage-collect)
     (should (= (1+ ocount) (alist-get 'conses (mgc-counts))))))
 
+(ert-deftest flip-one-symbol ()
+  (let* ((gc-cons-threshold most-positive-fixnum)
+         (ocount (alist-get 'symbols (mgc-counts)))
+         (bar (mgc-make-symbol "hisfooness")))
+    (ignore bar)
+    (should (= (1+ ocount) (alist-get 'symbols (mgc-counts))))
+    (garbage-collect)
+    (should (= (1+ ocount) (alist-get 'symbols (mgc-counts))))))
+
 ;;; alloc-tests.el ends here
