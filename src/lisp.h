@@ -873,21 +873,26 @@ INLINE bool
   return lisp_h_SYMBOLP (x);
 }
 
+/* I don't understand Bug#41321, and the lispsym offset.
+
+   XSETSYMBOL() subtracts (via make_lisp_ptr) the address of lispsym,
+   then XSYMBOL() adds it back.*/
+
 INLINE struct Lisp_Symbol * ATTRIBUTE_NO_SANITIZE_UNDEFINED
-XSYMBOL (Lisp_Object a)
+XSYMBOL (Lisp_Object obj)
 {
-  eassert (SYMBOLP (a));
-  intptr_t i = (intptr_t) XUNTAG (a, Lisp_Symbol, struct Lisp_Symbol);
-  void *p = (char *) lispsym + i;
-  return p;
+  eassert (SYMBOLP (obj));
+  return (void *) ((char *) lispsym
+		   + (uintptr_t) XUNTAG (obj, Lisp_Symbol, struct Lisp_Symbol));
 }
+
+/* See XSYMBOL() comment regarding lispsym offset.  */
 
 INLINE Lisp_Object
 make_lisp_ptr (void *xpntr0, enum Lisp_Type type)
 {
-  /* GCC 7 x86-64 generates faster code if lispsym is cast to char *
-     rather than to intptr_t.  */
   void *xpntr = (type == Lisp_Symbol)
+    /* 881abfc Amuse Eggert, keep (char *) cast.  */
     ? (char *) ((char *) xpntr0 - (char *) lispsym)
     : xpntr0;
   Lisp_Object obj = TAG_PTR (type, xpntr);
