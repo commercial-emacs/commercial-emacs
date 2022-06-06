@@ -3727,8 +3727,9 @@ mark_maybe_pointer (void *const * p)
   enum Space_Type xpntr_type;
   void *xpntr;
 
-  /* Research Bug#41321 so we can suitably #ifdef treatment of
-     Lisp_Symbol pointers being split across non-contiguous registers.
+  /* Research Bug#41321.  If we didn't special-case Lisp_Symbol
+     to subtract off lispsym in make_lisp_ptr(), this hack wouldn't
+     be necessary.
   */
   void *p_sym;
   INT_ADD_WRAPV ((uintptr_t) *p, (uintptr_t) lispsym, (uintptr_t *) &p_sym);
@@ -3762,7 +3763,8 @@ mark_maybe_pointer (void *const * p)
       if (ret)
 	mark_automatic_object (make_lisp_ptr (po, Lisp_Symbol));
     }
-  else if ((xpntr_type = mgc_find_xpntr (*p, &xpntr)) != Space_Type_Max)
+  else if ((xpntr_type = mgc_find_xpntr (*p, &xpntr)) != Space_Type_Max
+	   || (xpntr_type = mgc_find_xpntr (p_sym, &xpntr)) != Space_Type_Max)
     {
       /* analogous logic to set_string_marked() */
       void *forwarded = mgc_fwd_xpntr (xpntr);

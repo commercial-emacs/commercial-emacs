@@ -533,12 +533,18 @@ DEFUN ("mgc-make-symbol", Fmgc_make_symbol, Smgc_make_symbol, 1, 1, 0,
 {
   Lisp_Object val;
   size_t nbytes = sizeof (struct Lisp_Symbol);
-
+  specpdl_ref count = SPECPDL_INDEX ();
   CHECK_STRING (name);
+  record_unwind_protect_ptr (restore_string_allocator, static_string_allocator);
+  record_unwind_protect_ptr (restore_interval_allocator, static_interval_allocator);
+  static_string_allocator = &allocate_string;
+  // FIXME: static_interval_allocator = &allocate_interval;
+  (void) &allocate_interval;
   XSETSYMBOL (val, bump_alloc_ptr (space_in_use, nbytes, Space_Symbol));
-  init_symbol (val, name);
+  init_symbol (val, make_specified_string (SSDATA (name), SBYTES (name),
+					   STRING_MULTIBYTE (name)));
   bytes_since_gc += nbytes;
-  return val;
+  return unbind_to (count, val);
 }
 
 DEFUN ("mgc-make-marker", Fmgc_make_marker, Smgc_make_marker, 0, 0, 0,
