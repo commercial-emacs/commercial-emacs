@@ -1421,7 +1421,7 @@ symval_buffer_localize (struct Lisp_Symbol *symbol)
   if (! BUFFERP (blv->where)
       || current_buffer != XBUFFER (blv->where))
     {
-      Lisp_Object tem1 = assq_no_quit (make_lisp_symbol (symbol),
+      Lisp_Object tem1 = assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
 				       BVAR (current_buffer, local_var_alist));
       blv->found = ! NILP (tem1);
       set_blv_where (blv, Fcurrent_buffer ());
