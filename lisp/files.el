@@ -2102,8 +2102,11 @@ started Emacs, set `abbreviated-home-dir' to nil so it will be recalculated)."
   "Return the buffer visiting file FILENAME (a string).
 This is like `get-file-buffer', except that it checks for any buffer
 visiting the same file, possibly under a different name.
+
 If PREDICATE is non-nil, only buffers satisfying it are eligible,
-and others are ignored.
+and others are ignored.  PREDICATE is called with the buffer as
+the only argument, but not with the buffer as the current buffer.
+
 If there is no such live buffer, return nil."
   (let ((predicate (or predicate #'identity))
         (truename (abbreviate-file-name (file-truename filename))))
