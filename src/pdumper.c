@@ -182,12 +182,10 @@ enum dump_reloc_type
     RELOC_BIGNUM,
     /* dump_lv = make_lisp_ptr (dump_lv + dump_base,
 				type - RELOC_DUMP_TO_DUMP_LV)
-       (Special case for symbols: make_lisp_symbol)
        Must be second-last.  */
     RELOC_DUMP_TO_DUMP_LV,
     /* dump_lv = make_lisp_ptr (dump_lv + emacs_basis(),
 				type - RELOC_DUMP_TO_DUMP_LV)
-       (Special case for symbols: make_lisp_symbol.)
        Must be last.  */
     RELOC_DUMP_TO_EMACS_LV = RELOC_DUMP_TO_DUMP_LV + 8,
   };
@@ -1682,8 +1680,6 @@ dump_field_lv_or_rawptr (struct dump_context *ctx,
       switch (*ptr_raw_type)
         {
         case Lisp_Symbol:
-          value = make_lisp_symbol (ptrval);
-          break;
         case Lisp_String:
         case Lisp_Vectorlike:
         case Lisp_Cons:
@@ -2258,7 +2254,7 @@ dump_remember_symbol_aux (struct dump_context *ctx,
 static void
 dump_pre_dump_symbol (struct dump_context *ctx, struct Lisp_Symbol *symbol)
 {
-  Lisp_Object symbol_lv = make_lisp_symbol (symbol);
+  Lisp_Object symbol_lv = make_lisp_ptr (symbol, Lisp_Symbol);
   eassert (!dump_recall_symbol_aux (ctx, symbol_lv));
   switch (symbol->u.s.redirect)
     {
@@ -2346,7 +2342,7 @@ dump_symbol (struct dump_context *ctx,
   switch (symbol->u.s.redirect)
     {
     case SYMBOL_LOCALIZED:
-      aux_offset = dump_recall_symbol_aux (ctx, make_lisp_symbol (symbol));
+      aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
       dump_remember_fixup_ptr_raw
 	(ctx,
 	 offset + dump_offsetof (struct Lisp_Symbol, u.s.val.blv),
@@ -2355,7 +2351,7 @@ dump_symbol (struct dump_context *ctx,
 	  : dump_blv (ctx, symbol->u.s.val.blv)));
       break;
     case SYMBOL_FORWARDED:
-      aux_offset = dump_recall_symbol_aux (ctx, make_lisp_symbol (symbol));
+      aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
       dump_remember_fixup_ptr_raw
 	(ctx,
 	 offset + dump_offsetof (struct Lisp_Symbol, u.s.val.fwd),
@@ -3364,8 +3360,6 @@ read_ptr_raw_and_lv (const void *mem,
       switch (type)
         {
         case Lisp_Symbol:
-          *out_lv = make_lisp_symbol (*out_ptr);
-          break;
         case Lisp_String:
         case Lisp_Vectorlike:
         case Lisp_Cons:
@@ -5103,14 +5097,7 @@ dump_make_lv_from_reloc (const uintptr_t dump_base,
     }
 
   eassert (lisp_type != Lisp_Int0 && lisp_type != Lisp_Int1);
-
-  Lisp_Object lv;
-  if (lisp_type == Lisp_Symbol)
-    lv = make_lisp_symbol ((void *) value);
-  else
-    lv = make_lisp_ptr ((void *) value, lisp_type);
-
-  return lv;
+  return make_lisp_ptr ((void *) value, lisp_type);
 }
 
 /* Actually apply a dump relocation.  */
@@ -5320,10 +5307,7 @@ dump_do_emacs_relocation (const uintptr_t dump_base,
         void *obj_ptr = reloc.type == RELOC_EMACS_DUMP_LV
           ? dump_ptr (dump_base, reloc.u.dump_offset)
           : emacs_ptr_at (reloc.u.emacs_offset2);
-        if (reloc.length == Lisp_Symbol)
-          lv = make_lisp_symbol (obj_ptr);
-        else
-          lv = make_lisp_ptr (obj_ptr, reloc.length);
+	lv = make_lisp_ptr (obj_ptr, reloc.length);
         memcpy (emacs_ptr_at (reloc.emacs_offset), &lv, sizeof (lv));
         break;
       }

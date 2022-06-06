@@ -83,7 +83,6 @@
     (should (= (1+ ocount) (alist-get 'conses (mgc-counts))))))
 
 (ert-deftest flip-one-symbol ()
-  :expected-result t
   (let* ((gc-cons-threshold most-positive-fixnum)
          (ocount (alist-get 'symbols (mgc-counts)))
          (bar (mgc-make-symbol "hisfooness")))

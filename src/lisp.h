@@ -883,20 +883,23 @@ XSYMBOL (Lisp_Object a)
 }
 
 INLINE Lisp_Object
-make_lisp_symbol (struct Lisp_Symbol *sym)
+make_lisp_ptr (void *xpntr0, enum Lisp_Type type)
 {
-  /* GCC 7 x86-64 generates faster code if lispsym is
-     cast to char * rather than to intptr_t.  */
-  char *symoffset = (char *) ((char *) sym - (char *) lispsym);
-  Lisp_Object a = TAG_PTR (Lisp_Symbol, symoffset);
-  eassert (XSYMBOL (a) == sym);
-  return a;
+  /* GCC 7 x86-64 generates faster code if lispsym is cast to char *
+     rather than to intptr_t.  */
+  void *xpntr = (type == Lisp_Symbol)
+    ? (char *) ((char *) xpntr0 - (char *) lispsym)
+    : xpntr0;
+  Lisp_Object obj = TAG_PTR (type, xpntr);
+  eassert (TAGGEDP (obj, type)
+	   && XUNTAG (obj, type, char) == xpntr);
+  return obj;
 }
 
 INLINE Lisp_Object
 builtin_lisp_symbol (int index)
 {
-  return make_lisp_symbol (&lispsym[index]);
+  return make_lisp_ptr (&lispsym[index], Lisp_Symbol);
 }
 
 INLINE bool
@@ -1137,8 +1140,6 @@ make_fixed_natnum (EMACS_INT n)
   return USE_LSB_TAG ? make_fixnum (n) : XIL (n + (int0 << VALBITS));
 }
 
-/* Return true if X and Y are the same object.  */
-
 INLINE bool
 (EQ) (Lisp_Object x, Lisp_Object y)
 {
@@ -1151,22 +1152,12 @@ clip_to_bounds (intmax_t lower, intmax_t num, intmax_t upper)
   return num < lower ? lower : num <= upper ? num : upper;
 }
 
-/* Construct a Lisp_Object from a value or address.  */
-
-INLINE Lisp_Object
-make_lisp_ptr (void *ptr, enum Lisp_Type type)
-{
-  Lisp_Object a = TAG_PTR (type, ptr);
-  eassert (TAGGEDP (a, type) && XUNTAG (a, type, char) == ptr);
-  return a;
-}
-
 #define XSETINT(a, b) ((a) = make_fixnum (b))
 #define XSETFASTINT(a, b) ((a) = make_fixed_natnum (b))
 #define XSETCONS(a, b) ((a) = make_lisp_ptr (b, Lisp_Cons))
 #define XSETVECTOR(a, b) ((a) = make_lisp_ptr (b, Lisp_Vectorlike))
 #define XSETSTRING(a, b) ((a) = make_lisp_ptr (b, Lisp_String))
-#define XSETSYMBOL(a, b) ((a) = make_lisp_symbol (b))
+#define XSETSYMBOL(a, b) ((a) = make_lisp_ptr (b, Lisp_Symbol))
 #define XSETFLOAT(a, b) ((a) = make_lisp_ptr (b, Lisp_Float))
 
 /* Return a Lisp_Object value that does not correspond to any object.

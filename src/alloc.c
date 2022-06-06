@@ -3748,12 +3748,7 @@ mark_maybe_pointer (void *const * p)
 	     // Verify P’s tag, if any, matches pdumper-reported type.
 	     && (! USE_LSB_TAG || *p == po || cp - cpo == type));
       if (ret)
-	{
-	  if (type == Lisp_Symbol)
-	    mark_automatic_object (make_lisp_symbol (po));
-	  else
-	    mark_automatic_object (make_lisp_ptr (po, type));
-	}
+	mark_automatic_object (make_lisp_ptr (po, type));
     }
   else if (pdumper_object_p (p_sym))
     {
@@ -3765,7 +3760,7 @@ mark_maybe_pointer (void *const * p)
 	     // Verify P’s tag, if any, matches pdumper-reported type.
 	     && (! USE_LSB_TAG || p_sym == po || cp - cpo == Lisp_Symbol));
       if (ret)
-	mark_automatic_object (make_lisp_symbol (po));
+	mark_automatic_object (make_lisp_ptr (po, Lisp_Symbol));
     }
   else if ((xpntr_type = mgc_find_xpntr (*p, &xpntr)) != Space_Type_Max)
     {
@@ -3821,7 +3816,7 @@ mark_maybe_pointer (void *const * p)
 	    struct Lisp_Symbol *h = live_symbol_holding (m, *p);
 	    if (h)
 	      {
-		mark_automatic_object (make_lisp_symbol (h));
+		mark_automatic_object (make_lisp_ptr (h, Lisp_Symbol));
 		ret = true;
 	      }
 	  }
@@ -3869,7 +3864,7 @@ mark_maybe_pointer (void *const * p)
       struct Lisp_Symbol *h = live_symbol_holding (m, p_sym);
       if (h)
 	{
-	  mark_automatic_object (make_lisp_symbol (h));
+	  mark_automatic_object (make_lisp_ptr (h, Lisp_Symbol));
 	  ret = true;
 	}
     }
@@ -4723,7 +4718,7 @@ mark_pinned_symbols (void)
       struct Lisp_Symbol *sym = sblk->symbols, *end = sym + lim;
       for (; sym < end; ++sym)
 	if (sym->u.s.pinned)
-	  mark_automatic_object (make_lisp_symbol (sym));
+	  mark_automatic_object (make_lisp_ptr (sym, Lisp_Symbol));
 
       lim = BLOCK_NSYMBOLS;
     }
@@ -5593,7 +5588,6 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_Symbol:
 	  {
 	    struct Lisp_Symbol *ptr = XSYMBOL (*objp);
-	  nextsym:
 	    if (mgc_xpntr_p (ptr))
 	      {
 		void *forwarded = mgc_fwd_xpntr (ptr);
@@ -5621,12 +5615,9 @@ process_mark_stack (ptrdiff_t base_sp)
 		mark_stack_push (&ptr->u.s.val.value);
 		break;
 	      case SYMBOL_VARALIAS:
-		{
-		  Lisp_Object tem;
-		  XSETSYMBOL (tem, SYMBOL_ALIAS (ptr));
-		  mark_stack_push (&tem);
-		  break;
-		}
+		mark_automatic_object (make_lisp_ptr (SYMBOL_ALIAS (ptr),
+						      Lisp_Symbol));
+		break;
 	      case SYMBOL_LOCALIZED:
 		{
 		  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (ptr);
@@ -5654,10 +5645,8 @@ process_mark_stack (ptrdiff_t base_sp)
 	    if (! PURE_P (XSTRING (ptr->u.s.name)))
 	      gc_process_string (&ptr->u.s.name);
 
-	    /* Inner loop to mark next symbol in this bucket, if any.  */
-	    xpntr = ptr = ptr->u.s.next;
-	    if (ptr)
-	      goto nextsym;
+	    if (ptr->u.s.next)
+	      mark_automatic_object (make_lisp_ptr (ptr->u.s.next, Lisp_Symbol));
 	  }
 	  break;
 
@@ -6295,7 +6284,7 @@ which_symbols (Lisp_Object obj, EMACS_INT find_max)
 	       if (sblk == symbol_block && bn >= symbol_block_index)
 		 break;
 
-	       Lisp_Object sym = make_lisp_symbol (asym);
+	       Lisp_Object sym = make_lisp_ptr (asym, Lisp_Symbol);
 	       if (symbol_uses_obj (sym, obj))
 		 {
 		   found = Fcons (sym, found);
