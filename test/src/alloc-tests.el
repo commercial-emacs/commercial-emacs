@@ -91,4 +91,13 @@
     (garbage-collect)
     (should (= (1+ ocount) (alist-get 'symbols (mgc-counts))))))
 
+(ert-deftest flip-one-float ()
+  (let* ((gc-cons-threshold most-positive-fixnum)
+         (ocount (alist-get 'floats (mgc-counts)))
+         (bar (mgc-float -0.618)))
+    (ignore bar)
+    (should (= (1+ ocount) (alist-get 'floats (mgc-counts))))
+    (garbage-collect)
+    (should (= (1+ ocount) (alist-get 'floats (mgc-counts))))))
+
 ;;; alloc-tests.el ends here

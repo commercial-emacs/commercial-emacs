@@ -2996,7 +2996,7 @@ vector_marked_p (const struct Lisp_Vector *v)
   eassert (! mgc_xpntr_p (v));
   if (pdumper_object_p (v))
     {
-      /* Checking cold for bool vectors saves faulting in vector header.  */
+      /* Checking "cold" saves faulting in vector header.  */
       if (pdumper_cold_object_p (v))
         {
           eassert (PVTYPE (v) == PVEC_BOOL_VECTOR);
@@ -5689,13 +5689,31 @@ process_mark_stack (ptrdiff_t base_sp)
 	  break;
 
 	case Lisp_Float:
-	  CHECK_ALLOCATED_AND_LIVE (live_float_p, MEM_TYPE_FLOAT);
-	  /* Do not mark floats stored in a dump image: these floats are
-	     "cold" and do not have mark bits.  */
-	  if (pdumper_object_p (XFLOAT (*objp)))
-	    eassert (pdumper_cold_object_p (XFLOAT (*objp)));
-	  else if (! XFLOAT_MARKED_P (XFLOAT (*objp)))
-	    XFLOAT_MARK (XFLOAT (*objp));
+	  {
+	    struct Lisp_Float *ptr = XFLOAT (*objp);
+	    if (pdumper_object_p (ptr))
+	      /* pdumper floats are "cold" and lack mark bits.  */
+	      eassert (pdumper_cold_object_p (ptr));
+	    else if (mgc_xpntr_p (ptr))
+	      {
+		void *forwarded = mgc_fwd_xpntr (ptr);
+                if (forwarded)
+                  {
+                    XSETFLOAT (*objp, forwarded);
+                    eassert (! XFLOAT_MARKED_P (ptr));
+                    break; /* !!! */
+                  }
+                XSETFLOAT (*objp, mgc_flip_xpntr (ptr, Space_Float));
+		ptr = XFLOAT (*objp);  /* in case we do more with PTR */
+		(void) ptr;
+	      }
+	    else
+	      {
+		CHECK_ALLOCATED_AND_LIVE (live_float_p, MEM_TYPE_FLOAT);
+		if (! XFLOAT_MARKED_P (ptr))
+		  XFLOAT_MARK (ptr);
+	      }
+	  }
 	  break;
 
 	case_Lisp_Int:
@@ -5757,8 +5775,7 @@ survives_gc_p (Lisp_Object obj)
       break;
 
     case Lisp_String:
-      survives_p = string_marked_p (XSTRING (obj))
-	|| mgc_fwd_xpntr (XSTRING (obj));
+      survives_p = string_marked_p (XSTRING (obj));
       break;
 
     case Lisp_Vectorlike:

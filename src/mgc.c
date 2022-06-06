@@ -298,7 +298,7 @@ bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Space_Type xpntr_type)
 {
   void *retval = space->alloc_ptr;
   size_t nwords = nbytes / word_size;
-  eassert (nbytes >= 2 * word_size);
+  eassert (nbytes >= word_size);
   eassert ((int) space->current_block <= (int) space->nblocks);
 
   if (! retval
@@ -545,19 +545,19 @@ DEFUN ("mgc-make-symbol", Fmgc_make_symbol, Smgc_make_symbol, 1, 1, 0,
   return unbind_to (count, val);
 }
 
-DEFUN ("mgc-make-marker", Fmgc_make_marker, Smgc_make_marker, 0, 0, 0,
-       doc: /* Return a newly allocated marker which does not point at any place.  */)
-  (void)
+DEFUN ("mgc-float", Fmgc_float, Smgc_float, 1, 1, 0,
+       doc: /* Return the floating point number equal to ARG.
+Currently this is just an exercise of the mgc machinery since
+it makes no sense to create a Lisp float from another.  */)
+  (register Lisp_Object arg)
 {
-  struct Lisp_Marker *p = ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Marker,
-						       PVEC_MARKER);
-  p->buffer = 0;
-  p->bytepos = 0;
-  p->charpos = 0;
-  p->next = NULL;
-  p->insertion_type = 0;
-  p->need_adjustment = 0;
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  Lisp_Object val;
+  size_t nbytes = sizeof (struct Lisp_Float);
+  CHECK_NUMBER (arg);
+  XSETFLOAT (val, bump_alloc_ptr (space_in_use, nbytes, Space_Float));
+  XFLOAT (val)->u.data = XFLOATINT (arg);
+  bytes_since_gc += nbytes;
+  return val;
 }
 
 DEFUN ("memory-protect-now", Fmemory_protect_now, Smemory_protect_now, 0, 0, "",
@@ -675,8 +675,8 @@ syms_of_mgc (void)
   defsubr (&Smgc_make_bool_vector);
   defsubr (&Smgc_bool_vector);
   defsubr (&Smgc_make_symbol);
-  defsubr (&Smgc_make_marker);
   defsubr (&Smgc_counts);
+  defsubr (&Smgc_float);
   defsubr (&Smemory_protect_now);
 }
 
