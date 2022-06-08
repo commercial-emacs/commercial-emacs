@@ -1676,7 +1676,13 @@ It is too wide if it has any lines longer than the largest of
       (when (and kind docs (stringp docs)
                  (byte-compile--wide-docstring-p docs col))
         (byte-compile-warn "%s%sdocstring wider than %s characters"
-                           kind name col))))
+                           kind name col)
+        ;; There's a "naked" ' character before a symbol/list, so it
+        ;; should probably be quoted with \=.
+        (when (string-match-p "\\( \"\\|[ \t]\\|^\\)'[a-z(]" docs)
+          (byte-compile-warn
+           "%s%sdocstring has wrong usage of unescaped single quotes (use \\= or different quoting)"
+           kind name)))))
   form)
 
 (defun byte-compile-warn--undefined-funcs ()

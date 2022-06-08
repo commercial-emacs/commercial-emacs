@@ -166,7 +166,7 @@ where CAUSE can be:
   "Enter debugger.  \\<debugger-mode-map>`\\[debugger-continue]' returns from the debugger.
 
 ARGS are for internal use of the evaluator, which inserts the
-symbol 'debug to avoid printing extraneous debugger stack frames.
+symbol \\='debug to avoid printing extraneous debugger stack frames.
 
 A non-nil `inhibit-redisplay' precludes any action."
   (interactive)
