@@ -95,6 +95,8 @@ The value used here is passed to `quit-restore-window'."
   :type 'boolean
   :version "29.1")
 
+(defconst debugger-buffer-name "*Backtrace*")
+
 (defvar debugger-step-after-exit nil
   "Non-nil means \"single-step\" after the debugger exits.")
 
@@ -162,18 +164,13 @@ where CAUSE can be:
 ;;;###autoload
 (defun debug (&rest args)
   "Enter debugger.  \\<debugger-mode-map>`\\[debugger-continue]' returns from the debugger.
-Arguments are mainly for use when this is called from the internals
-of the evaluator.
 
-You may call with no args, or you may pass nil as the first arg and
-any other args you like.  In that case, the list of args after the
-first will be printed into the backtrace buffer.
+ARGS are for internal use of the evaluator, which inserts the
+symbol 'debug to avoid printing extraneous debugger stack frames.
 
-If `inhibit-redisplay' is non-nil when this function is called,
-the debugger will not be entered."
+A non-nil `inhibit-redisplay' precludes any action."
   (interactive)
   (if inhibit-redisplay
-      ;; Don't really try to enter debugger within an eval from redisplay.
       debugger-value
     (let ((non-interactive-frame
            (or noninteractive           ;FIXME: Presumably redundant.
@@ -187,50 +184,49 @@ the debugger will not be entered."
                     (equal "initial_terminal" (terminal-name)))))
           ;; Don't let `inhibit-message' get in our way (especially important if
           ;; `non-interactive-frame' evaluated to a non-nil value.
-          (inhibit-message nil)
+          inhibit-message
           ;; We may be entering the debugger from a context that has
           ;; let-bound `inhibit-read-only', which means that all
           ;; buffers would be read/write while the debugger is running.
-          (inhibit-read-only nil))
+          inhibit-read-only)
       (unless non-interactive-frame
         (message "Entering debugger..."))
-      (let (debugger-value
-	    (debugger-previous-state
-             (if (get-buffer "*Backtrace*")
-                 (with-current-buffer (get-buffer "*Backtrace*")
-                   (debugger--save-buffer-state))))
-            (debugger-args args)
-	    (debugger-buffer (get-buffer-create "*Backtrace*"))
-	    (debugger-old-buffer (current-buffer))
-	    (debugger-window nil)
-	    (debugger-step-after-exit nil)
-            (debugger-will-be-back nil)
-	    ;; Don't keep reading from an executing kbd macro!
-	    (executing-kbd-macro nil)
-	    ;; Save the outer values of these vars for the `e' command
-	    ;; before we replace the values.
-	    (debugger-outer-match-data (match-data))
-	    (debugger-with-timeout-suspend (with-timeout-suspend)))
+      (let* ((debugger-old-buffer (current-buffer))
+             (debugger-previous-state
+              (when-let ((buf (get-buffer debugger-buffer-name)))
+                (with-current-buffer buf
+                  (debugger--save-buffer-state))))
+             (debugger-buffer (get-buffer-create debugger-buffer-name))
+             (debugger-args args)
+	     ;; Save the outer values of these vars for the `e' command
+	     ;; before we replace the values.
+	     (debugger-outer-match-data (match-data))
+	     (debugger-with-timeout-suspend (with-timeout-suspend))
+             debugger-value debugger-window
+             debugger-step-after-exit debugger-will-be-back
+             debugger-step-after-exit
+	     ;; Don't keep reading from an executing kbd macro!
+             executing-kbd-macro)
         ;; Set this instead of binding it, so that `q'
         ;; will not restore it.
         (setq overriding-terminal-local-map nil)
         ;; Don't let these magic variables affect the debugger itself.
-        (let ((last-command nil) this-command track-mouse
-	      (inhibit-trace t)
-	      unread-command-events
-	      unread-post-input-method-events
-	      last-input-event last-command-event last-nonmenu-event
-	      last-event-frame
-	      overriding-local-map
+        (let ((inhibit-trace t)
 	      (load-read-function #'read)
 	      ;; If we are inside a minibuffer, allow nesting
 	      ;; so that we don't get an error from the `e' command.
 	      (enable-recursive-minibuffers
 	       (or enable-recursive-minibuffers (> (minibuffer-depth) 0)))
-	      (standard-input t) (standard-output t)
-	      inhibit-redisplay
-	      (cursor-in-echo-area nil)
-	      (window-configuration (current-window-configuration)))
+	      (standard-input t)
+              (standard-output t)
+	      (window-configuration (current-window-configuration))
+              last-command this-command track-mouse
+	      unread-command-events
+	      unread-post-input-method-events
+	      inhibit-redisplay cursor-in-echo-area
+	      last-input-event last-command-event last-nonmenu-event
+	      last-event-frame
+	      overriding-local-map)
 	  (unwind-protect
 	      (save-excursion
 	        (when (eq (car debugger-args) 'debug)
@@ -272,22 +268,19 @@ the debugger will not be entered."
 		          `((previous-window . ,debugger-previous-window))))))
 	        (setq debugger-window (selected-window))
 		(when debugger-jumping-flag
-		  ;; Try to restore previous height of debugger
-		  ;; window.
-		  (condition-case nil
-		      (window-resize
-		       debugger-window
-		       (- debugger-previous-window-height
-			  (window-total-height debugger-window)))
-		    (error nil))
+		  ;; Restore previous height of debugger window.
+		  (ignore-errors
+		    (window-resize
+		     debugger-window
+		     (- debugger-previous-window-height
+			(window-total-height debugger-window))))
 		  (setq debugger-previous-window debugger-window))
 	        (message "")
-	        (let ((standard-output nil)
+	        (let (standard-output
 		      (buffer-read-only t))
 		  (message "")
 		  ;; Make sure we unbind buffer-read-only in the right buffer.
-		  (save-excursion
-		    (recursive-edit))))
+		  (save-excursion (recursive-edit))))
 	    (when (and (window-live-p debugger-window)
 		       (eq (window-buffer debugger-window) debugger-buffer))
 	      ;; Record height of debugger window.
@@ -298,23 +291,21 @@ the debugger will not be entered."
 	        (set-window-configuration window-configuration)
 	      (when (and (window-live-p debugger-window)
 		         (eq (window-buffer debugger-window) debugger-buffer))
-	        (progn
-		  ;; Unshow debugger-buffer.
-		  (quit-restore-window debugger-window debugger-bury-or-kill)
-		  ;; Restore current buffer (Bug#12502).
-		  (set-buffer debugger-old-buffer)))
+	        ;; Unshow debugger-buffer.
+		(quit-restore-window debugger-window debugger-bury-or-kill)
+		;; Restore current buffer (Bug#12502).
+		(set-buffer debugger-old-buffer))
               ;; Forget debugger window, it won't be back (Bug#17882).
               (setq debugger-previous-window nil))
             ;; Restore previous state of debugger-buffer in case we were
             ;; in a recursive invocation of the debugger, otherwise just
-            ;; erase the buffer.
+            ;; kill the buffer.
 	    (when (buffer-live-p debugger-buffer)
-	      (with-current-buffer debugger-buffer
-	        (if debugger-previous-state
-                    (debugger--restore-buffer-state debugger-previous-state)
-                  (setq backtrace-insert-header-function nil)
-                  (setq backtrace-frames nil)
-                  (backtrace-print))))
+              (if debugger-previous-state
+	          (with-current-buffer debugger-buffer
+	            (debugger--restore-buffer-state debugger-previous-state))
+                (let (kill-buffer-query-functions)
+                  (kill-buffer debugger-buffer))))
 	    (with-timeout-unsuspend debugger-with-timeout-suspend)
 	    (set-match-data debugger-outer-match-data)))
         (setq debug-on-next-call debugger-step-after-exit)

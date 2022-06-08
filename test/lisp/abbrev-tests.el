@@ -93,7 +93,7 @@
              (copy-abbrev-table foo-abbrev-table)
            (error nil))))
     (should (abbrev-table-p new-foo-abbrev-table)))
-  (should-not (string-equal (buffer-name) "*Backtrace*")))
+  (should-not (string-equal (buffer-name) debugger-buffer-name)))
 
 (ert-deftest abbrev-table-empty-p-test ()
   (should-error (abbrev-table-empty-p 42))
