@@ -44,12 +44,11 @@
 (require 'cl-lib)
 (require 'dired)
 (require 'dired-aux)
-(require 'ert)
+(require 'tramp)
 (require 'ert-x)
 (require 'seq) ; For `seq-random-elt', autoloaded since Emacs 28.1
 (require 'tar-mode)
 (require 'trace)
-(require 'tramp)
 (require 'vc)
 (require 'vc-bzr)
 (require 'vc-git)
@@ -128,6 +127,33 @@ A resource file is in the resource directory as per
 `ert-resource-directory'."
       `(expand-file-name ,file (ert-resource-directory)))))
 
+;; `ert-remote-temporary-file-directory' was introduced in Emacs 29.1.
+(unless (boundp 'ert-remote-temporary-file-directory)
+  (eval-and-compile
+    ;; There is no default value on w32 systems, which could work out
+    ;; of the box.
+    (defconst ert-remote-temporary-file-directory
+      (cond
+       ((getenv "REMOTE_TEMPORARY_FILE_DIRECTORY"))
+       ((eq system-type 'windows-nt) null-device)
+       (t (add-to-list
+           'tramp-methods
+           '("mock"
+	     (tramp-login-program	"sh")
+	     (tramp-login-args		(("-i")))
+	     (tramp-remote-shell	"/bin/sh")
+	     (tramp-remote-shell-args	("-c"))
+	     (tramp-connection-timeout	10)))
+          (add-to-list
+           'tramp-default-host-alist
+           `("\\`mock\\'" nil ,(system-name)))
+          ;; Emacs's Makefile sets $HOME to a nonexistent value.
+          ;; Needed in batch mode only, therefore.
+          (unless (and (null noninteractive) (file-directory-p "~/"))
+            (setenv "HOME" temporary-file-directory))
+          (format "/mock::%s" temporary-file-directory)))
+      "Temporary directory for remote file tests.")))
+
 ;; Beautify batch mode.
 (when noninteractive
   ;; Suppress nasty messages.
@@ -137,32 +163,9 @@ A resource file is in the resource directory as per
     '(fset 'tramp-gvfs-handler-askquestion
 	   (lambda (_message _choices) '(t nil 0)))))
 
-;; There is no default value on w32 systems, which could work out of the box.
-(defconst tramp-test-temporary-file-directory
-  (cond
-   ((getenv "REMOTE_TEMPORARY_FILE_DIRECTORY"))
-   ((eq system-type 'windows-nt) null-device)
-   (t (add-to-list
-       'tramp-methods
-       '("mock"
-	 (tramp-login-program        "sh")
-	 (tramp-login-args           (("-i")))
-	 (tramp-remote-shell         "/bin/sh")
-	 (tramp-remote-shell-args    ("-c"))
-	 (tramp-connection-timeout   10)))
-      (add-to-list
-       'tramp-default-host-alist
-       `("\\`mock\\'" nil ,(system-name)))
-      ;; Emacs's Makefile sets $HOME to a nonexistent value.  Needed
-      ;; in batch mode only, therefore.
-      (unless (and (null noninteractive) (file-directory-p "~/"))
-        (setenv "HOME" temporary-file-directory))
-      (format "/mock::%s" temporary-file-directory)))
-  "Temporary directory for Tramp tests.")
-
 (defconst tramp-test-vec
-  (and (file-remote-p tramp-test-temporary-file-directory)
-       (tramp-dissect-file-name tramp-test-temporary-file-directory))
+  (and (file-remote-p ert-remote-temporary-file-directory)
+       (tramp-dissect-file-name ert-remote-temporary-file-directory))
   "The used `tramp-file-name' structure.")
 
 (setq auth-source-save-behavior nil
@@ -192,9 +195,9 @@ being the result.")
      (cons
       t (ignore-errors
 	  (and
-	   (file-remote-p tramp-test-temporary-file-directory)
-	   (file-directory-p tramp-test-temporary-file-directory)
-	   (file-writable-p tramp-test-temporary-file-directory))))))
+	   (file-remote-p ert-remote-temporary-file-directory)
+	   (file-directory-p ert-remote-temporary-file-directory)
+	   (file-writable-p ert-remote-temporary-file-directory))))))
 
   (when (cdr tramp--test-enabled-checked)
     ;; Cleanup connection.
@@ -213,7 +216,7 @@ The temporary file is not created."
    (if quoted #'tramp-compat-file-name-quote #'identity)
    (expand-file-name
     (make-temp-name "tramp-test")
-    (if local temporary-file-directory tramp-test-temporary-file-directory))))
+    (if local temporary-file-directory ert-remote-temporary-file-directory))))
 
 ;; Method "smb" supports `make-symbolic-link' only if the remote host
 ;; has CIFS capabilities.  tramp-adb.el, tramp-gvfs.el, tramp-rclone.el
@@ -295,12 +298,12 @@ Also see `ignore'."
   "Test availability of Tramp functions."
   :expected-result (if (tramp--test-enabled) :passed :failed)
   (tramp--test-message
-   "Remote directory: `%s'" tramp-test-temporary-file-directory)
+   "Remote directory: `%s'" ert-remote-temporary-file-directory)
   (should (ignore-errors
 	    (and
-	     (file-remote-p tramp-test-temporary-file-directory)
-	     (file-directory-p tramp-test-temporary-file-directory)
-	     (file-writable-p tramp-test-temporary-file-directory)))))
+	     (file-remote-p ert-remote-temporary-file-directory)
+	     (file-directory-p ert-remote-temporary-file-directory)
+	     (file-writable-p ert-remote-temporary-file-directory)))))
 
 (ert-deftest tramp-test01-file-name-syntax ()
   "Check remote file name syntax."
@@ -1997,7 +2000,7 @@ Also see `ignore'."
        (find-file
 	(format
 	 "%s|%s:foo:"
-	 (substring (file-remote-p tramp-test-temporary-file-directory) 0 -1)
+	 (substring (file-remote-p ert-remote-temporary-file-directory) 0 -1)
 	 m))
        :type 'user-error))))
 
@@ -2022,7 +2025,7 @@ Also see `ignore'."
       (should-error
        (tramp-smb-get-localname
 	(tramp-dissect-file-name
-	 (expand-file-name file tramp-test-temporary-file-directory)))
+	 (expand-file-name file ert-remote-temporary-file-directory)))
        :type 'file-error))))
 
 (ert-deftest tramp-test04-substitute-in-file-name ()
@@ -2178,16 +2181,16 @@ Also see `ignore'."
    (string-equal
     (let ((default-directory
 	    (concat
-	     (file-remote-p tramp-test-temporary-file-directory) "/path")))
+	     (file-remote-p ert-remote-temporary-file-directory) "/path")))
       (expand-file-name ".." "./"))
-    (concat (file-remote-p tramp-test-temporary-file-directory) "/"))))
+    (concat (file-remote-p ert-remote-temporary-file-directory) "/"))))
 
 (ert-deftest tramp-test05-expand-file-name-top ()
   "Check `expand-file-name'."
   (skip-unless (tramp--test-enabled))
   (skip-unless (not (tramp--test-ange-ftp-p)))
 
-  (let ((dir (concat (file-remote-p tramp-test-temporary-file-directory) "/")))
+  (let ((dir (concat (file-remote-p ert-remote-temporary-file-directory) "/")))
     (dolist (local '("." ".."))
       (should (string-equal (expand-file-name local dir) dir))
       (should (string-equal (expand-file-name (concat dir local)) dir)))))
@@ -2250,8 +2253,8 @@ This checks also `file-name-as-directory', `file-name-directory',
       ;; We must clear `tramp-default-method'.  On hydra, it is "ftp",
       ;; which ruins the tests.
       (let ((tramp-default-method
-	     (file-remote-p tramp-test-temporary-file-directory 'method))
-	    (host (file-remote-p tramp-test-temporary-file-directory 'host)))
+	     (file-remote-p ert-remote-temporary-file-directory 'method))
+	    (host (file-remote-p ert-remote-temporary-file-directory 'host)))
 	(dolist
 	    (file
 	     `(,(format "/%s::" tramp-default-method)
@@ -2278,8 +2281,8 @@ This checks also `file-name-as-directory', `file-name-directory',
   (skip-unless (tramp--test-emacs29-p))
 
   ;; We must refill the cache.  `file-truename' does it.
-  (file-truename tramp-test-temporary-file-directory)
-  (let* ((remote-host (file-remote-p tramp-test-temporary-file-directory))
+  (file-truename ert-remote-temporary-file-directory)
+  (let* ((remote-host (file-remote-p ert-remote-temporary-file-directory))
 	 (remote-host-nohop
 	  (tramp-make-tramp-file-name (tramp-dissect-file-name remote-host)))
 	 ;; Not all methods can expand "~".
@@ -2368,7 +2371,7 @@ This checks also `file-name-as-directory', `file-name-directory',
 	      (insert-file-contents tmp-name2)
 	      (should (string-equal (buffer-string) "foo")))
 	    ;; Check also that a file transfer with compression works.
-	    (let ((default-directory tramp-test-temporary-file-directory)
+	    (let ((default-directory ert-remote-temporary-file-directory)
 		  (tramp-copy-size-limit 4)
 		  (tramp-inline-compress-start-size 2))
 	      (delete-file tmp-name2)
@@ -2568,7 +2571,7 @@ This checks also `file-name-as-directory', `file-name-directory',
   ;; The function was introduced in Emacs 28.1.
   (skip-unless (boundp 'tar-goto-file))
 
-  (let* ((default-directory tramp-test-temporary-file-directory)
+  (let* ((default-directory ert-remote-temporary-file-directory)
 	 (archive (ert-resource-file "foo.tar.gz"))
 	 (tmp-file (expand-file-name (file-name-nondirectory archive)))
 	 (require-final-newline t)
@@ -3258,7 +3261,7 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 (ert-deftest tramp-test17-dired-with-wildcards ()
   "Check `dired' with wildcards."
   ;; `separate' syntax and IPv6 host name syntax do not work.
-  (skip-unless (not (string-match-p "\\[" tramp-test-temporary-file-directory)))
+  (skip-unless (not (string-match-p "\\[" ert-remote-temporary-file-directory)))
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
@@ -3272,10 +3275,10 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
             (expand-file-name (tramp--test-make-temp-name nil quoted)))
 	   (tmp-name3 (expand-file-name "foo" tmp-name1))
 	   (tmp-name4 (expand-file-name "bar" tmp-name2))
-	   (tramp-test-temporary-file-directory
+	   (ert-remote-temporary-file-directory
 	    (funcall
 	     (if quoted #'tramp-compat-file-name-quote #'identity)
-	     tramp-test-temporary-file-directory))
+	     ert-remote-temporary-file-directory))
 	   buffer)
       (unwind-protect
 	  (progn
@@ -3293,19 +3296,19 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 		(setq buffer
 		      (dired-noselect
 		       (expand-file-name
-			"tramp-test*" tramp-test-temporary-file-directory)))
+			"tramp-test*" ert-remote-temporary-file-directory)))
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
 		(regexp-quote
 		 (file-relative-name
-		  tmp-name1 tramp-test-temporary-file-directory))))
+		  tmp-name1 ert-remote-temporary-file-directory))))
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
 		(regexp-quote
 		 (file-relative-name
-		  tmp-name2 tramp-test-temporary-file-directory)))))
+		  tmp-name2 ert-remote-temporary-file-directory)))))
 	    (kill-buffer buffer)
 
 	    ;; Check for expanded directory and file names.
@@ -3313,20 +3316,20 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 		(setq buffer
 		      (dired-noselect
 		       (expand-file-name
-			"tramp-test*/*" tramp-test-temporary-file-directory)))
+			"tramp-test*/*" ert-remote-temporary-file-directory)))
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
 		(regexp-quote
 		 (file-relative-name
-		  tmp-name3 tramp-test-temporary-file-directory))))
+		  tmp-name3 ert-remote-temporary-file-directory))))
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
 		(regexp-quote
 		 (file-relative-name
 		  tmp-name4
-		  tramp-test-temporary-file-directory)))))
+		  ert-remote-temporary-file-directory)))))
 	    (kill-buffer buffer)
 
 	    ;; Check for special characters.
@@ -3341,20 +3344,20 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 		(setq buffer
 		      (dired-noselect
 		       (expand-file-name
-			"tramp-test*/*" tramp-test-temporary-file-directory)))
+			"tramp-test*/*" ert-remote-temporary-file-directory)))
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
 		(regexp-quote
 		 (file-relative-name
-		  tmp-name3 tramp-test-temporary-file-directory))))
+		  tmp-name3 ert-remote-temporary-file-directory))))
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
 		(regexp-quote
 		 (file-relative-name
 		  tmp-name4
-		  tramp-test-temporary-file-directory)))))
+		  ert-remote-temporary-file-directory)))))
 	    (kill-buffer buffer))
 
 	;; Cleanup.
@@ -3427,8 +3430,8 @@ This tests also `access-file', `file-readable-p',
     ;; We must use `file-truename' for the temporary directory,
     ;; because it could be located on a symlinked directory.  This
     ;; would let the test fail.
-    (let* ((tramp-test-temporary-file-directory
-	    (file-truename tramp-test-temporary-file-directory))
+    (let* ((ert-remote-temporary-file-directory
+	    (file-truename ert-remote-temporary-file-directory))
 	   (tmp-name1 (tramp--test-make-temp-name nil quoted))
 	   (tmp-name2 (tramp--test-make-temp-name nil quoted))
 	   ;; File name with "//".
@@ -3448,7 +3451,7 @@ This tests also `access-file', `file-readable-p',
 		(and test-file-ownership-preserved-p
 		     (zerop (logand
 			     #o1000
-			     (file-modes tramp-test-temporary-file-directory))))
+			     (file-modes ert-remote-temporary-file-directory))))
 	      (write-region "foo" nil tmp-name1)
 	      (setq test-file-ownership-preserved-p
 		    (= (file-attribute-group-id (file-attributes tmp-name1))
@@ -3527,7 +3530,7 @@ This tests also `access-file', `file-readable-p',
 
 	    ;; Check, that "//" in symlinks are handled properly.
 	    (with-temp-buffer
-	      (let ((default-directory tramp-test-temporary-file-directory))
+	      (let ((default-directory ert-remote-temporary-file-directory))
 		(shell-command
 		 (format
 		  "ln -s %s %s"
@@ -3785,8 +3788,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
     ;; We must use `file-truename' for the temporary directory,
     ;; because it could be located on a symlinked directory.  This
     ;; would let the test fail.
-    (let* ((tramp-test-temporary-file-directory
-	    (file-truename tramp-test-temporary-file-directory))
+    (let* ((ert-remote-temporary-file-directory
+	    (file-truename ert-remote-temporary-file-directory))
 	   (tmp-name1 (tramp--test-make-temp-name nil quoted))
 	   (tmp-name2 (tramp--test-make-temp-name nil quoted))
 	   (tmp-name3 (tramp--test-make-temp-name 'local quoted))
@@ -3933,7 +3936,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (should (file-equal-p tmp-name1 tmp-name2))
 	    ;; Check relative symlink file name.
 	    (delete-file tmp-name2)
-	    (let ((default-directory tramp-test-temporary-file-directory))
+	    (let ((default-directory ert-remote-temporary-file-directory))
 	      (make-symbolic-link (file-name-nondirectory tmp-name1) tmp-name2))
 	    (should (file-symlink-p tmp-name2))
 	    (should-not (string-equal tmp-name2 (file-truename tmp-name2)))
@@ -3980,7 +3983,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	  (tramp--test-ignore-make-symbolic-link-error
 	    (make-directory tmp-name1)
 	    (should (file-directory-p tmp-name1))
-	    (let* ((tramp-test-temporary-file-directory
+	    (let* ((ert-remote-temporary-file-directory
 		    (file-truename tmp-name1))
 		   (tmp-name2 (tramp--test-make-temp-name nil quoted))
 		   (tmp-name3 tmp-name2)
@@ -4041,7 +4044,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	      (directory-file-name
 	       (funcall
 		(if quoted #'tramp-compat-file-name-quote #'identity)
-		tramp-test-temporary-file-directory)))
+		ert-remote-temporary-file-directory)))
 	     (dir2 (file-name-as-directory dir1)))
 	(should (string-equal (file-truename dir1) (expand-file-name dir1)))
 	(should (string-equal (file-truename dir2) (expand-file-name dir2)))))))
@@ -4131,7 +4134,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   "Check that `file-acl' and `set-file-acl' work proper."
   (skip-unless (tramp--test-enabled))
   ;; The following test checks also whether `set-file-modes' will work.
-  (skip-unless (file-acl tramp-test-temporary-file-directory))
+  (skip-unless (file-acl ert-remote-temporary-file-directory))
   (skip-unless (not (tramp--test-crypt-p)))
 
   ;; `filename-non-special' has been fixed in Emacs 27.1, see Bug#29579.
@@ -4210,7 +4213,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   "Check `file-selinux-context' and `set-file-selinux-context'."
   (skip-unless (tramp--test-enabled))
   (skip-unless
-   (not (equal (file-selinux-context tramp-test-temporary-file-directory)
+   (not (equal (file-selinux-context ert-remote-temporary-file-directory)
 	       '(nil nil nil nil))))
   (skip-unless (not (tramp--test-crypt-p)))
 
@@ -4271,7 +4274,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		      (let ((default-directory temporary-file-directory))
 			(shell-command-to-string "id -Z"))
 		      (let ((default-directory
-			      tramp-test-temporary-file-directory))
+			      ert-remote-temporary-file-directory))
 			(shell-command-to-string "id -Z"))))
 
 	    ;; Two files with same SELinux context.
@@ -4508,7 +4511,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   (dolist (quoted (if (tramp--test-expensive-test-p) '(nil t) '(nil)))
     (let* ((tmp-name (tramp--test-make-temp-name nil quoted))
 	   (fnnd (file-name-nondirectory tmp-name))
-	   (default-directory tramp-test-temporary-file-directory)
+	   (default-directory ert-remote-temporary-file-directory)
 	   (buffer (get-buffer-create "*tramp-tests*"))
 	   kill-buffer-query-functions)
       (unwind-protect
@@ -4642,7 +4645,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   (skip-unless (tramp--test-supports-processes-p))
 
   (dolist (quoted (if (tramp--test-expensive-test-p) '(nil t) '(nil)))
-    (let ((default-directory tramp-test-temporary-file-directory)
+    (let ((default-directory ert-remote-temporary-file-directory)
 	  (tmp-name (tramp--test-make-temp-name nil quoted))
 	  kill-buffer-query-functions command proc)
 
@@ -4808,7 +4811,7 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
        :tags (append '(:expensive-test :tramp-asynchronous-processes)
 		     (and ,unstable '(:unstable)))
        (skip-unless (tramp--test-enabled))
-       (let ((default-directory tramp-test-temporary-file-directory)
+       (let ((default-directory ert-remote-temporary-file-directory)
 	     (ert-test (ert-get-test ',test))
 	     (tramp-connection-properties
 	      (cons '(nil "direct-async-process" t)
@@ -4821,7 +4824,7 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
 	 (cl-letf (((symbol-function #'tramp--test-enabled) #'tramp--test-always)
 		   ((symbol-function #'internal-default-process-sentinel)
 		    #'ignore))
-	   (file-truename tramp-test-temporary-file-directory)
+	   (file-truename ert-remote-temporary-file-directory)
 	   (funcall (ert-test-body ert-test)))))))
 
 (tramp--test--deftest-direct-async-process tramp-test29-start-file-process
@@ -4838,7 +4841,7 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
   (skip-unless (tramp--test-emacs27-p))
 
   (dolist (quoted (if (tramp--test-expensive-test-p) '(nil t) '(nil)))
-    (let ((default-directory tramp-test-temporary-file-directory)
+    (let ((default-directory ert-remote-temporary-file-directory)
 	  (tmp-name (tramp--test-make-temp-name nil quoted))
 	  kill-buffer-query-functions command proc)
       (with-no-warnings (should-not (make-process)))
@@ -5099,7 +5102,7 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
   ;; We must use `file-truename' for the temporary directory, in
   ;; order to establish the connection prior running an asynchronous
   ;; process.
-  (let ((default-directory (file-truename tramp-test-temporary-file-directory))
+  (let ((default-directory (file-truename ert-remote-temporary-file-directory))
 	(delete-exited-processes t)
 	kill-buffer-query-functions command proc)
     (unwind-protect
@@ -5144,7 +5147,7 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
   ;; We must use `file-truename' for the temporary directory, in
   ;; order to establish the connection prior running an asynchronous
   ;; process.
-  (let ((default-directory (file-truename tramp-test-temporary-file-directory))
+  (let ((default-directory (file-truename ert-remote-temporary-file-directory))
 	(delete-exited-processes t)
 	kill-buffer-query-functions command proc)
 
@@ -5206,7 +5209,7 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
   ;; `list-system-processes' is supported since Emacs 29.1.
   (skip-unless (tramp--test-emacs29-p))
 
-  (let ((default-directory tramp-test-temporary-file-directory))
+  (let ((default-directory ert-remote-temporary-file-directory))
     (skip-unless (consp (list-system-processes)))
     (should (not (equal (list-system-processes)
 			(let ((default-directory temporary-file-directory))
@@ -5223,7 +5226,7 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
   ;; We must use `file-truename' for the temporary directory, in
   ;; order to establish the connection prior running an asynchronous
   ;; process.
-  (let ((default-directory (file-truename tramp-test-temporary-file-directory))
+  (let ((default-directory (file-truename ert-remote-temporary-file-directory))
 	(delete-exited-processes t)
 	kill-buffer-query-functions command proc)
     (skip-unless (consp (list-system-processes)))
@@ -5281,7 +5284,7 @@ INPUT, if non-nil, is a string sent to the process."
 
   (dolist (quoted (if (tramp--test-expensive-test-p) '(nil t) '(nil)))
     (let ((tmp-name (tramp--test-make-temp-name nil quoted))
-	  (default-directory tramp-test-temporary-file-directory)
+	  (default-directory ert-remote-temporary-file-directory)
 	  ;; Suppress nasty messages.
 	  (inhibit-message t)
 	  kill-buffer-query-functions)
@@ -5362,7 +5365,7 @@ INPUT, if non-nil, is a string sent to the process."
   (when (and (tramp--test-asynchronous-processes-p)
 	     (tramp--test-sh-p) (tramp--test-emacs27-p))
     (let* ((async-shell-command-width 1024)
-	   (default-directory tramp-test-temporary-file-directory)
+	   (default-directory ert-remote-temporary-file-directory)
 	   (cols (ignore-errors
 		   (read (tramp--test-shell-command-to-string-asynchronously
 			  "tput cols")))))
@@ -5414,7 +5417,7 @@ INPUT, if non-nil, is a string sent to the process."
     ;; We check both the local and remote case, in order to guarantee
     ;; that they behave similar.
     (dolist (default-directory
-	      `(,temporary-file-directory ,tramp-test-temporary-file-directory))
+	      `(,temporary-file-directory ,ert-remote-temporary-file-directory))
       ;; These are the possible values of `shell-command-dont-erase-buffer'.
       ;; `random' is taken as non-nil value without special meaning.
       (dolist (shell-command-dont-erase-buffer
@@ -5514,7 +5517,7 @@ INPUT, if non-nil, is a string sent to the process."
 	    (and (tramp--test-asynchronous-processes-p)
 		 '(tramp--test-shell-command-to-string-asynchronously))))
 
-    (let ((default-directory tramp-test-temporary-file-directory)
+    (let ((default-directory ert-remote-temporary-file-directory)
 	  (shell-file-name "/bin/sh")
 	  (envvar (concat "VAR_" (upcase (md5 (current-time-string)))))
 	  kill-buffer-query-functions)
@@ -5605,7 +5608,7 @@ Use direct async.")
   (skip-unless (not (tramp--test-crypt-p)))
 
   ;; We force a reconnect, in order to have a clean environment.
-  (dolist (dir `(,tramp-test-temporary-file-directory
+  (dolist (dir `(,ert-remote-temporary-file-directory
 		 "/mock:localhost#11111:" "/mock:localhost#22222:"))
     (tramp-cleanup-connection
      (tramp-dissect-file-name dir) 'keep-debug 'keep-password))
@@ -5639,7 +5642,7 @@ Use direct async.")
   ;; Since Emacs 27.1.
   (skip-unless (macrop 'with-connection-local-variables))
 
-  (let* ((default-directory tramp-test-temporary-file-directory)
+  (let* ((default-directory ert-remote-temporary-file-directory)
 	 (tmp-name1 (tramp--test-make-temp-name))
 	 (tmp-name2 (expand-file-name "foo" tmp-name1))
 	 (enable-local-variables :all)
@@ -5706,7 +5709,7 @@ Use direct async.")
   (when (tramp--test-adb-p)
     (skip-unless (tramp--test-emacs27-p)))
 
-  (let ((default-directory tramp-test-temporary-file-directory)
+  (let ((default-directory ert-remote-temporary-file-directory)
 	explicit-shell-file-name kill-buffer-query-functions
 	connection-local-profile-alist connection-local-criteria-alist)
     (unwind-protect
@@ -5756,7 +5759,7 @@ Use direct async.")
   (skip-unless (fboundp 'exec-path))
 
   (let ((tmp-name (tramp--test-make-temp-name))
-	(default-directory tramp-test-temporary-file-directory))
+	(default-directory ert-remote-temporary-file-directory))
     (unwind-protect
 	(progn
 	  (should (consp (with-no-warnings (exec-path))))
@@ -5801,7 +5804,7 @@ Use direct async.")
   (skip-unless (fboundp 'exec-path))
 
   (let* ((tmp-name (tramp--test-make-temp-name))
-	 (default-directory tramp-test-temporary-file-directory)
+	 (default-directory ert-remote-temporary-file-directory)
          (orig-exec-path (with-no-warnings (exec-path)))
          (tramp-remote-path tramp-remote-path)
 	 (orig-tramp-remote-path tramp-remote-path)
@@ -5868,7 +5871,7 @@ Use direct async.")
     ;; order to establish the connection prior running an asynchronous
     ;; process.
     (let* ((default-directory
-	     (file-truename tramp-test-temporary-file-directory))
+	     (file-truename ert-remote-temporary-file-directory))
 	   (tmp-name1 (tramp--test-make-temp-name nil quoted))
 	   (tmp-name2 (expand-file-name "foo" tmp-name1))
 	   (tramp-remote-process-environment tramp-remote-process-environment)
@@ -5972,7 +5975,7 @@ Use direct async.")
 		   (if quoted #'tramp-compat-file-name-quote #'identity)
 		   (expand-file-name
 		    (format "#%s#" (file-name-nondirectory tmp-name1))
-		    tramp-test-temporary-file-directory))))))
+		    ert-remote-temporary-file-directory))))))
 
 	    ;; Use default `tramp-auto-save-directory' mechanism.
 	    ;; Ange-FTP doesn't care.
@@ -6077,7 +6080,7 @@ Use direct async.")
 		(if quoted #'tramp-compat-file-name-quote #'identity)
 		(expand-file-name
 		 (format "%s~" (file-name-nondirectory tmp-name1))
-		 tramp-test-temporary-file-directory)))))))
+		 ert-remote-temporary-file-directory)))))))
 
       (unwind-protect
 	  ;; Map `backup-directory-alist'.
@@ -6410,7 +6413,7 @@ Use direct async.")
   (skip-unless (tramp--test-enabled))
   (skip-unless (not (tramp--test-ange-ftp-p)))
 
-  (let ((default-directory tramp-test-temporary-file-directory)
+  (let ((default-directory ert-remote-temporary-file-directory)
 	tmp-file)
     ;; The remote host shall know a temporary file directory.
     (should (stringp (temporary-file-directory)))
@@ -6457,7 +6460,7 @@ variables, so we check the Emacs version directly."
 (defun tramp--test-adb-p ()
   "Check, whether the remote host runs Android.
 This requires restrictions of file name syntax."
-  (tramp-adb-file-name-p tramp-test-temporary-file-directory))
+  (tramp-adb-file-name-p ert-remote-temporary-file-directory))
 
 (defun tramp--test-ange-ftp-p ()
   "Check, whether Ange-FTP is used."
@@ -6480,13 +6483,13 @@ This is used in tests which we don't want to tag
 
 (defun tramp--test-crypt-p ()
   "Check, whether the remote directory is crypted."
-  (tramp-crypt-file-name-p tramp-test-temporary-file-directory))
+  (tramp-crypt-file-name-p ert-remote-temporary-file-directory))
 
 (defun tramp--test-docker-p ()
   "Check, whether the docker method is used.
 This does not support some special file names."
   (string-equal
-   "docker" (file-remote-p tramp-test-temporary-file-directory 'method)))
+   "docker" (file-remote-p ert-remote-temporary-file-directory 'method)))
 
 (defun tramp--test-expensive-test-p ()
   "Whether expensive tests are run.
@@ -6502,7 +6505,7 @@ completely."
 This does not support globbing characters in file names (yet)."
   ;; Globbing characters are ??, ?* and ?\[.
   (string-match-p
-   "ftp$" (file-remote-p tramp-test-temporary-file-directory 'method)))
+   "ftp$" (file-remote-p ert-remote-temporary-file-directory 'method)))
 
 (defun tramp--test-fuse-p ()
   "Check, whether an FUSE file system isused."
@@ -6511,20 +6514,20 @@ This does not support globbing characters in file names (yet)."
 (defun tramp--test-gdrive-p ()
   "Check, whether the gdrive method is used."
   (string-equal
-   "gdrive" (file-remote-p tramp-test-temporary-file-directory 'method)))
+   "gdrive" (file-remote-p ert-remote-temporary-file-directory 'method)))
 
 (defun tramp--test-gvfs-p (&optional method)
   "Check, whether the remote host runs a GVFS based method.
 This requires restrictions of file name syntax.
 If optional METHOD is given, it is checked first."
   (or (member method tramp-gvfs-methods)
-      (tramp-gvfs-file-name-p tramp-test-temporary-file-directory)))
+      (tramp-gvfs-file-name-p ert-remote-temporary-file-directory)))
 
 (defun tramp--test-hpux-p ()
   "Check, whether the remote host runs HP-UX.
 Several special characters do not work properly there."
   ;; We must refill the cache.  `file-truename' does it.
-  (file-truename tramp-test-temporary-file-directory)
+  (file-truename ert-remote-temporary-file-directory)
   (ignore-errors (tramp-check-remote-uname tramp-test-vec "^HP-UX")))
 
 (defun tramp--test-ksh-p ()
@@ -6532,21 +6535,21 @@ Several special characters do not work properly there."
 ksh93 makes some strange conversions of non-latin characters into
 a $'' syntax."
   ;; We must refill the cache.  `file-truename' does it.
-  (file-truename tramp-test-temporary-file-directory)
+  (file-truename ert-remote-temporary-file-directory)
   (string-match-p
    "ksh$" (tramp-get-connection-property tramp-test-vec "remote-shell" "")))
 
 (defun tramp--test-macos-p ()
   "Check, whether the remote host runs macOS."
   ;; We must refill the cache.  `file-truename' does it.
-  (file-truename tramp-test-temporary-file-directory)
+  (file-truename ert-remote-temporary-file-directory)
   (ignore-errors (tramp-check-remote-uname tramp-test-vec "Darwin")))
 
 (defun tramp--test-mock-p ()
   "Check, whether the mock method is used.
 This does not support external Emacs calls."
   (string-equal
-   "mock" (file-remote-p tramp-test-temporary-file-directory 'method)))
+   "mock" (file-remote-p ert-remote-temporary-file-directory 'method)))
 
 (defun tramp--test-out-of-band-p ()
   "Check, whether an out-of-band method is used."
@@ -6555,13 +6558,13 @@ This does not support external Emacs calls."
 (defun tramp--test-rclone-p ()
   "Check, whether the remote host is offered by rclone.
 This requires restrictions of file name syntax."
-  (tramp-rclone-file-name-p tramp-test-temporary-file-directory))
+  (tramp-rclone-file-name-p ert-remote-temporary-file-directory))
 
 (defun tramp--test-rsync-p ()
   "Check, whether the rsync method is used.
 This does not support special file names."
   (string-equal
-   "rsync" (file-remote-p tramp-test-temporary-file-directory 'method)))
+   "rsync" (file-remote-p ert-remote-temporary-file-directory 'method)))
 
 (defun tramp--test-sh-p ()
   "Check, whether the remote host runs a based method from tramp-sh.el."
@@ -6575,7 +6578,7 @@ Additionally, ls does not support \"--dired\"."
 	 ;; We must refill the cache.  `insert-directory' does it.
 	 ;; This fails for tramp-crypt.el, so we ignore that.
 	 (ignore-errors
-	   (insert-directory tramp-test-temporary-file-directory "-al"))
+	   (insert-directory ert-remote-temporary-file-directory "-al"))
 	 (not (tramp-get-connection-property tramp-test-vec "ls--dired" nil)))))
 
 (defun tramp--test-share-p ()
@@ -6583,22 +6586,22 @@ Additionally, ls does not support \"--dired\"."
   (and (tramp--test-gvfs-p)
        (string-match-p
 	"^\\(afp\\|davs?\\|smb\\)$"
-	(file-remote-p tramp-test-temporary-file-directory 'method))))
+	(file-remote-p ert-remote-temporary-file-directory 'method))))
 
 (defun tramp--test-sshfs-p ()
   "Check, whether the remote host is offered by sshfs.
 This requires restrictions of file name syntax."
-  (tramp-sshfs-file-name-p tramp-test-temporary-file-directory))
+  (tramp-sshfs-file-name-p ert-remote-temporary-file-directory))
 
 (defun tramp--test-sudoedit-p ()
   "Check, whether the sudoedit method is used."
-  (tramp-sudoedit-file-name-p tramp-test-temporary-file-directory))
+  (tramp-sudoedit-file-name-p ert-remote-temporary-file-directory))
 
 (defun tramp--test-telnet-p ()
   "Check, whether the telnet method is used.
 This does not support special file names."
   (string-equal
-   "telnet" (file-remote-p tramp-test-temporary-file-directory 'method)))
+   "telnet" (file-remote-p ert-remote-temporary-file-directory 'method)))
 
 (defun tramp--test-windows-nt-p ()
   "Check, whether the locale host runs MS Windows."
@@ -6619,7 +6622,7 @@ This requires restrictions of file name syntax."
 (defun tramp--test-smb-p ()
   "Check, whether the locale or remote host runs MS Windows.
 This requires restrictions of file name syntax."
-  (tramp-smb-file-name-p tramp-test-temporary-file-directory))
+  (tramp-smb-file-name-p ert-remote-temporary-file-directory))
 
 (defun tramp--test-supports-processes-p ()
   "Return whether the method under test supports external processes."
@@ -6635,7 +6638,7 @@ This requires restrictions of file name syntax."
       (and
        (tramp--test-gvfs-p)
        (string-match-p
-	"ftp" (file-remote-p tramp-test-temporary-file-directory 'method)))))
+	"ftp" (file-remote-p ert-remote-temporary-file-directory 'method)))))
 
 (defun tramp--test-check-files (&rest files)
   "Run a simple but comprehensive test over every file in FILES."
@@ -6646,8 +6649,8 @@ This requires restrictions of file name syntax."
     ;; We must use `file-truename' for the temporary directory,
     ;; because it could be located on a symlinked directory.  This
     ;; would let the test fail.
-    (let* ((tramp-test-temporary-file-directory
-	    (file-truename tramp-test-temporary-file-directory))
+    (let* ((ert-remote-temporary-file-directory
+	    (file-truename ert-remote-temporary-file-directory))
 	   (tramp-fuse-remove-hidden-files t)
 	   (tmp-name1 (tramp--test-make-temp-name nil quoted))
 	   (tmp-name2 (tramp--test-make-temp-name 'local quoted))
@@ -6834,7 +6837,7 @@ This requires restrictions of file name syntax."
 	      (dolist (elt files)
 		(let ((envvar (concat "VAR_" (upcase (md5 elt))))
 		      (elt (encode-coding-string elt coding-system-for-read))
-		      (default-directory tramp-test-temporary-file-directory)
+		      (default-directory ert-remote-temporary-file-directory)
 		      (process-environment process-environment))
 		  (setenv envvar elt)
 		  ;; The value of PS1 could confuse Tramp's detection
@@ -6932,12 +6935,12 @@ Use the \"stat\" command."
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
   ;; We cannot use `tramp-test-vec', because this fails during compilation.
-  (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
+  (with-parsed-tramp-file-name ert-remote-temporary-file-directory nil
     (skip-unless (tramp-get-remote-stat v)))
 
   (let ((tramp-connection-properties
 	 (append
-	  `((,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	  `((,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "perl" nil))
 	  tramp-connection-properties)))
     (tramp--test-special-characters)))
@@ -6951,15 +6954,15 @@ Use the \"perl\" command."
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
   ;; We cannot use `tramp-test-vec', because this fails during compilation.
-  (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
+  (with-parsed-tramp-file-name ert-remote-temporary-file-directory nil
     (skip-unless (tramp-get-remote-perl v)))
 
   (let ((tramp-connection-properties
 	 (append
-	  `((,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	  `((,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "stat" nil)
 	    ;; See `tramp-sh-handle-file-truename'.
-	    (,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	    (,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "readlink" nil))
 	  tramp-connection-properties)))
     (tramp--test-special-characters)))
@@ -6975,12 +6978,12 @@ Use the \"ls\" command."
 
   (let ((tramp-connection-properties
 	 (append
-	  `((,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	  `((,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "perl" nil)
-	    (,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	    (,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "stat" nil)
 	    ;; See `tramp-sh-handle-file-truename'.
-	    (,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	    (,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "readlink" nil))
 	  tramp-connection-properties)))
     (tramp--test-special-characters)))
@@ -7059,12 +7062,12 @@ Use the \"stat\" command."
   (skip-unless (not (tramp--test-ksh-p)))
   (skip-unless (not (tramp--test-crypt-p)))
   ;; We cannot use `tramp-test-vec', because this fails during compilation.
-  (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
+  (with-parsed-tramp-file-name ert-remote-temporary-file-directory nil
     (skip-unless (tramp-get-remote-stat v)))
 
   (let ((tramp-connection-properties
 	 (append
-	  `((,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	  `((,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "perl" nil))
 	  tramp-connection-properties)))
     (tramp--test-utf8)))
@@ -7082,15 +7085,15 @@ Use the \"perl\" command."
   (skip-unless (not (tramp--test-ksh-p)))
   (skip-unless (not (tramp--test-crypt-p)))
   ;; We cannot use `tramp-test-vec', because this fails during compilation.
-  (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
+  (with-parsed-tramp-file-name ert-remote-temporary-file-directory nil
     (skip-unless (tramp-get-remote-perl v)))
 
   (let ((tramp-connection-properties
 	 (append
-	  `((,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	  `((,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "stat" nil)
 	    ;; See `tramp-sh-handle-file-truename'.
-	    (,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	    (,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "readlink" nil))
 	  tramp-connection-properties)))
     (tramp--test-utf8)))
@@ -7110,12 +7113,12 @@ Use the \"ls\" command."
 
   (let ((tramp-connection-properties
 	 (append
-	  `((,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	  `((,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "perl" nil)
-	    (,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	    (,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "stat" nil)
 	    ;; See `tramp-sh-handle-file-truename'.
-	    (,(regexp-quote (file-remote-p tramp-test-temporary-file-directory))
+	    (,(regexp-quote (file-remote-p ert-remote-temporary-file-directory))
 	     "readlink" nil))
 	  tramp-connection-properties)))
     (tramp--test-utf8)))
@@ -7129,7 +7132,7 @@ Use the \"ls\" command."
   ;; `file-system-info' exists since Emacs 27.1.  We don't want to see
   ;; compiler warnings for older Emacsen.
   (when-let ((fsi (with-no-warnings
-		    (file-system-info tramp-test-temporary-file-directory))))
+		    (file-system-info ert-remote-temporary-file-directory))))
     (should (consp fsi))
     (should (= (length fsi) 3))
     (dotimes (i (length fsi))
@@ -7384,7 +7387,7 @@ process sentinels.  They shall not disturb each other."
   ;; default handler.
   (skip-unless (not (tramp--test-emacs29-p)))
 
-  (let ((default-directory tramp-test-temporary-file-directory)
+  (let ((default-directory ert-remote-temporary-file-directory)
         (tmp-name (tramp--test-make-temp-name)))
     (write-region "foo" nil tmp-name)
     (dired default-directory)
@@ -7405,7 +7408,7 @@ process sentinels.  They shall not disturb each other."
   ;; default handler.
   (skip-unless (not (tramp--test-emacs29-p)))
 
-  (let ((default-directory tramp-test-temporary-file-directory)
+  (let ((default-directory ert-remote-temporary-file-directory)
         (tmp-name (tramp--test-make-temp-name)))
     (make-directory tmp-name)
     (dired default-directory)
@@ -7450,17 +7453,17 @@ process sentinels.  They shall not disturb each other."
       (tramp-cleanup-connection tramp-test-vec 'keep-debug)
       ;; We don't want to invalidate the password.
       (setq mocked-input `(,(copy-sequence pass)))
-      (should (file-exists-p tramp-test-temporary-file-directory))
+      (should (file-exists-p ert-remote-temporary-file-directory))
 
       ;; Don't entering a password returns in error.
       (tramp-cleanup-connection tramp-test-vec 'keep-debug)
       (setq mocked-input nil)
-      (should-error (file-exists-p tramp-test-temporary-file-directory))
+      (should-error (file-exists-p ert-remote-temporary-file-directory))
 
       ;; A wrong password doesn't work either.
       (tramp-cleanup-connection tramp-test-vec 'keep-debug)
       (setq mocked-input `(,(concat pass pass)))
-      (should-error (file-exists-p tramp-test-temporary-file-directory))
+      (should-error (file-exists-p ert-remote-temporary-file-directory))
 
       ;; Reading password from auth-source works.  We use the netrc
       ;; backend; the other backends shall behave similar.
@@ -7473,9 +7476,9 @@ process sentinels.  They shall not disturb each other."
 	  :prefix "tramp-test" :suffix ""
 	  :text (format
 		 "machine %s port mock password %s"
-		 (file-remote-p tramp-test-temporary-file-directory 'host) pass)
+		 (file-remote-p ert-remote-temporary-file-directory 'host) pass)
 	  (let ((auth-sources `(,netrc-file)))
-	    (should (file-exists-p tramp-test-temporary-file-directory)))))))))
+	    (should (file-exists-p ert-remote-temporary-file-directory)))))))))
 
 ;; This test is inspired by Bug#29163.
 (ert-deftest tramp-test47-auto-load ()
@@ -7491,7 +7494,7 @@ process sentinels.  They shall not disturb each other."
 	  ;; Suppress method name check.
 	  "(let ((non-essential t)) \
              (message \"Tramp loaded: %%s\" (and (file-remote-p %S) t)))"
-	  tramp-test-temporary-file-directory)))
+	  ert-remote-temporary-file-directory)))
     (should
      (string-match-p
       "Tramp loaded: t[\n\r]+"
@@ -7540,10 +7543,10 @@ process sentinels.  They shall not disturb each other."
     (dolist (code
 	     (list
 	      (format
-	       "(expand-file-name %S)" tramp-test-temporary-file-directory)
+	       "(expand-file-name %S)" ert-remote-temporary-file-directory)
 	      (format
 	       "(let ((default-directory %S)) (expand-file-name %S))"
-	       tramp-test-temporary-file-directory
+	       ert-remote-temporary-file-directory
 	       temporary-file-directory)))
       (should-not
        (string-match-p
