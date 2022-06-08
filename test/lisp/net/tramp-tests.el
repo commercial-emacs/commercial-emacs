@@ -4358,8 +4358,9 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   ;; Method and host name in completion mode.  This kind of completion
   ;; does not work on MS Windows.
   (unless (memq system-type '(cygwin windows-nt))
-    (let ((method (file-remote-p tramp-test-temporary-file-directory 'method))
-	  (host (file-remote-p tramp-test-temporary-file-directory 'host))
+    (let ((tramp-fuse-remove-hidden-files t)
+	  (method (file-remote-p ert-remote-temporary-file-directory 'method))
+	  (host (file-remote-p ert-remote-temporary-file-directory 'host))
           (orig-syntax tramp-syntax))
       (when (and (stringp host) (string-match tramp-host-with-port-regexp host))
 	(setq host (match-string 1 host)))
