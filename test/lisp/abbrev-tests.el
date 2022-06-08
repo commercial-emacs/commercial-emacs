@@ -89,11 +89,23 @@
   (should (abbrev-table-p foo-abbrev-table))
   ;; Bug 21828
   (let ((new-foo-abbrev-table
-         (condition-case nil
-             (copy-abbrev-table foo-abbrev-table)
-           (error nil))))
+         (ignore-errors (copy-abbrev-table foo-abbrev-table))))
     (should (abbrev-table-p new-foo-abbrev-table)))
   (should-not (string-equal (buffer-name) debugger-buffer-name)))
+
+(ert-deftest abbrev-tests-backtrace-bury ()
+  "No hanging *Backtrace* chads."
+  (skip-unless (not noninteractive))
+  (let ((pop-after (lambda (&rest _args) (throw 'here t))))
+    (should
+     (unwind-protect
+         (catch 'here
+           (add-function :after (symbol-function 'pop-to-buffer) pop-after)
+           (should (advice-member-p pop-after 'pop-to-buffer))
+           (debug))
+       (remove-function (symbol-function 'pop-to-buffer) pop-after)))
+    (should-not (advice-member-p pop-after 'pop-to-buffer))
+    (should-not (get-buffer debugger-buffer-name))))
 
 (ert-deftest abbrev-table-empty-p-test ()
   (should-error (abbrev-table-empty-p 42))
