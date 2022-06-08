@@ -299,8 +299,8 @@ When called from Lisp, COMMAND may also be a function object."
 ;;;###autoload
 (defun help-C-file-name (subr-or-var kind)
   "Return the name of the C file where SUBR-OR-VAR is defined.
-KIND should be 'var for a variable or 'subr for a subroutine.  If
-we can't find the file name, nil is returned."
+KIND should be \\='var for a variable or \\='subr for a
+subroutine.  If we can't find the file name, nil is returned."
   (let ((docbuf (get-buffer-create " *DOC*"))
 	(name (if (eq 'var kind)
 		  (concat "V" (symbol-name subr-or-var))
