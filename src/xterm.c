@@ -15603,6 +15603,9 @@ x_monitors_changed_cb (GdkScreen *gscr, gpointer user_data)
     }
 
   dpyinfo->last_monitor_attributes_list = current_monitors;
+
+  if (x_dnd_in_progress && x_dnd_update_tooltip)
+    x_dnd_monitors = current_monitors;
 }
 #endif
 
@@ -21370,6 +21373,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    inev.ie.kind = NO_EVENT;
 
 	  dpyinfo->last_monitor_attributes_list = current_monitors;
+
+	  if (x_dnd_in_progress && x_dnd_update_tooltip)
+	    x_dnd_monitors = current_monitors;
 	}
 #endif
     OTHER:
