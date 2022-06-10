@@ -889,15 +889,15 @@ happens, so the major mode can be corrected."
 (defcustom font-lock-support-mode 'jit-lock-mode
   "An awkward specifier for the fontifying mechanism.
 
-The default is 'jit-lock-mode, a regexp-based vicinity fontifier.
+The default is \\='jit-lock-mode, a regexp-based vicinity fontifier.
 
-If assigned 'tree-sitter-lock-mode, use tree-sitter highlighting
+If assigned \\='tree-sitter-lock-mode, use tree-sitter highlighting
 if the major mode provides a grammar, otherwise fall back to
-'jit-lock-mode.
+\\='jit-lock-mode.
 
 A list of cells of the form (MAJOR-MODE . SUPPORT-MODE), e.g.,
-'((c-mode . fast-lock-mode) (t . jit-lock-mode)), specifies
-'fast-lock-mode for the C major mode, and `jit-lock-mode for all
+\\='((c-mode . fast-lock-mode) (t . jit-lock-mode)), specifies
+\\='fast-lock-mode for the C major mode, and \\='jit-lock-mode for all
 others.  This form is deprecated, as it puts too much faith in
 the user."
   :type '(choice (const :tag "none" nil)
@@ -1816,7 +1816,7 @@ Here each COMPILED is of the form (MATCHER HIGHLIGHT ...) as shown in the
 (defun font-lock-value-in-major-mode (alist)
   "Return the value for the prevailing major-mode's key in ALIST.
 If ALIST is the symbol 'tree-sitter-lock-mode, return the fallback
-'jit-lock-mode if a tree-sitter grammar is unavailable.
+\\='jit-lock-mode if a tree-sitter grammar is unavailable.
 If ALIST is not an alist, return ALIST."
   (cond ((eq alist 'tree-sitter-lock-mode)
          (if (assq major-mode tree-sitter-mode-alist)
