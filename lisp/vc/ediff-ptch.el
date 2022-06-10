@@ -217,10 +217,10 @@ it for the end.")
 	    ;;     (filename-from-1st-header-line . filename-from-2nd-line)
 	    (setq possible-file-names
 		  (cons (if (and beg1 end1)
-			    (buffer-substring beg1 end1)
+			    (buffer-substring-no-properties beg1 end1)
 			  null-device)
 			(if (and beg2 end2)
-			    (buffer-substring beg2 end2)
+			    (buffer-substring-no-properties beg2 end2)
 			  null-device)))
             ;; Remove file junk (Bug#26084).
             (while (re-search-backward
@@ -285,31 +285,42 @@ it for the end.")
 		    (or (file-name-directory (cdr proposed-file-names))
 			""))
 		   )
-	      ;; If both base-dir1 and base-dir2 are relative and exist,
-	      ;; assume that
-	      ;; these dirs lead to the actual files starting at the present
-	      ;; directory. So, we don't strip these relative dirs from the
-	      ;; file names. This is a heuristic intended to improve guessing
 	      (let ((default-directory (file-name-directory filename)))
-		(unless (or (file-name-absolute-p base-dir1)
-			    (file-name-absolute-p base-dir2))
-		  (if (and (file-exists-p base-dir1)
-			   (file-exists-p base-dir2))
-		      (setq base-dir1 ""
-			    base-dir2 "")
-		    ;; Strip possible source/destination prefixes
-		    ;; such as a/ and b/ from dir names.
-		    (save-match-data
-		      (let ((m1 (when (string-match "^[^/]+/" base-dir1)
-                                  (cons (substring base-dir1 0 (match-end 0))
-                                        (substring base-dir1 (match-end 0)))))
-			    (m2 (when (string-match "^[^/]+/" base-dir2)
-				  (cons (substring base-dir2 0 (match-end 0))
-                                        (substring base-dir2 (match-end 0))))))
-			(when (and (file-exists-p (cdr m1))
-				   (file-exists-p (cdr m2)))
-			  (setq base-dir1 (car m1)
-				base-dir2 (car m2))))))))
+                (cond
+                 (multi-patch-p
+                  ;; Git diffs appends 'a/' '/b' to the files.
+                  (if (and (string-match-p "\\`a/" base-dir1)
+                           (string-match-p "\\`b/" base-dir2))
+                      (setq base-dir1 "a/" base-dir2 "b/")
+                    (setq base-dir1 "" base-dir2 "")))
+                 (t
+                  ;; If both base-dir1 and base-dir2 are relative and
+                  ;; exist, assume that these dirs lead to the actual
+                  ;; files starting at the present directory. So, we
+                  ;; don't strip these relative dirs from the file
+                  ;; names. This is a heuristic intended to improve
+                  ;; guessing
+		  (unless (or (file-name-absolute-p base-dir1)
+			      (file-name-absolute-p base-dir2))
+		    (if (and (file-exists-p base-dir1)
+			     (file-exists-p base-dir2))
+		        (setq base-dir1 ""
+			      base-dir2 "")
+		      ;; Strip possible source/destination prefixes
+		      ;; such as a/ and b/ from dir names.
+		      (save-match-data
+		        (let ((m1
+                               (when (string-match "^[^/]+/" base-dir1)
+                                 (cons (substring base-dir1 0 (match-end 0))
+                                       (substring base-dir1 (match-end 0)))))
+			      (m2
+                               (when (string-match "^[^/]+/" base-dir2)
+				 (cons (substring base-dir2 0 (match-end 0))
+                                       (substring base-dir2 (match-end 0))))))
+			  (when (and (file-exists-p (cdr m1))
+				     (file-exists-p (cdr m2)))
+			    (setq base-dir1 (car m1)
+				  base-dir2 (car m2))))))))))
 	      (or (string= (car proposed-file-names) null-device)
 		  (setcar proposed-file-names
 			  (ediff-file-name-sans-prefix

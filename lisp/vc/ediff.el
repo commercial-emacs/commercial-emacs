@@ -111,6 +111,7 @@
 
 (require 'ediff-init)
 (require 'ediff-mult)  ; required because of the registry stuff
+(require 'diff-mode) ; diff-hunk-file-names
 
 (defgroup ediff nil
   "Comprehensive visual interface to `diff' and `patch'."
@@ -1412,6 +1413,7 @@ the merge buffer."
 (declare-function ediff-dispatch-file-patching-job "ediff-ptch"
                   (patch-buf filename &optional startup-hooks))
 
+(defvar ediff-patch-map)
 ;;;###autoload
 (defun ediff-patch-file (&optional arg patch-buf)
   "Query for a file name, and then run Ediff by patching that file.
@@ -1433,11 +1435,26 @@ patch is in a buffer.  If odd -- assume it is in a file."
 			     (expand-file-name
 			      (buffer-file-name patch-buf))))
 			   (t default-directory)))
-    (setq source-file
-	  (read-file-name
-	   "File to patch (directory, if multifile patch): "
-	   ;; use an explicit initial file
-	   source-dir nil nil (ediff-get-default-file-name)))
+    (let ((multi-patch-p (with-current-buffer patch-buf (cdr ediff-patch-map))))
+      (cond ((not multi-patch-p)
+             (let* ((files (with-current-buffer patch-buf
+                             (diff-hunk-file-names 'old-first)))
+                    (def (if (and (string-match "\\`a/" (car files))
+                                  (string-match "\\`b/" (cadr files)))
+                             (expand-file-name
+                              (substring-no-properties (car files) 2)
+                              default-directory)
+                           (car files))))
+               (setq source-file
+                     (read-file-name
+                      "Single file to patch: "
+                      ;; use an explicit initial file
+                      source-dir nil 'mustmatch def))))
+            (t ; multi-patch
+             (setq source-file
+                   (read-file-name
+                    "Directory to patch, use root project dir: "
+                    source-dir)))))
     (ediff-dispatch-file-patching-job patch-buf source-file)))
 
 (declare-function ediff-patch-buffer-internal "ediff-ptch"
