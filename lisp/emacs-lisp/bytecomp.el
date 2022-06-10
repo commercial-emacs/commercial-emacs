@@ -2991,9 +2991,9 @@ of the list FUN."
                                for-effect output-type lexenv num-constants)
   "Return equivalent byte-code expression for FORM.
 OUTPUT-TYPE advises how form will be used,
-'eval or nil: a single form,
-'lambda:      body of a lambda,
-'file:        used at file-level."
+\\='eval or nil: a single form,
+\\='lambda:      body of a lambda,
+\\='file:        used at file-level."
   (let ((byte-compile--for-effect for-effect)
         (byte-compile-constants nil)
 	(byte-compile-variables nil)
@@ -3880,7 +3880,7 @@ Is this worth it?  Both -backward and -forward are written in C."
 	     (byte-compile-out 'byte-nconc 0))))))
 
 (defun byte-compile-fset (form)
-  "Warn about forms like (fset 'foo '(lambda () ...))
+  "Warn about forms like (fset \\='foo \\='(lambda () ...))
    (where the lambda expression is non-trivial...)"
   (let ((fn (nth 2 form))
 	body)
