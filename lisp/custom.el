@@ -67,10 +67,8 @@ symbol."
 
 (defun custom-initialize-set (symbol exp)
   "Initialize SYMBOL based on EXP.
-If the symbol doesn't have a default binding already, then set it
-using its `:set' function (or `set-default-toplevel-value' if it
-has none).
-
+If the symbol doesn't have a default binding already,
+then set it using its `:set' function (or `set-default' if it has none).
 The value is either the value in the symbol's `saved-value' property,
 if any, or the value of EXP."
   (condition-case nil
@@ -83,9 +81,7 @@ if any, or the value of EXP."
 
 (defun custom-initialize-reset (symbol exp)
   "Initialize SYMBOL based on EXP.
-Set the symbol, using its `:set' function (or `set-default-toplevel-value'
-if it has none).
-
+Set the symbol, using its `:set' function (or `set-default' if it has none).
 The value is either the symbol's current value
  (as obtained using the `:get' function), if any,
 or the value in the symbol's `saved-value' property if any,
@@ -104,7 +100,7 @@ or (last of all) the value of EXP."
   "Initialize SYMBOL with EXP.
 Like `custom-initialize-reset', but only use the `:set' function if
 not using the standard setting.
-For the standard setting, use `set-default-toplevel-value'."
+For the standard setting, use `set-default'."
   (condition-case nil
       (let ((def (default-toplevel-value symbol)))
         (funcall (or (get symbol 'custom-set) #'set-default-toplevel-value)
@@ -118,7 +114,7 @@ For the standard setting, use `set-default-toplevel-value'."
                 symbol
                 (eval (car (get symbol 'saved-value)))))
       (t
-       (set-default-toplevel-value symbol (eval exp)))))))
+       (set-default symbol (eval exp)))))))
 
 (defvar custom-delayed-init-variables nil
   "List of variables whose initialization is pending until startup.
@@ -266,11 +262,11 @@ The following keywords are meaningful:
 	when using the Customize user interface.  It takes two arguments,
 	the symbol to set and the value to give it.  The function should
 	not modify its value argument destructively.  The default choice
-	of function is `set-default-toplevel-value'.
+	of function is `set-default'.
 :get	VALUE should be a function to extract the value of symbol.
 	The function takes one argument, a symbol, and should return
 	the current value for that symbol.  The default choice of function
-	is `default-toplevel-value'.
+	is `default-value'.
 :require
 	VALUE should be a feature symbol.  If you save a value
 	for this option, then when your init file loads the value,
@@ -721,7 +717,7 @@ this sets the local binding in that buffer instead."
   (if custom-local-buffer
       (with-current-buffer custom-local-buffer
 	(set variable value))
-    (set-default-toplevel-value variable value)))
+    (set-default variable value)))
 
 (defun custom-set-minor-mode (variable value)
   ":set function for minor mode variables.
