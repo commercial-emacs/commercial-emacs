@@ -10437,6 +10437,9 @@ x_tooltip_window_to_frame (struct x_display_info *dpyinfo,
 	return f;
 
 #ifdef USE_GTK
+      if (!FRAME_X_P (f))
+	continue;
+
       if (FRAME_X_OUTPUT (f)->ttip_window)
 	widget = GTK_WIDGET (FRAME_X_OUTPUT (f)->ttip_window);
       else
@@ -15216,6 +15219,7 @@ x_dnd_update_tooltip_position (int root_x, int root_y)
   tip_f = XFRAME (tip_frame);
 
   if (!FRAME_LIVE_P (tip_f)
+      || !FRAME_VISIBLE_P (tip_f)
       || (FRAME_X_DISPLAY (tip_f)
 	  != FRAME_X_DISPLAY (x_dnd_frame)))
     return;
