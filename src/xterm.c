@@ -2886,6 +2886,10 @@ x_dnd_compute_toplevels (struct x_display_info *dpyinfo)
 	      else
 		free (error);
 #endif
+	  tem->next = x_dnd_toplevels;
+	  tem->previous_event_mask = attrs.your_event_mask;
+	  tem->wm_state = wmstate[0];
+	  tem->xm_protocol_style = XM_DRAG_STYLE_NONE;
 
 #ifdef HAVE_XCB_SHAPE_INPUT_RECTS
 	      if (dpyinfo->xshape_major > 1
@@ -3795,6 +3799,7 @@ x_dnd_get_target_window (struct x_display_info *dpyinfo,
 		  return proxy;
 		}
 	    }
+	  x_uncatch_errors_after_check ();
 	}
 
       *proto_out = x_dnd_get_window_proto (dpyinfo, child);
@@ -5275,11 +5280,28 @@ x_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
       cairo_fill (cr);
     }
   else
+#endif
+#ifdef CAIRO_HAS_PNG_FUNCTIONS
+  if (surface_type == CAIRO_SURFACE_TYPE_IMAGE)
+    surface = cairo_image_surface_create (CAIRO_FORMAT_RGB24, width, height);
+  else
+#endif
+#ifdef CAIRO_HAS_PS_SURFACE
+  if (surface_type == CAIRO_SURFACE_TYPE_PS)
     {
       x_set_cr_source_with_gc_foreground (f, gc, false);
       cairo_clip (cr);
       cairo_mask (cr, image);
     }
+  else
+#endif
+#ifdef CAIRO_HAS_SVG_SURFACE
+  if (surface_type == CAIRO_SURFACE_TYPE_SVG)
+    surface = cairo_svg_surface_create_for_stream (x_cr_accumulate_data, &acc,
+						   width, height);
+  else
+#endif
+    abort ();
 
   x_end_cr_clip (f);
 }
@@ -5427,6 +5449,7 @@ x_xr_apply_ext_clip (struct frame *f, GC gc)
 				     0, 0, data->clip_rects,
 				     data->n_clip_rects);
 }
+# endif
 
 void
 x_xr_reset_ext_clip (struct frame *f)
@@ -5454,6 +5477,7 @@ x_set_clip_rectangles (struct frame *f, GC gc, XRectangle *rectangles, int n)
   }
 #endif
 }
+#endif
 
 static void
 x_reset_clip_rectangles (struct frame *f, GC gc)
@@ -5933,6 +5957,7 @@ x_set_frame_alpha (struct frame *f)
 			 XA_CARDINAL, 32, PropModeReplace,
 			 (unsigned char *) &opac, 1);
     }
+#endif
 
   /* return unless necessary */
   {
