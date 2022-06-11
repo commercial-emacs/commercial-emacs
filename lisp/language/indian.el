@@ -723,7 +723,8 @@ in this language environment."))
                         (list (vector
                                ;; Consonant based syllables
                                (concat consonant other-signs "?" vowel "?"
-                                       consonant-sign "?" subjoined-letter "?")
+                                       consonant-sign "?" subjoined-letter "?"
+                                       other-signs "?")
                                1 'font-shape-gstring))))
 
 (provide 'indian)
