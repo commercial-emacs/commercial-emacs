@@ -712,5 +712,19 @@ in this language environment."))
                                        "?" avagraha "?")
                                1 'font-shape-gstring))))
 
+;; Lepcha composition rules
+(let ((consonant            "[\x1C00-\x1C23\x1C4D-\x1C4F]")
+      (vowel                "[\x1C26-\x1C2C]")
+      (subjoined-letter     "[\x1C24\x1C25]")
+      (consonant-sign       "[\x1C2D-\x1C35]")
+      (other-signs          "[\x1C36\x1C37]"))
+  (set-char-table-range composition-function-table
+                        '(#x1C24 . #x1C37)
+                        (list (vector
+                               ;; Consonant based syllables
+                               (concat consonant other-signs "?" vowel "?"
+                                       consonant-sign "?" subjoined-letter "?")
+                               1 'font-shape-gstring))))
+
 (provide 'indian)
 ;;; indian.el ends here
