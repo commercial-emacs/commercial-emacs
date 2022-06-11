@@ -1661,8 +1661,9 @@ This function must be called from the source code buffer."
           ;; prolog-parse-sicstus-compilation-errors only accepts one argument
           ;; whereas compile.el calls it with 2 (and did so at least since
           ;; Emacs-20).
-          (setq-local compilation-parse-errors-function
-                      'prolog-parse-sicstus-compilation-errors))
+          (with-suppressed-warnings ((obsolete compilation-parse-errors-function))
+            (setq-local compilation-parse-errors-function
+                        'prolog-parse-sicstus-compilation-errors)))
       (setq buffer-read-only nil)
       (insert command-string "\n"))
     (display-buffer buffer)

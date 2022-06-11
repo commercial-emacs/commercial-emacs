@@ -3901,7 +3901,7 @@ Is this worth it?  Both -backward and -forward are written in C."
   (byte-compile-two-args form))
 
 (defun byte-compile-function-form (form)
-  "\(function foo) must compile like 'foo, not like (symbol-function 'foo).
+  "\(function foo) must compile like \='foo, not like (symbol-function \='foo).
 Otherwise it will be incompatible with the interpreter,
 and \(funcall (function foo)) will lose with autoloads."
   (let ((f (nth 1 form)))

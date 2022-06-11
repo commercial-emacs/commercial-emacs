@@ -1815,7 +1815,7 @@ Here each COMPILED is of the form (MATCHER HIGHLIGHT ...) as shown in the
 
 (defun font-lock-value-in-major-mode (alist)
   "Return the value for the prevailing major-mode's key in ALIST.
-If ALIST is the symbol 'tree-sitter-lock-mode, return the fallback
+If ALIST is the symbol \\='tree-sitter-lock-mode, return the fallback
 \\='jit-lock-mode if a tree-sitter grammar is unavailable.
 If ALIST is not an alist, return ALIST."
   (cond ((eq alist 'tree-sitter-lock-mode)
