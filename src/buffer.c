@@ -1191,7 +1191,7 @@ is the default binding of the variable.  */)
 {
   register Lisp_Object result = buffer_local_value (variable, buffer);
 
-  if (BASE_EQ (result, Qunbound))
+  if (EQ (result, Qunbound))
     xsignal1 (Qvoid_variable, variable);
 
   return result;
@@ -1286,7 +1286,7 @@ buffer_lisp_local_variables (struct buffer *buf, bool clone)
       if (buf != current_buffer)
 	val = XCDR (elt);
 
-      result = Fcons (!clone && BASE_EQ (val, Qunbound)
+      result = Fcons (!clone && EQ (val, Qunbound)
 		      ? XCAR (elt)
 		      : Fcons (XCAR (elt), val),
 		      result);
@@ -1309,7 +1309,7 @@ buffer_local_variables_1 (struct buffer *buf, int offset, Lisp_Object sym)
     {
       sym = NILP (sym) ? PER_BUFFER_SYMBOL (offset) : sym;
       Lisp_Object val = per_buffer_value (buf, offset);
-      return BASE_EQ (val, Qunbound) ? sym : Fcons (sym, val);
+      return EQ (val, Qunbound) ? sym : Fcons (sym, val);
     }
   return Qnil;
 }
