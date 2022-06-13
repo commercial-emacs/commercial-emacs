@@ -4303,6 +4303,11 @@ x_dnd_note_self_drop (struct x_display_info *dpyinfo, Window target,
 			      &win_x, &win_y, &dummy))
     return;
 
+  /* Emacs can't respond to DND events inside the nested event
+     loop, so when dragging items to itself, always return
+     XdndActionPrivate.  */
+  x_dnd_action = dpyinfo->Xatom_XdndActionPrivate;
+
   EVENT_INIT (ie);
 
   ie.kind = DRAG_N_DROP_EVENT;
@@ -10789,7 +10794,6 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 #endif
   XWindowAttributes root_window_attrs;
   struct input_event hold_quit;
-  struct frame *any;
   char *atom_name, *ask_actions;
   Lisp_Object action, ltimestamp;
   specpdl_ref ref, count, base;
@@ -11406,15 +11410,6 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 
   x_dnd_return_frame_object = NULL;
   FRAME_DISPLAY_INFO (f)->grabbed = 0;
-
-  /* Emacs can't respond to DND events inside the nested event
-     loop, so when dragging items to itself, always return
-     XdndActionPrivate.  */
-  if (x_dnd_end_window != None
-      && (any = x_any_window_to_frame (FRAME_DISPLAY_INFO (f),
-				       x_dnd_end_window))
-      && (allow_current_frame || any != f))
-    return unbind_to (base, QXdndActionPrivate);
 
   if (x_dnd_action != None)
     {
@@ -15303,6 +15298,31 @@ x_dnd_update_tooltip_position (int root_x, int root_y)
     }
 }
 
+static void
+x_dnd_update_tooltip_now (void)
+{
+  int root_x, root_y;
+  Window root, child;
+  int win_x, win_y;
+  unsigned int mask;
+  Bool rc;
+  struct x_display_info *dpyinfo;
+
+  if (!x_dnd_in_progress || !x_dnd_update_tooltip)
+    return;
+
+  dpyinfo = FRAME_DISPLAY_INFO (XFRAME (x_dnd_frame));
+
+  rc = XQueryPointer (dpyinfo->display,
+		      dpyinfo->root_window,
+		      &root, &child, &root_x,
+		      &root_y, &win_x, &win_y,
+		      &mask);
+
+  if (rc)
+    x_dnd_update_tooltip_position (root_x, root_y);
+}
+
 /* Get the window underneath the pointer, see if it moved, and update
    the DND state accordingly.  */
 static void
@@ -15683,6 +15703,8 @@ x_monitors_changed_cb (GdkScreen *gscr, gpointer user_data)
 
   if (x_dnd_in_progress && x_dnd_update_tooltip)
     x_dnd_monitors = current_monitors;
+
+  x_dnd_update_tooltip_now ();
 }
 #endif
 
@@ -18172,9 +18194,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			&& x_dnd_last_window_is_frame)
 		      {
 			x_dnd_waiting_for_finish = false;
-			x_dnd_note_self_drop (dpyinfo, x_dnd_last_seen_window,
-					      event->xbutton.time, event->xbutton.x_root,
-					      event->xbutton.y_root);
+			x_dnd_note_self_drop (dpyinfo,
+					      x_dnd_last_seen_window,
+					      event->xbutton.x_root,
+					      event->xbutton.y_root,
+					      event->xbutton.time);
 		      }
 		    else if (x_dnd_last_seen_window != None
 			&& x_dnd_last_protocol_version != -1)
@@ -19572,7 +19596,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			    {
 			      x_dnd_waiting_for_finish = false;
 			      x_dnd_note_self_drop (dpyinfo, x_dnd_last_seen_window,
-						    xev->time, xev->root_x, xev->root_y);
+						    xev->root_x, xev->root_y, xev->time);
 			    }
 			  else if (x_dnd_last_seen_window != None
 				   && x_dnd_last_protocol_version != -1)
@@ -21483,6 +21507,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	  if (x_dnd_in_progress && x_dnd_update_tooltip)
 	    x_dnd_monitors = current_monitors;
+
+	  x_dnd_update_tooltip_now ();
 	}
 #endif
     OTHER:
