@@ -727,5 +727,21 @@ in this language environment."))
                                        other-signs "?")
                                1 'font-shape-gstring))))
 
+;; Meetei Mayek composition rules
+(let ((akshara              "[\xABC0-\xABE2\xAAE0-\xAAEA]")
+      (vowel                "[\xABE3-\xABE9\xAAEB-\xAAEC]")
+      (nasal                "\xABEA")
+      (visarga              "\xAAF5")
+      (virama               "[\xABED\xAAF6]")
+      (heavy-tone           "\x11640"))
+  (set-char-table-range composition-function-table
+                        '(#xABE3 . #xABED)
+                        (list (vector
+                               ;; Consonant based syllables
+                               (concat akshara "\\(?:" virama akshara "\\)*\\(?:"
+                                       virama "\\|" vowel "*" nasal "?" visarga "?"
+                                       heavy-tone "?\\)")
+                               1 'font-shape-gstring))))
+
 (provide 'indian)
 ;;; indian.el ends here
