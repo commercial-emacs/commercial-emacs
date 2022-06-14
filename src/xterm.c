@@ -2396,6 +2396,30 @@ xm_read_drag_receiver_info (struct x_display_info *dpyinfo,
 }
 
 static void
+xm_read_drag_motion_message (const XEvent *msg,
+			     xm_drag_motion_message *dmsg)
+{
+  const uint8_t *data;
+
+  data = (const uint8_t *) &msg->xclient.data.b[0];
+
+  dmsg->reason = *(data++);
+  dmsg->byteorder = *(data++);
+  dmsg->side_effects = *(uint16_t *) data;
+  dmsg->timestamp = *(uint32_t *) (data + 2);
+  dmsg->x = *(uint16_t *) (data + 6);
+  dmsg->y = *(uint16_t *) (data + 8);
+
+  if (dmsg->byteorder != XM_BYTE_ORDER_CUR_FIRST)
+    {
+      SWAPCARD16 (dmsg->side_effects);
+      SWAPCARD32 (dmsg->timestamp);
+      SWAPCARD16 (dmsg->x);
+      SWAPCARD16 (dmsg->y);
+    }
+}
+
+static void
 x_dnd_send_xm_leave_for_drop (struct x_display_info *dpyinfo,
 			      struct frame *f, Window wdesc,
 			      Time timestamp)
@@ -15738,6 +15762,48 @@ x_monitors_changed_cb (GdkScreen *gscr, gpointer user_data)
 }
 #endif
 
+/* Extract the root window coordinates from the client message EVENT
+   if it is a message that we already understand.  Return false if the
+   event was not understood.  */
+static bool
+x_coords_from_dnd_message (struct x_display_info *dpyinfo,
+			   XEvent *event, int *x_out, int *y_out)
+{
+  xm_drag_motion_message dmsg;
+
+  if (event->type != ClientMessage)
+    return false;
+
+  if (event->xclient.message_type == dpyinfo->Xatom_XdndPosition)
+    {
+      if (event->xclient.format != 32)
+	return false;
+
+      *x_out = (((unsigned long) event->xclient.data.l[2]) >> 16
+		& 0xffff);
+      *y_out = (event->xclient.data.l[2] & 0xffff);
+
+      return true;
+    }
+
+  if ((event->xclient.message_type
+       == dpyinfo->Xatom_MOTIF_DRAG_AND_DROP_MESSAGE)
+      && event->xclient.format == 8)
+    {
+      if (event->xclient.data.b[0]
+	  == XM_DRAG_REASON_DRAG_MOTION)
+	{
+	  xm_read_drag_motion_message (event, &dmsg);
+	  *x_out = dmsg.x;
+	  *y_out = dmsg.y;
+
+	  return true;
+	}
+    }
+
+  return false;
+}
+
 /* Handles the XEvent EVENT on display DPYINFO.
 
    *FINISH is X_EVENT_GOTO_OUT if caller should stop reading events.
@@ -15780,6 +15846,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   GdkEvent *copy = NULL;
   GdkDisplay *gdpy = gdk_x11_lookup_xdisplay (dpyinfo->display);
 #endif
+  int dx, dy;
   USE_SAFE_ALLOCA;
 
   *finish = X_EVENT_NORMAL;
@@ -15811,6 +15878,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
     {
     case ClientMessage:
       {
+	int rc;
+
 	if (x_dnd_in_progress
 	    && FRAME_DISPLAY_INFO (x_dnd_frame) == dpyinfo
 	    && event->xclient.message_type == dpyinfo->Xatom_XdndStatus)
@@ -16187,7 +16256,17 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	f = any;
 	if (!f)
 	  goto OTHER;
-	if (x_handle_dnd_message (f, &event->xclient, dpyinfo, &inev.ie))
+
+	/* These values are always used initialized, but GCC doesn't
+	   know that.  */
+	dx = 0;
+	dy = 0;
+
+	rc = x_coords_from_dnd_message (dpyinfo, (XEvent *) event,
+					&dx, &dy);
+
+	if (x_handle_dnd_message (f, &event->xclient, dpyinfo, &inev.ie,
+				  rc, dx, dy))
 	  *finish = X_EVENT_DROP;
       }
       break;
