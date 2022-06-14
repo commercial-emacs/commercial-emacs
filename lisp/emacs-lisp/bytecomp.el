@@ -2398,9 +2398,7 @@ in the input buffer (now current), not in the output buffer."
 
 (defun byte-compile-preprocess (form)
   (let ((form* (macroexpand-all form byte-compile-macro-environment)))
-    (if lexical-binding
-        (cconv-closure-convert form*)
-      form*)))
+    (cconv-closure-convert form*)))
 
 ;; byte-hunk-handlers can call this.
 (defun byte-compile-file-form (form)
@@ -3945,24 +3943,13 @@ and \(funcall (function foo)) will lose with autoloads."
 (byte-defop-compiler-1 quote)
 
 (defun byte-compile-setq (form)
-  (let* ((args (cdr form))
-         (len (length args)))
-    (if (= (logand len 1) 1)
-        (progn
-          (setq byte-compile-abort-elc t)
-          (byte-compile-warn "missing value for `%S' at end of setq"
-                             (car (last args)))
-          (byte-compile-form `(signal 'wrong-number-of-arguments '(setq ,len))
-                             byte-compile--for-effect))
-      (if args
-          (while args
-            (byte-compile-form (car (cdr args)))
-            (or byte-compile--for-effect (cdr (cdr args))
-                (byte-compile-out 'byte-dup 0))
-            (byte-compile-variable-set (car args))
-            (setq args (cdr (cdr args))))
-        ;; (setq), with no arguments.
-        (byte-compile-form nil byte-compile--for-effect)))
+  (cl-assert (= (length form) 3))       ; normalised in macroexp
+  (let ((var (nth 1 form))
+        (expr (nth 2 form)))
+    (byte-compile-form expr)
+    (unless byte-compile--for-effect
+      (byte-compile-out 'byte-dup 0))
+    (byte-compile-variable-set var)
     (setq byte-compile--for-effect nil)))
 
 (byte-defop-compiler-1 set-default)
