@@ -719,7 +719,7 @@ This function does not return anything but instead fills the
 
            (cconv-analyze-form value (if (eq letsym 'let*) env orig-env)))
 
-         (unless (byte-compile-not-lexical-var-p var)
+         (unless (or (byte-compile-not-lexical-var-p var) (not lexical-binding))
            (cl-pushnew var byte-compile-lexical-variables)
            (let ((varstruct (list var nil nil nil nil)))
              (push (cons binder (cdr varstruct)) newvars)
@@ -736,14 +736,13 @@ This function does not return anything but instead fills the
        (cconv-analyze-form (cadr (pop body-forms)) env))
      (cconv--analyze-function vrs body-forms env form))
 
-    (`(setq . ,forms)
+    (`(setq ,var ,expr)
      ;; If a local variable (member of env) is modified by setq then
      ;; it is a mutated variable.
-     (while forms
-       (let ((v (assq (car forms) env))) ; v = non nil if visible
-         (when v (setf (nth 2 v) t)))
-       (cconv-analyze-form (cadr forms) env)
-       (setq forms (cddr forms))))
+     (let ((v (assq var env))) ; v = non nil if visible
+       (when v
+         (setf (nth 2 v) t)))
+     (cconv-analyze-form expr env))
 
     (`((lambda . ,_) . ,_)             ; First element is lambda expression.
      (byte-compile-warn
@@ -764,6 +763,8 @@ This function does not return anything but instead fills the
 
     (`(condition-case ,var ,protected-form . ,handlers)
      (cconv-analyze-form protected-form env)
+     (unless lexical-binding
+       (setq var nil))
      (when (and var (symbolp var) (byte-compile-not-lexical-var-p var))
        (byte-compile-warn
         "Lexical variable shadows the dynamic variable %S" var))

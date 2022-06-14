@@ -419,7 +419,7 @@ for speeding up processing.")
                               (byte-optimize-body (cdr clause) for-effect))))
                     clauses)))
 
-      (`(unwind-protect ,exp . ,exps)
+      (`(unwind-protect ,exp :fun-body ,f)
        ;; The unwinding part of an unwind-protect is compiled (and thus
        ;; optimized) as a top-level form, but run the optimizer for it here
        ;; anyway for lexical variable usage and substitution.  But the
@@ -427,13 +427,7 @@ for speeding up processing.")
        ;; unwind-protect itself.  (The unwinding part is always for effect,
        ;; but that isn't handled properly yet.)
        (let ((bodyform (byte-optimize-form exp for-effect)))
-         (pcase exps
-           (`(:fun-body ,f)
-            `(,fn ,bodyform
-               :fun-body ,(byte-optimize-form f nil)))
-           (_
-            `(,fn ,bodyform
-               . ,(byte-optimize-body exps t))))))
+         `(,fn ,bodyform :fun-body ,(byte-optimize-form f nil))))
 
       (`(catch ,tag . ,exps)
        `(,fn ,(byte-optimize-form tag nil)
@@ -1258,28 +1252,17 @@ See Info node `(elisp) Integer Basics'."
     ;; Body is empty or just contains a constant.
     (`(,head ,bindings . ,(or '() `(,(and const (pred macroexp-const-p)))))
      (if (eq head 'let)
-         `(progn ,@(mapcar (lambda (binding)
-                             (and (consp binding) (cadr binding)))
-                           bindings)
-                 ,const)
-       `(,head ,(butlast bindings)
-          ,@(and (consp (car (last bindings)))
-                 (cdar (last bindings)))
-          ,const)))
+         `(progn ,@(mapcar #'cadr bindings) ,const)
+       `(,head ,(butlast bindings) ,(cadar (last bindings)) ,const)))
 
     ;; Body is last variable.
     (`(,head ,(and bindings
-                   (let last-var (let ((last (car (last bindings))))
-                                   (if (consp last) (car last) last))))
+                   (let last-var (caar (last bindings))))
              ,(and last-var             ; non-linear pattern
                    (pred symbolp) (pred (not keywordp)) (pred (not booleanp))))
      (if (eq head 'let)
-         `(progn ,@(mapcar (lambda (binding)
-                             (and (consp binding) (cadr binding)))
-                           bindings))
-       `(,head ,(butlast bindings)
-          ,@(and (consp (car (last bindings)))
-                 (cdar (last bindings))))))
+         `(progn ,@(mapcar #'cadr bindings))
+       `(,head ,(butlast bindings) ,(cadar (last bindings)))))
 
     (_ form)))
 
