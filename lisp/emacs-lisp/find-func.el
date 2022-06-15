@@ -211,20 +211,6 @@ for completion."
         (setq messaged-p t)
         (message "Showing result from %s" file)))))
 
-(defsubst find-function-preferred-source (file)
-  (if-let ((preferred-p find-function-prefer-source-directory)
-           (prefix (file-name-as-directory installed-directory))
-           ;; :end2 says PREFIX matches beginning of FILE
-           (installed-p (cl-search prefix file
-                                   :end2 (length prefix)))
-           (preferred (expand-file-name
-                       (cl-subseq file (length prefix))
-                       source-directory))
-           (readable-p (file-readable-p preferred)))
-      (prog1 preferred
-        (funcall (symbol-function 'find-function-preferred-message) preferred))
-    file))
-
 (defun find-library-suffixes ()
   (let ((suffixes nil))
     (dolist (suffix (get-load-suffixes) (nreverse suffixes))
@@ -242,34 +228,52 @@ for completion."
 (defvar comp-eln-to-el-h)
 
 (defun find-library-name (library)
-  "Return the absolute file name of the Emacs Lisp source of LIBRARY.
-LIBRARY should be a string (the name of the library)."
-  ;; If the library is byte-compiled, try to find a source library by
-  ;; the same name.
+  "Return the absolute file name of LIBRARY.
+If LIBRARY ends in the byte-compiled extension .elc or the
+native-compiled extension .eln, find the corresponding source
+ending in .el."
   (cond
    ((string-match "\\.el\\(c\\(\\..*\\)?\\)\\'" library)
     (setq library (replace-match "" t t library)))
    ((string-match "\\.eln\\'" library)
     (setq library (gethash (file-name-nondirectory library) comp-eln-to-el-h))))
-  (or
-   (locate-file library
-                (or find-library-source-path load-path)
-                (find-library-suffixes))
-   (locate-file library
-                (or find-library-source-path load-path)
-                load-file-rep-suffixes)
-   (when (file-name-absolute-p library)
-     (let ((rel (find-library--load-name library)))
-       (when rel
+  (let ((result
          (or
-          (locate-file rel
+          (locate-file library
                        (or find-library-source-path load-path)
                        (find-library-suffixes))
-          (locate-file rel
+          (locate-file library
                        (or find-library-source-path load-path)
-                       load-file-rep-suffixes)))))
-   (find-library--from-load-history library)
-   (signal 'file-error (list "Can't find library" library))))
+                       load-file-rep-suffixes)
+          (when-let ((absolute-p (file-name-absolute-p library))
+                     (rel (find-library--load-name library)))
+            (or
+             (locate-file rel
+                          (or find-library-source-path load-path)
+                          (find-library-suffixes))
+             (locate-file rel
+                          (or find-library-source-path load-path)
+                          load-file-rep-suffixes)))
+          (find-library--from-load-history library)
+          (signal 'file-error (list "Can't find library" library)))))
+    (when find-function-prefer-source-directory
+      (when-let ((prefix (file-name-as-directory installed-directory))
+                 ;; :end2 says PREFIX matches beginning of FILE
+                 (installed-p (cl-search prefix result
+                                         :end2 (length prefix)))
+                 (unsuffixed (expand-file-name
+                              (concat
+                               (file-name-directory (cl-subseq result (length prefix)))
+                               (file-name-nondirectory library))
+                              source-directory))
+                 (suffixed (locate-file
+                            unsuffixed
+                            '("")
+                            (find-library-suffixes)))
+                 (readable-p (file-readable-p suffixed)))
+        (funcall (symbol-function 'find-function-preferred-message)
+                 (setq result suffixed))))
+    result))
 
 (defun find-library--from-load-history (library)
   ;; In `load-history', the file may be ".elc", ".el", ".el.gz", and
@@ -440,9 +444,8 @@ LIBRARY can be an absolute or relative file name."
     ;; .emacs too.
     (when (string-match "\\.emacs\\(.el\\)" library)
       (setq library (substring library 0 (match-beginning 1))))
-    (let* ((prefer-library (find-function-preferred-source library))
-           (filename (find-library-name prefer-library))
-	   (regexp-symbol (cdr (assq type find-function-regexp-alist))))
+    (let ((filename (find-library-name library))
+	  (regexp-symbol (cdr (assq type find-function-regexp-alist))))
       (cond ((not filename)
              (error "Could not find '%s'" library))
             ((not regexp-symbol)

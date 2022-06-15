@@ -962,26 +962,27 @@ See `file-symlink-p' to distinguish symlinks."
 (defvar comp-eln-to-el-h)
 
 (defun locate-file (filename path &optional suffixes predicate)
-  "Search for FILENAME through PATH.
-If found, return the absolute file name of FILENAME; otherwise
-return nil.
-PATH should be a list of directories to look in, like the lists in
-`exec-path' or `load-path'.
-If SUFFIXES is non-nil, it should be a list of suffixes to append to
-file name when searching.  If SUFFIXES is nil, it is equivalent to (\"\").
-Use (\"/\") to disable PATH search, but still try the suffixes in SUFFIXES.
-If non-nil, PREDICATE is used instead of `file-readable-p'.
+  "Return absolute file name of FILENAME in PATH, or nil if not found.
 
-This function will normally skip directories, so if you want it to find
-directories, make sure the PREDICATE function returns `dir-ok' for them.
+PATH is a list of directories such as `exec-path' or `load-path'.
+A file consisting of FILENAME followed by any one of SUFFIXES
+is considered a match among PATH.
 
-PREDICATE can also be an integer to pass to the `access' system call,
-in which case file name handlers are ignored.  This usage is deprecated.
-For compatibility, PREDICATE can also be one of the symbols
-`executable', `readable', `writable', or `exists', or a list of
-one or more of those symbols."
-  (if (and predicate (symbolp predicate) (not (functionp predicate)))
-      (setq predicate (list predicate)))
+To check an absolute FILENAME against various SUFFIXES, specify
+a PATH consisting of the lone empty string.
+
+The default PREDICATE is `file-readable-p'.
+
+To check against directories, ensure PREDICATE returns `dir-ok' for
+directories.  Otherwise directories are skipped.
+
+PREDICATE can be \\='executable, \\='readable, \\='writable, or
+\\='exists, or a list of one or more of those symbols.
+
+A deprecated integer PREDICATE is passed to the `access' system
+call, thus bypassing file name handlers."
+  (when (and predicate (symbolp predicate) (not (functionp predicate)))
+    (setq predicate (list predicate)))
   (when (and (consp predicate) (not (functionp predicate)))
     (setq predicate
 	  (logior (if (memq 'executable predicate) 1 0)

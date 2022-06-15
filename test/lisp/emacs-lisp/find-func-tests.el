@@ -123,5 +123,20 @@ expected function symbol and function library, respectively."
   (should (cdr (find-function-search-for-symbol
                 'c-mode-hook 'defvar "cc-mode"))))
 
+(ert-deftest find-func-tests--prefer-source-directory ()
+  "Make sure within-repo invocation still works.
+Since ert runs within-repo, prefer-source-directory
+logic does not apply."
+  (unless (equal source-directory installed-directory)
+    (let ((find-function-prefer-source-directory t)
+          (prefix (file-name-as-directory source-directory)))
+      ;; :end2 says PREFIX matches beginning of FILE
+      (should (cl-search prefix (find-library-name "autorevert")
+                         :end2 (length prefix)))
+      (let (find-function-prefer-source-directory
+            (prefix (file-name-as-directory installed-directory)))
+        (should-not (cl-search prefix (find-library-name "autorevert")
+                               :end2 (length prefix)))))))
+
 (provide 'find-func-tests)
 ;;; find-func-tests.el ends here
