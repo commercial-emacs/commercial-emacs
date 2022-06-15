@@ -133,9 +133,13 @@ logic does not apply."
       ;; :end2 says PREFIX matches beginning of FILE
       (should (cl-search prefix (find-library-name "autorevert")
                          :end2 (length prefix)))
+      (should (cl-search prefix (find-library-name "autorevert.elc")
+                         :end2 (length prefix)))
       (let (find-function-prefer-source-directory
             (prefix (file-name-as-directory installed-directory)))
         (should-not (cl-search prefix (find-library-name "autorevert")
+                               :end2 (length prefix)))
+        (should-not (cl-search prefix (find-library-name "autorevert.elc")
                                :end2 (length prefix)))))))
 
 (provide 'find-func-tests)

@@ -261,15 +261,17 @@ ending in .el."
                  ;; :end2 says PREFIX matches beginning of FILE
                  (installed-p (cl-search prefix result
                                          :end2 (length prefix)))
-                 (unsuffixed (expand-file-name
-                              (concat
-                               (file-name-directory (cl-subseq result (length prefix)))
-                               (file-name-nondirectory library))
-                              source-directory))
+                 (el-or-unsuffixed
+                  (expand-file-name
+                   (concat
+                    (file-name-directory (cl-subseq result (length prefix)))
+                    (file-name-nondirectory library))
+                   source-directory))
                  (suffixed (locate-file
-                            unsuffixed
+                            el-or-unsuffixed
                             '("")
-                            (find-library-suffixes)))
+                            (nconc (find-library-suffixes)
+                                   load-file-rep-suffixes)))
                  (readable-p (file-readable-p suffixed)))
         (funcall (symbol-function 'find-function-preferred-message)
                  (setq result suffixed))))
