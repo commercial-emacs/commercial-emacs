@@ -2282,6 +2282,7 @@ xm_get_drag_atom_1 (struct x_display_info *dpyinfo,
     }
 
   dpyinfo->motif_drag_atom_time = dpyinfo->last_user_time;
+  dpyinfo->motif_drag_atom_owner = source_frame;
 
   XUngrabServer (dpyinfo->display);
   return atom;
@@ -25259,6 +25260,12 @@ x_free_frame_resources (struct frame *f)
   if (FRAME_OUTPUT_DATA (f)->scrollbar_foreground_css_provider)
     g_object_unref (FRAME_OUTPUT_DATA (f)->scrollbar_foreground_css_provider);
 #endif
+
+  if (f == dpyinfo->motif_drag_atom_owner)
+    {
+      dpyinfo->motif_drag_atom_owner = NULL;
+      dpyinfo->motif_drag_atom = None;
+    }
 
   if (f == dpyinfo->x_focus_frame)
     dpyinfo->x_focus_frame = 0;
