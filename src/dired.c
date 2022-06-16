@@ -521,9 +521,9 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
       name = DECODE_FILE (name);
       ptrdiff_t name_blen = SBYTES (name), name_len = SCHARS (name);
       if (completion_ignore_case
-	  && !BASE_EQ (Fcompare_strings (name, zero, file_len, file, zero,
-					 file_len, Qt),
-		       Qt))
+	  && !EQ (Fcompare_strings (name, zero, file_len, file, zero, file_len,
+				    Qt),
+		  Qt))
 	    continue;
 
       switch (dirent_type (dp))
@@ -603,12 +603,10 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
 			skip = name_len - elt_len;
 			cmp_len = make_fixnum (elt_len);
 			if (skip < 0
-			    || !BASE_EQ (Fcompare_strings (name,
-							   make_fixnum (skip),
-							   Qnil,
-							   elt, zero, cmp_len,
-							   Qt),
-					 Qt))
+			    || !EQ (Fcompare_strings (name, make_fixnum (skip),
+						      Qnil,
+						      elt, zero, cmp_len, Qt),
+				    Qt))
 			  continue;
 		      }
 		    break;
@@ -639,12 +637,10 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
 			skip = name_len - elt_len;
 			cmp_len = make_fixnum (elt_len);
 			if (skip < 0
-			    || !BASE_EQ (Fcompare_strings (name,
-							   make_fixnum (skip),
-							   Qnil,
-							   elt, zero, cmp_len,
-							   Qt),
-					 Qt))
+			    || !EQ (Fcompare_strings (name, make_fixnum (skip),
+						      Qnil,
+						      elt, zero, cmp_len, Qt),
+				    Qt))
 			  continue;
 		      }
 		    break;
@@ -703,7 +699,7 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
 	    = Fcompare_strings (name, zero, make_fixnum (compare),
 				file, zero, make_fixnum (compare),
 				completion_ignore_case ? Qt : Qnil);
-	  if (!BASE_EQ (cmp, Qt))
+	  if (!EQ (cmp, Qt))
 	    continue;
 	}
 
@@ -726,8 +722,7 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
 	    = Fcompare_strings (bestmatch, zero, make_fixnum (compare),
 				name, zero, make_fixnum (compare),
 				completion_ignore_case ? Qt : Qnil);
-	  ptrdiff_t matchsize = BASE_EQ (cmp, Qt)
-	                        ? compare : eabs (XFIXNUM (cmp)) - 1;
+	  ptrdiff_t matchsize = EQ (cmp, Qt) ? compare : eabs (XFIXNUM (cmp)) - 1;
 
 	  if (completion_ignore_case)
 	    {
@@ -756,13 +751,13 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
 					       file, zero,
 					       Qnil,
 					       Qnil),
-		       BASE_EQ (Qt, cmp))
+		       EQ (Qt, cmp))
 		   && (cmp = Fcompare_strings (bestmatch, zero,
 					       make_fixnum (SCHARS (file)),
 					       file, zero,
 					       Qnil,
 					       Qnil),
-		       ! BASE_EQ (Qt, cmp))))
+		       ! EQ (Qt, cmp))))
 		bestmatch = name;
 	    }
 	  bestmatchsize = matchsize;

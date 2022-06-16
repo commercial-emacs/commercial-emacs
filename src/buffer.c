@@ -1038,7 +1038,7 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
           eassert (XSYMBOL (sym)->u.s.redirect == SYMBOL_LOCALIZED);
           /* Need not do anything if some other buffer's binding is
 	     now cached.  */
-          if (BASE_EQ (SYMBOL_BLV (XSYMBOL (sym))->where, buffer))
+          if (EQ (SYMBOL_BLV (XSYMBOL (sym))->where, buffer))
 	    {
 	      /* Symbol is set up for this buffer's old local value:
 	         swap it out!  */
@@ -1577,7 +1577,7 @@ This does not change the name of the visited file (if any).  */)
 static bool
 candidate_buffer (Lisp_Object b, Lisp_Object buffer)
 {
-  return (BUFFERP (b) && !BASE_EQ (b, buffer)
+  return (BUFFERP (b) && !EQ (b, buffer)
 	  && BUFFER_LIVE_P (XBUFFER (b))
 	  && !BUFFER_HIDDEN_P (XBUFFER (b)));
 }
@@ -1821,7 +1821,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
      since anything can happen within do_yes_or_no_p.  */
 
   /* Don't kill the minibuffer now current.  */
-  if (BASE_EQ (buffer, XWINDOW (minibuf_window)->contents))
+  if (EQ (buffer, XWINDOW (minibuf_window)->contents))
     return Qnil;
 
   /* When we kill an ordinary buffer which shares its buffer text
@@ -1865,7 +1865,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
      is the sole other buffer give up.  */
   XSETBUFFER (tem, current_buffer);
   if (EQ (tem, XWINDOW (minibuf_window)->contents)
-      && BASE_EQ (buffer, Fother_buffer (buffer, Qnil, Qnil)))
+      && EQ (buffer, Fother_buffer (buffer, Qnil, Qnil)))
     return Qnil;
 
   /* Now there is no question: we can kill the buffer.  */
@@ -2471,23 +2471,23 @@ results, see Info node `(elisp)Swapping Text'.  */)
       {
 	ws = Fcons (w, ws);
 	if (MARKERP (XWINDOW (w)->pointm)
-	    && (BASE_EQ (XWINDOW (w)->contents, buf1)
-		|| BASE_EQ (XWINDOW (w)->contents, buf2)))
+	    && (EQ (XWINDOW (w)->contents, buf1)
+		|| EQ (XWINDOW (w)->contents, buf2)))
 	  Fset_marker (XWINDOW (w)->pointm,
 		       make_fixnum
 		       (BUF_BEGV (XBUFFER (XWINDOW (w)->contents))),
 		       XWINDOW (w)->contents);
 	/* Blindly copied from pointm part.  */
 	if (MARKERP (XWINDOW (w)->old_pointm)
-	    && (BASE_EQ (XWINDOW (w)->contents, buf1)
-		|| BASE_EQ (XWINDOW (w)->contents, buf2)))
+	    && (EQ (XWINDOW (w)->contents, buf1)
+		|| EQ (XWINDOW (w)->contents, buf2)))
 	  Fset_marker (XWINDOW (w)->old_pointm,
 		       make_fixnum
 		       (BUF_BEGV (XBUFFER (XWINDOW (w)->contents))),
 		       XWINDOW (w)->contents);
 	if (MARKERP (XWINDOW (w)->start)
-	    && (BASE_EQ (XWINDOW (w)->contents, buf1)
-		|| BASE_EQ (XWINDOW (w)->contents, buf2)))
+	    && (EQ (XWINDOW (w)->contents, buf1)
+		|| EQ (XWINDOW (w)->contents, buf2)))
 	  Fset_marker (XWINDOW (w)->start,
 		       make_fixnum
 		       (XBUFFER (XWINDOW (w)->contents)->last_window_start),
@@ -2497,11 +2497,10 @@ results, see Info node `(elisp)Swapping Text'.  */)
   }
 
   if (current_buffer->text->intervals)
-    (eassert (BASE_EQ (current_buffer->text->intervals->up.obj, buffer)),
+    (eassert (EQ (current_buffer->text->intervals->up.obj, buffer)),
      XSETBUFFER (current_buffer->text->intervals->up.obj, current_buffer));
   if (other_buffer->text->intervals)
-    (eassert (BASE_EQ (other_buffer->text->intervals->up.obj,
-		       Fcurrent_buffer ())),
+    (eassert (EQ (other_buffer->text->intervals->up.obj, Fcurrent_buffer ())),
      XSETBUFFER (other_buffer->text->intervals->up.obj, other_buffer));
 
   return Qnil;
@@ -3911,9 +3910,9 @@ for the rear of the overlay advance when text is inserted there
   else
     CHECK_BUFFER (buffer);
 
-  if (MARKERP (beg) && !BASE_EQ (Fmarker_buffer (beg), buffer))
+  if (MARKERP (beg) && !EQ (Fmarker_buffer (beg), buffer))
     signal_error ("Marker points into wrong buffer", beg);
-  if (MARKERP (end) && !BASE_EQ (Fmarker_buffer (end), buffer))
+  if (MARKERP (end) && !EQ (Fmarker_buffer (end), buffer))
     signal_error ("Marker points into wrong buffer", end);
 
   CHECK_FIXNUM_COERCE_MARKER (beg);
@@ -4031,9 +4030,9 @@ buffer.  */)
   if (NILP (Fbuffer_live_p (buffer)))
     error ("Attempt to move overlay to a dead buffer");
 
-  if (MARKERP (beg) && !BASE_EQ (Fmarker_buffer (beg), buffer))
+  if (MARKERP (beg) && !EQ (Fmarker_buffer (beg), buffer))
     signal_error ("Marker points into wrong buffer", beg);
-  if (MARKERP (end) && !BASE_EQ (Fmarker_buffer (end), buffer))
+  if (MARKERP (end) && !EQ (Fmarker_buffer (end), buffer))
     signal_error ("Marker points into wrong buffer", end);
 
   CHECK_FIXNUM_COERCE_MARKER (beg);

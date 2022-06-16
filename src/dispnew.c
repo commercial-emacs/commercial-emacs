@@ -4257,11 +4257,11 @@ set_window_cursor_after_update (struct window *w)
       /* If we are showing a message instead of the mini-buffer,
 	 show the cursor for the message instead.  */
       && XWINDOW (minibuf_window) == w
-      && BASE_EQ (minibuf_window, echo_area_window)
+      && EQ (minibuf_window, echo_area_window)
       /* These cases apply only to the frame that contains
 	 the active mini-buffer window.  */
       && FRAME_HAS_MINIBUF_P (f)
-      && BASE_EQ (FRAME_MINIBUF_WINDOW (f), echo_area_window))
+      && EQ (FRAME_MINIBUF_WINDOW (f), echo_area_window))
     {
       cx = cy = vpos = hpos = 0;
 
@@ -4921,13 +4921,13 @@ update_frame_1 (struct frame *f, bool force_p, bool inhibit_id_p,
 	   /* If we are showing a message instead of the mini-buffer,
 	      show the cursor for the message instead of for the
 	      (now hidden) mini-buffer contents.  */
-	   || (BASE_EQ (minibuf_window, selected_window)
-	       && BASE_EQ (minibuf_window, echo_area_window)
+	   || (EQ (minibuf_window, selected_window)
+	       && EQ (minibuf_window, echo_area_window)
 	       && !NILP (echo_area_buffer[0])))
 	  /* These cases apply only to the frame that contains
 	     the active mini-buffer window.  */
 	  && FRAME_HAS_MINIBUF_P (f)
-	  && BASE_EQ (FRAME_MINIBUF_WINDOW (f), echo_area_window))
+	  && EQ (FRAME_MINIBUF_WINDOW (f), echo_area_window))
 	{
 	  int top = WINDOW_TOP_EDGE_LINE (XWINDOW (FRAME_MINIBUF_WINDOW (f)));
 	  int col;
@@ -6096,7 +6096,7 @@ pass nil for VARIABLE.  */)
     {
       if (idx == ASIZE (state))
 	goto changed;
-      if (!BASE_EQ (AREF (state, idx++), frame))
+      if (!EQ (AREF (state, idx++), frame))
 	goto changed;
       if (idx == ASIZE (state))
 	goto changed;
@@ -6111,7 +6111,7 @@ pass nil for VARIABLE.  */)
 	continue;
       if (idx == ASIZE (state))
 	goto changed;
-      if (!BASE_EQ (AREF (state, idx++), buf))
+      if (!EQ (AREF (state, idx++), buf))
 	goto changed;
       if (idx == ASIZE (state))
 	goto changed;

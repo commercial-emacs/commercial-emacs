@@ -1584,9 +1584,8 @@ the face font sort order, see `face-font-selection-order'.  */)
 			      /* If the font was specified in a way
 				 different from XLFD (e.g., on MS-Windows),
 				 we will have a number there, not 'p'.  */
-			      || BASE_EQ (spacing,
-					  make_fixnum
-					  (FONT_SPACING_PROPORTIONAL)))
+			      || EQ (spacing,
+				     make_fixnum (FONT_SPACING_PROPORTIONAL)))
 			     ? Qnil : Qt,
 			     Ffont_xlfd_name (font, Qnil),
 			     AREF (font, FONT_REGISTRY_INDEX));
@@ -1943,7 +1942,7 @@ resolve_face_name (Lisp_Object face_name, bool signal_p)
 	break;
 
       tortoise = Fget (tortoise, Qface_alias);
-      if (BASE_EQ (hare, tortoise))
+      if (EQ (hare, tortoise))
 	{
 	  if (signal_p)
 	    circular_list (orig_face);
@@ -5177,9 +5176,8 @@ gui_supports_face_attributes_p (struct frame *f,
 	      return true;
 	    s1 = SYMBOL_NAME (face->font->props[i]);
 	    s2 = SYMBOL_NAME (def_face->font->props[i]);
-	    if (! BASE_EQ (Fcompare_strings (s1, make_fixnum (0), Qnil,
-					     s2, make_fixnum (0), Qnil, Qt),
-			   Qt))
+	    if (! EQ (Fcompare_strings (s1, make_fixnum (0), Qnil,
+					s2, make_fixnum (0), Qnil, Qt), Qt))
 	      return true;
 	  }
       return false;

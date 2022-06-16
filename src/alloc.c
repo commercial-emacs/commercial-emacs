@@ -249,7 +249,7 @@ static void mark_interval_tree (INTERVAL *i);
 static bool
 deadp (Lisp_Object x)
 {
-  return BASE_EQ (x, dead_object ());
+  return EQ (x, dead_object ());
 }
 
 /* Root of the tree describing allocated Lisp memory.  */
