@@ -6908,6 +6908,7 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
 #ifdef ENABLE_CHECKING
   eassert (time <= X_ULONG_MAX);
 #endif
+
   dpyinfo->last_user_time = time;
 
 #ifndef USE_GTK
