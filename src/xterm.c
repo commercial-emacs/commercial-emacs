@@ -6902,7 +6902,6 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
 {
 #ifndef USE_GTK
   struct frame *focus_frame = dpyinfo->x_focus_frame;
-  struct x_output *output;
 #endif
 
 #ifdef ENABLE_CHECKING
@@ -6912,56 +6911,6 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
   dpyinfo->last_user_time = time;
 
 #ifndef USE_GTK
-  if (focus_frame
-      && (dpyinfo->last_user_time
-	  > (dpyinfo->last_user_check_time + 2000)))
-    {
-      output = FRAME_X_OUTPUT (focus_frame);
-
-      if (!x_wm_supports (focus_frame,
-			  dpyinfo->Xatom_net_wm_user_time_window))
-	{
-	  if (output->user_time_window == None)
-	    output->user_time_window = FRAME_OUTER_WINDOW (focus_frame);
-	  else if (output->user_time_window != FRAME_OUTER_WINDOW (focus_frame))
-	    {
-	      XDestroyWindow (dpyinfo->display,
-			      output->user_time_window);
-	      XDeleteProperty (dpyinfo->display,
-			       FRAME_OUTER_WINDOW (focus_frame),
-			       dpyinfo->Xatom_net_wm_user_time_window);
-	      output->user_time_window = FRAME_OUTER_WINDOW (focus_frame);
-	    }
-	}
-      else
-	{
-	  if (output->user_time_window == FRAME_OUTER_WINDOW (focus_frame)
-	      || output->user_time_window == None)
-	    {
-	      XSetWindowAttributes attrs;
-	      memset (&attrs, 0, sizeof attrs);
-
-	      output->user_time_window
-		= XCreateWindow (dpyinfo->display,
-				 FRAME_X_WINDOW (focus_frame),
-				 -1, -1, 1, 1, 0, 0, InputOnly,
-				 CopyFromParent, 0, &attrs);
-
-	      XDeleteProperty (dpyinfo->display,
-			       FRAME_OUTER_WINDOW (focus_frame),
-			       dpyinfo->Xatom_net_wm_user_time);
-	      XChangeProperty (dpyinfo->display,
-			       FRAME_OUTER_WINDOW (focus_frame),
-			       dpyinfo->Xatom_net_wm_user_time_window,
-			       XA_WINDOW, 32, PropModeReplace,
-			       (unsigned char *) &output->user_time_window,
-			       1);
-	    }
-	}
-
-      dpyinfo->last_user_check_time = time;
-    }
-
   if (focus_frame)
     {
       while (FRAME_PARENT_FRAME (focus_frame))
@@ -16872,8 +16821,26 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         {
 	  /* Maybe we shouldn't set this for child frames ??  */
 	  f->output_data.x->parent_desc = event->xreparent.parent;
+
 	  if (!FRAME_PARENT_FRAME (f))
-	    x_real_positions (f, &f->left_pos, &f->top_pos);
+	    {
+	      x_real_positions (f, &f->left_pos, &f->top_pos);
+
+	      /* Perhaps reparented due to a WM restart.  Reset this.  */
+	      FRAME_DISPLAY_INFO (f)->wm_type = X_WMTYPE_UNKNOWN;
+	      FRAME_DISPLAY_INFO (f)->net_supported_window = 0;
+
+#ifndef USE_GTK
+	      /* The window manager could have restarted and the new
+		 window manager might not support user time windows,
+		 so update what is used accordingly.
+
+	         Note that this doesn't handle changes between
+	         non-reparenting window managers.  */
+	      if (FRAME_X_OUTPUT (f)->has_been_visible)
+		x_update_frame_user_time_window (f);
+#endif
+	    }
 	  else
 	    {
 	      Window root;
@@ -16885,10 +16852,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			    &dummy_uint, &dummy_uint, &dummy_uint, &dummy_uint);
 	      unblock_input ();
 	    }
-
-          /* Perhaps reparented due to a WM restart.  Reset this.  */
-          FRAME_DISPLAY_INFO (f)->wm_type = X_WMTYPE_UNKNOWN;
-          FRAME_DISPLAY_INFO (f)->net_supported_window = 0;
 
           x_set_frame_alpha (f);
         }
