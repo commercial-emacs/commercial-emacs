@@ -304,50 +304,27 @@ interpreted according to `macro-declarations-alist'.
 The return value is undefined.
 
 \(fn NAME ARGLIST &optional DOCSTRING DECL &rest BODY)"
-       ;; We can't just have `decl' as an &optional argument, because we need
-       ;; to distinguish
-       ;;    (defmacro foo (arg) (bar) nil)
-       ;; from
-       ;;    (defmacro foo (arg) (bar)).
-       (let ((decls (cond
-		     ((eq (car-safe docstring) 'declare)
-		      (prog1 (cdr docstring) (setq docstring nil)))
-		     ((and (stringp docstring)
-			   (eq (car-safe (car body)) 'declare))
-		      (prog1 (cdr (car body)) (setq body (cdr body)))))))
-	 (if docstring (setq body (cons docstring body))
-	   (if (null body) (setq body '(nil))))
-	 ;; Can't use backquote because it's not defined yet!
-	 (let* ((fun (list 'function (cons 'lambda (cons arglist body))))
-		(def (list 'defalias
-			   (list 'quote name)
-			   (list 'cons ''macro fun)))
-		(declarations
-		 (mapcar
-		  #'(lambda (x)
-		      (let ((f (cdr (assq (car x) macro-declarations-alist))))
-			(if f (apply (car f) name arglist (cdr x))
-			  (macroexp-warn-and-return
-			   (format-message
-			    "Unknown macro property %S in %S"
-			    (car x) name)
-			   nil))))
-		  decls)))
-	   ;; Refresh font-lock if this is a new macro, or it is an
-	   ;; existing macro whose 'no-font-lock-keyword declaration
-	   ;; has changed.
-	   (if (and
-		;; If lisp-mode hasn't been loaded, there's no reason
-		;; to flush.
-		(fboundp 'lisp--el-font-lock-flush-elisp-buffers)
-		(or (not (fboundp name)) ;; new macro
-		    (and (fboundp name)  ;; existing macro
-			 (member `(function-put ',name 'no-font-lock-keyword
-						',(get name 'no-font-lock-keyword))
-				 declarations))))
-	       (lisp--el-font-lock-flush-elisp-buffers))
-	   (if declarations
-	       (cons 'prog1 (cons def declarations))
+       (let* ((parse (byte-run--parse-body body nil))
+              (docstring (nth 0 parse))
+              (declare-form (nth 1 parse))
+              (body (nth 3 parse))
+              (warnings (nth 4 parse))
+              (declarations
+               (and declare-form (byte-run--parse-declarations
+                                  name arglist (cdr declare-form) 'macro
+                                  macro-declarations-alist))))
+         (setq body (nconc warnings body))
+         (setq body (nconc (cdr declarations) body))
+         (if docstring
+             (setq body (cons docstring body)))
+         (if (null body)
+             (setq body '(nil)))
+         (let* ((fun (list 'function (cons 'lambda (cons arglist body))))
+	        (def (list 'defalias
+		           (list 'quote name)
+		           (list 'cons ''macro fun))))
+           (if declarations
+	       (cons 'prog1 (cons def (car declarations)))
 	     def))))))
 
 ;; Now that we defined defmacro we can use it!
@@ -367,40 +344,25 @@ The return value is undefined.
        (and (listp arglist)
             (null (delq t (mapcar #'symbolp arglist)))))
       (error "Malformed arglist: %s" arglist))
-  (let ((decls (cond
-                ((eq (car-safe docstring) 'declare)
-                 (prog1 (cdr docstring) (setq docstring nil)))
-                ((and (stringp docstring)
-		      (eq (car-safe (car body)) 'declare))
-                 (prog1 (cdr (car body)) (setq body (cdr body)))))))
-    (if docstring (setq body (cons docstring body))
-      (if (null body) (setq body '(nil))))
-    (let ((declarations
-           (mapcar
-            #'(lambda (x)
-                (let ((f (cdr (assq (car x) defun-declarations-alist))))
-                  (cond
-                   (f (apply (car f) name arglist (cdr x)))
-                   ;; Yuck!!
-                   ((and (featurep 'cl)
-                         (memq (car x)  ;C.f. cl-do-proclaim.
-                               '(special inline notinline optimize warn)))
-                    (push (list 'declare x)
-                          (if (stringp docstring)
-                              (if (eq (car-safe (cadr body)) 'interactive)
-                                  (cddr body)
-                                (cdr body))
-                            (if (eq (car-safe (car body)) 'interactive)
-                                (cdr body)
-                              body)))
-                    nil)
-                   (t
-                    (macroexp-warn-and-return
-                     (format-message "Unknown defun property `%S' in %S"
-                                     (car x) name)
-                     nil)))))
-            decls))
-          (def (list 'defalias
+  (let* ((parse (byte-run--parse-body body t))
+         (docstring (nth 0 parse))
+         (declare-form (nth 1 parse))
+         (interactive-form (nth 2 parse))
+         (body (nth 3 parse))
+         (warnings (nth 4 parse))
+         (declarations
+          (and declare-form (byte-run--parse-declarations
+                             name arglist (cdr declare-form) 'defun
+                             defun-declarations-alist))))
+    (setq body (nconc warnings body))
+    (setq body (nconc (cdr declarations) body))
+    (if interactive-form
+        (setq body (cons interactive-form body)))
+    (if docstring
+        (setq body (cons docstring body)))
+    (if (null body)
+        (setq body '(nil)))
+    (let ((def (list 'defalias
                      (list 'quote name)
                      (list 'function
                            (cons 'lambda
