@@ -215,7 +215,7 @@ This is used by `declare'.")
              (interactive-form nil)
              (warnings nil)
              (warn #'(lambda (msg form)
-                       (push (macroexp-warn-and-return msg nil nil t form)
+                       (push (macroexp-warn-and-return msg nil nil t)
                              warnings))))
         (while
             (and body
@@ -271,7 +271,7 @@ This is used by `declare'.")
                        (macroexp-warn-and-return
                         (format-message "Unknown %s property `%S'"
                                         construct (car x))
-                        nil nil nil (car x))))))
+                        nil nil nil)))))
                clauses)))
         (cons actions cl-decls))))
 
