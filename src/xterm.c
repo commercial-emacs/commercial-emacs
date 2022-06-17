@@ -6935,6 +6935,66 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
 #endif
 }
 
+/* Not needed on GTK because GTK handles reporting the user time
+   itself.  */
+
+#ifndef USE_GTK
+static void
+x_update_frame_user_time_window (struct frame *f)
+{
+  struct x_output *output;
+  struct x_display_info *dpyinfo;
+  XSetWindowAttributes attrs;
+
+  output = FRAME_X_OUTPUT (f);
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  if (!x_wm_supports (f, dpyinfo->Xatom_net_wm_user_time_window))
+    {
+      if (output->user_time_window == None)
+	output->user_time_window = FRAME_OUTER_WINDOW (f);
+      else if (output->user_time_window != FRAME_OUTER_WINDOW (f))
+	{
+	  XDestroyWindow (dpyinfo->display,
+			  output->user_time_window);
+	  XDeleteProperty (dpyinfo->display,
+			   FRAME_OUTER_WINDOW (f),
+			   dpyinfo->Xatom_net_wm_user_time_window);
+	  output->user_time_window = FRAME_OUTER_WINDOW (f);
+	}
+    }
+  else
+    {
+      if (output->user_time_window == FRAME_OUTER_WINDOW (f)
+	  || output->user_time_window == None)
+	{
+	  memset (&attrs, 0, sizeof attrs);
+
+	  output->user_time_window
+	    = XCreateWindow (dpyinfo->display, FRAME_X_WINDOW (f),
+			     -1, -1, 1, 1, 0, 0, InputOnly,
+			     CopyFromParent, 0, &attrs);
+
+	  XDeleteProperty (dpyinfo->display, FRAME_OUTER_WINDOW (f),
+			   dpyinfo->Xatom_net_wm_user_time);
+	  XChangeProperty (dpyinfo->display, FRAME_OUTER_WINDOW (f),
+			   dpyinfo->Xatom_net_wm_user_time_window,
+			   XA_WINDOW, 32, PropModeReplace,
+			   (unsigned char *) &output->user_time_window, 1);
+	}
+    }
+}
+#endif
+
+void
+x_set_last_user_time_from_lisp (struct x_display_info *dpyinfo,
+				Time time)
+{
+  if (dpyinfo->last_user_time > time)
+    x_display_set_last_user_time (dpyinfo, time);
+}
+
+
 /* Set S->gc to a suitable GC for drawing glyph string S in cursor
    face.  */
 
@@ -11265,6 +11325,17 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   if (x_dnd_toplevels)
     x_dnd_free_toplevels (true);
 
+  /* Set up a meaningless alias.  */
+  XSETCAR (x_dnd_selection_alias_cell, QSECONDARY);
+  XSETCDR (x_dnd_selection_alias_cell, QSECONDARY);
+
+  /* Bind this here.  The cell doesn't actually alias between
+     anything until `xm_setup_dnd_targets' is called.  */
+  specbind (Qx_selection_alias_alist,
+	    Fcons (x_dnd_selection_alias_cell,
+		   Vx_selection_alias_alist));
+
+  /* Initialize most of the state for the drag-and-drop operation.  */
   x_dnd_in_progress = true;
   x_dnd_recursion_depth = command_loop_level + minibuf_level;
   x_dnd_frame = f;
