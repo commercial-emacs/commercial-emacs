@@ -202,6 +202,75 @@ This is used by `declare'.")
       (list 'function-put (list 'quote name)
 	    ''no-font-lock-keyword (list 'quote val))))
 
+(defalias 'byte-run--parse-body
+  #'(lambda (body allow-interactive)
+      "Decompose BODY into (DOCSTRING DECLARE INTERACTIVE BODY-REST WARNINGS)."
+      (let* ((top body)
+             (docstring nil)
+             (declare-form nil)
+             (interactive-form nil)
+             (warnings nil)
+             (warn #'(lambda (msg form)
+                       (push (macroexp-warn-and-return msg nil nil t form)
+                             warnings))))
+        (while
+            (and body
+                 (let* ((form (car body))
+                        (head (car-safe form)))
+                   (cond
+                    ((or (and (stringp form) (cdr body))
+                         (eq head :documentation))
+                     (cond
+                      (docstring (funcall warn "More than one doc string" top))
+                      (declare-form
+                       (funcall warn "Doc string after `declare'" declare-form))
+                      (interactive-form
+                       (funcall warn "Doc string after `interactive'"
+                                interactive-form))
+                      (t (setq docstring form)))
+                     t)
+                    ((eq head 'declare)
+                     (cond
+                      (declare-form
+                       (funcall warn "More than one `declare' form" form))
+                      (interactive-form
+                       (funcall warn "`declare' after `interactive'" form))
+                      (t (setq declare-form form)))
+                     t)
+                    ((eq head 'interactive)
+                     (cond
+                      ((not allow-interactive)
+                       (funcall warn "No `interactive' form allowed here" form))
+                      (interactive-form
+                       (funcall warn "More than one `interactive' form" form))
+                      (t (setq interactive-form form)))
+                     t))))
+          (setq body (cdr body)))
+        (list docstring declare-form interactive-form body warnings))))
+
+(defalias 'byte-run--parse-declarations
+  #'(lambda (name arglist clauses construct declarations-alist)
+      (let* ((cl-decls nil)
+             (actions
+              (mapcar
+               #'(lambda (x)
+                   (let ((f (cdr (assq (car x) declarations-alist))))
+                     (cond
+                      (f (apply (car f) name arglist (cdr x)))
+                      ;; Yuck!!
+                      ((and (featurep 'cl)
+                            (memq (car x)  ;C.f. cl--do-proclaim.
+                                  '(special inline notinline optimize warn)))
+                       (push (list 'declare x) cl-decls)
+                       nil)
+                      (t
+                       (macroexp-warn-and-return
+                        (format-message "Unknown %s property `%S'"
+                                        construct (car x))
+                        nil nil nil (car x))))))
+               clauses)))
+        (cons actions cl-decls))))
+
 (defvar macro-declarations-alist
   (cons
    (list 'debug #'byte-run--set-debug)
@@ -219,7 +288,7 @@ This is used by `declare'.")
 (defalias 'defmacro
   (cons
    'macro
-   #'(lambda (name arglist &optional docstring &rest body)
+   #'(lambda (name arglist &rest body)
        "Define NAME as a macro.
 When the macro is called, as in (NAME ARGS...),
 the function (lambda ARGLIST BODY...) is applied to
@@ -278,21 +347,16 @@ The return value is undefined.
 	     def))))))
 
 ;; Now that we defined defmacro we can use it!
-(defmacro defun (name arglist &optional docstring &rest body)
+(defmacro defun (name arglist &rest body)
   "Define NAME as a function.
-The definition is (lambda ARGLIST [DOCSTRING] BODY...).
-See also the function `interactive'.
+The definition is (lambda ARGLIST [DOCSTRING] [INTERACTIVE] BODY...).
 DECL is a declaration, optional, of the form (declare DECLS...) where
 DECLS is a list of elements of the form (PROP . VALUES).  These are
 interpreted according to `defun-declarations-alist'.
+INTERACTIVE is an optional `interactive' specification.
 The return value is undefined.
 
-\(fn NAME ARGLIST &optional DOCSTRING DECL &rest BODY)"
-  ;; We can't just have `decl' as an &optional argument, because we need
-  ;; to distinguish
-  ;;    (defun foo (arg) (toto) nil)
-  ;; from
-  ;;    (defun foo (arg) (toto)).
+\(fn NAME ARGLIST [DOCSTRING] [DECL] [INTERACTIVE] BODY...)"
   (declare (doc-string 3) (indent 2))
   (or name (error "Cannot define '%s' as a function" name))
   (if (null
@@ -338,8 +402,8 @@ The return value is undefined.
                            (cons 'lambda
                                  (cons arglist body))))))
       (if declarations
-          (cons 'prog1 (cons def declarations))
-          def))))
+          (cons 'prog1 (cons def (car declarations)))
+        def))))
 
 
 ;; Redefined in byte-opt.el.
