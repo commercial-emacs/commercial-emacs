@@ -1,7 +1,6 @@
 ;;; emacsbug.el --- command to report Emacs bugs to appropriate mailing list  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1985, 1994, 1997-1998, 2000-2022 Free Software
-;; Foundation, Inc.
+;; Copyright (C) 1985-2022 Free Software Foundation, Inc.
 
 ;; Author: K. Shane Hartman
 ;; Maintainer: emacs-devel@gnu.org
@@ -29,6 +28,9 @@
 ;; describing a problem.  You need to be able to send mail from Emacs
 ;; to complete the process.  Alternatively, compose the bug report in
 ;; Emacs then paste it into your normal mail client.
+
+;; `M-x submit-emacs-patch' can be used to send a patch to the Emacs
+;; maintainers.
 
 ;;; Code:
 
@@ -348,10 +350,10 @@ usually do not have translators for other languages.\n\n")))
 
     ;; This is so the user has to type something in order to send easily.
     (use-local-map (nconc (make-sparse-keymap) (current-local-map)))
-    (define-key (current-local-map) "\C-c\C-i" #'info-emacs-bug)
+    (keymap-set (current-local-map) "C-c C-i" #'info-emacs-bug)
     (if can-insert-mail
-	(define-key (current-local-map) "\C-c\M-i"
-	  #'report-emacs-bug-insert-to-mailer))
+        (keymap-set (current-local-map) "C-c M-i"
+                    #'report-emacs-bug-insert-to-mailer))
     (setq report-emacs-bug-send-command (get mail-user-agent 'sendfunc)
 	  report-emacs-bug-send-hook (get mail-user-agent 'hookvar))
     (if report-emacs-bug-send-command
@@ -504,9 +506,10 @@ Message buffer where you can explain more about the patch."
     (erase-buffer)
     (insert "Thank you for considering submitting a patch to the Emacs project.\n\n"
             "Please describe what the patch fixes (or, if it's a new feature, what it\n"
-            "implements) in the mail buffer below.  When done, use the `C-c C-c' command\n"
+            "implements) in the mail buffer below.  When done, use the "
+            (substitute-command-keys "\\<message-mode-map>\\[message-send-and-exit] command\n")
             "to send the patch as an email to the Emacs issue tracker.\n\n"
-            "If this is the first time you've submitted an Emacs patch, please\n"
+            "If this is the first time you're submitting an Emacs patch, please\n"
             "read the ")
     (insert-text-button
      "CONTRIBUTE"
@@ -524,7 +527,8 @@ Message buffer where you can explain more about the patch."
   (emacs-bug--system-description)
   (mml-attach-file file "text/patch" nil "attachment")
   (message-goto-body)
-  (message "Write a description of the patch and use `C-c C-c' to send it")
+  (message "Write a description of the patch and use %s to send it"
+           (substitute-command-keys "\\[message-send-and-exit]"))
   (add-hook 'message-send-hook
             (lambda ()
               (message-goto-body)
