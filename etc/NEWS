@@ -506,6 +506,12 @@ This is in addition to previously-supported ways of discovering 24-bit
 color support: either via the "RGB" or "setf24" capabilities, or if
 the 'COLORTERM' environment variable is set to the value "truecolor".
 
+*** Select active regions with xterm selection support.
+On terminals with xterm setSelection support, the active region may be
+saved to the X primary selection, following the
+'select-active-regions' variable.  This support is enabled with
+'xterm-select-active-regions'.
+
 ** ERT
 
 +++
@@ -1023,6 +1029,12 @@ which is a change in behaviour from previous Emacs versions.
 *** 'e' in edebug can now take a prefix arg to pretty-print the results.
 When invoked with a prefix argument, as in 'C-u e', this command will
 pop up a new buffer and show the full pretty-printed value there.
+
++++
+*** 'C-x C-e' now interprets a non-zero prefix arg to pretty-print the results.
+When invoked with a non-zero prefix argument, as in 'C-u C-x C-e',
+this command will pop up a new buffer and show the full pretty-printed
+value there.
 
 ** Compile
 
