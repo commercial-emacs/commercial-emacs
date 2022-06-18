@@ -2367,15 +2367,14 @@ in the input buffer (now current), not in the output buffer."
         (insert (nth 2 info))))))
 
 (defun byte-compile-keep-pending (form &optional handler)
-  (when (memq byte-optimize '(t source))
-    (setq form (byte-optimize-one-form form t)))
   (prog1 nil
+    (when (memq byte-optimize '(t source))
+      (setq form (byte-optimize-one-form form t)))
+    (when (nthcdr 300 byte-compile-output)
+      ;; To avoid consing frenzy at load time, split here.
+      (byte-compile-flush-pending))
     (if handler
         (let ((byte-compile--for-effect t))
-          (when (and (memq (car-safe form) '(fset defalias))
-                     (nthcdr 300 byte-compile-output))
-            ;; To avoid consing frenzy at load time, split here
-            (byte-compile-flush-pending))
           (funcall handler form)
           (when byte-compile--for-effect
             (byte-compile-discard)))
