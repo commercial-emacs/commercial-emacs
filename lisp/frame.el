@@ -2167,7 +2167,7 @@ frame's display)."
        (not (null dos-windows-version))))
      ((memq frame-type '(x w32 ns pgtk))
       t)
-     ((and xterm-select-active-regions
+     ((and (bound-and-true-p xterm-select-active-regions)
            (terminal-parameter nil 'xterm--set-selection))
       t)
      (t
