@@ -2149,14 +2149,8 @@ frame's display)."
 (defalias 'display-multi-frame-p #'display-graphic-p)
 (defalias 'display-multi-font-p #'display-graphic-p)
 
-(defcustom tty-select-active-regions nil
-  "If non-nil, update PRIMARY window-system selection on text-mode frames.
-On a text-mode terminal that supports setSelection command, if
-this variable is non-nil, Emacs will set the PRIMARY selection
-from the active region, according to `select-active-regions'.
-This is currently supported only on xterm."
-  :version "29.1"
-  :type 'boolean)
+;; From term/xterm.el
+(defvar xterm-select-active-regions)
 
 (defun display-selections-p (&optional display)
   "Return non-nil if DISPLAY supports selections.
