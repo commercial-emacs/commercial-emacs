@@ -6884,7 +6884,7 @@ that mouse buttons are being held down, such as immediately after a
   int ntargets = 0, nnames = 0;
   char *target_names[2048];
   Atom *target_atoms;
-  Lisp_Object lval, original, tem, t1, t2;
+  Lisp_Object lval, original, targets_arg, tem, t1, t2;
   Atom xaction;
   Atom action_list[2048];
   char *name_list[2048];
@@ -6893,6 +6893,7 @@ that mouse buttons are being held down, such as immediately after a
 
   CHECK_LIST (targets);
   original = targets;
+  targets_arg = targets;
 
   for (; CONSP (targets); targets = XCDR (targets))
     {
@@ -6980,7 +6981,7 @@ that mouse buttons are being held down, such as immediately after a
 				    xaction, return_frame, action_list,
 				    (const char **) &name_list, nnames,
 				    !NILP (allow_current_frame), target_atoms,
-				    ntargets, original, !NILP (follow_tooltip));
+				    ntargets, targets_arg, !NILP (follow_tooltip));
 
   SAFE_FREE ();
   return lval;
