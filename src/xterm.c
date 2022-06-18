@@ -6906,8 +6906,15 @@ static void x_scroll_bar_clear (struct frame *);
 static void x_check_font (struct frame *, struct font *);
 #endif
 
+/* If SEND_EVENT, make sure that TIME is larger than the current last
+   user time.  We don't sanitize timestamps from events sent by the X
+   server itself because some Lisp might have set the user time to a
+   ridiculously large value, and this way a more reasonable timestamp
+   can be obtained upon the next event.  */
+
 static void
-x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
+x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time,
+			      bool send_event)
 {
 #ifndef USE_GTK
   struct frame *focus_frame = dpyinfo->x_focus_frame;
@@ -6917,7 +6924,8 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
   eassert (time <= X_ULONG_MAX);
 #endif
 
-  dpyinfo->last_user_time = time;
+  if (!send_event || time > dpyinfo->last_user_time)
+    dpyinfo->last_user_time = time;
 
 #ifndef USE_GTK
   if (focus_frame)
@@ -6990,8 +6998,7 @@ void
 x_set_last_user_time_from_lisp (struct x_display_info *dpyinfo,
 				Time time)
 {
-  if (dpyinfo->last_user_time > time)
-    x_display_set_last_user_time (dpyinfo, time);
+  x_display_set_last_user_time (dpyinfo, time, true);
 }
 
 
@@ -12603,7 +12610,7 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	    && (dpyinfo->last_user_time
 		< dpyinfo->last_mouse_movement_time))
 	  x_display_set_last_user_time (dpyinfo,
-					dpyinfo->last_mouse_movement_time);
+					dpyinfo->last_mouse_movement_time, false);
 
 	if ((!f1 || FRAME_TOOLTIP_P (f1))
 	    && (EQ (track_mouse, Qdropping)
@@ -17293,7 +17300,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       goto OTHER;
 
     case KeyPress:
-      x_display_set_last_user_time (dpyinfo, event->xkey.time);
+      x_display_set_last_user_time (dpyinfo, event->xkey.time,
+				    event->xkey.send_event);
       ignore_next_mouse_click_timeout = 0;
       coding = Qlatin_1;
 
@@ -17744,7 +17752,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
     case EnterNotify:
-      x_display_set_last_user_time (dpyinfo, event->xcrossing.time);
+      x_display_set_last_user_time (dpyinfo, event->xcrossing.time,
+				    event->xcrossing.send_event);
 
       if (x_top_window_to_frame (dpyinfo, event->xcrossing.window))
 	x_detect_focus_change (dpyinfo, any, event, &inev.ie);
@@ -17829,7 +17838,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       goto OTHER;
 
     case LeaveNotify:
-      x_display_set_last_user_time (dpyinfo, event->xcrossing.time);
+      x_display_set_last_user_time (dpyinfo, event->xcrossing.time,
+				    event->xcrossing.send_event);
 
 #ifdef HAVE_XWIDGETS
       {
@@ -18553,7 +18563,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
     case ButtonPress:
       {
 	if (event->xbutton.type == ButtonPress)
-	  x_display_set_last_user_time (dpyinfo, event->xbutton.time);
+	  x_display_set_last_user_time (dpyinfo, event->xbutton.time,
+					event->xbutton.send_event);
 
 #ifdef HAVE_XWIDGETS
 	struct xwidget_view *xvw = xwidget_view_from_window (event->xbutton.window);
@@ -19102,7 +19113,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      ev.window = enter->event;
 	      ev.time = enter->time;
 
-	      x_display_set_last_user_time (dpyinfo, enter->time);
+	      x_display_set_last_user_time (dpyinfo, enter->time,
+					    enter->send_event);
 
 #ifdef USE_MOTIF
 	      use_copy = true;
@@ -19251,7 +19263,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 							 leave->deviceid, false);
 #endif
 
-	      x_display_set_last_user_time (dpyinfo, leave->time);
+	      x_display_set_last_user_time (dpyinfo, leave->time,
+					    leave->send_event);
 
 #ifdef HAVE_XWIDGETS
 	      {
@@ -19505,7 +19518,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      if (xv)
 		{
 		  uint state = xev->mods.effective;
-		  x_display_set_last_user_time (dpyinfo, xev->time);
+		  x_display_set_last_user_time (dpyinfo, xev->time,
+						xev->send_event);
 
 		  if (xev->buttons.mask_len)
 		    {
@@ -19534,7 +19548,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 		  if (found_valuator)
 		    {
-		      x_display_set_last_user_time (dpyinfo, xev->time);
+		      x_display_set_last_user_time (dpyinfo, xev->time,
+						    xev->send_event);
 
 #if defined USE_GTK && !defined HAVE_GTK3
 		      /* Unlike on Motif, we can't select for XI
@@ -20252,7 +20267,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
 	      if (xev->evtype == XI_ButtonPress)
-		x_display_set_last_user_time (dpyinfo, xev->time);
+		x_display_set_last_user_time (dpyinfo, xev->time,
+					      xev->send_event);
 
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
 
@@ -20593,7 +20609,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		}
 #endif
 
-	      x_display_set_last_user_time (dpyinfo, xev->time);
+	      x_display_set_last_user_time (dpyinfo, xev->time,
+					    xev->send_event);
 	      ignore_next_mouse_click_timeout = 0;
 
 	      f = x_any_window_to_frame (dpyinfo, xev->event);
@@ -21387,7 +21404,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
-	      x_display_set_last_user_time (dpyinfo, xev->time);
+	      x_display_set_last_user_time (dpyinfo, xev->time,
+					    xev->send_event);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -21466,7 +21484,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
-	      x_display_set_last_user_time (dpyinfo, xev->time);
+	      x_display_set_last_user_time (dpyinfo, xev->time,
+					    xev->send_event);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -21512,7 +21531,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
-	      x_display_set_last_user_time (dpyinfo, xev->time);
+	      x_display_set_last_user_time (dpyinfo, xev->time,
+					    xev->send_event);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -21552,7 +21572,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      device = xi_device_from_id (dpyinfo, pev->deviceid);
 	      source = xi_device_from_id (dpyinfo, pev->sourceid);
-	      x_display_set_last_user_time (dpyinfo, pev->time);
+	      x_display_set_last_user_time (dpyinfo, pev->time,
+					    pev->send_event);
 
 	      if (!device)
 		goto XI_OTHER;
