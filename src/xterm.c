@@ -1997,7 +1997,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   bool rc, had_errors;
   xm_targets_table_header header;
   xm_targets_table_rec **recs = NULL;
-  xm_byte_order byteorder;
+  xm_byte_order byteorder = XM_BYTE_ORDER_LSB_FIRST;
   uint8_t *data;
   ptrdiff_t total_bytes, total_items, i;
   uint32_t size, target_count;
@@ -2036,17 +2036,18 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 
   if (rc
       && tmp_data
-      && !bytes_remaining
+      && ! bytes_remaining
       && actual_type == dpyinfo->Xatom_MOTIF_DRAG_TARGETS
       && actual_format == 8)
     {
       data = (uint8_t *) tmp_data;
-      if (xm_read_targets_table_header ((uint8_t *) tmp_data,
+      if (actual_format !=
+	  xm_read_targets_table_header ((uint8_t *) tmp_data,
 					nitems, &header,
-					&byteorder) == 8)
+					&byteorder))
 	{
-	  data += 8;
-	  nitems -= 8;
+	  data += actual_format;
+	  nitems -= actual_format;
 	  total_bytes = 0;
 	  total_items = 0;
 
@@ -2060,7 +2061,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	      recs[total_items] = xm_read_targets_table_rec (data + total_bytes,
 							     nitems, byteorder);
 
-	      if (!recs[total_items])
+	      if (! recs[total_items])
 		break;
 
 	      total_bytes += 2 + recs[total_items]->n_targets * 4;
@@ -2069,7 +2070,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	    }
 
 	  if (header.target_list_count != total_items
-	      || header.total_data_size != 8 + total_bytes)
+	      || header.total_data_size != actual_format + total_bytes)
 	    {
 	      for (i = 0; i < total_items; ++i)
 		{
@@ -2083,8 +2084,6 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	      recs = NULL;
 	    }
 	}
-      else
-	rc = false;
     }
 
   rc = (recs != NULL);
