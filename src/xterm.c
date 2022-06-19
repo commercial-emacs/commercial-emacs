@@ -2041,7 +2041,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
       && actual_format == 8)
     {
       data = (uint8_t *) tmp_data;
-      if (actual_format !=
+      if (actual_format ==
 	  xm_read_targets_table_header ((uint8_t *) tmp_data,
 					nitems, &header,
 					&byteorder))
