@@ -1805,7 +1805,7 @@ xm_drag_window_io_error_handler (Display *dpy)
 }
 
 static Window
-xm_get_drag_window (struct x_display_info *dpyinfo)
+xm_get_drag_window_1 (struct x_display_info *dpyinfo)
 {
   Atom actual_type, _MOTIF_DRAG_WINDOW;
   int rc, actual_format;
@@ -1975,6 +1975,16 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
   return drag_window;
 }
 
+static Window
+xm_get_drag_window (struct x_display_info *dpyinfo)
+{
+  if (dpyinfo->motif_drag_window != None)
+    return dpyinfo->motif_drag_window;
+
+  dpyinfo->motif_drag_window = xm_get_drag_window_1 (dpyinfo);
+  return dpyinfo->motif_drag_window;
+}
+
 static int
 xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 		      Atom *targets, int ntargets)
@@ -1991,6 +2001,8 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   uint8_t *data;
   ptrdiff_t total_bytes, total_items, i;
   uint32_t size, target_count;
+
+ retry_drag_window:
 
   drag_window = xm_get_drag_window (dpyinfo);
 
