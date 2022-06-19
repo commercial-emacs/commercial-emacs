@@ -1994,7 +1994,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   unsigned char *tmp_data = NULL;
   unsigned long nitems, bytes_remaining;
   int actual_format, idx;
-  bool rc;
+  bool rc, had_errors;
   xm_targets_table_header header;
   xm_targets_table_rec **recs = NULL;
   xm_byte_order byteorder;
@@ -2016,13 +2016,25 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	 sizeof (Atom), x_atoms_compare);
 
   XGrabServer (dpyinfo->display);
-  if (Success ==
-      XGetWindowProperty (dpyinfo->display, drag_window,
-			  dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
-			  0L, LONG_MAX, False,
-			  dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
-			  &actual_type, &actual_format, &nitems,
-			  &bytes_remaining, &tmp_data)
+  x_catch_errors (dpyinfo->display);
+  rc = (Success ==
+	XGetWindowProperty (dpyinfo->display, drag_window,
+			    dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
+			    0L, LONG_MAX, False,
+			    dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
+			    &actual_type, &actual_format, &nitems,
+			    &bytes_remaining, &tmp_data));
+  had_errors = x_had_errors_p (dpyinfo->display);
+  x_uncatch_errors ();
+  if (had_errors)
+    {
+      /* drag window is likely invalid so remove its record.  */
+      dpyinfo->motif_drag_window = None;
+      XUngrabServer (dpyinfo->display);
+      goto retry_drag_window;
+    }
+
+  if (rc
       && tmp_data
       && !bytes_remaining
       && actual_type == dpyinfo->Xatom_MOTIF_DRAG_TARGETS
