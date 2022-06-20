@@ -82,9 +82,10 @@
   ;; "sftp" does not belong to `url-tramp-protocols'.  The string
   ;; isn't changed, therefore.
   (should
-   (string-equal
-    (url-tramp-convert-tramp-to-url "/sftp:user@localhost:")
-    "/sftp:user@localhost:")))
+   (or (not (assoc "sftp" tramp-methods))
+       (string-equal
+        (url-tramp-convert-tramp-to-url "/sftp:user@localhost:")
+        "/sftp:user@localhost:"))))
 
 (provide 'url-tramp-tests)
 
