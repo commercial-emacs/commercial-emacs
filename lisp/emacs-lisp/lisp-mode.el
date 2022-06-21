@@ -863,7 +863,7 @@ function is `common-lisp-indent-function'."
                (:constructor lisp-indent-initial-state
                              (&aux (ppss (lisp-ppss))
                                    (ppss-point (point))
-                                   (stack (make-list (1+ (car ppss)) nil)))))
+                                   (stack (make-list (max 0 (1+ (car ppss))) nil)))))
   stack ;; Cached indentation, per depth.
   ppss
   ppss-point)
