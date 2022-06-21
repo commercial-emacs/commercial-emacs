@@ -904,6 +904,9 @@ Describe the following key, mouse click, or menu item: "
         (setq yank-menu (copy-sequence saved-yank-menu))
         (fset 'yank-menu (cons 'keymap yank-menu))))))
 
+;; Defined in help-fns.el.
+(defvar describe-function-orig-buffer)
+
 (defun describe-key (&optional key-list buffer up-event)
   "Display documentation of the function invoked by KEY-LIST.
 KEY-LIST can be any kind of a key sequence; it can include keyboard events,
@@ -934,6 +937,7 @@ current buffer."
     (setq buffer nil))
   (let* ((help-buffer-under-preparation t)
          (buf (or buffer (current-buffer)))
+         (describe-function-orig-buffer buf)
          (on-link
           (mapcar (lambda (kr)
                     (let ((raw (cdr kr)))
@@ -967,16 +971,16 @@ current buffer."
       (with-help-window (help-buffer)
         (when (> (length info-list) 1)
           ;; FIXME: Make this into clickable hyperlinks.
-          (princ "There were several key-sequences:\n\n")
-          (princ (mapconcat (lambda (info)
-                              (pcase-let ((`(,_seq ,brief-desc ,_defn ,_locus)
-                                           info))
-                                (concat "  " brief-desc)))
-                            info-list
-                            "\n"))
+          (insert "There were several key-sequences:\n\n")
+          (insert (mapconcat (lambda (info)
+                               (pcase-let ((`(,_seq ,brief-desc ,_defn ,_locus)
+                                            info))
+                                 (concat "  " brief-desc)))
+                             info-list
+                             "\n"))
           (when (delq nil on-link)
-            (princ "\n\nThose are influenced by `mouse-1-click-follows-link'"))
-          (princ "\n\nThey're all described below."))
+            (insert "\n\nThose are influenced by `mouse-1-click-follows-link'"))
+          (insert "\n\nThey're all described below."))
         (pcase-dolist (`(,_seq ,brief-desc ,defn ,locus)
                        info-list)
           (when defn
@@ -984,10 +988,10 @@ current buffer."
               (with-current-buffer standard-output
                 (insert "\n\n" (make-separator-line) "\n")))
 
-            (princ brief-desc)
+            (insert brief-desc)
             (when locus
-              (princ (format " (found in %s)" locus)))
-            (princ ", which is ")
+              (insert (format " (found in %s)" locus)))
+            (insert ", which is ")
 	    (describe-function-1 defn)))))))
 
 (defun search-forward-help-for-help ()
