@@ -508,6 +508,7 @@ enum ns_return_frame_mode
 #if defined (NS_IMPL_COCOA) && MAC_OS_X_VERSION_MAX_ALLOWED >= 1070
 - (void) updateCollectionBehavior;
 #endif
+- (void) updateVisibility: (NSNotification *)notification;
 
 #ifdef NS_IMPL_GNUSTEP
 - (void)windowDidMove: (id)sender;
