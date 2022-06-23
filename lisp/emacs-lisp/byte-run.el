@@ -214,7 +214,7 @@ This is used by `declare'.")
              (declare-form nil)
              (interactive-form nil)
              (warnings nil)
-             (warn #'(lambda (msg form)
+             (warn #'(lambda (msg _form)
                        (push (macroexp-warn-and-return msg nil nil t)
                              warnings))))
         (while
