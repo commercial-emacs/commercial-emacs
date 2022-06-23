@@ -160,7 +160,7 @@ If nil add it at end of menu (see also `easy-menu-add-item')."
                  (const :tag "Last" nil))
   :set 'recentf-menu-customization-changed)
 
-(defcustom recentf-menu-action 'find-file
+(defcustom recentf-menu-action #'find-file
   "Function to invoke with a filename item of the recentf menu.
 The default is to call `find-file' to edit the selected file."
   :group 'recentf
@@ -171,7 +171,7 @@ The default is to call `find-file' to edit the selected file."
   :group 'recentf
   :type 'integer)
 
-(defcustom recentf-menu-filter #'recentf-show-abbreviated
+(defcustom recentf-menu-filter nil
   "Function used to filter files displayed in the recentf menu.
 A nil value means no filter.  The following functions are predefined:
 
@@ -187,8 +187,6 @@ A nil value means no filter.  The following functions are predefined:
     Sort menu items by directories in ascending order.
 - `recentf-sort-directories-descending'
     Sort menu items by directories in descending order.
-- `recentf-show-abbreviated'
-    Show shortened filenames.
 - `recentf-show-basenames'
     Show filenames sans directory in menu items.
 - `recentf-show-basenames-ascending'
@@ -217,7 +215,6 @@ elements (see `recentf-make-menu-element' for menu element form)."
                 (function-item recentf-sort-basenames-descending)
                 (function-item recentf-sort-directories-ascending)
                 (function-item recentf-sort-directories-descending)
-                (function-item recentf-show-abbreviated)
                 (function-item recentf-show-basenames)
                 (function-item recentf-show-basenames-ascending)
                 (function-item recentf-show-basenames-descending)
@@ -226,8 +223,7 @@ elements (see `recentf-make-menu-element' for menu element form)."
                 (function-item recentf-arrange-by-mode)
                 (function-item recentf-arrange-by-dir)
                 (function-item recentf-filter-changer)
-                function)
-  :version "29.1")
+                function))
 
 (defcustom recentf-menu-open-all-flag nil
   "Non-nil means to show an \"All...\" item in the menu.
@@ -289,7 +285,7 @@ If `file-name-history' is not empty, do nothing."
 (make-obsolete-variable 'recentf-load-hook
                         "use `with-eval-after-load' instead." "28.1")
 
-(defcustom recentf-filename-handlers nil
+(defcustom recentf-filename-handlers '(abbreviate-file-name)
   "Functions to post process recent file names.
 They are successively passed a file name to transform it."
   :group 'recentf
@@ -299,7 +295,8 @@ They are successively passed a file name to transform it."
            (choice
             (const file-truename)
             (const abbreviate-file-name)
-            (function :tag "Other function")))))
+            (function :tag "Other function"))))
+  :version "29.1")
 
 (defcustom recentf-show-file-shortcuts-flag t
   "Non-nil means to show \"[N]\" for the Nth item up to 10.
@@ -484,7 +481,7 @@ See also the command `recentf-open-most-recent-file'."
              (interactive)
              (recentf-open-most-recent-file ,k)))
         ;; Bind it to a digit key.
-        (define-key km (vector (+ k ?0)) cmd)))
+        (keymap-set km (format "%d" k) cmd)))
     km)
   "Digit shortcuts keymap.")
 
@@ -725,11 +722,14 @@ Compares directories then filenames to order the list."
            (recentf-menu-element-value e2)
            (recentf-menu-element-value e1)))))
 
-(defun recentf--filter-names (l no-dir fun)
+(defun recentf-show-basenames (l &optional no-dir)
+  "Filter the list of menu elements L to show filenames sans directory.
+When a filename is duplicated, it is appended a sequence number if
+optional argument NO-DIR is non-nil, or its directory otherwise."
   (let (filtered-names filtered-list full name counters sufx)
     (dolist (elt l (nreverse filtered-list))
       (setq full (recentf-menu-element-value elt)
-            name (funcall fun full))
+            name (file-name-nondirectory full))
       (if (not (member name filtered-names))
           (push name filtered-names)
         (if no-dir
@@ -740,18 +740,6 @@ Compares directories then filenames to order the list."
           (setq sufx (file-name-directory full)))
         (setq name (format "%s(%s)" name sufx)))
       (push (recentf-make-menu-element name full) filtered-list))))
-
-(defun recentf-show-abbreviated (l &optional no-dir)
-  "Filter the list of menu elements L to show shortened filenames.
-When a filename is duplicated, it is appended a sequence number if
-optional argument NO-DIR is non-nil, or its directory otherwise."
-  (recentf--filter-names l no-dir #'abbreviate-file-name))
-
-(defun recentf-show-basenames (l &optional no-dir)
-  "Filter the list of menu elements L to show filenames sans directory.
-When a filename is duplicated, it is appended a sequence number if
-optional argument NO-DIR is non-nil, or its directory otherwise."
-  (recentf--filter-names l no-dir #'file-name-nondirectory))
 
 (defun recentf-show-basenames-ascending (l)
   "Filter the list of menu elements L to show filenames sans directory.
@@ -1349,8 +1337,8 @@ That is, remove duplicates, non-kept, and excluded files."
 
 ;;; The minor mode
 ;;
-(defvar recentf-mode-map (make-sparse-keymap)
-  "Keymap to use in recentf mode.")
+(defvar-keymap recentf-mode-map
+  :doc "Keymap to use in `recentf-mode'.")
 
 ;;;###autoload
 (define-minor-mode recentf-mode
