@@ -214,7 +214,7 @@ This is used by `declare'.")
              (declare-form nil)
              (interactive-form nil)
              (warnings nil)
-             (warn #'(lambda (msg form)
+             (warn #'(lambda (msg)
                        (push (macroexp-warn-and-return msg nil nil t)
                              warnings))))
         (while
@@ -227,26 +227,25 @@ This is used by `declare'.")
                      (cond
                       (docstring (funcall warn "More than one doc string" top))
                       (declare-form
-                       (funcall warn "Doc string after `declare'" declare-form))
+                       (funcall warn "Doc string after `declare'"))
                       (interactive-form
-                       (funcall warn "Doc string after `interactive'"
-                                interactive-form))
+                       (funcall warn "Doc string after `interactive'"))
                       (t (setq docstring form)))
                      t)
                     ((eq head 'declare)
                      (cond
                       (declare-form
-                       (funcall warn "More than one `declare' form" form))
+                       (funcall warn "More than one `declare' form"))
                       (interactive-form
-                       (funcall warn "`declare' after `interactive'" form))
+                       (funcall warn "`declare' after `interactive'"))
                       (t (setq declare-form form)))
                      t)
                     ((eq head 'interactive)
                      (cond
                       ((not allow-interactive)
-                       (funcall warn "No `interactive' form allowed here" form))
+                       (funcall warn "No `interactive' form allowed here"))
                       (interactive-form
-                       (funcall warn "More than one `interactive' form" form))
+                       (funcall warn "More than one `interactive' form"))
                       (t (setq interactive-form form)))
                      t))))
           (setq body (cdr body)))
