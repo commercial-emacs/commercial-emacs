@@ -28,6 +28,7 @@
 (require 'ert)
 (eval-when-compile (require 'cl-lib))
 (require 'subr-x)
+(require 'bytecomp)
 
 (ert-deftest eval-tests--bug24673 ()
   "Check that Bug#24673 has been fixed."
