@@ -678,6 +678,15 @@ static struct glyph_slice null_glyph_slice = { 0, 0, 0, 0 };
 
 bool redisplaying_p;
 
+/* True while some display-engine code is working on layout of some
+   window.
+
+   WARNING: Use sparingly, preferably only in top level of commands
+   and important functions, because using it in nested calls might
+   reset the flag when the inner call returns, behind the back of
+   the callers.  */
+bool display_working_on_window_p;
+
 /* If a string, XTread_socket generates an event to display that string.
    (The display is done in read_char.)  */
 
@@ -2743,6 +2752,8 @@ init_iterator (struct it *it, struct window *w,
   it->f = XFRAME (w->frame);
 
   it->cmp_it.id = -1;
+
+  update_redisplay_ticks (0, w);
 
   /* Extra space between lines (on window systems only).  */
   if (base_face_id == DEFAULT_FACE_ID
@@ -15194,9 +15205,14 @@ redisplay_internal (void)
 				 list_of_error,
 				 redisplay_window_error);
       if (update_miniwindow_p)
-	internal_condition_case_1 (redisplay_window_1,
-				   FRAME_MINIBUF_WINDOW (sf), list_of_error,
-				   redisplay_window_error);
+	{
+	  Lisp_Object mini_window = FRAME_MINIBUF_WINDOW (sf);
+
+	  displayed_buffer = XBUFFER (XWINDOW (mini_window)->contents);
+	  internal_condition_case_1 (redisplay_window_1, mini_window,
+				     list_of_error,
+				     redisplay_window_error);
+	}
 
       /* Compare desired and current matrices, perform output.  */
 
@@ -15593,9 +15609,19 @@ redisplay_windows (Lisp_Object window)
 }
 
 static Lisp_Object
-redisplay_window_error (Lisp_Object ignore)
+redisplay_window_error (Lisp_Object error_data)
 {
   displayed_buffer->display_error_modiff = BUF_MODIFF (displayed_buffer);
+
+  /* When in redisplay, the error is captured and not shown.  Arrange
+     for it to be shown later.  */
+  if (max_redisplay_ticks > 0
+      && CONSP (error_data)
+      && EQ (XCAR (error_data), Qerror)
+      && STRINGP (XCAR (XCDR (error_data))))
+    Vdelayed_warnings_list = Fcons (list2 (XCAR (error_data),
+					   XCAR (XCDR (error_data))),
+				    Vdelayed_warnings_list);
   return Qnil;
 }
 
@@ -33171,7 +33197,7 @@ be let-bound around code that needs to disable messages temporarily. */);
 
   DEFSYM (Qinhibit_free_realized_faces, "inhibit-free-realized-faces");
 
-  list_of_error = list1 (list2 (Qerror, Qvoid_variable));
+  list_of_error = list1 (Qerror);
   staticpro (&list_of_error);
 
   /* Values of those variables at last redisplay are stored as
@@ -34052,6 +34078,22 @@ and display the most important part of the minibuffer.   */);
 This makes it easier to edit character sequences that are
 composed on display.  */);
   composition_break_at_point = false;
+
+  DEFVAR_INT ("max-redisplay-ticks", max_redisplay_ticks,
+    doc: /* Maximum number of redisplay ticks before aborting redisplay of a window.
+
+This allows to abort the display of a window if the amount of low-level
+redisplay operations exceeds the value of this variable.  When display of
+a window is aborted due to this reason, the buffer shown in that window
+will not have its windows redisplayed until the buffer is modified or until
+you type \\[recenter-top-bottom] with one of its windows selected.
+You can also decide to kill the buffer and visit it in some
+other way, like under `so-long-mode' or literally.
+
+The default value is zero, which disables this feature.
+The recommended non-zero value is between 100000 and 1000000,
+depending on your patience and the speed of your system.  */);
+  max_redisplay_ticks = 0;
 }
 
 
