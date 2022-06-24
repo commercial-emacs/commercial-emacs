@@ -50,6 +50,7 @@
 (require 'ert)
 (eval-when-compile (require 'cl-lib))
 (require 'mh-utils)
+(require 'subr-x)
 
 (ert-deftest mh-quote-pick-expr ()
   "Test `mh-quote-pick-expr'."
