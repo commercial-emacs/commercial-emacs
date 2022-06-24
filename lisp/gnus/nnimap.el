@@ -273,7 +273,7 @@ during splitting, which may be slow."
     (when (nnimap-change-group group server)
       (with-current-buffer (nnimap-process-buffer)
 	(erase-buffer)
-        (let ((ranges (gnus-compress-sequence articles))
+        (let ((ranges (gnus-compress-sequence articles t))
               sequence)
           ;; If we have a lot of ranges, split them up to avoid
           ;; generating too-long lines.  (The limit is 8192 octects,
