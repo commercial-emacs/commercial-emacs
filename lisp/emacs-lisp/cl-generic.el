@@ -651,7 +651,8 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
 (defvar cl--generic-dispatchers (make-hash-table :test #'equal))
 
 (defvar cl--generic-compiler
-  (if (consp (lambda (x) (+ x 1)))
+  (if (or (consp (lambda (x) (+ x 1)))
+          (not (featurep 'bytecomp)))
       (lambda (exp) (eval exp t))
     #'byte-compile)
   "Don't byte-compile the dispatchers if cl-generic itself is not
@@ -705,7 +706,6 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
         (funcall
          cl--generic-compiler
          `(lambda (generic dispatches-left methods)
-            (eval-when-compile (require 'subr-x))
             (let ((method-cache (make-hash-table :test #'eql)))
               (apply-partially
                (lambda (generic* dispatches-left* methods* ,@fixedargs &rest args)
