@@ -271,11 +271,9 @@ newly created string with no text properties.
 @defun string-to-multibyte string
 This function returns a multibyte string containing the same sequence
 of characters as @var{string}.  If @var{string} is a multibyte string,
-it is returned unchanged.  The function assumes that @var{string}
-includes only @acronym{ASCII} characters and raw 8-bit bytes; the
-latter are converted to their multibyte representation corresponding
-to the codepoints @code{#x3FFF80} through @code{#x3FFFFF}, inclusive
-(@pxref{Text Representations, codepoints}).
+it is returned unchanged.  Otherwise, bytes with values 128 to 255 are
+converted to their corresponding multibyte representations in the
+@code{eight-bit} charset.
 @end defun
 
 @defun string-to-unibyte string
