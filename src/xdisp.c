@@ -15370,6 +15370,11 @@ redisplay_internal (void)
   if (interrupt_input && interrupts_deferred)
     request_sigio ();
 
+  /* We're done with this redisplay cycle, so reset the tick count in
+     preparation for the next redisplay cycle.  */
+  if (max_redisplay_ticks > 0)
+    update_redisplay_ticks (0, NULL);
+
   unbind_to (count, Qnil);
   RESUME_POLLING;
 }
