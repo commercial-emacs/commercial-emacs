@@ -3309,6 +3309,11 @@ help_char_p (Lisp_Object c)
 static void
 record_char (Lisp_Object c)
 {
+  /* subr.el/read-passwd binds inhibit_record_char to avoid recording
+     passwords.  */
+  if (!record_all_keys && inhibit_record_char)
+    return;
+
   int recorded = 0;
 
   if (CONSP (c) && (EQ (XCAR (c), Qhelp_echo) || EQ (XCAR (c), Qmouse_movement)))
@@ -13004,6 +13009,21 @@ resolution of a monitor changes.  The hook should accept a single
 argument, which is the terminal on which the monitor configuration
 changed.  */);
   Vdisplay_monitors_changed_functions = Qnil;
+
+  DEFVAR_BOOL ("inhibit--record-char",
+	       inhibit_record_char,
+	       doc: /* If non-nil, don't record input events.
+This inhibits recording input events for the purposes of keyboard
+macros, dribble file, and `recent-keys'.
+Internal use only.  */);
+  inhibit_record_char = false;
+
+  DEFVAR_BOOL ("record-all-keys", record_all_keys,
+	       doc: /* Non-nil means record all keys you type.
+When nil, the default, characters typed as part of passwords are
+not recorded.  The non-nil value countermands `inhibit--record-char',
+which see.  */);
+  record_all_keys = false;
 
   pdumper_do_now_and_after_load (syms_of_keyboard_for_pdumper);
 }
