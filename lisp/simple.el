@@ -10622,6 +10622,10 @@ If the buffer doesn't exist, create it first."
           (save-buffer)))
       t)))
 
+(defsubst string-empty-p (string)
+  "Check whether STRING is empty."
+  (string= string ""))
+
 
 
 (provide 'simple)
