@@ -1841,6 +1841,12 @@ values passed as a single token, such as '-oVALUE' or
 'eshell-eval-using-options' macro.  See "Defining new built-in
 commands" in the "(eshell) Built-ins" node of the Eshell manual.
 
+---
+*** Eshell globs ending with '/' now match only directories.
+Additionally, globs ending with '**/' or '***/' no longer raise an
+error, and now expand to all directories recursively (following
+symlinks in the latter case).
+
 ** Shell
 
 ---
@@ -2872,7 +2878,7 @@ invocation.  Such shells are POSIX conformant by default.
 This is to determine which function has to be called in order to
 deliver the signal.  This allows Tramp to send the signal to remote
 asynchronous processes.  The hitherto existing implementation has been
-moved to 'signal-default-interrupt-process'.
+moved to 'internal-default-signal-process'.
 
 +++
 ** 'list-system-processes' now returns remote process IDs.
