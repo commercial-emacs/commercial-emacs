@@ -48,7 +48,6 @@
 ;;; Code:
 
 (require 'ert)
-(eval-when-compile (require 'cl-lib))
 (require 'mh-utils)
 (require 'subr-x)
 
