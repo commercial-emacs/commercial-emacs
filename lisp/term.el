@@ -1445,10 +1445,7 @@ Entry to this mode runs the hooks on `term-mode-hook'."
 (defun term-char-mode ()
   "Switch to char (\"raw\") sub-mode of term mode.
 Each character you type is sent directly to the inferior without
-intervention from Emacs, except for the escape character (usually C-c).
-
-This command will send existing partial lines to the terminal
-process."
+intervention from Emacs, except for the escape character (usually C-c)."
   (interactive)
   ;; FIXME: Emit message? Cfr ilisp-raw-message
   (when (term-in-line-mode)
@@ -1467,10 +1464,10 @@ process."
       (when (> (point) pmark)
 	(unwind-protect
 	    (progn
-	      (add-function :override term-input-sender #'term-send-string)
+	      (add-function :override (local 'term-input-sender) #'term-send-string)
 	      (end-of-line)
 	      (term-send-input))
-	  (remove-function term-input-sender #'term-send-string))))
+	  (remove-function (local 'term-input-sender) #'term-send-string))))
     (term-update-mode-line)))
 
 (defun term-line-mode  ()
