@@ -2231,7 +2231,7 @@ verify_interval_modification (struct buffer *buf,
 
 		      tem = textget (i->plist, Qfront_sticky);
 		      if (TMEM (Qread_only, tem)
-			  || (NILP (Fplist_get (i->plist, Qread_only))
+			  || (NILP (plist_get (i->plist, Qread_only))
 			      && TMEM (Qcategory, tem)))
 			text_read_only (after);
 		    }
@@ -2251,7 +2251,7 @@ verify_interval_modification (struct buffer *buf,
 
 		      tem = textget (prev->plist, Qrear_nonsticky);
 		      if (! TMEM (Qread_only, tem)
-			  && (! NILP (Fplist_get (prev->plist,Qread_only))
+			  && (! NILP (plist_get (prev->plist,Qread_only))
 			      || ! TMEM (Qcategory, tem)))
 			text_read_only (before);
 		    }
@@ -2270,13 +2270,13 @@ verify_interval_modification (struct buffer *buf,
 
 		  tem = textget (i->plist, Qfront_sticky);
 		  if (TMEM (Qread_only, tem)
-		      || (NILP (Fplist_get (i->plist, Qread_only))
+		      || (NILP (plist_get (i->plist, Qread_only))
 			  && TMEM (Qcategory, tem)))
 		    text_read_only (after);
 
 		  tem = textget (prev->plist, Qrear_nonsticky);
 		  if (! TMEM (Qread_only, tem)
-		      && (! NILP (Fplist_get (prev->plist, Qread_only))
+		      && (! NILP (plist_get (prev->plist, Qread_only))
 			  || ! TMEM (Qcategory, tem)))
 		    text_read_only (after);
 		}
