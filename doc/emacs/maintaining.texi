@@ -2222,7 +2222,7 @@ where you were with @kbd{M-,}.
 
 @kindex C-M-,
 @findex xref-go-forward
-  Go forward to a place from where you previously went back using @kbd{M-,}.
+  Go forward to a place from where you previously went back using @kbd{C-M-,}.
 This is useful if you find that you went back too far.
 
 @findex xref-etags-mode
