@@ -667,13 +667,13 @@ Second\n
       "
 \(defun foo ()
   \"Summary.
-=!inside=Testing keywords: 01234567890123456789\"
+=!inside=Testing keywords: :one :two :three\"
   (body))" ; FIXME: Remove parens around body to test Bug#28937 once it's fixed
     (goto-char inside)
     (let ((emacs-lisp-docstring-fill-column 30))
       (fill-paragraph))
-    (next-line)
-    (should (eq ?3 (char-after (point))))
+    (forward-line)
+    (should (looking-at ":three"))
     (end-of-line)
     (should-not (eq (preceding-char) ?\)))))
 
