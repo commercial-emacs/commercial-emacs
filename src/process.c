@@ -2398,7 +2398,7 @@ usage:  (make-pipe-process &rest ARGS)  */)
   p->infd = inchannel;
   p->outfd = outchannel;
 
-  buffer = Fplist_get (contact, QCbuffer);
+  buffer = plist_get (contact, QCbuffer);
   if (NILP (buffer))
     buffer = name;
   buffer = Fget_buffer_create (buffer, Qnil);
@@ -3652,7 +3652,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	{
 	  Lisp_Object remote;
 	  memset (datagram_address[s].sa, 0, addrlen);
-	  if (remote = Fplist_get (contact, QCremote), !NILP (remote))
+	  if (remote = plist_get (contact, QCremote), !NILP (remote))
 	    {
 	      int rfamily;
 	      ptrdiff_t rlen = get_lisp_to_sockaddr_size (remote, &rfamily);
@@ -3667,8 +3667,8 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
     }
 #endif
 
-  contact = Fplist_put (contact, p->is_server ? QClocal : QCremote,
-			conv_sockaddr_to_lisp (sa, addrlen));
+  contact = plist_put (contact, p->is_server ? QClocal : QCremote,
+		       conv_sockaddr_to_lisp (sa, addrlen));
 
 #ifdef HAVE_GETSOCKNAME
   if (!p->is_server)
@@ -3677,8 +3677,8 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       socklen_t len1 = sizeof (sa1);
       DECLARE_POINTER_ALIAS (psa1, struct sockaddr, &sa1);
       if (getsockname (s, psa1, &len1) == 0)
-	contact = Fplist_put (contact, QClocal,
-			      conv_sockaddr_to_lisp (psa1, len1));
+	contact = plist_put (contact, QClocal,
+			     conv_sockaddr_to_lisp (psa1, len1));
     }
 #endif
 

@@ -2345,8 +2345,8 @@ This is the last value stored with `(put SYMBOL PROPNAME VALUE)'.  */)
   (Lisp_Object symbol, Lisp_Object propname)
 {
   CHECK_SYMBOL (symbol);
-  Lisp_Object propval = Fplist_get (CDR (Fassq (symbol, Voverriding_plist_environment)),
-                                    propname);
+  Lisp_Object propval = plist_get (CDR (Fassq (symbol, Voverriding_plist_environment)),
+				   propname);
   if (! NILP (propval))
     return propval;
   return plist_get (XSYMBOL (symbol)->u.s.plist, propname);
@@ -2391,47 +2391,8 @@ The PLIST is modified by side effects.  */)
   return plist;
 }
 
-DEFUN ("put", Fput, Sput, 3, 3, 0,
-       doc: /* Store SYMBOL's PROPNAME property with value VALUE.
-It can be retrieved with `(get SYMBOL PROPNAME)'.  */)
-  (Lisp_Object symbol, Lisp_Object propname, Lisp_Object value)
-{
-  CHECK_SYMBOL (symbol);
-  set_symbol_plist
-    (symbol, Fplist_put (XSYMBOL (symbol)->u.s.plist, propname, value));
-  return value;
-}
-
-DEFUN ("lax-plist-get", Flax_plist_get, Slax_plist_get, 2, 2, 0,
-       doc: /* Extract a value from a property list, comparing with `equal'.
-This function is otherwise like `plist-get', but may signal an error
-if PLIST isn't a valid plist.  */)
-  (Lisp_Object plist, Lisp_Object prop)
-{
-  Lisp_Object tail = plist;
-  FOR_EACH_TAIL (tail)
-    {
-      if (! CONSP (XCDR (tail)))
-	break;
-      if (! NILP (Fequal (prop, XCAR (tail))))
-	return XCAR (XCDR (tail));
-      tail = XCDR (tail);
-    }
-
-  CHECK_TYPE (NILP (tail), Qplistp, plist);
-
-  return Qnil;
-}
-
-DEFUN ("lax-plist-put", Flax_plist_put, Slax_plist_put, 3, 3, 0,
-       doc: /* Change value in PLIST of PROP to VAL, comparing with `equal'.
-PLIST is a property list, which is a list of the form
-\(PROP1 VALUE1 PROP2 VALUE2 ...).  PROP and VAL are any objects.
-If PROP is already a property on the list, its value is set to VAL,
-otherwise the new PROP VAL pair is added.  The new plist is returned;
-use `(setq x (lax-plist-put x prop val))' to be sure to use the new value.
-The PLIST is modified by side effects.  */)
-  (Lisp_Object plist, Lisp_Object prop, Lisp_Object val)
+Lisp_Object
+plist_put (Lisp_Object plist, Lisp_Object prop, Lisp_Object val)
 {
   Lisp_Object prev = Qnil, tail = plist;
   FOR_EACH_TAIL (tail)
@@ -2455,6 +2416,17 @@ The PLIST is modified by side effects.  */)
     return newcell;
   Fsetcdr (XCDR (prev), newcell);
   return plist;
+}
+
+DEFUN ("put", Fput, Sput, 3, 3, 0,
+       doc: /* Store SYMBOL's PROPNAME property with value VALUE.
+It can be retrieved with `(get SYMBOL PROPNAME)'.  */)
+  (Lisp_Object symbol, Lisp_Object propname, Lisp_Object value)
+{
+  CHECK_SYMBOL (symbol);
+  set_symbol_plist
+    (symbol, plist_put (XSYMBOL (symbol)->u.s.plist, propname, value));
+  return value;
 }
 
 DEFUN ("eql", Feql, Seql, 2, 2, 0,
