@@ -527,6 +527,22 @@ DEFUN ("tree-sitter-node-type",
     : build_string (ts_node_type (XTREE_SITTER_NODE (node)->node));
 }
 
+DEFUN ("tree-sitter-node-symbol",
+       Ftree_sitter_node_symbol, Stree_sitter_node_symbol,
+       1, 1, 0,
+       doc: /* Return symbol of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
+    ? Qnil
+    : make_uint (ts_node_symbol (XTREE_SITTER_NODE (node)->node));
+}
+
 DEFUN ("tree-sitter-node-start",
        Ftree_sitter_node_start, Stree_sitter_node_start,
        1, 1, 0,
@@ -773,6 +789,7 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_root_node);
   defsubr (&Stree_sitter_node_at);
   defsubr (&Stree_sitter_node_type);
+  defsubr (&Stree_sitter_node_symbol);
   defsubr (&Stree_sitter_node_start);
   defsubr (&Stree_sitter_node_end);
   defsubr (&Stree_sitter_ppss);
