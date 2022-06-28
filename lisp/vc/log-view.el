@@ -601,6 +601,7 @@ considered file(s)."
     (log-view-diff-common beg end t)))
 
 (defun log-view-diff-common (beg end &optional whole-changeset)
+  (setq-local git-log-view-diff-whole-changeset whole-changeset)
   (let* ((to (log-view-current-tag beg))
          (fr-entry (log-view-current-entry end))
          (fr (cadr fr-entry)))
