@@ -969,18 +969,77 @@ It is based on `log-edit-mode', and has Git-specific extensions.")
 		    (if only (list "--only" "--") '("-a")))))
     (if (and msg-file (file-exists-p msg-file)) (delete-file msg-file))))
 
+;;; '--follow' HANDLING
+
+(defvar vc-git--shalist-raw nil)
+(defvar vc-git--shalist nil)
+
+(defun vc-git--make-shalist (buffer files start-revision limit)
+  "Store newline-separated list of revision hashes and file names
+in vc-git--shalist-raw buffer-local variable."
+  (setq-local vc-git--shalist-raw nil)
+  (setq-local vc-git--shalist nil)
+  (with-temp-buffer
+    (set-process-filter
+     (apply #'vc-git-command nil
+            'async files
+            (append
+             '("log"
+               "--follow"
+               "--name-only"
+               "--pretty=tformat:%H"
+               "--no-color")
+             ;; Tail revision must now its parent
+             (when limit (list "-n" (format "%s" (1+ limit))))
+             (when start-revision (list start-revision))
+             '("--")))
+     (lambda (_p s)
+       (with-current-buffer buffer
+         (setq-local
+          vc-git--shalist-raw
+          (replace-regexp-in-string
+           "\n\n" "\n"
+           (concat vc-git--shalist-raw s))))))))
+
+(defun vc-git--shalist ()
+  "Return alternating list of SHA1 hashes and file names.
+The list contains commit hashes and historical names for a file
+in the current change log buffer."
+  (let ((vc-change-log (get-buffer "*vc-change-log*")))
+    (when vc-change-log
+      (with-current-buffer vc-change-log
+        (cond
+         (vc-git--shalist vc-git--shalist)
+         (vc-git--shalist-raw
+          (setq-local vc-git--shalist
+                      (split-string vc-git--shalist-raw "\n"))))))))
+
+(defun vc-git--rev-to-filename (rev)
+  "Return a historical file name for the file in REV."
+  (when rev
+    (setq rev (vc-git--rev-parse rev))
+    (cadr (member rev (vc-git--shalist)))))
+
+(defun vc-git--rev-to-previous-rev (rev)
+  "Return the revision before REV according to historical file
+name data."
+  (when rev
+    (setq rev (vc-git--rev-parse rev))
+    (car (cddr (member rev (vc-git--shalist))))))
+
 (defun vc-git-find-revision (file rev buffer)
   (let* (process-file-side-effects
 	 (coding-system-for-read 'binary)
 	 (coding-system-for-write 'binary)
 	 (fullname
-	  (let ((fn (vc-git--run-command-string
-		     file "ls-files" "-z" "--full-name" "--")))
-	    ;; ls-files does not return anything when looking for a
-	    ;; revision of a file that has been renamed or removed.
-	    (if (string= fn "")
-		(file-relative-name file (vc-git-root default-directory))
-	      (substring fn 0 -1)))))
+          (or (vc-git--rev-to-filename rev)
+	      (let ((fn (vc-git--run-command-string
+		         file "ls-files" "-z" "--full-name" "--")))
+	        ;; ls-files does not return anything when looking for a
+	        ;; revision of a file that has been renamed or removed.
+	        (if (string= fn "")
+	            (file-relative-name file (vc-git-root default-directory))
+	          (substring fn 0 -1))))))
     (vc-git-command
      buffer 0
      nil
@@ -1182,6 +1241,7 @@ If LIMIT is a revision string, use it as an end-revision."
                   ;; "--follow" on directories or multiple files is broken
                   ;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=8756
                   ;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=16422
+                  (vc-git--make-shalist buffer files start-revision limit)
                   (list "--follow"))
 		(when shortlog
 		  `("--graph" "--decorate" "--date=short"
@@ -1423,6 +1483,13 @@ This requires git 1.8.4 or later, for the \"-L\" option of \"git log\"."
         (unless rev1 (setq rev1 "4b825dc642cb6eb9a060e54bf8d69288fbee4904"))
       (setq command "diff-index")
       (unless rev1 (setq rev1 "HEAD")))
+    (let ((file1 (vc-git--rev-to-filename rev1))
+          (file2 (vc-git--rev-to-filename rev2)))
+      (when (and file1 file2)
+        ;; Run diff from the repository root because our file names are
+        ;; relative to it
+        (setq default-directory (vc-git-root default-directory)
+              files (list file1 file2))))
     (if vc-git-diff-switches
         (apply #'vc-git-command (or buffer "*vc-diff*")
 	       1 ; bug#21969
@@ -1459,7 +1526,9 @@ This requires git 1.8.4 or later, for the \"-L\" option of \"git log\"."
 
 (defun vc-git-annotate-command (file buf &optional rev)
   (vc-git--asciify-coding-system)
-  (let ((name (file-relative-name file)))
+  (let ((name (vc-git--rev-to-filename rev)))
+    (if name (setq default-directory (vc-git-root default-directory))
+      (setq name (file-relative-name file)))
     (apply #'vc-git-command buf 'async nil "blame" "--date=short"
 	   (append (vc-switches 'git 'annotate)
 		   (list rev "--" name)))))
@@ -1505,6 +1574,10 @@ This requires git 1.8.4 or later, for the \"-L\" option of \"git log\"."
 
 ;;; MISCELLANEOUS
 
+;; HACK: let log-view.el inform vc-git.el whether we are doing a
+;; "whole changeset" diff or not.
+(defvar git-log-view-diff-whole-changeset nil)
+
 (defun vc-git-previous-revision (file rev)
   "Git-specific version of `vc-previous-revision'."
   (if file
@@ -1520,11 +1593,13 @@ This requires git 1.8.4 or later, for the \"-L\" option of \"git log\"."
                            (point)
                            (1- (point-max)))))))
         (or (vc-git-symbolic-commit prev-rev) prev-rev))
-    ;; We used to use "^" here, but that fails on MS-Windows if git is
-    ;; invoked via a batch file, in which case cmd.exe strips the "^"
-    ;; because it is a special character for cmd which process-file
-    ;; does not (and cannot) quote.
-    (vc-git--rev-parse (concat rev "~1"))))
+    ;; Use historical data for the file if possible.
+    (or (and (not git-log-view-diff-whole-changeset) (vc-git--rev-to-previous-rev rev))
+        ;; We used to use "^" here, but that fails on MS-Windows if git is
+        ;; invoked via a batch file, in which case cmd.exe strips the "^"
+        ;; because it is a special character for cmd which process-file
+        ;; does not (and cannot) quote.
+        (vc-git--rev-parse (concat rev "~1")))))
 
 (defun vc-git--rev-parse (rev)
   (with-temp-buffer
