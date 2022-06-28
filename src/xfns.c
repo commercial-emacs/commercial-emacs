@@ -6895,10 +6895,9 @@ that mouse buttons are being held down, such as immediately after a
   original = targets;
   targets_arg = targets;
 
-  for (; CONSP (targets); targets = XCDR (targets))
+  FOR_EACH_TAIL (targets)
     {
       CHECK_STRING (XCAR (targets));
-      maybe_quit ();
 
       if (ntargets < 2048)
 	{
@@ -6928,9 +6927,8 @@ that mouse buttons are being held down, such as immediately after a
       original = action;
 
       CHECK_LIST (action);
-      for (; CONSP (action); action = XCDR (action))
+      FOR_EACH_TAIL (action)
 	{
-	  maybe_quit ();
 	  tem = XCAR (action);
 	  CHECK_CONS (tem);
 	  t1 = XCAR (tem);
