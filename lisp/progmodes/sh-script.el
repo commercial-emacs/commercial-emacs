@@ -1984,9 +1984,9 @@ May return nil if the line should not be treated as continued."
                              (sh-var-value 'sh-indent-for-case-label)))
     (`(:before . ,(or "(" "{" "[" "while" "if" "for" "case"))
      (cond
-      ((and (equal token "{") (smie-rule-parent-p "for"))
+      ((and (equal token "{") (smie-rule-parent-p "for" "case"))
        (let ((data (smie-backward-sexp "in")))
-         (when (equal (nth 2 data) "for")
+         (when (member (nth 2 data) '("for" "case"))
            `(column . ,(smie-indent-virtual)))))
       ((not (smie-rule-prev-p "&&" "||" "|"))
        (when (smie-rule-hanging-p)
@@ -2034,10 +2034,13 @@ May return nil if the line should not be treated as continued."
     ('(:after . "in") (sh-var-value 'sh-indent-for-case-label))
     ;; sh-indent-for-continuation: Line continuations are handled differently.
     (`(:after . ,(or "(" "{" "["))
-     (if (not (looking-at ".[ \t]*[^\n \t#]"))
-         (sh-var-value 'sh-indent-after-open)
-       (goto-char (1- (match-end 0)))
-       `(column . ,(current-column))))
+     (cond
+      ((smie-rule-parent-p "case")
+       (sh-var-value 'sh-indent-for-case-label))
+      ((not (looking-at ".[ \t]*[^\n \t#]"))
+       (sh-var-value 'sh-indent-after-open))
+      (t (goto-char (1- (match-end 0)))
+         `(column . ,(current-column)))))
     ;; sh-indent-after-function: we don't handle it differently.
     ))
 
