@@ -1901,6 +1901,15 @@ Enabling this minor mode turns on hiding header material, like
 If non-nil, files untracked by a VCS are considered to be part of
 the project by a VC project based on that VCS.
 
+** Hierarchy
+
++++
+*** Tree Display can delay computation of children
+'hierarchy-add-tree' and 'hierarchy-add-trees' have an optional
+argument, 'delay-children-p', which allows storing 'childrenfn' to the
+nodes of a tree-widget display to be activated and computed only when
+the users expands the node.
+
 ---
 *** 'recentf-mode' now uses shortened filenames by default.
 This means that e.g. "/home/foo/bar" is now displayed as "~/bar".
