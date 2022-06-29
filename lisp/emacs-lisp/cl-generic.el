@@ -651,6 +651,21 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
 (defvar cl--generic-dispatchers (make-hash-table :test #'equal))
 
 (defvar cl--generic-compiler
+  ;; Don't byte-compile the dispatchers if cl-generic itself is not
+  ;; compiled.  Otherwise the byte-compiler and all the code on
+  ;; which it depends needs to be usable before cl-generic is loaded,
+  ;; which imposes a significant burden on the bootstrap.
+  (if (consp (lambda (x) (+ x 1)))
+      (lambda (exp) (eval exp t))
+    ;; But do byte-compile the dispatchers once bootstrap is passed:
+    ;; the performance difference is substantial (like a 5x speedup on
+    ;; the `eieio' elisp-benchmark)).
+    ;; To avoid loading the byte-compiler during the final preload,
+    ;; see `cl--generic-prefill-dispatchers'.
+    ;; (Classic SM weak-sauce enforcement through longwinded comments).
+    #'byte-compile))
+
+(defvar cl--generic-compiler
   (if (or (consp (lambda (x) (+ x 1)))
           (not (featurep 'bytecomp)))
       (lambda (exp) (eval exp t))
@@ -665,6 +680,19 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
       ;; We need `copy-sequence` here because this `dispatch' object might be
       ;; modified by side-effect in `cl-generic-define-method' (bug#46722).
       (gethash (copy-sequence dispatch) cl--generic-dispatchers)
+    (when (and loadup-pure-table
+               (eq cl--generic-compiler #'byte-compile))
+      (error
+       "Missing cl-generic dispatcher in the prefilled cache!
+Missing for: %S
+You might need to add: %S"
+       (mapcar (lambda (x) (if (cl--generic-generalizer-p x)
+                               (cl--generic-generalizer-name x)
+                             x))
+               dispatch)
+       `(cl--generic-prefill-dispatchers
+         ,@(delq nil (mapcar #'cl--generic-prefill-generalizer-sample
+                             dispatch)))))
     (let* ((dispatch-arg (car dispatch))
            (generalizers (cdr dispatch))
            (tagcodes

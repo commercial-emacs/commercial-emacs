@@ -538,7 +538,25 @@ DEFUN ("tree-sitter-node-child",
   CHECK_TREE_SITTER_NODE (node);
   CHECK_FIXNAT (n);
 
-  TSNode child = ts_node_child (XTREE_SITTER_NODE (node)->node, (uint32_t) XFIXNAT (n));
+  TSNode child = ts_node_child (XTREE_SITTER_NODE (node)->node,
+				(uint32_t) XFIXNAT (n));
+  return (ts_node_is_null (child) ? Qnil : make_node (child));
+}
+
+DEFUN ("tree-sitter-node-named-child",
+       Ftree_sitter_node_named_child, Stree_sitter_node_named_child,
+       2, 2, 0,
+       doc: /* Return Nth named child of NODE. */)
+  (Lisp_Object node, Lisp_Object n)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+  CHECK_FIXNAT (n);
+
+  TSNode child = ts_node_named_child (XTREE_SITTER_NODE (node)->node,
+				      (uint32_t) XFIXNAT (n));
   return (ts_node_is_null (child) ? Qnil : make_node (child));
 }
 
@@ -575,6 +593,30 @@ DEFUN ("tree-sitter-node-type",
     : build_string (ts_node_type (XTREE_SITTER_NODE (node)->node));
 }
 
+DEFUN ("tree-sitter-node-field-name-for-child",
+       Ftree_sitter_node_field_name_for_child,
+       Stree_sitter_node_field_name_for_child,
+       2, 2, 0,
+       doc: /* Return field name for Nth child of NODE. */)
+  (Lisp_Object node, Lisp_Object n)
+{
+  Lisp_Object name = Qnil;
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+  CHECK_FIXNAT (n);
+
+  if (! ts_node_is_null (XTREE_SITTER_NODE (node)->node))
+    {
+      const char *ret = ts_node_field_name_for_child
+	(XTREE_SITTER_NODE (node)->node, (uint32_t) XFIXNAT (n));
+      if (ret)
+	name = build_string (ret);
+    }
+  return name;
+}
+
 DEFUN ("tree-sitter-node-symbol",
        Ftree_sitter_node_symbol, Stree_sitter_node_symbol,
        1, 1, 0,
@@ -589,6 +631,38 @@ DEFUN ("tree-sitter-node-symbol",
   return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
     ? Qnil
     : make_uint (ts_node_symbol (XTREE_SITTER_NODE (node)->node));
+}
+
+DEFUN ("tree-sitter-node-child-count",
+       Ftree_sitter_node_child_count, Stree_sitter_node_child_count,
+       1, 1, 0,
+       doc: /* Return number of children of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
+    ? Qnil
+    : make_uint (ts_node_child_count (XTREE_SITTER_NODE (node)->node));
+}
+
+DEFUN ("tree-sitter-node-named-child-count",
+       Ftree_sitter_node_named_child_count, Stree_sitter_node_named_child_count,
+       1, 1, 0,
+       doc: /* Return number of named children of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
+    ? Qnil
+    : make_uint (ts_node_named_child_count (XTREE_SITTER_NODE (node)->node));
 }
 
 DEFUN ("tree-sitter-node-string",
@@ -623,10 +697,10 @@ DEFUN ("tree-sitter-node-start",
 
   CHECK_TREE_SITTER_NODE (node);
 
-  return (ts_node_is_null (XTREE_SITTER_NODE (node)->node)
-	  ? Qnil
-	  : make_fixnum (SITTER_TO_BUFFER
-			 (ts_node_start_byte (XTREE_SITTER_NODE (node)->node))));
+  return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
+    ? Qnil
+    : make_fixnum (SITTER_TO_BUFFER
+		   (ts_node_start_byte (XTREE_SITTER_NODE (node)->node)));
 }
 
 DEFUN ("tree-sitter-node-end",
@@ -640,10 +714,10 @@ DEFUN ("tree-sitter-node-end",
 
   CHECK_TREE_SITTER_NODE (node);
 
-  return (ts_node_is_null (XTREE_SITTER_NODE (node)->node)
-	  ? Qnil
-	  : make_fixnum (SITTER_TO_BUFFER
-			 (ts_node_end_byte (XTREE_SITTER_NODE (node)->node))));
+  return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
+    ? Qnil
+    : make_fixnum (SITTER_TO_BUFFER
+		   (ts_node_end_byte (XTREE_SITTER_NODE (node)->node)));
 }
 
 DEFUN ("tree-sitter-highlights",
@@ -862,6 +936,10 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_string);
   defsubr (&Stree_sitter_node_parent);
   defsubr (&Stree_sitter_node_child);
+  defsubr (&Stree_sitter_node_field_name_for_child);
+  defsubr (&Stree_sitter_node_child_count);
+  defsubr (&Stree_sitter_node_named_child_count);
+  defsubr (&Stree_sitter_node_named_child);
   defsubr (&Stree_sitter_node_equal);
   defsubr (&Stree_sitter_node_start);
   defsubr (&Stree_sitter_node_end);
