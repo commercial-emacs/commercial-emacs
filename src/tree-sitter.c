@@ -511,6 +511,54 @@ DEFUN ("tree-sitter-node-at",
   return make_node (node);
 }
 
+DEFUN ("tree-sitter-node-parent",
+       Ftree_sitter_node_parent, Stree_sitter_node_parent,
+       1, 1, 0,
+       doc: /* Return parent of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  TSNode parent = ts_node_parent (XTREE_SITTER_NODE (node)->node);
+  return (ts_node_is_null (parent) ? Qnil : make_node (parent));
+}
+
+DEFUN ("tree-sitter-node-child",
+       Ftree_sitter_node_child, Stree_sitter_node_child,
+       2, 2, 0,
+       doc: /* Return Nth child of NODE. */)
+  (Lisp_Object node, Lisp_Object n)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+  CHECK_FIXNAT (n);
+
+  TSNode child = ts_node_child (XTREE_SITTER_NODE (node)->node, (uint32_t) XFIXNAT (n));
+  return (ts_node_is_null (child) ? Qnil : make_node (child));
+}
+
+DEFUN ("tree-sitter-node-equal",
+       Ftree_sitter_node_equal, Stree_sitter_node_equal,
+       2, 2, 0,
+       doc: /* Test for node equality. */)
+  (Lisp_Object node0, Lisp_Object node1)
+{
+  if (NILP (node0) || NILP (node1))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node0);
+  CHECK_TREE_SITTER_NODE (node1);
+
+  return (ts_node_eq (XTREE_SITTER_NODE (node0)->node,
+		      XTREE_SITTER_NODE (node1)->node)
+	  ? Qt : Qnil);
+}
+
 DEFUN ("tree-sitter-node-type",
        Ftree_sitter_node_type, Stree_sitter_node_type,
        1, 1, 0,
@@ -543,6 +591,27 @@ DEFUN ("tree-sitter-node-symbol",
     : make_uint (ts_node_symbol (XTREE_SITTER_NODE (node)->node));
 }
 
+DEFUN ("tree-sitter-node-string",
+       Ftree_sitter_node_string, Stree_sitter_node_string,
+       1, 1, 0,
+       doc: /* Return string representation of NODE. */)
+  (Lisp_Object node)
+{
+  Lisp_Object sexp = Qnil;
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  if (! ts_node_is_null (XTREE_SITTER_NODE (node)->node))
+    {
+      char *ret = ts_node_string (XTREE_SITTER_NODE (node)->node);
+      sexp = build_string (ret);
+      free (ret);
+    }
+  return sexp;
+}
+
 DEFUN ("tree-sitter-node-start",
        Ftree_sitter_node_start, Stree_sitter_node_start,
        1, 1, 0,
@@ -554,10 +623,10 @@ DEFUN ("tree-sitter-node-start",
 
   CHECK_TREE_SITTER_NODE (node);
 
-  return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
-    ? Qnil
-    : make_fixnum
-    (SITTER_TO_BUFFER (ts_node_start_byte (XTREE_SITTER_NODE (node)->node)));
+  return (ts_node_is_null (XTREE_SITTER_NODE (node)->node)
+	  ? Qnil
+	  : make_fixnum (SITTER_TO_BUFFER
+			 (ts_node_start_byte (XTREE_SITTER_NODE (node)->node))));
 }
 
 DEFUN ("tree-sitter-node-end",
@@ -571,10 +640,10 @@ DEFUN ("tree-sitter-node-end",
 
   CHECK_TREE_SITTER_NODE (node);
 
-  return ts_node_is_null (XTREE_SITTER_NODE (node)->node)
-    ? Qnil
-    : make_fixnum
-    (SITTER_TO_BUFFER (ts_node_end_byte (XTREE_SITTER_NODE (node)->node)));
+  return (ts_node_is_null (XTREE_SITTER_NODE (node)->node)
+	  ? Qnil
+	  : make_fixnum (SITTER_TO_BUFFER
+			 (ts_node_end_byte (XTREE_SITTER_NODE (node)->node))));
 }
 
 DEFUN ("tree-sitter-highlights",
@@ -790,6 +859,10 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_at);
   defsubr (&Stree_sitter_node_type);
   defsubr (&Stree_sitter_node_symbol);
+  defsubr (&Stree_sitter_node_string);
+  defsubr (&Stree_sitter_node_parent);
+  defsubr (&Stree_sitter_node_child);
+  defsubr (&Stree_sitter_node_equal);
   defsubr (&Stree_sitter_node_start);
   defsubr (&Stree_sitter_node_end);
   defsubr (&Stree_sitter_ppss);
