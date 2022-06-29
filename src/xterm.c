@@ -22968,8 +22968,9 @@ x_clean_failable_requests (struct x_display_info *dpyinfo)
 	break;
     }
 
-  memmove (&dpyinfo->failable_requests, first,
-	   sizeof *first * (last - first));
+  if (first != last)
+    memmove (&dpyinfo->failable_requests, first,
+	     sizeof *first * (last - first));
 
   dpyinfo->next_failable_request = (dpyinfo->failable_requests
 				    + (last - first));
@@ -22983,7 +22984,7 @@ x_ignore_errors_for_next_request (struct x_display_info *dpyinfo)
   request = dpyinfo->next_failable_request;
   max = dpyinfo->failable_requests + N_FAILABLE_REQUESTS;
 
-  if (request > max)
+  if (request >= max)
     {
       /* There is no point in making this extra sync if all requests
 	 are known to have been fully processed.  */
@@ -23077,6 +23078,7 @@ x_uncatch_errors (void)
 void
 x_check_errors (Display *dpy, const char *format)
 {
+  struct x_display_info *dpyinfo;
   char *string;
 
   /* This shouldn't happen, since x_check_errors should be called
@@ -23091,6 +23093,12 @@ x_check_errors (Display *dpy, const char *format)
       && (NextRequest (dpy)
 	  > x_error_message->first_request))
     XSync (dpy, False);
+
+  dpyinfo = x_display_info_for_display (dpy);
+
+  /* Clean the array of failable requests, since a sync happened.  */
+  if (dpyinfo)
+    x_clean_failable_requests (dpyinfo);
 
   if (x_error_message->string)
     {
@@ -23107,6 +23115,8 @@ x_check_errors (Display *dpy, const char *format)
 bool
 x_had_errors_p (Display *dpy)
 {
+  struct x_display_info *dpyinfo;
+
   /* This shouldn't happen, since x_check_errors should be called
      immediately inside an x_catch_errors block.  */
   if (dpy != x_error_message->dpy)
@@ -23118,6 +23128,12 @@ x_had_errors_p (Display *dpy)
       && (NextRequest (dpy)
 	  > x_error_message->first_request))
     XSync (dpy, False);
+
+  dpyinfo = x_display_info_for_display (dpy);
+
+  /* Clean the array of failable requests, since a sync happened.  */
+  if (dpyinfo)
+    x_clean_failable_requests (dpyinfo);
 
   return !!x_error_message->string;
 }
