@@ -52,6 +52,9 @@ All commands in `lisp-mode-shared-map' are inherited by this map."
   :parent lisp-mode-shared-map
   "M-TAB" #'completion-at-point
   "C-M-x" #'eval-defun
+  "C-c C-e" #'elisp-eval-buffer
+  "C-c C-f" #'elisp-byte-compile-file
+  "C-c C-b" #'elisp-byte-compile-buffer
   "C-M-q" #'indent-pp-sexp)
 
 (easy-menu-define emacs-lisp-mode-menu emacs-lisp-mode-map
