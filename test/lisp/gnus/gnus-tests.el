@@ -126,6 +126,8 @@ the innocent user trying `M-x gnus` would be rebuffed with hostility."
       (should-error (search-forward "foobar"))
       (search-forward "nnfolder")
       (goto-char (point-max))
+      (should (gnus-server-server-name))
+      (goto-char (point-min))
       (should (gnus-server-server-name)))
     (call-interactively #'gnus-group-exit)))
 
