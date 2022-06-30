@@ -492,6 +492,18 @@ DEFUN ("tree-sitter-ppss",
   return retval;
 }
 
+DEFUN ("tree-sitter-cursor-at",
+       Ftree_sitter_cursor_at, Stree_sitter_cursor_at,
+       0, 1, 0,
+       doc: /* Return TSTreeCursor at POS. */)
+  (Lisp_Object pos)
+{
+  Lisp_Object node = Ftree_sitter_node_at (pos);
+  return NILP (node)
+    ? Qnil
+    : make_cursor (ts_tree_cursor_new (XTREE_SITTER_NODE (node)->node));
+}
+
 DEFUN ("tree-sitter-node-at",
        Ftree_sitter_node_at, Stree_sitter_node_at,
        0, 1, 0,
@@ -1169,6 +1181,7 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_parent);
   defsubr (&Stree_sitter_node_child);
   defsubr (&Stree_sitter_node_field_name_for_child);
+  defsubr (&Stree_sitter_cursor_at);
   defsubr (&Stree_sitter_node_child_count);
   defsubr (&Stree_sitter_node_named_child_count);
   defsubr (&Stree_sitter_node_child_by_field_name);
