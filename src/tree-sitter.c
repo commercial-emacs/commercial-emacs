@@ -523,7 +523,9 @@ DEFUN ("tree-sitter-node-parent",
   CHECK_TREE_SITTER_NODE (node);
 
   TSNode parent = ts_node_parent (XTREE_SITTER_NODE (node)->node);
-  return (ts_node_is_null (parent) ? Qnil : make_node (parent));
+  return ts_node_is_null (parent)
+    ? Qnil
+    : make_node (parent);
 }
 
 DEFUN ("tree-sitter-node-child",
@@ -540,7 +542,9 @@ DEFUN ("tree-sitter-node-child",
 
   TSNode child = ts_node_child (XTREE_SITTER_NODE (node)->node,
 				(uint32_t) XFIXNAT (n));
-  return (ts_node_is_null (child) ? Qnil : make_node (child));
+  return ts_node_is_null (child)
+    ? Qnil
+    : make_node (child);
 }
 
 DEFUN ("tree-sitter-node-named-child",
@@ -557,7 +561,220 @@ DEFUN ("tree-sitter-node-named-child",
 
   TSNode child = ts_node_named_child (XTREE_SITTER_NODE (node)->node,
 				      (uint32_t) XFIXNAT (n));
-  return (ts_node_is_null (child) ? Qnil : make_node (child));
+  return ts_node_is_null (child)
+    ? Qnil
+    : make_node (child);
+}
+
+DEFUN ("tree-sitter-node-child-by-field-name",
+       Ftree_sitter_node_child_by_field_name,
+       Stree_sitter_node_child_by_field_name,
+       2, 2, 0,
+       doc: /* Return child of NODE by FIELD_NAME. */)
+  (Lisp_Object node, Lisp_Object field_name)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+  CHECK_STRING (field_name);
+
+  TSNode child = ts_node_child_by_field_name
+    (XTREE_SITTER_NODE (node)->node,
+     SSDATA (field_name),
+     strlen (SSDATA (field_name)));
+
+  return ts_node_is_null (child)
+    ? Qnil
+    : make_node (child);
+}
+
+DEFUN ("tree-sitter-node-child-by-field-id",
+       Ftree_sitter_node_child_by_field_id,
+       Stree_sitter_node_child_by_field_id,
+       2, 2, 0,
+       doc: /* Return child of NODE by FIELD_ID. */)
+  (Lisp_Object node, Lisp_Object field_id)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+  CHECK_FIXNAT (field_id);
+
+  TSNode child = ts_node_child_by_field_id
+    (XTREE_SITTER_NODE (node)->node,
+     XFIXNAT (field_id));
+
+  return ts_node_is_null (child)
+    ? Qnil
+    : make_node (child);
+}
+
+DEFUN ("tree-sitter-node-next-sibling",
+       Ftree_sitter_node_next_sibling,
+       Stree_sitter_node_next_sibling,
+       1, 1, 0,
+       doc: /* Return next sibling of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  TSNode sibling = ts_node_next_sibling (XTREE_SITTER_NODE (node)->node);
+
+  return ts_node_is_null (sibling)
+    ? Qnil
+    : make_node (sibling);
+}
+
+DEFUN ("tree-sitter-node-prev-sibling",
+       Ftree_sitter_node_prev_sibling,
+       Stree_sitter_node_prev_sibling,
+       1, 1, 0,
+       doc: /* Return previous sibling of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  TSNode sibling = ts_node_prev_sibling (XTREE_SITTER_NODE (node)->node);
+
+  return ts_node_is_null (sibling)
+    ? Qnil
+    : make_node (sibling);
+}
+
+DEFUN ("tree-sitter-node-next-named-sibling",
+       Ftree_sitter_node_next_named_sibling,
+       Stree_sitter_node_next_named_sibling,
+       1, 1, 0,
+       doc: /* Return next named sibling of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  TSNode sibling = ts_node_next_named_sibling (XTREE_SITTER_NODE (node)->node);
+
+  return ts_node_is_null (sibling)
+    ? Qnil
+    : make_node (sibling);
+}
+
+DEFUN ("tree-sitter-node-prev-named-sibling",
+       Ftree_sitter_node_prev_named_sibling,
+       Stree_sitter_node_prev_named_sibling,
+       1, 1, 0,
+       doc: /* Return previous named sibling of NODE. */)
+  (Lisp_Object node)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+
+  TSNode sibling = ts_node_prev_named_sibling (XTREE_SITTER_NODE (node)->node);
+
+  return ts_node_is_null (sibling)
+    ? Qnil
+    : make_node (sibling);
+}
+
+DEFUN ("tree-sitter-node-first-child-for-byte",
+       Ftree_sitter_node_first_child_for_byte,
+       Stree_sitter_node_first_child_for_byte,
+       2, 2, 0,
+       doc: /* Return first child of NODE extending beyond BEG.  */)
+  (Lisp_Object node, Lisp_Object beg)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+  CHECK_FIXNAT (beg);
+
+  TSNode child = ts_node_first_child_for_byte (XTREE_SITTER_NODE (node)->node,
+					       BUFFER_TO_SITTER (XFIXNAT (beg)));
+
+  return ts_node_is_null (child)
+    ? Qnil
+    : make_node (child);
+}
+
+DEFUN ("tree-sitter-node-first-named-child-for-byte",
+       Ftree_sitter_node_first_named_child_for_byte,
+       Stree_sitter_node_first_named_child_for_byte,
+       2, 2, 0,
+       doc: /* Return first named child of NODE extending beyond BEG.  */)
+  (Lisp_Object node, Lisp_Object beg)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+  CHECK_FIXNAT (beg);
+
+  TSNode child = ts_node_first_named_child_for_byte
+    (XTREE_SITTER_NODE (node)->node, BUFFER_TO_SITTER (XFIXNAT (beg)));
+
+  return ts_node_is_null (child)
+    ? Qnil
+    : make_node (child);
+}
+
+DEFUN ("tree-sitter-node-descendant-for-byte-range",
+       Ftree_sitter_node_descendant_for_byte_range,
+       Stree_sitter_node_descendant_for_byte_range,
+       3, 3, 0,
+       doc: /* Return deepest node under NODE spanning BEG to END. */)
+  (Lisp_Object node, Lisp_Object beg, Lisp_Object end)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+  CHECK_FIXNAT (beg);
+  CHECK_FIXNAT (end);
+
+  TSNode child = ts_node_descendant_for_byte_range
+    (XTREE_SITTER_NODE (node)->node,
+     BUFFER_TO_SITTER (XFIXNAT (beg)),
+     BUFFER_TO_SITTER (XFIXNAT (end)));
+
+  return ts_node_is_null (child)
+    ? Qnil
+    : make_node (child);
+}
+
+DEFUN ("tree-sitter-node-named-descendant-for-byte-range",
+       Ftree_sitter_node_named_descendant_for_byte_range,
+       Stree_sitter_node_named_descendant_for_byte_range,
+       3, 3, 0,
+       doc: /* Return deepest named node under NODE spanning BEG to END. */)
+  (Lisp_Object node, Lisp_Object beg, Lisp_Object end)
+{
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+  CHECK_FIXNAT (beg);
+  CHECK_FIXNAT (end);
+
+  TSNode child = ts_node_named_descendant_for_byte_range
+    (XTREE_SITTER_NODE (node)->node,
+     BUFFER_TO_SITTER (XFIXNAT (beg)),
+     BUFFER_TO_SITTER (XFIXNAT (end)));
+
+  return ts_node_is_null (child)
+    ? Qnil
+    : make_node (child);
 }
 
 DEFUN ("tree-sitter-node-equal",
@@ -616,6 +833,8 @@ DEFUN ("tree-sitter-node-field-name-for-child",
     }
   return name;
 }
+
+
 
 DEFUN ("tree-sitter-node-symbol",
        Ftree_sitter_node_symbol, Stree_sitter_node_symbol,
@@ -939,7 +1158,17 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_field_name_for_child);
   defsubr (&Stree_sitter_node_child_count);
   defsubr (&Stree_sitter_node_named_child_count);
+  defsubr (&Stree_sitter_node_child_by_field_name);
+  defsubr (&Stree_sitter_node_child_by_field_id);
   defsubr (&Stree_sitter_node_named_child);
+  defsubr (&Stree_sitter_node_next_sibling);
+  defsubr (&Stree_sitter_node_prev_sibling);
+  defsubr (&Stree_sitter_node_next_named_sibling);
+  defsubr (&Stree_sitter_node_prev_named_sibling);
+  defsubr (&Stree_sitter_node_first_child_for_byte);
+  defsubr (&Stree_sitter_node_first_named_child_for_byte);
+  defsubr (&Stree_sitter_node_descendant_for_byte_range);
+  defsubr (&Stree_sitter_node_named_descendant_for_byte_range);
   defsubr (&Stree_sitter_node_equal);
   defsubr (&Stree_sitter_node_start);
   defsubr (&Stree_sitter_node_end);
