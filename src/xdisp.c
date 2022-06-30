@@ -28899,8 +28899,8 @@ gui_produce_glyphs (struct it *it)
                 {
                   x -= it->lnum_pixel_width;
                   /* Restore the original TAB width, if required.  */
-                  if (x + it->tab_offset >= it->first_visible_x)
-                    x += it->tab_offset;
+                  if (x + it->stretch_adjust >= it->first_visible_x)
+                    x += it->stretch_adjust;
                 }
 
               int next_tab_x = ((1 + x + tab_width - 1) / tab_width) * tab_width;
@@ -28918,10 +28918,10 @@ gui_produce_glyphs (struct it *it)
                   if (x < it->first_visible_x)
                     {
                       next_tab_x -= it->first_visible_x - x;
-                      it->tab_offset = it->first_visible_x - x;
+                      it->stretch_adjust = it->first_visible_x - x;
                     }
                   else
-                    next_tab_x -= it->tab_offset;
+                    next_tab_x -= it->stretch_adjust;
                 }
 
               it->pixel_width = next_tab_x - x0;
