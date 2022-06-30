@@ -31,6 +31,7 @@
 (require 'message)
 (require 'gnus)
 (require 'gnus-start)
+(require 'gnus-group)
 (require 'nsm)
 
 (defconst gnus-tests-load-file-name (or load-file-name
@@ -47,7 +48,7 @@
 (cl-defmacro gnus-tests-doit (&rest
                               body
                               &key
-                              (select-methods '(default-value 'gnus-select-methods))
+                              (select-methods)
                               (customs)
                               &allow-other-keys
                               &aux
@@ -68,7 +69,7 @@
         (gnus-use-dribble-file nil)
         (network-security-level (quote low))
         (gnus-interactive-exit (quote quiet))
-        (gnus-select-methods ,select-methods)
+        ,@(when select-methods (list `(gnus-select-methods ,select-methods)))
         (message-directory (concat default-directory "Mail"))
         (mail-source-directory message-directory)
         (mail-source-crash-box (concat default-directory ".whatev"))
