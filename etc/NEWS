@@ -355,6 +355,11 @@ match those regexps will be ignored by 'switch-to-prev-buffer' and
 This command renames the file visited by the current buffer by moving
 it to a new location, and also makes the buffer visit this new file.
 
++++
+** New command 'delete-visited-file'.
+This command deletes the file visited by a buffer, then closes the
+buffer.
+
 ** Menus
 
 ---

@@ -6295,6 +6295,17 @@ RECURSIVE if DIRECTORY is nonempty."
 		  directory-exists))
 	(files--force recursive #'delete-directory-internal directory))))))
 
+(defun delete-visited-file (buffer-name)
+  "Delete the file visited by buffer BUFFER-NAME, then close the buffer."
+  (interactive "bDelete file visited by buffer ")
+  (let* ((buffer (get-buffer buffer-name))
+         (filename (buffer-file-name buffer)))
+    (when buffer
+      (when (and filename
+                 (file-exists-p filename))
+        (delete-file filename))
+      (kill-buffer buffer))))
+
 (defun file-equal-p (file1 file2)
   "Return non-nil if files FILE1 and FILE2 name the same file.
 If FILE1 or FILE2 does not exist, the return value is unspecified."
