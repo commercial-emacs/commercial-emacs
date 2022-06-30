@@ -117,6 +117,7 @@ union emacs_align_type
 #ifdef HAVE_TREE_SITTER
   struct Lisp_Tree_Sitter tree_sitter;
   struct Lisp_Tree_Sitter_Node tree_sitter_node;
+  struct Lisp_Tree_Sitter_Cursor tree_sitter_cursor;
 #endif
 
   /* Omit the following since they would require including process.h

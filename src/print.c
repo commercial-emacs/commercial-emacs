@@ -1983,6 +1983,15 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	printchar ('>', printcharfun);
       }
       break;
+    case PVEC_TREE_SITTER_CURSOR:
+      {
+	int len;
+	print_c_string ("#<tree-sitter-cursor for ", printcharfun);
+	len = sprintf (buf, "%p", XTREE_SITTER_CURSOR (obj));
+	strout (buf, len, len, printcharfun);
+	printchar ('>', printcharfun);
+      }
+      break;
 #endif
 #ifdef HAVE_SQLITE3
     case PVEC_SQLITE:

@@ -265,6 +265,8 @@ for example, (type-of 1) returns `integer'.  */)
 	  return Qtree_sitter;
 	case PVEC_TREE_SITTER_NODE:
 	  return Qtree_sitter_node;
+	case PVEC_TREE_SITTER_CURSOR:
+	  return Qtree_sitter_cursor;
         /* "Impossible" cases.  */
 	case PVEC_MISC_PTR:
         case PVEC_OTHER:
@@ -4157,6 +4159,7 @@ syms_of_data (void)
   DEFSYM (Qxwidget_view, "xwidget-view");
   DEFSYM (Qtree_sitter, "tree-sitter");
   DEFSYM (Qtree_sitter_node, "tree-sitter-node");
+  DEFSYM (Qtree_sitter_cursor, "tree-sitter-cursor");
   DEFSYM (Qsqlite, "sqlite");
 
   DEFSYM (Qdefun, "defun");

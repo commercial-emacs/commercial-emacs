@@ -2302,6 +2302,7 @@ free_by_pvtype (struct Lisp_Vector *vector)
       }
       break;
     case PVEC_TREE_SITTER_NODE:
+    case PVEC_TREE_SITTER_CURSOR:
       /* currently nothing to clean up.  */
       break;
 #endif

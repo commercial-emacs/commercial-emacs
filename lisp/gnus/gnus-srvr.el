@@ -336,15 +336,22 @@ The following commands are available:
   (goto-char (point-min))
   (gnus-server-position-point))
 
+(defsubst gnus-server--server-name (which)
+  (when-let ((server
+              (save-excursion
+                (let (prop)
+                  (while (and (null (setq prop (get-text-property (point-at-bol) which)))
+                              (zerop (forward-line -1))))
+                  prop))))
+    (symbol-name server)))
+
 (defun gnus-server-server-name ()
-  (let ((server (get-text-property (point-at-bol) 'gnus-server)))
-    (and server (symbol-name server))))
+  (gnus-server--server-name 'gnus-server))
 
 (defun gnus-server-named-server ()
   "Return a server name that matches one of the names returned by
 `gnus-method-to-server'."
-  (let ((server (get-text-property (point-at-bol) 'gnus-named-server)))
-    (and server (symbol-name server))))
+  (gnus-server--server-name 'gnus-named-server))
 
 (defalias 'gnus-server-position-point 'gnus-goto-colon)
 

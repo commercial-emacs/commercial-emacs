@@ -115,5 +115,16 @@ the innocent user trying `M-x gnus` would be rebuffed with hostility."
   (gnus-tests-doit :select-methods (quote ((nnfolder "")))
     (call-interactively #'gnus)))
 
+(ert-deftest gnus-test-server-at-eob ()
+  "`gnus-server-read-server' looks to nearest nonempty line."
+  (gnus-tests-doit :select-methods (quote ((nnfolder "")))
+    (call-interactively #'gnus)
+    (call-interactively #'gnus-group-enter-server-mode)
+    (with-current-buffer gnus-server-buffer
+      (should-error (search-forward "foobar"))
+      (search-forward "nnfolder")
+      (goto-char (point-max))
+      (should (gnus-server-server-name)))))
+
 (provide 'gnus-tests)
 ;;; gnus-tests.el ends here

@@ -55,6 +55,18 @@ make_node (TSNode node)
   return make_lisp_ptr (ptr, Lisp_Vectorlike);
 }
 
+/* I would make this a Lisp_Misc_Ptr or PVEC_OTHER but TSTreeCursor are
+   stack-allocated structs and I need CHECK_TREE_SITTER_CURSOR.  */
+
+static Lisp_Object
+make_cursor (TSTreeCursor cursor)
+{
+  struct Lisp_Tree_Sitter_Cursor *ptr =
+    ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Tree_Sitter_Cursor, PVEC_TREE_SITTER_CURSOR);
+  ptr->cursor = cursor;
+  return make_lisp_ptr (ptr, Lisp_Vectorlike);
+}
+
 static TSLanguageFunctor
 tree_sitter_language_functor (Lisp_Object progmode)
 {
@@ -1127,6 +1139,7 @@ syms_of_tree_sitter (void)
   DEFSYM (Qtree_sitter_language_error, "tree-sitter-language-error");
   DEFSYM (Qtree_sitterp, "tree-sitterp");
   DEFSYM (Qtree_sitter_nodep, "tree-sitter-nodep");
+  DEFSYM (Qtree_sitter_cursorp, "tree-sitter-cursorp");
   DEFSYM (Qjit_lock_chunk_size, "jit-lock-chunk-size");
 
   define_error (Qtree_sitter_error, "Generic tree-sitter exception", Qerror);
