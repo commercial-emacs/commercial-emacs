@@ -1193,18 +1193,11 @@ Put first the functions more likely to cause a change and cheaper to compute.")
 
 (defun font-lock-extend-region-wholelines ()
   "Move fontification boundaries to beginning of lines."
-  (let ((changed nil))
-    (goto-char font-lock-beg)
-    (unless (bolp)
-      (setq changed t font-lock-beg
-            (let ((inhibit-field-text-motion t))
-              (line-beginning-position))))
-    (goto-char font-lock-end)
-    (unless (bolp)
-      (unless (eq font-lock-end
-                  (setq font-lock-end (line-beginning-position 2)))
-        (setq changed t)))
-    changed))
+  (let ((new (syntax-propertize-wholelines font-lock-beg font-lock-end)))
+    (when new
+      (setq font-lock-beg (car new))
+      (setq font-lock-end (cdr new))
+      t)))
 
 (defun font-lock-default-fontify-region (beg end loudly)
   "Fontify the text between BEG and END.
@@ -1498,7 +1491,7 @@ see `font-lock-syntactic-keywords'."
 	(or (nth 3 highlight)
 	    (error "No match %d in highlight %S" match highlight))
       (when (and (consp value) (not (numberp (car value))))
-	(setq value (eval value)))
+	(setq value (eval value t)))
       (when (stringp value) (setq value (string-to-syntax value)))
       ;; Flush the syntax-cache.  I believe this is not necessary for
       ;; font-lock's use of syntax-ppss, but I'm not 100% sure and it can
@@ -1522,7 +1515,7 @@ KEYWORDS should be of the form MATCH-ANCHORED, see `font-lock-keywords',
 LIMIT can be modified by the value of its PRE-MATCH-FORM."
   (let ((matcher (nth 0 keywords)) (lowdarks (nthcdr 3 keywords)) highlights
 	;; Evaluate PRE-MATCH-FORM.
-	(pre-match-value (eval (nth 1 keywords))))
+	(pre-match-value (eval (nth 1 keywords) t)))
     ;; Set LIMIT to value of PRE-MATCH-FORM or the end of line.
     (if (and (numberp pre-match-value) (> pre-match-value (point)))
 	(setq limit pre-match-value)
@@ -1538,7 +1531,7 @@ LIMIT can be modified by the value of its PRE-MATCH-FORM."
 	  (font-lock-apply-syntactic-highlight (car highlights))
 	  (setq highlights (cdr highlights)))))
     ;; Evaluate POST-MATCH-FORM.
-    (eval (nth 2 keywords))))
+    (eval (nth 2 keywords) t)))
 
 (defun font-lock-fontify-syntactic-keywords-region (start end)
   "Fontify according to `font-lock-syntactic-keywords' between START and END.
@@ -1651,7 +1644,7 @@ HIGHLIGHT should be of the form MATCH-HIGHLIGHT, see `font-lock-keywords'."
 	;; No match but we might not signal an error.
 	(or (nth 3 highlight)
 	    (error "No match %d in highlight %S" match highlight))
-      (let ((val (eval (nth 1 highlight))))
+      (let ((val (eval (nth 1 highlight) t)))
 	(when (eq (car-safe val) 'face)
 	  (add-text-properties start end (cddr val))
 	  (setq val (cadr val)))
@@ -1686,7 +1679,7 @@ LIMIT can be modified by the value of its PRE-MATCH-FORM."
   (let ((matcher (nth 0 keywords)) (lowdarks (nthcdr 3 keywords)) highlights
 	(lead-start (match-beginning 0))
 	;; Evaluate PRE-MATCH-FORM.
-	(pre-match-value (eval (nth 1 keywords))))
+	(pre-match-value (eval (nth 1 keywords) t)))
     ;; Set LIMIT to value of PRE-MATCH-FORM or the end of line.
     (if (not (and (numberp pre-match-value) (> pre-match-value (point))))
 	(setq limit (line-end-position))
@@ -1711,7 +1704,7 @@ LIMIT can be modified by the value of its PRE-MATCH-FORM."
 	  (font-lock-apply-highlight (car highlights))
 	  (setq highlights (cdr highlights)))))
     ;; Evaluate POST-MATCH-FORM.
-    (eval (nth 2 keywords))))
+    (eval (nth 2 keywords) t)))
 
 (defun font-lock-fontify-keywords-region (start end &optional loudly)
   "Fontify according to `font-lock-keywords' between START and END.
@@ -1795,7 +1788,7 @@ Here each COMPILED is of the form (MATCHER HIGHLIGHT ...) as shown in the
   (cond ((or (functionp keyword) (nlistp keyword)) ; MATCHER
 	 (list keyword '(0 font-lock-keyword-face)))
 	((eq (car keyword) 'eval)		; (eval . FORM)
-	 (font-lock-compile-keyword (eval (cdr keyword))))
+	 (font-lock-compile-keyword (eval (cdr keyword) t)))
 	((eq (car-safe (cdr keyword)) 'quote)	; (MATCHER . 'FORM)
 	 ;; If FORM is a FACENAME then quote it.  Otherwise ignore the quote.
 	 (if (symbolp (nth 2 keyword))
@@ -1816,7 +1809,7 @@ Here each COMPILED is of the form (MATCHER HIGHLIGHT ...) as shown in the
       keywords
     (font-lock-eval-keywords (if (fboundp keywords)
 				 (funcall keywords)
-			       (eval keywords)))))
+			       (eval keywords t)))))
 
 (defun font-lock-value-in-major-mode (alist)
   "Return the value for the prevailing major-mode's key in ALIST.
