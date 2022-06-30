@@ -83,7 +83,7 @@
                         `(if (cl-search "gnus-tests/" ,x)
                              (delete-directory ,x t)
                            (error "Attempted delete of %s!" ,x))))
-           (safe-delete default-directory))))))
+           (safe-delete gnus-home-directory))))))
 
 (ert-deftest gnus-test-clean-room ()
   (gnus-tests-doit
@@ -113,7 +113,8 @@ the innocent user trying `M-x gnus` would be rebuffed with hostility."
 
 (ert-deftest gnus-test-basic-op ()
   (gnus-tests-doit :select-methods (quote ((nnfolder "")))
-    (call-interactively #'gnus)))
+    (call-interactively #'gnus)
+    (call-interactively #'gnus-group-exit)))
 
 (ert-deftest gnus-test-server-at-eob ()
   "`gnus-server-read-server' looks to nearest nonempty line."
@@ -124,7 +125,8 @@ the innocent user trying `M-x gnus` would be rebuffed with hostility."
       (should-error (search-forward "foobar"))
       (search-forward "nnfolder")
       (goto-char (point-max))
-      (should (gnus-server-server-name)))))
+      (should (gnus-server-server-name)))
+    (call-interactively #'gnus-group-exit)))
 
 (provide 'gnus-tests)
 ;;; gnus-tests.el ends here
