@@ -952,11 +952,12 @@ how new groups will be entered into the group buffer."
 
 (defun gnus-browse-group-name ()
   (save-excursion
-    (beginning-of-line)
-    (let ((name (get-text-property (point) 'gnus-group)))
+    (let (name)
+      (while (and (null (setq name (get-text-property (point-at-bol) 'gnus-group)))
+                  (zerop (forward-line -1))))
       (when (re-search-forward ": \\(.*\\)$" (point-at-eol) t)
-	(concat (gnus-method-to-server-name gnus-browse-current-method) ":"
-		(or name
+        (concat (gnus-method-to-server-name gnus-browse-current-method) ":"
+	        (or name
 		    (match-string-no-properties 1)))))))
 
 (defun gnus-browse-describe-group (group)
