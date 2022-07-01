@@ -29,6 +29,7 @@
 ;;; Code:
 
 (require 'cl-generic)
+(require 'subr-x)
 (require 'lisp-mode)
 (eval-when-compile (require 'cl-lib))
 (eval-when-compile (require 'subr-x))
@@ -338,6 +339,8 @@ be used instead.
   (add-hook 'completion-at-point-functions
             #'elisp-completion-at-point nil 'local)
   (add-hook 'flymake-diagnostic-functions #'elisp-flymake-checkdoc nil t)
+  (add-hook 'flymake-diagnostic-functions
+              #'elisp-flymake-byte-compile nil t)
   (add-hook 'context-menu-functions #'elisp-context-menu 10 t))
 
 ;; Font-locking support.
@@ -2054,6 +2057,169 @@ Calls REPORT-FN directly."
                        (or start 1) (or end (1+ (or start 1)))
                        :note text)))
     collected))
+
+(defun elisp-flymake--byte-compile-done (report-fn
+                                         source-buffer
+                                         output-buffer)
+  (with-current-buffer
+      source-buffer
+    (save-excursion
+      (save-restriction
+        (widen)
+        (funcall
+         report-fn
+         (cl-loop with data =
+                  (with-current-buffer output-buffer
+                    (goto-char (point-min))
+                    (search-forward ":elisp-flymake-output-start")
+                    (read (point-marker)))
+                  for (string pos _fill level) in data
+                  do (goto-char pos)
+                  for beg = (if (< (point) (point-max))
+                                (point)
+                              (line-beginning-position))
+                  for end = (min
+                             (line-end-position)
+                             (or (cdr
+                                  (bounds-of-thing-at-point 'sexp))
+                                 (point-max)))
+                  collect (flymake-make-diagnostic
+                           (current-buffer)
+                           (if (= beg end) (1- beg) beg)
+                           end
+                           level
+                           string)))))))
+
+(defvar-local elisp-flymake--byte-compile-process nil
+  "Buffer-local process started for byte-compiling the buffer.")
+
+(defvar elisp-flymake-byte-compile-load-path (list "./")
+  "Like `load-path' but used by `elisp-flymake-byte-compile'.
+The default value contains just \"./\" which includes the default
+directory of the buffer being compiled, and nothing else.")
+
+(put 'elisp-flymake-byte-compile-load-path 'safe-local-variable
+     (lambda (x) (and (listp x) (catch 'tag
+                                  (dolist (path x t) (unless (stringp path)
+                                                       (throw 'tag nil)))))))
+
+;;;###autoload
+(defun elisp-flymake-byte-compile (report-fn &rest _args)
+  "A Flymake backend for elisp byte compilation.
+Spawn an Emacs process that byte-compiles a file representing the
+current buffer state and calls REPORT-FN when done."
+  (when elisp-flymake--byte-compile-process
+    (when (process-live-p elisp-flymake--byte-compile-process)
+      (kill-process elisp-flymake--byte-compile-process)))
+  (let ((temp-file (make-temp-file "elisp-flymake-byte-compile"))
+        (source-buffer (current-buffer))
+        (coding-system-for-write 'utf-8-unix)
+        (coding-system-for-read 'utf-8))
+    (save-restriction
+      (widen)
+      (write-region (point-min) (point-max) temp-file nil 'nomessage))
+    (let* ((output-buffer (generate-new-buffer " *elisp-flymake-byte-compile*")))
+      (setq
+       elisp-flymake--byte-compile-process
+       (make-process
+        :name "elisp-flymake-byte-compile"
+        :buffer output-buffer
+        :command `(,(expand-file-name invocation-name invocation-directory)
+                   "-Q"
+                   "--batch"
+                   ;; "--eval" "(setq load-prefer-newer t)" ; for testing
+                   ,@(mapcan (lambda (path) (list "-L" path))
+                             elisp-flymake-byte-compile-load-path)
+                   "-f" "elisp-flymake--batch-compile-for-flymake"
+                   ,temp-file)
+        :connection-type 'pipe
+        :sentinel
+        (lambda (proc _event)
+          (unless (process-live-p proc)
+            (unwind-protect
+                (cond
+                 ((not (and (buffer-live-p source-buffer)
+                            (eq proc (with-current-buffer source-buffer
+                                       elisp-flymake--byte-compile-process))))
+                  (flymake-log :warning
+                               "byte-compile process %s obsolete" proc))
+                 ((zerop (process-exit-status proc))
+                  (elisp-flymake--byte-compile-done report-fn
+                                                    source-buffer
+                                                    output-buffer))
+                 (t
+                  (funcall report-fn
+                           :panic
+                           :explanation
+                           (format "byte-compile process %s died" proc))))
+              (ignore-errors (delete-file temp-file))
+              (kill-buffer output-buffer))))
+        :stderr " *stderr of elisp-flymake-byte-compile*"
+        :noquery t)))))
+
+(defun elisp-flymake--batch-compile-for-flymake (&optional file)
+  "Helper for `elisp-flymake-byte-compile'.
+Runs in a batch-mode Emacs.  Interactively use variable
+`buffer-file-name' for FILE."
+  (interactive (list buffer-file-name))
+  (let* ((file (or file
+                   (car command-line-args-left)))
+         (coding-system-for-read 'utf-8-unix)
+         (coding-system-for-write 'utf-8)
+         (byte-compile-log-buffer
+          (generate-new-buffer " *dummy-byte-compile-log-buffer*"))
+         (byte-compile-dest-file-function #'ignore))
+    (unwind-protect
+        (byte-compile-file file)
+      (ignore-errors
+        (kill-buffer byte-compile-log-buffer)))))
+
+(defun elisp-eval-buffer ()
+  "Evaluate the forms in the current buffer."
+  (interactive)
+  (eval-buffer)
+  (message "Evaluated the %s buffer" (buffer-name)))
+
+(defun elisp-byte-compile-file (&optional load)
+  "Byte compile the file the current buffer is visiting.
+If LOAD is non-nil, load the resulting .elc file.  When called
+interactively, this is the prefix argument."
+  (interactive "P")
+  (unless buffer-file-name
+    (error "This buffer is not visiting a file"))
+  (byte-compile-file buffer-file-name)
+  (when load
+    (load (funcall byte-compile-dest-file-function buffer-file-name))))
+
+(defun elisp-byte-compile-buffer (&optional load)
+  "Byte compile the current buffer, but don't write a file.
+If LOAD is non-nil, load byte-compiled data.  When called
+interactively, this is the prefix argument."
+  (interactive "P")
+  (let ((bfn buffer-file-name)
+        file elc)
+    (require 'bytecomp)
+    (unwind-protect
+        (progn
+          (setq file (make-temp-file "compile" nil ".el")
+                elc (funcall byte-compile-dest-file-function file))
+          (write-region (point-min) (point-max) file nil 'silent)
+          (let ((set-message-function
+                 (lambda (message)
+                   (when (string-match-p "\\`Wrote " message)
+                     'ignore))))
+            (byte-compile-file file))
+          (when (and bfn (get-buffer "*Compile-Log*"))
+            (with-current-buffer "*Compile-Log*"
+              (setq default-directory (file-name-directory bfn))))
+          (if load
+              (load elc)
+            (message "Byte-compiled the current buffer")))
+      (when file
+        (when (file-exists-p file)
+          (delete-file file))
+        (when (file-exists-p elc)
+          (delete-file elc))))))
 
 (put 'read-symbol-shorthands 'safe-local-variable #'consp)
 
