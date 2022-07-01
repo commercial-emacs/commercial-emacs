@@ -1879,11 +1879,7 @@ should be ignored.  */)
 	  for (i = SBYTES (string) - 1; i >= 0; i--)
 	    if (!ASCII_CHAR_P (SREF (string, i)))
 	      error ("Attempt to shape unibyte text");
-	  /* STRING is a pure-ASCII string, so we can convert it (or,
-	     rather, its copy) to multibyte and use that thereafter.  */
-	  Lisp_Object string_copy = Fconcat (1, &string);
-	  STRING_SET_MULTIBYTE (string_copy);
-	  string = string_copy;
+	  /* STRING is a pure-ASCII string, so we can treat it as multibyte.  */
 	}
       frombyte = string_char_to_byte (string, frompos);
     }
