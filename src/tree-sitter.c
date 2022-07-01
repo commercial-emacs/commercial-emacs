@@ -55,8 +55,8 @@ make_node (TSNode node)
   return make_lisp_ptr (ptr, Lisp_Vectorlike);
 }
 
-/* I would make this a Lisp_Misc_Ptr or PVEC_OTHER but TSTreeCursor are
-   stack-allocated structs and I need CHECK_TREE_SITTER_CURSOR.  */
+/* I would make this a Lisp_Misc_Ptr or PVEC_OTHER but TSTreeCursor
+   needs bespoke deletion in free_by_pvectype ().  */
 
 static Lisp_Object
 make_cursor (TSTreeCursor cursor)
@@ -492,6 +492,24 @@ DEFUN ("tree-sitter-ppss",
   return retval;
 }
 
+DEFUN ("tree-sitter-node-of",
+       Ftree_sitter_node_of, Stree_sitter_node_of,
+       1, 1, 0,
+       doc: /* Return node of CURSOR. */)
+  (Lisp_Object cursor)
+{
+  if (NILP (cursor))
+    return Qnil;
+
+  CHECK_TREE_SITTER_CURSOR (cursor);
+
+  TSNode node = ts_tree_cursor_current_node
+    (&XTREE_SITTER_CURSOR (cursor)->cursor);
+  return ts_node_is_null (node)
+    ? Qnil
+    : make_node (node);
+}
+
 DEFUN ("tree-sitter-cursor-at",
        Ftree_sitter_cursor_at, Stree_sitter_cursor_at,
        0, 1, 0,
@@ -502,6 +520,54 @@ DEFUN ("tree-sitter-cursor-at",
   return NILP (node)
     ? Qnil
     : make_cursor (ts_tree_cursor_new (XTREE_SITTER_NODE (node)->node));
+}
+
+DEFUN ("tree-sitter-goto-first-child",
+       Ftree_sitter_goto_first_child, Stree_sitter_goto_first_child,
+       1, 1, 0,
+       doc: /* Move CURSOR to its first child.
+Return t if moved or nil if there were no children.  */)
+  (Lisp_Object cursor)
+{
+  if (NILP (cursor))
+    return Qnil;
+
+  CHECK_TREE_SITTER_CURSOR (cursor);
+
+  return ts_tree_cursor_goto_first_child (&XTREE_SITTER_CURSOR (cursor)->cursor)
+    ? Qt : Qnil;
+}
+
+DEFUN ("tree-sitter-goto-next-sibling",
+       Ftree_sitter_goto_next_sibling, Stree_sitter_goto_next_sibling,
+       1, 1, 0,
+       doc: /* Move CURSOR to the next sibling of its current node.
+Return t if moved or nil if there was no next sibling node.  */)
+  (Lisp_Object cursor)
+{
+  if (NILP (cursor))
+    return Qnil;
+
+  CHECK_TREE_SITTER_CURSOR (cursor);
+
+  return ts_tree_cursor_goto_first_child (&XTREE_SITTER_CURSOR (cursor)->cursor)
+    ? Qt : Qnil;
+}
+
+DEFUN ("tree-sitter-goto-parent",
+       Ftree_sitter_goto_parent, Stree_sitter_goto_parent,
+       1, 1, 0,
+       doc: /* Move CURSOR to the parent of its current node.
+Return t if moved or nil if the cursor was already at the root node.  */)
+  (Lisp_Object cursor)
+{
+  if (NILP (cursor))
+    return Qnil;
+
+  CHECK_TREE_SITTER_CURSOR (cursor);
+
+  return ts_tree_cursor_goto_parent (&XTREE_SITTER_CURSOR (cursor)->cursor)
+    ? Qt : Qnil;
 }
 
 DEFUN ("tree-sitter-node-at",
@@ -1193,8 +1259,12 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_prev_named_sibling);
   defsubr (&Stree_sitter_node_first_child_for_byte);
   defsubr (&Stree_sitter_node_first_named_child_for_byte);
+  defsubr (&Stree_sitter_goto_first_child);
+  defsubr (&Stree_sitter_goto_next_sibling);
+  defsubr (&Stree_sitter_goto_parent);
   defsubr (&Stree_sitter_node_descendant_for_byte_range);
   defsubr (&Stree_sitter_node_named_descendant_for_byte_range);
+  defsubr (&Stree_sitter_node_of);
   defsubr (&Stree_sitter_node_equal);
   defsubr (&Stree_sitter_node_start);
   defsubr (&Stree_sitter_node_end);
