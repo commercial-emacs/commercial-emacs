@@ -20,7 +20,7 @@
 ;;; Code:
 
 (require 'ert-x) ; cl-lib
-(require 'erc)
+(require 'erc-networks)
 
 (defun erc-networks-tests--create-dead-proc (&optional buf)
   (let ((p (start-process "true" (or buf (current-buffer)) "true")))
