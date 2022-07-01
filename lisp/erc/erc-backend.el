@@ -2303,9 +2303,9 @@ See `erc-display-server-message'." nil
 
 (declare-function erc-nickname-in-use "erc")
 (define-erc-response-handler (433)
-                             "Login-time \"nick in use\"." nil
-                             (erc-nickname-in-use (cadr (erc-response.command-args parsed))
-                                                  "already in use"))
+  "Login-time \"nick in use\"." nil
+  (erc-nickname-in-use (cadr (erc-response.command-args parsed))
+                       "already in use"))
 
 (define-erc-response-handler (437)
   "Nick temporarily unavailable (on IRCnet)." nil
