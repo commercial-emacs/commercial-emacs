@@ -29,7 +29,6 @@
 ;;; Code:
 
 (require 'cl-generic)
-(require 'subr-x)
 (require 'lisp-mode)
 (eval-when-compile (require 'cl-lib))
 (eval-when-compile (require 'subr-x))
@@ -1768,6 +1767,7 @@ Also see `elisp-eldoc-var-docstring-with-value'."
                :thing sym
                :face 'font-lock-variable-name-face))))
 
+(declare-function string-limit "subr-x")
 (defun elisp-eldoc-var-docstring-with-value (callback &rest _)
   "Document variable at point.
 Intended for `eldoc-documentation-functions' (which see).
