@@ -1375,6 +1375,7 @@ that means treat it as not defined."
                           ((or (atom form)
                                (or (eq 'quote (car form))
                                    (eq 'backquote (car form))
+                                   (eq 'inline-quote (car form))
                                    (eq '\` (car form))
                                    (eq 'function (car form))))
                            1)

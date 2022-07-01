@@ -39,8 +39,15 @@
 
 ;;; Code:
 
-(require 'erc)
 (eval-when-compile (require 'cl-lib))
+(require 'erc-backend)
+(defvar erc--target)
+(defvar erc-reuse-buffers)
+(defvar erc-rename-buffers)
+(defvar erc-insert-marker)
+(defvar erc-kill-server-hook)
+(defvar erc-kill-buffer-hook)
+(defvar erc-modules)
 
 ;; Variables
 
@@ -813,7 +820,7 @@ This may have originated from an `:id' arg to entry-point commands
   (erc-networks--id-symbol nid))
 
 (cl-generic-define-context-rewriter erc-obsolete-var (var spec)
-  `((with-suppressed-warnings ((obsolete ,var)) ,var) ,spec))
+  `((with-suppressed-warnings ((obsolete ,var) (free-vars ,var)) ,var) ,spec))
 
 ;; As a catch-all, derive the symbol from the unquoted printed repr.
 (cl-defgeneric erc-networks--id-create (id)
@@ -1089,6 +1096,13 @@ naming.  Do not discriminate based on whether a buffer's
 connection is active."
   (erc-networks--shrink-ids-and-buffer-names))
 
+(declare-function erc--target-channel-local-p "erc")
+(declare-function erc--target-symbol "erc")
+(declare-function erc--target-string "erc")
+(declare-function erc--default-target "erc")
+(declare-function erc-buffer-filter "erc")
+(declare-function erc-downcase "erc")
+(declare-function erc-current-nick "erc")
 (defun erc-networks--examine-targets (identity target on-dupe on-collision)
   "Visit all ERC target buffers with the same TARGET.
 Call ON-DUPE when a buffer's identity belongs to a network
@@ -1212,6 +1226,7 @@ server name and search for a match in `erc-networks-alist'."
 		  do (cl-return name)))
        'Unknown))))
 
+(declare-function erc-server-buffer "erc")
 (defun erc-network ()
   "Return the value of `erc-network' for the current server."
   (or erc-network (erc-with-server-buffer erc-network)))
@@ -1245,6 +1260,8 @@ given by the `RPL_ISUPPORT' NETWORK parameter."
                  ((intern vanity))))
       erc-networks--name-missing-sentinel))
 
+(declare-function erc-error "erc")
+(declare-function erc-display-error-notice "erc")
 (defun erc-networks--set-name (_proc parsed)
   "Set `erc-network' to the value returned by `erc-networks--determine'.
 Signal an error when the network cannot be determined."
@@ -1298,6 +1315,7 @@ Copy source (prefix) from MOTD-ish message as a last resort."
 
 ;; This should run whenever a network identity is updated.
 
+(declare-function erc-get-buffer "erc")
 (defun erc-networks--reclaim-orphaned-target-buffers (new-proc nid announced)
   "Visit disowned buffers for same NID and associate with NEW-PROC.
 ANNOUNCED is the server's reported host name."
@@ -1384,6 +1402,7 @@ considered as well because server buffers are often killed."
   ;;
   nil)
 
+(declare-function erc-set-active-buffer "erc")
 (defun erc-networks--rename-server-buffer (new-proc &optional _parsed)
   "Rename a server buffer based on its network identity.
 Assume that the current buffer is a server buffer, either one

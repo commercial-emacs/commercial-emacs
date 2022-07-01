@@ -60,6 +60,8 @@
 
 (load "erc-loaddefs" 'noerror 'nomessage)
 
+(require 'erc-networks)
+(require 'erc-goodies)
 (require 'cl-lib)
 (require 'format-spec)
 (require 'pp)
@@ -347,9 +349,6 @@ A typical value would be \((\"#emacs\" \"QUIT\" \"JOIN\")
   :group 'erc-ignore
   :type 'erc-message-type)
 
-(defvar-local erc-session-password nil
-  "The password used for the current session.")
-
 (defcustom erc-disconnected-hook nil
   "Run this hook with arguments (NICK IP REASON) when disconnected.
 This happens before automatic reconnection.  Note, that
@@ -448,16 +447,6 @@ Use the CASEMAPPING ISUPPORT parameter to determine the style."
                               erc--casemapping-rfc1459-strict
                             erc--casemapping-rfc1459))
         (buffer-string)))))
-
-(defmacro erc-with-server-buffer (&rest body)
-  "Execute BODY in the current ERC server buffer.
-If no server buffer exists, return nil."
-  (declare (indent 0) (debug (body)))
-  (let ((buffer (make-symbol "buffer")))
-    `(let ((,buffer (erc-server-buffer)))
-       (when (buffer-live-p ,buffer)
-         (with-current-buffer ,buffer
-           ,@body)))))
 
 (cl-defstruct (erc-server-user (:type vector) :named)
   ;; User data
@@ -1375,76 +1364,6 @@ See also `erc-show-my-nick'."
 
 (defvar-local erc-dbuf nil)
 
-(defmacro define-erc-module (name alias doc enable-body disable-body
-                                  &optional local-p)
-  "Define a new minor mode using ERC conventions.
-Symbol NAME is the name of the module.
-Symbol ALIAS is the alias to use, or nil.
-DOC is the documentation string to use for the minor mode.
-ENABLE-BODY is a list of expressions used to enable the mode.
-DISABLE-BODY is a list of expressions used to disable the mode.
-If LOCAL-P is non-nil, the mode will be created as a buffer-local
-mode, rather than a global one.
-
-This will define a minor mode called erc-NAME-mode, possibly
-an alias erc-ALIAS-mode, as well as the helper functions
-erc-NAME-enable, and erc-NAME-disable.
-
-Example:
-
-  ;;;###autoload(autoload \\='erc-replace-mode \"erc-replace\")
-  (define-erc-module replace nil
-    \"This mode replaces incoming text according to `erc-replace-alist'.\"
-    ((add-hook \\='erc-insert-modify-hook
-               #\\='erc-replace-insert))
-    ((remove-hook \\='erc-insert-modify-hook
-                  #\\='erc-replace-insert)))"
-  (declare (doc-string 3) (indent defun))
-  (let* ((sn (symbol-name name))
-         (mode (intern (format "erc-%s-mode" (downcase sn))))
-         (group (intern (format "erc-%s" (downcase sn))))
-         (enable (intern (format "erc-%s-enable" (downcase sn))))
-         (disable (intern (format "erc-%s-disable" (downcase sn)))))
-    `(progn
-       (define-minor-mode
-        ,mode
-        ,(format "Toggle ERC %S mode.
-With a prefix argument ARG, enable %s if ARG is positive,
-and disable it otherwise.  If called from Lisp, enable the mode
-if ARG is omitted or nil.
-%s" name name doc)
-        ;; FIXME: We don't know if this group exists, so this `:group' may
-        ;; actually just silence a valid warning about the fact that the var
-        ;; is not associated with any group.
-        :global ,(not local-p) :group (quote ,group)
-        (if ,mode
-            (,enable)
-          (,disable)))
-       (defun ,enable ()
-         ,(format "Enable ERC %S mode."
-                  name)
-         (interactive)
-         (add-to-list 'erc-modules (quote ,name))
-         (setq ,mode t)
-         ,@enable-body)
-       (defun ,disable ()
-         ,(format "Disable ERC %S mode."
-                  name)
-         (interactive)
-         (setq erc-modules (delq (quote ,name) erc-modules))
-         (setq ,mode nil)
-         ,@disable-body)
-       ,(when (and alias (not (eq name alias)))
-          `(defalias
-             ',(intern
-                (format "erc-%s-mode"
-                        (downcase (symbol-name alias))))
-             #',mode))
-       ;; For find-function and find-variable.
-       (put ',mode    'definition-name ',name)
-       (put ',enable  'definition-name ',name)
-       (put ',disable 'definition-name ',name))))
-
 ;; The rationale for favoring inheritance here (nicer dispatch) is
 ;; kinda flimsy since there aren't yet any actual methods.
 
@@ -1838,40 +1757,6 @@ All strings are compared according to IRC protocol case rules, see
           (throw 'result list)
         (setq list (cdr list))))))
 
-(defmacro erc-with-buffer (spec &rest body)
-  "Execute BODY in the buffer associated with SPEC.
-
-SPEC should have the form
-
- (TARGET [PROCESS])
-
-If TARGET is a buffer, use it.  Otherwise, use the buffer
-matching TARGET in the process specified by PROCESS.
-
-If PROCESS is nil, use the current `erc-server-process'.
-See `erc-get-buffer' for details.
-
-See also `with-current-buffer'.
-
-\(fn (TARGET [PROCESS]) BODY...)"
-  (declare (indent 1) (debug ((form &optional form) body)))
-  (let ((buf (make-symbol "buf"))
-        (proc (make-symbol "proc"))
-        (target (make-symbol "target"))
-        (process (make-symbol "process")))
-    `(let* ((,target ,(car spec))
-            (,process ,(cadr spec))
-            (,buf (if (bufferp ,target)
-                      ,target
-                    (let ((,proc (or ,process
-                                     (and (processp erc-server-process)
-                                          erc-server-process))))
-                      (if (and ,target ,proc)
-                          (erc-get-buffer ,target ,proc))))))
-       (when (buffer-live-p ,buf)
-         (with-current-buffer ,buf
-           ,@body)))))
-
 (defun erc-get-buffer (target &optional proc)
   "Return the buffer matching TARGET in the process PROC.
 If PROC is not supplied, all processes are searched."
@@ -1917,18 +1802,6 @@ needs to match PROC."
   (unless predicate
     (setq predicate (lambda () t)))
   (erc-buffer-filter predicate proc))
-
-(defmacro erc-with-all-buffers-of-server (process pred &rest forms)
-  "Execute FORMS in all buffers which have same process as this server.
-FORMS will be evaluated in all buffers having the process PROCESS and
-where PRED matches or in all buffers of the server process if PRED is
-nil."
-  (declare (indent 1) (debug (form form body)))
-  (macroexp-let2 nil pred pred
-    `(erc-buffer-filter (lambda ()
-                          (when (or (not ,pred) (funcall ,pred))
-                            ,@forms))
-                        ,process)))
 
 (define-obsolete-function-alias 'erc-iswitchb #'erc-switch-to-buffer "25.1")
 (defun erc--switch-to-buffer (&optional arg)
@@ -7458,13 +7331,5 @@ Otherwise, connect to HOST:PORT as USER and /join CHANNEL."
                     (get-buffer-process server-buffer)))))))
 
 (provide 'erc)
-
-(require 'erc-backend)
-
-;; Deprecated. We might eventually stop requiring the goodies automatically.
-;; IMPORTANT: This require must appear _after_ the above (provide 'erc) to
-;; avoid a recursive require error when byte-compiling the entire package.
-(require 'erc-goodies)
-(require 'erc-networks)
 
 ;;; erc.el ends here
