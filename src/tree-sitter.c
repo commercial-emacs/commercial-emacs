@@ -393,10 +393,27 @@ DEFUN ("tree-sitter--testable",
   return dynlib_open (SSDATA (file)) ? Qt : Qnil;
 }
 
+DEFUN ("tree-sitter-node-sexp",
+       Ftree_sitter_node_sexp, Stree_sitter_node_sexp,
+       1, 1, 0,
+       doc: /* Return s-expression of NODE. */)
+  (Lisp_Object node)
+{
+  Lisp_Object retval = Qnil;
+  if (NILP (node))
+    return Qnil;
+
+  CHECK_TREE_SITTER_NODE (node);
+  char *sexp = ts_node_string (XTREE_SITTER_NODE (node)->node);
+  retval = build_string (sexp);
+  free (sexp);
+  return retval;
+}
+
 DEFUN ("tree-sitter-root-node",
        Ftree_sitter_root_node, Stree_sitter_root_node,
        0, 1, 0,
-       doc: /* Return TSNode stash from BUFFER's sitter. */)
+       doc: /* Return TSNode from BUFFER's sitter. */)
   (Lisp_Object buffer)
 {
   Lisp_Object retval = Qnil, sitter;
@@ -411,7 +428,11 @@ DEFUN ("tree-sitter-root-node",
     {
       const TSTree *tree = XTREE_SITTER (sitter)->tree;
       if (tree != NULL)
-	retval = build_string (ts_node_string (ts_tree_root_node (tree)));
+	{
+	  TSNode root_node = ts_tree_root_node (tree);
+	  if (! ts_node_is_null (root_node))
+	    retval = make_node (root_node);
+	}
     }
   return retval;
 }
@@ -924,8 +945,6 @@ DEFUN ("tree-sitter-node-field-name-for-child",
   return name;
 }
 
-
-
 DEFUN ("tree-sitter-node-symbol",
        Ftree_sitter_node_symbol, Stree_sitter_node_symbol,
        1, 1, 0,
@@ -1240,6 +1259,7 @@ syms_of_tree_sitter (void)
 
   defsubr (&Stree_sitter);
   defsubr (&Stree_sitter_root_node);
+  defsubr (&Stree_sitter_node_sexp);
   defsubr (&Stree_sitter_node_at);
   defsubr (&Stree_sitter_node_type);
   defsubr (&Stree_sitter_node_symbol);
