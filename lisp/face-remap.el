@@ -409,7 +409,8 @@ See also the related command `global-text-scale-adjust'."
               (_ inc))))
       (text-scale-increase step)
       ;; (unless (zerop step)
-      (message "Use +,-,0 for further adjustment")
+      (message (substitute-command-keys
+                "Use \\`+',\\`-',\\`0' for further adjustment"))
       (set-transient-map
        (let ((map (make-sparse-keymap)))
          (dolist (mods '(() (control)))
@@ -452,12 +453,12 @@ See also the related command `global-text-scale-adjust'."
   :type '(choice (const :tag "Off" nil)
                  (const :tag "On" t))
   :group 'display
-  :version "28.1")
+  :version "29.1")
 
 (defcustom global-text-scale-adjust-limits '(10 . 500)
   "Min/max values for `global-text-scale-adjust'.
 This is a cons cell where the `car' has the minimum font size and
-the `cdr' has the max font size."
+the `cdr' has the maximum font size, in units of 1/10 pt."
   :version "29.1"
   :group 'display
   :type '(cons (integer :tag "Min")
@@ -514,7 +515,8 @@ See also the related command `text-scale-adjust'."
                (not global-text-scale-adjust-resizes-frames)))
           (set-face-attribute 'default nil :height new)))
       (when (characterp key)
-        (message "Use +,-,0 for further adjustment")
+        (message (substitute-command-keys
+                  "Use \\`+',\\`-',\\`0' for further adjustment"))
         (set-transient-map
          (let ((map (make-sparse-keymap)))
            (dolist (mod '(() (control meta)))
