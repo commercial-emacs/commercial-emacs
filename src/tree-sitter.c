@@ -537,10 +537,29 @@ DEFUN ("tree-sitter-cursor-at",
        doc: /* Return TSTreeCursor at POS. */)
   (Lisp_Object pos)
 {
-  Lisp_Object node = Ftree_sitter_node_at (pos);
-  return NILP (node)
-    ? Qnil
-    : make_cursor (ts_tree_cursor_new (XTREE_SITTER_NODE (node)->node));
+  uint32_t byte = BUFFER_TO_SITTER (XFIXNUM (pos));
+  Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
+  TSTreeCursor cursor = ts_tree_cursor_new (ts_node_first_child_for_byte
+					    (XTREE_SITTER_NODE (root_node)->node,
+					     byte));
+  for (TSNode node = ts_tree_cursor_current_node (&cursor);
+       ! ts_node_is_null (node);
+       (void) node)
+    {
+      if (byte < ts_node_start_byte (node))
+	break;
+      else if (byte >= ts_node_end_byte(node))
+	{
+	  if (! ts_tree_cursor_goto_next_sibling (&cursor))
+	    break;
+	  node = ts_tree_cursor_current_node (&cursor);
+	}
+      else if (! ts_tree_cursor_goto_first_child (&cursor))
+	break;
+      else
+	node = ts_tree_cursor_current_node(&cursor);
+    }
+  return make_cursor (cursor);
 }
 
 DEFUN ("tree-sitter-goto-first-child",
@@ -571,7 +590,7 @@ Return t if moved or nil if there was no next sibling node.  */)
 
   CHECK_TREE_SITTER_CURSOR (cursor);
 
-  return ts_tree_cursor_goto_first_child (&XTREE_SITTER_CURSOR (cursor)->cursor)
+  return ts_tree_cursor_goto_next_sibling (&XTREE_SITTER_CURSOR (cursor)->cursor)
     ? Qt : Qnil;
 }
 
