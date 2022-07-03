@@ -46,7 +46,7 @@
 
 (defcustom erc-track-enable-keybindings 'ask
   "Whether to enable the ERC track keybindings, namely:
-`C-c C-SPC' and `C-c C-@', which both do the same thing.
+\\`C-c C-SPC' and \\`C-c C-@', which both do the same thing.
 
 The default is to check to see whether these keys are used
 already: if not, then enable the ERC track minor mode, which
@@ -453,12 +453,12 @@ START is the minimum length of the name used."
 ;; Play nice with other IRC clients (and Emacs development rules) by
 ;; making this a minor mode
 
-(defvar erc-track-minor-mode-map (make-sparse-keymap)
+(defvar erc-track-minor-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-@")   #'erc-track-switch-buffer)
+    (define-key map (kbd "C-c C-SPC") #'erc-track-switch-buffer)
+    map)
   "Keymap for rcirc track minor mode.")
-
-(define-key erc-track-minor-mode-map (kbd "C-c C-@") #'erc-track-switch-buffer)
-(define-key erc-track-minor-mode-map (kbd "C-c C-SPC")
-  #'erc-track-switch-buffer)
 
 ;;;###autoload
 (define-minor-mode erc-track-minor-mode

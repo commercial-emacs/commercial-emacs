@@ -476,15 +476,17 @@ This will generate compile-time constants from BINDINGS."
                    "[ \t']*\\(" lisp-mode-symbol-regexp "\\)?")
            (1 font-lock-keyword-face)
            (2 font-lock-constant-face nil t))
-         ;; Words inside \\[] or \\`' tend to be for `substitute-command-keys'.
-         (,(rx "\\\\[" (group (regexp lisp-mode-symbol-regexp)) "]")
+         ;; Words inside \\[], \\<>, \\{} or \\`' tend to be for
+         ;; `substitute-command-keys'.
+         (,(rx "\\\\" (or (seq "[" (group-n 1 (regexp lisp-mode-symbol-regexp)) "]")
+                          (seq "`" (group-n 1 (+ (regexp lisp-mode-symbol-regexp)
+                                                 ;; allow multiple words, e.g. "C-x a"
+                                                 (? " ")))
+                           "'")))
           (1 font-lock-constant-face prepend))
-         (,(rx "\\\\`" (group
-                        (+ (regexp lisp-mode-symbol-regexp)
-                           ;; allow multiple words, e.g. "C-x a"
-                           (? " ")))
-               "'")
-          (1 font-lock-constant-face prepend))
+         (,(rx "\\\\" (or (seq "<" (group-n 1 (regexp lisp-mode-symbol-regexp)) ">")
+                          (seq "{" (group-n 1 (regexp lisp-mode-symbol-regexp)) "}")))
+          (1 font-lock-variable-name-face prepend))
          ;; Ineffective backslashes (typically in need of doubling).
          ("\\(\\\\\\)\\([^\"\\]\\)"
           (1 (elisp--font-lock-backslash) prepend))
@@ -492,7 +494,7 @@ This will generate compile-time constants from BINDINGS."
          (,(concat "[`‘']\\(" lisp-mode-symbol-regexp "\\)['’]")
           (1 font-lock-constant-face prepend))
          ;; \\= tends to be an escape in doc strings.
-         ("\\\\\\\\="
+         (,(rx "\\\\=")
           (0 font-lock-builtin-face prepend))
          ;; Constant values.
          (,(concat "\\_<:" lisp-mode-symbol-regexp "\\_>")
