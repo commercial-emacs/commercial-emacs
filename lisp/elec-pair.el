@@ -222,13 +222,10 @@ inside a comment or string."
          (string-or-comment (and post-string-or-comment
                                  pre-string-or-comment))
          (table-syntax-and-pair
-          (cl-flet ((f ()
-                      (list (char-syntax command-event)
-                            (or (matching-paren command-event)
-                                command-event))))
-            (if string-or-comment
-                (electric-pair--with-text-syntax () (f))
-              (f))))
+          (electric-pair--with-syntax string-or-comment
+            (list (char-syntax command-event)
+                  (or (matching-paren command-event)
+                      command-event))))
          (fallback (if string-or-comment
                        (append electric-pair-text-pairs
                                electric-pair-pairs)
@@ -291,7 +288,7 @@ when to fallback to `parse-partial-sexp'."
                               (skip-syntax-forward " >!")
                               (point)))))
     (if s-or-c-start
-        (electric-pair--with-text-syntax (s-or-c-start)
+        (electric-pair--with-syntax s-or-c-start
           (parse-partial-sexp s-or-c-start pos))
       ;; HACK! cc-mode apparently has some `syntax-ppss' bugs
       (if (memq major-mode '(c-mode c++ mode))
@@ -309,7 +306,8 @@ when to fallback to `parse-partial-sexp'."
 (defun electric-pair--balance-info (direction string-or-comment)
   "Examine lists forward or backward according to DIRECTION's sign.
 
-STRING-OR-COMMENT is info suitable for running `parse-partial-sexp'.
+STRING-OR-COMMENT is the position of the start of the comment/string
+in which we are, if applicable.
 
 Return a cons of two descriptions (MATCHED-P . PAIR) for the
 innermost and outermost lists that enclose point.  The outermost
@@ -341,14 +339,11 @@ If point is not enclosed by any lists, return ((t) . (t))."
                       (cond ((< direction 0)
                              (condition-case nil
                                  (eq (char-after pos)
-                                     (cl-flet ((f ()
-                                                 (matching-paren
-                                                  (char-before
-                                                   (scan-sexps (point) 1)))))
-                                       (if string-or-comment
-                                           (electric-pair--with-text-syntax ()
-                                             (f))
-                                         (f))))
+                                     (electric-pair--with-syntax
+                                         string-or-comment
+                                       (matching-paren
+                                        (char-before
+                                         (scan-sexps (point) 1)))))
                                (scan-error nil)))
                             (t
                              ;; In this case, no need to use
@@ -362,9 +357,8 @@ If point is not enclosed by any lists, return ((t) . (t))."
                                     (opener (char-after start)))
                                (and start
                                     (eq (char-before pos)
-                                        (or (if string-or-comment
-                                                (electric-pair--with-text-syntax ()
-                                                  (matching-paren opener))
+                                        (or (electric-pair--with-syntax
+                                                string-or-comment
                                               (matching-paren opener))
                                             opener))))))))
                    (actual-pair (if (> direction 0)
@@ -377,14 +371,11 @@ If point is not enclosed by any lists, return ((t) . (t))."
     (save-excursion
       (while (not outermost)
         (condition-case err
-            (cl-flet ((f ()
-                        (scan-sexps (point) (if (> direction 0)
-                                                (point-max)
-                                              (- (point-max))))
-                        (funcall at-top-level-or-equivalent-fn)))
-              (if string-or-comment
-                  (electric-pair--with-text-syntax () (f))
-                (f)))
+            (electric-pair--with-syntax string-or-comment
+              (scan-sexps (point) (if (> direction 0)
+                                      (point-max)
+                                    (- (point-max))))
+              (funcall at-top-level-or-equivalent-fn))
           (scan-error
            (cond ((or
                    ;; some error happened and it is not of the "ended
