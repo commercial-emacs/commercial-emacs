@@ -72,6 +72,7 @@
         (should-not calls)))))
 
 (ert-deftest erc-autojoin-channels--delay ()
+  (skip-unless (eq system-type "gnu/linux"))
   (should (eq erc-autojoin-timing 'connect))
   (should (= erc-autojoin-delay 30))
   (should-not erc--autojoin-timer)
