@@ -188,24 +188,29 @@ be considered.")
    ;; I also find it often preferable not to pair next to a word.
    (eq (char-syntax (following-char)) ?w)))
 
-(cl-defmacro electric-pair--with-text-syntax ((&optional start) &rest body)
-  "Run BODY with `electric-pair-text-syntax-table' active.
-This ensures that all syntax related values are set properly and the
-`syntax-ppss' cache is cleared before and after.
-In particular, this must be used when BODY contains code which may
-update the `syntax-ppss' cache.  This includes calling
-`parse-partial-sexp' and any sexp-based movement functions when
-`parse-sexp-lookup-properties' is non-nil.  The cache is flushed from
-position START, defaulting to point."
-  (declare (debug ((&optional form) body)) (indent 1))
-  (let ((start-var (make-symbol "start")))
-    `(let ((syntax-propertize-function nil)
-           (,start-var ,(or start '(point))))
-       (syntax-ppss-invalidate-cache ,start-var)
+(defmacro electric-pair--with-syntax (string-or-comment &rest body)
+  "Run BODY with appropriate syntax table active.
+STRING-OR-COMMENT is the start position of the string/comment
+in which we are, if applicable.
+Uses the text-mode syntax table if within a string or a comment."
+  (declare (debug t) (indent 1))
+  `(electric-pair--with-syntax-1 ,string-or-comment (lambda () ,@body)))
+
+(defun electric-pair--with-syntax-1 (string-or-comment body-fun)
+  (if (not string-or-comment)
+      (funcall body-fun)
+    ;; Here we assume that the `syntax-ppss' cache has already been filled
+    ;; past `string-or-comment' with data corresponding to the "normal" syntax
+    ;; (this should be the case because STRING-OR-COMMENT was returned
+    ;; in the `nth 8' of `syntax-ppss').
+    ;; Maybe we should narrow-to-region so that `syntax-ppss' uses the narrow
+    ;; cache?
+    (syntax-ppss-invalidate-cache string-or-comment)
+    (let ((syntax-propertize-function nil))
        (unwind-protect
            (with-syntax-table electric-pair-text-syntax-table
-             ,@body)
-         (syntax-ppss-invalidate-cache ,start-var)))))
+             (funcall body-fun))
+         (syntax-ppss-invalidate-cache string-or-comment)))))
 
 (defun electric-pair-syntax-info (command-event)
   "Calculate a list (SYNTAX PAIR UNCONDITIONAL STRING-OR-COMMENT-START).
