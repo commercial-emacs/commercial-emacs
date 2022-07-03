@@ -201,11 +201,11 @@ position START, defaulting to point."
   (let ((start-var (make-symbol "start")))
     `(let ((syntax-propertize-function nil)
            (,start-var ,(or start '(point))))
-       (syntax-ppss-flush-cache ,start-var)
+       (syntax-ppss-invalidate-cache ,start-var)
        (unwind-protect
            (with-syntax-table electric-pair-text-syntax-table
              ,@body)
-         (syntax-ppss-flush-cache ,start-var)))))
+         (syntax-ppss-invalidate-cache ,start-var)))))
 
 (defun electric-pair-syntax-info (command-event)
   "Calculate a list (SYNTAX PAIR UNCONDITIONAL STRING-OR-COMMENT-START).
