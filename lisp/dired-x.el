@@ -82,11 +82,12 @@ files not writable by you are visited read-only."
 		 (other :tag "non-writable only" if-file-read-only))
   :group 'dired-x)
 
-(defcustom dired-omit-size-limit 30000
+(defcustom dired-omit-size-limit 100000
   "Maximum size for the \"omitting\" feature.
 If nil, there is no maximum size."
   :type '(choice (const :tag "no maximum" nil) integer)
-  :group 'dired-x)
+  :group 'dired-x
+  :version "29.1")
 
 (defcustom dired-omit-case-fold 'filesystem
   "Determine whether \"omitting\" patterns are case-sensitive.
@@ -227,17 +228,6 @@ to nil: a pipe using `zcat' or `gunzip -c' will be used."
   "If non-nil, then string of switches passed to `znew', example: \"-K\"."
   :type '(choice (const :tag "None" nil)
 		 (string :tag "Switches"))
-  :group 'dired-x)
-
-(defcustom dired-clean-up-buffers-too t
-  "Non-nil means offer to kill buffers visiting files and dirs deleted in Dired."
-  :type 'boolean
-  :group 'dired-x)
-
-(defcustom dired-clean-confirm-killing-deleted-buffers t
-  "If nil, don't ask whether to kill buffers visiting deleted files."
-  :version "26.1"
-  :type 'boolean
   :group 'dired-x)
 
 
