@@ -4176,11 +4176,6 @@ Default face attributes override any local face attributes.  */)
 	     the previously-cached vector.  */
 	  memcpy (attrs, oldface->lface, sizeof attrs);
 
-	  /* Make explicit any attributes whose value is 'reset'.  */
-	  for (int i = 1; i < LFACE_VECTOR_SIZE; i++)
-	    if (EQ (lvec[i], Qreset))
-	      lvec[i] = attrs[i];
-
 	  merge_face_vectors (NULL, f, lvec, attrs, 0);
 	  vcopy (local_lface, 0, attrs, LFACE_VECTOR_SIZE);
 	  newface = realize_face (c, lvec, DEFAULT_FACE_ID);
