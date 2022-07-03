@@ -4805,22 +4805,27 @@ Interactively with prefix argument, read FILE-NAME."
 (defvar manual-program) ; from man.el
 
 (defun dired-do-man ()
-  "Run `man' on this file."
-  (interactive)
+  "In Dired, run `man' on this file."
+  (interactive nil dired-mode)
   (require 'man)
   ;; FIXME: Move `dired-guess-shell-command' to dired.el to remove the
   ;;        need for requiring `dired-x'.
   (require 'dired-x)
-  (let* ((file (dired-get-filename))
+  (let* ((file (dired-get-file-for-visit))
          (manual-program (string-replace "*" "%s"
                                          (dired-guess-shell-command
                                           "Man command: " (list file)))))
     (Man-getpage-in-background file)))
 
 (defun dired-do-info ()
-  "Run `info' on this file."
-  (interactive)
-  (info (dired-get-filename)))
+  "In Dired, run `info' on this file."
+  (interactive nil dired-mode)
+  (info (dired-get-file-for-visit)))
+
+(defun dired-do-eww ()
+  "In Dired, visit file in EWW."
+  (interactive nil dired-mode)
+  (eww-open-file (dired-get-file-for-visit)))
 
 (provide 'dired)
 
