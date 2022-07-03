@@ -1809,17 +1809,25 @@ clients, no unsaved file-visiting buffers and no running processes
 anymore.
 
 @item
-With the argument @code{delete-frame}, when the last client frame is
-being closed, you are asked whether each unsaved file-visiting buffer
-must be saved and each unfinished process can be stopped, and if so,
-the server is stopped.
+With the argument @code{delete-last-frame}, when the last client frame
+is being closed, you are asked whether each unsaved file-visiting
+buffer must be saved and each unfinished process can be stopped, and
+if so, the server is stopped.
 
 @item
-With the argument @code{kill-terminal}, when the last client frame is
-being closed with @kbd{C-x C-c} (@code{save-buffers-kill-terminal}),
-you are asked whether each unsaved file-visiting buffer must be saved
-and each unfinished process can be stopped, and if so, the server is
-stopped.
+With the argument @code{kill-last-terminal} or @code{kill-terminal},
+when the last client terminal is being closed with @kbd{C-x C-c}
+(@code{save-buffers-kill-terminal}), you are asked whether each
+unsaved file-visiting buffer must be saved and each unfinished process
+can be stopped, and if so, the server is stopped.
+
+@item
+With the argument @code{kill-terminal}, when each client terminal but
+the last one is being closed with @kbd{C-x C-c}
+(@code{save-buffers-kill-terminal}), you are also asked whether
+unsaved file-visiting buffers must be saved, or, if
+@command{emacsclient} was started with a list of files to edit,
+whether these files must be saved.
 @end itemize
 
 @findex server-eval-at

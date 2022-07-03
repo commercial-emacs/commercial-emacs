@@ -1735,7 +1735,8 @@ With ARG non-nil, silently save all file-visiting buffers, then kill.
 If emacsclient was started with a list of filenames to edit, then
 only these files will be asked to be saved."
   (if server-stop-automatically
-      (server-stop-automatically--handle-delete-frame (selected-frame))
+      (server-stop-automatically--handle-delete-frame
+       (selected-frame) arg)
     (let ((proc (frame-parameter nil 'client)))
       (cond ((eq proc 'nowait)
 	     ;; Nowait frames have no client buffer list.
@@ -1758,7 +1759,7 @@ only these files will be asked to be saved."
 	       (server-delete-client proc)))
 	    (t (error "Invalid client frame"))))))
 
-(defun server-stop-automatically--handle-delete-frame (frame)
+(defun server-stop-automatically--handle-delete-frame (frame arg)
   "Handle deletion of FRAME when `server-stop-automatically' is used."
   (when server-stop-automatically
     (if (if (and (processp (frame-parameter frame 'client))
@@ -1772,13 +1773,22 @@ only these files will be asked to be saved."
 		  (let ((server-stop-automatically nil))
 		    (delete-frame f))))
 	      (if (cddr (frame-list))
-		  (let ((server-stop-automatically nil))
-		    (delete-frame frame)
-		    nil)
+		  (let ((kill-terminal
+			 (eq server-stop-automatically 'kill-terminal)))
+		    (let ((server-stop-automatically nil))
+		      (if kill-terminal
+			  (server-save-buffers-kill-terminal arg)
+			(delete-frame frame))
+		      nil))
 		t))
-	  (null (cddr (frame-list))))
+	  (if (and (eq (frame-parameter frame 'client) 'nowait)
+		   (cddr (frame-list)))
+	      (let ((server-stop-automatically nil))
+		(delete-frame frame)
+		nil)
+	    (null (cddr (frame-list)))))
 	(let ((server-stop-automatically nil))
-	  (save-buffers-kill-emacs)
+	  (save-buffers-kill-emacs arg)
 	  (delete-frame frame)))))
 
 (defun server-stop-automatically--maybe-kill-emacs ()
@@ -1804,16 +1814,24 @@ If ARG is the symbol `empty', stop the server when it has no
 remaining clients, no remaining unsaved file-visiting buffers,
 and no running processes with a `query-on-exit' flag.
 
-If ARG is the symbol `delete-frame', ask the user when the last
-frame is deleted whether each unsaved file-visiting buffer must
-be saved and each running process with a `query-on-exit' flag
-can be stopped, and if so, stop the server itself.
-
-If ARG is the symbol `kill-terminal', ask the user when the
-terminal is killed with \\[save-buffers-kill-terminal] \
-whether each unsaved file-visiting
-buffer must be saved and each running process with a `query-on-exit'
+If ARG is the symbol `delete-last-frame', ask the user when the
+last frame is deleted whether each unsaved file-visiting buffer
+must be saved and each running process with a `query-on-exit'
 flag can be stopped, and if so, stop the server itself.
+
+If ARG is the symbol `kill-last-terminal' or `kill-terminal',
+ask the user when the last terminal is killed with \
+\\[save-buffers-kill-terminal]
+whether each unsaved file-visiting buffer must be saved and each
+running process with a `query-on-exit' flag can be stopped, and
+if so, stop the server itself.
+
+If ARG is the symbol `kill-terminal', also ask the user when each
+but the last terminal is killed with \\[save-buffers-kill-terminal] \
+whether unsaved
+file-visiting buffers must be saved, or, if emacsclient was
+started with a list of files to edit, whether these files must be
+saved.
 
 Any other value of ARG will cause this function to signal an error.
 
@@ -1825,9 +1843,10 @@ This function is meant to be called from the user init file."
       (setq server-stop-automatically nil)
       (run-with-timer 10 2
 		      #'server-stop-automatically--maybe-kill-emacs))
-     ((eq arg 'delete-frame)
+     ((eq arg 'delete-last-frame)
       (add-hook 'delete-frame-functions
 		#'server-stop-automatically--handle-delete-frame))
+     ((eq arg 'kill-last-terminal))
      ((eq arg 'kill-terminal))
      (t
       (error "Unexpected argument")))))
