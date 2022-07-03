@@ -329,7 +329,7 @@ This list can be customized via `eww-suggest-uris'."
     (dolist (fun eww-suggest-uris)
       (let ((ret (funcall fun)))
 	(dolist (uri (if (stringp ret) (list ret) ret))
-	  (when (and uri (not (intern-soft uri obseen)))
+	  (when (and uri (stringp uri) (not (intern-soft uri obseen)))
 	    (intern uri obseen)
 	    (push   uri uris)))))
     (nreverse uris)))
