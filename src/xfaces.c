@@ -440,8 +440,7 @@ unregister_color (unsigned long pixel)
 void
 unregister_colors (unsigned long *pixels, int n)
 {
-  int i;
-  for (i = 0; i < n; ++i)
+  for (int i = 0; i < n; ++i)
     unregister_color (pixels[i]);
 }
 
@@ -1471,9 +1470,8 @@ compare_fonts_by_sort_order (const void *v1, const void *v2)
   Lisp_Object const *p2 = v2;
   Lisp_Object font1 = *p1;
   Lisp_Object font2 = *p2;
-  int i;
 
-  for (i = 0; i < FONT_SIZE_INDEX; i++)
+  for (int i = 0; i < FONT_SIZE_INDEX; i++)
     {
       enum font_property_index idx = font_props_for_sorting[i];
       Lisp_Object val1 = AREF (font1, idx), val2 = AREF (font2, idx);
@@ -2068,9 +2066,7 @@ get_lface_attributes (struct window *w,
 				  face_name, NAMED_MERGE_POINT_REMAP,
 				  &named_merge_points))
 	{
-	  int i;
-
-	  for (i = 1; i < LFACE_VECTOR_SIZE; ++i)
+	  for (int i = 1; i < LFACE_VECTOR_SIZE; ++i)
 	    attrs[i] = Qunspecified;
 
 	  return merge_face_ref (w, f, XCDR (face_remapping), attrs,
@@ -2090,15 +2086,12 @@ get_lface_attributes (struct window *w,
 static bool
 lface_fully_specified_p (Lisp_Object attrs[LFACE_VECTOR_SIZE])
 {
-  int i;
-
-  for (i = 1; i < LFACE_VECTOR_SIZE; ++i)
+  for (int i = 1; i < LFACE_VECTOR_SIZE; ++i)
     if (i != LFACE_FONT_INDEX && i != LFACE_INHERIT_INDEX
-        && i != LFACE_DISTANT_FOREGROUND_INDEX)
-      if ((UNSPECIFIEDP (attrs[i]) || IGNORE_DEFFACE_P (attrs[i])))
-	break;
-
-  return i == LFACE_VECTOR_SIZE;
+        && i != LFACE_DISTANT_FOREGROUND_INDEX
+	&& (UNSPECIFIEDP (attrs[i]) || IGNORE_DEFFACE_P (attrs[i])))
+      return false;
+  return true;
 }
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -2219,7 +2212,6 @@ merge_face_vectors (struct window *w,
 		    struct frame *f, const Lisp_Object *from, Lisp_Object *to,
                     struct named_merge_point *named_merge_points)
 {
-  int i;
   Lisp_Object font = Qnil;
 
   /* If FROM inherits from some other faces, merge their attributes into
@@ -2242,7 +2234,7 @@ merge_face_vectors (struct window *w,
       to[LFACE_FONT_INDEX] = font;
     }
 
-  for (i = 1; i < LFACE_VECTOR_SIZE; ++i)
+  for (int i = 1; i < LFACE_VECTOR_SIZE; ++i)
     if (!UNSPECIFIEDP (from[i]))
       {
 	if (i == LFACE_HEIGHT_INDEX && !FIXNUMP (from[i]))
@@ -2363,8 +2355,7 @@ merge_named_face (struct window *w,
       if (ok && !EQ (face_name, Qdefault))
 	{
 	  struct face *deflt = FACE_FROM_ID (f, DEFAULT_FACE_ID);
-	  int i;
-	  for (i = 1; i < LFACE_VECTOR_SIZE; i++)
+	  for (int i = 1; i < LFACE_VECTOR_SIZE; i++)
 	    if (EQ (from[i], Qreset))
 	      from[i] = deflt->lface[i];
 	}
@@ -2627,10 +2618,8 @@ merge_face_ref (struct window *w,
 		    return true;
 
 		  Lisp_Object scratch_attrs[LFACE_VECTOR_SIZE];
-		  int i;
-
 		  scratch_attrs[0] = Qface;
-		  for (i = 1; i < LFACE_VECTOR_SIZE; i++)
+		  for (int i = 1; i < LFACE_VECTOR_SIZE; i++)
 		    scratch_attrs[i] = Qunspecified;
 		  if (!merge_face_ref (w, f, parent_face, scratch_attrs,
 				       err_msgs, named_merge_points, 0))
@@ -2883,7 +2872,6 @@ Value is a vector of face attributes.  */)
 {
   Lisp_Object global_lface, lface;
   struct frame *f;
-  int i;
 
   CHECK_SYMBOL (face);
   global_lface = lface_from_face_name (NULL, face, false);
@@ -2919,7 +2907,7 @@ Value is a vector of face attributes.  */)
       Fputhash (face, Fcons (face_id, global_lface), Vface_new_frame_defaults);
     }
   else if (f == NULL)
-    for (i = 1; i < LFACE_VECTOR_SIZE; ++i)
+    for (int i = 1; i < LFACE_VECTOR_SIZE; ++i)
       ASET (global_lface, i, Qunspecified);
 
   /* Add a frame-local definition.  */
@@ -2932,7 +2920,7 @@ Value is a vector of face attributes.  */)
           Fputhash (face, lface, f->face_hash_table);
 	}
       else
-	for (i = 1; i < LFACE_VECTOR_SIZE; ++i)
+	for (int i = 1; i < LFACE_VECTOR_SIZE; ++i)
 	  ASET (lface, i, Qunspecified);
     }
   else
@@ -4151,7 +4139,6 @@ DEFUN ("internal-merge-in-global-face", Finternal_merge_in_global_face,
 Default face attributes override any local face attributes.  */)
   (Lisp_Object face, Lisp_Object frame)
 {
-  int i;
   Lisp_Object global_lface, local_lface, *gvec, *lvec;
   struct frame *f = XFRAME (frame);
 
@@ -4168,7 +4155,7 @@ Default face attributes override any local face attributes.  */)
      "global before local" priority.  */
   lvec = XVECTOR (local_lface)->contents;
   gvec = XVECTOR (global_lface)->contents;
-  for (i = 1; i < LFACE_VECTOR_SIZE; ++i)
+  for (int i = 1; i < LFACE_VECTOR_SIZE; ++i)
     if (IGNORE_DEFFACE_P (gvec[i]))
       ASET (local_lface, i, Qunspecified);
     else if (! UNSPECIFIEDP (gvec[i]))
@@ -4188,6 +4175,11 @@ Default face attributes override any local face attributes.  */)
 	  /* Ensure that the face vector is fully specified by merging
 	     the previously-cached vector.  */
 	  memcpy (attrs, oldface->lface, sizeof attrs);
+
+	  /* Make explicit any attributes whose value is 'reset'.  */
+	  for (int i = 1; i < LFACE_VECTOR_SIZE; i++)
+	    if (EQ (lvec[i], Qreset))
+	      lvec[i] = attrs[i];
 
 	  merge_face_vectors (NULL, f, lvec, attrs, 0);
 	  vcopy (local_lface, 0, attrs, LFACE_VECTOR_SIZE);
@@ -4327,10 +4319,9 @@ face_attr_equal_p (Lisp_Object v1, Lisp_Object v2)
 static bool
 lface_equal_p (Lisp_Object *v1, Lisp_Object *v2)
 {
-  int i;
   bool equal_p = true;
 
-  for (i = 1; i < LFACE_VECTOR_SIZE && equal_p; ++i)
+  for (int i = 1; i < LFACE_VECTOR_SIZE && equal_p; ++i)
     equal_p = face_attr_equal_p (v1[i], v2[i]);
 
   return equal_p;
@@ -4373,13 +4364,11 @@ If FRAME is omitted or nil, use the selected frame.  */)
 {
   struct frame *f = EQ (frame, Qt) ? NULL : decode_live_frame (frame);
   Lisp_Object lface = lface_from_face_name (f, face, true);
-  int i;
 
-  for (i = 1; i < LFACE_VECTOR_SIZE; ++i)
+  for (int i = 1; i < LFACE_VECTOR_SIZE; ++i)
     if (!UNSPECIFIEDP (AREF (lface, i)))
-      break;
-
-  return i == LFACE_VECTOR_SIZE ? Qt : Qnil;
+      return Qnil;
+  return Qt;
 }
 
 DEFUN ("frame--face-hash-table", Fframe_face_hash_table, Sframe_face_hash_table,
@@ -4656,8 +4645,7 @@ clear_face_gcs (struct face_cache *c)
 {
   if (c && FRAME_WINDOW_P (c->f))
     {
-      int i;
-      for (i = BASIC_FACE_ID_SENTINEL; i < c->used; ++i)
+      for (int i = BASIC_FACE_ID_SENTINEL; i < c->used; ++i)
 	{
 	  struct face *face = c->faces_by_id[i];
 	  if (face && face->gc)
@@ -4685,7 +4673,7 @@ free_realized_faces (struct face_cache *c)
 {
   if (c && c->used)
     {
-      int i, size;
+      int size;
       struct frame *f = c->f;
 
       /* We must block input here because we can't process X events
@@ -4693,7 +4681,7 @@ free_realized_faces (struct face_cache *c)
 	 current matrix still references freed faces.  */
       block_input ();
 
-      for (i = 0; i < c->used; ++i)
+      for (int i = 0; i < c->used; ++i)
 	{
 	  free_realized_face (f, c->faces_by_id[i]);
 	  c->faces_by_id[i] = NULL;
@@ -4796,10 +4784,13 @@ cache_face (struct face_cache *c, struct face *face, uintptr_t hash)
 
   /* Find a free slot in C->faces_by_id and use the index of the free
      slot as FACE->id.  */
+  face->id = c->used;
   for (i = 0; i < c->used; ++i)
     if (c->faces_by_id[i] == NULL)
-      break;
-  face->id = i;
+      {
+	face->id = i;
+	break;
+      }
 
 #ifdef GLYPH_DEBUG
   /* Check that FACE got a unique id.  */
@@ -4817,7 +4808,7 @@ cache_face (struct face_cache *c, struct face *face, uintptr_t hash)
 #endif /* GLYPH_DEBUG */
 
   /* Maybe enlarge C->faces_by_id.  */
-  if (i == c->used)
+  if (face->id == c->used)
     {
       if (c->used == c->size)
 	c->faces_by_id = xpalloc (c->faces_by_id, &c->size, 1, MAX_FACE_ID,
@@ -4825,7 +4816,7 @@ cache_face (struct face_cache *c, struct face *face, uintptr_t hash)
       c->used++;
     }
 
-  c->faces_by_id[i] = face;
+  c->faces_by_id[face->id] = face;
 }
 
 
@@ -4957,8 +4948,7 @@ lookup_named_face (struct window *w, struct frame *f,
   memcpy (attrs, default_face->lface, sizeof attrs);
 
   /* Make explicit any attributes whose value is 'reset'.  */
-  int i;
-  for (i = 1; i < LFACE_VECTOR_SIZE; i++)
+  for (int i = 1; i < LFACE_VECTOR_SIZE; i++)
     if (EQ (symbol_attrs[i], Qreset))
       symbol_attrs[i] = attrs[i];
 
@@ -5134,8 +5124,7 @@ lookup_derived_face (struct window *w,
   memcpy (attrs, default_face->lface, sizeof attrs);
 
   /* Make explicit any attributes whose value is 'reset'.  */
-  int i;
-  for (i = 1; i < LFACE_VECTOR_SIZE; i++)
+  for (int i = 1; i < LFACE_VECTOR_SIZE; i++)
     if (EQ (symbol_attrs[i], Qreset))
       symbol_attrs[i] = attrs[i];
 
@@ -5189,8 +5178,7 @@ gui_supports_face_attributes_p (struct frame *f,
   Lisp_Object lattrs[LFACE_VECTOR_SIZE];
 
   /* Make explicit any attributes whose value is 'reset'.  */
-  int i;
-  for (i = 1; i < LFACE_VECTOR_SIZE; i++)
+  for (int i = 1; i < LFACE_VECTOR_SIZE; i++)
     {
       if (EQ (attrs[i], Qreset))
 	lattrs[i] = def_attrs[i];
@@ -5244,7 +5232,6 @@ gui_supports_face_attributes_p (struct frame *f,
       int face_id;
       struct face *face;
       Lisp_Object merged_attrs[LFACE_VECTOR_SIZE];
-      int i;
 
       memcpy (merged_attrs, def_attrs, sizeof merged_attrs);
 
@@ -5261,7 +5248,7 @@ gui_supports_face_attributes_p (struct frame *f,
       if (face->font == def_face->font
 	  || ! face->font)
 	return false;
-      for (i = FONT_TYPE_INDEX; i <= FONT_SIZE_INDEX; i++)
+      for (int i = FONT_TYPE_INDEX; i <= FONT_SIZE_INDEX; i++)
 	if (! EQ (face->font->props[i], def_face->font->props[i]))
 	  {
 	    Lisp_Object s1, s2;
@@ -5497,7 +5484,6 @@ face for italic.  */)
   (Lisp_Object attributes, Lisp_Object display)
 {
   bool supports = false;
-  int i;
   Lisp_Object frame;
   struct frame *f;
   struct face *def_face;
@@ -5529,7 +5515,7 @@ face for italic.  */)
   CHECK_LIVE_FRAME (frame);
   f = XFRAME (frame);
 
-  for (i = 0; i < LFACE_VECTOR_SIZE; i++)
+  for (int i = 0; i < LFACE_VECTOR_SIZE; i++)
     attrs[i] = Qunspecified;
   merge_face_ref (NULL, f, attributes, attrs, true, NULL, 0);
 
@@ -5570,12 +5556,11 @@ Value is ORDER.  */)
   (Lisp_Object order)
 {
   Lisp_Object list;
-  int i;
+  int i = 0;
   int indices[ARRAYELTS (font_sort_order)];
 
   CHECK_LIST (order);
   memset (indices, 0, sizeof indices);
-  i = 0;
 
   for (list = order;
        CONSP (list) && i < ARRAYELTS (indices);
@@ -5909,8 +5894,7 @@ realize_named_face (struct frame *f, Lisp_Object symbol, int id)
 
   /* Handle the 'reset' pseudo-value of any attribute by replacing it
      with the corresponding value of the default face.  */
-  int i;
-  for (i = 1; i < LFACE_VECTOR_SIZE; i++)
+  for (int i = 1; i < LFACE_VECTOR_SIZE; i++)
     if (EQ (symbol_attrs[i], Qreset))
       symbol_attrs[i] = attrs[i];
   /* Merge SYMBOL's face with the default face.  */
@@ -6529,7 +6513,7 @@ face_at_buffer_position (struct window *w, ptrdiff_t pos,
   struct frame *f = XFRAME (w->frame);
   Lisp_Object attrs[LFACE_VECTOR_SIZE];
   Lisp_Object prop, position;
-  ptrdiff_t i, noverlays;
+  ptrdiff_t noverlays;
   Lisp_Object *overlay_vec;
   ptrdiff_t endpos;
   Lisp_Object propname = mouse ? Qmouse_face : Qface;
@@ -6608,7 +6592,8 @@ face_at_buffer_position (struct window *w, ptrdiff_t pos,
      from the overlays, if any.  */
   if (mouse)
     {
-      for (prop = Qnil, i = noverlays - 1; i >= 0 && NILP (prop); --i)
+      prop = Qnil;
+      for (ptrdiff_t i = noverlays - 1; i >= 0 && NILP (prop); --i)
 	{
 	  Lisp_Object oend;
 	  ptrdiff_t oendpos;
@@ -6631,7 +6616,7 @@ face_at_buffer_position (struct window *w, ptrdiff_t pos,
     }
   else
     {
-      for (i = 0; i < noverlays; i++)
+      for (ptrdiff_t i = 0; i < noverlays; i++)
 	{
 	  Lisp_Object oend;
 	  ptrdiff_t oendpos;
@@ -6855,11 +6840,10 @@ merge_faces (struct window *w, Lisp_Object face_name, int face_id,
 	{
 	  struct face *deflt = FACE_FROM_ID (f, DEFAULT_FACE_ID);
 	  Lisp_Object lface_attrs[LFACE_VECTOR_SIZE];
-	  int i;
 
 	  memcpy (lface_attrs, face->lface, LFACE_VECTOR_SIZE);
 	  /* Make explicit any attributes whose value is 'reset'.  */
-	  for (i = 1; i < LFACE_VECTOR_SIZE; i++)
+	  for (int i = 1; i < LFACE_VECTOR_SIZE; i++)
 	    if (EQ (lface_attrs[i], Qreset))
 	      lface_attrs[i] = deflt->lface[i];
 	  merge_face_vectors (w, f, lface_attrs, attrs, 0);
@@ -6963,10 +6947,8 @@ DEFUN ("dump-face", Fdump_face, Sdump_face, 0, 1, 0, doc: /* */)
 {
   if (NILP (n))
     {
-      int i;
-
       fputs ("font selection order: ", stderr);
-      for (i = 0; i < ARRAYELTS (font_sort_order); ++i)
+      for (int i = 0; i < ARRAYELTS (font_sort_order); ++i)
 	fprintf (stderr, "%d ", font_sort_order[i]);
       putc ('\n', stderr);
 
@@ -6974,7 +6956,7 @@ DEFUN ("dump-face", Fdump_face, Sdump_face, 0, 1, 0, doc: /* */)
       debug_print (Vface_alternative_font_family_alist);
       putc ('\n', stderr);
 
-      for (i = 0; i < FRAME_FACE_CACHE (SELECTED_FRAME ())->used; ++i)
+      for (int i = 0; i < FRAME_FACE_CACHE (SELECTED_FRAME ())->used; ++i)
 	Fdump_face (make_fixnum (i));
     }
   else
