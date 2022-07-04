@@ -5073,7 +5073,11 @@ xi_convert_button_state (XIButtonState *in, unsigned int *out)
 }
 
 /* Return the modifier state in XEV as a standard X modifier mask.  */
-static unsigned int
+
+#ifdef USE_GTK
+static
+#endif
+unsigned int
 xi_convert_event_state (XIDeviceEvent *xev)
 {
   unsigned int mods, buttons;
