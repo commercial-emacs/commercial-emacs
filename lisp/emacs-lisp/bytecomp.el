@@ -1085,10 +1085,8 @@ message buffer `default-directory'."
   :type '(repeat (choice (const :tag "Default" nil)
 			 (string :tag "Directory"))))
 
-(defvar emacs-lisp-compilation-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map "g" 'emacs-lisp-compilation-recompile)
-    map))
+(defvar-keymap emacs-lisp-compilation-mode-map
+  "g" #'emacs-lisp-compilation-recompile)
 
 (defvar emacs-lisp-compilation--current-file nil)
 
