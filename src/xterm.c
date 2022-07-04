@@ -23449,22 +23449,31 @@ For details, see etc/PROBLEMS.\n",
         /* We have just closed all frames on this display. */
         emacs_abort ();
 
-      XSETTERMINAL (tmp, dpyinfo->terminal);
-      Fdelete_terminal (tmp, Qnoelisp);
-    }
-
-  unblock_input ();
-
-  if (terminal_list == 0)
-    {
-      fprintf (stderr, "%s\n", error_msg);
-
-      if (!ioerror)
+      /* This was the last terminal remaining, so print the error
+	 message and associated error handlers and kill Emacs.  */
+      if (dpyinfo->terminal == terminal_list
+	  && !terminal_list->next_terminal)
 	{
-	  /* Dump the list of error handlers for debugging
-	     purposes.  */
+	  fprintf (stderr, "%s\n", error_msg);
 
-	  fprintf (stderr, "X error handlers currently installed:\n");
+	  if (!ioerror && dpyinfo)
+	    {
+	      /* Dump the list of error handlers for debugging
+		 purposes.  */
+
+	      fprintf (stderr, "X error handlers currently installed:\n");
+
+	      for (failable = dpyinfo->failable_requests;
+		   failable < dpyinfo->next_failable_request;
+		   ++failable)
+		{
+		  if (failable->end)
+		    fprintf (stderr, "Ignoring errors between %lu to %lu\n",
+			     failable->start, failable->end);
+		  else
+		    fprintf (stderr, "Ignoring errors from %lu onwards\n",
+			     failable->start);
+		}
 
 	  if (dpyinfo)
 	    for (failable = dpyinfo->failable_requests;
@@ -23484,8 +23493,14 @@ For details, see etc/PROBLEMS.\n",
 		     stack->first_request);
 	}
 
-      Fkill_emacs (make_fixnum (70), Qnil);
+      XSETTERMINAL (tmp, dpyinfo->terminal);
+      Fdelete_terminal (tmp, Qnoelisp);
     }
+
+  unblock_input ();
+
+  if (terminal_list == 0)
+    Fkill_emacs (make_fixnum (70), Qnil);
 
   totally_unblock_input ();
 
