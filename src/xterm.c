@@ -23466,17 +23466,18 @@ For details, see etc/PROBLEMS.\n",
 
 	  fprintf (stderr, "X error handlers currently installed:\n");
 
-	  for (failable = dpyinfo->failable_requests;
-	       failable < dpyinfo->next_failable_request;
-	       ++failable)
-	    {
-	      if (failable->end)
-		fprintf (stderr, "Ignoring errors between %lu to %lu\n",
-			 failable->start, failable->end);
-	      else
-		fprintf (stderr, "Ignoring errors from %lu onwards\n",
-			 failable->start);
-	    }
+	  if (dpyinfo)
+	    for (failable = dpyinfo->failable_requests;
+		 failable < dpyinfo->next_failable_request;
+		 ++failable)
+	      {
+		if (failable->end)
+		  fprintf (stderr, "Ignoring errors between %lu to %lu\n",
+			   failable->start, failable->end);
+		else
+		  fprintf (stderr, "Ignoring errors from %lu onwards\n",
+			   failable->start);
+	      }
 
 	  for (stack = x_error_message; stack; stack = stack->prev)
 	    fprintf (stderr, "Trapping errors from %lu\n",
