@@ -209,8 +209,7 @@ themselves."
                (not (string-match "\n.+$" string))
                (memq cmd-fun erc-noncommands-list))
       ;; Inhibit sending this string.
-      (with-no-warnings ;how to declare-function a cl-defmethod?
-        (setf (erc-input-insertp state) nil)))))
+      (setf (erc-input-insertp state) nil))))
 
 ;;; IRC control character processing.
 (defgroup erc-control-characters nil
