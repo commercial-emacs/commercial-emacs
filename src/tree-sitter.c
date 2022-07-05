@@ -537,11 +537,20 @@ DEFUN ("tree-sitter-cursor-at",
        doc: /* Return TSTreeCursor at POS. */)
   (Lisp_Object pos)
 {
-  uint32_t byte = BUFFER_TO_SITTER (XFIXNUM (pos));
-  Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
-  TSTreeCursor cursor = ts_tree_cursor_new (ts_node_first_child_for_byte
-					    (XTREE_SITTER_NODE (root_node)->node,
-					     byte));
+  uint32_t byte;
+  Lisp_Object root_node;
+  TSTreeCursor cursor;
+
+  if (NILP (pos))
+    pos = Fpoint ();
+
+  CHECK_FIXNUM (pos);
+
+  byte = BUFFER_TO_SITTER (XFIXNUM (pos));
+  root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
+  cursor = ts_tree_cursor_new (ts_node_first_child_for_byte
+			       (XTREE_SITTER_NODE (root_node)->node,
+				byte));
   for (TSNode node = ts_tree_cursor_current_node (&cursor);
        ! ts_node_is_null (node);
        (void) node)
@@ -557,7 +566,7 @@ DEFUN ("tree-sitter-cursor-at",
       else if (! ts_tree_cursor_goto_first_child (&cursor))
 	break;
       else
-	node = ts_tree_cursor_current_node(&cursor);
+	node = ts_tree_cursor_current_node (&cursor);
     }
   return make_cursor (cursor);
 }
@@ -566,7 +575,7 @@ DEFUN ("tree-sitter-goto-first-child",
        Ftree_sitter_goto_first_child, Stree_sitter_goto_first_child,
        1, 1, 0,
        doc: /* Move CURSOR to its first child.
-Return t if moved or nil if there were no children.  */)
+This is a no-op if CURSOR is at a leaf node.  */)
   (Lisp_Object cursor)
 {
   if (NILP (cursor))
@@ -574,15 +583,15 @@ Return t if moved or nil if there were no children.  */)
 
   CHECK_TREE_SITTER_CURSOR (cursor);
 
-  return ts_tree_cursor_goto_first_child (&XTREE_SITTER_CURSOR (cursor)->cursor)
-    ? Qt : Qnil;
+  ts_tree_cursor_goto_first_child (&XTREE_SITTER_CURSOR (cursor)->cursor);
+  return cursor;
 }
 
 DEFUN ("tree-sitter-goto-next-sibling",
        Ftree_sitter_goto_next_sibling, Stree_sitter_goto_next_sibling,
        1, 1, 0,
        doc: /* Move CURSOR to the next sibling of its current node.
-Return t if moved or nil if there was no next sibling node.  */)
+This is a no-op if no sibling follows.  */)
   (Lisp_Object cursor)
 {
   if (NILP (cursor))
@@ -590,15 +599,15 @@ Return t if moved or nil if there was no next sibling node.  */)
 
   CHECK_TREE_SITTER_CURSOR (cursor);
 
-  return ts_tree_cursor_goto_next_sibling (&XTREE_SITTER_CURSOR (cursor)->cursor)
-    ? Qt : Qnil;
+  ts_tree_cursor_goto_next_sibling (&XTREE_SITTER_CURSOR (cursor)->cursor);
+  return cursor;
 }
 
 DEFUN ("tree-sitter-goto-parent",
        Ftree_sitter_goto_parent, Stree_sitter_goto_parent,
        1, 1, 0,
-       doc: /* Move CURSOR to the parent of its current node.
-Return t if moved or nil if the cursor was already at the root node.  */)
+       doc: /* Return CURSOR after moving to the parent of its current node.
+This is a no-op if CURSOR was already at the root node.  */)
   (Lisp_Object cursor)
 {
   if (NILP (cursor))
@@ -606,8 +615,8 @@ Return t if moved or nil if the cursor was already at the root node.  */)
 
   CHECK_TREE_SITTER_CURSOR (cursor);
 
-  return ts_tree_cursor_goto_parent (&XTREE_SITTER_CURSOR (cursor)->cursor)
-    ? Qt : Qnil;
+  ts_tree_cursor_goto_parent (&XTREE_SITTER_CURSOR (cursor)->cursor);
+  return cursor;
 }
 
 DEFUN ("tree-sitter-node-at",
