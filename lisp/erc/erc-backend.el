@@ -2410,6 +2410,9 @@ See `erc-display-error-notice'." nil
 ;;   nil nil
 ;;   (ignore proc parsed))
 
+(cl-defstruct erc-input
+  string insertp sendp)
+
 (provide 'erc-backend)
 
 ;;; erc-backend.el ends here

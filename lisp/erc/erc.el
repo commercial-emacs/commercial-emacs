@@ -5881,9 +5881,6 @@ When the returned value is a string, pass it to `erc-error'.")
 (defvar erc-command-regexp "^/\\([A-Za-z']+\\)\\(\\s-+.*\\|\\s-*\\)$"
   "Regular expression used for matching commands in ERC.")
 
-(cl-defstruct erc-input
-  string insertp sendp)
-
 (cl-defstruct (erc--input-split (:include erc-input))
   lines cmdp)
 
