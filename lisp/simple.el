@@ -5455,7 +5455,7 @@ ring directly.")
 
 (defcustom kill-ring-max 120
   "Maximum length of kill ring before oldest elements are thrown away."
-  :type 'integer
+  :type 'natnum
   :group 'killing
   :version "29.1")
 
@@ -7025,13 +7025,13 @@ is set to the buffer displayed in that window.")
 
 (defcustom mark-ring-max 16
   "Maximum size of mark ring.  Start discarding off end if gets this big."
-  :type 'integer
+  :type 'natnum
   :group 'editing-basics)
 
 (defcustom global-mark-ring-max 16
   "Maximum size of global mark ring.  \
 Start discarding off end if gets this big."
-  :type 'integer
+  :type 'natnum
   :group 'editing-basics)
 
 (defun pop-to-mark-command ()
