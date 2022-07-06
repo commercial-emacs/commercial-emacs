@@ -11369,6 +11369,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 #ifndef USE_GTK
   struct x_display_info *event_display;
 #endif
+  unsigned int additional_mask;
 
   base = SPECPDL_INDEX ();
 
@@ -11572,7 +11573,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   if (EQ (return_frame, Qnow))
     x_dnd_return_frame = 2;
 
-  /* Now select for SubstructureNotifyMask and PropertyNotifyMask on
+  /* Now select for SubstructureNotifyMask and PropertyChangeMask on
      the root window, so we can get notified when window stacking
      changes, a common operation during drag-and-drop.  */
 
@@ -11580,11 +11581,15 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 			FRAME_DISPLAY_INFO (f)->root_window,
 			&root_window_attrs);
 
+  additional_mask = SubstructureNotifyMask;
+
+  if (x_dnd_use_toplevels)
+    additional_mask |= PropertyChangeMask;
+
   XSelectInput (FRAME_X_DISPLAY (f),
 		FRAME_DISPLAY_INFO (f)->root_window,
 		root_window_attrs.your_event_mask
-		| SubstructureNotifyMask
-		| PropertyChangeMask);
+		| additional_mask);
 
   if (EQ (return_frame, Qnow))
     x_dnd_update_state (FRAME_DISPLAY_INFO (f), CurrentTime);
@@ -16442,10 +16447,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    if (x_dnd_last_protocol_version != -1
 		&& x_dnd_in_progress
 		&& target == x_dnd_last_seen_window
-		&& event->xclient.data.l[1] & 2)
+		/* The XDND documentation is not very clearly worded.
+		   But this should be the correct behavior, since
+		   "kDNDStatusSendHereFlag" in the reference
+		   implementation is 2, and means the mouse rect
+		   should be ignored.  */
+		&& !(event->xclient.data.l[1] & 2))
 	      {
 		r1 = event->xclient.data.l[2];
-		r2 = event->xclient.data.l[2];
+		r2 = event->xclient.data.l[3];
 
 		x_dnd_mouse_rect_target = target;
 		x_dnd_mouse_rect.x = (r1 & 0xffff0000) >> 16;
