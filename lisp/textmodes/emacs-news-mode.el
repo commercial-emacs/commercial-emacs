@@ -25,6 +25,12 @@
 
 (eval-when-compile (require 'cl-lib))
 
+(declare-function outline-forward-same-level "outline")
+(declare-function outline-backward-same-level "outline")
+(declare-function outline-next-visible-heading "outline")
+(declare-function outline-previous-visible-heading "outline")
+(declare-function outline-up-heading "outline")
+
 (defgroup emacs-news-mode nil
   "Major mode for editing and viewing the Emacs NEWS file."
   :group 'lisp)
