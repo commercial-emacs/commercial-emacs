@@ -11874,6 +11874,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 			   && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
 			   && x_dnd_motif_setup_p)
 		    {
+		      xm_drop_start_message dmsg;
 		      dmsg.reason = XM_DRAG_REASON (XM_DRAG_ORIGINATOR_INITIATOR,
 						    XM_DRAG_REASON_DROP_START);
 		      dmsg.byte_order = XM_BYTE_ORDER_CUR_FIRST;
