@@ -611,13 +611,13 @@ static Lisp_Object concat_strings (ptrdiff_t nargs, Lisp_Object *args);
 Lisp_Object
 concat2 (Lisp_Object s1, Lisp_Object s2)
 {
-  return concat_strings (2, ((Lisp_Object []) {s1, s2}));
+  return concat_to_string (2, ((Lisp_Object []) {s1, s2}));
 }
 
 Lisp_Object
 concat3 (Lisp_Object s1, Lisp_Object s2, Lisp_Object s3)
 {
-  return concat_strings (3, ((Lisp_Object []) {s1, s2, s3}));
+  return concat_to_string (3, ((Lisp_Object []) {s1, s2, s3}));
 }
 
 DEFUN ("append", Fappend, Sappend, 0, MANY, 0,
@@ -630,7 +630,7 @@ usage: (append &rest SEQUENCES)  */)
 {
   if (nargs == 0)
     return Qnil;
-  return concat (nargs - 1, args, args[nargs - 1], false);
+  return concat_to_list (nargs - 1, args, args[nargs - 1]);
 }
 
 DEFUN ("concat", Fconcat, Sconcat, 0, MANY, 0,
@@ -643,7 +643,7 @@ to be `eq'.
 usage: (concat &rest SEQUENCES)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  return concat_strings (nargs, args);
+  return concat_to_string (nargs, args);
 }
 
 DEFUN ("vconcat", Fvconcat, Svconcat, 0, MANY, 0,
@@ -653,7 +653,7 @@ Each argument may be a list, vector or string.
 usage: (vconcat &rest SEQUENCES)   */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  return concat (nargs, args, Qnil, true);
+  return concat_to_vector (nargs, args);
 }
 
 
@@ -721,8 +721,8 @@ the same empty object instead of its copy.  */)
   wrong_type_argument (Qsequencep, arg);
 }
 
-/* This structure holds information of an argument of `concat_strings' that is
-   a string and has text properties to be copied.  */
+/* This structure holds information of an argument of `concat_to_string'
+   that is a string and has text properties to be copied.  */
 struct textprop_rec
 {
   ptrdiff_t argnum;		/* refer to ARGS (arguments of `concat') */
@@ -731,7 +731,7 @@ struct textprop_rec
 };
 
 static Lisp_Object
-concat_strings (ptrdiff_t nargs, Lisp_Object *args)
+concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 {
   USE_SAFE_ALLOCA;
 
@@ -927,19 +927,100 @@ concat_strings (ptrdiff_t nargs, Lisp_Object *args)
   return result;
 }
 
-/* Concatenate sequences into a list or vector. */
-
+/* Concatenate sequences into a list. */
 Lisp_Object
-concat (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail,
-	bool vector_target)
+concat_to_list (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail)
+{
+  /* Copy the contents of the args into the result.  */
+  Lisp_Object result = Qnil;
+  Lisp_Object last = Qnil;	/* Last cons in result if nonempty.  */
+
+  for (ptrdiff_t i = 0; i < nargs; i++)
+    {
+      Lisp_Object arg = args[i];
+      /* List arguments are treated specially since this is the common case.  */
+      if (CONSP (arg))
+	{
+	  Lisp_Object head = Fcons (XCAR (arg), Qnil);
+	  Lisp_Object prev = head;
+	  arg = XCDR (arg);
+	  FOR_EACH_TAIL (arg)
+	    {
+	      Lisp_Object next = Fcons (XCAR (arg), Qnil);
+	      XSETCDR (prev, next);
+	      prev = next;
+	    }
+	  CHECK_LIST_END (arg, arg);
+	  if (NILP (result))
+	    result = head;
+	  else
+	    XSETCDR (last, head);
+	  last = prev;
+	}
+      else if (NILP (arg))
+	;
+      else if (VECTORP (arg) || STRINGP (arg)
+	       || BOOL_VECTOR_P (arg) || COMPILEDP (arg))
+	{
+	  ptrdiff_t arglen = XFIXNUM (Flength (arg));
+	  ptrdiff_t argindex_byte = 0;
+
+	  /* Copy element by element.  */
+	  for (ptrdiff_t argindex = 0; argindex < arglen; argindex++)
+	    {
+	      /* Fetch next element of `arg' arg into `elt', or break if
+		 `arg' is exhausted. */
+	      Lisp_Object elt;
+	      if (STRINGP (arg))
+		{
+		  int c;
+		  if (STRING_MULTIBYTE (arg))
+		    {
+		      ptrdiff_t char_idx = argindex;
+		      c = fetch_string_char_advance_no_check (arg, &char_idx,
+							      &argindex_byte);
+		    }
+		  else
+		    c = SREF (arg, argindex);
+		  elt = make_fixed_natnum (c);
+		}
+	      else if (BOOL_VECTOR_P (arg))
+		elt = bool_vector_ref (arg, argindex);
+	      else
+		elt = AREF (arg, argindex);
+
+	      /* Store this element into the result.  */
+	      Lisp_Object node = Fcons (elt, Qnil);
+	      if (NILP (result))
+		result = node;
+	      else
+		XSETCDR (last, node);
+	      last = node;
+	    }
+	}
+      else
+	wrong_type_argument (Qsequencep, arg);
+    }
+
+  if (NILP (result))
+    result = last_tail;
+  else
+    XSETCDR (last, last_tail);
+
+  return result;
+}
+
+/* Concatenate sequences into a vector.  */
+Lisp_Object
+concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
 {
   /* Check argument types and compute total length of arguments.  */
   EMACS_INT result_len = 0;
   for (ptrdiff_t i = 0; i < nargs; i++)
     {
       Lisp_Object arg = args[i];
-      if (!(CONSP (arg) || NILP (arg) || VECTORP (arg) || STRINGP (arg)
-	    || COMPILEDP (arg) || BOOL_VECTOR_P (arg)))
+      if (!(VECTORP (arg) || CONSP (arg) || NILP (arg) || STRINGP (arg)
+	    || BOOL_VECTOR_P (arg) || COMPILEDP (arg)))
 	wrong_type_argument (Qsequencep, arg);
       EMACS_INT len = XFIXNAT (Flength (arg));
       result_len += len;
@@ -958,75 +1039,53 @@ concat (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail,
     : Fmake_list (make_fixnum (result_len), Qnil);
 
   /* Copy the contents of the args into the result.  */
-  Lisp_Object tail = Qnil;
-  ptrdiff_t toindex = 0;
-  if (CONSP (result))
-    {
-      tail = result;
-      toindex = -1;   /* -1 in toindex is flag we are making a list */
-    }
-
-  Lisp_Object prev = Qnil;
 
   for (ptrdiff_t i = 0; i < nargs; i++)
     {
-      ptrdiff_t arglen = 0;
-      ptrdiff_t argindex = 0;
-      ptrdiff_t argindex_byte = 0;
-
       Lisp_Object arg = args[i];
-      if (!CONSP (arg))
-	arglen = XFIXNUM (Flength (arg));
-
-      /* Copy element by element.  */
-      while (1)
+      if (VECTORP (arg))
 	{
-	  /* Fetch next element of `arg' arg into `elt', or break if
-	     `arg' is exhausted. */
-	  Lisp_Object elt;
-	  if (CONSP (arg))
+	  ptrdiff_t size = ASIZE (arg);
+	  memcpy (dst, XVECTOR (arg)->contents, size * sizeof *dst);
+	  dst += size;
+	}
+      else if (CONSP (arg))
+	do
+	  {
+	    *dst++ = XCAR (arg);
+	    arg = XCDR (arg);
+	  }
+	while (!NILP (arg));
+      else if (NILP (arg))
+	;
+      else if (STRINGP (arg))
+	{
+	  ptrdiff_t size = SCHARS (arg);
+	  if (STRING_MULTIBYTE (arg))
 	    {
-	      elt = XCAR (arg);
-	      arg = XCDR (arg);
-	    }
-	  else if (NILP (arg) || argindex >= arglen)
-	    break;
-	  else if (STRINGP (arg))
-	    {
-	      int c;
-	      if (STRING_MULTIBYTE (arg))
-		c = fetch_string_char_advance_no_check (arg, &argindex,
-							&argindex_byte);
-	      else
+	      ptrdiff_t byte = 0;
+	      for (ptrdiff_t i = 0; i < size;)
 		{
-		  c = SREF (arg, argindex);
-		  argindex++;
+		  int c = fetch_string_char_advance_no_check (arg, &i, &byte);
+		  *dst++ = make_fixnum (c);
 		}
-	      XSETFASTINT (elt, c);
-	    }
-	  else if (BOOL_VECTOR_P (arg))
-	    {
-	      elt = bool_vector_ref (arg, argindex);
-	      argindex++;
 	    }
 	  else
-	    {
-	      elt = AREF (arg, argindex);
-	      argindex++;
-	    }
-
-	  /* Store this element into the result.  */
-	  if (toindex < 0)
-	    {
-	      XSETCAR (tail, elt);
-	      prev = tail;
-	      tail = XCDR (tail);
-	    }
-	  else
-	    {
-	      ASET (result, toindex, elt);
-	      toindex++;
-	    }
+	    for (ptrdiff_t i = 0; i < size; i++)
+	      *dst++ = make_fixnum (SREF (arg, i));
+	}
+      else if (BOOL_VECTOR_P (arg))
+	{
+	  ptrdiff_t size = bool_vector_size (arg);
+	  for (ptrdiff_t i = 0; i < size; i++)
+	    *dst++ = bool_vector_ref (arg, i);
+	}
+      else
+	{
+	  eassert (COMPILEDP (arg));
+	  ptrdiff_t size = PVSIZE (arg);
+	  memcpy (dst, XVECTOR (arg)->contents, size * sizeof *dst);
+	  dst += size;
 	}
     }
   if (! NILP (prev))
