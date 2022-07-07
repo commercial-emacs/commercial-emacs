@@ -11910,9 +11910,8 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	      FRAME_DISPLAY_INFO (f)->grabbed = 0;
 	      current_hold_quit = NULL;
 
-	      /* Restore the old event mask.  */
+	      x_dnd_process_quit (f, FRAME_DISPLAY_INFO (f)->last_user_time);
 	      x_restore_events_after_dnd (f, &root_window_attrs);
-
 	      quit ();
 	    }
 #else
