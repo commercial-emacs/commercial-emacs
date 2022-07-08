@@ -1517,7 +1517,6 @@ public:
   BLocker cr_surface_lock;
 #endif
 
-  BPoint tt_absl_pos;
   BMessage *wait_for_release_message;
 
   EmacsView () : BView (BRect (0, 0, 0, 0), "Emacs",
@@ -1797,12 +1796,14 @@ public:
     struct haiku_mouse_motion_event rq;
     int32 windowid;
     EmacsWindow *window;
-    BToolTip *tooltip;
 
     window = (EmacsWindow *) Window ();
-    tooltip = ToolTip ();
 
-    rq.just_exited_p = transit == B_EXITED_VIEW;
+    if (transit == B_EXITED_VIEW)
+      rq.just_exited_p = true;
+    else
+      rq.just_exited_p = false;
+
     rq.x = point.x;
     rq.y = point.y;
     rq.window = window;
@@ -1815,10 +1816,6 @@ public:
       rq.dnd_message = true;
     else
       rq.dnd_message = false;
-
-    if (tooltip)
-      tooltip->SetMouseRelativeLocation (BPoint (-(point.x - tt_absl_pos.x),
-						 -(point.y - tt_absl_pos.y)));
 
     if (!grab_view_locker.Lock ())
       gui_abort ("Couldn't lock grab view locker");
@@ -3271,6 +3268,41 @@ public:
   }
 };
 
+/* A view that is added as a child of a tooltip's text view, and
+   prevents motion events from reaching it (thereby moving the
+   tooltip).  */
+class EmacsMotionSuppressionView : public BView
+{
+  void
+  AttachedToWindow (void)
+  {
+    BView *text_view, *tooltip_view;
+
+    /* We know that this view is a child of the text view, whose
+       parent is the tooltip view, and that the tooltip view has
+       already set its mouse event mask.  */
+
+    text_view = Parent ();
+
+    if (!text_view)
+      return;
+
+    tooltip_view = text_view->Parent ();
+
+    if (!tooltip_view)
+      return;
+
+    tooltip_view->SetEventMask (B_KEYBOARD_EVENTS, 0);
+  }
+
+public:
+  EmacsMotionSuppressionView (void) : BView (BRect (-1, -1, 1, 1),
+					     NULL, 0, 0)
+  {
+    return;
+  }
+};
+
 static int32
 start_running_application (void *data)
 {
@@ -4309,30 +4341,48 @@ BView_set_tooltip (void *view, const char *tooltip)
 
 /* Set VIEW's tooltip to a sticky tooltip at X by Y.  */
 void
-BView_set_and_show_sticky_tooltip (void *view, const char *tooltip,
-				   int x, int y)
+be_show_sticky_tooltip (void *view, const char *tooltip_text,
+			int x, int y)
 {
-  BToolTip *tip;
-  BView *vw = (BView *) view;
+  BToolTip *tooltip;
+  BView *vw, *tooltip_view;
+  BPoint point;
+
+  vw = (BView *) view;
+
   if (!vw->LockLooper ())
     gui_abort ("Failed to lock view while showing sticky tooltip");
-  vw->SetToolTip (tooltip);
-  tip = vw->ToolTip ();
-  BPoint pt;
-  EmacsView *ev = dynamic_cast<EmacsView *> (vw);
-  if (ev)
-    ev->tt_absl_pos = BPoint (x, y);
 
-  vw->GetMouse (&pt, NULL, 1);
-  pt.x -= x;
-  pt.y -= y;
+  vw->SetToolTip ((const char *) NULL);
 
-  pt.x = -pt.x;
-  pt.y = -pt.y;
+  /* If the tooltip text is empty, then a tooltip object won't be
+     created by SetToolTip.  */
+  if (tooltip_text[0] == '\0')
+    tooltip_text = " ";
 
-  tip->SetMouseRelativeLocation (pt);
-  tip->SetSticky (1);
-  vw->ShowToolTip (tip);
+  vw->SetToolTip (tooltip_text);
+
+  tooltip = vw->ToolTip ();
+
+  vw->GetMouse (&point, NULL, 1);
+  point.x -= x;
+  point.y -= y;
+
+  point.x = -point.x;
+  point.y = -point.y;
+
+  /* We don't have to make the tooltip sticky since not receiving
+     mouse movement is enough to prevent it from being hidden.  */
+  tooltip->SetMouseRelativeLocation (point);
+
+  /* Prevent the tooltip from moving in response to mouse
+     movement.  */
+  tooltip_view = tooltip->View ();
+
+  if (tooltip_view)
+    tooltip_view->AddChild (new EmacsMotionSuppressionView);
+
+  vw->ShowToolTip (tooltip);
   vw->UnlockLooper ();
 }
 

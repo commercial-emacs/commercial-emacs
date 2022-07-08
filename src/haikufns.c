@@ -1290,16 +1290,17 @@ compute_tip_xy (struct frame *f,
 static Lisp_Object
 haiku_hide_tip (bool delete)
 {
+  Lisp_Object it, frame;
+
   if (!NILP (tip_timer))
     {
       call1 (Qcancel_timer, tip_timer);
       tip_timer = Qnil;
     }
 
-  Lisp_Object it, frame;
   FOR_EACH_FRAME (it, frame)
-    if (FRAME_WINDOW_P (XFRAME (frame)) &&
-	FRAME_HAIKU_VIEW (XFRAME (frame)))
+    if (FRAME_WINDOW_P (XFRAME (frame))
+	&& FRAME_HAIKU_VIEW (XFRAME (frame)))
       BView_set_tooltip (FRAME_HAIKU_VIEW (XFRAME (frame)), NULL);
 
   if (NILP (tip_frame)
@@ -2391,8 +2392,8 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 		      reliable way to get it.  */
       compute_tip_xy (f, parms, dx, dy, width, height, &root_x, &root_y);
       BView_convert_from_screen (FRAME_HAIKU_VIEW (f), &root_x, &root_y);
-      BView_set_and_show_sticky_tooltip (FRAME_HAIKU_VIEW (f), SSDATA (string),
-					 root_x, root_y);
+      be_show_sticky_tooltip (FRAME_HAIKU_VIEW (f), SSDATA (string),
+			      root_x, root_y);
       unblock_input ();
       goto start_timer;
     }
