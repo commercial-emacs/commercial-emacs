@@ -6477,8 +6477,6 @@ x_set_frame_alpha (struct frame *f)
 
   opac = alpha * OPAQUE;
 
-  x_catch_errors (dpy);
-
   /* If there is a parent from the window manager, put the property there
      also, to work around broken window managers that fail to do that.
      Do this unconditionally as this function is called on reparent when
@@ -6487,10 +6485,16 @@ x_set_frame_alpha (struct frame *f)
   if (!FRAME_PARENT_FRAME (f))
     {
       parent = x_find_topmost_parent (f);
+
       if (parent != None)
-	XChangeProperty (dpy, parent, dpyinfo->Xatom_net_wm_window_opacity,
-			 XA_CARDINAL, 32, PropModeReplace,
-			 (unsigned char *) &opac, 1);
+	{
+	  x_ignore_errors_for_next_request (dpyinfo);
+	  XChangeProperty (dpy, parent,
+			   dpyinfo->Xatom_net_wm_window_opacity,
+			   XA_CARDINAL, 32, PropModeReplace,
+			   (unsigned char *) &opac, 1);
+	  x_stop_ignoring_errors (dpyinfo);
+	}
     }
 
   /* return unless necessary */
@@ -6547,7 +6551,7 @@ x_set_frame_alpha (struct frame *f)
   XChangeProperty (dpy, win, dpyinfo->Xatom_net_wm_window_opacity,
 		   XA_CARDINAL, 32, PropModeReplace,
 		   (unsigned char *) &opac, 1);
-  x_uncatch_errors ();
+  x_stop_ignoring_errors (dpyinfo);
 }
 
 /***********************************************************************
