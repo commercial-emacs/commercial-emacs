@@ -251,11 +251,6 @@ the functions you loaded will not be able to run.")
 (make-obsolete-variable 'byte-compile-dynamic "not worthwhile any more." "27.1")
 ;;;###autoload(put 'byte-compile-dynamic 'safe-local-variable 'booleanp)
 
-(defvar byte-compile-disable-print-circle nil
-  "If non-nil, disable `print-circle' on printing a byte-compiled code.")
-(make-obsolete-variable 'byte-compile-disable-print-circle nil "24.1")
-;;;###autoload(put 'byte-compile-disable-print-circle 'safe-local-variable 'booleanp)
-
 (defcustom byte-compile-dynamic-docstrings t
   "If non-nil, compile doc strings for lazy access.
 We bury the doc strings of functions and variables inside comments in
