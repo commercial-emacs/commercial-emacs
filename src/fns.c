@@ -726,7 +726,6 @@ the same empty object instead of its copy.  */)
 struct textprop_rec
 {
   ptrdiff_t argnum;		/* refer to ARGS (arguments of `concat') */
-  ptrdiff_t from;		/* refer to ARGS[argnum] (argument string) */
   ptrdiff_t to;			/* refer to VAL (the target string) */
 };
 
@@ -857,7 +856,6 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	  if (string_intervals (arg))
 	    {
 	      textprops[num_textprops].argnum = i;
-	      textprops[num_textprops].from = 0;
 	      textprops[num_textprops].to = toindex;
 	      num_textprops++;
 	    }
