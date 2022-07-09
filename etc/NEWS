@@ -1057,6 +1057,11 @@ The corresponding key "Y" is now bound by default in Dired.
 *** 'dired-do-relsymlink-regexp' moved from dired-x to dired.
 The corresponding key "% Y" is now bound by default in Dired.
 
+---
+*** 'M-G' is now bound to 'dired-goto-subdir'.
+Before, that binding was only available if the 'dired-x' package was
+loaded.
+
 +++
 *** 'dired-info' and 'dired-man' moved from dired-x to dired.
 The 'dired-info' and 'dired-man' commands have been moved from the
@@ -2253,8 +2258,9 @@ This change is now applied in 'dired-insert-directory'.
 'allout-mode-deactivate-hook', 'ansi-color-unfontify-region',
 'auth-source-forget-user-or-password', 'auth-source-hide-passwords',
 'auth-source-user-or-password', 'bibtex-complete',
-'bibtex-entry-field-alist', 'byte-compile-disable-print-circle',
-'cfengine-mode-abbrevs', 'chart-map', 'comint-dynamic-complete',
+'bibtex-entry-field-alist', 'buffer-substring-filters',
+'byte-compile-disable-print-circle', 'cfengine-mode-abbrevs',
+'chart-map', 'comint-dynamic-complete',
 'comint-dynamic-complete-as-filename',
 'comint-dynamic-simple-complete', 'command-history-map',
 'completion-annotate-function', 'condition-case-no-debug',
@@ -2262,7 +2268,8 @@ This change is now applied in 'dired-insert-directory'.
 'deferred-action-function', 'dired-x-submit-report',
 'eieio-defgeneric', 'eieio-defmethod', 'emacs-lock-from-exiting',
 'erc-complete-word', 'eshell-cmpl-suffix-list', 'eshell-for',
-'gnus-carpal', 'gnus-debug-exclude-variables', 'gnus-debug-files',
+'font-lock-maximum-size', 'gnus-carpal',
+'gnus-debug-exclude-variables', 'gnus-debug-files',
 'gnus-local-domain', 'gnus-outgoing-message-group',
 'gnus-registry-user-format-function-M', 'image-extension-data',
 'image-library-alist', 'inhibit-first-line-modes-regexps',

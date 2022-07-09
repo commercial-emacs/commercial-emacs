@@ -236,7 +236,6 @@ to nil: a pipe using `zcat' or `gunzip -c' will be used."
 (define-key dired-mode-map "\C-x\M-o" 'dired-omit-mode)
 (define-key dired-mode-map "\M-(" 'dired-mark-sexp)
 (define-key dired-mode-map "\M-!" 'dired-smart-shell-command)
-(define-key dired-mode-map "\M-G" 'dired-goto-subdir)
 (define-key dired-mode-map "F" 'dired-do-find-marked-files)
 (define-key dired-mode-map "V" 'dired-do-run-mail)
 
@@ -1137,14 +1136,6 @@ otherwise."
 
 
 ;;; Miscellaneous internal functions
-
-;; This should be a builtin
-(defun dired-buffer-more-recently-used-p (buffer1 buffer2)
-  "Return t if BUFFER1 is more recently used than BUFFER2.
-Considers buffers closer to the car of `buffer-list' to be more recent."
-  (and (not (equal buffer1 buffer2))
-       (memq buffer1 (buffer-list))
-       (not (memq buffer1 (memq buffer2 (buffer-list))))))
 
 ;; Needed if ls -lh is supported and also for GNU ls -ls.
 (defun dired-x--string-to-number (str)
