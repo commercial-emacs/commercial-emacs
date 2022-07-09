@@ -2285,7 +2285,7 @@ stupid (and also obsolete)."
         (print-level nil)
         (print-quoted t)
         (print-gensym t)
-        (print-circle (not byte-compile-disable-print-circle)))
+        (print-circle t))
     (if (and (memq (car-safe form)
                    '(defvaralias defvar defconst autoload custom-declare-variable))
              (stringp (nth 3 form)))
@@ -2340,7 +2340,7 @@ in the input buffer (now current), not in the output buffer."
               (print-level nil)
               (print-quoted t)
               (print-gensym t)
-              (print-circle (not byte-compile-disable-print-circle)))
+              (print-circle t))
           (when preface
             ;; FIXME: If cl-define-compiler-macro uses uninterned
             ;; "#:foo", we get:
