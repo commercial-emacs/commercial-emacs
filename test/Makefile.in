@@ -154,6 +154,9 @@ endif
 %.elc: %.el $(srcdir)/../lisp/emacs-lisp/bytecomp.el
 	$(AM_V_ELC)$(emacs_env) $(emacs) --batch -f batch-byte-compile $<
 
+ifdef EMACS_HYDRA_CI
+WRITE_LOG = 2>&1 | tee $@
+else
 ## Save logs, and show logs for failed tests.
 ifeq ($(GDB),)
 WRITE_LOG = > $@ 2>&1 || { STAT=$$?; cat $@; exit $$STAT; }
@@ -165,6 +168,7 @@ ifdef EMACS_HYDRA_CI
 lisp/net/tramp-tests.log \
 : WRITE_LOG = 2>&1 | tee $@
 endif
+## On Emba, always show logs for certain problematic tests.
 ifdef EMACS_EMBA_CI
 lisp/filenotify-tests.log lisp/net/tramp-tests.log src/emacs-module-tests.log \
 : WRITE_LOG = 2>&1 | tee $@
