@@ -163,10 +163,6 @@ WRITE_LOG = > $@ 2>&1 || { STAT=$$?; cat $@; exit $$STAT; }
 else
 WRITE_LOG =
 endif
-## On Hydra or Emba, always show logs for certain problematic tests.
-ifdef EMACS_HYDRA_CI
-lisp/net/tramp-tests.log \
-: WRITE_LOG = 2>&1 | tee $@
 endif
 ## On Emba, always show logs for certain problematic tests.
 ifdef EMACS_EMBA_CI
