@@ -1,4 +1,4 @@
-;;; browse-url.el --- pass a URL to a WWW browser  -*- lexical-binding: t; -*-
+;;; browse-url.el --- pass a URL to a web browser  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 1995-2022 Free Software Foundation, Inc.
 
@@ -24,23 +24,28 @@
 
 ;;; Commentary:
 
-;; This package provides functions which read a URL (Uniform Resource
-;; Locator) from the minibuffer, defaulting to the URL around point,
-;; and ask a World-Wide Web browser to load it.  It can also load the
-;; URL associated with the current buffer.  Different browsers use
-;; different methods of remote control so there is one function for
-;; each supported browser.  If the chosen browser is not running, it
-;; is started.  Currently there is support for the following browsers,
-;; as well as some other obsolete ones:
+;; This package provides functions which read a URL from the
+;; minibuffer, defaulting to the URL around point, and ask a web
+;; browser to load it.  It can also load the URL at point, or one
+;; associated with the current buffer.  The main functions are:
+
+;;   `browse-url'             Open URL
+;;   `browse-url-at-point'    Open URL at point
+;;   `browse-url-of-buffer'   Use web browser to display buffer
+;;   `browse-url-of-file'     Use web browser to display file
+
+;; Different browsers use different methods of remote control so there
+;; is one function for each supported browser.  If the chosen browser
+;; is not running, it is started.  Currently there is support for the
+;; following browsers, as well as some other obsolete ones:
 
 ;; Function                           Browser     Earliest version
-;; browse-url-mozilla                 Mozilla     Don't know
 ;; browse-url-firefox                 Firefox     Don't know (tried with 1.0.1)
 ;; browse-url-chrome                  Chrome      47.0.2526.111
 ;; browse-url-chromium                Chromium    3.0
 ;; browse-url-epiphany                GNOME Web (Epiphany)    Don't know
 ;; browse-url-webpositive             WebPositive 1.2-alpha (Haiku R1/beta3)
-;; browse-url-text-*	              Any text browser     0
+;; browse-url-text-*                  Any text browser     0
 ;; browse-url-generic                 arbitrary
 ;; browse-url-default-windows-browser MS-Windows browser
 ;; browse-url-default-macosx-browser  macOS browser
@@ -49,14 +54,12 @@
 ;; browse-url-elinks                  Elinks      Don't know (tried with 0.12.GIT)
 ;; eww-browse-url                     Emacs Web Wowser
 
-;; Browsers can cache Web pages so it may be necessary to tell them to
+;; Browsers can cache web pages so it may be necessary to tell them to
 ;; reload the current page if it has changed (e.g., if you have edited
 ;; it).  There is currently no perfect automatic solution to this.
 
-;; This package generalizes function html-previewer-process in Marc
-;; Andreessen's html-mode (LCD modes/html-mode.el.Z).  See also the
-;; ffap.el package.  The huge hyperbole package also contains similar
-;; functions.
+;; See also the ffap.el package.  The huge hyperbole package also
+;; contains similar functions.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Usage
@@ -82,14 +85,14 @@
 ;; M-x browse-url-of-dired-file RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Customization (~/.emacs)
+;; Customization (Init File)
 
 ;; To see what variables are available for customization, type
 ;; `M-x set-variable browse-url TAB'.  Better, use
 ;; `M-x customize-group browse-url'.
 
-;; Bind the browse-url commands to keys with the `C-c C-z' prefix
-;; (as used by html-helper-mode):
+;; Bind the browse-url commands to keys with the `C-c C-z' prefix:
+
 ;;	(keymap-global-set "C-c C-z ." 'browse-url-at-point)
 ;;	(keymap-global-set "C-c C-z b" 'browse-url-of-buffer)
 ;;	(keymap-global-set "C-c C-z r" 'browse-url-of-region)
@@ -150,7 +153,6 @@
 (defvar browse-url--browser-defcustom-type
   `(choice
     (function-item :tag "Emacs Web Wowser (EWW)" :value  eww-browse-url)
-    (function-item :tag "Mozilla" :value  browse-url-mozilla)
     (function-item :tag "Firefox" :value browse-url-firefox)
     (function-item :tag "Google Chrome" :value browse-url-chrome)
     (function-item :tag "Chromium" :value browse-url-chromium)
@@ -248,16 +250,19 @@ be used instead."
 (defcustom browse-url-mozilla-program "mozilla"
   "The name by which to invoke Mozilla."
   :type 'string)
+(make-obsolete-variable 'browse-url-mozilla-program nil "29.1")
 
 (defcustom browse-url-mozilla-arguments nil
   "A list of strings to pass to Mozilla as arguments."
   :type '(repeat (string :tag "Argument")))
+(make-obsolete-variable 'browse-url-mozilla-arguments nil "29.1")
 
 (defcustom browse-url-mozilla-startup-arguments browse-url-mozilla-arguments
   "A list of strings to pass to Mozilla when it starts up.
 Defaults to the value of `browse-url-mozilla-arguments' at the time
 `browse-url' is loaded."
   :type '(repeat (string :tag "Argument")))
+(make-obsolete-variable 'browse-url-mozilla-startup-arguments nil "29.1")
 
 (defun browse-url--find-executable (candidates default)
   (while (and candidates (not (executable-find (car candidates))))
@@ -341,6 +346,7 @@ Defaults to the value of `browse-url-epiphany-arguments' at the time
 If non-nil, then open the URL in a new tab rather than a new window if
 `browse-url-mozilla' is asked to open it in a new window."
   :type 'boolean)
+(make-obsolete-variable 'browse-url-mozilla-new-window-is-tab nil "29.1")
 
 (defcustom browse-url-firefox-new-window-is-tab nil
   "Whether to open up new windows in a tab or a new window.
@@ -1027,7 +1033,6 @@ instead of `browse-url-new-window-flag'."
      'browse-url-default-haiku-browser)
     ((browse-url-can-use-xdg-open) 'browse-url-xdg-open)
 ;;;    ((executable-find browse-url-gnome-moz-program) 'browse-url-gnome-moz)
-    ((executable-find browse-url-mozilla-program) 'browse-url-mozilla)
     ((executable-find browse-url-firefox-program) 'browse-url-firefox)
     ((executable-find browse-url-chromium-program) 'browse-url-chromium)
     ((executable-find browse-url-kde-program) 'browse-url-kde)
@@ -1079,6 +1084,7 @@ new tab in an existing window instead.
 
 When called non-interactively, optional second argument NEW-WINDOW is
 used instead of `browse-url-new-window-flag'."
+  (declare (obsolete nil "29.1"))
   (interactive (browse-url-interactive-arg "URL: "))
   (setq url (browse-url-encode-url url))
   (let* ((process-environment (browse-url-process-environment))
@@ -1105,6 +1111,7 @@ used instead of `browse-url-new-window-flag'."
 
 (defun browse-url-mozilla-sentinel (process url)
   "Handle a change to the process communicating with Mozilla."
+  (declare (obsolete nil "29.1"))
   (or (eq (process-exit-status process) 0)
       (let* ((process-environment (browse-url-process-environment)))
 	;; Mozilla is not running - start it
