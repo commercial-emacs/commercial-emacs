@@ -1267,7 +1267,7 @@ string_to_multibyte (Lisp_Object string)
   if (nbytes == nchars)
     return make_multibyte_string (SSDATA (string), nbytes, nbytes);
 
-  Lisp_Object ret = make_uninit_multibyte_string (nchars, nbytes);
+  Lisp_Object ret = make_multibyte_string (NULL, nchars, nbytes);
   str_to_multibyte (SDATA (ret), SDATA (string), nchars, nbytes);
   return ret;
 }

@@ -475,8 +475,7 @@ print_string (Lisp_Object string, Lisp_Object printcharfun)
 	  if (chars < bytes)
 	    {
 	      newstr = make_multibyte_string (NULL, chars, bytes);
-	      memcpy (SDATA (newstr), SDATA (string), chars);
-	      str_to_multibyte (SDATA (newstr), bytes, chars);
+	      str_to_multibyte (SDATA (newstr), SDATA (string), bytes, chars);
 	      string = newstr;
 	    }
 	}
