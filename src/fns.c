@@ -1218,36 +1218,6 @@ string_byte_to_char (Lisp_Object string, ptrdiff_t byte_index)
   return i;
 }
 
-/* Convert STRING to a multibyte string.  */
-
-static Lisp_Object
-string_make_multibyte (Lisp_Object string)
-{
-  unsigned char *buf;
-  ptrdiff_t nbytes;
-  Lisp_Object ret;
-  USE_SAFE_ALLOCA;
-
-  if (STRING_MULTIBYTE (string))
-    return string;
-
-  nbytes = count_size_as_multibyte (SDATA (string),
-				    SCHARS (string));
-  /* If all the chars are ASCII, they won't need any more bytes
-     once converted.  In that case, we can return STRING itself.  */
-  if (nbytes == SBYTES (string))
-    return string;
-
-  buf = SAFE_ALLOCA (nbytes);
-  copy_text (SDATA (string), buf, SBYTES (string),
-	     0, 1);
-
-  ret = make_multibyte_string ((char *) buf, SCHARS (string), nbytes);
-  SAFE_FREE ();
-
-  return ret;
-}
-
 
 /* Convert STRING (if unibyte) to a multibyte string without changing
    the number of characters.  Characters 0x80..0xff are interpreted as
@@ -1267,7 +1237,7 @@ string_to_multibyte (Lisp_Object string)
     return make_multibyte_string (SSDATA (string), nbytes, nbytes);
 
   Lisp_Object ret = make_multibyte_string (NULL, nchars, nbytes);
-  str_to_multibyte (SDATA (ret), SDATA (string), nchars, nbytes);
+  str_to_multibyte (SDATA (ret), SDATA (string), nchars);
   return ret;
 }
 
@@ -1320,7 +1290,7 @@ string the same way whether it is unibyte or multibyte.)  */)
   if (nbytes == nchars)
     return string;
 
-  Lisp_Object ret = make_uninit_multibyte_string (nchars, nbytes);
+  Lisp_Object ret = make_multibyte_string (NULL, nchars, nbytes);
   str_to_multibyte (SDATA (ret), SDATA (string), nchars);
   return ret;
 }
