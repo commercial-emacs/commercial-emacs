@@ -1431,7 +1431,7 @@ an error is signaled.  */)
     return string;
 
   ptrdiff_t chars = SCHARS (string);
-  Lisp_Object ret = make_uninit_string (chars);
+  Lisp_Object ret = make_unibyte_string (NULL, chars);
   unsigned char *src = SDATA (string);
   unsigned char *dst = SDATA (ret);
   for (ptrdiff_t i = 0; i < chars; i++)

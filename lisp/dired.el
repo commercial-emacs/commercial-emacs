@@ -2056,7 +2056,7 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
 
 
 ;;; Dired mode key bindings and menus
-
+(declare-function dired-do-relsymlink-regexp "dired-aux")
 (defvar-keymap dired-mode-map
   :doc "Local keymap for Dired mode buffers."
   :full t
