@@ -1026,33 +1026,6 @@ Return nil if FILENAME doesn't exist."
       ;; ...and the change description should be "interrupt".
       (should (equal '("interrupt\n") events)))))
 
-(ert-deftest process-async-https-with-delay ()
-  "Bug#49449: asynchronous TLS connection with delayed completion."
-  (skip-unless (not (getenv "CI")))
-  (skip-unless (and internet-is-working (gnutls-available-p)))
-  (let* (status
-         (network-security-level 'low)
-         (url-debug t)
-         (buf (url-http
-               #s(url "https" nil nil "elpa.gnu.org" nil
-                      "/packages/archive-contents" nil nil t silent t t)
-               (lambda (s) (setq status s))
-               '(nil) nil 'tls)))
-    (unwind-protect
-        (progn
-          (catch 'done
-            (dotimes (_i 40)
-              (when status
-                (throw 'done status))
-              (accept-process-output nil 0.1)))
-          (should status)
-          (should-not (plist-get status :error))
-          (should (buffer-live-p buf))
-          (should (> (buffer-size buf) 0)))
-      (when (buffer-live-p buf)
-        (let (kill-buffer-query-functions)
-          (kill-buffer buf))))))
-
 (ert-deftest process-num-processors ()
   "Sanity checks for num-processors."
   (should (equal (num-processors) (num-processors)))
