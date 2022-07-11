@@ -1580,9 +1580,12 @@ command_loop_1 (void)
 		{
 		  Lisp_Object txt
 		    = call1 (Vregion_extract_function, Qnil);
+
 		  if (XFIXNUM (Flength (txt)) > 0)
 		    /* Don't set empty selections.  */
 		    call2 (Qgui_set_selection, QPRIMARY, txt);
+
+		  CALLN (Frun_hook_with_args, Qpost_select_region_hook, txt);
 		}
 
 	      if (current_buffer != prev_buffer || MODIFF != prev_modiff)
@@ -12059,6 +12062,9 @@ syms_of_keyboard (void)
   DEFSYM (Qpre_command_hook, "pre-command-hook");
   DEFSYM (Qpost_command_hook, "post-command-hook");
 
+  /* Hook run after the region is selected.  */
+  DEFSYM (Qpost_select_region_hook, "post-select-region-hook");
+
   DEFSYM (Qundo_auto__add_boundary, "undo-auto--add-boundary");
   DEFSYM (Qundo_auto__undoably_changed_buffers,
           "undo-auto--undoably-changed-buffers");
@@ -13006,6 +13012,12 @@ When nil, the default, characters typed as part of passwords are
 not recorded.  The non-nil value countermands `inhibit--record-char',
 which see.  */);
   record_all_keys = false;
+
+  DEFVAR_LISP ("post-select-region-hook", Vpost_select_region_hook,
+    doc: /* Abnormal hook run after the region is selected.
+This usually happens as a result of `select-active-regions'.  The hook
+is called with one argument, the string that was selected.  */);;
+  Vpost_select_region_hook = Qnil;
 
   pdumper_do_now_and_after_load (syms_of_keyboard_for_pdumper);
 }
