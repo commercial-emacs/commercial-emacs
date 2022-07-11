@@ -870,9 +870,8 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	  else
 	    {
 	      /* Copy a single-byte string to a multibyte string.  */
-	      toindex_byte += copy_text (SDATA (arg),
-					 SDATA (result) + toindex_byte,
-					 nchars, 0, 1);
+	      toindex_byte += str_to_multibyte (SDATA (result) + toindex_byte,
+						SDATA (arg), nchars);
 	    }
 	  toindex += nchars;
 	}
@@ -1313,7 +1312,17 @@ string the same way whether it is unibyte or multibyte.)  */)
 {
   CHECK_STRING (string);
 
-  return string_make_multibyte (string);
+  if (STRING_MULTIBYTE (string))
+    return string;
+
+  ptrdiff_t nchars = SCHARS (string);
+  ptrdiff_t nbytes = count_size_as_multibyte (SDATA (string), nchars);
+  if (nbytes == nchars)
+    return string;
+
+  Lisp_Object ret = make_uninit_multibyte_string (nchars, nbytes);
+  str_to_multibyte (SDATA (ret), SDATA (string), nchars);
+  return ret;
 }
 
 DEFUN ("string-make-unibyte", Fstring_make_unibyte, Sstring_make_unibyte,

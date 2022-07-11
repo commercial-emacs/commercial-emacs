@@ -1283,8 +1283,6 @@ See Info node `(elisp) Integer Basics'."
     form))
 
 ;; Fixme: delete-char -> delete-region (byte-coded)
-;; optimize string-as-unibyte, string-as-multibyte, string-make-unibyte,
-;; string-make-multibyte for constant args.
 
 (put 'set 'byte-optimizer #'byte-optimize-set)
 (defun byte-optimize-set (form)
