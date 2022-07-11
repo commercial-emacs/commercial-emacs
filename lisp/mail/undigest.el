@@ -201,7 +201,6 @@ See rmail-digest-methods."
 
 (declare-function rmail-update-summary "rmailsum" (&rest ignore))
 
-;;;###autoload
 (defun undigestify-rmail-message ()
   "Break up a digest message into its constituent messages.
 Leaves original message, deleted, before the undigestified messages."
@@ -277,7 +276,6 @@ Leaves original message, deleted, before the undigestified messages."
 	  (set-buffer buff)
 	  (rmail-show-message current))))))
 
-;;;###autoload
 (defun unforward-rmail-message ()
   "Extract a forwarded message from the containing message.
 This puts the forwarded message into a separate rmail message following
@@ -377,9 +375,5 @@ forwarded with `rmail-enable-mime-composing' set to nil."
 	(rmail-show-message current)))))
 
 (provide 'undigest)
-
-;; Local Variables:
-;; generated-autoload-file: "rmail-loaddefs.el"
-;; End:
 
 ;;; undigest.el ends here
