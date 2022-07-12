@@ -534,7 +534,7 @@ DEFUN ("tree-sitter-node-of",
 DEFUN ("tree-sitter-cursor-at",
        Ftree_sitter_cursor_at, Stree_sitter_cursor_at,
        0, 1, 0,
-       doc: /* Return TSTreeCursor at POS. */)
+       doc: /* Return TSTreeCursor at or after POS. */)
   (Lisp_Object pos)
 {
   uint32_t byte;
@@ -603,6 +603,22 @@ This is a no-op if no sibling follows.  */)
   return cursor;
 }
 
+DEFUN ("tree-sitter-goto-prev-sibling",
+       Ftree_sitter_goto_prev_sibling, Stree_sitter_goto_prev_sibling,
+       1, 1, 0,
+       doc: /* Move CURSOR to the previous sibling of its current node.
+This is a no-op if no sibling precedes.  */)
+  (Lisp_Object cursor)
+{
+  if (NILP (cursor))
+    return Qnil;
+
+  CHECK_TREE_SITTER_CURSOR (cursor);
+
+  ts_tree_cursor_goto_prev_sibling (&XTREE_SITTER_CURSOR (cursor)->cursor);
+  return cursor;
+}
+
 DEFUN ("tree-sitter-goto-parent",
        Ftree_sitter_goto_parent, Stree_sitter_goto_parent,
        1, 1, 0,
@@ -621,9 +637,10 @@ This is a no-op if CURSOR was already at the root node.  */)
 
 DEFUN ("tree-sitter-node-at",
        Ftree_sitter_node_at, Stree_sitter_node_at,
-       0, 1, 0,
-       doc: /* Return TSNode at POS. */)
-  (Lisp_Object pos)
+       0, 2, 0,
+       doc: /* Return nearest node at or after POS.
+If PRECISE is non-nil, return nil if POS falls outside any node's range.  */)
+  (Lisp_Object pos, Lisp_Object precise)
 {
   TSNode node;
   const TSTree *tree;
@@ -642,12 +659,11 @@ DEFUN ("tree-sitter-node-at",
     return Qnil;
 
   node = ts_tree_node_at (tree, BUFFER_TO_SITTER (XFIXNUM (pos)));
-  if (ts_node_is_null (node)
-      || XFIXNUM (pos) < SITTER_TO_BUFFER (ts_node_start_byte (node))
-      || XFIXNUM (pos) >= SITTER_TO_BUFFER (ts_node_end_byte (node)))
-    return Qnil;
-
-  return make_node (node);
+  return (ts_node_is_null (node)
+	  || (! NILP (precise)
+	      && (XFIXNUM (pos) < SITTER_TO_BUFFER (ts_node_start_byte (node))
+		  || XFIXNUM (pos) >= SITTER_TO_BUFFER (ts_node_end_byte (node)))))
+    ? Qnil : make_node (node);
 }
 
 DEFUN ("tree-sitter-node-parent",
@@ -1309,6 +1325,7 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_first_named_child_for_byte);
   defsubr (&Stree_sitter_goto_first_child);
   defsubr (&Stree_sitter_goto_next_sibling);
+  defsubr (&Stree_sitter_goto_prev_sibling);
   defsubr (&Stree_sitter_goto_parent);
   defsubr (&Stree_sitter_node_descendant_for_byte_range);
   defsubr (&Stree_sitter_node_named_descendant_for_byte_range);

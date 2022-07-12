@@ -184,6 +184,30 @@ NILP(prop) it needs to proceed."
                                leftmost rightmost)
                        #'external-debugging-output)))))))))
 
+(defun tree-sitter-forward-node (&optional arg)
+  "Return character position of node ARG siblings from point.
+Upon reaching a final sibling, proceed from the parent node."
+  (unless (fixnump arg) (setq arg 1))
+  (let* ((cursor (tree-sitter-cursor-at))
+         (done
+          (catch 'done
+            (dotimes (_i arg cursor)
+              (unless (catch 'next
+                        (while t
+                          (if-let ((current (tree-sitter-node-of cursor))
+                                   (next (tree-sitter-node-of
+                                          (tree-sitter-goto-next-sibling cursor))))
+                              (if (tree-sitter-node-equal current next)
+                                  (let ((parent (tree-sitter-node-of
+                                                 (tree-sitter-goto-parent cursor))))
+                                    (when (tree-sitter-node-equal current parent)
+                                      (throw 'next nil)))
+                                (throw 'next next))
+                            (throw 'next nil))))
+                (throw 'done nil))))))
+    (or (tree-sitter-node-start (tree-sitter-node-of done))
+        (point-max))))
+
 (provide 'tree-sitter)
 
 ;;; tree-sitter.el ends here
