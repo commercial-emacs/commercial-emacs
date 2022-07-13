@@ -603,22 +603,6 @@ This is a no-op if no sibling follows.  */)
   return cursor;
 }
 
-DEFUN ("tree-sitter-goto-prev-sibling",
-       Ftree_sitter_goto_prev_sibling, Stree_sitter_goto_prev_sibling,
-       1, 1, 0,
-       doc: /* Move CURSOR to the previous sibling of its current node.
-This is a no-op if no sibling precedes.  */)
-  (Lisp_Object cursor)
-{
-  if (NILP (cursor))
-    return Qnil;
-
-  CHECK_TREE_SITTER_CURSOR (cursor);
-
-  ts_tree_cursor_goto_prev_sibling (&XTREE_SITTER_CURSOR (cursor)->cursor);
-  return cursor;
-}
-
 DEFUN ("tree-sitter-goto-parent",
        Ftree_sitter_goto_parent, Stree_sitter_goto_parent,
        1, 1, 0,
@@ -1325,7 +1309,6 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_first_named_child_for_byte);
   defsubr (&Stree_sitter_goto_first_child);
   defsubr (&Stree_sitter_goto_next_sibling);
-  defsubr (&Stree_sitter_goto_prev_sibling);
   defsubr (&Stree_sitter_goto_parent);
   defsubr (&Stree_sitter_node_descendant_for_byte_range);
   defsubr (&Stree_sitter_node_named_descendant_for_byte_range);
