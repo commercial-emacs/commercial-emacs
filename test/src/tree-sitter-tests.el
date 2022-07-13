@@ -75,7 +75,7 @@ void main (void) {
     (tree-sitter-tests-doit ".c" text
       (should (equal "primitive_type" (tree-sitter-node-type (tree-sitter-node-at 1))))
       (should (equal "(primitive_type)" (tree-sitter-node-string (tree-sitter-node-at 2))))
-      (should-not (tree-sitter-node-type (tree-sitter-node-at 5)))
+      (should-not (tree-sitter-node-type (tree-sitter-node-at 5 t)))
       (let ((node (tree-sitter-node-at 29))) ;; the "0" in "return 0"
         (should (tree-sitter-node-equal
                  node
