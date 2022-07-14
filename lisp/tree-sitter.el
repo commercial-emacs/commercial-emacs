@@ -222,11 +222,26 @@ tree-sitter-goto-prev-sibling."
 Move point forward an ARG number of balanced expressions.
 Return the number of unsatisfiable iterations."
   (unless (fixnump arg) (setq arg 1))
-  (catch 'done
-    (dotimes (i arg 0)
-      (if-let ((c (tree-sitter-node-end (tree-sitter-sexp-at))))
-          (goto-char c)
-        (throw 'done (- arg i))))))
+  (let ((ntimes (abs arg))
+        (func
+         (if (>= arg 0)
+             #'tree-sitter-node-end
+           (lambda (node)
+             (unless (eq (point) (point-min))
+               (if-let ((prev (tree-sitter-node-prev-sibling node)))
+                   (tree-sitter-node-start prev)
+                 (cl-loop with prev = node
+                          for parent = (tree-sitter-node-parent prev)
+                          until (not parent)
+                          do (setq prev (tree-sitter-node-prev-sibling parent))
+                          until prev
+                          finally return (or (tree-sitter-node-start prev)
+                                             (tree-sitter-node-start node)))))))))
+    (catch 'done
+      (dotimes (i ntimes 0)
+        (if-let ((c (funcall func (tree-sitter-sexp-at))))
+            (goto-char c)
+          (throw 'done (- ntimes i)))))))
 
 (defun tree-sitter-forward-sexp (&optional arg)
   (interactive "^p")

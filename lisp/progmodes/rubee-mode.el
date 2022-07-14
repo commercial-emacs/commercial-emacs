@@ -410,7 +410,8 @@ current block, a sibling block, or an outer block.  Do that (abs N) times."
                 (advice-add 'ruby-mode-forward-sexp :override
                             #'tree-sitter-forward-sexp)
                 (setq-local syntax-propertize-function #'ignore
-                            ruby-use-smie nil)))
+                            ruby-use-smie nil
+                            forward-sexp-function #'tree-sitter-forward-sexp-internal)))
 
 (provide 'rubee-mode)
 
