@@ -9931,7 +9931,7 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
     {
       Lisp_Object win;
       XSETWINDOW (win, window);
-      mark_object (win);
+      mark_object (&win);
     }
 }
 
