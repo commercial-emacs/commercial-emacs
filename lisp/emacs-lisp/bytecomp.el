@@ -3958,7 +3958,7 @@ and \(funcall (function foo)) will lose with autoloads."
 (byte-defop-compiler-1 quote)
 
 (defun byte-compile-setq (form)
-  (cl-assert (= (length form) 3))       ; normalised in macroexp
+  (cl-assert (= (length form) 3))       ; normalized in macroexp
   (let ((var (nth 1 form))
         (expr (nth 2 form)))
     (byte-compile-form expr)
