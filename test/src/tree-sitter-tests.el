@@ -26,6 +26,10 @@
 (declare-function tree-sitter-node-at "tree-sitter.c")
 (declare-function tree-sitter-node-type "tree-sitter.c")
 (declare-function tree-sitter--testable "tree-sitter.c")
+(declare-function tree-sitter-node-parent "tree-sitter.c")
+(declare-function tree-sitter-node-child "tree-sitter.c")
+(declare-function tree-sitter-node-equal "tree-sitter.c")
+(declare-function tree-sitter-node-string "tree-sitter.c")
 
 (defsubst tree-sitter-testable ()
   "Won't test osx since we don't bundle c.dylib into repo."
