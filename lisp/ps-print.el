@@ -6355,7 +6355,7 @@ If FACE is not a valid face name, use default face."
   ;; Generate some PostScript.
   (save-restriction
     (narrow-to-region from to)
-    (ps-print-ensure-fontified from to)
+    (font-lock-ensure from to)
     (deactivate-mark)                   ;bug#16866.
     (ps-generate-postscript-with-faces1 from to)))
 
@@ -6511,6 +6511,8 @@ If FACE is not a valid face name, use default face."
 
 (unless noninteractive
   (add-hook 'kill-emacs-query-functions #'ps-kill-emacs-check))
+
+(define-obsolete-function-alias 'ps-print-ensure-fontified #'font-lock-ensure "29.1")
 
 (provide 'ps-print)
 
