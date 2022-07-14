@@ -15015,10 +15015,10 @@ x_scroll_bar_expose (struct scroll_bar *bar, const XEvent *event)
 {
 #ifndef HAVE_XDBE
   Window w = bar->x_window;
+  int x, y, width, height;
 #else
   Drawable w = bar->x_drawable;
 #endif
-  int x, y, width, height;
 
   if (event->type == Expose)
     {
@@ -18718,10 +18718,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	       configureEvent.xconfigure.height,
 	       f->new_width, f->new_height);
 
+#ifdef HAVE_XDBE
 	  block_input ();
           if (FRAME_X_DOUBLE_BUFFERED_P (f))
             x_drop_xrender_surfaces (f);
           unblock_input ();
+#endif
           xg_frame_resized (f, configureEvent.xconfigure.width,
                             configureEvent.xconfigure.height);
 #ifdef USE_CAIRO
@@ -27966,7 +27968,8 @@ void
 mark_xterm (void)
 {
   Lisp_Object val;
-#if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS
+#if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS \
+  || defined HAVE_XRANDR || defined USE_GTK
   struct x_display_info *dpyinfo;
   int i;
 #endif
