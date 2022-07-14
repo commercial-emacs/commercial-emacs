@@ -15015,10 +15015,9 @@ x_scroll_bar_expose (struct scroll_bar *bar, const XEvent *event)
 {
 #ifndef HAVE_XDBE
   Window w = bar->x_window;
-  int x, y, width, height;
 #else
   Drawable w = bar->x_drawable;
-#endif
+  int x, y, width, height;
 
   if (event->type == Expose)
     {
@@ -15034,6 +15033,7 @@ x_scroll_bar_expose (struct scroll_bar *bar, const XEvent *event)
       width = event->xgraphicsexpose.width;
       height = event->xgraphicsexpose.height;
     }
+#endif
 
   struct frame *f = XFRAME (WINDOW_FRAME (XWINDOW (bar->window)));
   GC gc = f->output_data.x->normal_gc;
@@ -27971,7 +27971,9 @@ mark_xterm (void)
 #if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS \
   || defined HAVE_XRANDR || defined USE_GTK
   struct x_display_info *dpyinfo;
+#if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS
   int i;
+#endif
 #endif
 
   if (x_dnd_return_frame_object)
