@@ -212,11 +212,12 @@ tree-sitter-goto-prev-sibling."
 
 (defun tree-sitter-sexp-at (&optional pos)
   (unless (fixnump pos) (setq pos (point)))
-  (if (memq (syntax-class (syntax-after pos)) '(4 5))
-      (tree-sitter-node-of (tree-sitter-goto-parent (tree-sitter-cursor-at pos)))
-    (tree-sitter-node-at pos)))
+  (funcall (if (memq (syntax-class (syntax-after pos)) '(4 5))
+               #'tree-sitter-node-parent
+             #'identity)
+           (tree-sitter-node-at pos)))
 
-(defun tree-sitter-forward-sexp (&optional arg)
+(defun tree-sitter-forward-sexp-internal (&optional arg)
   "Candidate for `forward-sexp-function'.
 Move point forward an ARG number of balanced expressions.
 Return the number of unsatisfiable iterations."
@@ -226,6 +227,11 @@ Return the number of unsatisfiable iterations."
       (if-let ((c (tree-sitter-node-end (tree-sitter-sexp-at))))
           (goto-char c)
         (throw 'done (- arg i))))))
+
+(defun tree-sitter-forward-sexp (&optional arg)
+  (interactive "^p")
+  (let ((forward-sexp-function #'tree-sitter-forward-sexp-internal))
+    (forward-sexp arg)))
 
 (provide 'tree-sitter)
 
