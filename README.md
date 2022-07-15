@@ -23,16 +23,6 @@ make -j4
 src/emacs
 ```
 
-The `make` logic remains broken in the sense that frequently,
-incompatible artifacts from a previous build do not get rebuilt.
-Preceding the above with,
-
-```
-git clean -dfX
-```
-
-rebuilds from scratch.
-
 ### How often are you merging commits from GNU?
 
 Roughly every hour.
@@ -50,11 +40,13 @@ Roughly every hour.
 
 Install Rust library:
 ```bash
-git clone --depth 1 --branch 0.6.3alpha5 \
+git clone --depth 1 --branch 0.6.3alpha6 \
   https://github.com/commercial-emacs/tree-sitter.git
 make -C tree-sitter install
-pkg-config --exact-version=0.6.3alpha5 tree-sitter || echo not found
 ```
+
+Upon success the user is instructed to update `PKG_CONFIG_PATH` in his
+shell rc file.
 
 Then build emacs:
 ```bash
