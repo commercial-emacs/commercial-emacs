@@ -38,17 +38,17 @@ Roughly every hour.
 
 ### <a name="tree-sitter"></a>How can I try tree-sitter highlighting?
 
-Install Rust library:
+1. Install Rust library:
 ```bash
 git clone --depth 1 --branch 0.6.3alpha6 \
   https://github.com/commercial-emacs/tree-sitter.git
 make -C tree-sitter install
 ```
 
-Upon success the user is instructed to update `PKG_CONFIG_PATH` in his
+2. Upon success the user is instructed to update `PKG_CONFIG_PATH` in his
 shell rc file.
 
-Then build emacs:
+3. Then build emacs:
 ```bash
 ./autogen.sh
 ./configure --prefix=$HOME/.local --with-tree-sitter
