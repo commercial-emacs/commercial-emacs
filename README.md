@@ -48,7 +48,7 @@ make -C tree-sitter install
 2. Upon success the user is instructed to update `PKG_CONFIG_PATH` in his
 shell rc file.
 
-3. Then build emacs:
+3. Start a new shell and build emacs.
 ```bash
 ./autogen.sh
 ./configure --prefix=$HOME/.local --with-tree-sitter
