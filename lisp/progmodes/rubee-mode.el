@@ -405,12 +405,7 @@ current block, a sibling block, or an outer block.  Do that (abs N) times."
                                #'rubee-mode-parse-partial)
                 (advice-add 'ruby-mode-parse-partial :override
                             #'rubee-mode-parse-partial)
-                (advice-remove 'ruby-mode-forward-sexp
-                               #'tree-sitter-forward-sexp)
-                (advice-add 'ruby-mode-forward-sexp :override
-                            #'tree-sitter-forward-sexp)
                 (setq-local syntax-propertize-function #'ignore
-                            ruby-use-smie nil
                             forward-sexp-function #'tree-sitter-forward-sexp-internal)))
 
 (provide 'rubee-mode)
