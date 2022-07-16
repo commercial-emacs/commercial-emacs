@@ -1798,8 +1798,10 @@ current buffer and the selected frame, respectively."
                                (when (funcall testfn symbol)
                                  ;; Don't record the current entry in the stack.
                                  (setq help-xref-stack-item nil)
-                                 (cons name
-                                       (funcall descfn symbol buffer frame))))
+                                 (let ((help-xref-stack nil)
+                                       (help-xref-forward-stack nil))
+                                   (funcall descfn symbol buffer frame))
+                                 (cons name (buffer-string))))
                              describe-symbol-backends))))
              (single (null (cdr docs))))
         (while (cdr docs)
@@ -1820,6 +1822,8 @@ current buffer and the selected frame, respectively."
           ;; Don't record the `describe-variable' item in the stack.
           (setq help-xref-stack-item nil)
           (help-setup-xref (list #'describe-symbol symbol) nil))
+        (goto-char (point-max))
+        (help-xref--navigation-buttons)
         (goto-char (point-min))))))
 
 ;;;###autoload
