@@ -235,7 +235,7 @@ server there that you can connect to.  See also
 					  (const :format "" "password")
 					  (string :format "Password: %v")))))))
 
-(make-obsolete 'nntp-authinfo-file nil "24.1")
+(make-obsolete-variable 'nntp-authinfo-file 'netrc-file "24.1")
 
 (defvoo nntp-connection-timeout nil
   "Number of seconds to wait before an nntp connection times out.
