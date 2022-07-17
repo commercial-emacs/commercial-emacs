@@ -290,7 +290,7 @@ Note that this is the default face to use if
 
 ;; Functions:
 
-(defun erc-add-entry-to-list (list prompt &optional completions)
+(defun erc-add-entry-to-list (list prompt &optional completions regexpp)
   "Add an entry interactively to a list.
 LIST must be passed as a symbol
 The query happens using PROMPT.
@@ -300,6 +300,8 @@ Completion is performed on the optional alist COMPLETIONS."
 		completions
 		(lambda (x)
 		  (not (erc-member-ignore-case (car x) (symbol-value list)))))))
+    (when regexpp
+      (setq entry (regexp-quote entry)))
     (if (erc-member-ignore-case entry (symbol-value list))
 	(error "\"%s\" is already on the list" entry)
       (set list (cons entry (symbol-value list))))))
@@ -330,7 +332,8 @@ car is the string."
 (defun erc-add-pal ()
   "Add pal interactively to `erc-pals'."
   (interactive)
-  (erc-add-entry-to-list 'erc-pals "Add pal: " (erc-get-server-nickname-alist)))
+  (erc-add-entry-to-list 'erc-pals "Add pal: "
+                         (erc-get-server-nickname-alist) t))
 
 ;;;###autoload
 (defun erc-delete-pal ()
@@ -343,7 +346,7 @@ car is the string."
   "Add fool interactively to `erc-fools'."
   (interactive)
   (erc-add-entry-to-list 'erc-fools "Add fool: "
-			 (erc-get-server-nickname-alist)))
+                         (erc-get-server-nickname-alist) t))
 
 ;;;###autoload
 (defun erc-delete-fool ()
@@ -355,7 +358,7 @@ car is the string."
 (defun erc-add-keyword ()
   "Add keyword interactively to `erc-keywords'."
   (interactive)
-  (erc-add-entry-to-list 'erc-keywords "Add keyword: "))
+  (erc-add-entry-to-list 'erc-keywords "Add keyword: " nil t))
 
 ;;;###autoload
 (defun erc-delete-keyword ()
@@ -367,7 +370,7 @@ car is the string."
 (defun erc-add-dangerous-host ()
   "Add dangerous-host interactively to `erc-dangerous-hosts'."
   (interactive)
-  (erc-add-entry-to-list 'erc-dangerous-hosts "Add dangerous-host: "))
+  (erc-add-entry-to-list 'erc-dangerous-hosts "Add dangerous-host: " nil t))
 
 ;;;###autoload
 (defun erc-delete-dangerous-host ()
@@ -388,19 +391,19 @@ NICKUSERHOST will be ignored."
 (defun erc-match-pal-p (nickuserhost _msg)
   "Check whether NICKUSERHOST is in `erc-pals'.
 MSG will be ignored."
-  (and nickuserhost
+  (and nickuserhost erc-pals
        (erc-list-match erc-pals nickuserhost)))
 
 (defun erc-match-fool-p (nickuserhost msg)
   "Check whether NICKUSERHOST is in `erc-fools' or MSG is directed at a fool."
-  (and msg nickuserhost
+  (and msg nickuserhost erc-fools
        (or (erc-list-match erc-fools nickuserhost)
 	   (erc-match-directed-at-fool-p msg))))
 
 (defun erc-match-keyword-p (_nickuserhost msg)
   "Check whether any keyword of `erc-keywords' matches for MSG.
 NICKUSERHOST will be ignored."
-  (and msg
+  (and msg erc-keywords
        (erc-list-match
 	(mapcar (lambda (x)
 		  (if (listp x)
@@ -412,7 +415,7 @@ NICKUSERHOST will be ignored."
 (defun erc-match-dangerous-host-p (nickuserhost _msg)
   "Check whether NICKUSERHOST is in `erc-dangerous-hosts'.
 MSG will be ignored."
-  (and nickuserhost
+  (and nickuserhost erc-dangerous-hosts
        (erc-list-match erc-dangerous-hosts nickuserhost)))
 
 (defun erc-match-directed-at-fool-p (msg)
@@ -517,7 +520,7 @@ Use this defun with `erc-insert-modify-hook'."
 			     (face match-face))
 			 (when (consp regex)
 			   (setq regex (car elt)
-				 face (cdr elt)))
+                                 face (list (cadr elt) 'erc-keyword-face)))
 			 (goto-char (+ 2 (or nick-end
 					     (point-min))))
 			 (while (re-search-forward regex nil t)
@@ -643,6 +646,35 @@ This function should be called from `erc-text-matched-hook'."
 This function is meant to be called from `erc-text-matched-hook'."
   (when (member match-type erc-beep-match-types)
     (beep)))
+
+(declare-function text-property-search-forward "text-property-search"
+                  (property &optional value predicate not-current))
+(declare-function text-property-search-backward "text-property-search"
+                  (property &optional value predicate not-current))
+
+(defun erc-match-next-keyword (arg)
+  "Jump to the ARGth next keyword, if any."
+  (interactive "p")
+  (require 'text-property-search)
+  (let* ((f (if (< arg 0)
+                #'text-property-search-backward
+              #'text-property-search-forward))
+         (i (1+ (abs arg)))
+         (test (lambda (a b) (if (consp b) (memq a b) (eq a b))))
+         (args `(font-lock-face erc-keyword-face ,test t))
+         (opoint (and (> (point) erc-insert-marker) (point)))
+         m)
+    (when opoint
+      (goto-char erc-insert-marker))
+    (while (and (not (zerop (cl-decf i))) (setq m (apply f args)))
+      (goto-char (prop-match-beginning m)))
+    (unless (or m (not opoint))
+      (goto-char opoint))))
+
+(defun erc-match-previous-keyword (arg)
+  "Jump to the ARGth previous keyword, if any"
+  (interactive "p")
+  (erc-match-next-keyword (- arg)))
 
 (provide 'erc-match)
 
