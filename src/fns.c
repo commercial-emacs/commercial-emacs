@@ -6025,6 +6025,8 @@ The same variable also affects the function `read-answer'.  */);
   defsubr (&Scopy_alist);
   defsubr (&Ssubstring);
   defsubr (&Ssubstring_no_properties);
+  defsubr (&Stake);
+  defsubr (&Sntake);
   defsubr (&Snthcdr);
   defsubr (&Snth);
   defsubr (&Selt);
