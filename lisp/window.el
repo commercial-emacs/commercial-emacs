@@ -7659,6 +7659,9 @@ Action alist entries are:
     Possible values are nil (the selected frame), t (any live
     frame), visible (any visible frame), 0 (any visible or
     iconified frame) or an existing live frame.
+ `redirect-frame-focus' -- The value t means to redirect focus
+    from the frame used for display to the frame selected at the
+    time `display-buffer' was called (if these are different).
  `pop-up-frame-parameters' -- The value specifies an alist of
     frame parameters to give a new frame, if one is created.
  `window-height' -- The value specifies the desired height of the
@@ -7801,6 +7804,7 @@ indirectly called by the latter."
               (lambda (frame)
                 (and (not (eq frame (selected-frame)))
                      (get-lru-window frame)))))
+         (selected-frame (selected-frame))
          (frame (car (filtered-frame-list predicate)))
          (window
           (and frame
@@ -7810,7 +7814,10 @@ indirectly called by the latter."
       (prog1
           (window--display-buffer buffer window 'reuse alist)
         (unless (cdr (assq 'inhibit-switch-frame alist))
-          (window--maybe-raise-frame frame))))))
+          (window--maybe-raise-frame frame))
+        (when (and (cdr (assq 'redirect-frame-focus alist))
+                   (not (eq frame selected-frame)))
+          (redirect-frame-focus frame selected-frame))))))
 
 (defun display-buffer-same-window (buffer alist)
   "Display BUFFER in the selected window.
@@ -7895,6 +7902,7 @@ node `(elisp) Buffer Display Action Functions'.  It should be
 called only by `display-buffer' or a function directly or
 indirectly called by the latter."
   (let* ((alist-entry (assq 'reusable-frames alist))
+         (selected-frame (selected-frame))
 	 (frames (cond (alist-entry (cdr alist-entry))
 		       ((if (eq pop-up-frames 'graphic-only)
 			    (display-graphic-p)
@@ -7923,7 +7931,11 @@ indirectly called by the latter."
     (when (window-live-p window)
       (prog1 (window--display-buffer buffer window 'reuse alist)
 	(unless (cdr (assq 'inhibit-switch-frame alist))
-	  (window--maybe-raise-frame (window-frame window)))))))
+	  (window--maybe-raise-frame (window-frame window)))
+        (when (and (cdr (assq 'redirect-frame-focus alist))
+                   (not (eq (window-frame window) selected-frame)))
+          (redirect-frame-focus
+           (window-frame window) selected-frame))))))
 
 (defun display-buffer-reuse-mode-window (buffer alist)
   "Return a window based on the mode of the buffer it displays.
@@ -7996,7 +8008,11 @@ indirectly called by the latter."
         (when (window-live-p window)
           (prog1 (window--display-buffer buffer window 'reuse alist)
             (unless (cdr (assq 'inhibit-switch-frame alist))
-              (window--maybe-raise-frame (window-frame window)))))))))
+              (window--maybe-raise-frame (window-frame window)))
+            (when (and (cdr (assq 'redirect-frame-focus alist))
+                       (not (eq (window-frame window) curframe)))
+              (redirect-frame-focus
+               (window-frame window) curframe))))))))
 
 (defun display-buffer--special-action (buffer)
   "Return special display action for BUFFER, if any.
@@ -8033,6 +8049,7 @@ indirectly called by the latter."
   (let* ((params (cdr (assq 'pop-up-frame-parameters alist)))
 	 (pop-up-frame-alist (append params pop-up-frame-alist))
 	 (fun pop-up-frame-function)
+         (selected-frame (selected-frame))
 	 frame window)
     (when (and fun
 	       ;; Make BUFFER current so `make-frame' will use it as the
@@ -8041,8 +8058,11 @@ indirectly called by the latter."
 		 (setq frame (funcall fun)))
 	       (setq window (frame-selected-window frame)))
       (prog1 (window--display-buffer buffer window 'frame alist)
-	(unless (cdr (assq 'inhibit-switch-frame alist))
-	  (window--maybe-raise-frame frame))))))
+        (unless (cdr (assq 'inhibit-switch-frame alist))
+	  (window--maybe-raise-frame frame))
+        (when (and (cdr (assq 'redirect-frame-focus alist))
+                   (not (eq frame selected-frame)))
+          (redirect-frame-focus frame selected-frame))))))
 
 (defun display-buffer-pop-up-window (buffer alist)
   "Display BUFFER by popping up a new window.
@@ -8064,7 +8084,8 @@ called only by `display-buffer' or a function directly or
 indirectly called by the latter."
   (let ((frame (or (window--frame-usable-p (selected-frame))
 		   (window--frame-usable-p (last-nonminibuffer-frame))))
-	window)
+        (selected-frame (selected-frame))
+        window)
     (when (and (or (not (frame-parameter frame 'unsplittable))
 		   ;; If the selected frame cannot be split, look at
 		   ;; `last-nonminibuffer-frame'.
@@ -8080,7 +8101,10 @@ indirectly called by the latter."
 
       (prog1 (window--display-buffer buffer window 'window alist)
 	(unless (cdr (assq 'inhibit-switch-frame alist))
-	  (window--maybe-raise-frame (window-frame window)))))))
+	  (window--maybe-raise-frame (window-frame window)))
+        (when (and (cdr (assq 'redirect-frame-focus alist))
+                   (not (eq frame selected-frame)))
+          (redirect-frame-focus frame selected-frame))))))
 
 (defun display-buffer--maybe-pop-up-frame-or-window (buffer alist)
   "Try displaying BUFFER based on `pop-up-frames' or `pop-up-windows'.
@@ -8164,7 +8188,9 @@ indirectly called by the latter."
 
     (prog1 (window--display-buffer buffer window type alist)
       (unless (cdr (assq 'inhibit-switch-frame alist))
-	(window--maybe-raise-frame frame)))))
+	(window--maybe-raise-frame frame))
+      (when (cdr (assq 'redirect-frame-focus alist))
+        (redirect-frame-focus frame parent)))))
 
 (defun windows-sharing-edge (&optional window edge within)
   "Return list of live windows sharing the same edge with WINDOW.
@@ -8534,7 +8560,8 @@ indirectly called by the latter."
   (let* ((not-this-window (cdr (assq 'inhibit-same-window alist)))
 	 (frame (or (window--frame-usable-p (selected-frame))
 		    (window--frame-usable-p (last-nonminibuffer-frame))))
-	 (window
+         (selected-frame (selected-frame))
+         (window
 	  ;; Reuse an existing window.
 	  (or (get-lru-window frame nil not-this-window)
 	      (let ((window (get-buffer-window buffer 'visible)))
@@ -8564,7 +8591,11 @@ indirectly called by the latter."
 	  (window--display-buffer buffer window 'reuse alist)
 	(window--even-window-sizes window)
 	(unless (cdr (assq 'inhibit-switch-frame alist))
-	  (window--maybe-raise-frame (window-frame window)))))))
+	  (window--maybe-raise-frame (window-frame window)))
+        (when (and (cdr (assq 'redirect-frame-focus alist))
+                   (not (eq (window-frame window) selected-frame)))
+          (redirect-frame-focus
+           (window-frame window) selected-frame))))))
 
 (defun display-buffer-no-window (_buffer alist)
   "Display BUFFER in no window.
