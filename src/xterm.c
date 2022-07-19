@@ -28151,7 +28151,7 @@ mark_xterm (void)
   if (x_dnd_wheel_frame)
     {
       XSETFRAME (val, x_dnd_wheel_frame);
-      mark_object (val);
+      mark_object (&val);
     }
 
 #if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS \
