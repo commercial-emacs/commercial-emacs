@@ -5,7 +5,7 @@
 ;; Author: Noah Friedman <friedman@splode.com>
 ;; Keywords: extensions
 ;; Created: 1995-10-06
-;; Version: 1.12.0
+;; Version: 1.13.0
 ;; Package-Requires: ((emacs "26.3"))
 
 ;; This is a GNU ELPA :core package.  Avoid functionality that is not
@@ -551,12 +551,13 @@ Helper for `eldoc-display-in-echo-area'."
 (defun eldoc--echo-area-prefer-doc-buffer-p (truncatedp)
   "Tell if display in the echo area should be skipped.
 Helper for `eldoc-display-in-echo-area'.  If TRUNCATEDP the
-documentation to potentially appear in the echo are is truncated."
+documentation to potentially appear in the echo area is
+known to be truncated."
   (and (or (eq eldoc-echo-area-prefer-doc-buffer t)
            (and truncatedp
                 (eq eldoc-echo-area-prefer-doc-buffer
                     'maybe)))
-       (get-buffer-window eldoc--doc-buffer 'visible)))
+       (get-buffer-window eldoc--doc-buffer t)))
 
 (defun eldoc-display-in-echo-area (docs _interactive)
   "Display DOCS in echo area.
@@ -629,8 +630,7 @@ Honor `eldoc-echo-area-use-multiline-p' and
   "Display DOCS in a dedicated buffer.
 If INTERACTIVE is t, also display the buffer."
   (eldoc--format-doc-buffer docs)
-  (when interactive
-    (eldoc-doc-buffer)))
+  (when interactive (eldoc-doc-buffer t)))
 
 (defun eldoc-documentation-default ()
   "Show first doc string for item at point.
