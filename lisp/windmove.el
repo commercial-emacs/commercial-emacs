@@ -1,8 +1,8 @@
 ;;; windmove.el --- directional window-selection routines  -*- lexical-binding:t -*-
-;;
+
 ;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
-;;
-;; Author: Hovav Shacham (hovav@cs.stanford.edu)
+
+;; Author: Hovav Shacham <hovav@cs.stanford.edu>
 ;; Created: 17 October 1998
 ;; Keywords: window, movement, convenience
 ;;
@@ -20,8 +20,6 @@
 
 ;; You should have received a copy of the GNU General Public License
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
-;;
-;; --------------------------------------------------------------------
 
 ;;; Commentary:
 ;;
