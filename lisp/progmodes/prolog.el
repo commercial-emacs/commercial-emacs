@@ -1620,8 +1620,6 @@ Used for temporary files.")
 (defvar prolog-consult-compile-real-file nil
   "The file name of the buffer to compile/consult.")
 
-(defvar compilation-parse-errors-function)
-
 (defun prolog-consult-compile (compilep file &optional first-line)
   "Consult/compile FILE.
 If COMPILEP is non-nil, perform compilation, otherwise perform CONSULTING.
@@ -1686,40 +1684,41 @@ This function must be called from the source code buffer."
 
 (defvar compilation-error-list)
 
-(defun prolog-parse-sicstus-compilation-errors (limit)
-  "Parse the prolog compilation buffer for errors.
-Argument LIMIT is a buffer position limiting searching.
-For use with the `compilation-parse-errors-function' variable."
-  (setq compilation-error-list nil)
-  (message "Parsing SICStus error messages...")
-  (let (filepath dir file errorline)
-    (while
-        (re-search-backward
-         "{\\([a-zA-Z ]* ERROR\\|Warning\\):.* in line[s ]*\\([0-9]+\\)"
-         limit t)
-      (setq errorline (string-to-number (match-string 2)))
-      (save-excursion
-        (re-search-backward
-         "{\\(consulting\\|compiling\\|processing\\) \\(.*\\)\\.\\.\\.}"
-         limit t)
-        (setq filepath (match-string 2)))
+;; FIXME: This has been obsolete since Emacs-20!
+;; (defun prolog-parse-sicstus-compilation-errors (limit)
+;;   "Parse the prolog compilation buffer for errors.
+;; Argument LIMIT is a buffer position limiting searching.
+;; For use with the `compilation-parse-errors-function' variable."
+;;   (setq compilation-error-list nil)
+;;   (message "Parsing SICStus error messages...")
+;;   (let (filepath dir file errorline)
+;;     (while
+;;         (re-search-backward
+;;          "{\\([a-zA-Z ]* ERROR\\|Warning\\):.* in line[s ]*\\([0-9]+\\)"
+;;          limit t)
+;;       (setq errorline (string-to-number (match-string 2)))
+;;       (save-excursion
+;;         (re-search-backward
+;;          "{\\(consulting\\|compiling\\|processing\\) \\(.*\\)\\.\\.\\.}"
+;;          limit t)
+;;         (setq filepath (match-string 2)))
 
-      ;; ###### Does this work with SICStus under Windows
-      ;; (i.e. backslashes and stuff?)
-      (if (string-match "\\(.*/\\)\\([^/]*\\)$" filepath)
-          (progn
-            (setq dir (match-string 1 filepath))
-            (setq file (match-string 2 filepath))))
+;;       ;; ###### Does this work with SICStus under Windows
+;;       ;; (i.e. backslashes and stuff?)
+;;       (if (string-match "\\(.*/\\)\\([^/]*\\)$" filepath)
+;;           (progn
+;;             (setq dir (match-string 1 filepath))
+;;             (setq file (match-string 2 filepath))))
 
-      (setq compilation-error-list
-            (cons
-             (cons (save-excursion
-                     (beginning-of-line)
-                     (point-marker))
-                   (list (list file dir) errorline))
-             compilation-error-list)
-            ))
-    ))
+;;       (setq compilation-error-list
+;;             (cons
+;;              (cons (save-excursion
+;;                      (beginning-of-line)
+;;                      (point-marker))
+;;                    (list (list file dir) errorline))
+;;              compilation-error-list)
+;;             ))
+;;     ))
 
 (defun prolog-consult-compile-filter (process output)
   "Filter function for Prolog compilation PROCESS.
