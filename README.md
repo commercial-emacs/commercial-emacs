@@ -29,7 +29,7 @@ Roughly every hour.
 
 ### How has the code diverged thus far?
 
-- Performant long lines.
+- Performant long lines without narrowing.
 - [Tree-sitter font highlighting](#tree-sitter). <sup id="a1">[1](#f1)</sup>
 - Gnus is rewritten to be non-blocking.
 - Process management is rewritten.

@@ -17141,9 +17141,8 @@ set_vertical_scroll_bar (struct window *w)
 	  struct text_pos start_pos;
 
 	  SET_TEXT_POS_FROM_MARKER (start_pos, w->start);
-	  start_display (&it, w, start_pos);
-	  move_it_to (&it, -1, it.last_visible_x, window_box_height (w), -1,
-		      MOVE_TO_X | MOVE_TO_Y);
+	  start_move_it (&it, w, start_pos);
+	  move_it_forward (&it, -1, window_box_height (w), MOVE_TO_Y);
 	  window_end_pos = BUF_Z (buf) - IT_CHARPOS (it);
 	}
 
