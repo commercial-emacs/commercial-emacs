@@ -999,7 +999,7 @@ if test "$enable_check_lisp_object_type" = yes; then
     [Define to enable compile-time checks for the Lisp_Object data type.])
 fi
 
-WERROR_CFLAGS=
+AC_SUBST([WERROR_CFLAGS])
 # When compiling with GCC, prefer -isystem to -I when including system
 # include files, to avoid generating useless diagnostics for the files.
 AS_IF([test $gl_gcc_warnings = no],
@@ -1134,7 +1134,6 @@ nw=
 nw="$nw -Wunused-macros"
 gl_MANYWARN_COMPLEMENT([GNULIB_WARN_CFLAGS], [$WARN_CFLAGS], [$nw])
 
-AC_SUBST([WERROR_CFLAGS])
 AC_SUBST([GNULIB_WARN_CFLAGS])
 
 edit_cflags="
