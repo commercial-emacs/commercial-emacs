@@ -383,8 +383,8 @@ The format is (FUNCTION ARGS...).")
   'help-function
   (lambda (file pos)
     (if help-window-keep-selected
-        (view-buffer (find-file-noselect file))
-      (view-buffer-other-window (find-file-noselect file)))
+        (view-file file)
+      (view-file-other-window file))
     (goto-char pos))
   'help-echo (purecopy "mouse-2, RET: show corresponding NEWS announcement"))
 
@@ -407,7 +407,7 @@ Commands:
 \\{help-mode-map}"
   (setq-local revert-buffer-function
               #'help-mode-revert-buffer)
-  (add-hook 'context-menu-functions 'help-mode-context-menu 5 t)
+  (add-hook 'context-menu-functions #'help-mode-context-menu 5 t)
   (setq-local tool-bar-map
               help-mode-tool-bar-map)
   (setq-local help-mode--current-data nil)
@@ -760,7 +760,7 @@ See `help-make-xrefs'."
 ;; Additional functions for (re-)creating types of help buffers.
 
 ;;;###autoload
-(define-obsolete-function-alias 'help-xref-interned 'describe-symbol "25.1")
+(define-obsolete-function-alias 'help-xref-interned #'describe-symbol "25.1")
 
 
 ;; Navigation/hyperlinking with xrefs
@@ -830,7 +830,7 @@ The help buffers are divided into \"pages\" by the ^L character."
 
 (defun help-goto-previous-page ()
   "Go to the previous page (if any) in the current buffer.
-(If not at the start of a page, go to the start of the current page.)
+\(If not at the start of a page, go to the start of the current page.)
 
 The help buffers are divided into \"pages\" by the ^L character."
   (interactive nil help-mode)
