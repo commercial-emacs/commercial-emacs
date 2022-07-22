@@ -34,7 +34,7 @@ jobs:
       if: startsWith(runner.os, 'Linux')
       run: |
         sudo apt-get -yq update
-        DEBIAN_FRONTEND=noninteractive sudo apt-get -yq install gnutls-bin sharutils dirmngr libreadline-dev libcurl4-openssl-dev libxml2-dev libssl-dev libcairo2-dev libdbus-1-dev libfreetype6-dev libgif-dev libgio3.0-cil-dev libglib2.0-dev libgmp-dev libgnutls28-dev libharfbuzz-dev libjpeg-dev libjansson-dev liblcms2-dev libselinux1-dev libxml2-dev libpng-dev librsvg2-dev libtiff-dev libx11-dev libxext-dev libxpm-dev libgtk-3-dev zlib1g-dev
+        DEBIAN_FRONTEND=noninteractive sudo apt-get -yq install gnutls-bin sharutils dirmngr libreadline-dev libcurl4-openssl-dev libxml2-dev libssl-dev libcairo2-dev libdbus-1-dev libfreetype6-dev libgif-dev libgio3.0-cil-dev libglib2.0-dev libgmp-dev libgnutls28-dev libharfbuzz-dev libjpeg-dev libjansson-dev liblcms2-dev libselinux1-dev libxml2-dev libpng-dev librsvg2-dev libtiff-dev libx11-dev libxext-dev libxpm-dev libgtk-3-dev zlib1g-dev libxaw7-dev
     - name: brew-haha
       if: startsWith(runner.os, 'macOS')
       run: |
@@ -62,20 +62,32 @@ jobs:
       with:
         repository: commercial-emacs/tree-sitter
         path: tree-sitter
-        ref: 0.6.3alpha5
+        ref: 0.6.3alpha6
     - uses: actions-rs/toolchain@v1
       with:
           toolchain: stable
-    - name: make
+    - name: make-tree-sitter
       run: |
         mkdir -p $HOME/.local
         make -C tree-sitter install-ci
-        ./autogen.sh
-        ./configure --prefix=$HOME/.local --with-tree-sitter
-        make -j2
-    - name: test
+    - name: make-polu
+      if: startsWith(runner.os, 'Linux')
       run: |
-        make -j2 check
+        ./autogen.sh
+        CFLAGS='-g3 -O2 -Werror' ./configure --prefix=$HOME/.local --with-x-toolkit=lucid --without-cairo --without-xaw3d --without-gconf --without-libsystemd
+        make -j4
+    - name: make-linux
+      if: startsWith(runner.os, 'Linux')
+      run: |
+        ./autogen.sh
+        CFLAGS='-g3 -O2 -Werror' ./configure --prefix=$HOME/.local --with-tree-sitter
+        make -j4 check
+    - name: make-macos
+      if: startsWith(runner.os, 'macOS')
+      run: |
+        ./autogen.sh
+        ./configure --prefix=$HOME/.local
+        make -j4 check
     - name: elisp-benchmarks
       if: startsWith(runner.os, 'Linux')
       run: |

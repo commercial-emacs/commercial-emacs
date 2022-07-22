@@ -3775,7 +3775,7 @@ extern void tim_sort (Lisp_Object, Lisp_Object *, const ptrdiff_t);
 verify (FLT_RADIX == 2 || FLT_RADIX == 16);
 enum { LOG2_FLT_RADIX = FLT_RADIX == 2 ? 1 : 4 };
 int double_integer_scale (double);
-#ifndef HAVE_TRUNC
+#ifndef __USE_ISOC99
 extern double trunc (double);
 #endif
 extern Lisp_Object fmod_float (Lisp_Object x, Lisp_Object y);

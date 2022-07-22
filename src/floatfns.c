@@ -517,7 +517,7 @@ emacs_rint (double d)
 }
 #endif
 
-#ifndef HAVE_TRUNC
+#ifndef __USE_ISOC99
 double
 trunc (double d)
 {

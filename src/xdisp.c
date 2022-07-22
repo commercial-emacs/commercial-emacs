@@ -17117,54 +17117,33 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 void
 set_vertical_scroll_bar (struct window *w)
 {
-  ptrdiff_t start, end, whole;
+  void (*set_vertical_scroll_bar_hook) (struct window *window,
+                                        int portion, int whole,
+                                        int position) =
+    FRAME_TERMINAL (XFRAME (w->frame))->set_vertical_scroll_bar_hook;
 
-  /* Calculate the start and end positions for the current window.
-     At some point, it would be nice to choose between scrollbars
-     which reflect the whole buffer size, with special markers
-     indicating narrowing, and scrollbars which reflect only the
-     visible region.
-
-     Note that mini-buffers sometimes aren't displaying any text.  */
-  if (!MINI_WINDOW_P (w)
-      || (w == XWINDOW (minibuf_window)
-	  && NILP (echo_area_buffer[0])))
+  if (set_vertical_scroll_bar_hook)
     {
-      struct buffer *buf = XBUFFER (w->contents);
-
-      whole = BUF_ZV (buf) - BUF_BEGV (buf);
-      start = marker_position (w->start) - BUF_BEGV (buf);
-      end = BUF_Z (buf) - w->window_end_pos - BUF_BEGV (buf);
-
-      /* If w->window_end_pos cannot be trusted, recompute it "the
-	 hard way".  */
-      if (!MINI_WINDOW_P (w))
+      ptrdiff_t whole = 0, start = 0, end = 0;
+      if (! MINI_WINDOW_P (w))
 	{
+	  struct buffer *buf = XBUFFER (w->contents);
+	  struct buffer *obuf = current_buffer;
 	  struct it it;
 	  struct text_pos start_pos;
-	  struct buffer *obuf = current_buffer;
-	  /* When we display the scroll bar of a mini-window,
-	     current_buffer is not guaranteed to be the mini-window's
-	     buffer, see the beginning of redisplay_window.  */
+
 	  set_buffer_internal_1 (XBUFFER (w->contents));
 	  SET_TEXT_POS_FROM_MARKER (start_pos, w->start);
 	  start_move_it (&it, w, start_pos);
 	  move_it_forward (&it, -1, window_box_height (w), MOVE_TO_Y);
-	  window_end_pos = BUF_Z (buf) - IT_CHARPOS (it);
+	  set_buffer_internal_1 (obuf);
+
+	  start = marker_position (w->start) - BUF_BEGV (buf);
+	  end = max (start, IT_CHARPOS (it) - BUF_BEGV (buf));
+	  whole = max (end - start, BUF_ZV (buf) - BUF_BEGV (buf));
 	}
-
-      if (end < start)
-	end = start;
-      if (whole < (end - start))
-	whole = end - start;
+      (*set_vertical_scroll_bar_hook) (w, end - start, whole, start);
     }
-  else
-    start = end = whole = 0;
-
-  /* Indicate what this scroll bar ought to be displaying now.  */
-  if (FRAME_TERMINAL (XFRAME (w->frame))->set_vertical_scroll_bar_hook)
-    (*FRAME_TERMINAL (XFRAME (w->frame))->set_vertical_scroll_bar_hook)
-      (w, end - start, whole, start);
 }
 
 
