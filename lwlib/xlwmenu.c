@@ -561,6 +561,13 @@ size_menu (XlwMenuWidget mw, int level)
     }
 }
 
+/* Used to limit shadows thickness on arrows, toggle buttons and radio
+   buttons.  */
+static int
+tame_thickness(int width, int thickness)
+{
+  return ((width < (3 * thickness)) ? (width / 3) : thickness);
+}
 
 /* Display code */
 
@@ -575,7 +582,7 @@ draw_arrow (XlwMenuWidget mw,
 {
   Display *dpy = XtDisplay (mw);
   GC top_gc, bottom_gc;
-  int thickness = mw->menu.shadow_thickness;
+  int thickness = tame_thickness(width, mw->menu.shadow_thickness);
   int height = width;
   XPoint pt[10];
   /* alpha = atan (0.5)
@@ -655,6 +662,7 @@ draw_shadow_rectangle (XlwMenuWidget mw, Window window, int x, int y,
 	bottom_gc = mw->menu.shadow_bottom_gc;
     }
 
+  /* Toggle button case */
   if (!erase_p && width == height && width == toggle_button_width (mw))
     {
       points [0].x = x;
@@ -668,6 +676,8 @@ draw_shadow_rectangle (XlwMenuWidget mw, Window window, int x, int y,
       XFillPolygon (dpy, window,
                     down_p ? mw->menu.button_gc : mw->menu.inactive_button_gc,
                     points, 4, Convex, CoordModeOrigin);
+
+      thickness = tame_thickness(width, mw->menu.shadow_thickness);
     }
 
   if (!erase_p && down_p)
@@ -724,7 +734,7 @@ draw_shadow_rhombus (XlwMenuWidget mw, Window window, int x, int y,
 		     GC top_gc, GC bottom_gc)
 {
   Display *dpy = XtDisplay (mw);
-  int thickness = mw->menu.shadow_thickness;
+  int thickness = tame_thickness(width, mw->menu.shadow_thickness);
   XPoint points [4];
 
   /* Choose correct GC with a standard default if NULL */
