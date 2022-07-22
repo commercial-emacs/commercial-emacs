@@ -70,12 +70,12 @@ jobs:
       run: |
         mkdir -p $HOME/.local
         make -C tree-sitter install-ci
-    - name: make-polu
+    - name: make-alt-xtoolkit
       if: matrix.os == 'ubuntu-20.04'
       run: |
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-x-toolkit=lucid --without-cairo --without-xaw3d --without-gconf --without-libsystemd
-        make -j4
+        make -j4 -C src
     - name: make-linux
       if: matrix.os == 'ubuntu-latest'
       run: |
