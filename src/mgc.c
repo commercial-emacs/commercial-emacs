@@ -424,12 +424,16 @@ DEFUN ("mgc-cons", Fmgc_cons, Smgc_cons, 2, 2, 0,
 	       and return it.  */)
   (Lisp_Object car, Lisp_Object cdr)
 {
-  Lisp_Object val;
+  Lisp_Object val = Qnil;
   size_t nbytes = sizeof (struct Lisp_Cons);
-  XSETCONS (val, bump_alloc_ptr (space_in_use, nbytes, Space_Cons));
-  XSETCAR (val, car);
-  XSETCDR (val, cdr);
-  bytes_since_gc += nbytes;
+  void *bump = bump_alloc_ptr (space_in_use, nbytes, Space_Cons);
+  if (bump != NULL)
+    {
+      XSETCONS (val, bump);
+      XSETCAR (val, car);
+      XSETCDR (val, cdr);
+      bytes_since_gc += nbytes;
+    }
   return val;
 }
 

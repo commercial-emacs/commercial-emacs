@@ -74,6 +74,7 @@ lib/string.h
 lib/sys/
 lib/time.h
 lib/unistd.h
+lib/strings.h
 src/buildobj.h
 src/globals.h
 src/lisp.mk

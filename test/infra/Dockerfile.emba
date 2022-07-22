@@ -42,7 +42,7 @@ RUN apt-get update && \
 COPY . /checkout
 WORKDIR /checkout
 RUN ./autogen.sh autoconf
-RUN ./configure
+RUN CFLAGS='-g3 -O2 -Werror' ./configure
 # 'make -j4 bootstrap' does not work reliably.
 RUN make bootstrap
 
@@ -56,7 +56,7 @@ RUN apt-get update && \
 COPY . /checkout
 WORKDIR /checkout
 RUN ./autogen.sh autoconf
-RUN ./configure --with-file-notification=gfile
+RUN CFLAGS='-g3 -O2 -Werror' ./configure --with-file-notification=gfile
 RUN make bootstrap
 
 FROM emacs-base as emacs-gnustep

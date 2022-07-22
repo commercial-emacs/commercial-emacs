@@ -5640,56 +5640,45 @@ x_get_net_workarea (struct x_display_info *dpyinfo, XRectangle *rect)
 
   return result;
 #else
-  xcb_get_property_cookie_t current_desktop_cookie;
-  xcb_get_property_cookie_t workarea_cookie;
-  xcb_get_property_reply_t *reply;
-  uint32_t current_workspace, *values;
-  bool rc = true;
 
-  current_desktop_cookie
+  bool rc = false;
+  xcb_get_property_cookie_t current_desktop_cookie
     = xcb_get_property (dpyinfo->xcb_connection, 0,
 			(xcb_window_t) dpyinfo->root_window,
 			(xcb_atom_t) dpyinfo->Xatom_net_current_desktop,
 			XCB_ATOM_CARDINAL, 0, 1);
-
-  workarea_cookie
-    = xcb_get_property (dpyinfo->xcb_connection, 0,
-			(xcb_window_t) dpyinfo->root_window,
-			(xcb_atom_t) dpyinfo->Xatom_net_workarea,
-			XCB_ATOM_CARDINAL, 0, UINT32_MAX);
-
-  reply = xcb_get_property_reply (dpyinfo->xcb_connection,
-				  current_desktop_cookie, NULL);
-
-  if (! reply)
-    rc = false;
-  else
-    {
-      if (xcb_get_property_value_length (reply) != 4
-	  || reply->type != XCB_ATOM_CARDINAL || reply->format != 32)
-	rc = false;
-      else
-	current_workspace = *(uint32_t *) xcb_get_property_value (reply);
-      free (reply);
-    }
-
-  reply = xcb_get_property_reply (dpyinfo->xcb_connection,
-				  workarea_cookie, NULL);
+  xcb_get_property_reply_t *reply
+    = xcb_get_property_reply (dpyinfo->xcb_connection,
+			      current_desktop_cookie, NULL);
 
   if (reply
-      && reply->type == XCB_ATOM_CARDINAL && reply->format == 32
-      && (xcb_get_property_value_length (reply) / sizeof (uint32_t)
-	  >= current_workspace + 4))
+      && xcb_get_property_value_length (reply) == 4
+      && reply->type == XCB_ATOM_CARDINAL
+      && reply->format == 32)
     {
-      values = xcb_get_property_value (reply);
+      uint32_t current_workspace = *(uint32_t *) xcb_get_property_value (reply);
+      xcb_get_property_cookie_t workarea_cookie
+	= xcb_get_property (dpyinfo->xcb_connection, 0,
+			    (xcb_window_t) dpyinfo->root_window,
+			    (xcb_atom_t) dpyinfo->Xatom_net_workarea,
+			    XCB_ATOM_CARDINAL, 0, UINT32_MAX);
+      free (reply);
+      reply = xcb_get_property_reply (dpyinfo->xcb_connection, workarea_cookie, NULL);
 
-      rect->x = values[current_workspace];
-      rect->y = values[current_workspace + 1];
-      rect->width = values[current_workspace + 2];
-      rect->height = values[current_workspace + 3];
+      if (reply
+	  && reply->type == XCB_ATOM_CARDINAL
+	  && reply->format == 32
+	  && (xcb_get_property_value_length (reply) / sizeof (uint32_t)
+	      >= current_workspace + 4))
+	{
+	  uint32_t *values = xcb_get_property_value (reply);
+	  rect->x = values[current_workspace];
+	  rect->y = values[current_workspace + 1];
+	  rect->width = values[current_workspace + 2];
+	  rect->height = values[current_workspace + 3];
+	  rc = true;
+	}
     }
-  else
-    rc = false;
 
   if (reply)
     free (reply);
