@@ -1930,6 +1930,8 @@ modes using the same symbolic or octal format accepted by the
 execution permission for the user who owns the file.  It has no effect
 on operating systems that do not support file modes.  @code{chmod} is a
 convenience alias for this function.
+@findex delete-visited-file
+  @kbd{delete-visited-file} deletes the file visited by a buffer, and closes the buffer.
 
 @node Compressed Files
 @section Accessing Compressed Files
