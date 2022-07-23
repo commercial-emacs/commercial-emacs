@@ -2872,7 +2872,7 @@ CHECK_NUMBER (Lisp_Object x)
 INLINE void
 CHECK_INTEGER (Lisp_Object x)
 {
-  CHECK_TYPE (INTEGERP (x), Qnumberp, x);
+  CHECK_TYPE (INTEGERP (x), Qintegerp, x);
 }
 
 INLINE void
