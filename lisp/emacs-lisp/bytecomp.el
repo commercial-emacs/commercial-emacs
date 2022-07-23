@@ -831,6 +831,8 @@ the unwind-action")
 (byte-defop 178 -1 byte-stack-set)	; Stack offset in following one byte.
 (byte-defop 179 -1 byte-stack-set2)	; Stack offset in following two bytes.
 
+;; unused: 180-181
+
 ;; If (following one byte & 0x80) == 0
 ;;    discard (following one byte & 0x7F) stack entries
 ;; else
@@ -3596,7 +3598,6 @@ defaults to byte-compile-FUNCTION."
 (byte-defop-compiler (+ byte-plus)	byte-compile-variadic-numeric)
 (byte-defop-compiler (* byte-mult)	byte-compile-variadic-numeric)
 
-;;####(byte-defop-compiler move-to-column	1)
 (byte-defop-compiler-1 interactive byte-compile-noop)
 
 (defun byte-compile-subr-wrong-args (form n)
