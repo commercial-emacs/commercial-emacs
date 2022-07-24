@@ -528,11 +528,6 @@ i.e., subtract 2 * `most-negative-fixnum' from VALUE before shifting it.
 
 This function is provided for compatibility.  In new code, use `ash'
 instead."
-  (declare (compiler-macro
-            (lambda (form)
-              (prog1 form
-                (when (byte-compile-warning-enabled-p 'suspicious 'lsh)
-                  (byte-compile-warn "avoid `lsh'; use `ash' instead"))))))
   (when (and (< value 0) (< count 0))
     (when (< value most-negative-fixnum)
       (signal 'args-out-of-range (list value count)))

@@ -3239,6 +3239,9 @@ value should be byte-discard."
              (byte-compile-warning-enabled-p 'mapcar 'mapcar))
     (byte-compile-warn
      "`mapcar' called for effect; use `mapc' or `dolist' instead"))
+  (when (and (eq (car form) 'lsh)
+             (byte-compile-warning-enabled-p 'suspicious 'lsh))
+    (byte-compile-warn "avoid `lsh'; use `ash' instead"))
   (byte-compile-push-constant (car form))
   (mapc #'byte-compile-form (cdr form))
   (byte-compile-out 'byte-call (length (cdr form))))

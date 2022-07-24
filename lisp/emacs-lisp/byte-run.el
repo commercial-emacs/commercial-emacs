@@ -601,19 +601,14 @@ in `byte-compile-warning-types'; see the variable
 types.  The types that can be suppressed with this macro are
 `free-vars', `callargs', `redefine', `obsolete',
 `interactive-only', `lexical', `mapcar', `constants' and
-`suspicious'.
-
-For the `mapcar' case, only the `mapcar' function can be used in
-the symbol list.  For `suspicious', only `set-buffer' can be used."
+`suspicious'."
   (declare (debug (sexp body)) (indent 1))
+  ;; Defining this macro in bytecomp.el (where
+  ;; `byte-compile--suppressed-warnings' is defined) breaks bootstrap.
   (if (boundp 'byte-compile--suppressed-warnings)
       (let ((byte-compile--suppressed-warnings
              (append warnings byte-compile--suppressed-warnings)))
         (macroexpand-all (macroexp-progn body) macroexpand-all-environment))
-    ;; Since our intent relies completely on
-    ;; byte-compile--suppressed-warnings being defined, one wonders
-    ;; why this macro isn't defined in the same module as that
-    ;; variable in bytecomp.el.  Answer: bytecomp.el breaks bootstrap.
     `(progn ,@body)))
 
 ;; Called from lread.c and therefore needs to be preloaded.
