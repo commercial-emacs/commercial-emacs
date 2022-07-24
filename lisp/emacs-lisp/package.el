@@ -785,10 +785,14 @@ byte-compilation of the new package to fail."
   (with-demoted-errors "Error in package--load-files-for-activation: %s"
     (let* (result
            (dir (package-desc-dir pkg-desc))
-           (load-path-sans-dir
-            (cl-remove-if (apply-partially #'string= dir)
-                          (or (bound-and-true-p find-function-source-path)
-                              load-path)))
+           ;; A previous implementation would skip `dir' itself.
+           ;; However, in normal use reloading from the same directory
+           ;; never happens anyway, while in certain cases external to
+           ;; Emacs a package in the same directory not necessary
+           ;; stays byte-identical, e.g.  during development.  Just
+           ;; don't special-case `dir'.
+           (effective-path (or (bound-and-true-p find-library-source-path)
+                               load-path))
            (files (directory-files-recursively dir "\\`[^\\.].*\\.el\\'"))
            (history (mapcar #'file-truename
                             (cl-remove-if-not #'stringp
