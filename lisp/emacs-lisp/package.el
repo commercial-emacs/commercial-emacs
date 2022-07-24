@@ -785,12 +785,6 @@ byte-compilation of the new package to fail."
   (with-demoted-errors "Error in package--load-files-for-activation: %s"
     (let* (result
            (dir (package-desc-dir pkg-desc))
-           ;; A previous implementation would skip `dir' itself.
-           ;; However, in normal use reloading from the same directory
-           ;; never happens anyway, while in certain cases external to
-           ;; Emacs a package in the same directory not necessary
-           ;; stays byte-identical, e.g.  during development.  Just
-           ;; don't special-case `dir'.
            (effective-path (or (bound-and-true-p find-library-source-path)
                                load-path))
            (files (directory-files-recursively dir "\\`[^\\.].*\\.el\\'"))
@@ -799,8 +793,16 @@ byte-compilation of the new package to fail."
                                               (mapcar #'car load-history)))))
       (dolist (file files)
         (when-let ((library (package--library-stem (file-relative-name file dir)))
-                   (canonical (locate-library library nil load-path-sans-dir))
-                   (found (member (file-truename canonical) history))
+                   (canonical (locate-library library nil effective-path))
+                   (truename (file-truename canonical))
+                   (altname (if (string-suffix-p ".el" truename)
+                                (replace-regexp-in-string
+                                 "\\.el\\'" ".elc" truename t)
+                              (replace-regexp-in-string
+                               "\\.elc\\'" ".el" truename t)))
+                   (found (or (member truename history)
+                              (and (not (string= altname truename))
+                                   (member altname history))))
                    (recent-index (length found)))
           (unless (equal (file-name-base library)
                          (format "%s-autoloads" (package-desc-name pkg-desc)))
