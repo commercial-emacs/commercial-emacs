@@ -5369,12 +5369,16 @@ xi_populate_device_from_info (struct xi_device_t *xi_device,
 #endif
 }
 
-/* The code below handles the tracking of scroll valuators on XInput
-   2, in order to support scroll wheels that report information more
-   granular than a screen line.
+/* Populate our client-side record of all devices, which includes
+   basic information about the device and also touchscreen tracking
+   information and scroll valuators.
 
-   On X, when the XInput 2 extension is being utilized, the states of
-   the mouse wheels in each axis are stored as absolute values inside
+   Keeping track of scroll valuators is required in order to support
+   scroll wheels that report information in a fashion more detailed
+   than a single turn of a "step" in the wheel.
+
+   When the input extension is being utilized, the states of the mouse
+   wheels on each axis are stored as absolute values inside
    "valuators" attached to each mouse device.  To obtain the delta of
    the scroll wheel from a motion event (which is used to report that
    some valuator has changed), it is necessary to iterate over every
@@ -5388,20 +5392,13 @@ xi_populate_device_from_info (struct xi_device_t *xi_device,
    This delta however is still intermediate, to make driver
    implementations easier.  The XInput developers recommend (and most
    programs use) the following algorithm to convert from scroll unit
-   deltas to pixel deltas:
+   deltas to pixel deltas by which the display must actually be
+   scrolled:
 
      pixels_scrolled = pow (window_height, 2.0 / 3.0) * delta;  */
 
-/* Setup valuator tracking for XI2 master devices on
-   DPYINFO->display.  */
-
-/* This function's name is a misnomer: these days, it keeps a
-   client-side record of all devices, which includes basic information
-   about the device and also touchscreen tracking information, instead
-   of just scroll valuators.  */
-
 static void
-x_init_master_valuators (struct x_display_info *dpyinfo)
+x_cache_xi_devices (struct x_display_info *dpyinfo)
 {
   int ndevices, actual_devices;
   XIDeviceInfo *infos;
@@ -18354,6 +18351,19 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
       if (f)
         {
+	  /* Now clear dpyinfo->last_mouse_motion_frame, or
+	     gui_redo_mouse_highlight will end up highlighting the
+	     last known poisition of the mouse if a tooltip frame is
+	     later unmapped.  */
+
+	  if (f == dpyinfo->last_mouse_motion_frame)
+	    dpyinfo->last_mouse_motion_frame = NULL;
+
+	  /* Something similar applies to
+	     dpyinfo->last_mouse_glyph_frame.  */
+	  if (f == dpyinfo->last_mouse_glyph_frame)
+	    dpyinfo->last_mouse_glyph_frame = NULL;
+
           if (f == hlinfo->mouse_face_mouse_frame)
             {
               /* If we move outside the frame, then we're
@@ -19804,8 +19814,22 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      if (!f)
 		f = x_top_window_to_frame (dpyinfo, leave->event);
 #endif
+
 	      if (f)
 		{
+		  /* Now clear dpyinfo->last_mouse_motion_frame, or
+		     gui_redo_mouse_highlight will end up highlighting
+		     the last known poisition of the mouse if a
+		     tooltip frame is later unmapped.  */
+
+		  if (f == dpyinfo->last_mouse_motion_frame)
+		    dpyinfo->last_mouse_motion_frame = NULL;
+
+		  /* Something similar applies to
+		     dpyinfo->last_mouse_glyph_frame.  */
+		  if (f == dpyinfo->last_mouse_glyph_frame)
+		    dpyinfo->last_mouse_glyph_frame = NULL;
+
 		  if (f == hlinfo->mouse_face_mouse_frame)
 		    {
 		      /* If we move outside the frame, then we're
@@ -19895,9 +19919,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		      bar = NULL;
 
-		      /* See the comment on top of
-			 x_init_master_valuators for more details on how
-			 scroll wheel movement is reported on XInput 2.  */
+		      /* See the comment on top of x_cache_xi_devices
+			 for more details on how scroll wheel movement
+			 is reported on XInput 2.  */
 		      delta = x_get_scroll_valuator_delta (dpyinfo, device,
 							   i, *values, &val);
 		      values++;
@@ -21750,7 +21774,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      if (!device)
 		{
 		  /* An existing device might have been enabled.  */
-		  x_init_master_valuators (dpyinfo);
+		  x_cache_xi_devices (dpyinfo);
 
 		  /* Now try to find the device again, in case it was
 		     just enabled.  */
@@ -27370,7 +27394,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
       if (rc == Success)
 	{
 	  dpyinfo->supports_xi2 = true;
-	  x_init_master_valuators (dpyinfo);
+	  x_cache_xi_devices (dpyinfo);
 	}
     }
 
