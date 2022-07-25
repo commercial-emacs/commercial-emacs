@@ -3900,6 +3900,42 @@ DEFUN ("internal-set-lisp-face-attribute-from-resource",
 
 #if defined HAVE_X_WINDOWS && defined USE_X_TOOLKIT
 
+/* Update both fontSet and font resources for X toolkit menu.  */
+static void
+x_update_menu_font_resources (XrmDatabase *rdb, const char *myname,
+			      const char *popup_path,
+			      const char *fontset_path,
+			      char *fontsetname, char *fontname)
+{
+  char line[512];
+  char *buf = line;
+  ptrdiff_t bufsize = sizeof line;
+
+  /* fontSet */
+  if (fontset_path && fontsetname)
+    {
+      exprintf (&buf, &bufsize, line, -1, "%s.pane.menubar*%s: %s",
+		myname, fontset_path, fontsetname);
+      XrmPutLineResource (rdb, line);
+
+      exprintf (&buf, &bufsize, line, -1, "%s.%s*%s: %s",
+		myname, popup_path, fontset_path, fontsetname);
+      XrmPutLineResource (rdb, line);
+    }
+
+  /* font */
+  if (fontname)
+    {
+      exprintf (&buf, &bufsize, line, -1, "%s.pane.menubar*font: %s",
+		myname, fontname);
+      XrmPutLineResource (rdb, line);
+
+      exprintf (&buf, &bufsize, line, -1, "%s.%s*font: %s",
+		myname, popup_path, fontname);
+      XrmPutLineResource (rdb, line);
+    }
+}
+
 /* Make menus on frame F appear as specified by the `menu' face.  */
 
 static void
@@ -3964,14 +4000,13 @@ x_update_menu_appearance (struct frame *f)
 	{
 	  Lisp_Object xlfd = Ffont_xlfd_name (LFACE_FONT (lface), Qnil);
 #ifdef USE_MOTIF
-	  const char *suffix = "List";
+	  const char *fontset_path = "fontList";
 	  bool motif = true;
 #else
 #if defined HAVE_X_I18N
-
-	  const char *suffix = "Set";
+	  const char *fontset_path = "fontSet";
 #else
-	  const char *suffix = "";
+	  const char *fontset_path = NULL;
 #endif
 	  bool motif = false;
 #endif
@@ -3981,17 +4016,15 @@ x_update_menu_appearance (struct frame *f)
 #if defined HAVE_X_I18N
 	      char *fontsetname = xic_create_fontsetname (SSDATA (xlfd), motif);
 #else
-	      char *fontsetname = SSDATA (xlfd);
+	      char *fontsetname = NULL;
 #endif
-	      exprintf (&buf, &bufsize, line, -1, "%s.pane.menubar*font%s: %s",
-			myname, suffix, fontsetname);
-	      XrmPutLineResource (&rdb, line);
-
-	      exprintf (&buf, &bufsize, line, -1, "%s.%s*font%s: %s",
-			myname, popup_path, suffix, fontsetname);
-	      XrmPutLineResource (&rdb, line);
+	      char *fontname = SSDATA (LFACE_FAMILY (lface));
+	      x_update_menu_font_resources (&rdb, myname, popup_path,
+					    fontset_path, fontsetname,
+					    fontname);
 	      changed_p = true;
-	      if (fontsetname != SSDATA (xlfd))
+
+	      if (fontsetname)
 		xfree (fontsetname);
 	    }
 	}
