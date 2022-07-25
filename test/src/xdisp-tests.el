@@ -327,4 +327,14 @@ width of display property."
         (insert long ?\n)
         (test-it final oblivious-y nlines)))))
 
+(ert-deftest xdisp-tests--bidi-chlen-was-ignored ()
+  "get_visually_first_element() was repositioning
+bidi_it.charpos without also fetching its char."
+  (skip-unless (not noninteractive))
+  (xdisp-tests--visible-buffer
+   (save-excursion
+     (insert "给")
+     (insert (make-string (window-width) ?x)))
+   (redisplay)))
+
 ;;; xdisp-tests.el ends here

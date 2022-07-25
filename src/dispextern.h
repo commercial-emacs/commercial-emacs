@@ -3349,6 +3349,10 @@ extern void bidi_pop_it (struct bidi_it *);
 extern void *bidi_shelve_cache (void);
 extern void bidi_unshelve_cache (void *, bool);
 extern ptrdiff_t bidi_find_first_overridden (struct bidi_it *);
+extern int bidi_fetch_char (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t *disp_pos,
+			    int *disp_prop, struct bidi_string_data *string,
+			    struct window *w,
+			    bool frame_window_p, ptrdiff_t *ch_len, ptrdiff_t *nchars);
 
 /* Defined in xdisp.c */
 struct glyph_row *row_containing_pos (struct window *, ptrdiff_t,

@@ -7883,6 +7883,11 @@ get_visually_first_element (struct it *it)
 				find_newline_no_quit (IT_CHARPOS (*it),
 						      IT_BYTEPOS (*it), -1,
 						      &it->bidi_it.bytepos));
+      bidi_fetch_char (it->bidi_it.charpos, it->bidi_it.bytepos,
+		       &it->bidi_it.disp_pos, &it->bidi_it.disp_prop,
+		       &it->bidi_it.string, it->bidi_it.w,
+		       it->bidi_it.frame_window_p,
+		       &it->bidi_it.ch_len, &it->bidi_it.nchars);
       bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
       do
         {

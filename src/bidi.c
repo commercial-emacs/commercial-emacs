@@ -1160,7 +1160,7 @@ bidi_char_at_pos (ptrdiff_t bytepos, const unsigned char *s, bool unibyte)
    u+2029 to handle it as a paragraph separator.  STRING->s is the C
    string to iterate, or NULL if iterating over a buffer or a Lisp
    string; in the latter case, STRING->lstring is the Lisp string.  */
-static int
+int
 bidi_fetch_char (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t *disp_pos,
 		 int *disp_prop, struct bidi_string_data *string,
 		 struct window *w,
