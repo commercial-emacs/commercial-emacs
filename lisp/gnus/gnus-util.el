@@ -1061,6 +1061,7 @@ ARG is passed to the first function."
 ;; (`string-equal' uses symbol print names.)
 (defun gnus-string-equal (x y)
   "Like `string-equal', except it compares case-insensitively."
+  (declare (obsolete string-equal-ignore-case "29.1"))
   (and (= (length x) (length y))
        (or (string-equal x y)
 	   (string-equal (downcase x) (downcase y)))))
