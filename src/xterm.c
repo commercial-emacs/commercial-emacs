@@ -19110,10 +19110,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		dpyinfo->grabbed |= (1 << event->xbutton.button);
 		dpyinfo->last_mouse_frame = f;
-		if (f && !tab_bar_p)
+
+		if (f)
 		  f->last_tab_bar_item = -1;
 #if ! defined (USE_GTK)
-		if (f && !tool_bar_p)
+		if (f)
 		  f->last_tool_bar_item = -1;
 #endif /* not USE_GTK */
 	      }
@@ -20527,10 +20528,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			  if (device)
 			    device->grab |= (1 << xev->detail);
 
-			  if (f && !tab_bar_p)
+			  if (f)
 			    f->last_tab_bar_item = -1;
 #if ! defined (USE_GTK)
-			  if (f && !tool_bar_p)
+			  if (f)
 			    f->last_tool_bar_item = -1;
 #endif /* not USE_GTK */
 			}
