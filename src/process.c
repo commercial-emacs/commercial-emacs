@@ -413,14 +413,9 @@ make_lisp_proc (struct Lisp_Process *p)
 
 enum fd_bits
 {
-  /* Read from file descriptor.  */
   FOR_READ = 1,
-  /* Write to file descriptor.  */
   FOR_WRITE = 2,
-  /* This descriptor refers to a keyboard.  Only valid if FOR_READ is
-     set.  */
-  KEYBOARD_FD = 4,
-  /* This descriptor refers to a process.  */
+  KEYBOARD_FD = 4, /* Only valid FOR_READ.  */
   PROCESS_FD = 8,
 };
 
@@ -550,7 +545,7 @@ delete_write_fd (int fd)
 }
 
 static void
-compute_input_wait_mask (fd_set *mask)
+compute_wait_mask (fd_set *mask, int include_fd, int exclude_fd)
 {
   int fd;
 
@@ -564,78 +559,8 @@ compute_input_wait_mask (fd_set *mask)
       if (fd_callback_info[fd].waiting_thread != NULL
 	  && fd_callback_info[fd].waiting_thread != current_thread)
 	continue;
-      if ((fd_callback_info[fd].flags & FOR_READ) != 0)
-	{
-	  FD_SET (fd, mask);
-	  fd_callback_info[fd].waiting_thread = current_thread;
-	}
-    }
-}
-
-static void
-compute_non_process_wait_mask (fd_set *mask)
-{
-  int fd;
-
-  FD_ZERO (mask);
-  eassert (max_desc < FD_SETSIZE);
-  for (fd = 0; fd <= max_desc; ++fd)
-    {
-      if (fd_callback_info[fd].thread != NULL
-	  && fd_callback_info[fd].thread != current_thread)
-	continue;
-      if (fd_callback_info[fd].waiting_thread != NULL
-	  && fd_callback_info[fd].waiting_thread != current_thread)
-	continue;
-      if ((fd_callback_info[fd].flags & FOR_READ) != 0
-	  && (fd_callback_info[fd].flags & PROCESS_FD) == 0)
-	{
-	  FD_SET (fd, mask);
-	  fd_callback_info[fd].waiting_thread = current_thread;
-	}
-    }
-}
-
-static void
-compute_non_keyboard_wait_mask (fd_set *mask)
-{
-  int fd;
-
-  FD_ZERO (mask);
-  eassert (max_desc < FD_SETSIZE);
-  for (fd = 0; fd <= max_desc; ++fd)
-    {
-      if (fd_callback_info[fd].thread != NULL
-	  && fd_callback_info[fd].thread != current_thread)
-	continue;
-      if (fd_callback_info[fd].waiting_thread != NULL
-	  && fd_callback_info[fd].waiting_thread != current_thread)
-	continue;
-      if ((fd_callback_info[fd].flags & FOR_READ) != 0
-	  && (fd_callback_info[fd].flags & KEYBOARD_FD) == 0)
-	{
-	  FD_SET (fd, mask);
-	  fd_callback_info[fd].waiting_thread = current_thread;
-	}
-    }
-}
-
-static void
-compute_write_mask (fd_set *mask)
-{
-  int fd;
-
-  FD_ZERO (mask);
-  eassert (max_desc < FD_SETSIZE);
-  for (fd = 0; fd <= max_desc; ++fd)
-    {
-      if (fd_callback_info[fd].thread != NULL
-	  && fd_callback_info[fd].thread != current_thread)
-	continue;
-      if (fd_callback_info[fd].waiting_thread != NULL
-	  && fd_callback_info[fd].waiting_thread != current_thread)
-	continue;
-      if ((fd_callback_info[fd].flags & FOR_WRITE) != 0)
+      if ((fd_callback_info[fd].flags & include_fd) != 0
+	  && (fd_callback_info[fd].flags & exclude_fd) == 0)
 	{
 	  FD_SET (fd, mask);
 	  fd_callback_info[fd].waiting_thread = current_thread;
@@ -1250,7 +1175,7 @@ fails, return nil.  */)
 
   CHECK_PROCESS (process);
 
-  /* wait_reading_process_output will not compute_write_mask
+  /* wait_reading_process_output will not compute_wait_mask
      unless it's for all processes. */
   fd_set read, write;
   FD_ZERO (&read);
@@ -5395,19 +5320,16 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  check_delay = 0;
           check_write = 0;
 	}
-      else if (!NILP (wait_for_cell))
+      else if (! NILP (wait_for_cell))
 	{
-	  compute_non_process_wait_mask (&Available);
+	  compute_wait_mask (&Available, FOR_READ, PROCESS_FD);
 	  check_delay = 0;
 	  check_write = 0;
 	}
       else
 	{
-	  if (! read_kbd)
-	    compute_non_keyboard_wait_mask (&Available);
-	  else
-	    compute_input_wait_mask (&Available);
-	  compute_write_mask (&Writeok);
+	  compute_wait_mask (&Available, FOR_READ, read_kbd ? 0 : KEYBOARD_FD);
+	  compute_wait_mask (&Writeok, FOR_WRITE, 0);
 	  check_delay = ! wait_proc;
 	  check_write = true;
 	}
