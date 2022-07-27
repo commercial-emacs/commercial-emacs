@@ -3927,7 +3927,7 @@ mark_automatic_object (Lisp_Object obj)
   mark_objects (&obj, 1);
 }
 
-extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
+extern void with_flushed_stack (void (*func) (void *arg), void *arg);
 extern void garbage_collect (void);
 extern bool maybe_garbage_collect_eagerly (EMACS_INT factor);
 extern const char *pending_malloc_warning;

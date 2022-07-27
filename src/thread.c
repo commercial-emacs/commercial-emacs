@@ -347,7 +347,7 @@ Note that calls to `mutex-lock' and `mutex-unlock' must be paired.  */)
 
   current_thread->event_object = mutex;
   record_unwind_protect_void (do_unwind_mutex_lock);
-  flush_stack_call_func (mutex_lock_callback, lmutex);
+  with_flushed_stack (mutex_lock_callback, lmutex);
   return unbind_to (count, Qnil);
 }
 
@@ -373,7 +373,7 @@ release MUTEX.   */)
   CHECK_MUTEX (mutex);
   lmutex = XMUTEX (mutex);
 
-  flush_stack_call_func (mutex_unlock_callback, lmutex);
+  with_flushed_stack (mutex_unlock_callback, lmutex);
   return Qnil;
 }
 
@@ -481,7 +481,7 @@ this thread.  */)
   if (!lisp_mutex_owned_p (&mutex->mutex))
     error ("Condition variable's mutex is not held by current thread");
 
-  flush_stack_call_func (condition_wait_callback, cvar);
+  with_flushed_stack (condition_wait_callback, cvar);
 
   return Qnil;
 }
@@ -542,7 +542,7 @@ thread.  */)
 
   args.cvar = cvar;
   args.all = !NILP (all);
-  flush_stack_call_func (condition_notify_callback, &args);
+  with_flushed_stack (condition_notify_callback, &args);
 
   return Qnil;
 }
@@ -634,7 +634,7 @@ thread_select (select_func *func, int max_fds, fd_set *rfds,
   sa.efds = efds;
   sa.timeout = timeout;
   sa.sigmask = sigmask;
-  flush_stack_call_func (really_call_select, &sa);
+  with_flushed_stack (really_call_select, &sa);
   return sa.result;
 }
 
@@ -688,7 +688,7 @@ mark_threads_callback (void *ignore)
 void
 mark_threads (void)
 {
-  flush_stack_call_func (mark_threads_callback, NULL);
+  with_flushed_stack (mark_threads_callback, NULL);
 }
 
 void
@@ -713,7 +713,7 @@ DEFUN ("thread-yield", Fthread_yield, Sthread_yield, 0, 0, 0,
        doc: /* Yield the CPU to another thread.  */)
      (void)
 {
-  flush_stack_call_func (yield_callback, NULL);
+  with_flushed_stack (yield_callback, NULL);
   return Qnil;
 }
 
@@ -968,7 +968,7 @@ If THREAD is the main thread, just the error message is shown.  */)
       tstate->error_data = data;
 
       if (tstate->wait_condvar)
-	flush_stack_call_func (thread_signal_callback, tstate);
+	with_flushed_stack (thread_signal_callback, tstate);
     }
 
   return Qnil;
@@ -1041,7 +1041,7 @@ is an error for a thread to try to join itself.  */)
   error_data = tstate->error_data;
 
   if (thread_live_p (tstate))
-    flush_stack_call_func (thread_join_callback, tstate);
+    with_flushed_stack (thread_join_callback, tstate);
 
   if (!NILP (error_symbol))
     Fsignal (error_symbol, error_data);

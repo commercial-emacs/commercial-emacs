@@ -3886,24 +3886,19 @@ mark_maybe_pointer (void *const * p)
 
 /* Mark live Lisp objects on the C stack.
 
-   There are several system-dependent problems to consider when
-   porting this to new architectures:
+   When porting this to new architectures consider the following.
 
    Processor Registers
 
-   We have to mark Lisp objects in CPU registers that can hold local
-   variables or are used to pass parameters.
-
    If __builtin_unwind_init is available, it should suffice to save
-   registers in flush_stack_call_func().  This presumably is always
+   registers in with_flushed_stack().  This presumably is always
    the case for platforms of interest to Commercial Emacs.  We
    preserve the legacy else-branch that calls test_setjmp() to verify
    the sys_jmp_buf saves registers.
 
    Stack Layout
 
-   Architectures differ in the way their processor stack is organized.
-   For example, the stack might look like this
+   Architectures differ in their organization of the stack.  Consider:
 
      +----------------+
      |  Lisp_Object   |  size = 4
@@ -4037,14 +4032,15 @@ typedef union
 # define STACK_TOP_ADDRESS(addr) (addr)
 #endif
 
-/* Must be called before releasing global interpreter lock (e.g.,
-   thread-yield).
+/* Before calling any FUNC that could release the global interpreter
+   lock, e.g., thread-yield, record the prevailing stack top in
+   CURRENT_THREAD for later calls to mark_memory().
 
    FUNC must not run any Lisp code nor allocate any Lisp objects!
 */
 NO_INLINE /* Crucial.  Ensures registers are spilled.  */
 void
-flush_stack_call_func (void (*func) (void *arg), void *arg)
+with_flushed_stack (void (*func) (void *arg), void *arg)
 {
   stacktop_sentry sentry;
   struct thread_state *self = current_thread;
