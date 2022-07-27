@@ -238,10 +238,11 @@ Return the number of unsatisfiable iterations."
                           finally return (or (tree-sitter-node-start prev)
                                              (tree-sitter-node-start node)))))))))
     (catch 'done
-      (dotimes (i ntimes 0)
-        (if-let ((c (funcall func (tree-sitter-sexp-at))))
-            (goto-char c)
-          (throw 'done (- ntimes i)))))))
+      (prog1 0
+        (dotimes (i ntimes)
+          (if-let ((c (funcall func (tree-sitter-sexp-at))))
+              (goto-char c)
+            (throw 'done (- ntimes i))))))))
 
 (defun tree-sitter-forward-sexp (&optional arg)
   (interactive "^p")
