@@ -3913,7 +3913,6 @@ extern bool survives_gc_p (Lisp_Object);
 extern void mark_objects (Lisp_Object *, ptrdiff_t);
 extern void alloc_unexec_pre (void);
 extern void alloc_unexec_post (void);
-extern void flush_stack_call_func1 (void (*func) (void *arg), void *arg);
 extern void mark_memory (void const *start, void const *end);
 
 INLINE void
