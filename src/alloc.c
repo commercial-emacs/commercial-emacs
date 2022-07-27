@@ -3958,6 +3958,18 @@ mark_memory (void const *start, void const *end)
 }
 
 #ifndef HAVE___BUILTIN_UNWIND_INIT
+# ifdef __sparc__
+   /* This trick flushes the register windows so that all the state of
+      the process is contained in the stack.
+      FreeBSD does not have a ta 3 handler, so handle it specially.  */
+#  if defined __sparc64__ && defined __FreeBSD__
+#   define __builtin_unwind_init() asm ("flushw")
+#  else
+#   define __builtin_unwind_init() asm ("ta 3")
+#  endif
+# else
+#  define __builtin_unwind_init() ((void) 0)
+# endif
 
 # ifdef GC_SETJMP_WORKS
 static void
@@ -4007,12 +4019,10 @@ test_setjmp (void)
 # endif /* ! GC_SETJMP_WORKS */
 #endif /* ! HAVE___BUILTIN_UNWIND_INIT */
 
-/* The type of an object near the stack top, whose address can be used
-   as a stack scan limit.  */
+/* In the absence of built-in stack facilities, the address of the ad
+   hoc Lisp_Object O should suffice as top of the stack. */
 typedef union
 {
-  /* Make sure stack_top and m_stack_bottom are properly aligned as GC
-     expects.  */
   Lisp_Object o;
   void *p;
 #ifndef HAVE___BUILTIN_UNWIND_INIT
@@ -4021,38 +4031,40 @@ typedef union
 #endif
 } stacktop_sentry;
 
-/* Yield an address close enough to the top of the stack that the
-   garbage collector need not scan above it.  Callers should be
-   declared NO_INLINE.  */
 #ifdef HAVE___BUILTIN_FRAME_ADDRESS
-# define NEAR_STACK_TOP(addr) ((void) (addr), __builtin_frame_address (0))
+# define STACK_TOP_ADDRESS(addr) ((void) (addr), __builtin_frame_address (0))
 #else
-# define NEAR_STACK_TOP(addr) (addr)
+# define STACK_TOP_ADDRESS(addr) (addr)
 #endif
 
-/* Set *P to the address of the top of the stack.  This must be a
-   macro, not a function, so that it is executed in the caller's
-   environment.  It is not inside a do-while so that its storage
-   survives the macro.  Callers should be declared NO_INLINE.  */
-#ifdef HAVE___BUILTIN_UNWIND_INIT
-# define SET_STACK_TOP_ADDRESS(p)	\
-   stacktop_sentry sentry;		\
-   *(p) = NEAR_STACK_TOP (&sentry)
-#else
-# define SET_STACK_TOP_ADDRESS(p)		\
-   stacktop_sentry sentry;			\
-   test_setjmp ();				\
-   sys_setjmp (sentry.j);			\
-   *(p) = NEAR_STACK_TOP (&sentry + (stack_bottom < &sentry.c))
-#endif
-NO_INLINE /* Ensures registers are spilled. (Bug#41357)  */
+/* Must be called before releasing global interpreter lock (e.g.,
+   thread-yield).
+
+   FUNC must not run any Lisp code nor allocate any Lisp objects!
+*/
+NO_INLINE /* Crucial.  Ensures registers are spilled.  */
 void
-flush_stack_call_func1 (void (*func) (void *arg), void *arg)
+flush_stack_call_func (void (*func) (void *arg), void *arg)
 {
-  void *end;
+  stacktop_sentry sentry;
   struct thread_state *self = current_thread;
-  SET_STACK_TOP_ADDRESS (&end);
-  self->stack_top = end;
+
+  /* STACK_TOP_ADDRESS() returns the bp not the sp [1], thus GC would
+     miss marking callee-saved registers.  Calling
+     __builtin_unwind_init() precludes insidious Bug#41357.
+
+     [1] https://gcc.gnu.org/onlinedocs/gcc/Return-Address.html
+  */
+  __builtin_unwind_init ();
+
+#ifndef HAVE___BUILTIN_UNWIND_INIT
+  test_setjmp ();
+  sys_setjmp (sentry.j);
+  current_thread->stack_top = STACK_TOP_ADDRESS (&sentry + (stack_bottom < &sentry.c));
+#else
+  current_thread->stack_top = STACK_TOP_ADDRESS (&sentry);
+#endif
+
   func (arg);
   eassert (current_thread == self);
 }
