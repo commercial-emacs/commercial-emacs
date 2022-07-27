@@ -13,7 +13,7 @@
 ;;               Michael Olson (mwolson@gnu.org)
 ;;               Kelvin White (kwhite@gnu.org)
 ;; Version: 5.4.1
-;; Package-Requires: ((emacs "27.1"))
+;; Package-Requires: ((emacs "27.1") (compat "28.1.2.0"))
 ;; Keywords: IRC, chat, client, Internet
 ;; URL: https://www.gnu.org/software/emacs/erc.html
 
@@ -70,6 +70,8 @@
 (require 'time-date)
 (require 'iso8601)
 (eval-when-compile (require 'subr-x))
+
+(require 'erc-compat)
 
 (defconst erc-version "5.4.1"
   "This version of ERC.")
@@ -3392,9 +3394,7 @@ Without SECRET, consult auth-source, possibly passing SERVER as the
   "Non-nil when channel is server-local on a network that allows them."
   (and-let* (((eq ?& (aref channel 0)))
              (chan-types (erc--get-isupport-entry 'CHANTYPES 'single))
-             ((if (>= emacs-major-version 28)
-                  (string-search "&" chan-types)
-                (string-match-p "&" chan-types))))))
+             ((string-search "&" chan-types)))))
 
 (defun erc-cmd-JOIN (channel &optional key)
   "Join the channel given in CHANNEL, optionally with KEY.
@@ -4527,8 +4527,9 @@ a new window, but not to select it.  See the documentation for
                  (const :tag "Use current buffer" buffer)
                  (const :tag "Use current buffer" t)))
 
-;; FIXME either retire this or put it to use or more clearly explain
-;; what it's supposed to do.  It's currently only used by the obsolete
+;; FIXME either retire this or put it to use after determining how
+;; it's meant to work.  Clearly, the doc string does not describe
+;; current behavior.  It's currently only used by the obsolete
 ;; function `erc-auto-query'.
 (defcustom erc-query-on-unjoined-chan-privmsg t
   "If non-nil create query buffer on receiving any PRIVMSG at all.
@@ -6874,21 +6875,12 @@ shortened server name instead."
                                   (fill-region (point-min) (point-max))
                                   (buffer-string))))
                  (setq header-line-format
-                       (if (>= emacs-major-version 28)
-                           (string-replace
-                            "%"
-                            "%%"
-                            (if face
-                                (propertize header 'help-echo help-echo
-                                            'face face)
-                              (propertize header 'help-echo help-echo)))
-                         (replace-regexp-in-string
-                          "%"
-                          "%%"
-                          (if face
-                              (propertize header 'help-echo help-echo
-                                          'face face)
-                            (propertize header 'help-echo help-echo)))))))
+                       (string-replace
+                        "%"
+                        "%%"
+                        (if face
+                            (propertize header 'help-echo help-echo 'face face)
+                          (propertize header 'help-echo help-echo))))))
               (t (setq header-line-format
                        (if face
                            (propertize header 'face face)
@@ -7173,9 +7165,7 @@ functions."
               nick user host channel
               (if (not (string= reason ""))
                   (format ": %s"
-                          (if (>= emacs-major-version 28)
-                              (string-replace "%" "%%" reason)
-                            (replace-regexp-in-string "%" "%%" reason)))
+                          (string-replace "%" "%%" reason))
                 "")))))
 
 

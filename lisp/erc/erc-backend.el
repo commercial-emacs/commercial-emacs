@@ -257,7 +257,7 @@ current IRC process is still alive.")
 (defvar-local erc-server-lines-sent nil
   "Line counter.")
 
-(defvar-local erc-server-last-peers '(nil . nil)
+(defvar-local erc-server-last-peers nil
   "Last peers used, both sender and receiver.
 Those are used for /MSG destination shortcuts.")
 
@@ -590,7 +590,7 @@ TLS (see `erc-session-client-certificate' for more details)."
         (setq erc-server-last-received-time time))
       (setq erc-server-lines-sent 0)
       ;; last peers (sender and receiver)
-      (setq erc-server-last-peers '(nil . nil)))
+      (setq erc-server-last-peers (cons nil nil)))
     ;; we do our own encoding and decoding
     (when (fboundp 'set-process-coding-system)
       (set-process-coding-system process 'raw-text))
@@ -1071,21 +1071,20 @@ be used.  If the target is \".\", the last person you've sent a message
 to will be used."
   (cond
    ((string-match "^\\s-*\\(\\S-+\\) ?\\(.*\\)" line)
-    (let ((tgt (match-string 1 line))
-          (s (match-string 2 line)))
+    (let* ((tgt (match-string 1 line))
+           (s (match-string 2 line))
+           (server-buffer (erc-server-buffer))
+           (peers (buffer-local-value 'erc-server-last-peers server-buffer)))
       (erc-log (format "cmd: MSG(%s): [%s] %s" message-command tgt s))
       (cond
        ((string= tgt ",")
-        (if (car erc-server-last-peers)
-            (setq tgt (car erc-server-last-peers))
-          (setq tgt nil)))
+        (setq tgt (car peers)))
        ((string= tgt ".")
-        (if (cdr erc-server-last-peers)
-            (setq tgt (cdr erc-server-last-peers))
-          (setq tgt nil))))
+        (setq tgt (cdr peers))))
       (cond
        (tgt
-        (setcdr erc-server-last-peers tgt)
+        (with-current-buffer server-buffer
+          (setq erc-server-last-peers (cons (car peers) tgt)))
         (erc-server-send (format "%s %s :%s" message-command tgt s)
                          force))
        (t
@@ -1144,21 +1143,15 @@ PROCs `process-buffer' is `current-buffer' when this function is called."
     (save-match-data
       (let* ((tag-list (when (eq (aref string 0) ?@)
                          (substring string 1
-                                    (if (>= emacs-major-version 28)
-                                        (string-search " " string)
-                                      (string-match " " string)))))
+                                    (string-search " " string))))
              (msg (make-erc-response :unparsed string :tags (when tag-list
                                                               (erc-parse-tags
                                                                tag-list))))
              (string (if tag-list
-                         (substring string (+ 1 (if (>= emacs-major-version 28)
-                                                    (string-search " " string)
-                                                  (string-match " " string))))
+                         (substring string (+ 1 (string-search " " string)))
                        string))
              (posn (if (eq (aref string 0) ?:)
-                       (if (>= emacs-major-version 28)
-                           (string-search " " string)
-                         (string-match " " string))
+                       (string-search " " string)
                      0)))
 
         (setf (erc-response.sender msg)
@@ -1168,9 +1161,7 @@ PROCs `process-buffer' is `current-buffer' when this function is called."
 
         (setf (erc-response.command msg)
               (let* ((bposn (string-match "[^ \n]" string posn))
-                     (eposn (if (>= emacs-major-version 28)
-                                (string-search " " string bposn)
-                              (string-match " " string bposn))))
+                     (eposn (string-search " " string bposn)))
                 (setq posn (and eposn
                                 (string-match "[^ \n]" string eposn)))
                 (substring string bposn eposn)))
@@ -1178,9 +1169,7 @@ PROCs `process-buffer' is `current-buffer' when this function is called."
         (while (and posn
                     (not (eq (aref string posn) ?:)))
           (push (let* ((bposn posn)
-                       (eposn (if (>= emacs-major-version 28)
-                                  (string-search " " string bposn)
-                                (string-match " " string bposn))))
+                       (eposn (string-search " " string bposn)))
                   (setq posn (and eposn
                                   (string-match "[^ \n]" string eposn)))
                   (substring string bposn eposn))
@@ -1728,11 +1717,13 @@ add things to `%s' instead."
         (setf (erc-response.contents parsed) msg)
         (setq buffer (erc-get-buffer (if privp nick tgt) proc))
         ;; Even worth checking for empty target here? (invalid anyway)
-        (unless (or buffer noticep (string-empty-p tgt) (eq ?$ (aref tgt 0)))
-          (if (and privp msgp (not (erc-is-message-ctcp-and-not-action-p msg)))
+        (unless (or buffer noticep (string-empty-p tgt) (eq ?$ (aref tgt 0))
+                    (erc-is-message-ctcp-and-not-action-p msg))
+          (if privp
               (when erc-auto-query
                 (let ((erc-join-buffer erc-auto-query))
                   (setq buffer (erc--open-target nick))))
+            ;; A channel buffer has been killed but is still joined
             (setq buffer (erc--open-target tgt))))
         (when buffer
           (with-current-buffer buffer
@@ -1752,7 +1743,7 @@ add things to `%s' instead."
                     (erc-process-ctcp-reply proc parsed nick login host
                                             (match-string 1 msg)))))
          (t
-          (setcar erc-server-last-peers nick)
+          (setq erc-server-last-peers (cons nick (cdr erc-server-last-peers)))
           (setq s (erc-format-privmessage
                    (or fnick nick) msg
                    ;; If buffer is a query buffer,
@@ -1874,9 +1865,7 @@ Then display the welcome message."
                      start (- (match-end 0) 3))
              (setq start (match-end 0))))
          v))
-     (if (if (>= emacs-major-version 28)
-             (string-search "," value)
-           (string-match-p "," value))
+     (if (string-search "," value)
          (split-string value ",")
        (list value)))))
 
