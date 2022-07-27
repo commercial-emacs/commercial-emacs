@@ -148,7 +148,7 @@ bool print_output_debug_flag EXTERNALLY_VISIBLE = 1;
        if (! NILP (BVAR (current_buffer, enable_multibyte_characters))	\
 	   && ! print_escape_nonascii)					\
          specbind (Qprint_escape_nonascii, Qt);				\
-       if (print_buffer != 0)						\
+       if (print_buffer != NULL)					\
 	 {								\
 	   string = make_multibyte_string (print_buffer,		\
 					   print_buffer_pos,		\
