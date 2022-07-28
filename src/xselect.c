@@ -114,7 +114,7 @@ selection_quantum (Display *display)
 #define LOCAL_SELECTION(selection_symbol, dpyinfo)			\
   assq_no_quit (selection_symbol, dpyinfo->terminal->Vselection_alist)
 
-
+
 
 /* This converts a Lisp symbol to a server Atom, avoiding a server
    roundtrip whenever possible.  */
@@ -257,7 +257,7 @@ x_atom_to_symbol (struct x_display_info *dpyinfo, Atom atom)
   xfree (str);
   return val;
 }
-
+
 /* Do protocol to assert ourself as a selection owner.
    FRAME shall be the owner; it must be a valid X frame.
    TIMESTAMP should be the timestamp where selection ownership will be
@@ -316,7 +316,7 @@ x_own_selection (Lisp_Object selection_name, Lisp_Object selection_value,
       }
   }
 }
-
+
 /* Given a selection-name and desired type, look up our local copy of
    the selection value and convert it to the type.
    Return nil, a string, a vector, a symbol, an integer, or a cons
@@ -427,7 +427,7 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
   signal_error ("Invalid data returned by selection-conversion function",
 		list2 (handler_fn, value));
 }
-
+
 /* Subroutines of x_reply_selection_request.  */
 
 /* Send a SelectionNotify event to the requestor with property=None,
@@ -571,7 +571,7 @@ x_catch_errors_unwind (void)
   x_uncatch_errors ();
   unblock_input ();
 }
-
+
 
 /* This stuff is so that INCR selections are reentrant (that is, so we can
    be servicing multiple INCR selection requests simultaneously.)  I haven't
@@ -601,14 +601,13 @@ static struct prop_location *property_change_wait_list;
 static void
 set_property_change_object (struct prop_location *location)
 {
-  /* Input must be blocked so we don't get the event before we set these.  */
-  if (! input_blocked_p ())
+  if (! input_blocked_p ()) /* Bug#16737 */
     emacs_abort ();
   XSETCAR (property_change_reply, Qnil);
   property_change_reply_object = location;
 }
 
-
+
 /* Send the reply to a selection request event EVENT.  */
 
 #ifdef TRACE_SELECTION
@@ -714,9 +713,6 @@ x_reply_selection_request (struct selection_input_event *event,
 	int format_bytes = cs->format / 8;
 	bool had_errors_p = x_had_errors_p (display);
 
-        /* Must set this inside block_input ().  unblock_input may read
-           events and setting property_change_reply in
-           wait_for_property_change is then too late.  */
         set_property_change_object (cs->wait_object);
 	unblock_input ();
 
@@ -758,7 +754,6 @@ x_reply_selection_request (struct selection_input_event *event,
 			     : format_bytes);
 	    XFlush (display);
 	    had_errors_p = x_had_errors_p (display);
-            /* See comment above about property_change_reply.  */
             set_property_change_object (cs->wait_object);
 	    unblock_input ();
 
@@ -785,27 +780,17 @@ x_reply_selection_request (struct selection_input_event *event,
 	TRACE0 ("Done sending incrementally");
       }
 
-  /* rms, 2003-01-03: I think I have fixed this bug.  */
-  /* The window we're communicating with may have been deleted
-     in the meantime (that's a real situation from a bug report).
-     In this case, there may be events in the event queue still
-     referring to the deleted window, and we'll get a BadWindow error
-     in XTread_socket when processing the events.  I don't have
-     an idea how to fix that.  gerd, 2001-01-98.   */
-  /* 2004-09-10: XSync and UNBLOCK so that possible protocol errors are
-     delivered before uncatch errors.  */
+  /* GTK queues events in addition to Xlib.  So unblock to deliver
+     possible protocol errors.  */
   XSync (display, False);
   unblock_input ();
 
-  /* GTK queues events in addition to the queue in Xlib.  So we
-     UNBLOCK to enter the event loop and get possible errors delivered,
-     and then BLOCK again because x_uncatch_errors requires it.  */
+  /* Then re-block for x_uncatch_errors() in unbind_to(). */
   block_input ();
-  /* This calls x_uncatch_errors.  */
   unbind_to (count, Qnil);
   unblock_input ();
 }
-
+
 /* Handle a SelectionRequest event EVENT.
    This is called from keyboard.c when such an event is found in the queue.  */
 
@@ -1011,7 +996,7 @@ x_convert_selection (Lisp_Object selection_symbol,
   lisp_data_to_selection_data (dpyinfo, lisp_selection, cs);
   return true;
 }
-
+
 /* Handle a SelectionClear event EVENT, which indicates that some
    client cleared out our previously asserted selection.
    This is called from keyboard.c when such an event is found in the queue.  */
@@ -1154,7 +1139,7 @@ x_clear_frame_selections (struct frame *f)
   if (!NILP (lost))
     x_preserve_selections (dpyinfo, lost, frame);
 }
-
+
 /* True if any properties for DISPLAY and WINDOW
    are on the list of what we are waiting for.  */
 
@@ -1221,43 +1206,21 @@ wait_for_property_change_unwind (void *loc)
     property_change_reply_object = 0;
 }
 
-/* Actually wait for a property change.
-   IDENTIFIER should be the value that expect_property_change returned.  */
-
 static void
 wait_for_property_change (struct prop_location *location)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-
-  /* Make sure to do unexpect_property_change if we quit or err.  */
   record_unwind_protect_ptr (wait_for_property_change_unwind, location);
-
-  /* See comment in x_reply_selection_request about setting
-     property_change_reply.  Do not do it here.  */
-
-  /* If the event we are waiting for arrives beyond here, it will set
-     property_change_reply, because property_change_reply_object says so.  */
   if (! location->arrived)
     {
       intmax_t timeout = max (0, x_selection_timeout);
       intmax_t secs = timeout / 1000;
       int nsecs = (timeout % 1000) * 1000000;
       TRACE2 ("  Waiting %"PRIdMAX" secs, %d nsecs", secs, nsecs);
-
-      if (!input_blocked_p ())
-	wait_reading_process_output (secs, nsecs, 0, false,
-				     property_change_reply, NULL, 0);
-      else
-	x_wait_for_cell_change (property_change_reply,
-				make_timespec (secs, nsecs));
-
+      x_wait_for_cell_change (property_change_reply, make_timespec (secs, nsecs));
       if (NILP (XCAR (property_change_reply)))
-	{
-	  TRACE0 ("  Timed out");
-	  error ("Timed out waiting for property-notify event");
-	}
+	error ("Timed out waiting for property-notify event");
     }
-
   unbind_to (count, Qnil);
 }
 
@@ -1307,7 +1270,7 @@ x_cancel_atimer (void *atimer)
   cancel_atimer (atimer);
 }
 
-
+
 /* Variables for communication with x_handle_selection_notify.  */
 static Atom reading_which_selection;
 static Lisp_Object reading_selection_reply;
@@ -1418,7 +1381,7 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
 							selection_atom,
 							false));
 }
-
+
 /* Subroutines of x_get_window_property_as_lisp_data */
 
 /* Use xfree, not XFree, to free the data obtained with this function.  */
@@ -1556,7 +1519,7 @@ x_get_window_property (Display *display, Window window, Atom property,
   unblock_input ();
   memory_full (SIZE_MAX);
 }
-
+
 /* Use xfree, not XFree, to free the data obtained with this function.  */
 
 static void
@@ -1598,7 +1561,6 @@ receive_incremental_selection (struct x_display_info *dpyinfo,
   wait_object = expect_property_change (display, window, property,
 					PropertyNewValue);
   XFlush (display);
-  /* See comment in x_reply_selection_request about property_change_reply.  */
   set_property_change_object (wait_object);
   unblock_input ();
 
@@ -1638,8 +1600,6 @@ receive_incremental_selection (struct x_display_info *dpyinfo,
       XDeleteProperty (display, window, property);
       wait_object = expect_property_change (display, window, property,
 					    PropertyNewValue);
-      /* See comment in x_reply_selection_request about
-	 property_change_reply.  */
       set_property_change_object (wait_object);
       XFlush (display);
       unblock_input ();
@@ -1658,7 +1618,7 @@ receive_incremental_selection (struct x_display_info *dpyinfo,
     }
 }
 
-
+
 /* Fetch a value from property PROPERTY of X window WINDOW on display
    DISPLAY.  TARGET_TYPE and SELECTION_ATOM are used in error message
    if this fails.  */
@@ -1743,7 +1703,7 @@ x_get_window_property_as_lisp_data (struct x_display_info *dpyinfo,
   xfree (data);
   return val;
 }
-
+
 /* These functions convert from the selection data read from the server into
    something that we can use from Lisp, and vice versa.
 
@@ -2086,7 +2046,7 @@ clean_local_selection_data (Lisp_Object obj)
     }
   return obj;
 }
-
+
 /* Called from XTread_socket to handle SelectionNotify events.
    If it's the selection we are waiting for, stop waiting
    by setting the car of reading_selection_reply to non-nil.
@@ -2105,7 +2065,7 @@ x_handle_selection_notify (const XSelectionEvent *event)
 	   (event->property != 0 ? Qt : Qlambda));
 }
 
-
+
 /* From a Lisp_Object, return a suitable frame for selection
    operations.  OBJECT may be a frame, a terminal object, or nil
    (which stands for the selected frame--or, if that is not an X
@@ -2409,7 +2369,7 @@ run.  */)
   return clean_local_selection_data (result);
 }
 
-
+
 /* Send clipboard manager a SAVE_TARGETS request with a UTF8_STRING
    property (https://www.freedesktop.org/wiki/ClipboardManager/).  */
 
@@ -2512,7 +2472,7 @@ x_clipboard_manager_save_all (void)
     }
 }
 
-
+
 /***********************************************************************
                       Drag and drop support
 ***********************************************************************/
@@ -2909,7 +2869,7 @@ x_send_client_event (Lisp_Object display, Lisp_Object dest, Lisp_Object from,
   unblock_input ();
 }
 
-
+
 
 /* Return the timestamp where ownership of SELECTION was asserted, or
    nil if no local selection is present.  */

@@ -923,28 +923,16 @@ static void
 wait_for_property_change (struct prop_location *location)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-
-  /* Make sure to do unexpect_property_change if we quit or err.  */
   record_unwind_protect_ptr (wait_for_property_change_unwind, location);
-
-  /* See comment in x_reply_selection_request about setting
-     property_change_reply.  Do not do it here.  */
-
-  /* If the event we are waiting for arrives beyond here, it will set
-     property_change_reply, because property_change_reply_object says so.  */
   if (! location->arrived)
     {
       intmax_t timeout = max (0, pgtk_selection_timeout);
       intmax_t secs = timeout / 1000;
       int nsecs = (timeout % 1000) * 1000000;
-
-      wait_reading_process_output (secs, nsecs, 0, false,
-				   property_change_reply, NULL, 0);
-
+      x_wait_for_cell_change (property_change_reply, make_timespec (secs, nsecs));
       if (NILP (XCAR (property_change_reply)))
 	error ("Timed out waiting for property-notify event");
     }
-
   unbind_to (count, Qnil);
 }
 
