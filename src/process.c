@@ -1124,8 +1124,6 @@ fails, return nil.  */)
 
   CHECK_PROCESS (process);
 
-  /* wait_reading_process_output will not compute_wait_mask
-     unless it's for all processes. */
   fd_set read, write;
   FD_ZERO (&read);
   FD_ZERO (&write);
