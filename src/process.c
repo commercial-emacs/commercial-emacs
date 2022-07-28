@@ -423,15 +423,8 @@ static struct fd_callback_data
 {
   fd_callback func;
   void *data;
-  /* Flags from enum fd_bits.  */
   int flags;
-  /* If this fd is locked to a certain thread, this points to it.
-     Otherwise, this is NULL.  If an fd is locked to a thread, then
-     only that thread is permitted to wait on it.  */
-  struct thread_state *thread;
-  /* If this fd is currently being selected on by a thread, this
-     points to the thread.  Otherwise it is NULL.  */
-  struct thread_state *waiting_thread;
+  struct thread_state *selected_by;
 } fd_callback_info[FD_SETSIZE];
 
 /* Add a file descriptor FD to be monitored for when read is possible.
@@ -547,38 +540,29 @@ delete_write_fd (int fd)
 static void
 compute_wait_mask (fd_set *mask, int include_fd, int exclude_fd)
 {
-  int fd;
-
   FD_ZERO (mask);
   eassert (max_desc < FD_SETSIZE);
-  for (fd = 0; fd <= max_desc; ++fd)
+  for (int fd = 0; fd <= max_desc; ++fd)
     {
-      if (fd_callback_info[fd].thread != NULL
-	  && fd_callback_info[fd].thread != current_thread)
-	continue;
-      if (fd_callback_info[fd].waiting_thread != NULL
-	  && fd_callback_info[fd].waiting_thread != current_thread)
-	continue;
-      if ((fd_callback_info[fd].flags & include_fd) != 0
+      if ((! fd_callback_info[fd].selected_by
+	   ||
+	   fd_callback_info[fd].selected_by == current_thread)
+	  && (fd_callback_info[fd].flags & include_fd) != 0
 	  && (fd_callback_info[fd].flags & exclude_fd) == 0)
 	{
 	  FD_SET (fd, mask);
-	  fd_callback_info[fd].waiting_thread = current_thread;
+	  fd_callback_info[fd].selected_by = current_thread;
 	}
     }
 }
 
 static void
-clear_waiting_thread_info (void)
+clear_selected_by (void)
 {
-  int fd;
-
   eassert (max_desc < FD_SETSIZE);
-  for (fd = 0; fd <= max_desc; ++fd)
-    {
-      if (fd_callback_info[fd].waiting_thread == current_thread)
-	fd_callback_info[fd].waiting_thread = NULL;
-    }
+  for (int fd = 0; fd <= max_desc; ++fd)
+    if (fd_callback_info[fd].selected_by == current_thread)
+      fd_callback_info[fd].selected_by = NULL;
 }
 
 /* Compute the Lisp form of the process status, p->status, from
@@ -844,17 +828,7 @@ update_processes_for_thread_death (Lisp_Object dying_thread)
     {
       Lisp_Object process = XCDR (XCAR (pair));
       if (EQ (XPROCESS (process)->thread, dying_thread))
-	{
-	  struct Lisp_Process *proc = XPROCESS (process);
-
-	  pset_thread (proc, Qnil);
-	  eassert (proc->infd < FD_SETSIZE);
-	  if (proc->infd >= 0)
-	    fd_callback_info[proc->infd].thread = NULL;
-	  eassert (proc->outfd < FD_SETSIZE);
-	  if (proc->outfd >= 0)
-	    fd_callback_info[proc->outfd].thread = NULL;
-	}
+	pset_thread (XPROCESS (process), Qnil);
     }
 }
 
@@ -1326,26 +1300,10 @@ If THREAD is nil, the process is unlocked.  */)
   (Lisp_Object process, Lisp_Object thread)
 {
   struct Lisp_Process *proc;
-  struct thread_state *tstate;
 
   CHECK_PROCESS (process);
-  if (NILP (thread))
-    tstate = NULL;
-  else
-    {
-      CHECK_THREAD (thread);
-      tstate = XTHREAD (thread);
-    }
-
   proc = XPROCESS (process);
   pset_thread (proc, thread);
-  eassert (proc->infd < FD_SETSIZE);
-  if (proc->infd >= 0)
-    fd_callback_info[proc->infd].thread = tstate;
-  eassert (proc->outfd < FD_SETSIZE);
-  if (proc->outfd >= 0)
-    fd_callback_info[proc->outfd].thread = tstate;
-
   return thread;
 }
 
@@ -1507,18 +1465,6 @@ DEFUN ("set-process-plist", Fset_process_plist, Sset_process_plist,
   pset_plist (XPROCESS (process), plist);
   return plist;
 }
-
-#if 0 /* Turned off because we don't currently record this info
-	 in the process.  Perhaps add it.  */
-DEFUN ("process-connection", Fprocess_connection, Sprocess_connection, 1, 1, 0,
-       doc: /* Return the connection type of PROCESS.
-The value is nil for a pipe, t or `pty' for a pty, or `stream' for
-a socket connection.  */)
-  (Lisp_Object process)
-{
-  return XPROCESS (process)->type;
-}
-#endif
 
 DEFUN ("process-type", Fprocess_type, Sprocess_type, 1, 1, 0,
        doc: /* Return the connection type of PROCESS.
@@ -5054,13 +5000,6 @@ wait_for_tls_negotiation (Lisp_Object process)
 #endif
 }
 
-static void
-wait_reading_process_output_unwind (int data)
-{
-  clear_waiting_thread_info ();
-  waiting_for_user_input_p = data;
-}
-
 /* Read and dispose of subprocess output while waiting for timeout to
    elapse and/or keyboard input to be available.
 
@@ -5133,14 +5072,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
   FD_ZERO (&Available);
   FD_ZERO (&Writeok);
 
-  if (time_limit == 0 && nsecs == 0 && wait_proc && !NILP (Vinhibit_quit)
-      && !(CONSP (wait_proc->status)
-	   && EQ (XCAR (wait_proc->status), Qexit)))
-    message1 ("Blocking call to accept-process-output with quit inhibited!!");
-
-  record_unwind_protect_int (wait_reading_process_output_unwind,
-			     waiting_for_user_input_p);
-  waiting_for_user_input_p = read_kbd;
+  record_unwind_protect_void (clear_selected_by);
 
   if (TYPE_MAXIMUM (time_t) < time_limit)
     time_limit = TYPE_MAXIMUM (time_t);
@@ -5199,14 +5131,12 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       }
 #endif /* GETADDRINFO_A */
 
-      /* Compute time from now till when time limit is up.  */
-      /* Exit if already run out.  */
       if (wait == TIMEOUT)
 	{
 	  if (!timespec_valid_p (now))
 	    now = current_timespec ();
 	  if (timespec_cmp (end_time, now) <= 0)
-	    break;
+	    break; // exit if timed out
 	  timeout = timespec_sub (end_time, now);
 	}
       else
@@ -5294,7 +5224,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  break;
 	}
 
-      /* Wait till there is something to do.  */
       if (wait_proc && just_wait_proc)
 	{
 	  if (wait_proc->infd < 0)  /* Terminated.  */
@@ -5528,13 +5457,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
 	 (We used to do this only if wait_for_cell.)  */
       if (read_kbd == 0 && detect_input_pending ())
-	{
-	  swallow_events (do_display);
-#if 0  /* Exiting when read_kbd doesn't request that seems wrong, though.  */
-	  if (detect_input_pending ())
-	    break;
-#endif
-	}
+	swallow_events (do_display);
 
       /* Exit now if the cell we're waiting for became non-nil.  */
       if (! NILP (wait_for_cell) && ! NILP (XCAR (wait_for_cell)))
@@ -5789,7 +5712,6 @@ read_process_output (Lisp_Object proc, int channel)
   chars = SAFE_ALLOCA (sizeof coding->carryover + readmax);
 
   if (carryover)
-    /* See the comment above.  */
     memcpy (chars, SDATA (p->decoding_buf), carryover);
 
 #ifdef DATAGRAM_SOCKETS
@@ -5871,17 +5793,8 @@ read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
   Lisp_Object outstream = p->filter;
   Lisp_Object text;
   bool outer_running_asynch_code = running_asynch_code;
-  int waiting = waiting_for_user_input_p;
 
-#if 0
-  Lisp_Object obuffer, okeymap;
-  XSETBUFFER (obuffer, current_buffer);
-  okeymap = BVAR (current_buffer, keymap);
-#endif
-
-  /* We inhibit quit here instead of just catching it so that
-     hitting ^G when a filter happens to be running won't screw
-     it up.  */
+  /* We inhibit quit to avoid disrupting a filter.  */
   specbind (Qinhibit_quit, Qt);
   specbind (Qlast_nonmenu_event, Qt);
 
@@ -5952,10 +5865,6 @@ read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
   /* If we saved the match data nonrecursively, restore it now.  */
   restore_search_regs ();
   running_asynch_code = outer_running_asynch_code;
-
-  /* Restore waiting_for_user_input_p as it was
-     when we were called, in case the filter clobbered it.  */
-  waiting_for_user_input_p = waiting;
 }
 
 DEFUN ("internal-default-process-filter", Finternal_default_process_filter,
@@ -7174,17 +7083,10 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
   struct Lisp_Process *p = XPROCESS (proc);
   specpdl_ref count = SPECPDL_INDEX ();
   bool outer_running_asynch_code = running_asynch_code;
-  int waiting = waiting_for_user_input_p;
-
   if (inhibit_sentinels)
     return;
 
   odeactivate = Vdeactivate_mark;
-#if 0
-  Lisp_Object obuffer, okeymap;
-  XSETBUFFER (obuffer, current_buffer);
-  okeymap = BVAR (current_buffer, keymap);
-#endif
 
   /* There's no good reason to let sentinels change the current
      buffer, and many callers of accept-process-output, sit-for, and
@@ -7193,9 +7095,9 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
 
   sentinel = p->sentinel;
 
-  /* Inhibit quit so that random quits don't screw up a running filter.  */
+  /* We inhibit quit to avoid disrupting a filter.  */
   specbind (Qinhibit_quit, Qt);
-  specbind (Qlast_nonmenu_event, Qt); /* Why? --Stef  */
+  specbind (Qlast_nonmenu_event, Qt);
 
   /* In case we get recursively called,
      and we already saved the match data nonrecursively,
@@ -7223,11 +7125,6 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
   running_asynch_code = outer_running_asynch_code;
 
   Vdeactivate_mark = odeactivate;
-
-  /* Restore waiting_for_user_input_p as it was
-     when we were called, in case the filter clobbered it.  */
-  waiting_for_user_input_p = waiting;
-
   unbind_to (count, Qnil);
 }
 
@@ -7470,10 +7367,8 @@ delete_gpm_wait_descriptor (int desc)
 static bool
 keyboard_bit_set (fd_set *mask)
 {
-  int fd;
-
   eassert (max_desc < FD_SETSIZE);
-  for (fd = 0; fd <= max_desc; fd++)
+  for (int fd = 0; fd <= max_desc; fd++)
     if (FD_ISSET (fd, mask)
 	&& ((fd_callback_info[fd].flags & (FOR_READ | KEYBOARD_FD))
 	    == (FOR_READ | KEYBOARD_FD)))
@@ -7873,15 +7768,10 @@ kill_buffer_processes (Lisp_Object buffer)
 
 DEFUN ("waiting-for-user-input-p", Fwaiting_for_user_input_p,
        Swaiting_for_user_input_p, 0, 0, 0,
-       doc: /* Return non-nil if Emacs is waiting for input from the user.
-This is intended for use by asynchronous process output filters and sentinels.  */)
+       doc: /* Return nil.  */)
   (void)
 {
-#ifdef subprocesses
-  return (waiting_for_user_input_p ? Qt : Qnil);
-#else
   return Qnil;
-#endif
 }
 
 /* Stop reading input from keyboard sources.  */
@@ -8152,13 +8042,6 @@ init_process_emacs (int sockfd)
 
   max_desc = -1;
   memset (fd_callback_info, 0, sizeof (fd_callback_info));
-
-  /* Don't do this, it caused infinite select loops.  The display
-     method should call add_keyboard_wait_descriptor on stdin if it
-     needs that.  */
-#if 0
-  FD_SET (0, &input_wait_mask);
-#endif
 
   Vprocess_alist = Qnil;
   deleted_pid_list = Qnil;
