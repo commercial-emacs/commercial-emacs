@@ -543,17 +543,14 @@ compute_wait_mask (fd_set *mask, int include_fd, int exclude_fd)
   FD_ZERO (mask);
   eassert (max_desc < FD_SETSIZE);
   for (int fd = 0; fd <= max_desc; ++fd)
-    {
-      if ((! fd_callback_info[fd].selected_by
-	   ||
-	   fd_callback_info[fd].selected_by == current_thread)
-	  && (fd_callback_info[fd].flags & include_fd) != 0
-	  && (fd_callback_info[fd].flags & exclude_fd) == 0)
-	{
-	  FD_SET (fd, mask);
-	  fd_callback_info[fd].selected_by = current_thread;
-	}
-    }
+    if ((! fd_callback_info[fd].selected_by
+	 || fd_callback_info[fd].selected_by == current_thread)
+	&& (fd_callback_info[fd].flags & include_fd) != 0
+	&& (fd_callback_info[fd].flags & exclude_fd) == 0)
+      {
+	FD_SET (fd, mask);
+	fd_callback_info[fd].selected_by = current_thread;
+      }
 }
 
 static void
@@ -565,21 +562,8 @@ clear_selected_by (void)
       fd_callback_info[fd].selected_by = NULL;
 }
 
-/* Compute the Lisp form of the process status, p->status, from
-   the numeric status that was returned by `wait'.  */
-
-static Lisp_Object status_convert (int);
-
-static void
-update_status (struct Lisp_Process *p)
-{
-  eassert (p->raw_status_new);
-  pset_status (p, status_convert (p->raw_status));
-  p->raw_status_new = 0;
-}
-
-/*  Convert a process status word in Unix format to
-    the list that we use internally.  */
+/* Convert a process status word in Unix format to the list that we
+   use internally.  */
 
 static Lisp_Object
 status_convert (int w)
@@ -593,6 +577,14 @@ status_convert (int w)
 				  WCOREDUMP (w) ? Qt : Qnil));
   else
     return Qrun;
+}
+
+static void
+update_status (struct Lisp_Process *p)
+{
+  eassert (p->raw_status_new);
+  pset_status (p, status_convert (p->raw_status));
+  p->raw_status_new = 0;
 }
 
 /* True if STATUS is that of a process attempting connection.  */
