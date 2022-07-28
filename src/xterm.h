@@ -1493,7 +1493,6 @@ extern void x_clear_area (struct frame *f, int, int, int, int);
   || (!defined USE_X_TOOLKIT && !defined USE_GTK)
 extern void x_mouse_leave (struct x_display_info *);
 #endif
-extern void x_wait_for_cell_change (Lisp_Object, struct timespec);
 
 #ifndef USE_GTK
 extern int x_dispatch_event (XEvent *, Display *);

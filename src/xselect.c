@@ -40,17 +40,17 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <X11/Xproto.h>
 
-struct prop_location;
+struct property_change;
 struct selection_data;
 
 static void x_decline_selection_request (struct selection_input_event *);
 static bool x_convert_selection (Lisp_Object, Lisp_Object, Atom, bool,
 				 struct x_display_info *, bool);
 static bool waiting_for_other_props_on_window (Display *, Window);
-static struct prop_location *expect_property_change (Display *, Window,
+static struct property_change *pend_property_change (Display *, Window,
                                                      Atom, int);
-static void unexpect_property_change (struct prop_location *);
-static void wait_for_property_change (struct prop_location *);
+static void unpend_property_change (void *);
+static void wait_for_property_change (struct property_change *);
 static Lisp_Object x_get_window_property_as_lisp_data (struct x_display_info *,
                                                        Window, Atom,
                                                        Lisp_Object, Atom, bool);
@@ -114,7 +114,11 @@ selection_quantum (Display *display)
 #define LOCAL_SELECTION(selection_symbol, dpyinfo)			\
   assq_no_quit (selection_symbol, dpyinfo->terminal->Vselection_alist)
 
-
+typedef enum {
+  XSELECT_PENDING,
+  XSELECT_SUCCESS,
+  XSELECT_FAIL
+} xselect_sentinel;
 
 /* This converts a Lisp symbol to a server Atom, avoiding a server
    roundtrip whenever possible.  */
@@ -480,8 +484,8 @@ struct selection_data
   Atom property;
   /* This can be set to non-NULL during x_reply_selection_request, if
      the selection is waiting for an INCR transfer to complete.  Don't
-     free these; that's done by unexpect_property_change.  */
-  struct prop_location *wait_object;
+     free these; that's done by unpend_property_change.  */
+  struct property_change *wait_object;
   struct selection_data *next;
 };
 
@@ -579,7 +583,7 @@ x_catch_errors_unwind (void)
 
 /* Keep a list of the property changes that are awaited.  */
 
-struct prop_location
+struct property_change
 {
   int identifier;
   Display *display;
@@ -587,26 +591,10 @@ struct prop_location
   Atom property;
   int desired_state;
   bool arrived;
-  struct prop_location *next;
+  struct property_change *next;
 };
 
-static int prop_location_identifier;
-
-static Lisp_Object property_change_reply;
-
-static struct prop_location *property_change_reply_object;
-
-static struct prop_location *property_change_wait_list;
-
-static void
-set_property_change_object (struct prop_location *location)
-{
-  if (! input_blocked_p ()) /* Bug#16737 */
-    emacs_abort ();
-  XSETCAR (property_change_reply, Qnil);
-  property_change_reply_object = location;
-}
-
+static struct property_change *pending_property_changes;
 
 /* Send the reply to a selection request event EVENT.  */
 
@@ -641,7 +629,7 @@ x_reply_selection_request (struct selection_input_event *event,
     reply->property = reply->target;
 
   block_input ();
-  /* The protected block contains wait_for_property_change, which can
+  /* The protected block contains wait_for_property_change(), which can
      run random lisp code (process handlers) or signal.  Therefore, we
      put the x_uncatch_errors call in an unwind.  */
   record_unwind_protect_void (x_catch_errors_unwind);
@@ -675,8 +663,7 @@ x_reply_selection_request (struct selection_input_event *event,
 	  TRACE2 ("Start sending %"pD"d bytes incrementally (%s)",
 		  bytes_remaining, XGetAtomName (display, cs->property));
 	  cs->wait_object
-	    = expect_property_change (display, window, cs->property,
-				      PropertyDelete);
+	    = pend_property_change (display, window, cs->property, PropertyDelete);
 
 	  /* XChangeProperty expects an array of long even if long is
 	     more than 32 bits.  */
@@ -713,22 +700,19 @@ x_reply_selection_request (struct selection_input_event *event,
 	int format_bytes = cs->format / 8;
 	bool had_errors_p = x_had_errors_p (display);
 
-        set_property_change_object (cs->wait_object);
 	unblock_input ();
 
 	bytes_remaining = cs->size;
 	bytes_remaining *= format_bytes;
 
-	/* Wait for the requestor to ack by deleting the property.
-	   This can run Lisp code (process handlers) or signal.  */
-	if (! had_errors_p)
+	if (had_errors_p)
+	  unpend_property_change (cs->wait_object);
+	else
 	  {
 	    TRACE1 ("Waiting for ACK (deletion of %s)",
 		    XGetAtomName (display, cs->property));
 	    wait_for_property_change (cs->wait_object);
 	  }
-	else
-	  unexpect_property_change (cs->wait_object);
 
 	while (bytes_remaining)
 	  {
@@ -738,8 +722,7 @@ x_reply_selection_request (struct selection_input_event *event,
 	    block_input ();
 
 	    cs->wait_object
-	      = expect_property_change (display, window, cs->property,
-					PropertyDelete);
+	      = pend_property_change (display, window, cs->property, PropertyDelete);
 
 	    TRACE1 ("Sending increment of %d elements", i);
 	    TRACE1 ("Set %s to increment data",
@@ -754,16 +737,16 @@ x_reply_selection_request (struct selection_input_event *event,
 			     : format_bytes);
 	    XFlush (display);
 	    had_errors_p = x_had_errors_p (display);
-            set_property_change_object (cs->wait_object);
 	    unblock_input ();
 
-	    if (had_errors_p) break;
-
-	    /* Wait for the requestor to ack this chunk by deleting
-	       the property.  This can run Lisp code or signal.  */
-	    TRACE1 ("Waiting for increment ACK (deletion of %s)",
-		    XGetAtomName (display, cs->property));
-	    wait_for_property_change (cs->wait_object);
+	    if (had_errors_p)
+	      break;
+	    else
+	      {
+		TRACE1 ("Waiting for increment ACK (deletion of %s)",
+			XGetAtomName (display, cs->property));
+		wait_for_property_change (cs->wait_object);
+	      }
 	  }
 
 	/* Now write a zero-length chunk to the property to tell the
@@ -1146,7 +1129,7 @@ x_clear_frame_selections (struct frame *f)
 static bool
 waiting_for_other_props_on_window (Display *display, Window window)
 {
-  for (struct prop_location *p = property_change_wait_list; p; p = p->next)
+  for (struct property_change *p = pending_property_changes; p; p = p->next)
     if (p->display == display && p->window == window)
       return true;
   return false;
@@ -1157,33 +1140,34 @@ waiting_for_other_props_on_window (Display *display, Window window)
    The return value is a number that uniquely identifies
    this awaited property change.  */
 
-static struct prop_location *
-expect_property_change (Display *display, Window window,
-                        Atom property, int state)
+static struct property_change *
+pend_property_change (Display *display, Window window, Atom property, int state)
 {
-  struct prop_location *pl = xmalloc (sizeof *pl);
-  pl->identifier = ++prop_location_identifier;
+  static int property_change_identifier = 0;
+  struct property_change *pl = xmalloc (sizeof *pl);
+  pl->identifier = ++property_change_identifier;
   pl->display = display;
   pl->window = window;
   pl->property = property;
   pl->desired_state = state;
-  pl->next = property_change_wait_list;
+  pl->next = pending_property_changes;
   pl->arrived = false;
-  property_change_wait_list = pl;
+  pending_property_changes = pl;
   return pl;
 }
 
 /* Delete an entry from the list of property changes we are waiting for.
-   IDENTIFIER is the number that uniquely identifies the entry.  */
+   CHANGE is the number that uniquely identifies the entry.  */
 
 static void
-unexpect_property_change (struct prop_location *location)
+unpend_property_change (void *addr)
 {
-  struct prop_location *prop, **pprev = &property_change_wait_list;
+  struct property_change *change = (struct property_change *) addr;
+  struct property_change *prop, **pprev = &pending_property_changes;
 
-  for (prop = property_change_wait_list; prop; prop = *pprev)
+  for (prop = pending_property_changes; prop; prop = *pprev)
     {
-      if (prop == location)
+      if (prop == change)
 	{
 	  *pprev = prop->next;
 	  xfree (prop);
@@ -1194,31 +1178,24 @@ unexpect_property_change (struct prop_location *location)
     }
 }
 
-/* Remove the property change expectation element for IDENTIFIER.  */
-
 static void
-wait_for_property_change_unwind (void *loc)
-{
-  struct prop_location *location = loc;
-
-  unexpect_property_change (location);
-  if (location == property_change_reply_object)
-    property_change_reply_object = 0;
-}
-
-static void
-wait_for_property_change (struct prop_location *location)
+wait_for_property_change (struct property_change *change)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-  record_unwind_protect_ptr (wait_for_property_change_unwind, location);
-  if (! location->arrived)
+  record_unwind_protect_ptr (unpend_property_change, change);
+  if (! change->arrived)
     {
-      intmax_t timeout = max (0, x_selection_timeout);
-      intmax_t secs = timeout / 1000;
-      int nsecs = (timeout % 1000) * 1000000;
+      intmax_t itimeout = max (0, x_selection_timeout);
+      intmax_t secs = itimeout / 1000;
+      int nsecs = (itimeout % 1000) * 1000000;
       TRACE2 ("  Waiting %"PRIdMAX" secs, %d nsecs", secs, nsecs);
-      x_wait_for_cell_change (property_change_reply, make_timespec (secs, nsecs));
-      if (NILP (XCAR (property_change_reply)))
+      for (struct timespec at = timespec_add (current_timespec (),
+					      make_timespec (secs, nsecs));
+	   (! change->arrived
+	    && 0 <= timespec_cmp (at, current_timespec ()));
+	   (void) at)
+	wait_reading_process_output (0, 20 * 1000 * 1000, 0, false, NULL, 0);
+      if (! change->arrived)
 	error ("Timed out waiting for property-notify event");
     }
   unbind_to (count, Qnil);
@@ -1229,11 +1206,10 @@ wait_for_property_change (struct prop_location *location)
 void
 x_handle_property_notify (const XPropertyEvent *event)
 {
-  struct prop_location *rest;
-
-  for (rest = property_change_wait_list; rest; rest = rest->next)
+  struct property_change *rest;
+  for (rest = pending_property_changes; rest; rest = rest->next)
     {
-      if (!rest->arrived
+      if (! rest->arrived
 	  && rest->property == event->atom
 	  && rest->window == event->window
 	  && rest->display == event->display
@@ -1242,14 +1218,7 @@ x_handle_property_notify (const XPropertyEvent *event)
 	  TRACE2 ("Expected %s of property %s",
 		  (event->state == PropertyDelete ? "deletion" : "change"),
 		  XGetAtomName (event->display, event->atom));
-
 	  rest->arrived = true;
-
-	  /* If this is the one wait_for_property_change is waiting for,
-	     tell it to wake up.  */
-	  if (rest == property_change_reply_object)
-	    XSETCAR (property_change_reply, Qt);
-
 	  return;
 	}
     }
@@ -1258,9 +1227,7 @@ x_handle_property_notify (const XPropertyEvent *event)
 static void
 x_display_selection_waiting_message (struct atimer *timer)
 {
-  Lisp_Object val;
-
-  val = build_string ("Waiting for reply from selection owner...");
+  Lisp_Object val = build_string ("Waiting for reply from selection owner...");
   message3_nolog (val);
 }
 
@@ -1273,8 +1240,8 @@ x_cancel_atimer (void *atimer)
 
 /* Variables for communication with x_handle_selection_notify.  */
 static Atom reading_which_selection;
-static Lisp_Object reading_selection_reply;
 static Window reading_selection_window;
+static xselect_sentinel reading_selection_sentinel;
 
 /* Do protocol to read selection-data from the server.
    Converts this to Lisp data and returns it.
@@ -1300,12 +1267,13 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
 
   count = SPECPDL_INDEX ();
 
-  if (!FRAME_LIVE_P (f))
+  if (! FRAME_LIVE_P (f))
     return unbind_to (count, Qnil);
 
   if (! NILP (time_stamp))
     CONS_TO_INTEGER (time_stamp, Time, requestor_time);
 
+  /* critical section begin */
   block_input ();
   TRACE2 ("Get selection %s, type %s",
 	  XGetAtomName (display, type_atom),
@@ -1317,20 +1285,11 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
   x_check_errors (display, "Can't convert selection: %s");
   x_uncatch_errors_after_check ();
 
-  /* Prepare to block until the reply has been read.  */
   reading_selection_window = requestor_window;
   reading_which_selection = selection_atom;
-  XSETCAR (reading_selection_reply, Qnil);
+  reading_selection_sentinel = XSELECT_PENDING;
 
-  /* It should not be necessary to stop handling selection requests
-     during this time.  In fact, the SAVE_TARGETS mechanism requires
-     us to handle a clipboard manager's requests before it returns
-     SelectionNotify. */
-#if false
-  x_start_queuing_selection_requests ();
-  record_unwind_protect_void (x_stop_queuing_selection_requests);
-#endif
-
+  /* critical section end */
   unblock_input ();
 
   message_interval = make_timespec (1, 0);
@@ -1345,31 +1304,27 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
   int nsecs = (timeout % 1000) * 1000000;
   TRACE1 ("  Start waiting %"PRIdMAX" secs for SelectionNotify.", secs);
 
-  if (input_blocked_p ())
-    TRACE0 ("    Input is blocked.");
-  else
-    TRACE1 ("    Waiting for %d nsecs in addition.", nsecs);
+  for (struct timespec at = timespec_add (current_timespec (),
+					  make_timespec (secs, nsecs));
+       (reading_selection_sentinel == XSELECT_PENDING
+	&& 0 <= timespec_cmp (at, current_timespec ()));
+       (void) at)
+    wait_reading_process_output (0, 20 * 1000 * 1000, 0, false, NULL, 0);
 
-  x_wait_for_cell_change (reading_selection_reply, make_timespec (secs, nsecs));
-  TRACE1 ("  Got event = %s", (!NILP (XCAR (reading_selection_reply))
-			       ? (SYMBOLP (XCAR (reading_selection_reply))
-				  ? SSDATA (SYMBOL_NAME (XCAR (reading_selection_reply)))
-				  : "YES")
-			       : "NO"));
+  TRACE1 ("  Got event = %d", reading_selection_sentinel);
 
-  if (NILP (XCAR (reading_selection_reply)))
+  if (reading_selection_sentinel == XSELECT_PENDING)
     error ("Timed out waiting for reply from selection owner");
-  if (EQ (XCAR (reading_selection_reply), Qlambda))
-    return unbind_to (count, Qnil);
 
-  /* Otherwise, the selection is waiting for us on the requested property.  */
   return unbind_to (count,
-		    x_get_window_property_as_lisp_data (dpyinfo,
-							requestor_window,
-							target_property,
-							target_type,
-							selection_atom,
-							false));
+		    (reading_selection_sentinel == XSELECT_SUCCESS
+		     ? x_get_window_property_as_lisp_data (dpyinfo,
+							   requestor_window,
+							   target_property,
+							   target_type,
+							   selection_atom,
+							   false)
+		     : Qnil));
 }
 
 /* Subroutines of x_get_window_property_as_lisp_data */
@@ -1523,7 +1478,7 @@ receive_incremental_selection (struct x_display_info *dpyinfo,
 			       unsigned long *size_ret)
 {
   ptrdiff_t offset = 0;
-  struct prop_location *wait_object;
+  struct property_change *wait_object;
   Display *display = dpyinfo->display;
 
   if (min (PTRDIFF_MAX, SIZE_MAX) < min_size_bytes)
@@ -1548,10 +1503,8 @@ receive_incremental_selection (struct x_display_info *dpyinfo,
   XDeleteProperty (display, window, property);
   TRACE1 ("  Expect new value of property %s",
 	  SDATA (SYMBOL_NAME (x_atom_to_symbol (dpyinfo, property))));
-  wait_object = expect_property_change (display, window, property,
-					PropertyNewValue);
+  wait_object = pend_property_change (display, window, property, PropertyNewValue);
   XFlush (display);
-  set_property_change_object (wait_object);
   unblock_input ();
 
   while (true)
@@ -1588,9 +1541,7 @@ receive_incremental_selection (struct x_display_info *dpyinfo,
       TRACE1 ("  ACK by deleting property %s",
 	      XGetAtomName (display, property));
       XDeleteProperty (display, window, property);
-      wait_object = expect_property_change (display, window, property,
-					    PropertyNewValue);
-      set_property_change_object (wait_object);
+      wait_object = pend_property_change (display, window, property, PropertyNewValue);
       XFlush (display);
       unblock_input ();
 
@@ -2037,22 +1988,18 @@ clean_local_selection_data (Lisp_Object obj)
   return obj;
 }
 
-/* Called from XTread_socket to handle SelectionNotify events.
-   If it's the selection we are waiting for, stop waiting
-   by setting the car of reading_selection_reply to non-nil.
-   We store t there if the reply is successful, lambda if not.  */
+/* Called from XTread_socket to handle SelectionNotify events.  */
 
 void
 x_handle_selection_notify (const XSelectionEvent *event)
 {
-  if (event->requestor != reading_selection_window)
-    return;
-  if (event->selection != reading_which_selection)
-    return;
-
-  TRACE1 ("Received SelectionNotify: %d", (int) event->property);
-  XSETCAR (reading_selection_reply,
-	   (event->property != 0 ? Qt : Qlambda));
+  if (event->requestor == reading_selection_window
+      && event->selection == reading_which_selection)
+    {
+      TRACE1 ("Received SelectionNotify: %d", (int) event->property);
+      reading_selection_sentinel =
+	(event->property != 0 ? XSELECT_SUCCESS : XSELECT_FAIL);
+    }
 }
 
 
@@ -2896,11 +2843,6 @@ syms_of_xselect (void)
   defsubr (&Sx_register_dnd_atom);
   defsubr (&Sx_get_local_selection);
 
-  reading_selection_reply = Fcons (Qnil, Qnil);
-  staticpro (&reading_selection_reply);
-
-  staticpro (&property_change_reply);
-
   /* FIXME: Duplicate definition in nsselect.c.  */
   DEFVAR_LISP ("selection-converter-alist", Vselection_converter_alist,
 	       doc: /* An alist associating X Windows selection-types with functions.
@@ -3018,7 +2960,5 @@ syms_of_xselect_for_pdumper (void)
 {
   reading_selection_window = 0;
   reading_which_selection = 0;
-  property_change_wait_list = 0;
-  prop_location_identifier = 0;
-  property_change_reply = Fcons (Qnil, Qnil);
+  pending_property_changes = NULL;
 }

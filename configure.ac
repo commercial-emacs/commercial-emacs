@@ -2216,11 +2216,7 @@ dnl use the toolkit if we have gtk, or X11R5 or newer.
     term_header=w32term.h
   ;;
   pgtk )
-    term_header=pgtkterm.h
-    with_gtk3=yes
-    USE_X_TOOLKIT=none
-    HAVE_PGTK=yes
-    AC_DEFINE([HAVE_PGTK], [1], [Define to 1 if you have pure Gtk+-3.])
+    AC_MSG_ERROR([Not mirroring changes from xterm.c to pgtkterm.c]);
   ;;
   haiku )
     term_header=haikuterm.h

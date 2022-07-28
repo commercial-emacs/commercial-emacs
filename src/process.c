@@ -5138,7 +5138,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	      else
 		break;
 	    }
-	  while (!detect_input_pending ());
+	  while (! detect_input_pending ());
 
 	  /* If there is unread keyboard input, also return.  */
 	  if (read_kbd != 0

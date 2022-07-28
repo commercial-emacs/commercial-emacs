@@ -339,7 +339,7 @@ static struct timespec timer_last_idleness_start_time;
 static Lisp_Object virtual_core_pointer_name;
 static Lisp_Object virtual_core_keyboard_name;
 
-
+
 /* Global variable declarations.  */
 
 /* Flags for readable_events.  */
@@ -450,7 +450,7 @@ kset_system_key_syms (struct kboard *kb, Lisp_Object val)
   kb->system_key_syms_ = val;
 }
 
-
+
 static bool
 echo_keystrokes_p (void)
 {
@@ -661,7 +661,7 @@ echo_truncate (ptrdiff_t nchars)
   truncate_echo_area (nchars);
 }
 
-
+
 /* Functions for manipulating this_command_keys.  */
 static void
 add_command_key (Lisp_Object key)
@@ -673,7 +673,7 @@ add_command_key (Lisp_Object key)
   ++this_command_key_count;
 }
 
-
+
 Lisp_Object
 recursive_edit_1 (void)
 {
@@ -745,7 +745,7 @@ force_auto_save_soon (void)
   last_auto_save = - auto_save_interval - 1;
 }
 #endif
-
+
 DEFUN ("recursive-edit", Frecursive_edit, Srecursive_edit, 0, 0, "",
        doc: /* Invoke the editor command loop recursively.
 To get out of the recursive edit, a command can throw to `exit' -- for
@@ -811,7 +811,7 @@ recursive_edit_unwind (Lisp_Object buffer)
   update_mode_lines = 18;
 }
 
-
+
 
 /* If we're in single_kboard state for kboard KBOARD,
    get out of it.  */
@@ -924,7 +924,7 @@ restore_kboard_configuration (int was_locked)
     }
 }
 
-
+
 /* Handle errors that are not handled at inner levels
    by printing an error message and returning to the editor command loop.  */
 
@@ -1197,7 +1197,7 @@ DEFUN ("abort-recursive-edit", Fabort_recursive_edit, Sabort_recursive_edit, 0, 
 
   user_error ("No recursive edit is in progress");
 }
-
+
 /* Restore mouse tracking enablement.  See Finternal_track_mouse for
    the only use of this function.  */
 
@@ -1261,7 +1261,7 @@ some_mouse_moved (void)
   return NULL;
 }
 
-
+
 /* This is the actual command reading loop,
    sans error-handling encapsulation.  */
 
@@ -1885,7 +1885,7 @@ safe_run_hooks (Lisp_Object hook)
   unbind_to (count, Qnil);
 }
 
-
+
 /* Nonzero means polling for input is temporarily suppressed.  */
 
 int poll_suppress_count;
@@ -2045,7 +2045,7 @@ bind_polling_period (int n)
   start_polling ();
 #endif
 }
-
+
 /* Apply the control modifier to CHARACTER.  */
 
 int
@@ -2167,7 +2167,7 @@ show_help_echo (Lisp_Object help, Lisp_Object window, Lisp_Object object,
 }
 
 
-
+
 /* Input of single characters from keyboard.  */
 
 static Lisp_Object kbd_buffer_get_event (KBOARD **kbp, bool *used_mouse_menu,
@@ -3459,7 +3459,7 @@ restore_getcjmp (void *temp)
 {
   memcpy (getcjmp, temp, sizeof getcjmp);
 }
-
+
 /* Low level keyboard/mouse input.
    kbd_buffer_store_event places events in kbd_buffer, and
    kbd_buffer_get_event retrieves them.  */
@@ -3770,7 +3770,7 @@ kbd_buffer_store_help_event (Lisp_Object frame, Lisp_Object help)
   kbd_buffer_store_event (&event);
 }
 
-
+
 /* Discard any mouse events in the event buffer by setting them to
    NO_EVENT.  */
 void
@@ -3809,7 +3809,7 @@ kbd_buffer_events_waiting (void)
       }
 }
 
-
+
 /* Clear input event EVENT.  */
 
 static void
@@ -4332,7 +4332,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 
   return (obj);
 }
-
+
 /* Process any non-user-visible events (currently X selection events),
    without reading any user-visible events.  */
 
@@ -4432,7 +4432,7 @@ swallow_events (bool do_display)
   if (!input_pending && timers_run != old_timers_run && do_display)
     redisplay_preserve_echo_area (7);
 }
-
+
 /* Record the start of when Emacs is idle,
    for the sake of running idle-time timers.  */
 
@@ -4709,7 +4709,7 @@ PSEC is a multiple of the system clock resolution.  */)
 
   return Qnil;
 }
-
+
 /* Caches for modify_event_symbol.  */
 static Lisp_Object accent_key_syms;
 static Lisp_Object func_key_syms;
@@ -7033,7 +7033,7 @@ modify_event_symbol (ptrdiff_t symbol_num, int modifiers, Lisp_Object symbol_kin
   /* Apply modifiers to that symbol.  */
   return apply_modifiers (modifiers, value);
 }
-
+
 /* Convert a list that represents an event type,
    such as (ctrl meta backspace), into the usual representation of that
    event type as a number or a symbol.  */
@@ -7239,7 +7239,7 @@ lucid_event_type_list_p (Lisp_Object object)
 
   return NILP (tail);
 }
-
+
 /* Return true if terminal input chars are available.
    Also, store the return value into INPUT_PENDING.
 
@@ -7535,7 +7535,7 @@ tty_read_avail_input (struct terminal *terminal,
 
   return nread;
 }
-
+
 static void
 handle_async_input (void)
 {
@@ -7568,13 +7568,12 @@ void
 unblock_input_to (int level)
 {
   interrupt_input_blocked = level;
-  if (level == 0)
-    {
-      if (pending_signals && !fatal_error_in_progress)
-	process_pending_signals ();
-    }
-  else if (level < 0)
+  if (interrupt_input_blocked < 0)
     emacs_abort ();
+  if (interrupt_input_blocked == 0
+      && ! fatal_error_in_progress
+      && pending_signals)
+    process_pending_signals ();
 }
 
 /* End critical section.
@@ -7620,7 +7619,7 @@ deliver_input_available_signal (int sig)
 }
 #endif /* defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)  */
 
-
+
 /* User signal events.  */
 
 struct user_signal_info
@@ -7749,7 +7748,7 @@ store_user_signal_events (void)
       }
 }
 
-
+
 static void menu_bar_item (Lisp_Object, Lisp_Object, Lisp_Object, void *);
 static Lisp_Object menu_bar_one_keymap_changed_items;
 
@@ -7953,7 +7952,7 @@ menu_bar_items (Lisp_Object old)
   SAFE_FREE ();
   return menu_bar_items_vector;
 }
-
+
 /* Add one item to menu_bar_items_vector, for KEY, ITEM_STRING and DEF.
    If there's already an item for KEY, add this DEF to it.  */
 
@@ -8030,7 +8029,7 @@ menu_bar_item (Lisp_Object key, Lisp_Object item, Lisp_Object dummy1, void *dumm
       ASET (menu_bar_items_vector, i + 2, item);
     }
 }
-
+
  /* This is used as the handler when calling menu_item_eval_property.  */
 static Lisp_Object
 menu_item_eval_property_1 (Lisp_Object arg)
@@ -8350,7 +8349,7 @@ parse_menu_item (Lisp_Object item, int inmenubar)
 }
 
 
-
+
 /***********************************************************************
 			       Tab-bars
  ***********************************************************************/
@@ -8734,7 +8733,7 @@ append_tab_bar_item (void)
 
 
 
-
+
 /***********************************************************************
 			       Tool-bars
  ***********************************************************************/
@@ -9211,7 +9210,7 @@ append_tool_bar_item (void)
 
 
 
-
+
 /* Read a character using menus based on the keymap MAP.
    Return nil if there are no menus in the maps.
    Return t if we displayed a menu but the user rejected it.
@@ -9513,7 +9512,7 @@ read_char_minibuf_menu_prompt (int commandflag,
       /* Help char - go round again.  */
     }
 }
-
+
 /* Reading key sequences.  */
 
 static Lisp_Object
@@ -10765,7 +10764,7 @@ DEFUN ("read-key-sequence-vector", Fread_key_sequence_vector,
   return read_key_sequence_vs (prompt, continue_echo, dont_downcase_last,
 			       can_return_switch_frame, cmd_loop, false);
 }
-
+
 /* Return true if input events are pending.  */
 
 bool
@@ -11106,7 +11105,7 @@ Also end any kbd macro being defined.  */)
 
   return Qnil;
 }
-
+
 DEFUN ("suspend-emacs", Fsuspend_emacs, Ssuspend_emacs, 0, 1, "",
        doc: /* Stop Emacs and return to superior process.  You can resume later.
 If `cannot-suspend' is non-nil, or if the system doesn't support job
@@ -11197,7 +11196,7 @@ stuff_buffered_input (Lisp_Object stuffstring)
   input_pending = false;
 #endif /* SIGTSTP */
 }
-
+
 void
 set_waiting_for_input (struct timespec *time_to_clear)
 {
@@ -11437,7 +11436,7 @@ quit_throw_to_read_char (bool from_signal)
 
   sys_longjmp (getcjmp, 1);
 }
-
+
 DEFUN ("set-input-interrupt-mode", Fset_input_interrupt_mode,
        Sset_input_interrupt_mode, 1, 1, 0,
        doc: /* Set interrupt mode of reading keyboard input.

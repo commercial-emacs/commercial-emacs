@@ -16260,121 +16260,6 @@ x_display_pixel_width (struct x_display_info *dpyinfo)
   return WidthOfScreen (dpyinfo->screen);
 }
 
-/* Handle events from each display until CELL's car becomes non-nil,
-   or TIMEOUT elapses.  */
-void
-x_wait_for_cell_change (Lisp_Object cell, struct timespec timeout)
-{
-  struct x_display_info *dpyinfo;
-  fd_set fds;
-  int fd, maxfd;
-#ifndef USE_GTK
-  int finish, rc;
-  XEvent event;
-  fd_set rfds;
-#endif
-  struct input_event hold_quit;
-  struct timespec current, at;
-
-  at = timespec_add (current_timespec (), timeout);
-
-#ifndef USE_GTK
-  FD_ZERO (&rfds);
-  rc = -1;
-#endif
-
-  while (true)
-    {
-      FD_ZERO (&fds);
-      maxfd = -1;
-
-      for (dpyinfo = x_display_list; dpyinfo;
-	   dpyinfo = dpyinfo->next)
-	{
-	  fd = ConnectionNumber (dpyinfo->display);
-
-#ifndef USE_GTK
-	  if ((rc < 0 || FD_ISSET (fd, &rfds))
-	      /* If pselect failed, the erroring display's IO error
-		 handler will eventually be called.  */
-	      && XPending (dpyinfo->display))
-	    {
-	      while (XPending (dpyinfo->display))
-		{
-		  EVENT_INIT (hold_quit);
-
-		  XNextEvent (dpyinfo->display, &event);
-		  handle_one_xevent (dpyinfo, &event,
-				     &finish, &hold_quit);
-
-		  if (!NILP (XCAR (cell)))
-		    return;
-
-		  if (finish == X_EVENT_GOTO_OUT)
-		    break;
-
-		  /* Make us quit now.  */
-		  if (hold_quit.kind != NO_EVENT)
-		    kbd_buffer_store_event (&hold_quit);
-		}
-	    }
-#endif
-
-	  if (fd > maxfd)
-	    maxfd = fd;
-
-	  eassert (fd < FD_SETSIZE);
-	  FD_SET (fd, &fds);
-	}
-
-      /* Prevent events from being lost (from GTK's point of view) by
-	 using GDK to run the event loop.  */
-#ifdef USE_GTK
-      while (gtk_events_pending ())
-	{
-	  EVENT_INIT (hold_quit);
-	  current_count = 0;
-	  current_hold_quit = &hold_quit;
-	  current_finish = X_EVENT_NORMAL;
-
-	  gtk_main_iteration ();
-
-	  current_count = -1;
-	  current_hold_quit = NULL;
-
-	  /* Make us quit now.  */
-	  if (hold_quit.kind != NO_EVENT)
-	    kbd_buffer_store_event (&hold_quit);
-
-	  if (!NILP (XCAR (cell)))
-	    return;
-
-	  if (current_finish == X_EVENT_GOTO_OUT)
-	    break;
-	}
-#endif
-
-      eassert (maxfd >= 0);
-
-      current = current_timespec ();
-
-      if (timespec_cmp (at, current) < 0
-	  || !NILP (XCAR (cell)))
-	return;
-
-      timeout = timespec_sub (at, current);
-
-#ifndef USE_GTK
-      rc = pselect (maxfd + 1, &fds, NULL, NULL, &timeout, NULL);
-
-      if (rc >= 0)
-	rfds = fds;
-#else
-      pselect (maxfd + 1, &fds, NULL, NULL, &timeout, NULL);
-#endif
-    }
-}
-
 #ifdef USE_GTK
 static void
 x_monitors_changed_cb (GdkScreen *gscr, gpointer user_data)
@@ -25081,7 +24966,6 @@ x_sync_with_move (struct frame *f, int left, int top, bool fuzzy)
 {
   sigset_t emptyset;
   int count, current_left, current_top;
-  struct timespec fallback;
 
   sigemptyset (&emptyset);
   count = 0;
@@ -25111,8 +24995,7 @@ x_sync_with_move (struct frame *f, int left, int top, bool fuzzy)
 
   /* As a last resort, just wait 0.5 seconds and hope that XGetGeometry
      will then return up-to-date position info. */
-  fallback = dtotimespec (0.5);
-  pselect (0, NULL, NULL, NULL, &fallback, &emptyset);
+  wait_reading_process_output (0, 5e8, 0, false, NULL, 0);
 }
 
 /* Wait for an event on frame F matching EVENTTYPE.  */
