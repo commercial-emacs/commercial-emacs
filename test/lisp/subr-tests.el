@@ -1040,7 +1040,7 @@ final or penultimate step during initialization."))
   ;; Check that problem with unwinding properly is fixed (bug#56773).
   (with-temp-buffer
     (let ((buf (current-buffer)))
-      (readablep (make-marker))
+      (should-not (readablep (make-marker)))
       (should (eq buf (current-buffer))))))
 
 (ert-deftest test-string-lines ()
