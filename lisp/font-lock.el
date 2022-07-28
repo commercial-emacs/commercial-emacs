@@ -491,8 +491,7 @@ of the line, i.e., cause the MATCHER search to span lines.
 These regular expressions can match text which spans lines,
 although it is better to avoid it if possible since updating them
 while editing text is slower, and it is not guaranteed to be
-always correct when using support modes like jit-lock or
-lazy-lock.
+always correct.
 
 This variable is set by major modes via the variable
 `font-lock-defaults'.  Be careful when composing regexps for this
@@ -624,11 +623,8 @@ fontified.")
 It should take two args, the beginning and end of the region.
 This is normally set via `font-lock-defaults'.")
 
-(defvar font-lock-inhibit-thing-lock nil
-  "List of Font Lock mode related modes that should not be turned on.
-Currently, valid mode names are `fast-lock-mode', `jit-lock-mode' and
-`lazy-lock-mode'.  This is normally set via `font-lock-defaults'.")
-(make-obsolete-variable 'font-lock-inhibit-thing-lock nil "25.1")
+(defvar font-lock-inhibit-thing-lock nil)
+(make-obsolete-variable 'font-lock-inhibit-thing-lock "it does nothing." "25.1")
 
 (defvar-local font-lock-multiline nil
   "Whether font-lock should cater to multiline keywords.
@@ -643,7 +639,6 @@ Major/minor modes can set this variable if they know which option applies.")
 
 (eval-when-compile
   ;;
-  ;; Borrowed from lazy-lock.el.
   ;; We use this to preserve or protect things when modifying text properties.
   (defmacro save-buffer-state (&rest body)
     "Bind variables according to VARLIST and eval BODY restoring buffer state."
@@ -1125,7 +1120,6 @@ Lock mode."
 	    (save-excursion
 	      (save-match-data
 		(font-lock-fontify-region (point-min) (point-max) verbose)
-		(font-lock-after-fontify-buffer)
 		(setq font-lock-fontified t)))
 	  ;; We don't restore the old fontification, so it's best to unfontify.
 	  (quit (font-lock-unfontify-buffer)))))))
@@ -1136,7 +1130,6 @@ Lock mode."
   (save-restriction
     (widen)
     (font-lock-unfontify-region (point-min) (point-max))
-    (font-lock-after-unfontify-buffer)
     (setq font-lock-fontified nil)))
 
 (defvar font-lock-dont-widen nil
