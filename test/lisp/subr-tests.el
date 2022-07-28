@@ -1124,12 +1124,12 @@ final or penultimate step during initialization."))
 
 (ert-deftest test-print-unreadable-function-buffer ()
   (with-temp-buffer
-    (let ((current (current-buffer))
-          callback-buffer)
-      (let ((print-unreadable-function
-             (lambda (_object _escape)
-               (setq callback-buffer (current-buffer)))))
-        (prin1-to-string (make-marker)))
+    (let* (callback-buffer
+           (current (current-buffer))
+           (print-unreadable-function
+            (lambda (_object _escape)
+              (setq callback-buffer (current-buffer)))))
+      (ignore (prin1-to-string (make-marker)))
       (should (eq current callback-buffer)))))
 
 (provide 'subr-tests)
