@@ -5147,13 +5147,13 @@ extension, the value is \"\"."
             "")))))
 
 (defun file-name-with-extension (filename extension)
-  "Set the EXTENSION of a FILENAME.
+  "Return a string resulting from the concatenation of FILENAME and EXTENSION.
 The extension (in a file name) is the part that begins with the last \".\".
 
-Trims a leading dot from the EXTENSION so that either \"foo\" or
-\".foo\" can be given.
+If EXTENSION doesn't start with a \".\", one is inserted anyway
+between FILENAME and EXTENSION.
 
-Errors if the FILENAME or EXTENSION are empty, or if the given
+Signal an error if FILENAME or EXTENSION are empty, or if the given
 FILENAME has the format of a directory.
 
 See also `file-name-sans-extension'."
