@@ -25111,15 +25111,8 @@ x_sync_with_move (struct frame *f, int left, int top, bool fuzzy)
 
   /* As a last resort, just wait 0.5 seconds and hope that XGetGeometry
      will then return up-to-date position info. */
-
   fallback = dtotimespec (0.5);
-
-  /* This will hang if input is blocked, so use pselect to wait
-     instead.  */
-  if (input_blocked_p ())
-    pselect (0, NULL, NULL, NULL, &fallback, &emptyset);
-  else
-    wait_reading_process_output (0, 500000000, 0, false, Qnil, NULL, 0);
+  pselect (0, NULL, NULL, NULL, &fallback, &emptyset);
 }
 
 /* Wait for an event on frame F matching EVENTTYPE.  */

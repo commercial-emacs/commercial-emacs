@@ -924,6 +924,13 @@ pgtk_display_pixel_width (struct pgtk_display_info *dpyinfo)
 }
 
 void
+pgtk_wait_for_cell_change (Lisp_Object cell, struct timespec timeout)
+{
+  /* TODO replicate logic for x_wait_for_cell_change() here.  */
+  XSETCAR (cell, Qt);
+}
+
+void
 pgtk_set_parent_frame (struct frame *f, Lisp_Object new_value,
 		       Lisp_Object old_value)
 {

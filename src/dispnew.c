@@ -5926,7 +5926,7 @@ additional wait period, in milliseconds; this is for backwards compatibility.
 	 time expires.  */
       do {
 	wait_reading_process_output (min (t.tv_sec, WAIT_READING_MAX),
-				     t.tv_nsec, 0, 0, Qnil, NULL, 0);
+				     t.tv_nsec, 0, 0, NULL, 0);
 	t = timespec_sub (tend, current_timespec ());
       } while (timespec_sign (t) > 0);
     }
@@ -6011,9 +6011,8 @@ sit_for (Lisp_Object timeout, bool reading, int display_option)
   gobble_input ();
 #endif
 
-  int nbytes
-    = wait_reading_process_output (sec, nsec, reading ? -1 : 1, do_display,
-			           Qnil, NULL, 0);
+  int nbytes = wait_reading_process_output (sec, nsec, reading ? -1 : 1,
+					    do_display, NULL, 0);
 
   if (reading && curbuf_eq_winbuf)
     /* Timers and process filters/sentinels may have changed the selected

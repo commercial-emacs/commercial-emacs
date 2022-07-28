@@ -1350,17 +1350,7 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
   else
     TRACE1 ("    Waiting for %d nsecs in addition.", nsecs);
 
-  /* This function can be called with input blocked inside Xt or GTK
-     timeouts run inside popup menus, so use a function that works
-     when input is blocked.  Prefer wait_reading_process_output
-     otherwise, or the toolkit might not get some events.
-     (bug#22214) */
-  if (!input_blocked_p ())
-    wait_reading_process_output (secs, nsecs, 0, false,
-				 reading_selection_reply, NULL, 0);
-  else
-    x_wait_for_cell_change (reading_selection_reply,
-			    make_timespec (secs, nsecs));
+  x_wait_for_cell_change (reading_selection_reply, make_timespec (secs, nsecs));
   TRACE1 ("  Got event = %s", (!NILP (XCAR (reading_selection_reply))
 			       ? (SYMBOLP (XCAR (reading_selection_reply))
 				  ? SSDATA (SYMBOL_NAME (XCAR (reading_selection_reply)))

@@ -4706,7 +4706,6 @@ corresponding connection was closed.  */)
 
   return
     ((wait_reading_process_output (secs, nsecs, 0, 0,
-				   Qnil,
 				   !NILP (process) ? XPROCESS (process) : NULL,
 				   (NILP (just_this_one) ? 0
 				    : !FIXNUMP (just_this_one) ? 1 : -1))
@@ -4965,7 +4964,7 @@ wait_for_socket_fds (Lisp_Object process, char const *name)
 	 && connecting_status (XPROCESS (process)->status))
     {
       add_to_log ("Waiting for socket from %s...", build_string (name));
-      wait_reading_process_output (0, 20 * 1000 * 1000, 0, 0, Qnil, NULL, 0);
+      wait_reading_process_output (0, 20 * 1000 * 1000, 0, 0, NULL, 0);
     }
 }
 
@@ -4975,7 +4974,7 @@ wait_while_connecting (Lisp_Object process)
   while (connecting_status (XPROCESS (process)->status))
     {
       add_to_log ("Waiting for connection...");
-      wait_reading_process_output (0, 20 * 1000 * 1000, 0, 0, Qnil, NULL, 0);
+      wait_reading_process_output (0, 20 * 1000 * 1000, 0, 0, NULL, 0);
     }
 }
 
@@ -4987,7 +4986,7 @@ wait_for_tls_negotiation (Lisp_Object process)
 	 && XPROCESS (process)->gnutls_initstage != GNUTLS_STAGE_READY)
     {
       add_to_log ("Waiting for TLS...");
-      wait_reading_process_output (0, 20 * 1000 * 1000, 0, 0, Qnil, NULL, 0);
+      wait_reading_process_output (0, 20 * 1000 * 1000, 0, 0, NULL, 0);
     }
 #endif
 }
@@ -5015,9 +5014,6 @@ wait_for_tls_negotiation (Lisp_Object process)
    DO_DISPLAY means redisplay should be done to show subprocess
      output that arrives.
 
-   If WAIT_FOR_CELL is a cons cell, wait until its car is non-nil
-     (and gobble terminal input into the buffer if any arrives).
-
    If WAIT_PROC is specified, wait until something arrives from that
      process.
 
@@ -5031,9 +5027,8 @@ wait_for_tls_negotiation (Lisp_Object process)
 
 int
 wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
-			     bool do_display,
-			     Lisp_Object wait_for_cell,
-			     struct Lisp_Process *wait_proc, int just_wait_proc)
+			     bool do_display, struct Lisp_Process *wait_proc,
+			     int just_wait_proc)
 {
   static int last_read_channel = 0;
   int channel, nfds;
@@ -5092,10 +5087,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       else if (pending_signals)
 	process_pending_signals ();
 
-      /* Exit now if the cell we're waiting for became non-nil.  */
-      if (! NILP (wait_for_cell) && ! NILP (XCAR (wait_for_cell)))
-	break;
-
       eassert (max_desc < FD_SETSIZE);
 
 #ifdef HAVE_GETADDRINFO_A
@@ -5134,12 +5125,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       else
 	timeout = make_timespec (wait < TIMEOUT ? 0 : 100000, 0);
 
-      /* Normally we run timers here.
-	 But not if wait_for_cell; in those cases,
-	 the wait is supposed to be short,
-	 and those callers cannot handle running arbitrary Lisp code here.  */
-      if (NILP (wait_for_cell)
-	  && just_wait_proc >= 0)
+      if (just_wait_proc >= 0)
 	{
 	  do
 	    {
@@ -5224,12 +5210,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  check_delay = 0;
           check_write = 0;
 	}
-      else if (! NILP (wait_for_cell))
-	{
-	  compute_wait_mask (&Available, FOR_READ, PROCESS_FD);
-	  check_delay = 0;
-	  check_write = 0;
-	}
       else
 	{
 	  compute_wait_mask (&Available, FOR_READ, read_kbd ? 0 : KEYBOARD_FD);
@@ -5263,8 +5243,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	 waiting for keyboard input or a cell change (which can be
 	 triggered by processing X events).  In the latter case, set
 	 nfds to 1 to avoid breaking the loop.  */
-      if ((read_kbd || !NILP (wait_for_cell))
-	  && detect_input_pending ())
+      if (read_kbd && detect_input_pending ())
 	{
 	  avail = ! read_kbd;
 	  FD_ZERO (&Available);
@@ -5305,7 +5284,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		  || timeout.tv_nsec > READ_OUTPUT_DELAY_INCREMENT))
 	    timeout = make_timespec (0, READ_OUTPUT_DELAY_INCREMENT);
 
-	  if (NILP (wait_for_cell) && just_wait_proc >= 0
+	  if (just_wait_proc >= 0
 	      && timespec_valid_p (timer_delay)
 	      && timespec_cmp (timer_delay, timeout) < 0)
 	    {
@@ -5446,14 +5425,9 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	 This is so that X events will be processed.
 	 Otherwise they may have to wait until polling takes place.
 	 That would causes delays in pasting selections, for example.
-
-	 (We used to do this only if wait_for_cell.)  */
+      */
       if (read_kbd == 0 && detect_input_pending ())
 	swallow_events (do_display);
-
-      /* Exit now if the cell we're waiting for became non-nil.  */
-      if (! NILP (wait_for_cell) && ! NILP (XCAR (wait_for_cell)))
-	break;
 
 #if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
       /* If we think we have keyboard input waiting, but didn't get SIGIO,
@@ -5472,7 +5446,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
       /* If checking input just got us a size-change event from X,
 	 obey it now if we should.  */
-      if (read_kbd || ! NILP (wait_for_cell))
+      if (read_kbd)
 	do_pending_window_change (0);
 
       /* Obviously we need to consolidate this check with the same
@@ -6235,7 +6209,7 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 		  /* Put what we should have written in write_queue.  */
 		  write_queue_push (p, cur_object, cur_buf, cur_len, 1);
 		  wait_reading_process_output (0, 20 * 1000 * 1000,
-					       0, 0, Qnil, NULL, 0);
+					       0, 0, NULL, 0);
 		  /* Reread queue, to see what is left.  */
 		  break;
 		}
@@ -7415,9 +7389,8 @@ extern int sys_select (int, fd_set *, fd_set *, fd_set *,
 
 int
 wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
-			     bool do_display,
-			     Lisp_Object wait_for_cell,
-			     struct Lisp_Process *wait_proc, int just_wait_proc)
+			     bool do_display, struct Lisp_Process *wait_proc,
+			     int just_wait_proc)
 {
   register int nfds;
   struct timespec end_time, timeout;
@@ -7455,10 +7428,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       if (read_kbd >= 0)
 	maybe_quit ();
 
-      /* Exit now if the cell we're waiting for became non-nil.  */
-      if (! NILP (wait_for_cell) && ! NILP (XCAR (wait_for_cell)))
-	break;
-
       /* Compute time from now till when time limit is up.  */
       /* Exit if already run out.  */
       if (wait == TIMEOUT)
@@ -7475,37 +7444,36 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	 run timer events directly.
 	 (Callers that will immediately read keyboard events
 	 call timer_delay on their own.)  */
-      if (NILP (wait_for_cell))
-	{
-	  struct timespec timer_delay;
+      {
+	struct timespec timer_delay;
 
-	  do
-	    {
-	      unsigned old_timers_run = timers_run;
-	      timer_delay = timer_check ();
-	      if (timers_run != old_timers_run && do_display)
-		/* We must retry, since a timer may have requeued itself
-		   and that could alter the time delay.  */
-		redisplay_preserve_echo_area (14);
-	      else
-		break;
-	    }
-	  while (!detect_input_pending ());
+	do
+	  {
+	    unsigned old_timers_run = timers_run;
+	    timer_delay = timer_check ();
+	    if (timers_run != old_timers_run && do_display)
+	      /* We must retry, since a timer may have requeued itself
+		 and that could alter the time delay.  */
+	      redisplay_preserve_echo_area (14);
+	    else
+	      break;
+	  }
+	while (!detect_input_pending ());
 
-	  /* If there is unread keyboard input, also return.  */
-	  if (read_kbd != 0
-	      && requeued_events_pending_p ())
-	    break;
+	/* If there is unread keyboard input, also return.  */
+	if (read_kbd != 0
+	    && requeued_events_pending_p ())
+	  break;
 
-	  if (timespec_valid_p (timer_delay))
-	    {
-	      if (timespec_cmp (timer_delay, timeout) < 0)
-		{
-		  timeout = timer_delay;
-		  timeout_reduced_for_timers = true;
-		}
-	    }
-	}
+	if (timespec_valid_p (timer_delay))
+	  {
+	    if (timespec_cmp (timer_delay, timeout) < 0)
+	      {
+		timeout = timer_delay;
+		timeout_reduced_for_timers = true;
+	      }
+	  }
+      }
 
       /* `set_waiting_for_input' is a Blandyism that claims to have
 	 emacs react immediately to C-g and signals.  Passing a
@@ -7532,7 +7500,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	nfds = 0;
       else
 	{
-	  if (read_kbd || !NILP (wait_for_cell))
+	  if (read_kbd)
 	    FD_SET (0, &waitchannels);
 	  nfds = pselect (1, &waitchannels, NULL, NULL, &timeout, NULL);
 	}
@@ -7569,26 +7537,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	}
 
       /* If there is unread keyboard input, also return.  */
-      if (read_kbd
-	  && requeued_events_pending_p ())
-	break;
-
-      /* If wait_for_cell. check for keyboard input
-	 but don't run any timers.
-	 ??? (It seems wrong to me to check for keyboard
-	 input at all when wait_for_cell, but the code
-	 has been this way since July 1994.
-	 Try changing this after version 19.31.)  */
-      if (! NILP (wait_for_cell)
-	  && detect_input_pending ())
-	{
-	  swallow_events (do_display);
-	  if (detect_input_pending ())
-	    break;
-	}
-
-      /* Exit now if the cell we're waiting for became non-nil.  */
-      if (! NILP (wait_for_cell) && ! NILP (XCAR (wait_for_cell)))
+      if (read_kbd && requeued_events_pending_p ())
 	break;
     }
 

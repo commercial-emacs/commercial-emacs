@@ -566,7 +566,8 @@ extern void pgtk_set_event_handler (struct frame *);
 
 /* Implemented in pgtkterm.c */
 extern int pgtk_display_pixel_height (struct pgtk_display_info *);
-extern int pgtk_display_pixel_width (struct pgtk_display_info *);
+extern int pgtk_display_pixel_width (struct pgtk_display_info *)
+extern void pgtk_wait_for_cell_change (Lisp_Object, struct timespec);
 
 extern void pgtk_destroy_window (struct frame *);
 extern void pgtk_set_parent_frame (struct frame *, Lisp_Object, Lisp_Object);

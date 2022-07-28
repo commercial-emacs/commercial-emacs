@@ -548,7 +548,7 @@ Return t if all self-tests are passed, nil otherwise.  */)
 
 #ifdef HAVE_TIMERFD
   /* Wait for 1s but process timers.  */
-  wait_reading_process_output (1, 0, 0, false, Qnil, NULL, 0);
+  wait_reading_process_output (1, 0, 0, false, NULL, 0);
 #else
   /* If timerfd is not supported, wait_reading_process_output won't
      pay attention to timers that expired, and the callbacks won't be
@@ -561,7 +561,7 @@ Return t if all self-tests are passed, nil otherwise.  */)
   while (timespec_cmp (current_timespec (), tend) < 0)
     {
       /* Wait for 5 msec between iterations.  */
-      wait_reading_process_output (0, 5000000, 0, false, Qnil, NULL, 0);
+      wait_reading_process_output (0, 5000000, 0, false, NULL, 0);
       if (pending_signals)
 	do_pending_atimers ();
     }

@@ -440,8 +440,7 @@ static struct prop_location *property_change_wait_list;
 static void
 set_property_change_object (struct prop_location *location)
 {
-  /* Input must be blocked so we don't get the event before we set these.  */
-  if (!input_blocked_p ())
+  if (! input_blocked_p ())
     emacs_abort ();
 
   XSETCAR (property_change_reply, Qnil);
@@ -929,7 +928,7 @@ wait_for_property_change (struct prop_location *location)
       intmax_t timeout = max (0, pgtk_selection_timeout);
       intmax_t secs = timeout / 1000;
       int nsecs = (timeout % 1000) * 1000000;
-      x_wait_for_cell_change (property_change_reply, make_timespec (secs, nsecs));
+      pgtk_wait_for_cell_change (property_change_reply, make_timespec (secs, nsecs));
       if (NILP (XCAR (property_change_reply)))
 	error ("Timed out waiting for property-notify event");
     }
@@ -1042,8 +1041,7 @@ pgtk_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_typ
   intmax_t secs = timeout / 1000;
   int nsecs = (timeout % 1000) * 1000000;
 
-  wait_reading_process_output (secs, nsecs, 0, false,
-			       reading_selection_reply, NULL, 0);
+  pgtk_wait_for_cell_change (reading_selection_reply, make_timespec (secs, nsecs));
 
   if (NILP (XCAR (reading_selection_reply)))
     error ("Timed out waiting for reply from selection owner");

@@ -4585,7 +4585,7 @@ extern bool running_asynch_code;
 /* Defined in process.c.  */
 struct Lisp_Process;
 extern void kill_buffer_processes (Lisp_Object);
-extern int wait_reading_process_output (intmax_t, int, int, bool, Lisp_Object,
+extern int wait_reading_process_output (intmax_t, int, int, bool,
 					struct Lisp_Process *, int);
 /* Max value for the first argument of wait_reading_process_output.  */
 #if GNUC_PREREQ (3, 0, 0) && ! GNUC_PREREQ (4, 6, 0)

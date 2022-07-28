@@ -3928,10 +3928,8 @@ kbd_buffer_get_event (KBOARD **kbp,
 	  else
 	    {
 	      struct timespec duration = timespec_sub (*end_time, now);
-	      wait_reading_process_output (min (duration.tv_sec,
-						WAIT_READING_MAX),
-					   duration.tv_nsec,
-					   -1, 1, Qnil, NULL, 0);
+	      wait_reading_process_output (min (duration.tv_sec, WAIT_READING_MAX),
+					   duration.tv_nsec, -1, 1, NULL, 0);
 	    }
 	}
       else
@@ -3949,7 +3947,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 		do_display = false;
 	    }
 
-	  wait_reading_process_output (0, 0, -1, do_display, Qnil, NULL, 0);
+	  wait_reading_process_output (0, 0, -1, do_display, NULL, 0);
 	}
 
       if (!interrupt_input && kbd_fetch_ptr == kbd_store_ptr)
