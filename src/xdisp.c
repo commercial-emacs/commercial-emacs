@@ -2973,21 +2973,48 @@ init_iterator (struct it *it, struct window *w,
     }
 }
 
-/* Compute a suitable alternate value for BEGV that may be used
+/* Compute a suitable alternate value for BEGV and ZV that may be used
    temporarily to optimize display if the buffer in window W contains
    long lines.  */
+
+static int
+get_narrowed_width (struct window *w)
+{
+  int fact;
+  /* In a character-only terminal, only one font size is used, so we
+     can use a smaller factor.  */
+  fact = EQ (Fterminal_live_p (Qnil), Qt) ? 2 : 3;
+  return fact * window_body_width (w, WINDOW_BODY_IN_CANONICAL_CHARS);
+}
+
+static int
+get_narrowed_len (struct window *w)
+{
+  return get_narrowed_width (w) *
+    window_body_height (w, WINDOW_BODY_IN_CANONICAL_CHARS);
+}
 
 ptrdiff_t
 get_narrowed_begv (struct window *w)
 {
-  int len, fact; ptrdiff_t begv;
-  /* In a character-only terminal, only one font size is used, so we
-     can use a smaller factor.  */
-  fact = EQ (Fterminal_live_p (Qnil), Qt) ? 2 : 3;
-  len = fact * (window_body_width (w, WINDOW_BODY_IN_CANONICAL_CHARS) *
-		window_body_height (w, WINDOW_BODY_IN_CANONICAL_CHARS));
+  int len = get_narrowed_len (w);
+  ptrdiff_t begv;
   begv = max ((window_point (w) / len - 1) * len, BEGV);
   return begv == BEGV ? 0 : begv;
+}
+
+ptrdiff_t
+get_narrowed_zv (struct window *w)
+{
+  int len = get_narrowed_len (w);
+  return min ((window_point (w) / len + 1) * len, ZV);
+}
+
+ptrdiff_t
+get_closer_narrowed_begv (struct window *w, ptrdiff_t pos)
+{
+  int len = get_narrowed_width (w);
+  return max ((pos / len - 1) * len, BEGV);
 }
 
 static void
@@ -2997,15 +3024,15 @@ unwind_narrowed_begv (Lisp_Object point_min)
 }
 
 /* Set DST to EXPR.  When IT indicates that BEGV should temporarily be
-   updated to optimize display, evaluate EXPR with an updated BEGV.  */
+   updated to optimize display, evaluate EXPR with BEGV set to BV.  */
 
-#define SET_WITH_NARROWED_BEGV(IT,DST,EXPR)				\
+#define SET_WITH_NARROWED_BEGV(IT,DST,EXPR,BV)				\
   do {									\
     if (IT->narrowed_begv)						\
       {									\
 	specpdl_ref count = SPECPDL_INDEX ();				\
 	record_unwind_protect (unwind_narrowed_begv, Fpoint_min ());	\
-	SET_BUF_BEGV (current_buffer, IT->narrowed_begv);		\
+	SET_BUF_BEGV (current_buffer, BV);				\
 	DST = EXPR;							\
 	unbind_to (count, Qnil);					\
       }									\
@@ -6310,7 +6337,108 @@ preceding_line_start (struct it *it)
 
   dec_both (&cp, &bp);
   SET_WITH_NARROWED_BEGV (it, IT_CHARPOS (*it),
-			  find_newline_no_quit (cp, bp, -1, &IT_BYTEPOS (*it)));
+			  find_newline_no_quit (cp, bp, -1, &IT_BYTEPOS (*it)),
+			  get_closer_narrowed_begv (it->w, IT_CHARPOS (*it)));
+}
+
+/* Find in the current buffer the first display or overlay string
+   between STARTPOS and ENDPOS that includes embedded newlines.
+   Consider only overlays that apply to window W.
+   Value is non-zero if such a display/overlay string is found.  */
+static bool
+strings_with_newlines (ptrdiff_t startpos, ptrdiff_t endpos, struct window *w)
+{
+  /* Process overlays before the overlay center.  */
+  for (struct Lisp_Overlay *ov = current_buffer->overlays_before;
+       ov; ov = ov->next)
+    {
+      Lisp_Object overlay = make_lisp_ptr (ov, Lisp_Vectorlike);
+      eassert (OVERLAYP (overlay));
+
+      /* Skip this overlay if it doesn't apply to our window.  */
+      Lisp_Object window = Foverlay_get (overlay, Qwindow);
+      if (WINDOWP (window) && XWINDOW (window) != w)
+	continue;
+
+      ptrdiff_t ostart = OVERLAY_POSITION (OVERLAY_START (overlay));
+      ptrdiff_t oend = OVERLAY_POSITION (OVERLAY_END (overlay));
+
+      /* Due to the order of overlays in overlays_before, once we get
+	 to an overlay whose end position is before STARTPOS, all the
+	 rest also end before STARTPOS, and thus are of no concern to us.  */
+      if (oend < startpos)
+	break;
+
+      /* Skip overlays that don't overlap the range.  */
+      if (!((startpos < oend && ostart < endpos)
+	    || (ostart == oend
+		&& (startpos == oend || (endpos == ZV && oend == endpos)))))
+	continue;
+
+      Lisp_Object str;
+      str = Foverlay_get (overlay, Qbefore_string);
+      if (STRINGP (str) && SCHARS (str)
+	  && memchr (SDATA (str), '\n', SBYTES (str)))
+	return true;
+      str = Foverlay_get (overlay, Qafter_string);
+      if (STRINGP (str) && SCHARS (str)
+	  && memchr (SDATA (str), '\n', SBYTES (str)))
+	return true;
+    }
+
+  /* Process overlays after the overlay center.  */
+  for (struct Lisp_Overlay *ov = current_buffer->overlays_after;
+       ov; ov = ov->next)
+    {
+      Lisp_Object overlay = make_lisp_ptr (ov, Lisp_Vectorlike);
+      eassert (OVERLAYP (overlay));
+
+      /* Skip this overlay if it doesn't apply to our window.  */
+      Lisp_Object window = Foverlay_get (overlay, Qwindow);
+      if (WINDOWP (window) && XWINDOW (window) != w)
+	continue;
+
+      ptrdiff_t ostart = OVERLAY_POSITION (OVERLAY_START (overlay));
+      ptrdiff_t oend = OVERLAY_POSITION (OVERLAY_END (overlay));
+
+      /* Due to the order of overlays in overlays_after, once we get
+	 to an overlay whose start position is after ENDPOS, all the
+	 rest also start after ENDPOS, and thus are of no concern to us.  */
+      if (ostart > endpos)
+	break;
+
+      /* Skip overlays that don't overlap the range.  */
+      if (!((startpos < oend && ostart < endpos)
+	    || (ostart == oend
+		&& (startpos == oend || (endpos == ZV && oend == endpos)))))
+	continue;
+
+      Lisp_Object str;
+      str = Foverlay_get (overlay, Qbefore_string);
+      if (STRINGP (str) && SCHARS (str)
+	  && memchr (SDATA (str), '\n', SBYTES (str)))
+	return true;
+      str = Foverlay_get (overlay, Qafter_string);
+      if (STRINGP (str) && SCHARS (str)
+	  && memchr (SDATA (str), '\n', SBYTES (str)))
+	return true;
+    }
+
+  /* Check for 'display' properties whose values include strings.  */
+  Lisp_Object cpos = make_fixnum (startpos);
+  Lisp_Object limpos = make_fixnum (endpos);
+
+  while ((cpos = Fnext_single_property_change (cpos, Qdisplay, Qnil, limpos),
+	  !(NILP (cpos) || XFIXNAT (cpos) >= endpos)))
+    {
+      Lisp_Object spec = Fget_char_property (cpos, Qdisplay, Qnil);
+      Lisp_Object string = string_from_display_spec (spec);
+      if (STRINGP (string)
+	  && memchr (SDATA (string), '\n', SBYTES (string)))
+	return true;
+    }
+
+  return false;
 }
 
 
@@ -6365,7 +6493,8 @@ following_line_start (struct it *it, bool *skipped_p,
   it->selective = 0;
 
   /* Scan for a newline within MAX_NEWLINE_DISTANCE display elements
-     from buffer text.  */
+     from buffer text, or till the end of the string if iterating a
+     string.  */
   for (n = 0;
        !newline_found_p && n < MAX_NEWLINE_DISTANCE;
        n += !STRINGP (it->string))
@@ -6389,23 +6518,53 @@ following_line_start (struct it *it, bool *skipped_p,
 
       eassert (! STRINGP (it->string));
 
-      /* If there isn't any `display' property in sight, and no
-	 overlays, we can just use the position of the newline in
-	 buffer text.  */
-      if (it->stop_charpos >= limit
-	  || ((pos = Fnext_single_property_change (make_fixnum (start),
-						   Qdisplay, Qnil,
-						   make_fixnum (limit)),
-	       NILP (pos))
-	      && next_overlay_change (start) == ZV))
+      /* it->stop_charpos >= limit means we already know there's no
+	 stop position up until the newline at LIMIT, so there's no
+	 need for any further checks.  */
+      bool no_strings_with_newlines = it->stop_charpos >= limit;
+
+      if (!no_strings_with_newlines)
 	{
-	  if (!it->bidi_p)
+	  if (!(current_buffer->long_line_optimizations_p
+		&& it->line_wrap == TRUNCATE))
 	    {
+	      /* Quick-and-dirty check: if there isn't any `display'
+		 property in sight, and no overlays, we're done.  */
+	      Lisp_Object pos =
+		Fnext_single_property_change (make_fixnum (start),
+					      Qdisplay, Qnil,
+					      make_fixnum (limit));
+	      no_strings_with_newlines =
+		(NILP (pos) || XFIXNAT (pos) == limit) /* no 'display' props */
+		&& next_overlay_change (start) == ZV;  /* no overlays */
+	    }
+	  else
+	    {
+	      /* For buffers with very long and truncated lines we try
+		 harder, because it's worth our while to spend some
+		 time looking into the overlays and 'display' properties
+		 if we can then avoid iterating through all of them.  */
+	      no_strings_with_newlines =
+		!strings_with_newlines (start, limit, it->w);
+	    }
+	}
+
+      /* If there's no display or overlay strings with embedded
+	 newlines until the position of the newline in buffer text, we
+	 can just use that position.  */
+      if (no_strings_with_newlines)
+	{
+	  if (!it->bidi_p || !bidi_it_prev)
+	    {
+	      /* The optimal case: just jump there.  */
 	      IT_CHARPOS (*it) = limit;
 	      IT_BYTEPOS (*it) = bytepos;
 	    }
 	  else
 	    {
+	      /* The less optimal case: need to bidi-walk there, but
+		 this is still cheaper that the full iteration using
+		 get_next_display_element and set_iterator_to_next.  */
 	      struct bidi_it bprev;
 
 	      /* Help bidi.c avoid expensive searches for display
@@ -6432,6 +6591,7 @@ following_line_start (struct it *it, bool *skipped_p,
 	}
       else
 	{
+	  /* The slow case.  */
 	  while (!newline_found_p)
 	    {
 	      if (! get_display_element (it))
@@ -7839,7 +7999,8 @@ get_visually_first_element (struct it *it)
 
   SET_WITH_NARROWED_BEGV (it, bob,
 			  string_p ? 0 :
-			  IT_BYTEPOS (*it) < BEGV ? obegv : BEGV);
+			  IT_BYTEPOS (*it) < BEGV ? obegv : BEGV,
+			  it->narrowed_begv);
 
   if (STRINGP (it->string))
     {
@@ -18158,6 +18319,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
        || w->base_line_pos > 0
        /* Column number is displayed and different from the one displayed.  */
        || (w->column_number_displayed != -1
+	   && !current_buffer->long_line_optimizations_p
 	   && (w->column_number_displayed != current_column ())))
       /* This means that the window has a mode line.  */
       && (window_wants_mode_line (w)
@@ -25053,6 +25215,17 @@ decode_mode_spec (struct window *w, register int c, int field_width,
          even crash emacs.)  */
       if (mode_line_target == MODE_LINE_TITLE)
 	return "";
+      else if (b->long_line_optimizations_p)
+	{
+	  char *p = decode_mode_spec_buf;
+	  int pad = width - 2;
+	  while (pad-- > 0)
+	    *p++ = ' ';
+	  *p++ = '?';
+	  *p++ = '?';
+	  *p = '\0';
+	  return decode_mode_spec_buf;
+	}
       else
 	{
 	  ptrdiff_t col = current_column ();
@@ -33731,7 +33904,13 @@ The tool bar style must also show labels for this to have any effect, see
     doc: /* List of functions to call to fontify regions of text.
 Each function is called with one argument POS.  Functions must
 fontify a region starting at POS in the current buffer, and give
-fontified regions the property `fontified'.  */);
+fontified regions the property `fontified' with a non-nil value.
+
+Note that, when the buffer contains one or more lines whose length is
+above `long-line-threshold', these functions only have access to a
+small portion of the buffer around POS, and cannot use `widen' to gain
+access to other portions of buffer text because the narrowing of the
+buffer is locked (see `narrow-to-region').  */);
   Vfontification_functions = Qnil;
   Fmake_variable_buffer_local (Qfontification_functions);
 
