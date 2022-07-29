@@ -1989,7 +1989,7 @@ line_number_display_width (struct window *w, int *width, int *pixel_width)
       void *itdata = bidi_shelve_cache ();
 
       /* Make sure W's buffer is the current one.  */
-      set_buffer_internal_1 (XBUFFER (w->contents));
+      set_buffer_internal (XBUFFER (w->contents));
       /* We want to start from window's start point, but it could be
 	 outside the accessible region, in which case we widen the
 	 buffer temporarily.  It could even be beyond the buffer's end
@@ -2018,7 +2018,7 @@ line_number_display_width (struct window *w, int *width, int *pixel_width)
       *pixel_width = it.lnum_pixel_width;
       if (saved_restriction)
 	unbind_to (count, Qnil);
-      set_buffer_internal_1 (old_buf);
+      set_buffer_internal (old_buf);
       bidi_unshelve_cache (itdata, 0);
     }
 }

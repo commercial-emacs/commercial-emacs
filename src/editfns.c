@@ -1777,9 +1777,9 @@ using `string-make-multibyte' or `string-make-unibyte', which see.  */)
     args_out_of_range (start, end);
 
   obuf = current_buffer;
-  set_buffer_internal_1 (bp);
+  set_buffer_internal (bp);
   update_buffer_properties (b, e);
-  set_buffer_internal_1 (obuf);
+  set_buffer_internal (obuf);
 
   insert_from_buffer (bp, b, e - b, 0);
   return Qnil;

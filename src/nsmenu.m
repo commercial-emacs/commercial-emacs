@@ -192,7 +192,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
 	  specbind (Qoverriding_local_map, Qnil);
 	}
 
-      set_buffer_internal_1 (XBUFFER (buffer));
+      set_buffer_internal (XBUFFER (buffer));
 
       /* TODO: for some reason this is not needed in other terms, but
 	 some menu updates call Info-extract-pointer which causes
@@ -271,7 +271,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
 	  prev_wv = wv;
 	}
 
-      set_buffer_internal_1 (prev);
+      set_buffer_internal (prev);
 
       /* If there has been no change in the Lisp-level contents
 	 of the menu bar, skip redisplaying it.  Just exit.  */

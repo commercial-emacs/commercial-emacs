@@ -108,10 +108,10 @@ post_acquire_global_lock (struct thread_state *self)
 	unbind_for_thread_switch (prev_thread);
       rebind_for_thread_switch ();
 
-       /* Set the new thread's current buffer.  This needs to be done
-	  even if it is the same buffer as that of the previous thread,
-	  because of thread-local bindings.  */
-      set_buffer_internal_2 (current_buffer);
+      /* Thread-private variables need forceful reset.  */
+      struct buffer *b = current_buffer;
+      current_buffer = NULL;
+      set_buffer_internal (b);
     }
 
    /* We could have been signaled while waiting to grab the global lock

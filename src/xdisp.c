@@ -1147,7 +1147,7 @@ DEFUN ("line-pixel-height", Fline_pixel_height,
   if (XBUFFER (w->contents) != current_buffer)
     {
       old_buffer = current_buffer;
-      set_buffer_internal_1 (XBUFFER (w->contents));
+      set_buffer_internal (XBUFFER (w->contents));
     }
 
   SET_TEXT_POS (pt, PT, PT_BYTE);
@@ -1155,7 +1155,7 @@ DEFUN ("line-pixel-height", Fline_pixel_height,
   result = make_fixnum (actual_line_height (w, pt));
 
   if (old_buffer)
-    set_buffer_internal_1 (old_buffer);
+    set_buffer_internal (old_buffer);
 
   return result;
 }
@@ -1290,7 +1290,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
   if (XBUFFER (w->contents) != current_buffer)
     {
       old_buffer = current_buffer;
-      set_buffer_internal_1 (XBUFFER (w->contents));
+      set_buffer_internal (XBUFFER (w->contents));
     }
 
   SET_TEXT_POS_FROM_MARKER (top, w->start);
@@ -1674,7 +1674,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
   bidi_unshelve_cache (itdata, false);
 
   if (old_buffer)
-    set_buffer_internal_1 (old_buffer);
+    set_buffer_internal (old_buffer);
 
   if (visible_p)
     {
@@ -3798,7 +3798,7 @@ handle_fontified_prop (struct it *it)
       it->f->inhibit_clear_image_cache = saved_inhibit_flag;
       if (obuf != current_buffer && BUFFER_LIVE_P (obuf))
 	/* Fontification stultifyingly switched buffers!  */
-	set_buffer_internal_1 (obuf);
+	set_buffer_internal (obuf);
       if (obuf == current_buffer)
 	/* Bug#6671.  */
 	current_buffer->clip_changed = saved_clip_changed;
@@ -10092,13 +10092,13 @@ include the height of any of these, if present, in the return value.  */)
   if (b != current_buffer)
     {
       old_b = current_buffer;
-      set_buffer_internal_1 (b);
+      set_buffer_internal (b);
     }
 
   value = window_text_pixel_size (window, from, to, x_limit, y_limit, mode_lines);
 
   if (old_b)
-    set_buffer_internal_1 (old_b);
+    set_buffer_internal (old_b);
 
   return value;
 }
@@ -10136,7 +10136,7 @@ WINDOW.  */)
   record_unwind_protect (unwind_with_echo_area_buffer,
 			 with_echo_area_buffer_unwind_data (w));
 
-  set_buffer_internal_1 (b);
+  set_buffer_internal (b);
 
   if (!EQ (buffer, w->contents))
     {
@@ -10162,7 +10162,7 @@ DEFUN ("display--line-is-continued-p", Fdisplay__line_is_continued_p,
   struct window *w = XWINDOW (selected_window);
   enum move_it_result rc = MOVE_POS_MATCH_OR_ZV;
 
-  set_buffer_internal_1 (XBUFFER (w->contents));
+  set_buffer_internal (XBUFFER (w->contents));
 
   if (PT < ZV)
     {
@@ -10188,7 +10188,7 @@ DEFUN ("display--line-is-continued-p", Fdisplay__line_is_continued_p,
       SET_PT_BOTH (marker_position (opoint), marker_byte_position (opoint));
       bidi_unshelve_cache (itdata, false);
     }
-  set_buffer_internal_1 (oldb);
+  set_buffer_internal (oldb);
 
   return rc == MOVE_LINE_CONTINUED ? Qt : Qnil;
 }
@@ -10860,7 +10860,7 @@ with_echo_area_buffer (struct window *w, int which,
      Fset_window_buffer.  We must also change w->pointm, though,
      because otherwise an assertions in unshow_buffer fails, and Emacs
      aborts.  */
-  set_buffer_internal_1 (XBUFFER (buffer));
+  set_buffer_internal (XBUFFER (buffer));
   if (w)
     {
       wset_buffer (w, buffer);
@@ -10939,7 +10939,7 @@ with_echo_area_buffer_unwind_data (struct window *w)
 static void
 unwind_with_echo_area_buffer (Lisp_Object vector)
 {
-  set_buffer_internal_1 (XBUFFER (AREF (vector, 0)));
+  set_buffer_internal (XBUFFER (AREF (vector, 0)));
   Vdeactivate_mark = AREF (vector, 1);
   windows_or_buffers_changed = XFIXNAT (AREF (vector, 2));
 
@@ -11863,9 +11863,9 @@ unwind_format_mode_line (Lisp_Object vector)
 	}
     }
 
-  if (!NILP (AREF (vector, 6)))
+  if (! NILP (AREF (vector, 6)))
     {
-      set_buffer_internal_1 (XBUFFER (AREF (vector, 6)));
+      set_buffer_internal (XBUFFER (AREF (vector, 6)));
       ASET (vector, 6, Qnil);
     }
 
@@ -11988,8 +11988,7 @@ gui_consider_frame_title (Lisp_Object frame)
 			     (f, current_buffer, selected_window, false));
 
       Fselect_window (f->selected_window, Qt);
-      set_buffer_internal_1
-	(XBUFFER (XWINDOW (f->selected_window)->contents));
+      set_buffer_internal (XBUFFER (XWINDOW (f->selected_window)->contents));
       fmt = FRAME_ICONIFIED_P (f) ? Vicon_title_format : Vframe_title_format;
 
       mode_line_target = MODE_LINE_TITLE;
@@ -12216,7 +12215,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 
 	  specbind (Qinhibit_menubar_update, Qt);
 
-	  set_buffer_internal_1 (XBUFFER (w->contents));
+	  set_buffer_internal (XBUFFER (w->contents));
 	  if (save_match_data)
 	    record_unwind_save_match_data ();
 	  if (NILP (Voverriding_local_map_menu_flag))
@@ -12262,7 +12261,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 #endif /* HAVE_EXT_MENU_BAR */
 
 	  unbind_to (count, Qnil);
-	  set_buffer_internal_1 (prev);
+	  set_buffer_internal (prev);
 	}
     }
 
@@ -12380,7 +12379,7 @@ update_tab_bar (struct frame *f, bool save_match_data)
 	  /* Set current_buffer to the buffer of the selected
 	     window of the frame, so that we get the right local
 	     keymaps.  */
-	  set_buffer_internal_1 (XBUFFER (w->contents));
+	  set_buffer_internal (XBUFFER (w->contents));
 
 	  /* Save match data, if we must.  */
 	  if (save_match_data)
@@ -12429,7 +12428,7 @@ update_tab_bar (struct frame *f, bool save_match_data)
             }
 
 	  unbind_to (count, Qnil);
-	  set_buffer_internal_1 (prev);
+	  set_buffer_internal (prev);
 	}
     }
 }
@@ -13297,7 +13296,7 @@ update_tool_bar (struct frame *f, bool save_match_data)
 	  /* Set current_buffer to the buffer of the selected
 	     window of the frame, so that we get the right local
 	     keymaps.  */
-	  set_buffer_internal_1 (XBUFFER (w->contents));
+	  set_buffer_internal (XBUFFER (w->contents));
 
 	  /* Save match data, if we must.  */
 	  if (save_match_data)
@@ -13343,7 +13342,7 @@ update_tool_bar (struct frame *f, bool save_match_data)
             }
 
 	  unbind_to (count, Qnil);
-	  set_buffer_internal_1 (prev);
+	  set_buffer_internal (prev);
 	}
     }
 }
@@ -17297,11 +17296,11 @@ set_vertical_scroll_bar (struct window *w)
 	  struct it it;
 	  struct text_pos start_pos;
 
-	  set_buffer_internal_1 (XBUFFER (w->contents));
+	  set_buffer_internal (XBUFFER (w->contents));
 	  SET_TEXT_POS_FROM_MARKER (start_pos, w->start);
 	  start_move_it (&it, w, start_pos);
 	  move_it_forward (&it, -1, window_box_height (w), MOVE_TO_Y);
-	  set_buffer_internal_1 (obuf);
+	  set_buffer_internal (obuf);
 
 	  start = marker_position (w->start) - BUF_BEGV (buf);
 	  end = max (start, IT_CHARPOS (it) - BUF_BEGV (buf));
@@ -17517,7 +17516,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
      value.  */
   /* Really select the buffer, for the sake of buffer-local
      variables.  */
-  set_buffer_internal_1 (XBUFFER (w->contents));
+  set_buffer_internal (XBUFFER (w->contents));
 
   current_matrix_up_to_date_p
     = (w->window_end_valid
@@ -18487,7 +18486,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   else
     TEMP_SET_PT_BOTH (CHARPOS (opoint), BYTEPOS (opoint));
 
-  set_buffer_internal_1 (old);
+  set_buffer_internal (old);
   /* Avoid an abort in TEMP_SET_PT_BOTH if the buffer has become
      shorter.  This can be caused by log truncation in *Messages*.  */
   if (CHARPOS (lpoint) <= ZV)
@@ -23892,7 +23891,7 @@ redisplay_mode_lines (Lisp_Object window, bool force)
 
 	  /* Set the window's buffer for the mode line display.  */
 	  SET_TEXT_POS (lpoint, PT, PT_BYTE);
-	  set_buffer_internal_1 (XBUFFER (w->contents));
+	  set_buffer_internal (XBUFFER (w->contents));
 
 	  /* Point refers normally to the selected window.  For any
 	     other window, set up appropriate value.  */
@@ -23910,7 +23909,7 @@ redisplay_mode_lines (Lisp_Object window, bool force)
 	    ++nwindows;
 
 	  /* Restore old settings.  */
-	  set_buffer_internal_1 (old);
+	  set_buffer_internal (old);
 	  TEMP_SET_PT_BOTH (CHARPOS (lpoint), BYTEPOS (lpoint));
 	}
 
@@ -24828,7 +24827,7 @@ are the selected window and the WINDOW's buffer).  */)
   mode_line_proptrans_alist = Qnil;
 
   Fselect_window (window, Qt);
-  set_buffer_internal_1 (XBUFFER (buffer));
+  set_buffer_internal (XBUFFER (buffer));
 
   init_iterator (&it, w, -1, -1, NULL, face_id);
 
@@ -33041,9 +33040,9 @@ expose_window (struct window *w, const Emacs_Rectangle *fr)
 	 called from expose_line, will use the right face.  */
       bool buffer_changed = false;
       struct buffer *oldbuf = current_buffer;
-      if (!w->pseudo_window_p)
+      if (! w->pseudo_window_p)
 	{
-	  set_buffer_internal_1 (XBUFFER (w->contents));
+	  set_buffer_internal (XBUFFER (w->contents));
 	  buffer_changed = true;
 	}
 
@@ -33093,7 +33092,7 @@ expose_window (struct window *w, const Emacs_Rectangle *fr)
 	}
 
       if (buffer_changed)
-	set_buffer_internal_1 (oldbuf);
+	set_buffer_internal (oldbuf);
 
       /* Display the mode line if there is one.  */
       if (window_wants_mode_line (w)

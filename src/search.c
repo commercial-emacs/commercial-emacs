@@ -3314,7 +3314,7 @@ the buffer.  If the buffer doesn't have a cache, the value is nil.  */)
 
   /* find_newline can only work on the current buffer.  */
   if (old != NULL)
-    set_buffer_internal_1 (buf);
+    set_buffer_internal (buf);
 
   /* How many newlines are there according to the cache?  */
   find_newline (BEGV, BEGV_BYTE, ZV, ZV_BYTE,
@@ -3359,7 +3359,7 @@ the buffer.  If the buffer doesn't have a cache, the value is nil.  */)
   val = CALLN (Fvector, cache_newlines, buf_newlines);
 
   if (old != NULL)
-    set_buffer_internal_1 (old);
+    set_buffer_internal (old);
   return val;
 }
 

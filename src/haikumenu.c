@@ -627,7 +627,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
 	  specbind (Qoverriding_local_map, Qnil);
 	}
 
-      set_buffer_internal_1 (XBUFFER (buffer));
+      set_buffer_internal (XBUFFER (buffer));
 
       /* Run the Lucid hook.  */
       safe_run_hooks (Qactivate_menubar_hook);
@@ -683,7 +683,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
       submenu_start[i] = -1;
       finish_menu_items ();
 
-      set_buffer_internal_1 (prev);
+      set_buffer_internal (prev);
 
       /* If there has been no change in the Lisp-level contents
 	 of the menu bar, skip redisplaying it.  Just exit.  */

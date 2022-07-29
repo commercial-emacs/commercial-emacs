@@ -1149,8 +1149,7 @@ extern ptrdiff_t sort_overlays (Lisp_Object *, ptrdiff_t, struct window *);
 extern void recenter_overlay_lists (struct buffer *, ptrdiff_t);
 extern ptrdiff_t overlay_strings (ptrdiff_t, struct window *, unsigned char **);
 extern void validate_region (Lisp_Object *, Lisp_Object *);
-extern void set_buffer_internal_1 (struct buffer *);
-extern void set_buffer_internal_2 (struct buffer *);
+extern void set_buffer_internal (struct buffer *);
 extern void set_buffer_temp (struct buffer *);
 extern Lisp_Object buffer_local_value (Lisp_Object, Lisp_Object);
 extern void record_buffer (Lisp_Object);
@@ -1165,22 +1164,6 @@ INLINE struct buffer *
 decode_buffer (Lisp_Object b)
 {
   return NILP (b) ? current_buffer : (CHECK_BUFFER (b), XBUFFER (b));
-}
-
-/* Set the current buffer to B.
-
-   We previously set windows_or_buffers_changed here to invalidate
-   global unchanged information in beg_unchanged and end_unchanged.
-   This is no longer necessary because we now compute unchanged
-   information on a buffer-basis.  Every action affecting other
-   windows than the selected one requires a select_window at some
-   time, and that increments windows_or_buffers_changed.  */
-
-INLINE void
-set_buffer_internal (struct buffer *b)
-{
-  if (current_buffer != b)
-    set_buffer_internal_1 (b);
 }
 
 /* Arrange to go back to the original buffer after the next

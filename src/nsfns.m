@@ -3448,7 +3448,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 	 buffer.  */
       count_1 = SPECPDL_INDEX ();
       old_buffer = current_buffer;
-      set_buffer_internal_1 (XBUFFER (w->contents));
+      set_buffer_internal (XBUFFER (w->contents));
       bset_truncate_lines (current_buffer, Qnil);
       specbind (Qinhibit_read_only, Qt);
       specbind (Qinhibit_modification_hooks, Qt);
@@ -3506,7 +3506,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
       w->must_be_updated_p = true;
       update_single_window (w);
       flush_frame (tip_f);
-      set_buffer_internal_1 (old_buffer);
+      set_buffer_internal (old_buffer);
       unbind_to (count_1, Qnil);
       windows_or_buffers_changed = old_windows_or_buffers_changed;
 

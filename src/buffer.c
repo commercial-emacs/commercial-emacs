@@ -725,8 +725,8 @@ record_buffer_markers (struct buffer *b)
     {
       Lisp_Object buffer;
 
-      eassert (!NILP (BVAR (b, begv_marker)));
-      eassert (!NILP (BVAR (b, zv_marker)));
+      eassert (! NILP (BVAR (b, begv_marker)));
+      eassert (! NILP (BVAR (b, zv_marker)));
 
       XSETBUFFER (buffer, b);
       set_marker_both (BVAR (b, pt_marker), buffer, b->pt, b->pt_byte);
@@ -889,7 +889,7 @@ does not run the hooks `kill-buffer-hook',
       bset_backed_up (b, Qnil);
       bset_local_minor_modes (b, Qnil);
       bset_auto_save_file_name (b, Qnil);
-      set_buffer_internal_1 (b);
+      set_buffer_internal (b);
       Fset (intern ("buffer-save-without-query"), Qnil);
       Fset (intern ("buffer-file-number"), Qnil);
       if (!NILP (Flocal_variable_p (Qbuffer_stale_function, base_buffer)))
@@ -898,7 +898,7 @@ does not run the hooks `kill-buffer-hook',
 	 variable copies for list variables that might be mangled due
 	 to destructive operations in the indirect buffer. */
       run_hook (Qclone_indirect_buffer_hook);
-      set_buffer_internal_1 (old_b);
+      set_buffer_internal (old_b);
     }
 
   run_buffer_list_update_hook (NULL);
@@ -2127,76 +2127,62 @@ DEFUN ("current-buffer", Fcurrent_buffer, Scurrent_buffer, 0, 0, 0,
   return buf;
 }
 
-/* Set the current buffer to B, and do not set windows_or_buffers_changed.
-   This is used by redisplay.  */
-
 void
-set_buffer_internal_1 (register struct buffer *b)
+set_buffer_internal (struct buffer *new_buf)
 {
+  struct buffer *old_buf;
+  Lisp_Object tail;
+
 #ifdef USE_MMAP_FOR_BUFFERS
-  if (b->text->beg == NULL)
-    enlarge_buffer_text (b, 0);
+  if (new_buf->text->beg == NULL)
+    enlarge_buffer_text (new_buf, 0);
 #endif /* USE_MMAP_FOR_BUFFERS */
 
-  if (current_buffer == b)
+  if (new_buf == current_buffer)
     return;
 
-  set_buffer_internal_2 (b);
-}
-
-/* Like set_buffer_internal_1, but doesn't check whether B is already
-   the current buffer.  Called upon switch of the current thread, see
-   post_acquire_global_lock.  */
-void set_buffer_internal_2 (register struct buffer *b)
-{
-  register struct buffer *old_buf;
-  register Lisp_Object tail;
-
-  BUFFER_CHECK_INDIRECTION (b);
+  BUFFER_CHECK_INDIRECTION (new_buf);
 
   old_buf = current_buffer;
-  current_buffer = b;
-  last_known_column_point = -1;   /* Invalidate indentation cache.  */
+  current_buffer = new_buf;
+  last_known_column_point = -1; /* Invalidate indentation cache.  */
 
   if (old_buf)
     {
-      /* Put the undo list back in the base buffer, so that it appears
-	 that an indirect buffer shares the undo list of its base.  */
+      /* Set base's undo list to child's.  */
       if (old_buf->base_buffer)
 	bset_undo_list (old_buf->base_buffer, BVAR (old_buf, undo_list));
 
-      /* If the old current buffer has markers to record PT, BEGV and ZV
-	 when it is not current, update them now.  */
+      /* Backgrounds markers.  */
       record_buffer_markers (old_buf);
     }
 
-  /* Get the undo list from the base buffer, so that it appears
-     that an indirect buffer shares the undo list of its base.  */
-  if (b->base_buffer)
-    bset_undo_list (b, BVAR (b->base_buffer, undo_list));
+  if (current_buffer)
+    {
+      /* Set child's undo list to base's.  */
+      if (current_buffer->base_buffer)
+	bset_undo_list (current_buffer, BVAR (current_buffer->base_buffer, undo_list));
 
-  /* If the new current buffer has markers to record PT, BEGV and ZV
-     when it is not current, fetch them now.  */
-  fetch_buffer_markers (b);
+      /* Foregrounds markers.  */
+      fetch_buffer_markers (current_buffer);
+    }
 
   /* Look down buffer's list of local Lisp variables
      to find and update any that forward into C variables.  */
-
-  do
+  struct buffer *const arr[] = {old_buf, current_buffer};
+  for (int i = 0; i < 2; ++i)
     {
-      for (tail = BVAR (b, local_var_alist); CONSP (tail); tail = XCDR (tail))
-	{
-	  Lisp_Object var = XCAR (XCAR (tail));
-	  struct Lisp_Symbol *sym = XSYMBOL (var);
-	  if (sym->u.s.redirect == SYMBOL_LOCALIZED /* Just to be sure.  */
-	      && SYMBOL_BLV (sym)->fwd.fwdptr)
-	    /* Just reference the variable
-	       to cause it to become set for this buffer.  */
-	    Fsymbol_value (var);
-	}
+      struct buffer *b = arr[i];
+      if (b)
+	for (tail = BVAR (b, local_var_alist); CONSP (tail); tail = XCDR (tail))
+	  {
+	    Lisp_Object var = XCAR (XCAR (tail));
+	    struct Lisp_Symbol *sym = XSYMBOL (var);
+	    if (sym->u.s.redirect == SYMBOL_LOCALIZED
+		&& SYMBOL_BLV (sym)->fwd.fwdptr)
+	      Fsymbol_value (var); /* sets variable by side effect */
+	  }
     }
-  /* Do the same with any others that were local to the previous buffer */
-  while (b != old_buf && (b = old_buf, b));
 }
 
 /* Switch to buffer B temporarily for redisplay purposes.
