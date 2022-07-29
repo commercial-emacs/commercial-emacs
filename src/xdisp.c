@@ -6514,8 +6514,6 @@ following_line_start (struct it *it, bool *skipped_p,
       ptrdiff_t bytepos, start = IT_CHARPOS (*it);
       ptrdiff_t limit = find_newline_no_quit (start, IT_BYTEPOS (*it),
 					      1, &bytepos);
-      Lisp_Object pos;
-
       eassert (! STRINGP (it->string));
 
       /* it->stop_charpos >= limit means we already know there's no
@@ -8043,7 +8041,8 @@ get_visually_first_element (struct it *it)
 	SET_WITH_NARROWED_BEGV (it, it->bidi_it.charpos,
 				find_newline_no_quit (IT_CHARPOS (*it),
 						      IT_BYTEPOS (*it), -1,
-						      &it->bidi_it.bytepos));
+						      &it->bidi_it.bytepos),
+				it->narrowed_begv);
       bidi_fetch_char (it->bidi_it.charpos, it->bidi_it.bytepos,
 		       &it->bidi_it.disp_pos, &it->bidi_it.disp_prop,
 		       &it->bidi_it.string, it->bidi_it.w,
