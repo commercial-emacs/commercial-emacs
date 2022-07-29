@@ -6667,7 +6667,7 @@ x_sync_update_finish (struct frame *f)
 
   /* TODO: implement sync fences.  */
 }
-#endif
+#endif /* HAVE_XSYNC && ! USE_GTK */
 
 /* Start an update of frame F.  This function is installed as a hook
    for update_begin, i.e. it is called when update_begin is called.
@@ -6809,12 +6809,16 @@ x_flip_and_flush (struct frame *f)
     return;
 
   block_input ();
-#ifdef HAVE_XDBE
+#if defined HAVE_XSYNC && !defined USE_GTK
+# ifdef HAVE_XDBE
   if (FRAME_X_NEED_BUFFER_FLIP (f))
     {
       show_back_buffer (f);
+# endif
       x_sync_update_finish (f);
+# ifdef HAVE_XDBE
     }
+# endif
 #endif
   x_flush (f);
   unblock_input ();
@@ -11728,13 +11732,6 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   /* This shouldn't happen.  */
   if (x_dnd_toplevels)
     x_dnd_free_toplevels (true);
-
-#ifdef USE_GTK
-  /* Prevent GTK+ timeouts from being run, since they can call
-     handle_one_xevent behind our back.  */
-  suppress_xg_select ();
-  record_unwind_protect_void (release_xg_select);
-#endif
 
   /* Set up a meaningless alias.  */
   XSETCAR (x_dnd_selection_alias_cell, QSECONDARY);
