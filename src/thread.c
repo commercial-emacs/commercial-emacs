@@ -67,16 +67,9 @@ extern volatile int interrupt_input_blocked;
 #define thread_live_p(STATE) ((STATE)->m_specpdl != NULL)
 
 static void
-release_global_lock (void)
-{
-  sys_mutex_unlock (&global_lock);
-}
-
-static void
 rebind_for_thread_switch (void)
 {
-  ptrdiff_t distance
-    = current_thread->m_specpdl_ptr - current_thread->m_specpdl;
+  ptrdiff_t distance = current_thread->m_specpdl_ptr - current_thread->m_specpdl;
   specpdl_unrewind (specpdl_ptr, -distance, true);
 }
 
@@ -87,55 +80,42 @@ unbind_for_thread_switch (struct thread_state *thr)
   specpdl_unrewind (thr->m_specpdl_ptr, distance, true);
 }
 
-/* You must call this after acquiring the global lock.
-   acquire_global_lock does it for you.  */
 static void
-post_acquire_global_lock (struct thread_state *self)
+clear_thread (void *arg)
+{
+  struct thread_state *tstate = arg;
+  tstate->event_object = Qnil;
+  tstate->wait_condvar = NULL;
+}
+
+static void
+restore_thread (struct thread_state *self)
 {
   struct thread_state *prev_thread = current_thread;
-
-  /* Do this early on, so that code below could signal errors (e.g.,
-     unbind_for_thread_switch might) correctly, because we are already
-     running in the context of the thread pointed by SELF.  */
   current_thread = self;
-
   if (prev_thread != current_thread)
     {
-      /* PREV_THREAD is NULL if the previously current thread
-	 exited.  In this case, there is no reason to unbind, and
-	 trying will crash.  */
       if (prev_thread != NULL)
 	unbind_for_thread_switch (prev_thread);
       rebind_for_thread_switch ();
 
-      /* Thread-private variables need forceful reset.  */
+      /* Thread-private buffer variables require resetting, but
+	 set_buffer_internal(current_buffer) would be a no-op.  */
       struct buffer *b = current_buffer;
       current_buffer = NULL;
       set_buffer_internal (b);
     }
 
-   /* We could have been signaled while waiting to grab the global lock
-      for the first time since this thread was created, in which case
-      we didn't yet have the opportunity to set up the handlers.  Delay
-      raising the signal in that case (it will be actually raised when
-      the thread comes here after acquiring the lock the next time).  */
-  if (!NILP (current_thread->error_symbol) && handlerlist)
+  if (! NILP (current_thread->error_symbol) && handlerlist)
     {
-      Lisp_Object sym = current_thread->error_symbol;
-      Lisp_Object data = current_thread->error_data;
+      Lisp_Object sym = current_thread->error_symbol,
+	data = current_thread->error_data;
 
       current_thread->error_symbol = Qnil;
       current_thread->error_data = Qnil;
 
       Fsignal (sym, data);
     }
-}
-
-static void
-acquire_global_lock (struct thread_state *self)
-{
-  sys_mutex_lock (&global_lock);
-  post_acquire_global_lock (self);
 }
 
 static void
@@ -146,97 +126,64 @@ lisp_mutex_init (lisp_mutex_t *mutex)
   sys_cond_init (&mutex->condition);
 }
 
-/* Lock MUTEX for thread LOCKER, setting its lock count to COUNT, if
-   non-zero, or to 1 otherwise.
+/* If MUTEX is already locked by thread LOCKER, increment MUTEX's lock
+   count.  Return 0.
 
-   If MUTEX is locked by LOCKER, COUNT must be zero, and the MUTEX's
-   lock count will be incremented.
+   If MUTEX is unlocked, assign to thread LOCKER, set its lock
+   count to the larger of NEW_COUNT and 1.  Return 0.
 
-   If MUTEX is locked by another thread, this function will release
-   the global lock, giving other threads a chance to run, and will
-   wait for the MUTEX to become unlocked; when MUTEX becomes unlocked,
-   and will then re-acquire the global lock.
-
-   Return value is 1 if the function waited for the MUTEX to become
-   unlocked (meaning other threads could have run during the wait),
-   zero otherwise.  */
-static int
+   If MUTEX is locked by another thread, release the global lock,
+   allowing other threads to run while waiting MUTEX to become
+   unlocked.  Return 1 upon acquiring MUTEX.
+*/
+static void
 lisp_mutex_lock_for_thread (lisp_mutex_t *mutex, struct thread_state *locker,
 			    int new_count)
 {
-  struct thread_state *self;
+  eassume (locker != NULL);
 
-  if (mutex->owner == NULL)
+  if (! mutex->owner)
     {
       mutex->owner = locker;
-      mutex->count = new_count == 0 ? 1 : new_count;
-      return 0;
+      mutex->count = max (1, new_count);
     }
-  if (mutex->owner == locker)
+  else if (mutex->owner == locker)
     {
       eassert (new_count == 0);
       ++mutex->count;
-      return 0;
     }
-
-  self = locker;
-  self->wait_condvar = &mutex->condition;
-  while (mutex->owner != NULL && (new_count != 0
-				  || NILP (self->error_symbol)))
-    sys_cond_wait (&mutex->condition, &global_lock);
-  self->wait_condvar = NULL;
-
-  if (new_count == 0 && !NILP (self->error_symbol))
-    return 1;
-
-  mutex->owner = self;
-  mutex->count = new_count == 0 ? 1 : new_count;
-
-  return 1;
+  else
+    {
+      locker->wait_condvar = &mutex->condition;
+      /* If NEW_COUNT is zero, let errors disrupt? */
+      while (mutex->owner != NULL && NILP (locker->error_symbol))
+	sys_cond_wait (&mutex->condition, &global_lock);
+      restore_thread (locker);
+      mutex->owner = locker;
+      mutex->count = max (1, new_count);
+    }
 }
 
-static int
+static void
 lisp_mutex_lock (lisp_mutex_t *mutex, int new_count)
 {
-  return lisp_mutex_lock_for_thread (mutex, current_thread, new_count);
+  lisp_mutex_lock_for_thread (mutex, current_thread, new_count);
 }
 
-/* Decrement MUTEX's lock count.  If the lock count becomes zero after
-   decrementing it, meaning the mutex is now unlocked, broadcast that
-   to all the threads that might be waiting to lock the mutex.  This
-   function signals an error if MUTEX is locked by a thread other than
-   the current one.  Return value is 1 if the mutex becomes unlocked,
-   zero otherwise.  */
-static int
+/* Decrement MUTEX's lock count.  If the count becomes zero, meaning
+   the mutex is unlocked, broadcast to threads waiting to lock MUTEX
+   and return 1.  Otherwise return 0.  */
+static void
 lisp_mutex_unlock (lisp_mutex_t *mutex)
 {
   if (mutex->owner != current_thread)
     error ("Cannot unlock mutex owned by another thread");
 
-  if (--mutex->count > 0)
-    return 0;
-
-  mutex->owner = NULL;
-  sys_cond_broadcast (&mutex->condition);
-
-  return 1;
-}
-
-/* Like lisp_mutex_unlock, but sets MUTEX's lock count to zero
-   regardless of its value.  Return the previous lock count.  */
-static unsigned int
-lisp_mutex_unlock_for_wait (lisp_mutex_t *mutex)
-{
-  unsigned int result = mutex->count;
-
-  /* Ensured by condvar code.  */
-  eassert (mutex->owner == current_thread);
-
-  mutex->count = 0;
-  mutex->owner = NULL;
-  sys_cond_broadcast (&mutex->condition);
-
-  return result;
+  if (--mutex->count <= 0)
+    {
+      mutex->owner = NULL;
+      sys_cond_broadcast (&mutex->condition);
+    }
 }
 
 static void
@@ -250,8 +197,6 @@ lisp_mutex_owned_p (lisp_mutex_t *mutex)
 {
   return mutex->owner == current_thread;
 }
-
-
 
 DEFUN ("make-mutex", Fmake_mutex, Smake_mutex, 0, 1, 0,
        doc: /* Create a mutex.
@@ -282,20 +227,7 @@ static void
 mutex_lock_callback (void *arg)
 {
   struct Lisp_Mutex *mutex = arg;
-  struct thread_state *self = current_thread;
-
-  /* Calling lisp_mutex_lock might yield to other threads while this
-     one waits for the mutex to become unlocked, so we need to
-     announce us as the current thread by calling
-     post_acquire_global_lock.  */
-  if (lisp_mutex_lock (&mutex->mutex, 0))
-    post_acquire_global_lock (self);
-}
-
-static void
-do_unwind_mutex_lock (void)
-{
-  current_thread->event_object = Qnil;
+  lisp_mutex_lock (&mutex->mutex, 0);
 }
 
 DEFUN ("mutex-lock", Fmutex_lock, Smutex_lock, 1, 1, 0,
@@ -315,7 +247,7 @@ Note that calls to `mutex-lock' and `mutex-unlock' must be paired.  */)
   lmutex = XMUTEX (mutex);
 
   current_thread->event_object = mutex;
-  record_unwind_protect_void (do_unwind_mutex_lock);
+  record_unwind_protect_ptr (clear_thread, current_thread);
   with_flushed_stack (mutex_lock_callback, lmutex);
   return unbind_to (count, Qnil);
 }
@@ -324,10 +256,7 @@ static void
 mutex_unlock_callback (void *arg)
 {
   struct Lisp_Mutex *mutex = arg;
-  struct thread_state *self = current_thread;
-
-  if (lisp_mutex_unlock (&mutex->mutex))
-    post_acquire_global_lock (self); /* FIXME: is this call needed? */
+  lisp_mutex_unlock (&mutex->mutex);
 }
 
 DEFUN ("mutex-unlock", Fmutex_unlock, Smutex_unlock, 1, 1, 0,
@@ -397,34 +326,25 @@ informational only.  */)
 static void
 condition_wait_callback (void *arg)
 {
+  struct thread_state *self = current_thread; // current_thread changes!
   struct Lisp_CondVar *cvar = arg;
   struct Lisp_Mutex *mutex = XMUTEX (cvar->mutex);
-  struct thread_state *self = current_thread;
-  unsigned int saved_count;
+  unsigned int restore_count = mutex->mutex.count;
   Lisp_Object cond;
-
   XSETCONDVAR (cond, cvar);
+
   self->event_object = cond;
-  saved_count = lisp_mutex_unlock_for_wait (&mutex->mutex);
-  /* If signaled while unlocking, skip the wait but reacquire the lock.  */
-  if (NILP (self->error_symbol))
-    {
-      self->wait_condvar = &cvar->cond;
-      /* This call could switch to another thread.  */
-      sys_cond_wait (&cvar->cond, &global_lock);
-      self->wait_condvar = NULL;
-    }
-  self->event_object = Qnil;
-  /* Since sys_cond_wait could switch threads, we need to lock the
-     mutex for the thread which was the current when we were called,
-     otherwise lisp_mutex_lock will record the wrong thread as the
-     owner of the mutex lock.  */
-  lisp_mutex_lock_for_thread (&mutex->mutex, self, saved_count);
-  /* Calling lisp_mutex_lock_for_thread might yield to other threads
-     while this one waits for the mutex to become unlocked, so we need
-     to announce us as the current thread by calling
-     post_acquire_global_lock.  */
-  post_acquire_global_lock (self);
+  self->wait_condvar = &cvar->cond;
+
+  /* suspend locks and all-points bulletin.  */
+  mutex->mutex.count = 0;
+  mutex->mutex.owner = NULL;
+  sys_cond_broadcast (&mutex->mutex.condition);
+
+  sys_cond_wait (&cvar->cond, &global_lock);
+  clear_thread (self);
+  lisp_mutex_lock_for_thread (&mutex->mutex, self, restore_count);
+  restore_thread (self);
 }
 
 DEFUN ("condition-wait", Fcondition_wait, Scondition_wait, 1, 1, 0,
@@ -447,7 +367,7 @@ this thread.  */)
   cvar = XCONDVAR (cond);
 
   mutex = XMUTEX (cvar->mutex);
-  if (!lisp_mutex_owned_p (&mutex->mutex))
+  if (! lisp_mutex_owned_p (&mutex->mutex))
     error ("Condition variable's mutex is not held by current thread");
 
   with_flushed_stack (condition_wait_callback, cvar);
@@ -467,22 +387,18 @@ condition_notify_callback (void *arg)
 {
   struct notify_args *na = arg;
   struct Lisp_Mutex *mutex = XMUTEX (na->cvar->mutex);
-  struct thread_state *self = current_thread;
-  unsigned int saved_count;
-  Lisp_Object cond;
+  unsigned int restore_count = mutex->mutex.count;
 
-  XSETCONDVAR (cond, na->cvar);
-  saved_count = lisp_mutex_unlock_for_wait (&mutex->mutex);
+  /* suspend locks and all-points bulletin.  */
+  mutex->mutex.count = 0;
+  mutex->mutex.owner = NULL;
+  sys_cond_broadcast (&mutex->mutex.condition);
+
   if (na->all)
     sys_cond_broadcast (&na->cvar->cond);
   else
     sys_cond_signal (&na->cvar->cond);
-  /* Calling lisp_mutex_lock might yield to other threads while this
-     one waits for the mutex to become unlocked, so we need to
-     announce us as the current thread by calling
-     post_acquire_global_lock.  */
-  lisp_mutex_lock (&mutex->mutex, saved_count);
-  post_acquire_global_lock (self);
+  lisp_mutex_lock (&mutex->mutex, restore_count);
 }
 
 DEFUN ("condition-notify", Fcondition_notify, Scondition_notify, 1, 2, 0,
@@ -506,11 +422,11 @@ thread.  */)
   cvar = XCONDVAR (cond);
 
   mutex = XMUTEX (cvar->mutex);
-  if (!lisp_mutex_owned_p (&mutex->mutex))
+  if (! lisp_mutex_owned_p (&mutex->mutex))
     error ("Condition variable's mutex is not held by current thread");
 
   args.cvar = cvar;
-  args.all = !NILP (all);
+  args.all = ! NILP (all);
   with_flushed_stack (condition_notify_callback, &args);
 
   return Qnil;
@@ -563,18 +479,19 @@ static void
 internal_select (void *arg)
 {
   struct select_args *sa = arg;
-  struct thread_state *self = current_thread;
+  struct thread_state *self = current_thread; // current_thread changes!
   sigset_t oldset;
 
   block_interrupt_signal (&oldset);
-  release_global_lock ();
+  sys_mutex_unlock (&global_lock);
   restore_signal_mask (&oldset);
 
   sa->result = (sa->func) (sa->max_fds, sa->rfds, sa->wfds, sa->efds,
 			   sa->timeout, sa->sigmask);
 
   block_interrupt_signal (&oldset);
-  acquire_global_lock (self);
+  sys_mutex_lock (&global_lock);
+  restore_thread (self);
   restore_signal_mask (&oldset);
 }
 
@@ -653,16 +570,14 @@ unmark_main_thread (void)
   main_thread.s.header.size &= ~ARRAY_MARK_FLAG;
 }
 
-
-
 static void
 yield_callback (void *ignore)
 {
-  struct thread_state *self = current_thread;
-
-  release_global_lock ();
+  struct thread_state *self = current_thread; // current_thread changes!
+  sys_mutex_unlock (&global_lock);
   sys_thread_yield ();
-  acquire_global_lock (self);
+  sys_mutex_lock (&global_lock);
+  restore_thread (self);
 }
 
 DEFUN ("thread-yield", Fthread_yield, Sthread_yield, 0, 0, 0,
@@ -677,7 +592,6 @@ static Lisp_Object
 invoke_thread_function (void)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-
   current_thread->result = Ffuncall (1, &current_thread->function);
   return unbind_to (count, Qnil);
 }
@@ -721,7 +635,8 @@ run_thread (void *state)
   if (self->thread_name)
     sys_thread_set_name (self->thread_name);
 
-  acquire_global_lock (self);
+  sys_mutex_lock (&global_lock);
+  restore_thread (self);
 
   /* Put a dummy catcher at top-level so that handlerlist is never NULL.
      This is important since handlerlist->nextfree holds the freelist
@@ -733,7 +648,6 @@ run_thread (void *state)
   handlerlist_sentinel->nextfree = NULL;
   handlerlist_sentinel->next = NULL;
 
-  /* It might be nice to do something with errors here.  */
   internal_condition_case (invoke_thread_function, Qt, record_thread_error);
 
   update_processes_for_thread_death (Fcurrent_thread ());
@@ -769,7 +683,7 @@ run_thread (void *state)
     ;
   *iter = (*iter)->next_thread;
 
-  release_global_lock ();
+  sys_mutex_unlock (&global_lock);
 
   return NULL;
 }
@@ -878,10 +792,9 @@ static void
 thread_signal_callback (void *arg)
 {
   struct thread_state *tstate = arg;
-  struct thread_state *self = current_thread;
-
+  struct thread_state *self = current_thread; // current_thread changes!
   sys_cond_broadcast (tstate->wait_condvar);
-  post_acquire_global_lock (self);
+  restore_thread (self);
 }
 
 DEFUN ("thread-signal", Fthread_signal, Sthread_signal, 3, 3, 0,
@@ -914,7 +827,6 @@ If THREAD is the main thread, just the error message is shown.  */)
       /* Store it into the input event queue.  */
       kbd_buffer_store_event (&event);
     }
-
   else
 #endif
     {
@@ -963,7 +875,7 @@ static void
 thread_join_callback (void *arg)
 {
   struct thread_state *tstate = arg;
-  struct thread_state *self = current_thread;
+  struct thread_state *self = current_thread; // current_thread changes!
   Lisp_Object thread;
 
   XSETTHREAD (thread, tstate);
@@ -971,10 +883,8 @@ thread_join_callback (void *arg)
   self->wait_condvar = &tstate->thread_condvar;
   while (thread_live_p (tstate) && NILP (self->error_symbol))
     sys_cond_wait (self->wait_condvar, &global_lock);
-
-  self->wait_condvar = NULL;
-  self->event_object = Qnil;
-  post_acquire_global_lock (self);
+  clear_thread (self);
+  restore_thread (self);
 }
 
 DEFUN ("thread-join", Fthread_join, Sthread_join, 1, 1, 0,
@@ -999,7 +909,7 @@ is an error for a thread to try to join itself.  */)
   if (thread_live_p (tstate))
     with_flushed_stack (thread_join_callback, tstate);
 
-  if (!NILP (error_symbol))
+  if (! NILP (error_symbol))
     Fsignal (error_symbol, error_data);
 
   return tstate->result;
@@ -1069,9 +979,8 @@ main_thread_p (const void *ptr)
 bool
 in_current_thread (void)
 {
-  if (current_thread == NULL)
-    return false;
-  return sys_thread_equal (sys_thread_self (), current_thread->thread_id);
+  return current_thread == NULL
+    ? false : sys_thread_equal (sys_thread_self (), current_thread->thread_id);
 }
 
 void
