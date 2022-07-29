@@ -2995,19 +2995,19 @@ get_narrowed_len (struct window *w)
 }
 
 ptrdiff_t
-get_narrowed_begv (struct window *w)
+get_narrowed_begv (struct window *w, ptrdiff_t pos)
 {
   int len = get_narrowed_len (w);
   ptrdiff_t begv;
-  begv = max ((window_point (w) / len - 1) * len, BEGV);
+  begv = max ((pos / len - 1) * len, BEGV);
   return begv == BEGV ? 0 : begv;
 }
 
 ptrdiff_t
-get_narrowed_zv (struct window *w)
+get_narrowed_zv (struct window *w, ptrdiff_t pos)
 {
   int len = get_narrowed_len (w);
-  return min ((window_point (w) / len + 1) * len, ZV);
+  return min ((pos / len + 1) * len, ZV);
 }
 
 ptrdiff_t
