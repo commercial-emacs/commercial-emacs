@@ -6885,17 +6885,10 @@ x_flip_and_flush (struct frame *f)
     return;
 
   block_input ();
-#if defined HAVE_XSYNC && !defined USE_GTK
 # ifdef HAVE_XDBE
   if (FRAME_X_NEED_BUFFER_FLIP (f))
-    {
-      show_back_buffer (f);
+    show_back_buffer (f);
 # endif
-      x_sync_update_finish (f);
-# ifdef HAVE_XDBE
-    }
-# endif
-#endif
   x_flush (f);
   unblock_input ();
 }
