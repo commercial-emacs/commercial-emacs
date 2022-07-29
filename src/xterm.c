@@ -2128,7 +2128,8 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 			    &actual_type, &actual_format, &nitems,
 			    &bytes_remaining, &tmp_data));
   had_errors = x_had_errors_p (dpyinfo->display);
-  x_uncatch_errors ();
+  x_uncatch_errors_after_check ();
+
   if (had_errors)
     {
       /* drag window is likely invalid so remove its record.  */
@@ -6541,17 +6542,6 @@ x_set_frame_alpha (struct frame *f)
   unsigned long opac;
   Window parent;
 
-#ifndef USE_XCB
-  unsigned char *data = NULL;
-  Atom actual;
-  int rc, format;
-  unsigned long n, left;
-  unsigned long value;
-#else
-  xcb_get_property_cookie_t opacity_cookie;
-  xcb_get_property_reply_t *opacity_reply;
-#endif
-
   if (dpyinfo->highlight_frame == f)
     alpha = f->alpha[0];
   else
@@ -6592,57 +6582,7 @@ x_set_frame_alpha (struct frame *f)
 	}
     }
 
-  /* return unless necessary */
-  {
-#ifndef USE_XCB
-    rc = XGetWindowProperty (dpy, win, dpyinfo->Xatom_net_wm_window_opacity,
-			     0, 1, False, XA_CARDINAL,
-			     &actual, &format, &n, &left,
-			     &data);
-
-    if (rc == Success && actual != None
-	&& n && format == XA_CARDINAL && data)
-      {
-        value = *(unsigned long *) data;
-
-	/* Xlib sign-extends values greater than 0x7fffffff on 64-bit
-	   machines.  Get the low bits by ourself.  */
-
-	value &= 0xffffffff;
-
-	if (value == opac)
-	  {
-	    x_uncatch_errors ();
-	    XFree (data);
-	    return;
-	  }
-      }
-
-    if (data)
-      XFree (data);
-#else
-    /* Avoid the confusing Xlib sign-extension mess by using XCB
-       instead.  */
-    opacity_cookie
-      = xcb_get_property (dpyinfo->xcb_connection, 0, (xcb_window_t) win,
-			  (xcb_atom_t) dpyinfo->Xatom_net_wm_window_opacity,
-			  XCB_ATOM_CARDINAL, 0, 1);
-    opacity_reply
-      = xcb_get_property_reply (dpyinfo->xcb_connection, opacity_cookie, NULL);
-    if (opacity_reply)
-      {
-	bool opaque_p =
-	  (opacity_reply->format == 32
-	   && opacity_reply->type == XCB_ATOM_CARDINAL
-	   && (xcb_get_property_value_length (opacity_reply) >= 4)
-	   && opac == *(uint32_t *) xcb_get_property_value (opacity_reply));
-	free (opacity_reply);
-	if (opaque_p)
-	  return;
-      }
-#endif
-  }
-
+  x_ignore_errors_for_next_request (dpyinfo);
   XChangeProperty (dpy, win, dpyinfo->Xatom_net_wm_window_opacity,
 		   XA_CARDINAL, 32, PropModeReplace,
 		   (unsigned char *) &opac, 1);
@@ -11788,6 +11728,13 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   /* This shouldn't happen.  */
   if (x_dnd_toplevels)
     x_dnd_free_toplevels (true);
+
+#ifdef USE_GTK
+  /* Prevent GTK+ timeouts from being run, since they can call
+     handle_one_xevent behind our back.  */
+  suppress_xg_select ();
+  record_unwind_protect_void (release_xg_select);
+#endif
 
   /* Set up a meaningless alias.  */
   XSETCAR (x_dnd_selection_alias_cell, QSECONDARY);
