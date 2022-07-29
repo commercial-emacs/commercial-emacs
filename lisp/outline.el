@@ -434,10 +434,7 @@ outline font-lock faces to those of major mode."
                          (goto-char (match-beginning 0))
                          (not (get-text-property (point) 'face))))
             (overlay-put overlay 'face (outline-font-lock-face)))
-          (when (and outline-minor-mode-use-buttons
-                     (or (eq outline-minor-mode-use-buttons t)
-                         (buffer-match-p outline-minor-mode-use-buttons
-                                         (current-buffer))))
+          (when (outline--use-buttons-p)
             (outline--insert-open-button)))
         (goto-char (match-end 0))))))
 
@@ -477,6 +474,13 @@ See the command `outline-mode' for more information on this mode."
     (remove-from-invisibility-spec '(outline . t))
     ;; When turning off outline mode, get rid of any outline hiding.
     (outline-show-all)))
+
+(defun outline--use-buttons-p ()
+  (and outline-minor-mode
+       outline-minor-mode-use-buttons
+       (or (eq outline-minor-mode-use-buttons t)
+           (buffer-match-p outline-minor-mode-use-buttons
+                           (current-buffer)))))
 
 (defvar-local outline-heading-alist ()
   "Alist associating a heading for every possible level.
@@ -982,7 +986,7 @@ If non-nil, EVENT should be a mouse event."
   (interactive (list last-nonmenu-event))
   (when (mouse-event-p event)
     (mouse-set-point event))
-  (when (and outline-minor-mode-use-buttons outline-minor-mode)
+  (when (outline--use-buttons-p)
     (outline--insert-close-button))
   (outline-flag-subtree t))
 
@@ -1042,7 +1046,7 @@ If non-nil, EVENT should be a mouse event."
     (save-excursion
       (goto-char from)
       (setq from (line-beginning-position))))
-  (when outline-minor-mode-use-buttons
+  (when (outline--use-buttons-p)
     (outline-map-region
      (lambda ()
        ;; `outline--cycle-state' will fail if we're in a totally
@@ -1073,7 +1077,7 @@ If non-nil, EVENT should be a mouse event."
   (interactive (list last-nonmenu-event))
   (when (mouse-event-p event)
     (mouse-set-point event))
-  (when (and outline-minor-mode-use-buttons outline-minor-mode)
+  (when (outline--use-buttons-p)
     (outline--insert-open-button))
   (outline-flag-subtree nil))
 
