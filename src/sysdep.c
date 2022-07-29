@@ -1699,7 +1699,7 @@ emacs_sigaction_init (struct sigaction *action, signal_handler_t handler)
   action->sa_flags = emacs_sigaction_flags ();
 }
 
-#ifdef FORWARD_SIGNAL_TO_MAIN_THREAD
+#ifdef HAVE_PTHREAD
 static pthread_t main_thread_id;
 #endif
 
@@ -1718,12 +1718,9 @@ static pthread_t main_thread_id;
 void
 deliver_process_signal (int sig, signal_handler_t handler)
 {
-  /* Preserve errno, to avoid race conditions with signal handlers that
-     might change errno.  Races can occur even in single-threaded hosts.  */
-  int old_errno = errno;
-
-  bool on_main_thread = true;
-#ifdef FORWARD_SIGNAL_TO_MAIN_THREAD
+  int old_errno = errno; /* preserve errno since handlers change it.  */
+  bool handle_here = true;
+#ifdef HAVE_PTHREAD
   if (! pthread_equal (pthread_self (), main_thread_id))
     {
       sigset_t blocked;
@@ -1731,10 +1728,10 @@ deliver_process_signal (int sig, signal_handler_t handler)
       sigaddset (&blocked, sig);
       pthread_sigmask (SIG_BLOCK, &blocked, 0);
       pthread_kill (main_thread_id, sig);
-      on_main_thread = false;
+      handle_here = false;
     }
 #endif
-  if (on_main_thread)
+  if (handle_here)
     handler (sig);
 
   errno = old_errno;
@@ -1755,7 +1752,7 @@ deliver_thread_signal (int sig, signal_handler_t handler)
 {
   int old_errno = errno;
 
-#ifdef FORWARD_SIGNAL_TO_MAIN_THREAD
+#ifdef HAVE_PTHREAD
   if (! pthread_equal (pthread_self (), main_thread_id))
     {
       thread_backtrace_npointers
@@ -1876,7 +1873,7 @@ handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
      too nested calls to mark_object.  No way to survive.  */
   bool fatal = gc_in_progress;
 
-#ifdef FORWARD_SIGNAL_TO_MAIN_THREAD
+#ifdef HAVE_PTHREAD
   if (!fatal && !pthread_equal (pthread_self (), main_thread_id))
     fatal = true;
 #endif
@@ -1971,7 +1968,7 @@ init_signals (void)
 
   sigemptyset (&empty_mask);
 
-#ifdef FORWARD_SIGNAL_TO_MAIN_THREAD
+#ifdef HAVE_PTHREAD
   main_thread_id = pthread_self ();
 #endif
 

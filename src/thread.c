@@ -16,7 +16,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-
 #include <config.h>
 #include <setjmp.h>
 #include "lisp.h"
@@ -63,13 +62,9 @@ static sys_mutex_t global_lock;
 
 extern volatile int interrupt_input_blocked;
 
-
-
 /* m_specpdl is set when the thread is created and cleared when the
    thread dies.  */
 #define thread_live_p(STATE) ((STATE)->m_specpdl != NULL)
-
-
 
 static void
 release_global_lock (void)
@@ -91,7 +86,6 @@ unbind_for_thread_switch (struct thread_state *thr)
   ptrdiff_t distance = thr->m_specpdl_ptr - thr->m_specpdl;
   specpdl_unrewind (thr->m_specpdl_ptr, distance, true);
 }
-
 
 /* You must call this after acquiring the global lock.
    acquire_global_lock does it for you.  */
@@ -143,31 +137,6 @@ acquire_global_lock (struct thread_state *self)
   sys_mutex_lock (&global_lock);
   post_acquire_global_lock (self);
 }
-
-/* This is called from keyboard.c when it detects that SIGINT was
-   delivered to the main thread and interrupted thread_select before
-   the main thread could acquire the lock.  We must acquire the lock
-   to prevent a thread from running without holding the global lock,
-   and to avoid repeated calls to sys_mutex_unlock, which invokes
-   undefined behavior.  */
-void
-maybe_reacquire_global_lock (void)
-{
-  /* SIGINT handler is always run on the main thread, see
-     deliver_process_signal, so reflect that in our thread-tracking
-     variables.  */
-  current_thread = &main_thread.s;
-
-  if (current_thread->not_holding_lock)
-    {
-      struct thread_state *self = current_thread;
-
-      acquire_global_lock (self);
-      current_thread->not_holding_lock = 0;
-    }
-}
-
-
 
 static void
 lisp_mutex_init (lisp_mutex_t *mutex)
@@ -578,8 +547,6 @@ finalize_one_condvar (struct Lisp_CondVar *condvar)
   sys_cond_destroy (&condvar->cond);
 }
 
-
-
 struct select_args
 {
   select_func *func;
@@ -593,14 +560,13 @@ struct select_args
 };
 
 static void
-really_call_select (void *arg)
+internal_select (void *arg)
 {
   struct select_args *sa = arg;
   struct thread_state *self = current_thread;
   sigset_t oldset;
 
   block_interrupt_signal (&oldset);
-  self->not_holding_lock = 1;
   release_global_lock ();
   restore_signal_mask (&oldset);
 
@@ -608,15 +574,7 @@ really_call_select (void *arg)
 			   sa->timeout, sa->sigmask);
 
   block_interrupt_signal (&oldset);
-  /* If we were interrupted by C-g while inside sa->func above, the
-     signal handler could have called maybe_reacquire_global_lock, in
-     which case we are already holding the lock and shouldn't try
-     taking it again, or else we will hang forever.  */
-  if (self->not_holding_lock)
-    {
-      acquire_global_lock (self);
-      self->not_holding_lock = 0;
-    }
+  acquire_global_lock (self);
   restore_signal_mask (&oldset);
 }
 
@@ -634,11 +592,9 @@ thread_select (select_func *func, int max_fds, fd_set *rfds,
   sa.efds = efds;
   sa.timeout = timeout;
   sa.sigmask = sigmask;
-  with_flushed_stack (really_call_select, &sa);
+  with_flushed_stack (internal_select, &sa);
   return sa.result;
 }
-
-
 
 static void
 mark_one_thread (struct thread_state *thread)

@@ -168,13 +168,6 @@ struct thread_state
   /* Thread's name in the locale encoding.  */
   char *thread_name;
 
-  /* This thread might have released the global lock.  If so, this is
-     non-zero.  When a thread runs outside thread_select with this
-     flag non-zero, it means it has been interrupted by SIGINT while
-     in thread_select, and didn't have a chance of acquiring the lock.
-     It must do so ASAP.  */
-  int not_holding_lock;
-
   /* Threads are kept on a linked list.  */
   struct thread_state *next_thread;
 
@@ -286,7 +279,6 @@ extern struct thread_state *current_thread;
 extern void finalize_one_thread (struct thread_state *state);
 extern void finalize_one_mutex (struct Lisp_Mutex *);
 extern void finalize_one_condvar (struct Lisp_CondVar *);
-extern void maybe_reacquire_global_lock (void);
 
 extern void init_threads (void);
 extern void syms_of_threads (void);

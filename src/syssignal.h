@@ -34,9 +34,6 @@ extern void unblock_tty_out_signal (sigset_t const *);
 
 #ifdef HAVE_PTHREAD
 #include <pthread.h>
-/* If defined, asynchronous signals delivered to a non-main thread are
-   forwarded to the main thread.  */
-#define FORWARD_SIGNAL_TO_MAIN_THREAD
 #endif
 
 /* On Cygwin as of 2015-06-22 SIGEV_SIGNAL is defined as an enum

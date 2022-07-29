@@ -11293,7 +11293,7 @@ handle_interrupt (bool in_signal_handler)
   cancel_echoing ();
 
   /* XXX This code needs to be revised for multi-tty support.  */
-  if (!NILP (Vquit_flag) && get_named_terminal (DEV_TTY))
+  if (! NILP (Vquit_flag) && get_named_terminal (DEV_TTY))
     {
       if (! in_signal_handler)
 	{
@@ -11336,7 +11336,7 @@ handle_interrupt (bool in_signal_handler)
 
       /* It doesn't work to autosave while GC is in progress;
 	 the code used for auto-saving doesn't cope with the mark bit.  */
-      if (!gc_in_progress)
+      if (! gc_in_progress)
 	{
 	  write_stdout ("Auto-save? (y or n) ");
 	  c = read_stdin ();
@@ -11394,23 +11394,6 @@ handle_interrupt (bool in_signal_handler)
     }
 
   pthread_sigmask (SIG_SETMASK, &empty_mask, 0);
-
-/* TODO: The longjmp in this call throws the NS event loop integration off,
-         and it seems to do fine without this.  Probably some attention
-	 needs to be paid to the setting of waiting_for_input in
-         wait_reading_process_output() under HAVE_NS because of the call
-         to ns_select there (needed because otherwise events aren't picked up
-         outside of polling since we don't get SIGIO like X and we don't have a
-         separate event loop thread like W32.  */
-#ifndef HAVE_NS
-#ifdef THREADS_ENABLED
-  /* If we were called from a signal handler, we must be in the main
-     thread, see deliver_process_signal.  So we must make sure the
-     main thread holds the global lock.  */
-  if (in_signal_handler)
-    maybe_reacquire_global_lock ();
-#endif
-#endif
 }
 
 /* Handle a C-g by making read_char return C-g.  */
