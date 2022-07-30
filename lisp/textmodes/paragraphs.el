@@ -506,29 +506,31 @@ It is advised to use `add-function' on this to add more filters,
 for example, `(looking-back (rx (or \"e.g.\" \"i.e.\") \" \") 5)'
 with a set of predefined abbreviations to skip from adding two spaces.")
 
-(defun repunctuate-sentences (&optional no-query start end)
-  "Put two spaces at the end of sentences from point to the end of buffer.
-It works using `query-replace-regexp'.  In Transient Mark mode,
-if the mark is active, operate on the contents of the region.
-Second and third arg START and END specify the region to operate on.
-If optional argument NO-QUERY is non-nil, make changes without asking
-for confirmation.  You can use `repunctuate-sentences-filter' to add
-filters to skip occurrences of spaces that don't need to be replaced."
-  (interactive (list nil
-                     (if (use-region-p) (region-beginning))
-                     (if (use-region-p) (region-end))))
-  (let ((regexp "\\([]\"')]?\\)\\([.?!]\\)\\([]\"')]?\\) +")
-        (to-string "\\1\\2\\3  "))
+(defun repunctuate-sentences (&optional no-query)
+  "Put two spaces at the end of sentences.
+
+In Transient Mark mode, if the mark is active, operate on the
+contents of the region.  If optional argument NO-QUERY is
+non-nil, make changes without asking for confirmation.
+
+Use `repunctuate-sentences-filter' to add filters to skip
+occurrences of spaces that don't need to be replaced."
+  (interactive "P")
+  (let ((beg (if (use-region-p) (region-beginning) (point-min)))
+        (end (if (use-region-p) (region-end) (point-max)))
+        (case-fold-search nil)
+        (regexp "\\([]\"')]?\\)\\([.?!]\\)\\([]\"')]?\\) +\\([\"')[:upper:]]\\)")
+        (to-string "\\1\\2\\3  \\4"))
     (if no-query
         (progn
-          (when start (goto-char start))
+          (goto-char beg)
           (while (re-search-forward regexp end t)
             (replace-match to-string)))
       (unwind-protect
           (progn
             (add-function :after-while isearch-filter-predicate
                           repunctuate-sentences-filter)
-            (query-replace-regexp regexp to-string nil start end))
+            (query-replace-regexp regexp to-string nil beg end))
         (remove-function isearch-filter-predicate
                          repunctuate-sentences-filter)))))
 

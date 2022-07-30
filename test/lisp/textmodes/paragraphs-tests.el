@@ -101,10 +101,11 @@
 
 (ert-deftest paragraphs-tests-repunctuate-sentences ()
   (with-temp-buffer
-    (insert "Just. Some. Sentences.")
+    (insert "Just. Some. Sentences. Yet another, e.g. this one.")
     (goto-char (point-min))
     (repunctuate-sentences t)
-    (should (equal (buffer-string) "Just.  Some.  Sentences."))))
+    (should (equal (buffer-string)
+                   "Just.  Some.  Sentences.  Yet another, e.g. this one."))))
 
 (ert-deftest paragraphs-tests-backward-sentence ()
   (with-temp-buffer
