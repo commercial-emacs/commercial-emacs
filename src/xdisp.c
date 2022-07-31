@@ -778,7 +778,6 @@ static int display_string (const char *, Lisp_Object, Lisp_Object,
                            ptrdiff_t, ptrdiff_t, struct it *, int, int, int,
 			   int);
 static void compute_line_metrics (struct it *);
-static void run_redisplay_end_trigger_hook (struct it *);
 static bool get_overlay_strings (struct it *, ptrdiff_t);
 static bool get_overlay_strings_1 (struct it *, ptrdiff_t, bool);
 static void next_overlay_string (struct it *);
@@ -2788,17 +2787,6 @@ init_iterator (struct it *it, struct window *w,
 
   /* Are multibyte characters enabled in current_buffer?  */
   it->multibyte_p = !NILP (BVAR (current_buffer, enable_multibyte_characters));
-
-  /* Get the position at which the redisplay_end_trigger hook should
-     be run, if it is to be run at all.  */
-  if (MARKERP (w->redisplay_end_trigger)
-      && XMARKER (w->redisplay_end_trigger)->buffer != 0)
-    it->redisplay_end_trigger_charpos
-      = marker_position (w->redisplay_end_trigger);
-  else if (FIXNUMP (w->redisplay_end_trigger))
-    it->redisplay_end_trigger_charpos
-      = clip_to_bounds (PTRDIFF_MIN, XFIXNUM (w->redisplay_end_trigger),
-			PTRDIFF_MAX);
 
   it->tab_width = SANE_TAB_WIDTH (current_buffer);
 
@@ -8631,29 +8619,6 @@ get_element_from_buffer (struct it *it)
 
   eassert (!success_p || it->what != IT_CHARACTER || it->len > 0);
   return success_p;
-}
-
-
-/* Run the redisplay end trigger hook for IT.  */
-
-static void
-run_redisplay_end_trigger_hook (struct it *it)
-{
-  /* IT->glyph_row should be non-null, i.e. we should be actually
-     displaying something, or otherwise we should not run the hook.  */
-  eassert (it->glyph_row);
-
-  ptrdiff_t charpos = it->redisplay_end_trigger_charpos;
-  it->redisplay_end_trigger_charpos = 0;
-
-  /* Since we are *trying* to run these functions, don't try to run
-     them again, even if they get an error.  */
-  wset_redisplay_end_trigger (it->w, Qnil);
-  CALLN (Frun_hook_with_args, Qredisplay_end_trigger_functions, it->window,
-	 make_fixnum (charpos));
-
-  /* Notice if it changed the face of the character we are on.  */
-  handle_face_prop (it);
 }
 
 
@@ -33356,7 +33321,6 @@ be let-bound around code that needs to disable messages temporarily. */);
   DEFSYM (Qoverriding_terminal_local_map, "overriding-terminal-local-map");
   DEFSYM (Qoverriding_local_map, "overriding-local-map");
   DEFSYM (Qwindow_scroll_functions, "window-scroll-functions");
-  DEFSYM (Qredisplay_end_trigger_functions, "redisplay-end-trigger-functions");
   DEFSYM (Qinhibit_point_motion_hooks, "inhibit-point-motion-hooks");
   DEFSYM (Qeval, "eval");
   DEFSYM (QCdata, ":data");
@@ -33767,12 +33731,6 @@ Warning: Do not use this feature to alter the way the window
 is scrolled.  It is not designed for that, and such use probably won't
 work.  */);
   Vwindow_scroll_functions = Qnil;
-
-  DEFVAR_LISP ("redisplay-end-trigger-functions", Vredisplay_end_trigger_functions,
-    doc: /* Functions called when redisplay of a window reaches the end trigger.
-Each function is called with two arguments, the window and the end trigger value.
-See `set-window-redisplay-end-trigger'.  */);
-  Vredisplay_end_trigger_functions = Qnil;
 
   DEFVAR_LISP ("mouse-autoselect-window", Vmouse_autoselect_window,
      doc: /* Non-nil means autoselect window with mouse pointer.
