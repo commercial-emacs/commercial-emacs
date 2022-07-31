@@ -8563,12 +8563,6 @@ get_element_from_buffer (struct it *it)
 	 previously seen overlays is no longer valid.  */
       it->ignore_overlay_strings_at_pos_p = false;
 
-      /* Maybe run the redisplay end trigger hook.  */
-      if (it->redisplay_end_trigger_charpos
-	  && it->glyph_row
-	  && IT_CHARPOS (*it) >= it->redisplay_end_trigger_charpos)
-	run_redisplay_end_trigger_hook (it);
-
       stop = it->bidi_it.scan_dir < 0 ? -1 : it->end_charpos;
       if (CHAR_COMPOSED_P (it, IT_CHARPOS (*it), IT_BYTEPOS (*it), stop)
 	  && get_element_from_composition (it))
