@@ -341,11 +341,6 @@ call_debugger (Lisp_Object arg)
      then make sure debugger code can still use match data.  */
   specbind (Qinhibit_changing_match_data, Qnil);
 
-#if 0 /* Binding this prevents execution of Lisp code during
-	 redisplay, which necessarily leads to display problems.  */
-  specbind (Qinhibit_eval_during_redisplay, Qt);
-#endif
-
   val = apply1 (Vdebugger, arg);
 
   /* Interrupting redisplay and resuming it later is not safe under
@@ -3412,77 +3407,75 @@ specbind (Lisp_Object symbol, Lisp_Object value)
   CHECK_SYMBOL (symbol);
   sym = XSYMBOL (symbol);
 
- start:
+  /* First, qualify what kind of binding.  */
+ aliased:
   switch (sym->u.s.redirect)
     {
     case SYMBOL_VARALIAS:
       sym = indirect_variable (sym);
       XSETSYMBOL (symbol, sym);
-      goto start;
+      goto aliased;
+      break;
     case SYMBOL_PLAINVAL:
-      /* The most common case is that of a non-constant symbol with a
-	 trivial value.  Make that as fast as we can.  */
       specpdl_ptr->let.kind = SPECPDL_LET;
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.old_value = SYMBOL_VAL (sym);
       break;
     case SYMBOL_LOCALIZED:
     case SYMBOL_FORWARDED:
-      {
-	Lisp_Object ovalue = find_symbol_value (symbol);
-	specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
-	specpdl_ptr->let.symbol = symbol;
-	specpdl_ptr->let.old_value = ovalue;
-	specpdl_ptr->let.where = Fcurrent_buffer ();
+      specpdl_ptr->let.old_value = find_symbol_value (symbol);
+      specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
+      specpdl_ptr->let.symbol = symbol;
+      specpdl_ptr->let.where = Fcurrent_buffer ();
 
-	eassert (sym->u.s.redirect != SYMBOL_LOCALIZED
-		 || (EQ (SYMBOL_BLV (sym)->where, Fcurrent_buffer ())));
+      eassert (sym->u.s.redirect != SYMBOL_LOCALIZED
+	       || (EQ (SYMBOL_BLV (sym)->where, Fcurrent_buffer ())));
 
-	if (sym->u.s.redirect == SYMBOL_LOCALIZED)
-	  {
-	    if (! blv_found (SYMBOL_BLV (sym)))
-	      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
-	  }
-	else if (BUFFER_OBJFWDP (SYMBOL_FWD (sym)))
-	  {
-	    /* If SYMBOL is a per-buffer variable which doesn't have a
-	       buffer-local value here, make the `let' change the global
-	       value by changing the value of SYMBOL in all buffers not
-	       having their own value.  This is consistent with what
-	       happens with other buffer-local variables.  */
-	    if (NILP (Flocal_variable_p (symbol, Qnil)))
-	      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
-	  }
-	else
-	  specpdl_ptr->let.kind = SPECPDL_LET;
-	break;
-      }
-    default: emacs_abort ();
-    }
-  grow_specpdl ();
-
-  union specbinding *bind = specpdl_ptr - 1;
-  switch (sym->u.s.redirect)
-    {
-    case SYMBOL_PLAINVAL:
-      if (!sym->u.s.trapped_write)
-	SET_SYMBOL_VAL (sym, value);
-      else
-        set_internal (specpdl_symbol (bind), value, Qnil, SET_INTERNAL_BIND);
-      break;
-    case SYMBOL_FORWARDED:
-      if (BUFFER_OBJFWDP (SYMBOL_FWD (sym))
-	  && specpdl_kind (bind) == SPECPDL_LET_DEFAULT)
+      if (sym->u.s.redirect == SYMBOL_LOCALIZED)
 	{
-          set_default_internal (specpdl_symbol (bind), value, SET_INTERNAL_BIND);
-	  return;
+	  if (! blv_found (SYMBOL_BLV (sym)))
+	    specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
 	}
-      FALLTHROUGH;
-    case SYMBOL_LOCALIZED:
-      set_internal (specpdl_symbol (bind), value, Qnil, SET_INTERNAL_BIND);
+      else if (BUFFER_OBJFWDP (SYMBOL_FWD (sym)))
+	{
+	  /* If SYMBOL is a slot variable (see buffer.h), change its
+	     global default value, thus keeping consistent with
+	     non-slot, buffer-local behavior.  */
+	  if (NILP (Flocal_variable_p (symbol, Qnil)))
+	    specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
+	}
+      else
+	specpdl_ptr->let.kind = SPECPDL_LET;
       break;
     default:
       emacs_abort ();
+      break;
+    }
+
+  /* Second, actually set SYMBOL to the new value.  */
+  grow_specpdl ();
+  switch (sym->u.s.redirect)
+    {
+    case SYMBOL_PLAINVAL:
+      if (! sym->u.s.trapped_write)
+	SET_SYMBOL_VAL (sym, value);
+      else
+        set_internal (specpdl_symbol (specpdl_ptr - 1), value, Qnil, SET_INTERNAL_BIND);
+      break;
+    case SYMBOL_FORWARDED:
+      if (BUFFER_OBJFWDP (SYMBOL_FWD (sym))
+	  && specpdl_kind (specpdl_ptr - 1) == SPECPDL_LET_DEFAULT)
+	{
+          set_default_internal (specpdl_symbol (specpdl_ptr - 1), value, SET_INTERNAL_BIND);
+	  break;
+	}
+      FALLTHROUGH;
+    case SYMBOL_LOCALIZED:
+      set_internal (specpdl_symbol (specpdl_ptr - 1), value, Qnil, SET_INTERNAL_BIND);
+      break;
+    default:
+      emacs_abort ();
+      break;
     }
 }
 
@@ -3880,22 +3873,22 @@ or a lambda expression for macro calls.  */)
   return Fnreverse (list);
 }
 
-/* For backtrace-eval, we want to temporarily unwind the last few elements of
-   the specpdl stack, and then rewind them.  We store the pre-unwind values
-   directly in the pre-existing specpdl elements (i.e. we swap the current
-   value and the old value stored in the specpdl), kind of like the inplace
-   pointer-reversal trick.  As it turns out, the rewind does the same as the
-   unwind, except it starts from the other end of the specpdl stack, so we use
-   the same function for both unwind and rewind.
-   This same code is used when switching threads, except in that case
-   we unwind/rewind the whole specpdl of the threads.  */
+/* For backtrace-eval and thread switches, we unwind then rewind the
+   last few elements of specpdl.
+
+   The same function is used in both directions with a positive
+   DISTANCE connoting unwind, and a negative DISTANCE connoting rewind.
+
+   Values to be rewound are stored directly in existing specpdl
+   elements, much like the mark-and-sweep pointer reversal trick.  */
 void
-specpdl_unrewind (union specbinding *pdl, int distance, bool vars_only)
+specpdl_unwind (union specbinding *pdl, int distance, bool vars_only)
 {
   union specbinding *tmp = pdl;
   int step = -1;
   if (distance < 0)
-    { /* It's a rewind rather than unwind.  */
+    {
+      /* Rewind.  */
       tmp += distance - 1;
       step = 1;
       distance = -distance;
@@ -3988,9 +3981,17 @@ specpdl_unrewind (union specbinding *pdl, int distance, bool vars_only)
 }
 
 static void
-backtrace_eval_unrewind (int distance)
+backtrace_eval_rewind (int distance)
 {
-  specpdl_unrewind (specpdl_ptr, distance, false);
+  eassert (distance >= 0);
+  specpdl_unwind (specpdl_ptr, -distance, false);
+}
+
+static void
+backtrace_eval_unwind (int distance)
+{
+  eassert (distance >= 0);
+  specpdl_unwind (specpdl_ptr, distance, false);
 }
 
 DEFUN ("backtrace-eval", Fbacktrace_eval, Sbacktrace_eval, 2, 3, NULL,
@@ -4006,8 +4007,8 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
   if (!backtrace_p (pdl))
     error ("Activation frame not found!");
 
-  backtrace_eval_unrewind (distance);
-  record_unwind_protect_int (backtrace_eval_unrewind, -distance);
+  backtrace_eval_unwind (distance);
+  record_unwind_protect_int (backtrace_eval_rewind, distance);
 
   /* Use eval_sub rather than Feval since the main motivation behind
      backtrace-eval is to be able to get/set the value of lexical variables
@@ -4027,9 +4028,9 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
   Lisp_Object result = Qnil;
   eassert (distance >= 0);
 
-  if (!backtrace_p (prevframe))
+  if (! backtrace_p (prevframe))
     error ("Activation frame not found!");
-  if (!backtrace_p (frame))
+  if (! backtrace_p (frame))
     error ("Activation frame not found!");
 
   /* The specpdl entries normally contain the symbol being bound along with its
@@ -4037,11 +4038,11 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
      available in one of two places: either in the current value of the
      variable (if it hasn't been rebound yet) or in the `old_value' slot of the
      next specpdl entry for it.
-     `backtrace_eval_unrewind' happens to swap the role of `old_value'
+     `backtrace_eval_unwind' happens to swap the role of `old_value'
      and "new value", so we abuse it here, to fetch the new value.
      It's ugly (we'd rather not modify global data) and a bit inefficient,
      but it does the job for now.  */
-  backtrace_eval_unrewind (distance);
+  backtrace_eval_unwind (distance);
 
   /* Grab values.  */
   {
@@ -4079,7 +4080,7 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
   }
 
   /* Restore values from specpdl to original place.  */
-  backtrace_eval_unrewind (-distance);
+  backtrace_eval_rewind (distance);
 
   return result;
 }

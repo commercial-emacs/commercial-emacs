@@ -67,20 +67,6 @@ extern volatile int interrupt_input_blocked;
 #define thread_live_p(STATE) ((STATE)->m_specpdl != NULL)
 
 static void
-rebind_for_thread_switch (void)
-{
-  ptrdiff_t distance = current_thread->m_specpdl_ptr - current_thread->m_specpdl;
-  specpdl_unrewind (specpdl_ptr, -distance, true);
-}
-
-static void
-unbind_for_thread_switch (struct thread_state *thr)
-{
-  ptrdiff_t distance = thr->m_specpdl_ptr - thr->m_specpdl;
-  specpdl_unrewind (thr->m_specpdl_ptr, distance, true);
-}
-
-static void
 clear_thread (void *arg)
 {
   struct thread_state *tstate = arg;
@@ -96,8 +82,16 @@ restore_thread (struct thread_state *self)
   if (prev_thread != current_thread)
     {
       if (prev_thread != NULL)
-	unbind_for_thread_switch (prev_thread);
-      rebind_for_thread_switch ();
+	{
+	  /* analogous backtrace_eval_unwind */
+	  eassert (0 <= prev_thread->m_specpdl_ptr - prev_thread->m_specpdl);
+	  specpdl_unwind (prev_thread->m_specpdl_ptr,
+			  prev_thread->m_specpdl_ptr - prev_thread->m_specpdl,
+			  true);
+	}
+      /* analogous backtrace_eval_rewind */
+      eassert (0 >= specpdl - specpdl_ptr);
+      specpdl_unwind (specpdl_ptr, specpdl - specpdl_ptr, true);
 
       /* Thread-private buffer variables require resetting, but
 	 set_buffer_internal(current_buffer) would be a no-op.  */
