@@ -2558,6 +2558,7 @@ values.  For compatibility, (cl-values A B C) is a synonym for (list A B C).
       (push x macro-declarations-alist)
       (push x defun-declarations-alist)))
 
+;;;###cl-autoload
 (defun cl--optimize (f _args &rest qualities)
   "Serve `cl-optimize' in function declarations.
 Example:
@@ -3334,6 +3335,7 @@ the form NAME which is a shorthand for (NAME NAME)."
               :around #'cl--pcase-mutually-exclusive-p))
 
 
+;;;###cl-autoload
 (defun cl-struct-sequence-type (struct-type)
   "Return the sequence used to build STRUCT-TYPE.
 STRUCT-TYPE is a symbol naming a struct type.  Return values are
@@ -3373,6 +3375,7 @@ slots skipped by :initial-offset may appear in the list."
 
 (define-error 'cl-struct-unknown-slot "struct has no slot")
 
+;;;###cl-autoload
 (defun cl-struct-slot-offset (struct-type slot-name)
   "Return the offset of slot SLOT-NAME in STRUCT-TYPE.
 The returned zero-based slot index is relative to the start of
