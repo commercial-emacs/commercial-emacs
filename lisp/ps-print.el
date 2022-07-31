@@ -1450,11 +1450,7 @@ Please send all bug fixes and enhancements to
 
 ;;; Code:
 
-
 (require 'lpr)
-
-;; Load Emacs definitions
-(require 'ps-def)
 
 ;; autoloads for secondary file
 (require 'ps-print-loaddefs)
@@ -4510,7 +4506,7 @@ page-height == ((floor print-height ((th + ls) * zh)) * ((th + ls) * zh)) - th
 
 
 (defun ps-print-preprint-region (prefix)
-  (or (ps-mark-active-p)
+  (or mark-active
       (error "The mark is not set now"))
   (list (point) (mark) (ps-print-preprint prefix)))
 
@@ -4733,6 +4729,10 @@ page-height == ((floor print-height ((th + ls) * zh)) * ((th + ls) * zh)) - th
 (defun ps-output-boolean (name bool)
   (ps-output (format "/%s %s def\n" name (if bool "true" "false"))))
 
+;; Limit color RGB values to three decimals to cut down some on the
+;; size of the PostScript output.
+(defvar ps-color-format "%0.3f %0.3f %0.3f")
+(defvar ps-float-format "%0.3f ")
 
 (defun ps-output-frame-properties (name alist)
   (ps-output "/" name " ["
@@ -5749,7 +5749,7 @@ XSTART YSTART are the relative position for the first page in a sheet.")
 	;; Set the color scale.  We do it here instead of in the defvar so
 	;; that ps-print can be dumped into emacs.  This expression can't be
 	;; evaluated at dump-time because X isn't initialized.
-	ps-color-p            (and ps-print-color-p (ps-color-device))
+        ps-color-p            (and ps-print-color-p (display-color-p))
 	ps-print-color-scale  (if ps-color-p
 				  (float (car (color-values "white")))
 				1.0)
@@ -5762,7 +5762,7 @@ XSTART YSTART are the relative position for the first page in a sheet.")
 				((eq ps-default-bg 'frame-parameter)
 				 (frame-parameter nil 'background-color))
 				((eq ps-default-bg t)
-				 (ps-face-background-name 'default))
+                                 (face-background 'default nil t))
 				(t
 				 ps-default-bg))
 			       "unspecified-bg"
@@ -5776,7 +5776,7 @@ XSTART YSTART are the relative position for the first page in a sheet.")
 				((eq ps-default-fg 'frame-parameter)
 				 (frame-parameter nil 'foreground-color))
 				((eq ps-default-fg t)
-				 (ps-face-foreground-name 'default))
+                                 (face-foreground 'default nil t))
 				(t
 				 ps-default-fg))
 			       "unspecified-fg"
@@ -6312,6 +6312,22 @@ If FACE is not a valid face name, use default face."
       (setq ps-print-face-alist (cons face-map ps-print-face-alist)))
     face-map))
 
+(defun ps-face-bold-p (face)
+  (or (face-bold-p face)
+      (memq face ps-bold-faces)))
+
+(defun ps-face-italic-p (face)
+  (or (face-italic-p face)
+      (memq face ps-italic-faces)))
+
+(defun ps-face-strikeout-p (face)
+  (eq (face-attribute face :strike-through) t))
+
+(defun ps-face-overline-p (face)
+  (eq (face-attribute face :overline) t))
+
+(defun ps-face-box-p (face)
+  (not (memq (face-attribute face :box) '(nil unspecified))))
 
 (defun ps-screen-to-bit-face (face)
   (cons face
@@ -6321,9 +6337,41 @@ If FACE is not a valid face name, use default face."
 			(if (ps-face-strikeout-p face)  8 0)  ; strikeout
 			(if (ps-face-overline-p face)  16 0)  ; overline
 			(if (ps-face-box-p face)       64 0)) ; box
-		(ps-face-foreground-name face)
-		(ps-face-background-name face))))
+                (face-foreground face nil t)
+                (face-background face nil t))))
 
+
+(defun ps-generate-postscript-with-faces1 (from to)
+  ;; Generate some PostScript.
+  (let ((face 'default)
+        (position to)
+        (property-change from)
+        (overlay-change from)
+        before-string after-string)
+    (while (< from to)
+      (and (< property-change to)       ; Don't search for property change
+                                        ; unless previous search succeeded.
+           (setq property-change (next-property-change from nil to)))
+      (and (< overlay-change to)        ; Don't search for overlay change
+                                        ; unless previous search succeeded.
+           (setq overlay-change (min (next-overlay-change from)
+                                     to)))
+      (setq position (min property-change overlay-change)
+            before-string nil
+            after-string nil)
+      (setq face
+            (cond ((invisible-p from)
+                   'emacs--invisible--face)
+                  ((get-char-property from 'face))
+                  (t 'default)))
+      ;; Plot up to this record.
+      (and before-string
+           (ps-plot-string before-string))
+      (ps-plot-with-face from position face)
+      (and after-string
+           (ps-plot-string after-string))
+      (setq from position))
+    (ps-plot-with-face from to face)))
 
 (declare-function jit-lock-fontify-now "jit-lock" (start end))
 (declare-function lazy-lock-fontify-region "lazy-lock" (beg end))
