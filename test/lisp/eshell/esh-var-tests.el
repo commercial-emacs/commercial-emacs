@@ -158,6 +158,7 @@
 
 (ert-deftest esh-var-test/interp-cmd-external-indices ()
   "Interpolate command result from external command with index"
+  :tags (when (getenv "CI") '(:unstable))
   (skip-unless (executable-find "echo"))
   (with-temp-eshell
    (eshell-command-result-p "echo ${*echo \"hi\nbye\"}[1]"
