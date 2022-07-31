@@ -82,16 +82,10 @@ restore_thread (struct thread_state *self)
   if (prev_thread != current_thread)
     {
       if (prev_thread != NULL)
-	{
-	  /* analogous backtrace_eval_unwind */
-	  eassert (0 <= prev_thread->m_specpdl_ptr - prev_thread->m_specpdl);
-	  specpdl_unwind (prev_thread->m_specpdl_ptr,
-			  prev_thread->m_specpdl_ptr - prev_thread->m_specpdl,
-			  true);
-	}
-      /* analogous backtrace_eval_rewind */
-      eassert (0 >= specpdl - specpdl_ptr);
-      specpdl_unwind (specpdl_ptr, specpdl - specpdl_ptr, true);
+	specpdl_unwind (prev_thread->m_specpdl_ptr,
+			prev_thread->m_specpdl_ptr - prev_thread->m_specpdl,
+			true);
+      specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, true);
 
       /* Thread-private buffer variables require resetting, but
 	 set_buffer_internal(current_buffer) would be a no-op.  */

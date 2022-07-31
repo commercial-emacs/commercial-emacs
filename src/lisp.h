@@ -4251,7 +4251,8 @@ extern void set_unwind_protect (specpdl_ref, void (*) (Lisp_Object),
 				Lisp_Object);
 extern void set_unwind_protect_ptr (specpdl_ref, void (*) (void *), void *);
 extern Lisp_Object unbind_to (specpdl_ref, Lisp_Object);
-void specpdl_unwind (union specbinding *pdl, int distance, bool vars_only);
+extern void specpdl_unwind (union specbinding *pdl, int distance, bool vars_only);
+extern void specpdl_rewind (union specbinding *pdl, int distance, bool vars_only);
 extern AVOID error (const char *, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
 extern AVOID verror (const char *, va_list)
   ATTRIBUTE_FORMAT_PRINTF (1, 0);

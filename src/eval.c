@@ -3876,25 +3876,14 @@ or a lambda expression for macro calls.  */)
 /* For backtrace-eval and thread switches, we unwind then rewind the
    last few elements of specpdl.
 
-   The same function is used in both directions with a positive
-   DISTANCE connoting unwind, and a negative DISTANCE connoting rewind.
-
    Values to be rewound are stored directly in existing specpdl
    elements, much like the mark-and-sweep pointer reversal trick.  */
-void
-specpdl_unwind (union specbinding *pdl, int distance, bool vars_only)
-{
-  union specbinding *tmp = pdl;
-  int step = -1;
-  if (distance < 0)
-    {
-      /* Rewind.  */
-      tmp += distance - 1;
-      step = 1;
-      distance = -distance;
-    }
 
-  for (; distance > 0; distance--)
+static void
+specpdl_internal_step (union specbinding *pdl, int step, int distance, bool vars_only)
+{
+  eassert (distance >= 0);
+  for (union specbinding *tmp = pdl; distance > 0; distance--)
     {
       tmp += step;
       switch (tmp->kind)
@@ -3980,17 +3969,25 @@ specpdl_unwind (union specbinding *pdl, int distance, bool vars_only)
     }
 }
 
+void specpdl_rewind (union specbinding *pdl, int distance, bool vars_only)
+{
+  specpdl_internal_step (pdl - distance - 1, 1, distance, vars_only);
+}
+
+void specpdl_unwind (union specbinding *pdl, int distance, bool vars_only)
+{
+  specpdl_internal_step (pdl, -1, distance, vars_only);
+}
+
 static void
 backtrace_eval_rewind (int distance)
 {
-  eassert (distance >= 0);
-  specpdl_unwind (specpdl_ptr, -distance, false);
+  specpdl_rewind (specpdl_ptr, distance, false);
 }
 
 static void
 backtrace_eval_unwind (int distance)
 {
-  eassert (distance >= 0);
   specpdl_unwind (specpdl_ptr, distance, false);
 }
 
