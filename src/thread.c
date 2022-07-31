@@ -155,7 +155,6 @@ lisp_mutex_lock_for_thread (lisp_mutex_t *mutex, struct thread_state *locker,
   else
     {
       locker->wait_condvar = &mutex->condition;
-      /* If NEW_COUNT is zero, let errors disrupt? */
       while (mutex->owner != NULL && NILP (locker->error_symbol))
 	sys_cond_wait (&mutex->condition, &global_lock);
       restore_thread (locker);
@@ -170,9 +169,8 @@ lisp_mutex_lock (lisp_mutex_t *mutex, int new_count)
   lisp_mutex_lock_for_thread (mutex, current_thread, new_count);
 }
 
-/* Decrement MUTEX's lock count.  If the count becomes zero, meaning
-   the mutex is unlocked, broadcast to threads waiting to lock MUTEX
-   and return 1.  Otherwise return 0.  */
+/* Decrement MUTEX's lock count.  If the count becomes zero, broadcast
+   to threads waiting to lock MUTEX.  */
 static void
 lisp_mutex_unlock (lisp_mutex_t *mutex)
 {
@@ -232,12 +230,10 @@ mutex_lock_callback (void *arg)
 
 DEFUN ("mutex-lock", Fmutex_lock, Smutex_lock, 1, 1, 0,
        doc: /* Acquire a mutex.
-If the current thread already owns MUTEX, increment the count and
-return.
-Otherwise, if no thread owns MUTEX, make the current thread own it.
-Otherwise, block until MUTEX is available, or until the current thread
-is signaled using `thread-signal'.
-Note that calls to `mutex-lock' and `mutex-unlock' must be paired.  */)
+If the current thread already owns MUTEX, increment the lock count and
+return.  Otherwise, block until MUTEX is available, or until the
+current thread is signaled using `thread-signal'.  Calls to
+`mutex-lock' and `mutex-unlock' must be paired.  */)
   (Lisp_Object mutex)
 {
   struct Lisp_Mutex *lmutex;
@@ -261,9 +257,9 @@ mutex_unlock_callback (void *arg)
 
 DEFUN ("mutex-unlock", Fmutex_unlock, Smutex_unlock, 1, 1, 0,
        doc: /* Release the mutex.
-If this thread does not own MUTEX, signal an error.
-Otherwise, decrement the mutex's count.  If the count is zero,
-release MUTEX.   */)
+If this thread does not own MUTEX, signal an error.  Otherwise,
+decrement the mutex's count.  If the count becomes zero, release
+MUTEX.  */)
   (Lisp_Object mutex)
 {
   struct Lisp_Mutex *lmutex;
@@ -303,8 +299,8 @@ DEFUN ("make-condition-variable",
 A condition variable provides a way for a thread to sleep while
 waiting for a state change.
 
-MUTEX is the mutex associated with this condition variable.
-NAME, if given, is the name of this condition variable.  The name is
+MUTEX is the mutex associated with this condition variable.  NAME, if
+given, is the name of this condition variable.  The name is
 informational only.  */)
   (Lisp_Object mutex, Lisp_Object name)
 {
@@ -351,13 +347,12 @@ DEFUN ("condition-wait", Fcondition_wait, Scondition_wait, 1, 1, 0,
        doc: /* Wait for the condition variable COND to be notified.
 COND is the condition variable to wait on.
 
-The mutex associated with COND must be held when this is called.
-It is an error if it is not held.
+The mutex associated with COND must be held when this is called.  It
+is an error if it is not held.
 
-This releases the mutex and waits for COND to be notified or for
-this thread to be signaled with `thread-signal'.  When
-`condition-wait' returns, COND's mutex will again be locked by
-this thread.  */)
+This releases the mutex and waits for COND to be notified or for this
+thread to be signaled with `thread-signal'.  When `condition-wait'
+returns, COND's mutex will again be locked by this thread.  */)
   (Lisp_Object cond)
 {
   struct Lisp_CondVar *cvar;
@@ -406,8 +401,8 @@ DEFUN ("condition-notify", Fcondition_notify, Scondition_notify, 1, 2, 0,
 This wakes a thread waiting on COND.
 If ALL is non-nil, all waiting threads are awoken.
 
-The mutex associated with COND must be held when this is called.
-It is an error if it is not held.
+The mutex associated with COND must be held when this is called.  It
+is an error if it is not held.
 
 This releases COND's mutex when notifying COND.  When
 `condition-notify' returns, the mutex will again be locked by this
