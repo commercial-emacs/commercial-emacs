@@ -3884,7 +3884,7 @@ or a lambda expression for macro calls.  */)
    elements, much like the mark-and-sweep pointer reversal trick.  */
 
 static void
-specpdl_internal_step (union specbinding *pdl, int step, int distance, bool vars_only)
+specpdl_internal_walk (union specbinding *pdl, int step, int distance, bool vars_only)
 {
   eassert (distance >= 0);
   for (union specbinding *tmp = pdl; distance > 0; distance--)
@@ -3975,12 +3975,12 @@ specpdl_internal_step (union specbinding *pdl, int step, int distance, bool vars
 
 void specpdl_rewind (union specbinding *pdl, int distance, bool vars_only)
 {
-  specpdl_internal_step (pdl - distance - 1, 1, distance, vars_only);
+  specpdl_internal_walk (pdl - distance - 1, 1, distance, vars_only);
 }
 
 void specpdl_unwind (union specbinding *pdl, int distance, bool vars_only)
 {
-  specpdl_internal_step (pdl, -1, distance, vars_only);
+  specpdl_internal_walk (pdl, -1, distance, vars_only);
 }
 
 static void
