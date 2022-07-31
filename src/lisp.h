@@ -3079,22 +3079,12 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
 
 /* Elisp uses multiple stacks:
    - The C stack.
-   - The specpdl stack keeps track of backtraces, unwind-protects and
-     dynamic let-bindings.  It is allocated from the 'specpdl' array,
-     a manually managed stack.
+   - The specpdl stack, short for special push-down list, handles
+     dynamic let-bindings, unwind-protects, and backtraces.  Commit
+     2f592f9 unified specpdl with the erstwhile backtrace stack.
    - The handler stack keeps track of active catch tags and condition-case
      handlers.  It is allocated in a manually managed stack implemented by a
      doubly-linked list allocated via xmalloc and never freed.  */
-
-/* Structure for recording Lisp call stack for backtrace purposes.  */
-
-/* The special binding stack holds the outer values of variables while
-   they are bound by a function application or a let form, stores the
-   code to be executed for unwind-protect forms.
-
-   NOTE: The specbinding union is defined here, because SPECPDL_INDEX is
-   used all over the place, needs to be fast, and needs to know the size of
-   union specbinding.  But only eval.c should access it.  */
 
 enum specbind_tag {
   SPECPDL_UNWIND,		/* An unwind_protect function on Lisp_Object.  */
@@ -3119,8 +3109,6 @@ enum specbind_tag {
 
 union specbinding
   {
-    /* Aligning similar members consistently might help efficiency slightly
-       (Bug#31996#25).  */
     ENUM_BF (specbind_tag) kind : CHAR_BIT;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
@@ -3159,7 +3147,11 @@ union specbinding
     } unwind_void;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      /* `where' is not used in the case of SPECPDL_LET.  */
+      /* WHERE is the buffer in which SYMBOL is bound.  Note it
+	 applies to only two situations admitting buffer-local
+	 bindings, i.e., SPECPDL_LET_LOCAL (buffer-local bindings) or
+	 SPECPDL_LET_DEFAULT (global bindings for potentially
+	 buffer-local variables).  */
       Lisp_Object symbol, old_value, where;
     } let;
     struct {
@@ -4136,8 +4128,7 @@ extern Lisp_Object Vprin1_to_string_buffer;
 extern void debug_print (Lisp_Object) EXTERNALLY_VISIBLE;
 extern void temp_output_buffer_setup (const char *);
 extern int print_level;
-extern void print_error_message (Lisp_Object, Lisp_Object, const char *,
-				 Lisp_Object);
+extern void print_error_message (Lisp_Object, Lisp_Object, const char *);
 extern Lisp_Object internal_with_output_to_temp_buffer
         (const char *, Lisp_Object (*) (Lisp_Object), Lisp_Object);
 #define FLOAT_TO_STRING_BUFSIZE 350
@@ -4200,7 +4191,6 @@ intern_c_string (const char *str)
 /* Defined in eval.c.  */
 extern Lisp_Object Vautoload_queue;
 extern Lisp_Object Vrun_hooks;
-extern Lisp_Object Vsignaling_function;
 extern Lisp_Object inhibit_lisp_code;
 extern bool signal_quit_p (Lisp_Object);
 

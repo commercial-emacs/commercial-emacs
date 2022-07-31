@@ -396,7 +396,6 @@ run_protected (Lisp_Object (*code) (Lisp_Object), Lisp_Object arg)
 static Lisp_Object
 lisp_error_handler (Lisp_Object error)
 {
-  Vsignaling_function = Qnil;
   cmd_error_internal (error, "Error in delayed clipboard rendering: ");
   Vinhibit_quit = Qt;
   return Qt;

@@ -999,38 +999,33 @@ cmd_error_internal (Lisp_Object data, const char *context)
 {
   /* The immediate context is not interesting for Quits,
      since they are asynchronous.  */
-  if (signal_quit_p (XCAR (data)))
-    Vsignaling_function = Qnil;
-
   Vquit_flag = Qnil;
   Vinhibit_quit = Qt;
 
   /* Use user's specified output function if any.  */
-  if (!NILP (Vcommand_error_function))
+  if (! NILP (Vcommand_error_function))
     call3 (Vcommand_error_function, data,
 	   context ? build_string (context) : empty_unibyte_string,
-	   Vsignaling_function);
-
-  Vsignaling_function = Qnil;
+	   Qnil);
 }
 
 DEFUN ("command-error-default-function", Fcommand_error_default_function,
-       Scommand_error_default_function, 3, 3, 0,
+       Scommand_error_default_function, 2, 3, 0,
        doc: /* Produce default output for unhandled error message.
 Default value of `command-error-function'.  */)
-  (Lisp_Object data, Lisp_Object context, Lisp_Object signal)
+  (Lisp_Object data, Lisp_Object context, Lisp_Object unused)
 {
   struct frame *sf = SELECTED_FRAME ();
   Lisp_Object conditions = Fget (XCAR (data), Qerror_conditions);
-  int is_minibuffer_quit = !NILP (Fmemq (Qminibuffer_quit, conditions));
+  int is_minibuffer_quit = ! NILP (Fmemq (Qminibuffer_quit, conditions));
 
   CHECK_STRING (context);
 
   /* If the window system or terminal frame hasn't been initialized
      yet, or we're not interactive, write the message to stderr and exit.
      Don't do this for the minibuffer-quit condition.  */
-  if (!is_minibuffer_quit
-      && (!sf->glyphs_initialized_p
+  if (! is_minibuffer_quit
+      && (! sf->glyphs_initialized_p
 	  /* The initial frame is a special non-displaying frame. It
 	     will be current in daemon mode when there are no frames
 	     to display, and in non-daemon mode before the real frame
@@ -1041,11 +1036,10 @@ Default value of `command-error-function'.  */)
 	     many other potential errors that do not prevent frames
 	     from being created, so continuing as normal is better in
 	     that case.  */
-	  || (!IS_DAEMON && FRAME_INITIAL_P (sf))
+	  || (! IS_DAEMON && FRAME_INITIAL_P (sf))
 	  || noninteractive))
     {
-      print_error_message (data, Qexternal_debugging_output,
-			   SSDATA (context), signal);
+      print_error_message (data, Qexternal_debugging_output, SSDATA (context));
       Fterpri (Qexternal_debugging_output, Qnil);
       Fkill_emacs (make_fixnum (-1), Qnil);
     }
@@ -1064,7 +1058,7 @@ Default value of `command-error-function'.  */)
 	  bitch_at_user ();
 	}
 
-      print_error_message (data, Qt, SSDATA (context), signal);
+      print_error_message (data, Qt, SSDATA (context));
     }
   return Qnil;
 }

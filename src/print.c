@@ -1022,7 +1022,7 @@ error message is constructed.  */)
       && NILP (XCDR (XCDR (obj))))
     return XCAR (XCDR (obj));
 
-  print_error_message (obj, Vprin1_to_string_buffer, 0, Qnil);
+  print_error_message (obj, Vprin1_to_string_buffer, 0);
 
   set_buffer_internal (XBUFFER (Vprin1_to_string_buffer));
   value = Fbuffer_string ();
@@ -1039,27 +1039,12 @@ error message is constructed.  */)
    CALLER is the Lisp function inside which the error was signaled.  */
 
 void
-print_error_message (Lisp_Object data, Lisp_Object stream, const char *context,
-		     Lisp_Object caller)
+print_error_message (Lisp_Object data, Lisp_Object stream, const char *context)
 {
   Lisp_Object errname, errmsg, file_error, tail;
 
   if (context != 0)
     write_string (context, stream);
-
-  /* If we know from where the error was signaled, show it in
-   *Messages*.  */
-  if (!NILP (caller) && SYMBOLP (caller))
-    {
-      Lisp_Object cname = SYMBOL_NAME (caller);
-      ptrdiff_t cnamelen = SBYTES (cname);
-      USE_SAFE_ALLOCA;
-      char *name = SAFE_ALLOCA (cnamelen);
-      memcpy (name, SDATA (cname), cnamelen);
-      message_dolog (name, cnamelen, 0, STRING_MULTIBYTE (cname));
-      message_dolog (": ", 2, 0, 0);
-      SAFE_FREE ();
-    }
 
   errname = Fcar (data);
 

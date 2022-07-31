@@ -18,7 +18,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-
 #include <config.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -51,11 +50,6 @@ Lisp_Object Vautoload_queue;
    It is nil at an early stage of startup, and when Emacs
    is shutting down.  */
 Lisp_Object Vrun_hooks;
-
-/* The function from which the last `signal' was called.  Set in
-   Fsignal.  */
-/* FIXME: We should probably get rid of this!  */
-Lisp_Object Vsignaling_function;
 
 /* These would ordinarily be static, but they need to be visible to GDB.  */
 bool backtrace_p (union specbinding *) EXTERNALLY_VISIBLE;
@@ -1763,14 +1757,11 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
      `signal' itself.  If a frame for `error' follows, skip that,
      too.  Don't do this when ERROR_SYMBOL is nil, because that
      is a memory-full error.  */
-  Vsignaling_function = Qnil;
-  if (!NILP (error_symbol))
+  if (! NILP (error_symbol))
     {
       union specbinding *pdl = backtrace_next (backtrace_top ());
       if (backtrace_p (pdl) && EQ (backtrace_function (pdl), Qerror))
 	pdl = backtrace_next (pdl);
-      if (backtrace_p (pdl))
-	Vsignaling_function = backtrace_function (pdl);
     }
 
   for (h = handlerlist; h; h = h->next)
@@ -3413,48 +3404,6 @@ let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol)
   return 0;
 }
 
-static void
-do_specbind (struct Lisp_Symbol *sym, union specbinding *bind,
-             Lisp_Object value, enum Set_Internal_Bind bindflag)
-{
-  switch (sym->u.s.redirect)
-    {
-    case SYMBOL_PLAINVAL:
-      if (!sym->u.s.trapped_write)
-	SET_SYMBOL_VAL (sym, value);
-      else
-        set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
-      break;
-
-    case SYMBOL_FORWARDED:
-      if (BUFFER_OBJFWDP (SYMBOL_FWD (sym))
-	  && specpdl_kind (bind) == SPECPDL_LET_DEFAULT)
-	{
-          set_default_internal (specpdl_symbol (bind), value, bindflag);
-	  return;
-	}
-      FALLTHROUGH;
-    case SYMBOL_LOCALIZED:
-      set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
-      break;
-
-    default:
-      emacs_abort ();
-    }
-}
-
-/* `specpdl_ptr' describes which variable is
-   let-bound, so it can be properly undone when we unbind_to.
-   It can be either a plain SPECPDL_LET or a SPECPDL_LET_LOCAL/DEFAULT.
-   - SYMBOL is the variable being bound.  Note that it should not be
-     aliased (i.e. when let-binding V1 that's aliased to V2, we want
-     to record V2 here).
-   - WHERE tells us in which buffer the binding took place.
-     This is used for SPECPDL_LET_LOCAL bindings (i.e. bindings to a
-     buffer-local variable) as well as for SPECPDL_LET_DEFAULT bindings,
-     i.e. bindings to the default value of a variable which can be
-     buffer-local.  */
-
 void
 specbind (Lisp_Object symbol, Lisp_Object value)
 {
@@ -3511,7 +3460,30 @@ specbind (Lisp_Object symbol, Lisp_Object value)
     default: emacs_abort ();
     }
   grow_specpdl ();
-  do_specbind (sym, specpdl_ptr - 1, value, SET_INTERNAL_BIND);
+
+  union specbinding *bind = specpdl_ptr - 1;
+  switch (sym->u.s.redirect)
+    {
+    case SYMBOL_PLAINVAL:
+      if (!sym->u.s.trapped_write)
+	SET_SYMBOL_VAL (sym, value);
+      else
+        set_internal (specpdl_symbol (bind), value, Qnil, SET_INTERNAL_BIND);
+      break;
+    case SYMBOL_FORWARDED:
+      if (BUFFER_OBJFWDP (SYMBOL_FWD (sym))
+	  && specpdl_kind (bind) == SPECPDL_LET_DEFAULT)
+	{
+          set_default_internal (specpdl_symbol (bind), value, SET_INTERNAL_BIND);
+	  return;
+	}
+      FALLTHROUGH;
+    case SYMBOL_LOCALIZED:
+      set_internal (specpdl_symbol (bind), value, Qnil, SET_INTERNAL_BIND);
+      break;
+    default:
+      emacs_abort ();
+    }
 }
 
 void
@@ -4383,8 +4355,6 @@ alist of active lexical bindings.  */);
 
   staticpro (&Vautoload_queue);
   Vautoload_queue = Qnil;
-  staticpro (&Vsignaling_function);
-  Vsignaling_function = Qnil;
 
   staticpro (&Qcatch_all_memory_full);
   /* Make sure Qcatch_all_memory_full is a unique object.  We could
