@@ -166,7 +166,7 @@ circular_list (Lisp_Object list)
   xsignal1 (Qcircular_list, list);
 }
 
-
+
 /* Data type predicates.  */
 
 DEFUN ("eq", Feq, Seq, 2, 2, 0,
@@ -323,7 +323,7 @@ DEFUN ("nlistp", Fnlistp, Snlistp, 1, 1, 0,
     return Qnil;
   return Qt;
 }
-
+
 DEFUN ("symbolp", Fsymbolp, Ssymbolp, 1, 1, 0,
        doc: /* Return t if OBJECT is a symbol.  */
        attributes: const)
@@ -497,7 +497,7 @@ DEFUN ("char-or-string-p", Fchar_or_string_p, Schar_or_string_p, 1, 1, 0,
     return Qt;
   return Qnil;
 }
-
+
 DEFUN ("integerp", Fintegerp, Sintegerp, 1, 1, 0,
        doc: /* Return t if OBJECT is an integer.  */
        attributes: const)
@@ -585,7 +585,7 @@ DEFUN ("condition-variable-p", Fcondition_variable_p, Scondition_variable_p,
     return Qt;
   return Qnil;
 }
-
+
 /* Extract and set components of lists.  */
 
 DEFUN ("car", Fcar, Scar, 1, 1, 0,
@@ -643,7 +643,7 @@ DEFUN ("setcdr", Fsetcdr, Ssetcdr, 2, 2, 0,
   XSETCDR (cell, newcdr);
   return newcdr;
 }
-
+
 /* Extract and set components of symbols.  */
 
 DEFUN ("boundp", Fboundp, Sboundp, 1, 1, 0,
@@ -1155,7 +1155,7 @@ The value, if non-nil, is a list of mode name symbols.  */)
   return Qnil;
 }
 
-
+
 /***********************************************************************
 		Getting and Setting Values of Symbols
  ***********************************************************************/
@@ -1217,21 +1217,22 @@ chain of aliases, signal a `cyclic-variable-indirection' error.  */)
 Lisp_Object
 symval_resolve (lispfwd valcontents)
 {
+  Lisp_Object result = Qnil;
   switch (XFWDTYPE (valcontents))
     {
     case Lisp_Fwd_Int:
-      return make_int (*XFIXNUMFWD (valcontents)->intvar);
-
+      result = make_int (*XFIXNUMFWD (valcontents)->intvar);
+      break;
     case Lisp_Fwd_Bool:
-      return (*XBOOLFWD (valcontents)->boolvar ? Qt : Qnil);
-
+      result = (*XBOOLFWD (valcontents)->boolvar ? Qt : Qnil);
+      break;
     case Lisp_Fwd_Obj:
-      return *XOBJFWD (valcontents)->objvar;
-
+      result = *XOBJFWD (valcontents)->objvar;
+      break;
     case Lisp_Fwd_Buffer_Obj:
-      return per_buffer_value (current_buffer,
-			       XBUFFER_OBJFWD (valcontents)->offset);
-
+      result = per_buffer_value (current_buffer,
+				 XBUFFER_OBJFWD (valcontents)->offset);
+      break;
     case Lisp_Fwd_Kboard_Obj:
       /* We used to simply use current_kboard here, but from Lisp
 	 code, its value is often unexpected.  It seems nicer to
@@ -1244,10 +1245,14 @@ symval_resolve (lispfwd valcontents)
 	 last-command and real-last-command, and people may rely on
 	 that.  I took a quick look at the Lisp codebase, and I
 	 don't think anything will break.  --lorentey  */
-      return *(Lisp_Object *)(XKBOARD_OBJFWD (valcontents)->offset
-			      + (char *)FRAME_KBOARD (SELECTED_FRAME ()));
-    default: emacs_abort ();
+      result = *(Lisp_Object *)(XKBOARD_OBJFWD (valcontents)->offset
+				+ (char *)FRAME_KBOARD (SELECTED_FRAME ()));
+      break;
+    default:
+      emacs_abort ();
+      break;
     }
+  return result;
 }
 
 /* Used to signal a user-friendly error when symbol WRONG is
@@ -1436,7 +1441,7 @@ symval_buffer_localize (struct Lisp_Symbol *symbol)
     }
   return blv;
 }
-
+
 /* Find the value of a symbol, returning Qunbound if it's not bound.
    This is helpful for code which just wants to get a variable's value
    if it has one, without signaling an error.
@@ -1547,8 +1552,14 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
  start:
   switch (sym->u.s.redirect)
     {
-    case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
-    case SYMBOL_PLAINVAL: SET_SYMBOL_VAL (sym , newval); return;
+    case SYMBOL_VARALIAS:
+      sym = indirect_variable (sym);
+      goto start;
+      break;
+    case SYMBOL_PLAINVAL:
+      SET_SYMBOL_VAL (sym , newval);
+      return;
+      break;
     case SYMBOL_LOCALIZED:
       {
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
@@ -1657,9 +1668,10 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 	  symval_update (/* sym, */ innercontents, newval, buf);
 	break;
       }
-    default: emacs_abort ();
+    default:
+      emacs_abort ();
+      break;
     }
-  return;
 }
 
 static void
@@ -1784,15 +1796,10 @@ notify_variable_watchers (Lisp_Object symbol,
   unbind_to (count, Qnil);
 }
 
-
-/* Access or set a buffer-local symbol's default value.  */
-
-/* Return the default value of SYMBOL, but don't check for voidness.
-   Return Qunbound if it is void.  */
-
 Lisp_Object
 default_value (Lisp_Object symbol)
 {
+  Lisp_Object result = Qnil;
   struct Lisp_Symbol *sym;
 
   CHECK_SYMBOL (symbol);
@@ -1801,38 +1808,42 @@ default_value (Lisp_Object symbol)
  start:
   switch (sym->u.s.redirect)
     {
-    case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
-    case SYMBOL_PLAINVAL: return SYMBOL_VAL (sym);
+    case SYMBOL_VARALIAS:
+      sym = indirect_variable (sym);
+      goto start;
+      break;
+    case SYMBOL_PLAINVAL:
+      result = SYMBOL_VAL (sym);
+      break;
     case SYMBOL_LOCALIZED:
       {
-	/* If var is set up for a buffer that lacks a local value for it,
-	   the current value is nominally the default value.
-	   But the `realvalue' slot may be more up to date, since
-	   ordinary setq stores just that slot.  So use that.  */
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
-	if (blv->fwd.fwdptr && EQ (blv->valcell, blv->defcell))
-	  return symval_resolve (blv->fwd);
-	else
-	  return XCDR (blv->defcell);
+	result = (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
+	  ? symval_resolve (blv->fwd) /* use last assigned, if avail */
+	  : XCDR (blv->defcell);
+	break;
       }
     case SYMBOL_FORWARDED:
       {
 	lispfwd valcontents = SYMBOL_FWD (sym);
 
-	/* For a built-in buffer-local variable, get the default value
-	   rather than letting symval_resolve get the current value.  */
+	/* For a so-called slot or per-buffer variable (see buffer.h),
+	   get the default value.  */
 	if (BUFFER_OBJFWDP (valcontents))
 	  {
 	    int offset = XBUFFER_OBJFWD (valcontents)->offset;
 	    if (PER_BUFFER_IDX (offset) != 0)
-	      return per_buffer_default (offset);
+	      result = per_buffer_default (offset);
 	  }
-
 	/* For other variables, get the current value.  */
-	return symval_resolve (valcontents);
+	result = symval_resolve (valcontents);
+	break;
       }
-    default: emacs_abort ();
+    default:
+      emacs_abort ();
+      break;
     }
+  return result;
 }
 
 DEFUN ("default-boundp", Fdefault_boundp, Sdefault_boundp, 1, 1, 0,
@@ -1961,7 +1972,7 @@ for this variable.  */)
   set_default_internal (symbol, value, SET_INTERNAL_SET);
   return value;
 }
-
+
 /* Lisp functions for creating and removing buffer-local variables.  */
 
 union Lisp_Val_Fwd
@@ -2381,7 +2392,7 @@ If the current binding is global (the default), the value is nil.  */)
     }
 }
 
-
+
 /* Find the function at the end of a chain of symbol function indirections.  */
 
 /* If OBJECT is a symbol, find the end of its function chain and
@@ -2436,7 +2447,7 @@ function chain of symbols.  */)
 
   return Qnil;
 }
-
+
 /* Extract and set vector and string elements.  */
 
 DEFUN ("aref", Faref, Saref, 2, 2, 0,
@@ -2567,7 +2578,7 @@ bool-vector.  IDX starts at 0.  */)
 
   return newelt;
 }
-
+
 /* Arithmetic functions */
 
 static Lisp_Object
@@ -2784,7 +2795,7 @@ DEFUN ("/=", Fneq, Sneq, 2, 2, 0,
 {
   return arithcompare (num1, num2, ARITH_NOTEQUAL);
 }
-
+
 /* Convert the cons-of-integers, integer, or float value C to an
    unsigned value with maximum value MAX, where MAX is one less than a
    power of 2.  Signal an error if C does not have a valid format or
@@ -2905,7 +2916,7 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
     error ("Not an in-range integer, integral float, or cons of integers");
   return val;
 }
-
+
 /* Render NUMBER in decimal into BUFFER which ends right before END.
    Return the start of the string; the end is always at END.
    The string is not null-terminated.  */
@@ -2985,7 +2996,7 @@ If the base used is not 10, STRING is always parsed as an integer.  */)
   Lisp_Object val = string_to_number (p, b, 0);
   return NILP (val) ? make_fixnum (0) : val;
 }
-
+
 enum arithop
   {
     Aadd,
@@ -3979,7 +3990,7 @@ A is a bool vector, B is t or nil, and I is an index into A.  */)
   return make_fixnum (count);
 }
 
-
+
 void
 syms_of_data (void)
 {

@@ -46,8 +46,8 @@
 (defvar-local threads-test-bug48990 "global")
 
 (defclass threads-test-channel ()
-  ((condition :initarg :condition :type condition-variable)
-   (msg-queue :initarg :msg-queue :type ring)))
+  ((condition :initarg :condition)
+   (msg-queue :initarg :msg-queue)))
 
 (cl-defmethod threads-test-channel-send ((channel threads-test-channel) message)
   (with-slots (condition msg-queue) channel
