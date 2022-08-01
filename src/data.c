@@ -1828,15 +1828,13 @@ default_value (Lisp_Object symbol)
 	lispfwd valcontents = SYMBOL_FWD (sym);
 
 	/* For a so-called slot or per-buffer variable (see buffer.h),
-	   get the default value.  */
-	if (BUFFER_OBJFWDP (valcontents))
-	  {
-	    int offset = XBUFFER_OBJFWD (valcontents)->offset;
-	    if (PER_BUFFER_IDX (offset) != 0)
-	      result = per_buffer_default (offset);
-	  }
-	/* For other variables, get the current value.  */
-	result = symval_resolve (valcontents);
+	   get the default value.  For other variables, get the
+	   current value.  */
+	if (BUFFER_OBJFWDP (valcontents)
+	    && PER_BUFFER_IDX (XBUFFER_OBJFWD (valcontents)->offset))
+	  result = per_buffer_default (XBUFFER_OBJFWD (valcontents)->offset);
+	else
+	  result = symval_resolve (valcontents);
 	break;
       }
     default:
