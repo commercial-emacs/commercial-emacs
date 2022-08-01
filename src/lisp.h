@@ -2577,25 +2577,8 @@ struct Lisp_Buffer_Objfwd
     Lisp_Object predicate;
   };
 
-/* struct Lisp_Buffer_Local_Value is used in a symbol value cell when
-   the symbol has buffer-local bindings.  (Exception:
-   some buffer-local variables are built-in, with their values stored
-   in the buffer structure itself.  They are handled differently,
-   using struct Lisp_Buffer_Objfwd.)
-
-   The `valcell' slot holds the variable's current value (unless `fwd'
-   is set).  This value is the one that corresponds to the loaded binding.
-   To read or set the variable, you must first make sure the right binding
-   is loaded; then you can access the value in (or through) `valcell'.
-
-   `where' is the buffer for which the loaded binding was found.
-   If it has changed, to make sure the right binding is loaded it is
-   necessary to find which binding goes with the current buffer, then
-   load it.  To load it, first unload the previous binding.
-
-   `local_if_set' indicates that merely setting the variable creates a
-   local binding for the current buffer.  Otherwise the latter, setting
-   the variable does not do that; only make-local-variable does that.  */
+/* Note so-called "slots" or "per-buffer" variables form a subset
+   of buffer-local variables, and are administered by Lisp_Buffer_Objfwd.  */
 
 struct Lisp_Buffer_Local_Value
   {

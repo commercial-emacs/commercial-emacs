@@ -99,6 +99,19 @@ blv_value (struct Lisp_Buffer_Local_Value *blv)
   return XCDR (blv->valcell);
 }
 
+static Lisp_Object
+last_assigned_value (Lisp_Object symbol)
+{
+  /* translate confusing Blandyism involving "current_alist_element"
+     and "realvalue" into something only mildly less confusing.  */
+  CHECK_SYMBOL (symbol);
+  struct Lisp_Symbol *sym = XSYMBOL (symbol);
+  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
+  return (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
+    ? symval_resolve (blv->fwd)
+    : XCDR (blv->defcell);
+}
+
 static void
 set_blv_value (struct Lisp_Buffer_Local_Value *blv, Lisp_Object val)
 {
@@ -1503,50 +1516,38 @@ DEFUN ("set", Fset, Sset, 2, 2, 0,
 }
 
 /* Store the value NEWVAL into SYMBOL.
-   If buffer-locality is an issue, WHERE specifies which context to use.
-   (nil stands for the current buffer/frame).
-
-   If BINDFLAG is SET_INTERNAL_SET, then if this symbol is supposed to
-   become local in every buffer where it is set, then we make it
-   local.  If BINDFLAG is SET_INTERNAL_BIND or SET_INTERNAL_UNBIND, we
-   don't do that.  */
+   A non-nil WHERE indicates the buffer for buffer-local bindings.
+   For buffer-local bindings, the current buffer is assumed unless
+   WHERE specifies a non-nil buffer.
+*/
 
 void
 set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
               enum Set_Internal_Bind bindflag)
 {
-  bool voide = EQ (newval, Qunbound);
-
-  /* If restoring in a dead buffer, do nothing.  */
-  /* if (BUFFERP (where) && NILP (XBUFFER (where)->name))
-      return; */
-
+  bool unbound = EQ (newval, Qunbound);
   CHECK_SYMBOL (symbol);
   struct Lisp_Symbol *sym = XSYMBOL (symbol);
-  switch (sym->u.s.trapped_write)
+  if (sym->u.s.trapped_write == SYMBOL_NOWRITE)
     {
-    case SYMBOL_NOWRITE:
       if (NILP (Fkeywordp (symbol))
-          || !EQ (newval, Fsymbol_value (symbol)))
-        xsignal1 (Qsetting_constant, symbol);
-      else
-        /* Allow setting keywords to their own value.  */
-        return;
-
-    case SYMBOL_TRAPPED_WRITE:
-      /* Setting due to thread-switching doesn't count.  */
-      if (bindflag != SET_INTERNAL_THREAD_SWITCH)
-        notify_variable_watchers (symbol, voide? Qnil : newval,
-                                  (bindflag == SET_INTERNAL_BIND? Qlet :
-                                   bindflag == SET_INTERNAL_UNBIND? Qunlet :
-                                   voide? Qmakunbound : Qset),
-                                  where);
-      break;
-
-    case SYMBOL_UNTRAPPED_WRITE:
-      break;
-
-    default: emacs_abort ();
+          || ! EQ (newval, Fsymbol_value (symbol)))
+	xsignal1 (Qsetting_constant, symbol);
+      return; /* Allow setting keywords to their own value.  */
+    }
+  else if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE
+	   && bindflag != SET_INTERNAL_THREAD_SWITCH)
+    {
+      notify_variable_watchers (symbol,
+				unbound ? Qnil : newval,
+				bindflag == SET_INTERNAL_BIND
+				? Qlet
+				: bindflag == SET_INTERNAL_UNBIND
+				? Qunlet
+				: unbound
+				? Qmakunbound
+				: Qset,
+				where);
     }
 
  start:
@@ -1554,11 +1555,12 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
     {
     case SYMBOL_VARALIAS:
       sym = indirect_variable (sym);
+      if (sym->u.s.redirect == SYMBOL_LOCALIZED) /* too specific? */
+	XSETSYMBOL (symbol, sym);
       goto start;
       break;
     case SYMBOL_PLAINVAL:
-      SET_SYMBOL_VAL (sym , newval);
-      return;
+      SET_SYMBOL_VAL (sym, newval);
       break;
     case SYMBOL_LOCALIZED:
       {
@@ -1566,90 +1568,64 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 	if (NILP (where))
 	  XSETBUFFER (where, current_buffer);
 
-	/* If the current buffer is not the buffer whose binding is
-	   loaded, or if it's a Lisp_Buffer_Local_Value and
-	   the default binding is loaded, the loaded binding may be the
-	   wrong one.  */
-	if (!EQ (blv->where, where)
-	    /* Also unload a global binding (if the var is local_if_set).  */
-	    || (EQ (blv->valcell, blv->defcell)))
+	/* Dial in correct valcell if current buffer not WHERE or the
+	   "currently loaded binding is the default binding" (see ambiguous
+	   comment in lisp.h introduced in ce5b453).  */
+	if (! EQ (blv->where, where)
+	    || EQ (blv->defcell, blv->valcell))
 	  {
-	    /* The currently loaded binding is not necessarily valid.
-	       We need to unload it, and choose a new binding.  */
-
-	    /* Write out `realvalue' to the old loaded binding.  */
-	    if (blv->fwd.fwdptr)
-	      set_blv_value (blv, symval_resolve (blv->fwd));
-
-	    /* Find the new binding.  */
-	    XSETSYMBOL (symbol, sym); /* May have changed via aliasing.  */
-	    Lisp_Object tem1
-	      = assq_no_quit (symbol,
-			      BVAR (XBUFFER (where), local_var_alist));
-	    set_blv_where (blv, where);
+	    Lisp_Object val;
 	    blv->found = true;
-
-	    if (NILP (tem1))
+	    set_blv_where (blv, where);
+	    val = assq_no_quit (symbol, BVAR (XBUFFER (where), local_var_alist));
+	    if (NILP (val))
 	      {
-		/* This buffer still sees the default value.  */
+		/* Buffer still sees the default value.
 
-		/* If the variable is a Lisp_Some_Buffer_Local_Value,
-		   or if this is `let' rather than `set',
-		   make CURRENT-ALIST-ELEMENT point to itself,
-		   indicating that we're seeing the default value.
-		   Likewise if the variable has been let-bound
-		   in the current buffer.  */
-		if (bindflag || !blv->local_if_set
-		    || let_shadows_buffer_binding_p (sym))
-		  {
-		    blv->found = false;
-		    tem1 = blv->defcell;
-		  }
-		/* If it's a local_if_set, being set not bound,
+		   If it's a local_if_set, being set not bound,
 		   and we're not within a let that was made for this buffer,
 		   create a new buffer-local binding for the variable.
-		   That means, give this buffer a new assoc for a local value
-		   and load that binding.  */
-		else
+		   (RMS ramble from 2000).  */
+		if (! bindflag
+		    && blv->local_if_set
+		    && ! let_shadows_buffer_binding_p (sym))
 		  {
-		    tem1 = Fcons (symbol, XCDR (blv->defcell));
+		    val = Fcons (symbol, last_assigned_value (symbol));
 		    bset_local_var_alist
 		      (XBUFFER (where),
-		       Fcons (tem1, BVAR (XBUFFER (where), local_var_alist)));
+		       Fcons (val, BVAR (XBUFFER (where), local_var_alist)));
+		  }
+		else
+		  {
+		    blv->found = false;
+		    val = blv->defcell;
 		  }
 	      }
-
-	    /* Record which binding is now loaded.  */
-	    set_blv_valcell (blv, tem1);
+	    set_blv_valcell (blv, val);
 	  }
 
-	/* Store the new value in the cons cell.  */
+	/* Now that valcell is settled, update its cdr.  */
 	set_blv_value (blv, newval);
 
-	if (blv->fwd.fwdptr)
-	  {
-	    if (voide)
-	      /* If storing void (making the symbol void), forward only through
-		 buffer-local indicator, not through Lisp_Objfwd, etc.  */
-	      blv->fwd.fwdptr = NULL;
-	    else
-	      symval_update (blv->fwd, newval,
-				       BUFFERP (where)
-				       ? XBUFFER (where) : current_buffer);
-	  }
-	break;
+	if (unbound)
+	  blv->fwd.fwdptr = NULL;
+	else if (blv->fwd.fwdptr)
+	  symval_update (blv->fwd,
+			 newval,
+			 BUFFERP (where) ? XBUFFER (where) : current_buffer);
       }
+      break;
     case SYMBOL_FORWARDED:
       {
-	struct buffer *buf
-	  = BUFFERP (where) ? XBUFFER (where) : current_buffer;
+	struct buffer *buf = BUFFERP (where) ? XBUFFER (where) : current_buffer;
 	lispfwd innercontents = SYMBOL_FWD (sym);
 	if (BUFFER_OBJFWDP (innercontents))
 	  {
 	    int offset = XBUFFER_OBJFWD (innercontents)->offset;
 	    int idx = PER_BUFFER_IDX (offset);
-	    if (idx > 0 && bindflag == SET_INTERNAL_SET
-	        && !PER_BUFFER_VALUE_P (buf, idx))
+	    if (idx > 0
+		&& bindflag == SET_INTERNAL_SET
+	        && ! PER_BUFFER_VALUE_P (buf, idx))
 	      {
 		if (let_shadows_buffer_binding_p (sym))
 		  set_default_internal (symbol, newval, bindflag);
@@ -1658,16 +1634,17 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 	      }
 	  }
 
-	if (voide)
-	  { /* If storing void (making the symbol void), forward only through
-	       buffer-local indicator, not through Lisp_Objfwd, etc.  */
+	if (unbound)
+	  {
+	    /* If storing void (making the symbol void), forward only through
+	       buffer-local indicator, not through Lisp_Objfwd, etc. (what?)  */
 	    sym->u.s.redirect = SYMBOL_PLAINVAL;
 	    SET_SYMBOL_VAL (sym, newval);
 	  }
 	else
 	  symval_update (/* sym, */ innercontents, newval, buf);
-	break;
       }
+      break;
     default:
       emacs_abort ();
       break;
@@ -1816,13 +1793,8 @@ default_value (Lisp_Object symbol)
       result = SYMBOL_VAL (sym);
       break;
     case SYMBOL_LOCALIZED:
-      {
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
-	result = (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
-	  ? symval_resolve (blv->fwd) /* use last assigned, if avail */
-	  : XCDR (blv->defcell);
-	break;
-      }
+      result = last_assigned_value (symbol);
+      break;
     case SYMBOL_FORWARDED:
       {
 	lispfwd valcontents = SYMBOL_FWD (sym);
