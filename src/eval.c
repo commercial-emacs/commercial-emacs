@@ -3412,13 +3412,13 @@ specbind (Lisp_Object symbol, Lisp_Object value)
   sym = XSYMBOL (symbol);
 
   /* First, qualify what kind of binding.  */
- aliased:
+ start:
   switch (sym->u.s.redirect)
     {
     case SYMBOL_VARALIAS:
       sym = indirect_variable (sym);
       XSETSYMBOL (symbol, sym);
-      goto aliased;
+      goto start;
       break;
     case SYMBOL_PLAINVAL:
       specpdl_ptr->let.kind = SPECPDL_LET;
@@ -3884,115 +3884,115 @@ or a lambda expression for macro calls.  */)
    elements, much like the mark-and-sweep pointer reversal trick.  */
 
 static void
-specpdl_internal_walk (union specbinding *pdl, int step, int distance, bool vars_only)
+specpdl_internal_walk (union specbinding *pdl, int step, int distance,
+		       enum specbind_tag kind_or_above)
 {
   eassert (distance >= 0);
-  for (union specbinding *tmp = pdl; distance > 0; distance--)
+  for (union specbinding *tmp = pdl; distance > 0; --distance)
     {
       tmp += step;
-      switch (tmp->kind)
+      if (tmp->kind >= kind_or_above)
 	{
-	  /* FIXME: Ideally we'd like to "temporarily unwind" (some of) those
-	     unwind_protect, but the problem is that we don't know how to
-	     rewind them afterwards.  */
-	case SPECPDL_UNWIND:
-	  if (vars_only)
-	    break;
-	  if (tmp->unwind.func == set_buffer_if_live)
+	  switch (tmp->kind)
 	    {
-	      Lisp_Object oldarg = tmp->unwind.arg;
-	      tmp->unwind.arg = Fcurrent_buffer ();
-	      set_buffer_if_live (oldarg);
-	    }
-	  break;
-	case SPECPDL_UNWIND_EXCURSION:
-	  if (vars_only)
-	    break;
-	  {
-	    Lisp_Object marker = tmp->unwind_excursion.marker;
-	    Lisp_Object window = tmp->unwind_excursion.window;
-	    save_excursion_save (tmp);
-	    save_excursion_restore (marker, window);
-	  }
-	  break;
-	case SPECPDL_LET:
-	  { /* If variable has a trivial value (no forwarding), we can
-	       just set it.  No need to check for constant symbols here,
-	       since that was already done by specbind.  */
-	    Lisp_Object sym = specpdl_symbol (tmp);
-	    if (SYMBOLP (sym)
-		&& XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
+	    case SPECPDL_UNWIND:
+	      if (tmp->unwind.func == set_buffer_if_live)
+		{
+		  Lisp_Object oldarg = tmp->unwind.arg;
+		  tmp->unwind.arg = Fcurrent_buffer ();
+		  set_buffer_if_live (oldarg);
+		}
+	      break;
+	    case SPECPDL_UNWIND_EXCURSION:
 	      {
+		Lisp_Object marker = tmp->unwind_excursion.marker;
+		Lisp_Object window = tmp->unwind_excursion.window;
+		save_excursion_save (tmp);
+		save_excursion_restore (marker, window);
+	      }
+	      break;
+	    case SPECPDL_LET:
+	      {
+		/* If variable has a trivial value (no forwarding), we can
+		   just set it.  No need to check for constant symbols here,
+		   since that was already done by specbind.  */
+		Lisp_Object sym = specpdl_symbol (tmp);
+		if (SYMBOLP (sym)
+		    && XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
+		  {
+		    Lisp_Object old_value = specpdl_old_value (tmp);
+		    set_specpdl_old_value (tmp, SYMBOL_VAL (XSYMBOL (sym)));
+		    SET_SYMBOL_VAL (XSYMBOL (sym), old_value);
+		    break;
+		  }
+	      }
+	      /* Come here only if make_local_foo was used for the first
+		 time on this var within this let.  */
+	      FALLTHROUGH;
+	    case SPECPDL_LET_DEFAULT:
+	      {
+		Lisp_Object sym = specpdl_symbol (tmp);
 		Lisp_Object old_value = specpdl_old_value (tmp);
-		set_specpdl_old_value (tmp, SYMBOL_VAL (XSYMBOL (sym)));
-		SET_SYMBOL_VAL (XSYMBOL (sym), old_value);
-		break;
+		set_specpdl_old_value (tmp, default_value (sym));
+		set_default_internal (sym, old_value, SET_INTERNAL_THREAD_SWITCH);
 	      }
-	  }
-	  /* Come here only if make_local_foo was used for the first
-	     time on this var within this let.  */
-	  FALLTHROUGH;
-	case SPECPDL_LET_DEFAULT:
-	  {
-	    Lisp_Object sym = specpdl_symbol (tmp);
-	    Lisp_Object old_value = specpdl_old_value (tmp);
-	    set_specpdl_old_value (tmp, default_value (sym));
-	    set_default_internal (sym, old_value, SET_INTERNAL_THREAD_SWITCH);
-	  }
-	  break;
-	case SPECPDL_LET_LOCAL:
-	  {
-	    Lisp_Object symbol = specpdl_symbol (tmp);
-	    Lisp_Object where = specpdl_where (tmp);
-	    Lisp_Object old_value = specpdl_old_value (tmp);
-	    eassert (BUFFERP (where));
+	      break;
+	    case SPECPDL_LET_LOCAL:
+	      {
+		Lisp_Object symbol = specpdl_symbol (tmp);
+		Lisp_Object where = specpdl_where (tmp);
+		Lisp_Object old_value = specpdl_old_value (tmp);
+		eassert (BUFFERP (where));
 
-	    /* If this was a local binding, reset the value in the appropriate
-	       buffer, but only if that buffer's binding still exists.  */
-	    if (!NILP (Flocal_variable_p (symbol, where)))
-	      {
-		set_specpdl_old_value
-		  (tmp, buffer_local_value (symbol, where));
-                set_internal (symbol, old_value, where,
-                              SET_INTERNAL_THREAD_SWITCH);
+		/* If this was a local binding, reset the value in the appropriate
+		   buffer, but only if that buffer's binding still exists.  */
+		if (!NILP (Flocal_variable_p (symbol, where)))
+		  {
+		    set_specpdl_old_value
+		      (tmp, buffer_local_value (symbol, where));
+		    set_internal (symbol, old_value, where,
+				  SET_INTERNAL_THREAD_SWITCH);
+		  }
+		else
+		  {
+		    /* FIXME: If the var is not local any more, we failed
+		       to swap the old and new values.  As long as the var remains
+		       non-local, this is fine, but if it ever reverts to being
+		       local we may end up using this entry "in the wrong
+		       direction".  */
+		    tmp->kind = SPECPDL_NOP;
+		  }
 	      }
-	    else
-	      {
-		/* FIXME: If the var is not local any more, we failed
-                   to swap the old and new values.  As long as the var remains
-		   non-local, this is fine, but if it ever reverts to being
-		   local we may end up using this entry "in the wrong
-		   direction".  */
-		tmp->kind = SPECPDL_NOP;
-	      }
-	  }
-	  break;
-	default:
-	  break;
+	      break;
+	    default:
+	      break;
+	    }
 	}
     }
 }
 
-void specpdl_rewind (union specbinding *pdl, int distance, bool vars_only)
+void specpdl_rewind (union specbinding *pdl, int distance,
+		     enum specbind_tag kind_or_above)
 {
-  specpdl_internal_walk (pdl - distance - 1, 1, distance, vars_only);
+  specpdl_internal_walk (pdl - distance - 1, 1, distance, kind_or_above);
 }
 
-void specpdl_unwind (union specbinding *pdl, int distance, bool vars_only)
+void specpdl_unwind (union specbinding *pdl, int distance,
+		     enum specbind_tag kind_or_above)
 {
-  specpdl_internal_walk (pdl, -1, distance, vars_only);
+  specpdl_internal_walk (pdl, -1, distance, kind_or_above);
 }
 
 static void
 backtrace_eval_rewind (int distance)
 {
-  specpdl_rewind (specpdl_ptr, distance, false);
+  specpdl_rewind (specpdl_ptr, distance, SPECPDL_UNWIND);
 }
 
 static void
 backtrace_eval_unwind (int distance)
 {
-  specpdl_unwind (specpdl_ptr, distance, false);
+  specpdl_unwind (specpdl_ptr, distance, SPECPDL_UNWIND);
 }
 
 DEFUN ("backtrace-eval", Fbacktrace_eval, Sbacktrace_eval, 2, 3, NULL,

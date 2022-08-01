@@ -1769,8 +1769,8 @@ notify_variable_watchers (Lisp_Object symbol,
   set_symbol_trapped_write (symbol, SYMBOL_UNTRAPPED_WRITE);
 
   if (NILP (where)
-      && !EQ (operation, Qset_default) && !EQ (operation, Qmakunbound)
-      && !NILP (Flocal_variable_if_set_p (symbol, Fcurrent_buffer ())))
+      && ! EQ (operation, Qset_default) && !EQ (operation, Qmakunbound)
+      && ! NILP (Flocal_variable_if_set_p (symbol, Fcurrent_buffer ())))
     {
       XSETBUFFER (where, current_buffer);
     }

@@ -84,8 +84,8 @@ restore_thread (struct thread_state *self)
       if (prev_thread != NULL)
 	specpdl_unwind (prev_thread->m_specpdl_ptr,
 			prev_thread->m_specpdl_ptr - prev_thread->m_specpdl,
-			true);
-      specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, true);
+			SPECPDL_LET);
+      specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, SPECPDL_LET);
 
       /* Thread-private buffer variables require resetting, but
 	 set_buffer_internal(current_buffer) would be a no-op.  */
