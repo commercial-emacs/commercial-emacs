@@ -1196,7 +1196,7 @@ For example, nil stands for the current time.  */)
   /* Subtract nil from nil correctly, and handle other eq values
      quicker while we're at it.  This means (time-subtract X X) does
      not signal an error if X is not a valid time value, but that's OK.  */
-  if (BASE_EQ (a, b))
+  if (EQ (a, b))
     return timespec_to_lisp ((struct timespec) {0});
 
   return time_arith (a, b, true);
@@ -1216,7 +1216,7 @@ time_cmp (Lisp_Object a, Lisp_Object b)
 
   /* Compare (X . Z) to (Y . Z) quickly if X and Y are fixnums.
      Do not inspect Z, as it is OK to not signal if A and B are invalid.  */
-  if (FASTER_TIMEFNS && CONSP (a) && CONSP (b) && BASE_EQ (XCDR (a), XCDR (b))
+  if (FASTER_TIMEFNS && CONSP (a) && CONSP (b) && EQ (XCDR (a), XCDR (b))
       && FIXNUMP (XCAR (a)) && FIXNUMP (XCAR (b)))
     return XFIXNUM (XCAR (a)) - XFIXNUM (XCAR (b));
 
