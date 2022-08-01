@@ -81,6 +81,23 @@ Note how the single `-' got converted into a list before
 threading."
   (declare (indent 0) (debug thread-first))
   `(internal--thread-argument nil ,@forms))
+
+(defmacro thread-as (var &rest forms)
+  "Successively bind VAR to the result of evaluating each of the FORMS.
+Return the last computed value.
+
+Example:
+     (thread-as x
+       4
+       (- 10 x)
+       (/ x 2))
+          ⇒ 3"
+  (declare (indent 1))
+  (if forms
+      `(let ((,var ,(car forms)))
+         (thread-as ,var ,@(cdr forms)))
+    var))
+
 (defsubst hash-table-empty-p (hash-table)
   "Check whether HASH-TABLE is empty (has 0 elements)."
   (zerop (hash-table-count hash-table)))
