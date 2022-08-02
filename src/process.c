@@ -33,18 +33,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 
-/* Only MS-DOS does not define `subprocesses'.  */
-#ifdef subprocesses
-
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
-#else
-#define PIPECONN_P(p) false
-#define PIPECONN1_P(p) false
-#endif
 
 #ifdef HAVE_SETRLIMIT
 # include <sys/resource.h>
@@ -54,8 +46,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    which should be restored in child processes.  */
 static struct rlimit nofile_limit;
 #endif
-
-#ifdef subprocesses
 
 /* Are local (unix) sockets supported?  */
 #if defined (HAVE_SYS_UN_H)
@@ -97,8 +87,6 @@ static struct rlimit nofile_limit;
 #include <nproc.h>
 #include <sig2str.h>
 #include <verify.h>
-
-#endif	/* subprocesses */
 
 #include "systime.h"
 #include "systty.h"
@@ -156,7 +144,6 @@ static bool kbd_is_on_hold;
    when exiting.  */
 bool inhibit_sentinels;
 
-#ifdef subprocesses
 union u_sockaddr
 {
   struct sockaddr sa;
@@ -216,7 +203,7 @@ process_socket (int domain, int type, int protocol)
 }
 # undef socket
 # define socket(domain, type, protocol) process_socket (domain, type, protocol)
-#endif
+#endif /* ! HAVE_ACCEPT4 */
 
 #define NETCONN_P(p) (EQ (XPROCESS (p)->type, Qnetwork))
 #define NETCONN1_P(p) (EQ (p->type, Qnetwork))
@@ -302,13 +289,13 @@ static struct sockaddr_and_len {
   struct sockaddr *sa;
   ptrdiff_t len;
 } datagram_address[FD_SETSIZE];
-#define DATAGRAM_CHAN_P(chan)	(datagram_address[chan].sa != 0)
-#define DATAGRAM_CONN_P(proc)                                           \
-  (PROCESSP (proc) &&                                                   \
-   XPROCESS (proc)->infd >= 0 &&                                        \
+# define DATAGRAM_CHAN_P(chan)	(datagram_address[chan].sa != 0)
+# define DATAGRAM_CONN_P(proc)				\
+  (PROCESSP (proc) &&					\
+   XPROCESS (proc)->infd >= 0 &&			\
    datagram_address[XPROCESS (proc)->infd].sa != 0)
 #else
-#define DATAGRAM_CONN_P(proc)	(0)
+# define DATAGRAM_CONN_P(proc)	(0)
 #endif
 
 /* FOR_EACH_PROCESS (LIST_VAR, PROC_VAR) followed by a statement is
@@ -403,7 +390,6 @@ pset_stderrproc (struct Lisp_Process *p, Lisp_Object val)
 {
   p->stderrproc = val;
 }
-
 
 static Lisp_Object
 make_lisp_proc (struct Lisp_Process *p)
@@ -692,33 +678,33 @@ allocate_pty (char pty_name[PTY_NAME_SIZE])
 #ifdef HAVE_PTYS
   int fd;
 
-#ifdef PTY_ITERATION
+# ifdef PTY_ITERATION
   PTY_ITERATION
-#else
+# else
   register int c, i;
   for (c = FIRST_PTY_LETTER; c <= 'z'; c++)
     for (i = 0; i < 16; i++)
-#endif
+# endif
       {
-#ifdef PTY_NAME_SPRINTF
+# ifdef PTY_NAME_SPRINTF
 	PTY_NAME_SPRINTF
-#else
+# else
 	sprintf (pty_name, "/dev/pty%c%x", c, i);
-#endif /* no PTY_NAME_SPRINTF */
+# endif /* no PTY_NAME_SPRINTF */
 
-#ifdef PTY_OPEN
+# ifdef PTY_OPEN
 	PTY_OPEN;
-#else /* no PTY_OPEN */
+# else /* no PTY_OPEN */
 	fd = emacs_open (pty_name, O_RDWR | O_NONBLOCK, 0);
-#endif /* no PTY_OPEN */
+# endif /* no PTY_OPEN */
 
 	if (fd >= 0)
 	  {
-#ifdef PTY_TTY_NAME_SPRINTF
+# ifdef PTY_TTY_NAME_SPRINTF
 	    PTY_TTY_NAME_SPRINTF
-#else
+# else
 	    sprintf (pty_name, "/dev/tty%c%x", c, i);
-#endif /* no PTY_TTY_NAME_SPRINTF */
+# endif /* no PTY_TTY_NAME_SPRINTF */
 
 	    /* Set FD's close-on-exec flag.  This is needed even if
 	       PT_OPEN calls posix_openpt with O_CLOEXEC, since POSIX
@@ -913,7 +899,6 @@ record_deleted_pid (pid_t pid, Lisp_Object filename)
   deleted_pid_list = Fcons (Fcons (INT_TO_INTEGER (pid), filename),
 			    /* GC treated elements set to nil.  */
 			    Fdelq (Qnil, deleted_pid_list));
-
 }
 
 DEFUN ("delete-process", Fdelete_process, Sdelete_process, 0, 1,
@@ -1550,7 +1535,6 @@ DEFUN ("process-list", Fprocess_list, Sprocess_list, 0, 0, 0,
   return Fmapcar (Qcdr, Vprocess_alist);
 }
 
-
 /* Starting asynchronous inferior processes.  */
 
 DEFUN ("make-process", Fmake_process, Smake_process, 0, MANY, 0,
@@ -2128,12 +2112,12 @@ create_pty (Lisp_Object process)
       if (forkout < 0)
 	report_file_error ("Opening pty", Qnil);
       p->open_fd[WRITE_TO_SUBPROCESS] = forkout;
-#if defined (DONT_REOPEN_PTY)
+# if defined (DONT_REOPEN_PTY)
       /* In the case that vfork is defined as fork, the parent process
 	 (Emacs) may send some data before the child process completes
 	 tty options setup.  So we setup tty before forking.  */
       child_setup_tty (forkout);
-#endif /* DONT_REOPEN_PTY */
+# endif /* DONT_REOPEN_PTY */
 #endif /* not USG, or USG_SUBTTY_WORKS */
 
       fcntl (pty_fd, F_SETFL, O_NONBLOCK);
@@ -2601,7 +2585,6 @@ set up yet, this function will block until socket setup has completed.  */)
   return address;
 }
 #endif
-
 
 static const struct socket_options {
   /* The name of this option.  Should be lowercase version of option
@@ -3331,7 +3314,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 #ifdef DATAGRAM_SOCKETS
       if (!p->is_server && p->socktype == SOCK_DGRAM)
 	break;
-#endif /* DATAGRAM_SOCKETS */
+#endif
 
       /* Make us close socket if quit.  */
       record_unwind_protect_int (close_file_unwind, s);
@@ -3374,14 +3357,14 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
 #ifdef HAVE_GETSOCKNAME
 	  if (p->port == 0
-#ifdef HAVE_LOCAL_SOCKETS
+# ifdef HAVE_LOCAL_SOCKETS
 	      && family != AF_LOCAL
-#endif
+# endif
 	      )
 	    {
 	      struct sockaddr_in sa1;
 	      socklen_t len1 = sizeof (sa1);
-#ifdef AF_INET6
+# ifdef AF_INET6
 	      /* The code below assumes the port is at the same offset
 		 and of the same width in both IPv4 and IPv6
 		 structures, but the standards don't guarantee that,
@@ -3390,7 +3373,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	      verify ((offsetof (struct sockaddr_in, sin_port)
 		       == offsetof (struct sockaddr_in6, sin6_port))
 		      && sizeof (sa1.sin_port) == sizeof (sa6.sin6_port));
-#endif
+# endif
 	      DECLARE_POINTER_ALIAS (psa1, struct sockaddr, &sa1);
 	      if (getsockname (s, psa1, &len1) == 0)
 		{
@@ -3402,7 +3385,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 		  psa->sin_port = sa1.sin_port;
 		}
 	    }
-#endif
+#endif /* HAVE_GETSOCKNAME */
 
 	  if (p->socktype != SOCK_DGRAM && listen (s, p->backlog))
 	    report_file_error ("Cannot listen on server socket", Qnil);
@@ -3462,7 +3445,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	    goto retry_connect;
 	  else
 	    break;
-#endif
+#endif /* ! WINDOWSNT */
 	}
     connect_done:
       if (ret == 0)
@@ -4097,8 +4080,6 @@ usage: (make-network-process &rest ARGS)  */)
   return proc;
 }
 
-
-
 #ifdef HAVE_GETIFADDRS
 static Lisp_Object
 network_interface_list (bool full, unsigned short match)
@@ -4131,7 +4112,7 @@ network_interface_list (bool full, unsigned short match)
           len = sizeof (struct sockaddr_in);
           addr_len = 1;
         }
-#ifdef AF_INET6
+# ifdef AF_INET6
       else if (it->ifa_addr->sa_family == AF_INET6)
         {
           DECLARE_POINTER_ALIAS (sin6_1, struct sockaddr_in6, it->ifa_netmask);
@@ -4141,7 +4122,7 @@ network_interface_list (bool full, unsigned short match)
           len = sizeof (struct sockaddr_in6);
           addr_len = 4;
         }
-#endif
+# endif
       else
         continue;
 
@@ -4169,16 +4150,16 @@ network_interface_list (bool full, unsigned short match)
         }
       res = Fcons (Fcons (build_string (it->ifa_name), elt), res);
     }
-#ifdef HAVE_FREEIFADDRS
+# ifdef HAVE_FREEIFADDRS
   freeifaddrs (ifap);
-#endif
+# endif
 
   return res;
 }
 #endif  /* HAVE_GETIFADDRS */
 
 #ifdef HAVE_NET_IF_H
-#if defined (SIOCGIFADDR) || defined (SIOCGIFHWADDR) || defined (SIOCGIFFLAGS)
+# if defined (SIOCGIFADDR) || defined (SIOCGIFHWADDR) || defined (SIOCGIFFLAGS)
 
 struct ifflag_def {
   int flag_bit;
@@ -4186,74 +4167,74 @@ struct ifflag_def {
 };
 
 static const struct ifflag_def ifflag_table[] = {
-#ifdef IFF_UP
+#  ifdef IFF_UP
   { IFF_UP,		"up" },
-#endif
-#ifdef IFF_BROADCAST
+#  endif
+#  ifdef IFF_BROADCAST
   { IFF_BROADCAST,	"broadcast" },
-#endif
-#ifdef IFF_DEBUG
+#  endif
+#  ifdef IFF_DEBUG
   { IFF_DEBUG,		"debug" },
-#endif
-#ifdef IFF_LOOPBACK
+#  endif
+#  ifdef IFF_LOOPBACK
   { IFF_LOOPBACK,	"loopback" },
-#endif
-#ifdef IFF_POINTOPOINT
+#  endif
+#  ifdef IFF_POINTOPOINT
   { IFF_POINTOPOINT,	"pointopoint" },
-#endif
-#ifdef IFF_RUNNING
+#  endif
+#  ifdef IFF_RUNNING
   { IFF_RUNNING,	"running" },
-#endif
-#ifdef IFF_NOARP
+#  endif
+#  ifdef IFF_NOARP
   { IFF_NOARP,		"noarp" },
-#endif
-#ifdef IFF_PROMISC
+#  endif
+#  ifdef IFF_PROMISC
   { IFF_PROMISC,	"promisc" },
-#endif
-#ifdef IFF_NOTRAILERS
-#ifdef NS_IMPL_COCOA
+#  endif
+#  ifdef IFF_NOTRAILERS
+#   ifdef NS_IMPL_COCOA
   /* Really means smart, notrailers is obsolete.  */
   { IFF_NOTRAILERS,	"smart" },
-#else
+#   else
   { IFF_NOTRAILERS,	"notrailers" },
-#endif
-#endif
-#ifdef IFF_ALLMULTI
+#   endif
+#  endif
+#  ifdef IFF_ALLMULTI
   { IFF_ALLMULTI,	"allmulti" },
-#endif
-#ifdef IFF_MASTER
+#  endif
+#  ifdef IFF_MASTER
   { IFF_MASTER,		"master" },
-#endif
-#ifdef IFF_SLAVE
+#  endif
+#  ifdef IFF_SLAVE
   { IFF_SLAVE,		"slave" },
-#endif
-#ifdef IFF_MULTICAST
+#  endif
+#  ifdef IFF_MULTICAST
   { IFF_MULTICAST,	"multicast" },
-#endif
-#ifdef IFF_PORTSEL
+#  endif
+#  ifdef IFF_PORTSEL
   { IFF_PORTSEL,	"portsel" },
-#endif
-#ifdef IFF_AUTOMEDIA
+#  endif
+#  ifdef IFF_AUTOMEDIA
   { IFF_AUTOMEDIA,	"automedia" },
-#endif
-#ifdef IFF_DYNAMIC
+#  endif
+#  ifdef IFF_DYNAMIC
   { IFF_DYNAMIC,	"dynamic" },
-#endif
-#ifdef IFF_OACTIVE
+#  endif
+#  ifdef IFF_OACTIVE
   { IFF_OACTIVE,	"oactive" }, /* OpenBSD: transmission in progress.  */
-#endif
-#ifdef IFF_SIMPLEX
+#  endif
+#  ifdef IFF_SIMPLEX
   { IFF_SIMPLEX,	"simplex" }, /* OpenBSD: can't hear own transmissions.  */
-#endif
-#ifdef IFF_LINK0
+#  endif
+#  ifdef IFF_LINK0
   { IFF_LINK0,		"link0" }, /* OpenBSD: per link layer defined bit.  */
-#endif
-#ifdef IFF_LINK1
+#  endif
+#  ifdef IFF_LINK1
   { IFF_LINK1,		"link1" }, /* OpenBSD: per link layer defined bit.  */
-#endif
-#ifdef IFF_LINK2
+#  endif
+#  ifdef IFF_LINK2
   { IFF_LINK2,		"link2" }, /* OpenBSD: per link layer defined bit.  */
-#endif
+#  endif
   { 0, 0 }
 };
 
@@ -4265,10 +4246,10 @@ network_interface_info (Lisp_Object ifname)
   Lisp_Object elt;
   int s;
   bool any = false;
-#if (! (defined SIOCGIFHWADDR && defined HAVE_STRUCT_IFREQ_IFR_HWADDR)	\
-     && defined HAVE_GETIFADDRS && defined LLADDR)
+#  if (! (defined SIOCGIFHWADDR && defined HAVE_STRUCT_IFREQ_IFR_HWADDR)	\
+	&& defined HAVE_GETIFADDRS && defined LLADDR)
   struct ifaddrs *ifap;
-#endif
+#  endif
 
   CHECK_STRING (ifname);
 
@@ -4283,7 +4264,7 @@ network_interface_info (Lisp_Object ifname)
   record_unwind_protect_int (close_file_unwind, s);
 
   elt = Qnil;
-#if defined (SIOCGIFFLAGS) && defined (HAVE_STRUCT_IFREQ_IFR_FLAGS)
+#  if defined (SIOCGIFFLAGS) && defined (HAVE_STRUCT_IFREQ_IFR_FLAGS)
   if (ioctl (s, SIOCGIFFLAGS, &rq) == 0)
     {
       int flags = rq.ifr_flags;
@@ -4313,11 +4294,11 @@ network_interface_info (Lisp_Object ifname)
 	    }
 	}
     }
-#endif
+#  endif
   res = Fcons (elt, res);
 
   elt = Qnil;
-#if defined (SIOCGIFHWADDR) && defined (HAVE_STRUCT_IFREQ_IFR_HWADDR)
+#  if defined (SIOCGIFHWADDR) && defined (HAVE_STRUCT_IFREQ_IFR_HWADDR)
   if (ioctl (s, SIOCGIFHWADDR, &rq) == 0)
     {
       Lisp_Object hwaddr = make_vector (6);
@@ -4330,7 +4311,7 @@ network_interface_info (Lisp_Object ifname)
 				      [n]);
       elt = Fcons (make_fixnum (rq.ifr_hwaddr.sa_family), hwaddr);
     }
-#elif defined (HAVE_GETIFADDRS) && defined (LLADDR)
+#  elif defined (HAVE_GETIFADDRS) && defined (LLADDR)
   if (getifaddrs (&ifap) != -1)
     {
       Lisp_Object hwaddr = initialize_vector (6, Qnil);
@@ -4355,54 +4336,54 @@ network_interface_info (Lisp_Object ifname)
           break;
         }
     }
-#ifdef HAVE_FREEIFADDRS
+#   ifdef HAVE_FREEIFADDRS
   freeifaddrs (ifap);
-#endif
+#   endif
 
-#endif /* HAVE_GETIFADDRS && LLADDR */
+#  endif /* HAVE_GETIFADDRS && LLADDR */
 
   res = Fcons (elt, res);
 
   elt = Qnil;
-#if (defined SIOCGIFNETMASK \
+#  if (defined SIOCGIFNETMASK \
      && (defined HAVE_STRUCT_IFREQ_IFR_NETMASK \
 	 || defined HAVE_STRUCT_IFREQ_IFR_ADDR))
   if (ioctl (s, SIOCGIFNETMASK, &rq) == 0)
     {
       any = true;
-#ifdef HAVE_STRUCT_IFREQ_IFR_NETMASK
+#   ifdef HAVE_STRUCT_IFREQ_IFR_NETMASK
       elt = conv_sockaddr_to_lisp (&rq.ifr_netmask, sizeof (rq.ifr_netmask));
-#else
+#   else
       elt = conv_sockaddr_to_lisp (&rq.ifr_addr, sizeof (rq.ifr_addr));
-#endif
+#   endif
     }
-#endif
+#  endif
   res = Fcons (elt, res);
 
   elt = Qnil;
-#if defined (SIOCGIFBRDADDR) && defined (HAVE_STRUCT_IFREQ_IFR_BROADADDR)
+#  if defined (SIOCGIFBRDADDR) && defined (HAVE_STRUCT_IFREQ_IFR_BROADADDR)
   if (ioctl (s, SIOCGIFBRDADDR, &rq) == 0)
     {
       any = true;
       elt = conv_sockaddr_to_lisp (&rq.ifr_broadaddr, sizeof rq.ifr_broadaddr);
     }
-#endif
+#  endif
   res = Fcons (elt, res);
 
   elt = Qnil;
-#if defined (SIOCGIFADDR) && defined (HAVE_STRUCT_IFREQ_IFR_ADDR)
+#  if defined (SIOCGIFADDR) && defined (HAVE_STRUCT_IFREQ_IFR_ADDR)
   if (ioctl (s, SIOCGIFADDR, &rq) == 0)
     {
       any = true;
       elt = conv_sockaddr_to_lisp (&rq.ifr_addr, sizeof (rq.ifr_addr));
     }
-#endif
+#  endif
   res = Fcons (elt, res);
 
   return unbind_to (count, any ? res : Qnil);
 }
-#endif	/* !SIOCGIFADDR && !SIOCGIFHWADDR && !SIOCGIFFLAGS */
-#endif	/* defined (HAVE_NET_IF_H) */
+# endif /* !SIOCGIFADDR && !SIOCGIFHWADDR && !SIOCGIFFLAGS */
+#endif	/* HAVE_NET_IF_H */
 
 DEFUN ("network-interface-list", Fnetwork_interface_list,
        Snetwork_interface_list, 0, 2, 0,
@@ -4438,10 +4419,10 @@ If the information is not available, return nil.  */)
     match = 0;
   else if (EQ (family, Qipv4))
     match = AF_INET;
-#ifdef AF_INET6
+# ifdef AF_INET6
   else if (EQ (family, Qipv6))
     match = AF_INET6;
-#endif
+# endif
   else
     error ("Unsupported address family");
   return network_interface_list (full_info, match);
@@ -4759,8 +4740,8 @@ server_accept_connection (Lisp_Object server, int channel)
   service = Qnil;
   Lisp_Object args[11];
   int nargs = 0;
-  #define HOST_FORMAT_IN "%d.%d.%d.%d"
-  #define HOST_FORMAT_IN6 "%x:%x:%x:%x:%x:%x:%x:%x"
+#define HOST_FORMAT_IN "%d.%d.%d.%d"
+#define HOST_FORMAT_IN6 "%x:%x:%x:%x:%x:%x:%x:%x"
   AUTO_STRING (host_format_in, HOST_FORMAT_IN);
   AUTO_STRING (host_format_in6, HOST_FORMAT_IN6);
   AUTO_STRING (procname_format_in, "%s <"HOST_FORMAT_IN":%d>");
@@ -5435,11 +5416,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
       if (read_kbd && interrupt_input
 	  && keyboard_bit_set (&Available) && ! noninteractive)
-#ifdef USABLE_SIGIO
+# ifdef USABLE_SIGIO
 	handle_input_available_signal (SIGIO);
-#else
+# else
 	handle_input_available_signal (SIGPOLL);
-#endif
+# endif
 #endif
 
       /* If checking input just got us a size-change event from X,
@@ -6309,7 +6290,7 @@ emacs_get_tty_pgrp (struct Lisp_Process *p)
 	  emacs_close (fd);
 	}
     }
-#endif /* defined (TIOCGPGRP ) */
+#endif /* TIOCGPGRP */
 
   return gid;
 }
@@ -6405,11 +6386,11 @@ process_send_signal (Lisp_Object process, int signo, Lisp_Object current_group,
 	  break;
 
   	case SIGTSTP:
-#ifdef VSWTCH
+# ifdef VSWTCH
 	  sig_char = &t.c_cc[VSWTCH];
-#else
+# else
 	  sig_char = &t.c_cc[VSUSP];
-#endif
+# endif
 	  break;
 	}
 
@@ -6423,7 +6404,7 @@ process_send_signal (Lisp_Object process, int signo, Lisp_Object current_group,
 
       /* The code above may fall through if it can't
 	 handle the signal.  */
-#endif /* defined (SIGNALS_VIA_CHARACTERS) */
+#endif /* SIGNALS_VIA_CHARACTERS */
 
 #ifdef TIOCGPGRP
       /* Get the current pgrp using the tty itself, if we have that.
@@ -6446,11 +6427,11 @@ process_send_signal (Lisp_Object process, int signo, Lisp_Object current_group,
 	 Or perhaps this is vestigial.  */
       if (gid == -1)
 	no_pgrp = 1;
-#else  /* ! defined (TIOCGPGRP) */
+#else  /* ! TIOCGPGRP */
       /* Can't select pgrps on this system, so we know that
 	 the child itself heads the pgrp.  */
       gid = p->pid;
-#endif /* ! defined (TIOCGPGRP) */
+#endif /* ! TIOCGPGRP */
 
       /* If current_group is lambda, and the shell owns the terminal,
 	 don't send any signal.  */
@@ -6894,7 +6875,7 @@ child_signal_read (int fd, void *data)
 }
 #endif	/* !WINDOWSNT */
 
-/* Notify `wait_reading_process_output' of a process status
+/* Notify wait_reading_process_output() of a process status
    change.  */
 
 static void
@@ -7023,7 +7004,6 @@ deliver_child_signal (int sig)
 {
   deliver_process_signal (sig, handle_child_signal);
 }
-
 
 static Lisp_Object
 exec_sentinel_error_handler (Lisp_Object error_val)
@@ -7226,7 +7206,6 @@ This inserts a status message into the process's buffer, if there is one.  */)
   return Qnil;
 }
 
-
 DEFUN ("set-process-coding-system", Fset_process_coding_system,
        Sset_process_coding_system, 1, 3, 0,
        doc: /* Set coding systems of PROCESS to DECODING and ENCODING.
@@ -7304,10 +7283,7 @@ DEFUN ("process-filter-multibyte-p", Fprocess_filter_multibyte_p,
   return (CODING_FOR_UNIBYTE (coding) ? Qnil : Qt);
 }
 
-
-
-
-# ifdef HAVE_GPM
+#ifdef HAVE_GPM
 
 void
 add_gpm_wait_descriptor (int desc)
@@ -7321,7 +7297,7 @@ delete_gpm_wait_descriptor (int desc)
   delete_keyboard_wait_descriptor (desc);
 }
 
-# endif
+#endif
 
 #if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
 
@@ -7340,211 +7316,7 @@ keyboard_bit_set (fd_set *mask)
 
   return 0;
 }
-# endif
-
-#else  /* not subprocesses */
-
-/* This is referenced in thread.c:run_thread (which is never actually
-   called, since threads are not enabled for this configuration.  */
-void
-update_processes_for_thread_death (Lisp_Object dying_thread)
-{
-}
-
-/* Defined in msdos.c.  */
-extern int sys_select (int, fd_set *, fd_set *, fd_set *,
-		       struct timespec *, void *);
-
-/* Implementation of wait_reading_process_output, assuming that there
-   are no subprocesses.  Used only by the MS-DOS build.
-
-   Wait for timeout to elapse and/or keyboard input to be available.
-
-   TIME_LIMIT is:
-     timeout in seconds
-     If negative, gobble data immediately available but don't wait for any.
-
-   NSECS is:
-     an additional duration to wait, measured in nanoseconds
-     If TIME_LIMIT is zero, then:
-       If NSECS == 0, there is no limit.
-       If NSECS > 0, the timeout consists of NSECS only.
-       If NSECS < 0, gobble data immediately, as if TIME_LIMIT were negative.
-
-   READ_KBD is:
-     0 to ignore keyboard input, or
-     1 to return when input is available, or
-     -1 means caller will actually read the input, so don't throw to
-       the quit handler.
-
-   see full version for other parameters. We know that wait_proc will
-     always be NULL, since `subprocesses' isn't defined.
-
-   DO_DISPLAY means redisplay should be done to show subprocess
-   output that arrives.
-
-   Return -1 signifying we got no output and did not try.  */
-
-int
-wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
-			     bool do_display, struct Lisp_Process *wait_proc,
-			     int just_wait_proc)
-{
-  register int nfds;
-  struct timespec end_time, timeout;
-  enum { MINIMUM = -1, TIMEOUT, FOREVER } wait;
-
-  if (TYPE_MAXIMUM (time_t) < time_limit)
-    time_limit = TYPE_MAXIMUM (time_t);
-
-  if (time_limit < 0 || nsecs < 0)
-    wait = MINIMUM;
-  else if (time_limit > 0 || nsecs > 0)
-    {
-      wait = TIMEOUT;
-      end_time = timespec_add (current_timespec (),
-                               make_timespec (time_limit, nsecs));
-    }
-  else
-    wait = FOREVER;
-
-  /* Turn off periodic alarms (in case they are in use)
-     and then turn off any other atimers,
-     because the select emulator uses alarms.  */
-  stop_polling ();
-  turn_on_atimers (0);
-
-  while (1)
-    {
-      bool timeout_reduced_for_timers = false;
-      fd_set waitchannels;
-      int xerrno;
-
-      /* If calling from keyboard input, do not quit
-	 since we want to return C-g as an input character.
-	 Otherwise, do pending quit if requested.  */
-      if (read_kbd >= 0)
-	maybe_quit ();
-
-      /* Compute time from now till when time limit is up.  */
-      /* Exit if already run out.  */
-      if (wait == TIMEOUT)
-	{
-	  struct timespec now = current_timespec ();
-	  if (timespec_cmp (end_time, now) <= 0)
-	    break;
-	  timeout = timespec_sub (end_time, now);
-	}
-      else
-	timeout = make_timespec (wait < TIMEOUT ? 0 : 100000, 0);
-
-      /* If our caller will not immediately handle keyboard events,
-	 run timer events directly.
-	 (Callers that will immediately read keyboard events
-	 call timer_delay on their own.)  */
-      {
-	struct timespec timer_delay;
-
-	do
-	  {
-	    unsigned old_timers_run = timers_run;
-	    timer_delay = timer_check ();
-	    if (timers_run != old_timers_run && do_display)
-	      /* We must retry, since a timer may have requeued itself
-		 and that could alter the time delay.  */
-	      redisplay_preserve_echo_area (14);
-	    else
-	      break;
-	  }
-	while (!detect_input_pending ());
-
-	/* If there is unread keyboard input, also return.  */
-	if (read_kbd != 0
-	    && requeued_events_pending_p ())
-	  break;
-
-	if (timespec_valid_p (timer_delay))
-	  {
-	    if (timespec_cmp (timer_delay, timeout) < 0)
-	      {
-		timeout = timer_delay;
-		timeout_reduced_for_timers = true;
-	      }
-	  }
-      }
-
-      /* `set_waiting_for_input' is a Blandyism that claims to have
-	 emacs react immediately to C-g and signals.  Passing a
-	 writable reference to timeout so that signal handlers can
-	 manipulate timeout out-of-band is super obtuse and probably
-	 makes no discernible difference.
-      */
-      if (read_kbd < 0)
-	set_waiting_for_input (&timeout);
-
-      /* If a frame has been newly mapped and needs updating,
-	 reprocess its display stuff.  */
-      if (frame_garbaged && do_display)
-	{
-	  clear_waiting_for_input ();
-	  redisplay_preserve_echo_area (15);
-	  if (read_kbd < 0)
-	    set_waiting_for_input (&timeout);
-	}
-
-      /* Wait till there is something to do.  */
-      FD_ZERO (&waitchannels);
-      if (read_kbd && detect_input_pending ())
-	nfds = 0;
-      else
-	{
-	  if (read_kbd)
-	    FD_SET (0, &waitchannels);
-	  nfds = pselect (1, &waitchannels, NULL, NULL, &timeout, NULL);
-	}
-
-      xerrno = errno;
-
-      clear_waiting_for_input ();
-
-      /*  If we woke up due to SIGWINCH, actually change size now.  */
-      do_pending_window_change (0);
-
-      if (wait < FOREVER && nfds == 0 && ! timeout_reduced_for_timers)
-	/* We waited the full specified time, so return now.  */
-	break;
-
-      if (nfds == -1)
-	{
-	  /* If the system call was interrupted, then go around the
-	     loop again.  */
-	  if (xerrno == EINTR)
-	    FD_ZERO (&waitchannels);
-	  else
-	    report_file_errno ("Failed select", Qnil, xerrno);
-	}
-
-      /* Check for keyboard input.  */
-
-      if (read_kbd
-	  && detect_input_pending_run_timers (do_display))
-	{
-	  swallow_events (do_display);
-	  if (detect_input_pending_run_timers (do_display))
-	    break;
-	}
-
-      /* If there is unread keyboard input, also return.  */
-      if (read_kbd && requeued_events_pending_p ())
-	break;
-    }
-
-  start_polling ();
-
-  return -1;
-}
-
-#endif	/* not subprocesses */
+#endif
 
 /* The following functions are needed even if async subprocesses are
    not supported.  Some of them are no-op stubs in that case.  */
@@ -7585,13 +7357,11 @@ remove_slash_colon (Lisp_Object name)
 void
 add_keyboard_wait_descriptor (int desc)
 {
-#ifdef subprocesses /* Actually means "not MSDOS".  */
   eassert (desc >= 0 && desc < FD_SETSIZE);
   fd_callback_info[desc].flags &= ~PROCESS_FD;
   fd_callback_info[desc].flags |= (FOR_READ | KEYBOARD_FD);
   if (desc > max_desc)
     max_desc = desc;
-#endif
 }
 
 /* From now on, do not expect DESC to give keyboard input.  */
@@ -7599,14 +7369,12 @@ add_keyboard_wait_descriptor (int desc)
 void
 delete_keyboard_wait_descriptor (int desc)
 {
-#ifdef subprocesses
   eassert (desc >= 0 && desc < FD_SETSIZE);
 
   memset (&fd_callback_info[desc], 0, sizeof (struct fd_callback_data));
 
   if (desc == max_desc)
     recompute_max_desc ();
-#endif
 }
 
 /* Setup coding systems of PROCESS.  */
@@ -7614,7 +7382,6 @@ delete_keyboard_wait_descriptor (int desc)
 void
 setup_process_coding_systems (Lisp_Object process)
 {
-#ifdef subprocesses
   struct Lisp_Process *p = XPROCESS (process);
   int inch = p->infd;
   int outch = p->outfd;
@@ -7640,7 +7407,6 @@ setup_process_coding_systems (Lisp_Object process)
     proc_encode_coding_system[outch] = xmalloc (sizeof (struct coding_system));
   setup_coding_system (p->encode_coding_system,
 		       proc_encode_coding_system[outch]);
-#endif
 }
 
 DEFUN ("get-buffer-process", Fget_buffer_process, Sget_buffer_process, 1, 1, 0,
@@ -7650,7 +7416,6 @@ Return nil if all processes associated with BUFFER have been
 deleted or killed.  */)
   (register Lisp_Object buffer)
 {
-#ifdef subprocesses
   register Lisp_Object buf, tail, proc;
 
   if (NILP (buffer)) return Qnil;
@@ -7660,7 +7425,6 @@ deleted or killed.  */)
   FOR_EACH_PROCESS (tail, proc)
     if (EQ (XPROCESS (proc)->buffer, buf))
       return proc;
-#endif	/* subprocesses */
   return Qnil;
 }
 
@@ -7673,14 +7437,8 @@ associated with PROCESS will inherit the coding system used to decode
 the process output.  */)
   (register Lisp_Object process)
 {
-#ifdef subprocesses
   CHECK_PROCESS (process);
   return XPROCESS (process)->inherit_coding_system_flag ? Qt : Qnil;
-#else
-  /* Ignore the argument and return the value of
-     inherit-process-coding-system.  */
-  return inherit_process_coding_system ? Qt : Qnil;
-#endif
 }
 
 /* Kill all processes associated with `buffer'.
@@ -7689,7 +7447,6 @@ the process output.  */)
 void
 kill_buffer_processes (Lisp_Object buffer)
 {
-#ifdef subprocesses
   Lisp_Object tail, proc;
 
   FOR_EACH_PROCESS (tail, proc)
@@ -7700,9 +7457,6 @@ kill_buffer_processes (Lisp_Object buffer)
 	else if (XPROCESS (proc)->infd >= 0)
 	  process_send_signal (proc, SIGHUP, Qnil, 1);
       }
-#else  /* subprocesses */
-  /* Since we have no subprocesses, this does nothing.  */
-#endif /* subprocesses */
 }
 
 DEFUN ("waiting-for-user-input-p", Fwaiting_for_user_input_p,
@@ -7861,7 +7615,6 @@ DEFUN ("signal-names", Fsignal_names, Ssignal_names, 0, 0, 0,
 #endif
 }
 
-#ifdef subprocesses
 /* Arrange to catch SIGCHLD if this hasn't already been arranged.
    Invoke this after init_process_emacs, and after glib and/or GNUstep
    futz with the SIGCHLD handler, but before Emacs forks any children.
@@ -7885,7 +7638,6 @@ catch_child_signal (void)
 	 : old_action.sa_handler);
   unblock_child_signal (&oldset);
 }
-#endif	/* subprocesses */
 
 /* Limit the number of open files to the value it had at startup.  */
 
@@ -7920,7 +7672,6 @@ open_channel_for_module (Lisp_Object process)
 void
 init_process_emacs (int sockfd)
 {
-#ifdef subprocesses
   int i;
 
   inhibit_sentinels = 0;
@@ -7994,7 +7745,6 @@ init_process_emacs (int sockfd)
   memset (datagram_address, 0, sizeof datagram_address);
 #endif
 
-#endif	/* subprocesses */
   kbd_is_on_hold = 0;
 }
 
@@ -8004,8 +7754,6 @@ syms_of_process (void)
   DEFSYM (Qmake_process, "make-process");
   DEFSYM (Qlist_system_processes, "list-system-processes");
   DEFSYM (Qprocess_attributes, "process-attributes");
-
-#ifdef subprocesses
 
   DEFSYM (Qprocessp, "processp");
   DEFSYM (Qrun, "run");
@@ -8080,8 +7828,6 @@ syms_of_process (void)
   staticpro (&Vprocess_alist);
   staticpro (&deleted_pid_list);
 
-#endif	/* subprocesses */
-
   DEFSYM (QCname, ":name");
   DEFSYM (QCtype, ":type");
 
@@ -8106,12 +7852,10 @@ syms_of_process (void)
   DEFSYM (Qcutime, "cutime");
   DEFSYM (Qcstime, "cstime");
   DEFSYM (Qctime, "ctime");
-#ifdef subprocesses
   DEFSYM (Qinternal_default_process_sentinel,
 	  "internal-default-process-sentinel");
   DEFSYM (Qinternal_default_process_filter,
 	  "internal-default-process-filter");
-#endif
   DEFSYM (Qpri, "pri");
   DEFSYM (Qnice, "nice");
   DEFSYM (Qthcount, "thcount");
@@ -8131,7 +7875,6 @@ A value of nil means don't delete them until `list-processes' is run.  */);
 
   delete_exited_processes = 1;
 
-#ifdef subprocesses
   DEFVAR_LISP ("process-connection-type", Vprocess_connection_type,
 	       doc: /* Control type of device used to communicate with subprocesses.
 Values are nil to use a pipe, or t or `pty' to use a pty.
@@ -8292,8 +8035,6 @@ sentinel or a process filter function has an error.  */);
 
    Fprovide (intern_c_string ("make-network-process"), subfeatures);
  }
-
-#endif	/* subprocesses */
 
   defsubr (&Sget_buffer_process);
   defsubr (&Sprocess_inherit_coding_system_flag);

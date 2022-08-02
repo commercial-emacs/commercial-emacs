@@ -115,14 +115,14 @@ lisp_mutex_init (lisp_mutex_t *mutex)
 }
 
 /* If MUTEX is already locked by thread LOCKER, increment MUTEX's lock
-   count.  Return 0.
+   count.
 
    If MUTEX is unlocked, assign to thread LOCKER, set its lock
-   count to the larger of NEW_COUNT and 1.  Return 0.
+   count to the larger of NEW_COUNT and 1.
 
    If MUTEX is locked by another thread, release the global lock,
    allowing other threads to run while waiting MUTEX to become
-   unlocked.  Return 1 upon acquiring MUTEX.
+   unlocked.  Return upon reacquiring MUTEX.
 */
 static void
 lisp_mutex_lock_for_thread (lisp_mutex_t *mutex, struct thread_state *locker,
@@ -277,8 +277,6 @@ finalize_one_mutex (struct Lisp_Mutex *mutex)
 {
   lisp_mutex_destroy (&mutex->mutex);
 }
-
-
 
 DEFUN ("make-condition-variable",
        Fmake_condition_variable, Smake_condition_variable,
@@ -591,26 +589,13 @@ record_thread_error (Lisp_Object error_form)
 static void *
 run_thread (void *state)
 {
-  /* Make sure stack_top and m_stack_bottom are properly aligned as GC
-     expects.  */
-  union
-  {
-    Lisp_Object o;
-    void *p;
-    char c;
-  } stack_pos;
-
-  struct thread_state *self = state;
-  struct thread_state **iter;
-
 #ifdef HAVE_NS
-  /* Allocate an autorelease pool in case this thread calls any
-     Objective C code.
-
-     FIXME: In long running threads we may want to drain the pool
-     regularly instead of just at the end.  */
+  /* Alan Third anticipating calls to Objective C code.  */
   void *pool = ns_alloc_autorelease_pool ();
 #endif
+
+  struct thread_state *self = state;
+  union { char c; GCALIGNED_UNION_MEMBER } stack_pos;
 
   self->m_stack_bottom = self->stack_top = &stack_pos.c;
   self->thread_id = sys_thread_self ();
@@ -635,22 +620,19 @@ run_thread (void *state)
 
   update_processes_for_thread_death (Fcurrent_thread ());
 
+  /* 1- for unreachable dummy entry */
   xfree (self->m_specpdl - 1);
   self->m_specpdl = NULL;
   self->m_specpdl_ptr = NULL;
   self->m_specpdl_end = NULL;
 
-  {
-    struct handler *c, *c_next;
-    for (c = handlerlist_sentinel; c; c = c_next)
-      {
-	c_next = c->nextfree;
-	xfree (c);
-      }
-  }
+  for (struct handler *c_next, *c = handlerlist_sentinel; c != NULL; c = c_next)
+    {
+      c_next = c->nextfree;
+      xfree (c);
+    }
 
   xfree (self->thread_name);
-
   current_thread = NULL;
   sys_cond_broadcast (&self->thread_condvar);
 
@@ -658,16 +640,20 @@ run_thread (void *state)
   ns_release_autorelease_pool (pool);
 #endif
 
-  /* Unlink this thread from the list of all threads.  Note that we
-     have to do this very late, after broadcasting our death.
-     Otherwise the GC may decide to reap the thread_state object,
-     leading to crashes.  */
-  for (iter = &all_threads; *iter != self; iter = &(*iter)->next_thread)
-    ;
-  *iter = (*iter)->next_thread;
+  /* Unlink SELF from all_threads.  Avoid doing this before
+     sys_cond_broadcast() lest GC.  */
+  for (struct thread_state **iter = &all_threads;
+       *iter != NULL;
+       iter = &(*iter)->next_thread)
+    {
+      if (*iter == self)
+	{
+	  *iter = (*iter)->next_thread;
+	  break;
+	}
+    }
 
   sys_mutex_unlock (&global_lock);
-
   return NULL;
 }
 
@@ -696,22 +682,24 @@ When the function exits, the thread dies.
 If NAME is given, it must be a string; it names the new thread.  */)
   (Lisp_Object function, Lisp_Object name)
 {
+  Lisp_Object result;
+  sys_thread_t thr;
+  struct thread_state *new_thread;
+  const ptrdiff_t size = 50;
+
   /* Can't start a thread in temacs.  */
-  if (!initialized)
+  if (! initialized)
     emacs_abort ();
 
-  if (!NILP (name))
+  if (! NILP (name))
     CHECK_STRING (name);
 
-  struct thread_state *new_thread
-    = ALLOCATE_ZEROED_PSEUDOVECTOR (struct thread_state, event_object,
-				    PVEC_THREAD);
+  new_thread = ALLOCATE_ZEROED_PSEUDOVECTOR (struct thread_state, event_object,
+					     PVEC_THREAD);
   new_thread->function = function;
   new_thread->name = name;
-  /* Perhaps copy m_last_thing_searched from parent?  */
   new_thread->m_current_buffer = current_thread->m_current_buffer;
 
-  ptrdiff_t size = 50;
   /* 1+ for unreachable dummy entry */
   union specbinding *pdlvec = xmalloc ((1 + size) * sizeof (union specbinding));
   new_thread->m_specpdl = pdlvec + 1;  /* Skip the dummy entry.  */
@@ -722,29 +710,18 @@ If NAME is given, it must be a string; it names the new thread.  */)
 
   sys_cond_init (&new_thread->thread_condvar);
 
-  /* We'll need locking here eventually.  */
   new_thread->next_thread = all_threads;
   all_threads = new_thread;
 
-  char const *c_name = !NILP (name) ? SSDATA (ENCODE_SYSTEM (name)) : NULL;
-  if (c_name)
-    new_thread->thread_name = xstrdup (c_name);
-  else
-    new_thread->thread_name = NULL;
-  sys_thread_t thr;
+  new_thread->thread_name =
+    NILP (name) ? NULL : xstrdup (SSDATA (ENCODE_SYSTEM (name)));
+
   if (! sys_thread_create (&thr, run_thread, new_thread))
     {
-      /* Restore the previous situation.  */
-      all_threads = all_threads->next_thread;
-#ifdef THREADS_ENABLED
+      all_threads = all_threads->next_thread; /* restore to original.  */
       error ("Could not start a new thread");
-#else
-      error ("Concurrency is not supported in this configuration");
-#endif
     }
 
-  /* FIXME: race here where new thread might not be filled in?  */
-  Lisp_Object result;
   XSETTHREAD (result, new_thread);
   return result;
 }
@@ -950,8 +927,6 @@ thread_check_current_buffer (struct buffer *buffer)
 
   return false;
 }
-
-
 
 bool
 main_thread_p (const void *ptr)

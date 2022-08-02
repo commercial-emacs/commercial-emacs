@@ -710,10 +710,11 @@ struct Lisp_Symbol
       bool_bf gcmarkbit : 1;
 
       /* Indicates where the value can be found:
-	 0 : plain var, value in `value' field
-	 1 : varalias, value in `alias' symbol
-	 2 : localized var, value in `blv' object
-	 3 : forwarding variable, value in `forward'  */
+	 0 : plain var
+	 1 : varalias
+	 2 : localized var
+	 3 : forwarding variable
+      */
       ENUM_BF (symbol_redirect) redirect : 3;
 
       /* 0 : normal case, just set the value
@@ -733,8 +734,7 @@ struct Lisp_Symbol
       /* The symbol's name, as a Lisp string.  */
       Lisp_Object name;
 
-      /* Value of the symbol or Qunbound if unbound.  Which alternative of the
-	 union is used depends on the REDIRECT field above.  */
+      /* Value according to REDIRECT above, or Qunbound if unbound.  */
       union {
 	Lisp_Object value;
 	struct Lisp_Symbol *alias;

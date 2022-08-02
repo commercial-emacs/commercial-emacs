@@ -689,8 +689,7 @@ global value outside of any lexical scope.  */)
 	}
       FALLTHROUGH;
     case SYMBOL_FORWARDED:
-      /* In set_internal(), we un-forward vars when their value is
-	 set to Qunbound.  */
+      /* set_internal() un-forwards vars whose value is Qunbound.  */
       valcontents = Qt;
       break;
     default:

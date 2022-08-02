@@ -2783,6 +2783,13 @@ fi
 CFLAGS=$OLD_CFLAGS
 LIBS=$OLD_LIBS
 
+dnl process_msdos.c only exists in git history
+PROCESS_OBJ=process.o
+if test "$opsys" = msdos; then
+  PROCESS_OBJ="process_msdos.o"
+fi
+AC_SUBST([PROCESS_OBJ])
+
 PGTK_OBJ=
 PGTK_LIBS=
 if test "$window_system" = "pgtk"; then
@@ -5198,7 +5205,6 @@ dnl Everybody supports this, except MS-DOS.
 AC_DEFINE([subprocesses], [1], [Define to enable asynchronous subprocesses.])
 
 AC_DEFINE([USER_FULL_NAME], [pw->pw_gecos], [How to get a user's full name.])
-
 
 AC_DEFINE([DIRECTORY_SEP], ['/'],
   [Character that separates directories in a file name.])

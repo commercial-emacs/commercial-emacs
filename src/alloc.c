@@ -4032,9 +4032,9 @@ typedef union
 # define STACK_TOP_ADDRESS(addr) (addr)
 #endif
 
-/* Before calling any FUNC that could release the global interpreter
-   lock, e.g., thread-yield, record the prevailing stack top in
-   CURRENT_THREAD for later calls to mark_memory().
+/* Before calling any FUNC that results in a context switch, ensure
+   cpu registers fully flushed to C stack so that mark_memory() has
+   complete information.
 
    FUNC must not run any Lisp code nor allocate any Lisp objects!
 */
