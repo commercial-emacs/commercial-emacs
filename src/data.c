@@ -1529,10 +1529,9 @@ DEFUN ("set", Fset, Sset, 2, 2, 0,
   return newval;
 }
 
-/* Store the value NEWVAL into SYMBOL.
-   A non-nil WHERE indicates the buffer for buffer-local bindings.
-   For buffer-local bindings, the current buffer is assumed unless
-   WHERE specifies a non-nil buffer.
+/* Store the value NEWVAL into SYMBOL.  A non-nil WHERE indicates the
+   buffer for buffer-local bindings.  The current buffer is assumed
+   unless WHERE specifies a non-nil buffer.
 */
 
 void
