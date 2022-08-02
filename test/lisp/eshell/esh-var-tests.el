@@ -151,6 +151,7 @@
 
 (ert-deftest esh-var-test/interp-cmd-external ()
   "Interpolate command result from external command"
+  :tags (when (getenv "CI") '(:unstable))
   (skip-unless (executable-find "echo"))
   (with-temp-eshell
    (eshell-command-result-p "echo ${*echo hi}"
@@ -178,6 +179,8 @@
 
 (ert-deftest esh-var-test/interp-concat-cmd ()
   "Interpolate and concat command with literal"
+  :tags (when (getenv "CI") '(:unstable))
+  (skip-unless (executable-find "echo"))
   (should (equal (eshell-test-command-result "+ ${+ 1 2}3 3") 36))
   (should (equal (eshell-test-command-result "echo ${*echo \"foo\nbar\"}-baz")
                  '("foo" "bar-baz")))
@@ -195,6 +198,7 @@
 
 (ert-deftest esh-var-test/interp-concat-cmd-external ()
   "Interpolate command result from external command with concatenation"
+  :tags (when (getenv "CI") '(:unstable))
   (skip-unless (executable-find "echo"))
   (with-temp-eshell
    (eshell-command-result-p "echo ${echo hi}-${*echo there}"
