@@ -27,6 +27,7 @@
 (require 'url-vars)
 (require 'url-parse)
 (declare-function mm-disable-multibyte "mm-util" ())
+(declare-function url-find-file-dired "url-dired")
 
 (defvar url-allow-non-local-files nil
   "If non-nil, allow URL to fetch non-local files.
