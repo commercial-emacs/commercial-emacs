@@ -368,13 +368,6 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 
   error_file = Qt;
 
-#ifndef subprocesses
-  /* Without asynchronous processes we cannot have BUFFER == 0.  */
-  if (nargs >= 3
-      && (FIXNUMP (CONSP (args[2]) ? XCAR (args[2]) : args[2])))
-    error ("Operating system cannot handle asynchronous subprocesses");
-#endif /* subprocesses */
-
   /* Decide the coding-system for giving arguments.  */
   {
     Lisp_Object val, *args2;
@@ -1595,13 +1588,11 @@ emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,
       signal (SIGPROF, SIG_DFL);
 #endif
 
-#ifdef subprocesses
       /* Stop blocking SIGCHLD in the child.  */
       unblock_child_signal (oldset);
 
       if (pty_flag)
 	child_setup_tty (std_out);
-#endif
 
       if (std_err < 0)
 	std_err = std_out;

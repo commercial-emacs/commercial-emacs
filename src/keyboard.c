@@ -3557,7 +3557,6 @@ event_to_kboard (struct input_event *event)
     }
 }
 
-#ifdef subprocesses
 /* Return the number of slots occupied in kbd_buffer.  */
 
 static int
@@ -3566,7 +3565,6 @@ kbd_buffer_nr_stored (void)
   int n = kbd_store_ptr - kbd_fetch_ptr;
   return n + (n < 0 ? KBD_BUFFER_SIZE : 0);
 }
-#endif	/* Store an event obtained at interrupt level into kbd_buffer, fifo */
 
 void
 kbd_buffer_store_event (register struct input_event *event)
@@ -3669,7 +3667,6 @@ kbd_buffer_store_buffered_event (union buffered_input_event *event,
     {
       *kbd_store_ptr = *event;
       kbd_store_ptr = next_slot;
-#ifdef subprocesses
       if (kbd_buffer_nr_stored () > KBD_BUFFER_SIZE / 2
 	  && ! kbd_on_hold_p ())
         {
@@ -3679,7 +3676,6 @@ kbd_buffer_store_buffered_event (union buffered_input_event *event,
           unrequest_sigio ();
           stop_polling ();
         }
-#endif	/* subprocesses */
     }
 
   /* If we're inside while-no-input, and this event qualifies
@@ -3851,7 +3847,6 @@ kbd_buffer_get_event (KBOARD **kbp,
   had_pending_selection_requests = false;
 #endif
 
-#ifdef subprocesses
   if (kbd_on_hold_p () && kbd_buffer_nr_stored () < KBD_BUFFER_SIZE / 4)
     {
       /* Start reading input again because we have processed enough to
@@ -3860,7 +3855,6 @@ kbd_buffer_get_event (KBOARD **kbp,
       request_sigio ();
       start_polling ();
     }
-#endif	/* subprocesses */
 
 #if !defined HAVE_DBUS && !defined USE_FILE_NOTIFY && !defined THREADS_ENABLED
   if (noninteractive
@@ -7383,12 +7377,10 @@ tty_read_avail_input (struct terminal *terminal,
   int i;
   struct tty_display_info *tty = terminal->display_info.tty;
   int nread = 0;
-#ifdef subprocesses
   int buffer_free = KBD_BUFFER_SIZE - kbd_buffer_nr_stored () - 1;
 
   if (kbd_on_hold_p () || buffer_free <= 0)
     return 0;
-#endif	/* subprocesses */
 
   if (!terminal->name)		/* Don't read from a dead terminal.  */
     return 0;
@@ -7464,11 +7456,9 @@ tty_read_avail_input (struct terminal *terminal,
 # error "Cannot read without possibly delaying"
 #endif
 
-#ifdef subprocesses
   /* Don't read more than we can store.  */
   if (n_to_read > buffer_free)
     n_to_read = buffer_free;
-#endif	/* subprocesses */
 
   /* Now read; for one reason or another, this will not block.
      NREAD is set to the number of chars read.  */
