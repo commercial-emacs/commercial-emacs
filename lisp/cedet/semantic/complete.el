@@ -311,20 +311,7 @@ HISTORY is a symbol representing a variable to story the history in."
 (defvar semantic-complete-current-matched-tag nil
   "Variable used to pass the tags being matched to the prompt.")
 
-(defclass semantic-displayer-abstract ()
-  ((table :type (or null semanticdb-find-result-with-nil)
-	  :initform nil
-	  :protection :protected
-	  :documentation "List of tags this displayer is showing.")
-   (last-prefix :type string
-		:protection :protected
-		:documentation "Prefix associated with slot `table'.")
-   )
-  "Abstract displayer baseclass.
-Manages the display of some number of tags.
-Provides the basics for a displayer, including interacting with
-a collector, and tracking tables of completion to display."
-  :abstract t)
+
 
 ;; Abstract baseclass for any displayer which supports focus
 
