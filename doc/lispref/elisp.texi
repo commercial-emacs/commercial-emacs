@@ -1711,7 +1711,6 @@ Object Internals
 
 @include searching.texi
 @include syntax.texi
-@include parsing.texi
 @include abbrevs.texi
 @include threads.texi
 @include processes.texi
