@@ -30,16 +30,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <signal.h>		/* sigset_t */
 #endif
 
-#include "sysselect.h"		/* FIXME */
+#include "sysselect.h"
 #include "systhread.h"
 
 INLINE_HEADER_BEGIN
 
 /* Byte-code interpreter thread state.  */
 struct bc_thread_state {
-  struct bc_frame *fp;   /* current frame pointer */
-
-  /* start and end of allocated bytecode stack */
+  struct bc_frame *fp;
   char *stack;
   char *stack_end;
 };
@@ -48,62 +46,46 @@ struct thread_state
 {
   union vectorlike_header header;
 
-  /* The buffer in which the last search was performed, or
-     Qt if the last search was done in a string;
-     Qnil if no searching has been done yet.  */
+  /* Buffer where last search was performed, or Qt if done in a
+     string, or Qnil if no last search.  */
   Lisp_Object m_last_thing_searched;
 #define last_thing_searched (current_thread->m_last_thing_searched)
 
   Lisp_Object m_saved_last_thing_searched;
 #define saved_last_thing_searched (current_thread->m_saved_last_thing_searched)
 
-  /* The thread's name.  */
   Lisp_Object name;
-
-  /* The thread's function.  */
   Lisp_Object function;
 
-  /* The thread's result, if function has finished.  */
+  /* Populated when FUNCTION finished.  */
   Lisp_Object result;
 
-  /* If non-nil, this thread has been signaled.  */
+  /* If non-nil, thread has been signaled.  */
   Lisp_Object error_symbol;
   Lisp_Object error_data;
 
-  /* If we are waiting for some event, this holds the object we are
-     waiting on.  */
+  /* Mutex or condvar waited for.  */
   Lisp_Object event_object;
-  /* event_object must be the last Lisp field.  */
 
-  /* An address near the bottom of the stack.
-     Tells GC how to save a copy of the stack.  */
+  /* !!! Adjust ALLOCATE_ZEROED_PSEUDOVECTOR for new Lisp fields.  */
+
   char const *m_stack_bottom;
 #define stack_bottom (current_thread->m_stack_bottom)
 
-  /* The address of an object near the C stack top, used to determine
-     which words need to be scanned by the garbage collector.  This is
-     also used to detect heuristically whether segmentation violation
-     address indicates stack overflow, as opposed to some internal
-     error in Emacs.  If the C function F calls G which calls H which
-     calls ... F, then at least one of the functions in the chain
-     should set this to the address of a local variable.  */
   void const *stack_top;
 
   struct catchtag *m_catchlist;
 #define catchlist (current_thread->m_catchlist)
 
-  /* Chain of condition handlers currently in effect.
-     The elements of this chain are contained in the stack frames
-     of Fcondition_case and internal_condition_case.
-     When an error is signaled (by calling Fsignal),
-     this chain is searched for an element that applies.  */
+  /* Handlers pushed by Fcondition_case and internal_condition_case.  */
   struct handler *m_handlerlist;
 #define handlerlist (current_thread->m_handlerlist)
 
   struct handler *m_handlerlist_sentinel;
 #define handlerlist_sentinel (current_thread->m_handlerlist_sentinel)
 
-  /* Bottom of specpdl.  */
+  /* Bottom of specpdl, not to be confused with m_stack_bottom which
+     references the C stack.  */
   union specbinding *m_specpdl;
 #define specpdl (current_thread->m_specpdl)
 
@@ -115,11 +97,9 @@ struct thread_state
   union specbinding *m_specpdl_ptr;
 #define specpdl_ptr (current_thread->m_specpdl_ptr)
 
-  /* Depth in Lisp evaluations and function calls.  */
   intmax_t m_lisp_eval_depth;
 #define lisp_eval_depth (current_thread->m_lisp_eval_depth)
 
-  /* This points to the current buffer.  */
   struct buffer *m_current_buffer;
 #define current_buffer (current_thread->m_current_buffer)
 
@@ -193,14 +173,9 @@ XTHREAD (Lisp_Object a)
   return XUNTAG (a, Lisp_Vectorlike, struct thread_state);
 }
 
-/* A mutex in lisp is represented by a system condition variable.
-   The system mutex associated with this condition variable is the
-   global lock.
-
-   Using a condition variable lets us implement interruptibility for
-   lisp mutexes.  */
-typedef struct
-{
+/* The guts of Lisp_Mutex is a lower-level lisp_mutex_t, which in turn
+   wraps the sys_cond_t keyed off the global lock.  */
+typedef struct {
   /* The owning thread, or NULL if unlocked.  */
   struct thread_state *owner;
   /* The lock count.  */
@@ -209,15 +184,10 @@ typedef struct
   sys_cond_t condition;
 } lisp_mutex_t;
 
-/* A mutex as a lisp object.  */
 struct Lisp_Mutex
 {
   union vectorlike_header header;
-
-  /* The name of the mutex, or nil.  */
   Lisp_Object name;
-
-  /* The lower-level mutex object.  */
   lisp_mutex_t mutex;
 } GCALIGNED_STRUCT;
 
@@ -240,18 +210,11 @@ XMUTEX (Lisp_Object a)
   return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Mutex);
 }
 
-/* A condition variable as a lisp object.  */
 struct Lisp_CondVar
 {
   union vectorlike_header header;
-
-  /* The associated mutex.  */
   Lisp_Object mutex;
-
-  /* The name of the condition variable, or nil.  */
   Lisp_Object name;
-
-  /* The lower-level condition variable object.  */
   sys_cond_t cond;
 } GCALIGNED_STRUCT;
 

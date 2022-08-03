@@ -2143,7 +2143,10 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 		     max ((sizeof " with data 0x"
 			   + (sizeof (uintmax_t) * CHAR_BIT + 4 - 1) / 4),
 			  40)))];
+  /* As print_object() is highly recursive, 9dee1c8 updates stack_top
+     for the benefit of stack_overflow().  */
   current_thread->stack_top = buf;
+
 
  print_obj:
   maybe_quit ();

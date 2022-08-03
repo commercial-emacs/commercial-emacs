@@ -4144,10 +4144,8 @@ read0 (Lisp_Object readcharfun, bool annotated)
 
 	    Lisp_Object found;
 	    if (skip_shorthand
-		/* We exempt characters used in the "core" Emacs Lisp
-		   symbols that are comprised entirely of characters
-		   that have the 'symbol constituent' syntax from
-		   transforming according to shorthands.  */
+		/* Symbols composed entirely of "symbol constituents"
+		   are exempt from shorthands.  */
 		|| symbol_char_span (read_buffer) >= nbytes)
 	      found = oblookup (obarray, read_buffer, nchars, nbytes);
 	    else
