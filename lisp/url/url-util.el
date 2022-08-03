@@ -182,37 +182,26 @@ Will not do anything if `url-show-status' is nil."
 ;;;###autoload
 (defun url-eat-trailing-space (x)
   "Remove spaces/tabs at the end of a string."
-  (let ((y (1- (length x)))
-	(skip-chars (list ?  ?\t ?\n)))
-    (while (and (>= y 0) (memq (aref x y) skip-chars))
-      (setq y (1- y)))
-    (substring x 0 (1+ y))))
+  (declare (obsolete string-trim "29.1"))
+  (string-trim x ""))
 
 ;;;###autoload
 (defun url-strip-leading-spaces (x)
   "Remove spaces at the front of a string."
-  (let ((y (1- (length x)))
-	(z 0)
-	(skip-chars (list ?  ?\t ?\n)))
-    (while (and (<= z y) (memq (aref x z) skip-chars))
-      (setq z (1+ z)))
-    (substring x z nil)))
+  (declare (obsolete string-trim "29.1"))
+  (string-trim x nil ""))
 
 
 (define-obsolete-function-alias 'url-pretty-length
   'file-size-human-readable "24.4")
 
 ;;;###autoload
-(defun url-display-percentage (fmt perc &rest args)
+(defun url-display-percentage (fmt _perc &rest args)
   (when (and url-show-status
 	     (or (null url-current-object)
 		 (not (url-silent url-current-object))))
-    (if (null fmt)
-	(if (fboundp 'clear-progress-display)
-	    (clear-progress-display))
-      (if (and (fboundp 'progress-display) perc)
-	  (apply 'progress-display fmt perc args)
-	(apply 'message fmt args)))))
+    (when (not (null fmt))
+      (apply 'message fmt args))))
 
 ;;;###autoload
 (defun url-percentage (x y)
