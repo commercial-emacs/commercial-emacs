@@ -14484,7 +14484,7 @@ overlay_arrow_in_current_buffer_p (void)
 
       if (!SYMBOLP (var))
 	continue;
-      val = find_symbol_value (var);
+      val = find_symbol_value (var, NULL);
       if (MARKERP (val)
 	  && current_buffer == XMARKER (val)->buffer)
 	return true;
@@ -14513,7 +14513,7 @@ overlay_arrows_changed_p (bool set_redisplay)
 
       if (!SYMBOLP (var))
 	continue;
-      val = find_symbol_value (var);
+      val = find_symbol_value (var, NULL);
       if (!MARKERP (val))
 	continue;
       if (! EQ (Fmarker_position (val),
@@ -14556,7 +14556,7 @@ update_overlay_arrows (int up_to_date)
 
       if (up_to_date > 0)
 	{
-	  Lisp_Object val = find_symbol_value (var);
+	  Lisp_Object val = find_symbol_value (var, NULL);
           if (!MARKERP (val))
 	    continue;
 	  Fput (var, Qlast_arrow_position, Fmarker_position (val));
@@ -14592,7 +14592,7 @@ overlay_arrow_at_row (struct it *it, struct glyph_row *row)
       if (!SYMBOLP (var))
 	continue;
 
-      val = find_symbol_value (var);
+      val = find_symbol_value (var, NULL);
 
       if (MARKERP (val)
 	  && current_buffer == XMARKER (val)->buffer
@@ -16438,8 +16438,7 @@ cursor_row_fully_visible_p (struct window *w, bool force_p,
   struct glyph_matrix *matrix;
   struct glyph_row *row;
   int window_height;
-  Lisp_Object mclfv_p =
-    buffer_local_value (Qmake_cursor_line_fully_visible, w->contents);
+  Lisp_Object mclfv_p = WINDOW_BUFFER_LOCAL_VALUE (Qmake_cursor_line_fully_visible, w);
 
   /* If no local binding, use the global value.  */
   if (EQ (mclfv_p, Qunbound))
@@ -23898,8 +23897,8 @@ display_mode_lines (struct window *w)
   if (window_wants_mode_line (w))
     {
       Lisp_Object window;
-      Lisp_Object default_help
-	= buffer_local_value (Qmode_line_default_help_echo, w->contents);
+      Lisp_Object default_help =
+	WINDOW_BUFFER_LOCAL_VALUE (Qmode_line_default_help_echo, w);
 
       /* Set up mode line help echo.  Do this before selecting w so it
 	 can reasonably tell whether a mouse click will select w.  */
@@ -26173,7 +26172,7 @@ calc_pixel_width_or_height (double *res, struct it *it, Lisp_Object prop,
 	    return OK_PIXELS (WINDOW_SCROLL_BAR_AREA_WIDTH (it->w));
 	}
 
-      prop = buffer_local_value (prop, it->w->contents);
+      prop = find_symbol_value (prop, XBUFFER (it->w->contents));
       if (EQ (prop, Qunbound))
 	prop = Qnil;
     }
@@ -26236,7 +26235,7 @@ calc_pixel_width_or_height (double *res, struct it *it, Lisp_Object prop,
 	      return OK_PIXELS (pixels);
 	    }
 
-	  car = buffer_local_value (car, it->w->contents);
+	  car = WINDOW_BUFFER_LOCAL_VALUE (car, it->w);
 	  if (EQ (car, Qunbound))
 	    car = Qnil;
 	}

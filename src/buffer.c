@@ -1189,76 +1189,14 @@ DEFUN ("buffer-local-value", Fbuffer_local_value,
        doc: /* Return the value of VARIABLE in BUFFER.
 If VARIABLE does not have a buffer-local binding in BUFFER, the value
 is the default binding of the variable.  */)
-  (register Lisp_Object variable, register Lisp_Object buffer)
+  (Lisp_Object variable, Lisp_Object buffer)
 {
-  register Lisp_Object result = buffer_local_value (variable, buffer);
-
-  if (EQ (result, Qunbound))
-    xsignal1 (Qvoid_variable, variable);
-
-  return result;
-}
-
-
-/* Like Fbuffer_local_value, but return Qunbound if the variable is
-   locally unbound.  */
-
-Lisp_Object
-buffer_local_value (Lisp_Object variable, Lisp_Object buffer)
-{
-  register struct buffer *buf;
-  register Lisp_Object result;
-  struct Lisp_Symbol *sym;
-
-  CHECK_SYMBOL (variable);
+  Lisp_Object result;
   CHECK_BUFFER (buffer);
-  buf = XBUFFER (buffer);
-  sym = XSYMBOL (variable);
-
- start:
-  switch (sym->u.s.redirect)
-    {
-    case SYMBOL_VARALIAS: sym = indirect_variable (sym); goto start;
-    case SYMBOL_PLAINVAL: result = SYMBOL_VAL (sym); break;
-    case SYMBOL_LOCALIZED:
-      { /* Look in local_var_alist.  */
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
-	XSETSYMBOL (variable, sym); /* Update In case of aliasing.  */
-	result = assq_no_quit (variable, BVAR (buf, local_var_alist));
-	if (!NILP (result))
-	  {
-	    if (blv->fwd.fwdptr)
-	      { /* What binding is loaded right now?  */
-		Lisp_Object current_alist_element = blv->valcell;
-
-		/* The value of the currently loaded binding is not
-		   stored in it, but rather in the realvalue slot.
-		   Store that value into the binding it belongs to
-		   in case that is the one we are about to use.  */
-
-		XSETCDR (current_alist_element,
-			 symval_resolve (blv->fwd));
-	      }
-	    /* Now get the (perhaps updated) value out of the binding.  */
-	    result = XCDR (result);
-	  }
-	else
-	  result = Fdefault_value (variable);
-	break;
-      }
-    case SYMBOL_FORWARDED:
-      {
-	lispfwd fwd = SYMBOL_FWD (sym);
-	if (BUFFER_OBJFWDP (fwd))
-	  result = per_buffer_value (buf, XBUFFER_OBJFWD (fwd)->offset);
-	else
-	  result = Fdefault_value (variable);
-	break;
-      }
-    default: emacs_abort ();
-    }
-
-  return result;
+  result = find_symbol_value (variable, XBUFFER (buffer));
+  return EQ (result, Qunbound)
+    ? (xsignal1 (Qvoid_variable, variable), Qnil)
+    : result;
 }
 
 /* Return an alist of the Lisp-level buffer-local bindings of
@@ -1283,7 +1221,7 @@ buffer_lisp_local_variables (struct buffer *buf, bool clone)
 	 so store them into the alist so the alist is up to date.
 	 If inquiring about some other buffer, this swaps out any values
 	 for that buffer, making the alist up to date automatically.  */
-      val = find_symbol_value (XCAR (elt));
+      val = find_symbol_value (XCAR (elt), NULL);
       /* Use the current buffer value only if buf is the current buffer.  */
       if (buf != current_buffer)
 	val = XCDR (elt);
@@ -2091,7 +2029,7 @@ the current buffer's major mode.  */)
     error ("Attempt to set major mode for a dead buffer");
 
   if (strcmp (SSDATA (BVAR (XBUFFER (buffer), name)), "*scratch*") == 0)
-    function = find_symbol_value (intern ("initial-major-mode"));
+    function = find_symbol_value (intern ("initial-major-mode"), NULL);
   else
     {
       function = BVAR (&buffer_slot_defaults, major_mode);

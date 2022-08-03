@@ -2585,21 +2585,16 @@ struct Lisp_Buffer_Local_Value
     /* True means that merely setting the variable creates a local
        binding for the current buffer.  */
     bool_bf local_if_set : 1;
-    /* True means that the binding now loaded was found.
-       Presumably equivalent to (defcell!=valcell).  */
+    /* Presumably equivalent to (defcell!=valcell).  */
     bool_bf found : 1;
-    /* If non-NULL, a forwarding to the C var where it should also be set.  */
+    /* If non-NULL, override VALCELL with a C var.  */
     lispfwd fwd;	/* Should never be (Buffer|Kboard)_Objfwd.  */
     /* The buffer for which the loaded binding was found.  */
     Lisp_Object where;
-    /* A cons cell that holds the default value.  It has the form
-       (SYMBOL . DEFAULT-VALUE).  */
+    /* A cons cell of the form (SYMBOL . DEFAULT-VALUE).  */
     Lisp_Object defcell;
-    /* The cons cell from `where's parameter alist.
-       It always has the form (SYMBOL . VALUE)
-       Note that if `fwd' is non-NULL, VALUE may be out of date.
-       Also if the currently loaded binding is the default binding, then
-       this is `eq'ual to defcell.  */
+    /* A cons cell of the form (SYMBOL . VALUE).
+       This is `eq' to DEFCELL if unassigned.  */
     Lisp_Object valcell;
   };
 
@@ -3635,7 +3630,7 @@ extern AVOID wrong_choice (Lisp_Object, Lisp_Object);
 extern void notify_variable_watchers (Lisp_Object, Lisp_Object,
 				      Lisp_Object, Lisp_Object);
 extern Lisp_Object indirect_function (Lisp_Object);
-extern Lisp_Object find_symbol_value (Lisp_Object);
+extern Lisp_Object find_symbol_value (Lisp_Object, struct buffer *);
 enum Arith_Comparison {
   ARITH_EQUAL,
   ARITH_NOTEQUAL,
@@ -3660,7 +3655,7 @@ extern uintmax_t cons_to_unsigned (Lisp_Object, uintmax_t);
 extern struct Lisp_Symbol *indirect_variable (struct Lisp_Symbol *);
 extern AVOID args_out_of_range (Lisp_Object, Lisp_Object);
 extern AVOID circular_list (Lisp_Object);
-extern Lisp_Object symval_resolve (lispfwd);
+extern Lisp_Object symval_resolve (lispfwd, struct buffer *);
 enum Set_Internal_Bind {
   SET_INTERNAL_SET,
   SET_INTERNAL_BIND,

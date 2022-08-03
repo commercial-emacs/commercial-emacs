@@ -1728,8 +1728,8 @@ maybe_swap_for_eln (bool no_native, Lisp_Object *filename, int *fd,
       src_name = concat2 (src_name, build_string (".gz"));
       if (NILP (Ffile_exists_p (src_name)))
 	{
-	  if (! NILP (find_symbol_value (
-		       Qnative_comp_warning_on_missing_source)))
+	  if (! NILP (find_symbol_value (Qnative_comp_warning_on_missing_source,
+					 NULL)))
 	    {
 	      /* If we have an installation without any .el files,
 		 there's really no point in giving a warning here,
@@ -2206,7 +2206,7 @@ readevalloop (Lisp_Object readcharfun,
   /* If lexical binding is active (either because it was specified in
      the file's header, or via a buffer-local variable), create an empty
      lexical environment, otherwise, turn off lexical binding.  */
-  lex_bound = find_symbol_value (Qlexical_binding);
+  lex_bound = find_symbol_value (Qlexical_binding, NULL);
   specbind (Qinternal_interpreter_environment,
 	    (NILP (lex_bound) || EQ (lex_bound, Qunbound)
 	     ? Qnil : list1 (Qt)));

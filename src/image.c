@@ -10066,7 +10066,7 @@ static char *
 imagemagick_filename_hint (Lisp_Object spec, char hint_buffer[MaxTextExtent])
 {
   Lisp_Object symbol = intern ("image-format-suffixes");
-  Lisp_Object val = find_symbol_value (symbol);
+  Lisp_Object val = find_symbol_value (symbol, NULL);
   Lisp_Object format;
 
   if (! CONSP (val))

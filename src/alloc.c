@@ -6273,7 +6273,7 @@ static bool
 symbol_uses_obj (Lisp_Object symbol, Lisp_Object obj)
 {
   struct Lisp_Symbol *sym = XSYMBOL (symbol);
-  Lisp_Object val = find_symbol_value (symbol);
+  Lisp_Object val = find_symbol_value (symbol, NULL);
   return (EQ (val, obj)
 	  || EQ (sym->u.s.function, obj)
 	  || (! NILP (sym->u.s.function)

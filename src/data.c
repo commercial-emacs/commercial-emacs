@@ -38,8 +38,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "frame.h"
 #include "keymap.h"
 
-static struct Lisp_Buffer_Local_Value *symval_buffer_localize (struct Lisp_Symbol *);
-
 static bool
 BOOLFWDP (lispfwd a)
 {
@@ -108,7 +106,7 @@ last_assigned_value (Lisp_Object symbol)
   struct Lisp_Symbol *sym = XSYMBOL (symbol);
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
   return (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
-    ? symval_resolve (blv->fwd)
+    ? symval_resolve (blv->fwd, NULL)
     : XCDR (blv->defcell);
 }
 
@@ -657,6 +655,142 @@ DEFUN ("setcdr", Fsetcdr, Ssetcdr, 2, 2, 0,
   return newcdr;
 }
 
+/* Used to signal a user-friendly error if WRONG is not a number or
+   integer/floating-point number outsize of inclusive MIN..MAX range.  */
+
+static void
+wrong_range (Lisp_Object min, Lisp_Object max, Lisp_Object wrong)
+{
+  AUTO_STRING (value_should_be_from, "Value should be from ");
+  AUTO_STRING (to, " to ");
+  xsignal2 (Qerror,
+	    CALLN (Fconcat, value_should_be_from, Fnumber_to_string (min),
+		   to, Fnumber_to_string (max)),
+	    wrong);
+}
+
+static void
+symval_update_fwd (lispfwd valcontents, Lisp_Object newval, struct buffer *buf)
+{
+  switch (XFWDTYPE (valcontents))
+    {
+    case Lisp_Fwd_Int:
+      {
+	intmax_t i;
+	CHECK_INTEGER (newval);
+	if (! integer_to_intmax (newval, &i))
+	  xsignal1 (Qoverflow_error, newval);
+	*XFIXNUMFWD (valcontents)->intvar = i;
+      }
+      break;
+
+    case Lisp_Fwd_Bool:
+      *XBOOLFWD (valcontents)->boolvar = !NILP (newval);
+      break;
+
+    case Lisp_Fwd_Obj:
+      *XOBJFWD (valcontents)->objvar = newval;
+
+      /* If this variable is a default for something stored
+	 in the buffer itself, such as default-fill-column,
+	 find the buffers that don't have local values for it
+	 and update them.  */
+      if (XOBJFWD (valcontents)->objvar > (Lisp_Object *) &buffer_slot_defaults
+	  && XOBJFWD (valcontents)->objvar < (Lisp_Object *) (&buffer_slot_defaults + 1))
+	{
+	  int offset = ((char *) XOBJFWD (valcontents)->objvar
+			- (char *) &buffer_slot_defaults);
+	  int idx = PER_BUFFER_IDX (offset);
+
+	  Lisp_Object tail, buffer;
+
+	  if (idx <= 0)
+	    break;
+
+	  FOR_EACH_LIVE_BUFFER (tail, buffer)
+	    {
+	      struct buffer *b = XBUFFER (buffer);
+
+	      if (! PER_BUFFER_VALUE_P (b, idx))
+		set_per_buffer_value (b, offset, newval);
+	    }
+	}
+      break;
+
+    case Lisp_Fwd_Buffer_Obj:
+      {
+	int offset = XBUFFER_OBJFWD (valcontents)->offset;
+	Lisp_Object predicate = XBUFFER_OBJFWD (valcontents)->predicate;
+
+	if (!NILP (newval) && !NILP (predicate))
+	  {
+	    eassert (SYMBOLP (predicate));
+	    Lisp_Object choiceprop = Fget (predicate, Qchoice);
+	    if (!NILP (choiceprop))
+	      {
+		if (NILP (Fmemq (newval, choiceprop)))
+		  wrong_choice (choiceprop, newval);
+	      }
+	    else
+	      {
+		Lisp_Object rangeprop = Fget (predicate, Qrange);
+		if (CONSP (rangeprop))
+		  {
+		    Lisp_Object min = XCAR (rangeprop), max = XCDR (rangeprop);
+		    if (! NUMBERP (newval)
+			|| NILP (CALLN (Fleq, min, newval, max)))
+		      wrong_range (min, max, newval);
+		  }
+		else if (FUNCTIONP (predicate))
+		  {
+		    if (NILP (call1 (predicate, newval)))
+		      wrong_type_argument (predicate, newval);
+		  }
+	      }
+	  }
+	set_per_buffer_value (buf ? buf : current_buffer, offset, newval);
+      }
+      break;
+
+    case Lisp_Fwd_Kboard_Obj:
+      {
+	char *base = (char *) FRAME_KBOARD (SELECTED_FRAME ());
+	char *p = base + XKBOARD_OBJFWD (valcontents)->offset;
+	*(Lisp_Object *) p = newval;
+      }
+      break;
+
+    default:
+      emacs_abort (); /* goto def; */
+    }
+}
+
+/* Reassign SYMBOL's singleton blv member to SYMBOL's entry in BUFFER's
+   LOCAL_VAR_ALIST.  */
+
+static struct Lisp_Buffer_Local_Value *
+symval_update_blv (Lisp_Object symbol, Lisp_Object buffer)
+{
+  struct Lisp_Symbol *xsymbol = XSYMBOL (symbol);
+  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
+  eassert (xsymbol->u.s.redirect == SYMBOL_LOCALIZED);
+
+  if (! BUFFERP (blv->where)
+      || XBUFFER (buffer) != XBUFFER (blv->where))
+    {
+      Lisp_Object val =
+	assq_no_quit (symbol, BVAR (XBUFFER (buffer), local_var_alist));
+      blv->found = ! NILP (val);
+      set_blv_where (blv, buffer);
+      if (blv->fwd.fwdptr)
+	set_blv_value (blv, symval_resolve (blv->fwd, NULL));
+      set_blv_valcell (blv, blv->found ? val : blv->defcell);
+      if (blv->fwd.fwdptr)
+	symval_update_fwd (blv->fwd, blv_value (blv), NULL);
+    }
+  return blv;
+}
+
 /* Extract and set components of symbols.  */
 
 DEFUN ("boundp", Fboundp, Sboundp, 1, 1, 0,
@@ -684,7 +818,7 @@ global value outside of any lexical scope.  */)
     case SYMBOL_LOCALIZED:
       if (! SYMBOL_BLV (sym)->fwd.fwdptr)
 	{
-	  valcontents = blv_value (symval_buffer_localize (sym));
+	  valcontents = blv_value (symval_update_blv (symbol, Fcurrent_buffer ()));
 	  break;
 	}
       FALLTHROUGH;
@@ -1229,7 +1363,7 @@ chain of aliases, signal a `cyclic-variable-indirection' error.  */)
    return the Lisp value of the symbol. */
 
 Lisp_Object
-symval_resolve (lispfwd valcontents)
+symval_resolve (lispfwd valcontents, struct buffer *xbuffer)
 {
   Lisp_Object result = Qnil;
   switch (XFWDTYPE (valcontents))
@@ -1244,7 +1378,7 @@ symval_resolve (lispfwd valcontents)
       result = *XOBJFWD (valcontents)->objvar;
       break;
     case Lisp_Fwd_Buffer_Obj:
-      result = per_buffer_value (current_buffer,
+      result = per_buffer_value (xbuffer ? xbuffer : current_buffer,
 				 XBUFFER_OBJFWD (valcontents)->offset);
       break;
     case Lisp_Fwd_Kboard_Obj:
@@ -1302,116 +1436,6 @@ wrong_choice (Lisp_Object choice, Lisp_Object wrong)
   xsignal2 (Qerror, obj, wrong);
 }
 
-/* Used to signal a user-friendly error if WRONG is not a number or
-   integer/floating-point number outsize of inclusive MIN..MAX range.  */
-
-static void
-wrong_range (Lisp_Object min, Lisp_Object max, Lisp_Object wrong)
-{
-  AUTO_STRING (value_should_be_from, "Value should be from ");
-  AUTO_STRING (to, " to ");
-  xsignal2 (Qerror,
-	    CALLN (Fconcat, value_should_be_from, Fnumber_to_string (min),
-		   to, Fnumber_to_string (max)),
-	    wrong);
-}
-
-static void
-symval_update (lispfwd valcontents, Lisp_Object newval, struct buffer *buf)
-{
-  switch (XFWDTYPE (valcontents))
-    {
-    case Lisp_Fwd_Int:
-      {
-	intmax_t i;
-	CHECK_INTEGER (newval);
-	if (! integer_to_intmax (newval, &i))
-	  xsignal1 (Qoverflow_error, newval);
-	*XFIXNUMFWD (valcontents)->intvar = i;
-      }
-      break;
-
-    case Lisp_Fwd_Bool:
-      *XBOOLFWD (valcontents)->boolvar = !NILP (newval);
-      break;
-
-    case Lisp_Fwd_Obj:
-      *XOBJFWD (valcontents)->objvar = newval;
-
-      /* If this variable is a default for something stored
-	 in the buffer itself, such as default-fill-column,
-	 find the buffers that don't have local values for it
-	 and update them.  */
-      if (XOBJFWD (valcontents)->objvar > (Lisp_Object *) &buffer_slot_defaults
-	  && XOBJFWD (valcontents)->objvar < (Lisp_Object *) (&buffer_slot_defaults + 1))
-	{
-	  int offset = ((char *) XOBJFWD (valcontents)->objvar
-			- (char *) &buffer_slot_defaults);
-	  int idx = PER_BUFFER_IDX (offset);
-
-	  Lisp_Object tail, buffer;
-
-	  if (idx <= 0)
-	    break;
-
-	  FOR_EACH_LIVE_BUFFER (tail, buffer)
-	    {
-	      struct buffer *b = XBUFFER (buffer);
-
-	      if (! PER_BUFFER_VALUE_P (b, idx))
-		set_per_buffer_value (b, offset, newval);
-	    }
-	}
-      break;
-
-    case Lisp_Fwd_Buffer_Obj:
-      {
-	int offset = XBUFFER_OBJFWD (valcontents)->offset;
-	Lisp_Object predicate = XBUFFER_OBJFWD (valcontents)->predicate;
-
-	if (!NILP (newval) && !NILP (predicate))
-	  {
-	    eassert (SYMBOLP (predicate));
-	    Lisp_Object choiceprop = Fget (predicate, Qchoice);
-	    if (!NILP (choiceprop))
-	      {
-		if (NILP (Fmemq (newval, choiceprop)))
-		  wrong_choice (choiceprop, newval);
-	      }
-	    else
-	      {
-		Lisp_Object rangeprop = Fget (predicate, Qrange);
-		if (CONSP (rangeprop))
-		  {
-		    Lisp_Object min = XCAR (rangeprop), max = XCDR (rangeprop);
-		    if (! NUMBERP (newval)
-			|| NILP (CALLN (Fleq, min, newval, max)))
-		      wrong_range (min, max, newval);
-		  }
-		else if (FUNCTIONP (predicate))
-		  {
-		    if (NILP (call1 (predicate, newval)))
-		      wrong_type_argument (predicate, newval);
-		  }
-	      }
-	  }
-	set_per_buffer_value (buf ? buf : current_buffer, offset, newval);
-      }
-      break;
-
-    case Lisp_Fwd_Kboard_Obj:
-      {
-	char *base = (char *) FRAME_KBOARD (SELECTED_FRAME ());
-	char *p = base + XKBOARD_OBJFWD (valcontents)->offset;
-	*(Lisp_Object *) p = newval;
-      }
-      break;
-
-    default:
-      emacs_abort (); /* goto def; */
-    }
-}
-
 /* Assuming SYMBOL is buffer-local, restore to its default binding. */
 
 void
@@ -1421,82 +1445,49 @@ symval_restore_default (struct Lisp_Symbol *symbol)
   eassert (symbol->u.s.redirect == SYMBOL_LOCALIZED);
 
   if (blv->fwd.fwdptr) /* unload the previously loaded binding. */
-    set_blv_value (blv, symval_resolve (blv->fwd));
+    set_blv_value (blv, symval_resolve (blv->fwd, NULL));
 
   set_blv_valcell (blv, blv->defcell);
   if (blv->fwd.fwdptr) /* load symbol's default binding. */
-    symval_update (blv->fwd, XCDR (blv->defcell), NULL);
+    symval_update_fwd (blv->fwd, XCDR (blv->defcell), NULL);
 
   set_blv_where (blv, Qnil);
   set_blv_found (blv, false);
 }
 
-/* Assuming SYMBOL is buffer-local, assign value to current buffer's binding. */
-
-static struct Lisp_Buffer_Local_Value *
-symval_buffer_localize (struct Lisp_Symbol *symbol)
-{
-  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
-  eassert (symbol->u.s.redirect == SYMBOL_LOCALIZED);
-
-  if (! BUFFERP (blv->where)
-      || current_buffer != XBUFFER (blv->where))
-    {
-      Lisp_Object tem1 = assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
-				       BVAR (current_buffer, local_var_alist));
-      blv->found = ! NILP (tem1);
-      set_blv_where (blv, Fcurrent_buffer ());
-
-      if (blv->fwd.fwdptr) /* unload the previously loaded binding. */
-	set_blv_value (blv, symval_resolve (blv->fwd));
-      set_blv_valcell (blv, blv->found ? tem1 : blv->defcell);
-      if (blv->fwd.fwdptr)
-	symval_update (blv->fwd, blv_value (blv), NULL);
-    }
-  return blv;
-}
-
-/* Find the value of a symbol, returning Qunbound if it's not bound.
-   This is helpful for code which just wants to get a variable's value
-   if it has one, without signaling an error.
-
-   This function is very similar to buffer_local_value, but we have
-   two separate code paths here since find_symbol_value has to be very
-   efficient, while buffer_local_value doesn't have to be.
-
-   Note that it must not be possible to quit within this function.
-   Great care is required for this.  */
-
 Lisp_Object
-find_symbol_value (Lisp_Object symbol)
+find_symbol_value (Lisp_Object symbol, struct buffer *xbuffer)
 {
   Lisp_Object result = Qnil;
-  struct Lisp_Symbol *sym;
+  struct Lisp_Symbol *xsymbol;
 
   CHECK_SYMBOL (symbol);
-  sym = XSYMBOL (symbol);
+  xsymbol = XSYMBOL (symbol);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (xsymbol->u.s.redirect)
     {
     case SYMBOL_VARALIAS:
-      sym = indirect_variable (sym);
-      XSETSYMBOL (symbol, sym);
+      xsymbol = indirect_variable (xsymbol);
+      XSETSYMBOL (symbol, xsymbol);
       goto start;
       break;
     case SYMBOL_PLAINVAL:
-      result = SYMBOL_VAL (sym);
+      result = SYMBOL_VAL (xsymbol);
       break;
     case SYMBOL_LOCALIZED:
       {
-	struct Lisp_Buffer_Local_Value *blv = symval_buffer_localize (sym);
-	result = (blv->fwd.fwdptr
-		  ? symval_resolve (blv->fwd)
-		  : blv_value (blv));
+	struct Lisp_Buffer_Local_Value *blv =
+	  symval_update_blv (symbol,
+			     make_lisp_ptr (xbuffer ? xbuffer : current_buffer,
+					    Lisp_Vectorlike));
+	result = blv->fwd.fwdptr
+	  ? symval_resolve (blv->fwd, NULL) // historically not xbuffer
+	  : blv_value (blv);
       }
       break;
     case SYMBOL_FORWARDED:
-      result = symval_resolve (SYMBOL_FWD (sym));
+      result = symval_resolve (SYMBOL_FWD (xsymbol), xbuffer);
       break;
     default:
       emacs_abort ();
@@ -1511,13 +1502,10 @@ Note that if `lexical-binding' is in effect, this returns the
 global value outside of any lexical scope.  */)
   (Lisp_Object symbol)
 {
-  Lisp_Object val;
-
-  val = find_symbol_value (symbol);
-  if (!EQ (val, Qunbound))
-    return val;
-
-  xsignal1 (Qvoid_variable, symbol);
+  Lisp_Object val = find_symbol_value (symbol, NULL);
+  return EQ (val, Qunbound)
+    ? (xsignal1 (Qvoid_variable, symbol), Qnil)
+    : val;
 }
 
 DEFUN ("set", Fset, Sset, 2, 2, 0,
@@ -1621,9 +1609,9 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 	if (unbound)
 	  blv->fwd.fwdptr = NULL;
 	else if (blv->fwd.fwdptr)
-	  symval_update (blv->fwd,
-			 newval,
-			 BUFFERP (where) ? XBUFFER (where) : current_buffer);
+	  symval_update_fwd (blv->fwd,
+			     newval,
+			     BUFFERP (where) ? XBUFFER (where) : current_buffer);
       }
       break;
     case SYMBOL_FORWARDED:
@@ -1653,7 +1641,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 	    SET_SYMBOL_VAL (sym, newval);
 	  }
 	else
-	  symval_update (/* sym, */ innercontents, newval, buf);
+	  symval_update_fwd (/* sym, */ innercontents, newval, buf);
       }
       break;
     default:
@@ -1818,7 +1806,7 @@ default_value (Lisp_Object symbol)
 	    && PER_BUFFER_IDX (XBUFFER_OBJFWD (valcontents)->offset))
 	  result = per_buffer_default (XBUFFER_OBJFWD (valcontents)->offset);
 	else
-	  result = symval_resolve (valcontents);
+	  result = symval_resolve (valcontents, NULL);
 	break;
       }
     default:
@@ -1893,7 +1881,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 	XSETCDR (blv->defcell, value);
 	/* If the default binding is now loaded, set the REALVALUE slot too.  */
 	if (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
-	  symval_update (blv->fwd, value, NULL);
+	  symval_update_fwd (blv->fwd, value, NULL);
       }
       break;
     case SYMBOL_FORWARDED:
@@ -1961,7 +1949,7 @@ make_blv (struct Lisp_Symbol *sym, bool forwarded,
 
  XSETSYMBOL (symbol, sym);
  tem = Fcons (symbol, (forwarded
-                       ? symval_resolve (valcontents.fwd)
+                       ? symval_resolve (valcontents.fwd, NULL)
                        : valcontents.value));
 
   /* Buffer_Local_Values cannot have as realval a buffer-local
@@ -2177,7 +2165,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
 	 (People need to learn how to write a comprehensible comment.
 	 Hint: brevity is key.) */
       if (SYMBOL_BLV (sym)->fwd.fwdptr)
-        symval_buffer_localize (sym);
+        symval_update_blv (variable, Fcurrent_buffer ());
     }
 
   return variable;
@@ -2368,7 +2356,7 @@ If the current binding is global (the default), the value is nil.  */)
   sym = XSYMBOL (variable);
 
   /* Make sure the current binding is actually swapped in.  */
-  find_symbol_value (variable);
+  find_symbol_value (variable, NULL);
 
  start:
   switch (sym->u.s.redirect)

@@ -631,11 +631,11 @@ The return value is BASE-VARIABLE.  */)
      so that old-code that affects n_a before the aliasing is setup
      still works.  */
   if (NILP (Fboundp (base_variable)))
-    set_internal (base_variable, find_symbol_value (new_alias),
+    set_internal (base_variable, find_symbol_value (new_alias, NULL),
                   Qnil, SET_INTERNAL_BIND);
   else if (!NILP (Fboundp (new_alias))
-           && !EQ (find_symbol_value (new_alias),
-                   find_symbol_value (base_variable)))
+           && !EQ (find_symbol_value (new_alias, NULL),
+                   find_symbol_value (base_variable, NULL)))
     call2 (intern ("display-warning"),
            list3 (Qdefvaralias, intern ("losing-value"), new_alias),
            CALLN (Fformat_message,
@@ -2787,7 +2787,7 @@ run_hook_with_args (ptrdiff_t nargs, Lisp_Object *args,
     return Qnil;
 
   sym = args[0];
-  val = find_symbol_value (sym);
+  val = find_symbol_value (sym, NULL);
 
   if (EQ (val, Qunbound) || NILP (val))
     return ret;
@@ -3427,7 +3427,7 @@ specbind (Lisp_Object symbol, Lisp_Object value)
       break;
     case SYMBOL_LOCALIZED:
     case SYMBOL_FORWARDED:
-      specpdl_ptr->let.old_value = find_symbol_value (symbol);
+      specpdl_ptr->let.old_value = find_symbol_value (symbol, NULL);
       specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.where = Fcurrent_buffer ();
@@ -3949,7 +3949,7 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		if (!NILP (Flocal_variable_p (symbol, where)))
 		  {
 		    set_specpdl_old_value
-		      (tmp, buffer_local_value (symbol, where));
+		      (tmp, find_symbol_value (symbol, XBUFFER (where)));
 		    set_internal (symbol, old_value, where,
 				  SET_INTERNAL_THREAD_SWITCH);
 		  }

@@ -759,7 +759,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
     Vminibuffer_completing_file_name = Qlambda;
 
   /* If variable is unbound, make it nil.  */
-  histval = find_symbol_value (histvar);
+  histval = find_symbol_value (histvar, NULL);
   if (EQ (histval, Qunbound))
     {
       Fset (histvar, Qnil);
