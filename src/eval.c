@@ -3418,17 +3418,18 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 
   if (! main_thread_p (current_thread))
     {
-      symbol = Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray);
-      if (NILP (symbol))
+      Lisp_Object fixme =
+	Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray);
+      if (NILP (fixme))
 	{
-	  symbol = Fintern (SYMBOL_NAME (symbol), current_thread->obarray);
-	  XSYMBOL (symbol)->u.s.redirect = xsymbol->u.s.redirect;
-	  XSYMBOL (symbol)->u.s.trapped_write = xsymbol->u.s.trapped_write;
-	  XSYMBOL (symbol)->u.s.declared_special = xsymbol->u.s.declared_special;
-	  XSYMBOL (symbol)->u.s.val = xsymbol->u.s.val;
-	  XSYMBOL (symbol)->u.s.function = xsymbol->u.s.function;
-	  XSYMBOL (symbol)->u.s.plist = xsymbol->u.s.plist;
-	  xsymbol = XSYMBOL (symbol);
+	  fixme = Fintern (SYMBOL_NAME (symbol), current_thread->obarray);
+	  XSYMBOL (fixme)->u.s.redirect = xsymbol->u.s.redirect;
+	  XSYMBOL (fixme)->u.s.trapped_write = xsymbol->u.s.trapped_write;
+	  XSYMBOL (fixme)->u.s.declared_special = xsymbol->u.s.declared_special;
+	  XSYMBOL (fixme)->u.s.val = xsymbol->u.s.val;
+	  XSYMBOL (fixme)->u.s.function = xsymbol->u.s.function;
+	  XSYMBOL (fixme)->u.s.plist = xsymbol->u.s.plist;
+	  // xsymbol = XSYMBOL (fixme);
 	}
     }
 
