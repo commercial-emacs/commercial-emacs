@@ -5151,6 +5151,10 @@ This function is an internal primitive--use `make-frame' instead.  */)
 		       (unsigned char *) &counters,
 		       ((STRINGP (value)
 			 && !strcmp (SSDATA (value), "extended")) ? 2 : 1));
+
+#if defined HAVE_XSYNCTRIGGERFENCE && !defined USE_GTK
+      x_sync_init_fences (f);
+#endif
 #endif
     }
 #endif
