@@ -64,7 +64,7 @@ The action to be taken can be further customized via
   :version "28.1"
   :type 'regexp)
 
-(defun erc--download-directory ()
+(defun eww--download-directory ()
   "Return the name of the download directory.
 If ~/Downloads/ exists, that will be used, and if not, the
 DOWNLOAD XDG user directory will be returned.  If that's
@@ -75,7 +75,7 @@ undefined, ~/Downloads/ is returned anyway."
         (file-name-as-directory dir))
       "~/Downloads/"))
 
-(defcustom eww-download-directory 'erc--download-directory
+(defcustom eww-download-directory 'eww--download-directory
   "Directory where files will downloaded.
 This should either be a directory name or a function (called with
 no parameters) that returns a directory name."
@@ -450,9 +450,6 @@ For more information, see Info node `(eww) Top'."
 	;; Don't mangle file: URLs at all.
         ((string-match-p "\\`ftp://" url)
          (user-error "FTP is not supported"))
-        ((string-match-p "\\`about:" url)
-         ;; Treat this as an about: url.  (bug#56885)
-         url)
         (t
 	 ;; Anything that starts with something that vaguely looks
 	 ;; like a protocol designator is interpreted as a full URL.

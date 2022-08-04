@@ -3,6 +3,7 @@
 ;; Copyright (C) 2001-2022 Free Software Foundation, Inc.
 
 ;; Keywords: comm, data, processes, hypermedia
+;; Obsolete-since: 29.1
 
 ;; This file is NOT part of GNU Emacs.
 ;;
@@ -93,7 +94,7 @@
     (if (fboundp func)
 	(progn
 	  (set-buffer (generate-new-buffer " *about-data*"))
-	  (insert "Content-type: text/html\n\n")
+	  (insert "Content-type: text/plain\n\n")
 	  (funcall func url)
 	  (current-buffer))
       (error "URL does not know about `%s'" item))))
