@@ -101,7 +101,7 @@ sys_thread_yield (void)
 {
 }
 
-#elif defined (HAVE_PTHREAD)
+#elif defined (HAVE_PTHREAD) /* THREADS_ENABLED */
 
 #include <sched.h>
 
@@ -109,7 +109,7 @@ void
 sys_mutex_init (sys_mutex_t *mutex)
 {
   pthread_mutexattr_t *attr_ptr;
-#ifdef ENABLE_CHECKING
+# ifdef ENABLE_CHECKING
   pthread_mutexattr_t attr;
   {
     int error = pthread_mutexattr_init (&attr);
@@ -118,9 +118,9 @@ sys_mutex_init (sys_mutex_t *mutex)
     eassert (error == 0);
   }
   attr_ptr = &attr;
-#else
+# else
   attr_ptr = NULL;
-#endif
+# endif
   int error = pthread_mutex_init (mutex, attr_ptr);
   /* We could get ENOMEM.  Can't do anything except aborting.  */
   if (error != 0)
@@ -128,10 +128,10 @@ sys_mutex_init (sys_mutex_t *mutex)
       fprintf (stderr, "\npthread_mutex_init failed: %s\n", strerror (error));
       emacs_abort ();
     }
-#ifdef ENABLE_CHECKING
+# ifdef ENABLE_CHECKING
   error = pthread_mutexattr_destroy (&attr);
   eassert (error == 0);
-#endif
+# endif
 }
 
 void
@@ -179,13 +179,13 @@ sys_cond_broadcast (sys_cond_t *cond)
 {
   int error = pthread_cond_broadcast (cond);
   eassert (error == 0);
-#ifdef HAVE_NS
+# ifdef HAVE_NS
   /* Send an app defined event to break out of the NS run loop.
      It seems that if ns_select is running the NS run loop, this
      broadcast has no effect until the loop is done, breaking a couple
      of tests in thread-tests.el. */
   ns_run_loop_break ();
-#endif
+# endif
 }
 
 void
@@ -210,26 +210,26 @@ sys_thread_equal (sys_thread_t t, sys_thread_t u)
 void
 sys_thread_set_name (const char *name)
 {
-#ifdef HAVE_PTHREAD_SETNAME_NP
+# ifdef HAVE_PTHREAD_SETNAME_NP
   /* We need to truncate here otherwise pthread_setname_np
      fails to set the name.  TASK_COMM_LEN is what the length
      is called in the Linux kernel headers (Bug#38632).  */
-#define TASK_COMM_LEN 16
+# define TASK_COMM_LEN 16
   char p_name[TASK_COMM_LEN];
   strncpy (p_name, name, TASK_COMM_LEN - 1);
   p_name[TASK_COMM_LEN - 1] = '\0';
-# ifdef HAVE_PTHREAD_SETNAME_NP_1ARG
+#  ifdef HAVE_PTHREAD_SETNAME_NP_1ARG
   pthread_setname_np (p_name);
-# elif defined HAVE_PTHREAD_SETNAME_NP_3ARG
+#  elif defined HAVE_PTHREAD_SETNAME_NP_3ARG
   pthread_setname_np (pthread_self (), "%s", p_name);
-# else
+#  else
   pthread_setname_np (pthread_self (), p_name);
-# endif
-#elif HAVE_PTHREAD_SET_NAME_NP
+#  endif /* HAVE_PTHREAD_SETNAME_NP_1ARG */
+# elif HAVE_PTHREAD_SET_NAME_NP /* ! HAVE_PTHREAD_SETNAME_NP */
   /* The name will automatically be truncated if it exceeds a
      system-specific length.  */
   pthread_set_name_np (pthread_self (), name);
-#endif
+# endif /* HAVE_PTHREAD_SETNAME_NP */
 }
 
 bool
@@ -268,7 +268,7 @@ sys_thread_yield (void)
   sched_yield ();
 }
 
-#elif defined (WINDOWSNT)
+#elif defined (WINDOWSNT) /* THREADS_ENABLED, ! HAVE_PTHREAD */
 
 #include <mbctype.h>
 #include "w32term.h"
@@ -415,7 +415,7 @@ sys_thread_equal (sys_thread_t t, sys_thread_t u)
 
 /* Special exception used to communicate with a debugger.  The name is
    taken from example code shown on MSDN.  */
-#define MS_VC_EXCEPTION 0x406d1388UL
+# define MS_VC_EXCEPTION 0x406d1388UL
 
 /* Structure used to communicate thread name to a debugger.  */
 typedef struct _THREADNAME_INFO
@@ -537,7 +537,7 @@ sys_thread_yield (void)
   Sleep (0);
 }
 
-#else
+#else /* THREADS_ENABLED, ! HAVE_PTHREAD, ! WINDOWSNT  */
 
 #error port me
 
