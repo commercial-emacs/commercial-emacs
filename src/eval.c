@@ -3416,6 +3416,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       XSETSYMBOL (symbol, xsymbol);
     }
 
+#ifdef MULTITHREADED
   if (! main_thread_p (current_thread))
     {
       symbol = Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray);
@@ -3431,6 +3432,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 	  xsymbol = XSYMBOL (symbol);
 	}
     }
+#endif /* MULTITHREADED */
 
   /* First, qualify what kind of binding.  */
   switch (xsymbol->u.s.redirect)

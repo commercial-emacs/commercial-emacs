@@ -82,11 +82,13 @@ restore_thread (struct thread_state *self)
   current_thread = self;
   if (prev_thread != current_thread)
     {
+#ifndef MULTITHREADED
       if (prev_thread != NULL)
 	specpdl_unwind (prev_thread->m_specpdl_ptr,
 			prev_thread->m_specpdl_ptr - prev_thread->m_specpdl,
 			SPECPDL_LET);
       specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, SPECPDL_LET);
+#endif /* ! MULTITHREADED */
 
       /* Thread-private buffer variables require resetting, but
 	 set_buffer_internal(current_buffer) would be a no-op.  */

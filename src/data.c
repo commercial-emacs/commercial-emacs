@@ -1465,6 +1465,7 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
   symbol = argsym;
   xsymbol = XSYMBOL (symbol);
 
+#ifdef MULTITHREADED
   if (! NILP (current_thread->obarray))
     {
       Lisp_Object found = oblookup (current_thread->obarray,
@@ -1472,13 +1473,14 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
 				    SCHARS (SYMBOL_NAME (symbol)),
 				    SBYTES (SYMBOL_NAME (symbol)));
       eassert (! main_thread_p (current_thread));
-      if (false && SYMBOLP (found))
+      if (SYMBOLP (found))
 	{
 	  symbol = found;
 	  xsymbol = XSYMBOL (symbol);
 	  eassert (xsymbol->u.s.redirect != SYMBOL_VARALIAS);
 	}
     }
+#endif /* MULTITHREADED */
 
  start:
   switch (xsymbol->u.s.redirect)
