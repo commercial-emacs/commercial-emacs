@@ -4683,140 +4683,94 @@ x_restore_events_after_dnd (struct frame *f, XWindowAttributes *wa)
 
   dpyinfo = FRAME_DISPLAY_INFO (f);
 
-  /* Restore the old event mask.  */
-  XSelectInput (dpyinfo->display, dpyinfo->root_window,
-		wa->your_event_mask);
-#ifdef HAVE_XKB
-  if (dpyinfo->supports_xkb)
-    XkbSelectEvents (dpyinfo->display, XkbUseCoreKbd,
-		     XkbStateNotifyMask, 0);
-#endif
-  /* Delete the Motif drag initiator info if it was set up.  */
-  if (x_dnd_motif_setup_p)
-    XDeleteProperty (dpyinfo->display, FRAME_X_WINDOW (f),
-		     x_dnd_motif_atom);
+  xi_convert_button_state (&xev->buttons, &buttons);
 
-  /* Remove any type list set as well.  */
-  if (x_dnd_init_type_lists && x_dnd_n_targets > 3)
-    XDeleteProperty (dpyinfo->display, FRAME_X_WINDOW (f),
-		     dpyinfo->Xatom_XdndTypeList);
+  return mods | buttons;
 }
 
+/* Free all XI2 devices on DPYINFO.  */
 static void
-x_dnd_cleanup_drag_and_drop (void *frame)
+x_free_xi_devices (struct x_display_info *dpyinfo)
 {
-  struct frame *f = frame;
-  xm_drop_start_message dmsg;
+#ifdef HAVE_XINPUT2_2
+  struct xi_touch_point_t *tem, *last;
+#endif
 
-  if (!x_dnd_unwind_flag)
-    return;
+  block_input ();
 
-  if (x_dnd_in_progress)
+  if (dpyinfo->num_devices)
     {
-      eassert (x_dnd_frame);
-
-      block_input ();
-      if (x_dnd_last_seen_window != None
-	  && x_dnd_last_protocol_version != -1)
-	x_dnd_send_leave (x_dnd_frame,
-			  x_dnd_last_seen_window);
-      else if (x_dnd_last_seen_window != None
-	       && !XM_DRAG_STYLE_IS_DROP_ONLY (x_dnd_last_motif_style)
-	       && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
-	       && x_dnd_motif_setup_p)
+      for (int i = 0; i < dpyinfo->num_devices; ++i)
 	{
-	  dmsg.reason = XM_DRAG_REASON (XM_DRAG_ORIGINATOR_INITIATOR,
-					XM_DRAG_REASON_DROP_START);
-	  dmsg.byte_order = XM_BYTE_ORDER_CUR_FIRST;
-	  dmsg.timestamp = FRAME_DISPLAY_INFO (f)->last_user_time;
-	  dmsg.side_effects
-	    = XM_DRAG_SIDE_EFFECT (xm_side_effect_from_action (FRAME_DISPLAY_INFO (f),
-							       x_dnd_wanted_action),
-				   XM_DROP_SITE_VALID, x_dnd_motif_operations,
-				   XM_DROP_ACTION_DROP_CANCEL);
-	  dmsg.x = 0;
-	  dmsg.y = 0;
-	  dmsg.index_atom = x_dnd_motif_atom;
-	  dmsg.source_window = FRAME_X_WINDOW (f);
-
-	  x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (f), f,
-					x_dnd_last_seen_window,
-					FRAME_DISPLAY_INFO (f)->last_user_time);
-	  xm_send_drop_message (FRAME_DISPLAY_INFO (f), FRAME_X_WINDOW (f),
-				x_dnd_last_seen_window, &dmsg);
-	}
-      unblock_input ();
-
-      x_dnd_end_window = x_dnd_last_seen_window;
-      x_dnd_last_seen_window = None;
-      x_dnd_last_seen_toplevel = None;
-      x_dnd_in_progress = false;
-    }
-
-  x_dnd_waiting_for_finish = false;
-
-  FRAME_DISPLAY_INFO (f)->grabbed = 0;
-#ifdef USE_GTK
-  current_hold_quit = NULL;
+#ifdef HAVE_XINPUT2_1
+	  xfree (dpyinfo->devices[i].valuators);
 #endif
-  x_dnd_return_frame_object = NULL;
-  x_dnd_movement_frame = NULL;
-  x_dnd_wheel_frame = NULL;
-  x_dnd_frame = NULL;
 
-  x_restore_events_after_dnd (f, &x_dnd_old_window_attrs);
-}
+#ifdef HAVE_XINPUT2_2
+	  tem = dpyinfo->devices[i].touchpoints;
+	  while (tem)
+	    {
+	      last = tem;
+	      tem = tem->next;
+	      xfree (last);
+	    }
+#endif
+	}
 
-static void
-x_dnd_note_self_position (struct x_display_info *dpyinfo, Window target,
-			  unsigned short root_x, unsigned short root_y)
-{
-  struct frame *f;
-  int dest_x, dest_y;
-  Window child_return;
-
-  f = x_top_window_to_frame (dpyinfo, target);
-
-  if (f && XTranslateCoordinates (dpyinfo->display,
-				  dpyinfo->root_window,
-				  FRAME_X_WINDOW (f),
-				  root_x, root_y, &dest_x,
-				  &dest_y, &child_return))
-    {
-      x_dnd_movement_frame = f;
-      x_dnd_movement_x = dest_x;
-      x_dnd_movement_y = dest_y;
-
-      return;
+      xfree (dpyinfo->devices);
+      dpyinfo->devices = NULL;
+      dpyinfo->num_devices = 0;
     }
+
+  unblock_input ();
 }
 
-static void
-x_dnd_note_self_wheel (struct x_display_info *dpyinfo, Window target,
-		       unsigned short root_x, unsigned short root_y,
-		       int button, unsigned int state, Time time)
+#ifdef HAVE_XINPUT2_1
+struct xi_known_valuator
 {
-  struct frame *f;
-  int dest_x, dest_y;
-  Window child_return;
+  /* The current value of this valuator.  */
+  double current_value;
 
-  if (button < 4 || button > 7)
-    return;
+  /* The number of the valuator.  */
+  int number;
 
-  f = x_top_window_to_frame (dpyinfo, target);
+  /* The next valuator whose value we already know.  */
+  struct xi_known_valuator *next;
+};
+#endif
 
-  if (f && XTranslateCoordinates (dpyinfo->display,
-				  dpyinfo->root_window,
-				  FRAME_X_WINDOW (f),
-				  root_x, root_y, &dest_x,
-				  &dest_y, &child_return))
-    {
-      x_dnd_wheel_frame = f;
-      x_dnd_wheel_x = dest_x;
-      x_dnd_wheel_y = dest_y;
-      x_dnd_wheel_button = button;
-      x_dnd_wheel_state = state;
-      x_dnd_wheel_time = time;
+static void
+xi_populate_device_from_info (struct xi_device_t *xi_device,
+			      XIDeviceInfo *device)
+{
+#ifdef HAVE_XINPUT2_1
+  struct xi_scroll_valuator_t *valuator;
+  struct xi_known_valuator *values, *tem;
+  int actual_valuator_count;
+  XIScrollClassInfo *info;
+  XIValuatorClassInfo *val_info;
+#endif
+  int c;
+#ifdef HAVE_XINPUT2_2
+  XITouchClassInfo *touch_info;
+#endif
+
+#ifdef HAVE_XINPUT2_1
+  USE_SAFE_ALLOCA;
+#endif
+
+  xi_device->device_id = device->deviceid;
+  xi_device->grab = 0;
+
+#ifdef HAVE_XINPUT2_1
+  actual_valuator_count = 0;
+  xi_device->valuators = xmalloc (sizeof *xi_device->valuators
+				  * device->num_classes);
+  values = NULL;
+#endif
+#ifdef HAVE_XINPUT2_2
+  xi_device->touchpoints = NULL;
+#endif
 
       return;
     }
@@ -4845,312 +4799,306 @@ x_dnd_note_self_drop (struct x_display_info *dpyinfo, Window target,
   if (!f)
     return;
 
-  if (NILP (Vx_dnd_native_test_function))
-    return;
+/* Populate our client-side record of all devices, which includes
+   basic information about the device and also touchscreen tracking
+   information and scroll valuators.
 
-  if (!XTranslateCoordinates (dpyinfo->display, dpyinfo->root_window,
-			      FRAME_X_WINDOW (f), root_x, root_y,
-			      &win_x, &win_y, &dummy))
-    return;
+   Keeping track of scroll valuators is required in order to support
+   scroll wheels that report information in a fashion more detailed
+   than a single turn of a "step" in the wheel.
 
-  /* Emacs can't respond to DND events inside the nested event loop,
-     so when dragging items to itself, call the test function
-     manually.  */
+   When the input extension is being utilized, the states of the mouse
+   wheels on each axis are stored as absolute values inside
+   "valuators" attached to each mouse device.  To obtain the delta of
+   the scroll wheel from a motion event (which is used to report that
+   some valuator has changed), it is necessary to iterate over every
+   valuator that changed, and compare its previous value to the
+   current value of the valuator.
 
-  XSETFRAME (lval, f);
-  x_dnd_action = None;
-  x_dnd_action_symbol
-    = safe_call2 (Vx_dnd_native_test_function,
-		  Fposn_at_x_y (make_fixnum (win_x),
-				make_fixnum (win_y),
-				lval, Qnil),
-		  x_atom_to_symbol (dpyinfo,
-				    x_dnd_wanted_action));
+   Each individual valuator also has an "interval", which is the
+   amount you must divide that delta by in order to obtain a delta in
+   the terms of scroll units.
 
-  if (!SYMBOLP (x_dnd_action_symbol))
-    return;
+   This delta however is still intermediate, to make driver
+   implementations easier.  The XInput developers recommend (and most
+   programs use) the following algorithm to convert from scroll unit
+   deltas to pixel deltas by which the display must actually be
+   scrolled:
 
-  EVENT_INIT (ie);
+     pixels_scrolled = pow (window_height, 2.0 / 3.0) * delta;  */
 
-  ie.kind = DRAG_N_DROP_EVENT;
-  XSETFRAME (ie.frame_or_window, f);
+static void
+x_cache_xi_devices (struct x_display_info *dpyinfo)
+{
+  int ndevices, actual_devices;
+  XIDeviceInfo *infos;
 
-  lval = Qnil;
-  atom_names = alloca (x_dnd_n_targets * sizeof *atom_names);
-  name = x_get_atom_name (dpyinfo, x_dnd_wanted_action, NULL);
+  actual_devices = 0;
+  block_input ();
+  x_free_xi_devices (dpyinfo);
+  infos = XIQueryDevice (dpyinfo->display,
+			 XIAllDevices,
+			 &ndevices);
 
-  if (!XGetAtomNames (dpyinfo->display, x_dnd_targets,
-		      x_dnd_n_targets, atom_names))
+  if (!ndevices)
     {
-      xfree (name);
+      XIFreeDeviceInfo (infos);
+      unblock_input ();
       return;
     }
 
   for (i = x_dnd_n_targets; i != 0; --i)
     {
-      lval = Fcons (intern (atom_names[i - 1]), lval);
-      XFree (atom_names[i - 1]);
-    }
-
-  lval = Fcons (assq_no_quit (QXdndSelection,
-			      FRAME_TERMINAL (f)->Vselection_alist),
-		lval);
-  lval = Fcons (intern (name), lval);
-  lval = Fcons (QXdndSelection, lval);
-  ie.arg = lval;
-  ie.timestamp = timestamp;
-
-  XSETINT (ie.x, win_x);
-  XSETINT (ie.y, win_y);
-
-  xfree (name);
-  kbd_buffer_store_event (&ie);
-}
-
-/* Flush display of frame F.  */
-
-static void
-x_flush (struct frame *f)
-{
-  eassert (f && FRAME_X_P (f));
-  /* Don't call XFlush when it is not safe to redisplay; the X
-     connection may be broken.  */
-  if (!NILP (Vinhibit_redisplay))
-    return;
-
-  block_input ();
-  XFlush (FRAME_X_DISPLAY (f));
-  unblock_input ();
-}
-
-#ifdef HAVE_XDBE
-static void
-x_drop_xrender_surfaces (struct frame *f)
-{
-  font_drop_xrender_surfaces (f);
-
-#ifdef HAVE_XRENDER
-  if (f && FRAME_X_DOUBLE_BUFFERED_P (f)
-      && FRAME_X_PICTURE (f) != None)
-    {
-      XRenderFreePicture (FRAME_X_DISPLAY (f),
-			  FRAME_X_PICTURE (f));
-      FRAME_X_PICTURE (f) = None;
-    }
-#endif
-}
-#endif
-
-#ifdef HAVE_XRENDER
-void
-x_xr_ensure_picture (struct frame *f)
-{
-  if (FRAME_X_PICTURE (f) == None && FRAME_X_PICTURE_FORMAT (f))
-    {
-      XRenderPictureAttributes attrs;
-      attrs.clip_mask = None;
-      XRenderPictFormat *fmt = FRAME_X_PICTURE_FORMAT (f);
-
-      FRAME_X_PICTURE (f) = XRenderCreatePicture (FRAME_X_DISPLAY (f),
-						  FRAME_X_RAW_DRAWABLE (f),
-						  fmt, CPClipMask, &attrs);
+      cairo_destroy (FRAME_CR_CONTEXT (f));
+      FRAME_CR_CONTEXT (f) = NULL;
     }
 }
-#endif
-
-
-/***********************************************************************
-			      Debugging
- ***********************************************************************/
-
-#if false
-
-/* This is a function useful for recording debugging information about
-   the sequence of occurrences in this file.  */
-
-struct record
-{
-  char *locus;
-  int type;
-};
-
-struct record event_record[100];
-
-int event_record_index;
 
 void
-record_event (char *locus, int type)
+x_cr_update_surface_desired_size (struct frame *f, int width, int height)
 {
-  if (event_record_index == ARRAYELTS (event_record))
-    event_record_index = 0;
-
-  event_record[event_record_index].locus = locus;
-  event_record[event_record_index].type = type;
-  event_record_index++;
+  if (FRAME_CR_SURFACE_DESIRED_WIDTH (f) != width
+      || FRAME_CR_SURFACE_DESIRED_HEIGHT (f) != height)
+    {
+      x_cr_destroy_frame_context (f);
+      FRAME_CR_SURFACE_DESIRED_WIDTH (f) = width;
+      FRAME_CR_SURFACE_DESIRED_HEIGHT (f) = height;
+    }
 }
 
-#endif
-
-#ifdef HAVE_XINPUT2
-bool
-xi_frame_selected_for (struct frame *f, unsigned long event)
+static void
+x_cr_gc_clip (cairo_t *cr, struct frame *f, GC gc)
 {
-  XIEventMask *masks;
-  int i;
-
-  masks = FRAME_X_OUTPUT (f)->xi_masks;
-
-  if (!masks)
-    return false;
-
-  for (i = 0; i < FRAME_X_OUTPUT (f)->num_xi_masks; ++i)
+  if (gc)
     {
-      if (masks[i].mask_len >= XIMaskLen (event)
-	  && XIMaskIsSet (masks[i].mask, event))
-	return true;
+      struct x_gc_ext_data *gc_ext = x_gc_get_ext_data (f, gc, 0);
+
+      if (gc_ext && gc_ext->n_clip_rects)
+	{
+	  for (int i = 0; i < gc_ext->n_clip_rects; i++)
+	    cairo_rectangle (cr, gc_ext->clip_rects[i].x,
+			     gc_ext->clip_rects[i].y,
+			     gc_ext->clip_rects[i].width,
+			     gc_ext->clip_rects[i].height);
+	  cairo_clip (cr);
+	}
+    }
+}
+
+cairo_t *
+x_begin_cr_clip (struct frame *f, GC gc)
+{
+  cairo_t *cr = FRAME_CR_CONTEXT (f);
+
+  if (!cr)
+    {
+      int width = FRAME_CR_SURFACE_DESIRED_WIDTH (f);
+      int height = FRAME_CR_SURFACE_DESIRED_HEIGHT (f);
+      cairo_surface_t *surface;
+#ifdef USE_CAIRO_XCB_SURFACE
+      if (FRAME_DISPLAY_INFO (f)->xcb_visual)
+	surface = cairo_xcb_surface_create (FRAME_DISPLAY_INFO (f)->xcb_connection,
+					    (xcb_drawable_t) FRAME_X_RAW_DRAWABLE (f),
+					    FRAME_DISPLAY_INFO (f)->xcb_visual,
+					    width, height);
+      else
+#endif
+	surface = cairo_xlib_surface_create (FRAME_X_DISPLAY (f),
+					     FRAME_X_RAW_DRAWABLE (f),
+					     FRAME_X_VISUAL (f),
+					     width, height);
+
+      cr = FRAME_CR_CONTEXT (f) = cairo_create (surface);
+      cairo_surface_destroy (surface);
+    }
+  cairo_save (cr);
+  x_cr_gc_clip (cr, f, gc);
+
+  return cr;
+}
+
+void
+x_end_cr_clip (struct frame *f)
+{
+  cairo_restore (FRAME_CR_CONTEXT (f));
+  if (FRAME_X_DOUBLE_BUFFERED_P (f))
+    x_mark_frame_dirty (f);
+}
+
+void
+x_set_cr_source_with_gc_foreground (struct frame *f, GC gc,
+				    bool respect_alpha_background)
+{
+  XGCValues xgcv;
+  XColor color;
+  unsigned int depth;
+
+  XGetGCValues (FRAME_X_DISPLAY (f), gc, GCForeground, &xgcv);
+  color.pixel = xgcv.foreground;
+  x_query_colors (f, &color, 1);
+  depth = FRAME_DISPLAY_INFO (f)->n_planes;
+
+  if (f->alpha_background < 1.0 && depth == 32
+      && respect_alpha_background)
+    {
+      cairo_set_source_rgba (FRAME_CR_CONTEXT (f), color.red / 65535.0,
+			     color.green / 65535.0, color.blue / 65535.0,
+			     f->alpha_background);
+
+      cairo_set_operator (FRAME_CR_CONTEXT (f), CAIRO_OPERATOR_SOURCE);
+    }
+  else
+    {
+      cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
+			    color.green / 65535.0, color.blue / 65535.0);
+      cairo_set_operator (FRAME_CR_CONTEXT (f), CAIRO_OPERATOR_OVER);
+    }
+}
+
+void
+x_set_cr_source_with_gc_background (struct frame *f, GC gc,
+				    bool respect_alpha_background)
+{
+  XGCValues xgcv;
+  XColor color;
+  unsigned int depth;
+
+  XGetGCValues (FRAME_X_DISPLAY (f), gc, GCBackground, &xgcv);
+  color.pixel = xgcv.background;
+
+  x_query_colors (f, &color, 1);
+
+  depth = FRAME_DISPLAY_INFO (f)->n_planes;
+
+  if (f->alpha_background < 1.0 && depth == 32
+      && respect_alpha_background)
+    {
+      cairo_set_source_rgba (FRAME_CR_CONTEXT (f), color.red / 65535.0,
+			     color.green / 65535.0, color.blue / 65535.0,
+			     f->alpha_background);
+
+      cairo_set_operator (FRAME_CR_CONTEXT (f), CAIRO_OPERATOR_SOURCE);
+    }
+  else
+    {
+      cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
+			    color.green / 65535.0, color.blue / 65535.0);
+      cairo_set_operator (FRAME_CR_CONTEXT (f), CAIRO_OPERATOR_OVER);
     }
 
   return false;
 }
-#endif
 
-static void
-x_toolkit_position (struct frame *f, int x, int y,
-		    bool *menu_bar_p, bool *tool_bar_p)
-{
-#ifdef USE_GTK
-  GdkRectangle test_rect;
-  int scale;
+static const cairo_user_data_key_t xlib_surface_key, saved_drawable_key;
 
   y += (FRAME_MENUBAR_HEIGHT (f)
 	+ FRAME_TOOLBAR_TOP_HEIGHT (f));
   x += FRAME_TOOLBAR_LEFT_WIDTH (f);
 
-  if (FRAME_EXTERNAL_MENU_BAR (f))
-    *menu_bar_p = (x >= 0 && x < FRAME_PIXEL_WIDTH (f)
-		   && y >= 0 && y < FRAME_MENUBAR_HEIGHT (f));
+  cairo_t *buf = cairo_create (xlib_surface);
+  cairo_set_source_surface (buf, surface, 0, 0);
+  cairo_matrix_t matrix;
+  cairo_get_matrix (cr, &matrix);
+  cairo_pattern_set_matrix (cairo_get_source (cr), &matrix);
+  cairo_set_operator (buf, CAIRO_OPERATOR_SOURCE);
+  x_cr_gc_clip (buf, f, gc);
+  cairo_paint (buf);
+  cairo_destroy (buf);
 
-  if (FRAME_X_OUTPUT (f)->toolbar_widget)
-    {
-      scale = xg_get_scale (f);
-      test_rect.x = x / scale;
-      test_rect.y = y / scale;
-      test_rect.width = 1;
-      test_rect.height = 1;
+  cairo_set_user_data (cr, &saved_drawable_key,
+		       (void *) (uintptr_t) FRAME_X_RAW_DRAWABLE (f), NULL);
+  FRAME_X_RAW_DRAWABLE (f) = pixmap;
+  cairo_surface_flush (xlib_surface);
 
-      *tool_bar_p = gtk_widget_intersect (FRAME_X_OUTPUT (f)->toolbar_widget,
-					  &test_rect, NULL);
-    }
-#elif defined USE_X_TOOLKIT
-  *menu_bar_p = (x > 0 && x < FRAME_PIXEL_WIDTH (f)
-		 && (y < 0 && y >= -FRAME_MENUBAR_HEIGHT (f)));
-#else
-  *menu_bar_p = (WINDOWP (f->menu_bar_window)
-		 && (x > 0 && x < FRAME_PIXEL_WIDTH (f)
-		     && (y > 0 && y < FRAME_MENU_BAR_HEIGHT (f))));
-#endif
+  return true;
 }
 
 static void
-x_update_opaque_region (struct frame *f, XEvent *configure)
+x_end_cr_xlib_drawable (struct frame *f, GC gc)
 {
-  unsigned long opaque_region[] = {0, 0,
-				   (configure
-				    ? configure->xconfigure.width
-				    : FRAME_PIXEL_WIDTH (f)),
-				   (configure
-				    ? configure->xconfigure.height
-				    : FRAME_PIXEL_HEIGHT (f))};
-#ifdef HAVE_GTK3
-  GObjectClass *object_class;
-  GtkWidgetClass *class;
-#endif
-
-  if (!FRAME_DISPLAY_INFO (f)->alpha_bits)
+  cairo_t *cr = FRAME_CR_CONTEXT (f);
+  if (!cr)
     return;
 
+  Drawable saved_drawable
+    = (uintptr_t) cairo_get_user_data (cr, &saved_drawable_key);
+  cairo_surface_t *surface = (saved_drawable
+			      ? cairo_get_user_data (cr, &xlib_surface_key)
+			      : cairo_get_target (cr));
+  struct x_gc_ext_data *gc_ext = x_gc_get_ext_data (f, gc, 0);
+  if (gc_ext && gc_ext->n_clip_rects)
+    for (int i = 0; i < gc_ext->n_clip_rects; i++)
+      cairo_surface_mark_dirty_rectangle (surface, gc_ext->clip_rects[i].x,
+					  gc_ext->clip_rects[i].y,
+					  gc_ext->clip_rects[i].width,
+					  gc_ext->clip_rects[i].height);
+  else
+    cairo_surface_mark_dirty (surface);
+  if (!saved_drawable)
+    return;
+
+  cairo_save (cr);
+  cairo_set_source_surface (cr, surface, 0, 0);
+  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
+  x_cr_gc_clip (cr, f, gc);
+  cairo_paint (cr);
+  cairo_restore (cr);
+
+  FRAME_X_RAW_DRAWABLE (f) = saved_drawable;
+  cairo_set_user_data (cr, &saved_drawable_key, NULL, NULL);
+}
+
+/* Fringe bitmaps.  */
+
+static int max_fringe_bmp = 0;
+static cairo_pattern_t **fringe_bmp = 0;
+
+static void
+x_cr_define_fringe_bitmap (int which, unsigned short *bits, int h, int wd)
+{
+  int i, stride;
+  cairo_surface_t *surface;
+  cairo_pattern_t *pattern;
+  unsigned char *data;
+
+  if (which >= max_fringe_bmp)
+    {
+      i = max_fringe_bmp;
+      max_fringe_bmp = which + 20;
+      fringe_bmp = xrealloc (fringe_bmp, max_fringe_bmp * sizeof (*fringe_bmp));
+      while (i < max_fringe_bmp)
+	fringe_bmp[i++] = 0;
+    }
+
   block_input ();
-  if (f->alpha_background < 1.0)
-    XChangeProperty (FRAME_X_DISPLAY (f),
-		     FRAME_X_WINDOW (f),
-		     FRAME_DISPLAY_INFO (f)->Xatom_net_wm_opaque_region,
-		     XA_CARDINAL, 32, PropModeReplace,
-		     NULL, 0);
-#ifndef HAVE_GTK3
-  else
-    XChangeProperty (FRAME_X_DISPLAY (f),
-		     FRAME_X_WINDOW (f),
-		     FRAME_DISPLAY_INFO (f)->Xatom_net_wm_opaque_region,
-		     XA_CARDINAL, 32, PropModeReplace,
-		     (unsigned char *) &opaque_region, 4);
-#else
-  else if (FRAME_TOOLTIP_P (f))
-    XChangeProperty (FRAME_X_DISPLAY (f),
-		     FRAME_X_WINDOW (f),
-		     FRAME_DISPLAY_INFO (f)->Xatom_net_wm_opaque_region,
-		     XA_CARDINAL, 32, PropModeReplace,
-		     (unsigned char *) &opaque_region, 4);
-  else
-    {
-      /* This causes child frames to not update correctly for an
-	 unknown reason.  (bug#55779) */
-      if (!FRAME_PARENT_FRAME (f))
-	{
-	  object_class = G_OBJECT_GET_CLASS (FRAME_GTK_OUTER_WIDGET (f));
-	  class = GTK_WIDGET_CLASS (object_class);
 
-	  if (class->style_updated)
-	    class->style_updated (FRAME_GTK_OUTER_WIDGET (f));
-	}
+  surface = cairo_image_surface_create (CAIRO_FORMAT_A1, wd, h);
+  stride = cairo_image_surface_get_stride (surface);
+  data = cairo_image_surface_get_data (surface);
+
+  for (i = 0; i < h; i++)
+    {
+      *((unsigned short *) data) = bits[i];
+      data += stride;
     }
-#endif
+
+  cairo_surface_mark_dirty (surface);
+  pattern = cairo_pattern_create_for_surface (surface);
+  cairo_surface_destroy (surface);
+
   unblock_input ();
-}
 
-
-#if defined USE_CAIRO || defined HAVE_XRENDER
-static int
-x_gc_free_ext_data_private (XExtData *extension)
-{
-  xfree (extension->private_data);
-
-  return 0;
-}
-
-static struct x_gc_ext_data *
-x_gc_get_ext_data (struct frame *f, GC gc, int create_if_not_found_p)
-{
-  struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
-  XEDataObject object;
-  XExtData **head, *ext_data;
-
-  object.gc = gc;
-  head = XEHeadOfExtensionList (object);
-  ext_data = XFindOnExtensionList (head, dpyinfo->ext_codes->extension);
-  if (ext_data == NULL)
-    {
-      if (!create_if_not_found_p)
-	return NULL;
-      else
-	{
-	  ext_data = xzalloc (sizeof (*ext_data));
-	  ext_data->number = dpyinfo->ext_codes->extension;
-	  ext_data->private_data = xzalloc (sizeof (struct x_gc_ext_data));
-	  ext_data->free_private = x_gc_free_ext_data_private;
-	  XAddToExtensionList (head, ext_data);
-	}
-    }
-  return (struct x_gc_ext_data *) ext_data->private_data;
+  fringe_bmp[which] = pattern;
 }
 
 static void
-x_extension_initialize (struct x_display_info *dpyinfo)
+x_cr_destroy_fringe_bitmap (int which)
 {
-  XExtCodes *ext_codes = XAddExtension (dpyinfo->display);
+  if (which >= max_fringe_bmp)
+    return;
 
   dpyinfo->ext_codes = ext_codes;
 }
-#endif
 
 #ifdef USE_CAIRO
 
@@ -5242,288 +5190,273 @@ struct xi_known_valuator
   /* The current value of this valuator.  */
   double current_value;
 
-  /* The number of the valuator.  */
-  int number;
+	      stipple = XRenderCreatePicture (FRAME_X_DISPLAY (f),
+					      xgcv.stipple,
+					      XRenderFindStandardFormat (FRAME_X_DISPLAY (f),
+									 PictStandardA1),
+					      CPRepeat, &attrs);
 
-  /* The next valuator whose value we already know.  */
-  struct xi_known_valuator *next;
-};
-#endif
+	      XRenderFillRectangle (FRAME_X_DISPLAY (f), PictOpSrc,
+				    FRAME_X_PICTURE (f),
+				    &alpha, x, y, width, height);
 
-static void
-xi_populate_device_from_info (struct xi_device_t *xi_device,
-			      XIDeviceInfo *device)
-{
-#ifdef HAVE_XINPUT2_1
-  struct xi_scroll_valuator_t *valuator;
-  struct xi_known_valuator *values, *tem;
-  int actual_valuator_count;
-  XIScrollClassInfo *info;
-  XIValuatorClassInfo *val_info;
-#endif
-  int c;
-#ifdef HAVE_XINPUT2_2
-  XITouchClassInfo *touch_info;
-#endif
+	      fill = XRenderCreateSolidFill (FRAME_X_DISPLAY (f), &xc);
 
-#ifdef HAVE_XINPUT2_1
-  USE_SAFE_ALLOCA;
-#endif
+	      XRenderComposite (FRAME_X_DISPLAY (f), PictOpOver, fill, stipple,
+				FRAME_X_PICTURE (f), 0, 0, x, y, x, y, width, height);
 
-  xi_device->device_id = device->deviceid;
-  xi_device->grab = 0;
-
-#ifdef HAVE_XINPUT2_1
-  actual_valuator_count = 0;
-  xi_device->valuators = xmalloc (sizeof *xi_device->valuators
-				  * device->num_classes);
-  values = NULL;
-#endif
-#ifdef HAVE_XINPUT2_2
-  xi_device->touchpoints = NULL;
-#endif
-
-  xi_device->use = device->use;
-#ifdef HAVE_XINPUT2_2
-  xi_device->direct_p = false;
-#endif
-  xi_device->name = build_string (device->name);
-
-  for (c = 0; c < device->num_classes; ++c)
-    {
-      switch (device->classes[c]->type)
-	{
-#ifdef HAVE_XINPUT2_1
-	case XIScrollClass:
-	  {
-	    info = (XIScrollClassInfo *) device->classes[c];
-
-	    valuator = &xi_device->valuators[actual_valuator_count++];
-	    valuator->horizontal
-	      = (info->scroll_type == XIScrollTypeHorizontal);
-	    valuator->invalid_p = true;
-	    valuator->emacs_value = DBL_MIN;
-	    valuator->increment = info->increment;
-	    valuator->number = info->number;
-	    valuator->pending_enter_reset = false;
-
-	    break;
-	  }
-
-	case XIValuatorClass:
-	  {
-	    val_info = (XIValuatorClassInfo *) device->classes[c];
-	    tem = SAFE_ALLOCA (sizeof *tem);
-
-	    tem->next = values;
-	    tem->number = val_info->number;
-	    tem->current_value = val_info->value;
-
-	    values = tem;
-	    break;
-	  }
-#endif
-
-#ifdef HAVE_XINPUT2_2
-	case XITouchClass:
-	  {
-	    touch_info = (XITouchClassInfo *) device->classes[c];
-	    xi_device->direct_p = touch_info->mode == XIDirectTouch;
-	  }
-#endif
-	default:
-	  break;
-	}
-    }
-
-#ifdef HAVE_XINPUT2_1
-  xi_device->scroll_valuator_count = actual_valuator_count;
-
-  /* Now look through all the valuators whose values are already known
-     and populate our client-side records with their current
-     values.  */
-
-  for (tem = values; values; values = values->next)
-    {
-      for (c = 0; c < xi_device->scroll_valuator_count; ++c)
-	{
-	  if (xi_device->valuators[c].number == tem->number)
-	    {
-	      xi_device->valuators[c].invalid_p = false;
-	      xi_device->valuators[c].current_value = tem->current_value;
-	      xi_device->valuators[c].pending_enter_reset = true;
+	      XRenderFreePicture (FRAME_X_DISPLAY (f), stipple);
+	      XRenderFreePicture (FRAME_X_DISPLAY (f), fill);
 	    }
+	  else
+#endif
+	    {
+	      x_xrender_color_from_gc_foreground (f, gc, &xc, true);
+	      XRenderFillRectangle (FRAME_X_DISPLAY (f),
+				    PictOpSrc, FRAME_X_PICTURE (f),
+				    &xc, x, y, width, height);
+	    }
+	  x_xr_reset_ext_clip (f);
+	  x_mark_frame_dirty (f);
+
+	  return;
 	}
     }
-
-  SAFE_FREE ();
+#endif
+  XFillRectangle (FRAME_X_DISPLAY (f), FRAME_X_DRAWABLE (f),
+		  gc, x, y, width, height);
 #endif
 }
 
-/* Populate our client-side record of all devices, which includes
-   basic information about the device and also touchscreen tracking
-   information and scroll valuators.
-
-   Keeping track of scroll valuators is required in order to support
-   scroll wheels that report information in a fashion more detailed
-   than a single turn of a "step" in the wheel.
-
-   When the input extension is being utilized, the states of the mouse
-   wheels on each axis are stored as absolute values inside
-   "valuators" attached to each mouse device.  To obtain the delta of
-   the scroll wheel from a motion event (which is used to report that
-   some valuator has changed), it is necessary to iterate over every
-   valuator that changed, and compare its previous value to the
-   current value of the valuator.
-
-   Each individual valuator also has an "interval", which is the
-   amount you must divide that delta by in order to obtain a delta in
-   the terms of scroll units.
-
-   This delta however is still intermediate, to make driver
-   implementations easier.  The XInput developers recommend (and most
-   programs use) the following algorithm to convert from scroll unit
-   deltas to pixel deltas by which the display must actually be
-   scrolled:
-
-     pixels_scrolled = pow (window_height, 2.0 / 3.0) * delta;  */
 
 static void
-x_cache_xi_devices (struct x_display_info *dpyinfo)
+x_clear_rectangle (struct frame *f, GC gc, int x, int y, int width, int height,
+		   bool respect_alpha_background)
 {
-  int ndevices, actual_devices;
-  XIDeviceInfo *infos;
+#ifdef USE_CAIRO
+  cairo_t *cr;
 
-  actual_devices = 0;
-  block_input ();
-  x_free_xi_devices (dpyinfo);
-  infos = XIQueryDevice (dpyinfo->display,
-			 XIAllDevices,
-			 &ndevices);
-
-  if (!ndevices)
+  cr = x_begin_cr_clip (f, gc);
+  x_set_cr_source_with_gc_background (f, gc, respect_alpha_background);
+  cairo_rectangle (cr, x, y, width, height);
+  cairo_fill (cr);
+  x_end_cr_clip (f);
+#else
+#if defined HAVE_XRENDER && (RENDER_MAJOR > 0 || (RENDER_MINOR >= 2))
+  if (respect_alpha_background
+      && f->alpha_background != 1.0
+      && FRAME_DISPLAY_INFO (f)->alpha_bits
+      && FRAME_CHECK_XR_VERSION (f, 0, 2))
     {
-      XIFreeDeviceInfo (infos);
-      unblock_input ();
-      return;
+      x_xr_ensure_picture (f);
+
+      if (FRAME_X_PICTURE (f) != None)
+	{
+	  XRenderColor xc;
+
+	  x_xr_apply_ext_clip (f, gc);
+	  x_xrender_color_from_gc_background (f, gc, &xc, true);
+	  XRenderFillRectangle (FRAME_X_DISPLAY (f),
+				PictOpSrc, FRAME_X_PICTURE (f),
+				&xc, x, y, width, height);
+	  x_xr_reset_ext_clip (f);
+	  x_mark_frame_dirty (f);
+
+	  return;
+	}
     }
+#endif
 
-  dpyinfo->devices = xmalloc (sizeof *dpyinfo->devices * ndevices);
-
-  for (int i = 0; i < ndevices; ++i)
-    {
-      if (infos[i].enabled)
-	xi_populate_device_from_info (&dpyinfo->devices[actual_devices++],
-				      &infos[i]);
-    }
-
-  dpyinfo->num_devices = actual_devices;
-  XIFreeDeviceInfo (infos);
-  unblock_input ();
+  XGCValues xgcv;
+  Display *dpy = FRAME_X_DISPLAY (f);
+  XGetGCValues (dpy, gc, GCBackground | GCForeground, &xgcv);
+  XSetForeground (dpy, gc, xgcv.background);
+  XFillRectangle (dpy, FRAME_X_DRAWABLE (f),
+		  gc, x, y, width, height);
+  XSetForeground (dpy, gc, xgcv.foreground);
+#endif
 }
 
-#ifdef HAVE_XINPUT2_1
-/* Return the delta of the scroll valuator VALUATOR_NUMBER under
-   DEVICE in the display DPYINFO with VALUE.  The valuator's valuator
-   will be set to VALUE afterwards.  In case no scroll valuator is
-   found, or if the valuator state is invalid (see the comment under
-   XI_Enter in handle_one_xevent).  Otherwise, the valuator is
-   returned in VALUATOR_RETURN.  */
-static double
-x_get_scroll_valuator_delta (struct x_display_info *dpyinfo,
-			     struct xi_device_t *device,
-			     int valuator_number, double value,
-			     struct xi_scroll_valuator_t **valuator_return)
+static void
+x_draw_rectangle (struct frame *f, GC gc, int x, int y, int width, int height)
 {
-  struct xi_scroll_valuator_t *sv;
-  double delta;
+#ifdef USE_CAIRO
+  cairo_t *cr;
+
+  cr = x_begin_cr_clip (f, gc);
+  x_set_cr_source_with_gc_foreground (f, gc, false);
+  cairo_rectangle (cr, x + 0.5, y + 0.5, width, height);
+  cairo_set_line_width (cr, 1);
+  cairo_stroke (cr);
+  x_end_cr_clip (f);
+#else
+  XDrawRectangle (FRAME_X_DISPLAY (f), FRAME_X_DRAWABLE (f),
+		  gc, x, y, width, height);
+#endif
+}
+
+static void
+x_clear_window (struct frame *f)
+{
+#ifdef USE_CAIRO
+  cairo_t *cr;
+
+  cr = x_begin_cr_clip (f, NULL);
+  x_set_cr_source_with_gc_background (f, f->output_data.x->normal_gc, true);
+  cairo_paint (cr);
+  x_end_cr_clip (f);
+#else
+#ifndef USE_GTK
+  if (f->alpha_background != 1.0
+#ifdef HAVE_XDBE
+      || FRAME_X_DOUBLE_BUFFERED_P (f)
+#endif
+      )
+#endif
+    x_clear_area (f, 0, 0, FRAME_PIXEL_WIDTH (f),
+		  FRAME_PIXEL_HEIGHT (f));
+#ifndef USE_GTK
+  else
+    XClearWindow (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f));
+#endif
+#endif
+}
+
+#ifdef USE_CAIRO
+static void
+x_fill_trapezoid_for_relief (struct frame *f, GC gc, int x, int y,
+			     int width, int height, int top_p)
+{
+  cairo_t *cr;
+
+  cr = x_begin_cr_clip (f, gc);
+  x_set_cr_source_with_gc_foreground (f, gc, false);
+  cairo_move_to (cr, top_p ? x : x + height, y);
+  cairo_line_to (cr, x, y + height);
+  cairo_line_to (cr, top_p ? x + width - height : x + width, y + height);
+  cairo_line_to (cr, x + width, y);
+  cairo_fill (cr);
+  x_end_cr_clip (f);
+}
+
+enum corners
+  {
+    CORNER_BOTTOM_RIGHT,	/* 0 -> pi/2 */
+    CORNER_BOTTOM_LEFT,		/* pi/2 -> pi */
+    CORNER_TOP_LEFT,		/* pi -> 3pi/2 */
+    CORNER_TOP_RIGHT,		/* 3pi/2 -> 2pi */
+    CORNER_LAST
+  };
+
+static void
+x_erase_corners_for_relief (struct frame *f, GC gc, int x, int y,
+			    int width, int height,
+			    double radius, double margin, int corners)
+{
+  cairo_t *cr;
   int i;
 
-  for (i = 0; i < device->scroll_valuator_count; ++i)
-    {
-      sv = &device->valuators[i];
+  cr = x_begin_cr_clip (f, gc);
+  x_set_cr_source_with_gc_background (f, gc, false);
+  for (i = 0; i < CORNER_LAST; i++)
+    if (corners & (1 << i))
+      {
+	double xm, ym, xc, yc;
 
-      if (sv->number == valuator_number)
-	{
-	  *valuator_return = sv;
+	if (i == CORNER_TOP_LEFT || i == CORNER_BOTTOM_LEFT)
+	  xm = x - margin, xc = xm + radius;
+	else
+	  xm = x + width + margin, xc = xm - radius;
+	if (i == CORNER_TOP_LEFT || i == CORNER_TOP_RIGHT)
+	  ym = y - margin, yc = ym + radius;
+	else
+	  ym = y + height + margin, yc = ym - radius;
 
-	  if (sv->increment == 0)
-	    return DBL_MAX;
-
-	  if (sv->invalid_p)
-	    {
-	      sv->current_value = value;
-	      sv->invalid_p = false;
-
-	      return DBL_MAX;
-	    }
-	  else
-	    {
-	      delta = (sv->current_value - value) / sv->increment;
-	      sv->current_value = value;
-
-	      return delta;
-	    }
-	}
-    }
-
-  *valuator_return = NULL;
-  return DBL_MAX;
+	cairo_move_to (cr, xm, ym);
+	cairo_arc (cr, xc, yc, radius, i * M_PI_2, (i + 1) * M_PI_2);
+      }
+  cairo_clip (cr);
+  cairo_rectangle (cr, x, y, width, height);
+  cairo_fill (cr);
+  x_end_cr_clip (f);
 }
-
-#endif
-
-struct xi_device_t *
-xi_device_from_id (struct x_display_info *dpyinfo, int deviceid)
-{
-  for (int i = 0; i < dpyinfo->num_devices; ++i)
-    {
-      if (dpyinfo->devices[i].device_id == deviceid)
-	return &dpyinfo->devices[i];
-    }
-
-  return NULL;
-}
-
-#ifdef HAVE_XINPUT2_2
 
 static void
-xi_link_touch_point (struct xi_device_t *device,
-		     int detail, double x, double y)
+x_draw_horizontal_wave (struct frame *f, GC gc, int x, int y,
+			int width, int height, int wave_length)
 {
-  struct xi_touch_point_t *touchpoint;
+  cairo_t *cr;
+  double dx = wave_length, dy = height - 1;
+  int xoffset, n;
 
-  touchpoint = xmalloc (sizeof *touchpoint);
-  touchpoint->next = device->touchpoints;
-  touchpoint->x = x;
-  touchpoint->y = y;
-  touchpoint->number = detail;
+  cr = x_begin_cr_clip (f, gc);
+  x_set_cr_source_with_gc_foreground (f, gc, false);
+  cairo_rectangle (cr, x, y, width, height);
+  cairo_clip (cr);
 
-  device->touchpoints = touchpoint;
+  if (x >= 0)
+    {
+      xoffset = x % (wave_length * 2);
+      if (xoffset == 0)
+	xoffset = wave_length * 2;
+    }
+  else
+    xoffset = x % (wave_length * 2) + wave_length * 2;
+  n = (width + xoffset) / wave_length + 1;
+  if (xoffset > wave_length)
+    {
+      xoffset -= wave_length;
+      --n;
+      y += height - 1;
+      dy = -dy;
+    }
+
+  cairo_move_to (cr, x - xoffset + 0.5, y + 0.5);
+  while (--n >= 0)
+    {
+      cairo_rel_line_to (cr, dx, dy);
+      dy = -dy;
+    }
+  cairo_set_line_width (cr, 1);
+  cairo_stroke (cr);
+  x_end_cr_clip (f);
+}
+#endif
+
+
+/* Return the struct x_display_info corresponding to DPY.  */
+
+struct x_display_info *
+x_display_info_for_display (Display *dpy)
+{
+  struct x_display_info *dpyinfo;
+
+  for (dpyinfo = x_display_list; dpyinfo; dpyinfo = dpyinfo->next)
+    if (dpyinfo->display == dpy)
+      return dpyinfo;
+
+  return 0;
 }
 
-static bool
-xi_unlink_touch_point (int detail,
-		       struct xi_device_t *device)
+static Window
+x_find_topmost_parent (struct frame *f)
 {
-  struct xi_touch_point_t *last, *tem;
+  struct x_output *x = f->output_data.x;
+  Window win = None, wi = x->parent_desc;
+  Display *dpy = FRAME_X_DISPLAY (f);
 
-  for (last = NULL, tem = device->touchpoints; tem;
-       last = tem, tem = tem->next)
+  while (wi != FRAME_DISPLAY_INFO (f)->root_window)
     {
-      if (tem->number == detail)
-	{
-	  if (!last)
-	    device->touchpoints = tem->next;
-	  else
-	    last->next = tem->next;
+      Window root;
+      Window *children;
+      unsigned int nchildren;
 
 	  xfree (tem);
 	  return true;
 	}
     }
 
-  return false;
+  return win;
 }
 
 static struct xi_touch_point_t *
@@ -5537,29 +5470,47 @@ xi_find_touch_point (struct xi_device_t *device, int detail)
 	return point;
     }
 
-  return NULL;
+  x_ignore_errors_for_next_request (dpyinfo);
+  XChangeProperty (dpy, win, dpyinfo->Xatom_net_wm_window_opacity,
+		   XA_CARDINAL, 32, PropModeReplace,
+		   (unsigned char *) &opac, 1);
+  x_stop_ignoring_errors (dpyinfo);
 }
 
-#endif /* HAVE_XINPUT2_2 */
+/***********************************************************************
+		    Starting and ending an update
+ ***********************************************************************/
 
-#ifdef HAVE_XINPUT2_1
+#if defined HAVE_XSYNC && !defined USE_GTK
 
-static void
-xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo, int id,
-					 bool pending_only)
+/* Wait for an event matching PREDICATE to show up in the event
+   queue, or TIMEOUT to elapse.
+
+   If TIMEOUT passes without an event being found, return 1.
+   Otherwise, return 0 and behave as XIfEvent would.  */
+
+static int
+x_if_event (Display *dpy, XEvent *event_return,
+	    Bool (*predicate) (Display *, XEvent *, XPointer),
+	    XPointer arg, struct timespec timeout)
 {
-  struct xi_device_t *device = xi_device_from_id (dpyinfo, id);
-  struct xi_scroll_valuator_t *valuator;
+  struct timespec current_time, target;
+  int fd;
+  fd_set fds;
 
-  if (!device)
-    return;
+  fd = ConnectionNumber (dpy);
+  current_time = current_timespec ();
+  target = timespec_add (current_time, timeout);
 
-  if (!device->scroll_valuator_count)
-    return;
+  /* Check if an event is already in the queue.  If it is, avoid
+     syncing.  */
+  if (XCheckIfEvent (dpy, event_return, predicate, arg))
+    return 0;
 
-  for (int i = 0; i < device->scroll_valuator_count; ++i)
+  while (true)
     {
-      valuator = &device->valuators[i];
+      /* Get events into the queue.  */
+      XSync (dpy, False);
 
       if (pending_only && !valuator->pending_enter_reset)
 	continue;
@@ -6175,6 +6126,11 @@ x_xrender_color_from_gc_background (struct frame *f, GC gc, XRenderColor *color,
 }
 #endif
 
+#endif
+
+/* Updates back buffer and flushes changes to display.  Called from
+   minibuf read code.  Note that we display the back buffer even if
+   buffer flipping is blocked.  */
 static void
 x_fill_rectangle (struct frame *f, GC gc, int x, int y, int width, int height,
 		  bool respect_alpha_background)
@@ -6333,6 +6289,12 @@ x_clear_rectangle (struct frame *f, GC gc, int x, int y, int width, int height,
   XSetForeground (dpy, gc, xgcv.foreground);
 #endif
 }
+
+/* Draw truncation mark bitmaps, continuation mark bitmaps, overlay
+   arrow bitmaps, or clear the fringes if no bitmaps are required
+   before DESIRED_ROW is made current.  This function is called from
+   update_window_line only if it is known that there are differences
+   between bitmaps to be drawn between current row and DESIRED_ROW.  */
 
 static void
 x_draw_rectangle (struct frame *f, GC gc, int x, int y, int width, int height)
@@ -6654,6 +6616,7 @@ x_sync_get_monotonic_time (struct x_display_info *dpyinfo,
 
   return timestamp - dpyinfo->server_time_offset;
 }
+#endif
 
 /* Return the current monotonic time in the same format as a
    high-resolution server timestamp.  */
@@ -7134,6 +7097,9 @@ x_update_end (struct frame *f)
   if (!FRAME_X_DOUBLE_BUFFERED_P (f) && FRAME_CR_CONTEXT (f))
     cairo_surface_flush (cairo_get_target (FRAME_CR_CONTEXT (f)));
 #endif
+      char buf[7 + PACIFY_GCC_BUG_81401];
+      char *str = NULL;
+      int len = glyph->u.glyphless.len;
 
   /* If double buffering is disabled, finish the update here.
      Otherwise, finish the update when the back buffer is next
@@ -7562,7 +7528,6 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time,
 	    = ((int64_t) time * 1000) - monotonic_time;
 	}
     }
-#endif
 
 #ifndef USE_GTK
   /* Don't waste bandwidth if the time hasn't actually changed.  */
@@ -7650,7 +7615,6 @@ x_update_frame_user_time_window (struct frame *f)
 	}
     }
 }
-#endif
 
 void
 x_set_last_user_time_from_lisp (struct x_display_info *dpyinfo,
@@ -8980,7 +8944,15 @@ x_alloc_lighter_color (struct frame *f, Display *display, Colormap cmap,
 	  new.green = max (0, new.green - min_delta);
 	  new.blue =  max (0, new.blue -  min_delta);
 	}
-      else
+      else if (FIXNUMP (Vtab_bar_button_margin))
+	extra_x = extra_y = XFIXNUM (Vtab_bar_button_margin) - thick;
+    }
+
+  if (s->face->id == TOOL_BAR_FACE_ID)
+    {
+      if (CONSP (Vtool_bar_button_margin)
+	  && FIXNUMP (XCAR (Vtool_bar_button_margin))
+	  && FIXNUMP (XCDR (Vtool_bar_button_margin)))
 	{
 	  new.red =   min (0xffff, min_delta + new.red);
 	  new.green = min (0xffff, min_delta + new.green);
@@ -9134,6 +9106,12 @@ x_inside_rect_p (XRectangle *rects, int nrects, int x, int y)
 	  && y < rects[i].y + rects[i].height)
 	return true;
     }
+  else
+    /* Draw a rectangle if image could not be loaded.  */
+    x_draw_rectangle (s->f, s->gc, x, y,
+		    s->slice.width - 1, s->slice.height - 1);
+}
+#endif	/* ! USE_CAIRO */
 
   return false;
 }
@@ -9391,6 +9369,7 @@ x_draw_box_rect (struct glyph_string *s,
 
 /* Draw a box around glyph string S.  */
 
+*/
 static void
 x_draw_glyph_string_box (struct glyph_string *s)
 {
@@ -9703,6 +9682,11 @@ x_draw_image_relief (struct glyph_string *s)
 		      top_p, bot_p, left_p, right_p, &r);
 }
 
+      /* Prevent the underline from overwriting surrounding areas
+	 and the fringe.  */
+      window_box (s->w, s->area, &area_x, &area_y,
+		  &area_width, &area_height);
+      area_max_x = area_x + area_width - 1;
 
 #ifndef USE_CAIRO
 /* Draw the foreground of image glyph string S to PIXMAP.  */
@@ -9954,6 +9938,9 @@ x_draw_image_glyph_string (struct glyph_string *s)
     x_draw_image_relief (s);
 }
 
+  block_input ();
+  font_drop_xrender_surfaces (f);
+  x_clear_window (f);
 
 /* Draw stretch glyph string S.  */
 
@@ -10706,6 +10693,7 @@ x_show_hourglass (struct frame *f)
        }
     }
 }
+#endif /* HAVE_XFIXES */
 
 /* RIF: Cancel hourglass cursor on frame F.  */
 
@@ -13946,6 +13934,15 @@ xg_end_scroll_callback (GtkWidget *widget,
    scroll bar struct.  CALL_DATA is a pointer to a float saying where
    the thumb is.  */
 
+
+/* Xaw scroll bar callback.  Invoked for incremental scrolling.,
+   i.e. line or page up or down.  WIDGET is the Xaw scroll bar
+   widget.  CLIENT_DATA is a pointer to the scroll_bar structure for
+   the scroll bar.  CALL_DATA is an integer specifying the action that
+   has taken place.  Its magnitude is in the range 0..height of the
+   scroll bar.  Negative values mean scroll towards buffer start.
+   Values < height of scroll bar mean line-wise movement.  */
+
 static void
 xaw_jump_callback (Widget widget, XtPointer client_data, XtPointer call_data)
 {
@@ -15025,6 +15022,7 @@ x_scroll_bar_remove (struct scroll_bar *bar)
   unblock_input ();
 }
 
+#endif /* !USE_TOOLKIT_SCROLL_BARS */
 
 /* Set the handle of the vertical scroll bar for WINDOW to indicate
    that we are displaying PORTION characters out of a total of WHOLE
@@ -16089,6 +16087,11 @@ flush_dirty_back_buffer_on (struct frame *f)
       && FRAME_X_NEED_BUFFER_FLIP (f))
     show_back_buffer (f);
   unblock_input ();
+
+  if (current_finish == X_EVENT_GOTO_OUT || current_finish == X_EVENT_DROP)
+    return GDK_FILTER_REMOVE;
+
+  return GDK_FILTER_CONTINUE;
 }
 #endif
 
@@ -16151,6 +16154,7 @@ mouse_or_wdesc_frame (struct x_display_info *dpyinfo, int wdesc)
 	return w_f;
     }
 }
+#endif
 
 static void
 x_dnd_compute_tip_xy (int *root_x, int *root_y, Lisp_Object attributes)
@@ -16260,7 +16264,6 @@ x_dnd_update_tooltip_position (int root_x, int root_y)
       XMoveWindow (FRAME_X_DISPLAY (x_dnd_frame),
 		   tip_window, root_x, root_y);
     }
-}
 
 static void
 x_dnd_update_tooltip_now (void)
@@ -17668,6 +17671,17 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	  else
 	    x_scroll_bar_handle_exposure (f, (XEvent *) event);
 #endif
+		      xfree (tem);
+		    }
+		  else
+		    {
+		      x_catch_errors (dpyinfo->display);
+		      rc = XGetWindowProperty (dpyinfo->display,
+					       event->xproperty.window,
+					       dpyinfo->Xatom_wm_state,
+					       0, 2, False, AnyPropertyType,
+					       &actual_type, &actual_format,
+					       &nitems, &bytesafter, &data);
 
 #ifdef HAVE_XDBE
           if (!FRAME_GARBAGED_P (f))

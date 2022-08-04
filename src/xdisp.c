@@ -2742,6 +2742,7 @@ init_iterator (struct it *it, struct window *w,
   it->f = XFRAME (w->frame);
 
   it->cmp_it.id = -1;
+  it->cmp_it.parent_it = it;
 
   /* Extra space between lines (on window systems only).  */
   if (base_face_id == DEFAULT_FACE_ID
@@ -2986,9 +2987,7 @@ ptrdiff_t
 get_narrowed_begv (struct window *w, ptrdiff_t pos)
 {
   int len = get_narrowed_len (w);
-  ptrdiff_t begv;
-  begv = max ((pos / len - 1) * len, BEGV);
-  return begv == BEGV ? 0 : begv;
+  return max ((pos / len - 1) * len, BEGV);
 }
 
 ptrdiff_t
@@ -6767,6 +6766,21 @@ reseat (struct it *it, struct text_pos pos, bool force_p)
 
   reseat_1 (it, pos, false);
 
+  if (current_buffer->long_line_optimizations_p)
+    {
+      if (!it->narrowed_begv)
+	{
+	  it->narrowed_begv = get_narrowed_begv (it->w, window_point (it->w));
+	  it->narrowed_zv = get_narrowed_zv (it->w, window_point (it->w));
+	}
+      else if ((pos.charpos < it->narrowed_begv || pos.charpos > it->narrowed_zv)
+		&& (!redisplaying_p || it->line_wrap == TRUNCATE))
+	{
+	  it->narrowed_begv = get_narrowed_begv (it->w, pos.charpos);
+	  it->narrowed_zv = get_narrowed_zv (it->w, pos.charpos);
+	}
+    }
+
   /* Determine where to check text properties.  Avoid doing it
      where possible because text property lookup is very expensive.  */
   if (force_p
@@ -7985,7 +7999,7 @@ get_visually_first_element (struct it *it)
 
   SET_WITH_NARROWED_BEGV (it, bob,
 			  string_p ? 0 :
-			  IT_BYTEPOS (*it) < BEGV ? obegv : BEGV,
+			  IT_CHARPOS (*it) < BEGV ? obegv : BEGV,
 			  it->narrowed_begv);
 
   if (STRINGP (it->string))
