@@ -3024,7 +3024,6 @@ read_string_literal (char stackbuf[VLA_ELEMS (stackbufsize)],
   /* True if we saw an escape sequence specifying
      a single-byte character.  */
   bool force_singlebyte = false;
-  bool cancel = false;
   ptrdiff_t nchars = 0;
 
   int ch;
@@ -3053,8 +3052,6 @@ read_string_literal (char stackbuf[VLA_ELEMS (stackbufsize)],
 	    case ' ':
 	    case '\n':
 	      /* `\SPC' and `\LF' generate no characters at all.  */
-	      if (p == read_buffer)
-		cancel = true;
 	      continue;
 	    default:
 	      UNREAD (ch);
