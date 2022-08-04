@@ -2426,8 +2426,7 @@ This checks also `file-name-as-directory', `file-name-directory',
 
 (ert-deftest tramp-test10-write-region ()
   "Check `write-region'."
-  (skip-unless (and (tramp--test-enabled)
-                    (eq system-type 'gnu/linux)))
+  (skip-unless (tramp--test-enabled))
   (dolist (quoted (if (tramp--test-expensive-test-p) '(nil t) '(nil)))
     (let ((tmp-name (tramp--test-make-temp-name nil quoted))
           (inhibit-message t))
