@@ -57,6 +57,9 @@ struct thread_state
   Lisp_Object name;
   Lisp_Object function;
 
+  /* Thread-local let-bindings.  Leave global Vobarray alone.  */
+  Lisp_Object obarray;
+
   /* Populated when FUNCTION finished.  */
   Lisp_Object result;
 

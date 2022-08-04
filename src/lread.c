@@ -4132,17 +4132,13 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	  }
 	else
 	  {
-	    /* Don't create the string object for the name unless
-	       we're going to retain it in a new symbol.
-
-	       Like intern_1 but supports multibyte names.  */
-	    Lisp_Object obarray = check_obarray (Vobarray);
-
-	    char *longhand = NULL;
-	    ptrdiff_t longhand_chars = 0;
-	    ptrdiff_t longhand_bytes = 0;
-
+	    /* Intern NAME if not already registered with Vobarray.
+	       Then assign RESULT to the interned symbol.  */
 	    Lisp_Object found;
+	    Lisp_Object obarray = check_obarray (Vobarray);
+	    char *longhand = NULL;
+	    ptrdiff_t longhand_chars = 0, longhand_bytes = 0;
+
 	    if (skip_shorthand
 		/* Symbols composed entirely of "symbol constituents"
 		   are exempt from shorthands.  */
@@ -4153,7 +4149,6 @@ read0 (Lisp_Object readcharfun, bool annotated)
 						      nchars, nbytes, &longhand,
 						      &longhand_chars,
 						      &longhand_bytes);
-
 	    if (SYMBOLP (found))
 	      result = found;
 	    else if (longhand)
@@ -4634,8 +4629,7 @@ define_symbol (Lisp_Object sym, char const *str)
   Lisp_Object string = make_pure_c_string (str, len);
   init_symbol (sym, string);
 
-  /* Qunbound is uninterned, so that it's not confused with any symbol
-     'unbound' created by a Lisp program.  */
+  /* Qunbound is uninterned, thus distinct from the symbol 'unbound.  */
   if (! EQ (sym, Qunbound))
     {
       Lisp_Object bucket = oblookup (initial_obarray, str, len, len);
@@ -4656,10 +4650,8 @@ it defaults to the value of `obarray'.  */)
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
 
-
   char* longhand = NULL;
-  ptrdiff_t longhand_chars = 0;
-  ptrdiff_t longhand_bytes = 0;
+  ptrdiff_t longhand_chars = 0, longhand_bytes = 0;
   tem = oblookup_considering_shorthand (obarray, SSDATA (string),
 					SCHARS (string), SBYTES (string),
 					&longhand, &longhand_chars,
@@ -4695,11 +4687,10 @@ it defaults to the value of `obarray'.  */)
   if (NILP (obarray)) obarray = Vobarray;
   obarray = check_obarray (obarray);
 
-  if (!SYMBOLP (name))
+  if (! SYMBOLP (name))
     {
       char *longhand = NULL;
-      ptrdiff_t longhand_chars = 0;
-      ptrdiff_t longhand_bytes = 0;
+      ptrdiff_t longhand_chars = 0, longhand_bytes = 0;
 
       CHECK_STRING (name);
       string = name;
@@ -4716,8 +4707,7 @@ it defaults to the value of `obarray'.  */)
       /* If already a symbol, we don't do shorthand-longhand translation,
 	 as promised in the docstring.  */
       string = SYMBOL_NAME (name);
-      tem
-	= oblookup (obarray, SSDATA (string), SCHARS (string), SBYTES (string));
+      tem = oblookup (obarray, SSDATA (string), SCHARS (string), SBYTES (string));
       return EQ (name, tem) ? name : Qnil;
     }
 }
@@ -4946,8 +4936,6 @@ OBARRAY defaults to the value of `obarray'.  */)
   map_obarray (obarray, mapatoms_1, function);
   return Qnil;
 }
-
-#define OBARRAY_SIZE 15121
 
 void
 init_obarray_once (void)

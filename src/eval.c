@@ -3387,43 +3387,58 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
 bool
 let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol)
 {
-  union specbinding *p;
   Lisp_Object buf = Fcurrent_buffer ();
-
-  for (p = specpdl_ptr; p > specpdl; )
+  for (union specbinding *p = specpdl_ptr; p > specpdl; )
     if ((--p)->kind > SPECPDL_LET)
       {
 	struct Lisp_Symbol *let_bound_symbol = XSYMBOL (specpdl_symbol (p));
 	eassert (let_bound_symbol->u.s.redirect != SYMBOL_VARALIAS);
 	if (symbol == let_bound_symbol
 	    && EQ (specpdl_where (p), buf))
-	  return 1;
+	  return true;
       }
-
-  return 0;
+  return false;
 }
 
 void
-specbind (Lisp_Object symbol, Lisp_Object value)
+specbind (Lisp_Object argsym, Lisp_Object value)
 {
-  struct Lisp_Symbol *sym;
+  Lisp_Object symbol;
+  struct Lisp_Symbol *xsymbol;
 
-  CHECK_SYMBOL (symbol);
-  sym = XSYMBOL (symbol);
+  CHECK_SYMBOL (argsym);
+  symbol = argsym;
+  xsymbol = XSYMBOL (symbol);
+
+  if (xsymbol->u.s.redirect == SYMBOL_VARALIAS)
+    {
+      xsymbol = indirect_variable (xsymbol);
+      XSETSYMBOL (symbol, xsymbol);
+    }
+
+  if (! main_thread_p (current_thread))
+    {
+      symbol = Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray);
+      if (NILP (symbol))
+	{
+	  symbol = Fintern (SYMBOL_NAME (symbol), current_thread->obarray);
+	  XSYMBOL (symbol)->u.s.redirect = xsymbol->u.s.redirect;
+	  XSYMBOL (symbol)->u.s.trapped_write = xsymbol->u.s.trapped_write;
+	  XSYMBOL (symbol)->u.s.declared_special = xsymbol->u.s.declared_special;
+	  XSYMBOL (symbol)->u.s.val = xsymbol->u.s.val;
+	  XSYMBOL (symbol)->u.s.function = xsymbol->u.s.function;
+	  XSYMBOL (symbol)->u.s.plist = xsymbol->u.s.plist;
+	  xsymbol = XSYMBOL (symbol);
+	}
+    }
 
   /* First, qualify what kind of binding.  */
- start:
-  switch (sym->u.s.redirect)
+  switch (xsymbol->u.s.redirect)
     {
-    case SYMBOL_VARALIAS:
-      sym = indirect_variable (sym);
-      XSETSYMBOL (symbol, sym);
-      goto start;
-      break;
     case SYMBOL_PLAINVAL:
       specpdl_ptr->let.kind = SPECPDL_LET;
       specpdl_ptr->let.symbol = symbol;
-      specpdl_ptr->let.old_value = SYMBOL_VAL (sym);
+      specpdl_ptr->let.old_value = SYMBOL_VAL (xsymbol);
       break;
     case SYMBOL_LOCALIZED:
     case SYMBOL_FORWARDED:
@@ -3432,15 +3447,15 @@ specbind (Lisp_Object symbol, Lisp_Object value)
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.where = Fcurrent_buffer ();
 
-      eassert (sym->u.s.redirect != SYMBOL_LOCALIZED
-	       || (EQ (SYMBOL_BLV (sym)->where, Fcurrent_buffer ())));
+      eassert (xsymbol->u.s.redirect != SYMBOL_LOCALIZED
+	       || (EQ (SYMBOL_BLV (xsymbol)->where, Fcurrent_buffer ())));
 
-      if (sym->u.s.redirect == SYMBOL_LOCALIZED)
+      if (xsymbol->u.s.redirect == SYMBOL_LOCALIZED)
 	{
-	  if (! blv_found (SYMBOL_BLV (sym)))
+	  if (! blv_found (SYMBOL_BLV (xsymbol)))
 	    specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
 	}
-      else if (BUFFER_OBJFWDP (SYMBOL_FWD (sym)))
+      else if (BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol)))
 	{
 	  /* If SYMBOL is a slot variable (see buffer.h), change its
 	     global default value, thus keeping consistent with
@@ -3458,29 +3473,15 @@ specbind (Lisp_Object symbol, Lisp_Object value)
 
   /* Second, actually set SYMBOL to the new value.  */
   grow_specpdl ();
-  switch (sym->u.s.redirect)
-    {
-    case SYMBOL_PLAINVAL:
-      if (! sym->u.s.trapped_write)
-	SET_SYMBOL_VAL (sym, value);
-      else
-        set_internal (specpdl_symbol (specpdl_ptr - 1), value, Qnil, SET_INTERNAL_BIND);
-      break;
-    case SYMBOL_FORWARDED:
-      if (BUFFER_OBJFWDP (SYMBOL_FWD (sym))
-	  && specpdl_kind (specpdl_ptr - 1) == SPECPDL_LET_DEFAULT)
-	{
-          set_default_internal (specpdl_symbol (specpdl_ptr - 1), value, SET_INTERNAL_BIND);
-	  break;
-	}
-      FALLTHROUGH;
-    case SYMBOL_LOCALIZED:
-      set_internal (specpdl_symbol (specpdl_ptr - 1), value, Qnil, SET_INTERNAL_BIND);
-      break;
-    default:
-      emacs_abort ();
-      break;
-    }
+  if (xsymbol->u.s.redirect == SYMBOL_PLAINVAL
+      && ! xsymbol->u.s.trapped_write)
+    SET_SYMBOL_VAL (xsymbol, value);
+  else if (xsymbol->u.s.redirect == SYMBOL_FORWARDED
+	   && BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol))
+	   && specpdl_kind (specpdl_ptr - 1) == SPECPDL_LET_DEFAULT)
+    set_default_internal (specpdl_symbol (specpdl_ptr - 1), value, SET_INTERNAL_BIND);
+  else
+    set_internal (specpdl_symbol (specpdl_ptr - 1), value, Qnil, SET_INTERNAL_BIND);
 }
 
 void

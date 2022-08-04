@@ -2204,7 +2204,7 @@ When nil, avoid this potentially time consuming check."
   :version "29.1"
   :type '(choice integer (const :tag "Never scan" nil)))
 
-(defcustom large-file-warning-threshold 10000000
+(defcustom large-file-warning-threshold nil
   "Maximum size of file above which a confirmation is requested.
 When nil, never request confirmation."
   :group 'files

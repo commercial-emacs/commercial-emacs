@@ -162,6 +162,8 @@ verify (BITS_WORD_MAX >> (BITS_PER_BITS_WORD - 1) == 1);
    pre-C99 libraries such as glibc 2.0 (1997) and Solaris 8 (2000).  */
 #define pD "t"
 
+#define OBARRAY_SIZE 15121
+
 /* Convenience macro for rarely-used functions that do not return.  */
 #define AVOID _Noreturn ATTRIBUTE_COLD void
 
