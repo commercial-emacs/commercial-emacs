@@ -25598,6 +25598,7 @@ x_make_frame_visible (struct frame *f)
   struct x_display_info *dpyinfo;
   struct x_output *output;
 #endif
+  bool output_flushed;
 
   if (FRAME_PARENT_FRAME (f))
     {
@@ -25688,8 +25689,6 @@ x_make_frame_visible (struct frame *f)
 	}
     }
 
-  XFlush (FRAME_X_DISPLAY (f));
-
   /* Synchronize to ensure Emacs knows the frame is visible
      before we do anything else.  We do this loop with input not blocked
      so that incoming events are handled.  */
@@ -25707,6 +25706,10 @@ x_make_frame_visible (struct frame *f)
 
     /* This must come after we set COUNT.  */
     unblock_input ();
+
+    /* Keep track of whether or not the output buffer was flushed, to
+       avoid any extra flushes.  */
+    output_flushed = false;
 
     /* We unblock here so that arriving X events are processed.  */
 
@@ -25741,6 +25744,7 @@ x_make_frame_visible (struct frame *f)
 	   there, and take the potential window manager hit.  */
 	XGetGeometry (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 		      &rootw, &x, &y, &width, &height, &border, &depth);
+	output_flushed = true;
 
 	if (original_left != x || original_top != y)
 	  XMoveWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
@@ -25775,7 +25779,11 @@ x_make_frame_visible (struct frame *f)
 	    (f, build_string ("x_make_frame_visible"));
 
 	x_wait_for_event (f, MapNotify);
+	output_flushed = true;
       }
+
+    if (!output_flushed)
+      x_flush (f);
   }
 }
 
