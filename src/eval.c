@@ -512,11 +512,11 @@ usage: (setq [SYM VAL]...)  */)
       /* Like for eval_sub, we do not check declared_special here since
 	 it's been done when let-binding.  */
       Lisp_Object lex_binding
-	= ((!NILP (Vinternal_interpreter_environment) /* Mere optimization!  */
-	    && SYMBOLP (sym))
+	= (! NILP (Vinternal_interpreter_environment) /* Mere optimization!  */
+	   && SYMBOLP (sym)
 	   ? Fassq (sym, Vinternal_interpreter_environment)
 	   : Qnil);
-      if (!NILP (lex_binding))
+      if (! NILP (lex_binding))
 	XSETCDR (lex_binding, val); /* SYM is lexically bound.  */
       else
 	Fset (sym, val);	/* SYM is dynamically bound.  */
@@ -751,7 +751,7 @@ This is like `defvar' and `defconst' but without affecting the variable's
 value.  */)
   (Lisp_Object symbol, Lisp_Object doc)
 {
-  if (!XSYMBOL (symbol)->u.s.declared_special
+  if ( !XSYMBOL (symbol)->u.s.declared_special
       && lexbound_p (symbol))
     /* This test tries to catch the situation where we do
        (let ((<foo-var> ...)) ...(<foo-function> ...)....)
@@ -835,16 +835,16 @@ usage: (defvar SYMBOL &optional INITVALUE DOCSTRING)  */)
 
   CHECK_SYMBOL (sym);
 
-  if (!NILP (tail))
+  if (! NILP (tail))
     {
-      if (!NILP (XCDR (tail)) && !NILP (XCDR (XCDR (tail))))
+      if (! NILP (XCDR (tail)) && ! NILP (XCDR (XCDR (tail))))
 	error ("Too many arguments");
       Lisp_Object exp = XCAR (tail);
       tail = XCDR (tail);
       return defvar (sym, exp, CAR (tail), true);
     }
-  else if (!NILP (Vinternal_interpreter_environment)
-	   && (SYMBOLP (sym) && !XSYMBOL (sym)->u.s.declared_special))
+  else if (! NILP (Vinternal_interpreter_environment)
+	   && (SYMBOLP (sym) && ! XSYMBOL (sym)->u.s.declared_special))
     /* A simple (defvar foo) with lexical scoping does "nothing" except
        declare that var to be dynamically scoped *locally* (i.e. within
        the current file or let-block).  */
@@ -937,11 +937,8 @@ Each VALUEFORM can refer to the symbols already bound by this VARLIST.
 usage: (let* VARLIST BODY...)  */)
   (Lisp_Object args)
 {
-  Lisp_Object var, val, elt, lexenv;
+  Lisp_Object var, val, elt, lexenv = Vinternal_interpreter_environment;
   specpdl_ref count = SPECPDL_INDEX ();
-
-  lexenv = Vinternal_interpreter_environment;
-
   Lisp_Object varlist = XCAR (args);
   while (CONSP (varlist))
     {
@@ -962,12 +959,12 @@ usage: (let* VARLIST BODY...)  */)
 	  val = eval_sub (Fcar (XCDR (elt)));
 	}
 
-      if (!NILP (lexenv) && SYMBOLP (var)
-	  && !XSYMBOL (var)->u.s.declared_special
+      if (! NILP (lexenv)
+	  && SYMBOLP (var)
+	  && ! XSYMBOL (var)->u.s.declared_special
 	  && NILP (Fmemq (var, Vinternal_interpreter_environment)))
-	/* Lexically bind VAR by adding it to the interpreter's binding
-	   alist.  */
 	{
+	  /* Lexically bind VAR.  */
 	  Lisp_Object newenv
 	    = Fcons (Fcons (var, val), Vinternal_interpreter_environment);
 	  if (EQ (Vinternal_interpreter_environment, lexenv))
@@ -979,6 +976,7 @@ usage: (let* VARLIST BODY...)  */)
 	    Vinternal_interpreter_environment = newenv;
 	}
       else
+	/* Dynamically bind VAR.  */
 	specbind (var, val);
     }
   CHECK_LIST_END (varlist, XCAR (args));
@@ -1037,17 +1035,18 @@ usage: (let VARLIST BODY...)  */)
       var = SYMBOLP (elt) ? elt : Fcar (elt);
       tem = temps[argnum];
 
-      if (!NILP (lexenv) && SYMBOLP (var)
-	  && !XSYMBOL (var)->u.s.declared_special
+      if (! NILP (lexenv)
+	  && SYMBOLP (var)
+	  && ! XSYMBOL (var)->u.s.declared_special
 	  && NILP (Fmemq (var, Vinternal_interpreter_environment)))
-	/* Lexically bind VAR by adding it to the lexenv alist.  */
+	/* Lexically bind VAR .  */
 	lexenv = Fcons (Fcons (var, tem), lexenv);
       else
 	/* Dynamically bind VAR.  */
 	specbind (var, tem);
     }
 
-  if (!EQ (lexenv, Vinternal_interpreter_environment))
+  if (! EQ (lexenv, Vinternal_interpreter_environment))
     /* Instantiate a new lexical environment.  */
     specbind (Qinternal_interpreter_environment, lexenv);
 
