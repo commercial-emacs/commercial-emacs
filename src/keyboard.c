@@ -1883,6 +1883,21 @@ safe_run_hooks (Lisp_Object hook)
   unbind_to (count, Qnil);
 }
 
+void
+safe_run_hooks_maybe_narrowed (Lisp_Object hook, struct window *w)
+{
+  specpdl_ref count = SPECPDL_INDEX ();
+
+  specbind (Qinhibit_quit, Qt);
+
+  if (current_buffer->long_line_optimizations_p)
+    narrow_to_region_internal (make_fixnum (get_narrowed_begv (w, PT)),
+			       make_fixnum (get_narrowed_zv (w, PT)),
+			       true);
+
+  run_hook_with_args (2, ((Lisp_Object []) {hook, hook}), safe_run_hook_funcall);
+  unbind_to (count, Qnil);
+}
 
 /* Nonzero means polling for input is temporarily suppressed.  */
 
