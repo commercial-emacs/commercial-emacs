@@ -53,7 +53,8 @@ be included.")
 (defvar autoload-ignored-definitions
   '("define-obsolete-function-alias"
     "define-obsolete-variable-alias"
-    "define-category" "define-key"
+    "define-category"
+    "define-key" "define-key-after" "define-keymap"
     "defgroup" "defface" "defadvice"
     "def-edebug-spec"
     ;; Hmm... this is getting ugly:
@@ -63,7 +64,9 @@ be included.")
     "defun-rcirc-command"
     "define-short-documentation-group"
     "def-edebug-elem-spec"
-    "defvar-mode-local")
+    "defvar-mode-local"
+    "define-ibuffer-column"
+    "define-ibuffer-sorter")
   "List of strings naming definitions to ignore for prefixes.
 More specifically those definitions will not be considered for the
 `register-definition-prefixes' call.")
