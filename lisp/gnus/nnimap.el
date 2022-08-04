@@ -29,7 +29,6 @@
 (require 'nnheader)
 (require 'gnus)
 (require 'nnoo)
-(require 'netrc)
 (require 'utf7)
 (require 'nnmail)
 (require 'cl-seq)
