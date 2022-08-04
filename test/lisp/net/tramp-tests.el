@@ -2483,6 +2483,7 @@ This checks also `file-name-as-directory', `file-name-directory',
 
 	    ;; Write empty string.  Used for creation of temprorary files.
 	    ;; Since Emacs 27.1.
+(tramp--test-instrument-test-case 10
 	    (when (fboundp 'make-empty-file)
 	      (with-no-warnings
 		(should-error
@@ -2492,7 +2493,7 @@ This checks also `file-name-as-directory', `file-name-directory',
 		(make-empty-file tmp-name)
 		(with-temp-buffer
 		  (insert-file-contents tmp-name)
-		  (should (string-equal (buffer-string) "")))))
+(should (string-equal (buffer-string) ""))))))
 
 	    ;; Write partly.
 	    (with-temp-buffer

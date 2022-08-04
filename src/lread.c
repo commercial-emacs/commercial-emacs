@@ -3117,12 +3117,6 @@ read_string_literal (char stackbuf[VLA_ELEMS (stackbufsize)],
   if (ch < 0)
     end_of_file_error ();
 
-  /* If purifying, and string starts with \ newline,
-     return zero instead.  This is for doc strings
-     that we are really going to find in etc/DOC.nn.nn.  */
-  if (! NILP (Vloadup_pure_table) && NILP (Vdoc_file_name) && cancel)
-    return unbind_to (count, make_fixnum (0));
-
   if (! force_multibyte && force_singlebyte)
     {
       /* READ_BUFFER contains raw 8-bit bytes and no multibyte
