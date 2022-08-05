@@ -78,7 +78,6 @@ enum { MALLOC_ALIGNMENT = 16 };
 enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 #endif
 
-// static sys_mutex_t global_lock;
 static bool gc_inhibited;
 struct Lisp_String *(*static_string_allocator) (void);
 struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t len, bool q_clear);
