@@ -6662,7 +6662,7 @@ preceding_line_start_visible (struct it *it)
 
   eassert (IT_POS_VALID_AFTER_MOVE_P (it));
   eassert (IT_CHARPOS (*it) >= BEGV);
-  eassert (it->narrowed_begv > BEGV
+  eassert (it->narrowed_begv > 0 /* long-line optimizations: all bets off */
 	   || IT_CHARPOS (*it) == BEGV
 	   || FETCH_BYTE (IT_BYTEPOS (*it) - 1) == '\n');
 }
