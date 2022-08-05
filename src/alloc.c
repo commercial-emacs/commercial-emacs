@@ -78,6 +78,7 @@ enum { MALLOC_ALIGNMENT = 16 };
 enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 #endif
 
+// static sys_mutex_t global_lock;
 static bool gc_inhibited;
 struct Lisp_String *(*static_string_allocator) (void);
 struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t len, bool q_clear);
@@ -935,9 +936,7 @@ static INTERVAL interval_free_list;
 static INTERVAL
 allocate_interval (void)
 {
-  static sys_mutex_t lock;
   INTERVAL val;
-  sys_mutex_lock (&lock);
 
   if (interval_free_list)
     {
@@ -962,7 +961,6 @@ allocate_interval (void)
   intervals_consed++;
   RESET_INTERVAL (val);
   val->gcmarkbit = false;
-  sys_mutex_unlock (&lock);
   return val;
 }
 
@@ -1181,9 +1179,7 @@ check_string_free_list (void)
 static struct Lisp_String *
 allocate_string (void)
 {
-  static sys_mutex_t lock;
   struct Lisp_String *s;
-  sys_mutex_lock (&lock);
 
   /* Our normal scheme: chunks begin life on a newly allocated block,
      then get reclaimed as links in the free list.
@@ -1229,7 +1225,6 @@ allocate_string (void)
     }
 #endif /* GC_CHECK_STRING_BYTES */
 
-  sys_mutex_unlock (&lock);
   return s;
 }
 
@@ -1243,7 +1238,6 @@ allocate_sdata (struct Lisp_String *s,
 		EMACS_INT nchars, EMACS_INT nbytes,
 		bool immovable)
 {
-  static sys_mutex_t lock;
   sdata *the_data;
   struct sblock *b;
   ptrdiff_t sdata_nbytes;
@@ -1253,7 +1247,6 @@ allocate_sdata (struct Lisp_String *s,
   if (nbytes > STRING_BYTES_MAX)
     error ("Requested %ld bytes exceeds %ld", nbytes, STRING_BYTES_MAX);
 
-  sys_mutex_lock (&lock);
   sdata_nbytes = sdata_size (nbytes);
 
   if (nbytes > LARGE_STRING_THRESH || immovable)
@@ -1304,7 +1297,6 @@ allocate_sdata (struct Lisp_String *s,
 #endif
 
   bytes_since_gc += sdata_nbytes;
-  sys_mutex_unlock (&lock);
 }
 
 /* Reallocate multibyte STRING data when a single character is replaced.
@@ -1836,9 +1828,7 @@ static struct Lisp_Float *float_free_list;
 Lisp_Object
 make_float (double float_value)
 {
-  static sys_mutex_t lock;
   register Lisp_Object val;
-  sys_mutex_lock (&lock);
 
   if (float_free_list)
     {
@@ -1864,7 +1854,6 @@ make_float (double float_value)
   eassert (! XFLOAT_MARKED_P (XFLOAT (val)));
   bytes_since_gc += sizeof (struct Lisp_Float);
   floats_consed++;
-  sys_mutex_unlock (&lock);
   return val;
 }
 
@@ -1901,23 +1890,18 @@ static struct Lisp_Cons *cons_free_list;
 void
 free_cons (struct Lisp_Cons *ptr)
 {
-  static sys_mutex_t lock;
-  sys_mutex_lock (&lock);
   ptr->u.s.u.chain = cons_free_list;
   ptr->u.s.car = dead_object ();
   cons_free_list = ptr;
   ptrdiff_t nbytes = sizeof *ptr;
   bytes_since_gc -= nbytes;
-  sys_mutex_unlock (&lock);
 }
 
 DEFUN ("cons", Fcons, Scons, 2, 2, 0,
        doc: /* Create a new cons, give it CAR and CDR as components, and return it.  */)
   (Lisp_Object car, Lisp_Object cdr)
 {
-  static sys_mutex_t lock;
   register Lisp_Object val;
-  sys_mutex_lock (&lock);
 
   if (cons_free_list)
     {
@@ -1945,7 +1929,6 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
   bytes_since_gc += sizeof (struct Lisp_Cons);
   cons_cells_consed++;
 
-  sys_mutex_unlock (&lock);
   return val;
 }
 
@@ -2455,7 +2438,6 @@ sweep_vectors (void)
 static struct Lisp_Vector *
 allocate_vector (ptrdiff_t len, bool q_clear)
 {
-  static sys_mutex_t lock;
   ptrdiff_t nbytes = header_size + len * word_size;
   struct Lisp_Vector *p = NULL;
 
@@ -2465,7 +2447,6 @@ allocate_vector (ptrdiff_t len, bool q_clear)
   if (len > VECTOR_ELTS_MAX)
     error ("Requested %ld > %ld vector elements", len, VECTOR_ELTS_MAX);
 
-  sys_mutex_lock (&lock);
   if (nbytes > LARGE_VECTOR_THRESH)
     {
       struct large_vector *lv = lisp_malloc (large_vector_contents_offset + nbytes,
@@ -2518,16 +2499,12 @@ allocate_vector (ptrdiff_t len, bool q_clear)
     }
 
   if (find_suspicious_object_in_range (p, (char *) p + nbytes))
-    {
-      sys_mutex_unlock (&lock);
-      emacs_abort ();
-    }
+    emacs_abort ();
 
   bytes_since_gc += nbytes;
   vector_cells_consed += len;
 
   p->header.size = len;
-  sys_mutex_unlock (&lock);
   return p;
 }
 
@@ -2750,9 +2727,7 @@ DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
        doc: /* Return an uninterned, unbound symbol whose name is NAME. */)
   (Lisp_Object name)
 {
-  static sys_mutex_t lock;
   Lisp_Object val;
-  sys_mutex_lock (&lock);
 
   CHECK_STRING (name);
 
@@ -2778,7 +2753,6 @@ DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
   init_symbol (val, name);
   bytes_since_gc += sizeof (struct Lisp_Symbol);
   symbols_consed++;
-  sys_mutex_unlock (&lock);
   return val;
 }
 

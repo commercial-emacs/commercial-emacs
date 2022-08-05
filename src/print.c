@@ -106,8 +106,6 @@ bool print_output_debug_flag EXTERNALLY_VISIBLE = 1;
    or call strout to output a block of characters.  */
 
 #define PRINTPREPARE							\
-   static sys_mutex_t lock;						\
-   sys_mutex_lock (&lock);						\
    ptrdiff_t old_point = -1, start_point = -1;				\
    ptrdiff_t old_point_byte = -1, start_point_byte = -1;		\
    specpdl_ref specpdl_count = SPECPDL_INDEX ();			\
@@ -197,9 +195,7 @@ bool print_output_debug_flag EXTERNALLY_VISIBLE = 1;
 			       ? PT - start_point : 0),			\
 		  old_point_byte + (old_point_byte >= start_point_byte	\
 				    ? PT_BYTE - start_point_byte : 0)); \
-   unbind_to (specpdl_count, Qnil);					\
-   sys_mutex_unlock (&lock);
-
+   unbind_to (specpdl_count, Qnil);
 
 /* This is used to free the print buffer; we don't simply record xfree
    since print_buffer can be reallocated during the printing.  */
