@@ -16,6 +16,14 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
+/* Unlike pthread_mutex_lock() which deadlocks if the calling thread
+   already holds the sys_mutex_t, lisp_mutex_lock() merely increments
+   a count of lisp_mutex_t.
+
+   Unlike the one-dimensional sys_mutex_t, lisp_mutex_t cannot be
+   considered unlocked until a sequence of lisp_mutex_unlock() calls
+   decrement its count to zero.  */
+
 #include <config.h>
 #include <setjmp.h>
 #include "lisp.h"
@@ -83,6 +91,7 @@ restore_thread (struct thread_state *self)
   if (prev_thread != current_thread)
     {
 #ifndef MULTITHREADED
+      /* Tromey specpdl swap under thread-at-a-time conservatism.  */
       if (prev_thread != NULL)
 	specpdl_unwind (prev_thread->m_specpdl_ptr,
 			prev_thread->m_specpdl_ptr - prev_thread->m_specpdl,
@@ -117,47 +126,50 @@ lisp_mutex_init (lisp_mutex_t *mutex)
   sys_cond_init (&mutex->condition);
 }
 
-/* If MUTEX is already locked by thread LOCKER, increment MUTEX's lock
-   count.
-
-   If MUTEX is unlocked, assign to thread LOCKER, set its lock
-   count to the larger of NEW_COUNT and 1.
-
-   If MUTEX is locked by another thread, release the global lock,
-   allowing other threads to run while waiting MUTEX to become
-   unlocked.  Return upon reacquiring MUTEX.
-*/
-static void
-lisp_mutex_lock_for_thread (lisp_mutex_t *mutex, struct thread_state *locker,
-			    int new_count)
+static bool
+lisp_mutex_restore_lock (lisp_mutex_t *mutex, struct thread_state *locker,
+			 int restore_count)
 {
   eassume (locker != NULL);
-
-  if (! mutex->owner)
+  if (mutex->owner == locker)
+    mutex->count = restore_count;
+  else
     {
+      locker->wait_condvar = &mutex->condition;
+      while (mutex->owner != NULL)
+	sys_cond_wait (&mutex->condition, &global_lock);
+      clear_thread (locker);
+      /* Tromey ignored locker->error_symbol, and so shall we. */
       mutex->owner = locker;
-      mutex->count = max (1, new_count);
+      mutex->count = restore_count;
+      /* must be after setting owner lest Fsignal() in
+	 restore_thread() derails `with-mutex' (as in
+	 threads-test-condvar-wait).  */
+      restore_thread (locker);
     }
-  else if (mutex->owner == locker)
-    {
-      eassert (new_count == 0);
-      ++mutex->count;
-    }
+  return mutex->owner == locker;
+}
+
+static bool
+lisp_mutex_lock (lisp_mutex_t *mutex, struct thread_state *locker)
+{
+  eassume (locker != NULL);
+  if (mutex->owner == locker)
+    mutex->count++;
   else
     {
       locker->wait_condvar = &mutex->condition;
       while (mutex->owner != NULL && NILP (locker->error_symbol))
 	sys_cond_wait (&mutex->condition, &global_lock);
+      clear_thread (locker);
       restore_thread (locker);
-      mutex->owner = locker;
-      mutex->count = max (1, new_count);
+      if (NILP (locker->error_symbol))
+	{
+	  mutex->owner = locker;
+	  mutex->count = 1;
+	}
     }
-}
-
-static void
-lisp_mutex_lock (lisp_mutex_t *mutex, int new_count)
-{
-  lisp_mutex_lock_for_thread (mutex, current_thread, new_count);
+  return mutex->owner == locker;
 }
 
 /* Decrement MUTEX's lock count.  If the count becomes zero, broadcast
@@ -166,7 +178,7 @@ static void
 lisp_mutex_unlock (lisp_mutex_t *mutex)
 {
   if (mutex->owner != current_thread)
-    error ("Cannot unlock mutex owned by another thread");
+    emacs_abort ();
 
   if (--mutex->count <= 0)
     {
@@ -216,7 +228,7 @@ static void
 mutex_lock_callback (void *arg)
 {
   struct Lisp_Mutex *mutex = arg;
-  lisp_mutex_lock (&mutex->mutex, 0);
+  lisp_mutex_lock (&mutex->mutex, current_thread);
 }
 
 DEFUN ("mutex-lock", Fmutex_lock, Smutex_lock, 1, 1, 0,
@@ -328,8 +340,7 @@ condition_wait_callback (void *arg)
 
   sys_cond_wait (&cvar->cond, &global_lock);
   clear_thread (self);
-  lisp_mutex_lock_for_thread (&mutex->mutex, self, restore_count);
-  restore_thread (self);
+  lisp_mutex_restore_lock (&mutex->mutex, self, restore_count);
 }
 
 DEFUN ("condition-wait", Fcondition_wait, Scondition_wait, 1, 1, 0,
@@ -369,6 +380,7 @@ struct notify_args
 static void
 condition_notify_callback (void *arg)
 {
+  struct thread_state *self = current_thread; // current_thread changes!
   struct notify_args *na = arg;
   struct Lisp_Mutex *mutex = XMUTEX (na->cvar->mutex);
   unsigned int restore_count = mutex->mutex.count;
@@ -382,7 +394,7 @@ condition_notify_callback (void *arg)
     sys_cond_broadcast (&na->cvar->cond);
   else
     sys_cond_signal (&na->cvar->cond);
-  lisp_mutex_lock (&mutex->mutex, restore_count);
+  lisp_mutex_restore_lock (&mutex->mutex, self, restore_count);
 }
 
 DEFUN ("condition-notify", Fcondition_notify, Scondition_notify, 1, 2, 0,
@@ -606,8 +618,11 @@ run_thread (void *state)
   if (self->thread_name)
     sys_thread_set_name (self->thread_name);
 
-  sys_mutex_lock (&global_lock);
-  restore_thread (self);
+  if (self->cooperative)
+    {
+      sys_mutex_lock (&global_lock);
+      restore_thread (self);
+    }
 
   /* Put a dummy catcher at top-level so that handlerlist is never NULL.
      This is important since handlerlist->nextfree holds the freelist
@@ -621,7 +636,7 @@ run_thread (void *state)
 
   internal_condition_case (invoke_thread_function, Qt, record_thread_error);
 
-  update_processes_for_thread_death (Fcurrent_thread ());
+  update_processes_for_thread_death (self);
 
   /* 1- for unreachable dummy entry */
   xfree (self->m_specpdl - 1);
@@ -636,7 +651,8 @@ run_thread (void *state)
     }
 
   xfree (self->thread_name);
-  current_thread = NULL;
+  if (current_thread == self)
+    current_thread = NULL;
   sys_cond_broadcast (&self->thread_condvar);
 
 #ifdef HAVE_NS
@@ -656,7 +672,9 @@ run_thread (void *state)
 	}
     }
 
-  sys_mutex_unlock (&global_lock);
+  if (self->cooperative)
+    sys_mutex_unlock (&global_lock);
+
   return NULL;
 }
 
@@ -679,11 +697,12 @@ finalize_one_thread (struct thread_state *state)
   free_bc_thread (&state->bc);
 }
 
-DEFUN ("make-thread", Fmake_thread, Smake_thread, 1, 2, 0,
-       doc: /* Start a new thread and run FUNCTION in it.
-When the function exits, the thread dies.
-If NAME is given, it must be a string; it names the new thread.  */)
-  (Lisp_Object function, Lisp_Object name)
+DEFUN ("make-thread", Fmake_thread, Smake_thread, 1, 3, 0,
+       doc: /* Start new thread whose lifetime is that of running FUNCTION.
+A non-nil NAME string is assigned to the thread.
+A non-nil UNCOOPERATIVE runs the thread outside the global lock.
+*/)
+  (Lisp_Object function, Lisp_Object name, Lisp_Object uncooperative)
 {
   Lisp_Object result;
   sys_thread_t thr;
@@ -702,6 +721,7 @@ If NAME is given, it must be a string; it names the new thread.  */)
   new_thread->name = name;
   new_thread->function = function;
   new_thread->obarray = initialize_vector (OBARRAY_SIZE / 10, make_fixnum (0));
+  new_thread->cooperative = NILP (uncooperative);
   new_thread->m_current_buffer = current_thread->m_current_buffer;
 
   /* 1+ for unreachable dummy entry */
@@ -942,7 +962,8 @@ bool
 in_current_thread (void)
 {
   return current_thread == NULL
-    ? false : sys_thread_equal (sys_thread_self (), current_thread->thread_id);
+    ? false
+    : sys_thread_equal (sys_thread_self (), current_thread->thread_id);
 }
 
 void
@@ -959,35 +980,32 @@ init_threads (void)
 void
 syms_of_threads (void)
 {
-#ifndef THREADS_ENABLED
-  if (0)
+#ifdef THREADS_ENABLED
+  defsubr (&Sthread_yield);
+  defsubr (&Smake_thread);
+  defsubr (&Scurrent_thread);
+  defsubr (&Sthread_name);
+  defsubr (&Sthread_signal);
+  defsubr (&Sthread_live_p);
+  defsubr (&Sthread_join);
+  defsubr (&Sthread_blocker);
+  defsubr (&Sall_threads);
+  defsubr (&Smake_mutex);
+  defsubr (&Smutex_lock);
+  defsubr (&Smutex_unlock);
+  defsubr (&Smutex_name);
+  defsubr (&Smake_condition_variable);
+  defsubr (&Scondition_wait);
+  defsubr (&Scondition_notify);
+  defsubr (&Scondition_mutex);
+  defsubr (&Scondition_name);
+  defsubr (&Sthread_last_error);
+
+  staticpro (&last_thread_error);
+  last_thread_error = Qnil;
+
+  Fprovide (intern_c_string ("threads"), Qnil);
 #endif
-    {
-      defsubr (&Sthread_yield);
-      defsubr (&Smake_thread);
-      defsubr (&Scurrent_thread);
-      defsubr (&Sthread_name);
-      defsubr (&Sthread_signal);
-      defsubr (&Sthread_live_p);
-      defsubr (&Sthread_join);
-      defsubr (&Sthread_blocker);
-      defsubr (&Sall_threads);
-      defsubr (&Smake_mutex);
-      defsubr (&Smutex_lock);
-      defsubr (&Smutex_unlock);
-      defsubr (&Smutex_name);
-      defsubr (&Smake_condition_variable);
-      defsubr (&Scondition_wait);
-      defsubr (&Scondition_notify);
-      defsubr (&Scondition_mutex);
-      defsubr (&Scondition_name);
-      defsubr (&Sthread_last_error);
-
-      staticpro (&last_thread_error);
-      last_thread_error = Qnil;
-
-      Fprovide (intern_c_string ("threads"), Qnil);
-    }
 
   DEFSYM (Qthreadp, "threadp");
   DEFSYM (Qmutexp, "mutexp");

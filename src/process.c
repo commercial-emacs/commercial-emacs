@@ -798,14 +798,14 @@ remove_process (register Lisp_Object proc)
 }
 
 void
-update_processes_for_thread_death (Lisp_Object dying_thread)
+update_processes_for_thread_death (const struct thread_state *thread)
 {
   Lisp_Object pair;
 
-  for (pair = Vprocess_alist; !NILP (pair); pair = XCDR (pair))
+  for (pair = Vprocess_alist; ! NILP (pair); pair = XCDR (pair))
     {
       Lisp_Object process = XCDR (XCAR (pair));
-      if (EQ (XPROCESS (process)->thread, dying_thread))
+      if (XTHREAD (XPROCESS (process)->thread) == thread)
 	pset_thread (XPROCESS (process), Qnil);
     }
 }

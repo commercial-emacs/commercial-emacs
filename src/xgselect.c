@@ -131,30 +131,13 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 			&all_rfds, have_wfds ? &all_wfds : NULL, efds,
 			tmop, sigmask);
 #else
-  /* On PGTK, when you type a key, the key press event are received,
-     and one more key press event seems to be received internally.
-
-     The same can happen with GTK native input, which makes input
-     slow.
-
-     The second event is not sent via the display connection, so the
-     following is the case:
-
-       - socket read buffer is empty
-       - a key press event is pending
-
-     In that case, we should not sleep in pselect, and dispatch the
-     event immediately.  (Bug#52761) */
-  if (!already_has_events)
+  if (already_has_events)
     {
-      fds_lim = max_fds + 1;
-      nfds = thread_select (pselect, fds_lim,
-			    &all_rfds, have_wfds ? &all_wfds : NULL, efds,
-			    tmop, sigmask);
-    }
-  else
-    {
-      /* Emulate return values */
+      /* Under GTK native input or PGTK, a keypress results in two
+	 events, the second of which is not sent via the display
+	 connection.  So while this latter event pends, the socket
+	 read buffer is also empty.  Dispatch immediately without
+	 calling thread_select().  (Bug#52761) */
       nfds = 1;
       FD_ZERO (&all_rfds);
       if (have_wfds)
@@ -162,6 +145,13 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
       if (efds)
 	FD_ZERO (efds);
       our_fds++;
+    }
+  else
+    {
+      fds_lim = max_fds + 1;
+      nfds = thread_select (pselect, fds_lim,
+			    &all_rfds, have_wfds ? &all_wfds : NULL, efds,
+			    tmop, sigmask);
     }
 #endif
 

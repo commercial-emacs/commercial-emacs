@@ -265,6 +265,10 @@ sys_thread_create (sys_thread_t *thread_ptr, thread_creation_function *func,
 void
 sys_thread_yield (void)
 {
+  /* J. Bollinger writes in https://stackoverflow.com/a/65381133,
+     "The kernel manages assigning CPU time to threads without any
+     such help, but there may occasionally be cases where
+     [sched_yield] smooths out scheduling.*/
   sched_yield ();
 }
 

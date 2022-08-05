@@ -151,6 +151,9 @@ struct thread_state
   /* Thread's name in the locale encoding.  */
   char *thread_name;
 
+  /* Run under auspices of global lock.  */
+  bool cooperative;
+
   /* Threads are kept on a linked list.  */
   struct thread_state *next_thread;
 
@@ -176,8 +179,8 @@ XTHREAD (Lisp_Object a)
   return XUNTAG (a, Lisp_Vectorlike, struct thread_state);
 }
 
-/* The guts of Lisp_Mutex is a lower-level lisp_mutex_t, which in turn
-   wraps the sys_cond_t keyed off the global lock.  */
+/* The guts of Lisp_Mutex is a lower-level lisp_mutex_t, which is
+   a rich man's sys_mutex_t.  See thread.c header comment.  */
 typedef struct {
   /* The owning thread, or NULL if unlocked.  */
   struct thread_state *owner;
