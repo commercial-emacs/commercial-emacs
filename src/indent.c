@@ -2327,7 +2327,7 @@ whether or not it is currently displayed in some window.  */)
 		{
 		  it.vpos = 0;
 		  it.current_y = 0;
-		  move_it_by_lines (&it, 1);
+		  move_it_dvpos (&it, 1);
 		}
 	      while (IT_CHARPOS (it) == it_start)
 		{
