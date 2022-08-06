@@ -1153,6 +1153,19 @@ update_process_mark (struct Lisp_Process *p)
 		     BUF_ZV_BYTE (XBUFFER (buffer)));
 }
 
+static bool
+is_pty_from_symbol (Lisp_Object symbol)
+{
+  if (EQ (symbol, Qpty))
+    return true;
+  else if (EQ (symbol, Qpipe))
+    return false;
+  else if (NILP (symbol))
+    return !NILP (Vprocess_connection_type);
+  else
+    report_file_error ("Unknown connection type", symbol);
+}
+
 DEFUN ("set-process-buffer", Fset_process_buffer, Sset_process_buffer,
        2, 2, 0,
        doc: /* Set buffer associated with PROCESS to BUFFER (a buffer, or nil).

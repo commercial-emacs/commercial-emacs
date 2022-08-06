@@ -139,14 +139,7 @@ process to complete."
 				      (push input stderr-output)))
     (set-process-sentinel stderr-proc (lambda (_proc _input)
 					(setq stderr-sentinel-called t)))
-    (while (and (or (not sentinel-called)
-                    (not stderr-sentinel-called))
-	        (<= (- (float-time) start-time)
-		    process-test-sentinel-wait-timeout))
-      (accept-process-output nil 0.05))
-    (cl-assert (eq (process-status proc) 'exit))
-    (cl-assert (= (process-exit-status proc) 20))
-    (should sentinel-called)
+    (process-test-wait-for-sentinel proc 20)
     (should (equal 1 (with-current-buffer stdout-buffer
 		       (point-max))))
     (should (equal "hello stdout!\n"
