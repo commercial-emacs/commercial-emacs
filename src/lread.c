@@ -3439,6 +3439,56 @@ skip_lazy_string (Lisp_Object readcharfun)
     skip_dyn_bytes (readcharfun, nskip);
 }
 
+/* Given a lazy-loaded string designator VAL, return the actual string.
+   VAL is (FILENAME . POS).  */
+static Lisp_Object
+get_lazy_string (Lisp_Object val)
+{
+  /* Get a doc string from the file we are loading.
+     If it's in a saved string, get it from there.
+
+     Here, we don't know if the string is a bytecode string or a doc
+     string.  As a bytecode string must be unibyte, we always return a
+     unibyte string.  If it is actually a doc string, caller must make
+     it multibyte.  */
+
+  /* We used to emit negative positions for 'user variables' (whose doc
+     strings started with an asterisk); take the absolute value for
+     compatibility.  */
+  EMACS_INT pos = eabs (XFIXNUM (XCDR (val)));
+  struct saved_string *ss = &saved_strings[0];
+  struct saved_string *ssend = ss + ARRAYELTS (saved_strings);
+  while (ss < ssend
+	 && !(pos >= ss->position && pos < ss->position + ss->length))
+    ss++;
+  if (ss >= ssend)
+    return get_doc_string (val, 1, 0);
+
+  ptrdiff_t start = pos - ss->position;
+  char *str = ss->string;
+  ptrdiff_t from = start;
+  ptrdiff_t to = start;
+
+  /* Process quoting with ^A, and find the end of the string,
+     which is marked with ^_ (037).  */
+  while (str[from] != 037)
+    {
+      int c = str[from++];
+      if (c == 1)
+	{
+	  c = str[from++];
+	  str[to++] = (c == 1 ? c
+		       : c == '0' ? 0
+		       : c == '_' ? 037
+		       : c);
+	}
+      else
+	str[to++] = c;
+    }
+
+  return make_unibyte_string (str + start, to - start);
+}
+
 /* Length of prefix only consisting of symbol constituent characters.  */
 static ptrdiff_t
 symbol_char_span (const char *s)
@@ -4184,7 +4234,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	    /* Hack: immediately convert (#$ . FIXNUM) to the corresponding
 	       string if load-force-doc-strings is set.  */
 	    if (load_force_doc_strings
-		&& BASE_EQ (XCAR (obj), Vload_file_name)
+		&& EQ (XCAR (obj), Vload_file_name)
 		&& !NILP (XCAR (obj))
 		&& FIXNUMP (XCDR (obj)))
 	      obj = get_lazy_string (obj);
