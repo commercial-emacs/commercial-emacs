@@ -299,7 +299,7 @@
    :host "localhost"))
 
 (ert-deftest connect-to-tls-ipv4-nowait ()
-  :expected-result (if (getenv "CI") t :passed)
+  :expected-result t
   (skip-unless (executable-find "gnutls-serv"))
   (skip-unless (gnutls-available-p))
   (network-stream-tests-make-network-process
@@ -313,7 +313,7 @@
    :host "localhost"))
 
 (ert-deftest connect-to-tls-ipv6-nowait ()
-  :expected-result (if (getenv "CI") t :passed)
+  :expected-result t
   (skip-unless (executable-find "gnutls-serv"))
   (skip-unless (gnutls-available-p))
   (skip-unless (not (eq system-type 'windows-nt)))
