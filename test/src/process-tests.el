@@ -38,20 +38,27 @@
 ;; Timeout in seconds; the test fails if the timeout is reached.
 (defvar process-test-sentinel-wait-timeout 2.0)
 
-(defun process-test-wait-for-sentinel (proc exit-status &optional wait-function)
+(defun process-test-wait-for-sentinel (proc exit-status &optional wait-function stderr-proc)
   "Set a sentinel on PROC and wait for it to be called with EXIT-STATUS.
 Call WAIT-FUNCTION, possibly multiple times, to wait for the
 process to complete."
   (let ((wait-function (or wait-function #'accept-process-output))
 	(sentinel-called nil)
+        (stderr-sentinel-called nil)
 	(start-time (float-time)))
+    (if stderr-proc
+        (set-process-sentinel stderr-proc (lambda (_proc _input)
+				            (setq stderr-sentinel-called t)))
+      (setq stderr-sentinel-called t))
     (set-process-sentinel proc (lambda (_proc _msg)
 				 (setq sentinel-called t)))
-    (while (not (or sentinel-called
-		    (> (- (float-time) start-time)
-		       process-test-sentinel-wait-timeout)))
+    (while (and (or (not sentinel-called)
+                    (not stderr-sentinel-called))
+	        (<= (- (float-time) start-time)
+		    process-test-sentinel-wait-timeout))
       (funcall wait-function))
     (should sentinel-called)
+    (should stderr-sentinel-called)
     (should (eq (process-status proc) 'exit))
     (should (= (process-exit-status proc) exit-status))))
 
@@ -120,8 +127,7 @@ process to complete."
 (ert-deftest process-test-stderr-filter ()
   (skip-unless (executable-find "bash"))
   (with-timeout (60 (ert-fail "Test timed out"))
-  (let* ((stderr-sentinel-called nil)
-	 (stdout-output nil)
+  (let* ((stdout-output nil)
 	 (stderr-output nil)
 	 (stdout-buffer (generate-new-buffer "*stdout*"))
 	 (stderr-buffer (generate-new-buffer "*stderr*"))
@@ -137,14 +143,11 @@ process to complete."
 			       (push input stdout-output)))
     (set-process-filter stderr-proc (lambda (_proc input)
 				      (push input stderr-output)))
-    (set-process-sentinel stderr-proc (lambda (_proc _input)
-					(setq stderr-sentinel-called t)))
-    (process-test-wait-for-sentinel proc 20)
+    (process-test-wait-for-sentinel proc 20 nil stderr-proc)
     (should (equal 1 (with-current-buffer stdout-buffer
 		       (point-max))))
     (should (equal "hello stdout!\n"
 		   (mapconcat #'identity (nreverse stdout-output) "")))
-    (should stderr-sentinel-called)
     (should (equal 1 (with-current-buffer stderr-buffer
 		       (point-max))))
     (should (equal "hello stderr!\n"
