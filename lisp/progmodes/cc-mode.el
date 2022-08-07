@@ -1507,10 +1507,7 @@ Note that the style variables are always made local to the buffer."
 
       ;; Move to end of logical line (as it will be after the change, or as it
       ;; was before unescaping a NL.)
-      (while
-	  (progn (end-of-line)
-		 (eq (char-before) ?\\))
-	(forward-line))
+      (re-search-forward "\\(?:\\\\\\(?:.\\|\n\\)\\|[^\\\n\r]\\)*" nil t)
       ;; We're at an EOLL or point-max.
       (if (equal (c-get-char-property (point) 'syntax-table) '(15))
 	  (if (memq (char-after) '(?\n ?\r))
@@ -1628,10 +1625,8 @@ Note that the style variables are always made local to the buffer."
 		  (min (1+ end)	; 1+, if we're inside an escaped NL.
 		       (point-max))
 		end))
-	     (while
-		 (progn (end-of-line)
-			(eq (char-before) ?\\))
-	       (forward-line))
+	     (re-search-forward "\\(?:\\\\\\(?:.\\|\n\\)\\|[^\\\n\r]\\)*"
+				nil t)
 	     (point))
 	   c-new-END))
 	 s)
