@@ -700,7 +700,7 @@ finalize_one_thread (struct thread_state *state)
 DEFUN ("make-thread", Fmake_thread, Smake_thread, 1, 3, 0,
        doc: /* Start new thread whose lifetime is that of running FUNCTION.
 A non-nil NAME string is assigned to the thread.
-A non-nil UNCOOPERATIVE runs the thread outside the global lock.
+A non-nil UNCOOPERATIVE currently does nothing.
 */)
   (Lisp_Object function, Lisp_Object name, Lisp_Object uncooperative)
 {
@@ -721,7 +721,7 @@ A non-nil UNCOOPERATIVE runs the thread outside the global lock.
   new_thread->name = name;
   new_thread->function = function;
   new_thread->obarray = initialize_vector (OBARRAY_SIZE / 10, make_fixnum (0));
-  new_thread->cooperative = NILP (uncooperative);
+  new_thread->cooperative = true;
   new_thread->m_current_buffer = current_thread->m_current_buffer;
 
   /* 1+ for unreachable dummy entry */
