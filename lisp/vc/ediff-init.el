@@ -44,9 +44,8 @@
 This is provided as a temporary relief for users of face-capable displays
 that Ediff doesn't know about.")
 
-;; Are we running as a window application or on a TTY?
 (defsubst ediff-device-type ()
-  (declare (obsolete nil "27.1"))
+  (declare (obsolete window-system "27.1"))
   window-system)
 
 (defun ediff-window-display-p ()
@@ -1273,9 +1272,6 @@ This default should work without changes."
   "Temporary file used for refining difference regions in buffer C.")
 
 
-(defun ediff-file-remote-p (file-name)
-  (file-remote-p file-name))
-
 ;; File for which we can get attributes, such as size or date
 (defun ediff-listable-file (file-name)
   (let ((handler (find-file-name-handler file-name 'file-local-copy)))
@@ -1381,7 +1377,7 @@ This default should work without changes."
 (define-obsolete-function-alias 'ediff-event-key #'identity "27.1")
 
 (defun ediff-last-command-char ()
-  (declare (obsolete nil "27.1"))
+  (declare (obsolete last-command-event "27.1"))
   last-command-event)
 
 
@@ -1419,26 +1415,27 @@ This default should work without changes."
 	)))
 
 (defsubst ediff-spy-after-mouse ()
-  (setq ediff-mouse-pixel-position (mouse-pixel-position)))
+  (declare (obsolete nil "29.1"))
+  (with-suppressed-warnings ((obsolete ediff-mouse-pixel-position))
+    (setq ediff-mouse-pixel-position (mouse-pixel-position))))
 
-;; It is not easy to find out when the user grabs the mouse, since emacs and
-;; xemacs behave differently when mouse is not in any frame.  Also, this is
-;; sensitive to when the user grabbed mouse.  Not used for now.
 (defun ediff-user-grabbed-mouse ()
-  (if ediff-mouse-pixel-position
-      (cond ((not (eq (car ediff-mouse-pixel-position)
-		      (car (mouse-pixel-position)))))
-	    ((and (car (cdr ediff-mouse-pixel-position))
-		  (car (cdr (mouse-pixel-position)))
-		  (cdr (cdr ediff-mouse-pixel-position))
-		  (cdr (cdr (mouse-pixel-position))))
-	     (not (and (< (abs (- (car (cdr ediff-mouse-pixel-position))
-				  (car (cdr (mouse-pixel-position)))))
-			  ediff-mouse-pixel-threshold)
-		       (< (abs (- (cdr (cdr ediff-mouse-pixel-position))
-				  (cdr (cdr (mouse-pixel-position)))))
-			  ediff-mouse-pixel-threshold))))
-	    (t nil))))
+  (declare (obsolete nil "29.1"))
+  (with-suppressed-warnings ((obsolete ediff-mouse-pixel-position))
+    (if ediff-mouse-pixel-position
+        (cond ((not (eq (car ediff-mouse-pixel-position)
+                        (car (mouse-pixel-position)))))
+              ((and (car (cdr ediff-mouse-pixel-position))
+                    (car (cdr (mouse-pixel-position)))
+                    (cdr (cdr ediff-mouse-pixel-position))
+                    (cdr (cdr (mouse-pixel-position))))
+               (not (and (< (abs (- (car (cdr ediff-mouse-pixel-position))
+                                    (car (cdr (mouse-pixel-position)))))
+                            ediff-mouse-pixel-threshold)
+                         (< (abs (- (cdr (cdr ediff-mouse-pixel-position))
+                                    (cdr (cdr (mouse-pixel-position)))))
+                            ediff-mouse-pixel-threshold))))
+              (t nil)))))
 
 (define-obsolete-function-alias 'ediff-frame-char-height
   #'frame-char-height "27.1")
@@ -1561,16 +1558,10 @@ This default should work without changes."
   (ediff-file-attributes filename 5))
 
 
-;;; Obsolete
-
-(defun ediff-convert-standard-filename (fname)
-  (declare (obsolete convert-standard-filename "28.1"))
-  (convert-standard-filename fname))
-
-(define-obsolete-function-alias 'ediff-with-syntax-table
-  #'with-syntax-table "27.1")
-
+(define-obsolete-function-alias 'ediff-with-syntax-table #'with-syntax-table "27.1")
+(define-obsolete-function-alias 'ediff-convert-standard-filename #'convert-standard-filename "28.1")
 (define-obsolete-function-alias 'ediff-hide-face #'ignore "28.1")
+(define-obsolete-function-alias 'ediff-file-remote-p #'file-remote-p "29.1")
 
 (provide 'ediff-init)
 ;;; ediff-init.el ends here

@@ -296,10 +296,6 @@ to invocation.")
       (if (string-match "buffer" (symbol-name ediff-job-name))
 	  (setq ediff-keep-variants t))
 
-      (if (ediff-window-display-p)
-	  (add-hook 'pre-command-hook 'ediff-spy-after-mouse nil 'local))
-      (setq ediff-mouse-pixel-position (mouse-pixel-position))
-
       ;; adjust for merge jobs
       (if ediff-merge-job
 	  (let ((buf
@@ -3197,13 +3193,7 @@ Hit \\[ediff-recenter] to reset the windows afterward."
                (progn
 		 (if (or (file-exists-p file) (not keep-proposed-name))
 		     (setq file (make-temp-name proposed-name)))
-		 ;; the with-temp-buffer thing is a workaround for an XEmacs
-		 ;; bug: write-region complains that we are trying to visit a
-		 ;; file in an indirect buffer, failing to notice that the
-		 ;; VISIT flag is unset and that we are actually writing from a
-		 ;; string and not from any buffer.
-		 (with-temp-buffer
-		   (write-region "" nil file nil 'silent nil 'excl))
+                 (write-region "" nil file nil 'silent nil 'excl)
                  nil)
             (file-already-exists t))
       ;; the file was somehow created by someone else between
@@ -3283,7 +3273,7 @@ Hit \\[ediff-recenter] to reset the windows afterward."
 
 (defun ediff-filename-magic-p (file)
   (or (ediff-file-compressed-p file)
-      (ediff-file-remote-p file)))
+      (file-remote-p file)))
 
 
 (defun ediff-save-buffer (arg)
@@ -3404,11 +3394,11 @@ Without an argument, it saves customized diff argument, if available
 	file-A file-B)
     (unless (and buf-A-file-name
 		 (file-exists-p buf-A-file-name)
-		 (not (ediff-file-remote-p buf-A-file-name)))
+                 (not (file-remote-p buf-A-file-name)))
       (setq file-A (ediff-make-temp-file ediff-buffer-A)))
     (unless (and buf-B-file-name
 		 (file-exists-p buf-B-file-name)
-		 (not (ediff-file-remote-p buf-B-file-name)))
+                 (not (file-remote-p buf-B-file-name)))
       (setq file-B (ediff-make-temp-file ediff-buffer-B)))
     (or (ediff-buffer-live-p ediff-custom-diff-buffer)
 	(setq ediff-custom-diff-buffer
