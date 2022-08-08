@@ -3443,9 +3443,10 @@ The hook `ido-make-buffer-list-hook' is run after the list has been
 created to allow the user to further modify the order of the buffer names
 in this list.  If DEFAULT is non-nil, and corresponds to an existing buffer,
 it is put to the start of the list."
-  (let ((ido-temp-list (ido-make-buffer-list-1
-                        (selected-frame)
-                        (list (buffer-name (window-buffer (selected-window)))))))
+  (let* ((current (buffer-name (window-buffer (selected-window))))
+         (ido-temp-list (ido-make-buffer-list-1 (selected-frame) (list current))))
+    (when (consp ido-temp-list)
+      (setcdr (last ido-temp-list) (list current)))
     (when ido-predicate
       (setq ido-temp-list
             (seq-filter
