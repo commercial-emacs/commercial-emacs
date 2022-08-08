@@ -97,106 +97,8 @@ static void print_interval (INTERVAL interval, Lisp_Object printcharfun);
 /* GDB resets this to zero on W32 to disable OutputDebugString calls.  */
 bool print_output_debug_flag EXTERNALLY_VISIBLE = 1;
 
-
+
 /* Low level output routines for characters and strings.  */
-
-/* Lisp functions to do output using a stream
-   must have the stream in a variable called printcharfun
-   and must start with PRINTPREPARE, end with PRINTFINISH.
-   Use printchar to output one character,
-   or call strout to output a block of characters.  */
-
-#define PRINTPREPARE							\
-   ptrdiff_t old_point = -1, start_point = -1;				\
-   ptrdiff_t old_point_byte = -1, start_point_byte = -1;		\
-   specpdl_ref specpdl_count = SPECPDL_INDEX ();			\
-   bool multibyte							\
-     = !NILP (BVAR (current_buffer, enable_multibyte_characters));	\
-   Lisp_Object original = printcharfun;					\
-   record_unwind_current_buffer ();					\
-   specbind(Qprint__unreadable_callback_buffer, Fcurrent_buffer ());	\
-   if (NILP (printcharfun)) printcharfun = Qt;				\
-   if (BUFFERP (printcharfun))						\
-     {									\
-       if (XBUFFER (printcharfun) != current_buffer)			\
-	 Fset_buffer (printcharfun);					\
-       printcharfun = Qnil;						\
-     }									\
-   if (MARKERP (printcharfun))						\
-     {									\
-       ptrdiff_t marker_pos;						\
-       if (! XMARKER (printcharfun)->buffer)				\
-         error ("Marker does not point anywhere");			\
-       if (XMARKER (printcharfun)->buffer != current_buffer)		\
-         set_buffer_internal (XMARKER (printcharfun)->buffer);		\
-       marker_pos = marker_position (printcharfun);			\
-       if (marker_pos < BEGV || marker_pos > ZV)			\
-	 signal_error ("Marker is outside the accessible "		\
-		       "part of the buffer", printcharfun);		\
-       old_point = PT;							\
-       old_point_byte = PT_BYTE;					\
-       SET_PT_BOTH (marker_pos,						\
-		    marker_byte_position (printcharfun));		\
-       start_point = PT;						\
-       start_point_byte = PT_BYTE;					\
-       printcharfun = Qnil;						\
-     }									\
-   if (NILP (printcharfun))						\
-     {									\
-       Lisp_Object string;						\
-       if (NILP (BVAR (current_buffer, enable_multibyte_characters))	\
-	   && ! print_escape_multibyte)					\
-         specbind (Qprint_escape_multibyte, Qt);			\
-       if (! NILP (BVAR (current_buffer, enable_multibyte_characters))	\
-	   && ! print_escape_nonascii)					\
-         specbind (Qprint_escape_nonascii, Qt);				\
-       if (print_buffer != NULL)					\
-	 {								\
-	   string = make_multibyte_string (print_buffer,		\
-					   print_buffer_pos,		\
-					   print_buffer_pos_byte);	\
-	   record_unwind_protect (print_unwind, string);		\
-	 }								\
-       else								\
-	 {								\
-	   int new_size = 1000;						\
-	   print_buffer = xmalloc (new_size);				\
-	   print_buffer_size = new_size;				\
-	   record_unwind_protect_void (print_free_buffer);		\
-	 }								\
-       print_buffer_pos = 0;						\
-       print_buffer_pos_byte = 0;					\
-     }									\
-   if (EQ (printcharfun, Qt) && ! noninteractive)			\
-     setup_echo_area_for_printing (multibyte);
-
-#define PRINTFINISH							\
-   if (NILP (printcharfun))						\
-     {									\
-       if (print_buffer_pos != print_buffer_pos_byte			\
-	   && NILP (BVAR (current_buffer, enable_multibyte_characters)))\
-	 {								\
-	   USE_SAFE_ALLOCA;						\
-	   unsigned char *temp = SAFE_ALLOCA (print_buffer_pos + 1);	\
-	   copy_text ((unsigned char *) print_buffer, temp,		\
-		      print_buffer_pos_byte, 1, 0);			\
-	   insert_1_both ((char *) temp, print_buffer_pos,		\
-			  print_buffer_pos, 0, 1, 0);			\
-	   SAFE_FREE ();						\
-	 }								\
-       else								\
-	 insert_1_both (print_buffer, print_buffer_pos,			\
-			print_buffer_pos_byte, 0, 1, 0);		\
-       signal_after_change (PT - print_buffer_pos, 0, print_buffer_pos);\
-     }									\
-   if (MARKERP (original))						\
-     set_marker_both (original, Qnil, PT, PT_BYTE);			\
-   if (old_point >= 0)							\
-     SET_PT_BOTH (old_point + (old_point >= start_point			\
-			       ? PT - start_point : 0),			\
-		  old_point_byte + (old_point_byte >= start_point_byte	\
-				    ? PT_BYTE - start_point_byte : 0)); \
-   unbind_to (specpdl_count, Qnil);
 
 /* This is used to free the print buffer; we don't simply record xfree
    since print_buffer can be reallocated during the printing.  */
@@ -279,9 +181,9 @@ print_prepare (Lisp_Object printcharfun)
 	specbind (Qprint_escape_nonascii, Qt);
       if (print_buffer.buffer != NULL)
 	{
-	  Lisp_Object string = make_string_from_bytes (print_buffer.buffer,
-						       print_buffer.pos,
-						       print_buffer.pos_byte);
+	  Lisp_Object string = make_multibyte_string (print_buffer.buffer,
+						      print_buffer.pos,
+						      print_buffer.pos_byte);
 	  record_unwind_protect (print_unwind, string);
 	}
       else
@@ -645,7 +547,7 @@ print_string (Lisp_Object string, Lisp_Object printcharfun)
 	  }
     }
 }
-
+
 DEFUN ("write-char", Fwrite_char, Swrite_char, 1, 2, 0,
        doc: /* Output character CHARACTER to stream PRINTCHARFUN.
 PRINTCHARFUN defaults to the value of `standard-output' (which see).  */)
@@ -715,7 +617,7 @@ temp_output_buffer_setup (const char *bufname)
 
   specbind (Qstandard_output, buf);
 }
-
+
 static void print (Lisp_Object, Lisp_Object, bool);
 static void print_preprocess (Lisp_Object);
 static void print_preprocess_string (INTERVAL *, void *);
@@ -1120,7 +1022,7 @@ debug_format (const char *fmt, Lisp_Object arg)
   return SSDATA (CALLN (Fformat, build_string (fmt), arg));
 }
 
-
+
 DEFUN ("error-message-string", Ferror_message_string, Serror_message_string,
        1, 1, 0,
        doc: /* Convert an error value (ERROR-SYMBOL . DATA) to an error message.
@@ -1227,7 +1129,7 @@ print_error_message (Lisp_Object data, Lisp_Object stream, const char *context)
 }
 
 
-
+
 /*
  * The buffer should be at least as large as the max string size of the
  * largest float, printed in the biggest notation.  This is undoubtedly
@@ -1347,7 +1249,7 @@ float_to_string (char *buf, double data)
   return len;
 }
 
-
+
 static void
 print (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 {
@@ -2844,7 +2746,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
     }
   eassert (print_depth == base_depth);
 }
-
+
 
 /* Print a description of INTERVAL using PRINTCHARFUN.
    This is part of printing a string that has text properties.  */
