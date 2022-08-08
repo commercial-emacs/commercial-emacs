@@ -135,7 +135,6 @@ This is taken from RFC 2396.")
 (provide 'mh-compat)
 
 ;; Local Variables:
-;; indent-tabs-mode: nil
 ;; sentence-end-double-space: nil
 ;; End:
 

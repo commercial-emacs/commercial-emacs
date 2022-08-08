@@ -1789,7 +1789,6 @@ initialized. Always use the command `mh-have-file-command'.")
 (provide 'mh-mime)
 
 ;; Local Variables:
-;; indent-tabs-mode: nil
 ;; sentence-end-double-space: nil
 ;; End:
 

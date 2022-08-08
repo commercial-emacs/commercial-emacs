@@ -1784,9 +1784,4 @@ This variable is set by `nnmaildir-request-article'.")
 
 (provide 'nnmaildir)
 
-;; Local Variables:
-;; indent-tabs-mode: t
-;; fill-column: 77
-;; End:
-
 ;;; nnmaildir.el ends here

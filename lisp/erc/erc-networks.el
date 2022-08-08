@@ -1566,6 +1566,3 @@ VALUE is the options value.")
 (provide 'erc-networks)
 
 ;;; erc-networks.el ends here
-;;
-;; Local Variables:
-;; End:
