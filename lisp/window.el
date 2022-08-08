@@ -8684,7 +8684,7 @@ from the list of completions and default values."
               (setq-local icomplete-with-completion-tables
                           (cons rbts-completion-table
                                 icomplete-with-completion-tables))))
-      (read-buffer prompt (other-buffer (current-buffer))
+      (read-buffer prompt (other-buffer (current-buffer) t)
                    (confirm-nonexistent-file-or-buffer)))))
 
 (defun window-normalize-buffer-to-switch-to (buffer-or-name)
@@ -8764,8 +8764,8 @@ the buffer in the window specified by the rules from these variables."
   "Return and display buffer BUFFER-OR-NAME in the selected window.
 
 Use `with-current-buffer' or less idiomatically `set-buffer' to
-switch buffers in a programmatic context so as to avoid
-disrupting display and window-buffer correspondences.
+switch buffers in a programmatic context.  This avoids disrupting
+display and window-buffer correspondences.
 
 BUFFER-OR-NAME may be a buffer, a string, or nil.  Create the
 target buffer if BUFFER-OR-NAME is a string and does not identify

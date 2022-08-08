@@ -3432,32 +3432,31 @@ instead removed from the current item list."
 	  (mapcar
 	   (lambda (x)
 	     (let ((name (buffer-name x)))
-	       (if (not (or (ido-ignore-item-p name ido-ignore-buffers) (member name visible)))
-		   name)))
+	       (and (not (ido-ignore-item-p name ido-ignore-buffers))
+                    (not (member name visible))
+	            name)))
 	   (buffer-list frame)))))
 
 (defun ido-make-buffer-list (default)
   "Return the current list of buffers.
-Currently visible buffers are put at the end of the list.
 The hook `ido-make-buffer-list-hook' is run after the list has been
 created to allow the user to further modify the order of the buffer names
 in this list.  If DEFAULT is non-nil, and corresponds to an existing buffer,
 it is put to the start of the list."
-  (let* ((ido-current-buffers (ido-get-buffers-in-frames 'current))
-	 (ido-temp-list (ido-make-buffer-list-1 (selected-frame) ido-current-buffers)))
-    (if ido-temp-list
-	(nconc ido-temp-list ido-current-buffers)
-      (setq ido-temp-list ido-current-buffers))
-    (if ido-predicate
-        (setq ido-temp-list (seq-filter
-                             (lambda (name)
-                               (funcall ido-predicate (cons name (get-buffer name))))
-                             ido-temp-list)))
-    (if default
-	(setq ido-temp-list
-	      (cons default (delete default ido-temp-list))))
-    (if (bound-and-true-p ido-enable-virtual-buffers)
-	(ido-add-virtual-buffers-to-list))
+  (let ((ido-temp-list (ido-make-buffer-list-1
+                        (selected-frame)
+                        (list (buffer-name (window-buffer (selected-window)))))))
+    (when ido-predicate
+      (setq ido-temp-list
+            (seq-filter
+             (lambda (name)
+               (funcall ido-predicate (cons name (get-buffer name))))
+             ido-temp-list)))
+    (when default
+      (setq ido-temp-list
+	    (cons default (delete default ido-temp-list))))
+    (when (bound-and-true-p ido-enable-virtual-buffers)
+      (ido-add-virtual-buffers-to-list))
     (run-hooks 'ido-make-buffer-list-hook)
     ido-temp-list))
 
@@ -3723,11 +3722,8 @@ directory names in this list."
   "Return the list of buffers that are visible in the current frame.
 If optional argument CURRENT is given, restrict searching to the current
 frame, rather than all frames, regardless of value of `ido-all-frames'."
-  (let ((ido-bufs-in-frame nil))
-    (walk-windows 'ido-get-bufname nil
-		  (if current
-		      nil
-		    ido-all-frames))
+  (let (ido-bufs-in-frame)
+    (walk-windows 'ido-get-bufname nil (unless current ido-all-frames))
     ido-bufs-in-frame))
 
 (defun ido-get-bufname (win)
