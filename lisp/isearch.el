@@ -539,8 +539,6 @@ This is like `describe-bindings', but displays only Isearch keys."
     (describe-function 'isearch-forward))
   (when isearch-mode (isearch-update)))
 
-(defalias 'isearch-mode-help 'isearch-describe-mode)
-
 
 ;; Define isearch-mode keymap.
 
@@ -4637,6 +4635,8 @@ CASE-FOLD non-nil means the search was case-insensitive."
                        (replace-regexp-in-string "'" "['’]")
                        (replace-regexp-in-string "\"" "[\"“”]")))))
     (buffer-local-restore-state isearch-fold-quotes-mode--state)))
+
+(define-obsolete-function-alias 'isearch-mode-help #'isearch-describe-mode "29.1")
 
 (provide 'isearch)
 
