@@ -1555,4 +1555,25 @@ with parameters from the *Messages* buffer modification."
       (if f2 (delete-file f2))
       )))
 
+(ert-deftest test-buffer-switch-visible ()
+  "switch-to-buffer should include already visible buffers."
+  (let* ((name "test-buffer-switch-visible")
+         (buffer (get-buffer-create name)))
+    (unwind-protect
+        (progn
+          (switch-to-buffer buffer)
+          (delete-other-windows)
+          (split-window-below)
+          (goto-char (point-min))
+          (other-window 1)
+          (insert "foo")
+          (goto-char (point-max))
+          (cl-letf (((symbol-function 'read-from-minibuffer)
+                     (lambda (&rest args) (nth 5 args))))
+            (call-interactively #'switch-to-buffer)
+            (call-interactively #'switch-to-buffer))
+          (should (and (equal name (buffer-name)) (eq (point) (point-max)))))
+      (let (kill-buffer-query-functions)
+        (kill-buffer buffer)))))
+
 ;;; buffer-tests.el ends here

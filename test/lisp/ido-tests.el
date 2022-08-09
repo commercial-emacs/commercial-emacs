@@ -51,4 +51,25 @@
   (let ((ido-big-directories (cons (rx "me/di") ido-big-directories)))
     (should (ido-directory-too-big-p "/some/dir/"))))
 
+(ert-deftest ido-buffer-switch-visible ()
+  "switch-to-buffer should include already visible buffers."
+  (let* ((name "test-buffer-switch-visible")
+         (buffer (get-buffer-create name)))
+    (unwind-protect
+        (progn
+          (switch-to-buffer buffer)
+          (delete-other-windows)
+          (split-window-below)
+          (goto-char (point-min))
+          (other-window 1)
+          (insert "foo")
+          (goto-char (point-max))
+          (cl-letf (((symbol-function 'read-from-minibuffer)
+                     (lambda (&rest args) (nth 5 args))))
+            (call-interactively #'ido-switch-buffer)
+            (call-interactively #'ido-switch-buffer))
+          (should (and (equal name (buffer-name)) (eq (point) (point-max)))))
+      (let (kill-buffer-query-functions)
+        (kill-buffer buffer)))))
+
 ;;; ido-tests.el ends here
