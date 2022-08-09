@@ -1544,6 +1544,8 @@ lists of strings."
        (mapc (lambda (v) (set (make-local-variable (car v)) (cdr v))) gnus-vars)
        ,@forms)))
 
+(define-obsolete-function-alias 'gnus-delete-duplicates #'seq-uniq "29.1")
+
 (provide 'gnus-util)
 
 ;;; gnus-util.el ends here
