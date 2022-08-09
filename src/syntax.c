@@ -1217,16 +1217,13 @@ the value of a `syntax-table' text property.  */)
     return Fcons (make_fixnum (val), match);
 }
 
-/* I really don't know why this is interactive
-   help-form should at least be made useful whilst reading the second arg.  */
 DEFUN ("modify-syntax-entry", Fmodify_syntax_entry, Smodify_syntax_entry, 2, 3,
   "cSet syntax for character: \nsSet syntax for %s to: ",
-       doc: /* Set syntax for character CHAR according to string NEWENTRY.
-The syntax is changed only for table SYNTAX-TABLE, which defaults to
- the current buffer's syntax table.
-CHAR may be a cons (MIN . MAX), in which case, syntaxes of all characters
-in the range MIN to MAX are changed.
-The first character of NEWENTRY should be one of the following:
+       doc: /* Set syntax for CHAR in SYNTAX-TABLE according to NEWENTRY string.
+
+CHAR is a character or a cons (BEG . END) specifying a range.  The
+first character of NEWENTRY is one of:
+
   Space or -  whitespace syntax.    w   word constituent.
   _           symbol constituent.   .   punctuation.
   (           open-parenthesis.     )   close-parenthesis.
@@ -1236,29 +1233,21 @@ The first character of NEWENTRY should be one of the following:
   /           character-quote.      @   inherit from parent table.
   |           generic string fence. !   generic comment fence.
 
-Only single-character comment start and end sequences are represented thus.
-Two-character sequences are represented as described below.
-The second character of NEWENTRY is the matching parenthesis,
- used only if the first character is `(' or `)'.
-Any additional characters are flags.
-Defined flags are the characters 1, 2, 3, 4, b, p, and n.
- 1 means CHAR is the start of a two-char comment start sequence.
- 2 means CHAR is the second character of such a sequence.
- 3 means CHAR is the start of a two-char comment end sequence.
- 4 means CHAR is the second character of such a sequence.
+In the case of '(' and ')', the second character of NEWENTRY is the
+corresponding matching parenthesis.
 
-There can be several orthogonal comment sequences.  This is to support
-language modes such as C++.  By default, all comment sequences are of style
-a, but you can set the comment sequence style to b (on the second character
-of a comment-start, and the first character of a comment-end sequence) and/or
-c (on any of its chars) using this flag:
- b means CHAR is part of comment sequence b.
- c means CHAR is part of comment sequence c.
- n means CHAR is part of a nestable comment sequence.
+Additional NEWENTRY characters are legacy flags dating back to RMS,
+and appear narrowly defined for C-style comments.  Their descriptions
+also defy comprehension.
 
- p means CHAR is a prefix character for `backward-prefix-chars';
-   such characters are treated as whitespace when they occur
-   between expressions.
+  b     CHAR part of comment sequence b.
+  c     CHAR part of comment sequence c.
+  n     CHAR part of a nestable comment sequence.
+  p     CHAR a prefix character for `backward-prefix-chars';
+  1     CHAR start of a two-char comment start sequence.
+  2     CHAR second character of such a sequence.
+  3     CHAR start of a two-char comment end sequence.
+  4     CHAR second character of such a sequence.
 usage: (modify-syntax-entry CHAR NEWENTRY &optional SYNTAX-TABLE)  */)
   (Lisp_Object c, Lisp_Object newentry, Lisp_Object syntax_table)
 {
