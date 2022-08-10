@@ -114,14 +114,12 @@ supplant all of the above."
     ;; batch mode or buffer is hidden (name starts space).
     (setq font-lock-mode nil))
   (funcall font-lock-function font-lock-mode)
-  ;; Arrange to unfontify this buffer if we change major mode later.
   (if font-lock-mode
       (add-hook 'change-major-mode-hook 'font-lock-change-mode nil t)
     (remove-hook 'change-major-mode-hook 'font-lock-change-mode t)))
 
-;; Get rid of fontification for the old major mode.
-;; We do this when changing major modes.
 (defun font-lock-change-mode ()
+  "Douse fontification on major mode change."
   (font-lock-mode -1))
 
 (defun font-lock-defontify ()
@@ -137,12 +135,12 @@ this function onto `change-major-mode-hook'."
     (restore-buffer-modified-p modp)))
 
 (defvar font-lock-set-defaults)
-(defun font-lock-default-function (mode)
-  (if mode
+(defun font-lock-default-function (activate)
+  (if activate
       (progn
         (setq-local char-property-alias-alist
                     (copy-tree char-property-alias-alist))
-        ;; Add `font-lock-face' as an alias for the `face' property.
+        ;; Add `font-lock-face' as an alias for the face property.
         (let ((elt (assq 'face char-property-alias-alist)))
           (if elt
 	      (unless (memq 'font-lock-face (cdr elt))
@@ -156,15 +154,18 @@ this function onto `change-major-mode-hook'."
 	(unless (cdr elt)
 	  (setq char-property-alias-alist
 		(delq elt char-property-alias-alist))))))
+  (if activate
+      (progn
+        (font-lock-set-defaults)
+        (font-lock-turn-on-thing-lock))
+    (font-lock-unfontify-buffer)
+    (font-lock-turn-off-thing-lock)))
 
-  ;; Only do hard work if the mode has specified stuff in
-  ;; `font-lock-defaults'.
-  (when (font-lock-specified-p mode)
-    (font-lock-mode-internal mode)))
-
-(define-obsolete-function-alias
-  'turn-on-font-lock
-  'font-lock-mode "29.1")
+;; Cannot `define-obsolete-function-alias' because
+;; `font-lock-mode' is interactive and `turn-on-font-lock' wasn't.
+(make-obsolete 'turn-on-font-lock 'font-lock-mode "29.1")
+(defun turn-on-font-lock ()
+  (font-lock-mode))
 
 (defcustom font-lock-global-modes t
   "Modes for which Font Lock mode is automagically turned on.
@@ -184,7 +185,7 @@ means that Font Lock mode is turned on for buffers in C and C++ modes only."
 		      (repeat :inline t (symbol :tag "mode"))))
   :group 'font-lock)
 
-(defun turn-on-font-lock-if-desired ()
+(defun turn-on-font-lock-mode ()
   (unless (minibufferp)
     (when (cond ((eq font-lock-global-modes t)
 	         t)
@@ -196,7 +197,7 @@ means that Font Lock mode is turned on for buffers in C and C++ modes only."
 
 (define-globalized-minor-mode global-font-lock-mode
   font-lock-mode
-  turn-on-font-lock-if-desired
+  turn-on-font-lock-mode
   :initialize 'custom-initialize-delay
   :init-value (not (or noninteractive emacs-basic-display))
   :group 'font-lock

@@ -646,35 +646,11 @@ Major/minor modes can set this variable if they know which option applies.")
 
 (defvar-local font-lock-set-defaults nil) ; Whether we have set up defaults.
 
-(defun font-lock-specified-p (mode)
-  "Return non-nil if the current buffer is ready for fontification.
-The MODE argument, if non-nil, means Font Lock mode is about to
-be enabled."
-  (or font-lock-defaults
-      (and (boundp 'font-lock-keywords)
-	   font-lock-keywords)
-      (and mode
-	   font-lock-set-defaults
-	   font-lock-major-mode
-	   (not (eq font-lock-major-mode major-mode)))))
-
 (defun font-lock-initial-fontify ()
   "The :after-hook of `font-lock-mode' minor mode."
-  (when (and font-lock-mode
-	     (font-lock-specified-p t)
-             (not font-lock-fontified))
+  (when (and font-lock-mode (not font-lock-fontified))
     (let (jit-lock-chunk-size)
       (font-lock-ensure))))
-
-(defun font-lock-mode-internal (arg)
-  "This was better embedded in a minor mode, obviously."
-  (if arg
-      (progn
-        (cl-assert font-lock-mode)
-        (font-lock-set-defaults)
-        (font-lock-turn-on-thing-lock))
-    (font-lock-unfontify-buffer)
-    (font-lock-turn-off-thing-lock)))
 
 (defun font-lock-add-keywords (mode keywords &optional how)
   "Add highlighting KEYWORDS for MODE.
@@ -733,7 +709,7 @@ see the variables `c-font-lock-extra-types', `c++-font-lock-extra-types',
                     (not (or font-lock-keywords font-lock-defaults)))
            ;; The major mode has not set any keywords, so when we enabled
            ;; font-lock-mode it only enabled the font-core.el part, not the
-           ;; font-lock-mode-internal.  Try again.
+           ;; font-lock-default-function.  Try again.
            (font-lock-mode -1)
            (setq-local font-lock-defaults '(nil t))
            (font-lock-mode 1))
@@ -1245,9 +1221,8 @@ This function is the default `font-lock-unfontify-region-function'."
   (remove-list-of-text-properties
    beg end (append
 	    font-lock-extra-managed-props
-	    (if font-lock-syntactic-keywords
-		'(syntax-table face font-lock-multiline)
-	      '(face font-lock-multiline)))))
+	    `(,@(when font-lock-syntactic-keywords '(syntax-table))
+              face font-lock-multiline))))
 
 ;; Called when any modification is made to buffer text.
 (defun font-lock-after-change-function (beg end &optional old-len)
@@ -1894,7 +1869,6 @@ preserve `hi-lock-mode' highlighting patterns."
   "Set fontification defaults appropriately for this mode.
 Sets various variables using `font-lock-defaults' and
 `font-lock-maximum-decoration'."
-  ;; Set fontification defaults if not previously set for correct major mode.
   (when (or (not font-lock-set-defaults)
 	    (not font-lock-major-mode)
             (not (derived-mode-p font-lock-major-mode)))

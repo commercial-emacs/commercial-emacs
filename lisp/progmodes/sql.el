@@ -2828,11 +2828,9 @@ configured."
          (list 'sql-mode-font-lock-keywords
                keywords-only t syntax-alist))
 
-    ;; Force font lock to reinitialize if it is already on
-    ;; Otherwise, we can wait until it can be started.
     (when font-lock-mode
-      (font-lock-mode-internal nil)
-      (font-lock-mode-internal t))
+      (font-lock-mode 'toggle)
+      (font-lock-mode 'toggle))
 
     ;; Setup imenu; it needs the same syntax-alist.
     (when imenu

@@ -640,8 +640,7 @@ Return nil if they are."
   "Explainer function for `equal-including-properties'."
   ;; Do a quick comparison in C to avoid running our expensive
   ;; comparison when possible.
-  (if (equal-including-properties a b)
-      nil
+  (unless (equal-including-properties a b)
     (ert--explain-equal-including-properties-rec a b)))
 
 ;;; Implementation of `ert-info'.

@@ -138,16 +138,14 @@
                  `(category ,(button-category-symbol
                               'ert--results-progress-bar-button)
                             button (t)
-                            face ,(if with-font-lock-p
-                                      'ert-test-result-unexpected
-                                    'button))
+                            ,@(when with-font-lock-p
+                                '(face ert-test-result-unexpected)))
                  ".Fs" nil "\n\n"
                  `(category ,(button-category-symbol
                               'ert--results-expand-collapse-button)
                             button (t)
-                            face ,(if with-font-lock-p
-                                      'ert-test-result-unexpected
-                                    'button))
+                            ,@(when with-font-lock-p
+                                '(face ert-test-result-unexpected)))
                  "F" nil " "
                  `(category ,(button-category-symbol
                               'ert--test-name-button)
@@ -178,9 +176,15 @@
                 (let ((noninteractive nil))
                   (font-lock-mode 1))
                 (should (equal-including-properties
-                         (ert-filter-string (buffer-string)
-                                            '("Started at:\\(.*\\)$" 1)
-                                            '("Finished at:\\(.*\\)$" 1))
+                         (let ((unmassaged
+                                (ert-filter-string (buffer-string)
+                                                   '("Started at:\\(.*\\)$" 1)
+                                                   '("Finished at:\\(.*\\)$" 1))))
+                           (with-temp-buffer
+                             (insert unmassaged)
+                             (remove-list-of-text-properties (point-min) (point-max)
+                                                             '(fontified))
+                             (buffer-string)))
                          (expected-string t)))))
           (when (get-buffer buffer-name)
             (kill-buffer buffer-name)))))))

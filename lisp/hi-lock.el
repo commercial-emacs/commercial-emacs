@@ -300,10 +300,7 @@ or add (global-hi-lock-mode 1) to your init file.
 In buffers where Font Lock mode is enabled, patterns are
 highlighted using font lock.  In buffers where Font Lock mode is
 disabled, patterns are applied using overlays; in this case, the
-highlighting will not be updated as you type.  The Font Lock mode
-is considered \"enabled\" in a buffer if its `major-mode'
-causes `font-lock-specified-p' to return non-nil, which means
-the major mode specifies support for Font Lock.
+highlighting will not be updated as you type.
 
 When Hi Lock mode is enabled, a \"Regexp Highlighting\" submenu
 is added to the \"Edit\" menu.  The commands in the submenu,
@@ -455,10 +452,7 @@ and `search-upper-case' is non-nil, the matching is case-sensitive.
 
 Use Font lock mode, if enabled, to highlight REGEXP.  Otherwise,
 use overlays for highlighting.  If overlays are used, the
-highlighting will not update as you type.  The Font Lock mode
-is considered \"enabled\" in a buffer if its `major-mode'
-causes `font-lock-specified-p' to return non-nil, which means
-the major mode specifies support for Font Lock."
+highlighting will not update as you type."
   (interactive
    (list
     (hi-lock-regexp-okay
@@ -496,10 +490,7 @@ Also set `search-spaces-regexp' to the value of `search-whitespace-regexp'.
 
 Use Font lock mode, if enabled, to highlight REGEXP.  Otherwise,
 use overlays for highlighting.  If overlays are used, the
-highlighting will not update as you type.  The Font Lock mode
-is considered \"enabled\" in a buffer if its `major-mode'
-causes `font-lock-specified-p' to return non-nil, which means
-the major mode specifies support for Font Lock."
+highlighting will not update as you type."
   (interactive
    (list
     (hi-lock-regexp-okay
@@ -527,10 +518,7 @@ If REGEXP contains upper case characters (excluding those preceded by `\\')
 and `search-upper-case' is non-nil, the matching is case-sensitive.
 
 This uses Font lock mode if it is enabled; otherwise it uses overlays,
-in which case the highlighting will not update as you type.  The Font
-Lock mode is considered \"enabled\" in a buffer if its `major-mode'
-causes `font-lock-specified-p' to return non-nil, which means
-the major mode specifies support for Font Lock."
+in which case the highlighting will not update as you type."
   (interactive)
   (let* ((regexp (hi-lock-regexp-okay
 		  (find-tag-default-as-symbol-regexp)))
@@ -661,11 +649,6 @@ then remove all hi-lock highlighting."
         ;; Make `face' the next one to use by default.
         (when (symbolp face)          ;Don't add it if it's a list (bug#13297).
           (add-to-list 'hi-lock--unused-faces (face-name face))))
-      ;; FIXME: Calling `font-lock-remove-keywords' causes
-      ;; `font-lock-specified-p' to go from nil to non-nil (because it
-      ;; calls font-lock-set-defaults).  This is yet-another bug in
-      ;; font-lock-add/remove-keywords, which we circumvent here by
-      ;; testing `font-lock-fontified' (bug#19796).
       (if font-lock-fontified (font-lock-remove-keywords nil (list keyword)))
       (setq hi-lock-interactive-patterns
             (delq keyword hi-lock-interactive-patterns))
@@ -770,7 +753,7 @@ SPACES-REGEXP is a regexp to substitute spaces in font-lock search."
         (add-to-list 'hi-lock--unused-faces (face-name face))
       (push pattern hi-lock-interactive-patterns)
       (push (cons (or lighter regexp) pattern) hi-lock-interactive-lighters)
-      (if (and font-lock-mode (font-lock-specified-p major-mode)
+      (if (and font-lock-mode
                (not hi-lock-use-overlays))
 	  (progn
 	    (font-lock-add-keywords nil (list pattern) t)

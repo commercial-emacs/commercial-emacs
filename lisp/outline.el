@@ -452,7 +452,7 @@ See the command `outline-mode' for more information on this mode."
   (if outline-minor-mode
       (progn
         (when outline-minor-mode-highlight
-          (when (and global-font-lock-mode (font-lock-specified-p major-mode))
+          (when global-font-lock-mode
             (font-lock-add-keywords nil outline-font-lock-keywords t)
             (font-lock-flush))
           (outline-minor-mode-highlight-buffer))
