@@ -21206,6 +21206,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    }
 #endif
 
+		  if (f && device)
+		    xi_handle_interaction (dpyinfo, f, device,
+					   xev->time);
+
 		  if (xev->evtype == XI_ButtonPress
 		      && x_dnd_last_seen_window != None)
 		    {
@@ -21452,11 +21456,19 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 					      xev->send_event);
 
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
+	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 
 #ifdef HAVE_XWIDGETS
 	      xvw = xwidget_view_from_window (xev->event);
 	      if (xvw)
 		{
+		  /* If the user interacts with a frame that's focused
+		     on another device, but not the current focus
+		     frame, make it the focus frame.  */
+		  if (device)
+		    xi_handle_interaction (dpyinfo, xvw->frame,
+					   device, xev->time);
+
 		  xwidget_button (xvw, xev->evtype == XI_ButtonPress,
 				  lrint (xev->event_x), lrint (xev->event_y),
 				  xev->detail, xi_convert_event_state (xev),
@@ -21475,8 +21487,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  goto XI_OTHER;
 		}
 #endif
-
-	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 
 	      if (!device)
 		goto XI_OTHER;
