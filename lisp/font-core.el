@@ -185,19 +185,20 @@ means that Font Lock mode is turned on for buffers in C and C++ modes only."
 		      (repeat :inline t (symbol :tag "mode"))))
   :group 'font-lock)
 
-(defun turn-on-font-lock-mode ()
+(defun maybe-turn-on-font-lock ()
   (unless (minibufferp)
-    (when (cond ((eq font-lock-global-modes t)
-	         t)
-	        ((eq (car-safe font-lock-global-modes) 'not)
-	         (not (memq major-mode (cdr font-lock-global-modes))))
-	        (t (memq major-mode font-lock-global-modes)))
+    (when (and (cond ((eq font-lock-global-modes t)
+	              t)
+	             ((eq (car-safe font-lock-global-modes) 'not)
+	              (not (memq major-mode (cdr font-lock-global-modes))))
+	             (t (memq major-mode font-lock-global-modes)))
+               (or font-lock-defaults font-lock-keywords))
       (let (inhibit-quit)
         (font-lock-mode)))))
 
 (define-globalized-minor-mode global-font-lock-mode
   font-lock-mode
-  turn-on-font-lock-mode
+  maybe-turn-on-font-lock
   :initialize 'custom-initialize-delay
   :init-value (not (or noninteractive emacs-basic-display))
   :group 'font-lock
