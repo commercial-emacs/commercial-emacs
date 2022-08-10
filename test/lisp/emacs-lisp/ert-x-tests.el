@@ -138,14 +138,16 @@
                  `(category ,(button-category-symbol
                               'ert--results-progress-bar-button)
                             button (t)
-                            ,@(when with-font-lock-p
-                                '(face ert-test-result-unexpected)))
+                            face ,(if with-font-lock-p
+                                      'ert-test-result-unexpected
+                                    'button))
                  ".Fs" nil "\n\n"
                  `(category ,(button-category-symbol
                               'ert--results-expand-collapse-button)
                             button (t)
-                            ,@(when with-font-lock-p
-                                '(face ert-test-result-unexpected)))
+                            face ,(if with-font-lock-p
+                                      'ert-test-result-unexpected
+                                    'button))
                  "F" nil " "
                  `(category ,(button-category-symbol
                               'ert--test-name-button)
@@ -173,7 +175,8 @@
                          (expected-string nil)))
                 ;; `font-lock-mode' only works if interactive, so
                 ;; pretend we are.
-                (let ((noninteractive nil))
+                (let ((noninteractive nil)
+                      (font-lock-defaults '(nil t)))
                   (font-lock-mode 1))
                 (should (equal-including-properties
                          (let ((unmassaged

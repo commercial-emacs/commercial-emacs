@@ -106,18 +106,25 @@
 
 (ert-deftest erc-track--erc-faces-in ()
   "`erc-faces-in' should pick up both 'face and 'font-lock-face properties."
-  (let ((str0 (copy-sequence "is bold"))
-        (str1 (copy-sequence "is bold")))
-    ;; Turn on Font Lock mode: this initialize `char-property-alias-alist'
-    ;; to '((face font-lock-face)).  Note that `font-lock-mode' don't
-    ;; turn on the mode if the test is run on batch mode or if the
-    ;; buffer name starts with ?\s (Bug#23954).
-    (unless font-lock-mode (font-lock-default-function 1))
-    (put-text-property 3 (length str0) 'font-lock-face
-                       '(bold erc-current-nick-face) str0)
-    (put-text-property 3 (length str1) 'face
-                       '(bold erc-current-nick-face) str1)
-    (should (erc-faces-in str0))
-    (should (erc-faces-in str1)) ))
+  (let ((buffer (get-buffer-create "erc-trace--erc-faces-in")))
+    (unwind-protect
+        (with-current-buffer buffer
+          (let ((str0 (copy-sequence "is bold"))
+                (str1 (copy-sequence "is bold")))
+            ;; Turn on Font Lock mode: this initialize `char-property-alias-alist'
+            ;; to '((face font-lock-face)).  Note that `font-lock-mode' don't
+            ;; turn on the mode if the test is run on batch mode or if the
+            ;; buffer name starts with ?\s (Bug#23954).
+            (let ((noninteractive nil)
+                  (font-lock-defaults '(nil t)))
+              (font-lock-mode 1))
+            (put-text-property 3 (length str0) 'font-lock-face
+                               '(bold erc-current-nick-face) str0)
+            (put-text-property 3 (length str1) 'face
+                               '(bold erc-current-nick-face) str1)
+            (should (erc-faces-in str0))
+            (should (erc-faces-in str1))))
+      (let (kill-buffer-query-functions)
+        (kill-buffer buffer)))))
 
 ;;; erc-track-tests.el ends here

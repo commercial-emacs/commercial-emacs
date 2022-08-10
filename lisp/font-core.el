@@ -113,7 +113,28 @@ supplant all of the above."
   (when (or noninteractive (eq (aref (buffer-name) 0) ?\s))
     ;; batch mode or buffer is hidden (name starts space).
     (setq font-lock-mode nil))
+
+  ;; Add `font-lock-face' as an alias for the face property.
+  (if font-lock-mode
+      (progn
+        (setq-local char-property-alias-alist
+                    (copy-tree char-property-alias-alist))
+        (let ((elt (assq 'face char-property-alias-alist)))
+          (if elt
+	      (unless (memq 'font-lock-face (cdr elt))
+	        (setcdr elt (nconc (cdr elt) (list 'font-lock-face))))
+	    (push (list 'face 'font-lock-face) char-property-alias-alist))))
+    (setq-local char-property-alias-alist
+                (copy-tree char-property-alias-alist))
+    (let ((elt (assq 'face char-property-alias-alist)))
+      (when elt
+	(setcdr elt (remq 'font-lock-face (cdr elt)))
+	(unless (cdr elt)
+	  (setq char-property-alias-alist
+		(delq elt char-property-alias-alist))))))
+
   (funcall font-lock-function font-lock-mode)
+
   (if font-lock-mode
       (add-hook 'change-major-mode-hook 'font-lock-change-mode nil t)
     (remove-hook 'change-major-mode-hook 'font-lock-change-mode t)))
@@ -136,30 +157,13 @@ this function onto `change-major-mode-hook'."
 
 (defvar font-lock-set-defaults)
 (defun font-lock-default-function (activate)
-  (if activate
-      (progn
-        (setq-local char-property-alias-alist
-                    (copy-tree char-property-alias-alist))
-        ;; Add `font-lock-face' as an alias for the face property.
-        (let ((elt (assq 'face char-property-alias-alist)))
-          (if elt
-	      (unless (memq 'font-lock-face (cdr elt))
-	        (setcdr elt (nconc (cdr elt) (list 'font-lock-face))))
-	    (push (list 'face 'font-lock-face) char-property-alias-alist))))
-    (setq-local char-property-alias-alist
-                (copy-tree char-property-alias-alist))
-    (let ((elt (assq 'face char-property-alias-alist)))
-      (when elt
-	(setcdr elt (remq 'font-lock-face (cdr elt)))
-	(unless (cdr elt)
-	  (setq char-property-alias-alist
-		(delq elt char-property-alias-alist))))))
-  (if activate
-      (progn
-        (font-lock-set-defaults)
-        (font-lock-turn-on-thing-lock))
-    (font-lock-unfontify-buffer)
-    (font-lock-turn-off-thing-lock)))
+  (when (or font-lock-keywords font-lock-defaults)
+    (if activate
+        (progn
+          (font-lock-set-defaults)
+          (font-lock-turn-on-thing-lock))
+      (font-lock-unfontify-buffer)
+      (font-lock-turn-off-thing-lock))))
 
 ;; Cannot `define-obsolete-function-alias' because
 ;; `font-lock-mode' is interactive and `turn-on-font-lock' wasn't.
@@ -191,7 +195,8 @@ means that Font Lock mode is turned on for buffers in C and C++ modes only."
 	         t)
 	        ((eq (car-safe font-lock-global-modes) 'not)
 	         (not (memq major-mode (cdr font-lock-global-modes))))
-	        (t (memq major-mode font-lock-global-modes)))
+	        (t
+                 (memq major-mode font-lock-global-modes)))
       (let (inhibit-quit)
         (font-lock-mode)))))
 
