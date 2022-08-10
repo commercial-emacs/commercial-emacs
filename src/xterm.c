@@ -21215,7 +21215,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      else
 			{
 			  dpyinfo->grabbed &= ~(1 << xev->detail);
-			  device->grab &= ~(1 << xev->detail);
+			  if (device)
+			    device->grab &= ~(1 << xev->detail);
 			}
 #ifdef XIPointerEmulated
 		    }
