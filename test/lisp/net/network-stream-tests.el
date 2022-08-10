@@ -387,7 +387,7 @@
    nil))
 
 (ert-deftest open-gnutls-stream-new-api-nowait ()
-  :expected-result (if (getenv "CI") t :passed)
+  :expected-result t
   (skip-unless (executable-find "gnutls-serv"))
   (skip-unless (gnutls-available-p))
   (network-stream-tests-open-stream
