@@ -358,7 +358,7 @@ at point.
 (setq idlwave-do-actions t
       idlwave-surround-by-blank t)
 ;; Syntax Highlighting
-(add-hook 'idlwave-mode-hook 'turn-on-font-lock)
+(add-hook 'idlwave-mode-hook 'font-lock-mode)
 ;; Automatically start the shell when needed
 (setq idlwave-shell-automatic-start t)
 ;; Bind debugging commands with CONTROL and SHIFT modifiers
@@ -1018,7 +1018,7 @@ prefer invoking font-lock individually by mode, you can enforce it in
 @code{idlwave-mode} with the following line in your @file{.emacs}:
 
 @lisp
-(add-hook 'idlwave-mode-hook 'turn-on-font-lock)
+(add-hook 'idlwave-mode-hook 'font-lock-mode)
 @end lisp
 
 @noindent IDLWAVE supports 3 increasing levels of syntax highlighting.

@@ -1308,7 +1308,7 @@ a previously found match."
 See `occur-revert-function'.")
 (put 'occur-revert-arguments 'permanent-local t)
 
-(defcustom occur-mode-hook '(turn-on-font-lock)
+(defcustom occur-mode-hook '(font-lock-mode)
   "Hook run when entering Occur mode."
   :type 'hook
   :group 'matching)

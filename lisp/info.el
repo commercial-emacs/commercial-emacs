@@ -292,7 +292,7 @@ with wrapping around the current Info node."
 (defcustom Info-mode-hook
   ;; Try to obey obsolete Info-fontify settings.
   (unless (and (boundp 'Info-fontify) (null Info-fontify))
-    '(turn-on-font-lock))
+    '(font-lock-mode))
   "Hook run when activating Info Mode."
   :type 'hook)
 

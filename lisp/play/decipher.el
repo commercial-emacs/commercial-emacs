@@ -71,7 +71,7 @@
 ;; Emacs commands.
 ;;
 ;; Decipher supports Font Lock mode.  To use it, you can also add
-;;     (add-hook 'decipher-mode-hook #'turn-on-font-lock)
+;;     (add-hook 'decipher-mode-hook #'font-lock-mode)
 ;; See the variable `decipher-font-lock-keywords' if you want to customize
 ;; the faces used.  I'd like to thank Simon Marshall for his help in making
 ;; Decipher work well with Font Lock.

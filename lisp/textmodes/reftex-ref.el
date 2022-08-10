@@ -813,7 +813,7 @@ When called with 2 \\[universal-argument] prefix args, disable magic word recogn
               (run-hook-with-args
                'reftex-pre-refontification-functions
                reftex-call-back-to-this-buffer 'reftex-hidden)
-              (turn-on-font-lock))
+              (font-lock-mode))
           (when (or (not (eq major-mode 'fundamental-mode))
                     font-lock-mode)
             (fundamental-mode)))

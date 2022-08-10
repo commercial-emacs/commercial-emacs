@@ -91,42 +91,24 @@ When Font Lock mode is enabled, text is fontified as you type it:
 To customize the faces (colors, fonts, etc.) used by Font Lock for
 fontifying different parts of buffer text, use \\[customize-face].
 
-You can enable Font Lock mode in any major mode automatically by
-turning on in the major mode's hook.  For example, put in your
-~/.emacs:
+Global Font Lock mode is active by default, and turns on Font
+Lock mode for major modes amongst `font-lock-global-modes'.
 
- (add-hook \\='c-mode-hook \\='turn-on-font-lock)
+While not recommended, Font Lock mode can be individually applied
+by turning off Global Font Lock mode and adding `font-lock-mode'
+to the major mode's hook, e.g.,
 
-Alternatively, you can use Global Font Lock mode to automagically
-turn on Font Lock mode in buffers whose major mode supports it
-and whose major mode is one of `font-lock-global-modes'.  For
-example, put in your ~/.emacs:
+ (add-hook \\='c-mode-hook #\\='font-lock-mode)
 
- (global-font-lock-mode t)
+For those major modes which support it, the variable
+`font-lock-maximum-decoration' allows greater control over the
+degree of highlighting.
 
-Where major modes support different levels of fontification, you
-can use the variable `font-lock-maximum-decoration' to specify
-which level you generally prefer.
+Highlighting can be further customized with
+`font-lock-add-keywords' and `font-lock-defaults'.
 
-To add your own highlighting for some major mode, and modify the
-highlighting selected automatically via the variable
-`font-lock-maximum-decoration', you can use
-`font-lock-add-keywords'.
-
-To fontify a buffer, without turning on Font Lock mode and
-regardless of buffer size, you can use \\[font-lock-fontify-buffer].
-
-To fontify a block (the function or paragraph containing point,
-or a number of lines around point), perhaps because modification
-on the current line caused syntactic change on other lines, you
-can use \\[font-lock-fontify-block].
-
-You can set your own default settings for some mode, by setting a
-buffer local value for `font-lock-defaults', via its mode hook.
-
-The above is the default behavior of `font-lock-mode'; you may
-specify your own function which is called when `font-lock-mode'
-is toggled via `font-lock-function'."
+Expert users can specify their own `font-lock-function' to
+supplant all of the above."
   :after-hook (font-lock-initial-fontify)
   (when (or noninteractive (eq (aref (buffer-name) 0) ?\s))
     ;; batch mode or buffer is hidden (name starts space).
@@ -180,10 +162,9 @@ this function onto `change-major-mode-hook'."
   (when (font-lock-specified-p mode)
     (font-lock-mode-internal mode)))
 
-(defun turn-on-font-lock ()
-  "Turn on Font Lock mode (only if the terminal can display it)."
-  (unless font-lock-mode
-    (font-lock-mode)))
+(define-obsolete-function-alias
+  'turn-on-font-lock
+  'font-lock-mode "29.1")
 
 (defcustom font-lock-global-modes t
   "Modes for which Font Lock mode is automagically turned on.
@@ -211,10 +192,11 @@ means that Font Lock mode is turned on for buffers in C and C++ modes only."
 	         (not (memq major-mode (cdr font-lock-global-modes))))
 	        (t (memq major-mode font-lock-global-modes)))
       (let (inhibit-quit)
-        (turn-on-font-lock)))))
+        (font-lock-mode)))))
 
 (define-globalized-minor-mode global-font-lock-mode
-  font-lock-mode turn-on-font-lock-if-desired
+  font-lock-mode
+  turn-on-font-lock-if-desired
   :initialize 'custom-initialize-delay
   :init-value (not (or noninteractive emacs-basic-display))
   :group 'font-lock

@@ -57,7 +57,7 @@
              (find-file file-name)
              (should-not (text-property-any (point-min) (point-max) 'fontified t))
              (let (noninteractive)
-               (turn-on-font-lock))
+               (font-lock-mode))
              (should font-lock-mode)
              (should tree-sitter-lock-mode)
              (should-not (text-property-any (point-min) (point-max) 'fontified nil))
@@ -171,7 +171,7 @@ for each change in the insufferable `custom-save-variables.')"
 	            (set-auto-mode)
 	            (cl-letf (((symbol-function 'font-lock-initial-fontify) #'ignore))
                       (let (noninteractive)
-		        (turn-on-font-lock)))
+		        (font-lock-mode)))
                     (should-not (text-property-any (point-min) (point-max) 'fontified t))
 	            (unwind-protect
                         (benchmark-run reps

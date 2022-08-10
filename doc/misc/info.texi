@@ -1206,8 +1206,8 @@ A list of additional directories to search for Info documentation files.
 These directories are not searched for merging the @file{dir} file.
 
 @item Info-mode-hook
-Hooks run when @code{Info-mode} is called.  By default, it contains
-the hook @code{turn-on-font-lock} which enables highlighting of Info
+Hooks run when @code{Info-mode} is called.  By default, it calls
+@code{font-lock-mode} which enables highlighting of Info
 files.  You can change how the highlighting looks by customizing the
 faces @code{info-node}, @code{info-xref}, @code{info-xref-visited},
 @code{info-header-xref}, @code{info-header-node}, @code{info-menu-header},

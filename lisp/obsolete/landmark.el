@@ -246,7 +246,7 @@ You play by moving the cursor over the square you choose and hitting \\[landmark
 Other useful commands:
 \\{landmark-mode-map}
 Entry to this mode calls the value of `landmark-mode-hook' if that value
-is non-nil.  One interesting value is `turn-on-font-lock'."
+is non-nil.  One interesting value is `font-lock-mode'."
   (landmark-display-statistics)
   (setq-local font-lock-defaults '(landmark-font-lock-keywords t))
   (setq buffer-read-only t)

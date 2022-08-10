@@ -21628,7 +21628,7 @@ modify this GNU manual."
 * Footnotes
 
 [fn:1] If you do not use Font Lock globally turn it on in Org buffer
-with =(add-hook 'org-mode-hook #'turn-on-font-lock)=.
+with =(add-hook 'org-mode-hook #'font-lock-mode)=.
 
 [fn:2] Please consider subscribing to the mailing list in order to
 minimize the work the mailing list moderators have to do.

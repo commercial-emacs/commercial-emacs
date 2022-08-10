@@ -72,7 +72,7 @@
 ;;;
 (defcustom gomoku-mode-hook nil
   "If non-nil, its value is called on entry to Gomoku mode.
-One useful value to include is `turn-on-font-lock' to highlight the pieces."
+One useful value to include is `font-lock-mode' to highlight the pieces."
   :type 'hook)
 
 ;;;

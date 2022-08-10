@@ -39,7 +39,7 @@
 ;;
 ;; To turn Font Lock mode on automatically, add this to your init file:
 ;;
-;;  (add-hook 'emacs-lisp-mode-hook #'turn-on-font-lock)
+;;  (add-hook 'emacs-lisp-mode-hook #'font-lock-mode)
 ;;
 ;; Or if you want to turn Font Lock mode on in many modes:
 ;;

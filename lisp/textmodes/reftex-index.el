@@ -1394,7 +1394,7 @@ Here are all local bindings.
   (set (make-local-variable 'font-lock-defaults)
        reftex-index-phrases-font-lock-defaults)
   (set (make-local-variable 'reftex-index-phrases-marker) (make-marker)))
-;; (add-hook 'reftex-index-phrases-mode-hook #'turn-on-font-lock)
+;; (add-hook 'reftex-index-phrases-mode-hook #'font-lock-mode)
 
 (defun reftex-index-next-phrase (&optional arg)
   "Index the next ARG phrases in the phrases buffer."
