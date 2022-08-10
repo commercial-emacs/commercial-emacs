@@ -974,6 +974,210 @@ delimiter."
           (no-error nil)
           ((error "Unterminated string")))))
 
+(defun ruby-deep-indent-paren-p (c)
+  "TODO: document."
+  (cond ((listp ruby-deep-indent-paren)
+         (let ((deep (assoc c ruby-deep-indent-paren)))
+           (cond (deep
+                  (or (cdr deep) ruby-deep-indent-paren-style))
+                 ((memq c ruby-deep-indent-paren)
+                  ruby-deep-indent-paren-style))))
+        ((eq c ruby-deep-indent-paren) ruby-deep-indent-paren-style)
+        ((eq c ?\( ) ruby-deep-arglist)))
+
+(defun ruby-parse-partial (&optional end in-string nest depth pcol indent)
+  ;; FIXME: Document why we can't just use parse-partial-sexp.
+  "TODO: document throughout function body."
+  (or depth (setq depth 0))
+  (or indent (setq indent 0))
+  (when (re-search-forward ruby-delimiter end 'move)
+    (let ((pnt (point)) w re expand)
+      (goto-char (match-beginning 0))
+      (cond
+       ((and (memq (char-before) '(?@ ?$)) (looking-at "\\sw"))
+        (goto-char pnt))
+       ((looking-at "[\"`]")            ;skip string
+        (cond
+         ((and (not (eobp))
+               (ruby-forward-string (buffer-substring (point) (1+ (point)))
+                                    end t t))
+          nil)
+         (t
+          (setq in-string (point))
+          (goto-char end))))
+       ((looking-at "'")
+        (cond
+         ((and (not (eobp))
+               (re-search-forward "[^\\]\\(\\\\\\\\\\)*'" end t))
+          nil)
+         (t
+          (setq in-string (point))
+          (goto-char end))))
+       ((looking-at "/=")
+        (goto-char pnt))
+       ((looking-at "/")
+        (cond
+         ((and (not (eobp)) (ruby-expr-beg 'expr-re))
+          (if (ruby-forward-string "/" end t t)
+              nil
+            (setq in-string (point))
+            (goto-char end)))
+         (t
+          (goto-char pnt))))
+       ((looking-at "%")
+        (cond
+         ((and (not (eobp))
+               (ruby-expr-beg 'expr-qstr)
+               (not (looking-at "%="))
+               (looking-at "%[QqrxWw]?\\([^a-zA-Z0-9 \t\n]\\)"))
+          (goto-char (match-beginning 1))
+          (setq expand (not (memq (char-before) '(?q ?w))))
+          (setq w (match-string 1))
+          (cond
+           ((string= w "[") (setq re "]["))
+           ((string= w "{") (setq re "}{"))
+           ((string= w "(") (setq re ")("))
+           ((string= w "<") (setq re "><"))
+           ((and expand (string= w "\\"))
+            (setq w (concat "\\" w))))
+          (unless (cond (re (ruby-forward-string re end t expand))
+                        (expand (ruby-forward-string w end t t))
+                        (t (re-search-forward
+                            (if (string= w "\\")
+                                "\\\\[^\\]*\\\\"
+                              (concat "[^\\]\\(\\\\\\\\\\)*" w))
+                            end t)))
+            (setq in-string (point))
+            (goto-char end)))
+         (t
+          (goto-char pnt))))
+       ((looking-at "\\?")              ;skip ?char
+        (cond
+         ((and (ruby-expr-beg)
+               (looking-at "\\?\\(\\\\C-\\|\\\\M-\\)*\\\\?."))
+          (goto-char (match-end 0)))
+         (t
+          (goto-char pnt))))
+       ((looking-at "\\$")              ;skip $char
+        (goto-char pnt)
+        (forward-char 1))
+       ((looking-at "#")                ;skip comment
+        (forward-line 1)
+        (goto-char (point))
+        )
+       ((looking-at "[\\[{(]")
+        (setq nest (cons (cons (char-after (point)) pnt) nest))
+        (setq depth (1+ depth))
+        (goto-char pnt)
+        )
+       ((looking-at "[])}]")
+        (setq depth (1- depth))
+        (setq nest (cdr nest))
+        (goto-char pnt))
+       ((looking-at ruby-block-end-re)
+        (if (or (and (not (bolp))
+                     (progn
+                       (forward-char -1)
+                       (setq w (char-after (point)))
+                       (or (eq ?_ w)
+                           (eq ?. w))))
+                (progn
+                  (goto-char pnt)
+                  (setq w (char-after (point)))
+                  (or (eq ?_ w)
+                      (eq ?! w)
+                      (eq ?? w))))
+            nil
+          (setq nest (cdr nest))
+          (setq depth (1- depth)))
+        (goto-char pnt))
+       ((looking-at "def\\s +[^(\n;]*")
+        (if (or (bolp)
+                (progn
+                  (forward-char -1)
+                  (not (eq ?_ (char-after (point))))))
+            (progn
+              (setq nest (cons (cons nil pnt) nest))
+              (setq depth (1+ depth))))
+        (goto-char (match-end 0)))
+       ((looking-at (concat "\\_<\\(" ruby-block-beg-re "\\)\\_>"))
+        (and
+         (save-match-data
+           (or (not (looking-at "do\\_>"))
+               (save-excursion
+                 (back-to-indentation)
+                 (not (looking-at ruby-non-block-do-re)))))
+         (or (bolp)
+             (progn
+               (forward-char -1)
+               (setq w (char-after (point)))
+               (not (or (eq ?_ w)
+                        (eq ?. w)))))
+         (goto-char pnt)
+         (not (eq ?! (char-after (point))))
+         (skip-chars-forward " \t")
+         (goto-char (match-beginning 0))
+         (or (not (looking-at ruby-modifier-re))
+             (ruby-expr-beg 'modifier))
+         (goto-char pnt)
+         (setq nest (cons (cons nil pnt) nest))
+         (setq depth (1+ depth)))
+        (goto-char pnt))
+       ((looking-at ":\\(['\"]\\)")
+        (goto-char (match-beginning 1))
+        (ruby-forward-string (match-string 1) end t))
+       ((looking-at ":\\([-,.+*/%&|^~<>]=?\\|===?\\|<=>\\|![~=]?\\)")
+        (goto-char (match-end 0)))
+       ((looking-at ":\\([a-zA-Z_][a-zA-Z_0-9]*[!?=]?\\)?")
+        (goto-char (match-end 0)))
+       ((or (looking-at "\\.\\.\\.?")
+            (looking-at "\\.[0-9]+")
+            (looking-at "\\.[a-zA-Z_0-9]+")
+            (looking-at "\\."))
+        (goto-char (match-end 0)))
+       ((looking-at "^=begin")
+        (if (re-search-forward "^=end" end t)
+            (forward-line 1)
+          (setq in-string (match-end 0))
+          (goto-char end)))
+       ((looking-at "<<")
+        (cond
+         ((and (ruby-expr-beg 'heredoc)
+               (looking-at "<<\\([-~]\\)?\\(\\([\"'`]\\)\\([^\n]+?\\)\\3\\|\\(?:\\sw\\|\\s_\\)+\\)"))
+          (setq re (regexp-quote (or (match-string 4) (match-string 2))))
+          (if (match-beginning 1) (setq re (concat "\\s *" re)))
+          (let* ((id-end (goto-char (match-end 0)))
+                 (line-end-position (point-at-eol))
+                 (state (list in-string nest depth pcol indent)))
+            ;; parse the rest of the line
+            (while (and (> line-end-position (point))
+                        (setq state (apply #'ruby-parse-partial
+                                           line-end-position state))))
+            (setq in-string (car state)
+                  nest (nth 1 state)
+                  depth (nth 2 state)
+                  pcol (nth 3 state)
+                  indent (nth 4 state))
+            ;; skip heredoc section
+            (if (re-search-forward (concat "^" re "$") end 'move)
+                (forward-line 1)
+              (setq in-string id-end)
+              (goto-char end))))
+         (t
+          (goto-char pnt))))
+       ((looking-at "^__END__$")
+        (goto-char pnt))
+       ((and (looking-at ruby-here-doc-beg-re)
+	     (boundp 'ruby-indent-point))
+        (if (re-search-forward (ruby-here-doc-end-match)
+                               ruby-indent-point t)
+            (forward-line 1)
+          (setq in-string (match-end 0))
+          (goto-char ruby-indent-point)))
+       (t
+        (error "Bad string %s" (buffer-substring (point) pnt))))))
+  (list in-string nest depth pcol))
+
 (defun ruby-parse-region (start end)
   "TODO: document."
   (let (state)
