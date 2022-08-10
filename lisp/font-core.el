@@ -185,55 +185,6 @@ this function onto `change-major-mode-hook'."
   (unless font-lock-mode
     (font-lock-mode)))
 
-;;; Global Font Lock mode.
-
-;; A few people have hassled in the past for a way to make it easier to turn on
-;; Font Lock mode, without the user needing to know for which modes s/he has to
-;; turn it on, perhaps the same way hilit19.el/hl319.el does.  I've always
-;; balked at that way, as I see it as just re-molding the same problem in
-;; another form.  That is; some person would still have to keep track of which
-;; modes (which may not even be distributed with Emacs) support Font Lock mode.
-;; The list would always be out of date.  And that person might have to be me.
-
-;; Implementation.
-;;
-;; In a previous discussion the following hack came to mind.  It is a gross
-;; hack, but it generally works.  We use the convention that major modes start
-;; by calling the function `kill-all-local-variables', which in turn runs
-;; functions on the hook variable `change-major-mode-hook'.  We attach our
-;; function `font-lock-change-major-mode' to that hook.  Of course, when this
-;; hook is run, the major mode is in the process of being changed and we do not
-;; know what the final major mode will be.  So, `font-lock-change-major-mode'
-;; only (a) notes the name of the current buffer, and (b) adds our function
-;; `turn-on-font-lock-if-desired' to the hook variables
-;; `after-change-major-mode-hook' and `post-command-hook' (for modes
-;; that do not yet run `after-change-major-mode-hook').  By the time
-;; the functions on the first of these hooks to be run are run, the new major
-;; mode is assumed to be in place.  This way we get a Font Lock function run
-;; when a major mode is turned on, without knowing major modes or their hooks.
-;;
-;; Naturally this requires that major modes run `kill-all-local-variables'
-;; and `after-change-major-mode-hook', as they are supposed to.  For modes
-;; that do not run `after-change-major-mode-hook' yet, `post-command-hook'
-;; takes care of things if the mode is set directly or indirectly by
-;; an interactive command; however, problems can occur if the mode is
-;; set by a timer or process: in that case, proper handling of Font Lock mode
-;; may be delayed until the next interactive command.
-
-;; User interface.
-;;
-;; Although Global Font Lock mode is a pseudo-mode, I think that the user
-;; interface should conform to the usual Emacs convention for modes, i.e., a
-;; command to toggle the feature (`global-font-lock-mode') with a variable for
-;; finer control of the mode's behavior (`font-lock-global-modes').
-;;
-;; The feature should not be enabled by loading font-lock.el, since other
-;; mechanisms for turning on Font Lock mode, such as M-x font-lock-mode RET or
-;; (add-hook 'c-mode-hook 'turn-on-font-lock), would cause Font Lock mode to be
-;; turned on everywhere.  That would not be intuitive or informative because
-;; loading a file tells you nothing about the feature or how to control it.  It
-;; would also be contrary to the Principle of Least Surprise.  sm.
-
 (defcustom font-lock-global-modes t
   "Modes for which Font Lock mode is automagically turned on.
 Global Font Lock mode is controlled by the command `global-font-lock-mode'.
@@ -264,8 +215,6 @@ means that Font Lock mode is turned on for buffers in C and C++ modes only."
 
 (define-globalized-minor-mode global-font-lock-mode
   font-lock-mode turn-on-font-lock-if-desired
-  ;; What was this :extra-args thingy for?  --Stef
-  ;; :extra-args (dummy)
   :initialize 'custom-initialize-delay
   :init-value (not (or noninteractive emacs-basic-display))
   :group 'font-lock

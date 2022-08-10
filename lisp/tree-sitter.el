@@ -79,7 +79,8 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
     (java-mode . "java")
     (js-mode . "javascript")
     (python-mode . "python")
-    (ruby-mode . "ruby"))
+    (ruby-mode . "ruby")
+    (tree-sitter-ruby-mode . "ruby"))
   "Map prog-mode to tree-sitter grammar."
   :group 'tree-sitter
   :type '(alist :key-type (symbol :tag "Prog mode")
