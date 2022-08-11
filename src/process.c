@@ -29,7 +29,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#if HAVE_NETINET_TCP_H
 #include <netinet/tcp.h>
+#endif
 
 #include "lisp.h"
 
@@ -3348,7 +3350,10 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       /* Systems with SOCK_NONBLOCK can save a call to fcntl */
       if (! SOCK_NONBLOCK || s == external_sock_fd)
 	{
-	  int flags = fcntl (s, F_GETFL, 0);
+	  int flags = 0;
+#ifndef WINDOWSNT
+	  flags = fcntl (s, F_GETFL, 0);
+#endif
 	  ret = fcntl (s, F_SETFL, flags | O_NONBLOCK);
 	  if (ret < 0)
 	    {
@@ -5369,15 +5374,19 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #endif
 
 #if defined HAVE_NS
-#define WAIT_SELECT ns_select
+	  nfds = ns_select (max_desc + 1, &Available,
+			    (check_write ? &Writeok : NULL),
+			    NULL, &timeout, NULL);
 #elif defined HAVE_GLIB
-#define WAIT_SELECT xg_select
+	  nfds = xg_select (max_desc + 1, &Available,
+			    (check_write ? &Writeok : NULL),
+			    NULL, &timeout, NULL);
 #else
-#define WAIT_SELECT thread_select
+	  nfds = thread_select (pselect, max_desc + 1, &Available,
+				(check_write ? &Writeok : NULL),
+				NULL, &timeout, NULL);
 #endif
-	  nfds = WAIT_SELECT (max_desc + 1, &Available,
-			      (check_write ? &Writeok : NULL),
-			      NULL, &timeout, NULL);
+
 #ifdef HAVE_GNUTLS
 	  if (override_p)
 	    {

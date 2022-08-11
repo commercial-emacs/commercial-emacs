@@ -25,6 +25,15 @@
 (require 'font-lock)
 (declare-function tree-sitter-changed-range "tree-sitter.c")
 (declare-function tree-sitter-highlight-region "tree-sitter.c")
+(declare-function tree-sitter-node-prev-sibling "tree-sitter.c")
+(declare-function tree-sitter-node-end "tree-sitter.c")
+(declare-function tree-sitter-node-at "tree-sitter.c")
+(declare-function tree-sitter-node-parent "tree-sitter.c")
+(declare-function tree-sitter-goto-parent "tree-sitter.c")
+(declare-function tree-sitter-node-equal "tree-sitter.c")
+(declare-function tree-sitter-goto-next-sibling "tree-sitter.c")
+(declare-function tree-sitter-node-of "tree-sitter.c")
+(declare-function tree-sitter-cursor-at "tree-sitter.c")
 
 (defgroup tree-sitter
   nil

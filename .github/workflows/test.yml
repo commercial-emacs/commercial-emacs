@@ -93,3 +93,50 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         src/emacs -batch -l ./elisp-benchmarks/elisp-benchmarks.el --eval "(custom-set-variables (quote (elb-runs 1)))" -f elisp-benchmarks-run
+
+  build-w32:
+    runs-on: windows-latest
+    steps:
+    - run: |
+        git config --global core.autocrlf false
+        git config --global core.eol lf
+    - uses: actions/checkout@v3
+    - uses: actions/cache@v3
+      id: cache-tree-sitter
+      with:
+        path: tree-sitter
+        key: cache-tree-sitter-${{ runner.os }}-000
+    - uses: actions/checkout@v3
+      if: steps.cache-tree-sitter.outputs.cache-hit != 'true'
+      with:
+        repository: commercial-emacs/tree-sitter
+        path: tree-sitter
+        ref: 0.6.3alpha6
+    - uses: actions-rs/toolchain@v1
+      with:
+          toolchain: stable
+    - uses: msys2/setup-msys2@v2
+      with:
+        update: false
+        install: >-
+          base-devel
+          git
+          autotools
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-xpm-nox
+          mingw-w64-x86_64-libtiff
+          mingw-w64-x86_64-giflib
+          mingw-w64-x86_64-libpng
+          mingw-w64-x86_64-libjpeg-turbo
+          mingw-w64-x86_64-librsvg
+          mingw-w64-x86_64-libwebp
+          mingw-w64-x86_64-lcms2
+          mingw-w64-x86_64-jansson
+          mingw-w64-x86_64-libxml2
+          mingw-w64-x86_64-gnutls
+          mingw-w64-x86_64-zlib
+    - shell: msys2 {0}
+      run: |
+        bash ./autogen.sh
+        bash ./configure --prefix=$HOME/.local --without-dbus
+        make -j4 -C src

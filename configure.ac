@@ -2316,6 +2316,8 @@ LIBS="$LIBS_SYSTEM $LIBS"
 dnl FIXME replace main with a function we actually want from this library.
 AC_CHECK_LIB([Xbsd], [main], [LD_SWITCH_X_SITE="$LD_SWITCH_X_SITE -lXbsd"])
 
+AC_CHECK_HEADERS
+
 dnl Check for the POSIX thread library.
 LIB_PTHREAD=
 AC_CHECK_HEADERS_ONCE([pthread.h])
@@ -5079,6 +5081,9 @@ AC_FUNC_FORK
 dnl AC_CHECK_FUNCS_ONCE wouldn’t be right for snprintf, which needs
 dnl the current CFLAGS etc.
 AC_CHECK_FUNCS([snprintf])
+AC_CHECK_FUNCS([mprotect])
+AC_CHECK_FUNCS([rawmemchr])
+AC_CHECK_HEADERS([netinet/tcp.h])
 
 dnl posix_spawn.  The chdir and setsid functionality is relatively
 dnl recent, so we check for it specifically.

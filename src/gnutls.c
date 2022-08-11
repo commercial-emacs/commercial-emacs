@@ -618,7 +618,7 @@ gnutls_try_handshake (struct Lisp_Process *proc, bool blocking)
 
   ++proc->gnutls_handshakes_tried;
 
-# ifdef HAVE_GNUTLS3
+# if defined HAVE_GNUTLS3 && !defined WINDOWSNT
   gnutls_handshake_set_timeout(state, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
 # endif
   for (ret = gnutls_handshake (state);

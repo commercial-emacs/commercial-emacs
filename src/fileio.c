@@ -3301,6 +3301,7 @@ wc_long_lines_p (char const *file, int fd, EMACS_INT threshold)
 		}
 	    }
         }
+#ifdef HAVE_RAWMEMCHR
       else
         {
           /* rawmemchr is more efficient with longer lines.  */
@@ -3330,6 +3331,7 @@ wc_long_lines_p (char const *file, int fd, EMACS_INT threshold)
       if (lines - plines <= bytes_read / 15)
         shorter_lines = false;
       else
+#endif /* HAVE_RAWMEMCHR */
         shorter_lines = true;
     }
   return false;
