@@ -21,6 +21,9 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
+    - run: |
+        git config --global core.autocrlf false
+        git config --global core.eol lf
     - uses: actions/checkout@v3
     - uses: actions/cache@v3
       id: cache-tree-sitter
@@ -42,7 +45,6 @@ jobs:
         install: >-
           base-devel
           autotools
-          git
           mingw-w64-x86_64-toolchain
           mingw-w64-x86_64-xpm-nox
           mingw-w64-x86_64-libtiff
@@ -58,8 +60,6 @@ jobs:
           mingw-w64-x86_64-zlib
 
     - run: |
-        git config --global core.autocrlf false
-        git config --global core.eol lf
         bash ./autogen.sh
         bash ./configure --prefix=$HOME/.local --without-dbus
         make -j4 -C src
