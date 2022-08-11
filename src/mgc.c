@@ -568,7 +568,7 @@ DEFUN ("memory-protect-now", Fmemory_protect_now, Smemory_protect_now, 0, 0, "",
        doc: /* Call mprotect().  */)
   (void)
 {
-#ifdef HAVE_MPROTECT
+#if defined HAVE_MPROTECT && ! defined WINDOWSNT
   if (CONSP (Vmemory__protect_p))
     {
       int pagesize = getpagesize ();
@@ -576,14 +576,14 @@ DEFUN ("memory-protect-now", Fmemory_protect_now, Smemory_protect_now, 0, 0, "",
 	(char *) ((uintptr_t) (XLP (Vmemory__protect_p)) & ~(pagesize - 1));
       mprotect (page_start, pagesize, PROT_READ);
     }
-#endif
+#endif /* HAVE_MPROTECT && ! WINDOWSNT */
   return Vmemory__protect_p;
 }
 
 bool
 mgc_handle_sigsegv (void *const fault_address)
 {
-#ifdef HAVE_MPROTECT
+#if defined HAVE_MPROTECT && ! defined WINDOWSNT
   if (! NILP (Vmemory__protect_p))
     {
       Vmemory__protect_p = Qnil;
@@ -595,7 +595,7 @@ mgc_handle_sigsegv (void *const fault_address)
 	  return true;
 	}
     }
-#endif
+#endif /* HAVE_MPROTECT && ! WINDOWSNT */
   return false;
 }
 
