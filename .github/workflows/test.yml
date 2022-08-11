@@ -17,10 +17,11 @@ on:
 jobs:
   build-w32:
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
+    - run: |
+        git config --global core.autocrlf false
+        git config --global core.eol lf
+    - uses: actions/checkout@v3
     - uses: actions/cache@v3
       id: cache-tree-sitter
       with:
@@ -55,11 +56,8 @@ jobs:
           mingw-w64-x86_64-libxml2
           mingw-w64-x86_64-gnutls
           mingw-w64-x86_64-zlib
-    - run: |
-        git config --global core.autocrlf false
-        git config --global core.eol lf
-    - uses: actions/checkout@v2
-    - run: |
+    - shell: msys2 {0}
+      run: |
         bash ./autogen.sh
         bash ./configure --prefix=$HOME/.local --without-dbus
         make -j4 -C src
