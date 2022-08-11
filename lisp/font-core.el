@@ -109,7 +109,7 @@ Highlighting can be further customized with
 
 Expert users can specify their own `font-lock-function' to
 supplant all of the above."
-  :after-hook (font-lock-initial-fontify)
+  :lighter nil
   (when (or noninteractive (eq (aref (buffer-name) 0) ?\s))
     ;; batch mode or buffer is hidden (name starts space).
     (setq font-lock-mode nil))
@@ -155,7 +155,6 @@ this function onto `change-major-mode-hook'."
 				      '(font-lock-face)))
     (restore-buffer-modified-p modp)))
 
-(defvar font-lock-set-defaults)
 (defun font-lock-default-function (activate)
   (when (or font-lock-keywords font-lock-defaults)
     (if activate

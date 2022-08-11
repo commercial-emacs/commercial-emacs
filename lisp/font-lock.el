@@ -646,12 +646,6 @@ Major/minor modes can set this variable if they know which option applies.")
 
 (defvar-local font-lock-set-defaults nil) ; Whether we have set up defaults.
 
-(defun font-lock-initial-fontify ()
-  "The :after-hook of `font-lock-mode' minor mode."
-  (when (and font-lock-mode (not font-lock-fontified))
-    (let (jit-lock-chunk-size)
-      (font-lock-ensure))))
-
 (defun font-lock-add-keywords (mode keywords &optional how)
   "Add highlighting KEYWORDS for MODE.
 
@@ -915,8 +909,7 @@ the user."
     ('jit-lock-mode
      (setq-local font-lock-fontify-buffer-function #'jit-lock-refontify
                  font-lock-flush-function #'jit-lock-refontify
-                 font-lock-ensure-function #'jit-lock-fontify-now
-                 font-lock-fontified t) ;; ramifies in `font-lock-initial-fontify'
+                 font-lock-ensure-function #'jit-lock-fontify-now)
      (jit-lock-register #'font-lock-fontify-region (not font-lock-keywords-only))
      (add-hook 'jit-lock-after-change-extend-region-functions
                #'font-lock-extend-jit-lock-region-after-change
@@ -1326,7 +1319,7 @@ delimit the region to fontify."
   (let ((inhibit-point-motion-hooks t)
 	deactivate-mark)
     ;; Make sure we have the right `font-lock-keywords' etc.
-    (if (not font-lock-mode) (font-lock-set-defaults))
+    (unless font-lock-mode (font-lock-set-defaults))
     (save-mark-and-excursion
       (save-match-data
 	(condition-case error-data

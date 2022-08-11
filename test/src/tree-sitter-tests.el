@@ -169,7 +169,7 @@ for each change in the insufferable `custom-save-variables.')"
 		        font-lock-global-modes
 		        font-lock-fontified)
 	            (set-auto-mode)
-	            (cl-letf (((symbol-function 'font-lock-initial-fontify) #'ignore))
+	            (cl-letf (((symbol-function 'font-lock-ensure) #'ignore))
                       (let (noninteractive)
 		        (font-lock-mode)))
                     (should-not (text-property-any (point-min) (point-max) 'fontified t))
