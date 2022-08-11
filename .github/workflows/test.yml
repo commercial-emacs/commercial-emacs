@@ -58,6 +58,7 @@ jobs:
           mingw-w64-x86_64-zlib
 
     - run: |
-        git config core.autocrlf false && ./autogen.sh
-        git config core.autocrlf false && ./configure --prefix=$HOME/.local --without-dbus
-        git config core.autocrlf false && make -j4 -C src
+        git config core.autocrlf false
+        bash ./autogen.sh
+        bash ./configure --prefix=$HOME/.local --without-dbus
+        make -j4 -C src
