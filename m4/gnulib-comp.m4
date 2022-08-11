@@ -379,13 +379,7 @@ AC_DEFUN([gl_INIT],
     AC_LIBOBJ([fopen])
     gl_PREREQ_FOPEN
   fi
-  case "$host_os" in
-    mingw* | msys*)
-      ;;
-    *)
-      gl_MODULE_INDICATOR([fopen-gnu])
-      ;;
-  esac
+  gl_MODULE_INDICATOR([fopen-gnu])
   gl_FUNC_FPENDING
   gl_CONDITIONAL([GL_COND_OBJ_FPENDING], [test $gl_cv_func___fpending = no])
   gl_FUNC_FREE
