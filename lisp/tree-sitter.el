@@ -143,11 +143,11 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
   (if tree-sitter-lock-mode
       (progn
         (setq-local font-lock-fontify-region-function #'tree-sitter-fontify-region)
-        (add-hook 'font-lock-mode-hook #'font-lock-ensure)
+        (add-hook 'font-lock-mode-hook #'font-lock-ensure nil t)
         (add-hook 'fontification-functions #'tree-sitter-do-fontify nil t)
         (add-hook 'after-change-functions #'tree-sitter-douse-fontify nil t))
     (kill-local-variable 'font-lock-fontify-region-function)
-    (remove-hook 'font-lock-mode-hook #'font-lock-ensure)
+    (remove-hook 'font-lock-mode-hook #'font-lock-ensure t)
     (remove-hook 'fontification-functions #'tree-sitter-do-fontify t)
     (remove-hook 'after-change-functions #'tree-sitter-douse-fontify t)))
 
