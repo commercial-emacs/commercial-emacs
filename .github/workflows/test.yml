@@ -40,6 +40,7 @@ jobs:
         update: false
         install: >-
           base-devel
+          git
           autotools
           mingw-w64-x86_64-toolchain
           mingw-w64-x86_64-xpm-nox
