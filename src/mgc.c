@@ -568,7 +568,7 @@ DEFUN ("memory-protect-now", Fmemory_protect_now, Smemory_protect_now, 0, 0, "",
        doc: /* Call mprotect().  */)
   (void)
 {
-#if defined HAVE_MPROTECT && ! defined WINDOWSNT
+#if HAVE_MPROTECT && ! WINDOWSNT
   if (CONSP (Vmemory__protect_p))
     {
       int pagesize = getpagesize ();
@@ -583,7 +583,7 @@ DEFUN ("memory-protect-now", Fmemory_protect_now, Smemory_protect_now, 0, 0, "",
 bool
 mgc_handle_sigsegv (void *const fault_address)
 {
-#if defined HAVE_MPROTECT && ! defined WINDOWSNT
+#if HAVE_MPROTECT && ! WINDOWSNT
   if (! NILP (Vmemory__protect_p))
     {
       Vmemory__protect_p = Qnil;

@@ -29,7 +29,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#if HAVE_NETINET_TCP_H
 #include <netinet/tcp.h>
+#endif
 
 #include "lisp.h"
 

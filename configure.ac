@@ -5082,6 +5082,7 @@ dnl AC_CHECK_FUNCS_ONCE wouldn’t be right for snprintf, which needs
 dnl the current CFLAGS etc.
 AC_CHECK_FUNCS([snprintf])
 AC_CHECK_FUNCS([mprotect])
+AC_CHECK_HEADERS([netinet/tcp.h])
 
 dnl posix_spawn.  The chdir and setsid functionality is relatively
 dnl recent, so we check for it specifically.
