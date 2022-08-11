@@ -127,7 +127,7 @@ int main ()
           linux*-gnu* | gnu* | kfreebsd*-gnu | *-musl*)
             gl_cv_func_fopen_mode_e="guessing yes" ;;
           # Guess no on native Windows.
-          mingw* | msys*)
+          mingw*)
             gl_cv_func_fopen_mode_e="guessing no" ;;
           # If we don't know, obey --enable-cross-guesses.
           *)
