@@ -3303,10 +3303,14 @@ wc_long_lines_p (char const *file, int fd, EMACS_INT threshold)
         }
       else
         {
-          /* rawmemchr is more efficient with longer lines.  */
 	  char *op = p;
           *end = '\n';
+#ifdef HAVE_RAWMEMCHR
+          /* rawmemchr is more efficient with longer lines.  */
           while ((p = rawmemchr (p, '\n')) < end)
+#else
+	  while ((p = memchr (p, '\n')) < end)
+#endif
             {
 	      running += (p - op);
 	      if (running >= threshold)
