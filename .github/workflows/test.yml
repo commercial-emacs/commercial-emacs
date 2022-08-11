@@ -70,7 +70,7 @@ jobs:
       with:
           toolchain: stable
     - name: make-tree-sitter
-      if: !(startsWith(runner.os, 'windows'))
+      if: startsWith(runner.os, 'windows') != true
       run: |
         mkdir -p $HOME/.local
         make -C tree-sitter install-ci
