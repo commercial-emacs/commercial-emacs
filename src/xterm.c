@@ -17189,6 +17189,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   union buffered_input_event inev;
   int count = 0;
   int do_help = 0;
+#ifdef HAVE_XINPUT2
+  struct xi_device_t *gen_help_device;
+  Time gen_help_time;
+#endif
   ptrdiff_t nbytes = 0;
   struct frame *any, *f = NULL;
   Mouse_HLInfo *hlinfo = &dpyinfo->mouse_highlight;
@@ -17218,6 +17222,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   EVENT_INIT (inev.ie);
   inev.ie.kind = NO_EVENT;
   inev.ie.arg = Qnil;
+#ifdef HAVE_XINPUT2
+  gen_help_device = NULL;
+#endif
 
   /* Ignore events coming from various extensions, such as XFIXES and
      XKB.  */
@@ -21143,7 +21150,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		 has changed, generate a HELP_EVENT.  */
 	      if (!NILP (help_echo_string)
 		  || !NILP (previous_help_echo_string))
-		do_help = 1;
+		{
+		  /* Also allow the focus and client pointer to be
+		     adjusted accordingly, in case a help tooltip is
+		     shown.  */
+		  gen_help_device = device;
+		  gen_help_time = xev->time;
+
+		  do_help = 1;
+		}
 	      goto XI_OTHER;
 	    }
 
@@ -23064,6 +23079,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       if (do_help > 0)
 	{
 	  any_help_event_p = true;
+#ifdef HAVE_XINPUT2
+	  if (gen_help_device)
+	    xi_handle_interaction (dpyinfo, f,
+				   gen_help_device,
+				   gen_help_time);
+#endif
 	  gen_help_event (help_echo_string, frame, help_echo_window,
 			  help_echo_object, help_echo_pos);
 	}
