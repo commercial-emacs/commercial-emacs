@@ -3351,7 +3351,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       if (! SOCK_NONBLOCK || s == external_sock_fd)
 	{
 	  int flags = 0;
-#ifndef WINDOWS_NT
+#ifndef WINDOWSNT
 	  flags = fcntl (s, F_GETFL, 0);
 #endif
 	  ret = fcntl (s, F_SETFL, flags | O_NONBLOCK);
