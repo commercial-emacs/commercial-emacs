@@ -2318,14 +2318,6 @@ AC_CHECK_LIB([Xbsd], [main], [LD_SWITCH_X_SITE="$LD_SWITCH_X_SITE -lXbsd"])
 
 AC_CHECK_HEADERS
 
-AC_CHECK_HEADER([sys/mman.h])
-if test "$ac_cv_header_sys_mman_h" = yes ; then
-  AC_CHECK_FUNC([mprotect])
-  if test "$ac_cv_func_mprotect" = yes; then
-    AC_DEFINE([HAVE_MPROTECT], [1], [Define to 1 to use mprotect.])
-  fi
-fi
-
 dnl Check for the POSIX thread library.
 LIB_PTHREAD=
 AC_CHECK_HEADERS_ONCE([pthread.h])
@@ -5089,6 +5081,7 @@ AC_FUNC_FORK
 dnl AC_CHECK_FUNCS_ONCE wouldn’t be right for snprintf, which needs
 dnl the current CFLAGS etc.
 AC_CHECK_FUNCS([snprintf])
+AC_CHECK_FUNCS([mprotect])
 
 dnl posix_spawn.  The chdir and setsid functionality is relatively
 dnl recent, so we check for it specifically.
