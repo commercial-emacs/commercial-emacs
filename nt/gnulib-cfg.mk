@@ -59,7 +59,6 @@ OMIT_GNULIB_MODULE_realloc-gnu = true
 OMIT_GNULIB_MODULE_realloc-posix = true
 OMIT_GNULIB_MODULE_secure_getenv = true
 OMIT_GNULIB_MODULE_signal-h = true
-OMIT_GNULIB_MODULE_stdio = true
 OMIT_GNULIB_MODULE_stdlib = true
 OMIT_GNULIB_MODULE_sys_select = true
 OMIT_GNULIB_MODULE_sys_stat = true
