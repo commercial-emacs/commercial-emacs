@@ -862,8 +862,11 @@ to (xref-elisp-test-descr-to-target xref)."
     (if (stringp form)
         (insert form)
       (pp form (current-buffer)))
-    (with-suppressed-warnings ((interactive-only font-lock-debug-fontify))
-      (font-lock-debug-fontify))
+    (require 'font-lock)
+    (syntax-ppss-invalidate-cache -1)
+    (font-lock-set-defaults)
+    (save-excursion
+      (font-lock-fontify-region (point-min) (point-max)))
     (goto-char (point-min))
     (and (re-search-forward search nil t)
          (get-text-property (match-beginning 1) 'face))))

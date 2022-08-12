@@ -75,9 +75,6 @@ functions, `font-lock-fontify-buffer-function',
 It will be passed one argument, which is the current value of
 `font-lock-mode'.")
 
-;; The mode for which font-lock was initialized, or nil if none.
-(defvar font-lock-major-mode)
-
 (define-minor-mode font-lock-mode
   "Toggle syntax highlighting in this buffer (Font Lock mode).
 

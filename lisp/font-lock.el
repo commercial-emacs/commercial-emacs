@@ -33,9 +33,9 @@
 ;; In modern parlance, the term has come to mean syntax highlighting
 ;; although emacs users continue to use "fontification" as a synonym.
 ;;
-;; Font Lock Mode defaults to a globalized minor mode, that is,
-;; all buffers will attempt fontification using whatever `font-lock-keywords'
-;; or `font-lock-defaults' settings are buffer-locally defined.
+;; Font Lock Mode defaults to a globalized minor mode, that is, all
+;; buffers will attempt fontification using whatever
+;; `font-lock-defaults' settings are buffer-locally defined.
 ;;
 ;; Font Lock Mode can be individually applied by toggling off
 ;; `global-font-lock-mode' and adding `font-lock-mode' to the major
@@ -79,7 +79,7 @@
 (make-obsolete-variable 'font-lock-maximum-size nil "24.1")
 
 (defcustom font-lock-maximum-decoration t
-  "Maximum decoration level for fontification.
+  "Maximum decoration level for fontification.  Deprecated.
 If nil, use the default decoration (typically the minimum available).
 If t, use the maximum decoration available.
 If a number, use that level of decoration (or if not available the maximum).
@@ -354,7 +354,7 @@ optimized.")
   "Alist of additional `font-lock-keywords' elements for major modes.
 
 Each element has the form (MODE KEYWORDS . HOW).
-Function `font-lock-set-defaults' adds the elements in the list KEYWORDS to
+Function `font-lock-ensure-keywords' adds the elements in the list KEYWORDS to
 `font-lock-keywords' when Font Lock is turned on in major mode MODE.
 
 If HOW is nil, KEYWORDS are added at the beginning of
@@ -369,7 +369,7 @@ This is normally set via `font-lock-add-keywords' and
 (defvar font-lock-removed-keywords-alist nil
   "Alist of `font-lock-keywords' elements to be removed for major modes.
 
-Each element has the form (MODE . KEYWORDS).  Function `font-lock-set-defaults'
+Each element has the form (MODE . KEYWORDS).  Function `font-lock-ensure-keywords'
 removes the elements in the list KEYWORDS from `font-lock-keywords'
 when Font Lock is turned on in major mode MODE.
 
@@ -382,7 +382,7 @@ This is normally set via `font-lock-defaults'.")
 
 (defvar-local font-lock-keywords-case-fold-search nil
   "Non-nil means the patterns in `font-lock-keywords' are case-insensitive.
-This is set via the function `font-lock-set-defaults', based on
+This is set via the function `font-lock-ensure-keywords', based on
 the CASE-FOLD argument of `font-lock-defaults'.")
 
 (defvar-local font-lock-syntactically-fontified 0
@@ -490,18 +490,19 @@ Major/minor modes can set this variable if they know which option applies.")
      (with-silent-modifications
        ,@body)))
 
-(defvar-local font-lock-set-defaults nil) ; Whether we have set up defaults.
+(defvar-local font-lock-keywords-set nil)
 
 (defun font-lock-add-keywords (mode keywords &optional how)
   "Add highlighting KEYWORDS for MODE.
 
-MODE should be a symbol, the major mode command name, such as `c-mode'
-or nil.  If nil, highlighting keywords are added for the current buffer.
-KEYWORDS should be a list; see the variable `font-lock-keywords'.
-By default they are added at the beginning of the current highlighting list.
-If optional argument HOW is `set', they are used to replace the current
-highlighting list.  If HOW is any other non-nil value, they are added at the
-end of the current highlighting list.
+MODE can be a major mode symbol, such as \\='c-mode, or nil,
+in which case keywords are added to the current buffer.
+
+KEYWORDS is a list of the form laboriously described by
+`font-lock-keywords'.  If HOW is the symbol \\='set, KEYWORDS
+supplants the prevailing keywords list.  If HOW is any other
+non-nil value, KEYWORDS are appended.  Otherwise KEYWORDS are
+prepended.
 
 For example:
 
@@ -509,14 +510,11 @@ For example:
   \\='((\"\\\\\\=<\\\\(FIXME\\\\):\" 1 \\='font-lock-warning-face prepend)
     (\"\\\\\\=<\\\\(and\\\\|or\\\\|not\\\\)\\\\\\=>\" . \\='font-lock-keyword-face)))
 
-adds two fontification patterns for C mode, to fontify `FIXME:' words, even in
-comments, and to fontify `and', `or' and `not' words as keywords.
+adds two fontification patterns to `c-mode', to fontify occurrences of
+\"FIXME:\", even within comments, and to fontify \"and\", \"or\" and \"not\".
 
-The above procedure will only add the keywords for C mode, not
-for modes derived from C mode.  To add them for derived modes too,
-pass nil for MODE and add the call to `c-mode-hook'.
-
-For example:
+The above only adds keywords for the C major mode, not for its
+derived modes.  To achieve this, modify `c-mode-hook' as follows:
 
  (add-hook \\='c-mode-hook
   (lambda ()
@@ -525,56 +523,40 @@ For example:
       (\"\\\\\\=<\\\\(and\\\\|or\\\\|not\\\\)\\\\\\=>\" .
        \\='font-lock-keyword-face)))))
 
-The above procedure may fail to add keywords to derived modes if
-some involved major mode does not follow the standard conventions.
-File a bug report if this happens, so the major mode can be corrected.
-
-Note that some modes have specialized support for additional patterns, e.g.,
-see the variables `c-font-lock-extra-types', `c++-font-lock-extra-types',
+Some modes inject specialized logic for additional patterns.  See
+the `c-font-lock-extra-types', `c++-font-lock-extra-types',
 `objc-font-lock-extra-types' and `java-font-lock-extra-types'."
-  (cond (mode
-	 ;; If MODE is non-nil, add the KEYWORDS and HOW spec to
-	 ;; `font-lock-keywords-alist' so `font-lock-set-defaults' uses them.
-	 (let ((spec (cons keywords how)) cell)
-	   (if (setq cell (assq mode font-lock-keywords-alist))
-	       (if (eq how 'set)
-		   (setcdr cell (list spec))
-		 (setcdr cell (append (cdr cell) (list spec))))
-	     (push (list mode spec) font-lock-keywords-alist)))
-	 ;; Make sure that `font-lock-removed-keywords-alist' does not
-	 ;; contain the new keywords.
-	 (font-lock-update-removed-keyword-alist mode keywords how))
-	(t
-         (when (and font-lock-mode
-                    (not (or font-lock-keywords font-lock-defaults)))
-           ;; The major mode has not set any keywords, so when we enabled
-           ;; font-lock-mode it only enabled the font-core.el part, not the
-           ;; font-lock-default-function.  Try again.
-           (font-lock-mode -1)
-           (setq-local font-lock-defaults '(nil t))
-           (font-lock-mode 1))
-	 ;; Otherwise set or add the keywords now.
-	 ;; This is a no-op if it has been done already in this buffer
-	 ;; for the correct major mode.
-	 (font-lock-set-defaults)
-	 (let ((was-compiled (eq (car font-lock-keywords) t)))
-	   ;; Bring back the user-level (uncompiled) keywords.
-	   (if was-compiled
-	       (setq font-lock-keywords (cadr font-lock-keywords)))
-	   ;; Now modify or replace them.
-	   (if (eq how 'set)
-	       (setq font-lock-keywords keywords)
-	     (font-lock-remove-keywords nil keywords) ;to avoid duplicates
-	     (let ((old (if (eq (car-safe font-lock-keywords) t)
-			    (cdr font-lock-keywords)
-			  font-lock-keywords)))
-	       (setq font-lock-keywords (if how
-					    (append old keywords)
-					  (append keywords old)))))
-	   ;; If the keywords were compiled before, compile them again.
-	   (if was-compiled
-	       (setq font-lock-keywords
-                     (font-lock-compile-keywords font-lock-keywords)))))))
+  (if mode
+      ;; Explicit mode
+      (progn
+        (let ((spec (cons keywords how)) cell)
+	 (if (setq cell (assq mode font-lock-keywords-alist))
+	     (if (eq how 'set)
+		 (setcdr cell (list spec))
+	       (setcdr cell (append (cdr cell) (list spec))))
+	   (push (list mode spec) font-lock-keywords-alist)))
+        ;; Ensure new keywords not in `font-lock-removed-keywords-alist'.
+        (font-lock-update-removed-keyword-alist mode keywords how))
+    ;; Implicit mode hack to compose derived modes; see docstring above.
+    (font-lock-ensure-keywords)
+    (let ((was-compiled (eq (car font-lock-keywords) t)))
+      ;; Bring back the user-level (uncompiled) keywords.
+      (if was-compiled
+	  (setq font-lock-keywords (cadr font-lock-keywords)))
+      ;; Now modify or replace them.
+      (if (eq how 'set)
+	  (setq font-lock-keywords keywords)
+	(font-lock-remove-keywords nil keywords) ;to avoid duplicates
+	(let ((old (if (eq (car-safe font-lock-keywords) t)
+		       (cdr font-lock-keywords)
+		     font-lock-keywords)))
+	  (setq font-lock-keywords (if how
+				       (append old keywords)
+				     (append keywords old)))))
+      ;; If the keywords were compiled before, compile them again.
+      (if was-compiled
+	  (setq font-lock-keywords
+                (font-lock-compile-keywords font-lock-keywords))))))
 
 (defun font-lock-update-removed-keyword-alist (mode keywords how)
   "Update `font-lock-removed-keywords-alist' when adding new KEYWORDS to MODE."
@@ -669,7 +651,7 @@ happens, so the major mode can be corrected."
 		       font-lock-removed-keywords-alist))))))
 	(t
 	 ;; Otherwise remove it immediately.
-	 (font-lock-set-defaults)
+	 (font-lock-ensure-keywords)
 	 (let ((was-compiled (eq (car font-lock-keywords) t)))
 	   ;; Bring back the user-level (uncompiled) keywords.
 	   (if was-compiled
@@ -701,7 +683,7 @@ if the major mode provides a grammar, otherwise fall back to
 (declare-function tree-sitter-lock-mode "tree-sitter")
 
 (defun font-lock-register ()
-  (font-lock-set-defaults)
+  (font-lock-ensure-keywords)
   (if (and (eq font-lock-support-mode 'tree-sitter-lock-mode)
            (assq major-mode tree-sitter-mode-alist))
       (tree-sitter-lock-mode t)
@@ -758,7 +740,7 @@ The region it returns may start or end in the middle of a line.")
    ;; the caller wants.
    (interactive-only "use `font-lock-ensure' or `font-lock-flush' instead."))
   (interactive "p")
-  (font-lock-set-defaults)
+  (font-lock-ensure-keywords)
   (let ((font-lock-verbose (or font-lock-verbose interactively)))
     (funcall font-lock-fontify-buffer-function)))
 
@@ -769,7 +751,7 @@ The region it returns may start or end in the middle of a line.")
   "Fontify the text between BEG and END.
 If LOUDLY is non-nil, print status messages while fontifying.
 This works by calling `font-lock-fontify-region-function'."
-  (font-lock-set-defaults)
+  (font-lock-ensure-keywords)
   (save-restriction
     (unless font-lock-dont-widen (widen))
     (funcall font-lock-fontify-region-function beg end loudly)))
@@ -800,20 +782,6 @@ accessible portion of the current buffer."
         (font-lock-fontify-region beg end))))
   "Function to make sure a region has been fontified.
 Called with two arguments BEG and END.")
-
-(defun font-lock-debug-fontify ()
-  "Reinitialize the font-lock machinery and (re-)fontify the buffer.
-This functions is a convenience functions when developing font
-locking for a mode, and is not meant to be called from Lisp functions."
-  (declare (interactive-only t))
-  (interactive)
-  ;; Make font-lock recalculate all the mode-specific data.
-  (setq font-lock-major-mode nil)
-  ;; Make the syntax machinery discard all information.
-  (syntax-ppss-invalidate-cache -1)
-  (font-lock-set-defaults)
-  (save-excursion
-    (font-lock-fontify-region (point-min) (point-max))))
 
 (defun font-lock-ensure (&optional beg end)
   "Make sure the region BEG...END has been fontified.
@@ -1078,7 +1046,7 @@ delimit the region to fontify."
   (let ((inhibit-point-motion-hooks t)
 	deactivate-mark)
     ;; Make sure we have the right `font-lock-keywords' etc.
-    (unless font-lock-mode (font-lock-set-defaults))
+    (unless font-lock-mode (font-lock-ensure-keywords))
     (save-mark-and-excursion
       (save-match-data
 	(condition-case error-data
@@ -1460,7 +1428,7 @@ LOUDLY, if non-nil, allows progress-meter bar."
   "Compile KEYWORDS into the form (t KEYWORDS COMPILED...)
 Here each COMPILED is of the form (MATCHER HIGHLIGHT ...) as shown in the
 `font-lock-keywords' doc string."
-  (unless font-lock-set-defaults
+  (unless font-lock-keywords-set
     ;; This should never happen.  But some external packages sometimes
     ;; call font-lock in unexpected and incorrect ways.  It's important to
     ;; stop processing at this point, otherwise we may end up changing the
@@ -1544,18 +1512,10 @@ See `font-lock-ignore' for the possible rules."
                                   rules))
     (`(pred ,fun) (funcall fun keyword))))
 
-(defvar-local font-lock-major-mode nil
-  "Major mode for which the font-lock settings have been setup.")
-
-(defun font-lock-set-defaults ()
-  "Set fontification defaults appropriately for this mode.
-Sets various variables using `font-lock-defaults' and
-`font-lock-maximum-decoration'."
-  (when (or (not font-lock-set-defaults)
-	    (not font-lock-major-mode)
-            (not (derived-mode-p font-lock-major-mode)))
-    (setq font-lock-major-mode major-mode)
-    (setq font-lock-set-defaults t)
+(defun font-lock-ensure-keywords ()
+  "Parse `font-lock-defaults' into `font-lock-keywords'."
+  (unless font-lock-keywords-set
+    (setq font-lock-keywords-set t)
     (let* ((defaults font-lock-defaults)
 	   (keywords
 	    (font-lock-choose-keywords
@@ -1588,14 +1548,12 @@ Sets various variables using `font-lock-defaults' and
 	      (modify-syntax-entry char syntax font-lock-syntax-table)
 	      (unless (memq (car (aref font-lock-syntax-table char))
 	                    '(1 2 3))    ;"." "w" "_"
-	        (setq font-lock--syntax-table-affects-ppss t))
-	      ))))
+	        (setq font-lock--syntax-table-affects-ppss t))))))
       ;; rest is (var . val) bindings
       (dolist (x (nthcdr 4 defaults))
         (when (consp x)
 	  (set (make-local-variable (car x)) (cdr x))))
-      ;; Set up `font-lock-keywords' last because its value might depend
-      ;; on other settings.
+      ;; Set this last to capture earlier side effects.
       (setq-local font-lock-keywords
                   (font-lock-eval-keywords keywords))
       ;; Local fontification?

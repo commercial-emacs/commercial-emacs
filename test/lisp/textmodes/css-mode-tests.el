@@ -419,73 +419,83 @@
       (indent-region (point-min) (point-max))
       (should (equal (buffer-string) orig)))))
 
+(require 'font-lock)
+(defun debug-fontify ()
+  "Reinitialize the font-lock machinery and (re-)fontify the buffer.
+This functions is a convenience functions when developing font
+locking for a mode, and is not meant to be called from Lisp functions."
+  ;; Make font-lock recalculate all the mode-specific data.
+  ;; Make the syntax machinery discard all information.
+  (syntax-ppss-invalidate-cache -1)
+  (font-lock-set-defaults)
+  (save-excursion
+    (font-lock-fontify-region (point-min) (point-max))))
+
 (ert-deftest css-mode-test-selectors ()
   (let ((selectors
          (with-temp-buffer
            (insert-file-contents (ert-resource-file "css-selectors.txt"))
            (string-lines (buffer-string)))))
-    (with-suppressed-warnings ((interactive-only font-lock-debug-fontify))
-      (dolist (selector selectors)
-        (with-temp-buffer
-          (css-mode)
-          (insert selector " {\n}\n")
-          (font-lock-debug-fontify)
-          (goto-char (point-min))
-          (unless (eq (get-text-property (point) 'face)
-                      'css-selector)
-            (should-not (format "Didn't recognize %s as a selector"
-                                (buffer-substring-no-properties
-                                 (point) (pos-eol)))))))
-      ;; Test many selectors.
-      (dolist (selector selectors)
-        (with-temp-buffer
-          (css-mode)
-          (insert selector " ")
-          (dotimes (_ (random 5))
-            (insert (seq-random-elt '(" , " " > " " + "))
-                    (seq-random-elt selectors)))
-          (insert "{\n}\n")
-          (font-lock-debug-fontify)
-          (goto-char (point-min))
-          (unless (eq (get-text-property (point) 'face)
-                      'css-selector)
-            (should-not (format "Didn't recognize %s as a selector"
-                                (buffer-substring-no-properties
-                                 (point) (pos-eol)))))))
-      ;; Test wrong separators.
-      (dolist (selector selectors)
-        (with-temp-buffer
-          (css-mode)
-          (insert selector " ")
-          (dotimes (_ (1+ (random 5)))
-            (insert (seq-random-elt '("=" " @ "))
-                    (seq-random-elt selectors)))
-          (insert "{\n}\n")
-          (font-lock-debug-fontify)
-          (goto-char (point-min))
-          (when (eq (get-text-property (point) 'face)
+    (dolist (selector selectors)
+      (with-temp-buffer
+        (css-mode)
+        (insert selector " {\n}\n")
+        (debug-fontify)
+        (goto-char (point-min))
+        (unless (eq (get-text-property (point) 'face)
                     'css-selector)
-            (should-not (format "Recognized %s as a selector"
-                                (buffer-substring-no-properties
-                                 (point) (pos-eol))))))))))
+          (should-not (format "Didn't recognize %s as a selector"
+                              (buffer-substring-no-properties
+                               (point) (pos-eol)))))))
+    ;; Test many selectors.
+    (dolist (selector selectors)
+      (with-temp-buffer
+        (css-mode)
+        (insert selector " ")
+        (dotimes (_ (random 5))
+          (insert (seq-random-elt '(" , " " > " " + "))
+                  (seq-random-elt selectors)))
+        (insert "{\n}\n")
+        (debug-fontify)
+        (goto-char (point-min))
+        (unless (eq (get-text-property (point) 'face)
+                    'css-selector)
+          (should-not (format "Didn't recognize %s as a selector"
+                              (buffer-substring-no-properties
+                               (point) (pos-eol)))))))
+    ;; Test wrong separators.
+    (dolist (selector selectors)
+      (with-temp-buffer
+        (css-mode)
+        (insert selector " ")
+        (dotimes (_ (1+ (random 5)))
+          (insert (seq-random-elt '("=" " @ "))
+                  (seq-random-elt selectors)))
+        (insert "{\n}\n")
+        (debug-fontify)
+        (goto-char (point-min))
+        (when (eq (get-text-property (point) 'face)
+                  'css-selector)
+          (should-not (format "Recognized %s as a selector"
+                              (buffer-substring-no-properties
+                               (point) (pos-eol)))))))))
 
 (ert-deftest scss-mode-test-selectors ()
   (let ((selectors
          (with-temp-buffer
            (insert-file-contents (ert-resource-file "scss-selectors.txt"))
            (string-lines (buffer-string)))))
-    (with-suppressed-warnings ((interactive-only font-lock-debug-fontify))
-      (dolist (selector selectors)
-        (with-temp-buffer
-          (scss-mode)
-          (insert selector " {\n}\n")
-          (font-lock-debug-fontify)
-          (goto-char (point-min))
-          (unless (eq (get-text-property (point) 'face)
-                      'css-selector)
-            (should-not (format "Didn't recognize %s as a selector"
-                                (buffer-substring-no-properties
-                                 (point) (pos-eol))))))))))
+    (dolist (selector selectors)
+      (with-temp-buffer
+        (scss-mode)
+        (insert selector " {\n}\n")
+        (debug-fontify)
+        (goto-char (point-min))
+        (unless (eq (get-text-property (point) 'face)
+                    'css-selector)
+          (should-not (format "Didn't recognize %s as a selector"
+                              (buffer-substring-no-properties
+                               (point) (pos-eol)))))))))
 
 
 (provide 'css-mode-tests)
