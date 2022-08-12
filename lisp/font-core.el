@@ -158,11 +158,8 @@ this function onto `change-major-mode-hook'."
 (defun font-lock-default-function (activate)
   (when (or font-lock-keywords font-lock-defaults)
     (if activate
-        (progn
-          (font-lock-set-defaults)
-          (font-lock-turn-on-thing-lock))
-      (font-lock-unfontify-buffer)
-      (font-lock-turn-off-thing-lock))))
+        (font-lock-register)
+      (font-lock-deregister))))
 
 ;; Cannot `define-obsolete-function-alias' because
 ;; `font-lock-mode' is interactive and `turn-on-font-lock' wasn't.

@@ -4114,10 +4114,8 @@ Key bindings specific to `verilog-mode-map' are:
   (unless noninteractive  ; Else can't see the result, and change hooks are slow
     (when (featurep 'xemacs)
       (make-local-hook 'font-lock-mode-hook)
-      (make-local-hook 'font-lock-after-fontify-buffer-hook); doesn't exist in Emacs
       (make-local-hook 'after-change-functions))
     (add-hook 'font-lock-mode-hook #'verilog-highlight-buffer t t)
-    (add-hook 'font-lock-after-fontify-buffer-hook #'verilog-highlight-buffer t t) ; not in Emacs
     (add-hook 'after-change-functions #'verilog-highlight-region t t))
 
   ;; Tell imenu how to handle Verilog.

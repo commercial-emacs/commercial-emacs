@@ -372,8 +372,8 @@ Only applies to the current buffer."
 
 (defun jit-lock-function (start)
   "Workhorse called from handle_fontified_prop() in xdisp.c.
-Registered in `font-lock-turn-on-thing-lock' when `font-lock-support-mode'
-is `jit-lock-mode'."
+Registered in `font-lock-register' when `font-lock-support-mode' is
+`jit-lock-mode'."
   (when (and jit-lock-mode (not (memory-full)))
     (if (or (not jit-lock-defer-timer) (zerop jit-lock-defer-time))
 	(jit-lock-fontify-now start (+ start jit-lock-chunk-size))

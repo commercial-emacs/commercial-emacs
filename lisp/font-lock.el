@@ -840,14 +840,6 @@ happens, so the major mode can be corrected."
 	       (setq font-lock-keywords
                      (font-lock-compile-keywords font-lock-keywords)))))))
 
-;;; Font Lock Support mode.
-
-;; This is the code used to interface font-lock.el with any of its add-on
-;; packages, and provide the user interface.  Packages that have their own
-;; local buffer fontification functions (see below) may have to call
-;; `font-lock-after-fontify-buffer' and/or `font-lock-after-unfontify-buffer'
-;; themselves.
-
 (defcustom font-lock-support-mode 'jit-lock-mode
   "An awkward specifier for the fontifying mechanism.
 
@@ -896,7 +888,8 @@ the user."
 (declare-function tree-sitter-fontify-region "tree-sitter")
 (declare-function tree-sitter-lock-mode "tree-sitter")
 
-(defun font-lock-turn-on-thing-lock ()
+(defun font-lock-register ()
+  (font-lock-set-defaults)
   (pcase (font-lock-value-in-major-mode font-lock-support-mode)
     ('fast-lock-mode
      (add-hook 'after-change-functions #'font-lock-after-change-function t t)
@@ -915,7 +908,8 @@ the user."
                #'font-lock-extend-jit-lock-region-after-change
                nil t))))
 
-(defun font-lock-turn-off-thing-lock ()
+(defun font-lock-deregister ()
+  (font-lock-unfontify-buffer)
   (mapc #'kill-local-variable
         '(font-lock-fontify-buffer-function
           font-lock-fontify-region-function
@@ -934,29 +928,6 @@ the user."
          (remove-hook 'jit-lock-after-change-extend-region-functions
                       #'font-lock-extend-jit-lock-region-after-change
                       t))))
-
-(defun font-lock-after-fontify-buffer ()
-  (cond ((bound-and-true-p fast-lock-mode)
-	 (fast-lock-after-fontify-buffer))
-	;; Useless now that jit-lock intercepts font-lock-fontify-buffer.  -sm
-	;; (jit-lock-mode
-	;;  (jit-lock-after-fontify-buffer))
-	((bound-and-true-p lazy-lock-mode)
-	 (lazy-lock-after-fontify-buffer))))
-
-(defun font-lock-after-unfontify-buffer ()
-  (cond ((bound-and-true-p fast-lock-mode)
-	 (fast-lock-after-unfontify-buffer))
-	;; Useless as well.  It's only called when:
-	;; - turning off font-lock: it does not matter if we leave spurious
-	;;   `fontified' text props around since jit-lock-mode is also off.
-	;; - font-lock-default-fontify-buffer fails: this is not run
-	;;   any more anyway.   -sm
-	;;
-	;; (jit-lock-mode
-	;;  (jit-lock-after-unfontify-buffer))
-	((bound-and-true-p lazy-lock-mode)
-	 (lazy-lock-after-unfontify-buffer))))
 
 ;; End of Font Lock Support mode.
 
@@ -1194,14 +1165,6 @@ This function is the default `font-lock-fontify-region-function'."
        (font-lock-fontify-syntactically-region beg end loudly))
      (font-lock-fontify-keywords-region beg end loudly)
      `(jit-lock-bounds ,beg . ,end))))
-
-;; The following must be rethought, since keywords can override fontification.
-;;    ;; Now scan for keywords, but not if we are inside a comment now.
-;;    (or (and (not font-lock-keywords-only)
-;;             (let ((state (parse-partial-sexp beg end nil nil
-;;                                              font-lock-cache-state)))
-;;               (or (nth 4 state) (nth 7 state))))
-;;        (font-lock-fontify-keywords-region beg end))
 
 (defvar font-lock-extra-managed-props nil
   "Additional text properties managed by font-lock.
