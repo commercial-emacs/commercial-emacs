@@ -81,7 +81,8 @@
               outline-minor-mode-cycle t
               outline-level (lambda () (length (match-string 2)))
               outline-minor-mode-highlight 'append)
-  (outline-minor-mode))
+  (outline-minor-mode)
+  (emacs-etc--hide-local-variables))
 
 ;;;###autoload
 (define-derived-mode emacs-news-mode text-mode "NEWS"
