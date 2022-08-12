@@ -864,7 +864,7 @@ to (xref-elisp-test-descr-to-target xref)."
       (pp form (current-buffer)))
     (require 'font-lock)
     (syntax-ppss-invalidate-cache -1)
-    (font-lock-set-defaults)
+    (font-lock-ensure-keywords)
     (save-excursion
       (font-lock-fontify-region (point-min) (point-max)))
     (goto-char (point-min))

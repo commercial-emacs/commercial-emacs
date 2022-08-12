@@ -93,7 +93,7 @@ code();
     (with-temp-buffer
       (funcall mode)
       ;; Make sure font lock is all set up.
-      (font-lock-set-defaults)
+      (font-lock-ensure-keywords)
       ;; This has to be set to a value other than the mhtml-mode
       ;; value, to avoid recursion.
       (unless (variable-binding-locus 'font-lock-fontify-region-function)
@@ -167,7 +167,7 @@ code();
       (mhtml--with-locals submode
         (save-restriction
           (font-lock-fontify-region beg end loudly)))
-    (font-lock-set-defaults)
+    (font-lock-ensure-keywords)
     (font-lock-default-fontify-region beg end loudly)))
 
 (defun mhtml--submode-fontify-region (beg end loudly)

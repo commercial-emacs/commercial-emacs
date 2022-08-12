@@ -427,7 +427,7 @@ locking for a mode, and is not meant to be called from Lisp functions."
   ;; Make font-lock recalculate all the mode-specific data.
   ;; Make the syntax machinery discard all information.
   (syntax-ppss-invalidate-cache -1)
-  (font-lock-set-defaults)
+  (font-lock-ensure-keywords)
   (save-excursion
     (font-lock-fontify-region (point-min) (point-max))))
 

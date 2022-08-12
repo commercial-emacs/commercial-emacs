@@ -1127,9 +1127,9 @@ Returns nil if there is no such line before LIMIT, t otherwise."
 
 (defvar font-lock-defaults-computed)
 (defvar font-lock-keywords)
-(defvar font-lock-set-defaults)
+(defvar font-lock-keywords-set)
 
-(autoload 'font-lock-set-defaults "font-lock")
+(autoload 'font-lock-ensure-keywords "font-lock")
 
 (define-minor-mode gnus-message-citation-mode
   "Minor mode providing more font-lock support for nested citations.
@@ -1155,9 +1155,9 @@ When enabled, it automatically turns on `font-lock-mode'."
 		 (append (default-value default)
 			 gnus-message-citation-keywords))
 	  (kill-local-variable default))))
-    ;; Force `font-lock-set-defaults' to update `font-lock-keywords'.
-    (setq font-lock-set-defaults nil)
-    (font-lock-set-defaults)
+    ;; Force `font-lock-ensure-keywords' to update `font-lock-keywords'.
+    (setq font-lock-keywords-set nil)
+    (font-lock-ensure-keywords)
     (if font-lock-mode
 	(font-lock-flush)
       (gnus-message-citation-mode (font-lock-mode 1)))))

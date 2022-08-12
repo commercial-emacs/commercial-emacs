@@ -2090,7 +2090,7 @@ find the errors."
 	  (progn
 	    (set (make-local-variable 'compilation-font-lock-keywords)
 		 verilog-error-font-lock-keywords)
-	    (font-lock-set-defaults)))
+	    (font-lock-ensure-keywords)))
       ;; Need to re-run compilation-error-regexp builder
       (if (fboundp 'compilation-build-compilation-error-regexp-alist)
 	  (compilation-build-compilation-error-regexp-alist))

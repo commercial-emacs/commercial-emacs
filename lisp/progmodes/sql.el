@@ -236,7 +236,7 @@
 (eval-when-compile (require 'subr-x))   ; string-empty-p
 
 (defvar font-lock-keyword-face)
-(defvar font-lock-set-defaults)
+(defvar font-lock-keywords-set)
 (defvar font-lock-string-face)
 
 ;;; Allow customization
@@ -2823,7 +2823,7 @@ configured."
           (list sql-mode-font-lock-object-name)))
 
     ;; Setup font-lock.  Force re-parsing of `font-lock-defaults'.
-    (kill-local-variable 'font-lock-set-defaults)
+    (kill-local-variable 'font-lock-keywords-set)
     (setq-local font-lock-defaults
          (list 'sql-mode-font-lock-keywords
                keywords-only t syntax-alist))

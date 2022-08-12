@@ -3664,7 +3664,7 @@ if that value is non-nil.
   ;; We may be using the mode programmatically to extract data, and we
   ;; then need this to be set up first so that sexp-based movement
   ;; commands don't bug out.
-  (font-lock-set-defaults))
+  (font-lock-ensure-keywords))
 
 (defun bibtex-entry-alist (dialect)
   "Return entry-alist for DIALECT."

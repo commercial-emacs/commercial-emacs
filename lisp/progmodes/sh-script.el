@@ -151,7 +151,7 @@
 (autoload 'shell-environment-variable-completion "shell")
 
 (defvar font-lock-comment-face)
-(defvar font-lock-set-defaults)
+(defvar font-lock-keywords-set)
 (defvar font-lock-string-face)
 
 
@@ -2297,8 +2297,8 @@ whose value is the shell name (don't quote it)."
     (message "No indentation for this shell type.")
     (setq-local indent-line-function #'sh-basic-indent-line))
   (when font-lock-mode
-    (setq font-lock-set-defaults nil)
-    (font-lock-set-defaults)
+    (setq font-lock-keywords-set nil)
+    (font-lock-ensure-keywords)
     (font-lock-flush))
   (setq sh-shell-process nil)
   (run-hooks 'sh-set-shell-hook))

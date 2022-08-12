@@ -13686,7 +13686,7 @@ This does background highlighting of translate-off regions.")
           beginning-of-line))
   (when (fboundp 'font-lock-unset-defaults)
     (font-lock-unset-defaults))		; not implemented in XEmacs
-  (font-lock-set-defaults)
+  (font-lock-ensure-keywords)
   (font-lock-mode nil)
   (font-lock-mode t))
 

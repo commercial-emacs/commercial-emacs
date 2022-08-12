@@ -822,7 +822,7 @@ If SUBEXP is non-nil mark only the corresponding sub-expressions."
   (with-current-buffer (get-buffer reb-buffer)
     (let ((font-lock-is-on font-lock-mode))
       (font-lock-mode -1)
-      (kill-local-variable 'font-lock-set-defaults)
+      (kill-local-variable 'font-lock-keywords-set)
       ;;(setq-local reb-re-syntax 'string)
       ;;(setq-local reb-re-syntax 'rx)
       (setq font-lock-defaults
