@@ -26,189 +26,38 @@
 
 ;;; Commentary:
 
-;; Font Lock mode is a minor mode that causes your comments to be displayed in
-;; one face, strings in another, reserved words in another, and so on.
+;; Font Lock is an archaic term from the lisp machine days
+;; when keyboards contained a "Font Lock" key similar to a "Caps Lock" key
+;; that would constrain the font instead of the case.
 ;;
-;; Comments will be displayed in `font-lock-comment-face'.
-;; Strings will be displayed in `font-lock-string-face'.
-;; Regexps are used to display selected patterns in other faces.
+;; In modern parlance, the term has come to mean syntax highlighting
+;; although emacs users continue to use "fontification" as a synonym.
 ;;
-;; To make the text you type be fontified, use M-x font-lock-mode RET.
-;; When this minor mode is on, the faces of the current line are updated with
-;; every insertion or deletion.
+;; Font Lock Mode defaults to a globalized minor mode, that is,
+;; all buffers will attempt fontification when the `font-lock-keywords'
+;; or `font-lock-defaults' settings are defined for the buffer.
 ;;
-;; To turn Font Lock mode on automatically, add this to your init file:
+;; Font Lock Mode can be individually applied by toggling off
+;; `global-font-lock-mode' and adding `font-lock-mode' to the major
+;; mode's hook, e.g.,
 ;;
-;;  (add-hook 'emacs-lisp-mode-hook #'font-lock-mode)
+;;  (add-hook \\='c-mode-hook #\\='font-lock-mode)
 ;;
-;; Or if you want to turn Font Lock mode on in many modes:
+;;;; Three Text-Propertizing Passes
 ;;
-;;  (global-font-lock-mode t)
+;; The syntactic keyword pass addresses context-sensitive exceptions
+;; to the one-character-one-role syntax table.
 ;;
-;; Fontification for a particular mode may be available in a number of levels
-;; of decoration.  The higher the level, the more decoration, but the more time
-;; it takes to fontify.  See the variable `font-lock-maximum-decoration'.
-;; Support modes for Font Lock mode can be used to speed up Font Lock mode.
-;; See `font-lock-support-mode'.
-
-;;;; How Font Lock mode fontifies:
-
-;; When Font Lock mode is turned on in a buffer, it (a) fontifies the entire
-;; buffer and (b) installs one of its fontification functions on one of the
-;; hook variables that are run by Emacs after every buffer change (i.e., an
-;; insertion or deletion).  Fontification means the replacement of `face' text
-;; properties in a given region; Emacs displays text with these `face' text
-;; properties appropriately.
+;; The syntactic pass applies "face" text properties according to the
+;; syntax table and any bespoke "syntax-table" text properties.  This
+;; pass addresses stateful constructs like strings and comments.
 ;;
-;; Fontification normally involves syntactic (i.e., strings and comments) and
-;; regexp (i.e., keywords and everything else) passes.  There are actually
-;; three passes; (a) the syntactic keyword pass, (b) the syntactic pass and (c)
-;; the keyword pass.  Confused?
-;;
-;; The syntactic keyword pass places `syntax-table' text properties in the
-;; buffer according to the variable `font-lock-syntactic-keywords'.  It is
-;; necessary because Emacs's syntax table is not powerful enough to describe all
-;; the different syntactic constructs required by the sort of people who decide
-;; that a single quote can be syntactic or not depending on the time of day.
-;; (What sort of person could decide to overload the meaning of a quote?)
-;; Obviously the syntactic keyword pass must occur before the syntactic pass.
-;;
-;; The syntactic pass places `face' text properties in the buffer according to
-;; syntactic context, i.e., according to the buffer's syntax table and buffer
-;; text's `syntax-table' text properties.  It involves using a syntax parsing
-;; function to determine the context of different parts of a region of text.  A
-;; syntax parsing function is necessary because generally strings and/or
-;; comments can span lines, and so the context of a given region is not
-;; necessarily apparent from the content of that region.  Because the keyword
-;; pass only works within a given region, it is not generally appropriate for
-;; syntactic fontification.  This is the first fontification pass that makes
-;; changes visible to the user; it fontifies strings and comments.
-;;
-;; The keyword pass places `face' text properties in the buffer according to
-;; the variable `font-lock-keywords'.  It involves searching for given regexps
-;; (or calling given search functions) within the given region.  This is the
-;; second fontification pass that makes changes visible to the user; it
-;; fontifies language reserved words, etc.
-;;
-;; Oh, and the answer is, "Yes, obviously just about everything should be done
-;; in a single syntactic pass, but the only syntactic parser available
-;; understands only strings and comments."  Perhaps one day someone will write
-;; some syntactic parsers for common languages and a son-of-font-lock.el could
-;; use them rather then relying so heavily on the keyword (regexp) pass.
-
-;;;; How Font Lock mode supports modes or is supported by modes:
-
-;; Modes that support Font Lock mode do so by defining one or more variables
-;; whose values specify the fontification.  Font Lock mode knows of these
-;; variable names from the buffer local variable `font-lock-defaults'.
-;; (Font Lock mode is set up via (a) where a mode's patterns are
-;; distributed with the mode's package library, and (b) where a mode's
-;; patterns are distributed with font-lock.el itself.  An example of (a)
-;; is Pascal mode, an example of (b) is Lisp mode.  Normally, the mechanism is
-;; (a); (b) is used where it is not clear which package library should contain
-;; the pattern definitions.)  Font Lock mode chooses which variable to use for
-;; fontification based on `font-lock-maximum-decoration'.
-;;
-;; Font Lock mode fontification behavior can be modified in a number of ways.
-;; See the below comments and the comments distributed throughout this file.
-
-;;;; Constructing patterns:
-
-;; See the documentation for the variable `font-lock-keywords'.
-;;
-;; Efficient regexps for use as MATCHERs for `font-lock-keywords' and
-;; `font-lock-syntactic-keywords' can be generated via the function
-;; `regexp-opt'.
-
-;;;; Adding patterns for modes that already support Font Lock:
-
-;; Though Font Lock highlighting patterns already exist for many modes, it's
-;; likely there's something that you want fontified that currently isn't, even
-;; at the maximum fontification level.  You can add highlighting patterns via
-;; `font-lock-add-keywords'.  For example, say in some C
-;; header file you #define the token `and' to expand to `&&', etc., to make
-;; your C code almost readable.  In your ~/.emacs there could be:
-;;
-;;  (font-lock-add-keywords 'c-mode '("\\<\\(and\\|or\\|not\\)\\>"))
-;;
-;; Some modes provide specific ways to modify patterns based on the values of
-;; other variables.  For example, additional C types can be specified via the
-;; variable `c-font-lock-extra-types'.
-
-;;;; Adding patterns for modes that do not support Font Lock:
-
-;; Not all modes support Font Lock mode.  If you (as a user of the mode) add
-;; patterns for a new mode, you must define in your ~/.emacs a variable or
-;; variables that specify regexp fontification.  Then, you should indicate to
-;; Font Lock mode, via the mode hook setting `font-lock-defaults', exactly what
-;; support is required.  For example, say Foo mode should have the following
-;; regexps fontified case-sensitively, and comments and strings should not be
-;; fontified automagically.  In your ~/.emacs there could be:
-;;
-;;  (defvar foo-font-lock-keywords
-;;    '(("\\<\\(one\\|two\\|three\\)\\>" . 'font-lock-keyword-face)
-;;      ("\\<\\(four\\|five\\|six\\)\\>" . 'font-lock-type-face))
-;;    "Default expressions to highlight in Foo mode.")
-;;
-;;  (add-hook 'foo-mode-hook
-;;   (lambda ()
-;;     (setq-local font-lock-defaults
-;;                 '(foo-font-lock-keywords t))))
-
-;;;; Adding Font Lock support for modes:
-
-;; Of course, it would be better that the mode already supports Font Lock mode.
-;; The package author would do something similar to above.  The mode must
-;; define at the top-level a variable or variables that specify regexp
-;; fontification.  Then, the mode command should indicate to Font Lock mode,
-;; via `font-lock-defaults', exactly what support is required.  For example,
-;; say Bar mode should have the following regexps fontified case-insensitively,
-;; and comments and strings should be fontified automagically.  In bar.el there
-;; could be:
-;;
-;;  (defvar bar-font-lock-keywords
-;;    '(("\\<\\(uno\\|due\\|tre\\)\\>" . 'font-lock-keyword-face)
-;;      ("\\<\\(quattro\\|cinque\\|sei\\)\\>" . 'font-lock-type-face))
-;;    "Default expressions to highlight in Bar mode.")
-;;
-;; and within `bar-mode' there could be:
-;;
-;;  (setq-local font-lock-defaults
-;;              '(bar-font-lock-keywords nil t))
-
-;; What is fontification for?  You might say, "It's to make my code look nice."
-;; I think it should be for adding information in the form of cues.  These cues
-;; should provide you with enough information to both (a) distinguish between
-;; different items, and (b) identify the item meanings, without having to read
-;; the items and think about it.  Therefore, fontification allows you to think
-;; less about, say, the structure of code, and more about, say, why the code
-;; doesn't work.  Or maybe it allows you to think less and drift off to sleep.
-;;
-;; So, here are my opinions/advice/guidelines:
-;;
-;; - Highlight conceptual objects, such as function and variable names, and
-;;   different objects types differently, i.e., (a) and (b) above, highlight
-;;   function names differently to variable names.
-;; - Keep the faces distinct from each other as far as possible.
-;;   i.e., (a) above.
-;; - Use the same face for the same conceptual object, across all modes.
-;;   i.e., (b) above, all modes that have items that can be thought of as, say,
-;;   keywords, should be highlighted with the same face, etc.
-;; - Make the face attributes fit the concept as far as possible.
-;;   i.e., function names might be a bold color such as blue, comments might
-;;   be a bright color such as red, character strings might be brown, because,
-;;   err, strings are brown (that was not the reason, please believe me).
-;; - Don't use a non-nil OVERRIDE unless you have a good reason.
-;;   Only use OVERRIDE for special things that are easy to define, such as the
-;;   way `...' quotes are treated in strings and comments in Emacs Lisp mode.
-;;   Don't use it to, say, highlight keywords in commented out code or strings.
-;; - Err, that's it.
+;; The keyword pass fontifies reserved words specified in
+;; `font-lock-keywords'.
 
 ;;; Code:
 
 (require 'syntax)
-(eval-when-compile (require 'cl-lib))
-(eval-when-compile (require 'subr-x))
 
 ;; Define core `font-lock' group.
 (defgroup font-lock '((jit-lock custom-group))
@@ -634,15 +483,12 @@ Major/minor modes can set this variable if they know which option applies.")
 
 ;; Font Lock mode.
 
-(eval-when-compile
-  ;;
-  ;; We use this to preserve or protect things when modifying text properties.
-  (defmacro save-buffer-state (&rest body)
-    "Bind variables according to VARLIST and eval BODY restoring buffer state."
-    (declare (indent 0) (debug t))
-    `(let ((inhibit-point-motion-hooks t))
-       (with-silent-modifications
-         ,@body))))
+(defmacro save-buffer-state (&rest body)
+  "Bind variables according to VARLIST and eval BODY restoring buffer state."
+  (declare (indent 0) (debug t))
+  `(let ((inhibit-point-motion-hooks t))
+     (with-silent-modifications
+       ,@body)))
 
 (defvar-local font-lock-set-defaults nil) ; Whether we have set up defaults.
 
@@ -929,10 +775,6 @@ the user."
                       #'font-lock-extend-jit-lock-region-after-change
                       t))))
 
-;; End of Font Lock Support mode.
-
-;;; Fontification functions.
-
 (defvar-local font-lock-extend-after-change-region-function nil
   "A function that determines the region to refontify after a change.
 
@@ -1180,8 +1022,8 @@ This function is the default `font-lock-unfontify-region-function'."
 	    `(,@(when font-lock-syntactic-keywords '(syntax-table))
               face font-lock-multiline))))
 
-;; Called when any modification is made to buffer text.
 (defun font-lock-after-change-function (beg end &optional old-len)
+  "Called when any modification is made to buffer text."
   (save-excursion
     (let ((inhibit-point-motion-hooks t)
           (inhibit-quit t)
@@ -1206,7 +1048,8 @@ This function is the default `font-lock-unfontify-region-function'."
 	    (setq end (1+ end))))
 	(font-lock-fontify-region beg end)))))
 
-(defvar jit-lock-start) (defvar jit-lock-end)
+(defvar jit-lock-start)
+(defvar jit-lock-end)
 (defun font-lock-extend-jit-lock-region-after-change (beg end old-len)
   "Function meant for `jit-lock-after-change-extend-region-functions'.
 This function does 2 things:
@@ -1295,16 +1138,6 @@ delimit the region to fontify."
 	      (font-lock-fontify-region (point) (mark)))
 	  ((error quit) (message "Fontifying block...%s" error-data)))))))
 
-;; End of Fontification functions.
-
-;;; Additional text property functions.
-
-;; The following text property functions should be builtins.  This means they
-;; should be written in C and put with all the other text property functions.
-;; In the meantime, those that are used by font-lock.el are defined in Lisp
-;; below and given a `font-lock-' prefix.  Those that are not used are defined
-;; in Lisp below and commented out.  sm.
-
 (defun font-lock--add-text-property (start end prop value object append)
   "Add an element to a property of the text from START to END.
 Arguments PROP and VALUE specify the property and value to add to
@@ -1387,17 +1220,10 @@ Optional argument OBJECT is the string or buffer containing the text."
 		      (put-text-property start next prop new object))))))
       (setq start (text-property-not-all next end prop nil object)))))
 
-;; End of Additional text property functions.
-
-;;; Syntactic regexp fontification functions.
-
-;; These syntactic keyword pass functions are identical to those keyword pass
-;; functions below, with the following exceptions; (a) they operate on
-;; `font-lock-syntactic-keywords' of course, (b) they are all `defun' as speed
-;; is less of an issue, (c) eval of property value does not occur JIT as speed
-;; is less of an issue, (d) OVERRIDE cannot be `prepend' or `append' as it
-;; makes no sense for `syntax-table' property values, (e) they do not do it
-;; LOUDLY as it is not likely to be intensive.
+;; Bristling with youthful exuberance, someone (monnier?) defined
+;; syntactic and non-syntactic versions of apply-highlight,
+;; fontify-keywords-region, and fontify-anchored-keywords.
+;; Effete but longwinded reasons are given in the git history.
 
 (defun font-lock-apply-syntactic-highlight (highlight)
   "Apply HIGHLIGHT following a match.
@@ -1493,10 +1319,6 @@ START should be at the beginning of a line."
 	  (setq highlights (cdr highlights))))
       (setq keywords (cdr keywords)))))
 
-;; End of Syntactic regexp fontification functions.
-
-;;; Syntactic fontification functions.
-
 (defvar font-lock-comment-start-skip nil
   "If non-nil, Font Lock mode uses this instead of `comment-start-skip'.")
 
@@ -1550,10 +1372,6 @@ START should be at the beginning of a line."
 	    (< (point) end))
         (setq state (parse-partial-sexp (point) end nil nil state
 				        'syntax-table))))))
-
-;; End of Syntactic fontification functions.
-
-;;; Keyword regexp fontification functions.
 
 (defsubst font-lock-apply-highlight (highlight)
   "Apply HIGHLIGHT following a match.
@@ -1685,10 +1503,6 @@ LOUDLY, if non-nil, allows progress-meter bar."
       (setq keywords (cdr keywords)))
     (set-marker pos nil)))
 
-;; End of Keyword regexp fontification functions.
-
-;;; Various functions.
-
 (defun font-lock-compile-keywords (keywords &optional _syntactic-keywords)
   "Compile KEYWORDS into the form (t KEYWORDS COMPILED...)
 Here each COMPILED is of the form (MATCHER HIGHLIGHT ...) as shown in the
@@ -1791,33 +1605,6 @@ See `font-lock-ignore' for the possible rules."
                                   rules))
     (`(pred ,fun) (funcall fun keyword))))
 
-(defun font-lock--filter-keywords (keywords)
-  "Filter a list of KEYWORDS using `font-lock-ignore'."
-  (if-let ((rules (mapcan (pcase-lambda (`(,mode . ,rules))
-                            (when (or (and (boundp mode) mode)
-                                      (derived-mode-p mode))
-                              (copy-sequence rules)))
-                          font-lock-ignore)))
-      (seq-filter (lambda (keyword) (not (font-lock--match-keyword
-                                          `(or ,@rules) keyword)))
-                  keywords)
-    keywords))
-
-(defun font-lock-refresh-defaults ()
-  "Restart fontification in current buffer after recomputing from defaults.
-Recompute fontification variables using `font-lock-defaults' and
-`font-lock-maximum-decoration'.  Then restart fontification.
-
-Use this function when you have changed any of the above
-variables directly.
-
-Note: This function will erase modifications done by
-`font-lock-add-keywords' or `font-lock-remove-keywords', but will
-preserve `hi-lock-mode' highlighting patterns."
-  (font-lock-mode -1)
-  (kill-local-variable 'font-lock-set-defaults)
-  (font-lock-mode 1))
-
 (defvar-local font-lock-major-mode nil
   "Major mode for which the font-lock settings have been setup.")
 
@@ -1880,8 +1667,6 @@ Sets various variables using `font-lock-defaults' and
               (font-lock-compile-keywords font-lock-keywords))))
     (font-lock-flush)))
 
-;; Note that `defface' will not overwrite any faces declared above via
-;; `custom-declare-face'.
 (defface font-lock-comment-face
   '((((class grayscale) (background light))
      :foreground "DimGray" :weight bold :slant italic)
