@@ -38,4 +38,47 @@
     (should (equal (get-text-property 1 'face (current-buffer))
                    '((:strike-through t) italic)))))
 
+(ert-deftest font-lock-test-add-keywords-derived-mode ()
+  "Bug#24176 exercises monnier's `font-lock-add-keywords' implicit hack.
+To specify keywords for a derived mode without repeating those of
+the base mode, the programmer supplies a null first argument to
+`font-lock-add-keywords' to append the argument keywords to the
+current buffer's keywords.  This calling mode is then deployed as
+an `add-hook' to the derived mode."
+  (skip-unless (not noninteractive))
+  (eval-and-compile
+    (define-derived-mode ~/a fundamental-mode "~/a"
+      (font-lock-add-keywords nil `(("a" 0 'font-lock-keyword-face))))
+    (define-derived-mode ~/b ~/a "~/b"
+      (font-lock-add-keywords nil `(("b" 0 'font-lock-builtin-face))))
+    (define-derived-mode ~/c ~/b "~/c"
+      (font-lock-add-keywords nil `(("c" 0 'font-lock-constant-face)))))
+  (let ((unhidden-font-lockable-buffer (get-buffer-create "font-lock-test-akdm")))
+    (unwind-protect
+        (progn
+          (with-current-buffer unhidden-font-lockable-buffer
+            (insert "abc")
+            (call-interactively #'~/a)
+            (font-lock-update)
+            (should (eq (get-text-property 1 'face) 'font-lock-keyword-face))
+            (should-not (eq (get-text-property 2 'face) 'font-lock-builtin-face))
+            (should-not (eq (get-text-property 3 'face) 'font-lock-constant-face))
+            (call-interactively #'~/b)
+            (font-lock-update)
+            (should (eq (get-text-property 1 'face) 'font-lock-keyword-face))
+            (should (eq (get-text-property 2 'face) 'font-lock-builtin-face))
+            (should-not (eq (get-text-property 3 'face) 'font-lock-constant-face))
+            (call-interactively #'~/c)
+            (font-lock-update)
+            (should (eq (get-text-property 1 'face) 'font-lock-keyword-face))
+            (should (eq (get-text-property 2 'face) 'font-lock-builtin-face))
+            (should (eq (get-text-property 3 'face) 'font-lock-constant-face))
+            (call-interactively #'~/a)
+            (font-lock-update)
+            (should (eq (get-text-property 1 'face) 'font-lock-keyword-face))
+            (should-not (eq (get-text-property 2 'face) 'font-lock-builtin-face))
+            (should-not (eq (get-text-property 3 'face) 'font-lock-constant-face))))
+      (let (kill-buffer-query-functions)
+        (kill-buffer unhidden-font-lockable-buffer)))))
+
 ;; font-lock-tests.el ends here

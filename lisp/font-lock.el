@@ -27,8 +27,8 @@
 ;;; Commentary:
 
 ;; Font Lock is an archaic term from the lisp machine days
-;; when keyboards contained a "Font Lock" key similar to a "Caps Lock" key
-;; that would constrain the font instead of the case.
+;; when keyboards contained a "Font Lock" key that constrained the font
+;; just as "Caps Lock" constrained the case.
 ;;
 ;; In modern parlance, the term has come to mean syntax highlighting
 ;; although emacs users continue to use "fontification" as a synonym.
@@ -153,7 +153,6 @@ If a number, only buffers greater than this size have fontification messages."
 		 (integer :tag "size"))
   :group 'font-lock
   :version "24.1")
-
 
 ;; Originally these variable values were face names such as `bold' etc.
 ;; Now we create our own faces, but we keep these variables for compatibility
