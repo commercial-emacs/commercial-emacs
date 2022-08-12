@@ -2640,22 +2640,6 @@ This function is called from `c-common-init', once per mode initialization."
 	    (put-text-property end c-new-END 'fontified nil)))))
   (cons c-new-BEG c-new-END))
 
-;; Emacs < 22 and XEmacs
-(defmacro c-advise-fl-for-region (function)
-  (declare (debug t))
-  `(defadvice ,function (before get-awk-region activate)
-     ;; Make sure that any string/regexp is completely font-locked.
-     (when c-buffer-is-cc-mode
-       (save-excursion
-	 (ad-set-arg 1 c-new-END)   ; end
-	 (ad-set-arg 0 c-new-BEG)))))	; beg
-
-(unless (boundp 'font-lock-extend-after-change-region-function)
-  (c-advise-fl-for-region font-lock-after-change-function)
-  (c-advise-fl-for-region jit-lock-after-change)
-  (c-advise-fl-for-region lazy-lock-defer-rest-after-change)
-  (c-advise-fl-for-region lazy-lock-defer-line-after-change))
-
 ;; Connect up to `electric-indent-mode' (Emacs 24.4 and later).
 (defun c-electric-indent-mode-hook ()
   ;; Emacs has en/disabled `electric-indent-mode'.  Propagate this through to

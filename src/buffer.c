@@ -1342,12 +1342,12 @@ and `buffer-file-truename' are non-nil.  */)
   Frestore_buffer_modified_p (flag);
 
   /* Set update_mode_lines only if buffer is displayed in some window.
-     Packages like jit-lock or lazy-lock preserve a buffer's modified
-     state by recording/restoring the state around blocks of code.
-     Setting update_mode_lines makes redisplay consider all windows
-     (on all frames).  Stealth fontification of buffers not displayed
-     would incur additional redisplay costs if we'd set
-     update_modes_lines unconditionally.
+     Modes like jit-lock preserve a buffer's modified state by
+     recording/restoring the state around blocks of code.  Setting
+     update_mode_lines makes redisplay consider all windows (on all
+     frames).  Stealth fontification of buffers not displayed would
+     incur additional redisplay costs if we'd set update_modes_lines
+     unconditionally.
 
      Ideally, I think there should be another mechanism for fontifying
      buffers without "modifying" buffers, or redisplay should be

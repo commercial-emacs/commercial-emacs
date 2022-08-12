@@ -6373,15 +6373,11 @@ If FACE is not a valid face name, use default face."
     (ps-plot-with-face from to face)))
 
 (declare-function jit-lock-fontify-now "jit-lock" (start end))
-(declare-function lazy-lock-fontify-region "lazy-lock" (beg end))
 
 ;; to avoid compilation gripes
 (defun ps-print-ensure-fontified (start end)
-  (cond ((and (boundp 'jit-lock-mode) (symbol-value 'jit-lock-mode))
-	 (jit-lock-fontify-now start end))
-	((and (boundp 'lazy-lock-mode) (symbol-value 'lazy-lock-mode))
-	 (lazy-lock-fontify-region start end))))
-
+  (when(and (boundp 'jit-lock-mode) (symbol-value 'jit-lock-mode))
+    (jit-lock-fontify-now start end)))
 
 (defun ps-generate-postscript-with-faces (from to)
   ;; Some initialization...

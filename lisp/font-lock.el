@@ -34,8 +34,8 @@
 ;; although emacs users continue to use "fontification" as a synonym.
 ;;
 ;; Font Lock Mode defaults to a globalized minor mode, that is,
-;; all buffers will attempt fontification when the `font-lock-keywords'
-;; or `font-lock-defaults' settings are defined for the buffer.
+;; all buffers will attempt fontification using whatever `font-lock-keywords'
+;; or `font-lock-defaults' settings are buffer-locally defined.
 ;;
 ;; Font Lock Mode can be individually applied by toggling off
 ;; `global-font-lock-mode' and adding `font-lock-mode' to the major
@@ -687,72 +687,31 @@ happens, so the major mode can be corrected."
                      (font-lock-compile-keywords font-lock-keywords)))))))
 
 (defcustom font-lock-support-mode 'jit-lock-mode
-  "An awkward specifier for the fontifying mechanism.
-
-The default is \\='jit-lock-mode, a regexp-based vicinity fontifier.
-
+  "The default is \\='jit-lock-mode, a regexp-based vicinity fontifier.
 If assigned \\='tree-sitter-lock-mode, use tree-sitter highlighting
 if the major mode provides a grammar, otherwise fall back to
-\\='jit-lock-mode.
-
-A list of cells of the form (MAJOR-MODE . SUPPORT-MODE), e.g.,
-\\='((c-mode . fast-lock-mode) (t . jit-lock-mode)), specifies
-\\='fast-lock-mode for the C major mode, and \\='jit-lock-mode for all
-others.  This form is deprecated, as it puts too much faith in
-the user."
-  :type '(choice (const :tag "none" nil)
-		 (const :tag "fast lock" fast-lock-mode)
-		 (const :tag "lazy lock" lazy-lock-mode)
-		 (const :tag "jit lock" jit-lock-mode)
-		 (const :tag "tree sitter" tree-sitter-lock-mode)
-		 (repeat :menu-tag "mode specific" :tag "mode specific"
-			 :value ((t . jit-lock-mode))
-			 (cons :tag "Instance"
-			       (radio :tag "Mode"
-				      (const :tag "all" t)
-				      (symbol :tag "name"))
-			       (radio :tag "Support"
-				      (const :tag "none" nil)
-				      (const :tag "fast lock" fast-lock-mode)
-				      (const :tag "lazy lock" lazy-lock-mode)
-				      (const :tag "JIT lock" jit-lock-mode)
-                                      (const :tag "tree sitter" tree-sitter-lock-mode)))))
+\\='jit-lock-mode."
   :version "21.1"
   :group 'font-lock)
 
-(defvar fast-lock-mode)
-(defvar lazy-lock-mode)
 (defvar jit-lock-mode)
 (defvar tree-sitter-lock-mode)
 
-(declare-function fast-lock-after-fontify-buffer "fast-lock")
-(declare-function fast-lock-after-unfontify-buffer "fast-lock")
-(declare-function fast-lock-mode "fast-lock")
-(declare-function lazy-lock-after-fontify-buffer "lazy-lock")
-(declare-function lazy-lock-after-unfontify-buffer "lazy-lock")
-(declare-function lazy-lock-mode "lazy-lock")
 (declare-function tree-sitter-fontify-region "tree-sitter")
 (declare-function tree-sitter-lock-mode "tree-sitter")
 
 (defun font-lock-register ()
   (font-lock-set-defaults)
-  (pcase (font-lock-value-in-major-mode font-lock-support-mode)
-    ('fast-lock-mode
-     (add-hook 'after-change-functions #'font-lock-after-change-function t t)
-     (fast-lock-mode t))
-    ('lazy-lock-mode
-     (add-hook 'after-change-functions #'font-lock-after-change-function t t)
-     (lazy-lock-mode t))
-    ('tree-sitter-lock-mode
-     (tree-sitter-lock-mode t))
-    ('jit-lock-mode
-     (setq-local font-lock-fontify-buffer-function #'jit-lock-refontify
-                 font-lock-flush-function #'jit-lock-refontify
-                 font-lock-ensure-function #'jit-lock-fontify-now)
-     (jit-lock-register #'font-lock-fontify-region (not font-lock-keywords-only))
-     (add-hook 'jit-lock-after-change-extend-region-functions
-               #'font-lock-extend-jit-lock-region-after-change
-               nil t))))
+  (if (and (eq font-lock-support-mode 'tree-sitter-lock-mode)
+           (assq major-mode tree-sitter-mode-alist))
+      (tree-sitter-lock-mode t)
+    (setq-local font-lock-fontify-buffer-function #'jit-lock-refontify
+                font-lock-flush-function #'jit-lock-refontify
+                font-lock-ensure-function #'jit-lock-fontify-now)
+    (jit-lock-register #'font-lock-fontify-region (not font-lock-keywords-only))
+    (add-hook 'jit-lock-after-change-extend-region-functions
+              #'font-lock-extend-jit-lock-region-after-change
+              nil t)))
 
 (defun font-lock-deregister ()
   (font-lock-unfontify-buffer)
@@ -761,13 +720,7 @@ the user."
           font-lock-fontify-region-function
           font-lock-flush-function
           font-lock-ensure-function))
-  (cond ((bound-and-true-p fast-lock-mode)
-	 (fast-lock-mode -1)
-         (remove-hook 'after-change-functions #'font-lock-after-change-function t))
-        ((bound-and-true-p lazy-lock-mode)
-	 (lazy-lock-mode -1)
-         (remove-hook 'after-change-functions #'font-lock-after-change-function t))
-        ((bound-and-true-p tree-sitter-lock-mode)
+  (cond ((bound-and-true-p tree-sitter-lock-mode)
          (tree-sitter-lock-mode -1))
         ((bound-and-true-p jit-lock-mode)
          (jit-lock-unregister 'font-lock-fontify-region)
@@ -1546,20 +1499,6 @@ Here each COMPILED is of the form (MATCHER HIGHLIGHT ...) as shown in the
 				 (funcall keywords)
 			       (eval keywords t)))))
 
-(defun font-lock-value-in-major-mode (alist)
-  "Return the value for the prevailing major-mode's key in ALIST.
-If ALIST is the symbol \\='tree-sitter-lock-mode, return the fallback
-\\='jit-lock-mode if a tree-sitter grammar is unavailable.
-If ALIST is not an alist, return ALIST."
-  (cond ((eq alist 'tree-sitter-lock-mode)
-         (if (assq major-mode tree-sitter-mode-alist)
-             alist
-           'jit-lock-mode))
-        ((consp alist)
-         (cdr (or (assq major-mode alist) (assq t alist))))
-        (t
-         alist)))
-
 (defun font-lock-choose-keywords (keywords level)
   "Return LEVELth element of KEYWORDS.
 A LEVEL of nil is equal to a LEVEL of 0, a LEVEL of t is equal to
@@ -1619,8 +1558,12 @@ Sets various variables using `font-lock-defaults' and
     (setq font-lock-set-defaults t)
     (let* ((defaults font-lock-defaults)
 	   (keywords
-	    (font-lock-choose-keywords (nth 0 defaults)
-				       (font-lock-value-in-major-mode font-lock-maximum-decoration)))
+	    (font-lock-choose-keywords
+             (nth 0 defaults)
+             (if (consp font-lock-maximum-decoration)
+                 (cdr (or (assq major-mode font-lock-maximum-decoration)
+                          (assq t font-lock-maximum-decoration)))
+               font-lock-maximum-decoration)))
 	   (local (cdr (assq major-mode font-lock-keywords-alist)))
 	   (removed-keywords
 	    (cdr-safe (assq major-mode font-lock-removed-keywords-alist))))

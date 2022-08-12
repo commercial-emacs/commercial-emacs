@@ -1428,7 +1428,7 @@ casts and declarations are fontified.  Used on level 2 and higher."
 	     ))
 
 	;; Below we fontify a whole declaration even when it crosses the limit,
-	;; to avoid gaps when jit/lazy-lock fontifies the file a block at a
+	;; to avoid gaps when jit-lock fontifies the file a block at a
 	;; time.  That is however annoying during editing, e.g. the following is
 	;; a common situation while the first line is being written:
 	;;

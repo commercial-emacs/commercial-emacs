@@ -149,9 +149,6 @@
 (defvar conf-key)
 (defvar ent-alist)
 (defvar itimer-version)
-(defvar lazy-lock-defer-contextually)
-(defvar lazy-lock-defer-on-scrolling)
-(defvar lazy-lock-defer-on-the-fly)
 (defvar speedbar-attached-frame)
 (defvar arch-alist)
 (defvar pack-alist)
@@ -4923,11 +4920,6 @@ Key bindings:
             ("\\('\\).\\('\\)" (1 "\"'") (2 "\"'"))))
     (set (make-local-variable 'font-lock-syntactic-keywords)
          vhdl-font-lock-syntactic-keywords))
-  (when (featurep 'xemacs)
-    (set (make-local-variable 'font-lock-support-mode) 'lazy-lock-mode)
-    (set (make-local-variable 'lazy-lock-defer-contextually) nil)
-    (set (make-local-variable 'lazy-lock-defer-on-the-fly) t)
-    (set (make-local-variable 'lazy-lock-defer-on-scrolling) t))
 
   ;; variables for source file compilation
   (when vhdl-compile-use-local-error-regexp
@@ -16673,8 +16665,6 @@ component instantiation."
     (vhdl-comment-insert-inline (nth 4 entry) t))
   (insert "\n"))
 
-(defvar lazy-lock-minimum-size)
-
 (defun vhdl-compose-components-package ()
   "Generate a package containing component declarations for all entities in the
 current project/directory."
@@ -16688,7 +16678,6 @@ current project/directory."
 	 (ent-alist (vhdl-aget vhdl-entity-alist
 			       (or project
 				   (abbreviate-file-name default-directory))))
-	 (lazy-lock-minimum-size 0)
 	 clause-pos component-pos)
     (message "Generating components package \"%s\"..." pack-name)
     ;; open package file

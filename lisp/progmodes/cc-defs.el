@@ -591,8 +591,6 @@ to it is returned.  This function does not modify the point or the mark."
 	 (c-sub-at-c++-raw-string-opener))
     `(c-sub-at-c++-raw-string-opener)))
 
-;; The following is essentially `save-buffer-state' from lazy-lock.el.
-;; It ought to be a standard macro.
 (defmacro c-save-buffer-state (varlist &rest body)
   "Bind variables according to VARLIST (in `let*' style) and eval BODY,
 then restore the buffer state under the assumption that no significant

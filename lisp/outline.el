@@ -947,9 +947,6 @@ Note that this does not hide the lines preceding the first heading line."
 
 (defun outline-hide-region-body (start end)
   "Hide all body lines between START and END, but not headings."
-  ;; Nullify the hook to avoid repeated calls to `outline-flag-region'
-  ;; wasting lots of time running `lazy-lock-fontify-after-outline'
-  ;; and run the hook finally.
   (let (outline-view-change-hook)
     (save-excursion
       (save-restriction

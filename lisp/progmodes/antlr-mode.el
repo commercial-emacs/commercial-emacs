@@ -85,7 +85,7 @@
 
 ;; More compile-time-macros
 (eval-when-compile
-  (defmacro save-buffer-state-x (&rest body) ; similar to EMACS/lazy-lock.el
+  (defmacro save-buffer-state-x (&rest body)
     (declare (debug t) (indent 0))
     `(let ((inhibit-point-motion-hooks t))
        (with-silent-modifications
