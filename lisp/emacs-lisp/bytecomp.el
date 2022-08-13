@@ -1766,7 +1766,8 @@ and cl-macs.el.")
 		   (progn ,@body)
 	         (error
                   (prog1 nil
-                    (setq byte-compile-abort-elc err)))))))
+                    (byte-compile-warn "%s" (error-message-string err))
+                    (setq byte-compile-abort-elc t)))))))
      (if (and (markerp warning-series)
 	      (eq (marker-buffer warning-series)
 		  (get-buffer byte-compile-log-buffer)))
@@ -2428,7 +2429,8 @@ in the input buffer (now current), not in the output buffer."
                         (funcall handler form)
                       (error
                        (prog1 nil
-                         (setq byte-compile-abort-elc err))))))
+                         (byte-compile-warn "%s" (error-message-string err))
+                         (setq byte-compile-abort-elc t))))))
 	(byte-compile-flush-pending)
 	(byte-compile-output-file-form form*))
     (byte-compile-keep-pending form)))
