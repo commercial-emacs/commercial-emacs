@@ -268,6 +268,7 @@ to insert Cancel-Lock headers.")
 (defvoo nntp-server-type nil)
 (defvoo nntp-status-string "")
 (defconst nntp-version "nntp 5.0")
+(make-obsolete-variable 'nntp-version 'emacs-version "29.1")
 (defvoo nntp-inhibit-erase nil)
 (defvoo nntp-inhibit-output nil)
 
