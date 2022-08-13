@@ -39,6 +39,7 @@
 
 (ert-deftest esh-proc-test/sigpipe-exits-process ()
   "Test that a SIGPIPE is properly sent to a process if a pipe closes"
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (and (executable-find "sh")
                     (executable-find "echo")
                     (executable-find "sleep")))
@@ -55,6 +56,7 @@
 
 (ert-deftest esh-proc-test/pipeline-connection-type/no-pipeline ()
   "Test that all streams are PTYs when a command is not in a pipeline."
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (executable-find "sh"))
   (should (equal (eshell-test-command-result esh-proc-test--detect-pty-cmd)
                  ;; PTYs aren't supported on MS-Windows.
@@ -63,6 +65,7 @@
 
 (ert-deftest esh-proc-test/pipeline-connection-type/first ()
   "Test that only stdin is a PTY when a command starts a pipeline."
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (and (executable-find "sh")
                     (executable-find "cat")))
   (should (equal (eshell-test-command-result
@@ -73,6 +76,7 @@
 (ert-deftest esh-proc-test/pipeline-connection-type/middle ()
   "Test that all streams are pipes when a command is in the middle of a
 pipeline."
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (and (executable-find "sh")
                     (executable-find "cat")))
   (should (equal (eshell-test-command-result
@@ -81,6 +85,7 @@ pipeline."
 
 (ert-deftest esh-proc-test/pipeline-connection-type/last ()
   "Test that only output streams are PTYs when a command ends a pipeline."
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (executable-find "sh"))
   (should (equal (eshell-test-command-result
                   (concat "echo | " esh-proc-test--detect-pty-cmd))
@@ -90,7 +95,7 @@ pipeline."
 (ert-deftest esh-proc-test/kill-pipeline ()
   "Test that killing a pipeline of processes only emits a single
 prompt.  See bug#54136."
-  :tags (when (getenv "CI") '(:unstable))
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (and (executable-find "sh")
                     (executable-find "echo")
                     (executable-find "sleep")))
@@ -113,6 +118,7 @@ prompt.  See bug#54136."
 (ert-deftest esh-proc-test/kill-pipeline-head ()
   "Test that killing the first process in a pipeline doesn't
 write the exit status to the pipe.  See bug#54136."
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (and (executable-find "sh")
                     (executable-find "echo")
                     (executable-find "sleep")))
@@ -130,6 +136,7 @@ write the exit status to the pipe.  See bug#54136."
 (ert-deftest esh-proc-test/kill-background-process ()
   "Test that killing a background process doesn't emit a new
 prompt.  See bug#54136."
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (and (executable-find "sh")
                     (executable-find "sleep")))
   (with-temp-eshell
