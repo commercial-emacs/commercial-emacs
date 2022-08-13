@@ -52,7 +52,7 @@ Bug#24912 and Bug#24913."
             (should-error
              (eval `(funcall (lambda ,args)) lb) :type 'invalid-function)
             (should-error (byte-compile-check-lambda-list args))
-            (let ((byte-compile-error-on-warn t)
+            (let ((byte-compile-error-on-warn nil)
                   (debug-on-error nil))
               (should-not byte-compile-abort-elc)
               (eval `(byte-compile (lambda ,args)) lb)

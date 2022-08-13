@@ -1209,7 +1209,7 @@ literals (Bug#20852)."
     (write-region "(list ?) ?( ?; ?\" ?[ ?])" nil source)
     (bytecomp-tests--with-temp-file destination
       (let ((byte-compile-dest-file-function (lambda (_) destination))
-            (byte-compile-error-on-warn t)
+            (byte-compile-error-on-warn nil)
             (debug-on-error nil))
         (byte-compile-file source)
         (should (with-current-buffer byte-compile-log-buffer

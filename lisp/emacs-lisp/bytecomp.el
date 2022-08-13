@@ -1767,7 +1767,7 @@ and cl-macs.el.")
 	         (error
                   (prog1 nil
                     (byte-compile-warn "%s" (error-message-string err))
-                    (setq byte-compile-abort-elc t)))))))
+                    (setq byte-compile-abort-elc err)))))))
      (if (and (markerp warning-series)
 	      (eq (marker-buffer warning-series)
 		  (get-buffer byte-compile-log-buffer)))
