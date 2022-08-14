@@ -17369,6 +17369,16 @@ window_start_acceptable_p (Lisp_Object window, ptrdiff_t startp)
   return true;
 }
 
+DEFUN ("long-line-optimizations-p", Flong_line_optimizations_p, Slong_line_optimizations_p,
+       0, 0, 0,
+       doc: /* Return non-nil if long-line optimizations are in effect in current buffer.
+See `long-line-threshold' and `large-hscroll-threshold' for what these
+optimizations mean and when they are in effect.  */)
+  (void)
+{
+  return current_buffer->long_line_optimizations_p ? Qt : Qnil;
+}
+
 /* Redisplay leaf window WINDOW.  JUST_THIS_ONE_P means only
    selected_window is redisplayed.
 
@@ -18289,7 +18299,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
        || w->base_line_pos > 0
        /* Column number is displayed and different from the one displayed.  */
        || (w->column_number_displayed != -1
-	   && !current_buffer->long_line_optimizations_p
 	   && (w->column_number_displayed != current_column ())))
       /* This means that the window has a mode line.  */
       && (window_wants_mode_line (w)
@@ -25185,17 +25194,6 @@ decode_mode_spec (struct window *w, register int c, int field_width,
          even crash emacs.)  */
       if (mode_line_target == MODE_LINE_TITLE)
 	return "";
-      else if (b->long_line_optimizations_p)
-	{
-	  char *p = decode_mode_spec_buf;
-	  int pad = width - 2;
-	  while (pad-- > 0)
-	    *p++ = ' ';
-	  *p++ = '?';
-	  *p++ = '?';
-	  *p = '\0';
-	  return decode_mode_spec_buf;
-	}
       else
 	{
 	  ptrdiff_t col = current_column ();
@@ -33323,6 +33321,7 @@ be let-bound around code that needs to disable messages temporarily. */);
   defsubr (&Sbidi_find_overridden_directionality);
   defsubr (&Sdisplay__line_is_continued_p);
   defsubr (&Sget_display_property);
+  defsubr (&Slong_line_optimizations_p);
 
   DEFSYM (Qmenu_bar_update_hook, "menu-bar-update-hook");
   DEFSYM (Qoverriding_terminal_local_map, "overriding-terminal-local-map");
