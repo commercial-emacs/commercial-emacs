@@ -281,6 +281,7 @@
 (load "emacs-lisp/tabulated-list")
 (load "buff-menu")
 (load "tree-sitter")
+(load "progmodes/tree-sitter-prog-mode")
 
 (if (fboundp 'x-create-frame)
     (progn
@@ -353,6 +354,7 @@
 ;; which happens while processing 'elisp-flymake-byte-compile', when
 ;; elisp-mode.elc is outdated.
 (load "progmodes/elisp-mode")
+(load "progmodes/tree-sitter-elisp-mode")
 
 ;; Preload some constants and floating point functions.
 (load "emacs-lisp/float-sup")

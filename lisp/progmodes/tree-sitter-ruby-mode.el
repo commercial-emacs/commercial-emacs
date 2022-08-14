@@ -5,7 +5,7 @@
 ;;;###autoload
 (define-derived-mode tree-sitter-ruby-mode tree-sitter-prog-mode "Ruby"
   "Have tree-sitter replace syntax-ppss."
-  (setq-local forward-sexp-function #'tree-sitter-forward-sexp-internal))
+)
 
 (provide 'tree-sitter-ruby-mode)
 

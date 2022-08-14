@@ -29,9 +29,6 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib)
-                   (require 'subr-x))
-
 (defgroup prog-mode nil
   "Generic programming mode, from which others derive."
   :group 'languages)
@@ -308,7 +305,8 @@ support it."
   (setq-local parse-sexp-ignore-comments t)
   (add-hook 'context-menu-functions 'prog-context-menu 10 t)
   ;; Any programming language is always written left to right.
-  (setq bidi-paragraph-direction 'left-to-right))
+  (setq bidi-paragraph-direction 'left-to-right)
+  (kill-local-variable 'font-lock-support-mode))
 
 (provide 'prog-mode)
 

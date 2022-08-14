@@ -368,9 +368,10 @@ This is normally set via `font-lock-add-keywords' and
 (defvar font-lock-removed-keywords-alist nil
   "Alist of `font-lock-keywords' elements to be removed for major modes.
 
-Each element has the form (MODE . KEYWORDS).  Function `font-lock-ensure-keywords'
-removes the elements in the list KEYWORDS from `font-lock-keywords'
-when Font Lock is turned on in major mode MODE.
+Each element has the form (MODE . KEYWORDS).  Function
+`font-lock-ensure-keywords' removes the elements in the list
+KEYWORDS from `font-lock-keywords' when Font Lock is turned on in
+major mode MODE.
 
 This is normally set via `font-lock-add-keywords' and
 `font-lock-remove-keywords'.")
@@ -558,31 +559,28 @@ the `c-font-lock-extra-types', `c++-font-lock-extra-types',
                 (font-lock-compile-keywords font-lock-keywords))))))
 
 (defun font-lock-update-removed-keyword-alist (mode keywords how)
-  "Update `font-lock-removed-keywords-alist' when adding new KEYWORDS to MODE."
-  ;; When font-lock is enabled first all keywords in the list
-  ;; `font-lock-keywords-alist' are added, then all keywords in the
-  ;; list `font-lock-removed-keywords-alist' are removed.  If a
-  ;; keyword was once added, removed, and then added again it must be
-  ;; removed from the removed-keywords list.  Otherwise the second add
-  ;; will not take effect.
-  (let ((cell (assq mode font-lock-removed-keywords-alist)))
-    (if cell
-	(if (eq how 'set)
-	    ;; A new set of keywords is defined.  Forget all about
-	    ;; our old keywords that should be removed.
-	    (setq font-lock-removed-keywords-alist
-		  (delq cell font-lock-removed-keywords-alist))
-	  ;; Delete all previously removed keywords.
-	  (dolist (kword keywords)
-	    (setcdr cell (delete kword (cdr cell))))
-	  ;; Delete the mode cell if empty.
-	  (if (null (cdr cell))
-	      (setq font-lock-removed-keywords-alist
-		    (delq cell font-lock-removed-keywords-alist)))))))
+  "Update `font-lock-removed-keywords-alist' when adding new KEYWORDS to MODE.
+When font-lock is enabled first all keywords in the list
+`font-lock-keywords-alist' are added, then all keywords in the
+list `font-lock-removed-keywords-alist' are removed.  If a
+keyword was once added, removed, and then added again it must be
+removed from the removed-keywords list.  Otherwise the second add
+will not take effect."
+  (when-let ((cell (assq mode font-lock-removed-keywords-alist)))
+    (if (eq how 'set)
+	;; A new set of keywords is defined.  Forget all about
+	;; our old keywords that should be removed.
+	(setq font-lock-removed-keywords-alist
+	      (delq cell font-lock-removed-keywords-alist))
+      ;; Delete all previously removed keywords.
+      (dolist (kword keywords)
+	(setcdr cell (delete kword (cdr cell))))
+      ;; Delete the mode cell if empty.
+      (unless (cdr cell)
+	(setq font-lock-removed-keywords-alist
+	      (delq cell font-lock-removed-keywords-alist))))))
 
-;; Written by Anders Lindgren
-;;
-;; Case study:
+;; Case study (Anders Lindgren):
 ;; (I)  The keywords are removed from a major mode.
 ;;      In this case the keyword could be local (i.e. added earlier by
 ;;      `font-lock-add-keywords'), global, or both.
@@ -672,6 +670,7 @@ happens, so the major mode can be corrected."
 If assigned \\='tree-sitter-lock-mode, use tree-sitter highlighting
 if the major mode provides a grammar, otherwise fall back to
 \\='jit-lock-mode."
+  :type 'symbol
   :version "21.1"
   :group 'font-lock)
 

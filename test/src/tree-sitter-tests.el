@@ -192,5 +192,18 @@ for each change in the insufferable `custom-save-variables.')"
         (message "tree-sitter-how-fast: %s versus %s" fast slow)
         (should (< fast (/ slow 3)))))))
 
+(ert-deftest tree-sitter-basic-motion ()
+  (let ((text "
+(defun foo ())
+
+(defun bar ())
+
+(defun baz ())
+"))
+    (tree-sitter-tests-doit ".el" text
+      (tree-sitter-elisp-mode)
+      (call-interactively #'end-of-defun)
+      (should (eq (point) 16)))))
+
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here

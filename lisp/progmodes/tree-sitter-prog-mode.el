@@ -34,10 +34,14 @@
 (define-derived-mode tree-sitter-prog-mode prog-mode "TreeSitter"
   "Tree-sitter enabled major mode."
   :group 'prog-mode
-  :interactive nil
-  (if (fboundp 'tree-sitter)
-      (tree-sitter)
-    (error "Executable not built with tree sitter support.")))
+  :interactive nil ;; this precludes autoloadability
+  (if (not (fboundp 'tree-sitter))
+      (error "Executable not built with tree sitter support.")
+    (setq-local font-lock-support-mode 'tree-sitter-lock-mode
+                forward-sexp-function #'tree-sitter-forward-sexp
+                beginning-of-defun-function #'tree-sitter-beginning-of-defun
+                end-of-defun-function #'tree-sitter-end-of-defun)
+    (tree-sitter)))
 
 (provide 'tree-sitter-prog-mode)
 

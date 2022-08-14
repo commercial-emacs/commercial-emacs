@@ -152,8 +152,13 @@ this function onto `change-major-mode-hook'."
 				      '(font-lock-face)))
     (restore-buffer-modified-p modp)))
 
+(defun font-lock-registrable-p ()
+  (pcase font-lock-support-mode
+    ('tree-sitter-lock-mode t)
+    ('jit-lock-mode (or font-lock-keywords font-lock-defaults))))
+
 (defun font-lock-default-function (activate)
-  (when (or font-lock-keywords font-lock-defaults)
+  (when (font-lock-registrable-p)
     (if activate
         (font-lock-register)
       (font-lock-deregister))))

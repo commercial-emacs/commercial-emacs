@@ -89,7 +89,8 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
     (js-mode . "javascript")
     (python-mode . "python")
     (ruby-mode . "ruby")
-    (tree-sitter-ruby-mode . "ruby"))
+    (tree-sitter-ruby-mode . "ruby")
+    (tree-sitter-elisp-mode . "elisp"))
   "Map prog-mode to tree-sitter grammar."
   :group 'tree-sitter
   :type '(alist :key-type (symbol :tag "Prog mode")
@@ -229,7 +230,7 @@ tree-sitter-goto-prev-sibling."
              #'identity)
            (tree-sitter-node-at pos)))
 
-(defun tree-sitter-forward-sexp-internal (&optional arg)
+(defun tree-sitter-forward-sexp (&optional arg)
   "Candidate for `forward-sexp-function'.
 Move point forward an ARG number of balanced expressions.
 Return the number of unsatisfiable iterations."
@@ -256,10 +257,48 @@ Return the number of unsatisfiable iterations."
               (goto-char c)
             (throw 'done (- ntimes i))))))))
 
-(defun tree-sitter-forward-sexp (&optional arg)
-  (interactive "^p")
-  (let ((forward-sexp-function #'tree-sitter-forward-sexp-internal))
-    (forward-sexp arg)))
+(defun tree-sitter-node-round-up (pos)
+  (let ((node (tree-sitter-node-at pos)))
+    (while (< pos (tree-sitter-node-start node))
+      (setq node (tree-sitter-node-prev-sibling node)))
+    node))
+
+(defun tree-sitter-node-round-down (pos)
+  (tree-sitter-node-at pos))
+
+(defun tree-sitter-beginning-of-defun (&optional arg)
+  "Candidate for `beginning-of-defun-function'."
+  (let ((ntimes (abs (or arg 1)))
+        (root-node (tree-sitter-root-node))
+        (node (tree-sitter-node-round-up (point))))
+    (catch 'done
+      (prog1 0
+        (dotimes (i ntimes)
+          (unless node
+            (throw 'done (- ntimes i)))
+          (while (not (tree-sitter-node-equal
+                       root-node
+                       (tree-sitter-node-parent node)))
+            (setq node (tree-sitter-node-parent node)))
+          (goto-char (tree-sitter-node-start node))
+          (setq node (tree-sitter-node-prev-sibling node)))))))
+
+(defun tree-sitter-end-of-defun (&optional arg)
+  "Candidate for `end-of-defun-function'."
+  (let ((ntimes (abs (or arg 1)))
+        (root-node (tree-sitter-root-node))
+        (node (tree-sitter-node-round-down (point))))
+    (catch 'done
+      (prog1 0
+        (dotimes (i ntimes)
+          (unless node
+            (throw 'done (- ntimes i)))
+          (while (not (tree-sitter-node-equal
+                       root-node
+                       (tree-sitter-node-parent node)))
+            (setq node (tree-sitter-node-parent node)))
+          (goto-char (tree-sitter-node-end node))
+          (setq node (tree-sitter-node-next-sibling node)))))))
 
 (provide 'tree-sitter)
 
