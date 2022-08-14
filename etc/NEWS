@@ -2549,6 +2549,11 @@ patcomp.el, pc-mode.el, pc-select.el, s-region.el, and sregex.el.
 
 * Lisp Changes in Emacs 29.1
 
++++
+** New function 'compiled-function-p'.
+This returns non-nil if its argument is either a byte-compiled or a
+natively-compiled function object.
+
 ---
 ** 'deactivate-mark' can have new value 'dont-save'.
 This value means that Emacs should deactivate the mark as usual, but

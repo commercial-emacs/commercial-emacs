@@ -1288,7 +1288,7 @@ that means treat it as not defined."
 		      (or (symbolp (symbol-function fn))
 			  (consp (symbol-function fn))
 			  (and (not macro-p)
-			       (byte-code-function-p (symbol-function fn)))))
+			       (compiled-function-p (symbol-function fn)))))
 	    (setq fn (symbol-function fn)))
           (let ((advertised (gethash (if (and (symbolp fn) (fboundp fn))
                                          ;; Could be a subr.
@@ -1300,7 +1300,7 @@ that means treat it as not defined."
               (if macro-p
                   `(macro lambda ,advertised)
                 `(lambda ,advertised)))
-             ((and (not macro-p) (byte-code-function-p fn)) fn)
+             ((and (not macro-p) (compiled-function-p fn)) fn)
              ((not (consp fn)) nil)
              ((eq 'macro (car fn)) (cdr fn))
              (macro-p nil)
@@ -4948,11 +4948,13 @@ invoked interactively."
 		((not (consp f))
 		 "<malformed function>")
 		((eq 'macro (car f))
-		 (if (or (byte-code-function-p (cdr f))
+		 (if (or (compiled-function-p (cdr f))
+			 ;; FIXME: Can this still happen?
 			 (assq 'byte-code (cdr (cdr (cdr f)))))
 		     " <compiled macro>"
 		   " <macro>"))
 		((assq 'byte-code (cdr (cdr f)))
+		 ;; FIXME: Can this still happen?
 		 "<compiled lambda>")
 		((eq 'lambda (car f))
 		 "<function>")
