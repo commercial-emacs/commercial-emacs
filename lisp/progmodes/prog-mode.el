@@ -305,8 +305,7 @@ support it."
   (setq-local parse-sexp-ignore-comments t)
   (add-hook 'context-menu-functions 'prog-context-menu 10 t)
   ;; Any programming language is always written left to right.
-  (setq bidi-paragraph-direction 'left-to-right)
-  (kill-local-variable 'font-lock-support-mode))
+  (setq bidi-paragraph-direction 'left-to-right))
 
 (provide 'prog-mode)
 

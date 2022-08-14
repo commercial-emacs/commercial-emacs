@@ -37,6 +37,8 @@
   :interactive nil ;; this precludes autoloadability
   (if (not (fboundp 'tree-sitter))
       (error "Executable not built with tree sitter support.")
+    ;; Base `fundamental-mode' will `kill-all-local-variables',
+    ;; so rest assured these won't linger after major mode change.
     (setq-local font-lock-support-mode 'tree-sitter-lock-mode
                 forward-sexp-function #'tree-sitter-forward-sexp
                 beginning-of-defun-function #'tree-sitter-beginning-of-defun

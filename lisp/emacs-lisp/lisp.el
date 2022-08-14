@@ -505,11 +505,6 @@ It is called with no argument, right after calling `beginning-of-defun-raw'.
 So the function can assume that point is at the beginning of the defun body.
 It should move point to the first position after the defun.")
 
-(defvar end-of-defun-moves-to-eol t
-  "Whether `end-of-defun' moves to eol before doing anything else.
-Set this to nil if this movement adversely affects the buffer's
-major mode's decisions about context.")
-
 (defun buffer-end (arg)
   "Return the \"far end\" position of the buffer, in direction ARG.
 If ARG is positive, that's the end of the buffer.
@@ -517,80 +512,74 @@ Otherwise, that's the beginning of the buffer."
   (if (> arg 0) (point-max) (point-min)))
 
 (defun end-of-defun (&optional arg interactive)
-  "Move forward to next end of defun.
-With argument, do it that many times.
-Negative argument -N means move back to Nth preceding end of defun.
+  "Move point to position just past nearest \"definition\".
+If ARG is a number, move point just past the next ARG definition
+instances (with negative ARG moving oppositely).
 
-An end of a defun occurs right after the close-parenthesis that
-matches the open-parenthesis that starts a defun; see function
-`beginning-of-defun'.
+Major modes generally define their own `end-of-defun-function'
+tailored to their respective notions of \"definition\".
 
-If variable `end-of-defun-function' is non-nil, its value
-is called as a function to find the defun's end.
+If INTERACTIVE is non-nil, call `user-error' for scan errors.
 
-If INTERACTIVE is non-nil, as it is interactively,
-report errors as appropriate for this kind of usage."
+The name of this function is historical."
   (interactive "^p\nd")
-  (if interactive
-      (condition-case e
-          (end-of-defun arg nil)
-        (scan-error (user-error (cadr e))))
-    (or (not (eq this-command 'end-of-defun))
-        (eq last-command 'end-of-defun)
-        (and transient-mark-mode mark-active)
-        (push-mark))
-    (if (or (null arg) (= arg 0)) (setq arg 1))
-    (let ((pos (point))
-          (beg (progn (when end-of-defun-moves-to-eol
-                        (end-of-line 1))
-                      (beginning-of-defun-raw 1) (point)))
-	  (skip (lambda ()
-		  ;; When comparing point against pos, we want to consider that
-		  ;; if point was right after the end of the function, it's
-		  ;; still considered as "in that function".
-		  ;; E.g. `eval-defun' from right after the last close-paren.
-		  (unless (bolp)
-		    (skip-chars-forward " \t")
-		    (if (looking-at "\\s<\\|\n")
-		        (forward-line 1))))))
-      (funcall end-of-defun-function)
-      (when (<= arg 1)
-        (funcall skip))
-      (cond
-       ((> arg 0)
-        ;; Moving forward.
-        (if (> (point) pos)
-            ;; We already moved forward by one because we started from
-            ;; within a function.
-            (setq arg (1- arg))
-          ;; We started from after the end of the previous function.
-          (goto-char pos))
-        (unless (zerop arg)
+  (when (or (null arg) (= arg 0))
+    (setq arg 1))
+  (when (and (eq this-command 'end-of-defun)
+             (not (eq last-command 'end-of-defun))
+             (or (not transient-mark-mode) (not mark-active)))
+    (push-mark))
+  (condition-case err
+      (let ((origin (point))
+            (beg (progn
+                   (end-of-line 1)
+                   (beginning-of-defun-raw 1)
+                   (point)))
+            ;; To dial in the desired backwards behavior, f2a8252 had
+            ;; to round forward to next line, violating parsimony.
+	    (skip (lambda ()
+		    (unless (bolp)
+		      (skip-chars-forward " \t")
+		      (if (looking-at "\\s<\\|\n")
+		          (forward-line 1))))))
+        (funcall end-of-defun-function)
+        (when (<= arg 1)
+          (funcall skip))
+        (cond
+         ((> arg 0)
+          ;; Moving forward.
+          (if (> (point) origin)
+              ;; Started within function: already moved forward.
+              (setq arg (1- arg))
+            ;; Started outside function.
+            (goto-char origin))
+          (unless (zerop arg)
+            (beginning-of-defun-raw (- arg))
+            (funcall end-of-defun-function)))
+         ((< arg 0)
+          ;; Moving backward.
+          (if (< (point) origin)
+              ;; Started outside function: already moved backward.
+              (setq arg (1+ arg))
+            ;; Started within function.
+            (goto-char beg))
+          (unless (zerop arg)
+            (beginning-of-defun-raw (- arg))
+	    (setq beg (point))
+            (funcall end-of-defun-function))))
+        (funcall skip)
+        (while (and (< arg 0) (>= (point) origin))
+          ;; Retry moving backward (7b952d6 more monnier fumbling)
+          (goto-char beg)
           (beginning-of-defun-raw (- arg))
-          (funcall end-of-defun-function)))
-       ((< arg 0)
-        ;; Moving backward.
-        (if (< (point) pos)
-            ;; We already moved backward because we started from between
-            ;; two functions.
-            (setq arg (1+ arg))
-          ;; We started from inside a function.
-          (goto-char beg))
-        (unless (zerop arg)
-          (beginning-of-defun-raw (- arg))
-	  (setq beg (point))
-          (funcall end-of-defun-function))))
-      (funcall skip)
-      (while (and (< arg 0) (>= (point) pos))
-        ;; We intended to move backward, but this ended up not doing so:
-        ;; Try harder!
-        (goto-char beg)
-        (beginning-of-defun-raw (- arg))
-        (if (>= (point) beg)
-	    (setq arg 0)
-	  (setq beg (point))
-          (funcall end-of-defun-function)
-	  (funcall skip))))))
+          (if (>= (point) beg)
+	      (setq arg 0)
+	    (setq beg (point))
+            (funcall end-of-defun-function)
+	    (funcall skip))))
+    (scan-error (if interactive
+                    (user-error (error-message-string err))
+                  (error err)))))
 
 (defun mark-defun (&optional arg interactive)
   "Put mark at end of this defun, point at beginning.
