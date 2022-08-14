@@ -579,8 +579,7 @@ the key of the front-line assoc list to incorporate SERVER."
                              ;; Look for the credentials based on
                              ;; the virtual server name and the address
                              (nnimap-credentials
-			      (seq-uniq
-			       (list server nnimap-address))
+			      (delete-dups (list server nnimap-address))
                               ports
                               nnimap-user))))
 		(setq nnimap-object nil)
