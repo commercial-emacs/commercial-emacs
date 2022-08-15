@@ -263,13 +263,13 @@ Return the number of unsatisfiable iterations."
 
 (defun tree-sitter-node-round-up (pos)
   (let ((node (tree-sitter-node-at pos)))
-    (while (<= pos (tree-sitter-node-start node))
+    (while (and node (<= pos (tree-sitter-node-start node)))
       (setq node (tree-sitter-node-preceding node)))
     node))
 
 (defun tree-sitter-node-round-down (pos)
   (let ((node (tree-sitter-node-at pos)))
-    (when (< pos (tree-sitter-node-start node))
+    (when (and node (< pos (tree-sitter-node-start node)))
       (setq node (tree-sitter-node-first-child-for-byte node pos)))
     node))
 

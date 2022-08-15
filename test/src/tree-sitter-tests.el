@@ -46,14 +46,13 @@
   "font-lock setup is highly circular, redundant, and difficult to isolate."
   (declare (indent defun))
   `(tree-sitter-tests-with-resources-dir
-     (let ((dir (make-temp-file "tree-sitter-tests" t))
-           (text (replace-regexp-in-string "^\n" "" ,text)))
+     (let ((dir (make-temp-file "tree-sitter-tests" t)))
        (unwind-protect
            (let ((font-lock-support-mode 'tree-sitter-lock-mode)
                  (file-name (expand-file-name (concat "tree-sitter-tests" ,ext) dir))
                  font-lock-global-modes ;; only works when not interactive
                  enable-dir-local-variables)
-             (with-temp-file file-name (insert text))
+             (with-temp-file file-name (insert ,text))
              (find-file file-name)
              (should-not (text-property-any (point-min) (point-max) 'fontified t))
              (let (noninteractive)
@@ -72,7 +71,7 @@ void main (void) {
   return 0;
 }
 "))
-    (tree-sitter-tests-doit ".c" text
+    (tree-sitter-tests-doit ".c" (replace-regexp-in-string "^\n" "" text)
       (should (equal "primitive_type" (tree-sitter-node-type (tree-sitter-node-at 1))))
       (should (equal "(primitive_type)" (tree-sitter-node-string (tree-sitter-node-at 2))))
       (should-not (tree-sitter-node-type (tree-sitter-node-at 5 t)))
@@ -89,7 +88,7 @@ void main (void) {
   return 0;
 }
 "))
-    (tree-sitter-tests-doit ".c" text
+    (tree-sitter-tests-doit ".c" (replace-regexp-in-string "^\n" "" text)
       (should (equal (tree-sitter-highlights (point-min) (point-max))
                      '(font-lock-type-face (1 . 5) nil (5 . 6) font-lock-function-name-face (6 . 10) nil (10 . 12) font-lock-type-face (12 . 16) nil (16 . 22) font-lock-keyword-face (22 . 28) nil (28 . 29) font-lock-constant-face (29 . 30) nil (30 . 33))))
       (goto-char (point-min))
@@ -106,7 +105,7 @@ void main (void) {
   return 0;
 }
 "))
-    (tree-sitter-tests-doit ".c" text
+    (tree-sitter-tests-doit ".c" (replace-regexp-in-string "^\n" "" text)
       (should t))))
 
 
@@ -121,7 +120,7 @@ for each change in the insufferable `custom-save-variables.')"
 (custom-set-variables
  '(c-basic-offset 'set-from-style))
 "))
-    (tree-sitter-tests-doit ".el" text
+    (tree-sitter-tests-doit ".el" (replace-regexp-in-string "^\n" "" text)
       (save-buffer)
       (should (equal font-lock-fontify-region-function
                      #'tree-sitter-fontify-region))
@@ -203,7 +202,9 @@ for each change in the insufferable `custom-save-variables.')"
     (tree-sitter-tests-doit ".el" text
       (tree-sitter-elisp-mode)
       (call-interactively #'end-of-defun)
-      (should (eq (point) 16)))))
+      (should (eq (point) 17))
+      (call-interactively #'end-of-defun)
+      (should (eq (point) 33)))))
 
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here
