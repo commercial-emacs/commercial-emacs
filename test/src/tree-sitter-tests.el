@@ -204,7 +204,9 @@ for each change in the insufferable `custom-save-variables.')"
       (call-interactively #'end-of-defun)
       (should (eq (point) 17))
       (call-interactively #'end-of-defun)
-      (should (eq (point) 33)))))
+      (should (eq (point) 33))
+      (call-interactively #'beginning-of-defun)
+      (should (eq (point) 18)))))
 
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here
