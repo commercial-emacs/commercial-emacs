@@ -275,10 +275,14 @@ Return the number of unsatisfiable iterations."
 
 (defun tree-sitter--traverse-defun (beginning-p &optional arg)
   "Two mutually sensitive polarities.
-If BEGINNING-P and positive ARG, go backward.
-If BEGINNING-P and negative ARG, go forward.
-If not BEGINNING-P and positive ARG, go forward.
-If not BEGINNING-P and negative ARG, go backward."
+
+BEGINNING-P   ARG         MOTION
+-----------   --------    ---------
+          t   positive    backwards
+          t   negative    forwards
+        nil   positive    forwards
+        nil   negative    backwards
+"
   (setq arg (or arg 1))
   (let* ((forward-p (or (and beginning-p (< arg 0))
                         (and (not beginning-p) (> arg 0))))
