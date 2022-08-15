@@ -977,13 +977,14 @@ delimiter."
 (defun ruby-deep-indent-paren-p (c)
   "TODO: document."
   (cond ((listp ruby-deep-indent-paren)
-         (let ((deep (assoc c ruby-deep-indent-paren)))
-           (cond (deep
-                  (or (cdr deep) ruby-deep-indent-paren-style))
-                 ((memq c ruby-deep-indent-paren)
-                  ruby-deep-indent-paren-style))))
-        ((eq c ruby-deep-indent-paren) ruby-deep-indent-paren-style)
-        ((eq c ?\( ) ruby-deep-arglist)))
+         (if-let ((deep (assoc c ruby-deep-indent-paren)))
+             (or (cdr deep) ruby-deep-indent-paren-style)
+           (when (memq c ruby-deep-indent-paren)
+             ruby-deep-indent-paren-style)))
+        ((eq c ruby-deep-indent-paren)
+         ruby-deep-indent-paren-style)
+        ((eq c ?\( )
+         ruby-deep-arglist)))
 
 (defun ruby-parse-partial (&optional end in-string nest depth pcol indent)
   ;; FIXME: Document why we can't just use parse-partial-sexp.
@@ -1206,7 +1207,7 @@ delimiter."
   (save-excursion
     (beginning-of-line)
     (let ((target-line-start (point))
-          closing-paren? case-fold-search indent eol begin op-end
+          closing-paren? case-fold-search result eol begin op-end
           in-string? paren-char paren-point depth pcol)
       (skip-syntax-forward " ")
       (setq closing-paren? (and (char-after) (matching-paren (char-after))))
@@ -1214,7 +1215,7 @@ delimiter."
         (setq parse-start (progn (ruby-beginning-of-indent) (point))))
       (goto-char parse-start)
       (back-to-indentation)
-      (setq indent (current-column))
+      (setq result (current-column))
       (cl-flet ((parse-again
                   (start end)
                   (cl-destructuring-bind
@@ -1226,55 +1227,54 @@ delimiter."
                           depth depth*
                           pcol pcol*))))
         (parse-again parse-start target-line-start)
-        (cond
-         (in-string?
-          (setq indent nil))
-         (paren-char
-          (goto-char (setq begin paren-point))
-          (when-let ((deep (ruby-deep-indent-paren-p paren-char)))
-            (cond ((and (eq deep t) (eq paren-char closing-paren?))
-                   (skip-syntax-backward " ")
-                   (setq indent (1- (current-column))))
-                  ((cl-destructuring-bind
-                       (_in-string? (_paren-char . paren-point) depth _pcol)
-                       (ruby-parse-region (point) target-line-start)
-                     (and depth (> depth 0)))
-                   (goto-char paren-point)
-                   (forward-word-strictly -1)
-                   (setq indent (ruby-indent-size (current-column) depth)))
-                  (t
-                   (setq indent (current-column))
-                   (cond ((eq deep 'space))
-                         (closing-paren? (setq indent (1- indent)))
-                         (t (setq indent (ruby-indent-size (1- indent) 1))))))
-            (if pcol
-                (goto-char pcol)
-              (goto-char parse-start)
-              (back-to-indentation))
-            (setq indent (ruby-indent-size (current-column) depth)))
-          (when (and (eq paren-char closing-paren?)
-                     (ruby-deep-indent-paren-p (matching-paren closing-paren?))
-                     (search-backward (char-to-string closing-paren?)))
-            ;; PAREN-CHAR was the droid we're looking for.  Pop stack.
-            (setq indent (current-column))))
-         ((and depth (> depth 0))
-          (unless paren-point
-            (error "Invalid nesting"))
-          (goto-char paren-point)
-          (forward-word-strictly -1) ; skip back a keyword
-          (setq begin (point))
+        (if in-string?
+            (setq result nil)
           (cond
-           ((looking-at "do\\>[^_]") ; iter block is a special case
-            (if pcol
-                (goto-char pcol)
-              (goto-char parse-start)
-              (back-to-indentation))
-            (setq indent (ruby-indent-size (current-column) depth)))
-           (t
-            (setq indent (+ (current-column) ruby-indent-level)))))
-         ((and depth (< depth 0))    ; in negative nest
-          (setq indent (ruby-indent-size (current-column) depth))))
-        (when indent
+           (paren-char
+            (goto-char (setq begin paren-point))
+            (when-let ((deep (ruby-deep-indent-paren-p paren-char)))
+              (cond ((and (eq deep t) (eq paren-char closing-paren?))
+                     (skip-syntax-backward " ")
+                     (setq result (1- (current-column))))
+                    ((cl-destructuring-bind
+                         (_in-string? (_paren-char . paren-point) depth _pcol)
+                         (ruby-parse-region (point) target-line-start)
+                       (and depth (> depth 0)))
+                     (goto-char paren-point)
+                     (forward-word-strictly -1)
+                     (setq result (ruby-indent-size (current-column) depth)))
+                    (t
+                     (setq result (current-column))
+                     (cond ((eq deep 'space))
+                           (closing-paren? (setq result (1- result)))
+                           (t (setq result (ruby-indent-size (1- result) 1))))))
+              (if pcol
+                  (goto-char pcol)
+                (goto-char parse-start)
+                (back-to-indentation))
+              (setq result (ruby-indent-size (current-column) depth)))
+            (when (and (eq paren-char closing-paren?)
+                       (ruby-deep-indent-paren-p (matching-paren closing-paren?))
+                       (search-backward (char-to-string closing-paren?)))
+              ;; PAREN-CHAR was the droid we're looking for.  Pop stack.
+              (setq result (current-column))))
+           ((and depth (> depth 0))
+            (unless paren-point
+              (error "Invalid nesting"))
+            (goto-char paren-point)
+            (forward-word-strictly -1) ; skip back a keyword
+            (setq begin (point))
+            (cond
+             ((looking-at "do\\>[^_]") ; iter block is a special case
+              (if pcol
+                  (goto-char pcol)
+                (goto-char parse-start)
+                (back-to-indentation))
+              (setq result (ruby-indent-size (current-column) depth)))
+             (t
+              (setq result (+ (current-column) ruby-indent-level)))))
+           ((and depth (< depth 0))    ; in negative nest
+            (setq result (ruby-indent-size (current-column) depth))))
           (goto-char target-line-start)
           (end-of-line)
           (setq eol (point))
@@ -1283,7 +1283,7 @@ delimiter."
            ((and (not (ruby-deep-indent-paren-p closing-paren?))
                  (re-search-forward ruby-negative eol t))
             (unless (eq ?_ (char-after (match-end 0)))
-              (setq indent (- indent ruby-indent-level))))
+              (setq result (- result ruby-indent-level))))
            ((and
              (save-excursion
                (beginning-of-line)
@@ -1352,7 +1352,7 @@ delimiter."
                                      (t t))))
                               (not (eq ?, c))
                               (setq op-end t)))))
-              (setq indent
+              (setq result
                     (cond
                      ((and
                        (null op-end)
@@ -1364,15 +1364,15 @@ delimiter."
                       (skip-syntax-forward " ")
                       (current-column))
                      (paren-char
-                      indent)
+                      result)
                      (t
-                      (+ indent ruby-indent-level)))))))))
-      (goto-char target-line-start)
-      (beginning-of-line)
-      (skip-syntax-forward " ")
-      (if (looking-at "\\.[^.]\\|&\\.")
-          (+ indent ruby-indent-level)
-        indent))))
+                      (+ result ruby-indent-level)))))))
+          (goto-char target-line-start)
+          (beginning-of-line)
+          (skip-syntax-forward " ")
+          (when (looking-at "\\.[^.]\\|&\\.")
+            (setq result (+ result ruby-indent-level)))))
+      result)))
 
 (defun ruby-beginning-of-defun (&optional arg)
   "Move backward to the beginning of the current defun.
