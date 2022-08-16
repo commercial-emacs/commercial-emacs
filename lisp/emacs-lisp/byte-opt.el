@@ -1297,8 +1297,19 @@ See Info node `(elisp) Integer Basics'."
   ;; FIXME: This check does not belong here, move!
   (when (< (length form) 2)
     (byte-compile-warn "too few arguments for `while'"))
-  (if (nth 1 form)
-      form))
+  (let ((condition (nth 1 form)))
+    (if (byte-compile-nilconstp condition)
+        condition
+      form)))
+
+(defun byte-optimize-not (form)
+  (and (= (length form) 2)
+       (let ((arg (nth 1 form)))
+        (cond ((null arg) t)
+               ((macroexp-const-p arg) nil)
+               ((byte-compile-nilconstp arg) `(progn ,arg t))
+               ((byte-compile-trueconstp arg) `(progn ,arg nil))
+               (t form)))))
 
 (put 'and   'byte-optimizer #'byte-optimize-and)
 (put 'or    'byte-optimizer #'byte-optimize-or)
