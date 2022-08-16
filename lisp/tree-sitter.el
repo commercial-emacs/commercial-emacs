@@ -315,6 +315,11 @@ BEGINNING-P   ARG         MOTION
   "Candidate for `end-of-defun-function'."
   (tree-sitter--traverse-defun nil arg))
 
+(defun tree-sitter-indent-line ()
+  "Indent the line."
+
+  )
+
 (provide 'tree-sitter)
 
 ;;; tree-sitter.el ends here
