@@ -36,12 +36,17 @@
 BODY is code to be executed within the temp buffer.  Point is
 always located at the beginning of buffer."
   (declare (indent 1) (debug t))
-  `(with-temp-buffer
-     (let ((python-indent-guess-indent-offset nil))
-       (python-mode)
-       (insert ,contents)
-       (goto-char (point-min))
-       ,@body)))
+  `(let ((python-indent-guess-indent-offset nil)
+         (buf (get-buffer-create "python-tests-with-temp-buffer")))
+     (unwind-protect
+         (progn
+           (switch-to-buffer buf)
+           (python-mode)
+           (insert ,contents)
+           (goto-char (point-min))
+           ,@body)
+       (let (kill-buffer-query-functions)
+         (kill-buffer buf)))))
 
 (defmacro python-tests-with-temp-file (contents &rest body)
   "Create a `python-mode' enabled file with CONTENTS.
@@ -114,12 +119,9 @@ All occurrences of SEARCH are changed to REPLACE."
   (python-tests-with-temp-buffer
    content
    ;; Force enable font-lock mode without jit-lock.
-   (rename-buffer "*python-font-lock-test*" t)
-   (let (noninteractive font-lock-support-mode)
-     (font-lock-mode))
-   (while
-       (re-search-forward search nil t)
+   (while (re-search-forward search nil t)
      (replace-match replace))
+   (redisplay)
    (should (equal faces (python-tests-get-buffer-faces)))))
 
 (defun python-tests-self-insert (char-or-str)
@@ -402,6 +404,7 @@ def f(x: CustomInt) -> CustomInt:
      (144 . font-lock-keyword-face) (150))))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-1 ()
+  (skip-unless (not noninteractive))
   (python-tests-assert-faces-after-change
    "
 [
@@ -418,6 +421,7 @@ def f(x: CustomInt) -> CustomInt:
    "#" "="))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-2 ()
+  (skip-unless (not noninteractive))
   (python-tests-assert-faces-after-change
    "
 [
@@ -429,6 +433,7 @@ def f(x: CustomInt) -> CustomInt:
    "#" "="))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-3 ()
+  (skip-unless (not noninteractive))
   (python-tests-assert-faces-after-change
    "a\\
     ,\\
@@ -447,6 +452,7 @@ def f(x: CustomInt) -> CustomInt:
    "#" "="))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-4 ()
+  (skip-unless (not noninteractive))
   (python-tests-assert-faces-after-change
    "a\\
     :\\
@@ -458,6 +464,7 @@ def f(x: CustomInt) -> CustomInt:
    "#" "="))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-5 ()
+  (skip-unless (not noninteractive))
   (python-tests-assert-faces-after-change
    "(\\
     a\\
@@ -476,6 +483,7 @@ def f(x: CustomInt) -> CustomInt:
    "#" "="))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-6 ()
+  (skip-unless (not noninteractive))
   (python-tests-assert-faces-after-change
    "(
     a
