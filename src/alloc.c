@@ -2311,6 +2311,14 @@ free_by_pvtype (struct Lisp_Vector *vector)
 	ts_tree_cursor_delete (&cursor->cursor);
       }
       break;
+    case PVEC_TREE_SITTER_QUERY:
+      {
+	struct Lisp_Tree_Sitter_Query *query
+	  = PSEUDOVEC_STRUCT (vector, Lisp_Tree_Sitter_Query);
+	ts_query_delete (query->query);
+	ts_query_cursor_delete (query->cursor);
+      }
+      break;
 #endif
 #ifdef HAVE_SQLITE3
     case PVEC_SQLITE:

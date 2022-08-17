@@ -55,6 +55,32 @@ make_node (TSNode node)
   return make_lisp_ptr (ptr, Lisp_Vectorlike);
 }
 
+/* I would make this a Lisp_Misc_Ptr or PVEC_OTHER but TSQuery
+   needs bespoke deletion in free_by_pvectype ().  */
+
+static Lisp_Object
+make_query (TSLanguageFunctor fn, const char *query_buf)
+{
+  uint32_t error_offset;
+  TSQueryError error_type;
+  Lisp_Object result = Qnil;
+  TSQuery *query = ts_query_new (fn (), query_buf, strlen (query_buf),
+				 &error_offset, &error_type);
+  TSQueryCursor *cursor = ts_query_cursor_new ();
+  struct Lisp_Tree_Sitter_Query *ptr =
+    ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Tree_Sitter_Query,
+				 PVEC_TREE_SITTER_QUERY);
+  Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
+  if (! NILP (root_node) && query && cursor && ptr)
+    {
+      ptr->query = query;
+      ptr->cursor = cursor;
+      ts_query_cursor_exec (ptr->cursor, ptr->query, XTREE_SITTER_NODE (root_node)->node);
+      result = make_lisp_ptr (ptr, Lisp_Vectorlike);
+    }
+  return result;
+}
+
 /* I would make this a Lisp_Misc_Ptr or PVEC_OTHER but TSTreeCursor
    needs bespoke deletion in free_by_pvectype ().  */
 
@@ -1076,12 +1102,30 @@ DEFUN ("tree-sitter-node-end",
 		   (ts_node_end_byte (XTREE_SITTER_NODE (node)->node)));
 }
 
+DEFUN ("tree-sitter-query-next-capture",
+       Ftree_sitter_query_next_capture, Stree_sitter_query_next_capture,
+       1, 2, 0,
+       doc: /* Return next capture as alist.  */)
+  (Lisp_Object query, Lisp_Object node)
+{
+  CHECK_TREE_SITTER_QUERY (query);
+  TSQueryCursor *cursor = XTREE_SITTER_QUERY (query)->cursor;
+  TSQuery *xquery = XTREE_SITTER_QUERY (query)->query;
+  if (! NILP (node))
+    {
+      CHECK_TREE_SITTER_NODE (node);
+      ts_query_cursor_exec (cursor, xquery, XTREE_SITTER_NODE (node)->node);
+    }
+  return Qnil;
+}
+
 DEFUN ("tree-sitter-query",
        Ftree_sitter_query, Stree_sitter_query,
        1, 2, 0,
-       doc: /* Return TSQuery in alist form.
+       doc: /* Return TSQuery.
 If FILENAME is relative, look "queries/[language-of-major-mode]" subdirectory
-of Qtree_sitter_resources_dir.  */)
+of Qtree_sitter_resources_dir.  Optional PROGMODE is the symbol of
+a major mode.  */)
   (Lisp_Object filename, Lisp_Object progmode)
 {
   Lisp_Object result = Qnil;
@@ -1091,45 +1135,30 @@ of Qtree_sitter_resources_dir.  */)
     progmode = BVAR (XBUFFER (Fcurrent_buffer ()), major_mode);
   if (! NILP (progmode))
     {
+      TSLanguageFunctor fn = tree_sitter_language_functor (progmode);
       Lisp_Object language =
 	Fcdr_safe (Fassq (progmode, Fsymbol_value (Qtree_sitter_mode_alist)));
-      if (! NILP (language))
+      if (fn != NULL && ! NILP (language))
 	{
-	  TSLanguageFunctor fn = tree_sitter_language_functor (progmode);
-	  if (fn != NULL)
+	  FILE *fp;
+	  if (NILP (Ffile_name_absolute_p (filename)))
+	    filename = Fexpand_file_name
+	      (filename, concat3 (Ffile_name_as_directory
+				  (Fsymbol_value (Qtree_sitter_resources_dir)),
+				  build_string ("queries/"),
+				  language));
+	  fp = fopen (SSDATA (filename), "rb");
+	  if (fp != NULL)
 	    {
-	      FILE *fp;
-	      filename = Fexpand_file_name
-		(filename, concat3 (Ffile_name_as_directory
-				    (Fsymbol_value (Qtree_sitter_resources_dir)),
-				    build_string ("queries/"),
-				    language));
-	      fp = fopen (SSDATA (filename), "rb");
-	      if (fp != NULL)
-		{
-		  char *query_buf;
-		  long query_length;
-		  fseek (fp, 0L, SEEK_END);
-		  query_length = ftell (fp);
-		  rewind (fp);
-		  query_buf = xzalloc(query_length + 1);
-		  if (1 == fread (query_buf, query_length, 1, fp))
-		    {
-		      uint32_t error_offset;
-		      TSQueryError error_type;
-		      TSQuery *query = ts_query_new (fn (),
-						     query_buf,
-						     strlen (query_buf),
-						     &error_offset,
-						     &error_type);
-		      if (query != NULL)
-			{
-			  result = make_fixnum (ts_query_pattern_count (query));
-			  ts_query_delete (query);
-			}
-		    }
-		  xfree (query_buf);
-		}
+	      char *query_buf;
+	      long query_length;
+	      fseek (fp, 0L, SEEK_END);
+	      query_length = ftell (fp);
+	      rewind (fp);
+	      query_buf = xzalloc(query_length + 1);
+	      if (1 == fread (query_buf, query_length, 1, fp))
+		result = make_query (fn, query_buf);
+	      xfree (query_buf);
 	    }
 	}
     }
@@ -1325,6 +1354,7 @@ syms_of_tree_sitter (void)
   DEFSYM (Qtree_sitterp, "tree-sitterp");
   DEFSYM (Qtree_sitter_nodep, "tree-sitter-nodep");
   DEFSYM (Qtree_sitter_cursorp, "tree-sitter-cursorp");
+  DEFSYM (Qtree_sitter_queryp, "tree-sitter-queryp");
   DEFSYM (Qjit_lock_chunk_size, "jit-lock-chunk-size");
 
   define_error (Qtree_sitter_error, "Generic tree-sitter exception", Qerror);
@@ -1378,6 +1408,7 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_end);
   defsubr (&Stree_sitter_ppss);
   defsubr (&Stree_sitter_query);
+  defsubr (&Stree_sitter_query_next_capture);
   defsubr (&Stree_sitter_highlights);
   defsubr (&Stree_sitter_highlight_region);
   defsubr (&Stree_sitter_changed_range);
