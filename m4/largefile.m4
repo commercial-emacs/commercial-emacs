@@ -10,9 +10,10 @@
 # It does not set _LARGEFILE_SOURCE=1 on HP-UX/ia64 32-bit, although this
 # setting of _LARGEFILE_SOURCE is needed so that <stdio.h> declares fseeko
 # and ftello in C++ mode as well.
-# This problem occurs in Autoconf 2.71 and earlier, which lack AC_SYS_YEAR2038.
+# Fixed in Autoconf 2.72, which has AC_SYS_YEAR2038.
 AC_DEFUN([gl_SET_LARGEFILE_SOURCE],
 [
+ m4_ifndef([AC_SYS_YEAR2038], [
   AC_REQUIRE([AC_CANONICAL_HOST])
   AC_FUNC_FSEEKO
   case "$host_os" in
@@ -21,11 +22,14 @@ AC_DEFUN([gl_SET_LARGEFILE_SOURCE],
         [Define to 1 to make fseeko visible on some hosts (e.g. glibc 2.2).])
       ;;
   esac
+ ])
 ])
 
-m4_ifndef([AC_SYS_YEAR2038_RECOMMENDED], [
-# Support AC_SYS_YEAR2038_RECOMMENDED and related macros, even if
-# Autoconf 2.71 or earlier.  This code is taken from Autoconf master.
+# Work around a problem in Autoconf through 2.71 on glibc 2.34+
+# with _TIME_BITS.  Also, work around a problem in autoconf <= 2.69:
+# AC_SYS_LARGEFILE does not configure for large inodes on Mac OS X 10.5,
+# or configures them incorrectly in some cases.
+m4_version_prereq([2.70], [], [
 
 # _AC_SYS_YEAR2038_TEST_CODE
 # --------------------------
@@ -192,17 +196,7 @@ m4_define([_AC_SYS_LARGEFILE_TEST_CODE],
 # Defined by Autoconf 2.71 and circa 2022 Gnulib unwisely depended on it.
 m4_define([_AC_SYS_LARGEFILE_TEST_INCLUDES], [_AC_SYS_LARGEFILE_TEST_CODE])
 
-# _AC_SYS_LARGEFILE_OPTIONS
-# -------------------------
-# List of known ways to enable support for large files.  If you change
-# this list you probably also need to change the AS_CASE at the end of
-# _AC_SYS_LARGEFILE_PROBE.
-m4_define([_AC_SYS_LARGEFILE_OPTIONS], m4_normalize(
-    ["none needed"]                   dnl Most current systems
-    ["-D_FILE_OFFSET_BITS=64"]        dnl X/Open LFS spec
-    ["-D_LARGE_FILES=1"]              dnl 32-bit AIX 4.2.1+, 32-bit z/OS
-    ["-n32"]                          dnl 32-bit IRIX 6, SGI cc (obsolete)
-))
+m4_ifndef([AC_SYS_YEAR2038], [
 
 # _AC_SYS_LARGEFILE_PROBE
 # -----------------------
@@ -280,12 +274,44 @@ AC_CONFIG_COMMANDS_PRE([_AC_SYS_YEAR2038_ENABLE])])
 # to have a 64-bit inode number cannot be accessed by 32-bit applications on
 # Linux x86/x86_64.  This can occur with file systems such as XFS and NFS.
 AC_DEFUN([AC_SYS_LARGEFILE],
-[AC_ARG_ENABLE([largefile],
-   [AS_HELP_STRING([--disable-largefile],
-      [omit support for large files])])dnl
-AS_IF([test "$enable_largefile,$enable_year2038" != no,no],
-  [_AC_SYS_LARGEFILE_PROBE])])
-])# m4_ifndef AC_SYS_YEAR2038_RECOMMENDED
+[AC_ARG_ENABLE(largefile,
+               [  --disable-largefile     omit support for large files])
+AS_IF([test "$enable_largefile" != no],
+ [AC_CACHE_CHECK([for special C compiler options needed for large files],
+    ac_cv_sys_largefile_CC,
+    [ac_cv_sys_largefile_CC=no
+     if test "$GCC" != yes; then
+       ac_save_CC=$CC
+       while :; do
+         # IRIX 6.2 and later do not support large files by default,
+         # so use the C compiler's -n32 option if that helps.
+         AC_LANG_CONFTEST([AC_LANG_PROGRAM([_AC_SYS_LARGEFILE_TEST_INCLUDES])])
+         AC_COMPILE_IFELSE([], [break])
+         CC="$CC -n32"
+         AC_COMPILE_IFELSE([], [ac_cv_sys_largefile_CC=' -n32'; break])
+         break
+       done
+       CC=$ac_save_CC
+       rm -f conftest.$ac_ext
+    fi])
+  if test "$ac_cv_sys_largefile_CC" != no; then
+    CC=$CC$ac_cv_sys_largefile_CC
+  fi
+
+  _AC_SYS_LARGEFILE_MACRO_VALUE(_FILE_OFFSET_BITS, 64,
+    ac_cv_sys_file_offset_bits,
+    [Number of bits in a file offset, on hosts where this is settable.],
+    [_AC_SYS_LARGEFILE_TEST_INCLUDES])
+  AS_CASE([$ac_cv_sys_file_offset_bits],
+    [unknown],
+      [_AC_SYS_LARGEFILE_MACRO_VALUE([_LARGE_FILES], [1],
+         [ac_cv_sys_large_files],
+         [Define for large files, on AIX-style hosts.],
+         [_AC_SYS_LARGEFILE_TEST_INCLUDES])],
+    [64],
+      [gl_YEAR2038_BODY([])])])
+])# AC_SYS_LARGEFILE
+])# m4_ifndef AC_SYS_YEAR2038
 
 # Enable large files on systems where this is implemented by Gnulib, not by the
 # system headers.

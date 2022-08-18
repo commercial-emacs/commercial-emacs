@@ -192,6 +192,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module stat-time:
   # Code from module std-gnu11:
   # Code from module stdbool:
+  # Code from module stdalign:
   # Code from module stdckdint:
   # Code from module stddef:
   # Code from module stdint:
@@ -771,6 +772,7 @@ AC_DEFUN([gl_INIT],
   gl_gnulib_enabled_strerror=false
   gl_gnulib_enabled_dbb57f49352be8fb86869629a254fb72=false
   gl_gnulib_enabled_strings=false
+  gl_gnulib_enabled_stdckdint=false
   gl_gnulib_enabled_strtoll=false
   gl_gnulib_enabled_utimens=false
   gl_gnulib_enabled_682e609604ccaac6be382e4ee3a4eaec=false
@@ -902,6 +904,12 @@ AC_DEFUN([gl_INIT],
       gl_gnulib_enabled_a9786850e999ae65a836a6041e8e5ed1=true
       if test $HAVE_GROUP_MEMBER = 0; then
         func_gl_gnulib_m4code_getgroups
+      fi
+      if test $HAVE_GROUP_MEMBER = 0; then
+        func_gl_gnulib_m4code_d3b2383720ee0e541357aa2aac598e2b
+      fi
+      if test $HAVE_GROUP_MEMBER = 0; then
+        func_gl_gnulib_m4code_stdckdint
       fi
     fi
   }
@@ -1073,6 +1081,20 @@ AC_DEFUN([gl_INIT],
       gl_gnulib_enabled_strings=true
     fi
   }
+  func_gl_gnulib_m4code_stdckdint ()
+  {
+    if ! $gl_gnulib_enabled_stdckdint; then
+      AC_CHECK_HEADERS_ONCE([stdckdint.h])
+      if test $ac_cv_header_stdckdint_h = yes; then
+        GL_GENERATE_STDCKDINT_H=false
+      else
+        GL_GENERATE_STDCKDINT_H=true
+      fi
+      gl_CONDITIONAL_HEADER([stdckdint.h])
+      AC_PROG_MKDIR_P
+      gl_gnulib_enabled_stdckdint=true
+    fi
+  }
   func_gl_gnulib_m4code_strtoll ()
   {
     if $gl_gnulib_enabled_strtoll; then :; else
@@ -1215,6 +1237,7 @@ AC_DEFUN([gl_INIT],
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strerror], [$gl_gnulib_enabled_strerror])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_dbb57f49352be8fb86869629a254fb72], [$gl_gnulib_enabled_dbb57f49352be8fb86869629a254fb72])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strings], [$gl_gnulib_enabled_strings])
+  AM_CONDITIONAL([gl_GNULIB_ENABLED_stdckdint], [$gl_gnulib_enabled_stdckdint])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strtoll], [$gl_gnulib_enabled_strtoll])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_utimens], [$gl_gnulib_enabled_utimens])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_682e609604ccaac6be382e4ee3a4eaec], [$gl_gnulib_enabled_682e609604ccaac6be382e4ee3a4eaec])
@@ -1522,6 +1545,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/integer_length.c
   lib/integer_length.h
   lib/integer_length_l.c
+  lib/intprops-internal.h
   lib/intprops.h
   lib/inttypes.in.h
   lib/itold.c
@@ -1601,6 +1625,9 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/signal.in.h
   lib/stat-time.c
   lib/stat-time.h
+  lib/stdckdint.in.h
+  lib/stdalign.in.h
+  lib/stdalign.in.h
   lib/stdckdint.in.h
   lib/stddef.in.h
   lib/stdint.in.h
