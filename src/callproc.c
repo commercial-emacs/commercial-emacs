@@ -1567,7 +1567,7 @@ emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,
 #endif /* not DONT_REOPEN_PTY */
 
 #ifdef SETUP_SLAVE_PTY
-      if (pty_flag)
+      if (pty_in && std_in >= 0)
 	{
 	  SETUP_SLAVE_PTY;
 	}
