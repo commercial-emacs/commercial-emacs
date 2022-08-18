@@ -4735,8 +4735,6 @@ helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code)
 
 /* `native-comp-eln-load-path' clean-up support code.  */
 
-static Lisp_Object all_loaded_comp_units_h;
-
 #ifdef WINDOWSNT
 static Lisp_Object
 return_nil (Lisp_Object arg)
@@ -4778,11 +4776,12 @@ eln_load_path_final_clean_up (void)
 }
 
 /* This function puts the compilation unit in the
-  `all_loaded_comp_units_h` hashmap.  */
+  `Vcomp_loaded_comp_units_h` hashmap.  */
 static void
 register_native_comp_unit (Lisp_Object comp_u)
 {
-  Fputhash (XNATIVE_COMP_UNIT (comp_u)->file, comp_u, all_loaded_comp_units_h);
+  Fputhash (
+    XNATIVE_COMP_UNIT (comp_u)->file, comp_u, Vcomp_loaded_comp_units_h);
 }
 
 
@@ -5266,7 +5265,7 @@ LATE_LOAD has to be non-nil when loading for deferred compilation.  */)
   struct Lisp_Native_Comp_Unit *comp_u = allocate_native_comp_unit ();
   Lisp_Object encoded_filename = ENCODE_FILE (filename);
 
-  if (!NILP (Fgethash (filename, all_loaded_comp_units_h, Qnil))
+  if (!NILP (Fgethash (filename, Vcomp_loaded_comp_units_h, Qnil))
       && !file_in_eln_sys_dir (filename)
       && !NILP (Ffile_writable_p (filename)))
     {
@@ -5467,10 +5466,6 @@ compiled one.  */);
   staticpro (&loadsearch_re_list);
   loadsearch_re_list = Qnil;
 
-  staticpro (&all_loaded_comp_units_h);
-  all_loaded_comp_units_h =
-    CALLN (Fmake_hash_table, QCweakness, Qkey_and_value, QCtest, Qequal);
-
   DEFVAR_LISP ("comp-ctxt", Vcomp_ctxt,
 	       doc: /* The compiler context.  */);
   Vcomp_ctxt = Qnil;
@@ -5529,6 +5524,12 @@ For internal use.  */);
   DEFVAR_BOOL ("comp-file-preloaded-p", comp_file_preloaded_p,
 	       doc: /* When non-nil assume the file being compiled to
 be preloaded.  */);
+
+  DEFVAR_LISP ("comp-loaded-comp-units-h", Vcomp_loaded_comp_units_h,
+	       doc: /* Hash table recording all loaded compilation units.
+file -> CU.  */);
+  Vcomp_loaded_comp_units_h =
+    CALLN (Fmake_hash_table, QCweakness, Qvalue, QCtest, Qequal);
 
   Fprovide (intern_c_string ("native-compile"), Qnil);
 #endif /* #ifdef HAVE_NATIVE_COMP */
