@@ -335,6 +335,7 @@ GL_GENERATE_IEEE754_H_CONDITION = @GL_GENERATE_IEEE754_H_CONDITION@
 GL_GENERATE_LIMITS_H_CONDITION = @GL_GENERATE_LIMITS_H_CONDITION@
 GL_GENERATE_MINI_GMP_H_CONDITION = @GL_GENERATE_MINI_GMP_H_CONDITION@
 GL_GENERATE_STDALIGN_H_CONDITION = @GL_GENERATE_STDALIGN_H_CONDITION@
+GL_GENERATE_STDCKDINT_H_CONDITION = @GL_GENERATE_STDCKDINT_H_CONDITION@
 GL_GENERATE_STDDEF_H_CONDITION = @GL_GENERATE_STDDEF_H_CONDITION@
 GL_GENERATE_STDINT_H_CONDITION = @GL_GENERATE_STDINT_H_CONDITION@
 GL_GNULIB_ACCESS = @GL_GNULIB_ACCESS@
@@ -1227,11 +1228,13 @@ SETTINGS_CFLAGS = @SETTINGS_CFLAGS@
 SETTINGS_LIBS = @SETTINGS_LIBS@
 SHELL = @SHELL@
 SIG_ATOMIC_T_SUFFIX = @SIG_ATOMIC_T_SUFFIX@
+SIZEOF_LONG = @SIZEOF_LONG@
 SIZE_T_SUFFIX = @SIZE_T_SUFFIX@
 SQLITE3_CFLAGS = @SQLITE3_CFLAGS@
 SQLITE3_LIBS = @SQLITE3_LIBS@
 SQLITE3_OBJ = @SQLITE3_OBJ@
 STDALIGN_H = @STDALIGN_H@
+STDCKDINT_H = @STDCKDINT_H@
 STDDEF_H = @STDDEF_H@
 STDINT_H = @STDINT_H@
 SUBDIR_MAKEFILES_IN = @SUBDIR_MAKEFILES_IN@
@@ -2489,7 +2492,7 @@ endif
 ifeq (,$(OMIT_GNULIB_MODULE_intprops))
 
 
-EXTRA_DIST += intprops.h
+EXTRA_DIST += intprops-internal.h intprops.h
 
 endif
 ## end   gnulib module intprops
@@ -3125,6 +3128,31 @@ EXTRA_DIST += stdalign.in.h
 
 endif
 ## end   gnulib module stdalign
+
+## begin gnulib module stdckdint
+ifeq (,$(OMIT_GNULIB_MODULE_stdckdint))
+
+ifneq (,$(gl_GNULIB_ENABLED_stdckdint_CONDITION))
+BUILT_SOURCES += $(STDCKDINT_H)
+
+# We need the following in order to create <stdckdint.h> when the system
+# doesn't have one that works with the given compiler.
+ifneq (,$(GL_GENERATE_STDCKDINT_H_CONDITION))
+stdckdint.h: stdckdint.in.h $(top_builddir)/config.status
+	$(gl_V_at)$(SED_HEADER_STDOUT) \
+	  $(srcdir)/stdckdint.in.h > $@-t
+	$(AM_V_at)mv $@-t $@
+else
+stdckdint.h: $(top_builddir)/config.status
+	rm -f $@
+endif
+MOSTLYCLEANFILES += stdckdint.h stdckdint.h-t
+
+endif
+EXTRA_DIST += intprops-internal.h stdckdint.in.h
+
+endif
+## end   gnulib module stdckdint
 
 ## begin gnulib module stddef
 ifeq (,$(OMIT_GNULIB_MODULE_stddef))

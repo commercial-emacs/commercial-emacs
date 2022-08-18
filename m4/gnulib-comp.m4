@@ -191,6 +191,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module stat-time:
   # Code from module std-gnu11:
   # Code from module stdalign:
+  # Code from module stdckdint:
   # Code from module stddef:
   # Code from module stdint:
   # Code from module stdio:
@@ -945,6 +946,20 @@ AC_DEFUN([gl_INIT],
       gl_gnulib_enabled_strings=true
     fi
   }
+  func_gl_gnulib_m4code_stdckdint ()
+  {
+    if ! $gl_gnulib_enabled_stdckdint; then
+      AC_CHECK_HEADERS_ONCE([stdckdint.h])
+      if test $ac_cv_header_stdckdint_h = yes; then
+        GL_GENERATE_STDCKDINT_H=false
+      else
+        GL_GENERATE_STDCKDINT_H=true
+      fi
+      gl_CONDITIONAL_HEADER([stdckdint.h])
+      AC_PROG_MKDIR_P
+      gl_gnulib_enabled_stdckdint=true
+    fi
+  }
   func_gl_gnulib_m4code_strtoll ()
   {
     if ! $gl_gnulib_enabled_strtoll; then
@@ -1472,6 +1487,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/stat-time.c
   lib/stat-time.h
   lib/stdalign.in.h
+  lib/stdckdint.in.h
   lib/stddef.in.h
   lib/stdint.in.h
   lib/stdio-impl.h

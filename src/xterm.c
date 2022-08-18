@@ -27503,6 +27503,8 @@ xi_select_hierarchy_events (struct x_display_info *dpyinfo)
   memset (m, 0, l);
   mask.mask_len = l;
 
+  mask.deviceid = XIAllDevices;
+
   XISetMask (m, XI_PropertyEvent);
   XISetMask (m, XI_HierarchyChanged);
   XISetMask (m, XI_DeviceChanged);
