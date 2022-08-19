@@ -4184,6 +4184,7 @@ static void *
 pure_alloc (size_t size, int type)
 {
   void *result;
+  static bool pure_overflow_warned = false;
 
  again:
   if (type >= 0)
@@ -4207,6 +4208,12 @@ pure_alloc (size_t size, int type)
 
   if (pure_bytes_used <= pure_size)
     return result;
+
+  if (!pure_overflow_warned)
+    {
+      message ("Pure Lisp storage overflowed");
+      pure_overflow_warned = true;
+    }
 
   /* Don't allocate a large amount here,
      because it might get mmap'd and then its address
