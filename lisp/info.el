@@ -294,7 +294,8 @@ with wrapping around the current Info node."
   (unless (and (boundp 'Info-fontify) (null Info-fontify))
     '(font-lock-mode))
   "Hook run when activating Info Mode."
-  :type 'hook)
+  :type 'hook
+  :version "29.1")
 
 (defcustom Info-selection-hook nil
   "Hook run when an Info node is selected as the current node."

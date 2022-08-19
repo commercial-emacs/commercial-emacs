@@ -8058,8 +8058,6 @@ sentinel or a process filter function has an error.  */);
   defsubr (&Sinternal_default_process_filter);
   defsubr (&Sset_process_coding_system);
   defsubr (&Sprocess_coding_system);
-  defsubr (&Sset_process_filter_multibyte);
-  defsubr (&Sprocess_filter_multibyte_p);
 
  {
    Lisp_Object subfeatures = Qnil;
