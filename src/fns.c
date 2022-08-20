@@ -2613,6 +2613,51 @@ It can be retrieved with `(get SYMBOL PROPNAME)'.  */)
   return value;
 }
 
+DEFUN ("plist-member", Fplist_member, Splist_member, 2, 3, 0,
+       doc: /* Return non-nil if PLIST has the property PROP.
+PLIST is a property list, which is a list of the form
+\(PROP1 VALUE1 PROP2 VALUE2 ...).
+
+The comparison with PROP is done using PREDICATE, which defaults to
+`eq'.
+
+Unlike `plist-get', this allows you to distinguish between a missing
+property and a property with the value nil.
+The value is actually the tail of PLIST whose car is PROP.  */)
+  (Lisp_Object plist, Lisp_Object prop, Lisp_Object predicate)
+{
+  if (NILP (predicate))
+    return plist_member (plist, prop);
+  Lisp_Object tail = plist;
+  FOR_EACH_TAIL (tail)
+    {
+      if (!NILP (call2 (predicate, XCAR (tail), prop)))
+	return tail;
+      tail = XCDR (tail);
+      if (! CONSP (tail))
+	break;
+    }
+  CHECK_TYPE (NILP (tail), Qplistp, plist);
+  return Qnil;
+}
+
+/* Faster version of Fplist_member that works with EQ only.  */
+Lisp_Object
+plist_member (Lisp_Object plist, Lisp_Object prop)
+{
+  Lisp_Object tail = plist;
+  FOR_EACH_TAIL (tail)
+    {
+      if (EQ (XCAR (tail), prop))
+	return tail;
+      tail = XCDR (tail);
+      if (! CONSP (tail))
+	break;
+    }
+  CHECK_TYPE (NILP (tail), Qplistp, plist);
+  return Qnil;
+}
+
 DEFUN ("eql", Feql, Seql, 2, 2, 0,
        doc: /* Return t if the two args are `eq' or are indistinguishable numbers.
 Integers with the same value are `eql'.
