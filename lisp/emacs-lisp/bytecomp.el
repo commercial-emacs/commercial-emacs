@@ -1250,17 +1250,22 @@ message buffer `default-directory'."
 	   (compilation-forget-errors)
 	   pt))))
 
-(defun byte-compile-warn-obsolete (symbol)
-  "Warn that SYMBOL (a variable or function) is obsolete."
+(defun byte-compile-warn-obsolete (symbol type)
+  "Warn that SYMBOL (a variable, function or generalized variable) is obsolete.
+TYPE is a string that say which one of these three types it is."
   (when (byte-compile-warning-enabled-p 'obsolete symbol)
-    (let* ((funcp (get symbol 'byte-obsolete-info))
-           (msg (macroexp--obsolete-warning
-                 symbol
-                 (or funcp (get symbol 'byte-obsolete-variable))
-                 (if funcp "function" "variable"))))
-      (when (or (not funcp)
-                (not (memq symbol byte-compile-not-obsolete-funcs)))
-	(byte-compile-warn "%s" msg)))))
+    (byte-compile-warn-x
+     symbol "%s"
+     (macroexp--obsolete-warning
+      symbol
+      (pcase type
+        ("function"
+         (get symbol 'byte-obsolete-info))
+        ("variable"
+         (get symbol 'byte-obsolete-variable))
+        ("generalized variable"
+         (get symbol 'byte-obsolete-generalized-variable)))
+      type))))
 
 (defun byte-compile-warn (format &rest args)
   (let ((missive (apply #'format-message format args))
