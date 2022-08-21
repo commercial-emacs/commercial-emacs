@@ -94,7 +94,7 @@ DO must return an Elisp expression."
            (gf (function-get head 'gv-expander 'autoload)))
       (when (and (symbolp head)
                  (get head 'byte-obsolete-generalized-variable))
-        (byte-compile-warn-obsolete head))
+        (byte-compile-warn-obsolete head "generalized variable"))
       (if gf (apply gf do (cdr place))
         (let ((me (macroexpand-1 place
                                  ;; (append macroexpand-all-environment
