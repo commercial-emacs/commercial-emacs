@@ -3385,7 +3385,7 @@ value should be byte-discard."
                   ('set (not (eq access-type 'reference)))
                   ('get (eq access-type 'reference))
                   (_ t))))
-	 (byte-compile-warn-obsolete var))))
+	 (byte-compile-warn-obsolete var "variable"))))
 
 (defsubst byte-compile-dynamic-variable-op (base-op var)
   (let ((tmp (assq var byte-compile-variables)))
