@@ -1385,14 +1385,22 @@ that means treat it as not defined."
       (let ((match-count (recurse-count byte-compile-current-form)))
         (cl-labels ((recurse
                       (form)
-                      (cl-loop for element in form
+                      (cl-loop with tail = (unless (cl-tailp nil (last form))
+                                             (prog1 (cons (car (last form))
+                                                          (cdr (last form)))
+                                               (setcdr (last form) nil)
+                                               (setq form (nbutlast form))))
+                               for element in form
                                for count = (recurse-count
                                             (byte-compile--decouple element #'cdr))
                                if (>= match-count count)
-                               collect element
+                               collect element into result
                                else
-                               append (recurse element)
-                               end))
+                               append (recurse element) into result
+                               end
+                               finally return (nconc result
+                                                     (when tail
+                                                       (byte-compile--decouple tail #'cdr)))))
                     (first-atom
                       (form)
                       (cond ((atom form) form)
@@ -1430,7 +1438,7 @@ that means treat it as not defined."
   "Warn if function F is undefined or called with inconsistent NARGS."
   (when (and (get f 'byte-obsolete-info)
              (byte-compile-warning-enabled-p 'obsolete f))
-    (byte-compile-warn-obsolete f))
+    (byte-compile-warn-obsolete f "function"))
   (let* ((compiled-def (or (byte-compile-fdefinition f nil)
 		           (byte-compile-fdefinition f t)))
          (undefined-p
