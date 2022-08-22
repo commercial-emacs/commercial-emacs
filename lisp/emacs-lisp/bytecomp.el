@@ -1254,8 +1254,8 @@ message buffer `default-directory'."
   "Warn that SYMBOL (a variable, function or generalized variable) is obsolete.
 TYPE is a string that say which one of these three types it is."
   (when (byte-compile-warning-enabled-p 'obsolete symbol)
-    (byte-compile-warn-x
-     symbol "%s"
+    (byte-compile-warn
+     "%s"
      (macroexp--obsolete-warning
       symbol
       (pcase type

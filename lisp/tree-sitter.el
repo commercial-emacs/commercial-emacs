@@ -34,6 +34,7 @@
 (declare-function tree-sitter-goto-next-sibling "tree-sitter.c")
 (declare-function tree-sitter-node-of "tree-sitter.c")
 (declare-function tree-sitter-cursor-at "tree-sitter.c")
+(declare-function tree-sitter-node-start "tree-sitter.c")
 
 (defgroup tree-sitter
   nil
