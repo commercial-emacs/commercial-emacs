@@ -2679,17 +2679,46 @@ cdar      nthcdr
 A call to any of the following Emacs-specific functions:
 
 @smallexample
-alist-get                     process-get
-frame-parameter               process-sentinel
-terminal-parameter            window-buffer
-keymap-parent                 window-display-table
-match-data                    window-dedicated-p
-overlay-get                   window-hscroll
-overlay-start                 window-parameter
-overlay-end                   window-point
-process-buffer                window-start
-process-filter                default-value
+alist-get                     overlay-get
+face-background               overlay-start
+face-font                     overlay-end
+face-foreground               process-buffer
+face-stipple                  process-filter
+face-underline-p              process-get
+file-modes                    process-sentinel
+frame-parameter               window-buffer
+frame-parameters              window-display-table
+frame-width                   window-dedicated-p
+get-register                  window-hscroll
+getenv                        window-parameter
+terminal-parameter            window-point
+keymap-parent                 window-start
+match-data                    default-value
 @end smallexample
+
+@item
+A call of the form @code{(substring @var{subplace} @var{n} [@var{m}])},
+where @var{subplace} is itself a valid generalized variable whose
+current value is a string, and where the value stored is also a
+string.  The new string is spliced into the specified part of the
+destination string.  For example:
+
+@example
+(setq a (list "hello" "world"))
+     @result{} ("hello" "world")
+(cadr a)
+     @result{} "world"
+(substring (cadr a) 2 4)
+     @result{} "rl"
+(setf (substring (cadr a) 2 4) "o")
+     @result{} "o"
+(cadr a)
+     @result{} "wood"
+a
+     @result{} ("hello" "wood")
+@end example
+
+@c FIXME?  Also 'eq'? (see gv.el)
 @end itemize
 
 @noindent
