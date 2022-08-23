@@ -275,6 +275,9 @@ struct buffer_text
      end_unchanged contain no useful information.  */
   modiff_count overlay_unchanged_modified;
 
+  /* CHARS_MODIFF as of last redisplay that finished.  */
+  modiff_count chars_unchanged_modified;
+
   /* Properties of this buffer's text.  */
   INTERVAL intervals;
 

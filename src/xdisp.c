@@ -17585,7 +17585,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   /* Check whether the buffer to be displayed contains long lines.  */
   if (!NILP (Vlong_line_threshold)
       && !current_buffer->long_line_optimizations_p
-      && CHARS_MODIFF - CHARS_UNCHANGED_MODIFIED > 8)
+      && CHARS_MODIFF - BUF_CHARS_UNCHANGED_MODIFIED (current_buffer) > 8)
     {
       ptrdiff_t cur, next, found, max = 0, threshold;
       threshold = XFIXNUM (Vlong_line_threshold);
