@@ -747,6 +747,7 @@ AC_DEFUN([gl_INIT],
   gl_gnulib_enabled_rawmemchr=false
   gl_gnulib_enabled_6099e9737f757db36c47fa9d9f02e88c=false
   gl_gnulib_enabled_scratch_buffer=false
+  gl_gnulib_enabled_stdckdint=false
   gl_gnulib_enabled_strerror=false
   gl_gnulib_enabled_dbb57f49352be8fb86869629a254fb72=false
   gl_gnulib_enabled_strings=false
@@ -854,6 +855,9 @@ AC_DEFUN([gl_INIT],
       gl_gnulib_enabled_a9786850e999ae65a836a6041e8e5ed1=true
       if test $HAVE_GROUP_MEMBER = 0; then
         func_gl_gnulib_m4code_getgroups
+      fi
+      if test $HAVE_GROUP_MEMBER = 0; then
+        func_gl_gnulib_m4code_stdckdint
       fi
     fi
   }
@@ -1099,6 +1103,7 @@ AC_DEFUN([gl_INIT],
   AM_CONDITIONAL([gl_GNULIB_ENABLED_rawmemchr], [$gl_gnulib_enabled_rawmemchr])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_6099e9737f757db36c47fa9d9f02e88c], [$gl_gnulib_enabled_6099e9737f757db36c47fa9d9f02e88c])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_scratch_buffer], [$gl_gnulib_enabled_scratch_buffer])
+  AM_CONDITIONAL([gl_GNULIB_ENABLED_stdckdint], [$gl_gnulib_enabled_stdckdint])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strerror], [$gl_gnulib_enabled_strerror])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_dbb57f49352be8fb86869629a254fb72], [$gl_gnulib_enabled_dbb57f49352be8fb86869629a254fb72])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strings], [$gl_gnulib_enabled_strings])
@@ -1408,6 +1413,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/integer_length.c
   lib/integer_length.h
   lib/integer_length_l.c
+  lib/intprops-internal.h
   lib/intprops.h
   lib/inttypes.in.h
   lib/itold.c
