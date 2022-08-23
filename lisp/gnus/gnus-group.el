@@ -1200,7 +1200,7 @@ case interactively), the level will be updated by this command."
   (setq level (gnus-group-default-level level))
   (gnus-group-setup-buffer)
   (gnus-update-format-specifications 'group 'group-mode)
-  (let ((props (text-properties-at (point-at-bol)))
+  (let ((props (text-properties-at (line-beginning-position)))
 	(group (gnus-group-group-name))
         (number (funcall gnus-group-prepare-function level unread lowest))
         case-fold-search)

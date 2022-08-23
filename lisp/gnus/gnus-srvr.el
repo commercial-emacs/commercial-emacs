@@ -340,7 +340,7 @@ The following commands are available:
   (when-let ((server
               (save-excursion
                 (let (prop)
-                  (while (and (null (setq prop (get-text-property (point-at-bol) which)))
+                  (while (and (null (setq prop (get-text-property (line-beginning-position) which)))
                               (zerop (forward-line -1))))
                   prop))))
     (symbol-name server)))
@@ -952,9 +952,9 @@ how new groups will be entered into the group buffer."
 (defun gnus-browse-group-name ()
   (save-excursion
     (let (name)
-      (while (and (null (setq name (get-text-property (point-at-bol) 'gnus-group)))
+      (while (and (null (setq name (get-text-property (line-beginning-position) 'gnus-group)))
                   (zerop (forward-line -1))))
-      (when (re-search-forward ": \\(.*\\)$" (point-at-eol) t)
+      (when (re-search-forward ": \\(.*\\)$" (line-end-position) t)
         (concat (gnus-method-to-server-name gnus-browse-current-method) ":"
 	        (or name
 		    (match-string-no-properties 1)))))))

@@ -24,6 +24,7 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
+(require 'subr-x)
 
 (declare-function outline-forward-same-level "outline")
 (declare-function outline-backward-same-level "outline")

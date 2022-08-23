@@ -1179,7 +1179,8 @@ message buffer `default-directory'."
                       (apply #'format "%d:%d:"
 			     (save-excursion
 			       (goto-char charpos)
-			       (list (1+ (count-lines (point-min) (point-at-bol)))
+			       (list (1+ (count-lines (point-min)
+                                                      (line-beginning-position)))
                                      ;; `next-error' uses one-indexed column
                                      (1+ (current-column))))))
 		  ""))

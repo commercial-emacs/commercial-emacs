@@ -2673,9 +2673,9 @@ The form should return either t or nil."
 	      (while (re-search-forward
                       "[^ \t,\n]+"
                       (or (save-excursion
-		            (and (re-search-forward "[ \t]-n" (point-at-eol) t)
+		            (and (re-search-forward "[ \t]-n" (line-end-position) t)
 			         (- (point) 2)))
-		          (point-at-eol))
+		          (line-end-position))
                       t)
 	        (if (eq (char-after (match-beginning 0)) ?!)
 	            ;; If the word begins with a bang (!), this is a "not"
