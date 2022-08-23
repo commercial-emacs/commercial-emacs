@@ -528,7 +528,7 @@ retried once before actually displaying the error report."
 	      (goto-char pos)
 	      (if (looking-at (regexp-quote command))
 		  (delete-region pos (progn (forward-line 1)
-					    (point-at-bol)))))))
+                                            (line-beginning-position)))))))
       (nnheader-report 'nntp "Couldn't open connection to %s."
 		       nntp-address))))
 
@@ -553,7 +553,8 @@ retried once before actually displaying the error report."
 	    (with-current-buffer buffer
 	      (goto-char pos)
 	      (if (looking-at (regexp-quote command))
-		  (delete-region pos (progn (forward-line 1) (point-at-bol))))
+                  (delete-region pos (progn (forward-line 1)
+                                            (line-beginning-position))))
 	      )))
       (nnheader-report 'nntp "Couldn't open connection to %s."
 		       nntp-address))))
