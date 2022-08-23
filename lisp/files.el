@@ -853,13 +853,8 @@ nil (meaning `default-directory') as the associated list element."
   (when (stringp search-path)
     (let ((spath (substitute-env-vars search-path)))
       (mapcar (lambda (f)
-                (if (equal "" f) nil
-                  (let ((dir (file-name-as-directory f)))
-                    ;; Previous implementation used `substitute-in-file-name'
-                    ;; which collapse multiple "/" in front.  Do the same for
-                    ;; backward compatibility.
-                    (if (string-match "\\`/+" dir)
-                        (substring dir (1- (match-end 0))) dir))))
+                (unless (equal "" f)
+                  (file-name-as-directory f)))
               (split-string spath path-separator)))))
 
 (defun cd-absolute (dir)
