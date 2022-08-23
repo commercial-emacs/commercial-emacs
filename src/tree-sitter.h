@@ -43,13 +43,6 @@ struct Lisp_Tree_Sitter_Cursor
   TSTreeCursor cursor;
 } GCALIGNED_STRUCT;
 
-struct Lisp_Tree_Sitter_Query
-{
-  union vectorlike_header header;
-  TSQuery *query;
-  TSQueryCursor *cursor;
-} GCALIGNED_STRUCT;
-
 struct Lisp_Tree_Sitter
 {
   union vectorlike_header header;
@@ -60,6 +53,7 @@ struct Lisp_Tree_Sitter
   TSHighlighter *highlighter;
   const char **highlight_names;
   char *highlights_query;
+  TSQuery *indents_query;
 } GCALIGNED_STRUCT;
 
 INLINE bool
@@ -100,19 +94,6 @@ XTREE_SITTER_CURSOR (Lisp_Object x)
   return XUNTAG (x, Lisp_Vectorlike, struct Lisp_Tree_Sitter_Cursor);
 }
 
-INLINE bool
-TREE_SITTER_QUERYP (Lisp_Object x)
-{
-  return PSEUDOVECTORP (x, PVEC_TREE_SITTER_QUERY);
-}
-
-INLINE struct Lisp_Tree_Sitter_Query *
-XTREE_SITTER_QUERY (Lisp_Object x)
-{
-  eassert (TREE_SITTER_QUERYP (x));
-  return XUNTAG (x, Lisp_Vectorlike, struct Lisp_Tree_Sitter_Query);
-}
-
 INLINE struct Lisp_Tree_Sitter_Node *
 XTREE_SITTER_NODE (Lisp_Object x)
 {
@@ -130,12 +111,6 @@ INLINE void
 CHECK_TREE_SITTER_CURSOR (Lisp_Object x)
 {
   CHECK_TYPE (TREE_SITTER_CURSORP (x), Qtree_sitter_cursorp, x);
-}
-
-INLINE void
-CHECK_TREE_SITTER_QUERY (Lisp_Object x)
-{
-  CHECK_TYPE (TREE_SITTER_QUERYP (x), Qtree_sitter_queryp, x);
 }
 
 INLINE_HEADER_END

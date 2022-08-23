@@ -18,12 +18,13 @@ You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
+#include <ctype.h>
 
 #include "lisp.h"
 #include "tree-sitter.h"
 
 typedef TSLanguage *(*TSLanguageFunctor) (void);
-typedef Lisp_Object (*HighlightsFunctor) (const TSHighlightEventSlice *, const TSNode *, const char **);
+typedef Lisp_Object (*HighlightsFunctor) (const TSHighlightEventSlice *, TSNode, const char **);
 
 static Lisp_Object
 make_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
@@ -53,32 +54,6 @@ make_node (TSNode node)
     ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Tree_Sitter_Node, PVEC_TREE_SITTER_NODE);
   ptr->node = node;
   return make_lisp_ptr (ptr, Lisp_Vectorlike);
-}
-
-/* I would make this a Lisp_Misc_Ptr or PVEC_OTHER but TSQuery
-   needs bespoke deletion in free_by_pvectype ().  */
-
-static Lisp_Object
-make_query (TSLanguageFunctor fn, const char *query_buf)
-{
-  uint32_t error_offset;
-  TSQueryError error_type;
-  Lisp_Object result = Qnil;
-  TSQuery *query = ts_query_new (fn (), query_buf, strlen (query_buf),
-				 &error_offset, &error_type);
-  TSQueryCursor *cursor = ts_query_cursor_new ();
-  struct Lisp_Tree_Sitter_Query *ptr =
-    ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Tree_Sitter_Query,
-				 PVEC_TREE_SITTER_QUERY);
-  Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
-  if (! NILP (root_node) && query && cursor && ptr)
-    {
-      ptr->query = query;
-      ptr->cursor = cursor;
-      ts_query_cursor_exec (ptr->cursor, ptr->query, XTREE_SITTER_NODE (root_node)->node);
-      result = make_lisp_ptr (ptr, Lisp_Vectorlike);
-    }
-  return result;
 }
 
 /* I would make this a Lisp_Misc_Ptr or PVEC_OTHER but TSTreeCursor
@@ -160,14 +135,14 @@ tree_sitter_create (Lisp_Object progmode)
 }
 
 static Lisp_Object
-list_highlights (const TSHighlightEventSlice *slice, const TSNode *node,
+list_highlights (const TSHighlightEventSlice *slice, TSNode node,
 		 const char **highlight_names)
 {
   Lisp_Object
     retval = Qnil,
     alist = Fsymbol_value (Qtree_sitter_highlight_alist);
   const EMACS_INT count = XFIXNUM (Flength (alist));
-  const uint32_t offset = ts_node_start_byte (*node);
+  const uint32_t offset = ts_node_start_byte (node);
 
   for (int i = 0; i < slice->len; ++i)
     {
@@ -192,13 +167,13 @@ list_highlights (const TSHighlightEventSlice *slice, const TSNode *node,
 
 static Lisp_Object
 highlight_region (const TSHighlightEventSlice *slice,
-		  const TSNode *node, const char **highlight_names)
+		  const TSNode node, const char **highlight_names)
 {
   Lisp_Object
     alist = Fsymbol_value (Qtree_sitter_highlight_alist),
     prevailing = Qnil;
   const EMACS_INT count = XFIXNUM (Flength (alist));
-  const uint32_t offset = ts_node_start_byte (*node);
+  const uint32_t offset = ts_node_start_byte (node);
   ptrdiff_t smallest = PTRDIFF_MAX, biggest = PTRDIFF_MIN;
 
   for (int i=0; i<slice->len; ++i)
@@ -390,12 +365,12 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 		ts_highlighter_return_highlights (ts_highlighter, scope,
 						  SSDATA (source_code),
 						  (uint32_t) SBYTES (source_code),
-						  &node,
+						  node,
 						  ts_highlight_buffer);
 
 	      /* restore to absolute coords */
 	      node.context[0] = restore_start;
-	      retval = nconc2 (fn (&ts_highlight_event_slice, &node,
+	      retval = nconc2 (fn (&ts_highlight_event_slice, node,
 				   XTREE_SITTER (sitter)->highlight_names),
 			       retval);
 	      ts_highlighter_free_highlights (ts_highlight_event_slice);
@@ -1102,52 +1077,55 @@ DEFUN ("tree-sitter-node-end",
 		   (ts_node_end_byte (XTREE_SITTER_NODE (node)->node)));
 }
 
-DEFUN ("tree-sitter-query-next-capture",
-       Ftree_sitter_query_next_capture, Stree_sitter_query_next_capture,
-       1, 2, 0,
-       doc: /* Return next capture as alist.  */)
-  (Lisp_Object query, Lisp_Object node)
+DEFUN ("tree-sitter-indent",
+       Ftree_sitter_indent, Stree_sitter_indent,
+       0, 0, 0,
+       doc: /* Return number of spaces for current line.  */)
+  (void)
 {
-  CHECK_TREE_SITTER_QUERY (query);
-  TSQueryCursor *cursor = XTREE_SITTER_QUERY (query)->cursor;
-  TSQuery *xquery = XTREE_SITTER_QUERY (query)->query;
-  if (! NILP (node))
-    {
-      CHECK_TREE_SITTER_NODE (node);
-      ts_query_cursor_exec (cursor, xquery, XTREE_SITTER_NODE (node)->node);
-    }
-  return Qnil;
-}
+  Lisp_Object sitter = Ftree_sitter (Fcurrent_buffer ());
+  if (NILP (sitter))
+    return Qnil;
 
-DEFUN ("tree-sitter-query",
-       Ftree_sitter_query, Stree_sitter_query,
-       1, 2, 0,
-       doc: /* Return TSQuery.
-If FILENAME is relative, look "queries/[language-of-major-mode]" subdirectory
-of Qtree_sitter_resources_dir.  Optional PROGMODE is the symbol of
-a major mode.  */)
-  (Lisp_Object filename, Lisp_Object progmode)
-{
-  Lisp_Object result = Qnil;
-  CHECK_STRING (filename);
-  CHECK_SYMBOL (progmode);
-  if (NILP (progmode))
-    progmode = BVAR (XBUFFER (Fcurrent_buffer ()), major_mode);
-  if (! NILP (progmode))
+  /* target_node is the immediate node of current line (innermost).
+     enclosing_node is the child of root_node that contains target_node (outermost) */
+  const size_t indent_nspaces = 2;
+  size_t result = 0;
+  Lisp_Object target_node = Ftree_sitter_node_at (Qnil, Qnil);
+  Lisp_Object enclosing_node = target_node;
+  for (Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
+       ! NILP (enclosing_node)
+	 && NILP (Ftree_sitter_node_equal
+		  (root_node, Ftree_sitter_node_parent (enclosing_node)));
+       enclosing_node = Ftree_sitter_node_parent (enclosing_node));
+  TSLanguageFunctor fn = tree_sitter_language_functor (XTREE_SITTER (sitter)->progmode);
+  Lisp_Object language = Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
+					   Fsymbol_value (Qtree_sitter_mode_alist)));
+  if (! NILP (enclosing_node) && fn != NULL && ! NILP (language))
     {
-      TSLanguageFunctor fn = tree_sitter_language_functor (progmode);
-      Lisp_Object language =
-	Fcdr_safe (Fassq (progmode, Fsymbol_value (Qtree_sitter_mode_alist)));
-      if (fn != NULL && ! NILP (language))
+      static Lisp_Object cache = LISPSYM_INITIALLY (Qnil);
+      struct Lisp_Hash_Table *h;
+      Lisp_Object hash;
+      ptrdiff_t i;
+
+      if (NILP (cache))
 	{
-	  FILE *fp;
-	  if (NILP (Ffile_name_absolute_p (filename)))
-	    filename = Fexpand_file_name
-	      (filename, concat3 (Ffile_name_as_directory
-				  (Fsymbol_value (Qtree_sitter_resources_dir)),
-				  build_string ("queries/"),
-				  language));
-	  fp = fopen (SSDATA (filename), "rb");
+	  cache = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
+				   DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
+				   Qnil, false);
+	  staticpro (&cache);
+	}
+      h = XHASH_TABLE (cache);
+      i = hash_lookup (h, XTREE_SITTER (sitter)->progmode, &hash);
+      if (i < 0)
+	{
+	  Lisp_Object filename = Fexpand_file_name
+	    (build_string ("indents.scm"),
+	     concat3 (Ffile_name_as_directory
+		      (Fsymbol_value (Qtree_sitter_resources_dir)),
+		      build_string ("queries/"),
+		      language));
+	  FILE *fp = fopen (SSDATA (filename), "rb");
 	  if (fp != NULL)
 	    {
 	      char *query_buf;
@@ -1157,12 +1135,224 @@ a major mode.  */)
 	      rewind (fp);
 	      query_buf = xzalloc(query_length + 1);
 	      if (1 == fread (query_buf, query_length, 1, fp))
-		result = make_query (fn, query_buf);
+		{
+		  uint32_t error_offset;
+		  TSQueryError error_type;
+		  TSQuery *query = ts_query_new (fn (), query_buf, strlen (query_buf),
+						 &error_offset, &error_type);
+		  if (query != NULL)
+		    {
+		      if (XTREE_SITTER (sitter)->indents_query != NULL)
+			ts_query_delete (XTREE_SITTER (sitter)->indents_query);
+		      XTREE_SITTER (sitter)->indents_query = query;
+		      i = hash_put (h, XTREE_SITTER (sitter)->progmode,
+				    build_string (query_buf), hash);
+		    }
+		}
 	      xfree (query_buf);
 	    }
 	}
+      if (i >= 0)
+	{
+	  Lisp_Object source_query = HASH_VALUE (h, i);
+	  const uint32_t sitter_beg =
+	    ts_node_start_byte (XTREE_SITTER_NODE (enclosing_node)->node);
+	  const uint32_t sitter_end =
+	    ts_node_end_byte (XTREE_SITTER_NODE (enclosing_node)->node);
+	  const ptrdiff_t beg = SITTER_TO_BUFFER (sitter_beg);
+	  const ptrdiff_t end = SITTER_TO_BUFFER (sitter_end);
+
+	  Lisp_Object source_code =
+	    Fbuffer_substring_no_properties (make_fixnum (beg), make_fixnum (end));
+	  // ts_captures_new() recreates TSQuery from source_query
+	  // string, which is dumb since we already have indents_query.
+	  TSQueryCaptureSlice slice =
+	    ts_captures_new (fn (),
+			     SSDATA (source_query),
+			     (uint32_t) SBYTES (source_query),
+			     SSDATA (source_code),
+			     (uint32_t) SBYTES (source_code),
+			     XTREE_SITTER_NODE (enclosing_node)->node,
+			     sitter_beg,
+			     sitter_end);
+
+	  int slice_index = slice.len - 1;
+	  const ptrdiff_t line_target_pt = count_lines (CHAR_TO_BYTE (beg), PT_BYTE);
+	  ptrdiff_t line_node_beg;
+	  for (Lisp_Object node = target_node,
+		 root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
+	       slice_index >= 0
+		 && ! NILP (node)
+		 && NILP (Ftree_sitter_node_equal (root_node, node));
+	       (void) node)
+	    {
+	      /* Find enclosing QueryCapture of NODE.  */
+	      ptrdiff_t node_beg =
+		SITTER_TO_BUFFER (ts_node_start_byte
+				  (XTREE_SITTER_NODE (node)->node));
+	      line_node_beg = count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (node_beg));
+	      while (node_beg < SITTER_TO_BUFFER (ts_node_start_byte
+						  (slice.captures[slice_index].node)))
+		if (--slice_index < 0)
+		  goto done;
+
+	      /* Process all QueryCaptures for the same line.  */
+	      bool ignored_line = false, dented_line = false;
+	      for ((void) slice_index; slice_index >= 0; --slice_index)
+		{
+		  ptrdiff_t capture_beg =
+		    SITTER_TO_BUFFER (ts_node_start_byte (slice.captures[slice_index].node));
+		  ptrdiff_t capture_end =
+		    SITTER_TO_BUFFER (ts_node_end_byte (slice.captures[slice_index].node));
+		  ptrdiff_t line_capture_beg =
+		    count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (capture_beg));
+		  ptrdiff_t line_capture_end =
+		    count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (capture_end));
+
+		  if (line_capture_beg != line_node_beg)
+		    goto next_parent; /* !!! */
+
+		  uint32_t capture_name_length = 0;
+		  const char *capture_name =
+		    ts_query_capture_name_for_id (XTREE_SITTER (sitter)->indents_query,
+						  slice.captures[slice_index].index,
+						  &capture_name_length);
+		  uint32_t predicates_length = 0;
+		  const TSQueryPredicateStep *predicates =
+		    ts_query_predicates_for_pattern (XTREE_SITTER (sitter)->indents_query,
+						     slice.pattern_indices[slice_index],
+						     &predicates_length);
+		  char delimiter_open = '\0';
+		  if (predicates_length)
+		    {
+		      uint32_t length;
+		      const char *what =
+			ts_query_string_value_for_id
+			(XTREE_SITTER (sitter)->indents_query,
+			 predicates[i].value_id, &length);
+		      /* For lack of hash table for char *'s... */
+		      if (predicates[i].type == TSQueryPredicateStepTypeString
+			  && 0 == strcmp (what, "set!")
+			  && 3 == predicates_length
+			  && 0 == strcmp (ts_query_string_value_for_id
+					  (XTREE_SITTER (sitter)->indents_query,
+					   predicates[1].value_id, &length),
+					  "delimiter"))
+			{
+			  delimiter_open = ts_query_string_value_for_id
+			    (XTREE_SITTER (sitter)->indents_query,
+			     predicates[2].value_id, &length)[0];
+			}
+		    }
+
+		  if (0 == strcmp (capture_name, "zero_indent"))
+		    {
+		      result = 0;
+		      goto next_parent; /* !!! */
+		    }
+		  else if (0 == strcmp (capture_name, "ignore"))
+		    {
+		      ignored_line = true;
+		    }
+		  else if (0 == strcmp (capture_name, "indent_end"))
+		    {
+		      if (! dented_line)
+			result -= indent_nspaces;
+		      dented_line = true;
+		    }
+		  else if (0 == strcmp (capture_name, "branch")
+			   && line_node_beg == line_target_pt)
+		    {
+		      if (! dented_line)
+			result -= indent_nspaces;
+		      dented_line = true;
+		    }
+		  else if (0 == strcmp (capture_name, "dedent")
+			   && line_node_beg != line_target_pt)
+		    {
+		      if (! dented_line)
+			result -= indent_nspaces;
+		      dented_line = true;
+		    }
+		  else if (line_capture_beg != line_capture_end
+			   && line_node_beg != line_target_pt)
+		    {
+		      if (0 == strcmp (capture_name, "indent"))
+			{
+			  if (! dented_line)
+			    result += indent_nspaces;
+			  dented_line = true;
+			}
+		      else if (0 == strcmp (capture_name, "aligned_indent"))
+			{
+			  bool hanging_indent_p = true;
+			  TSNode delimiter_node;
+			  for (uint32_t count = ts_node_child_count
+				 (slice.captures[slice_index].node), i = 0;
+			       i < count;
+			       ++i)
+			    {
+			      delimiter_node =
+				ts_node_child (slice.captures[slice_index].node, i);
+			      if (strlen (ts_node_type (delimiter_node)) == 1
+				  && ts_node_type (delimiter_node)[0] == delimiter_open)
+				{
+				  ptrdiff_t delimiter_end =
+				    SITTER_TO_BUFFER (ts_node_end_byte (delimiter_node));
+				  for (ptrdiff_t bytepos = delimiter_end;
+				       bytepos != ZV && FETCH_CHAR (bytepos) != '\n';
+				       ++bytepos)
+				    {
+				      if (! isspace (FETCH_CHAR (bytepos)))
+					{
+					  hanging_indent_p = false;
+					  break;
+					}
+				    }
+				}
+			    }
+			  if (hanging_indent_p)
+			    {
+			      /* previous line ended with left paren. */
+			      result += indent_nspaces;
+			    }
+			  else
+			    {
+			      /* align to left paren on previous line.  */
+			      ptrdiff_t delimiter_beg =
+				SITTER_TO_BUFFER (ts_node_start_byte (delimiter_node));
+			      result += delimiter_beg;
+			      goto done; /* since delimiter_beg is absolute.  */
+			    }
+			}
+		    }
+		}
+
+	    next_parent:
+	      if (ignored_line && ! dented_line)
+		{
+		  // unclear
+		  result = 0;
+		  goto done;
+		}
+	      for (;;)
+		{
+		  node = Ftree_sitter_node_parent (node);
+		  if (NILP (node))
+		    break;
+		  ptrdiff_t node_beg =
+		    SITTER_TO_BUFFER (ts_node_start_byte
+				      (XTREE_SITTER_NODE (node)->node));
+		  if (count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (node_beg))
+		      < line_node_beg)
+		    break;
+		}
+	    }
+	done:
+	  ts_captures_free (slice);
+	}
     }
-  return result;
+  return make_fixnum (result);
 }
 
 DEFUN ("tree-sitter-highlights",
@@ -1349,18 +1539,14 @@ syms_of_tree_sitter (void)
 {
   DEFSYM (Qtree_sitter_error, "tree-sitter-error");
   DEFSYM (Qtree_sitter_parse_error, "tree-sitter-parse-error");
-  DEFSYM (Qtree_sitter_query_error, "tree-sitter-query-error");
   DEFSYM (Qtree_sitter_language_error, "tree-sitter-language-error");
   DEFSYM (Qtree_sitterp, "tree-sitterp");
   DEFSYM (Qtree_sitter_nodep, "tree-sitter-nodep");
   DEFSYM (Qtree_sitter_cursorp, "tree-sitter-cursorp");
-  DEFSYM (Qtree_sitter_queryp, "tree-sitter-queryp");
   DEFSYM (Qjit_lock_chunk_size, "jit-lock-chunk-size");
 
   define_error (Qtree_sitter_error, "Generic tree-sitter exception", Qerror);
   define_error (Qtree_sitter_parse_error, "Parse error",
-		Qtree_sitter_error);
-  define_error (Qtree_sitter_query_error, "Query pattern is malformed",
 		Qtree_sitter_error);
   define_error (Qtree_sitter_language_error, "Cannot load language",
 		Qtree_sitter_error);
@@ -1407,8 +1593,7 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_start);
   defsubr (&Stree_sitter_node_end);
   defsubr (&Stree_sitter_ppss);
-  defsubr (&Stree_sitter_query);
-  defsubr (&Stree_sitter_query_next_capture);
+  defsubr (&Stree_sitter_indent);
   defsubr (&Stree_sitter_highlights);
   defsubr (&Stree_sitter_highlight_region);
   defsubr (&Stree_sitter_changed_range);

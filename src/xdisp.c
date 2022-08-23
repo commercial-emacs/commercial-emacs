@@ -25648,7 +25648,6 @@ display_count_lines (ptrdiff_t start_byte,
   if (count < 0)
     return - orig_count + count;
   return orig_count - count;
-
 }
 
 /* Display a NUL-terminated string, starting with index START.

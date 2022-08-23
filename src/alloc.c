@@ -2299,6 +2299,8 @@ free_by_pvtype (struct Lisp_Vector *vector)
 	  ts_tree_delete(lisp_parser->prev_tree);
 	if (lisp_parser->parser != NULL)
 	  ts_parser_delete(lisp_parser->parser);
+	if (lisp_parser->indents_query)
+	  ts_query_delete (lisp_parser->indents_query);
       }
       break;
     case PVEC_TREE_SITTER_NODE:
@@ -2309,14 +2311,6 @@ free_by_pvtype (struct Lisp_Vector *vector)
 	struct Lisp_Tree_Sitter_Cursor *cursor
 	  = PSEUDOVEC_STRUCT (vector, Lisp_Tree_Sitter_Cursor);
 	ts_tree_cursor_delete (&cursor->cursor);
-      }
-      break;
-    case PVEC_TREE_SITTER_QUERY:
-      {
-	struct Lisp_Tree_Sitter_Query *query
-	  = PSEUDOVEC_STRUCT (vector, Lisp_Tree_Sitter_Query);
-	ts_query_delete (query->query);
-	ts_query_cursor_delete (query->cursor);
       }
       break;
 #endif

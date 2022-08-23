@@ -65,7 +65,7 @@ jobs:
       with:
         repository: commercial-emacs/tree-sitter
         path: tree-sitter
-        ref: 0.6.3alpha6
+        ref: v0.20.8alpha1
     - uses: actions-rs/toolchain@v1
       with:
           toolchain: stable
