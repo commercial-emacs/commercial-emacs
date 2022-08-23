@@ -154,6 +154,9 @@ enum { BEG = 1, BEG_BYTE = BEG };
 #define BUF_BEG_UNCHANGED(buf) ((buf)->text->beg_unchanged)
 #define BUF_END_UNCHANGED(buf) ((buf)->text->end_unchanged)
 
+#define BUF_CHARS_UNCHANGED_MODIFIED(buf) \
+  ((buf)->text->chars_unchanged_modified)
+
 #define UNCHANGED_MODIFIED \
   BUF_UNCHANGED_MODIFIED (current_buffer)
 #define OVERLAY_UNCHANGED_MODIFIED \
