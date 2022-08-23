@@ -685,7 +685,10 @@ REF must have been previously obtained with `gv-ref'."
 (gv-define-setter face-background (x f &optional s)
   `(set-face-background ,f ,x ,s))
 (gv-define-setter face-background-pixmap (x f &optional s)
-  `(set-face-background-pixmap ,f ,x ,s))
+  `(set-face-stipple ,f ,x ,s))
+(make-obsolete-generalized-variable 'face-background-pixmap 'face-stipple "29.1")
+(gv-define-setter face-stipple (x f &optional s)
+  `(set-face-stipple ,f ,x ,s))
 (gv-define-setter face-font (x f &optional s) `(set-face-font ,f ,x ,s))
 (gv-define-setter face-foreground (x f &optional s)
   `(set-face-foreground ,f ,x ,s))
@@ -761,7 +764,8 @@ REF must have been previously obtained with `gv-ref'."
 (make-obsolete-generalized-variable 'selected-frame 'select-frame "29.1")
 
 (gv-define-simple-setter standard-case-table set-standard-case-table)
-(make-obsolete-generalized-variable 'standard-case-table 'set-standard-case-table "29.1")
+(make-obsolete-generalized-variable
+ 'standard-case-table 'set-standard-case-table "29.1")
 
 (gv-define-simple-setter syntax-table set-syntax-table)
 (make-obsolete-generalized-variable 'syntax-table 'set-syntax-table "29.1")
