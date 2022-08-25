@@ -99,6 +99,7 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
   :risky t
   :version "28.1")
 
+;;;###autoload
 (defcustom tree-sitter-highlight-alist
   '(("constant" . font-lock-constant-face)
     ("type.builtin" . font-lock-type-face)

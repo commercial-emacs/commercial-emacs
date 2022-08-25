@@ -1223,6 +1223,9 @@ DEFUN ("tree-sitter-indent",
 		  ptrdiff_t line_capture_end =
 		    count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (capture_end));
 
+		  if (slice.captures[slice_index].index == UINT32_MAX)
+		    continue;
+
 		  if (line_capture_beg != line_node_beg)
 		    goto next_parent; /* !!! */
 
@@ -1279,18 +1282,23 @@ DEFUN ("tree-sitter-indent",
 				(0 == strcmp (node_type, ts_query_string_value_for_id
 					      (XTREE_SITTER (sitter)->indents_query,
 					       predicates[2].value_id, &length)));
-			      /* skip when:
+			      /* Exclude capture when:
 				 has-type? (!negate) and no match, or,
 				 not-has-type? (negate) and match.  */
 			      if (negate == match)
-				{
-				  if (dented_line)
-				    result -= indent_nspaces;
-				  goto next_parent; /* !!! */
-				}
+				for (int i = slice_index - 1; i >= 0; --i)
+				  {
+				    /* annul up-tree captures of this pattern.  */
+				    if (slice.pattern_indices[i] ==
+					slice.pattern_indices[slice_index])
+				      slice.captures[i].index = UINT32_MAX;
+				  }
 			    }
 			}
 		    }
+
+		  if (node_beg != capture_beg)
+		    continue; /* next slice_index; no indents apply. */
 
 		  if (0 == strcmp (capture_name, "zero_indent"))
 		    {
