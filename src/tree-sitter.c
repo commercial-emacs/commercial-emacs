@@ -41,6 +41,7 @@ make_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
   ptr->highlighter = NULL;
   ptr->highlight_names = NULL;
   ptr->highlights_query = NULL;
+  ptr->indents_query = NULL;
   return make_lisp_ptr (ptr, Lisp_Vectorlike);
 }
 
@@ -1191,13 +1192,26 @@ DEFUN ("tree-sitter-indent",
 		SITTER_TO_BUFFER (ts_node_start_byte
 				  (XTREE_SITTER_NODE (node)->node));
 	      line_node_beg = count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (node_beg));
-	      while (node_beg < SITTER_TO_BUFFER (ts_node_start_byte
-						  (slice.captures[slice_index].node)))
-		if (--slice_index < 0)
-		  goto done;
+	      for (;;)
+		{
+		  ptrdiff_t slice_beg =
+		    SITTER_TO_BUFFER (ts_node_start_byte
+				      (slice.captures[slice_index].node));
+		  ptrdiff_t line_slice_beg =
+		    count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (slice_beg));
+		  if (line_slice_beg <= line_node_beg)
+		    break;
+		  if (--slice_index < 0)
+		    goto done;
+		}
 
 	      /* Process all QueryCaptures for the same line.  */
 	      bool ignored_line = false, dented_line = false;
+	      Lisp_Object capture_name_to_tsnode =
+		make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
+				 DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
+				 Qnil, false);
+	      Lisp_Object obarray = initialize_vector (10, make_fixnum (0));
 	      for ((void) slice_index; slice_index >= 0; --slice_index)
 		{
 		  ptrdiff_t capture_beg =
@@ -1217,23 +1231,24 @@ DEFUN ("tree-sitter-indent",
 		    ts_query_capture_name_for_id (XTREE_SITTER (sitter)->indents_query,
 						  slice.captures[slice_index].index,
 						  &capture_name_length);
+		  Fputhash (Fintern (build_string (capture_name), obarray),
+			    make_node (slice.captures[slice_index].node),
+			    capture_name_to_tsnode);
 		  uint32_t predicates_length = 0;
 		  const TSQueryPredicateStep *predicates =
 		    ts_query_predicates_for_pattern (XTREE_SITTER (sitter)->indents_query,
 						     slice.pattern_indices[slice_index],
 						     &predicates_length);
 		  char delimiter_open = '\0';
-		  if (predicates_length)
+		  if (predicates_length
+		      && predicates[0].type == TSQueryPredicateStepTypeString)
 		    {
 		      uint32_t length;
 		      const char *what =
 			ts_query_string_value_for_id
 			(XTREE_SITTER (sitter)->indents_query,
-			 predicates[i].value_id, &length);
-		      /* For lack of hash table for char *'s... */
-		      if (predicates[i].type == TSQueryPredicateStepTypeString
-			  && 0 == strcmp (what, "set!")
-			  && 3 == predicates_length
+			 predicates[0].value_id, &length);
+		      if (0 == strcmp (what, "set!")
 			  && 0 == strcmp (ts_query_string_value_for_id
 					  (XTREE_SITTER (sitter)->indents_query,
 					   predicates[1].value_id, &length),
@@ -1242,6 +1257,38 @@ DEFUN ("tree-sitter-indent",
 			  delimiter_open = ts_query_string_value_for_id
 			    (XTREE_SITTER (sitter)->indents_query,
 			     predicates[2].value_id, &length)[0];
+			}
+		      else if (strstr (what, "has-type?")
+			       && predicates[1].type == TSQueryPredicateStepTypeCapture)
+			{
+			  bool negate = (0 == strncmp (what, "not", 3));
+			  const char *capture_name = ts_query_capture_name_for_id
+			    (XTREE_SITTER (sitter)->indents_query,
+			     predicates[1].value_id, &length);
+			  Lisp_Object captured =
+			    Fgethash (Fintern_soft (build_string (capture_name),
+						    obarray),
+				      capture_name_to_tsnode,
+				      Qnil);
+			  if (! NILP (captured))
+			    {
+			      CHECK_TREE_SITTER_NODE (captured);
+			      const char *node_type =
+				ts_node_type (XTREE_SITTER_NODE (captured)->node);
+			      bool match =
+				(0 == strcmp (node_type, ts_query_string_value_for_id
+					      (XTREE_SITTER (sitter)->indents_query,
+					       predicates[2].value_id, &length)));
+			      /* skip when:
+				 has-type? (!negate) and no match, or,
+				 not-has-type? (negate) and match.  */
+			      if (negate == match)
+				{
+				  if (dented_line)
+				    result -= indent_nspaces;
+				  goto next_parent; /* !!! */
+				}
+			    }
 			}
 		    }
 
@@ -1253,12 +1300,6 @@ DEFUN ("tree-sitter-indent",
 		  else if (0 == strcmp (capture_name, "ignore"))
 		    {
 		      ignored_line = true;
-		    }
-		  else if (0 == strcmp (capture_name, "indent_end"))
-		    {
-		      if (! dented_line)
-			result -= indent_nspaces;
-		      dented_line = true;
 		    }
 		  else if (0 == strcmp (capture_name, "branch")
 			   && line_node_beg == line_target_pt)
@@ -1285,7 +1326,7 @@ DEFUN ("tree-sitter-indent",
 			}
 		      else if (0 == strcmp (capture_name, "aligned_indent"))
 			{
-			  bool hanging_indent_p = true;
+			  bool hanging_indent_p = false;
 			  TSNode delimiter_node;
 			  for (uint32_t count = ts_node_child_count
 				 (slice.captures[slice_index].node), i = 0;
@@ -1297,6 +1338,7 @@ DEFUN ("tree-sitter-indent",
 			      if (strlen (ts_node_type (delimiter_node)) == 1
 				  && ts_node_type (delimiter_node)[0] == delimiter_open)
 				{
+				  hanging_indent_p = true;
 				  ptrdiff_t delimiter_end =
 				    SITTER_TO_BUFFER (ts_node_end_byte (delimiter_node));
 				  for (ptrdiff_t bytepos = delimiter_end;

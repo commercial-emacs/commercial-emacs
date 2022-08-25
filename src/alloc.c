@@ -2297,10 +2297,10 @@ free_by_pvtype (struct Lisp_Vector *vector)
 	  ts_tree_delete(lisp_parser->tree);
 	if (lisp_parser->prev_tree != NULL)
 	  ts_tree_delete(lisp_parser->prev_tree);
+	if (lisp_parser->indents_query != NULL)
+	  ts_query_delete (lisp_parser->indents_query);
 	if (lisp_parser->parser != NULL)
 	  ts_parser_delete(lisp_parser->parser);
-	if (lisp_parser->indents_query)
-	  ts_query_delete (lisp_parser->indents_query);
       }
       break;
     case PVEC_TREE_SITTER_NODE:
