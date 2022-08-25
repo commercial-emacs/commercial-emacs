@@ -148,15 +148,14 @@ switches."
       (cd (file-name-directory file))
       (let* (process-file-side-effects
 	     (status
-             (condition-case nil
-                 ;; Ignore all errors.
+             (condition-case err
                  (vc-svn-command t t file "status" "-v")
                ;; Some problem happened.  E.g. We can't find an `svn'
                ;; executable.  We used to only catch `file-error' but when
                ;; the process is run on a remote host via Tramp, the error
                ;; is only reported via the exit status which is turned into
                ;; an `error' by vc-do-command.
-               (error nil))))
+               (error (signal (car err) (cdr err))))))
         (when (eq 0 status)
 	  (let ((parsed (vc-svn-parse-status file)))
 	    (and parsed (not (memq parsed '(ignored unregistered))))))))))

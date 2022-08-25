@@ -259,15 +259,18 @@ Good example of file name that needs this: \"test[56].xx\".")
                ;; path specs.
                ;; See also: https://marc.info/?l=git&m=125787684318129&w=2
                (name (file-relative-name file dir))
-               (str (with-demoted-errors "Error: %S"
-                      (cd dir)
-                      (vc-git--out-ok "ls-files" "-c" "-z" "--" name)
-                      ;; If result is empty, use ls-tree to check for deleted
-                      ;; file.
-                      (when (eq (point-min) (point-max))
-                        (vc-git--out-ok "ls-tree" "--name-only" "-z" "HEAD"
-                                        "--" name))
-                      (buffer-string))))
+               (str (condition-case err
+                        (progn
+                          (cd dir)
+                          (vc-git-command (current-buffer) nil
+                                          name "ls-files" "-c" "-z" "--")
+                          ;; If result is empty, use ls-tree to check for deleted
+                          ;; file.
+                          (when (eq (point-min) (point-max))
+                            (vc-git-command (current-buffer) nil
+                                            name "ls-tree" "--name-only" "-z" "HEAD" "--"))
+                          (buffer-string))
+                      (error (signal (car err) (cdr err))))))
           (and str
                (> (length str) (length name))
                (string= (substring str 0 (1+ (length name)))
@@ -1775,7 +1778,8 @@ This command shares argument histories with \\[rgrep] and \\[grep]."
   "A wrapper around `vc-do-command' for use in vc-git.el.
 The difference to vc-do-command is that this function always invokes
 `vc-git-program'."
-  (let ((coding-system-for-read
+  (let ((inhibit-null-byte-detection t)
+        (coding-system-for-read
          (or coding-system-for-read vc-git-log-output-coding-system))
 	(coding-system-for-write
          (or coding-system-for-write vc-git-commits-coding-system))

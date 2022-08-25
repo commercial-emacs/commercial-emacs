@@ -206,7 +206,7 @@ If `ask', you will be prompted for a branch type."
 (defun vc-hg-registered (file)
   "Return non-nil if FILE is registered with hg."
   (when (vc-hg-root file)           ; short cut
-    (let ((state (vc-state file 'Hg)))  ; expensive
+    (let ((state (vc-hg-state file)))
       (if (memq state '(ignored unregistered nil))
           ;; Clear the cache for proper fallback to another backend.
           (ignore (vc-file-setprop file 'vc-state nil))
@@ -228,23 +228,22 @@ If `ask', you will be prompted for a branch type."
           (with-current-buffer
               standard-output
             (setq status
-                  (condition-case nil
-                      ;; Ignore all errors.
+                  (condition-case err
 		      (let ((process-environment
 			     ;; Avoid localization of messages so we
 			     ;; can parse the output.  Disable pager.
 			     (append
 			      (list "TERM=dumb" "LANGUAGE=C" "HGPLAIN=1")
 			      process-environment)))
-			(process-file
-			 vc-hg-program nil t nil
+			(vc-hg-command (current-buffer) nil
+                         (file-relative-name file)
                          "--config" "ui.report_untrusted=0"
 			 "--config" "alias.status=status"
 			 "--config" "defaults.status="
-			 "status" "-A" (file-relative-name file)))
+			 "status" "-A"))
                     ;; Some problem happened.  E.g. We can't find an `hg'
                     ;; executable.
-                    (error nil)))))))
+                    (error (signal (car err) (cdr err)))))))))
     (when (and (eq 0 status)
 	       (> (length out) 0)
 	       (null (string-match ".*: No such file or directory$" out)))
