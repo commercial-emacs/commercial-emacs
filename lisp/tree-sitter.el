@@ -67,6 +67,7 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
   :risky t
   :version "28.1")
 
+;;;###autoload
 (defcustom tree-sitter-mode-alist
   '((c++-mode . "cpp")
     (rust-mode . "rust")
@@ -145,6 +146,7 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
                  (point-max))))
     (font-lock-fontify-region pos end font-lock-verbose)))
 
+;;;###autoload
 (define-minor-mode tree-sitter-lock-mode
   "Tree-sitter font-lock minor mode."
   :lighter nil

@@ -21,6 +21,7 @@
 
 (require 'ert)
 (require 'tree-sitter)
+(require 'tree-sitter-elisp-mode)
 
 (declare-function tree-sitter-highlights "tree-sitter.c")
 (declare-function tree-sitter-node-at "tree-sitter.c")
