@@ -4613,16 +4613,16 @@ commands:
 
     (with-current-buffer (gnus-get-buffer-create article-buffer-name)
       (dolist (buffer `(,(current-buffer) ,summary-buffer))
-        (gnus-assign-former-global 'gnus-article-buffer
+        (gnus-assign-former-global gnus-article-buffer
                                    article-buffer-name
                                    buffer)
-        (gnus-assign-former-global 'gnus-original-article-buffer
+        (gnus-assign-former-global gnus-original-article-buffer
                                    original-article-buffer-name
                                    buffer)
-        (gnus-assign-former-global 'gnus-newsgroup-name
+        (gnus-assign-former-global gnus-newsgroup-name
                                    newsgroup-name
                                    buffer)
-        (gnus-assign-former-global 'gnus-summary-buffer
+        (gnus-assign-former-global gnus-summary-buffer
                                    summary-buffer
                                    buffer))
       (mm-destroy-parts gnus-article-mime-handles)
@@ -4751,19 +4751,19 @@ If ALL-HEADERS is non-nil, no headers are hidden."
                    (dolist (buffer `(,(get-buffer gnus-article-buffer)
                                      ,(get-buffer summary)))
                      (gnus-assign-former-global
-                      'gnus-last-article
+                      gnus-last-article
                       gnus-current-article
                       buffer)
                      (gnus-assign-former-global
-                      'gnus-current-article
+                      gnus-current-article
                       article
                       buffer)
                      (gnus-assign-former-global
-                      'gnus-current-headers
+                      gnus-current-headers
                       (gnus-summary-article-header article)
                       buffer)
                      (gnus-assign-former-global
-                      'gnus-article-current
+                      gnus-article-current
                       (cons gnus-newsgroup-name article)
                       buffer))
                    (unless (mail-header-p gnus-current-headers)

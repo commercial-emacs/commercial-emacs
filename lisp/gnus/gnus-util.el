@@ -1065,7 +1065,8 @@ ARG is passed to the first function."
 
 (defmacro gnus-assign-former-global (var val buffer)
   "Will rename this."
-  `(setf (buffer-local-value ,var ,buffer) ,val))
+  `(with-current-buffer ,buffer
+     (setq-local ,var ,val)))
 
 (defcustom gnus-use-byte-compile t
   "If non-nil, byte-compile crucial run-time code."
