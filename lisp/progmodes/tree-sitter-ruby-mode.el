@@ -4,8 +4,7 @@
 
 ;;;###autoload
 (define-derived-mode tree-sitter-ruby-mode tree-sitter-prog-mode "Ruby"
-  "Have tree-sitter replace syntax-ppss."
-)
+  "Have tree-sitter replace syntax-ppss.")
 
 (provide 'tree-sitter-ruby-mode)
 

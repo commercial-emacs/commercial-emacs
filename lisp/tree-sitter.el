@@ -226,24 +226,43 @@ tree-sitter-goto-prev-sibling."
     (or (tree-sitter-node-start (tree-sitter-node-of done))
         (point-max))))
 
+(defun tree-sitter-node-preceding (node)
+  "Left then up."
+  (unless (eq (point) (point-min))
+    (or (tree-sitter-node-prev-sibling node)
+        (cl-loop with prev = node
+                 for parent = (tree-sitter-node-parent prev)
+                 until (not parent)
+                 do (setq prev (tree-sitter-node-prev-sibling parent))
+                 until prev
+                 finally return (or prev node)))))
+
+(defun tree-sitter-node-shallowest (node)
+  (let ((pos (tree-sitter-node-start node))
+        (parent (tree-sitter-node-parent node)))
+    (while (and parent (<= pos (tree-sitter-node-start parent)))
+      (setq node parent
+            parent (tree-sitter-node-parent node)))
+    node))
+
+(defun tree-sitter-node-deepest (node)
+  (let ((pos (tree-sitter-node-start node)))
+    (when (and node (< pos (tree-sitter-node-start node)))
+      (setq node (tree-sitter-node-first-child-for-byte node pos)))
+    node))
+
 (defun tree-sitter-sexp-at (&optional pos)
   (unless (fixnump pos) (setq pos (point)))
   (funcall (if (memq (syntax-class (syntax-after pos)) '(4 5))
                #'tree-sitter-node-parent
              #'identity)
-           (tree-sitter-node-at pos)))
-
-(defun tree-sitter-node-preceding (node)
-  "Left then up."
-  (unless (eq (point) (point-min))
-    (if-let ((prev (tree-sitter-node-prev-sibling node)))
-        prev
-      (cl-loop with prev = node
-               for parent = (tree-sitter-node-parent prev)
-               until (not parent)
-               do (setq prev (tree-sitter-node-prev-sibling parent))
-               until prev
-               finally return (or prev node)))))
+           (if-let ((precise-node (tree-sitter-node-at pos t)))
+               (let ((shallowest (tree-sitter-node-shallowest precise-node)))
+                 (if (>= 1 (count-lines (tree-sitter-node-start shallowest)
+                                        (tree-sitter-node-end shallowest)))
+                     (tree-sitter-node-deepest precise-node)
+                   shallowest))
+             (tree-sitter-node-shallowest (tree-sitter-node-at pos)))))
 
 (defun tree-sitter-forward-sexp (&optional arg)
   "Candidate for `forward-sexp-function'.
@@ -260,21 +279,23 @@ Return the number of unsatisfiable iterations."
     (catch 'done
       (prog1 0
         (dotimes (i ntimes)
-          (if-let ((c (funcall func (tree-sitter-sexp-at))))
+          (if-let ((c (if-let ((sexp (tree-sitter-sexp-at nil)))
+                          (funcall func sexp)
+                        (when (< arg 0)
+                          (save-excursion
+                            (tree-sitter-beginning-of-defun)
+                            (tree-sitter-node-start (tree-sitter-node-at)))))))
               (goto-char c)
             (throw 'done (- ntimes i))))))))
 
-(defun tree-sitter-node-round-up (pos)
-  (let ((node (tree-sitter-node-at pos)))
-    (while (and node (<= pos (tree-sitter-node-start node)))
-      (setq node (tree-sitter-node-preceding node)))
-    node))
-
-(defun tree-sitter-node-round-down (pos)
-  (let ((node (tree-sitter-node-at pos)))
-    (when (and node (< pos (tree-sitter-node-start node)))
-      (setq node (tree-sitter-node-first-child-for-byte node pos)))
-    node))
+(defun tree-sitter-node-round-up (&optional pos)
+  (setq pos (or pos (point)))
+  (save-excursion
+    (goto-char pos)
+    (skip-chars-backward "[:space:]")
+    (when (looking-at "[[:space:]]")
+      (backward-char))
+    (tree-sitter-node-preceding (tree-sitter-node-at (point)))))
 
 (defun tree-sitter--traverse-defun (beginning-p &optional arg)
   "Two mutually sensitive polarities.
@@ -291,9 +312,12 @@ BEGINNING-P   ARG         MOTION
                         (and (not beginning-p) (> arg 0))))
          (ntimes (abs arg))
          (root-node (tree-sitter-root-node))
-         (node (if forward-p
-                   (tree-sitter-node-round-down (point))
-                 (tree-sitter-node-round-up (point)))))
+         (node (or (tree-sitter-node-at (point) t)
+                   (let ((next-node (tree-sitter-node-at (point))))
+                     (if forward-p
+                         (tree-sitter-node-shallowest next-node)
+                       (or (tree-sitter-node-preceding next-node)
+                           (tree-sitter-node-round-up)))))))
     (catch 'done
       (prog1 0
         (dotimes (i ntimes)
@@ -320,8 +344,8 @@ BEGINNING-P   ARG         MOTION
 
 (defun tree-sitter-indent-line ()
   "Indent the line."
-
-  )
+  (interactive)
+  (indent-line-to (tree-sitter-calculate-indent)))
 
 (provide 'tree-sitter)
 

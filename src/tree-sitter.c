@@ -1078,8 +1078,8 @@ DEFUN ("tree-sitter-node-end",
 		   (ts_node_end_byte (XTREE_SITTER_NODE (node)->node)));
 }
 
-DEFUN ("tree-sitter-indent",
-       Ftree_sitter_indent, Stree_sitter_indent,
+DEFUN ("tree-sitter-calculate-indent",
+       Ftree_sitter_calculate_indent, Stree_sitter_calculate_indent,
        0, 0, 0,
        doc: /* Return number of spaces for current line.  */)
   (void)
@@ -1646,7 +1646,7 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_start);
   defsubr (&Stree_sitter_node_end);
   defsubr (&Stree_sitter_ppss);
-  defsubr (&Stree_sitter_indent);
+  defsubr (&Stree_sitter_calculate_indent);
   defsubr (&Stree_sitter_highlights);
   defsubr (&Stree_sitter_highlight_region);
   defsubr (&Stree_sitter_changed_range);

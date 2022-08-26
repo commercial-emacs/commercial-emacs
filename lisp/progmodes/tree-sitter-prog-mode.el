@@ -24,6 +24,12 @@
 ;;; Commentary:
 
 ;; Try avoiding syntax-ppss altogether.
+;;
+;;                          jit-lock-mode      tree-sitter-lock-mode
+;;             prog-mode          ok                    ok
+;; tree-sitter-prog-mode        not ok                  ok
+;;
+;; jit-lock requires syntax-ppss that tree-sitter-prog-mode dispenses.
 
 ;;; Code:
 
@@ -40,7 +46,8 @@
     (setq-local font-lock-support-mode 'tree-sitter-lock-mode
                 forward-sexp-function #'tree-sitter-forward-sexp
                 beginning-of-defun-function #'tree-sitter-beginning-of-defun
-                end-of-defun-function #'tree-sitter-end-of-defun)
+                end-of-defun-function #'tree-sitter-end-of-defun
+                indent-line-function #'tree-sitter-indent-line)
     (tree-sitter)))
 
 (provide 'tree-sitter-prog-mode)
