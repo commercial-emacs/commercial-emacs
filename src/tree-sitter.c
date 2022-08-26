@@ -1092,7 +1092,7 @@ DEFUN ("tree-sitter-indent",
      enclosing_node is the child of root_node that contains target_node (outermost) */
   const size_t indent_nspaces = 2;
   size_t result = 0;
-  Lisp_Object target_node = Ftree_sitter_node_at (Qnil, Qnil);
+  Lisp_Object target_node = Ftree_sitter_node_at (Fline_beginning_position (Qnil), Qnil);
   Lisp_Object enclosing_node = target_node;
   for (Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
        ! NILP (enclosing_node)
@@ -1224,7 +1224,10 @@ DEFUN ("tree-sitter-indent",
 		    count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (capture_end));
 
 		  if (slice.captures[slice_index].index == UINT32_MAX)
-		    continue;
+		    {
+		      /* line's captures should not have been */
+		      continue;
+		    }
 
 		  if (line_capture_beg != line_node_beg)
 		    goto next_parent; /* !!! */
@@ -1297,7 +1300,7 @@ DEFUN ("tree-sitter-indent",
 			}
 		    }
 
-		  if (node_beg != capture_beg)
+		  if (node_beg < capture_beg)
 		    continue; /* next slice_index; no indents apply. */
 
 		  if (0 == strcmp (capture_name, "zero_indent"))

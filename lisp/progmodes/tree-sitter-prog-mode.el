@@ -23,9 +23,7 @@
 
 ;;; Commentary:
 
-;; This major mode is mostly intended as a parent of other programming
-;; modes.  All major modes for programming languages should derive from this
-;; mode so that users can put generic customization on prog-mode-hook.
+;; Try avoiding syntax-ppss altogether.
 
 ;;; Code:
 
