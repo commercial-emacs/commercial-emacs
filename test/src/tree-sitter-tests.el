@@ -222,21 +222,23 @@ for each change in the insufferable `custom-save-variables.')"
 (ert-deftest tree-sitter-c-indent ()
   (let ((text "
 void main (int argc, char *argv []) {
-  int far, boogaloo = 5;
-  if (far) {
-    0;
-  } else {
-    1;
-  }
+int far, boogaloo = 5;
+if (far) {
+0;
+} else {
+1;
+}
 }
 "))
     (should (equal
              (tree-sitter-tests-doit ".c" text
                (tree-sitter-c-mode)
-               (indent-region (point-min) (point-max)))
+               (indent-region (point-min) (point-max))
+               (buffer-substring-no-properties (point-min) (point-max)))
              (tree-sitter-tests-doit ".c" text
                (c-mode)
-               (indent-region (point-min) (point-max)))))))
+               (indent-region (point-min) (point-max))
+               (buffer-substring-no-properties (point-min) (point-max)))))))
 
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here

@@ -1127,7 +1127,9 @@ DEFUN ("tree-sitter-calculate-indent",
 		      build_string ("queries/"),
 		      language));
 	  FILE *fp = fopen (SSDATA (filename), "rb");
-	  if (fp != NULL)
+	  if (! fp)
+	    xsignal1 (Qfile_missing, filename);
+	  else
 	    {
 	      char *query_buf;
 	      long query_length;
