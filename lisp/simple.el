@@ -10636,24 +10636,51 @@ too short to have a dst element.
 
 (fn CL-X)")
 
-(defun get-scratch-buffer-create ()
-  "Return the *scratch* buffer, creating a new one if needed."
-  (or (get-buffer "*scratch*")
-      (let ((scratch (get-buffer-create "*scratch*")))
-        ;; Don't touch the buffer contents or mode unless we know that
-        ;; we just created it.
-        (with-current-buffer scratch
-          (when initial-scratch-message
-            (insert (substitute-command-keys initial-scratch-message))
-            (set-buffer-modified-p nil))
-          (funcall initial-major-mode))
-        scratch)))
+(defun get-scratch-buffer-create (&optional mode)
+  "Return a scratch buffer for MODE, creating a new one if needed.
+If MODE is nil, use `initial-major-mode' and insert
+`initial-scratch-message'."
+  (let ((name (if mode
+                  (format "*scratch-%s*"
+                          (string-trim-right (symbol-name mode) "-mode"))
+                "*scratch*")))
+    (or (get-buffer name)
+        (let ((scratch (get-buffer-create name)))
+          ;; Don't touch the buffer contents or mode unless we know that
+          ;; we just created it.
+          (with-current-buffer scratch
+            (when (and (not mode) initial-scratch-message)
+              (insert (substitute-command-keys initial-scratch-message))
+              (set-buffer-modified-p nil))
+            (funcall (or mode initial-major-mode)))
+          scratch))))
 
-(defun scratch-buffer ()
+(defun scratch-buffer (&optional mode)
   "Switch to the *scratch* buffer.
-If the buffer doesn't exist, create it first."
-  (interactive)
-  (pop-to-buffer-same-window (get-scratch-buffer-create)))
+If the buffer doesn't exist, create it first.
+With a prefix argument, select a major mode for the scratch buffer."
+  (interactive
+   (list (when current-prefix-arg
+           (intern
+            (completing-read "Scratch buffer mode: "
+                             (delete-dups
+                              (delq nil
+                                    (mapcar (pcase-lambda (`(_ . ,it))
+                                              (and (symbolp it)
+                                                   (commandp it)
+                                                   it))
+                                            auto-mode-alist))))))))
+            ;; (completing-read "Scratch buffer mode: "
+            ;;                  obarray
+            ;;                  (lambda (sym)
+            ;;                    (and (commandp sym)
+            ;;                         (if (autoloadp (symbol-function sym))
+            ;;                             (string-suffix-p "-mode"
+            ;;                                              (symbol-name sym))
+            ;;                           (memq 'derived-mode-parent
+            ;;                                 (symbol-plist sym)))))
+            ;;                  t)))))
+  (pop-to-buffer-same-window (get-scratch-buffer-create mode)))
 
 (defun kill-buffer--possibly-save (buffer)
   (let ((response
