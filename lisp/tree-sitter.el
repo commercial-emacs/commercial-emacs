@@ -239,9 +239,13 @@ tree-sitter-goto-prev-sibling."
                finally return (or prev node))))
 
 (defun tree-sitter-node-shallowest (node)
-  (let ((pos (tree-sitter-node-start node))
+  "Get node furthest up the tree starting at NODE's start, excludes root."
+  (let ((root-node (tree-sitter-root-node))
+        (pos (tree-sitter-node-start node))
         (parent (tree-sitter-node-parent node)))
-    (while (and parent (<= pos (tree-sitter-node-start parent)))
+    (while (and parent
+                (not (tree-sitter-node-equal parent root-node))
+                (<= pos (tree-sitter-node-start parent)))
       (setq node parent
             parent (tree-sitter-node-parent node)))
     node))
@@ -254,19 +258,15 @@ tree-sitter-goto-prev-sibling."
 
 (defun tree-sitter-sexp-at (&optional pos)
   (unless (fixnump pos) (setq pos (point)))
-  (let ((paren-p (memq (syntax-class (syntax-after pos)) '(4 5))))
-    (funcall (if paren-p
-                 #'tree-sitter-node-parent
-               #'identity)
-             (if-let ((precise-node (tree-sitter-node-at pos t)))
-                 (let ((shallowest (tree-sitter-node-shallowest precise-node)))
-                   (if (>= 1 (count-lines (tree-sitter-node-start shallowest)
-                                          (tree-sitter-node-end shallowest)))
-                       ;; single-line node, just iterate next sexpr
-                       (tree-sitter-node-deepest precise-node)
-                     ;; multi-line node, iterate over entire block
-                     shallowest))
-               (tree-sitter-node-shallowest (tree-sitter-node-at pos))))))
+  (if-let ((precise-node (tree-sitter-node-at pos t)))
+      (let ((shallowest (tree-sitter-node-shallowest precise-node)))
+        (if (>= 1 (count-lines (tree-sitter-node-start shallowest)
+                               (tree-sitter-node-end shallowest)))
+            ;; single-line node, just iterate next sexpr
+            (tree-sitter-node-deepest precise-node)
+          ;; multi-line node, iterate over entire block
+          shallowest))
+    (tree-sitter-node-shallowest (tree-sitter-node-at pos))))
 
 (defun tree-sitter-forward-sexp (&optional arg)
   "Candidate for `forward-sexp-function'.
@@ -317,12 +317,23 @@ BEGINNING-P   ARG         MOTION
                         (and (not beginning-p) (> arg 0))))
          (ntimes (abs arg))
          (root-node (tree-sitter-root-node))
-         (node (or (tree-sitter-node-at (point) t)
-                   (let ((next-node (tree-sitter-node-at (point))))
-                     (if forward-p
-                         (tree-sitter-node-shallowest next-node)
-                       (or (tree-sitter-node-preceding next-node)
-                           (tree-sitter-node-round-up)))))))
+         (node (tree-sitter-node-shallowest
+                (if-let ((precise-node
+                          (tree-sitter-node-shallowest
+                           (tree-sitter-node-at (point) t))))
+                    (if (and beginning-p
+                             (tree-sitter-node-equal
+                              root-node (tree-sitter-node-parent precise-node)))
+                        ;; already at defun boundary
+                        (tree-sitter-node-shallowest
+                         (tree-sitter-node-preceding precise-node))
+                      precise-node)
+                  (let ((next-node (tree-sitter-node-at (point))))
+                    (if forward-p
+                        next-node
+                      (or (tree-sitter-node-preceding next-node)
+                          ;; at bottom
+                          (tree-sitter-node-round-up))))))))
     (catch 'done
       (prog1 0
         (dotimes (i ntimes)
