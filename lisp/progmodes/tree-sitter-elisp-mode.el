@@ -4,8 +4,7 @@
 
 ;;;###autoload
 (define-derived-mode tree-sitter-elisp-mode tree-sitter-prog-mode "ELisp"
-  "Have tree-sitter replace syntax-ppss."
-)
+  "Have tree-sitter replace syntax-ppss.")
 
 (provide 'tree-sitter-elisp-mode)
 

@@ -2260,7 +2260,7 @@ higher."
 ;; redisplay.
 (defvar c-re-redisplay-timer nil)
 
-(defun c-force-redisplay (_start _end)
+(defun c-force-redisplay (_buffer _start _end)
   ;; Force redisplay immediately.  This assumes `font-lock-support-mode' is
   ;; 'jit-lock-mode.  Set the variable `c-re-redisplay-timer' to nil.
   (setq c-re-redisplay-timer nil))

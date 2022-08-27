@@ -22,6 +22,7 @@
 (require 'ert)
 (require 'tree-sitter)
 (require 'tree-sitter-elisp-mode)
+(require 'tree-sitter-c-mode)
 
 (declare-function tree-sitter-highlights "tree-sitter.c")
 (declare-function tree-sitter-node-at "tree-sitter.c")
@@ -63,6 +64,7 @@
              (should-not (text-property-any (point-min) (point-max) 'fontified nil))
              ,@body)
          (let (kill-buffer-query-functions)
+           (set-buffer-modified-p nil)
            (kill-buffer))
          (delete-directory dir t)))))
 
@@ -108,10 +110,6 @@ void main (void) {
 "))
     (tree-sitter-tests-doit ".c" (replace-regexp-in-string "^\n" "" text)
       (should t))))
-
-
-
-
 
 (ert-deftest tree-sitter-bog-customize-option ()
   "When tree-sitter highlighting was implemented as `after-change-functions',
@@ -208,6 +206,25 @@ for each change in the insufferable `custom-save-variables.')"
       (should (eq (point) 33))
       (call-interactively #'beginning-of-defun)
       (should (eq (point) 18)))))
+
+(ert-deftest tree-sitter-c-indent ()
+  (let ((text "
+void main (int argc, char *argv []) {
+  int far, boogaloo = 5;
+  if (far) {
+    0;
+  } else {
+    1;
+  }
+}
+"))
+    (should (equal
+             (tree-sitter-tests-doit ".c" text
+               (tree-sitter-c-mode)
+               (indent-region (point-min) (point-max)))
+             (tree-sitter-tests-doit ".c" text
+               (c-mode)
+               (indent-region (point-min) (point-max)))))))
 
 (provide 'tree-sitter-tests)
 ;;; tree-sitter-tests.el ends here

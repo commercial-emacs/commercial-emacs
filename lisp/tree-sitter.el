@@ -91,7 +91,8 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
     (python-mode . "python")
     (ruby-mode . "ruby")
     (tree-sitter-ruby-mode . "ruby")
-    (tree-sitter-elisp-mode . "elisp"))
+    (tree-sitter-elisp-mode . "elisp")
+    (tree-sitter-c-mode . "c"))
   "Map prog-mode to tree-sitter grammar."
   :group 'tree-sitter
   :type '(alist :key-type (symbol :tag "Prog mode")
@@ -228,14 +229,14 @@ tree-sitter-goto-prev-sibling."
 
 (defun tree-sitter-node-preceding (node)
   "Left then up."
-  (unless (eq (point) (point-min))
-    (or (tree-sitter-node-prev-sibling node)
-        (cl-loop with prev = node
-                 for parent = (tree-sitter-node-parent prev)
-                 until (not parent)
-                 do (setq prev (tree-sitter-node-prev-sibling parent))
-                 until prev
-                 finally return (or prev node)))))
+  (or (tree-sitter-node-prev-sibling (tree-sitter-node-shallowest node))
+      (cl-loop with prev = (tree-sitter-node-shallowest node)
+               for parent = (tree-sitter-node-parent prev)
+               until (not parent)
+               do (setq prev (tree-sitter-node-prev-sibling
+                              (tree-sitter-node-shallowest parent)))
+               until prev
+               finally return (or prev node))))
 
 (defun tree-sitter-node-shallowest (node)
   (let ((pos (tree-sitter-node-start node))
@@ -253,16 +254,19 @@ tree-sitter-goto-prev-sibling."
 
 (defun tree-sitter-sexp-at (&optional pos)
   (unless (fixnump pos) (setq pos (point)))
-  (funcall (if (memq (syntax-class (syntax-after pos)) '(4 5))
-               #'tree-sitter-node-parent
-             #'identity)
-           (if-let ((precise-node (tree-sitter-node-at pos t)))
-               (let ((shallowest (tree-sitter-node-shallowest precise-node)))
-                 (if (>= 1 (count-lines (tree-sitter-node-start shallowest)
-                                        (tree-sitter-node-end shallowest)))
-                     (tree-sitter-node-deepest precise-node)
-                   shallowest))
-             (tree-sitter-node-shallowest (tree-sitter-node-at pos)))))
+  (let ((paren-p (memq (syntax-class (syntax-after pos)) '(4 5))))
+    (funcall (if paren-p
+                 #'tree-sitter-node-parent
+               #'identity)
+             (if-let ((precise-node (tree-sitter-node-at pos t)))
+                 (let ((shallowest (tree-sitter-node-shallowest precise-node)))
+                   (if (>= 1 (count-lines (tree-sitter-node-start shallowest)
+                                          (tree-sitter-node-end shallowest)))
+                       ;; single-line node, just iterate next sexpr
+                       (tree-sitter-node-deepest precise-node)
+                     ;; multi-line node, iterate over entire block
+                     shallowest))
+               (tree-sitter-node-shallowest (tree-sitter-node-at pos))))))
 
 (defun tree-sitter-forward-sexp (&optional arg)
   "Candidate for `forward-sexp-function'.
@@ -292,9 +296,10 @@ Return the number of unsatisfiable iterations."
   (setq pos (or pos (point)))
   (save-excursion
     (goto-char pos)
-    (skip-chars-backward "[:space:]")
+    (ignore-errors
+      (skip-chars-backward "[:space:]"))
     (when (looking-at "[[:space:]]")
-      (backward-char))
+      (ignore-errors (backward-char)))
     (tree-sitter-node-preceding (tree-sitter-node-at (point)))))
 
 (defun tree-sitter--traverse-defun (beginning-p &optional arg)
