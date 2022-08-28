@@ -662,6 +662,19 @@ comment history, see `log-edit-comment-ring', and hides `log-edit-files-buf'."
       (indent-rigidly (point) (point-max)
 		      (- log-edit-common-indent common)))))
 
+(defvar vc-patch-string)
+
+(autoload 'vc-diff-patch-string "vc")
+(defun log-edit-diff-patch ()
+  (vc-diff-patch-string vc-patch-string))
+
+(defvar vc-log-fileset)
+
+(defun log-edit-diff-fileset ()
+  "Display diffs for the files to be committed."
+  (interactive)
+  (vc-diff nil nil (list log-edit-vc-backend vc-log-fileset)))
+
 (defun log-edit-show-diff ()
   "Show the diff for the files to be committed."
   (interactive)
