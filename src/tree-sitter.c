@@ -113,6 +113,12 @@ tree_sitter_language_functor (Lisp_Object progmode)
 		i = hash_put (h, progmode, make_misc_ptr (fn), hash);
 	    }
 	}
+      else
+	xsignal1 (Qtree_sitter_language_error,
+		  concat2 (build_string ("No entry for "),
+			   (concat3 (Fsymbol_name (progmode),
+				     build_string (" in "),
+				     Fsymbol_name (Qtree_sitter_mode_alist)))));
     }
   return i >= 0 ? (TSLanguageFunctor) (xmint_pointer (HASH_VALUE (h, i))) : NULL;
 }
@@ -1539,6 +1545,8 @@ DEFUN ("tree-sitter",
 	    xsignal1 (Qtree_sitter_parse_error, BVAR (XBUFFER (buffer), name));
 	}
     }
+  else
+    xsignal1 (Qtree_sitter_error, BVAR (XBUFFER (Fcurrent_buffer ()), name));
   return sitter;
 }
 
