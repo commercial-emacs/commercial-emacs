@@ -3676,6 +3676,13 @@ read_stack_push (struct read_stack_entry e)
     quoted_counts[quote_type]++;
 }
 
+static void
+read_stack_reset (intmax_t sp)
+{
+  eassert (sp <= rdstack.sp);
+  rdstack.sp = sp;
+}
+
 /* Read a Lisp object.  */
 static Lisp_Object
 read0 (Lisp_Object readcharfun, bool annotated)
