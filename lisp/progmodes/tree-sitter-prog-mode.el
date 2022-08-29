@@ -42,6 +42,7 @@
 (define-derived-mode tree-sitter-prog-mode prog-mode "TreeSitter"
   "Tree-sitter enabled major mode."
   :group 'prog-mode
+  :after-hook (tree-sitter)
   :interactive nil ;; this precludes autoloadability
   (if (not (fboundp 'tree-sitter))
       (error "Executable not built with tree sitter support.")
@@ -51,8 +52,7 @@
                 forward-sexp-function #'tree-sitter-forward-sexp
                 beginning-of-defun-function #'tree-sitter-beginning-of-defun
                 end-of-defun-function #'tree-sitter-end-of-defun
-                indent-line-function #'tree-sitter-indent-line)
-    (tree-sitter)))
+                indent-line-function #'tree-sitter-indent-line)))
 
 (provide 'tree-sitter-prog-mode)
 
