@@ -166,6 +166,8 @@ this function onto `change-major-mode-hook'."
 ;; Cannot `define-obsolete-function-alias' because
 ;; `font-lock-mode' is interactive and `turn-on-font-lock' wasn't.
 (make-obsolete 'turn-on-font-lock 'font-lock-mode "29.1")
+(make-obsolete 'turn-on-font-lock-if-desired 'font-lock-mode "29.1")
+(defalias 'turn-on-font-lock-if-desired 'turn-on-font-lock)
 (defun turn-on-font-lock ()
   (font-lock-mode))
 
