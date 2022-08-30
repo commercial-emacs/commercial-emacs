@@ -1510,6 +1510,7 @@ See `font-lock-ignore' for the possible rules."
                                   rules))
     (`(pred ,fun) (funcall fun keyword))))
 
+(defalias 'font-lock-set-defaults #'font-lock-ensure-keywords)
 (defun font-lock-ensure-keywords ()
   "Parse `font-lock-defaults' into `font-lock-keywords'."
   (unless font-lock-keywords-set
