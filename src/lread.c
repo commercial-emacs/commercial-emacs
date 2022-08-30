@@ -3963,7 +3963,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 		  {
 		    /* #NrDIGITS -- radix-N number */
 		    if (n < 0 || n > 36)
-		      invalid_radix_integer (n, stackbuf, readcharfun);
+		      invalid_radix_integer (n, readcharfun);
 		    obj = ANNOTATE (read_integer (readcharfun, n, stackbuf));
 		    break;
 		  }
