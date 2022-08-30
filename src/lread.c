@@ -3695,6 +3695,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
   specpdl_ref base_pdl = SPECPDL_INDEX ();
   ptrdiff_t base_sp = rdstack.sp;
   record_unwind_protect_intmax (read_stack_reset, base_sp);
+  specpdl_ref count = SPECPDL_INDEX ();
 
   EMACS_INT initial_charpos;
   bool uninterned_symbol;
