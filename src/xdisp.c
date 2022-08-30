@@ -9936,7 +9936,6 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
 
   itdata = bidi_shelve_cache ();
   start_move_it (&it, w, startpos);
-  it.last_visible_x = min (it.last_visible_x, max_x);
 
   reseat_preceding_line_start (&it);
   it.current_x = it.hpos = 0;
@@ -9944,6 +9943,10 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
   start_x = it.current_x;
   start_vpos = it.vpos;
 
+  /* Old hack: move_it_forward() returns max x-coord scanned.
+     Setting last_visible_x important when frame narrower than buffer (as in
+     `fit-frame-to-buffer').  */
+  it.last_visible_x = max_x;
   x = move_it_forward (&it, end, max_y, MOVE_TO_POS | MOVE_TO_Y);
   x = min (x, max_x);
 
