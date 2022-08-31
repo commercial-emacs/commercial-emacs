@@ -9943,10 +9943,8 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
   start_x = it.current_x;
   start_vpos = it.vpos;
 
-  /* Old hack: move_it_forward() returns max x-coord scanned.
-     Setting last_visible_x important when frame narrower than buffer (as in
-     `fit-frame-to-buffer').  */
-  it.last_visible_x = max_x;
+  /* Old hack: move_it_forward() returns max x-coord scanned.  */
+  it.last_visible_x = max_x; /* important when frame narrower than buffer.  */
   x = move_it_forward (&it, end, max_y, MOVE_TO_POS | MOVE_TO_Y);
   x = min (x, max_x);
 
@@ -9994,7 +9992,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
 
   bidi_unshelve_cache (itdata, false);
 
-  /* X is widest line seen by move_it_forwards() */
+  /* X is widest line seen by move_it_forward() */
   return Fcons (make_fixnum
 		(it.vpos == start_vpos
 		 ? x - start_x /* START to END same sline */
