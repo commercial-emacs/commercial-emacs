@@ -3039,6 +3039,15 @@ The value is TO.  */)
 }
 
 
+#define HANDLE_INVALID_NIL_VALUE(A,F)					\
+  if (NILP (value))							\
+    {									\
+      add_to_log ("Warning: setting attribute `%s' of face `%s': nil "	\
+		  "value is invalid, use `unspecified' instead.", A, F); \
+      /* Compatibility with 20.x.  */					\
+      value = Qunspecified;						\
+    }
+
 DEFUN ("internal-set-lisp-face-attribute", Finternal_set_lisp_face_attribute,
        Sinternal_set_lisp_face_attribute, 3, 4, 0,
        doc: /* Set attribute ATTR of FACE to VALUE.
@@ -3377,9 +3386,7 @@ FRAME 0 means change the face on all frames, and change the default
     }
   else if (EQ (attr, QCforeground))
     {
-      /* Compatibility with 20.x.  */
-      if (NILP (value))
-	value = Qunspecified;
+      HANDLE_INVALID_NIL_VALUE (QCforeground, face);
       if (!UNSPECIFIEDP (value)
 	  && !IGNORE_DEFFACE_P (value)
 	  && !RESET_P (value))
@@ -3396,9 +3403,7 @@ FRAME 0 means change the face on all frames, and change the default
     }
   else if (EQ (attr, QCdistant_foreground))
     {
-      /* Compatibility with 20.x.  */
-      if (NILP (value))
-	value = Qunspecified;
+      HANDLE_INVALID_NIL_VALUE (QCdistant_foreground, face);
       if (!UNSPECIFIEDP (value)
 	  && !IGNORE_DEFFACE_P (value)
 	  && !RESET_P (value))
@@ -3415,9 +3420,7 @@ FRAME 0 means change the face on all frames, and change the default
     }
   else if (EQ (attr, QCbackground))
     {
-      /* Compatibility with 20.x.  */
-      if (NILP (value))
-	value = Qunspecified;
+      HANDLE_INVALID_NIL_VALUE (QCbackground, face);
       if (!UNSPECIFIEDP (value)
 	  && !IGNORE_DEFFACE_P (value)
 	  && !RESET_P (value))
