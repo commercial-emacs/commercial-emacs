@@ -2001,19 +2001,25 @@ This replaces the message most navigation commands in the thumbnail
 buffer used to show at the bottom of the screen.
 
 +++
-*** 'image-dired-show-all-from-dir-max-files' has been increased to 500.
-This option controls asking for confirmation when starting Image-Dired
-in a directory with many files.  However, Image-Dired creates
-thumbnails in the background these days, so this is not as important
-as it used to be, back when entering a large directory could lock up
-Emacs for tens of seconds.  In addition, you can now customize this
-option to nil to disable this confirmation completely.
+*** 'image-dired-show-all-from-dir-max-files' increased to 1000.
+This user option controls asking for confirmation when starting
+Image-Dired in a directory with many files.  Since Image-Dired creates
+thumbnails in the background in recent versions, this is not as
+important as it used to be.  You can now also customize this option to
+nil to disable this confirmation completely.
 
 ---
 *** 'image-dired-rotate-thumbnail-(left|right)' is now obsolete.
 Instead, use commands 'image-dired-refresh-thumb' to generate a new
 thumbnail, or 'image-rotate' to rotate the thumbnail without updating
 the thumbnail file.
+
+---
+*** HTML image gallery generation is now obsolete.
+The 'image-dired-gallery-generate' command and these user options are
+now obsolete: 'image-dired-gallery-thumb-image-root-url',
+'image-dired-gallery-hidden-tags', 'image-dired-gallery-dir',
+'image-dired-gallery-image-root-url'.
 
 ** Dired
 
