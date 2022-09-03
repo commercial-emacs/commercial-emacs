@@ -680,6 +680,7 @@ if the major mode provides a grammar, otherwise fall back to
 (declare-function tree-sitter-fontify-region "tree-sitter")
 (declare-function tree-sitter-lock-mode "tree-sitter")
 
+(defvar tree-sitter-mode-alist)
 (defun font-lock-register ()
   (font-lock-ensure-keywords)
   (if (and (eq font-lock-support-mode 'tree-sitter-lock-mode)
