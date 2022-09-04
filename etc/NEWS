@@ -2177,6 +2177,17 @@ the Galeon web browser was released in September, 2008.
 Note that this historical web browser is different from Mozilla
 Firefox; it is its predecessor.
 
+** Python Mode
++++
+*** Project shells and a new user option 'python-shell-dedicated'
+When called with a prefix argument, 'run-python' now offers the choice
+of creating a shell dedicated to the current project.  This shell runs
+in the project root directory and is shared among all project buffers.
+
+Without a prefix argument, the kind of shell (buffer-dedicated,
+project-dedicated or global) is specified by the new
+'python-shell-dedicated' variable.
+
 ** Ruby Mode
 
 ---
@@ -2710,6 +2721,11 @@ These can be used for buttons in buffers and the like.  See the
 "(elisp) Icons" and "(emacs) Icons" nodes in the manuals for details.
 
 +++
+** New function 'seq-positions'.
+This returns a list of the (zero-based) indices of elements matching a
+given predicate in the specified sequence.
+
++++
 ** New arguments MESSAGE and TIMEOUT of 'set-transient-map'.
 MESSAGE specifies a message to display after activating the transient
 map, including a special formatting spec to list available keys.
@@ -2720,6 +2736,11 @@ The default timeout value can be defined by the new variable
 +++
 ** New function 'seq-split'.
 This returns a list of sub-sequences of the specified sequence.
+
++++
+** New function 'seq-remove-at-position'.
+This function returns a copy of the specified sequence where the
+element at a given (zero-based) index got removed.
 
 +++
 ** 'plist-get', 'plist-put' and 'plist-member' are no longer limited to 'eq'.
