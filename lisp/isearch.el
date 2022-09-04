@@ -2391,8 +2391,7 @@ type \\[help-command] at that time."
 	      (if (use-region-p) " in region" ""))
       isearch-regexp)
      t isearch-regexp (or delimited isearch-regexp-function) nil nil
-     (if (use-region-p) (region-beginning))
-     (if (use-region-p) (region-end))
+     (use-region-beginning) (use-region-end)
      backward))
   (and isearch-recursive-edit (exit-recursive-edit)))
 
