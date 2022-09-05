@@ -104,7 +104,8 @@ where:
    Currently supported properties are:
    - `:right-align': If non-nil, the column should be right-aligned.
    - `:pad-right': Number of additional padding spaces to the
-     right of the column (defaults to 1 if omitted).")
+     right of the column (defaults to 1 if omitted).
+   - `:hidden': If non-nil, the column should not be visible.")
 (put 'tabulated-list-format 'permanent-local t)
 
 (defvar-local tabulated-list-use-header-line t
@@ -178,6 +179,11 @@ POS, if omitted or nil, defaults to point."
 The value is a vector of column descriptors, or nil if there is
 no entry at POS.  POS, if omitted or nil, defaults to point."
   (get-text-property (or pos (point)) 'tabulated-list-entry))
+
+(defun tabulated-list-get-column (&optional pos)
+  "Return the column name of the Tabulated List cell at POS.
+POS, if omitted or nil, defaults to point."
+  (get-text-property (or pos (point)) 'tabulated-list-column-name))
 
 (defun tabulated-list-put-tag (tag &optional advance)
   "Put TAG in the padding area of the current line.
@@ -285,7 +291,7 @@ Populated by `tabulated-list-init-header'.")
           cols)
     (dotimes (n len)
       (let* ((col (aref tabulated-list-format n))
-             (not-last-col (< n (1- len)))
+             (not-last-col (tabulated-list--next-visible-column n))
 	     (label (nth 0 col))
              (lablen (length label))
              (pname label)
@@ -293,62 +299,64 @@ Populated by `tabulated-list-init-header'.")
 	     (props (nthcdr 3 col))
 	     (pad-right (or (plist-get props :pad-right) 1))
              (right-align (plist-get props :right-align))
+             (hidden (plist-get props :hidden))
              (next-x (+ x pad-right width))
              (available-space
               (and not-last-col
                    (if right-align
                        width
                      (tabulated-list--available-space width n)))))
-        (when (and (>= lablen 3)
-                   not-last-col
-                   (> lablen available-space))
-          (setq label (truncate-string-to-width label available-space
-                                                nil nil t)))
-	(push
-	 (cond
-	  ;; An unsortable column
-	  ((not (nth 2 col))
-	   (propertize label 'tabulated-list-column-name pname))
-	  ;; The selected sort column
-	  ((equal (car col) (car tabulated-list-sort-key))
-	   (apply 'propertize
-                  (concat label
-                          (cond
-                           ((and (< lablen 3) not-last-col) "")
-                           ((cdr tabulated-list-sort-key)
-                            (format " %c"
-                                    tabulated-list-gui-sort-indicator-desc))
-                           (t (format " %c"
-                                      tabulated-list-gui-sort-indicator-asc))))
-                  'face 'bold
-                  'tabulated-list-column-name pname
-                  button-props))
-	  ;; Unselected sortable column.
-	  (t (apply 'propertize label
-		    'tabulated-list-column-name pname
-		    button-props)))
-	 cols)
-        (when right-align
-          (let ((shift (- width (string-width (car cols)))))
-            (when (> shift 0)
-              (setq cols
-                    (cons (car cols)
-                          (cons
-                           (propertize
-                            (make-string shift ?\s)
-                            'display
-                            `(space :align-to
-                                    (+ header-line-indent-width ,(+ x shift))))
-                           (cdr cols))))
-              (setq x (+ x shift)))))
-	(if (>= pad-right 0)
-	    (push (propertize
-                   " "
-		   'display `(space :align-to
-                                    (+ header-line-indent-width ,next-x))
-		   'face 'fixed-pitch)
-		  cols))
-        (setq x next-x)))
+        (unless hidden
+          (when (and (>= lablen 3)
+                     not-last-col
+                     (> lablen available-space))
+            (setq label (truncate-string-to-width label available-space
+                                                  nil nil t)))
+	  (push
+	   (cond
+	    ;; An unsortable column
+	    ((not (nth 2 col))
+	     (propertize label 'tabulated-list-column-name pname))
+	    ;; The selected sort column
+	    ((equal (car col) (car tabulated-list-sort-key))
+	     (apply 'propertize
+                    (concat label
+                            (cond
+                             ((and (< lablen 3) not-last-col) "")
+                             ((cdr tabulated-list-sort-key)
+                              (format " %c"
+                                      tabulated-list-gui-sort-indicator-desc))
+                             (t (format " %c"
+                                        tabulated-list-gui-sort-indicator-asc))))
+                    'face 'bold
+                    'tabulated-list-column-name pname
+                    button-props))
+	    ;; Unselected sortable column.
+	    (t (apply 'propertize label
+		      'tabulated-list-column-name pname
+		      button-props)))
+	   cols)
+          (when right-align
+            (let ((shift (- width (string-width (car cols)))))
+              (when (> shift 0)
+                (setq cols
+                      (cons (car cols)
+                            (cons
+                             (propertize
+                              (make-string shift ?\s)
+                              'display
+                              `(space :align-to
+                                      (+ header-line-indent-width ,(+ x shift))))
+                             (cdr cols))))
+                (setq x (+ x shift)))))
+	  (if (>= pad-right 0)
+	      (push (propertize
+                     " "
+		     'display `(space :align-to
+                                      (+ header-line-indent-width ,next-x))
+		     'face 'fixed-pitch)
+		    cols))
+          (setq x next-x))))
     (setq cols (apply 'concat (nreverse cols)))
     (if tabulated-list-use-header-line
 	(setq header-line-format (list "" 'header-line-indent cols))
@@ -530,15 +538,29 @@ of column descriptors."
      beg (point)
      `(tabulated-list-id ,id tabulated-list-entry ,cols))))
 
+(defun tabulated-list--next-visible-column (n)
+  (let ((len (length tabulated-list-format))
+        (col-nb (1+ n))
+        found)
+    (while (and (< col-nb len)
+                (not found))
+      (if (plist-get (nthcdr 3 (aref tabulated-list-format col-nb))
+                     :hidden)
+          (setq col-nb (1+ col-nb))
+        (setq found t)))
+    (when (< col-nb len)
+      col-nb)))
+
 (defun tabulated-list--available-space (width n)
-  (let* ((next-col-format (aref tabulated-list-format (1+ n)))
+  (let* ((next-col (tabulated-list--next-visible-column n))
+         (next-col-format (aref tabulated-list-format next-col))
          (next-col-right-align (plist-get (nthcdr 3 next-col-format)
                                           :right-align))
          (next-col-width (nth 1 next-col-format)))
     (if next-col-right-align
         (- (+ width next-col-width)
            (min next-col-width
-                (tabulated-list--col-local-max-widths (1+ n))))
+                (tabulated-list--col-local-max-widths next-col)))
       width)))
 
 (defun tabulated-list-print-col (n col-desc x)
@@ -552,50 +574,52 @@ Return the column number after insertion."
 	 (props     (nthcdr 3 format))
 	 (pad-right (or (plist-get props :pad-right) 1))
          (right-align (plist-get props :right-align))
+         (hidden (plist-get props :hidden))
          (label (cond ((stringp col-desc) col-desc)
                       ((eq (car col-desc) 'image) " ")
                       (t (car col-desc))))
          (label-width (string-width label))
 	 (help-echo (concat (car format) ": " label))
 	 (opoint (point))
-	 (not-last-col (< (1+ n) (length tabulated-list-format)))
+	 (not-last-col (tabulated-list--next-visible-column n))
 	 (available-space (and not-last-col
                                (if right-align
                                    width
                                  (tabulated-list--available-space width n)))))
-    ;; Truncate labels if necessary (except last column).
-    ;; Don't truncate to `width' if the next column is align-right
-    ;; and has some space left, truncate to `available-space' instead.
-    (when (and not-last-col
-	       (> label-width available-space))
-      (setq label (truncate-string-to-width
-		   label available-space nil nil t t)
-	    label-width available-space))
-    (setq label (bidi-string-mark-left-to-right label))
-    (when (and right-align (> width label-width))
-      (let ((shift (- width label-width)))
-        (insert (propertize (make-string shift ?\s)
-                            'display `(space :align-to ,(+ x shift))))
-        (setq width (- width shift))
-        (setq x (+ x shift))))
-    (cond ((stringp col-desc)
-           (insert (if (get-text-property 0 'help-echo label)
-                       label
-                     (propertize label 'help-echo help-echo))))
-          ((eq (car col-desc) 'image)
-           (insert (propertize " "
-                               'display col-desc
-                               'help-echo help-echo)))
-          ((apply 'insert-text-button label (cdr col-desc))))
-    (let ((next-x (+ x pad-right width)))
-      ;; No need to append any spaces if this is the last column.
-      (when not-last-col
-        (when (> pad-right 0) (insert (make-string pad-right ?\s)))
-        (insert (propertize
-                 (make-string (- width (min width label-width)) ?\s)
-                 'display `(space :align-to ,next-x))))
-      (put-text-property opoint (point) 'tabulated-list-column-name name)
-      next-x)))
+    (if hidden x
+      ;; Truncate labels if necessary (except last column).
+      ;; Don't truncate to `width' if the next column is align-right
+      ;; and has some space left, truncate to `available-space' instead.
+      (when (and not-last-col
+	         (> label-width available-space))
+        (setq label (truncate-string-to-width
+		     label available-space nil nil t t)
+	      label-width available-space))
+      (setq label (bidi-string-mark-left-to-right label))
+      (when (and right-align (> width label-width))
+        (let ((shift (- width label-width)))
+          (insert (propertize (make-string shift ?\s)
+                              'display `(space :align-to ,(+ x shift))))
+          (setq width (- width shift))
+          (setq x (+ x shift))))
+      (cond ((stringp col-desc)
+             (insert (if (get-text-property 0 'help-echo label)
+                         label
+                       (propertize label 'help-echo help-echo))))
+            ((eq (car col-desc) 'image)
+             (insert (propertize " "
+                                 'display col-desc
+                                 'help-echo help-echo)))
+            ((apply 'insert-text-button label (cdr col-desc))))
+      (let ((next-x (+ x pad-right width)))
+        ;; No need to append any spaces if this is the last column.
+        (when not-last-col
+          (when (> pad-right 0) (insert (make-string pad-right ?\s)))
+          (insert (propertize
+                   (make-string (- width (min width label-width)) ?\s)
+                   'display `(space :align-to ,next-x))))
+        (put-text-property opoint (point) 'tabulated-list-column-name name)
+        next-x))))
 
 (defun tabulated-list-delete-entry ()
   "Delete the Tabulated List entry at point.
@@ -726,38 +750,16 @@ originally displayed in."
 Interactively, N is the prefix numeric argument, and defaults to
 1."
   (interactive "p")
-  (let ((start (current-column))
-        (entry (tabulated-list-get-entry))
-        (nb-cols (length tabulated-list-format))
-        (col-nb 0)
-        (total-width 0)
-        (found nil)
-        col-width)
-    (while (and (not found)
-                (< col-nb nb-cols))
-      (if (>= start
-              (setq total-width
-                    (+ total-width
-                       (max (setq col-width
-                                  (cadr (aref tabulated-list-format
-                                              col-nb)))
-                            (let ((desc (aref entry col-nb)))
-                              (string-width (if (stringp desc)
-                                                desc
-                                              (car desc)))))
-                       (or (plist-get (nthcdr 3 (aref tabulated-list-format
-                                                      col-nb))
-                                      :pad-right)
-                           1))))
-          (setq col-nb (1+ col-nb))
-        (setq found t)
-        ;; `tabulated-list-format' may be a constant (sharing list
-        ;; structures), so copy it before mutating.
-        (setq tabulated-list-format (copy-tree tabulated-list-format t))
-        (setf (cadr (aref tabulated-list-format col-nb))
-              (max 1 (+ col-width n)))
-        (tabulated-list-print t)
-        (tabulated-list-init-header)))))
+  (let* ((col-nb (tabulated-list--column-number
+                  (tabulated-list-get-column)))
+         (col-width (cadr (aref tabulated-list-format col-nb))))
+    ;; `tabulated-list-format' may be a constant (sharing list
+    ;; structures), so copy it before mutating.
+    (setq tabulated-list-format (copy-tree tabulated-list-format t))
+    (setf (cadr (aref tabulated-list-format col-nb))
+          (max 1 (+ col-width n)))
+    (tabulated-list-print t)
+    (tabulated-list-init-header)))
 
 (defun tabulated-list-narrow-current-column (&optional n)
   "Narrow the current tabulated list column by N chars.
@@ -765,6 +767,35 @@ Interactively, N is the prefix numeric argument, and defaults to
 1."
   (interactive "p")
   (tabulated-list-widen-current-column (- n)))
+
+(defun tabulated-list-hide-current-column ()
+  "Hide the current tabulated list column."
+  (interactive)
+  (let ((col-nb (tabulated-list--column-number
+                 (tabulated-list-get-column))))
+    (setf (nthcdr 3 (aref tabulated-list-format col-nb))
+          (plist-put (nthcdr 3 (aref tabulated-list-format col-nb))
+                     :hidden t)))
+  (tabulated-list-init-header)
+  (tabulated-list-print t t))
+
+(defun tabulated-list-make-column-visible (name)
+  "Make the tabulated list column NAME visible.
+Interactively, NAME is a hidden column propmted for with
+`completing-read'."
+  (interactive
+   (list
+    (completing-read "Colummn name: "
+                     (append tabulated-list-format nil)
+                     (lambda (col)
+                       (plist-get (nthcdr 3 col) :hidden))
+                     t)))
+  (let ((col-nb (tabulated-list--column-number name)))
+    (setf (nthcdr 3 (aref tabulated-list-format col-nb))
+          (plist-put (nthcdr 3 (aref tabulated-list-format col-nb))
+                     :hidden nil)))
+  (tabulated-list-init-header)
+  (tabulated-list-print t t))
 
 (defun tabulated-list-next-column (&optional arg)
   "Go to the start of the next column after point on the current line.
