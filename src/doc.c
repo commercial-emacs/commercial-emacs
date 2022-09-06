@@ -350,8 +350,7 @@ string is passed through `substitute-command-keys'.  */)
     doc = Qnil;
   if (FIXNUMP (doc) || CONSP (doc))
     {
-      Lisp_Object tem;
-      tem = get_doc_string (doc, 0, 0);
+      Lisp_Object tem = get_doc_string (doc, 0, 0);
       if (NILP (tem) && try_reload)
 	{
 	  /* The file is newer, we need to reset the pointers.  */

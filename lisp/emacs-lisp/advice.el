@@ -1680,13 +1680,12 @@ On each iteration VAR will be bound to the name of an advised function
   #'ad-get-advice-info "27.1")
 
 (defsubst ad-set-advice-info (function advice-info)
-  (cond
-   (advice-info
-    (add-function :around (get function 'defalias-fset-function)
-                  #'ad--defalias-fset))
-   ((get function 'defalias-fset-function)
-    (remove-function (get function 'defalias-fset-function)
-                     #'ad--defalias-fset)))
+  (cond (advice-info
+         (add-function :around (get function 'defalias-fset-function)
+                       #'ad--defalias-fset))
+        ((get function 'defalias-fset-function)
+         (remove-function (get function 'defalias-fset-function)
+                          #'ad--defalias-fset)))
   (put function 'ad-advice-info advice-info))
 
 (defsubst ad-copy-advice-info (function)
@@ -2874,42 +2873,24 @@ The current definition and its cache-id will be put into the cache."
        function (symbol-function advicefunname) (ad-make-cache-id function)))))
 
 (defun ad--defalias-fset (fsetfun function newdef)
-  ;; Besides ad-redefinition-action we use this defalias-fset-function hook
-  ;; for two other reasons:
-  ;; - for `activation/deactivation' advices.
-  ;; - to rebuild the ad-Advice-* function with the right argument names.
-  "Handle re/definition of an advised FUNCTION during de/activation.
-If FUNCTION does not have an original definition associated with it and
-the current definition is usable, then it will be stored as FUNCTION's
-original definition.  If no current definition is available (even in the
-case of undefinition) nothing will be done.  In the case of redefinition
-the action taken depends on the value of `ad-redefinition-action' (which
-see).  Redefinition occurs when FUNCTION already has an original definition
-associated with it but got redefined with a new definition and then
-de/activated.  If you do not like the current redefinition action change
-the value of `ad-redefinition-action' and de/activate again."
-  (let ((original-definition (ad-get-orig-definition function))
-	(current-definition (ad-get-orig-definition newdef)))
-    (if original-definition
-	(if current-definition
-	    (if (not (eq current-definition original-definition))
-		;; We have a redefinition:
-		(if (not (memq ad-redefinition-action '(accept discard warn)))
-		    (error "ad-redefinition-action: `%s' %s"
-			   function "invalidly redefined")
-		  (if (eq ad-redefinition-action 'discard)
-		      nil ;; Just drop it!
-		    (funcall (or fsetfun #'fset) function newdef)
-                    (ad-activate-internal function)
-		    (if (eq ad-redefinition-action 'warn)
-			(message "ad-handle-definition: `%s' got redefined"
-				 function))))
-	      ;; either advised def or correct original is in place:
-	      nil)
-	  ;; We have an undefinition, ignore it:
-          (funcall (or fsetfun #'fset) function newdef))
-      (funcall (or fsetfun #'fset) function newdef)
-      (when current-definition (ad-activate-internal function)))))
+  "Specialized `fset' for `defalias'.
+When a function alias is re/defined, automatically activate its advices."
+  (if-let ((current-definition (ad-get-orig-definition newdef))
+           (original-definition (ad-get-orig-definition function)))
+      (if (not (memq ad-redefinition-action '(accept discard warn)))
+	  (error "Advised defalias `%s' unchanged for ad-redefinition-action '%s'"
+                 function ad-redefinition-action)
+        (when (and (not (eq ad-redefinition-action 'discard))
+                   (not (eq current-definition original-definition)))
+          ;; We have a redefinition.
+          (funcall (or fsetfun #'fset) function newdef)
+          (ad-activate-internal function)
+	  (when (eq ad-redefinition-action 'warn)
+	    (message "Advised defalias `%s' redefined" function))))
+    ;; We have a new definition (null original) or undefinition (null current).
+    (funcall (or fsetfun #'fset) function newdef)
+    (when current-definition
+      (ad-activate-internal function))))
 
 
 ;; @@ The top-level advice interface:
