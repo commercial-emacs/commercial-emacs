@@ -3386,8 +3386,8 @@ handle_stop (struct it *it)
 
      HANDLED_RECOMPUTE_PROPS means reinvoke all handlers, say, when
      fontification of IT occurred, or overlay strings need redisplay.
-     It's not clear how useful this since setting it->f->fonts_changed
-     to true triggers frame redisplay.
+     Incidentally, setting it->f->fonts_changed to true also triggers
+     frame redisplay, and is more convenient.
 
      HANDLED_RETURN means return immediately.  Perhaps the main loop
      needs to act on some property right away, for example to display
@@ -9226,7 +9226,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
    (MOVE_TO_VPOS | MOVE_TO_POS)
 
    If TO_CHARPOS is within unvisible text, e.g. a truncated part of a
-   screen line, set IT to the next displayable position right of TO_CHARPOS.
+   screen line, set IT to the next displayable position after TO_CHARPOS.
 
    If TO_CHARPOS is in a display vector, set IT to its last glyph.
 
@@ -31217,7 +31217,7 @@ mouse_face_from_buffer_pos (Lisp_Object window,
 	    }
 	}
 
-      glyph++; /* first glyph to the right of the highlighted area */
+      glyph++; /* first glyph after highlighted area.  */
       for (g = r1->glyphs[TEXT_AREA], x = r1->x; g < glyph; g++)
 	x += g->pixel_width;
       hlinfo->mouse_face_beg_x = x;
@@ -33850,8 +33850,8 @@ It can be one of
  image            - show images only
  text             - show text only
  both             - show both, text below image
- both-horiz       - show text to the right of the image
- text-image-horiz - show text to the left of the image
+ both-horiz       - show text after the image
+ text-image-horiz - show text before the image
  any other        - use system default or image if no system default.
 
 This variable only affects the GTK+ toolkit version of Emacs.  */);
