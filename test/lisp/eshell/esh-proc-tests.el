@@ -57,6 +57,7 @@
 
 (ert-deftest esh-proc-test/output/stdout-to-buffer ()
   "Check that redirecting only stdout works."
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (executable-find "sh"))
   (eshell-with-temp-buffer bufname "old"
     (with-temp-eshell
@@ -208,6 +209,7 @@ prompt.  See bug#54136."
 (ert-deftest esh-proc-test/kill-pipeline ()
   "Test that killing a pipeline of processes only emits a single
 prompt.  See bug#54136."
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (and (executable-find "sh")
                     (executable-find "echo")
                     (executable-find "sleep")))
