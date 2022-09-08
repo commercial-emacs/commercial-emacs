@@ -151,7 +151,7 @@ process to complete."
     (should (equal 1 (with-current-buffer stderr-buffer
 		       (point-max))))
     (should (equal "hello stderr!\n"
-		   (mapconcat #'identity (nreverse stderr-output) ""))))))
+		   (mapconcat #'identity (nreverse stderr-output)))))))
 
 (ert-deftest set-process-filter-t ()
   "Test setting process filter to t and back." ;; Bug#36591
