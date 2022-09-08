@@ -122,6 +122,7 @@
 
 (ert-deftest esh-proc-test/sigpipe-exits-process ()
   "Test that a SIGPIPE is properly sent to a process if a pipe closes"
+  :expected-result (if (getenv "CI") t :passed)
   (skip-unless (and (executable-find "sh")
                     (executable-find "echo")
                     (executable-find "sleep")))
