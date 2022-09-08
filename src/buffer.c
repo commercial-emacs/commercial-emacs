@@ -6292,7 +6292,7 @@ Display optimizations for long lines will automatically be enabled in
 buffers which contain one or more lines whose length is above that
 threshold.
 When nil, these display optimizations are disabled.  */);
-  XSETFASTINT (Vlong_line_threshold, 10000);
+  Vlong_line_threshold = Qnil;
 
   defsubr (&Sbuffer_monospace_p);
   defsubr (&Sbuffer_live_p);
