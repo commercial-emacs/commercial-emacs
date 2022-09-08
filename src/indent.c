@@ -316,9 +316,6 @@ Text that has an invisible property is considered as having width 0, unless
   (void)
 {
   Lisp_Object temp;
-
-  if (current_buffer->long_line_optimizations_p)
-    return make_fixnum (0);
   XSETFASTINT (temp, current_column ());
   return temp;
 }
