@@ -2295,9 +2295,9 @@ This checks also `file-name-as-directory', `file-name-directory',
 
     ;; Check `directory-abbrev-alist' abbreviation.
     (let ((directory-abbrev-alist
-           `((,(rx bos (literal home-dir) "/foo")
+           `((,(tramp-compat-rx bos (literal home-dir) "/foo")
               . ,(concat home-dir "/f"))
-             (,(rx bos (literal remote-host) "/nowhere")
+             (,(tramp-compat-rx bos (literal remote-host) "/nowhere")
               . ,(concat remote-host "/nw")))))
       (should (equal (abbreviate-file-name (concat home-dir "/foo/bar"))
                      (concat remote-host-nohop "~/f/bar")))
@@ -2509,7 +2509,8 @@ This checks also `file-name-as-directory', `file-name-directory',
 		     (string-match-p
 		      (if (and (null noninteractive)
 			       (or (eq visit t) (null visit) (stringp visit)))
-			  (rx bol "Wrote " (literal tmp-name) "\n" eos)
+			  (tramp-compat-rx
+			   bol "Wrote " (literal tmp-name) "\n" eos)
 			(rx bos))
 		      tramp--test-messages))))))
 
@@ -3210,24 +3211,26 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	    (with-temp-buffer
 	      (insert-directory tmp-name1 nil)
 	      (goto-char (point-min))
-	      (should (looking-at-p (rx (literal tmp-name1)))))
+	      (should (looking-at-p (tramp-compat-rx (literal tmp-name1)))))
 	    (with-temp-buffer
 	      (insert-directory (file-name-as-directory tmp-name1) nil)
 	      (goto-char (point-min))
 	      (should
                (looking-at-p
-                (rx (literal (file-name-as-directory tmp-name1))))))
+                (tramp-compat-rx (literal (file-name-as-directory tmp-name1))))))
 	    (with-temp-buffer
 	      (insert-directory tmp-name1 "-al")
 	      (goto-char (point-min))
 	      (should
-	       (looking-at-p (rx bol (+ nonl) blank (literal tmp-name1) eol))))
+	       (looking-at-p
+		(tramp-compat-rx bol (+ nonl) blank (literal tmp-name1) eol))))
 	    (with-temp-buffer
 	      (insert-directory (file-name-as-directory tmp-name1) "-al")
 	      (goto-char (point-min))
 	      (should
 	       (looking-at-p
-		(rx bol (+ nonl) blank (literal tmp-name1) "/" eol))))
+		(tramp-compat-rx
+		 bol (+ nonl) blank (literal tmp-name1) "/" eol))))
 	    (with-temp-buffer
 	      (insert-directory
 	       (file-name-as-directory tmp-name1) "-al" nil 'full-directory-p)
@@ -3311,15 +3314,17 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
-		(rx (literal
-		     (file-relative-name
-		      tmp-name1 ert-remote-temporary-file-directory)))))
+		(tramp-compat-rx
+		 (literal
+		  (file-relative-name
+		   tmp-name1 ert-remote-temporary-file-directory)))))
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
-		(rx (literal
-		     (file-relative-name
-		      tmp-name2 ert-remote-temporary-file-directory))))))
+		(tramp-compat-rx
+		 (literal
+		  (file-relative-name
+		   tmp-name2 ert-remote-temporary-file-directory))))))
 	    (kill-buffer buffer)
 
 	    ;; Check for expanded directory and file names.
@@ -3331,16 +3336,18 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
-		(rx (literal
-		     (file-relative-name
-		      tmp-name3 ert-remote-temporary-file-directory)))))
+		(tramp-compat-rx
+		 (literal
+		  (file-relative-name
+		   tmp-name3 ert-remote-temporary-file-directory)))))
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
-		(rx (literal
-		     (file-relative-name
-		      tmp-name4
-		      ert-remote-temporary-file-directory))))))
+		(tramp-compat-rx
+		 (literal
+		  (file-relative-name
+		   tmp-name4
+		   ert-remote-temporary-file-directory))))))
 	    (kill-buffer buffer)
 
 	    ;; Check for special characters.
@@ -3359,16 +3366,18 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
-		(rx (literal
-		     (file-relative-name
-		      tmp-name3 ert-remote-temporary-file-directory)))))
+		(tramp-compat-rx
+		 (literal
+		  (file-relative-name
+		   tmp-name3 ert-remote-temporary-file-directory)))))
 	      (goto-char (point-min))
 	      (should
 	       (re-search-forward
-		(rx (literal
-		     (file-relative-name
-		      tmp-name4
-		      ert-remote-temporary-file-directory))))))
+		(tramp-compat-rx
+		 (literal
+		  (file-relative-name
+		   tmp-name4
+		   ert-remote-temporary-file-directory))))))
 	    (kill-buffer buffer))
 
 	;; Cleanup.
@@ -3598,6 +3607,9 @@ This tests also `access-file', `file-readable-p',
 	       (cons '(nil "perl" nil)
 		     tramp-connection-properties)))
 	 (progn
+	   ;; `ert-test-result-duration' exists since Emacs 27.  It
+	   ;; doesn't hurt to call it unconditionally, because
+	   ;; `skip-unless' hides the error.
 	   (skip-unless (< (ert-test-result-duration result) 300))
 	   (funcall (ert-test-body ert-test)))
        (ert-skip (format "Test `%s' must run before" ',test)))))
@@ -3626,6 +3638,9 @@ This tests also `access-file', `file-readable-p',
 		  (nil "id" nil))
 		tramp-connection-properties)))
 	 (progn
+	   ;; `ert-test-result-duration' exists since Emacs 27.  It
+	   ;; doesn't hurt to call it unconditionally, because
+	   ;; `skip-unless' hides the error.
 	   (skip-unless (< (ert-test-result-duration result) 300))
 	   (funcall (ert-test-body ert-test)))
        (ert-skip (format "Test `%s' must run before" ',test)))))
@@ -3652,6 +3667,9 @@ This tests also `access-file', `file-readable-p',
 		  (nil "readlink" nil))
 		tramp-connection-properties)))
 	 (progn
+	   ;; `ert-test-result-duration' exists since Emacs 27.  It
+	   ;; doesn't hurt to call it unconditionally, because
+	   ;; `skip-unless' hides the error.
 	   (skip-unless (< (ert-test-result-duration result) 300))
 	   (funcall (ert-test-body ert-test)))
        (ert-skip (format "Test `%s' must run before" ',test)))))
@@ -5678,7 +5696,7 @@ INPUT, if non-nil, is a string sent to the process."
 	;; Variable is set.
 	(should
 	 (string-match-p
-	  (rx (literal envvar))
+	  (tramp-compat-rx (literal envvar))
 	  (funcall this-shell-command-to-string "set"))))
 
       (unless (tramp-direct-async-process-p)
@@ -5705,7 +5723,7 @@ INPUT, if non-nil, is a string sent to the process."
 	    ;; Variable is unset.
 	    (should-not
 	     (string-match-p
-	      (rx (literal envvar))
+	      (tramp-compat-rx (literal envvar))
 	      ;; We must remove PS1, the output is truncated otherwise.
 	      ;; We must suppress "_=VAR...".
 	      (funcall
@@ -6597,7 +6615,7 @@ This is used in tests which we don't want to tag
                          :body nil :tags '(:tramp-asynchronous-processes))))
    ;; tramp-adb.el cannot apply multi-byte commands.
    (not (and (tramp--test-adb-p)
-	     (string-match-p (rx multibyte) default-directory)))))
+	     (string-match-p (tramp-compat-rx multibyte) default-directory)))))
 
 (defun tramp--test-crypt-p ()
   "Check, whether the remote directory is encrypted."
@@ -6905,14 +6923,14 @@ This requires restrictions of file name syntax."
 		    (should
 		     (string-equal
 		      (caar (directory-files-and-attributes
-			     file1 nil (rx (literal elt1))))
+			     file1 nil (tramp-compat-rx (literal elt1))))
 		      elt1))
 		    (should
 		     (string-equal
 		      (funcall
 		       (if quoted #'tramp-compat-file-name-quote #'identity)
 		       (cadr (car (directory-files-and-attributes
-				   file1 nil (rx (literal elt1))))))
+				   file1 nil (tramp-compat-rx (literal elt1))))))
 		      (file-remote-p (file-truename file2) 'localname)))
 		    (delete-file file3)
 		    (should-not (file-exists-p file3))))
@@ -6967,8 +6985,9 @@ This requires restrictions of file name syntax."
 		    (goto-char (point-min))
 		    (should
 		     (re-search-forward
-		      (rx bol (literal envvar)
-			  "=" (literal (getenv envvar)) eol))))))))
+		      (tramp-compat-rx
+		       bol (literal envvar)
+		       "=" (literal (getenv envvar)) eol))))))))
 
 	;; Cleanup.
 	(ignore-errors (kill-buffer buffer))
@@ -7510,9 +7529,10 @@ process sentinels.  They shall not disturb each other."
     (dolist (tm '(t nil))
       (should
        (string-match-p
-	(rx "Tramp loaded: nil" (+ (any "\n\r"))
-	    "Tramp loaded: nil" (+ (any "\n\r"))
-	    "Tramp loaded: " (literal (symbol-name tm)) (+ (any "\n\r")))
+	(tramp-compat-rx
+	 "Tramp loaded: nil" (+ (any "\n\r"))
+	 "Tramp loaded: nil" (+ (any "\n\r"))
+	 "Tramp loaded: " (literal (symbol-name tm)) (+ (any "\n\r")))
 	(shell-command-to-string
 	 (format
 	  "%s -batch -Q -L %s --eval %s"
@@ -7557,10 +7577,11 @@ process sentinels.  They shall not disturb each other."
 	    (tramp-cleanup-all-connections))"))
     (should
      (string-match-p
-      (rx "Loading "
-	  (literal
-           (expand-file-name
-            "tramp-cmds" (file-name-directory (locate-library "tramp")))))
+      (tramp-compat-rx
+       "Loading "
+       (literal
+        (expand-file-name
+         "tramp-cmds" (file-name-directory (locate-library "tramp")))))
       (shell-command-to-string
        (format
 	"%s -batch -Q -L %s -l tramp-sh --eval %s"
@@ -7664,6 +7685,7 @@ If INTERACTIVE is non-nil, the tests are run interactively."
 ;; * file-in-directory-p
 ;; * file-name-case-insensitive-p
 ;; * tramp-get-remote-gid
+;; * tramp-get-remote-groups
 ;; * tramp-get-remote-uid
 ;; * tramp-set-file-uid-gid
 
