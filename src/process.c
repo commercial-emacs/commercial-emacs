@@ -7711,11 +7711,15 @@ init_process_emacs (int sockfd)
       catch_child_signal ();
       g_source_unref (source);
 
-      eassert (lib_child_handler != dummy_handler);
-      signal_handler_t lib_child_handler_glib = lib_child_handler;
-      catch_child_signal ();
-      eassert (lib_child_handler == dummy_handler);
-      lib_child_handler = lib_child_handler_glib;
+      /* Apparently more recent versions of glib do not set this handler
+         any more, so make sure the dance is needed before going for it.  */
+      if (lib_child_handler != dummy_handler)
+        {
+          signal_handler_t lib_child_handler_glib = lib_child_handler;
+          catch_child_signal ();
+          eassert (lib_child_handler == dummy_handler);
+          lib_child_handler = lib_child_handler_glib;
+        }
 #else
       catch_child_signal ();
 #endif
