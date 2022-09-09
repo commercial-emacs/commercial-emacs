@@ -1790,8 +1790,6 @@ be a list of the form returned by `event-start' and `event-end'."
 
 ;;;; Obsolescent names for functions.
 
-(make-obsolete 'buffer-has-markers-at nil "24.3")
-
 (make-obsolete 'invocation-directory "use the variable of the same name."
                "27.1")
 (make-obsolete 'invocation-name "use the variable of the same name." "27.1")
@@ -3741,10 +3739,6 @@ This finishes the change group by reverting all of its changes."
               (setcdr elt old-cdr))))))))
 
 ;;;; Display-related functions.
-
-;; For compatibility.
-(define-obsolete-function-alias 'redraw-modeline
-  #'force-mode-line-update "24.3")
 
 (defun momentary-string-display (string pos &optional exit-char message)
   "Momentarily display STRING in the buffer at POS.
