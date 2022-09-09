@@ -2393,21 +2393,23 @@ the various files."
                    (not nowarn)
                    attributes
                    (file-readable-p filename))
-          (when (or (eq 'raw
-                        (abort-if-file-too-large
-                         (file-attribute-size attributes) "open" filename
-                         (not rawfile)))
-                    (and (not noninteractive)
-                         (find-file-long-lines-p filename)
-                         (let ((response
-                                (y-or-n-p
-                                 (format "Open %s in raw mode?"
-                                         (file-name-nondirectory filename)))))
-                           (prog1 response
-                             (unless response
-                               (message "find-file-literally-line-length currently %s"
-                                        find-file-literally-line-length))))))
-            (setf rawfile t))
+          (let ((too-large
+                 (abort-if-file-too-large
+                  (file-attribute-size attributes) "open" filename
+                  (not rawfile))))
+            (unless rawfile
+              (when (or (eq 'raw too-large)
+                        (and (not noninteractive)
+                             (find-file-long-lines-p filename)
+                             (let ((response
+                                    (y-or-n-p
+                                     (format "Open %s in raw mode?"
+                                             (file-name-nondirectory filename)))))
+                               (prog1 response
+                                 (unless response
+                                   (message "find-file-literally-line-length currently %s"
+                                            find-file-literally-line-length))))))
+                (setf rawfile t))))
 	  (warn-maybe-out-of-memory (file-attribute-size attributes)))
 	(if buf
 	    ;; We are using an existing buffer.
