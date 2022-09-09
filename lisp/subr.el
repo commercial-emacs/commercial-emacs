@@ -5057,6 +5057,8 @@ Modifies the match data; use `save-match-data' if necessary."
 
     (nreverse list)))
 
+(defalias 'string-split #'split-string)
+
 (defun combine-and-quote-strings (strings &optional separator)
   "Concatenate the STRINGS, adding the SEPARATOR (default \" \").
 This tries to quote the strings to avoid ambiguity such that
