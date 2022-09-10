@@ -4112,8 +4112,8 @@ setting."
 (defun comint--fl-ppss-flush-indirect (beg &rest rest)
   (when-let ((buf (comint-indirect-buffer t)))
     (with-current-buffer buf
-      (when (memq #'syntax-ppss-flush-cache before-change-functions)
-        (apply #'syntax-ppss-flush-cache beg rest)))))
+      (when (memq #'syntax-ppss-invalidate-cache before-change-functions)
+        (apply #'syntax-ppss-invalidate-cache beg rest)))))
 
 (defun comint--fl-fontify-region (fun beg end verbose)
   "Fontify process output and user input in the current comint buffer.
