@@ -4452,7 +4452,8 @@ x_dnd_get_window_proto (struct x_display_info *dpyinfo, Window wdesc)
 }
 
 static void
-x_dnd_send_enter (struct frame *f, Window target, int supported)
+x_dnd_send_enter (struct frame *f, Window target, Window toplevel,
+		  int supported)
 {
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   int i;
@@ -4461,7 +4462,7 @@ x_dnd_send_enter (struct frame *f, Window target, int supported)
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = dpyinfo->Xatom_XdndEnter;
   msg.xclient.format = 32;
-  msg.xclient.window = target;
+  msg.xclient.window = toplevel;
   msg.xclient.data.l[0] = FRAME_X_WINDOW (f);
   msg.xclient.data.l[1] = (((unsigned int) min (X_DND_SUPPORTED_VERSION,
 						supported) << 24)
@@ -4489,10 +4490,10 @@ x_dnd_send_enter (struct frame *f, Window target, int supported)
 }
 
 static void
-x_dnd_send_position (struct frame *f, Window target, int supported,
-		     unsigned short root_x, unsigned short root_y,
-		     Time timestamp, Atom action, int button,
-		     unsigned state)
+x_dnd_send_position (struct frame *f, Window target, Window toplevel,
+		     int supported, unsigned short root_x,
+		     unsigned short root_y, Time timestamp, Atom action,
+		     int button, unsigned state)
 {
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   XEvent msg;
@@ -4500,7 +4501,7 @@ x_dnd_send_position (struct frame *f, Window target, int supported,
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = dpyinfo->Xatom_XdndPosition;
   msg.xclient.format = 32;
-  msg.xclient.window = target;
+  msg.xclient.window = toplevel;
   msg.xclient.data.l[0] = FRAME_X_WINDOW (f);
   msg.xclient.data.l[1] = 0;
 
@@ -4564,7 +4565,7 @@ x_dnd_send_position (struct frame *f, Window target, int supported,
 }
 
 static void
-x_dnd_send_leave (struct frame *f, Window target)
+x_dnd_send_leave (struct frame *f, Window target, Window toplevel)
 {
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   XEvent msg;
@@ -4572,7 +4573,7 @@ x_dnd_send_leave (struct frame *f, Window target)
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = dpyinfo->Xatom_XdndLeave;
   msg.xclient.format = 32;
-  msg.xclient.window = target;
+  msg.xclient.window = toplevel;
   msg.xclient.data.l[0] = FRAME_X_WINDOW (f);
   msg.xclient.data.l[1] = 0;
   msg.xclient.data.l[2] = 0;
@@ -4588,15 +4589,15 @@ x_dnd_send_leave (struct frame *f, Window target)
 }
 
 static bool
-x_dnd_send_drop (struct frame *f, Window target, Time timestamp,
-		 int supported)
+x_dnd_send_drop (struct frame *f, Window target, Window toplevel,
+		 Time timestamp, int supported)
 {
   struct x_display_info *dpyinfo;
   XEvent msg;
 
   if (x_dnd_action == None)
     {
-      x_dnd_send_leave (f, target);
+      x_dnd_send_leave (f, target, toplevel);
       return false;
     }
 
@@ -4605,7 +4606,7 @@ x_dnd_send_drop (struct frame *f, Window target, Time timestamp,
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = dpyinfo->Xatom_XdndDrop;
   msg.xclient.format = 32;
-  msg.xclient.window = target;
+  msg.xclient.window = toplevel;
   msg.xclient.data.l[0] = FRAME_X_WINDOW (f);
   msg.xclient.data.l[1] = 0;
   msg.xclient.data.l[2] = 0;
@@ -4622,10 +4623,10 @@ x_dnd_send_drop (struct frame *f, Window target, Time timestamp,
 }
 
 static bool
-x_dnd_do_drop (Window target, int supported)
+x_dnd_do_drop (Window target, Window toplevel, int supported)
 {
   if (x_dnd_waiting_for_status_window != target)
-    return x_dnd_send_drop (x_dnd_frame, target,
+    return x_dnd_send_drop (x_dnd_frame, target, toplevel,
 			    x_dnd_selection_timestamp, supported);
 
   x_dnd_need_send_drop = true;
@@ -4730,7 +4731,8 @@ x_dnd_cancel_dnd_early (void)
   if (x_dnd_last_seen_window != None
       && x_dnd_last_protocol_version != -1)
     x_dnd_send_leave (x_dnd_frame,
-		      x_dnd_last_seen_window);
+		      x_dnd_last_seen_window,
+		      x_dnd_last_seen_toplevel);
   else if (x_dnd_last_seen_window != None
 	   && !XM_DRAG_STYLE_IS_DROP_ONLY (x_dnd_last_motif_style)
 	   && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
@@ -4788,7 +4790,8 @@ x_dnd_cleanup_drag_and_drop (void *frame)
       if (x_dnd_last_seen_window != None
 	  && x_dnd_last_protocol_version != -1)
 	x_dnd_send_leave (x_dnd_frame,
-			  x_dnd_last_seen_window);
+			  x_dnd_last_seen_window,
+			  x_dnd_last_seen_toplevel);
       else if (x_dnd_last_seen_window != None
 	       && !XM_DRAG_STYLE_IS_DROP_ONLY (x_dnd_last_motif_style)
 	       && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
@@ -11907,7 +11910,8 @@ x_dnd_process_quit (struct frame *f, Time timestamp)
     {
       if (x_dnd_last_seen_window != None
 	  && x_dnd_last_protocol_version != -1)
-	x_dnd_send_leave (f, x_dnd_last_seen_window);
+	x_dnd_send_leave (f, x_dnd_last_seen_window,
+			  x_dnd_last_seen_toplevel);
       else if (x_dnd_last_seen_window != None
 	       && !XM_DRAG_STYLE_IS_DROP_ONLY (x_dnd_last_motif_style)
 	       && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
@@ -17095,7 +17099,8 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 	      if (x_dnd_last_seen_window != None
 		  && x_dnd_last_protocol_version != -1
 		  && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
-		x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
+		x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window,
+				  x_dnd_last_seen_toplevel);
 	      else if (x_dnd_last_seen_window != None
 		       && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
 		       && !x_dnd_disable_motif_drag
@@ -17135,7 +17140,8 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 	  if (x_dnd_last_seen_window != None
 	      && x_dnd_last_protocol_version != -1
 	      && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
-	    x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
+	    x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window,
+			      x_dnd_last_seen_toplevel);
 	  else if (x_dnd_last_seen_window != None
 		   && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
 		   && !x_dnd_disable_motif_drag
@@ -17163,7 +17169,7 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 	  x_dnd_last_window_is_frame = was_frame;
 
 	  if (target != None && x_dnd_last_protocol_version != -1)
-	    x_dnd_send_enter (x_dnd_frame, target,
+	    x_dnd_send_enter (x_dnd_frame, target, x_dnd_last_seen_toplevel,
 			      x_dnd_last_protocol_version);
 	  else if (target != None && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
 		   && !x_dnd_disable_motif_drag)
@@ -17189,6 +17195,7 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 	x_dnd_note_self_position (dpyinfo, target, root_x, root_y);
       else if (x_dnd_last_protocol_version != -1 && target != None)
 	x_dnd_send_position (x_dnd_frame, target,
+			     x_dnd_last_seen_toplevel,
 			     x_dnd_last_protocol_version,
 			     root_x, root_y,
 			     x_dnd_selection_timestamp,
@@ -17232,7 +17239,8 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
       if (x_dnd_last_seen_window != None
 	  && x_dnd_last_protocol_version != -1)
 	x_dnd_send_leave (x_dnd_frame,
-			  x_dnd_last_seen_window);
+			  x_dnd_last_seen_window,
+			  x_dnd_last_seen_toplevel);
       else if (x_dnd_last_seen_window != None
 	       && !XM_DRAG_STYLE_IS_DROP_ONLY (x_dnd_last_motif_style)
 	       && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
@@ -17629,7 +17637,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		    x_dnd_waiting_for_finish
 		      = x_dnd_send_drop (x_dnd_finish_frame,
-					 target, x_dnd_selection_timestamp,
+					 target,
+					 x_dnd_last_seen_toplevel,
+					 x_dnd_selection_timestamp,
 					 x_dnd_send_drop_proto);
 		  }
 	      }
@@ -19497,7 +19507,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    if (x_dnd_last_seen_window != None
 			&& x_dnd_last_protocol_version != -1
 			&& x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
-		      x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
+		      x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window,
+					x_dnd_last_seen_toplevel);
 		    else if (x_dnd_last_seen_window != None
 			     && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
 			     && !x_dnd_disable_motif_drag
@@ -19537,7 +19548,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		if (x_dnd_last_seen_window != None
 		    && x_dnd_last_protocol_version != -1
 		    && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
-		  x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
+		  x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window,
+				    x_dnd_last_seen_toplevel);
 		else if (x_dnd_last_seen_window != None
 			 && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
 			 && x_dnd_disable_motif_drag
@@ -19587,6 +19599,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		if (target != None && x_dnd_last_protocol_version != -1)
 		  x_dnd_send_enter (x_dnd_frame, target,
+				    x_dnd_last_seen_toplevel,
 				    x_dnd_last_protocol_version);
 		else if (target != None && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
 			 && !x_dnd_disable_motif_drag)
@@ -19614,6 +19627,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 					event->xbutton.y_root);
 	    else if (x_dnd_last_protocol_version != -1 && target != None)
 	      x_dnd_send_position (x_dnd_frame, target,
+				   x_dnd_last_seen_toplevel,
 				   x_dnd_last_protocol_version,
 				   event->xmotion.x_root,
 				   event->xmotion.y_root,
@@ -20175,6 +20189,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		else if (x_dnd_last_protocol_version != -1)
 		  x_dnd_send_position (x_dnd_frame,
 				       x_dnd_last_seen_window,
+				       x_dnd_last_seen_toplevel,
 				       x_dnd_last_protocol_version,
 				       event->xbutton.x_root,
 				       event->xbutton.y_root,
@@ -20227,6 +20242,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 			x_dnd_waiting_for_finish
 			  = x_dnd_do_drop (x_dnd_last_seen_window,
+					   x_dnd_last_seen_toplevel,
 					   x_dnd_last_protocol_version);
 			x_dnd_finish_display = dpyinfo->display;
 		      }
@@ -21353,7 +21369,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			  if (x_dnd_last_seen_window != None
 			      && x_dnd_last_protocol_version != -1
 			      && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
-			    x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
+			    x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window,
+					      x_dnd_last_seen_toplevel);
 			  else if (x_dnd_last_seen_window != None
 				   && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
 				   && !x_dnd_disable_motif_drag
@@ -21393,7 +21410,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      if (x_dnd_last_seen_window != None
 			  && x_dnd_last_protocol_version != -1
 			  && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
-			x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
+			x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window,
+					  x_dnd_last_seen_toplevel);
 		      else if (x_dnd_last_seen_window != None
 			       && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
 			       && !x_dnd_disable_motif_drag
@@ -21445,6 +21463,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		      if (target != None && x_dnd_last_protocol_version != -1)
 			x_dnd_send_enter (x_dnd_frame, target,
+					  x_dnd_last_seen_toplevel,
 					  x_dnd_last_protocol_version);
 		      else if (target != None && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
 			       && !x_dnd_disable_motif_drag)
@@ -21475,6 +21494,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      dnd_state = xi_convert_event_state (xev);
 
 		      x_dnd_send_position (x_dnd_frame, target,
+					   x_dnd_last_seen_toplevel,
 					   x_dnd_last_protocol_version,
 					   lrint (xev->root_x),
 					   lrint (xev->root_y),
@@ -21693,6 +21713,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      else
 			x_dnd_send_position (x_dnd_frame,
 					     x_dnd_last_seen_window,
+					     x_dnd_last_seen_toplevel,
 					     x_dnd_last_protocol_version,
 					     lrint (xev->root_x),
 					     lrint (xev->root_y),
@@ -21749,6 +21770,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 			      x_dnd_waiting_for_finish
 				= x_dnd_do_drop (x_dnd_last_seen_window,
+						 x_dnd_last_seen_toplevel,
 						 x_dnd_last_protocol_version);
 			      x_dnd_finish_display = dpyinfo->display;
 			    }
@@ -24674,7 +24696,8 @@ x_connection_closed (Display *dpy, const char *error_message, bool ioerror)
 	      if (x_dnd_last_seen_window != None
 		  && x_dnd_last_protocol_version != -1)
 		x_dnd_send_leave (x_dnd_frame,
-				  x_dnd_last_seen_window);
+				  x_dnd_last_seen_window,
+				  x_dnd_last_seen_toplevel);
 	      else if (x_dnd_last_seen_window != None
 		       && !XM_DRAG_STYLE_IS_DROP_ONLY (x_dnd_last_motif_style)
 		       && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
