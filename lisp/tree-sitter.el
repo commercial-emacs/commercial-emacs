@@ -34,6 +34,10 @@
 (declare-function tree-sitter-node-of "tree-sitter.c")
 (declare-function tree-sitter-cursor-at "tree-sitter.c")
 (declare-function tree-sitter-node-start "tree-sitter.c")
+(declare-function tree-sitter-calculate-indent "tree-sitter.c")
+(declare-function tree-sitter-node-next-sibling "tree-sitter.c")
+(declare-function tree-sitter-node-first-child-for-byte "tree-sitter.c")
+(declare-function tree-sitter-root-node "tree-sitter.c")
 
 (defgroup tree-sitter
   nil
