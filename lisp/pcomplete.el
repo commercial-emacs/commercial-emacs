@@ -119,6 +119,9 @@
 ;;; Code:
 
 (require 'comint)
+(eval-when-compile
+  (require 'cl-lib)
+  (require 'rx))
 
 (defgroup pcomplete nil
   "Programmable completion."
@@ -481,6 +484,14 @@ Same as `pcomplete' but using the standard completion UI."
           (when completion-ignore-case
             (setq table (completion-table-case-fold table)))
           (list beg (point) table
+                :annotation-function
+                (lambda (cand)
+                  (when (stringp cand)
+                    (get-text-property 0 'pcomplete-annotation cand)))
+                :company-docsig
+                (lambda (cand)
+                  (when (stringp cand)
+                    (get-text-property 0 'pcomplete-help cand)))
                 :predicate pred
                 :exit-function
 		;; If completion is finished, add a terminating space.
@@ -1324,6 +1335,137 @@ If specific documentation can't be given, be generic."
   (if pcomplete-hosts-file
       (pcomplete-read-hosts pcomplete-hosts-file 'pcomplete--host-name-cache
                    'pcomplete--host-name-cache-timestamp)))
+
+;;; Parsing help messages
+
+(defvar pcomplete-from-help (make-hash-table :test #'equal)
+  "Memoization table for function `pcomplete-from-help'.")
+
+(cl-defun pcomplete-from-help (command
+                               &rest args
+                               &key
+                               (margin (rx bol (+ " ")))
+                               (argument (rx "-" (+ (any "-" alnum)) (? "=")))
+                               (metavar (rx (? " ")
+                                            (or (+ (any alnum "_-"))
+                                                (seq "[" (+? nonl) "]")
+                                                (seq "<" (+? nonl) ">")
+                                                (seq "{" (+? nonl) "}"))))
+                               (separator (rx ", " symbol-start))
+                               (description (rx (* nonl)
+                                                (* "\n" (>= 9 " ") (* nonl))))
+                               narrow-start
+                               narrow-end)
+  "Parse output of COMMAND into a list of completion candidates.
+
+COMMAND can be a list (program name and arguments) or a string to
+be executed in a shell.  It should print a help message.
+
+A list of arguments is collected after each match of MARGIN.
+Each argument should match ARGUMENT, possibly followed by a match
+of METAVAR.  If a match of SEPARATOR follows, then more
+argument-metavar pairs are collected.  Finally, a match of
+DESCRIPTION is collected.
+
+Keyword ARGS:
+
+MARGIN: regular expression after which argument descriptions are
+  to be found.  Parsing continues at the end of the first match
+  group, or at the end of the entire match.
+
+ARGUMENT: regular expression matching an argument name.  The
+  first match group (or the entire match if missing) is collected
+  as the argument name.  Parsing continues at the end of the
+  second matching group (or first group, or entire match).
+
+METAVAR: regular expression matching an argument parameter name.
+  The first match group (or the entire match if missing) is
+  collected as the parameter name and used as completion
+  annotation.  Parsing continues at the end of the second
+  matching group (or first group, or entire match).
+
+SEPARATOR: regular expression matching the separator between
+  arguments.  Parsing continues at the end of the first match
+  group, or at the end of the match.
+
+DESCRIPTION: regular expression matching the description of an
+  argument.  The first match group (or the entire match if
+  missing) is collected as the parameter name and used as
+  completion help.  Parsing continues at the end of the first
+  matching group or entire match.
+
+NARROW-START, NARROW-END: if non-nil, parsing of help message is
+  narrowed to the region between the (end of) the first match of
+  these regular expressions."
+  (with-memoization (gethash (cons command args) pcomplete-from-help)
+    (with-temp-buffer
+      (let ((default-directory (expand-file-name "~/"))
+            (command (if (stringp command)
+                         (list shell-file-name
+                               shell-command-switch
+                               command)
+                       command))
+            i result)
+        (apply #'call-process (car command) nil t nil (cdr command))
+        (goto-char (point-min))
+        (narrow-to-region (or (and narrow-start
+                                   (re-search-forward narrow-start nil t)
+                                   (or (match-beginning 1) (match-beginning 0)))
+                              (point-min))
+                          (or (and narrow-end
+                                   (re-search-forward narrow-end nil t)
+                                   (or (match-beginning 1) (match-beginning 0)))
+                              (point-max)))
+        (goto-char (point-min))
+        (while (re-search-forward margin nil t)
+          (goto-char (or (match-end 1) (match-end 0)))
+          (setq i 0)
+          (while (and (or (zerop i)
+                          (and (looking-at separator)
+                               (goto-char (or (match-end 1)
+                                              (match-end 0)))))
+                      (looking-at argument))
+            (setq i (1+ i))
+            (goto-char (seq-some #'match-end '(2 1 0)))
+            (push (or (match-string 1) (match-string 0)) result)
+            (when (looking-at metavar)
+              (goto-char (seq-some #'match-end '(2 1 0)))
+              (put-text-property 0 1
+                                 'pcomplete-annotation
+                                 (or (match-string 1) (match-string 0))
+                                 (car result))))
+          (when (looking-at description)
+            (goto-char (seq-some #'match-end '(2 1 0)))
+            (let ((help (string-clean-whitespace
+                         (or (match-string 1) (match-string 0))))
+                  (items (take i result)))
+              (while items
+                (put-text-property 0 1 'pcomplete-help help
+                                   (pop items))))))
+        (nreverse result)))))
+
+(defun pcomplete--simple-command (command args)
+  "Helper function for `define-simple-pcomplete'."
+  (while (pcomplete-here
+          (completion-table-merge
+           (apply #'pcomplete-from-help command args)
+           (pcomplete-entries)))))
+
+;; What do you think of a macro like this?
+(defmacro define-simple-pcomplete (name command &rest args)
+  "Create `pcomplete' completions for a simple command.
+COMMAND and ARGS are as in `pcomplete-from-help'.  Completion
+candidates for this command will include the parsed arguments as
+well as files."
+  (let* ((namestr (symbol-name name))
+         (docstring (if-let ((i (string-search "/" namestr)))
+                       (format "Completions for the `%s' command in `%s'."
+                               (substring namestr 0 i)
+                               (substring namestr i))
+                     (format "Completions for the `%s' command." namestr))))
+    `(defun ,(intern (concat "pcomplete/" namestr)) ()
+       ,docstring
+       (pcomplete--simple-command ,command ',args))))
 
 (provide 'pcomplete)
 

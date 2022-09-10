@@ -394,6 +394,36 @@ Return the new list."
     (while (pcomplete-here (pcomplete-dirs) nil #'identity))))
 
 ;;;###autoload
+(defun pcomplete/awk ()
+  "Completion for the `awk' command."
+  (while (pcomplete-here
+          (completion-table-in-turn
+           (pcomplete-from-help "awk --help"
+                                :margin "\t"
+                                :separator "  +"
+                                :description "\0"
+                                :metavar "[=a-z]+")
+           (pcomplete-entries)))))
+
+;;;###autoload
+(defun pcomplete/gpg ()
+  "Completion for the GNU Privacy Guard."
+  (while (pcomplete-here
+          (completion-table-in-turn
+           (pcomplete-from-help "gpg --help" :narrow-end "^ -se")
+           (pcomplete-entries)))))
+
+;; This is going to get tedious pretty quickly, how about introducing
+;; a macro for the simple cases?
+(define-simple-pcomplete awk "awk --help"
+                         :margin "\t"
+                         :separator "  +"
+                         :description "\0"
+                         :metavar "[=a-z]+")
+(define-simple-pcomplete gpg "gpg --help"  :narrow-end "^ -se")
+(define-simple-pcomplete ls "ls --help")
+(define-simple-pcomplete grep "grep --help")
+
 (defalias 'pcomplete/gdb 'pcomplete/xargs)
 
 ;;; pcmpl-gnu.el ends here

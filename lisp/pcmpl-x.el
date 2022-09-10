@@ -321,5 +321,22 @@ long options."
 ;;;###autoload
 (defalias 'pcomplete/bcc 'pcomplete/bcc32)
 
+;;;###autoload
+(defun pcomplete/rclone ()
+  "Completion for the `rclone' command."
+  (let ((subcmds (pcomplete-from-help "rclone help"
+                                      :margin "^  "
+                                      :argument "[a-z]+"
+                                      :narrow-start "\n\n")))
+    (while (not (member (pcomplete-arg 1) subcmds))
+      (pcomplete-here (completion-table-merge
+                       subcmds
+                       (pcomplete-from-help "rclone help flags"))))
+    (let ((subcmd (pcomplete-arg 1)))
+      (while (if (pcomplete-match "\\`-" 0)
+                 (pcomplete-here (pcomplete-from-help
+                                  `("rclone" ,subcmd "--help")))
+               (pcomplete-here (pcomplete-entries)))))))
+
 (provide 'pcmpl-x)
 ;;; pcmpl-x.el ends here
