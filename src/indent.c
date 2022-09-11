@@ -2235,7 +2235,7 @@ whether or not it is currently displayed in some window.  */)
 	    /* Back off to avoid overshooting.  */
             ? PT - 1
             : PT;
-          move_it_forward (&it, target, -1, MOVE_TO_POS);
+          move_it_forward (&it, target, -1, MOVE_TO_POS, NULL);
         }
 
       if (IT_CHARPOS (it) > it_start)

@@ -807,7 +807,8 @@ update_processes_for_thread_death (const struct thread_state *thread)
   for (pair = Vprocess_alist; ! NILP (pair); pair = XCDR (pair))
     {
       Lisp_Object process = XCDR (XCAR (pair));
-      if (XTHREAD (XPROCESS (process)->thread) == thread)
+      if (! NILP (XPROCESS (process)->thread)
+	  && thread == XTHREAD (XPROCESS (process)->thread))
 	pset_thread (XPROCESS (process), Qnil);
     }
 }

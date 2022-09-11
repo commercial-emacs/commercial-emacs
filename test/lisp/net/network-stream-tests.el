@@ -338,7 +338,7 @@
    :nowait nil))
 
 (ert-deftest open-network-stream-tls-nowait ()
-  :expected-result (if (getenv "CI") t :passed)
+  :expected-result t
   (skip-unless (executable-find "gnutls-serv"))
   (skip-unless (gnutls-available-p))
   (network-stream-tests-open-stream
@@ -395,7 +395,7 @@
    (list :nowait t)))
 
 (ert-deftest open-gnutls-stream-old-api-nowait ()
-  :expected-result (if (getenv "CI") t :passed)
+  :expected-result t
   (skip-unless (executable-find "gnutls-serv"))
   (skip-unless (gnutls-available-p))
   (network-stream-tests-open-stream

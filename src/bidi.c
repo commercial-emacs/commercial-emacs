@@ -570,7 +570,9 @@ bidi_cache_search (ptrdiff_t charpos, int level, int dir)
 	  i_start = bidi_cache_last_idx + 1;
 	}
       else if (dir)
-	i_start = bidi_cache_last_idx;
+	{
+	  i_start = bidi_cache_last_idx;
+	}
       else
 	{
 	  dir = -1;
@@ -579,8 +581,7 @@ bidi_cache_search (ptrdiff_t charpos, int level, int dir)
 
       if (dir < 0)
 	{
-	  /* Linear search for now; FIXME!  */
-	  for (i = i_start; i >= bidi_cache_start; i--)
+	  for (i = i_start; i >= bidi_cache_start; --i)
 	    if (bidi_cache[i].charpos <= charpos
 		&& charpos < bidi_cache[i].charpos + bidi_cache[i].nchars
 		&& (level == -1 || bidi_cache[i].resolved_level <= level))
@@ -588,7 +589,7 @@ bidi_cache_search (ptrdiff_t charpos, int level, int dir)
 	}
       else
 	{
-	  for (i = i_start; i < bidi_cache_idx; i++)
+	  for (i = i_start; i < bidi_cache_idx; ++i)
 	    if (bidi_cache[i].charpos <= charpos
 		&& charpos < bidi_cache[i].charpos + bidi_cache[i].nchars
 		&& (level == -1 || bidi_cache[i].resolved_level <= level))
@@ -775,27 +776,19 @@ bidi_cache_iterator_state (struct bidi_it *bidi_it, bool resolved,
 static bidi_type_t
 bidi_cache_find (ptrdiff_t charpos, bool resolved_only, struct bidi_it *bidi_it)
 {
-  ptrdiff_t i = bidi_cache_search (charpos, -1, bidi_it->scan_dir);
+  bidi_type_t type = UNKNOWN_BT;
+  bidi_dir_t scan_dir = bidi_it->scan_dir;
+  ptrdiff_t i = bidi_cache_search (charpos, -1, scan_dir);
 
   if (i >= bidi_cache_start
-      && (!resolved_only
-	  /* Callers that want only fully resolved states (and set
-	     resolved_only = true) need to be sure that there's enough
-	     info in the cached state to return the state as final,
-	     and if not, they don't want the cached state.  */
-	  || bidi_cache[i].resolved_level >= 0))
+      && (! resolved_only || bidi_cache[i].resolved_level >= 0))
     {
-      bidi_dir_t current_scan_dir = bidi_it->scan_dir;
-
       bidi_copy_it (bidi_it, &bidi_cache[i]);
+      bidi_it->scan_dir = scan_dir; /* cached scan direction is junk.  */
       bidi_cache_last_idx = i;
-      /* Don't let scan direction from the cached state override
-	 the current scan direction.  */
-      bidi_it->scan_dir = current_scan_dir;
-      return bidi_it->type;
+      type = bidi_it->type;
     }
-
-  return UNKNOWN_BT;
+  return type;
 }
 
 static int
@@ -3084,10 +3077,8 @@ bidi_type_of_next_char (struct bidi_it *bidi_it)
   return type;
 }
 
-/* Given an iterator state BIDI_IT, advance one character position in
-   the buffer/string to the next character (in the current scan
-   direction), resolve the embedding and implicit levels of that next
-   character, and return the resulting level.  */
+/* Advance BIDI_IT by one character in the current scan direction.
+   Return the resolved embedding or implicit level of the new character.  */
 static int
 bidi_level_of_next_char (struct bidi_it *bidi_it)
 {
@@ -3101,8 +3092,6 @@ bidi_level_of_next_char (struct bidi_it *bidi_it)
 	= ((bidi_it->string.s || STRINGP (bidi_it->string.lstring))
 	   ? bidi_it->string.schars : ZV);
 
-      /* There's no sense in trying to advance if we've already hit
-	 the end of text.  */
       if (bidi_it->charpos >= eob)
 	{
 	  eassert (bidi_it->resolved_level >= 0);
@@ -3110,10 +3099,8 @@ bidi_level_of_next_char (struct bidi_it *bidi_it)
 	}
     }
 
-  /* Perhaps the character we want is already cached as fully resolved.
-     If it is, the call to bidi_cache_find below will return a type
-     other than UNKNOWN_BT.  */
-  if (bidi_cache_idx > bidi_cache_start && !bidi_it->first_elt)
+  /* Check cache if character was already fully resolved.  */
+  if (bidi_cache_idx > bidi_cache_start && ! bidi_it->first_elt)
     {
       int bob = ((bidi_it->string.s || STRINGP (bidi_it->string.lstring))
 		 ? 0 : 1);
@@ -3125,24 +3112,25 @@ bidi_level_of_next_char (struct bidi_it *bidi_it)
 	  next_char_pos = bidi_it->charpos + bidi_it->nchars;
 	}
       else if (bidi_it->charpos >= bob)
-	/* Implementation note: we allow next_char_pos to be as low as
-	   0 for buffers or -1 for strings, and that is okay because
-	   that's the "position" of the sentinel iterator state we
-	   cached at the beginning of the iteration.  */
-	next_char_pos = bidi_it->charpos - 1;
+	{
+	  /* next_char_pos can be as low as 0 for buffers and -1 for strings,
+	     which are sentinel "positions" cached before iteration.  */
+	  next_char_pos = bidi_it->charpos - 1;
+	}
+
       if (next_char_pos >= bob - 1)
 	type = bidi_cache_find (next_char_pos, 1, bidi_it);
+
       if (type != UNKNOWN_BT)
 	{
-	  /* We asked the cache for fully resolved states.  */
+	  /* bidi_cache_find() asked for fully resolved states.  */
 	  eassert (bidi_it->resolved_level >= 0);
 	  return bidi_it->resolved_level;
 	}
     }
 
   if (bidi_it->scan_dir == -1)
-    /* If we are going backwards, the iterator state is already cached
-       from previous scans, and should be fully resolved.  */
+    /* If R2L, bidi_cache_find() above should have found it.  */
     emacs_abort ();
 
   if (type == UNKNOWN_BT)
@@ -3213,7 +3201,9 @@ bidi_level_of_next_char (struct bidi_it *bidi_it)
 	   || bidi_explicit_dir_char (bidi_it->ch))
 	  && (bidi_it->next_for_ws.type == NEUTRAL_B
 	      || bidi_it->next_for_ws.type == NEUTRAL_S)))
-    level = bidi_it->level_stack[0].level;
+    {
+      level = bidi_it->level_stack[0].level;
+    }
   else if ((level & 1) == 0) /* I1 */
     {
       if (type == STRONG_R)
@@ -3221,7 +3211,7 @@ bidi_level_of_next_char (struct bidi_it *bidi_it)
       else if (type == WEAK_EN || type == WEAK_AN)
 	level += 2;
     }
-  else			/* I2 */
+  else /* I2 */
     {
       if (type == STRONG_L || type == WEAK_EN || type == WEAK_AN)
 	level++;
@@ -3301,8 +3291,6 @@ bidi_find_other_level_edge (struct bidi_it *bidi_it, int level, bool end_flag)
       } while (new_level >= level);
     }
 }
-
-unsigned int bmtvn_count = 0;
 
 void
 bidi_move_to_visually_next (struct bidi_it *bidi_it)

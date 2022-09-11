@@ -5732,7 +5732,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	  || NILP (Fget (KVAR (current_kboard, Vlast_command), Qscroll_command)))
 	{
 	  start_move_it (&it, w, start);
-	  move_it_forward (&it, PT, -1, MOVE_TO_POS);
+	  move_it_forward (&it, PT, -1, MOVE_TO_POS, NULL);
 	  window_scroll_pixel_based_preserve_y = it.current_y;
 	  window_scroll_pixel_based_preserve_x = it.current_x;
 	}
@@ -5788,7 +5788,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       else if (dy > 0)
 	{
 	  goal_y = it.current_y + dy;
-	  move_it_forward (&it, ZV, goal_y, MOVE_TO_POS | MOVE_TO_Y);
+	  move_it_forward (&it, ZV, goal_y, MOVE_TO_POS | MOVE_TO_Y, NULL);
 	  /* Extra precision for people who want us to preserve the
 	     screen position of the cursor: effectively round DY to the
 	     nearest screen line, instead of rounding to zero; the latter
@@ -5882,7 +5882,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       if (in_display_vector_p (&it))
 	{
 	  ++pos;
-	  move_it_forward (&it, pos, -1, MOVE_TO_POS);
+	  move_it_forward (&it, pos, -1, MOVE_TO_POS, NULL);
 	}
 
       /* Set the window start, and set up the window for redisplay.  */
@@ -5911,7 +5911,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 
       /* We moved the window start towards ZV, so PT may be now
 	 in the scroll margin at the top.  */
-      move_it_forward (&it, PT, -1, MOVE_TO_POS);
+      move_it_forward (&it, PT, -1, MOVE_TO_POS, NULL);
       if (IT_CHARPOS (it) == PT
 	  && it.current_y >= this_scroll_margin
 	  && it.current_y <= last_y - WINDOW_TAB_LINE_HEIGHT (w)
@@ -5930,9 +5930,10 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	      /* If we have a header line, take account of it.  This
 		 is necessary because we set it.current_y to 0, above.  */
 	      move_it_forward (&it, -1,
-			  (goal_y - WINDOW_TAB_LINE_HEIGHT (w)
-			   - WINDOW_HEADER_LINE_HEIGHT (w)),
-			  MOVE_TO_Y);
+			       (goal_y - WINDOW_TAB_LINE_HEIGHT (w)
+				- WINDOW_HEADER_LINE_HEIGHT (w)),
+			       MOVE_TO_Y,
+			       NULL);
 	    }
 
 	  /* Get out of the scroll margin at the top of the window.  */
@@ -5965,7 +5966,8 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 		       (it.last_visible_y - WINDOW_TAB_LINE_HEIGHT (w)
 			- WINDOW_HEADER_LINE_HEIGHT (w)
 			- partial_line_height (&it) - this_scroll_margin - 1),
-		       MOVE_TO_POS | MOVE_TO_Y);
+		       MOVE_TO_POS | MOVE_TO_Y,
+		       NULL);
 
       /* Save our position, in case it's correct.  */
       charpos = IT_CHARPOS (it);
@@ -5983,7 +5985,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 
 	  it2 = it;
 	  it_data = bidi_shelve_cache ();
-	  move_it_forward (&it, PT, -1, MOVE_TO_POS);
+	  move_it_forward (&it, PT, -1, MOVE_TO_POS, NULL);
 	  if (IT_CHARPOS (it) == PT && it.current_y == it2.current_y)
 	    {
 	      charpos = IT_CHARPOS (it);
@@ -6031,7 +6033,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	  /* It would be wrong to subtract WINDOW_HEADER_LINE_HEIGHT
 	     here because we called start_move_it again and did not
 	     alter it.current_y this time.  */
-	  move_it_forward (&it, -1, goal_y, MOVE_TO_Y);
+	  move_it_forward (&it, -1, goal_y, MOVE_TO_Y, NULL);
 	  SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
 	}
       else

@@ -79,6 +79,7 @@
 
 (ert-deftest eshell-test/subcommand-reset-in-pipeline ()
   "Check that subcommands reset `eshell-in-pipeline-p'."
+  :expected-result t
   (skip-unless (executable-find "cat"))
   (dolist (template '("echo {%s} | *cat"
                       "echo ${%s} | *cat"
