@@ -10907,6 +10907,7 @@ DEF_DLL_FN (int, gdk_pixbuf_get_bits_per_sample, (const GdkPixbuf *));
 DEF_DLL_FN (void, g_type_init, (void));
 #  endif
 DEF_DLL_FN (void, g_object_unref, (gpointer));
+DEF_DLL_FN (void, g_error_free, (GError *));
 
 static bool
 init_svg_functions (void)
@@ -10966,6 +10967,7 @@ init_svg_functions (void)
   LOAD_DLL_FN (gobject, g_type_init);
 #  endif
   LOAD_DLL_FN (gobject, g_object_unref);
+  LOAD_DLL_FN (glib, g_error_free);
 
   return 1;
 }
@@ -10981,6 +10983,7 @@ init_svg_functions (void)
 #  undef gdk_pixbuf_get_pixels
 #  undef gdk_pixbuf_get_rowstride
 #  undef gdk_pixbuf_get_width
+#  undef g_error_free
 #  undef g_object_unref
 #  undef g_type_init
 #  if LIBRSVG_CHECK_VERSION (2, 52, 1)
@@ -11016,6 +11019,7 @@ init_svg_functions (void)
 #  define gdk_pixbuf_get_pixels fn_gdk_pixbuf_get_pixels
 #  define gdk_pixbuf_get_rowstride fn_gdk_pixbuf_get_rowstride
 #  define gdk_pixbuf_get_width fn_gdk_pixbuf_get_width
+#  define g_error_free fn_g_error_free
 #  define g_object_unref fn_g_object_unref
 #  if ! GLIB_CHECK_VERSION (2, 36, 0)
 #   define g_type_init fn_g_type_init
