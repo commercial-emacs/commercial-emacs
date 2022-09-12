@@ -10907,7 +10907,6 @@ DEF_DLL_FN (int, gdk_pixbuf_get_bits_per_sample, (const GdkPixbuf *));
 DEF_DLL_FN (void, g_type_init, (void));
 #  endif
 DEF_DLL_FN (void, g_object_unref, (gpointer));
-DEF_DLL_FN (void, g_clear_error, (GError **));
 
 static bool
 init_svg_functions (void)
@@ -10967,7 +10966,6 @@ init_svg_functions (void)
   LOAD_DLL_FN (gobject, g_type_init);
 #  endif
   LOAD_DLL_FN (gobject, g_object_unref);
-  LOAD_DLL_FN (glib, g_clear_error);
 
   return 1;
 }
@@ -10983,7 +10981,6 @@ init_svg_functions (void)
 #  undef gdk_pixbuf_get_pixels
 #  undef gdk_pixbuf_get_rowstride
 #  undef gdk_pixbuf_get_width
-#  undef g_clear_error
 #  undef g_object_unref
 #  undef g_type_init
 #  if LIBRSVG_CHECK_VERSION (2, 52, 1)
@@ -11019,7 +11016,6 @@ init_svg_functions (void)
 #  define gdk_pixbuf_get_pixels fn_gdk_pixbuf_get_pixels
 #  define gdk_pixbuf_get_rowstride fn_gdk_pixbuf_get_rowstride
 #  define gdk_pixbuf_get_width fn_gdk_pixbuf_get_width
-#  define g_clear_error fn_g_clear_error
 #  define g_object_unref fn_g_object_unref
 #  if ! GLIB_CHECK_VERSION (2, 36, 0)
 #   define g_type_init fn_g_type_init
@@ -11353,7 +11349,7 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
   if (! check_image_size (f, width, height))
     {
       image_size_error ();
-      goto rsvg_error;
+      goto done_error;
     }
 
   /* We are now done with the unmodified data.  */
@@ -11536,9 +11532,21 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
     image_put_x_image (f, img, ximg, 0);
   }
 
+  eassume (err == NULL);
   return true;
 
  rsvg_error:
+  if (err == NULL)
+    image_error ("Error parsing SVG image");
+  else
+    {
+      image_error ("Error parsing SVG image: %s",
+		   call2 (intern ("string-trim-right"), build_string (err->message),
+			  Qnil));
+      g_error_free (err);
+    }
+
+ done_error:
   if (rsvg_handle)
     g_object_unref (rsvg_handle);
   if (wrapped_contents)
@@ -11547,10 +11555,6 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
   if (css && !STRINGP (lcss))
     xfree (css);
 #endif
-  image_error ("Error parsing SVG image: %s",
-	       /* The -1 removes an extra newline.  */
-	       make_string (err->message, strlen (err->message) - 1));
-  g_clear_error (&err);
   return false;
 }
 
