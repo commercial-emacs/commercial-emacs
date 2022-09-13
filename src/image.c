@@ -11546,10 +11546,13 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
  rsvg_error:
   if (err && err->message[0])
     {
-      image_error ("Error parsing SVG image: %s",
-		   call2 (intern ("string-trim-right"), build_string (err->message),
-			  Qnil));
-      g_error_free (err);
+      errmsg = err->message;
+      errlen = strlen (errmsg);
+      /* Remove trailing whitespace from the error message text.  It
+	 has a newline at the end, and perhaps more whitespace.  */
+      while (errlen && c_isspace (errmsg[errlen - 1]))
+	errlen--;
+      empty_errmsg = errlen == 0;
     }
 
   if (empty_errmsg)
