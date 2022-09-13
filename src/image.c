@@ -11540,7 +11540,7 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
   return true;
 
  rsvg_error:
-  if (err == NULL)
+  if (!err || !err->message[0])
     image_error ("Error parsing SVG image");
   else
     {
@@ -11549,6 +11549,9 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 			  Qnil));
       g_error_free (err);
     }
+
+  if (err)
+    g_error_free (err);
 
  done_error:
   if (rsvg_handle)
@@ -12272,6 +12275,4 @@ The options are:
   /* MagickExportImagePixels is in 6.4.6-9, but not 6.4.4-10.  */
   imagemagick_render_type = 0;
 #endif
-
-  DEFSYM (Qstring_trim_right, "string-trim-right");
 }
