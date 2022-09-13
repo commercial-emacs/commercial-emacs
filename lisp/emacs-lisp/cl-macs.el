@@ -775,14 +775,34 @@ compared by `eql'.
 \(fn EXPR (KEYLIST BODY...)...)"
   (declare (indent 1) (debug (form &rest (sexp body))))
   (macroexp-let2 macroexp-copyable-p temp expr
-    (let* ((head-list nil))
+    (let* ((head-list nil)
+           (has-otherwise nil))
       `(cond
         ,@(mapcar
            (lambda (c)
-             (cons (cond ((memq (car c) '(t otherwise)) t)
+             (cons (cond (has-otherwise
+                          (error "Misplaced t or `otherwise' clause"))
+                         ((memq (car c) '(t otherwise))
+                          (setq has-otherwise t)
+                          t)
                          ((eq (car c) 'cl--ecase-error-flag)
                           `(error "cl-ecase failed: %s, %s"
                                   ,temp ',(reverse head-list)))
+                         ((null (car c))
+                          (macroexp-warn-and-return
+                           "Case nil will never match"
+                           nil 'suspicious))
+                         ((and (consp (car c)) (not (cddar c))
+                               (memq (caar c) '(quote function)))
+                          (macroexp-warn-and-return
+                           (format-message
+                            (concat "Case %s will match `%s'.  If "
+                                    "that's intended, write %s "
+                                    "instead.  Otherwise, don't "
+                                    "quote `%s'.")
+                            (car c) (caar c) (list (cadar c) (caar c))
+                            (cadar c))
+                           `(cl-member ,temp ',(car c)) 'suspicious))
                          ((listp (car c))
                           (setq head-list (append (car c) head-list))
                           `(cl-member ,temp ',(car c)))
