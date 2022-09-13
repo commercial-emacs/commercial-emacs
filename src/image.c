@@ -12273,4 +12273,5 @@ The options are:
   imagemagick_render_type = 0;
 #endif
 
+  DEFSYM (Qstring_trim_right, "string-trim-right");
 }
