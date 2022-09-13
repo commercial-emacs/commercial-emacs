@@ -34,6 +34,8 @@
 (declare-function image-flush "image.c" (spec &optional frame))
 (declare-function clear-image-cache "image.c"
                   (&optional filter animation-cache))
+(declare-function image-elide "image.c")
+(declare-function image-crop "image.c")
 
 (defconst image-type-header-regexps
   `(("\\`/[\t\n\r ]*\\*.*XPM.\\*/" . xpm)
