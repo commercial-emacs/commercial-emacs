@@ -11183,6 +11183,10 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
   char *wrapped_contents = NULL;
   ptrdiff_t wrapped_size;
 
+  bool empty_errmsg = true;
+  const char *errmsg = "";
+  ptrdiff_t errlen = 0;
+
 #if LIBRSVG_CHECK_VERSION (2, 48, 0)
   char *css = NULL;
 #endif
@@ -11540,15 +11544,18 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
   return true;
 
  rsvg_error:
-  if (!err || !err->message[0])
-    image_error ("Error parsing SVG image");
-  else
+  if (err && err->message[0])
     {
       image_error ("Error parsing SVG image: %s",
 		   call2 (intern ("string-trim-right"), build_string (err->message),
 			  Qnil));
       g_error_free (err);
     }
+
+  if (empty_errmsg)
+    image_error ("Error parsing SVG image");
+  else
+    image_error ("Error parsing SVG image: %s", make_string (errmsg, errlen));
 
   if (err)
     g_error_free (err);
@@ -11828,9 +11835,6 @@ x_kill_gs_process (Pixmap pixmap, struct frame *f)
 /***********************************************************************
 				Tests
  ***********************************************************************/
-
-#ifdef GLYPH_DEBUG
-
 DEFUN ("imagep", Fimagep, Simagep, 1, 1, 0,
        doc: /* Value is non-nil if SPEC is a valid image specification.  */)
   (Lisp_Object spec)
@@ -11838,6 +11842,7 @@ DEFUN ("imagep", Fimagep, Simagep, 1, 1, 0,
   return valid_image_p (spec) ? Qt : Qnil;
 }
 
+#ifdef GLYPH_DEBUG
 
 DEFUN ("lookup-image", Flookup_image, Slookup_image, 1, 1, 0,
        doc: /* */)
@@ -12230,9 +12235,9 @@ non-numeric, there is no explicit limit on the size of images.  */);
   defsubr (&Simage_mask_p);
   defsubr (&Simage_metadata);
   defsubr (&Simage_cache_size);
+  defsubr (&Simagep);
 
 #ifdef GLYPH_DEBUG
-  defsubr (&Simagep);
   defsubr (&Slookup_image);
 #endif
 
