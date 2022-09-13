@@ -63,7 +63,8 @@
      (let* ((img (cdr (assq ,type image-tests--images)))
             (file (if (listp img)
                       (plist-get (cdr img) :file)
-                    img)))
+                    img))
+            (noninteractive t))
        (find-file file))
      (should (equal major-mode 'image-mode))
      ;; Cleanup
@@ -86,7 +87,8 @@
            (img (cdr (assq 'svg image-tests--images)))
            (file (if (listp img)
                      (plist-get (cdr img) :file)
-                   img)))
+                   img))
+           (noninteractive t))
       (save-excursion (find-file file))
       (should (string-match-p "invalid image size" (buffer-string)))
       ;; no annoying newlines
