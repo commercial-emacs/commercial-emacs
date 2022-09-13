@@ -1967,6 +1967,12 @@ and is bound to "s p" in Image mode.
 *** Users can now add special image conversion functions.
 This is done via 'image-converter-add-handler'.
 
+---
+*** New library wallpaper.el.
+This library contains the command `wallpaper-set', which uses an
+external command to set the desktop background.  The new user option
+`wallpaper-commands' controls which command is being used.
+
 ** Image-Dired
 
 +++
@@ -2023,6 +2029,11 @@ added, and is used instead of ImageMagick when it is available.
 If 'image-dired-thumb-mark' is non-nil (the default), this face is
 used for images that are flagged for deletion in the Dired buffer
 associated with Image-Dired.
+
+---
+*** New command 'image-dired-wallpaper-set'.
+This command sets the wallpaper to the image at point in the thumbnail
+buffer.  It is bound to 'W' by default.
 
 ---
 *** 'image-dired-slideshow-start' is now bound to 'S'.
@@ -2409,10 +2420,11 @@ The old name is still available as an obsolete function alias.
 
 +++
 ** New commands 'image-crop' and 'image-elide'.
-These commands allow interactively cropping/eliding the image under
-point.  These commands are bound to 'c' and 'e' (respectively) in the
-local keymap over images.  They rely on external programs to do the
-actual cropping/eliding of the image file.
+These commands allow interactively cropping/eliding the image at
+point.  The commands are bound to keys 'c' and 'e' (respectively) in
+the local keymap over images.  They rely on external programs, by
+default 'convert' from ImageMagick and 'exiftool', to do the actual
+cropping/eliding of the image file.
 
 +++
 ** New package 'oclosure'.
