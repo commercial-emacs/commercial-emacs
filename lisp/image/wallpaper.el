@@ -52,7 +52,7 @@
     ;; Sway (Wayland)
     ("swaybg" "-o" "*" "-i" "%f" "-m" "fill")
     ;; Wayland General
-    ("wbg" %f)
+    ("wbg" "%f")
     ;; Gnome
     ("gsettings" "set" "org.gnome.desktop.background" "picture-uri" "file://%f")
     ;; KDE Plasma
@@ -62,6 +62,7 @@
     ("display" "-resize" "%wx%h" "-window" "root" "%f")
     ("feh" "--bg-max" "%f")
     ("xwallpaper" "--zoom" "%f")
+    ("hsetroot" "-full" "%f")
     ("xloadimage" "-onroot" "-fullscreen" "%f")
     ("xsetbg" " %f")
     )
@@ -152,6 +153,7 @@ native API will be used instead (see `haiku-set-wallpaper')."
      (const :tag "display                     (X Window System)"  "display")
      (const :tag "feh                         (X Window System)"  "feh")
      (const :tag "xwallpaper                  (X Window System)"  "xwallpaper")
+     (const :tag "hsetroot                    (X Window System)"  "hsetroot")
      (const :tag "xloadimage                  (X Window System)"  "xloadimage")
      (const :tag "xsetbg                      (X Window System)"  "xsetbg"))
     (const :tag "Other (specify)"         string))
