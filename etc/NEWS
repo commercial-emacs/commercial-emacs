@@ -1932,6 +1932,11 @@ up as necessary.  Unlike 'image-transform-fit-both', this does not
 only scale the image down, but up as well.  It is bound to "s w" in
 Image Mode by default.
 
+---
+*** New command 'image-mode-wallpaper-set'.
+This command sets the desktop background to the current image.  It is
+bound to "W" by default.
+
 +++
 *** 'image-transform-fit-to-(height|width)' are now obsolete.
 Use the new command 'image-transform-fit-to-window' instead.
@@ -1961,25 +1966,19 @@ These commands horizontally and vertically flip the image under point.
 It allows setting the image size to a percentage of its original size,
 and is bound to "s p" in Image mode.
 
++++
+*** 'image-transform-original' renamed to 'image-transform-reset-to-original'.
+The old name was confusing, and is now an obsolete function alias.
+
++++
+*** 'image-transform-reset' renamed to 'image-transform-reset-to-initial'.
+The old name was confusing, and is now an obsolete function alias.
+
 ** Images
 
 +++
 *** Users can now add special image conversion functions.
 This is done via 'image-converter-add-handler'.
-
----
-*** New library wallpaper.el.
-This library contains the command `wallpaper-set', which sets the
-desktop background.
-
-On GNU/Linux and other Unix-like systems, it uses an external command
-(such as "swaybg", "gm", "display" or "xloadimage").  A suitable
-command should be detected automatically in most cases, but can also
-be customized manually with the new user options 'wallpaper-command'
-and 'wallpaper-command-args' if needed.
-
-On Haiku, it uses the new function `haiku-set-wallpaper', which does
-not rely on any external command.
 
 ** Image-Dired
 
@@ -2040,8 +2039,8 @@ associated with Image-Dired.
 
 ---
 *** New command 'image-dired-wallpaper-set'.
-This command sets the wallpaper to the image at point in the thumbnail
-buffer.  It is bound to 'W' by default.
+This command sets the desktop background to the image at point in the
+thumbnail buffer.  It is bound to 'W' by default.
 
 ---
 *** 'image-dired-slideshow-start' is now bound to 'S'.
@@ -2434,6 +2433,20 @@ the local keymap over images.  They rely on external programs, by
 default 'convert' from ImageMagick, to do the actual cropping/eliding
 of the image file.  If the 'exiftool' program is available, it is used
 to optionally rotate images which have the :rotation property.
+
+---
+** New package 'wallpaper'.
+This package provides the command `wallpaper-set', which sets the
+desktop background.
+
+On GNU/Linux and other Unix-like systems, it uses an external command
+(such as "swaybg", "gm", "display" or "xloadimage").  A suitable
+command should be detected automatically in most cases, but can also
+be customized manually with the new user options 'wallpaper-command'
+and 'wallpaper-command-args' if needed.
+
+On Haiku, it uses the new function `haiku-set-wallpaper', which does
+not rely on any external command.
 
 +++
 ** New package 'oclosure'.

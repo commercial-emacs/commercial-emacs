@@ -45,6 +45,7 @@
 (require 'image)
 (require 'exif)
 (require 'dired)
+(require 'wallpaper)
 (eval-when-compile (require 'cl-lib))
 
 ;;; Image mode window-info management.
@@ -498,8 +499,8 @@ image as text, when opening such images in `image-mode'."
   "s s"     #'image-transform-set-scale
   "s r"     #'image-transform-set-rotation
   "s m"     #'image-transform-set-smoothing
-  "s o"     #'image-transform-original
-  "s 0"     #'image-transform-reset
+  "s o"     #'image-transform-reset-to-original
+  "s 0"     #'image-transform-reset-to-initial
 
   ;; Multi-frame keys
   "RET"     #'image-toggle-animation
@@ -522,6 +523,9 @@ image as text, when opening such images in `image-mode'."
   "SPC"     #'image-scroll-up
   "S-SPC"   #'image-scroll-down
   "DEL"     #'image-scroll-down
+
+  ;; Misc
+  "W"       #'image-mode-wallpaper-set
 
   ;; Remapped
   "<remap> <forward-char>"           #'image-forward-hscroll
@@ -567,9 +571,9 @@ image as text, when opening such images in `image-mode'."
      :help "Set rotation angle of the image"]
     ["Set Smoothing..." image-transform-set-smoothing
      :help "Toggle smoothing"]
-    ["Original Size" image-transform-original
+    ["Original Size" image-transform-reset-to-original
      :help "Reset image to actual size"]
-    ["Reset to Default Size" image-transform-reset
+    ["Reset to Default Size" image-transform-reset-to-initial
      :help "Reset all image transformations to initial size"]
     "--"
     ["Show Thumbnails"
@@ -1387,7 +1391,18 @@ If no such buffer exists, it will be opened."
   (prog1 (bookmark-default-handler bmk)
     (when (not (string= image-type (bookmark-prop-get bmk 'image-type)))
       (image-toggle-display))))
+
 
+;;; Setting the wallpaper
+
+(defun image-mode-wallpaper-set ()
+  "Set the desktop background to the current image.
+This uses `wallpaper-set' (which see)."
+  (interactive nil image-mode)
+  (wallpaper-set buffer-file-name))
+
+
+;;; Image transformation
 
 (defsubst image-transform-width (width height)
   "Return the bounding box width of a rotated WIDTH x HEIGHT rectangle.
@@ -1593,14 +1608,14 @@ ROTATION should be in degrees."
   (setq image--transform-smoothing smoothing)
   (image-toggle-display-image))
 
-(defun image-transform-original ()
+(defun image-transform-reset-to-original ()
   "Display the current image with the original (actual) size and rotation."
   (interactive nil image-mode)
   (setq image-transform-resize nil
 	image-transform-scale 1)
   (image-toggle-display-image))
 
-(defun image-transform-reset ()
+(defun image-transform-reset-to-initial ()
   "Display the current image with the default (initial) size and rotation."
   (interactive nil image-mode)
   (setq image-transform-resize image-auto-resize
@@ -1608,6 +1623,9 @@ ROTATION should be in degrees."
 	image-transform-scale 1
         image--transform-smoothing nil)
   (image-toggle-display-image))
+
+(define-obsolete-function-alias 'image-transform-original #'image-transform-reset-to-original "29.1")
+(define-obsolete-function-alias 'image-transform-reset #'image-transform-reset-to-initial "29.1")
 
 (provide 'image-mode)
 

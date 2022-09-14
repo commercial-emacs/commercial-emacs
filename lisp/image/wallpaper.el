@@ -1,4 +1,4 @@
-;;; wallpaper.el --- Set desktop wallpaper from Emacs  -*- lexical-binding: t; -*-
+;;; wallpaper.el --- Change desktop background from Emacs  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2022 Free Software Foundation, Inc.
 
@@ -47,6 +47,7 @@
 ;;; Finding the wallpaper command
 
 (defvar wallpaper--default-commands
+  ;; When updating this, also update the custom :type for `wallpaper-command'.
   '(
     ;; Sway (Wayland)
     ("swaybg" "-o" "*" "-i" "%f" "-m" "fill")
@@ -64,7 +65,7 @@
     ("xloadimage" "-onroot" "-fullscreen" "%f")
     ("xsetbg" " %f")
     )
-  "Executable used for setting the wallpaper.
+  "List of executables and options used for setting the wallpaper.
 This is used by `wallpaper--find-command' to automatically set
 `wallpaper-command', and by `wallpaper--find-command-args' to set
 `wallpaper-command-args'.  The commands will be tested in the
@@ -114,8 +115,9 @@ will be replaced as described in `wallpaper-command-args'.")
 
 (defvar wallpaper-command-args) ; silence byte-compiler
 (defun wallpaper--set-wallpaper-command (sym val)
-  "Set `wallpaper-command', and update `wallpaper-command-args'."
-  ;; Note: `command-args' is used by `wallpaper--find-command-arguments'.
+  "Set `wallpaper-command', and update `wallpaper-command-args'.
+Used to set `wallpaper-command'."
+  ;; Note: `wallpaper-command' is used by `wallpaper--find-command-arguments'.
   (prog1 (set-default sym val)
     (set-default 'wallpaper-command-args
                  (wallpaper--find-command-arguments))))
@@ -124,16 +126,35 @@ will be replaced as described in `wallpaper-command-args'.")
   "Executable used for setting the wallpaper.
 A suitable command for your environment should be detected
 automatically, so there is usually no need to customize this.
-However, if you do need to change this, you might also want to
-customize `wallpaper-command-args' to match.
+
+If you set this to any supported command using customize or
+`setopt', the user option `wallpaper-command-args' is
+automatically updated to match.  If you need to change this to an
+unsupported command, you will want to manually customize
+`wallpaper-command-args' to match.
 
 Note: If you find that you need to use a command in your
 environment that is not automatically detected, we would love to
 hear about it!  Please send an email to bug-gnu-emacs@gnu.org and
 tell us the command (and all options) that worked for you.  You
-can also use \\[report-emacs-bug]."
-  :type '(choice string
-                 (const :tag "Not set" nil))
+can also use \\[report-emacs-bug].
+
+The value of this variable is ignored on Haiku systems, where a
+native API will be used instead (see `haiku-set-wallpaper')."
+  :type
+  '(choice
+    (radio
+     (const :tag "gsettings                   (GNOME)"            "gsettings")
+     (const :tag "plasma-apply-wallpaperimage (KDE Plasma)"       "plasma-apply-wallpaperimage")
+     (const :tag "swaybg                      (Wayland/Sway)"     "swaybg")
+     (const :tag "wbg                         (Wayland)"          "wbg")
+     (const :tag "gm                          (X Window System)"  "gm")
+     (const :tag "display                     (X Window System)"  "display")
+     (const :tag "feh                         (X Window System)"  "feh")
+     (const :tag "xwallpaper                  (X Window System)"  "xwallpaper")
+     (const :tag "xloadimage                  (X Window System)"  "xloadimage")
+     (const :tag "xsetbg                      (X Window System)"  "xsetbg"))
+    (const :tag "Other (specify)"         string))
   :set #'wallpaper--set-wallpaper-command
   :group 'image
   :version "29.1")
@@ -149,7 +170,13 @@ In each of the command line arguments, \"%f\" will be replaced
 with the full file name, \"%h\" with the height of the selected
 frame's display (as returned by `display-pixel-height'), and
 \"%w\" with the width of the selected frame's display (as
-returned by `display-pixel-width')."
+returned by `display-pixel-width').
+
+If `wallpaper-set' is run from a TTY frame, it will prompt for a
+height and width for \"%h\" and \"%w\" instead.
+
+The value of this variable is ignored on Haiku systems, where a
+native API will be used instead (see `haiku-set-wallpaper')."
   :type '(repeat string)
   :group 'image
   :version "29.1")
@@ -190,8 +217,9 @@ See also `wallpaper-default-width'.")
   "Set the desktop background to FILE in a graphical environment.
 
 On GNU/Linux and other Unix-like systems, this relies on an
-external command.  Which command is being used depends on the
-user option `wallpaper-commands'.
+external command.  Which command to use is automatically detected
+in most cases, but can be manually customized with the user
+options `wallpaper-command' and `wallpaper-command-args'.
 
 On Haiku, no external command is needed, so the value of
 `wallpaper-commands' is ignored."
