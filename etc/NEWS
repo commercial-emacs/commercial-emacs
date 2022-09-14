@@ -1969,9 +1969,16 @@ This is done via 'image-converter-add-handler'.
 
 ---
 *** New library wallpaper.el.
-This library contains the command `wallpaper-set', which uses an
-external command to set the desktop background.  The new user option
-`wallpaper-commands' controls which command is being used.
+This library contains the command `wallpaper-set', which sets the
+desktop background.
+
+On GNU/Linux and other Unix-like systems, it uses an external command
+(such as "swaybg", "gm", "display" or "xloadimage").  A suitable
+command should be detected automatically in most cases, but can also
+be customized manually with the new user option `wallpaper-commands'.
+
+On Haiku, it uses the new function `haiku-set-wallpaper', which does
+not rely on any external command.
 
 ** Image-Dired
 
@@ -3430,11 +3437,21 @@ This means the vscroll will not be reset when set on a window that is
 ** XDG support
 
 ---
-*** New function 'xdg-state-home' returns 'XDG_STATE_HOME' environment variable.
-This new location, introduced in the XDG Base Directory Specification
-version 0.8 (8th May 2021), "contains state data that should persist
+*** New function 'xdg-state-home'.
+It returns the new 'XDG_STATE_HOME' environment variable.  It should
+point to a file name that "contains state data that should persist
 between (application) restarts, but that is not important or portable
 enough to the user that it should be stored in $XDG_DATA_HOME".
+(This variable was introduced in the XDG Base Directory Specification
+version 0.8 released on May 8, 2021.)
+
+---
+*** New function 'xdg-current-desktop'.
+It returns a list of strings, corresponding to the colon-separated
+list of names in the 'XDG_CURRENT_DESKTOP' environment variable, which
+identify the current desktop environment.
+(This variable was introduced in XDG Desktop Entry Specification
+version 1.2.)
 
 +++
 ** New macro 'with-delayed-message'.

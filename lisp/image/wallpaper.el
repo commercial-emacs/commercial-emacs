@@ -1,4 +1,4 @@
-;;; wallpaper.el --- Set wallpaper using external command  -*- lexical-binding: t; -*-
+;;; wallpaper.el --- Set desktop wallpaper from Emacs  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2022 Free Software Foundation, Inc.
 
@@ -22,17 +22,25 @@
 
 ;;; Commentary:
 
-;; This library provides the command `wallpaper-set', which uses an
-;; external command to set the desktop background.  This is obviously
-;; a bit tricky to get right, as there is no lack of platforms, window
-;; managers, desktop environments and tools.
+;; This library provides the command `wallpaper-set', which sets the
+;; desktop background.
 ;;
-;; If this doesn't work in your environment, customize the user option
-;; `wallpaper-commands'.
+;; On GNU/Linux and other Unix-like systems, it uses an external
+;; command to set the desktop background.
+;;
+;; On Haiku, it uses the `haiku-set-wallpaper' function, which does
+;; not rely on any external commands.
+;;
+;; Finding an external command to use is obviously a bit tricky to get
+;; right, as there is no lack of platforms, window managers, desktop
+;; environments and tools.  However, it should be detected
+;; automatically in most cases.  If it doesn't work in your
+;; environment, customize the user option `wallpaper-commands'.
 
 ;;; Code:
 
 (eval-when-compile (require 'subr-x))
+(require 'xdg)
 
 (defcustom wallpaper-commands
   '(
@@ -42,10 +50,13 @@
     ("wbg" %f)
     ;; Gnome
     ("gsettings" "set" "org.gnome.desktop.background" "picture-uri" "file://%f")
+    ;; KDE Plasma
+    ("plasma-apply-wallpaperimage" "%f")
     ;; Other / General X
     ("gm" "display" "-size" "%wx%h" "-window" "root" "%f")
     ("display" "-resize" "%wx%h" "-window" "root" "%f")
     ("feh" "--bg-max" "%f")
+    ("xwallpaper" "--zoom" "%f")
     ("xloadimage" "-onroot" "-fullscreen" "%f")
     ("xsetbg" " %f")
     )
@@ -85,7 +96,10 @@ You can also use \\[report-emacs-bug]."
            (cdr args))))
 
 (cl-defmethod wallpaper--check-command ((_type (eql 'gsettings)))
-  (equal (getenv "XDG_CURRENT_DESKTOP") "GNOME"))
+  (member "GNOME" (xdg-current-desktop)))
+
+(cl-defmethod wallpaper--check-command ((_type (eql 'plasma-apply-wallpaperimage)))
+  (member "KDE" (xdg-current-desktop)))
 
 (cl-defmethod wallpaper--check-command ((_type (eql 'swaybg)))
   (and (getenv "WAYLAND_DISPLAY")
@@ -105,10 +119,32 @@ You can also use \\[report-emacs-bug]."
                (executable-find (car cmd)))
           (throw 'found cmd)))))
 
+(defvar wallpaper-default-width 1080
+  "Default width used by `wallpaper-set'.
+This is only used when it can't be detected automatically.
+See also `wallpaper-default-height'.")
+
+(defvar wallpaper-default-height 1920
+  "Default height used by `wallpaper-set'.
+This is only used when it can't be detected automatically.
+See also `wallpaper-default-width'.")
+
 (declare-function haiku-set-wallpaper "term/haiku-win.el")
 
+(defun wallpaper--get-height-or-width (desc fun default)
+  (if (display-graphic-p)
+      (funcall fun)
+    (read-number (format "Wallpaper %s in pixels: " desc) default)))
+
 (defun wallpaper-set (file)
-  "Set the desktop background to FILE in a graphical environment."
+  "Set the desktop background to FILE in a graphical environment.
+
+On GNU/Linux and other Unix-like systems, this relies on an
+external command.  Which command is being used depends on the
+user option `wallpaper-commands'.
+
+On Haiku, no external command is needed, so the value of
+`wallpaper-commands' is ignored."
   (interactive (list (and
                       (display-graphic-p)
                       (read-file-name "Set desktop background to: "
@@ -122,35 +158,41 @@ You can also use \\[report-emacs-bug]."
     (error "No such file: %s" file))
   (unless (file-readable-p file)
     (error "File is not readable: %s" file))
-  (when (display-graphic-p)
-    (if (featurep 'haiku)
-        (haiku-set-wallpaper file)
-      (let* ((command (wallpaper--find-command))
-             (fmt-spec `((?f . ,(expand-file-name file))
-                         (?h . ,(display-pixel-height))
-                         (?w . ,(display-pixel-width))))
-             (bufname (format " *wallpaper-%s*" (random)))
-             (process
-              (and command
-                   (apply #'start-process "set-wallpaper" bufname
-                          (car command)
-                          (mapcar (lambda (arg) (format-spec arg fmt-spec))
-                                  (cdr command))))))
-        (unless command
-          (error "Can't find a suitable command for setting the wallpaper"))
-        (wallpaper-debug "Using command %s" (car command))
-        (setf (process-sentinel process)
-              (lambda (process status)
-                (unwind-protect
-                    (unless (and (eq (process-status process) 'exit)
-                                 (zerop (process-exit-status process)))
-                      (message "command %S %s: %S" (string-join (process-command process) " ")
-                               (string-replace "\n" "" status)
-                               (with-current-buffer (process-buffer process)
-                                 (string-clean-whitespace (buffer-string)))))
-                  (ignore-errors
-                    (kill-buffer (process-buffer process))))))
-        process))))
+  (cond ((featurep 'haiku)
+         (haiku-set-wallpaper file))
+        (t
+         (let* ((command (wallpaper--find-command))
+                (fmt-spec `((?f . ,(expand-file-name file))
+                            (?h . ,(wallpaper--get-height-or-width
+                                    "height"
+                                    #'display-pixel-height
+                                    wallpaper-default-height))
+                            (?w . ,(wallpaper--get-height-or-width
+                                    "width"
+                                    #'display-pixel-width
+                                    wallpaper-default-width))))
+                (bufname (format " *wallpaper-%s*" (random)))
+                (process
+                 (and command
+                      (apply #'start-process "set-wallpaper" bufname
+                             (car command)
+                             (mapcar (lambda (arg) (format-spec arg fmt-spec))
+                                     (cdr command))))))
+           (unless command
+             (error "Can't find a suitable command for setting the wallpaper"))
+           (wallpaper-debug "Using command %s" (car command))
+           (setf (process-sentinel process)
+                 (lambda (process status)
+                   (unwind-protect
+                       (unless (and (eq (process-status process) 'exit)
+                                    (zerop (process-exit-status process)))
+                         (message "command %S %s: %S" (string-join (process-command process) " ")
+                                  (string-replace "\n" "" status)
+                                  (with-current-buffer (process-buffer process)
+                                    (string-clean-whitespace (buffer-string)))))
+                     (ignore-errors
+                       (kill-buffer (process-buffer process))))))
+           process))))
 
 (provide 'wallpaper)
 
