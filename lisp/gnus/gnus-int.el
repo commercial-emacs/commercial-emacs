@@ -137,10 +137,10 @@ If CONFIRM is non-nil, the user will be asked for an NNTP server."
                          (list 'nntp gnus-nntp-server))))))))
     (setq gnus-current-select-method gnus-select-method)
     (cl-case (car gnus-select-method)
-      ('nnspool
+      (nnspool
        (require 'nnspool)
        (gnus-message 5 "Looking up local news spool..."))
-      ('nnmh
+      (nnmh
        (require 'nnmh)
        (gnus-message 5 "Looking up mh spool..."))
       (t

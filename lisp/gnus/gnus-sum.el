@@ -3810,7 +3810,7 @@ effects."
       (if-let ((prepare-p (gnus-summary-setup-buffer group)))
           (with-current-buffer (gnus-summary-buffer-name group)
             (cl-case (gnus-select-newsgroup group show-all select-articles)
-              ('quit
+              (quit
                ;; The user did a `C-g' while prompting for number of articles,
                ;; so we exit this group.
                (and (derived-mode-p 'gnus-summary-mode)
@@ -3825,7 +3825,7 @@ effects."
                  (gnus-configure-windows 'group 'force))
                ;; Finally signal the quit.
                (signal 'quit nil))
-              (nil
+              ((nil)
                (when (and (derived-mode-p 'gnus-summary-mode)
                           (not (equal (current-buffer) kill-buffer)))
                  (kill-buffer (current-buffer))
