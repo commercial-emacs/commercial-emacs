@@ -3865,7 +3865,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 
 	  case '&':
 	    /* #&N"..." -- bool-vector */
-	    obj = ANNOTATE (read_bool_vector (stackbuf, readcharfun));
+	    obj = ANNOTATE (read_bool_vector (readcharfun));
 	    break;
 
 	  case '!':
@@ -3881,17 +3881,17 @@ read0 (Lisp_Object readcharfun, bool annotated)
 
 	  case 'x':
 	  case 'X':
-	    obj = ANNOTATE (read_integer (readcharfun, 16, stackbuf));
+	    obj = ANNOTATE (read_integer (readcharfun, 16));
 	    break;
 
 	  case 'o':
 	  case 'O':
-	    obj = ANNOTATE (read_integer (readcharfun, 8, stackbuf));
+	    obj = ANNOTATE (read_integer (readcharfun, 8));
 	    break;
 
 	  case 'b':
 	  case 'B':
-	    obj = ANNOTATE (read_integer (readcharfun, 2, stackbuf));
+	    obj = ANNOTATE (read_integer (readcharfun, 2));
 	    break;
 
 	  case '@':
@@ -3960,7 +3960,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 		    /* #NrDIGITS -- radix-N number */
 		    if (n < 0 || n > 36)
 		      invalid_radix_integer (n, readcharfun);
-		    obj = ANNOTATE (read_integer (readcharfun, n, stackbuf));
+		    obj = ANNOTATE (read_integer (readcharfun, n));
 		    break;
 		  }
 		else if (n <= MOST_POSITIVE_FIXNUM && !NILP (Vread_circle))
@@ -4016,7 +4016,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
       break;
 
     case '"':
-      obj = ANNOTATE (read_string_literal (stackbuf, readcharfun));
+      obj = ANNOTATE (read_string_literal (readcharfun));
       break;
 
     case '\'':
