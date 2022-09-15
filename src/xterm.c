@@ -17549,7 +17549,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	    if (x_dnd_last_protocol_version != -1
 		&& x_dnd_in_progress
-		&& target == x_dnd_last_seen_window
+		&& target == x_dnd_last_seen_toplevel
 		/* The XDND documentation is not very clearly worded.
 		   But this should be the correct behavior, since
 		   "kDNDStatusSendHereFlag" in the reference
@@ -20250,7 +20250,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    else if (x_dnd_last_seen_window != None
 			&& x_dnd_last_protocol_version != -1)
 		      {
-			x_dnd_pending_finish_target = x_dnd_last_seen_window;
+			x_dnd_pending_finish_target = x_dnd_last_seen_toplevel;
 			x_dnd_waiting_for_finish_proto = x_dnd_last_protocol_version;
 
 			x_dnd_waiting_for_finish
@@ -21787,7 +21787,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			  else if (x_dnd_last_seen_window != None
 				   && x_dnd_last_protocol_version != -1)
 			    {
-			      x_dnd_pending_finish_target = x_dnd_last_seen_window;
+			      x_dnd_pending_finish_target = x_dnd_last_seen_toplevel;
 			      x_dnd_waiting_for_finish_proto = x_dnd_last_protocol_version;
 
 			      x_dnd_waiting_for_finish
