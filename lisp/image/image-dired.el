@@ -750,18 +750,20 @@ Should be called from commands in `image-dired-thumbnail-mode'."
          (message "No image, or image with correct properties, at point")
        (with-current-buffer dired-buf
          (when (dired-goto-file file-name)
-           ,@body
-           (image-dired-thumb-update-marks))))))
+           ,@body)))))
 
-(defmacro image-dired--do-mark-command (maybe-next &rest body)
+(defmacro image-dired--do-mark-command (maybe-next update &rest body)
   "Helper macro for the mark, unmark and flag commands.
 Run BODY in Dired buffer.
-If optional argument MAYBE-NEXT is non-nil, show next image
-according to `image-dired-marking-shows-next'."
+If MAYBE-NEXT is non-nil, show next image according to
+`image-dired-marking-shows-next'.
+If UPDATE is non-nil, call `image-dired-thumb-update-marks' too."
   (declare (indent defun) (debug t))
   `(image-dired--with-thumbnail-buffer
      (image-dired--on-file-in-dired-buffer
        ,@body)
+     ,(when update
+        '(image-dired-thumb-update-marks))
      ,(when maybe-next
         '(if image-dired-marking-shows-next
              (image-dired-display-next-thumbnail-original)
@@ -770,34 +772,26 @@ according to `image-dired-marking-shows-next'."
 (defun image-dired-mark-thumb-original-file ()
   "Mark original image file in associated Dired buffer."
   (interactive nil image-dired-thumbnail-mode image-dired-display-image-mode)
-  (image-dired--do-mark-command t
+  (image-dired--do-mark-command t t
     (dired-mark 1)))
 
 (defun image-dired-unmark-thumb-original-file ()
   "Unmark original image file in associated Dired buffer."
   (interactive nil image-dired-thumbnail-mode image-dired-display-image-mode)
-  (image-dired--do-mark-command t
+  (image-dired--do-mark-command t t
     (dired-unmark 1)))
 
 (defun image-dired-flag-thumb-original-file ()
   "Flag original image file for deletion in associated Dired buffer."
   (interactive nil image-dired-thumbnail-mode image-dired-display-image-mode)
-  (image-dired--do-mark-command t
+  (image-dired--do-mark-command t t
     (dired-flag-file-deletion 1)))
-
-(defun image-dired-toggle-mark-thumb-original-file ()
-  "Toggle mark on original image file in associated Dired buffer."
-  (interactive nil image-dired-thumbnail-mode image-dired-display-image-mode)
-  (image-dired--do-mark-command nil
-    (if (image-dired-dired-file-marked-p)
-        (dired-unmark 1)
-      (dired-mark 1))))
 
 (defun image-dired-unmark-all-marks ()
   "Remove all marks from all files in associated Dired buffer.
 Also update the marks in the thumbnail buffer."
   (interactive nil image-dired-thumbnail-mode image-dired-display-image-mode)
-  (image-dired--do-mark-command nil
+  (image-dired--do-mark-command nil t
     (dired-unmark-all-marks))
   (image-dired--with-thumbnail-buffer
     (image-dired-thumb-update-marks)))
@@ -1261,7 +1255,10 @@ Track this in associated Dired buffer if
 `image-dired-track-movement' is non-nil."
   (when image-dired-track-movement
     (image-dired-track-original-file))
-  (image-dired-toggle-mark-thumb-original-file))
+  (image-dired--do-mark-command nil nil
+    (if (image-dired-dired-file-marked-p)
+        (dired-unmark 1)
+      (dired-mark 1))))
 
 (defun image-dired-mouse-toggle-mark (event)
   "Use mouse EVENT to toggle Dired mark for thumbnail.
@@ -1371,6 +1368,15 @@ completely fit)."
   :type 'integer)
 (make-obsolete-variable 'image-dired-display-window-height-correction
                         "no longer used." "29.1")
+
+(defun image-dired-toggle-mark-thumb-original-file ()
+  "Toggle mark on original image file in associated Dired buffer."
+  (declare (obsolete nil "29.1"))
+  (interactive nil image-dired-thumbnail-mode image-dired-display-image-mode)
+  (image-dired--do-mark-command nil t
+    (if (image-dired-dired-file-marked-p)
+        (dired-unmark 1)
+      (dired-mark 1))))
 
 (defun image-dired-display-window-width (window)
   "Return width, in pixels, of WINDOW."
