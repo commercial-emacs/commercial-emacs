@@ -226,7 +226,7 @@ in the repository root directory of FILE."
             (insert-file-contents dirstate)
             (goto-char (point-min))
             (if (not (looking-at "#bazaar dirstate flat format 3"))
-                (vc-bzr-state file)     ; Some other unknown format?
+                (signal 'error "VC: Bzr dirstate is not flat format 3")
               (let* ((relfile (file-relative-name file root))
                      (reldir (file-name-directory relfile)))
                 (cond
@@ -314,7 +314,9 @@ in the repository root directory of FILE."
 
 (defun vc-bzr-registered (file)
   "Return non-nil if FILE is registered with bzr."
-  (let ((state (vc-bzr-state-heuristic file)))
+  (let ((state (condition-case err
+                   (vc-bzr-state-heuristic file)
+                 (error (signal (car err) (cdr err))))))
     (not (memq state '(nil unregistered ignored)))))
 
 (defconst vc-bzr-state-words
@@ -445,45 +447,45 @@ in the branch repository (or whose status not be determined)."
 ;; (unchanged . WARNING).  FIXME unchanged is not the best status to
 ;; return in case of error.
   (with-temp-buffer
-    ;; This is with-demoted-errors without the condition-case-unless-debug
-    ;; annoyance, which makes it fail during ert testing.
-    (condition-case err (vc-bzr-command "status" t 0 file)
-      (error (message "Error: %S" err) nil))
     (let ((status 'unchanged))
-      ;; the only secure status indication in `bzr status' output
-      ;; is a couple of lines following the pattern::
-      ;;   | <status>:
-      ;;   |   <file name>
-      ;; if the file is up-to-date, we get no status report from `bzr',
-      ;; so if the regexp search for the above pattern fails, we consider
-      ;; the file to be up-to-date.
-      (goto-char (point-min))
-      (when (re-search-forward
-             ;; bzr prints paths relative to the repository root.
-             (concat "^\\(" vc-bzr-state-words "\\):[ \t\n]+"
-                     (regexp-quote (vc-bzr-file-name-relative file))
-                     ;; Bzr appends a '/' to directory names and
-                     ;; '*' to executable files
-                     (if (file-directory-p file) "/?" "\\*?")
-                     "[ \t\n]*$")
-             nil t)
-        (let ((statusword (match-string 1)))
-          ;; Erase the status text that matched.
-          (delete-region (match-beginning 0) (match-end 0))
-          (setq status
-                (intern (string-replace " " "" statusword)))))
-      (when status
-        (goto-char (point-min))
-        (skip-chars-forward " \n\t") ;Throw away spaces.
-        (cons status
-              ;; "bzr" will output warnings and informational messages to
-              ;; stderr; due to Emacs's `vc-do-command' (and, it seems,
-              ;; `start-process' itself) limitations, we cannot catch stderr
-              ;; and stdout into different buffers.  So, if there's anything
-              ;; left in the buffer after removing the above status
-              ;; keywords, let us just presume that any other message from
-              ;; "bzr" is a user warning, and display it.
-              (unless (eobp) (buffer-substring (point) (point-max))))))))
+      (condition-case err
+          (progn
+            (vc-bzr-command "status" t 0 file)
+            ;; the only secure status indication in `bzr status' output
+            ;; is a couple of lines following the pattern::
+            ;;   | <status>:
+            ;;   |   <file name>
+            ;; if the file is up-to-date, we get no status report from `bzr',
+            ;; so if the regexp search for the above pattern fails, we consider
+            ;; the file to be up-to-date.
+            (goto-char (point-min))
+            (when (re-search-forward
+                   ;; bzr prints paths relative to the repository root.
+                   (concat "^\\(" vc-bzr-state-words "\\):[ \t\n]+"
+                           (regexp-quote (vc-bzr-file-name-relative file))
+                           ;; Bzr appends a '/' to directory names and
+                           ;; '*' to executable files
+                           (if (file-directory-p file) "/?" "\\*?")
+                           "[ \t\n]*$")
+                   nil t)
+              (let ((statusword (match-string 1)))
+                ;; Erase the status text that matched.
+                (delete-region (match-beginning 0) (match-end 0))
+                (setq status
+                      (intern (string-replace " " "" statusword)))))
+            (when status
+              (goto-char (point-min))
+              (skip-chars-forward " \n\t") ;Throw away spaces.
+              (cons status
+                    ;; "bzr" will output warnings and informational messages to
+                    ;; stderr; due to Emacs's `vc-do-command' (and, it seems,
+                    ;; `start-process' itself) limitations, we cannot catch stderr
+                    ;; and stdout into different buffers.  So, if there's anything
+                    ;; left in the buffer after removing the above status
+                    ;; keywords, let us just presume that any other message from
+                    ;; "bzr" is a user warning, and display it.
+                    (unless (eobp) (buffer-substring (point) (point-max))))))
+        (error (signal (car err) (cdr err)))))))
 
 (defun vc-bzr-state (file)
   (let ((result (vc-bzr-status file)))
