@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 1985-2022 Free Software Foundation, Inc.
 
-;; Author: Ilya Zakharevich
+;; Author: Ilya Zakharevich <ilyaz@cpan.org>
 ;;	Bob Olson
 ;;	Jonathan Rockway <jon@jrock.us>
 ;; Maintainer: emacs-devel@gnu.org
@@ -23,8 +23,6 @@
 
 ;; You should have received a copy of the GNU General Public License
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
-
-;; Corrections made by Ilya Zakharevich ilyaz@cpan.org
 
 ;;; Commentary:
 
@@ -54,7 +52,7 @@
 ;;     (define-key global-map [M-S-down-mouse-3] #'imenu)
 
 ;; This version supports the syntax added by the MooseX::Declare CPAN
-;; module, as well as Perl 5.10 keyword support.
+;; module, as well as Perl 5.10 keywords.
 
 ;;; Code:
 
@@ -957,13 +955,6 @@ Unless KEEP, removes the old indentation."
 (define-abbrev-table 'cperl-mode-abbrev-table ()
   "Abbrev table in use in CPerl mode buffers."
   :parents (list cperl-mode-electric-keywords-abbrev-table))
-
-;; ;; TODO: Commented out as we don't know what it is used for.  If
-;; ;;       there are no bug reports about this for Emacs 28.1, this
-;; ;;       can probably be removed.  (Code search online reveals nothing.)
-;; (when (boundp 'edit-var-mode-alist)
-;;   ;; FIXME: What package uses this?
-;;   (add-to-list 'edit-var-mode-alist '(perl-mode (regexp . "^cperl-"))))
 
 (defvar cperl-mode-map
   (let ((map (make-sparse-keymap)))
@@ -6044,39 +6035,6 @@ Style of printout regulated by the variable `cperl-ps-print-face-properties'."
 	(ps-print-face-extension-alist ps-print-face-extension-alist))
     (ps-extend-face-list cperl-ps-print-face-properties)
     (ps-print-buffer-with-faces file)))
-
-;; (defun cperl-ps-print-init ()
-;;   "Initialization of `ps-print' components for faces used in CPerl."
-;;   ;; Guard against old versions
-;;   (defvar ps-underlined-faces nil)
-;;   (defvar ps-bold-faces nil)
-;;   (defvar ps-italic-faces nil)
-;;   (setq ps-bold-faces
-;; 	(append '(font-lock-emphasized-face
-;; 		  cperl-array-face
-;; 		  font-lock-keyword-face
-;; 		  font-lock-variable-name-face
-;; 		  font-lock-constant-face
-;; 		  font-lock-reference-face
-;; 		  font-lock-other-emphasized-face
-;; 		  cperl-hash-face)
-;; 		ps-bold-faces))
-;;   (setq ps-italic-faces
-;; 	(append '(cperl-nonoverridable-face
-;; 		  font-lock-constant-face
-;; 		  font-lock-reference-face
-;; 		  font-lock-other-emphasized-face
-;; 		  cperl-hash-face)
-;; 		ps-italic-faces))
-;;   (setq ps-underlined-faces
-;; 	(append '(font-lock-emphasized-face
-;; 		  cperl-array-face
-;; 		  font-lock-other-emphasized-face
-;; 		  cperl-hash-face
-;; 		  cperl-nonoverridable-face font-lock-type-face)
-;; 		ps-underlined-faces))
-;;   (cons 'font-lock-type-face ps-underlined-faces))
-
 
 (cperl-windowed-init)
 
