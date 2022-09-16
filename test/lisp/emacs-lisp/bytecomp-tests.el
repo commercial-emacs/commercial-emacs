@@ -1133,6 +1133,10 @@ byte-compiled.  Run with dynamic binding."
  "defvar .foo-bar. docstring wider than .* characters" 'reverse)
 
 (bytecomp--define-warning-file-test
+ "warn-wide-docstring-ignore-function-signature.el"
+ "defvar .foo-bar. docstring wider than .* characters" 'reverse)
+
+(bytecomp--define-warning-file-test
  "warn-wide-docstring-ignore-override.el"
  "defvar .foo-bar. docstring wider than .* characters" 'reverse)
 

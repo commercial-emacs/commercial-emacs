@@ -1648,7 +1648,7 @@ URLs."
               (+ " " (or
                       ;; Arguments.
                       (+ (or (syntax symbol)
-                             (any word "-/:[]&=().?^\\#'")))
+                             (any word "-/:[]&=()<>.,?^\\#*'\"")))
                       ;; Argument that is a list.
                       (seq "(" (* (not ")")) ")")))
               ")")))
