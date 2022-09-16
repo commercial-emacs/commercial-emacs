@@ -103,6 +103,7 @@
                         (process-get listen-server 'handlers))))))))
 
 (cl-defmacro jsonrpc--with-emacsrpc-fixture ((endpoint-sym) &body body)
+  (declare (indent defun))
   `(jsonrpc--call-with-emacsrpc-fixture (lambda (,endpoint-sym) ,@body)))
 
 (ert-deftest returns-3 ()
@@ -133,11 +134,13 @@
 (ert-deftest times-out ()
   "Request for 3-sec sit-for with 1-sec timeout times out."
   (jsonrpc--with-emacsrpc-fixture (conn)
+    ;; requires full sit-for time to error out since test server in
+    ;; same main thread (previously timeout-fn throw'ed thus erroring
+    ;; out much sooner after :timeout seconds).
     (should-error
      (jsonrpc-request conn 'sit-for [3] :timeout 1))))
 
 (ert-deftest doesnt-time-out ()
-  :tags '(:expensive-test)
   "Request for 1-sec sit-for with 2-sec timeout succeeds."
   (jsonrpc--with-emacsrpc-fixture (conn)
     (jsonrpc-request conn 'sit-for [1] :timeout 2)))
@@ -166,7 +169,6 @@
            (not (jsonrpc--hold-deferred conn)))))
 
 (ert-deftest deferred-action-toolate ()
-  :tags '(:expensive-test)
   "Deferred request fails because no one clears the flag."
   (jsonrpc--with-emacsrpc-fixture (conn)
     (should-error
@@ -178,7 +180,6 @@
                            :timeout 0.5)))))
 
 (ert-deftest deferred-action-intime ()
-  :tags '(:expensive-test)
   "Deferred request barely makes it after event clears a flag."
   ;; Send an async request, which returns immediately. However the
   ;; success fun which sets the flag only runs after some time.
@@ -196,7 +197,6 @@
                            :timeout 1)))))
 
 (ert-deftest deferred-action-complex-tests ()
-  :tags '(:expensive-test)
   "Test a more complex situation with deferred requests."
   (jsonrpc--with-emacsrpc-fixture (conn)
     (let (n-deferred-1
@@ -249,7 +249,7 @@
       (should second-deferred-went-through-p)
       (should (eq 1 n-deferred-1))
       (should (eq 2 n-deferred-2))
-      (should (eq 0 (hash-table-count (jsonrpc--deferred-actions conn)))))))
+      (should (zerop (hash-table-count (jsonrpc--deferred-actions conn)))))))
 
 (provide 'jsonrpc-tests)
 ;;; jsonrpc-tests.el ends here
