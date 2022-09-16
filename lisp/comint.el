@@ -3914,7 +3914,8 @@ REGEXP-GROUP is the regular expression group in REGEXP to use."
 ;; to `comint-osc-handlers' allows a customized treatment of further
 ;; sequences.
 
-(defvar-local comint-osc-handlers '(("7" . comint-osc-directory-tracker)
+(defvar-local comint-osc-handlers '(("2" . comint-osc-window-title-handler)
+                                    ("7" . comint-osc-directory-tracker)
                                     ("8" . comint-osc-hyperlink-handler))
   "Alist of handlers for OSC escape sequences.
 See `comint-osc-process-output' for details.")
@@ -3954,6 +3955,18 @@ arguments, with point where the escape sequence was located."
                   (funcall fun code text)))
             (put-text-property pos0 bound 'invisible t)
             (setq comint-osc--marker (copy-marker pos0))))))))
+
+;; Window title handling (OSC 2)
+
+(defvar-local comint-osc-window-title nil)
+(defun comint-osc-window-title-handler (_ text)
+  "Set value of `comint-osc-window-title' from an OSC 2 escape sequence.
+The variable `comint-osc-window-title' can be reffered to in
+`frame-title-format' to dynamically set the frame title.
+
+This function is intended to be included as an entry of
+`comint-osc-handlers'."
+  (setq comint-osc-window-title text))
 
 ;; Current directory tracking (OSC 7)
 
