@@ -112,8 +112,7 @@
 	 ;; In Emacs font-lock-builtin-face has traditionally been
 	 ;; used for preprocessor directives.
 	 'font-lock-builtin-face)
-	((and (c-face-name-p 'font-lock-reference-face)
-	      (eq font-lock-reference-face 'font-lock-reference-face))
+	((c-face-name-p 'font-lock-reference-face)
 	 'font-lock-reference-face)
 	(t 'font-lock-constant-face)))
 
@@ -1958,7 +1957,7 @@ casts and declarations are fontified.  Used on level 2 and higher."
   ;; prevent a repeat invocation.  See elisp/lispref page "Search-based
   ;; Fontification".
   (while (and (< (point) limit)
-	      (re-search-forward 
+	      (re-search-forward
 	       "\\<\\(module\\|export\\|import\\)\\>\\(?:[^_$]\\|$\\)"
 	       limit t))
     (goto-char (match-end 1))
