@@ -359,7 +359,17 @@ case, and the process object in the asynchronous case."
 	      (let ((inhibit-message vc-inhibit-message))
 		(message "Running in foreground: %s" full-command)))
 	    (let ((buffer-undo-list t))
-	      (setq status (apply #'process-file command nil t nil squeezed)))
+              (condition-case err
+	          (setq status (apply #'process-file command nil t nil squeezed))
+                (error
+                 (pcase (car err)
+                   ('file-missing
+                    (if (string= (cadr err) "Searching for program")
+                        ;; The most probable is the lack of the backend binary.
+                        (signal 'vc-not-supported (cdr err))
+                      (signal (car err) (cdr err))))
+                   (_
+                    (signal (car err) (cdr err)))))))
 	    (when (and (not (eq t okstatus))
 		       (or (not (integerp status))
 			   (and okstatus (< okstatus status))))
