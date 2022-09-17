@@ -954,6 +954,7 @@ how new groups will be entered into the group buffer."
     (let (name)
       (while (and (null (setq name (get-text-property (line-beginning-position) 'gnus-group)))
                   (zerop (forward-line -1))))
+      (beginning-of-line)
       (when (re-search-forward ": \\(.*\\)$" (line-end-position) t)
         (concat (gnus-method-to-server-name gnus-browse-current-method) ":"
 	        (or name
