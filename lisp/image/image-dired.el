@@ -4,7 +4,7 @@
 
 ;; Author: Mathias Dahl <mathias.rem0veth1s.dahl@gmail.com>
 ;; Maintainer: Stefan Kangas <stefankangas@gmail.com>
-;; Version: 0.4.11
+;; Version: 0.5
 ;; Keywords: multimedia
 
 ;; This file is NOT part of GNU Emacs.
