@@ -228,7 +228,7 @@ Already submitted bugs can be found in the Emacs bug tracker:
           (set-window-dedicated-p nil nil)
           (set-frame-parameter nil 'unsplittable nil))
       (error nil))
-    (compose-mail report-emacs-bug-address topic)
+    (compose-mail report-emacs-bug-address topic '(("X-Debbugs-Cc" . "")))
     ;; The rest of this does not execute if the user was asked to
     ;; confirm and said no.
     (when (eq major-mode 'message-mode)
@@ -518,7 +518,10 @@ Message buffer where you can explain more about the patch."
     (goto-char (point-min))
     (view-mode 1)
     (button-mode 1))
-  (compose-mail-other-window report-emacs-bug-address subject)
+  (compose-mail-other-window report-emacs-bug-address
+                             subject
+                             '(("X-Debbugs-Cc" . "")))
+  (message-sort-headers)
   (message-goto-body)
   (insert "\n\n\n")
   (emacs-bug--system-description)
