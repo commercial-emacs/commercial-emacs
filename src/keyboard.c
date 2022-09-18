@@ -499,27 +499,19 @@ echo_add_key (Lisp_Object c)
 			STRING_MULTIBYTE (name), 1);
     }
 
+  Lisp_Object new_string = make_string (buffer, ptr - buffer);
   if ((NILP (echo_string) || SCHARS (echo_string) == 0)
       && help_char_p (c))
     {
-      static const char text[] = " (Type ? for further options)";
-      int len = sizeof text - 1;
-
-      if (size - (ptr - buffer) < len)
-	{
-	  ptrdiff_t offset = ptr - buffer;
-	  size += len;
-	  buffer = SAFE_ALLOCA (size);
-	  ptr = buffer + offset;
-	}
-
-      memcpy (ptr, text, len);
-      ptr += len;
+      AUTO_STRING (str, " (Type ? for further options)");
+      AUTO_LIST2 (props, Qface, Qhelp_key_binding);
+      Fadd_text_properties (make_fixnum (7), make_fixnum (8), props, str);
+      new_string = concat2 (new_string, str);
     }
 
   kset_echo_string
     (current_kboard,
-     concat2 (echo_string, make_string (buffer, ptr - buffer)));
+     concat2 (echo_string, new_string));
   SAFE_FREE ();
 }
 
@@ -12027,6 +12019,8 @@ syms_of_keyboard (void)
   DEFVAR_LISP ("internal--top-level-message", Vinternal__top_level_message,
 	       doc: /* Message displayed by `normal-top-level'.  */);
   Vinternal__top_level_message = regular_top_level_message;
+
+  DEFSYM (Qhelp_key_binding, "help-key-binding");
 
   /* Tool-bars.  */
   DEFSYM (QCimage, ":image");
