@@ -17501,6 +17501,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   int dx, dy;
   USE_SAFE_ALLOCA;
 
+  /* This function is not reentrant, so input should be blocked before
+     it is called.  */
+
+  if (!input_blocked_p ())
+    emacs_abort ();
+
   *finish = X_EVENT_NORMAL;
 
   EVENT_INIT (inev.ie);
@@ -18399,11 +18405,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      Window root;
 	      unsigned int dummy_uint;
 
-	      block_input ();
 	      XGetGeometry (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 			    &root, &f->left_pos, &f->top_pos,
 			    &dummy_uint, &dummy_uint, &dummy_uint, &dummy_uint);
-	      unblock_input ();
 	    }
 
           x_set_frame_alpha (f);
@@ -18428,7 +18432,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         {
           if (!FRAME_VISIBLE_P (f))
             {
-              block_input ();
 	      /* By default, do not set the frame's visibility here, see
 		 https://lists.gnu.org/archive/html/emacs-devel/2017-02/msg00133.html.
 		 The default behavior can be overridden by setting
@@ -18447,7 +18450,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
               f->output_data.x->has_been_visible = true;
               SET_FRAME_GARBAGED (f);
-              unblock_input ();
             }
           else if (FRAME_GARBAGED_P (f))
 	    {
@@ -19942,12 +19944,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
          flicker.  Don't try to optimize these calls by looking only
          for size changes: that's not sufficient.  We miss some
          surface invalidations and flicker.  */
-      block_input ();
 #ifdef HAVE_XDBE
       if (f && FRAME_X_DOUBLE_BUFFERED_P (f))
         x_drop_xrender_surfaces (f);
 #endif
-      unblock_input ();
 #if defined USE_CAIRO && !defined USE_GTK
       if (f)
 	x_cr_update_surface_desired_size (f, configureEvent.xconfigure.width,
@@ -19977,10 +19977,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	       f->new_width, f->new_height);
 
 #ifdef HAVE_XDBE
-	  block_input ();
           if (FRAME_X_DOUBLE_BUFFERED_P (f))
             x_drop_xrender_surfaces (f);
-          unblock_input ();
 #endif
           xg_frame_resized (f, configureEvent.xconfigure.width,
                             configureEvent.xconfigure.height);
@@ -20070,11 +20068,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  Window root;
 		  unsigned int dummy_uint;
 
-		  block_input ();
 		  XGetGeometry (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 				&root, &f->left_pos, &f->top_pos,
 				&dummy_uint, &dummy_uint, &dummy_uint, &dummy_uint);
-		  unblock_input ();
 		}
 
 	      if (!FRAME_TOOLTIP_P (f)
@@ -20359,12 +20355,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	    if (FRAME_PARENT_FRAME (f) || (hf && frame_ancestor_p (f, hf)))
 	      {
-		block_input ();
 		XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 				RevertToParent, event->xbutton.time);
 		if (FRAME_PARENT_FRAME (f))
 		  XRaiseWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f));
-		unblock_input ();
 	      }
 	  }
 
@@ -22025,7 +22019,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		  if (FRAME_PARENT_FRAME (f) || (hf && frame_ancestor_p (f, hf)))
 		    {
-		      block_input ();
 #if defined HAVE_GTK3 || (!defined USE_GTK && !defined USE_X_TOOLKIT)
 		      if (device)
 			{
@@ -22048,7 +22041,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 		      if (FRAME_PARENT_FRAME (f))
 			XRaiseWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f));
-		      unblock_input ();
 		    }
 		}
 
@@ -23537,7 +23529,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
     OTHER:
 #ifdef USE_X_TOOLKIT
-      block_input ();
       if (*finish != X_EVENT_DROP)
 	{
 	  /* Ignore some obviously bogus ConfigureNotify events that
@@ -23554,7 +23545,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 	    }
 	}
-      unblock_input ();
 #endif /* USE_X_TOOLKIT */
 #if defined USE_GTK && !defined HAVE_GTK3 && defined HAVE_XINPUT2
       if (*finish != X_EVENT_DROP && copy)
