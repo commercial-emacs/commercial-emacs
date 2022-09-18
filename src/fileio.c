@@ -3907,7 +3907,7 @@ file_offset (Lisp_Object val)
 	}
     }
 
-  wrong_type_argument (intern ("file-offset"), val);
+  wrong_type_argument (Qfile_offset, val);
 }
 
 /* Return a special time value indicating the error number ERRNUM.  */
@@ -4974,7 +4974,7 @@ by calling `format-decode', which see.  */)
       if (! NILP (insval))
 	{
 	  if (! RANGED_FIXNUMP (0, insval, ZV - PT))
-	    wrong_type_argument (intern ("inserted-chars"), insval);
+	    wrong_type_argument (Qinserted_chars, insval);
 	  inserted = XFIXNAT (insval);
 	}
     }
@@ -4997,7 +4997,7 @@ by calling `format-decode', which see.  */)
 	  insval = call3 (Qformat_decode,
 			  Qnil, make_fixnum (inserted), visit);
 	  if (! RANGED_FIXNUMP (0, insval, ZV - PT))
-	    wrong_type_argument (intern ("inserted-chars"), insval);
+	    wrong_type_argument (Qinserted_chars, insval);
 	  inserted = XFIXNAT (insval);
 	}
       else
@@ -5020,7 +5020,7 @@ by calling `format-decode', which see.  */)
 	  insval = call3 (Qformat_decode,
 			  Qnil, make_fixnum (oinserted), visit);
 	  if (! RANGED_FIXNUMP (0, insval, ZV - PT))
-	    wrong_type_argument (intern ("inserted-chars"), insval);
+	    wrong_type_argument (Qinserted_chars, insval);
 	  if (ochars_modiff == CHARS_MODIFF)
 	    /* format_decode didn't modify buffer's characters => move
 	       point back to position before inserted text and leave
@@ -5043,7 +5043,7 @@ by calling `format-decode', which see.  */)
 	      if (!NILP (insval))
 		{
 		  if (! RANGED_FIXNUMP (0, insval, ZV - PT))
-		    wrong_type_argument (intern ("inserted-chars"), insval);
+		    wrong_type_argument (Qinserted_chars, insval);
 		  inserted = XFIXNAT (insval);
 		}
 	    }
@@ -5061,7 +5061,7 @@ by calling `format-decode', which see.  */)
 	      if (!NILP (insval))
 		{
 		  if (! RANGED_FIXNUMP (0, insval, ZV - PT))
-		    wrong_type_argument (intern ("inserted-chars"), insval);
+		    wrong_type_argument (Qinserted_chars, insval);
 		  if (ochars_modiff == CHARS_MODIFF)
 		    /* after_insert_file_functions didn't modify
 		       buffer's characters => move point back to
@@ -6531,9 +6531,11 @@ syms_of_fileio (void)
   DEFSYM (Qfile_date_error, "file-date-error");
   DEFSYM (Qfile_missing, "file-missing");
   DEFSYM (Qpermission_denied, "permission-denied");
+  DEFSYM (Qfile_offset, "file-offset");
   DEFSYM (Qfile_notify_error, "file-notify-error");
   DEFSYM (Qremote_file_error, "remote-file-error");
   DEFSYM (Qexcl, "excl");
+  DEFSYM (Qinserted_chars, "inserted-chars");
 
   DEFVAR_LISP ("file-name-coding-system", Vfile_name_coding_system,
 	       doc: /* Coding system for encoding file names.
