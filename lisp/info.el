@@ -766,6 +766,10 @@ See a list of available Info commands in `Info-mode'."
                     (read-file-name "Info file name: " nil nil t))
                 (if (numberp current-prefix-arg)
                     (format "*info*<%s>" current-prefix-arg))))
+  ;; Info nodes don't contain newlines, so allow for easier use of
+  ;; wrapped info node names in emails, etc.
+  (setq file-or-node
+        (replace-regexp-in-string "\n" " " file-or-node))
   (info-setup file-or-node
 	      (pop-to-buffer-same-window (or buffer "*info*"))))
 
