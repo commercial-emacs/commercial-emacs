@@ -1149,7 +1149,18 @@ DEFUN ("tree-sitter-calculate-indent",
 		  TSQueryError error_type;
 		  TSQuery *query = ts_query_new (fn (), query_buf, strlen (query_buf),
 						 &error_offset, &error_type);
-		  if (query != NULL)
+		  if (query == NULL)
+		    {
+		      Lisp_Object args[4];
+		      args[0] = build_string
+			("ts_query_new() of %s returned %d at offset %d");
+		      args[1] = filename;
+		      args[2] = make_fixnum ((EMACS_INT) error_type);
+		      args[3] = make_fixnum ((EMACS_INT) error_offset);
+		      xfree (query_buf);
+		      xsignal1 (Qtree_sitter_language_error, Fformat (4, args));
+		    }
+		  else
 		    {
 		      if (XTREE_SITTER (sitter)->indents_query != NULL)
 			ts_query_delete (XTREE_SITTER (sitter)->indents_query);
