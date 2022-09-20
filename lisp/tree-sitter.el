@@ -96,7 +96,8 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
     (ruby-mode . "ruby")
     (tree-sitter-ruby-mode . "ruby")
     (tree-sitter-elisp-mode . "elisp")
-    (tree-sitter-c-mode . "c"))
+    (tree-sitter-c-mode . "c")
+    (tree-sitter-lisp-mode . "commonlisp"))
   "Map prog-mode to tree-sitter grammar."
   :group 'tree-sitter
   :type '(alist :key-type (symbol :tag "Prog mode")
