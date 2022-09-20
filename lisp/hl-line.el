@@ -103,12 +103,6 @@ Currently used in calendar/todo-mode."
 (define-minor-mode hl-line-mode
   "Toggle highlighting of the current line."
   :group 'hl-line
-  ;; If the global mode is switched on, then `M-x hl-line-mode' should
-  ;; switch the mode off in this buffer.
-  (when global-hl-line-mode
-    (setq hl-line-mode nil)
-    (setq-local global-hl-line-mode nil)
-    (global-hl-line-unhighlight))
   (if hl-line-mode
       (progn
         (hl-line-highlight)
