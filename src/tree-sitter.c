@@ -1134,7 +1134,12 @@ DEFUN ("tree-sitter-calculate-indent",
 		      language));
 	  FILE *fp = fopen (SSDATA (filename), "rb");
 	  if (! fp)
-	    xsignal1 (Qfile_missing, filename);
+	    {
+	      Lisp_Object args[2];
+	      args[0] = build_string ("%s not found");
+	      args[1] = filename;
+	      xsignal1 (Qtree_sitter_language_error, Fformat (4, args));
+	    }
 	  else
 	    {
 	      char *query_buf;

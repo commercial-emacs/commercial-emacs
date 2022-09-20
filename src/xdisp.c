@@ -9495,7 +9495,7 @@ move_it_dy (struct it *it, int dy)
    If OP is any other value, we proceed as if it were MOVE_TO_VPOS.
 
    The method is very confusing: we manually set IT an estimated
-   slines back.  Then from that position, call `move_it_forward' on a
+   slines back.  Then from that position, call move_it_forward() on a
    throwaway IT_FROM to FROM_POS.
 
    IT should end up on an sline start.  For OP_TO == 0, IT would go
@@ -9567,7 +9567,7 @@ move_it_backward (struct it *it, int op_to, int op)
       it->current_x = it->hpos = it->continuation_lines_width = 0;
       reseat_1 (it, it->current.pos, true);
 
-      /* "Then from that position, call `move_it_forward' on a throwaway
+      /* "Then from that position, call move_it_forward() on a throwaway
 	 IT_FROM to FROM_POS."  */
       SAVE_IT (it_from, *it, itdata);
       move_it_forward (&it_from, from_pos, -1, MOVE_TO_POS, NULL);
@@ -9580,7 +9580,7 @@ move_it_backward (struct it *it, int op_to, int op)
       slines = it_from.vpos - it->vpos;
 
       /* Continue manually setting IT (again, we don't have the luxury
-       of `move_it_forward').  */
+	 of move_it_forward).  */
       it->vpos -= slines;
       it->current_y -= h;
       SET_TEXT_POS (tpos, IT_CHARPOS (*it), IT_BYTEPOS (*it));
