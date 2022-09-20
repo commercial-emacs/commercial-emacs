@@ -57,6 +57,19 @@ Create the thumbnail directory if it does not exist."
       (message "Thumbnail directory created: %s" image-dired-dir))
     image-dired-dir))
 
+(defun image-dired-file-name-extension (file)
+  "Return the filename extension for thumbnail FILE.
+Return the value of `file-name-extension', but for PDF files
+return PNG or JPG, depending on the thumbnail storage
+configuration."
+  (let ((extension (file-name-extension file)))
+    (cond ((string-equal extension "pdf")
+           (cond ((memq image-dired-thumbnail-storage
+                        image-dired--thumbnail-standard-sizes)
+                  "png")
+                 (t "jpg")))
+          (t extension))))
+
 (defun image-dired-thumb-name (file)
   "Return absolute file name for thumbnail FILE.
 Depending on the value of `image-dired-thumbnail-storage', the
@@ -91,13 +104,13 @@ See also `image-dired-thumbnail-storage'."
                    (file-name-as-directory (expand-file-name (image-dired-dir)))
                    (file-name-base f)
                    (if hash (concat "_" hash) "")
-                   (file-name-extension f))))
+                   (image-dired-file-name-extension f))))
         ((eq 'per-directory image-dired-thumbnail-storage)
          (let ((f (expand-file-name file)))
            (format "%s.image-dired/%s.thumb.%s"
                    (file-name-directory f)
                    (file-name-base f)
-                   (file-name-extension f))))))
+                   (image-dired-file-name-extension f))))))
 
 (defvar image-dired-thumbnail-buffer "*image-dired*"
   "Image-Dired's thumbnail buffer.")
