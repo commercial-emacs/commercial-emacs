@@ -1145,7 +1145,7 @@ output.
 
 Return the original STRING if no substitutions are made.
 Otherwise, return a new string."
-  (when (not (null string))
+  (when string
     ;; KEYMAP is either nil (which means search all the active
     ;; keymaps) or a specified local map (which means search just that
     ;; and the global map).  If non-nil, it might come from
@@ -1205,12 +1205,14 @@ Otherwise, return a new string."
                 (delete-char 2)
                 (let* ((fun (intern (buffer-substring (point) (1- end-point))))
                        (key (with-current-buffer orig-buf
-                              (where-is-internal fun
-                                                 (and keymap
-                                                      (list keymap))
-                                                 t))))
+                              (if keymap
+                                  ;; First call `where-is-internal' with
+                                  ;; a list of keymaps so that it avoids
+                                  ;; consulting the global map.  (Bug#51384)
+                                  (or (where-is-internal fun (list keymap) t)
+                                      (where-is-internal fun keymap t))
+                                (where-is-internal fun nil t)))))
                   (if (not key)
-                      ;; Function is not on any key.
                       (let ((op (point)))
                         (insert "M-x ")
                         (goto-char (+ end-point 3))
@@ -1222,7 +1224,6 @@ Otherwise, return a new string."
                         (delete-char 1))
                     ;; Function is on a key.
                     (delete-char (- end-point (point)))
-
                     (insert
                      (if no-face
                          (key-description key)

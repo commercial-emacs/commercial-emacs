@@ -182,7 +182,8 @@ M-g M-c		switch-to-completions
 (ert-deftest help-tests-substitute-command-keys/keymap-change ()
   (with-substitute-command-keys-test
    (test "\\<minibuffer-local-must-match-map>\\[abort-recursive-edit]" "C-]")
-   (test "\\<emacs-lisp-mode-map>\\[eval-defun]" "C-M-x")))
+   (test "\\<emacs-lisp-mode-map>\\[eval-defun]" "C-M-x")
+   (test "\\<undo-repeat-map>\\[undo]" "u")))
 
 (defvar-keymap help-tests-remap-map
   :full t
