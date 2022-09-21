@@ -181,6 +181,7 @@ M-g M-c		switch-to-completions
 
 (ert-deftest help-tests-substitute-command-keys/keymap-change ()
   (with-substitute-command-keys-test
+   ;; Global binding should be found even if specifying a specific map
    (test "\\<minibuffer-local-must-match-map>\\[abort-recursive-edit]" "C-]")
    (test "\\<emacs-lisp-mode-map>\\[eval-defun]" "C-M-x")
    (test "\\<undo-repeat-map>\\[undo]" "u")))
