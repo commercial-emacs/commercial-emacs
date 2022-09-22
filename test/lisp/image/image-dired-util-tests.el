@@ -20,8 +20,10 @@
 ;;; Code:
 
 (require 'ert)
+(require 'ert-x)
 (require 'image-dired)
 (require 'image-dired-util)
+(require 'xdg)
 
 (ert-deftest image-dired-thumb-name ()
   (skip-unless (file-directory-p (temporary-file-directory)))
