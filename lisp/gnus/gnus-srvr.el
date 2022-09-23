@@ -833,9 +833,10 @@ claim them."
 	  (erase-buffer))
 	(gnus-browse-mode)
 	(setq mode-line-buffer-identification
-	      (list
-	       (format
-		"Gnus: %%b {%s:%s}" (car method) (cadr method))))
+	      (gnus-mode-line-buffer-identification
+               (list
+	        (format
+		 "Gnus: %%b {%s:%s}" (car method) (cadr method)))))
 	(let ((buffer-read-only nil)
 	      name
 	      (prefix (let ((gnus-select-methods orig-select-methods))
