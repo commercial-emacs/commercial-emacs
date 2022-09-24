@@ -1352,6 +1352,10 @@ This controls how statements like the following are indented:
     foo &&
         bar
 
+*** New Flymake backend using the ShellCheck program
+It is enabled by default, but requires that the external "shellcheck"
+command is installed.
+
 ** Cperl Mode
 
 ---
