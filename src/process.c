@@ -1242,10 +1242,10 @@ The string argument is normally a multibyte string, except:
 
   if (p->infd >= 0)
     {
-      /* If filter WILL be t, stop reading output.  */
+      /* If p->filter WILL be t, stop reading output.  */
       if (EQ (filter, Qt) && !EQ (p->status, Qlisten))
         delete_read_fd (p->infd);
-      else if (/* If filter WAS t, then resume reading output.  */
+      else if (/* If p->filter WAS t, then resume reading output.  */
                EQ (p->filter, Qt)
                /* Network or serial process not stopped:  */
                && !EQ (p->command, Qt))
