@@ -344,61 +344,86 @@ case, and the process object in the asynchronous case."
 		       (string= (buffer-name) buffer))
 		  (eq buffer (current-buffer)))
 	(vc-setup-buffer buffer))
-      (run-hook-with-args 'vc-pre-command-functions
-		          command file-or-list flags)
-      ;; If there's some previous async process still running, just kill it.
-      (let ((squeezed (remq nil flags))
-	    (inhibit-read-only t)
-	    (status 0))
-	(when files
-	  (setq squeezed (nconc squeezed files)))
-	(let (;; Since some functions need to parse the output
-	      ;; from external commands, set LC_MESSAGES to C.
-	      (process-environment (cons "LC_MESSAGES=C" process-environment))
-	      (w32-quote-process-args t))
-	  (if (eq okstatus 'async)
-	      ;; Run asynchronously.
-	      (let ((proc
-		     (let ((process-connection-type nil))
-		       (apply #'start-file-process command (current-buffer)
-                              command squeezed))))
-		(when vc-command-messages
-		  (let ((inhibit-message vc-inhibit-message))
-		    (message "Running in background: %s" full-command)))
-                ;; Get rid of the default message insertion, in case we don't
-                ;; set a sentinel explicitly.
-		(set-process-sentinel proc #'ignore)
-		(set-process-filter proc #'vc-process-filter)
-		(setq status proc)
-		(when vc-command-messages
-		  (vc-run-delayed
-		    (let ((message-truncate-lines t)
-			  (inhibit-message vc-inhibit-message))
-		      (message "Done in background: %s" full-command)))))
-	    ;; Run synchronously
-	    (when vc-command-messages
-	      (let ((inhibit-message vc-inhibit-message))
-		(message "Running in foreground: %s" full-command)))
-	    (let ((buffer-undo-list t))
-	      (setq status (apply #'process-file command nil t nil squeezed)))
-	    (when (and (not (eq t okstatus))
-		       (or (not (integerp status))
-			   (and okstatus (< okstatus status))))
-              (unless (eq ?\s (aref (buffer-name (current-buffer)) 0))
-                (pop-to-buffer (current-buffer))
-                (goto-char (point-min))
-                (shrink-window-if-larger-than-buffer))
-	      (error "Failed (%s): %s -> %s"
-		     (if (integerp status) (format "status %d" status) status)
-		     full-command
-                     (buffer-substring-no-properties (point-min) (point-max))))
-	    (when vc-command-messages
-	      (let ((inhibit-message vc-inhibit-message))
-		(message "Done (status=%d): %s" status full-command)))))
-	(vc-run-delayed
-	  (run-hook-with-args 'vc-post-command-functions
-			      command file-or-list flags))
-	status))))
+      (cl-destructuring-bind (command file-or-list flags)
+          (funcall vc-filter-command-function command file-or-list flags)
+        (when vc-tor
+          (push command flags)
+          (setq command "torsocks"))
+        (let* (;; FIXME: file-relative-name can return a bogus result
+               ;; because it doesn't look at the actual file-system to
+               ;; see if symlinks come into play.
+               (files
+	        (mapcar (lambda (f)
+                          (file-relative-name (expand-file-name f)))
+		        (if (listp file-or-list)
+                            file-or-list
+                          (list file-or-list))))
+	       (full-command
+	        (concat (if (string= (substring command -1) "\n")
+		            (substring command 0 -1)
+		          command)
+		        " " (vc-delistify flags)
+		        " " (vc-delistify files)))
+               (squeezed (remq nil flags))
+	       (inhibit-read-only t)
+	       (status 0))
+          ;; If there's some previous async process still running,
+          ;; just kill it.
+          (when files
+	    (setq squeezed (nconc squeezed files)))
+	  (let (;; Since some functions need to parse the output
+	        ;; from external commands, set LC_MESSAGES to C.
+	        (process-environment
+                 (cons "LC_MESSAGES=C" process-environment))
+	        (w32-quote-process-args t))
+	    (if (eq okstatus 'async)
+	        ;; Run asynchronously.
+	        (let ((proc
+		       (let ((process-connection-type nil))
+		         (apply #'start-file-process command
+                                (current-buffer) command squeezed))))
+		  (when vc-command-messages
+		    (let ((inhibit-message vc-inhibit-message))
+		      (message "Running in background: %s"
+                               full-command)))
+                  ;; Get rid of the default message insertion, in case
+                  ;; we don't set a sentinel explicitly.
+		  (set-process-sentinel proc #'ignore)
+		  (set-process-filter proc #'vc-process-filter)
+		  (setq status proc)
+		  (when vc-command-messages
+		    (vc-run-delayed
+		      (let ((message-truncate-lines t)
+			    (inhibit-message vc-inhibit-message))
+		        (message "Done in background: %s"
+                                 full-command)))))
+	      ;; Run synchronously
+	      (when vc-command-messages
+	        (let ((inhibit-message vc-inhibit-message))
+		  (message "Running in foreground: %s" full-command)))
+	      (let ((buffer-undo-list t))
+	        (setq status (apply #'process-file
+                                    command nil t nil squeezed)))
+	      (when (and (not (eq t okstatus))
+		         (or (not (integerp status))
+			     (and okstatus (< okstatus status))))
+                (unless (eq ?\s (aref (buffer-name (current-buffer)) 0))
+                  (pop-to-buffer (current-buffer))
+                  (goto-char (point-min))
+                  (shrink-window-if-larger-than-buffer))
+	        (error "Failed (%s): %s"
+		       (if (integerp status)
+                           (format "status %d" status)
+                         status)
+		       full-command))
+	      (when vc-command-messages
+	        (let ((inhibit-message vc-inhibit-message))
+		  (message "Done (status=%d): %s"
+                           status full-command)))))
+	  (vc-run-delayed
+	    (run-hook-with-args 'vc-post-command-functions
+			        command file-or-list flags))
+	  status)))))
 
 (defvar vc--inhibit-change-window-start nil)
 
