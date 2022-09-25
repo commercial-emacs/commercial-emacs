@@ -1095,7 +1095,8 @@ DEFUN ("tree-sitter-calculate-indent",
     return Qnil;
 
   /* target_node is the immediate node of current line (innermost).
-     enclosing_node is the child of root_node that contains target_node (outermost) */
+     enclosing_node is the child of root_node that contains
+     target_node (outermost) */
   const size_t indent_nspaces = 2;
   size_t result = 0;
   Lisp_Object target_node = Ftree_sitter_node_at (Fline_beginning_position (Qnil), Qnil);
