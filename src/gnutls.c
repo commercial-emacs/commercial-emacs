@@ -1784,6 +1784,61 @@ gnutls_handshake_and_verify(Lisp_Object proc,
   return gnutls_verify_boot (proc, proplist);
 }
 
+#ifdef HAVE_GNUTLS_CERTIFICATE_SET_X509_KEY_FILE2
+
+/* Helper function for gnutls-boot.
+
+   The key :flags receives a list of symbols, each of which
+   corresponds to a GnuTLS C flag, the ORed result is to be passed to
+   the function gnutls_certificate_set_x509_key_file2() as its last
+   argument.
+*/
+static unsigned int
+key_file2_aux (Lisp_Object flags)
+{
+  unsigned int rv = 0;
+  Lisp_Object tail = flags;
+  FOR_EACH_TAIL_SAFE (tail)
+    {
+      Lisp_Object flag = XCAR (tail);
+      if (EQ (flag, Qgnutls_pkcs_plain))
+	rv |= GNUTLS_PKCS_PLAIN;
+      else if (EQ (flag, Qgnutls_pkcs_pkcs12_3des))
+	rv |= GNUTLS_PKCS_PKCS12_3DES;
+      else if (EQ (flag, Qgnutls_pkcs_pkcs12_arcfour))
+	rv |= GNUTLS_PKCS_PKCS12_ARCFOUR;
+      else if (EQ (flag, Qgnutls_pkcs_pkcs12_rc2_40))
+	rv |= GNUTLS_PKCS_PKCS12_RC2_40;
+      else if (EQ (flag, Qgnutls_pkcs_pbes2_3des))
+	rv |= GNUTLS_PKCS_PBES2_3DES;
+      else if (EQ (flag, Qgnutls_pkcs_pbes2_aes_128))
+	rv |= GNUTLS_PKCS_PBES2_AES_128;
+      else if (EQ (flag, Qgnutls_pkcs_pbes2_aes_192))
+	rv |= GNUTLS_PKCS_PBES2_AES_192;
+      else if (EQ (flag, Qgnutls_pkcs_pbes2_aes_256))
+	rv |= GNUTLS_PKCS_PBES2_AES_256;
+      else if (EQ (flag, Qgnutls_pkcs_null_password))
+	rv |= GNUTLS_PKCS_NULL_PASSWORD;
+      else if (EQ (flag, Qgnutls_pkcs_pbes2_des))
+	rv |= GNUTLS_PKCS_PBES2_DES;
+      else if (EQ (flag, Qgnutls_pkcs_pbes1_des_md5))
+	rv |= GNUTLS_PKCS_PBES1_DES_MD5;
+      else if (EQ (flag, Qgnutls_pkcs_pbes2_gost_tc26z))
+	rv |= GNUTLS_PKCS_PBES2_GOST_TC26Z;
+      else if (EQ (flag, Qgnutls_pkcs_pbes2_gost_cpa))
+	rv |= GNUTLS_PKCS_PBES2_GOST_CPA;
+      else if (EQ (flag, Qgnutls_pkcs_pbes2_gost_cpb))
+	rv |= GNUTLS_PKCS_PBES2_GOST_CPB;
+      else if (EQ (flag, Qgnutls_pkcs_pbes2_gost_cpc))
+	rv |= GNUTLS_PKCS_PBES2_GOST_CPC;
+      else if (EQ (flag, Qgnutls_pkcs_pbes2_gost_cpd))
+	rv |= GNUTLS_PKCS_PBES2_GOST_CPD;
+    }
+  return rv;
+}
+
+#endif /* HAVE_GNUTLS_CERTIFICATE_SET_X509_KEY_FILE2 */
+
 DEFUN ("gnutls-boot", Fgnutls_boot, Sgnutls_boot, 3, 4, 0,
        doc: /* Initialize GnuTLS client for process PROC with TYPE+PROPLIST.
 Currently only client mode is supported.  Return a success/failure
@@ -1821,6 +1876,21 @@ t to do all checks.  Currently it can contain `:trustfiles' and
 
 :min-prime-bits is the minimum accepted number of bits the client will
 accept in Diffie-Hellman key exchange.
+
+:pass, the password of the private key as per GnuTLS'
+gnutls_certificate_set_x509_key_file2.  Specify as nil to have a NULL
+password.
+
+:flags, a list of symbols relating to :pass, each specifying a flag:
+GNUTLS_PKCS_PLAIN, GNUTLS_PKCS_PKCS12_3DES,
+GNUTLS_PKCS_PKCS12_ARCFOUR, GNUTLS_PKCS_PKCS12_RC2_40,
+GNUTLS_PKCS_PBES2_3DES, GNUTLS_PKCS_PBES2_AES_128,
+GNUTLS_PKCS_PBES2_AES_192, GNUTLS_PKCS_PBES2_AES_256,
+GNUTLS_PKCS_NULL_PASSWORD, GNUTLS_PKCS_PBES2_DES,
+GNUTLS_PKCS_PBES2_DES_MD5, GNUTLS_PKCS_PBES2_GOST_TC26Z,
+GNUTLS_PKCS_PBES2_GOST_CPA, GNUTLS_PKCS_PBES2_GOST_CPB,
+GNUTLS_PKCS_PBES2_GOST_CPC, GNUTLS_PKCS_PBES2_GOST_CPD.  If not
+specified, or if nil, the bitflag with value 0 is used.
 
 The debug level will be set for this process AND globally for GnuTLS.
 So if you set it higher or lower at any point, it affects global
@@ -2894,6 +2964,8 @@ level in the ones.  For builds without libgnutls, the value is -1.  */);
   DEFSYM (QCmin_prime_bits, ":min-prime-bits");
   DEFSYM (QCloglevel, ":loglevel");
   DEFSYM (QCcomplete_negotiation, ":complete-negotiation"); /* obsolete */
+  DEFSYM (QCpass, ":pass");
+  DEFSYM (QCflags, ":flags");
   DEFSYM (QCverify_flags, ":verify-flags");
   DEFSYM (QCverify_error, ":verify-error");
   DEFSYM (Qgnutls_pkcs_plain, "GNUTLS_PKCS_PLAIN");
