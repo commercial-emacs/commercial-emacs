@@ -83,93 +83,157 @@ the image file to set the wallpaper to.")
 
 ;;; Finding the wallpaper command
 
-(defvar wallpaper--default-commands
-  ;; When updating this, also update the custom :type for `wallpaper-command'.
-  '(
-    ;; Gnome
-    ("gsettings" "set" "org.gnome.desktop.background" "picture-uri" "file://%F")
-    ;; KDE Plasma
-    ("plasma-apply-wallpaperimage" "%f")
-    ;; XFCE
-    ("xfconf-query" "-c" "xfce4-desktop" "-p"
-     "/backdrop/screen0/monitoreDP/workspace0/last-image" "-s" "%f")
-    ;; LXDE
-    ("pcmanfm" "--set-wallpaper=%f")
-    ;; LXQt
-    ("pcmanfm-qt" "--set-wallpaper=%f") ; "--wallpaper-mode=MODE"
-    ;; ;; Mate
-    ;; ("gsettings" "set" "org.mate.background" "picture-filename" "%f")
-    ;; ;; Cinnamon
-    ;; ("gsettings" "set" "org.cinnamon.desktop.background" "picture-uri" "file://%F")
-    ;; ;; Deepin
-    ;; ("gsettings" "set" "com.deepin.wrap.gnome.desktop.background" "picture-uri" "file://%F")
-    ;; Sway (Wayland)
-    ("swaybg" "-o" "*" "-i" "%f" "-m" "fill")
-    ;; Wayland General
-    ("wbg" "%f")
-    ;; macOS
-    ("osascript" "-e" "tell application \"Finder\" to set desktop picture to POSIX file \"%f\"")
-    ;; Other / General X
-    ("gm" "display" "-size" "%wx%h" "-window" "root" "%f")
-    ("display" "-resize" "%wx%h" "-window" "root" "%f")
-    ("feh" "--bg-max" "%f")
-    ("fbsetbg" "-a" "%f")
-    ("xwallpaper" "--zoom" "%f")
-    ("hsetroot" "-full" "%f")
-    ("xloadimage" "-onroot" "-fullscreen" "%f")
-    ("xsetbg" " %f")
-    )
-  "List of executables and options used for setting the wallpaper.
-This is used by `wallpaper--find-command' to automatically set
-`wallpaper-command', and by `wallpaper--find-command-args' to set
-`wallpaper-command-args'.  The commands will be tested in the
-order in which they appear.
+(cl-defstruct (wallpaper-setter
+               ;; Rename the default constructor from `make-wallpaper-cmd'.
+               (:constructor
+                wallpaper-setter-create
+                ( name command args-raw
+                  &rest rest-plist
+                  &aux
+                  (args (if (listp args-raw)
+                            args-raw
+                          (string-split args-raw)))
+                  (predicate (plist-get rest-plist :predicate))))
+               (:copier wallpaper-setter-copy))
+  "Structure containing a command to set the wallpaper.
 
-Every item in the list has the following form:
+NAME is a description of the setter (e.g. the name of the Desktop
+Environment).
 
-  (COMMAND ARG1 .. ARGN)
+COMMAND is the executable to run to set the wallpaper.
 
-COMMAND is the name of the executable (a string) and ARG1 .. ARGN
-is its command line arguments (also strings).
+ARGS is the default list of command line arguments for COMMAND.
 
-In each of the command line arguments, \"%f\", \"%h\" and \"%w\"
-will be replaced as described in `wallpaper-command-args'.")
+PREDICATE is a function that will be called without any arguments
+and returns non-nil if this setter should be used."
+  name
+  command
+  args
+  (predicate #'always))
 
-(cl-defmethod wallpaper--check-command ((_type (eql 'gsettings)))
-  (or (member (downcase (getenv "DESKTOP_SESSION"))
-              '("gnome" "gnome" "gnome-wayland" "gnome-xorg"
-                "unity" "ubuntu" "pantheon" "budgie-desktop"
-                "pop"))
-      (member "GNOME" (xdg-current-desktop))
-      (member "Budgie" (xdg-current-desktop))
-      (member "GNOME-Classic" (xdg-current-desktop))))
+;;;###autoload
+(put 'wallpaper-setter-create 'lisp-indent-function 1)
 
-(cl-defmethod wallpaper--check-command ((_type (eql 'plasma-apply-wallpaperimage)))
-  (member "KDE" (xdg-current-desktop)))
+(defmacro wallpaper--default-methods-create (&rest items)
+  "Helper macro for defining `wallpaper--default-setters'."
+  (cons 'list
+        (mapcar
+         (lambda (item)
+           `(wallpaper-setter-create ,@item))
+         items)))
 
-(cl-defmethod wallpaper--check-command ((_type (eql 'xfconf-query)))
-  (or (member (downcase (getenv "DESKTOP_SESSION"))
-              '("xubuntu" "ubuntustudio"))
-      (member "XFCE" (xdg-current-desktop))))
+(defvar wallpaper--default-setters
+  (wallpaper--default-methods-create
 
-(cl-defmethod wallpaper--check-command ((_type (eql 'pcmanf)))
-  (member "LXDE" (xdg-current-desktop)))
+   ;; macOS.
+   ;; NB. Should come first to override everything else.
+   ("macOS"
+    "osascript"
+    '("-e" "tell application \"Finder\" to set desktop picture to POSIX file \"%f\"")
+    :predicate (lambda ()
+                 (eq system-type 'darwin)))
 
-(cl-defmethod wallpaper--check-command ((_type (eql 'pcmanf-qt)))
-  (or (member (downcase (getenv "DESKTOP_SESSION"))
-              '("lubuntu" "lxqt"))
-      (member "LXQt" (xdg-current-desktop))))
+   ;; Desktop environments.
+   ("Gnome"
+    "gsettings"
+    "set org.gnome.desktop.background picture-uri file://%F"
+    :predicate (lambda ()
+                 (or (and (getenv "DESKTOP_SESSION")
+                          (member (downcase (getenv "DESKTOP_SESSION"))
+                                  '("gnome" "gnome" "gnome-wayland" "gnome-xorg"
+                                    "unity" "ubuntu" "pantheon" "budgie-desktop"
+                                    "pop")))
+                     (member "GNOME" (xdg-current-desktop))
+                     (member "Budgie" (xdg-current-desktop))
+                     (member "GNOME-Classic" (xdg-current-desktop)))))
 
-;; (cl-defmethod wallpaper--check-command ((_type (eql 'gsettings)))
-;;   (or (equal "mate" (downcase (getenv "DESKTOP_SESSION")))
-;;       (member "MATE" (xdg-current-desktop))))
+   ("KDE Plasma"
+    "plasma-apply-wallpaperimage" "%f"
+    :predicate (lambda ()
+                 (member "KDE" (xdg-current-desktop))))
 
-;; (cl-defmethod wallpaper--check-command ((_type (eql 'gsettings)))
-;;   (or (equal "cinnamon" (downcase (getenv "DESKTOP_SESSION")))
-;;       (member "X-Cinnamon" (xdg-current-desktop))))
+   ("XFCE"
+    "xfconf-query" '("-c" "xfce4-desktop"
+                     "-p" "/backdrop/screen%S/monitor%M/workspace%W/last-image"
+                     "-s" "%f")
+    :predicate (lambda ()
+                 (or (and (getenv "DESKTOP_SESSION")
+                          (member (downcase (getenv "DESKTOP_SESSION"))
+                                  '("xubuntu" "ubuntustudio")))
+                     (member "XFCE" (xdg-current-desktop)))))
 
-;; (cl-defmethod wallpaper--check-command ((_type (eql 'gsettings)))
-;;   (member "Deepin" (xdg-current-desktop)))
+   ("LXDE"
+    "pcmanfm" "--set-wallpaper=%f"
+    :predicate (lambda ()
+                 (member "LXDE" (xdg-current-desktop))))
+
+   ("LXQt"
+    "pcmanfm-qt" "--set-wallpaper=%f" ; "--wallpaper-mode=MODE"
+    :predicate (lambda ()
+                 (or (member (and (getenv "DESKTOP_SESSION")
+                                  (downcase (getenv "DESKTOP_SESSION")))
+                             '("lubuntu" "lxqt"))
+                     (member "LXQt" (xdg-current-desktop)))))
+
+   ("Mate"
+    "gsettings" "set org.mate.background picture-filename %f"
+    :predicate (lambda ()
+                 (or (and (getenv "DESKTOP_SESSION")
+                          (equal "mate" (downcase (getenv "DESKTOP_SESSION"))))
+                     (member "MATE" (xdg-current-desktop)))))
+
+   ("Cinnamon"
+    "gsettings" "set org.cinnamon.desktop.background picture-uri file://%F"
+    :predicate (lambda ()
+                 (or (equal "cinnamon" (and (getenv "DESKTOP_SESSION")
+                                            (downcase (getenv "DESKTOP_SESSION"))))
+                     (member "X-Cinnamon" (xdg-current-desktop)))))
+
+   ("Deepin"
+    "gsettings" "set com.deepin.wrap.gnome.desktop.background picture-uri file://%F"
+    :predicate (lambda ()
+                 (member "Deepin" (xdg-current-desktop))))
+
+   ;; Wayland general.
+   ("Sway (Wayland)"
+    "swaybg" "-o * -i %f -m fill"
+    :predicate (lambda ()
+                 (and (getenv "WAYLAND_DISPLAY")
+                      (getenv "SWAYSOCK"))))
+
+   ("wbg"
+    "wbg" "%f"
+    :predicate (lambda ()
+                 (getenv "WAYLAND_DISPLAY")))
+
+   ;; X general.
+   ("GraphicsMagick"
+    "gm" "display -size %wx%h -window root %f")
+
+   ("ImageMagick"
+    "display" "-resize %wx%h -window root %f")
+
+   ("feh"
+    "feh" "--bg-max %f")
+
+   ("fbsetbg"
+    "fbsetbg" "-a %f")
+
+   ("xwallpaper"
+    "xwallpaper" "--zoom %f")
+
+   ("hsetroot"
+    "hsetroot" "-full %f")
+
+   ("xloadimage"
+    "xloadimage" "-onroot -fullscreen %f")
+
+   ("xsetbg"
+    "xsetbg" "%f")
+   )
+  "List of setters used for setting the wallpaper.
+Every item in the list is a structure of type
+`wallpaper-setter' (which see).
 
 This is used by `wallpaper--find-command' to automatically set
 `wallpaper-command', and by `wallpaper--find-command-args' to set
