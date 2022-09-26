@@ -23,6 +23,17 @@
 (require 'ert-x)
 (require 'wallpaper)
 
+(ert-deftest wallpaper--find-command/return-string ()
+  (should (and (wallpaper--find-command)
+               (stringp (wallpaper--find-command)))))
+
+(ert-deftest wallpaper--find-command-args/return-list ()
+  (should (and (wallpaper--find-command-args)
+               (listp (wallpaper--find-command-args)))))
+
+(ert-deftest wallpaper--image-file-regexp/return-string ()
+  (should (stringp (wallpaper--image-file-regexp))))
+
 (ert-deftest wallpaper--get-default-file/empty-gives-nil ()
   (with-temp-buffer
     (should-not (wallpaper--get-default-file))))
@@ -42,5 +53,34 @@
     (with-current-buffer buf
       (insert fil)
       (should (stringp (wallpaper--get-default-file))))))
+
+(ert-deftest wallpaper--format-arg/filename ()
+  (should (file-name-absolute-p (wallpaper--format-arg "%f" "foo.jpg"))))
+
+(ert-deftest wallpaper--format-arg/filename-hex ()
+  (should (equal (wallpaper--format-arg "%F" "foo bar åäö.jpg")
+                 "foo%20bar%20%C3%A5%C3%A4%C3%B6.jpg")))
+
+(ert-deftest wallpaper--format-arg/width ()
+  (skip-unless noninteractive)
+  (should (equal (wallpaper--format-arg "%w" "foo.jpg")
+                 (number-to-string wallpaper-default-width))))
+
+(ert-deftest wallpaper--format-arg/height ()
+  (skip-unless noninteractive)
+  (should (equal (wallpaper--format-arg "%h" "foo.jpg")
+                 (number-to-string wallpaper-default-height))))
+
+(ert-deftest wallpaper--format-arg/screen ()
+  (skip-unless noninteractive)
+  (should (equal (wallpaper--format-arg "%S" "foo.jpg") "0")))
+
+(ert-deftest wallpaper--format-arg/monitor ()
+  (skip-unless noninteractive)
+  (should (equal (wallpaper--format-arg "%M" "foo.jpg") "0")))
+
+(ert-deftest wallpaper--format-arg/workspace ()
+  (skip-unless noninteractive)
+  (should (equal (wallpaper--format-arg "%W" "foo.jpg") "0")))
 
 ;;; wallpaper-tests.el ends here

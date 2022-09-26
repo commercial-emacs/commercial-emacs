@@ -44,11 +44,26 @@
 ;; disable the option "Change picture" in the "Desktop & Screensaver"
 ;; preferences for this to work (this was seen with macOS 10.13).
 ;; You might also have to tweak some permissions.
+;;
+;; Note: If you find that you need to use a command in your
+;; environment that was not automatically detected, we would love to
+;; hear about it!  Please send an email to bug-gnu-emacs@gnu.org and
+;; tell us the command (and all options) that worked for you.  You can
+;; also use `M-x report-emacs-bug'.
 
 ;;; Code:
 
 (eval-when-compile (require 'subr-x))
 (require 'xdg)
+
+(defvar wallpaper-debug nil
+  "If non-nil, display debug messages.")
+
+(defun wallpaper-debug (&rest args)
+  (when wallpaper-debug
+    (apply #'message
+           (concat "wallpaper-debug: " (car args))
+           (cdr args))))
 
 (defvar wallpaper-set-function
   (cond ((fboundp 'w32-set-wallpaper)
@@ -155,30 +170,34 @@ will be replaced as described in `wallpaper-command-args'.")
 ;; (cl-defmethod wallpaper--check-command ((_type (eql 'gsettings)))
 ;;   (member "Deepin" (xdg-current-desktop)))
 
-(cl-defmethod wallpaper--check-command ((_type (eql 'swaybg)))
-  (and (getenv "WAYLAND_DISPLAY")
-       (getenv "SWAYSOCK")))
+This is used by `wallpaper--find-command' to automatically set
+`wallpaper-command', and by `wallpaper--find-command-args' to set
+`wallpaper-command-args'.  The setters will be tested in the
+order in which they appear.")
 
-(cl-defmethod wallpaper--check-command ((_type (eql 'wbg)))
-  (getenv "WAYLAND_DISPLAY"))
+(defvar wallpaper--current-setter nil)
 
-(cl-defmethod wallpaper--check-command (_type)
-  t)
+(defun wallpaper--find-setter ()
+  (when (wallpaper--use-default-set-function-p)
+    (or wallpaper--current-setter
+        (setq wallpaper--current-setter
+              (catch 'found
+                (dolist (setter wallpaper--default-setters)
+                  (wallpaper-debug "Testing setter %s" (wallpaper-setter-name setter))
+                  (when (and (executable-find (wallpaper-setter-command setter))
+                             (if-let ((pred (wallpaper-setter-predicate setter)))
+                                 (funcall pred)
+                               t))
+                    (wallpaper-debug "Found setter %s" (wallpaper-setter-name setter))
+                    (throw 'found setter))))))))
 
 (defun wallpaper--find-command ()
   "Return a valid command to set the wallpaper in this environment."
-  (when (wallpaper--use-default-set-function-p)
-    (catch 'found
-      (dolist (cmd wallpaper--default-commands)
-        (if (and (wallpaper--check-command (intern (car cmd)))
-                 (executable-find (car cmd)))
-            (throw 'found (car cmd)))))))
+  (wallpaper-setter-command (wallpaper--find-setter)))
 
-(defvar wallpaper-command) ; silence byte-compiler
-(defun wallpaper--find-command-arguments ()
+(defun wallpaper--find-command-args ()
   "Return command line arguments matching `wallpaper-command'."
-  (when (wallpaper--use-default-set-function-p)
-    (cdr (assoc wallpaper-command wallpaper--default-commands))))
+  (wallpaper-setter-args (wallpaper--find-setter)))
 
 
 ;;; Customizable variables
@@ -187,10 +206,10 @@ will be replaced as described in `wallpaper-command-args'.")
 (defun wallpaper--set-wallpaper-command (sym val)
   "Set `wallpaper-command', and update `wallpaper-command-args'.
 Used to set `wallpaper-command'."
-  ;; Note: `wallpaper-command' is used by `wallpaper--find-command-arguments'.
+  ;; Note: `wallpaper-command' is used by `wallpaper--find-command-args'.
   (prog1 (set-default sym val)
     (set-default 'wallpaper-command-args
-                 (wallpaper--find-command-arguments))))
+                 (wallpaper--find-command-args))))
 
 (defcustom wallpaper-command (wallpaper--find-command)
   "Executable used by `wallpaper-set' for setting the wallpaper.
@@ -202,12 +221,6 @@ If you set this to any supported command using customize or
 automatically updated to match.  If you need to change this to an
 unsupported command, you will want to manually customize
 `wallpaper-command-args' to match.
-
-Note: If you find that you need to use a command in your
-environment that is not automatically detected, we would love to
-hear about it!  Please send an email to bug-gnu-emacs@gnu.org and
-tell us the command (and all options) that worked for you.  You
-can also use \\[report-emacs-bug].
 
 The value of this variable is ignored on MS-Windows and Haiku
 systems, where a native API is used instead."
@@ -236,22 +249,27 @@ systems, where a native API is used instead."
   :group 'image
   :version "29.1")
 
-(defcustom wallpaper-command-args (wallpaper--find-command-arguments)
+(defcustom wallpaper-command-args (wallpaper--find-command-args)
   "Command line arguments for `wallpaper-command'.
 A suitable command for your environment should be detected
 automatically, so there is usually no need to customize this.
 However, if you do need to change this, you might also want to
 customize `wallpaper-command' to match.
 
-In each of the command line arguments, \"%f\" will be replaced
-with the full file name, \"%F\" with the full file name
-URI-encoded, \"%h\" with the height of the selected frame's
-display (as returned by `display-pixel-height'), and \"%w\" with
-the width of the selected frame's display (as returned by
-`display-pixel-width').
+In each command line argument, these specifiers will be replaced:
 
-If `wallpaper-set' is run from a TTY frame, it will prompt for a
-height and width for \"%h\" and \"%w\" instead.
+  %f   full file name
+  %h   height of the selected frame's display (as returned
+         by `display-pixel-height')
+  %w   the width of the selected frame's display (as returned
+         by `display-pixel-width').
+  %F   full file name URI-encoded
+  %S   current X screen (e.g. \"0\")
+  %W   current workspace (e.g., \"0\")
+  %M   name of the monitor (e.g., \"0\" or \"LVDS\")
+
+If `wallpaper-set' is run from a TTY frame, instead prompt for a
+height and width to use for %h and %w.
 
 The value of this variable is ignored on MS-Windows and Haiku
 systems, where a native API is used instead."
@@ -261,15 +279,6 @@ systems, where a native API is used instead."
 
 
 ;;; Utility functions
-
-(defvar wallpaper-debug nil
-  "If non-nil, display debug messages.")
-
-(defun wallpaper-debug (&rest args)
-  (when wallpaper-debug
-    (apply #'message
-           (concat "wallpaper-debug: " (car args))
-           (cdr args))))
 
 (defvar wallpaper-default-width 1080
   "Default width used by `wallpaper-set'.
@@ -282,9 +291,9 @@ This is only used when it can't be detected automatically.
 See also `wallpaper-default-width'.")
 
 (defun wallpaper--get-height-or-width (desc fun default)
-  (if (display-graphic-p)
-      (funcall fun)
-    (read-number (format "Wallpaper %s in pixels: " desc) default)))
+  (cond ((display-graphic-p) (funcall fun))
+        (noninteractive default)
+        ((read-number (format "Wallpaper %s in pixels: " desc) default))))
 
 (autoload 'ffap-file-at-point "ffap")
 
@@ -305,41 +314,72 @@ See also `wallpaper-default-width'.")
 
 ;;; wallpaper-set
 
+(defun wallpaper--format-arg (format file)
+  "Format a `wallpaper-command-args' argument ARG.
+FILE is the image file name."
+  (format-spec
+   format
+   `((?f . ,(expand-file-name file))
+     (?F . ,(mapconcat #'url-hexify-string
+                       (file-name-split file)
+                       "/"))
+     (?h . ,(wallpaper--get-height-or-width
+             "height"
+             #'display-pixel-height
+             wallpaper-default-height))
+     (?w . ,(wallpaper--get-height-or-width
+             "width"
+             #'display-pixel-width
+             wallpaper-default-width))
+     ;; screen number
+     (?S . ,(let ((display (frame-parameter (selected-frame) 'display)))
+              (if (and display
+                       (string-match (rx ":" (+ (in "0-9")) "."
+                                         (group (+ (in "0-9"))) eos)
+                                     display))
+                  (match-string 1 display)
+                "0")))
+     ;; monitor name
+     (?M . ,(let* ((attrs (car (display-monitor-attributes-list)))
+                   (source (cdr (assq 'source attrs)))
+                   (monitor (cdr (assq 'name attrs))))
+              (if (and monitor (member source '("XRandr" "XRandr 1.5" "Gdk")))
+                  monitor
+                "0")))
+     ;; workspace
+     (?W . ,(or (and (fboundp 'x-window-property)
+                     (display-graphic-p)
+                     (number-to-string
+                      (or (x-window-property "_NET_CURRENT_DESKTOP" nil "CARDINAL" 0 nil t)
+                          (x-window-property "WIN_WORKSPACE" nil "CARDINAL" 0 nil t))))
+                "0")))))
+
 (defun wallpaper-default-set-function (file)
   "Set the wallpaper to FILE using a command.
 This is the default function for `wallpaper-set-function'."
   (unless wallpaper-command
     (error "Couldn't find a command to set the wallpaper with"))
-  (let* ((fmt-spec `((?f . ,(expand-file-name file))
-                     (?F . ,(mapconcat #'url-hexify-string
-                                       (file-name-split file)
-                                       "/"))
-                     (?h . ,(wallpaper--get-height-or-width
-                             "height"
-                             #'display-pixel-height
-                             wallpaper-default-height))
-                     (?w . ,(wallpaper--get-height-or-width
-                             "width"
-                             #'display-pixel-width
-                             wallpaper-default-width))))
+  (let* ((real-args (mapcar (lambda (arg) (wallpaper--format-arg arg file))
+                            wallpaper-command-args))
          (bufname (format " *wallpaper-%s*" (random)))
          (process
           (and wallpaper-command
                (apply #'start-process "set-wallpaper" bufname
-                      wallpaper-command
-                      (mapcar (lambda (arg) (format-spec arg fmt-spec))
-                              wallpaper-command-args)))))
+                      wallpaper-command real-args))))
     (unless wallpaper-command
       (error "Couldn't find a suitable command for setting the wallpaper"))
-    (wallpaper-debug
-     "Using command %S %S" wallpaper-command
-     wallpaper-command-args)
+    (wallpaper-debug "Using command: \"%s %s\""
+            wallpaper-command (string-join wallpaper-command-args " "))
+    (wallpaper-debug (wallpaper--format-arg
+             "f=%f w=%w h=%h S=%S M=%M W=%W" file))
     (setf (process-sentinel process)
           (lambda (process status)
             (unwind-protect
-                (unless (and (eq (process-status process) 'exit)
-                             (zerop (process-exit-status process)))
-                  (message "command %S %s: %S"
+                (if (and (eq (process-status process) 'exit)
+                         (zerop (process-exit-status process)))
+                    (message "Desktop wallpaper changed to %s"
+                             (abbreviate-file-name file))
+                  (message "command \"%s %s\": %S"
                            (string-join (process-command process) " ")
                            (string-replace "\n" "" status)
                            (with-current-buffer (process-buffer process)
