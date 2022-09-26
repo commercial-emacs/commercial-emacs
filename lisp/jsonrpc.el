@@ -43,8 +43,6 @@
 (eval-when-compile (require 'subr-x))
 (require 'warnings)
 (require 'pcase)
-(require 'ert) ; to escape a `condition-case-unless-debug'
-
 
 ;;; Public API
 ;;;
@@ -165,8 +163,7 @@ dispatcher in CONNECTION."
       (cond
        (;; A remote request
         (and method id)
-        (let* ((debug-on-error (and debug-on-error (not (ert-running-test))))
-               (reply
+        (let* ((reply
                 (condition-case-unless-debug _ignore
                     (condition-case oops
                         `(:result ,(funcall (jsonrpc--request-dispatcher connection)

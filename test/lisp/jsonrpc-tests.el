@@ -124,12 +124,13 @@
 (ert-deftest signals-an--32603-JSONRPC-error ()
   "Signals an -32603 JSONRPC error."
   (jsonrpc--with-emacsrpc-fixture (conn)
-    (condition-case err
-        (progn
-          (jsonrpc-request conn '+ ["a" 2])
-          (ert-fail "A `jsonrpc-error' should have been signaled!"))
-      (jsonrpc-error
-       (should (= -32603 (cdr (assoc 'jsonrpc-error-code (cdr err)))))))))
+    (let (debug-on-error)
+      (condition-case err
+          (progn
+            (jsonrpc-request conn '+ ["a" 2])
+            (ert-fail "A `jsonrpc-error' should have been signaled!"))
+        (jsonrpc-error
+         (should (= -32603 (cdr (assoc 'jsonrpc-error-code (cdr err))))))))))
 
 (ert-deftest times-out ()
   "Request for 3-sec sit-for with 1-sec timeout times out."
