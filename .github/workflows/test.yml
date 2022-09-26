@@ -43,4 +43,4 @@ jobs:
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local
         make -j4
-        src/emacs -batch --eval "(setq debug-on-error t)" -f batch-byte-compile test/lisp/image/wallpaper-tests
+        src/emacs -batch --eval "(setq debug-on-error t)" -f batch-byte-compile test/lisp/image/wallpaper-tests.el
