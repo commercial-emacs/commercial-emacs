@@ -5272,7 +5272,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	    set_waiting_for_input (&timeout);
 	}
 
-      /* Skip the `select' call if input is available and we're
+      /* Skip the select() call if input is available and we're
 	 waiting for keyboard input or a cell change (which can be
 	 triggered by processing X events).  In the latter case, set
 	 nfds to 1 to avoid breaking the loop.  */
