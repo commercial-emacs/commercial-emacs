@@ -28,6 +28,7 @@
                (stringp (wallpaper--find-command)))))
 
 (ert-deftest wallpaper--find-command-args/return-list ()
+  (message "!!! %S" (wallpaper--find-command-args))
   (should (and (wallpaper--find-command-args)
                (listp (wallpaper--find-command-args)))))
 

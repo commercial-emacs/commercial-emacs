@@ -91,9 +91,11 @@ the image file to set the wallpaper to.")
                 ( name command args-raw
                   &rest rest-plist
                   &aux
-                  (args (if (or (listp args-raw) (symbolp args-raw))
-                            args-raw
-                          (string-split args-raw)))
+                  (args (cond ((functionp args-raw)
+                               (funcall args-raw))
+                              ((stringp args-raw)
+                               (string-split args-raw))
+                              (t args-raw)))
                   (predicate (plist-get rest-plist :predicate))))
                (:copier wallpaper-setter-copy))
   "Structure containing a command to set the wallpaper.
@@ -122,6 +124,20 @@ and returns non-nil if this setter should be used."
          (lambda (item)
            `(wallpaper-setter-create ,@item))
          items)))
+
+(defun wallpaper-xfce-command-args ()
+  (let ((info
+         (with-temp-buffer
+           (call-process "xfconf-query" nil t nil
+                         "-c" "xfce4-desktop"
+                         "-p" "/backdrop/single-workspace-mode")
+           (buffer-string))))
+    (list "-c" "xfce4-desktop"
+          "-p" (format "/backdrop/screen%%S/monitor%%M/workspace%s/last-image"
+                       (if (equal info "true")
+                           "0"
+                         "%W"))
+          "-s" "%f")))
 
 (defvar wallpaper--default-setters
   (wallpaper--default-methods-create
@@ -238,20 +254,6 @@ This is used by `wallpaper--find-command' to automatically set
 `wallpaper-command', and by `wallpaper--find-command-args' to set
 `wallpaper-command-args'.  The setters will be tested in the
 order in which they appear.")
-
-(defun wallpaper-xfce-command-args ()
-  (let ((info
-         (with-temp-buffer
-           (call-process "xfconf-query" nil t nil
-                         "-c" "xfce4-desktop"
-                         "-p" "/backdrop/single-workspace-mode")
-           (buffer-string))))
-    (list "-c" "xfce4-desktop"
-          "-p" (format "/backdrop/screen%%S/monitor%%M/workspace%s/last-image"
-                       (if (equal info "true")
-                           "0"
-                         "%W"))
-          "-s" "%f")))
 
 (defvar wallpaper--current-setter nil)
 
