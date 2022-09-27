@@ -361,7 +361,7 @@ This affects the following commands:
   "Face for the directory name in the header line of the thumbnail buffer."
   :version "29.1")
 
-(defface -image-dired-thumb-header-file-size
+(defface image-dired-thumb-header-file-size
   '((((class color) (min-colors 88)) :foreground "cadet blue")
     (((class color) (min-colors 16)) :foreground "black")
     (default :inherit header-line))
@@ -768,9 +768,11 @@ comment."
                         'face 'image-dired-thumb-header-file-name))
      (?n . ,(propertize image-count
                         'face 'image-dired-thumb-header-image-count))
-     (?s . ,(propertize (file-size-human-readable
-                         (file-attribute-size
-                          (file-attributes file)))
+     (?s . ,(propertize (if (file-exists-p file)
+                            (file-size-human-readable
+                             (file-attribute-size
+                              (file-attributes file)))
+                          "<File missing>")
                         'face 'image-dired-thumb-header-file-size))
      (?t . ,(or props ""))
      (?c . ,(or comment "")))))
