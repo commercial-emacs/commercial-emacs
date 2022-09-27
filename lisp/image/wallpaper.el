@@ -126,12 +126,13 @@ and returns non-nil if this setter should be used."
          items)))
 
 (defun wallpaper-xfce-command-args ()
-  (let ((info
-         (with-temp-buffer
-           (call-process "xfconf-query" nil t nil
-                         "-c" "xfce4-desktop"
-                         "-p" "/backdrop/single-workspace-mode")
-           (buffer-string))))
+  (when-let ((program (executable-find "xfconf-query"))
+             (info
+              (with-temp-buffer
+                (call-process program nil t nil
+                              "-c" "xfce4-desktop"
+                              "-p" "/backdrop/single-workspace-mode")
+                (buffer-string))))
     (list "-c" "xfce4-desktop"
           "-p" (format "/backdrop/screen%%S/monitor%%M/workspace%s/last-image"
                        (if (equal info "true")
