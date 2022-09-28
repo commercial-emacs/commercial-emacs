@@ -192,6 +192,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module stat-time:
   # Code from module std-gnu11:
   # Code from module stdalign:
+  # Code from module stdbool:
   # Code from module stdckdint:
   # Code from module stddef:
   # Code from module stdint:
@@ -604,6 +605,7 @@ AC_DEFUN([gl_INIT],
   gl_STDALIGN_H
   gl_CONDITIONAL_HEADER([stdalign.h])
   AC_PROG_MKDIR_P
+  gl_C_BOOL
   gl_STDDEF_H
   gl_STDDEF_H_REQUIRE_DEFAULTS
   gl_CONDITIONAL_HEADER([stddef.h])
