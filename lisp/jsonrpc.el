@@ -92,7 +92,7 @@ The following initargs are accepted:
 
 :REQUEST-DISPATCHER (optional), a function of three
 arguments (CONN METHOD PARAMS) for handling JSONRPC requests.
-CONN is a `jsonrpc-connection' object, method is a symbol, and
+CONN is a `jsonrpc-connection' object, METHOD is a symbol, and
 PARAMS is a plist representing a JSON object.  The function is
 expected to return a JSONRPC result, a plist of (:result
 RESULT) or signal an error of type `jsonrpc-error'.
