@@ -20,6 +20,7 @@
 #ifndef _GL_ACL_H
 #define _GL_ACL_H 1
 
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 

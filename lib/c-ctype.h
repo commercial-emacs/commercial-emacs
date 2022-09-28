@@ -23,6 +23,8 @@
 #ifndef C_CTYPE_H
 #define C_CTYPE_H
 
+#include <stdbool.h>
+
 #ifndef _GL_INLINE_HEADER_BEGIN
  #error "Please include config.h first."
 #endif

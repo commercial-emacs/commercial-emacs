@@ -28,6 +28,7 @@
 #endif
 #include "sha256.h"
 
+#include <stdalign.h>
 #include <stdint.h>
 #include <string.h>
 

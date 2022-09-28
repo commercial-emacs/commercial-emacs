@@ -28,6 +28,7 @@
 #endif
 #include "sha512.h"
 
+#include <stdalign.h>
 #include <stdint.h>
 #include <string.h>
 

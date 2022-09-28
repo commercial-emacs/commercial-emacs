@@ -23,6 +23,7 @@
 #include <fcntl.h>
 
 #include "binary-io.h"
+#include "verify.h"
 
 #if GNULIB_defined_O_NONBLOCK
 # include "nonblocking.h"
@@ -94,7 +95,7 @@ pipe2 (int fd[2], int flags)
     }
 # else
   {
-    static_assert (O_NONBLOCK == 0);
+    verify (O_NONBLOCK == 0);
   }
 # endif
 

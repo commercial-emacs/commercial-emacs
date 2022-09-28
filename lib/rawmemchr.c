@@ -23,8 +23,10 @@
 #if !HAVE_RAWMEMCHR
 
 # include <limits.h>
+# include <stdalign.h>
 # include <stdint.h>
 
+# include "verify.h"
 
 /* Find the first occurrence of C in S.  */
 void *
@@ -34,7 +36,7 @@ rawmemchr (const void *s, int c_in)
   typedef uintptr_t longword;
   /* If you change the "uintptr_t", you should change UINTPTR_WIDTH to match.
      This verifies that the type does not have padding bits.  */
-  static_assert (UINTPTR_WIDTH == UCHAR_WIDTH * sizeof (longword));
+  verify (UINTPTR_WIDTH == UCHAR_WIDTH * sizeof (longword));
 
   const unsigned char *char_ptr;
   unsigned char c = c_in;

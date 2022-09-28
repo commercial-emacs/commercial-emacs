@@ -20,9 +20,11 @@
 #include <config.h>
 #include "filevercmp.h"
 
+#include <stdbool.h>
 #include <c-ctype.h>
 #include <limits.h>
 #include <idx.h>
+#include <verify.h>
 
 /* Return the length of a prefix of S that corresponds to the suffix
    defined by this extended regular expression in the C locale:
@@ -73,7 +75,7 @@ order (char const *s, idx_t pos, idx_t len)
     return -2;
   else
     {
-      static_assert (UCHAR_MAX <= (INT_MAX - 1 - 2) / 2);
+      verify (UCHAR_MAX <= (INT_MAX - 1 - 2) / 2);
       return c + UCHAR_MAX + 1;
     }
 }

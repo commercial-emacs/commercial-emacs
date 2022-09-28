@@ -94,6 +94,7 @@
 #ifndef _DYNARRAY_H
 #define _DYNARRAY_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
 
