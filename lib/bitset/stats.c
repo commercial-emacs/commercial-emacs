@@ -151,8 +151,8 @@ bitset_log_histogram_print (FILE *file, const char *name, const char *msg,
   {
     unsigned i;
     for (i = 0; i < 2; i++)
-      fprintf (file, "%*d\t%8u (%5.1f%%)\n",
-               (int)max_width, (int)i, bins[i], 100.0 * bins[i] / total);
+      fprintf (file, "%*u\t%8u (%5.1f%%)\n",
+               (int)max_width, i, bins[i], 100.0 * bins[i] / total);
 
     for (; i < n_bins - 1; i++)
       fprintf (file, "%*lu-%lu\t%8u (%5.1f%%)\n",

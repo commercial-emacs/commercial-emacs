@@ -191,7 +191,6 @@ AC_DEFUN([gl_EARLY],
   # Code from module stat-time:
   # Code from module std-gnu11:
   # Code from module stdalign:
-  # Code from module stdckdint:
   # Code from module stddef:
   # Code from module stdint:
   # Code from module stdio:
@@ -380,13 +379,7 @@ AC_DEFUN([gl_INIT],
     AC_LIBOBJ([fopen])
     gl_PREREQ_FOPEN
   fi
-  case "$host_os" in
-    mingw* | msys*)
-      ;;
-    *)
-      gl_MODULE_INDICATOR([fopen-gnu])
-      ;;
-  esac
+  gl_MODULE_INDICATOR([fopen-gnu])
   gl_FUNC_FPENDING
   gl_CONDITIONAL([GL_COND_OBJ_FPENDING], [test $gl_cv_func___fpending = no])
   gl_FUNC_FREE
@@ -747,7 +740,6 @@ AC_DEFUN([gl_INIT],
   gl_gnulib_enabled_rawmemchr=false
   gl_gnulib_enabled_6099e9737f757db36c47fa9d9f02e88c=false
   gl_gnulib_enabled_scratch_buffer=false
-  gl_gnulib_enabled_stdckdint=false
   gl_gnulib_enabled_strerror=false
   gl_gnulib_enabled_dbb57f49352be8fb86869629a254fb72=false
   gl_gnulib_enabled_strings=false
@@ -856,9 +848,6 @@ AC_DEFUN([gl_INIT],
       if test $HAVE_GROUP_MEMBER = 0; then
         func_gl_gnulib_m4code_getgroups
       fi
-      if test $HAVE_GROUP_MEMBER = 0; then
-        func_gl_gnulib_m4code_stdckdint
-      fi
     fi
   }
   func_gl_gnulib_m4code_lchmod ()
@@ -948,20 +937,6 @@ AC_DEFUN([gl_INIT],
       gl_STRINGS_H_REQUIRE_DEFAULTS
       AC_PROG_MKDIR_P
       gl_gnulib_enabled_strings=true
-    fi
-  }
-  func_gl_gnulib_m4code_stdckdint ()
-  {
-    if ! $gl_gnulib_enabled_stdckdint; then
-      AC_CHECK_HEADERS_ONCE([stdckdint.h])
-      if test $ac_cv_header_stdckdint_h = yes; then
-        GL_GENERATE_STDCKDINT_H=false
-      else
-        GL_GENERATE_STDCKDINT_H=true
-      fi
-      gl_CONDITIONAL_HEADER([stdckdint.h])
-      AC_PROG_MKDIR_P
-      gl_gnulib_enabled_stdckdint=true
     fi
   }
   func_gl_gnulib_m4code_strtoll ()
@@ -1103,7 +1078,6 @@ AC_DEFUN([gl_INIT],
   AM_CONDITIONAL([gl_GNULIB_ENABLED_rawmemchr], [$gl_gnulib_enabled_rawmemchr])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_6099e9737f757db36c47fa9d9f02e88c], [$gl_gnulib_enabled_6099e9737f757db36c47fa9d9f02e88c])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_scratch_buffer], [$gl_gnulib_enabled_scratch_buffer])
-  AM_CONDITIONAL([gl_GNULIB_ENABLED_stdckdint], [$gl_gnulib_enabled_stdckdint])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strerror], [$gl_gnulib_enabled_strerror])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_dbb57f49352be8fb86869629a254fb72], [$gl_gnulib_enabled_dbb57f49352be8fb86869629a254fb72])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strings], [$gl_gnulib_enabled_strings])
@@ -1413,7 +1387,6 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/integer_length.c
   lib/integer_length.h
   lib/integer_length_l.c
-  lib/intprops-internal.h
   lib/intprops.h
   lib/inttypes.in.h
   lib/itold.c
@@ -1493,7 +1466,6 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/stat-time.c
   lib/stat-time.h
   lib/stdalign.in.h
-  lib/stdckdint.in.h
   lib/stddef.in.h
   lib/stdint.in.h
   lib/stdio-impl.h

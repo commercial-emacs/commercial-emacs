@@ -21,10 +21,11 @@
 /* Specification.  */
 #include <unistd.h>
 
-#include <stdckdint.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
+
+#include "intprops.h"
 
 /* Most processes have no more than this many groups, and for these
    processes we can avoid using malloc.  */
@@ -53,7 +54,7 @@ get_group_info (struct group_info *gi)
     {
       int n_group_slots = getgroups (0, NULL);
       size_t nbytes;
-      if (! ckd_mul (&nbytes, n_group_slots, sizeof *gi->group))
+      if (! INT_MULTIPLY_WRAPV (n_group_slots, sizeof *gi->group, &nbytes))
         {
           gi->group = malloc (nbytes);
           if (gi->group)

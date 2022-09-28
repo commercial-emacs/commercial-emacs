@@ -440,7 +440,7 @@ lbitset_copy_ (bitset dst, bitset src)
     return;
 
   lbitset_elt *prev = 0;
-  lbitset_elt *tmp = 0;
+  lbitset_elt *tmp;
   for (lbitset_elt *elt = head; elt; elt = elt->next)
     {
       tmp = lbitset_elt_alloc ();
