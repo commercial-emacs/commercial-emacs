@@ -39,6 +39,7 @@ variants of those files that can be used to sandbox Emacs before
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>

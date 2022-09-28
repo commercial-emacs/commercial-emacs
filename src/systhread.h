@@ -19,6 +19,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifndef SYSTHREAD_H
 #define SYSTHREAD_H
 
+#include <stdbool.h>
+
 #include <attribute.h>
 
 #ifdef THREADS_ENABLED

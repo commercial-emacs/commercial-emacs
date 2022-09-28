@@ -78,6 +78,7 @@ To add a new module function, proceed as follows:
 #include "emacs-module.h"
 
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>

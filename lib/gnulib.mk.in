@@ -60,6 +60,7 @@
 #  --avoid=sigprocmask \
 #  --avoid=stat \
 #  --avoid=stdarg \
+#  --avoid=stdbool \
 #  --avoid=threadlib \
 #  --avoid=tzset \
 #  --avoid=unsetenv \
@@ -148,7 +149,6 @@
 #  stat-time \
 #  std-gnu11 \
 #  stdalign \
-#  stdbool \
 #  stddef \
 #  stdio \
 #  stpcpy \
@@ -975,8 +975,6 @@ MKDIR_P = @MKDIR_P@
 MODULES_OBJ = @MODULES_OBJ@
 MODULES_SECONDARY_SUFFIX = @MODULES_SECONDARY_SUFFIX@
 MODULES_SUFFIX = @MODULES_SUFFIX@
-NEXT_ASSERT_H = @NEXT_ASSERT_H@
-NEXT_AS_FIRST_DIRECTIVE_ASSERT_H = @NEXT_AS_FIRST_DIRECTIVE_ASSERT_H@
 NEXT_AS_FIRST_DIRECTIVE_DIRENT_H = @NEXT_AS_FIRST_DIRECTIVE_DIRENT_H@
 NEXT_AS_FIRST_DIRECTIVE_ERRNO_H = @NEXT_AS_FIRST_DIRECTIVE_ERRNO_H@
 NEXT_AS_FIRST_DIRECTIVE_FCNTL_H = @NEXT_AS_FIRST_DIRECTIVE_FCNTL_H@
