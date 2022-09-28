@@ -20,26 +20,52 @@
 ;;; Code:
 
 (require 'ert)
+(require 'ert-x)
 (require 'image-dired)
 (require 'image-dired-util)
+(require 'xdg)
 
-(ert-deftest image-dired-thumb-name ()
-  (skip-unless (file-directory-p (temporary-file-directory)))
-  (let* ((image-dired-dir (temporary-file-directory))
-         (restore-cache-home (getenv "XDG_CACHE_HOME"))
-         (jpg "foo.jpg"))
-    (setenv "XDG_CACHE_HOME" (temporary-file-directory))
-    (unwind-protect
-        (dolist (test-case
-                 '((standard . "\\.png$")
-                   (image-dired . "thumb\\.jpg$")
-                   (per-directory . "foo\\.thumb\\.jpg$")))
-          (let* ((image-dired-thumbnail-storage (car test-case))
-                 (thumb-name (image-dired-thumb-name jpg)))
-            (should (file-name-absolute-p thumb-name))
-            (should (string-match-p (cdr test-case)
-                                    (file-name-nondirectory thumb-name)))))
-      (setenv "XDG_CACHE_HOME" restore-cache-home)
-      (should (equal (getenv "XDG_CACHE_HOME") restore-cache-home)))))
+(ert-deftest image-dired-thumb-name/standard ()
+  (let ((image-dired-thumbnail-storage 'standard))
+    (should (file-name-absolute-p (image-dired-thumb-name "foo.jpg")))
+    (should (file-name-absolute-p (image-dired-thumb-name "/tmp/foo.jpg")))
+    (should (equal
+             (file-name-directory (image-dired-thumb-name "foo.jpg"))
+             (file-name-directory (image-dired-thumb-name "/tmp/foo.jpg"))))
+    (should (string-search (xdg-cache-home)
+                           (image-dired-thumb-name "foo.jpg")))
+    (should (string-match (rx (in "0-9a-f") ".png")
+                          (image-dired-thumb-name "foo.jpg")))))
+
+(ert-deftest image-dired-thumb-name/image-dired ()
+  ;; Avoid trying to create `image-dired-dir'.
+  (ert-with-temp-directory dir
+    (let ((image-dired-dir dir)
+          (image-dired-thumbnail-storage 'image-dired))
+      (should (file-name-absolute-p (image-dired-thumb-name "foo.jpg")))
+      (should (file-name-absolute-p (image-dired-thumb-name "/tmp/foo.jpg")))
+      (should (equal
+               (file-name-directory (image-dired-thumb-name "foo.jpg"))
+               (file-name-directory (image-dired-thumb-name "/tmp/foo.jpg"))))
+      (should (equal (file-name-nondirectory
+                      ;; The checksum is based on the file name.
+                      (image-dired-thumb-name "/some/path/foo.jpg"))
+                     "dc4e6f7068157023e7f2e8362d15bdd2e3ca89e4.jpg"))
+      (should (equal (file-name-extension
+                      (image-dired-thumb-name "foo.gif"))
+                     "jpg")))))
+
+(ert-deftest image-dired-thumb-name/per-directory ()
+  (let ((image-dired-thumbnail-storage 'per-directory))
+    (should (file-name-absolute-p (image-dired-thumb-name "foo.jpg")))
+    (should (file-name-absolute-p (image-dired-thumb-name "/tmp/foo.jpg")))
+    (should (equal
+             (file-name-nondirectory (image-dired-thumb-name "foo.jpg"))
+             (file-name-nondirectory (image-dired-thumb-name "/tmp/foo.jpg"))))
+    (should (equal (file-name-split (image-dired-thumb-name "/tmp/foo.jpg"))
+                   '("" "tmp" ".image-dired" "foo.jpg.thumb.jpg")))
+    (should (equal (file-name-nondirectory
+                    (image-dired-thumb-name "foo.jpg"))
+                   "foo.jpg.thumb.jpg"))))
 
 ;;; image-dired-util-tests.el ends here
