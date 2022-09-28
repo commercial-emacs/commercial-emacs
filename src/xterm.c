@@ -13572,6 +13572,13 @@ xi_compute_root_window_offset (struct frame *f, XIDeviceEvent *xev)
 				xev->event_x, xev->event_y);
 }
 
+static void
+xi_compute_root_window_offset_enter (struct frame *f, XIEnterEvent *enter)
+{
+  x_compute_root_window_offset (f, enter->root_x, enter->root_y,
+				enter->event_x, enter->event_y);
+}
+
 #ifdef HAVE_XINPUT2_4
 
 static void
@@ -19368,6 +19375,16 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
       f = any;
 
+      if (f && event->xcrossing.window == FRAME_X_WINDOW (f))
+	x_compute_root_window_offset (f, event->xcrossing.x_root,
+				      event->xcrossing.y_root,
+				      event->xcrossing.x,
+				      event->xcrossing.y);
+
+      /* The code below relies on the first several fields of
+	 XCrossingEvent being laid out the same way as
+	 XMotionEvent.  */
+
       if (f && x_mouse_click_focus_ignore_position)
 	{
 	  ignore_next_mouse_click_timeout = (event->xmotion.time
@@ -19512,6 +19529,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    || EQ (track_mouse, Qdropping))
 		   && gui_mouse_grabbed (dpyinfo)))
 	    do_help = -1;
+
+	  if (event->xcrossing.window == FRAME_X_WINDOW (f))
+	    x_compute_root_window_offset (f, event->xcrossing.x_root,
+					  event->xcrossing.y_root,
+					  event->xcrossing.x,
+					  event->xcrossing.y);
+
         }
 #ifdef USE_GTK
       /* See comment in EnterNotify above */
@@ -20922,6 +20946,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      f = any;
 
+	      if (f && enter->event == FRAME_X_WINDOW (f))
+		xi_compute_root_window_offset_enter (f, enter);
+
 	      if (f && x_mouse_click_focus_ignore_position)
 		{
 		  ignore_next_mouse_click_timeout = (enter->time
@@ -21118,6 +21145,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			    || EQ (track_mouse, Qdropping))
 			   && gui_mouse_grabbed (dpyinfo)))
 		    do_help = -1;
+
+		  if (f && leave->event == FRAME_X_WINDOW (f))
+		    xi_compute_root_window_offset_enter (f, leave);
 		}
 #ifdef USE_GTK
 	      /* See comment in EnterNotify above */
