@@ -861,6 +861,8 @@ See also `fmakunbound'.  */)
   if (SYMBOL_CONSTANT_P (symbol))
     xsignal1 (Qsetting_constant, symbol);
   Fset (symbol, Qunbound);
+  /* In lieu of more dangerous, set_symbol_plist (symbol, Qnil); */
+  Fput (symbol, Qvariable_documentation, Qnil);
   return symbol;
 }
 
