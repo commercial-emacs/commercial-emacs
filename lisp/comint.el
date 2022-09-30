@@ -1945,7 +1945,7 @@ Similarly for Soar, Scheme, etc."
               (when comint-highlight-input
                 (add-text-properties beg end
                                      '( font-lock-face comint-highlight-input
-                                        comint--fl-inhibit-fontification t
+                                        comint--fontify-input-inhibit-fontification t
                                         front-sticky t )))
               (unless comint-use-prompt-regexp
                 ;; Give old user input a field property of `input', to
@@ -2150,24 +2150,26 @@ Make backspaces delete the previous character."
 	    ;; insert-before-markers is a bad thing. XXX
 	    ;; Luckily we don't have to use it any more, we use
 	    ;; window-point-insertion-type instead.
-	    (insert string)
+	    (make-local-variable 'jit-lock-mode)
+	    (let ((jit-lock-mode nil))
+	      (insert string)
 
-	    ;; Advance process-mark
-	    (set-marker (process-mark process) (point))
+	      ;; Advance process-mark
+	      (set-marker (process-mark process) (point))
 
-	    (unless comint-inhibit-carriage-motion
+	      (unless comint-inhibit-carriage-motion
 	      ;; Interpret any carriage motion characters (newline, backspace)
 	      (comint-carriage-motion comint-last-output-start (point)))
 
-	    ;; Run these hooks with point where the user had it.
-	    (goto-char saved-point)
-	    (run-hook-with-args 'comint-output-filter-functions string)
-	    (set-marker saved-point (point))
+	      ;; Run these hooks with point where the user had it.
+	      (goto-char saved-point)
+	      (run-hook-with-args 'comint-output-filter-functions string)
+	      (set-marker saved-point (point))
 
-	    (goto-char (process-mark process)) ; In case a filter moved it.
+	      (goto-char (process-mark process)) ; In case a filter moved it.
 
-	    (unless comint-use-prompt-regexp
-              (comint--mark-as-output comint-last-output-start (point)))
+	      (unless comint-use-prompt-regexp
+                (comint--mark-as-output comint-last-output-start (point))))
 
 	    ;; Highlight the prompt, where we define `prompt' to mean
 	    ;; the most recent output that doesn't end with a newline.
@@ -3974,9 +3976,9 @@ fontification and other behavior of the indirect buffer."
 (defvar-local comint--indirect-buffer nil
   "Indirect buffer used for input fontification.")
 
-(defvar-local comint--fl-saved-jit-lock-contextually nil)
+(defvar-local comint--fontify-input-saved-jit-lock-contextually nil)
 
-(define-minor-mode comint-fl-mode
+(define-minor-mode comint-fontify-input-mode
   "Enable input fontification in the current comint buffer.
 This minor mode is useful if the current major mode derives from
 `comint-mode' and if `comint-indirect-setup-function' is set.
@@ -3991,71 +3993,71 @@ This function signals an error if `comint-use-prompt-regexp' is
 non-nil.  Input fontification isn't compatible with this
 setting."
   :lighter nil
-  (if comint-fl-mode
+  (if comint-fontify-input-mode
       (let ((success nil))
         (unwind-protect
             (progn
-              (comint--fl-on)
+              (comint--fontify-input-on)
               (setq success t))
           (unless success
-            (setq comint-fl-mode nil)
-            (comint--fl-off))))
-    (comint--fl-off)))
+            (setq comint-fontify-input-mode nil)
+            (comint--fontify-input-off))))
+    (comint--fontify-input-off)))
 
-(defun comint--fl-on ()
+(defun comint--fontify-input-on ()
   "Enable input fontification in the current comint buffer."
-  (comint--fl-off)
+  (comint--fontify-input-off)
 
   (when comint-use-prompt-regexp
     (error
      "Input fontification is incompatible with `comint-use-prompt-regexp'"))
 
   (add-function :around (local 'font-lock-fontify-region-function)
-                #'comint--fl-fontify-region)
+                #'comint--fontify-input-fontify-region)
   ;; `before-change-functions' are only run in the current buffer and
   ;; not in its indirect buffers, which means that we must manually
   ;; flush ppss cache
   (add-hook 'before-change-functions
-            #'comint--fl-ppss-flush-indirect 99 t)
+            #'comint--fontify-input-ppss-flush-indirect 99 t)
 
   ;; Set up contextual fontification
   (unless (booleanp jit-lock-contextually)
-    (setq comint--fl-saved-jit-lock-contextually
+    (setq comint--fontify-input-saved-jit-lock-contextually
           jit-lock-contextually)
     (setq-local jit-lock-contextually t)
     (when jit-lock-mode
       (jit-lock-mode t))))
 
-(defun comint--fl-off ()
+(defun comint--fontify-input-off ()
   "Disable input fontification in the current comint buffer."
   (remove-function (local 'font-lock-fontify-region-function)
-                   #'comint--fl-fontify-region)
+                   #'comint--fontify-input-fontify-region)
   (remove-hook 'before-change-functions
-               #'comint--fl-ppss-flush-indirect t)
+               #'comint--fontify-input-ppss-flush-indirect t)
 
   ;; Reset contextual fontification
-  (when comint--fl-saved-jit-lock-contextually
+  (when comint--fontify-input-saved-jit-lock-contextually
     (setq-local jit-lock-contextually
-                comint--fl-saved-jit-lock-contextually)
-    (setq comint--fl-saved-jit-lock-contextually nil)
+                comint--fontify-input-saved-jit-lock-contextually)
+    (setq comint--fontify-input-saved-jit-lock-contextually nil)
     (when jit-lock-mode
       (jit-lock-mode t)))
 
   (font-lock-flush))
 
-(defun comint--fl-ppss-flush-indirect (beg &rest rest)
+(defun comint--fontify-input-ppss-flush-indirect (beg &rest rest)
   (when-let ((buf (comint-indirect-buffer t)))
     (with-current-buffer buf
       (when (memq #'syntax-ppss-invalidate-cache before-change-functions)
         (apply #'syntax-ppss-invalidate-cache beg rest)))))
 
-(defun comint--fl-fontify-region (fun beg end verbose)
+(defun comint--fontify-input-fontify-region (fun beg end verbose)
   "Fontify process output and user input in the current comint buffer.
 First, fontify the region between BEG and END using FUN.  Then
 fontify only the input text in the region with the help of an
 indirect buffer.  VERBOSE is passed to the fontify-region
 functions.  Skip fontification of input regions with non-nil
-`comint--fl-inhibit-fontification' text property."
+`comint--fontify-input-inhibit-fontification' text property."
   (pcase (funcall fun beg end verbose)
     (`(jit-lock-bounds ,beg1 . ,end1)
      (setq beg beg1 end end1)))
@@ -4067,7 +4069,7 @@ functions.  Skip fontification of input regions with non-nil
           (comint--intersect-regions
            nil (lambda (beg end)
                  (unless (get-text-property
-                          beg 'comint--fl-inhibit-fontification)
+                          beg 'comint--fontify-input-inhibit-fontification)
                    (font-lock-fontify-region beg end verbose)))
            beg end)))
     (`((jit-lock-bounds ,beg1 . ,_) . (jit-lock-bounds ,_ . ,end1))
