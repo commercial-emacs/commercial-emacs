@@ -3674,7 +3674,7 @@ Let-bind it when necessary.")
 
 ;; `directory-abbrev-apply' and `directory-abbrev-make-regexp' exists
 ;; since Emacs 29.1.  Since this handler isn't called for older
-;; Emacsen, it is save to invoke them via `tramp-compat-funcall'.
+;; Emacs, it is save to invoke them via `tramp-compat-funcall'.
 (defun tramp-handle-abbreviate-file-name (filename)
   "Like `abbreviate-file-name' for Tramp files."
   (let* ((case-fold-search (file-name-case-insensitive-p filename))
@@ -5485,7 +5485,7 @@ performed successfully.  Any other value means an error."
 Mostly useful to protect BODY from being interrupted by timers."
   (declare (indent 1) (debug t))
   `(if (tramp-get-connection-property ,proc "locked")
-       ;; Be kind for older Emacsen.
+       ;; Be kind for old versions of Emacs.
        (if (member 'remote-file-error debug-ignored-errors)
 	   (throw 'non-essential 'non-essential)
 	 (tramp-error
@@ -6124,6 +6124,11 @@ This handles also chrooted environments, which are not regarded as local."
 (defun tramp-get-remote-tmpdir (vec)
   "Return directory for temporary files on the remote host identified by VEC."
   (with-tramp-connection-property (tramp-get-process vec) "remote-tmpdir"
+    ;; Prior Tramp 2.5.3.2, the connection property "tmpdir" did exist
+    ;; with a remote file name.  This must be discarded.  (Bug#57800)
+    (when-let ((tmpdir (tramp-get-connection-property vec "tmpdir" nil)))
+      (when (tramp-tramp-file-p tmpdir)
+	(tramp-flush-connection-property vec "tmpdir")))
     (let ((dir
 	   (tramp-make-tramp-file-name
 	    vec (or (tramp-get-method-parameter vec 'tramp-tmpdir) "/tmp"))))
