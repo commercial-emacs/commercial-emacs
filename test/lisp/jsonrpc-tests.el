@@ -252,5 +252,26 @@
       (should (eq 2 n-deferred-2))
       (should (zerop (hash-table-count (jsonrpc--deferred-actions conn)))))))
 
+(ert-deftest jsonrpc-connection-send-contortion ()
+  "`jsonrpc-connection-send' contortion to accommodate non-string :method."
+  (cl-letf (((symbol-function 'initialize-instance) #'ignore)
+            ((symbol-function 'process-send-string) #'ignore)
+            ((symbol-function 'jsonrpc--json-encode) (lambda (&rest_args) ""))
+            ((symbol-function 'jsonrpc--log-event)
+             (lambda (_conn message _type) message)))
+    (let ((conn (make-instance 'jsonrpc-process-connection)))
+      (should (equal (jsonrpc-connection-send conn :method 'foo :id 100)
+                     '(:jsonrpc "2.0" :method "foo" :id 100)))
+      (should (equal (jsonrpc-connection-send conn :id 100 :method :foo)
+                     '(:jsonrpc "2.0" :id 100 :method "foo")))
+      (should (equal (jsonrpc-connection-send conn :method "foo" :id 100)
+                     '(:jsonrpc "2.0" :method "foo" :id 100)))
+      (should (equal (jsonrpc-connection-send conn :method nil :id 100)
+                     '(:jsonrpc "2.0" :id 100)))
+      (should (equal (jsonrpc-connection-send conn :id 100 :method '(foo))
+                     '(:jsonrpc "2.0" :id 100)))
+      (should (equal (jsonrpc-connection-send conn :id 100 :method)
+                     '(:jsonrpc "2.0" :id 100 :method))))))
+
 (provide 'jsonrpc-tests)
 ;;; jsonrpc-tests.el ends here

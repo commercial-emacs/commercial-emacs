@@ -384,20 +384,27 @@ connection object, called when the process dies.")
       (setq buffer-read-only t))
     (process-put proc 'jsonrpc-connection conn)))
 
+(defun jsonrpc--stringify-method (args)
+  "Normalize :method in ARGS."
+  (cl-loop for i below (1- (length args)) by 2
+           for keyword = (nth i args)
+           while (keywordp keyword)
+           do (when (eq :method keyword)
+                (let* ((method* (nth (1+ i) args))
+                       (method (cond ((keywordp method*)
+                                      (substring (symbol-name method*) 1))
+                                     ((and method* (symbolp method*))
+                                      (symbol-name method*))
+                                     ((stringp method*)
+                                      method*))))
+                  (if method
+                      (setcar (nthcdr (1+ i) args) method)
+                    (setf (nthcdr i args) (nthcdr (+ 2 i) args)))))
+           finally return args))
+
 (cl-defmethod jsonrpc-connection-send ((connection jsonrpc-process-connection)
-                                       &rest args
-                                       &key
-                                       _id
-                                       method
-                                       _params
-                                       _result
-                                       _error
-                                       _partial)
-  "Send MESSAGE, a JSON object, to CONNECTION."
-  (when method
-    (plist-put args :method
-               (cond ((keywordp method) (substring (symbol-name method) 1))
-                     ((and method (symbolp method)) (symbol-name method)))))
+                                       &rest args)
+  (setq args (jsonrpc--stringify-method args))
   (let* ((message `(:jsonrpc "2.0" ,@args))
          (json (jsonrpc--json-encode message))
          (headers `(("Content-Length" . ,(format "%d" (string-bytes json))))))
