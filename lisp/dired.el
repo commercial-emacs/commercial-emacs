@@ -3656,19 +3656,13 @@ non-empty directories is allowed."
   (interactive)
   (let* ((dired-marker-char dired-del-marker)
 	 (regexp (dired-marker-regexp))
-	 case-fold-search markers)
+         case-fold-search)
     (if (save-excursion (goto-char (point-min))
 			(re-search-forward regexp nil t))
-	(dired-internal-do-deletions
+        (dired-internal-do-deletions
          (nreverse
-	  ;; this can't move point since ARG is nil
-	  (dired-map-over-marks (cons (dired-get-filename)
-                                      (let ((m (point-marker)))
-                                        (push m markers)
-                                        m))
-			        nil))
+          (dired-map-over-marks (cons (dired-get-filename) (point-marker)) nil))
 	 nil t)
-      (dolist (m markers) (set-marker m nil))
       (or nomessage
 	  (message "(No deletions requested)")))))
 
