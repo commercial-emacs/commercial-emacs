@@ -1418,6 +1418,7 @@ Return t if the file exists and loads successfully.  */)
 	  struct stat s1, s2;
 	  int result;
 
+	  struct timespec epoch_timespec = {(time_t)0, 0}; /* 1970-01-01T00:00 UTC */
 	  if (version < 0 && !(version = safe_to_load_version (file, fd)))
 	    error ("File `%s' was not compiled in Emacs", SDATA (found));
 
