@@ -5324,6 +5324,13 @@ For internal use.  */);
 	       doc: /* Non-nil when comp.el can be native compiled.
 For internal use. */);
   /* Compiler control customizes.  */
+  DEFVAR_LISP ("inhibit-native-compilation", Vinhibit_native_compilation,
+	       doc: /* If non-nil, inhibit automatic native compilation of loaded .elc files.
+
+After compilation, each function definition is updated to the native
+compiled one.  */);
+  Vinhibit_native_compilation = Qnil;
+
   DEFVAR_BOOL ("native-comp-deferred-compilation",
 	       native_comp_deferred_compilation,
 	       doc: /* If non-nil compile loaded .elc files asynchronously.

@@ -541,7 +541,7 @@ DIRS are relative."
   (setq comp--compilable t))
 
 (defvar native-comp-eln-load-path)
-(defvar native-comp-deferred-compilation)
+(defvar inhibit-native-compilation)
 (defvar comp-enable-subr-trampolines)
 
 (defvar startup--original-eln-load-path nil
@@ -578,6 +578,9 @@ the updated value."
 It sets `command-line-processed', processes the command-line,
 reads the initialization files, etc.
 It is the default value of the variable `top-level'."
+  ;; Allow disabling automatic .elc->.eln processing.
+  (setq inhibit-native-compilation (getenv "EMACS_INHIBIT_NATIVE_COMPILATION"))
+
   (if command-line-processed
       (message internal--top-level-message)
     (setq command-line-processed t)
