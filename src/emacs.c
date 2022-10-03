@@ -897,14 +897,8 @@ load_pdump (int argc, char **argv)
     }
 
   /* Where's our executable?  */
-  ptrdiff_t bufsize;
-#ifndef NS_SELF_CONTAINED
-  ptrdiff_t exec_bufsize;
-#endif
-  emacs_executable = find_emacs_executable (argv[0], &bufsize);
-#ifndef NS_SELF_CONTAINED
-  exec_bufsize = bufsize;
-#endif
+  ptrdiff_t exec_bufsize, needed;
+  emacs_executable = find_emacs_executable (argv[0], &exec_bufsize);
 
   /* If we couldn't find our executable, go straight to looking for
      the dump in the hardcoded location.  */
@@ -937,8 +931,8 @@ load_pdump (int argc, char **argv)
 		       strip_suffix_length))
 	exenamelen = prefix_length;
     }
-  ptrdiff_t needed = exenamelen + strlen (suffix) + 1;
-  dump_file = xpalloc (NULL, &bufsize, needed - bufsize, -1, 1);
+  ptrdiff_t bufsize = exenamelen + strlen (suffix) + 1;
+  dump_file = xpalloc (NULL, &bufsize, 1, -1, 1);
   memcpy (dump_file, emacs_executable, exenamelen);
   strcpy (dump_file + exenamelen, suffix);
   result = pdumper_load (dump_file, emacs_executable);
