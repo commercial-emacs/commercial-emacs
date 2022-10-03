@@ -330,7 +330,7 @@ ifeq ($(ANCIENT),yes)
 %.elc: %.el $(COMPILE_FIRST:.elc=.el) $(top_srcdir)/src/lread.c
 	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) \
 	-l comp -f batch-byte-compile $<
-	TZ=UTC touch -t 197001010000 $@
+	TZ=UTC0 touch -t 197001010000 $@
 else
 %.elc: %.el $(COMPILE_FIRST:.elc=.el) $(top_srcdir)/src/lread.c
 	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) \
