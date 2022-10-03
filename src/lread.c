@@ -1447,7 +1447,12 @@ Return t if the file exists and loads successfully.  */)
                   newer = 1;
 
                   /* If we won't print another message, mention this anyway.  */
-                  if (! NILP (nomessage) && !force_load_messages)
+                  if (! NILP (nomessage) && !force_load_messages
+                     /* We don't want this message during
+                        bootstrapping for the "compile-first" .elc
+                        files, which have had their timestamps set to
+                        the epoch.  See bug #58224.  */
+                     && timespec_cmp (get_stat_mtime (&s1), epoch_timespec))
                     {
                       Lisp_Object msg_file;
                       msg_file = Fsubstring (found, make_fixnum (0), make_fixnum (-1));
