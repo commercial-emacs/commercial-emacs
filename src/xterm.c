@@ -29715,7 +29715,7 @@ mark_xterm (void)
       mark_object (&dpyinfo->last_monitor_attributes_list);
 #endif
 #if defined HAVE_X_I18N
-      mark_object (dpyinfo->xim_coding);
+      mark_object (&dpyinfo->xim_coding);
 #endif
     }
 #endif
