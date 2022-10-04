@@ -441,40 +441,40 @@ displayed in the echo area."
 
 (defvar gnus-action-message-log nil)
 
-(defmacro gnus-message-with-timestamp (format-string &rest args)
+(defun gnus-message-with-timestamp (format-string &rest args)
   "Display message with timestamp.  Arguments are the same as `message'.
 The `gnus-add-timestamp-to-message' variable controls how to add
 timestamp to message."
-  (let ((timestamp '(format-time-string "%Y%m%dT%H%M%S.%3N> " time)))
-    `(let (str time)
-       (cond ((eq gnus-add-timestamp-to-message 'log)
-	      (setq str (let (message-log-max)
-			  (message ,format-string ,@args)))
-	      (when (and message-log-max
-			 (> message-log-max 0)
-			 (/= (length str) 0))
-		(setq time (current-time))
-		(with-current-buffer (messages-buffer)
-		  (goto-char (point-max))
-		  (let ((inhibit-read-only t))
-		    (insert ,timestamp str "\n")
-		    (forward-line (- message-log-max))
-		    (delete-region (point-min) (point)))
-		  (goto-char (point-max))))
-	      str)
-	     (gnus-add-timestamp-to-message
-	      (if (or (and (null ,format-string) (null ',args))
-		      (progn
-			(setq str (format-message ,format-string ,@args))
-			(zerop (length str))))
-		  (prog1
-		      (and ,format-string str)
-		    (message nil))
-		(setq time (current-time))
-		(message "%s" (concat ,timestamp str))
-		str))
-	     (t
-	      (message ,format-string ,@args))))))
+  (let ((time-fmt "%Y%m%dT%H%M%S.%3N> ")
+        str time)
+    (cond ((eq gnus-add-timestamp-to-message 'log)
+	   (setq str (let (message-log-max)
+		       (apply #'message format-string args)))
+	   (when (and message-log-max
+		      (> message-log-max 0)
+		      (/= (length str) 0))
+	     (setq time (current-time))
+	     (with-current-buffer (messages-buffer)
+	       (goto-char (point-max))
+	       (let ((inhibit-read-only t))
+		 (insert (format-time-string time-fmt time) str "\n")
+		 (forward-line (- message-log-max))
+		 (delete-region (point-min) (point)))
+	       (goto-char (point-max))))
+	   str)
+	  (gnus-add-timestamp-to-message
+	   (if (or (and (null format-string) (null args))
+		   (progn
+		     (setq str (apply #'format-message format-string args))
+		     (zerop (length str))))
+	       (prog1
+		   (and format-string str)
+		 (message nil))
+	     (setq time (current-time))
+	     (message "%s" (concat (format-time-string time-fmt time) str))
+	     str))
+	  (t
+	   (apply #'message format-string args)))))
 
 (defun gnus-message (level &rest args)
   "If LEVEL is lower than `gnus-verbose' print ARGS using `message'.
