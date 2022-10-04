@@ -448,7 +448,7 @@ timestamp to message."
   (let ((time-fmt "%Y%m%dT%H%M%S.%3N> ")
         str time)
     (cond ((eq gnus-add-timestamp-to-message 'log)
-	   (setq str (let ((inhibit-message t))
+	   (setq str (let (message-log-max)
 		       (apply #'message format-string args)))
 	   (when (and (fixnump message-log-max)
 		      (> message-log-max 0)

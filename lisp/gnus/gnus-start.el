@@ -1579,6 +1579,7 @@ Else we get unblocked but permanently yielded threads."
   (let* ((run-name (concat thread-group "-" label))
          (working (get-buffer-create (format " *%s*" run-name)))
          (inhibit-debugger t)
+         (gnus-add-timestamp-to-message 'log)
          debug-on-quit
          debug-on-error)
     ;; once context switch occurs handlerlist in eval.c(throw) is lost
