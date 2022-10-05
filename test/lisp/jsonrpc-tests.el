@@ -273,5 +273,35 @@
       (should (equal (jsonrpc-connection-send conn :id 100 :method)
                      '(:jsonrpc "2.0" :id 100 :method))))))
 
+(ert-deftest jsonrpc-process-connection-sham-genericity ()
+  "`jsonrpc-process-connection' is hardcoded for eglot."
+  (let* ((name "sham-genericity")
+         (too-bad (get-buffer-create (make-temp-name name) t))
+         (fragile-name (format "*%s stderr*" name))
+         (output-name (format " *%s output*" name))
+         (process (make-process
+                   :name name
+                   :buffer too-bad
+                   :command (split-string "sleep 10")
+                   :connection-type 'pipe
+                   :noquery t
+                   :stderr (get-buffer-create fragile-name))))
+    (should (bufferp (get-buffer fragile-name)))
+    (should (buffer-live-p too-bad))
+    (should-not (get-buffer output-name))
+    (let ((conn (make-instance 'jsonrpc-process-connection
+                               :name name
+                               :process process)))
+      (should (buffer-live-p (get-buffer output-name)))
+      (should-not (get-buffer fragile-name))
+      (should (buffer-live-p (get-buffer (concat " " fragile-name))))
+      (should (buffer-live-p too-bad))
+      (jsonrpc-shutdown conn t)
+      (let (kill-buffer-query-functions)
+        (kill-buffer too-bad)
+        (kill-buffer (jsonrpc-events-buffer conn)))
+      (should-not (cl-some (lambda (x) (cl-search x name))
+                           (mapcar #'buffer-name (buffer-list)))))))
+
 (provide 'jsonrpc-tests)
 ;;; jsonrpc-tests.el ends here

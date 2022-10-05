@@ -331,58 +331,53 @@ enveloping headers such as \"Content-Length:\".
 :ON-SHUTDOWN (optional), a function of one argument, the
 connection object, called when the process dies.")
 
-(cl-defmethod initialize-instance ((conn jsonrpc-process-connection) slots)
+(cl-defmethod initialize-instance ((conn jsonrpc-process-connection) _slots)
+  "Strongarm buffers of CONN's process to satisfy eglot.
+CONN's extant process buffer, if any, is potentially orphaned and
+replaced with an invisible buffer \" *[CONN name] output*\".  If
+:stderr of CONN's process is named '*[CONN name] stderr*', it is
+modified to replicate messages to CONN's event buffer, and made
+invisible by renaming to \" *[CONN name] stderr*\"."
   (cl-call-next-method)
-  (cl-destructuring-bind (&key ((:process proc)) name &allow-other-keys) slots
-    ;; FIXME: notice the undocumented bad coupling in the stderr
-    ;; buffer name, it must be named exactly like this we expect when
-    ;; calling `make-process'.  If there were a `set-process-stderr'
-    ;; like there is `set-process-buffer' we wouldn't need this and
-    ;; could use a pipe with a process filter instead of
-    ;; `after-change-functions'.  Alternatively, we need a new initarg
-    ;; (but maybe not a slot).
-    (let ((calling-buffer (current-buffer)))
-      (with-current-buffer (get-buffer-create (format "*%s stderr*" name))
-        (let ((inhibit-read-only t)
-              (hidden-name (concat " " (buffer-name))))
-          (erase-buffer)
-          (buffer-disable-undo)
-          (add-hook
-           'after-change-functions
-           (lambda (beg _end _pre-change-len)
-             (cl-loop initially (goto-char beg)
-                      do (forward-line)
-                      when (bolp)
-                      for line = (buffer-substring
-                                  (line-beginning-position 0)
-                                  (line-end-position 0))
-                      do (with-current-buffer (jsonrpc-events-buffer conn)
-                           (goto-char (point-max))
-                           (let ((inhibit-read-only t))
-                             (insert (format "[stderr] %s\n" line))))
-                      until (eobp)))
-           nil t)
-          ;; If we are correctly coupled to the client, the process
-          ;; now created should pick up the current stderr buffer,
-          ;; which we immediately rename
-          (setq proc (if (functionp proc)
-                         (with-current-buffer calling-buffer (funcall proc))
-                       proc))
-          (ignore-errors (kill-buffer hidden-name))
-          (rename-buffer hidden-name)
-          (process-put proc 'jsonrpc-stderr (current-buffer))
-          (setq buffer-read-only t))))
-    (setf (jsonrpc--process conn) proc)
-    (set-process-buffer proc (get-buffer-create (format " *%s output*" name)))
-    (set-process-filter proc #'jsonrpc--process-filter)
-    (set-process-sentinel proc #'jsonrpc--process-sentinel)
-    (with-current-buffer (process-buffer proc)
-      (buffer-disable-undo)
-      (set-marker (process-mark proc) (point-min))
-      (let ((inhibit-read-only t))
-        (erase-buffer))
-      (setq buffer-read-only t))
-    (process-put proc 'jsonrpc-connection conn)))
+  (when (functionp (jsonrpc--process conn))
+    (setf (jsonrpc--process conn) (funcall (jsonrpc--process conn))))
+  (process-put (jsonrpc--process conn) 'jsonrpc-connection conn)
+  (set-process-filter (jsonrpc--process conn) #'jsonrpc--process-filter)
+  (set-process-sentinel (jsonrpc--process conn) #'jsonrpc--process-sentinel)
+  (cl-macrolet ((render-log-like (buffer)
+                  `(with-current-buffer ,buffer
+                     (let ((inhibit-read-only t))
+                       (erase-buffer))
+                     (buffer-disable-undo)
+                     (setq buffer-read-only t))))
+    (let ((stdout-buffer (get-buffer-create
+                          (format " *%s output*" (jsonrpc-name conn)))))
+      (render-log-like stdout-buffer)
+      (set-process-buffer (jsonrpc--process conn) stdout-buffer)
+      (with-current-buffer stdout-buffer
+        (set-marker (process-mark (jsonrpc--process conn)) (point-min))))
+    (when-let ((stderr-buffer
+                (get-buffer (format "*%s stderr*" (jsonrpc-name conn)))))
+      (render-log-like stderr-buffer)
+      (process-put (jsonrpc--process conn) 'jsonrpc-stderr stderr-buffer)
+      (with-current-buffer stderr-buffer
+        (rename-buffer (concat " " (buffer-name)))
+        (add-hook
+         'after-change-functions
+         (lambda (beg _end _pre-change-len)
+           "Mimeograph stderr to events."
+           (cl-loop initially (goto-char beg)
+                    do (forward-line)
+                    when (bolp)
+                    for line = (buffer-substring
+                                (line-beginning-position 0)
+                                (line-end-position 0))
+                    do (with-current-buffer (jsonrpc-events-buffer conn)
+                         (goto-char (point-max))
+                         (let ((inhibit-read-only t))
+                           (insert (format "[stderr] %s\n" line))))
+                    until (eobp)))
+         nil t)))))
 
 (defun jsonrpc--stringify-method (args)
   "Normalize :method in ARGS."
@@ -519,74 +514,51 @@ With optional CLEANUP, kill any associated buffers."
         (funcall (jsonrpc--on-shutdown connection) connection)))))
 
 (defun jsonrpc--process-filter (proc string)
-  "Called when new data STRING has arrived for PROC."
+  "Log STRING and possibly other strings piped in from PROC."
   (when (buffer-live-p (process-buffer proc))
     (with-current-buffer (process-buffer proc)
-      (let* ((inhibit-read-only t)
-             (connection (process-get proc 'jsonrpc-connection))
-             (expected-bytes (jsonrpc--expected-bytes connection)))
+      (let ((inhibit-read-only t)
+            (connection (process-get proc 'jsonrpc-connection)))
         ;; Insert the text, advancing the process marker.
-        ;;
         (save-excursion
           (goto-char (process-mark proc))
           (insert string)
           (set-marker (process-mark proc) (point)))
-        ;; Loop (more than one message might have arrived)
-        ;;
-        (unwind-protect
-            (let (done)
-              (while (not done)
-                (cond
-                 ((not expected-bytes)
-                  ;; Starting a new message
-                  ;;
-                  (setq expected-bytes
-                        (and (search-forward-regexp
-                              "\\(?:.*: .*\r\n\\)*Content-Length: \
+        (catch 'done
+          (while t
+            ;; More than one message might have arrived
+            (unless (setf (jsonrpc--expected-bytes connection)
+                          (or (jsonrpc--expected-bytes connection)
+                              (and (search-forward-regexp
+                                    "\\(?:.*: .*\r\n\\)*Content-Length: \
 *\\([[:digit:]]+\\)\r\n\\(?:.*: .*\r\n\\)*\r\n"
-                              (+ (point) 100)
-                              t)
-                             (string-to-number (match-string 1))))
-                  (unless expected-bytes
-                    (setq done :waiting-for-new-message)))
-                 (t
-                  ;; Attempt to complete a message body
-                  ;;
-                  (let ((available-bytes (- (position-bytes (process-mark proc))
-                                            (position-bytes (point)))))
-                    (cond
-                     ((>= available-bytes
-                          expected-bytes)
-                      (let* ((message-end (byte-to-position
-                                           (+ (position-bytes (point))
-                                              expected-bytes))))
-                        (unwind-protect
-                            (save-restriction
-                              (narrow-to-region (point) message-end)
-                              (let* ((json-message
-                                      (condition-case-unless-debug oops
-                                          (jsonrpc--json-read)
-                                        (error
-                                         (jsonrpc--warn "Invalid JSON: %s %s"
-                                                        (cdr oops) (buffer-string))
-                                         nil))))
-                                (when json-message
-                                  ;; Process content in another
-                                  ;; buffer, shielding proc buffer from
-                                  ;; tamper
-                                  (with-temp-buffer
-                                    (jsonrpc-connection-receive connection
-                                                                json-message)))))
-                          (goto-char message-end)
-                          (delete-region (point-min) (point))
-                          (setq expected-bytes nil))))
-                     (t
-                      ;; Message is still incomplete
-                      ;;
-                      (setq done :waiting-for-more-bytes-in-this-message))))))))
-          ;; Saved parsing state for next visit to this filter
-          ;;
-          (setf (jsonrpc--expected-bytes connection) expected-bytes))))))
+                                    (+ (point) 100) t)
+                                   (string-to-number (match-string 1)))))
+              (throw 'done t))
+
+            ;; Attempt to complete a message body
+            (let ((available-bytes (- (position-bytes (process-mark proc))
+                                      (position-bytes (point))))
+                  (message-end (byte-to-position
+                                (+ (position-bytes (point))
+                                   (jsonrpc--expected-bytes connection)))))
+              (if (< available-bytes (jsonrpc--expected-bytes connection))
+                  (throw 'done t) ; message still incomplete
+                (unwind-protect
+                    (save-restriction
+                      (narrow-to-region (point) message-end)
+                      (when-let ((json-message
+                                  (condition-case err
+                                      (jsonrpc--json-read)
+                                    (error
+                                     (jsonrpc--warn "Invalid JSON: %s %s"
+                                                    (cdr err) (buffer-string))
+                                     nil))))
+                        (with-temp-buffer ; avoid polluting current buffer
+                          (jsonrpc-connection-receive connection json-message))))
+                  (goto-char message-end)
+                  (delete-region (point-min) (point))
+                  (setf (jsonrpc--expected-bytes connection) nil))))))))))
 
 (cl-defun jsonrpc--async-request-1 (connection method params
                                     &rest args
