@@ -357,11 +357,15 @@ invisible by renaming to \" *[CONN name] stderr*\"."
       (with-current-buffer stdout-buffer
         (set-marker (process-mark (jsonrpc--process conn)) (point-min))))
     (when-let ((stderr-buffer
-                (get-buffer (format "*%s stderr*" (jsonrpc-name conn)))))
+                (get-buffer (format "*%s stderr*" (jsonrpc-name conn))))
+               (invisible-name (concat " " (buffer-name stderr-buffer))))
       (render-log-like stderr-buffer)
       (process-put (jsonrpc--process conn) 'jsonrpc-stderr stderr-buffer)
+      (when-let (detritus (get-buffer invisible-name))
+        (let (kill-buffer-query-functions)
+          (kill-buffer detritus)))
       (with-current-buffer stderr-buffer
-        (rename-buffer (concat " " (buffer-name)))
+        (rename-buffer invisible-name)
         (add-hook
          'after-change-functions
          (lambda (beg _end _pre-change-len)
