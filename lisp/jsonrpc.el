@@ -361,7 +361,7 @@ invisible by renaming to \" *[CONN name] stderr*\"."
                (invisible-name (concat " " (buffer-name stderr-buffer))))
       (render-log-like stderr-buffer)
       (process-put (jsonrpc--process conn) 'jsonrpc-stderr stderr-buffer)
-      (when-let (detritus (get-buffer invisible-name))
+      (when-let ((detritus (get-buffer invisible-name)))
         (let (kill-buffer-query-functions)
           (kill-buffer detritus)))
       (with-current-buffer stderr-buffer
