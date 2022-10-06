@@ -1546,7 +1546,6 @@ pop_down_menu (void *arg)
 #ifdef NS_IMPL_COCOA
       [[FRAME_NS_VIEW (SELECTED_FRAME ()) window] makeKeyWindow];
 #endif
-      discard_menu_items ();
     }
 }
 
@@ -1594,6 +1593,7 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
 
   if (error_name)
     {
+      unbind_to (specpdl_count, Qnil);
       discard_menu_items ();
       [dialog close];
       error ("%s", error_name);
@@ -1603,6 +1603,9 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
   popup_activated_flag = 1;
   tem = [dialog runDialogAt: p];
   unbind_to (specpdl_count, Qnil);
+
+  /* This must come *after* unuse_menu_items.  */
+  discard_menu_items ();
   return tem;
 }
 
