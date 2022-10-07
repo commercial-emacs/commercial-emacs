@@ -1320,7 +1320,7 @@ actions if ARG is 0 or negative.  See `antlr-action-visibility'.
 
 Display a message unless optional argument SILENT is non-nil."
   (interactive "p")
-  (save-buffer-state-x
+  (with-silent-modifications
     (if (> arg 0)
 	(let ((regexp (if (= arg 1) "[]}]" "}"))
 	      (diff (and antlr-action-visibility

@@ -758,7 +758,7 @@ This works by calling `font-lock-fontify-region-function'."
 (defun font-lock-unfontify-region (beg end)
   "Unfontify the text between BEG and END.
 This works by calling `font-lock-unfontify-region-function'."
-  (save-buffer-state
+  (with-silent-modifications
     (funcall font-lock-unfontify-region-function beg end)))
 
 (defvar font-lock-flush-function #'font-lock-after-change-function
@@ -895,7 +895,7 @@ Put first the functions more likely to cause a change and cheaper to compute.")
   "Fontify the text between BEG and END.
 If LOUDLY is non-nil, print status messages while fontifying.
 This function is the default `font-lock-fontify-region-function'."
-  (save-buffer-state
+  (with-silent-modifications
    ;; Use the fontification syntax table, if any.
    (with-syntax-table (or font-lock-syntax-table (syntax-table))
      ;; Extend the region to fontify so that it starts and ends at
@@ -1042,8 +1042,7 @@ no ARG is given and `font-lock-mark-block-function' is nil.
 If `font-lock-mark-block-function' non-nil and no ARG is given, it is used to
 delimit the region to fontify."
   (interactive "P")
-  (let ((inhibit-point-motion-hooks t)
-	deactivate-mark)
+  (let (deactivate-mark)
     ;; Make sure we have the right `font-lock-keywords' etc.
     (unless font-lock-mode (font-lock-ensure-keywords))
     (save-mark-and-excursion
