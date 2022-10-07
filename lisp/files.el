@@ -5251,6 +5251,11 @@ to `default-directory', and the result will also be relative."
      (t
       parent))))
 
+(defun file-name-parent-p (dir file)
+  "Return non-nil if DIR is a parent-directory of FILE."
+  (and (locate-dominating-file file (apply-partially #'file-equal-p dir))
+       t))
+
 (defcustom make-backup-file-name-function
   #'make-backup-file-name--default-function
   "A function that `make-backup-file-name' uses to create backup file names.

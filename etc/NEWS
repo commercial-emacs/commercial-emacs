@@ -3636,6 +3636,10 @@ This returns a list of all the components of a file name.
 This returns the parent directory of a file name.
 
 +++
+** New function 'file-name-parent-p'.
+This checks if a directory is an eventual parent of a file.
+
++++
 ** New macro 'with-undo-amalgamate'.
 It records a particular sequence of operations as a single undo step.
 

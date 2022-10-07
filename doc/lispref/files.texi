@@ -2454,6 +2454,11 @@ value will also be relative in that case.  If the return value is
 non-@code{nil}, it ends in a slash.
 @end defun
 
+@defun file-name-parent-p directory filename
+This function will return a non-@code{nil} value if @var{directory} is
+a parent directory of @var{filename}.
+@end defun
+
 @node File Name Expansion
 @subsection Functions that Expand Filenames
 @cindex expansion of file names
