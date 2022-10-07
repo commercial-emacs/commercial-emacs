@@ -137,7 +137,7 @@ If nil, fontification is not deferred.
 If 0, then fontification is only deferred while there is input pending."
   :type '(choice (const :tag "never" nil)
 	         (number :tag "seconds")))
-
+
 ;;; Variables that are not customizable.
 
 (defvar-local jit-lock-mode nil
@@ -175,7 +175,7 @@ If nil, contextual fontification is disabled.")
   "Last line beginning position after last command (a marker).")
 (defvar jit-lock--antiblink-string-or-comment nil
   "Non-nil if in string or comment after last command (a boolean).")
-
+
 ;;; JIT lock mode
 
 (defun jit-lock-mode (arg)
@@ -360,7 +360,6 @@ Only applies to the current buffer."
      (widen)
      (put-text-property (or beg (point-min)) (or end (point-max))
 			'fontified nil))))
-
 ;;; On demand fontification.
 
 (defun jit-lock-function (start)
@@ -407,7 +406,7 @@ Registered in `font-lock-register' when `font-lock-support-mode' is
 (defun jit-lock-fontify-now (start end)
   "One of about six levels of indirection leading up to `font-lock-fontify-region'."
   (setq end (min (point-max) end))
-  (with-buffer-prepared-for-jit-lock
+  (with-silent-modifications
    (save-excursion
      (save-match-data
        (cl-loop for istart = (text-property-any (or istart start) end 'fontified nil)
@@ -425,7 +424,6 @@ Registered in `font-lock-register' when `font-lock-support-mode' is
                        (setq jit-lock-context-unfontify-pos iend*)))
                 do (setq istart iend))))))
 
-
 ;;; Stealth fontification.
 
 (defsubst jit-lock-stealth-chunk-start (around)
@@ -520,7 +518,6 @@ non-nil in a repeated invocation of this function."
 	(timer-inc-time jit-lock-stealth-repeat-timer delay)
 	(timer-activate-when-idle jit-lock-stealth-repeat-timer t)))))
 
-
 ;;; Deferred fontification.
 
 (defun jit-lock-deferred-fontify ()

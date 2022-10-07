@@ -483,13 +483,6 @@ Major/minor modes can set this variable if they know which option applies.")
 
 ;; Font Lock mode.
 
-(defmacro save-buffer-state (&rest body)
-  "Bind variables according to VARLIST and eval BODY restoring buffer state."
-  (declare (indent 0) (debug t))
-  `(let ((inhibit-point-motion-hooks t))
-     (with-silent-modifications
-       ,@body)))
-
 (defvar-local font-lock-keywords-set nil)
 
 (defun font-lock-add-keywords (mode keywords &optional how)
@@ -945,8 +938,7 @@ This function is the default `font-lock-unfontify-region-function'."
 (defun font-lock-after-change-function (beg end &optional old-len)
   "Called when any modification is made to buffer text."
   (save-excursion
-    (let ((inhibit-point-motion-hooks t)
-          (inhibit-quit t)
+    (let ((inhibit-quit t)
           (region (when font-lock-extend-after-change-region-function
                     (funcall font-lock-extend-after-change-region-function
                              beg end old-len))))

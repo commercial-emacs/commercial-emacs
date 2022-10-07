@@ -83,14 +83,6 @@
   (require 'easymenu))
 (require 'cc-mode)
 
-;; More compile-time-macros
-(eval-when-compile
-  (defmacro save-buffer-state-x (&rest body)
-    (declare (debug t) (indent 0))
-    `(let ((inhibit-point-motion-hooks t))
-       (with-silent-modifications
-         ,@body))))
-
 (defvar outline-level)
 (defvar imenu-use-markers)
 (defvar imenu-create-index-function)
