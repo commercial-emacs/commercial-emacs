@@ -89,15 +89,16 @@ the image file to set the wallpaper to.")
                (:constructor nil)
                (:constructor
                 wallpaper-setter-create
-                ( name command args-raw
-                  &rest rest-plist
-                  &aux
-                  (args (cond ((functionp args-raw)
-                               (funcall args-raw))
-                              ((stringp args-raw)
-                               (string-split args-raw))
-                              (t args-raw)))
-                  (predicate (plist-get rest-plist :predicate))))
+                (name command args-raw
+                 &rest rest-plist
+                 &aux
+                 (args (cond ((functionp args-raw)
+                              (funcall args-raw))
+                             ((stringp args-raw)
+                              (string-split args-raw))
+                             (t args-raw)))
+                 (predicate (plist-get rest-plist :predicate))
+                 (init-action (plist-get rest-plist :init-action))))
                (:copier wallpaper-setter-copy))
   "Structure containing a method to set the wallpaper.
 

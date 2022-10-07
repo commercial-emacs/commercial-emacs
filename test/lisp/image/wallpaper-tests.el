@@ -33,11 +33,12 @@
 
 (ert-deftest wallpaper--find-setter/call-predicate ()
   (skip-unless (executable-find "touch"))
-  (let* ( wallpaper--current-setter called
-          (wallpaper--default-setters
-           (wallpaper--default-methods-create
-            ("touch" "touch" "/tmp/touched"
-             :predicate (lambda () (setq called t))))))
+  (let* (wallpaper--current-setter
+         called
+         (wallpaper--default-setters
+          (wallpaper--default-methods-create
+           ("touch" "touch" "/tmp/touched"
+            :predicate (lambda () (setq called t))))))
     (should-not called)
     (wallpaper--find-setter)
     (should called)))
@@ -56,12 +57,12 @@
   (ert-with-temp-file fil-jpg
     :suffix ".jpg"
     (ert-with-temp-file fil
-      (let* ( wallpaper--current-setter
-              (wallpaper--default-setters
-               (wallpaper--default-methods-create
-                ("touch" "touch" fil)))
-              (wallpaper-command (wallpaper--find-command))
-              (wallpaper-command-args (wallpaper--find-command-args)))
+      (let* (wallpaper--current-setter
+             (wallpaper--default-setters
+              (wallpaper--default-methods-create
+               ("touch" "touch" fil)))
+             (wallpaper-command (wallpaper--find-command))
+             (wallpaper-command-args (wallpaper--find-command-args)))
         (delete-file fil)
         (let ((process (wallpaper-set fil-jpg)))
           (while (process-live-p process)
@@ -74,13 +75,13 @@
   (ert-with-temp-file fil-jpg
     :suffix ".jpg"
     (ert-with-temp-file fil
-      (let* ( wallpaper--current-setter
-              (wallpaper--default-setters
-               (wallpaper--default-methods-create
-                ("touch" "touch" fil
-                 :detach t)))
-              (wallpaper-command (wallpaper--find-command))
-              (wallpaper-command-args (wallpaper--find-command-args)))
+      (let* (wallpaper--current-setter
+             (wallpaper--default-setters
+              (wallpaper--default-methods-create
+               ("touch" "touch" fil
+                :detach t)))
+             (wallpaper-command (wallpaper--find-command))
+             (wallpaper-command-args (wallpaper--find-command-args)))
         (delete-file fil)
         (wallpaper-set fil-jpg)
         (while (not (file-exists-p fil))
@@ -93,13 +94,15 @@
   (ert-with-temp-file fil-jpg
     :suffix ".jpg"
     (ert-with-temp-file fil
-      (let* ( wallpaper--current-setter called
-              (wallpaper--default-setters
-               (wallpaper--default-methods-create
-                ("touch" "touch" fil
-                 :init-action (lambda () (setq called t)))))
-              (wallpaper-command (wallpaper--find-command))
-              (wallpaper-command-args (wallpaper--find-command-args)))
+      (let* (wallpaper--current-setter
+             called
+             (wallpaper--default-setters
+              (wallpaper--default-methods-create
+               ("touch" "touch" fil
+                :init-action (lambda () (setq called t)))))
+             (wallpaper-command (wallpaper--find-command))
+             (wallpaper-command-args (wallpaper--find-command-args)))
+        (message "a %S\nb %S" (wallpaper-setter-init-action wallpaper--current-setter) wallpaper--current-setter)
         (should (functionp (wallpaper-setter-init-action wallpaper--current-setter)))
         (wallpaper-set fil-jpg)
         (should called)))))
@@ -108,11 +111,12 @@
   (skip-unless (executable-find "touch"))
   (ert-with-temp-file fil-jpg
     :suffix ".jpg"
-    (let* ( wallpaper--current-setter called
-            (wallpaper--default-setters
-             (wallpaper--default-methods-create
-              ("touch" "touch" "foo")))
-            (wallpaper-set-function
+    (let* (wallpaper--current-setter
+           called
+           (wallpaper--default-setters
+            (wallpaper--default-methods-create
+             ("touch" "touch" "foo")))
+           (wallpaper-set-function
              (lambda (file) (setq called file))))
       (wallpaper--find-setter)
       (wallpaper-set fil-jpg)
