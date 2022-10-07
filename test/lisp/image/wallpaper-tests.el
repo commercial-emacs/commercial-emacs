@@ -102,7 +102,6 @@
                 :init-action (lambda () (setq called t)))))
              (wallpaper-command (wallpaper--find-command))
              (wallpaper-command-args (wallpaper--find-command-args)))
-        (message "a %S\nb %S" (wallpaper-setter-init-action wallpaper--current-setter) wallpaper--current-setter)
         (should (functionp (wallpaper-setter-init-action wallpaper--current-setter)))
         (wallpaper-set fil-jpg)
         (should called)))))
