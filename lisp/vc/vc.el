@@ -1921,6 +1921,13 @@ Return t if the buffer had changes, nil otherwise."
   "History for `vc-read-revision'.")
 
 (defun vc-read-revision (prompt &optional files backend default initial-input multiple)
+  "Query the user for a revision using PROMPT.
+All subsequent arguments are optional.  FILES may specify a file
+set to restrict the revisions to.  BACKEND is a VC backend as
+listed in `vc-handled-backends'.  DEFAULT and INITIAL-INPUT are
+handled as defined by `completing-read'.  If MULTIPLE is non-nil,
+the user may be prompted for multiple revisions.  If possible
+this means that `completing-read-multiple' will be used."
   (cond
    ((null files)
     (let ((vc-fileset (vc-deduce-fileset t))) ;FIXME: why t?  --Stef
@@ -1942,6 +1949,10 @@ Return t if the buffer had changes, nil otherwise."
           answer)))))
 
 (defun vc-read-multiple-revisions (prompt &optional files backend default initial-input)
+  "Query the user for multiple revisions.
+This is equivalent to invoking `vc-read-revision' with t for
+MULTIPLE.  The arguments PROMPT, FILES, BACKEND, DEFAULT and
+INITIAL-INPUT are passed on to `vc-read-revision' directly."
   (vc-read-revision prompt files backend default initial-input t))
 
 (defun vc-diff-build-argument-list-internal (&optional fileset)
@@ -3282,10 +3293,11 @@ immediately after this one."
             (apply #'vc-user-edit-command (apply old args))))))
 
 (defcustom vc-prepare-patches-separately t
-  "Non-nil means that `vc-prepare-patch' creates a single message.
-A single message is created by attaching all patches to the body
-of a single message.  If nil, each patch will be sent out in a
-separate message, which will be prepared sequentially."
+  "Configure the default behaviour of `vc-prepare-patch'.
+If nil, a single message is created by attaching all patches to
+the body of a single message.  If non-nil, each patch will be
+sent out in a separate message, which will be prepared
+sequentially."
   :type 'boolean
   :safe #'booleanp
   :version "29.1")
