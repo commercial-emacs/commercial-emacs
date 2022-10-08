@@ -9355,8 +9355,7 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op,
 		  IT_CHARPOS (*it) = npos;
 		  IT_BYTEPOS (*it) = CHAR_TO_BYTE (npos);
 		  move_it_forward (it, npos, -1, MOVE_TO_POS, NULL);
-		  if (it->bidi_p
-		      && ! MINI_WINDOW_P (it->w))
+		  if (it->bidi_p)
 		    get_visually_first_element (it);
 		  last_height = it->max_ascent + it->max_descent;
 		  it->vpos += full_rows;
