@@ -916,11 +916,12 @@ untar into a directory named DIR; otherwise, signal an error."
   (let ((regexp (concat "\\`" (regexp-quote (expand-file-name dir)) "/"))
         (case-fold-search (file-name-case-insensitive-p dir)))
     (dolist (tar-data tar-parse-info)
-      (let ((name (expand-file-name (tar-header-name tar-data))))
+      (let* ((header-name (tar-header-name tar-data))
+             (name (expand-file-name header-name)))
         (or (string-match regexp name)
             ;; Tarballs created by some utilities don't list
             ;; directories with a trailing slash (Bug#13136).
-            (and (string-equal dir name)
+            (and (string-equal dir header-name)
                  (eq (tar-header-link-type tar-data) 5))
             (error "Package does not untar cleanly into directory %s/" dir)))))
   (tar-untar-buffer))
@@ -1182,8 +1183,10 @@ Return the pkg-desc, with desc-kind set to KIND."
   "Find package information for a tar file.
 The return result is a `package-desc'."
   (cl-assert (derived-mode-p 'tar-mode))
-  (let* ((dir-name (file-name-directory
-                    (tar-header-name (car tar-parse-info))))
+  (let* ((header-name (tar-header-name (car tar-parse-info)))
+	 (dir-name (or (file-name-directory header-name)
+                       ;; Some tar utilities generate a plain directory name first
+                       (file-name-as-directory header-name)))
          (desc-file (package--description-file dir-name))
          (tar-desc (tar-get-file-descriptor (concat dir-name desc-file))))
     (unless tar-desc
