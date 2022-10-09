@@ -2630,39 +2630,28 @@ These are functions which return proper completion data rather than
 a completion function or god knows what else.")
 
 (defun completion--capf-wrapper (fun which)
-  ;; FIXME: The safe/misbehave handling assumes that a given function will
-  ;; always return the same kind of data, but this breaks down with functions
-  ;; like comint-completion-at-point or mh-letter-completion-at-point, which
-  ;; could be sometimes safe and sometimes misbehaving (and sometimes neither).
-  (if (pcase which
-        ('all t)
-        ('safe (member fun completion--capf-safe-funs))
-        ('optimist (not (member fun completion--capf-misbehave-funs))))
-      (let ((res (funcall fun)))
-        (cond
-         ((and (consp res) (not (functionp res)))
-          (unless (member fun completion--capf-safe-funs)
-            (push fun completion--capf-safe-funs))
-          (and (eq 'no (plist-get (nthcdr 3 res) :exclusive))
-               ;; FIXME: Here we'd need to decide whether there are
-               ;; valid completions against the current text.  But this depends
-               ;; on the actual completion UI (e.g. with the default completion
-               ;; it depends on completion-style) ;-(
-               ;; We approximate this result by checking whether prefix
-               ;; completion might work, which means that non-prefix completion
-               ;; will not work (or not right) for completion functions that
-               ;; are non-exclusive.
-               (null (try-completion (buffer-substring-no-properties
-                                      (car res) (point))
-                                     (nth 2 res)
-                                     (plist-get (nthcdr 3 res) :predicate)))
-               (setq res nil)))
-         ((not (or (listp res) (functionp res)))
-          (unless (member fun completion--capf-misbehave-funs)
-            (message
-             "Completion function %S uses a deprecated calling convention" fun)
-            (push fun completion--capf-misbehave-funs))))
-        (if res (cons fun res)))))
+  (when (pcase which
+          ('all t)
+          ('safe (member fun completion--capf-safe-funs))
+          ('optimist (not (member fun completion--capf-misbehave-funs))))
+    (let* ((res (funcall fun))
+           ;; Heuristic that only 0ff8e1b cares about.
+           ;; A non-exclusive context that fails a smoke test, i.e.,
+           ;; a non-prefix completion, is known to be undecidable.
+           (non-prefix (and (not (functionp res))
+                            (consp res)
+                            (eq 'no (plist-get (nthcdr 3 res) :exclusive))
+                            (not (try-completion (buffer-substring-no-properties
+                                                  (car res) (point))
+                                                 (nth 2 res)
+                                                 (plist-get (nthcdr 3 res) :predicate))))))
+      (unless (functionp res)
+        (add-to-list (if (consp res)
+                         'completion--capf-safe-funs
+                       'completion--capf-misbehave-funs)
+                     fun))
+      (when (and res (not non-prefix))
+        (cons fun res)))))
 
 (defun completion-at-point ()
   "Perform completion on the text around point.
