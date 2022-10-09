@@ -520,9 +520,8 @@ which means that we return a set object that can be queried with
     xsignal1 (Qerror, build_string ("VALUES must be a list or a vector"));
 
   sqlite3 *sdb = XSQLITE (db)->db;
-  Lisp_Object retval = Qnil;
-  const char *errmsg = NULL;
-  Lisp_Object encoded = encode_string (query);
+  Lisp_Object retval = Qnil, errmsg = Qnil,
+    encoded = encode_string (query);
 
   sqlite3_stmt *stmt = NULL;
   int ret = sqlite3_prepare_v2 (sdb, SSDATA (encoded), SBYTES (encoded),
@@ -531,7 +530,12 @@ which means that we return a set object that can be queried with
     {
       if (stmt)
 	sqlite3_finalize (stmt);
-      errmsg = sqlite3_errstr (ret);
+      errmsg = build_string (sqlite3_errstr (ret));
+      /* More details about what went wrong.  */
+      const char *sql_error = sqlite3_errmsg (sdb);
+      if (sql_error)
+	errmsg = CALLN (Fformat, build_string ("%s (%s)"),
+			errmsg, build_string (sql_error));
       goto exit;
     }
 
@@ -542,7 +546,7 @@ which means that we return a set object that can be queried with
       if (err != NULL)
 	{
 	  sqlite3_finalize (stmt);
-	  errmsg = err;
+	  errmsg = build_string (err);
 	  goto exit;
 	}
     }
@@ -556,7 +560,7 @@ which means that we return a set object that can be queried with
 
   /* Return the data directly.  */
   Lisp_Object data = Qnil;
-  while ((ret = sqlite3_step (stmt)) == SQLITE_ROW)
+  while (sqlite3_step (stmt) == SQLITE_ROW)
     data = Fcons (row_to_value (stmt), data);
 
   if (EQ (return_type, Qfull))
@@ -566,8 +570,8 @@ which means that we return a set object that can be queried with
   sqlite3_finalize (stmt);
 
  exit:
-  if (errmsg != NULL)
-    xsignal1 (Qerror, build_string (errmsg));
+  if (! NILP (errmsg))
+    xsignal1 (Qerror, errmsg);
 
   return retval;
 }
