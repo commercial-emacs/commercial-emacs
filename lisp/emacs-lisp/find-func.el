@@ -258,7 +258,7 @@ ending in .el."
           (signal 'file-error (list "Can't find library" library)))))
     (when find-function-prefer-source-directory
       (when-let ((prefix (file-name-as-directory installed-directory))
-                 ;; :end2 says PREFIX matches beginning of FILE
+                 ;; :end2 says PREFIX matches beginning of RESULT
                  (installed-p (cl-search prefix result
                                          :end2 (length prefix)))
                  (el-or-unsuffixed
