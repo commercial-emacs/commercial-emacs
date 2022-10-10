@@ -1048,7 +1048,7 @@ namespace but with lower confidence."
         ;; aliased function
         (let* ((alias-symbol symbol)
                (alias-file (symbol-file alias-symbol))
-               (real-symbol  (symbol-function symbol))
+               (real-symbol (symbol-function symbol))
                (real-file (find-lisp-object-file-name real-symbol 'defun)))
 
           (when real-file

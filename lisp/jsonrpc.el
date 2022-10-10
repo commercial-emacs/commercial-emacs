@@ -302,10 +302,6 @@ dropped."
 (defconst jsonrpc-default-request-timeout 10
   "Time in seconds before timing out a JSONRPC request.")
 
-
-;;; Specific to `jsonrpc-process-connection'
-;;;
-
 (defclass jsonrpc-process-connection (jsonrpc-connection)
   ((-process
     :initarg :process :accessor jsonrpc--process
