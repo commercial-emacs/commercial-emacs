@@ -6831,6 +6831,8 @@ shortened server name instead."
 
 (defvar tabbar--local-hlf)
 
+;; FIXME when 29.1 is cut and `format-spec' is added to ELPA Compat,
+;; remove the function invocations from the spec form below.
 (defun erc-update-mode-line-buffer (buffer)
   "Update the mode line in a single ERC buffer BUFFER."
   (with-current-buffer buffer
@@ -7195,7 +7197,7 @@ See also `format-spec'."
       (error "No format spec for message %s" msg))
     (when (functionp entry)
       (setq entry (apply entry args)))
-    (format-spec entry (apply #'format-spec-make args))))
+    (format-spec entry (apply #'format-spec-make args) 'ignore)))
 
 ;;; Various hook functions
 
