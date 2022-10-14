@@ -3315,7 +3315,7 @@ If nil, no default will be used.  This option may be set locally."
                   (buffer &optional type description disposition))
 (declare-function log-view-get-marked "log-view" ())
 
-(defun vc-default-prepare-patch (rev)
+(defun vc-default-prepare-patch (_backend rev)
   (let ((backend (vc-backend buffer-file-name)))
     (with-current-buffer (generate-new-buffer " *vc-default-prepare-patch*")
       (vc-diff-internal
@@ -3341,8 +3341,12 @@ invidividual commits.
 When invoked interactively in a Log View buffer with marked
 revisions, those revisions will be used."
   (interactive
-   (let ((revs (or (log-view-get-marked)
-                   (vc-read-multiple-revisions "Revisions: ")))
+   (let ((revs (vc-read-multiple-revisions
+                "Revisions: " nil nil nil
+                (or (and-let* ((revs (log-view-get-marked)))
+                      (mapconcat #'identity revs ","))
+                    (and-let* ((file (buffer-file-name)))
+                      (vc-working-revision file)))))
          to)
      (require 'message)
      (while (null (setq to (completing-read-multiple
@@ -3366,7 +3370,8 @@ revisions, those revisions will be used."
                               'prepare-patch rev))
                            revisions)))
       (if vc-prepare-patches-separately
-          (dolist (patch patches)
+          (dolist (patch (reverse patches)
+                         (message "Prepared %d patches..." (length patches)))
             (compose-mail addressee
                           (plist-get patch :subject)
                           nil nil nil nil
@@ -3377,8 +3382,7 @@ revisions, those revisions will be used."
               (insert-buffer-substring
                (plist-get patch :buffer)
                (plist-get patch :body-start)
-               (plist-get patch :body-end)))
-            (recursive-edit))
+               (plist-get patch :body-end))))
         (compose-mail addressee subject nil nil nil nil
                       (mapcar
                        (lambda (p)
