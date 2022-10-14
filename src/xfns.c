@@ -1674,7 +1674,7 @@ x_set_menu_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval)
     }
 #else /* not USE_X_TOOLKIT && not USE_GTK */
   FRAME_MENU_BAR_LINES (f) = nlines;
-  FRAME_MENU_BAR_HEIGHT (f) = nlines * FRAME_LINE_HEIGHT (f);
+  FRAME_MENU_BAR_HEIGHT (f) = nlines * x_menu_bar_height (f);
   if (FRAME_X_WINDOW (f))
     x_clear_under_internal_border (f);
 

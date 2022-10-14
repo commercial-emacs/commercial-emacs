@@ -1595,6 +1595,7 @@ extern void x_uncatch_errors_after_check (void);
 extern void x_ignore_errors_for_next_request (struct x_display_info *);
 extern void x_stop_ignoring_errors (struct x_display_info *);
 extern void x_clear_errors (Display *);
+extern int x_menu_bar_height (struct frame *);
 extern void x_set_window_size (struct frame *, bool, int, int);
 extern void x_set_last_user_time_from_lisp (struct x_display_info *, Time);
 extern void x_make_frame_visible (struct frame *);

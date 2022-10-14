@@ -25351,6 +25351,29 @@ x_io_error_quitter (Display *display)
 
 /* Changing the font of the frame.  */
 
+int
+x_menu_bar_height (struct frame *f)
+{
+  int font_ascent = 0;
+  int font_descent = 0;
+  int height = 0;
+
+  recompute_basic_faces (f);
+  if (FRAME_FACE_CACHE (f))
+    {
+      struct face *face = FACE_FROM_ID_OR_NULL (f, MENU_FACE_ID);
+      if (face && face->font)
+	{
+	  height += (face->box_horizontal_line_width > 0)
+	    ? (face->box_horizontal_line_width * 2)
+	    : 0;
+	  get_font_ascent_descent (face->font, &font_ascent, &font_descent);
+	}
+    }
+
+  return (height + font_ascent + font_descent);
+}
+
 /* Give frame F the font FONT-OBJECT as its default font.  The return
    value is FONT-OBJECT.  FONTSET is an ID of the fontset for the
    frame.  If it is negative, generate a new fontset from
@@ -25377,7 +25400,7 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
   FRAME_LINE_HEIGHT (f) = font_ascent + font_descent;
 
 #ifndef USE_X_TOOLKIT
-  FRAME_MENU_BAR_HEIGHT (f) = FRAME_MENU_BAR_LINES (f) * FRAME_LINE_HEIGHT (f);
+  FRAME_MENU_BAR_HEIGHT (f) = FRAME_MENU_BAR_LINES (f) * x_menu_bar_height (f);
 #endif
   /* We could use a more elaborate calculation here.  */
   FRAME_TAB_BAR_HEIGHT (f) = FRAME_TAB_BAR_LINES (f) * FRAME_LINE_HEIGHT (f);
