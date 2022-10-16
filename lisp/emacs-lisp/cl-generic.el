@@ -647,7 +647,9 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
                                      (cl--generic-name generic)
                                      qualifiers specializers))
                   current-load-list :test #'equal)
-      (let (;; Prevent `defalias' from recording this as the definition site of
+      (let ((old-adv-cc (get-advertised-calling-convention
+                         (symbol-function sym)))
+            ;; Prevent `defalias' from recording this as the definition site of
             ;; the generic function.
             current-load-list
             ;; BEWARE!  Don't purify this function definition, since that leads
