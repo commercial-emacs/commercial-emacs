@@ -4435,6 +4435,23 @@ import abc
      (insert "abc.")
      (should (completion-at-point)))))
 
+(ert-deftest python-shell-completion-pdb-1 ()
+  "Should not complete PDB commands in Python buffer."
+  (skip-unless (executable-find python-tests-shell-interpreter))
+  (python-tests-with-temp-buffer-with-shell
+   "
+import pdb
+
+pdb.set_trace()
+print('Hello')
+"
+   (let ((inhibit-message t))
+     (python-shell-send-buffer)
+     (python-tests-shell-wait-for-prompt)
+     (goto-char (point-max))
+     (insert "u")
+     (should-not (nth 2 (python-completion-at-point))))))
+
 (ert-deftest python-shell-completion-native-1 ()
   (skip-unless (executable-find python-tests-shell-interpreter))
   (python-tests-with-temp-buffer-with-shell
@@ -4499,6 +4516,33 @@ import abc
      ;; This is called by idle-timer when ElDoc is enabled.
      (python-eldoc-function)
      (should (completion-at-point)))))
+
+(ert-deftest python-shell-completion-shell-buffer-1 ()
+  (skip-unless (executable-find python-tests-shell-interpreter))
+  (python-tests-with-temp-buffer-with-shell
+   ""
+   (python-shell-with-shell-buffer
+     (insert "import abc")
+     (comint-send-input)
+     (python-tests-shell-wait-for-prompt)
+     (insert "abc.")
+     (should (nth 2 (python-shell-completion-at-point)))
+     (end-of-line 0)
+     (should-not (nth 2 (python-shell-completion-at-point))))))
+
+(ert-deftest python-shell-completion-shell-buffer-native-1 ()
+  (skip-unless (executable-find python-tests-shell-interpreter))
+  (python-tests-with-temp-buffer-with-shell
+   ""
+   (python-shell-completion-native-turn-on)
+   (python-shell-with-shell-buffer
+     (insert "import abc")
+     (comint-send-input)
+     (python-tests-shell-wait-for-prompt)
+     (insert "abc.")
+     (should (nth 2 (python-shell-completion-at-point)))
+     (end-of-line 0)
+     (should-not (nth 2 (python-shell-completion-at-point))))))
 
 
 

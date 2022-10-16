@@ -3371,12 +3371,12 @@ revisions, those revisions will be used."
                            revisions)))
       (if vc-prepare-patches-separately
           (dolist (patch (reverse patches)
-                         (message "Prepared %d patches..." (length patches)))
+                         (message "Prepared %d patch%s..." (length patches)
+                                  (if (length> patches 1) "es" "")))
             (compose-mail addressee
                           (plist-get patch :subject)
                           nil nil nil nil
-                          `((kill-buffer ,(plist-get patch :buffer))
-                            (exit-recursive-edit)))
+                          `((kill-buffer ,(plist-get patch :buffer))))
             (rfc822-goto-eoh) (forward-line)
             (save-excursion             ;don't jump to the end
               (insert-buffer-substring
