@@ -25,6 +25,8 @@
 (require 'ert-x)
 (require 'comp)
 
+(defvar native-comp-eln-load-path)
+(defvar comp-native-version-dir)
 (defmacro with-test-native-compile-prune-cache (&rest body)
   `(ert-with-temp-directory testdir
      (setq testdir (expand-file-name "eln-cache" testdir))
