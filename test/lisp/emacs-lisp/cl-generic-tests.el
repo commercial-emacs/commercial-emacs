@@ -306,15 +306,15 @@ Edebug symbols (Bug#42672)."
   (should (equal (get-advertised-calling-convention
                   (indirect-function 'cl-generic-tests--acc))
                  '(x)))
+
   (should
    (condition-case err
        (let ((lexical-binding t)
-             (byte-compile-debug t)
              (byte-compile-error-on-warn t))
-         (byte-compile '(cl-defmethod cl-generic-tests--acc ((x list))
-                          (declare (advertised-calling-convention (y) "1.1"))
-                          (cons x '(5 5 5 5 5))))
-         nil)
+         (prog1 nil
+           (byte-compile '(cl-defmethod cl-generic-tests--acc ((x list))
+                            (declare (advertised-calling-convention (y) "1.1"))
+                            (cons x '(5 5 5 5 5))))))
      (error
       (and (eq 'error (car err))
            (string-match "Stray.*declare" (cadr err)))))))

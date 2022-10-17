@@ -656,6 +656,8 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
             ;; to memory corruption if the hash-tables it holds are modified
             ;; (the GC doesn't trace those pointers).
             loadup-pure-table)
+        (when (listp old-adv-cc)
+          (set-advertised-calling-convention gfun old-adv-cc nil))
         ;; But do use `defalias', so that it interacts properly with nadvice,
         ;; e.g. for tracing/debug-on-entry.
         (defalias sym gfun)))))
