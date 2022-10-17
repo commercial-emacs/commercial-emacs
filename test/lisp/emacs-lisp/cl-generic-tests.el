@@ -306,15 +306,13 @@ Edebug symbols (Bug#42672)."
   (should (equal (get-advertised-calling-convention
                   (indirect-function 'cl-generic-tests--acc))
                  '(x)))
-
   (should-error
    (let ((lexical-binding t)
          (byte-compile-error-on-warn t)
          (debug-on-error nil))
-     (prog1 nil
-       (byte-compile '(cl-defmethod cl-generic-tests--acc ((x list))
-                        (declare (advertised-calling-convention (y) "1.1"))
-                        (cons x '(5 5 5 5 5)))))))
+     (byte-compile '(cl-defmethod cl-generic-tests--acc ((x list))
+                      (declare (advertised-calling-convention (y) "1.1"))
+                      (cons x '(5 5 5 5 5))))))
   (with-current-buffer byte-compile-log-buffer
     (save-excursion
       (goto-char (point-min))
