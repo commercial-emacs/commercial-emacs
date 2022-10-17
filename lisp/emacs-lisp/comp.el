@@ -4318,13 +4318,15 @@ of (commands) to run simultaneously."
     ;; `invocation-directory'.
     (setq dir (expand-file-name dir invocation-directory))
     (when (file-exists-p dir)
-      (dolist (subdir (directory-files dir t))
+      (dolist (subdir (seq-filter
+                       (lambda (f) (not (string-match (rx "/." (? ".") eos) f)))
+                       (directory-files dir t)))
         (when (and (file-directory-p subdir)
                    (file-writable-p subdir)
                    (not (equal (file-name-nondirectory
                                 (directory-file-name subdir))
                                comp-native-version-dir)))
-          (message "Deleting %s..." subdir)
+          (message "Deleting `%s'..." subdir)
           ;; We're being overly cautious here -- there shouldn't be
           ;; anything but .eln files in these directories.
           (dolist (eln (directory-files subdir t "\\.eln\\(\\.tmp\\)?\\'"))
