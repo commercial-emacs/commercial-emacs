@@ -31,6 +31,16 @@
 
 (require 'cl-lib)
 
+(ert-deftest message-unique-id-test ()
+  (should (stringp (message-unique-id)))
+  (should (= (length (message-unique-id)) 26))
+  (should (string-match (rx ".gnu" eos) (message-unique-id))))
+
+(ert-deftest message--number-base62-test ()
+  (should (equal (message--number-base62 10 -1) "K"))
+  (should (equal (message--number-base62 1 2) "AB"))
+  (should (equal (message--number-base62 (expt 62 5) -1) "BAAAAA")))
+
 (ert-deftest message-mode-propertize ()
   (with-temp-buffer
     (unwind-protect
