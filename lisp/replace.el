@@ -1706,7 +1706,9 @@ which means to discard all text properties."
          (regexp (read-regexp (if perform-collect
                                   "Collect strings matching regexp"
                                 "List lines matching regexp")
-                              'regexp-history-last)))
+                              (or (when-let ((thing (thing-at-point 'symbol t)))
+                                    (regexp-quote thing))
+                                  'regexp-history-last))))
     (list regexp
 	  (if perform-collect
 	      ;; Perform collect operation
