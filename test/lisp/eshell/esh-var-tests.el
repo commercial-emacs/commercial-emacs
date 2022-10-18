@@ -506,7 +506,7 @@ inside double-quotes"
    (push `("ALIAS" ,(lambda () "value") nil t) eshell-variable-aliases-list)
    (eshell-match-command-output "echo $ALIAS" "value\n")
    (eshell-match-command-output "set ALIAS hello"
-                                "Variable `ALIAS' is not settable\n"
+                                "Variable .ALIAS. is not settable\n"
                                 nil t)))
 
 (ert-deftest esh-var-test/alias/function-pair ()
@@ -567,7 +567,7 @@ it, since the setter is nil."
      (push '("ALIAS" (eshell-test-value . nil)) eshell-variable-aliases-list)
      (eshell-match-command-output "echo $ALIAS" "value\n")
      (eshell-match-command-output "set ALIAS hello"
-                                "Variable `ALIAS' is not settable\n"
+                                "Variable .ALIAS. is not settable\n"
                                 nil t))))
 
 (ert-deftest esh-var-test/alias/export ()
