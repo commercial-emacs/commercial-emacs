@@ -687,6 +687,9 @@ Useful to hook into pass checkers.")
   'native-compiler-error)
 
 
+(defvar comp-no-spawn nil
+  "Non-nil don't spawn native compilation processes.")
+
 ;; Moved early to avoid circularity when comp.el is loaded and
 ;; `macroexpand' needs to be advised (bug#47049).
 ;;;###autoload
@@ -696,12 +699,9 @@ Useful to hook into pass checkers.")
               (memq subr-name native-comp-never-optimize-functions)
               (gethash subr-name comp-installed-trampolines-h))
     (cl-assert (subr-primitive-p (symbol-function subr-name)))
-    (comp--install-trampoline
-     subr-name
-     (or (comp-trampoline-search subr-name)
-         (comp-trampoline-compile subr-name)
-         ;; Should never happen.
-         (cl-assert nil)))))
+    (when-let ((trampoline (or (comp-trampoline-search subr-name)
+                               (comp-trampoline-compile subr-name))))
+        (comp--install-trampoline subr-name trampoline))))
 
 
 (cl-defstruct (comp-vec (:copier nil))
@@ -3689,7 +3689,8 @@ Prepare every function for final compilation and drive the C back-end."
              (print-circle t)
              (print-escape-multibyte t)
              (expr `((require 'comp)
-                     (setf native-comp-verbose ,native-comp-verbose
+                     (setf comp-no-spawn t
+                           native-comp-verbose ,native-comp-verbose
                            comp-libgccjit-reproducer ,comp-libgccjit-reproducer
                            comp-ctxt ,comp-ctxt
                            native-comp-eln-load-path ',native-comp-eln-load-path
@@ -3945,8 +3946,9 @@ display a message."
                     (file-newer-than-file-p
                      source-file (comp-el-to-eln-filename source-file))))
          do (let* ((expr `((require 'comp)
-                           (setq comp-async-compilation t)
-                           (setq warning-fill-column most-positive-fixnum)
+                           (setq comp-async-compilation t
+                                 comp-no-spawn t
+                                 warning-fill-column most-positive-fixnum)
                            ,(let ((set (list 'setq)))
                               (dolist (var '(comp-file-preloaded-p
                                              native-compile-target-directory
@@ -4224,14 +4226,13 @@ Search happens in `native-comp-eln-load-path'."
 (defun native-compile (function-or-file &optional output)
   "Compile FUNCTION-OR-FILE into native code.
 This is the synchronous entry-point for the Emacs Lisp native
-compiler.
-FUNCTION-OR-FILE is a function symbol, a form, or the filename of
-an Emacs Lisp source file.
-If OUTPUT is non-nil, use it as the filename for the compiled
-object.
-If FUNCTION-OR-FILE is a filename, return the filename of the
-compiled object.  If FUNCTION-OR-FILE is a function symbol or a
-form, return the compiled function."
+compiler.  FUNCTION-OR-FILE is a function symbol, a form, or the
+filename of an Emacs Lisp source file.  If OUTPUT is non-nil, use
+it as the filename for the compiled object.  If FUNCTION-OR-FILE
+is a filename, if the compilation was successful return the
+filename of the compiled object.  If FUNCTION-OR-FILE is a
+function symbol or a form, if the compilation was successful
+return the compiled function."
   (comp--native-compile function-or-file nil output))
 
 ;;;###autoload
