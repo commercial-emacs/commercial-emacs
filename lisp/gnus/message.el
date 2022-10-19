@@ -3919,6 +3919,12 @@ Numeric argument means justify as well."
   (save-excursion
     (goto-char (point-min))
     (search-forward (concat "\n" mail-header-separator "\n") nil t)
+    ;; Skip debbugs control commands.
+    (when (and (boundp 'debbugs-gnu-control-message-keywords)
+               (boundp 'debbugs-gnu-control-message-end-regexp))
+     (while (looking-at (rx (or (regexp debbugs-gnu-control-message-commands-regexp)
+                                (regexp debbugs-gnu-control-message-end-regexp))))
+       (forward-line 1)))
     (let ((fill-prefix message-yank-prefix))
       (fill-individual-paragraphs (point) (point-max) justifyp))))
 
