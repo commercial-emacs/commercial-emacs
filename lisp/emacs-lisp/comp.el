@@ -3928,6 +3928,7 @@ processes from `comp-async-compilations'"
   "Start compiling files from `comp-files-queue' asynchronously.
 When compilation is finished, run `native-comp-async-all-done-hook' and
 display a message."
+  (cl-assert (null comp-no-spawn))
   (if (or comp-files-queue
           (> (comp-async-runnings) 0))
       (unless (>= (comp-async-runnings) (comp-effective-async-max-jobs))
