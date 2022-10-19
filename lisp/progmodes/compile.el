@@ -762,10 +762,10 @@ you may also want to change `compilation-page-delimiter'.")
       (1 font-lock-function-name-face) (3 compilation-line-face nil t))
      (" --?o\\(?:utfile\\|utput\\)?[= ]\\(\\S +\\)" . 1)
      ("^Compilation \\(finished\\).*"
-      (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t)
+      (0 '(face nil compilation-message nil compilation-help-echo nil compilation-mouse-face nil) t)
       (1 compilation-info-face))
      ("^Compilation \\(exited abnormally\\|interrupt\\|killed\\|terminated\\|segmentation fault\\)\\(?:.*with code \\([0-9]+\\)\\)?.*"
-      (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t)
+      (0 '(face nil compilation-message nil compilation-help-echo nil compilation-mouse-face nil) t)
       (1 compilation-error-face)
       (2 compilation-error-face nil t)))
    "Additional things to highlight in Compilation mode.
@@ -1185,9 +1185,9 @@ POS and RES.")
   (let ((dir (compilation--previous-directory (match-beginning 0))))
     (setq dir (if dir (or (get-text-property (1- dir) 'compilation-directory)
 			  (get-text-property dir 'compilation-directory))))
-    `(font-lock-face ,(if leave
-                          compilation-leave-directory-face
-                        compilation-enter-directory-face)
+    `(compilation-face ,(if leave
+                            compilation-leave-directory-face
+                          compilation-enter-directory-face)
       compilation-directory ,(if leave
                                  (or (cdr dir)
                                      '(nil)) ; nil only isn't a property-change
@@ -1195,9 +1195,9 @@ POS and RES.")
       ;; Place a `compilation-message' everywhere we change text-properties
       ;; so compilation--remove-properties can know what to remove.
       compilation-message ,(compilation--make-message nil 0 nil nil)
-      mouse-face highlight
-      keymap compilation-button-map
-      help-echo "mouse-2: visit destination directory")))
+      compilation-mouse-face highlight
+      compilation-keymap compilation-button-map
+      compilation-help-echo "mouse-2: visit destination directory")))
 
 ;; Data type `reverse-ordered-alist' retriever.  This function retrieves the
 ;; KEY element from the ALIST, creating it in the right position if not already
@@ -1467,15 +1467,15 @@ RULE is the name (symbol) of the rule used or nil if anonymous.
                                               end-marker))))
 
     ;; Must start with face
-    `(font-lock-face ,compilation-message-face
+    `(compilation-face ,compilation-message-face
       compilation-message ,(compilation--make-message loc type end-loc rule)
-      help-echo ,(if col
-                     "mouse-2: visit this file, line and column"
-                   (if line
-                       "mouse-2: visit this file and line"
-                     "mouse-2: visit this file"))
-      keymap compilation-button-map
-      mouse-face highlight)))
+      compilation-help-echo ,(if col
+                                 "mouse-2: visit this file, line and column"
+                               (if line
+                                   "mouse-2: visit this file and line"
+                                 "mouse-2: visit this file"))
+      compilation-keymap compilation-button-map
+      compilation-mouse-face highlight)))
 
 (defun compilation--put-prop (matchnum prop val)
   (when (and (integerp matchnum) (match-beginning matchnum))
@@ -1485,30 +1485,11 @@ RULE is the name (symbol) of the rule used or nil if anonymous.
 
 (defun compilation--remove-properties (&optional start end)
   (with-silent-modifications
-    ;; When compile.el used font-lock directly, we could just remove all
-    ;; our text-properties in one go, but now that we manually place
-    ;; font-lock-face, we have to be careful to only remove the font-lock-face
-    ;; we placed.
-    ;; (remove-list-of-text-properties
-    ;;  (or start (point-min)) (or end (point-max))
-    ;;  '(compilation-debug compilation-directory compilation-message
-    ;;    font-lock-face help-echo mouse-face))
-    (let (next)
-      (unless start (setq start (point-min)))
-      (unless end (setq end (point-max)))
-      (compilation--flush-directory-cache start end)
-      (while
-          (progn
-            (setq next (or (next-single-property-change
-                            start 'compilation-message nil end)
-                           end))
-            (when (get-text-property start 'compilation-message)
-              (remove-list-of-text-properties
-               start next
-               '(compilation-debug compilation-directory compilation-message
-                 font-lock-face help-echo mouse-face)))
-            (< next end))
-        (setq start next)))))
+    (remove-list-of-text-properties
+     (or start (point-min)) (or end (point-max))
+     '( compilation-debug compilation-directory compilation-message
+        compilation-face compilation-help-echo compilation-keymap
+        compilation-mouse-face))))
 
 (defun compilation--parse-region (start end)
   (goto-char end)
@@ -1609,21 +1590,21 @@ to `compilation-error-regexp-alist' if RULES is nil."
                 (compilation--note-type this-type)
 
                 (compilation--put-prop
-                 file 'font-lock-face
+                 file 'compilation-face
                  (symbol-value (aref [compilation-info-face
                                       compilation-warning-face
                                       compilation-error-face]
                                      this-type)))))
 
             (compilation--put-prop
-             line 'font-lock-face compilation-line-face)
+             line 'compilation-face compilation-line-face)
             (compilation--put-prop
-             end-line 'font-lock-face compilation-line-face)
+             end-line 'compilation-face compilation-line-face)
 
             (compilation--put-prop
-             col 'font-lock-face compilation-column-face)
+             col 'compilation-face compilation-column-face)
             (compilation--put-prop
-             end-col 'font-lock-face compilation-column-face)
+             end-col 'compilation-face compilation-column-face)
 
             ;; Obey HIGHLIGHT.
             (dolist (extra-item (nthcdr 6 item))
@@ -1635,12 +1616,12 @@ to `compilation-error-regexp-alist' if RULES is nil."
                      ((or (symbolp face) (stringp face))
                       (put-text-property
                        (match-beginning mn) (match-end mn)
-                       'font-lock-face face))
+                       'compilation-face face))
 		     ((and (listp face)
 			   (eq (car face) 'face)
 			   (or (symbolp (cadr face))
 			       (stringp (cadr face))))
-                      (compilation--put-prop mn 'font-lock-face (cadr face))
+                      (compilation--put-prop mn 'compilation-face (cadr face))
                       (add-text-properties
                        (match-beginning mn) (match-end mn)
                        (nthcdr 2 face)))
@@ -1657,7 +1638,7 @@ to `compilation-error-regexp-alist' if RULES is nil."
                (cddr props))
               (font-lock-append-text-property
                (match-beginning mn) (match-end mn)
-               'font-lock-face (cadr props)))))))))
+               'compilation-face (cadr props)))))))))
 
 (defvar-local compilation--parsed -1)
 
@@ -2382,6 +2363,13 @@ Optional argument MINOR indicates this is called from
   (add-hook 'before-change-functions #'compilation--flush-parse nil t)
   ;; Also for minor mode, since it's not permanent-local.
   (add-hook 'change-major-mode-hook #'compilation--remove-properties nil t)
+
+  (let ((alist (copy-alist char-property-alias-alist)))
+    (cl-pushnew 'compilation-face (alist-get 'face alist))
+    (cl-pushnew 'compilation-mouse-face (alist-get 'mouse-face alist))
+    (cl-pushnew 'compilation-help-echo (alist-get 'help-echo alist))
+    (cl-pushnew 'compilation-keymap (alist-get 'keymap alist))
+    (setq-local char-property-alias-alist alist))
   (if minor
       (progn
 	(font-lock-add-keywords nil (compilation-mode-font-lock-keywords))
@@ -2391,6 +2379,12 @@ Optional argument MINOR indicates this is called from
 (defun compilation--unsetup ()
   ;; Only for minor mode.
   (font-lock-remove-keywords nil (compilation-mode-font-lock-keywords))
+  (let ((alist (copy-alist char-property-alias-alist)))
+    (when-let ((as (assq 'face alist))) (delq 'compilation-face as))
+    (when-let ((as (assq 'mouse-face alist))) (delq 'compilation-mose-face as))
+    (when-let ((as (assq 'help-echo alist))) (delq 'compilation-help-echo as))
+    (when-let ((as (assq 'keymap alist))) (delq 'compilation-keymap as))
+    (setq-local char-property-alias-alist alist))
   (remove-hook 'before-change-functions #'compilation--flush-parse t)
   (kill-local-variable 'compilation--parsed)
   (compilation--remove-properties)
