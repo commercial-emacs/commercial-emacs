@@ -96,6 +96,7 @@
     (ert-with-temp-file fil
       (let* (wallpaper--current-setter
              called
+             process
              (wallpaper--default-setters
               (wallpaper--default-methods-create
                ("touch" "touch" fil
