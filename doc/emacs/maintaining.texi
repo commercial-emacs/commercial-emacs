@@ -4,6 +4,8 @@
 @c See file emacs.texi for copying conditions.
 @node Maintaining
 @chapter Maintaining Large Programs
+@cindex maintaining large programs
+@cindex large programming projects, maintaining
 
   This chapter describes Emacs features for maintaining medium- to
 large-size programs and packages.  These features include:
@@ -2093,6 +2095,13 @@ Emacs Lisp mode uses these facilities in its backend to allow finding
 definitions of symbols.  (One disadvantage of this kind of backend is
 that it only knows about subunits that were loaded into the
 interpreter.)
+
+@item
+If Eglot is activated for the current buffer's project
+(@pxref{Projects}) and the current buffer's major mode, Eglot consults
+an external language server program and provides the data supplied by
+the server regarding the definitions of the identifiers in the
+project.  @xref{Eglot Features,,, eglot, Eglot: The Emacs LSP Client}.
 
 @item
 An external program can extract references by scanning the relevant
