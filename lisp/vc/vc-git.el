@@ -374,31 +374,22 @@ in the order given by `git status'."
 (defun vc-git-working-revision (_file)
   "Git-specific version of `vc-working-revision'."
   (let* ((process-file-side-effects nil)
-         (commit (vc-git--rev-parse "HEAD" t)))
-    (or (vc-git-symbolic-commit commit) commit)))
-
-(defun vc-git--symbolic-ref (file)
-  (or
-   (vc-file-getprop file 'vc-git-symbolic-ref)
-   (let* (process-file-side-effects
-          (str (vc-git--run-command-string nil "symbolic-ref" "HEAD")))
-     (vc-file-setprop file 'vc-git-symbolic-ref
-                      (if str
-                          (if (string-match "^\\(refs/heads/\\)?\\(.+\\)$" str)
-                              (match-string 2 str)
-                            str))))))
+         (commit (vc-git--rev-parse "HEAD" t))
+         (name (vc-git-symbolic-commit commit)))
+    (or (prog1 name
+          (add-text-properties 0 (length name) `(commit ,commit) name))
+        commit)))
 
 (defun vc-git-mode-line-string (file)
   "Return a string for `vc-mode-line' to put in the mode line for FILE."
   (let* ((rev (vc-working-revision file 'Git))
-         (disp-rev (or (vc-git--symbolic-ref file)
-                       (and rev (substring rev 0 7))))
          (def-ml (vc-default-mode-line-string 'Git file))
          (help-echo (get-text-property 0 'help-echo def-ml))
          (face   (get-text-property 0 'face def-ml)))
-    (propertize (concat (substring def-ml 0 4) disp-rev)
+    (propertize (concat (substring def-ml 0 4) rev)
                 'face face
-                'help-echo (concat help-echo "\nCurrent revision: " rev))))
+                'help-echo (concat help-echo "\nCurrent revision: "
+                                   (get-text-property 0 'commit rev)))))
 
 (cl-defstruct (vc-git-extra-fileinfo
             (:copier nil)

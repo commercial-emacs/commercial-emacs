@@ -56,6 +56,27 @@
    "git version .2.30.1.5"
    "0"))
 
+(defmacro vc-git-test--mock-repo (&rest body)
+  (declare (indent defun))
+  `(let* ((dir (make-temp-file "vc-git-tests" t))
+          (default-directory dir))
+     (unwind-protect
+         (progn
+           (vc-git-create-repo)
+           ,@body)
+       (delete-directory dir t))))
+
+(ert-deftest vc-git-test-detached-head ()
+  (skip-unless (executable-find vc-git-program))
+  (require 'log-edit)
+  (vc-git-test--mock-repo
+    (with-temp-file "foo")
+    (vc-git-register (split-string "foo"))
+    (vc-git-checkin (split-string "foo") "his fooness")
+    (vc-git-checkout nil (vc-git--rev-parse "HEAD" t))
+    (with-current-buffer (find-file-noselect "foo")
+      (vc-git-mode-line-string (buffer-file-name)))))
+
 (defun vc-git-test--run-program-version-test
     (mock-version-string expected-output)
   (cl-letf* (((symbol-function 'vc-git--run-command-string)
