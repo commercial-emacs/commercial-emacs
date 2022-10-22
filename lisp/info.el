@@ -2484,7 +2484,6 @@ Table of contents is created from the tree structure of menus."
            (sections '(("Top" "Top")))
            nodes subfiles)
       (while (or main-file subfiles)
-        ;; (or main-file (message "Searching subfile %s..." (car subfiles)))
         (erase-buffer)
         (info-insert-file-contents (or main-file (car subfiles)))
         (goto-char (point-min))
@@ -2543,7 +2542,6 @@ Table of contents is created from the tree structure of menus."
               (setq subfiles (nreverse subfiles)
                     main-file nil))
           (setq subfiles (cdr subfiles))))
-      (message "")
       (nreverse nodes))))
 
 (defun Info-toc-nodes (filename)
