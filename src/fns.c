@@ -3323,7 +3323,9 @@ FILENAME are suppressed.  */)
 	{
 	  /* Avoid landing here recursively while outputting the
 	     backtrace from the error.  */
+#if defined HAVE_PDUMPER || defined HAVE_UNEXEC
 	  gflags.will_dump_ = false;
+#endif
 	  error ("(require %s) while preparing to dump",
 		 SDATA (SYMBOL_NAME (feature)));
 	}

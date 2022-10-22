@@ -2264,9 +2264,11 @@ it defines a macro.  */)
      of what files are preloaded and when.  */
   if (will_dump_p () && !will_bootstrap_p ())
     {
+#if defined HAVE_PDUMPER || defined HAVE_UNEXEC
       /* Avoid landing here recursively while outputting the
 	 backtrace from the error.  */
       gflags.will_dump_ = false;
+#endif
       error ("Attempt to autoload %s while preparing to dump",
 	     SDATA (SYMBOL_NAME (funname)));
     }
