@@ -63,6 +63,7 @@
      (unwind-protect
          (progn
            (vc-git-create-repo)
+           (vc-git-command nil 0 nil "config" "--add" "user.name" "frou")
            ,@body)
        (delete-directory dir t))))
 
@@ -71,11 +72,14 @@
   (require 'log-edit)
   (vc-git-test--mock-repo
     (with-temp-file "foo")
-    (vc-git-register (split-string "foo"))
-    (vc-git-checkin (split-string "foo") "his fooness")
-    (vc-git-checkout nil (vc-git--rev-parse "HEAD" t))
-    (with-current-buffer (find-file-noselect "foo")
-      (vc-git-mode-line-string (buffer-file-name)))))
+    (condition-case err
+        (progn
+          (vc-git-register (split-string "foo"))
+          (vc-git-checkin (split-string "foo") "No-Verify: yes
+his fooness")
+          (vc-git-checkout nil (vc-git--rev-parse "HEAD" t)))
+      (error (signal (car err) (with-current-buffer "*vc*" (buffer-string)))))
+    (find-file-noselect "foo")))
 
 (defun vc-git-test--run-program-version-test
     (mock-version-string expected-output)

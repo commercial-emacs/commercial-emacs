@@ -389,7 +389,8 @@ in the order given by `git status'."
     (propertize (concat (substring def-ml 0 4) rev)
                 'face face
                 'help-echo (concat help-echo "\nCurrent revision: "
-                                   (or (get-text-property 0 'commit rev) rev)))))
+                                   (when rev
+                                     (or (get-text-property 0 'commit rev) rev))))))
 
 (cl-defstruct (vc-git-extra-fileinfo
             (:copier nil)
