@@ -543,7 +543,7 @@ With optional CLEANUP, kill any associated buffers."
                                 (+ (position-bytes (point))
                                    (jsonrpc--expected-bytes connection)))))
               (if (< available-bytes (jsonrpc--expected-bytes connection))
-                  (throw 'done t) ; message still incomplete
+                  (throw 'done t)       ; message still incomplete
                 (unwind-protect
                     (save-restriction
                       (narrow-to-region (point) message-end)
@@ -554,11 +554,18 @@ With optional CLEANUP, kill any associated buffers."
                                      (jsonrpc--warn "Invalid JSON: %s %s"
                                                     (cdr err) (buffer-string))
                                      nil))))
-                        (with-temp-buffer ; avoid polluting current buffer
+                        (with-temp-buffer
+                          ;; Calls success-fn and error-fn
+                          ;; of jsonrpc-async-request, which
+                          ;; can arbitrarily pollute or even kill
+                          ;; (process-buffer PROC).  Ergo, buffer-live-p
+                          ;; check in unwind clause.
                           (jsonrpc-connection-receive connection json-message))))
-                  (goto-char message-end)
-                  (delete-region (point-min) (point))
-                  (setf (jsonrpc--expected-bytes connection) nil))))))))))
+                  (when (buffer-live-p (process-buffer proc))
+                    (with-current-buffer (process-buffer proc)
+                      (goto-char message-end)
+                      (delete-region (point-min) (point))
+                      (setf (jsonrpc--expected-bytes connection) nil))))))))))))
 
 (cl-defun jsonrpc--async-request-1 (connection method params
                                     &rest args
