@@ -481,18 +481,18 @@ the specializer used will be the one returned by BODY."
 (defun cl--generic-make-defmethod-docstring ()
   ;; FIXME: Copy&paste from pcase--make-docstring.
   (let* ((main (documentation (symbol-function 'cl-defmethod) 'raw))
-         (ud (help-split-fundoc main 'cl-defmethod)))
+         (ud (help-split-fundoc main 'cl-defmethod))
+         (generic (cl--generic 'cl-generic-generalizers)))
     ;; So that eg emacs -Q -l cl-lib --eval "(documentation 'pcase)" works,
     ;; where cl-lib is anything using pcase-defmacro.
     (require 'help-fns)
     (with-temp-buffer
       (insert (or (cdr ud) main))
       (insert "\n\n\tCurrently supported forms for TYPE:\n\n")
-      (dolist (method (reverse (cl--generic-method-table
-                                (cl--generic 'cl-generic-generalizers))))
-        (let* ((info (cl--generic-method-info method)))
+      (dolist (method (reverse (cl--generic-method-table generic)))
+        (let ((info (cl--generic-method-info method generic)))
           (when (nth 2 info)
-          (insert (nth 2 info) "\n\n"))))
+            (insert (nth 2 info) "\n\n"))))
       (let ((combined-doc (buffer-string)))
         (if ud (help-add-fundoc-usage combined-doc (car ud)) combined-doc)))))
 
@@ -1099,15 +1099,19 @@ MET-NAME is as returned by `cl--generic-load-hist-format'."
   (add-to-list 'find-function-regexp-alist
                '(cl-defgeneric . cl--generic-find-defgeneric-regexp)))
 
-(defun cl--generic-method-info (method)
+(defun cl--generic-method-info (method &optional generic)
   (let* ((specializers (cl--generic-method-specializers method))
          (qualifiers   (cl--generic-method-qualifiers method))
          (call-con     (cl--generic-method-call-con method))
          (function     (cl--generic-method-function method))
-         (args (help-function-arglist (if (not (eq call-con 'curried))
-                                          function
-                                        (funcall function #'ignore))
-                                      'names))
+         (signature    (and generic
+                            (get-advertised-calling-convention
+                             (symbol-function (cl--generic-name generic)))))
+         (args (if (and generic (listp signature)) signature
+                 (help-function-arglist (if (not (eq call-con 'curried))
+                                            function
+                                          (funcall function #'ignore))
+                                        'names)))
          (docstring (documentation function))
          (qual-string
           (if (null qualifiers) ""
@@ -1157,8 +1161,8 @@ MET-NAME is as returned by `cl--generic-load-hist-format'."
         (insert (propertize "Implementations:\n\n" 'face 'bold))
         ;; Loop over fanciful generics
         (dolist (method (cl--generic-method-table generic))
-          (pcase-let*
-              ((`(,qualifiers ,args ,doc) (cl--generic-method-info method)))
+          (pcase-let ((`(,qualifiers ,args ,doc)
+                       (cl--generic-method-info method generic)))
             ;; FIXME: Add hyperlinks for the types as well.
             (let ((print-quoted nil)
                   (quals (if (length> qualifiers 0)
@@ -1230,7 +1234,7 @@ The value returned is a list of elements of the form
       (dolist (method (cl--generic-method-table generic))
         (when (cl--generic-specializers-apply-to-type-p
                (cl--generic-method-specializers method) type)
-          (push (cl--generic-method-info method) docs))))
+          (push (cl--generic-method-info method generic) docs))))
     docs))
 
 (defun cl--generic-method-files (method)
