@@ -493,7 +493,7 @@ With optional CLEANUP, kill any associated buffers."
   "Called when PROC undergoes CHANGE."
   (let ((connection (process-get proc 'jsonrpc-connection)))
     (jsonrpc--debug connection `(:message "Connection state changed" :change ,change))
-    (when (not (process-live-p proc))
+    (unless (process-live-p proc)
       (with-current-buffer (jsonrpc-events-buffer connection)
         (let ((inhibit-read-only t))
           (insert "\n----------b---y---e---b---y---e----------\n")))

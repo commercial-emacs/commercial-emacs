@@ -243,10 +243,18 @@
       (jsonrpc-request conn 'ignore ["third deferred"]
                        :deferred "third deferred"
                        :timeout 1)
+      (should (zerop (hash-table-count (jsonrpc--deferred-actions conn))))
+      (unless (zerop (hash-table-count (jsonrpc--request-continuations conn)))
+        ;; In transferring THIRD from deferred-actions to
+        ;; request-continuations, jsonrpc--call-deferred necessarily
+        ;; also moved SECOND, but while THIRD's continuation was
+        ;; certainly put paid by a server reply (by dint of
+        ;; jsonrpc-request returning), that says nothing about SECOND's
+        ;; reply.  Ergo the following fudge.
+        (accept-process-output nil 0.5))
       (should second-deferred-went-through-p)
       (should (eq 1 n-deferred-1))
-      (should (eq 2 n-deferred-2))
-      (should (zerop (hash-table-count (jsonrpc--deferred-actions conn)))))))
+      (should (eq 2 n-deferred-2)))))
 
 (ert-deftest jsonrpc-connection-send-contortion ()
   "`jsonrpc-connection-send' contortion to accommodate non-string :method."
