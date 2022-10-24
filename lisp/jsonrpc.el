@@ -403,12 +403,12 @@ invisible by renaming to \" *[CONN name] stderr*\"."
   (let* ((message `(:jsonrpc "2.0" ,@args))
          (json (jsonrpc--json-encode message))
          (headers `(("Content-Length" . ,(format "%d" (string-bytes json))))))
+    (jsonrpc--log-event connection message 'client)
     (process-send-string
      (jsonrpc--process connection)
      (cl-loop for (header . value) in headers
               concat (concat header ": " value "\r\n") into header-section
-              finally return (format "%s\r\n%s" header-section json)))
-    (jsonrpc--log-event connection message 'client)))
+              finally return (format "%s\r\n%s" header-section json)))))
 
 (defun jsonrpc-process-type (conn)
   "Return the `process-type' of JSONRPC connection CONN."
