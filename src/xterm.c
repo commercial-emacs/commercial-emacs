@@ -27192,6 +27192,7 @@ static void
 x_focus_frame (struct frame *f, bool noactivate)
 {
   struct x_display_info *dpyinfo;
+  Time time;
 
   dpyinfo = FRAME_DISPLAY_INFO (f);
 
@@ -27217,16 +27218,25 @@ x_focus_frame (struct frame *f, bool noactivate)
       /* Ignore any BadMatch error this request might result in.  */
       x_ignore_errors_for_next_request (dpyinfo);
       if (NILP (Vx_no_window_manager))
-	XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
-			/* It is invalid to use CurrentTime according to
-			   the ICCCM:
+	{
+	  /* Use the last user time.  It is invalid to use CurrentTime
+	     according to the ICCCM:
 
-			   Clients that use a SetInputFocus request must
-			   set the time field to the timestamp of the
-			   event that caused them to make the
-			   attempt. [...] Note that clients must not use
-			   CurrentTime in the time field. */
-			RevertToParent, dpyinfo->last_user_time);
+	       Clients that use a SetInputFocus request must set the
+	       time field to the timestamp of the event that caused
+	       them to make the attempt. [...] Note that clients must
+	       not use CurrentTime in the time field.  */
+	  time = dpyinfo->last_user_time;
+
+	  /* Unless the focus doesn't belong to Emacs anymore and
+	     `x-allow-focus-stealing' is set to Qnewer_time.  */
+	  if (EQ (Vx_allow_focus_stealing, Qnewer_time)
+	      && !dpyinfo->x_focus_frame)
+	    time = x_get_server_time (f);
+
+	  XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+			  RevertToParent, time);
+	}
       else
 	XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 			/* But when no window manager is in use, we
@@ -30893,10 +30903,16 @@ connection setup.  */);
 
 Some window managers prevent `x-focus-frame' from activating the given
 frame when Emacs is in the background, which is especially prone to
-cause problems when the Emacs server wants to activate itself.  This
-variable specifies the strategy used to activate frames when that is
-the case, and has several valid values (any other value means to not
-bypass window manager focus stealing prevention):
+cause problems when the Emacs server wants to activate itself.
+
+In addition, when an old-fashioned (pre-EWMH) window manager is being
+run and `x-no-window-manager' is nil, the X server will not let Emacs
+focus itself if another program was focused after the last time Emacs
+obtained the input focus.
+
+This variable specifies the strategy used to activate frames when that
+is the case, and has several valid values (any other value means to
+not bypass window manager focus stealing prevention):
 
   - The symbol `imitate-pager', which means to pretend that Emacs is a
     pager.
