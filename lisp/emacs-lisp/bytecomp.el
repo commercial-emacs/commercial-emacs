@@ -4412,13 +4412,6 @@ Return the offset in the form (VAR . OFFSET)."
           (byte-compile-form (cadr clause))
         (byte-compile-push-constant nil)))))
 
-(defun byte-compile-not-lexical-var-p (var)
-  (or (not (symbolp var))
-      (special-variable-p var)
-      (memq var byte-compile-bound-variables)
-      (memq var '(nil t))
-      (keywordp var)))
-
 (defun byte-compile-bind (var init-lexenv)
   "Emit byte-codes to bind VAR and update `byte-compile--lexical-environment'.
 INIT-LEXENV should be a lexical-environment alist describing the
@@ -4427,7 +4420,7 @@ Return non-nil if the TOS value was popped."
   ;; The mix of lexical and dynamic bindings mean that we may have to
   ;; juggle things on the stack, to move them to TOS for
   ;; dynamic binding.
-  (if (and lexical-binding (not (byte-compile-not-lexical-var-p var)))
+  (if (not (cconv--not-lexical-var-p var byte-compile-bound-variables))
       ;; VAR is a simple stack-allocated lexical variable.
       (progn (push (assq var init-lexenv)
                    byte-compile--lexical-environment)
