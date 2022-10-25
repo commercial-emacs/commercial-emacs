@@ -337,4 +337,13 @@ bidi_it.charpos without also fetching its char."
      (insert (make-string (window-width) ?x)))
    (redisplay)))
 
+(ert-deftest xdisp-tests--respect-inhibit-message ()
+  "It's borderline criminal that inhibit-message still clears echo area."
+  (skip-unless (not noninteractive))
+  (let ((dont "dont clear me!"))
+    (message dont)
+    (let ((inhibit-message t))
+      (message "nice try")
+      (should (equal (current-message) dont)))))
+
 ;;; xdisp-tests.el ends here

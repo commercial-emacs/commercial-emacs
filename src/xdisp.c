@@ -10466,7 +10466,6 @@ message_log_check_duplicate (ptrdiff_t prev_bol_byte, ptrdiff_t bol_byte)
 void
 message3 (Lisp_Object m)
 {
-  clear_message (true, true);
   cancel_echoing ();
 
   /* First flush out any partial line written with print.  */
