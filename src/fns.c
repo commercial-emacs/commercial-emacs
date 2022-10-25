@@ -3655,7 +3655,7 @@ static signed char const base64_char_to_value[2][UCHAR_MAX] =
 static ptrdiff_t base64_encode_1 (const char *, char *, ptrdiff_t, bool, bool,
 				  bool, bool);
 static ptrdiff_t base64_decode_1 (const char *, char *, ptrdiff_t, bool,
-				  bool, ptrdiff_t *);
+				  bool, bool, ptrdiff_t *);
 
 static Lisp_Object base64_encode_region_1 (Lisp_Object, Lisp_Object, bool,
 					   bool, bool);
@@ -3918,7 +3918,7 @@ base64_encode_1 (const char *from, char *to, ptrdiff_t length,
 
 
 DEFUN ("base64-decode-region", Fbase64_decode_region, Sbase64_decode_region,
-       2, 3, "r",
+       2, 4, "r",
        doc: /* Base64-decode the region between BEG and END.
 Return the length of the decoded data.
 
@@ -3929,8 +3929,11 @@ system.
 
 If the region can't be decoded, signal an error and don't modify the buffer.
 Optional third argument BASE64URL determines whether to use the URL variant
-of the base 64 encoding, as defined in RFC 4648.  */)
-     (Lisp_Object beg, Lisp_Object end, Lisp_Object base64url)
+of the base 64 encoding, as defined in RFC 4648.
+If optional fourth argument INGORE-INVALID is non-nil invalid characters
+are ignored instead of signaling an error.  */)
+     (Lisp_Object beg, Lisp_Object end, Lisp_Object base64url,
+      Lisp_Object ignore_invalid)
 {
   ptrdiff_t ibeg, iend, length, allength;
   char *decoded;
@@ -3956,7 +3959,8 @@ of the base 64 encoding, as defined in RFC 4648.  */)
   move_gap_both (XFIXNAT (beg), ibeg);
   decoded_length = base64_decode_1 ((char *) BYTE_POS_ADDR (ibeg),
 				    decoded, length, ! NILP (base64url),
-				    multibyte, &inserted_chars);
+				    multibyte, ! NILP (ignore_invalid),
+				    &inserted_chars);
   if (decoded_length > allength)
     emacs_abort ();
 
@@ -3989,11 +3993,13 @@ of the base 64 encoding, as defined in RFC 4648.  */)
 }
 
 DEFUN ("base64-decode-string", Fbase64_decode_string, Sbase64_decode_string,
-       1, 2, 0,
+       1, 3, 0,
        doc: /* Base64-decode STRING and return the result as a string.
 Optional argument BASE64URL determines whether to use the URL variant of
-the base 64 encoding, as defined in RFC 4648.  */)
-     (Lisp_Object string, Lisp_Object base64url)
+the base 64 encoding, as defined in RFC 4648.
+If optional third argument IGNORE-INVALID is non-nil invalid characters are
+ignored instead of signaling an error.  */)
+     (Lisp_Object string, Lisp_Object base64url, Lisp_Object ignore_invalid)
 {
   char *decoded;
   ptrdiff_t length, decoded_length;
@@ -4009,7 +4015,8 @@ the base 64 encoding, as defined in RFC 4648.  */)
   /* The decoded result should be unibyte. */
   ptrdiff_t decoded_chars;
   decoded_length = base64_decode_1 (SSDATA (string), decoded, length,
-				    ! NILP (base64url), 0, &decoded_chars);
+				    ! NILP (base64url), false,
+				    ! NILP (ignore_invalid), &decoded_chars);
   if (decoded_length > length)
     emacs_abort ();
   else if (decoded_length >= 0)
@@ -4026,12 +4033,13 @@ the base 64 encoding, as defined in RFC 4648.  */)
 
 /* Base64-decode the data at FROM of LENGTH bytes into TO.  If
    MULTIBYTE, the decoded result should be in multibyte
-   form.  Store the number of produced characters in *NCHARS_RETURN.  */
+   form.  If IGNORE_INVALID, ignore invalid base64 characters.
+   Store the number of produced characters in *NCHARS_RETURN.  */
 
 static ptrdiff_t
 base64_decode_1 (const char *from, char *to, ptrdiff_t length,
-		 bool base64url,
-		 bool multibyte, ptrdiff_t *nchars_return)
+		 bool base64url, bool multibyte, bool ignore_invalid,
+		 ptrdiff_t *nchars_return)
 {
   char const *f = from;
   char const *flim = from + length;
@@ -4057,7 +4065,7 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
 	  c = *f++;
 	  v1 = b64_char_to_value[c];
 	}
-      while (v1 < 0);
+      while (v1 < 0 || (v1 == 0 && ignore_invalid));
 
       if (v1 == 0)
 	return -1;
@@ -4072,7 +4080,7 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
 	  c = *f++;
 	  v1 = b64_char_to_value[c];
 	}
-      while (v1 < 0);
+      while (v1 < 0 || (v1 == 0 && ignore_invalid));
 
       if (v1 == 0)
 	return -1;
@@ -4091,7 +4099,7 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
 	{
 	  if (f == flim)
 	    {
-	      if (!base64url)
+	      if (!base64url && !ignore_invalid)
 		return -1;
 	      *nchars_return = nchars;
 	      return e - to;
@@ -4099,7 +4107,7 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
 	  c = *f++;
 	  v1 = b64_char_to_value[c];
 	}
-      while (v1 < 0);
+      while (v1 < 0 || (v1 == 0 && ignore_invalid));
 
       if (c == '=')
 	{
@@ -4133,7 +4141,7 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
 	{
 	  if (f == flim)
 	    {
-	      if (!base64url)
+	      if (!base64url && !ignore_invalid)
 		return -1;
 	      *nchars_return = nchars;
 	      return e - to;
@@ -4141,7 +4149,7 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
 	  c = *f++;
 	  v1 = b64_char_to_value[c];
 	}
-      while (v1 < 0);
+      while (v1 < 0 || (v1 == 0 && ignore_invalid));
 
       if (c == '=')
 	continue;
