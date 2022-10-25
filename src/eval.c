@@ -556,15 +556,8 @@ usage: (function ARG)  */)
 	  CHECK_STRING (docstring);
 	  cdr = Fcons (XCAR (cdr), Fcons (docstring, XCDR (XCDR (cdr))));
 	}
-      Lisp_Object env
-        = NILP (Vinternal_filter_closure_env_function)
-          ? Vinternal_interpreter_environment
-          /* FIXME: This macroexpands the body, so we should use the resulting
-             macroexpanded code!  */
-          : call2 (Vinternal_filter_closure_env_function,
-                   Fcons (Qprogn, CONSP (cdr) ? XCDR (cdr) : cdr),
-                   Vinternal_interpreter_environment);
-      return Fcons (Qclosure, Fcons (env, cdr));
+      return Fcons (Qclosure, Fcons (Vinternal_interpreter_environment,
+				     cdr));
     }
   else
     /* Simply quote the argument.  */
@@ -2345,7 +2338,9 @@ eval_sub (Lisp_Object form)
 	 We do not pay attention to the declared_special flag here, since we
 	 already did that when let-binding the variable.  */
       Lisp_Object lex_binding
-	= Fassq (form, Vinternal_interpreter_environment);
+	= (!NILP (Vinternal_interpreter_environment) /* Mere optimization!  */
+	   ? Fassq (form, Vinternal_interpreter_environment)
+	   : Qnil);
       return !NILP (lex_binding) ? XCDR (lex_binding) : Fsymbol_value (form);
     }
 
@@ -2361,7 +2356,7 @@ eval_sub (Lisp_Object form)
       if (max_lisp_eval_depth < 100)
 	max_lisp_eval_depth = 100;
       if (lisp_eval_depth > max_lisp_eval_depth)
-	xsignal1 (Qexcessive_lisp_nesting, make_fixnum (lisp_eval_depth));
+	xsignal0 (Qexcessive_lisp_nesting);
     }
 
   Lisp_Object original_fun = XCAR (form);
@@ -2935,7 +2930,7 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
       if (max_lisp_eval_depth < 100)
 	max_lisp_eval_depth = 100;
       if (lisp_eval_depth > max_lisp_eval_depth)
-	xsignal1 (Qexcessive_lisp_nesting, make_fixnum (lisp_eval_depth));
+	xsignal0 (Qexcessive_lisp_nesting);
     }
 
   count = record_in_backtrace (args[0], &args[1], nargs - 1);
@@ -4309,11 +4304,6 @@ alist of active lexical bindings.  */);
   /* Don't export this variable to Elisp, so no one can mess with it
      (Just imagine if someone makes it buffer-local).  */
   Funintern (Qinternal_interpreter_environment, Qnil);
-
-  DEFVAR_LISP ("internal-filter-closure-env-function",
-	       Vinternal_filter_closure_env_function,
-	       doc: /* Function to filter the env when constructing a closure.  */);
-  Vinternal_filter_closure_env_function = Qnil;
 
   Vrun_hooks = intern_c_string ("run-hooks");
   staticpro (&Vrun_hooks);
