@@ -551,9 +551,9 @@ With optional CLEANUP, kill any associated buffers."
                                   (condition-case err
                                       (jsonrpc--json-read)
                                     (error
-                                     (jsonrpc--warn "Invalid JSON: %s %s"
-                                                    (cdr err) (buffer-string))
-                                     nil))))
+                                     (prog1 nil
+                                       (jsonrpc--warn "Invalid JSON: %s %s"
+                                                      (cdr err) (buffer-string)))))))
                         (with-temp-buffer
                           ;; Calls success-fn and error-fn
                           ;; of jsonrpc-async-request, which

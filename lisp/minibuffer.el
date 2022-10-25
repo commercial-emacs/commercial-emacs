@@ -861,11 +861,7 @@ Intended to be called via `clear-message-function'."
       (setq minibuffer-message-timer nil))
     (when (overlayp minibuffer-message-overlay)
       (delete-overlay minibuffer-message-overlay)
-      (setq minibuffer-message-overlay nil)))
-
-  ;; Return nil telling the caller that the message
-  ;; should be also handled by the caller.
-  nil)
+      (setq minibuffer-message-overlay nil))))
 
 (setq clear-message-function 'clear-minibuffer-message)
 
