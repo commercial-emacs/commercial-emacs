@@ -252,6 +252,7 @@
 			     res (cdr res)))
 		     buf)))))))))
 
+;;;###autoload
 (defvar calc-eval-error nil
   "Determines how calc handles errors.
 If nil, return a list containing the character position of error.
