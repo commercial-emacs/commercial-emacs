@@ -1,6 +1,7 @@
 /* Lisp object printing and output streams.
 
-Copyright (C) 1985-2022  Free Software Foundation, Inc.
+Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2022 Free Software
+Foundation, Inc.
 
 This file is NOT part of GNU Emacs.
 
@@ -601,7 +602,8 @@ temp_output_buffer_setup (const char *bufname)
   bset_read_only (current_buffer, Qnil);
   bset_filename (current_buffer, Qnil);
   bset_undo_list (current_buffer, Qt);
-  eassert (current_buffer->overlays == NULL);
+  eassert (current_buffer->overlays_before == NULL);
+  eassert (current_buffer->overlays_after == NULL);
   bset_enable_multibyte_characters
     (current_buffer, BVAR (&buffer_slot_defaults, enable_multibyte_characters));
   specbind (Qinhibit_read_only, Qt);
@@ -1715,15 +1717,15 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 
     case PVEC_OVERLAY:
       print_c_string ("#<overlay ", printcharfun);
-      if (! OVERLAY_BUFFER (obj))
+      if (! XMARKER (OVERLAY_START (obj))->buffer)
 	print_c_string ("in no buffer", printcharfun);
       else
 	{
 	  int len = sprintf (buf, "from %"pD"d to %"pD"d in ",
-			     OVERLAY_START (obj),
-			     OVERLAY_END   (obj));
+			     marker_position (OVERLAY_START (obj)),
+			     marker_position (OVERLAY_END   (obj)));
 	  strout (buf, len, len, printcharfun);
-	  print_string (BVAR (OVERLAY_BUFFER (obj), name),
+	  print_string (BVAR (XMARKER (OVERLAY_START (obj))->buffer, name),
 			printcharfun);
 	}
       printchar ('>', printcharfun);

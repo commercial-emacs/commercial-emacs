@@ -514,7 +514,7 @@ all: ../native-lisp
 endif
 .PHONY: all
 
-dmpstruct_headers=$(srcdir)/lisp.h $(srcdir)/buffer.h $(srcdir)/itree.h \
+dmpstruct_headers=$(srcdir)/lisp.h $(srcdir)/buffer.h \
 	$(srcdir)/intervals.h $(srcdir)/charset.h $(srcdir)/bignum.h
 ifeq ($(CHECK_STRUCTS),true)
 pdumper.o: dmpstruct.h

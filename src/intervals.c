@@ -1798,8 +1798,8 @@ adjust_for_invis_intang (ptrdiff_t pos, ptrdiff_t test_offs, ptrdiff_t adj,
 	     == (test_offs == 0 ? 1 : -1))
 	  /* Invisible property is from an overlay.  */
 	  : (test_offs == 0
-	     ? ! OVERLAY_FRONT_ADVANCE_P (invis_overlay)
-	     : OVERLAY_REAR_ADVANCE_P (invis_overlay))))
+	     ? XMARKER (OVERLAY_START (invis_overlay))->insertion_type == 0
+	     : XMARKER (OVERLAY_END (invis_overlay))->insertion_type == 1)))
     pos += adj;
 
   return pos;

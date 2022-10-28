@@ -1,5 +1,6 @@
 /* Interface code for dealing with text properties.
-   Copyright (C) 1993-2022  Free Software Foundation, Inc.
+   Copyright (C) 1993-1995, 1997, 1999-2022 Free Software Foundation,
+   Inc.
 
 This file is NOT part of GNU Emacs.
 
@@ -634,40 +635,36 @@ get_char_property_and_overlay (Lisp_Object position, register Lisp_Object prop, 
     }
   if (BUFFERP (object))
     {
-      struct buffer *b = XBUFFER (object);
-      struct itree_node *node;
-      struct sortvec items[2];
-      struct sortvec *result = NULL;
-      Lisp_Object result_tem = Qnil;
+      ptrdiff_t noverlays;
+      Lisp_Object *overlay_vec;
+      struct buffer *obuf = current_buffer;
 
-      if (! (BUF_BEGV (b) <= pos
-	     && pos <= BUF_ZV (b)))
+      if (! (BUF_BEGV (XBUFFER (object)) <= pos
+	     && pos <= BUF_ZV (XBUFFER (object))))
 	xsignal1 (Qargs_out_of_range, position);
 
+      set_buffer_temp (XBUFFER (object));
+
+      USE_SAFE_ALLOCA;
+      GET_OVERLAYS_AT (pos, overlay_vec, noverlays, NULL, false);
+      noverlays = sort_overlays (overlay_vec, noverlays, w);
+
+      set_buffer_temp (obuf);
+
       /* Now check the overlays in order of decreasing priority.  */
-      ITREE_FOREACH (node, b->overlays, pos, pos + 1, ASCENDING)
+      while (--noverlays >= 0)
 	{
-	  Lisp_Object tem = Foverlay_get (node->data, prop);
-          struct sortvec *this;
-
-	  if (NILP (tem) || node->end < pos + 1
-	      || (w && ! overlay_matches_window (w, node->data)))
-	    continue;
-
-          this = (result == items ? items + 1 : items);
-          make_sortvec_item (this, node->data);
-          if (! result || (compare_overlays (result, this) < 0))
-            {
-              result = this;
-              result_tem = tem;
-            }
+	  Lisp_Object tem = Foverlay_get (overlay_vec[noverlays], prop);
+	  if (!NILP (tem))
+	    {
+	      if (overlay)
+		/* Return the overlay we got the property from.  */
+		*overlay = overlay_vec[noverlays];
+	      SAFE_FREE ();
+	      return tem;
+	    }
 	}
-      if (result)
-        {
-          if (overlay)
-            *overlay = result->overlay;
-          return result_tem;
-        }
+      SAFE_FREE ();
     }
 
   if (overlay)
