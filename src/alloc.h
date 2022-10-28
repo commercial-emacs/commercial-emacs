@@ -31,6 +31,7 @@
 #include "pdumper.h"
 #include "termhooks.h"		/* For struct terminal.  */
 #include "getpagesize.h"
+#include "itree.h"
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */

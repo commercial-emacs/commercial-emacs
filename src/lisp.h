@@ -1,7 +1,6 @@
 /* Fundamental definitions for GNU Emacs Lisp interpreter. -*- coding: utf-8 -*-
 
-Copyright (C) 1985-1987, 1993-1995, 1997-2022 Free Software Foundation,
-Inc.
+Copyright (C) 1985-2022  Free Software Foundation, Inc.
 
 This file is NOT part of GNU Emacs.
 
@@ -2381,10 +2380,9 @@ struct Lisp_Overlay
 */
   {
     union vectorlike_header header;
-    Lisp_Object start;
-    Lisp_Object end;
     Lisp_Object plist;
-    struct Lisp_Overlay *next;
+    struct buffer *buffer;        /* eassert (live buffer || NULL). */
+    struct itree_node *interval;
   } GCALIGNED_STRUCT;
 
 struct Lisp_Misc_Ptr
@@ -4059,7 +4057,6 @@ extern bool gc_in_progress;
 extern Lisp_Object make_float (double);
 extern void display_malloc_warning (void);
 extern specpdl_ref inhibit_garbage_collection (void);
-extern Lisp_Object build_overlay (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void free_cons (struct Lisp_Cons *);
 extern bool mgc_handle_sigsegv (void *);
 extern void init_alloc_once (void);
