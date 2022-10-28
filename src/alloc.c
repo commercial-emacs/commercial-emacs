@@ -1,7 +1,6 @@
 /* Allocator and garbage collector.
 
-Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2022 Free Software
-Foundation, Inc.
+Copyright (C) 1985-2022  Free Software Foundation, Inc.
 
 This file is NOT part of GNU Emacs.
 
@@ -2769,15 +2768,17 @@ make_misc_ptr (void *a)
 /* Return a new overlay with specified START, END and PLIST.  */
 
 Lisp_Object
-build_overlay (Lisp_Object start, Lisp_Object end, Lisp_Object plist)
+build_overlay (bool front_advance, bool rear_advance,
+               Lisp_Object plist)
 {
   struct Lisp_Overlay *p = ALLOCATE_PSEUDOVECTOR (struct Lisp_Overlay, plist,
 						  PVEC_OVERLAY);
   Lisp_Object overlay = make_lisp_ptr (p, Lisp_Vectorlike);
-  OVERLAY_START (overlay) = start;
-  OVERLAY_END (overlay) = end;
+  struct itree_node *node = xmalloc (sizeof (*node));
+  itree_node_init (node, front_advance, rear_advance, overlay);
+  p->interval = node;
+  p->buffer = NULL;
   set_overlay_plist (overlay, plist);
-  p->next = NULL;
   return overlay;
 }
 
@@ -5154,7 +5155,7 @@ mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
 /* Mark the chain of overlays starting at PTR.  */
 
 static void
-mark_overlay (struct Lisp_Overlay *ptr)
+mark_overlay (struct Lisp_Overlay *ov)
 {
   for (; ptr && ! vectorlike_marked_p (&ptr->header); ptr = ptr->next)
     {
@@ -5187,8 +5188,8 @@ mark_buffer (struct buffer *buffer)
   if (! BUFFER_LIVE_P (buffer))
       mark_object (&BVAR (buffer, undo_list));
 
-  mark_overlay (buffer->overlays_before);
-  mark_overlay (buffer->overlays_after);
+  if (buffer->overlays)
+    mark_overlays (buffer->overlays->root);
 
   /* If this is an indirect buffer, mark its base buffer.  */
   if (buffer->base_buffer &&
