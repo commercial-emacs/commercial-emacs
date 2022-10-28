@@ -54,12 +54,11 @@ typedef unsigned int CARD32;
 #include <gconf/gconf-client.h>
 #endif
 
-#if defined USE_CAIRO || defined HAVE_XFT
-#ifdef USE_CAIRO
-#include <fontconfig/fontconfig.h>
-#else  /* HAVE_XFT */
+#if defined HAVE_XFT
 #include <X11/Xft/Xft.h>
-#endif
+#elif defined USE_CAIRO
+#include <cairo-ft.h>
+#include <fontconfig/fontconfig.h>
 #endif
 
 static char *current_mono_font;
@@ -815,11 +814,11 @@ apply_xft_settings (Display_Info *dpyinfo,
 
   memset (&oldsettings, 0, sizeof (oldsettings));
   pat = FcPatternCreate ();
-#ifdef HAVE_XFT
+#if defined HAVE_XFT
   XftDefaultSubstitute (dpyinfo->display,
                         XScreenNumberOfScreen (dpyinfo->screen),
                         pat);
-#else
+#elif defined USE_CAIRO
   FcConfigSubstitute (NULL, pat, FcMatchPattern);
   options = cairo_font_options_create ();
   cairo_ft_font_options_substitute (options, pat);
