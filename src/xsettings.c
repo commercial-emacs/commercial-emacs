@@ -803,9 +803,7 @@ static void
 apply_xft_settings (Display_Info *dpyinfo,
                     struct xsettings *settings)
 {
-#if defined HAVE_XFT					\
-  || (defined USE_CAIRO && defined CAIRO_HAS_FC_FONT	\
-      && defined CAIRO_HAS_FT_FONT)
+#if defined USE_CAIRO || defined HAVE_XFT
   FcPattern *pat;
   struct xsettings oldsettings;
   bool changed = false;
@@ -941,7 +939,7 @@ apply_xft_settings (Display_Info *dpyinfo,
     }
   else
     FcPatternDestroy (pat);
-#endif /* HAVE_XFT || (USE_CAIRO && CAIRO_HAS_FC_FONT && CAIRO_HAS_FT_FONT) */
+#endif /* HAVE_XFT */
 }
 #endif
 
