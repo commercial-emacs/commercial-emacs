@@ -5366,7 +5366,6 @@ xi_populate_device_from_info (struct xi_device_t *xi_device,
 	    valuator->emacs_value = DBL_MIN;
 	    valuator->increment = info->increment;
 	    valuator->number = info->number;
-	    valuator->pending_enter_reset = false;
 
 	    break;
 	  }
@@ -5412,7 +5411,6 @@ xi_populate_device_from_info (struct xi_device_t *xi_device,
 	    {
 	      xi_device->valuators[c].invalid_p = false;
 	      xi_device->valuators[c].current_value = tem->current_value;
-	      xi_device->valuators[c].pending_enter_reset = true;
 	    }
 	}
     }
@@ -5606,8 +5604,8 @@ xi_find_touch_point (struct xi_device_t *device, int detail)
 #ifdef HAVE_XINPUT2_1
 
 static void
-xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo, int id,
-					 bool pending_only)
+xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo,
+					 int id)
 {
   struct xi_device_t *device = xi_device_from_id (dpyinfo, id);
   struct xi_scroll_valuator_t *valuator;
@@ -5621,11 +5619,6 @@ xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo, int id,
   for (int i = 0; i < device->scroll_valuator_count; ++i)
     {
       valuator = &device->valuators[i];
-
-      if (pending_only && !valuator->pending_enter_reset)
-	continue;
-
-      valuator->pending_enter_reset = false;
       valuator->invalid_p = true;
       valuator->emacs_value = 0.0;
     }
@@ -13097,14 +13090,6 @@ xi_handle_device_changed (struct x_display_info *dpyinfo,
 		{
 		  valuator->invalid_p = false;
 		  valuator->current_value = valuator_info->value;
-
-		  /* Make sure that this is reset if the pointer moves
-		     into a window of ours.
-
-		     Otherwise the valuator state could be left
-		     invalid if the DeviceChange event happened with
-		     the pointer outside any Emacs frame. */
-		  valuator->pending_enter_reset = true;
 		}
 
 	      break;
@@ -18831,11 +18816,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       goto OTHER;
 
     case Expose:
-      f = x_window_to_frame (dpyinfo, event->xexpose.window);
+
 #ifdef HAVE_XWIDGETS
       {
-	struct xwidget_view *xv =
-	  xwidget_view_from_window (event->xexpose.window);
+	struct xwidget_view *xv;
+
+	xv = xwidget_view_from_window (event->xexpose.window);
 
 	if (xv)
 	  {
@@ -18844,6 +18830,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	  }
       }
 #endif
+
+      f = x_window_to_frame (dpyinfo, event->xexpose.window);
       if (f)
         {
           if (!FRAME_VISIBLE_P (f))
@@ -19647,7 +19635,35 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
     case EnterNotify:
       x_display_set_last_user_time (dpyinfo, event->xcrossing.time,
-				    event->xcrossing.send_event, false);
+				    event->xcrossing.send_event,
+				    false);
+
+#ifdef HAVE_XWIDGETS
+      {
+	struct xwidget_view *xvw;
+	Mouse_HLInfo *hlinfo;
+
+	xvw = xwidget_view_from_window (event->xcrossing.window);
+
+	if (xvw)
+	  {
+	    xwidget_motion_or_crossing (xvw, event);
+	    hlinfo = MOUSE_HL_INFO (xvw->frame);
+
+	    if (xvw->frame == hlinfo->mouse_face_mouse_frame)
+	      {
+		clear_mouse_face (hlinfo);
+		hlinfo->mouse_face_mouse_frame = 0;
+		x_flush_dirty_back_buffer_on (xvw->frame);
+	      }
+
+	    if (any_help_event_p)
+	      do_help = -1;
+
+	    goto OTHER;
+	  }
+      }
+#endif
 
 #ifdef HAVE_XINPUT2
       /* For whatever reason, the X server continues to deliver
@@ -19663,32 +19679,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
       if (x_top_window_to_frame (dpyinfo, event->xcrossing.window))
 	x_detect_focus_change (dpyinfo, any, event, &inev.ie);
-
-#ifdef HAVE_XWIDGETS
-      {
-	struct xwidget_view *xvw = xwidget_view_from_window (event->xcrossing.window);
-	Mouse_HLInfo *hlinfo;
-
-	if (xvw)
-	  {
-	    xwidget_motion_or_crossing (xvw, event);
-	    hlinfo = MOUSE_HL_INFO (xvw->frame);
-
-	    if (xvw->frame == hlinfo->mouse_face_mouse_frame)
-	      {
-		clear_mouse_face (hlinfo);
-		hlinfo->mouse_face_mouse_frame = 0;
-		x_flush_dirty_back_buffer_on (xvw->frame);
-	      }
-
-	    if (any_help_event_p)
-	      {
-		do_help = -1;
-	      }
-	    goto OTHER;
-	  }
-      }
-#endif
 
       f = any;
 
@@ -19800,7 +19790,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 #ifdef HAVE_XWIDGETS
       {
-	struct xwidget_view *xvw = xwidget_view_from_window (event->xcrossing.window);
+	struct xwidget_view *xvw;
+
+	xvw = xwidget_view_from_window (event->xcrossing.window);
 
 	if (xvw)
 	  {
@@ -20160,7 +20152,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
           f = 0;
 #endif
 #ifdef HAVE_XWIDGETS
-	struct xwidget_view *xvw = xwidget_view_from_window (event->xmotion.window);
+	struct xwidget_view *xvw;
+
+	xvw = xwidget_view_from_window (event->xmotion.window);
 
 	if (xvw)
 	  xwidget_motion_or_crossing (xvw, event);
@@ -20611,7 +20605,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 					event->xbutton.send_event, true);
 
 #ifdef HAVE_XWIDGETS
-	struct xwidget_view *xvw = xwidget_view_from_window (event->xbutton.window);
+	struct xwidget_view *xvw;
+
+	xvw = xwidget_view_from_window (event->xbutton.window);
 
 	if (xvw)
 	  {
@@ -21270,16 +21266,16 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  && enter->mode != XINotifyGrab
 		  && enter->mode != XINotifyPassiveGrab
 		  && enter->mode != XINotifyPassiveUngrab)
-		xi_reset_scroll_valuators_for_device_id (dpyinfo, enter->deviceid,
-							 true);
+		xi_reset_scroll_valuators_for_device_id (dpyinfo,
+							 enter->deviceid);
 #endif
 
 	      {
 #ifdef HAVE_XWIDGETS
-		struct xwidget_view *xwidget_view = xwidget_view_from_window (enter->event);
-#endif
+		struct xwidget_view *xwidget_view;
 
-#ifdef HAVE_XWIDGETS
+		xwidget_view = xwidget_view_from_window (enter->event);
+
 		if (xwidget_view)
 		  {
 		    xwidget_motion_or_crossing (xwidget_view, event);
@@ -21384,13 +21380,18 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		 retrieve the value of a valuator outside of each motion
 		 event.
 
-		 As such, to prevent wildly inaccurate results when the
-		 valuators have changed outside Emacs, we reset our
-		 records of each valuator's value whenever the pointer
-		 moves out of a frame (and not into one of its
-		 children, which we know about).  */
+		 As such, to prevent wildly inaccurate results when
+		 the valuators have changed outside Emacs, we reset
+		 our records of each valuator's value whenever the
+		 pointer moves out of a frame.  Ideally, this would
+		 ignore events with a detail of XINotifyInferior, as
+		 the window the pointer moved to would be one known to
+		 Emacs, but the code to keep track of which valuators
+		 had to be reset upon the corresponding XI_Enter event
+		 was very complicated and kept running into server
+		 bugs.  */
 #ifdef HAVE_XINPUT2_1
-	      if (leave->detail != XINotifyInferior && any
+	      if (any
 		  /* xfwm4 selects for button events on the frame
 		     window, resulting in passive grabs being
 		     generated along with the delivery of emulated
@@ -21405,7 +21406,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  && leave->mode != XINotifyPassiveUngrab
 		  && leave->mode != XINotifyPassiveGrab)
 		xi_reset_scroll_valuators_for_device_id (dpyinfo,
-							 leave->deviceid, false);
+							 leave->deviceid);
 #endif
 
 	      x_display_set_last_user_time (dpyinfo, leave->time,
@@ -21413,8 +21414,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 #ifdef HAVE_XWIDGETS
 	      {
-		struct xwidget_view *xvw
-		  = xwidget_view_from_window (leave->event);
+		struct xwidget_view *xvw;
+
+		xvw = xwidget_view_from_window (leave->event);
 
 		if (xvw)
 		  {
@@ -21441,13 +21443,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		 just looks up a top window on Xt builds.  */
 
 #ifdef HAVE_XINPUT2_1
-	      if (leave->detail != XINotifyInferior && f
-		  && leave->mode != XINotifyUngrab
+	      if (f && leave->mode != XINotifyUngrab
 		  && leave->mode != XINotifyGrab
 		  && leave->mode != XINotifyPassiveUngrab
 		  && leave->mode != XINotifyPassiveGrab)
 		xi_reset_scroll_valuators_for_device_id (dpyinfo,
-							 leave->deviceid, false);
+							 leave->deviceid);
 #endif
 
 	      if (!f)
