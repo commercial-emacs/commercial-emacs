@@ -85,9 +85,19 @@ and END, and return the encrypted string."
 
 ;;;###autoload
 (defun rot13-region (start end)
-  "ROT13 encrypt the region between START and END in current buffer."
+  "ROT13 encrypt the region between START and END in current buffer.
+If invoked interactively and the buffer is read-only, the buffer
+is either displayed in a the echo area if the text is short
+enough (as determined by `resize-mini-windows' and
+`max-mini-window-height'), or in a separate buffer."
   (interactive "r")
-  (translate-region start end rot13-translate-table))
+  (condition-case nil
+      (translate-region start end rot13-translate-table)
+    (buffer-read-only
+     (when (called-interactively-p 'interactive)
+       (let* ((encrypted (buffer-substring-no-properties start end))
+              (decrypted (rot13-string encrypted)))
+         (display-message-or-buffer decrypted "*Rot 13*"))))))
 
 ;;;###autoload
 (defun rot13-other-window ()

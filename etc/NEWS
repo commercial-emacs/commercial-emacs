@@ -812,6 +812,10 @@ wheel reports.  Unlike 'pixel-scroll-mode', this mode scrolls the
 display pixel-by-pixel, as opposed to only animating line-by-line
 scrolls.
 
+** 'rot13-region' handles read-only text
+If a buffer is read-only, 'rot13-region' will display the "decrypted"
+text in the echo area, or if necessary in a separate buffer.
+
 ** Terminal Emacs
 
 ---
