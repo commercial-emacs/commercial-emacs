@@ -1906,17 +1906,15 @@ mouse-2: visit this file in other window"
 (defun dired--make-directory-clickable ()
   (save-excursion
     (goto-char (point-min))
-    (let ((dir "/")
-          (inhibit-read-only t)
-          bound segment-start)
-      (while (prog1 (re-search-forward
-                     (if (memq system-type '(windows-nt ms-dos))
-                         "^  \\([a-zA-Z]:/\\|//\\)"
-                       "^  /")
-                     nil t 1)
-               (when-let ((drive (match-string 1))) (setq dir drive)))
-        (setq bound (line-end-position)
-              segment-start (point))
+    (while (re-search-forward
+            (if (memq system-type '(windows-nt ms-dos))
+                "^  \\([a-zA-Z]:/\\|//\\)"
+              "^  /")
+            nil t 1)
+      (let ((bound (line-end-position))
+            (segment-start (point))
+            (inhibit-read-only t)
+            (dir (substring (match-string 1) 2)))
         (while (search-forward "/" bound t 1)
           (setq dir (concat dir (buffer-substring segment-start (point))))
           (add-text-properties
