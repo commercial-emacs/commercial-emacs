@@ -349,6 +349,8 @@ FILE, NOWARN, RAWFILE, and WILDCARDS are passed into `find-file-noselect'."
 	 (enable-local-variables :safe)
 	 ;; ... or eval variables
 	 (enable-local-eval nil)
+	 ;; also disable the find-file-hook
+	 (find-file-hook nil)
 	 )
     (save-match-data
       (find-file-noselect file nowarn rawfile wildcards))))
