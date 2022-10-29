@@ -65,12 +65,406 @@ using 'emacsclient':
 
     emacsclient "org-protocol://store-link?url=URL&title=TITLE"
 
-Previously, users had to manually configure their GNU/Linux desktop
-environment to open 'org-protocol' links in Emacs.  These links should
-now open in Emacs automatically, as the "emacsclient.desktop" file now
-arranges for Emacs to be the default application for the 'org-protocol'
-URI scheme.  See the Org mode manual, Info node "(org) Protocols" for
-more details.
+A companion variable 'large-hscroll-threshold' controls when another
+set of display optimizations are in effect, which are aimed
+specifically at speeding up display of long lines that are truncated.
+
+If you still experience slowdowns while editing files with long lines,
+this may be due to line truncation, or to one of the enabled minor
+modes, or to the current major mode.  Try turning off line truncation
+with 'C-x x t', or try disabling all known slow minor modes with
+'M-x so-long-minor-mode', or try disabling both known slow minor modes
+and the major mode with 'M-x so-long-mode', or visit the file with
+'M-x find-file-literally' instead of the usual 'C-x C-f'.
+
+Note that the display optimizations in these cases may cause the
+buffer to be occasionally mis-fontified.
+
+The new function 'long-line-optimizations-p' returns non-nil when
+these optimizations are in effect in the current buffer.
+
++++
+** New command to change the font size globally.
+To increase the font size, type 'C-x C-M-+' or 'C-x C-M-='; to
+decrease it, type 'C-x C-M--'; to restore the font size, type 'C-x
+C-M-0'.  The final key in these commands may be repeated without the
+leading 'C-x' and without the modifiers, e.g. 'C-x C-M-+ C-M-+ C-M-+'
+and 'C-x C-M-+ + +' increase the font size by three steps.  When
+'mouse-wheel-mode' is enabled, 'C-M-wheel-up' and 'C-M-wheel-down' also
+increase and decrease the font size globally.  Additionally, the
+user option 'global-text-scale-adjust-resizes-frames' controls whether
+the frames are resized when the font size is changed.
+
+** New config variable 'syntax-wholeline-max' to reduce the cost of long lines.
+This variable is used by some operations (mostly syntax-propertization
+and font-locking) to treat lines longer than this variable as if they
+were made up of various smaller lines.  This can help reduce the
+slowdowns seen in buffers made of a single long line, but can also
+cause misbehavior in the presence of such long lines (tho most of that
+misbehavior should usually be limited to mis-highlighting).  You can
+recover the previous behavior with:
+
+    (setq syntax-wholeline-max most-positive-fixnum)
+
+---
+** New bindings in 'find-function-setup-keys' for 'find-library'.
+When 'find-function-setup-keys' is enabled, 'C-x L' is now bound to
+'find-library', 'C-x 4 L' is now bound to 'find-library-other-window'
+and 'C-x 5 L' is now bound to 'find-library-other-frame'.
+
++++
+** New key binding after 'M-x' or 'M-X': 'M-X'.
+Emacs allows different completion predicates to be used with 'M-x'
+(i.e., 'execute-extended-command') via the
+'read-extended-command-predicate' user option.  Emacs also has the
+'M-X' (note upper case) command, which only displays commands
+especially relevant to the current buffer.  Emacs now allows toggling
+between these modes while the user is inputting a command by hitting
+'M-X' while in the minibuffer.
+
+---
+** Interactively, 'kill-buffer' will now offer to save the buffer if unsaved.
+
+---
+** New commands 'duplicate-line' and 'duplicate-dwim'.
+'duplicate-line' duplicates the current line the specified number of times.
+'duplicate-dwim' duplicates the region if it is active.  If not, it
+works like 'duplicate-line'.  An active rectangular region is
+duplicated on its right-hand side.
+
+---
+** Files with the ".eld" extension are now visited in 'lisp-data-mode'.
+
++++
+** 'network-lookup-address-info' can now check numeric IP address validity.
+Specifying 'numeric' as the new optional 'hints' argument makes it
+check if the passed address is a valid IPv4/IPv6 address (without DNS
+traffic).
+
+    (network-lookup-address-info "127.1" 'ipv4 'numeric)
+    => ([127 0 0 1 0])
+
++++
+** New command 'find-sibling-file'.
+This command jumps to a file considered a "sibling file", which is
+determined according to the new user option 'find-sibling-rules'.
+
++++
+** New user option 'delete-selection-temporary-region'.
+When non-nil, 'delete-selection-mode' will only delete the temporary
+regions (usually set by mouse-dragging or shift-selection).
+
++++
+** New user option 'switch-to-prev-buffer-skip-regexp'.
+This should be a regexp or a list of regexps; buffers whose names
+match those regexps will be ignored by 'switch-to-prev-buffer' and
+'switch-to-next-buffer'.
+
++++
+** New command 'rename-visited-file'.
+This command renames the file visited by the current buffer by moving
+it to a new location, and also makes the buffer visit this new file.
+
+** Menus
+
+---
+*** The entries following the buffers in the "Buffers" menu can now be altered.
+Change the 'menu-bar-buffers-menu-command-entries' variable to alter
+the entries that follow the buffer list.
+
+---
+** 'delete-process' is now a command.
+When called interactively, it will kill the process running in the
+current buffer (if any).  This can be useful if you have runaway
+output in the current buffer (from a process or a network connection),
+and want to stop it.
+
++++
+** New command 'restart-emacs'.
+This is like 'save-buffers-kill-emacs', but instead of just killing
+the current Emacs process at the end, it starts a new Emacs process
+(using the same command line arguments as the running Emacs process).
+'kill-emacs' and 'save-buffers-kill-emacs' have also gained new
+optional parameters to restart instead of just killing the current
+process.
+
++++
+** New user option 'mouse-drag-mode-line-buffer'.
+If non-nil, dragging on the buffer name part of the mode-line will
+drag the buffer's associated file to other programs.  This option is
+currently only available on X, Haiku and Nextstep (GNUstep or macOS).
+
++++
+** New user option 'mouse-drag-and-drop-region-cross-program'.
+If non-nil, this option allows dragging text in the region from Emacs
+to another program.
+
+---
+** New user option 'mouse-drag-and-drop-region-scroll-margin'.
+If non-nil, this option allows scrolling a window while dragging text
+around without a scroll wheel.
+
++++
+*** The value of 'mouse-drag-copy-region' can now be the symbol 'non-empty'.
+This prevents mouse drag gestures from putting empty strings onto the
+kill ring.
+
++++
+** New user options 'dnd-indicate-insertion-point' and 'dnd-scroll-margin'.
+These options allow adjusting point and scrolling a window when
+dragging items from another program.
+
++++
+** The X Direct Save (XDS) protocol is now supported.
+This means dropping an image or file link from programs such as
+Firefox will no longer create a temporary file in a random directory,
+instead asking you where to save the file first.
+
++++
+** New user option 'record-all-keys'.
+If non-nil, this option will force recording of all input keys,
+including those typed in response to passwords prompt (this was the
+previous behavior).  The default is nil, which inhibits recording of
+passwords.
+
++++
+** New function 'command-query'.
+This function makes its argument command prompt the user for
+confirmation before executing.
+
++++
+** The 'disabled' property of a command's symbol can now be a list.
+The first element of the list should be the symbol 'query', which will
+cause the command disabled this way prompt the user with a y/n or a
+yes/no question before executing.  The new function 'command-query' is
+a convenient method of making commands disabled in this way.
+
+---
+** 'count-words' will now report buffer totals if given a prefix.
+Without a prefix, it will only report the word count for the narrowed
+part of the buffer.
+
++++
+** 'count-words' will now report sentence count when used interactively.
+
+---
+** New user option 'find-library-include-other-files'.
+If set to nil, commands like 'find-library' will only include library
+files in the completion candidates.  The default is t, which preserves
+previous behavior, whereby non-library files could also be included.
+
++++
+** New command 'sqlite-mode-open-file' for examining an sqlite3 file.
+This uses the new 'sqlite-mode' which allows listing the tables in a
+DB file, and examining and modifying the columns and the contents of
+those tables.
+
+---
+** 'write-file' will now copy some file mode bits.
+If the current buffer is visiting a file that is executable, the
+'C-x C-w' command will now make the new file executable, too.
+
++++
+** New user option 'process-error-pause-time'.
+This determines how long to pause Emacs after a process
+filter/sentinel error has been handled.
+
++++
+** New faces for font-lock.
+These faces are primarily meant for use with tree-sitter. They are:
+'font-lock-bracket-face', 'font-lock-delimiter-face',
+'font-lock-escape-face', 'font-lock-number-face',
+'font-lock-misc-punctuation-face', 'font-lock-operator-face',
+'font-lock-property-face', 'font-lock-punctuation-face'.
+
++++
+** New face 'variable-pitch-text'.
+This face is like 'variable-pitch' (from which it inherits), but is
+slightly larger, which should help with the visual size differences
+between the default, non-proportional font and proportional fonts when
+mixed.
+
++++
+** New face 'mode-line-active'.
+This inherits from the 'mode-line' face, but is the face actually used
+on the mode lines (along with 'mode-line-inactive').
+
++++
+** New face attribute pseudo-value 'reset'.
+This value stands for the value of the corresponding attribute of the
+'default' face.  It can be used to reset attribute values produced by
+inheriting from other faces.
+
++++
+** New X resource: "borderThickness".
+This controls the thickness of the external borders of the menu bars
+and pop-up menus.
+
++++
+** New X resource: "inputStyle".
+This controls the style of the pre-edit and status areas of X input
+methods.
+
++++
+** New X resources: "highlightForeground" and "highlightBackground".
+Only in the Lucid build, this controls colors used for highlighted
+menu item widgets.
+
++++
+** On X, Emacs now tries to synchronize window resize with the window manager.
+This leads to less flicker and empty areas of a frame being displayed
+when a frame is being resized.  Unfortunately, it does not work on
+some ancient buggy window managers, so if Emacs appears to freeze, but
+is still responsive to input, you can turn it off by setting the X
+resource "synchronizeResize" to "off".
+
++++
+** On X, Emacs can optionally synchronize display with the graphics hardware.
+When this is enabled by setting the X resource "synchronizeResize" to
+"extended", frame content "tearing" is drastically reduced.  This is
+only supported on the Motif, Lucid, and no-toolkit builds, and
+requires an X compositing manager supporting the extended frame
+synchronization protocol (see
+https://fishsoup.net/misc/wm-spec-synchronization.html).
+
+This behavior can be toggled on and off via the frame parameter
+'use-frame-synchronization'.
+
++++
+** New frame parameter 'alpha-background' and X resource "alphaBackground".
+This controls the opacity of the text background when running on a
+composited display.
+
++++
+** New frame parameter 'shaded'.
+With window managers which support this, it controls whether or not a
+frame's contents will be hidden, leaving only the title bar on display.
+
+---
+** New user option 'x-gtk-use-native-input'.
+This controls whether or not GTK input methods are used by Emacs,
+instead of XIM input methods.
+
++++
+** New user option 'use-system-tooltips'.
+This controls whether to use the toolkit tooltips, or Emacs's own
+native implementation of tooltips as small frames.  This option is
+only meaningful if Emacs was built with GTK+, Nextstep, or Haiku
+support, and defaults to t, which makes Emacs use the toolkit
+tooltips.  The existing GTK-specific option
+'x-gtk-use-system-tooltips' is now an alias of this new option.
+
++++
+** Non-native tooltips are now supported on Nextstep.
+This means Emacs built with GNUstep or built on macOS is now able to
+display different faces and images inside tooltips when the
+'use-system-tooltips' user option is nil.
+
+** Connection-local variables
+
++++
+*** Some connection-local variables are now user options.
+The variables 'connection-local-profile-alist' and
+'connection-local-criteria-alist' are now user options, in order to
+make it more convenient to inspect and modify them.
+
++++
+*** The default connection-local application can be changed temporarily.
+Running 'with-connection-local-variables' defaults to application
+'tramp'.  This can be changed by let-binding
+'connection-local-default-application' to another symbol.  This is
+useful when running code in a buffer where Tramp has already set some
+connection-local variables.
+
+---
+** New minor mode 'pixel-scroll-precision-mode'.
+When enabled, and if your mouse supports it, you can scroll the
+display up or down at pixel resolution, according to what your mouse
+wheel reports.  Unlike 'pixel-scroll-mode', this mode scrolls the
+display pixel-by-pixel, as opposed to only animating line-by-line
+scrolls.
+
+** Terminal Emacs
+
+---
+*** Emacs will now use 24-bit colors on terminals that support "Tc" capability.
+This is in addition to previously-supported ways of discovering 24-bit
+color support: either via the "RGB" or "setf24" capabilities, or if
+the 'COLORTERM' environment variable is set to the value "truecolor".
+
+*** Select active regions with xterm selection support.
+On terminals with xterm setSelection support, the active region may be
+saved to the X primary selection, following the
+'select-active-regions' variable.  This support is enabled when
+'tty-select-active-regions' is non-nil.
+
+---
+*** New command to set up display of unsupported characters.
+The new command 'standard-display-by-replacement-char' produces Lisp
+code that sets up the 'standard-display-table' to use a replacement
+character for display of characters that the text-mode terminal
+doesn't support.  It is most useful with the Linux console and similar
+terminals, where Emacs has a reliable way of determining which
+characters have glyphs in the font loaded into the terminal's memory.
+
+---
+*** New functions to set terminal output buffer size.
+The new functions 'tty--set-output-buffer-size' and
+'tty--output-buffer-size' allow setting and retrieving the output
+buffer size of a terminal device.  The default buffer size is and has
+always been BUFSIZ, which is defined in your system's stdio.h.  When
+you set a buffer size with 'tty--set-output-buffer-size', this also
+prevents Emacs from explicitly flushing the tty output stream, except
+at the end of display update.
+
+** ERT
+
++++
+*** New ERT variables 'ert-batch-print-length' and 'ert-batch-print-level'.
+These variables will override 'print-length' and 'print-level' when
+printing Lisp values in ERT batch test results.
+
+---
+*** Redefining an ERT test in batch mode now signals an error.
+Executing 'ert-deftest' with the same name as an existing test causes
+the previous definition to be discarded, which was probably not
+intended when this occurs in batch mode.  To remedy the error, rename
+tests so that they all have unique names.
+
++++
+*** ERT can generate JUnit test reports.
+When environment variable 'EMACS_TEST_JUNIT_REPORT' is set, ERT
+generates a JUnit test report under this file name.  This is useful
+for Emacs integration into CI/CD test environments.
+
+---
+*** Unbound test symbols now signal an 'ert-test-unbound' error.
+This affects the 'ert-select-tests' function and its callers.
+
+** Emoji
+
++++
+*** Emacs now has several new methods for inserting Emojis.
+The Emoji commands are under the new 'C-x 8 e' prefix.
+
++++
+*** New command 'emoji-insert' (bound to 'C-x 8 e e' and 'C-x 8 e i').
+This command guides you through various Emoji categories and
+combinations in a graphical menu system.
+
++++
+*** New command 'emoji-search' (bound to 'C-x 8 e s').
+This command lets you search for Emojis based on names.
+
++++
+*** New command 'emoji-list' (bound to 'C-x 8 e l').
+This command lists all Emojis (categorized by themes) in a special
+buffer and lets you choose one of them.
+
+---
+*** New command 'emoji-recent' (bound to 'C-x 8 e r').
+This command lets you choose among the Emojis you have recently
+inserted.
 
 +++
 ** New variable lets Lisp code read emacsclient arguments.
