@@ -1823,8 +1823,8 @@ If it is activated, also signal textDocument/didOpen."
                                            (call-interactively what)
                                            (force-mode-line-update t))))))
 
-(defun eglot-manual () "Open on-line documentation."
-  (interactive) (browse-url "https://github.com/joaotavora/eglot#readme"))
+(defun eglot-manual () "Open documentation."
+  (interactive) (info "(eglot)"))
 
 (easy-menu-define eglot-menu nil "Eglot"
   `("Eglot"
