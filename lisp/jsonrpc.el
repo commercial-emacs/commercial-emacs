@@ -542,35 +542,30 @@ With optional CLEANUP, kill any associated buffers."
                   (message-end (byte-to-position
                                 (+ (position-bytes (point))
                                    (jsonrpc--expected-bytes connection)))))
-              (cond ((< available-bytes (jsonrpc--expected-bytes connection))
-                     ;; message still incomplete
-                     (throw 'done t))
-                    ((< (length (buffer-substring-no-properties (point) message-end))
-                        (- message-end (point)))
-                     ;; output flushing vagaries
-                     (throw 'done t))
-                    (t
-                     (save-restriction
-                       (narrow-to-region (point) message-end)
-                       (unwind-protect
-                           (when-let ((json-message
-                                       (condition-case err
-                                           (jsonrpc--json-read)
-                                         (error
-                                          (prog1 nil
-                                            (jsonrpc--warn "Invalid JSON: %s\n%s"
-                                                           (cdr err) (buffer-string)))))))
-                             (with-temp-buffer
-                               ;; Calls success-fn and error-fn of
-                               ;; jsonrpc-async-request, which can arbitrarily
-                               ;; pollute or even kill (process-buffer PROC).
-                               ;; Ergo, ensuing buffer-live-p check.
-                               (jsonrpc-connection-receive connection json-message)))
-                         (when (buffer-live-p (process-buffer proc))
-                           (with-current-buffer (process-buffer proc)
-                             (goto-char message-end)
-                             (delete-region (point-min) (point))
-                             (setf (jsonrpc--expected-bytes connection) nil))))))))))))))
+              (if (< available-bytes (jsonrpc--expected-bytes connection))
+                  (throw 'done t)       ; message still incomplete
+                (unwind-protect
+                    (save-restriction
+                      (narrow-to-region (point) message-end)
+                      (when-let ((json-message
+                                  (condition-case err
+                                      (jsonrpc--json-read)
+                                    (error
+                                     (prog1 nil
+                                       (jsonrpc--warn "Invalid JSON: %s %s"
+                                                      (cdr err) (buffer-string)))))))
+                        (with-temp-buffer
+                          ;; Calls success-fn and error-fn
+                          ;; of jsonrpc-async-request, which
+                          ;; can arbitrarily pollute or even kill
+                          ;; (process-buffer PROC).  Ergo, buffer-live-p
+                          ;; check in unwind clause.
+                          (jsonrpc-connection-receive connection json-message))))
+                  (when (buffer-live-p (process-buffer proc))
+                    (with-current-buffer (process-buffer proc)
+                      (goto-char message-end)
+                      (delete-region (point-min) (point))
+                      (setf (jsonrpc--expected-bytes connection) nil))))))))))))
 
 (cl-defun jsonrpc--async-request-1 (connection method params
                                     &rest args
