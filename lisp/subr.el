@@ -6845,8 +6845,38 @@ lines."
             (setq start (length string)))))
       (nreverse lines))))
 
-(defun buffer-match-p (condition buffer-or-name &optional arg)
-  "Return non-nil if BUFFER-OR-NAME matches CONDITION.
+(letrec ((buffer-sym (make-symbol "buffer"))
+         (arg-sym (make-symbol "arg"))
+         (translate
+          (lambda (condition)
+            "Compile a CONDITION into a predicate function."
+            (pcase-exhaustive condition
+              ((or 't 'nil)
+               condition)
+              ((pred stringp)
+               `(string-match-p ,condition (buffer-name ,buffer-sym)))
+              ((pred functionp)
+               (if (eq 1 (cdr (func-arity condition)))
+                   `(condition ,buffer-sym)
+                 `(condition
+                   ,buffer-sym
+                   ,arg-sym)))
+              (`(major-mode . ,mode)
+               `(eq (buffer-local-value 'major-mode ,buffer-sym)
+                    ',mode))
+              (`(derived-mode . ,mode)
+               `(provided-mode-derived-p
+                 (buffer-local-value 'major-mode ,buffer-sym)
+                 ',mode))
+              (`(not . ,cond)
+               `(not ,(funcall translate cond)))
+              (`(or . ,conds)
+               `(or ,@(mapcar translate conds)))
+              (`(and . ,conds)
+               `(and ,@(mapcar translate conds))))))
+         (cond-cache (make-hash-table :test 'eq)))
+  (defun buffer-match-p (condition buffer-or-name &optional arg)
+    "Return non-nil if BUFFER-OR-NAME matches CONDITION.
 CONDITION is either:
 - the symbol t, to always match,
 - the symbol nil, which never matches,
@@ -6865,40 +6895,13 @@ CONDITION is either:
     to be met.
   * `or': the cdr is a list of recursive condition, of which at
     least one has to be met."
-  (letrec
-      ((buffer (get-buffer buffer-or-name))
-       (match
-        (lambda (conditions)
-          (catch 'match
-            (dolist (condition conditions)
-              (when (pcase condition
-                      ('t t)
-                      ((pred stringp)
-                       (string-match-p condition (buffer-name buffer)))
-                      ((pred functionp)
-                       (if (eq 1 (cdr (func-arity condition)))
-                           (funcall condition buffer)
-                         (funcall condition buffer arg)))
-                      (`(major-mode . ,mode)
-                       (eq
-                        (buffer-local-value 'major-mode buffer)
-                        mode))
-                      (`(derived-mode . ,mode)
-                       (provided-mode-derived-p
-                        (buffer-local-value 'major-mode buffer)
-                        mode))
-                      (`(not . ,cond)
-                       (not (funcall match cond)))
-                      (`(or . ,args)
-                       (funcall match args))
-                      (`(and . ,args)
-                       (catch 'fail
-                         (dolist (c args)
-                           (unless (funcall match (list c))
-                             (throw 'fail nil)))
-                         t)))
-                (throw 'match t)))))))
-    (funcall match (list condition))))
+    (funcall (or (gethash condition cond-cache)
+                 (puthash condition
+                          (byte-compile
+                           `(lambda (,buffer-sym ,arg-sym)
+                              ,(funcall translate condition)))
+                          cond-cache))
+             (get-buffer buffer-or-name) arg)))
 
 (defun match-buffers (condition &optional buffers arg)
   "Return a list of buffers that match CONDITION.
