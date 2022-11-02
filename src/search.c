@@ -1560,7 +1560,6 @@ simple_search (EMACS_INT n, unsigned char *pat,
 	while (1)
 	  {
 	    /* Try matching at position POS.  */
-	    ptrdiff_t this_pos = pos;
 	    ptrdiff_t this_pos_byte = pos_byte;
 	    ptrdiff_t this_len = len;
 	    unsigned char *p = pat;
@@ -1582,7 +1581,6 @@ simple_search (EMACS_INT n, unsigned char *pat,
 		p += charlen;
 
 		this_pos_byte += buf_charlen;
-		this_pos++;
 	      }
 
 	    if (this_len == 0)
