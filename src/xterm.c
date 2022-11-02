@@ -11405,15 +11405,18 @@ x_new_focus_frame (struct x_display_info *dpyinfo, struct frame *frame)
   x_frame_rehighlight (dpyinfo);
 }
 
+#ifdef HAVE_XFIXES
+
 /* True if the display in DPYINFO supports a version of Xfixes
    sufficient for pointer blanking.  */
-#ifdef HAVE_XFIXES
+
 static bool
-x_probe_xfixes_extension (struct x_display_info *dpyinfo)
+x_fixes_pointer_blanking_supported (struct x_display_info *dpyinfo)
 {
   return (dpyinfo->xfixes_supported_p
 	  && dpyinfo->xfixes_major >= 4);
 }
+
 #endif /* HAVE_XFIXES */
 
 /* Toggle mouse pointer visibility on frame F using the XFixes
@@ -11484,7 +11487,7 @@ x_toggle_visible_pointer (struct frame *f, bool invisible)
   /* But if Xfixes is available, try using it instead.  */
   if (dpyinfo->invisible_cursor == None)
     {
-      if (x_probe_xfixes_extension (dpyinfo))
+      if (x_fixes_pointer_blanking_supported (dpyinfo))
 	{
 	  dpyinfo->fixes_pointer_blanking = true;
 	  xfixes_toggle_visible_pointer (f, invisible);
@@ -11512,7 +11515,7 @@ XTtoggle_invisible_pointer (struct frame *f, bool invisible)
   block_input ();
 #ifdef HAVE_XFIXES
   if (FRAME_DISPLAY_INFO (f)->fixes_pointer_blanking
-      && x_probe_xfixes_extension (FRAME_DISPLAY_INFO (f)))
+      && x_fixes_pointer_blanking_supported (FRAME_DISPLAY_INFO (f)))
     xfixes_toggle_visible_pointer (f, invisible);
   else
 #endif
@@ -11520,13 +11523,16 @@ XTtoggle_invisible_pointer (struct frame *f, bool invisible)
   unblock_input ();
 }
 
-/* Handle FocusIn and FocusOut state changes for FRAME.
-   If FRAME has focus and there exists more than one frame, puts
-   a FOCUS_IN_EVENT into *BUFP.  */
+/* Handle FocusIn and FocusOut state changes for FRAME.  If FRAME has
+   focus and there exists more than one frame, puts a FOCUS_IN_EVENT
+   into *BUFP.  Note that this code is not used to handle focus
+   changes on builds that can use the X Input extension for handling
+   input focus when it is available (currently the no toolkit and GTK
+   3 toolkits).  */
 
 static void
-x_focus_changed (int type, int state, struct x_display_info *dpyinfo, struct frame *frame,
-		 struct input_event *bufp)
+x_focus_changed (int type, int state, struct x_display_info *dpyinfo,
+		 struct frame *frame, struct input_event *bufp)
 {
   if (type == FocusIn)
     {
