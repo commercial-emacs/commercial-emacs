@@ -45,6 +45,7 @@
 
 (ert-deftest eshell-test/pipe-tailproc ()
   "Check that piping a process to a non-process command waits for the process"
+  :expected-result (if (getenv "CI") t :passed) ; spotty echo on macos vm's
   (skip-unless (executable-find "echo"))
   (with-temp-eshell
    (eshell-match-command-output "*echo hi | echo bye"
@@ -63,6 +64,7 @@
 
 (ert-deftest eshell-test/pipe-subcommand ()
   "Check that piping with an asynchronous subcommand works"
+  :expected-result (if (getenv "CI") t :passed) ; spotty echo on macos vm's
   (skip-unless (and (executable-find "echo")
                     (executable-find "cat")))
   (with-temp-eshell
@@ -71,6 +73,7 @@
 
 (ert-deftest eshell-test/pipe-subcommand-with-pipe ()
   "Check that piping with an asynchronous subcommand with its own pipe works"
+  :expected-result (if (getenv "CI") t :passed) ; spotty echo on macos vm's
   (skip-unless (and (executable-find "echo")
                     (executable-find "cat")))
   (with-temp-eshell
