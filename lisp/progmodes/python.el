@@ -3429,7 +3429,7 @@ Return the output."
      (with-local-quit
        (unwind-protect
            (python-shell-send-string string process)
-         (when (not (null last-prompt))
+         (when last-prompt
            (with-current-buffer buffer
              (set last-prompt last-prompt-value))))
        (while python-shell-output-filter-in-progress
@@ -4810,7 +4810,7 @@ def __FFAP_get_module_path(objstr):
                        python-ffap-setup-code
                        (python-shell--encode-string module)))))
     (unless (string-empty-p module-file)
-      (python-util-strip-string module-file))))
+      (python-util-strip-string (car (last (split-string module-file "\r\n")))))))
 
 (defvar ffap-alist)
 
