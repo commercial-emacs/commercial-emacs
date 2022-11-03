@@ -55,13 +55,23 @@
   :type 'string
   :version "27.1")
 
+(defcustom auth-source-pass-standard-search nil
+  "Whether to use more standardized search behavior.
+When nil, the password-store backend works like it always has and
+considers at most one `:user' search parameter and returns at
+most one result.  With t, it tries to more faithfully mimic other
+auth-source backends."
+  :version "29.1"
+  :type 'boolean)
+
 (cl-defun auth-source-pass-search (&rest spec
                                          &key backend type host user port
+                                         require max
                                          &allow-other-keys)
   "Given some search query, return matching credentials.
 
 See `auth-source-search' for details on the parameters SPEC, BACKEND, TYPE,
-HOST, USER and PORT."
+HOST, USER, PORT, REQUIRE, and MAX."
   (cl-assert (or (null type) (eq type (oref backend type)))
              t "Invalid password-store search: %s %s")
   (cond ((eq host t)
@@ -70,6 +80,8 @@ HOST, USER and PORT."
         ((null host)
          ;; Do not build a result, as none will match when HOST is nil
          nil)
+        (auth-source-pass-standard-search
+         (auth-source-pass--build-result-many host port user require max))
         (t
          (when-let ((result (auth-source-pass--build-result host port user)))
            (list result)))))
@@ -88,6 +100,25 @@ HOSTS can be a string or a list of strings."
         (auth-source-pass--do-debug "return %s as final result (plus hidden password)"
                                     (seq-subseq retval 0 -2)) ;; remove password
         retval))))
+
+(defun auth-source-pass--build-result-many (hosts ports users require max)
+  "Return multiple `auth-source-pass--build-result' values."
+  (unless (listp hosts) (setq hosts (list hosts)))
+  (unless (listp users) (setq users (list users)))
+  (unless (listp ports) (setq ports (list ports)))
+  (let ((rv (auth-source-pass--find-match-many hosts users ports
+                                               require (or max 1))))
+    (when auth-source-debug
+      (auth-source-pass--do-debug "final result: %S" rv))
+    (if (eq auth-source-pass-standard-search 'test)
+        (reverse rv)
+      (let (out)
+        (dolist (e rv out)
+          (when-let* ((s (plist-get e :secret)) ; s not captured by closure
+                      (v (auth-source--obfuscate s)))
+            (setf (plist-get e :secret)
+                  (lambda () (auth-source--deobfuscate v))))
+          (push e out))))))
 
 ;;;###autoload
 (defun auth-source-pass-enable ()
@@ -205,6 +236,72 @@ HOSTS can be a string or a list of strings."
             (if (listp hosts)
                 hosts
               (list hosts))))
+
+(defconst auth-source-pass--match-regexp
+  (rx (or bot "/")
+      (or (: (? (group-n 20 (+ (not (in " /@")))) "@")
+             (group-n 10 (+ (not (in " /:@"))))
+             (? ":" (group-n 30 (+ (not (in " /:"))))))
+          (: (group-n 11 (+ (not (in " /:@"))))
+             (? ":" (group-n 31 (+ (not (in " /:")))))
+             (? "/" (group-n 21 (+ (not (in " /:")))))))
+      eot))
+
+(defun auth-source-pass--retrieve-parsed (seen path port-number-p)
+  (when-let ((m (string-match auth-source-pass--match-regexp path)))
+    (puthash path
+             (list :host (or (match-string 10 path) (match-string 11 path))
+                   :user (or (match-string 20 path) (match-string 21 path))
+                   :port (and-let* ((p (or (match-string 30 path)
+                                           (match-string 31 path)))
+                                    (n (string-to-number p)))
+                           (if (or (zerop n) (not port-number-p))
+                               (format "%s" p)
+                             n)))
+             seen)))
+
+(defun auth-source-pass--match-parts (parts key value require)
+  (let ((mv (plist-get parts key)))
+    (if (memq key require)
+        (and value (equal mv value))
+      (or (not value) (not mv) (equal mv value)))))
+
+;; For now, this ignores the contents of files and only considers path
+;;  components when matching.
+(defun auth-source-pass--find-match-many (hosts users ports require max)
+  "Return plists for valid combinations of HOSTS, USERS, PORTS.
+Each plist contains, at the very least, a host and a secret."
+  (let ((seen (make-hash-table :test #'equal))
+        (entries (auth-source-pass-entries))
+        port-number-p
+        out)
+    (catch 'done
+      (dolist (host hosts out)
+        (pcase-let ((`(,_ ,u ,p) (auth-source-pass--disambiguate host)))
+          (unless (or (not (equal "443" p)) (string-prefix-p "https://" host))
+            (setq p nil))
+          (dolist (user (or users (list u)))
+            (dolist (port (or ports (list p)))
+              (setq port-number-p (equal 'integer (type-of port)))
+              (dolist (e entries)
+                (when-let*
+                    ((m (or (gethash e seen) (auth-source-pass--retrieve-parsed
+                                              seen e port-number-p)))
+                     ((equal host (plist-get m :host)))
+                     ((auth-source-pass--match-parts m :port port require))
+                     ((auth-source-pass--match-parts m :user user require))
+                     (parsed (auth-source-pass-parse-entry e))
+                     (secret (or (auth-source-pass--get-attr 'secret parsed)
+                                 (not (memq :secret require)))))
+                  (push
+                   `( :host ,host ; prefer user-provided :host over h
+                      ,@(and-let* ((u (plist-get m :user))) (list :user u))
+                      ,@(and-let* ((p (plist-get m :port))) (list :port p))
+                      ,@(and secret (not (eq secret t)) (list :secret secret)))
+                   out)
+                  (when (or (zerop (cl-decf max))
+                            (null (setq entries (delete e entries))))
+                    (throw 'done out)))))))))))
 
 (defun auth-source-pass--disambiguate (host &optional user port)
   "Return (HOST USER PORT) after disambiguation.

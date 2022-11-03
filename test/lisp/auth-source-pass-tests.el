@@ -488,6 +488,122 @@ HOSTNAME, USER and PORT are passed unchanged to
     (should (auth-source-pass--have-message-matching
              "found 2 entries matching \"gitlab.com\": (\"a/gitlab.com\" \"b/gitlab.com\")"))))
 
+
+;; FIXME move this to top of file if keeping these netrc tests
+(require 'ert-x)
+
+;; No entry has the requested port, but a result is still returned.
+
+(ert-deftest auth-source-pass-standard-search--wild-port-miss-netrc ()
+  (ert-with-temp-file netrc-file
+    :text "\
+machine x.com password a
+machine x.com port 42 password b
+"
+    (let* ((auth-sources (list netrc-file))
+           (auth-source-do-cache nil)
+           (results (auth-source-search :host "x.com" :port 22 :max 2)))
+      (dolist (result results)
+        (setf result (plist-put result :secret (auth-info-password result))))
+      (should (equal results '((:host "x.com" :secret "a")))))))
+
+(ert-deftest auth-source-pass-standard-search--wild-port-miss ()
+  (let ((auth-source-pass-standard-search 'test))
+    (auth-source-pass--with-store '(("x.com" (secret . "a"))
+                                    ("x.com:42" (secret . "b")))
+      (auth-source-pass-enable)
+      (should (equal (auth-source-search :host "x.com" :port 22 :max 2)
+                     '((:host "x.com" :secret "a")))))))
+
+;; One of two entries has the requested port, both returned
+
+(ert-deftest auth-source-pass-standard-search--wild-port-hit-netrc ()
+  (ert-with-temp-file netrc-file
+    :text "\
+machine x.com password a
+machine x.com port 42 password b
+"
+    (let* ((auth-sources (list netrc-file))
+           (auth-source-do-cache nil)
+           (results (auth-source-search :host "x.com" :port 42 :max 2)))
+      (dolist (result results)
+        (setf result (plist-put result :secret (auth-info-password result))))
+      (should (equal results '((:host "x.com" :secret "a")
+                               (:host "x.com" :port "42" :secret "b")))))))
+
+(ert-deftest auth-source-pass-standard-search--wild-port-hit ()
+  (let ((auth-source-pass-standard-search 'test))
+    (auth-source-pass--with-store '(("x.com" (secret . "a"))
+                                    ("x.com:42" (secret . "b")))
+      (auth-source-pass-enable)
+      (should (equal (auth-source-search :host "x.com" :port 42 :max 2)
+                     '((:host "x.com" :secret "a")
+                       (:host "x.com" :port 42 :secret "b")))))))
+
+;; No entry has the requested port, but :port is required, so search fails
+
+(ert-deftest auth-source-pass-standard-search--wild-port-req-miss-netrc ()
+  (ert-with-temp-file netrc-file
+    :text "\
+machine x.com password a
+machine x.com port 42 password b
+"
+    (let* ((auth-sources (list netrc-file))
+           (auth-source-do-cache nil)
+           (results (auth-source-search
+                     :host "x.com" :port 22 :require '(:port) :max 2)))
+      (should-not results))))
+
+(ert-deftest auth-source-pass-standard-search--wild-port-req-miss ()
+  (let ((auth-source-pass-standard-search 'test))
+    (auth-source-pass--with-store '(("x.com" (secret . "a"))
+                                    ("x.com:42" (secret . "b")))
+      (auth-source-pass-enable)
+      (should-not (auth-source-search
+                   :host "x.com" :port 22 :require '(:port) :max 2)))))
+
+;; A retrieved store entry mustn't be nil regardless of whether its
+;; path contains port or user components
+
+(ert-deftest auth-source-pass-standard-search--baseline ()
+  (let ((auth-source-pass-standard-search 'test))
+    (auth-source-pass--with-store '(("x.com"))
+      (auth-source-pass-enable)
+      (should-not (auth-source-search :host "x.com")))))
+
+;; Output port type (int or string) matches that of input parameter
+
+(ert-deftest auth-source-pass-standard-search--port-type ()
+  (let ((auth-source-pass-standard-search 'test))
+    (auth-source-pass--with-store '(("x.com:42" (secret . "a")))
+      (auth-source-pass-enable)
+      (should (equal (auth-source-search :host "x.com" :port 42)
+                     '((:host "x.com" :port 42 :secret "a")))))
+    (auth-source-pass--with-store '(("x.com:42" (secret . "a")))
+      (auth-source-pass-enable)
+      (should (equal (auth-source-search :host "x.com" :port "42")
+                     '((:host "x.com" :port "42" :secret "a")))))))
+
+;; The :host search param ordering more heavily influences the output
+;; because (h1, u1, p1), (h1, u1, p2), ... (hN, uN, pN); also, exact
+;; matches are not given precedence, i.e., matching store items are
+;; returned in the order encountered
+
+(ert-deftest auth-source-pass-standard-search--hosts-first ()
+  (let ((auth-source-pass-standard-search 'test))
+    (auth-source-pass--with-store '(("x.com:42/bar" (secret . "a"))
+                                    ("gnu.org" (secret . "b"))
+                                    ("x.com" (secret . "c"))
+                                    ("fake.com" (secret . "d"))
+                                    ("x.com/foo" (secret . "e")))
+      (auth-source-pass-enable)
+      (should (equal (auth-source-search :host '("x.com" "gnu.org") :max 3)
+                     ;; Notice gnu.org is never considered ^
+                     '((:host "x.com" :user "bar" :port "42" :secret "a")
+                       (:host "x.com" :secret "c")
+                       (:host "x.com" :user "foo" :secret "e")))))))
+
+
 (provide 'auth-source-pass-tests)
 
 ;;; auth-source-pass-tests.el ends here
