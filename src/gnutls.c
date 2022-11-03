@@ -2780,6 +2780,10 @@ Any GnuTLS extension with ID up to 100
 
   capabilities = Fcons (intern("gnutls"), capabilities);
 
+#  ifdef HAVE_GNUTLS_EXT__DUMBFW
+  capabilities = Fcons (intern("ClientHello Padding"), capabilities);
+#  endif
+
 # ifdef HAVE_GNUTLS3
   capabilities = Fcons (intern("gnutls3"), capabilities);
   capabilities = Fcons (intern("digests"), capabilities);
@@ -2797,15 +2801,13 @@ Any GnuTLS extension with ID up to 100
       const char* name = gnutls_ext_get_name(ext);
       if (name != NULL)
         {
-          capabilities = Fcons (intern(name), capabilities);
+          Lisp_Object cap = intern (name);
+          if (NILP (Fmemq (cap, capabilities)))
+            capabilities = Fcons (cap, capabilities);
         }
     }
 #  endif
 # endif	  /* HAVE_GNUTLS3 */
-
-#  ifdef HAVE_GNUTLS_EXT__DUMBFW
-  capabilities = Fcons (intern("ClientHello Padding"), capabilities);
-#  endif
 
 # ifdef WINDOWSNT
   Vlibrary_cache = Fcons (Fcons (Qgnutls, capabilities), Vlibrary_cache);
