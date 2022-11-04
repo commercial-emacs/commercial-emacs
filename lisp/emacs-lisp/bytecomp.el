@@ -5123,11 +5123,7 @@ Use with caution."
                                 '("pcase.el" "bytecomp.el" "macroexp.el"
                                   "cconv.el" "byte-opt.el" "comp.el"))))
           (message "Reloading stale %s" (file-name-nondirectory f))
-          (condition-case nil
-              (load f 'noerror nil 'nosuffix)
-            ;; Probably shouldn't happen, but in case of an error, it seems
-            ;; at least as useful to ignore it as it is to stop compilation.
-            (error nil)))))))
+          (ignore-errors (load f 'noerror nil 'nosuffix )))))))
 
 ;;;###autoload
 (defun batch-byte-recompile-directory (&optional arg)
