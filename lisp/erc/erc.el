@@ -71,8 +71,6 @@
 (require 'iso8601)
 (eval-when-compile (require 'subr-x))
 
-(require 'erc-compat)
-
 (defconst erc-version "5.4.1"
   "This version of ERC.")
 
@@ -134,29 +132,12 @@
   "Running scripts at startup and with /LOAD."
   :group 'erc)
 
-;; Defined in erc-backend
-(defvar erc--server-last-reconnect-count)
-(defvar erc--server-reconnecting)
-(defvar erc-channel-members-changed-hook)
-(defvar erc-network)
-(defvar erc-networks--id)
-(defvar erc-server-367-functions)
-(defvar erc-server-announced-name)
-(defvar erc-server-connect-function)
-(defvar erc-server-connected)
-(defvar erc-server-current-nick)
-(defvar erc-server-lag)
-(defvar erc-server-last-sent-time)
-(defvar erc-server-process)
-(defvar erc-server-quitting)
-(defvar erc-server-reconnect-count)
-(defvar erc-server-reconnecting)
-(defvar erc-session-client-certificate)
-(defvar erc-session-connector)
-(defvar erc-session-port)
-(defvar erc-session-server)
-(defvar erc-session-user-full-name)
-(defvar erc-session-username)
+;; Forward declarations
+(defvar erc-message-parsed)
+
+(defvar tabbar--local-hlf)
+(defvar motif-version-string)
+(defvar gtk-version-string)
 
 ;; tunable connection and authentication parameters
 
@@ -482,12 +463,10 @@ Use the CASEMAPPING ISUPPORT parameter to determine the style."
   "This function is for internal use only.
 
 Adds USER with nickname NICK to the `erc-server-users' hash table."
-  (inline-letevals (nick user)
-    (inline-quote
-     (erc-with-server-buffer
-       (puthash (erc-downcase ,nick) ,user erc-server-users)))))
+  (erc-with-server-buffer
+    (puthash (erc-downcase nick) user erc-server-users)))
 
-(define-inline erc-remove-server-user (nick)
+(defun erc-remove-server-user (nick)
   "This function is for internal use only.
 
 Removes the user with nickname NICK from the `erc-server-users'
@@ -495,10 +474,8 @@ hash table.  This user is not removed from the
 `erc-channel-users' lists of other buffers.
 
 See also: `erc-remove-user'."
-  (inline-letevals (nick)
-    (inline-quote
-     (erc-with-server-buffer
-       (remhash (erc-downcase ,nick) erc-server-users)))))
+  (erc-with-server-buffer
+    (remhash (erc-downcase nick) erc-server-users)))
 
 (defun erc-change-user-nickname (user new-nick)
   "This function is for internal use only.
@@ -569,55 +546,45 @@ Removes all users in the current channel.  This is called by
              erc-channel-users)
     (clrhash erc-channel-users)))
 
-(define-inline erc-channel-user-owner-p (nick)
+(defun erc-channel-user-owner-p (nick)
   "Return non-nil if NICK is an owner of the current channel."
-  (inline-letevals (nick)
-    (inline-quote
-     (and ,nick
-	  (hash-table-p erc-channel-users)
-	  (let ((cdata (erc-get-channel-user ,nick)))
-	    (and cdata (cdr cdata)
-		 (erc-channel-user-owner (cdr cdata))))))))
+  (and nick
+       (hash-table-p erc-channel-users)
+       (let ((cdata (erc-get-channel-user nick)))
+         (and cdata (cdr cdata)
+              (erc-channel-user-owner (cdr cdata))))))
 
-(define-inline erc-channel-user-admin-p (nick)
+(defun erc-channel-user-admin-p (nick)
   "Return non-nil if NICK is an admin in the current channel."
-  (inline-letevals (nick)
-    (inline-quote
-     (and ,nick
+  (and nick
        (hash-table-p erc-channel-users)
-       (let ((cdata (erc-get-channel-user ,nick)))
+       (let ((cdata (erc-get-channel-user nick)))
          (and cdata (cdr cdata)
-              (erc-channel-user-admin (cdr cdata))))))))
+              (erc-channel-user-admin (cdr cdata))))))
 
-(define-inline erc-channel-user-op-p (nick)
+(defun erc-channel-user-op-p (nick)
   "Return non-nil if NICK is an operator in the current channel."
-  (inline-letevals (nick)
-    (inline-quote
-     (and ,nick
+  (and nick
        (hash-table-p erc-channel-users)
-       (let ((cdata (erc-get-channel-user ,nick)))
+       (let ((cdata (erc-get-channel-user nick)))
          (and cdata (cdr cdata)
-              (erc-channel-user-op (cdr cdata))))))))
+              (erc-channel-user-op (cdr cdata))))))
 
-(define-inline erc-channel-user-halfop-p (nick)
+(defun erc-channel-user-halfop-p (nick)
   "Return non-nil if NICK is a half-operator in the current channel."
-  (inline-letevals (nick)
-    (inline-quote
-     (and ,nick
+  (and nick
        (hash-table-p erc-channel-users)
-       (let ((cdata (erc-get-channel-user ,nick)))
+       (let ((cdata (erc-get-channel-user nick)))
          (and cdata (cdr cdata)
-              (erc-channel-user-halfop (cdr cdata))))))))
+              (erc-channel-user-halfop (cdr cdata))))))
 
-(define-inline erc-channel-user-voice-p (nick)
+(defun erc-channel-user-voice-p (nick)
   "Return non-nil if NICK has voice in the current channel."
-  (inline-letevals (nick)
-    (inline-quote
-     (and ,nick
+  (and nick
        (hash-table-p erc-channel-users)
-       (let ((cdata (erc-get-channel-user ,nick)))
+       (let ((cdata (erc-get-channel-user nick)))
          (and cdata (cdr cdata)
-              (erc-channel-user-voice (cdr cdata))))))))
+              (erc-channel-user-voice (cdr cdata))))))
 
 (defun erc-get-channel-user-list ()
   "Return a list of users in the current channel.
@@ -1435,12 +1402,6 @@ capabilities."
     (add-hook hook fun nil t)
     fun))
 
-(define-inline erc-log (string)
-  "Logs STRING if logging is on (see `erc-log-p')."
-  (inline-quote
-   (when erc-log-p
-     (erc-log-aux ,string))))
-
 (defun erc-server-buffer ()
   "Return the server buffer for the current buffer's process.
 The buffer-local variable `erc-server-process' is used to find
@@ -1496,29 +1457,7 @@ If BUFFER is nil, the current buffer is used."
                    (if erc-online-p "" "not "))
         erc-online-p))))
 
-(defun erc-log-aux (string)
-  "Do the debug logging of STRING."
-  (let ((cb (current-buffer))
-        (point 1)
-        (was-eob nil)
-        (session-buffer (erc-server-buffer)))
-    (if session-buffer
-        (progn
-          (set-buffer session-buffer)
-          (if (not (and erc-dbuf (bufferp erc-dbuf) (buffer-live-p erc-dbuf)))
-              (progn
-                (setq erc-dbuf (get-buffer-create
-                                (concat "*ERC-DEBUG: "
-                                        erc-session-server "*")))))
-          (set-buffer erc-dbuf)
-          (setq point (point))
-          (setq was-eob (eobp))
-          (goto-char (point-max))
-          (insert (concat "** " string "\n"))
-          (if was-eob (goto-char (point-max))
-            (goto-char point))
-          (set-buffer cb))
-      (message "ERC: ** %s" string))))
+
 
 ;; Last active buffer, to print server messages in the right place
 
@@ -2750,8 +2689,6 @@ every `erc-lurker-cleanup-interval' updates to
 consumption of lurker state during long Emacs sessions and/or ERC
 sessions with large numbers of incoming PRIVMSGs.")
 
-(defvar erc-message-parsed)
-
 (defun erc-lurker-update-status (_message)
   "Update `erc-lurker-state' if necessary.
 
@@ -3944,7 +3881,7 @@ the message given by REASON."
         (delete-process process))
       (erc-server-reconnect)
       (with-suppressed-warnings ((obsolete erc-server-reconnecting)
-                                 ((obsolete erc-reuse-buffers)))
+                                 (obsolete erc-reuse-buffers))
         (if erc-reuse-buffers
             (progn (cl-assert (not erc--server-reconnecting))
                    (cl-assert (not erc-server-reconnecting)))
@@ -3962,9 +3899,6 @@ the message given by REASON."
      (erc-error "Cannot find host: `%s'" server)))
   t)
 (put 'erc-cmd-SERVER 'process-not-needed t)
-
-(defvar motif-version-string)
-(defvar gtk-version-string)
 
 (defun erc-cmd-SV ()
   "Say the current ERC and Emacs version into channel."
@@ -5222,6 +5156,12 @@ Example: (operator) o => @, (voiced) v => +."
           (setq i (1+ i)))
         alist))))
 
+(defcustom erc-channel-members-changed-hook nil
+  "This hook is called every time the variable `channel-members' changes.
+The buffer where the change happened is current while this hook is called."
+  :group 'erc-hooks
+  :type 'hook)
+
 (defun erc-channel-receive-names (names-string)
   "This function is for internal use only.
 
@@ -5264,13 +5204,6 @@ channel."
             (erc-update-current-channel-member
              name name t voice halfop op admin owner)))))
     (run-hooks 'erc-channel-members-changed-hook)))
-
-
-(defcustom erc-channel-members-changed-hook nil
-  "This hook is called every time the variable `channel-members' changes.
-The buffer where the change happened is current while this hook is called."
-  :group 'erc-hooks
-  :type 'hook)
 
 (defun erc-update-user-nick (nick &optional new-nick
                                   host login full-name info)
@@ -6827,9 +6760,6 @@ shortened server name instead."
           (t ""))))
 
 ;; erc-goodies is required at end of this file.
-(declare-function erc-controls-strip "erc-goodies" (str))
-
-(defvar tabbar--local-hlf)
 
 ;; FIXME when 29.1 is cut and `format-spec' is added to ELPA Compat,
 ;; remove the function invocations from the spec form below.
