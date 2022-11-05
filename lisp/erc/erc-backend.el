@@ -136,6 +136,14 @@
 (defvar erc-server-responses (make-hash-table :test #'equal)
   "Hash table mapping server responses to their handler hooks.")
 
+(cl-defstruct (erc-response (:conc-name erc-response.))
+  (unparsed "" :type string)
+  (sender "" :type string)
+  (command "" :type string)
+  (command-args '() :type list)
+  (contents "" :type string)
+  (tags '() :type list))
+
 ;;; User data
 
 (defvar-local erc-server-current-nick nil
@@ -1861,6 +1869,16 @@ Then display the welcome message."
          (split-string value ",")
        (list value)))))
 
+(defmacro erc--with-memoization (table &rest forms)
+  "Adapter to be migrated to erc-compat."
+  (declare (indent defun))
+  `(cond
+    ((fboundp 'with-memoization)
+     (with-memoization ,table ,@forms)) ; 29.1
+    ((fboundp 'cl--generic-with-memoization)
+     (cl--generic-with-memoization ,table ,@forms))
+    (t ,@forms)))
+
 (defun erc--get-isupport-entry (key &optional single)
   "Return an item for \"ISUPPORT\" token KEY, a symbol.
 When a lookup fails return nil.  Otherwise return a list whose
@@ -1870,7 +1888,7 @@ ambiguous and only useful for tokens supporting a single
 primitive value."
   (if-let* ((table (or erc--isupport-params
                        (erc-with-server-buffer erc--isupport-params)))
-            (value (erc-compat--with-memoization (gethash key table)
+            (value (erc--with-memoization (gethash key table)
                      (when-let ((v (assoc (symbol-name key)
                                           erc-server-parameters)))
                        (if (cdr v)
