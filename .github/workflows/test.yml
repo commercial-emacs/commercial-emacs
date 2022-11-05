@@ -74,53 +74,13 @@ jobs:
       run: |
         mkdir -p $HOME/.local
         make -C tree-sitter install-ci
-    - name: make-alt-xtoolkit
-      if: matrix.os == 'ubuntu-20.04'
-      run: |
-        ./autogen.sh
-        ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-x-toolkit=lucid --without-cairo --without-xaw3d --without-gconf --without-libsystemd
-        make -j4 -C src
-    - name: make-linux
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        ./autogen.sh
-        ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-tree-sitter
-        make -j4 check
-        ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
     - name: make-macos
       if: startsWith(runner.os, 'macOS')
       run: |
         ./autogen.sh
         ./configure --prefix=$HOME/.local --with-tree-sitter
-        make -j4 check
-    - uses: msys2/setup-msys2@v2
-      if: startsWith(runner.os, 'windows')
-      with:
-        update: false
-        install: >-
-          base-devel
-          git
-          autotools
-          mingw-w64-x86_64-toolchain
-          mingw-w64-x86_64-xpm-nox
-          mingw-w64-x86_64-libtiff
-          mingw-w64-x86_64-giflib
-          mingw-w64-x86_64-libpng
-          mingw-w64-x86_64-libjpeg-turbo
-          mingw-w64-x86_64-librsvg
-          mingw-w64-x86_64-libwebp
-          mingw-w64-x86_64-lcms2
-          mingw-w64-x86_64-jansson
-          mingw-w64-x86_64-libxml2
-          mingw-w64-x86_64-gnutls
-          mingw-w64-x86_64-zlib
-    - shell: msys2 {0}
-      if: startsWith(runner.os, 'windows')
-      run: |
-        bash ./autogen.sh
-        bash ./configure --prefix=$HOME/.local --without-dbus
-        make -j4 -C src
-    - name: elisp-benchmarks
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        src/emacs -batch -l ./elisp-benchmarks/elisp-benchmarks.el --eval "(custom-set-variables (quote (elb-runs 1)))" -f elisp-benchmarks-run
+        cat config.log
+        make -j4
+        ldd src/emacs | grep -q tree-sitter
+        make test/src/tree-sitter-tests.log
+        ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
