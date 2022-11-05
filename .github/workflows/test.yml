@@ -33,13 +33,6 @@ jobs:
         echo "$HOME/.local/bin" >> $GITHUB_PATH
         echo "LD_LIBRARY_PATH=$HOME/.local/lib" >> $GITHUB_ENV
         echo "PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig" >> $GITHUB_ENV
-    - name: brew-haha
-      if: startsWith(runner.os, 'macOS')
-      run: |
-        brew install libxml2 texinfo
-        # github doc (unintelligible as of 20220428) suggests ">>" prepends to PATH.
-        echo "`brew --prefix texinfo`/bin" >> $GITHUB_PATH
-        echo "PKG_CONFIG_PATH=`brew --prefix libxml2`/lib/pkgconfig:$HOME/.local/lib/pkgconfig" >> $GITHUB_ENV
     - uses: actions/cache@v3
       id: cache-tree-sitter
       with:
@@ -75,5 +68,9 @@ jobs:
         ls -ltrdc /Users/runner/Library/Caches/tree-sitter/lib/*
     - uses: actions/upload-artifact@v3
       with:
-        name: mz.artifact
-        path: ${{ env.dumplibpath }}/c.dylib
+        name: so.artifact
+        path: ${{ env.dumplibpath }}/c.so
+    - uses: actions/upload-artifact@v3
+      with:
+        name: dsym.artifact
+        path: ${{ env.dumplibpath }}/c.so.dSYM
