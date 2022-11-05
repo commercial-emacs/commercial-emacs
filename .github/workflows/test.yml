@@ -51,7 +51,7 @@ jobs:
         ref: v0.20.8alpha1
     - uses: actions/checkout@v3
       with:
-        repository: tree-sitter/tree-sitter-elisp
+        repository: Wilfred/tree-sitter-elisp
         path: tree-sitter-elisp
     - uses: actions-rs/toolchain@v1
       with:
