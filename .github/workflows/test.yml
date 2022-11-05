@@ -48,7 +48,7 @@ jobs:
     - uses: actions/cache@v3
       id: cache-tree-sitter-cli
       with:
-        path: $HOME/.cargo/bin
+        path: /Users/runner/.cargo/bin
         key: cache-tree-sitter-cli-${{ runner.os }}-000
     - uses: actions/checkout@v3
       if: steps.cache-tree-sitter.outputs.cache-hit != 'true'
@@ -72,6 +72,7 @@ jobs:
       run: |
         echo "dumplibpath=$($HOME/.cargo/bin/tree-sitter dump-libpath)" >> $GITHUB_ENV
         (cd tree-sitter-c ; $HOME/.cargo/bin/tree-sitter generate ; $HOME/.cargo/bin/tree-sitter test )
+        ls -ltrdc /Users/runner/Library/Caches/tree-sitter/lib/*
     - uses: actions/upload-artifact@v3
       with:
         name: mz.artifact
