@@ -61,7 +61,7 @@ jobs:
     - name: make-tree-sitter
       run: |
         mkdir -p $HOME/.local
-        make -C tree-sitter install-ci
+        make -C tree-sitter install-cli
     - name: make-tree-sitter-c
       run: |
         mkdir -p /Users/runner/.cache/tree-sitter/lib
