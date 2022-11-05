@@ -51,8 +51,8 @@ jobs:
         ref: v0.20.8alpha1
     - uses: actions/checkout@v3
       with:
-        repository: tree-sitter/tree-sitter-c
-        path: tree-sitter-c
+        repository: tree-sitter/tree-sitter-elisp
+        path: tree-sitter-elisp
     - uses: actions-rs/toolchain@v1
       with:
           toolchain: stable
@@ -61,12 +61,13 @@ jobs:
       run: |
         mkdir -p $HOME/.local
         make -C tree-sitter install-cli
-    - name: make-tree-sitter-c
+    - name: make-tree-sitter-elisp
       run: |
+        uname
         echo "dumplibpath=$($HOME/.cargo/bin/tree-sitter dump-libpath)" >> $GITHUB_ENV
-        (cd tree-sitter-c ; $HOME/.cargo/bin/tree-sitter generate ; $HOME/.cargo/bin/tree-sitter test )
+        (cd tree-sitter-elisp ; $HOME/.cargo/bin/tree-sitter generate ; $HOME/.cargo/bin/tree-sitter test )
         ls -ltrdc /Users/runner/Library/Caches/tree-sitter/lib/*
     - uses: actions/upload-artifact@v3
       with:
         name: so.artifact
-        path: ${{ env.dumplibpath }}/c.so
+        path: ${{ env.dumplibpath }}/elisp.so
