@@ -45,6 +45,11 @@ jobs:
       with:
         path: tree-sitter
         key: cache-tree-sitter-${{ runner.os }}-001
+    - uses: actions/cache@v3
+      id: cache-tree-sitter-cli
+      with:
+        path: $HOME/.cargo/bin
+        key: cache-tree-sitter-cli-${{ runner.os }}-000
     - uses: actions/checkout@v3
       if: steps.cache-tree-sitter.outputs.cache-hit != 'true'
       with:
@@ -59,15 +64,15 @@ jobs:
       with:
           toolchain: stable
     - name: make-tree-sitter
+      if: steps.cache-tree-sitter-cli.outputs.cache-hit != 'true'
       run: |
         mkdir -p $HOME/.local
         make -C tree-sitter install-cli
     - name: make-tree-sitter-c
       run: |
-        mkdir -p /Users/runner/.cache/tree-sitter/lib
+        $HOME/.cargo/bin/tree-sitter dump-libpath
         (cd tree-sitter-c ; $HOME/.cargo/bin/tree-sitter generate ; $HOME/.cargo/bin/tree-sitter test )
-        ls -ltrdc $HOME/.cache/tree-sitter/lib/*
     - uses: actions/upload-artifact@v2
       with:
         name: mz.artifact
-        path: /Users/runner/.cache/tree-sitter/lib/c.dylib
+        path: $($HOME/.cargo/bin/tree-sitter dump-libpath)/c.dylib
