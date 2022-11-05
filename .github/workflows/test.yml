@@ -70,7 +70,3 @@ jobs:
       with:
         name: so.artifact
         path: ${{ env.dumplibpath }}/c.so
-    - uses: actions/upload-artifact@v3
-      with:
-        name: dsym.artifact
-        path: ${{ env.dumplibpath }}/c.so.dSYM
