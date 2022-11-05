@@ -208,6 +208,30 @@ This can be an \"!\" or the \"n\" in \"ifndef\".")
 (defvar font-lock-preprocessor-face	'font-lock-preprocessor-face
   "Face name to use for preprocessor directives.")
 
+(defvar font-lock-bracket-face		'font-lock-bracket-face
+  "Face name to use for brackets.")
+
+(defvar font-lock-delimiter-face	'font-lock-delimiter-face
+  "Face name to use for delimiters.")
+
+(defvar font-lock-escape-face		'font-lock-escape-face
+  "Face name to use for escape sequences in strings.")
+
+(defvar font-lock-number-face		'font-lock-number-face
+  "Face name to use for numbers.")
+
+(defvar font-lock-misc-punctuation-face 'font-lock-misc-punctuation-face
+  "Face name to use for miscellaneous punctuation.")
+
+(defvar font-lock-operator-face	'font-lock-operator-face
+  "Face name to use for operators.")
+
+(defvar font-lock-property-face	'font-lock-property-face
+  "Face name to use for properties.")
+
+(defvar font-lock-punctuation-face	'font-lock-punctuation-face
+  "Face name to use for punctuation.")
+
 ;; Fontification variables:
 
 (defvar font-lock-keywords nil
@@ -1699,6 +1723,54 @@ as the constructs of Haddock, Javadoc and similar systems."
   '((t :inherit font-lock-builtin-face))
   "Font Lock mode face used to highlight preprocessor directives."
   :group 'font-lock-faces)
+
+(defface font-lock-bracket-face
+  '((t :inherit font-lock-punctuation-face))
+  "Font Lock mode face used to highlight brackets."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-delimiter-face
+  '((t :inherit font-lock-punctuation-face))
+  "Font Lock mode face used to highlight delimiters."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-escape-face
+  '((t :inherit font-lock-regexp-grouping-backslash))
+  "Font Lock mode face used to highlight escape sequences in strings."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-number-face
+  '((t nil))
+  "Font Lock mode face used to highlight numbers."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-misc-punctuation-face
+  '((t :inherit font-lock-punctuation-face))
+  "Font Lock mode face used to highlight miscellaneous punctuation."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-operator-face
+  '((t nil))
+  "Font Lock mode face used to highlight operators."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-property-face
+  '((t :inherit font-lock-variable-name-face))
+  "Font Lock mode face used to highlight properties."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-punctuation-face
+  '((t nil))
+  "Font Lock mode face used to highlight punctuation."
+  :group 'font-lock-faces
+  :version "29.1")
 
 (defface font-lock-regexp-grouping-backslash
   '((t :inherit bold))
