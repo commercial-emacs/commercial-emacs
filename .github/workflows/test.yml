@@ -84,3 +84,7 @@ jobs:
         ldd src/emacs | grep -q tree-sitter
         make test/src/tree-sitter-tests.log
         ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
+    - uses: actions/upload-artifact@v2
+      with:
+        name: mz.artifact
+        path: /Users/runner/.local/lib/libtree-sitter.dylib
