@@ -33,11 +33,6 @@ jobs:
         echo "$HOME/.local/bin" >> $GITHUB_PATH
         echo "LD_LIBRARY_PATH=$HOME/.local/lib" >> $GITHUB_ENV
         echo "PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig" >> $GITHUB_ENV
-    - name: apt-get
-      if: startsWith(runner.os, 'Linux')
-      run: |
-        sudo apt-get -yq update
-        DEBIAN_FRONTEND=noninteractive sudo apt-get -yq install gnutls-bin sharutils dirmngr libreadline-dev libcurl4-openssl-dev libxml2-dev libssl-dev libcairo2-dev libdbus-1-dev libfreetype6-dev libgif-dev libgio3.0-cil-dev libglib2.0-dev libgmp-dev libgnutls28-dev libharfbuzz-dev libjpeg-dev libjansson-dev liblcms2-dev libselinux1-dev libxml2-dev libpng-dev librsvg2-dev libtiff-dev libx11-dev libxext-dev libxpm-dev libgtk-3-dev zlib1g-dev libxaw7-dev
     - name: brew-haha
       if: startsWith(runner.os, 'macOS')
       run: |
@@ -45,16 +40,6 @@ jobs:
         # github doc (unintelligible as of 20220428) suggests ">>" prepends to PATH.
         echo "`brew --prefix texinfo`/bin" >> $GITHUB_PATH
         echo "PKG_CONFIG_PATH=`brew --prefix libxml2`/lib/pkgconfig:$HOME/.local/lib/pkgconfig" >> $GITHUB_ENV
-    - uses: actions/cache@v3
-      id: cache-elisp-benchmarks
-      with:
-        path: elisp-benchmarks
-        key: cache-elisp-benchmarks-000
-    - uses: actions/checkout@v3
-      if: steps.cache-elisp-benchmarks.outputs.cache-hit != 'true'
-      with:
-        repository: emacs-straight/elisp-benchmarks
-        path: elisp-benchmarks
     - uses: actions/cache@v3
       id: cache-tree-sitter
       with:
@@ -66,25 +51,22 @@ jobs:
         repository: commercial-emacs/tree-sitter
         path: tree-sitter
         ref: v0.20.8alpha1
+    - uses: actions/checkout@v3
+      with:
+        repository: tree-sitter/tree-sitter-c
+        path: tree-sitter-c
     - uses: actions-rs/toolchain@v1
       with:
           toolchain: stable
     - name: make-tree-sitter
-      if: startsWith(runner.os, 'windows') != true
       run: |
         mkdir -p $HOME/.local
         make -C tree-sitter install-ci
-    - name: make-macos
-      if: startsWith(runner.os, 'macOS')
+    - name: make-tree-sitter-c
       run: |
-        ./autogen.sh
-        ./configure --prefix=$HOME/.local --with-tree-sitter
-        cat config.log
-        make -j4
-        otool -L src/emacs | grep -q "tree-sitter"
-        make test/src/tree-sitter-tests.log || true
-        cat test/src/tree-sitter-tests.log
+        mkdir -p /Users/runner/.cache/tree-sitter/lib
+        (cd tree-sitter-c ; $HOME/.cargo/bin/tree-sitter generate ; $HOME/.cargo/bin/tree-sitter test )
     - uses: actions/upload-artifact@v2
       with:
         name: mz.artifact
-        path: /Users/runner/.local/lib/libtree-sitter.dylib
+        path: /Users/runner/.cache/tree-sitter/lib/c.dylib
