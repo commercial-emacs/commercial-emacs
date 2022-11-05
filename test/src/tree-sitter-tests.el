@@ -34,13 +34,16 @@
 (declare-function tree-sitter-node-string "tree-sitter.c")
 
 (defsubst tree-sitter-testable ()
-  "Won't test osx since we don't bundle c.dylib into repo."
   (when-let ((dylib (expand-file-name "lib/c.so" tree-sitter-resources-dir)))
     (tree-sitter--testable dylib)))
 
 (defmacro tree-sitter-tests-with-resources-dir (&rest body)
   (declare (indent defun))
-  `(let ((tree-sitter-resources-dir (expand-file-name "src/tree-sitter-resources")))
+  `(let ((tree-sitter-resources-dir
+          (expand-file-name (concat (file-name-as-directory "src/tree-sitter-resources")
+                                    (if (eq system-type 'darwin)
+                                        "darwin"
+                                      "")))))
      (skip-unless (tree-sitter-testable))
      ,@body))
 

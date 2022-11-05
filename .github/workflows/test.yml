@@ -91,8 +91,9 @@ jobs:
       if: startsWith(runner.os, 'macOS')
       run: |
         ./autogen.sh
-        ./configure --prefix=$HOME/.local
+        ./configure --prefix=$HOME/.local --with-tree-sitter
         make -j4 check
+        ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
     - uses: msys2/setup-msys2@v2
       if: startsWith(runner.os, 'windows')
       with:
