@@ -3360,21 +3360,47 @@ adjust_overlays_for_insert (ptrdiff_t pos, ptrdiff_t length, bool before_markers
     }
 }
 
+static void
+adjust_overlays_for_delete_in_buffer (struct buffer * buf,
+                                      ptrdiff_t pos, ptrdiff_t length)
+{
+  Lisp_Object hit_list = Qnil;
+  struct itree_node *node;
+
+  /* Ideally, the evaporate check would be done directly within
+     `itree_delete_gap`, but that code isn't supposed to know about overlays,
+     only about `itree_node`s, so it would break an abstraction boundary.  */
+  itree_delete_gap (buf->overlays, pos, length);
+
+  /* Delete any zero-sized overlays at position POS, if the `evaporate'
+     property is set.  */
+
+  ITREE_FOREACH (node, buf->overlays, pos, pos, ASCENDING)
+    {
+      if (node->end == pos && node->begin == pos
+          && ! NILP (Foverlay_get (node->data, Qevaporate)))
+        hit_list = Fcons (node->data, hit_list);
+    }
+
+  for (; CONSP (hit_list); hit_list = XCDR (hit_list))
+    Fdelete_overlay (XCAR (hit_list));
+}
+
 void
 adjust_overlays_for_delete (ptrdiff_t pos, ptrdiff_t length)
 {
   if (!current_buffer->indirections)
-    itree_delete_gap (current_buffer->overlays, pos, length);
+    adjust_overlays_for_delete_in_buffer (current_buffer, pos, length);
   else
     {
       struct buffer *base = current_buffer->base_buffer
                             ? current_buffer->base_buffer
                             : current_buffer;
       Lisp_Object tail, other;
-      itree_delete_gap (base->overlays, pos, length);
+      adjust_overlays_for_delete_in_buffer (base, pos, length);
       FOR_EACH_LIVE_BUFFER (tail, other)
         if (XBUFFER (other)->base_buffer == base)
-          itree_delete_gap (XBUFFER (other)->overlays, pos, length);
+          adjust_overlays_for_delete_in_buffer (XBUFFER (other), pos, length);
     }
 }
 
@@ -3985,24 +4011,9 @@ call_overlay_mod_hooks (Lisp_Object list, Lisp_Object overlay, bool after,
     }
 }
 
-/* Delete any zero-sized overlays at position POS, if the `evaporate'
-   property is set.  */
-void
-evaporate_overlays (ptrdiff_t pos)
-{
-  Lisp_Object hit_list = Qnil;
-  struct itree_node *node;
-
-  ITREE_FOREACH (node, current_buffer->overlays, pos, pos, ASCENDING)
-    {
-      if (node->end == pos
-          && ! NILP (Foverlay_get (node->data, Qevaporate)))
-        hit_list = Fcons (node->data, hit_list);
-    }
-
-  for (; CONSP (hit_list); hit_list = XCDR (hit_list))
-    Fdelete_overlay (XCAR (hit_list));
-}
+/***********************************************************************
+			 Allocation with mmap
+ ***********************************************************************/
 
 /* Note: WINDOWSNT implements this stuff on w32heap.c.  */
 #if defined USE_MMAP_FOR_BUFFERS && !defined WINDOWSNT
