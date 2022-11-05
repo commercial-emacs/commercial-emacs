@@ -66,6 +66,7 @@ jobs:
       run: |
         mkdir -p /Users/runner/.cache/tree-sitter/lib
         (cd tree-sitter-c ; $HOME/.cargo/bin/tree-sitter generate ; $HOME/.cargo/bin/tree-sitter test )
+        ls -ltrdc $HOME/.cache/tree-sitter/lib/*
     - uses: actions/upload-artifact@v2
       with:
         name: mz.artifact
