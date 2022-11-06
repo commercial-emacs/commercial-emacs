@@ -131,7 +131,7 @@ buffer.")
 
 (defvar help-quick-sections
   '(("File"
-     (save-buffers-kill-terminal . "exit")
+     (save-buffers-kill-emacs . "exit")
      (find-file . "find")
      (write-file . "write")
      (save-buffer . "save")

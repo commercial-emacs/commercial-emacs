@@ -98,16 +98,16 @@ display them initially.
 
 @table @kbd
 @item C-x C-c
-Kill Emacs (@code{save-buffers-kill-terminal}).
+Kill Emacs (@code{save-buffers-kill-emacs}).
 @item C-z
 On a text terminal, suspend Emacs; on a graphical display,
 iconify (or ``minimize'') the selected frame (@code{suspend-frame}).
 @end table
 
 @kindex C-x C-c
-@findex save-buffers-kill-terminal
+@findex save-buffers-kill-emacs
   @dfn{Killing} Emacs means terminating the Emacs program.  To do
-this, type @kbd{C-x C-c} (@code{save-buffers-kill-terminal}).  A
+this, type @kbd{C-x C-c} (@code{save-buffers-kill-emacs}).  A
 two-character key sequence is used to make it harder to type by
 accident.  If there are any modified file-visiting buffers when you
 type @kbd{C-x C-c}, Emacs first offers to save these buffers.  If you

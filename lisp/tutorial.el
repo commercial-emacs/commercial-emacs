@@ -209,7 +209,7 @@ LEFT and RIGHT are the elements to compare."
            `((ESC-prefix [27])
              (Control-X-prefix [?\C-x])
              (mode-specific-command-prefix [?\C-c])
-             (save-buffers-kill-terminal [?\C-x ?\C-c])
+             (save-buffers-kill-emacs [?\C-x ?\C-c])
 
              ;; * SUMMARY
              (scroll-up-command [?\C-v])

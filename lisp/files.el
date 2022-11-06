@@ -8103,20 +8103,6 @@ If RESTART, restart Emacs after killing the current Emacs process."
          (funcall confirm "Really exit Emacs? "))
      (kill-emacs nil restart))))
 
-(defun save-buffers-kill-terminal (&optional arg)
-  "Offer to save each buffer, then kill the current connection.
-If the current frame has no client, kill Emacs itself using
-`save-buffers-kill-emacs'.
-
-With prefix ARG, silently save all file-visiting buffers, then kill.
-
-If emacsclient was started with a list of file names to edit, then
-only these files will be asked to be saved."
-  (interactive "P")
-  (if (frame-parameter nil 'client)
-      (server-save-buffers-kill-terminal arg)
-    (save-buffers-kill-emacs arg)))
-
 (defun restart-emacs ()
   "Kill the current Emacs process and start a new one.
 This goes through the same shutdown procedure as
@@ -8731,7 +8717,7 @@ inode-number, device-number and file-number."
 (define-key ctl-x-map "i" 'insert-file)
 (define-key esc-map "~" 'not-modified)
 (define-key ctl-x-map "\C-d" 'list-directory)
-(define-key ctl-x-map "\C-c" 'save-buffers-kill-terminal)
+(define-key ctl-x-map "\C-c" 'save-buffers-kill-emacs)
 (define-key ctl-x-map "\C-q" 'read-only-mode)
 
 (define-key ctl-x-4-map "f" 'find-file-other-window)

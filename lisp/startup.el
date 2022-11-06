@@ -2300,7 +2300,7 @@ To quit a partially entered command, type Control-g.\n")
                    'action (lambda (_button) (view-order-manuals))
                    'follow-link t)
     (insert (substitute-command-keys
-             "\t   \\[view-order-manuals]\tExit Emacs\t   \\[save-buffers-kill-terminal]")))
+             "\t   \\[view-order-manuals]\tExit Emacs\t   \\[save-buffers-kill-emacs]")))
 
   ;; Say how to use the menu bar with the keyboard.
   (insert "\n")

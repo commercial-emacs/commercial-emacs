@@ -84,7 +84,7 @@
 
     ;; The "File" menu items
     (bindings--define-key menu [exit-emacs]
-      '(menu-item "Quit" save-buffers-kill-terminal
+      '(menu-item "Quit" save-buffers-kill-emacs
                   :help "Save unsaved buffers, then exit"))
 
     (bindings--define-key menu [separator-exit]
