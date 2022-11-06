@@ -642,127 +642,130 @@ functions are annotated with \"<f>\" via the
               (error nil))))
       (when (and end (or (not (nth 8 (syntax-ppss)))
                          (memq (char-before beg) '(?` ?‘))))
-        (let ((table-etc
-               (if (or (not funpos) quoted)
-                   (cond
-                    ;; FIXME: We could look at the first element of
-                    ;; the current form and use it to provide a more
-                    ;; specific completion table in more cases.
-                    (is-ignore-error
-                     (list t (elisp--completion-local-symbols)
-                           :predicate (lambda (sym)
-                                        (get sym 'error-conditions))))
-                    ((elisp--expect-function-p beg)
-                     (list nil (elisp--completion-local-symbols)
-                           :predicate
-                           #'elisp--shorthand-aware-fboundp
-                           :company-kind #'elisp--company-kind
-                           :company-doc-buffer #'elisp--company-doc-buffer
-                           :company-docsig #'elisp--company-doc-string
-                           :company-location #'elisp--company-location
-                           :company-deprecated #'elisp--company-deprecated))
-                    (quoted
-                     (list nil (elisp--completion-local-symbols)
-                           ;; Don't include all symbols (bug#16646).
-                           :predicate (lambda (sym)
-                                        ;; shorthand-aware
-                                        (let ((sym (intern-soft (symbol-name sym))))
-                                          (or (boundp sym)
-                                              (fboundp sym)
-                                              (featurep sym)
-                                              (symbol-plist sym))))
-                           :annotation-function
-                           (lambda (str) (if (fboundp (intern-soft str)) " <f>"))
-                           :company-kind #'elisp--company-kind
-                           :company-doc-buffer #'elisp--company-doc-buffer
-                           :company-docsig #'elisp--company-doc-string
-                           :company-location #'elisp--company-location
-                           :company-deprecated #'elisp--company-deprecated))
-                    (t
-                     (list nil (completion-table-merge
-                                elisp--local-variables-completion-table
-                                (apply-partially #'completion-table-with-predicate
-                                                 (elisp--completion-local-symbols)
-                                                 #'elisp--shorthand-aware-boundp
-                                                 'strict))
-                           :company-kind
-                           (lambda (s)
-                             (if (test-completion s elisp--local-variables-completion-table)
-                                 'value
-                               'variable))
-                           :company-doc-buffer #'elisp--company-doc-buffer
-                           :company-docsig #'elisp--company-doc-string
-                           :company-location #'elisp--company-location
-                           :company-deprecated #'elisp--company-deprecated)))
-                 ;; Looks like a funcall position.  Let's double check.
-                 (save-excursion
-                   (goto-char (1- beg))
-                   (let ((parent
-                          (condition-case nil
-                              (progn (up-list -1) (forward-char 1)
-                                     (let ((c (char-after)))
-                                       (if (eq c ?\() ?\(
-                                         (if (memq (char-syntax c) '(?w ?_))
-                                             (let ((pt (point)))
-                                               (forward-sexp)
-                                               (intern-soft
-                                                (buffer-substring pt (point))))))))
-                            (error nil))))
-                     (pcase parent
-                       ;; FIXME: Rather than hardcode special cases here,
-                       ;; we should use something like a symbol-property.
-                       ('declare
-                        (list t (mapcar (lambda (x) (symbol-name (car x)))
-                                        (delete-dups
-                                         ;; FIXME: We should include some
-                                         ;; docstring with each entry.
-                                         (append macro-declarations-alist
-                                                 defun-declarations-alist
-                                                 nil))))) ; Copy both alists.
-                       ((and (or 'condition-case 'condition-case-unless-debug)
-                             (guard (save-excursion
-                                      (ignore-errors
-                                        (forward-sexp 2)
-                                        (< (point) beg)))))
-                        (list t (elisp--completion-local-symbols)
-                              :predicate (lambda (sym) (get sym 'error-conditions))))
-                       ;; `ignore-error' with a list CONDITION parameter.
-                       ('ignore-error
-                        (list t (elisp--completion-local-symbols)
-                              :predicate (lambda (sym)
-                                           (get sym 'error-conditions))))
-                       ((and (or ?\( 'let 'let*)
-                             (guard (save-excursion
-                                      (goto-char (1- beg))
-                                      (when (eq parent ?\()
-                                        (up-list -1))
-                                      (forward-symbol -1)
-                                      (looking-at "\\_<let\\*?\\_>"))))
-                        (list t (elisp--completion-local-symbols)
-                              :predicate #'elisp--shorthand-aware-boundp
-                              :company-kind (lambda (_) 'variable)
-                              :company-doc-buffer #'elisp--company-doc-buffer
-                              :company-docsig #'elisp--company-doc-string
-                              :company-location #'elisp--company-location
-                              :company-deprecated #'elisp--company-deprecated))
-                       (_ (list nil (elisp--completion-local-symbols)
-                                :predicate #'elisp--shorthand-aware-fboundp
-                                :company-kind #'elisp--company-kind
-                                :company-doc-buffer #'elisp--company-doc-buffer
-                                :company-docsig #'elisp--company-doc-string
-                                :company-location #'elisp--company-location
-                                :company-deprecated #'elisp--company-deprecated
-                                ))))))))
-          (nconc (list beg end)
-                 (if (null (car table-etc))
-                     (cdr table-etc)
-                   (cons
-                    (if (memq (char-syntax (or (char-after end) ?\s))
-                              '(?\s ?>))
-                        (cadr table-etc)
-                      (apply-partially 'completion-table-with-terminator
-                                       " " (cadr table-etc)))
-                    (cddr table-etc)))))))))
+        (let* ((curry-table
+                (if (memq (char-syntax (or (char-after end) ?\s))
+                          '(?\s ?>))
+                    #'list
+                  (lambda (table &rest etc)
+                    (cons (apply-partially #'completion-table-with-terminator
+                                           " " table)
+                          etc))))
+               (table-etc
+                (if (and funpos (not quoted))
+                    ;; Looks like a funcall position.  Let's double check.
+                    (save-excursion
+                      (goto-char (1- beg))
+                      (let ((parent
+                             (ignore-errors
+                               (progn (up-list -1)
+                                      (forward-char 1)
+                                      (let ((c (char-after)))
+                                        (if (eq c ?\() ?\(
+                                          (if (memq (char-syntax c) '(?w ?_))
+                                              (let ((pt (point)))
+                                                (forward-sexp)
+                                                (intern-soft
+                                                 (buffer-substring pt (point)))))))))))
+                        (pcase parent
+                          ;; We could have used symbol-property instead of
+                          ;; hardcoded special casing.
+                          ('declare
+                           (apply curry-table
+                                  (mapcar (lambda (x) (symbol-name (car x)))
+                                          (delete-dups
+                                           ;; FIXME: We should include some
+                                           ;; docstring with each entry.
+                                           (append macro-declarations-alist
+                                                   defun-declarations-alist
+                                                   nil))))) ; Copy both alists.
+                          ((and (or 'condition-case 'condition-case-unless-debug)
+                                (guard (save-excursion
+                                         (ignore-errors
+                                           (forward-sexp 2)
+                                           (< (point) beg)))))
+                           (funcall curry-table
+                                    (elisp--completion-local-symbols)
+                                    :predicate (lambda (sym) (get sym 'error-conditions))))
+                          ;; `ignore-error' with a list CONDITION parameter.
+                          ('ignore-error
+                              (funcall curry-table
+                                       (elisp--completion-local-symbols)
+                                       :predicate (lambda (sym)
+                                                    (get sym 'error-conditions))))
+                          ((and (or ?\( 'let 'let*)
+                                (guard (save-excursion
+                                         (goto-char (1- beg))
+                                         (when (eq parent ?\()
+                                           (up-list -1))
+                                         (forward-symbol -1)
+                                         (looking-at "\\_<let\\*?\\_>"))))
+                           (funcall curry-table
+                                    (elisp--completion-local-symbols)
+                                    :predicate #'elisp--shorthand-aware-boundp
+                                    :company-kind (lambda (_) 'variable)
+                                    :company-doc-buffer #'elisp--company-doc-buffer
+                                    :company-docsig #'elisp--company-doc-string
+                                    :company-location #'elisp--company-location
+                                    :company-deprecated #'elisp--company-deprecated))
+                          (_ (list (elisp--completion-local-symbols)
+                                   :predicate #'elisp--shorthand-aware-fboundp
+                                   :company-kind #'elisp--company-kind
+                                   :company-doc-buffer #'elisp--company-doc-buffer
+                                   :company-docsig #'elisp--company-doc-string
+                                   :company-location #'elisp--company-location
+                                   :company-deprecated #'elisp--company-deprecated)))))
+                  (cond
+                     ;; FIXME: We could look at the first element of
+                     ;; the current form and use it to provide a more
+                     ;; specific completion table in more cases.
+                     (is-ignore-error
+                      (funcall curry-table
+                               (elisp--completion-local-symbols)
+                               :predicate (lambda (sym)
+                                            (get sym 'error-conditions))))
+                     ((elisp--expect-function-p beg)
+                      (list (elisp--completion-local-symbols)
+                            :predicate
+                            #'elisp--shorthand-aware-fboundp
+                            :company-kind #'elisp--company-kind
+                            :company-doc-buffer #'elisp--company-doc-buffer
+                            :company-docsig #'elisp--company-doc-string
+                            :company-location #'elisp--company-location
+                            :company-deprecated #'elisp--company-deprecated))
+                     (quoted
+                      (list (elisp--completion-local-symbols)
+                            ;; Don't include all symbols (bug#16646).
+                            :predicate (lambda (sym)
+                                         ;; shorthand-aware
+                                         (let ((sym (intern-soft (symbol-name sym))))
+                                           (or (boundp sym)
+                                               (fboundp sym)
+                                               (featurep sym)
+                                               (symbol-plist sym))))
+                            :annotation-function
+                            (lambda (str) (if (fboundp (intern-soft str)) " <f>"))
+                            :company-kind #'elisp--company-kind
+                            :company-doc-buffer #'elisp--company-doc-buffer
+                            :company-docsig #'elisp--company-doc-string
+                            :company-location #'elisp--company-location
+                            :company-deprecated #'elisp--company-deprecated))
+                     (t
+                      (list (completion-table-merge
+                             elisp--local-variables-completion-table
+                             (apply-partially #'completion-table-with-predicate
+                                              (elisp--completion-local-symbols)
+                                              #'elisp--shorthand-aware-boundp
+                                              'strict))
+                            :company-kind
+                            (lambda (s)
+                              (if (test-completion s elisp--local-variables-completion-table)
+                                  'value
+                                'variable))
+                            :company-doc-buffer #'elisp--company-doc-buffer
+                            :company-docsig #'elisp--company-doc-string
+                            :company-location #'elisp--company-location
+                            :company-deprecated #'elisp--company-deprecated))))))
+          (apply #'list beg end table-etc))))))
 
 (defun elisp--company-kind (str)
   (let ((sym (intern-soft str)))
