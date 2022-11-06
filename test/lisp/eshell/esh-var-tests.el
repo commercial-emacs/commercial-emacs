@@ -563,7 +563,8 @@ This should get/set the value bound to the symbol."
 This should get the value bound to the symbol, but fail to set
 it, since the setter is nil."
   (with-temp-eshell
-   (let ((eshell-test-value "value"))
+   (let ((eshell-test-value "value")
+         (text-quoting-style 'grave))
      (push '("ALIAS" (eshell-test-value . nil)) eshell-variable-aliases-list)
      (eshell-match-command-output "echo $ALIAS" "value\n")
      (eshell-match-command-output "set ALIAS hello"
