@@ -619,9 +619,9 @@ functions are annotated with \"<f>\" via the
 		      (point))
 		  (scan-error pos)))
 	   (end
-	    (unless (or (eq beg (point-max))
-			(member (char-syntax (char-after beg))
-                                '(?\" ?\()))
+	    (when (and (< beg (point-max))
+		       (not (memq (char-syntax (char-after beg))
+                                  '(?\" ?\())))
 	      (condition-case nil
 		  (save-excursion
 		    (goto-char beg)
@@ -634,12 +634,11 @@ functions are annotated with \"<f>\" via the
            (funpos (eq (char-before beg) ?\())
            (quoted (elisp--form-quoted-p beg))
            (is-ignore-error
-            (condition-case nil
-                (save-excursion
-                  (up-list -1)
-                  (forward-char 1)
-                  (looking-at-p "ignore-error\\>"))
-              (error nil))))
+            (ignore-errors
+              (save-excursion
+                (up-list -1)
+                (forward-char 1)
+                (looking-at-p "ignore-error\\>")))))
       (when (and end (or (not (nth 8 (syntax-ppss)))
                          (memq (char-before beg) '(?` ?‘))))
         (let* ((curry-table
