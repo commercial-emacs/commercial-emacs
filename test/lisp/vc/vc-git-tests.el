@@ -77,7 +77,7 @@
           (vc-git-register (split-string "foo"))
           (vc-git-checkin (split-string "foo") "No-Verify: yes
 his fooness")
-          (vc-git-checkout nil (vc-git--rev-parse "HEAD" t)))
+          (vc-git-checkout nil (vc-git--rev-parse "HEAD")))
       (error (signal (car err) (with-current-buffer "*vc*" (buffer-string)))))
     (find-file-noselect "foo")))
 

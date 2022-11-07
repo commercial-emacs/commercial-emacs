@@ -6,7 +6,7 @@
 ;; Keywords: vc tools
 ;; Package: vc
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -373,24 +373,31 @@ in the order given by `git status'."
 
 (defun vc-git-working-revision (_file)
   "Git-specific version of `vc-working-revision'."
-  (let* ((process-file-side-effects nil)
-         (commit (vc-git--rev-parse "HEAD" t))
-         (name (vc-git-symbolic-commit commit)))
-    (or (prog1 name
-          (add-text-properties 0 (length name) `(commit ,commit) name))
-        commit)))
+  (let (process-file-side-effects)
+    (vc-git--rev-parse "HEAD")))
+
+(defun vc-git--symbolic-ref (file)
+  (or
+   (vc-file-getprop file 'vc-git-symbolic-ref)
+   (let* (process-file-side-effects
+          (str (vc-git--run-command-string nil "symbolic-ref" "HEAD")))
+     (vc-file-setprop file 'vc-git-symbolic-ref
+                      (if str
+                          (if (string-match "^\\(refs/heads/\\)?\\(.+\\)$" str)
+                              (match-string 2 str)
+                            str))))))
 
 (defun vc-git-mode-line-string (file)
   "Return a string for `vc-mode-line' to put in the mode line for FILE."
   (let* ((rev (vc-working-revision file 'Git))
+         (disp-rev (or (vc-git--symbolic-ref file)
+                       (and rev (substring rev 0 7))))
          (def-ml (vc-default-mode-line-string 'Git file))
          (help-echo (get-text-property 0 'help-echo def-ml))
          (face   (get-text-property 0 'face def-ml)))
-    (propertize (concat (substring def-ml 0 4) rev)
+    (propertize (concat (substring def-ml 0 4) disp-rev)
                 'face face
-                'help-echo (concat help-echo "\nCurrent revision: "
-                                   (when rev
-                                     (or (get-text-property 0 'commit rev) rev))))))
+                'help-echo (concat help-echo "\nCurrent revision: " rev))))
 
 (cl-defstruct (vc-git-extra-fileinfo
             (:copier nil)
@@ -1260,6 +1267,12 @@ This prompts for a branch to merge from."
       (add-hook 'after-save-hook #'vc-git-resolve-when-done nil 'local))
     (vc-message-unresolved-conflicts buffer-file-name)))
 
+(defun vc-git-clone (remote directory rev)
+  (if rev
+      (vc-git--out-ok "clone" "--branch" rev remote directory)
+    (vc-git--out-ok "clone" remote directory))
+  directory)
+
 ;;; HISTORY FUNCTIONS
 
 (autoload 'vc-setup-buffer "vc-dispatcher")
@@ -1617,6 +1630,19 @@ This requires git 1.8.4 or later, for the \"-L\" option of \"git log\"."
 	      (cons revision
 		    (expand-file-name fname (vc-git-root default-directory))))
 	  revision)))))
+
+(defun vc-git-last-change (file line)
+  (vc-buffer-sync)
+  (let ((file (file-relative-name file (vc-git-root (buffer-file-name)))))
+    (with-temp-buffer
+      (when (vc-git--out-ok
+             "blame" "--porcelain"
+             (format "-L%d,+1" line)
+             file)
+        (goto-char (point-min))
+        (save-match-data
+          (when (looking-at "\\`\\([[:alnum:]]+\\)[[:space:]]+")
+            (match-string 1)))))))
 
 ;;; TAG/BRANCH SYSTEM
 
