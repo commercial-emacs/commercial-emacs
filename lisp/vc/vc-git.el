@@ -385,7 +385,7 @@ in the order given by `git status'."
   (let* ((rev (vc-working-revision file 'Git))
          (def-ml (vc-default-mode-line-string 'Git file))
          (help-echo (get-text-property 0 'help-echo def-ml))
-         (face (get-text-property 0 'face def-ml)))
+         (face   (get-text-property 0 'face def-ml)))
     (propertize (concat (substring def-ml 0 4) rev)
                 'face face
                 'help-echo (concat help-echo "\nCurrent revision: "
