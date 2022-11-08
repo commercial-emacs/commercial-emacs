@@ -288,7 +288,7 @@ itree_iterator_create (struct itree_tree *tree)
 }
 
 void
-init_itree (void)
+itree_init (void)
 {
   eassert (!iter);
   iter = itree_iterator_create (NULL);
@@ -296,7 +296,7 @@ init_itree (void)
 
 #ifdef HAVE_UNEXEC
 void
-forget_itree (void)
+itree_forget (void)
 {
   iter = NULL;
 }

@@ -1995,7 +1995,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   running_asynch_code = 0;
   init_random ();
   init_xfaces ();
-  init_itree ();
+  itree_init ();
 
 #if defined HAVE_JSON && !defined WINDOWSNT
   init_json ();
@@ -3194,7 +3194,7 @@ You must run Emacs in batch mode in order to dump it.  */)
   gflags.will_dump_with_unexec_ = false;
   gflags.dumped_with_unexec_ = true;
 
-  forget_itree ();
+  itree_forget ();
 
   alloc_unexec_pre ();
 

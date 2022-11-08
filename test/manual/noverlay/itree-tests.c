@@ -1281,7 +1281,7 @@ main (void)
   Suite *s = basic_suite ();
   SRunner *sr = srunner_create (s);
 
-  init_itree ();
+  itree_init ();
   srunner_run_all (sr, CK_ENV);
   int nfailed = srunner_ntests_failed (sr);
   srunner_free (sr);
