@@ -534,14 +534,15 @@ itree_node_init (struct itree_node *node,
 		 bool front_advance, bool rear_advance,
 		 Lisp_Object data)
 {
-  node->parent = NULL;
-  node->left = NULL;
-  node->right = NULL;
-  node->begin = -1;
-  node->end = -1;
-  node->front_advance = front_advance;
-  node->rear_advance = rear_advance;
+  node->begin = 0;
+  node->end = 0;
+  node->limit = 0;
+  node->offset = 0;
+  node->otick = 0;
   node->data = data;
+  node->red = 0;
+  node->rear_advance = rear_advance;
+  node->front_advance = front_advance;
 }
 
 /* Return NODE's begin value, computing it if necessary. */
