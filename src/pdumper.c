@@ -2001,46 +2001,20 @@ dump_marker (struct dump_context *ctx, const struct Lisp_Marker *marker)
 }
 
 static dump_off
-dump_interval_node (struct dump_context *ctx, struct itree_node *node,
-                    dump_off parent_offset)
+dump_itree_node (struct dump_context *ctx, struct itree_node *node,
+		 dump_off parent_offset)
 {
 #if CHECK_STRUCTS && !defined (HASH_itree_node_50DE304F13)
 # error "itree_node changed. See CHECK_STRUCTS comment in config.h."
 #endif
+  /* Dumping of a buffer's overlays is not implemented.  Overlays are
+     dumped as if they had been deleted.  See bug#59029.  */
   struct itree_node out;
   dump_object_start (ctx, &out, sizeof (out));
-  if (node->parent)
-    dump_field_fixup_later (ctx, &out, node, &node->parent);
-  if (node->left)
-    dump_field_fixup_later (ctx, &out, node, &node->parent);
-  if (node->right)
-    dump_field_fixup_later (ctx, &out, node, &node->parent);
-  DUMP_FIELD_COPY (&out, node, begin);
-  DUMP_FIELD_COPY (&out, node, end);
-  DUMP_FIELD_COPY (&out, node, limit);
-  DUMP_FIELD_COPY (&out, node, offset);
-  DUMP_FIELD_COPY (&out, node, otick);
+  itree_node_init (&out, node->front_advance, node->rear_advance,
+		   node->data);
   dump_field_lv (ctx, &out, node, &node->data, WEIGHT_STRONG);
-  DUMP_FIELD_COPY (&out, node, red);
-  DUMP_FIELD_COPY (&out, node, rear_advance);
-  DUMP_FIELD_COPY (&out, node, front_advance);
-  dump_off offset = dump_object_finish (ctx, &out, sizeof (out));
-  if (node->parent)
-      dump_remember_fixup_ptr_raw
-	(ctx,
-	 offset + dump_offsetof (struct itree_node, parent),
-	 dump_interval_node (ctx, node->parent, offset));
-  if (node->left)
-      dump_remember_fixup_ptr_raw
-	(ctx,
-	 offset + dump_offsetof (struct itree_node, left),
-	 dump_interval_node (ctx, node->left, offset));
-  if (node->right)
-      dump_remember_fixup_ptr_raw
-	(ctx,
-	 offset + dump_offsetof (struct itree_node, right),
-	 dump_interval_node (ctx, node->right, offset));
-  return offset;
+  return dump_object_finish (ctx, &out, sizeof (out));
 }
 
 static dump_off
@@ -2056,7 +2030,7 @@ dump_overlay (struct dump_context *ctx, const struct Lisp_Overlay *overlay)
   dump_remember_fixup_ptr_raw
     (ctx,
      offset + dump_offsetof (struct Lisp_Overlay, interval),
-     dump_interval_node (ctx, overlay->interval, offset));
+     dump_itree_node (ctx, overlay->interval, offset));
   return offset;
 }
 
@@ -2724,11 +2698,9 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
   DUMP_FIELD_COPY (out, buffer, inhibit_buffer_hooks);
   DUMP_FIELD_COPY (out, buffer, long_line_optimizations_p);
 
-  if (buffer->overlays && buffer->overlays->root != NULL)
-    /* We haven't implemented the code to dump overlays.  */
-    emacs_abort ();
-  else
-    out->overlays = NULL;
+  /* Dumping of a buffer's overlays is not implemented.  See
+     bug#59029.  */
+  out->overlays = NULL;
 
   dump_field_lv (ctx, out, buffer, &buffer->undo_list_,
                  WEIGHT_STRONG);
