@@ -7411,42 +7411,37 @@ lines rather than by display lines."
   nil)
 
 (defun previous-line (&optional arg try-vscroll)
-  "Move cursor vertically up ARG lines.
-Interactively, vscroll tall lines if `auto-window-vscroll' is enabled.
-Non-interactively, use TRY-VSCROLL to control whether to vscroll tall
-lines: if either `auto-window-vscroll' or TRY-VSCROLL is nil, this
-function will not vscroll.
+  "Move cursor up ARG lines, where ARG defaults to 1.
 
-ARG defaults to 1.
+Within the target line, position cursor either at the `goal-column'
+(described later), the current column, after the character
+spanning the current column, or at the end of the target line, in
+that order of preference.
 
-If there is no character in the target line exactly over the current column,
-the cursor is positioned after the character in that line that spans this
-column, or at the end of the line if it is not long enough.
+We count physical screen lines unless `line-move-visual' is
+toggled from its default true value.  Then we count
+newline-delimited logical lines, which may span many more
+physical lines.  Use \\[previous-logical-line] to better express
+intent.
 
-If the variable `line-move-visual' is non-nil, this command moves
-by display lines.  Otherwise, it moves by buffer lines, without
-taking variable-width characters or continued lines into account.
-See \\[previous-logical-line] for a command that always moves by buffer lines.
+The aforementioned `goal-column' is assigned by
+\\[set-goal-column], which also effects a nil `line-move-visual',
+that is, logical lines are used.
 
-The command \\[set-goal-column] can be used to create
-a semipermanent goal column for this command.
-Then instead of trying to move exactly vertically (or as close as possible),
-this command moves to the specified goal column (or as close as possible).
-The goal column is stored in the variable `goal-column', which is nil
-when there is no goal column.  Note that setting `goal-column'
-overrides `line-move-visual' and causes this command to move by buffer
-lines rather than by display lines."
-  (declare (interactive-only
-            "use `forward-line' with negative argument instead."))
+Scroll tall lines if and only if `auto-window-vscroll' (defaults true) and
+TRY-VSCROLL are true.  TRY-VSCROLL is assumed true in batch mode.
+
+(declare (interactive-only
+            \"use `forward-line' with negative argument instead.\"))"
   (interactive "^p\np")
-  (or arg (setq arg 1))
-  (if (called-interactively-p 'interactive)
-      (condition-case err
-	  (line-move (- arg) nil nil try-vscroll)
-	((beginning-of-buffer end-of-buffer)
-	 (signal (car err) (cdr err))))
-    (line-move (- arg) nil nil try-vscroll))
-  nil)
+  (setq arg (or arg 1))
+  (prog1 nil
+    (if (called-interactively-p 'interactive)
+        (condition-case err
+	    (line-move (- arg) nil nil try-vscroll)
+	  ((beginning-of-buffer end-of-buffer)
+	   (signal (car err) (cdr err))))
+      (line-move (- arg) nil nil try-vscroll))))
 
 (defcustom track-eol nil
   "Non-nil means vertical motion starting at end of line keeps to ends of lines.
@@ -7688,64 +7683,47 @@ The value is a floating-point number."
 	 (t
 	  (set-window-vscroll nil dlh t)))))))
 
-
-;; This is like line-move-1 except that it also performs
-;; vertical scrolling of tall images if appropriate.
-;; That is not really a clean thing to do, since it mixes
-;; scrolling with cursor motion.  But so far we don't have
-;; a cleaner solution to the problem of making C-n do something
-;; useful given a tall image.
 (defun line-move (arg &optional noerror _to-end try-vscroll)
-  "Move forward ARG lines.
-If NOERROR, don't signal an error if we can't move ARG lines.
-TO-END is unused.
-TRY-VSCROLL controls whether to vscroll tall lines: if either
-`auto-window-vscroll' or TRY-VSCROLL is nil, this function will
-not vscroll."
-  (if noninteractive
-      (line-move-1 arg noerror)
-    (unless (and auto-window-vscroll try-vscroll
-		 ;; Only vscroll for single line moves
-		 (= (abs arg) 1)
-		 ;; Under scroll-conservatively, the display engine
-		 ;; does this better.
-		 (zerop scroll-conservatively)
-		 ;; But don't vscroll in a keyboard macro.
-		 (not defining-kbd-macro)
-		 (not executing-kbd-macro)
-		 (line-move-partial arg noerror))
-      (set-window-vscroll nil 0 t)
-      (if (and line-move-visual
-	       ;; Display-based column are incompatible with goal-column.
-	       (not goal-column)
-	       ;; When the text in the window is scrolled to the left,
-	       ;; display-based motion doesn't make sense (because each
-	       ;; logical line occupies exactly one screen line).
-	       (not (> (window-hscroll) 0))
-	       ;; Likewise when the text _was_ scrolled to the left
-	       ;; when the current run of vertical motion commands
-	       ;; started.
-	       (not (and (memq last-command
-			       `(next-line previous-line ,this-command))
-			 auto-hscroll-mode
-			 (numberp temporary-goal-column)
-			 (>= temporary-goal-column
+  "Move signed ARG lines or signal error on failure.
+Scroll tall lines if and only if `auto-window-vscroll' (defaults
+true) and TRY-VSCROLL are true.  TRY-VSCROLL is assumed true in
+batch (noninteractive) mode."
+  (cond (noninteractive
+         (line-move-1 arg noerror))
+        ((and auto-window-vscroll
+              try-vscroll
+	      (= (abs arg) 1)
+	      (zerop scroll-conservatively)
+	      (not defining-kbd-macro)
+	      (not executing-kbd-macro)
+	      (line-move-partial arg noerror))
+         (ignore "Redisplay handles vanilla case?"))
+        ((and line-move-visual
+	      (not goal-column)
+	      ;; When text scrolled left, display-based motion doesn't apply
+	      ;; since logical line is one-to-one with screen line (what?).
+	      (not (> (window-hscroll) 0))
+              ;; More EZ incomprehensibility in fbfd0e1 (Bug#15712)
+	      (not (and (memq last-command
+			      `(next-line previous-line ,this-command))
+		        auto-hscroll-mode
+		        (numberp temporary-goal-column)
+		        (>= temporary-goal-column
 			    (- (window-width) hscroll-margin)))))
-	  (prog1 (line-move-visual arg noerror)
-	    ;; If we moved into a tall line, set vscroll to make
-	    ;; scrolling through tall images more smooth.
-	    (let ((lh (line-pixel-height))
+         (prog2 (set-window-vscroll nil 0 t)
+             (line-move-visual arg noerror)
+	   ;; Smooth scrolling through tall images.
+	   (let* ((lh (line-pixel-height))
 		  (edges (window-inside-pixel-edges))
 		  (dlh (default-line-height))
-		  winh)
-	      (setq winh (- (nth 3 edges) (nth 1 edges) 1))
-	      (if (and (< arg 0)
-		       (< (point) (window-start))
-		       (> lh winh))
-		  (set-window-vscroll
-		   nil
-		   (- lh dlh) t))))
-	(line-move-1 arg noerror)))))
+		  (winh (- (nth 3 edges) (nth 1 edges) 1)))
+	     (when (and (< arg 0)
+		        (< (point) (window-start))
+		        (> lh winh))
+	       (set-window-vscroll nil (- lh dlh) t)))))
+        (t
+         (set-window-vscroll nil 0 t)
+         (line-move-1 arg noerror))))
 
 ;; Display-based alternative to line-move-1.
 ;; Arg says how many lines to move.  The value is t if we can move the
