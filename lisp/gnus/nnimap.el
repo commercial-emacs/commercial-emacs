@@ -272,7 +272,7 @@ during splitting, which may be slow."
       (with-current-buffer (nnimap-process-buffer)
 	(erase-buffer)
         ;; If we have a lot of ranges, split them up to avoid
-        ;; generating too-long lines.  (The limit is 8192 octects,
+        ;; generating too-long lines.  (The limit is 8192 octets,
         ;; and this should guarantee that it's (much) shorter than
         ;; that.)  We don't stream the requests, since the server
         ;; may respond to the requests out-of-order:
