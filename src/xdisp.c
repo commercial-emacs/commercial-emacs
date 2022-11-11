@@ -794,7 +794,7 @@ static void load_overlay_strings (struct it *, ptrdiff_t);
 static bool get_display_element (struct it *);
 static enum move_it_result emulate_display_sline (struct it *, ptrdiff_t, int,
 						 enum move_operation_enum);
-static void get_visually_first_element (struct it *);
+static void bidi_reseat (struct it *);
 static void compute_stop_pos (struct it *);
 static int face_before_or_after_it_pos (struct it *, bool);
 static int handle_display_spec (struct it *, Lisp_Object, Lisp_Object,
@@ -3240,14 +3240,14 @@ init_from_display_pos (struct it *it, struct window *w, struct display_pos *pos)
 	  /* Synchronize the state of the bidi iterator with
 	     pos->string_pos.  For any string position other than
 	     zero, this will be done automagically when we resume
-	     iteration over the string and get_visually_first_element
+	     iteration over the string and bidi_reseat()
 	     is called.  But if string_pos is zero, and the string is
 	     to be reordered for display, we need to resync manually,
 	     since it could be that the iteration state recorded in
 	     pos ended at string_pos of 0 moving backwards in string.  */
 	  if (CHARPOS (pos->string_pos) == 0)
 	    {
-	      get_visually_first_element (it);
+	      bidi_reseat (it);
 	      if (IT_STRING_CHARPOS (*it) != 0)
 		do {
 		  /* Paranoia.  */
@@ -3319,16 +3319,13 @@ init_to_row_end (struct it *it, struct window *w, struct glyph_row *row)
 	 order, and we might therefore miss the composition earlier in
 	 the buffer that affects how glypsh are laid out in this row.
 	 So we punt instead.  Note: the test below works because
-	 get_display_element calls get_visually_first_element,
+	 get_display_element() calls bidi_reseat(),
 	 which calls composition_compute_stop_pos, which populates
 	 it->cmp_it.  */
-      if (get_display_element (it)
-	  && (it->bidi_it.scan_dir == -1 && it->cmp_it.id >= 0))
-	success = false;
-      else
-	success = true;
+      success = ! get_display_element (it)
+	|| it->bidi_it.scan_dir != -1
+	|| it->cmp_it.id < 0;
     }
-
   return success;
 }
 
@@ -7856,20 +7853,16 @@ get_element_from_display_vector (struct it *it)
   return true;
 }
 
-/* Get the first element of string/buffer in the visual order, after
-   being reseated to a new position in a string or a buffer.  */
+/* With bidi reordering, the character to display might not be the
+   character at IT_STRING_CHARPOS().  BIDI_IT.FIRST_ELT means
+   that we were reseat()ed to a new string, whose paragraph
+   direction is not known.
+*/
 static void
-get_visually_first_element (struct it *it)
+bidi_reseat (struct it *it)
 {
   bool string_p = STRINGP (it->string) || it->s;
   ptrdiff_t eob = (string_p ? it->bidi_it.string.schars : ZV);
-  ptrdiff_t bob;
-  ptrdiff_t obegv = BEGV;
-
-  SET_WITH_NARROWED_BEGV (it, bob,
-			  string_p ? 0 :
-			  IT_CHARPOS (*it) < BEGV ? obegv : BEGV,
-			  it->narrowed_begv);
 
   if (STRINGP (it->string))
     {
@@ -7882,38 +7875,33 @@ get_visually_first_element (struct it *it)
       it->bidi_it.bytepos = IT_BYTEPOS (*it);
     }
 
-  if (it->bidi_it.charpos == eob)
+  if (it->bidi_it.charpos != eob)
     {
-      /* Nothing to do, but reset the FIRST_ELT flag, like
-	 bidi_paragraph_init does, because we are not going to
-	 call it.  */
-      it->bidi_it.first_elt = false;
-    }
-  else if (it->bidi_it.charpos == bob
-	   || (!string_p
-	       && (FETCH_BYTE (it->bidi_it.bytepos - 1) == '\n'
-		   || FETCH_BYTE (it->bidi_it.bytepos) == '\n')))
-    {
-      /* If we are at the beginning of a line/string, we can produce
-	 the next element right away.  */
-      bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
-      bidi_move_to_visually_next (&it->bidi_it);
-    }
-  else
-    {
+      /* Bidi-traverse character-by-character from preceding newline
+	 to current position.  EZ kowtows to Levantine languages, long
+	 lines be damned.  */
       ptrdiff_t orig_bytepos = it->bidi_it.bytepos;
-
-      /* We need to prime the bidi iterator starting at the line's or
-	 string's beginning, before we will be able to produce the
-	 next element.  */
       if (string_p)
-	it->bidi_it.charpos = it->bidi_it.bytepos = 0;
+	{
+	  it->bidi_it.charpos = it->bidi_it.bytepos = 0;
+	}
       else
-	SET_WITH_NARROWED_BEGV (it, it->bidi_it.charpos,
-				find_newline_no_quit (IT_CHARPOS (*it),
-						      IT_BYTEPOS (*it), -1,
-						      &it->bidi_it.bytepos),
-				it->narrowed_begv);
+	{
+	  ptrdiff_t bob = (it->narrowed_begv && IT_CHARPOS (*it) >= it->narrowed_begv
+			   ? it->narrowed_begv
+			   : BEGV);
+	  if (it->bidi_it.charpos != bob
+	      && FETCH_BYTE (it->bidi_it.bytepos - 1) != '\n'
+	      && FETCH_BYTE (it->bidi_it.bytepos) != '\n')
+	    {
+	      /* not already at bob or bol */
+	      SET_WITH_NARROWED_BEGV (it, it->bidi_it.charpos,
+				      find_newline_no_quit (IT_CHARPOS (*it),
+							    IT_BYTEPOS (*it), -1,
+							    &it->bidi_it.bytepos),
+				      it->narrowed_begv);
+	    }
+	}
       bidi_fetch_char (it->bidi_it.charpos, it->bidi_it.bytepos,
 		       &it->bidi_it.disp_pos, &it->bidi_it.disp_prop,
 		       &it->bidi_it.string, it->bidi_it.w,
@@ -7922,13 +7910,12 @@ get_visually_first_element (struct it *it)
       bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
       do
         {
-          /* Now return to buffer/string position where we were asked
-             to get the next display element, and produce that.  */
           bidi_move_to_visually_next (&it->bidi_it);
         }
       while (it->bidi_it.bytepos != orig_bytepos
              && it->bidi_it.charpos < eob);
     }
+  /* else it->bidi_it.first_elt = false; // must I do this?  */
 
   /*  Adjust IT's position information to where we ended up.  */
   if (STRINGP (it->string))
@@ -7942,13 +7929,12 @@ get_visually_first_element (struct it *it)
       IT_BYTEPOS (*it) = it->bidi_it.bytepos;
     }
 
-  if (STRINGP (it->string) || !it->s)
+  if (STRINGP (it->string) || ! it->s)
     {
       ptrdiff_t stop, charpos, bytepos;
-
       if (STRINGP (it->string))
 	{
-	  eassert (!it->s);
+	  eassert (! it->s);
 	  stop = SCHARS (it->string);
 	  if (stop > it->end_charpos)
 	    stop = it->end_charpos;
@@ -7983,13 +7969,9 @@ get_element_from_string (struct it *it)
   eassert (IT_STRING_CHARPOS (*it) >= 0);
   position = it->current.string_pos;
 
-  /* With bidi reordering, the character to display might not be the
-     character at IT_STRING_CHARPOS.  BIDI_IT.FIRST_ELT means
-     that we were reseat()ed to a new string, whose paragraph
-     direction is not known.  */
   if (it->bidi_p && it->bidi_it.first_elt)
     {
-      get_visually_first_element (it);
+      bidi_reseat (it);
       SET_TEXT_POS (position, IT_STRING_CHARPOS (*it), IT_STRING_BYTEPOS (*it));
     }
 
@@ -7998,9 +7980,9 @@ get_element_from_string (struct it *it)
     {
       if (IT_STRING_CHARPOS (*it) >= it->stop_charpos)
 	{
-	  if (!(!it->bidi_p
-		|| BIDI_AT_BASE_LEVEL (it->bidi_it)
-		|| IT_STRING_CHARPOS (*it) == it->stop_charpos))
+	  if (it->bidi_p
+	      && ! BIDI_AT_BASE_LEVEL (it->bidi_it)
+	      && IT_STRING_CHARPOS (*it) != it->stop_charpos)
 	    {
 	      /* With bidi non-sequential iteration, we could find
 		 ourselves far beyond the last computed stop_charpos,
@@ -8150,12 +8132,8 @@ get_element_from_c_string (struct it *it)
   BYTEPOS (it->position) = CHARPOS (it->position) = 0;
   it->object = make_fixnum (0);
 
-  /* With bidi reordering, the character to display might not be the
-     character at IT_CHARPOS.  BIDI_IT.FIRST_ELT means that
-     we were reseated to a new string, whose paragraph direction is
-     not known.  */
   if (it->bidi_p && it->bidi_it.first_elt)
-    get_visually_first_element (it);
+    bidi_reseat (it);
 
   /* IT's position can be greater than IT->string_nchars in case a
      field width or precision has been specified when the iterator was
@@ -8238,10 +8216,10 @@ get_element_from_stretch (struct it *it)
   return true;
 }
 
-/* Scan backwards from IT's current position until we find a stop
-   position, or until BEGV.  This is called when we find ourself
-   before both the last known prev_stop and base_level_stop while
-   reordering bidirectional text.  */
+/* If we lost track of base_level_stop, we need to find
+   prev_stop by looking backwards.  This happens, e.g., when
+   we were reseated to the previous screenful of text by
+   vertical-motion.  */
 
 static void
 compute_stop_pos_backwards (struct it *it)
@@ -8346,13 +8324,9 @@ get_element_from_buffer (struct it *it)
 	   || (NILP (it->bidi_it.string.lstring)
 	       && it->bidi_it.string.s == NULL));
 
-  /* With bidi reordering, the character to display might not be the
-     character at IT_CHARPOS.  BIDI_IT.FIRST_ELT means that
-     we were reseat()ed to a new buffer position, which is potentially
-     a different paragraph.  */
   if (it->bidi_p && it->bidi_it.first_elt)
     {
-      get_visually_first_element (it);
+      bidi_reseat (it);
       SET_TEXT_POS (it->position, IT_CHARPOS (*it), IT_BYTEPOS (*it));
     }
 
@@ -9241,7 +9215,7 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op,
 		  IT_BYTEPOS (*it) = CHAR_TO_BYTE (npos);
 		  move_it_forward (it, npos, -1, MOVE_TO_POS, NULL);
 		  if (it->bidi_p)
-		    get_visually_first_element (it);
+		    bidi_reseat (it);
 		  last_height = it->max_ascent + it->max_descent;
 		  it->vpos += full_rows;
 		  it->current_y += full_rows * last_height;

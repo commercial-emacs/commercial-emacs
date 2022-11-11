@@ -713,7 +713,8 @@ bidi_cache_iterator_state (struct bidi_it *bidi_it, bool resolved,
       /* Character positions should correspond to cache positions 1:1.
 	 If we are outside the range of cached positions, the cache is
 	 useless and must be reset.  */
-      if (bidi_cache_start < idx && idx < bidi_cache_size
+      if (bidi_cache_start < idx
+	  && idx < bidi_cache_size
 	  && (bidi_it->charpos > (bidi_cache[idx - 1].charpos
 				  + bidi_cache[idx - 1].nchars)
 	      || bidi_it->charpos < bidi_cache[bidi_cache_start].charpos))
@@ -1036,7 +1037,7 @@ bidi_init_it (ptrdiff_t charpos, ptrdiff_t bytepos, bool frame_window_p,
     bidi_it->bytepos = bytepos;
   bidi_it->frame_window_p = frame_window_p;
   bidi_it->nchars = -1;	/* to be computed in bidi_resolve_explicit */
-  bidi_it->first_elt = 1;
+  bidi_it->first_elt = true;
   bidi_set_paragraph_end (bidi_it);
   bidi_it->new_paragraph = 1;
   bidi_it->separator_limit = -1;
@@ -1687,7 +1688,7 @@ bidi_paragraph_init (bidi_dir_t dir, struct bidi_it *bidi_it, bool no_default_p)
      direction to L2R if we have no previous usable paragraph
      direction.  This is allowed by the HL1 clause.  */
   if (bidi_it->paragraph_dir != L2R && bidi_it->paragraph_dir != R2L)
-    bidi_it->paragraph_dir = L2R; /* P3 and HL1 ``higher-level protocols'' */
+    bidi_it->paragraph_dir = L2R; /* P3 and HL1 "higher-level protocols" */
   if (bidi_it->paragraph_dir == R2L)
     bidi_it->level_stack[0].level = 1;
   else
@@ -1796,7 +1797,7 @@ bidi_resolve_explicit (struct bidi_it *bidi_it)
   if (bidi_it->bytepos < (string_p ? 0 : BEGV_BYTE)
       || bidi_it->first_elt)
     {
-      bidi_it->first_elt = 0;
+      bidi_it->first_elt = false;
       if (string_p)
 	{
 	  const unsigned char *p
@@ -2738,7 +2739,7 @@ bidi_resolve_brackets (struct bidi_it *bidi_it)
     next_for_neutral = bidi_it->next_for_neutral;
   else
     next_for_neutral.charpos = -1;
-  if (!bidi_it->first_elt)
+  if (! bidi_it->first_elt)
     {
       type = bidi_cache_find (bidi_it->charpos + bidi_it->nchars, 0, bidi_it);
       ch = bidi_it->ch;
