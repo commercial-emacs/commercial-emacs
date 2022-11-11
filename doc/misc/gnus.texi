@@ -21521,6 +21521,8 @@ details on Gnus' query language, see @ref{Search Queries}.
 * Creating Search Groups::     How and where.
 * Search Queries::             Gnus' built-in search syntax.
 * nnmairix::                   Searching with Mairix.
+* nnir::                       Migrating from nnir
+
 @end menu
 
 @node Search Engines
