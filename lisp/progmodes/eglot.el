@@ -187,15 +187,16 @@ chosen (interactively or automatically)."
                                 (python-mode
                                  . ,(eglot-alternatives
                                      '("pylsp" "pyls" ("pyright-langserver" "--stdio") "jedi-language-server")))
-                                ((js-json-mode json-mode) . ,(eglot-alternatives '(("vscode-json-language-server" "--stdio") ("json-languageserver" "--stdio"))))
+                                ((js-json-mode json-mode json-ts-mode) . ,(eglot-alternatives '(("vscode-json-language-server" "--stdio") ("json-languageserver" "--stdio"))))
                                 ((js-mode ts-mode typescript-mode)
                                  . ("typescript-language-server" "--stdio"))
                                 (sh-mode . ("bash-language-server" "start"))
                                 ((php-mode phps-mode)
                                  . ("php" "vendor/felixfbecker/\
 language-server/bin/php-language-server.php"))
-                                ((c++-mode c-mode) . ,(eglot-alternatives
-                                                       '("clangd" "ccls")))
+                                ((c++-mode c++-ts-mode c-mode c-ts-mode)
+                                 . ,(eglot-alternatives
+                                     '("clangd" "ccls")))
                                 (((caml-mode :language-id "ocaml")
                                   (tuareg-mode :language-id "ocaml") reason-mode)
                                  . ("ocamllsp"))
@@ -209,7 +210,7 @@ language-server/bin/php-language-server.php"))
                                 (go-mode . ("gopls"))
                                 ((R-mode ess-r-mode) . ("R" "--slave" "-e"
                                                         "languageserver::run()"))
-                                (java-mode . ("jdtls"))
+                                ((java-mode java-ts-mode) . ("jdtls"))
                                 (dart-mode . ("dart" "language-server"
                                               "--client-id" "emacs.eglot-dart"))
                                 (elixir-mode . ("language_server.sh"))
@@ -227,7 +228,7 @@ language-server/bin/php-language-server.php"))
                                 (lua-mode . ,(eglot-alternatives
                                               '("lua-language-server" "lua-lsp")))
                                 (zig-mode . ("zls"))
-                                (css-mode . ,(eglot-alternatives '(("vscode-css-language-server" "--stdio") ("css-languageserver" "--stdio"))))
+                                ((css-mode css-ts-mode) . ,(eglot-alternatives '(("vscode-css-language-server" "--stdio") ("css-languageserver" "--stdio"))))
                                 (html-mode . ,(eglot-alternatives '(("vscode-html-language-server" "--stdio") ("html-languageserver" "--stdio"))))
                                 (dockerfile-mode . ("docker-langserver" "--stdio"))
                                 ((clojure-mode clojurescript-mode clojurec-mode)
