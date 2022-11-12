@@ -33,9 +33,9 @@ chapters describe features that are peculiar to Emacs Lisp or relate
 specifically to editing.
 
   This is
-@iftex
+@ifset VERSION
 edition @value{VERSION} of
-@end iftex
+@end ifset
 the @cite{GNU Emacs Lisp Reference Manual},
 corresponding to Emacs version @value{EMACSVER}.
 
