@@ -2099,10 +2099,13 @@ For use in `add-log-current-defun-function'."
               (goto-char (+ (car pos) (cdr src)))
               (add-log-current-defun)))))))
 
-(defun diff-ignore-whitespace-hunk ()
-  "Re-diff the current hunk, ignoring whitespace differences."
-  (interactive)
-  (diff-refresh-hunk t))
+(defun diff-ignore-whitespace-hunk (whole-buffer)
+  "Re-diff the current hunk, ignoring whitespace differences.
+With non-nil prefix arg, re-diff all the hunks."
+  (interactive "P")
+  (if whole-buffer
+      (diff--ignore-whitespace-all-hunks)
+    (diff-refresh-hunk t)))
 
 (defun diff-refresh-hunk (&optional ignore-whitespace)
   "Re-diff the current hunk."
@@ -2272,10 +2275,12 @@ Return new point, if it was moved."
                                   (match-end 0) end
                                   nil #'diff-refine-preproc props-r props-a)))))))
 
-(defun diff--iterate-hunks (max fun)
+(defun diff--iterate-hunks (max fun &optional min)
   "Iterate over all hunks between point and MAX.
 Call FUN with two args (BEG and END) for each hunk."
   (save-excursion
+      (when min
+      (goto-char min))
     (catch 'malformed
       (let* ((beg (or (ignore-errors (diff-beginning-of-hunk))
                       (ignore-errors (diff-hunk-next) (point))
@@ -2294,6 +2299,12 @@ Call FUN with two args (BEG and END) for each hunk."
                           end
                         (or (ignore-errors (diff-hunk-next) (point))
                             max)))))))))
+
+(defun diff--ignore-whitespace-all-hunks ()
+  "Re-diff all the hunks, ignoring whitespace-differences."
+  (diff--iterate-hunks (point-max) (lambda (_ _)
+                                     (diff-refresh-hunk t))
+                       (point-min)))
 
 (defun diff--font-lock-refined (max)
   "Apply hunk refinement from font-lock."
