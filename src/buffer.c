@@ -150,11 +150,6 @@ bset_begv_marker (struct buffer *b, Lisp_Object val)
   b->begv_marker_ = val;
 }
 static void
-bset_bidi_display_reordering (struct buffer *b, Lisp_Object val)
-{
-  b->bidi_display_reordering_ = val;
-}
-static void
 bset_bidi_paragraph_start_re (struct buffer *b, Lisp_Object val)
 {
   b->bidi_paragraph_start_re_ = val;
@@ -4618,7 +4613,7 @@ init_buffer_once (void)
   bset_truncate_lines (&buffer_slot_defaults, Qnil);
   bset_word_wrap (&buffer_slot_defaults, Qnil);
   bset_ctl_arrow (&buffer_slot_defaults, Qt);
-  bset_bidi_display_reordering (&buffer_slot_defaults, Qt);
+  bset_bidi_display_reordering (&buffer_slot_defaults, Qnil);
   bset_bidi_paragraph_direction (&buffer_slot_defaults, Qnil);
   bset_bidi_paragraph_start_re (&buffer_slot_defaults, Qnil);
   bset_bidi_paragraph_separate_re (&buffer_slot_defaults, Qnil);

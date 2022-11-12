@@ -42,7 +42,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    The incomprehensibility of UAX#9, even for a technical reference,
    is just asking for an ass kicking.
 
-   The main entry point is bidi_move_to_visually_next, which returns
+   The main entry point is bidi_next, which returns
    the next character in the visual order along with data important to
    UAX#9.  There is something called bidi levels.
 
@@ -78,7 +78,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    cache, described below.
 
    See the commentary before the 'while' loop in
-   bidi_move_to_visually_next, for the details.
+   bidi_next, for the details.
 
    Fetching characters
    -------------------
@@ -148,8 +148,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "region-cache.h"
 #include "sysstdio.h"
 
-static bool bidi_initialized = 0;
-
 static Lisp_Object bidi_type_table, bidi_mirror_table, bidi_brackets_table;
 
 #define BIDI_EOB   (-1)
@@ -164,55 +162,6 @@ typedef enum {
 } bidi_category_t;
 
 static Lisp_Object paragraph_start_re, paragraph_separate_re;
-
-
-/***********************************************************************
-			Utilities
- ***********************************************************************/
-
-/* Return the bidi type of a character CH, subject to the current
-   directional OVERRIDE.  */
-static bidi_type_t
-bidi_get_type (int ch, bidi_dir_t override)
-{
-  bidi_type_t default_type;
-
-  if (ch == BIDI_EOB)
-    return NEUTRAL_B;
-  if (ch < 0 || ch > MAX_CHAR)
-    emacs_abort ();
-
-  default_type = (bidi_type_t) XFIXNUM (CHAR_TABLE_REF (bidi_type_table, ch));
-  /* Every valid character code, even those that are unassigned by the
-     UCD, have some bidi-class property, according to
-     DerivedBidiClass.txt file.  Therefore, if we ever get UNKNOWN_BT
-     (= zero) code from CHAR_TABLE_REF, that's a bug.  */
-  if (default_type == UNKNOWN_BT)
-    emacs_abort ();
-
-  switch (default_type)
-    {
-      case WEAK_BN:
-      case NEUTRAL_B:
-      case LRE:
-      case LRO:
-      case RLE:
-      case RLO:
-      case PDF:
-      case LRI:
-      case RLI:
-      case FSI:
-      case PDI:
-	return default_type;
-      default:
-	if (override == L2R)
-	  return STRONG_L;
-	else if (override == R2L)
-	  return STRONG_R;
-	else
-	  return default_type;
-    }
-}
 
 static void
 bidi_check_type (bidi_type_t type)
@@ -438,10 +387,6 @@ bidi_copy_it (struct bidi_it *to, struct bidi_it *from)
 	   + from->stack_idx * sizeof from->level_stack[0]));
 }
 
-
-/***********************************************************************
-			Caching the bidi iterator states
- ***********************************************************************/
 
 /* We allocate and de-allocate the cache in chunks of this size (in
    characters).  200 was chosen as an upper limit for reasonably-long
@@ -605,7 +550,7 @@ bidi_cache_search (ptrdiff_t charpos, int level, int dir)
    the direction to search, starting with the last used cache slot.
    If DIR is zero, we search backwards from the last occupied cache
    slot.  BEFORE means return the index of the slot that
-   is ``before'' the level change in the search direction.  That is,
+   is "before" the level change in the search direction.  That is,
    given the cached levels like this:
 
 	 1122333442211
@@ -805,11 +750,6 @@ bidi_peek_at_next_level (struct bidi_it *bidi_it)
   return bidi_cache[bidi_cache_last_idx + bidi_it->scan_dir].resolved_level;
 }
 
-
-/***********************************************************************
-	     Pushing and popping the bidi iterator state
- ***********************************************************************/
-
 /* Push the bidi iterator state in preparation for reordering a
    different object, e.g. display string found at certain buffer
    position.  Pushing the bidi iterator boils down to saving its
@@ -979,24 +919,24 @@ bidi_unshelve_cache (void *databuf, bool just_free)
     }
 }
 
-
-/***********************************************************************
-			Initialization
- ***********************************************************************/
-static void
+bool
 bidi_initialize (void)
 {
-  bidi_type_table = uniprop_table (intern ("bidi-class"));
+  if (! NILP (bidi_type_table))
+    return true;
+  if (NILP (Fassq (Qbidi_class, Vchar_code_property_alist)))
+    return false;
+  bidi_type_table = uniprop_table (Qbidi_class);
   if (NILP (bidi_type_table))
     emacs_abort ();
   staticpro (&bidi_type_table);
 
-  bidi_mirror_table = uniprop_table (intern ("mirroring"));
+  bidi_mirror_table = uniprop_table (Qmirroring);
   if (NILP (bidi_mirror_table))
     emacs_abort ();
   staticpro (&bidi_mirror_table);
 
-  bidi_brackets_table = uniprop_table (intern ("bracket-type"));
+  bidi_brackets_table = uniprop_table (Qbracket_type);
   if (NILP (bidi_brackets_table))
     emacs_abort ();
   staticpro (&bidi_brackets_table);
@@ -1009,8 +949,54 @@ bidi_initialize (void)
   bidi_cache_sp = 0;
   bidi_cache_total_alloc = 0;
   bidi_cache_max_elts = BIDI_CACHE_MAX_ELTS_PER_SLOT;
+  return true;
+}
 
-  bidi_initialized = 1;
+/* Return the bidi type of a character CH, subject to the current
+   directional OVERRIDE.  */
+bidi_type_t
+bidi_get_type (int ch, bidi_dir_t override)
+{
+  if (! bidi_initialize ())
+    return NEUTRAL_B;
+
+  bidi_type_t default_type;
+
+  if (ch == BIDI_EOB)
+    return NEUTRAL_B;
+  if (ch < 0 || ch > MAX_CHAR)
+    emacs_abort ();
+
+  default_type = (bidi_type_t) XFIXNUM (CHAR_TABLE_REF (bidi_type_table, ch));
+  /* Every valid character code, even those that are unassigned by the
+     UCD, have some bidi-class property, according to
+     DerivedBidiClass.txt file.  Therefore, if we ever get UNKNOWN_BT
+     (= zero) code from CHAR_TABLE_REF, that's a bug.  */
+  if (default_type == UNKNOWN_BT)
+    emacs_abort ();
+
+  switch (default_type)
+    {
+      case WEAK_BN:
+      case NEUTRAL_B:
+      case LRE:
+      case LRO:
+      case RLE:
+      case RLO:
+      case PDF:
+      case LRI:
+      case RLI:
+      case FSI:
+      case PDI:
+	return default_type;
+      default:
+	if (override == L2R)
+	  return STRONG_L;
+	else if (override == R2L)
+	  return STRONG_R;
+	else
+	  return default_type;
+    }
 }
 
 /* Do whatever UAX#9 clause X8 says should be done at paragraph's
@@ -1029,8 +1015,8 @@ void
 bidi_init_it (ptrdiff_t charpos, ptrdiff_t bytepos, bool frame_window_p,
 	      struct bidi_it *bidi_it)
 {
-  if (! bidi_initialized)
-    bidi_initialize ();
+  if (! bidi_initialize ())
+    emacs_abort ();
   if (charpos >= 0)
     bidi_it->charpos = charpos;
   if (bytepos >= 0)
@@ -1044,7 +1030,6 @@ bidi_init_it (ptrdiff_t charpos, ptrdiff_t bytepos, bool frame_window_p,
   bidi_it->type = NEUTRAL_B;
   bidi_it->type_after_wn = NEUTRAL_B;
   bidi_it->orig_type = NEUTRAL_B;
-  /* FIXME: Review this!!! */
   bidi_it->prev.type = bidi_it->prev.orig_type = UNKNOWN_BT;
   bidi_it->last_strong.type = bidi_it->last_strong.orig_type = UNKNOWN_BT;
   bidi_it->next_for_neutral.charpos = -1;
@@ -1054,12 +1039,10 @@ bidi_init_it (ptrdiff_t charpos, ptrdiff_t bytepos, bool frame_window_p,
   bidi_it->prev_for_neutral.type
     = bidi_it->prev_for_neutral.orig_type = UNKNOWN_BT;
   bidi_it->bracket_pairing_pos = -1;
-  bidi_it->sos = L2R;	 /* FIXME: should it be user-selectable? */
-  bidi_it->disp_pos = -1;	/* invalid/unknown */
+  bidi_it->sos = L2R;
+  bidi_it->disp_pos = -1;
   bidi_it->disp_prop = 0;
-  /* We can only shrink the cache if we are at the bottom level of its
-     "stack".  */
-  if (bidi_cache_start == 0)
+  if (bidi_cache_start == 0) /* shrinkable only at stack bottom */
     bidi_cache_shrink ();
   else
     bidi_cache_reset ();
@@ -1089,11 +1072,6 @@ bidi_line_init (struct bidi_it *bidi_it)
 
   bidi_cache_reset ();
 }
-
-
-/***********************************************************************
-			Fetching characters
- ***********************************************************************/
 
 /* Count bytes in string S between BEG/BEGBYTE and END.  BEG and END
    are zero-based character positions in S, BEGBYTE is byte position
@@ -1150,7 +1128,7 @@ bidi_char_at_pos (ptrdiff_t bytepos, const unsigned char *s, bool unibyte)
    next display string.  *DISP_PROP non-zero means that there's really
    a display string at DISP_POS, as opposed to when we searched till
    DISP_POS without finding one.  If *DISP_PROP is 2, it means the
-   display spec is of the form `(space ...)', which is replaced with
+   display spec is of the form "(space ...)", which is replaced with
    u+2029 to handle it as a paragraph separator.  STRING->s is the C
    string to iterate, or NULL if iterating over a buffer or a Lisp
    string; in the latter case, STRING->lstring is the Lisp string.  */
@@ -1191,13 +1169,13 @@ bidi_fetch_char (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t *disp_pos,
 	 property.  Hopefully, it will never be needed.  */
       if (charpos > *disp_pos)
 	emacs_abort ();
-      /* Text covered by `display' properties and overlays with
+      /* Text covered by display properties and overlays with
 	 display properties or display strings is handled as a single
 	 character that represents the entire run of characters
 	 covered by the display property.  */
       if (*disp_prop == 2)
 	{
-	  /* `(space ...)' display specs are handled as paragraph
+	  /* "(space ...)" display specs are handled as paragraph
 	     separators for the purposes of the reordering; see UAX#9
 	     section 3 and clause HL1 in section 4.3 there.  */
 	  ch = PARAGRAPH_SEPARATOR;
@@ -1327,12 +1305,6 @@ bidi_fetch_char_skip_isolates (ptrdiff_t charpos, ptrdiff_t bytepos,
   *ch_len += bytepos - orig_bytepos;
   return ch;
 }
-
-
-
-/***********************************************************************
-			Determining paragraph direction
- ***********************************************************************/
 
 /* Check if buffer position CHARPOS/BYTEPOS is the end of a paragraph.
    Value is the non-negative length of the paragraph separator
@@ -1602,8 +1574,8 @@ bidi_paragraph_init (bidi_dir_t dir, struct bidi_it *bidi_it, bool no_default_p)
       bidi_type_t type;
       const unsigned char *s;
 
-      if (!bidi_initialized)
-	bidi_initialize ();
+      if (! bidi_initialize ())
+	emacs_abort ();
 
       /* If we are inside a paragraph separator, we are just waiting
 	 for the separator to be exhausted; use the previous paragraph
@@ -1697,19 +1669,11 @@ bidi_paragraph_init (bidi_dir_t dir, struct bidi_it *bidi_it, bool no_default_p)
   bidi_line_init (bidi_it);
 }
 
-
-/***********************************************************************
-		 Resolving explicit and implicit levels.
-  The rest of this file constitutes the core of the UBA implementation.
- ***********************************************************************/
-
 static bool
 bidi_explicit_dir_char (int ch)
 {
   bidi_type_t ch_type;
 
-  if (!bidi_initialized)
-    emacs_abort ();
   if (ch < 0)
     {
       eassert (ch == BIDI_EOB);
@@ -2646,7 +2610,7 @@ bidi_find_bracket_pairs (struct bidi_it *bidi_it)
 	 this case.  So we pretend we did not resolve the brackets in
 	 this case, set up next_for_neutral for the entire bracketed
 	 text, and reset the cache to the character before the opening
-	 bracket.  The upshot is to allow bidi_move_to_visually_next
+	 bracket.  The upshot is to allow bidi_next
 	 reset the cache when it returns this opening bracket, thus
 	 cutting significantly on the size of the cache, which is
 	 important with long lines, especially if word-wrap is non-nil
@@ -3231,8 +3195,8 @@ bidi_level_of_next_char (struct bidi_it *bidi_it)
    Otherwise, we walk the buffer or string until we come back to the
    same level as LEVEL.
 
-   Note: we are not talking here about a ``level run'' in the UAX#9
-   sense of the term, but rather about a ``level'' which includes
+   Note: we are not talking here about a "level run" in the UAX#9
+   sense of the term, but rather about a "level" which includes
    all the levels higher than it.  In other words, given the levels
    like this:
 
@@ -3240,7 +3204,7 @@ bidi_level_of_next_char (struct bidi_it *bidi_it)
                 A      B                    C
 
    and assuming we are at point A scanning left to right, this
-   function moves to point C, whereas the UAX#9 ``level 2 run'' ends
+   function moves to point C, whereas the UAX#9 "level 2 run" ends
    at point B.  */
 static void
 bidi_find_other_level_edge (struct bidi_it *bidi_it, int level, bool end_flag)
@@ -3294,7 +3258,7 @@ bidi_find_other_level_edge (struct bidi_it *bidi_it, int level, bool end_flag)
 }
 
 void
-bidi_move_to_visually_next (struct bidi_it *bidi_it)
+bidi_next (struct bidi_it *bidi_it)
 {
   int old_level, new_level, next_level;
   struct bidi_it sentinel;
@@ -3541,4 +3505,12 @@ bidi_dump_cached_states (void)
   for (i = 0; i < bidi_cache_idx; i++)
     fprintf (stderr, "%*"pD"d", ndigits, bidi_cache[i].charpos);
   putc ('\n', stderr);
+}
+
+void
+syms_of_bidi (void)
+{
+  DEFSYM (Qbidi_class, "bidi-class");
+  DEFSYM (Qmirroring, "mirroring");
+  DEFSYM (Qbracket_type, "bracket-type");
 }

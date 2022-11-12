@@ -744,6 +744,11 @@ XBUFFER (Lisp_Object a)
    buffer.  (Some setters that are private to a single .c file are
    defined as static in those files.)  */
 INLINE void
+bset_bidi_display_reordering (struct buffer *b, Lisp_Object val)
+{
+  b->bidi_display_reordering_ = val;
+}
+INLINE void
 bset_bidi_paragraph_direction (struct buffer *b, Lisp_Object val)
 {
   b->bidi_paragraph_direction_ = val;

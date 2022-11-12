@@ -2347,6 +2347,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #endif
       syms_of_window ();
       syms_of_xdisp ();
+      syms_of_bidi ();
       syms_of_font ();
 #ifdef HAVE_SQLITE3
       syms_of_sqlite ();

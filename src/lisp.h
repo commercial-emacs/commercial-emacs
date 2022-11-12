@@ -3856,6 +3856,8 @@ extern ptrdiff_t count_lines (ptrdiff_t start_byte, ptrdiff_t end_byte);
 void set_frame_cursor_types (struct frame *, Lisp_Object);
 extern void syms_of_xdisp (void);
 extern void init_xdisp (void);
+extern void syms_of_bidi (void);
+extern bool bidi_initialize (void);
 extern Lisp_Object safe_eval (Lisp_Object);
 extern bool window_start_coordinates (struct window *, ptrdiff_t, int *,
 				      int *, int *, int *, int *, int *);

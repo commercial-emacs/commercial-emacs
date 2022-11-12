@@ -302,14 +302,14 @@ a non-nil value for the inserted character.  At the end, it runs
 
 /* Insert N times character C
 
-   If this insertion is suitable for direct output (completely simple),
-   return 0.  A value of 1 indicates this *might* not have been simple.
-   A value of 2 means this did things that call for an undo boundary.  */
+   Return 2 if insertion requires an undo boundary (e.g.,
+   overwrite-mode, abbrev-mode or auto-fill character), 1 if either
+   before- or after-change-functions are active, or 0 otherwise.  */
 
 static int
 internal_self_insert (int c, EMACS_INT n)
 {
-  int hairy = 0;
+  int retval = 0;
   Lisp_Object tem;
   register enum syntaxcode synt;
   Lisp_Object overwrite;
@@ -322,7 +322,7 @@ internal_self_insert (int c, EMACS_INT n)
 
   overwrite = BVAR (current_buffer, overwrite_mode);
   if (!NILP (Vbefore_change_functions) || !NILP (Vafter_change_functions))
-    hairy = 1;
+    retval = 1;
 
   /* At first, get multi-byte form of C in STR.  */
   if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
@@ -401,7 +401,7 @@ internal_self_insert (int c, EMACS_INT n)
 	      SET_PT_BOTH (pos, pos_byte);
 	    }
 	}
-      hairy = 2;
+      retval = 2;
     }
 
   synt = SYNTAX (c);
@@ -434,7 +434,7 @@ internal_self_insert (int c, EMACS_INT n)
 	}
 
       if (MODIFF != modiff)
-	hairy = 2;
+	retval = 2;
     }
 
   if (chars_to_delete)
@@ -488,13 +488,13 @@ internal_self_insert (int c, EMACS_INT n)
       if (c == '\n' && PT < ZV)
 	SET_PT_BOTH (PT + 1, PT_BYTE + 1);
       if (!NILP (auto_fill_result))
-	hairy = 2;
+	retval = 2;
     }
 
   /* Run hooks for electric keys.  */
   run_hook (Qpost_self_insert_hook);
 
-  return hairy;
+  return retval;
 }
 
 /* module initialization */

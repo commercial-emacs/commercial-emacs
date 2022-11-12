@@ -147,7 +147,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    background face.
 
    The set_iterator_to_next() function defers to
-   bidi_move_to_visually_next() which moves the iterator to the next
+   bidi_next() which moves the iterator to the next
    spot in the reading order (left to right, or right to left).
 
    Some backtracking is necessary since filling glyphs from the right
@@ -2897,9 +2897,8 @@ init_iterator (struct it *it, struct window *w,
       it->face_id = it->base_face_id;
       it->start = it->current;
       it->bidi_p =
-	/* When we are loading loadup.el, the character property tables
-	   needed for bidi iteration are not yet available.  */
-	! redisplay__inhibit_bidi
+	/* Bidi property tables only available after loadup.el.  */
+	bidi_initialize ()
 	&& ! NILP (BVAR (current_buffer, bidi_display_reordering))
 	&& it->multibyte_p;
 
@@ -3252,7 +3251,7 @@ init_from_display_pos (struct it *it, struct window *w, struct display_pos *pos)
 		do {
 		  /* Paranoia.  */
 		  eassert (it->bidi_it.charpos < it->bidi_it.string.schars);
-		  bidi_move_to_visually_next (&it->bidi_it);
+		  bidi_next (&it->bidi_it);
 		} while (it->bidi_it.charpos != 0);
 	    }
 	  eassert (IT_STRING_CHARPOS (*it) == it->bidi_it.charpos
@@ -3983,7 +3982,7 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 	      charpos = it_copy.bidi_it.charpos;
 	      if (charpos >= SCHARS (it->string))
 		break;
-	      bidi_move_to_visually_next (&it_copy.bidi_it);
+	      bidi_next (&it_copy.bidi_it);
 	    }
 	  while (it_copy.bidi_it.charpos != IT_STRING_CHARPOS (*it));
 
@@ -3994,12 +3993,12 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 		 order.  */
 	      int n = (it->what == IT_COMPOSITION ? it->cmp_it.nchars : 1);
 	      /* If this is the first string character,
-		 bidi_move_to_visually_next will deliver character at
+		 bidi_next will deliver character at
 		 current position without moving, so we need to enlarge N.  */
 	      if (it_copy.bidi_it.first_elt)
 		n++;
 	      while (n--)
-		bidi_move_to_visually_next (&it_copy.bidi_it);
+		bidi_next (&it_copy.bidi_it);
 
 	      charpos = it_copy.bidi_it.charpos;
 	    }
@@ -4097,12 +4096,12 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 
 	      it_copy = *it;
 	      /* If this is the first display element,
-		 bidi_move_to_visually_next will deliver character at
+		 bidi_next will deliver character at
 		 current position without moving, so we need to enlarge N.  */
 	      if (it->bidi_it.first_elt)
 		n++;
 	      while (n--)
-		bidi_move_to_visually_next (&it_copy.bidi_it);
+		bidi_next (&it_copy.bidi_it);
 
 	      SET_TEXT_POS (pos,
 			    it_copy.bidi_it.charpos, it_copy.bidi_it.bytepos);
@@ -4205,7 +4204,7 @@ handle_invisible_prop (struct it *it)
 		  /* Bidi-iterate out of the invisible text.  */
 		  do
 		    {
-		      bidi_move_to_visually_next (&it->bidi_it);
+		      bidi_next (&it->bidi_it);
 		    }
 		  while (oldpos <= it->bidi_it.charpos
 			 && it->bidi_it.charpos < endpos
@@ -4368,7 +4367,7 @@ handle_invisible_prop (struct it *it)
 		    }
 		  do
 		    {
-		      bidi_move_to_visually_next (&it->bidi_it);
+		      bidi_next (&it->bidi_it);
 		    }
 		  while (it->stop_charpos <= it->bidi_it.charpos
 			 && it->bidi_it.charpos < newpos);
@@ -6063,7 +6062,7 @@ iterate_out_of_display_property (struct it *it)
 	 && it->prev_stop <= it->bidi_it.charpos
 	 && it->bidi_it.charpos < CHARPOS (it->position)
 	 && it->bidi_it.charpos < eob)
-    bidi_move_to_visually_next (&it->bidi_it);
+    bidi_next (&it->bidi_it);
   /* Record the stop_pos we just crossed, for when we cross it
      back, maybe.  */
   if (it->bidi_it.charpos > CHARPOS (it->position))
@@ -6431,7 +6430,7 @@ following_line_start (struct it *it, bool *skipped_p,
 	      do
 		{
 		  bprev = it->bidi_it;
-		  bidi_move_to_visually_next (&it->bidi_it);
+		  bidi_next (&it->bidi_it);
 		} while (it->bidi_it.charpos != limit);
 
 	      IT_CHARPOS (*it) = limit;
@@ -6771,7 +6770,7 @@ reseat_to_string (struct it *it, const char *s, Lisp_Object string,
      loading loadup.el, as the necessary character property tables are
      not yet available.  */
   it->bidi_p =
-    ! redisplay__inhibit_bidi
+    bidi_initialize ()
     && ! NILP (BVAR (&buffer_slot_defaults, bidi_display_reordering));
 
   if (s == NULL)
@@ -7472,7 +7471,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 		 character of the next grapheme cluster, or to the
 		 character visually after the current composition.  */
 	      for (int i = 0; i < it->cmp_it.nchars; i++)
-		bidi_move_to_visually_next (&it->bidi_it);
+		bidi_next (&it->bidi_it);
 	      IT_CHARPOS (*it) = it->bidi_it.charpos;
 	      IT_BYTEPOS (*it) = it->bidi_it.bytepos;
 	    }
@@ -7515,7 +7514,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 		bidi_paragraph_init (it->paragraph_embedding,
 				     &it->bidi_it,
 				     false);
-	      bidi_move_to_visually_next (&it->bidi_it);
+	      bidi_next (&it->bidi_it);
 	      IT_CHARPOS (*it) = it->bidi_it.charpos;
 	      IT_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      if (prev_scan_dir != it->bidi_it.scan_dir)
@@ -7541,7 +7540,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	}
       else
 	{
-	  bidi_move_to_visually_next (&it->bidi_it);
+	  bidi_next (&it->bidi_it);
 	  IT_BYTEPOS (*it) = it->bidi_it.bytepos;
 	  IT_CHARPOS (*it) = it->bidi_it.charpos;
 	}
@@ -7633,7 +7632,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	      int i;
 
 	      for (i = 0; i < it->cmp_it.nchars; i++) {
-		bidi_move_to_visually_next (&it->bidi_it);
+		bidi_next (&it->bidi_it);
               }
 	      IT_STRING_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      IT_STRING_CHARPOS (*it) = it->bidi_it.charpos;
@@ -7695,7 +7694,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	    {
 	      int prev_scan_dir = it->bidi_it.scan_dir;
 
-	      bidi_move_to_visually_next (&it->bidi_it);
+	      bidi_next (&it->bidi_it);
 	      IT_STRING_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      IT_STRING_CHARPOS (*it) = it->bidi_it.charpos;
 	      /* If the scan direction changes, we may need to update
@@ -7854,7 +7853,7 @@ get_element_from_display_vector (struct it *it)
 }
 
 /* With bidi reordering, the character to display might not be the
-   character at IT_STRING_CHARPOS().  BIDI_IT.FIRST_ELT means
+   character at IT_CHARPOS().  BIDI_IT.FIRST_ELT means
    that we were reseat()ed to a new string, whose paragraph
    direction is not known.
 */
@@ -7910,7 +7909,7 @@ bidi_reseat (struct it *it)
       bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
       do
         {
-          bidi_move_to_visually_next (&it->bidi_it);
+          bidi_next (&it->bidi_it);
         }
       while (it->bidi_it.bytepos != orig_bytepos
              && it->bidi_it.charpos < eob);
@@ -8510,7 +8509,7 @@ get_element_from_composition (struct it *it)
 	      /* Resync the bidi iterator with IT's new position.
 		 FIXME: this doesn't support bidirectional text.  */
 	      while (it->bidi_it.charpos < IT_CHARPOS (*it))
-		bidi_move_to_visually_next (&it->bidi_it);
+		bidi_next (&it->bidi_it);
 	    }
 	  return false;
 	}
@@ -22686,7 +22685,7 @@ See also `bidi-paragraph-direction'.  */)
       || NILP (BVAR (buf, enable_multibyte_characters))
       /* When we are loading loadup.el, the character property tables
 	 needed for bidi iteration are not yet available.  */
-      || redisplay__inhibit_bidi)
+      || NILP (Fassq (Qbidi_class, Vchar_code_property_alist)))
     return Qleft_to_right;
   else if (!NILP (BVAR (buf, bidi_paragraph_direction)))
     return BVAR (buf, bidi_paragraph_direction);
@@ -22821,11 +22820,11 @@ useful in similar circumstances as this function.  */)
     {
       /* Characters in unibyte strings are always treated by bidi.c as
 	 strong LTR.  */
-      if (!STRING_MULTIBYTE (object)
+      if (! STRING_MULTIBYTE (object)
 	  /* When we are loading loadup.el, the character property
 	     tables needed for bidi iteration are not yet
 	     available.  */
-	  || redisplay__inhibit_bidi)
+	  || NILP (Fassq (Qbidi_class, Vchar_code_property_alist)))
 	return Qnil;
 
       validate_subarray (object, from, to, SCHARS (object), &from_pos, &to_pos);
@@ -22853,7 +22852,7 @@ useful in similar circumstances as this function.  */)
 	  /* When we are loading loadup.el, the character property
 	     tables needed for bidi iteration are not yet
 	     available.  */
-	  || redisplay__inhibit_bidi)
+	  || NILP (Fassq (Qbidi_class, Vchar_code_property_alist)))
 	return Qnil;
 
       set_buffer_temp (buf);
@@ -34111,12 +34110,6 @@ Internal use only.  */);
 	       doc: /* Code of the cause for redisplaying mode lines.
 Internal use only.  */);
   Vredisplay__mode_lines_cause = Fmake_hash_table (0, NULL);
-
-  DEFVAR_BOOL ("redisplay--inhibit-bidi", redisplay__inhibit_bidi,
-     doc: /* Non-nil means it is not safe to attempt bidi reordering for display.  */);
-  /* Initialize to t, since we need to disable reordering until
-     loadup.el successfully loads charprop.el.  */
-  redisplay__inhibit_bidi = true;
 
   DEFVAR_BOOL ("display-raw-bytes-as-hex", display_raw_bytes_as_hex,
     doc: /* Non-nil means display raw bytes in hexadecimal format.

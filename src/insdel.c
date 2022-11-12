@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "region-cache.h"
 #include "pdumper.h"
+#include "dispextern.h"
 
 #ifdef HAVE_TREE_SITTER
 #include "tree-sitter.h"
@@ -855,6 +856,25 @@ count_combining_after (const unsigned char *string,
 
 #endif
 
+/* Put bidi processing on notice if just inserted C is R2L.  */
+
+static void
+detect_bidi (struct buffer *buf, const unsigned char *string, ptrdiff_t nbytes)
+{
+  if (! NILP (BVAR (buf, enable_multibyte_characters)))
+    for (int len, offset = 0;
+	 offset < nbytes && NILP (BVAR (buf, bidi_display_reordering));
+	 offset += len)
+      switch (bidi_get_type (string_char_and_length (&string[offset], &len), R2L))
+	{
+	case STRONG_R:
+	case STRONG_AL:
+	  bset_bidi_display_reordering (buf, Qt);
+	  break;
+	default:
+	  break;
+	}
+}
 
 /* Insert a sequence of NCHARS chars which occupy NBYTES bytes
    starting at STRING.  INHERIT non-zero means inherit the text
@@ -917,13 +937,15 @@ insert_1_both (const char *string,
   if (Z - GPT < END_UNCHANGED)
     END_UNCHANGED = Z - GPT;
 
+  detect_bidi (current_buffer, (unsigned char *) string, nbytes);
+
   adjust_markers_for_insert (PT, PT_BYTE,
 			     PT + nchars, PT_BYTE + nbytes,
 			     before_markers);
 
   offset_intervals (current_buffer, PT, nchars);
 
-  if (!inherit && buffer_intervals (current_buffer))
+  if (! inherit && buffer_intervals (current_buffer))
     set_text_properties (make_fixnum (PT), make_fixnum (PT + nchars),
 			 Qnil, Qnil, Qnil);
 
@@ -1045,6 +1067,9 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
   /* The insert may have been in the unchanged region, so check again.  */
   if (Z - GPT < END_UNCHANGED)
     END_UNCHANGED = Z - GPT;
+
+  if (STRING_MULTIBYTE (string))
+    detect_bidi (current_buffer, (unsigned char *) SDATA (string), nbytes);
 
   adjust_markers_for_insert (PT, PT_BYTE, PT + nchars,
 			     PT_BYTE + outgoing_nbytes,
@@ -1204,6 +1229,9 @@ insert_from_buffer_1 (struct buffer *buf,
 
       outgoing_nbytes = outgoing_before_gap + outgoing_after_gap;
     }
+  else
+    {
+    }
 
   /* Do this before moving and increasing the gap,
      because the before-change hooks might move the gap
@@ -1266,6 +1294,10 @@ insert_from_buffer_1 (struct buffer *buf,
   /* The insert may have been in the unchanged region, so check again.  */
   if (Z - GPT < END_UNCHANGED)
     END_UNCHANGED = Z - GPT;
+
+  if (NILP (BVAR (current_buffer, bidi_display_reordering))
+      && ! NILP (BVAR (buf, bidi_display_reordering)))
+    bset_bidi_display_reordering (buf, Qt);
 
   adjust_markers_for_insert (PT, PT_BYTE, PT + nchars,
 			     PT_BYTE + outgoing_nbytes,

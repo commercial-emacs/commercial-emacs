@@ -3343,7 +3343,7 @@ enum tool_bar_item_image
 /* Defined in bidi.c */
 
 extern void bidi_init_it (ptrdiff_t, ptrdiff_t, bool, struct bidi_it *);
-extern void bidi_move_to_visually_next (struct bidi_it *);
+extern void bidi_next (struct bidi_it *);
 extern void bidi_paragraph_init (bidi_dir_t, struct bidi_it *, bool);
 extern int  bidi_mirror_char (int);
 extern void bidi_push_it (struct bidi_it *);
@@ -3355,6 +3355,7 @@ extern int bidi_fetch_char (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t *dis
 			    int *disp_prop, struct bidi_string_data *string,
 			    struct window *w,
 			    bool frame_window_p, ptrdiff_t *ch_len, ptrdiff_t *nchars);
+extern bidi_type_t bidi_get_type (int ch, bidi_dir_t override);
 
 /* Defined in xdisp.c */
 struct glyph_row *row_containing_pos (struct window *, ptrdiff_t,
