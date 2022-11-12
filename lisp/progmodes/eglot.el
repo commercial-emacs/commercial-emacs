@@ -209,7 +209,8 @@ language-server/bin/php-language-server.php"))
                                 (go-mode . ("gopls"))
                                 ((R-mode ess-r-mode) . ("R" "--slave" "-e"
                                                         "languageserver::run()"))
-                                (java-mode . ("jdtls"))
+                                (java-mode
+                                 . ,(eglot-alternatives '("jdtls" "java-language-server")))
                                 (dart-mode . ("dart" "language-server"
                                               "--client-id" "emacs.eglot-dart"))
                                 (elixir-mode . ("language_server.sh"))
