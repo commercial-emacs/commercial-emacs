@@ -2399,17 +2399,7 @@ the various files."
                   (file-attribute-size attributes) "open" filename
                   (not rawfile))))
             (unless rawfile
-              (when (or (eq 'raw too-large)
-                        (and (not noninteractive)
-                             (find-file-long-lines-p filename)
-                             (let ((response
-                                    (y-or-n-p
-                                     (format "Open %s in raw mode?"
-                                             (file-name-nondirectory filename)))))
-                               (prog1 response
-                                 (unless response
-                                   (message "find-file-literally-line-length currently %s"
-                                            find-file-literally-line-length))))))
+              (when (eq 'raw too-large)
                 (setf rawfile t))))
 	  (warn-maybe-out-of-memory (file-attribute-size attributes)))
 	(if buf
