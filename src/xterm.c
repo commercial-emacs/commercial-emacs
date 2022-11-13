@@ -28964,10 +28964,9 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #endif
   int i;
 
+#if defined HAVE_XFIXES && defined USE_XCB
   USE_SAFE_ALLOCA;
-
-  /* Avoid warnings when SAFE_ALLOCA is not actually used.  */
-  ((void) SAFE_ALLOCA (0));
+#endif
 
   block_input ();
 
@@ -29121,7 +29120,9 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 
       unblock_input ();
 
+#if defined HAVE_XFIXES && defined USE_XCB
       SAFE_FREE ();
+#endif
       return 0;
     }
 
@@ -29141,7 +29142,9 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 
       unblock_input ();
 
+#if defined HAVE_XFIXES && defined USE_XCB
       SAFE_FREE ();
+#endif
       return 0;
     }
 #endif
@@ -30026,7 +30029,9 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 
   unblock_input ();
 
+#if defined HAVE_XFIXES && defined USE_XCB
   SAFE_FREE ();
+#endif
   return dpyinfo;
 }
 
