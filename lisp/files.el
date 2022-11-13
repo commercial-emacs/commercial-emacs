@@ -2200,7 +2200,7 @@ suppresses this warning."
   :version "21.1"
   :type 'boolean)
 
-(defcustom find-file-literally-line-length 9000
+(defcustom find-file-literally-line-length 50000
   "Shortest run of non-newline characters triggering a raw file read.
 When nil, avoid this potentially time consuming check."
   :group 'files
