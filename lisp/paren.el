@@ -32,6 +32,8 @@
 
 ;;; Code:
 
+(autoload 'cl-position "cl-seq")
+
 (defgroup paren-showing nil
   "Showing (un)matching of parens and expressions."
   :prefix "show-paren-"
@@ -139,18 +141,16 @@ this mode is enabled in.
 
 This is a global minor mode.  To toggle the mode in a single buffer,
 use `show-paren-local-mode'."
-  :global t :group 'paren-showing
+  :global t
+  :group 'paren-showing
   :initialize 'custom-initialize-delay
   :init-value t
-  ;; Enable or disable the mechanism.
-  ;; First get rid of the old idle timer.
-  (when show-paren--idle-timer
-    (cancel-timer show-paren--idle-timer)
-    (setq show-paren--idle-timer nil))
-  (setq show-paren--idle-timer (run-with-idle-timer
-                                show-paren-delay t
-                                #'show-paren-function))
-  (unless show-paren-mode
+  (when (timerp show-paren--idle-timer)
+    (cancel-timer show-paren--idle-timer))
+  (if show-paren-mode
+      (setq show-paren--idle-timer (run-with-idle-timer
+                                    show-paren-delay t
+                                    #'show-paren-function))
     (show-paren--delete-overlays)))
 
 (defun show-paren--delete-overlays ()
@@ -182,30 +182,23 @@ use `show-paren-local-mode'."
     (= (logand (skip-syntax-backward "/\\") 1) 0)))
 
 (defun show-paren--categorize-paren (pos)
-  "Determine whether the character after POS has paren syntax,
-and if so, return a cons (DIR . OUTSIDE), where DIR is 1 for an
-open paren, -1 for a close paren, and OUTSIDE is the buffer
-position of the outside of the paren.  If the character isn't a
-paren, or it is an escaped paren, return nil."
-  (cond
-   ((and (eq (syntax-class (syntax-after pos)) 4)
-	 (show-paren--unescaped-p pos))
-    (cons 1 pos))
-   ((and (eq (syntax-class (syntax-after pos)) 5)
-	 (show-paren--unescaped-p pos))
-    (cons -1 (1+ pos)))))
+  "Primitive for `show-paren--locate-near-paren'."
+  (unless (nth 8 (save-excursion (syntax-ppss pos)))
+    (when (show-paren--unescaped-p pos)
+      (let ((class (syntax-class (syntax-after pos))))
+        (if (eq class 4)
+            (cons 1 pos)
+          (when (eq class 5)
+            (cons -1 (1+ pos))))))))
 
 (defun show-paren--locate-near-paren ()
-  "Locate an unescaped paren \"near\" point to show.
-If one is found, return the cons (DIR . OUTSIDE), where DIR is 1
-for an open paren, -1 for a close paren, and OUTSIDE is the buffer
-position of the outside of the paren.  Otherwise return nil."
-  (let* ((ind-pos (save-excursion (back-to-indentation) (point)))
-	 (eol-pos
-	  (save-excursion
-	    (end-of-line) (skip-chars-backward " \t" ind-pos) (point)))
-	 (before (show-paren--categorize-paren (1- (point))))
-	 (after (show-paren--categorize-paren (point))))
+  "Return (DIR . OUTSIDE), where DIR is 1 for an
+opening, and -1 for a closing paren.  OUTSIDE
+is the buffer position preceding an opening paren, or
+the position following a closing paren."
+  (let ((before (unless (eq (point) (point-min))
+                  (show-paren--categorize-paren (1- (point)))))
+	(after (show-paren--categorize-paren (point))))
     (cond
      ;; Point is immediately outside a paren.
      ((eq (car before) -1) before)
@@ -213,15 +206,18 @@ position of the outside of the paren.  Otherwise return nil."
      ;; Point is immediately inside a paren.
      ((and show-paren-when-point-inside-paren before))
      ((and show-paren-when-point-inside-paren after))
-     ;; Point is in the whitespace before the code.
-     ((and show-paren-when-point-in-periphery
-	   (<= (point) ind-pos))
-      (or (show-paren--categorize-paren ind-pos)
-	  (show-paren--categorize-paren (1- eol-pos))))
-     ;; Point is in the whitespace after the code.
-     ((and show-paren-when-point-in-periphery
-	   (>= (point) eol-pos))
-      (show-paren--categorize-paren (1- eol-pos))))))
+     (show-paren-when-point-in-periphery
+      (let* ((ind-pos (save-excursion (back-to-indentation) (point)))
+	     (eol-pos
+	      (save-excursion
+	        (end-of-line) (skip-chars-backward " \t" ind-pos) (point))))
+        (if (<= (point) ind-pos)
+            ;; Point is in the whitespace before the code.
+            (or (show-paren--categorize-paren ind-pos)
+	        (show-paren--categorize-paren (1- eol-pos)))
+          (when (>= (point) eol-pos)
+            ;; Point is in the whitespace after the code.
+            (show-paren--categorize-paren (1- eol-pos)))))))))
 
 (defvar show-paren-data-function #'show-paren--default
   "Function to find the opener/closer \"near\" point and its match.
@@ -230,10 +226,11 @@ if there's no opener/closer near point, or a list of the form
 \(HERE-BEG HERE-END THERE-BEG THERE-END MISMATCH)
 Where HERE-BEG..HERE-END is expected to be near point.")
 
-(defun show-paren--default ()
-  "Find the opener/closer near point and its match.
+(defvar-local show-paren--scan-errors 0
+  "Too many scan errors suggests long lines.")
 
-It is the default value of `show-paren-data-function'."
+(defun show-paren--default ()
+  "Default value of `show-paren-data-function'."
   (when-let ((temp (show-paren--locate-near-paren))
 	     (dir (car temp))
 	     (outside (cdr temp))
@@ -248,37 +245,32 @@ It is the default value of `show-paren-data-function'."
 	   (min (point-max) (+ (point) blink-matching-paren-distance))))
         ;; Scan across one sexp within that range.
         ;; Errors or nil mean there is a mismatch.
-        (condition-case ()
+        (condition-case nil
 	    (setq pos (scan-sexps outside dir))
-	  (scan-error (setq pos t mismatch t)))
-        ;; Move back the other way and verify we get back to the
-        ;; starting point.  If not, these two parens don't really match.
-        ;; Maybe the one at point is escaped and doesn't really count,
-        ;; or one is inside a comment.
-        (when (integerp pos)
-	  (unless (condition-case ()
-		      (eq outside (scan-sexps pos (- dir)))
-		    (scan-error nil))
-	    (setq pos nil)))
+	  (scan-error
+           (cl-incf show-paren--scan-errors)
+           (setq pos t mismatch t)))
+
         ;; If found a "matching" paren, see if it is the right
         ;; kind of paren to match the one we started at.
         (if (not (integerp pos))
-	    (if mismatch (list here-beg here-end nil nil t))
-	  (let ((beg (min pos outside)) (end (max pos outside)))
-	    (unless (eq (syntax-class (syntax-after beg)) 8)
+	    (when mismatch
+              (list here-beg here-end nil nil t))
+	  (let ((beg (min pos outside))
+                (end (max pos outside)))
+	    (unless (eq 8 (syntax-class (syntax-after beg)))
 	      (setq mismatch
-		    (not (or (eq (char-before end)
-			         ;; This can give nil.
-			         (cdr (syntax-after beg)))
-			     (eq (char-after beg)
-			         ;; This can give nil.
-			         (cdr (syntax-after (1- end))))
-			     ;; The cdr might hold a new paren-class
-			     ;; info rather than a matching-char info,
-			     ;; in which case the two CDRs should match.
-			     (eq (cdr (syntax-after (1- end)))
-			         (cdr (syntax-after beg)))))))
-	    (list here-beg here-end
+		    (and (not (eq (char-before end)
+			          (cdr (syntax-after beg))))
+			 (not (eq (char-after beg)
+			          (cdr (syntax-after (1- end)))))
+			 ;; The cdr might hold a new paren-class
+			 ;; info rather than a matching-char info,
+			 ;; in which case the two CDRs should match.
+			 (not (eq (cdr (syntax-after (1- end)))
+			          (cdr (syntax-after beg)))))))
+	    (list here-beg
+                  here-end
 		  (if (= dir 1) (1- pos) pos)
 		  (if (= dir 1) pos (1+ pos))
 		  mismatch)))))))
@@ -422,15 +414,9 @@ It is the default value of `show-paren-data-function'."
                        ;; If not, check that the predicate matches.
                        (buffer-match-p show-paren-predicate (current-buffer)))
                    (funcall show-paren-data-function))))
+    (setq show-paren--last-pos (point))
     (if (not data)
-        (progn
-          ;; If show-paren-mode is nil in this buffer or if not at a paren that
-          ;; has a match, turn off any previous paren highlighting.
-          (delete-overlay show-paren--overlay)
-          (delete-overlay show-paren--overlay-1)
-          (setq show-paren--last-pos (point)))
-
-      ;; Found something to highlight.
+        (show-paren--delete-overlays)
       (let* ((here-beg (nth 0 data))
              (here-end (nth 1 data))
              (there-beg (nth 2 data))
@@ -488,22 +474,24 @@ It is the default value of `show-paren-data-function'."
                        (not (eql show-paren--last-pos (point)))
                        (< there-beg here-beg)
                        (not (pos-visible-in-window-p openparen)))
-              (let ((context (blink-paren-open-paren-line-string
-                              openparen))
-                    (message-log-max nil))
+              (let ((context (blink-paren-open-paren-line-string openparen))
+                    message-log-max)
                 (cond
-                 ((and
-                   (eq show-paren-context-when-offscreen 'child-frame)
-                   (display-graphic-p))
+                 ((and (eq show-paren-context-when-offscreen 'child-frame)
+                       (display-graphic-p))
                   (show-paren--show-context-in-child-frame context))
                  ((eq show-paren-context-when-offscreen 'overlay)
                   (show-paren--show-context-in-overlay context))
                  (show-paren-context-when-offscreen
                   (minibuffer-message "Matches %s" context))))))
-          (setq show-paren--last-pos (point))
           ;; Always set the overlay face, since it varies.
           (overlay-put show-paren--overlay 'priority show-paren-priority)
-          (overlay-put show-paren--overlay 'face face))))))
+          (overlay-put show-paren--overlay 'face face))
+        (when (<= 3 show-paren--scan-errors)
+          ;; three strikes, you're out?
+          (message "Disabling show-paren-mode for scan errors")
+          (setq show-paren--scan-errors 0)
+          (show-paren-mode -1))))))
 
 (provide 'paren)
 

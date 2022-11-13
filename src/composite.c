@@ -24,6 +24,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stdlib.h>		/* for qsort */
 
 #include "lisp.h"
@@ -37,105 +38,92 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "termhooks.h"
 
 
-/* Emacs uses special text property `composition' to support character
-   composition.  A sequence of characters that have the same (i.e. eq)
-   `composition' property value is treated as a single composite
-   sequence (we call it just `composition' here after).  Characters in
-   a composition are all composed somehow on the screen.
+/* Static compositions
+   -------------------
+   Adjacent characters sharing the eq-same 'composition text property
+   are treated as a single composition.
 
-   The property value has this form when the composition is made:
+   Upon construction, the 'composition property is of the form:
 	((LENGTH . COMPONENTS) . MODIFICATION-FUNC)
-   then turns to this form:
-	(COMPOSITION-ID . (LENGTH COMPONENTS-VEC . MODIFICATION-FUNC))
-   when the composition is registered in composition_hash_table and
-   composition_table.  These rather peculiar structures were designed
-   to make it easy to distinguish them quickly (we can do that by
-   checking only the first element) and to extract LENGTH (from the
-   former form) and COMPOSITION-ID (from the latter form).
 
-   We register a composition when it is displayed, or when the width
-   is required (for instance, to calculate columns).
+   Upon registration in composition_hash_table it takes the form:
+        (COMPOSITION-ID . (LENGTH COMPONENTS-VEC . MODIFICATION-FUNC))
 
-   LENGTH -- Length of the composition.  This information is used to
-	check the validity of the composition.
+   The forms were chosen so that consp of the first element distinguishes
+   between them.
 
-   COMPONENTS --  Character, string, vector, list, or nil.
+   Registration occurs when a composition is displayed or when its
+   width is required for layout.  A call to get_composition_id() first
+   returns a COMPOSITION-ID if the composition is already registered, and
+   otherwise updates composition_hash_table and composition_table with
+   a new id in addition to changing the form of the property value.  An
+   invalid property value results in a no-op.
 
-	If it is nil, characters in the text are composed relatively
-	according to their metrics in font glyphs.
+   Description of fields
+   ---------------------
+   LENGTH is the composition length in characters.
 
-	If it is a character or a string, the character or characters
-	in the string are composed relatively.
+   COMPONENTS is normally a character or string.  It can also be nil
+   meaning the composition width is naively set to its widest
+   constituent glyph (for unclear reasons, this is called "relative
+   composition" by Handa).
 
-	If it is a vector or list of integers, the element is a
-	character or an encoded composition rule.  The characters are
-	composed according to the rules.  (2N)th elements are
-	characters to be composed and (2N+1)th elements are
-	composition rules to tell how to compose (2N+2)th element with
-	the previously composed 2N glyphs.
+   COMPONENTS can also be a vector or list of integers
+   of the form:
+       (CHARACTER0 RULE0 CHARACTER1 RULE1 CHARACTER2 RULE2... )
+   where each successive RULE describes how to compose its CHARACTER
+   with those preceding it in the sequence.
 
-   COMPONENTS-VEC -- Vector of integers.  In a relative composition,
-	the elements are the characters to be composed.  In a rule-base
-	composition, the elements are characters or encoded
-	composition rules.
+   COMPONENTS-VEC is  vector of characters (integers) to be
+   composed in a relative composition (see above), or a facsimile
+   of COMPONENTS otherwise.
 
-   MODIFICATION-FUNC -- If non-nil, it is a function to call when the
-	composition gets invalid after a modification in a buffer.  If
-	it is nil, a function in `composition-function-table' of the
-	first character in the sequence is called.
+   MODIFICATION-FUNC if non-nil is the callback triggered when a
+   buffer modification invalidates a composition.  If nil,
+   invalidation calls instead the entry in
+   `composition-function-table' corresponding to the first character.
 
-   COMPOSITION-ID --Identification number of the composition.  It is
-	used as an index to composition_table for the composition.
+   COMPOSITION-ID is the composition's index into composition_table.
 
-   When Emacs has to display a composition or has to know its
-   displaying width, the function get_composition_id is called.  It
-   returns COMPOSITION-ID so that the caller can access the
-   information about the composition through composition_table.  If a
-   COMPOSITION-ID has not yet been assigned to the composition,
-   get_composition_id checks the validity of `composition' property,
-   and, if valid, assigns a new ID, registers the information in
-   composition_hash_table and composition_table, and changes the form
-   of the property value.  If the property is invalid,
-   get_composition_id returns -1 without changing the property value.
+   Internal state
+   --------------
+   composition_hash_table maps COMPONENTS-VEC to COMPOSITION-ID.
+   The table is weak so we rely on each key being also kept in the
+   'composition property to prevent premature gc while any text
+   with the eq-same COMPONENTS-VEC persist.
 
-   We use two tables to keep the information about composition;
-   composition_hash_table and composition_table.
+   composition_table indexes `struct composition` pointers by
+   COMPOSITION-ID.
 
-   The former is a hash table whose keys are COMPONENTS-VECs and
-   values are the corresponding COMPOSITION-IDs.  This hash table is
-   weak, but as each key (COMPONENTS-VEC) is also kept as a value of the
-   `composition' property, it won't be collected as garbage until all
-   bits of text that have the same COMPONENTS-VEC are deleted.
+   The 'composition text property is similar to the 'intangible text
+   property in its fragile association with whole character sequences
+   instead of individual characters (like other text properties).
+   Adjacent sequences cannot be distinguished if they share the
+   eq-same 'composition property.  The update_compositions routine
+   called after every buffer change ensures this distinction (it
+   actually assigns a new copy of 'composition to problematic adjacent
+   sequences).
 
-   The latter is a table of pointers to `struct composition' indexed
-   by COMPOSITION-ID.  This structure keeps the other information (see
-   composite.h).
+   The number of characters sharing a 'composition property in a
+   composition instance should only ever get shorter.  The property is
+   rear-nonsticky and update_compositions could only "break up" its
+   application to a given run of character.  Validity is readily
+   checked by comparing its LENGTH with the actual length of the
+   composition.
 
-   In general, a text property holds information about individual
-   characters.  But, a `composition' property holds information about
-   a sequence of characters (in this sense, it is like the `intangible'
-   property).  That means that we should not share the property value
-   in adjacent compositions -- we can't distinguish them if they have the
-   same property.  So, after any changes, we call
-   `update_compositions' and change a property of one of adjacent
-   compositions to a copy of it.  This function also runs a proper
-   composition modification function to make a composition that gets
-   invalid by the change valid again.
+   Automatic compositions
+   ----------------------
+   These I think are just unicode codepoints.
 
-   As the value of the `composition' property holds information about a
-   specific range of text, the value gets invalid if we change the
-   text in the range.  We treat the `composition' property as always
-   rear-nonsticky (currently by setting default-text-properties to
-   (rear-nonsticky (composition))) and we never make properties of
-   adjacent compositions identical.  Thus, any such changes make the
-   range just shorter.  So, we can check the validity of the `composition'
-   property by comparing LENGTH information with the actual length of
-   the composition.
+   For example, if I run (next-single-property-change (point-min) 'composition)
+   in the `M-x view-hello-file', I don't get any static compositions.  I would
+   think therefore automatic compositions are more prevalent and a lot more
+   important to get right.
 
 */
 
 
-/* Table of pointers to the structure `composition' indexed by
+/* Table of pointers to the structure 'composition indexed by
    COMPOSITION-ID.  This structure is for storing information about
    each composition except for COMPONENTS-VEC.  */
 struct composition **composition_table;
@@ -147,16 +135,16 @@ static ptrdiff_t composition_table_size;
 ptrdiff_t n_compositions;
 
 /* Hash table for compositions.  The key is COMPONENTS-VEC of
-   `composition' property.  The value is the corresponding
+   'composition property.  The value is the corresponding
    COMPOSITION-ID.  */
 Lisp_Object composition_hash_table;
 
-/* Maximum number of characters to look back for
-   auto-compositions.  */
+/* Maximum number of characters to look back for automatic compositions.
+   This is a limitation imposed by `composition-function-table'. */
 #define MAX_AUTO_COMPOSITION_LOOKBACK 3
 
 /* Return COMPOSITION-ID of a composition at buffer position
-   CHARPOS/BYTEPOS and length NCHARS.  The `composition' property of
+   CHARPOS/BYTEPOS and length NCHARS.  The 'composition property of
    the sequence is PROP.  STRING, if non-nil, is a string that
    contains the composition instead of the current buffer.
 
@@ -394,27 +382,21 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
   return n_compositions++;
 
  invalid_composition:
-  /* Would it be better to remove this `composition' property?  */
+  /* Would it be better to remove this 'composition property?  */
   return -1;
 }
 
-
-/* Find a static composition at or nearest to position POS of OBJECT
-   (buffer or string).
 
-   OBJECT defaults to the current buffer.  If there's a composition at
-   POS, set *START and *END to the start and end of the sequence,
-   *PROP to the `composition' property, and return 1.
+/* Finds a static composition at POS of OBJECT, which defaults
+   to the current buffer.
 
-   If there's no composition at POS and LIMIT is negative, return 0.
+   Sets *START and *END to the boundaries of the composition.
+   Sets *PROP to the 'composition property.
 
-   Otherwise, search for a composition forward (LIMIT > POS) or
-   backward (LIMIT < POS).  In this case, LIMIT bounds the search.
+   A valid (non-negative) LIMIT scans for a composition nearest POS
+   between POS and LIMIT.
 
-   If a composition is found, set *START, *END, and *PROP as above,
-   and return 1, else return 0.
-
-   This doesn't check the validity of composition.  */
+   Return true if a composition is found.  */
 
 bool
 find_composition (ptrdiff_t pos, ptrdiff_t limit,
@@ -424,10 +406,10 @@ find_composition (ptrdiff_t pos, ptrdiff_t limit,
   Lisp_Object val;
 
   if (get_property_and_range (pos, Qcomposition, prop, start, end, object))
-    return 1;
+    return true;
 
   if (limit < 0 || limit == pos)
-    return 0;
+    return false;
 
   if (limit > pos)		/* search forward */
     {
@@ -435,22 +417,22 @@ find_composition (ptrdiff_t pos, ptrdiff_t limit,
 					  object, make_fixnum (limit));
       pos = XFIXNUM (val);
       if (pos == limit)
-	return 0;
+	return false;
     }
   else				/* search backward */
     {
       if (get_property_and_range (pos - 1, Qcomposition, prop, start, end,
 				  object))
-	return 1;
+	return true;
       val = Fprevious_single_property_change (make_fixnum (pos), Qcomposition,
 					      object, make_fixnum (limit));
       pos = XFIXNUM (val);
       if (pos == limit)
-	return 0;
+	return false;
       pos--;
     }
   get_property_and_range (pos, Qcomposition, prop, start, end, object);
-  return 1;
+  return true;
 }
 
 /* Run a proper function to adjust the composition sitting between
@@ -994,9 +976,8 @@ autocmp_chars (Lisp_Object rule, ptrdiff_t charpos, ptrdiff_t bytepos,
   return unbind_to (count, lgstring);
 }
 
-/* 1 iff the character C is composable.  Characters of general
-   category Z? or C? are not composable except for ZWNJ and ZWJ,
-   and characters of category Zs. */
+/* Characters of general category Z? or C? are not composable except
+   for ZWNJ and ZWJ, and characters of category Zs. */
 
 static bool
 char_composable_p (int c)
@@ -1564,195 +1545,96 @@ struct position_record
     (POSITION).pos--;				\
   } while (0)
 
-/* Similar to find_composition, but find an automatic composition instead.
+/* Finds an automatic composition at POS of STRING, which defaults
+   to the current buffer.
 
-   This function looks for automatic composition at or near position
-   POS of STRING object, either a buffer or a Lisp string.  If STRING
-   is nil, it defaults to the current buffer.  It must be assured that
-   POS is not within a static composition.  Also, the current buffer
-   must be displayed in some window, otherwise the function will
-   return FALSE.
+   A valid (non-negative) LIMIT scans for a composition nearest POS
+   between POS and LIMIT.
 
-   If LIMIT is negative, and there's no composition that includes POS
-   (i.e. starts at or before POS and ends at or after POS), return
-   FALSE.  In this case, the function is allowed to look from POS as
-   far back as BACKLIM, and as far forward as POS+1 plus
-   MAX_AUTO_COMPOSITION_LOOKBACK, the maximum number of look-back for
-   automatic compositions (3) -- this is a limitation imposed by
-   composition rules in composition-function-table, which see.  If
-   BACKLIM is negative, it stands for the beginning of STRING object:
-   BEGV for a buffer or position zero for a string.
-
-   If LIMIT is positive, search for a composition forward (LIMIT >
-   POS) or backward (LIMIT < POS).  In this case, LIMIT bounds the
-   search for the first character of a composed sequence.
-   (LIMIT == POS is the same as LIMIT < 0.)  If LIMIT > POS, the
-   function can find a composition that starts after POS.
-
-   BACKLIM limits how far back is the function allowed to look in
-   STRING object while trying to find a position where it is safe to
-   start searching forward for compositions.  Such a safe place is
-   generally the position after a character that can never be
-   composed.
-
-   If BACKLIM is negative, that means the first character position of
-   STRING object; this is useful when calling the function for the
-   first time for a given buffer or string, since it is possible that
-   a composition begins before POS.  However, if POS is very far from
-   the beginning of STRING object, a negative value of BACKLIM could
-   make the function slow.  For that reason, when STRING is a buffer
-   or nil, we restrict the search back to the first newline before
-   POS.  Also, in this case the function may return START and END that
-   do not include POS, something that is not necessarily wanted, and
-   needs to be explicitly checked by the caller.
-
-   When calling the function in a loop for the same buffer/string, the
-   caller should generally set BACKLIM equal to POS, to avoid costly
-   repeated searches backward.  This is because if the previous
-   positions were already checked for compositions, there should be no
-   reason to re-check them.
-
-   If BACKLIM is positive, it must be less or equal to LIMIT.
-
-   If an automatic composition satisfying the above conditions is
-   found, set *GSTRING to the Lispy glyph-string representing the
-   composition, set *START and *END to the start and end of the
-   composed sequence, and return TRUE.  Otherwise, set *GSTRING to
-   nil, and return FALSE.  */
+   Upon finding a composition, sets *GSTRING to its Lispy glyph-string,
+   sets *START and *END to its bounds, and returns true.
+   Otherwise, sets *GSTRING to nil, and returns false.  */
 
 bool
-find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit, ptrdiff_t backlim,
+find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
 			    ptrdiff_t *start, ptrdiff_t *end,
 			    Lisp_Object *gstring, Lisp_Object string)
 {
-  ptrdiff_t head, tail, stop;
-  /* Forward limit position of checking a composition taking a
-     looking-back count into account.  */
-  ptrdiff_t fore_check_limit;
-  struct position_record cur, prev;
-  int c;
-  Lisp_Object window;
+  ptrdiff_t head, tail_cap, tail, stop;
+  struct position_record cur;
   struct window *w;
-  bool need_adjustment = 0;
-
-  window = Fget_buffer_window (Fcurrent_buffer (), Qnil);
+  Lisp_Object window = Fget_buffer_window (Fcurrent_buffer (), Qnil);
   if (NILP (window))
-    return 0;
+    return false;
   w = XWINDOW (window);
-
   cur.pos = pos;
-  if (NILP (string))
+  if (limit < 0)
+    limit = pos; /* invalid LIMIT means point check at POS */
+  if (! NILP (string))
     {
-      if (backlim < 0)
-	{
-	  /* This assumes a newline can never be composed.  */
-	  head = find_newline (pos, -1, 0, -1, -1, NULL, NULL, false);
-	}
-      else
-	head = backlim;
-      if (current_buffer->long_line_optimizations_p)
-	{
-	  /* In buffers with very long lines, this function becomes very
-	     slow.  Pretend that the buffer is narrowed to make it fast.  */
-	  ptrdiff_t begv = get_closer_narrowed_begv (w, window_point (w));
-	  if (pos > begv)
-	    head = begv;
-	}
-      tail = ZV;
-      stop = GPT;
-      cur.pos_byte = CHAR_TO_BYTE (cur.pos);
-      cur.p = BYTE_POS_ADDR (cur.pos_byte);
-    }
-  else
-    {
-      head = backlim < 0 ? 0 : backlim, tail = SCHARS (string), stop = -1;
+      stop = -1;
+      head = 0;
+      tail_cap = SCHARS (string);
       cur.pos_byte = string_char_to_byte (string, cur.pos);
       cur.p = SDATA (string) + cur.pos_byte;
     }
-  if (limit < 0)
-    /* Finding a composition covering the character after POS is the
-       same as setting LIMIT to POS.  */
-    limit = pos;
-
-  eassert (backlim < 0 || backlim <= limit);
-
-  if (limit <= pos)
-    fore_check_limit = min (tail, pos + 1 + MAX_AUTO_COMPOSITION_LOOKBACK);
   else
-    fore_check_limit = min (tail, limit + MAX_AUTO_COMPOSITION_LOOKBACK);
+    {
+      /* Operate on current buffer.  */
+      stop = GPT;
+      head = min (limit, pos);
+      tail_cap = ZV;
+      cur.pos_byte = CHAR_TO_BYTE (cur.pos);
+      cur.p = BYTE_POS_ADDR (cur.pos_byte);
+    }
+  tail = (limit <= pos)
+    ? min (tail_cap, pos + 1 + MAX_AUTO_COMPOSITION_LOOKBACK)
+    : min (tail_cap, limit + MAX_AUTO_COMPOSITION_LOOKBACK);
 
-  /* Provided that we have these possible compositions now:
-
-	   POS:	1 2 3 4 5 6 7 8 9
-		        |-A-|
-		  |-B-|-C-|--D--|
-
-     Here, it is known that characters after positions 1 and 9 can
-     never be composed (i.e. ! char_composable_p (CH)), and
-     composition A is an invalid one because it's partially covered by
-     the valid composition C.  And to know whether a composition is
-     valid or not, the only way is to start searching forward from a
-     position that can not be a tail part of composition (it's 2 in
-     the above case).
-
-     Now we have these cases (1 through 4):
+  /* Four cases:
 
                    -- character after POS is ... --
-                   not composable         composable
+                    not composable         composable
      LIMIT <= POS  (1)                    (3)
      POS < LIMIT   (2)                    (4)
-
-     Among them, in case (2), we simply search forward from POS.
-
-     In the other cases, we at first rewind back to the position where
-     the previous character is not composable or the beginning of
-     buffer (string), then search compositions forward.  In case (1)
-     and (3) we repeat this process until a composition is found.  */
-
-  while (1)
+  */
+  while (cur.pos > head)
     {
-      c = STRING_CHAR (cur.p);
-      if (! char_composable_p (c))
+      if (! char_composable_p (STRING_CHAR (cur.p)))
 	{
-	  if (limit <= pos)	/* case (1)  */
+	  if (pos < limit)  /* case (2), easy */
+	    goto search_forward;
+	  else /* case (1), become case (3).  */
 	    {
+	      int c;
 	      do {
 		if (cur.pos <= limit)
-		  return 0;
+		  return false;
 		BACKWARD_CHAR (cur, stop);
 		c = STRING_CHAR (cur.p);
 	      } while (! char_composable_p (c));
-	      fore_check_limit = cur.pos + 1;
+	      tail = cur.pos + 1;
 	    }
-	  else			/* case (2) */
-	    /* No need of rewinding back.  */
-	    goto search_forward;
 	}
 
-      /* Rewind back to the position where we can safely search
-	 forward for compositions.  It is assured that the character
-	 at cur.pos is composable.  */
-      while (head < cur.pos)
+      /* Now we're assured case (3) or case(4).  Character after
+         preceding non-composable is our search start.  */
+      for (struct position_record candidate = cur;
+	   cur.pos > head;
+	   cur = candidate)
 	{
-	  prev = cur;
-	  BACKWARD_CHAR (cur, stop);
-	  c = STRING_CHAR (cur.p);
-	  if (! char_composable_p (c))
-	    {
-	      cur = prev;
-	      break;
-	    }
+	  BACKWARD_CHAR (candidate, stop);
+	  if (! char_composable_p (STRING_CHAR (candidate.p)))
+	    break;
 	}
 
     search_forward:
-      /* Now search forward. */
       *gstring = Qnil;
-      prev = cur;	/* remember the start of searching position. */
-      while (cur.pos < fore_check_limit)
+      struct position_record restore_cur = cur;
+      while (cur.pos < tail)
 	{
 	  Lisp_Object val;
-
-	  c = STRING_CHAR (cur.p);
+	  int c = STRING_CHAR (cur.p);
 	  for (val = CHAR_TABLE_REF (Vcomposition_function_table, c);
 	       CONSP (val); val = XCDR (val))
 	    {
@@ -1764,20 +1646,20 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit, ptrdiff_t backlim,
 		  struct position_record check;
 
 		  if (check_pos < head
-		      || (limit <= pos ? pos < check_pos
+		      || (limit <= pos
+			  ? pos < check_pos
 			  : limit <= check_pos))
 		    continue;
 		  for (check = cur; check_pos < check.pos; )
 		    BACKWARD_CHAR (check, stop);
 		  *gstring = autocmp_chars (elt, check.pos, check.pos_byte,
-					    tail, w, NULL, string, Qnil, c);
-		  need_adjustment = 1;
+					    tail_cap, w, NULL, string, Qnil, c);
 		  if (NILP (*gstring))
 		    {
-		      /* As we have called Lisp, there's a possibility
-			 that buffer/string is relocated.  */
+		      /* Arbitrary Vauto_composition_function could have
+			 sweep_buffers() or sweep_strings() a relocation.  */
 		      if (NILP (string))
-			cur.p  = BYTE_POS_ADDR (cur.pos_byte);
+			cur.p = BYTE_POS_ADDR (cur.pos_byte);
 		      else
 			cur.p = SDATA (string) + cur.pos_byte;
 		    }
@@ -1790,19 +1672,19 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit, ptrdiff_t backlim,
 			  ? pos < *end
 			  : *start <= pos && pos < *end)
 			/* This is the target composition. */
-			return 1;
+			return true;
 		      cur.pos = *end;
 		      if (NILP (string))
 			{
 			  cur.pos_byte = CHAR_TO_BYTE (cur.pos);
-			  cur.p  = BYTE_POS_ADDR (cur.pos_byte);
+			  cur.p = BYTE_POS_ADDR (cur.pos_byte);
 			}
 		      else
 			{
 			  cur.pos_byte = string_char_to_byte (string, cur.pos);
 			  cur.p = SDATA (string) + cur.pos_byte;
 			}
-		      break;
+		      break; /* scan next character */
 		    }
 		}
 	    }
@@ -1812,21 +1694,13 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit, ptrdiff_t backlim,
 	}
 
       if (pos < limit)		/* case (2) and (4)*/
-	return 0;
+	return false;
       if (! NILP (*gstring))
-	return 1;
-      if (prev.pos == head)
-	return 0;
-      cur = prev;
-      if (need_adjustment)
-	{
-	  if (NILP (string))
-	    cur.p  = BYTE_POS_ADDR (cur.pos_byte);
-	  else
-	    cur.p = SDATA (string) + cur.pos_byte;
-	}
+	return true;
+      cur = restore_cur;
       BACKWARD_CHAR (cur, stop);
     }
+  return false;
 }
 
 /* Return the adjusted point provided that point is moved from LAST_PT
@@ -1835,19 +1709,23 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit, ptrdiff_t backlim,
 ptrdiff_t
 composition_adjust_point (ptrdiff_t last_pt, ptrdiff_t new_pt)
 {
-  ptrdiff_t i, beg, end;
+  ptrdiff_t beg, end;
   Lisp_Object val;
 
   if (new_pt == BEGV || new_pt == ZV)
     return new_pt;
 
-  /* At first check the static composition. */
+  /* First check for static composition. */
   if (get_property_and_range (new_pt, Qcomposition, &val, &beg, &end, Qnil)
       && composition_valid_p (beg, end, val))
     {
-      if (beg < new_pt /* && end > new_pt   <- It's always the case.  */
-	  && (last_pt <= beg || last_pt >= end))
-	return (new_pt < last_pt ? beg : end);
+      if (beg < new_pt && (last_pt <= beg || last_pt >= end))
+	/* LAST_PT <= BEG < NEW_PT (going forward)
+	   -or-
+	   BEG < NEW_PT <= END <= LAST_PT (going backward) */
+	return (new_pt < last_pt
+		? beg /* going backward, move beyond NEW_PT to BEG */
+		: end /* going forward, move beyond NEW_PT to END */);
       return new_pt;
     }
 
@@ -1855,12 +1733,11 @@ composition_adjust_point (ptrdiff_t last_pt, ptrdiff_t new_pt)
       || inhibit_auto_composition ())
     return new_pt;
 
-  /* Next check the automatic composition.  */
-  if (! find_automatic_composition (new_pt, (ptrdiff_t) -1, (ptrdiff_t) -1,
-				    &beg, &end, &val, Qnil)
+  /* Next check for automatic composition.  */
+  if (! find_automatic_composition (new_pt, last_pt, &beg, &end, &val, Qnil)
       || beg == new_pt)
     return new_pt;
-  for (i = 0; i < LGSTRING_GLYPH_LEN (val); i++)
+  for (ptrdiff_t i = 0; i < LGSTRING_GLYPH_LEN (val); ++i)
     {
       Lisp_Object glyph = LGSTRING_GLYPH (val, i);
 
@@ -1978,7 +1855,7 @@ should be ignored.  */)
   return gstring_work;
 }
 
-
+
 /* Emacs Lisp APIs.  */
 
 DEFUN ("compose-region-internal", Fcompose_region_internal,
@@ -2057,8 +1934,7 @@ See `find-composition' for more details.  */)
 	    && !NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	   || (!NILP (string) && STRING_MULTIBYTE (string)))
 	  && ! inhibit_auto_composition ()
-	  && find_automatic_composition (from, to, (ptrdiff_t) -1,
-					 &start, &end, &gstring, string))
+	  && find_automatic_composition (from, to, &start, &end, &gstring, string))
 	return list3 (make_fixnum (start), make_fixnum (end), gstring);
       return Qnil;
     }
@@ -2066,8 +1942,7 @@ See `find-composition' for more details.  */)
     {
       ptrdiff_t s, e;
 
-      if (find_automatic_composition (from, to, (ptrdiff_t) -1,
-				      &s, &e, &gstring, string)
+      if (find_automatic_composition (from, to, &s, &e, &gstring, string)
 	  && (e <= fixed_pos ? e > end : s < start))
 	return list3 (make_fixnum (s), make_fixnum (e), gstring);
     }
@@ -2152,7 +2027,7 @@ of the way buffer text is examined for matching one of the rules.  */)
   return rules;
 }
 
-
+
 void
 syms_of_composite (void)
 {
@@ -2181,7 +2056,7 @@ syms_of_composite (void)
   staticpro (&gstring_work);
   gstring_work = initialize_vector (10, Qnil);
 
-  /* Text property `composition' should be nonsticky by default.  */
+  /* Text property 'composition should be nonsticky by default.  */
   Vtext_property_default_nonsticky
     = Fcons (Fcons (Qcomposition, Qt), Vtext_property_default_nonsticky);
 
@@ -2192,8 +2067,8 @@ This function is called with three arguments: FROM, TO, and OBJECT.
 FROM and TO specify the range of text whose composition should be
 adjusted.  OBJECT, if non-nil, is a string that contains the text.
 
-This function is called after a text with `composition' property is
-inserted or deleted to keep `composition' property of buffer text
+This function is called after a text with 'composition property is
+inserted or deleted to keep 'composition property of buffer text
 valid.
 
 The default value is the function `compose-chars-after'.  */);

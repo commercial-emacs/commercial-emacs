@@ -1639,29 +1639,22 @@ read_menu_command (void)
 
 /* Adjust point to a boundary of a region that has such a property
    that should be treated intangible.  For the moment, we check
-   `composition', `display' and `invisible' properties.
+   composition, display and invisible properties.
    LAST_PT is the last position of point.  */
 
 static void
 adjust_point_for_property (ptrdiff_t last_pt, bool modified)
 {
-  ptrdiff_t beg, end;
+  ptrdiff_t beg, end, orig_pt = PT;
   Lisp_Object val, overlay, tmp;
-  /* When called after buffer modification, we should temporarily
-     suppress the point adjustment for automatic composition so that a
-     user can keep inserting another character at point or keep
-     deleting characters around point.  */
-  bool check_composition = ! modified;
-  bool check_display = true, check_invisible = true;
-  ptrdiff_t orig_pt = PT;
+  bool check_display = true;
+  bool check_invisible = true;
+  bool check_composition = ! modified; /* Avoids check when user is typing.  */
 
   eassert (XBUFFER (XWINDOW (selected_window)->contents) == current_buffer);
 
-  /* FIXME: cycling is probably not necessary because these properties
-     can't be usefully combined anyway.  */
   while (check_composition || check_display || check_invisible)
     {
-      /* FIXME: check `intangible'.  */
       if (check_composition
 	  && PT > BEGV && PT < ZV
 	  && (beg = composition_adjust_point (last_pt, PT)) != PT)
@@ -1700,20 +1693,6 @@ adjust_point_for_property (ptrdiff_t last_pt, bool modified)
 
 	  /* Find boundaries `beg' and `end' of the invisible area, if any.  */
 	  while (end < ZV
-#if 0
-		 /* FIXME: We should stop if we find a spot between
-		    two runs of `invisible' where inserted text would
-		    be visible.  This is important when we have two
-		    invisible boundaries that enclose an area: if the
-		    area is empty, we need this test in order to make
-		    it possible to place point in the middle rather
-		    than skip both boundaries.  However, this code
-		    also stops anywhere in a non-sticky text-property,
-		    which breaks (e.g.) Org mode.  */
-		 && (val = Fget_pos_property (make_fixnum (end),
-					      Qinvisible, Qnil),
-		     TEXT_PROP_MEANS_INVISIBLE (val))
-#endif
 		 && !NILP (val = get_char_property_and_overlay
 		           (make_fixnum (end), Qinvisible, Qnil, &overlay))
 		 && (inv = TEXT_PROP_MEANS_INVISIBLE (val)))
@@ -1727,11 +1706,6 @@ adjust_point_for_property (ptrdiff_t last_pt, bool modified)
 	      end = FIXNATP (tmp) ? XFIXNAT (tmp) : ZV;
 	    }
 	  while (beg > BEGV
-#if 0
-		 && (val = Fget_pos_property (make_fixnum (beg),
-					      Qinvisible, Qnil),
-		     TEXT_PROP_MEANS_INVISIBLE (val))
-#endif
 		 && !NILP (val = get_char_property_and_overlay
 		           (make_fixnum (beg - 1), Qinvisible, Qnil, &overlay))
 		 && (inv = TEXT_PROP_MEANS_INVISIBLE (val)))
@@ -1763,12 +1737,6 @@ adjust_point_for_property (ptrdiff_t last_pt, bool modified)
 		      : (PT < last_pt ? beg : end));
 	      check_composition = check_display = true;
 	    }
-#if 0 /* This assertion isn't correct, because SET_PT may end up setting
-	 the point to something other than its argument, due to
-	 point-motion hooks, intangibility, etc.  */
-	  eassert (PT == beg || PT == end);
-#endif
-
 	  /* Pretend the area doesn't exist if the buffer is not
 	     modified.  */
 	  if (!modified && !ellipsis && beg < end)

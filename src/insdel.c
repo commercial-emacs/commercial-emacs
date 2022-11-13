@@ -865,10 +865,13 @@ detect_bidi (struct buffer *buf, const unsigned char *string, ptrdiff_t nbytes)
     for (int len, offset = 0;
 	 offset < nbytes && NILP (BVAR (buf, bidi_display_reordering));
 	 offset += len)
-      switch (bidi_get_type (string_char_and_length (&string[offset], &len), R2L))
+      switch (bidi_get_type (string_char_and_length (&string[offset], &len), NEUTRAL_DIR))
 	{
 	case STRONG_R:
 	case STRONG_AL:
+	case RLE:
+	case RLO:
+	case RLI:
 	  bset_bidi_display_reordering (buf, Qt);
 	  break;
 	default:
