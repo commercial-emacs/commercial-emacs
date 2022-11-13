@@ -2491,13 +2491,6 @@ Also see `suggest-key-bindings'."
 
 (defvar execute-extended-command--binding-timer nil)
 
-(defun execute-extended-command--describe-binding-msg (function binding shorter)
-  (format-message "You can run the command `%s' with %s"
-                  function
-                  (cond (shorter (concat "M-x " shorter))
-                        ((stringp binding) binding)
-                        (t (key-description binding)))))
-
 (defun execute-extended-command (prefixarg &optional command-name typed)
   "Read a command name, then read the arguments and call the command.
 To pass a prefix argument to the command you are
@@ -2521,7 +2514,7 @@ invoking, give a prefix argument to `execute-extended-command'."
 		       (not executing-kbd-macro)
 		       (where-is-internal function overriding-local-map t)))
          (delay-before-suggest 0)
-         find-shorter shorter)
+         (find-shorter nil))
     (unless (commandp function)
       (error "`%s' is not a valid command name" command-name))
     ;; If we're executing a command that's remapped, we can't actually
@@ -2575,12 +2568,15 @@ invoking, give a prefix argument to `execute-extended-command'."
                    (when find-shorter
                      (while-no-input
                        ;; FIXME: Can be slow.  Cache it maybe?
-                       (setq shorter (execute-extended-command--shorter
+                       (setq binding (execute-extended-command--shorter
                                       (symbol-name function) typed))))
-                   (when (or binding shorter)
+                   (when binding
                      (with-temp-message
-                         (execute-extended-command--describe-binding-msg
-                          function binding shorter)
+                         (format-message "You can run the command `%s' with %s"
+                                         function
+                                         (if (stringp binding)
+                                             (concat "M-x " binding " RET")
+                                           (key-description binding)))
                        (sit-for (if (numberp suggest-key-bindings)
                                     suggest-key-bindings
                                   2))))))))))))
