@@ -41,7 +41,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* Static compositions
    -------------------
    Adjacent characters sharing the eq-same 'composition text property
-   are treated as a single composition.
+   are treated as a single composition.  The reason for Handa's
+   descriptor "static" (in opposition to "automatic", see below) is
+   unclear.
 
    Upon construction, the 'composition property is of the form:
 	((LENGTH . COMPONENTS) . MODIFICATION-FUNC)
@@ -113,7 +115,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    Automatic compositions
    ----------------------
-   These I think are just unicode codepoints.
+   These I think are just standard multibyte characters (Unicode).
 
    For example, if I run (next-single-property-change (point-min) 'composition)
    in the `M-x view-hello-file', I don't get any static compositions.  I would

@@ -1541,11 +1541,14 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 			top_x_before_string = it3.current_x;
 		      it3.glyph_row = NULL;
 		      PRODUCE_GLYPHS (&it3);
-		      if ((it3.bidi_it.scan_dir == 1
-			   && IT_CHARPOS (it3) >= charpos)
-			  || (it3.bidi_it.scan_dir == -1
-			      && IT_CHARPOS (it3) <= charpos)
-			  || ITERATOR_AT_END_OF_LINE_P (&it3))
+		      if ((! it3.bidi_p || it3.bidi_it.scan_dir == 1)
+			  && IT_CHARPOS (it3) >= charpos)
+			break;
+		      if (it3.bidi_p
+			  && it3.bidi_it.scan_dir == -1
+			  && IT_CHARPOS (it3) <= charpos)
+			break;
+		      if (ITERATOR_AT_END_OF_LINE_P (&it3))
 			break;
 		      it3_moved = true;
 		      set_iterator_to_next (&it3, false);
@@ -2896,11 +2899,9 @@ init_iterator (struct it *it, struct window *w,
 
       it->face_id = it->base_face_id;
       it->start = it->current;
-      it->bidi_p =
-	/* Bidi property tables only available after loadup.el.  */
-	bidi_initialize ()
-	&& ! NILP (BVAR (current_buffer, bidi_display_reordering))
-	&& it->multibyte_p;
+      it->bidi_p = bidi_initialize ()
+	&& it->multibyte_p
+	&& ! NILP (BVAR (current_buffer, bidi_display_reordering));
 
       if (it->bidi_p)
 	{

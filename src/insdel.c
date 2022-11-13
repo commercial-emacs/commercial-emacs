@@ -1232,9 +1232,6 @@ insert_from_buffer_1 (struct buffer *buf,
 
       outgoing_nbytes = outgoing_before_gap + outgoing_after_gap;
     }
-  else
-    {
-    }
 
   /* Do this before moving and increasing the gap,
      because the before-change hooks might move the gap
