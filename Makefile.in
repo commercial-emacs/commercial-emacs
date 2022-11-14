@@ -1357,3 +1357,10 @@ ifeq ($(HAVE_PGTK)$(HAVE_GSETTINGS),yesyes)
 	$(MKDIR_P) $(@D)
 	touch $@
 endif
+
+PHONY: retag
+retag:
+	2>/dev/null git tag -d v0.2.1-pre || true
+	2>/dev/null git push --delete origin v0.2.1-pre || true
+	git tag v0.2.1-pre
+	git push origin v0.2.1-pre
