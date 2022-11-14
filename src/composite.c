@@ -1600,7 +1600,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
      LIMIT <= POS  (1)                    (3)
      POS < LIMIT   (2)                    (4)
   */
-  while (cur.pos > head)
+  do
     {
       if (! char_composable_p (STRING_CHAR (cur.p)))
 	{
@@ -1701,7 +1701,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
 	return true;
       cur = restore_cur;
       BACKWARD_CHAR (cur, stop);
-    }
+    } while (cur.pos > head);
   return false;
 }
 
