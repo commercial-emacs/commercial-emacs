@@ -1585,16 +1585,6 @@ command_loop_1 (void)
 	      && NILP (Vglobal_disable_point_adjustment)
 	      && !composition_break_at_point)
 	    {
-	      if (last_point_position > BEGV
-		  && last_point_position < ZV
-		  && (composition_adjust_point (last_point_position,
-						last_point_position)
-		      != last_point_position))
-		/* The last point was temporarily set within a grapheme
-		   cluster to prevent automatic composition.  To recover
-		   the automatic composition, we must update the
-		   display.  */
-		windows_or_buffers_changed = 21;
 	      adjust_point_for_property (last_point_position,
 					 MODIFF != prev_modiff);
 	    }
@@ -1660,6 +1650,7 @@ adjust_point_for_property (ptrdiff_t last_pt, bool modified)
 	  && (beg = composition_adjust_point (last_pt, PT)) != PT)
 	{
 	  SET_PT (beg);
+	  windows_or_buffers_changed = 21;
 	  check_display = check_invisible = true;
 	}
       check_composition = false;

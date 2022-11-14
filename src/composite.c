@@ -1557,46 +1557,51 @@ struct position_record
    sets *START and *END to its bounds, and returns true.
    Otherwise, sets *GSTRING to nil, and returns false.  */
 
+/* Return the adjusted point provided that point is moved from LAST_PT
+   to NEW_PT.  */
+
 bool
 find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
 			    ptrdiff_t *start, ptrdiff_t *end,
 			    Lisp_Object *gstring, Lisp_Object string)
 {
-  ptrdiff_t head, tail_cap, tail, stop;
-  struct position_record cur;
+  ptrdiff_t head, tail, head_min, tail_max, stop;
+  struct position_record cur = { pos, 0, 0 };
   struct window *w;
   Lisp_Object window = Fget_buffer_window (Fcurrent_buffer (), Qnil);
   if (NILP (window))
     return false;
   w = XWINDOW (window);
-  cur.pos = pos;
+
   if (limit < 0)
     limit = pos; /* invalid LIMIT means point check at POS */
-  if (! NILP (string))
-    {
-      stop = -1;
-      head = 0;
-      tail_cap = SCHARS (string);
-      cur.pos_byte = string_char_to_byte (string, cur.pos);
-      cur.p = SDATA (string) + cur.pos_byte;
-    }
-  else
+
+  if (NILP (string))
     {
       /* Operate on current buffer.  */
       stop = GPT;
-      head = min (limit, pos);
-      tail_cap = ZV;
+      head_min = BEGV;
+      tail_max = ZV;
       cur.pos_byte = CHAR_TO_BYTE (cur.pos);
       cur.p = BYTE_POS_ADDR (cur.pos_byte);
     }
-  tail = (limit <= pos)
-    ? min (tail_cap, pos + 1 + MAX_AUTO_COMPOSITION_LOOKBACK)
-    : min (tail_cap, limit + MAX_AUTO_COMPOSITION_LOOKBACK);
+  else
+    {
+      stop = -1;
+      head_min = 0;
+      tail_max = SCHARS (string);
+      cur.pos_byte = string_char_to_byte (string, cur.pos);
+      cur.p = SDATA (string) + cur.pos_byte;
+    }
 
-  /* Four cases:
+  head = max (head_min, min (pos, limit) - MAX_AUTO_COMPOSITION_LOOKBACK);
+  tail = (pos < limit)
+    ? min (tail_max, limit + MAX_AUTO_COMPOSITION_LOOKBACK)
+    : min (tail_max, pos + 1 + MAX_AUTO_COMPOSITION_LOOKBACK);
 
+  /*
                    -- character after POS is ... --
-                    not composable         composable
+                   not composable         composable
      LIMIT <= POS  (1)                    (3)
      POS < LIMIT   (2)                    (4)
   */
@@ -1622,7 +1627,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
       /* Now we're assured case (3) or case(4).  Character after
          preceding non-composable is our search start.  */
       for (struct position_record candidate = cur;
-	   cur.pos > head;
+	   cur.pos >= head;
 	   cur = candidate)
 	{
 	  BACKWARD_CHAR (candidate, stop);
@@ -1635,78 +1640,66 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
       struct position_record restore_cur = cur;
       while (cur.pos < tail)
 	{
-	  Lisp_Object val;
 	  int c = STRING_CHAR (cur.p);
-	  for (val = CHAR_TABLE_REF (Vcomposition_function_table, c);
-	       CONSP (val); val = XCDR (val))
+	  Lisp_Object candidate = Qnil;
+	  struct position_record probe;
+
+	  for (Lisp_Object val = CHAR_TABLE_REF (Vcomposition_function_table, c);
+	       CONSP (val) && NILP (candidate); val = XCDR (val))
 	    {
 	      Lisp_Object elt = XCAR (val);
-
 	      if (VECTORP (elt) && ASIZE (elt) == 3 && FIXNATP (AREF (elt, 1)))
 		{
-		  EMACS_INT check_pos = cur.pos - XFIXNAT (AREF (elt, 1));
-		  struct position_record check;
-
-		  if (check_pos < head
-		      || (limit <= pos
-			  ? pos < check_pos
-			  : limit <= check_pos))
+		  EMACS_INT probe_min = cur.pos - XFIXNAT (AREF (elt, 1));
+		  if (probe_min < head
+		      || (pos < limit
+			  ? limit <= probe_min
+			  : pos < probe_min))
 		    continue;
-		  for (check = cur; check_pos < check.pos; )
-		    BACKWARD_CHAR (check, stop);
-		  *gstring = autocmp_chars (elt, check.pos, check.pos_byte,
-					    tail_cap, w, NULL, string, Qnil, c);
-		  if (NILP (*gstring))
-		    {
-		      /* Arbitrary Vauto_composition_function could have
-			 sweep_buffers() or sweep_strings() a relocation.  */
-		      if (NILP (string))
-			cur.p = BYTE_POS_ADDR (cur.pos_byte);
-		      else
-			cur.p = SDATA (string) + cur.pos_byte;
-		    }
-		  else
-		    {
-		      /* We found a candidate of a target composition.  */
-		      *start = check.pos;
-		      *end = check.pos + LGSTRING_CHAR_LEN (*gstring);
-		      if (pos < limit
-			  ? pos < *end
-			  : *start <= pos && pos < *end)
-			/* This is the target composition. */
-			return true;
-		      cur.pos = *end;
-		      if (NILP (string))
-			{
-			  cur.pos_byte = CHAR_TO_BYTE (cur.pos);
-			  cur.p = BYTE_POS_ADDR (cur.pos_byte);
-			}
-		      else
-			{
-			  cur.pos_byte = string_char_to_byte (string, cur.pos);
-			  cur.p = SDATA (string) + cur.pos_byte;
-			}
-		      break; /* scan next character */
-		    }
+
+		  for (probe = cur; probe_min < probe.pos; )
+		    BACKWARD_CHAR (probe, stop);
+
+		  candidate = autocmp_chars (elt, probe.pos, probe.pos_byte,
+					     tail_max, w, NULL, string, Qnil, c);
+		  /* Arbitrary Vauto_composition_function could have
+		     sweep_buffers() or sweep_strings() a relocation.  */
+		  cur.p = (NILP (string)
+			   ? BYTE_POS_ADDR (cur.pos_byte)
+			   : SDATA (string) + cur.pos_byte);
 		}
 	    }
-	  if (! CONSP (val))
-	    /* We found no composition here.  */
+
+	  if (NILP (candidate))
 	    FORWARD_CHAR (cur, stop);
+	  else
+	    {
+	      *start = probe.pos;
+	      cur.pos = *end = probe.pos + LGSTRING_CHAR_LEN (candidate);
+	      cur.pos_byte = (NILP (string)
+			      ? CHAR_TO_BYTE (cur.pos)
+			      : string_char_to_byte (string, cur.pos));
+	      cur.p = (NILP (string)
+		       ? BYTE_POS_ADDR (cur.pos_byte)
+		       : SDATA (string) + cur.pos_byte);
+	      if (pos < limit
+		  ? pos < *end
+		  : *start <= pos && pos < *end)
+		{
+		  *gstring = candidate;
+		  break;
+		}
+	    }
 	}
-
-      if (pos < limit)		/* case (2) and (4)*/
-	return false;
-      if (! NILP (*gstring))
-	return true;
       cur = restore_cur;
+      cur.p = (NILP (string)
+	       ? BYTE_POS_ADDR (cur.pos_byte)
+	       : SDATA (string) + cur.pos_byte);
       BACKWARD_CHAR (cur, stop);
-    } while (cur.pos > head);
-  return false;
+      /* only need to iterate cases (1) and (3) */
+    } while (pos < limit && NILP (*gstring) && cur.pos >= head);
+  return ! NILP (*gstring);
 }
-
-/* Return the adjusted point provided that point is moved from LAST_PT
-   to NEW_PT.  */
 
 ptrdiff_t
 composition_adjust_point (ptrdiff_t last_pt, ptrdiff_t new_pt)
@@ -1736,7 +1729,7 @@ composition_adjust_point (ptrdiff_t last_pt, ptrdiff_t new_pt)
     return new_pt;
 
   /* Next check for automatic composition.  */
-  if (! find_automatic_composition (new_pt, last_pt, &beg, &end, &val, Qnil)
+  if (! find_automatic_composition (new_pt, (ptrdiff_t) -1, &beg, &end, &val, Qnil)
       || beg == new_pt)
     return new_pt;
   for (ptrdiff_t i = 0; i < LGSTRING_GLYPH_LEN (val); ++i)
