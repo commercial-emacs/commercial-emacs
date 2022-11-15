@@ -821,6 +821,7 @@ apply_xft_settings (Display_Info *dpyinfo,
 #elif defined USE_CAIRO
   FcConfigSubstitute (NULL, pat, FcMatchPattern);
   options = cairo_font_options_create ();
+  ftcrfont_get_default_font_options (dpyinfo, options);
   cairo_ft_font_options_substitute (options, pat);
   cairo_font_options_destroy (options);
   FcDefaultSubstitute (pat);
