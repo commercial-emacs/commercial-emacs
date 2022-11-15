@@ -346,4 +346,21 @@ bidi_it.charpos without also fetching its char."
       (message "nice try")
       (should (equal (current-message) dont)))))
 
+(ert-deftest xdisp-tests--find-automatic-composition ()
+  "`find-automatic-composition' could stand yet another rewrite."
+  (xdisp-tests--visible-buffer
+    (save-excursion
+      (insert "Hebrew (עִבְרִית)	שָׁלוֹם" "\n")
+      (insert "Hindi (हिन्दी)	प्रणाम / पाय लागू" "\n"))
+    (dotimes (_i 11)
+      (call-interactively #'forward-char))
+    (call-interactively #'backward-char)
+    (should (looking-at (regexp-quote "בְ")))
+    (call-interactively #'forward-char)
+    (call-interactively #'next-line)
+    (should (eq (char-after) 2381))
+    (call-interactively #'forward-char)
+    (call-interactively #'previous-line)
+    (should (eq (char-after) 1456))))
+
 ;;; xdisp-tests.el ends here
