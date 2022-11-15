@@ -59,6 +59,7 @@ typedef unsigned int CARD32;
 #elif defined USE_CAIRO
 #include <cairo-ft.h>
 #include <fontconfig/fontconfig.h>
+#include "ftfont.h"
 #endif
 
 static char *current_mono_font;
@@ -821,7 +822,9 @@ apply_xft_settings (Display_Info *dpyinfo,
 #elif defined USE_CAIRO
   FcConfigSubstitute (NULL, pat, FcMatchPattern);
   options = cairo_font_options_create ();
+#ifdef HAVE_X_WINDOWS
   ftcrfont_get_default_font_options (dpyinfo, options);
+#endif
   cairo_ft_font_options_substitute (options, pat);
   cairo_font_options_destroy (options);
   FcDefaultSubstitute (pat);
