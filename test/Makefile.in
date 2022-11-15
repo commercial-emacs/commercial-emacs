@@ -67,7 +67,7 @@ EMACSOPT = --no-init-file --no-site-file --no-site-lisp -L "$(SEPCHAR)$(srcdir)"
 # Prevent any settings in the user environment causing problems.
 unexport EMACSDATA EMACSDOC EMACSLOADPATH EMACSPATH GREP_OPTIONS XDG_CONFIG_HOME
 
-## To run tests under a debugger, set this to eg: "gdb --args".
+## To run tests under a debugger, set this to eg: "gdb -q -iex \"set auto-load safe-path $PWD/src\" --args".
 GDB ?=
 
 # Whether a timeout shall be given, writing possibly a core dump.

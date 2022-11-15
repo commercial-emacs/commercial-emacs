@@ -2129,16 +2129,23 @@ whether or not it is currently displayed in some window.  */)
   Lisp_Object lcols = Qnil;
   void *itdata = NULL;
   specpdl_ref count = SPECPDL_INDEX ();
+  ptrdiff_t nlines;
 
-  /* Allow LINES to be of the form (HPOS . VPOS) aka (COLUMNS . LINES).  */
+  /* Monnier overloaded LINES to possibly be cons.
+     There's a reason "overload" has "over" in it. */
   if (CONSP (lines))
     {
       lcols = XCAR (lines);
       CHECK_NUMBER (lcols);
-      lines = XCDR (lines);
+      CHECK_FIXNUM (XCDR (lines));
+      nlines = XFIXNUM (XCDR (lines));
+    }
+  else
+    {
+      CHECK_FIXNUM (lines);
+      nlines = XFIXNUM (lines);
     }
 
-  CHECK_FIXNUM (lines);
   w = decode_live_window (window);
 
   if (XBUFFER (w->contents) != current_buffer)
@@ -2156,7 +2163,7 @@ whether or not it is currently displayed in some window.  */)
   if (noninteractive)
     {
       struct position pos;
-      pos = *vmotion (PT, PT_BYTE, XFIXNUM (lines), w);
+      pos = *vmotion (PT, PT_BYTE, nlines, w);
       SET_PT_BOTH (pos.bufpos, pos.bytepos);
       it.vpos = pos.vpos;
     }
@@ -2166,7 +2173,6 @@ whether or not it is currently displayed in some window.  */)
       int first_x;
       bool overshoot_handled = false;
       bool disp_string_at_start_p = false;
-      ptrdiff_t nlines = XFIXNUM (lines);
       int vpos_init = 0;
       double start_col UNINIT;
       int start_x UNINIT;
@@ -2295,8 +2301,7 @@ whether or not it is currently displayed in some window.  */)
 	}
 
       if (! NILP (lcols))
-	to_x =
-	  window_column_x (w, window, XFLOATINT (lcols), lcols)
+	to_x = window_column_x (w, window, XFLOATINT (lcols), lcols)
 	  + lnum_pixel_width;
 
       if (nlines <= 0)

@@ -7457,7 +7457,7 @@ A non-nil setting overrides the variable `line-move-visual', which see."
   :group 'editing-basics)
 (make-variable-buffer-local 'goal-column)
 
-(defvar temporary-goal-column 0
+(defvar-local temporary-goal-column 0
   "Current goal column for vertical motion.
 It is the column where point was at the start of the current run
 of vertical motion commands.
@@ -7811,9 +7811,9 @@ If NOERROR, don't signal an error if we can't move that many lines."
 	(inhibit-point-motion-hooks t)
 	(opoint (point))
 	(orig-arg arg))
-    (if (consp temporary-goal-column)
-	(setq temporary-goal-column (+ (car temporary-goal-column)
-				       (cdr temporary-goal-column))))
+    (when (consp temporary-goal-column)
+      (setq temporary-goal-column (+ (car temporary-goal-column)
+				     (cdr temporary-goal-column))))
     (unwind-protect
 	(progn
 	  (if (not (memq last-command '(next-line previous-line)))
