@@ -2323,7 +2323,7 @@ whether or not it is currently displayed in some window.  */)
 	     last line that it occupies.  */
 	  if (it_start < ZV)
 	    {
-	      if ((it.bidi_it.scan_dir > 0)
+	      if ((! it.bidi_p || it.bidi_it.scan_dir > 0)
 		  ? IT_CHARPOS (it) < it_start
 		  : IT_CHARPOS (it) > it_start)
 		{

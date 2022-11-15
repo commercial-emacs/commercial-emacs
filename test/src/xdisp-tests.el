@@ -42,7 +42,7 @@
 
 (ert-deftest xdisp-tests--minibuffer-resizing ()
   "Unvisible overlay string following visible text should not
-scroll up.  (Bug#43519) "
+scroll up.  (Bug#43519)"
   (xdisp-tests--in-minibuffer
    (insert "hello")
    (let ((ol (make-overlay (point) (point)))
@@ -59,7 +59,7 @@ scroll up.  (Bug#43519) "
 
 (ert-deftest xdisp-tests--minibuffer-scroll ()
   "Deleting the last character shouldn't cause the text
-to scroll. (Bug#44070) "
+to scroll. (Bug#44070)"
   (xdisp-tests--in-minibuffer
    (let ((max-mini-window-height 4))
      (dotimes (_ 80) (insert "\nhello"))
@@ -346,21 +346,6 @@ bidi_it.charpos without also fetching its char."
       (message "nice try")
       (should (equal (current-message) dont)))))
 
-(ert-deftest xdisp-tests--find-automatic-composition ()
-  "`find-automatic-composition' could stand yet another rewrite."
-  (xdisp-tests--visible-buffer
-    (save-excursion
-      (insert "Hebrew (עִבְרִית)	שָׁלוֹם" "\n")
-      (insert "Hindi (हिन्दी)	प्रणाम / पाय लागू" "\n"))
-    (dotimes (_i 11)
-      (call-interactively #'forward-char))
-    (call-interactively #'backward-char)
-    (should (looking-at (regexp-quote "בְ")))
-    (call-interactively #'forward-char)
-    (call-interactively #'next-line)
-    (should (eq (char-after) 2381))
-    (call-interactively #'forward-char)
-    (call-interactively #'previous-line)
-    (should (eq (char-after) 1456))))
+
 
 ;;; xdisp-tests.el ends here

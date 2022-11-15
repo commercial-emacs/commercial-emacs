@@ -2265,6 +2265,7 @@ so the buffer is truly empty after this.  */)
      if future size is less than past size.  Use of erase-buffer
      implies that the future text is not really related to the past text.  */
   XSETFASTINT (BVAR (current_buffer, save_length), 0);
+  bset_bidi_display_reordering (current_buffer, Qnil);
   return Qnil;
 }
 
