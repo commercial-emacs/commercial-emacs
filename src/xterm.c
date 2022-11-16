@@ -3461,6 +3461,15 @@ x_dnd_compute_toplevels (struct x_display_info *dpyinfo)
 
 	  x_dnd_toplevels = tem;
 	}
+    }
+
+  if (proto_out)
+    {
+      reply = xcb_get_property_reply (dpyinfo->xcb_connection,
+				      xdnd_proto_cookie, &error);
+
+      if (!reply)
+	free (error);
       else
 	{
 #ifdef HAVE_XCB_SHAPE
@@ -4769,6 +4778,7 @@ x_dnd_cancel_dnd_early (void)
   x_dnd_action = None;
   x_dnd_action_symbol = Qnil;
 }
+#endif
 
 #endif
 
@@ -4858,6 +4868,7 @@ x_dnd_note_self_position (struct x_display_info *dpyinfo, Window target,
       return;
     }
 }
+#endif
 
 static void
 x_dnd_note_self_wheel (struct x_display_info *dpyinfo, Window target,
@@ -5495,6 +5506,7 @@ xi_populate_device_from_info (struct x_display_info *dpyinfo,
 	    }
 	}
     }
+}
 
   SAFE_FREE ();
 #endif
@@ -5557,6 +5569,7 @@ x_cache_xi_devices (struct x_display_info *dpyinfo)
 				      &dpyinfo->devices[actual_devices++],
 				      &infos[i]);
     }
+}
 
   dpyinfo->num_devices = actual_devices;
   XIFreeDeviceInfo (infos);
@@ -6046,6 +6059,13 @@ x_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
       cairo_rectangle (cr, dest_x, dest_y, width, height);
       cairo_fill_preserve (cr);
     }
+  else
+    {
+      eassert (xgcv.fill_style == FillOpaqueStippled);
+      eassert (xgcv.stipple != None);
+      x_set_cr_source_with_gc_background (f, gc, respect_alpha_background);
+      cairo_rectangle (cr, x, y, width, height);
+      cairo_fill_preserve (cr);
 
   cairo_translate (cr, dest_x - src_x, dest_y - src_y);
 
@@ -6814,6 +6834,7 @@ x_sync_current_monotonic_time (void)
 	   || INT_ADD_WRAPV (t, time.tv_nsec / 1000, &t))
 	  ? 0 : t);
 }
+#endif
 
 /* Decode a _NET_WM_FRAME_DRAWN message and calculate the time it took
    to draw the last frame.  */
