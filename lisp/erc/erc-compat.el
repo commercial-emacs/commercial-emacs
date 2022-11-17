@@ -32,6 +32,7 @@
 ;;; Code:
 
 (require 'compat nil 'noerror)
+(eval-when-compile (require 'cl-lib) (require 'url-parse))
 
 ;;;###autoload(autoload 'erc-define-minor-mode "erc-compat")
 (define-obsolete-function-alias 'erc-define-minor-mode
