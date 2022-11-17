@@ -410,10 +410,10 @@ already ticked in ENCOUNTERED-MSGS."
            (lambda (msg)
              (rmail-summary--walk-thread-message-recursively
               msg encountered-msgs))))
-      (mapcar walk-thread-msg
-              (aref rmail-summary-message-parents-vector msgnum))
-      (mapcar walk-thread-msg
-              (rmail-summary-direct-descendants msgnum encountered-msgs)))))
+      (mapc walk-thread-msg
+            (aref rmail-summary-message-parents-vector msgnum))
+      (mapc walk-thread-msg
+            (rmail-summary-direct-descendants msgnum encountered-msgs)))))
 
 ;;;###autoload
 (defun rmail-summary-by-thread (&optional msgnum)
@@ -436,7 +436,7 @@ headers of the messages."
       (rmail-summary--walk-thread-message-recursively msgnum enc-msgs)
       (rmail-new-summary (format "thread containing message %d" msgnum)
 			 (list 'rmail-summary-by-thread msgnum)
-			 (if (and rmail-summary-intersect-consecutive-filters
+			 (if (and rmail-summary-progressively-narrow
 				  (rmail-summary--exists-1))
 			     (lambda (msg msgnum)
 			       (and (eq (aref rmail-summary-currently-displayed-msgs msg)
