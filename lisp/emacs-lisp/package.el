@@ -1038,10 +1038,15 @@ untar into a directory named DIR; otherwise, signal an error."
          (backup-inhibited t)
          (version-control 'never))
     (loaddefs-generate
-     pkg-dir output-file
-     nil
-     "(add-to-list 'load-path (directory-file-name
-                         (or (file-name-directory #$) (car load-path))))")
+     pkg-dir output-file nil
+     (prin1-to-string
+      '(add-to-list
+        'load-path
+        ;; Add the directory that will contain the autoload file to
+        ;; the load path.  We don't hard-code `pkg-dir', to avoid
+        ;; issues if the package directory is moved around.
+        (or (and load-file-name (file-name-directory load-file-name))
+            (car load-path)))))
     (let ((buf (find-buffer-visiting output-file)))
       (when buf (kill-buffer buf)))
     auto-name))
@@ -1304,10 +1309,7 @@ is non-nil, don't propagate connection errors (does not apply to
 errors signaled by ERROR-FORM or by BODY).
 
 \(fn URL &key ASYNC FILE ERROR-FORM NOERROR &rest BODY)"
-  (declare (indent defun)
-           ;; FIXME: This should be something like
-           ;; `form def-body &rest form', but that doesn't work.
-           (debug (form &rest sexp)))
+  (declare (indent defun) (debug (sexp body)))
   (while (keywordp (car body))
     (setq body (cdr (cdr body))))
   `(package--with-response-buffer-1 ,url (lambda () ,@body)
