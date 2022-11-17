@@ -1247,15 +1247,14 @@ server name and search for a match in `erc-networks-alist'."
 (defconst erc-networks--name-missing-sentinel (gensym "Unknown ")
   "Value to cover rare case of a literal NETWORK=nil.")
 
-(defun erc-networks--determine (&optional server)
+(defun erc-networks--determine ()
   "Return the name of the network as a symbol.
-Search `erc-networks-alist' for a known entity matching SERVER or
+Search `erc-networks-alist' for a known entity matching
 `erc-server-announced-name'.  If that fails, use the display name
 given by the `RPL_ISUPPORT' NETWORK parameter."
   (or (cl-loop for (name matcher) in erc-networks-alist
-               when (and matcher
-                         (string-match (concat matcher "\\'")
-                                       (or server erc-server-announced-name)))
+               when (and matcher (string-match (concat matcher "\\'")
+                                               erc-server-announced-name))
                return name)
       (and-let* ((vanity (erc--get-isupport-entry 'NETWORK 'single))
                  ((intern vanity))))

@@ -167,8 +167,7 @@
 
 (defun erc-dcc-tests--pcomplete-common (test-fn)
   (with-current-buffer (get-buffer-create "*erc-dcc-do-GET-command*")
-    (let* ((inhibit-message noninteractive)
-           (proc (start-process "fake" (current-buffer) "sleep" "10"))
+    (let* ((proc (start-process "fake" (current-buffer) "sleep" "10"))
            (elt (list :nick "tester!~tester@fake.irc"
                       :type 'GET
                       :peer nil

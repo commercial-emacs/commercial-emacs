@@ -73,7 +73,7 @@
     (require 'erc-d-t)
     (require 'erc-d)))
 
-(require 'erc)
+(require 'erc-backend)
 
 (eval-when-compile (require 'erc-join)
                    (require 'erc-services))
@@ -125,7 +125,6 @@
       (erc-auth-source-parameters-join-function nil)
       (erc-autojoin-channels-alist nil)
       (erc-server-auto-reconnect nil)
-      (erc-after-connect nil)
       (erc-d-linger-secs 10)
       ,@bindings)))
 
