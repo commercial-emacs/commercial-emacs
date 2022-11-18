@@ -1557,9 +1557,6 @@ struct position_record
    sets *START and *END to its bounds, and returns true.
    Otherwise, sets *GSTRING to nil, and returns false.  */
 
-/* Return the adjusted point provided that point is moved from LAST_PT
-   to NEW_PT.  */
-
 bool
 find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
 			    ptrdiff_t *start, ptrdiff_t *end,
@@ -1567,8 +1564,10 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
 {
   ptrdiff_t head, tail, head_min, tail_max, stop;
   struct position_record cur = { pos, 0, 0 };
+  struct position_record restore_cur;
   struct window *w;
   Lisp_Object window = Fget_buffer_window (Fcurrent_buffer (), Qnil);
+  *gstring = Qnil;
   if (NILP (window))
     return false;
   w = XWINDOW (window);
@@ -1636,8 +1635,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
 	}
 
     search_forward:
-      *gstring = Qnil;
-      struct position_record restore_cur = cur;
+      restore_cur = cur;
       while (cur.pos < tail)
 	{
 	  int c = STRING_CHAR (cur.p);
