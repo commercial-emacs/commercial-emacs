@@ -7325,7 +7325,7 @@ by `sh' are supported."
 			      (setq i (1+ i))
 			      "[]"))
 			   (t "["))
-			  (prog1	; copy everything upto next `]'.
+			  (prog1	; copy everything up to next `]'.
 			      (substring wildcard
 					 i
 					 (setq j (string-search
