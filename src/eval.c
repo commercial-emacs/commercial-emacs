@@ -1333,7 +1333,7 @@ Then the value of the last BODY form is returned from the `condition-case'
 expression.
 
 The special handler (:success BODY...) is invoked if BODYFORM terminated
-without signalling an error.  BODY is then evaluated with VAR bound to
+without signaling an error.  BODY is then evaluated with VAR bound to
 the value returned by BODYFORM.
 
 See also the function `signal' for more info.
