@@ -115,13 +115,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    Automatic compositions
    ----------------------
-   These I think are just standard multibyte characters (Unicode).
+   Standard multibyte characters (Unicode).
 
-   For example, if I run (next-single-property-change (point-min) 'composition)
-   in the `M-x view-hello-file', I don't get any static compositions.  I would
-   think therefore automatic compositions are more prevalent and a lot more
-   important to get right.
-
+   If we evaluate (next-single-property-change (point-min) 'composition)
+   in the `M-x view-hello-file', we don't get any static compositions.
+   They're all automatic compositions.
 */
 
 
