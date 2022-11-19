@@ -303,6 +303,12 @@ Binding}), but it's impractical to @code{defvar} these variables.
 the forms, and then make the variables non-special again.
 @end defspec
 
+@defspec dlet* (bindings@dots{}) forms@dots{}
+This form is like @code{dlet}, but each valueform can refer to the
+symbols already bound previously, like what @code{let*} is to
+@code{let}.
+@end defspec
+
 @defspec named-let name bindings &rest body
 This special form is a looping construct inspired from the
 Scheme language.  It is similar to @code{let}: It binds the variables in

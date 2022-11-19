@@ -3258,6 +3258,11 @@ The following generalized variables have been made obsolete:
 
 * Lisp Changes in Emacs 29.1
 
+
++++
+** New macro 'dlet*'.
+Like what 'let*' is to 'let'.
+
 +++
 ** Interpreted closures are "safe for space".
 As was already the case for byte-compiled closures, instead of capturing
