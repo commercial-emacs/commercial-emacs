@@ -45,8 +45,8 @@ git clone --depth 1 --branch v0.20.8alpha1 \
 make -C tree-sitter install
 ```
 
-2. Upon success the user is instructed to update `PKG_CONFIG_PATH` in his
-shell rc file.
+2. Upon success the user is instructed to update `PKG_CONFIG_PATH` and
+`LD_LIBRARY_PATH` in his shell rc file.
 
 3. Start a new shell and build emacs.
 ```bash
