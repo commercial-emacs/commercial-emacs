@@ -26,6 +26,7 @@
 
 (ert-deftest server-test/server-start-sets-minor-mode ()
   "Ensure that calling `server-start' also sets `server-mode' properly."
+  (skip-unless (not (server-running-p server-name)))
   (server-start)
   (unwind-protect
       (progn
