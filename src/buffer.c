@@ -3254,8 +3254,7 @@ overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
       if (WINDOWP (window) && XWINDOW (window) != w)
 	continue;
       Lisp_Object str;
-      /* FIXME: Are we really sure that `record_overlay_string` can
-         never cause a non-local exit?  */
+
       if (startpos == pos
 	  && (str = Foverlay_get (overlay, Qbefore_string), STRINGP (str)))
 	record_overlay_string (&overlay_heads, str,

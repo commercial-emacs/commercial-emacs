@@ -157,7 +157,8 @@
    (unless (eq system-type 'windows-nt)
      "stdin\n")))
 
-(ert-deftest esh-proc-test/pipeline-connection-type/middle ()
+;; I don't make the rules.  Do this one last.
+(ert-deftest esh-proc-test/zzz-pipeline-connection-type/middle ()
   "Test that all streams are pipes when a command is in the middle of a
 pipeline."
   (skip-unless (and (executable-find "sh")

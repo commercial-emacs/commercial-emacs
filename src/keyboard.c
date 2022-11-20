@@ -1682,7 +1682,7 @@ adjust_point_for_property (ptrdiff_t last_pt, bool modified)
 	  bool ellipsis = false;
 	  beg = end = PT;
 
-	  /* Find boundaries `beg' and `end' of the invisible area, if any.  */
+	  /* Find boundaries of the invisible area, if any.  */
 	  while (end < ZV
 		 && !NILP (val = get_char_property_and_overlay
 		           (make_fixnum (end), Qinvisible, Qnil, &overlay))

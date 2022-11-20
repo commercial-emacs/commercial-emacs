@@ -68,7 +68,7 @@ buffer_display_table (void)
     return XCHAR_TABLE (Vstandard_display_table);
   return 0;
 }
-
+
 /* Width run cache considerations.  */
 
 /* Return the width of character C under display table DP.  */
@@ -190,7 +190,7 @@ width_run_cache_on_off (void)
     }
 }
 
-
+
 /* Skip some invisible characters starting from POS.
    This includes characters invisible because of text properties
    and characters invisible because of overlays.
@@ -273,7 +273,7 @@ skip_invisible (ptrdiff_t pos, ptrdiff_t *next_boundary_p, ptrdiff_t to, Lisp_Ob
     return *next_boundary_p;
   return pos;
 }
-
+
 /* Set variables WIDTH and BYTES for a multibyte sequence starting at P.
 
    DP is a display table or NULL.
@@ -456,7 +456,7 @@ current_column (void)
 
   return col;
 }
-
+
 
 /* Check the presence of a display property and compute its width.
    If a property was found and its width was found as well, return
@@ -749,7 +749,7 @@ current_column_1 (void)
   scan_for_column (&opoint, &col, NULL, NULL, NULL);
   return col;
 }
-
+
 
 #if 0 /* Not used.  */
 
@@ -830,7 +830,7 @@ string_display_width (Lisp_Object string, Lisp_Object beg, Lisp_Object end)
 
 #endif /* 0 */
 
-
+
 DEFUN ("indent-to", Findent_to, Sindent_to, 1, 2, "NIndent to column: ",
        doc: /* Indent from point with tabs and spaces until COLUMN is reached.
 Optional second argument MINIMUM says always do at least MINIMUM spaces
@@ -877,7 +877,7 @@ The return value is the column where the insertion ends.  */)
   return column;
 }
 
-
+
 DEFUN ("current-indentation", Fcurrent_indentation, Scurrent_indentation,
        0, 0, 0,
        doc: /* Return the indentation of the current line.
@@ -992,7 +992,7 @@ indented_beyond_p (ptrdiff_t pos, ptrdiff_t pos_byte, EMACS_INT column)
     }
   return position_indentation (pos_byte) >= column;
 }
-
+
 DEFUN ("move-to-column", Fmove_to_column, Smove_to_column, 1, 2,
        "NMove to column: ",
        doc: /* Move point to column COLUMN in the current line.
@@ -1070,7 +1070,7 @@ The return value is the current column.  */)
 
   return make_fixnum (col);
 }
-
+
 /* compute_motion: compute buffer posn given screen posn and vice versa */
 
 static struct position val_compute_motion;
@@ -2170,7 +2170,6 @@ whether or not it is currently displayed in some window.  */)
   else
     {
       ptrdiff_t it_start, it_overshoot_count = 0;
-      int first_x;
       bool overshoot_handled = false;
       bool disp_string_at_start_p = false;
       int vpos_init = 0;
@@ -2197,7 +2196,6 @@ whether or not it is currently displayed in some window.  */)
       itdata = bidi_shelve_cache ();
       start_move_it (&it, w, pt);
       it.lnum_width = lnum_width;
-      first_x = it.first_visible_x;
       it_start = IT_CHARPOS (it);
 
       if (it.cmp_it.id >= 0)
@@ -2206,18 +2204,13 @@ whether or not it is currently displayed in some window.  */)
 	{
 	  const char *s = SSDATA (it.string);
 	  const char *e = s + SBYTES (it.string);
-
 	  disp_string_at_start_p =
-	    it.area == TEXT_AREA
+	    (it.area == TEXT_AREA)
 	    && it.string_from_display_prop_p
-	    /* Cursor positioning only affected when display string
-	       originates from buffer text.  */
 	    && (it.sp > 0 && it.stack[it.sp - 1].method == GET_FROM_BUFFER);
 	  while (s < e)
-	    {
-	      if (*s++ == '\n')
-		it_overshoot_count++;
-	    }
+	    if (*s++ == '\n')
+	      it_overshoot_count++;
 	  if (! it_overshoot_count)
 	    it_overshoot_count = -1;
 	}
@@ -2232,9 +2225,7 @@ whether or not it is currently displayed in some window.  */)
 	}
       else
 	{
-	  /* Scan from the start of the line containing PT.  If we don't
-	     do this, we start moving with IT->current_x == 0, while PT is
-	     really at some x > 0.  */
+	  /* Not reseating starts IT->current_x at 0, while PT is some x > 0.  */
 	  reseat_preceding_line_start (&it);
 	  it.current_x = it.hpos = 0;
 	}
@@ -2251,7 +2242,7 @@ whether or not it is currently displayed in some window.  */)
 
       if (IT_CHARPOS (it) > it_start)
 	{
-	  /* Update IT_OVERSHOOT_COUNT.  */
+	  /* EZ overshoot whack-a-mole.  */
 	  if (it_overshoot_count < 0
 	      && it.method == GET_FROM_BUFFER
 	      && it.c == '\n')
@@ -2259,24 +2250,22 @@ whether or not it is currently displayed in some window.  */)
 	  else if (it_overshoot_count == 1 && it.vpos == 0
 		   && it.current_x < it.last_visible_x)
 	    {
-	      /* If we came to the same screen line as the one where
-		 we started, we didn't overshoot the line, and won't
-		 need to backtrack after all.  This happens, for
-		 example, when PT is in the middle of a composition.  */
+	      /* Screen line unchanged so no backtrack needed.
+		 PT potentially within a composition.  */
 	      it_overshoot_count = 0;
 	    }
 	  else if (disp_string_at_start_p && it.vpos > 0)
 	    {
-	      /* This is the case of a display string that spans
-		 several screen lines.  In that case, we end up at the
-		 end of the string, and it.vpos tells us how many
-		 screen lines we need to backtrack.  */
+	      /* Multi-line display string.  */
 	      it_overshoot_count = it.vpos;
 	    }
+
 	  /* We might overshoot if lines are truncated and point lies
 	     beyond the right margin of the window.  */
-	  if (it.line_wrap == TRUNCATE && it.current_x >= it.last_visible_x
-	      && it_overshoot_count == 0 && it.vpos > 0)
+	  if (it.line_wrap == TRUNCATE
+	      && it.current_x >= it.last_visible_x
+	      && it_overshoot_count == 0
+	      && it.vpos > 0)
 	    it_overshoot_count = 1;
 	  if (it_overshoot_count > 0)
 	    move_it_dvpos (&it, -it_overshoot_count);
@@ -2287,16 +2276,9 @@ whether or not it is currently displayed in some window.  */)
 	       && FETCH_BYTE (PT_BYTE - 1) == '\n'
 	       && nlines <= 0)
 	{
-	  /* In the case we backed off to (PT - 1) to avoid
-	     overshooting a display string, and (PT - 1) happens to be
-	     a newline, we'll need one less line to go up (or exactly
-	     one line to go down if nlines == 0).  */
+	  /* EZ drivel in 82193f2: will have to decipher later.  */
 	  nlines++;
-
-	  /* But we still need to record that one line, in order to
-	     return the correct value to the caller.  */
 	  vpos_init = -1;
-
 	  overshoot_handled = true;
 	}
 
@@ -2306,82 +2288,48 @@ whether or not it is currently displayed in some window.  */)
 
       if (nlines <= 0)
 	{
+	  /* EZ drivel: dbffbe0 */
 	  it.vpos = vpos_init;
 	  it.current_y = 0;
-	  /* Do this even if LINES is 0, so that we move back to the
-	     beginning of the current line as we ought.  */
 	  if ((nlines < 0 && IT_CHARPOS (it) > BEGV)
 	      || (nlines == 0 && !(start_x_given && start_x <= to_x)))
-	    move_it_dvpos (&it, max (PTRDIFF_MIN, nlines));
+	    move_it_dvpos (&it, nlines);
 	}
       else if (overshoot_handled)
 	{
 	  it.vpos = vpos_init;
 	  it.current_y = 0;
-	  move_it_dvpos (&it, min (PTRDIFF_MAX, nlines));
+	  move_it_dvpos (&it, nlines);
 	}
-      else
+      else if (it_start < ZV)
 	{
-	  /* Otherwise, we are at the first row occupied by PT, which
-	     might span multiple screen lines (e.g., if it's on a
-	     multi-line display string).  We want to start from the
-	     last line that it occupies.  */
-	  if (it_start < ZV)
-	    {
-	      if ((! it.bidi_p || it.bidi_it.scan_dir > 0)
-		  ? IT_CHARPOS (it) < it_start
-		  : IT_CHARPOS (it) > it_start)
-		{
-		  it.vpos = 0;
-		  it.current_y = 0;
-		  move_it_dvpos (&it, 1);
-		}
-	      while (IT_CHARPOS (it) == it_start)
-		{
-		  it.vpos = 0;
-		  it.current_y = 0;
-		  move_it_dvpos (&it, 1);
-		}
-	      if (nlines > 1)
-		move_it_dvpos (&it, min (PTRDIFF_MAX, nlines - 1));
-	    }
-	  else	/* it_start = ZV */
+	  if ((! it.bidi_p || it.bidi_it.scan_dir > 0)
+	      ? IT_CHARPOS (it) < it_start
+	      : IT_CHARPOS (it) > it_start)
 	    {
 	      it.vpos = 0;
 	      it.current_y = 0;
-	      move_it_dvpos (&it, min (PTRDIFF_MAX, nlines));
-	      /* We could have some display or overlay string at ZV,
-		 in which case it.vpos will be nonzero now, while
-		 actually we didn't move vertically at all.  */
-	      if (IT_CHARPOS (it) == CHARPOS (pt) && CHARPOS (pt) == it_start)
-		it.vpos = 0;
+	      move_it_dvpos (&it, 1);
 	    }
-	}
-
-      /* Move to the goal column, if one was specified.  If the window
-	 was originally hscrolled, the goal column is interpreted as
-	 an addition to the hscroll amount.  */
-      if (! NILP (lcols))
-	{
-	  move_it_x (&it, first_x + to_x);
-	  /* If we find ourselves in the middle of an overlay string
-	     which includes a newline after current string position,
-	     we need to move by lines until we get out of the string,
-	     and then reposition point at the requested X coordinate;
-	     if we don't, the cursor will be placed just after the
-	     string, which might not be the requested column.  */
-	  if (nlines >= 0 && it.area == TEXT_AREA)
+	  while (IT_CHARPOS (it) == it_start)
 	    {
-	      while (it.method == GET_FROM_STRING
-		     && ! it.string_from_display_prop_p
-		     && memchr (SSDATA (it.string) + IT_STRING_BYTEPOS (it),
-				'\n',
-				SBYTES (it.string) - IT_STRING_BYTEPOS (it)))
-		{
-		  move_it_dvpos (&it, 1);
-		  move_it_x (&it, first_x + to_x);
-		}
+	      it.vpos = 0;
+	      it.current_y = 0;
+	      move_it_dvpos (&it, 1);
 	    }
+	  if (nlines > 1)
+	    move_it_dvpos (&it, nlines - 1);
+	}
+      else	/* it_start == ZV, a youth special cased this.  */
+	{
+	  it.vpos = 0;
+	  it.current_y = 0;
+	  move_it_dvpos (&it, nlines);
+	  /* We could have some display or overlay string at ZV,
+	     in which case it.vpos will be nonzero now, while
+	     actually we didn't move vertically at all.  */
+	  if (IT_CHARPOS (it) == CHARPOS (pt) && CHARPOS (pt) == it_start)
+	    it.vpos = 0;
 	}
 
       SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
@@ -2392,7 +2340,6 @@ whether or not it is currently displayed in some window.  */)
 }
 
 
-
 /* File's initialization.  */
 
 void

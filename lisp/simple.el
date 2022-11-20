@@ -7756,49 +7756,47 @@ If NOERROR, don't signal an error if we can't move that many lines."
 	  ;; left edge of the window, but columns are still counted
 	  ;; from the logical-order beginning of the line, i.e. from
 	  ;; the right edge in this case.  We need to adjust for that.
-	  (if (eq (current-bidi-paragraph-direction) 'right-to-left)
-	      (setq x-pos (- (window-body-width nil t) 1 x-pos)))
-	  (setq temporary-goal-column
-		(cons (/ (float x-pos)
-			 (frame-char-width))
-                      hscroll)))
+	  (when (eq (current-bidi-paragraph-direction) 'right-to-left)
+	    (setq x-pos (- (window-body-width nil t) 1 x-pos)))
+	  (setq temporary-goal-column (cons (/ (float x-pos)
+			                       (frame-char-width))
+                                            hscroll)))
 	 (executing-kbd-macro
 	  ;; When we move beyond the first/last character visible in
 	  ;; the window, posn-at-point will return nil, so we need to
 	  ;; approximate the goal column as below.
 	  (setq temporary-goal-column
 		(mod (current-column) (window-text-width)))))))
-    (if target-hscroll
-	(set-window-hscroll (selected-window) target-hscroll))
-    ;; vertical-motion can move more than it was asked to if it moves
-    ;; across display strings with newlines.  We don't want to ring
-    ;; the bell and announce beginning/end of buffer in that case.
-    (or (and (or (and (>= arg 0)
-		      (>= (vertical-motion
+    (when target-hscroll
+      (set-window-hscroll (selected-window) target-hscroll))
+    (when (or (and (or (< arg 0)
+		       (< (vertical-motion
 			   (cons (or goal-column
 				     (if (consp temporary-goal-column)
 					 (car temporary-goal-column)
 				       temporary-goal-column))
 				 arg))
 			  arg))
-		 (and (< arg 0)
-		      (<= (vertical-motion
+		   (or (>= arg 0)
+		       (> (vertical-motion
 			   (cons (or goal-column
 				     (if (consp temporary-goal-column)
 					 (car temporary-goal-column)
 				       temporary-goal-column))
 				 arg))
 			  arg)))
-	     (or (>= arg 0)
-		 (/= (point) opoint)
-		 ;; If the goal column lies on a display string,
-		 ;; `vertical-motion' advances the cursor to the end
-		 ;; of the string.  For arg < 0, this can cause the
-		 ;; cursor to get stuck.  (Bug#3020).
-		 (= (vertical-motion arg) arg)))
-	(unless noerror
-	  (signal (if (< arg 0) 'beginning-of-buffer 'end-of-buffer)
-		  nil)))))
+	      (and (< arg 0)
+		   (= (point) opoint)
+		   ;; If the goal column lies on a display string,
+		   ;; `vertical-motion' advances the cursor to the end
+		   ;; of the string.  For arg < 0, this can cause the
+		   ;; cursor to get stuck.  (Bug#3020).
+		   (/= (vertical-motion arg) arg)))
+      (unless noerror
+	(signal (if (< arg 0)
+                    'beginning-of-buffer
+                  'end-of-buffer)
+		nil)))))
 
 ;; This is the guts of next-line and previous-line.
 ;; Arg says how many lines to move.

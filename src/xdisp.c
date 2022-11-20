@@ -222,9 +222,6 @@ static Lisp_Object list_of_error;
 
 #ifdef HAVE_WINDOW_SYSTEM
 
-#define IT_POS_VALID_AFTER_MOVE_P(it)					\
-  ((it)->method != GET_FROM_STRING || IT_STRING_CHARPOS (*it) == 0)
-
 /* Test if overflow newline into fringe.  Called with iterator IT
    at or past right window margin, and with IT->current_x set.  */
 
@@ -3268,7 +3265,7 @@ init_from_display_pos (struct it *it, struct window *w, struct display_pos *pos)
   if (CHARPOS (pos->string_pos) >= 0)
     {
       /* Recorded position is not in an overlay string, but in another
-	 string.  This can only be a string from a `display' property.
+	 string.  This can only be a string from a display property.
 	 IT should already be filled with that string.  */
       it->current.string_pos = pos->string_pos;
       eassert (STRINGP (it->string));
@@ -3952,7 +3949,7 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 	  || it->current_x <= it->first_visible_x)
 	return it->face_id;
 
-      if (!it->bidi_p)
+      if (! it->bidi_p)
 	{
 	  /* Set charpos to the position before or after IT's current
 	     position, in the logical order, which in the non-bidi
@@ -5107,8 +5104,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
   if (it)
     it->stop_charpos = position->charpos;
 
-  /* Handle `(left-fringe BITMAP [FACE])'
-     and `(right-fringe BITMAP [FACE])'.  */
+  /* Handle `(left-fringe BITMAP [FACE])' or right.  */
   if (CONSP (spec)
       && (EQ (XCAR (spec), Qleft_fringe)
 	  || EQ (XCAR (spec), Qright_fringe))
@@ -5187,7 +5183,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	  it->from_disp_prop_p = true;
 
 	  /* Say that we haven't consumed the characters with
-	     `display' property yet.  The call to pop_it in
+	     display property yet.  The call to pop_it in
 	     set_iterator_to_next will clean this up.  */
 	  *position = start_pos;
 
@@ -6054,31 +6050,33 @@ push_it (struct it *it, struct text_pos *position)
 static void
 iterate_out_of_display_property (struct it *it)
 {
-  bool buffer_p = !STRINGP (it->string);
+  bool buffer_p = ! STRINGP (it->string);
   ptrdiff_t eob = (buffer_p ? ZV : it->end_charpos);
   ptrdiff_t bob = (buffer_p ? BEGV : 0);
 
   eassert (eob >= CHARPOS (it->position) && CHARPOS (it->position) >= bob);
 
-  /* Maybe initialize paragraph direction.  If we are at the beginning
-     of a new paragraph, get_element_from_buffer may not have a
-     chance to do that.  */
+  /* If at start of new paragraph, get_element_from_buffer()
+     may not have bidi_paragraph_init().  */
   if (it->bidi_it.first_elt && it->bidi_it.charpos < eob)
     bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
+
   /* prev_stop can be zero, so check against BEGV as well.  */
   while (it->bidi_it.charpos >= bob
 	 && it->prev_stop <= it->bidi_it.charpos
 	 && it->bidi_it.charpos < CHARPOS (it->position)
 	 && it->bidi_it.charpos < eob)
     bidi_next (&it->bidi_it);
-  /* Record the stop_pos we just crossed, for when we cross it
-     back, maybe.  */
+
+  /* Record stop_pos just crossed, for possible bidi backtrack.  */
   if (it->bidi_it.charpos > CHARPOS (it->position))
     it->prev_stop = CHARPOS (it->position);
+
   /* If we ended up not where pop_it put us, resync IT's
      positional members with the bidi iterator. */
   if (it->bidi_it.charpos != CHARPOS (it->position))
     SET_TEXT_POS (it->position, it->bidi_it.charpos, it->bidi_it.bytepos);
+
   if (buffer_p)
     it->current.pos = it->position;
   else
@@ -6190,16 +6188,11 @@ pop_it (struct it *it)
   it->bidi_p = p->bidi_p;
   it->paragraph_embedding = p->paragraph_embedding;
   it->from_disp_prop_p = p->from_disp_prop_p;
+
   if (it->bidi_p)
     {
       bidi_pop_it (&it->bidi_it);
-      /* Bidi-iterate until we get out of the portion of text, if any,
-	 covered by a `display' text property or by an overlay with
-	 `display' property.  (We cannot just jump there, because the
-	 internal coherency of the bidi iterator state can not be
-	 preserved across such jumps.)  We also must determine the
-	 paragraph base direction if the overlay we just processed is
-	 at the beginning of a new paragraph.  */
+
       if (from_display_prop
 	  && (it->method == GET_FROM_BUFFER || it->method == GET_FROM_STRING))
 	iterate_out_of_display_property (it);
@@ -6219,6 +6212,7 @@ pop_it (struct it *it)
 		  display property".  */
 	       || it->sp > 0);
     }
+
   /* If we move the iterator over text covered by a display property
      to a new buffer position, any info about previously seen overlays
      is no longer valid.  */
@@ -6239,63 +6233,6 @@ preceding_line_start (struct it *it)
 			  find_newline_no_quit (cp, bp, -1, &IT_BYTEPOS (*it)),
 			  get_closer_narrowed_begv (it->w, IT_CHARPOS (*it)));
 }
-
-/* Find in the current buffer the first display or overlay string
-   between STARTPOS and ENDPOS that includes embedded newlines.
-   Consider only overlays that apply to window W.
-   Value is non-zero if such a display/overlay string is found.  */
-static bool
-strings_with_newlines (ptrdiff_t startpos, ptrdiff_t endpos, struct window *w)
-{
-  struct itree_node *node;
-  /* Process overlays.  */
-  ITREE_FOREACH (node, current_buffer->overlays, startpos, endpos, DESCENDING)
-    {
-      Lisp_Object overlay = node->data;
-      eassert (OVERLAYP (overlay));
-
-      /* Skip this overlay if it doesn't apply to our window.  */
-      Lisp_Object window = Foverlay_get (overlay, Qwindow);
-      if (WINDOWP (window) && XWINDOW (window) != w)
-	continue;
-
-      ptrdiff_t ostart = node->begin;
-      ptrdiff_t oend = node->end;
-
-      /* Skip overlays that don't overlap the range.  */
-      if (!((startpos < oend && ostart < endpos)
-	    || (ostart == oend
-		&& (startpos == oend || (endpos == ZV && oend == endpos)))))
-	continue;
-
-      Lisp_Object str;
-      str = Foverlay_get (overlay, Qbefore_string);
-      if (STRINGP (str) && SCHARS (str)
-	  && memchr (SDATA (str), '\n', SBYTES (str)))
-	return true;
-      str = Foverlay_get (overlay, Qafter_string);
-      if (STRINGP (str) && SCHARS (str)
-	  && memchr (SDATA (str), '\n', SBYTES (str)))
-	return true;
-    }
-
-  /* Check for 'display' properties whose values include strings.  */
-  Lisp_Object cpos = make_fixnum (startpos);
-  Lisp_Object limpos = make_fixnum (endpos);
-
-  while ((cpos = Fnext_single_property_change (cpos, Qdisplay, Qnil, limpos),
-	  !(NILP (cpos) || XFIXNAT (cpos) >= endpos)))
-    {
-      Lisp_Object spec = Fget_char_property (cpos, Qdisplay, Qnil);
-      Lisp_Object string = string_from_display_spec (spec);
-      if (STRINGP (string)
-	  && memchr (SDATA (string), '\n', SBYTES (string)))
-	return true;
-    }
-
-  return false;
-}
-
 
 /* Move IT to the next line start.
 
@@ -6319,145 +6256,81 @@ strings_with_newlines (ptrdiff_t startpos, ptrdiff_t endpos, struct window *w)
    */
 
 static bool
-following_line_start (struct it *it, bool *skipped_p,
-		     struct bidi_it *bidi_it_prev)
+following_line_start (struct it *it, bool *skipped_p, struct bidi_it *bidi_it_prev)
 {
-  ptrdiff_t old_selective;
+  ptrdiff_t restore_selective = it->selective;
   bool newline_found_p = false;
-  int n;
-  const int MAX_NEWLINE_DISTANCE = 500;
 
-  /* If already on a newline, just consume it to avoid unintended
-     skipping over invisible text below.  */
-  if (it->what == IT_CHARACTER
-      && it->c == '\n'
-      && CHARPOS (it->position) == IT_CHARPOS (*it))
-    {
-      if (it->bidi_p && bidi_it_prev)
-	*bidi_it_prev = it->bidi_it;
-      set_iterator_to_next (it, false);
-      it->c = 0;
-      return true;
-    }
-
-  /* Don't handle selective display in the following.  It's (a)
-     unnecessary because it's done by the caller, and (b) leads to an
-     infinite recursion because get_element_from_ellipsis indirectly
-     calls this function.  */
-  old_selective = it->selective;
+  /* Don't handle selective display; leads to infinite recursion
+     from get_element_from_ellipsis().  */
   it->selective = 0;
 
-  /* Scan for a newline within MAX_NEWLINE_DISTANCE display elements
-     from buffer text, or till the end of the string if iterating a
-     string.  */
-  for (n = 0;
-       !newline_found_p && n < MAX_NEWLINE_DISTANCE;
-       n += !STRINGP (it->string))
+  ptrdiff_t bytepos, start = IT_CHARPOS (*it);
+  ptrdiff_t limit = find_newline_no_quit (start, IT_BYTEPOS (*it), 1, &bytepos);
+
+  /* *SKIPPED_P means we don't have to do an element
+     by element inspection for overlays or display strings
+     that may contain newline characters.  */
+  *skipped_p = (it->stop_charpos >= limit);
+
+  if (! *skipped_p)
     {
-      if (! get_display_element (it))
-	return false;
-      newline_found_p = it->what == IT_CHARACTER && it->c == '\n';
-      if (newline_found_p && it->bidi_p && bidi_it_prev)
-	*bidi_it_prev = it->bidi_it;
-      set_iterator_to_next (it, false);
+      Lisp_Object pos =	Fnext_single_property_change (make_fixnum (start),
+						      Qdisplay, Qnil,
+						      make_fixnum (limit));
+      *skipped_p =
+	(NILP (pos) || XFIXNAT (pos) == limit) /* no display props */
+	&& next_overlay_change (start) == ZV;  /* no overlays */
     }
 
-  /* If we didn't find a newline near enough, see if we can use a
-     short-cut.  */
-  if (! newline_found_p)
+  if (*skipped_p)
     {
-      ptrdiff_t bytepos, start = IT_CHARPOS (*it);
-      ptrdiff_t limit = find_newline_no_quit (start, IT_BYTEPOS (*it),
-					      1, &bytepos);
-      eassert (! STRINGP (it->string));
+      newline_found_p = true;
 
-      /* it->stop_charpos >= limit means we already know there's no
-	 stop position up until the newline at LIMIT, so there's no
-	 need for any further checks.  */
-      bool no_strings_with_newlines = it->stop_charpos >= limit;
-
-      if (!no_strings_with_newlines)
+      if (! it->bidi_p || ! bidi_it_prev)
 	{
-	  if (!(current_buffer->long_line_optimizations_p
-		&& it->line_wrap == TRUNCATE))
-	    {
-	      /* Quick-and-dirty check: if there isn't any `display'
-		 property in sight, and no overlays, we're done.  */
-	      Lisp_Object pos =
-		Fnext_single_property_change (make_fixnum (start),
-					      Qdisplay, Qnil,
-					      make_fixnum (limit));
-	      no_strings_with_newlines =
-		(NILP (pos) || XFIXNAT (pos) == limit) /* no 'display' props */
-		&& next_overlay_change (start) == ZV;  /* no overlays */
-	    }
-	  else
-	    {
-	      /* For buffers with very long and truncated lines we try
-		 harder, because it's worth our while to spend some
-		 time looking into the overlays and 'display' properties
-		 if we can then avoid iterating through all of them.  */
-	      no_strings_with_newlines =
-		!strings_with_newlines (start, limit, it->w);
-	    }
-	}
-
-      /* If there's no display or overlay strings with embedded
-	 newlines until the position of the newline in buffer text, we
-	 can just use that position.  */
-      if (no_strings_with_newlines)
-	{
-	  if (!it->bidi_p || !bidi_it_prev)
-	    {
-	      /* The optimal case: just jump there.  */
-	      IT_CHARPOS (*it) = limit;
-	      IT_BYTEPOS (*it) = bytepos;
-	    }
-	  else
-	    {
-	      /* The less optimal case: need to bidi-walk there, but
-		 this is still cheaper that the full iteration using
-		 get_next_display_element and set_iterator_to_next.  */
-	      struct bidi_it bprev;
-
-	      /* Help bidi.c avoid expensive searches for display
-		 properties and overlays, by telling it that there are
-		 none up to `limit'.  */
-	      if (it->bidi_it.disp_pos < limit)
-		{
-		  it->bidi_it.disp_pos = limit;
-		  it->bidi_it.disp_prop = 0;
-		}
-
-	      do
-		{
-		  bprev = it->bidi_it;
-		  bidi_next (&it->bidi_it);
-		} while (it->bidi_it.charpos != limit);
-
-	      IT_CHARPOS (*it) = limit;
-	      IT_BYTEPOS (*it) = it->bidi_it.bytepos;
-	      if (bidi_it_prev)
-	        *bidi_it_prev = bprev;
-	    }
-	  *skipped_p = newline_found_p = true;
+	  IT_CHARPOS (*it) = limit;
+	  IT_BYTEPOS (*it) = bytepos;
 	}
       else
 	{
-	  /* The slow case.  */
-	  while (!newline_found_p)
+	  struct bidi_it bprev;
+
+	  /* Help bidi.c avoid expensive searches for display
+	     properties and overlays, by telling it that there are
+	     none up to `limit'.  */
+	  if (it->bidi_it.disp_pos < limit)
 	    {
-	      if (! get_display_element (it))
-		break;
-	      newline_found_p = ITERATOR_AT_END_OF_LINE_P (it);
-	      if (newline_found_p && it->bidi_p && bidi_it_prev)
-		*bidi_it_prev = it->bidi_it;
-	      set_iterator_to_next (it, false);
+	      it->bidi_it.disp_pos = limit;
+	      it->bidi_it.disp_prop = 0;
 	    }
+
+	  do
+	    {
+	      bprev = it->bidi_it;
+	      bidi_next (&it->bidi_it);
+	    } while (it->bidi_it.charpos != limit);
+
+	  IT_CHARPOS (*it) = limit;
+	  IT_BYTEPOS (*it) = it->bidi_it.bytepos;
+	  if (bidi_it_prev)
+	    *bidi_it_prev = bprev;
+	}
+    }
+  else        /* Not *skipped_p.  */
+    {
+      while (! newline_found_p)
+	{
+	  if (! get_display_element (it))
+	    break;
+	  newline_found_p = ITERATOR_AT_END_OF_LINE_P (it);
+	  if (newline_found_p && it->bidi_p && bidi_it_prev)
+	    *bidi_it_prev = it->bidi_it;
+	  set_iterator_to_next (it, false);
 	}
     }
 
-  it->selective = old_selective;
+  it->selective = restore_selective;
   return newline_found_p;
 }
 
@@ -6528,7 +6401,7 @@ preceding_line_start_visible (struct it *it)
 
   it->continuation_lines_width = 0;
 
-  eassert (IT_POS_VALID_AFTER_MOVE_P (it));
+  eassert (it->method != GET_FROM_STRING || IT_STRING_CHARPOS (*it) == 0);
   eassert (IT_CHARPOS (*it) >= BEGV);
   eassert (it->narrowed_begv > 0 /* long-line optimizations: all bets off */
 	   || IT_CHARPOS (*it) == BEGV
@@ -6561,8 +6434,7 @@ reseat_following_line_start (struct it *it, bool on_newline_p)
 {
   bool skipped_p = false;
   struct bidi_it bidi_it_prev;
-  bool newline_found_p
-    = following_line_start (it, &skipped_p, &bidi_it_prev);
+  bool newline_found_p = following_line_start (it, &skipped_p, &bidi_it_prev);
 
   /* Skip over lines that are invisible because they are indented
      more than the value of IT->selective.  */
@@ -7459,9 +7331,8 @@ set_iterator_to_next (struct it *it, bool reseat_p)
     case GET_FROM_BUFFER:
       if (ITERATOR_AT_END_OF_LINE_P (it) && reseat_p)
 	reseat_following_line_start (it, false);
-      else if (it->cmp_it.id >= 0)
+      else if (it->cmp_it.id >= 0) 	  /* A composition.  */
 	{
-	  /* Composite characters.  */
 	  if (! it->bidi_p)
 	    {
 	      IT_CHARPOS (*it) += it->cmp_it.nchars;
@@ -7500,7 +7371,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 					    IT_BYTEPOS (*it), stop, Qnil);
 	    }
 	}
-      else
+      else   /* Not a composition.  */
 	{
 	  eassert (it->len != 0);
 
@@ -7619,11 +7490,10 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	  if (IT_STRING_CHARPOS (*it) >= it->end_charpos)
 	    goto consider_string_end;
 	}
-      if (it->cmp_it.id >= 0)
+
+      if (it->cmp_it.id >= 0)   /* Just processed a composition.  */
 	{
-	  /* We are delivering display elements from a composition.
-	     Update the string position past the grapheme cluster
-	     we've just processed.  */
+	  /* Update string position past the grapheme cluster.  */
 	  if (! it->bidi_p)
 	    {
 	      IT_STRING_CHARPOS (*it) += it->cmp_it.nchars;
@@ -7631,39 +7501,29 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	    }
 	  else
 	    {
-	      int i;
-
-	      for (i = 0; i < it->cmp_it.nchars; i++) {
+	      for (int i = 0; i < it->cmp_it.nchars; i++)
 		bidi_next (&it->bidi_it);
-              }
 	      IT_STRING_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      IT_STRING_CHARPOS (*it) = it->bidi_it.charpos;
 	    }
 
-	  /* Did we exhaust all the grapheme clusters of this
-	     composition?  */
+	  /* Are there more clusters? */
 	  if ((! it->bidi_p || ! it->cmp_it.reversed_p)
 	      && (it->cmp_it.to < it->cmp_it.nglyphs))
 	    {
-	      /* Not all the grapheme clusters were processed yet;
-		 advance to the next cluster.  */
+	      /* Yes, advance to next cluster going forward.  */
 	      it->cmp_it.from = it->cmp_it.to;
 	    }
 	  else if ((it->bidi_p && it->cmp_it.reversed_p)
 		   && it->cmp_it.from > 0)
 	    {
-	      /* Likewise: advance to the next cluster, but going in
-		 the reverse direction.  */
+	      /* Yes, advance to next cluster going backward.  */
 	      it->cmp_it.to = it->cmp_it.from;
 	    }
 	  else
 	    {
-	      /* This composition was fully processed; find the next
-		 candidate place for checking for composed
-		 characters.  */
-	      /* Always limit string searches to the string length;
-		 any padding spaces are not part of the string, and
-		 there cannot be any compositions in that padding.  */
+	      /* No, find the next position to checking for compositions.
+		 Always limit string searches to the string length.  */
 	      ptrdiff_t stop = SCHARS (it->string);
 
 	      if (it->bidi_p && it->bidi_it.scan_dir < 0)
@@ -7681,41 +7541,30 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 					    it->string);
 	    }
 	}
+      else if (! it->bidi_p || IT_STRING_CHARPOS (*it) >= it->bidi_it.string.schars)
+	{
+	  /* Apparently if string position is past its end,
+	     get_element_from_string() is retrieving padding
+	     blanks, and bidi cannot handle that.  */
+	  IT_STRING_BYTEPOS (*it) += it->len;
+	  IT_STRING_CHARPOS (*it) += 1;
+	}
       else
 	{
-	  if (! it->bidi_p
-	      /* Apparently if string position is past its end,
-		 this means get_element_from_string is retrieving padding
-		 blanks, and bidi cannot handle that.  */
-	      || IT_STRING_CHARPOS (*it) >= it->bidi_it.string.schars)
-	    {
-	      IT_STRING_BYTEPOS (*it) += it->len;
-	      IT_STRING_CHARPOS (*it) += 1;
-	    }
-	  else
-	    {
-	      int prev_scan_dir = it->bidi_it.scan_dir;
-
-	      bidi_next (&it->bidi_it);
-	      IT_STRING_BYTEPOS (*it) = it->bidi_it.bytepos;
-	      IT_STRING_CHARPOS (*it) = it->bidi_it.charpos;
-	      /* If the scan direction changes, we may need to update
-		 the place where to check for composed characters.  */
-	      if (prev_scan_dir != it->bidi_it.scan_dir)
-		{
-		  ptrdiff_t stop = SCHARS (it->string);
-
-		  if (it->bidi_it.scan_dir < 0)
-		    stop = -1;
-		  else if (it->end_charpos < stop)
-		    stop = it->end_charpos;
-
-		  composition_compute_stop_pos (&it->cmp_it,
-						IT_STRING_CHARPOS (*it),
-						IT_STRING_BYTEPOS (*it), stop,
-						it->string);
-		}
-	    }
+	  int prev_scan_dir = it->bidi_it.scan_dir;
+	  bidi_next (&it->bidi_it);
+	  IT_STRING_BYTEPOS (*it) = it->bidi_it.bytepos;
+	  IT_STRING_CHARPOS (*it) = it->bidi_it.charpos;
+	  if (prev_scan_dir != it->bidi_it.scan_dir)
+	    /* Bidi reversed; update composition stop pos.  */
+	    composition_compute_stop_pos (&it->cmp_it,
+					  IT_STRING_CHARPOS (*it),
+					  IT_STRING_BYTEPOS (*it),
+					  (it->bidi_it.scan_dir < 0
+					   ? -1
+					   : min (it->end_charpos,
+						  SCHARS (it->string))),
+					  it->string);
 	}
 
     consider_string_end:
@@ -21179,7 +21028,7 @@ get_line_prefix_it_property (struct it *it, Lisp_Object prop)
 }
 
 /* Have IT take on the line-prefix or wrap-prefix.
-   The function `iterate_out_of_display_property' restores IT.
+   The function iterate_out_of_display_property() restores IT.
 */
 
 static void
