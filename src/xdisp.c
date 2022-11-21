@@ -181,7 +181,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <time.h>
 
 #include "lisp.h"
-#include "alloc.h"
 #include "atimer.h"
 #include "composite.h"
 #include "keyboard.h"
