@@ -3004,7 +3004,7 @@ AC_SUBST([JSON_OBJ])
 HAVE_TREE_SITTER=no
 TREE_SITTER_OBJ=
 
-if test "${with_tree_sitter}" == "yes"; then
+if test "${with_tree_sitter}" = "yes"; then
   EMACS_CHECK_MODULES([TREE_SITTER], [tree-sitter = v0.20.8alpha1])
   if test "${HAVE_TREE_SITTER}" = yes; then
     AC_DEFINE(HAVE_TREE_SITTER, 1, [Define if using tree-sitter.])
