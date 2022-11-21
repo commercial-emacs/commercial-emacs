@@ -64,6 +64,7 @@
          (progn
            (vc-git-create-repo)
            (vc-git-command nil 0 nil "config" "--add" "user.name" "frou")
+           (vc-git-command nil 0 nil "config" "--add" "user.email" "frou@frou.org")
            ,@body)
        (delete-directory dir t))))
 
