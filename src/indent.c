@@ -2175,7 +2175,7 @@ whether or not it is currently displayed in some window.  */)
       int vpos_init = 0;
       double start_col UNINIT;
       int start_x UNINIT;
-      int to_x = -1;
+      int first_x, to_x = -1;
 
       bool start_x_given = !NILP (cur_col);
       if (start_x_given)
@@ -2196,6 +2196,7 @@ whether or not it is currently displayed in some window.  */)
       itdata = bidi_shelve_cache ();
       start_move_it (&it, w, pt);
       it.lnum_width = lnum_width;
+      first_x = it.first_visible_x;
       it_start = IT_CHARPOS (it);
 
       if (it.cmp_it.id >= 0)
@@ -2321,6 +2322,26 @@ whether or not it is currently displayed in some window.  */)
 	  move_it_dvpos (&it, nlines);
 	  if (IT_CHARPOS (it) == CHARPOS (pt) && CHARPOS (pt) == it_start)
 	    it.vpos = 0;
+	}
+
+      /* Move to the goal column on top of any hscroll.  */
+      if (! NILP (lcols))
+	{
+	  move_it_x (&it, first_x + to_x);
+	  /* EZ min-impact, max-obfuscation fix 6514b30.  Moving off a
+	     newline-containing overlay string.  */
+	  if (nlines >= 0 && it.area == TEXT_AREA)
+	    {
+	      while (it.method == GET_FROM_STRING
+		     && ! it.string_from_display_prop_p
+		     && memchr (SSDATA (it.string) + IT_STRING_BYTEPOS (it),
+				'\n',
+				SBYTES (it.string) - IT_STRING_BYTEPOS (it)))
+		{
+		  move_it_dvpos (&it, 1);
+		  move_it_x (&it, first_x + to_x);
+		}
+	    }
 	}
 
       SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
