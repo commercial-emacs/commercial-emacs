@@ -1373,13 +1373,20 @@ If SAME-WINDOW, don't pop to a new window."
          (unless (bobp)
            (insert "\n"))
          (insert (propertize
-                  (concat (substitute-command-keys data) "\n\n")
+                  (substitute-command-keys data)
+                  'face 'shortdoc-heading
+                  'shortdoc-section t
+                  'outline-level 1))
+         (insert (propertize
+                  "\n\n"
                   'face 'shortdoc-heading
                   'shortdoc-section t)))
         ;; There may be functions not yet defined in the data.
         ((fboundp (car data))
          (when prev
-           (insert (make-separator-line)))
+           (insert (make-separator-line)
+                   ;; This helps with hidden outlines (bug#53981)
+                   (propertize "\n" 'face '(:height 0))))
          (setq prev t)
          (shortdoc--display-function data))))
      (cdr (assq group shortdoc--groups))))
@@ -1396,7 +1403,7 @@ If SAME-WINDOW, don't pop to a new window."
         (start-section (point))
         arglist-start)
     ;; Function calling convention.
-    (insert (propertize "(" 'shortdoc-function function))
+    (insert (propertize "(" 'shortdoc-function function 'outline-level 2))
     (if (plist-get data :no-manual)
         (insert-text-button
          (symbol-name function)
@@ -1530,7 +1537,10 @@ Example:
 
 (define-derived-mode shortdoc-mode special-mode "shortdoc"
   "Mode for shortdoc."
-  :interactive nil)
+  :interactive nil
+  (setq-local outline-search-function #'outline-search-level
+              outline-level (lambda ()
+                              (get-text-property (point) 'outline-level))))
 
 (defun shortdoc--goto-section (arg sym &optional reverse)
   (unless (natnump arg)
