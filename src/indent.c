@@ -2276,7 +2276,7 @@ whether or not it is currently displayed in some window.  */)
 	       && FETCH_BYTE (PT_BYTE - 1) == '\n'
 	       && nlines <= 0)
 	{
-	  /* EZ drivel in 82193f2: will have to decipher later.  */
+	  /* EZ palaver in 82193f2: will have to decipher later.  */
 	  nlines++;
 	  vpos_init = -1;
 	  overshoot_handled = true;
@@ -2288,7 +2288,7 @@ whether or not it is currently displayed in some window.  */)
 
       if (nlines <= 0)
 	{
-	  /* EZ drivel: dbffbe0 */
+	  /* EZ palaver: dbffbe0 */
 	  it.vpos = vpos_init;
 	  it.current_y = 0;
 	  if ((nlines < 0 && IT_CHARPOS (it) > BEGV)
@@ -2303,31 +2303,22 @@ whether or not it is currently displayed in some window.  */)
 	}
       else if (it_start < ZV)
 	{
-	  if ((! it.bidi_p || it.bidi_it.scan_dir > 0)
-	      ? IT_CHARPOS (it) < it_start
-	      : IT_CHARPOS (it) > it_start)
+	  while ((! it.bidi_p || it.bidi_it.scan_dir > 0)
+		 ? IT_CHARPOS (it) <= it_start
+		 : IT_CHARPOS (it) >= it_start)
 	    {
-	      it.vpos = 0;
-	      it.current_y = 0;
-	      move_it_dvpos (&it, 1);
-	    }
-	  while (IT_CHARPOS (it) == it_start)
-	    {
-	      it.vpos = 0;
-	      it.current_y = 0;
+	      it.vpos = it.current_y = 0;
 	      move_it_dvpos (&it, 1);
 	    }
 	  if (nlines > 1)
 	    move_it_dvpos (&it, nlines - 1);
 	}
-      else	/* it_start == ZV, a youth special cased this.  */
+      else	/* it_start == ZV */
 	{
-	  it.vpos = 0;
-	  it.current_y = 0;
+	  /* EZ special cased this in b544ab5.
+	     Will have to inspect wtf he was thinking.  */
+	  it.vpos = it.current_y = 0;
 	  move_it_dvpos (&it, nlines);
-	  /* We could have some display or overlay string at ZV,
-	     in which case it.vpos will be nonzero now, while
-	     actually we didn't move vertically at all.  */
 	  if (IT_CHARPOS (it) == CHARPOS (pt) && CHARPOS (pt) == it_start)
 	    it.vpos = 0;
 	}
