@@ -1455,7 +1455,7 @@ state of the current buffer.  Use with care.  */)
 	 decrease SAVE_MODIFF and auto_save_modified or increase
 	 MODIFF.  */
       if (SAVE_MODIFF >= MODIFF)
-	SAVE_MODIFF = modiff_incr (&MODIFF, 1);
+	SAVE_MODIFF = modiff_incr (&MODIFF);
       if (EQ (flag, Qautosaved))
 	BUF_AUTOSAVE_MODIFF (b) = MODIFF;
     }
@@ -2420,12 +2420,12 @@ results, see Info node `(elisp)Swapping Text'.  */)
   bset_point_before_scroll (current_buffer, Qnil);
   bset_point_before_scroll (other_buffer, Qnil);
 
-  modiff_incr (&current_buffer->text->modiff, 1);
-  modiff_incr (&other_buffer->text->modiff, 1);
-  modiff_incr (&current_buffer->text->chars_modiff, 1);
-  modiff_incr (&other_buffer->text->chars_modiff, 1);
-  modiff_incr (&current_buffer->text->overlay_modiff, 1);
-  modiff_incr (&other_buffer->text->overlay_modiff, 1);
+  modiff_incr (&current_buffer->text->modiff);
+  modiff_incr (&other_buffer->text->modiff);
+  modiff_incr (&current_buffer->text->chars_modiff);
+  modiff_incr (&other_buffer->text->chars_modiff);
+  modiff_incr (&current_buffer->text->overlay_modiff);
+  modiff_incr (&other_buffer->text->overlay_modiff);
   current_buffer->text->beg_unchanged = current_buffer->text->gpt;
   current_buffer->text->end_unchanged = current_buffer->text->gpt;
   other_buffer->text->beg_unchanged = other_buffer->text->gpt;
@@ -3459,7 +3459,7 @@ modify_overlay (struct buffer *buf, ptrdiff_t start, ptrdiff_t end)
 
   bset_redisplay (buf);
 
-  modiff_incr (&BUF_OVERLAY_MODIFF (buf), 1);
+  modiff_incr (&BUF_OVERLAY_MODIFF (buf));
 }
 
 DEFUN ("move-overlay", Fmove_overlay, Smove_overlay, 3, 4, 0,

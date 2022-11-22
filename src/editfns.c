@@ -2735,21 +2735,6 @@ remain visible.  */)
   return Qnil;
 }
 
-DEFUN ("narrow-to-region", Fnarrow_to_region, Snarrow_to_region, 2, 2, "r",
-       doc: /* Restrict editing in this buffer to the current region.
-The rest of the text becomes temporarily invisible and untouchable
-but is not deleted; if you save the buffer in a file, the invisible
-text is included in the file.  \\[widen] makes all visible again.
-See also `save-restriction'.
-
-When calling from Lisp, pass two arguments START and END:
-positions (integers or markers) bounding the text that should
-remain visible.  */)
-  (Lisp_Object start, Lisp_Object end)
-{
-  return narrow_to_region_internal (start, end, false);
-}
-
 Lisp_Object
 save_restriction_save (void)
 {
