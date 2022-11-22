@@ -151,7 +151,6 @@ garbled displays, running out of memory, and crashes and hangs.
 Emacs.
 
 @menu
-* DEL Does Not Delete::   What to do if @key{DEL} doesn't delete.
 * Stuck Recursive::       '[...]' in mode line around the parentheses.
 * Screen Garbled::        Garbage on the screen.
 * Text Garbled::          Garbage in the text.
