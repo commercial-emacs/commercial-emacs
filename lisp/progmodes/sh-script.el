@@ -1466,57 +1466,12 @@ When the region is active, send the region instead."
                     sh-shell))))
 
 ;;;###autoload
-(define-derived-mode sh-mode prog-mode "Shell-script"
-  "Major mode for editing shell scripts.
-This mode works for many shells, since they all have roughly the same syntax,
-as far as commands, arguments, variables, pipes, comments etc. are concerned.
-Unless the file's magic number indicates the shell, your usual shell is
-assumed.  Since filenames rarely give a clue, they are not further analyzed.
+(define-derived-mode sh-base-mode prog-mode "Shell-script"
+  "Generic major mode for editing shell scripts.
 
-This mode adapts to the variations between shells (see `sh-set-shell') by
-means of an inheritance based feature lookup (see `sh-feature').  This
-mechanism applies to all variables (including skeletons) that pertain to
-shell-specific features.  Shell script files can use the `sh-shell' local
-variable to indicate the shell variant to be used for the file.
-
-The default style of this mode is that of Rosenblatt's Korn shell book.
-The syntax of the statements varies with the shell being used.  The
-following commands are available, based on the current shell's syntax:
-\\<sh-mode-map>
-\\[sh-case]	 case statement
-\\[sh-for]	 for loop
-\\[sh-function]	 function definition
-\\[sh-if]	 if statement
-\\[sh-indexed-loop]	 indexed loop from 1 to n
-\\[sh-while-getopts]	 while getopts loop
-\\[sh-repeat]	 repeat loop
-\\[sh-select]	 select loop
-\\[sh-until]	 until loop
-\\[sh-while]	 while loop
-
-For sh and rc shells indentation commands are:
-\\[smie-config-show-indent]	Show the rules controlling this line's indentation.
-\\[smie-config-set-indent]	Change the rules controlling this line's indentation.
-\\[smie-config-guess]  Try to tweak the indentation rules so the
-buffer indents as it currently is indented.
-
-
-\\[backward-delete-char-untabify]	 Delete backward one position, even if it was a tab.
-\\[sh-end-of-command]	 Go to end of successive commands.
-\\[sh-beginning-of-command]	 Go to beginning of successive commands.
-\\[sh-set-shell]	 Set this buffer's shell, and maybe its magic number.
-\\[sh-execute-region]	 Have optional header and region be executed in a subshell.
-
-`sh-electric-here-document-mode' controls whether insertion of two
-unquoted < insert a here document.  You can control this behavior by
-modifying `sh-mode-hook'.
-
-If you generally program a shell different from your login shell you can
-set `sh-shell-file' accordingly.  If your shell's file name doesn't correctly
-indicate what shell it is use `sh-alias-alist' to translate.
-
-If your shell gives error messages with line numbers, you can use \\[executable-interpret]
-with your script for an edit-interpret-debug cycle."
+This is a generic major mode intended to be inherited by concrete
+implementations.  Currently there are two: `sh-mode' and
+`bash-ts-mode'."
   (make-local-variable 'sh-shell-file)
   (make-local-variable 'sh-shell)
 
