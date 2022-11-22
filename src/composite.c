@@ -1036,36 +1036,13 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
   ptrdiff_t start, end;
   int c;
   Lisp_Object prop, val;
-  /* This is from forward_to_next_line_start in xdisp.c.  */
-  const int MAX_NEWLINE_DISTANCE = 500;
-
-  if (charpos < endpos)
-    {
-      if (endpos > charpos + MAX_NEWLINE_DISTANCE)
-	endpos = charpos + MAX_NEWLINE_DISTANCE;
-    }
-  else if (endpos < charpos)
-    {
-      /* We search backward for a position to check composition.  */
-      if (endpos < 0)
-	{
-	  /* But we don't know where to stop the searching.  */
-	  endpos = NILP (string) ? BEGV - 1 : -1;
-	  /* Usually we don't reach ENDPOS because we stop searching
-	     at an uncomposable character (NL, LRE, etc).  In buffers
-	     with long lines, however, NL might be far away, so
-	     pretend that the buffer is smaller.  */
-	  if (current_buffer->long_line_optimizations_p)
-	    endpos = get_closer_narrowed_begv (cmp_it->parent_it->w, charpos);
-	}
-    }
+  endpos = max (NILP (string) ? BEGV - 1 : -1, endpos);
   cmp_it->id = -1;
   cmp_it->ch = -2;
   cmp_it->reversed_p = 0;
   cmp_it->stop_pos = endpos;
   if (charpos == endpos)
     return;
-  /* FIXME: Bidi is not yet handled well in static composition.  */
   if (charpos < endpos
       && find_composition (charpos, endpos, &start, &end, &prop, string)
       && start >= charpos
@@ -1076,16 +1053,13 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
     }
   if ((NILP (string)
        && NILP (BVAR (current_buffer, enable_multibyte_characters)))
-      || (STRINGP (string) && !STRING_MULTIBYTE (string))
+      || (STRINGP (string) && ! STRING_MULTIBYTE (string))
       || inhibit_auto_composition ())
     return;
   if (bytepos < 0)
-    {
-      if (NILP (string))
-	bytepos = CHAR_TO_BYTE (charpos);
-      else
-	bytepos = string_char_to_byte (string, charpos);
-    }
+    bytepos = NILP (string)
+      ? CHAR_TO_BYTE (charpos)
+      : string_char_to_byte (string, charpos);
 
   start = charpos;
   if (charpos < endpos)

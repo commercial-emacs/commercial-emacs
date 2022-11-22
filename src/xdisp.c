@@ -2935,71 +2935,6 @@ init_iterator (struct it *it, struct window *w,
     }
 }
 
-/* Compute a suitable alternate value for BEGV and ZV that may be used
-   temporarily to optimize display if the buffer in window W contains
-   long lines.  */
-
-static int
-get_narrowed_width (struct window *w)
-{
-  int fact;
-  /* In a character-only terminal, only one font size is used, so we
-     can use a smaller factor.  */
-  fact = EQ (Fterminal_live_p (Qnil), Qt) ? 2 : 3;
-  return fact * window_body_width (w, WINDOW_BODY_IN_CANONICAL_CHARS);
-}
-
-static int
-get_narrowed_len (struct window *w)
-{
-  return get_narrowed_width (w) *
-    window_body_height (w, WINDOW_BODY_IN_CANONICAL_CHARS);
-}
-
-ptrdiff_t
-get_narrowed_begv (struct window *w, ptrdiff_t pos)
-{
-  int len = get_narrowed_len (w);
-  return max ((pos / len - 1) * len, BEGV);
-}
-
-ptrdiff_t
-get_narrowed_zv (struct window *w, ptrdiff_t pos)
-{
-  int len = get_narrowed_len (w);
-  return min ((pos / len + 1) * len, ZV);
-}
-
-ptrdiff_t
-get_closer_narrowed_begv (struct window *w, ptrdiff_t pos)
-{
-  int len = get_narrowed_width (w);
-  return max ((pos / len - 1) * len, BEGV);
-}
-
-static void
-unwind_narrowed_begv (Lisp_Object point_min)
-{
-  SET_BUF_BEGV (current_buffer, XFIXNUM (point_min));
-}
-
-/* Set DST to EXPR.  When IT indicates that BEGV should temporarily be
-   updated to optimize display, evaluate EXPR with BEGV set to BV.  */
-
-#define SET_WITH_NARROWED_BEGV(IT,DST,EXPR,BV)				\
-  do {									\
-    if (IT->narrowed_begv)						\
-      {									\
-	specpdl_ref count = SPECPDL_INDEX ();				\
-	record_unwind_protect (unwind_narrowed_begv, Fpoint_min ());	\
-	SET_BUF_BEGV (current_buffer, BV);				\
-	DST = EXPR;							\
-	unbind_to (count, Qnil);					\
-      }									\
-    else								\
-      DST = EXPR;							\
-  } while (0)
-
 /* Get glyph code of character C in FONT in the two-byte form CHAR2B.
    Return true iff FONT has a glyph for C.  */
 
@@ -6227,9 +6162,7 @@ preceding_line_start (struct it *it)
   ptrdiff_t cp = IT_CHARPOS (*it), bp = IT_BYTEPOS (*it);
 
   dec_both (&cp, &bp);
-  SET_WITH_NARROWED_BEGV (it, IT_CHARPOS (*it),
-			  find_newline_no_quit (cp, bp, -1, &IT_BYTEPOS (*it)),
-			  get_closer_narrowed_begv (it->w, IT_CHARPOS (*it)));
+  IT_CHARPOS (*it) = find_newline_no_quit (cp, bp, -1, &IT_BYTEPOS (*it));
 }
 
 /* Move IT to the next line start.
@@ -6401,8 +6334,7 @@ preceding_line_start_visible (struct it *it)
 
   eassert (it->method != GET_FROM_STRING || IT_STRING_CHARPOS (*it) == 0);
   eassert (IT_CHARPOS (*it) >= BEGV);
-  eassert (it->narrowed_begv > 0 /* long-line optimizations: all bets off */
-	   || IT_CHARPOS (*it) == BEGV
+  eassert (IT_CHARPOS (*it) == BEGV
 	   || FETCH_BYTE (IT_BYTEPOS (*it) - 1) == '\n');
 }
 
@@ -6501,23 +6433,7 @@ static void
 reseat (struct it *it, struct text_pos pos, bool force_p)
 {
   ptrdiff_t original_pos = IT_CHARPOS (*it);
-
   reseat_1 (it, pos, false);
-
-  if (current_buffer->long_line_optimizations_p)
-    {
-      if (!it->narrowed_begv)
-	{
-	  it->narrowed_begv = get_narrowed_begv (it->w, window_point (it->w));
-	  it->narrowed_zv = get_narrowed_zv (it->w, window_point (it->w));
-	}
-      else if ((pos.charpos < it->narrowed_begv || pos.charpos > it->narrowed_zv)
-		&& (!redisplaying_p || it->line_wrap == TRUNCATE))
-	{
-	  it->narrowed_begv = get_narrowed_begv (it->w, pos.charpos);
-	  it->narrowed_zv = get_narrowed_zv (it->w, pos.charpos);
-	}
-    }
 
   /* Determine where to check text properties.  Avoid doing it
      where possible because text property lookup is very expensive.  */
@@ -7706,26 +7622,11 @@ bidi_reseat (struct it *it)
 	 lines be damned.  */
       ptrdiff_t orig_bytepos = it->bidi_it.bytepos;
       if (string_p)
-	{
-	  it->bidi_it.charpos = it->bidi_it.bytepos = 0;
-	}
+	it->bidi_it.charpos = it->bidi_it.bytepos = 0;
       else
-	{
-	  ptrdiff_t bob = (it->narrowed_begv && IT_CHARPOS (*it) >= it->narrowed_begv
-			   ? it->narrowed_begv
-			   : BEGV);
-	  if (it->bidi_it.charpos != bob
-	      && FETCH_BYTE (it->bidi_it.bytepos - 1) != '\n'
-	      && FETCH_BYTE (it->bidi_it.bytepos) != '\n')
-	    {
-	      /* not already at bob or bol */
-	      SET_WITH_NARROWED_BEGV (it, it->bidi_it.charpos,
-				      find_newline_no_quit (IT_CHARPOS (*it),
-							    IT_BYTEPOS (*it), -1,
-							    &it->bidi_it.bytepos),
-				      it->narrowed_begv);
-	    }
-	}
+	it->bidi_it.charpos = find_newline_no_quit (IT_CHARPOS (*it),
+						    IT_BYTEPOS (*it), -1,
+						    &it->bidi_it.bytepos);
       bidi_fetch_char (it->bidi_it.charpos, it->bidi_it.bytepos,
 		       &it->bidi_it.disp_pos, &it->bidi_it.disp_prop,
 		       &it->bidi_it.string, it->bidi_it.w,
@@ -7739,7 +7640,6 @@ bidi_reseat (struct it *it)
       while (it->bidi_it.bytepos != orig_bytepos
              && it->bidi_it.charpos < eob);
     }
-  /* else it->bidi_it.first_elt = false; // must I do this?  */
 
   /*  Adjust IT's position information to where we ended up.  */
   if (STRINGP (it->string))
@@ -15209,7 +15109,6 @@ mark_window_display_accurate_1 (struct window *w, bool accurate_p)
 
       BUF_UNCHANGED_MODIFIED (b) = BUF_MODIFF (b);
       BUF_OVERLAY_UNCHANGED_MODIFIED (b) = BUF_OVERLAY_MODIFF (b);
-      BUF_CHARS_UNCHANGED_MODIFIED (b) = BUF_CHARS_MODIFF (b);
       BUF_BEG_UNCHANGED (b) = BUF_GPT (b) - BUF_BEG (b);
       BUF_END_UNCHANGED (b) = BUF_Z (b) - BUF_GPT (b);
 
@@ -17109,24 +17008,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
         }
     }
 
-  /* Check whether the buffer to be displayed contains long lines.  */
-  if (!NILP (Vlong_line_threshold)
-      && !current_buffer->long_line_optimizations_p
-      && CHARS_MODIFF - BUF_CHARS_UNCHANGED_MODIFIED (current_buffer) > 8)
-    {
-      ptrdiff_t cur, next, found, max = 0, threshold;
-      threshold = XFIXNUM (Vlong_line_threshold);
-      for (cur = BEGV; cur < ZV; cur = next)
-	{
-	  next = find_newline1 (cur, CHAR_TO_BYTE (cur), 0, -1, 1,
-				&found, NULL, true);
-	  if (next - cur > max) max = next - cur;
-	  if (!found || max > threshold) break;
-	}
-      if (max > threshold)
-	current_buffer->long_line_optimizations_p = true;
-    }
-
   /* If window-start is screwed up, choose a new one.  */
   if (XMARKER (w->start)->buffer != current_buffer)
     goto recenter;
@@ -17810,14 +17691,13 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  if (a) the window to its side is being redone and
 	  (b) we do a frame-based redisplay.  This is a consequence
 	  of how inverted lines are drawn in frame-based redisplay.  */
-       || (!just_this_one_p
-	   && !FRAME_WINDOW_P (f)
-	   && !WINDOW_FULL_WIDTH_P (w))
+       || (! just_this_one_p
+	   && ! FRAME_WINDOW_P (f)
+	   && ! WINDOW_FULL_WIDTH_P (w))
        /* Line number to display.  */
        || w->base_line_pos > 0
        /* Column number is displayed and different from the one displayed.  */
        || (w->column_number_displayed != -1
-	   && !current_buffer->long_line_optimizations_p
 	   && (w->column_number_displayed != current_column ())))
       /* This means that the window has a mode line.  */
       && (window_wants_mode_line (w)
@@ -17867,7 +17747,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	goto need_larger_matrices;
     }
 
-  if (!line_number_displayed && w->base_line_pos != -1)
+  if ( !line_number_displayed && w->base_line_pos != -1)
     {
       w->base_line_pos = 0;
       w->base_line_number = 0;
@@ -21105,9 +20985,9 @@ produce_line_number (struct it *it)
 		 numbers, so we cannot use its data if the user wants
 		 line numbers that disregard narrowing, or if the
 		 buffer's narrowing has just changed.  */
-	      && !(line_numbers_wide
-		   && (BEG_BYTE != BEGV_BYTE || Z_BYTE != ZV_BYTE))
-	      && !current_buffer->clip_changed)
+	      && ! (line_numbers_wide
+		    && (BEG_BYTE != BEGV_BYTE || Z_BYTE != ZV_BYTE))
+	      && ! current_buffer->clip_changed)
 	    {
 	      start_from = CHAR_TO_BYTE (it->w->base_line_pos);
 	      last_line = it->w->base_line_number - 1;
@@ -24707,17 +24587,6 @@ decode_mode_spec (struct window *w, register int c, int field_width,
          even crash emacs.)  */
       if (mode_line_target == MODE_LINE_TITLE)
 	return "";
-      else if (b->long_line_optimizations_p)
-	{
-	  char *p = decode_mode_spec_buf;
-	  int pad = width - 2;
-	  while (pad-- > 0)
-	    *p++ = ' ';
-	  *p++ = '?';
-	  *p++ = '?';
-	  *p = '\0';
-	  return decode_mode_spec_buf;
-	}
       else
 	{
 	  ptrdiff_t col = current_column ();
@@ -33394,13 +33263,7 @@ The tool bar style must also show labels for this to have any effect, see
     doc: /* List of functions to call to fontify regions of text.
 Each function is called with one argument POS.  Functions must
 fontify a region starting at POS in the current buffer, and give
-fontified regions the property `fontified' with a non-nil value.
-
-Note that, when the buffer contains one or more lines whose length is
-above `long-line-threshold', these functions are called with the buffer
-narrowed to a small portion around POS, and the narrowing is locked (see
-`narrow-to-region'), so that these functions cannot use `widen' to gain
-access to other portions of buffer text.  */);
+fontified regions the 'fontified property with a non-nil value.  */);
   Vfontification_functions = Qnil;
   Fmake_variable_buffer_local (Qfontification_functions);
 

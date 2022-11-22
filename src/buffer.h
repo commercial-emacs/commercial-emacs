@@ -154,9 +154,6 @@ enum { BEG = 1, BEG_BYTE = BEG };
 #define BUF_BEG_UNCHANGED(buf) ((buf)->text->beg_unchanged)
 #define BUF_END_UNCHANGED(buf) ((buf)->text->end_unchanged)
 
-#define BUF_CHARS_UNCHANGED_MODIFIED(buf) \
-  ((buf)->text->chars_unchanged_modified)
-
 #define UNCHANGED_MODIFIED \
   BUF_UNCHANGED_MODIFIED (current_buffer)
 #define OVERLAY_UNCHANGED_MODIFIED \
@@ -274,9 +271,6 @@ struct buffer_text
      finished; if it matches BUF_OVERLAY_MODIFF, beg_unchanged and
      end_unchanged contain no useful information.  */
   modiff_count overlay_unchanged_modified;
-
-  /* CHARS_MODIFF as of last redisplay that finished.  */
-  modiff_count chars_unchanged_modified;
 
   /* Properties of this buffer's text.  */
   INTERVAL intervals;
@@ -697,10 +691,6 @@ struct buffer
      slowing down en/decoding when a lot of these hooks are
      defined, as well as by with-temp-buffer, for example.  */
   bool_bf inhibit_buffer_hooks : 1;
-
-  /* Non-zero when the buffer contains long lines and specific
-     display optimizations must be used.  */
-  bool_bf long_line_optimizations_p : 1;
 
   /* The inveral tree containing this buffer's overlays. */
   struct itree_tree *overlays;

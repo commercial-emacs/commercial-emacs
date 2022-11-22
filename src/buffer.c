@@ -572,7 +572,6 @@ even if it is dead.  The return value is never nil.  */)
   set_buffer_intervals (b, NULL);
   BUF_UNCHANGED_MODIFIED (b) = 1;
   BUF_OVERLAY_UNCHANGED_MODIFIED (b) = 1;
-  BUF_CHARS_UNCHANGED_MODIFIED (b) = 1;
   BUF_END_UNCHANGED (b) = 0;
   BUF_BEG_UNCHANGED (b) = 0;
   *(BUF_GPT_ADDR (b)) = *(BUF_Z_ADDR (b)) = 0; /* Put an anchor '\0'.  */
@@ -1010,7 +1009,6 @@ reset_buffer (register struct buffer *b)
   /* It is more conservative to start out "changed" than "unchanged".  */
   b->clip_changed = 0;
   b->prevent_redisplay_optimizations_p = 1;
-  b->long_line_optimizations_p = 0;
   bset_backed_up (b, Qnil);
   bset_local_minor_modes (b, Qnil);
   BUF_AUTOSAVE_MODIFF (b) = 0;
@@ -2406,7 +2404,6 @@ results, see Info node `(elisp)Swapping Text'.  */)
   swapfield (bidi_paragraph_cache, struct region_cache *);
   current_buffer->prevent_redisplay_optimizations_p = 1;
   other_buffer->prevent_redisplay_optimizations_p = 1;
-  swapfield (long_line_optimizations_p, bool_bf);
   swapfield_ (undo_list, Lisp_Object);
   swapfield_ (mark, Lisp_Object);
   swapfield_ (mark_active, Lisp_Object); /* Belongs with the `mark'.  */
@@ -5715,14 +5712,6 @@ If `delete-auto-save-files' is nil, any autosave deletion is inhibited.  */);
 	       doc: /* Non-nil means delete auto-save file when a buffer is saved.
 This is the default.  If nil, auto-save file deletion is inhibited.  */);
   delete_auto_save_files = 1;
-
-  DEFVAR_LISP ("long-line-threshold", Vlong_line_threshold,
-           doc: /* Line length above which specific display optimizations are used.
-Display optimizations for long lines will automatically be enabled in
-buffers which contain one or more lines whose length is above that
-threshold.
-When nil, these display optimizations are disabled.  */);
-  Vlong_line_threshold = Qnil;
 
   defsubr (&Sbuffer_monospace_p);
   defsubr (&Sbuffer_live_p);

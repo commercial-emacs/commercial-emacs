@@ -2686,13 +2686,7 @@ DEFUN ("delete-and-extract-region", Fdelete_and_extract_region,
 
 DEFUN ("widen", Fwiden, Swiden, 0, 0, "",
        doc: /* Remove restrictions (narrowing) from current buffer.
-This allows the buffer's full text to be seen and edited.
-
-Note that, when the current buffer contains one or more lines whose
-length is above `long-line-threshold', Emacs may decide to leave, for
-performance reasons, the accessible portion of the buffer unchanged
-after this function is called from low-level hooks, such as
-`jit-lock-functions' or `post-command-hook'.  */)
+This allows the buffer's full text to be seen and edited.  */)
   (void)
 {
   if (! NILP (Vrestrictions_locked))
@@ -2780,13 +2774,7 @@ See also `save-restriction'.
 
 When calling from Lisp, pass two arguments START and END:
 positions (integers or markers) bounding the text that should
-remain visible.
-
-Note that, when the current buffer contains one or more lines whose
-length is above `long-line-threshold', Emacs may decide to leave, for
-performance reasons, the accessible portion of the buffer unchanged
-after this function is called from low-level hooks, such as
-`jit-lock-functions' or `post-command-hook'.  */)
+remain visible.  */)
   (Lisp_Object start, Lisp_Object end)
 {
   return narrow_to_region_internal (start, end, false);
