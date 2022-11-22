@@ -145,6 +145,10 @@ extern char etext;
 #include <sys/resource.h>
 #endif
 
+/* We don't guard this with HAVE_TREE_SITTER because treesit.o is
+   always compiled (to provide treesit-available-p).  */
+#include "treesit.h"
+
 #include "pdumper.h"
 #include "fingerprint.h"
 #include "epaths.h"
@@ -2332,7 +2336,9 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #ifdef HAVE_MODULES
       syms_of_module ();
 #endif
-
+      /* We don't guard this with HAVE_TREE_SITTER because treesit.o
+	 is always compiled (to provide treesit-available-p).  */
+      syms_of_treesit ();
 #ifdef HAVE_SOUND
       syms_of_sound ();
 #endif

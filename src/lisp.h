@@ -969,6 +969,9 @@ enum pvec_type
   PVEC_CONDVAR,
   PVEC_MODULE_FUNCTION,
   PVEC_NATIVE_COMP_UNIT,
+  PVEC_TS_PARSER,
+  PVEC_TS_NODE,
+  PVEC_TS_COMPILED_QUERY,
   PVEC_SQLITE,
   PVEC_TREE_SITTER,
   PVEC_TREE_SITTER_NODE,
@@ -4395,6 +4398,8 @@ extern void update_search_regs (ptrdiff_t oldstart,
 extern void record_unwind_save_match_data (void);
 extern ptrdiff_t fast_string_match_internal (Lisp_Object, Lisp_Object,
 					     Lisp_Object);
+extern ptrdiff_t fast_c_string_match_internal (Lisp_Object, const char *,
+					       ptrdiff_t, Lisp_Object);
 
 INLINE ptrdiff_t
 fast_string_match (Lisp_Object regexp, Lisp_Object string)
@@ -4408,8 +4413,21 @@ fast_string_match_ignore_case (Lisp_Object regexp, Lisp_Object string)
   return fast_string_match_internal (regexp, string, Vascii_canon_table);
 }
 
-extern ptrdiff_t fast_c_string_match_ignore_case (Lisp_Object, const char *,
-						  ptrdiff_t);
+INLINE ptrdiff_t
+fast_c_string_match (Lisp_Object regexp,
+		     const char *string, ptrdiff_t len)
+{
+  return fast_c_string_match_internal (regexp, string, len, Qnil);
+}
+
+INLINE ptrdiff_t
+fast_c_string_match_ignore_case (Lisp_Object regexp,
+				 const char *string, ptrdiff_t len)
+{
+  return fast_c_string_match_internal (regexp, string, len,
+				       Vascii_canon_table);
+}
+
 extern ptrdiff_t fast_looking_at (Lisp_Object, ptrdiff_t, ptrdiff_t,
                                   ptrdiff_t, ptrdiff_t, Lisp_Object);
 extern ptrdiff_t find_newline1 (ptrdiff_t, ptrdiff_t, ptrdiff_t, ptrdiff_t,

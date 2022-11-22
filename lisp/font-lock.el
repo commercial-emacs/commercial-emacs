@@ -464,6 +464,14 @@ If it fontifies a larger region, it should ideally return a list of the form
 \(jit-lock-bounds BEG . END) indicating the bounds of the region actually
 fontified.")
 
+(defvar font-lock-fontify-syntactically-function
+  #'font-lock-default-fontify-syntactically
+  "Function to use for syntactically fontifying a region.
+
+It should take two args, the beginning and end of the region, and
+an optional third arg VERBOSE.  If VERBOSE is non-nil, the
+function should print status messages.")
+
 (defvar font-lock-unfontify-region-function #'font-lock-default-unfontify-region
   "Function to use for unfontifying a region.
 It should take two args, the beginning and end of the region.
@@ -917,7 +925,7 @@ This function is the default `font-lock-fontify-region-function'."
            (setq font-lock-syntactically-fontified end))
          (font-lock-fontify-syntactic-keywords-region start end)))
      (unless font-lock-keywords-only
-       (font-lock-fontify-syntactically-region beg end loudly))
+       (funcall font-lock-fontify-syntactically-function beg end loudly))
      (font-lock-fontify-keywords-region beg end loudly)
      `(jit-lock-bounds ,beg . ,end))))
 
@@ -1236,7 +1244,7 @@ START should be at the beginning of a line."
 (defvar font-lock-comment-end-skip nil
   "If non-nil, Font Lock mode uses this instead of `comment-end-skip'.")
 
-(defun font-lock-fontify-syntactically-region (start end &optional loudly)
+(defun font-lock-default-fontify-syntactically (start end &optional loudly)
   "Put proper face on each string and comment between START and END.
 START should be at the beginning of a line."
   (syntax-propertize end)  ; Apply any needed syntax-table properties.

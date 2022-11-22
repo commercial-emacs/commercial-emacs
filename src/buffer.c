@@ -194,6 +194,13 @@ bset_extra_line_spacing (struct buffer *b, Lisp_Object val)
 {
   b->extra_line_spacing_ = val;
 }
+#ifdef HAVE_TREE_SITTER
+static void
+bset_ts_parser_list (struct buffer *b, Lisp_Object val)
+{
+  b->ts_parser_list_ = val;
+}
+#endif
 static void
 bset_file_format (struct buffer *b, Lisp_Object val)
 {
