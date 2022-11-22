@@ -1005,7 +1005,7 @@ the entire buffer regardless of any narrowing.
 types of text, consider using an alternative facility described in
 @ref{Swapping Text}.
 
-@deffn Command narrow-to-region start end &optional lock
+@deffn Command narrow-to-region start end
 This function sets the accessible portion of the current buffer to start
 at @var{start} and end at @var{end}.  Both arguments should be character
 positions.
