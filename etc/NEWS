@@ -743,14 +743,6 @@ This determines how long to pause Emacs after a process
 filter/sentinel error has been handled.
 
 +++
-** New faces for font-lock.
-These faces are primarily meant for use with tree-sitter.  They are:
-'font-lock-bracket-face', 'font-lock-delimiter-face',
-'font-lock-escape-face', 'font-lock-number-face',
-'font-lock-misc-punctuation-face', 'font-lock-operator-face',
-'font-lock-property-face', and 'font-lock-punctuation-face'.
-
-+++
 ** New face 'variable-pitch-text'.
 This face is like 'variable-pitch' (from which it inherits), but is
 slightly larger, which should help with the visual size differences
@@ -2906,37 +2898,6 @@ Emacs buffers, like indentation and the like.  The new ert function
 ** New mode 'js-json-mode'.
 This is a lightweight variant of 'js-mode' that is used by default
 when visiting JSON files.
-
-
-** New mode 'ts-mode'.
-A major mode based on the tree-sitter library for editing programs
-in the TypeScript language.  It includes support for font-locking,
-indentation, and navigation.
-
-** New mode 'c-ts-mode'.
-A major mode based on the tree-sitter library for editing programs
-in the C language.  It includes support for font-locking,
-indentation, Imenu, which-func, and navigation.
-
-** New mode 'c++-ts-mode'.
-A major mode based on the tree-sitter library for editing programs
-in the C++ language.  It includes support for font-locking,
-indentation, Imenu, which-func, and navigation.
-
-** New mode 'java-ts-mode'.
-A major mode based on the tree-sitter library for editing programs
-in the Java language.  It includes support for font-locking,
-indentation, Imenu, which-func, and navigation.
-
-** New mode 'css-ts-mode'.
-A major mode based on the tree-sitter library for editing programs
-in the CSS language.  It includes support for font-locking,
-indentation, Imenu, which-func, and navigation.
-
-** New mode 'json-ts-mode'.
-A major mode based on the tree-sitter library for editing programs
-in the JSON language.  It includes support for font-locking,
-indentation, Imenu, which-func, and navigation.
 
 
 * Incompatible Lisp Changes in Emacs 29.1

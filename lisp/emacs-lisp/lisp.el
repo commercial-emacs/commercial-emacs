@@ -375,10 +375,7 @@ does not move to the beginning of the line when `defun-prompt-regexp'
 is non-nil.
 
 If variable `beginning-of-defun-function' is non-nil, its value
-is called as a function to find the defun's beginning.
-
-Return non-nil if this function successfully found the beginning
-of a defun, nil if it failed to find one."
+is called as a function to find the defun's beginning."
   (interactive "^p")   ; change this to "P", maybe, if we ever come to pass ARG
                       ; to beginning-of-defun-function.
   (unless arg (setq arg 1))
