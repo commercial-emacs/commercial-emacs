@@ -1036,23 +1036,23 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
   ptrdiff_t start, end;
   int c;
   Lisp_Object prop, val;
-  if (charpos < endpos)
-    // 3ffdafc blamed cafafe0 for the hardcoded constant
-    endpos = min (endpos, charpos + 500);
-  else
-    endpos = max (NILP (string) ? BEGV - 1 : -1, endpos);
   cmp_it->id = -1;
   cmp_it->ch = -2;
   cmp_it->reversed_p = 0;
   cmp_it->stop_pos = endpos;
-  if (charpos == endpos)
+  if (charpos < cmp_it->stop_pos)
+    // 3ffdafc blamed cafafe0 for the hardcoded constant
+    cmp_it->stop_pos = min (cmp_it->stop_pos, charpos + 500);
+  else if (charpos > cmp_it->stop_pos)
+    cmp_it->stop_pos = max (NILP (string) ? BEGV - 1 : -1, cmp_it->stop_pos);
+  if (charpos == cmp_it->stop_pos)
     return;
-  if (charpos < endpos
-      && find_composition (charpos, endpos, &start, &end, &prop, string)
+  if (charpos < cmp_it->stop_pos
+      && find_composition (charpos, cmp_it->stop_pos, &start, &end, &prop, string)
       && start >= charpos
       && composition_valid_p (start, end, prop))
     {
-      cmp_it->stop_pos = endpos = start;
+      cmp_it->stop_pos = start;
       cmp_it->ch = -1;
     }
   if ((NILP (string)
@@ -1066,10 +1066,10 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
       : string_char_to_byte (string, charpos);
 
   start = charpos;
-  if (charpos < endpos)
+  if (charpos < cmp_it->stop_pos)
     {
       /* Forward search.  */
-      while (charpos < endpos)
+      while (charpos < cmp_it->stop_pos)
 	{
 	  c = (STRINGP (string)
 	       ? fetch_string_char_advance (string, &charpos, &bytepos)
@@ -1098,19 +1098,14 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 		}
 	    }
 	}
-      if (charpos == endpos
-	  && !(STRINGP (string) && endpos == SCHARS (string)))
-	{
-	  /* We couldn't find a composition point before ENDPOS.  But,
-	     some character after ENDPOS may be composed with
-	     characters before ENDPOS.  So, we should stop at the safe
-	     point.  */
-	  charpos = endpos - MAX_AUTO_COMPOSITION_LOOKBACK;
-	  if (charpos < start)
-	    charpos = start;
-	}
+      if (charpos == cmp_it->stop_pos
+	  && ! (STRINGP (string) && cmp_it->stop_pos == SCHARS (string)))
+	/* Characters after CMP_IT->STOP_POS could be composed with ones before;
+	   so stop at the safest offset preceding CMP_IT->STOP_POS.  */
+	charpos = max (start, cmp_it->stop_pos - MAX_AUTO_COMPOSITION_LOOKBACK);
+      cmp_it->stop_pos = charpos;
     }
-  else if (charpos > endpos)
+  else if (charpos > cmp_it->stop_pos)
     {
       /* Search backward for a pattern that may be composed and the
 	 position of (possibly) the last character of the match is
@@ -1123,6 +1118,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
       /* Limit byte position used in fast_looking_at.  This is the
 	 byte position of the character after START. */
       ptrdiff_t limit;
+      ptrdiff_t ostop_pos = cmp_it->stop_pos;
 
       if (NILP (string))
 	p = BYTE_POS_ADDR (bytepos);
@@ -1138,7 +1134,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	      Lisp_Object elt = XCAR (val);
 	      if (VECTORP (elt) && ASIZE (elt) == 3
 		  && FIXNATP (AREF (elt, 1))
-		  && charpos - XFIXNAT (AREF (elt, 1)) > endpos)
+		  && charpos - XFIXNAT (AREF (elt, 1)) > ostop_pos)
 		{
 		  ptrdiff_t back = XFIXNAT (AREF (elt, 1));
 		  ptrdiff_t cpos = charpos - back, bpos;
@@ -1179,7 +1175,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 		    }
 		}
 	    }
-	  if (charpos - 1 == endpos)
+	  if (charpos - 1 == ostop_pos)
 	    break;
 	  if (STRINGP (string))
 	    {
@@ -1201,7 +1197,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
       /* Skip all uncomposable characters.  */
       if (NILP (string))
 	{
-	  while (charpos - 1 > endpos && ! char_composable_p (c))
+	  while (charpos - 1 > ostop_pos && ! char_composable_p (c))
 	    {
 	      dec_both (&charpos, &bytepos);
 	      c = FETCH_MULTIBYTE_CHAR (bytepos);
@@ -1209,7 +1205,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	}
       else
 	{
-	  while (charpos - 1 > endpos && ! char_composable_p (c))
+	  while (charpos - 1 > ostop_pos && ! char_composable_p (c))
 	    {
 	      p--;
 	      while (! CHAR_HEAD_P (*p))
@@ -1218,8 +1214,9 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	      c = STRING_CHAR (p);
 	    }
 	}
+      cmp_it->stop_pos = charpos;
     }
-  cmp_it->stop_pos = charpos;
+  eassert (cmp_it->stop_pos == charpos);
 }
 
 /* Check if the character at CHARPOS (and BYTEPOS) is composed
