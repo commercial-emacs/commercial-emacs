@@ -1036,7 +1036,11 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
   ptrdiff_t start, end;
   int c;
   Lisp_Object prop, val;
-  endpos = max (NILP (string) ? BEGV - 1 : -1, endpos);
+  if (charpos < endpos)
+    // 3ffdafc blamed cafafe0 for the hardcoded constant
+    endpos = min (endpos, charpos + 500);
+  else
+    endpos = max (NILP (string) ? BEGV - 1 : -1, endpos);
   cmp_it->id = -1;
   cmp_it->ch = -2;
   cmp_it->reversed_p = 0;
