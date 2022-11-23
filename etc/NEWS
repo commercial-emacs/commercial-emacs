@@ -2191,6 +2191,14 @@ matches.
 ---
 *** New function 'xref-show-xrefs'.
 
++++
+*** New user option 'project-buffer-name-function'.
+This control the name of project-related buffers.
+
+---
+*** 'project-compilation-buffer-name-function' is now obsolete.
+Use the new user option 'project-buffer-name-function' instead.
+
 ** File notifications
 
 +++

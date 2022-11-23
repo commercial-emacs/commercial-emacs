@@ -832,7 +832,8 @@ requires quoting, e.g. `\\[quoted-insert]<space>'."
                                             caller-dir nil t)))
               (project--files-in-directory dir
                                            nil
-                                           (grep-read-files regexp))))))
+                                           (grep-read-files regexp)))))
+         (xref-buffer-name (funcall project-buffer-name-function "xref")))
     (xref-show-xrefs
      (apply-partially #'project--find-regexp-in-files regexp files)
      nil)))
@@ -860,7 +861,8 @@ pattern to search for."
          (files
           (project-files pr (cons
                              (project-root pr)
-                             (project-external-roots pr)))))
+                             (project-external-roots pr))))
+         (xref-buffer-name (funcall project-buffer-name-function "xref")))
     (xref-show-xrefs
      (apply-partially #'project--find-regexp-in-files regexp files)
      nil)))
@@ -1038,7 +1040,8 @@ directories listed in `vc-directory-exclusion-list'."
 (defun project-vc-dir ()
   "Run VC-Dir in the current project's root."
   (interactive)
-  (vc-dir (project-root (project-current t))))
+  (let ((vc-dir-buffer-name (funcall project-buffer-name-function "vc-dir")))
+    (vc-dir (project-root (project-current t)))))
 
 (declare-function comint-check-proc "comint")
 
@@ -1052,13 +1055,13 @@ if one already exists."
   (interactive)
   (require 'comint)
   (let* ((default-directory (project-root (project-current t)))
-         (default-project-shell-name (project-prefixed-buffer-name "shell"))
-         (shell-buffer (get-buffer default-project-shell-name)))
+         (buffer-name (funcall project-buffer-name-function "shell"))
+         (shell-buffer (get-buffer buffer-name)))
     (if (and shell-buffer (not current-prefix-arg))
         (if (comint-check-proc shell-buffer)
             (pop-to-buffer shell-buffer (bound-and-true-p display-comint-buffer-action))
           (shell shell-buffer))
-      (shell (generate-new-buffer-name default-project-shell-name)))))
+      (shell (generate-new-buffer-name buffer-name)))))
 
 ;;;###autoload
 (defun project-eshell ()
@@ -1070,7 +1073,7 @@ if one already exists."
   (interactive)
   (defvar eshell-buffer-name)
   (let* ((default-directory (project-root (project-current t)))
-         (eshell-buffer-name (project-prefixed-buffer-name "eshell"))
+         (eshell-buffer-name (funcall project-buffer-name-function "eshell"))
          (eshell-buffer (get-buffer eshell-buffer-name)))
     (if (and eshell-buffer (not current-prefix-arg))
         (pop-to-buffer eshell-buffer (bound-and-true-p display-comint-buffer-action))
@@ -1081,7 +1084,9 @@ if one already exists."
   "Run `async-shell-command' in the current project's root directory."
   (declare (interactive-only async-shell-command))
   (interactive)
-  (let ((default-directory (project-root (project-current t))))
+  (let ((default-directory (project-root (project-current t)))
+        (shell-command-buffer-name-async (funcall project-buffer-name-function
+                                                  "Async Shell Command")))
     (call-interactively #'async-shell-command)))
 
 ;;;###autoload
@@ -1089,7 +1094,9 @@ if one already exists."
   "Run `shell-command' in the current project's root directory."
   (declare (interactive-only shell-command))
   (interactive)
-  (let ((default-directory (project-root (project-current t))))
+  (let ((default-directory (project-root (project-current t)))
+        (shell-command-buffer-name (funcall project-buffer-name-function
+                                            "Shell Command Output")))
     (call-interactively #'shell-command)))
 
 (declare-function fileloop-continue "fileloop" ())
@@ -1150,6 +1157,32 @@ If non-nil, it overrides `compilation-buffer-name-function' for
                  (const :tag "Prefixed with root directory name"
                         project-prefixed-buffer-name)
                  (function :tag "Custom function")))
+(make-obsolete-variable 'project-compilation-buffer-name-function
+                        'project-buffer-name-function
+                        "29.1")
+
+(defcustom project-buffer-name-function 'project-buffer-name-default
+  "Function to compute the name of a project buffer.
+Function receives one argument, the base buffer name as string.
+It should return the buffer name as string."
+  :version "29.1"
+  :group 'project
+  :type 'function)
+
+(defun project-buffer-name-default (name)
+  "Function to compute buffer names for project commands."
+  (pcase name
+    ("compilation"          (compilation--default-buffer-name name))
+    ("shell"                (project-prefixed-buffer-name name))
+    ("eshell"               (project-prefixed-buffer-name name))
+    ("Shell Command Output" shell-command-buffer-name)
+    ("Async Shell Command"  shell-command-buffer-name-async)
+    ("Buffer List"          Buffer-menu-buffer-name)
+    ("xref"                 xref-buffer-name)
+    ("vc-dir"               vc-dir-buffer-name)
+    (t                      (format "*%s-%s*"
+                                    (project-name (project-current))
+                                    name))))
 
 ;;;###autoload
 (defun project-compile ()
@@ -1157,9 +1190,9 @@ If non-nil, it overrides `compilation-buffer-name-function' for
   (declare (interactive-only compile))
   (interactive)
   (let ((default-directory (project-root (project-current t)))
-        (compilation-buffer-name-function
-         (or project-compilation-buffer-name-function
-             compilation-buffer-name-function)))
+        (compilation-buffer-name-function (lambda (_)
+                                            (funcall project-buffer-name-function
+                                                     "compilation"))))
     (call-interactively #'compile)))
 
 (defcustom project-ignore-buffer-conditions nil
@@ -1245,13 +1278,13 @@ displayed."
 ;;;###autoload
 (defun project-list-buffers (&optional arg)
   "Display a list of project buffers.
-The list is displayed in a buffer named \"*Buffer List*\".
 
 By default, all project buffers are listed except those whose names
 start with a space (which are for internal use).  With prefix argument
 ARG, show only buffers that are visiting files."
   (interactive "P")
-  (let ((pr (project-current t)))
+  (let ((pr (project-current t))
+        (Buffer-menu-buffer-name (funcall project-buffer-name-function "Buffer List")))
     (display-buffer
      (if (version< emacs-version "29.0.50")
          (let ((buf (list-buffers-noselect arg (project-buffers pr))))
@@ -1379,6 +1412,8 @@ Also see the `project-kill-buffers-display-buffer-list' variable."
   (interactive)
   (let* ((pr (project-current t))
          (bufs (project--buffers-to-kill pr))
+         (Buffer-menu-buffer-name (funcall project-buffer-name-function
+                                           "Buffer List"))
          (query-user (lambda ()
                        (yes-or-no-p
                         (format "Kill %d buffers in %s? "
@@ -1391,7 +1426,7 @@ Also see the `project-kill-buffers-display-buffer-list' variable."
           (project-kill-buffers-display-buffer-list
            (when
                (with-current-buffer-window
-                   (get-buffer-create "*Buffer List*")
+                   (get-buffer-create Buffer-menu-buffer-name)
                    `(display-buffer--maybe-at-bottom
                      (dedicated . t)
                      (window-height . (fit-window-to-buffer))

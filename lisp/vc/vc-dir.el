@@ -118,6 +118,10 @@ See `run-hooks'."
   ;; To distinguish files and directories.
   directory)
 
+;;;###autoload
+(defconst vc-dir-buffer-name "*vc-dir*"
+  "Name of the output buffer for `vc-dir' command.")
+
 (defvar vc-ewoc nil)
 
 (defvar vc-dir-process-buffer nil
@@ -1446,7 +1450,8 @@ These are the commands available for use in the file status buffer:
   (unless backend
     (setq backend (vc-responsible-backend dir)))
   (let (pop-up-windows)		      ; based on cvs-examine; bug#6204
-    (pop-to-buffer (vc-dir-prepare-status-buffer "*vc-dir*" dir backend)))
+    (pop-to-buffer (vc-dir-prepare-status-buffer vc-dir-buffer-name
+                                                 dir backend)))
   (if (derived-mode-p 'vc-dir-mode)
       (vc-dir-refresh)
     ;; FIXME: find a better way to pass the backend to `vc-dir-mode'.

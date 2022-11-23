@@ -95,6 +95,9 @@ as it is by default."
   :group 'Buffer-menu
   :version "22.1")
 
+(defconst Buffer-menu-buffer-name "*Buffer List*"
+  "Name of the output buffer for `buffer-menu' and related commands.")
+
 (defvar-local Buffer-menu-files-only nil
   "Non-nil if the current Buffer Menu lists only file buffers.
 This is set by the prefix argument to `buffer-menu' and related
@@ -634,11 +637,11 @@ If FILTER-PREDICATE is non-nil, it should be a function
 that filters out buffers from the list of buffers.
 See more at `Buffer-menu-filter-predicate'."
   (let ((old-buffer (current-buffer))
-	(buffer (get-buffer-create "*Buffer List*")))
+        (buffer (get-buffer-create Buffer-menu-buffer-name)))
     (with-current-buffer buffer
       (Buffer-menu-mode)
       (setq Buffer-menu-files-only
-	    (and files-only (>= (prefix-numeric-value files-only) 0)))
+            (and files-only (>= (prefix-numeric-value files-only) 0)))
       (setq Buffer-menu-filter-predicate filter-predicate)
       (list-buffers--refresh buffer-list old-buffer)
       (tabulated-list-print))
