@@ -547,7 +547,12 @@ casify_region (enum case_action flag, Lisp_Object b, Lisp_Object e)
     }
 
   if (start >= 0)
-    update_compositions (start, end, CHECK_ALL);
+    {
+      /* signal_after_change arguments pertain to characters not
+	 yet written to the buffer!  */
+      signal_after_change (start, end - start - added, end - start);
+      update_compositions (start, end, CHECK_ALL);
+    }
 
   return orig_end + added;
 }
