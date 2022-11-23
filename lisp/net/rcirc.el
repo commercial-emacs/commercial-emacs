@@ -1233,9 +1233,9 @@ If SILENT is non-nil, do not print the message in any irc buffer."
   (let ((response (if noticep "NOTICE" "PRIVMSG")))
     (rcirc-get-buffer-create process target)
     (dolist (msg (rcirc-split-message message))
-      (rcirc-send-string process response target : msg)
       (unless silent
-        (rcirc-print process (rcirc-nick process) response target msg)))))
+        (rcirc-print process (rcirc-nick process) response target msg))
+      (rcirc-send-string process response target : msg))))
 
 (defvar-local rcirc-input-ring nil
   "Ring object for input.")
@@ -2034,7 +2034,7 @@ connection."
                (not (string= sender (rcirc-nick process))))
     (let* ((buffer (rcirc-target-buffer process sender response target text))
            (time (if-let ((time (rcirc-get-tag "time")))
-                     (parse-iso8601-time-string time)
+                     (parse-iso8601-time-string time t)
                    (current-time)))
            (inhibit-read-only t))
       (with-current-buffer buffer
