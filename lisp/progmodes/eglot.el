@@ -1185,9 +1185,7 @@ Each function is passed the server as an argument")
   "Connect to MANAGED-MODES, LANGUAGE-ID, PROJECT, CLASS and CONTACT.
 This docstring appeases checkdoc, that's all."
   (let* ((default-directory (project-root project))
-         (nickname (if (fboundp 'project-name)
-                       (project-name project)
-                     (file-name-base (directory-file-name default-directory))))
+         (nickname (project-name project))
          (readable-name (format "EGLOT (%s/%s)" nickname managed-modes))
          autostart-inferior-process
          server-info
@@ -1505,11 +1503,15 @@ If optional MARKER, return a marker instead"
 (defun eglot--path-to-uri (path)
   "URIfy PATH."
   (let ((truepath (file-truename path)))
-    (if (url-type (url-generic-parse-url truepath))
+    (if (and (url-type (url-generic-parse-url path))
+             ;; It might be MS Windows path which includes a drive
+             ;; letter that looks like a URL scheme (bug#59338)
+             (not (and (eq system-type 'windows-nt)
+                       (file-name-absolute-p truepath))))
         ;; Path is already a URI, so forward it to the LSP server
         ;; untouched.  The server should be able to handle it, since
         ;; it provided this URI to clients in the first place.
-        truepath
+        path
       (concat "file://"
               ;; Add a leading "/" for local MS Windows-style paths.
               (if (and (eq system-type 'windows-nt)
