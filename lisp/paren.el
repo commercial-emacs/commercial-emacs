@@ -392,6 +392,10 @@ Where HERE-BEG..HERE-END is expected to be near point.")
                 (line-end-position))))
     (setq show-paren--context-overlay (make-overlay beg end)))
   (overlay-put show-paren--context-overlay 'display text)
+  ;; Use the (default very high) `show-paren-priority' ensuring that
+  ;; not other overlays shine through (bug#59527).
+  (overlay-put show-paren--context-overlay 'priority
+               show-paren-priority)
   (overlay-put show-paren--context-overlay
                'face `(:box
                        ( :line-width (1 . -1)
