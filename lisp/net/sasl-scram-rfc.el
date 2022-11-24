@@ -45,21 +45,14 @@
 
 ;;; Generic for SCRAM-*
 
-(defvar sasl-scram-gs2-header-function 'sasl-scram-construct-gs2-header
-  "Function to create GS2 header.
-See https://www.rfc-editor.org/rfc/rfc5801#section-4.")
-
-(defun sasl-scram-construct-gs2-header (client)
-  ;; The "n," means the client doesn't support channel binding, and
-  ;; the trailing comma is included as per RFC 5801.
-  (let ((authzid (sasl-client-property client 'authenticator-name)))
-    (concat "n," (and authzid "a=") authzid ",")))
-
 (defun sasl-scram-client-first-message (client _step)
   (let ((c-nonce (sasl-unique-id)))
     (sasl-client-set-property client 'c-nonce c-nonce))
   (concat
-   (funcall sasl-scram-gs2-header-function client)
+   ;; n = client doesn't support channel binding
+   "n,"
+   ;; TODO: where would we get authorization id from?
+   ","
    (sasl-scram--client-first-message-bare client)))
 
 (defun sasl-scram--client-first-message-bare (client)
@@ -84,11 +77,11 @@ See https://www.rfc-editor.org/rfc/rfc5801#section-4.")
 
 	 (c-nonce (sasl-client-property client 'c-nonce))
 	 ;; no channel binding, no authorization id
-         (cbind-input (funcall sasl-scram-gs2-header-function client)))
+	 (cbind-input "n,,"))
     (unless (string-prefix-p c-nonce nonce)
       (sasl-error "Invalid nonce from server"))
     (let* ((client-final-message-without-proof
-            (concat "c=" (base64-encode-string cbind-input t) ","
+	    (concat "c=" (base64-encode-string cbind-input) ","
 		    "r=" nonce))
 	   (password
 	    ;; TODO: either apply saslprep or disallow non-ASCII characters
@@ -120,7 +113,7 @@ See https://www.rfc-editor.org/rfc/rfc5801#section-4.")
 	   (client-proof (funcall string-xor client-key client-signature))
 	   (client-final-message
 	    (concat client-final-message-without-proof ","
-                    "p=" (base64-encode-string client-proof t))))
+		    "p=" (base64-encode-string client-proof))))
       (sasl-client-set-property client 'auth-message auth-message)
       (sasl-client-set-property client 'salted-password salted-password)
       client-final-message)))

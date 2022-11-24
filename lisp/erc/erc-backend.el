@@ -131,8 +131,7 @@
 (defvar erc-active-buffer)
 
 (defvar-local erc-session-password nil
-  "The password used for the current session.
-This should be a string or a function returning a string.")
+  "The password used for the current session.")
 
 (defvar erc-server-responses (make-hash-table :test #'equal)
   "Hash table mapping server responses to their handler hooks.")
@@ -246,13 +245,8 @@ current IRC process is still alive.")
 (make-obsolete-variable 'erc-server-reconnecting
                         "see `erc--server-reconnecting'" "29.1")
 
-(defvar erc--server-reconnecting nil
-  "An alist of buffer-local vars and their values when reconnecting.
-This is for the benefit of local modules and `erc-mode-hook'
-members so they can access buffer-local data from the previous
-session when reconnecting.  Once `erc-reuse-buffers' is retired
-and fully removed, modules can switch to leveraging the
-`permanent-local' property instead.")
+(defvar-local erc--server-reconnecting nil
+  "Non-nil when reconnecting.")
 
 (defvar-local erc-server-timed-out nil
   "Non-nil if the IRC server failed to respond to a ping.")
@@ -605,6 +599,7 @@ TLS (see `erc-session-client-certificate' for more details)."
       (setq erc-server-process process)
       (setq erc-server-quitting nil)
       (setq erc-server-reconnecting nil
+            erc--server-reconnecting nil
             erc--server-reconnect-timer nil)
       (setq erc-server-timed-out nil)
       (setq erc-server-banned nil)
@@ -633,7 +628,7 @@ TLS (see `erc-session-client-certificate' for more details)."
         ;; waiting for a non-blocking connect - keep the user informed
         (erc-display-message nil nil buffer "Opening connection..\n")
       (message "%s...done" msg)
-      (erc--register-connection))))
+      (erc-login)) ))
 
 (declare-function erc-networks--id-given "erc")
 (declare-function erc-open "erc")
@@ -651,11 +646,11 @@ Make sure you are in an ERC buffer when running this."
     (with-current-buffer buffer
       (erc-update-mode-line)
       (erc-set-active-buffer (current-buffer))
+      (setq erc--server-reconnecting t)
       (setq erc-server-last-sent-time 0)
       (setq erc-server-lines-sent 0)
       (let ((erc-server-connect-function (or erc-session-connector
-                                             #'erc-open-network-stream))
-            (erc--server-reconnecting (buffer-local-variables)))
+                                             #'erc-open-network-stream)))
         (erc-open erc-session-server erc-session-port erc-server-current-nick
                   erc-session-user-full-name t erc-session-password
                   nil nil nil erc-session-client-certificate
@@ -770,7 +765,8 @@ When `erc-server-reconnect-attempts' is a number, increment
         (if (not reconnect-p)
             ;; terminate, do not reconnect
             (progn
-              (setq erc--server-reconnect-timer nil)
+              (setq erc--server-reconnecting nil
+                    erc--server-reconnect-timer nil)
               (erc-display-message nil 'error (current-buffer)
                                    'terminated ?e event)
               (set-buffer-modified-p nil))
@@ -924,7 +920,7 @@ nil."
                   cproc (process-status cproc) event erc-server-quitting))
         (if (string-match "^open" event)
             ;; newly opened connection (no wait)
-            (erc--register-connection)
+            (erc-login)
           ;; assume event is 'failed
           (erc-with-all-buffers-of-server cproc nil
                                           (setq erc-server-connected nil))
@@ -1719,7 +1715,7 @@ add things to `%s' instead."
         (cl-pushnew (erc-server-buffer) bufs)
         (erc-set-current-nick nn)
         ;; Rename session, possibly rename server buf and all targets
-        (when erc-server-connected
+        (when (erc-network)
           (erc-networks--id-reload erc-networks--id proc parsed))
         (erc-update-mode-line)
         (setq erc-nick-change-attempt-count 0)
@@ -1729,8 +1725,6 @@ add things to `%s' instead."
          'NICK-you ?n nick ?N nn)
         (run-hook-with-args 'erc-nick-changed-functions nn nick))
        (t
-        (when erc-server-connected
-          (erc-networks--id-reload erc-networks--id proc parsed))
         (erc-handle-user-status-change 'nick (list nick login host) (list nn))
         (erc-display-message parsed 'notice bufs 'NICK ?n nick
                              ?u login ?h host ?N nn))))))
@@ -2393,8 +2387,6 @@ See `erc-display-server-message'." nil
 (declare-function erc-nickname-in-use "erc")
 (define-erc-response-handler (433)
   "Login-time \"nick in use\"." nil
-  (when erc-server-connected
-    (erc-networks--id-reload erc-networks--id proc parsed))
   (erc-nickname-in-use (cadr (erc-response.command-args parsed))
                        "already in use"))
 
