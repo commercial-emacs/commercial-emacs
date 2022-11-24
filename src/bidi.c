@@ -396,8 +396,8 @@ bidi_copy_it (struct bidi_it *to, struct bidi_it *from)
    in units of struct bidi_it size.  If we allow unlimited growth, we
    could run out of memory for pathologically long bracketed text or
    very long text lines that need to be reordered.  This is aggravated
-   when word-wrap is in effect, since then functions display_line and
-   emulate_display_line need to keep up to 4 copies of the
+   when word-wrap is in effect, since then functions display_sline and
+   emulate_display_sline need to keep up to 4 copies of the
    cache.
 
    This limitation means there can be no more than that amount of

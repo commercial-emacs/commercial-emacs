@@ -69,7 +69,7 @@ static Lisp_Object minibuf_prompt;
 
 static Lisp_Object MB_frame;
 
-/* Width of current mini-buffer prompt.  Only set after display_line
+/* Width of current mini-buffer prompt.  Only set after display_sline
    of the line that contains the prompt.  */
 
 static ptrdiff_t minibuf_prompt_width;
