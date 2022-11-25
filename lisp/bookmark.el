@@ -38,13 +38,6 @@
 (require 'fringe) ; for builds --without-x
 (eval-when-compile (require 'cl-lib))
 
-;;; Misc comments:
-;;
-;; The bookmark list is sorted lexically by default, but you can turn
-;; this off by setting bookmark-sort-flag to nil.  If it is nil, then
-;; the list will be presented in the order it is recorded
-;; (chronologically), which is actually fairly useful as well.
-
 ;;; User Variables
 
 (defgroup bookmark nil
@@ -116,16 +109,16 @@ just use the value of `version-control'."
 
 
 (defcustom bookmark-sort-flag t
-  "This controls the bookmark display sorting.
-nil means they will be displayed in LIFO order (that is, most
-recently created ones come first, oldest ones come last).
+  "Controls the bookmark display sorting.
 
-`last-modified' means that bookmarks will be displayed sorted
-from most recently modified to least recently modified.
-
-Other values means that bookmarks will be displayed sorted by
-bookmark name."
+A value of t means to display bookmarks sorted by name.  A value
+of `type' means to display bookmarks sorted by type.  A value of
+`file' means to display bookmarks sorted by file.  A value of
+`last-modified' means to display bookmarks by modification time.
+A value of nil means to display bookmarks by creation time."
   :type '(choice (const :tag "By name" t)
+                 (const :tag "By type" type)
+                 (const :tag "By file" file)
                  (const :tag "By modified time" last-modified)
                  (const :tag "By creation time" nil)))
 
@@ -524,14 +517,22 @@ See user option `bookmark-fringe-mark'."
                 (delete-overlay (setq found temp))))))))))
 
 (defun bookmark-maybe-sort-alist ()
-  "Return `bookmark-alist' for display.
-If `bookmark-sort-flag' is T, then return a sorted by name copy of the alist.
-If `bookmark-sort-flag' is LAST-MODIFIED, then return a sorted by last modified
-copy of the alist.  Otherwise, just return `bookmark-alist', which by default
-is ordered from most recently created to least recently created bookmark."
+  "Return a copy of `bookmark-alist' for display.
+
+The sort order is controlled by `bookmark-sort-flag'."
   (let ((copy (copy-alist bookmark-alist)))
     (cond ((eq bookmark-sort-flag t)
-           (sort copy (lambda (x y) (string-lessp (car x) (car y)))))
+           (sort copy (lambda (x y)
+                        (string-collate-lessp  (bookmark-name-from-full-record x)
+                                               (bookmark-name-from-full-record y)))))
+          ((eq bookmark-sort-flag 'type)
+           (sort copy (lambda (x y)
+                        (string-collate-lessp (bookmark-type-from-full-record x)
+                                              (bookmark-type-from-full-record y)))))
+          ((eq bookmark-sort-flag 'file)
+           (sort copy (lambda (x y)
+                        (string-collate-lessp (bookmark-location x)
+                                              (bookmark-location y)))))
           ((eq bookmark-sort-flag 'last-modified)
            (sort copy (lambda (x y)
                         (let ((tx (bookmark-get-last-modified x))
@@ -1903,6 +1904,12 @@ Don't affect the buffer ring order."
     (cond ((eq bookmark-sort-flag t)
            (setq tabulated-list-sort-key '("Bookmark Name" . nil)
                  tabulated-list-entries entries))
+          ((eq bookmark-sort-flag 'type)
+           (setq tabulated-list-sort-key '("Type" . nil)
+                 tabulated-list-entries entries))
+          ((eq bookmark-sort-flag 'file)
+           (setq tabulated-list-sort-key '("File" . nil)
+                 tabulated-list-entries entries))
           ((or (null bookmark-sort-flag)
                (eq bookmark-sort-flag 'last-modified))
            (setq tabulated-list-sort-key nil)
@@ -1971,16 +1978,10 @@ Each line describes one of the bookmarks in Emacs.
 Letters do not insert themselves; instead, they are commands.
 Bookmark names preceded by a \"*\" have annotations.
 
-If `bookmark-sort-flag' is non-nil, then sort the list by
-bookmark name (case-insensitively, in collation order); the
-direction of that sort can be reversed by using the column sort
-toggle for the bookmark name column.
-
-If `bookmark-sort-flag' is nil, then sort the list by bookmark
-creation order, with most recently created bookmarks on top.
-However, the column sort toggle will still activate (and
-thereafter toggle the direction of) lexical sorting by bookmark name.
-At any time you may use \\[revert-buffer] to go back to sorting by creation order.
+The sort order can be controlled with `bookmark-sort-flag'.  The
+sort direction can be reversed by using the column sort toggle
+for the bookmark name column.  At any time you may use
+\\[revert-buffer] to go back to the original sort order.
 
 \\<bookmark-bmenu-mode-map>
 \\[bookmark-bmenu-mark] -- mark bookmark to be displayed.
@@ -2015,8 +2016,7 @@ At any time you may use \\[revert-buffer] to go back to sorting by creation orde
 \\[bookmark-bmenu-show-all-annotations] -- show the annotations of all bookmarks in another buffer.
 \\[bookmark-bmenu-edit-annotation] -- edit the annotation for the current bookmark.
 \\[bookmark-bmenu-search] -- incrementally search for bookmarks.
-\\[revert-buffer] -- refresh the buffer, and thus refresh the sort order (useful
-  if `bookmark-sort-flag' is nil)."
+\\[revert-buffer] -- refresh the buffer, and thus refresh the sort order."
   (setq truncate-lines t)
   (setq buffer-read-only t)
   ;; FIXME: The header could also display the current default bookmark file
@@ -2029,9 +2029,6 @@ At any time you may use \\[revert-buffer] to go back to sorting by creation orde
           ,@(if bookmark-bmenu-toggle-filenames
                 '(("File" 0 bookmark-bmenu--file-predicate)))])
   (setq tabulated-list-padding bookmark-bmenu-marks-width)
-  (when (and bookmark-sort-flag
-             (not (eq bookmark-sort-flag 'last-modified)))
-    (setq tabulated-list-sort-key '("Bookmark Name" . nil)))
   (add-hook 'tabulated-list-revert-hook #'bookmark-bmenu--revert nil t)'
   (setq revert-buffer-function 'bookmark-bmenu--revert)
   (tabulated-list-init-header))
