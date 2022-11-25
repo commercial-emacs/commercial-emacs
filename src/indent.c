@@ -877,17 +877,20 @@ The return value is the column where the insertion ends.  */)
 
 
 DEFUN ("current-indentation", Fcurrent_indentation, Scurrent_indentation,
-       0, 0, 0,
+       0, 1, 0,
        doc: /* Return the indentation of the current line.
 This is the horizontal position of the character following any initial
 whitespace.
 Text that has an invisible property is considered as having width 0, unless
 `buffer-invisibility-spec' specifies that it is replaced by an ellipsis.  */)
-  (void)
+  (Lisp_Object pos)
 {
   ptrdiff_t posbyte;
-
-  find_newline (PT, PT_BYTE, BEGV, BEGV_BYTE, -1, NULL, &posbyte, 1);
+  if (NILP (pos))
+    pos = Fpoint ();
+  CHECK_FIXNUM (pos);
+  find_newline (XFIXNUM (pos), CHAR_TO_BYTE (XFIXNUM (pos)), BEGV, BEGV_BYTE,
+		-1, NULL, &posbyte, 1);
   return make_fixnum (position_indentation (posbyte));
 }
 

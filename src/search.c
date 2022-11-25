@@ -644,15 +644,14 @@ newline_cache_on_off (struct buffer *buf)
    If COUNT is negative, search backwards for the -COUNTth instance;
    END must be <= START.
 
-   If COUNT is zero, do anything you please; run rogue, for all I care.
+   If COUNT is zero, behavior is undefined.
 
    If END is zero, use BEGV or ZV instead, as appropriate for the
    direction indicated by COUNT.  If START_BYTE is -1 it is unknown,
    and similarly for END_BYTE.
 
    If we find COUNT instances, set *COUNTED to COUNT, and return the
-   position past the COUNTth match.  Note that for reverse motion
-   this is not the same as the usual convention for Emacs motion commands.
+   position *after* the COUNTth match, even when COUNT is negative.
 
    If we don't find COUNT instances before reaching END, set *COUNTED
    to the number of newlines left found (negated if COUNT is negative),

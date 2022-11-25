@@ -21,7 +21,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <ctype.h>
 
 #include "lisp.h"
+#include "dispextern.h"
 #include "tree-sitter.h"
+#include "window.h"
 
 typedef TSLanguage *(*TSLanguageFunctor) (void);
 typedef Lisp_Object (*HighlightsFunctor) (const TSHighlightEventSlice *, TSNode, const char **);
@@ -1334,14 +1336,46 @@ DEFUN ("tree-sitter-calculate-indent",
 		  if (node_beg < capture_beg)
 		    continue; /* next slice_index; no indents apply. */
 
+		  if (0 == strcmp ("comment",
+				   ts_node_type (XTREE_SITTER_NODE (node)->node))
+		      && line_node_beg != line_target_pt)
+		    {
+		      struct text_pos pt;
+		      void *itdata = bidi_shelve_cache ();
+		      struct it it;
+		      ptrdiff_t bytepos = node_beg;
+		      ptrdiff_t comment_start = 0;
+
+		      /* Note the indentation of the following line:
+			 Preceding line's indent + (2 for delim) + (1 space).
+			 (Assuming space fails for say #foo in bash).  */
+		      for ( ;
+			    bytepos != ZV && ! isspace (FETCH_CHAR (bytepos));
+			    ++bytepos, ++comment_start);
+		      for ( ;
+			    bytepos != ZV && isspace (FETCH_CHAR (bytepos));
+			    ++bytepos, ++comment_start);
+
+		      SET_TEXT_POS (pt, PT, PT_BYTE);
+		      start_move_it (&it, decode_live_window (selected_window), pt);
+		      move_it_dvpos (&it, -1);
+		      move_it_dvpos (&it, 0);
+		      result += XFIXNUM (Fcurrent_indentation
+					 (make_fixnum (IT_CHARPOS (it))));
+		      result = max (comment_start, result);
+		      bidi_unshelve_cache (itdata, 0);
+		    }
+
 		  if (0 == strcmp (capture_name, "zero_indent"))
 		    {
-		      result = 0;
 		      goto next_parent; /* !!! */
 		    }
 		  else if (0 == strcmp (capture_name, "ignore"))
 		    {
 		      ignored_line = true;
+		    }
+		  else if (0 == strcmp (capture_name, "auto"))
+		    {
 		    }
 		  else if (0 == strcmp (capture_name, "branch")
 			   && line_node_beg == line_target_pt)
@@ -1405,7 +1439,8 @@ DEFUN ("tree-sitter-calculate-indent",
 			      /* align to left paren on previous line.  */
 			      ptrdiff_t delimiter_beg =
 				SITTER_TO_BUFFER (ts_node_start_byte (delimiter_node));
-			      result += delimiter_beg;
+			      result += XFIXNUM (Fcurrent_indentation
+						 (make_fixnum (delimiter_beg)));
 			      goto done; /* since delimiter_beg is absolute.  */
 			    }
 			}
@@ -1416,7 +1451,6 @@ DEFUN ("tree-sitter-calculate-indent",
 	      if (ignored_line && ! dented_line)
 		{
 		  // unclear
-		  result = 0;
 		  goto done;
 		}
 	      for (;;)
