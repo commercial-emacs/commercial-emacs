@@ -80,7 +80,6 @@
 (ert-deftest server-tests/server-start/stop-prompt-with-client ()
   "Ensure that stopping the server prompts when there are clients."
   (skip-unless (not (server-running-p server-name)))
-  (skip-unless (not (getenv "CI")))
   (server-tests/with-server
     (let ((yes-or-no-p-called nil)
           (emacsclient (server-tests/start-emacsclient "-c")))
@@ -94,7 +93,6 @@
 
 (ert-deftest server-tests/server-start/no-stop-prompt-without-client ()
   "Ensure that stopping the server doesn't prompt when there are no clients."
-  (skip-unless (not (server-running-p server-name)))
   (server-tests/with-server
     (let ((yes-or-no-p-called nil))
       (cl-letf (((symbol-function 'yes-or-no-p)
@@ -106,7 +104,6 @@
 
 (ert-deftest server-tests/emacsclient/server-edit ()
   "Test that calling `server-edit' from a client buffer exits the client."
-  (skip-unless (not (server-running-p server-name)))
   (server-tests/with-server
     (let ((emacsclient (server-tests/start-emacsclient "file.txt")))
       (server-tests/wait-until (get-buffer "file.txt"))
@@ -119,7 +116,6 @@
 (ert-deftest server-tests/emacsclient/create-frame ()
   "Test that \"emacsclient -c\" creates a frame."
   (skip-unless (not (server-running-p server-name)))
-  (skip-unless (not (getenv "CI")))
   (server-tests/with-server
     (let ((emacsclient (server-tests/start-emacsclient "-c")))
       (server-tests/wait-until (length= (frame-list) 2))
@@ -132,7 +128,6 @@
 
 (ert-deftest server-tests/emacsclient/eval ()
   "Test that \"emacsclient --eval\" works correctly."
-  (skip-unless (not (server-running-p server-name)))
   (server-tests/with-server
     (let ((value (random)))
       (server-tests/start-emacsclient
@@ -148,7 +143,6 @@ tests that `server-force-stop' doesn't delete frames (and even
 then, requires a few tricks to run as a regression test).  So
 long as this works, the problem in bug#58877 shouldn't occur."
   (skip-unless (not (server-running-p server-name)))
-  (skip-unless (not (getenv "CI")))
   (let (terminal)
     (unwind-protect
         (server-tests/with-server
