@@ -54,6 +54,7 @@ DEF_DLL_FN (SQLITE_API const char*, sqlite3_errmsg, (sqlite3*));
 #if SQLITE_VERSION_NUMBER >= 3007015
 DEF_DLL_FN (SQLITE_API const char*, sqlite3_errstr, (int));
 #endif
+DEF_DLL_FN (SQLITE_API const char*, sqlite3_libversion, (void));
 DEF_DLL_FN (SQLITE_API int, sqlite3_step, (sqlite3_stmt*));
 DEF_DLL_FN (SQLITE_API int, sqlite3_changes, (sqlite3*));
 DEF_DLL_FN (SQLITE_API int, sqlite3_column_count, (sqlite3_stmt*));
@@ -95,6 +96,7 @@ DEF_DLL_FN (SQLITE_API int, sqlite3_load_extension,
 # if SQLITE_VERSION_NUMBER >= 3007015
 #  undef sqlite3_errstr
 # endif
+# undef sqlite3_libversion
 # undef sqlite3_step
 # undef sqlite3_changes
 # undef sqlite3_column_count
@@ -123,6 +125,7 @@ DEF_DLL_FN (SQLITE_API int, sqlite3_load_extension,
 # if SQLITE_VERSION_NUMBER >= 3007015
 #  define sqlite3_errstr fn_sqlite3_errstr
 # endif
+# define sqlite3_libversion fn_sqlite3_libversion
 # define sqlite3_step fn_sqlite3_step
 # define sqlite3_changes fn_sqlite3_changes
 # define sqlite3_column_count fn_sqlite3_column_count
@@ -154,6 +157,7 @@ load_dll_functions (HMODULE library)
 #if SQLITE_VERSION_NUMBER >= 3007015
   LOAD_DLL_FN (library, sqlite3_errstr);
 #endif
+  LOAD_DLL_FN (library, sqlite3_libversion);
   LOAD_DLL_FN (library, sqlite3_step);
   LOAD_DLL_FN (library, sqlite3_changes);
   LOAD_DLL_FN (library, sqlite3_column_count);
@@ -802,6 +806,7 @@ syms_of_sqlite (void)
   defsubr (&Ssqlite_columns);
   defsubr (&Ssqlite_more_p);
   defsubr (&Ssqlite_finalize);
+  defsubr (&Ssqlite_version);
   DEFSYM (Qset, "set");
   DEFSYM (Qfull, "full");
 
