@@ -766,6 +766,15 @@ This will free the resources held by SET.  */)
   return Qt;
 }
 
+DEFUN ("sqlite-version", Fsqlite_version, Ssqlite_version, 0, 0, 0,
+       doc: /* SQLite library version string.  */)
+  (void)
+{
+  if (!init_sqlite_functions ())
+    error ("sqlite support is not available");
+  return build_string (sqlite3_libversion ());
+}
+
 DEFUN ("sqlitep", Fsqlitep, Ssqlitep, 1, 1, 0,
        doc: /* Say whether OBJECT is an SQlite object.  */)
   (Lisp_Object object)
