@@ -511,7 +511,7 @@ backend implementation of `project-external-roots'.")
 (cl-defmethod project-files ((project (head vc)) &optional dirs)
   (mapcan
    (lambda (dir)
-     (let ((ignores (project--value-in-dir 'project-vc-ignores dir))
+     (let ((ignores project-vc-ignores)
            backend)
        (if (and (file-equal-p dir (cdr project))
                 (setq backend (or (vc-file-getprop dir 'vc-backend)
@@ -576,7 +576,7 @@ backend implementation of `project-external-roots'.")
               (split-string
                (apply #'vc-git--run-command-string nil "ls-files" args)
                "\0" t)))
-       (when (project--vc-merge-submodules-p default-directory)
+       (when project-vc-merge-submodules
          ;; Unfortunately, 'ls-files --recurse-submodules' conflicts with '-o'.
          (let* ((submodules (project--git-submodules))
                 (sub-files
@@ -609,11 +609,6 @@ backend implementation of `project-external-roots'.")
          (mapcar
           (lambda (s) (concat default-directory s))
           (split-string (buffer-string) "\0" t)))))))
-
-(defun project--vc-merge-submodules-p (dir)
-  (project--value-in-dir
-   'project-vc-merge-submodules
-   dir))
 
 (defun project--git-submodules ()
   ;; 'git submodule foreach' is much slower.
@@ -656,7 +651,7 @@ backend implementation of `project-external-roots'.")
          (condition-case nil
              (vc-call-backend backend 'ignore-completion-table root)
            (vc-not-supported () nil)))))
-     (project--value-in-dir 'project-vc-ignores root)
+     project-vc-ignores
      (mapcar
       (lambda (dir)
         (concat dir "/"))
@@ -687,16 +682,9 @@ DIRS must contain directory names."
   ;; Sidestep the issue of expanded/abbreviated file names here.
   (cl-set-difference files dirs :test #'file-in-directory-p))
 
-(defun project--value-in-dir (var dir)
-  (with-temp-buffer
-    (setq default-directory dir)
-    (let ((enable-local-variables :all))
-      (hack-dir-local-variables-non-file-buffer))
-    (symbol-value var)))
-
 (cl-defmethod project-buffers ((project (head vc)))
   (let* ((root (expand-file-name (file-name-as-directory (project-root project))))
-         (modules (unless (or (project--vc-merge-submodules-p root)
+         (modules (unless (or project-vc-merge-submodules
                               (project--submodule-p root))
                     (mapcar
                      (lambda (m) (format "%s%s/" root m))
