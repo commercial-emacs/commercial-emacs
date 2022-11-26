@@ -215,7 +215,6 @@ int main ()
            LIBS="$LIBS $LIBMULTITHREAD"])
         AC_RUN_IFELSE(
           [AC_LANG_SOURCE([[
-#include <limits.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -231,16 +230,14 @@ sigint_handler (int sig)
 int main ()
 {
   sigset_t set;
-  pid_t pid = getpid ();
+  int pid = getpid ();
   char command[80];
-  if (LONG_MAX < pid)
-    return 6;
   signal (SIGINT, sigint_handler);
   sigemptyset (&set);
   sigaddset (&set, SIGINT);
   if (!(pthread_sigmask (SIG_BLOCK, &set, NULL) == 0))
     return 1;
-  sprintf (command, "sh -c 'sleep 1; kill -INT %ld' &", (long) pid);
+  sprintf (command, "sh -c 'sleep 1; kill -%d %d' &", SIGINT, pid);
   if (!(system (command) == 0))
     return 2;
   sleep (2);

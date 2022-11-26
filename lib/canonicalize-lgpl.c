@@ -48,7 +48,6 @@
 #else
 # define __canonicalize_file_name canonicalize_file_name
 # define __realpath realpath
-# define __strdup strdup
 # include "pathmax.h"
 # define __faccessat faccessat
 # if defined _WIN32 && !defined __CYGWIN__
@@ -181,16 +180,27 @@ get_path_max (void)
   return path_max < 0 ? 1024 : path_max <= IDX_MAX ? path_max : IDX_MAX;
 }
 
-/* Scratch buffers used by realpath_stk and managed by __realpath.  */
-struct realpath_bufs
-{
-  struct scratch_buffer rname;
-  struct scratch_buffer extra;
-  struct scratch_buffer link;
-};
+/* Act like __realpath (see below), with an additional argument
+   rname_buf that can be used as temporary storage.
 
+   If GCC_LINT is defined, do not inline this function with GCC 10.1
+   and later, to avoid creating a pointer to the stack that GCC
+   -Wreturn-local-addr incorrectly complains about.  See:
+   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=93644
+   Although the noinline attribute can hurt performance a bit, no better way
+   to pacify GCC is known; even an explicit #pragma does not pacify GCC.
+   When the GCC bug is fixed this workaround should be limited to the
+   broken GCC versions.  */
+# if __GNUC_PREREQ (10, 1)
+#  if defined GCC_LINT || defined lint
+__attribute__ ((__noinline__))
+#  elif __OPTIMIZE__ && !__NO_INLINE__
+#   define GCC_BOGUS_WRETURN_LOCAL_ADDR
+#  endif
+# endif
 static char *
-realpath_stk (const char *name, char *resolved, struct realpath_bufs *bufs)
+realpath_stk (const char *name, char *resolved,
+              struct scratch_buffer *rname_buf)
 {
   char *dest;
   char const *start;
@@ -215,7 +225,12 @@ realpath_stk (const char *name, char *resolved, struct realpath_bufs *bufs)
       return NULL;
     }
 
-  char *rname = bufs->rname.data;
+  struct scratch_buffer extra_buffer, link_buffer;
+  scratch_buffer_init (&extra_buffer);
+  scratch_buffer_init (&link_buffer);
+  scratch_buffer_init (rname_buf);
+  char *rname_on_stack = rname_buf->data;
+  char *rname = rname_on_stack;
   bool end_in_extra_buffer = false;
   bool failed = true;
 
@@ -225,16 +240,16 @@ realpath_stk (const char *name, char *resolved, struct realpath_bufs *bufs)
 
   if (!IS_ABSOLUTE_FILE_NAME (name))
     {
-      while (!__getcwd (bufs->rname.data, bufs->rname.length))
+      while (!__getcwd (rname, rname_buf->length))
         {
           if (errno != ERANGE)
             {
               dest = rname;
               goto error;
             }
-          if (!scratch_buffer_grow (&bufs->rname))
-            return NULL;
-          rname = bufs->rname.data;
+          if (!scratch_buffer_grow (rname_buf))
+            goto error_nomem;
+          rname = rname_buf->data;
         }
       dest = __rawmemchr (rname, '\0');
       start = name;
@@ -288,13 +303,13 @@ realpath_stk (const char *name, char *resolved, struct realpath_bufs *bufs)
           if (!ISSLASH (dest[-1]))
             *dest++ = '/';
 
-          while (rname + bufs->rname.length - dest
+          while (rname + rname_buf->length - dest
                  < startlen + sizeof dir_suffix)
             {
               idx_t dest_offset = dest - rname;
-              if (!scratch_buffer_grow_preserve (&bufs->rname))
-                return NULL;
-              rname = bufs->rname.data;
+              if (!scratch_buffer_grow_preserve (rname_buf))
+                goto error_nomem;
+              rname = rname_buf->data;
               dest = rname + dest_offset;
             }
 
@@ -305,13 +320,13 @@ realpath_stk (const char *name, char *resolved, struct realpath_bufs *bufs)
           ssize_t n;
           while (true)
             {
-              buf = bufs->link.data;
-              idx_t bufsize = bufs->link.length;
+              buf = link_buffer.data;
+              idx_t bufsize = link_buffer.length;
               n = __readlink (rname, buf, bufsize - 1);
               if (n < bufsize - 1)
                 break;
-              if (!scratch_buffer_grow (&bufs->link))
-                return NULL;
+              if (!scratch_buffer_grow (&link_buffer))
+                goto error_nomem;
             }
           if (0 <= n)
             {
@@ -323,7 +338,7 @@ realpath_stk (const char *name, char *resolved, struct realpath_bufs *bufs)
 
               buf[n] = '\0';
 
-              char *extra_buf = bufs->extra.data;
+              char *extra_buf = extra_buffer.data;
               idx_t end_idx IF_LINT (= 0);
               if (end_in_extra_buffer)
                 end_idx = end - extra_buf;
@@ -331,13 +346,13 @@ realpath_stk (const char *name, char *resolved, struct realpath_bufs *bufs)
               if (INT_ADD_OVERFLOW (len, n))
                 {
                   __set_errno (ENOMEM);
-                  return NULL;
+                  goto error_nomem;
                 }
-              while (bufs->extra.length <= len + n)
+              while (extra_buffer.length <= len + n)
                 {
-                  if (!scratch_buffer_grow_preserve (&bufs->extra))
-                    return NULL;
-                  extra_buf = bufs->extra.data;
+                  if (!scratch_buffer_grow_preserve (&extra_buffer))
+                    goto error_nomem;
+                  extra_buf = extra_buffer.data;
                 }
               if (end_in_extra_buffer)
                 end = extra_buf + end_idx;
@@ -389,30 +404,20 @@ realpath_stk (const char *name, char *resolved, struct realpath_bufs *bufs)
 
 error:
   *dest++ = '\0';
-  if (resolved != NULL)
+  if (resolved != NULL && dest - rname <= get_path_max ())
+    rname = strcpy (resolved, rname);
+
+error_nomem:
+  scratch_buffer_free (&extra_buffer);
+  scratch_buffer_free (&link_buffer);
+
+  if (failed || rname == resolved)
     {
-      /* Copy the full result on success or partial result if failure was due
-         to the path not existing or not being accessible.  */
-      if ((!failed || errno == ENOENT || errno == EACCES)
-          && dest - rname <= get_path_max ())
-        {
-          strcpy (resolved, rname);
-          if (failed)
-            return NULL;
-          else
-            return resolved;
-        }
-      if (!failed)
-        __set_errno (ENAMETOOLONG);
-      return NULL;
+      scratch_buffer_free (rname_buf);
+      return failed ? NULL : resolved;
     }
-  else
-    {
-      if (failed)
-        return NULL;
-      else
-        return __strdup (bufs->rname.data);
-    }
+
+  return scratch_buffer_dupfree (rname_buf, dest - rname);
 }
 
 /* Return the canonical absolute name of file NAME.  A canonical name
@@ -429,15 +434,12 @@ error:
 char *
 __realpath (const char *name, char *resolved)
 {
-  struct realpath_bufs bufs;
-  scratch_buffer_init (&bufs.rname);
-  scratch_buffer_init (&bufs.extra);
-  scratch_buffer_init (&bufs.link);
-  char *result = realpath_stk (name, resolved, &bufs);
-  scratch_buffer_free (&bufs.link);
-  scratch_buffer_free (&bufs.extra);
-  scratch_buffer_free (&bufs.rname);
-  return result;
+  #ifdef GCC_BOGUS_WRETURN_LOCAL_ADDR
+   #warning "GCC might issue a bogus -Wreturn-local-addr warning here."
+   #warning "See <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=93644>."
+  #endif
+  struct scratch_buffer rname_buffer;
+  return realpath_stk (name, resolved, &rname_buffer);
 }
 libc_hidden_def (__realpath)
 versioned_symbol (libc, __realpath, realpath, GLIBC_2_3);
