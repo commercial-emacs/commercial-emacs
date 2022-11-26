@@ -731,6 +731,7 @@ server or call `\\[server-force-delete]' to forcibly disconnect it."))
 			       :service server-file
 			       :plist '(:authenticated t)))))
 	  (unless server-process (error "Could not start server process"))
+          (server-log "Starting server")
 	  (process-put server-process :server-file server-file)
           (setq server-mode t)
           (push 'server-mode global-minor-modes)
