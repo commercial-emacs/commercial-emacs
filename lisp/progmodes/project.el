@@ -460,7 +460,7 @@ backend implementation of `project-external-roots'.")
                       (if (and
                            ;; FIXME: Invalidate the cache when the value
                            ;; of this variable changes.
-                           (project--vc-merge-submodules-p root)
+                           project-vc-merge-submodules
                            (project--submodule-p root))
                           (let* ((parent (file-name-directory
                                           (directory-file-name root))))
