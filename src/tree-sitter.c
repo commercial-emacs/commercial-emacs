@@ -1121,22 +1121,29 @@ DEFUN ("tree-sitter-calculate-indent",
     {
       static Lisp_Object cache = LISPSYM_INITIALLY (Qnil);
       struct Lisp_Hash_Table *h;
-      Lisp_Object hash;
+      Lisp_Object hash, key;
       ptrdiff_t i;
 
       if (NILP (cache))
 	{
-	  cache = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
+	  cache = make_hash_table (hashtest_equal, DEFAULT_HASH_SIZE,
 				   DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
 				   Qnil, false);
 	  staticpro (&cache);
 	}
       h = XHASH_TABLE (cache);
-      i = hash_lookup (h, XTREE_SITTER (sitter)->progmode, &hash);
+      Lisp_Object style = (Fsymbol_value
+			   (Fintern_soft
+			    (concat2 (Fsymbol_name (XTREE_SITTER (sitter)->progmode),
+				      build_string ("_indentation_style")),
+			     Vobarray)));
+      key = ! NILP (style) ? style : Fsymbol_name (XTREE_SITTER (sitter)->progmode);
+      i = hash_lookup (h, key, &hash);
       if (i < 0)
 	{
 	  Lisp_Object filename = Fexpand_file_name
-	    (build_string ("indents.scm"),
+	    (concat2 (! NILP (style) ? style : build_string ("indents"),
+		      build_string (".scm")),
 	     concat3 (Ffile_name_as_directory
 		      (Fsymbol_value (Qtree_sitter_resources_dir)),
 		      build_string ("queries/"),
@@ -1179,8 +1186,7 @@ DEFUN ("tree-sitter-calculate-indent",
 		      if (XTREE_SITTER (sitter)->indents_query != NULL)
 			ts_query_delete (XTREE_SITTER (sitter)->indents_query);
 		      XTREE_SITTER (sitter)->indents_query = query;
-		      i = hash_put (h, XTREE_SITTER (sitter)->progmode,
-				    build_string (query_buf), hash);
+		      i = hash_put (h, key, build_string (query_buf), hash);
 		    }
 		}
 	      xfree (query_buf);
@@ -1343,30 +1349,31 @@ DEFUN ("tree-sitter-calculate-indent",
 		      struct text_pos pt;
 		      void *itdata = bidi_shelve_cache ();
 		      struct it it;
-		      ptrdiff_t bytepos = node_beg;
-		      ptrdiff_t comment_start = 0;
+		      ptrdiff_t pos = CHAR_TO_BYTE (node_beg);
+		      ptrdiff_t comment_start =
+			XFIXNUM (Fcurrent_indentation (make_fixnum (node_beg)));
 
 		      /* Note the indentation of the following line:
 			 Preceding line's indent + (2 for delim) + (1 space).
 			 (Assuming space fails for say #foo in bash).  */
 		      for ( ;
-			    bytepos != ZV && ! isspace (FETCH_CHAR (bytepos));
-			    ++bytepos, ++comment_start);
+			    pos != ZV && ! isspace (FETCH_CHAR (pos));
+			    ++pos, ++comment_start);
 		      for ( ;
-			    bytepos != ZV && isspace (FETCH_CHAR (bytepos));
-			    ++bytepos, ++comment_start);
+			    pos != ZV && isspace (FETCH_CHAR (pos));
+			    ++pos, ++comment_start);
 
 		      SET_TEXT_POS (pt, PT, PT_BYTE);
 		      start_move_it (&it, decode_live_window (selected_window), pt);
 		      move_it_dvpos (&it, -1);
 		      move_it_dvpos (&it, 0);
-		      result += XFIXNUM (Fcurrent_indentation
-					 (make_fixnum (IT_CHARPOS (it))));
-		      result = max (comment_start, result);
 		      bidi_unshelve_cache (itdata, 0);
+		      result = max (comment_start,
+				    XFIXNUM (Fcurrent_indentation
+					     (make_fixnum (IT_CHARPOS (it)))));
+		      goto done; /* since Fcurrent_indentation is absolute.  */
 		    }
-
-		  if (0 == strcmp (capture_name, "zero_indent"))
+		  else if (0 == strcmp (capture_name, "zero_indent"))
 		    {
 		      goto next_parent; /* !!! */
 		    }
@@ -1376,6 +1383,7 @@ DEFUN ("tree-sitter-calculate-indent",
 		    }
 		  else if (0 == strcmp (capture_name, "auto"))
 		    {
+
 		    }
 		  else if (0 == strcmp (capture_name, "branch")
 			   && line_node_beg == line_target_pt)
@@ -1417,11 +1425,11 @@ DEFUN ("tree-sitter-calculate-indent",
 				  hanging_indent_p = true;
 				  ptrdiff_t delimiter_end =
 				    SITTER_TO_BUFFER (ts_node_end_byte (delimiter_node));
-				  for (ptrdiff_t bytepos = delimiter_end;
-				       bytepos != ZV && FETCH_CHAR (bytepos) != '\n';
-				       ++bytepos)
+				  for (ptrdiff_t pos = delimiter_end;
+				       pos != ZV && FETCH_CHAR (pos) != '\n';
+				       ++pos)
 				    {
-				      if (! isspace (FETCH_CHAR (bytepos)))
+				      if (! isspace (FETCH_CHAR (pos)))
 					{
 					  hanging_indent_p = false;
 					  break;
