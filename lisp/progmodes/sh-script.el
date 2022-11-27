@@ -1568,7 +1568,23 @@ with your script for an edit-interpret-debug cycle."
                   "\\")))
   ;; Parse or insert magic number for exec, and set all variables depending
   ;; on the shell thus determined.
-  (sh-set-shell (sh--guess-shell) nil nil)
+  (sh-set-shell
+   (cond ((save-excursion
+            (goto-char (point-min))
+            (looking-at auto-mode-interpreter-regexp))
+          (match-string 2))
+         ((not buffer-file-name) sh-shell-file)
+         ;; Checks that use `buffer-file-name' follow.
+         ((string-match "\\.m?spec\\'" buffer-file-name) "rpm")
+         ((string-match "[.]sh\\>"     buffer-file-name) "sh")
+         ((string-match "[.]bash\\(rc\\)?\\>"   buffer-file-name) "bash")
+         ((string-match "[.]ksh\\>"    buffer-file-name) "ksh")
+         ((string-match "[.]mkshrc\\>" buffer-file-name) "mksh")
+         ((string-match "[.]t?csh\\(rc\\)?\\>" buffer-file-name) "csh")
+         ((string-match "[.]zsh\\(rc\\|env\\)?\\>" buffer-file-name) "zsh")
+	 ((equal (file-name-nondirectory buffer-file-name) ".profile") "sh")
+         (t sh-shell-file))
+   nil nil)
   (add-hook 'flymake-diagnostic-functions #'sh-shellcheck-flymake nil t)
   (add-hook 'hack-local-variables-hook
     #'sh-after-hack-local-variables nil t))
@@ -1576,23 +1592,6 @@ with your script for an edit-interpret-debug cycle."
 ;;;###autoload
 (defalias 'shell-script-mode 'sh-mode)
 
-
-(advice-add 'bash-ts-mode :around #'sh--redirect-bash-ts-mode
-            ;; Give it lower precedence than normal advice, so other
-            ;; advices take precedence over it.
-            '((depth . 50)))
-
-(defvar sh--redirect-recursing nil)
-(defun sh--redirect-bash-ts-mode (oldfn)
-  "Redirect to `sh-mode' if the current file is not written in Bash.
-OLDFN should be `bash-ts-mode'."
-  (let ((sh--redirect-recursing sh--redirect-recursing))
-    (funcall (if (or delay-mode-hooks sh--redirect-recursing)
-                 oldfn
-               (setq sh--redirect-recursing t)
-               (if (member (file-name-base (sh--guess-shell)) '("bash" "sh"))
-                   oldfn
-                 #'sh-mode)))))
 
 (defun sh-font-lock-keywords (&optional keywords)
   "Function to get simple fontification based on `sh-font-lock-keywords'.
