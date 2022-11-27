@@ -107,6 +107,16 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
   :version "28.1")
 
 ;;;###autoload
+(defcustom tree-sitter-indent-alist
+  '((tree-sitter-c-mode . "gnu.scm"))
+  "Map prog-mode to indent scm file."
+  :group 'tree-sitter
+  :type '(alist :key-type (symbol :tag "Prog mode")
+                :value-type (string :tag "Tree-sitter symbol"))
+  :risky t
+  :version "28.1")
+
+;;;###autoload
 (defcustom tree-sitter-highlight-alist
   '(("constant" . font-lock-constant-face)
     ("type.builtin" . font-lock-type-face)

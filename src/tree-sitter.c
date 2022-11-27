@@ -1121,7 +1121,7 @@ DEFUN ("tree-sitter-calculate-indent",
     {
       static Lisp_Object cache = LISPSYM_INITIALLY (Qnil);
       struct Lisp_Hash_Table *h;
-      Lisp_Object hash, key;
+      Lisp_Object hash, fstyle, indents_scm;
       ptrdiff_t i;
 
       if (NILP (cache))
@@ -1132,28 +1132,36 @@ DEFUN ("tree-sitter-calculate-indent",
 	  staticpro (&cache);
 	}
       h = XHASH_TABLE (cache);
-      Lisp_Object style = (Fsymbol_value
-			   (Fintern_soft
-			    (concat2 (Fsymbol_name (XTREE_SITTER (sitter)->progmode),
-				      build_string ("_indentation_style")),
-			     Vobarray)));
-      key = ! NILP (style) ? style : Fsymbol_name (XTREE_SITTER (sitter)->progmode);
-      i = hash_lookup (h, key, &hash);
+
+      fstyle = /* grandfathered RMS variable */
+	(Fsymbol_value
+	 (Fintern_soft
+	  (concat2 (Fsymbol_name (XTREE_SITTER (sitter)->progmode),
+		    build_string ("-file-style")),
+	   Vobarray)));
+      indents_scm =
+	Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
+			  Fsymbol_value (Qtree_sitter_indent_alist)));
+      if (NILP (indents_scm))
+	indents_scm = concat2 (! NILP (fstyle)
+			       ? fstyle : build_string ("indents"),
+			       build_string (".scm"));
+      if (NILP (Ffile_name_absolute_p (indents_scm)))
+	indents_scm =
+	  Fexpand_file_name (indents_scm,
+			     concat3 (Ffile_name_as_directory
+				      (Fsymbol_value (Qtree_sitter_resources_dir)),
+				      build_string ("queries/"),
+				      language));
+      i = hash_lookup (h, indents_scm, &hash);
       if (i < 0)
 	{
-	  Lisp_Object filename = Fexpand_file_name
-	    (concat2 (! NILP (style) ? style : build_string ("indents"),
-		      build_string (".scm")),
-	     concat3 (Ffile_name_as_directory
-		      (Fsymbol_value (Qtree_sitter_resources_dir)),
-		      build_string ("queries/"),
-		      language));
-	  FILE *fp = fopen (SSDATA (filename), "rb");
+	  FILE *fp = fopen (SSDATA (indents_scm), "rb");
 	  if (! fp)
 	    {
 	      Lisp_Object args[2];
 	      args[0] = build_string ("%s not found");
-	      args[1] = filename;
+	      args[1] = indents_scm;
 	      xsignal1 (Qtree_sitter_language_error, Fformat (4, args));
 	    }
 	  else
@@ -1175,7 +1183,7 @@ DEFUN ("tree-sitter-calculate-indent",
 		      Lisp_Object args[4];
 		      args[0] = build_string
 			("ts_query_new() of %s returned %d at offset %d");
-		      args[1] = filename;
+		      args[1] = indents_scm;
 		      args[2] = make_fixnum ((EMACS_INT) error_type);
 		      args[3] = make_fixnum ((EMACS_INT) error_offset);
 		      xfree (query_buf);
@@ -1186,7 +1194,7 @@ DEFUN ("tree-sitter-calculate-indent",
 		      if (XTREE_SITTER (sitter)->indents_query != NULL)
 			ts_query_delete (XTREE_SITTER (sitter)->indents_query);
 		      XTREE_SITTER (sitter)->indents_query = query;
-		      i = hash_put (h, key, build_string (query_buf), hash);
+		      i = hash_put (h, indents_scm, build_string (query_buf), hash);
 		    }
 		}
 	      xfree (query_buf);
@@ -1435,6 +1443,7 @@ DEFUN ("tree-sitter-calculate-indent",
 					  break;
 					}
 				    }
+				  break;
 				}
 			    }
 			  if (hanging_indent_p)
@@ -1445,10 +1454,13 @@ DEFUN ("tree-sitter-calculate-indent",
 			  else
 			    {
 			      /* align to left paren on previous line.  */
+			      specpdl_ref count = SPECPDL_INDEX ();
 			      ptrdiff_t delimiter_beg =
 				SITTER_TO_BUFFER (ts_node_start_byte (delimiter_node));
-			      result += XFIXNUM (Fcurrent_indentation
-						 (make_fixnum (delimiter_beg)));
+			      record_unwind_protect_excursion ();
+			      Fgoto_char (make_fixnum (delimiter_beg));
+			      result = 1 + current_column ();
+			      unbind_to (count, Qnil);
 			      goto done; /* since delimiter_beg is absolute.  */
 			    }
 			}
@@ -1684,6 +1696,7 @@ syms_of_tree_sitter (void)
   tree_sitter_scan_characters = 2048;
 
   DEFSYM (Qtree_sitter_mode_alist, "tree-sitter-mode-alist");
+  DEFSYM (Qtree_sitter_indent_alist, "tree-sitter-indent-alist");
   DEFSYM (Qtree_sitter_resources_dir, "tree-sitter-resources-dir");
   DEFSYM (Qtree_sitter_highlight_alist, "tree-sitter-highlight-alist");
   DEFSYM (Qtree_sitter_sitter, "tree-sitter-sitter");
