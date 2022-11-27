@@ -14312,6 +14312,7 @@ do { if (! polling_stopped_here) stop_polling ();	\
 do { if (polling_stopped_here) start_polling ();	\
        polling_stopped_here = false; } while (false)
 
+
 /* Perhaps in the future avoid recentering windows if it
    is not necessary; currently that causes some problems.  */
 
@@ -14373,8 +14374,6 @@ redisplay_internal (void)
 
   FOR_EACH_FRAME (tail, frame)
     XFRAME (frame)->already_hscrolled_p = false;
-
-  reset_outermost_narrowings ();
 
  retry:
   sw = w; /* stash W */

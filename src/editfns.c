@@ -2711,16 +2711,12 @@ positions (integers or markers) bounding the text that should
 remain visible.  */)
   (Lisp_Object start, Lisp_Object end)
 {
-  struct Lisp_Marker *begv = narrowing_lock_get_bound (buf, true, false);
-  struct Lisp_Marker *zv = narrowing_lock_get_bound (buf, false, false);
-  if (begv != NULL && zv != NULL)
+  EMACS_INT s = fix_position (start), e = fix_position (end);
+
+  if (e < s)
     {
-      SET_BUF_BEGV_BOTH (XBUFFER (buf), begv->charpos, begv->bytepos);
-      SET_BUF_ZV_BOTH (XBUFFER (buf), zv->charpos, zv->bytepos);
+      EMACS_INT tem = s; s = e; e = tem;
     }
-  else
-    narrowing_locks_remove (buf);
-}
 
   if (!(BEG <= s && s <= e && e <= Z))
     args_out_of_range (start, end);
@@ -2836,12 +2832,11 @@ DEFUN ("save-restriction", Fsave_restriction, Ssave_restriction, 0, UNEVALLED, 0
        doc: /* Execute BODY, saving and restoring current buffer's restrictions.
 The buffer's restrictions make parts of the beginning and end invisible.
 \(They are set up with `narrow-to-region' and eliminated with `widen'.)
-This special form, `save-restriction', saves the current buffer's
-restrictions, as well as their locks if they have been locked with
-`narrowing-lock', when it is entered, and restores them when it is exited.
+This special form, `save-restriction', saves the current buffer's restrictions
+when it is entered, and restores them when it is exited.
 So any `narrow-to-region' within BODY lasts only until the end of the form.
-The old restrictions settings are restored even in case of abnormal exit
-\(throw or error).
+The old restrictions settings are restored
+even in case of abnormal exit (throw or error).
 
 The value returned is the value of the last form in BODY.
 
@@ -2856,7 +2851,6 @@ usage: (save-restriction &rest BODY)  */)
   specpdl_ref count = SPECPDL_INDEX ();
 
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
-  record_unwind_protect (narrowing_locks_restore, narrowing_locks_save ());
   val = Fprogn (body);
   return unbind_to (count, val);
 }
@@ -4500,8 +4494,6 @@ syms_of_editfns (void)
   DEFSYM (Qwall, "wall");
   DEFSYM (Qpropertize, "propertize");
 
-  staticpro (&narrowing_locks);
-
   DEFVAR_LISP ("inhibit-field-text-motion", Vinhibit_field_text_motion,
 	       doc: /* Non-nil means text motion commands don't notice fields.  */);
   Vinhibit_field_text_motion = Qnil;
@@ -4662,8 +4654,6 @@ it to be non-nil.  */);
   defsubr (&Sdelete_and_extract_region);
   defsubr (&Swiden);
   defsubr (&Snarrow_to_region);
-  defsubr (&Snarrowing_lock);
-  defsubr (&Snarrowing_unlock);
   defsubr (&Ssave_restriction);
   defsubr (&Stranspose_regions);
   defsubr (&Spush_global_mark);
