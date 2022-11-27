@@ -1443,6 +1443,7 @@ DEFUN ("tree-sitter-calculate-indent",
 					  break;
 					}
 				    }
+				  break;
 				}
 			    }
 			  if (hanging_indent_p)
@@ -1453,10 +1454,13 @@ DEFUN ("tree-sitter-calculate-indent",
 			  else
 			    {
 			      /* align to left paren on previous line.  */
+			      specpdl_ref count = SPECPDL_INDEX ();
 			      ptrdiff_t delimiter_beg =
 				SITTER_TO_BUFFER (ts_node_start_byte (delimiter_node));
-			      result += XFIXNUM (Fcurrent_indentation
-						 (make_fixnum (delimiter_beg)));
+			      record_unwind_protect_excursion ();
+			      Fgoto_char (make_fixnum (delimiter_beg));
+			      result = 1 + current_column ();
+			      unbind_to (count, Qnil);
 			      goto done; /* since delimiter_beg is absolute.  */
 			    }
 			}
