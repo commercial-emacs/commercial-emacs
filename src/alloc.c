@@ -6602,6 +6602,7 @@ If this portion is smaller than `gc-cons-threshold', this is ignored.  */);
 				      " M-x save-some-buffers then"
 				      " exit and restart Emacs"));
 
+  DEFSYM (Qmemory_info, "memory-info");
   DEFSYM (Qconses, "conses");
   DEFSYM (Qsymbols, "symbols");
   DEFSYM (Qstrings, "strings");
