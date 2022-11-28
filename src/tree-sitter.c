@@ -1154,7 +1154,7 @@ DEFUN ("tree-sitter-calculate-indent",
 				      build_string ("queries/"),
 				      language));
       i = hash_lookup (h, indents_scm, &hash);
-      if (i < 0)
+      if (XTREE_SITTER (sitter)->indents_query == NULL || i < 0)
 	{
 	  FILE *fp = fopen (SSDATA (indents_scm), "rb");
 	  if (! fp)
@@ -1200,7 +1200,7 @@ DEFUN ("tree-sitter-calculate-indent",
 	      xfree (query_buf);
 	    }
 	}
-      if (i >= 0)
+      if (XTREE_SITTER (sitter)->indents_query != NULL && i >= 0)
 	{
 	  Lisp_Object source_query = HASH_VALUE (h, i);
 	  const uint32_t sitter_beg =

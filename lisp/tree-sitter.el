@@ -74,8 +74,7 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
 
 ;;;###autoload
 (defcustom tree-sitter-mode-alist
-  '((c++-mode . "cpp")
-    (rust-mode . "rust")
+  '((rust-mode . "rust")
     (rustic-mode . "rust")
     (emacs-lisp-mode . "elisp")
     (csharp-mode . "sharp")
