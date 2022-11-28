@@ -1252,8 +1252,10 @@ DEFUN ("tree-sitter-calculate-indent",
 		    goto done;
 		}
 
-	      /* Process all QueryCaptures for the same line.  */
-	      bool ignored_line = false, dented_line = false;
+	      /* Process all QueryCaptures until the line of capture
+		 is no longer line of NODE.  */
+	      bool ignored_node = false;
+	      ptrdiff_t last_dented_line = -1;
 	      Lisp_Object capture_name_to_tsnode =
 		make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
 				 DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
@@ -1272,7 +1274,7 @@ DEFUN ("tree-sitter-calculate-indent",
 
 		  if (slice.captures[slice_index].index == UINT32_MAX)
 		    {
-		      /* line's captures should not have been */
+		      /* line's captures should not have been.  */
 		      continue;
 		    }
 
@@ -1387,34 +1389,34 @@ DEFUN ("tree-sitter-calculate-indent",
 		    }
 		  else if (0 == strcmp (capture_name, "ignore"))
 		    {
-		      ignored_line = true;
+		      ignored_node = true;
 		    }
 		  else if (0 == strcmp (capture_name, "auto"))
 		    {
 
 		    }
 		  else if (0 == strcmp (capture_name, "branch")
-			   && line_node_beg == line_target_pt)
+			   && line_node_beg == line_target_pt
+			   && last_dented_line < 0)
 		    {
-		      if (! dented_line)
-			result -= indent_nspaces;
-		      dented_line = true;
+		      result -= indent_nspaces;
+		      last_dented_line = line_capture_beg;
 		    }
-		  else if (0 == strcmp (capture_name, "dedent")
-			   && line_node_beg != line_target_pt)
+		  else if (0 == strcmp (capture_name, "dedent"))
 		    {
-		      if (! dented_line)
+		      if (last_dented_line < 0
+			  || last_dented_line == line_capture_beg)
 			result -= indent_nspaces;
-		      dented_line = true;
+		      last_dented_line = line_capture_beg;
 		    }
 		  else if (line_capture_beg != line_capture_end
 			   && line_node_beg != line_target_pt)
 		    {
 		      if (0 == strcmp (capture_name, "indent"))
 			{
-			  if (! dented_line)
+			  if (last_dented_line < 0)
 			    result += indent_nspaces;
-			  dented_line = true;
+			  last_dented_line = line_capture_beg;
 			}
 		      else if (0 == strcmp (capture_name, "aligned_indent"))
 			{
@@ -1468,7 +1470,7 @@ DEFUN ("tree-sitter-calculate-indent",
 		}
 
 	    next_parent:
-	      if (ignored_line && ! dented_line)
+	      if (ignored_node && last_dented_line < 0)
 		{
 		  // unclear
 		  goto done;
