@@ -3954,7 +3954,7 @@ AC_SUBST([HAVE_MODULES])
 AC_SUBST([MODULES_SUFFIX])
 AC_SUBST([MODULES_SECONDARY_SUFFIX])
 
-upstream_version="29.0.50"
+upstream_version="30.0.50"
 AC_DEFINE_UNQUOTED([UPSTREAM_VERSION], ["$upstream_version"], [GNU Emacs version])
 AC_CONFIG_FILES([src/emacs-module.h])
 AC_SUBST_FILE([module_env_snippet_25])
