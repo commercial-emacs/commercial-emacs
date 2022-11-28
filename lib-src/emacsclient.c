@@ -568,7 +568,6 @@ decode_options (int argc, char **argv)
         case 't':
 	  tty = true;
 	  create_frame = true;
-	  reuse_frame = false;
           break;
 
         case 'c':
@@ -577,8 +576,7 @@ decode_options (int argc, char **argv)
 
 	case 'r':
 	  create_frame = true;
-	  if (!tty)
-	    reuse_frame = true;
+	  reuse_frame = true;
 	  break;
 
 	case 'p':
