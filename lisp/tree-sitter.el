@@ -192,29 +192,28 @@ NILP(prop) it needs to proceed."
 
 (defun tree-sitter-fontify-region (beg end loudly)
   "Presumably widened in `font-lock-fontify-region'."
-  (let ((inhibit-point-motion-hooks t))
-    (with-silent-modifications
-      (save-excursion
-        (save-match-data
-          (let* ((changed-range (tree-sitter-changed-range))
-                 (beg* (if changed-range
-                           (min beg (cl-first changed-range))
-                         beg))
-                 (end* (if changed-range
-                           (min (point-max)
-                                (max (cl-second changed-range) end))
-                         end))
-                 (bounds (tree-sitter-highlight-region beg* end*))
-                 (leftmost (if bounds (min beg* (car bounds)) beg*))
-                 (rightmost (if bounds (max end* (cdr bounds)) end*)))
-            (prog1 leftmost
-              (put-text-property leftmost rightmost 'fontified t)
-              (when loudly
-                (princ (format "initial [%d %d], inputs [%d %d] final [%d %d]\n"
-                               beg end
-                               beg* end*
-                               leftmost rightmost)
-                       #'external-debugging-output)))))))))
+  (with-silent-modifications
+    (save-excursion
+      (save-match-data
+        (let* ((changed-range (tree-sitter-changed-range))
+               (beg* (if changed-range
+                         (min beg (cl-first changed-range))
+                       beg))
+               (end* (if changed-range
+                         (min (point-max)
+                              (max (cl-second changed-range) end))
+                       end))
+               (bounds (tree-sitter-highlight-region beg* end*))
+               (leftmost (if bounds (min beg* (car bounds)) beg*))
+               (rightmost (if bounds (max end* (cdr bounds)) end*)))
+          (prog1 leftmost
+            (put-text-property leftmost rightmost 'fontified t)
+            (when loudly
+              (princ (format "initial [%d %d], inputs [%d %d] final [%d %d]\n"
+                             beg end
+                             beg* end*
+                             leftmost rightmost)
+                     #'external-debugging-output))))))))
 
 (defun tree-sitter-forward-cursor (&optional arg)
   "Return character position of node ARG siblings from point.
