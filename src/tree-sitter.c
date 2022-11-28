@@ -1395,19 +1395,23 @@ DEFUN ("tree-sitter-calculate-indent",
 		    {
 
 		    }
-		  else if (0 == strcmp (capture_name, "branch")
-			   && line_node_beg == line_target_pt
-			   && last_dented_line < 0)
+		  else if (0 == strcmp (capture_name, "branch"))
 		    {
-		      result -= indent_nspaces;
-		      last_dented_line = line_capture_beg;
+		      if (line_node_beg == line_target_pt
+			  && last_dented_line < 0)
+			{
+			  result -= indent_nspaces;
+			  last_dented_line = line_capture_beg;
+			}
 		    }
 		  else if (0 == strcmp (capture_name, "dedent"))
 		    {
 		      if (last_dented_line < 0
 			  || last_dented_line == line_capture_beg)
-			result -= indent_nspaces;
-		      last_dented_line = line_capture_beg;
+			{
+			  result -= indent_nspaces;
+			  last_dented_line = line_capture_beg;
+			}
 		    }
 		  else if (line_capture_beg != line_capture_end
 			   && line_node_beg != line_target_pt)
@@ -1415,8 +1419,10 @@ DEFUN ("tree-sitter-calculate-indent",
 		      if (0 == strcmp (capture_name, "indent"))
 			{
 			  if (last_dented_line < 0)
-			    result += indent_nspaces;
-			  last_dented_line = line_capture_beg;
+			    {
+			      result += indent_nspaces;
+			      last_dented_line = line_capture_beg;
+			    }
 			}
 		      else if (0 == strcmp (capture_name, "aligned_indent"))
 			{
