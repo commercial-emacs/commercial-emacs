@@ -6,10 +6,10 @@ See the end of the file for license conditions.
 Please send Emacs bug reports to 'bug-gnu-emacs@gnu.org'.
 If possible, use 'M-x report-emacs-bug'.
 
-This file is about changes in Emacs version 30.
+This file is about changes in Emacs version 29.
 
 See file HISTORY for a list of GNU Emacs versions and release dates.
-See files NEWS.29, NEWS.28, ..., NEWS.18, and NEWS.1-17 for changes
+See files NEWS.28, NEWS.27, ..., NEWS.18, and NEWS.1-17 for changes
 in older Emacs versions.
 
 You can narrow news to a specific version by calling 'view-emacs-news'
@@ -22,13 +22,489 @@ When you add a new item, use the appropriate mark if you are sure it
 applies, and please also update docstrings as needed.
 
 
-* Installation Changes in Emacs 30.1
+* Installation Changes in Emacs 29.1
+
+---
+** Ahead-of-time native compilation can now be specified via configure.
+Use '--with-native-compilation=aot' to specify that all the Lisp files
+in the Emacs tree should be natively compiled ahead of time.  (This is
+slow on most machines.)
+
++++
+** Emacs can be built with built-in support for accessing SQLite databases.
+This uses the popular sqlite3 library, and can be disabled by using
+the '--without-sqlite3' option to the 'configure' script.
+
++++
+** Support for the WebP image format.
+This support is built by default when the libwebp library is
+available, and includes support for animated WebP images.  To disable
+WebP support, use the '--without-webp' configure flag.  Image
+specifiers can now use ':type webp'.
+
++++
+** Emacs has been ported to the Haiku operating system.
+The configuration process should automatically detect and build for
+Haiku.  There is also an optional window-system port to Haiku, which
+can be enabled by configuring Emacs with the option '--with-be-app',
+which will require the Haiku Application Kit development headers and a
+C++ compiler to be present on your system.  If Emacs is not built with
+the option '--with-be-app', the resulting Emacs will only run in
+text-mode terminals.
+
+To enable Cairo support, ensure that the Cairo and FreeType
+development files are present on your system, and configure Emacs with
+'--with-be-cairo'.
+
+Unlike X, there is no compile-time option to enable or disable
+double-buffering; it is always enabled.  To disable it, change the
+frame parameter 'inhibit-double-buffering' instead.
+
+---
+** Emacs now installs the ".pdmp" file using a unique fingerprint in the name.
+The file is typically installed using a file name akin to
+"...dir/libexec/emacs/29.1/x86_64-pc-linux-gnu/emacs-<fingerprint>.pdmp".
+If a constant file name is required, the file can be renamed to
+"emacs.pdmp", and Emacs will find it during startup anyway.
+
+---
+** Emacs now uses XInput 2 for input events.
+If your X server has support and you have the XInput 2 development
+headers installed, Emacs will use the X Input Extension for handling
+input.  If this causes problems, you can configure Emacs with the
+option '--without-xinput2' to disable this support.
+
+'(featurep 'xinput2)' can be used to test for the presence of XInput 2
+support from Lisp programs.
+
+---
+** Emacs no longer reduces the size of the Japanese dictionary.
+Building Emacs includes generation of a Japanese dictionary, which is
+used by Japanese input methods.  Previously, the build included a step
+of reducing the size of this dictionary's vocabulary.  This vocabulary
+reduction is now optional, by default off.  If you need the Emacs
+build to include the vocabulary reduction, configure Emacs with the
+option '--with-small-ja-dic'.  In an Emacs source tree already
+configured without that option, you can force the vocabulary reduction
+by saying
+
+    make -C leim generate-ja-dic JA_DIC_NO_REDUCTION_OPTION=''
+
+after deleting "lisp/leim/ja-dic/ja-dic.el".
+
++++
+** Emacs now supports being built with pure GTK.
+To use this option, make sure the GTK 3 (version 3.22.23 or later) and
+Cairo development files are installed, and configure Emacs with the
+option '--with-pgtk'.  Unlike the default X and GTK build, the
+resulting Emacs binary will work on any underlying window system
+supported by GDK, such as Wayland and Broadway.  We do not recommend
+that you use this configuration, unless you are running a window
+system that's supported by GDK other than X.  Running this
+configuration on X is known to have problems, such as undesirable
+frame positioning and various issues with keyboard input of sequences
+such as 'C-;' and 'C-S-u'.
+
+---
+** The implementation of overlays has changed.
+Emacs now uses an implementation of overlays that is much more
+efficient than the original one, and should speed up all the
+operations that involve overlays, especially when there are lots of
+them in a buffer.  However, no changes in behavior of overlays should
+be visible on the Lisp or user level, with the exception of better
+performance and the order of overlays returned by functions that don't
+promise any particular order.
+
+---
+** The docstrings of preloaded files are not in "etc/DOC" any more.
+Instead, they're fetched as needed from the corresponding ".elc" file,
+as was already the case for all the non-preloaded files.
 
 
-* Startup Changes in Emacs 30.1
+* Startup Changes in Emacs 29.1
+
++++
+** '--batch' and '--script' now adjust the garbage collection levels.
+These switches now set 'gc-cons-percentage' to 1.0 (up from the
+default of 0.1).  This means that batch processes will typically use
+more memory than before, but use less time doing garbage collection.
+Batch jobs that are supposed to run for a long time should adjust the
+limit back down again.
+
++++
+** Emacs can now be used more easily in an executable script.
+If you start an executable script with
+
+    #!/usr/bin/emacs -x
+
+Emacs will start without reading any init files (like with '--quick'),
+and then execute the rest of the script file as Emacs Lisp.  When it
+reaches the end of the script, Emacs will exit with an exit code from
+the value of the final form.
+
++++
+** New function 'substitute-quotes'.
+This function works like 'substitute-command-keys' but only
+substitutes quote characters.
+
++++
+** Emacs now supports setting 'user-emacs-directory' via '--init-directory'.
+
++++
+** Emacs now has a '--fingerprint' option.
+This will output a string identifying the current Emacs build.
+
++++
+** New hook 'after-pdump-load-hook'.
+This is run at the end of the Emacs startup process, and is meant to
+be used to reinitialize structures that would normally be done at load
+time.
+
+** Native Compilation
+
++++
+*** New variable 'inhibit-automatic-native-compilation'.
+If set, Emacs will inhibit native compilation (and won't write
+anything to the eln cache automatically).  The variable is initialized
+from the 'EMACS_INHIBIT_AUTOMATIC_NATIVE_COMPILATION' environment
+variable on Emacs startup.
+
+---
+*** New command 'native-compile-prune-cache'.
+This command deletes older eln cache entries (but not the ones for
+the current Emacs version).
+
+---
+*** New function 'startup-redirect-eln-cache'.
+This function can be called in your init files to change the
+user-specific directory where Emacs stores the "*.eln" files produced
+by native compilation of Lisp packages Emacs loads.  The default
+eln cache directory is unchanged: it is the "eln-cache" subdirectory
+of 'user-emacs-directory'.
 
 
-* Changes in Emacs 30.1
+* Incompatible changes in Emacs 29.1
+
++++
+** The image commands have changed key bindings.
+In previous Emacs versions, images have had the '+', '-' and 'r' keys
+bound when point is over an image.  In Emacs 29.1, additional commands
+were added, and this made it more likely that users would trigger the
+image commands by mistake.  To avoid this, all image commands have
+moved to the 'i' keymap, so '+' is now 'i +', '-' is now 'i -', and
+'r' is now 'i r'.  In addition, these commands are now repeating, so
+you can rotate an image twice by saying 'i r r', for instance.
+
++++
+** Emacs now picks the correct coding system for X input methods.
+Previously, Emacs would use the locale coding system for input
+methods, which could in some circumstances be incorrect, especially
+when the input method chose to fall back to some other coding system.
+
+Now, Emacs automatically detects the coding system used by input
+methods, and uses that to decode input in preference to the value of
+'locale-coding-system'.  This unfortunately means that users who have
+changed the coding system used to decode X keyboard input must adjust
+their customizations to 'locale-coding-system' to the variable
+'x-input-coding-system' instead.
+
++++
+** Bookmarks no longer include context for encrypted files.
+If you're visiting an encrypted file, setting a bookmark no longer
+includes excerpts from that buffer in the bookmarks file.  This is
+implemented by the new hook 'bookmark-inhibit-context-functions',
+where packages can register a function which returns non-nil for file
+names to be excluded from adding such excerpts.
+
+---
+** 'show-paren-mode' is now disabled in 'special-mode' buffers.
+In Emacs versions previous to Emacs 28.1, 'show-paren-mode' defaulted
+off.  In Emacs 28.1, the mode was switched on in all buffers.  In
+Emacs 29.1, this was changed to be switched on in all editing-related
+buffers, but not in buffers that inherit from 'special-mode'.  To get
+back to how things worked in Emacs 28.1, put the following in your
+init file:
+
+    (setopt show-paren-predicate t)
+
++++
+** Explicitly-set read-only state is preserved when reverting a buffer.
+If you use the 'C-x C-q' command to change the read-only state of the
+buffer and then revert it, Emacs would previously use the file
+permission bits to determine whether the buffer should be read-only
+after reverting the buffer.  Emacs now remembers the decision made in
+'C-x C-q'.
+
+---
+** The Gtk selection face is no longer used for the region.
+The combination of a Gtk-controlled background and a foreground color
+controlled by the internal Emacs machinery led to low-contrast faces
+in common default setups.  Emacs now uses the same 'region' face on
+Gtk and non-Gtk setups.
+
+** Dired
+
+---
+*** 'w' ('dired-copy-filename-as-kill') has changed behavior.
+If there are several files marked, file names containing space and
+quote characters will be quoted "like this".
+
+---
+*** The 'd' command now more consistently skips dot files.
+In previous Emacs versions, commands like 'C-u 10 d' would put the "D"
+mark on the next ten files, no matter whether they were dot files
+(i.e., "." and "..") or not, while marking the next ten lines with the
+mouse (in 'transient-mark-mode') and then hitting 'd' would skip dot
+files.  These now work equivalently.
+
++++
+** Warning about "eager macro-expansion failure" is changed into an error.
+
+---
+** Previously, the X "reverseVideo" value at startup was heeded for all frames.
+This meant that if you had a "reverseVideo" resource on the initial
+display, and then opened up a new frame on a display without any
+explicit "reverseVideo" setting, it would get heeded there, too.  (This
+included terminal frames.)  In Emacs 29, the "reverseVideo" X resource
+is handled like all the other X resources, and set on a per-frame basis.
+
++++
+** 'E' in 'query-replace' now edits the replacement with exact case.
+Previously, this command did the same as 'e'.
+
+---
+** '/ a' in "*Packages*" buffer now limits by archive name(s) instead of regexp.
+
++++
+** Setting the goal columns now also affects '<prior>' and '<next>'.
+Previously, 'C-x C-n' only affected 'next-line' and 'previous-line',
+but it now also affects 'scroll-up-command' and 'scroll-down-command'.
+
+---
+** Isearch in "*Help*" and "*info*" now char-folds quote characters by default.
+This means that you can say 'C-s `foo' (GRAVE ACCENT) if the buffer
+contains "‘foo" (LEFT SINGLE QUOTATION MARK) and the like.  These
+quotation characters look somewhat similar in some fonts.  To switch
+this off, disable the new 'isearch-fold-quotes-mode' minor mode.
+
+---
+** Sorting commands no longer necessarily change modification status.
+In earlier Emacs versions, commands like 'M-x sort-lines' would always
+change buffer modification status to "modified", whether they changed
+something in the buffer or not.  This has been changed: The buffer is
+marked as modified only if the sorting ended up changing the contents
+of the buffer.
+
+---
+** 'string-lines' handles trailing newlines differently.
+It no longer returns an empty final string if the string ends with a
+newline.
+
+---
+** 'TAB' and '<backtab>' are now bound in 'button-map'.
+This means that if point is on a button, 'TAB' will take you to the
+next button, even if the mode has bound it to something else.  This
+also means that 'TAB' on a button in an 'outline-minor-mode' heading
+will move point instead of collapsing the outline.
+
+---
+** 'Info-default-directory-list' is no longer populated at Emacs startup.
+If you have code in your init file that removes directories from
+'Info-default-directory-list', this will no longer work.
+
+---
+** 'C-k' no longer deletes files in 'ido-mode'.
+To get the previous action back, put something like the following in
+your Init file:
+
+    (require 'ido)
+    (keymap-set ido-file-completion-map "C-k" #'ido-delete-file-at-head)
+
+---
+** New user option 'term-clear-full-screen-programs'.
+By default, term will now work like most terminals when displaying
+full-screen programs: When they exit, the output is cleared, leaving
+what was displayed in the window before the programs started.  Set
+this user option to nil to revert back to the old behavior.
+
+---
+** Support for old EIEIO functions is not autoloaded any more.
+You need an explicit '(require 'eieio-compat)' to use 'defmethod'
+and 'defgeneric' (which have been made obsolete in Emacs 25.1 with
+'cl-defmethod' and 'cl-defgeneric').
+Similarly you might need to '(require 'eieio-compat)' before loading
+files that were compiled with an old EIEIO (Emacs<25).
+
+---
+** 'C-x 8 .' has been moved to 'C-x 8 . .'.
+This is to open up the 'C-x 8 .' map to bind further characters there.
+
+---
+** 'C-x 8 =' moved to 'C-x 8 = ='.
+You can now use 'C-x 8 =' to insert several characters with macron;
+for example, 'C-x 8 = a' will insert U+0101 LATIN SMALL LETTER A WITH
+MACRON.  To insert a lone macron, type 'C-x 8 = =' instead of the
+previous 'C-x ='.
+
+** Eshell
+
+*** Eshell's PATH is now derived from 'exec-path'.
+For consistency with remote connections, Eshell now uses 'exec-path'
+to determine the execution path on the local system, instead of using
+the PATH environment variable directly.
+
+---
+*** 'source' and '.' no longer accept the '--help' option.
+This is for compatibility with the shell versions of these commands,
+which don't handle options like '--help' in any special way.
+
++++
+*** String delimiters in argument predicates/modifiers are more restricted.
+Previously, some argument predicates/modifiers allowed arbitrary
+characters as string delimiters.  To provide more unified behavior
+across all predicates/modifiers, the list of allowed delimiters has
+been restricted to "...", '...', /.../, |...|, (...), [...], <...>,
+and {...}.  See the "(eshell) Argument Predication and Modification"
+node in the Eshell manual for more details.
+
++++
+*** Eshell pipelines now only pipe stdout by default.
+To pipe both stdout and stderr, use the '|&' operator instead of '|'.
+
+---
+** The 'delete-forward-char' command now deletes by grapheme clusters.
+This command is by default bound to the <Delete> function key
+(a.k.a. <deletechar>).  When invoked without a prefix argument or with
+a positive prefix numeric argument, the command will now delete
+complete grapheme clusters produced by character composition.  For
+example, if point is before an Emoji sequence, pressing <Delete> will
+delete the entire sequence, not just a single character at its
+beginning.
+
++++
+** 'load-history' does not treat autoloads specially any more.
+An autoload definition appears just as a '(defun . NAME)' and the
+'(t . NAME)' entries are not generated any more.
+
+---
+** The Tamil input methods no longer insert Tamil digits.
+The input methods 'tamil-itrans' and 'tamil-inscript' no longer insert
+the Tamil digits, as those digit characters are not used nowadays by
+speakers of the Tamil language.  To get back the previous behavior,
+use the new 'tamil-itrans-digits' and 'tamil-inscript-digits' input
+methods instead.
+
++++
+** New variable 'current-time-list' governing default timestamp form.
+Functions like 'current-time' now yield '(TICKS . HZ)' timestamps if
+this new variable is nil.  The variable defaults to t, which means
+these functions default to timestamps of the forms '(HI LO US PS)',
+'(HI LO US)' or '(HI LO)', which are less regular and less efficient.
+This is part of a long-planned change first documented in Emacs 27.
+Developers are encouraged to test timestamp-related code with this
+variable set to nil, as it will default to nil in a future Emacs
+version and will be removed some time after that.
+
++++
+** Functions that recreate the "*scratch*" buffer now also initialize it.
+When functions like 'other-buffer' and 'server-execute' recreate
+"*scratch*", they now also insert 'initial-scratch-message' and set
+the major mode according to 'initial-major-mode', like at Emacs
+startup.  Previously, these functions ignored
+'initial-scratch-message' and left "*scratch*" in 'fundamental-mode'.
+
+---
+** Naming of Image-Dired thumbnail files has changed.
+Names of thumbnail files generated when 'image-dired-thumbnail-storage'
+is 'image-dired' now always end in ".jpg".  This fixes various issues
+on different platforms, but means that thumbnails generated in Emacs 28
+will not be used in Emacs 29, and vice-versa.  If disk space is an
+issue, consider deleting the 'image-dired-dir' directory after
+upgrading (usually "~/.emacs.d/image-dired/").
+
+---
+** The 'rlogin' method in the URL library is now obsolete.
+Emacs will now display a warning if you request a URL like
+"rlogin://foo@example.org".
+
+---
+** Setting 'url-gateway-method' to 'rlogin' is now obsolete.
+Emacs will now display a warning when setting it to that value.
+The user options 'url-gateway-rlogin-host',
+'url-gateway-rlogin-parameters', and 'url-gateway-rlogin-user-name'
+are also obsolete.
+
+---
+** The user function 'url-irc-function' now takes a SCHEME argument.
+The user option 'url-irc-function' is now called with a sixth argument
+corresponding to the scheme portion of the target URL.  For example,
+this would be "ircs" for a URL like "ircs://irc.libera.chat".
+
+---
+** The linum.el library is now obsolete.
+We recommend using either the built-in 'display-line-numbers-mode', or
+the 'nlinum' package from GNU ELPA instead.  The former has better
+performance, but the latter is closer to a drop-in replacement.
+
+1. To use 'display-line-numbers-mode', add something like this to your
+   Init file:
+
+    (global-display-line-numbers-mode 1)
+    ;; Alternatively, to use it only in programming modes:
+    (add-hook 'prog-mode-hook #'display-line-numbers-mode)
+
+2. To use 'nlinum', add this to your Init file:
+
+    (package-install 'nlinum)
+    (global-nlinum-mode 1)
+    ;; Alternatively, to use it only in programming modes:
+    (add-hook 'prog-mode-hook #'nlinum-mode)
+
+3. To continue using the obsolete package 'linum', add this line to
+   your Init file, in addition to any existing customizations:
+
+    (require 'linum)
+
+---
+** The thumbs.el library is now obsolete.
+We recommend using 'M-x image-dired' instead.
+
+---
+** The autoarg.el library is now marked obsolete.
+This library provides the 'autoarg-mode' and 'autoarg-kp-mode' minor
+modes to emulate the behavior of the historical editor Twenex Emacs.
+It is believed to no longer be useful.
+
+---
+** The quickurl.el library is now obsolete.
+Use 'abbrev', 'skeleton' or 'tempo' instead.
+
+---
+** The rlogin.el library, and the 'rsh' command are now obsolete.
+Use something like 'M-x shell RET ssh <host> RET' instead.
+
+---
+** The url-about.el library is now obsolete.
+
+---
+** The autoload.el library is now obsolete.
+It is superseded by the loaddefs-gen.el library.
+
+---
+** The netrc.el library is now obsolete.
+Use the 'auth-source-netrc-parse-all' function in auth-source.el
+instead.
+
+---
+** The url-dired.el library is now obsolete.
+
+---
+** The fast-lock.el and lazy-lock.el library have been removed.
+They have been obsolete since Emacs 22.1.
+
+The variable 'font-lock-support-mode' is occasionally useful for
+debugging purposes.  It is now a regular variable (instead of a user
+option) and can be set to nil to disable Just-in-time Lock mode.
 
 
 * Changes in Emacs 29.1
@@ -48,6 +524,30 @@ variables, etc.
 ---
 ** New user option 'electric-quote-replace-consecutive'.
 
+---
+** Emacs is now capable of editing files with very long lines.
+The display of long lines has been optimized, and Emacs should no
+longer choke when a buffer on display contains long lines.  The
+variable 'long-line-threshold' controls whether and when these display
+optimizations are in effect.
+
+A companion variable 'large-hscroll-threshold' controls when another
+set of display optimizations are in effect, which are aimed
+specifically at speeding up display of long lines that are truncated.
+
+If you still experience slowdowns while editing files with long lines,
+this may be due to line truncation, or to one of the enabled minor
+modes, or to the current major mode.  Try turning off line truncation
+with 'C-x x t', or try disabling all known slow minor modes with
+'M-x so-long-minor-mode', or try disabling both known slow minor modes
+and the major mode with 'M-x so-long-mode', or visit the file with
+'M-x find-file-literally' instead of the usual 'C-x C-f'.
+
+Note that the display optimizations in these cases may cause the
+buffer to be occasionally mis-fontified.
+
+The new function 'long-line-optimizations-p' returns non-nil when
+these optimizations are in effect in the current buffer.
 
 +++
 ** New command to change the font size globally.
@@ -65,10 +565,10 @@ the frames are resized when the font size is changed.
 This variable is used by some operations (mostly syntax-propertization
 and font-locking) to treat lines longer than this variable as if they
 were made up of various smaller lines.  This can help reduce the
-pathological slowdowns seen in buffers made of a single long line, but
-can also cause misbehavior in the presence of such long lines (tho
-most of that misbehavior should usually be limited to mis-highlighting).
-You can recover the previous behavior with:
+slowdowns seen in buffers made of a single long line, but can also
+cause misbehavior in the presence of such long lines (tho most of that
+misbehavior should usually be limited to mis-highlighting).  You can
+recover the previous behavior with:
 
     (setq syntax-wholeline-max most-positive-fixnum)
 
@@ -194,11 +694,6 @@ previous behavior).  The default is nil, which inhibits recording of
 passwords.
 
 +++
-** New user option 'longlines-break-chars'.
-This is a string containing chars that could be used as break point in
-longlines mode.
-
-+++
 ** New function 'command-query'.
 This function makes its argument command prompt the user for
 confirmation before executing.
@@ -248,6 +743,14 @@ If the current buffer is visiting a file that is executable, the
 ** New user option 'process-error-pause-time'.
 This determines how long to pause Emacs after a process
 filter/sentinel error has been handled.
+
++++
+** New faces for font-lock.
+These faces are primarily meant for use with tree-sitter.  They are:
+'font-lock-bracket-face', 'font-lock-delimiter-face',
+'font-lock-escape-face', 'font-lock-number-face',
+'font-lock-misc-punctuation-face', 'font-lock-operator-face',
+'font-lock-property-face', and 'font-lock-punctuation-face'.
 
 +++
 ** New face 'variable-pitch-text'.
@@ -351,8 +854,8 @@ the 'COLORTERM' environment variable is set to the value "truecolor".
 *** Select active regions with xterm selection support.
 On terminals with xterm setSelection support, the active region may be
 saved to the X primary selection, following the
-'select-active-regions' variable.  This support is enabled with
-'xterm-select-active-regions'.
+'select-active-regions' variable.  This support is enabled when
+'tty-select-active-regions' is non-nil.
 
 ---
 *** New command to set up display of unsupported characters.
@@ -684,6 +1187,14 @@ to be highlighted bold.
 Use it if you want Imenu to forget the buffer's index alist and
 recreate it anew next time 'imenu' is invoked.
 
++++
+** Emacs is now capable of abandoning a window's redisplay that takes too long.
+This is controlled by the new variable 'max-redisplay-ticks'.  If that
+variable is set to a non-zero value, display of a window will be
+aborted after that many low-level redisplay operations, thus
+preventing Emacs from becoming wedged when visiting files with very
+long lines.
+
 * Editing Changes in Emacs 29.1
 
 +++
@@ -875,13 +1386,14 @@ This is a variant of the 'slovak' input method, which corresponds to
 the QWERTY Slovak keyboards.
 
 
-* Changes in Specialized Modes and Packages in Emacs 30.1
+* Changes in Specialized Modes and Packages in Emacs 29.1
 
-
-* New Modes and Packages in Emacs 30.1
+** Ecomplete
 
-
-* Incompatible Lisp Changes in Emacs 30.1
+---
+*** New commands 'ecomplete-edit' and 'ecomplete-remove'.
+These allow you to (respectively) edit and bulk-remove entries from
+the ecomplete database.
 
 ---
 *** New user option 'ecomplete-auto-select'.
@@ -1081,6 +1593,36 @@ These commands can be useful if the ".elc" files are out of date
 If no packages are marked, 'x' will install the package under point if
 it isn't already, and remove it if it is installed.
 
++++
+*** New command 'package-vc-install'.
+Packages can now be installed directly from source by cloning from a
+repository.
+
++++
+*** New command 'package-vc-install-from-checkout'.
+An existing checkout can now be loaded via package.el, by creating a
+symbolic link from the usual package directory to the checkout.
+
++++
+*** New command 'package-vc-checkout'.
+Used to fetch the source of a package by cloning a repository without
+activating the package.
+
++++
+*** New command 'package-vc-prepare-patch'.
+This command allows you to send patches to package maintainers, for
+packages checked out using 'package-vc-install'.
+
++++
+*** New command 'package-report-bug'.
+This command helps you compose an email for sending bug reports to
+package maintainers.
+
++++
+*** New user option 'package-vc-selected-packages'.
+By customizing this user option you can specify specific packages to
+install.
+
 ** Emacs Sessions (Desktop)
 
 +++
@@ -1126,6 +1668,13 @@ pop up a new buffer and show the full pretty-printed value there.
 When invoked with a non-zero prefix argument, as in 'C-u C-x C-e',
 this command will pop up a new buffer and show the full pretty-printed
 value there.
+
++++
+*** You can now generate a backtrace from Lisp errors in redisplay.
+To do this, set the new variable 'backtrace-on-redisplay-error' to a
+non-nil value.  The backtrace will be written to a special buffer
+named "*Redisplay-trace*".  This buffer will not be automatically
+displayed in a window.
 
 ** Compile
 
@@ -2419,6 +2968,44 @@ Emacs buffers, like indentation and the like.  The new ert function
 ** New mode 'js-json-mode'.
 This is a lightweight variant of 'js-mode' that is used by default
 when visiting JSON files.
+
+** New mode 'typescript-ts-mode'.
+A major mode based on the tree-sitter library for editing programs
+in the TypeScript language.  It includes support for font-locking,
+indentation, and navigation.
+
+** New mode 'c-ts-mode'.
+A major mode based on the tree-sitter library for editing programs
+in the C language.  It includes support for font-locking,
+indentation, Imenu, which-func, and navigation.
+
+** New mode 'c++-ts-mode'.
+A major mode based on the tree-sitter library for editing programs
+in the C++ language.  It includes support for font-locking,
+indentation, Imenu, which-func, and navigation.
+
+** New mode 'java-ts-mode'.
+A major mode based on the tree-sitter library for editing programs
+in the Java language.  It includes support for font-locking,
+indentation, Imenu, which-func, and navigation.
+
+** New mode 'css-ts-mode'.
+A major mode based on the tree-sitter library for editing programs
+in the CSS language.  It includes support for font-locking,
+indentation, Imenu, which-func, and navigation.
+
+** New mode 'json-ts-mode'.
+A major mode based on the tree-sitter library for editing programs
+in the JSON language.  It includes support for font-locking,
+indentation, Imenu, which-func, and navigation.
+
+** New mode 'csharp-ts-mode'.
+A major mode based on the tree-sitter library for editing programs
+in the C# language.  It includes support for font-locking,
+indentation, Imenu, which-func, and navigation.
+
+** New mode 'csharp-mode'.
+A major mode based on CC Mode for editing programs in the C# language.
 
 
 * Incompatible Lisp Changes in Emacs 29.1
@@ -3763,11 +4350,58 @@ and stack usage.  'max-specpdl-size' is still present as a plain
 variable for compatibility but its limiting powers have been taken away.
 
 
-* Changes in Emacs 30.1 on Non-Free Operating Systems
+* Changes in Emacs 29.1 on Non-Free Operating Systems
+
+** MS-Windows
+
+---
+*** Emacs now supports double-buffering on MS-Windows to reduce display flicker.
+(This was supported on Free systems since Emacs 26.1.)
+
+To disable double-buffering (e.g., if it causes display problems), set
+the frame parameter 'inhibit-double-buffering' to a non-nil value.
+You can do that either by adding
+
+    '(inhibit-double-buffering . t)
+
+to 'default-frame-alist', or by modifying the frame parameters of the
+selected frame by evaluating
+
+    (modify-frame-parameters nil '((inhibit-double-buffering . t)))
+
++++
+*** Emacs now supports system dark mode.
+On Windows 10 (version 1809 and higher) and Windows 11, Emacs will now
+follow the system's dark mode: GUI frames use the appropriate light or
+dark title bar and scroll bars, based on the user's Windows-wide color
+settings.
+
+---
+*** Emacs now uses native image APIs to display some image formats.
+On Windows 2000 and later, Emacs now defaults to using the native
+image APIs for displaying the BMP, GIF, JPEG, PNG, and TIFF images.
+This means Emacs on MS-Windows needs no longer use external image
+support libraries to display those images.  Other image types -- XPM,
+SVG, and WEBP -- still need support libraries for Emacs to be able to
+display them.
+
+The use of native image APIs is controlled by the variable
+'w32-use-native-image-API', whose value now defaults to t on systems
+where those APIs are available.
+
++++
+*** Emacs now supports display of BMP images using native image APIs.
+When 'w32-use-native-image-API' is non-nil, Emacs on MS-Windows now
+has built-in support for displaying BMP images.
+
+** Cygwin
+
+---
+*** 'process-attributes' is now implemented.
 
 
 ----------------------------------------------------------------------
-This file is NOT part of GNU Emacs.
+This file is part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -3781,11 +4415,3 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
-
-
-Local variables:
-coding: utf-8
-mode: outline
-mode: emacs-news
-paragraph-separate: "[ 	]*$"
-end:
