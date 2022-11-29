@@ -1438,7 +1438,7 @@ DEFUN ("tree-sitter-calculate-indent",
 			      if (strlen (ts_node_type (delimiter_node)) == 1
 				  && ts_node_type (delimiter_node)[0] == delimiter_open)
 				{
-				  hanging_indent_p = true;
+				  hanging_indent_p = true; /* prev line was lone '(' */
 				  ptrdiff_t delimiter_end =
 				    SITTER_TO_BUFFER (ts_node_end_byte (delimiter_node));
 				  for (ptrdiff_t pos = delimiter_end;
@@ -1454,23 +1454,15 @@ DEFUN ("tree-sitter-calculate-indent",
 				  break;
 				}
 			    }
-			  if (hanging_indent_p)
-			    {
-			      /* previous line ended with left paren. */
-			      result += indent_nspaces;
-			    }
-			  else
-			    {
-			      /* align to left paren on previous line.  */
-			      specpdl_ref count = SPECPDL_INDEX ();
-			      ptrdiff_t delimiter_beg =
-				SITTER_TO_BUFFER (ts_node_start_byte (delimiter_node));
-			      record_unwind_protect_excursion ();
-			      Fgoto_char (make_fixnum (delimiter_beg));
-			      result = 1 + current_column ();
-			      unbind_to (count, Qnil);
-			      goto done; /* since delimiter_beg is absolute.  */
-			    }
+			  (void) hanging_indent_p; /* neovim uses this.  */
+			  specpdl_ref count = SPECPDL_INDEX ();
+			  ptrdiff_t delimiter_beg =
+			    SITTER_TO_BUFFER (ts_node_start_byte (delimiter_node));
+			  record_unwind_protect_excursion ();
+			  Fgoto_char (make_fixnum (delimiter_beg));
+			  result = 1 + current_column ();
+			  unbind_to (count, Qnil);
+			  goto done; /* since delimiter_beg is absolute.  */
 			}
 		    }
 		}
