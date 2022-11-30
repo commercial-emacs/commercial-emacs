@@ -6252,9 +6252,6 @@ Add import for undefined name `%s' (empty to skip): "
 
   (make-local-variable 'python-shell-internal-buffer)
 
-  (when python-indent-guess-indent-offset
-    (python-indent-guess-indent-offset))
-
   (add-hook 'flymake-diagnostic-functions #'python-flymake nil t))
 
 ;;; Completion predicates for M-x

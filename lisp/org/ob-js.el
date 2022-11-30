@@ -4,7 +4,7 @@
 
 ;; Author: Eric Schulte
 ;; Keywords: literate programming, reproducible research, js
-;; Homepage: https://orgmode.org
+;; URL: https://orgmode.org
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -38,6 +38,10 @@
 ;;   configuration instructions
 
 ;;; Code:
+
+(require 'org-macs)
+(org-assert-version)
+
 (require 'ob)
 
 (declare-function run-mozilla "ext:moz" (arg))
