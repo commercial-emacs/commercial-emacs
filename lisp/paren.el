@@ -491,8 +491,8 @@ Where HERE-BEG..HERE-END is expected to be near point.")
           ;; Always set the overlay face, since it varies.
           (overlay-put show-paren--overlay 'priority show-paren-priority)
           (overlay-put show-paren--overlay 'face face))
-        (when (<= 3 show-paren--scan-errors)
-          ;; three strikes, you're out?
+        (when (<= 100 show-paren--scan-errors)
+          ;; 100 strikes, you're out?
           (message "Disabling show-paren-mode for scan errors")
           (setq show-paren--scan-errors 0)
           (show-paren-mode -1))))))
