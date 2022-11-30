@@ -1160,14 +1160,18 @@ DEFUN ("tree-sitter-calculate-indent",
 	{
 	  /* stack of cons pairs (SCM . SCM_CONTENT) */
 	  Lisp_Object stack = list1 (Fcons (indents_scm, Qnil));
+	  Lisp_Object inherited = Qnil;
+	  uint32_t error_offset, scm_offset = 0;
+	  TSQueryError error_type;
+	  TSQuery *query;
 	  char *query_buf = NULL;
-	  long query_length = 0;
+
 	  while (! NILP (stack))
 	    {
-	      if (NILP (Fcdr (Fcar (stack))))
+	      if (NILP (XCDR (XCAR (stack))))
 		{
 		  /* not yet hydrated; build stack.  */
-		  FILE *fp = fopen (SSDATA (Fcar (stack)), "rb");
+		  FILE *fp = fopen (SSDATA (XCAR (XCAR (stack))), "rb");
 		  if (fp)
 		    {
 		      long len;
@@ -1176,18 +1180,25 @@ DEFUN ("tree-sitter-calculate-indent",
 		      len = ftell (fp);
 		      rewind (fp);
 		      content = xzalloc (len + 1);
-		      if (1 != fread (content, len + 1, 1, fp))
-			fp = NULL;
+		      if (1 != fread (content, len, 1, fp))
+			{
+			  fclose (fp);
+			  fp = NULL;
+			}
 		      else
 			{
 			  int j = 0;
-			  char *header = strtok (content, "\n");
-			  Fsetcdr (Fcar (stack), build_string (content));
+			  char *header;
+			  const char *inherits = "inherits";
+			  /* Do this now since strtok() mucks.  */
+			  Fsetcdr (XCAR (stack), build_string (content));
 
+			  header = strtok (content, "\n");
 			  for (; isspace (header[j]) || header[j] == ';'; ++j);
-			  if (0 == strcmp (&header[j], "inherits"))
+			  if (0 == strncmp (&header[j], inherits, strlen (inherits)))
 			    {
 			      Lisp_Object reversed = Qnil;
+			      j += strlen (inherits);
 			      for (; isspace (header[j]) || header[j] == ':'; ++j);
 			      for (char *p = strtok (&header[j], ",");
 				   p != NULL;
@@ -1197,11 +1208,26 @@ DEFUN ("tree-sitter-calculate-indent",
 				    p[strlen(p) - 1] = '\0';
 				  if (p[0] == '(')
 				    ++p;
-				  reversed = Fcons (build_string (p), reversed);
+				  reversed =
+				    Fcons
+				    (Fexpand_file_name
+				     (build_string ("indents.scm"),
+				      concat3 (Ffile_name_as_directory
+					       (Fsymbol_value
+						(Qtree_sitter_resources_dir)),
+					       build_string ("queries/"),
+					       build_string (p))), reversed);
 				}
 			      FOR_EACH_TAIL (reversed)
 				{
-				  stack = Fcons (Fcons (reversed, Qnil), stack);
+				  if (Fmember (XCAR (reversed), inherited))
+				    {
+				      fclose (fp);
+				      fp = NULL;
+				      break;
+				    }
+				  inherited = Fcons (XCAR (reversed), inherited);
+				  stack = Fcons (Fcons (XCAR (reversed), Qnil), stack);
 				}
 			    }
 			}
@@ -1210,26 +1236,32 @@ DEFUN ("tree-sitter-calculate-indent",
 		  if (! fp)
 		    {
 		      Lisp_Object args[2];
-		      args[0] = build_string ("%s not found");
-		      args[1] = indents_scm;
+		      args[0] = build_string ("%s not found or malformed");
+		      args[1] = XCAR (XCAR (stack));
 		      xsignal1 (Qtree_sitter_language_error, Fformat (4, args));
 		    }
+		  fclose (fp);
 		}
 	      else
 		{
 		  /* content hydrated; append query_buf.  */
-		  char *where = &query_buf[query_length];
-		  query_length = query_length + SCHARS (Fcdr (Fcar (stack))) + 1;
-		  query_buf = xrealloc (query_buf, query_length);
-		  sprintf (where, "%s", SSDATA (Fcdr (Fcar (stack))));
-		  stack = Fcdr (stack);
+		  if (query_buf)
+		    query_buf = xrealloc (query_buf,
+					  strlen (query_buf)
+					  + SCHARS (XCDR (XCAR (stack)))
+					  + 1);
+		  else
+		    query_buf = xzalloc (SCHARS (XCDR (XCAR (stack))) + 1);
+		  if (NILP (XCDR (stack)))
+		    scm_offset = strlen (query_buf);
+		  sprintf (&query_buf[strlen (query_buf)],
+			   "%s", SSDATA (XCDR (XCAR (stack))));
+		  stack = XCDR (stack);
 		}
 	    }
 
-	  uint32_t error_offset;
-	  TSQueryError error_type;
-	  TSQuery *query = ts_query_new (fn (), query_buf, strlen (query_buf),
-					 &error_offset, &error_type);
+	  query = ts_query_new (fn (), query_buf, strlen (query_buf),
+				&error_offset, &error_type);
 	  if (query == NULL)
 	    {
 	      Lisp_Object args[4];
@@ -1237,7 +1269,7 @@ DEFUN ("tree-sitter-calculate-indent",
 		("ts_query_new() of %s returned %d at offset %d");
 	      args[1] = indents_scm;
 	      args[2] = make_fixnum ((EMACS_INT) error_type);
-	      args[3] = make_fixnum ((EMACS_INT) error_offset);
+	      args[3] = make_fixnum ((EMACS_INT) (error_offset - scm_offset));
 	      xfree (query_buf);
 	      xsignal1 (Qtree_sitter_language_error, Fformat (4, args));
 	    }
@@ -1344,7 +1376,7 @@ DEFUN ("tree-sitter-calculate-indent",
 		    ts_query_predicates_for_pattern (XTREE_SITTER (sitter)->indents_query,
 						     slice.pattern_indices[slice_index],
 						     &predicates_length);
-		  char delimiter_open = '\0';
+		  char delimiter_open = '\0', delimiter_close = '\0';
 		  if (predicates_length
 		      && predicates[0].type == TSQueryPredicateStepTypeString)
 		    {
@@ -1359,9 +1391,13 @@ DEFUN ("tree-sitter-calculate-indent",
 					   predicates[1].value_id, &length),
 					  "delimiter"))
 			{
-			  delimiter_open = ts_query_string_value_for_id
+			  const char *what = ts_query_string_value_for_id
 			    (XTREE_SITTER (sitter)->indents_query,
-			     predicates[2].value_id, &length)[0];
+			     predicates[2].value_id, &length);
+			  if (strlen (what) > 0)
+			    delimiter_open = what[0];
+			  if (strlen (what) > 1)
+			    delimiter_close = what[1];
 			}
 		      else if (strstr (what, "has-type?")
 			       && predicates[1].type == TSQueryPredicateStepTypeCapture)
@@ -1476,43 +1512,41 @@ DEFUN ("tree-sitter-calculate-indent",
 			}
 		      else if (0 == strcmp (capture_name, "aligned_indent"))
 			{
-			  bool hanging_indent_p = false;
-			  TSNode delimiter_node;
+			  Lisp_Object stack = Qnil;
 			  for (uint32_t count = ts_node_child_count
 				 (slice.captures[slice_index].node), i = 0;
 			       i < count;
 			       ++i)
 			    {
-			      delimiter_node =
-				ts_node_child (slice.captures[slice_index].node, i);
-			      if (strlen (ts_node_type (delimiter_node)) == 1
-				  && ts_node_type (delimiter_node)[0] == delimiter_open)
+			      TSNode child = ts_node_child
+				(slice.captures[slice_index].node, i);
+			      ptrdiff_t child_beg =
+				SITTER_TO_BUFFER (ts_node_start_byte (child));
+			      const ptrdiff_t line_child_beg = count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (child_beg));
+			      if (line_child_beg >= line_target_pt)
+				break;
+			      if (strlen (ts_node_type (child)) == 1)
 				{
-				  hanging_indent_p = true; /* prev line was lone '(' */
-				  ptrdiff_t delimiter_end =
-				    SITTER_TO_BUFFER (ts_node_end_byte (delimiter_node));
-				  for (ptrdiff_t pos = delimiter_end;
-				       pos != ZV && FETCH_CHAR (pos) != '\n';
-				       ++pos)
-				    {
-				      if (! isspace (FETCH_CHAR (pos)))
-					{
-					  hanging_indent_p = false;
-					  break;
-					}
-				    }
-				  break;
+				  if (ts_node_type (child)[0] == delimiter_open)
+				    stack = Fcons (make_fixnum (child_beg), stack);
+				  else if (ts_node_type (child)[0] == delimiter_close)
+				    stack = XCDR (stack);
 				}
 			    }
-			  (void) hanging_indent_p; /* neovim used this.  */
-			  specpdl_ref count = SPECPDL_INDEX ();
-			  ptrdiff_t delimiter_beg =
-			    SITTER_TO_BUFFER (ts_node_start_byte (delimiter_node));
-			  record_unwind_protect_excursion ();
-			  Fgoto_char (make_fixnum (delimiter_beg));
-			  result = 1 + current_column ();
-			  unbind_to (count, Qnil);
-			  goto done; /* since delimiter_beg is absolute.  */
+			  if (! NILP (stack))
+			    {
+			      specpdl_ref count = SPECPDL_INDEX ();
+			      record_unwind_protect_excursion ();
+			      Fgoto_char (XCAR (stack));
+			      result = 1 + current_column ();
+			      unbind_to (count, Qnil);
+			      goto done; /* since delimiter pos is absolute.  */
+			    }
+			  else if (last_dented_line < 0) /* as if just @indent */
+			    {
+			      result += indent_nspaces;
+			      last_dented_line = line_capture_beg;
+			    }
 			}
 		    }
 		}
