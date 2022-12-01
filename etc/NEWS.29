@@ -2224,11 +2224,13 @@ underlying shell instead of using the normal Emacs bindings.
 also handle ANSI codes for faint, italic and blinking text, displaying
 it with new 'term-{faint,italic,slow-blink,fast-blink}' faces.
 
-** Xref
+** Project
 
 +++
-*** 'project-find-file' and 'project-or-external-find-file' now accept
-a prefix argument which is interpreted to mean "include all files".
+*** 'project-find-file' and 'project-or-external-find-file' can include all.
+The commands 'project-find-file' and 'project-or-external-find-file'
+now accept a prefix argument, which is interpreted to mean "include
+all files".
 
 +++
 *** New command 'project-list-buffers' bound to 'C-x p C-b'.
@@ -2238,6 +2240,15 @@ This command displays a list of buffers from the current project.
 *** 'project-kill-buffers' can display the list of buffers to kill.
 Customize the user option 'project-kill-buffers-display-buffer-list'
 to enable the display of the buffer list.
+
+*** New user option 'project-vc-extra-root-markers'.
+Use it to add detection of nested projects (inside a VCS repository),
+or projects outside of VCS repositories.
+
+As a consequence, the 'VC project backend' is formally renamed to
+'VC-aware project backend'.
+
+** Xref
 
 +++
 *** New command 'xref-go-forward'.
