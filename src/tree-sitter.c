@@ -1092,6 +1092,24 @@ DEFUN ("tree-sitter-node-end",
 		   (ts_node_end_byte (XTREE_SITTER_NODE (node)->node)));
 }
 
+/* Constructs from count_lines(), which we avoid calling (expensive)
+   if we only require an existential proof.
+*/
+static bool
+same_line (ptrdiff_t beg, ptrdiff_t end)
+{
+  if (end < beg)
+    {
+      ptrdiff_t tmp = beg;
+      beg = end;
+      end = tmp;
+    }
+  ptrdiff_t ceiling = min (end - 1, BUFFER_CEILING_OF (beg));
+  unsigned char *ceiling_addr = BYTE_POS_ADDR (ceiling) + 1;
+  unsigned char *cursor = BYTE_POS_ADDR (beg);
+  return memchr (cursor, '\n', ceiling_addr - cursor) == NULL;
+}
+
 DEFUN ("tree-sitter-calculate-indent",
        Ftree_sitter_calculate_indent, Stree_sitter_calculate_indent,
        0, 0, 0,
@@ -1307,8 +1325,6 @@ DEFUN ("tree-sitter-calculate-indent",
 			     sitter_end);
 
 	  int slice_index = slice.len - 1;
-	  const ptrdiff_t line_target_pt = count_lines (CHAR_TO_BYTE (beg), PT_BYTE);
-	  ptrdiff_t line_node_beg;
 	  for (Lisp_Object node = target_node,
 		 root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
 	       slice_index >= 0
@@ -1320,15 +1336,13 @@ DEFUN ("tree-sitter-calculate-indent",
 	      ptrdiff_t node_beg =
 		SITTER_TO_BUFFER (ts_node_start_byte
 				  (XTREE_SITTER_NODE (node)->node));
-	      line_node_beg = count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (node_beg));
 	      for (;;)
 		{
 		  ptrdiff_t slice_beg =
 		    SITTER_TO_BUFFER (ts_node_start_byte
 				      (slice.captures[slice_index].node));
-		  ptrdiff_t line_slice_beg =
-		    count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (slice_beg));
-		  if (line_slice_beg <= line_node_beg)
+		  if (same_line (node_beg, slice_beg)
+		      || slice_beg < node_beg)
 		    break;
 		  if (--slice_index < 0)
 		    goto done;
@@ -1351,8 +1365,6 @@ DEFUN ("tree-sitter-calculate-indent",
 		    SITTER_TO_BUFFER (ts_node_end_byte (slice.captures[slice_index].node));
 		  ptrdiff_t line_capture_beg =
 		    count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (capture_beg));
-		  ptrdiff_t line_capture_end =
-		    count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (capture_end));
 
 		  if (slice.captures[slice_index].index == UINT32_MAX)
 		    {
@@ -1360,7 +1372,7 @@ DEFUN ("tree-sitter-calculate-indent",
 		      continue;
 		    }
 
-		  if (line_capture_beg != line_node_beg)
+		  if (! same_line (capture_beg, node_beg))
 		    goto next_parent; /* !!! */
 
 		  uint32_t capture_name_length = 0;
@@ -1440,7 +1452,7 @@ DEFUN ("tree-sitter-calculate-indent",
 
 		  if (0 == strcmp ("comment",
 				   ts_node_type (XTREE_SITTER_NODE (node)->node))
-		      && line_node_beg != line_target_pt)
+		      && ! same_line (node_beg, PT_BYTE))
 		    {
 		      struct text_pos pt;
 		      void *itdata = bidi_shelve_cache ();
@@ -1483,7 +1495,7 @@ DEFUN ("tree-sitter-calculate-indent",
 		    }
 		  else if (0 == strcmp (capture_name, "branch"))
 		    {
-		      if (line_node_beg == line_target_pt
+		      if (same_line (node_beg, PT_BYTE)
 			  && last_dented_line < 0)
 			{
 			  result -= indent_nspaces;
@@ -1499,8 +1511,8 @@ DEFUN ("tree-sitter-calculate-indent",
 			  last_dented_line = line_capture_beg;
 			}
 		    }
-		  else if (line_capture_beg != line_capture_end
-			   && line_node_beg != line_target_pt)
+		  else if (! same_line (capture_beg, capture_end)
+			   && ! same_line (node_beg, PT_BYTE))
 		    {
 		      if (0 == strcmp (capture_name, "indent"))
 			{
@@ -1522,8 +1534,8 @@ DEFUN ("tree-sitter-calculate-indent",
 				(slice.captures[slice_index].node, i);
 			      ptrdiff_t child_beg =
 				SITTER_TO_BUFFER (ts_node_start_byte (child));
-			      const ptrdiff_t line_child_beg = count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (child_beg));
-			      if (line_child_beg >= line_target_pt)
+			      if (same_line (child_beg, PT_BYTE)
+				  || child_beg > PT_BYTE)
 				break;
 			      if (strlen (ts_node_type (child)) == 1)
 				{
@@ -1560,13 +1572,11 @@ DEFUN ("tree-sitter-calculate-indent",
 	      for (;;)
 		{
 		  node = Ftree_sitter_node_parent (node);
-		  if (NILP (node))
-		    break;
-		  ptrdiff_t node_beg =
-		    SITTER_TO_BUFFER (ts_node_start_byte
-				      (XTREE_SITTER_NODE (node)->node));
-		  if (count_lines (CHAR_TO_BYTE (beg), CHAR_TO_BYTE (node_beg))
-		      < line_node_beg)
+		  if (NILP (node)
+		      || ! same_line (node_beg,
+				      SITTER_TO_BUFFER
+				      (ts_node_start_byte
+				       (XTREE_SITTER_NODE (node)->node))))
 		    break;
 		}
 	    }
