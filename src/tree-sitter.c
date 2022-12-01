@@ -1350,7 +1350,6 @@ DEFUN ("tree-sitter-calculate-indent",
 
 	      /* Process all QueryCaptures until the line of capture
 		 is no longer line of NODE.  */
-	      bool ignored_node = false;
 	      ptrdiff_t last_dented_line = -1;
 	      Lisp_Object capture_name_to_tsnode =
 		make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
@@ -1487,11 +1486,9 @@ DEFUN ("tree-sitter-calculate-indent",
 		    }
 		  else if (0 == strcmp (capture_name, "ignore"))
 		    {
-		      ignored_node = true;
 		    }
 		  else if (0 == strcmp (capture_name, "auto"))
 		    {
-
 		    }
 		  else if (0 == strcmp (capture_name, "branch"))
 		    {
@@ -1564,11 +1561,6 @@ DEFUN ("tree-sitter-calculate-indent",
 		}
 
 	    next_parent:
-	      if (ignored_node && last_dented_line < 0)
-		{
-		  // unclear
-		  goto done;
-		}
 	      for (;;)
 		{
 		  node = Ftree_sitter_node_parent (node);
