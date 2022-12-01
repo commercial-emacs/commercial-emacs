@@ -565,9 +565,7 @@ struct x_selection_request *selection_request_stack;
 
 struct transfer outstanding_transfers;
 
-
-
-struct prop_location
+struct property_change
 {
   int identifier;
   Display *display;
@@ -575,30 +573,10 @@ struct prop_location
   Atom property;
   int desired_state;
   bool arrived;
-  struct prop_location *next;
+  struct property_change *next;
 };
 
-static int prop_location_identifier;
-
-static Lisp_Object property_change_reply;
-
-static struct prop_location *property_change_reply_object;
-
-static struct prop_location *property_change_wait_list;
-
-static void
-set_property_change_object (struct prop_location *location)
-{
-  /* Input must be blocked so we don't get the event before we set
-     these.  */
-  if (! input_blocked_p ())
-    emacs_abort ();
-
-  XSETCAR (property_change_reply, Qnil);
-  property_change_reply_object = location;
-}
-
-
+static struct property_change *pending_property_changes;
 
 static void
 x_push_current_selection_request (struct selection_input_event *se,
@@ -1486,13 +1464,13 @@ wait_for_property_change (struct property_change *change)
 void
 x_handle_property_notify (const XPropertyEvent *event)
 {
-  struct prop_location *rest;
+  struct property_change *rest;
   struct transfer *next;
 #ifdef TRACE_SELECTION
   char *name;
 #endif
 
-  for (rest = property_change_wait_list; rest; rest = rest->next)
+  for (rest = pending_property_changes; rest; rest = rest->next)
     {
       if (! rest->arrived
 	  && rest->property == event->atom
@@ -3206,10 +3184,6 @@ syms_of_xselect (void)
   defsubr (&Sx_register_dnd_atom);
   defsubr (&Sx_get_local_selection);
 
-  reading_selection_reply = Fcons (Qnil, Qnil);
-  staticpro (&reading_selection_reply);
-  staticpro (&property_change_reply);
-
   outstanding_transfers.next = &outstanding_transfers;
   outstanding_transfers.last = &outstanding_transfers;
 
@@ -3349,7 +3323,7 @@ mark_xselect (void)
   next = outstanding_transfers.next;
   while (next != &outstanding_transfers)
     {
-      mark_object (next->data.string);
+      mark_object (&next->data.string);
       next = next->next;
     }
 
@@ -3357,6 +3331,6 @@ mark_xselect (void)
   for (; frame; frame = frame->last)
     {
       for (cs = frame->converted_selections; cs; cs = cs->next)
-	mark_object (cs->string);
+	mark_object (&cs->string);
     }
 }
