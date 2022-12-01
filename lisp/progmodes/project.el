@@ -1,7 +1,7 @@
 ;;; project.el --- Operations on the current project  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2015-2022 Free Software Foundation, Inc.
-;; Version: 0.9.0
+;; Version: 0.8.3
 ;; Package-Requires: ((emacs "26.1") (xref "1.4.0"))
 
 ;; This is a GNU ELPA :core package.  Avoid using functionality that
@@ -58,30 +58,13 @@
 ;;
 ;; This list can change in future versions.
 ;;
-;; Transient project:
-;;
-;; An instance of this type can be returned by `project-current' if no
-;; project was detected automatically, and the user had to pick a
-;; directory manually.  The fileset it describes is the whole
-;; directory, with the exception of some standard ignored files and
-;; directories.  This type has little purpose otherwise, as the only
-;; generic function it provides an override for is `project-root'.
-;;
-;; VC-aware project:
+;; VC project:
 ;;
 ;; Originally conceived as an example implementation, now it's a
 ;; relatively fast backend that delegates to 'git ls-files' or 'hg
 ;; status' to list the project's files.  It honors the VC ignore
 ;; files, but supports additions to the list using the user option
-;; `project-vc-ignores' (usually through .dir-locals.el).  See the
-;; customization group `project-vc' for other options that control its
-;; behavior.
-;;
-;; If the repository is using any other VCS than Git or Hg, the file
-;; listing uses the default mechanism based on `find-program'.
-;;
-;; This project type can also be used for non-VCS controlled
-;; directories, see the variable `project-vc-extra-root-markers'.
+;; `project-vc-ignores' (usually through .dir-locals.el).
 ;;
 ;; Utils:
 ;;
@@ -213,8 +196,8 @@ project instance.
 
 The \"transient\" project instance is a special kind of value
 which denotes a project rooted in that directory and includes all
-the files under the directory except for those that match entries
-in `vc-directory-exclusion-list' or `grep-find-ignored-files'.
+the files under the directory except for those that should be
+ignored (per `project-ignores').
 
 See the doc string of `project-find-functions' for the general form
 of the project instance object."
@@ -394,7 +377,7 @@ the buffer's value of `default-directory'."
     (nreverse bufs)))
 
 (defgroup project-vc nil
-  "VC-aware project implementation."
+  "Project implementation based on the VC package."
   :version "25.1"
   :group 'project)
 
@@ -414,49 +397,20 @@ you might have to restart Emacs to see the effect."
   :safe #'booleanp)
 
 (defcustom project-vc-include-untracked t
-  "When non-nil, the VC-aware project backend includes untracked files."
+  "When non-nil, the VC project backend includes untracked files."
   :type 'boolean
   :version "29.1"
   :safe #'booleanp)
 
 (defcustom project-vc-name nil
-  "When non-nil, the name of the current VC-aware project.
+  "When non-nil, the name of the current VC project.
 
-The best way to change the value a VC-aware project reports as
-its name, is by setting this in .dir-locals.el."
+The best way to change the value a VC project reports as its
+name, is by setting this in .dir-locals.el."
   :type '(choice (const :tag "Default to the base name" nil)
                  (string :tag "Custom name"))
   :version "29.1"
-  :package-version '(project . "0.9.0")
   :safe #'stringp)
-
-;; Not using regexps because these wouldn't work in Git pathspecs, in
-;; case we decide we need to be able to list nested projects.
-(defcustom project-vc-extra-root-markers nil
-  "List of additional markers to signal project roots.
-
-A marker is either a base file name or a glob pattern for such.
-
-A directory containing such a marker file or a file matching a
-marker pattern will be recognized as the root of a VC-aware
-project.
-
-Example values: \".dir-locals.el\", \"package.json\", \"pom.xml\",
-\"requirements.txt\", \"Gemfile\", \"*.gemspec\", \"autogen.sh\".
-
-These will be used in addition to regular directory markers such
-as \".git\", \".hg\", and so on, depending on the value of
-`vc-handled-backends'.  It is most useful when a project has
-subdirectories inside it that need to be considered as separate
-projects.  It can also be used for projects outside of VC
-repositories.
-
-In either case, their behavior will still obey the relevant
-variables, such as `project-vc-ignores' or `project-vc-name'."
-  :type 'list
-  :version "29.1"
-  :package-version '(project . "0.9.0")
-  :safe (lambda (val) (and (listp val) (cl-every #'stringp val))))
 
 ;; FIXME: Using the current approach, major modes are supposed to set
 ;; this variable to a buffer-local value.  So we don't have access to
@@ -466,7 +420,7 @@ variables, such as `project-vc-ignores' or `project-vc-name'."
 ;;
 ;; We could add a second argument to this function: a file extension,
 ;; or a language name.  Some projects will know the set of languages
-;; used in them; for others, like the VC-aware type, we'll need
+;; used in them; for others, like VC-based projects, we'll need
 ;; auto-detection.  I see two options:
 ;;
 ;; - That could be implemented as a separate second hook, with a
@@ -490,8 +444,8 @@ variables, such as `project-vc-ignores' or `project-vc-name'."
 It should return a list of directory roots that contain source
 files related to the current buffer.
 
-The directory names should be absolute.  Used in the VC-aware
-project backend implementation of `project-external-roots'.")
+The directory names should be absolute.  Used in the VC project
+backend implementation of `project-external-roots'.")
 
 (defun project-try-vc (dir)
   (unless (vc-file-getprop dir 'project-vc)

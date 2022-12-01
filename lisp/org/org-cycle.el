@@ -87,7 +87,7 @@
 (defvar-local org-cycle-subtree-status nil)
 (put 'org-cycle-subtree-status 'org-state t)
 
-;;;; Customization:
+;;;; Customisation:
 
 
 (defgroup org-cycle nil

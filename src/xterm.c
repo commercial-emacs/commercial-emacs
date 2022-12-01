@@ -1052,20 +1052,6 @@ static const struct x_atom_ref x_atom_refs[] =
     /* Old OffiX (a.k.a. old KDE) drop protocol support.  */
     ATOM_REFS_INIT ("DndProtocol", Xatom_DndProtocol)
     ATOM_REFS_INIT ("_DND_PROTOCOL", Xatom_DND_PROTOCOL)
-    /* Here are some atoms that are not actually used from C, just
-       defined to make replying to selection requests fast.  */
-    ATOM_REFS_INIT ("text/plain;charset=utf-8", Xatom_text_plain_charset_utf_8)
-    ATOM_REFS_INIT ("LENGTH", Xatom_LENGTH)
-    ATOM_REFS_INIT ("FILE_NAME", Xatom_FILE_NAME)
-    ATOM_REFS_INIT ("CHARACTER_POSITION", Xatom_CHARACTER_POSITION)
-    ATOM_REFS_INIT ("LINE_NUMBER", Xatom_LINE_NUMBER)
-    ATOM_REFS_INIT ("COLUMN_NUMBER", Xatom_COLUMN_NUMBER)
-    ATOM_REFS_INIT ("OWNER_OS", Xatom_OWNER_OS)
-    ATOM_REFS_INIT ("HOST_NAME", Xatom_HOST_NAME)
-    ATOM_REFS_INIT ("USER", Xatom_USER)
-    ATOM_REFS_INIT ("CLASS", Xatom_CLASS)
-    ATOM_REFS_INIT ("NAME", Xatom_NAME)
-    ATOM_REFS_INIT ("SAVE_TARGETS", Xatom_SAVE_TARGETS)
   };
 
 enum
@@ -26634,14 +26620,13 @@ x_wm_supports_1 (struct x_display_info *dpyinfo, Atom want_atom)
 
       if (rc != Success || actual_type != XA_ATOM || x_had_errors_p (dpy))
         {
-          if (tmp_data)
-	    XFree (tmp_data);
+          if (tmp_data) XFree (tmp_data);
           x_uncatch_errors ();
           unblock_input ();
           return false;
         }
 
-      dpyinfo->net_supported_atoms = (Atom *) tmp_data;
+      dpyinfo->net_supported_atoms = (Atom *)tmp_data;
       dpyinfo->nr_net_supported_atoms = actual_size;
       dpyinfo->net_supported_window = wmcheck_window;
     }
@@ -30457,12 +30442,7 @@ x_delete_display (struct x_display_info *dpyinfo)
       last = ie;
     }
 
-  /* Delete selection requests bound for dpyinfo from the keyboard
-     buffer.  */
   x_delete_selection_requests (dpyinfo);
-
-  /* And remove any outstanding selection transfers.  */
-  x_remove_selection_transfers (dpyinfo);
 
   if (next_noop_dpyinfo == dpyinfo)
     next_noop_dpyinfo = dpyinfo->next;
@@ -30492,9 +30472,6 @@ x_delete_display (struct x_display_info *dpyinfo)
 	  xfree (color_entry);
 	}
     }
-
-  if (dpyinfo->net_supported_atoms)
-    XFree (dpyinfo->net_supported_atoms);
 
   xfree (dpyinfo->color_names);
   xfree (dpyinfo->color_names_length);
@@ -30607,11 +30584,7 @@ static struct redisplay_interface x_redisplay_interface =
 void
 x_delete_terminal (struct terminal *terminal)
 {
-  struct x_display_info *dpyinfo;
-  struct frame *f;
-  Lisp_Object tail, frame;
-
-  dpyinfo = terminal->display_info.x;
+  struct x_display_info *dpyinfo = terminal->display_info.x;
 
   /* Protect against recursive calls.  delete_frame in
      delete_terminal calls us back when it deletes our last frame.  */
@@ -30619,19 +30592,6 @@ x_delete_terminal (struct terminal *terminal)
     return;
 
   block_input ();
-
-  /* Delete all remaining frames on the display that is going away.
-     Otherwise, font backends assume the display is still up, and
-     xftfont_end_for_frame crashes.  */
-  FOR_EACH_FRAME (tail, frame)
-    {
-      f = XFRAME (frame);
-
-      if (FRAME_LIVE_P (f) && f->terminal == terminal)
-	/* Pass Qnoelisp rather than Qt.  */
-	delete_frame (frame, Qnoelisp);
-    }
-
 #ifdef HAVE_X_I18N
   /* We must close our connection to the XIM server before closing the
      X display.  */
@@ -30644,10 +30604,6 @@ x_delete_terminal (struct terminal *terminal)
     {
       image_destroy_all_bitmaps (dpyinfo);
       XSetCloseDownMode (dpyinfo->display, DestroyAll);
-
-      /* Delete the scratch cursor GC, should it exist.  */
-      if (dpyinfo->scratch_cursor_gc)
-	XFreeGC (dpyinfo->display, dpyinfo->scratch_cursor_gc);
 
       /* Get rid of any drag-and-drop operation that might be in
 	 progress as well.  */
