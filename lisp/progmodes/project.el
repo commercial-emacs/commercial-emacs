@@ -526,7 +526,8 @@ project backend implementation of `project-external-roots'.")
                dir
                (lambda (d)
                  ;; Maybe limit count to 100 when we can drop Emacs < 28.
-                 (setq last-matches (directory-files d nil marker-re t)))))
+                 (when (file-directory-p d)
+                   (setq last-matches (directory-files d nil marker-re t))))))
              (backend
               (cl-find-if
                (lambda (b)
