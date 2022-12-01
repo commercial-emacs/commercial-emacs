@@ -42,7 +42,6 @@ quoted directory names (Bug#47799)."
   (skip-unless (executable-find "grep"))
   (ert-with-temp-directory directory
     (let ((default-directory directory)
-          (project-current-inhibit-prompt t)
           (project-find-functions nil)
           (project-list-file
            (expand-file-name "projects" directory))
@@ -111,20 +110,6 @@ When `project-ignores' includes a name matching project dir."
                      (list
                       (expand-file-name "some-file" dir)))))))
 
-(ert-deftest project-sparing-backend-discovery ()
-  "Cache results of `vc-responsible-backend`."
-  (skip-unless (eq 'Git (ignore-errors
-                          (vc-responsible-backend default-directory))))
-  (let* ((default-directory (vc-call-backend 'Git 'root default-directory))
-         (project (project-current)))
-    (should (vc-file-getprop default-directory 'project-vc))
-    (should (eq 'Git (vc-file-getprop default-directory 'vc-backend)))
-    (cl-letf (((symbol-function 'vc-responsible-backend)
-               (lambda (&rest _args) (should nil))))
-      (project-files project)
-      (vc-file-clearprops default-directory)
-      (should-error (project-files project)))))
-
 (defvar project-tests--this-file (or (bound-and-true-p byte-compile-current-file)
                                      (and load-in-progress load-file-name)
                                      buffer-file-name))
@@ -136,13 +121,12 @@ When `project-ignores' includes a name matching project dir."
          (dir (file-name-directory project-tests--this-file))
          (_ (vc-file-clearprops dir))
          (project-vc-extra-root-markers nil)
-         (project (project-current nil dir)))
+         (project (project-current nil dir))
+         (this-file "test/lisp/progmodes/project-tests.el"))
     (should-not (null project))
-    (should (equal
-             "test/lisp/progmodes/project-tests.el"
-             (file-relative-name
-              project-tests--this-file
-              (project-root project))))))
+    (should (string-prefix-p this-file (file-relative-name
+                                        project-tests--this-file
+                                        (project-root project))))))
 
 (ert-deftest project-vc-extra-root-markers-supports-wildcards ()
   "Check that one can add wildcard entries."

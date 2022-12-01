@@ -2622,13 +2622,7 @@ Helper function for `describe-package'."
          (incompatible-reason (package--incompatible-p desc))
          (signed (if desc (package-desc-signed desc)))
          (maintainer (cdr (assoc :maintainer extras)))
-         (authors (cdr (assoc :authors extras)))
-         (news (and-let* (pkg-dir
-                          ((not built-in))
-                          (file (expand-file-name "news" pkg-dir))
-                          ((file-regular-p file))
-                          ((file-readable-p file)))
-                 file)))
+         (authors (cdr (assoc :authors extras))))
     (when (string= status "avail-obso")
       (setq status "available obsolete"))
     (when incompatible-reason

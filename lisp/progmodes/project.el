@@ -251,7 +251,8 @@ The directory name must be absolute.")
 (cl-defmethod project-root (project
                             &context (project--within-roots-fallback
                                       (eql nil)))
-  (cl-call-next-method project))
+  (let ((project--within-roots-fallback t))
+    (project-root project)))
 
 (cl-defgeneric project-roots (project)
   "Return the list containing the current project root.
@@ -453,7 +454,7 @@ repositories.
 
 In either case, their behavior will still obey the relevant
 variables, such as `project-vc-ignores' or `project-vc-name'."
-  :type 'list
+  :type '(repeat string)
   :version "29.1"
   :package-version '(project . "0.9.0")
   :safe (lambda (val) (and (listp val) (cl-every #'stringp val))))
@@ -569,7 +570,7 @@ project backend implementation of `project-external-roots'.")
      (t nil))))
 
 (cl-defmethod project-root ((project (head vc)))
-  (cdr project))
+  (nth 2 project))
 
 (cl-defmethod project-external-roots ((project (head vc)))
   (project-subtract-directories
@@ -584,9 +585,8 @@ project backend implementation of `project-external-roots'.")
    (lambda (dir)
      (let ((ignores project-vc-ignores)
            backend)
-       (if (and (file-equal-p dir (cdr project))
-                (setq backend (or (vc-file-getprop dir 'vc-backend)
-                                  (vc-responsible-backend dir)))
+       (if (and (file-equal-p dir (nth 2 project))
+                (setq backend (cadr project))
                 (cond
                  ((eq backend 'Hg))
                  ((and (eq backend 'Git)
@@ -694,7 +694,7 @@ project backend implementation of `project-external-roots'.")
     (file-missing nil)))
 
 (cl-defmethod project-ignores ((project (head vc)) dir)
-  (let* ((root (cdr project))
+  (let* ((root (nth 2 project))
          backend)
     (append
      (when (and backend
