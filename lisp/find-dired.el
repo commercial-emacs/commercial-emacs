@@ -240,12 +240,13 @@ it finishes, type \\[kill-find]."
     (erase-buffer)
     (setq default-directory dir)
     ;; Start the find process.
-    (shell-command (concat command "&") (current-buffer))
-    (let ((proc (get-buffer-process (current-buffer))))
-      ;; Initialize the process marker; it is used by the filter.
-      (move-marker (process-mark proc) (point) (current-buffer))
-      (set-process-filter proc #'find-dired-filter)
-      (set-process-sentinel proc #'find-dired-sentinel))
+    (make-process
+     :name "find-dired"
+     :buffer (current-buffer)
+     :command (split-string-shell-command command)
+     :filter #'find-dired-filter
+     :sentinel #'find-dired-sentinel
+     :file-handler t)
     (dired-mode dir (cdr find-ls-option))
     (let ((map (make-sparse-keymap)))
       (set-keymap-parent map (current-local-map))
