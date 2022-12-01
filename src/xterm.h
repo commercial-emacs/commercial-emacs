@@ -537,6 +537,12 @@ struct x_display_info
      KDE" protocol in x-dnd.el). */
   Atom Xatom_DndProtocol, Xatom_DND_PROTOCOL;
 
+  /* Atoms to make x_intern_cached_atom fast.  */
+  Atom Xatom_text_plain_charset_utf_8, Xatom_LENGTH, Xatom_FILE_NAME,
+    Xatom_CHARACTER_POSITION, Xatom_LINE_NUMBER, Xatom_COLUMN_NUMBER,
+    Xatom_OWNER_OS, Xatom_HOST_NAME, Xatom_USER, Xatom_CLASS,
+    Xatom_NAME, Xatom_SAVE_TARGETS;
+
   /* The frame (if any) which has the X window that has keyboard focus.
      Zero if none.  This is examined by Ffocus_frame in xfns.c.  Note
      that a mere EnterNotify event can set this; if you need to know the
@@ -1797,6 +1803,8 @@ extern void x_handle_property_notify (const XPropertyEvent *);
 extern void x_handle_selection_notify (const XSelectionEvent *);
 extern void x_handle_selection_event (struct selection_input_event *);
 extern void x_clear_frame_selections (struct frame *);
+extern void x_remove_selection_transfers (struct x_display_info *);
+
 extern Lisp_Object x_atom_to_symbol (struct x_display_info *, Atom);
 extern Atom symbol_to_x_atom (struct x_display_info *, Lisp_Object);
 
@@ -1827,6 +1835,10 @@ extern Atom x_intern_cached_atom (struct x_display_info *, const char *,
 				  bool);
 extern char *x_get_atom_name (struct x_display_info *, Atom, bool *)
   ATTRIBUTE_MALLOC ATTRIBUTE_DEALLOC_FREE;
+
+extern void mark_xselect (void);
+
+/* Misc definitions.  */
 
 #ifdef USE_GTK
 extern bool xg_set_icon (struct frame *, Lisp_Object);
