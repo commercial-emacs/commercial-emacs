@@ -2028,11 +2028,11 @@ a `let' form, except that the list of symbols can be computed at run-time."
 ;;;###autoload
 (defmacro cl-flet (bindings &rest body)
   "Make local function definitions.
-Each definition can take the form (FUNC EXP) where
+Each definition can take the form (FUNC = EXP) where
 FUNC is the function name, and EXP is an expression that returns the
 function value to which it should be bound, or it can take the more common
 form (FUNC ARGLIST BODY...) which is a shorthand
-for (FUNC (lambda ARGLIST BODY)).
+for (FUNC = (lambda ARGLIST BODY)).
 
 FUNC is defined only within FORM, not BODY, so you can't write
 recursive function definitions.  Use `cl-labels' for that.  See
@@ -2055,8 +2055,12 @@ info node `(cl) Function Bindings' for details.
         (if (and (= (length args-and-body) 1) (symbolp (car args-and-body)))
             ;; Optimize (cl-flet ((fun var)) body).
             (setq var (car args-and-body))
-          (push (list var (if (= (length args-and-body) 1)
-                              (car args-and-body)
+          (push (list var (cond
+                           ((= (length args-and-body) 1) ;Obsolete syntax.
+                            (car args-and-body))
+                           ((eq '= (car args-and-body))
+                            (macroexp-progn (cdr args-and-body)))
+                           (t
                             `(cl-function (lambda . ,args-and-body))))
                 binds))
 	(push (cons (car binding)
@@ -2203,12 +2207,13 @@ Like `cl-flet' but the definitions can refer to previous ones.
 ;;;###autoload
 (defmacro cl-labels (bindings &rest body)
   "Make local (recursive) function definitions.
-+BINDINGS is a list of definitions of the form (FUNC ARGLIST BODY...) where
-FUNC is the function name, ARGLIST its arguments, and BODY the
-forms of the function body.  FUNC is defined in any BODY, as well
-as FORM, so you can write recursive and mutually recursive
-function definitions.  See info node `(cl) Function Bindings' for
-details.
+BINDINGS is a list of definitions of the form either:
+- (FUNC ARGLIST BODY...) where FUNC is the function name,
+  ARGLIST its arguments, and BODY the forms of the function body.
+- (FUNC = BODY) where BODY is an expression that evaluates to a function.
+FUNC is defined in any BODY, as well as FORM, so you can write recursive
+and mutually recursive function definitions.
+See info node `(cl) Function Bindings' for details.
 
 \(fn ((FUNC ARGLIST BODY...) ...) FORM...)"
   (declare (indent 1) (debug cl-flet))
@@ -2226,17 +2231,31 @@ details.
     (unless (assq 'function newenv)
       (push (cons 'function #'cl--labels-convert) newenv))
     ;; Perform self-tail call elimination.
-    (setq binds (mapcar
-                 (lambda (bind)
-                   (pcase-let*
-                       ((`(,var ,sargs . ,sbody) bind)
-                        (`(function (lambda ,fargs . ,ebody))
-                         (macroexpand-all `(cl-function (lambda ,sargs . ,sbody))
-                                          newenv))
-                        (`(,ofargs . ,obody)
-                         (cl--self-tco var fargs ebody)))
-                     `(,var (function (lambda ,ofargs . ,obody)))))
-                 (nreverse binds)))
+    (setq binds
+          (mapcar
+           (lambda (bind)
+             (pcase-let*
+                 ((`(,var ,sargs . ,sbody) bind))
+               (list var
+                     (named-let loop
+                         ((mfunexp (macroexpand-all
+                                    (if (eq '= sargs)
+                                        (macroexp-progn sbody)
+                                      `(cl-function (lambda ,sargs . ,sbody)))
+                                    newenv)))
+                       (pcase mfunexp
+                         (`#'(lambda ,fargs . ,ebody)
+                          `#'(lambda . ,(cl--self-tco var fargs ebody)))
+                         (`(progn . ,exps)
+                          `(progn ,@(butlast exps) ,(loop (car (last exps)))))
+                         (`(let ,bindings ,exps)
+                          `(let ,bindings
+                             ,@(butlast exps) ,(loop (car (last exps)))))
+                         (`(if ,exp1 ,exp2 ,exps)
+                          `(if ,exp1 ,(loop exp2)
+                             ,@(butlast exps) ,(loop (car (last exps)))))
+                         (_ mfunexp))))))
+           (nreverse binds)))
     `(letrec ,binds
        . ,(macroexp-unprogn
            (macroexpand-all
