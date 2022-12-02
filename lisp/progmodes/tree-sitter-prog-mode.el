@@ -34,10 +34,10 @@
 ;;; Code:
 
 (declare-function tree-sitter "tree-sitter.c")
-(declare-function tree-sitter-indent-line "tree-sitter.c")
-(declare-function tree-sitter-end-of-defun "tree-sitter.c")
-(declare-function tree-sitter-beginning-of-defun "tree-sitter.c")
-(declare-function tree-sitter-forward-sexp "tree-sitter.c")
+(declare-function tree-sitter-indent-line "tree-sitter")
+(declare-function tree-sitter-end-of-defun "tree-sitter")
+(declare-function tree-sitter-beginning-of-defun "tree-sitter")
+(declare-function tree-sitter-forward-sexp "tree-sitter")
 
 (define-derived-mode tree-sitter-prog-mode prog-mode "TreeSitter"
   "Tree-sitter enabled major mode."
@@ -52,7 +52,8 @@
                 forward-sexp-function #'tree-sitter-forward-sexp
                 beginning-of-defun-function #'tree-sitter-beginning-of-defun
                 end-of-defun-function #'tree-sitter-end-of-defun
-                indent-line-function #'tree-sitter-indent-line)))
+                indent-line-function #'tree-sitter-indent-line
+                indent-region-function #'tree-sitter-indent-region)))
 
 (provide 'tree-sitter-prog-mode)
 

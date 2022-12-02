@@ -374,10 +374,39 @@ BEGINNING-P   ARG         MOTION
   "Candidate for `end-of-defun-function'."
   (tree-sitter--traverse-defun nil arg))
 
+(defun tree-sitter-outermost-node (pos)
+  "Immediate child of root node that encompasses POS."
+  (interactive "d")
+  (let ((current (tree-sitter-node-at pos))
+        prev)
+    (while (not (tree-sitter-node-equal current (tree-sitter-root-node)))
+      (setq prev current
+            current (tree-sitter-node-parent current)))
+    prev))
+
+(defun tree-sitter-indent-region (beg end)
+  (interactive "r")
+  (let ((region-beg (save-excursion (goto-char beg) (line-beginning-position)))
+        (region-end (1+ (save-excursion (goto-char (1- end)) (line-end-position)))))
+    (cl-loop for node = (tree-sitter-outermost-node region-beg)
+             then (tree-sitter-node-next-sibling node)
+             for node-beg = (tree-sitter-node-start node)
+             for calc-beg = (max node-beg region-beg)
+             for calc-end = (min (tree-sitter-node-end node) region-end)
+             until (>= calc-beg region-end)
+             do (mapc
+                 (lambda (elem)
+                   "ELEM is (LINE . SPACES)"
+                   (save-excursion
+                     (goto-char node-beg)
+                     (forward-line (car elem))
+                     (indent-line-to (cdr elem))))
+                 (tree-sitter-calculate-indent node calc-beg calc-end)))))
+
 (defun tree-sitter-indent-line ()
   "Indent the line."
   (interactive)
-  (indent-line-to (tree-sitter-calculate-indent)))
+  (tree-sitter-indent-region (point) (1+ (point))))
 
 (provide 'tree-sitter)
 
