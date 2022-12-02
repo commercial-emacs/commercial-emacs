@@ -279,7 +279,7 @@ headers search path, load path, class path, and so on."
 (cl-defgeneric project-name (project)
   "A human-readable name for the project.
 Nominally unique, but not enforced."
-  (file-name-base (directory-file-name (project-root project))))
+  (file-name-nondirectory (directory-file-name (project-root project))))
 
 (cl-defgeneric project-ignores (_project _dir)
   "Return the list of glob patterns to ignore inside DIR.
