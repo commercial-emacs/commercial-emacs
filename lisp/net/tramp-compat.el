@@ -42,14 +42,6 @@
 (declare-function tramp-tramp-file-p "tramp")
 (defvar tramp-temp-name-prefix)
 
-(defconst tramp-compat-emacs-compiled-version (eval-when-compile emacs-version)
-  "The Emacs version used for compilation.")
-
-(unless (= emacs-major-version
-	   (car (version-to-list tramp-compat-emacs-compiled-version)))
-  (warn "Tramp has been compiled with Emacs %s, this is Emacs %s"
-	tramp-compat-emacs-compiled-version emacs-version))
-
 (with-eval-after-load 'docker-tramp
   (warn (concat "Package `docker-tramp' has been obsoleted, "
 		"please use integrated package `tramp-container'")))
