@@ -389,9 +389,11 @@ BEGINNING-P   ARG         MOTION
   (interactive "r")
   (let ((region-beg (save-excursion (goto-char beg) (line-beginning-position)))
         (region-end (1+ (save-excursion (goto-char (1- end)) (line-end-position)))))
-    (cl-loop for outer-node = (tree-sitter-outermost-node (tree-sitter-node-at beg))
-             then (tree-sitter-node-next-sibling outer-node)
-             while outer-node
+    (cl-loop with outer-node
+             while (setq outer-node
+                         (if outer-node
+                             (tree-sitter-node-next-sibling outer-node)
+                           (tree-sitter-outermost-node (tree-sitter-node-at beg))))
              for node-beg = (tree-sitter-node-start outer-node)
              for calc-beg = (max node-beg region-beg)
              for calc-end = (min (tree-sitter-node-end outer-node) region-end)
