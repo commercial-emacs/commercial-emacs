@@ -21,6 +21,7 @@
 
 (require 'ert)
 (require 'server)
+(require 'cl-lib)
 
 ;;; Tests:
 
