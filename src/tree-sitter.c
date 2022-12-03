@@ -1111,63 +1111,115 @@ same_line (ptrdiff_t pos0, ptrdiff_t pos1)
   return memchr (cursor, '\n', ceiling_addr - cursor) == NULL;
 }
 
-static void
-update_record_parents (Lisp_Object record, ptrdiff_t pos, int dspaces)
+static Lisp_Object
+lines_above_parent (Lisp_Object node, ptrdiff_t node_beg)
 {
-  FOR_EACH_TAIL (record)
+  Lisp_Object parent = Ftree_sitter_node_parent (node);
+  for ( ; /* Get nearest parent on different line.  */
+	(! NILP (parent)
+	 && same_line (node_beg,
+		       SITTER_TO_BUFFER
+		       (ts_node_start_byte
+			(XTREE_SITTER_NODE (parent)->node))));
+	parent = Ftree_sitter_node_parent (parent));
+  return parent;
+}
+
+/* There is a distinction between denting a line (a deliberate indent
+   according to a specific rule via dent_record_line) and updating a
+   line (reflecting a dent from a parent via update_record_progeny).
+*/
+
+static void
+update_record_progeny (Lisp_Object *record, ptrdiff_t pos0, int dspaces)
+{
+  Lisp_Object orecord, queue = list1 (make_fixnum (pos0));
+  while (! NILP (queue))
     {
-      Lisp_Object entry = XCAR (record);
-      Lisp_Object parent = XCAR (XCDR (XCDR (entry)));
-      if (! NILP (parent))
+      orecord = *record; /* FOR_EACH_TAIL mucks */
+      ptrdiff_t pos = XFIXNUM (XCAR (queue));
+      FOR_EACH_TAIL (orecord)
 	{
-	  ptrdiff_t parent_pos =
-	    SITTER_TO_BUFFER (ts_node_start_byte
-			      (XTREE_SITTER_NODE (parent)->node));
-	  if (same_line (pos, parent_pos))
+	  Lisp_Object entry = XCAR (orecord);
+	  Lisp_Object parent = XCAR (XCDR (XCDR (entry)));
+	  if (! NILP (parent))
 	    {
-	      ptrdiff_t sofar = XFIXNUM (XCAR (XCDR (entry)));
-	      Fsetcar (XCDR (entry), make_fixnum (sofar + dspaces));
-	      update_record_parents (record, parent_pos, dspaces);
+	      ptrdiff_t parent_pos =
+		SITTER_TO_BUFFER (ts_node_start_byte
+				  (XTREE_SITTER_NODE (parent)->node));
+	      if (same_line (pos, parent_pos))
+		{
+		  if (NILP (Fmemq (make_fixnum (parent_pos), queue)))
+		    queue = CALLN (Fappend, queue,
+				   list1 (make_fixnum (parent_pos)));
+		  ptrdiff_t sofar = XFIXNUM (XCAR (XCDR (entry)));
+		  Fsetcar (XCDR (entry), make_fixnum (sofar + dspaces));
+		  Fsetcar (XCDR (XCDR (entry)), lines_above_parent (parent, pos));
+		}
 	    }
 	}
+      queue = XCDR (queue);
     }
+
+}
+
+static bool
+dented_record_line_p (Lisp_Object record, ptrdiff_t line, bool *prev_p)
+{
+  static ptrdiff_t last_dented_line = -1;
+  if (prev_p != NULL) /* hack state fud from neovim.  */
+    *prev_p = (last_dented_line == line);
+  last_dented_line = line;
+  Lisp_Object entry = Fassq (make_fixnum (line), record);
+  return NILP (entry)
+    ? false
+    : ! NILP (XCAR (XCDR (XCDR (XCDR (entry)))));
 }
 
 static void
-update_record_line (Lisp_Object record, ptrdiff_t pos, int dspaces, ptrdiff_t line)
+insert_record_line (Lisp_Object *record, ptrdiff_t line, Lisp_Object parent)
 {
-  Lisp_Object entry = Fassq (make_fixnum (line), record);
-  if (NILP (entry)) {
-    entry = list3 (make_fixnum (line), make_fixnum (0), Qnil);
-    record = Fcons (entry, record);
+  /* LINE NSPACES PARENT DENTED */
+  Lisp_Object entry = list4 (make_fixnum (line), make_fixnum (0), parent, Qnil);
+  *record = Fcons (entry, *record);
+}
+
+/* There is a distinction between denting a line (a deliberate indent
+   or dedent according to a specific rule) and updating a line
+   (reflecting a dent from a parent).
+*/
+
+static void
+dent_record_line (Lisp_Object *record, ptrdiff_t line, int dspaces,
+		  Lisp_Object parent)
+{
+  Lisp_Object entry = Fassq (make_fixnum (line), *record);
+  if (! NILP (entry)) {
+    Fsetcar (XCDR (XCDR (XCDR (entry))), Qt);
+    Fsetcar (XCDR (XCDR (entry)), parent);
+    ptrdiff_t sofar = 0; /* DSPACES is absolute.  */
+    if (! NILP (parent))
+      /* no, DSPACES is relative.  */
+      sofar = XFIXNUM (XCAR (XCDR (entry)));
+    Fsetcar (XCDR (entry), make_fixnum (sofar + dspaces));
   }
-  ptrdiff_t sofar = XFIXNUM (XCAR (XCDR (entry)));
-  Fsetcar (XCDR (entry), make_fixnum (sofar + dspaces));
 }
 
 static Lisp_Object
-first_node_of_line (Lisp_Object node, int nlines)
+line_above_node (Lisp_Object node)
 {
-  Lisp_Object next;
-  if (nlines < 0)
-    nlines = -nlines;
   while (! NILP (node))
     {
       ptrdiff_t nextpos, pos =
 	SITTER_TO_BUFFER (ts_node_start_byte
 			  (XTREE_SITTER_NODE (node)->node));
-      next = call1 (Qtree_sitter_node_preceding, node);
+      node = call1 (Qtree_sitter_node_preceding, node);
       nextpos =	SITTER_TO_BUFFER (ts_node_start_byte
-				  (XTREE_SITTER_NODE (next)->node));
-      if (NILP (next) ||
-	  ! same_line (pos, nextpos))
-	{
-	  if (--nlines < 0)
-	    break;
-	}
-      node = next;
+				  (XTREE_SITTER_NODE (node)->node));
+      if (! same_line (pos, nextpos))
+	break;
     }
-  return nlines >= 0 ? Qnil : node;
+  return node;
 }
 
 DEFUN ("tree-sitter-calculate-indent",
@@ -1186,7 +1238,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
     return Qnil;
 
   const int indent_nspaces = 2;
-  Lisp_Object record = Qnil; /* ((LINE NSPACES-SOFAR NODE-PARENT) ... )  */
+  Lisp_Object record = Qnil; /* ((LINE NSPACES PARENT DENTED) ... )  */
   TSLanguageFunctor fn = tree_sitter_language_functor (XTREE_SITTER (sitter)->progmode);
   Lisp_Object language = Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
 					   Fsymbol_value (Qtree_sitter_mode_alist)));
@@ -1361,6 +1413,9 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
   /* Second, run the query.  */
   if (XTREE_SITTER (sitter)->indents_query != NULL && i >= 0)
     {
+      specpdl_ref count = SPECPDL_INDEX ();
+      record_unwind_protect_excursion ();
+
       Lisp_Object source_query = HASH_VALUE (h, i);
       const uint32_t sitter_beg =
 	ts_node_start_byte (XTREE_SITTER_NODE (enclosing_node)->node);
@@ -1385,15 +1440,16 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			 sitter_end);
 
       int slice_index = slice.len - 1;
-      Lisp_Object node = Ftree_sitter_node_descendant_for_byte_range
-	(enclosing_node,
-	 (XFIXNUM (calc_beg) < XFIXNUM (Fsub1 (calc_end))
-	  ? Fsub1 (calc_end)
-	  : calc_beg),
-	 calc_end);
-      node = first_node_of_line (node, 0);
       Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
-      bool beyond_calc_beg = false; /* once beyond, just process parents.  */
+      Lisp_Object node;
+      {
+	specpdl_ref count = SPECPDL_INDEX ();
+	record_unwind_protect_excursion ();
+	Fgoto_char (Fsub1 (calc_end));
+	/* node_at wasteful but descendant_for_byte_range hews to spaces.  */
+	node = Ftree_sitter_node_at (Fline_beginning_position (Qnil), Qnil);
+	unbind_to (count, Qnil);
+      }
       for (ptrdiff_t node_beg = SITTER_TO_BUFFER (ts_node_start_byte
 						  (XTREE_SITTER_NODE (node)->node));
 	   slice_index >= 0
@@ -1404,6 +1460,13 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 		       : SITTER_TO_BUFFER
 		       (ts_node_start_byte (XTREE_SITTER_NODE (node)->node))))
 	{
+	  Fgoto_char (make_fixnum (node_beg));
+	  const ptrdiff_t line_node_beg =
+	    count_lines (CHAR_TO_BYTE (enclosing_beg), CHAR_TO_BYTE (node_beg));
+	  Lisp_Object parent = lines_above_parent (node, node_beg);
+	  if (node_beg >= XFIXNUM (calc_beg))
+	    insert_record_line (&record, line_node_beg, parent);
+
 	  /* Find enclosing QueryCapture of NODE.  */
 	  for (;;)
 	    {
@@ -1417,30 +1480,27 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 	    }
 
 	  /* Process all QueryCaptures until the line of capture
-	     is no longer line of NODE.  All line numbering is
-	     relative to ENCLOSING_BEG.  */
-	  ptrdiff_t last_dented_line = -1;
+	     is no longer line of NODE.  */
 	  Lisp_Object capture_name_to_tsnode =
 	    make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
 			     DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
 			     Qnil, false);
 	  Lisp_Object obarray = initialize_vector (10, make_fixnum (0));
-	  const ptrdiff_t line_node_beg =
-	    count_lines (CHAR_TO_BYTE (enclosing_beg), CHAR_TO_BYTE (node_beg));
 	  for ((void) slice_index; slice_index >= 0; --slice_index)
 	    {
 	      const ptrdiff_t capture_beg =
 		SITTER_TO_BUFFER (ts_node_start_byte (slice.captures[slice_index].node));
 	      const ptrdiff_t capture_end =
 		SITTER_TO_BUFFER (ts_node_end_byte (slice.captures[slice_index].node));
-	      const ptrdiff_t line_capture_beg =
-		count_lines (CHAR_TO_BYTE (enclosing_beg), CHAR_TO_BYTE (capture_beg));
 
 	      /* line's captures should not have been.  */
 	      if (slice.captures[slice_index].index == UINT32_MAX)
 		continue;
 
-	      if (line_capture_beg != line_node_beg)
+	      if (line_node_beg !=
+		  count_lines (CHAR_TO_BYTE (enclosing_beg),
+			       CHAR_TO_BYTE (capture_beg)))
+		/* capture not relevant to NODE.  */
 		goto prev_line; /* !!! */
 
 	      uint32_t capture_name_length = 0;
@@ -1548,9 +1608,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 		  ptrdiff_t where = max (comment_start,
 					 XFIXNUM (Fcurrent_indentation
 						  (make_fixnum (IT_CHARPOS (it)))));
-		  if (! beyond_calc_beg)
-		    update_record_line (record, node_beg, where, line_node_beg);
-		  update_record_parents (record, node_beg, where);
+		  dent_record_line (&record, line_node_beg, where, Qnil);
 		  goto prev_line;
 		}
 	      else if (0 == strcmp (capture_name, "zero_indent"))
@@ -1566,36 +1624,30 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 	      else if (0 == strcmp (capture_name, "branch"))
 		{
 		  if (same_line (node_beg, PT)
-		      && last_dented_line < 0)
+		      && ! dented_record_line_p (record, line_node_beg, NULL))
 		    {
-		      if (! beyond_calc_beg)
-			update_record_line (record, node_beg, - indent_nspaces, line_node_beg);
-		      update_record_parents (record, node_beg, - indent_nspaces);
-		      last_dented_line = line_capture_beg;
+		      dent_record_line (&record, line_node_beg, - indent_nspaces, parent);
 		    }
 		}
 	      else if (0 == strcmp (capture_name, "dedent"))
 		{
-		  if (last_dented_line < 0
-		      || last_dented_line == line_capture_beg)
+		  bool prev_p = false;
+		  if (! dented_record_line_p (record, line_node_beg, &prev_p)
+		      || prev_p)
 		    {
-		      if (! beyond_calc_beg)
-			update_record_line (record, node_beg, - indent_nspaces, line_node_beg);
-		      update_record_parents (record, node_beg, - indent_nspaces);
-		      last_dented_line = line_capture_beg;
+		      dent_record_line (&record, line_node_beg, - indent_nspaces, parent);
+		      update_record_progeny (&record, node_beg, - indent_nspaces);
 		    }
 		}
-	      else if (! same_line (capture_beg, capture_end - 1)
-		       && ! same_line (node_beg, PT))
+	      else if (! same_line (capture_beg, capture_end - 1))
 		{
 		  if (0 == strcmp (capture_name, "indent"))
 		    {
-		      if (last_dented_line < 0)
+		      if (! dented_record_line_p (record, line_node_beg, NULL))
 			{
-			  if (! beyond_calc_beg)
-			    update_record_line (record, node_beg, indent_nspaces, line_node_beg);
-			  update_record_parents (record, node_beg, indent_nspaces);
-			  last_dented_line = line_capture_beg;
+			  if (! same_line (node_beg, PT))
+			    dent_record_line (&record, line_node_beg, indent_nspaces, parent);
+			  update_record_progeny (&record, node_beg, indent_nspaces);
 			}
 		    }
 		  else if (0 == strcmp (capture_name, "aligned_indent"))
@@ -1627,56 +1679,25 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			  record_unwind_protect_excursion ();
 			  Fgoto_char (XCAR (stack));
 			  int nspaces = 1 + current_column ();
-			  if (! beyond_calc_beg)
-			    update_record_line (record, node_beg, nspaces, line_node_beg);
-			  update_record_parents (record, node_beg, nspaces);
+			  dent_record_line (&record, line_node_beg, nspaces, Qnil);
 			  unbind_to (count, Qnil);
 			  goto prev_line;
 			}
-		      else if (last_dented_line < 0) /* as if just @indent */
+		      else if (! dented_record_line_p (record, line_node_beg, NULL)) /* as if just @indent */
 			{
-			  if (! beyond_calc_beg)
-			    update_record_line (record, node_beg, indent_nspaces, line_node_beg);
-			  update_record_parents (record, node_beg, indent_nspaces);
-			  last_dented_line = line_capture_beg;
+			  dent_record_line (&record, line_node_beg, indent_nspaces, parent);
+			  update_record_progeny (&record, node_beg, indent_nspaces);
 			}
 		    }
 		}
 	    }
 
 	prev_line:
-	  /* Get next parent on different line.  */
-	  (void) NULL;
-	  Lisp_Object parent = Ftree_sitter_node_parent (node);
-	  for ( ;
-		(! NILP (parent)
-		 && same_line (node_beg,
-			       SITTER_TO_BUFFER
-			       (ts_node_start_byte
-				(XTREE_SITTER_NODE (parent)->node))));
-		parent = Ftree_sitter_node_parent (parent));
-
-	  Lisp_Object entry = Fassq (make_fixnum (line_node_beg), record);
-	  if (! NILP (parent) && ! NILP (entry))
-	    /* The just processed line will require updates for parent.  */
-	    Fsetcar (XCDR (XCDR (entry)), parent);
-
-	  /* Iterate NODE to *first* node of previous line.  */
-	  if (! beyond_calc_beg)
-	    {
-	      node = first_node_of_line (node, 1);
-	      ptrdiff_t prospect_node_beg =
-		SITTER_TO_BUFFER (ts_node_start_byte
-				  (XTREE_SITTER_NODE (node)->node));
-	      if (XFIXNUM (calc_beg) > prospect_node_beg
-		  && ! same_line (XFIXNUM (calc_beg), prospect_node_beg))
-		beyond_calc_beg = true;
-	    }
-	  if (beyond_calc_beg)
-	    node = parent;
+	  node = line_above_node (node);
 	}
     done:
       ts_captures_free (slice);
+      unbind_to (count, Qnil);
     }
 
   Lisp_Object result = Qnil;

@@ -22,6 +22,7 @@
 ;;; Code:
 
 (require 'font-lock)
+(require 'cl-lib)
 (declare-function tree-sitter-changed-range "tree-sitter.c")
 (declare-function tree-sitter-highlight-region "tree-sitter.c")
 (declare-function tree-sitter-node-prev-sibling "tree-sitter.c")
@@ -44,6 +45,7 @@
   "Tree-sitter is an incremental parser."
   :group 'tools)
 
+;;;###autoload
 (defcustom tree-sitter-resources-dir
   (if-let ((interactive (not noninteractive))
            (proper-dir
@@ -387,7 +389,6 @@ BEGINNING-P   ARG         MOTION
   (interactive "r")
   (let ((region-beg (save-excursion (goto-char beg) (line-beginning-position)))
         (region-end (1+ (save-excursion (goto-char (1- end)) (line-end-position)))))
-    ;; I know,
     (cl-loop for outer-node = (tree-sitter-outermost-node (tree-sitter-node-at beg))
              then (tree-sitter-node-next-sibling outer-node)
              while outer-node
@@ -402,7 +403,8 @@ BEGINNING-P   ARG         MOTION
                      (goto-char node-beg)
                      (forward-line (car elem))
                      (indent-line-to (cdr elem))))
-                 (tree-sitter-calculate-indent outer-node calc-beg calc-end)))))
+                 (let ((foo (tree-sitter-calculate-indent outer-node calc-beg calc-end)))
+                   (prog1 foo (message "%S\n%S" foo outer-node)))))))
 
 (defun tree-sitter-indent-line ()
   "Indent the line."
