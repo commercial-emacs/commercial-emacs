@@ -399,12 +399,10 @@ BEGINNING-P   ARG         MOTION
              do (mapc
                  (lambda (elem)
                    "ELEM is (LINE . SPACES)"
-                   (save-excursion
-                     (goto-char node-beg)
-                     (forward-line (car elem))
-                     (indent-line-to (cdr elem))))
-                 (let ((foo (tree-sitter-calculate-indent outer-node calc-beg calc-end)))
-                   (prog1 foo (message "%S\n%S" foo outer-node)))))))
+                   (goto-char node-beg)
+                   (forward-line (car elem))
+                   (indent-line-to (cdr elem)))
+                 (tree-sitter-calculate-indent outer-node calc-beg calc-end)))))
 
 (defun tree-sitter-indent-line ()
   "Indent the line."

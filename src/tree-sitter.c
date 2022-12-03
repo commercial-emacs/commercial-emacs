@@ -1112,7 +1112,7 @@ same_line (ptrdiff_t pos0, ptrdiff_t pos1)
 }
 
 static Lisp_Object
-lines_above_parent (Lisp_Object node, ptrdiff_t node_beg)
+parent_earlier_line (Lisp_Object node, ptrdiff_t node_beg)
 {
   Lisp_Object parent = Ftree_sitter_node_parent (node);
   for ( ; /* Get nearest parent on different line.  */
@@ -1123,103 +1123,6 @@ lines_above_parent (Lisp_Object node, ptrdiff_t node_beg)
 			(XTREE_SITTER_NODE (parent)->node))));
 	parent = Ftree_sitter_node_parent (parent));
   return parent;
-}
-
-/* There is a distinction between denting a line (a deliberate indent
-   according to a specific rule via dent_record_line) and updating a
-   line (reflecting a dent from a parent via update_record_progeny).
-*/
-
-static void
-update_record_progeny (Lisp_Object *record, ptrdiff_t pos0, int dspaces)
-{
-  Lisp_Object orecord, queue = list1 (make_fixnum (pos0));
-  while (! NILP (queue))
-    {
-      orecord = *record; /* FOR_EACH_TAIL mucks */
-      ptrdiff_t pos = XFIXNUM (XCAR (queue));
-      FOR_EACH_TAIL (orecord)
-	{
-	  Lisp_Object entry = XCAR (orecord);
-	  Lisp_Object parent = XCAR (XCDR (XCDR (entry)));
-	  if (! NILP (parent))
-	    {
-	      ptrdiff_t parent_pos =
-		SITTER_TO_BUFFER (ts_node_start_byte
-				  (XTREE_SITTER_NODE (parent)->node));
-	      if (same_line (pos, parent_pos))
-		{
-		  if (NILP (Fmemq (make_fixnum (parent_pos), queue)))
-		    queue = CALLN (Fappend, queue,
-				   list1 (make_fixnum (parent_pos)));
-		  ptrdiff_t sofar = XFIXNUM (XCAR (XCDR (entry)));
-		  Fsetcar (XCDR (entry), make_fixnum (sofar + dspaces));
-		  Fsetcar (XCDR (XCDR (entry)), lines_above_parent (parent, pos));
-		}
-	    }
-	}
-      queue = XCDR (queue);
-    }
-
-}
-
-static bool
-dented_record_line_p (Lisp_Object record, ptrdiff_t line, bool *prev_p)
-{
-  static ptrdiff_t last_dented_line = -1;
-  if (prev_p != NULL) /* hack state fud from neovim.  */
-    *prev_p = (last_dented_line == line);
-  last_dented_line = line;
-  Lisp_Object entry = Fassq (make_fixnum (line), record);
-  return NILP (entry)
-    ? false
-    : ! NILP (XCAR (XCDR (XCDR (XCDR (entry)))));
-}
-
-static void
-insert_record_line (Lisp_Object *record, ptrdiff_t line, Lisp_Object parent)
-{
-  /* LINE NSPACES PARENT DENTED */
-  Lisp_Object entry = list4 (make_fixnum (line), make_fixnum (0), parent, Qnil);
-  *record = Fcons (entry, *record);
-}
-
-/* There is a distinction between denting a line (a deliberate indent
-   or dedent according to a specific rule) and updating a line
-   (reflecting a dent from a parent).
-*/
-
-static void
-dent_record_line (Lisp_Object *record, ptrdiff_t line, int dspaces,
-		  Lisp_Object parent)
-{
-  Lisp_Object entry = Fassq (make_fixnum (line), *record);
-  if (! NILP (entry)) {
-    Fsetcar (XCDR (XCDR (XCDR (entry))), Qt);
-    Fsetcar (XCDR (XCDR (entry)), parent);
-    ptrdiff_t sofar = 0; /* DSPACES is absolute.  */
-    if (! NILP (parent))
-      /* no, DSPACES is relative.  */
-      sofar = XFIXNUM (XCAR (XCDR (entry)));
-    Fsetcar (XCDR (entry), make_fixnum (sofar + dspaces));
-  }
-}
-
-static Lisp_Object
-line_above_node (Lisp_Object node)
-{
-  while (! NILP (node))
-    {
-      ptrdiff_t nextpos, pos =
-	SITTER_TO_BUFFER (ts_node_start_byte
-			  (XTREE_SITTER_NODE (node)->node));
-      node = call1 (Qtree_sitter_node_preceding, node);
-      nextpos =	SITTER_TO_BUFFER (ts_node_start_byte
-				  (XTREE_SITTER_NODE (node)->node));
-      if (! same_line (pos, nextpos))
-	break;
-    }
-  return node;
 }
 
 DEFUN ("tree-sitter-calculate-indent",
@@ -1238,7 +1141,6 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
     return Qnil;
 
   const int indent_nspaces = 2;
-  Lisp_Object record = Qnil; /* ((LINE NSPACES PARENT DENTED) ... )  */
   TSLanguageFunctor fn = tree_sitter_language_functor (XTREE_SITTER (sitter)->progmode);
   Lisp_Object language = Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
 					   Fsymbol_value (Qtree_sitter_mode_alist)));
@@ -1248,7 +1150,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 
   static Lisp_Object cache = LISPSYM_INITIALLY (Qnil);
   struct Lisp_Hash_Table *h;
-  Lisp_Object hash, fstyle, indents_scm;
+  Lisp_Object hash, fstyle, indents_scm, result = Qnil;
   ptrdiff_t i;
 
   if (NILP (cache))
@@ -1415,6 +1317,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
     {
       specpdl_ref count = SPECPDL_INDEX ();
       record_unwind_protect_excursion ();
+      void *itdata = bidi_shelve_cache ();
 
       Lisp_Object source_query = HASH_VALUE (h, i);
       const uint32_t sitter_beg =
@@ -1439,275 +1342,263 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			 sitter_beg,
 			 sitter_end);
 
-      int slice_index = slice.len - 1;
-      Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
-      Lisp_Object node;
-      {
-	specpdl_ref count = SPECPDL_INDEX ();
-	record_unwind_protect_excursion ();
-	Fgoto_char (Fsub1 (calc_end));
-	/* node_at wasteful but descendant_for_byte_range hews to spaces.  */
-	node = Ftree_sitter_node_at (Fline_beginning_position (Qnil), Qnil);
-	unbind_to (count, Qnil);
-      }
-      for (ptrdiff_t node_beg = SITTER_TO_BUFFER (ts_node_start_byte
-						  (XTREE_SITTER_NODE (node)->node));
-	   slice_index >= 0
-	     && node_beg >= enclosing_beg
-	     && NILP (Ftree_sitter_node_equal (root_node, node));
-	   node_beg = (NILP (node)
-		       ? -1
-		       : SITTER_TO_BUFFER
-		       (ts_node_start_byte (XTREE_SITTER_NODE (node)->node))))
+      const Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
+      ptrdiff_t line_target =
+	count_lines (CHAR_TO_BYTE (enclosing_beg), CHAR_TO_BYTE (XFIXNUM (calc_beg)));
+      struct text_pos pt;
+      struct it it;
+      SET_TEXT_POS (pt, XFIXNUM (calc_beg), CHAR_TO_BYTE (XFIXNUM (calc_beg)));
+      start_move_it (&it, decode_live_window (selected_window), pt);
+      move_it_dvpos (&it, 0);
+      for ((void) it; IT_CHARPOS (it) < XFIXNUM (calc_end); move_it_dvpos (&it, 1))
 	{
-	  Fgoto_char (make_fixnum (node_beg));
-	  const ptrdiff_t line_node_beg =
-	    count_lines (CHAR_TO_BYTE (enclosing_beg), CHAR_TO_BYTE (node_beg));
-	  Lisp_Object parent = lines_above_parent (node, node_beg);
-	  if (node_beg >= XFIXNUM (calc_beg))
-	    insert_record_line (&record, line_node_beg, parent);
+	  int nspaces = 0;
+	  Fgoto_char (make_fixnum (IT_CHARPOS (it)));
 
-	  /* Find enclosing QueryCapture of NODE.  */
-	  for (;;)
+	  Lisp_Object node = Ftree_sitter_node_at (Qnil, Qnil);
+	  int slice_index = slice.len - 1;
+	  for (ptrdiff_t node_beg =
+		 SITTER_TO_BUFFER (ts_node_start_byte
+				   (XTREE_SITTER_NODE (node)->node));
+	       node_beg >= enclosing_beg
+		 && NILP (Ftree_sitter_node_equal (root_node, node));
+	       node_beg = (NILP (node)
+			   ? -1
+			   : SITTER_TO_BUFFER
+			   (ts_node_start_byte (XTREE_SITTER_NODE (node)->node))))
 	    {
-	      ptrdiff_t slice_beg =
-		SITTER_TO_BUFFER (ts_node_start_byte (slice.captures[slice_index].node));
-	      if (same_line (node_beg, slice_beg)
-		  || slice_beg < node_beg)
-		break;
-	      if (--slice_index < 0)
-		goto done;
-	    }
-
-	  /* Process all QueryCaptures until the line of capture
-	     is no longer line of NODE.  */
-	  Lisp_Object capture_name_to_tsnode =
-	    make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
-			     DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
-			     Qnil, false);
-	  Lisp_Object obarray = initialize_vector (10, make_fixnum (0));
-	  for ((void) slice_index; slice_index >= 0; --slice_index)
-	    {
-	      const ptrdiff_t capture_beg =
-		SITTER_TO_BUFFER (ts_node_start_byte (slice.captures[slice_index].node));
-	      const ptrdiff_t capture_end =
-		SITTER_TO_BUFFER (ts_node_end_byte (slice.captures[slice_index].node));
-
-	      /* line's captures should not have been.  */
-	      if (slice.captures[slice_index].index == UINT32_MAX)
-		continue;
-
-	      if (line_node_beg !=
-		  count_lines (CHAR_TO_BYTE (enclosing_beg),
-			       CHAR_TO_BYTE (capture_beg)))
-		/* capture not relevant to NODE.  */
-		goto prev_line; /* !!! */
-
-	      uint32_t capture_name_length = 0;
-	      const char *capture_name =
-		ts_query_capture_name_for_id (XTREE_SITTER (sitter)->indents_query,
-					      slice.captures[slice_index].index,
-					      &capture_name_length);
-	      Fputhash (Fintern (build_string (capture_name), obarray),
-			make_node (slice.captures[slice_index].node),
-			capture_name_to_tsnode);
-	      uint32_t predicates_length = 0;
-	      const TSQueryPredicateStep *predicates =
-		ts_query_predicates_for_pattern (XTREE_SITTER (sitter)->indents_query,
-						 slice.pattern_indices[slice_index],
-						 &predicates_length);
-	      char delimiter_open = '\0', delimiter_close = '\0';
-	      if (predicates_length
-		  && predicates[0].type == TSQueryPredicateStepTypeString)
+	      /* Find enclosing QueryCapture of NODE.  */
+	      for ((void) slice_index; slice_index >= 0; --slice_index)
 		{
-		  uint32_t length;
-		  const char *what =
-		    ts_query_string_value_for_id
-		    (XTREE_SITTER (sitter)->indents_query,
-		     predicates[0].value_id, &length);
-		  if (0 == strcmp (what, "set!")
-		      && 0 == strcmp (ts_query_string_value_for_id
-				      (XTREE_SITTER (sitter)->indents_query,
-				       predicates[1].value_id, &length),
-				      "delimiter"))
+		  ptrdiff_t slice_beg =
+		    SITTER_TO_BUFFER (ts_node_start_byte (slice.captures[slice_index].node));
+		  if (same_line (node_beg, slice_beg)
+		      || slice_beg < node_beg)
+		    break;
+		}
+	      if (slice_index < 0)
+		goto next_target_line;
+
+	      /* Process all QueryCaptures until the line of capture
+		 is no longer line of NODE.  */
+	      ptrdiff_t last_dented_pos = -1;
+	      Lisp_Object capture_name_to_tsnode =
+		make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
+				 DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
+				 Qnil, false);
+	      Lisp_Object obarray = initialize_vector (10, make_fixnum (0));
+	      for ((void) slice_index; slice_index >= 0; --slice_index)
+		{
+		  /* line's captures should not have been.  */
+		  if (slice.captures[slice_index].index == UINT32_MAX)
+		    continue;
+
+		  const ptrdiff_t capture_beg =
+		    SITTER_TO_BUFFER (ts_node_start_byte (slice.captures[slice_index].node));
+		  const ptrdiff_t capture_end =
+		    SITTER_TO_BUFFER (ts_node_end_byte (slice.captures[slice_index].node));
+
+		  if (! same_line (capture_beg, node_beg))
+		    /* capture not relevant to NODE.  */
+		    goto next_parent;
+
+		  uint32_t capture_name_length = 0;
+		  const char *capture_name =
+		    ts_query_capture_name_for_id (XTREE_SITTER (sitter)->indents_query,
+						  slice.captures[slice_index].index,
+						  &capture_name_length);
+		  Fputhash (Fintern (build_string (capture_name), obarray),
+			    make_node (slice.captures[slice_index].node),
+			    capture_name_to_tsnode);
+		  uint32_t predicates_length = 0;
+		  const TSQueryPredicateStep *predicates =
+		    ts_query_predicates_for_pattern (XTREE_SITTER (sitter)->indents_query,
+						     slice.pattern_indices[slice_index],
+						     &predicates_length);
+		  char delimiter_open = '\0', delimiter_close = '\0';
+		  if (predicates_length
+		      && predicates[0].type == TSQueryPredicateStepTypeString)
 		    {
-		      const char *what = ts_query_string_value_for_id
+		      uint32_t length;
+		      const char *what =
+			ts_query_string_value_for_id
 			(XTREE_SITTER (sitter)->indents_query,
-			 predicates[2].value_id, &length);
-		      if (strlen (what) > 0)
-			delimiter_open = what[0];
-		      if (strlen (what) > 1)
-			delimiter_close = what[1];
-		    }
-		  else if (strstr (what, "has-type?")
-			   && predicates[1].type == TSQueryPredicateStepTypeCapture)
-		    {
-		      bool negate = (0 == strncmp (what, "not", 3));
-		      const char *capture_name = ts_query_capture_name_for_id
-			(XTREE_SITTER (sitter)->indents_query,
-			 predicates[1].value_id, &length);
-		      Lisp_Object captured =
-			Fgethash (Fintern_soft (build_string (capture_name),
-						obarray),
-				  capture_name_to_tsnode,
-				  Qnil);
-		      if (! NILP (captured))
-			{
-			  CHECK_TREE_SITTER_NODE (captured);
-			  const char *node_type =
-			    ts_node_type (XTREE_SITTER_NODE (captured)->node);
-			  bool match =
-			    (0 == strcmp (node_type, ts_query_string_value_for_id
+			 predicates[0].value_id, &length);
+		      if (0 == strcmp (what, "set!")
+			  && 0 == strcmp (ts_query_string_value_for_id
 					  (XTREE_SITTER (sitter)->indents_query,
-					   predicates[2].value_id, &length)));
-			  /* Exclude capture when:
-			     has-type? (!negate) and no match, or,
-			     not-has-type? (negate) and match.  */
-			  if (negate == match)
-			    for (int i = slice_index - 1; i >= 0; --i)
-			      {
-				/* annul up-tree captures of this pattern.  */
-				if (slice.pattern_indices[i] ==
-				    slice.pattern_indices[slice_index])
-				  slice.captures[i].index = UINT32_MAX;
-			      }
-			}
-		    }
-		}
-
-	      if (node_beg < capture_beg)
-		continue; /* next slice_index; no indents apply. */
-
-	      if (0 == strcmp ("comment",
-			       ts_node_type (XTREE_SITTER_NODE (node)->node))
-		  && ! same_line (node_beg, PT))
-		{
-		  struct text_pos pt;
-		  void *itdata = bidi_shelve_cache ();
-		  struct it it;
-		  ptrdiff_t pos = CHAR_TO_BYTE (node_beg);
-		  ptrdiff_t comment_start =
-		    XFIXNUM (Fcurrent_indentation (make_fixnum (node_beg)));
-
-		  /* Note the indentation of the following line:
-		     Preceding line's indent + (2 for delim) + (1 space).
-		     (Assuming space fails for say #foo in bash).  */
-		  for ( ;
-			pos != ZV && ! isspace (FETCH_CHAR (pos));
-			++pos, ++comment_start);
-		  for ( ;
-			pos != ZV && isspace (FETCH_CHAR (pos));
-			++pos, ++comment_start);
-
-		  SET_TEXT_POS (pt, PT, PT_BYTE);
-		  start_move_it (&it, decode_live_window (selected_window), pt);
-		  move_it_dvpos (&it, -1);
-		  move_it_dvpos (&it, 0);
-		  bidi_unshelve_cache (itdata, 0);
-
-		  ptrdiff_t where = max (comment_start,
-					 XFIXNUM (Fcurrent_indentation
-						  (make_fixnum (IT_CHARPOS (it)))));
-		  dent_record_line (&record, line_node_beg, where, Qnil);
-		  goto prev_line;
-		}
-	      else if (0 == strcmp (capture_name, "zero_indent"))
-		{
-		  goto prev_line;
-		}
-	      else if (0 == strcmp (capture_name, "ignore"))
-		{
-		}
-	      else if (0 == strcmp (capture_name, "auto"))
-		{
-		}
-	      else if (0 == strcmp (capture_name, "branch"))
-		{
-		  if (same_line (node_beg, PT)
-		      && ! dented_record_line_p (record, line_node_beg, NULL))
-		    {
-		      dent_record_line (&record, line_node_beg, - indent_nspaces, parent);
-		    }
-		}
-	      else if (0 == strcmp (capture_name, "dedent"))
-		{
-		  bool prev_p = false;
-		  if (! dented_record_line_p (record, line_node_beg, &prev_p)
-		      || prev_p)
-		    {
-		      dent_record_line (&record, line_node_beg, - indent_nspaces, parent);
-		      update_record_progeny (&record, node_beg, - indent_nspaces);
-		    }
-		}
-	      else if (! same_line (capture_beg, capture_end - 1))
-		{
-		  if (0 == strcmp (capture_name, "indent"))
-		    {
-		      if (! dented_record_line_p (record, line_node_beg, NULL))
+					   predicates[1].value_id, &length),
+					  "delimiter"))
 			{
-			  if (! same_line (node_beg, PT))
-			    dent_record_line (&record, line_node_beg, indent_nspaces, parent);
-			  update_record_progeny (&record, node_beg, indent_nspaces);
+			  const char *what = ts_query_string_value_for_id
+			    (XTREE_SITTER (sitter)->indents_query,
+			     predicates[2].value_id, &length);
+			  if (strlen (what) > 0)
+			    delimiter_open = what[0];
+			  if (strlen (what) > 1)
+			    delimiter_close = what[1];
 			}
-		    }
-		  else if (0 == strcmp (capture_name, "aligned_indent"))
-		    {
-		      Lisp_Object stack = Qnil;
-		      for (uint32_t count = ts_node_child_count
-			     (slice.captures[slice_index].node), i = 0;
-			   i < count;
-			   ++i)
+		      else if (strstr (what, "has-type?")
+			       && predicates[1].type == TSQueryPredicateStepTypeCapture)
 			{
-			  TSNode child = ts_node_child
-			    (slice.captures[slice_index].node, i);
-			  ptrdiff_t child_beg =
-			    SITTER_TO_BUFFER (ts_node_start_byte (child));
-			  if (same_line (child_beg, PT)
-			      || child_beg > PT)
-			    break;
-			  if (strlen (ts_node_type (child)) == 1)
+			  bool negate = (0 == strncmp (what, "not", 3));
+			  const char *capture_name = ts_query_capture_name_for_id
+			    (XTREE_SITTER (sitter)->indents_query,
+			     predicates[1].value_id, &length);
+			  Lisp_Object captured =
+			    Fgethash (Fintern_soft (build_string (capture_name),
+						    obarray),
+				      capture_name_to_tsnode,
+				      Qnil);
+			  if (! NILP (captured))
 			    {
-			      if (ts_node_type (child)[0] == delimiter_open)
-				stack = Fcons (make_fixnum (child_beg), stack);
-			      else if (ts_node_type (child)[0] == delimiter_close)
-				stack = XCDR (stack);
+			      CHECK_TREE_SITTER_NODE (captured);
+			      const char *node_type =
+				ts_node_type (XTREE_SITTER_NODE (captured)->node);
+			      bool match =
+				(0 == strcmp (node_type, ts_query_string_value_for_id
+					      (XTREE_SITTER (sitter)->indents_query,
+					       predicates[2].value_id, &length)));
+			      /* Exclude capture when:
+				 has-type? (!negate) and no match, or,
+				 not-has-type? (negate) and match.  */
+			      if (negate == match)
+				for (int i = slice_index - 1; i >= 0; --i)
+				  {
+				    /* annul up-tree captures of this pattern.  */
+				    if (slice.pattern_indices[i] ==
+					slice.pattern_indices[slice_index])
+				      slice.captures[i].index = UINT32_MAX;
+				  }
 			    }
 			}
-		      if (! NILP (stack))
+		    }
+
+		  if (node_beg < capture_beg)
+		    continue; /* next slice_index; no indents apply. */
+
+		  if (0 == strcmp ("comment",
+				   ts_node_type (XTREE_SITTER_NODE (node)->node))
+		      && ! same_line (node_beg, PT))
+		    {
+		      struct text_pos pt;
+		      void *itdata = bidi_shelve_cache ();
+		      struct it it;
+		      ptrdiff_t pos = node_beg;
+		      ptrdiff_t comment_start =
+			XFIXNUM (Fcurrent_indentation (make_fixnum (node_beg)));
+
+		      /* Note the indentation of the following line:
+			 Preceding line's indent + (2 for delim) + (1 space).
+			 (Assuming space fails for say #foo in bash).  */
+		      for ( ;
+			    pos != ZV && ! isspace (FETCH_CHAR (pos));
+			    ++pos, ++comment_start);
+		      for ( ;
+			    pos != ZV && isspace (FETCH_CHAR (pos));
+			    ++pos, ++comment_start);
+
+		      SET_TEXT_POS (pt, PT, PT_BYTE);
+		      start_move_it (&it, decode_live_window (selected_window), pt);
+		      move_it_dvpos (&it, -1);
+		      move_it_dvpos (&it, 0);
+		      bidi_unshelve_cache (itdata, 0);
+		      nspaces = max (comment_start,
+				     XFIXNUM (Fcurrent_indentation
+					      (make_fixnum (IT_CHARPOS (it)))));
+		      goto next_target_line; /* since Fcurrent_indentation is absolute. */
+		    }
+		  else if (0 == strcmp (capture_name, "zero_indent"))
+		    {
+		      goto next_parent;
+		    }
+		  else if (0 == strcmp (capture_name, "ignore"))
+		    {
+		    }
+		  else if (0 == strcmp (capture_name, "auto"))
+		    {
+		    }
+		  else if (0 == strcmp (capture_name, "branch"))
+		    {
+		      if (same_line (node_beg, PT)
+			  && last_dented_pos < 0)
 			{
-			  specpdl_ref count = SPECPDL_INDEX ();
-			  record_unwind_protect_excursion ();
-			  Fgoto_char (XCAR (stack));
-			  int nspaces = 1 + current_column ();
-			  dent_record_line (&record, line_node_beg, nspaces, Qnil);
-			  unbind_to (count, Qnil);
-			  goto prev_line;
+			  nspaces -= indent_nspaces;
+			  last_dented_pos = node_beg;
 			}
-		      else if (! dented_record_line_p (record, line_node_beg, NULL)) /* as if just @indent */
+		    }
+		  else if (0 == strcmp (capture_name, "dedent"))
+		    {
+		      if (last_dented_pos < 0
+			  || same_line (last_dented_pos, node_beg))
 			{
-			  dent_record_line (&record, line_node_beg, indent_nspaces, parent);
-			  update_record_progeny (&record, node_beg, indent_nspaces);
+			  nspaces -= indent_nspaces;
+			  last_dented_pos = node_beg;
+			}
+		    }
+		  else if (! same_line (capture_beg, capture_end - 1)
+			   && ! same_line (node_beg, PT))
+		    {
+		      if (0 == strcmp (capture_name, "indent"))
+			{
+			  if (last_dented_pos < 0)
+			    {
+			      nspaces += indent_nspaces;
+			      last_dented_pos = node_beg;
+			    }
+			}
+		      else if (0 == strcmp (capture_name, "aligned_indent"))
+			{
+			  Lisp_Object stack = Qnil;
+			  for (uint32_t count = ts_node_child_count
+				 (slice.captures[slice_index].node), i = 0;
+			       i < count;
+			       ++i)
+			    {
+			      TSNode child = ts_node_child
+				(slice.captures[slice_index].node, i);
+			      ptrdiff_t child_beg =
+				SITTER_TO_BUFFER (ts_node_start_byte (child));
+			      if (same_line (child_beg, PT)
+				  || child_beg > PT)
+				break;
+			      if (strlen (ts_node_type (child)) == 1)
+				{
+				  if (ts_node_type (child)[0] == delimiter_open)
+				    stack = Fcons (make_fixnum (child_beg), stack);
+				  else if (ts_node_type (child)[0] == delimiter_close)
+				    stack = XCDR (stack);
+				}
+			    }
+			  if (! NILP (stack))
+			    {
+			      specpdl_ref count = SPECPDL_INDEX ();
+			      record_unwind_protect_excursion ();
+			      Fgoto_char (XCAR (stack));
+			      nspaces = 1 + current_column ();
+			      unbind_to (count, Qnil);
+			      goto next_target_line; /* since delimiter pos is absolute. */
+			    }
+			  else if (last_dented_pos < 0) /* as if just @indent */
+			    {
+			      nspaces += indent_nspaces;
+			      last_dented_pos = node_beg;
+			    }
 			}
 		    }
 		}
-	    }
 
-	prev_line:
-	  node = line_above_node (node);
+	    next_parent:
+	      node = parent_earlier_line (node, node_beg);
+	    }
+	  next_target_line:
+	  result = Fcons (Fcons (make_fixnum (line_target++), make_fixnum (nspaces)), result);
 	}
-    done:
       ts_captures_free (slice);
+      bidi_unshelve_cache (itdata, 0);
       unbind_to (count, Qnil);
     }
 
-  Lisp_Object result = Qnil;
-  FOR_EACH_TAIL (record)
-    {
-      /* From ((LINE NSPACES NODE-PARENT)...) to ((LINE . NSPACES)...)  */
-      Lisp_Object entry = XCAR (record);
-      result = Fcons (Fcons (XCAR (entry), XCAR (XCDR (entry))),
-		      result);
-    }
   return result;
 }
 
