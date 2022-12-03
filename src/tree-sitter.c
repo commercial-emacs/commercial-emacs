@@ -1096,17 +1096,18 @@ DEFUN ("tree-sitter-node-end",
    if we only require an existential proof.
 */
 static bool
-same_line (ptrdiff_t beg, ptrdiff_t end)
+same_line (ptrdiff_t pos0, ptrdiff_t pos1)
 {
-  if (end < beg)
+  ptrdiff_t bpos0 = CHAR_TO_BYTE (pos0), bpos1 = CHAR_TO_BYTE (pos1);
+  if (bpos1 < bpos0)
     {
-      ptrdiff_t tmp = beg;
-      beg = end;
-      end = tmp;
+      ptrdiff_t tmp = bpos0;
+      bpos0 = bpos1;
+      bpos1 = tmp;
     }
-  ptrdiff_t ceiling = min (end - 1, BUFFER_CEILING_OF (beg));
+  ptrdiff_t ceiling = min (bpos1, BUFFER_CEILING_OF (bpos0));
   unsigned char *ceiling_addr = BYTE_POS_ADDR (ceiling) + 1;
-  unsigned char *cursor = BYTE_POS_ADDR (beg);
+  unsigned char *cursor = BYTE_POS_ADDR (bpos0);
   return memchr (cursor, '\n', ceiling_addr - cursor) == NULL;
 }
 
@@ -1142,14 +1143,38 @@ update_record_line (Lisp_Object record, ptrdiff_t pos, int dspaces, ptrdiff_t li
   }
   ptrdiff_t sofar = XFIXNUM (XCAR (XCDR (entry)));
   Fsetcar (XCDR (entry), make_fixnum (sofar + dspaces));
-  update_record_parents (record, pos, dspaces);
+}
+
+static Lisp_Object
+first_node_of_line (Lisp_Object node, int nlines)
+{
+  Lisp_Object next;
+  if (nlines < 0)
+    nlines = -nlines;
+  while (! NILP (node))
+    {
+      ptrdiff_t nextpos, pos =
+	SITTER_TO_BUFFER (ts_node_start_byte
+			  (XTREE_SITTER_NODE (node)->node));
+      next = call1 (Qtree_sitter_node_preceding, node);
+      nextpos =	SITTER_TO_BUFFER (ts_node_start_byte
+				  (XTREE_SITTER_NODE (next)->node));
+      if (NILP (next) ||
+	  ! same_line (pos, nextpos))
+	{
+	  if (--nlines < 0)
+	    break;
+	}
+      node = next;
+    }
+  return nlines >= 0 ? Qnil : node;
 }
 
 DEFUN ("tree-sitter-calculate-indent",
        Ftree_sitter_calculate_indent, Stree_sitter_calculate_indent,
        3, 3, 0,
        doc: /* Return list of (LINE . NSPACES) pairs.
-Every line between BEGIN and END must have a cons pair entry.  */)
+Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
   (Lisp_Object enclosing_node, Lisp_Object calc_beg, Lisp_Object calc_end)
 {
   CHECK_TREE_SITTER_NODE (enclosing_node);
@@ -1160,9 +1185,6 @@ Every line between BEGIN and END must have a cons pair entry.  */)
   if (NILP (sitter))
     return Qnil;
 
-  /* target_node is the immediate node of current line (innermost).
-     enclosing_node is the child of root_node that contains
-     target_node (outermost) */
   const int indent_nspaces = 2;
   Lisp_Object record = Qnil; /* ((LINE NSPACES-SOFAR NODE-PARENT) ... )  */
   TSLanguageFunctor fn = tree_sitter_language_functor (XTREE_SITTER (sitter)->progmode);
@@ -1365,10 +1387,11 @@ Every line between BEGIN and END must have a cons pair entry.  */)
       int slice_index = slice.len - 1;
       Lisp_Object node = Ftree_sitter_node_descendant_for_byte_range
 	(enclosing_node,
-	 (enclosing_beg < XFIXNUM (Fsub1 (calc_end))
+	 (XFIXNUM (calc_beg) < XFIXNUM (Fsub1 (calc_end))
 	  ? Fsub1 (calc_end)
-	  : make_fixnum (enclosing_beg)),
-	 make_fixnum (enclosing_end));
+	  : calc_beg),
+	 calc_end);
+      node = first_node_of_line (node, 0);
       Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
       bool beyond_calc_beg = false; /* once beyond, just process parents.  */
       for (ptrdiff_t node_beg = SITTER_TO_BUFFER (ts_node_start_byte
@@ -1394,7 +1417,8 @@ Every line between BEGIN and END must have a cons pair entry.  */)
 	    }
 
 	  /* Process all QueryCaptures until the line of capture
-	     is no longer line of NODE.  */
+	     is no longer line of NODE.  All line numbering is
+	     relative to ENCLOSING_BEG.  */
 	  ptrdiff_t last_dented_line = -1;
 	  Lisp_Object capture_name_to_tsnode =
 	    make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
@@ -1496,7 +1520,7 @@ Every line between BEGIN and END must have a cons pair entry.  */)
 
 	      if (0 == strcmp ("comment",
 			       ts_node_type (XTREE_SITTER_NODE (node)->node))
-		  && ! same_line (node_beg, PT_BYTE))
+		  && ! same_line (node_beg, PT))
 		{
 		  struct text_pos pt;
 		  void *itdata = bidi_shelve_cache ();
@@ -1524,7 +1548,9 @@ Every line between BEGIN and END must have a cons pair entry.  */)
 		  ptrdiff_t where = max (comment_start,
 					 XFIXNUM (Fcurrent_indentation
 						  (make_fixnum (IT_CHARPOS (it)))));
-		  update_record_line (record, node_beg, where, line_node_beg);
+		  if (! beyond_calc_beg)
+		    update_record_line (record, node_beg, where, line_node_beg);
+		  update_record_parents (record, node_beg, where);
 		  goto prev_line;
 		}
 	      else if (0 == strcmp (capture_name, "zero_indent"))
@@ -1539,10 +1565,12 @@ Every line between BEGIN and END must have a cons pair entry.  */)
 		}
 	      else if (0 == strcmp (capture_name, "branch"))
 		{
-		  if (same_line (node_beg, PT_BYTE)
+		  if (same_line (node_beg, PT)
 		      && last_dented_line < 0)
 		    {
-		      update_record_line (record, node_beg, - indent_nspaces, line_node_beg);
+		      if (! beyond_calc_beg)
+			update_record_line (record, node_beg, - indent_nspaces, line_node_beg);
+		      update_record_parents (record, node_beg, - indent_nspaces);
 		      last_dented_line = line_capture_beg;
 		    }
 		}
@@ -1551,18 +1579,22 @@ Every line between BEGIN and END must have a cons pair entry.  */)
 		  if (last_dented_line < 0
 		      || last_dented_line == line_capture_beg)
 		    {
-		      update_record_line (record, node_beg, - indent_nspaces, line_node_beg);
+		      if (! beyond_calc_beg)
+			update_record_line (record, node_beg, - indent_nspaces, line_node_beg);
+		      update_record_parents (record, node_beg, - indent_nspaces);
 		      last_dented_line = line_capture_beg;
 		    }
 		}
-	      else if (! same_line (capture_beg, capture_end)
-		       && ! same_line (node_beg, PT_BYTE))
+	      else if (! same_line (capture_beg, capture_end - 1)
+		       && ! same_line (node_beg, PT))
 		{
 		  if (0 == strcmp (capture_name, "indent"))
 		    {
 		      if (last_dented_line < 0)
 			{
-			  update_record_line (record, node_beg, indent_nspaces, line_node_beg);
+			  if (! beyond_calc_beg)
+			    update_record_line (record, node_beg, indent_nspaces, line_node_beg);
+			  update_record_parents (record, node_beg, indent_nspaces);
 			  last_dented_line = line_capture_beg;
 			}
 		    }
@@ -1578,8 +1610,8 @@ Every line between BEGIN and END must have a cons pair entry.  */)
 			    (slice.captures[slice_index].node, i);
 			  ptrdiff_t child_beg =
 			    SITTER_TO_BUFFER (ts_node_start_byte (child));
-			  if (same_line (child_beg, PT_BYTE)
-			      || child_beg > PT_BYTE)
+			  if (same_line (child_beg, PT)
+			      || child_beg > PT)
 			    break;
 			  if (strlen (ts_node_type (child)) == 1)
 			    {
@@ -1594,13 +1626,18 @@ Every line between BEGIN and END must have a cons pair entry.  */)
 			  specpdl_ref count = SPECPDL_INDEX ();
 			  record_unwind_protect_excursion ();
 			  Fgoto_char (XCAR (stack));
-			  update_record_line (record, node_beg, 1 + current_column (), line_node_beg);
+			  int nspaces = 1 + current_column ();
+			  if (! beyond_calc_beg)
+			    update_record_line (record, node_beg, nspaces, line_node_beg);
+			  update_record_parents (record, node_beg, nspaces);
 			  unbind_to (count, Qnil);
 			  goto prev_line;
 			}
 		      else if (last_dented_line < 0) /* as if just @indent */
 			{
-			  update_record_line (record, node_beg, indent_nspaces, line_node_beg);
+			  if (! beyond_calc_beg)
+			    update_record_line (record, node_beg, indent_nspaces, line_node_beg);
+			  update_record_parents (record, node_beg, indent_nspaces);
 			  last_dented_line = line_capture_beg;
 			}
 		    }
@@ -1625,39 +1662,15 @@ Every line between BEGIN and END must have a cons pair entry.  */)
 	    Fsetcar (XCDR (XCDR (entry)), parent);
 
 	  /* Iterate NODE to *first* node of previous line.  */
-	  for (; ! beyond_calc_beg; )
+	  if (! beyond_calc_beg)
 	    {
-	      node = call1 (Qtree_sitter_node_preceding, node);
-	      if (NILP (node))
-		break;
-	      else if (! same_line (node_beg,
-				    SITTER_TO_BUFFER
-				    (ts_node_start_byte
-				     (XTREE_SITTER_NODE (node)->node))))
-		{
-		  ptrdiff_t pos = SITTER_TO_BUFFER (ts_node_start_byte
-						    (XTREE_SITTER_NODE (node)->node));
-		  for (Lisp_Object prev = node; ; prev = node)
-		    {
-		      node = call1 (Qtree_sitter_node_preceding, node);
-		      if (NILP (node) ||
-			  ! same_line (pos,
-				       SITTER_TO_BUFFER
-				       (ts_node_start_byte
-					(XTREE_SITTER_NODE (node)->node))))
-			{
-			  node = prev;
-			  ptrdiff_t prospect_node_beg =
-			    SITTER_TO_BUFFER (ts_node_start_byte
-					      (XTREE_SITTER_NODE (node)->node));
-			  if (XFIXNUM (calc_beg) > prospect_node_beg
-			      && ! same_line (XFIXNUM (calc_beg), prospect_node_beg))
-			    beyond_calc_beg = true;
-			  break;
-			}
-		    }
-		  break;
-		}
+	      node = first_node_of_line (node, 1);
+	      ptrdiff_t prospect_node_beg =
+		SITTER_TO_BUFFER (ts_node_start_byte
+				  (XTREE_SITTER_NODE (node)->node));
+	      if (XFIXNUM (calc_beg) > prospect_node_beg
+		  && ! same_line (XFIXNUM (calc_beg), prospect_node_beg))
+		beyond_calc_beg = true;
 	    }
 	  if (beyond_calc_beg)
 	    node = parent;

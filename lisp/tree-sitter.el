@@ -374,10 +374,9 @@ BEGINNING-P   ARG         MOTION
   "Candidate for `end-of-defun-function'."
   (tree-sitter--traverse-defun nil arg))
 
-(defun tree-sitter-outermost-node (pos)
-  "Immediate child of root node that encompasses POS."
-  (interactive "d")
-  (let ((current (tree-sitter-node-at pos))
+(defun tree-sitter-outermost-node (node)
+  "Immediate child of root node that encompasses NODE."
+  (let ((current node)
         prev)
     (while (not (tree-sitter-node-equal current (tree-sitter-root-node)))
       (setq prev current
@@ -388,11 +387,13 @@ BEGINNING-P   ARG         MOTION
   (interactive "r")
   (let ((region-beg (save-excursion (goto-char beg) (line-beginning-position)))
         (region-end (1+ (save-excursion (goto-char (1- end)) (line-end-position)))))
-    (cl-loop for node = (tree-sitter-outermost-node region-beg)
-             then (tree-sitter-node-next-sibling node)
-             for node-beg = (tree-sitter-node-start node)
+    ;; I know,
+    (cl-loop for outer-node = (tree-sitter-outermost-node (tree-sitter-node-at beg))
+             then (tree-sitter-node-next-sibling outer-node)
+             while outer-node
+             for node-beg = (tree-sitter-node-start outer-node)
              for calc-beg = (max node-beg region-beg)
-             for calc-end = (min (tree-sitter-node-end node) region-end)
+             for calc-end = (min (tree-sitter-node-end outer-node) region-end)
              until (>= calc-beg region-end)
              do (mapc
                  (lambda (elem)
@@ -401,7 +402,7 @@ BEGINNING-P   ARG         MOTION
                      (goto-char node-beg)
                      (forward-line (car elem))
                      (indent-line-to (cdr elem))))
-                 (tree-sitter-calculate-indent node calc-beg calc-end)))))
+                 (tree-sitter-calculate-indent outer-node calc-beg calc-end)))))
 
 (defun tree-sitter-indent-line ()
   "Indent the line."

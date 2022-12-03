@@ -35,6 +35,7 @@
 
 (declare-function tree-sitter "tree-sitter.c")
 (declare-function tree-sitter-indent-line "tree-sitter")
+(declare-function tree-sitter-indent-region "tree-sitter")
 (declare-function tree-sitter-end-of-defun "tree-sitter")
 (declare-function tree-sitter-beginning-of-defun "tree-sitter")
 (declare-function tree-sitter-forward-sexp "tree-sitter")
