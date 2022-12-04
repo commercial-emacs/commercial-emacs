@@ -376,35 +376,35 @@ BEGINNING-P   ARG         MOTION
   "Candidate for `end-of-defun-function'."
   (tree-sitter--traverse-defun nil arg))
 
-(defun tree-sitter-outermost-node (node)
-  "Immediate child of root node that encompasses NODE."
-  (let ((current node)
-        prev)
-    (while (not (tree-sitter-node-equal current (tree-sitter-root-node)))
-      (setq prev current
-            current (tree-sitter-node-parent current)))
-    prev))
-
 (defun tree-sitter-indent-region (beg end)
   (interactive "r")
-  (let ((region-beg (save-excursion (goto-char beg) (line-beginning-position)))
-        (region-end (1+ (save-excursion (goto-char (1- end)) (line-end-position)))))
-    (cl-loop with outer-node
-             while (setq outer-node
-                         (if outer-node
-                             (tree-sitter-node-next-sibling outer-node)
-                           (tree-sitter-outermost-node (tree-sitter-node-at beg))))
-             for node-beg = (tree-sitter-node-start outer-node)
-             for calc-beg = (max node-beg region-beg)
-             for calc-end = (min (tree-sitter-node-end outer-node) region-end)
-             until (>= calc-beg region-end)
-             do (mapc
-                 (lambda (elem)
-                   "ELEM is (LINE . SPACES)"
-                   (goto-char node-beg)
-                   (forward-line (car elem))
-                   (indent-line-to (cdr elem)))
-                 (tree-sitter-calculate-indent outer-node calc-beg calc-end)))))
+  (cl-flet ((outermost (node)
+              (let ((current node) prev)
+                (while (not (tree-sitter-node-equal
+                             current (tree-sitter-root-node)))
+                  (setq prev current
+                        current (tree-sitter-node-parent current)))
+                prev)))
+    (let ((region-beg (save-excursion (goto-char beg) (line-beginning-position)))
+          (region-end (1+ (save-excursion (goto-char (1- end)) (line-end-position)))))
+      (save-excursion
+        (cl-loop for outer-node = (outermost (tree-sitter-node-at beg))
+                 then (tree-sitter-node-next-sibling
+                       (outermost (tree-sitter-node-at (point))))
+                 while outer-node
+                 for node-beg = (tree-sitter-node-start outer-node)
+                 for calc-beg = (max node-beg region-beg)
+                 for calc-end = (min (tree-sitter-node-end outer-node) region-end)
+                 until (>= calc-beg region-end)
+                 do (goto-char node-beg)
+                 do (mapc
+                     (lambda (elem)
+                       "ELEM is (LINE . SPACES)"
+                       (goto-char node-beg)
+                       (forward-line (car elem))
+                       (indent-line-to (cdr elem)))
+                     (tree-sitter-calculate-indent outer-node calc-beg calc-end))))
+      (back-to-indentation))))
 
 (defun tree-sitter-indent-line ()
   "Indent the line."

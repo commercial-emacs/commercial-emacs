@@ -1099,6 +1099,8 @@ static bool
 same_line (ptrdiff_t pos0, ptrdiff_t pos1)
 {
   ptrdiff_t bpos0 = CHAR_TO_BYTE (pos0), bpos1 = CHAR_TO_BYTE (pos1);
+  if (bpos0 == bpos1)
+    return true;
   if (bpos1 < bpos0)
     {
       ptrdiff_t tmp = bpos0;
@@ -1350,7 +1352,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
       SET_TEXT_POS (pt, XFIXNUM (calc_beg), CHAR_TO_BYTE (XFIXNUM (calc_beg)));
       start_move_it (&it, decode_live_window (selected_window), pt);
       move_it_dvpos (&it, 0);
-      for ((void) it; IT_CHARPOS (it) < XFIXNUM (calc_end); move_it_dvpos (&it, 1))
+      for ((void) it; IT_CHARPOS (it) < XFIXNUM (calc_end); (void) it)
 	{
 	  int nspaces = 0;
 	  Fgoto_char (make_fixnum (IT_CHARPOS (it)));
@@ -1593,6 +1595,10 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 	    }
 	  next_target_line:
 	  result = Fcons (Fcons (make_fixnum (line_target++), make_fixnum (nspaces)), result);
+          for (ptrdiff_t pos = IT_CHARPOS (it);
+               IT_CHARPOS (it) < XFIXNUM (calc_end)
+		 && same_line (pos, IT_CHARPOS (it));
+               move_it_dvpos (&it, 1));
 	}
       ts_captures_free (slice);
       bidi_unshelve_cache (itdata, 0);
