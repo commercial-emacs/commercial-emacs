@@ -1368,7 +1368,6 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 
 	  Lisp_Object node = Ftree_sitter_node_at (Qnil, Qnil);
 	  int slice_index = slice.len - 1;
-	  size_t node_count = 0;
 	  for (ptrdiff_t node_beg =
 		 SITTER_TO_BUFFER (ts_node_start_byte
 				   (XTREE_SITTER_NODE (node)->node));
@@ -1547,18 +1546,15 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			}
 		    }
 		  else if (! same_line (capture_beg, capture_end - 1)
-			   && ! same_line (node_beg, PT))
+			   && ! same_line (node_beg, PT)
+			   && last_dented_pos < 0)
 		    {
 		      if (0 == strcmp (capture_name, "indent"))
 			{
-			  if (last_dented_pos < 0)
-			    {
-			      nspaces += indent_nspaces;
-			      last_dented_pos = node_beg;
-			    }
+			  nspaces += indent_nspaces;
+			  last_dented_pos = node_beg;
 			}
-		      else if (0 == strcmp (capture_name, "aligned_indent")
-                               && node_count == 1)
+		      else if (0 == strcmp (capture_name, "aligned_indent"))
 			{
 			  Lisp_Object stack = Qnil;
 			  for (uint32_t count = ts_node_child_count
@@ -1601,7 +1597,6 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 
 	    next_parent:
 	      node = parent_earlier_line (node, node_beg);
-	      ++node_count;
 	    }
 	next_target_line:
 	  result = Fcons (Fcons (make_fixnum (line_target++),
