@@ -191,7 +191,7 @@ highlight_region (const TSHighlightEventSlice *slice,
   const uint32_t offset = ts_node_start_byte (node);
   ptrdiff_t smallest = PTRDIFF_MAX, biggest = PTRDIFF_MIN;
 
-  for (int i=0; i<slice->len; ++i)
+  for (int i = 0; i < slice->len; ++i)
     {
       const TSHighlightEvent *ev = &(slice->arr[i]);
       eassert (ev->index < count);
@@ -1344,6 +1344,11 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			 sitter_beg,
 			 sitter_end);
 
+      Lisp_Object capture_name_to_tsnode =
+	make_hash_table (hashtest_eq, 10,
+			 DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
+			 Qnil, false);
+      Lisp_Object obarray = initialize_vector (10, make_fixnum (0));
       const Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
       ptrdiff_t line_target =
 	count_lines (CHAR_TO_BYTE (enclosing_beg), CHAR_TO_BYTE (XFIXNUM (calc_beg)));
@@ -1381,14 +1386,12 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 	      if (slice_index < 0)
 		goto next_target_line;
 
+	      // obarray uncleared okay since Fgethash(stale) is nil.
+	      Fclrhash (capture_name_to_tsnode);
+
 	      /* Process all QueryCaptures until the line of capture
 		 is no longer line of NODE.  */
 	      ptrdiff_t last_dented_pos = -1;
-	      Lisp_Object capture_name_to_tsnode =
-		make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
-				 DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
-				 Qnil, false);
-	      Lisp_Object obarray = initialize_vector (10, make_fixnum (0));
 	      for ((void) slice_index; slice_index >= 0; --slice_index)
 		{
 		  /* line's captures should not have been.  */
@@ -1593,8 +1596,10 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 	    next_parent:
 	      node = parent_earlier_line (node, node_beg);
 	    }
-	  next_target_line:
-	  result = Fcons (Fcons (make_fixnum (line_target++), make_fixnum (nspaces)), result);
+	next_target_line:
+	  result = Fcons (Fcons (make_fixnum (line_target++),
+				 make_fixnum (nspaces)),
+			  result);
           for (ptrdiff_t pos = IT_CHARPOS (it);
                IT_CHARPOS (it) < XFIXNUM (calc_end)
 		 && same_line (pos, IT_CHARPOS (it));
@@ -1604,7 +1609,6 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
       bidi_unshelve_cache (itdata, 0);
       unbind_to (count, Qnil);
     }
-
   return result;
 }
 

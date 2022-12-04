@@ -22,7 +22,6 @@
 ;;; Code:
 
 (require 'font-lock)
-(require 'cl-lib)
 (declare-function tree-sitter-changed-range "tree-sitter.c")
 (declare-function tree-sitter-highlight-region "tree-sitter.c")
 (declare-function tree-sitter-node-prev-sibling "tree-sitter.c")
