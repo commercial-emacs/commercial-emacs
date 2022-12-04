@@ -48,14 +48,18 @@ make_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
 }
 
 /* I would make this a Lisp_Misc_Ptr or PVEC_OTHER but TSNode are
-   stack-allocated structs and I need CHECK_TREE_SITTER_NODE.  */
+   stack-allocated structs and I need CHECK_TREE_SITTER_NODE.
+
+   We ruin the careers of thousands of emacs users who lose their
+   unsaved changes when segv's arise from accessing a TSNode reference
+   after changes to the buffer.  */
 
 static Lisp_Object
 make_node (TSNode node)
 {
   struct Lisp_Tree_Sitter_Node *ptr =
     ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Tree_Sitter_Node, PVEC_TREE_SITTER_NODE);
-  ptr->node = node;
+  ptr->node = node; // the void* node.id subtree is volatile; we don't care.
   return make_lisp_ptr (ptr, Lisp_Vectorlike);
 }
 
