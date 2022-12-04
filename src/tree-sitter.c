@@ -1546,13 +1546,15 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			}
 		    }
 		  else if (! same_line (capture_beg, capture_end - 1)
-			   && ! same_line (node_beg, PT)
-			   && last_dented_pos < 0)
+			   && ! same_line (node_beg, PT))
 		    {
 		      if (0 == strcmp (capture_name, "indent"))
 			{
-			  nspaces += indent_nspaces;
-			  last_dented_pos = node_beg;
+                          if (last_dented_pos < 0)
+                            {
+			      nspaces += indent_nspaces;
+			      last_dented_pos = node_beg;
+                            }
 			}
 		      else if (0 == strcmp (capture_name, "aligned_indent"))
 			{
@@ -1582,7 +1584,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			      specpdl_ref count = SPECPDL_INDEX ();
 			      record_unwind_protect_excursion ();
 			      Fgoto_char (XCAR (stack));
-			      nspaces = 1 + current_column ();
+			      nspaces += 1 + current_column ();
 			      unbind_to (count, Qnil);
 			      goto next_target_line; /* since delimiter pos is absolute. */
 			    }
