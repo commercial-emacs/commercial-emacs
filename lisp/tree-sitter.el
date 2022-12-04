@@ -379,8 +379,9 @@ BEGINNING-P   ARG         MOTION
   (interactive "r")
   (cl-flet ((outermost (node)
               (let ((current node) prev)
-                (while (not (tree-sitter-node-equal
-                             current (tree-sitter-root-node)))
+                (while (and current
+                            (not (tree-sitter-node-equal
+                                  current (tree-sitter-root-node))))
                   (setq prev current
                         current (tree-sitter-node-parent current)))
                 prev)))
@@ -396,13 +397,14 @@ BEGINNING-P   ARG         MOTION
                  for calc-end = (min (tree-sitter-node-end outer-node) region-end)
                  until (>= calc-beg region-end)
                  do (goto-char node-beg)
-                 do (mapc
-                     (lambda (elem)
-                       "ELEM is (LINE . SPACES)"
-                       (goto-char node-beg)
-                       (forward-line (car elem))
-                       (indent-line-to (cdr elem)))
-                     (tree-sitter-calculate-indent outer-node calc-beg calc-end))))
+                 do (save-excursion
+                      (mapc
+                       (lambda (elem)
+                         "ELEM is (LINE . SPACES)"
+                         (goto-char node-beg)
+                         (forward-line (car elem))
+                         (indent-line-to (cdr elem)))
+                       (tree-sitter-calculate-indent outer-node calc-beg calc-end)))))
       (back-to-indentation))))
 
 (defun tree-sitter-indent-line ()
