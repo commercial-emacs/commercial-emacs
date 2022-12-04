@@ -11568,7 +11568,7 @@ x_new_focus_frame (struct x_display_info *dpyinfo, struct frame *frame)
   x_frame_rehighlight (dpyinfo);
 }
 
-#ifdef HAVE_XFIXES
+#if defined HAVE_XFIXES && XFIXES_VERSION >= 40000
 
 /* True if the display in DPYINFO supports a version of Xfixes
    sufficient for pointer blanking.  */
@@ -11580,11 +11580,12 @@ x_fixes_pointer_blanking_supported (struct x_display_info *dpyinfo)
 	  && dpyinfo->xfixes_major >= 4);
 }
 
-#endif /* HAVE_XFIXES */
+#endif /* HAVE_XFIXES && XFIXES_VERSION >= 40000 */
 
 /* Toggle mouse pointer visibility on frame F using the XFixes
    extension.  */
-#ifdef HAVE_XFIXES
+#if defined HAVE_XFIXES && XFIXES_VERSION >= 40000
+
 static void
 xfixes_toggle_visible_pointer (struct frame *f, bool invisible)
 
@@ -11595,6 +11596,7 @@ xfixes_toggle_visible_pointer (struct frame *f, bool invisible)
     XFixesShowCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f));
   f->pointer_invisible = invisible;
 }
+
 #endif /* HAVE_XFIXES */
 
 /* Create invisible cursor on the X display referred by DPYINFO.  */
@@ -11643,7 +11645,7 @@ x_toggle_visible_pointer (struct frame *f, bool invisible)
   if (dpyinfo->invisible_cursor == None)
     dpyinfo->invisible_cursor = make_invisible_cursor (dpyinfo);
 
-#ifndef HAVE_XFIXES
+#if !defined HAVE_XFIXES || XFIXES_VERSION < 40000
   if (dpyinfo->invisible_cursor == None)
     invisible = false;
 #else
@@ -11676,7 +11678,7 @@ static void
 XTtoggle_invisible_pointer (struct frame *f, bool invisible)
 {
   block_input ();
-#ifdef HAVE_XFIXES
+#if defined HAVE_XFIXES && XFIXES_VERSION >= 40000
   if (FRAME_DISPLAY_INFO (f)->fixes_pointer_blanking
       && x_fixes_pointer_blanking_supported (FRAME_DISPLAY_INFO (f)))
     xfixes_toggle_visible_pointer (f, invisible);
@@ -30170,7 +30172,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 				   1, 0, 1);
 
   dpyinfo->invisible_cursor = make_invisible_cursor (dpyinfo);
-#ifdef HAVE_XFIXES
+#if defined HAVE_XFIXES && XFIXES_VERSION >= 40000
   dpyinfo->fixes_pointer_blanking = egetenv ("EMACS_XFIXES");
 #endif
 
