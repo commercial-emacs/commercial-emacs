@@ -1111,10 +1111,18 @@ same_line (ptrdiff_t pos0, ptrdiff_t pos1)
       bpos0 = bpos1;
       bpos1 = tmp;
     }
-  ptrdiff_t ceiling = min (bpos1, BUFFER_CEILING_OF (bpos0));
-  unsigned char *ceiling_addr = BYTE_POS_ADDR (ceiling) + 1;
-  unsigned char *cursor = BYTE_POS_ADDR (bpos0);
-  return memchr (cursor, '\n', ceiling_addr - cursor) == NULL;
+
+  while (bpos0 < bpos1)
+    {
+      /* BUFFER_CEILING_OF() minds the gap.  */
+      ptrdiff_t ceiling = min (bpos1, BUFFER_CEILING_OF (bpos0));
+      unsigned char *ceiling_addr = BYTE_POS_ADDR (ceiling) + 1;
+      unsigned char *cursor = BYTE_POS_ADDR (bpos0);
+      if (memchr (cursor, '\n', ceiling_addr - cursor) != NULL)
+        return false;
+      bpos0 += ceiling_addr - cursor;
+    }
+  return true;
 }
 
 static Lisp_Object
