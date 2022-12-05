@@ -391,16 +391,18 @@ BEGINNING-P   ARG         MOTION
                                      (beginning-of-line)
                                      (search-forward-regexp "\\S-" nil t))
                              (save-excursion
-                               (let (inhibit-modification-hooks)
+                               (let (inhibit-modification-hooks
+                                     (restore-modified-p (buffer-modified-p)))
                                  (delete-region (point) (point-max))
-                                 (insert ?\()))
+                                 (insert ?\()
+                                 (set-buffer-modified-p restore-modified-p)))
                              (let ((m (make-marker)))
                                (set-marker-insertion-type m t)
                                (set-marker m (point))))))
       ;; hack eob
       (save-excursion
         (unwind-protect
-           (cl-loop for outer-node = (outermost (tree-sitter-node-at beg))
+           (cl-loop for outer-node = (outermost (tree-sitter-node-at region-beg))
                     then (tree-sitter-node-next-sibling
                           (outermost (tree-sitter-node-at (point))))
                     while outer-node
@@ -420,8 +422,10 @@ BEGINNING-P   ARG         MOTION
           (when hack-eob-marker
             (save-excursion
               (goto-char hack-eob-marker)
-              (let (inhibit-modification-hooks)
-                (delete-char 1))))))
+              (let (inhibit-modification-hooks
+                    (restore-modified-p (buffer-modified-p)))
+                (delete-char 1)
+                (set-buffer-modified-p restore-modified-p))))))
       (let ((pos (save-excursion (back-to-indentation) (point))))
         (when (< (point) pos)
           (goto-char pos)))))
