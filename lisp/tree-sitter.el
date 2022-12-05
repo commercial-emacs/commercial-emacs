@@ -274,6 +274,7 @@ tree-sitter-goto-prev-sibling."
     node))
 
 (defun tree-sitter-sexp-at (&optional pos)
+  "This is almost certainly wrong.  See `tree-sitter-c-forward-sexp'."
   (unless (fixnump pos) (setq pos (point)))
   (if-let ((precise-node (tree-sitter-node-at pos t)))
       (let ((shallowest (tree-sitter-node-shallowest precise-node)))
