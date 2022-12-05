@@ -1488,7 +1488,8 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 
 		  if (0 == strcmp ("comment",
 				   ts_node_type (XTREE_SITTER_NODE (node)->node))
-		      && ! same_line (node_beg, PT))
+		      && ! same_line (node_beg, PT)
+                      && node_beg < PT)
 		    {
 		      struct text_pos pt;
 		      void *itdata = bidi_shelve_cache ();
@@ -1546,7 +1547,8 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			}
 		    }
 		  else if (! same_line (capture_beg, capture_end - 1)
-			   && ! same_line (node_beg, PT))
+			   && ! same_line (node_beg, PT)
+                           && node_beg < PT)
 		    {
 		      if (0 == strcmp (capture_name, "indent"))
 			{
