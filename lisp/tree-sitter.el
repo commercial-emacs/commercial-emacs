@@ -386,28 +386,45 @@ BEGINNING-P   ARG         MOTION
                         current (tree-sitter-node-parent current)))
                 prev)))
     (let ((region-beg (save-excursion (goto-char beg) (line-beginning-position)))
-          (region-end (1+ (save-excursion (goto-char (1- end)) (line-end-position)))))
+          (region-end (1+ (save-excursion (goto-char (1- end)) (line-end-position))))
+          (hack-eob-marker (unless (save-excursion
+                                     (beginning-of-line)
+                                     (search-forward-regexp "\\S-" nil t))
+                             (save-excursion
+                               (let (inhibit-modification-hooks)
+                                 (delete-region (point) (point-max))
+                                 (insert ?\()))
+                             (let ((m (make-marker)))
+                               (set-marker-insertion-type m t)
+                               (set-marker m (point))))))
+      ;; hack eob
       (save-excursion
-        (cl-loop for outer-node = (outermost (tree-sitter-node-at beg))
-                 then (tree-sitter-node-next-sibling
-                       (outermost (tree-sitter-node-at (point))))
-                 while outer-node
-                 for node-beg = (tree-sitter-node-start outer-node)
-                 for calc-beg = (max node-beg region-beg)
-                 for calc-end = (min (tree-sitter-node-end outer-node) region-end)
-                 until (>= calc-beg region-end)
-                 do (goto-char node-beg)
-                 do (save-excursion
-                      (mapc
-                       (lambda (elem)
-                         "ELEM is (LINE . SPACES)"
-                         (goto-char node-beg)
-                         (forward-line (car elem))
-                         (indent-line-to (cdr elem)))
-                       (tree-sitter-calculate-indent outer-node calc-beg calc-end)))))
+        (unwind-protect
+           (cl-loop for outer-node = (outermost (tree-sitter-node-at beg))
+                    then (tree-sitter-node-next-sibling
+                          (outermost (tree-sitter-node-at (point))))
+                    while outer-node
+                    for node-beg = (tree-sitter-node-start outer-node)
+                    for calc-beg = (max node-beg region-beg)
+                    for calc-end = (min (tree-sitter-node-end outer-node) region-end)
+                    until (>= calc-beg region-end)
+                    do (goto-char node-beg)
+                    do (save-excursion
+                         (mapc
+                          (lambda (elem)
+                            "ELEM is (LINE . SPACES)"
+                            (goto-char node-beg)
+                            (forward-line (car elem))
+                            (indent-line-to (cdr elem)))
+                          (tree-sitter-calculate-indent outer-node calc-beg calc-end)))))
+          (when hack-eob-marker
+            (save-excursion
+              (goto-char hack-eob-marker)
+              (let (inhibit-modification-hooks)
+                (delete-char 1))))))
       (let ((pos (save-excursion (back-to-indentation) (point))))
         (when (< (point) pos)
-          (goto-char pos))))))
+          (goto-char pos)))))
 
 (defun tree-sitter-indent-line ()
   "Indent the line."
