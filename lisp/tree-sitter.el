@@ -405,7 +405,9 @@ BEGINNING-P   ARG         MOTION
                          (forward-line (car elem))
                          (indent-line-to (cdr elem)))
                        (tree-sitter-calculate-indent outer-node calc-beg calc-end)))))
-      (back-to-indentation))))
+      (let ((pos (save-excursion (back-to-indentation) (point))))
+        (when (< (point) pos)
+          (goto-char pos))))))
 
 (defun tree-sitter-indent-line ()
   "Indent the line."
