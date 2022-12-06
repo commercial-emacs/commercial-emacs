@@ -44,6 +44,7 @@ make_sitter (TSParser *parser, TSTree *tree, Lisp_Object progmode_arg)
   ptr->highlight_names = NULL;
   ptr->highlights_query = NULL;
   ptr->indents_query = NULL;
+  ptr->dirty = true;
   return make_lisp_ptr (ptr, Lisp_Vectorlike);
 }
 
@@ -323,6 +324,73 @@ ensure_highlighter(Lisp_Object sitter)
   return ret;
 }
 
+static const char*
+tree_sitter_read_buffer (void *payload, uint32_t byte_index,
+                         TSPoint position, uint32_t *bytes_read)
+{
+  static int thread_unsafe_last_scan_characters = -1;
+  static char *thread_unsafe_return_value = NULL;
+  EMACS_INT start = SITTER_TO_BUFFER (byte_index);
+  struct buffer *bp = (struct buffer *) payload;
+  specpdl_ref pdl_count = SPECPDL_INDEX ();
+
+  if (thread_unsafe_last_scan_characters < tree_sitter_scan_characters)
+    {
+      thread_unsafe_last_scan_characters = tree_sitter_scan_characters;
+      /* hyper-conservative estimate of 4 bytes per character. */
+      if (thread_unsafe_return_value == NULL)
+	thread_unsafe_return_value = xmalloc (tree_sitter_scan_characters * 4 + 1);
+      else
+	thread_unsafe_return_value = xrealloc (thread_unsafe_return_value,
+					       tree_sitter_scan_characters * 4 + 1);
+    }
+
+  if (! BUFFER_LIVE_P (bp))
+    error ("Selecting deleted buffer");
+
+  record_unwind_protect (save_restriction_restore, save_restriction_save ());
+  Fwiden ();
+  /* Fbuffer_substring_no_properties is smart about multibyte and gap. */
+  sprintf (thread_unsafe_return_value, "%s",
+           SSDATA (Fbuffer_substring_no_properties
+                   (make_fixnum (start),
+                    make_fixnum (min (start + tree_sitter_scan_characters,
+                                      BUF_Z (bp))))));
+  unbind_to (pdl_count, Qnil);
+  if (bytes_read)
+    *bytes_read = strlen (thread_unsafe_return_value);
+  return thread_unsafe_return_value;
+}
+
+static TSTree *
+parsed_tree (struct Lisp_Tree_Sitter *sitter)
+{
+  if (sitter->tree == NULL)
+    xsignal1 (Qtree_sitter_error, BVAR (XBUFFER (Fcurrent_buffer ()), name));
+  if (sitter->dirty)
+    {
+      TSTree *tree = sitter->tree;
+      sitter->dirty = false;
+      if (sitter->prev_tree != NULL)
+	{
+	  ts_tree_delete (sitter->prev_tree);
+	  sitter->prev_tree = NULL;
+	}
+
+      sitter->prev_tree = ts_tree_copy (tree);
+      sitter->tree =
+	ts_parser_parse (sitter->parser,
+			 tree,
+			 (TSInput) {
+			   current_buffer,
+			   tree_sitter_read_buffer,
+			   TSInputEncodingUTF8
+			 });
+      ts_tree_delete (tree);
+    }
+  return sitter->tree;
+}
+
 static Lisp_Object
 do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 {
@@ -346,7 +414,7 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
       if (ts_highlighter)
 	{
 	  TSNode node = ts_node_first_child_for_byte
-	    (ts_tree_root_node (XTREE_SITTER (sitter)->tree),
+	    (ts_tree_root_node (parsed_tree (XTREE_SITTER (sitter))),
 	     BUFFER_TO_SITTER (XFIXNUM (beg)));
 	  while (! ts_node_is_null (node)
 		 && ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end)))
@@ -446,7 +514,7 @@ DEFUN ("tree-sitter-root-node",
 
   if (! NILP (sitter))
     {
-      const TSTree *tree = XTREE_SITTER (sitter)->tree;
+      const TSTree *tree = parsed_tree (XTREE_SITTER (sitter));
       if (tree != NULL)
 	{
 	  TSNode root_node = ts_tree_root_node (tree);
@@ -478,7 +546,7 @@ DEFUN ("tree-sitter-ppss",
   if (NILP (sitter))
     return retval;
 
-  tree = XTREE_SITTER (sitter)->tree;
+  tree = parsed_tree (XTREE_SITTER (sitter));
   if (tree == NULL)
     return retval;
 
@@ -658,7 +726,7 @@ If PRECISE is non-nil, return nil if POS falls outside any node's range.  */)
   if (NILP (sitter))
     return Qnil;
 
-  tree = XTREE_SITTER (sitter)->tree;
+  tree = parsed_tree (XTREE_SITTER (sitter));
   if (tree == NULL)
     return Qnil;
 
@@ -1663,7 +1731,7 @@ DEFUN ("tree-sitter-changed-range",
 
   if (! NILP (sitter))
     {
-      const TSTree *tree = XTREE_SITTER (sitter)->tree,
+      const TSTree *tree = parsed_tree (XTREE_SITTER (sitter)),
 	*prev_tree = XTREE_SITTER (sitter)->prev_tree;
       if (tree != NULL && prev_tree != NULL)
 	{
@@ -1679,44 +1747,6 @@ DEFUN ("tree-sitter-changed-range",
 	}
     }
   return retval;
-}
-
-static const char*
-tree_sitter_read_buffer (void *payload, uint32_t byte_index,
-                         TSPoint position, uint32_t *bytes_read)
-{
-  static int thread_unsafe_last_scan_characters = -1;
-  static char *thread_unsafe_return_value = NULL;
-  EMACS_INT start = SITTER_TO_BUFFER (byte_index);
-  struct buffer *bp = (struct buffer *) payload;
-  specpdl_ref pdl_count = SPECPDL_INDEX ();
-
-  if (thread_unsafe_last_scan_characters < tree_sitter_scan_characters)
-    {
-      thread_unsafe_last_scan_characters = tree_sitter_scan_characters;
-      /* hyper-conservative estimate of 4 bytes per character. */
-      if (thread_unsafe_return_value == NULL)
-	thread_unsafe_return_value = xmalloc (tree_sitter_scan_characters * 4 + 1);
-      else
-	thread_unsafe_return_value = xrealloc (thread_unsafe_return_value,
-					       tree_sitter_scan_characters * 4 + 1);
-    }
-
-  if (! BUFFER_LIVE_P (bp))
-    error ("Selecting deleted buffer");
-
-  record_unwind_protect (save_restriction_restore, save_restriction_save ());
-  Fwiden ();
-  /* Fbuffer_substring_no_properties is smart about multibyte and gap. */
-  sprintf (thread_unsafe_return_value, "%s",
-           SSDATA (Fbuffer_substring_no_properties
-                   (make_fixnum (start),
-                    make_fixnum (min (start + tree_sitter_scan_characters,
-                                      BUF_Z (bp))))));
-  unbind_to (pdl_count, Qnil);
-  if (bytes_read)
-    *bytes_read = strlen (thread_unsafe_return_value);
-  return thread_unsafe_return_value;
 }
 
 DEFUN ("tree-sitter",
@@ -1753,6 +1783,7 @@ DEFUN ("tree-sitter",
 			     });
 	  if (XTREE_SITTER (sitter)->tree == NULL)
 	    xsignal1 (Qtree_sitter_parse_error, BVAR (XBUFFER (buffer), name));
+          XTREE_SITTER (sitter)->dirty = false;
 	}
     }
   else
@@ -1781,24 +1812,8 @@ tree_sitter_record_change (ptrdiff_t start_char,
 	    (TSPoint) { 0, 0 },
 	    (TSPoint) { 0, max (1, new_end_char - start_char) } /* black magic */
 	  };
-
-	  if (XTREE_SITTER (sitter)->prev_tree != NULL)
-	    {
-	      ts_tree_delete (XTREE_SITTER (sitter)->prev_tree);
-	      XTREE_SITTER (sitter)->prev_tree = NULL;
-	    }
-
-	  XTREE_SITTER (sitter)->prev_tree = ts_tree_copy (tree);
+          XTREE_SITTER (sitter)->dirty = true;
 	  ts_tree_edit (tree, &edit);
-	  XTREE_SITTER (sitter)->tree =
-	    ts_parser_parse (XTREE_SITTER (sitter)->parser,
-			     tree,
-			     (TSInput) {
-			       current_buffer,
-			       tree_sitter_read_buffer,
-			       TSInputEncodingUTF8
-			     });
-	  ts_tree_delete (tree);
 	}
       else
 	{

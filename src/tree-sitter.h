@@ -54,6 +54,7 @@ struct Lisp_Tree_Sitter
   const char **highlight_names;
   char *highlights_query;
   TSQuery *indents_query;
+  bool dirty;
 } GCALIGNED_STRUCT;
 
 INLINE bool
