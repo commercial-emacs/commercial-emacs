@@ -388,8 +388,6 @@ BEGINNING-P   ARG         MOTION
                 prev)))
     (let ((region-beg (save-excursion (goto-char beg) (line-beginning-position)))
           (region-end (1+ (save-excursion (goto-char (1- end)) (line-end-position))))
-          (font-lock-p (when font-lock-mode
-                         (prog1 t (font-lock-mode 'toggle))))
           (hack-eob-marker (unless (save-excursion
                                      (beginning-of-line)
                                      (search-forward-regexp "\\S-" nil t))
@@ -421,19 +419,17 @@ BEGINNING-P   ARG         MOTION
                             (goto-char node-beg)
                             (forward-line (car elem))
                             (indent-line-to (cdr elem)))
-                          (tree-sitter-calculate-indent outer-node calc-beg calc-end))))
+                          (tree-sitter-calculate-indent outer-node calc-beg calc-end)))))
           (when hack-eob-marker
             (save-excursion
               (goto-char hack-eob-marker)
               (let (inhibit-modification-hooks
                     (restore-modified-p (buffer-modified-p)))
                 (delete-char 1)
-                (set-buffer-modified-p restore-modified-p))))
-          (when font-lock-p
-            (font-lock-mode 'toggle)))))
-    (let ((pos (save-excursion (back-to-indentation) (point))))
-      (when (< (point) pos)
-        (goto-char pos)))))
+                (set-buffer-modified-p restore-modified-p))))))
+      (let ((pos (save-excursion (back-to-indentation) (point))))
+        (when (< (point) pos)
+          (goto-char pos)))))
 
 (defun tree-sitter-indent-line ()
   "Indent the line."
