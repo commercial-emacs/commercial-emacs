@@ -400,10 +400,10 @@ BEGINNING-P   ARG         MOTION
                              (let ((m (make-marker)))
                                (set-marker-insertion-type m t)
                                (set-marker m (point))))))
-      ;; hack eob
       (save-excursion
         (unwind-protect
-           (cl-loop for outer-node = (outermost (tree-sitter-node-at region-beg))
+           (cl-loop with t1 = (current-time)
+                    for outer-node = (outermost (tree-sitter-node-at region-beg))
                     then (tree-sitter-node-next-sibling
                           (outermost (tree-sitter-node-at (point))))
                     while outer-node
@@ -412,6 +412,10 @@ BEGINNING-P   ARG         MOTION
                     for calc-end = (min (tree-sitter-node-end outer-node) region-end)
                     until (>= calc-beg region-end)
                     do (goto-char node-beg)
+                    do (when (> (float-time (time-since t1)) 1.5)
+                         (message "Indenting region...%s%%"
+                                  (/ (* (- (point) region-beg) 100)
+                                     (- region-end region-beg))))
                     do (save-excursion
                          (mapc
                           (lambda (elem)
