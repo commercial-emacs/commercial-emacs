@@ -30,6 +30,7 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
+(eval-when-compile (require 'rx))
 (require 'compile)
 
 (defgroup grep nil
@@ -1406,6 +1407,76 @@ The returned file name is relative."
 
 ;;;###autoload
 (defalias 'rzgrep #'zrgrep)
+
+;;; Headings mode
+(defcustom grep-heading-regexp
+  (rx bol
+      (or
+       (seq "Grep" (* (any "/a-zA-Z")) " "
+            (or "started" "finished" "exited" "interrupt" "killed" "terminated")
+            (* (not (any "\0\n"))))
+       (seq
+        (group-n 2
+          (group-n 1 (+? any))
+          (any "\0-:="))
+        (+ digit)
+        (any "-:="))))
+  "Regexp used to create headings from grep output lines.
+It should be anchored at beginning of line.  The first capture
+group, if present, should match the heading associated to the
+line.  The buffer range of the second capture, if present, is
+made invisible (presumably because displaying it would be
+redundant)."
+  :type 'regexp
+  :version "30.1")
+
+(defface grep-heading '((t :inherit font-lock-function-name-face))
+  "Face of headings when using `grep-heading-mode'.")
+
+(defvar grep--heading-format
+  #("\n%s\n" 1 3 (font-lock-face grep-heading outline-level 1))
+  "Format string of grep headings.
+This is passed to `format' with one argument, the text of the
+first capture group of `grep-heading-regexp'.")
+
+(defvar-local grep--current-heading nil
+  "Used by `grep--heading-filter' to keep track of the current heading.")
+
+(defun grep--heading-filter ()
+  "Filter function to add headings to output of a grep process."
+  (save-excursion
+    (let ((bound (copy-marker (pos-bol))))
+      (goto-char compilation-filter-start)
+      (forward-line 0)
+      (while (re-search-forward grep-heading-regexp bound t)
+        (let ((heading (match-string-no-properties 1))
+              (start (match-beginning 2))
+              (end (match-end 2)))
+          (when start
+            (put-text-property start end 'invisible t))
+          (when (and heading (not (equal heading grep--current-heading)))
+            (save-excursion
+              (forward-line 0)
+              (insert-before-markers (format grep--heading-format heading)))
+            (setq grep--current-heading heading)))))))
+
+;;;###autoload
+(define-minor-mode grep-heading-mode
+  "Subdivide grep output into sections, one per file."
+  :interactive 'grep-mode
+  (if (not grep-heading-mode)
+      (recompile)
+    (save-excursion
+      (save-restriction
+        (widen)
+        (let ((inhibit-read-only t)
+              (compilation-filter-start (point-min)))
+          (goto-char (point-max))
+          (grep--heading-filter))))
+    (add-hook 'compilation-filter-hook #'grep--heading-filter 80 t)
+    (setq-local outline-search-function #'outline-search-level
+                outline-level (lambda () (get-text-property
+                                          (point) 'outline-level)))))
 
 (provide 'grep)
 

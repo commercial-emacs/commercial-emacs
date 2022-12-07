@@ -41,6 +41,14 @@ connection.
 
 * Changes in Specialized Modes and Packages in Emacs 30.1
 
+** Compile
+
+*** New minor mode 'grep-heading-mode'.
+In this mode, the grep output is split into sections, one for each
+file, instead of having file names prefixed to each line.  It is
+equivalent to the --heading option of some tools such as 'git grep'
+and 'rg.
+
 ** VC
 
 ---
