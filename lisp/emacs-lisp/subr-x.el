@@ -370,8 +370,7 @@ this defaults to the current buffer."
                                                    (min end (point-max)))))
       (if (not (setq disp (get-text-property sub-start 'display object)))
           ;; No old properties in this range.
-          (put-text-property sub-start sub-end 'display (list prop value)
-                             object)
+          (put-text-property sub-start sub-end 'display (list prop value))
         ;; We have old properties.
         (let ((vector nil))
           ;; Make disp into a list.
@@ -391,7 +390,7 @@ this defaults to the current buffer."
           (when vector
             (setq disp (seq-into disp 'vector)))
           ;; Finally update the range.
-          (put-text-property sub-start sub-end 'display disp object)))
+          (put-text-property sub-start sub-end 'display disp)))
       (setq sub-start sub-end))))
 
 ;;;###autoload

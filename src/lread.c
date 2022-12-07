@@ -3340,7 +3340,7 @@ read_bool_vector (Lisp_Object readcharfun)
 	  break;
 	}
       if (INT_MULTIPLY_WRAPV (length, 10, &length)
-	  || INT_ADD_WRAPV (length, c - '0', &length))
+	  | INT_ADD_WRAPV (length, c - '0', &length))
 	invalid_syntax ("#&", readcharfun);
     }
 
@@ -3386,7 +3386,7 @@ skip_lazy_string (Lisp_Object readcharfun)
 	  break;
 	}
       if (INT_MULTIPLY_WRAPV (nskip, 10, &nskip)
-	  || INT_ADD_WRAPV (nskip, c - '0', &nskip))
+	  | INT_ADD_WRAPV (nskip, c - '0', &nskip))
 	invalid_syntax ("#@", readcharfun);
       digits++;
       if (digits == 2 && nskip == 0)
@@ -5358,14 +5358,6 @@ to the specified file name if a suffix is allowed or required.  */);
 #ifdef MODULES_SECONDARY_SUFFIX
   Vload_suffixes =
     Fcons (build_pure_c_string (MODULES_SECONDARY_SUFFIX), Vload_suffixes);
-#endif
-#endif
-  DEFVAR_LISP ("module-file-suffix", Vmodule_file_suffix,
-	       doc: /* Suffix of loadable module file, or nil if modules are not supported.  */);
-#ifdef HAVE_MODULES
-  Vmodule_file_suffix = build_pure_c_string (MODULES_SUFFIX);
-#else
-  Vmodule_file_suffix = Qnil;
 #endif
 
 #endif
