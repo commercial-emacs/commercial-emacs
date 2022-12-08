@@ -601,13 +601,6 @@ x_pop_current_selection_request (void)
   xfree (tem);
 }
 
-static bool
-x_selection_for_multiple (struct selection_data *data)
-{
-  return (Atom *) data->data
-    == &selection_request_stack->conversion_fail_tag;
-}
-
 /* Used as an unwind-protect clause so that, if a selection-converter signals
    an error, we tell the requestor that we were unable to do what they wanted
    before we throw to top-level or go into the debugger or whatever.  */
@@ -623,7 +616,7 @@ x_selection_request_lisp_error (void)
   for (cs = frame->converted_selections; cs; cs = next)
     {
       next = cs->next;
-      if (cs->data && ! x_selection_for_multiple (cs))
+      if (cs->data)
 	xfree (cs->data);
       xfree (cs);
     }
@@ -820,9 +813,6 @@ x_start_selection_transfer (struct x_display_info *dpyinfo, Window requestor,
   timeout = max (0, x_selection_timeout);
   secs = timeout / 1000;
   nsecs = (timeout % 1000) * 1000000;
-
-  if (x_selection_for_multiple (data))
-    return;
 
   transfer = xzalloc (sizeof *transfer);
   transfer->requestor = requestor;
