@@ -320,7 +320,15 @@ Return the number of unsatisfiable iterations."
       (ignore-errors (backward-char)))
     (tree-sitter-node-preceding (tree-sitter-node-at (point)))))
 
-(defun tree-sitter--traverse-defun (function-type beginning-p &optional arg)
+(cl-defun tree-sitter--traverse-defun (function-type
+                                       beginning-p
+                                       &optional arg
+                                       &aux
+                                       (arg (or arg 1))
+                                       (forward-p
+                                        (or (and beginning-p (< arg 0))
+                                            (and (not beginning-p) (> arg 0))))
+                                       (root-node (tree-sitter-root-node)))
   "Two mutually sensitive polarities.
 
 BEGINNING-P   ARG         MOTION
@@ -330,45 +338,41 @@ BEGINNING-P   ARG         MOTION
         nil   positive    forwards
         nil   negative    backwards
 "
-  (setq arg (or arg 1))
-  (let* ((forward-p (or (and beginning-p (< arg 0))
-                        (and (not beginning-p) (> arg 0))))
-         (ntimes (abs arg))
-         (root-node (tree-sitter-root-node))
-         (node (tree-sitter-node-shallowest
-                (if-let ((precise-node
-                          (tree-sitter-node-shallowest
-                           (tree-sitter-node-at (point) t))))
-                    (if (and beginning-p
-                             (tree-sitter-node-equal
-                              root-node (tree-sitter-node-parent precise-node)))
-                        ;; already at defun boundary
-                        (tree-sitter-node-shallowest
-                         (tree-sitter-node-preceding precise-node))
-                      precise-node)
-                  (let ((next-node (tree-sitter-node-at (point))))
-                    (if forward-p
-                        next-node
-                      (or (tree-sitter-node-preceding next-node)
-                          ;; at bottom
-                          (tree-sitter-node-round-up))))))))
-    (catch 'done
-      (prog1 0
-        (dotimes (i ntimes)
-          (unless node
-            (throw 'done (- ntimes i)))
-          (while (and (not (tree-sitter-node-equal
-                            root-node
-                            (tree-sitter-node-parent node)))
-                      (not (equal function-type
-                                  (tree-sitter-node-type node))))
-            (setq node (tree-sitter-node-parent node)))
-          (goto-char (if beginning-p
-                         (tree-sitter-node-start node)
-                       (tree-sitter-node-end node)))
-          (setq node (if forward-p
-                         (tree-sitter-node-next-sibling node)
-                       (tree-sitter-node-prev-sibling node))))))))
+  (cl-flet ((is-defun (node) (equal function-type (tree-sitter-node-type node)))
+            (is-top-level (node) (tree-sitter-node-equal
+                                  root-node
+                                  (tree-sitter-node-parent node)))
+            (progress (node) (if forward-p
+                                 (tree-sitter-node-next-sibling node)
+                               (tree-sitter-node-prev-sibling node))))
+    (let ((ntimes (abs arg))
+          (node (tree-sitter-node-shallowest
+                 (if-let ((precise-node
+                           (tree-sitter-node-shallowest
+                            (tree-sitter-node-at (point) :precise))))
+                     (if (and beginning-p (is-defun precise-node))
+                         ;; already at defun boundary
+                         (tree-sitter-node-shallowest
+                          (tree-sitter-node-preceding precise-node))
+                       precise-node)
+                   (if forward-p
+                       (tree-sitter-node-at (point))
+                     (or (tree-sitter-node-preceding (tree-sitter-node-at (point)))
+                         ;; at eob
+                         (tree-sitter-node-round-up)))))))
+      (catch 'done
+        (prog1 0
+          (dotimes (i ntimes)
+            (while (and node (not (is-defun node)))
+              (if (is-top-level node)
+                  (setq node (progress node))
+                (setq node (tree-sitter-node-parent node))))
+            (if (not node)
+                (throw 'done (- ntimes i))
+              (goto-char (if beginning-p
+                             (tree-sitter-node-start node)
+                           (tree-sitter-node-end node)))
+              (setq node (progress node)))))))))
 
 (defun tree-sitter-beginning-of-defun (function-type &optional arg)
   "Candidate for `beginning-of-defun-function'."
