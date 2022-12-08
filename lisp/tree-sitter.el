@@ -305,7 +305,7 @@ Return the number of unsatisfiable iterations."
                           (funcall func sexp)
                         (when (< arg 0)
                           (save-excursion
-                            (tree-sitter-beginning-of-defun)
+                            (beginning-of-defun)
                             (tree-sitter-node-start (tree-sitter-node-at)))))))
               (goto-char c)
             (throw 'done (- ntimes i))))))))
@@ -320,7 +320,7 @@ Return the number of unsatisfiable iterations."
       (ignore-errors (backward-char)))
     (tree-sitter-node-preceding (tree-sitter-node-at (point)))))
 
-(defun tree-sitter--traverse-defun (beginning-p &optional arg)
+(defun tree-sitter--traverse-defun (function-type beginning-p &optional arg)
   "Two mutually sensitive polarities.
 
 BEGINNING-P   ARG         MOTION
@@ -357,9 +357,11 @@ BEGINNING-P   ARG         MOTION
         (dotimes (i ntimes)
           (unless node
             (throw 'done (- ntimes i)))
-          (while (not (tree-sitter-node-equal
-                       root-node
-                       (tree-sitter-node-parent node)))
+          (while (and (not (tree-sitter-node-equal
+                            root-node
+                            (tree-sitter-node-parent node)))
+                      (not (equal function-type
+                                  (tree-sitter-node-type node))))
             (setq node (tree-sitter-node-parent node)))
           (goto-char (if beginning-p
                          (tree-sitter-node-start node)
@@ -368,13 +370,13 @@ BEGINNING-P   ARG         MOTION
                          (tree-sitter-node-next-sibling node)
                        (tree-sitter-node-prev-sibling node))))))))
 
-(defun tree-sitter-beginning-of-defun (&optional arg)
+(defun tree-sitter-beginning-of-defun (function-type &optional arg)
   "Candidate for `beginning-of-defun-function'."
-  (tree-sitter--traverse-defun t arg))
+  (tree-sitter--traverse-defun function-type t arg))
 
-(defun tree-sitter-end-of-defun (&optional arg)
+(defun tree-sitter-end-of-defun (function-type &optional arg)
   "Candidate for `end-of-defun-function'."
-  (tree-sitter--traverse-defun nil arg))
+  (tree-sitter--traverse-defun function-type nil arg))
 
 (defun tree-sitter-indent-region (beg end)
   (interactive "r")

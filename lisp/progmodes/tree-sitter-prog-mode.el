@@ -47,8 +47,8 @@
     ;; so rest assured these won't linger after major mode change.
     (setq-local font-lock-support-mode 'tree-sitter-lock-mode
                 forward-sexp-function #'tree-sitter-forward-sexp
-                beginning-of-defun-function #'tree-sitter-beginning-of-defun
-                end-of-defun-function #'tree-sitter-end-of-defun
+                beginning-of-defun-function (apply-partially #'tree-sitter-beginning-of-defun "function_definition")
+                end-of-defun-function (apply-partially #'tree-sitter-end-of-defun "function_definition")
                 indent-line-function #'tree-sitter-indent-line
                 indent-region-function #'tree-sitter-indent-region)))
 
