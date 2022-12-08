@@ -99,7 +99,8 @@
 
 (defvar-keymap prog-mode-map
   :doc "Keymap used for programming modes."
-  "C-M-q" #'prog-indent-sexp)
+  "C-M-q" #'prog-indent-sexp
+  "M-q" #'prog-reindent-defun)
 
 (defvar prog-indentation-context nil
   "When non-nil, provides context for indenting embedded code chunks.
@@ -140,6 +141,26 @@ instead."
 (defun prog-first-column ()
   "Return the indentation column normally used for top-level constructs."
   (or (car prog-indentation-context) 0))
+
+(defun prog-reindent-defun (&optional argument)
+  "Refill paragraph or reindent the definition that the point is on.
+
+If the point is in a string, or in a comment, or there is a
+comment on the current line, fill the paragraph that the point is
+in or is on the same line.
+
+Otherwise, reindent the definition around or below point."
+  (interactive "P")
+  (save-excursion
+    (if (or (nth 8 (syntax-ppss))
+            (re-search-forward comment-start-skip (line-end-position) t))
+        (if (memq fill-paragraph-function '(t nil))
+            (lisp-fill-paragraph argument)
+          (funcall fill-paragraph-function argument))
+      (end-of-defun)
+      (let ((end (point)))
+        (beginning-of-defun)
+        (indent-region (point) end)))))
 
 (defvar-local prettify-symbols-alist nil
   "Alist of symbol prettifications.
