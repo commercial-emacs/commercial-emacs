@@ -4041,6 +4041,8 @@ If you really want to try it anyway, use the configure option
 fi
 
 if test "${with_native_compilation}" != "no"; then
+    AC_MSG_ERROR([We don't understand native compilation]);
+
     if test "${HAVE_PDUMPER}" = no; then
        AC_MSG_ERROR(['--with-native-compilation' requires '--with-dumping=pdumper'])
     fi
