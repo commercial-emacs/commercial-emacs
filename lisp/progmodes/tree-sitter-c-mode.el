@@ -49,10 +49,30 @@ or parenthesized_expression."
                 (goto-char c)
               (throw 'done (- ntimes i)))))))))
 
+(defun tree-sitter-c-add-log-current-defun ()
+  "Kind of insane."
+  (when-let ((def-dec
+              (save-excursion
+                (unless (equal
+                         "function_definition"
+                         (tree-sitter-node-type
+                          (tree-sitter-node-shallowest
+                           (tree-sitter-node-at nil :precise))))
+                  (beginning-of-defun))
+                (tree-sitter-node-child-by-field-name
+                 (tree-sitter-node-shallowest (tree-sitter-node-at nil :precise))
+                 "declarator")))
+             (dec-dec
+              (tree-sitter-node-child-by-field-name def-dec "declarator")))
+    (buffer-substring-no-properties (tree-sitter-node-start dec-dec)
+                                    (tree-sitter-node-end dec-dec))))
+
 ;;;###autoload
 (define-derived-mode tree-sitter-c-mode tree-sitter-prog-mode "C"
   "Have tree-sitter replace syntax-ppss."
-  (setq-local forward-sexp-function #'tree-sitter-c-forward-sexp))
+  (setq-local forward-sexp-function #'tree-sitter-c-forward-sexp)
+  (set (make-local-variable 'add-log-current-defun-function)
+       #'tree-sitter-c-add-log-current-defun))
 
 (provide 'tree-sitter-c-mode)
 
