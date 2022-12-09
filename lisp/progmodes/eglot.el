@@ -1281,7 +1281,10 @@ This docstring appeases checkdoc, that's all."
                             :initializationOptions (eglot-initialization-options
                                                     server)
                             :capabilities (eglot-client-capabilities server)
-                            :workspaceFolders (eglot-workspace-folders server))
+                            :workspaceFolders (eglot-workspace-folders server)
+                            ;; Request $/progress notifications from the
+                            ;; server on startup.
+                            :workDoneToken "initialize")
                       :success-fn
                       (eglot--lambda ((InitializeResult) capabilities serverInfo)
                         (unless canceled
