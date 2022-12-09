@@ -364,10 +364,8 @@ BEGINNING-P   ARG         MOTION
         (prog1 0
           (dotimes (i ntimes)
             (while (and node (not (is-defun node)))
-              (if (is-top-level node)
-                  (setq node (progress node))
-                (setq node (or (progress node)
-                               (tree-sitter-node-parent node)))))
+              (setq node (or (progress node)
+                             (tree-sitter-node-parent node))))
             (if (not node)
                 (throw 'done (- ntimes i))
               (goto-char (if beginning-p
