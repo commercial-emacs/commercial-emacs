@@ -320,37 +320,6 @@ Return the number of unsatisfiable iterations."
       (ignore-errors (backward-char)))
     (tree-sitter-node-preceding (tree-sitter-node-at (point)))))
 
-(defun tree-sitter-node-find (node* forward-p pivot-pos ntimes pred)
-  (if (<= ntimes 0)
-      (cons ntimes nil)
-    (let ((queue (list node*))
-          found node)
-      (while queue
-        (let ((node (pop queue)))
-          (when (funcall pred node)
-            (push node found))
-          (let (adds)
-            ;; yeah I know about tree-sitter-node-first-named-child-for-pos
-            (when-let ((child (tree-sitter-node-named-child node 0)))
-              (while (and child
-                          (funcall (if forward-p #'>= #'<)
-                                   (funcall (if forward-p
-                                                #'tree-sitter-node-start
-                                              #'tree-sitter-node-end)
-                                            child)
-                                   pivot-pos))
-                (push child adds)
-                (setq child (tree-sitter-node-next-sibling child))))
-            (setq queue (append queue (nreverse adds))))))
-      (setq found (sort found (lambda (x y)
-                                (funcall (if forward-p #'<= #'>)
-                                         (tree-sitter-node-start x)
-                                         (tree-sitter-node-start y)))))
-      (if (zerop (length found))
-          (cons 0 nil)
-        (let ((j (min (length found) ntimes)))
-          (cons j (nth (1- j) found)))))))
-
 (cl-defun tree-sitter--traverse-defun (function-type
                                        beginning-p
                                        &optional arg
@@ -369,49 +338,42 @@ BEGINNING-P   ARG         MOTION
         nil   positive    forwards
         nil   negative    backwards
 "
-  (let* ((ntimes (abs arg))
-         (nfound 0)
-         (node (tree-sitter-node-shallowest
-                (if-let ((precise-node
-                          (tree-sitter-node-shallowest
-                           (tree-sitter-node-at (point) :precise))))
-                    (if (and beginning-p (is-defun precise-node))
-                        ;; already at defun boundary
-                        (tree-sitter-node-shallowest
-                         (tree-sitter-node-preceding precise-node))
-                      precise-node)
-                  (if forward-p
-                      (tree-sitter-node-at (point))
-                    (or (tree-sitter-node-preceding (tree-sitter-node-at (point)))
-                        ;; at eob
-                        (tree-sitter-node-round-up))))))
-         (pivot-pos (tree-sitter-node-start node)))
-    (while (and node
-                (not (= ntimes nfound))
-                (not (tree-sitter-node-equal root-node node)))
-      (cl-destructuring-bind (nfound* . node*)
-          (tree-sitter-node-find node
-                                 forward-p
-                                 pivot-pos
-                                 (- ntimes nfound)
-                                 (lambda (node*)
-                                   (equal function-type
-                                          (tree-sitter-node-type node*))))
-        (cl-incf nfound nfound*)
-        (setq pivot-pos (if forward-p
-                            (tree-sitter-node-end node)
-                          (tree-sitter-node-start node))
-              node (or node*
-                       (if forward-p
-                           ;; NODE should already be shallowest.
-                           (or (tree-sitter-node-next-sibling node)
-                               (tree-sitter-node-parent node))
-                         (tree-sitter-node-preceding node))))))
-    (when node
-      (goto-char (if beginning-p
-                     (tree-sitter-node-start node)
-                   (tree-sitter-node-end node))))
-    (- ntimes nfound)))
+  (cl-flet ((is-defun (node) (equal function-type (tree-sitter-node-type node)))
+            (is-top-level (node) (tree-sitter-node-equal
+                                  root-node
+                                  (tree-sitter-node-parent node)))
+            (progress (node) (if forward-p
+                                 (tree-sitter-node-next-sibling node)
+                               (tree-sitter-node-prev-sibling node))))
+    (let ((ntimes (abs arg))
+          (node (tree-sitter-node-shallowest
+                 (if-let ((precise-node
+                           (tree-sitter-node-shallowest
+                            (tree-sitter-node-at (point) :precise))))
+                     (if (and beginning-p (is-defun precise-node))
+                         ;; already at defun boundary
+                         (tree-sitter-node-shallowest
+                          (tree-sitter-node-preceding precise-node))
+                       precise-node)
+                   (if forward-p
+                       (tree-sitter-node-at (point))
+                     (or (tree-sitter-node-preceding (tree-sitter-node-at (point)))
+                         ;; at eob
+                         (tree-sitter-node-round-up)))))))
+      (catch 'done
+        (prog1 0
+          (dotimes (i ntimes)
+            (while (and node (not (is-defun node)))
+              (if (is-top-level node)
+                  (setq node (progress node))
+                (setq node (or (progress node)
+                               (tree-sitter-node-parent node)))))
+            (if (not node)
+                (throw 'done (- ntimes i))
+              (goto-char (if beginning-p
+                             (tree-sitter-node-start node)
+                           (tree-sitter-node-end node)))
+              (setq node (progress node)))))))))
 
 (defun tree-sitter-beginning-of-defun (function-type &optional arg)
   "Candidate for `beginning-of-defun-function'."
