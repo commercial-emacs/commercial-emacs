@@ -2963,6 +2963,13 @@ based on data provided by language servers using the Language Server
 Protocol (LSP).
 
 +++
+*** use-package: Declarative package configuration.
+use-package is shipped with Emacs.  It provides the 'use-package'
+macro, which allows you to isolate package configuration in your init
+file in a way that is declarative, tidy, and performance-oriented.
+See the new Info manual 'use-package' for more.
+
++++
 ** New commands 'image-crop' and 'image-cut'.
 These commands allow interactively cropping/cutting the image at
 point.  The commands are bound to keys 'i c' and 'i x' (respectively)
@@ -4406,6 +4413,14 @@ actually being used for anything.
 Now 'max-lisp-eval-depth' alone is used for limiting Lisp recursion
 and stack usage.  'max-specpdl-size' is still present as a plain
 variable for compatibility but its limiting powers have been taken away.
+
+** New function 'external-completion-table'.
+This function returns a completion table designed to ease
+communication between Emacs's completion facilities and external tools
+offering completion services, particularly tools whose full working
+set is too big to transfer to Emacs's every time a completion is
+needed.  The table uses new 'external' completion style exclusively
+and cannot work with regular styles such as 'basic' or 'flex'.
 
 
 * Changes in Emacs 29.1 on Non-Free Operating Systems
