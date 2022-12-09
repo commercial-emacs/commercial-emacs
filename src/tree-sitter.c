@@ -914,9 +914,9 @@ DEFUN ("tree-sitter-node-prev-named-sibling",
     : make_node (sibling);
 }
 
-DEFUN ("tree-sitter-node-first-child-for-byte",
-       Ftree_sitter_node_first_child_for_byte,
-       Stree_sitter_node_first_child_for_byte,
+DEFUN ("tree-sitter-node-first-child-for-pos",
+       Ftree_sitter_node_first_child_for_pos,
+       Stree_sitter_node_first_child_for_pos,
        2, 2, 0,
        doc: /* Return first child of NODE extending beyond BEG.  */)
   (Lisp_Object node, Lisp_Object beg)
@@ -935,9 +935,9 @@ DEFUN ("tree-sitter-node-first-child-for-byte",
     : make_node (child);
 }
 
-DEFUN ("tree-sitter-node-first-named-child-for-byte",
-       Ftree_sitter_node_first_named_child_for_byte,
-       Stree_sitter_node_first_named_child_for_byte,
+DEFUN ("tree-sitter-node-first-named-child-for-pos",
+       Ftree_sitter_node_first_named_child_for_pos,
+       Stree_sitter_node_first_named_child_for_pos,
        2, 2, 0,
        doc: /* Return first named child of NODE extending beyond BEG.  */)
   (Lisp_Object node, Lisp_Object beg)
@@ -956,9 +956,9 @@ DEFUN ("tree-sitter-node-first-named-child-for-byte",
     : make_node (child);
 }
 
-DEFUN ("tree-sitter-node-descendant-for-byte-range",
-       Ftree_sitter_node_descendant_for_byte_range,
-       Stree_sitter_node_descendant_for_byte_range,
+DEFUN ("tree-sitter-node-descendant-for-pos-range",
+       Ftree_sitter_node_descendant_for_pos_range,
+       Stree_sitter_node_descendant_for_pos_range,
        3, 3, 0,
        doc: /* Return deepest node under NODE spanning BEG to END. */)
   (Lisp_Object node, Lisp_Object beg, Lisp_Object end)
@@ -980,9 +980,9 @@ DEFUN ("tree-sitter-node-descendant-for-byte-range",
     : make_node (child);
 }
 
-DEFUN ("tree-sitter-node-named-descendant-for-byte-range",
-       Ftree_sitter_node_named_descendant_for_byte_range,
-       Stree_sitter_node_named_descendant_for_byte_range,
+DEFUN ("tree-sitter-node-named-descendant-for-pos-range",
+       Ftree_sitter_node_named_descendant_for_pos_range,
+       Stree_sitter_node_named_descendant_for_pos_range,
        3, 3, 0,
        doc: /* Return deepest named node under NODE spanning BEG to END. */)
   (Lisp_Object node, Lisp_Object beg, Lisp_Object end)
@@ -1871,13 +1871,13 @@ syms_of_tree_sitter (void)
   defsubr (&Stree_sitter_node_prev_sibling);
   defsubr (&Stree_sitter_node_next_named_sibling);
   defsubr (&Stree_sitter_node_prev_named_sibling);
-  defsubr (&Stree_sitter_node_first_child_for_byte);
-  defsubr (&Stree_sitter_node_first_named_child_for_byte);
+  defsubr (&Stree_sitter_node_first_child_for_pos);
+  defsubr (&Stree_sitter_node_first_named_child_for_pos);
   defsubr (&Stree_sitter_goto_first_child);
   defsubr (&Stree_sitter_goto_next_sibling);
   defsubr (&Stree_sitter_goto_parent);
-  defsubr (&Stree_sitter_node_descendant_for_byte_range);
-  defsubr (&Stree_sitter_node_named_descendant_for_byte_range);
+  defsubr (&Stree_sitter_node_descendant_for_pos_range);
+  defsubr (&Stree_sitter_node_named_descendant_for_pos_range);
   defsubr (&Stree_sitter_node_of);
   defsubr (&Stree_sitter_node_equal);
   defsubr (&Stree_sitter_node_start);
