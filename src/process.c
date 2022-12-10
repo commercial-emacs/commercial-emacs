@@ -5762,14 +5762,11 @@ read_process_output (Lisp_Object proc, int channel)
   restore_deactivate = Vdeactivate_mark;
   record_unwind_current_buffer ();
 
-  Lisp_Object outstream = p->filter, text;
-
   /* We inhibit quit to avoid disrupting a filter.  */
   specbind (Qinhibit_quit, Qt);
   specbind (Qlast_nonmenu_event, Qt);
 
   decode_coding_c_string (coding, (unsigned char *) chars, nbytes, Qt);
-  text = coding->dst_object;
   Vlast_coding_system_used = CODING_ID_NAME (coding->id);
 
   /* Set decoder to last coding system used..  */
@@ -5801,9 +5798,10 @@ read_process_output (Lisp_Object proc, int channel)
       p->decoding_carryover = coding->carryover_bytes;
     }
 
-  if (SBYTES (text) > 0)
+  if (SBYTES (coding->dst_object) > 0)
     internal_condition_case_1 (read_process_output_call,
-			       list3 (outstream, make_lisp_proc (p), text),
+			       list3 (p->filter, make_lisp_proc (p),
+                                      coding->dst_object),
 			       ! NILP (Vdebug_on_error) ? Qnil : Qerror,
 			       read_process_output_error_handler);
 
