@@ -126,9 +126,6 @@ struct thread_state
   struct re_registers m_search_regs;
 #define search_regs (current_thread->m_search_regs)
 
-  struct re_registers m_saved_search_regs;
-#define saved_search_regs (current_thread->m_saved_search_regs)
-
   /* For longjmp to where kbd input is being done.  This is per-thread
      so that if more than one thread calls read_char, they don't
      clobber each other's getcjmp, which will cause

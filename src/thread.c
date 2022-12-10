@@ -692,7 +692,6 @@ void
 finalize_one_thread (struct thread_state *state)
 {
   free_search_regs (&state->m_search_regs);
-  free_search_regs (&state->m_saved_search_regs);
   sys_cond_destroy (&state->thread_condvar);
   free_bc_thread (&state->bc);
 }
