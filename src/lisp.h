@@ -4384,7 +4384,6 @@ extern void syms_of_fileio (void);
 
 /* Defined in search.c.  */
 extern void shrink_regexp_cache (void);
-extern void restore_search_regs (void);
 extern void update_search_regs (ptrdiff_t oldstart,
                                 ptrdiff_t oldend, ptrdiff_t newend);
 extern void record_unwind_save_match_data (void);
@@ -4543,8 +4542,6 @@ extern bool fatal_error_in_progress;
 
 /* True means don't do use window-system-specific display code.  */
 extern bool inhibit_window_system;
-/* True means that a filter or a sentinel is running.  */
-extern bool running_asynch_code;
 
 /* Defined in process.c.  */
 struct Lisp_Process;

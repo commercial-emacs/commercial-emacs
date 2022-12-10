@@ -61,7 +61,6 @@ static struct regexp_cache searchbufs[REGEXP_CACHE_SIZE];
 static struct regexp_cache *searchbuf_head;
 
 static void set_search_regs (ptrdiff_t, ptrdiff_t);
-static void save_search_regs (void);
 static EMACS_INT simple_search (EMACS_INT, unsigned char *, ptrdiff_t,
 				ptrdiff_t, Lisp_Object, ptrdiff_t, ptrdiff_t,
                                 ptrdiff_t, ptrdiff_t);
@@ -267,9 +266,6 @@ looking_at_1 (Lisp_Object string, bool posix, bool modify_data)
   ptrdiff_t s1, s2;
   register ptrdiff_t i;
 
-  if (running_asynch_code)
-    save_search_regs ();
-
   /* This is so set_image_of_range_1 in regex-emacs.c can find the EQV
      table.  */
   set_char_table_extras (BVAR (current_buffer, case_canon_table), 2,
@@ -373,9 +369,6 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
   EMACS_INT pos;
   ptrdiff_t pos_byte, i;
   bool modify_match_data = NILP (Vinhibit_changing_match_data) && modify_data;
-
-  if (running_asynch_code)
-    save_search_regs ();
 
   CHECK_STRING (regexp);
   CHECK_STRING (string);
@@ -1508,11 +1501,7 @@ search_buffer (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 	       ptrdiff_t lim, ptrdiff_t lim_byte, EMACS_INT n,
 	       int RE, Lisp_Object trt, Lisp_Object inverse_trt, bool posix)
 {
-  if (running_asynch_code)
-    save_search_regs ();
-
-  /* Searching 0 times means don't move.  */
-  /* Null string is found at starting position.  */
+  /* N = 0 or null STRING means don't move.  */
   if (n == 0 || SCHARS (string) == 0)
     {
       set_search_regs (pos_byte, 0);
@@ -2964,9 +2953,6 @@ If optional arg RESEAT is non-nil, make markers on LIST point nowhere.  */)
   ptrdiff_t i;
   register Lisp_Object marker;
 
-  if (running_asynch_code)
-    save_search_regs ();
-
   CHECK_LIST (list);
 
   /* Unless we find a marker with a buffer or an explicit buffer
@@ -3082,40 +3068,6 @@ DEFUN ("match-data--translate", Fmatch_data__translate, Smatch_data__translate,
           search_regs.end[i] = max (0, search_regs.end[i] + delta);
         }
   return Qnil;
-}
-
-/* Called from Flooking_at, Fstring_match, search_buffer, Fstore_match_data
-   if asynchronous code (filter or sentinel) is running. */
-static void
-save_search_regs (void)
-{
-  if (saved_search_regs.num_regs == 0)
-    {
-      saved_search_regs = search_regs;
-      saved_last_thing_searched = last_thing_searched;
-      last_thing_searched = Qnil;
-      search_regs.num_regs = 0;
-      search_regs.start = 0;
-      search_regs.end = 0;
-    }
-}
-
-/* Called upon exit from filters and sentinels. */
-void
-restore_search_regs (void)
-{
-  if (saved_search_regs.num_regs != 0)
-    {
-      if (search_regs.num_regs > 0)
-	{
-	  xfree (search_regs.start);
-	  xfree (search_regs.end);
-	}
-      search_regs = saved_search_regs;
-      last_thing_searched = saved_last_thing_searched;
-      saved_last_thing_searched = Qnil;
-      saved_search_regs.num_regs = 0;
-    }
 }
 
 /* Called from replace-match via replace_range.  */

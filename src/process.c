@@ -5686,16 +5686,11 @@ read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
 				    ssize_t nbytes,
 				    struct coding_system *coding);
 
-/* Read pending output from the process channel.
-   Yield number of decoded characters read,
-   or -1 (setting errno) if there is a read error.
+/* Read pending output from the process channel.  Return number of
+   decoded characters read, or -1 (setting errno) upon error.
 
-   This function reads at most read_process_output_max bytes.
-   If you want to read all available subprocess output,
-   you must call it repeatedly until it returns zero.
-
-   The characters read are decoded according to PROC's coding-system
-   for decoding.  */
+   Reads at most read_process_output_max bytes, so must be repeated
+   until returning zero for all subprocess output to be read.  */
 
 static int
 read_process_output (Lisp_Object proc, int channel)
@@ -5704,10 +5699,10 @@ read_process_output (Lisp_Object proc, int channel)
   struct Lisp_Process *p = XPROCESS (proc);
   eassert (0 <= channel && channel < FD_SETSIZE);
   struct coding_system *coding = proc_decode_coding_system[channel];
-  int carryover = p->decoding_carryover;
-  ptrdiff_t readmax = clip_to_bounds (1, read_process_output_max, PTRDIFF_MAX);
-  specpdl_ref count = SPECPDL_INDEX ();
-  Lisp_Object odeactivate;
+  const int carryover = p->decoding_carryover;
+  const ptrdiff_t readmax = clip_to_bounds (1, read_process_output_max, PTRDIFF_MAX);
+  const specpdl_ref count = SPECPDL_INDEX ();
+  Lisp_Object restore_deactivate;
   char *chars;
 
   USE_SAFE_ALLOCA;
@@ -5730,12 +5725,10 @@ read_process_output (Lisp_Object proc, int channel)
     {
 #ifdef HAVE_GNUTLS
       if (p->gnutls_state)
-	nbytes = emacs_gnutls_read (p, chars + carryover,
-				    readmax);
+	nbytes = emacs_gnutls_read (p, chars + carryover, readmax);
       else
 #endif
-	nbytes = emacs_read (channel, chars + carryover,
-			     readmax);
+        nbytes = emacs_read (channel, chars + carryover, readmax);
       if (nbytes > 0 && p->adaptive_read_buffering)
 	{
 	  unsigned int delay = p->read_output_delay;
@@ -5764,24 +5757,17 @@ read_process_output (Lisp_Object proc, int channel)
       coding->mode |= CODING_MODE_LAST_BLOCK;
     }
 
-  /* At this point, NBYTES holds number of bytes just received */
-
-  /* Ignore carryover, it's been added by a previous iteration already.  */
+  /* NBYTES is bytes just received.
+     CARRYOVER was added in a previous iteration.  */
   p->nbytes_read += nbytes;
 
-  /* Now set NBYTES how many bytes we must decode.  */
+  /* Add CARRYOVER for next iteration.  */
   nbytes += carryover;
 
-  odeactivate = Vdeactivate_mark;
-  /* There's no good reason to let process filters change the current
-     buffer, and many callers of accept-process-output, sit-for, and
-     friends don't expect current-buffer to be changed from under them.  */
+  restore_deactivate = Vdeactivate_mark;
   record_unwind_current_buffer ();
-
   read_and_dispose_of_process_output (p, chars, nbytes, coding);
-
-  /* Handling the process output should not deactivate the mark.  */
-  Vdeactivate_mark = odeactivate;
+  Vdeactivate_mark = restore_deactivate;
 
   SAFE_FREE_UNBIND_TO (count, Qnil);
   return nbytes;
@@ -5792,52 +5778,27 @@ read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
 				    ssize_t nbytes,
 				    struct coding_system *coding)
 {
-  Lisp_Object outstream = p->filter;
-  Lisp_Object text;
-  bool outer_running_asynch_code = running_asynch_code;
+  Lisp_Object outstream = p->filter, text;
 
   /* We inhibit quit to avoid disrupting a filter.  */
   specbind (Qinhibit_quit, Qt);
   specbind (Qlast_nonmenu_event, Qt);
 
-  /* In case we get recursively called,
-     and we already saved the match data nonrecursively,
-     save the same match data in safely recursive fashion.  */
-  if (outer_running_asynch_code)
-    {
-      Lisp_Object tem;
-      /* Don't clobber the CURRENT match data, either!  */
-      tem = Fmatch_data (Qnil, Qnil, Qnil);
-      restore_search_regs ();
-      record_unwind_save_match_data ();
-      Fset_match_data (tem, Qt);
-    }
-
-  /* For speed, if a search happens within this code,
-     save the match data in a special nonrecursive fashion.  */
-  running_asynch_code = 1;
-
   decode_coding_c_string (coding, (unsigned char *) chars, nbytes, Qt);
   text = coding->dst_object;
   Vlast_coding_system_used = CODING_ID_NAME (coding->id);
-  /* A new coding system might be found.  */
-  if (!EQ (p->decode_coding_system, Vlast_coding_system_used))
+
+  /* Set decoder to last coding system used..  */
+  if (! EQ (p->decode_coding_system, Vlast_coding_system_used))
     {
       pset_decode_coding_system (p, Vlast_coding_system_used);
 
-      /* Don't call setup_coding_system for
-	 proc_decode_coding_system[channel] here.  It is done in
-	 detect_coding called via decode_coding above.  */
-
-      /* If a coding system for encoding is not yet decided, we set
-	 it as the same as coding-system for decoding.
-
-	 But, before doing that we must check if
-	 proc_encode_coding_system[p->outfd] surely points to a
-	 valid memory because p->outfd will be changed once EOF is
-	 sent to the process.  */
+      /* Set an undecided encoder to the decoder.  Since p->outfd
+	 could change once EOF is sent, verify its slot in
+	 proc_encode_coding_system is still valid.  */
       eassert (p->outfd < FD_SETSIZE);
-      if (NILP (p->encode_coding_system) && p->outfd >= 0
+      if (NILP (p->encode_coding_system)
+          && p->outfd >= 0
 	  && proc_encode_coding_system[p->outfd])
 	{
 	  pset_encode_coding_system
@@ -5855,18 +5816,12 @@ read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
 	      coding->carryover_bytes);
       p->decoding_carryover = coding->carryover_bytes;
     }
+
   if (SBYTES (text) > 0)
-    /* FIXME: It's wrong to wrap or not based on debug-on-error, and
-       sometimes it's simply wrong to wrap (e.g. when called from
-       accept-process-output).  */
     internal_condition_case_1 (read_process_output_call,
 			       list3 (outstream, make_lisp_proc (p), text),
-			       !NILP (Vdebug_on_error) ? Qnil : Qerror,
+			       ! NILP (Vdebug_on_error) ? Qnil : Qerror,
 			       read_process_output_error_handler);
-
-  /* If we saved the match data nonrecursively, restore it now.  */
-  restore_search_regs ();
-  running_asynch_code = outer_running_asynch_code;
 }
 
 DEFUN ("internal-default-process-filter", Finternal_default_process_filter,
@@ -7081,52 +7036,25 @@ exec_sentinel_error_handler (Lisp_Object error_val)
 static void
 exec_sentinel (Lisp_Object proc, Lisp_Object reason)
 {
-  Lisp_Object sentinel, odeactivate;
+  Lisp_Object restore_deactivate = Vdeactivate_mark;
   struct Lisp_Process *p = XPROCESS (proc);
   specpdl_ref count = SPECPDL_INDEX ();
-  bool outer_running_asynch_code = running_asynch_code;
+
   if (inhibit_sentinels)
     return;
 
-  odeactivate = Vdeactivate_mark;
-
-  /* There's no good reason to let sentinels change the current
-     buffer, and many callers of accept-process-output, sit-for, and
-     friends don't expect current-buffer to be changed from under them.  */
   record_unwind_current_buffer ();
 
-  sentinel = p->sentinel;
-
-  /* We inhibit quit to avoid disrupting a filter.  */
+  /* Inhibit quit to avoid disrupting a filter.  */
   specbind (Qinhibit_quit, Qt);
   specbind (Qlast_nonmenu_event, Qt);
 
-  /* In case we get recursively called,
-     and we already saved the match data nonrecursively,
-     save the same match data in safely recursive fashion.  */
-  if (outer_running_asynch_code)
-    {
-      Lisp_Object tem;
-      tem = Fmatch_data (Qnil, Qnil, Qnil);
-      restore_search_regs ();
-      record_unwind_save_match_data ();
-      Fset_match_data (tem, Qt);
-    }
-
-  /* For speed, if a search happens within this code,
-     save the match data in a special nonrecursive fashion.  */
-  running_asynch_code = 1;
-
   internal_condition_case_1 (read_process_output_call,
-			     list3 (sentinel, proc, reason),
-			     !NILP (Vdebug_on_error) ? Qnil : Qerror,
+			     list3 (p->sentinel, proc, reason),
+			     ! NILP (Vdebug_on_error) ? Qnil : Qerror,
 			     exec_sentinel_error_handler);
 
-  /* If we saved the match data nonrecursively, restore it now.  */
-  restore_search_regs ();
-  running_asynch_code = outer_running_asynch_code;
-
-  Vdeactivate_mark = odeactivate;
+  Vdeactivate_mark = restore_deactivate;
   unbind_to (count, Qnil);
 }
 

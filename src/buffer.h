@@ -292,11 +292,9 @@ struct buffer_text
   /* True if it needs to be redisplayed.  */
   bool_bf redisplay : 1;
 
-  /* True if glyph widths are uniform.  The width_run_cache of the
-     parent 'struct buffer' is only a 256-value thing, does not
-     operate under `enable-multibyte-characters' (which is most of
-     the time), and is generally not what we need for coping with
-     long lines.
+  /* True if glyph widths are semi-uniform enough to get
+     away with algebraic height.  This heuristic *will*
+     fail, and ad hoc patching is (deep) on the todo list.
   */
   bool_bf monospace : 1;
 };
@@ -476,7 +474,7 @@ struct buffer
   Lisp_Object cache_long_scans_;
 
   /* If the width run cache is enabled, this table contains the
-     character widths width_run_cache (see above) assumes.  When we
+     character widths width_run_cache (see below) assumes.  When we
      do a thorough redisplay, we compare this against the buffer's
      current display table to see whether the display table has
      affected the widths of any characters.  If it has, we
@@ -670,7 +668,11 @@ struct buffer
      the character's width; if it maps a character to zero, we don't
      know what its width is.  This allows compute_motion to process
      such regions very quickly, using algebra instead of inspecting
-     each character.   See also width_table, below.
+     each character.   See also width_table, above.
+
+     As width_run_cache only allows 256 values, and does not operate
+     under `enable-multibyte-characters' (which is most of the time),
+     it's not what we need for coping with long lines.
 
      The latter cache is used to speedup bidi_find_paragraph_start.  */
   struct region_cache *newline_cache;

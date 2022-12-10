@@ -179,10 +179,6 @@ bool initialized;
    but instead should use the virtual terminal under which it was started.  */
 bool inhibit_window_system;
 
-/* If true, a filter or a sentinel is running.  Tested to save the match
-   data on the first attempt to change it inside asynchronous code.  */
-bool running_asynch_code;
-
 #if defined (HAVE_X_WINDOWS) || defined (HAVE_NS)
 /* If true, -d was specified, meaning we're using some window system.  */
 bool display_arg;
@@ -1999,7 +1995,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_bignum ();
   init_threads ();
   init_eval ();
-  running_asynch_code = 0;
   init_random ();
   init_xfaces ();
 
