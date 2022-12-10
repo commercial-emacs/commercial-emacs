@@ -5681,11 +5681,6 @@ read_process_output_error_handler (Lisp_Object error_val)
   return Qt;
 }
 
-static void
-read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
-				    ssize_t nbytes,
-				    struct coding_system *coding);
-
 /* Read pending output from the process channel.  Return number of
    decoded characters read, or -1 (setting errno) upon error.
 
@@ -5766,18 +5761,7 @@ read_process_output (Lisp_Object proc, int channel)
 
   restore_deactivate = Vdeactivate_mark;
   record_unwind_current_buffer ();
-  read_and_dispose_of_process_output (p, chars, nbytes, coding);
-  Vdeactivate_mark = restore_deactivate;
 
-  SAFE_FREE_UNBIND_TO (count, Qnil);
-  return nbytes;
-}
-
-static void
-read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
-				    ssize_t nbytes,
-				    struct coding_system *coding)
-{
   Lisp_Object outstream = p->filter, text;
 
   /* We inhibit quit to avoid disrupting a filter.  */
@@ -5822,6 +5806,11 @@ read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
 			       list3 (outstream, make_lisp_proc (p), text),
 			       ! NILP (Vdebug_on_error) ? Qnil : Qerror,
 			       read_process_output_error_handler);
+
+  Vdeactivate_mark = restore_deactivate;
+
+  SAFE_FREE_UNBIND_TO (count, Qnil);
+  return nbytes;
 }
 
 DEFUN ("internal-default-process-filter", Finternal_default_process_filter,

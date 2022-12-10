@@ -70,9 +70,11 @@ or parenthesized_expression."
 ;;;###autoload
 (define-derived-mode tree-sitter-c-mode tree-sitter-prog-mode "C"
   "Have tree-sitter replace syntax-ppss."
-  (setq-local forward-sexp-function #'tree-sitter-c-forward-sexp)
-  (set (make-local-variable 'add-log-current-defun-function)
-       #'tree-sitter-c-add-log-current-defun))
+  (setq-local forward-sexp-function #'tree-sitter-c-forward-sexp
+              comment-start "/* "
+              comment-end " */"
+              comment-start-skip "\\(?://+\\|/\\*+\\)\\s *"
+              add-log-current-defun-function #'tree-sitter-c-add-log-current-defun))
 
 (provide 'tree-sitter-c-mode)
 
