@@ -53,7 +53,6 @@ static union aligned_thread_state main_thread
 						    event_object),
 				     VECSIZE (struct thread_state)),
       .m_last_thing_searched = LISPSYM_INITIALLY (Qnil),
-      .m_saved_last_thing_searched = LISPSYM_INITIALLY (Qnil),
       .name = LISPSYM_INITIALLY (Qnil),
       .function = LISPSYM_INITIALLY (Qnil),
       .obarray = LISPSYM_INITIALLY (Qnil),

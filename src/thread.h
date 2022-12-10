@@ -51,9 +51,6 @@ struct thread_state
   Lisp_Object m_last_thing_searched;
 #define last_thing_searched (current_thread->m_last_thing_searched)
 
-  Lisp_Object m_saved_last_thing_searched;
-#define saved_last_thing_searched (current_thread->m_saved_last_thing_searched)
-
   Lisp_Object name;
   Lisp_Object function;
 
