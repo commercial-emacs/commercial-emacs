@@ -587,9 +587,8 @@ struct buffer
      in ordinary buffers.  In indirect buffers, this is not used.  */
   struct buffer_text own_text;
 
-  /* This points to the `struct buffer_text' that used for this buffer.
-     In an ordinary buffer, this is the own_text field above.
-     In an indirect buffer, this is the own_text field of another buffer.  */
+  /* In ordinary buffer, points to own_text field above.
+     In indirect buffer, points to own_text field of another buffer.  */
   struct buffer_text *text;
 
   /* Char position of point in buffer.  */

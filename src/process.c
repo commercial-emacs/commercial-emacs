@@ -5419,11 +5419,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  if (wait < TIMEOUT)
 	    break;
 
-	  if (!process_skipped
+	  if (! process_skipped
 	      && got_some_output > 0
 	      && (timeout.tv_sec > 0 || timeout.tv_nsec > 0))
 	    {
-	      if (!timespec_valid_p (got_output_end_time)
+	      if (! timespec_valid_p (got_output_end_time)
 		  ||
 		  timespec_cmp (got_output_end_time, current_timespec ()) <= 0)
 		break;
