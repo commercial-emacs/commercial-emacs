@@ -874,7 +874,7 @@ detailed description of this mode.
 					   "_gdb_history"
 					 ".gdb_history"))))
 	  ;; gdb defaults to 256, but we'll default to comint-input-ring-size.
-	  (hsize (getenv "HISTSIZE")))
+	  (hsize (or (getenv "HISTSIZE") comint-input-ring-size)))
       (dolist (file (append '("~/.gdbinit")
 			    (unless (string-equal (expand-file-name ".")
                                                   (expand-file-name "~"))
