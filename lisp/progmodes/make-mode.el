@@ -44,10 +44,6 @@
 ;; prerequisites, which targets are out-of-date, and which have no
 ;; prerequisites.
 ;;
-;; The command C-c C-b pops up a browser window listing all target and
-;; macro names.  You can mark or unmark items with C-c SPC, and insert
-;; all marked items back in the Makefile with C-c TAB.
-;;
 ;; The command C-c TAB in the makefile buffer inserts a GNU make builtin.
 ;; You will be prompted for the builtin's arguments.
 ;;
@@ -66,17 +62,9 @@
 ;;   interact with font-lock.
 ;; * Would be nice to edit the commands in ksh-mode and have
 ;;   indentation and slashification done automatically.  Hard.
-;; * Consider removing browser mode.  It seems useless.
 ;; * ":" should notice when a new target is made and add it to the
 ;;   list (or at least set `makefile-need-target-pickup').
-;; * Make browser into a major mode.
 ;; * Clean up macro insertion stuff.  It is a mess.
-;; * Browser entry and exit is weird.  Normalize.
-;; * Browser needs to be rewritten.  Right now it is kind of a crock.
-;;   Should at least:
-;;    * Act more like dired/buffer menu/whatever.
-;;    * Highlight as mouse traverses.
-;;    * B2 inserts.
 ;; * Update documentation above.
 ;; * Update texinfo manual.
 ;; * Update files.el.
@@ -118,6 +106,7 @@
   "Face to use for additionally highlighting Perl code in Font-Lock mode."
   :version "22.1")
 
+(make-obsolete-variable 'makefile-browser-buffer-name nil "30.1")
 (defcustom makefile-browser-buffer-name "*Macros and Targets*"
   "Name of the macro- and target browser buffer."
   :type 'string)
@@ -152,10 +141,12 @@ Otherwise, a space is inserted.
 The default is t."
   :type 'boolean)
 
+(make-obsolete-variable 'makefile-browser-leftmost-column nil "30.1")
 (defcustom makefile-browser-leftmost-column 10
   "Number of blanks to the left of the browser selection mark."
   :type 'integer)
 
+(make-obsolete-variable 'makefile-browser-cursor-column nil "30.1")
 (defcustom makefile-browser-cursor-column 10
   "Column the cursor goes to when it moves up or down in the Makefile browser."
   :type 'integer)
@@ -168,14 +159,17 @@ The default is t."
   "If non-nil, `makefile-backslash-region' will align backslashes."
   :type 'boolean)
 
+(make-obsolete-variable 'makefile-browser-selected-mark nil "30.1")
 (defcustom makefile-browser-selected-mark "+  "
   "String used to mark selected entries in the Makefile browser."
   :type 'string)
 
+(make-obsolete-variable 'makefile-browser-unselected-mark nil "30.1")
 (defcustom makefile-browser-unselected-mark "   "
   "String used to mark unselected entries in the Makefile browser."
   :type 'string)
 
+(make-obsolete-variable 'makefile-browser-auto-advance-after-selection-p nil "30.1")
 (defcustom makefile-browser-auto-advance-after-selection-p t
   "If non-nil, cursor will move after item is selected in Makefile browser."
   :type 'boolean)
@@ -198,6 +192,7 @@ to MODIFY A FILE WITHOUT YOUR CONFIRMATION when \"it seems necessary\"."
   "Normal hook run by `makefile-mode'."
   :type 'hook)
 
+(make-obsolete-variable 'makefile-browser-hook nil "30.1")
 (defvar makefile-browser-hook '())
 
 ;;
@@ -611,9 +606,6 @@ The function must satisfy this calling convention:
     ;; Other.
     ["Up To Date Overview" makefile-create-up-to-date-overview
      :help "Create a buffer containing an overview of the state of all known targets"]
-    ["Pop up Makefile Browser" makefile-switch-to-browser
-     ;; XXX: this needs a better string, the function is not documented...
-     :help "Pop up Makefile Browser"]
     ("Switch Makefile Type"
      ["GNU make" makefile-gmake-mode
       :help "An adapted `makefile-mode' that knows about GNU make"
@@ -641,6 +633,7 @@ The function must satisfy this calling convention:
       :selected (eq major-mode 'makefile-makepp-mode)])))
 
 
+(make-obsolete-variable 'makefile-browser-map nil "30.1")
 (defvar-keymap makefile-browser-map
   :doc "The keymap that is used in the macro- and target browser."
   "n"       #'makefile-browser-next-line
@@ -695,9 +688,11 @@ The function must satisfy this calling convention:
   "Table of all macro names known for this buffer.")
 (put 'makefile-macro-table 'risky-local-variable t)
 
+(make-obsolete-variable 'makefile-browser-client nil "30.1")
 (defvar makefile-browser-client
   "A buffer in Makefile mode that is currently using the browser.")
 
+(make-obsolete-variable 'makefile-browser-selection-vector nil "30.1")
 (defvar makefile-browser-selection-vector nil)
 (defvar makefile-has-prereqs nil)
 (defvar makefile-need-target-pickup t)
@@ -757,14 +752,7 @@ dependency, despite the colon.
 
 \\{makefile-mode-map}
 
-In the browser, use the following keys:
-
-\\{makefile-browser-map}
-
 Makefile mode can be configured by modifying the following variables:
-
-`makefile-browser-buffer-name':
-    Name of the macro- and target browser buffer.
 
 `makefile-target-colon':
     The string that gets appended to all target names
@@ -783,24 +771,6 @@ Makefile mode can be configured by modifying the following variables:
    If you want a TAB (instead of a space) to be appended after the
    target colon, then set this to a non-nil value.
 
-`makefile-browser-leftmost-column':
-   Number of blanks to the left of the browser selection mark.
-
-`makefile-browser-cursor-column':
-   Column in which the cursor is positioned when it moves
-   up or down in the browser.
-
-`makefile-browser-selected-mark':
-   String used to mark selected entries in the browser.
-
-`makefile-browser-unselected-mark':
-   String used to mark unselected entries in the browser.
-
-`makefile-browser-auto-advance-after-selection-p':
-   If this variable is set to a non-nil value the cursor
-   will automagically advance to the next line after an item
-   has been selected in the browser.
-
 `makefile-pickup-everything-picks-up-filenames-p':
    If this variable is set to a non-nil value then
    `makefile-pickup-everything' also picks up filenames as targets
@@ -815,10 +785,6 @@ Makefile mode can be configured by modifying the following variables:
    the backslash itself intact.
    IMPORTANT: Please note that enabling this option causes Makefile mode
    to MODIFY A FILE WITHOUT YOUR CONFIRMATION when \"it seems necessary\".
-
-`makefile-browser-hook':
-   A function or list of functions to be called just before the
-   browser is entered. This is executed in the makefile buffer.
 
 `makefile-special-targets-list':
    List of special targets. You will be offered to complete
@@ -1306,6 +1272,7 @@ Fill comments, backslashed lines, and variable definitions specially."
 ;;; ------------------------------------------------------------
 
 (defun makefile-browser-format-target-line (target selected)
+  (declare (obsolete nil "30.1"))
   (format
    (concat (make-string makefile-browser-leftmost-column ?\ )
 	   (if selected
@@ -1315,6 +1282,7 @@ Fill comments, backslashed lines, and variable definitions specially."
    target makefile-target-colon))
 
 (defun makefile-browser-format-macro-line (macro selected)
+  (declare (obsolete nil "30.1"))
   (format
    (concat (make-string makefile-browser-leftmost-column ?\ )
 	   (if selected
@@ -1323,6 +1291,7 @@ Fill comments, backslashed lines, and variable definitions specially."
 	   (makefile-format-macro-ref macro))))
 
 (defun makefile-browser-fill (targets macros)
+  (declare (obsolete nil "30.1"))
   (let ((inhibit-read-only t))
     (goto-char (point-min))
     (erase-buffer)
@@ -1346,6 +1315,7 @@ Fill comments, backslashed lines, and variable definitions specially."
 
 (defun makefile-browser-next-line ()
   "Move the browser selection cursor to the next line."
+  (declare (obsolete nil "30.1"))
   (interactive)
   (unless (makefile-last-line-p)
     (forward-line 1)
@@ -1353,6 +1323,7 @@ Fill comments, backslashed lines, and variable definitions specially."
 
 (defun makefile-browser-previous-line ()
   "Move the browser selection cursor to the previous line."
+  (declare (obsolete nil "30.1"))
   (interactive)
   (unless (makefile-first-line-p)
     (forward-line -1)
@@ -1364,6 +1335,7 @@ Fill comments, backslashed lines, and variable definitions specially."
 
 (defun makefile-browser-quit ()
   "Leave the browser and return to the makefile buffer."
+  (declare (obsolete nil "30.1"))
   (interactive)
   (let ((my-client makefile-browser-client))
     (setq makefile-browser-client nil)	; we quit, so NO client!
@@ -1377,6 +1349,7 @@ Fill comments, backslashed lines, and variable definitions specially."
 
 (defun makefile-browser-toggle ()
   "Toggle the selection state of the browser item at the cursor position."
+  (declare (obsolete nil "30.1"))
   (interactive)
   (let ((this-line (count-lines (point-min) (point))))
     (setq this-line (max 1 this-line))
@@ -1414,6 +1387,7 @@ character, insert a new blank line, go to that line and indent by one TAB.
 This is most useful in the process of creating continued lines when copying
 large dependencies from the browser to the client buffer.
 \(point) advances accordingly in the client buffer."
+  (declare (obsolete nil "30.1"))
   (interactive)
   (with-current-buffer makefile-browser-client
     (end-of-line)
@@ -1422,6 +1396,7 @@ large dependencies from the browser to the client buffer.
 (defun makefile-browser-insert-selection ()
   "Insert all selected targets and/or macros in the makefile buffer.
 Insertion takes place at point."
+  (declare (obsolete nil "30.1"))
   (interactive)
   (save-excursion
     (goto-char (point-min))
@@ -1433,11 +1408,13 @@ Insertion takes place at point."
 	(setq current-line (1+ current-line))))))
 
 (defun makefile-browser-insert-selection-and-quit ()
+  (declare (obsolete nil "30.1"))
   (interactive)
   (makefile-browser-insert-selection)
   (makefile-browser-quit))
 
 (defun makefile-browser-send-this-line-item ()
+  (declare (obsolete nil "30.1"))
   (if (makefile-browser-on-macro-line-p)
       (save-excursion
 	(let ((macro-name (makefile-browser-this-line-macro-name)))
@@ -1449,10 +1426,12 @@ Insertion takes place at point."
 	(insert target-name " ")))))
 
 (defun makefile-browser-start-interaction ()
+  (declare (obsolete nil "30.1"))
   (use-local-map makefile-browser-map)
   (setq buffer-read-only t))
 
 (defun makefile-browse (targets macros)
+  (declare (obsolete imenu "30.1"))
   (if (zerop (+ (length targets) (length macros)))
       (progn
 	(beep)
@@ -1469,6 +1448,7 @@ Insertion takes place at point."
       (makefile-browser-start-interaction))))
 
 (defun makefile-switch-to-browser ()
+  (declare (obsolete imenu "30.1"))
   (interactive)
   (run-hooks 'makefile-browser-hook)
   (setq makefile-browser-client (current-buffer))
@@ -1726,12 +1706,14 @@ This acts according to the value of `makefile-tab-after-target-colon'."
 
 (defun makefile-browser-on-macro-line-p ()
   "Determine if point is on a macro line in the browser."
+  (declare (obsolete nil "30.1"))
   (save-excursion
     (beginning-of-line)
     (re-search-forward "\\$[{(]" (line-end-position) t)))
 
 (defun makefile-browser-this-line-target-name ()
   "Extract the target name from a line in the browser."
+  (declare (obsolete nil "30.1"))
   (save-excursion
     (end-of-line)
     (skip-chars-backward "^ \t")
@@ -1739,6 +1721,7 @@ This acts according to the value of `makefile-tab-after-target-colon'."
 
 (defun makefile-browser-this-line-macro-name ()
   "Extract the macro name from a line in the browser."
+  (declare (obsolete nil "30.1"))
   (save-excursion
     (beginning-of-line)
     (re-search-forward "\\$[{(]" (line-end-position) t)
@@ -1757,12 +1740,15 @@ Uses `makefile-use-curly-braces-for-macros-p'."
       (format "$(%s)" macro-name))))
 
 (defun makefile-browser-get-state-for-line (n)
+  (declare (obsolete nil "30.1"))
   (aref makefile-browser-selection-vector (1- n)))
 
 (defun makefile-browser-set-state-for-line (n to-state)
+  (declare (obsolete nil "30.1"))
   (aset makefile-browser-selection-vector (1- n) to-state))
 
 (defun makefile-browser-toggle-state-for-line (n)
+  (declare (obsolete nil "30.1"))
   (makefile-browser-set-state-for-line n (not (makefile-browser-get-state-for-line n))))
 
 (defun makefile-last-line-p ()
@@ -1799,7 +1785,7 @@ If it isn't in one, return nil."
 
 (defun makefile-generate-temporary-filename ()
   "Create a filename suitable for use in `makefile-save-temporary'."
-  (declare (obsolete make-temp-name "29.1"))
+  (declare (obsolete make-temp-name "30.1"))
   (format "mktmp%s.%s"
           (string-limit (user-login-name) 3)
           (string-limit (int-to-string (user-uid)) 3)))
