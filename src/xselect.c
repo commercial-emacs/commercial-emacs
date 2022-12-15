@@ -567,6 +567,10 @@ struct x_selection_request *selection_request_stack;
 
 struct transfer outstanding_transfers;
 
+/* A counter for selection serials.  */
+
+static unsigned int selection_serial;
+
 struct property_change
 {
   int identifier;
