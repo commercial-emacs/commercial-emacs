@@ -138,32 +138,6 @@ instead."
 	  (end (progn (forward-sexp 1) (point))))
       (indent-region start end nil))))
 
-(defun prog-fill-reindent-defun (&optional argument)
-  "Refill or reindent the paragraph or defun that contains point.
-
-If the point is in a string or a comment, fill the paragraph that
-contains point or follows point.
-
-Otherwise, reindent the function definition that contains point
-or follows point."
-  (interactive "P")
-  (save-excursion
-    (let ((treesit-text-node
-           (and (treesit-parser-list)
-                (string-match-p
-                 treesit-text-type-regexp
-                 (treesit-node-type (treesit-node-at (point)))))))
-      (if (or treesit-text-node
-              (nth 8 (syntax-ppss))
-              (re-search-forward comment-start-skip (line-end-position) t))
-          (if (memq fill-paragraph-function '(t nil))
-              (lisp-fill-paragraph argument)
-            (funcall fill-paragraph-function argument))
-        (beginning-of-defun)
-        (let ((start (point)))
-          (end-of-defun)
-          (indent-region start (point) nil))))))
-
 (defun prog-first-column ()
   "Return the indentation column normally used for top-level constructs."
   (or (car prog-indentation-context) 0))

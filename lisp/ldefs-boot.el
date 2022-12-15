@@ -32751,11 +32751,6 @@ See info node `(transient)Modifying Existing Transients'.
 (register-definition-prefixes "tree-widget" '("tree-widget-"))
 
 
-;;; Generated autoloads from treesit.el
-
-(register-definition-prefixes "treesit" '("treesit-"))
-
-
 ;;; Generated autoloads from tutorial.el
 
 (autoload 'help-with-tutorial "tutorial" "\
