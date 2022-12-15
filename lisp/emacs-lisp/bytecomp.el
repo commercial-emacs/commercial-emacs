@@ -1428,17 +1428,9 @@ that means treat it as not defined."
                    for cand-score =
                    (cl-loop for w in (listify match*)
                             count (member w (listify byte-compile-current-form)))
-                   when (or (> cand-score best-score)
-                            (and (= cand-score best-score)
-                                 (or (not result) ; first iteration
-                                     ;; For a compiled-function
-                                     ;; byte-compile-current-form,
-                                     ;; cand-score is always zero.  So
-                                     ;; this allows a subsequent `defun'
-                                     ;; match to usurp a `(lambda ())'
-                                     ;; match since both have zero scores.
-                                     (not (zerop cand-score)))
-                                 (not (= cand-milieu best-milieu))))
+                   when (and (>= cand-score best-score)
+                             (or (not (= cand-milieu best-milieu))
+                                 (not (= cand-score best-score))))
                    do (setq result match
                             best-score cand-score
                             best-milieu cand-milieu)
