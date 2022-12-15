@@ -172,9 +172,9 @@ contains the name of the directory which the buffer is visiting.")
 
 ;; uniquify-fix-list data structure
 (cl-defstruct (uniquify-item
-	    (:constructor nil) (:copier nil)
-	    (:constructor uniquify-make-item
-	     (base dirname buffer &optional proposed original-dirname)))
+	       (:constructor nil) (:copier nil)
+	       (:constructor uniquify-make-item
+	                     (base dirname buffer &optional proposed original-dirname)))
   base dirname buffer proposed original-dirname)
 
 ;; Internal variables used free

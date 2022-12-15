@@ -5909,7 +5909,7 @@ command is called from a keyboard macro?"
              ;; FIXME: For lexical-binding code, this is much worse,
              ;; because the frames look like "byte-code -> funcall -> #[...]",
              ;; which is not a reliable signature.
-             (memq (nth 1 frame) '(interactive-p 'byte-code))
+             (memq (nth 1 frame) '(interactive-p byte-code))
              ;; Skip package-specific stack-frames.
              (let ((skip (run-hook-with-args-until-success
                           'called-interactively-p-functions

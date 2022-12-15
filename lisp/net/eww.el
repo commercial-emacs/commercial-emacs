@@ -2496,12 +2496,12 @@ Otherwise, the restored buffer will contain a prompt to do so by using
 			    (list :url (plist-get misc-data :uri))))
     (unless file-name
       (when (plist-get eww-data :url)
-	(cl-case eww-restore-desktop
-	  ((t auto) (eww (plist-get eww-data :url)))
-	  ((zerop (buffer-size))
-	   (let ((inhibit-read-only t))
-	     (insert (substitute-command-keys
-		      eww-restore-reload-prompt)))))))
+	(unless (cl-case eww-restore-desktop
+	          ((t auto) (eww (plist-get eww-data :url))))
+	  (when (zerop (buffer-size))
+	    (let ((inhibit-read-only t))
+	      (insert (substitute-command-keys
+		       eww-restore-reload-prompt)))))))
     ;; .
     (current-buffer)))
 

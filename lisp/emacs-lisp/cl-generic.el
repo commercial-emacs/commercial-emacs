@@ -101,10 +101,10 @@
 ;; usually be simplified, or even completely skipped.
 
 (eval-when-compile (require 'cl-lib))
-(eval-when-compile (require 'cl-macs))  ;For cl--find-class.
 (eval-when-compile (require 'pcase))
 (eval-when-compile (require 'subr-x))
 
+(declare-function cl-defstruct "cl-macs")
 (cl-defstruct (cl--generic-generalizer
                (:constructor nil)
                (:constructor cl-generic-make-generalizer

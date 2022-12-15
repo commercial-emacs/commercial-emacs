@@ -26,6 +26,7 @@
 
 ;;; Code:
 (eval-when-compile (require 'cl-lib))
+(declare-function tab-bar-height "xdisp.c" (&optional frame pixelwise))
 
 (cl-defgeneric frame-creation-function (params)
   "Method for window-system dependent functions to create a new frame.
@@ -370,7 +371,6 @@ there (in decreasing order of priority)."
       ;; by the lines added in x-create-frame for the tab-bar and
       ;; switch `tab-bar-mode' off.
       (when (display-graphic-p)
-        (declare-function tab-bar-height "xdisp.c" (&optional frame pixelwise))
 	(let* ((init-lines
 		(assq 'tab-bar-lines initial-frame-alist))
 	       (other-lines

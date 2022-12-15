@@ -26,6 +26,7 @@
 ;;
 
 (require 'semantic)
+(require 'eieio)
 
 (eval-when-compile
   (require 'semantic/db-find)

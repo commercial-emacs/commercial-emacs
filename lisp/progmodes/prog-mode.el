@@ -99,8 +99,7 @@
 
 (defvar-keymap prog-mode-map
   :doc "Keymap used for programming modes."
-  "C-M-q" #'prog-indent-sexp
-  "M-q" #'prog-fill-reindent-defun)
+  "C-M-q" #'prog-indent-sexp)
 
 (defvar prog-indentation-context nil
   "When non-nil, provides context for indenting embedded code chunks.

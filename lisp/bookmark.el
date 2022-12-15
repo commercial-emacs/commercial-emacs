@@ -37,6 +37,7 @@
 (require 'text-property-search)
 (require 'fringe) ; for builds --without-x
 (eval-when-compile (require 'cl-lib))
+(require 'tab-bar)
 
 ;;; Misc comments:
 ;;

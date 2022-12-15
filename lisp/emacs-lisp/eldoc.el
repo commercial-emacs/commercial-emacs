@@ -500,8 +500,8 @@ If INTERACTIVE, display it.  Else, return said buffer."
         (special-mode)
         (erase-buffer)
         (setq-local nobreak-char-display nil)
-        (cl-loop for (docs . rest) on docs
-                 for (this-doc . plist) = docs
+        (cl-loop for (docs* . rest) on docs
+                 for (this-doc . plist) = docs*
                  for thing = (plist-get plist :thing)
                  when thing do
                  (cl-pushnew thing things-reported-on)

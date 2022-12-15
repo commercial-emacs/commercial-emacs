@@ -1446,12 +1446,8 @@ dumping to it."
 	       (frame-text-width frame) (frame-text-height frame)
 	       (frame-text-cols frame) (frame-text-lines frame))
        (format "tab: %s  tool: %s  scroll: %s/%s  fringe: %s  border: %s  right: %s  bottom: %s\n\n"
-	       (if (fboundp 'tab-bar-height)
-		   (tab-bar-height frame t)
-		 "0")
-	       (if (fboundp 'tool-bar-height)
-		   (tool-bar-height frame t)
-		 "0")
+	       (tab-bar-height frame t)
+	       (tool-bar-height frame t)
 	       (frame-scroll-bar-width frame)
 	       (frame-scroll-bar-height frame)
 	       (frame-fringe-width frame)
@@ -10576,9 +10572,10 @@ Used in `repeat-mode'."
   "3" #'split-root-window-right
   "s" #'window-toggle-side-windows
   "^ f" #'tear-off-window
-  "^ t" #'tab-window-detach
   "-" #'fit-window-to-buffer
   "0" #'delete-windows-on)
+(when (fboundp 'tab-window-detach)
+  (define-key window-prefix-map "^ t" #'tab-window-detach))
 (define-key ctl-x-map "w" window-prefix-map)
 
 (provide 'window)

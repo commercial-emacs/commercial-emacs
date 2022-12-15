@@ -2,6 +2,15 @@
 
 (require 'tree-sitter-prog-mode)
 
+(declare-function tree-sitter-node-child-by-field-name "tree-sitter.c")
+(declare-function tree-sitter-node-end "tree-sitter.c")
+(declare-function tree-sitter-node-start "tree-sitter.c")
+(declare-function tree-sitter-node-type "tree-sitter.c")
+(declare-function tree-sitter-root-node "tree-sitter.c")
+(declare-function tree-sitter-node-equal "tree-sitter.c")
+(declare-function tree-sitter-node-parent "tree-sitter.c")
+(declare-function tree-sitter-node-at "tree-sitter.c")
+
 (defun tree-sitter-c-forward-sexp (&optional arg)
   "Specialization of `tree-sitter-forward-sexp' for C.
 For lack of a proper captures scm formally describing
