@@ -859,18 +859,6 @@ So the second decryption fails."
       "jens.lechtenboerger@informationelle-selbstbestimmung-im-internet.de"
       "no-exp@example.org" nil t nil nil t))))
 
-(defun mml-secure-select-preferred-keys-ok ()
-  "Manual customization with entire question."
-  :expected-result (if (getenv "CI") t :passed)
-  (mml-secure-test-fixture
-   (lambda ()
-     (mml-secure-select-preferred-keys
-      (epg-make-context 'OpenPGP)
-      '("jens.lechtenboerger@informationelle-selbstbestimmung-im-internet.de")
-      'encrypt))
-   t))
-
-
 ;; ERT entry points
 (defun mml-secure-run-tests ()
     "Run all tests with defaults."
