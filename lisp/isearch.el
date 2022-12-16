@@ -1538,6 +1538,7 @@ REGEXP if non-nil says use the regexp search ring."
 
 ;; The search status structure and stack.
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (isearch--state
                (:constructor nil)
                (:copier nil)

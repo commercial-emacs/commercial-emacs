@@ -104,7 +104,7 @@
 (eval-when-compile (require 'pcase))
 (eval-when-compile (require 'subr-x))
 
-(declare-function cl-defstruct "cl-macs")
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (cl--generic-generalizer
                (:constructor nil)
                (:constructor cl-generic-make-generalizer

@@ -227,6 +227,7 @@ for completion."
 
 (defvar comp-eln-to-el-h)
 
+(declare-function cl-search "cl-seq")
 (defun find-library-name (library)
   "Return the absolute file name of LIBRARY.
 If LIBRARY ends in the byte-compiled extension .elc or the
