@@ -183,6 +183,7 @@
 ;;; Structs
 ;;;; Data Struct
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (epg-data
                (:constructor nil)
                (:constructor epg-make-data-from-file (file))

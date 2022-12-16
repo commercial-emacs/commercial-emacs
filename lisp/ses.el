@@ -413,6 +413,7 @@ message.")
   (declare (debug t))
   `(aref (aref ses--cells ,row) ,col))
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (ses-cell
 	       (:constructor nil)
 	       (:constructor ses-make-cell

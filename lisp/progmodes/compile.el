@@ -30,7 +30,7 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
+(eval-and-compile (require 'cl-lib))
 (require 'tool-bar)
 (require 'comint)
 (require 'text-property-search)

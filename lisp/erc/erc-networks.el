@@ -39,7 +39,7 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
+(eval-and-compile (require 'cl-lib))
 (require 'erc-common)
 
 (defvar erc--target)
