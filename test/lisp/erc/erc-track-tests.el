@@ -108,11 +108,13 @@
   "`erc-faces-in' should pick up both 'face and 'font-lock-face properties."
   (let ((str0 (copy-sequence "is bold"))
         (str1 (copy-sequence "is bold")))
-    ;; Turn on Font Lock mode: this initialize `char-property-alias-alist'
-    ;; to '((face font-lock-face)).  Note that `font-lock-mode' don't
-    ;; turn on the mode if the test is run on batch mode or if the
-    ;; buffer name starts with ?\s (Bug#23954).
-    (unless font-lock-mode (font-lock-default-function 1))
+    ;; font-lock-mode aliases font-lock-face to face
+    ;; but won't activate in noninteractive or hidden buffers.
+    (let (noninteractive)
+      (cl-letf (((symbol-function 'buffer-name)
+                 (lambda (&rest _args) "respect-me")))
+        (font-lock-mode 1)))
+    (should font-lock-mode)
     (put-text-property 3 (length str0) 'font-lock-face
                        '(bold erc-current-nick-face) str0)
     (put-text-property 3 (length str1) 'face
