@@ -36,6 +36,7 @@
   (require 'seq)
   (require 'icons))
 
+
 (defgroup tab-bar nil
   "Frame-local tabs."
   :group 'convenience
@@ -383,10 +384,6 @@ and can restore them."
 
 (defun tab-bar--load-buttons ()
   "Load the icons for the tab buttons."
-  (require 'icons)
-  (declare-function icon-string "icons" (name))
-  (declare-function iconp "icons" (object))
-  (declare-function icons--register "icons")
   (unless (iconp 'tab-bar-new)
     (define-icon tab-bar-new nil
       `((image "tabs/new.xpm"

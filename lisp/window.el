@@ -10572,9 +10572,10 @@ Used in `repeat-mode'."
   "3" #'split-root-window-right
   "s" #'window-toggle-side-windows
   "^ f" #'tear-off-window
-  "^ t" #'tab-window-detach
   "-" #'fit-window-to-buffer
   "0" #'delete-windows-on)
+(when (fboundp 'tab-window-detach)
+  (define-key window-prefix-map "^ t" #'tab-window-detach))
 (define-key ctl-x-map "w" window-prefix-map)
 
 (provide 'window)
