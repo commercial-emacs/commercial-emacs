@@ -122,6 +122,7 @@ has set everything up already."
 	;;
 	;; Borrowed these concepts out of font-lock.
 	(let ((start (point))
+              (inhibit-point-motion-hooks t)
 	      (inhibit-modification-hooks t))
 	  (srecode--insert-into-buffer template dictionary)
 	  ;; Now call those after change functions.

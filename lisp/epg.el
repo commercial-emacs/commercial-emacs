@@ -28,7 +28,7 @@
 
 (require 'epg-config)
 (require 'rfc6068)
-(eval-and-compile (require 'cl-lib))
+(eval-when-compile (require 'cl-lib))
 
 (define-error 'epg-error "GPG error")
 

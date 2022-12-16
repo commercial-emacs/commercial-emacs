@@ -88,149 +88,7 @@
   :version "28.1"
   :group 'tab-bar-faces)
 
-(defcustom tab-bar-close-last-tab-choice nil
-  "What to do when the last tab is closed.
-If nil, do nothing and show a message, like closing the last window or frame.
-If `delete-frame', delete the containing frame, as a web browser would do.
-If `tab-bar-mode-disable', disable `tab-bar-mode' so that tabs no longer show
-in the frame.
-If the value is a function, call that function with the tab to be closed
-as an argument."
-  :type '(choice (const    :tag "Do nothing and show message" nil)
-                 (const    :tag "Close the containing frame" delete-frame)
-                 (const    :tag "Disable tab-bar-mode" tab-bar-mode-disable)
-                 (function :tag "Function"))
-  :group 'tab-bar
-  :version "27.1")
-
-(defcustom tab-bar-close-last-tab-choice nil
-  "What to do when the last tab is closed.
-If nil, do nothing and show a message, like closing the last window or frame.
-If `delete-frame', delete the containing frame, as a web browser would do.
-If `tab-bar-mode-disable', disable `tab-bar-mode' so that tabs no longer show
-in the frame.
-If the value is a function, call that function with the tab to be closed
-as an argument."
-  :type '(choice (const    :tag "Do nothing and show message" nil)
-                 (const    :tag "Close the containing frame" delete-frame)
-                 (const    :tag "Disable tab-bar-mode" tab-bar-mode-disable)
-                 (function :tag "Function"))
-  :group 'tab-bar
-  :version "27.1")
-
-(defvar tab-bar-history-omit nil
-  "When non-nil, omit window-configuration changes from the current command.")
-
-(defvar tab-bar-history-back (make-hash-table)
-  "History of back changes in every tab per frame.")
-
-(defvar tab-bar-history-forward (make-hash-table)
-  "History of forward changes in every tab per frame.")
-
-(defvar tab-bar--fixed-width-hash nil
-  "Memoization table for `tab-bar-auto-width'.")
-
-(defvar tab-bar-back-button " < "
-  "Button for going back in tab history.")
-
-(defvar tab-bar-forward-button " > "
-  "Button for going forward in tab history.")
-
-(defvar tab-bar-tabs-function #'tab-bar-tabs
-  "Function to get a list of tabs to display in the tab bar.
-This function should have one optional argument FRAME,
-defaulting to the selected frame when nil.
-It should return a list of alists with parameters
-that include at least the element (name . TAB-NAME).
-For example, \\='((tab (name . \"Tab 1\")) (current-tab (name . \"Tab 2\")))
-By default, use function `tab-bar-tabs'.")
-
-(defvar tab-bar-menu-bar-button
-  (propertize "Menu" 'face 'tab-bar-tab-inactive)
-  "Button for the menu bar.")
-
-(defvar tab-bar-closed-tabs nil
-  "A list of closed tabs to be able to undo their closing.")
-
-(defcustom tab-bar-auto-width t
-  "Automatically resize width of tabs on tab bar to fill available tab-bar space.
-When non-nil, the widths of the tabs on the tab bar are
-automatically resized so that their width is evenly distributed
-across the tab bar.  This keeps the widths of the tabs
-independent of the length of the buffer names shown on each tab;
-the tab widths change only when tabs are added or deleted, or
-when the frame's dimensions change.  This also avoids as much as
-possible wrapping a long tab bar to a second tab-bar line.
-
-The automatic resizing of tabs takes place as long as tabs are no
-wider than allowed by the value of `tab-bar-auto-width-max', and
-at least as wide as specified by the value of
-`tab-bar-auto-width-min'.
-
-When this variable is nil, the width of each tab is determined by the
-length of the tab's name."
-  :type 'boolean
-  :group 'tab-bar
-  :version "29.1")
-
-(defcustom tab-bar-show t
-  "Defines when to show the tab bar.
-If t, the default, enable `tab-bar-mode' automatically upon using
-the commands that create new window configurations (e.g., `tab-new').
-If a non-negative integer, show the tab bar only if the number of
-the tabs exceeds the value of this variable.  In particular,
-if the value is 1, hide the tab bar when it has only one tab, and
-show it again once more tabs are created.  A value that is a
-non-negative integer also makes the tab bar appearance be different
-on different frames: the tab bar can be shown on some frames and
-hidden on others, depending on how many tab-bar tabs are on that
-frame, and whether that number is greater than the numerical value
-of this variable.
-If nil, always keep the tab bar hidden.  In this case it's still
-possible to use persistent named window configurations by relying on
-keyboard commands `tab-new', `tab-close', `tab-next', `tab-switcher', etc.
-
-Setting this variable directly does not take effect; please customize
-it (see the info node `Easy Customization'), then it will automatically
-update the tab bar on all frames according to the new value.
-
-To enable or disable the tab bar individually on each frame,
-you can use the command `toggle-frame-tab-bar'."
-  :type '(choice (const :tag "Always" t)
-                 (const :tag "When more than one tab" 1)
-                 (const :tag "Never" nil))
-  :initialize 'custom-initialize-default
-  :set (lambda (sym val)
-         (set-default sym val)
-         (if val
-             (tab-bar-mode 1)
-           (tab-bar--update-tab-bar-lines t)))
-  :group 'tab-bar
-  :version "27.1")
-
-(defcustom tab-bar-close-button-show t
-  "Defines where to show the close tab button.
-If t, show the close tab button on all tabs.
-If `selected', show it only on the selected tab.
-If `non-selected', show it only on non-selected tab.
-If nil, don't show it at all."
-  :type '(choice (const :tag "On all tabs" t)
-                 (const :tag "On selected tab" selected)
-                 (const :tag "On non-selected tabs" non-selected)
-                 (const :tag "None" nil))
-  :initialize 'custom-initialize-default
-  :set (lambda (sym val)
-         (set-default sym val)
-         (force-mode-line-update))
-  :group 'tab-bar
-  :version "27.1")
-
-(defvar tab-bar-close-button
-  (propertize " x"
-              'close-tab t
-              :help "Click to close tab")
-  "Button for closing the clicked tab.")
-
+
 (defcustom tab-bar-select-tab-modifiers '()
   "List of modifier keys for selecting tab-bar tabs by their numbers.
 Possible modifier keys are `control', `meta', `shift', `hyper', `super' and
@@ -256,92 +114,6 @@ For easier selection of tabs by their numbers, consider customizing
            (tab-bar--define-keys)))
   :group 'tab-bar
   :version "27.1")
-
-(defcustom tab-bar-format '(tab-bar-format-history
-                            tab-bar-format-tabs
-                            tab-bar-separator
-                            tab-bar-format-add-tab)
-  "Template for displaying tab bar items.
-Every item in the list is a function that returns
-a string, or a list of menu-item elements, or nil.
-Adding a function to the list causes the tab bar to show
-that string, or display a tab button which, when clicked,
-will invoke the command that is the binding of the menu item.
-The menu-item binding of nil will produce a tab clicking
-on which will select that tab.  The menu-item's title is
-displayed as the label of the tab.
-If a function returns nil, it doesn't directly affect the
-tab bar appearance, but can do that by some side-effect.
-If the list ends with `tab-bar-format-align-right' and
-`tab-bar-format-global', then after enabling `display-time-mode'
-\(or any other mode that uses `global-mode-string'),
-it will display time aligned to the right on the tab bar instead
-of the mode line.  Replacing `tab-bar-format-tabs' with
-`tab-bar-format-tabs-groups' will group tabs on the tab bar."
-  :type 'hook
-  :options '(tab-bar-format-menu-bar
-             tab-bar-format-history
-             tab-bar-format-tabs
-             tab-bar-format-tabs-groups
-             tab-bar-separator
-             tab-bar-format-add-tab
-             tab-bar-format-align-right
-             tab-bar-format-global)
-  :initialize 'custom-initialize-default
-  :set (lambda (sym val)
-         (set-default sym val)
-         (force-mode-line-update))
-  :group 'tab-bar
-  :version "28.1")
-
-(defcustom tab-bar-new-button-show t
-  "If non-nil, show the \"New tab\" button in the tab bar.
-When this is nil, you can create new tabs with \\[tab-new]."
-  :type 'boolean
-  :initialize 'custom-initialize-default
-  :set (lambda (sym val)
-         (set-default sym val)
-         (force-mode-line-update))
-  :group 'tab-bar
-  :version "27.1")
-(make-obsolete-variable 'tab-bar-new-button-show 'tab-bar-format "28.1")
-
-(defvar tab-bar-new-button " + "
-  "Button for creating a new tab.")
-
-(define-minor-mode tab-bar-history-mode
-  "Toggle tab history mode for the tab bar.
-Tab history mode remembers window configurations used in every tab,
-and can restore them."
-  :global t :group 'tab-bar
-  (if tab-bar-history-mode
-      (progn
-        (unless (iconp 'tab-bar-back)
-          (define-icon tab-bar-back nil
-            `((image "tabs/left-arrow.xpm"
-                     :margin ,tab-bar-button-margin
-                     :ascent center)
-              (text " < "))
-            "Icon for going back in tab history."
-            :version "29.1"))
-        (setq tab-bar-back-button (icon-string 'tab-bar-back))
-
-        (unless (iconp 'tab-bar-forward)
-          (define-icon tab-bar-forward nil
-            `((image "tabs/right-arrow.xpm"
-                     :margin ,tab-bar-button-margin
-                     :ascent center)
-              (text " > "))
-            "Icon for going forward in tab history."
-            :version "29.1"))
-        (setq tab-bar-forward-button (icon-string 'tab-bar-forward))
-
-        (add-hook 'pre-command-hook 'tab-bar--history-pre-change)
-        (add-hook 'window-configuration-change-hook 'tab-bar--history-change))
-    (remove-hook 'pre-command-hook 'tab-bar--history-pre-change)
-    (remove-hook 'window-configuration-change-hook 'tab-bar--history-change)))
-
-(defvar-local tab-switcher-column 3)
 
 (defun tab-bar--define-keys ()
   "Install key bindings to switch between tabs if so configured."
@@ -384,6 +156,7 @@ and can restore them."
 
 (defun tab-bar--load-buttons ()
   "Load the icons for the tab buttons."
+  (require 'icons)
   (unless (iconp 'tab-bar-new)
     (define-icon tab-bar-new nil
       `((image "tabs/new.xpm"
@@ -473,7 +246,7 @@ a list of frames to update."
       (tab-bar--define-keys)
     (tab-bar--undefine-keys)))
 
-
+
 ;;; Key bindings
 
 (defun tab-bar--key-to-number (key)
@@ -654,7 +427,7 @@ Its main job is to show tabs in the tab bar
 and to bind mouse events to the commands."
   (tab-bar-make-keymap-1))
 
-
+
 (defun toggle-tab-bar-mode-from-frame (&optional arg)
   "Toggle tab bar on or off, based on the status of the current frame.
 Used in the Show/Hide menu, to have the toggle reflect the current frame.
@@ -680,6 +453,41 @@ new frame when the global `tab-bar-mode' is enabled, by using
   (set-frame-parameter frame 'tab-bar-lines-keep-state
                        (not (frame-parameter frame 'tab-bar-lines-keep-state))))
 
+
+(defcustom tab-bar-show t
+  "Defines when to show the tab bar.
+If t, the default, enable `tab-bar-mode' automatically upon using
+the commands that create new window configurations (e.g., `tab-new').
+If a non-negative integer, show the tab bar only if the number of
+the tabs exceeds the value of this variable.  In particular,
+if the value is 1, hide the tab bar when it has only one tab, and
+show it again once more tabs are created.  A value that is a
+non-negative integer also makes the tab bar appearance be different
+on different frames: the tab bar can be shown on some frames and
+hidden on others, depending on how many tab-bar tabs are on that
+frame, and whether that number is greater than the numerical value
+of this variable.
+If nil, always keep the tab bar hidden.  In this case it's still
+possible to use persistent named window configurations by relying on
+keyboard commands `tab-new', `tab-close', `tab-next', `tab-switcher', etc.
+
+Setting this variable directly does not take effect; please customize
+it (see the info node `Easy Customization'), then it will automatically
+update the tab bar on all frames according to the new value.
+
+To enable or disable the tab bar individually on each frame,
+you can use the command `toggle-frame-tab-bar'."
+  :type '(choice (const :tag "Always" t)
+                 (const :tag "When more than one tab" 1)
+                 (const :tag "Never" nil))
+  :initialize 'custom-initialize-default
+  :set (lambda (sym val)
+         (set-default sym val)
+         (if val
+             (tab-bar-mode 1)
+           (tab-bar--update-tab-bar-lines t)))
+  :group 'tab-bar
+  :version "27.1")
 
 (defcustom tab-bar-new-tab-choice t
   "Defines what to show in a new tab.
@@ -719,6 +527,50 @@ to get the group name."
   :group 'tab-bar
   :version "28.1")
 
+(defcustom tab-bar-new-button-show t
+  "If non-nil, show the \"New tab\" button in the tab bar.
+When this is nil, you can create new tabs with \\[tab-new]."
+  :type 'boolean
+  :initialize 'custom-initialize-default
+  :set (lambda (sym val)
+         (set-default sym val)
+         (force-mode-line-update))
+  :group 'tab-bar
+  :version "27.1")
+(make-obsolete-variable 'tab-bar-new-button-show 'tab-bar-format "28.1")
+
+(defvar tab-bar-new-button " + "
+  "Button for creating a new tab.")
+
+(defcustom tab-bar-close-button-show t
+  "Defines where to show the close tab button.
+If t, show the close tab button on all tabs.
+If `selected', show it only on the selected tab.
+If `non-selected', show it only on non-selected tab.
+If nil, don't show it at all."
+  :type '(choice (const :tag "On all tabs" t)
+                 (const :tag "On selected tab" selected)
+                 (const :tag "On non-selected tabs" non-selected)
+                 (const :tag "None" nil))
+  :initialize 'custom-initialize-default
+  :set (lambda (sym val)
+         (set-default sym val)
+         (force-mode-line-update))
+  :group 'tab-bar
+  :version "27.1")
+
+(defvar tab-bar-close-button
+  (propertize " x"
+              'close-tab t
+              :help "Click to close tab")
+  "Button for closing the clicked tab.")
+
+(defvar tab-bar-back-button " < "
+  "Button for going back in tab history.")
+
+(defvar tab-bar-forward-button " > "
+  "Button for going forward in tab history.")
+
 (defcustom tab-bar-tab-hints nil
   "Show absolute numbers on tabs in the tab bar before the tab name.
 This helps to select the tab by its number using `tab-bar-select-tab'
@@ -738,7 +590,7 @@ and `tab-bar-select-tab-modifiers'."
   "Separator between tabs."
   (or tab-bar-separator (if (window-system) " " "|")))
 
-
+
 (defcustom tab-bar-tab-name-function #'tab-bar-tab-name-current
   "Function to get a tab name.
 Function gets no arguments.
@@ -804,6 +656,16 @@ Append ellipsis `tab-bar-tab-name-ellipsis' in this case."
                    tab-bar-tab-name-ellipsis)
                   'help-echo tab-name))))
 
+
+(defvar tab-bar-tabs-function #'tab-bar-tabs
+  "Function to get a list of tabs to display in the tab bar.
+This function should have one optional argument FRAME,
+defaulting to the selected frame when nil.
+It should return a list of alists with parameters
+that include at least the element (name . TAB-NAME).
+For example, \\='((tab (name . \"Tab 1\")) (current-tab (name . \"Tab 2\")))
+By default, use function `tab-bar-tabs'.")
+
 (defun tab-bar-tabs (&optional frame)
   "Return a list of tabs belonging to the FRAME.
 Ensure the frame parameter `tabs' is pre-populated.
@@ -828,7 +690,7 @@ Return its existing value or a new value."
   "Set a list of TABS on the FRAME."
   (set-frame-parameter frame 'tabs tabs))
 
-
+
 (defcustom tab-bar-tab-face-function #'tab-bar-tab-face-default
   "Function to define a tab face.
 Function gets one argument: a tab."
@@ -863,6 +725,43 @@ the formatted tab name to display in the tab bar."
                  ""))
      'face (funcall tab-bar-tab-face-function tab))))
 
+(defcustom tab-bar-format '(tab-bar-format-history
+                            tab-bar-format-tabs
+                            tab-bar-separator
+                            tab-bar-format-add-tab)
+  "Template for displaying tab bar items.
+Every item in the list is a function that returns
+a string, or a list of menu-item elements, or nil.
+Adding a function to the list causes the tab bar to show
+that string, or display a tab button which, when clicked,
+will invoke the command that is the binding of the menu item.
+The menu-item binding of nil will produce a tab clicking
+on which will select that tab.  The menu-item's title is
+displayed as the label of the tab.
+If a function returns nil, it doesn't directly affect the
+tab bar appearance, but can do that by some side-effect.
+If the list ends with `tab-bar-format-align-right' and
+`tab-bar-format-global', then after enabling `display-time-mode'
+\(or any other mode that uses `global-mode-string'),
+it will display time aligned to the right on the tab bar instead
+of the mode line.  Replacing `tab-bar-format-tabs' with
+`tab-bar-format-tabs-groups' will group tabs on the tab bar."
+  :type 'hook
+  :options '(tab-bar-format-menu-bar
+             tab-bar-format-history
+             tab-bar-format-tabs
+             tab-bar-format-tabs-groups
+             tab-bar-separator
+             tab-bar-format-add-tab
+             tab-bar-format-align-right
+             tab-bar-format-global)
+  :initialize 'custom-initialize-default
+  :set (lambda (sym val)
+         (set-default sym val)
+         (force-mode-line-update))
+  :group 'tab-bar
+  :version "28.1")
+
 (defun tab-bar-menu-bar (event)
   "Pop up the same menu as displayed by the menu bar.
 Used by `tab-bar-format-menu-bar'."
@@ -875,6 +774,10 @@ Used by `tab-bar-format-menu-bar'."
                       (copy-sequence binding))))
                 (menu-bar-keymap))
     (popup-menu menu event)))
+
+(defvar tab-bar-menu-bar-button
+  (propertize "Menu" 'face 'tab-bar-tab-inactive)
+  "Button for the menu bar.")
 
 (defun tab-bar-format-menu-bar ()
   "Produce the Menu button for the tab bar that shows the menu bar."
@@ -1084,6 +987,28 @@ on the tab bar instead."
       (setq items (tab-bar-auto-width items)))
     (append tab-bar-map items)))
 
+
+(defcustom tab-bar-auto-width t
+  "Automatically resize width of tabs on tab bar to fill available tab-bar space.
+When non-nil, the widths of the tabs on the tab bar are
+automatically resized so that their width is evenly distributed
+across the tab bar.  This keeps the widths of the tabs
+independent of the length of the buffer names shown on each tab;
+the tab widths change only when tabs are added or deleted, or
+when the frame's dimensions change.  This also avoids as much as
+possible wrapping a long tab bar to a second tab-bar line.
+
+The automatic resizing of tabs takes place as long as tabs are no
+wider than allowed by the value of `tab-bar-auto-width-max', and
+at least as wide as specified by the value of
+`tab-bar-auto-width-min'.
+
+When this variable is nil, the width of each tab is determined by the
+length of the tab's name."
+  :type 'boolean
+  :group 'tab-bar
+  :version "29.1")
+
 (defcustom tab-bar-auto-width-max '(220 20)
   "Maximum width for automatic resizing of width of tab-bar tabs.
 This determines the maximum width of tabs before their names will be
@@ -1119,6 +1044,9 @@ tab bar might wrap to the second line when it shouldn't.")
      tab-bar-tab-ungrouped
      tab-bar-tab-group-inactive)
   "Resize tabs only with these faces.")
+
+(defvar tab-bar--fixed-width-hash nil
+  "Memoization table for `tab-bar-auto-width'.")
 
 (defun tab-bar-auto-width (items)
   "Return tab-bar items with resized tab names."
@@ -1198,7 +1126,7 @@ tab bar might wrap to the second line when it shouldn't.")
                   name)))))
     items))
 
-
+
 ;; Some window-configuration parameters don't need to be persistent.
 ;; Don't save to the desktop file such tab parameters that are saved
 ;; as "Unprintable entity" so can't be used after restoring the desktop.
@@ -1320,7 +1248,7 @@ inherits the current tab's `explicit-name' parameter."
                                (eq (car tab) 'current-tab))
                              tabs))))
 
-
+
 (defun tab-bar-select-tab (&optional tab-number)
   "Switch to the tab by its absolute position TAB-NUMBER in the tab bar.
 When this command is bound to a numeric key (with a key prefix or modifier key
@@ -1491,7 +1419,7 @@ and rename it to NAME."
 
 (defalias 'tab-bar-select-tab-by-name #'tab-bar-switch-to-tab)
 
-
+
 (defun tab-bar-move-tab-to (to-number &optional from-number)
   "Move tab from FROM-NUMBER position to new position at TO-NUMBER.
 FROM-NUMBER defaults to the current tab number.
@@ -1595,7 +1523,7 @@ configuration."
     (delete-window))
   (tab-bar-switch-to-recent-tab))
 
-
+
 (defcustom tab-bar-new-tab-to 'right
   "Where to create a new tab.
 If `leftmost', create as the first tab.
@@ -1738,6 +1666,10 @@ ARG and FROM-NUMBER have the same meaning as in `tab-bar-new-tab'."
         (tab-bar-new-tab-group t))
     (tab-bar-new-tab arg from-number)))
 
+
+(defvar tab-bar-closed-tabs nil
+  "A list of closed tabs to be able to undo their closing.")
+
 (defcustom tab-bar-close-tab-select 'recent
   "Which tab to make current after closing the specified tab.
 If `left', select the adjacent left tab.
@@ -1746,6 +1678,21 @@ If `recent', select the most recently visited tab."
   :type '(choice (const :tag "Select left tab" left)
                  (const :tag "Select right tab" right)
                  (const :tag "Select recent tab" recent))
+  :group 'tab-bar
+  :version "27.1")
+
+(defcustom tab-bar-close-last-tab-choice nil
+  "What to do when the last tab is closed.
+If nil, do nothing and show a message, like closing the last window or frame.
+If `delete-frame', delete the containing frame, as a web browser would do.
+If `tab-bar-mode-disable', disable `tab-bar-mode' so that tabs no longer show
+in the frame.
+If the value is a function, call that function with the tab to be closed
+as an argument."
+  :type '(choice (const    :tag "Do nothing and show message" nil)
+                 (const    :tag "Close the containing frame" delete-frame)
+                 (const    :tag "Disable tab-bar-mode" tab-bar-mode-disable)
+                 (function :tag "Function"))
   :group 'tab-bar
   :version "27.1")
 
@@ -1922,7 +1869,7 @@ happens interactively)."
 
     (message "No more closed tabs to undo")))
 
-
+
 (defun tab-bar-rename-tab (name &optional tab-number)
   "Give the tab specified by its absolute position TAB-NUMBER a new NAME.
 If no TAB-NUMBER is specified, then rename the current tab.
@@ -1972,7 +1919,7 @@ function `tab-bar-tab-name-function'."
                      nil nil nil nil tab-name))))
   (tab-bar-rename-tab new-name (1+ (tab-bar--tab-index-by-name tab-name))))
 
-
+
 ;;; Tab groups
 
 (defun tab-bar-move-tab-to-group (&optional tab)
@@ -2082,11 +2029,20 @@ Interactively, prompt for GROUP-NAME."
                  close-group)
       (tab-bar-close-tab))))
 
-
+
 ;;; Tab history mode
 
 (defvar tab-bar-history-limit 10
   "The number of history elements to keep.")
+
+(defvar tab-bar-history-omit nil
+  "When non-nil, omit window-configuration changes from the current command.")
+
+(defvar tab-bar-history-back (make-hash-table)
+  "History of back changes in every tab per frame.")
+
+(defvar tab-bar-history-forward (make-hash-table)
+  "History of forward changes in every tab per frame.")
 
 (defvar tab-bar-history-old nil
   "Window configuration before the current command.")
@@ -2162,6 +2118,41 @@ This navigates forward in the history of window configurations."
   "C-c <left>"  #'tab-bar-history-back
   "C-c <right>" #'tab-bar-history-forward)
 
+(define-minor-mode tab-bar-history-mode
+  "Toggle tab history mode for the tab bar.
+Tab history mode remembers window configurations used in every tab,
+and can restore them."
+  :global t :group 'tab-bar
+  (if tab-bar-history-mode
+      (progn
+        (require 'icons)
+
+        (unless (iconp 'tab-bar-back)
+          (define-icon tab-bar-back nil
+            `((image "tabs/left-arrow.xpm"
+                     :margin ,tab-bar-button-margin
+                     :ascent center)
+              (text " < "))
+            "Icon for going back in tab history."
+            :version "29.1"))
+        (setq tab-bar-back-button (icon-string 'tab-bar-back))
+
+        (unless (iconp 'tab-bar-forward)
+          (define-icon tab-bar-forward nil
+            `((image "tabs/right-arrow.xpm"
+                     :margin ,tab-bar-button-margin
+                     :ascent center)
+              (text " > "))
+            "Icon for going forward in tab history."
+            :version "29.1"))
+        (setq tab-bar-forward-button (icon-string 'tab-bar-forward))
+
+        (add-hook 'pre-command-hook 'tab-bar--history-pre-change)
+        (add-hook 'window-configuration-change-hook 'tab-bar--history-change))
+    (remove-hook 'pre-command-hook 'tab-bar--history-pre-change)
+    (remove-hook 'window-configuration-change-hook 'tab-bar--history-change)))
+
+
 ;;; Non-graphical access to frame-local tabs (named window configurations)
 
 (defun tab-switcher ()
@@ -2227,6 +2218,8 @@ For more information, see the function `tab-switcher'."
       (set-buffer-modified-p nil)
       (setq buffer-read-only t)
       (current-buffer))))
+
+(defvar-local tab-switcher-column 3)
 
 (defvar-keymap tab-switcher-mode-map
   :doc "Local keymap for `tab-switcher-mode' buffers."
@@ -2387,7 +2380,7 @@ with those specified by the selected window configuration."
   (goto-char (posn-point (event-end event)))
   (tab-switcher-select))
 
-
+
 (defun tab-bar--reusable-frames (all-frames)
   (cond
    ((eq all-frames t) (frame-list))
@@ -2611,7 +2604,7 @@ When `switch-to-buffer-obey-display-actions' is non-nil,
    nil "[other-tab]")
   (message "Display next command buffer in a new tab..."))
 
-
+
 ;;; Short aliases and keybindings
 
 (defalias 'tab-new             #'tab-bar-new-tab)
@@ -2671,6 +2664,7 @@ Used in `repeat-mode'."
 (put 'tab-move 'repeat-map 'tab-bar-move-repeat-map)
 (put 'tab-bar-move-tab-backward 'repeat-map 'tab-bar-move-repeat-map)
 
+
 (provide 'tab-bar)
 
 ;;; tab-bar.el ends here

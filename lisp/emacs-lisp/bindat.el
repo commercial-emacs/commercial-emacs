@@ -125,7 +125,7 @@
 ;; Helper functions for structure unpacking.
 ;; Relies on dynamic binding of `bindat-raw' and `bindat-idx'.
 
-(eval-and-compile (require 'cl-lib))
+(eval-when-compile (require 'cl-lib))
 (eval-when-compile (require 'subr-x))   ;For `named-let'.
 
 (cl-defstruct (bindat--type

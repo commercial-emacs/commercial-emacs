@@ -33,7 +33,6 @@
 
 ;;; Code:
 (require 'comint)
-(require 'smie)
 
 (defgroup octave nil
   "Editing Octave code."

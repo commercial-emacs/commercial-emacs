@@ -100,7 +100,7 @@
 
 ;;; Code:
 
-(eval-and-compile (require 'cl-lib))
+(eval-when-compile (require 'cl-lib))
 (eval-when-compile (require 'subr-x))
 
 ;; -------------------------------------------------------------------------

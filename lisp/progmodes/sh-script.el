@@ -147,7 +147,6 @@
   (require 'comint)
   (require 'let-alist)
   (require 'subr-x))
-(require 'smie)
 (require 'executable)
 
 (autoload 'comint-completion-at-point "comint")

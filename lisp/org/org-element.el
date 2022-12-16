@@ -5295,7 +5295,6 @@ indentation removed from its contents."
 ;; `org-element--cache-diagnostics-ring-size', `org-element--cache-map-statistics',
 ;; `org-element--cache-map-statistics-threshold'.
 
-;;;###autoload
 (defvar org-element-use-cache t
   "Non-nil when Org parser should cache its results.")
 
@@ -7372,10 +7371,8 @@ argument of FUNC.  Changes to elements made in FUNC will also alter
 the cache."
   (unless (org-element--cache-active-p)
     (error "Cache must be active."))
-  (unless (memq granularity '(headline
-                              headline+inlinetask
-                              greater-element
-                              element))
+  (unless (memq granularity '( headline headline+inlinetask
+                               greater-element element))
     (error "Unsupported granularity: %S" granularity))
   ;; Make TO-POS marker.  Otherwise, buffer edits may garble the the
   ;; process.
@@ -7546,15 +7543,15 @@ the cache."
                  ;; beginning.
                  (next-element-re (pcase granularity
                                     ((or `headline
-                                         (guard (equal '(headline)
-                                                       restrict-elements)))
+                                         (guard (eq '(headline)
+                                                    restrict-elements)))
                                      (cons
                                       (org-with-limited-levels
                                        org-element-headline-re)
                                       'match-beg))
                                     (`headline+inlinetask
                                      (cons
-                                      (if (equal '(inlinetask) restrict-elements)
+                                      (if (eq '(inlinetask) restrict-elements)
                                           (org-inlinetask-outline-regexp)
                                         org-element-headline-re)
                                       'match-beg))

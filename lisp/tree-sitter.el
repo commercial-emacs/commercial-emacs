@@ -38,7 +38,6 @@
 (declare-function tree-sitter-node-next-sibling "tree-sitter.c")
 (declare-function tree-sitter-node-first-child-for-pos "tree-sitter.c")
 (declare-function tree-sitter-root-node "tree-sitter.c")
-(declare-function tree-sitter-node-type "tree-sitter.c")
 
 (defgroup tree-sitter
   nil

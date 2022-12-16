@@ -275,7 +275,6 @@
 ;;---------------------------------------------------------------------------
 ;; User changeable parameters
 ;;---------------------------------------------------------------------------
-(require 'cl-lib)
 
 (defgroup completion nil
   "Dynamic word-completion code."
@@ -2088,6 +2087,7 @@ TYPE is the type of the wrapper to be added.  Can be :before or :under."
 (declare-function cl-set-difference "cl-seq" (cl-list1 cl-list2 &rest cl-keys))
 
 (defun completion-lisp-mode-hook ()
+  (require 'cl-lib)
   (setq completion-syntax-table completion-lisp-syntax-table)
   ;; Lisp Mode diffs
   (setq-local completion-separator-chars
