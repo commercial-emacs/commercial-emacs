@@ -36,7 +36,9 @@
   (require 'seq)
   (require 'icons))
 
-
+(declare-function icon-string "icons")
+(declare-function iconp "icons")
+
 (defgroup tab-bar nil
   "Frame-local tabs."
   :group 'convenience
@@ -114,6 +116,93 @@ For easier selection of tabs by their numbers, consider customizing
            (tab-bar--define-keys)))
   :group 'tab-bar
   :version "27.1")
+
+(defcustom tab-bar-format '(tab-bar-format-history
+                            tab-bar-format-tabs
+                            tab-bar-separator
+                            tab-bar-format-add-tab)
+  "Template for displaying tab bar items.
+Every item in the list is a function that returns
+a string, or a list of menu-item elements, or nil.
+Adding a function to the list causes the tab bar to show
+that string, or display a tab button which, when clicked,
+will invoke the command that is the binding of the menu item.
+The menu-item binding of nil will produce a tab clicking
+on which will select that tab.  The menu-item's title is
+displayed as the label of the tab.
+If a function returns nil, it doesn't directly affect the
+tab bar appearance, but can do that by some side-effect.
+If the list ends with `tab-bar-format-align-right' and
+`tab-bar-format-global', then after enabling `display-time-mode'
+\(or any other mode that uses `global-mode-string'),
+it will display time aligned to the right on the tab bar instead
+of the mode line.  Replacing `tab-bar-format-tabs' with
+`tab-bar-format-tabs-groups' will group tabs on the tab bar."
+  :type 'hook
+  :options '(tab-bar-format-menu-bar
+             tab-bar-format-history
+             tab-bar-format-tabs
+             tab-bar-format-tabs-groups
+             tab-bar-separator
+             tab-bar-format-add-tab
+             tab-bar-format-align-right
+             tab-bar-format-global)
+  :initialize 'custom-initialize-default
+  :set (lambda (sym val)
+         (set-default sym val)
+         (force-mode-line-update))
+  :group 'tab-bar
+  :version "28.1")
+
+(defcustom tab-bar-new-button-show t
+  "If non-nil, show the \"New tab\" button in the tab bar.
+When this is nil, you can create new tabs with \\[tab-new]."
+  :type 'boolean
+  :initialize 'custom-initialize-default
+  :set (lambda (sym val)
+         (set-default sym val)
+         (force-mode-line-update))
+  :group 'tab-bar
+  :version "27.1")
+(make-obsolete-variable 'tab-bar-new-button-show 'tab-bar-format "28.1")
+
+(defvar tab-bar-new-button " + "
+  "Button for creating a new tab.")
+
+(define-minor-mode tab-bar-history-mode
+  "Toggle tab history mode for the tab bar.
+Tab history mode remembers window configurations used in every tab,
+and can restore them."
+  :global t :group 'tab-bar
+  (require 'icons)
+  (if tab-bar-history-mode
+      (progn
+        (unless (iconp 'tab-bar-back)
+          (define-icon tab-bar-back nil
+            `((image "tabs/left-arrow.xpm"
+                     :margin ,tab-bar-button-margin
+                     :ascent center)
+              (text " < "))
+            "Icon for going back in tab history."
+            :version "29.1"))
+        (setq tab-bar-back-button (icon-string 'tab-bar-back))
+
+        (unless (iconp 'tab-bar-forward)
+          (define-icon tab-bar-forward nil
+            `((image "tabs/right-arrow.xpm"
+                     :margin ,tab-bar-button-margin
+                     :ascent center)
+              (text " > "))
+            "Icon for going forward in tab history."
+            :version "29.1"))
+        (setq tab-bar-forward-button (icon-string 'tab-bar-forward))
+
+        (add-hook 'pre-command-hook 'tab-bar--history-pre-change)
+        (add-hook 'window-configuration-change-hook 'tab-bar--history-change))
+    (remove-hook 'pre-command-hook 'tab-bar--history-pre-change)
+    (remove-hook 'window-configuration-change-hook 'tab-bar--history-change)))
+
+(defvar-local tab-switcher-column 3)
 
 (defun tab-bar--define-keys ()
   "Install key bindings to switch between tabs if so configured."

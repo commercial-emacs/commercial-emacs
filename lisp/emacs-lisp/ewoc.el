@@ -100,6 +100,7 @@
 
 ;; The doubly linked list is implemented as a circular list with a dummy
 ;; node first and last. The dummy node is used as "the dll".
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (ewoc--node
 	    (:type vector)		;ewoc--node-nth needs this
             (:constructor nil)

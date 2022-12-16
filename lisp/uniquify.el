@@ -171,6 +171,7 @@ contains the name of the directory which the buffer is visiting.")
 ;;; Utilities
 
 ;; uniquify-fix-list data structure
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (uniquify-item
 	    (:constructor nil) (:copier nil)
 	    (:constructor uniquify-make-item

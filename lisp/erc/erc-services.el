@@ -5,7 +5,7 @@
 ;; Maintainer: Amin Bandali <bandali@gnu.org>, F. Jason Park <jp@neverwas.me>
 ;; URL: https://www.emacswiki.org/emacs/ErcNickserv
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -455,7 +455,7 @@ it returns nil."
                   (read-passwd
                    (format "NickServ password for %s on %s (RET to cancel): "
                            nick nid)))))
-       ((not (string-empty-p ret))))
+       ((not (string-empty-p (erc--unfun ret)))))
     ret))
 
 (defvar erc-auto-discard-away)
@@ -477,7 +477,8 @@ Returns t if the message could be sent, nil otherwise."
          (msgtype (or (erc-nickserv-alist-ident-command nil nickserv-info)
                       "PRIVMSG")))
     (erc-message msgtype
-                 (concat nickserv " " identify-word " " nick password))))
+                 (concat nickserv " " identify-word " " nick
+                         (erc--unfun password)))))
 
 (defun erc-nickserv-call-identify-function (nickname)
   "Call `erc-nickserv-identify' with NICKNAME."

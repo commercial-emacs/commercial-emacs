@@ -875,6 +875,7 @@ function is `common-lisp-indent-function'."
                                            (syntax-ppss sexp-start))))
         ppss-sexp))))
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (lisp-indent-state
                (:constructor nil)
                (:constructor lisp-indent-initial-state

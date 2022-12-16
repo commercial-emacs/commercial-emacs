@@ -4,7 +4,7 @@
 
 ;; Author: Lars Ingebrigtsen <larsi@gnus.org>
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@
 (require 'ert-x)
 (require 'erc)
 (require 'erc-ring)
-(require 'erc-networks)
 
 (ert-deftest erc--read-time-period ()
   (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "")))
@@ -47,27 +46,6 @@
 
   (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "1d")))
     (should (equal (erc--read-time-period "foo: ") 86400))))
-
-(ert-deftest erc--meta--backend-dependencies ()
-  (with-temp-buffer
-    (insert-file-contents-literally
-     (concat (file-name-sans-extension (symbol-file 'erc)) ".el"))
-    (let ((beg (search-forward ";; Defined in erc-backend"))
-          (end (search-forward "\n\n"))
-          vars)
-      (save-excursion
-        (save-restriction
-          (narrow-to-region beg end)
-          (goto-char (point-min))
-          (with-syntax-table lisp-data-mode-syntax-table
-            (condition-case _
-                (while (push (cadr (read (current-buffer))) vars))
-              (end-of-file)))))
-      (should (= (point) end))
-      (dolist (var vars)
-        (setq var (concat "\\_<" (symbol-name var) "\\_>"))
-        (ert-info (var)
-          (should (save-excursion (search-forward-regexp var nil t))))))))
 
 (ert-deftest erc-with-all-buffers-of-server ()
   (let (proc-exnet
@@ -554,6 +532,28 @@
         (should (looking-at "abc")))))
   (when noninteractive
     (kill-buffer "*#fake*")))
+
+(ert-deftest erc--debug-irc-protocol-mask-secrets ()
+  (should-not erc-debug-irc-protocol)
+  (should erc--debug-irc-protocol-mask-secrets)
+  (with-temp-buffer
+    (setq erc-server-process (start-process "fake" (current-buffer) "true")
+          erc-server-current-nick "tester"
+          erc-session-server "myproxy.localhost"
+          erc-session-port 6667)
+    (let ((inhibit-message noninteractive))
+      (erc-toggle-debug-irc-protocol)
+      (erc-log-irc-protocol
+       (concat "PASS :" (erc--unfun (lambda () "changeme")) "\r\n")
+       'outgoing)
+      (set-process-query-on-exit-flag erc-server-process nil))
+    (with-current-buffer "*erc-protocol*"
+      (goto-char (point-min))
+      (search-forward "\r\n\r\n")
+      (search-forward "myproxy.localhost:6667 >> PASS :????????" (pos-eol)))
+    (when noninteractive
+      (kill-buffer "*erc-protocol*")
+      (should-not erc-debug-irc-protocol))))
 
 (ert-deftest erc-log-irc-protocol ()
   (should-not erc-debug-irc-protocol)

@@ -175,6 +175,7 @@ arguments.  If ARGS is not a list, no argument will be passed."
 ;;;; (interactive <foo>) support function
 ;;;;
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (cvs-qtypedesc
                (:constructor nil) (:copier nil)
                (:constructor cvs-qtypedesc-create

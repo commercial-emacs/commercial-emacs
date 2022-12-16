@@ -63,6 +63,7 @@ Used to detect invalid recursive references.")
 
 ;;; Interned patterns
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (rng--ipattern
                (:constructor nil)
                (:type vector)

@@ -128,14 +128,9 @@
 (require 'macroexp)
 (require 'cconv)
 
-(autoload 'cl-every "cl-extra")
 (autoload 'cl-tailp "cl-extra")
-(autoload 'cl-loop "cl-macs")
-(autoload 'cl-some "cl-extra")
-(autoload 'cl-destructuring-bind "cl-macs")
-(autoload 'cl-find-if "cl-seq")
-(autoload 'cl-labels "cl-macs")
-(autoload 'cl-remove-if "cl-seq")
+(declare-function cl-find-if "cl-seq")
+(declare-function cl-remove-if "cl-seq")
 
 ;; The feature of compiling in a specific target Emacs version
 ;; has been turned off because compile time options are a bad idea.
@@ -597,6 +592,7 @@ Each element is (INDEX . VALUE)")
 ;;   top-level forms as they would be outputted in the .elc file.
 ;;
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct byte-to-native-lambda
   byte-func lap)
 
@@ -5102,15 +5098,8 @@ Use with caution."
         (setq f (car f))
         (if (string-match "elc\\'" f) (setq f (substring f 0 -1)))
         (when (and (file-readable-p f)
-                   (file-newer-than-file-p f emacs-file)
-                   ;; Don't reload the source version of the files below
-                   ;; because that causes subsequent byte-compilation to
-                   ;; be a lot slower and need a higher max-lisp-eval-depth,
-                   ;; so it can cause recompilation to fail.
-                   (not (member (file-name-nondirectory f)
-                                '("pcase.el" "bytecomp.el" "macroexp.el"
-                                  "cconv.el" "byte-opt.el" "comp.el"))))
-          (message "Reloading stale %s" (file-name-nondirectory f))
+                   (file-newer-than-file-p f emacs-file))
+          (message "Loading newer %s over pdumped version" (file-name-nondirectory f))
           (ignore-errors (load f 'noerror nil 'nosuffix )))))))
 
 ;;;###autoload

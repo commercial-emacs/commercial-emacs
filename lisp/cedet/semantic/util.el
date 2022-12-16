@@ -114,6 +114,7 @@ buffer, or a filename.  If SOMETHING is nil return nil."
 	 (require 'semantic/db-mode)
 	 (semanticdb-minor-mode-p)
 	 (progn
+           (declare-function semanticdb-abstract-table--eieio-childp nil)
 	   (cl-typep something 'semanticdb-abstract-table)))
     (semanticdb-refresh-table something)
     (semanticdb-get-tags something))

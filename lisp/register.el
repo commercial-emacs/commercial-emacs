@@ -35,6 +35,7 @@
 
 ;; FIXME: Clean up namespace usage!
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct
   (registerv (:constructor nil)
 	     (:constructor registerv--make (&optional data print-func

@@ -29,6 +29,7 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
+(declare-function cl-remove-if-not "cl-seq")
 
 (declare-function widget-convert "wid-edit" (type &rest args))
 (declare-function shell-mode "shell" ())
@@ -10592,6 +10593,7 @@ to capitalize ARG words."
 
 ;;; Accessors for `decode-time' values.
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (decoded-time
                (:constructor nil)
                (:copier nil)

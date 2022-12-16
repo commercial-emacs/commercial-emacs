@@ -138,6 +138,7 @@ to confuse some users sometimes."
 
 ;; Constructor:
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (cvs-fileinfo
 	    (:constructor nil)
 	    (:copier nil)

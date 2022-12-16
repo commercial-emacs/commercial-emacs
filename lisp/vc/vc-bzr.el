@@ -902,6 +902,7 @@ stream.  Standard error output is discarded."
      (apply #'process-file command nil (list (current-buffer) nil) nil args)
      (buffer-substring (point-min) (point-max)))))
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (vc-bzr-extra-fileinfo
             (:copier nil)
             (:constructor vc-bzr-create-extra-fileinfo (extra-name))

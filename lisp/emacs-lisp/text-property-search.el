@@ -26,6 +26,7 @@
 
 (eval-when-compile (require 'cl-lib))
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (prop-match)
   beginning end value)
 

@@ -31,6 +31,7 @@
 
 ;; If you change this structure, you also have to change `timerp'
 ;; (below) and decode_timer in keyboard.c.
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (timer
                (:constructor nil)
                (:copier nil)

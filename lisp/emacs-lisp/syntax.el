@@ -50,6 +50,7 @@ either a cons (NEW-START . NEW-END) or nil if no adjustment should be made.
 These functions are run in turn repeatedly until they all return nil.
 Put first the functions more likely to cause a change and cheaper to compute.")
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (ppss
                (:constructor make-ppss)
                (:copier nil)

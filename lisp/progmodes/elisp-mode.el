@@ -1182,6 +1182,7 @@ namespace but with lower confidence."
                                                          (eql 'elisp)))
   elisp--xref-identifier-completion-table)
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (xref-elisp-location
                (:constructor xref-make-elisp-location (symbol type file)))
   "Location of an Emacs Lisp symbol definition."

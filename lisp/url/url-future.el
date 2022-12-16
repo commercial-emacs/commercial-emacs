@@ -42,6 +42,7 @@
 
 (eval-when-compile (require 'cl-lib))
 
+(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct url-future callback errorback status value)
 
 (define-inline url-future-done-p (url-future)

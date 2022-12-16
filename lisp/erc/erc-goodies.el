@@ -8,7 +8,7 @@
 ;; Most code is taken verbatim from erc.el, see there for the original
 ;; authors.
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -31,17 +31,21 @@
 
 ;;; Imenu support
 
-(require 'erc-backend)
-(defvar erc--target)
-(defvar erc-reuse-buffers)
-(defvar erc-rename-buffers)
-(defvar erc-input-marker)
-(defvar erc-insert-marker)
-(defvar erc-kill-server-hook)
-(defvar erc-kill-buffer-hook)
-(defvar erc-modules)
+(eval-when-compile (require 'cl-lib))
+(require 'erc-common)
+
 (defvar erc-controls-highlight-regexp)
 (defvar erc-controls-remove-regexp)
+(defvar erc-input-marker)
+(defvar erc-insert-marker)
+(defvar erc-server-process)
+(defvar erc-modules)
+(defvar erc-log-p)
+
+(declare-function erc-buffer-list "erc" (&optional predicate proc))
+(declare-function erc-error "erc" (&rest args))
+(declare-function erc-extract-command-from-line "erc" (line))
+(declare-function erc-beg-of-input-line "erc" nil)
 
 (defun erc-imenu-setup ()
   "Setup Imenu support in an ERC buffer."
@@ -156,7 +160,6 @@ Put this function on `erc-insert-post-hook' and/or `erc-send-post-hook'."
   ((add-hook 'erc-insert-pre-hook  #'erc-keep-place))
   ((remove-hook 'erc-insert-pre-hook  #'erc-keep-place)))
 
-(declare-function erc-beg-of-input-line "erc")
 (defun erc-keep-place (_ignored)
   "Move point away from the last line in a non-selected ERC buffer."
   (when (and (not (eq (window-buffer (selected-window))
@@ -197,8 +200,6 @@ themselves."
   ((add-hook 'erc-pre-send-functions #'erc-send-distinguish-noncommands))
   ((remove-hook 'erc-pre-send-functions #'erc-send-distinguish-noncommands)))
 
-(declare-function erc-extract-command-from-line "erc")
-(declare-function erc-input-string "erc")
 (defun erc-send-distinguish-noncommands (state)
   "If STR is an ERC non-command, set `insertp' in STATE to nil."
   (let* ((string (erc-input-string state))
@@ -352,8 +353,6 @@ The value `erc-interpret-controls-p' must also be t for this to work."
   "ERC face."
   :group 'erc-faces)
 
-(declare-function erc-log "erc")
-(declare-function erc-error "erc")
 (defun erc-get-bg-color-face (n)
   "Fetches the right face for background color N (0-15)."
   (if (stringp n) (setq n (string-to-number n)))
@@ -597,7 +596,6 @@ See also `unmorse-region'."
       (unmorse-region (point-min) (point-max)))))
 
 ;;; erc-occur
-(declare-function erc-buffer-list "erc")
 (defun erc-occur (string &optional proc)
   "Search for STRING in all buffers related to current server.
 If called interactively and prefix argument is given, search on all connected

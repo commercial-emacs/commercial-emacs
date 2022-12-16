@@ -152,6 +152,8 @@
 (defun oclosure--slot-mutable-p (slotdesc)
   (not (alist-get :read-only (cl--slot-descriptor-props slotdesc))))
 
+(declare-function cl--arglist-args "cl-macs")
+(declare-function cl--defsubst-expand "cl-macs")
 (defun oclosure--defstruct-make-copiers (copiers slotdescs name)
   (require 'cl-macs)            ;`cl--arglist-args' is not autoloaded.
   (let* ((mutables '())
