@@ -1450,7 +1450,8 @@ that means treat it as not defined."
            (and (not (memq f byte-compile--defined-funcs))
                 (memq f byte-compile--noruntime-funcs))
            ;; cl-lib function without require of cl-lib (Bug#30635)
-           (and (boundp 'cldefs-cl-lib-functions)
+           (and (not (assq f byte-compile-function-environment))
+                (boundp 'cldefs-cl-lib-functions)
                 (memq f cldefs-cl-lib-functions)
                 (cl-every (lambda (cl)
                             (not (memq cl byte-compile--seen-requires)))
@@ -2576,8 +2577,9 @@ in the input buffer (now current), not in the output buffer."
 (put 'internal--with-suppressed-warnings 'byte-hunk-handler
      'byte-compile-file-form-with-suppressed-warnings)
 (defun byte-compile-file-form-with-suppressed-warnings (form)
+  "FORM is (internal--with-suppressed-warnings (quote warnings) body)."
   (let ((byte-compile--suppressed-warnings
-         (append (cadadr form) byte-compile--suppressed-warnings)))
+         (append (eval (cl-second form)) byte-compile--suppressed-warnings)))
     (byte-compile-file-form-progn (cdr form))))
 
 ;; Automatically evaluate define-obsolete-function-alias etc at top-level.
@@ -4752,8 +4754,9 @@ longer need to hew to its rules)."
 (byte-defop-compiler-1 internal--with-suppressed-warnings
                        byte-compile-suppressed-warnings)
 (defun byte-compile-suppressed-warnings (form)
+  "FORM is (internal--with-suppressed-warnings (quote warnings) body)."
   (let ((byte-compile--suppressed-warnings
-         (append (cadadr form) byte-compile--suppressed-warnings)))
+         (append (eval (cl-second form)) byte-compile--suppressed-warnings)))
     (byte-compile-form (macroexp-progn (cddr form)))))
 
 ;; Warn about misuses of make-variable-buffer-local.

@@ -392,9 +392,7 @@ If START or END is negative, it counts from the end."
 (cond ((fboundp 'browse-url-irc)) ; 29
       ((boundp 'browse-url-default-handlers) ; 28
        (setf (alist-get "\\`irc6?s?://" browse-url-default-handlers
-                        nil nil (lambda (a _)
-                                  (and (stringp a)
-                                       (string-match-p a "irc://localhost"))))
+                        nil nil #'equal)
              #'erc-compat--29-browse-url-irc))
       ((boundp 'browse-url-browser-function) ; 27
        (require 'browse-url)

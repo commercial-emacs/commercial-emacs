@@ -43,6 +43,7 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
+(declare-function cl-search "cl-seq")
 
 ;;; User variables:
 

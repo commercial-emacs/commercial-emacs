@@ -2348,6 +2348,23 @@ but you won't see it.
 WARNING: Do not set this variable directly!  Instead, use the
 function `erc-toggle-debug-irc-protocol' to toggle its value.")
 
+(defvar erc--debug-irc-protocol-mask-secrets t
+  "Whether to hide secrets in a debug log.
+They are still visible on screen but are replaced by question
+marks when yanked.")
+
+(defun erc--mask-secrets (string)
+  (when-let* ((eot (length string))
+              (beg (text-property-any 0 eot 'erc-secret t string))
+              (end (text-property-not-all beg eot 'erc-secret t string))
+              (sec (substring string beg end)))
+    (setq string (concat (substring string 0 beg)
+                         (make-string 10 ??)
+                         (substring string end eot)))
+    (put-text-property beg (+ 10 beg) 'face 'erc-inverse-face string)
+    (put-text-property beg (+ 10 beg) 'display sec string))
+  string)
+
 (defun erc-log-irc-protocol (string &optional outbound)
   "Append STRING to the buffer *erc-protocol*.
 
@@ -6357,6 +6374,15 @@ user input."
       (setq lines (cdr lines)))))
 
 ;; authentication
+
+(defun erc--unfun (maybe-fn)
+  "Return MAYBE-FN or whatever it returns."
+  (let ((s (if (functionp maybe-fn) (funcall maybe-fn) maybe-fn)))
+    (when (and erc-debug-irc-protocol
+               erc--debug-irc-protocol-mask-secrets
+               (stringp s))
+      (put-text-property 0 (length s) 'erc-secret t s))
+    s))
 
 (defun erc-login ()
   "Perform user authentication at the IRC server."

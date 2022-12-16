@@ -777,7 +777,6 @@ MATCHER is used to find a corresponding network to a server while
 Also shared among all target buffers for a given connection.  See
 \\[describe-symbol] `erc-networks--id' for more.")
 
-(declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct erc-networks--id
   "Persistent identifying info for a network presence.
 
