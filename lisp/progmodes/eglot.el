@@ -183,12 +183,12 @@ chosen (interactively or automatically)."
                       finally (funcall err)))))))
 
 (defvar eglot-server-programs `((rust-mode . ,(eglot-alternatives '("rust-analyzer" "rls")))
-                                ((cmake-mode cmake-ts-mode) . ("cmake-language-server"))
+                                ((cmake-ts-mode cmake-mode) . ("cmake-language-server"))
                                 (vimrc-mode . ("vim-language-server" "--stdio"))
                                 ((python-mode python-ts-mode)
                                  . ,(eglot-alternatives
                                      '("pylsp" "pyls" ("pyright-langserver" "--stdio") "jedi-language-server")))
-                                ((js-json-mode json-mode json-ts-mode)
+                                ((js-json-mode json-ts-mode json-mode)
                                  . ,(eglot-alternatives '(("vscode-json-language-server" "--stdio")
                                                           ("json-languageserver" "--stdio"))))
                                 ((js-mode js-ts-mode tsx-ts-mode typescript-ts-mode typescript-mode)
@@ -211,7 +211,7 @@ chosen (interactively or automatically)."
                                 (elm-mode . ("elm-language-server"))
                                 (mint-mode . ("mint" "ls"))
                                 (kotlin-mode . ("kotlin-language-server"))
-                                ((go-mode go-dot-mod-mode go-dot-work-mode go-ts-mode go-mod-ts-mode)
+                                ((go-ts-mode go-mod-ts-mode go-mode go-dot-mod-mode go-dot-work-mode)
                                  . ("gopls"))
                                 ((R-mode ess-r-mode) . ("R" "--slave" "-e"
                                                         "languageserver::run()"))
@@ -237,7 +237,7 @@ chosen (interactively or automatically)."
                                  . ,(eglot-alternatives '(("vscode-css-language-server" "--stdio")
                                                           ("css-languageserver" "--stdio"))))
                                 (html-mode . ,(eglot-alternatives '(("vscode-html-language-server" "--stdio") ("html-languageserver" "--stdio"))))
-                                ((dockerfile-mode dockerfile-ts-mode) . ("docker-langserver" "--stdio"))
+                                ((dockerfile-ts-mode dockerfile-mode) . ("docker-langserver" "--stdio"))
                                 ((clojure-mode clojurescript-mode clojurec-mode)
                                  . ("clojure-lsp"))
                                 ((csharp-mode csharp-ts-mode)
