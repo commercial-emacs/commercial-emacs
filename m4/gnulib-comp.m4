@@ -151,6 +151,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module memmem-simple:
   # Code from module mempcpy:
   # Code from module memrchr:
+  # Code from module memset_explicit:
   # Code from module minmax:
   # Code from module mkostemp:
   # Code from module mktime:
@@ -325,12 +326,6 @@ AC_DEFUN([gl_INIT],
   gl_CONDITIONAL_HEADER([execinfo.h])
   AC_PROG_MKDIR_P
   gl_CONDITIONAL([GL_COND_OBJ_EXECINFO], [$GL_GENERATE_EXECINFO_H])
-  gl_FUNC_EXPLICIT_BZERO
-  gl_CONDITIONAL([GL_COND_OBJ_EXPLICIT_BZERO], [test $HAVE_EXPLICIT_BZERO = 0])
-  AM_COND_IF([GL_COND_OBJ_EXPLICIT_BZERO], [
-    gl_PREREQ_EXPLICIT_BZERO
-  ])
-  gl_STRING_MODULE_INDICATOR([explicit_bzero])
   AC_REQUIRE([gl_EXTERN_INLINE])
   gl_FUNC_FACCESSAT
   gl_CONDITIONAL([GL_COND_OBJ_FACCESSAT],
@@ -502,6 +497,12 @@ AC_DEFUN([gl_INIT],
     gl_PREREQ_MEMRCHR
   ])
   gl_STRING_MODULE_INDICATOR([memrchr])
+  gl_FUNC_MEMSET_EXPLICIT
+  gl_CONDITIONAL([GL_COND_OBJ_MEMSET_EXPLICIT], [test $HAVE_MEMSET_EXPLICIT = 0])
+  AM_COND_IF([GL_COND_OBJ_MEMSET_EXPLICIT], [
+    gl_PREREQ_MEMSET_EXPLICIT
+  ])
+  gl_STRING_MODULE_INDICATOR([memset_explicit])
   gl_MINMAX
   gl_FUNC_MKOSTEMP
   gl_CONDITIONAL([GL_COND_OBJ_MKOSTEMP], [test $HAVE_MKOSTEMP = 0])
@@ -1422,6 +1423,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/memmem.c
   lib/mempcpy.c
   lib/memrchr.c
+  lib/memset_explicit.c
   lib/mini-gmp-gnulib.c
   lib/mini-gmp.c
   lib/mini-gmp.h
@@ -1600,6 +1602,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/memmem.m4
   m4/mempcpy.m4
   m4/memrchr.m4
+  m4/memset_explicit.m4
   m4/minmax.m4
   m4/mkostemp.m4
   m4/mktime.m4
