@@ -1932,7 +1932,7 @@ After updating a displayed Proced buffer run the normal hook
     ;; Sometimes this puts point in the middle of the proced buffer
     ;; where it is not interesting.  Is there a better / more flexible solution?
     (goto-char (point-min))
-    (let (pid mark new-pos)
+    (let (pid mark new-pos pt)
       (if (or mp-list (car old-pos))
           (while (not (eobp))
             (setq pid (proced-pid-at-point))
@@ -1940,6 +1940,7 @@ After updating a displayed Proced buffer run the normal hook
               (insert (cdr mark))
               (delete-char 1)
               (beginning-of-line))
+            (setq pt (point))
             (when (eq (car old-pos) pid)
               (if (nth 1 old-pos)
                   (let ((limit (line-end-position)) pos)
@@ -1958,6 +1959,7 @@ After updating a displayed Proced buffer run the normal hook
                       (setq new-pos (proced-move-to-goal-column))))
                 (setq new-pos (min (+ (line-beginning-position) (nth 2 old-pos))
                                    (line-end-position)))))
+            (goto-char (max (point) pt))
             (forward-line)))
       (if new-pos
           (goto-char new-pos)
