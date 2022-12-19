@@ -85,7 +85,8 @@
 (ert-deftest test-setopt ()
   (should (= (setopt cus-edit-test-foo1 1) 1))
   (should (= cus-edit-test-foo1 1))
-  (should-error (setopt cus-edit-test-foo1 :foo)))
+  (cl-letf (((symbol-function 'warn) #'user-error))
+    (should-error (setopt cus-edit-test-foo1 :foo))))
 
 (provide 'cus-edit-tests)
 ;;; cus-edit-tests.el ends here
