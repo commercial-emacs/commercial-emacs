@@ -4142,7 +4142,8 @@ valid_lisp_object_p (Lisp_Object obj)
       if (valid <= 0)
 	return valid;
 
-      if (SUBRP (obj))
+      /* Strings and conses produced by AUTO_STRING etc. all get here.  */
+      if (SUBRP (obj) || STRINGP (obj) || CONSP (obj))
 	return 1;
 
       return 0;
