@@ -70,6 +70,37 @@
 #include <valgrind/memcheck.h>
 #endif
 
+/* AddressSanitizer exposes additional functions for manually marking
+   memory as poisoned/unpoisoned.  When ASan is enabled and the needed
+   header is available, memory is poisoned when:
+
+   * An ablock is freed (lisp_align_free), or ablocks are initially
+   allocated (lisp_align_malloc).
+   * An interval_block is initially allocated (make_interval).
+   * A dead INTERVAL is put on the interval free list
+   (sweep_intervals).
+   * A sdata is marked as dead (sweep_strings, pin_string).
+   * An sblock is initially allocated (allocate_string_data).
+   * A string_block is initially allocated (allocate_string).
+   * A dead string is put on string_free_list (sweep_strings).
+   * A float_block is initially allocated (make_float).
+   * A dead float is put on float_free_list.
+   * A cons_block is initially allocated (Fcons).
+   * A dead cons is put on cons_free_list (sweep_cons).
+   * A dead vector is put on vector_free_list (setup_on_free_list),
+   or a new vector block is allocated (allocate_vector_from_block).
+   Accordingly, objects reused from the free list are unpoisoned.
+
+   This feature can be disabled wtih the run-time flag
+   `allow_user_poisoning' set to zero.  */
+#if ADDRESS_SANITIZER && defined HAVE_SANITIZER_ASAN_INTERFACE_H \
+  && !defined GC_ASAN_POISON_OBJECTS
+# define GC_ASAN_POISON_OBJECTS 1
+# include <sanitizer/asan_interface.h>
+#else
+# define GC_ASAN_POISON_OBJECTS 0
+#endif
+
 /* GC_CHECK_MARKED_OBJECTS means do sanity checks on allocated objects.
    We turn that on by default when ENABLE_CHECKING is defined;
    define GC_CHECK_MARKED_OBJECTS to zero to disable.  */
