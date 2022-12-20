@@ -1030,30 +1030,39 @@ It is based on `log-edit-mode', and has Git-specific extensions."
         (with-temp-buffer
           (vc-git-command (current-buffer) t nil "diff" "--cached")
           (goto-char (point-min))
-          (let ((pos (point)) file-diff file-beg)
+          (let ((pos (point)) file-name file-diff file-beg)
             (while (not (eobp))
+              (when (and (looking-at "^diff --git a/\\(.+\\) b/\\(.+\\)")
+                         (string= (match-string 1) (match-string 2)))
+                (setq file-name (match-string 1)))
               (forward-line 1) ; skip current "diff --git" line
               (search-forward "diff --git" nil 'move)
               (move-beginning-of-line 1)
               (setq file-diff (buffer-substring pos (point)))
-              (if (and (setq file-beg (string-search
-                                       file-diff vc-git-patch-string))
-                       ;; Check that file diff ends with an empty string
-                       ;; or the beginning of the next file diff.
-                       (string-match-p "\\`\\'\\|\\`diff --git"
-                                       (substring
-                                        vc-git-patch-string
-                                        (+ file-beg (length file-diff)))))
-                  (setq vc-git-patch-string
-                        (string-replace file-diff "" vc-git-patch-string))
-                (user-error "Index not empty"))
+              (cond ((and (setq file-beg (string-search
+                                          file-diff vc-git-patch-string))
+                          ;; Check that file diff ends with an empty string
+                          ;; or the beginning of the next file diff.
+                          (string-match-p "\\`\\'\\|\\`diff --git"
+                                          (substring
+                                           vc-git-patch-string
+                                           (+ file-beg (length file-diff)))))
+                     (setq vc-git-patch-string
+                           (string-replace file-diff "" vc-git-patch-string)))
+                    ((and file-name
+                          (yes-or-no-p
+                           (format "Unstage already-staged changes to %s?"
+                                   file-name)))
+                     (vc-git-command nil 0 file-name "reset" "-q" "--"))
+                    (t (user-error "Index not empty")))
               (setq pos (point))))))
-      (let ((patch-file (make-nearby-temp-file "git-patch")))
-        (with-temp-file patch-file
-          (insert vc-git-patch-string))
-        (unwind-protect
-            (vc-git-command nil 0 patch-file "apply" "--cached")
-          (delete-file patch-file))))
+      (unless (string-empty-p vc-git-patch-string)
+        (let ((patch-file (make-nearby-temp-file "git-patch")))
+          (with-temp-file patch-file
+            (insert vc-git-patch-string))
+          (unwind-protect
+              (vc-git-command nil 0 patch-file "apply" "--cached")
+            (delete-file patch-file)))))
     (cl-flet ((boolean-arg-fn
                (argument)
                (lambda (value) (when (equal value "yes") (list argument)))))
