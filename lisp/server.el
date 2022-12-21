@@ -826,17 +826,12 @@ Server mode runs a process that accepts commands from the
   ;; Fixme: Should this check for an existing server socket and do
   ;; nothing if there is one (for multiple Emacs sessions)?
   (server-start (not server-mode)))
-
+
 (defun server-eval-and-print (expr proc)
   "Eval EXPR and send the result back to client PROC."
-  ;; While we're running asynchronously (from a process filter), it is likely
-  ;; that the emacsclient command was run in response to a user
-  ;; action, so the user probably knows that Emacs is processing this
-  ;; emacsclient request, so if we get a C-g it's likely that the user
-  ;; intended it to interrupt us rather than interrupt whatever Emacs
-  ;; was doing before it started handling the process filter.
-  ;; Hence `with-local-quit' (bug#6585).
   (let ((v (with-local-quit (eval (car (read-from-string expr)) t))))
+    ;; with-local-quit to interrupt this emacsclient request, and not
+    ;; whatever Emacs was doing before it (Bug#6585).
     (when proc
       (with-temp-buffer
         (let ((standard-output (current-buffer)))
@@ -1631,7 +1626,7 @@ Designed to be added to `kill-buffer-hook'."
 	   (let ((server-kill-buffer-running t))
 	     (when server-process
 	       (server-buffer-done (current-buffer) t))))))
-
+
 (defun server-edit (&optional arg)
   "Switch to next server editing buffer; say \"Done\" for current buffer.
 If a server buffer is current, it is marked \"done\" and optionally saved.
@@ -1955,7 +1950,7 @@ returns the process ID of the Emacs instance running \"server\"."
 	    (read (decode-coding-string (server-unquote-arg answer)
 					'emacs-internal)))))))
 
-
+
 (provide 'server)
 
 ;;; server.el ends here
