@@ -64,6 +64,12 @@ buffer's content."
     (whitespace-cleanup)
     (buffer-string)))
 
+(ert-deftest whitespace-tests--clear-markers ()
+  (whitespace-tests--with-test-buffer '(face empty)
+    (whitespace-mode -1)
+    (should (null (marker-buffer whitespace-bob-marker)))
+    (should (null (marker-buffer whitespace-eob-marker)))))
+
 (ert-deftest whitespace-cleanup-eob ()
   (let ((whitespace-style '(empty)))
     (should (equal (whitespace-tests--cleanup-string "a\n")

@@ -2220,7 +2220,9 @@ resultant list will be returned."
     (remove-hook 'clone-buffer-hook #'whitespace--clone t)
     (remove-hook 'clone-indirect-buffer-hook #'whitespace--clone t)
     (font-lock-remove-keywords nil whitespace-font-lock-keywords)
-    (font-lock-flush)))
+    (font-lock-flush)
+    (set-marker whitespace-bob-marker nil)
+    (set-marker whitespace-eob-marker nil)))
 
 (defun whitespace-point--used (start end)
   (let ((ostart (overlay-start whitespace-point--used)))
