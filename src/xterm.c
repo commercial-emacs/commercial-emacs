@@ -28314,7 +28314,10 @@ x_make_frame_invisible (struct frame *f)
 	error ("Can't notify window manager of window withdrawal");
       }
 
-  XSync (FRAME_X_DISPLAY (f), False);
+  /* Don't perform the synchronization if the network connection is
+     slow, and the user says it is unwanted.  */
+  if (NILP (Vx_lax_frame_positioning))
+    XSync (FRAME_X_DISPLAY (f), False);
 
   /* We can't distinguish this from iconification
      just by the event that we get from the server.
@@ -28325,8 +28328,7 @@ x_make_frame_invisible (struct frame *f)
   SET_FRAME_ICONIFIED (f, false);
 
   if (CONSP (frame_size_history))
-    frame_size_history_plain
-      (f, build_string ("x_make_frame_invisible"));
+    frame_size_history_plain (f, build_string ("x_make_frame_invisible"));
 
   unblock_input ();
 }
@@ -31853,6 +31855,7 @@ too slow, which is usually true when the X server is located over a
 network connection with high latency.  Doing so will make frame
 creation and placement faster at the cost of reducing the accuracy of
 frame placement via frame parameters, `set-frame-position', and
-`set-frame-size'.  */);
+`set-frame-size', along with the actual state of a frame after
+`x_make_frame_invisible'.  */);
   Vx_lax_frame_positioning = Qnil;
 }
