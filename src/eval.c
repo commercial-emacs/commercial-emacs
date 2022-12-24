@@ -1371,7 +1371,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 	error ("Invalid condition handler: %s",
 	       SDATA (Fprin1_to_string (tem, Qt, Qnil)));
       if (CONSP (tem) && EQ (XCAR (tem), QCsuccess))
-	success_handler = XCDR (tem);
+	success_handler = tem;
       else
 	clausenb++;
     }
@@ -1434,7 +1434,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
   if (!NILP (success_handler))
     {
       if (NILP (var))
-	return Fprogn (success_handler);
+	return Fprogn (XCDR (success_handler));
 
       Lisp_Object handler_var = var;
       if (!NILP (Vinternal_interpreter_environment))
@@ -1446,7 +1446,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 
       specpdl_ref count = SPECPDL_INDEX ();
       specbind (handler_var, result);
-      return unbind_to (count, Fprogn (success_handler));
+      return unbind_to (count, Fprogn (XCDR (success_handler)));
     }
   return result;
 }
