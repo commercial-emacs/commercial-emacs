@@ -4943,6 +4943,7 @@ AC_CACHE_CHECK([whether signals can be handled on alternate stack],
 	       [emacs_cv_alternate_stack],
   [AC_COMPILE_IFELSE(
      [AC_LANG_PROGRAM([[#include <signal.h>
+			#include <stdlib.h>
 		      ]],
 		      [[stack_t ss;
 			struct sigaction sa;
