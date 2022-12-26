@@ -955,6 +955,13 @@ Note that you can still configure the excluded Emacs features manually
 to use Eglot in your @code{eglot-managed-mode-hook} or via some other
 mechanism.
 
+@vindex eglot-use-diffs
+@item eglot-use-diffs
+If this option is enabled, any server modifications (renames, code
+actions, refactoring, @dots{}) will be presented as diffs that the
+user can selectively apply.  The default is that all modifications are
+made in place.
+
 @vindex eglot-report-progress
 @cindex progress
 @item eglot-report-progress

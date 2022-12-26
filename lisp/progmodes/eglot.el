@@ -111,6 +111,8 @@
 (require 'ert)
 (require 'array)
 (require 'external-completion)
+(require 'diff-mode)
+(require 'diff)
 
 ;; ElDoc is preloaded in Emacs, so `require'-ing won't guarantee we are
 ;; using the latest version from GNU Elpa when we load eglot.el.  Use an
@@ -3160,6 +3162,11 @@ Returns a list as described in docstring of `imenu--index-alist'."
       (undo-amalgamate-change-group change-group)
       (progress-reporter-done reporter))))
 
+(defcustom eglot-use-diffs nil
+  "Non-nil means that server changes are presented as diffs."
+  :type 'boolean
+  :version "30.1")
+
 (defun eglot--apply-workspace-edit (wedit &optional confirm)
   "Apply the workspace edit WEDIT.  If CONFIRM, ask user first."
   (eglot--dbind ((WorkspaceEdit) changes documentChanges) wedit
@@ -3175,18 +3182,41 @@ Returns a list as described in docstring of `imenu--index-alist'."
         ;; prefer documentChanges over changes.
         (cl-loop for (uri edits) on changes by #'cddr
                  do (push (list (eglot--uri-to-path uri) edits) prepared)))
-      (if (or confirm
-              (cl-notevery #'find-buffer-visiting
-                           (mapcar #'car prepared)))
-          (unless (y-or-n-p
-                   (format "[eglot] Server wants to edit:\n  %s\n Proceed? "
-                           (mapconcat #'identity (mapcar #'car prepared) "\n  ")))
-            (jsonrpc-error "User canceled server edit")))
-      (cl-loop for edit in prepared
-               for (path edits version) = edit
-               do (with-current-buffer (find-file-noselect path)
-                    (eglot--apply-text-edits edits version))
-               finally (eldoc) (eglot--message "Edit successful!")))))
+      (if eglot-use-diffs
+          (with-current-buffer (get-buffer-create " *Server Changes*")
+            (buffer-disable-undo (current-buffer))
+            (let ((buffer-read-only t))
+              (diff-mode))
+            (let ((inhibit-read-only t)
+                  (target (current-buffer)))
+              (erase-buffer)
+              (pcase-dolist (`(,path ,edits ,_) prepared)
+                (with-temp-buffer
+                  (let ((diff (current-buffer)))
+                    (with-temp-buffer
+                      (insert-file-contents path)
+                      (eglot--apply-text-edits edits)
+                      (diff-no-select path (current-buffer)
+                                      nil t diff))
+                    (with-current-buffer target
+                      (insert-buffer-substring diff))))))
+            (setq-local buffer-read-only t)
+            (buffer-enable-undo (current-buffer))
+            (goto-char (point-min))
+            (pop-to-buffer (current-buffer))
+            (font-lock-ensure))
+        (if (or confirm
+                (cl-notevery #'find-buffer-visiting
+                             (mapcar #'car prepared)))
+            (unless (y-or-n-p
+                     (format "[eglot] Server wants to edit:\n  %s\n Proceed? "
+                             (mapconcat #'identity (mapcar #'car prepared) "\n  ")))
+              (jsonrpc-error "User canceled server edit")))
+        (cl-loop for edit in prepared
+                 for (path edits version) = edit
+                 do (with-current-buffer (find-file-noselect path)
+                      (eglot--apply-text-edits edits version))
+                 finally (eldoc) (eglot--message "Edit successful!"))))))
 
 (defun eglot-rename (newname)
   "Rename the current symbol to NEWNAME."
