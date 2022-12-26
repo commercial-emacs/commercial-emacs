@@ -524,6 +524,12 @@ Translate morse code in messages
 
 @end table
 
+Note that one module, @code{networks} (from the library
+@file{erc-networks}), is essential to core IRC operations and thus not
+listed above.  It can nevertheless still be removed, just like any
+other module.  However, doing so without taking special precautions
+will likely degrade the overall user experience.
+
 @subheading Local Modules
 @cindex local modules
 

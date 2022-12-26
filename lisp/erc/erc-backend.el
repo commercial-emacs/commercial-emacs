@@ -119,6 +119,7 @@
 (defvar erc-log-p)
 (defvar erc-minibuffer-ignored)
 (defvar erc-networks--id)
+(defvar erc-networks-mode)
 (defvar erc-nick)
 (defvar erc-nick-change-attempt-count)
 (defvar erc-prompt-for-channel-key)
@@ -696,6 +697,11 @@ TLS (see `erc-session-client-certificate' for more details)."
     (message "%s" (erc-format-message
                    'login ?n
                    (with-current-buffer buffer (erc-current-nick))))
+    (unless erc-networks-mode
+      (setq msg (concat "Required module `networks' not loaded.  If this "
+                        " was unexpected, please add it to `erc-modules'."))
+      (erc-display-error-notice nil msg)
+      (lwarn 'erc :warning msg))
     ;; wait with script loading until we receive a confirmation (first
     ;; MOTD line)
     (if (eq (process-status process) 'connect)
