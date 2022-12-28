@@ -905,7 +905,8 @@ If there are no proced buffers, cancel the timer."
   (unless (seq-filter (lambda (buf)
                         (with-current-buffer buf
                           (when (eq major-mode 'proced-mode)
-                            (if proced-auto-update-flag
+                            (if (and proced-auto-update-flag
+                                     (get-buffer-window buf t))
                                 (proced-update t t))
                             t)))
                       (buffer-list))
@@ -1988,7 +1989,13 @@ After updating a displayed Proced buffer run the normal hook
     ;; done
     (or quiet (input-pending-p)
         (message (if revert "Updating process information...done."
-                   "Updating process display...done.")))))
+                   "Updating process display...done."))))
+  ;; This sets the window point for all windows displaying the Proced buffer
+  ;; which means all windows will have their point set to the most recently
+  ;; visited window displaying the buffer.  Possibly we could save all window
+  ;; points ahead of time, though this is more complicated.
+  (mapc (lambda (win) (set-window-point win (point)))
+        (get-buffer-window-list (current-buffer))))
 
 (defun proced-revert (&rest _args)
   "Reevaluate the process listing based on the currently running processes.
