@@ -991,6 +991,7 @@ Return (MANAGED-MODE PROJECT CLASS CONTACT LANG-ID).  If INTERACTIVE is
 non-nil, maybe prompt user, else error as soon as something can't
 be guessed."
   (let* ((guessed-mode (if buffer-file-name major-mode))
+         (guessed-mode-name (and guessed-mode (symbol-name guessed-mode)))
          (main-mode
           (cond
            ((and interactive
@@ -998,9 +999,10 @@ be guessed."
                      (not guessed-mode)))
             (intern
              (completing-read
-              "[eglot] Start a server to manage buffers of what major mode? "
-              (mapcar #'symbol-name (eglot--all-major-modes)) nil t
-              (symbol-name guessed-mode) nil (symbol-name guessed-mode) nil)))
+              (format-prompt "Start LSP server for major mode"
+                             guessed-mode-name)
+              (mapcar #'symbol-name (eglot--all-major-modes))
+              nil t nil nil guessed-mode-name nil)))
            ((not guessed-mode)
             (eglot--error "Can't guess mode to manage for `%s'" (current-buffer)))
            (t guessed-mode)))
