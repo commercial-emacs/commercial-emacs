@@ -299,7 +299,8 @@ The information is logged to `byte-compile-log-buffer'."
   '(redefine callargs free-vars unresolved
              obsolete noruntime interactive-only
              make-local mapcar constants suspicious lexical lexical-dynamic
-             docstrings docstrings-non-ascii-quotes not-unused)
+             docstrings docstrings-non-ascii-quotes not-unused
+             empty-body)
   "The list of warning types used when `byte-compile-warnings' is t.")
 (defcustom byte-compile-warnings t
   "List of warnings that the byte-compiler should issue (t for almost all).
@@ -330,6 +331,7 @@ Elements of the list may be:
   docstrings-non-ascii-quotes docstrings that have non-ASCII quotes.
                               This depends on the `docstrings' warning type.
   suspicious  constructs that usually don't do what the coder wanted.
+  empty-body  body argument to a special form or macro is empty.
 
 If the list begins with `not', then the remaining elements specify warnings to
 suppress.  For example, (not mapcar) will suppress warnings about mapcar.
