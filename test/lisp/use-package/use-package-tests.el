@@ -1951,6 +1951,52 @@
     (should (eq (nth 1 binding) 'ignore))
     (should (eq (nth 2 binding) nil))))
 
+(ert-deftest use-package-test/:vc-1 ()
+  (match-expansion
+   (use-package foo :vc (:url "bar"))
+   `(unless (package-installed-p 'foo)
+      (package-vc-install '(foo :url "bar") nil))))
+
+(ert-deftest use-package-test/:vc-2 ()
+  (match-expansion
+   (use-package foo
+     :vc (baz . (:url "baz" :vc-backend "Git"
+                 :main-file qux.el :rev "rev-string")))
+   `(unless (package-installed-p 'baz)
+      (package-vc-install '(baz :url "baz" :vc-backend Git :main-file "qux.el")
+                          "rev-string"))))
+
+(ert-deftest use-package-test/:vc-3 ()
+  (match-expansion
+   (use-package foo :vc (bar . "baz"))
+   `(unless (package-installed-p 'bar)
+      (package-vc-install '(bar . "baz") nil))))
+
+(ert-deftest use-package-test/:vc-4 ()
+  (let ((load-path? '(pred (apply-partially
+                            #'string=
+                            (expand-file-name "bar" user-emacs-directory)))))
+    (match-expansion
+     (use-package foo :vc other-name :load-path "bar")
+     `(progn (eval-and-compile
+               (add-to-list 'load-path ,load-path?))
+             (unless (package-installed-p 'other-name)
+               (package-vc-install-from-checkout ,load-path? "other-name"))))))
+
+(ert-deftest use-package-test-normalize/:vc ()
+  (should (equal '(foo "version-string")
+                 (use-package-normalize/:vc 'foo :vc '("version-string"))))
+  (should (equal '(bar "version-string")
+                 (use-package-normalize/:vc 'foo :vc '((bar . "version-string")))))
+  (should (equal '(foo (:url "bar") "baz")
+                 (use-package-normalize/:vc 'foo :vc '((:url "bar" :rev "baz")))))
+  (should (equal '(foo)
+                 (use-package-normalize/:vc 'foo :vc '(t))))
+  (should (equal '(foo)
+                 (use-package-normalize/:vc 'foo :vc nil)))
+  (should (equal '(bar)
+                 (use-package-normalize/:vc 'foo :vc '(bar)))))
+
 ;; Local Variables:
 ;; no-byte-compile: t
 ;; no-update-autoloads: t

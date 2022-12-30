@@ -1564,8 +1564,10 @@ The standard Emacs package manager is documented in the Emacs manual
 (@pxref{Package Installation,,, emacs, GNU Emacs Manual}).  The
 @code{use-package} macro provides the @code{:ensure} and @code{:pin}
 keywords that interface with that package manager to automatically
-install packages.  This is particularly useful if you use your init
-file on more than one system.
+install packages.  Further, the @code{:vc} keyword may be used to
+control how package sources are fetched (@pxref{Fetching Package
+Sources,,, emacs, GNU Emacs Manual}).  This is particularly useful if
+you use your init file on more than one system.
 
 @menu
 * Install package::
@@ -1616,6 +1618,40 @@ packages:
 @noindent
 You can override the above setting for a single package by adding
 @w{@code{:ensure nil}} to its declaration.
+
+@findex :vc
+The @code{:vc} keyword can be used to control how packages are
+fetched.  It accepts the same arguments as
+@code{package-vc-selected-packages}, except that a name need not
+explicitly given: it is inferred from the declaration.  Further, the
+accepted property list is augmented by a @code{:rev} keyword, which
+has the same shape as the @code{REV} argument to
+@code{package-vc-install}.
+
+For example,
+
+@lisp
+@group
+(use-package foo
+  :vc (:url "https://bar.com/foo"))
+@end group
+@end lisp
+
+would try—by invoking @code{package-vc-install}—to install the package
+@code{foo} from the specified remote.
+
+This can also be used for local packages, by combining it with the
+@code{:load-path} (@pxref{Load path}) keyword:
+
+@lisp
+@group
+(use-package foo
+  :vc t
+  :load-path "/path/to/foo/)
+@end group
+@end lisp
+
+The above dispatches to @code{package-vc-install-from-checkout}.
 
 @node Pinning packages
 @section Pinning packages using @code{:pin}

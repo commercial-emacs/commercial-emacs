@@ -108,6 +108,16 @@ This command either fills a single paragraph in a defun, such as a
 doc-string, or a comment, or (re)indents the surrounding defun if
 point is not in a comment or a string.  It is by default bound to
 'M-q' in 'prog-mode' and all its descendants.
+
+** use-package
+
+*** New ':vc' keyword
+This keyword enables the user to control how packages are fetched by
+utilising 'package-vc.el'.  By default, it relays its arguments to
+'package-vc-install', but—when combined with the ':load-path'
+keyword—it can also call upon 'package-vc-install-from-checkout'
+instead.
+
 
 * New Modes and Packages in Emacs 30.1
 

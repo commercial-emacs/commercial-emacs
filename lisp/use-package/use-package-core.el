@@ -76,6 +76,7 @@
     :functions
     :preface
     :if :when :unless
+    :vc
     :no-require
     :catch
     :after
@@ -1151,7 +1152,8 @@ meaning:
     #'use-package-normalize-paths))
 
 (defun use-package-handler/:load-path (name _keyword arg rest state)
-  (let ((body (use-package-process-keywords name rest state)))
+  (let ((body (use-package-process-keywords name rest
+                (plist-put state :load-path arg))))
     (use-package-concat
      (mapcar #'(lambda (path)
                  `(eval-and-compile (add-to-list 'load-path ,path)))
@@ -1577,6 +1579,72 @@ no keyword implies `:all'."
      (when use-package-compute-statistics
        `((use-package-statistics-gather :config ',name t))))))
 
+;;;; :vc
+
+(defun use-package-handler/:vc (name _keyword arg rest state)
+  "Generate code for the :vc keyword."
+  (pcase-let ((body (use-package-process-keywords name rest state))
+              (local-path (car (plist-get state :load-path)))
+              (`(,name ,opts ,rev) arg))
+    (use-package-concat
+     `((unless (package-installed-p ',name)
+         ,(if local-path
+              `(package-vc-install-from-checkout ,local-path ,(symbol-name name))
+            `(package-vc-install ',(cons name opts) ,rev))))
+     body)))
+
+(defun use-package-normalize--vc-arg (arg)
+  "Normalize possible arguments to the :vc keyword.
+ARG is a cons-cell of approximately the form that
+`package-vc-selected-packages' accepts, plus an additional `:rev'
+keyword.
+
+Returns a list (NAME SPEC REV), where (NAME . SPEC) is compliant
+with `package-vc-selected-packages' and REV is a (possibly nil)
+revision."
+  (cl-flet* ((mk-string (s)
+	       (if (stringp s) s (symbol-name s)))
+             (mk-sym (s)
+               (if (stringp s) (intern s) s))
+	     (normalize (k v)
+               (when v
+	         (pcase k
+                   (:vc-backend (mk-sym v))
+                   (:rev (if (eq v :last-release) v (mk-string v)))
+                   (_ (mk-string v))))))
+    (pcase-let ((valid-kws '(:url :branch :lisp-dir :main-file :vc-backend :rev))
+                (`(,name . ,opts) arg))
+      (if (stringp opts)                ; (NAME . VERSION-STRING) ?
+          (list name opts)
+        ;; Error handling
+        (cl-loop for (k _) on opts by #'cddr
+                 if (not (member k valid-kws))
+                 do (use-package-error
+                     (format "Keyword :vc received unknown argument: %s. Supported keywords are: %s"
+                             k valid-kws)))
+        ;; Actual normalization
+        (list name
+              (cl-loop for (k v) on opts by #'cddr
+                       if (not (eq k :rev))
+                       nconc (list k (normalize k v)))
+              (normalize :rev (plist-get opts :rev)))))))
+
+(defun use-package-normalize/:vc (name _keyword args)
+  (let ((arg (car args)))
+    (pcase arg
+      ((or 'nil 't) (list name))                 ; guess name
+      ((pred symbolp) (list arg))                ; use this name
+      ((pred stringp) (list name arg))           ; version string + guess name
+      ((pred plistp)                             ; plist + guess name
+       (use-package-normalize--vc-arg (cons name arg)))
+      (`(,(pred symbolp) . ,(or (pred plistp)    ; plist/version string + name
+                                (pred stringp)))
+       (use-package-normalize--vc-arg arg))
+      (_ (use-package-error "Unrecognised argument to :vc.\
+ The keyword wants an argument of nil, t, a name of a package,\
+ or a cons-cell as accepted by `package-vc-selected-packages', where \
+ the accepted plist is augmented by a `:rev' keyword.")))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;; The main macro
@@ -1666,7 +1734,8 @@ Usage:
                  (compare with `custom-set-variables').
 :custom-face     Call `custom-set-faces' with each face definition.
 :ensure          Loads the package using package.el if necessary.
-:pin             Pin the package to an archive."
+:pin             Pin the package to an archive.
+:vc              Integration with `package-vc.el'."
   (declare (indent defun))
   (unless (memq :disabled args)
     (macroexp-progn
