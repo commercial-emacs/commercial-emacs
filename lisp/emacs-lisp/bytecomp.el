@@ -542,15 +542,19 @@ bytecomp-tests.el for interesting cases."
              ;; affect the macroexpansion.  The byte-hunk-handler of
              ;; `internal--with-suppressed-warnings' binds it again
              ;; for the compilation itself.
-             (let ((byte-compile--suppressed-warnings
-                    (append warnings byte-compile--suppressed-warnings)))
-               ;; This function doesn't exist, but is just a placeholder
-               ;; symbol to hook up with the
-               ;; `byte-hunk-handler'/`byte-defop-compiler-1' machinery.
-               `(internal--with-suppressed-warnings
-                 ',warnings
-                 ,(macroexpand-all `(progn ,@body)
-                                   macroexpand-all-environment))))))
+             (if body
+                 (let ((byte-compile--suppressed-warnings
+                        (append warnings byte-compile--suppressed-warnings)))
+                   ;; This function doesn't exist, but is just a placeholder
+                   ;; symbol to hook up with the
+                   ;; `byte-hunk-handler'/`byte-defop-compiler-1' machinery.
+                   `(internal--with-suppressed-warnings
+                     ',warnings
+                     ,(macroexpand-all `(progn ,@body)
+                                       macroexpand-all-environment)))
+               (macroexp-warn-and-return
+                "`with-suppressed-warnings' with empty body"
+                nil '(empty-body with-suppressed-warnings) t)))))
   "The default macro-environment passed to macroexpand by the compiler.
 Placing a macro here will cause a macro to have different semantics when
 expanded by the compiler as when expanded by the interpreter.")
