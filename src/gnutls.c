@@ -1867,6 +1867,9 @@ one trustfile (usually a CA bundle).  */)
   Lisp_Object loglevel;
   Lisp_Object hostname;
   Lisp_Object prime_bits;
+#ifdef HAVE_GNUTLS_CERTIFICATE_SET_X509_KEY_FILE2
+  unsigned int aux_key_file;
+#endif
   struct Lisp_Process *p = XPROCESS (proc);
 
   CHECK_PROCESS (proc);
@@ -2061,10 +2064,17 @@ one trustfile (usually a CA bundle).  */)
 	      certfile = ansi_encode_filename (certfile);
 # endif
 # ifdef HAVE_GNUTLS_CERTIFICATE_SET_X509_KEY_FILE2
-	      if (plist_member (proplist, QCpass))
-		ret = gnutls_certificate_set_x509_key_file2
-		  (x509_cred, SSDATA (certfile), SSDATA (keyfile), file_format,
-		   c_pass, key_file2_aux (flags));
+	      if (!NILP (plist_member (proplist, QCpass)))
+		{
+		  aux_key_file = key_file2_aux (flags);
+		  ret
+		    = gnutls_certificate_set_x509_key_file2 (x509_cred,
+							     SSDATA (certfile),
+							     SSDATA (keyfile),
+							     file_format,
+							     c_pass,
+							     aux_key_file);
+		}
 	      else
 # endif
 	      ret = gnutls_certificate_set_x509_key_file
