@@ -351,7 +351,7 @@ Assumes the caller has bound `macroexpand-all-environment'."
            (if (null body)
                (macroexp-unprogn
                 (macroexp-warn-and-return
-                 (format "Empty %s body" fun)
+                 (format "`%s' with empty body" fun)
                  nil nil 'compile-only))
              (macroexp--all-forms body))
            (cdr form))

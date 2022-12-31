@@ -2863,11 +2863,10 @@ matched by @var{regexp} and @var{pred} are not grouped under
 @var{name-fn} should be either @var{nil} or a function that takes a
 defun node and returns the name of that defun, e.g., the function name
 for a function definition.  If @var{name-fn} is @var{nil},
-@code{treesit-defun-name} (@pxref{Tree-sitter major modes}) is used
-instead.
+@code{treesit-defun-name} is used instead.
 
-@code{treesit-major-mode-setup} (@pxref{Tree-sitter major modes})
-automatically sets up Imenu if this variable is non-@code{nil}.
+@code{treesit-major-mode-setup} automatically sets up Imenu if this
+variable is non-@code{nil}.
 @end defvar
 
 @node Font Lock Mode

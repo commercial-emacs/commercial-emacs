@@ -396,12 +396,12 @@ The CONDITION argument is not evaluated.  Do not quote it."
      (format "`ignore-error' condition argument should not be quoted: %S"
              condition)
      `(condition-case nil (progn ,@body) (,(cadr condition) nil))
-     nil t condition))
+     nil t))
    (body
     `(condition-case nil (progn ,@body) (,condition nil)))
    (t
     (macroexp-warn-and-return "`ignore-error' with empty body"
-                              nil '(empty-body ignore-error) t condition))))
+                              nil '(empty-body ignore-error) t))))
 
 
 ;;;; Basic Lisp functions.
@@ -4829,7 +4829,6 @@ used is \"Error: %S\"."
   (declare (debug t) (indent 1))
   (let* ((err (make-symbol "err"))
          (orig-body body)
-         (orig-format format)
          (format (if (and (stringp format) body) format
                    (prog1 "Error: %S"
                      (if format (push format body)))))
