@@ -181,7 +181,6 @@ skips to the end of all the years."
   ;; This uses the match-data from copyright-find-copyright/end.
   (goto-char (match-end 1))
   (copyright-find-end)
-  (setq copyright-current-year (format-time-string "%Y"))
   (unless (string= (buffer-substring (- (match-end 3) 2) (match-end 3))
 		   (substring copyright-current-year -2))
     (if (or noquery

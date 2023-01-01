@@ -26,7 +26,7 @@
 (defmacro with-copyright-test (orig result)
   `(cl-letf (((symbol-function 'format-time-string) (lambda (&rest _) "2019")))
      (let ((copyright-query nil)
-           (copyright-current-year 2019))
+           (copyright-current-year "2019"))
        (with-temp-buffer
          (insert ,orig)
          (copyright-update)
@@ -54,7 +54,8 @@
   (should
    (equal
     (with-temp-buffer
-      (let ((copyright-query nil))
+      (let ((copyright-query nil)
+            (copyright-current-year "2022"))
         (insert (make-string (- copyright-limit 14) ?x) "\n"
                 "\nCopyright 2006, 2007, 2008 Foo Bar\n\n")
         (copyright-update)
@@ -67,7 +68,8 @@
              (dotimes (_ 2)
                (insert "Copyright 2021 FSF\n"))
              (let ((copyright-at-end-flag t)
-                   (copyright-query nil))
+                   (copyright-query nil)
+                   (copyright-current-year "2022"))
                (copyright-update))
              (buffer-string))
            "Copyright 2021 FSF\nCopyright 2021, 2022 FSF\n")))
