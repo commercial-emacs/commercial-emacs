@@ -439,15 +439,13 @@ If CACHE is not a list, leave cached entries as-is."
 (defun syntax-ppss-invalidate-cache (beg &rest _args)
   "Invalidate ppss data after BEG."
   (setq syntax-propertize--done (min beg syntax-propertize--done))
-  (save-restriction
-    (widen)
-    (cl-destructuring-bind ((last-pos . last-ppss) . cache)
-        syntax-ppss--data
-      (let ((before-beg (syntax-ppss--cached-state cache beg)))
-        (if (or (<= beg (or (syntax-ppss-toplevel-pos last-ppss) 0))
-                (<= beg (or (syntax-ppss--marker-position last-pos) 0)))
-	    (syntax-ppss--set-data nil nil before-beg)
-          (syntax-ppss--set-data last-pos last-ppss before-beg))))))
+  (cl-destructuring-bind ((last-pos . last-ppss) . cache)
+      syntax-ppss--data
+    (let ((before-beg (syntax-ppss--cached-state cache beg)))
+      (if (or (<= beg (or (syntax-ppss-toplevel-pos last-ppss) 0))
+              (<= beg (or (syntax-ppss--marker-position last-pos) 0)))
+	  (syntax-ppss--set-data nil nil before-beg)
+        (syntax-ppss--set-data last-pos last-ppss before-beg)))))
 
 (defmacro syntax-ppss--cache-insert (cache what)
 `(let* ((where (or (cl-position (car ,what) ,cache :key #'car :test #'>=)
@@ -469,42 +467,40 @@ Point is at POS when this function returns."
             #'syntax-ppss-invalidate-cache
             ;; ersatz ordinal range (-100, 100)
             99 t)
-  (save-restriction
-    (widen)
-    (syntax-propertize pos)
-    (with-syntax-table (or syntax-ppss-table (syntax-table))
-      (cl-destructuring-bind ((pt-last . ppss-last) . ppss-cache)
-          syntax-ppss--data
-        (setq pt-last (syntax-ppss--marker-position pt-last))
-        (if (and pt-last
-                 (<= pt-last pos)
-                 (< (- pos pt-last) 2500))
-            ;; theoretically unnecessary but cperl-test-heredocs
-            ;; depends on this
-            (parse-partial-sexp pt-last pos nil nil ppss-last)
-	  (let* ((pt-best (if (and (fixnump pt-last) (<= pt-last pos))
-                              pt-last
-                            (point-min)))
-                 (ppss-best (when (eq pt-best pt-last)
-                              ppss-last)))
-	    (when-let ((elem (syntax-ppss--cached-state ppss-cache pos))
-                       (pt-cache (car elem)))
-	      (when (and (fixnump pt-cache) (> pt-cache pt-best))
-	        (setq pt-best pt-cache
-                      ppss-best (cdr elem))))
-            (cl-assert (<= pt-best pos))
-	    (let ((new-cache ppss-cache)
-                  (ppss ppss-best))
-              (cl-loop with step = syntax-ppss-max-span
-                       for i = 0 then (1+ i)
-                       for beg = (min pos (+ pt-best (* i step)))
-                       for end = (min pos (+ pt-best (* (1+ i) step)))
-                       while (/= end pos)
-                       do (setq ppss (parse-partial-sexp beg end nil nil ppss))
-                       do (syntax-ppss--cache-insert new-cache (cons end ppss))
-                       finally (setq ppss (parse-partial-sexp beg pos nil nil ppss)))
-              (prog1 ppss
-                (syntax-ppss--set-data pos ppss new-cache)))))))))
+  (syntax-propertize pos)
+  (with-syntax-table (or syntax-ppss-table (syntax-table))
+    (cl-destructuring-bind ((pt-last . ppss-last) . ppss-cache)
+        syntax-ppss--data
+      (setq pt-last (syntax-ppss--marker-position pt-last))
+      (if (and pt-last
+               (<= pt-last pos)
+               (< (- pos pt-last) 2500))
+          ;; theoretically unnecessary but cperl-test-heredocs
+          ;; depends on this
+          (parse-partial-sexp pt-last pos nil nil ppss-last)
+	(let* ((pt-best (if (and (fixnump pt-last) (<= pt-last pos))
+                            pt-last
+                          (point-min)))
+               (ppss-best (when (eq pt-best pt-last)
+                            ppss-last)))
+	  (when-let ((elem (syntax-ppss--cached-state ppss-cache pos))
+                     (pt-cache (car elem)))
+	    (when (and (fixnump pt-cache) (> pt-cache pt-best))
+	      (setq pt-best pt-cache
+                    ppss-best (cdr elem))))
+          (cl-assert (<= pt-best pos))
+	  (let ((new-cache ppss-cache)
+                (ppss ppss-best))
+            (cl-loop with step = syntax-ppss-max-span
+                     for i = 0 then (1+ i)
+                     for beg = (min pos (+ pt-best (* i step)))
+                     for end = (min pos (+ pt-best (* (1+ i) step)))
+                     while (/= end pos)
+                     do (setq ppss (parse-partial-sexp beg end nil nil ppss))
+                     do (syntax-ppss--cache-insert new-cache (cons end ppss))
+                     finally (setq ppss (parse-partial-sexp beg pos nil nil ppss)))
+            (prog1 ppss
+              (syntax-ppss--set-data pos ppss new-cache))))))))
 
 (provide 'syntax)
 
