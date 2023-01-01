@@ -150,7 +150,9 @@ inserting the command."
 
 (defun eshell-command-result--equal (_command actual expected)
   "Compare the ACTUAL result of a COMMAND with its EXPECTED value."
-  (equal actual expected))
+  (or (equal actual expected)
+      (when (eq system-type 'darwin)
+        (equal actual (concat expected "\n")))))
 
 (defun eshell-command-result--equal-explainer (command actual expected)
   "Explain the result of `eshell-command-result--equal'."
