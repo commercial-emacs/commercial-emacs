@@ -917,7 +917,7 @@ comment delimiters."
     (save-excursion
       (funcall uncomment-region-function beg end arg))))
 
-(defun uncomment-region-default-1 (beg end &optional arg)
+(defun uncomment-region-default (beg end &optional arg)
   "Uncomment each line in the BEG .. END region.
 The numeric prefix ARG can specify a number of chars to remove from the
 comment delimiters.
@@ -1023,13 +1023,6 @@ This function is the default value of `uncomment-region-function'."
                    (slim (- (point) (mod fcol tab-width))))
               (delete-char (- (skip-chars-backward " " slim)))))))))
   (set-marker end nil))
-
-(defun uncomment-region-default (beg end &optional arg)
-  "Uncomment each line in the BEG .. END region.
-The numeric prefix ARG can specify a number of chars to remove from the
-comment markers."
-  (uncomment-region-default-1 beg end arg))
-
 
 (defun comment-make-bol-ws (len)
   "Make a white-space string of width LEN for use at BOL.
@@ -1227,81 +1220,69 @@ changed with `comment-style'."
     ;; FIXME: maybe we should call uncomment depending on ARG.
     (funcall comment-region-function beg end arg)))
 
-(defun comment-region-default-1 (beg end &optional arg)
-  (let* ((numarg (prefix-numeric-value arg))
-	 (style (cdr (assoc comment-style comment-styles)))
-	 (lines (nth 2 style))
-	 (block (nth 1 style))
-	 (multi (nth 0 style)))
-
-    ;; We use `chars' instead of `syntax' because `\n' might be
-    ;; of end-comment syntax rather than of whitespace syntax.
-    ;; sanitize BEG and END
+(defun comment-region-default (beg end &optional arg)
+  "We use skip-chars instead of skip-syntax because
+newline could be a comment delimiter."
+  (cl-destructuring-bind (multi block lines indent &rest _args
+                          &aux
+                          (numarg (prefix-numeric-value arg))
+                          (multi-char (/= (string-match "[ \t]*\\'" comment-start) 1)))
+      (cdr (assoc comment-style comment-styles))
+    ;; sanitize BEG-END range
     (goto-char beg) (skip-chars-forward " \t\n\r") (beginning-of-line)
     (setq beg (max beg (point)))
     (goto-char end) (skip-chars-backward " \t\n\r") (end-of-line)
     (setq end (min end (point)))
-    (if (>= beg end) (error "Nothing to comment"))
-
+    (when (>= beg end) (error "Nothing to comment"))
     ;; sanitize LINES
     (setq lines
 	  (and
-	   lines ;; multi
+	   lines ; multi
 	   (progn (goto-char beg) (beginning-of-line)
 		  (skip-syntax-forward " ")
 		  (>= (point) beg))
 	   (progn (goto-char end) (end-of-line) (skip-syntax-backward " ")
 		  (<= (point) end))
-	   (or block (not (string= "" comment-end)))
+	   (or block (not (string-empty-p comment-end)))
            (or block (progn (goto-char beg) (re-search-forward "$" end t)))))
-
-    ;; don't add end-markers just because the user asked for `block'
-    (unless (or lines (string= "" comment-end)) (setq block nil))
+    ;; don't add end-markers just because user asked for "block"
+    (when (and (not lines) (not (string-empty-p comment-end)))
+      (setq block nil))
 
     (cond
-     ((consp arg) (uncomment-region beg end))
-     ((< numarg 0) (uncomment-region beg end (- numarg)))
+     ((consp arg)
+      (uncomment-region beg end))
+     ((< numarg 0)
+      (uncomment-region beg end (- numarg)))
      (t
-      (let ((multi-char (/= (string-match "[ \t]*\\'" comment-start) 1))
-	    indent triple)
-	(if (eq (nth 3 style) 'multi-char)
-	    (save-excursion
-	      (goto-char beg)
-	      (setq indent multi-char
-		    ;; Triple if we will put the comment starter at the margin
-		    ;; and the first line of the region isn't indented
-		    ;; at least two spaces.
-		    triple (and (not multi-char) (looking-at "\t\\|  "))))
-	  (setq indent (nth 3 style)))
-
-	;; In Lisp and similar modes with one-character comment starters,
-	;; double it by default if `comment-add' says so.
-	;; If it isn't indented, triple it.
-	(if (and (null arg) (not multi-char))
-	    (setq numarg (* comment-add (if triple 2 1)))
-	  (setq numarg (1- (prefix-numeric-value arg))))
-
-	(comment-region-internal
-	 beg end
-	 (let ((s (comment-padright comment-start numarg)))
-	   (if (string-match comment-start-skip s) s
-	     (comment-padright comment-start)))
-	 (let ((s (comment-padleft comment-end numarg)))
-	   (and s (if (string-match comment-end-skip s) s
-		    (comment-padright comment-end))))
-	 (if multi
-             (or (comment-padright comment-continue numarg)
-                 ;; `comment-padright' returns nil when
-                 ;; `comment-continue' contains only whitespace
-                 (and (stringp comment-continue) comment-continue)))
-	 (if multi
-	     (comment-padleft (comment-string-reverse comment-continue) numarg))
-	 block
-	 lines
-	 indent))))))
-
-(defun comment-region-default (beg end &optional arg)
-  (comment-region-default-1 beg end arg))
+      (if (or arg multi-char)
+	  (setq numarg (1- (prefix-numeric-value arg)))
+        ;; Mono-char comment delimiter:
+        ;; Double it if `comment-add' says so.
+        ;; RMS added weird rule to triple it in 9f15f67.
+	(setq numarg (* comment-add (if (and (eq indent 'multi-char)
+                                             (save-excursion
+                                               (goto-char beg)
+                                               (looking-at "\t\\|  ")))
+                                        2
+                                      1))))
+      (comment-region-internal
+       beg end
+       (let ((s (comment-padright comment-start numarg)))
+	 (if (string-match comment-start-skip s) s
+	   (comment-padright comment-start)))
+       (when-let ((s (comment-padleft comment-end numarg)))
+	 (if (string-match comment-end-skip s) s
+	   (comment-padright comment-end)))
+       (when multi
+         ;; comment-padright returns nil if comment-continue is all ws.
+         (or (comment-padright comment-continue numarg)
+             (when (stringp comment-continue) comment-continue)))
+       (when multi
+	 (comment-padleft (comment-string-reverse comment-continue) numarg))
+       block
+       lines
+       (if (eq indent 'multi-char) multi-char indent))))))
 
 ;;;###autoload
 (defun comment-box (beg end &optional arg)
