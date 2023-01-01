@@ -321,7 +321,9 @@ stdout originally pointed (the terminal)."
   "Chek that all commands in a subcommand are properly piped."
   (skip-unless (executable-find "rev"))
   (eshell-command-result-equal "{echo foo; echo bar} | rev"
-                               "raboof"))
+                               (concat "raboof"
+                                       (when (eq system-type 'darwin)
+                                         "\n"))))
 
 
 ;; Virtual targets

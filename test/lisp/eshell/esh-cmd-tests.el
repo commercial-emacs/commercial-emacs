@@ -275,11 +275,13 @@ This tests when `eshell-lisp-form-nil-is-failure' is nil."
   "Test invocation of an if statement piped to another command."
   (skip-unless (executable-find "rev"))
   (let ((eshell-test-value t))
-    (eshell-command-result-equal "if $eshell-test-value {echo yes} | rev"
-                                 "sey"))
+    (eshell-command-result-equal
+     "if $eshell-test-value {echo yes} | rev"
+     (concat "sey" (when (eq system-type 'darwin) "\n"))))
   (let ((eshell-test-value nil))
-    (eshell-command-result-equal "if $eshell-test-value {echo yes} | rev"
-                                 nil)))
+    (eshell-command-result-equal
+     "if $eshell-test-value {echo yes} | rev"
+     nil)))
 
 (ert-deftest esh-cmd-test/if-else-statement-pipe ()
   "Test invocation of an if/else statement piped to another command."
@@ -287,7 +289,7 @@ This tests when `eshell-lisp-form-nil-is-failure' is nil."
   (let ((eshell-test-value t))
     (eshell-command-result-equal
      "if $eshell-test-value {echo yes} {echo no} | rev"
-     "sey"))
+     (concat "sey" (when (eq system-type 'darwin) "\n"))))
   (let ((eshell-test-value nil))
     (eshell-command-result-equal
      "if $eshell-test-value {echo yes} {echo no} | rev"
