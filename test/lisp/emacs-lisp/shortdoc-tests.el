@@ -22,7 +22,6 @@
 (require 'ert)
 (require 'shortdoc)
 (require 'subr-x) ; `string-pad' in shortdoc group needed at run time
-(require 'regexp-opt)    ; `regexp-opt-charset' not autoloaded
 
 (defun shortdoc-tests--tree-contains (tree fun)
   "Whether TREE contains a call to FUN."

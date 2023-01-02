@@ -74,15 +74,11 @@ Version mismatch is commonly encountered in the following situations:
    loading of the newer Org version.
 
    It is recommended to put
-
-    %s
-
+    (straight-use-package 'org)
    early in the config.  Ideally, right after the straight.el
    bootstrap.  Moving `use-package' :straight declaration may not be
    sufficient if the corresponding `use-package' statement is
-   deferring the loading."
-           ;; Avoid `warn' replacing "'" with "’" (see `format-message').
-           "(straight-use-package 'org)")
+   deferring the loading.")
      (error "Org version mismatch.  Make sure that correct `load-path' is set early in init.el")))
 
 ;; We rely on org-macs when generating Org version.  Checking Org

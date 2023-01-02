@@ -60,8 +60,7 @@
                 "\nCopyright 2006, 2007, 2008 Foo Bar\n\n")
         (copyright-update)
         (buffer-substring (- (point-max) 42) (point-max))))
-    (format "Copyright 2006, 2007, 2008, %s Foo Bar\n\n"
-            (format-time-string "%Y")))))
+    "Copyright 2006, 2007, 2008, 2022 Foo Bar\n\n")))
 
 (ert-deftest test-correct-notice ()
   (should (equal
@@ -73,8 +72,7 @@
                    (copyright-current-year "2022"))
                (copyright-update))
              (buffer-string))
-           (format "Copyright 2021 FSF\nCopyright 2021, %s FSF\n"
-                   (format-time-string "%Y")))))
+           "Copyright 2021 FSF\nCopyright 2021, 2022 FSF\n")))
 
 (defmacro with-copyright-fix-years-test (orig result)
   `(let ((copyright-year-ranges t))
