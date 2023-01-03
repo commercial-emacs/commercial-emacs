@@ -5172,8 +5172,8 @@ and corresponding effects."
 
 (defun bytecomp--warn-dodgy-eq-arg (form type parenthesis)
   (macroexp-warn-and-return
-   (format "`%s' called with literal %s that may never match (%s)"
-           (car form) type parenthesis)
+   (format-message "`%s' called with literal %s that may never match (%s)"
+                   (car form) type parenthesis)
    form (list 'suspicious (car form)) t))
 
 (defun bytecomp--check-eq-args (form &optional a b &rest _ignore)
