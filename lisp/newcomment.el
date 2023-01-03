@@ -1223,7 +1223,7 @@ changed with `comment-style'."
 (defun comment-region-default (beg end &optional arg)
   "We use skip-chars instead of skip-syntax because
 newline could be a comment delimiter."
-  (cl-destructuring-bind (multi block lines indent &rest _args
+  (cl-destructuring-bind (multi block lines indent &rest args
                           &aux
                           (numarg (prefix-numeric-value arg))
                           (multi-char (/= (string-match "[ \t]*\\'" comment-start) 1)))

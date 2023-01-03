@@ -6228,7 +6228,7 @@ variable to determine how strings should be escaped."
                ((not eolp) (delete-char -1))
                (bolp (insert "\n"))))
             (comment-normalize-vars)
-            (comment-region-default-1
+            (comment-region-default
              (if bolp
                  (point-min)
                (save-excursion
