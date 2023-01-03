@@ -853,10 +853,10 @@ _XMTransToOrigin(Display *display, register XMenu *menu, register XMPane *p_ptr,
 	l_orig_y = y_pos - (menu->s_height >> 1);
 
 	/*
-	 * Then translate to the upper left of the current pane window.
+	 * Then translate to the upper left of the current pane
+	 * window.  Do not move y to the first selection.
 	 */
 	l_orig_x -= (s_ptr->window_x + menu->p_bdr_width);
-	l_orig_y -= (s_ptr->window_y + menu->p_bdr_width);
     }
 
     /*
