@@ -1572,43 +1572,42 @@ literals (Bug#20852)."
       (let ((_ 1))
         ))
    '((empty-body let))
-   "Warning: `let' with empty body")
+   "Warning: .let. with empty body")
 
   (test-suppression
    '(defun zot ()
       (let* ((_ 1))
         ))
    '((empty-body let*))
-   "Warning: `let\\*' with empty body")
+   "Warning: .let\\*. with empty body")
 
   (test-suppression
    '(defun zot (x)
       (when x
         ))
    '((empty-body when))
-   "Warning: `when' with empty body")
+   "Warning: .when. with empty body")
 
   (test-suppression
    '(defun zot (x)
       (unless x
         ))
    '((empty-body unless))
-   "Warning: `unless' with empty body")
+   "Warning: .unless. with empty body")
 
   (test-suppression
    '(defun zot (x)
       (ignore-error arith-error
         ))
    '((empty-body ignore-error))
-   "Warning: `ignore-error' with empty body")
+   "Warning: .ignore-error. with empty body")
 
   (test-suppression
    '(defun zot (x)
       (with-suppressed-warnings ((suspicious eq))
         ))
    '((empty-body with-suppressed-warnings))
-   "Warning: `with-suppressed-warnings' with empty body")
-  )
+   "Warning: .with-suppressed-warnings. with empty body"))
 
 (ert-deftest bytecomp-tests--not-writable-directory ()
   "Test that byte compilation works if the output directory isn't
