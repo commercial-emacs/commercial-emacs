@@ -1826,8 +1826,9 @@ Strips any leading \"./\" from each filename."
   ;;(message "hfy-list-files");;DBUG
   ;; FIXME: this changes the dir of the current buffer.  Is that right??
   (cd directory)
-  (mapcar (lambda (F) (if (string-match "^./\\(.*\\)" F) (match-string 1 F) F))
-          (split-string (shell-command-to-string hfy-find-cmd))) )
+  (remove-if #'string-empty-p
+             (mapcar (lambda (F) (if (string-match "^./\\(.*\\)" F) (match-string 1 F) F))
+                     (split-string (shell-command-to-string hfy-find-cmd) "[\n\r]+")) ))
 
 ;; strip the filename off, return a directory name
 ;; not a particularly thorough implementation, but it will be
