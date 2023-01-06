@@ -24350,7 +24350,9 @@ static const char power_letter[] =
     'P', /* peta */
     'E', /* exa */
     'Z', /* zetta */
-    'Y'	 /* yotta */
+    'Y', /* yotta */
+    'R', /* ronna */
+    'Q'  /* quetta */
   };
 
 static void
