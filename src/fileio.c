@@ -3334,10 +3334,9 @@ non-newline characters.  */)
     {
       Lisp_Object absname = Fexpand_file_name (filename, Qnil);
       int fd = emacs_open (SSDATA (absname), O_RDONLY, 0);
-      if (fd < 0)
-	report_file_error ("Opening input file", absname);
-      result = wc_long_lines_p (SSDATA (filename), fd, XFIXNUM (threshold))
-	? Qt : Qnil;
+      if (fd >= 0) /* false for tramp */
+        result = wc_long_lines_p (SSDATA (filename), fd, XFIXNUM (threshold))
+	  ? Qt : Qnil;
     }
   return result;
 }
