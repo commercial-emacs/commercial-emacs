@@ -134,14 +134,19 @@ arriving, or after."
   (if (not eshell-prompt-function)
       (set-marker eshell-last-output-end (point))
     (let ((prompt (funcall eshell-prompt-function)))
-      (and eshell-highlight-prompt
-	   (add-text-properties 0 (length prompt)
-				'(read-only t
-				  font-lock-face eshell-prompt
-				  front-sticky (font-lock-face read-only)
-				  rear-nonsticky (font-lock-face read-only))
-				prompt))
-      (eshell-interactive-print prompt)))
+      (add-text-properties
+       0 (length prompt)
+       (if eshell-highlight-prompt
+           '( read-only t
+              field prompt
+              font-lock-face eshell-prompt
+              front-sticky (read-only field font-lock-face)
+              rear-nonsticky (read-only field font-lock-face))
+         '( field prompt
+            front-sticky (field)
+            rear-nonsticky (field)))
+       prompt)
+      (eshell-interactive-filter nil prompt)))
   (run-hooks 'eshell-after-prompt-hook))
 
 (defun eshell-backward-matching-input (regexp arg)
