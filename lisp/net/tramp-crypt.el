@@ -239,6 +239,7 @@ If NAME doesn't belong to an encrypted remote directory, return nil."
     (tramp-set-file-uid-gid . tramp-crypt-handle-set-file-uid-gid)
     (unhandled-file-name-directory . ignore)
     (unlock-file . tramp-crypt-handle-unlock-file)
+    ;; `user-uid-for-file' performed by default handler.
     (vc-registered . ignore)
     (verify-visited-file-modtime . tramp-handle-verify-visited-file-modtime)
     (write-region . tramp-handle-write-region))

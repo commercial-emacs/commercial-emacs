@@ -300,6 +300,7 @@ It must be supported by libarchive(3).")
     (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
     (unlock-file . ignore)
+    ;; `user-uid-for-file' performed by default handler.
     (vc-registered . ignore)
     (verify-visited-file-modtime . tramp-handle-verify-visited-file-modtime)
     (write-region . tramp-archive-handle-not-implemented))

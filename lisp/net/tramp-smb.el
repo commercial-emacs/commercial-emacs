@@ -304,6 +304,7 @@ See `tramp-actions-before-shell' for more info.")
     (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
     (unlock-file . tramp-handle-unlock-file)
+    ;; `user-uid-for-file' performed by default handler.
     (vc-registered . ignore)
     (verify-visited-file-modtime . tramp-handle-verify-visited-file-modtime)
     (write-region . tramp-smb-handle-write-region))

@@ -4716,6 +4716,15 @@ Also see the `async-shell-command-buffer' variable."
                      action))
       (user-error "Shell command in progress"))))
 
+(defun user-uid-for-file (filename)
+  "Return the effective uid for FILENAME.
+For local files, this is equivalent to `user-uid' (which see),
+but for remote files, this returns the effective uid for that
+remote connection."
+  (if-let ((handler (find-file-name-handler filename 'user-uid-for-file)))
+      (funcall handler 'user-uid-for-file filename)
+    (user-uid)))
+
 (defun max-mini-window-lines (&optional frame)
   "Compute maximum number of lines for echo area in FRAME.
 As defined by `max-mini-window-height'.  FRAME defaults to the

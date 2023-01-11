@@ -49,8 +49,9 @@ as is common with most shells."
 
 (defcustom eshell-prompt-function
   (lambda ()
-    (concat (abbreviate-file-name (eshell/pwd))
-            (if (= (user-uid) 0) " # " " $ ")))
+    (let ((cwd (eshell/pwd)))
+      (concat (abbreviate-file-name cwd)
+              (if (= (user-uid-for-file cwd) 0) " # " " $ "))))
   "A function that returns the Eshell prompt string.
 Make sure to update `eshell-prompt-regexp' so that it will match your
 prompt."

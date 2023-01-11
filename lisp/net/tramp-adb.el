@@ -188,6 +188,7 @@ It is used for TCP/IP devices."
     (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
     (unlock-file . tramp-handle-unlock-file)
+    (user-uid-for-file . tramp-handle-user-uid-for-file)
     (vc-registered . ignore)
     (verify-visited-file-modtime . tramp-handle-verify-visited-file-modtime)
     (write-region . tramp-adb-handle-write-region))

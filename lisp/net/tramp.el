@@ -2589,6 +2589,8 @@ Must be handled by the callers."
 	      file-locked-p lock-file make-lock-file-name unlock-file
 	      ;; Emacs 29+ only.
 	      abbreviate-file-name
+	      ;; Emacs 30+ only.
+	      user-uid-for-file
 	      ;; Tramp internal magic file name function.
 	      tramp-set-file-uid-gid))
     (if (file-name-absolute-p (nth 0 args))
@@ -3709,6 +3711,10 @@ Let-bind it when necessary.")
         (tramp-make-tramp-file-name
 	 vec (concat "~" (substring filename (match-beginning 1))))
       (tramp-make-tramp-file-name (tramp-dissect-file-name filename)))))
+
+(defun tramp-handle-user-uid-for-file (filename)
+  "Like `user-uid' for Tramp files."
+  (tramp-get-remote-uid (tramp-dissect-file-name filename) 'integer))
 
 (defun tramp-handle-access-file (filename string)
   "Like `access-file' for Tramp files."

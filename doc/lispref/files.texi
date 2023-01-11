@@ -3412,6 +3412,7 @@ first, before handlers for jobs such as remote file access.
 @code{temporary-file-directory},
 @code{unhandled-file-name-directory},
 @code{unlock-file},
+@code{user-uid-for-file},
 @code{vc-registered},
 @code{verify-visited-file-modtime},@*
 @code{write-region}.
@@ -3473,6 +3474,7 @@ first, before handlers for jobs such as remote file access.
 @code{temporary-file-directory},
 @code{unhandled-file-name-directory},
 @code{unlock-file},
+@code{user-uid-for-file},
 @code{vc-regis@discretionary{}{}{}tered},
 @code{verify-visited-file-modtime},
 @code{write-region}.
