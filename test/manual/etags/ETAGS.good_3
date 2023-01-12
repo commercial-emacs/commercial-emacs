@@ -176,41 +176,41 @@ package body Truc.Bidule Truc.Bidule/b138,2153
   protected body Machin_T Machin_T/b146,2281
 
 c-src/abbrev.c,1957
-Lisp_Object Vabbrev_table_name_list;43,1429
-Lisp_Object Vglobal_abbrev_table;48,1574
-Lisp_Object Vfundamental_mode_abbrev_table;52,1685
-int abbrevs_changed;56,1786
-int abbrev_all_caps;58,1808
-Lisp_Object Vabbrev_start_location;63,1957
-Lisp_Object Vabbrev_start_location_buffer;66,2046
-Lisp_Object Vlast_abbrev;70,2155
-Lisp_Object Vlast_abbrev_text;75,2324
-int last_abbrev_point;79,2414
-DEFUN ("make-abbrev-table", Fmake_abbrev_table,82,2440
-DEFUN ("make-abbrev-table", Fmake_abbrev_table,make-abbrev-table82,2440
-DEFUN ("clear-abbrev-table", Fclear_abbrev_table,89,2632
-DEFUN ("clear-abbrev-table", Fclear_abbrev_table,clear-abbrev-table89,2632
-DEFUN ("define-abbrev", Fdefine_abbrev,104,3013
-DEFUN ("define-abbrev", Fdefine_abbrev,define-abbrev104,3013
-DEFUN ("define-global-abbrev", Fdefine_global_abbrev,146,4332
-DEFUN ("define-global-abbrev", Fdefine_global_abbrev,define-global-abbrev146,4332
-DEFUN ("define-mode-abbrev", Fdefine_mode_abbrev,157,4703
-DEFUN ("define-mode-abbrev", Fdefine_mode_abbrev,define-mode-abbrev157,4703
-DEFUN ("abbrev-symbol", Fabbrev_symbol,171,5171
-DEFUN ("abbrev-symbol", Fabbrev_symbol,abbrev-symbol171,5171
-DEFUN ("abbrev-expansion", Fabbrev_expansion,199,6135
-DEFUN ("abbrev-expansion", Fabbrev_expansion,abbrev-expansion199,6135
-DEFUN ("expand-abbrev", Fexpand_abbrev,215,6650
-DEFUN ("expand-abbrev", Fexpand_abbrev,expand-abbrev215,6650
-DEFUN ("unexpand-abbrev", Funexpand_abbrev,383,11495
-DEFUN ("unexpand-abbrev", Funexpand_abbrev,unexpand-abbrev383,11495
-write_abbrev 420,12702
-describe_abbrev 439,13137
-DEFUN ("insert-abbrev-table-description", Finsert_abbrev_table_description,460,13652
-DEFUN ("insert-abbrev-table-description", Finsert_abbrev_table_description,insert-abbrev-table-description460,13652
-DEFUN ("define-abbrev-table", Fdefine_abbrev_table,500,14808
-DEFUN ("define-abbrev-table", Fdefine_abbrev_table,define-abbrev-table500,14808
-syms_of_abbrev 534,15885
+Lisp_Object Vabbrev_table_name_list;43,1433
+Lisp_Object Vglobal_abbrev_table;48,1578
+Lisp_Object Vfundamental_mode_abbrev_table;52,1689
+int abbrevs_changed;56,1790
+int abbrev_all_caps;58,1812
+Lisp_Object Vabbrev_start_location;63,1961
+Lisp_Object Vabbrev_start_location_buffer;66,2050
+Lisp_Object Vlast_abbrev;70,2159
+Lisp_Object Vlast_abbrev_text;75,2328
+int last_abbrev_point;79,2418
+DEFUN ("make-abbrev-table", Fmake_abbrev_table,82,2444
+DEFUN ("make-abbrev-table", Fmake_abbrev_table,make-abbrev-table82,2444
+DEFUN ("clear-abbrev-table", Fclear_abbrev_table,89,2636
+DEFUN ("clear-abbrev-table", Fclear_abbrev_table,clear-abbrev-table89,2636
+DEFUN ("define-abbrev", Fdefine_abbrev,104,3017
+DEFUN ("define-abbrev", Fdefine_abbrev,define-abbrev104,3017
+DEFUN ("define-global-abbrev", Fdefine_global_abbrev,146,4336
+DEFUN ("define-global-abbrev", Fdefine_global_abbrev,define-global-abbrev146,4336
+DEFUN ("define-mode-abbrev", Fdefine_mode_abbrev,157,4707
+DEFUN ("define-mode-abbrev", Fdefine_mode_abbrev,define-mode-abbrev157,4707
+DEFUN ("abbrev-symbol", Fabbrev_symbol,171,5175
+DEFUN ("abbrev-symbol", Fabbrev_symbol,abbrev-symbol171,5175
+DEFUN ("abbrev-expansion", Fabbrev_expansion,199,6139
+DEFUN ("abbrev-expansion", Fabbrev_expansion,abbrev-expansion199,6139
+DEFUN ("expand-abbrev", Fexpand_abbrev,215,6654
+DEFUN ("expand-abbrev", Fexpand_abbrev,expand-abbrev215,6654
+DEFUN ("unexpand-abbrev", Funexpand_abbrev,383,11499
+DEFUN ("unexpand-abbrev", Funexpand_abbrev,unexpand-abbrev383,11499
+write_abbrev 420,12706
+describe_abbrev 439,13141
+DEFUN ("insert-abbrev-table-description", Finsert_abbrev_table_description,460,13656
+DEFUN ("insert-abbrev-table-description", Finsert_abbrev_table_description,insert-abbrev-table-description460,13656
+DEFUN ("define-abbrev-table", Fdefine_abbrev_table,500,14812
+DEFUN ("define-abbrev-table", Fdefine_abbrev_table,define-abbrev-table500,14812
+syms_of_abbrev 534,15889
 
 c-src/torture.c,197
 (*tag1 tag118,452
@@ -952,1207 +952,1207 @@ typedef enum { RECC_ERROR 609,22954
 typedef int re_wchar_t;623,23388
 
 c-src/emacs/src/keyboard.c,15923
-volatile int interrupt_input_blocked;76,1809
-volatile bool pending_signals;80,1945
-#define KBD_BUFFER_SIZE 82,1977
-KBOARD *initial_kboard;initial_kboard84,2007
-KBOARD *current_kboard;current_kboard85,2031
-static KBOARD *all_kboards;all_kboards86,2055
-static bool single_kboard;89,2155
-#define NUM_RECENT_KEYS 91,2183
-static int recent_keys_index;94,2270
-static int total_keys;97,2358
-static Lisp_Object recent_keys;100,2444
-Lisp_Object this_command_keys;107,2778
-ptrdiff_t this_command_key_count;108,2809
-static bool this_command_key_count_reset;112,2923
-static Lisp_Object raw_keybuf;116,3075
-static int raw_keybuf_count;117,3106
-#define GROW_RAW_KEYBUF	119,3136
-static ptrdiff_t this_single_command_key_start;125,3351
-static ptrdiff_t before_command_key_count;129,3499
-static ptrdiff_t before_command_echo_length;130,3542
-sigjmp_buf return_to_command_loop;135,3678
-static Lisp_Object recover_top_level_message;138,3792
-static Lisp_Object regular_top_level_message;143,3931
-static sys_jmp_buf getcjmp;147,4032
-bool waiting_for_input;150,4096
-static bool echoing;154,4187
-static struct kboard *ok_to_echo_at_next_pause;ok_to_echo_at_next_pause159,4329
-struct kboard *echo_kboard;echo_kboard166,4633
-Lisp_Object echo_message_buffer;171,4745
-bool immediate_quit;174,4838
-int quit_char;192,5624
-EMACS_INT command_loop_level;195,5681
-Lisp_Object unread_switch_frame;204,6109
-static ptrdiff_t last_non_minibuf_size;207,6217
-uintmax_t num_input_events;210,6335
-static EMACS_INT last_auto_save;214,6429
-static ptrdiff_t last_point_position;217,6524
-Lisp_Object internal_last_event_frame;228,7029
-static Lisp_Object read_key_sequence_cmd;232,7169
-static Lisp_Object read_key_sequence_remapped;233,7211
-static FILE *dribble;dribble236,7311
-bool input_pending;239,7369
-static bool input_was_pending;287,10023
-static struct input_event kbd_buffer[kbd_buffer291,10108
-static struct input_event *kbd_fetch_ptr;kbd_fetch_ptr297,10387
-static struct input_event * volatile kbd_store_ptr;302,10602
-unsigned timers_run;320,11297
-struct timespec *input_available_clear_time;input_available_clear_time324,11409
-bool interrupt_input;328,11574
-bool interrupts_deferred;331,11672
-static struct timespec timer_idleness_start_time;335,11747
-static struct timespec timer_last_idleness_start_time;340,11917
-#define READABLE_EVENTS_DO_TIMERS_NOW	346,12047
-#define READABLE_EVENTS_FILTER_EVENTS	347,12095
-#define READABLE_EVENTS_IGNORE_SQUEEZABLES	348,12143
-kset_echo_string 392,14089
-kset_kbd_queue 397,14185
-kset_keyboard_translate_table 402,14277
-kset_last_prefix_arg 407,14400
-kset_last_repeatable_command 412,14505
-kset_local_function_key_map 417,14626
-kset_overriding_terminal_local_map 422,14745
-kset_real_last_command 427,14878
-kset_system_key_syms 432,14987
-echo_add_key 443,15250
-echo_char 527,17528
-echo_dash 541,17814
-echo_now 586,19141
-cancel_echoing 635,20615
-echo_length 648,20923
-echo_truncate 660,21254
-add_command_key 672,21583
-recursive_edit_1 697,22407
-record_auto_save 742,23849
-force_auto_save_soon 751,24017
-DEFUN ("recursive-edit", Frecursive_edit,759,24138
-DEFUN ("recursive-edit", Frecursive_edit,recursive-edit759,24138
-recursive_edit_unwind 804,25751
-any_kboard_state 817,26017
-single_kboard_state 838,26669
-not_single_kboard_state 848,26807
-struct kboard_stack858,27069
-  KBOARD *kboard;kboard860,27091
-  struct kboard_stack *next;next861,27109
-static struct kboard_stack *kboard_stack;kboard_stack864,27142
-push_kboard 867,27190
-pop_kboard 879,27379
-temporarily_switch_to_single_kboard 914,28267
-record_single_kboard_state 943,29441
-restore_kboard_configuration 952,29625
-cmd_error 970,30081
-cmd_error_internal 1024,31514
-DEFUN ("command-error-default-function", Fcommand_error_default_function,1043,32034
-DEFUN ("command-error-default-function", Fcommand_error_default_function,command-error-default-function1043,32034
-command_loop 1094,33920
-command_loop_2 1134,35139
-top_level_2 1146,35343
-top_level_1 1152,35421
-DEFUN ("top-level", Ftop_level,1164,35791
-DEFUN ("top-level", Ftop_level,top-level1164,35791
-user_error 1183,36292
-DEFUN ("exit-recursive-edit", Fexit_recursive_edit,1189,36433
-DEFUN ("exit-recursive-edit", Fexit_recursive_edit,exit-recursive-edit1189,36433
-DEFUN ("abort-recursive-edit", Fabort_recursive_edit,1201,36823
-DEFUN ("abort-recursive-edit", Fabort_recursive_edit,abort-recursive-edit1201,36823
-tracking_off 1216,37285
-DEFUN ("internal--track-mouse", Ftrack_mouse,1234,37820
-DEFUN ("internal--track-mouse", Ftrack_mouse,track-mouse1234,37820
-bool ignore_mouse_drag_p;1256,38396
-some_mouse_moved 1259,38445
-Lisp_Object last_undo_boundary;1287,39036
-command_loop_1 1294,39277
-read_menu_command 1649,50893
-adjust_point_for_property 1678,51621
-safe_run_hooks_1 1831,57343
-safe_run_hooks_error 1841,57573
-safe_run_hook_funcall 1878,58580
-safe_run_hooks 1893,59062
-int poll_suppress_count;1908,59401
-static struct atimer *poll_timer;poll_timer1915,59491
-poll_for_input_1 1919,59593
-poll_for_input 1930,59793
-start_polling 1942,60057
-input_polling_used 1979,61095
-stop_polling 1994,61394
-set_poll_suppress_count 2009,61763
-bind_polling_period 2029,62145
-make_ctrl_char 2048,62496
-show_help_echo 2113,64459
-static Lisp_Object help_form_saved_window_configs;2156,65642
-read_char_help_form_unwind 2158,65705
-#define STOP_POLLING	2166,65963
-#define RESUME_POLLING	2170,66088
-read_event_from_main_queue 2175,66233
-read_decoded_event_from_main_queue 2249,68421
-#define MAX_ENCODED_BYTES 2254,68668
-echo_keystrokes_p 2342,71560
-read_char 2376,72852
-record_menu_key 3225,98953
-help_char_p 3258,99678
-record_char 3273,99957
-save_getcjmp 3412,104239
-restore_getcjmp 3418,104330
-readable_events 3430,104701
-int stop_character EXTERNALLY_VISIBLE;3497,106441
-event_to_kboard 3500,106497
-kbd_buffer_nr_stored 3522,107146
-kbd_buffer_store_event 3534,107487
-kbd_buffer_store_event_hold 3550,108029
-kbd_buffer_unget_event 3684,111621
-#define INPUT_EVENT_POS_MAX 3698,112022
-#define INPUT_EVENT_POS_MIN 3701,112151
-position_to_Time 3706,112291
-Time_to_position 3716,112518
-gen_help_event 3738,113175
-kbd_buffer_store_help_event 3756,113615
-discard_mouse_events 3773,113980
-kbd_buffer_events_waiting 3803,114715
-clear_event 3823,115072
-kbd_buffer_get_event 3836,115412
-process_special_events 4258,127885
-swallow_events 4322,129709
-timer_start_idle 4339,130102
-timer_stop_idle 4355,130580
-timer_resume_idle 4363,130724
-struct input_event last_timer_event EXTERNALLY_VISIBLE;4372,130916
-Lisp_Object pending_funcalls;4377,131176
-decode_timer 4381,131297
-timer_check_2 4414,132250
-timer_check 4572,136821
-DEFUN ("current-idle-time", Fcurrent_idle_time,4607,137666
-DEFUN ("current-idle-time", Fcurrent_idle_time,current-idle-time4607,137666
-static Lisp_Object accent_key_syms;4625,138243
-static Lisp_Object func_key_syms;4626,138279
-static Lisp_Object mouse_syms;4627,138313
-static Lisp_Object wheel_syms;4628,138344
-static Lisp_Object drag_n_drop_syms;4629,138375
-static const int lispy_accent_codes[lispy_accent_codes4634,138520
-static const char *const lispy_accent_keys[lispy_accent_keys4741,139882
-#define FUNCTION_KEY_OFFSET 4766,140318
-const char *const lispy_function_keys[lispy_function_keys4768,140351
-static const char *const lispy_multimedia_keys[lispy_multimedia_keys4962,148905
-static const char *const lispy_kana_keys[lispy_kana_keys5026,150139
-#define FUNCTION_KEY_OFFSET 5061,151755
-static const char *const lispy_function_keys[lispy_function_keys5065,151898
-#define ISO_FUNCTION_KEY_OFFSET 5149,154433
-static const char *const iso_lispy_function_keys[iso_lispy_function_keys5151,154473
-static Lisp_Object Vlispy_mouse_stem;5172,155332
-static const char *const lispy_wheel_names[lispy_wheel_names5174,155371
-static const char *const lispy_drag_n_drop_names[lispy_drag_n_drop_names5181,155623
-static short const scroll_bar_parts[scroll_bar_parts5189,155889
-static Lisp_Object button_down_location;5210,156914
-static int last_mouse_button;5215,157069
-static int last_mouse_x;5216,157099
-static int last_mouse_y;5217,157124
-static Time button_down_time;5218,157149
-static int double_click_count;5222,157233
-make_lispy_position 5228,157394
-toolkit_menubar_in_use 5456,163957
-make_scroll_bar_position 5469,164325
-make_lispy_event 5485,164971
-make_lispy_movement 6104,183534
-make_lispy_switch_frame 6131,184265
-make_lispy_focus_in 6137,184372
-make_lispy_focus_out 6145,184498
-parse_modifiers_uncached 6163,184948
-#define SINGLE_LETTER_MOD(6185,185468
-#undef SINGLE_LETTER_MOD6212,185909
-#define MULTI_LETTER_MOD(6214,185935
-#undef MULTI_LETTER_MOD6231,186403
-apply_modifiers_uncached 6273,187577
-static const char *const modifier_names[modifier_names6319,189196
-#define NUM_MOD_NAMES 6325,189402
-static Lisp_Object modifier_symbols;6327,189452
-lispy_modifier_list 6331,189589
-#define KEY_TO_CHAR(6353,190255
-parse_modifiers 6356,190331
-DEFUN ("internal-event-symbol-parse-modifiers", Fevent_symbol_parse_modifiers,6399,191520
-DEFUN ("internal-event-symbol-parse-modifiers", Fevent_symbol_parse_modifiers,event-symbol-parse-modifiers6399,191520
-apply_modifiers 6422,192394
-reorder_modifiers 6491,194723
-modify_event_symbol 6536,196531
-DEFUN ("event-convert-list", Fevent_convert_list,6628,199247
-DEFUN ("event-convert-list", Fevent_convert_list,event-convert-list6628,199247
-parse_solitary_modifier 6695,201138
-#define SINGLE_LETTER_MOD(6701,201261
-#define MULTI_LETTER_MOD(6705,201346
-#undef SINGLE_LETTER_MOD6763,202644
-#undef MULTI_LETTER_MOD6764,202669
-lucid_event_type_list_p 6775,202892
-get_input_pending 6814,203963
-record_asynch_buffer_change 6834,204582
-gobble_input 6872,205705
-tty_read_avail_input 6967,208313
-handle_async_input 7149,214042
-process_pending_signals 7165,214362
-unblock_input_to 7177,214648
-unblock_input 7200,215280
-totally_unblock_input 7209,215448
-handle_input_available_signal 7217,215532
-deliver_input_available_signal 7226,215703
-struct user_signal_info7235,215868
-  int sig;7238,215918
-  char *name;name7241,215959
-  int npending;7244,216010
-  struct user_signal_info *next;next7246,216027
-static struct user_signal_info *user_signals user_signals7250,216093
-add_user_signal 7253,216152
-handle_user_signal 7275,216601
-deliver_user_signal 7316,217561
-find_user_signal_name 7322,217662
-store_user_signal_events 7334,217844
-static Lisp_Object menu_bar_one_keymap_changed_items;7363,218419
-static Lisp_Object menu_bar_items_vector;7368,218633
-static int menu_bar_items_index;7369,218675
-static const char *separator_names[separator_names7372,218710
-menu_separator_name_p 7393,219151
-menu_bar_items 7426,219855
-Lisp_Object item_properties;7568,224606
-menu_bar_item 7571,224648
-menu_item_eval_property_1 7647,227178
-eval_dyn 7658,227468
-menu_item_eval_property 7666,227678
-parse_menu_item 7686,228344
-static Lisp_Object tool_bar_items_vector;7965,236339
-static Lisp_Object tool_bar_item_properties;7970,236513
-static int ntool_bar_items;7974,236609
-tool_bar_items 7990,237086
-process_tool_bar_item 8075,239895
-#define PROP(8112,240972
-set_prop 8114,241041
-parse_tool_bar_item 8167,242456
-#undef PROP8379,248847
-init_tool_bar_items 8387,248972
-append_tool_bar_item 8401,249264
-read_char_x_menu_prompt 8443,250774
-read_char_minibuf_menu_prompt 8503,252448
-#define PUSH_C_STR(8527,253017
-follow_key 8726,258556
-active_maps 8733,258698
-typedef struct keyremap8742,259024
-  Lisp_Object parent;8745,259110
-  Lisp_Object map;8748,259227
-  int start,8753,259449
-  int start, end;8753,259449
-} keyremap;8754,259467
-access_keymap_keyremap 8764,259811
-keyremap_step 8811,261453
-test_undefined 8867,262937
-read_key_sequence 8916,264864
-read_key_sequence_vs 9826,295824
-DEFUN ("read-key-sequence", Fread_key_sequence,9885,297297
-DEFUN ("read-key-sequence", Fread_key_sequence,read-key-sequence9885,297297
-DEFUN ("read-key-sequence-vector", Fread_key_sequence_vector,9938,299985
-DEFUN ("read-key-sequence-vector", Fread_key_sequence_vector,read-key-sequence-vector9938,299985
-detect_input_pending 9950,300491
-detect_input_pending_ignore_squeezables 9959,300657
-detect_input_pending_run_timers 9967,300873
-clear_input_pending 9985,301365
-requeued_events_pending_p 9997,301735
-DEFUN ("input-pending-p", Finput_pending_p,10002,301816
-DEFUN ("input-pending-p", Finput_pending_p,input-pending-p10002,301816
-DEFUN ("recent-keys", Frecent_keys,10024,302599
-DEFUN ("recent-keys", Frecent_keys,recent-keys10024,302599
-DEFUN ("this-command-keys", Fthis_command_keys,10055,303520
-DEFUN ("this-command-keys", Fthis_command_keys,this-command-keys10055,303520
-DEFUN ("this-command-keys-vector", Fthis_command_keys_vector,10068,303961
-DEFUN ("this-command-keys-vector", Fthis_command_keys_vector,this-command-keys-vector10068,303961
-DEFUN ("this-single-command-keys", Fthis_single_command_keys,10080,304383
-DEFUN ("this-single-command-keys", Fthis_single_command_keys,this-single-command-keys10080,304383
-DEFUN ("this-single-command-raw-keys", Fthis_single_command_raw_keys,10096,304958
-DEFUN ("this-single-command-raw-keys", Fthis_single_command_raw_keys,this-single-command-raw-keys10096,304958
-DEFUN ("reset-this-command-lengths", Freset_this_command_lengths,10109,305498
-DEFUN ("reset-this-command-lengths", Freset_this_command_lengths,reset-this-command-lengths10109,305498
-DEFUN ("clear-this-command-keys", Fclear_this_command_keys,10136,306513
-DEFUN ("clear-this-command-keys", Fclear_this_command_keys,clear-this-command-keys10136,306513
-DEFUN ("recursion-depth", Frecursion_depth,10158,307072
-DEFUN ("recursion-depth", Frecursion_depth,recursion-depth10158,307072
-DEFUN ("open-dribble-file", Fopen_dribble_file,10169,307409
-DEFUN ("open-dribble-file", Fopen_dribble_file,open-dribble-file10169,307409
-DEFUN ("discard-input", Fdiscard_input,10203,308450
-DEFUN ("discard-input", Fdiscard_input,discard-input10203,308450
-DEFUN ("suspend-emacs", Fsuspend_emacs,10225,308952
-DEFUN ("suspend-emacs", Fsuspend_emacs,suspend-emacs10225,308952
-stuff_buffered_input 10285,311048
-set_waiting_for_input 10323,312019
-clear_waiting_for_input 10337,312393
-handle_interrupt_signal 10351,312757
-deliver_interrupt_signal 10378,313645
-static int volatile force_quit_count;10387,313935
-handle_interrupt 10401,314417
-quit_throw_to_read_char 10541,318714
-DEFUN ("set-input-interrupt-mode", Fset_input_interrupt_mode,10562,319291
-DEFUN ("set-input-interrupt-mode", Fset_input_interrupt_mode,set-input-interrupt-mode10562,319291
-DEFUN ("set-output-flow-control", Fset_output_flow_control,10609,320519
-DEFUN ("set-output-flow-control", Fset_output_flow_control,set-output-flow-control10609,320519
-DEFUN ("set-input-meta-mode", Fset_input_meta_mode,10643,321435
-DEFUN ("set-input-meta-mode", Fset_input_meta_mode,set-input-meta-mode10643,321435
-DEFUN ("set-quit-char", Fset_quit_char,10694,322709
-DEFUN ("set-quit-char", Fset_quit_char,set-quit-char10694,322709
-DEFUN ("set-input-mode", Fset_input_mode,10729,323573
-DEFUN ("set-input-mode", Fset_input_mode,set-input-mode10729,323573
-DEFUN ("current-input-mode", Fcurrent_input_mode,10750,324462
-DEFUN ("current-input-mode", Fcurrent_input_mode,current-input-mode10750,324462
-DEFUN ("posn-at-x-y", Fposn_at_x_y,10787,325840
-DEFUN ("posn-at-x-y", Fposn_at_x_y,posn-at-x-y10787,325840
-DEFUN ("posn-at-point", Fposn_at_point,10824,327063
-DEFUN ("posn-at-point", Fposn_at_point,posn-at-point10824,327063
-init_kboard 10861,328217
-allocate_kboard 10893,329287
-wipe_kboard 10909,329640
-delete_kboard 10917,329754
-init_keyboard 10942,330284
-struct event_head11021,332699
-  short var;11023,332719
-  short kind;11024,332732
-static const struct event_head head_table[head_table11027,332750
-syms_of_keyboard 11045,333580
-keys_of_keyboard 11841,367118
-mark_kboards 11916,370437
+volatile int interrupt_input_blocked;76,1813
+volatile bool pending_signals;80,1949
+#define KBD_BUFFER_SIZE 82,1981
+KBOARD *initial_kboard;initial_kboard84,2011
+KBOARD *current_kboard;current_kboard85,2035
+static KBOARD *all_kboards;all_kboards86,2059
+static bool single_kboard;89,2159
+#define NUM_RECENT_KEYS 91,2187
+static int recent_keys_index;94,2274
+static int total_keys;97,2362
+static Lisp_Object recent_keys;100,2448
+Lisp_Object this_command_keys;107,2782
+ptrdiff_t this_command_key_count;108,2813
+static bool this_command_key_count_reset;112,2927
+static Lisp_Object raw_keybuf;116,3079
+static int raw_keybuf_count;117,3110
+#define GROW_RAW_KEYBUF	119,3140
+static ptrdiff_t this_single_command_key_start;125,3355
+static ptrdiff_t before_command_key_count;129,3503
+static ptrdiff_t before_command_echo_length;130,3546
+sigjmp_buf return_to_command_loop;135,3682
+static Lisp_Object recover_top_level_message;138,3796
+static Lisp_Object regular_top_level_message;143,3935
+static sys_jmp_buf getcjmp;147,4036
+bool waiting_for_input;150,4100
+static bool echoing;154,4191
+static struct kboard *ok_to_echo_at_next_pause;ok_to_echo_at_next_pause159,4333
+struct kboard *echo_kboard;echo_kboard166,4637
+Lisp_Object echo_message_buffer;171,4749
+bool immediate_quit;174,4842
+int quit_char;192,5628
+EMACS_INT command_loop_level;195,5685
+Lisp_Object unread_switch_frame;204,6113
+static ptrdiff_t last_non_minibuf_size;207,6221
+uintmax_t num_input_events;210,6339
+static EMACS_INT last_auto_save;214,6433
+static ptrdiff_t last_point_position;217,6528
+Lisp_Object internal_last_event_frame;228,7033
+static Lisp_Object read_key_sequence_cmd;232,7173
+static Lisp_Object read_key_sequence_remapped;233,7215
+static FILE *dribble;dribble236,7315
+bool input_pending;239,7373
+static bool input_was_pending;287,10027
+static struct input_event kbd_buffer[kbd_buffer291,10112
+static struct input_event *kbd_fetch_ptr;kbd_fetch_ptr297,10391
+static struct input_event * volatile kbd_store_ptr;302,10606
+unsigned timers_run;320,11301
+struct timespec *input_available_clear_time;input_available_clear_time324,11413
+bool interrupt_input;328,11578
+bool interrupts_deferred;331,11676
+static struct timespec timer_idleness_start_time;335,11751
+static struct timespec timer_last_idleness_start_time;340,11921
+#define READABLE_EVENTS_DO_TIMERS_NOW	346,12051
+#define READABLE_EVENTS_FILTER_EVENTS	347,12099
+#define READABLE_EVENTS_IGNORE_SQUEEZABLES	348,12147
+kset_echo_string 392,14093
+kset_kbd_queue 397,14189
+kset_keyboard_translate_table 402,14281
+kset_last_prefix_arg 407,14404
+kset_last_repeatable_command 412,14509
+kset_local_function_key_map 417,14630
+kset_overriding_terminal_local_map 422,14749
+kset_real_last_command 427,14882
+kset_system_key_syms 432,14991
+echo_add_key 443,15254
+echo_char 527,17532
+echo_dash 541,17818
+echo_now 586,19145
+cancel_echoing 635,20619
+echo_length 648,20927
+echo_truncate 660,21258
+add_command_key 672,21587
+recursive_edit_1 697,22411
+record_auto_save 742,23853
+force_auto_save_soon 751,24021
+DEFUN ("recursive-edit", Frecursive_edit,759,24142
+DEFUN ("recursive-edit", Frecursive_edit,recursive-edit759,24142
+recursive_edit_unwind 804,25755
+any_kboard_state 817,26021
+single_kboard_state 838,26673
+not_single_kboard_state 848,26811
+struct kboard_stack858,27073
+  KBOARD *kboard;kboard860,27095
+  struct kboard_stack *next;next861,27113
+static struct kboard_stack *kboard_stack;kboard_stack864,27146
+push_kboard 867,27194
+pop_kboard 879,27383
+temporarily_switch_to_single_kboard 914,28271
+record_single_kboard_state 943,29445
+restore_kboard_configuration 952,29629
+cmd_error 970,30085
+cmd_error_internal 1024,31518
+DEFUN ("command-error-default-function", Fcommand_error_default_function,1043,32038
+DEFUN ("command-error-default-function", Fcommand_error_default_function,command-error-default-function1043,32038
+command_loop 1094,33924
+command_loop_2 1134,35143
+top_level_2 1146,35347
+top_level_1 1152,35425
+DEFUN ("top-level", Ftop_level,1164,35795
+DEFUN ("top-level", Ftop_level,top-level1164,35795
+user_error 1183,36296
+DEFUN ("exit-recursive-edit", Fexit_recursive_edit,1189,36437
+DEFUN ("exit-recursive-edit", Fexit_recursive_edit,exit-recursive-edit1189,36437
+DEFUN ("abort-recursive-edit", Fabort_recursive_edit,1201,36827
+DEFUN ("abort-recursive-edit", Fabort_recursive_edit,abort-recursive-edit1201,36827
+tracking_off 1216,37289
+DEFUN ("internal--track-mouse", Ftrack_mouse,1234,37824
+DEFUN ("internal--track-mouse", Ftrack_mouse,track-mouse1234,37824
+bool ignore_mouse_drag_p;1256,38400
+some_mouse_moved 1259,38449
+Lisp_Object last_undo_boundary;1287,39040
+command_loop_1 1294,39281
+read_menu_command 1649,50897
+adjust_point_for_property 1678,51625
+safe_run_hooks_1 1831,57347
+safe_run_hooks_error 1841,57577
+safe_run_hook_funcall 1878,58584
+safe_run_hooks 1893,59066
+int poll_suppress_count;1908,59405
+static struct atimer *poll_timer;poll_timer1915,59495
+poll_for_input_1 1919,59597
+poll_for_input 1930,59797
+start_polling 1942,60061
+input_polling_used 1979,61099
+stop_polling 1994,61398
+set_poll_suppress_count 2009,61767
+bind_polling_period 2029,62149
+make_ctrl_char 2048,62500
+show_help_echo 2113,64463
+static Lisp_Object help_form_saved_window_configs;2156,65646
+read_char_help_form_unwind 2158,65709
+#define STOP_POLLING	2166,65967
+#define RESUME_POLLING	2170,66092
+read_event_from_main_queue 2175,66237
+read_decoded_event_from_main_queue 2249,68425
+#define MAX_ENCODED_BYTES 2254,68672
+echo_keystrokes_p 2342,71564
+read_char 2376,72856
+record_menu_key 3225,98957
+help_char_p 3258,99682
+record_char 3273,99961
+save_getcjmp 3412,104243
+restore_getcjmp 3418,104334
+readable_events 3430,104705
+int stop_character EXTERNALLY_VISIBLE;3497,106445
+event_to_kboard 3500,106501
+kbd_buffer_nr_stored 3522,107150
+kbd_buffer_store_event 3534,107491
+kbd_buffer_store_event_hold 3550,108033
+kbd_buffer_unget_event 3684,111625
+#define INPUT_EVENT_POS_MAX 3698,112026
+#define INPUT_EVENT_POS_MIN 3701,112155
+position_to_Time 3706,112295
+Time_to_position 3716,112522
+gen_help_event 3738,113179
+kbd_buffer_store_help_event 3756,113619
+discard_mouse_events 3773,113984
+kbd_buffer_events_waiting 3803,114719
+clear_event 3823,115076
+kbd_buffer_get_event 3836,115416
+process_special_events 4258,127889
+swallow_events 4322,129713
+timer_start_idle 4339,130106
+timer_stop_idle 4355,130584
+timer_resume_idle 4363,130728
+struct input_event last_timer_event EXTERNALLY_VISIBLE;4372,130920
+Lisp_Object pending_funcalls;4377,131180
+decode_timer 4381,131301
+timer_check_2 4414,132254
+timer_check 4572,136825
+DEFUN ("current-idle-time", Fcurrent_idle_time,4607,137670
+DEFUN ("current-idle-time", Fcurrent_idle_time,current-idle-time4607,137670
+static Lisp_Object accent_key_syms;4625,138247
+static Lisp_Object func_key_syms;4626,138283
+static Lisp_Object mouse_syms;4627,138317
+static Lisp_Object wheel_syms;4628,138348
+static Lisp_Object drag_n_drop_syms;4629,138379
+static const int lispy_accent_codes[lispy_accent_codes4634,138524
+static const char *const lispy_accent_keys[lispy_accent_keys4741,139886
+#define FUNCTION_KEY_OFFSET 4766,140322
+const char *const lispy_function_keys[lispy_function_keys4768,140355
+static const char *const lispy_multimedia_keys[lispy_multimedia_keys4962,148909
+static const char *const lispy_kana_keys[lispy_kana_keys5026,150143
+#define FUNCTION_KEY_OFFSET 5061,151759
+static const char *const lispy_function_keys[lispy_function_keys5065,151902
+#define ISO_FUNCTION_KEY_OFFSET 5149,154437
+static const char *const iso_lispy_function_keys[iso_lispy_function_keys5151,154477
+static Lisp_Object Vlispy_mouse_stem;5172,155336
+static const char *const lispy_wheel_names[lispy_wheel_names5174,155375
+static const char *const lispy_drag_n_drop_names[lispy_drag_n_drop_names5181,155627
+static short const scroll_bar_parts[scroll_bar_parts5189,155893
+static Lisp_Object button_down_location;5210,156918
+static int last_mouse_button;5215,157073
+static int last_mouse_x;5216,157103
+static int last_mouse_y;5217,157128
+static Time button_down_time;5218,157153
+static int double_click_count;5222,157237
+make_lispy_position 5228,157398
+toolkit_menubar_in_use 5456,163961
+make_scroll_bar_position 5469,164329
+make_lispy_event 5485,164975
+make_lispy_movement 6104,183538
+make_lispy_switch_frame 6131,184269
+make_lispy_focus_in 6137,184376
+make_lispy_focus_out 6145,184502
+parse_modifiers_uncached 6163,184952
+#define SINGLE_LETTER_MOD(6185,185472
+#undef SINGLE_LETTER_MOD6212,185913
+#define MULTI_LETTER_MOD(6214,185939
+#undef MULTI_LETTER_MOD6231,186407
+apply_modifiers_uncached 6273,187581
+static const char *const modifier_names[modifier_names6319,189200
+#define NUM_MOD_NAMES 6325,189406
+static Lisp_Object modifier_symbols;6327,189456
+lispy_modifier_list 6331,189593
+#define KEY_TO_CHAR(6353,190259
+parse_modifiers 6356,190335
+DEFUN ("internal-event-symbol-parse-modifiers", Fevent_symbol_parse_modifiers,6399,191524
+DEFUN ("internal-event-symbol-parse-modifiers", Fevent_symbol_parse_modifiers,event-symbol-parse-modifiers6399,191524
+apply_modifiers 6422,192398
+reorder_modifiers 6491,194727
+modify_event_symbol 6536,196535
+DEFUN ("event-convert-list", Fevent_convert_list,6628,199251
+DEFUN ("event-convert-list", Fevent_convert_list,event-convert-list6628,199251
+parse_solitary_modifier 6695,201142
+#define SINGLE_LETTER_MOD(6701,201265
+#define MULTI_LETTER_MOD(6705,201350
+#undef SINGLE_LETTER_MOD6763,202648
+#undef MULTI_LETTER_MOD6764,202673
+lucid_event_type_list_p 6775,202896
+get_input_pending 6814,203967
+record_asynch_buffer_change 6834,204586
+gobble_input 6872,205709
+tty_read_avail_input 6967,208317
+handle_async_input 7149,214046
+process_pending_signals 7165,214366
+unblock_input_to 7177,214652
+unblock_input 7200,215284
+totally_unblock_input 7209,215452
+handle_input_available_signal 7217,215536
+deliver_input_available_signal 7226,215707
+struct user_signal_info7235,215872
+  int sig;7238,215922
+  char *name;name7241,215963
+  int npending;7244,216014
+  struct user_signal_info *next;next7246,216031
+static struct user_signal_info *user_signals user_signals7250,216097
+add_user_signal 7253,216156
+handle_user_signal 7275,216605
+deliver_user_signal 7316,217565
+find_user_signal_name 7322,217666
+store_user_signal_events 7334,217848
+static Lisp_Object menu_bar_one_keymap_changed_items;7363,218423
+static Lisp_Object menu_bar_items_vector;7368,218637
+static int menu_bar_items_index;7369,218679
+static const char *separator_names[separator_names7372,218714
+menu_separator_name_p 7393,219155
+menu_bar_items 7426,219859
+Lisp_Object item_properties;7568,224610
+menu_bar_item 7571,224652
+menu_item_eval_property_1 7647,227182
+eval_dyn 7658,227472
+menu_item_eval_property 7666,227682
+parse_menu_item 7686,228348
+static Lisp_Object tool_bar_items_vector;7965,236343
+static Lisp_Object tool_bar_item_properties;7970,236517
+static int ntool_bar_items;7974,236613
+tool_bar_items 7990,237090
+process_tool_bar_item 8075,239899
+#define PROP(8112,240976
+set_prop 8114,241045
+parse_tool_bar_item 8167,242460
+#undef PROP8379,248851
+init_tool_bar_items 8387,248976
+append_tool_bar_item 8401,249268
+read_char_x_menu_prompt 8443,250778
+read_char_minibuf_menu_prompt 8503,252452
+#define PUSH_C_STR(8527,253021
+follow_key 8726,258560
+active_maps 8733,258702
+typedef struct keyremap8742,259028
+  Lisp_Object parent;8745,259114
+  Lisp_Object map;8748,259231
+  int start,8753,259453
+  int start, end;8753,259453
+} keyremap;8754,259471
+access_keymap_keyremap 8764,259815
+keyremap_step 8811,261457
+test_undefined 8867,262941
+read_key_sequence 8916,264868
+read_key_sequence_vs 9826,295828
+DEFUN ("read-key-sequence", Fread_key_sequence,9885,297301
+DEFUN ("read-key-sequence", Fread_key_sequence,read-key-sequence9885,297301
+DEFUN ("read-key-sequence-vector", Fread_key_sequence_vector,9938,299989
+DEFUN ("read-key-sequence-vector", Fread_key_sequence_vector,read-key-sequence-vector9938,299989
+detect_input_pending 9950,300495
+detect_input_pending_ignore_squeezables 9959,300661
+detect_input_pending_run_timers 9967,300877
+clear_input_pending 9985,301369
+requeued_events_pending_p 9997,301739
+DEFUN ("input-pending-p", Finput_pending_p,10002,301820
+DEFUN ("input-pending-p", Finput_pending_p,input-pending-p10002,301820
+DEFUN ("recent-keys", Frecent_keys,10024,302603
+DEFUN ("recent-keys", Frecent_keys,recent-keys10024,302603
+DEFUN ("this-command-keys", Fthis_command_keys,10055,303524
+DEFUN ("this-command-keys", Fthis_command_keys,this-command-keys10055,303524
+DEFUN ("this-command-keys-vector", Fthis_command_keys_vector,10068,303965
+DEFUN ("this-command-keys-vector", Fthis_command_keys_vector,this-command-keys-vector10068,303965
+DEFUN ("this-single-command-keys", Fthis_single_command_keys,10080,304387
+DEFUN ("this-single-command-keys", Fthis_single_command_keys,this-single-command-keys10080,304387
+DEFUN ("this-single-command-raw-keys", Fthis_single_command_raw_keys,10096,304962
+DEFUN ("this-single-command-raw-keys", Fthis_single_command_raw_keys,this-single-command-raw-keys10096,304962
+DEFUN ("reset-this-command-lengths", Freset_this_command_lengths,10109,305502
+DEFUN ("reset-this-command-lengths", Freset_this_command_lengths,reset-this-command-lengths10109,305502
+DEFUN ("clear-this-command-keys", Fclear_this_command_keys,10136,306517
+DEFUN ("clear-this-command-keys", Fclear_this_command_keys,clear-this-command-keys10136,306517
+DEFUN ("recursion-depth", Frecursion_depth,10158,307076
+DEFUN ("recursion-depth", Frecursion_depth,recursion-depth10158,307076
+DEFUN ("open-dribble-file", Fopen_dribble_file,10169,307413
+DEFUN ("open-dribble-file", Fopen_dribble_file,open-dribble-file10169,307413
+DEFUN ("discard-input", Fdiscard_input,10203,308454
+DEFUN ("discard-input", Fdiscard_input,discard-input10203,308454
+DEFUN ("suspend-emacs", Fsuspend_emacs,10225,308956
+DEFUN ("suspend-emacs", Fsuspend_emacs,suspend-emacs10225,308956
+stuff_buffered_input 10285,311052
+set_waiting_for_input 10323,312023
+clear_waiting_for_input 10337,312397
+handle_interrupt_signal 10351,312761
+deliver_interrupt_signal 10378,313649
+static int volatile force_quit_count;10387,313939
+handle_interrupt 10401,314421
+quit_throw_to_read_char 10541,318718
+DEFUN ("set-input-interrupt-mode", Fset_input_interrupt_mode,10562,319295
+DEFUN ("set-input-interrupt-mode", Fset_input_interrupt_mode,set-input-interrupt-mode10562,319295
+DEFUN ("set-output-flow-control", Fset_output_flow_control,10609,320523
+DEFUN ("set-output-flow-control", Fset_output_flow_control,set-output-flow-control10609,320523
+DEFUN ("set-input-meta-mode", Fset_input_meta_mode,10643,321439
+DEFUN ("set-input-meta-mode", Fset_input_meta_mode,set-input-meta-mode10643,321439
+DEFUN ("set-quit-char", Fset_quit_char,10694,322713
+DEFUN ("set-quit-char", Fset_quit_char,set-quit-char10694,322713
+DEFUN ("set-input-mode", Fset_input_mode,10729,323577
+DEFUN ("set-input-mode", Fset_input_mode,set-input-mode10729,323577
+DEFUN ("current-input-mode", Fcurrent_input_mode,10750,324466
+DEFUN ("current-input-mode", Fcurrent_input_mode,current-input-mode10750,324466
+DEFUN ("posn-at-x-y", Fposn_at_x_y,10787,325844
+DEFUN ("posn-at-x-y", Fposn_at_x_y,posn-at-x-y10787,325844
+DEFUN ("posn-at-point", Fposn_at_point,10824,327067
+DEFUN ("posn-at-point", Fposn_at_point,posn-at-point10824,327067
+init_kboard 10861,328221
+allocate_kboard 10893,329291
+wipe_kboard 10909,329644
+delete_kboard 10917,329758
+init_keyboard 10942,330288
+struct event_head11021,332703
+  short var;11023,332723
+  short kind;11024,332736
+static const struct event_head head_table[head_table11027,332754
+syms_of_keyboard 11045,333584
+keys_of_keyboard 11841,367122
+mark_kboards 11916,370441
 
 c-src/emacs/src/lisp.h,27827
-#define EMACS_LISP_H22,801
-#define DECLARE_GDB_SYM(47,1422
-# define DEFINE_GDB_SYMBOL_BEGIN(49,1509
-# define DEFINE_GDB_SYMBOL_END(50,1579
-# define DEFINE_GDB_SYMBOL_BEGIN(52,1626
-# define DEFINE_GDB_SYMBOL_END(53,1703
-#undef min57,1791
-#undef max58,1802
-#define max(59,1813
-#define min(60,1855
-#define ARRAYELTS(63,1937
-#define GCTYPEBITS 67,2080
-DEFINE_GDB_SYMBOL_BEGIN GCTYPEBITS66,2038
-# define NONPOINTER_BITS 78,2568
-# define NONPOINTER_BITS 80,2601
-typedef int EMACS_INT;91,3024
-typedef unsigned int EMACS_UINT;92,3047
-#  define EMACS_INT_MAX 93,3080
-#  define pI 94,3112
-typedef long int EMACS_INT;96,3204
-typedef unsigned long EMACS_UINT;97,3232
-#  define EMACS_INT_MAX 98,3266
-#  define pI 99,3299
-typedef long long int EMACS_INT;103,3478
-typedef unsigned long long int EMACS_UINT;104,3511
-#  define EMACS_INT_MAX 105,3554
-#  define pI 106,3588
-enum {  BOOL_VECTOR_BITS_PER_CHAR 114,3805
-#define BOOL_VECTOR_BITS_PER_CHAR 115,3841
-typedef size_t bits_word;123,4166
-# define BITS_WORD_MAX 124,4192
-enum { BITS_PER_BITS_WORD 125,4224
-typedef unsigned char bits_word;127,4291
-# define BITS_WORD_MAX 128,4324
-enum { BITS_PER_BITS_WORD 129,4387
-    BITS_PER_CHAR 136,4571
-    BITS_PER_SHORT 137,4606
-    BITS_PER_LONG 138,4658
-    BITS_PER_EMACS_INT 139,4713
-typedef intmax_t printmax_t;148,5090
-typedef uintmax_t uprintmax_t;149,5119
-# define pMd 150,5150
-# define pMu 151,5171
-typedef EMACS_INT printmax_t;153,5198
-typedef EMACS_UINT uprintmax_t;154,5228
-# define pMd 155,5260
-# define pMu 156,5279
-# define pD 165,5665
-# define pD 167,5710
-# define pD 169,5757
-# define pD 171,5780
-# define eassert(200,7063
-# define eassume(201,7141
-# define eassert(208,7320
-# define eassume(212,7451
-enum Lisp_Bits239,8520
-#define GCALIGNMENT 243,8648
-    VALBITS 246,8743
-    INTTYPEBITS 249,8839
-    FIXNUM_BITS 252,8946
-#define VAL_MAX 263,9328
-#define USE_LSB_TAG 271,9778
-DEFINE_GDB_SYMBOL_BEGIN USE_LSB_TAG270,9734
-# define alignas(281,10078
-# define GCALIGNED 288,10228
-# define GCALIGNED 290,10293
-# define lisp_h_XLI(327,11643
-# define lisp_h_XIL(328,11674
-# define lisp_h_XLI(330,11725
-# define lisp_h_XIL(331,11752
-#define lisp_h_CHECK_LIST_CONS(333,11786
-#define lisp_h_CHECK_NUMBER(334,11857
-#define lisp_h_CHECK_SYMBOL(335,11928
-#define lisp_h_CHECK_TYPE(336,11997
-#define lisp_h_CONSP(338,12108
-#define lisp_h_EQ(339,12157
-#define lisp_h_FLOATP(340,12202
-#define lisp_h_INTEGERP(341,12253
-#define lisp_h_MARKERP(342,12334
-#define lisp_h_MISCP(343,12409
-#define lisp_h_NILP(344,12458
-#define lisp_h_SET_SYMBOL_VAL(345,12494
-#define lisp_h_SYMBOL_CONSTANT_P(347,12608
-#define lisp_h_SYMBOL_VAL(348,12672
-#define lisp_h_SYMBOLP(350,12773
-#define lisp_h_VECTORLIKEP(351,12826
-#define lisp_h_XCAR(352,12887
-#define lisp_h_XCDR(353,12925
-#define lisp_h_XCONS(354,12965
-#define lisp_h_XHASH(356,13060
-#define lisp_h_XPNTR(357,13094
-# define lisp_h_check_cons_list(360,13222
-# define lisp_h_make_number(363,13290
-# define lisp_h_XFASTINT(365,13393
-# define lisp_h_XINT(366,13430
-# define lisp_h_XSYMBOL(367,13479
-# define lisp_h_XTYPE(371,13632
-# define lisp_h_XUNTAG(372,13697
-# define XLI(381,14087
-# define XIL(382,14118
-# define CHECK_LIST_CONS(383,14149
-# define CHECK_NUMBER(384,14210
-# define CHECK_SYMBOL(385,14259
-# define CHECK_TYPE(386,14308
-# define CONSP(387,14383
-# define EQ(388,14418
-# define FLOATP(389,14453
-# define INTEGERP(390,14490
-# define MARKERP(391,14531
-# define MISCP(392,14570
-# define NILP(393,14605
-# define SET_SYMBOL_VAL(394,14638
-# define SYMBOL_CONSTANT_P(395,14701
-# define SYMBOL_VAL(396,14764
-# define SYMBOLP(397,14813
-# define VECTORLIKEP(398,14852
-# define XCAR(399,14899
-# define XCDR(400,14932
-# define XCONS(401,14965
-# define XHASH(402,15000
-# define XPNTR(403,15035
-#  define check_cons_list(405,15098
-#  define make_number(408,15177
-#  define XFASTINT(409,15225
-#  define XINT(410,15267
-#  define XSYMBOL(411,15301
-#  define XTYPE(412,15341
-#  define XUNTAG(413,15377
-#define LISP_MACRO_DEFUN(421,15673
-#define LISP_MACRO_DEFUN_VOID(425,15846
-#define INTMASK 437,16290
-#define case_Lisp_Int 438,16343
-#define ENUM_BF(445,16682
-#define ENUM_BF(447,16723
-enum Lisp_Type451,16764
-    Lisp_Symbol 454,16852
-    Lisp_Misc 458,16994
-    Lisp_Int0 461,17068
-    Lisp_Int1 462,17087
-    Lisp_String 466,17265
-    Lisp_Vectorlike 472,17544
-    Lisp_Cons 475,17633
-    Lisp_Float 477,17671
-enum Lisp_Misc_Type485,18017
-    Lisp_Misc_Free 487,18041
-    Lisp_Misc_Marker,488,18070
-    Lisp_Misc_Overlay,489,18092
-    Lisp_Misc_Save_Value,490,18115
-    Lisp_Misc_Finalizer,491,18141
-    Lisp_Misc_Float,494,18276
-    Lisp_Misc_Limit496,18360
-enum Lisp_Fwd_Type502,18544
-    Lisp_Fwd_Int,504,18567
-    Lisp_Fwd_Bool,505,18620
-    Lisp_Fwd_Obj,506,18671
-    Lisp_Fwd_Buffer_Obj,507,18730
-    Lisp_Fwd_Kboard_Obj	508,18801
-typedef struct { EMACS_INT i;567,21772
-typedef struct { EMACS_INT i; } Lisp_Object;567,21772
-#define LISP_INITIALLY(569,21818
-#undef CHECK_LISP_OBJECT_TYPE571,21849
-enum CHECK_LISP_OBJECT_TYPE 572,21879
-enum CHECK_LISP_OBJECT_TYPE { CHECK_LISP_OBJECT_TYPE 572,21879
-typedef EMACS_INT Lisp_Object;577,22055
-#define LISP_INITIALLY(578,22086
-enum CHECK_LISP_OBJECT_TYPE 579,22116
-enum CHECK_LISP_OBJECT_TYPE { CHECK_LISP_OBJECT_TYPE 579,22116
-#define LISP_INITIALLY_ZERO 582,22217
-enum symbol_interned639,24190
-  SYMBOL_UNINTERNED 641,24213
-  SYMBOL_INTERNED 642,24238
-  SYMBOL_INTERNED_IN_INITIAL_OBARRAY 643,24261
-enum symbol_redirect646,24306
-  SYMBOL_PLAINVAL 648,24329
-  SYMBOL_VARALIAS 649,24353
-  SYMBOL_LOCALIZED 650,24377
-  SYMBOL_FORWARDED 651,24401
-struct Lisp_Symbol654,24428
-  bool_bf gcmarkbit 656,24449
-  ENUM_BF (symbol_redirect) redirect 663,24784
-  unsigned constant 668,25002
-  unsigned interned 672,25122
-  bool_bf declared_special 676,25284
-  bool_bf pinned 679,25385
-  Lisp_Object name;682,25454
-    Lisp_Object value;687,25622
-    struct Lisp_Symbol *alias;alias688,25645
-    struct Lisp_Buffer_Local_Value *blv;blv689,25676
-    union Lisp_Fwd *fwd;fwd690,25717
-  } val;691,25742
-  Lisp_Object function;694,25814
-  Lisp_Object plist;697,25876
-  struct Lisp_Symbol *next;next700,25965
-#define EXFUN(707,26243
-#define DEFUN_ARGS_MANY	712,26437
-#define DEFUN_ARGS_UNEVALLED	713,26489
-#define DEFUN_ARGS_0	714,26532
-#define DEFUN_ARGS_1	715,26560
-#define DEFUN_ARGS_2	716,26595
-#define DEFUN_ARGS_3	717,26643
-#define DEFUN_ARGS_4	718,26704
-#define DEFUN_ARGS_5	719,26778
-#define DEFUN_ARGS_6	721,26871
-#define DEFUN_ARGS_7	723,26977
-#define DEFUN_ARGS_8	725,27096
-#define TAG_PTR(729,27287
-#define TAG_SYMOFFSET(734,27534
-#define XLI_BUILTIN_LISPSYM(741,27833
-#define DEFINE_LISP_SYMBOL(746,28092
-# define DEFINE_NON_NIL_Q_SYMBOL_MACROS 755,28563
-LISP_MACRO_DEFUN 762,28768
-# define ARRAY_MARK_FLAG 768,29015
-# define PSEUDOVECTOR_FLAG 774,29258
-enum pvec_type780,29559
-  PVEC_NORMAL_VECTOR,782,29576
-  PVEC_FREE,783,29598
-  PVEC_PROCESS,784,29611
-  PVEC_FRAME,785,29627
-  PVEC_WINDOW,786,29641
-  PVEC_BOOL_VECTOR,787,29656
-  PVEC_BUFFER,788,29676
-  PVEC_HASH_TABLE,789,29691
-  PVEC_TERMINAL,790,29710
-  PVEC_WINDOW_CONFIGURATION,791,29727
-  PVEC_SUBR,792,29756
-  PVEC_OTHER,793,29769
-  PVEC_COMPILED,795,29847
-  PVEC_CHAR_TABLE,796,29864
-  PVEC_SUB_CHAR_TABLE,797,29883
-  PVEC_FONT 798,29906
-enum More_Lisp_Bits801,29982
-    PSEUDOVECTOR_SIZE_BITS 808,30373
-    PSEUDOVECTOR_SIZE_MASK 809,30406
-    PSEUDOVECTOR_REST_BITS 813,30616
-    PSEUDOVECTOR_REST_MASK 814,30649
-    PSEUDOVECTOR_AREA_BITS 818,30814
-    PVEC_TYPE_MASK 819,30892
-# define VALMASK 829,31293
-DEFINE_GDB_SYMBOL_BEGIN VALMASK828,31248
-#define MOST_POSITIVE_FIXNUM 834,31523
-#define MOST_NEGATIVE_FIXNUM 835,31583
-XINT 874,32675
-XFASTINT 889,33026
-XSYMBOL 899,33254
-XTYPE 910,33472
-XUNTAG 918,33652
-LISP_MACRO_DEFUN 927,33848
-LISP_MACRO_DEFUN 940,34233
-#define FIXNUM_OVERFLOW_P(958,34846
-LISP_MACRO_DEFUN FIXNUM_OVERFLOW_P952,34623
-LISP_MACRO_DEFUN 970,35162
-XSTRING 980,35382
-#define SYMBOL_INDEX(988,35566
-XFLOAT 991,35627
-XPROCESS 1000,35769
-XWINDOW 1007,35886
-XTERMINAL 1014,36003
-XSUBR 1021,36125
-XBUFFER 1028,36236
-XCHAR_TABLE 1035,36360
-XSUB_CHAR_TABLE 1042,36497
-XBOOL_VECTOR 1049,36639
-make_lisp_ptr 1058,36818
-make_lisp_symbol 1066,37004
-builtin_lisp_symbol 1074,37188
-#define XSETINT(1079,37270
-#define XSETFASTINT(1080,37316
-#define XSETCONS(1081,37366
-#define XSETVECTOR(1082,37426
-#define XSETSTRING(1083,37494
-#define XSETSYMBOL(1084,37558
-#define XSETFLOAT(1085,37612
-#define XSETMISC(1086,37674
-#define XSETPVECTYPE(1090,37763
-#define XSETPVECTYPESIZE(1092,37879
-#define XSETPSEUDOVECTOR(1099,38176
-#define XSETTYPED_PSEUDOVECTOR(1105,38360
-#define XSETWINDOW_CONFIGURATION(1110,38570
-#define XSETPROCESS(1112,38666
-#define XSETWINDOW(1113,38732
-#define XSETTERMINAL(1114,38796
-#define XSETSUBR(1115,38864
-#define XSETCOMPILED(1116,38924
-#define XSETBUFFER(1117,38992
-#define XSETCHAR_TABLE(1118,39056
-#define XSETBOOL_VECTOR(1119,39128
-#define XSETSUB_CHAR_TABLE(1120,39202
-XINTPTR 1128,39572
-make_pointer_integer 1134,39652
-LISP_MACRO_DEFUN_VOID 1143,39817
-typedef struct interval *INTERVAL;INTERVAL1149,39978
-      Lisp_Object cdr;1159,40153
-      struct Lisp_Cons *chain;chain1162,40227
-xcar_addr 1174,40751
-xcdr_addr 1179,40828
-LISP_MACRO_DEFUN 1185,40922
-XSETCDR 1198,41298
-CAR 1205,41448
-CDR 1212,41582
-CAR_SAFE 1221,41782
-CDR_SAFE 1226,41868
-STRING_MULTIBYTE 1243,42241
-#define STRING_BYTES_BOUND 1261,43048
-#define STRING_SET_UNIBYTE(1265,43192
-#define STRING_SET_MULTIBYTE(1275,43507
-SDATA 1286,43821
-SSDATA 1291,43899
-SREF 1297,44028
-SSET 1302,44119
-SCHARS 1307,44233
-STRING_BYTES 1316,44406
-SBYTES 1326,44586
-STRING_SET_CHARS 1331,44672
-struct vectorlike_header1343,45223
-    ptrdiff_t size;1364,46374
-struct Lisp_Vector1369,46473
-    struct vectorlike_header header;1371,46496
-    Lisp_Object contents[contents1372,46533
-    ALIGNOF_STRUCT_LISP_VECTOR1378,46672
-struct Lisp_Bool_Vector1384,46855
-    struct vectorlike_header header;1388,47003
-    EMACS_INT size;1390,47077
-    bits_word data[data1395,47310
-bool_vector_size 1399,47376
-bool_vector_data 1407,47514
-bool_vector_uchar_data 1413,47608
-bool_vector_words 1421,47794
-bool_vector_bytes 1428,47989
-bool_vector_bitref 1437,48229
-bool_vector_ref 1445,48469
-bool_vector_set 1453,48609
-    header_size 1471,49038
-    bool_header_size 1472,49097
-    word_size 1473,49162
-AREF 1479,49275
-aref_addr 1485,49382
-ASIZE 1491,49492
-ASET 1497,49574
-gc_aset 1504,49733
-enum { NIL_IS_ZERO 1515,50260
-memclear 1520,50455
-#define VECSIZE(1531,50753
-#define PSEUDOVECSIZE(1538,51038
-#define UNSIGNED_CMP(1546,51471
-#define ASCII_CHAR_P(1552,51725
-enum CHARTAB_SIZE_BITS1565,52480
-    CHARTAB_SIZE_BITS_0 1567,52507
-    CHARTAB_SIZE_BITS_1 1568,52536
-    CHARTAB_SIZE_BITS_2 1569,52565
-    CHARTAB_SIZE_BITS_3 1570,52594
-struct Lisp_Char_Table1575,52663
-    struct vectorlike_header header;1581,52919
-    Lisp_Object defalt;1585,53069
-    Lisp_Object parent;1590,53271
-    Lisp_Object purpose;1594,53389
-    Lisp_Object ascii;1598,53555
-    Lisp_Object contents[contents1600,53579
-    Lisp_Object extras[extras1603,53690
-struct Lisp_Sub_Char_Table1606,53743
-    struct vectorlike_header header;1610,53909
-    int depth;1618,54332
-    int min_char;1621,54408
-    Lisp_Object contents[contents1624,54483
-CHAR_TABLE_REF_ASCII 1628,54557
-CHAR_TABLE_REF 1648,55104
-CHAR_TABLE_SET 1658,55393
-struct Lisp_Subr1670,55777
-    struct vectorlike_header header;1672,55798
-      Lisp_Object (*a0)a01674,55847
-      Lisp_Object (*a1)a11675,55879
-      Lisp_Object (*a2)a21676,55918
-      Lisp_Object (*a3)a31677,55970
-      Lisp_Object (*a4)a41678,56035
-      Lisp_Object (*a5)a51679,56113
-      Lisp_Object (*a6)a61680,56204
-      Lisp_Object (*a7)a71681,56308
-      Lisp_Object (*a8)a81682,56425
-      Lisp_Object (*aUNEVALLED)aUNEVALLED1683,56555
-      Lisp_Object (*aMANY)aMANY1684,56607
-    } function;1685,56662
-    short min_args,1686,56678
-    short min_args, max_args;1686,56678
-    const char *symbol_name;symbol_name1687,56708
-    const char *intspec;intspec1688,56737
-    const char *doc;doc1689,56762
-enum char_table_specials1692,56789
-    CHAR_TABLE_STANDARD_SLOTS 1697,56984
-    SUB_CHAR_TABLE_OFFSET 1701,57205
-CHAR_TABLE_EXTRA_SLOTS 1707,57368
-LISP_MACRO_DEFUN 1723,57912
-SYMBOL_BLV 1732,58172
-SYMBOL_FWD 1738,58307
-LISP_MACRO_DEFUN_VOID 1744,58419
-SET_SYMBOL_BLV 1754,58682
-SET_SYMBOL_FWD 1760,58841
-SYMBOL_NAME 1767,58992
-SYMBOL_INTERNED_P 1775,59121
-SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P 1783,59290
-#define DEFSYM(1796,59800
-LISP_MACRO_DEFUN DEFSYM1792,59621
-struct hash_table_test1805,60053
-  Lisp_Object name;1808,60130
-  Lisp_Object user_hash_function;1811,60197
-  Lisp_Object user_cmp_function;1814,60288
-  bool (*cmpfn)cmpfn1817,60363
-  EMACS_UINT (*hashfn)hashfn1820,60477
-struct Lisp_Hash_Table1823,60546
-  struct vectorlike_header header;1826,60640
-  Lisp_Object weak;1830,60774
-  Lisp_Object rehash_size;1835,60998
-  Lisp_Object rehash_threshold;1839,61120
-  Lisp_Object hash;1843,61251
-  Lisp_Object next;1848,61481
-  Lisp_Object next_free;1851,61551
-  Lisp_Object index;1856,61762
-  ptrdiff_t count;1863,62032
-  Lisp_Object key_and_value;1868,62231
-  struct hash_table_test test;1871,62305
-  struct Lisp_Hash_Table *next_weak;next_weak1875,62448
-XHASH_TABLE 1880,62522
-#define XSET_HASH_TABLE(1885,62593
-HASH_TABLE_P 1889,62694
-HASH_KEY 1896,62851
-HASH_VALUE 1903,63031
-HASH_NEXT 1911,63245
-HASH_HASH 1918,63422
-HASH_INDEX 1926,63668
-HASH_TABLE_SIZE 1933,63817
-enum DEFAULT_HASH_SIZE 1940,63947
-enum DEFAULT_HASH_SIZE { DEFAULT_HASH_SIZE 1940,63947
-static double const DEFAULT_REHASH_THRESHOLD 1946,64167
-static double const DEFAULT_REHASH_SIZE 1950,64290
-sxhash_combine 1956,64456
-SXHASH_REDUCE 1964,64639
-struct Lisp_Misc_Any	1971,64797
-  ENUM_BF (Lisp_Misc_Type) type 1973,64857
-  bool_bf gcmarkbit 1974,64918
-  unsigned spacer 1975,64943
-struct Lisp_Marker1978,64971
-  ENUM_BF (Lisp_Misc_Type) type 1980,64992
-  bool_bf gcmarkbit 1981,65056
-  unsigned spacer 1982,65081
-  bool_bf need_adjustment 1986,65273
-  bool_bf insertion_type 1989,65414
-  struct buffer *buffer;buffer2000,66007
-  struct Lisp_Marker *next;next2009,66358
-  ptrdiff_t charpos;2011,66446
-  ptrdiff_t bytepos;2016,66704
-struct Lisp_Overlay2021,66832
-    ENUM_BF (Lisp_Misc_Type) type 2034,67340
-    bool_bf gcmarkbit 2035,67406
-    unsigned spacer 2036,67433
-    struct Lisp_Overlay *next;next2037,67459
-    Lisp_Object start;2038,67490
-    Lisp_Object end;2039,67513
-    Lisp_Object plist;2040,67534
-    SAVE_UNUSED,2047,67635
-    SAVE_INTEGER,2048,67652
-    SAVE_FUNCPOINTER,2049,67670
-    SAVE_POINTER,2050,67692
-    SAVE_OBJECT2051,67710
-enum { SAVE_SLOT_BITS 2055,67795
-enum { SAVE_VALUE_SLOTS 2058,67892
-enum { SAVE_TYPE_BITS 2062,68000
-enum Lisp_Save_Type2064,68066
-    SAVE_TYPE_INT_INT 2066,68090
-    SAVE_TYPE_INT_INT_INT2067,68163
-    SAVE_TYPE_OBJ_OBJ 2069,68253
-    SAVE_TYPE_OBJ_OBJ_OBJ 2070,68324
-    SAVE_TYPE_OBJ_OBJ_OBJ_OBJ2071,68405
-    SAVE_TYPE_PTR_INT 2073,68500
-    SAVE_TYPE_PTR_OBJ 2074,68573
-    SAVE_TYPE_PTR_PTR 2075,68645
-    SAVE_TYPE_FUNCPTR_PTR_OBJ2076,68718
-    SAVE_TYPE_MEMORY 2080,68876
-typedef void (*voidfuncptr)voidfuncptr2108,69830
-struct Lisp_Save_Value2110,69867
-    ENUM_BF (Lisp_Misc_Type) type 2112,69894
-    bool_bf gcmarkbit 2113,69963
-    unsigned spacer : 32 - (16 + 1 + SAVE_TYPE_BITS)2114,69990
-    ENUM_BF (Lisp_Save_Type) save_type : SAVE_TYPE_BITS;2123,70480
-      void *pointer;pointer2125,70549
-      voidfuncptr funcpointer;2126,70570
-      ptrdiff_t integer;2127,70601
-      Lisp_Object object;2128,70626
-    } data[data2129,70652
-save_type 2134,70746
-XSAVE_POINTER 2143,70976
-set_save_pointer 2149,71138
-XSAVE_FUNCPOINTER 2155,71320
-XSAVE_INTEGER 2164,71540
-set_save_integer 2170,71702
-XSAVE_OBJECT 2179,71923
-struct Lisp_Finalizer2186,72100
-    struct Lisp_Misc_Any base;2188,72126
-    struct Lisp_Finalizer *prev;prev2191,72214
-    struct Lisp_Finalizer *next;next2192,72247
-    Lisp_Object function;2197,72484
-struct Lisp_Free2201,72575
-    ENUM_BF (Lisp_Misc_Type) type 2203,72596
-    bool_bf gcmarkbit 2204,72659
-    unsigned spacer 2205,72686
-    union Lisp_Misc *chain;chain2206,72712
-union Lisp_Misc2212,72876
-    struct Lisp_Misc_Any u_any;2214,72896
-    struct Lisp_Free u_free;2215,72967
-    struct Lisp_Marker u_marker;2216,72996
-    struct Lisp_Overlay u_overlay;2217,73029
-    struct Lisp_Save_Value u_save_value;2218,73064
-    struct Lisp_Finalizer u_finalizer;2219,73105
-XMISC 2223,73175
-XMISCANY 2229,73264
-XMISCTYPE 2236,73373
-XMARKER 2242,73461
-XOVERLAY 2249,73576
-XSAVE_VALUE 2256,73697
-XFINALIZER 2263,73826
-struct Lisp_Intfwd2274,74111
-    enum Lisp_Fwd_Type type;2276,74134
-    EMACS_INT *intvar;intvar2277,74184
-struct Lisp_Boolfwd2284,74405
-    enum Lisp_Fwd_Type type;2286,74429
-    bool *boolvar;boolvar2287,74480
-struct Lisp_Objfwd2294,74696
-    enum Lisp_Fwd_Type type;2296,74719
-    Lisp_Object *objvar;objvar2297,74769
-struct Lisp_Buffer_Objfwd2302,74928
-    enum Lisp_Fwd_Type type;2304,74958
-    int offset;2305,75015
-    Lisp_Object predicate;2307,75107
-struct Lisp_Buffer_Local_Value2334,76464
-    bool_bf local_if_set 2338,76609
-    bool_bf frame_local 2341,76791
-    bool_bf found 2344,76933
-    union Lisp_Fwd *fwd;fwd2346,77035
-    Lisp_Object where;2348,77178
-    Lisp_Object defcell;2351,77304
-    Lisp_Object valcell;2357,77608
-struct Lisp_Kboard_Objfwd2362,77723
-    enum Lisp_Fwd_Type type;2364,77753
-    int offset;2365,77810
-union Lisp_Fwd2368,77832
-    struct Lisp_Intfwd u_intfwd;2370,77851
-    struct Lisp_Boolfwd u_boolfwd;2371,77884
-    struct Lisp_Objfwd u_objfwd;2372,77919
-    struct Lisp_Buffer_Objfwd u_buffer_objfwd;2373,77952
-    struct Lisp_Kboard_Objfwd u_kboard_objfwd;2374,77999
-XFWDTYPE 2378,78078
-XBUFFER_OBJFWD 2384,78174
-struct Lisp_Float2391,78310
-      double data;2395,78348
-      struct Lisp_Float *chain;chain2396,78367
-    } u;2397,78399
-XFLOAT_DATA 2401,78428
-    IEEE_FLOATING_POINT2415,78937
-#define _UCHAR_T2423,79260
-typedef unsigned char UCHAR;2424,79277
-enum Lisp_Compiled2429,79360
-    COMPILED_ARGLIST 2431,79383
-    COMPILED_BYTECODE 2432,79409
-    COMPILED_CONSTANTS 2433,79436
-    COMPILED_STACK_DEPTH 2434,79464
-    COMPILED_DOC_STRING 2435,79494
-    COMPILED_INTERACTIVE 2436,79523
-enum char_bits2443,79825
-    CHAR_ALT 2445,79844
-    CHAR_SUPER 2446,79870
-    CHAR_HYPER 2447,79898
-    CHAR_SHIFT 2448,79926
-    CHAR_CTL 2449,79954
-    CHAR_META 2450,79980
-    CHAR_MODIFIER_MASK 2452,80008
-    CHARACTERBITS 2457,80203
-LISP_MACRO_DEFUN 2462,80261
-NATNUMP 2470,80403
-RANGED_INTEGERP 2476,80484
-#define TYPE_RANGED_INTEGERP(2481,80606
-LISP_MACRO_DEFUN 2486,80791
-VECTORP 2500,81264
-OVERLAYP 2505,81367
-SAVE_VALUEP 2510,81466
-FINALIZERP 2516,81572
-AUTOLOADP 2522,81676
-BUFFER_OBJFWDP 2528,81767
-PSEUDOVECTOR_TYPEP 2534,81865
-PSEUDOVECTORP 2542,82118
-WINDOW_CONFIGURATIONP 2558,82470
-PROCESSP 2564,82580
-WINDOWP 2570,82664
-TERMINALP 2576,82746
-SUBRP 2582,82832
-COMPILEDP 2588,82910
-BUFFERP 2594,82996
-CHAR_TABLE_P 2600,83078
-SUB_CHAR_TABLE_P 2606,83169
-BOOL_VECTOR_P 2612,83268
-FRAMEP 2618,83361
-IMAGEP 2625,83478
-ARRAYP 2632,83583
-CHECK_LIST 2638,83702
-LISP_MACRO_DEFUN_VOID 2643,83783
-CHECK_STRING_CAR 2653,84080
-CHECK_CONS 2658,84184
-CHECK_VECTOR 2663,84264
-CHECK_BOOL_VECTOR 2668,84350
-CHECK_VECTOR_OR_STRING 2674,84527
-CHECK_ARRAY 2683,84701
-CHECK_BUFFER 2688,84809
-CHECK_WINDOW 2693,84895
-CHECK_PROCESS 2699,85001
-CHECK_NATNUM 2705,85097
-#define CHECK_RANGED_INTEGER(2710,85174
-#define CHECK_TYPE_RANGED_INTEGER(2721,85557
-#define CHECK_NUMBER_COERCE_MARKER(2729,85827
-XFLOATINT 2738,86080
-CHECK_NUMBER_OR_FLOAT 2744,86151
-#define CHECK_NUMBER_OR_FLOAT_COERCE_MARKER(2749,86250
-CHECK_NUMBER_CAR 2760,86660
-CHECK_NUMBER_CDR 2768,86782
-#define DEFUN(2803,88377
-#define DEFUN(2812,88845
-FUNCTIONP 2822,89200
-enum maxargs2831,89395
-    MANY 2833,89412
-    UNEVALLED 2834,89427
-#define CALLMANY(2838,89530
-#define CALLN(2844,89883
-#define DEFVAR_LISP(2869,91088
-#define DEFVAR_LISP_NOPRO(2874,91260
-#define DEFVAR_BOOL(2879,91442
-#define DEFVAR_INT(2884,91615
-#define DEFVAR_BUFFER_DEFAULTS(2890,91786
-#define DEFVAR_KBOARD(2896,91990
-typedef jmp_buf sys_jmp_buf;2906,92314
-# define sys_setjmp(2907,92343
-# define sys_longjmp(2908,92378
-typedef sigjmp_buf sys_jmp_buf;2910,92450
-# define sys_setjmp(2911,92482
-# define sys_longjmp(2912,92522
-typedef jmp_buf sys_jmp_buf;2916,92681
-# define sys_setjmp(2917,92710
-# define sys_longjmp(2918,92744
-enum specbind_tag 2943,93796
-  SPECPDL_UNWIND,2944,93816
-  SPECPDL_UNWIND_PTR,2945,93885
-  SPECPDL_UNWIND_INT,2946,93936
-  SPECPDL_UNWIND_VOID,2947,93984
-  SPECPDL_BACKTRACE,2948,94038
-  SPECPDL_LET,2949,94096
-  SPECPDL_LET_LOCAL,2951,94226
-  SPECPDL_LET_DEFAULT	2952,94283
-union specbinding2955,94355
-    ENUM_BF (specbind_tag) kind : CHAR_BIT;2957,94377
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;2959,94434
-      void (*func)func2960,94480
-      Lisp_Object arg;2961,94514
-    } unwind;2962,94537
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;2964,94564
-      void (*func)func2965,94610
-      void *arg;arg2966,94639
-    } unwind_ptr;2967,94656
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;2969,94687
-      void (*func)func2970,94733
-      int arg;2971,94759
-    } unwind_int;2972,94774
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;2974,94805
-      void (*func)func2975,94851
-    } unwind_void;2976,94878
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;2978,94910
-      Lisp_Object symbol,2980,95017
-      Lisp_Object symbol, old_value,2980,95017
-      Lisp_Object symbol, old_value, where;2980,95017
-    } let;2981,95061
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;2983,95085
-      bool_bf debug_on_exit 2984,95131
-      Lisp_Object function;2985,95164
-      Lisp_Object *args;args2986,95192
-      ptrdiff_t nargs;2987,95217
-    } bt;2988,95240
-SPECPDL_INDEX 2996,95379
-enum handlertype 3021,96401
-enum handlertype { CATCHER,3021,96401
-enum handlertype { CATCHER, CONDITION_CASE 3021,96401
-struct handler3023,96448
-  enum handlertype type;3025,96465
-  Lisp_Object tag_or_ch;3026,96490
-  Lisp_Object val;3027,96515
-  struct handler *next;next3028,96534
-  struct handler *nextfree;nextfree3029,96558
-  Lisp_Object *bytecode_top;bytecode_top3036,96916
-  int bytecode_dest;3037,96945
-  struct gcpro *gcpro;gcpro3042,97182
-  sys_jmp_buf jmp;3044,97212
-  EMACS_INT lisp_eval_depth;3045,97231
-  ptrdiff_t pdlcount;3046,97260
-  int poll_suppress_count;3047,97282
-  int interrupt_input_blocked;3048,97309
-  struct byte_stack *byte_stack;byte_stack3049,97340
-#define PUSH_HANDLER(3053,97437
-#define QUIT	3101,99214
-#define QUITP 3112,99464
-struct gcpro3132,100307
-  struct gcpro *next;next3134,100322
-  volatile Lisp_Object *var;var3137,100391
-  ptrdiff_t nvars;3140,100473
-  const char *name;name3144,100558
-  int lineno;3147,100614
-  int idx;3150,100675
-  int level;3153,100711
-#define GC_USE_GCPROS_AS_BEFORE	3171,101288
-#define GC_MAKE_GCPROS_NOOPS	3172,101323
-#define GC_MARK_STACK_CHECK_GCPROS	3173,101355
-#define GC_USE_GCPROS_CHECK_ZOMBIES	3174,101392
-#define GC_MARK_STACK 3177,101453
-#define BYTE_MARK_STACK 3181,101553
-#define GCPRO1(3190,101824
-#define GCPRO2(3191,101864
-#define GCPRO3(3192,101930
-#define GCPRO4(3194,102025
-#define GCPRO5(3196,102145
-#define GCPRO6(3198,102290
-#define GCPRO7(3201,102465
-#define UNGCPRO 3202,102544
-#define GCPRO1(3208,102644
-#define GCPRO2(3212,102766
-#define GCPRO3(3217,102958
-#define GCPRO4(3223,103220
-#define GCPRO5(3230,103551
-#define GCPRO6(3238,103952
-#define GCPRO7(3247,104422
-#define UNGCPRO 3257,104962
-#define GCPRO1(3263,105056
-#define GCPRO2(3269,105290
-#define GCPRO3(3278,105708
-#define GCPRO4(3289,106265
-#define GCPRO5(3302,106963
-#define GCPRO6(3317,107803
-#define GCPRO7(3334,108784
-#define UNGCPRO	3353,109907
-#define RETURN_UNGCPRO(3363,110174
-vcopy 3384,110648
-set_hash_key_slot 3393,110923
-set_hash_value_slot 3399,111062
-set_symbol_function 3408,111297
-set_symbol_plist 3414,111412
-set_symbol_next 3420,111515
-blv_found 3428,111688
-set_overlay_plist 3437,111871
-string_intervals 3445,112022
-set_string_intervals 3453,112144
-set_char_table_defalt 3462,112346
-set_char_table_purpose 3467,112458
-set_char_table_extras 3475,112627
-set_char_table_contents 3482,112836
-set_sub_char_table_contents 3489,113031
-enum Arith_Comparison 3497,113294
-  ARITH_EQUAL,3498,113318
-  ARITH_NOTEQUAL,3499,113333
-  ARITH_LESS,3500,113351
-  ARITH_GRTR,3501,113365
-  ARITH_LESS_OR_EQUAL,3502,113379
-  ARITH_GRTR_OR_EQUAL3503,113402
-#define INTEGER_TO_CONS(3511,113753
-#define CONS_TO_INTEGER(3529,114616
-enum { NEXT_ALMOST_PRIME_LIMIT 3573,116320
-extern EMACS_INT next_almost_prime 3574,116359
-enum constype 3739,123811
-enum constype {CONSTYPE_HEAP,CONSTYPE_HEAP3739,123811
-enum constype {CONSTYPE_HEAP, CONSTYPE_PURE}CONSTYPE_PURE3739,123811
-list2i 3745,124001
-list3i 3751,124110
-list4i 3757,124249
-extern Lisp_Object make_formatted_string 3767,124625
-build_pure_c_string 3792,125653
-build_string 3801,125858
-make_uninit_vector 3820,126429
-make_uninit_sub_char_table 3833,126648
-#define ALLOCATE_PSEUDOVECTOR(3850,127192
-#define ALLOCATE_ZEROED_PSEUDOVECTOR(3858,127528
-INLINE void 3890,128934
-extern void *r_alloc r_alloc3895,129055
-#define FLOAT_TO_STRING_BUFSIZE 3927,130518
-intern 3968,132125
-intern_c_string 3974,132213
-extern _Noreturn void error 4034,135592
-fast_string_match_ignore_case 4136,140080
-INLINE void fixup_locale 4241,143845
-INLINE void synchronize_system_messages_locale 4242,143880
-INLINE void synchronize_system_time_locale 4243,143937
-#define IS_DAEMON 4257,144410
-#define DAEMON_RUNNING 4258,144450
-#define IS_DAEMON 4261,144549
-#define DAEMON_RUNNING 4262,144594
-# define WAIT_READING_MAX 4281,145413
-# define WAIT_READING_MAX 4283,145485
-extern _Noreturn void emacs_abort 4374,148377
-egetenv 4532,152800
-#define eabs(4545,153296
-#define make_fixnum_or_float(4550,153429
-enum MAX_ALLOCA 4556,153680
-enum MAX_ALLOCA { MAX_ALLOCA 4556,153680
-extern void *record_xmalloc record_xmalloc4558,153725
-#define USE_SAFE_ALLOCA	4560,153791
-#define AVAIL_ALLOCA(4564,153924
-#define SAFE_ALLOCA(4568,154035
-#define SAFE_NALLOCA(4576,154376
-#define SAFE_ALLOCA_STRING(4590,154852
-#define SAFE_FREE(4598,155104
-#define SAFE_ALLOCA_LISP(4625,155682
-# define USE_STACK_LISP_OBJECTS 4652,156804
-# undef USE_STACK_LISP_OBJECTS4658,156970
-# define USE_STACK_LISP_OBJECTS 4659,157001
-enum { defined_GC_CHECK_STRING_BYTES 4663,157076
-enum { defined_GC_CHECK_STRING_BYTES 4665,157129
-union Aligned_Cons4670,157263
-  struct Lisp_Cons s;4672,157284
-  double d;4673,157306
-  double d; intmax_t i;4673,157306
-  double d; intmax_t i; void *p;p4673,157306
-union Aligned_String4676,157343
-  struct Lisp_String s;4678,157366
-  double d;4679,157390
-  double d; intmax_t i;4679,157390
-  double d; intmax_t i; void *p;p4679,157390
-    USE_STACK_CONS 4689,157698
-    USE_STACK_STRING 4691,157804
-#define STACK_CONS(4699,158141
-#define AUTO_CONS_EXPR(4701,158238
-#define AUTO_CONS(4709,158601
-#define AUTO_LIST1(4710,158672
-#define AUTO_LIST2(4712,158780
-#define AUTO_LIST3(4716,158935
-#define AUTO_LIST4(4720,159110
-# define verify_ascii(4732,159501
-#define AUTO_STRING(4740,159809
-#define FOR_EACH_TAIL(4752,160273
-#define FOR_EACH_ALIST_VALUE(4766,160764
-maybe_gc 4774,161051
-functionp 4784,161290
+#define EMACS_LISP_H22,805
+#define DECLARE_GDB_SYM(47,1426
+# define DEFINE_GDB_SYMBOL_BEGIN(49,1513
+# define DEFINE_GDB_SYMBOL_END(50,1583
+# define DEFINE_GDB_SYMBOL_BEGIN(52,1630
+# define DEFINE_GDB_SYMBOL_END(53,1707
+#undef min57,1795
+#undef max58,1806
+#define max(59,1817
+#define min(60,1859
+#define ARRAYELTS(63,1941
+#define GCTYPEBITS 67,2084
+DEFINE_GDB_SYMBOL_BEGIN GCTYPEBITS66,2042
+# define NONPOINTER_BITS 78,2572
+# define NONPOINTER_BITS 80,2605
+typedef int EMACS_INT;91,3028
+typedef unsigned int EMACS_UINT;92,3051
+#  define EMACS_INT_MAX 93,3084
+#  define pI 94,3116
+typedef long int EMACS_INT;96,3208
+typedef unsigned long EMACS_UINT;97,3236
+#  define EMACS_INT_MAX 98,3270
+#  define pI 99,3303
+typedef long long int EMACS_INT;103,3482
+typedef unsigned long long int EMACS_UINT;104,3515
+#  define EMACS_INT_MAX 105,3558
+#  define pI 106,3592
+enum {  BOOL_VECTOR_BITS_PER_CHAR 114,3809
+#define BOOL_VECTOR_BITS_PER_CHAR 115,3845
+typedef size_t bits_word;123,4170
+# define BITS_WORD_MAX 124,4196
+enum { BITS_PER_BITS_WORD 125,4228
+typedef unsigned char bits_word;127,4295
+# define BITS_WORD_MAX 128,4328
+enum { BITS_PER_BITS_WORD 129,4391
+    BITS_PER_CHAR 136,4575
+    BITS_PER_SHORT 137,4610
+    BITS_PER_LONG 138,4662
+    BITS_PER_EMACS_INT 139,4717
+typedef intmax_t printmax_t;148,5094
+typedef uintmax_t uprintmax_t;149,5123
+# define pMd 150,5154
+# define pMu 151,5175
+typedef EMACS_INT printmax_t;153,5202
+typedef EMACS_UINT uprintmax_t;154,5232
+# define pMd 155,5264
+# define pMu 156,5283
+# define pD 165,5669
+# define pD 167,5714
+# define pD 169,5761
+# define pD 171,5784
+# define eassert(200,7067
+# define eassume(201,7145
+# define eassert(208,7324
+# define eassume(212,7455
+enum Lisp_Bits239,8524
+#define GCALIGNMENT 243,8652
+    VALBITS 246,8747
+    INTTYPEBITS 249,8843
+    FIXNUM_BITS 252,8950
+#define VAL_MAX 263,9332
+#define USE_LSB_TAG 271,9782
+DEFINE_GDB_SYMBOL_BEGIN USE_LSB_TAG270,9738
+# define alignas(281,10082
+# define GCALIGNED 288,10232
+# define GCALIGNED 290,10297
+# define lisp_h_XLI(327,11647
+# define lisp_h_XIL(328,11678
+# define lisp_h_XLI(330,11729
+# define lisp_h_XIL(331,11756
+#define lisp_h_CHECK_LIST_CONS(333,11790
+#define lisp_h_CHECK_NUMBER(334,11861
+#define lisp_h_CHECK_SYMBOL(335,11932
+#define lisp_h_CHECK_TYPE(336,12001
+#define lisp_h_CONSP(338,12112
+#define lisp_h_EQ(339,12161
+#define lisp_h_FLOATP(340,12206
+#define lisp_h_INTEGERP(341,12257
+#define lisp_h_MARKERP(342,12338
+#define lisp_h_MISCP(343,12413
+#define lisp_h_NILP(344,12462
+#define lisp_h_SET_SYMBOL_VAL(345,12498
+#define lisp_h_SYMBOL_CONSTANT_P(347,12612
+#define lisp_h_SYMBOL_VAL(348,12676
+#define lisp_h_SYMBOLP(350,12777
+#define lisp_h_VECTORLIKEP(351,12830
+#define lisp_h_XCAR(352,12891
+#define lisp_h_XCDR(353,12929
+#define lisp_h_XCONS(354,12969
+#define lisp_h_XHASH(356,13064
+#define lisp_h_XPNTR(357,13098
+# define lisp_h_check_cons_list(360,13226
+# define lisp_h_make_number(363,13294
+# define lisp_h_XFASTINT(365,13397
+# define lisp_h_XINT(366,13434
+# define lisp_h_XSYMBOL(367,13483
+# define lisp_h_XTYPE(371,13636
+# define lisp_h_XUNTAG(372,13701
+# define XLI(381,14091
+# define XIL(382,14122
+# define CHECK_LIST_CONS(383,14153
+# define CHECK_NUMBER(384,14214
+# define CHECK_SYMBOL(385,14263
+# define CHECK_TYPE(386,14312
+# define CONSP(387,14387
+# define EQ(388,14422
+# define FLOATP(389,14457
+# define INTEGERP(390,14494
+# define MARKERP(391,14535
+# define MISCP(392,14574
+# define NILP(393,14609
+# define SET_SYMBOL_VAL(394,14642
+# define SYMBOL_CONSTANT_P(395,14705
+# define SYMBOL_VAL(396,14768
+# define SYMBOLP(397,14817
+# define VECTORLIKEP(398,14856
+# define XCAR(399,14903
+# define XCDR(400,14936
+# define XCONS(401,14969
+# define XHASH(402,15004
+# define XPNTR(403,15039
+#  define check_cons_list(405,15102
+#  define make_number(408,15181
+#  define XFASTINT(409,15229
+#  define XINT(410,15271
+#  define XSYMBOL(411,15305
+#  define XTYPE(412,15345
+#  define XUNTAG(413,15381
+#define LISP_MACRO_DEFUN(421,15677
+#define LISP_MACRO_DEFUN_VOID(425,15850
+#define INTMASK 437,16294
+#define case_Lisp_Int 438,16347
+#define ENUM_BF(445,16686
+#define ENUM_BF(447,16727
+enum Lisp_Type451,16768
+    Lisp_Symbol 454,16856
+    Lisp_Misc 458,16998
+    Lisp_Int0 461,17072
+    Lisp_Int1 462,17091
+    Lisp_String 466,17269
+    Lisp_Vectorlike 472,17548
+    Lisp_Cons 475,17637
+    Lisp_Float 477,17675
+enum Lisp_Misc_Type485,18021
+    Lisp_Misc_Free 487,18045
+    Lisp_Misc_Marker,488,18074
+    Lisp_Misc_Overlay,489,18096
+    Lisp_Misc_Save_Value,490,18119
+    Lisp_Misc_Finalizer,491,18145
+    Lisp_Misc_Float,494,18280
+    Lisp_Misc_Limit496,18364
+enum Lisp_Fwd_Type502,18548
+    Lisp_Fwd_Int,504,18571
+    Lisp_Fwd_Bool,505,18624
+    Lisp_Fwd_Obj,506,18675
+    Lisp_Fwd_Buffer_Obj,507,18734
+    Lisp_Fwd_Kboard_Obj	508,18805
+typedef struct { EMACS_INT i;567,21776
+typedef struct { EMACS_INT i; } Lisp_Object;567,21776
+#define LISP_INITIALLY(569,21822
+#undef CHECK_LISP_OBJECT_TYPE571,21853
+enum CHECK_LISP_OBJECT_TYPE 572,21883
+enum CHECK_LISP_OBJECT_TYPE { CHECK_LISP_OBJECT_TYPE 572,21883
+typedef EMACS_INT Lisp_Object;577,22059
+#define LISP_INITIALLY(578,22090
+enum CHECK_LISP_OBJECT_TYPE 579,22120
+enum CHECK_LISP_OBJECT_TYPE { CHECK_LISP_OBJECT_TYPE 579,22120
+#define LISP_INITIALLY_ZERO 582,22221
+enum symbol_interned639,24194
+  SYMBOL_UNINTERNED 641,24217
+  SYMBOL_INTERNED 642,24242
+  SYMBOL_INTERNED_IN_INITIAL_OBARRAY 643,24265
+enum symbol_redirect646,24310
+  SYMBOL_PLAINVAL 648,24333
+  SYMBOL_VARALIAS 649,24357
+  SYMBOL_LOCALIZED 650,24381
+  SYMBOL_FORWARDED 651,24405
+struct Lisp_Symbol654,24432
+  bool_bf gcmarkbit 656,24453
+  ENUM_BF (symbol_redirect) redirect 663,24788
+  unsigned constant 668,25006
+  unsigned interned 672,25126
+  bool_bf declared_special 676,25288
+  bool_bf pinned 679,25389
+  Lisp_Object name;682,25458
+    Lisp_Object value;687,25626
+    struct Lisp_Symbol *alias;alias688,25649
+    struct Lisp_Buffer_Local_Value *blv;blv689,25680
+    union Lisp_Fwd *fwd;fwd690,25721
+  } val;691,25746
+  Lisp_Object function;694,25818
+  Lisp_Object plist;697,25880
+  struct Lisp_Symbol *next;next700,25969
+#define EXFUN(707,26247
+#define DEFUN_ARGS_MANY	712,26441
+#define DEFUN_ARGS_UNEVALLED	713,26493
+#define DEFUN_ARGS_0	714,26536
+#define DEFUN_ARGS_1	715,26564
+#define DEFUN_ARGS_2	716,26599
+#define DEFUN_ARGS_3	717,26647
+#define DEFUN_ARGS_4	718,26708
+#define DEFUN_ARGS_5	719,26782
+#define DEFUN_ARGS_6	721,26875
+#define DEFUN_ARGS_7	723,26981
+#define DEFUN_ARGS_8	725,27100
+#define TAG_PTR(729,27291
+#define TAG_SYMOFFSET(734,27538
+#define XLI_BUILTIN_LISPSYM(741,27837
+#define DEFINE_LISP_SYMBOL(746,28096
+# define DEFINE_NON_NIL_Q_SYMBOL_MACROS 755,28567
+LISP_MACRO_DEFUN 762,28772
+# define ARRAY_MARK_FLAG 768,29019
+# define PSEUDOVECTOR_FLAG 774,29262
+enum pvec_type780,29563
+  PVEC_NORMAL_VECTOR,782,29580
+  PVEC_FREE,783,29602
+  PVEC_PROCESS,784,29615
+  PVEC_FRAME,785,29631
+  PVEC_WINDOW,786,29645
+  PVEC_BOOL_VECTOR,787,29660
+  PVEC_BUFFER,788,29680
+  PVEC_HASH_TABLE,789,29695
+  PVEC_TERMINAL,790,29714
+  PVEC_WINDOW_CONFIGURATION,791,29731
+  PVEC_SUBR,792,29760
+  PVEC_OTHER,793,29773
+  PVEC_COMPILED,795,29851
+  PVEC_CHAR_TABLE,796,29868
+  PVEC_SUB_CHAR_TABLE,797,29887
+  PVEC_FONT 798,29910
+enum More_Lisp_Bits801,29986
+    PSEUDOVECTOR_SIZE_BITS 808,30377
+    PSEUDOVECTOR_SIZE_MASK 809,30410
+    PSEUDOVECTOR_REST_BITS 813,30620
+    PSEUDOVECTOR_REST_MASK 814,30653
+    PSEUDOVECTOR_AREA_BITS 818,30818
+    PVEC_TYPE_MASK 819,30896
+# define VALMASK 829,31297
+DEFINE_GDB_SYMBOL_BEGIN VALMASK828,31252
+#define MOST_POSITIVE_FIXNUM 834,31527
+#define MOST_NEGATIVE_FIXNUM 835,31587
+XINT 874,32679
+XFASTINT 889,33030
+XSYMBOL 899,33258
+XTYPE 910,33476
+XUNTAG 918,33656
+LISP_MACRO_DEFUN 927,33852
+LISP_MACRO_DEFUN 940,34237
+#define FIXNUM_OVERFLOW_P(958,34850
+LISP_MACRO_DEFUN FIXNUM_OVERFLOW_P952,34627
+LISP_MACRO_DEFUN 970,35166
+XSTRING 980,35386
+#define SYMBOL_INDEX(988,35570
+XFLOAT 991,35631
+XPROCESS 1000,35773
+XWINDOW 1007,35890
+XTERMINAL 1014,36007
+XSUBR 1021,36129
+XBUFFER 1028,36240
+XCHAR_TABLE 1035,36364
+XSUB_CHAR_TABLE 1042,36501
+XBOOL_VECTOR 1049,36643
+make_lisp_ptr 1058,36822
+make_lisp_symbol 1066,37008
+builtin_lisp_symbol 1074,37192
+#define XSETINT(1079,37274
+#define XSETFASTINT(1080,37320
+#define XSETCONS(1081,37370
+#define XSETVECTOR(1082,37430
+#define XSETSTRING(1083,37498
+#define XSETSYMBOL(1084,37562
+#define XSETFLOAT(1085,37616
+#define XSETMISC(1086,37678
+#define XSETPVECTYPE(1090,37767
+#define XSETPVECTYPESIZE(1092,37883
+#define XSETPSEUDOVECTOR(1099,38180
+#define XSETTYPED_PSEUDOVECTOR(1105,38364
+#define XSETWINDOW_CONFIGURATION(1110,38574
+#define XSETPROCESS(1112,38670
+#define XSETWINDOW(1113,38736
+#define XSETTERMINAL(1114,38800
+#define XSETSUBR(1115,38868
+#define XSETCOMPILED(1116,38928
+#define XSETBUFFER(1117,38996
+#define XSETCHAR_TABLE(1118,39060
+#define XSETBOOL_VECTOR(1119,39132
+#define XSETSUB_CHAR_TABLE(1120,39206
+XINTPTR 1128,39576
+make_pointer_integer 1134,39656
+LISP_MACRO_DEFUN_VOID 1143,39821
+typedef struct interval *INTERVAL;INTERVAL1149,39982
+      Lisp_Object cdr;1159,40157
+      struct Lisp_Cons *chain;chain1162,40231
+xcar_addr 1174,40755
+xcdr_addr 1179,40832
+LISP_MACRO_DEFUN 1185,40926
+XSETCDR 1198,41302
+CAR 1205,41452
+CDR 1212,41586
+CAR_SAFE 1221,41786
+CDR_SAFE 1226,41872
+STRING_MULTIBYTE 1243,42245
+#define STRING_BYTES_BOUND 1261,43052
+#define STRING_SET_UNIBYTE(1265,43196
+#define STRING_SET_MULTIBYTE(1275,43511
+SDATA 1286,43825
+SSDATA 1291,43903
+SREF 1297,44032
+SSET 1302,44123
+SCHARS 1307,44237
+STRING_BYTES 1316,44410
+SBYTES 1326,44590
+STRING_SET_CHARS 1331,44676
+struct vectorlike_header1343,45227
+    ptrdiff_t size;1364,46378
+struct Lisp_Vector1369,46477
+    struct vectorlike_header header;1371,46500
+    Lisp_Object contents[contents1372,46537
+    ALIGNOF_STRUCT_LISP_VECTOR1378,46676
+struct Lisp_Bool_Vector1384,46859
+    struct vectorlike_header header;1388,47007
+    EMACS_INT size;1390,47081
+    bits_word data[data1395,47314
+bool_vector_size 1399,47380
+bool_vector_data 1407,47518
+bool_vector_uchar_data 1413,47612
+bool_vector_words 1421,47798
+bool_vector_bytes 1428,47993
+bool_vector_bitref 1437,48233
+bool_vector_ref 1445,48473
+bool_vector_set 1453,48613
+    header_size 1471,49042
+    bool_header_size 1472,49101
+    word_size 1473,49166
+AREF 1479,49279
+aref_addr 1485,49386
+ASIZE 1491,49496
+ASET 1497,49578
+gc_aset 1504,49737
+enum { NIL_IS_ZERO 1515,50264
+memclear 1520,50459
+#define VECSIZE(1531,50757
+#define PSEUDOVECSIZE(1538,51042
+#define UNSIGNED_CMP(1546,51475
+#define ASCII_CHAR_P(1552,51729
+enum CHARTAB_SIZE_BITS1565,52484
+    CHARTAB_SIZE_BITS_0 1567,52511
+    CHARTAB_SIZE_BITS_1 1568,52540
+    CHARTAB_SIZE_BITS_2 1569,52569
+    CHARTAB_SIZE_BITS_3 1570,52598
+struct Lisp_Char_Table1575,52667
+    struct vectorlike_header header;1581,52923
+    Lisp_Object defalt;1585,53073
+    Lisp_Object parent;1590,53275
+    Lisp_Object purpose;1594,53393
+    Lisp_Object ascii;1598,53559
+    Lisp_Object contents[contents1600,53583
+    Lisp_Object extras[extras1603,53694
+struct Lisp_Sub_Char_Table1606,53747
+    struct vectorlike_header header;1610,53913
+    int depth;1618,54336
+    int min_char;1621,54412
+    Lisp_Object contents[contents1624,54487
+CHAR_TABLE_REF_ASCII 1628,54561
+CHAR_TABLE_REF 1648,55108
+CHAR_TABLE_SET 1658,55397
+struct Lisp_Subr1670,55781
+    struct vectorlike_header header;1672,55802
+      Lisp_Object (*a0)a01674,55851
+      Lisp_Object (*a1)a11675,55883
+      Lisp_Object (*a2)a21676,55922
+      Lisp_Object (*a3)a31677,55974
+      Lisp_Object (*a4)a41678,56039
+      Lisp_Object (*a5)a51679,56117
+      Lisp_Object (*a6)a61680,56208
+      Lisp_Object (*a7)a71681,56312
+      Lisp_Object (*a8)a81682,56429
+      Lisp_Object (*aUNEVALLED)aUNEVALLED1683,56559
+      Lisp_Object (*aMANY)aMANY1684,56611
+    } function;1685,56666
+    short min_args,1686,56682
+    short min_args, max_args;1686,56682
+    const char *symbol_name;symbol_name1687,56712
+    const char *intspec;intspec1688,56741
+    const char *doc;doc1689,56766
+enum char_table_specials1692,56793
+    CHAR_TABLE_STANDARD_SLOTS 1697,56988
+    SUB_CHAR_TABLE_OFFSET 1701,57209
+CHAR_TABLE_EXTRA_SLOTS 1707,57372
+LISP_MACRO_DEFUN 1723,57916
+SYMBOL_BLV 1732,58176
+SYMBOL_FWD 1738,58311
+LISP_MACRO_DEFUN_VOID 1744,58423
+SET_SYMBOL_BLV 1754,58686
+SET_SYMBOL_FWD 1760,58845
+SYMBOL_NAME 1767,58996
+SYMBOL_INTERNED_P 1775,59125
+SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P 1783,59294
+#define DEFSYM(1796,59804
+LISP_MACRO_DEFUN DEFSYM1792,59625
+struct hash_table_test1805,60057
+  Lisp_Object name;1808,60134
+  Lisp_Object user_hash_function;1811,60201
+  Lisp_Object user_cmp_function;1814,60292
+  bool (*cmpfn)cmpfn1817,60367
+  EMACS_UINT (*hashfn)hashfn1820,60481
+struct Lisp_Hash_Table1823,60550
+  struct vectorlike_header header;1826,60644
+  Lisp_Object weak;1830,60778
+  Lisp_Object rehash_size;1835,61002
+  Lisp_Object rehash_threshold;1839,61124
+  Lisp_Object hash;1843,61255
+  Lisp_Object next;1848,61485
+  Lisp_Object next_free;1851,61555
+  Lisp_Object index;1856,61766
+  ptrdiff_t count;1863,62036
+  Lisp_Object key_and_value;1868,62235
+  struct hash_table_test test;1871,62309
+  struct Lisp_Hash_Table *next_weak;next_weak1875,62452
+XHASH_TABLE 1880,62526
+#define XSET_HASH_TABLE(1885,62597
+HASH_TABLE_P 1889,62698
+HASH_KEY 1896,62855
+HASH_VALUE 1903,63035
+HASH_NEXT 1911,63249
+HASH_HASH 1918,63426
+HASH_INDEX 1926,63672
+HASH_TABLE_SIZE 1933,63821
+enum DEFAULT_HASH_SIZE 1940,63951
+enum DEFAULT_HASH_SIZE { DEFAULT_HASH_SIZE 1940,63951
+static double const DEFAULT_REHASH_THRESHOLD 1946,64171
+static double const DEFAULT_REHASH_SIZE 1950,64294
+sxhash_combine 1956,64460
+SXHASH_REDUCE 1964,64643
+struct Lisp_Misc_Any	1971,64801
+  ENUM_BF (Lisp_Misc_Type) type 1973,64861
+  bool_bf gcmarkbit 1974,64922
+  unsigned spacer 1975,64947
+struct Lisp_Marker1978,64975
+  ENUM_BF (Lisp_Misc_Type) type 1980,64996
+  bool_bf gcmarkbit 1981,65060
+  unsigned spacer 1982,65085
+  bool_bf need_adjustment 1986,65277
+  bool_bf insertion_type 1989,65418
+  struct buffer *buffer;buffer2000,66011
+  struct Lisp_Marker *next;next2009,66362
+  ptrdiff_t charpos;2011,66450
+  ptrdiff_t bytepos;2016,66708
+struct Lisp_Overlay2021,66836
+    ENUM_BF (Lisp_Misc_Type) type 2034,67344
+    bool_bf gcmarkbit 2035,67410
+    unsigned spacer 2036,67437
+    struct Lisp_Overlay *next;next2037,67463
+    Lisp_Object start;2038,67494
+    Lisp_Object end;2039,67517
+    Lisp_Object plist;2040,67538
+    SAVE_UNUSED,2047,67639
+    SAVE_INTEGER,2048,67656
+    SAVE_FUNCPOINTER,2049,67674
+    SAVE_POINTER,2050,67696
+    SAVE_OBJECT2051,67714
+enum { SAVE_SLOT_BITS 2055,67799
+enum { SAVE_VALUE_SLOTS 2058,67896
+enum { SAVE_TYPE_BITS 2062,68004
+enum Lisp_Save_Type2064,68070
+    SAVE_TYPE_INT_INT 2066,68094
+    SAVE_TYPE_INT_INT_INT2067,68167
+    SAVE_TYPE_OBJ_OBJ 2069,68257
+    SAVE_TYPE_OBJ_OBJ_OBJ 2070,68328
+    SAVE_TYPE_OBJ_OBJ_OBJ_OBJ2071,68409
+    SAVE_TYPE_PTR_INT 2073,68504
+    SAVE_TYPE_PTR_OBJ 2074,68577
+    SAVE_TYPE_PTR_PTR 2075,68649
+    SAVE_TYPE_FUNCPTR_PTR_OBJ2076,68722
+    SAVE_TYPE_MEMORY 2080,68880
+typedef void (*voidfuncptr)voidfuncptr2108,69834
+struct Lisp_Save_Value2110,69871
+    ENUM_BF (Lisp_Misc_Type) type 2112,69898
+    bool_bf gcmarkbit 2113,69967
+    unsigned spacer : 32 - (16 + 1 + SAVE_TYPE_BITS)2114,69994
+    ENUM_BF (Lisp_Save_Type) save_type : SAVE_TYPE_BITS;2123,70484
+      void *pointer;pointer2125,70553
+      voidfuncptr funcpointer;2126,70574
+      ptrdiff_t integer;2127,70605
+      Lisp_Object object;2128,70630
+    } data[data2129,70656
+save_type 2134,70750
+XSAVE_POINTER 2143,70980
+set_save_pointer 2149,71142
+XSAVE_FUNCPOINTER 2155,71324
+XSAVE_INTEGER 2164,71544
+set_save_integer 2170,71706
+XSAVE_OBJECT 2179,71927
+struct Lisp_Finalizer2186,72104
+    struct Lisp_Misc_Any base;2188,72130
+    struct Lisp_Finalizer *prev;prev2191,72218
+    struct Lisp_Finalizer *next;next2192,72251
+    Lisp_Object function;2197,72488
+struct Lisp_Free2201,72579
+    ENUM_BF (Lisp_Misc_Type) type 2203,72600
+    bool_bf gcmarkbit 2204,72663
+    unsigned spacer 2205,72690
+    union Lisp_Misc *chain;chain2206,72716
+union Lisp_Misc2212,72880
+    struct Lisp_Misc_Any u_any;2214,72900
+    struct Lisp_Free u_free;2215,72971
+    struct Lisp_Marker u_marker;2216,73000
+    struct Lisp_Overlay u_overlay;2217,73033
+    struct Lisp_Save_Value u_save_value;2218,73068
+    struct Lisp_Finalizer u_finalizer;2219,73109
+XMISC 2223,73179
+XMISCANY 2229,73268
+XMISCTYPE 2236,73377
+XMARKER 2242,73465
+XOVERLAY 2249,73580
+XSAVE_VALUE 2256,73701
+XFINALIZER 2263,73830
+struct Lisp_Intfwd2274,74115
+    enum Lisp_Fwd_Type type;2276,74138
+    EMACS_INT *intvar;intvar2277,74188
+struct Lisp_Boolfwd2284,74409
+    enum Lisp_Fwd_Type type;2286,74433
+    bool *boolvar;boolvar2287,74484
+struct Lisp_Objfwd2294,74700
+    enum Lisp_Fwd_Type type;2296,74723
+    Lisp_Object *objvar;objvar2297,74773
+struct Lisp_Buffer_Objfwd2302,74932
+    enum Lisp_Fwd_Type type;2304,74962
+    int offset;2305,75019
+    Lisp_Object predicate;2307,75111
+struct Lisp_Buffer_Local_Value2334,76468
+    bool_bf local_if_set 2338,76613
+    bool_bf frame_local 2341,76795
+    bool_bf found 2344,76937
+    union Lisp_Fwd *fwd;fwd2346,77039
+    Lisp_Object where;2348,77182
+    Lisp_Object defcell;2351,77308
+    Lisp_Object valcell;2357,77612
+struct Lisp_Kboard_Objfwd2362,77727
+    enum Lisp_Fwd_Type type;2364,77757
+    int offset;2365,77814
+union Lisp_Fwd2368,77836
+    struct Lisp_Intfwd u_intfwd;2370,77855
+    struct Lisp_Boolfwd u_boolfwd;2371,77888
+    struct Lisp_Objfwd u_objfwd;2372,77923
+    struct Lisp_Buffer_Objfwd u_buffer_objfwd;2373,77956
+    struct Lisp_Kboard_Objfwd u_kboard_objfwd;2374,78003
+XFWDTYPE 2378,78082
+XBUFFER_OBJFWD 2384,78178
+struct Lisp_Float2391,78314
+      double data;2395,78352
+      struct Lisp_Float *chain;chain2396,78371
+    } u;2397,78403
+XFLOAT_DATA 2401,78432
+    IEEE_FLOATING_POINT2415,78941
+#define _UCHAR_T2423,79264
+typedef unsigned char UCHAR;2424,79281
+enum Lisp_Compiled2429,79364
+    COMPILED_ARGLIST 2431,79387
+    COMPILED_BYTECODE 2432,79413
+    COMPILED_CONSTANTS 2433,79440
+    COMPILED_STACK_DEPTH 2434,79468
+    COMPILED_DOC_STRING 2435,79498
+    COMPILED_INTERACTIVE 2436,79527
+enum char_bits2443,79829
+    CHAR_ALT 2445,79848
+    CHAR_SUPER 2446,79874
+    CHAR_HYPER 2447,79902
+    CHAR_SHIFT 2448,79930
+    CHAR_CTL 2449,79958
+    CHAR_META 2450,79984
+    CHAR_MODIFIER_MASK 2452,80012
+    CHARACTERBITS 2457,80207
+LISP_MACRO_DEFUN 2462,80265
+NATNUMP 2470,80407
+RANGED_INTEGERP 2476,80488
+#define TYPE_RANGED_INTEGERP(2481,80610
+LISP_MACRO_DEFUN 2486,80795
+VECTORP 2500,81268
+OVERLAYP 2505,81371
+SAVE_VALUEP 2510,81470
+FINALIZERP 2516,81576
+AUTOLOADP 2522,81680
+BUFFER_OBJFWDP 2528,81771
+PSEUDOVECTOR_TYPEP 2534,81869
+PSEUDOVECTORP 2542,82122
+WINDOW_CONFIGURATIONP 2558,82474
+PROCESSP 2564,82584
+WINDOWP 2570,82668
+TERMINALP 2576,82750
+SUBRP 2582,82836
+COMPILEDP 2588,82914
+BUFFERP 2594,83000
+CHAR_TABLE_P 2600,83082
+SUB_CHAR_TABLE_P 2606,83173
+BOOL_VECTOR_P 2612,83272
+FRAMEP 2618,83365
+IMAGEP 2625,83482
+ARRAYP 2632,83587
+CHECK_LIST 2638,83706
+LISP_MACRO_DEFUN_VOID 2643,83787
+CHECK_STRING_CAR 2653,84084
+CHECK_CONS 2658,84188
+CHECK_VECTOR 2663,84268
+CHECK_BOOL_VECTOR 2668,84354
+CHECK_VECTOR_OR_STRING 2674,84531
+CHECK_ARRAY 2683,84705
+CHECK_BUFFER 2688,84813
+CHECK_WINDOW 2693,84899
+CHECK_PROCESS 2699,85005
+CHECK_NATNUM 2705,85101
+#define CHECK_RANGED_INTEGER(2710,85178
+#define CHECK_TYPE_RANGED_INTEGER(2721,85561
+#define CHECK_NUMBER_COERCE_MARKER(2729,85831
+XFLOATINT 2738,86084
+CHECK_NUMBER_OR_FLOAT 2744,86155
+#define CHECK_NUMBER_OR_FLOAT_COERCE_MARKER(2749,86254
+CHECK_NUMBER_CAR 2760,86664
+CHECK_NUMBER_CDR 2768,86786
+#define DEFUN(2803,88381
+#define DEFUN(2812,88849
+FUNCTIONP 2822,89204
+enum maxargs2831,89399
+    MANY 2833,89416
+    UNEVALLED 2834,89431
+#define CALLMANY(2838,89534
+#define CALLN(2844,89887
+#define DEFVAR_LISP(2869,91092
+#define DEFVAR_LISP_NOPRO(2874,91264
+#define DEFVAR_BOOL(2879,91446
+#define DEFVAR_INT(2884,91619
+#define DEFVAR_BUFFER_DEFAULTS(2890,91790
+#define DEFVAR_KBOARD(2896,91994
+typedef jmp_buf sys_jmp_buf;2906,92318
+# define sys_setjmp(2907,92347
+# define sys_longjmp(2908,92382
+typedef sigjmp_buf sys_jmp_buf;2910,92454
+# define sys_setjmp(2911,92486
+# define sys_longjmp(2912,92526
+typedef jmp_buf sys_jmp_buf;2916,92685
+# define sys_setjmp(2917,92714
+# define sys_longjmp(2918,92748
+enum specbind_tag 2943,93800
+  SPECPDL_UNWIND,2944,93820
+  SPECPDL_UNWIND_PTR,2945,93889
+  SPECPDL_UNWIND_INT,2946,93940
+  SPECPDL_UNWIND_VOID,2947,93988
+  SPECPDL_BACKTRACE,2948,94042
+  SPECPDL_LET,2949,94100
+  SPECPDL_LET_LOCAL,2951,94230
+  SPECPDL_LET_DEFAULT	2952,94287
+union specbinding2955,94359
+    ENUM_BF (specbind_tag) kind : CHAR_BIT;2957,94381
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;2959,94438
+      void (*func)func2960,94484
+      Lisp_Object arg;2961,94518
+    } unwind;2962,94541
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;2964,94568
+      void (*func)func2965,94614
+      void *arg;arg2966,94643
+    } unwind_ptr;2967,94660
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;2969,94691
+      void (*func)func2970,94737
+      int arg;2971,94763
+    } unwind_int;2972,94778
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;2974,94809
+      void (*func)func2975,94855
+    } unwind_void;2976,94882
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;2978,94914
+      Lisp_Object symbol,2980,95021
+      Lisp_Object symbol, old_value,2980,95021
+      Lisp_Object symbol, old_value, where;2980,95021
+    } let;2981,95065
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;2983,95089
+      bool_bf debug_on_exit 2984,95135
+      Lisp_Object function;2985,95168
+      Lisp_Object *args;args2986,95196
+      ptrdiff_t nargs;2987,95221
+    } bt;2988,95244
+SPECPDL_INDEX 2996,95383
+enum handlertype 3021,96405
+enum handlertype { CATCHER,3021,96405
+enum handlertype { CATCHER, CONDITION_CASE 3021,96405
+struct handler3023,96452
+  enum handlertype type;3025,96469
+  Lisp_Object tag_or_ch;3026,96494
+  Lisp_Object val;3027,96519
+  struct handler *next;next3028,96538
+  struct handler *nextfree;nextfree3029,96562
+  Lisp_Object *bytecode_top;bytecode_top3036,96920
+  int bytecode_dest;3037,96949
+  struct gcpro *gcpro;gcpro3042,97186
+  sys_jmp_buf jmp;3044,97216
+  EMACS_INT lisp_eval_depth;3045,97235
+  ptrdiff_t pdlcount;3046,97264
+  int poll_suppress_count;3047,97286
+  int interrupt_input_blocked;3048,97313
+  struct byte_stack *byte_stack;byte_stack3049,97344
+#define PUSH_HANDLER(3053,97441
+#define QUIT	3101,99218
+#define QUITP 3112,99468
+struct gcpro3132,100311
+  struct gcpro *next;next3134,100326
+  volatile Lisp_Object *var;var3137,100395
+  ptrdiff_t nvars;3140,100477
+  const char *name;name3144,100562
+  int lineno;3147,100618
+  int idx;3150,100679
+  int level;3153,100715
+#define GC_USE_GCPROS_AS_BEFORE	3171,101292
+#define GC_MAKE_GCPROS_NOOPS	3172,101327
+#define GC_MARK_STACK_CHECK_GCPROS	3173,101359
+#define GC_USE_GCPROS_CHECK_ZOMBIES	3174,101396
+#define GC_MARK_STACK 3177,101457
+#define BYTE_MARK_STACK 3181,101557
+#define GCPRO1(3190,101828
+#define GCPRO2(3191,101868
+#define GCPRO3(3192,101934
+#define GCPRO4(3194,102029
+#define GCPRO5(3196,102149
+#define GCPRO6(3198,102294
+#define GCPRO7(3201,102469
+#define UNGCPRO 3202,102548
+#define GCPRO1(3208,102648
+#define GCPRO2(3212,102770
+#define GCPRO3(3217,102962
+#define GCPRO4(3223,103224
+#define GCPRO5(3230,103555
+#define GCPRO6(3238,103956
+#define GCPRO7(3247,104426
+#define UNGCPRO 3257,104966
+#define GCPRO1(3263,105060
+#define GCPRO2(3269,105294
+#define GCPRO3(3278,105712
+#define GCPRO4(3289,106269
+#define GCPRO5(3302,106967
+#define GCPRO6(3317,107807
+#define GCPRO7(3334,108788
+#define UNGCPRO	3353,109911
+#define RETURN_UNGCPRO(3363,110178
+vcopy 3384,110652
+set_hash_key_slot 3393,110927
+set_hash_value_slot 3399,111066
+set_symbol_function 3408,111301
+set_symbol_plist 3414,111416
+set_symbol_next 3420,111519
+blv_found 3428,111692
+set_overlay_plist 3437,111875
+string_intervals 3445,112026
+set_string_intervals 3453,112148
+set_char_table_defalt 3462,112350
+set_char_table_purpose 3467,112462
+set_char_table_extras 3475,112631
+set_char_table_contents 3482,112840
+set_sub_char_table_contents 3489,113035
+enum Arith_Comparison 3497,113298
+  ARITH_EQUAL,3498,113322
+  ARITH_NOTEQUAL,3499,113337
+  ARITH_LESS,3500,113355
+  ARITH_GRTR,3501,113369
+  ARITH_LESS_OR_EQUAL,3502,113383
+  ARITH_GRTR_OR_EQUAL3503,113406
+#define INTEGER_TO_CONS(3511,113757
+#define CONS_TO_INTEGER(3529,114620
+enum { NEXT_ALMOST_PRIME_LIMIT 3573,116324
+extern EMACS_INT next_almost_prime 3574,116363
+enum constype 3739,123830
+enum constype {CONSTYPE_HEAP,CONSTYPE_HEAP3739,123830
+enum constype {CONSTYPE_HEAP, CONSTYPE_PURE}CONSTYPE_PURE3739,123830
+list2i 3745,124020
+list3i 3751,124129
+list4i 3757,124268
+extern Lisp_Object make_formatted_string 3767,124644
+build_pure_c_string 3792,125672
+build_string 3801,125877
+make_uninit_vector 3820,126448
+make_uninit_sub_char_table 3833,126667
+#define ALLOCATE_PSEUDOVECTOR(3850,127211
+#define ALLOCATE_ZEROED_PSEUDOVECTOR(3858,127547
+INLINE void 3890,128953
+extern void *r_alloc r_alloc3895,129074
+#define FLOAT_TO_STRING_BUFSIZE 3927,130537
+intern 3968,132144
+intern_c_string 3974,132232
+extern _Noreturn void error 4034,135611
+fast_string_match_ignore_case 4136,140099
+INLINE void fixup_locale 4241,143864
+INLINE void synchronize_system_messages_locale 4242,143899
+INLINE void synchronize_system_time_locale 4243,143956
+#define IS_DAEMON 4257,144429
+#define DAEMON_RUNNING 4258,144469
+#define IS_DAEMON 4261,144568
+#define DAEMON_RUNNING 4262,144613
+# define WAIT_READING_MAX 4281,145432
+# define WAIT_READING_MAX 4283,145504
+extern _Noreturn void emacs_abort 4374,148396
+egetenv 4532,152819
+#define eabs(4545,153315
+#define make_fixnum_or_float(4550,153448
+enum MAX_ALLOCA 4556,153699
+enum MAX_ALLOCA { MAX_ALLOCA 4556,153699
+extern void *record_xmalloc record_xmalloc4558,153744
+#define USE_SAFE_ALLOCA	4560,153810
+#define AVAIL_ALLOCA(4564,153943
+#define SAFE_ALLOCA(4568,154054
+#define SAFE_NALLOCA(4576,154395
+#define SAFE_ALLOCA_STRING(4590,154871
+#define SAFE_FREE(4598,155123
+#define SAFE_ALLOCA_LISP(4625,155701
+# define USE_STACK_LISP_OBJECTS 4652,156823
+# undef USE_STACK_LISP_OBJECTS4658,156989
+# define USE_STACK_LISP_OBJECTS 4659,157020
+enum { defined_GC_CHECK_STRING_BYTES 4663,157095
+enum { defined_GC_CHECK_STRING_BYTES 4665,157148
+union Aligned_Cons4670,157282
+  struct Lisp_Cons s;4672,157303
+  double d;4673,157325
+  double d; intmax_t i;4673,157325
+  double d; intmax_t i; void *p;p4673,157325
+union Aligned_String4676,157362
+  struct Lisp_String s;4678,157385
+  double d;4679,157409
+  double d; intmax_t i;4679,157409
+  double d; intmax_t i; void *p;p4679,157409
+    USE_STACK_CONS 4689,157717
+    USE_STACK_STRING 4691,157823
+#define STACK_CONS(4699,158160
+#define AUTO_CONS_EXPR(4701,158257
+#define AUTO_CONS(4709,158620
+#define AUTO_LIST1(4710,158691
+#define AUTO_LIST2(4712,158799
+#define AUTO_LIST3(4716,158954
+#define AUTO_LIST4(4720,159129
+# define verify_ascii(4732,159520
+#define AUTO_STRING(4740,159828
+#define FOR_EACH_TAIL(4752,160292
+#define FOR_EACH_ALIST_VALUE(4766,160783
+maybe_gc 4774,161070
+functionp 4784,161309
 
 c-src/machsyscalls.c,23
 #define	SYSCALL(6,113
@@ -2525,127 +2525,127 @@ el-src/TAGTEST.EL,181
 (defalias (quote explicitly-quoted-pending-delete-mode)11,255
 
 el-src/emacs/lisp/progmodes/etags.el,5069
-(defvar tags-file-name 34,1035
-(defgroup etags 43,1499
-(defcustom tags-case-fold-search 47,1567
-(defcustom tags-table-list 59,2052
-(defcustom tags-compression-info-list69,2450
-(defcustom tags-add-tables 88,3232
-(defcustom tags-revert-without-query 98,3628
-(defvar tags-table-computed-list 103,3779
-(defvar tags-table-computed-list-for 112,4263
-(defvar tags-table-list-pointer 117,4511
-(defvar tags-table-list-started-at 121,4702
-(defvar tags-table-set-list 124,4822
-(defcustom find-tag-hook 129,5001
-(defcustom find-tag-default-function 137,5264
-(define-obsolete-variable-alias 'find-tag-marker-ring-lengthfind-tag-marker-ring-length145,5603
-(defcustom tags-tag-face 148,5700
-(defcustom tags-apropos-verbose 154,5835
-(defcustom tags-apropos-additional-actions 160,5999
-(defvaralias 'find-tag-marker-ring find-tag-marker-ring183,6921
-(defvar default-tags-table-function 189,7101
-(defvar tags-location-ring 194,7327
-(defvar tags-table-files 201,7603
-(defvar tags-completion-table 206,7770
-(defvar tags-included-tables 209,7862
-(defvar next-file-list 212,7957
-(defvar tags-table-format-functions 217,8063
-(defvar file-of-tag-function 224,8444
-(defvar tags-table-files-function 228,8638
-(defvar tags-completion-table-function 230,8749
-(defvar snarf-tag-function 232,8844
-(defvar goto-tag-location-function 236,9053
-(defvar find-tag-regexp-search-function 239,9226
-(defvar find-tag-regexp-tag-order 241,9347
-(defvar find-tag-regexp-next-line-after-failure-p 243,9456
-(defvar find-tag-search-function 245,9576
-(defvar find-tag-tag-order 247,9683
-(defvar find-tag-next-line-after-failure-p 249,9778
-(defvar list-tags-function 251,9884
-(defvar tags-apropos-function 253,9972
-(defvar tags-included-tables-function 255,10066
-(defvar verify-tags-table-function 257,10185
-(defun initialize-new-tags-table 260,10296
-(defun tags-table-mode 276,10984
-(defun visit-tags-table 285,11249
-(defun tags-table-check-computed-list 321,12787
-(defun tags-table-extend-computed-list 360,14658
-(defun tags-expand-table-name 400,16371
-(defun tags-table-list-member 409,16714
-(defun tags-verify-table 421,17186
-(defun tags-table-including 470,19306
-(defun tags-next-table 522,21350
-(defun visit-tags-table-buffer 543,22207
-(defun tags-reset-tags-tables 712,28517
-(defun file-of-tag 731,29174
-(defun tags-table-files 740,29524
-(defun tags-included-tables 749,29874
-(defun tags-completion-table 755,30120
-(defun tags-lazy-completion-table 783,31314
-(defun tags-completion-at-point-function 799,31949
-(defun find-tag-tag 818,32699
-(defvar last-tag 837,33372
-(defun find-tag-interactive 840,33431
-(defvar find-tag-history 852,33846
-(defun find-tag-noselect 860,34016
-(defun find-tag 932,37130
-(defun find-tag-other-window 959,38346
-(defun find-tag-other-frame 1000,40274
-(defun find-tag-regexp 1025,41448
-(defalias 'pop-tag-mark pop-tag-mark1049,42610
-(defvar tag-lines-already-matched 1052,42661
-(defun find-tag-in-order 1055,42768
-(defun tag-find-file-of-tag-noselect 1167,47114
-(defun tag-find-file-of-tag 1200,48960
-(defun etags-recognize-tags-table 1208,49186
-(defun etags-verify-tags-table 1241,50817
-(defun etags-file-of-tag 1246,51015
-(defun etags-tags-completion-table 1256,51350
-(defun etags-snarf-tag 1286,52556
-(defun etags-goto-tag-location 1324,54125
-(defun etags-list-tags 1388,56568
-(defmacro tags-with-face 1423,57843
-(defun etags-tags-apropos-additional 1431,58176
-(defun etags-tags-apropos 1465,59413
-(defun etags-tags-table-files 1527,61622
-(defun etags-tags-included-tables 1542,62058
-(defun tags-recognize-empty-tags-table 1559,62598
-(defun tag-exact-file-name-match-p 1587,63744
-(defun tag-file-name-match-p 1596,64137
-(defun tag-exact-match-p 1609,64693
-(defun tag-implicit-name-match-p 1620,65261
-(defun tag-symbol-match-p 1633,65861
-(defun tag-word-match-p 1643,66297
-(defun tag-partial-file-name-match-p 1652,66695
-(defun tag-any-match-p 1662,67139
-(defun tag-re-match-p 1667,67323
-(defcustom tags-loop-revert-buffers 1675,67572
-(defun next-file 1685,67981
-(defvar tags-loop-operate 1760,70895
-(defvar tags-loop-scan1763,70989
-(defun tags-loop-eval 1771,71318
-(defun tags-loop-continue 1782,71647
-(defun tags-search 1850,73953
-(defun tags-query-replace 1871,74779
-(defun tags-complete-tags-table-file 1896,76003
-(defun list-tags 1906,76382
-(defun tags-apropos 1934,77335
-(define-button-type 'tags-select-tags-tabletags-select-tags-table1957,78161
-(defun select-tags-table 1964,78400
-(defvar select-tags-table-mode-map 2019,80527
-(define-derived-mode select-tags-table-mode 2030,80910
-(defun select-tags-table-select 2034,81094
-(defun select-tags-table-quit 2043,81460
-(defun complete-tag 2049,81615
-(defconst etags--xref-limit 2074,82556
-(defvar etags-xref-find-definitions-tag-order 2076,82591
-(defun etags-xref-find 2082,82881
-(defun etags--xref-find-definitions 2096,83410
-(defclass xref-etags-location 2129,85124
-(defun xref-make-etags-location 2135,85347
-(cl-defmethod xref-location-marker 2139,85502
-(cl-defmethod xref-location-line 2146,85746
+(defvar tags-file-name 34,1039
+(defgroup etags 43,1503
+(defcustom tags-case-fold-search 47,1571
+(defcustom tags-table-list 59,2056
+(defcustom tags-compression-info-list69,2454
+(defcustom tags-add-tables 88,3236
+(defcustom tags-revert-without-query 98,3632
+(defvar tags-table-computed-list 103,3783
+(defvar tags-table-computed-list-for 112,4267
+(defvar tags-table-list-pointer 117,4515
+(defvar tags-table-list-started-at 121,4706
+(defvar tags-table-set-list 124,4826
+(defcustom find-tag-hook 129,5005
+(defcustom find-tag-default-function 137,5268
+(define-obsolete-variable-alias 'find-tag-marker-ring-lengthfind-tag-marker-ring-length145,5607
+(defcustom tags-tag-face 148,5704
+(defcustom tags-apropos-verbose 154,5839
+(defcustom tags-apropos-additional-actions 160,6003
+(defvaralias 'find-tag-marker-ring find-tag-marker-ring183,6925
+(defvar default-tags-table-function 189,7105
+(defvar tags-location-ring 194,7331
+(defvar tags-table-files 201,7607
+(defvar tags-completion-table 206,7774
+(defvar tags-included-tables 209,7866
+(defvar next-file-list 212,7961
+(defvar tags-table-format-functions 217,8067
+(defvar file-of-tag-function 224,8448
+(defvar tags-table-files-function 228,8642
+(defvar tags-completion-table-function 230,8753
+(defvar snarf-tag-function 232,8848
+(defvar goto-tag-location-function 236,9057
+(defvar find-tag-regexp-search-function 239,9230
+(defvar find-tag-regexp-tag-order 241,9351
+(defvar find-tag-regexp-next-line-after-failure-p 243,9460
+(defvar find-tag-search-function 245,9580
+(defvar find-tag-tag-order 247,9687
+(defvar find-tag-next-line-after-failure-p 249,9782
+(defvar list-tags-function 251,9888
+(defvar tags-apropos-function 253,9976
+(defvar tags-included-tables-function 255,10070
+(defvar verify-tags-table-function 257,10189
+(defun initialize-new-tags-table 260,10300
+(defun tags-table-mode 276,10988
+(defun visit-tags-table 285,11253
+(defun tags-table-check-computed-list 321,12791
+(defun tags-table-extend-computed-list 360,14662
+(defun tags-expand-table-name 400,16375
+(defun tags-table-list-member 409,16718
+(defun tags-verify-table 421,17190
+(defun tags-table-including 470,19310
+(defun tags-next-table 522,21354
+(defun visit-tags-table-buffer 543,22211
+(defun tags-reset-tags-tables 712,28521
+(defun file-of-tag 731,29178
+(defun tags-table-files 740,29528
+(defun tags-included-tables 749,29878
+(defun tags-completion-table 755,30124
+(defun tags-lazy-completion-table 783,31318
+(defun tags-completion-at-point-function 799,31953
+(defun find-tag-tag 818,32703
+(defvar last-tag 837,33376
+(defun find-tag-interactive 840,33435
+(defvar find-tag-history 852,33850
+(defun find-tag-noselect 860,34020
+(defun find-tag 932,37134
+(defun find-tag-other-window 959,38350
+(defun find-tag-other-frame 1000,40278
+(defun find-tag-regexp 1025,41452
+(defalias 'pop-tag-mark pop-tag-mark1049,42614
+(defvar tag-lines-already-matched 1052,42665
+(defun find-tag-in-order 1055,42772
+(defun tag-find-file-of-tag-noselect 1167,47118
+(defun tag-find-file-of-tag 1200,48964
+(defun etags-recognize-tags-table 1208,49190
+(defun etags-verify-tags-table 1241,50821
+(defun etags-file-of-tag 1246,51019
+(defun etags-tags-completion-table 1256,51354
+(defun etags-snarf-tag 1286,52560
+(defun etags-goto-tag-location 1324,54129
+(defun etags-list-tags 1388,56572
+(defmacro tags-with-face 1423,57847
+(defun etags-tags-apropos-additional 1431,58180
+(defun etags-tags-apropos 1465,59417
+(defun etags-tags-table-files 1527,61626
+(defun etags-tags-included-tables 1542,62062
+(defun tags-recognize-empty-tags-table 1559,62602
+(defun tag-exact-file-name-match-p 1587,63748
+(defun tag-file-name-match-p 1596,64141
+(defun tag-exact-match-p 1609,64697
+(defun tag-implicit-name-match-p 1620,65265
+(defun tag-symbol-match-p 1633,65865
+(defun tag-word-match-p 1643,66301
+(defun tag-partial-file-name-match-p 1652,66699
+(defun tag-any-match-p 1662,67143
+(defun tag-re-match-p 1667,67327
+(defcustom tags-loop-revert-buffers 1675,67576
+(defun next-file 1685,67985
+(defvar tags-loop-operate 1760,70899
+(defvar tags-loop-scan1763,70993
+(defun tags-loop-eval 1771,71322
+(defun tags-loop-continue 1782,71651
+(defun tags-search 1850,73957
+(defun tags-query-replace 1871,74783
+(defun tags-complete-tags-table-file 1896,76007
+(defun list-tags 1906,76386
+(defun tags-apropos 1934,77339
+(define-button-type 'tags-select-tags-tabletags-select-tags-table1957,78165
+(defun select-tags-table 1964,78404
+(defvar select-tags-table-mode-map 2019,80531
+(define-derived-mode select-tags-table-mode 2030,80914
+(defun select-tags-table-select 2034,81098
+(defun select-tags-table-quit 2043,81464
+(defun complete-tag 2049,81619
+(defconst etags--xref-limit 2074,82560
+(defvar etags-xref-find-definitions-tag-order 2076,82595
+(defun etags-xref-find 2082,82885
+(defun etags--xref-find-definitions 2096,83414
+(defclass xref-etags-location 2129,85128
+(defun xref-make-etags-location 2135,85351
+(cl-defmethod xref-location-marker 2139,85506
+(cl-defmethod xref-location-line 2146,85750
 
 erl-src/gs_dialog.erl,98
 -define(VERSION2,32
