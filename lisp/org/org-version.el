@@ -5,7 +5,7 @@
 (defun org-release ()
   "The release version of Org.
 Inserted by installing Org mode or when a release is made."
-   (let ((org-release "9.6"))
+   (let ((org-release "9.6.1"))
      org-release))
 ;;;###autoload
 (defun org-git-version ()
