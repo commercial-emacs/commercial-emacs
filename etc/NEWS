@@ -102,6 +102,16 @@ If you want to get back the old behavior, set the user option to the value
     (setopt gdb-locals-table-row-config
             `((type . 0) (name . 0) (value . ,gdb-locals-value-limit)))
 
+** Declarative package configuration
+
+*** Custom descriptions of commands can now be provided when binding keys.
+The 'bind-key' macro from 'use-package' already had support for
+providing a custom description of the command in a key binding.  Now,
+it is possible to do the same when defining key bindings with ':bind'.
+These descriptions can be used by other code that deals with key
+bindings.  For example, the GNU ELPA 'which-key' package displays them
+when showing key bindings, instead of the plain command names.
+
 ** VC
 
 ---
