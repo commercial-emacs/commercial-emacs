@@ -54,7 +54,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef WINDOWSNT
 #include "w32.h"
 #endif
-
+
 /* Structure to pass dimensions around.  Used for character bounding
    boxes, glyph matrix dimensions and alike.  */
 
@@ -64,7 +64,7 @@ struct dim
   int height;
 };
 
-
+
 /* Function prototypes.  */
 
 static void update_frame_line (struct frame *, int, bool);
@@ -157,7 +157,7 @@ static int history_idx;
    history.  */
 
 static uintmax_t history_tick;
-
+
 /* Add to the redisplay history how window W has been displayed.
    MSG is a trace containing the information how W's glyph matrix
    has been constructed.  PAUSED_P means that the update
@@ -243,7 +243,7 @@ __executable_start (void)
   emacs_abort ();
 }
 #endif
-
+
 /***********************************************************************
 			    Glyph Matrices
  ***********************************************************************/
@@ -869,7 +869,7 @@ clear_window_matrices (struct window *w, bool desired_p)
 }
 
 
-
+
 /***********************************************************************
 			      Glyph Rows
 
@@ -1317,7 +1317,7 @@ row_equal_p (struct glyph_row *a, struct glyph_row *b, bool mouse_face_p)
 }
 
 
-
+
 /***********************************************************************
 			      Glyph Pool
 
@@ -1407,7 +1407,7 @@ realloc_glyph_pool (struct glyph_pool *pool, struct dim matrix_dim)
 }
 
 
-
+
 /***********************************************************************
 			      Debug Code
  ***********************************************************************/
@@ -1540,7 +1540,7 @@ check_matrix_invariants (struct window *w)
 #endif /* GLYPH_DEBUG */
 
 
-
+
 /**********************************************************************
 		 Allocating/ Adjusting Glyph Matrices
  **********************************************************************/
@@ -2272,7 +2272,7 @@ adjust_decode_mode_spec_buffer (struct frame *f)
 }
 
 
-
+
 /**********************************************************************
 			Freeing Glyph Matrices
  **********************************************************************/
@@ -2404,7 +2404,7 @@ check_glyph_memory (void)
 }
 
 
-
+
 /**********************************************************************
 		       Building a Frame Matrix
  **********************************************************************/
@@ -2710,7 +2710,7 @@ fill_up_frame_row_with_spaces (struct glyph_row *row, int upto)
 }
 
 
-
+
 /**********************************************************************
       Mirroring operations on frame matrices in window matrices
  **********************************************************************/
@@ -3080,7 +3080,7 @@ check_matrix_pointers (struct glyph_matrix *window_matrix,
 #endif /* GLYPH_DEBUG */
 
 
-
+
 /**********************************************************************
 		      VPOS and HPOS translations
  **********************************************************************/
@@ -3115,7 +3115,7 @@ window_to_frame_hpos (struct window *w, int hpos)
 #endif /* GLYPH_DEBUG */
 
 
-
+
 /**********************************************************************
 			    Redrawing Frames
  **********************************************************************/
@@ -3173,7 +3173,7 @@ DEFUN ("redraw-display", Fredraw_display, Sredraw_display, 0, 0, "",
 }
 
 
-
+
 /***********************************************************************
 			     Frame Update
  ***********************************************************************/
@@ -3413,7 +3413,7 @@ properties or updating the help echo text.  */)
   return Qnil;
 }
 
-
+
 /************************************************************************
 			 Window-based updates
  ************************************************************************/
@@ -4342,7 +4342,7 @@ set_window_update_flags (struct window *w, bool on_p)
 }
 
 
-
+
 /***********************************************************************
 			Window-Based Scrolling
  ***********************************************************************/
@@ -4843,7 +4843,7 @@ scrolling_window (struct window *w, int tab_line_p)
 }
 
 
-
+
 /************************************************************************
 			 Frame-Based Updates
  ************************************************************************/
@@ -5467,7 +5467,7 @@ update_frame_line (struct frame *f, int vpos, bool updating_menu_p)
 }
 
 
-
+
 /***********************************************************************
 		   X/Y Position -> Buffer Position
  ***********************************************************************/
@@ -5789,7 +5789,7 @@ change_frame_size (struct frame *f, int new_width, int new_height,
   else
     change_frame_size_1 (f, new_width, new_height, pretend, delay, safe);
 }
-
+
 /***********************************************************************
 		   Terminal Related Lisp Functions
  ***********************************************************************/
@@ -5909,7 +5909,7 @@ bitch_at_user (void)
 }
 
 
-
+
 /***********************************************************************
 			  Sleeping, Waiting
  ***********************************************************************/
@@ -6064,7 +6064,7 @@ immediately by pending input.  */)
 }
 
 
-
+
 /***********************************************************************
 			 Other Lisp Functions
  ***********************************************************************/
@@ -6199,7 +6199,7 @@ pass nil for VARIABLE.  */)
 }
 
 
-
+
 /***********************************************************************
 			    Initialization
 ***********************************************************************/
@@ -6436,7 +6436,7 @@ init_display (void)
     init_display_interactive ();
 }
 
-
+
 /***********************************************************************
 			   Blinking cursor
  ***********************************************************************/
@@ -6465,7 +6465,7 @@ WINDOW nil or omitted means report on the selected window.  */)
 {
   return decode_any_window (window)->cursor_off_p ? Qnil : Qt;
 }
-
+
 /***********************************************************************
 			    Initialization
  ***********************************************************************/

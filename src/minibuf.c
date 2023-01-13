@@ -601,8 +601,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
     Vminibuffer_completing_file_name = Qnil;
 
 #ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
-    cancel_hourglass ();
+  cancel_hourglass ();
 #endif
 
   if (!NILP (initial))

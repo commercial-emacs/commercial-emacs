@@ -680,8 +680,7 @@ read_filtered_event (bool no_switch_frame, bool ascii_required,
   struct timespec end_time;
 
 #ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
-    cancel_hourglass ();
+  cancel_hourglass ();
 #endif
 
   delayed_switch_frame = Qnil;

@@ -2225,8 +2225,9 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
     }
 }
 
-/* Read a character from the keyboard; call the redisplay if needed.  */
-/* commandflag 0 means do not autosave, but do redisplay.
+/* Read a character from the keyboard; call the redisplay if needed.
+
+   commandflag 0 means do not autosave, but do redisplay.
    -1 means do not redisplay, but do autosave.
    -2 means do neither.
    1 means do both.
@@ -2412,8 +2413,8 @@ read_char (int commandflag, Lisp_Object map,
 	swallow_events (false);		/* May clear input_pending.  */
 
       /* Redisplay if no pending input.  */
-      while (!(input_pending
-	       && (input_was_pending || !redisplay_dont_pause)))
+      while (! input_pending
+             || (! input_was_pending && redisplay_dont_pause))
 	{
 	  input_was_pending = input_pending;
 	  if (help_echo_showing_p && !EQ (selected_window, minibuf_window))
@@ -9701,7 +9702,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	    Thus, if ESC O a has a function-key-map translation
 	    and ESC o has a binding, don't return after ESC O,
 	    so that we can translate ESC O plus the next character.  */
-	 : (/* indec.start < t || fkey.start < t || */ keytran.start < t))
+         : (/* indec.start < t || fkey.start < t || */ keytran.start < t))
     {
       Lisp_Object key;
       bool used_mouse_menu = false;

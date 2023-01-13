@@ -297,8 +297,7 @@ call_debugger (Lisp_Object arg)
   record_unwind_protect (restore_stack_limits, make_int (old_depth));
 
 #ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
-    cancel_hourglass ();
+  cancel_hourglass ();
 #endif
 
   debug_on_next_call = 0;
