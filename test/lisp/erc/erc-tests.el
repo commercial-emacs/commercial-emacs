@@ -1251,18 +1251,28 @@
         (setq calls nil)))))
 
 (ert-deftest erc--merge-local-modes ()
+  (cl-letf (((symbol-function 'erc-b-enable) #'ignore)
+            ((symbol-function 'erc-c-enable) #'ignore)
+            ((symbol-function 'erc-d-enable) #'ignore)
+            ((symbol-function 'erc-e-enable) #'ignore))
 
-  (ert-info ("No existing modes")
-    (let ((old '((a) (b . t)))
-          (new '(erc-c-mode erc-d-mode)))
-      (should (equal (erc--merge-local-modes new old)
-                     '((erc-c-mode erc-d-mode))))))
+    (ert-info ("No existing modes")
+      (let ((old '((a) (b . t)))
+            (new '(erc-c-mode erc-d-mode)))
+        (should (equal (erc--merge-local-modes new old)
+                       '((erc-c-mode erc-d-mode))))))
 
-  (ert-info ("Active existing added, inactive existing removed, deduped")
-    (let ((old '((a) (erc-b-mode) (c . t) (erc-d-mode . t) (erc-e-mode . t)))
-          (new '(erc-b-mode erc-d-mode)))
-      (should (equal (erc--merge-local-modes new old)
-                     '((erc-d-mode erc-e-mode) . (erc-b-mode)))))))
+    (ert-info ("Active existing added, inactive existing removed, deduped")
+      (let ((old '((a) (erc-b-mode) (c . t) (erc-d-mode . t) (erc-e-mode . t)))
+            (new '(erc-b-mode erc-d-mode)))
+        (should (equal (erc--merge-local-modes new old)
+                       '((erc-d-mode erc-e-mode) . (erc-b-mode))))))
+
+    (ert-info ("Non-module erc-prefixed mode ignored")
+      (let ((old '((erc-b-mode) (erc-f-mode . t) (erc-d-mode . t)))
+            (new '(erc-b-mode)))
+        (should (equal (erc--merge-local-modes new old)
+                       '((erc-d-mode) . (erc-b-mode))))))))
 
 (ert-deftest define-erc-module--global ()
   (let ((global-module '(define-erc-module mname malias

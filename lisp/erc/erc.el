@@ -1950,7 +1950,10 @@ nil."
       (let ((out (list (reverse new-modes))))
         (pcase-dolist (`(,k . ,v) old-vars)
           (when (and (string-prefix-p "erc-" (symbol-name k))
-                     (string-suffix-p "-mode" (symbol-name k)))
+                     (string-suffix-p "-mode" (symbol-name k))
+                     (fboundp (intern-soft
+                               (concat (substring (symbol-name k) 0 -5)
+                                       "-enable"))))
             (if v
                 (cl-pushnew k (car out))
               (setf (car out) (delq k (car out)))
