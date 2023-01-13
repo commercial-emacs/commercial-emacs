@@ -191,7 +191,7 @@ Lisp_Object echo_message_buffer;
 int quit_char;
 
 /* Current depth in recursive edits.  */
-EMACS_INT command_loop_level;
+EMACS_INT edit_level;
 
 /* If not Qnil, this is a switch-frame event which we decided to put
    off until the end of a key sequence.  This should be read as the
@@ -306,7 +306,6 @@ union buffered_input_event *kbd_store_ptr;
    dequeuing functions?  The code is a bit simpler this way.  */
 
 static void recursive_edit_unwind (Lisp_Object buffer);
-static Lisp_Object command_loop (void);
 
 static void echo_now (void);
 static ptrdiff_t echo_length (void);
@@ -664,52 +663,145 @@ add_command_key (Lisp_Object key)
   ++this_command_key_count;
 }
 
+/* Handle errors that are not handled at inner levels
+   by printing an error message and returning to the editor command loop.  */
+
+static Lisp_Object
+cmd_error (Lisp_Object data)
+{
+  Lisp_Object old_level, old_length;
+  specpdl_ref count = SPECPDL_INDEX ();
+  Lisp_Object conditions;
+  char macroerror[sizeof "After..kbd macro iterations: "
+		  + INT_STRLEN_BOUND (EMACS_INT)];
+
+#ifdef HAVE_WINDOW_SYSTEM
+  cancel_hourglass ();
+#endif
+
+  if (!NILP (executing_kbd_macro))
+    {
+      if (executing_kbd_macro_iterations == 1)
+	sprintf (macroerror, "After 1 kbd macro iteration: ");
+      else
+	sprintf (macroerror, "After %"pI"d kbd macro iterations: ",
+		 executing_kbd_macro_iterations);
+    }
+  else
+    *macroerror = 0;
+
+  conditions = Fget (XCAR (data), Qerror_conditions);
+  if (NILP (Fmemq (Qminibuffer_quit, conditions)))
+    {
+      Vexecuting_kbd_macro = Qnil;
+      executing_kbd_macro = Qnil;
+    }
+  else if (!NILP (KVAR (current_kboard, defining_kbd_macro)))
+    /* An `M-x' command that signals a `minibuffer-quit' condition
+       that's part of a kbd macro.  */
+    finalize_kbd_macro_chars ();
+
+  specbind (Qstandard_output, Qt);
+  specbind (Qstandard_input, Qt);
+  kset_prefix_arg (current_kboard, Qnil);
+  kset_last_prefix_arg (current_kboard, Qnil);
+  cancel_echoing ();
+
+  /* Avoid unquittable loop if data contains a circular list.  */
+  old_level = Vprint_level;
+  old_length = Vprint_length;
+  XSETFASTINT (Vprint_level, 10);
+  XSETFASTINT (Vprint_length, 10);
+  cmd_error_internal (data, macroerror);
+  Vprint_level = old_level;
+  Vprint_length = old_length;
+
+  Vquit_flag = Qnil;
+  Vinhibit_quit = Qnil;
+
+  unbind_to (count, Qnil);
+  return make_fixnum (0);
+}
+
+/* Adapted for internal_condition_case() interface. */
+static Lisp_Object
+evaluate_top_level_expr (void)
+{
+  return NILP (Vtop_level)
+    ? call0 (Qnormal_top_level)
+    : Feval (Vtop_level, Qnil);
+}
+
+/* Adapted for internal_catch() interface. */
+static Lisp_Object
+condition_cased_top_level (Lisp_Object ignore)
+{
+  internal_condition_case (evaluate_top_level_expr, Qerror, cmd_error);
+  return Qnil;
+}
 
 Lisp_Object
-recursive_edit_1 (void)
+recursive_edit (void)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object val;
 
-  if (command_loop_level > 0)
+  if (edit_level > 0)
     {
       specbind (Qstandard_output, Qt);
       specbind (Qstandard_input, Qt);
     }
 
 #ifdef HAVE_WINDOW_SYSTEM
-  /* The command loop has started an hourglass timer, so we have to
-     cancel it here, otherwise it will fire because the recursive edit
-     can take some time.  Do not check for display_hourglass_p here,
-     because it could already be nil.  */
     cancel_hourglass ();
 #endif
 
-  /* This function may have been called from a debugger called from
-     within redisplay, for instance by Edebugging a function called
-     from fontification-functions.  We want to allow redisplay in
-     the debugging session.
-
-     The recursive edit is left with a `(throw exit ...)'.  The `exit'
-     tag is not caught anywhere in redisplay, i.e. when we leave the
-     recursive edit, the original redisplay leading to the recursive
-     edit will be unwound.  The outcome should therefore be safe.  */
+  /* Edebugging fontification-functions could lead here, in which case
+     the tag Qexit, if thrown, nicely results in the unwinding of
+     redisplay().  */
   specbind (Qinhibit_redisplay, Qnil);
-  redisplaying_p = 0;
+  redisplaying_p = false;
 
-  /* This variable stores buffers that have changed so that an undo
-     boundary can be added. specbind this so that changes in the
-     recursive edit will not result in undo boundaries in buffers
-     changed before we entered there recursive edit.
-     See Bug #23632.
-  */
+  /* Insulate undo boundaries outside recursive edit (Bug#23632), */
   specbind (Qundo_auto__undoably_changed_buffers, Qnil);
 
-  val = command_loop ();
+#ifdef HAVE_STACK_OVERFLOW_HANDLING
+  /* At least on GNU/Linux, saving signal mask is important here.  */
+  if (sigsetjmp (return_to_command_loop, 1) != 0)
+    {
+      /* Comes here from handle_sigsegv (see sysdep.c) and
+	 stack_overflow_handler (see w32fns.c).  */
+#ifdef WINDOWSNT
+      w32_reset_stack_overflow_guard ();
+#endif
+      init_eval ();
+      Vinternal__top_level_message = recover_top_level_message;
+    }
+  else
+    Vinternal__top_level_message = regular_top_level_message;
+#endif /* HAVE_STACK_OVERFLOW_HANDLING */
+
+  if (edit_level > 0 || minibuf_level > 0)
+    {
+      val = internal_catch (Qexit, condition_cased_command_loop, Qerror);
+      executing_kbd_macro = Qnil;
+    }
+  else
+    for (;;)
+      {
+        internal_catch (Qtop_level, condition_cased_top_level, Qnil);
+        internal_catch (Qtop_level, condition_cased_command_loop, Qerror);
+        executing_kbd_macro = Qnil;
+
+        /* End of file in -batch run exits here.  */
+        if (noninteractive)
+	  Fkill_emacs (Qt, Qnil);
+      }
+
   if (EQ (val, Qt))
     quit ();
-  /* Handle throw from read_minibuf when using minibuffer
-     while it's active but we're in another window.  */
+
+  /* Handle throw from read_minibuf when we're in another window.  */
   if (STRINGP (val))
     xsignal1 (Qerror, val);
 
@@ -755,40 +847,34 @@ throwing to \\='exit:
   arguments, and then return normally.
 
 - Any other value causes `recursive-edit' to return normally to the
-  function that called it.
-
-This function is called by the editor initialization to begin editing.  */)
+  function that called it.*/)
   (void)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-  Lisp_Object buffer;
+  Lisp_Object buffer =
+    (edit_level >= 0
+     && current_buffer != XBUFFER (XWINDOW (selected_window)->contents))
+      ? Fcurrent_buffer () : Qnil;
 
-  /* If we enter while input is blocked, don't lock up here.
-     This may happen through the debugger during redisplay.  */
   if (input_blocked_p ())
+    /* Presumably edebugging redisplay.  */
     return Qnil;
-
-  if (command_loop_level >= 0
-      && current_buffer != XBUFFER (XWINDOW (selected_window)->contents))
-    buffer = Fcurrent_buffer ();
-  else
-    buffer = Qnil;
 
   /* Don't do anything interesting between the increment and the
      record_unwind_protect!  Otherwise, we could get distracted and
      never decrement the counter again.  */
-  command_loop_level++;
+  edit_level++;
   update_mode_lines = 17;
   record_unwind_protect (recursive_edit_unwind, buffer);
 
-  /* If we leave recursive_edit_1 below with a `throw' for instance,
+  /* If we leave recursive_edit below with a `throw' for instance,
      like it is done in the splash screen display, we have to
-     make sure that we restore single_kboard as command_loop_1
+     make sure that we restore single_kboard as command_loop
      would have done if it were left normally.  */
-  if (command_loop_level > 0)
+  if (edit_level > 0)
     temporarily_switch_to_single_kboard (SELECTED_FRAME ());
 
-  recursive_edit_1 ();
+  recursive_edit ();
   return unbind_to (count, Qnil);
 }
 
@@ -798,7 +884,7 @@ recursive_edit_unwind (Lisp_Object buffer)
   if (BUFFERP (buffer))
     Fset_buffer (buffer);
 
-  command_loop_level--;
+  edit_level--;
   update_mode_lines = 18;
 }
 
@@ -915,68 +1001,6 @@ restore_kboard_configuration (int was_locked)
     }
 }
 
-
-/* Handle errors that are not handled at inner levels
-   by printing an error message and returning to the editor command loop.  */
-
-static Lisp_Object
-cmd_error (Lisp_Object data)
-{
-  Lisp_Object old_level, old_length;
-  specpdl_ref count = SPECPDL_INDEX ();
-  Lisp_Object conditions;
-  char macroerror[sizeof "After..kbd macro iterations: "
-		  + INT_STRLEN_BOUND (EMACS_INT)];
-
-#ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
-    cancel_hourglass ();
-#endif
-
-  if (!NILP (executing_kbd_macro))
-    {
-      if (executing_kbd_macro_iterations == 1)
-	sprintf (macroerror, "After 1 kbd macro iteration: ");
-      else
-	sprintf (macroerror, "After %"pI"d kbd macro iterations: ",
-		 executing_kbd_macro_iterations);
-    }
-  else
-    *macroerror = 0;
-
-  conditions = Fget (XCAR (data), Qerror_conditions);
-  if (NILP (Fmemq (Qminibuffer_quit, conditions)))
-    {
-      Vexecuting_kbd_macro = Qnil;
-      executing_kbd_macro = Qnil;
-    }
-  else if (!NILP (KVAR (current_kboard, defining_kbd_macro)))
-    /* An `M-x' command that signals a `minibuffer-quit' condition
-       that's part of a kbd macro.  */
-    finalize_kbd_macro_chars ();
-
-  specbind (Qstandard_output, Qt);
-  specbind (Qstandard_input, Qt);
-  kset_prefix_arg (current_kboard, Qnil);
-  kset_last_prefix_arg (current_kboard, Qnil);
-  cancel_echoing ();
-
-  /* Avoid unquittable loop if data contains a circular list.  */
-  old_level = Vprint_level;
-  old_length = Vprint_length;
-  XSETFASTINT (Vprint_level, 10);
-  XSETFASTINT (Vprint_length, 10);
-  cmd_error_internal (data, macroerror);
-  Vprint_level = old_level;
-  Vprint_length = old_length;
-
-  Vquit_flag = Qnil;
-  Vinhibit_quit = Qnil;
-
-  unbind_to (count, Qnil);
-  return make_fixnum (0);
-}
-
 /* Take actions on handling an error.  DATA is the data that describes
    the error.
 
@@ -1054,104 +1078,328 @@ Default value of `command-error-function'.  */)
   return Qnil;
 }
 
-static Lisp_Object command_loop_1 (void);
-static Lisp_Object top_level_1 (Lisp_Object);
+enum { READ_KEY_ELTS = 30 };
+static int read_key_sequence (Lisp_Object *, Lisp_Object,
+                              bool, bool, bool, bool);
+static void adjust_point_for_property (ptrdiff_t, bool);
 
-/* Entry to editor-command-loop.
-   This level has the catches for exiting/returning to editor command loop.
-   It returns nil to exit recursive edit, t to abort it.  */
-
-Lisp_Object
+static Lisp_Object
 command_loop (void)
 {
-#ifdef HAVE_STACK_OVERFLOW_HANDLING
-  /* At least on GNU/Linux, saving signal mask is important here.  */
-  if (sigsetjmp (return_to_command_loop, 1) != 0)
-    {
-      /* Comes here from handle_sigsegv (see sysdep.c) and
-	 stack_overflow_handler (see w32fns.c).  */
-#ifdef WINDOWSNT
-      w32_reset_stack_overflow_guard ();
-#endif
-      init_eval ();
-      Vinternal__top_level_message = recover_top_level_message;
-    }
-  else
-    Vinternal__top_level_message = regular_top_level_message;
-#endif /* HAVE_STACK_OVERFLOW_HANDLING */
-  if (command_loop_level > 0 || minibuf_level > 0)
-    {
-      Lisp_Object val;
-      val = internal_catch (Qexit, command_loop_2, Qerror);
-      executing_kbd_macro = Qnil;
-      return val;
-    }
-  else
-    while (1)
-      {
-	internal_catch (Qtop_level, top_level_1, Qnil);
-	internal_catch (Qtop_level, command_loop_2, Qerror);
-	executing_kbd_macro = Qnil;
+  modiff_count prev_modiff = 0;
+  struct buffer *prev_buffer = NULL;
 
-	/* End of file in -batch run causes exit here.  */
-	if (noninteractive)
-	  Fkill_emacs (Qt, Qnil);
+  kset_prefix_arg (current_kboard, Qnil);
+  kset_last_prefix_arg (current_kboard, Qnil);
+  Vdeactivate_mark = Qnil;
+  cancel_echoing ();
+
+  this_command_key_count = 0;
+  this_single_command_key_start = 0;
+
+  if (NILP (Vmemory_full))
+    {
+      if (!NILP (Vpost_command_hook) && !NILP (Vrun_hooks))
+	safe_run_hooks (Qpost_command_hook);
+
+      if (!NILP (echo_area_buffer[0]))
+	resize_echo_area_exactly ();
+
+      if (!NILP (Vdelayed_warnings_list))
+        safe_run_hooks (Qdelayed_warnings_hook);
+    }
+
+  /* Set last command variables after Vpost_command_hook.  */
+  kset_last_command (current_kboard, Vthis_command);
+  kset_real_last_command (current_kboard, Vreal_this_command);
+  if (!CONSP (last_command_event))
+    kset_last_repeatable_command (current_kboard, Vreal_this_command);
+
+  for (;;)
+    {
+      Lisp_Object cmd;
+
+      if (! FRAME_LIVE_P (XFRAME (selected_frame)))
+	Fkill_emacs (Qnil, Qnil);
+
+      /* Reselect current window's buffer.  */
+      set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
+
+      while (pending_malloc_warning)
+	display_malloc_warning ();
+
+      Vdeactivate_mark = Qnil;
+
+      /* Reinstate mouse drag events in case tool bar resizes in
+         xdisp.c set this flag to true.  */
+      ignore_mouse_drag_p = false;
+
+      /* If minibuffer on, pause and redraw minibuffer.  */
+      if (minibuf_level
+	  && !NILP (echo_area_buffer[0])
+	  && EQ (minibuf_window, echo_area_window)
+	  && NUMBERP (Vminibuffer_message_timeout))
+	{
+	  specpdl_ref count = SPECPDL_INDEX ();
+	  specbind (Qinhibit_quit, Qt); /* Capture C-g; don't quit out.  */
+
+	  sit_for (Vminibuffer_message_timeout, 0, 2);
+
+	  /* Clear echo area.  */
+	  message1 (0);
+	  safe_run_hooks (Qecho_area_clear_hook);
+	  resize_mini_window (XWINDOW (minibuf_window), false);
+
+	  unbind_to (count, Qnil);
+
+	  /* Treat any captured C-g as input.  */
+	  if (!NILP (Vquit_flag))
+	    {
+	      Vquit_flag = Qnil;
+	      Vunread_command_events = list1i (quit_char);
+	    }
+	}
+
+      Vthis_command = Qnil;
+      Vreal_this_command = Qnil;
+      Vthis_original_command = Qnil;
+      Vthis_command_keys_shift_translated = Qnil;
+
+      /* Read next key sequence.  */
+      raw_keybuf_count = 0;
+      Lisp_Object keybuf[READ_KEY_ELTS];
+      int keylen = read_key_sequence (keybuf, Qnil, false, true, true, false);
+
+      /* A filter may have run while we were reading the input.  */
+      if (! FRAME_LIVE_P (XFRAME (selected_frame)))
+	Fkill_emacs (Qnil, Qnil);
+      set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
+
+      ++num_input_keys;
+
+      if (keylen == 0)
+        /* EOF found; presumably at end of kbd macro. */
+	return Qnil;
+
+      if (keylen == -1)
+	{
+          /* read_key_sequence got a menu that was rejected.
+	     Skip to next command.  */
+	  cancel_echoing ();
+	  this_command_key_count = 0;
+	  this_single_command_key_start = 0;
+	  goto finalize;
+	}
+
+      last_command_event = keybuf[keylen - 1];
+
+      /* By clearing UNCHANGED, redisplay updates entire window
+         in case previous command forced a specific window-start.  */
+      if (XWINDOW (selected_window)->force_start) {
+        struct buffer *b;
+        XWINDOW (selected_window)->force_start = 0;
+        b = XBUFFER (XWINDOW (selected_window)->contents);
+        BUF_BEG_UNCHANGED (b) = BUF_END_UNCHANGED (b) = 0;
       }
+
+      cmd = read_key_sequence_cmd;
+      if (!NILP (Vexecuting_kbd_macro))
+	{
+	  if (!NILP (Vquit_flag))
+	    {
+	      Vexecuting_kbd_macro = Qt;
+	      maybe_quit ();
+	    }
+	}
+
+      prev_buffer = current_buffer;
+      prev_modiff = MODIFF;
+      last_point_position = PT;
+
+      /* Re-enable adjusting point to a tangibility boundary (e.g.,
+         composition, display).  */
+      Vdisable_point_adjustment = Qnil;
+
+      /* Clear deactivate-mark if set by process filters and timers.  */
+      Vdeactivate_mark = Qnil;
+
+      /* Remap command through active keymaps.  */
+      Vthis_original_command = cmd;
+      if (!NILP (read_key_sequence_remapped))
+	cmd = read_key_sequence_remapped;
+
+      total_keys += total_keys < lossage_limit;
+      ASET (recent_keys, recent_keys_index, Fcons (Qnil, cmd));
+      if (++recent_keys_index >= lossage_limit)
+	recent_keys_index = 0;
+
+      Vthis_command = cmd;
+      Vreal_this_command = cmd;
+      safe_run_hooks (Qpre_command_hook);
+
+      if (NILP (Vthis_command))
+	call0 (Qundefined);
+      else
+	{
+#ifdef HAVE_WINDOW_SYSTEM
+          specpdl_ref scount = SPECPDL_INDEX ();
+
+          if (display_hourglass_p
+              && NILP (Vexecuting_kbd_macro))
+            {
+              record_unwind_protect_void (cancel_hourglass);
+              start_hourglass ();
+            }
+#endif
+
+          /* Adjust undo-boundaries for previous command.  */
+          call0 (Qundo_auto__add_boundary);
+
+          /* Record point and buffer for undo.  */
+          point_before_last_command_or_undo = PT;
+          buffer_before_last_command_or_undo = current_buffer;
+
+          /* Execute the command.  */
+          call1 (Qcommand_execute, Vthis_command);
+
+#ifdef HAVE_WINDOW_SYSTEM
+          unbind_to (scount, Qnil);
+#endif
+        }
+      kset_last_prefix_arg (current_kboard, Vcurrent_prefix_arg);
+
+      safe_run_hooks (Qpost_command_hook);
+
+      /* Resize minibuffer of selected frame (Bug#34317).  */
+      if (!NILP (echo_area_buffer[0])
+	  && (EQ (echo_area_window,
+		  FRAME_MINIBUF_WINDOW (XFRAME (selected_frame)))))
+	resize_echo_area_exactly ();
+
+      if (!NILP (Vdelayed_warnings_list))
+        safe_run_hooks (Qdelayed_warnings_hook);
+
+      kset_last_command (current_kboard, Vthis_command);
+      kset_real_last_command (current_kboard, Vreal_this_command);
+      if (!CONSP (last_command_event))
+	kset_last_repeatable_command (current_kboard, Vreal_this_command);
+
+      this_command_key_count = 0;
+      this_single_command_key_start = 0;
+
+      if (current_kboard->immediate_echo
+	  && !NILP (call0 (Qinternal_echo_keystrokes_prefix)))
+	{
+	  current_kboard->immediate_echo = false;
+	  echo_now (); /* Refresh echo message.  */
+	}
+      else
+	cancel_echoing ();
+
+      if (!NILP (BVAR (current_buffer, mark_active))
+	  && !NILP (Vrun_hooks))
+	{
+	  if (EQ (Vtransient_mark_mode, Qidentity))
+	    Vtransient_mark_mode = Qnil;
+	  else if (EQ (Vtransient_mark_mode, Qonly))
+	    /* Deprecated since v22.  Setting transient-mark-mode to
+	       `only' turns it on for a single command.  */
+	    Vtransient_mark_mode = Qidentity;
+
+	  /* Set PRIMARY if `select-active-regions' is non-nil.  */
+	  if (!NILP (Vdeactivate_mark))
+	    call0 (Qdeactivate_mark); /* Sets PRIMARY appropriately.  */
+	  else
+	    {
+	      Lisp_Object symval;
+	      if ((!NILP (Fwindow_system (Qnil))
+		   || ((symval =
+			find_symbol_value (Qxterm_select_active_regions, NULL),
+			(!EQ (symval, Qunbound) && !NILP (symval)))
+		         && !NILP (Fterminal_parameter (Qnil,
+						        Qxterm__set_selection))))
+		  /* Even if mark_active is non-nil, the actual buffer
+		     marker may not have been set yet (Bug#7044).  */
+		  && XMARKER (BVAR (current_buffer, mark))->buffer
+		  && (EQ (Vselect_active_regions, Qonly)
+		      ? EQ (CAR_SAFE (Vtransient_mark_mode), Qonly)
+		      : (!NILP (Vselect_active_regions)
+			 && !NILP (Vtransient_mark_mode)))
+		  && NILP (Fmemq (Vthis_command,
+				  Vselection_inhibit_update_commands)))
+		{
+		  Lisp_Object txt
+		    = call1 (Vregion_extract_function, Qnil);
+
+		  if (XFIXNUM (Flength (txt)) > 0)
+		    call2 (Qgui_set_selection, QPRIMARY, txt);
+
+		  CALLN (Frun_hook_with_args, Qpost_select_region_hook, txt);
+		}
+
+	      if (current_buffer != prev_buffer || MODIFF != prev_modiff)
+		run_hook (intern ("activate-mark-hook"));
+	    }
+	  Vsaved_region_selection = Qnil;
+	}
+
+    finalize:
+
+      if (current_buffer == prev_buffer
+	  && XBUFFER (XWINDOW (selected_window)->contents) == current_buffer
+	  && last_point_position != PT)
+	{
+	  if (NILP (Vdisable_point_adjustment)
+	      && NILP (Vglobal_disable_point_adjustment)
+	      && !composition_break_at_point)
+	    adjust_point_for_property (last_point_position,
+				       MODIFF != prev_modiff);
+	  else if (PT > BEGV
+                   && PT < ZV
+		   && PT != composition_adjust_point (last_point_position, PT))
+	    /* Point is within a multibyte glyph.  Updating display
+               decomposes glyph so that cursor finds point.  */
+            windows_or_buffers_changed = 39;
+        }
+
+      /* Install chars in kbd macro.  */
+      if (!NILP (KVAR (current_kboard, defining_kbd_macro))
+	  && NILP (KVAR (current_kboard, Vprefix_arg)))
+	finalize_kbd_macro_chars ();
+    }
 }
 
-/* Here we catch errors in execution of commands within the
-   editing loop, and reenter the editing loop.
-   When there is an error, cmd_error runs and returns a non-nil
-   value to us.  A value of nil means that command_loop_1 itself
-   returned due to end of file (or end of kbd macro).  HANDLERS is a
-   list of condition names, passed to internal_condition_case.  */
+/* HANDLERS is a list of condition names.  */
 
 Lisp_Object
-command_loop_2 (Lisp_Object handlers)
+condition_cased_command_loop (Lisp_Object handlers)
 {
-  register Lisp_Object val;
+  Lisp_Object val;
 
+  /* VAL is nil when command_loop finds an EOF.
+     VAL is otherwise the return value of cmd_error().  */
   do
-    val = internal_condition_case (command_loop_1, handlers, cmd_error);
-  while (!NILP (val));
+    {
+      val = internal_condition_case (command_loop, handlers, cmd_error);
+    } while (!NILP (val));
 
-  return Qnil;
-}
-
-static Lisp_Object
-top_level_2 (void)
-{
-  return Feval (Vtop_level, Qnil);
-}
-
-static Lisp_Object
-top_level_1 (Lisp_Object ignore)
-{
-  /* On entry to the outer level, run the startup file.  */
-  if (! NILP (Vtop_level))
-    internal_condition_case (top_level_2, Qerror, cmd_error);
-  else if (! NILP (Vloadup_pure_table))
-    message1 ("Bare impure Emacs (standard Lisp code not loaded)");
-  else
-    message1 ("Bare Emacs (standard Lisp code not loaded)");
-  return Qnil;
+  return val;
 }
 
 DEFUN ("top-level", Ftop_level, Stop_level, 0, 0, "",
-       doc: /* Exit all recursive editing levels.
-This also exits all active minibuffers.  */
+       doc: /* Distinct from `normal-top-level'.
+This throws on tag \\='top-level to the handler Vtop_level which
+in most cases evaluates to a call to `normal-top-level'.
+*/
        attributes: noreturn)
   (void)
 {
 #ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
-    cancel_hourglass ();
+  cancel_hourglass ();
 #endif
 
-  /* Unblock input if we enter with input blocked.  This may happen if
-     redisplay traps e.g. during tool-bar update with input blocked.  */
+  /* Unblock during redisplay traps, e.g., tool-bar update.  */
   totally_unblock_input ();
-
   Fthrow (Qtop_level, Qnil);
 }
 
@@ -1166,7 +1414,7 @@ DEFUN ("exit-recursive-edit", Fexit_recursive_edit, Sexit_recursive_edit, 0, 0, 
        attributes: noreturn)
   (void)
 {
-  if (command_loop_level > 0 || minibuf_level > 0)
+  if (edit_level > 0 || minibuf_level > 0)
     Fthrow (Qexit, Qnil);
 
   user_error ("No recursive edit is in progress");
@@ -1177,7 +1425,7 @@ DEFUN ("abort-recursive-edit", Fabort_recursive_edit, Sabort_recursive_edit, 0, 
        attributes: noreturn)
   (void)
 {
-  if (command_loop_level > 0 || minibuf_level > 0)
+  if (edit_level > 0 || minibuf_level > 0)
     Fthrow (Qexit, Qt);
 
   user_error ("No recursive edit is in progress");
@@ -1246,361 +1494,6 @@ some_mouse_moved (void)
   return NULL;
 }
 
-
-/* This is the actual command reading loop,
-   sans error-handling encapsulation.  */
-
-enum { READ_KEY_ELTS = 30 };
-static int read_key_sequence (Lisp_Object *, Lisp_Object,
-                              bool, bool, bool, bool);
-static void adjust_point_for_property (ptrdiff_t, bool);
-
-static Lisp_Object
-command_loop_1 (void)
-{
-  modiff_count prev_modiff = 0;
-  struct buffer *prev_buffer = NULL;
-
-  kset_prefix_arg (current_kboard, Qnil);
-  kset_last_prefix_arg (current_kboard, Qnil);
-  Vdeactivate_mark = Qnil;
-  cancel_echoing ();
-
-  this_command_key_count = 0;
-  this_single_command_key_start = 0;
-
-  if (NILP (Vmemory_full))
-    {
-      /* Make sure this hook runs after commands that get errors and
-	 throw to top level.  */
-      /* Note that the value cell will never directly contain nil
-	 if the symbol is a local variable.  */
-      if (!NILP (Vpost_command_hook) && !NILP (Vrun_hooks))
-	safe_run_hooks (Qpost_command_hook);
-
-      /* If displaying a message, resize the echo area window to fit
-	 that message's size exactly.  */
-      if (!NILP (echo_area_buffer[0]))
-	resize_echo_area_exactly ();
-
-      /* If there are warnings waiting, process them.  */
-      if (!NILP (Vdelayed_warnings_list))
-        safe_run_hooks (Qdelayed_warnings_hook);
-    }
-
-  /* Do this after running Vpost_command_hook, for consistency.  */
-  kset_last_command (current_kboard, Vthis_command);
-  kset_real_last_command (current_kboard, Vreal_this_command);
-  if (!CONSP (last_command_event))
-    kset_last_repeatable_command (current_kboard, Vreal_this_command);
-
-  while (true)
-    {
-      Lisp_Object cmd;
-
-      if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-	Fkill_emacs (Qnil, Qnil);
-
-      /* Make sure the current window's buffer is selected.  */
-      set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
-
-      /* Display any malloc warning that just came out.  Use while because
-	 displaying one warning can cause another.  */
-
-      while (pending_malloc_warning)
-	display_malloc_warning ();
-
-      Vdeactivate_mark = Qnil;
-
-      /* Don't ignore mouse movements for more than a single command
-	 loop.  (This flag is set in xdisp.c whenever the tool bar is
-	 resized, because the resize moves text up or down, and would
-	 generate false mouse drag events if we don't ignore them.)  */
-      ignore_mouse_drag_p = false;
-
-      /* If minibuffer on and echo area in use,
-	 wait a short time and redraw minibuffer.  */
-
-      if (minibuf_level
-	  && !NILP (echo_area_buffer[0])
-	  && EQ (minibuf_window, echo_area_window)
-	  && NUMBERP (Vminibuffer_message_timeout))
-	{
-	  /* Bind inhibit-quit to t so that C-g gets read in
-	     rather than quitting back to the minibuffer.  */
-	  specpdl_ref count = SPECPDL_INDEX ();
-	  specbind (Qinhibit_quit, Qt);
-
-	  sit_for (Vminibuffer_message_timeout, 0, 2);
-
-	  /* Clear the echo area.  */
-	  message1 (0);
-	  safe_run_hooks (Qecho_area_clear_hook);
-
-	  /* We cleared the echo area, and the minibuffer will now
-	     show, so resize the mini-window in case the minibuffer
-	     needs more or less space than the echo area.  */
-	  resize_mini_window (XWINDOW (minibuf_window), false);
-
-	  unbind_to (count, Qnil);
-
-	  /* If a C-g came in before, treat it as input now.  */
-	  if (!NILP (Vquit_flag))
-	    {
-	      Vquit_flag = Qnil;
-	      Vunread_command_events = list1i (quit_char);
-	    }
-	}
-
-      Vthis_command = Qnil;
-      Vreal_this_command = Qnil;
-      Vthis_original_command = Qnil;
-      Vthis_command_keys_shift_translated = Qnil;
-
-      /* Read next key sequence; i gets its length.  */
-      raw_keybuf_count = 0;
-      Lisp_Object keybuf[READ_KEY_ELTS];
-      int i = read_key_sequence (keybuf, Qnil, false, true, true, false);
-
-      /* A filter may have run while we were reading the input.  */
-      if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-	Fkill_emacs (Qnil, Qnil);
-      set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
-
-      ++num_input_keys;
-
-      /* Now we have read a key sequence of length I,
-	 or else I is 0 and we found end of file.  */
-
-      if (i == 0)		/* End of file -- happens only in */
-	return Qnil;		/* a kbd macro, at the end.  */
-      /* -1 means read_key_sequence got a menu that was rejected.
-	 Just loop around and read another command.  */
-      if (i == -1)
-	{
-	  cancel_echoing ();
-	  this_command_key_count = 0;
-	  this_single_command_key_start = 0;
-	  goto finalize;
-	}
-
-      last_command_event = keybuf[i - 1];
-
-      /* If the previous command tried to force a specific window-start,
-	 forget about that, in case this command moves point far away
-	 from that position.  But also throw away beg_unchanged and
-	 end_unchanged information in that case, so that redisplay will
-	 update the whole window properly.  */
-      if (XWINDOW (selected_window)->force_start)
-	{
-	  struct buffer *b;
-	  XWINDOW (selected_window)->force_start = 0;
-	  b = XBUFFER (XWINDOW (selected_window)->contents);
-	  BUF_BEG_UNCHANGED (b) = BUF_END_UNCHANGED (b) = 0;
-	}
-
-      cmd = read_key_sequence_cmd;
-      if (!NILP (Vexecuting_kbd_macro))
-	{
-	  if (!NILP (Vquit_flag))
-	    {
-	      Vexecuting_kbd_macro = Qt;
-	      maybe_quit ();	/* Make some noise.  */
-				/* Will return since macro now empty.  */
-	    }
-	}
-
-      /* Do redisplay processing after this command except in special
-	 cases identified below.  */
-      prev_buffer = current_buffer;
-      prev_modiff = MODIFF;
-      last_point_position = PT;
-
-      /* By default, we adjust point to a boundary of a region that
-         has such a property that should be treated intangible
-         (e.g. composition, display).  But, some commands will set
-         this variable differently.  */
-      Vdisable_point_adjustment = Qnil;
-
-      /* Process filters and timers may have messed with deactivate-mark.
-	 reset it before we execute the command.  */
-      Vdeactivate_mark = Qnil;
-
-      /* Remap command through active keymaps.  */
-      Vthis_original_command = cmd;
-      if (!NILP (read_key_sequence_remapped))
-	cmd = read_key_sequence_remapped;
-
-      /* Execute the command.  */
-
-      {
-	total_keys += total_keys < lossage_limit;
-	ASET (recent_keys, recent_keys_index,
-	      Fcons (Qnil, cmd));
-	if (++recent_keys_index >= lossage_limit)
-	  recent_keys_index = 0;
-      }
-      Vthis_command = cmd;
-      Vreal_this_command = cmd;
-      safe_run_hooks (Qpre_command_hook);
-
-      if (NILP (Vthis_command))
-	/* nil means key is undefined.  */
-	call0 (Qundefined);
-      else
-	{
-	  /* Here for a command that isn't executed directly.  */
-
-#ifdef HAVE_WINDOW_SYSTEM
-            specpdl_ref scount = SPECPDL_INDEX ();
-
-            if (display_hourglass_p
-                && NILP (Vexecuting_kbd_macro))
-              {
-                record_unwind_protect_void (cancel_hourglass);
-                start_hourglass ();
-              }
-#endif
-
-            /* Ensure that we have added appropriate undo-boundaries as a
-               result of changes from the last command. */
-            call0 (Qundo_auto__add_boundary);
-
-            /* Record point and buffer, so we can put point into the undo
-               information if necessary. */
-            point_before_last_command_or_undo = PT;
-            buffer_before_last_command_or_undo = current_buffer;
-
-            call1 (Qcommand_execute, Vthis_command);
-
-#ifdef HAVE_WINDOW_SYSTEM
-	  /* Do not check display_hourglass_p here, because
-	     `command-execute' could change it, but we should cancel
-	     hourglass cursor anyway.
-	     But don't cancel the hourglass within a macro
-	     just because a command in the macro finishes.  */
-	  if (NILP (Vexecuting_kbd_macro))
-            unbind_to (scount, Qnil);
-#endif
-          }
-      kset_last_prefix_arg (current_kboard, Vcurrent_prefix_arg);
-
-      safe_run_hooks (Qpost_command_hook);
-
-      /* If displaying a message, resize the echo area window to fit
-	 that message's size exactly.  Do this only if the echo area
-	 window is the minibuffer window of the selected frame.  See
-	 Bug#34317.  */
-      if (!NILP (echo_area_buffer[0])
-	  && (EQ (echo_area_window,
-		  FRAME_MINIBUF_WINDOW (XFRAME (selected_frame)))))
-	resize_echo_area_exactly ();
-
-      /* If there are warnings waiting, process them.  */
-      if (!NILP (Vdelayed_warnings_list))
-        safe_run_hooks (Qdelayed_warnings_hook);
-
-      kset_last_command (current_kboard, Vthis_command);
-      kset_real_last_command (current_kboard, Vreal_this_command);
-      if (!CONSP (last_command_event))
-	kset_last_repeatable_command (current_kboard, Vreal_this_command);
-
-      this_command_key_count = 0;
-      this_single_command_key_start = 0;
-
-      if (current_kboard->immediate_echo
-	  && !NILP (call0 (Qinternal_echo_keystrokes_prefix)))
-	{
-	  current_kboard->immediate_echo = false;
-	  /* Refresh the echo message.  */
-	  echo_now ();
-	}
-      else
-	cancel_echoing ();
-
-      if (!NILP (BVAR (current_buffer, mark_active))
-	  && !NILP (Vrun_hooks))
-	{
-	  /* In Emacs 22, setting transient-mark-mode to `only' was a
-	     way of turning it on for just one command.  This usage is
-	     obsolete, but support it anyway.  */
-	  if (EQ (Vtransient_mark_mode, Qidentity))
-	    Vtransient_mark_mode = Qnil;
-	  else if (EQ (Vtransient_mark_mode, Qonly))
-	    Vtransient_mark_mode = Qidentity;
-
-	  if (!NILP (Vdeactivate_mark))
-	    /* If `select-active-regions' is non-nil, this call to
-	       `deactivate-mark' also sets the PRIMARY selection.  */
-	    call0 (Qdeactivate_mark);
-	  else
-	    {
-	      Lisp_Object symval;
-	      /* Even if not deactivating the mark, set PRIMARY if
-		 `select-active-regions' is non-nil.  */
-	      if ((!NILP (Fwindow_system (Qnil))
-		   || ((symval =
-			find_symbol_value (Qxterm_select_active_regions, NULL),
-			(!EQ (symval, Qunbound) && !NILP (symval)))
-		       && !NILP (Fterminal_parameter (Qnil,
-						      Qxterm__set_selection))))
-		  /* Even if mark_active is non-nil, the actual buffer
-		     marker may not have been set yet (Bug#7044).  */
-		  && XMARKER (BVAR (current_buffer, mark))->buffer
-		  && (EQ (Vselect_active_regions, Qonly)
-		      ? EQ (CAR_SAFE (Vtransient_mark_mode), Qonly)
-		      : (!NILP (Vselect_active_regions)
-			 && !NILP (Vtransient_mark_mode)))
-		  && NILP (Fmemq (Vthis_command,
-				  Vselection_inhibit_update_commands)))
-		{
-		  Lisp_Object txt
-		    = call1 (Vregion_extract_function, Qnil);
-
-		  if (XFIXNUM (Flength (txt)) > 0)
-		    /* Don't set empty selections.  */
-		    call2 (Qgui_set_selection, QPRIMARY, txt);
-
-		  CALLN (Frun_hook_with_args, Qpost_select_region_hook, txt);
-		}
-
-	      if (current_buffer != prev_buffer || MODIFF != prev_modiff)
-		run_hook (intern ("activate-mark-hook"));
-	    }
-
-	  Vsaved_region_selection = Qnil;
-	}
-
-    finalize:
-
-      if (current_buffer == prev_buffer
-	  && XBUFFER (XWINDOW (selected_window)->contents) == current_buffer
-	  && last_point_position != PT)
-	{
-	  if (NILP (Vdisable_point_adjustment)
-	      && NILP (Vglobal_disable_point_adjustment)
-	      && !composition_break_at_point)
-	    {
-	      adjust_point_for_property (last_point_position,
-					 MODIFF != prev_modiff);
-	    }
-	  else if (PT > BEGV && PT < ZV
-		   && (composition_adjust_point (last_point_position, PT)
-		       != PT))
-	    /* Now point is within a grapheme cluster.  We must update
-	       the display so that this cluster is de-composed on the
-	       screen and the cursor is correctly placed at point.  */
-	    windows_or_buffers_changed = 39;
-	}
-
-      /* Install chars successfully executed in kbd macro.  */
-
-      if (!NILP (KVAR (current_kboard, defining_kbd_macro))
-	  && NILP (KVAR (current_kboard, Vprefix_arg)))
-	finalize_kbd_macro_chars ();
-    }
-}
-
 Lisp_Object
 read_menu_command (void)
 {
@@ -1611,13 +1504,13 @@ read_menu_command (void)
   specbind (Qecho_keystrokes, make_fixnum (0));
 
   Lisp_Object keybuf[READ_KEY_ELTS];
-  int i = read_key_sequence (keybuf, Qnil, false, true, true, true);
+  int keylen = read_key_sequence (keybuf, Qnil, false, true, true, true);
 
   unbind_to (count, Qnil);
 
   if (! FRAME_LIVE_P (XFRAME (selected_frame)))
     Fkill_emacs (Qnil, Qnil);
-  if (i == 0 || i == -1)
+  if (keylen == 0 || keylen == -1)
     return Qt;
 
   return read_key_sequence_cmd;
@@ -3029,7 +2922,7 @@ read_char (int commandflag, Lisp_Object map,
 	  if (minibuf_level
 	      && EQ (minibuf_window, echo_area_window)
 	      /* The case where minibuffer-message-timeout is a number
-		 was already handled near the beginning of command_loop_1.  */
+		 was already handled near the beginning of command_loop.  */
 	      && !NUMBERP (Vminibuffer_message_timeout))
 	    resize_mini_window (XWINDOW (minibuf_window), false);
 	}
@@ -5060,46 +4953,6 @@ static const char *const lispy_multimedia_keys[] =
 
 #else /* not HAVE_NTGUI */
 
-/* This should be dealt with in XTread_socket now, and that doesn't
-   depend on the client system having the Kana syms defined.  See also
-   the XK_kana_A case below.  */
-#if 0
-#ifdef XK_kana_A
-static const char *const lispy_kana_keys[] =
-  {
-    /* X Keysym value */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x400 .. 0x40f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x410 .. 0x41f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x420 .. 0x42f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x430 .. 0x43f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x440 .. 0x44f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x450 .. 0x45f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x460 .. 0x46f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,"overline",0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x480 .. 0x48f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x490 .. 0x49f */
-    0, "kana-fullstop", "kana-openingbracket", "kana-closingbracket",
-    "kana-comma", "kana-conjunctive", "kana-WO", "kana-a",
-    "kana-i", "kana-u", "kana-e", "kana-o",
-    "kana-ya", "kana-yu", "kana-yo", "kana-tsu",
-    "prolongedsound", "kana-A", "kana-I", "kana-U",
-    "kana-E", "kana-O", "kana-KA", "kana-KI",
-    "kana-KU", "kana-KE", "kana-KO", "kana-SA",
-    "kana-SHI", "kana-SU", "kana-SE", "kana-SO",
-    "kana-TA", "kana-CHI", "kana-TSU", "kana-TE",
-    "kana-TO", "kana-NA", "kana-NI", "kana-NU",
-    "kana-NE", "kana-NO", "kana-HA", "kana-HI",
-    "kana-FU", "kana-HE", "kana-HO", "kana-MA",
-    "kana-MI", "kana-MU", "kana-ME", "kana-MO",
-    "kana-YA", "kana-YU", "kana-YO", "kana-RA",
-    "kana-RI", "kana-RU", "kana-RE", "kana-RO",
-    "kana-WA", "kana-N", "voicedsound", "semivoicedsound",
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x4e0 .. 0x4ef */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x4f0 .. 0x4ff */
-  };
-#endif /* XK_kana_A */
-#endif /* 0 */
-
 #define FUNCTION_KEY_OFFSET 0xff00
 
 /* You'll notice that this table is arranged to be conveniently
@@ -5794,17 +5647,6 @@ make_lispy_event (struct input_event *event)
 				      Qfunction_key, Qnil,
 				      lispy_accent_keys, &accent_key_syms,
                                       ARRAYELTS (lispy_accent_keys));
-
-#if 0
-#ifdef XK_kana_A
-      if (event->code >= 0x400 && event->code < 0x500)
-	return modify_event_symbol (event->code - 0x400,
-				    event->modifiers & ~shift_modifier,
-				    Qfunction_key, Qnil,
-				    lispy_kana_keys, &func_key_syms,
-                                    ARRAYELTS (lispy_kana_keys));
-#endif /* XK_kana_A */
-#endif /* 0 */
 
 #ifdef ISO_FUNCTION_KEY_OFFSET
       if (event->code < FUNCTION_KEY_OFFSET
@@ -9391,17 +9233,7 @@ read_char_minibuf_menu_prompt (int commandflag,
 				  || XFIXNUM (downcased_event) == SREF (s, 0));
 		  if (! char_matches)
 		    desc = Fsingle_key_description (event, Qnil);
-
-#if 0  /* It is redundant to list the equivalent key bindings because
-	  the prefix is what the user has already typed.  */
-		  tem
-		    = XVECTOR (item_properties)->contents[ITEM_PROPERTY_KEYEQ];
-		  if (!NILP (tem))
-		    /* Insert equivalent keybinding.  */
-		    s = concat2 (s, tem);
-#endif
-		  tem
-		    = AREF (item_properties, ITEM_PROPERTY_TYPE);
+		  tem = AREF (item_properties, ITEM_PROPERTY_TYPE);
 		  if (EQ (tem, QCradio) || EQ (tem, QCtoggle))
 		    {
 		      /* Insert button prefix.  */
@@ -10066,7 +9898,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	      /* Reset the current buffer from the selected window
 		 in case something changed the former and not the latter.
 		 This is to be more consistent with the behavior
-		 of the command_loop_1.  */
+		 of the command_loop.  */
 	      if (fix_current_buffer)
 		{
 		  if (! FRAME_LIVE_P (XFRAME (selected_frame)))
@@ -10667,7 +10499,6 @@ read_key_sequence_vs (Lisp_Object prompt, Lisp_Object continue_echo,
     }
 
 #ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
     cancel_hourglass ();
 #endif
 
@@ -10675,15 +10506,6 @@ read_key_sequence_vs (Lisp_Object prompt, Lisp_Object continue_echo,
   Lisp_Object keybuf[READ_KEY_ELTS];
   int i = read_key_sequence (keybuf, prompt, ! NILP (dont_downcase_last),
 			     ! NILP (can_return_switch_frame), false, false);
-
-#if 0  /* The following is fine for code reading a key sequence and
-	  then proceeding with a lengthy computation, but it's not good
-	  for code reading keys in a loop, like an input method.  */
-#ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
-    start_hourglass ();
-#endif
-#endif
 
   if (i == -1)
     {
@@ -11032,7 +10854,7 @@ DEFUN ("recursion-depth", Frecursion_depth, Srecursion_depth, 0, 0, 0,
   (void)
 {
   EMACS_INT sum;
-  INT_ADD_WRAPV (command_loop_level, minibuf_level, &sum);
+  INT_ADD_WRAPV (edit_level, minibuf_level, &sum);
   return make_fixnum (sum);
 }
 
@@ -11825,8 +11647,7 @@ delete_kboard (KBOARD *kb)
 void
 init_keyboard (void)
 {
-  /* This is correct before outermost invocation of the editor loop.  */
-  command_loop_level = -1;
+  edit_level = -1;
   quit_char = Ctl ('g');
   Vunread_command_events = Qnil;
   timer_idleness_start_time = invalid_timespec ();
@@ -11843,7 +11664,7 @@ init_keyboard (void)
   virtual_core_keyboard_name = build_string ("Virtual core keyboard");
   Vlast_event_device = Qnil;
 
-  /* This means that command_loop_1 won't try to select anything the first
+  /* This means that command_loop won't try to select anything the first
      time through.  */
   internal_last_event_frame = Qnil;
   Vlast_event_frame = internal_last_event_frame;
@@ -12230,6 +12051,7 @@ syms_of_keyboard (void)
 
   DEFSYM (Qcommand_execute, "command-execute");
   DEFSYM (Qinternal_echo_keystrokes_prefix, "internal-echo-keystrokes-prefix");
+  DEFSYM (Qnormal_top_level, "normal-top-level");
 
   accent_key_syms = Qnil;
   staticpro (&accent_key_syms);
@@ -12379,12 +12201,14 @@ Taken from a previous value of `real-this-command'.  */);
 
   DEFVAR_LISP ("this-command", Vthis_command,
 	       doc: /* The command now being executed.
-The command can set this variable; whatever is put here
-will be in `last-command' during the following command.  */);
+Since the command can set this variable, the variable `real-this-command'
+holds the original command.  */);
   Vthis_command = Qnil;
 
   DEFVAR_LISP ("real-this-command", Vreal_this_command,
-	       doc: /* This is like `this-command', except that commands should never modify it.  */);
+	       doc: /* The original value of `this-command'.
+Since the command itself can modify `this-command', this auxiliary variable
+preserves the original.  */);
   Vreal_this_command = Qnil;
 
   DEFSYM (Qcurrent_minibuffer_command, "current-minibuffer-command");
@@ -12606,10 +12430,6 @@ avoid making Emacs unresponsive while the user types.
 See also `pre-command-hook'.  */);
   Vpost_command_hook = Qnil;
 
-#if 0
-  DEFVAR_LISP ("echo-area-clear-hook", ...,
-	       doc: /* Normal hook run when clearing the echo area.  */);
-#endif
   DEFSYM (Qecho_area_clear_hook, "echo-area-clear-hook");
   DEFSYM (Qtouchscreen_begin, "touchscreen-begin");
   DEFSYM (Qtouchscreen_end, "touchscreen-end");

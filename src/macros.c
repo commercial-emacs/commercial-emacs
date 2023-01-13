@@ -330,7 +330,7 @@ buffer before the macro is executed.  */)
 	    break;
 	}
 
-      command_loop_2 (list1 (Qminibuffer_quit));
+      condition_cased_command_loop (list1 (Qminibuffer_quit));
 
       executing_kbd_macro_iterations = ++success_count;
 

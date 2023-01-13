@@ -4033,9 +4033,9 @@ REASON describes the reason that the boundary is being added; see
   (when (eq cause 'command)
     (add-to-list 'undo-auto--undoably-changed-buffers (current-buffer)))
   (dolist (b undo-auto--undoably-changed-buffers)
-          (when (buffer-live-p b)
-            (with-current-buffer b
-              (undo-auto--ensure-boundary cause))))
+    (when (buffer-live-p b)
+      (with-current-buffer b
+        (undo-auto--ensure-boundary cause))))
   (setq undo-auto--undoably-changed-buffers nil))
 
 (defun undo-auto--boundary-timer ()

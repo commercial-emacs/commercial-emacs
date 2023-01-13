@@ -45,7 +45,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    minibuffer recursions are encountered.  */
 
 Lisp_Object Vminibuffer_list;
-static Lisp_Object Vcommand_loop_level_list;
+static Lisp_Object Vedit_level_list;
 
 /* Data to remember during recursive minibuffer invocations.  */
 
@@ -445,7 +445,7 @@ No argument or nil as argument means use the current buffer as BUFFER.  */)
   if (NILP (buffer))
     buffer = Fcurrent_buffer ();
   depth = this_minibuffer_depth (buffer);
-  return depth && minibuf_c_loop_level (depth) == command_loop_level
+  return depth && minibuf_c_loop_level (depth) == edit_level
     ? Qt
     : Qnil;
 }
@@ -902,7 +902,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
   /* Don't allow the user to undo past this point.  */
   bset_undo_list (current_buffer, Qnil);
 
-  recursive_edit_1 ();
+  recursive_edit ();
 
   /* If cursor is on the minibuffer line,
      show the user we have exited by putting it in column 0.  */
@@ -1027,15 +1027,15 @@ get_minibuffer (EMACS_INT depth)
 {
   Lisp_Object tail = Fnthcdr (make_fixnum (depth), Vminibuffer_list);
   Lisp_Object cll_tail = Fnthcdr (make_fixnum (depth),
-				  Vcommand_loop_level_list);
+				  Vedit_level_list);
   if (NILP (tail))
     {
       tail = list1 (Qnil);
       Vminibuffer_list = nconc2 (Vminibuffer_list, tail);
       cll_tail = list1 (Qnil);
-      Vcommand_loop_level_list = nconc2 (Vcommand_loop_level_list, cll_tail);
+      Vedit_level_list = nconc2 (Vedit_level_list, cll_tail);
     }
-  XSETCAR (cll_tail, make_fixnum (depth ? command_loop_level : 0));
+  XSETCAR (cll_tail, make_fixnum (depth ? edit_level : 0));
   Lisp_Object buf = Fcar (tail);
   if (NILP (buf) || !BUFFER_LIVE_P (XBUFFER (buf)))
     {
@@ -1063,7 +1063,7 @@ get_minibuffer (EMACS_INT depth)
 
 static EMACS_INT minibuf_c_loop_level (EMACS_INT depth)
 {
-  Lisp_Object cll = Fnth (make_fixnum (depth), Vcommand_loop_level_list);
+  Lisp_Object cll = Fnth (make_fixnum (depth), Vedit_level_list);
   if (FIXNUMP (cll))
     return XFIXNUM (cll);
   return 0;
@@ -2263,7 +2263,7 @@ void
 init_minibuf_once (void)
 {
   staticpro (&Vminibuffer_list);
-  staticpro (&Vcommand_loop_level_list);
+  staticpro (&Vedit_level_list);
   pdumper_do_now_and_after_load (init_minibuf_once_for_pdumper);
   /* Ensure our inactive minibuffer exists.  */
   get_minibuffer (0);
@@ -2279,7 +2279,7 @@ init_minibuf_once_for_pdumper (void)
      restore from a dump file.  pdumper doesn't try to preserve
      frames, windows, and so on, so reset everything related here.  */
   Vminibuffer_list = Qnil;
-  Vcommand_loop_level_list = Qnil;
+  Vedit_level_list = Qnil;
   minibuf_level = 0;
   minibuf_prompt = Qnil;
   minibuf_save_list = Qnil;

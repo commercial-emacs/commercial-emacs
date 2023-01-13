@@ -307,7 +307,7 @@ call_debugger (Lisp_Object arg)
   /* Resetting redisplaying_p to 0 makes sure that debug output is
      displayed if the debugger is invoked during redisplay.  */
   debug_while_redisplaying = redisplaying_p;
-  redisplaying_p = 0;
+  redisplaying_p = false;
   specbind (intern ("debugger-may-continue"),
 	    debug_while_redisplaying ? Qnil : Qt);
   specbind (Qinhibit_redisplay, Qnil);
@@ -1184,7 +1184,7 @@ usage: (catch TAG BODY...)  */)
 
 #define clobbered_eassert(E) verify (sizeof (E) != 0)
 
-/* Set up a catch, then call C function FUNC on argument ARG.
+/* Set up catch on TAG, then call C function FUNC on argument ARG.
    FUNC should return a Lisp_Object.
    This is how catches are done from within C code.  */
 
@@ -1192,7 +1192,7 @@ Lisp_Object
 internal_catch (Lisp_Object tag,
 		Lisp_Object (*func) (Lisp_Object), Lisp_Object arg)
 {
-  /* This structure is made part of the chain `catchlist'.  */
+  /* Add to the "catchlist" chain.  */
   struct handler *c = push_handler (tag, CATCHER);
 
   /* Call FUNC.  */
@@ -1204,7 +1204,7 @@ internal_catch (Lisp_Object tag,
       return val;
     }
   else
-    { /* Throw works by a longjmp that comes right here.  */
+    {
       Lisp_Object val = handlerlist->val;
       clobbered_eassert (handlerlist == c);
       handlerlist = handlerlist->next;

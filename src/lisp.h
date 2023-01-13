@@ -4447,7 +4447,7 @@ extern void syms_of_casetab (void);
 
 /* Defined in keyboard.c.  */
 
-extern EMACS_INT command_loop_level;
+extern EMACS_INT edit_level;
 extern Lisp_Object echo_message_buffer;
 extern struct kboard *echo_kboard;
 extern void cancel_echoing (void);
@@ -4468,9 +4468,9 @@ extern bool detect_input_pending_ignore_squeezables (void);
 extern bool detect_input_pending_run_timers (bool);
 extern void safe_run_hooks (Lisp_Object);
 extern void cmd_error_internal (Lisp_Object, const char *);
-extern Lisp_Object command_loop_2 (Lisp_Object);
+extern Lisp_Object condition_cased_command_loop (Lisp_Object);
 extern Lisp_Object read_menu_command (void);
-extern Lisp_Object recursive_edit_1 (void);
+extern Lisp_Object recursive_edit (void);
 extern void record_auto_save (void);
 extern void force_auto_save_soon (void);
 extern void init_keyboard (void);

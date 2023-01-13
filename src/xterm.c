@@ -12563,7 +12563,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 
   /* Initialize most of the state for the drag-and-drop operation.  */
   x_dnd_in_progress = true;
-  x_dnd_recursion_depth = command_loop_level + minibuf_level;
+  x_dnd_recursion_depth = edit_level + minibuf_level;
   x_dnd_frame = f;
   x_dnd_last_seen_window = None;
   x_dnd_last_seen_toplevel = None;
@@ -20462,7 +20462,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	       operation was initiated.  This is so that mouse
 	       input works while we're in the debugger for, say,
 	       `x-dnd-movement-function`.  */
-	    && (command_loop_level + minibuf_level
+	    && (edit_level + minibuf_level
 		<= x_dnd_recursion_depth)
 	    && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 	  {
@@ -21180,7 +21180,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	       operation was initiated.  This is so that mouse
 	       input works while we're in the debugger for, say,
 	       `x-dnd-movement-function`.  */
-	    && (command_loop_level + minibuf_level
+	    && (edit_level + minibuf_level
 		<= x_dnd_recursion_depth)
 	    && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 	  {
@@ -21359,7 +21359,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	  }
 
 	if (x_dnd_in_progress
-	    && (command_loop_level + minibuf_level
+	    && (edit_level + minibuf_level
 		<= x_dnd_recursion_depth))
 	  goto OTHER;
 
@@ -22266,7 +22266,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			     run once the drag-and-drop operation
 			     completes.  */
 			  && xev->deviceid == x_dnd_pointer_device
-			  && (command_loop_level + minibuf_level
+			  && (edit_level + minibuf_level
 			      <= x_dnd_recursion_depth)
 			  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 			goto XI_OTHER;
@@ -22364,7 +22364,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		     operation was initiated.  This is so that mouse
 		     input works while we're in the debugger for, say,
 		     `x-dnd-movement-function`.  */
-		  && (command_loop_level + minibuf_level
+		  && (edit_level + minibuf_level
 		      <= x_dnd_recursion_depth)
 		  && xev->deviceid == x_dnd_pointer_device
 		  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
@@ -22709,7 +22709,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      int dnd_state;
 
 	      if (x_dnd_in_progress
-		  && (command_loop_level + minibuf_level
+		  && (edit_level + minibuf_level
 		      <= x_dnd_recursion_depth)
 		  && xev->deviceid == x_dnd_pointer_device
 		  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
@@ -22934,7 +22934,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		}
 
 	      if (x_dnd_in_progress
-		  && (command_loop_level + minibuf_level
+		  && (edit_level + minibuf_level
 		      <= x_dnd_recursion_depth))
 		goto XI_OTHER;
 

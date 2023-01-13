@@ -430,20 +430,18 @@ static bool message_enable_multibyte;
 
 enum { REDISPLAY_SOME = 2};	/* Arbitrary choice.  */
 
-/* Every buffer, window, and frame admits a REDISPLAY bit, which if
-   true warrants redisplay.  A windows_or_buffers_changed of 0,
-   however, allows us to call off that search.  Apparently, some
-   non-zero values which are not the default (REDISPLAY_SOME) also
-   allow us to short-circuit the search (but has the opposite effect
-   of directing emacs to redisplay everything).
- */
+/* When the global override WINDOWS_OR_BUFFERS_CHANGED is set to its
+   default value REDISPLAY_SOME, emacs consults the redisplay bit of
+   every buffer, window, and frame.
+
+   A WINDOWS_OR_BUFFERS_CHANGED of any other non-zero value redisplays
+   everything.  Setting it to zero avoids redisplay altogether.  */
 
 int windows_or_buffers_changed;
 
 /* Same semantics as window_or_buffers_changed but for the mode lines.
-   Largely redundant with the window redisplay bit since redisplaying
-   the window would redisplay the mode line.
- */
+   Redundant with the window redisplay bit since redisplaying the
+   window redisplays the mode line.  */
 
 int update_mode_lines;
 
@@ -24599,10 +24597,10 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 	int i;
 	char *p;
 
-	if (command_loop_level > 5)
+	if (edit_level > 5)
 	  return "[[[... ";
 	p = decode_mode_spec_buf;
-	for (i = 0; i < command_loop_level; i++)
+	for (i = 0; i < edit_level; i++)
 	  *p++ = '[';
 	*p = 0;
 	return decode_mode_spec_buf;
@@ -24613,10 +24611,10 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 	int i;
 	char *p;
 
-	if (command_loop_level > 5)
+	if (edit_level > 5)
 	  return " ...]]]";
 	p = decode_mode_spec_buf;
-	for (i = 0; i < command_loop_level; i++)
+	for (i = 0; i < edit_level; i++)
 	  *p++ = ']';
 	*p = 0;
 	return decode_mode_spec_buf;
