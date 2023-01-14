@@ -31,10 +31,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    in response to mouse or expose events or lisp invocations of
    sit-for and the like.
 
-   Note in the diagram that redisplay can invoke lisp forms which
-   could arbitrarily mutate state that redisplay assumed immutable.
-   Those critical sections, e.g., the processing of timers, should be
-   fenced with block_interrupts and unblock_interrupts.
+   Note in the diagram that interrupt handling within
+   redisplay code could invoke lisp forms which mutate state
+   redisplay assumed immutable.  Those critical sections should be
+   fenced with block_interrupts() and unblock_interrupts().
 
    +--------------+  in-band call   +----------------+
    | Command loop |---------------->| Redisplay code |<--+
