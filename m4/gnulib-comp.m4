@@ -552,6 +552,14 @@ AC_DEFUN([gl_INIT],
     gl_PREREQ_READ
   ])
   gl_UNISTD_MODULE_INDICATOR([read])
+  gl_FUNC_XATTR
+  AC_REQUIRE([gl_FUNC_ACL])
+  if test "$use_xattr" = yes; then
+    QCOPY_ACL_LIB="$LIB_XATTR"
+  else
+    QCOPY_ACL_LIB="$LIB_ACL"
+  fi
+  AC_SUBST([QCOPY_ACL_LIB])
   gl_FUNC_READLINK
   gl_CONDITIONAL([GL_COND_OBJ_READLINK],
                  [test $HAVE_READLINK = 0 || test $REPLACE_READLINK = 1])
@@ -1679,5 +1687,6 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/wint_t.m4
   m4/xalloc.m4
   m4/year2038.m4
+  m4/xattr.m4
   m4/zzgnulib.m4
 ])
