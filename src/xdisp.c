@@ -42,7 +42,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
           ^                                   |          |
 	  |		  /                   |          |
 	  +--------------/  ------------------+          |
-                     block_interrupts()                       |
+                 block_interrupts() switch               |
 							 |
 		    note_mouse_highlight (out-of-band)	 |
 							 |
