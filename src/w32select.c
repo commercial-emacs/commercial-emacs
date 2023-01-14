@@ -77,7 +77,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "w32common.h"	/* os_subtype */
 #include "w32term.h"	/* for all of the w32 includes */
 #include "w32select.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "coding.h"
 
 #ifdef CYGWIN
@@ -386,11 +386,11 @@ run_protected (Lisp_Object (*code) (Lisp_Object), Lisp_Object arg)
      with global variables and calling strange looking functions.  Is
      this really the right way to run Lisp callbacks?  No.*/
 
-  block_input ();
+  block_interrupts ();
 
   internal_condition_case_1 (code, arg, Qt, lisp_error_handler);
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static Lisp_Object
@@ -684,7 +684,7 @@ DEFUN ("w32-set-clipboard-data", Fw32_set_clipboard_data,
   current_num_nls = 0;
   current_requires_encoding = 0;
 
-  block_input ();
+  block_interrupts ();
 
   /* Check for non-ASCII characters.  While we are at it, count the
      number of LFs, so we know how many CRs we will have to add later
@@ -772,7 +772,7 @@ DEFUN ("w32-set-clipboard-data", Fw32_set_clipboard_data,
   current_coding_system = Qnil;
 
  done:
-  unblock_input ();
+  unblock_interrupts ();
 
   return (ok ? string : Qnil);
 }
@@ -800,7 +800,7 @@ DEFUN ("w32-get-clipboard-data", Fw32_get_clipboard_data,
   setup_config ();
   actual_clipboard_type = cfg_clipboard_type;
 
-  block_input ();
+  block_interrupts ();
 
   if (!OpenClipboard (clipboard_owner))
     goto done;
@@ -990,7 +990,7 @@ DEFUN ("w32-get-clipboard-data", Fw32_get_clipboard_data,
   CloseClipboard ();
 
  done:
-  unblock_input ();
+  unblock_interrupts ();
 
   return (ret);
 }

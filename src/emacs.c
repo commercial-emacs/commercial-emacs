@@ -97,7 +97,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "xwidget.h"
 #include "atimer.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "syssignal.h"
 #include "process.h"
 #include "frame.h"
@@ -431,7 +431,7 @@ terminate_due_to_signal (int sig, int backtrace_limit)
         {
           fatal_error_in_progress = 1;
 
-          totally_unblock_input ();
+          totally_unblock_interrupts ();
           if (sig == SIGTERM || sig == SIGHUP || sig == SIGINT)
 	    {
 	      /* Avoid abort in shut_down_emacs if we were interrupted

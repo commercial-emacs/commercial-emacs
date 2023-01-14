@@ -3339,7 +3339,7 @@ struct handler
   specpdl_ref pdlcount;
   struct bc_frame *act_rec;
   int poll_suppress_count;
-  int interrupt_input_blocked;
+  int interrupts_blocked;
 
 #ifdef HAVE_X_WINDOWS
   int x_error_handler_depth;

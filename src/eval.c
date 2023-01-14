@@ -22,7 +22,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <limits.h>
 #include <stdlib.h>
 #include "lisp.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "commands.h"
 #include "keyboard.h"
 #include "dispextern.h"
@@ -1241,7 +1241,7 @@ unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
 
   /* Restore certain special C variables.  */
   set_poll_suppress_count (catch->poll_suppress_count);
-  unblock_input_to (catch->interrupt_input_blocked);
+  unblock_interrupts_to (catch->interrupts_blocked);
 
 #ifdef HAVE_X_WINDOWS
   /* Restore the X error handler stack.  This is important because
@@ -1623,7 +1623,7 @@ push_handler_nosignal (Lisp_Object tag_ch_val, enum handlertype handlertype)
   c->pdlcount = SPECPDL_INDEX ();
   c->act_rec = get_act_rec (current_thread);
   c->poll_suppress_count = poll_suppress_count;
-  c->interrupt_input_blocked = interrupt_input_blocked;
+  c->interrupts_blocked = interrupts_blocked;
 #ifdef HAVE_X_WINDOWS
   c->x_error_handler_depth = x_error_message_count;
 #endif
@@ -1962,7 +1962,7 @@ maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig, Lisp_Object data)
   if (
       /* Don't try to run the debugger with interrupts blocked.
 	 The editing loop would return anyway.  */
-      ! input_blocked_p ()
+      ! interrupts_blocked_p ()
       && NILP (Vinhibit_debugger)
       /* Does user want to enter debugger for this kind of error?  */
       && (signal_quit_p (sig)

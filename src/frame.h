@@ -1273,11 +1273,11 @@ default_pixels_per_inch_y (void)
     Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (frame);		\
     if (frame == hlinfo->mouse_face_mouse_frame)		\
       {								\
-	block_input ();						\
+	block_interrupts ();					\
 	note_mouse_highlight (hlinfo->mouse_face_mouse_frame,	\
 			      hlinfo->mouse_face_mouse_x,	\
 			      hlinfo->mouse_face_mouse_y);	\
-	unblock_input ();					\
+	unblock_interrupts ();					\
       }								\
   } while (false)
 

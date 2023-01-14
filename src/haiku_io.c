@@ -28,7 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "haiku_support.h"
 #include "lisp.h"
 #include "haikuterm.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 
 #define PORT_CAP 1200
 
@@ -163,14 +163,14 @@ haiku_read_with_timeout (enum haiku_event_type *type, void *buf, ssize_t len,
 		  ? port_popup_menu_to_emacs
 		  : port_application_to_emacs);
 
-  block_input ();
+  block_interrupts ();
   if (read_port_etc (from, &typ, buf, len,
 		     B_TIMEOUT, (bigtime_t) timeout) < B_OK)
     {
-      unblock_input ();
+      unblock_interrupts ();
       return -1;
     }
-  unblock_input ();
+  unblock_interrupts ();
   *type = (enum haiku_event_type) typ;
   eassert (len >= haiku_len (typ));
   return 0;

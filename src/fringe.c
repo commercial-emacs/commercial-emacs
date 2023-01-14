@@ -26,7 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "dispextern.h"
 #include "buffer.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "termhooks.h"
 #include "pdumper.h"
 
@@ -890,7 +890,7 @@ draw_fringe_bitmap (struct window *w, struct glyph_row *row, int left_p)
 void
 draw_row_fringe_bitmaps (struct window *w, struct glyph_row *row)
 {
-  eassert (input_blocked_p ());
+  eassert (interrupts_blocked_p ());
 
   /* If row is completely invisible, because of vscrolling, we
      don't have to draw anything.  */

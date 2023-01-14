@@ -22,7 +22,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "frame.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "termchar.h"
 #include "font.h"
 #include "keyboard.h"
@@ -317,7 +317,7 @@ haiku_get_color (const char *name, Emacs_Color *color)
     }
   else
     {
-      block_input ();
+      block_interrupts ();
       eassert (x_display_list && !NILP (x_display_list->color_map));
       tem = x_display_list->color_map;
       for (; CONSP (tem); tem = XCDR (tem))
@@ -331,11 +331,11 @@ haiku_get_color (const char *name, Emacs_Color *color)
 	      color->red = RED_FROM_ULONG (clr) * 257;
 	      color->green = GREEN_FROM_ULONG (clr) * 257;
 	      color->blue = BLUE_FROM_ULONG (clr) * 257;
-	      unblock_input ();
+	      unblock_interrupts ();
 	      return 0;
 	  }
 	}
-      unblock_input ();
+      unblock_interrupts ();
     }
 
   rc = 1;
@@ -347,10 +347,10 @@ haiku_get_color (const char *name, Emacs_Color *color)
 	{
 	  string = AREF (Vhaiku_allowed_ui_colors, i);
 
-	  block_input ();
+	  block_interrupts ();
 	  if (STRINGP (string) && !strcmp (SSDATA (string), name))
 	    rc = be_get_ui_color (name, &ui_color);
-	  unblock_input ();
+	  unblock_interrupts ();
 	}
     }
 
@@ -422,9 +422,9 @@ haiku_set_title_bar_text (struct frame *f, Lisp_Object text)
 {
   if (FRAME_HAIKU_WINDOW (f))
     {
-      block_input ();
+      block_interrupts ();
       BWindow_retitle (FRAME_HAIKU_WINDOW (f), SSDATA (ENCODE_UTF_8 (text)));
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -474,20 +474,20 @@ haiku_set_parent_frame (struct frame *f, Lisp_Object new_value,
 			Lisp_Object old_value)
 {
   struct frame *p = NULL;
-  block_input ();
+  block_interrupts ();
   if (!NILP (new_value)
       && (!FRAMEP (new_value)
 	  || !FRAME_LIVE_P (p = XFRAME (new_value))
 	  || !FRAME_HAIKU_P (p)))
     {
       store_frame_param (f, Qparent_frame, old_value);
-      unblock_input ();
+      unblock_interrupts ();
       error ("Invalid specification of `parent-frame'");
     }
 
   if (EQ (new_value, old_value))
     {
-      unblock_input ();
+      unblock_interrupts ();
       return;
     }
 
@@ -509,7 +509,7 @@ haiku_set_parent_frame (struct frame *f, Lisp_Object new_value,
       FRAME_OUTPUT_DATA (f)->parent_desc = FRAME_HAIKU_WINDOW (p);
     }
   fset_parent_frame (f, new_value);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -524,7 +524,7 @@ haiku_set_z_group (struct frame *f, Lisp_Object new_value,
     return;
 
   rc = 1;
-  block_input ();
+  block_interrupts ();
 
   if (NILP (new_value))
     {
@@ -544,7 +544,7 @@ haiku_set_z_group (struct frame *f, Lisp_Object new_value,
   else
     rc = 0;
 
-  unblock_input ();
+  unblock_interrupts ();
 
   if (!rc)
     error ("Invalid z-group specification");
@@ -565,20 +565,20 @@ haiku_set_no_accept_focus (struct frame *f, Lisp_Object new_value, Lisp_Object o
   if (!EQ (new_value, old_value))
     FRAME_NO_ACCEPT_FOCUS (f) = !NILP (new_value);
 
-  block_input ();
+  block_interrupts ();
   if (FRAME_HAIKU_WINDOW (f))
     BWindow_set_avoid_focus (FRAME_HAIKU_WINDOW (f),
 			     FRAME_NO_ACCEPT_FOCUS (f));
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
 initial_setup_back_buffer (struct frame *f)
 {
-  block_input ();
+  block_interrupts ();
   if (NILP (CDR (Fassq (Qinhibit_double_buffering, f->param_alist))))
     EmacsView_set_up_double_buffering (FRAME_HAIKU_VIEW (f));
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -877,10 +877,10 @@ haiku_create_frame (Lisp_Object parms)
   if (!FRAME_OUTPUT_DATA (f)->window)
     xsignal1 (Qerror, build_unibyte_string ("Could not create window"));
 
-  block_input ();
+  block_interrupts ();
   if (!minibuffer_only && FRAME_EXTERNAL_MENU_BAR (f))
     initialize_frame_menubar (f);
-  unblock_input ();
+  unblock_interrupts ();
 
   Vframe_list = Fcons (frame, Vframe_list);
 
@@ -969,7 +969,7 @@ haiku_create_frame (Lisp_Object parms)
     if (CONSP (XCAR (tem)) && !NILP (XCAR (XCAR (tem))))
       fset_param_alist (f, Fcons (XCAR (tem), f->param_alist));
 
-  block_input ();
+  block_interrupts ();
   if (window_prompting & (USPosition | PPosition))
     haiku_set_offset (f, f->left_pos, f->top_pos, 1);
   else if (cascade_target)
@@ -977,7 +977,7 @@ haiku_create_frame (Lisp_Object parms)
 		      cascade_target->top_pos + 15, 1);
   else
     BWindow_center_on_screen (FRAME_HAIKU_WINDOW (f));
-  unblock_input ();
+  unblock_interrupts ();
 
   FRAME_OUTPUT_DATA (f)->configury_done = true;
 
@@ -1132,7 +1132,7 @@ haiku_create_tip_frame (Lisp_Object parms)
   {
     void *window;
 
-    block_input ();
+    block_interrupts ();
     window = BWindow_new (&FRAME_OUTPUT_DATA (f)->view);
 
     FRAME_OUTPUT_DATA (f)->window = window;
@@ -1140,7 +1140,7 @@ haiku_create_tip_frame (Lisp_Object parms)
       emacs_abort ();
 
     BWindow_set_tooltip_decoration (window);
-    unblock_input ();
+    unblock_interrupts ();
   }
 
   gui_default_parameter (f, parms, Qauto_raise, Qnil,
@@ -1259,12 +1259,12 @@ compute_tip_xy (struct frame *f,
       max_x = max_x - 1;
       max_y = max_y - 1;
 
-      block_input ();
+      block_interrupts ();
       BView_get_mouse (FRAME_HAIKU_VIEW (f), &x, &y);
       BView_convert_to_screen (FRAME_HAIKU_VIEW (f), &x, &y);
       *root_x = x;
       *root_y = y;
-      unblock_input ();
+      unblock_interrupts ();
     }
 
   if (FIXNUMP (top))
@@ -1359,10 +1359,10 @@ haiku_set_undecorated (struct frame *f, Lisp_Object new_value,
   if (EQ (new_value, old_value))
     return;
 
-  block_input ();
+  block_interrupts ();
   FRAME_UNDECORATED (f) = !NILP (new_value);
   BWindow_change_decoration (FRAME_HAIKU_WINDOW (f), NILP (new_value));
-  unblock_input ();
+  unblock_interrupts ();
 
   haiku_update_after_decoration_change (f);
 }
@@ -1374,11 +1374,11 @@ haiku_set_override_redirect (struct frame *f, Lisp_Object new_value,
   if (EQ (new_value, old_value))
     return;
 
-  block_input ();
+  block_interrupts ();
   BWindow_set_override_redirect (FRAME_HAIKU_WINDOW (f),
 				 !NILP (new_value));
   FRAME_OVERRIDE_REDIRECT (f) = !NILP (new_value);
-  unblock_input ();
+  unblock_interrupts ();
 
   haiku_update_after_decoration_change (f);
 }
@@ -1620,7 +1620,7 @@ haiku_free_frame_resources (struct frame *f)
   struct scroll_bar *b;
 
   check_window_system (f);
-  block_input ();
+  block_interrupts ();
 
   hlinfo = MOUSE_HL_INFO (f);
   window = FRAME_HAIKU_WINDOW (f);
@@ -1674,7 +1674,7 @@ haiku_free_frame_resources (struct frame *f)
   xfree (FRAME_OUTPUT_DATA (f));
   FRAME_OUTPUT_DATA (f) = NULL;
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 void
@@ -1686,15 +1686,15 @@ haiku_iconify_frame (struct frame *frame)
   SET_FRAME_VISIBLE (frame, false);
   SET_FRAME_ICONIFIED (frame, true);
 
-  block_input ();
+  block_interrupts ();
   BWindow_iconify (FRAME_HAIKU_WINDOW (frame));
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 void
 haiku_visualize_frame (struct frame *f)
 {
-  block_input ();
+  block_interrupts ();
 
   if (!FRAME_VISIBLE_P (f))
     {
@@ -1712,20 +1712,20 @@ haiku_visualize_frame (struct frame *f)
       SET_FRAME_ICONIFIED (f, 0);
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 void
 haiku_unvisualize_frame (struct frame *f)
 {
-  block_input ();
+  block_interrupts ();
 
   BWindow_set_visible (FRAME_HAIKU_WINDOW (f), 0);
   BWindow_sync (FRAME_HAIKU_WINDOW (f));
   SET_FRAME_VISIBLE (f, 0);
   SET_FRAME_ICONIFIED (f, 0);
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 void
@@ -1761,12 +1761,12 @@ haiku_set_frame_visible_invisible (struct frame *f, bool visible_p)
 void
 frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y)
 {
-  block_input ();
+  block_interrupts ();
 
   BView_convert_to_screen (FRAME_HAIKU_VIEW (f), &pix_x, &pix_y);
   be_warp_pointer (pix_x, pix_y);
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 void
@@ -1829,7 +1829,7 @@ haiku_set_inhibit_double_buffering (struct frame *f,
 				    Lisp_Object new_value,
 				    Lisp_Object old_value)
 {
-  block_input ();
+  block_interrupts ();
   if (FRAME_HAIKU_WINDOW (f))
     {
 #ifndef USE_BE_CAIRO
@@ -1843,16 +1843,16 @@ haiku_set_inhibit_double_buffering (struct frame *f,
 
       SET_FRAME_GARBAGED (f);
     }
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
 haiku_set_sticky (struct frame *f, Lisp_Object new_value,
 		  Lisp_Object old_value)
 {
-  block_input ();
+  block_interrupts ();
   BWindow_set_sticky (FRAME_HAIKU_WINDOW (f), !NILP (new_value));
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 struct user_cursor_info
@@ -2151,9 +2151,9 @@ corner of the screen.  */)
   if (!x_display_list)
     error ("Window system not initialized");
 
-  block_input ();
+  block_interrupts ();
   be_warp_pointer (xval, yval);
-  unblock_input ();
+  unblock_interrupts ();
   return Qnil;
 }
 
@@ -2172,11 +2172,11 @@ selected frame's display.  */)
   if (FRAME_INITIAL_P (f) || !FRAME_HAIKU_P (f))
     return Qnil;
 
-  block_input ();
+  block_interrupts ();
   view = FRAME_HAIKU_VIEW (f);
   BView_get_mouse (view, &x, &y);
   BView_convert_to_screen (view, &x, &y);
-  unblock_input ();
+  unblock_interrupts ();
 
   return Fcons (make_fixnum (x), make_fixnum (y));
 }
@@ -2212,9 +2212,9 @@ DEFUN ("xw-color-values", Fxw_color_values, Sxw_color_values, 1, 2, 0,
   CHECK_STRING (color);
   decode_window_system_frame (frame);
 
-  block_input ();
+  block_interrupts ();
   rc = haiku_get_color (SSDATA (color), &col);
-  unblock_input ();
+  unblock_interrupts ();
 
   if (rc)
     return Qnil;
@@ -2394,7 +2394,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 	frame = selected_frame;
 
       struct frame *f = decode_window_system_frame (frame);
-      block_input ();
+      block_interrupts ();
 
       char *str = xstrdup (SSDATA (string));
       int height = be_plain_font_height ();
@@ -2418,7 +2418,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
       BView_convert_from_screen (FRAME_HAIKU_VIEW (f), &root_x, &root_y);
       be_show_sticky_tooltip (FRAME_HAIKU_VIEW (f), SSDATA (string),
 			      root_x, root_y);
-      unblock_input ();
+      unblock_interrupts ();
       goto start_timer;
     }
 
@@ -2436,11 +2436,11 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 	      tip_timer = Qnil;
 	    }
 
-	  block_input ();
+	  block_interrupts ();
 	  compute_tip_xy (tip_f, parms, dx, dy, FRAME_PIXEL_WIDTH (tip_f),
 			  FRAME_PIXEL_HEIGHT (tip_f), &root_x, &root_y);
 	  BWindow_set_offset (FRAME_HAIKU_WINDOW (tip_f), root_x, root_y);
-	  unblock_input ();
+	  unblock_interrupts ();
 
 	  goto start_timer;
 	}
@@ -2613,7 +2613,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   compute_tip_xy (tip_f, parms, dx, dy, width, height, &root_x, &root_y);
 
   /* Show tooltip frame.  */
-  block_input ();
+  block_interrupts ();
   void *wnd = FRAME_HAIKU_WINDOW (tip_f);
   BWindow_resize (wnd, width, height);
   /* The window decorator might cause the actual width and height to
@@ -2634,7 +2634,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
      tooltip if the mouse pointer isn't actually over it.  */
   BView_set_view_cursor (FRAME_HAIKU_VIEW (f),
 			 FRAME_OUTPUT_DATA (f)->current_cursor);
-  unblock_input ();
+  unblock_interrupts ();
 
   w->must_be_updated_p = true;
   update_single_window (w);
@@ -2977,7 +2977,7 @@ Some window managers may refuse to restack windows.  */)
   struct frame *f1 = decode_window_system_frame (frame1);
   struct frame *f2 = decode_window_system_frame (frame2);
 
-  block_input ();
+  block_interrupts ();
 
   if (NILP (above))
     {
@@ -3016,7 +3016,7 @@ Some window managers may refuse to restack windows.  */)
   BWindow_sync (FRAME_HAIKU_WINDOW (f1));
   BWindow_sync (FRAME_HAIKU_WINDOW (f2));
 
-  unblock_input ();
+  unblock_interrupts ();
 
   return Qnil;
 }
@@ -3035,12 +3035,12 @@ call this function yourself.  */)
   struct haiku_session_manager_reply reply;
   reply.quit_reply = !NILP (quit_reply);
 
-  block_input ();
+  block_interrupts ();
   unrequest_sigio ();
   write_port (port_emacs_to_session_manager, 0, &reply,
 	      sizeof reply);
   request_sigio ();
-  unblock_input ();
+  unblock_interrupts ();
 
   return Qnil;
 }

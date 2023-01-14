@@ -38,7 +38,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "syntax.h"
 #include "intervals.h"
 #include "keymap.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "sysstdio.h"
 #include "systime.h"
 #include "atimer.h"
@@ -86,10 +86,10 @@ char const DEV_TTY[] = "CONOUT$";
 char const DEV_TTY[] = "/dev/tty";
 #endif
 
-/* Variables for blockinput.h:  */
+/* Variables for blockinterrupt.h:  */
 
-/* Positive if interrupt input is blocked right now.  */
-volatile int interrupt_input_blocked;
+/* Positive if interrupts are blocked right now.  */
+volatile int interrupts_blocked;
 
 /* True means an input interrupt or alarm signal has arrived.
    The maybe_quit function checks this.  */
@@ -856,7 +856,7 @@ throwing to \\='exit:
      && current_buffer != XBUFFER (XWINDOW (selected_window)->contents))
       ? Fcurrent_buffer () : Qnil;
 
-  if (input_blocked_p ())
+  if (interrupts_blocked_p ())
     /* Presumably edebugging redisplay.  */
     return Qnil;
 
@@ -1399,7 +1399,7 @@ in most cases evaluates to a call to `normal-top-level'.
 #endif
 
   /* Unblock during redisplay traps, e.g., tool-bar update.  */
-  totally_unblock_input ();
+  totally_unblock_interrupts ();
   Fthrow (Qtop_level, Qnil);
 }
 
@@ -1751,7 +1751,7 @@ static Lisp_Object poll_timer_time;
 void
 poll_for_input_1 (void)
 {
-  if (! input_blocked_p ())
+  if (! interrupts_blocked_p ())
     gobble_input ();
 }
 #endif
@@ -3261,7 +3261,7 @@ record_char (Lisp_Object c)
      If you, dear reader, have a better idea, you've got the source.  :-) */
   if (dribble && NILP (Vexecuting_kbd_macro))
     {
-      block_input ();
+      block_interrupts ();
       if (FIXNUMP (c))
 	{
 	  if (XUFIXNUM (c) < 0x100)
@@ -3286,7 +3286,7 @@ record_char (Lisp_Object c)
 	}
 
       fflush (dribble);
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -4511,7 +4511,7 @@ timer_check (void)
 
   Lisp_Object tem = Vinhibit_quit;
   Vinhibit_quit = Qt;
-  block_input ();
+  block_interrupts ();
   turn_on_atimers (false);
 
   /* We use copies of the timers' lists to allow a timer to add itself
@@ -4527,7 +4527,7 @@ timer_check (void)
     idle_timers = Qnil;
 
   turn_on_atimers (true);
-  unblock_input ();
+  unblock_interrupts ();
   Vinhibit_quit = tem;
 
   do
@@ -7141,7 +7141,7 @@ gobble_input (void)
           int nr;
           struct input_event hold_quit;
 
-	  if (input_blocked_p ())
+	  if (interrupts_blocked_p ())
 	    {
 	      pending_signals = true;
 	      break;
@@ -7380,7 +7380,7 @@ handle_async_input (void)
     {
       int nread = gobble_input ();
       /* -1 means it's not ok to read the input now.
-	 UNBLOCK_INPUT will read it later; now, avoid infinite loop.
+	 UNBLOCK_INTERRUPTS will read it later; now, avoid infinite loop.
 	 0 means there was no keyboard input available.  */
       if (nread <= 0)
 	break;
@@ -7396,17 +7396,17 @@ process_pending_signals (void)
   do_pending_atimers ();
 }
 
-/* Undo any number of BLOCK_INPUT calls down to level LEVEL,
+/* Undo any number of BLOCK_INTERRUPTS calls down to level LEVEL,
    and reinvoke any pending signal if the level is now 0 and
    a fatal error is not already in progress.  */
 
 void
-unblock_input_to (int level)
+unblock_interrupts_to (int level)
 {
-  interrupt_input_blocked = level;
-  if (interrupt_input_blocked < 0)
+  interrupts_blocked = level;
+  if (interrupts_blocked < 0)
     emacs_abort ();
-  if (interrupt_input_blocked == 0
+  if (interrupts_blocked == 0
       && ! fatal_error_in_progress
       && pending_signals)
     process_pending_signals ();
@@ -7420,21 +7420,21 @@ unblock_input_to (int level)
    It will also process queued input, if it was not read before.
    When a longer code sequence does not use block/unblock input
    at all, the whole input gathered up to the next call to
-   unblock_input will be processed inside that call. */
+   unblock_interrupts will be processed inside that call. */
 
 void
-unblock_input (void)
+unblock_interrupts (void)
 {
-  unblock_input_to (interrupt_input_blocked - 1);
+  unblock_interrupts_to (interrupts_blocked - 1);
 }
 
-/* Undo any number of BLOCK_INPUT calls,
+/* Undo any number of BLOCK_INTERRUPTS calls,
    and also reinvoke any pending signal.  */
 
 void
-totally_unblock_input (void)
+totally_unblock_interrupts (void)
 {
-  unblock_input_to (0);
+  unblock_interrupts_to (0);
 }
 
 #if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
@@ -10877,9 +10877,9 @@ This may include sensitive information such as passwords.  */)
 {
   if (dribble)
     {
-      block_input ();
+      block_interrupts ();
       fclose (dribble);
-      unblock_input ();
+      unblock_interrupts ();
       dribble = 0;
     }
   if (!NILP (file))
@@ -11658,7 +11658,7 @@ init_keyboard (void)
   kbd_store_ptr = kbd_buffer;
   track_mouse = Qnil;
   input_pending = false;
-  interrupt_input_blocked = 0;
+  interrupts_blocked = 0;
   pending_signals = false;
 
   virtual_core_pointer_name = build_string ("Virtual core pointer");

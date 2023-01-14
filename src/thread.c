@@ -68,7 +68,7 @@ static struct thread_state *all_threads = &main_thread.s;
 
 static sys_mutex_t global_lock;
 
-extern volatile int interrupt_input_blocked;
+extern volatile int interrupts_blocked;
 
 /* m_specpdl is set when the thread is created and cleared when the
    thread dies.  */

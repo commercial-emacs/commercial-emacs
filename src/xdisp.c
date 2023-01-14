@@ -34,21 +34,21 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    Note in the diagram that redisplay can invoke lisp forms which
    could arbitrarily mutate state that redisplay assumed immutable.
    Those critical sections, e.g., the processing of timers, should be
-   fenced with block_input and unblock_input.
+   fenced with block_interrupts and unblock_interrupts.
 
-   +--------------+   redisplay     +----------------+
-   | Lisp machine |---------------->| Redisplay code |<--+
-   +--------------+   (xdisp.c)     +----------------+   |
-	  ^				     |		 |
-	  +----------------------------------+           |
-	    Block input to prevent this when             |
-	    called asynchronously!			 |
+   +--------------+  in-band call   +----------------+
+   | Command loop |---------------->| Redisplay code |<--+
+   +--------------+  to redisplay   +----------------+   |
+          ^                                   |          |
+	  |		  /                   |          |
+	  +--------------/  ------------------+          |
+                     block_interrupts()                       |
 							 |
-		    note_mouse_highlight (asynchronous)	 |
+		    note_mouse_highlight (out-of-band)	 |
 							 |
 				    X mouse events  -----+
 							 |
-			    expose_frame (asynchronous)	 |
+			    expose_frame (out-of-band)	 |
 							 |
 				   X expose events  -----+
 
@@ -205,7 +205,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "region-cache.h"
 #include "font.h"
 #include "fontset.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "xwidget.h"
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
@@ -11974,12 +11974,12 @@ update_tab_bar (struct frame *f, bool save_match_data)
             {
               /* Redisplay that happens asynchronously due to an expose event
                  may access f->tab_bar_items.  Make sure we update both
-                 variables within BLOCK_INPUT so no such event interrupts.  */
-              block_input ();
+                 variables within BLOCK_INTERRUPTS so no such event interrupts.  */
+              block_interrupts ();
               fset_tab_bar_items (f, new_tab_bar);
               f->n_tab_bar_items = new_n_tab_bar;
               w->update_mode_line = true;
-              unblock_input ();
+              unblock_interrupts ();
             }
 
 	  unbind_to (count, Qnil);
@@ -12890,12 +12890,12 @@ update_tool_bar (struct frame *f, bool save_match_data)
             {
               /* Redisplay that happens asynchronously due to an expose event
                  may access f->tool_bar_items.  Make sure we update both
-                 variables within BLOCK_INPUT so no such event interrupts.  */
-              block_input ();
+                 variables within BLOCK_INTERRUPTS so no such event interrupts.  */
+              block_interrupts ();
               fset_tool_bar_items (f, new_tool_bar);
               f->n_tool_bar_items = new_n_tool_bar;
               w->update_mode_line = true;
-              unblock_input ();
+              unblock_interrupts ();
             }
 
 	  unbind_to (count, Qnil);
@@ -15060,11 +15060,11 @@ unwind_redisplay_preserve_echo_area (void)
 void
 redisplay_preserve_echo_area (int from_where)
 {
-  block_input ();
+  block_interrupts ();
   specpdl_ref count = SPECPDL_INDEX ();
   record_unwind_protect_void (unwind_redisplay_preserve_echo_area);
   block_buffer_flips ();
-  unblock_input ();
+  unblock_interrupts ();
 
   if (!NILP (echo_area_buffer[1]))
     {
@@ -15216,14 +15216,14 @@ unblock_buffer_flips (void)
   if (--buffer_flip_blocked_depth == 0)
     {
       Lisp_Object tail, frame;
-      block_input ();
+      block_interrupts ();
       FOR_EACH_FRAME (tail, frame)
         {
           struct frame *f = XFRAME (frame);
           if (FRAME_TERMINAL (f)->buffer_flipping_unblocked_hook)
             (*FRAME_TERMINAL (f)->buffer_flipping_unblocked_hook) (f);
         }
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -17831,7 +17831,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 				    || w->pseudo_window_p)))
     {
       update_begin (f);
-      block_input ();
+      block_interrupts ();
       if (draw_window_fringes (w, true))
 	{
 	  if (WINDOW_RIGHT_DIVIDER_WIDTH (w))
@@ -17839,7 +17839,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  else
 	    gui_draw_vertical_border (w);
 	}
-      unblock_input ();
+      unblock_interrupts ();
       update_end (f);
     }
 
@@ -29196,7 +29196,7 @@ gui_write_glyphs (struct window *w, struct glyph_row *updated_row,
   if (updated_row->reversed_p && chpos >= updated_row->used[TEXT_AREA])
     chpos = updated_row->used[TEXT_AREA] - 1;
 
-  block_input ();
+  block_interrupts ();
 
   /* Write glyphs.  */
 
@@ -29214,7 +29214,7 @@ gui_write_glyphs (struct window *w, struct glyph_row *updated_row,
       && chpos < hpos + len)
     w->phys_cursor_on_p = false;
 
-  unblock_input ();
+  unblock_interrupts ();
 
   /* Advance the output cursor.  */
   w->output_cursor.hpos += len;
@@ -29237,7 +29237,7 @@ gui_insert_glyphs (struct window *w, struct glyph_row *updated_row,
   ptrdiff_t hpos;
 
   eassert (updated_row);
-  block_input ();
+  block_interrupts ();
   f = XFRAME (WINDOW_FRAME (w));
 
   /* Get the height of the line we are in.  */
@@ -29270,7 +29270,7 @@ gui_insert_glyphs (struct window *w, struct glyph_row *updated_row,
   /* Advance the output cursor.  */
   w->output_cursor.hpos += len;
   w->output_cursor.x += shift_by_width;
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -29342,13 +29342,13 @@ gui_clear_end_of_line (struct window *w, struct glyph_row *updated_row,
   /* Prevent inadvertently clearing to end of the X window.  */
   if (to_x > from_x && to_y > from_y)
     {
-      block_input ();
+      block_interrupts ();
       FRAME_RIF (f)->clear_frame_area (f, from_x, from_y,
                                        to_x - from_x, to_y - from_y);
 
       if (face && ! updated_row->stipple_p)
 	updated_row->stipple_p = face->stipple;
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -29651,7 +29651,7 @@ gui_fix_overlapping_area (struct window *w, struct glyph_row *row,
 {
   int i, x;
 
-  block_input ();
+  block_interrupts ();
 
   x = 0;
   for (i = 0; i < row->used[area];)
@@ -29679,7 +29679,7 @@ gui_fix_overlapping_area (struct window *w, struct glyph_row *row,
 	}
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -29930,7 +29930,7 @@ display_and_set_cursor (struct window *w, bool on,
   if (0 <= hpos && hpos < glyph_row->used[TEXT_AREA])
     glyph = glyph_row->glyphs[TEXT_AREA] + hpos;
 
-  eassert (input_blocked_p ());
+  eassert (interrupts_blocked_p ());
 
   /* Set new_cursor_type to the cursor we want to be displayed.  */
   new_cursor_type = get_window_cursor_type (w, glyph,
@@ -30004,10 +30004,10 @@ update_window_cursor (struct window *w, bool on)
       if (row->reversed_p && hpos >= row->used[TEXT_AREA])
 	hpos = row->used[TEXT_AREA] - 1;
 
-      block_input ();
+      block_interrupts ();
       display_and_set_cursor (w, on, hpos, vpos,
 			      w->phys_cursor.x, w->phys_cursor.y);
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -30078,25 +30078,21 @@ draw_row_with_mouse_face (struct window *w, int start_x, struct glyph_row *row,
 static void
 show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
 {
-  /* Don't bother doing anything if the mouse-face window is not set
-     up.  */
+  struct window *w;
+  struct frame *f;
   if (!WINDOWP (hlinfo->mouse_face_window))
     return;
 
-  struct window *w = XWINDOW (hlinfo->mouse_face_window);
-  struct frame *f = XFRAME (WINDOW_FRAME (w));
-
-  /* Don't bother doing anything if we are on a wrong frame.  */
+  w = XWINDOW (hlinfo->mouse_face_window);
+  f = XFRAME (WINDOW_FRAME (w));
   if (f != hlinfo->mouse_face_mouse_frame)
     return;
 
-  if (/* If window is in the process of being destroyed, don't bother
-	 to do anything.  */
+  if (/* W not being destroyed.  */
       w->current_matrix != NULL
-      /* Don't update mouse highlight if hidden.  */
+      /* Mouse highlight not hidden.  */
       && (draw != DRAW_MOUSE_FACE || !hlinfo->mouse_face_hidden)
-      /* Recognize when we are called to operate on rows that don't exist
-	 anymore.  This can happen when a window is split.  */
+      /* W should not be split, leading to non-existent rows.  */
       && hlinfo->mouse_face_end_row < w->current_matrix->nrows)
     {
       bool phys_cursor_on_p = w->phys_cursor_on_p;
@@ -30204,14 +30200,14 @@ show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
 	  if (row->reversed_p && hpos >= row->used[TEXT_AREA])
 	    hpos = row->used[TEXT_AREA] - 1;
 
-	  block_input ();
+	  block_interrupts ();
 	  display_and_set_cursor (w, true, hpos, w->phys_cursor.vpos,
 				  w->phys_cursor.x + mouse_off,
 				  w->phys_cursor.y);
 	  /* Restore the original cursor coordinates, perhaps modified
 	     to account for mouse-highlight.  */
 	  w->phys_cursor.x = old_phys_cursor_x;
-	  unblock_input ();
+	  unblock_interrupts ();
 #endif	/* HAVE_WINDOW_SYSTEM */
 	}
     }
@@ -32107,11 +32103,11 @@ gui_clear_window_mouse_face (struct window *w)
   Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (XFRAME (w->frame));
   Lisp_Object window;
 
-  block_input ();
+  block_interrupts ();
   XSETWINDOW (window, w);
   if (EQ (window, hlinfo->mouse_face_window))
     clear_mouse_face (hlinfo);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -33835,7 +33831,7 @@ show_hourglass (struct atimer *timer)
     {
       Lisp_Object tail, frame;
 
-      block_input ();
+      block_interrupts ();
 
       FOR_EACH_FRAME (tail, frame)
 	{
@@ -33847,7 +33843,7 @@ show_hourglass (struct atimer *timer)
 	}
 
       hourglass_shown_p = true;
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -33891,7 +33887,7 @@ cancel_hourglass (void)
     {
       Lisp_Object tail, frame;
 
-      block_input ();
+      block_interrupts ();
 
       FOR_EACH_FRAME (tail, frame)
 	{
@@ -33908,7 +33904,7 @@ cancel_hourglass (void)
 	}
 
       hourglass_shown_p = false;
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -33987,7 +33983,7 @@ get_cursor_offset_for_mouse_face (struct window *w, struct glyph_row *row,
   if (row->mode_line_p)
     return;
 
-  block_input ();
+  block_interrupts ();
 
   struct frame *f = WINDOW_XFRAME (w);
   Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
@@ -34027,6 +34023,6 @@ get_cursor_offset_for_mouse_face (struct window *w, struct glyph_row *row,
 
   *offset = sum;
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 #endif /* HAVE_WINDOW_SYSTEM */

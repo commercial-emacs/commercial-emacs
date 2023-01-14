@@ -24,7 +24,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "haikugui.h"
 #include "keyboard.h"
 #include "haikuterm.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "termchar.h"
 #include "termhooks.h"
 #include "menu.h"
@@ -143,13 +143,13 @@ haiku_update_size_hints (struct frame *f)
   if (f->tooltip)
     return;
 
-  block_input ();
+  block_interrupts ();
   BWindow_set_size_alignment (FRAME_HAIKU_WINDOW (f),
 			      (frame_resize_pixelwise
 			       ? 1 : FRAME_COLUMN_WIDTH (f)),
 			      (frame_resize_pixelwise
 			       ? 1 : FRAME_LINE_HEIGHT (f)));
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -208,20 +208,20 @@ static void
 haiku_flip_buffers (struct frame *f)
 {
   void *view = FRAME_OUTPUT_DATA (f)->view;
-  block_input ();
+  block_interrupts ();
 
   BView_draw_lock (view, false, 0, 0, 0, 0);
   FRAME_DIRTY_P (f) = 0;
   EmacsView_flip_and_blit (view);
   BView_draw_unlock (view);
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
 haiku_frame_up_to_date (struct frame *f)
 {
-  block_input ();
+  block_interrupts ();
   FRAME_MOUSE_UPDATE (f);
   if (FRAME_DIRTY_P (f) && !buffer_flipping_blocked_p ())
     haiku_flip_buffers (f);
@@ -235,7 +235,7 @@ haiku_frame_up_to_date (struct frame *f)
 
   /* Mark the frame as complete.  */
   FRAME_COMPLETE_P (f) = true;
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -250,7 +250,7 @@ haiku_clear_frame_area (struct frame *f, int x, int y,
 			int width, int height)
 {
   void *vw = FRAME_HAIKU_DRAWABLE (f);
-  block_input ();
+  block_interrupts ();
   BView_draw_lock (vw, true, x, y, width, height);
   BView_StartClip (vw);
   BView_ClipToRect (vw, x, y, width, height);
@@ -258,7 +258,7 @@ haiku_clear_frame_area (struct frame *f, int x, int y,
   BView_FillRectangle (vw, x, y, width, height);
   BView_EndClip (vw);
   BView_draw_unlock (vw);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -270,7 +270,7 @@ haiku_clear_frame (struct frame *f)
 
   FRAME_COMPLETE_P (f) = false;
 
-  block_input ();
+  block_interrupts ();
   BView_draw_lock (view, true, 0, 0, FRAME_PIXEL_WIDTH (f),
 		   FRAME_PIXEL_HEIGHT (f));
   BView_StartClip (view);
@@ -281,7 +281,7 @@ haiku_clear_frame (struct frame *f)
 		       FRAME_PIXEL_HEIGHT (f));
   BView_EndClip (view);
   BView_draw_unlock (view);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 /* Give frame F the font FONT-OBJECT as its default font.  The return
@@ -369,7 +369,7 @@ haiku_rehighlight (void)
 {
   eassert (x_display_list && !x_display_list->next);
 
-  block_input ();
+  block_interrupts ();
 
   struct frame *old_hl = x_display_list->highlight_frame;
 
@@ -393,7 +393,7 @@ haiku_rehighlight (void)
 
   if (x_display_list->highlight_frame)
     gui_update_cursor (x_display_list->highlight_frame, true);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -401,17 +401,17 @@ haiku_frame_raise_lower (struct frame *f, bool raise_p)
 {
   if (raise_p)
     {
-      block_input ();
+      block_interrupts ();
       BWindow_activate (FRAME_HAIKU_WINDOW (f));
       BWindow_sync (FRAME_HAIKU_WINDOW (f));
-      unblock_input ();
+      unblock_interrupts ();
     }
   else
     {
-      block_input ();
+      block_interrupts ();
       BWindow_send_behind (FRAME_HAIKU_WINDOW (f), NULL);
       BWindow_sync (FRAME_HAIKU_WINDOW (f));
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -552,7 +552,7 @@ haiku_new_focus_frame (struct frame *frame)
 {
   eassert (x_display_list && !x_display_list->next);
 
-  block_input ();
+  block_interrupts ();
   if (frame != x_display_list->focused_frame)
     {
       if (x_display_list->focused_frame &&
@@ -564,7 +564,7 @@ haiku_new_focus_frame (struct frame *frame)
       if (frame && frame->auto_raise && !popup_activated_p)
 	haiku_frame_raise_lower (frame, 1);
     }
-  unblock_input ();
+  unblock_interrupts ();
 
   haiku_rehighlight ();
 }
@@ -1816,7 +1816,7 @@ haiku_draw_glyph_string (struct glyph_string *s)
   void *view = FRAME_HAIKU_DRAWABLE (s->f);;
   struct face *face = s->face;
 
-  block_input ();
+  block_interrupts ();
   BView_draw_lock (view, false, 0, 0, 0, 0);
   prepare_face_for_display (s->f, s->face);
 
@@ -1979,7 +1979,7 @@ haiku_draw_glyph_string (struct glyph_string *s)
 	  || s->hl != DRAW_CURSOR))
     s->row->stipple_p = true;
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -2008,7 +2008,7 @@ haiku_after_update_window_line (struct window *w,
         : INTERNAL_BORDER_FACE_ID;
       struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
 
-      block_input ();
+      block_interrupts ();
       if (face)
 	{
 	  void *view = FRAME_HAIKU_DRAWABLE (f);
@@ -2033,7 +2033,7 @@ haiku_after_update_window_line (struct window *w,
 	  haiku_clear_frame_area (f, FRAME_PIXEL_WIDTH (f) - width,
 				  y, width, height);
 	}
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -2061,7 +2061,7 @@ haiku_set_window_size (struct frame *f, bool change_gravity,
 
   if (FRAME_HAIKU_WINDOW (f))
     {
-      block_input ();
+      block_interrupts ();
       BWindow_resize (FRAME_HAIKU_WINDOW (f),
 		      width, height);
 
@@ -2069,7 +2069,7 @@ haiku_set_window_size (struct frame *f, bool change_gravity,
 	  && (width != FRAME_PIXEL_WIDTH (f)
 	      || height != FRAME_PIXEL_HEIGHT (f)))
 	haiku_wait_for_event (f, FRAME_RESIZED);
-      unblock_input ();
+      unblock_interrupts ();
     }
 
   do_pending_window_change (false);
@@ -2280,13 +2280,13 @@ haiku_show_hourglass (struct frame *f)
       || FRAME_OUTPUT_DATA (f)->hourglass_p)
     return;
 
-  block_input ();
+  block_interrupts ();
   FRAME_OUTPUT_DATA (f)->hourglass_p = 1;
 
   if (FRAME_HAIKU_VIEW (f))
     BView_set_view_cursor (FRAME_HAIKU_VIEW (f),
 			   FRAME_OUTPUT_DATA (f)->hourglass_cursor);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -2296,13 +2296,13 @@ haiku_hide_hourglass (struct frame *f)
       || !FRAME_OUTPUT_DATA (f)->hourglass_p)
     return;
 
-  block_input ();
+  block_interrupts ();
   FRAME_OUTPUT_DATA (f)->hourglass_p = 0;
 
   if (FRAME_HAIKU_VIEW (f))
     BView_set_view_cursor (FRAME_HAIKU_VIEW (f),
 			   FRAME_OUTPUT_DATA (f)->current_cursor);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -2566,7 +2566,7 @@ haiku_scroll_bar_create (struct window *w, int left, int top,
   f = XFRAME (WINDOW_FRAME (w));
   view = FRAME_HAIKU_DRAWABLE (f);
 
-  block_input ();
+  block_interrupts ();
   bar = ALLOCATE_PSEUDOVECTOR (struct scroll_bar, prev, PVEC_OTHER);
 
   XSETWINDOW (bar->window, w);
@@ -2594,7 +2594,7 @@ haiku_scroll_bar_create (struct window *w, int left, int top,
   if (!NILP (bar->next))
     XSETVECTOR (XSCROLL_BAR (bar->next)->prev, bar);
 
-  unblock_input ();
+  unblock_interrupts ();
   return bar;
 }
 
@@ -2616,7 +2616,7 @@ haiku_set_horizontal_scroll_bar (struct window *w, int portion, int whole, int p
   height = WINDOW_CONFIG_SCROLL_BAR_HEIGHT (w);
   view = FRAME_HAIKU_DRAWABLE (WINDOW_XFRAME (w));
 
-  block_input ();
+  block_interrupts ();
 
   if (NILP (w->horizontal_scroll_bar))
     {
@@ -2650,7 +2650,7 @@ haiku_set_horizontal_scroll_bar (struct window *w, int portion, int whole, int p
   bar->total = whole;
   XSETVECTOR (barobj, bar);
   wset_horizontal_scroll_bar (w, barobj);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -2675,7 +2675,7 @@ haiku_set_vertical_scroll_bar (struct window *w, int portion, int whole, int pos
 
   view = FRAME_HAIKU_DRAWABLE (WINDOW_XFRAME (w));
 
-  block_input ();
+  block_interrupts ();
   if (NILP (w->vertical_scroll_bar))
     {
       bar = haiku_scroll_bar_create (w, left, top, width, height, false);
@@ -2708,7 +2708,7 @@ haiku_set_vertical_scroll_bar (struct window *w, int portion, int whole, int pos
 
   XSETVECTOR (barobj, bar);
   wset_vertical_scroll_bar (w, barobj);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -2725,7 +2725,7 @@ haiku_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
   view = FRAME_HAIKU_DRAWABLE (f);
   face = p->face;
 
-  block_input ();
+  block_interrupts ();
   BView_draw_lock (view, true, 0, 0, 0, 0);
   BView_StartClip (view);
 
@@ -2797,7 +2797,7 @@ haiku_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
     }
   BView_EndClip (view);
   BView_draw_unlock (view);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -2815,12 +2815,12 @@ haiku_define_fringe_bitmap (int which, unsigned short *bits,
 	fringe_bmps[i++] = NULL;
     }
 
-  block_input ();
+  block_interrupts ();
   fringe_bmps[which] = BBitmap_new (wd, h, 1);
   if (!fringe_bmps[which])
     memory_full (SIZE_MAX);
   BBitmap_import_fringe_bitmap (fringe_bmps[which], bits, wd, h);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -2865,7 +2865,7 @@ haiku_scroll_run (struct window *w, struct run *run)
 	height = run->height;
     }
 
-  block_input ();
+  block_interrupts ();
   gui_clear_cursor (w);
 
   BView_draw_lock (view, true, x, to_y, width, height);
@@ -2875,7 +2875,7 @@ haiku_scroll_run (struct window *w, struct run *run)
   BView_EndClip (view);
   BView_draw_unlock (view);
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 /* Haiku doesn't provide any way to get the frame actually underneath
@@ -2898,7 +2898,7 @@ haiku_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
     return;
 
   f1 = NULL;
-  block_input ();
+  block_interrupts ();
 
   FOR_EACH_FRAME (tail, frame)
     {
@@ -2956,7 +2956,7 @@ haiku_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	}
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -2981,11 +2981,11 @@ haiku_define_frame_cursor (struct frame *f, Emacs_Cursor cursor)
   if (FRAME_TOOLTIP_P (f))
     return;
 
-  block_input ();
+  block_interrupts ();
   if (!f->pointer_invisible && FRAME_HAIKU_VIEW (f)
       && !FRAME_OUTPUT_DATA (f)->hourglass_p)
     BView_set_view_cursor (FRAME_HAIKU_VIEW (f), cursor);
-  unblock_input ();
+  unblock_interrupts ();
   FRAME_OUTPUT_DATA (f)->current_cursor = cursor;
 }
 
@@ -3118,7 +3118,7 @@ haiku_wait_for_event (struct frame *f, int type)
   object_wait_info info;
   specpdl_ref depth;
 
-  input_blocked_to = interrupt_input_blocked;
+  interrupts_blocked_to = interrupts_blocked;
   info.object = port_application_to_emacs;
   info.type = B_OBJECT_TYPE_PORT;
   info.events = B_EVENT_READ;
@@ -3135,8 +3135,8 @@ haiku_wait_for_event (struct frame *f, int type)
 
       pending_signals = true;
       /* This will call the read_socket_hook.  */
-      totally_unblock_input ();
-      interrupt_input_blocked = input_blocked_to;
+      totally_unblock_interrupts ();
+      interrupts_blocked = interrupts_blocked_to;
       info.events = B_EVENT_READ;
     }
 
@@ -3160,7 +3160,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 
   buf = alloca (200);
 
-  block_input ();
+  block_interrupts ();
   haiku_read_size (&b_size, false);
   while (b_size >= 0)
     {
@@ -4098,7 +4098,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	}
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   return message_count;
 }
@@ -4238,9 +4238,9 @@ haiku_beep (struct frame *f)
       void *view = FRAME_HAIKU_VIEW (f);
       if (view)
 	{
-	  block_input ();
+	  block_interrupts ();
 	  haiku_flash (f);
-	  unblock_input ();
+	  unblock_interrupts ();
 	}
     }
   else
@@ -4254,12 +4254,12 @@ haiku_toggle_invisible_pointer (struct frame *f, bool invisible_p)
 
   if (view && !FRAME_TOOLTIP_P (f))
     {
-      block_input ();
+      block_interrupts ();
       BView_set_view_cursor (view, (invisible_p
 				    ? FRAME_OUTPUT_DATA (f)->no_cursor
 				    : FRAME_OUTPUT_DATA (f)->current_cursor));
       f->pointer_invisible = invisible_p;
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -4357,7 +4357,7 @@ haiku_term_init (void)
   ptrdiff_t nbytes;
   void *name_buffer;
 
-  block_input ();
+  block_interrupts ();
 
   Fset_input_interrupt_mode (Qt);
   baud_rate = 19200;
@@ -4440,7 +4440,7 @@ haiku_term_init (void)
 
   /* Start listening for font configuration changes.  */
   be_listen_font_settings ();
-  unblock_input ();
+  unblock_interrupts ();
 
   return dpyinfo;
 }
@@ -4481,7 +4481,7 @@ haiku_clear_under_internal_border (struct frame *f)
       struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
       void *view = FRAME_HAIKU_DRAWABLE (f);
 
-      block_input ();
+      block_interrupts ();
       BView_draw_lock (view, true, 0, 0, FRAME_PIXEL_WIDTH (f),
 		       FRAME_PIXEL_HEIGHT (f));
       BView_StartClip (view);
@@ -4500,7 +4500,7 @@ haiku_clear_under_internal_border (struct frame *f)
       BView_FillRectangle (view, 0, height - border, width, border);
       BView_EndClip (view);
       BView_draw_unlock (view);
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -4523,7 +4523,7 @@ haiku_scroll_bar_remove (struct scroll_bar *bar)
   f = WINDOW_XFRAME (XWINDOW (bar->window));
   view = FRAME_HAIKU_DRAWABLE (f);
 
-  block_input ();
+  block_interrupts ();
   BView_forget_scroll_bar (view, bar->left, bar->top,
 			   bar->width, bar->height);
   BScrollBar_delete (bar->scroll_bar);
@@ -4534,7 +4534,7 @@ haiku_scroll_bar_remove (struct scroll_bar *bar)
     wset_horizontal_scroll_bar (XWINDOW (bar->window), Qnil);
   else
     wset_vertical_scroll_bar (XWINDOW (bar->window), Qnil);
-  unblock_input ();
+  unblock_interrupts ();
 };
 
 void
@@ -4571,10 +4571,10 @@ haiku_set_offset (struct frame *frame, int x, int y,
 
   haiku_update_size_hints (frame);
 
-  block_input ();
+  block_interrupts ();
   if (change_gravity)
     BWindow_set_offset (FRAME_HAIKU_WINDOW (frame), x, y);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 #ifdef USE_BE_CAIRO

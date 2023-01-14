@@ -101,7 +101,7 @@ static struct rlimit nofile_limit;
 #include "frame.h"
 #include "termopts.h"
 #include "keyboard.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "atimer.h"
 #include "sysselect.h"
 #include "syssignal.h"
@@ -2077,7 +2077,7 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
   setup_process_coding_systems (process);
   char **env = make_environment_block (current_dir);
 
-  block_input ();
+  block_interrupts ();
   block_child_signal (&oldset);
 
   pty_in = p->pty_in;
@@ -2098,7 +2098,7 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
 
   /* Stop blocking in the parent.  */
   unblock_child_signal (&oldset);
-  unblock_input ();
+  unblock_interrupts ();
 
   /* Environment block no longer needed.  */
   unbind_to (count, Qnil);

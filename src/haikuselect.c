@@ -19,7 +19,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include "lisp.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "coding.h"
 #include "haikuselect.h"
 #include "haikuterm.h"
@@ -99,10 +99,10 @@ message in the format accepted by `haiku-drag-message', which see.  */)
     {
       CHECK_STRING (name);
 
-      block_input ();
+      block_interrupts ();
       dat = be_find_clipboard_data (clipboard_name,
 				    SSDATA (name), &len);
-      unblock_input ();
+      unblock_interrupts ();
 
       if (!dat)
 	return Qnil;
@@ -115,23 +115,23 @@ message in the format accepted by `haiku-drag-message', which see.  */)
       Fput_text_property (make_fixnum (0), make_fixnum (len),
 			  Qforeign_selection, Qt, str);
 
-      block_input ();
+      block_interrupts ();
       free (dat);
-      unblock_input ();
+      unblock_interrupts ();
     }
   else
     {
-      block_input ();
+      block_interrupts ();
       rc = be_lock_clipboard_message (clipboard_name, &message, false);
-      unblock_input ();
+      unblock_interrupts ();
 
       if (rc)
 	signal_error ("Couldn't open clipboard", clipboard);
 
-      block_input ();
+      block_interrupts ();
       str = haiku_message_to_lisp (message);
       be_unlock_clipboard (clipboard_name, true);
-      unblock_input ();
+      unblock_interrupts ();
     }
 
   return str;
@@ -208,10 +208,10 @@ of the symbols `PRIMARY', `SECONDARY', or `CLIPBOARD'.  */)
   bool value;
   enum haiku_clipboard name;
 
-  block_input ();
+  block_interrupts ();
   name = haiku_get_clipboard_name (selection);
   value = be_clipboard_owner_p (name);
-  unblock_input ();
+  unblock_interrupts ();
 
   return value ? Qt : Qnil;
 }
@@ -492,18 +492,18 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	      if (!t5 || t5 > TYPE_MAXIMUM (uint32))
 		signal_error ("Value too large", t2);
 
-	      block_input ();
+	      block_interrupts ();
 	      be_set_message_type (message, t5);
-	      unblock_input ();
+	      unblock_interrupts ();
 	    }
 	  else
 	    {
 	      if (!TYPE_RANGED_FIXNUMP (uint32, t2))
 		signal_error ("Invalid data type", t2);
 
-	      block_input ();
+	      block_interrupts ();
 	      be_set_message_type (message, XFIXNAT (t2));
-	      unblock_input ();
+	      unblock_interrupts ();
 	    }
 
 	  continue;
@@ -534,16 +534,16 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	    case 'MSGG':
 	      ref = SPECPDL_INDEX ();
 
-	      block_input ();
+	      block_interrupts ();
 	      msg_data = be_create_simple_message ();
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      record_unwind_protect_ptr (BMessage_delete, msg_data);
 	      haiku_lisp_to_message (data, msg_data);
 
-	      block_input ();
+	      block_interrupts ();
 	      rc = be_add_message_message (message, SSDATA (name), msg_data);
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      if (rc)
 		signal_error ("Invalid message", data);
@@ -601,11 +601,11 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 		signal_error ("Invalid value", data);
 	      short_data = XFIXNUM (data);
 
-	      block_input ();
+	      block_interrupts ();
 	      rc = be_add_message_data (message, SSDATA (name),
 					type_code, &short_data,
 					sizeof short_data);
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      if (rc)
 		signal_error ("Failed to add short", data);
@@ -631,11 +631,11 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 		  long_data = (int32) XFIXNUM (data);
 		}
 
-	      block_input ();
+	      block_interrupts ();
 	      rc = be_add_message_data (message, SSDATA (name),
 					type_code, &long_data,
 					sizeof long_data);
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      if (rc)
 		signal_error ("Failed to add long", data);
@@ -660,11 +660,11 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 		  llong_data = (int64) XFIXNUM (data);
 		}
 
-	      block_input ();
+	      block_interrupts ();
 	      rc = be_add_message_data (message, SSDATA (name),
 					type_code, &llong_data,
 					sizeof llong_data);
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      if (rc)
 		signal_error ("Failed to add llong", data);
@@ -688,11 +688,11 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 		  sizet_data = (int64) XFIXNUM (data);
 		}
 
-	      block_input ();
+	      block_interrupts ();
 	      rc = be_add_message_data (message, SSDATA (name),
 					type_code, &sizet_data,
 					sizeof sizet_data);
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      if (rc)
 		signal_error ("Failed to add sizet", data);
@@ -717,11 +717,11 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 		  ssizet_data = (int64) XFIXNUM (data);
 		}
 
-	      block_input ();
+	      block_interrupts ();
 	      rc = be_add_message_data (message, SSDATA (name),
 					type_code, &ssizet_data,
 					sizeof ssizet_data);
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      if (rc)
 		signal_error ("Failed to add ssizet", data);
@@ -733,11 +733,11 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 		signal_error ("Invalid value", data);
 	      char_data = XFIXNUM (data);
 
-	      block_input ();
+	      block_interrupts ();
 	      rc = be_add_message_data (message, SSDATA (name),
 					type_code, &char_data,
 					sizeof char_data);
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      if (rc)
 		signal_error ("Failed to add char", data);
@@ -746,11 +746,11 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	    case 'BOOL':
 	      bool_data = !NILP (data);
 
-	      block_input ();
+	      block_interrupts ();
 	      rc = be_add_message_data (message, SSDATA (name),
 					type_code, &bool_data,
 					sizeof bool_data);
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      if (rc)
 		signal_error ("Failed to add bool", data);
@@ -761,11 +761,11 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 		 include a trailing NULL byte.  */
 	      CHECK_STRING (data);
 
-	      block_input ();
+	      block_interrupts ();
 	      rc = be_add_message_data (message, SSDATA (name),
 					type_code, SDATA (data),
 					SBYTES (data) + 1);
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      if (rc)
 		signal_error ("Failed to add", data);
@@ -775,11 +775,11 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	    decode_normally:
 	      CHECK_STRING (data);
 
-	      block_input ();
+	      block_interrupts ();
 	      rc = be_add_message_data (message, SSDATA (name),
 					type_code, SDATA (data),
 					SBYTES (data));
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      if (rc)
 		signal_error ("Failed to add", data);
@@ -910,7 +910,7 @@ currently being displayed to move along with the mouse pointer.  */)
 
   rc = be_drag_message (FRAME_HAIKU_VIEW (f), be_message,
 			!NILP (allow_same_frame),
-			block_input, unblock_input,
+			block_interrupts, unblock_interrupts,
 			process_pending_signals,
 			haiku_should_quit_drag);
 
@@ -1003,10 +1003,10 @@ after it starts.  */)
       haiku_lisp_to_message (args, message);
     }
 
-  block_input ();
+  block_interrupts ();
   rc = be_roster_launch (type, file, cargs, nargs, message,
 			 &team_id);
-  unblock_input ();
+  unblock_interrupts ();
 
   /* `be_roster_launch' can potentially take a while in IO, but
      signals from async input will interrupt that operation.  If the

@@ -30,7 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "buffer.h"
 #include "charset.h"
 #include "coding.h"
@@ -3994,7 +3994,7 @@ DEFUN ("dump-emacs-portable",
   ctx->dump_filename = filename;
 
   record_unwind_protect_ptr (dump_unwind_cleanup, ctx);
-  block_input ();
+  block_interrupts ();
 
 #ifdef REL_ALLOC
   r_alloc_inhibit_buffer_relocation (1);
@@ -4184,7 +4184,7 @@ DEFUN ("dump-emacs-portable",
            number_hot_relocations,
            number_discardable_relocations);
 
-  unblock_input ();
+  unblock_interrupts ();
   return unbind_to (count, Qnil);
 }
 

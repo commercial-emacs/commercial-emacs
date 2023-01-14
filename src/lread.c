@@ -41,7 +41,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keyboard.h"
 #include "systime.h"
 #include "termhooks.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "pdumper.h"
 #include <c-ctype.h>
 #include <vla.h>
@@ -373,9 +373,9 @@ skip_dyn_bytes (Lisp_Object readcharfun, ptrdiff_t n)
 {
   if (FROM_FILE_P (readcharfun))
     {
-      block_input ();		/* FIXME: Not sure if it's needed.  */
+      block_interrupts ();		/* FIXME: Not sure if it's needed.  */
       fseek (infile->stream, n - infile->lookahead, SEEK_CUR);
-      unblock_input ();
+      unblock_interrupts ();
       infile->lookahead = 0;
     }
   else
@@ -397,9 +397,9 @@ skip_dyn_eof (Lisp_Object readcharfun)
 {
   if (FROM_FILE_P (readcharfun))
     {
-      block_input ();		/* FIXME: Not sure if it's needed.  */
+      block_interrupts ();		/* FIXME: Not sure if it's needed.  */
       fseek (infile->stream, 0, SEEK_END);
-      unblock_input ();
+      unblock_interrupts ();
       infile->lookahead = 0;
     }
   else
@@ -480,18 +480,18 @@ readbyte_from_stdio (void)
   int c;
   FILE *instream = infile->stream;
 
-  block_input ();
+  block_interrupts ();
 
   /* Interrupted reads have been observed while reading over the network.  */
   while ((c = getc (instream)) == EOF && errno == EINTR && ferror (instream))
     {
-      unblock_input ();
+      unblock_interrupts ();
       maybe_quit ();
-      block_input ();
+      block_interrupts ();
       clearerr (instream);
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   return (c == EOF ? -1 : c);
 }
@@ -3429,10 +3429,10 @@ skip_lazy_string (Lisp_Object readcharfun)
       int c = 0;
       for (int n = min (nskip, infile->lookahead); n > 0; n--)
 	ss->string[i++] = c = infile->buf[--infile->lookahead];
-      block_input ();
+      block_interrupts ();
       for (; i < nskip && c >= 0; i++)
 	ss->string[i] = c = getc (instream);
-      unblock_input ();
+      unblock_interrupts ();
 
       ss->length = i;
     }

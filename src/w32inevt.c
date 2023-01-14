@@ -37,7 +37,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "keyboard.h"
 #include "frame.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "termchar.h"	/* for Mouse_HLInfo, tty_display_info */
 #include "w32term.h"
 #include "w32inevt.h"
@@ -413,7 +413,7 @@ w32_console_mouse_position (struct frame **f,
 			    Lisp_Object *y,
 			    Time *time)
 {
-  block_input ();
+  block_interrupts ();
 
   insist = insist;
 
@@ -426,7 +426,7 @@ w32_console_mouse_position (struct frame **f,
   XSETINT (*y, movement_pos.Y);
   *time = movement_time;
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 /* Remember mouse motion and notify emacs.  */
@@ -764,7 +764,7 @@ w32_console_read_socket (struct terminal *terminal,
   int nev, add;
   int isdead;
 
-  block_input ();
+  block_interrupts ();
 
   for (;;)
     {
@@ -835,6 +835,6 @@ w32_console_read_socket (struct terminal *terminal,
   if (!w32_use_full_screen_buffer)
     maybe_generate_resize_event ();
 
-  unblock_input ();
+  unblock_interrupts ();
   return nev;
 }

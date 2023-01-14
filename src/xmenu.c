@@ -41,7 +41,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "systime.h"
 #include "termhooks.h"
 #include "window.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "buffer.h"
 #include "coding.h"
 #include "sysselect.h"
@@ -315,7 +315,7 @@ x_menu_dispatch_event (XEvent *event)
    and x-popup-dialog; it is not used for the menu bar.
 
    NOTE: All calls to popup_get_selection should be protected
-   with BLOCK_INPUT, UNBLOCK_INPUT wrappers.  */
+   with BLOCK_INTERRUPTS, UNBLOCK_INTERRUPTS wrappers.  */
 
 static void
 popup_get_selection (XEvent *initial_event, struct x_display_info *dpyinfo,
@@ -478,7 +478,7 @@ DEFUN ("x-menu-bar-open-internal", Fx_menu_bar_open_internal, Sx_menu_bar_open_i
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
 #endif
   Widget menubar;
-  block_input ();
+  block_interrupts ();
 
   if (FRAME_EXTERNAL_MENU_BAR (f))
     set_frame_menubar (f, true);
@@ -568,7 +568,7 @@ DEFUN ("x-menu-bar-open-internal", Fx_menu_bar_open_internal, Sx_menu_bar_open_i
         }
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   return Qnil;
 }
@@ -588,7 +588,7 @@ If FRAME is nil or not given, use the selected frame.  */)
   GtkWidget *menubar;
   struct frame *f;
 
-  block_input ();
+  block_interrupts ();
   f = decode_window_system_frame (frame);
 
   if (FRAME_EXTERNAL_MENU_BAR (f))
@@ -607,7 +607,7 @@ If FRAME is nil or not given, use the selected frame.  */)
           g_list_free (children);
         }
     }
-  unblock_input ();
+  unblock_interrupts ();
 
   return Qnil;
 }
@@ -658,7 +658,7 @@ x_activate_menubar (struct frame *f)
 #endif
 
   set_frame_menubar (f, true);
-  block_input ();
+  block_interrupts ();
   popup_activated_flag = 1;
 #ifdef USE_GTK
   XPutBackEvent (f->output_data.x->display_info->display,
@@ -687,7 +687,7 @@ x_activate_menubar (struct frame *f)
   popup_activated_flag
     = XtDispatchEvent (f->output_data.x->saved_menu_event);
 #endif
-  unblock_input ();
+  unblock_interrupts ();
 
   /* Ignore this if we get it a second time.  */
   f->output_data.x->saved_menu_event->type = 0;
@@ -816,10 +816,10 @@ menubar_selection_callback (GtkWidget *widget, gpointer client_data)
      sit-for will exit at once if the focus event follows the menu selection
      event.  */
 
-  block_input ();
+  block_interrupts ();
   while (gtk_events_pending ())
     gtk_main_iteration ();
-  unblock_input ();
+  unblock_interrupts ();
 
   find_and_call_menu_selection (cb_data->cl_data->f,
                                 cb_data->cl_data->menu_bar_items_used,
@@ -864,7 +864,7 @@ update_frame_menubar (struct frame *f)
   if (!x->menubar_widget || XtIsManaged (x->menubar_widget))
     return;
 
-  block_input ();
+  block_interrupts ();
 
   /* Do the voodoo which means "I'm changing lots of things, don't try
      to refigure sizes until I'm done."  */
@@ -887,7 +887,7 @@ update_frame_menubar (struct frame *f)
 
   /* Force the pane widget to resize itself.  */
   adjust_frame_size (f, -1, -1, 2, false, Qmenu_bar_lines);
-  unblock_input ();
+  unblock_interrupts ();
 #endif /* USE_GTK */
 }
 
@@ -1148,7 +1148,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
   /* Create or update the menu bar widget.  */
 
-  block_input ();
+  block_interrupts ();
 
 #ifdef USE_GTK
   xg_crazy_callback_abort = true;
@@ -1256,7 +1256,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
   xg_crazy_callback_abort = false;
 #endif
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 /* Called from Fx_create_frame to create the initial menubar of a frame
@@ -1311,7 +1311,7 @@ free_frame_menubar (struct frame *f)
       Position x0, y0, x1, y1;
 #endif
 
-      block_input ();
+      block_interrupts ();
 
 #ifdef USE_MOTIF
       if (f->output_data.x->widget)
@@ -1361,7 +1361,7 @@ free_frame_menubar (struct frame *f)
 #endif
 	}
 
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 #endif /* not USE_GTK */
@@ -1488,9 +1488,9 @@ static void
 pop_down_menu (void *arg)
 {
   popup_activated_flag = 0;
-  block_input ();
+  block_interrupts ();
   gtk_widget_destroy (GTK_WIDGET (arg));
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 /* Pop up the menu for frame F defined by FIRST_WV at X/Y and loop until the
@@ -1528,7 +1528,7 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
       pos_func = menu_position_func;
 
       /* Adjust coordinates to be root-window-relative.  */
-      block_input ();
+      block_interrupts ();
       x_translate_coordinates_to_root (f, x, y, &x, &y);
 #ifdef HAVE_GTK3
       /* Use window scaling factor to adjust position for scaled
@@ -1536,7 +1536,7 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
       x /= xg_get_scale (f);
       y /= xg_get_scale (f);
 #endif
-      unblock_input ();
+      unblock_interrupts ();
       popup_x_y.x = x;
       popup_x_y.y = y;
       popup_x_y.f = f;
@@ -1698,9 +1698,9 @@ leave_toolkit_menu (void *data)
 static void
 pop_down_menu (int id)
 {
-  block_input ();
+  block_interrupts ();
   lw_destroy_all_widgets ((LWLIB_ID) id);
-  unblock_input ();
+  unblock_interrupts ();
   popup_activated_flag = 0;
 }
 
@@ -1764,10 +1764,10 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
   event->y = y;
 
   /* Adjust coordinates to be root-window-relative.  */
-  block_input ();
+  block_interrupts ();
   x += FRAME_LEFT_SCROLL_BAR_AREA_WIDTH (f);
   x_translate_coordinates_to_root (f, x, y, &x, &y);
-  unblock_input ();
+  unblock_interrupts ();
 
   event->x_root = x;
   event->y_root = y;
@@ -1904,7 +1904,7 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
       return Qnil;
     }
 
-  block_input ();
+  block_interrupts ();
 
   /* Create a tree of widget_value objects
      representing the panes and their items.  */
@@ -2132,7 +2132,7 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
 			if (!NILP (subprefix_stack[j]))
 			  entry = Fcons (subprefix_stack[j], entry);
 		    }
-		  unblock_input ();
+		  unblock_interrupts ();
 
 		  SAFE_FREE ();
 		  return entry;
@@ -2143,12 +2143,12 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
     }
   else if (!(menuflags & MENU_FOR_CLICK))
     {
-      unblock_input ();
+      unblock_interrupts ();
       /* Make "Cancel" equivalent to C-g.  */
       quit ();
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   SAFE_FREE ();
   return Qnil;
@@ -2207,9 +2207,9 @@ dialog_selection_callback (Widget widget, LWLIB_ID id, XtPointer client_data)
   if ((intptr_t) client_data != -1)
     menu_item_selection = client_data;
 
-  block_input ();
+  block_interrupts ();
   lw_destroy_all_widgets (id);
-  unblock_input ();
+  unblock_interrupts ();
   popup_activated_flag = 0;
 }
 
@@ -2444,9 +2444,9 @@ xw_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
   list_of_panes (list1 (contents));
 
   /* Display them in a dialog box.  */
-  block_input ();
+  block_interrupts ();
   selection = x_dialog_show (f, title, header, &error_name);
-  unblock_input ();
+  unblock_interrupts ();
 
   unbind_to (specpdl_count, Qnil);
   discard_menu_items ();
@@ -2511,7 +2511,7 @@ pop_down_menu (void *arg)
   struct xi_device_t *device;
 #endif
 
-  block_input ();
+  block_interrupts ();
 #ifndef MSDOS
   XUngrabPointer (FRAME_X_DISPLAY (f), CurrentTime);
   XUngrabKeyboard (FRAME_X_DISPLAY (f), CurrentTime);
@@ -2544,7 +2544,7 @@ pop_down_menu (void *arg)
   popup_activated_flag = 0;
 #endif /* HAVE_X_WINDOWS */
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -2579,7 +2579,7 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
     }
 
   USE_SAFE_ALLOCA;
-  block_input ();
+  block_interrupts ();
 
   /* Figure out which root window F is on.  */
   XGetGeometry (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), &root,
@@ -2855,14 +2855,14 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
 	 the menu was invoked with a mouse event as POSITION).  */
       if (!(menuflags & MENU_FOR_CLICK))
 	{
-	  unblock_input ();
+	  unblock_interrupts ();
 	  quit ();
 	}
       break;
     }
 
  return_entry:
-  unblock_input ();
+  unblock_interrupts ();
   return SAFE_FREE_UNBIND_TO (specpdl_count, entry);
 }
 

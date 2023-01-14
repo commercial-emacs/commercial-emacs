@@ -32,7 +32,7 @@ Carbon version by Yamamoto Mitsuharu. */
 #include "keymap.h"
 #include "coding.h"
 #include "commands.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "nsterm.h"
 #include "termhooks.h"
 #include "keyboard.h"
@@ -147,7 +147,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
 
   XSETFRAME (Vmenu_updating_frame, f);
   last_menubar_frame = f;
-  block_input ();
+  block_interrupts ();
 
   /* Menu may have been created automatically; if so, discard it.  */
   if ([menu isKindOfClass: [EmacsMenu class]] == NO)
@@ -428,7 +428,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
   inside--;
 #endif
 
-  unblock_input ();
+  unblock_interrupts ();
 
 }
 
@@ -885,7 +885,7 @@ ns_menu_show (struct frame *f, int x, int y, int menuflags,
 
   NSTRACE ("ns_menu_show");
 
-  block_input ();
+  block_interrupts ();
 
   p.x = x; p.y = y;
 
@@ -1063,7 +1063,7 @@ ns_menu_show (struct frame *f, int x, int y, int menuflags,
   popup_activated_flag = 0;
   [[FRAME_NS_VIEW (SELECTED_FRAME ()) window] makeKeyWindow];
   unbind_to (specpdl_count, Qnil);
-  unblock_input ();
+  unblock_interrupts ();
 
   SAFE_FREE ();
   return tem;
@@ -1086,7 +1086,7 @@ free_frame_tool_bar (struct frame *f)
 
   NSTRACE ("free_frame_tool_bar");
 
-  block_input ();
+  block_interrupts ();
 
   /* Note: This triggers an animation, which calls windowDidResize
      repeatedly.  */
@@ -1096,7 +1096,7 @@ free_frame_tool_bar (struct frame *f)
 
   [[view window] setToolbar:nil];
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 void
@@ -1109,7 +1109,7 @@ update_frame_tool_bar_1 (struct frame *f, EmacsToolbar *toolbar)
 
   NSTRACE ("update_frame_tool_bar");
 
-  block_input ();
+  block_interrupts ();
 
 #ifdef NS_IMPL_COCOA
   [toolbar clearActive];
@@ -1219,7 +1219,7 @@ update_frame_tool_bar_1 (struct frame *f, EmacsToolbar *toolbar)
 #endif
 
   [toolbar setVisible:YES];
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 void
@@ -1581,7 +1581,7 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
   record_unwind_protect_void (unuse_menu_items);
   list_of_panes (list1 (contents));
 
-  block_input ();
+  block_interrupts ();
   dialog = [[EmacsDialogPanel alloc] initWithTitle: SSDATA (title)
 					isQuestion: is_question];
 
@@ -1589,7 +1589,7 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
 		      used: menu_items_used
 	   withErrorOutput: &error_name];
   [dialog resizeBoundsPriorToDisplay];
-  unblock_input ();
+  unblock_interrupts ();
 
   if (error_name)
     {

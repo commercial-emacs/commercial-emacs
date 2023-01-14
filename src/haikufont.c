@@ -22,7 +22,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "dispextern.h"
 #include "composite.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "charset.h"
 #include "frame.h"
 #include "window.h"
@@ -659,7 +659,7 @@ haikufont_done_with_query_pattern (struct haiku_font_pattern *ptn)
 static Lisp_Object
 haikufont_match (struct frame *f, Lisp_Object font_spec)
 {
-  block_input ();
+  block_interrupts ();
   Lisp_Object tem = Qnil;
   struct haiku_font_pattern ptn;
   haikufont_spec_or_entity_to_pattern (font_spec, 0, &ptn);
@@ -671,7 +671,7 @@ haikufont_match (struct frame *f, Lisp_Object font_spec)
       tem = haikufont_pattern_to_entity (found);
       haiku_font_pattern_free (found);
     }
-  unblock_input ();
+  unblock_interrupts ();
   return !NILP (tem) ? tem : haikufont_get_fallback_entity ();
 }
 
@@ -683,7 +683,7 @@ haikufont_list (struct frame *f, Lisp_Object font_spec)
 
   lst = Qnil;
 
-  block_input ();
+  block_interrupts ();
   /* Returning irrelevant results on receiving an OTF form will cause
      fontset.c to loop over and over, making displaying some
      characters very slow.  */
@@ -691,7 +691,7 @@ haikufont_list (struct frame *f, Lisp_Object font_spec)
 
   if (CONSP (tem) && !NILP (XCDR (tem)))
     {
-      unblock_input ();
+      unblock_interrupts ();
       return Qnil;
     }
 
@@ -704,7 +704,7 @@ haikufont_list (struct frame *f, Lisp_Object font_spec)
 	lst = Fcons (haikufont_pattern_to_entity (pt), lst);
       haiku_font_pattern_free (found);
     }
-  unblock_input ();
+  unblock_interrupts ();
   return lst;
 }
 
@@ -714,7 +714,7 @@ haiku_bulk_encode (struct haikufont_info *font_info, int block)
   unsigned short *unichars = xmalloc (0x101 * sizeof (*unichars));
   unsigned int i, idx;
 
-  block_input ();
+  block_interrupts ();
 
   font_info->glyphs[block] = unichars;
   if (!unichars)
@@ -734,7 +734,7 @@ haiku_bulk_encode (struct haikufont_info *font_info, int block)
 	  unichars[i] = 0xFFFF;
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static unsigned int
@@ -794,32 +794,32 @@ haikufont_open (struct frame *f, Lisp_Object font_entity, int pixel_size)
   if (CONSP (indices) && FIXNUMP (XCAR (indices))
       && FIXNUMP (XCDR (indices)))
     {
-      block_input ();
+      block_interrupts ();
       be_font = be_open_font_at_index (XFIXNUM (XCAR (indices)),
 				       XFIXNUM (XCDR (indices)),
 				       pixel_size);
-      unblock_input ();
+      unblock_interrupts ();
 
       if (!be_font)
 	return Qnil;
     }
   else
     {
-      block_input ();
+      block_interrupts ();
       haikufont_spec_or_entity_to_pattern (font_entity, 1, &ptn);
 
       if (BFont_open_pattern (&ptn, &be_font, pixel_size))
 	{
 	  haikufont_done_with_query_pattern (&ptn);
-	  unblock_input ();
+	  unblock_interrupts ();
 	  return Qnil;
 	}
 
       haikufont_done_with_query_pattern (&ptn);
-      unblock_input ();
+      unblock_interrupts ();
     }
 
-  block_input ();
+  block_interrupts ();
 
   font_object = font_make_object (VECSIZE (struct haikufont_info),
 				  font_entity, pixel_size);
@@ -830,7 +830,7 @@ haikufont_open (struct frame *f, Lisp_Object font_entity, int pixel_size)
 
   if (!font)
     {
-      unblock_input ();
+      unblock_interrupts ();
       return Qnil;
     }
 
@@ -875,7 +875,7 @@ haikufont_open (struct frame *f, Lisp_Object font_entity, int pixel_size)
 
   font->props[FONT_NAME_INDEX] = Ffont_xlfd_name (font_object, Qnil);
 
-  unblock_input ();
+  unblock_interrupts ();
   return font_object;
 }
 
@@ -888,7 +888,7 @@ haikufont_close (struct font *font)
   if (font_data_structures_may_be_ill_formed ())
     return;
 
-  block_input ();
+  block_interrupts ();
   if (info && info->be_font)
     BFont_close (info->be_font);
 
@@ -908,7 +908,7 @@ haikufont_close (struct font *font)
     }
 
   xfree (info->glyphs);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -977,7 +977,7 @@ haikufont_text_extents (struct font *font, const unsigned int *code,
   int totalwidth = 0;
   memset (metrics, 0, sizeof (struct font_metrics));
 
-  block_input ();
+  block_interrupts ();
   for (int i = 0; i < nglyphs; i++)
     {
       struct font_metrics m;
@@ -996,7 +996,7 @@ haikufont_text_extents (struct font *font, const unsigned int *code,
       totalwidth += m.width;
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   if (metrics)
     metrics->width = totalwidth;
@@ -1027,7 +1027,7 @@ haikufont_shape (Lisp_Object lgstring, Lisp_Object direction)
   if (INT_MAX / 2 < len)
     memory_full (SIZE_MAX);
 
-  block_input ();
+  block_interrupts ();
 
   b_len = 0;
   b = xmalloc (b_len);
@@ -1076,7 +1076,7 @@ haikufont_shape (Lisp_Object lgstring, Lisp_Object direction)
       LGLYPH_SET_DESCENT (tem, font->font.descent);
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   return make_fixnum (len);
 }
@@ -1092,7 +1092,7 @@ haikufont_draw (struct glyph_string *s, int from, int to,
   void *view = FRAME_HAIKU_VIEW (f);
   unsigned long foreground, background;
 
-  block_input ();
+  block_interrupts ();
   prepare_face_for_display (s->f, face);
 
   if (s->hl != DRAW_CURSOR)
@@ -1158,7 +1158,7 @@ haikufont_draw (struct glyph_string *s, int from, int to,
       BView_DrawString (view, b, b_len);
     }
 
-  unblock_input ();
+  unblock_interrupts ();
   return 1;
 }
 
@@ -1170,14 +1170,14 @@ haikufont_list_family (struct frame *f)
   ptrdiff_t idx;
   haiku_font_family_or_style *styles;
 
-  block_input ();
+  block_interrupts ();
   styles = be_list_font_families (&length);
-  unblock_input ();
+  unblock_interrupts ();
 
   if (!styles)
     return list;
 
-  block_input ();
+  block_interrupts ();
   for (idx = 0; idx < length; ++idx)
     {
       if (styles[idx][0])
@@ -1185,7 +1185,7 @@ haikufont_list_family (struct frame *f)
     }
 
   free (styles);
-  unblock_input ();
+  unblock_interrupts ();
 
   return list;
 }

@@ -258,7 +258,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "buffer.h"
 #include "dispextern.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "window.h"
 #include "termchar.h"
 
@@ -520,9 +520,9 @@ static GC
 x_create_gc (struct frame *f, unsigned long mask, XGCValues *xgcv)
 {
   GC gc;
-  block_input ();
+  block_interrupts ();
   gc = XCreateGC (FRAME_X_DISPLAY (f), FRAME_X_DRAWABLE (f), mask, xgcv);
-  unblock_input ();
+  unblock_interrupts ();
   IF_DEBUG (++ngcs);
   return gc;
 }
@@ -533,7 +533,7 @@ x_create_gc (struct frame *f, unsigned long mask, XGCValues *xgcv)
 static void
 x_free_gc (struct frame *f, GC gc)
 {
-  eassert (input_blocked_p ());
+  eassert (interrupts_blocked_p ());
   IF_DEBUG ((--ngcs, eassert (ngcs >= 0)));
   XFreeGC (FRAME_X_DISPLAY (f), gc);
 }
@@ -547,9 +547,9 @@ static Emacs_GC *
 x_create_gc (struct frame *f, unsigned long mask, Emacs_GC *egc)
 {
   Emacs_GC *gc;
-  block_input ();
+  block_interrupts ();
   gc = XCreateGC (NULL, FRAME_W32_WINDOW (f), mask, egc);
-  unblock_input ();
+  unblock_interrupts ();
   IF_DEBUG (++ngcs);
   return gc;
 }
@@ -811,7 +811,7 @@ load_pixmap (struct frame *f, Lisp_Object name)
 
   CHECK_TYPE (!NILP (Fbitmap_spec_p (name)), Qbitmap_spec_p, name);
 
-  block_input ();
+  block_interrupts ();
   if (CONSP (name))
     {
       /* Decode a bitmap spec into a bitmap.  */
@@ -831,7 +831,7 @@ load_pixmap (struct frame *f, Lisp_Object name)
       /* It must be a string -- a file name.  */
       bitmap_id = image_create_bitmap_from_file (f, name);
     }
-  unblock_input ();
+  unblock_interrupts ();
 
   if (bitmap_id < 0)
     {
@@ -1360,9 +1360,9 @@ unload_color (struct frame *f, unsigned long pixel)
 {
   if (pixel != -1)
     {
-      block_input ();
+      block_interrupts ();
       x_free_colors (f, &pixel, 1);
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -1376,7 +1376,7 @@ free_face_colors (struct frame *f, struct face *face)
   if (face->colors_copied_bitwise_p)
     return;
 
-  block_input ();
+  block_interrupts ();
 
   if (!face->foreground_defaulted_p)
     {
@@ -1418,7 +1418,7 @@ free_face_colors (struct frame *f, struct face *face)
       IF_DEBUG (--ncolors_allocated);
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 #endif /* HAVE_X_WINDOWS */
@@ -3815,10 +3815,10 @@ ordinary `x-get-resource' doesn't take a frame argument.  */)
   CHECK_STRING (resource);
   CHECK_STRING (class);
   f = decode_live_frame (frame);
-  block_input ();
+  block_interrupts ();
   value = gui_display_get_resource (FRAME_DISPLAY_INFO (f),
                                     resource, class, Qnil, Qnil);
-  unblock_input ();
+  unblock_interrupts ();
   return value;
 }
 
@@ -4477,12 +4477,12 @@ free_realized_face (struct frame *f, struct face *face)
 	    free_face_fontset (f, face);
 	  if (face->gc)
 	    {
-	      block_input ();
+	      block_interrupts ();
 	      if (face->font)
 		font_done_for_face (f, face);
 	      x_free_gc (f, face->gc);
 	      face->gc = 0;
-	      unblock_input ();
+	      unblock_interrupts ();
 	    }
 #ifdef HAVE_X_WINDOWS
 	  free_face_colors (f, face);
@@ -4526,7 +4526,7 @@ prepare_face_for_display (struct frame *f, struct face *face)
       egc.line_width = 1;
 #endif
 
-      block_input ();
+      block_interrupts ();
 #ifdef HAVE_X_WINDOWS
       if (face->stipple)
 	{
@@ -4538,7 +4538,7 @@ prepare_face_for_display (struct frame *f, struct face *face)
       face->gc = x_create_gc (f, mask, &egc);
       if (face->font)
 	font_prepare_for_face (f, face);
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -4648,12 +4648,12 @@ clear_face_gcs (struct face_cache *c)
 	  struct face *face = c->faces_by_id[i];
 	  if (face && face->gc)
 	    {
-	      block_input ();
+	      block_interrupts ();
 	      if (face->font)
 		font_done_for_face (c->f, face);
 	      x_free_gc (c->f, face->gc);
 	      face->gc = 0;
-	      unblock_input ();
+	      unblock_interrupts ();
 	    }
 	}
     }
@@ -4677,7 +4677,7 @@ free_realized_faces (struct face_cache *c)
       /* We must block input here because we can't process X events
 	 safely while only some faces are freed, or when the frame's
 	 current matrix still references freed faces.  */
-      block_input ();
+      block_interrupts ();
 
       for (int i = 0; i < c->used; ++i)
 	{
@@ -4701,7 +4701,7 @@ free_realized_faces (struct face_cache *c)
 	  fset_redisplay (f);
 	}
 
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -5694,7 +5694,7 @@ realize_basic_faces (struct frame *f)
 
   /* Block input here so that we won't be surprised by an X expose
      event, for instance, without having the faces set up.  */
-  block_input ();
+  block_interrupts ();
 
   if (realize_default_face (f))
     {
@@ -5732,7 +5732,7 @@ realize_basic_faces (struct frame *f)
       success_p = true;
     }
 
-  unblock_input ();
+  unblock_interrupts ();
   return success_p;
 }
 
@@ -6905,7 +6905,7 @@ where R,G,B are numbers between 0 and 255 and name is an arbitrary string.  */)
   CHECK_STRING (filename);
   abspath = Fexpand_file_name (filename, Qnil);
 
-  block_input ();
+  block_interrupts ();
   fp = emacs_fopen (SSDATA (abspath), "r" FOPEN_TEXT);
   if (fp)
     {
@@ -6929,7 +6929,7 @@ where R,G,B are numbers between 0 and 255 and name is an arbitrary string.  */)
 	  }
       fclose (fp);
     }
-  unblock_input ();
+  unblock_interrupts ();
   return cmap;
 }
 #endif

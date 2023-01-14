@@ -24,7 +24,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "xwidget.h"
 
 #include "lisp.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "dispextern.h"
 #include "frame.h"
 #include "keyboard.h"
@@ -333,7 +333,7 @@ fails.  */)
   xw->hit_result = 0;
   if (EQ (xw->type, Qwebkit))
     {
-      block_input ();
+      block_interrupts ();
       WebKitSettings *settings;
       WebKitWebContext *webkit_context = webkit_web_context_get_default ();
 
@@ -449,7 +449,7 @@ fails.  */)
       g_signal_connect (G_OBJECT (xw->widgetwindow_osr), "damage-event",
 			G_CALLBACK (offscreen_damage_event), xw);
 
-      unblock_input ();
+      unblock_interrupts ();
     }
 #elif defined NS_IMPL_COCOA
   nsxwidget_init (xw);
@@ -518,12 +518,12 @@ selected frame is not an X-Windows frame.  */)
   if (!f)
     return Qnil;
 
-  block_input ();
+  block_interrupts ();
   osw = gtk_widget_get_window (xw->widgetwindow_osr);
   embedder = gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f));
 
   gdk_offscreen_window_set_embedder (osw, embedder);
-  unblock_input ();
+  unblock_interrupts ();
 #endif
   widget = gtk_window_get_focus (GTK_WINDOW (xw->widgetwindow_osr));
 
@@ -601,17 +601,17 @@ selected frame is not an X-Windows frame.  */)
   if (character == -1 && keycode == -1)
     {
 #ifdef HAVE_XINPUT2
-      block_input ();
+      block_interrupts ();
       if (xw->embedder_view)
 	record_osr_embedder (xw->embedder_view);
       else
 	gdk_offscreen_window_set_embedder (osw, NULL);
-      unblock_input ();
+      unblock_interrupts ();
 #endif
       return Qnil;
     }
 
-  block_input ();
+  block_interrupts ();
   xg_event = gdk_event_new (GDK_KEY_PRESS);
   xg_event->any.window = gtk_widget_get_window (xw->widget_osr);
   g_object_ref (xg_event->any.window);
@@ -666,7 +666,7 @@ selected frame is not an X-Windows frame.  */)
   else
     gdk_offscreen_window_set_embedder (osw, NULL);
 #endif
-  unblock_input ();
+  unblock_interrupts ();
 #endif
 
   return Qnil;
@@ -2172,7 +2172,7 @@ xv_do_draw (struct xwidget_view *xw, struct xwidget *w)
       return;
     }
 
-  block_input ();
+  block_interrupts ();
   wnd = GTK_OFFSCREEN_WINDOW (w->widgetwindow_osr);
   surface = gtk_offscreen_window_get_surface (wnd);
 
@@ -2186,7 +2186,7 @@ xv_do_draw (struct xwidget_view *xw, struct xwidget *w)
     }
   cairo_restore (xw->cr_context);
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 #else
 static void
@@ -2201,7 +2201,7 @@ xwidget_view_draw_cb (GtkWidget *widget, cairo_t *cr,
   if (NILP (w->buffer))
     return;
 
-  block_input ();
+  block_interrupts ();
   wnd = GTK_OFFSCREEN_WINDOW (w->widgetwindow_osr);
   surface = gtk_offscreen_window_get_surface (wnd);
 
@@ -2216,7 +2216,7 @@ xwidget_view_draw_cb (GtkWidget *widget, cairo_t *cr,
     }
   cairo_restore (cr);
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 #endif
 
@@ -2226,7 +2226,7 @@ static gboolean
 offscreen_damage_event (GtkWidget *widget, GdkEvent *event,
                         gpointer xwidget)
 {
-  block_input ();
+  block_interrupts ();
 
   for (Lisp_Object tail = internal_xwidget_view_list; CONSP (tail);
        tail = XCDR (tail))
@@ -2243,7 +2243,7 @@ offscreen_damage_event (GtkWidget *widget, GdkEvent *event,
 	}
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   return FALSE;
 }
@@ -2845,7 +2845,7 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
   xv->y = y;
 
 #ifdef HAVE_X_WINDOWS
-  block_input ();
+  block_interrupts ();
   if (xv->wdesc == None)
     {
       Lisp_Object xvw;
@@ -2857,7 +2857,7 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
       if (clip_right - clip_left <= 0
 	  || clip_bottom - clip_top <= 0)
 	{
-	  unblock_input ();
+	  unblock_interrupts ();
 	  return;
 	}
 
@@ -2909,7 +2909,7 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
     }
 #endif
 #ifdef HAVE_PGTK
-  block_input ();
+  block_interrupts ();
 #endif
 
   /* Has it moved?  */
@@ -3014,7 +3014,7 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
 #endif
 
 #ifdef USE_GTK
-  unblock_input ();
+  unblock_interrupts ();
 #endif
 }
 
@@ -3210,7 +3210,7 @@ DEFUN ("xwidget-resize", Fxwidget_resize, Sxwidget_resize, 3, 3, 0,
   xw->width = w;
   xw->height = h;
 
-  block_input ();
+  block_interrupts ();
 
   for (Lisp_Object tail = internal_xwidget_view_list; CONSP (tail);
        tail = XCDR (tail))
@@ -3246,7 +3246,7 @@ DEFUN ("xwidget-resize", Fxwidget_resize, Sxwidget_resize, 3, 3, 0,
 #elif defined NS_IMPL_COCOA
   nsxwidget_resize (xw);
 #endif
-  unblock_input ();
+  unblock_interrupts ();
 
   return Qnil;
 }
@@ -3347,7 +3347,7 @@ DEFUN ("delete-xwidget-view",
   CHECK_XWIDGET_VIEW (xwidget_view);
   struct xwidget_view *xv = XXWIDGET_VIEW (xwidget_view);
 
-  block_input ();
+  block_interrupts ();
 #ifdef USE_GTK
   struct xwidget *xw = XXWIDGET (xv->model);
   GdkWindow *w;
@@ -3394,7 +3394,7 @@ DEFUN ("delete-xwidget-view",
 
   internal_xwidget_view_list = Fdelq (xwidget_view, internal_xwidget_view_list);
   Vxwidget_view_list = Fcopy_sequence (internal_xwidget_view_list);
-  unblock_input ();
+  unblock_interrupts ();
   return Qnil;
 }
 
@@ -3546,10 +3546,10 @@ with QUERY.  */)
     xfree (xw->find_text);
   xw->find_text = g_query;
 
-  block_input ();
+  block_interrupts ();
   controller = webkit_web_view_get_find_controller (webview);
   webkit_find_controller_search (controller, g_query, opt, G_MAXUINT);
-  unblock_input ();
+  unblock_interrupts ();
 #endif
 
   return Qnil;
@@ -3578,11 +3578,11 @@ using `xwidget-webkit-search'.  */)
     error ("Widget has no ongoing search operation");
 
 #ifdef USE_GTK
-  block_input ();
+  block_interrupts ();
   webview = WEBKIT_WEB_VIEW (xw->widget_osr);
   controller = webkit_web_view_get_find_controller (webview);
   webkit_find_controller_search_next (controller);
-  unblock_input ();
+  unblock_interrupts ();
 #endif
 
   return Qnil;
@@ -3611,11 +3611,11 @@ using `xwidget-webkit-search'.  */)
     error ("Widget has no ongoing search operation");
 
 #ifdef USE_GTK
-  block_input ();
+  block_interrupts ();
   webview = WEBKIT_WEB_VIEW (xw->widget_osr);
   controller = webkit_web_view_get_find_controller (webview);
   webkit_find_controller_search_previous (controller);
-  unblock_input ();
+  unblock_interrupts ();
 #endif
 
   return Qnil;
@@ -3644,7 +3644,7 @@ using `xwidget-webkit-search'.  */)
     error ("Widget has no ongoing search operation");
 
 #ifdef USE_GTK
-  block_input ();
+  block_interrupts ();
   webview = WEBKIT_WEB_VIEW (xw->widget_osr);
   controller = webkit_web_view_get_find_controller (webview);
   webkit_find_controller_search_finish (controller);
@@ -3654,7 +3654,7 @@ using `xwidget-webkit-search'.  */)
       xfree (xw->find_text);
       xw->find_text = NULL;
     }
-  unblock_input ();
+  unblock_interrupts ();
 #endif
 
   return Qnil;
@@ -3672,9 +3672,9 @@ removes it from `xwidget-list', and detaches it from its buffer.  */)
   CHECK_LIVE_XWIDGET (xwidget);
   xw = XXWIDGET (xwidget);
 
-  block_input ();
+  block_interrupts ();
   kill_xwidget (xw);
-  unblock_input ();
+  unblock_interrupts ();
 
   return Qnil;
 }
@@ -3710,9 +3710,9 @@ to "about:blank".  */)
   uri = SSDATA (base_uri);
   webview = WEBKIT_WEB_VIEW (xw->widget_osr);
 
-  block_input ();
+  block_interrupts ();
   webkit_web_view_load_html (webview, data, uri);
-  unblock_input ();
+  unblock_interrupts ();
 
   return Qnil;
 }
@@ -3825,10 +3825,10 @@ is to completely loading its page.  */)
   xw = XXWIDGET (xwidget);
   CHECK_WEBKIT_WIDGET (xw);
 
-  block_input ();
+  block_interrupts ();
   webview = WEBKIT_WEB_VIEW (xw->widget_osr);
   value = webkit_web_view_get_estimated_load_progress (webview);
-  unblock_input ();
+  unblock_interrupts ();
 
   return make_float (value);
 }
@@ -3854,14 +3854,14 @@ store cookies in FILE and load them from there.  */)
   CHECK_WEBKIT_WIDGET (xw);
   CHECK_STRING (file);
 
-  block_input ();
+  block_interrupts ();
   webview = WEBKIT_WEB_VIEW (xw->widget_osr);
   context = webkit_web_view_get_context (webview);
   manager = webkit_web_context_get_cookie_manager (context);
   webkit_cookie_manager_set_persistent_storage (manager,
 						SSDATA (ENCODE_UTF_8 (file)),
 						WEBKIT_COOKIE_PERSISTENT_STORAGE_TEXT);
-  unblock_input ();
+  unblock_interrupts ();
 #endif
 
   return Qnil;
@@ -3882,10 +3882,10 @@ XWIDGET as part of loading a page.  */)
   xw = XXWIDGET (xwidget);
   CHECK_WEBKIT_WIDGET (xw);
 
-  block_input ();
+  block_interrupts ();
   webview = WEBKIT_WEB_VIEW (xw->widget_osr);
   webkit_web_view_stop_loading (webview);
-  unblock_input ();
+  unblock_interrupts ();
 #endif
 
   return Qnil;

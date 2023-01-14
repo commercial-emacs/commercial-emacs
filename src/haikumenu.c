@@ -23,7 +23,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keyboard.h"
 #include "menu.h"
 #include "buffer.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 
 #include "haikuterm.h"
 #include "haiku_support.h"
@@ -212,7 +212,7 @@ haiku_dialog_show (struct frame *f, Lisp_Object title,
   if (STRING_MULTIBYTE (pane_name))
     pane_name = ENCODE_UTF_8 (pane_name);
 
-  block_input ();
+  block_interrupts ();
   alert = BAlert_new (SSDATA (pane_name), NILP (header) ? HAIKU_INFO_ALERT :
 		      HAIKU_IDEA_ALERT);
 
@@ -228,7 +228,7 @@ haiku_dialog_show (struct frame *f, Lisp_Object title,
 	{
 	  BAlert_delete (alert);
 	  *error_name = "Submenu in dialog items";
-	  unblock_input ();
+	  unblock_interrupts ();
 	  return Qnil;
 	}
 
@@ -245,7 +245,7 @@ haiku_dialog_show (struct frame *f, Lisp_Object title,
 	{
 	  BAlert_delete (alert);
 	  *error_name = "Too many dialog items";
-	  unblock_input ();
+	  unblock_interrupts ();
 	  return Qnil;
 	}
 
@@ -276,11 +276,11 @@ haiku_dialog_show (struct frame *f, Lisp_Object title,
      popup can be dismissed.  */
   if (!enabled_item_seen_p)
     BAlert_add_button (alert, "Ok");
-  unblock_input ();
+  unblock_interrupts ();
 
   unrequest_sigio ();
   ++popup_activated_p;
-  val = BAlert_go (alert, block_input, unblock_input,
+  val = BAlert_go (alert, block_interrupts, unblock_interrupts,
 		   process_pending_signals);
   --popup_activated_p;
   request_sigio ();
@@ -408,7 +408,7 @@ haiku_menu_show (struct frame *f, int x, int y, int menuflags,
       return Qnil;
     }
 
-  block_input ();
+  block_interrupts ();
   if (STRINGP (title) && STRING_MULTIBYTE (title))
     title = ENCODE_UTF_8 (title);
 
@@ -420,12 +420,12 @@ haiku_menu_show (struct frame *f, int x, int y, int menuflags,
     }
   digest_menu_items (menu, 0, menu_items_used, 0);
   BView_convert_to_screen (view, &x, &y);
-  unblock_input ();
+  unblock_interrupts ();
 
   unrequest_sigio ();
   popup_activated_p++;
   menu_item_selection = BMenu_run (menu, x, y,  haiku_menu_show_help,
-				   block_input, unblock_input,
+				   block_interrupts, unblock_interrupts,
 				   haiku_process_pending_signals_for_menu, NULL);
   popup_activated_p--;
   request_sigio ();
@@ -479,9 +479,9 @@ haiku_menu_show (struct frame *f, int x, int y, int menuflags,
 			if (!NILP (subprefix_stack[j]))
 			  entry = Fcons (subprefix_stack[j], entry);
 		    }
-		  block_input ();
+		  block_interrupts ();
 		  BPopUpMenu_delete (menu);
-		  unblock_input ();
+		  unblock_interrupts ();
 
 		  SAFE_FREE ();
 		  return entry;
@@ -492,14 +492,14 @@ haiku_menu_show (struct frame *f, int x, int y, int menuflags,
     }
   else if (!(menuflags & MENU_FOR_CLICK))
     {
-      block_input ();
+      block_interrupts ();
       BPopUpMenu_delete (menu);
-      unblock_input ();
+      unblock_interrupts ();
       quit ();
     }
-  block_input ();
+  block_interrupts ();
   BPopUpMenu_delete (menu);
-  unblock_input ();
+  unblock_interrupts ();
 
   SAFE_FREE ();
   return Qnil;
@@ -514,7 +514,7 @@ free_frame_menubar (struct frame *f)
   FRAME_MENU_BAR_HEIGHT (f) = 0;
   FRAME_EXTERNAL_MENU_BAR (f) = 0;
 
-  block_input ();
+  block_interrupts ();
   mbar = FRAME_HAIKU_MENU_BAR (f);
   FRAME_HAIKU_MENU_BAR (f) = NULL;
 
@@ -524,7 +524,7 @@ free_frame_menubar (struct frame *f)
   if (FRAME_OUTPUT_DATA (f)->menu_bar_open_p)
     --popup_activated_p;
   FRAME_OUTPUT_DATA (f)->menu_bar_open_p = 0;
-  unblock_input ();
+  unblock_interrupts ();
 
   adjust_frame_size (f, -1, -1, 2, false, Qmenu_bar_lines);
 }
@@ -547,7 +547,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
   if (!mbar)
     {
-      block_input ();
+      block_interrupts ();
       mbar = FRAME_HAIKU_MENU_BAR (f) = BMenuBar_new (view);
       first_time_p = 1;
 
@@ -556,7 +556,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
       if (FRAME_VISIBLE_P (f))
 	haiku_wait_for_event (f, MENU_BAR_RESIZE);
 
-      unblock_input ();
+      unblock_interrupts ();
     }
 
   Lisp_Object items;
@@ -578,7 +578,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
       items = FRAME_MENU_BAR_ITEMS (f);
       Lisp_Object string;
 
-      block_input ();
+      block_interrupts ();
       int count = BMenu_count_items (mbar);
 
       int i;
@@ -603,7 +603,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
       if (i / 4 < count)
 	BMenu_delete_from (mbar, i / 4, count - i / 4 + 1);
-      unblock_input ();
+      unblock_interrupts ();
 
       f->menu_bar_items_used = 0;
     }
@@ -705,7 +705,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
       /* Convert menu_items into widget_value trees
 	 to display the menu.  This cannot evaluate Lisp code.  */
 
-      block_input ();
+      block_interrupts ();
       count = BMenu_count_items (mbar);
       for (i = 0; submenu_start[i] >= 0; ++i)
 	{
@@ -720,7 +720,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
 	  menu_items_n_panes = submenu_n_panes[i];
 	  digest_menu_items (mn, submenu_start[i], submenu_end[i], 1);
 	}
-      unblock_input ();
+      unblock_interrupts ();
 
       /* The menu items are different, so store them in the frame.  */
       fset_menu_bar_vector (f, menu_items);
@@ -738,11 +738,11 @@ run_menu_bar_help_event (struct frame *f, int mb_idx)
 
   XSETFRAME (frame, f);
 
-  block_input ();
+  block_interrupts ();
   if (mb_idx < 0)
     {
       kbd_buffer_store_help_event (frame, Qnil);
-      unblock_input ();
+      unblock_interrupts ();
       return;
     }
 
@@ -753,7 +753,7 @@ run_menu_bar_help_event (struct frame *f, int mb_idx)
   help = AREF (vec, mb_idx + MENU_ITEMS_ITEM_HELP);
   if (STRINGP (help) || NILP (help))
     kbd_buffer_store_help_event (frame, help);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 DEFUN ("menu-or-popup-active-p", Fmenu_or_popup_active_p, Smenu_or_popup_active_p,
@@ -777,10 +777,10 @@ the position of the last non-menu event instead.  */)
 
   if (FRAME_EXTERNAL_MENU_BAR (f))
     {
-      block_input ();
+      block_interrupts ();
       set_frame_menubar (f, 1);
       rc = BMenuBar_start_tracking (FRAME_HAIKU_MENU_BAR (f));
-      unblock_input ();
+      unblock_interrupts ();
 
       if (!rc)
 	return Qnil;
@@ -807,12 +807,12 @@ haiku_activate_menubar (struct frame *f)
 
   if (FRAME_OUTPUT_DATA (f)->saved_menu_event)
     {
-      block_input ();
+      block_interrupts ();
       rc = be_replay_menu_bar_event (FRAME_HAIKU_MENU_BAR (f),
 				     FRAME_OUTPUT_DATA (f)->saved_menu_event);
       xfree (FRAME_OUTPUT_DATA (f)->saved_menu_event);
       FRAME_OUTPUT_DATA (f)->saved_menu_event = NULL;
-      unblock_input ();
+      unblock_interrupts ();
 
       if (!rc)
 	return;
@@ -822,9 +822,9 @@ haiku_activate_menubar (struct frame *f)
     }
   else
     {
-      block_input ();
+      block_interrupts ();
       rc = BMenuBar_start_tracking (FRAME_HAIKU_MENU_BAR (f));
-      unblock_input ();
+      unblock_interrupts ();
 
       if (!rc)
 	return;

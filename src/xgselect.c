@@ -26,7 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <glib.h>
 #include <errno.h>
 #include "lisp.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "systime.h"
 #include "process.h"
 
@@ -200,12 +200,12 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
     {
       int pselect_errno = errno;
       /* Prevent g_main_dispatch recursion, that would occur without
-         block_input wrapper, because event handlers call
-         unblock_input.  Event loop recursion was causing Bug#15801.  */
-      block_input ();
+         block_interrupts wrapper, because event handlers call
+         unblock_interrupts.  Event loop recursion was causing Bug#15801.  */
+      block_interrupts ();
       while (g_main_context_pending (context))
         g_main_context_dispatch (context);
-      unblock_input ();
+      unblock_interrupts ();
       errno = pselect_errno;
     }
 

@@ -34,7 +34,7 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 #include <c-strcase.h>
 
 #include "lisp.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "nsterm.h"
 #include "window.h"
 #include "character.h"
@@ -267,14 +267,14 @@ ns_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   NSColor *col;
 
-  /* Must block_input, because ns_lisp_to_color does block/unblock_input
-     which means that col may be deallocated in its unblock_input if there
-     is user input, unless we also block_input.  */
-  block_input ();
+  /* Must block_interrupts, because ns_lisp_to_color does block/unblock_interrupts
+     which means that col may be deallocated in its unblock_interrupts if there
+     is user input, unless we also block_interrupts.  */
+  block_interrupts ();
   if (ns_lisp_to_color (arg, &col))
     {
       store_frame_param (f, Qforeground_color, oldval);
-      unblock_input ();
+      unblock_interrupts ();
       error ("Unknown color");
     }
 
@@ -291,7 +291,7 @@ ns_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       if (FRAME_VISIBLE_P (f))
         SET_FRAME_GARBAGED (f);
     }
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -303,11 +303,11 @@ ns_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   NSView *view = FRAME_NS_VIEW (f);
   EmacsCGFloat alpha;
 
-  block_input ();
+  block_interrupts ();
   if (ns_lisp_to_color (arg, &col))
     {
       store_frame_param (f, Qbackground_color, oldval);
-      unblock_input ();
+      unblock_interrupts ();
       error ("Unknown color");
     }
 
@@ -343,7 +343,7 @@ ns_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
           ns_clear_frame (f);
         }
     }
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -352,11 +352,11 @@ ns_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   NSColor *col;
 
-  block_input ();
+  block_interrupts ();
   if (ns_lisp_to_color (arg, &col))
     {
       store_frame_param (f, Qcursor_color, oldval);
-      unblock_input ();
+      unblock_interrupts ();
       error ("Unknown color");
     }
 
@@ -369,7 +369,7 @@ ns_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       gui_update_cursor (f, 1);
     }
   update_face_from_frame_parameter (f, Qcursor_color, arg);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -487,7 +487,7 @@ ns_set_represented_filename (struct frame *f)
   if (f->explicit_name || ! NILP (f->title))
     return;
 
-  block_input ();
+  block_interrupts ();
   pool = [[NSAutoreleasePool alloc] init];
   filename = BVAR (XBUFFER (buf), filename);
 
@@ -520,7 +520,7 @@ ns_set_represented_filename (struct frame *f)
   [[view window] setRepresentedFilename: fstr];
 
   [pool release];
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -578,7 +578,7 @@ ns_set_doc_edited (void)
 {
   NSAutoreleasePool *pool;
   Lisp_Object tail, frame;
-  block_input ();
+  block_interrupts ();
   pool = [[NSAutoreleasePool alloc] init];
   FOR_EACH_FRAME (tail, frame)
     {
@@ -597,7 +597,7 @@ ns_set_doc_edited (void)
     }
 
   [pool release];
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -812,7 +812,7 @@ ns_implicitly_set_icon_type (struct frame *f)
 
   NSTRACE ("ns_implicitly_set_icon_type");
 
-  block_input ();
+  block_interrupts ();
   pool = [[NSAutoreleasePool alloc] init];
   workspace = [NSWorkspace sharedWorkspace];
   if (f->output_data.ns->miniimage
@@ -820,7 +820,7 @@ ns_implicitly_set_icon_type (struct frame *f)
                isEqualToString: [(NSImage *)f->output_data.ns->miniimage name]])
     {
       [pool release];
-      unblock_input ();
+      unblock_interrupts ();
       return;
     }
 
@@ -828,7 +828,7 @@ ns_implicitly_set_icon_type (struct frame *f)
   if (CONSP (tem) && ! NILP (XCDR (tem)))
     {
       [pool release];
-      unblock_input ();
+      unblock_interrupts ();
       return;
     }
 
@@ -881,7 +881,7 @@ ns_implicitly_set_icon_type (struct frame *f)
   f->output_data.ns->miniimage = image;
   [view setMiniwindowImage: setMini];
   [pool release];
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -1286,7 +1286,7 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
       specbind (Qx_resource_name, name);
     }
 
-  block_input ();
+  block_interrupts ();
 
 #ifdef NS_IMPL_COCOA
     mac_register_font_driver (f);
@@ -1322,7 +1322,7 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
                            "font", "Font", RES_TYPE_STRING);
 #endif
   }
-  unblock_input ();
+  unblock_interrupts ();
 
   gui_default_parameter (f, parms, Qborder_width, make_fixnum (0),
                          "borderwidth", "BorderWidth", RES_TYPE_NUMBER);
@@ -1788,7 +1788,7 @@ Optional arg DIR-ONLY-P, if non-nil, means choose only directories.  */)
       [panel setCanChooseFiles: YES];
     }
 
-  block_input ();
+  block_interrupts ();
   ns_fd_data.panel = panel;
   ns_fd_data.ret = NO;
 #ifdef NS_IMPL_COCOA
@@ -1852,7 +1852,7 @@ Optional arg DIR-ONLY-P, if non-nil, means choose only directories.  */)
     }
 
   [[FRAME_NS_VIEW (SELECTED_FRAME ()) window] makeKeyWindow];
-  unblock_input ();
+  unblock_interrupts ();
 
   return fname;
 }
@@ -2202,7 +2202,7 @@ The optional argument FRAME is currently ignored.  */)
         error ("non-Nextstep frame used in `ns-list-colors'");
     }
 
-  block_input ();
+  block_interrupts ();
   /* This can be called during dumping, so we need to set up a
      temporary autorelease pool.  */
   pool = [[NSAutoreleasePool alloc] init];
@@ -2219,7 +2219,7 @@ The optional argument FRAME is currently ignored.  */)
         }
     }
   [pool release];
-  unblock_input ();
+  unblock_interrupts ();
 
   return list;
 }
@@ -2363,7 +2363,7 @@ In case the execution fails, an error is signaled.  */)
   CHECK_STRING (script);
   check_window_system (NULL);
 
-  block_input ();
+  block_interrupts ();
 
   as_script = script;
   as_result = &result;
@@ -2394,7 +2394,7 @@ In case the execution fails, an error is signaled.  */)
   status = as_status;
   as_status = 0;
   as_result = 0;
-  unblock_input ();
+  unblock_interrupts ();
   if (status == 0)
     return result;
   else if (!STRINGP (result))
@@ -2526,16 +2526,16 @@ DEFUN ("xw-color-values", Fxw_color_values, Sxw_color_values, 1, 2, 0,
   check_window_system (NULL);
   CHECK_STRING (color);
 
-  block_input ();
+  block_interrupts ();
   if (ns_lisp_to_color (color, &col))
     {
-      unblock_input ();
+      unblock_interrupts ();
       return Qnil;
     }
 
   [[col colorUsingDefaultColorSpace]
         getRed: &red green: &green blue: &blue alpha: &alpha];
-  unblock_input ();
+  unblock_interrupts ();
   return list3i (lrint (red * 65535), lrint (green * 65535),
 		 lrint (blue * 65535));
 }
@@ -2983,13 +2983,13 @@ ns_create_tip_frame (struct ns_display_info *dpyinfo, Lisp_Object parms)
   FRAME_FONTSET (f) = -1;
   FRAME_DISPLAY_INFO (f) = dpyinfo;
 
-  block_input ();
+  block_interrupts ();
 #ifdef NS_IMPL_COCOA
   mac_register_font_driver (f);
 #else
   register_font_driver (&nsfont_driver, f);
 #endif
-  unblock_input ();
+  unblock_interrupts ();
 
   image_cache_refcount =
     FRAME_IMAGE_CACHE (f) ? FRAME_IMAGE_CACHE (f)->refcount : 0;
@@ -3073,10 +3073,10 @@ ns_create_tip_frame (struct ns_display_info *dpyinfo, Lisp_Object parms)
 
   gui_figure_window_size (f, parms, false, false);
 
-  block_input ();
+  block_interrupts ();
   [[EmacsView alloc] initFrameFromEmacs: f];
   ns_icon (f, parms);
-  unblock_input ();
+  unblock_interrupts ();
 
   gui_default_parameter (f, parms, Qauto_raise, Qnil,
                          "autoRaise", "AutoRaiseLower", RES_TYPE_BOOLEAN);
@@ -3270,7 +3270,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
       NSColor *color;
       Lisp_Object t;
 
-      block_input ();
+      block_interrupts ();
       if (ns_tooltip == nil)
 	ns_tooltip = [[EmacsTooltip alloc] init];
       else
@@ -3295,7 +3295,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 		      &root_x, &root_y);
 
       [ns_tooltip showAtX: root_x Y: root_y for: XFIXNUM (timeout)];
-      unblock_input ();
+      unblock_interrupts ();
     }
   else
     {
@@ -3315,7 +3315,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 
 	      nswindow = [FRAME_NS_VIEW (tip_f) window];
 
-	      block_input ();
+	      block_interrupts ();
 	      compute_tip_xy (tip_f, parms, dx, dy, FRAME_PIXEL_WIDTH (tip_f),
 			      FRAME_PIXEL_HEIGHT (tip_f), &root_x, &root_y);
 	      [nswindow setFrame: NSMakeRect (root_x, root_y,
@@ -3327,7 +3327,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 	      [nswindow display];
 
 	      SET_FRAME_VISIBLE (tip_f, 1);
-	      unblock_input ();
+	      unblock_interrupts ();
 
 	      goto start_timer;
 	    }
@@ -3499,7 +3499,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
       compute_tip_xy (tip_f, parms, dx, dy, width,
 		      height, &root_x, &root_y);
 
-      block_input ();
+      block_interrupts ();
       nswindow = [FRAME_NS_VIEW (tip_f) window];
       [nswindow setFrame: NSMakeRect (root_x, root_y,
 				      width, height)
@@ -3511,7 +3511,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
       SET_FRAME_VISIBLE (tip_f, YES);
       FRAME_PIXEL_WIDTH (tip_f) = width;
       FRAME_PIXEL_HEIGHT (tip_f) = height;
-      unblock_input ();
+      unblock_interrupts ();
 
       w->must_be_updated_p = true;
       update_single_window (w);

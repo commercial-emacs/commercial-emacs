@@ -36,7 +36,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "commands.h"
 #include "disptab.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "syssignal.h"
 #include "systime.h"
 #include "tparam.h"
@@ -1835,7 +1835,7 @@ adjust_frame_glyphs (struct frame *f)
 {
   /* Block input so that expose events and other events that access
      glyph matrices are not processed while we are changing them.  */
-  block_input ();
+  block_interrupts ();
 
   if (FRAME_WINDOW_P (f))
     adjust_frame_glyphs_for_window_redisplay (f);
@@ -1858,7 +1858,7 @@ adjust_frame_glyphs (struct frame *f)
 
   f->glyphs_initialized_p = true;
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 /* Return true if any window in the tree has nonzero window margins.  See
@@ -2289,7 +2289,7 @@ free_glyphs (struct frame *f)
     {
       /* Block interrupt input so that we don't get surprised by an X
          event while we're in an inconsistent state.  */
-      block_input ();
+      block_interrupts ();
       f->glyphs_initialized_p = false;
 
       /* Release window sub-matrices.  */
@@ -2350,7 +2350,7 @@ free_glyphs (struct frame *f)
 	  f->desired_pool = f->current_pool = NULL;
 	}
 
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -3832,7 +3832,7 @@ gui_update_window_begin (struct window *w)
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
 
-  block_input ();
+  block_interrupts ();
 
   if (FRAME_RIF (f)->update_window_begin_hook)
     FRAME_RIF (f)->update_window_begin_hook (w);
@@ -3850,7 +3850,7 @@ gui_update_window_begin (struct window *w)
 	hlinfo->mouse_face_window = Qnil;
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 /* End update of window W.
@@ -3870,7 +3870,7 @@ gui_update_window_end (struct window *w, bool cursor_on_p,
   /* Pseudo windows don't have cursors, so don't display them here.  */
   if (!w->pseudo_window_p)
     {
-      block_input ();
+      block_interrupts ();
 
       if (cursor_on_p)
 	display_and_set_cursor (w, true,
@@ -3887,7 +3887,7 @@ gui_update_window_end (struct window *w, bool cursor_on_p,
 	  else
 	    gui_draw_vertical_border (w);
 	}
-      unblock_input ();
+      unblock_interrupts ();
     }
 
   /* If a row with mouse-face was overwritten, arrange for
@@ -5810,10 +5810,10 @@ FILE = nil means just close any termscript file currently open.  */)
 
   if (tty->termscript != 0)
     {
-      block_input ();
+      block_interrupts ();
       fclose (tty->termscript);
       tty->termscript = 0;
-      unblock_input ();
+      unblock_interrupts ();
     }
 
   if (! NILP (file))
@@ -5843,7 +5843,7 @@ when TERMINAL is nil.  */)
 
   /* ??? Perhaps we should do something special for multibyte strings here.  */
   CHECK_STRING (string);
-  block_input ();
+  block_interrupts ();
 
   if (t->type == output_initial)
     out = stdout;
@@ -5869,7 +5869,7 @@ when TERMINAL is nil.  */)
   fwrite (SDATA (string), 1, SBYTES (string), out);
   fflush (out);
   request_sigio ();
-  unblock_input ();
+  unblock_interrupts ();
   return Qnil;
 }
 

@@ -27,7 +27,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <stddef.h>
 
 #include "lisp.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include <unistd.h>
 
 #include "getpagesize.h"
@@ -1175,9 +1175,9 @@ r_alloc_init (void)
 #endif
 
 #ifdef DOUG_LEA_MALLOC
-  block_input ();
+  block_interrupts ();
   mallopt (M_TOP_PAD, 64 * 4096);
-  unblock_input ();
+  unblock_interrupts ();
 #else
 #if !defined SYSTEM_MALLOC && !defined HYBRID_MALLOC
   /* Give GNU malloc's morecore some hysteresis so that we move all

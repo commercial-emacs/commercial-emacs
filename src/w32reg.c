@@ -21,7 +21,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 #include "lisp.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "w32term.h"
 
 #include <stdio.h>
@@ -87,7 +87,7 @@ w32_get_string_resource_1 (const char *name, const char *class, DWORD dwexptype)
 
  trykey:
 
-  block_input ();
+  block_interrupts ();
 
   /* Check both the current user and the local machine to see if we have
      any resources */
@@ -118,7 +118,7 @@ w32_get_string_resource_1 (const char *name, const char *class, DWORD dwexptype)
       RegCloseKey (hrootkey);
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   if (!ok)
     {

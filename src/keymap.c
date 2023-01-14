@@ -49,7 +49,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "keyboard.h"
 #include "termhooks.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "puresize.h"
 #include "intervals.h"
 #include "keymap.h"
@@ -1589,7 +1589,7 @@ current_minor_maps (Lisp_Object **modeptr, Lisp_Object **mapptr)
 
 		/* Use malloc here.  See the comment above this function.
 		   Avoid realloc here; it causes spurious traps on GNU/Linux [KFS] */
-		block_input ();
+		block_interrupts ();
 		newmodes = malloc (allocsize);
 		if (newmodes)
 		  {
@@ -1613,7 +1613,7 @@ current_minor_maps (Lisp_Object **modeptr, Lisp_Object **mapptr)
 		      }
 		    cmm_maps = newmaps;
 		  }
-		unblock_input ();
+		unblock_interrupts ();
 
 		if (newmodes == NULL || newmaps == NULL)
 		  break;

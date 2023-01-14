@@ -31,7 +31,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #else
 #include "pgtkterm.h"
 #endif
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "charset.h"
 #include "composite.h"
 #include "font.h"
@@ -151,7 +151,7 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   if (size == 0)
     size = pixel_size;
 
-  block_input ();
+  block_interrupts ();
 
   pat = ftfont_entity_pattern (entity, pixel_size);
   FcConfigSubstitute (NULL, pat, FcMatchPattern);
@@ -164,7 +164,7 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   if (!font_face
       || cairo_font_face_status (font_face) != CAIRO_STATUS_SUCCESS)
     {
-      unblock_input ();
+      unblock_interrupts ();
       FcPatternDestroy (match);
       return Qnil;
     }
@@ -185,7 +185,7 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
     = cairo_scaled_font_create (font_face, &font_matrix, &ctm, options);
   cairo_font_face_destroy (font_face);
   cairo_font_options_destroy (options);
-  unblock_input ();
+  unblock_interrupts ();
   if (!scaled_font
       || cairo_scaled_font_status (scaled_font) != CAIRO_STATUS_SUCCESS)
     {
@@ -229,7 +229,7 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   ftcrfont_info->metrics = NULL;
   ftcrfont_info->metrics_nrows = 0;
 
-  block_input ();
+  block_interrupts ();
   cairo_glyph_t stack_glyph;
   font->min_width = font->max_width = 0;
   font->average_width = font->space_width = 0;
@@ -310,7 +310,7 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 					   / ft_face->size->metrics.height);
   cairo_ft_scaled_font_unlock_face (scaled_font);
   ftcrfont_info->ft_size = NULL;
-  unblock_input ();
+  unblock_interrupts ();
 
   font->baseline_offset = 0;
   font->relative_compose = 0;
@@ -329,7 +329,7 @@ ftcrfont_close (struct font *font)
 
   struct font_info *ftcrfont_info = (struct font_info *) font;
 
-  block_input ();
+  block_interrupts ();
 #ifdef HAVE_LIBOTF
   if (ftcrfont_info->otf)
     {
@@ -350,7 +350,7 @@ ftcrfont_close (struct font *font)
   if (ftcrfont_info->metrics)
     xfree (ftcrfont_info->metrics);
   cairo_scaled_font_destroy (ftcrfont_info->cr_scaled_font);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static int
@@ -407,7 +407,7 @@ ftcrfont_text_extents (struct font *font,
 {
   int width, i;
 
-  block_input ();
+  block_interrupts ();
   width = ftcrfont_glyph_extents (font, code[0], metrics);
   for (i = 1; i < nglyphs; i++)
     {
@@ -427,7 +427,7 @@ ftcrfont_text_extents (struct font *font,
 	}
       width += w;
     }
-  unblock_input ();
+  unblock_interrupts ();
 
   if (metrics)
     metrics->width = width;
@@ -552,7 +552,7 @@ ftcrfont_draw (struct glyph_string *s,
 				   &be_background);
 #endif
 
-  block_input ();
+  block_interrupts ();
 
 #ifndef USE_BE_CAIRO
 #ifdef HAVE_X_WINDOWS
@@ -568,7 +568,7 @@ ftcrfont_draw (struct glyph_string *s,
   if (!cr)
     {
       EmacsWindow_end_cr_critical_section (FRAME_HAIKU_WINDOW (f));
-      unblock_input ();
+      unblock_interrupts ();
       return 0;
     }
   BView_cr_dump_clipping (FRAME_HAIKU_DRAWABLE (f), cr);
@@ -631,7 +631,7 @@ ftcrfont_draw (struct glyph_string *s,
   haiku_end_cr_clip (cr);
   EmacsWindow_end_cr_critical_section (FRAME_HAIKU_WINDOW (f));
 #endif
-  unblock_input ();
+  unblock_interrupts ();
 
   return len;
 }

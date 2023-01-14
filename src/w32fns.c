@@ -40,7 +40,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "buffer.h"
 #include "keyboard.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "coding.h"
 
 #include "w32common.h"
@@ -505,7 +505,7 @@ if the entry is new.  */)
 
   XSETINT (rgb, RGB (XUFIXNUM (red), XUFIXNUM (green), XUFIXNUM (blue)));
 
-  block_input ();
+  block_interrupts ();
 
   /* replace existing entry in w32-color-map or add new entry. */
   entry = Fassoc (name, Vw32_color_map, Qnil);
@@ -520,7 +520,7 @@ if the entry is new.  */)
       Fsetcdr (entry, rgb);
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   return (oldrgb);
 }
@@ -783,7 +783,7 @@ w32_default_color_map (void)
   colormap_t *pc = w32_color_map;
   Lisp_Object cmap;
 
-  block_input ();
+  block_interrupts ();
 
   cmap = Qnil;
 
@@ -792,7 +792,7 @@ w32_default_color_map (void)
 			 make_fixnum (pc->colorref)),
 		  cmap);
 
-  unblock_input ();
+  unblock_interrupts ();
 
   return (cmap);
 }
@@ -802,7 +802,7 @@ w32_color_map_lookup (const char *colorname)
 {
   Lisp_Object tail, ret = Qnil;
 
-  block_input ();
+  block_interrupts ();
 
   for (tail = Vw32_color_map; CONSP (tail); tail = XCDR (tail))
     {
@@ -822,7 +822,7 @@ w32_color_map_lookup (const char *colorname)
       maybe_quit ();
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   return ret;
 }
@@ -834,7 +834,7 @@ add_system_logical_colors_to_map (Lisp_Object *system_colors)
   HKEY colors_key;
 
   /* Other registry operations are done with input blocked.  */
-  block_input ();
+  block_interrupts ();
 
   /* Look for "Control Panel/Colors" under User and Machine registry
      settings.  */
@@ -872,7 +872,7 @@ add_system_logical_colors_to_map (Lisp_Object *system_colors)
       RegCloseKey (colors_key);
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -881,12 +881,12 @@ x_to_w32_color (const char * colorname)
 {
   register Lisp_Object ret = Qnil;
 
-  block_input ();
+  block_interrupts ();
 
   unsigned short r, g, b;
   if (parse_color_spec (colorname, &r, &g, &b))
     {
-      unblock_input ();
+      unblock_interrupts ();
       /* Throw away the low 8 bits and return 0xBBGGRR.  */
       return make_fixnum ((b & 0xff00) << 8 | (g & 0xff00) | r >> 8);
     }
@@ -917,7 +917,7 @@ x_to_w32_color (const char * colorname)
 	}
     }
 
-  unblock_input ();
+  unblock_interrupts ();
   return ret;
 }
 
@@ -1223,7 +1223,7 @@ w32_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     f->output_data.w32->mouse_pixel = FRAME_FOREGROUND_PIXEL (f);
 
 #if 0 /* TODO : Mouse cursor customization.  */
-  block_input ();
+  block_interrupts ();
 
   /* It's not okay to crash if the user selects a screwy cursor.  */
   count = x_catch_errors (FRAME_W32_DISPLAY (f));
@@ -1357,7 +1357,7 @@ w32_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   f->output_data.w32->hand_cursor = hand_cursor;
 
   XFlush (FRAME_W32_DISPLAY (f));
-  unblock_input ();
+  unblock_interrupts ();
 
   update_face_from_frame_parameter (f, Qmouse_color, arg);
 #endif /* TODO */
@@ -1389,12 +1389,12 @@ w32_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 
   if (FRAME_W32_WINDOW (f) != 0)
     {
-      block_input ();
+      block_interrupts ();
       /* Update frame's cursor_gc.  */
       f->output_data.w32->cursor_gc->foreground = fore_pixel;
       f->output_data.w32->cursor_gc->background = pixel;
 
-      unblock_input ();
+      unblock_interrupts ();
 
       if (FRAME_VISIBLE_P (f))
 	{
@@ -1462,16 +1462,16 @@ w32_set_icon_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   if (SYMBOLP (arg) && SYMBOLP (oldval) && EQ (arg, oldval))
     return;
 
-  block_input ();
+  block_interrupts ();
 
   result = FRAME_TERMINAL (f)->set_bitmap_icon_hook (f, arg);
   if (result)
     {
-      unblock_input ();
+      unblock_interrupts ();
       error ("No icon window available");
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static void
@@ -1491,7 +1491,7 @@ w32_set_icon_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   if (f->output_data.w32->icon_bitmap != 0)
     return;
 
-  block_input ();
+  block_interrupts ();
 
   result = x_text_icon (f,
 			SSDATA ((!NILP (f->icon_name)
@@ -1502,7 +1502,7 @@ w32_set_icon_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 
   if (result)
     {
-      unblock_input ();
+      unblock_interrupts ();
       error ("No icon window available");
     }
 
@@ -1517,7 +1517,7 @@ w32_set_icon_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     }
 
   XFlush (FRAME_W32_DISPLAY (f));
-  unblock_input ();
+  unblock_interrupts ();
 #endif
 }
 
@@ -1547,7 +1547,7 @@ w32_clear_under_internal_border (struct frame *f)
 	    : INTERNAL_BORDER_FACE_ID));
       struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
 
-      block_input ();
+      block_interrupts ();
       HDC hdc = get_frame_dc (f);
       if (face)
 	{
@@ -1567,7 +1567,7 @@ w32_clear_under_internal_border (struct frame *f)
 	  w32_clear_area (f, hdc, 0, height - border, width, border);
 	}
       release_frame_dc (f, hdc);
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -1818,7 +1818,7 @@ w32_set_inhibit_double_buffering (struct frame *f,
 				  /* This parameter is unused.  */
 				  Lisp_Object old_value)
 {
-  block_input ();
+  block_interrupts ();
 
   if (NILP (new_value))
     FRAME_OUTPUT_DATA (f)->want_paint_buffer = 1;
@@ -1830,7 +1830,7 @@ w32_set_inhibit_double_buffering (struct frame *f,
       SET_FRAME_GARBAGED (f);
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 /* Set the pixel height of the tool bar of frame F to HEIGHT.  */
@@ -1890,7 +1890,7 @@ w32_set_title_bar_text (struct frame *f, Lisp_Object name)
 {
   if (FRAME_W32_WINDOW (f))
     {
-      block_input ();
+      block_interrupts ();
 #ifdef __CYGWIN__
       GUI_FN (SetWindowText) (FRAME_W32_WINDOW (f),
 			      GUI_SDATA (GUI_ENCODE_SYSTEM (name)));
@@ -1926,7 +1926,7 @@ w32_set_title_bar_text (struct frame *f, Lisp_Object name)
       else
 	SetWindowTextA (FRAME_W32_WINDOW (f), SSDATA (ENCODE_SYSTEM (name)));
 #endif
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -2063,7 +2063,7 @@ w32_set_undecorated (struct frame *f, Lisp_Object new_value, Lisp_Object old_val
   DWORD dwStyle = GetWindowLong (hwnd, GWL_STYLE);
   Lisp_Object border_width = Fcdr (Fassq (Qborder_width, f->param_alist));
 
-  block_input ();
+  block_interrupts ();
   if (!NILP (new_value) && !FRAME_UNDECORATED (f))
     {
       dwStyle = ((dwStyle & ~WS_THICKFRAME & ~WS_CAPTION)
@@ -2087,7 +2087,7 @@ w32_set_undecorated (struct frame *f, Lisp_Object new_value, Lisp_Object old_val
 
   f->output_data.w32->dwStyle = GetWindowLong (hwnd, GWL_STYLE);
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 /**
@@ -2138,9 +2138,9 @@ w32_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_va
       HWND hwnd_parent = p ? FRAME_W32_WINDOW (p) : NULL;
       HWND hwnd_value;
 
-      block_input ();
+      block_interrupts ();
       hwnd_value = SetParent (hwnd, hwnd_parent);
-      unblock_input ();
+      unblock_interrupts ();
 
       if (hwnd_value)
 	fset_parent_frame (f, new_value);
@@ -2171,7 +2171,7 @@ w32_set_skip_taskbar (struct frame *f, Lisp_Object new_value, Lisp_Object old_va
       HWND hwnd = FRAME_W32_WINDOW (f);
       DWORD exStyle = GetWindowLong (hwnd, GWL_EXSTYLE);
 
-      block_input ();
+      block_interrupts ();
       /* Temporarily hide the window while changing its WS_EX_NOACTIVATE
 	 setting.  */
       ShowWindow (hwnd, SW_HIDE);
@@ -2180,7 +2180,7 @@ w32_set_skip_taskbar (struct frame *f, Lisp_Object new_value, Lisp_Object old_va
       else
 	SetWindowLong (hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_NOACTIVATE);
       ShowWindow (hwnd, SW_SHOWNOACTIVATE);
-      unblock_input ();
+      unblock_interrupts ();
 
       FRAME_SKIP_TASKBAR (f) = !NILP (new_value);
     }
@@ -2248,29 +2248,29 @@ w32_set_z_group (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 
   if (NILP (new_value))
     {
-      block_input ();
+      block_interrupts ();
       SetWindowPos (hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
 		    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
 		    | SWP_NOOWNERZORDER);
-      unblock_input ();
+      unblock_interrupts ();
       FRAME_Z_GROUP (f) = z_group_none;
     }
   else if (EQ (new_value, Qabove))
     {
-      block_input ();
+      block_interrupts ();
       SetWindowPos (hwnd, HWND_TOPMOST, 0, 0, 0, 0,
 		    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
 		    | SWP_NOOWNERZORDER);
-      unblock_input ();
+      unblock_interrupts ();
       FRAME_Z_GROUP (f) = z_group_above;
     }
   else if (EQ (new_value, Qabove_suspended))
     {
-      block_input ();
+      block_interrupts ();
       SetWindowPos (hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
 		    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
 		    | SWP_NOOWNERZORDER);
-      unblock_input ();
+      unblock_interrupts ();
       FRAME_Z_GROUP (f) = z_group_above_suspended;
     }
   else if (EQ (new_value, Qbelow))
@@ -5616,7 +5616,7 @@ my_create_tip_window (struct frame *f)
 static void
 w32_window (struct frame *f, long window_prompting, bool minibuffer_only)
 {
-  block_input ();
+  block_interrupts ();
 
   /* Use the resource name as the top-level window name
      for looking up resources.  Make a non-Lisp copy
@@ -5643,7 +5643,7 @@ w32_window (struct frame *f, long window_prompting, bool minibuffer_only)
     w32_set_name (f, name, explicit);
   }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   if (!minibuffer_only && FRAME_EXTERNAL_MENU_BAR (f)
       && !FRAME_PARENT_FRAME (f))
@@ -5677,11 +5677,11 @@ w32_icon (struct frame *f, Lisp_Object parms)
   else if (!EQ (icon_x, Qunbound) || !EQ (icon_y, Qunbound))
     error ("Both left and top icon corners of icon must be specified");
 
-  block_input ();
+  block_interrupts ();
 
   /* TODO: Start up iconic or window? */
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -5690,7 +5690,7 @@ w32_make_gc (struct frame *f)
 {
   Emacs_GC gc_values;
 
-  block_input ();
+  block_interrupts ();
 
   /* Create the GC's of this frame.
      Note that many default values are used.  */
@@ -5707,7 +5707,7 @@ w32_make_gc (struct frame *f)
   f->output_data.w32->white_relief.gc = 0;
   f->output_data.w32->black_relief.gc = 0;
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -6189,9 +6189,9 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
   /* Tell the server what size and position, etc, we want, and how
      badly we want them.  This should be done after we have the menu
      bar so that its size can be taken into account.  */
-  block_input ();
+  block_interrupts ();
   w32_wm_set_size_hint (f, window_prompting, false);
-  unblock_input ();
+  unblock_interrupts ();
 
   adjust_frame_size (f, FRAME_TEXT_WIDTH (f), FRAME_TEXT_HEIGHT (f),
 		     0, true, Qx_create_frame_2);
@@ -6643,11 +6643,11 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
   struct w32_display_info *dpyinfo = check_x_display_info (display);
   Lisp_Object attributes_list;
 
-  block_input ();
+  block_interrupts ();
   attributes_list = w32_display_monitor_attributes_list ();
   if (NILP (attributes_list))
     attributes_list = w32_display_monitor_attributes_list_fallback (dpyinfo);
-  unblock_input ();
+  unblock_interrupts ();
 
   return attributes_list;
 }
@@ -6800,11 +6800,11 @@ DEFUN ("x-close-connection", Fx_close_connection,
   if (dpyinfo->reference_count > 0)
     error ("Display still has frames on it");
 
-  block_input ();
+  block_interrupts ();
   image_destroy_all_bitmaps (dpyinfo);
 
   w32_delete_display (dpyinfo);
-  unblock_input ();
+  unblock_interrupts ();
 
   return Qnil;
 }
@@ -6849,7 +6849,7 @@ DEFUN ("x-change-window-property", Fx_change_window_property,
   CHECK_STRING (prop);
   CHECK_STRING (value);
 
-  block_input ();
+  block_interrupts ();
   prop_atom = XInternAtom (FRAME_W32_DISPLAY (f), SDATA (prop), False);
   XChangeProperty (FRAME_W32_DISPLAY (f), FRAME_W32_WINDOW (f),
 		   prop_atom, XA_STRING, 8, PropModeReplace,
@@ -6857,7 +6857,7 @@ DEFUN ("x-change-window-property", Fx_change_window_property,
 
   /* Make sure the property is set when we return.  */
   XFlush (FRAME_W32_DISPLAY (f));
-  unblock_input ();
+  unblock_interrupts ();
 
   return value;
 }
@@ -6872,13 +6872,13 @@ DEFUN ("x-delete-window-property", Fx_delete_window_property,
   Atom prop_atom;
 
   CHECK_STRING (prop);
-  block_input ();
+  block_interrupts ();
   prop_atom = XInternAtom (FRAME_W32_DISPLAY (f), SDATA (prop), False);
   XDeleteProperty (FRAME_W32_DISPLAY (f), FRAME_W32_WINDOW (f), prop_atom);
 
   /* Make sure the property is removed when we return.  */
   XFlush (FRAME_W32_DISPLAY (f));
-  unblock_input ();
+  unblock_interrupts ();
 
   return prop;
 }
@@ -6900,7 +6900,7 @@ DEFUN ("x-window-property", Fx_window_property, Sx_window_property,
   unsigned long actual_size, bytes_remaining;
 
   CHECK_STRING (prop);
-  block_input ();
+  block_interrupts ();
   prop_atom = XInternAtom (FRAME_W32_DISPLAY (f), SDATA (prop), False);
   rc = XGetWindowProperty (FRAME_W32_DISPLAY (f), FRAME_W32_WINDOW (f),
 			   prop_atom, 0, 0, False, XA_STRING,
@@ -6925,7 +6925,7 @@ DEFUN ("x-window-property", Fx_window_property, Sx_window_property,
       XFree (tmp_data);
     }
 
-  unblock_input ();
+  unblock_interrupts ();
 
   return prop_value;
 
@@ -7123,9 +7123,9 @@ w32_create_tip_frame (struct w32_display_info *dpyinfo, Lisp_Object parms)
   f->right_divider_width = 0;
   f->bottom_divider_width = 0;
 
-  block_input ();
+  block_interrupts ();
   my_create_tip_window (f);
-  unblock_input ();
+  unblock_interrupts ();
 
   w32_make_gc (f);
 
@@ -7232,11 +7232,11 @@ compute_tip_xy (struct frame *f,
       max_x = w32_display_pixel_width (FRAME_DISPLAY_INFO (f));
       max_y = w32_display_pixel_height (FRAME_DISPLAY_INFO (f));
 
-      block_input ();
+      block_interrupts ();
       GetCursorPos (&pt);
       *root_x = pt.x;
       *root_y = pt.y;
-      unblock_input ();
+      unblock_interrupts ();
 
       /* If multiple monitor support is available, constrain the tip onto
 	 the current monitor. This improves the above by allowing negative
@@ -7406,7 +7406,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 	      call1 (Qcancel_timer, timer);
 	    }
 
-	  block_input ();
+	  block_interrupts ();
 	  compute_tip_xy (tip_f, parms, dx, dy, FRAME_PIXEL_WIDTH (tip_f),
 			  FRAME_PIXEL_HEIGHT (tip_f), &root_x, &root_y);
 
@@ -7424,7 +7424,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 	  /* Let redisplay know that we have made the frame visible already.  */
 	  SET_FRAME_VISIBLE (tip_f, 1);
 	  ShowWindow (FRAME_W32_WINDOW (tip_f), SW_SHOWNOACTIVATE);
-	  unblock_input ();
+	  unblock_interrupts ();
 
 	  goto start_timer;
 	}
@@ -7490,7 +7490,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 
   /* Block input until the tip has been fully drawn, to avoid crashes
      when drawing tips in menus.  */
-  block_input ();
+  block_interrupts ();
 
   if (!FRAMEP (tip_frame) || !FRAME_LIVE_P (XFRAME (tip_frame)))
     {
@@ -7514,7 +7514,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
       if (NILP (tip_frame = w32_create_tip_frame (FRAME_DISPLAY_INFO (f), parms)))
 	{
 	  /* Creating the tip frame failed.  */
-	  unblock_input ();
+	  unblock_interrupts ();
 	  return unbind_to (count, Qnil);
 	}
     }
@@ -7634,7 +7634,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   update_single_window (w);
   set_buffer_internal (old_buffer);
   unbind_to (count_1, Qnil);
-  unblock_input ();
+  unblock_interrupts ();
   windows_or_buffers_changed = old_windows_or_buffers_changed;
 
  start_timer:
@@ -8027,7 +8027,7 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
       /* Prevent redisplay.  */
       specbind (Qinhibit_redisplay, Qt);
       record_unwind_protect (w32_dialog_in_progress, Qnil);
-      block_input ();
+      block_interrupts ();
       if (use_unicode)
 	{
 	  file_details_w->lpfnHook = file_dialog_callback;
@@ -8042,7 +8042,7 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
 	  file_opened = GetOpenFileNameA (file_details_a);
 	}
 #endif	/* !NTGUI_UNICODE */
-      unblock_input ();
+      unblock_interrupts ();
       unbind_to (count, Qnil);
     }
 
@@ -8923,7 +8923,7 @@ and width values are in pixels.
   if (FRAME_INITIAL_P (f) || !FRAME_W32_P (f))
     return Qnil;
 
-  block_input ();
+  block_interrupts ();
   /* Outer rectangle and borders.  */
   window.cbSize = sizeof (window);
   GetWindowInfo (FRAME_W32_WINDOW (f), &window);
@@ -8957,7 +8957,7 @@ and width values are in pixels.
   GetMenuBarInfo (FRAME_W32_WINDOW (f), 0xFFFFFFFD, 0, &menu_bar);
   single_menu_bar_height = GetSystemMetrics (SM_CYMENU);
   wrapped_menu_bar_height = GetSystemMetrics (SM_CYMENUSIZE);
-  unblock_input ();
+  unblock_interrupts ();
 
   left = window.rcWindow.left;
   top = window.rcWindow.top;
@@ -9038,10 +9038,10 @@ menu bar or tool bar of FRAME.  */)
       RECT rectangle;
       BOOL success = false;
 
-      block_input ();
+      block_interrupts ();
       /* Outer frame rectangle, including outer borders and title bar. */
       success = GetWindowRect (FRAME_W32_WINDOW (f), &rectangle);
-      unblock_input ();
+      unblock_interrupts ();
 
       if (success)
 	return list4 (make_fixnum (rectangle.left),
@@ -9058,21 +9058,21 @@ menu bar or tool bar of FRAME.  */)
       int left, top, right, bottom;
       BOOL success;
 
-      block_input ();
+      block_interrupts ();
       /* Inner frame rectangle, excluding borders and title bar.  */
       success = GetClientRect (FRAME_W32_WINDOW (f), &rectangle);
       /* Get top-left corner of native rectangle in screen
 	 coordinates.  */
       if (!success)
 	{
-	  unblock_input ();
+	  unblock_interrupts ();
 	  return Qnil;
 	}
 
       pt.x = 0;
       pt.y = 0;
       success = ClientToScreen (FRAME_W32_WINDOW (f), &pt);
-      unblock_input ();
+      unblock_interrupts ();
 
       if (!success)
 	return Qnil;
@@ -9122,9 +9122,9 @@ w32_frame_list_z_order (struct w32_display_info *dpyinfo, HWND window)
 	  frames = Fcons (frame, frames);
 	}
 
-      block_input ();
+      block_interrupts ();
       window = GetNextWindow (window, GW_HWNDNEXT);
-      unblock_input ();
+      unblock_interrupts ();
     }
 
   return Fnreverse (frames);
@@ -9146,12 +9146,12 @@ Frames are listed from topmost (first) to bottommost (last).  */)
   struct w32_display_info *dpyinfo = check_x_display_info (display);
   HWND window;
 
-  block_input ();
+  block_interrupts ();
   if (FRAMEP (display) && FRAME_LIVE_P (XFRAME (display)))
     window = GetWindow (FRAME_W32_WINDOW (XFRAME (display)), GW_CHILD);
   else
     window = GetTopWindow (NULL);
-  unblock_input ();
+  unblock_interrupts ();
 
   return w32_frame_list_z_order (dpyinfo, window);
 }
@@ -9170,7 +9170,7 @@ w32_frame_restack (struct frame *f1, struct frame *f2, bool above_flag)
   HWND hwnd1 = FRAME_W32_WINDOW (f1);
   HWND hwnd2 = FRAME_W32_WINDOW (f2);
 
-  block_input ();
+  block_interrupts ();
   if (above_flag)
     /* Put F1 above F2 in the z-order.  */
     {
@@ -9194,7 +9194,7 @@ w32_frame_restack (struct frame *f1, struct frame *f2, bool above_flag)
     SetWindowPos (hwnd1, hwnd2, 0, 0, 0, 0,
 		  SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
 		  | SWP_FRAMECHANGED);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 DEFUN ("w32-frame-restack", Fw32_frame_restack, Sw32_frame_restack, 2, 3, 0,
@@ -9240,9 +9240,9 @@ selected frame's display.  */)
 {
   POINT pt;
 
-  block_input ();
+  block_interrupts ();
   GetCursorPos (&pt);
-  unblock_input ();
+  unblock_interrupts ();
 
   return Fcons (make_fixnum (pt.x), make_fixnum (pt.y));
 }
@@ -9260,7 +9260,7 @@ The coordinates X and Y are interpreted in pixels relative to a position
   int xval = check_integer_range (x, INT_MIN, INT_MAX);
   int yval = check_integer_range (y, INT_MIN, INT_MAX);
 
-  block_input ();
+  block_interrupts ();
   /* When "mouse trails" are in effect, moving the mouse cursor
      sometimes leaves behind an annoying "ghost" of the pointer.
      Avoid that by momentarily switching off mouse trails.  */
@@ -9270,7 +9270,7 @@ The coordinates X and Y are interpreted in pixels relative to a position
   SetCursorPos (xval, yval);
   if (ret)
     SystemParametersInfo (SPI_SETMOUSETRAILS, trail_num, NULL, 0);
-  unblock_input ();
+  unblock_interrupts ();
 
   return Qnil;
 }

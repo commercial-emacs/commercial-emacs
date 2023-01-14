@@ -4096,8 +4096,8 @@ BMenu_new_menu_bar_submenu (void *menu, const char *label)
 void *
 BMenu_run (void *menu, int x, int y,
 	   void (*run_help_callback) (void *, void *),
-	   void (*block_input_function) (void),
-	   void (*unblock_input_function) (void),
+	   void (*block_interrupts_function) (void),
+	   void (*unblock_interrupts_function) (void),
 	   struct timespec (*process_pending_signals_function) (void),
 	   void *run_help_callback_data)
 {
@@ -4113,17 +4113,17 @@ BMenu_run (void *menu, int x, int y,
   struct timespec next_time;
   bigtime_t timeout;
 
-  block_input_function ();
+  block_interrupts_function ();
   port_popup_menu_to_emacs = create_port (1800, "popup menu port");
   data.x = x;
   data.y = y;
   data.menu = mn;
-  unblock_input_function ();
+  unblock_interrupts_function ();
 
   if (port_popup_menu_to_emacs < B_OK)
     return NULL;
 
-  block_input_function ();
+  block_interrupts_function ();
   mn->SetRadioMode (0);
   buf = alloca (200);
 
@@ -4140,19 +4140,19 @@ BMenu_run (void *menu, int x, int y,
   infos[2].object = port_application_to_emacs;
   infos[2].type = B_OBJECT_TYPE_PORT;
   infos[2].events = B_EVENT_READ;
-  unblock_input_function ();
+  unblock_interrupts_function ();
 
   if (infos[1].object < B_OK)
     {
-      block_input_function ();
+      block_interrupts_function ();
       delete_port (port_popup_menu_to_emacs);
-      unblock_input_function ();
+      unblock_interrupts_function ();
       return NULL;
     }
 
-  block_input_function ();
+  block_interrupts_function ();
   resume_thread (infos[1].object);
-  unblock_input_function ();
+  unblock_interrupts_function ();
 
   while (true)
     {
@@ -4194,13 +4194,13 @@ BMenu_run (void *menu, int x, int y,
 
       if (infos[1].events & B_EVENT_INVALID)
 	{
-	  block_input_function ();
+	  block_interrupts_function ();
 	  msg = (BMessage *) popup_track_message;
 	  if (popup_track_message)
 	    ptr = (void *) msg->GetPointer ("menuptr");
 
 	  delete_port (port_popup_menu_to_emacs);
-	  unblock_input_function ();
+	  unblock_interrupts_function ();
 	  return ptr;
 	}
 
@@ -4349,8 +4349,8 @@ be_alert_thread_entry (void *thread_data)
    or -1 if no button was selected before the alert was closed.  */
 int32
 BAlert_go (void *alert,
-	   void (*block_input_function) (void),
-	   void (*unblock_input_function) (void),
+	   void (*block_interrupts_function) (void),
+	   void (*unblock_interrupts_function) (void),
 	   void (*process_pending_signals_function) (void))
 {
   struct object_wait_info infos[2];
@@ -4361,7 +4361,7 @@ BAlert_go (void *alert,
   infos[0].type = B_OBJECT_TYPE_PORT;
   infos[0].events = B_EVENT_READ;
 
-  block_input_function ();
+  block_interrupts_function ();
   /* Alerts are created locked, just like other windows.  */
   alert_object->UnlockLooper ();
   infos[1].object = spawn_thread (be_alert_thread_entry,
@@ -4370,14 +4370,14 @@ BAlert_go (void *alert,
 				  alert);
   infos[1].type = B_OBJECT_TYPE_THREAD;
   infos[1].events = B_EVENT_INVALID;
-  unblock_input_function ();
+  unblock_interrupts_function ();
 
   if (infos[1].object < B_OK)
     return -1;
 
-  block_input_function ();
+  block_interrupts_function ();
   resume_thread (infos[1].object);
-  unblock_input_function ();
+  unblock_interrupts_function ();
 
   while (true)
     {
@@ -5107,8 +5107,8 @@ be_drag_message_thread_entry (void *thread_data)
 
 bool
 be_drag_message (void *view, void *message, bool allow_same_view,
-		 void (*block_input_function) (void),
-		 void (*unblock_input_function) (void),
+		 void (*block_interrupts_function) (void),
+		 void (*unblock_interrupts_function) (void),
 		 void (*process_pending_signals_function) (void),
 		 bool (*should_quit_function) (void))
 {
@@ -5122,7 +5122,7 @@ be_drag_message (void *view, void *message, bool allow_same_view,
   ssize_t stat;
   thread_id window_thread;
 
-  block_input_function ();
+  block_interrupts_function ();
 
   if (!allow_same_view)
     window_thread = window->Looper ()->Thread ();
@@ -5148,22 +5148,22 @@ be_drag_message (void *view, void *message, bool allow_same_view,
 				  (void *) &messenger);
   infos[1].type = B_OBJECT_TYPE_THREAD;
   infos[1].events = B_EVENT_INVALID;
-  unblock_input_function ();
+  unblock_interrupts_function ();
 
   if (infos[1].object < B_OK)
     return false;
 
-  block_input_function ();
+  block_interrupts_function ();
   resume_thread (infos[1].object);
-  unblock_input_function ();
+  unblock_interrupts_function ();
 
   drag_and_drop_in_progress = true;
 
   while (true)
     {
-      block_input_function ();
+      block_interrupts_function ();
       stat = wait_for_objects ((struct object_wait_info *) &infos, 2);
-      unblock_input_function ();
+      unblock_interrupts_function ();
 
       if (stat == B_INTERRUPTED || stat == B_TIMED_OUT
 	  || stat == B_WOULD_BLOCK)

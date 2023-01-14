@@ -36,7 +36,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* These help us bind and responding to switch-frame events.  */
 #include "keyboard.h"
 #include "frame.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "termchar.h"
 #include "termhooks.h"
 #include "dispextern.h"
@@ -810,7 +810,7 @@ adjust_frame_size (struct frame *f, int new_text_width, int new_text_height,
     /* No change.  */
     return;
 
-  block_input ();
+  block_interrupts ();
 
 #ifdef MSDOS
   /* We only can set screen dimensions to certain values supported by
@@ -904,7 +904,7 @@ adjust_frame_size (struct frame *f, int new_text_width, int new_text_height,
 /**   f->resized_p = (new_native_width != old_native_width **/
 /** 		  || new_native_height != old_native_height); **/
 
-  unblock_input ();
+  unblock_interrupts ();
 
 #ifdef HAVE_WINDOW_SYSTEM
   {
@@ -2245,12 +2245,12 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
      routine.  */
   {
     struct terminal *terminal;
-    block_input ();
+    block_interrupts ();
     if (FRAME_TERMINAL (f)->delete_frame_hook)
       (*FRAME_TERMINAL (f)->delete_frame_hook) (f);
     terminal = FRAME_TERMINAL (f);
     f->terminal = 0;             /* Now the frame is dead.  */
-    unblock_input ();
+    unblock_interrupts ();
 
     /* If needed, delete the terminal that this frame was on.
        (This must be done after the frame is killed.)  */
@@ -5092,9 +5092,9 @@ gui_set_alpha (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 
   if (FRAME_TERMINAL (f)->set_frame_alpha_hook)
     {
-      block_input ();
+      block_interrupts ();
       FRAME_TERMINAL (f)->set_frame_alpha_hook (f);
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 

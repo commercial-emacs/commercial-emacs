@@ -52,7 +52,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "coding.h"
 #include "window.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "region-cache.h"
 #include "frame.h"
 
@@ -1750,9 +1750,9 @@ See also the function `substitute-in-file-name'.")
 	o[len] = 0;
 
 	/* Look up the user name.  */
-	block_input ();
+	block_interrupts ();
 	pw = (struct passwd *) getpwnam (o + 1);
-	unblock_input ();
+	unblock_interrupts ();
 	if (!pw)
 	  error ("\"%s\" isn't a registered user", o + 1);
 
@@ -3657,10 +3657,10 @@ by having the corresponding bit in the mask reset.  */)
   oldrealmask = realmask;
   newumask = ~ XFIXNUM (mode) & 0777;
 
-  block_input ();
+  block_interrupts ();
   realmask = newumask;
   oldumask = umask (newumask);
-  unblock_input ();
+  unblock_interrupts ();
 
   eassert (oldumask == oldrealmask);
   return Qnil;
@@ -6052,9 +6052,9 @@ do_auto_save_unwind (void *arg)
   auto_saving = 0;
   if (stream != NULL)
     {
-      block_input ();
+      block_interrupts ();
       fclose (stream);
-      unblock_input ();
+      unblock_interrupts ();
     }
 }
 
@@ -6170,7 +6170,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
 	if (STRINGP (BVAR (b, auto_save_file_name))
 	    && stream != NULL && do_handled_files == 0)
 	  {
-	    block_input ();
+	    block_interrupts ();
 	    if (!NILP (BVAR (b, filename)))
 	      fwrite (SDATA (BVAR (b, filename)), 1,
 		      SBYTES (BVAR (b, filename)), stream);
@@ -6178,7 +6178,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
 	    fwrite (SDATA (BVAR (b, auto_save_file_name)), 1,
 		    SBYTES (BVAR (b, auto_save_file_name)), stream);
 	    putc ('\n', stream);
-	    unblock_input ();
+	    unblock_interrupts ();
 	  }
 
 	if (!NILP (current_only)

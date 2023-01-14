@@ -26,7 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "xterm.h"
 #include "frame.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "character.h"
 #include "charset.h"
 #include "font.h"
@@ -243,7 +243,7 @@ static Lisp_Object xfont_scratch_props;
 
 /* Return a list of scripts supported by the font of FONTNAME whose
    characteristic properties are in PROPS and whose encoding charset
-   is ENCODING.  A caller must call BLOCK_INPUT in advance.  */
+   is ENCODING.  A caller must call BLOCK_INTERRUPTS in advance.  */
 
 static Lisp_Object
 xfont_supported_scripts (Display *display, char *fontname, Lisp_Object props,
@@ -320,7 +320,7 @@ xfont_list_pattern (Display *display, const char *pattern,
 	}
     }
 
-  block_input ();
+  block_interrupts ();
   x_catch_errors (display);
 
   for (limit = 512; ; limit *= 2)
@@ -450,7 +450,7 @@ xfont_list_pattern (Display *display, const char *pattern,
     }
 
   x_uncatch_errors ();
-  unblock_input ();
+  unblock_interrupts ();
 
   FONT_ADD_LOG ("xfont-list", build_string (pattern), list);
   return list;
@@ -558,7 +558,7 @@ xfont_match (struct frame *f, Lisp_Object spec)
   if (xfont_encode_coding_xlfd (name) < 0)
     return Qnil;
 
-  block_input ();
+  block_interrupts ();
   entity = Qnil;
   xfont = XLoadQueryFont (display, name);
   if (xfont)
@@ -583,7 +583,7 @@ xfont_match (struct frame *f, Lisp_Object spec)
 	}
       XFreeFont (display, xfont);
     }
-  unblock_input ();
+  unblock_interrupts ();
 
   FONT_ADD_LOG ("xfont-match", spec, entity);
   return entity;
@@ -602,7 +602,7 @@ xfont_list_family (struct frame *f)
 #endif
   int last_len;
 
-  block_input ();
+  block_interrupts ();
   x_catch_errors (dpyinfo->display);
   names = XListFonts (dpyinfo->display, "-*-*-*-*-*-*-*-*-*-*-*-*-*-*",
 		      0x8000, &num_fonts);
@@ -643,7 +643,7 @@ xfont_list_family (struct frame *f)
 
   XFreeFontNames (names);
   x_uncatch_errors ();
-  unblock_input ();
+  unblock_interrupts ();
 
   return list;
 }
@@ -687,7 +687,7 @@ xfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
       return Qnil;
     }
 
-  block_input ();
+  block_interrupts ();
   x_catch_errors (display);
   xfont = XLoadQueryFont (display, name);
   if (x_had_errors_p (display))
@@ -754,7 +754,7 @@ xfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
       XFree (p0);
     }
   x_uncatch_errors ();
-  unblock_input ();
+  unblock_interrupts ();
 
   if (! xfont)
     {
@@ -833,7 +833,7 @@ xfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 	}
     }
 
-  block_input ();
+  block_interrupts ();
   font->underline_thickness
     = (XGetFontProperty (xfont, XA_UNDERLINE_THICKNESS, &value)
        ? (long) value : 0);
@@ -849,7 +849,7 @@ xfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   font->default_ascent
     = (XGetFontProperty (xfont, dpyinfo->Xatom_MULE_DEFAULT_ASCENT, &value)
        ? (long) value : 0);
-  unblock_input ();
+  unblock_interrupts ();
 
   if (NILP (fullname))
     fullname = AREF (font_object, FONT_NAME_INDEX);
@@ -879,9 +879,9 @@ xfont_close (struct font *font)
       && ((xdi = x_display_info_for_display (xfi->display))
 	  && xfi->x_display_id == xdi->x_id))
     {
-      block_input ();
+      block_interrupts ();
       XFreeFont (xfi->display, xfi->xfont);
-      unblock_input ();
+      unblock_interrupts ();
       xfi->xfont = NULL;
     }
 }
@@ -889,10 +889,10 @@ xfont_close (struct font *font)
 static void
 xfont_prepare_face (struct frame *f, struct face *face)
 {
-  block_input ();
+  block_interrupts ();
   XSetFont (FRAME_X_DISPLAY (f), face->gc,
 	    ((struct xfont_info *) face->font)->xfont->fid);
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 static int
@@ -998,9 +998,9 @@ xfont_draw (struct glyph_string *s, int from, int to, int x, int y,
 
   if (s->gc != s->face->gc)
     {
-      block_input ();
+      block_interrupts ();
       XSetFont (display, gc, xfont->fid);
-      unblock_input ();
+      unblock_interrupts ();
     }
 
 #if defined HAVE_XRENDER && (RENDER_MAJOR > 0 || (RENDER_MINOR >= 2))
@@ -1035,7 +1035,7 @@ xfont_draw (struct glyph_string *s, int from, int to, int x, int y,
       char *str = SAFE_ALLOCA (len);
       for (i = 0; i < len ; i++)
 	str[i] = s->char2b[from + i] & 0xFF;
-      block_input ();
+      block_interrupts ();
       if (with_background)
 	{
 	  if (s->padding_p)
@@ -1056,12 +1056,12 @@ xfont_draw (struct glyph_string *s, int from, int to, int x, int y,
             XDrawString (display, FRAME_X_DRAWABLE (s->f),
 			 gc, x, y, str, len);
 	}
-      unblock_input ();
+      unblock_interrupts ();
       SAFE_FREE ();
       return s->nchars;
     }
 
-  block_input ();
+  block_interrupts ();
   if (with_background)
     {
       if (s->padding_p)
@@ -1112,7 +1112,7 @@ xfont_draw (struct glyph_string *s, int from, int to, int x, int y,
           SAFE_FREE ();
         }
     }
-  unblock_input ();
+  unblock_interrupts ();
 
   return len;
 }

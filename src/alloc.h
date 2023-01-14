@@ -27,7 +27,7 @@
 #include "window.h"
 #include "keyboard.h"
 #include "frame.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "pdumper.h"
 #include "termhooks.h"		/* For struct terminal.  */
 #include "getpagesize.h"

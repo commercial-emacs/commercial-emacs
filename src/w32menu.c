@@ -26,7 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "keyboard.h"
 #include "frame.h"
-#include "blockinput.h"
+#include "blockinterrupts.h"
 #include "buffer.h"
 #include "coding.h"	/* for ENCODE_SYSTEM */
 #include "menu.h"
@@ -127,9 +127,9 @@ w32_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
       list_of_panes (Fcons (contents, Qnil));
 
       /* Display them in a dialog box.  */
-      block_input ();
+      block_interrupts ();
       selection = w32_dialog_show (f, title, header, &error_name);
-      unblock_input ();
+      unblock_interrupts ();
 
       discard_menu_items ();
       FRAME_DISPLAY_INFO (f)->grabbed = 0;
@@ -462,7 +462,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
   /* Create or update the menu bar widget.  */
 
-  block_input ();
+  block_interrupts ();
 
   if (menubar_widget)
     {
@@ -495,7 +495,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
       }
   }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 /* Called from Fx_create_frame to create the initial menubar of a frame
@@ -518,7 +518,7 @@ initialize_frame_menubar (struct frame *f)
 void
 free_frame_menubar (struct frame *f)
 {
-  block_input ();
+  block_interrupts ();
 
   {
     HMENU old = GetMenu (FRAME_W32_WINDOW (f));
@@ -527,7 +527,7 @@ free_frame_menubar (struct frame *f)
     DestroyMenu (old);
   }
 
-  unblock_input ();
+  unblock_interrupts ();
 }
 
 
@@ -577,7 +577,7 @@ w32_menu_show (struct frame *f, int x, int y, int menuflags,
   submenu_stack = SAFE_ALLOCA (menu_items_used * sizeof (widget_value *));
   subprefix_stack = SAFE_ALLOCA (menu_items_used * word_size);
 
-  block_input ();
+  block_interrupts ();
 
   /* Create a tree of widget_value objects
      representing the panes and their items.  */
@@ -818,7 +818,7 @@ w32_menu_show (struct frame *f, int x, int y, int menuflags,
 			if (!NILP (subprefix_stack[j]))
 			  entry = Fcons (subprefix_stack[j], entry);
 		    }
-		  unblock_input ();
+		  unblock_interrupts ();
 		  SAFE_FREE ();
 		  return entry;
 		}
@@ -828,12 +828,12 @@ w32_menu_show (struct frame *f, int x, int y, int menuflags,
     }
   else if (!(menuflags & MENU_FOR_CLICK))
     {
-      unblock_input ();
+      unblock_interrupts ();
       /* Make "Cancel" equivalent to C-g.  */
       quit ();
     }
 
-  unblock_input ();
+  unblock_interrupts ();
   SAFE_FREE ();
   return Qnil;
 }
