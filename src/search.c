@@ -27,7 +27,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "syntax.h"
 #include "charset.h"
 #include "region-cache.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "intervals.h"
 #include "pdumper.h"
 #include "composite.h"

@@ -30,7 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "process.h"
 #include "disptab.h"
 #include "intervals.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "xwidget.h"
 #include "dynlib.h"
 

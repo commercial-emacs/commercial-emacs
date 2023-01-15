@@ -35,7 +35,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "dispextern.h"	/* frame.h seems to want this */
 #include "frame.h"	/* Need this to get the X window of selected_frame */
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "character.h"
 #include "buffer.h"
 #include "coding.h"
@@ -454,7 +454,7 @@ DEFUN ("w16-set-clipboard-data", Fw16_set_clipboard_data, Sw16_set_clipboard_dat
   if (!FRAME_MSDOS_P (decode_live_frame (frame)))
     goto done;
 
-  block_interrupts ();
+  block_input ();
 
   if (!open_clipboard ())
     goto error;
@@ -515,7 +515,7 @@ DEFUN ("w16-set-clipboard-data", Fw16_set_clipboard_data, Sw16_set_clipboard_dat
 
  unblock:
   xfree (dst);
-  unblock_interrupts ();
+  unblock_input ();
 
   /* Notify user if the text is too large to fit into DOS memory.
      (This will happen somewhere after 600K bytes (470K in DJGPP v1.x),
@@ -556,7 +556,7 @@ DEFUN ("w16-get-clipboard-data", Fw16_get_clipboard_data, Sw16_get_clipboard_dat
   if (!FRAME_MSDOS_P (decode_live_frame (frame)))
     goto done;
 
-  block_interrupts ();
+  block_input ();
 
   if (!open_clipboard ())
     goto unblock;
@@ -617,7 +617,7 @@ DEFUN ("w16-get-clipboard-data", Fw16_get_clipboard_data, Sw16_get_clipboard_dat
   close_clipboard ();
 
  unblock:
-  unblock_interrupts ();
+  unblock_input ();
 
  done:
 

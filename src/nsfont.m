@@ -27,7 +27,7 @@ Author: Adrian Robert (arobert@cogsci.ucsd.edu)
 #include "lisp.h"
 #include "dispextern.h"
 #include "composite.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "charset.h"
 #include "frame.h"
 #include "window.h"
@@ -791,7 +791,7 @@ ns_findfonts (Lisp_Object font_spec, BOOL isMatch)
 
   NSSet *cFamilies;
 
-  block_interrupts ();
+  block_input ();
   if (NSFONT_TRACE)
     {
       fprintf (stderr, "nsfont: %s for fontspec:\n    ",
@@ -820,7 +820,7 @@ ns_findfonts (Lisp_Object font_spec, BOOL isMatch)
       list = Fcons (tem, list);
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 
   /* Return something if was a match and nothing found.  */
   if (isMatch)
@@ -891,7 +891,7 @@ nsfont_list_family (struct frame *f)
   NSEnumerator *families;
   NSString *family;
 
-  block_interrupts ();
+  block_input ();
   families = [[[NSFontManager sharedFontManager] availableFontFamilies]
                objectEnumerator];
   while ((family = [families nextObject]))
@@ -901,7 +901,7 @@ nsfont_list_family (struct frame *f)
     fprintf (stderr, "nsfont: list families returning %"pD"d entries\n",
 	     list_length (list));
 
-  unblock_interrupts ();
+  unblock_input ();
   return list;
 }
 
@@ -921,7 +921,7 @@ nsfont_open (struct frame *f, Lisp_Object font_entity, int pixel_size)
   Lisp_Object font_object;
   Lisp_Object tem;
 
-  block_interrupts ();
+  block_input ();
 
   if (NSFONT_TRACE)
     {
@@ -957,7 +957,7 @@ nsfont_open (struct frame *f, Lisp_Object font_entity, int pixel_size)
   font = (struct font *) font_info;
   if (!font)
     {
-      unblock_interrupts ();
+      unblock_input ();
       return Qnil;
     }
 
@@ -1038,7 +1038,7 @@ nsfont_open (struct frame *f, Lisp_Object font_entity, int pixel_size)
     font->props[FONT_NAME_INDEX] = Ffont_xlfd_name (font_object, Qnil);
     font->props[FONT_FULLNAME_INDEX] = build_unibyte_string (font_info->name);
   }
-  unblock_interrupts ();
+  unblock_input ();
 
   return font_object;
 }
@@ -1160,7 +1160,7 @@ nsfont_draw (struct glyph_string *s, int from, int to, int x, int y,
   int len = to - from;
   char isComposite = s->first_glyph->type == COMPOSITE_GLYPH;
 
-  block_interrupts ();
+  block_input ();
 
   font = (struct nsfont_info *) s->font;
   if (font == NULL)
@@ -1215,7 +1215,7 @@ nsfont_draw (struct glyph_string *s, int from, int to, int x, int y,
     GSShowGlyphs (context, c, len);
   }
 
-  unblock_interrupts ();
+  unblock_input ();
   return to-from;
 }
 
@@ -1495,7 +1495,7 @@ nsfont_shape (Lisp_Object lgstring, Lisp_Object direction)
   if (INT_MAX / 2 < len)
     memory_full (SIZE_MAX);
 
-  block_interrupts ();
+  block_input ();
 
   mb_buf = alloca (len * sizeof *mb_buf);
 
@@ -1507,12 +1507,12 @@ nsfont_shape (Lisp_Object lgstring, Lisp_Object direction)
 
   NSString *string = [NSString stringWithCharacters: mb_buf
 					     length: len];
-  unblock_interrupts ();
+  unblock_input ();
 
   if (!string)
     return Qnil;
 
-  block_interrupts ();
+  block_input ();
 
   enum lgstring_direction dir = DIR_UNKNOWN;
 
@@ -1569,7 +1569,7 @@ nsfont_shape (Lisp_Object lgstring, Lisp_Object direction)
       LGLYPH_SET_ASCENT (lglyph, metrics.ascent);
       LGLYPH_SET_DESCENT (lglyph, metrics.descent);
     }
-  unblock_interrupts ();
+  unblock_input ();
 
   return make_fixnum (used);
 }
@@ -1638,7 +1638,7 @@ ns_uni_to_glyphs (struct nsfont_info *font_info, unsigned char block)
     fprintf (stderr, "%p\tFinding glyphs for glyphs in block %d\n",
             font_info, block);
 
-  block_interrupts ();
+  block_input ();
 
   font_info->glyphs[block] = xmalloc (0x100 * sizeof (unsigned int));
   if (!unichars || !(font_info->glyphs[block]))
@@ -1662,7 +1662,7 @@ ns_uni_to_glyphs (struct nsfont_info *font_info, unsigned char block)
       }
   }
 
-  unblock_interrupts ();
+  unblock_input ();
   xfree (unichars);
 }
 
@@ -1686,7 +1686,7 @@ ns_glyph_metrics (struct nsfont_info *font_info, unsigned int block)
   if (numGlyphs == 0)
     numGlyphs = 0x10000;
 
-  block_interrupts ();
+  block_input ();
   sfont = [font_info->nsfont screenFont];
 
   font_info->metrics[block] = xzalloc (0x100 * sizeof (struct font_metrics));
@@ -1711,7 +1711,7 @@ ns_glyph_metrics (struct nsfont_info *font_info, unsigned int block)
       metrics->descent = - NSMaxY (r);
       metrics->ascent = - NSMinY (r);
     }
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 

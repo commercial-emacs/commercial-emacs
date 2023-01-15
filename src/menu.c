@@ -30,7 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "frame.h"
 #include "window.h"
 #include "termhooks.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "buffer.h"
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -573,9 +573,9 @@ make_widget_value (const char *name, char *value,
 {
   widget_value *wv;
 
-  block_interrupts ();
+  block_input ();
   wv = xzalloc (sizeof (widget_value));
-  unblock_interrupts ();
+  unblock_input ();
 
   wv->name = (char *) name;
   wv->value = value;
@@ -606,9 +606,9 @@ free_menubar_widget_value_tree (widget_value *wv)
       free_menubar_widget_value_tree (wv->next);
       wv->next = (widget_value *) 0xDEADBEEF;
     }
-  block_interrupts ();
+  block_input ();
   xfree (wv);
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* Create a tree of widget_value objects

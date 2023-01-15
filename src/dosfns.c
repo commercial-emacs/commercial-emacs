@@ -38,7 +38,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "termchar.h"
 #include "frame.h"
 #include "termhooks.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "window.h"
 #include "dosfns.h"
 #include "msdos.h"
@@ -472,9 +472,9 @@ x_set_title (struct frame *f, Lisp_Object name)
 
   if (FRAME_MSDOS_P (f))
     {
-      block_interrupts ();
+      block_input ();
       w95_set_virtual_machine_title (SDATA (name));
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 #endif /* !HAVE_X_WINDOWS */

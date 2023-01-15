@@ -80,7 +80,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "menu.h"
 #include "buffer.h"
 #include "commands.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "keyboard.h"
 #include "intervals.h"
 #include <go32.h>
@@ -1239,7 +1239,7 @@ IT_update_begin (struct frame *f)
   if (display_info->termscript)
     fprintf (display_info->termscript, "\n\n<UPDATE_BEGIN");
 
-  block_interrupts ();
+  block_input ();
 
   if (f && f == mouse_face_frame)
     {
@@ -1283,7 +1283,7 @@ IT_update_begin (struct frame *f)
        highlight info.  */
     reset_mouse_highlight (hlinfo);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 static void
@@ -3994,7 +3994,7 @@ futimens (int fd, const struct timespec times[2])
   struct ftime ft;
   time_t t;
 
-  block_interrupts ();
+  block_input ();
   if (times[1].tv_sec == UTIME_NOW)
     t = time (NULL);
   else
@@ -4007,7 +4007,7 @@ futimens (int fd, const struct timespec times[2])
   ft.ft_day = tm->tm_mday;
   ft.ft_month = tm->tm_mon + 1;
   ft.ft_year = max (0, tm->tm_year - 80);
-  unblock_interrupts ();
+  unblock_input ();
 
   return setftime (fd, &ft);
 }

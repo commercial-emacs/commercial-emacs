@@ -36,7 +36,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "termchar.h"
 #include "disptab.h"
 #include "dispextern.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "termhooks.h"		/* For FRAME_TERMINAL.  */
 #include "xwidget.h"
 #ifdef HAVE_WINDOW_SYSTEM
@@ -3345,7 +3345,7 @@ window-start value is reasonable when this function is called.  */)
 	}
     }
 
-  block_interrupts ();
+  block_input ();
   if (!FRAME_INITIAL_P (f))
     {
       Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
@@ -3479,7 +3479,7 @@ window-start value is reasonable when this function is called.  */)
     }
 
   adjust_frame_glyphs (f);
-  unblock_interrupts ();
+  unblock_input ();
 
   FRAME_WINDOW_CHANGE (f) = true;
 
@@ -4738,13 +4738,13 @@ be applied on the Elisp level.  */)
 	  != (horflag ? r->pixel_width : r->pixel_height)))
     return Qnil;
 
-  block_interrupts ();
+  block_input ();
   window_resize_apply (r, horflag);
 
   fset_redisplay (f);
 
   adjust_frame_glyphs (f);
-  unblock_interrupts ();
+  unblock_input ();
 
   return Qt;
 }
@@ -4765,7 +4765,7 @@ values.  */)
   struct frame *f = decode_live_frame (frame);
   struct window *r = XWINDOW (FRAME_ROOT_WINDOW (f));
 
-  block_interrupts ();
+  block_input ();
   /* Necessary when deleting the top-/or leftmost window.  */
   r->left_col = 0;
   r->top_line = FRAME_TOP_MARGIN (f);
@@ -4784,7 +4784,7 @@ values.  */)
 	m->total_cols = XFIXNAT (m->new_total);
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 
   return Qt;
 }
@@ -5081,13 +5081,13 @@ set correctly.  See the code of `split-window' for how this is done.  */)
 				  - sum));
   wset_new_normal (n, normal_size);
 
-  block_interrupts ();
+  block_input ();
   window_resize_apply (p, horflag);
   adjust_frame_glyphs (f);
   /* Set buffer of NEW to buffer of reference window.  */
   set_window_buffer (new, r->contents, true, true);
   FRAME_WINDOW_CHANGE (f) = true;
-  unblock_interrupts ();
+  unblock_input ();
 
   return new;
 }
@@ -5157,7 +5157,7 @@ Signal an error when WINDOW is the only window on its frame.  */)
     {
 
       /* Block input.  */
-      block_interrupts ();
+      block_input ();
       xwidget_view_delete_all_in_window (w);
       window_resize_apply (p, horflag);
       /* If this window is referred to by the dpyinfo's mouse
@@ -5225,7 +5225,7 @@ Signal an error when WINDOW is the only window on its frame.  */)
 	    fset_selected_window (f, new_selected_window);
 	}
 
-      unblock_interrupts ();
+      unblock_input ();
       FRAME_WINDOW_CHANGE (f) = true;
     }
   else
@@ -5265,7 +5265,7 @@ resize_mini_window_apply (struct window *w, int delta)
   Lisp_Object root = FRAME_ROOT_WINDOW (f);
   struct window *r = XWINDOW (root);
 
-  block_interrupts ();
+  block_input ();
   w->pixel_height = w->pixel_height + delta;
   w->total_lines = w->pixel_height / FRAME_LINE_HEIGHT (f);
 
@@ -5278,7 +5278,7 @@ resize_mini_window_apply (struct window *w, int delta)
   /* FIXME: Shouldn't some of the caller do it?  */
   fset_redisplay (f);
   adjust_frame_glyphs (f);
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /**
@@ -7014,7 +7014,7 @@ the return value is nil.  Otherwise the value is t.  */)
       f->can_set_window_size = false;
       /* The mouse highlighting code could get screwed up
 	 if it runs during this.  */
-      block_interrupts ();
+      block_input ();
 
       /* "Swap out" point from the selected window's buffer
 	 into the window itself.  (Normally the pointm of the selected
@@ -7235,7 +7235,7 @@ the return value is nil.  Otherwise the value is t.  */)
       adjust_frame_size (f, -1, -1, 4, false, Qset_window_configuration);
 
       adjust_frame_glyphs (f);
-      unblock_interrupts ();
+      unblock_input ();
 
       /* Scan dead buffer windows.  */
       for (; CONSP (dead_windows); dead_windows = XCDR (dead_windows))

@@ -51,7 +51,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "character.h"
 #include "buffer.h"
 #include "window.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 
 #define GLOBAL_MARK_RING_MAX_DEFAULT (128)
 
@@ -1183,9 +1183,9 @@ of the user with that uid, or nil if there is no such user.  */)
     return Vuser_login_name;
 
   CONS_TO_INTEGER (uid, uid_t, id);
-  block_interrupts ();
+  block_input ();
   pw = getpwuid (id);
-  unblock_interrupts ();
+  unblock_input ();
   return (pw ? build_string (pw->pw_name) : Qnil);
 }
 
@@ -1232,9 +1232,9 @@ Return nil if a group with such GID does not exists or is not known.  */)
   if (!NUMBERP (gid) && !CONSP (gid))
     error ("Invalid GID specification");
   CONS_TO_INTEGER (gid, gid_t, id);
-  block_interrupts ();
+  block_input ();
   gr = getgrgid (id);
-  unblock_interrupts ();
+  unblock_input ();
   return gr ? build_string (gr->gr_name) : Qnil;
 }
 
@@ -1279,15 +1279,15 @@ is in general a comma-separated list.  */)
     {
       uid_t u;
       CONS_TO_INTEGER (uid, uid_t, u);
-      block_interrupts ();
+      block_input ();
       pw = getpwuid (u);
-      unblock_interrupts ();
+      unblock_input ();
     }
   else if (STRINGP (uid))
     {
-      block_interrupts ();
+      block_input ();
       pw = getpwnam (SSDATA (uid));
-      unblock_interrupts ();
+      unblock_input ();
     }
   else
     error ("Invalid UID specification");

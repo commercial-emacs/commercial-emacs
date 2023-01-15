@@ -26,7 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "systime.h"
 
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "bignum.h"
 #include "coding.h"
 #include "lisp.h"
@@ -293,13 +293,13 @@ tzlookup (Lisp_Object zone, bool settz)
 
   if (settz)
     {
-      block_interrupts ();
+      block_input ();
       emacs_setenv_TZ (zone_string);
       tzset ();
       timezone_t old_tz = local_tz;
       local_tz = new_tz;
       tzfree (old_tz);
-      unblock_interrupts ();
+      unblock_input ();
     }
 
   return new_tz;

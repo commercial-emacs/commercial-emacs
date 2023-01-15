@@ -26,7 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "xterm.h"
 #include "frame.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "charset.h"
 #include "composite.h"
 #include "font.h"
@@ -80,7 +80,7 @@ xftfont_get_colors (struct frame *f, struct face *face, GC gc,
       XGCValues xgcv;
       bool fg_done = false, bg_done = false;
 
-      block_interrupts ();
+      block_input ();
       XGetGCValues (FRAME_X_DISPLAY (f), gc,
 		    GCForeground | GCBackground, &xgcv);
       if (xftface_info)
@@ -136,7 +136,7 @@ xftfont_get_colors (struct frame *f, struct face *face, GC gc,
 		*bg_allocated_p = true;
 	    }
 	}
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -179,7 +179,7 @@ xftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   if (size == 0)
     size = pixel_size;
 
-  block_interrupts ();
+  block_input ();
 
   pat = ftfont_entity_pattern (entity, pixel_size);
   /* Substitute in values from X resources and XftDefaultSet.  */
@@ -191,12 +191,12 @@ xftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   xftfont = XftFontOpenPattern (display, match);
   if (!xftfont)
     {
-      unblock_interrupts ();
+      unblock_input ();
       XftPatternDestroy (match);
       return Qnil;
     }
   ft_face = XftLockFace (xftfont);
-  unblock_interrupts ();
+  unblock_input ();
 
   /* We should not destroy PAT here because it is kept in XFTFONT and
      destroyed automatically when XFTFONT is closed.  */
@@ -238,7 +238,7 @@ xftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
       for (ch = 0; ch < 95; ch++)
 	ascii_printable[ch] = ' ' + ch;
     }
-  block_interrupts ();
+  block_input ();
 
   /* Unfortunately Xft doesn't provide a way to get minimum char
      width.  So, we set min_width to space_width.  */
@@ -267,7 +267,7 @@ xftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
       XftTextExtents8 (display, xftfont, ascii_printable + 1, 94, &extents);
       font->average_width = (font->space_width + extents.xOff) / 95;
     }
-  unblock_interrupts ();
+  unblock_input ();
 
   font->ascent = xftfont->ascent;
   font->descent = xftfont->descent;
@@ -364,10 +364,10 @@ xftfont_close (struct font *font)
       && ((xdi = x_display_info_for_display (xftfont_info->display))
 	  && xftfont_info->x_display_id == xdi->x_id))
     {
-      block_interrupts ();
+      block_input ();
       XftUnlockFace (xftfont_info->xftfont);
       XftFontClose (xftfont_info->display, xftfont_info->xftfont);
-      unblock_interrupts ();
+      unblock_input ();
       xftfont_info->xftfont = NULL;
     }
 }
@@ -466,10 +466,10 @@ xftfont_text_extents (struct font *font, const unsigned int *code,
   struct font_info *xftfont_info = (struct font_info *) font;
   XGlyphInfo extents;
 
-  block_interrupts ();
+  block_input ();
   XftGlyphExtents (xftfont_info->display, xftfont_info->xftfont, code, nglyphs,
 		   &extents);
-  unblock_interrupts ();
+  unblock_input ();
 
   metrics->lbearing = - extents.x;
   metrics->rbearing = - extents.x + extents.width;
@@ -485,12 +485,12 @@ xftfont_get_xft_draw (struct frame *f)
 
   if (! xft_draw)
     {
-      block_interrupts ();
+      block_input ();
       xft_draw = XftDrawCreate (FRAME_X_DISPLAY (f),
 				FRAME_X_DRAWABLE (f),
 				FRAME_X_VISUAL (f),
 				FRAME_X_COLORMAP (f));
-      unblock_interrupts ();
+      unblock_input ();
       eassert (xft_draw != NULL);
       font_put_frame_data (f, Qxft, xft_draw);
     }
@@ -501,7 +501,7 @@ static int
 xftfont_draw (struct glyph_string *s, int from, int to, int x, int y,
               bool with_background)
 {
-  block_interrupts ();
+  block_input ();
 
   struct frame *f = s->f;
   struct face *face = s->face;
@@ -607,7 +607,7 @@ xftfont_draw (struct glyph_string *s, int from, int to, int x, int y,
 		  FRAME_X_COLORMAP (f),
 		  &fg);
 
-  unblock_interrupts ();
+  unblock_input ();
   return len;
 }
 
@@ -634,18 +634,18 @@ xftfont_end_for_frame (struct frame *f)
   if (!FRAME_X_DISPLAY (f))
     return 0;
 
-  block_interrupts ();
+  block_input ();
   XftDraw *xft_draw;
 
   xft_draw = font_get_frame_data (f, Qxft);
   if (xft_draw)
     {
-      block_interrupts ();
+      block_input ();
       XftDrawDestroy (xft_draw);
-      unblock_interrupts ();
+      unblock_input ();
       font_put_frame_data (f, Qxft, NULL);
     }
-  unblock_interrupts ();
+  unblock_input ();
   return 0;
 }
 
@@ -660,9 +660,9 @@ xftfont_drop_xrender_surfaces (struct frame *f)
 {
   if (FRAME_X_DOUBLE_BUFFERED_P (f))
     {
-      block_interrupts ();
+      block_input ();
       xftfont_end_for_frame (f);
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 #endif

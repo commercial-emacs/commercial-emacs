@@ -38,7 +38,7 @@ typedef struct x_output xp_output;
 #define xp pgtk
 typedef struct pgtk_output xp_output;
 #endif
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "window.h"
 #include "gtkutil.h"
 #include "termhooks.h"
@@ -763,7 +763,7 @@ xg_check_special_colors (struct frame *f,
   if (!FRAME_GTK_WIDGET (f) || !(get_bg || get_fg))
     return success_p;
 
-  block_interrupts ();
+  block_input ();
 #ifdef HAVE_GTK3
   gsty = gtk_widget_get_style_context (FRAME_GTK_OUTER_WIDGET (f));
   state = GTK_STATE_FLAG_SELECTED | GTK_STATE_FLAG_FOCUSED;
@@ -804,7 +804,7 @@ xg_check_special_colors (struct frame *f,
   color->pixel = grgb->pixel;
   success_p = 1;
 #endif
-  unblock_interrupts ();
+  unblock_input ();
   return success_p;
 }
 
@@ -907,7 +907,7 @@ xg_prepare_tooltip (struct frame *f,
   if (!x->ttip_lbl)
     return FALSE;
 
-  block_interrupts ();
+  block_input ();
   encoded_string = ENCODE_UTF_8 (string);
   widget = GTK_WIDGET (x->ttip_lbl);
   gwin = gtk_widget_get_window (GTK_WIDGET (x->ttip_window));
@@ -935,7 +935,7 @@ xg_prepare_tooltip (struct frame *f,
   if (width) *width = req.width;
   if (height) *height = req.height;
 
-  unblock_interrupts ();
+  unblock_input ();
 
   return TRUE;
 }
@@ -949,7 +949,7 @@ xg_show_tooltip (struct frame *f, int root_x, int root_y)
   xp_output *x = f->output_data.xp;
   if (x->ttip_window)
     {
-      block_interrupts ();
+      block_input ();
 #ifndef HAVE_PGTK
       gtk_window_move (x->ttip_window, root_x / xg_get_scale (f),
 		       root_y / xg_get_scale (f));
@@ -959,7 +959,7 @@ xg_show_tooltip (struct frame *f, int root_x, int root_y)
       gtk_window_move (x->ttip_window, root_x / xg_get_scale (f),
 		       root_y / xg_get_scale (f));
 #endif
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -973,7 +973,7 @@ xg_hide_tooltip (struct frame *f)
   if (f->output_data.xp->ttip_window)
     {
       GtkWindow *win = f->output_data.xp->ttip_window;
-      block_interrupts ();
+      block_input ();
       gtk_widget_hide (GTK_WIDGET (win));
 
       if (g_object_get_data (G_OBJECT (win), "restore-tt"))
@@ -983,7 +983,7 @@ xg_hide_tooltip (struct frame *f)
           GtkSettings *settings = gtk_settings_get_for_screen (screen);
           g_object_set (settings, "gtk-enable-tooltips", TRUE, NULL);
         }
-      unblock_interrupts ();
+      unblock_input ();
 
       return TRUE;
     }
@@ -1255,13 +1255,13 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
 	{
           if (hide_child_frame)
             {
-              block_interrupts ();
+              block_input ();
 #ifndef HAVE_PGTK
               gtk_widget_hide (FRAME_GTK_OUTER_WIDGET (f));
 #else
 	      gtk_widget_hide (FRAME_WIDGET (f));
 #endif
-              unblock_interrupts ();
+              unblock_input ();
             }
 
 #ifndef HAVE_PGTK
@@ -1282,13 +1282,13 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
 
           if (hide_child_frame)
             {
-              block_interrupts ();
+              block_input ();
 #ifndef HAVE_PGTK
               gtk_widget_show_all (FRAME_GTK_OUTER_WIDGET (f));
 #else
 	      gtk_widget_show_all (FRAME_WIDGET (f));
 #endif
-              unblock_interrupts ();
+              unblock_input ();
             }
 
 	  fullscreen = Qnil;
@@ -1388,7 +1388,7 @@ xg_win_to_widget (Display *dpy, Window wdesc)
   gpointer gdkwin;
   GtkWidget *gwdesc = 0;
 
-  block_interrupts ();
+  block_input ();
 
   gdkwin = gdk_x11_window_lookup_for_display (gdk_x11_lookup_xdisplay (dpy),
                                               wdesc);
@@ -1400,7 +1400,7 @@ xg_win_to_widget (Display *dpy, Window wdesc)
       gwdesc = gtk_get_event_widget (&event);
     }
 
-  unblock_interrupts ();
+  unblock_input ();
   return gwdesc;
 }
 #endif
@@ -1533,7 +1533,7 @@ xg_create_frame_widgets (struct frame *f)
   GtkWindowType type = GTK_WINDOW_TOPLEVEL;
   char *title = 0;
 
-  block_interrupts ();
+  block_input ();
 
 #ifndef HAVE_PGTK  /* gtk_plug not found. */
   if (FRAME_X_EMBEDDED_P (f))
@@ -1587,7 +1587,7 @@ xg_create_frame_widgets (struct frame *f)
       if (whbox) gtk_widget_destroy (whbox);
       if (wfixed) gtk_widget_destroy (wfixed);
 
-      unblock_interrupts ();
+      unblock_input ();
       return 0;
     }
 
@@ -1766,7 +1766,7 @@ xg_create_frame_widgets (struct frame *f)
       }
   }
 
-  unblock_interrupts ();
+  unblock_input ();
 
   return 1;
 }
@@ -1780,7 +1780,7 @@ xg_create_frame_outer_widgets (struct frame *f)
   GtkWindowType type = GTK_WINDOW_TOPLEVEL;
   char *title = 0;
 
-  block_interrupts ();
+  block_input ();
 
   wtop = gtk_window_new (type);
   gtk_widget_add_events (wtop, GDK_ALL_EVENTS_MASK);
@@ -1869,7 +1869,7 @@ xg_create_frame_outer_widgets (struct frame *f)
       }
   }
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 #endif
 
@@ -2028,12 +2028,12 @@ xg_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
 		 &f->output_data.xp->size_hints,
 		 sizeof (size_hints)) != 0)
     {
-      block_interrupts ();
+      block_input ();
       gtk_window_set_geometry_hints (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
                                      NULL, &size_hints, hint_flags);
       f->output_data.xp->size_hints = size_hints;
       f->output_data.xp->hint_flags = hint_flags;
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -2048,7 +2048,7 @@ xg_set_background_color (struct frame *f, unsigned long bg)
 {
   if (FRAME_GTK_WIDGET (f))
     {
-      block_interrupts ();
+      block_input ();
       xg_set_widget_bg (f, FRAME_GTK_WIDGET (f), FRAME_BACKGROUND_PIXEL (f));
 
 #ifdef USE_TOOLKIT_SCROLL_BARS
@@ -2063,7 +2063,7 @@ xg_set_background_color (struct frame *f, unsigned long bg)
           xg_set_widget_bg (f, webox, FRAME_BACKGROUND_PIXEL (f));
         }
 #endif
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -2078,10 +2078,10 @@ xg_set_undecorated (struct frame *f, Lisp_Object undecorated)
 #endif
   if (FRAME_GTK_WIDGET (f))
     {
-      block_interrupts ();
+      block_input ();
       gtk_window_set_decorated (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
 				NILP (undecorated) ? TRUE : FALSE);
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -2091,7 +2091,7 @@ xg_set_undecorated (struct frame *f, Lisp_Object undecorated)
 void
 xg_frame_restack (struct frame *f1, struct frame *f2, bool above_flag)
 {
-  block_interrupts ();
+  block_input ();
   if (FRAME_GTK_OUTER_WIDGET (f1) && FRAME_GTK_OUTER_WIDGET (f2))
     {
       GdkWindow *gwin1 = gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f1));
@@ -2108,7 +2108,7 @@ xg_frame_restack (struct frame *f1, struct frame *f2, bool above_flag)
       gdk_flush ();
 #endif
     }
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -2116,7 +2116,7 @@ xg_frame_restack (struct frame *f1, struct frame *f2, bool above_flag)
 void
 xg_set_skip_taskbar (struct frame *f, Lisp_Object skip_taskbar)
 {
-  block_interrupts ();
+  block_input ();
 #ifndef HAVE_PGTK
   if (FRAME_GTK_WIDGET (f))
     gdk_window_set_skip_taskbar_hint
@@ -2128,7 +2128,7 @@ xg_set_skip_taskbar (struct frame *f, Lisp_Object skip_taskbar)
       (gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f)),
        NILP (skip_taskbar) ? FALSE : TRUE);
 #endif
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -2140,7 +2140,7 @@ xg_set_no_focus_on_map (struct frame *f, Lisp_Object no_focus_on_map)
   if (!FRAME_GTK_OUTER_WIDGET (f))
     return;
 #endif
-  block_interrupts ();
+  block_input ();
   if (FRAME_GTK_WIDGET (f))
     {
       GtkWindow *gwin = GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f));
@@ -2148,7 +2148,7 @@ xg_set_no_focus_on_map (struct frame *f, Lisp_Object no_focus_on_map)
 
       gtk_window_set_focus_on_map (gwin, g_no_focus_on_map);
     }
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -2164,19 +2164,19 @@ xg_set_no_accept_focus (struct frame *f, Lisp_Object no_accept_focus)
       return;
     }
 #endif
-  block_interrupts ();
+  block_input ();
   if (FRAME_GTK_WIDGET (f))
     {
       GtkWindow *gwin = GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f));
       gtk_window_set_accept_focus (gwin, g_no_accept_focus);
     }
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 void
 xg_set_override_redirect (struct frame *f, Lisp_Object override_redirect)
 {
-  block_interrupts ();
+  block_input ();
 
   if (FRAME_GTK_OUTER_WIDGET (f))
     {
@@ -2185,7 +2185,7 @@ xg_set_override_redirect (struct frame *f, Lisp_Object override_redirect)
       gdk_window_set_override_redirect (gwin, NILP (override_redirect) ? FALSE : TRUE);
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 #ifndef HAVE_PGTK
@@ -2416,14 +2416,14 @@ pop_down_dialog (void *arg)
 {
   struct xg_dialog_data *dd = arg;
 
-  block_interrupts ();
+  block_input ();
   if (dd->w) gtk_widget_destroy (dd->w);
   if (dd->timerid != 0) g_source_remove (dd->timerid);
 
   g_main_loop_quit (dd->loop);
   g_main_loop_unref (dd->loop);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* If there are any emacs timers pending, add a timeout to main loop in DATA.
@@ -4132,7 +4132,7 @@ xg_update_frame_menubar (struct frame *f)
   if (x->menubar_widget && gtk_widget_get_parent (x->menubar_widget))
     return; /* Already done this, happens for frames created invisible.  */
 
-  block_interrupts ();
+  block_input ();
 
   gtk_box_pack_start (GTK_BOX (x->vbox_widget), x->menubar_widget,
                       FALSE, FALSE, 0);
@@ -4159,7 +4159,7 @@ xg_update_frame_menubar (struct frame *f)
       FRAME_MENUBAR_HEIGHT (f) = req.height * scale;
       adjust_frame_size (f, -1, -1, 2, 0, Qmenu_bar_lines);
     }
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* Get rid of the menu bar of frame F, and free its storage.
@@ -4172,7 +4172,7 @@ free_frame_menubar (struct frame *f)
 
   if (x->menubar_widget)
     {
-      block_interrupts ();
+      block_input ();
 
       gtk_container_remove (GTK_CONTAINER (x->vbox_widget), x->menubar_widget);
        /* The menubar and its children shall be deleted when removed from
@@ -4180,7 +4180,7 @@ free_frame_menubar (struct frame *f)
       x->menubar_widget = 0;
       FRAME_MENUBAR_HEIGHT (f) = 0;
       adjust_frame_size (f, -1, -1, 2, 0, Qmenu_bar_lines);
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -4981,7 +4981,7 @@ xg_set_toolkit_scroll_bar_thumb (struct scroll_bar *bar,
 
       if (changed || int_gtk_range_get_value (GTK_RANGE (wscroll)) != value)
       {
-        block_interrupts ();
+        block_input ();
 
         /* gtk_range_set_value invokes the callback.  Set
            ignore_gtk_scrollbar to make the callback do nothing  */
@@ -4996,7 +4996,7 @@ xg_set_toolkit_scroll_bar_thumb (struct scroll_bar *bar,
 
         xg_ignore_gtk_scrollbar = 0;
 
-        unblock_interrupts ();
+        unblock_input ();
       }
     }
 }
@@ -5026,7 +5026,7 @@ xg_set_toolkit_horizontal_scroll_bar_thumb (struct scroll_bar *bar,
       int page_increment = 4;
       int step_increment = 1;
 
-      block_interrupts ();
+      block_input ();
       adj = gtk_range_get_adjustment (GTK_RANGE (wscroll));
       gtk_adjustment_configure (adj, (gdouble) value, (gdouble) lower,
 				(gdouble) upper, (gdouble) step_increment,
@@ -5034,7 +5034,7 @@ xg_set_toolkit_horizontal_scroll_bar_thumb (struct scroll_bar *bar,
 #if ! GTK_CHECK_VERSION (3, 18, 0)
       gtk_adjustment_changed (adj);
 #endif
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -5802,7 +5802,7 @@ update_frame_tool_bar (struct frame *f)
     return;
 #endif
 
-  block_interrupts ();
+  block_input ();
 
   if (RANGED_FIXNUMP (1, Vtool_bar_button_margin, INT_MAX))
     {
@@ -5846,7 +5846,7 @@ update_frame_tool_bar (struct frame *f)
       && ! NILP (Fequal (tbinfo->style, style))
       && ! NILP (Fequal (tbinfo->last_tool_bar, f->tool_bar_items)))
     {
-      unblock_interrupts ();
+      unblock_input ();
       return;
     }
 
@@ -6088,7 +6088,7 @@ update_frame_tool_bar (struct frame *f)
       f->tool_bar_resized = f->tool_bar_redisplayed;
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* Deallocate all resources for the tool bar on frame F.
@@ -6104,7 +6104,7 @@ free_frame_tool_bar (struct frame *f)
       struct xg_frame_tb_info *tbinfo;
       GtkWidget *top_widget = x->toolbar_widget;
 
-      block_interrupts ();
+      block_input ();
       if (x->toolbar_is_packed)
         {
           if (x->toolbar_in_hbox)
@@ -6135,7 +6135,7 @@ free_frame_tool_bar (struct frame *f)
 
       adjust_frame_size (f, -1, -1, 2, 0, Qtool_bar_lines);
 
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -6148,7 +6148,7 @@ xg_change_toolbar_position (struct frame *f, Lisp_Object pos)
   if (! x->toolbar_widget || ! top_widget)
     return;
 
-  block_interrupts ();
+  block_input ();
   g_object_ref (top_widget);
   if (x->toolbar_is_packed)
     {
@@ -6166,7 +6166,7 @@ xg_change_toolbar_position (struct frame *f, Lisp_Object pos)
   if (xg_update_tool_bar_sizes (f))
     adjust_frame_size (f, -1, -1, 2, 0, Qtool_bar_lines);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 

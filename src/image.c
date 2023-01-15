@@ -42,7 +42,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "buffer.h"
 #include "dispextern.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "sysstdio.h"
 #include "systime.h"
 #include <epaths.h>
@@ -888,9 +888,9 @@ image_destroy_bitmap (struct frame *f, ptrdiff_t id)
 
       if (--bm->refcount == 0)
 	{
-	  block_interrupts ();
+	  block_input ();
 	  free_bitmap_record (dpyinfo, bm);
-	  unblock_interrupts ();
+	  unblock_input ();
 	}
     }
 }
@@ -972,19 +972,19 @@ x_create_bitmap_mask (struct frame *f, ptrdiff_t id)
   width = x_bitmap_width (f, id);
   height = x_bitmap_height (f, id);
 
-  block_interrupts ();
+  block_input ();
   ximg = XGetImage (FRAME_X_DISPLAY (f), pixmap, 0, 0, width, height,
 		    ~0, ZPixmap);
 
   if (!ximg)
     {
-      unblock_interrupts ();
+      unblock_input ();
       return;
     }
 
   result = x_create_x_image_and_pixmap (f, width, height, 1, &mask_img, &mask);
 
-  unblock_interrupts ();
+  unblock_input ();
   if (!result)
     {
       XDestroyImage (ximg);
@@ -1032,7 +1032,7 @@ x_create_bitmap_mask (struct frame *f, ptrdiff_t id)
 	}
     }
 
-  eassert (interrupts_blocked_p ());
+  eassert (input_blocked_p ());
   gc = XCreateGC (FRAME_X_DISPLAY (f), mask, 0, NULL);
   XPutImage (FRAME_X_DISPLAY (f), mask, gc, mask_img, 0, 0, 0, 0,
 	     width, height);
@@ -1564,7 +1564,7 @@ prepare_image_for_display (struct frame *f, struct image *img)
 #ifdef USE_CAIRO
   if (!img->load_failed_p)
     {
-      block_interrupts ();
+      block_input ();
       if (img->cr_data == NULL || (cairo_pattern_get_type (img->cr_data)
 				   != CAIRO_PATTERN_TYPE_SURFACE))
 	{
@@ -1579,14 +1579,14 @@ prepare_image_for_display (struct frame *f, struct image *img)
 	      img->type->free_img (f, img);
 	    }
 	}
-      unblock_interrupts ();
+      unblock_input ();
     }
 #elif defined HAVE_X_WINDOWS
   if (!img->load_failed_p)
     {
-      block_interrupts ();
+      block_input ();
       image_sync_to_pixmaps (f, img);
-      unblock_interrupts ();
+      unblock_input ();
     }
 #endif
 }
@@ -1841,12 +1841,12 @@ image_clear_image_1 (struct frame *f, struct image *img, int flags)
 static void
 image_clear_image (struct frame *f, struct image *img)
 {
-  block_interrupts ();
+  block_input ();
   image_clear_image_1 (f, img,
 		       (CLEAR_IMAGE_PIXMAP
 			| CLEAR_IMAGE_MASK
 			| CLEAR_IMAGE_COLORS));
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -2049,7 +2049,7 @@ clear_image_cache (struct frame *f, Lisp_Object filter)
 
       /* Block input so that we won't be interrupted by a SIGIO
 	 while being in an inconsistent state.  */
-      block_interrupts ();
+      block_input ();
 
       if (!NILP (filter))
 	{
@@ -2115,7 +2115,7 @@ clear_image_cache (struct frame *f, Lisp_Object filter)
 	  windows_or_buffers_changed = 19;
 	}
 
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -2899,7 +2899,7 @@ lookup_image (struct frame *f, Lisp_Object spec, int face_id)
   /* If not found, create a new image and cache it.  */
   if (img == NULL)
     {
-      block_interrupts ();
+      block_input ();
       img = make_image (spec, hash);
       cache_image (f, img);
       img->face_foreground = foreground;
@@ -2979,7 +2979,7 @@ lookup_image (struct frame *f, Lisp_Object spec, int face_id)
 #endif
 	}
 
-      unblock_interrupts ();
+      unblock_input ();
     }
 
   /* IMG is now being used, so set its timestamp to the current
@@ -3200,7 +3200,7 @@ x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
   Display *display = FRAME_X_DISPLAY (f);
   Drawable drawable = FRAME_X_DRAWABLE (f);
 
-  eassert (interrupts_blocked_p ());
+  eassert (input_blocked_p ());
 
   if (depth <= 0)
     depth = FRAME_DISPLAY_INFO (f)->n_planes;
@@ -3339,7 +3339,7 @@ image_create_x_image_and_pixmap_1 (struct frame *f, int width, int height, int d
                                    Emacs_Pixmap *pixmap, Picture *picture)
 {
 #ifdef USE_CAIRO
-  eassert (interrupts_blocked_p ());
+  eassert (input_blocked_p ());
 
   /* Allocate a pixmap of the same size.  */
   *pixmap = image_create_pix_container (width, height, depth);
@@ -3501,7 +3501,7 @@ image_destroy_x_image (Emacs_Pix_Container pimg)
 #if defined HAVE_X_WINDOWS && !defined USE_CAIRO
   x_destroy_x_image (pimg);
 #else
-  eassert (interrupts_blocked_p ());
+  eassert (input_blocked_p ());
   if (pimg)
     {
 #ifdef USE_CAIRO
@@ -3532,7 +3532,7 @@ gui_put_x_image (struct frame *f, Emacs_Pix_Container pimg,
 #elif defined HAVE_X_WINDOWS
   GC gc;
 
-  eassert (interrupts_blocked_p ());
+  eassert (input_blocked_p ());
   gc = XCreateGC (FRAME_X_DISPLAY (f), pixmap, 0, NULL);
   XPutImage (FRAME_X_DISPLAY (f), pixmap, gc, pimg, 0, 0, 0, 0,
              pimg->width, pimg->height);
@@ -6012,12 +6012,12 @@ lookup_pixel_color (struct frame *f, unsigned long pixel)
       x_query_colors (f, &color, 1);
       rc = x_alloc_nearest_color (f, cmap, &color);
 #else
-      block_interrupts ();
+      block_input ();
       cmap = DefaultColormapOfScreen (FRAME_X_SCREEN (f));
       color.pixel = pixel;
       XQueryColor (NULL, cmap, &color);
       rc = x_alloc_nearest_color (f, cmap, &color);
-      unblock_interrupts ();
+      unblock_input ();
 #endif /* HAVE_X_WINDOWS */
 
       if (rc)
@@ -11723,12 +11723,12 @@ gs_load (struct frame *f, struct image *img)
 
   if (image_check_image_size (0, img->width, img->height))
     {
-      /* Only W32 version did BLOCK_INTERRUPTS here.  ++kfs */
-      block_interrupts ();
+      /* Only W32 version did BLOCK_INPUT here.  ++kfs */
+      block_input ();
       img->pixmap = XCreatePixmap (FRAME_X_DISPLAY (f), FRAME_X_DRAWABLE (f),
 				   img->width, img->height,
 				   FRAME_DISPLAY_INFO (f)->n_planes);
-      unblock_interrupts ();
+      unblock_input ();
     }
 
   if (!img->pixmap)
@@ -11804,7 +11804,7 @@ x_kill_gs_process (Pixmap pixmap, struct frame *f)
     {
       XImage *ximg;
 
-      block_interrupts ();
+      block_input ();
 
       /* Try to get an XImage for img->pixmep.  */
       ximg = XGetImage (FRAME_X_DISPLAY (f), img->pixmap,
@@ -11836,15 +11836,15 @@ x_kill_gs_process (Pixmap pixmap, struct frame *f)
 	image_error ("Cannot get X image of `%s'; colors will not be freed",
 		     img->spec);
 
-      unblock_interrupts ();
+      unblock_input ();
     }
 #endif /* HAVE_X_WINDOWS */
 
   /* Now that we have the pixmap, compute mask and transform the
      image if requested.  */
-  block_interrupts ();
+  block_input ();
   postprocess_image (f, img);
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 #endif /* HAVE_GHOSTSCRIPT */

@@ -21,7 +21,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <signal.h>
 #include <stdio.h>
 #include "lisp.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "w32term.h"
 #include "w32common.h"	/* for OS version info */
 
@@ -825,7 +825,7 @@ w32_after_update_window_line (struct window *w, struct glyph_row *desired_row)
 	: INTERNAL_BORDER_FACE_ID;
       struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
 
-      block_interrupts ();
+      block_input ();
 
       HDC hdc = get_frame_dc (f);
       if (face)
@@ -845,7 +845,7 @@ w32_after_update_window_line (struct window *w, struct glyph_row *desired_row)
 	}
       release_frame_dc (f, hdc);
 
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -2891,7 +2891,7 @@ w32_clear_frame (struct frame *f)
      longer visible.  */
   mark_window_cursors_off (XWINDOW (FRAME_ROOT_WINDOW (f)));
 
-  block_interrupts ();
+  block_input ();
 
   w32_clear_window (f);
 
@@ -2899,7 +2899,7 @@ w32_clear_frame (struct frame *f)
      colors or something like that, then they should be notified.  */
   w32_scroll_bar_clear (f);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -2908,7 +2908,7 @@ w32_clear_frame (struct frame *f)
 static void
 w32_ring_bell (struct frame *f)
 {
-  block_interrupts ();
+  block_input ();
 
   if (FRAME_W32_P (f) && visible_bell)
     {
@@ -2925,7 +2925,7 @@ w32_ring_bell (struct frame *f)
   else
       w32_sys_ring_bell (f);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /***********************************************************************
@@ -2990,7 +2990,7 @@ w32_scroll_run (struct window *w, struct run *run)
 	expect_dirty = CreateRectRgn (x, y, x + width, to_y);
     }
 
-  block_interrupts ();
+  block_input ();
 
   /* Cursor off.  Will be switched on again in gui_update_window_end.  */
   gui_clear_cursor (w);
@@ -3029,7 +3029,7 @@ w32_scroll_run (struct window *w, struct run *run)
       DeleteObject (combined);
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 
   if (w32_disable_double_buffering
       && expect_dirty)
@@ -3214,9 +3214,9 @@ get_keysym_name (int keysym)
   /* Make static so we can always return it */
   static char value[100];
 
-  block_interrupts ();
+  block_input ();
   GetKeyNameText (keysym, value, 100);
-  unblock_interrupts ();
+  unblock_input ();
 
   return value;
 }
@@ -3742,7 +3742,7 @@ w32_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 {
   struct w32_display_info *dpyinfo = FRAME_DISPLAY_INFO (*fp);
 
-  block_interrupts ();
+  block_input ();
 
   if (dpyinfo->last_mouse_scroll_bar && insist == 0)
     {
@@ -3843,7 +3843,7 @@ w32_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	}
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -3962,12 +3962,12 @@ w32_set_scroll_bar_thumb (struct scroll_bar *bar,
   if (draggingp)
     {
       int near_bottom_p;
-      block_interrupts ();
+      block_input ();
       si.cbSize = sizeof (si);
       si.fMask = SIF_POS | SIF_PAGE;
       GetScrollInfo (w, SB_CTL, &si);
       near_bottom_p = si.nPos + si.nPage >= range;
-      unblock_interrupts ();
+      unblock_input ();
       if (!near_bottom_p)
 	return;
     }
@@ -3996,7 +3996,7 @@ w32_set_scroll_bar_thumb (struct scroll_bar *bar,
 
   sb_page = max (sb_page, VERTICAL_SCROLL_BAR_MIN_HANDLE);
 
-  block_interrupts ();
+  block_input ();
 
   si.cbSize = sizeof (si);
   si.fMask = SIF_PAGE | SIF_POS;
@@ -4005,7 +4005,7 @@ w32_set_scroll_bar_thumb (struct scroll_bar *bar,
 
   SetScrollInfo (w, SB_CTL, &si, TRUE);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* Set the thumb size and position of horizontal scroll bar BAR.  We are currently
@@ -4018,7 +4018,7 @@ w32_set_horizontal_scroll_bar_thumb (struct scroll_bar *bar,
   Window w = SCROLL_BAR_W32_WINDOW (bar);
   SCROLLINFO si;
 
-  block_interrupts ();
+  block_input ();
 
   si.cbSize = sizeof (si);
   si.fMask = SIF_PAGE | SIF_POS | SIF_RANGE;
@@ -4030,7 +4030,7 @@ w32_set_horizontal_scroll_bar_thumb (struct scroll_bar *bar,
   si.nPos = min (position, si.nMax);
   SetScrollInfo (w, SB_CTL, &si, TRUE);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -4133,7 +4133,7 @@ w32_scroll_bar_create (struct window *w, int left, int top,
     = ALLOCATE_PSEUDOVECTOR (struct scroll_bar, w32_widget_high, PVEC_OTHER);
   Lisp_Object barobj;
 
-  block_interrupts ();
+  block_input ();
 
   XSETWINDOW (bar->window, w);
   bar->top = top;
@@ -4176,7 +4176,7 @@ w32_scroll_bar_create (struct window *w, int left, int top,
   if (! NILP (bar->next))
     XSETVECTOR (XSCROLL_BAR (bar->next)->prev, bar);
 
-  unblock_interrupts ();
+  unblock_input ();
 
   return bar;
 }
@@ -4190,7 +4190,7 @@ w32_scroll_bar_remove (struct scroll_bar *bar)
 {
   struct frame *f = XFRAME (WINDOW_FRAME (XWINDOW (bar->window)));
 
-  block_interrupts ();
+  block_input ();
 
   /* Destroy the window.  */
   my_destroy_window (f, SCROLL_BAR_W32_WINDOW (bar));
@@ -4201,7 +4201,7 @@ w32_scroll_bar_remove (struct scroll_bar *bar)
   else
     wset_vertical_scroll_bar (XWINDOW (bar->window), Qnil);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* Set the handle of the vertical scroll bar for WINDOW to indicate that
@@ -4231,14 +4231,14 @@ w32_set_vertical_scroll_bar (struct window *w,
   if (NILP (w->vertical_scroll_bar))
     {
       HDC hdc;
-      block_interrupts ();
+      block_input ();
       if (width > 0 && height > 0)
 	{
 	  hdc = get_frame_dc (f);
 	  w32_clear_area (f, hdc, left, top, width, height);
 	  release_frame_dc (f, hdc);
 	}
-      unblock_interrupts ();
+      unblock_input ();
 
       bar = w32_scroll_bar_create (w, left, top, width, height, false);
     }
@@ -4265,7 +4265,7 @@ w32_set_vertical_scroll_bar (struct window *w,
           HDC hdc;
 	  SCROLLINFO si;
 
-          block_interrupts ();
+          block_input ();
 	  if (width && height)
 	    {
 	      hdc = get_frame_dc (f);
@@ -4300,7 +4300,7 @@ w32_set_vertical_scroll_bar (struct window *w,
           bar->width = width;
           bar->height = height;
 
-          unblock_interrupts ();
+          unblock_input ();
         }
     }
   w32_set_scroll_bar_thumb (bar, portion, position, whole);
@@ -4335,14 +4335,14 @@ w32_set_horizontal_scroll_bar (struct window *w,
   if (NILP (w->horizontal_scroll_bar))
     {
       HDC hdc;
-      block_interrupts ();
+      block_input ();
       if (width > 0 && height > 0)
 	{
 	  hdc = get_frame_dc (f);
 	  w32_clear_area (f, hdc, clear_left, top, clear_width, height);
 	  release_frame_dc (f, hdc);
 	}
-      unblock_interrupts ();
+      unblock_input ();
 
       bar = w32_scroll_bar_create (w, left, top, width, height, true);
     }
@@ -4367,7 +4367,7 @@ w32_set_horizontal_scroll_bar (struct window *w,
           HDC hdc;
 	  SCROLLINFO si;
 
-          block_interrupts ();
+          block_input ();
 	  if (width && height)
 	    {
 	      hdc = get_frame_dc (f);
@@ -4403,7 +4403,7 @@ w32_set_horizontal_scroll_bar (struct window *w,
           bar->width = width;
           bar->height = height;
 
-          unblock_interrupts ();
+          unblock_input ();
         }
     }
 
@@ -4808,7 +4808,7 @@ w32_scroll_bar_report_motion (struct frame **fp, Lisp_Object *bar_window,
   SCROLLINFO si;
   int sb_event = LOWORD (dpyinfo->last_mouse_scroll_bar_pos);
 
-  block_interrupts ();
+  block_input ();
 
   *fp = f;
   *bar_window = bar->window;
@@ -4838,7 +4838,7 @@ w32_scroll_bar_report_motion (struct frame **fp, Lisp_Object *bar_window,
 
   *time = dpyinfo->last_mouse_movement_time;
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* Return information to the user about the current position of the mouse
@@ -4858,7 +4858,7 @@ w32_horizontal_scroll_bar_report_motion (struct frame **fp, Lisp_Object *bar_win
   SCROLLINFO si;
   int sb_event = LOWORD (dpyinfo->last_mouse_scroll_bar_pos);
 
-  block_interrupts ();
+  block_input ();
 
   *fp = f;
   *bar_window = bar->window;
@@ -4889,7 +4889,7 @@ w32_horizontal_scroll_bar_report_motion (struct frame **fp, Lisp_Object *bar_win
 
   *time = dpyinfo->last_mouse_movement_time;
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -5015,7 +5015,7 @@ w32_read_socket (struct terminal *terminal,
   struct w32_display_info *dpyinfo = &one_w32_display_info;
   Mouse_HLInfo *hlinfo = &dpyinfo->mouse_highlight;
 
-  block_interrupts ();
+  block_input ();
 
   /* Process any incoming thread messages.  */
   drain_message_queue ();
@@ -6079,7 +6079,7 @@ w32_read_socket (struct terminal *terminal,
       }
     }
 
-  unblock_interrupts ();
+  unblock_input ();
   return count;
 }
 
@@ -6666,7 +6666,7 @@ w32_set_offset (struct frame *f, register int xoff, register int yoff,
     }
   w32_calc_absolute_position (f);
 
-  block_interrupts ();
+  block_input ();
   w32_wm_set_size_hint (f, (long) 0, false);
 
   modified_left = f->left_pos;
@@ -6682,7 +6682,7 @@ w32_set_offset (struct frame *f, register int xoff, register int yoff,
 		       modified_left, modified_top,
 		       0, 0,
 		       SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 static void
@@ -6695,7 +6695,7 @@ w32fullscreen_hook (struct frame *f)
       RECT rect;
       enum fullscreen_type prev_fsmode = FRAME_PREV_FSMODE (f);
 
-      block_interrupts();
+      block_input();
       f->want_fullscreen &= ~FULLSCREEN_WAIT;
 
       if (FRAME_PREV_FSMODE (f) == FULLSCREEN_NONE)
@@ -6754,7 +6754,7 @@ w32fullscreen_hook (struct frame *f)
 	}
 
       f->want_fullscreen = FULLSCREEN_NONE;
-      unblock_interrupts ();
+      unblock_input ();
 
       if (f->want_fullscreen == FULLSCREEN_BOTH
 	  || f->want_fullscreen == FULLSCREEN_WIDTH
@@ -6779,7 +6779,7 @@ w32_set_window_size (struct frame *f, bool change_gravity,
   MENUBARINFO info;
   int menu_bar_height;
 
-  block_interrupts ();
+  block_input ();
 
   /* Get the height of the menu bar here.  It's used below to detect
      whether the menu bar is wrapped.  It's also used to specify the
@@ -6871,7 +6871,7 @@ w32_set_window_size (struct frame *f, bool change_gravity,
       cancel_mouse_face (f);
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 
   do_pending_window_change (false);
 }
@@ -6886,7 +6886,7 @@ frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y)
   RECT rect;
   POINT pt;
 
-  block_interrupts ();
+  block_input ();
 
   GetClientRect (FRAME_W32_WINDOW (f), &rect);
   pt.x = rect.left + pix_x;
@@ -6903,7 +6903,7 @@ frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y)
   if (ret)
     SystemParametersInfo (SPI_SETMOUSETRAILS, trail_num, NULL, 0);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 static Lisp_Object
@@ -6935,7 +6935,7 @@ w32_focus_frame (struct frame *f, bool noactivate)
 #endif
 
   /* Give input focus to frame.  */
-  block_interrupts ();
+  block_input ();
 #if 0
   /* Try not to change its Z-order if possible.  */
   if (w32_window_to_frame (dpyinfo, GetForegroundWindow ()))
@@ -6943,14 +6943,14 @@ w32_focus_frame (struct frame *f, bool noactivate)
   else
 #endif
     my_set_foreground_window (FRAME_W32_WINDOW (f));
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* Raise frame F.  */
 static void
 w32_raise_frame (struct frame *f)
 {
-  block_interrupts ();
+  block_input ();
 
   /* Strictly speaking, raise-frame should only change the frame's Z
      order, leaving input focus unchanged.  This is reasonable behavior
@@ -7005,19 +7005,19 @@ w32_raise_frame (struct frame *f)
       my_bring_window_to_top (FRAME_W32_WINDOW (f));
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* Lower frame F.  */
 static void
 w32_lower_frame (struct frame *f)
 {
-  block_interrupts ();
+  block_input ();
   my_set_window_pos (FRAME_W32_WINDOW (f),
 		     HWND_BOTTOM,
 		     0, 0, 0, 0,
 		     SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 static void
@@ -7045,7 +7045,7 @@ w32_frame_raise_lower (struct frame *f, bool raise_flag)
 void
 w32_make_frame_visible (struct frame *f)
 {
-  block_interrupts ();
+  block_input ();
 
   gui_set_bitmap_icon (f);
 
@@ -7096,7 +7096,7 @@ w32_make_frame_visible (struct frame *f)
 
   if (!FLOATP (Vx_wait_for_event_timeout))
     {
-      unblock_interrupts ();
+      unblock_input ();
       return;
     }
 
@@ -7109,7 +7109,7 @@ w32_make_frame_visible (struct frame *f)
     double start_time = XFLOAT_DATA (Ffloat_time (Qnil));
 
     /* This must come after we set COUNT.  */
-    unblock_interrupts ();
+    unblock_input ();
 
     XSETFRAME (frame, f);
 
@@ -7151,7 +7151,7 @@ w32_make_frame_invisible (struct frame *f)
   if (FRAME_DISPLAY_INFO (f)->highlight_frame == f)
     FRAME_DISPLAY_INFO (f)->highlight_frame = 0;
 
-  block_interrupts ();
+  block_input ();
 
   my_show_window (f, FRAME_W32_WINDOW (f), SW_HIDE);
 
@@ -7163,7 +7163,7 @@ w32_make_frame_invisible (struct frame *f)
   SET_FRAME_VISIBLE (f, 0);
   SET_FRAME_ICONIFIED (f, false);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 static void
@@ -7187,7 +7187,7 @@ w32_iconify_frame (struct frame *f)
   if (FRAME_ICONIFIED_P (f))
     return;
 
-  block_interrupts ();
+  block_input ();
 
   gui_set_bitmap_icon (f);
 
@@ -7198,7 +7198,7 @@ w32_iconify_frame (struct frame *f)
   SET_FRAME_VISIBLE (f, 0);
   SET_FRAME_ICONIFIED (f, true);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -7210,7 +7210,7 @@ w32_free_frame_resources (struct frame *f)
   struct w32_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
 
-  block_interrupts ();
+  block_input ();
 
   /* We must free faces before destroying windows because some
      font-driver (e.g. xft) access a window while finishing a
@@ -7237,7 +7237,7 @@ w32_free_frame_resources (struct frame *f)
   if (f == hlinfo->mouse_face_mouse_frame)
     reset_mouse_highlight (hlinfo);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -7335,7 +7335,7 @@ w32_arrow_cursor (void)
 static void
 w32_toggle_invisible_pointer (struct frame *f, bool invisible)
 {
-  block_interrupts ();
+  block_input ();
 
   if (f->pointer_invisible != invisible)
     {
@@ -7344,7 +7344,7 @@ w32_toggle_invisible_pointer (struct frame *f, bool invisible)
 			 f->output_data.w32->current_cursor);
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -7576,10 +7576,10 @@ w32_delete_terminal (struct terminal *terminal)
   if (!terminal->name)
     return;
 
-  block_interrupts ();
+  block_input ();
 
   w32_delete_display (dpyinfo);
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 struct w32_display_info *
@@ -7589,7 +7589,7 @@ w32_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   struct terminal *terminal;
   HDC hdc;
 
-  block_interrupts ();
+  block_input ();
 
   if (!w32_initialized)
     {
@@ -7647,7 +7647,7 @@ w32_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
      the bitmaps.  */
   gui_init_fringe (terminal->rif);
 
-  unblock_interrupts ();
+  unblock_input ();
 
   return dpyinfo;
 }

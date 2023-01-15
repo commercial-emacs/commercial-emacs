@@ -43,7 +43,7 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 #include <ftoastr.h>
 
 #include "lisp.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "sysselect.h"
 #include "nsterm.h"
 #include "systime.h"
@@ -989,7 +989,7 @@ ns_constrain_all_frames (void)
 
   NSTRACE ("ns_constrain_all_frames");
 
-  block_interrupts ();
+  block_input ();
 
   FOR_EACH_FRAME (tail, frame)
     {
@@ -1007,7 +1007,7 @@ ns_constrain_all_frames (void)
         }
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -1020,7 +1020,7 @@ ns_update_auto_hide_menu_bar (void)
 #ifdef NS_IMPL_COCOA
   NSTRACE ("ns_update_auto_hide_menu_bar");
 
-  block_interrupts ();
+  block_input ();
 
   if (NSApp != nil && [NSApp isActive])
     {
@@ -1048,7 +1048,7 @@ ns_update_auto_hide_menu_bar (void)
         }
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 #endif
 }
 
@@ -1084,14 +1084,14 @@ ns_update_end (struct frame *f)
 /*   if (f == MOUSE_HL_INFO (f)->mouse_face_mouse_frame) */
   MOUSE_HL_INFO (f)->mouse_face_defer = 0;
 
-  block_interrupts ();
+  block_input ();
 
   [view unlockFocus];
 #if defined (NS_IMPL_GNUSTEP) || MAC_OS_X_VERSION_MIN_REQUIRED < 101400
   [[view window] flushWindow];
 #endif
 
-  unblock_interrupts ();
+  unblock_input ();
   ns_updating_frame = NULL;
 }
 
@@ -1308,7 +1308,7 @@ ns_ring_bell (struct frame *f)
           [bell_view retain];
         }
 
-      block_interrupts ();
+      block_input ();
 
       view = FRAME_NS_VIEW (frame);
       if (view != nil)
@@ -1316,7 +1316,7 @@ ns_ring_bell (struct frame *f)
           [bell_view show:view];
         }
 
-      unblock_interrupts ();
+      unblock_input ();
     }
   else
     {
@@ -1375,10 +1375,10 @@ ns_focus_frame (struct frame *f, bool noactivate)
   if (dpyinfo->ns_focus_frame != f)
     {
       EmacsView *view = FRAME_NS_VIEW (f);
-      block_interrupts ();
+      block_input ();
       [NSApp activateIgnoringOtherApps: YES];
       [[view window] makeKeyAndOrderFront: view];
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -1392,7 +1392,7 @@ ns_raise_frame (struct frame *f, BOOL make_key)
 
   check_window_system (f);
   view = FRAME_NS_VIEW (f);
-  block_interrupts ();
+  block_input ();
   if (FRAME_VISIBLE_P (f))
     {
       if (make_key)
@@ -1400,7 +1400,7 @@ ns_raise_frame (struct frame *f, BOOL make_key)
       else
         [[view window] orderFront: NSApp];
     }
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -1414,9 +1414,9 @@ ns_lower_frame (struct frame *f)
 
   check_window_system (f);
   view = FRAME_NS_VIEW (f);
-  block_interrupts ();
+  block_input ();
   [[view window] orderBack: NSApp];
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -1505,18 +1505,18 @@ ns_make_frame_visible (struct frame *f)
 
       if (f->want_fullscreen != FULLSCREEN_NONE)
         {
-          block_interrupts ();
+          block_input ();
           [view handleFS];
-          unblock_interrupts ();
+          unblock_input ();
         }
 
       /* Making a frame invisible seems to break the parent->child
          relationship, so reinstate it.  */
       if ([window parentWindow] == nil && FRAME_PARENT_FRAME (f) != NULL)
         {
-          block_interrupts ();
+          block_input ();
           [window setParentChildRelationships];
-          unblock_interrupts ();
+          unblock_input ();
 
           /* If the parent frame moved while the child frame was
              invisible, the child frame's position won't have been
@@ -1586,9 +1586,9 @@ ns_iconify_frame (struct frame *f)
 
   /* Processing input while Emacs is being minimized can cause a
      crash, so block it for the duration.  */
-  block_interrupts();
+  block_input();
   [[view window] miniaturize: NSApp];
-  unblock_interrupts();
+  unblock_input();
 }
 
 /* Free resources of frame F.  */
@@ -1608,7 +1608,7 @@ ns_free_frame_resources (struct frame *f)
 
   [(EmacsView *)view setWindowClosing: YES]; /* may not have been informed */
 
-  block_interrupts ();
+  block_input ();
 
   free_frame_menubar (f);
   free_frame_faces (f);
@@ -1629,7 +1629,7 @@ ns_free_frame_resources (struct frame *f)
   xfree (f->output_data.ns);
   f->output_data.ns = NULL;
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 static void
@@ -1677,7 +1677,7 @@ ns_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
 
   NSTRACE ("ns_set_offset");
 
-  block_interrupts ();
+  block_input ();
 
   /* If there is no parent frame then just convert to screen
      coordinates, UNLESS we have negative values, in which case I
@@ -1713,7 +1713,7 @@ ns_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
   [[view window] setFrameTopLeftPoint:topLeft];
   f->size_hint_flags &= ~(XNegative|YNegative);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -1739,7 +1739,7 @@ ns_set_window_size (struct frame *f, bool change_gravity,
   NSTRACE_MSG ("Width:%d Height:%d", width, height);
   NSTRACE_MSG ("Font %d x %d", FRAME_COLUMN_WIDTH (f), FRAME_LINE_HEIGHT (f));
 
-  block_interrupts ();
+  block_input ();
 
   frameRect = [window frameRectForContentRect:NSMakeRect (0, 0, width, height)];
 
@@ -1757,7 +1757,7 @@ ns_set_window_size (struct frame *f, bool change_gravity,
 
   [window setFrame:frameRect display:NO];
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 void
@@ -1779,7 +1779,7 @@ ns_set_undecorated (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
       NSWindow *oldWindow = [view window];
       NSWindow *newWindow;
 
-      block_interrupts ();
+      block_input ();
 
       FRAME_UNDECORATED (f) = !NILP (new_value);
 
@@ -1794,7 +1794,7 @@ ns_set_undecorated (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
 
       [oldWindow close];
 
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -1837,9 +1837,9 @@ ns_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_val
 
   fset_parent_frame (f, new_value);
 
-  block_interrupts ();
+  block_input ();
   [(EmacsWindow *)[FRAME_NS_VIEW (f) window] setParentChildRelationships];
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 void
@@ -1982,9 +1982,9 @@ ns_fullscreen_hook (struct frame *f)
       return;
     }
 
-  block_interrupts ();
+  block_input ();
   [view handleFS];
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* ==========================================================================
@@ -2008,7 +2008,7 @@ ns_get_color (const char *name, NSColor **col)
 
   NSTRACE ("ns_get_color(%s, **)", name);
 
-  block_interrupts ();
+  block_input ();
 
   if ([nsname isEqualToString: @"ns_selection_bg_color"])
     {
@@ -2022,7 +2022,7 @@ ns_get_color (const char *name, NSColor **col)
       if ((new = [NSColor selectedTextBackgroundColor]) != nil)
         {
           *col = [new colorUsingDefaultColorSpace];
-          unblock_interrupts ();
+          unblock_input ();
           return 0;
         }
       else
@@ -2037,7 +2037,7 @@ ns_get_color (const char *name, NSColor **col)
       if ((new = [NSColor selectedTextColor]) != nil)
         {
           *col = [new colorUsingDefaultColorSpace];
-          unblock_interrupts ();
+          unblock_input ();
           return 0;
         }
 
@@ -2053,7 +2053,7 @@ ns_get_color (const char *name, NSColor **col)
                                  green: g16 / 65535.0
                                   blue: b16 / 65535.0
                                  alpha: 1.0];
-      unblock_interrupts ();
+      unblock_input ();
       return 0;
     }
   else if (name[0] == '0' || name[0] == '1' || name[0] == '.')
@@ -2066,7 +2066,7 @@ ns_get_color (const char *name, NSColor **col)
           && [scanner scanFloat: &b] && b >= 0 && b <= 1)
         {
           *col = [NSColor colorForEmacsRed: r green: g blue: b alpha: 1.0];
-          unblock_interrupts ();
+          unblock_input ();
           return 0;
         }
     }
@@ -2099,7 +2099,7 @@ ns_get_color (const char *name, NSColor **col)
 
   if (new)
     *col = [new colorUsingDefaultColorSpace];
-  unblock_interrupts ();
+  unblock_input ();
   return new ? 0 : 1;
 }
 
@@ -2149,14 +2149,14 @@ ns_defined_color (struct frame *f,
   NSColor *col;
   NSTRACE_WHEN (NSTRACE_GROUP_COLOR, "ns_defined_color");
 
-  block_interrupts ();
+  block_input ();
   if (ns_get_color (name, &col) != 0) /* Color not found  */
     {
-      unblock_interrupts ();
+      unblock_input ();
       return 0;
     }
   ns_query_color (col, color_def);
-  unblock_interrupts ();
+  unblock_input ();
   return 1;
 }
 
@@ -2312,7 +2312,7 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 
   dpyinfo = FRAME_DISPLAY_INFO (*fp);
 
-  block_interrupts ();
+  block_input ();
 
   /* Clear the mouse-moved flag for every frame on this display.  */
   FOR_EACH_FRAME (tail, frame)
@@ -2398,7 +2398,7 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
       *fp = return_no_frame_flag ? NULL : f;
     }
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -2416,13 +2416,13 @@ ns_frame_up_to_date (struct frame *f)
       Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
       if (f == hlinfo->mouse_face_mouse_frame)
 	{
-	  block_interrupts ();
+	  block_input ();
 	  ns_update_begin(f);
 	  note_mouse_highlight (hlinfo->mouse_face_mouse_frame,
 				hlinfo->mouse_face_mouse_x,
 				hlinfo->mouse_face_mouse_y);
 	  ns_update_end(f);
-	  unblock_interrupts ();
+	  unblock_input ();
 	}
     }
 }
@@ -2613,7 +2613,7 @@ ns_clear_frame (struct frame *f)
 
   r = [view bounds];
 
-  block_interrupts ();
+  block_input ();
   ns_focus (f, &r, 1);
   [[NSColor colorWithUnsignedLong:NS_FACE_BACKGROUND
 			    (FACE_FROM_ID (f, DEFAULT_FACE_ID))] set];
@@ -2623,7 +2623,7 @@ ns_clear_frame (struct frame *f)
 #ifdef NS_IMPL_GNUSTEP
   ns_redraw_scroll_bars (f);
 #endif
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -2697,7 +2697,7 @@ ns_scroll_run (struct window *w, struct run *run)
   if (height == 0)
       return;
 
-  block_interrupts ();
+  block_input ();
 
   gui_clear_cursor (w);
 
@@ -2712,7 +2712,7 @@ ns_scroll_run (struct window *w, struct run *run)
 #endif
   }
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -2792,7 +2792,7 @@ ns_after_update_window_line (struct window *w, struct glyph_row *desired_row)
         : INTERNAL_BORDER_FACE_ID;
       struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
 
-      block_interrupts ();
+      block_input ();
       if (face)
         {
           NSRect r = NSMakeRect (0, y, FRAME_PIXEL_WIDTH (f), height);
@@ -2812,7 +2812,7 @@ ns_after_update_window_line (struct window *w, struct glyph_row *desired_row)
                                FRAME_PIXEL_WIDTH (f) - width,
                                y, width, height);
         }
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 
@@ -4659,7 +4659,7 @@ ns_read_socket_1 (struct terminal *terminal, struct input_event *hold_quit,
 
   if ([NSThread isMainThread])
     {
-      block_interrupts ();
+      block_input ();
       n_emacs_events_pending = 0;
       ns_init_events (&ev);
       q_event_ptr = hold_quit;
@@ -4702,7 +4702,7 @@ ns_read_socket_1 (struct terminal *terminal, struct input_event *hold_quit,
       n_emacs_events_pending = 0;
       ns_finish_events ();
       q_event_ptr = NULL;
-      unblock_interrupts ();
+      unblock_input ();
     }
   else
     return -1;
@@ -4827,7 +4827,7 @@ ns_select_1 (int nfds, fd_set *readfds, fd_set *writefds,
       ns_send_appdefined (-1);
     }
 
-  block_interrupts ();
+  block_input ();
   ns_init_events (&event);
 
   [NSApp run];
@@ -4838,7 +4838,7 @@ ns_select_1 (int nfds, fd_set *readfds, fd_set *writefds,
       c = 's';
       emacs_write_sig (selfds[1], &c, 1);
     }
-  unblock_interrupts ();
+  unblock_input ();
 
   t = last_appdefined_event_data;
 
@@ -4955,7 +4955,7 @@ ns_set_vertical_scroll_bar (struct window *window,
   r.origin.y = (v.size.height - r.size.height - r.origin.y);
 
   XSETWINDOW (win, window);
-  block_interrupts ();
+  block_input ();
 
   /* We want at least 5 lines to display a scrollbar.  */
   if (WINDOW_TOTAL_LINES (window) < 5)
@@ -4968,7 +4968,7 @@ ns_set_vertical_scroll_bar (struct window *window,
           [bar release];
           ns_clear_frame_area (f, left, top, width, height);
         }
-      unblock_interrupts ();
+      unblock_input ();
       return;
     }
 
@@ -4997,7 +4997,7 @@ ns_set_vertical_scroll_bar (struct window *window,
 
   if (update_p)
     [bar setPosition: position portion: portion whole: whole];
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -5049,7 +5049,7 @@ ns_set_horizontal_scroll_bar (struct window *window,
   r.origin.y = (v.size.height - r.size.height - r.origin.y);
 
   XSETWINDOW (win, window);
-  block_interrupts ();
+  block_input ();
 
   if (NILP (window->horizontal_scroll_bar))
     {
@@ -5082,7 +5082,7 @@ ns_set_horizontal_scroll_bar (struct window *window,
 
   if (update_p)
     [bar setPosition: position portion: portion whole: whole];
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -5404,7 +5404,7 @@ ns_delete_terminal (struct terminal *terminal)
   if (!terminal->name)
     return;
 
-  block_interrupts ();
+  block_input ();
 
 #ifdef NS_IMPL_COCOA
   /* Rather than try to clean up the NS environment we can just
@@ -5414,7 +5414,7 @@ ns_delete_terminal (struct terminal *terminal)
 
   image_destroy_all_bitmaps (dpyinfo);
   ns_delete_display (dpyinfo);
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 static Lisp_Object ns_new_font (struct frame *f, Lisp_Object font_object,
@@ -5490,7 +5490,7 @@ ns_term_init (Lisp_Object display_name)
   if (ns_initialized) return x_display_list;
   ns_initialized = 1;
 
-  block_interrupts ();
+  block_input ();
 
   NSTRACE ("ns_term_init");
 
@@ -5499,7 +5499,7 @@ ns_term_init (Lisp_Object display_name)
 
   /* count object allocs (About, click icon); on macOS use ObjectAlloc tool */
   /*GSDebugAllocationActive (YES); */
-  block_interrupts ();
+  block_input ();
 
   baud_rate = 38400;
   Fset_input_interrupt_mode (Qnil);
@@ -5563,7 +5563,7 @@ ns_term_init (Lisp_Object display_name)
 
   gui_init_fringe (terminal->rif);
 
-  unblock_interrupts ();
+  unblock_input ();
 
   if (!inhibit_x_resources)
     {
@@ -5739,7 +5739,7 @@ ns_term_init (Lisp_Object display_name)
 
   NSTRACE_MSG ("ns_term_init done");
 
-  unblock_interrupts ();
+  unblock_input ();
 
   return dpyinfo;
 }
@@ -6663,7 +6663,7 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   font_panel_active = YES;
   timeout = make_timespec (0, 100000000);
 
-  block_interrupts ();
+  block_input ();
   while (font_panel_active
 #ifdef NS_IMPL_COCOA
 	 && (canceled = [[fm fontPanel: YES] isVisible])
@@ -6672,7 +6672,7 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 #endif
 	 )
     ns_select_1 (0, NULL, NULL, NULL, &timeout, NULL, YES);
-  unblock_interrupts ();
+  unblock_input ();
 
   if (font_panel_result)
     [font_panel_result autorelease];
@@ -8706,11 +8706,11 @@ ns_in_echo_area (void)
          within the run loop and for whatever reason processing input
          is dangerous.  This technique was stolen wholesale from
          nsmenu.m and seems to work.  */
-      block_interrupts ();
+      block_input ();
 
       redisplay ();
 
-      unblock_interrupts ();
+      unblock_input ();
     }
 }
 #endif
@@ -8727,9 +8727,9 @@ ns_in_echo_area (void)
   int width = NSWidth (rect), height = NSHeight (rect);
 
   ns_clear_frame_area (emacsframe, x, y, width, height);
-  block_interrupts ();
+  block_input ();
   expose_frame (emacsframe, x, y, width, height);
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 
@@ -9813,7 +9813,7 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
 			    NSCompositingOperationCopy);
   [image unlockFocus];
 
-  block_interrupts ();
+  block_input ();
 #ifdef NS_IMPL_COCOA
   if (mode == RETURN_FRAME_NOW)
     {
@@ -9826,7 +9826,7 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
 	{
 	  *frame_return = ((EmacsView *) [w delegate])->emacsframe;
 	  [image release];
-	  unblock_interrupts ();
+	  unblock_input ();
 
 	  return NSDragOperationNone;
 	}
@@ -9851,7 +9851,7 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
 	 drag-and-drop run loop.  */
     }
 #endif
-  unblock_interrupts ();
+  unblock_input ();
 
   /* The drop happened, so delete the tooltip.  */
   if (follow_tooltip)
@@ -9965,7 +9965,7 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
 {
   NSTRACE ("[EmacsScroller setFrame:]");
 
-  /* block_interrupts (); */
+  /* block_input (); */
   if (horizontal)
     pixel_length = NSWidth (newRect);
   else
@@ -9973,7 +9973,7 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
   if (pixel_length == 0) pixel_length = 1;
   min_portion = 20 / pixel_length;
   [super setFrame: newRect];
-  /* unblock_interrupts (); */
+  /* unblock_input (); */
 }
 
 
@@ -10015,7 +10015,7 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
   if (condemned)
     {
       EmacsView *view;
-      block_interrupts ();
+      block_input ();
       /* Ensure other scrollbar updates after deletion.  */
       view = (EmacsView *)FRAME_NS_VIEW (frame);
       if (view != nil)
@@ -10030,7 +10030,7 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
       window = 0;
       [self removeFromSuperview];
       [self release];
-      unblock_interrupts ();
+      unblock_input ();
     }
   return ret;
 }

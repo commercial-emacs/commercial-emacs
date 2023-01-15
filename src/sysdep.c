@@ -38,7 +38,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "sheap.h"
 #include "sysselect.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 
 #ifdef HAVE_LINUX_FS_H
 # include <linux/fs.h>
@@ -953,11 +953,11 @@ tcsetpgrp_without_stopping (int fd, pid_t pgid)
 {
 #ifdef SIGTTOU
   sigset_t oldset;
-  block_interrupts ();
+  block_input ();
   block_tty_out_signal (&oldset);
   tcsetpgrp (fd, pgid);
   unblock_tty_out_signal (&oldset);
-  unblock_interrupts ();
+  unblock_input ();
 #endif
 }
 
@@ -3219,7 +3219,7 @@ get_up_time (void)
   FILE *fup;
   Lisp_Object up = Qnil;
 
-  block_interrupts ();
+  block_input ();
   fup = emacs_fopen ("/proc/uptime", "r");
 
   if (fup)
@@ -3241,7 +3241,7 @@ get_up_time (void)
 	}
       fclose (fup);
     }
-  unblock_interrupts ();
+  unblock_input ();
 
   return up;
 }
@@ -3256,7 +3256,7 @@ procfs_ttyname (int rdev)
   FILE *fdev;
   char name[PATH_MAX];
 
-  block_interrupts ();
+  block_input ();
   fdev = emacs_fopen ("/proc/tty/drivers", "r");
   name[0] = 0;
 
@@ -3289,7 +3289,7 @@ procfs_ttyname (int rdev)
 	}
       fclose (fdev);
     }
-  unblock_interrupts ();
+  unblock_input ();
   return build_string (name);
 }
 # endif	/* GNU_LINUX */
@@ -3301,7 +3301,7 @@ procfs_get_total_memory (void)
   uintmax_t retval = 2 * 1024 * 1024; /* default: 2 GiB */
   int c;
 
-  block_interrupts ();
+  block_input ();
   fmem = emacs_fopen ("/proc/meminfo", "r");
 
   if (fmem)
@@ -3331,7 +3331,7 @@ procfs_get_total_memory (void)
 
       fclose (fmem);
     }
-  unblock_interrupts ();
+  unblock_input ();
   return retval;
 }
 
@@ -3373,17 +3373,17 @@ system_process_attributes (Lisp_Object pid)
   /* euid egid */
   uid = st.st_uid;
   attrs = Fcons (Fcons (Qeuid, INT_TO_INTEGER (uid)), attrs);
-  block_interrupts ();
+  block_input ();
   pw = getpwuid (uid);
-  unblock_interrupts ();
+  unblock_input ();
   if (pw)
     attrs = Fcons (Fcons (Quser, build_string (pw->pw_name)), attrs);
 
   gid = st.st_gid;
   attrs = Fcons (Fcons (Qegid, INT_TO_INTEGER (gid)), attrs);
-  block_interrupts ();
+  block_input ();
   gr = getgrgid (gid);
-  unblock_interrupts ();
+  unblock_input ();
   if (gr)
     attrs = Fcons (Fcons (Qgroup, build_string (gr->gr_name)), attrs);
 
@@ -3618,17 +3618,17 @@ system_process_attributes (Lisp_Object pid)
   /* euid egid */
   uid = st.st_uid;
   attrs = Fcons (Fcons (Qeuid, INT_TO_INTEGER (uid)), attrs);
-  block_interrupts ();
+  block_input ();
   pw = getpwuid (uid);
-  unblock_interrupts ();
+  unblock_input ();
   if (pw)
     attrs = Fcons (Fcons (Quser, build_string (pw->pw_name)), attrs);
 
   gid = st.st_gid;
   attrs = Fcons (Fcons (Qegid, INT_TO_INTEGER (gid)), attrs);
-  block_interrupts ();
+  block_input ();
   gr = getgrgid (gid);
-  unblock_interrupts ();
+  unblock_input ();
   if (gr)
     attrs = Fcons (Fcons (Qgroup, build_string (gr->gr_name)), attrs);
 
@@ -3737,17 +3737,17 @@ system_process_attributes (Lisp_Object pid)
 
   attrs = Fcons (Fcons (Qeuid, INT_TO_INTEGER (proc.ki_uid)), attrs);
 
-  block_interrupts ();
+  block_input ();
   pw = getpwuid (proc.ki_uid);
-  unblock_interrupts ();
+  unblock_input ();
   if (pw)
     attrs = Fcons (Fcons (Quser, build_string (pw->pw_name)), attrs);
 
   attrs = Fcons (Fcons (Qegid, INT_TO_INTEGER (proc.ki_svgid)), attrs);
 
-  block_interrupts ();
+  block_input ();
   gr = getgrgid (proc.ki_svgid);
-  unblock_interrupts ();
+  unblock_input ();
   if (gr)
     attrs = Fcons (Fcons (Qgroup, build_string (gr->gr_name)), attrs);
 
@@ -3786,9 +3786,9 @@ system_process_attributes (Lisp_Object pid)
   attrs = Fcons (Fcons (Qpgrp, INT_TO_INTEGER (proc.ki_pgid)), attrs);
   attrs = Fcons (Fcons (Qsess, INT_TO_INTEGER (proc.ki_sid)),  attrs);
 
-  block_interrupts ();
+  block_input ();
   ttyname = proc.ki_tdev == NODEV ? NULL : devname (proc.ki_tdev, S_IFCHR);
-  unblock_interrupts ();
+  unblock_input ();
   if (ttyname)
     attrs = Fcons (Fcons (Qttname, build_string (ttyname)), attrs);
 
@@ -3903,17 +3903,17 @@ system_process_attributes (Lisp_Object pid)
 
   attrs = Fcons (Fcons (Qeuid, INT_TO_INTEGER (proc.p_uid)), attrs);
 
-  block_interrupts ();
+  block_input ();
   pw = getpwuid (proc.p_uid);
-  unblock_interrupts ();
+  unblock_input ();
   if (pw)
     attrs = Fcons (Fcons (Quser, build_string(pw->pw_name)), attrs);
 
   attrs = Fcons (Fcons (Qegid, INT_TO_INTEGER(proc.p_svgid)), attrs);
 
-  block_interrupts ();
+  block_input ();
   gr = getgrgid (proc.p_svgid);
-  unblock_interrupts ();
+  unblock_input ();
   if (gr)
     attrs = Fcons (Fcons (Qgroup, build_string (gr->gr_name)), attrs);
 
@@ -3950,9 +3950,9 @@ system_process_attributes (Lisp_Object pid)
   attrs = Fcons (Fcons (Qpgrp, INT_TO_INTEGER (proc.p_gid)), attrs);
   attrs = Fcons (Fcons (Qsess, INT_TO_INTEGER (proc.p_sid)),  attrs);
 
-  block_interrupts ();
+  block_input ();
   ttyname = proc.p_tdev == NODEV ? NULL : devname (proc.p_tdev, S_IFCHR);
-  unblock_interrupts ();
+  unblock_input ();
   if (ttyname)
     attrs = Fcons (Fcons (Qttname, build_string (ttyname)), attrs);
 
@@ -4080,18 +4080,18 @@ system_process_attributes (Lisp_Object pid)
   uid = proc.kp_eproc.e_ucred.cr_uid;
   attrs = Fcons (Fcons (Qeuid, INT_TO_INTEGER (uid)), attrs);
 
-  block_interrupts ();
+  block_input ();
   pw = getpwuid (uid);
-  unblock_interrupts ();
+  unblock_input ();
   if (pw)
     attrs = Fcons (Fcons (Quser, build_string (pw->pw_name)), attrs);
 
   gid = proc.kp_eproc.e_pcred.p_svgid;
   attrs = Fcons (Fcons (Qegid, INT_TO_INTEGER (gid)), attrs);
 
-  block_interrupts ();
+  block_input ();
   gr = getgrgid (gid);
-  unblock_interrupts ();
+  unblock_input ();
   if (gr)
     attrs = Fcons (Fcons (Qgroup, build_string (gr->gr_name)), attrs);
 
@@ -4144,9 +4144,9 @@ system_process_attributes (Lisp_Object pid)
   attrs = Fcons (Fcons (Qpgrp, INT_TO_INTEGER (proc.kp_eproc.e_pgid)), attrs);
 
   tdev = proc.kp_eproc.e_tdev;
-  block_interrupts ();
+  block_input ();
   ttyname = tdev == NODEV ? NULL : devname (tdev, S_IFCHR);
-  unblock_interrupts ();
+  unblock_input ();
   if (ttyname)
     attrs = Fcons (Fcons (Qttname, build_string (ttyname)), attrs);
 

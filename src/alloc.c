@@ -5102,7 +5102,7 @@ garbage_collect (void)
   if (garbage_collection_messages)
     message1_nolog ("Garbage collecting...");
 
-  block_interrupts ();
+  block_input ();
 
   shrink_regexp_cache ();
 
@@ -5168,7 +5168,7 @@ garbage_collect (void)
   update_bytes_between_gc ();
 
   /* Unblock as late as possible since it could signal (Bug#43389).  */
-  unblock_interrupts ();
+  unblock_input ();
 
   if (garbage_collection_messages && NILP (Vmemory_full))
     {

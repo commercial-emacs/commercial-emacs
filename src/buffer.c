@@ -39,7 +39,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "region-cache.h"
 #include "indent.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "keymap.h"
 #include "frame.h"
 #include "xwidget.h"
@@ -544,11 +544,11 @@ even if it is dead.  The return value is never nil.  */)
   memset (&b->local_flags, 0, sizeof (b->local_flags));
 
   BUF_GAP_SIZE (b) = 20;
-  block_interrupts ();
+  block_input ();
   /* We allocate extra 1-byte at the tail and keep it always '\0' for
      anchoring a search.  */
   alloc_buffer_text (b, BUF_GAP_SIZE (b) + 1);
-  unblock_interrupts ();
+  unblock_input ();
   if (! BUF_BEG_ADDR (b))
     memory_full (BUF_GAP_SIZE (b) + 1);
 
@@ -1952,7 +1952,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 
   bset_name (b, Qnil);
 
-  block_interrupts ();
+  block_input ();
   if (b->base_buffer)
     {
       /* Notify our base buffer that we don't share the text anymore.  */
@@ -1986,7 +1986,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
       b->bidi_paragraph_cache = 0;
     }
   bset_width_table (b, Qnil);
-  unblock_interrupts ();
+  unblock_input ();
 
   run_buffer_list_update_hook (b);
 
@@ -4375,7 +4375,7 @@ alloc_buffer_text (struct buffer *b, ptrdiff_t nbytes)
 {
   void *p;
 
-  block_interrupts ();
+  block_input ();
 #if defined USE_MMAP_FOR_BUFFERS
   p = mmap_alloc ((void **) &b->text->beg, nbytes);
 #elif defined REL_ALLOC
@@ -4386,12 +4386,12 @@ alloc_buffer_text (struct buffer *b, ptrdiff_t nbytes)
 
   if (p == NULL)
     {
-      unblock_interrupts ();
+      unblock_input ();
       memory_full (nbytes);
     }
 
   b->text->beg = p;
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* Enlarge buffer B's text buffer by DELTA bytes.  DELTA < 0 means
@@ -4400,7 +4400,7 @@ alloc_buffer_text (struct buffer *b, ptrdiff_t nbytes)
 void
 enlarge_buffer_text (struct buffer *b, ptrdiff_t delta)
 {
-  block_interrupts ();
+  block_input ();
   void *p;
   unsigned char *old_beg = b->text->beg;
   ptrdiff_t old_nbytes =
@@ -4425,7 +4425,7 @@ enlarge_buffer_text (struct buffer *b, ptrdiff_t delta)
     {
       if (old_beg)
         b->text->beg = old_beg;
-      unblock_interrupts ();
+      unblock_input ();
       memory_full (new_nbytes);
     }
 
@@ -4433,13 +4433,13 @@ enlarge_buffer_text (struct buffer *b, ptrdiff_t delta)
     memcpy (p, old_beg, min (old_nbytes, new_nbytes));
 
   BUF_BEG_ADDR (b) = p;
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 static void
 free_buffer_text (struct buffer *b)
 {
-  block_interrupts ();
+  block_input ();
 
   if (!pdumper_object_p (b->text->beg))
     {
@@ -4453,7 +4453,7 @@ free_buffer_text (struct buffer *b)
     }
 
   BUF_BEG_ADDR (b) = NULL;
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 void

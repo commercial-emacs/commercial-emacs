@@ -20,7 +20,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include "lisp.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "dispextern.h"
 #include "buffer.h"
 #include "frame.h"
@@ -448,7 +448,7 @@ nsxwidget_webkit_execute_script (struct xwidget *xw, const char *script,
 void
 nsxwidget_init(struct xwidget *xw)
 {
-  block_interrupts ();
+  block_input ();
   NSRect rect = NSMakeRect (0, 0, xw->width, xw->height);
   xw->xwWidget = [[XwWebView alloc]
                    initWithFrame:rect
@@ -458,7 +458,7 @@ nsxwidget_init(struct xwidget *xw)
                    initWithFrame:rect];
   [xw->xwWindow addSubview:xw->xwWidget];
   xw->xv = NULL; /* for 1 to 1 relationship of webkit2.  */
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 void

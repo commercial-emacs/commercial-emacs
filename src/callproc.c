@@ -75,7 +75,7 @@ extern char **environ;
 #include "process.h"
 #include "syssignal.h"
 #include "syswait.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "frame.h"
 #include "systty.h"
 #include "keyboard.h"
@@ -642,7 +642,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 #ifndef MSDOS
 
   child_signal_init ();
-  block_interrupts ();
+  block_input ();
   block_child_signal (&oldset);
 
   child_errno
@@ -669,7 +669,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
     }
 
   unblock_child_signal (&oldset);
-  unblock_interrupts ();
+  unblock_input ();
 
   if (pid < 0)
     report_file_errno (CHILD_SETUP_ERROR_DESC, Qnil, child_errno);
@@ -1402,8 +1402,8 @@ emacs_posix_spawn_init_attributes (posix_spawnattr_t *attributes,
    If PTY is not NULL, it must be a pseudoterminal device.  If PTY is
    NULL, don't perform any terminal setup.  OLDSET must be a pointer
    to a signal set initialized by `block_child_signal'.  Before
-   calling this function, call `block_interrupts' and `block_child_signal';
-   afterwards, call `unblock_interrupts' and `unblock_child_signal'.  Be
+   calling this function, call `block_input' and `block_child_signal';
+   afterwards, call `unblock_input' and `unblock_child_signal'.  Be
    sure to call `unblock_child_signal' only after registering NEWPID
    in a list where `handle_child_signal' can find it!  */
 
@@ -1440,7 +1440,7 @@ emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,
   int pid;
   int vfork_error;
 
-  eassert (interrupts_blocked_p ());
+  eassert (input_blocked_p ());
 
 #if USABLE_POSIX_SPAWN
   if (use_posix_spawn)

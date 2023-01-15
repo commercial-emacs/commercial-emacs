@@ -42,7 +42,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "dispextern.h"
 #include "window.h"
 #include "keymap.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "syssignal.h"
 #include "sysstdio.h"
 #ifdef MSDOS
@@ -774,12 +774,12 @@ tty_write_glyphs (struct frame *f, struct glyph *string, int len)
       conversion_buffer = encode_terminal_code (string, n, coding);
       if (coding->produced > 0)
 	{
-	  block_interrupts ();
+	  block_input ();
 	  fwrite (conversion_buffer, 1, coding->produced, tty->output);
 	  clearerr (tty->output);
 	  if (tty->termscript)
 	    fwrite (conversion_buffer, 1, coding->produced, tty->termscript);
-	  unblock_interrupts ();
+	  unblock_input ();
 	}
       string += n;
 
@@ -834,12 +834,12 @@ tty_write_glyphs_with_face (register struct frame *f, register struct glyph *str
   conversion_buffer = encode_terminal_code (string, len, coding);
   if (coding->produced > 0)
     {
-      block_interrupts ();
+      block_input ();
       fwrite (conversion_buffer, 1, coding->produced, tty->output);
       clearerr (tty->output);
       if (tty->termscript)
 	fwrite (conversion_buffer, 1, coding->produced, tty->termscript);
-      unblock_interrupts ();
+      unblock_input ();
     }
 
   /* Turn appearance modes off.  */
@@ -920,12 +920,12 @@ tty_insert_glyphs (struct frame *f, struct glyph *start, int len)
 
       if (coding->produced > 0)
 	{
-	  block_interrupts ();
+	  block_input ();
 	  fwrite (conversion_buffer, 1, coding->produced, tty->output);
 	  clearerr (tty->output);
 	  if (tty->termscript)
 	    fwrite (conversion_buffer, 1, coding->produced, tty->termscript);
-	  unblock_interrupts ();
+	  unblock_input ();
 	}
 
       OUTPUT1_IF (tty, tty->TS_pad_inserted_char);
@@ -3437,10 +3437,10 @@ tty_pop_down_menu (void *arg)
 {
   struct tty_pop_down_menu *data = arg;
 
-  block_interrupts ();
+  block_input ();
   tty_menu_destroy (data->menu);
   set_buffer_internal (data->buffer);
-  unblock_interrupts ();
+  unblock_input ();
 }
 
 /* Return the zero-based index of the last menu-bar item on frame F.  */
