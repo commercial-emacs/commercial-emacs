@@ -59,6 +59,8 @@
                   (format "*SQLite %s*" (file-name-nondirectory file))))
   (sqlite-mode)
   (setq-local sqlite--db (sqlite-open file))
+  (unless (sqlitep sqlite--db)
+    (error "`sqlite-open' failed to open SQLite file"))
   (sqlite-mode-list-tables))
 
 (defun sqlite-mode-list-tables ()
