@@ -9064,9 +9064,7 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
   /* Prevent redisplay.  */
   specbind (Qinhibit_redisplay, Qt);
 
-  /* Defer selection requests.  */
-  DEFER_SELECTIONS;
-
+  x_defer_selection_requests ();
   block_interrupts ();
 
   /* Create the dialog with PROMPT as title, using DIR as initial

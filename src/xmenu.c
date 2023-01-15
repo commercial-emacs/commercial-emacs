@@ -200,7 +200,7 @@ x_menu_wait_for_event (void *data)
 
       /* ISTM that if timer_check is okay, this should be too, since
 	 both can run random Lisp.  */
-      x_handle_pending_selection_requests ();
+      x_flush_selection_requests ();
 
       FD_ZERO (&read_fds);
       for (dpyinfo = x_display_list; dpyinfo; dpyinfo = dpyinfo->next)
@@ -1571,7 +1571,7 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
     }
 #endif
 
-  DEFER_SELECTIONS;
+  x_defer_selection_requests();
 
   /* Display the menu.  */
   gtk_widget_show_all (menu);
@@ -1851,7 +1851,7 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
   {
     specpdl_ref specpdl_count = SPECPDL_INDEX ();
 
-    DEFER_SELECTIONS;
+    x_defer_selection_requests();
 
     record_unwind_protect_int (pop_down_menu, (int) menu_id);
 #ifdef HAVE_XINPUT2
@@ -2185,7 +2185,7 @@ create_and_show_dialog (struct frame *f, widget_value *first_wv)
     {
       specpdl_ref specpdl_count = SPECPDL_INDEX ();
 
-      DEFER_SELECTIONS;
+      x_defer_selection_requests();
       record_unwind_protect_ptr (pop_down_menu, menu);
 
       /* Display the menu.  */
@@ -2242,7 +2242,7 @@ create_and_show_dialog (struct frame *f, widget_value *first_wv)
   {
     specpdl_ref count = SPECPDL_INDEX ();
 
-    DEFER_SELECTIONS;
+    x_defer_selection_requests();
 
     /* xdialog_show_unwind is responsible for popping the dialog box down.  */
 
@@ -2756,7 +2756,7 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
   pane = selidx = 0;
 
 #ifndef MSDOS
-  DEFER_SELECTIONS;
+  x_defer_selection_requests();
 
   XMenuActivateSetWaitFunction (x_menu_wait_for_event,
 				FRAME_X_DISPLAY (f));

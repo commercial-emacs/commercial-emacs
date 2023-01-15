@@ -883,9 +883,7 @@ static struct input_event *current_hold_quit;
 #endif
 #endif
 
-/* Queue selection requests in `pending_selection_requests' if more
-   than 0.  */
-static int x_use_pending_selection_requests;
+static int defer_selection_requests;
 
 /* Like `next_kbd_event', but for use in X code.  */
 #define X_NEXT_KBD_EVENT(ptr) \
@@ -893,72 +891,52 @@ static int x_use_pending_selection_requests;
 
 static void x_push_selection_request (struct selection_input_event *);
 
-/* Defer selection requests.  Between this and
-   x_release_selection_requests, any selection requests can be
-   processed by calling `x_handle_pending_selection_requests'.
+/* Flush selection requests unless recursively called. */
 
-   Also run through and queue all the selection events already in the
-   keyboard buffer.  */
+static void
+x_undefer_selection_requests (void)
+{
+  if (--defer_selection_requests <= 0)
+    x_flush_selection_requests ();
+}
+
 void
 x_defer_selection_requests (void)
 {
-  union buffered_input_event *event;
-  bool between;
-
-  between = false;
-
   block_interrupts ();
-  if (!x_use_pending_selection_requests)
+  if (defer_selection_requests <= 0)
     {
-      event = kbd_fetch_ptr;
+      bool between = false;
 
-      while (event != kbd_store_ptr)
+      /* Queue selection events already in the keyboard buffer.  */
+      for (union buffered_input_event *event = kbd_fetch_ptr;
+	   event != kbd_store_ptr;
+	   event = X_NEXT_KBD_EVENT (event))
 	{
-	  if (event->ie.kind == SELECTION_REQUEST_EVENT
-	      || event->ie.kind == SELECTION_CLEAR_EVENT)
+	  if (event->ie.kind != SELECTION_REQUEST_EVENT
+	      && event->ie.kind != SELECTION_CLEAR_EVENT)
+	    between = true;
+	  else
 	    {
 	      x_push_selection_request (&event->sie);
-
-	      /* Mark this selection event as invalid.   */
+	      /* Mark this selection event as invalid.  */
 	      SELECTION_EVENT_DPYINFO (&event->sie) = NULL;
-
-	      /* Move the kbd_fetch_ptr along if doing so would not
-		 result in any other events being skipped.  This
-		 avoids exhausting the keyboard buffer with some
-		 over-enthusiastic clipboard managers.  */
 	      if (!between)
 		{
+		  /* To avoid exhausting the keyboard buffer, advance
+		     kbd_fetch_ptr when no other events are in danger
+		     of being skipped.  */
 		  kbd_fetch_ptr = X_NEXT_KBD_EVENT (event);
 
-		  /* `detect_input_pending' will then recompute
-		     whether or not pending input events exist.  */
+		  /* detect_input_pending() recomputes this.  */
 		  input_pending = false;
 		}
 	    }
-	  else
-	    between = true;
-
-	  event = X_NEXT_KBD_EVENT (event);
 	}
     }
-
-  x_use_pending_selection_requests++;
+  defer_selection_requests++;
   unblock_interrupts ();
-}
-
-static void
-x_release_selection_requests (void)
-{
-  x_use_pending_selection_requests--;
-}
-
-void
-x_release_selection_requests_and_flush (void)
-{
-  x_release_selection_requests ();
-
-  if (!x_use_pending_selection_requests)
-    x_handle_pending_selection_requests ();
+  record_unwind_protect_void (x_undefer_selection_requests);
 }
 
 struct x_selection_request_event
@@ -974,7 +952,7 @@ struct x_selection_request_event
    selection requests inside long-lasting modal event loops, such as
    the drag-and-drop loop.  */
 
-struct x_selection_request_event *pending_selection_requests;
+static struct x_selection_request_event *selection_requests;
 
 struct x_atom_ref
 {
@@ -12221,33 +12199,22 @@ x_next_event_from_any_display (XEvent *event)
 
 #endif /* USE_X_TOOLKIT || USE_GTK */
 
-static void
-x_handle_pending_selection_requests_1 (struct x_selection_request_event *tem)
-{
-  specpdl_ref count;
-  struct selection_input_event se;
-
-  count = SPECPDL_INDEX ();
-  se = tem->se;
-
-  record_unwind_protect_ptr (xfree, tem);
-  x_handle_selection_event (&se);
-  unbind_to (count, Qnil);
-}
-
-/* Handle all pending selection request events from modal event
-   loops.  */
 void
-x_handle_pending_selection_requests (void)
+x_flush_selection_requests (void)
 {
-  struct x_selection_request_event *tem;
-
-  while (pending_selection_requests)
+  if (--defer_selection_requests <= 0)
     {
-      tem = pending_selection_requests;
-      pending_selection_requests = tem->next;
-
-      x_handle_pending_selection_requests_1 (tem);
+      for (struct x_selection_request_event *head = selection_requests;
+	   head != NULL;
+	   head = selection_requests)
+	{
+	  specpdl_ref count = SPECPDL_INDEX ();
+	  struct selection_input_event se = head->se;
+	  selection_requests = head->next;
+	  record_unwind_protect_ptr (xfree, head);
+	  x_handle_selection_event (&se);
+	  unbind_to (count, Qnil);
+	}
     }
 }
 
@@ -12257,15 +12224,15 @@ x_push_selection_request (struct selection_input_event *se)
   struct x_selection_request_event *tem;
 
   tem = xmalloc (sizeof *tem);
-  tem->next = pending_selection_requests;
+  tem->next = selection_requests;
   tem->se = *se;
-  pending_selection_requests = tem;
+  selection_requests = tem;
 }
 
 bool
-x_detect_pending_selection_requests (void)
+x_pending_selection_requests (void)
 {
-  return !!pending_selection_requests;
+  return !!selection_requests;
 }
 
 static void
@@ -12436,7 +12403,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   if (x_dnd_in_progress || x_dnd_waiting_for_finish)
     error ("A drag-and-drop session is already in progress");
 
-  DEFER_SELECTIONS;
+  x_defer_selection_requests();
 
   /* If local_value is nil, then we lost ownership of XdndSelection.
      Signal a more informative error than args-out-of-range.  */
@@ -12845,7 +12812,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	      quit ();
 	    }
 
-	  if (pending_selection_requests
+	  if (selection_requests
 	      && (x_dnd_in_progress || x_dnd_waiting_for_finish))
 	    {
 	      x_dnd_old_window_attrs = root_window_attrs;
@@ -12853,7 +12820,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 
 	      ref = SPECPDL_INDEX ();
 	      record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
-	      x_handle_pending_selection_requests ();
+	      x_flush_selection_requests ();
 	      x_dnd_unwind_flag = false;
 	      unbind_to (ref, Qnil);
 	    }
@@ -18997,7 +18964,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         SELECTION_EVENT_SELECTION (&inev.sie) = eventp->selection;
         SELECTION_EVENT_TIME (&inev.sie) = eventp->time;
 
-	if (x_use_pending_selection_requests)
+	if (selection_requests)
 	  {
 	    x_push_selection_request (&inev.sie);
 	    EVENT_INIT (inev.ie);
@@ -19028,7 +18995,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	   progress, handle SelectionRequest events immediately, by
 	   pushing it onto the selection queue.  */
 
-	if (x_use_pending_selection_requests)
+	if (selection_requests)
 	  {
 	    x_push_selection_request (&inev.sie);
 	    EVENT_INIT (inev.ie);
@@ -30721,7 +30688,7 @@ x_delete_display (struct x_display_info *dpyinfo)
 
   last = NULL;
 
-  for (ie = pending_selection_requests; ie; ie = ie->next)
+  for (ie = selection_requests; ie; ie = ie->next)
     {
     again:
 

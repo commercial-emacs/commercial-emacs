@@ -3367,7 +3367,7 @@ readable_events (int flags)
     }
 
 #ifdef HAVE_X_WINDOWS
-  if (x_detect_pending_selection_requests ())
+  if (x_pending_selection_requests ())
     return 1;
 #endif
 
@@ -3695,9 +3695,9 @@ kbd_buffer_get_event (KBOARD **kbp,
 {
   Lisp_Object obj, str;
 #ifdef HAVE_X_WINDOWS
-  bool had_pending_selection_requests;
+  bool had_selection_requests;
 
-  had_pending_selection_requests = false;
+  had_selection_requests = false;
 #endif
 
   if (kbd_on_hold_p () && kbd_buffer_nr_stored () < KBD_BUFFER_SIZE / 4)
@@ -3755,9 +3755,9 @@ kbd_buffer_get_event (KBOARD **kbp,
       if (some_mouse_moved ())
 	break;
 #ifdef HAVE_X_WINDOWS
-      if (x_detect_pending_selection_requests ())
+      if (x_pending_selection_requests ())
 	{
-	  had_pending_selection_requests = true;
+	  had_selection_requests = true;
 	  break;
 	}
 #endif
@@ -3801,8 +3801,8 @@ kbd_buffer_get_event (KBOARD **kbp,
      because the debugger opened) or someone called
      `read-char'.  */
 
-  if (had_pending_selection_requests)
-    x_handle_pending_selection_requests ();
+  if (had_selection_requests)
+    x_flush_selection_requests ();
 #endif
 
   if (CONSP (Vunread_command_events))
@@ -4159,7 +4159,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 			      : virtual_core_pointer_name);
     }
 #ifdef HAVE_X_WINDOWS
-  else if (had_pending_selection_requests)
+  else if (had_selection_requests)
     obj = Qnil;
 #endif
   else

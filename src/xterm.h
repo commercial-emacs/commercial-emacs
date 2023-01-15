@@ -1766,14 +1766,9 @@ extern char *x_get_atom_name (struct x_display_info *, Atom, bool *)
 extern void x_scroll_bar_configure (GdkEvent *);
 #endif
 
-#define DEFER_SELECTIONS						\
-  x_defer_selection_requests ();					\
-  record_unwind_protect_void (x_release_selection_requests_and_flush)
-
 extern void x_defer_selection_requests (void);
-extern void x_release_selection_requests_and_flush (void);
-extern void x_handle_pending_selection_requests (void);
-extern bool x_detect_pending_selection_requests (void);
+extern void x_flush_selection_requests (void);
+extern bool x_pending_selection_requests (void);
 extern Lisp_Object x_dnd_begin_drag_and_drop (struct frame *, Time, Atom,
 					      Lisp_Object, Atom *, const char **,
 					      size_t, bool, Atom *, int,
