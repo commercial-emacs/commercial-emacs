@@ -1,4 +1,4 @@
-/* X Communication module for terminals which understand the X protocol.
+/* Communication module for X terminals.
 
 Copyright (C) 1989, 1993-2023 Free Software Foundation, Inc.
 
@@ -17,79 +17,32 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-/* New display code by Gerd Moellmann <gerd@gnu.org>.  */
-/* Xt features made by Fred Pierresteguy.  */
+/* New display code by Gerd Moellmann <gerd@gnu.org>.
+   Xt features made by Fred Pierresteguy.  */
 
-/* X window system support for GNU Emacs
+/* INPUT
 
-   This file is part of the X window system support for GNU Emacs.  It
-   contains subroutines comprising the redisplay interface, setting up
-   scroll bars and widgets, and handling input.
+   When pselect() detects available input from the X server, or when
+   the X connection signals, x_filter_event() first runs the event
+   through X Input Method (XIM) or GTK, which could for instance map
+   keystrokes to international characters unavailable to the keyboard.
+   Then handle_one_xevent() translates the filtered Xlib events into
+   struct input_events, which queue to the keyboard buffer.
 
-   X WINDOW SYSTEM
+   C-g quits are treated specially.  A consequent longjmp() from the
+   XTread_socket code queueing keyboard events is unsafe.  The quit
+   event is instead recorded in an auxiliary buffer HOLD_QUIT,
+   allowing XTread_socket's caller to requeue it when all
+   other input events have been parsed (and discarded).
 
-   The X Window System is a windowing system for bitmap graphics
-   displays which originated at MIT in 1984.  Version 11, which is
-   currently supported by Emacs, first appeared in September 1987.
-
-   X has a long history and has been developed by many different
-   organizations over the years; at present, it is being primarily
-   developed by the X.Org Foundation.  It is the main window system
-   that Emacs is developed and tested against, and X version 10 was
-   the first window system that Emacs was ported to.  As a consequence
-   of its age and wide availability, X contains many idiosyncrasies,
-   but that has not prevented it from becoming the dominant free
-   window system, and the platform of reference for all GUI code in
-   Emacs.
-
-   Some of what is explained below also applies to the other window
-   systems that Emacs supports, to varying degrees.  YMMV.
-
-   INPUT
-
-   Emacs handles input by running pselect in a loop, which returns
-   whenever there is input available on the connection to the X
-   server.  On some systems, Emacs also arranges for any new input on
-   that connection to send an asynchronous signal.  Whenever pselect
-   returns, or such a signal is received and input is not blocked,
-   XTread_socket is called and translates X11 events read by Xlib into
-   struct input_events, which are then stored in the keyboard buffer,
-   to be processed and acted upon at some later time.  The function
-   handle_one_xevent is responsible for handling core events after
-   they are filtered, and filtering X Input Extension events.  It also
-   performs actions on some special events, such as updating the
-   dimensions of a frame after a ConfigureNotify is sent by the X
-   server to inform us that it changed.
-
-   Before such events are translated, an Emacs build with
-   internationalization enabled (the default since X11R6) will filter
-   events through an X Input Method (XIM) or GTK, which might decide
-   to intercept the event and send a different one in its place, for
-   reasons such as enabling the user to insert international
-   characters that aren't on his keyboard by typing a sequence of
-   characters which are.  See the function x_filter_event and its
-   callers for more details.
-
-   Events that cause Emacs to quit are treated specially by the code
-   that stores them in the keyboard buffer and generally cause an
-   immediate interrupt.  Such an interrupt can lead to a longjmp from
-   the code that stored the keyboard event, which isn't safe inside
-   XTread_socket.  To avoid this problem, XTread_socket is provided a
-   special event buffer named hold_quit.  When a quit event is
-   encountered, it is stored inside this special buffer, which will
-   cause the keyboard code that called XTread_socket to store it at a
-   later time when it is safe to do so.
-
-   handle_one_xevent will generally have to determine which frame an
-   event should be attributed to.  This is not easy, because events
-   can come from multiple X windows, and a frame can also have
-   multiple windows.  handle_one_xevent usually calls the function
-   x_any_window_to_frame, which searches for a frame by toplevel
-   window and widget windows.  There are also some other functions for
-   searching by specific types of window, such as
-   x_top_window_to_frame (which only searches for frames by toplevel
-   window), and x_menubar_window_to_frame (which will only search
-   through frame menu bars).
+   handle_one_xevent() attributes events to frames.  This is not easy
+   because events can issue from multiple X windows, and a frame can
+   also have multiple windows.  handle_one_xevent() usually calls
+   x_any_window_to_frame(), which searches for a frame by toplevel
+   window and widget windows.  Other functions search by specific
+   window types, such as x_top_window_to_frame (which only searches
+   for frames by toplevel window), and x_menubar_window_to_frame
+   (which will only search through frame menu bars).
 
    INPUT FOCUS
 
@@ -808,12 +761,12 @@ bool use_xim = false;  /* configure --without-xim */
 #endif
 
 #ifdef USE_GTK
-/* GTK can't tolerate a call to `handle_interrupt' inside an event
+/* GTK can't tolerate a call to handle_interrupt inside an event
    signal handler, but we have to store input events inside the
    handler for native input to work.
 
-   This acts as a `hold_quit', and it is stored in the keyboard buffer
-   (thereby causing the call to `handle_interrupt') after the GTK
+   This acts as a hold_quit, and it is stored in the keyboard buffer
+   (thereby causing the call to handle_interrupt) after the GTK
    signal handler exits and control returns to XTread_socket.  */
 struct input_event xg_pending_quit_event = { .kind = NO_EVENT };
 #endif
@@ -24647,7 +24600,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
     }
 
   if (do_help
-      && !(hold_quit && hold_quit->kind != NO_EVENT))
+      && ! (hold_quit && hold_quit->kind != NO_EVENT))
     {
       Lisp_Object frame;
 
