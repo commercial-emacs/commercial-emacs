@@ -26,6 +26,7 @@
 (require 'cl-lib)
 (eval-when-compile (require 'subr-x))
 
+(declare-function sqlitep "sqlite.c")
 (declare-function sqlite-execute "sqlite.c")
 (declare-function sqlite-more-p "sqlite.c")
 (declare-function sqlite-next "sqlite.c")
