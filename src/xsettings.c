@@ -34,7 +34,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "xsettings.h"
 #include "frame.h"
 #include "keyboard.h"
-#include "blockinterrupts.h"
+#include "blockinput.h"
 #include "termhooks.h"
 #include "pdumper.h"
 
@@ -1180,7 +1180,7 @@ init_xsettings (Display_Info *dpyinfo)
 {
   Display *dpy = dpyinfo->display;
 
-  block_interrupts ();
+  block_input ();
 
   /* Select events so we can detect client messages sent when selection
      owner changes.  */
@@ -1190,7 +1190,7 @@ init_xsettings (Display_Info *dpyinfo)
   if (dpyinfo->xsettings_window != None)
     read_and_apply_settings (dpyinfo, false);
 
-  unblock_interrupts ();
+  unblock_input ();
 }
 #endif
 
