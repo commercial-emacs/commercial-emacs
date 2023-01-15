@@ -3488,6 +3488,31 @@ This function is intended for use in `after-change-functions'."
   ;;(syntax-propertize (point-max))
   )
 
+(defvar js--treesit-sentence-type-regexp
+  '("import_statement"
+    "debugger_statement"
+    "expression_statement"
+    "if_statement"
+    "switch_statement"
+    "for_statement"
+    "for_in_statement"
+    "while_statement"
+    "do_statement"
+    "try_statement"
+    "with_statement"
+    "break_statement"
+    "continue_statement"
+    "return_statement"
+    "throw_statement"
+    "empty_statement"
+    "labeled_statement"
+    "variable_declaration"
+    "lexical_declaration"
+    "jsx_element"
+    "jsx_self_closing_element")
+  "Nodes that designate sentences in JavaScript.
+See `treesit-sentence-type-regexp' for more information.")
+
 ;;;###autoload
 (define-derived-mode js-json-mode js-mode "JSON"
   (setq-local js-enabled-frameworks nil)
