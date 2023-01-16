@@ -3488,7 +3488,7 @@ This function is intended for use in `after-change-functions'."
   ;;(syntax-propertize (point-max))
   )
 
-(defvar js--treesit-sentence-type-regexp
+(defvar js--treesit-sentence-nodes
   '("import_statement"
     "debugger_statement"
     "expression_statement"
