@@ -34,8 +34,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    C-g quits are treated specially.  A longjmp() from the code
    queueing keyboard events is unsafe.  The quit event is instead
    recorded in an auxiliary buffer HOLD_QUIT, allowing XTread_socket's
-   caller to requeue it when all other input events have been
-   processed.
+   caller gobble_input() to requeue it when all other input events
+   have been processed.
 
    handle_one_xevent() attributes events to frames.  This is nontrvial
    since events can issue from multiple X windows, only some of which
@@ -4702,7 +4702,7 @@ x_xr_ensure_picture (struct frame *f)
 }
 #endif
 
-
+
 /***********************************************************************
 			      Debugging
  ***********************************************************************/
@@ -6333,7 +6333,7 @@ x_draw_horizontal_wave (struct frame *f, GC gc, int x, int y,
 }
 #endif
 
-
+
 /* Return the struct x_display_info corresponding to DPY.  */
 
 struct x_display_info *
@@ -11205,12 +11205,12 @@ x_scroll_run (struct window *w, struct run *run)
 }
 
 
-
+
 /***********************************************************************
 			   Exposure Events
  ***********************************************************************/
 
-
+
 static void
 x_frame_highlight (struct frame *f)
 {
@@ -13326,7 +13326,7 @@ x_frame_rehighlight (struct x_display_info *dpyinfo)
 }
 
 
-
+
 /* Keyboard processing - modifier keys, vendor-specific keysyms, etc.  */
 
 /* Initialize mode_switch_bit and modifier_meaning.  */
@@ -14485,7 +14485,7 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 }
 
 
-
+
 /***********************************************************************
 			       Scroll bars
  ***********************************************************************/
@@ -14589,7 +14589,7 @@ x_window_to_menu_bar (Window window)
 
 #endif /* USE_LUCID */
 
-
+
 /************************************************************************
 			 Toolkit scroll bars
  ************************************************************************/
@@ -15890,7 +15890,7 @@ x_set_toolkit_horizontal_scroll_bar_thumb (struct scroll_bar *bar, int portion, 
 #endif /* USE_TOOLKIT_SCROLL_BARS */
 
 
-
+
 /************************************************************************
 			 Scroll bars, general
  ************************************************************************/
@@ -17990,11 +17990,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   USE_SAFE_ALLOCA;
 #endif
 
-  /* This function is not reentrant, so input should be blocked before
-     it is called.  */
-
-  if (!input_blocked_p ())
-    emacs_abort ();
+  eassert (input_blocked_p ());
 
   *finish = X_EVENT_NORMAL;
 
@@ -24486,7 +24482,7 @@ XTread_socket (struct terminal *terminal, struct input_event *hold_quit)
 
 
 
-
+
 /***********************************************************************
 			     Text Cursor
  ***********************************************************************/
@@ -24762,7 +24758,7 @@ x_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
     }
 }
 
-
+
 /* Icons.  */
 
 /* Make the x-window of frame F use the gnu icon bitmap.  */
@@ -24879,7 +24875,7 @@ x_text_icon (struct frame *f, const char *icon_name)
 
   return false;
 }
-
+
 
 struct x_error_message_stack
 {
@@ -25388,7 +25384,7 @@ x_trace_wire (Display *dpy)
 }
 #endif
 
-
+
 /************************************************************************
 			  Handling X errors
  ************************************************************************/
@@ -25783,7 +25779,7 @@ x_io_error_quitter (Display *display)
   return 0;
 }
 
-
+
 /* Changing the font of the frame.  */
 
 /* Give frame F the font FONT-OBJECT as its default font.  The return
@@ -25850,7 +25846,7 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
   return font_object;
 }
 
-
+
 /***********************************************************************
 			   X Input Methods
  ***********************************************************************/
@@ -26105,7 +26101,7 @@ xim_close_dpy (struct x_display_info *dpyinfo)
 #endif /* not HAVE_X11R6_XIM */
 
 
-
+
 /* Calculate the absolute position in frame F
    from its current recorded position values and gravity.  */
 
@@ -27209,7 +27205,7 @@ frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y)
     XWarpPointer (FRAME_X_DISPLAY (f), None, FRAME_X_WINDOW (f),
 		  0, 0, 0, 0, pix_x, pix_y);
 }
-
+
 /* Raise frame F.  */
 
 static void
@@ -27608,7 +27604,7 @@ x_focus_frame (struct frame *f, bool noactivate)
   unblock_input ();
 }
 
-
+
 /* XEmbed implementation.  */
 
 #if defined USE_X_TOOLKIT || ! defined USE_GTK
@@ -27657,7 +27653,7 @@ xembed_send_message (struct frame *f, Time t, enum xembed_message msg,
 	      False, NoEventMask, &event);
   x_stop_ignoring_errors (FRAME_DISPLAY_INFO (f));
 }
-
+
 /* Change of visibility.  */
 
 /* This tries to wait until the frame is really visible, depending on
@@ -28070,7 +28066,7 @@ x_iconify_frame (struct frame *f)
 #endif /* not USE_X_TOOLKIT */
 }
 
-
+
 /* Free X resources of frame F.  */
 
 void
@@ -28588,7 +28584,7 @@ x_embed_frame (struct x_display_info *dpyinfo, struct frame *f)
 
 #endif
 
-
+
 /* Setting window manager hints.  */
 
 /* Set the normal size hints for the window manager, for frame F.
@@ -28862,7 +28858,7 @@ x_wm_set_icon_position (struct frame *f, int icon_x, int icon_y)
   XSetWMHints (FRAME_X_DISPLAY (f), window, &f->output_data.x->wm_hints);
 }
 
-
+
 /***********************************************************************
 				Fonts
  ***********************************************************************/
@@ -28882,7 +28878,7 @@ x_check_font (struct frame *f, struct font *font)
 
 #endif /* GLYPH_DEBUG */
 
-
+
 /***********************************************************************
                              Image Hooks
  ***********************************************************************/
@@ -28901,7 +28897,7 @@ x_free_pixmap (struct frame *f, Emacs_Pixmap pixmap)
 #endif
 }
 
-
+
 /***********************************************************************
 			    Initialization
  ***********************************************************************/
@@ -30237,7 +30233,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   return dpyinfo;
 }
 
-
+
 
 /* Remove all the selection input events on the keyboard buffer
    intended for DPYINFO.  */
@@ -30277,8 +30273,7 @@ x_delete_selection_requests (struct x_display_info *dpyinfo)
 		   moved_events * sizeof *kbd_fetch_ptr);
 	  kbd_fetch_ptr = X_NEXT_KBD_EVENT (kbd_fetch_ptr);
 
-	  /* `detect_input_pending' will then recompute whether or not
-	     pending input events exist.  */
+	  /* detect_input_pending() recomputes this.  */
 	  input_pending = false;
 	}
     }
@@ -30436,7 +30431,7 @@ x_activate_timeout_atimer (void)
 
 #endif /* USE_X_TOOLKIT */
 
-
+
 /* Set up use of X before we make the first connection.  */
 
 extern frame_parm_handler x_frame_parm_handlers[];

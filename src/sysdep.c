@@ -1665,8 +1665,6 @@ emacs_sigaction_flags (void)
   return 0;
 }
 
-/* Store into *ACTION a signal action suitable for Emacs, with handler
-   HANDLER.  */
 void
 emacs_sigaction_init (struct sigaction *action, signal_handler_t handler)
 {
@@ -1706,22 +1704,16 @@ emacs_sigaction_init (struct sigaction *action, signal_handler_t handler)
 static pthread_t main_thread_id;
 #endif
 
-/* SIG has arrived at the current process.  Deliver it to the main
-   thread, which should handle it with HANDLER.  (Delivering the
-   signal to some other thread might not work if the other thread is
-   about to exit.)
-
-   If we are on the main thread, handle the signal SIG with HANDLER.
+/* If we are on the main thread, handle the signal SIG with HANDLER.
    Otherwise, redirect the signal to the main thread, blocking it from
-   this thread.  POSIX says any thread can receive a signal that is
-   associated with a process, process group, or asynchronous event.
-   On GNU/Linux the main thread typically gets a process signal unless
-   it's blocked, but other systems (FreeBSD at least) can deliver the
-   signal to other threads.  */
+   this thread.  POSIX says *any* thread can receive a signal that is
+   associated with a process, process group, or asynchronous event
+   (less true for GNU/Linux, which typically signals on main thread).
+*/
 void
 deliver_process_signal (int sig, signal_handler_t handler)
 {
-  int old_errno = errno; /* preserve errno since handlers change it.  */
+  int old_errno = errno; /* errno could change.  */
   bool handle_here = true;
 #ifdef HAVE_PTHREAD
   if (! pthread_equal (pthread_self (), main_thread_id))
@@ -2021,10 +2013,10 @@ init_signals (void)
     }
 
 #ifdef SIGUSR1
-  add_user_signal (SIGUSR1, "sigusr1");
+  add_sigusr (SIGUSR1, "sigusr1");
 #endif
 #ifdef SIGUSR2
-  add_user_signal (SIGUSR2, "sigusr2");
+  add_sigusr (SIGUSR2, "sigusr2");
 #endif
   sigaction (SIGABRT, &thread_fatal_action, 0);
 #ifdef SIGPRE

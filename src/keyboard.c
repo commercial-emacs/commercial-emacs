@@ -370,14 +370,14 @@ static void save_getcjmp (sys_jmp_buf);
 static void restore_getcjmp (void *);
 static Lisp_Object apply_modifiers (int, Lisp_Object);
 static void restore_kboard_configuration (int);
-static void handle_interrupt (bool);
+static void handle_keyboard_quit (bool);
 static AVOID quit_throw_to_read_char (bool);
 static void timer_start_idle (void);
 static void timer_stop_idle (void);
 static void timer_resume_idle (void);
-static void deliver_user_signal (int);
-static char *find_user_signal_name (int);
-static void store_user_signal_events (void);
+static void deliver_sigusr (int);
+static char *find_sigusr_name (int);
+static void store_sigusr_events (void);
 static bool is_ignored_event (union buffered_input_event *);
 
 /* Advance or retreat a buffered input event pointer.  */
@@ -3500,7 +3500,7 @@ kbd_buffer_store_buffered_event (union buffered_input_event *event,
 	    Vlast_event_frame = focus;
 	  }
 
-	  handle_interrupt (0);
+	  handle_keyboard_quit (false);
 	  return;
 	}
 
@@ -3662,7 +3662,7 @@ clear_event (struct input_event *event)
 }
 
 static Lisp_Object
-kbd_buffer_get_event_1 (Lisp_Object arg)
+kbd_buffer_get_event_fun (Lisp_Object arg)
 {
   Lisp_Object coding_system = Fget_text_property (make_fixnum (0),
 						  Qcoding, arg);
@@ -3677,7 +3677,7 @@ kbd_buffer_get_event_1 (Lisp_Object arg)
 }
 
 static Lisp_Object
-kbd_buffer_get_event_2 (Lisp_Object val)
+kbd_buffer_get_event_handler (Lisp_Object val)
 {
   return Qnil;
 }
@@ -4036,9 +4036,9 @@ kbd_buffer_get_event (KBOARD **kbp,
 		  /* This string has to be decoded.  */
 		  && STRINGP (event->ie.arg))
 		{
-		  str = internal_condition_case_1 (kbd_buffer_get_event_1,
+		  str = internal_condition_case_1 (kbd_buffer_get_event_fun,
 						   event->ie.arg, Qt,
-						   kbd_buffer_get_event_2);
+						   kbd_buffer_get_event_handler);
 
 		  /* Decoding the string failed, so use the original,
 		     where at least ASCII text will work.  */
@@ -6305,7 +6305,7 @@ make_lispy_event (struct input_event *event)
     case USER_SIGNAL_EVENT:
       /* A user signal.  */
       {
-	char *name = find_user_signal_name (event->code);
+	char *name = find_sigusr_name (event->code);
 	if (!name)
 	  emacs_abort ();
 	return intern (name);
@@ -7128,7 +7128,7 @@ gobble_input (void)
   struct terminal *t;
 
   /* Store pending user signal events, if any.  */
-  store_user_signal_events ();
+  store_sigusr_events ();
 
   /* Loop through the available terminals, and call their input hooks.  */
   t = terminal_list;
@@ -7143,6 +7143,7 @@ gobble_input (void)
 
 	  if (input_blocked_p ())
 	    {
+	      fprintf (stderr, "heyo!!!\n");
 	      pending_signals = true;
 	      break;
 	    }
@@ -7458,7 +7459,7 @@ deliver_input_available_signal (int sig)
 
 /* User signal events.  */
 
-struct user_signal_info
+struct sigusr_info
 {
   /* Signal number.  */
   int sig;
@@ -7469,19 +7470,19 @@ struct user_signal_info
   /* Number of pending signals.  */
   int npending;
 
-  struct user_signal_info *next;
+  struct sigusr_info *next;
 };
 
 /* List of user signals.  */
-static struct user_signal_info *user_signals = NULL;
+static struct sigusr_info *sigusrs = NULL;
 
 void
-add_user_signal (int sig, const char *name)
+add_sigusr (int sig, const char *name)
 {
   struct sigaction action;
-  struct user_signal_info *p;
+  struct sigusr_info *p;
 
-  for (p = user_signals; p; p = p->next)
+  for (p = sigusrs; p; p = p->next)
     if (p->sig == sig)
       /* Already added.  */
       return;
@@ -7490,23 +7491,23 @@ add_user_signal (int sig, const char *name)
   p->sig = sig;
   p->name = xstrdup (name);
   p->npending = 0;
-  p->next = user_signals;
-  user_signals = p;
+  p->next = sigusrs;
+  sigusrs = p;
 
-  emacs_sigaction_init (&action, deliver_user_signal);
+  emacs_sigaction_init (&action, deliver_sigusr);
   sigaction (sig, &action, 0);
 }
 
 static void
-handle_user_signal (int sig)
+handle_sigusr (int sig)
 {
-  struct user_signal_info *p;
+  struct sigusr_info *p;
   const char *special_event_name = NULL;
 
   if (SYMBOLP (Vdebug_on_event))
     special_event_name = SSDATA (SYMBOL_NAME (Vdebug_on_event));
 
-  for (p = user_signals; p; p = p->next)
+  for (p = sigusrs; p; p = p->next)
     if (p->sig == sig)
       {
         if (special_event_name
@@ -7539,17 +7540,17 @@ handle_user_signal (int sig)
 }
 
 static void
-deliver_user_signal (int sig)
+deliver_sigusr (int sig)
 {
-  deliver_process_signal (sig, handle_user_signal);
+  deliver_process_signal (sig, handle_sigusr);
 }
 
 static char *
-find_user_signal_name (int sig)
+find_sigusr_name (int sig)
 {
-  struct user_signal_info *p;
+  struct sigusr_info *p;
 
-  for (p = user_signals; p; p = p->next)
+  for (p = sigusrs; p; p = p->next)
     if (p->sig == sig)
       return p->name;
 
@@ -7557,13 +7558,13 @@ find_user_signal_name (int sig)
 }
 
 static void
-store_user_signal_events (void)
+store_sigusr_events (void)
 {
-  struct user_signal_info *p;
+  struct sigusr_info *p;
   struct input_event buf;
   bool buf_initialized = false;
 
-  for (p = user_signals; p; p = p->next)
+  for (p = sigusrs; p; p = p->next)
     if (p->npending > 0)
       {
 	if (! buf_initialized)
@@ -11018,7 +11019,7 @@ set_waiting_for_input (struct timespec *time_to_clear)
 {
   input_available_clear_time = time_to_clear;
 
-  /* If handle_interrupt was called before and buffered a C-g,
+  /* If handle_keyboard_quit was called before and buffered a C-g,
      make it run again now, to avoid timing error.  */
   if (!NILP (Vquit_flag))
     quit_throw_to_read_char (0);
@@ -11030,43 +11031,25 @@ clear_waiting_for_input (void)
   input_available_clear_time = 0;
 }
 
-/* The SIGINT handler.
-
-   If we have a frame on the controlling tty, we assume that the
-   SIGINT was generated by C-g, so we call handle_interrupt.
-   Otherwise, tell maybe_quit to kill Emacs.  */
-
 static void
-handle_interrupt_signal (int sig)
+handle_sigint (int sig)
 {
-  /* See if we have an active terminal on our controlling tty.  */
   struct terminal *terminal = get_named_terminal (DEV_TTY);
-  if (!terminal)
-    {
-      /* If there are no frames there, let's pretend that we are a
-         well-behaving UN*X program and quit.  We must not call Lisp
-         in a signal handler, so tell maybe_quit to exit when it is
-         safe.  */
-      Vquit_flag = Qkill_emacs;
-    }
-  else
-    {
-      /* Otherwise, the SIGINT was probably generated by C-g.  */
 
-      /* Set internal_last_event_frame to the top frame of the
-         controlling tty, if we have a frame there.  We disable the
-         interrupt key on secondary ttys, so the SIGINT must have come
-         from the controlling tty.  */
+  if (! terminal) /* No frames, bail.  */
+    Vquit_flag = Qkill_emacs;
+  else /* Presumably SIGINT from C-g.  */
+    {
+      /* Set internal_last_event_frame to controlling tty's top frame.  */
       internal_last_event_frame = terminal->display_info.tty->top_frame;
-
-      handle_interrupt (1);
+      handle_keyboard_quit (true);
     }
 }
 
 static void
-deliver_interrupt_signal (int sig)
+deliver_sigint (int sig)
 {
-  deliver_process_signal (sig, handle_interrupt_signal);
+  deliver_process_signal (sig, handle_sigint);
 }
 
 /* Output MSG directly to standard output, without buffering.  Ignore
@@ -11090,25 +11073,16 @@ read_stdin (void)
    enough times, then quit anyway.  See bug#6585.  */
 static int volatile force_quit_count;
 
-/* This routine is called at interrupt level in response to C-g.
+/* Called from handle_sigint or kbd_buffer_store_event in response to C-g.
 
-   It is called from the SIGINT handler or kbd_buffer_store_event.
-
-   If `waiting_for_input' is non zero, then unless `echoing' is
-   nonzero, immediately throw back to read_char.
-
-   Otherwise it sets the Lisp variable quit-flag not-nil.  This causes
-   eval to throw, when it gets a chance.  If quit-flag is already
-   non-nil, it stops the job right away.  */
+   Sets `quit-flag' so that eval throws.  An already set `quit-flag'
+   is an anomalous condition requiring breaking the fourth wall.  */
 
 static void
-handle_interrupt (bool in_signal_handler)
+handle_keyboard_quit (bool in_signal_handler)
 {
   char c;
-
   cancel_echoing ();
-
-  /* XXX This code needs to be revised for multi-tty support.  */
   if (! NILP (Vquit_flag) && get_named_terminal (DEV_TTY))
     {
       if (! in_signal_handler)
@@ -11679,14 +11653,8 @@ init_keyboard (void)
 
   if (!noninteractive)
     {
-      /* Before multi-tty support, these handlers used to be installed
-         only if the current session was a tty session.  Now an Emacs
-         session may have multiple display types, so we always handle
-         SIGINT.  There is special code in handle_interrupt_signal to exit
-         Emacs on SIGINT when there are no termcap frames on the
-         controlling terminal.  */
       struct sigaction action;
-      emacs_sigaction_init (&action, deliver_interrupt_signal);
+      emacs_sigaction_init (&action, deliver_sigint);
       sigaction (SIGINT, &action, 0);
 #ifndef DOS_NT
       /* For systems with SysV TERMIO, C-g is set up for both SIGINT and
