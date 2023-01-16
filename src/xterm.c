@@ -186,7 +186,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    creating an X server-side counter object, and setting it as the
    _NET_WM_SYNC_REQUEST_COUNTER property of the frame's top-level
    window.  The window manager then sends Emacs a ClientMessage event
-   (before the ConfigureNotify event) where:
+   (before the ConfigureNotify event) in which:
 
    type = ClientMessage
    window = the respective client window
@@ -208,49 +208,21 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    DRAG AND DROP
 
-   Drag and drop in Emacs is implemented in two ways, depending on
-   which side initiated the drag-and-drop operation.  When another X
-   client initiates a drag, and the user drops something on Emacs, a
-   drag-n-drop-event is sent with the contents of the ClientMessage,
-   and further processing (i.e. retrieving selection contents and
-   replying to the initiating client) is performed from Lisp inside
-   x-dnd.el.
+   Processing of drag-and-drop ClientMessages from another X client into
+   Emacs are performed at the Lisp level in x-dnd.el.
 
-   However, dragging contents from Emacs is implemented almost entirely
-   in C.  X Windows has several competing drag-and-drop protocols, of
-   which Emacs supports two on the C level: the XDND protocol (see
-   https://freedesktop.org/wiki/Specifications/XDND) and the Motif drag
-   and drop protocols.  These protocols are based on the initiator
-   owning a special selection, specifying an action the recipient
-   should perform, grabbing the mouse, and sending various different
-   client messages to the top-level window underneath the mouse as it
-   moves, or when buttons are released.
+   Dragging contents from Emacs into another X client is largely
+   implemented in C via the XDND protocol (see
+   https://freedesktop.org/wiki/Specifications/XDND) or the Motif drag
+   and drop protocol.  When the mouse button is released, Emacs issues
+   a "drop" message to the target window and synchronously waits for a
+   reply.
 
-   The Lisp interface to drag-and-drop is synchronous, and involves
-   running a nested event loop with some global state until the drag
-   finishes.  When the mouse moves, Emacs looks up the top-level window
-   underneath the pointer (the target window) either using a cache
-   provided by window managers that support the
-   _NET_WM_CLIENT_LIST_STACKING root window property, or by calling
-   XTranslateCoordinates in a loop until a top-level window is found,
-   and sends various entry, exit, or motion events to the window
-   containing a list of targets the special selection can be converted
-   to, and the chosen action that the recipient should perform.  The
-   recipient can then send messages in reply detailing the action it
-   has actually chosen to perform.  Finally, when the mouse buttons are
-   released over the recipient window, Emacs sends a "drop" message to
-   the target window, waits for a reply, and returns the action
-   selected by the recipient to the Lisp code that initiated the
-   drag-and-drop operation.
-
-   When a drop happens on a window not supporting any protocol
-   implemented on the C level, the function inside
-   `x-dnd-unsupported-drop-function' is called with some parameters of
-   the drop.  If it returns non-nil, then Emacs tries to simulate a
-   drop happening with the primary selection and synthetic button
-   events (see x_dnd_do_unsupported_drop).  That function implements
-   the OffiX drag-and-drop protocol by default.  See
-   `x-dnd-handle-unsupported-drop' in x-dnd.el.
+   Target windows for which `x-dnd-unsupported-drop-function' returns
+   true, that is, those which lack support for the above protocols,
+   fall back to x_dnd_do_unsupported_drop wherein Emacs attempts
+   simulating a drop with the primary selection and synthetic button
+   events.
 
    DISPLAY ERROR HANDLING
 
