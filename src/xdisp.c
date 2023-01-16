@@ -44,11 +44,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 	  +--------------/  ------------------+          |
                  block_input() switch                    |
 							 |
-		    note_mouse_highlight (asynchronous)	 |
+		    note_mouse_highlight (out-of-band)	 |
 							 |
 				    X mouse events  -----+
 							 |
-			    expose_frame (asynchronous)	 |
+			    expose_frame (out-of-band)	 |
 							 |
 				   X expose events  -----+
 
