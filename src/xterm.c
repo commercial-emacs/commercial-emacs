@@ -101,9 +101,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    X TOOLKIT SUPPORT
 
-   Emacs be configured to use GTK+ 2, GTK 3, the X Toolkit Intrinsics (Xt),
-   or no toolkit, in which case Emacs uses its own scrollbar implementation and
-   X11R2 popup menus.
+   Emacs is configured to use GTK+ 2, GTK 3, the X Toolkit Intrinsics
+   (Xt), or no toolkit, in which case Emacs uses its own scrollbar
+   implementation and X11R2 popup menus.
 
    Xt configurations are one of Lucid or Motif.  The former utilizes
    Emacs's own Xt-based Lucid widget library for menus, and Xaw (or
