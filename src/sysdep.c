@@ -1711,7 +1711,7 @@ handle_signal (int sig, signal_handler_t handler)
 #ifdef HAVE_PTHREAD
   /* Propagate the signal to the main thread if necessary (POSIX
      admits the possibility of non-main threads receiving signals,
-     although that's (currently) verboten under GNU/Linux).  */
+     although that's currently verboten under GNU/Linux).  */
   if (! pthread_equal (pthread_self (), main_thread_id))
     {
       sigset_t blocked;
