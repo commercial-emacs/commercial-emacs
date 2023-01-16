@@ -1887,12 +1887,8 @@ command is less work to invoke when you really want to.
 you can specify them in your initialization file by writing Lisp code.
 @xref{Init File}, for a description of the initialization file.
 
-@findex kbd
-  There are several ways to write a key binding using Lisp.  The
-simplest is to use the @code{kbd} function, which converts a textual
-representation of a key sequence---similar to how we have written key
-sequences in this manual---into a form that can be passed as an
-argument to @code{keymap-global-set}.  For example, here's how to bind
+  The simplest way to write a key binding using Lisp is to use the
+@code{keymap-global-set} function.  For example, here's how to bind
 @kbd{C-z} to the @code{shell} command (@pxref{Interactive Shell}):
 
 @example
