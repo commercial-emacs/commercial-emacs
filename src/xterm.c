@@ -18590,7 +18590,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         SELECTION_EVENT_SELECTION (&inev.sie) = eventp->selection;
         SELECTION_EVENT_TIME (&inev.sie) = eventp->time;
 
-	if (defer_selection_requests)
+	if (defer_selection_requests > 0)
 	  {
 	    x_push_selection_request (&inev.sie);
 	    EVENT_INIT (inev.ie);
@@ -18621,7 +18621,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	   progress, handle SelectionRequest events immediately, by
 	   pushing it onto the selection queue.  */
 
-	if (defer_selection_requests)
+	if (defer_selection_requests > 0)
 	  {
 	    x_push_selection_request (&inev.sie);
 	    EVENT_INIT (inev.ie);
