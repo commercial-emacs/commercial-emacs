@@ -7143,7 +7143,6 @@ gobble_input (void)
 
 	  if (input_blocked_p ())
 	    {
-	      fprintf (stderr, "heyo!!!\n");
 	      pending_signals = true;
 	      break;
 	    }
@@ -7441,7 +7440,7 @@ totally_unblock_input (void)
 #if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
 
 void
-handle_input_available_signal (int sig)
+handle_sigio (int sig)
 {
   pending_signals = true;
 
@@ -7450,9 +7449,9 @@ handle_input_available_signal (int sig)
 }
 
 static void
-deliver_input_available_signal (int sig)
+deliver_sigio (int sig)
 {
-  deliver_process_signal (sig, handle_input_available_signal);
+  handle_signal (sig, handle_sigio);
 }
 #endif /* defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)  */
 
@@ -7526,7 +7525,7 @@ handle_sigusr (int sig)
 	p->npending++;
 #if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
 	if (interrupt_input)
-	  handle_input_available_signal (sig);
+	  handle_sigio (sig);
 	else
 #endif
 	  {
@@ -7542,7 +7541,7 @@ handle_sigusr (int sig)
 static void
 deliver_sigusr (int sig)
 {
-  deliver_process_signal (sig, handle_sigusr);
+  handle_signal (sig, handle_sigusr);
 }
 
 static char *
@@ -11049,7 +11048,7 @@ handle_sigint (int sig)
 static void
 deliver_sigint (int sig)
 {
-  deliver_process_signal (sig, handle_sigint);
+  handle_signal (sig, handle_sigint);
 }
 
 /* Output MSG directly to standard output, without buffering.  Ignore
@@ -11666,7 +11665,7 @@ init_keyboard (void)
   if (!noninteractive)
     {
       struct sigaction action;
-      emacs_sigaction_init (&action, deliver_input_available_signal);
+      emacs_sigaction_init (&action, deliver_sigio);
 #ifdef USABLE_SIGIO
       sigaction (SIGIO, &action, 0);
 #else

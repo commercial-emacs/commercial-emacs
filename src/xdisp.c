@@ -31,13 +31,13 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    in response to mouse or expose events or lisp invocations of
    sit-for and the like.
 
-   Note in the diagram that redisplay can invoke lisp forms which
-   could arbitrarily mutate state that redisplay assumed immutable.
-   Those critical sections should be fenced with block_input() and
-   unblock_input().
+   Sensitive redisplay code should be fenced with block_input /
+   unblock_input to temporarily suspend gobble_input()'s processing of
+   X inputs that could trigger state-changing lisp callbacks, e.g.,
+   :eval forms in mode-line-format.
 
    +--------------+  in-band call   +----------------+
-   | Command loop |---------------->| Redisplay code |<--+
+   | Lisp machine |---------------->| Redisplay code |<--+
    +--------------+  to redisplay   +----------------+   |
           ^                                   |          |
 	  |		  /                   |          |

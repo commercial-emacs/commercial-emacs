@@ -75,6 +75,6 @@ char const *safe_strsignal (int) ATTRIBUTE_CONST;
 # define strsignal(sig) safe_strsignal (sig)
 #endif
 
-void deliver_process_signal (int, signal_handler_t);
+void handle_signal (int, signal_handler_t);
 
 #endif /* EMACS_SYSSIGNAL_H */

@@ -1704,18 +1704,14 @@ emacs_sigaction_init (struct sigaction *action, signal_handler_t handler)
 static pthread_t main_thread_id;
 #endif
 
-/* If we are on the main thread, handle the signal SIG with HANDLER.
-   Otherwise, redirect the signal to the main thread, blocking it from
-   this thread.  POSIX says *any* thread can receive a signal that is
-   associated with a process, process group, or asynchronous event
-   (less true for GNU/Linux, which typically signals on main thread).
-*/
 void
-deliver_process_signal (int sig, signal_handler_t handler)
+handle_signal (int sig, signal_handler_t handler)
 {
-  int old_errno = errno; /* errno could change.  */
-  bool handle_here = true;
+  int restore_errno = errno;
 #ifdef HAVE_PTHREAD
+  /* Propagate the signal to the main thread if necessary (POSIX
+     admits the possibility of non-main threads receiving signals,
+     although that's (currently) verboten under GNU/Linux).  */
   if (! pthread_equal (pthread_self (), main_thread_id))
     {
       sigset_t blocked;
@@ -1723,13 +1719,11 @@ deliver_process_signal (int sig, signal_handler_t handler)
       sigaddset (&blocked, sig);
       pthread_sigmask (SIG_BLOCK, &blocked, 0);
       pthread_kill (main_thread_id, sig);
-      handle_here = false;
     }
+  else
 #endif
-  if (handle_here)
     handler (sig);
-
-  errno = old_errno;
+  errno = restore_errno;
 }
 
 /* Static location to save a fatal backtrace in a thread.
@@ -1775,7 +1769,7 @@ handle_fatal_signal (int sig)
 static void
 deliver_fatal_signal (int sig)
 {
-  deliver_process_signal (sig, handle_fatal_signal);
+  handle_signal (sig, handle_fatal_signal);
 }
 
 static void
@@ -1935,7 +1929,7 @@ handle_danger_signal (int sig)
 static void
 deliver_danger_signal (int sig)
 {
-  deliver_process_signal (sig, handle_danger_signal);
+  handle_signal (sig, handle_danger_signal);
 }
 #endif
 

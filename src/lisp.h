@@ -4460,7 +4460,7 @@ extern Lisp_Object tab_bar_items (Lisp_Object, int *);
 extern Lisp_Object tool_bar_items (Lisp_Object, int *);
 extern void discard_mouse_events (void);
 #if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
-void handle_input_available_signal (int);
+void handle_sigio (int);
 #endif
 extern Lisp_Object pending_funcalls;
 extern bool detect_input_pending (void);

@@ -5474,9 +5474,9 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       if (read_kbd && interrupt_input
 	  && keyboard_bit_set (&Available) && ! noninteractive)
 # ifdef USABLE_SIGIO
-	handle_input_available_signal (SIGIO);
+	handle_sigio (SIGIO);
 # else
-	handle_input_available_signal (SIGPOLL);
+	handle_sigio (SIGPOLL);
 # endif
 #endif
 
@@ -7005,7 +7005,7 @@ handle_child_signal (int sig)
 static void
 deliver_child_signal (int sig)
 {
-  deliver_process_signal (sig, handle_child_signal);
+  handle_signal (sig, handle_child_signal);
 }
 
 static Lisp_Object

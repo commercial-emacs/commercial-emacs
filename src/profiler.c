@@ -262,7 +262,7 @@ handle_profiler_signal (int signal)
 static void
 deliver_profiler_signal (int signal)
 {
-  deliver_process_signal (signal, handle_profiler_signal);
+  handle_signal (signal, handle_profiler_signal);
 }
 
 static int

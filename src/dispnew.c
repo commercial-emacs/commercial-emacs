@@ -5683,7 +5683,7 @@ handle_window_change_signal (int sig)
 static void
 deliver_window_change_signal (int sig)
 {
-  deliver_process_signal (sig, handle_window_change_signal);
+  handle_signal (sig, handle_window_change_signal);
 }
 #endif /* SIGWINCH */
 
