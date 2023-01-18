@@ -100,12 +100,8 @@
 
 (message "Using load-path %s" load-path)
 
-(if dump-mode
-  ;; To reduce the size of dumped Emacs, we avoid making huge char-tables.
-    (progn (setq inhibit-load-charset-map t)
-           ;; --eval gets handled too late.
-           (defvar load--prefer-newer load-prefer-newer)
-           (setq load-prefer-newer t)))
+;; avoid huge char-tables to reduce dump size
+(setq inhibit-load-charset-map dump-mode)
 
 ;; We don't want to have any undo records in the dumped Emacs.
 (set-buffer "*scratch*")
@@ -449,12 +445,6 @@ lost after dumping")))
 
 (remove-hook 'after-load-functions (lambda (_) (garbage-collect)))
 
-(when (boundp 'load--prefer-newer)
-  (setq load-prefer-newer load--prefer-newer)
-  (put 'load-prefer-newer 'standard-value load--prefer-newer)
-  (makunbound 'load--prefer-newer))
-
-(setq inhibit-load-charset-map nil)
 (clear-charset-maps)
 (garbage-collect)
 

@@ -1217,8 +1217,6 @@ Return t if the file exists and loads successfully.  */)
   specpdl_ref fd_index UNINIT;
   specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object found, efound, hist_file_name;
-  /* True means we printed the ".el is newer" message.  */
-  bool newer = 0;
   /* True means we are loading a compiled file.  */
   bool compiled = 0;
   Lisp_Object handler;
@@ -1291,10 +1289,8 @@ Return t if the file exists and loads successfully.  */)
 	  if (NILP (must_suffix))
 	    suffixes = CALLN (Fappend, suffixes, Vload_file_rep_suffixes);
 	}
-
-      fd =
-	openp (Vload_path, file, suffixes, &found, Qnil, load_prefer_newer,
-	       no_native);
+      fd = openp (Vload_path, file, suffixes, &found, Qnil, load_prefer_newer,
+		  no_native);
     }
 
   if (fd == -1)
@@ -1415,9 +1411,6 @@ Return t if the file exists and loads successfully.  */)
       if (fd != -2)
 	{
 	  struct stat s1, s2;
-	  int result;
-
-	  struct timespec epoch_timespec = {(time_t)0, 0}; /* 1970-01-01T00:00 UTC */
 	  if (version < 0 && !(version = safe_to_load_version (file, fd)))
 	    error ("File `%s' was not compiled in Emacs", SDATA (found));
 
@@ -1426,40 +1419,27 @@ Return t if the file exists and loads successfully.  */)
 	  efound = ENCODE_FILE (found);
 	  fmode = "r" FOPEN_BINARY;
 
-          /* openp already checked for newness, no point doing it again.
-             FIXME would be nice to get a message when openp
-             ignores suffix order due to load_prefer_newer.  */
-          if (!load_prefer_newer && is_elc)
+          if (is_elc
+	      && ! load_prefer_newer
+	      && 0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s1, 0))
             {
-	      result = emacs_fstatat (AT_FDCWD, SSDATA (efound), &s1, 0);
-              if (result == 0)
-                {
-                  SSET (efound, SBYTES (efound) - 1, 0);
-		  result = emacs_fstatat (AT_FDCWD, SSDATA (efound), &s2, 0);
-                  SSET (efound, SBYTES (efound) - 1, 'c');
-                }
-
-              if (result == 0
-                  && timespec_cmp (get_stat_mtime (&s1), get_stat_mtime (&s2)) < 0)
-                {
-                  /* Make the progress messages mention that source is newer.  */
-                  newer = 1;
-
-                  /* If we won't print another message, mention this anyway.  */
-                  if (! NILP (nomessage) && !force_load_messages
-                     /* We don't want this message during
-                        bootstrapping for the "compile-first" .elc
-                        files, which have had their timestamps set to
-                        the epoch.  See bug #58224.  */
-                     && timespec_cmp (get_stat_mtime (&s1), epoch_timespec))
-                    {
-                      Lisp_Object msg_file;
-                      msg_file = Fsubstring (found, make_fixnum (0), make_fixnum (-1));
-                      message_with_string ("Source file `%s' newer than byte-compiled file; using older file",
-                                           msg_file, 1);
-                    }
-                }
-            } /* !load_prefer_newer */
+	      bool report_newer;
+	      SSET (efound, SBYTES (efound) - 1, 0);
+              report_newer = (0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s2, 0)
+			      /* the "compile-first" make targets
+				 have their timestamps shunted to epoch.
+				 Bug#58224.  */
+			      && 0 != timespec_cmp (get_stat_mtime (&s1),
+						    (struct timespec) {
+						      (time_t) 0, 0
+						    })
+			      && 0 > timespec_cmp (get_stat_mtime (&s1),
+						   get_stat_mtime (&s2)));
+	      SSET (efound, SBYTES (efound) - 1, 'c');
+              if (report_newer)
+		message_with_string ("Source file `%s' newer than byte-compiled file; using older file",
+				     Fsubstring (found, make_fixnum (0), make_fixnum (-1)), 1);
+            }
 	}
     }
   else if (!is_module && !is_native_elisp)
@@ -1537,9 +1517,6 @@ Return t if the file exists and loads successfully.  */)
         message_with_string ("Loading %s (native compiled elisp)...", file, 1);
       else if (!compiled)
 	message_with_string ("Loading %s (source)...", file, 1);
-      else if (newer)
-	message_with_string ("Loading %s (compiled; note, source file is newer)...",
-		 file, 1);
       else /* The typical case; compiled file newer than source file.  */
 	message_with_string ("Loading %s...", file, 1);
     }
@@ -1602,7 +1579,7 @@ Return t if the file exists and loads successfully.  */)
       saved_strings[i].size = 0;
     }
 
-  if (!noninteractive && (NILP (nomessage) || force_load_messages))
+  if (! noninteractive && (NILP (nomessage) || force_load_messages))
     {
       if (is_module)
         message_with_string ("Loading %s (module)...done", file, 1);
@@ -1610,9 +1587,6 @@ Return t if the file exists and loads successfully.  */)
 	message_with_string ("Loading %s (native compiled elisp)...done", file, 1);
       else if (!compiled)
 	message_with_string ("Loading %s (source)...done", file, 1);
-      else if (newer)
-	message_with_string ("Loading %s (compiled; note, source file is newer)...done",
-		 file, 1);
       else /* The typical case; compiled file newer than source file.  */
 	message_with_string ("Loading %s...done", file, 1);
     }
@@ -5563,16 +5537,12 @@ For internal use only.  */);
           "lread--unescaped-character-literals");
 
   DEFVAR_BOOL ("load-prefer-newer", load_prefer_newer,
-               doc: /* Non-nil means `load' prefers the newest version of a file.
-This applies when a filename suffix is not explicitly specified and
-`load' is trying various possible suffixes (see `load-suffixes' and
-`load-file-rep-suffixes').  Normally, it stops at the first file
-that exists unless you explicitly specify one or the other.  If this
-option is non-nil, it checks all suffixes and uses whichever file is
-newest.
-Note that if you customize this, obviously it will not affect files
-that are loaded before your customizations are read!  */);
-  load_prefer_newer = 0;
+               doc: /* Load the newer of .el and .elc.
+The `load' function loads an explicitly suffixed library file name.
+If unsuffixed, a nil `load-prefer-newer' loads the first readable file among
+`load-suffixes' or `load-file-rep-suffixes'.  A non-nil `load-prefer-newer'
+loads the most recently modified readable file.  */);
+  load_prefer_newer = false;
 
   DEFVAR_BOOL ("load-no-native", load_no_native,
                doc: /* Non-nil means not to load a .eln file when a .elc was requested.  */);
