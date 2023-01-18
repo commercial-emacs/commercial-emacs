@@ -96,6 +96,7 @@
     (erc-page page ctcp-page)
     (erc-sound sound ctcp-sound)
     (erc-stamp stamp timestamp)
+    (erc-fill fill-wrap)
     (erc-services services nickserv))
   "Migration alist mapping a library feature to module names.
 Keys need not be unique: a library may define more than one

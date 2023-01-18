@@ -2854,7 +2854,6 @@ See also `erc-format-message' and `erc-display-line'."
         (erc-display-line string buffer)
       (unless (erc-hide-current-message-p parsed)
         (erc-put-text-property 0 (length string) 'erc-parsed parsed string)
-        (erc-put-text-property 0 (length string) 'rear-sticky t string)
 	(when (erc-response.tags parsed)
 	  (erc-put-text-property 0 (length string) 'tags (erc-response.tags parsed)
 				 string))
@@ -4283,7 +4282,7 @@ If FACE is non-nil, it will be used to propertize the prompt.  If it is nil,
         (setq prompt (propertize prompt
                                  'rear-nonsticky t
                                  'erc-prompt t
-                                 'field t
+                                 'field 'erc-prompt
                                  'front-sticky t
                                  'read-only t))
         (erc-put-text-property 0 (1- (length prompt))
