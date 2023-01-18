@@ -102,8 +102,15 @@ longer than `erc-fill-column'."
   :type '(choice integer boolean))
 
 (defcustom erc-button-buttonize-nicks t
-  "Flag indicating whether nicks should be buttonized or not."
-  :type 'boolean)
+  "Flag indicating whether nicks should be buttonized or not.
+When the value is a function, it must accept four arguments: the
+bounds of the nick in the current message (as a cons), the nick
+itself (case-mapped and without text properties), the nick's
+`erc-server-users' entry, and a (possibly nil) `erc-channel-user'
+object.  It must return replacement bounds when buttonizing
+should proceed and nil otherwise."
+  :package-version '(ERC . "5.6")
+  :type '(choice boolean function))
 
 (defcustom erc-button-rfc-url "https://tools.ietf.org/html/rfc%s"
   "URL used to browse RFC references.
@@ -133,7 +140,7 @@ longer than `erc-fill-column'."
     ("[`‘]\\([a-zA-Z][-a-zA-Z_0-9!*<=>+]+\\)['’]"
      1 t erc-button-describe-symbol 1)
     ;; pseudo links
-    ("\\bInfo:[\"]\\([^\"]+\\)[\"]" 0 t Info-goto-node 1)
+    ("\\bInfo:[\"]\\([^\"]+\\)[\"]" 0 t info 1)
     ("\\b\\(Ward\\|Wiki\\|WardsWiki\\|TheWiki\\):\\([A-Z][a-z]+\\([A-Z][a-z]+\\)+\\)"
      0 t (lambda (page)
            (browse-url (concat "http://c2.com/cgi-bin/wiki?" page)))
@@ -165,8 +172,16 @@ REGEXP is the string matching text around the button or a symbol
 BUTTON is the number of the regexp grouping actually matching the
   button.  This is ignored if REGEXP is `nicknames'.
 
-FORM is a Lisp expression which must eval to true for the button to
-  be added.
+FORM is a Lisp symbol for a special variable whose value must be
+  true for the button to be added.  Alternatively, it can be a
+  function whose arguments are BEG and END, the bounds of the
+  button in the current buffer.  It's expected to return a cons
+  of (possibly identical) bounds or nil, to deny.  For the extent
+  of the call, all face options defined for the button module are
+  re-bound, shadowing themselves, so the function is free to
+  change their values.  Important: different arguments are passed
+  when REGEXP is `nickname'; see `erc-button-buttonize-nicks' for
+  details.
 
 CALLBACK is the function to call when the user push this button.
   CALLBACK can also be a symbol.  Its variable value will be used
@@ -176,7 +191,7 @@ PAR is a number of a regexp grouping whose text will be passed to
   CALLBACK.  There can be several PAR arguments.  If REGEXP is
   `nicknames', these are ignored, and CALLBACK will be called with
   the nickname matched as the argument."
-  :version "29.1"
+  :package-version '(ERC . "5.6") ; FIXME sync on release
   :type '(repeat
           (list :tag "Button"
                 (choice :tag "Matches"
@@ -275,22 +290,47 @@ specified by `erc-button-alist'."
                         (concat "\\<" (regexp-quote (car elem)) "\\>")
                         entry)))))))))))
 
+(defun erc-button--maybe-warn-arbitrary-sexp (form)
+  (if (and (symbolp form) (special-variable-p form))
+      (symbol-value form)
+    (unless (get 'erc-button--maybe-warn-arbitrary-sexp 'warned-arbitrary-sexp)
+      (put 'erc-button--maybe-warn-arbitrary-sexp 'warned-arbitrary-sexp t)
+      (lwarn 'erc :warning
+             (concat "Arbitrary sexps for the third FORM"
+                     " slot of `erc-button-alist' entries"
+                     " have been deprecated.")))
+    (eval form t)))
+
 (defun erc-button-add-nickname-buttons (entry)
   "Search through the buffer for nicknames, and add buttons."
   (let ((form (nth 2 entry))
         (fun (nth 3 entry))
         bounds word)
-    (when (or (eq t form)
-              (eval form t))
+    (when (eq 'erc-button-buttonize-nicks form)
+      (setq form (symbol-value form)))
+    (when (or (functionp form)
+              (eq t form)
+              (and form (erc-button--maybe-warn-arbitrary-sexp form)))
       (goto-char (point-min))
       (while (erc-forward-word)
         (when (setq bounds (erc-bounds-of-word-at-point))
           (setq word (buffer-substring-no-properties
                       (car bounds) (cdr bounds)))
-          (when (or (and (erc-server-buffer-p) (erc-get-server-user word))
-                    (and erc-channel-users (erc-get-channel-user word)))
-            (erc-button-add-button (car bounds) (cdr bounds)
-                                   fun t (list word))))))))
+          (let* ((erc-button-face erc-button-face)
+                 (erc-button-mouse-face erc-button-mouse-face)
+                 (erc-button-nickname-face erc-button-nickname-face)
+                 (down (erc-downcase word))
+                 (cuser (and erc-channel-users
+                             (gethash down erc-channel-users)))
+                 (user (or (and cuser (car cuser))
+                           (and erc-server-users
+                                (gethash down erc-server-users)))))
+            (when (and user
+                       (or (not (functionp form))
+                           (setq bounds
+                                 (funcall form bounds down user (cdr cuser)))))
+              (erc-button-add-button (car bounds) (cdr bounds)
+                                     fun t (list word)))))))))
 
 (defun erc-button-add-buttons-1 (regexp entry)
   "Search through the buffer for matches to ENTRY and add buttons."
@@ -302,7 +342,14 @@ specified by `erc-button-alist'."
           (fun (nth 3 entry))
           (data (mapcar #'match-string-no-properties (nthcdr 4 entry))))
       (when (or (eq t form)
-                (eval form t))
+                (and (functionp form)
+                     (let* ((erc-button-face erc-button-face)
+                            (erc-button-mouse-face erc-button-mouse-face)
+                            (erc-button-nickname-face erc-button-nickname-face)
+                            (rv (funcall form start end)))
+                       (when rv
+                         (setq end (cdr rv) start (car rv)))))
+                (erc-button--maybe-warn-arbitrary-sexp form))
         (erc-button-add-button start end fun nil data regexp)))))
 
 (defun erc-button-remove-old-buttons ()
@@ -316,6 +363,8 @@ that `erc-button-add-button' adds, except for the face."
                   erc-data nil
                   mouse-face nil
                   keymap nil)))
+
+(defvar erc-button--add-nickname-face-function nil)
 
 (defun erc-button-add-button (from to fun nick-p &optional data regexp)
   "Create a button between FROM and TO with callback FUN and data DATA.
@@ -343,7 +392,10 @@ REGEXP is the regular expression which matched for this button."
           (move-marker pos (point))))))
   (if nick-p
       (when erc-button-nickname-face
-        (erc-button-add-face from to erc-button-nickname-face))
+        (if erc-button--add-nickname-face-function
+            (funcall erc-button--add-nickname-face-function
+                     from to erc-button-nickname-face)
+          (erc-button-add-face from to erc-button-nickname-face)))
     (when erc-button-face
       (erc-button-add-face from to erc-button-face)))
   (add-text-properties
@@ -355,16 +407,16 @@ REGEXP is the regular expression which matched for this button."
           (list 'rear-nonsticky t)
           (and data (list 'erc-data data)))))
 
-(defun erc-button-add-face (from to face)
+(defun erc-button-add-face (from to face &optional object)
   "Add FACE to the region between FROM and TO."
   ;; If we just use `add-text-property', then this will overwrite any
   ;; face text property already used for the button.  It will not be
   ;; merged correctly.  If we use overlays, then redisplay will be
   ;; very slow with lots of buttons.  This is why we manually merge
   ;; face text properties.
-  (let ((old (erc-list (get-text-property from 'font-lock-face)))
+  (let ((old (erc-list (get-text-property from 'font-lock-face object)))
         (pos from)
-        (end (next-single-property-change from 'font-lock-face nil to))
+        (end (next-single-property-change from 'font-lock-face object to))
         new)
     ;; old is the face at pos, in list form.  It is nil if there is no
     ;; face at pos.  If nil, the new face is FACE.  If not nil, the
@@ -372,10 +424,10 @@ REGEXP is the regular expression which matched for this button."
     ;; where this face changes.
     (while (< pos to)
       (setq new (if old (cons face old) face))
-      (put-text-property pos end 'font-lock-face new)
+      (put-text-property pos end 'font-lock-face new object)
       (setq pos end
-            old (erc-list (get-text-property pos 'font-lock-face))
-            end (next-single-property-change pos 'font-lock-face nil to)))))
+            old (erc-list (get-text-property pos 'font-lock-face object))
+            end (next-single-property-change pos 'font-lock-face object to)))))
 
 ;; widget-button-click calls with two args, we ignore the first.
 ;; Since Emacs runs this directly, rather than with
@@ -510,6 +562,29 @@ and `apropos' for other symbols."
          (minutes (mod (round seconds 60) 60)))
     (message "@%s is %d:%02d local time"
              beats hours minutes)))
+
+(defun erc-button--substitute-command-keys-in-region (beg end)
+  "Replace command in region with keys and return new bounds"
+  (let* ((o (buffer-substring beg end))
+         (s (substitute-command-keys o)))
+    (unless (equal o s)
+      (setq erc-button-face nil))
+    (delete-region beg end)
+    (insert s))
+  (cons beg (point)))
+
+(defun erc-button--display-error-notice-with-keys (parsed &rest strings)
+  "Add help keys to STRING for corner-case admonishments."
+  (when (stringp parsed)
+    (push parsed strings)
+    (setq parsed nil))
+  (let ((string (apply #'concat strings))
+        (erc-button-alist
+         `((,(rx "\\[" (group (+ (not "]"))) "]") 0
+            erc-button--substitute-command-keys-in-region
+            erc-button-describe-symbol 1)
+           ,@erc-button-alist)))
+    (erc-display-error-notice parsed string)))
 
 (provide 'erc-button)
 
