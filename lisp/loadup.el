@@ -444,6 +444,7 @@ lost after dumping")))
 (set-buffer-modified-p nil)
 
 (remove-hook 'after-load-functions (lambda (_) (garbage-collect)))
+(setq inhibit-load-charset-map nil)
 
 (clear-charset-maps)
 (garbage-collect)
