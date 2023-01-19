@@ -1846,7 +1846,8 @@ removed from the list will be disabled."
          (set sym val)
          ;; this test is for the case where erc hasn't been loaded yet
          (when (fboundp 'erc-update-modules)
-           (erc-update-modules)))
+           (unless erc--inside-mode-toggle-p
+             (erc-update-modules))))
   :type
   '(set
     :greedy t
@@ -1854,10 +1855,9 @@ removed from the list will be disabled."
     (const :tag "autojoin: Join channels automatically" autojoin)
     (const :tag "button: Buttonize URLs, nicknames, and other text" button)
     (const :tag "capab: Mark unidentified users on servers supporting CAPAB"
-           capab-identify)
+           capab)
     (const :tag "completion: Complete nicknames and commands (programmable)"
            completion)
-    (const :tag "hecomplete: Complete nicknames and commands (obsolete, use \"completion\")" hecomplete)
     (const :tag "dcc: Provide Direct Client-to-Client support" dcc)
     (const :tag "fill: Wrap long lines" fill)
     (const :tag "identd: Launch an identd server on port 8113" identd)

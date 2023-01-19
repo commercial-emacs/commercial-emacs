@@ -1209,6 +1209,35 @@
   ;; Default unchanged
   (should (equal (erc-migrate-modules erc-modules) erc-modules)))
 
+(ert-deftest erc--find-group ()
+  ;; These two are loaded by default
+  (should (eq (erc--find-group 'keep-place nil) 'erc))
+  (should (eq (erc--find-group 'networks nil) 'erc-networks))
+  ;; These are fake
+  (cl-letf (((get 'erc-bar 'group-documentation) ""))
+    (should (eq (erc--find-group 'foo 'bar) 'erc-bar))
+    (should (eq (erc--find-group 'bar 'foo) 'erc-bar))
+    (should (eq (erc--find-group 'bar nil) 'erc-bar))
+    (should (eq (erc--find-group 'foo nil) 'erc))))
+
+(ert-deftest erc--find-group--real ()
+  :tags '(:unstable)
+  (let (out)
+    (pcase-dolist (`(,feat . ,syms) erc--features-to-modules)
+      (require feat)
+      (push (cons syms (apply #'erc--find-group syms)) out))
+    ;; Remove local modules, which are mapped to the catch-all
+    (while (and-let* ((m (rassq 'erc out))) ; while-let
+             (setq out (remq m out))))
+    (should (equal out
+                   '(((services nickserv) . erc-services)
+                     ((stamp timestamp) . erc-stamp)
+                     ((sound ctcp-sound) . erc-sound)
+                     ((page ctcp-page) . erc-page)
+                     ((autojoin) . erc-autojoin)
+                     ((capab capab-identify) . erc-capab)
+                     ((completion pcomplete) . erc-pcomplete))))))
+
 (ert-deftest erc--update-modules ()
   (let (calls
         erc-modules
@@ -1276,21 +1305,27 @@
 
 (ert-deftest define-erc-module--global ()
   (let ((global-module '(define-erc-module mname malias
-                          "Some docstring"
+                          "Some docstring."
                           ((ignore a) (ignore b))
                           ((ignore c) (ignore d)))))
 
-    (should (equal (macroexpand global-module)
+    (should (equal (cl-letf (((symbol-function
+                               'erc--prepare-custom-module-type)
+                              #'symbol-name))
+                     (macroexpand global-module))
                    `(progn
 
                       (define-minor-mode erc-mname-mode
                         "Toggle ERC mname mode.
-With a prefix argument ARG, enable mname if ARG is positive,
-and disable it otherwise.  If called from Lisp, enable the mode
-if ARG is omitted or nil.
-Some docstring"
+With a prefix argument ARG, enable mname if ARG is positive, and
+disable it otherwise.  If called from Lisp, enable the mode if
+ARG is omitted or nil.
+
+Some docstring."
                         :global t
-                        :group 'erc-mname
+                        :group (erc--find-group 'mname 'malias)
+                        :set #'erc--custom-set-minor-mode
+                        :type "mname"
                         (if erc-mname-mode
                             (erc-mname-enable)
                           (erc-mname-disable)))
@@ -1298,14 +1333,16 @@ Some docstring"
                       (defun erc-mname-enable ()
                         "Enable ERC mname mode."
                         (interactive)
-                        (cl-pushnew 'mname erc-modules)
+                        (unless erc--inside-mode-toggle-p
+                          (cl-pushnew 'mname erc-modules))
                         (setq erc-mname-mode t)
                         (ignore a) (ignore b))
 
                       (defun erc-mname-disable ()
                         "Disable ERC mname mode."
                         (interactive)
-                        (setq erc-modules (delq 'mname erc-modules))
+                        (unless erc--inside-mode-toggle-p
+                          (setq erc-modules (delq 'mname erc-modules)))
                         (setq erc-mname-mode nil)
                         (ignore c) (ignore d))
 
@@ -1319,7 +1356,7 @@ Some docstring"
 
 (ert-deftest define-erc-module--local ()
   (let* ((global-module '(define-erc-module mname nil ; no alias
-                           "Some docstring"
+                           "Some docstring."
                            ((ignore a) (ignore b))
                            ((ignore c) (ignore d))
                            'local))
@@ -1331,19 +1368,21 @@ Some docstring"
                    `(progn
                       (define-minor-mode erc-mname-mode
                         "Toggle ERC mname mode.
-With a prefix argument ARG, enable mname if ARG is positive,
-and disable it otherwise.  If called from Lisp, enable the mode
-if ARG is omitted or nil.
-Some docstring"
+With a prefix argument ARG, enable mname if ARG is positive, and
+disable it otherwise.  If called from Lisp, enable the mode if
+ARG is omitted or nil.
+
+Some docstring."
                         :global nil
-                        :group 'erc-mname
+                        :group (erc--find-group 'mname nil)
                         (if erc-mname-mode
                             (erc-mname-enable)
                           (erc-mname-disable)))
 
                       (defun erc-mname-enable (&optional ,arg-en)
                         "Enable ERC mname mode.
-When called interactively, do so in all buffers for the current connection."
+When called interactively, do so in all buffers for the current
+connection."
                         (interactive "p")
                         (when (derived-mode-p 'erc-mode)
                           (if ,arg-en
@@ -1355,7 +1394,8 @@ When called interactively, do so in all buffers for the current connection."
 
                       (defun erc-mname-disable (&optional ,arg-dis)
                         "Disable ERC mname mode.
-When called interactively, do so in all buffers for the current connection."
+When called interactively, do so in all buffers for the current
+connection."
                         (interactive "p")
                         (when (derived-mode-p 'erc-mode)
                           (if ,arg-dis

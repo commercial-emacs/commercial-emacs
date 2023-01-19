@@ -29,6 +29,7 @@
 (defvar erc--casemapping-rfc1459)
 (defvar erc--casemapping-rfc1459-strict)
 (defvar erc-channel-users)
+(defvar erc-modules)
 (defvar erc-dbuf)
 (defvar erc-log-p)
 (defvar erc-server-users)
@@ -37,6 +38,11 @@
 (declare-function erc--get-isupport-entry "erc-backend" (key &optional single))
 (declare-function erc-get-buffer "erc" (target &optional proc))
 (declare-function erc-server-buffer "erc" nil)
+(declare-function widget-apply-action "wid-edit" (widget &optional event))
+(declare-function widget-at "wid-edit" (&optional pos))
+(declare-function widget-get-sibling "wid-edit" (widget))
+(declare-function widget-move "wid-edit" (arg &optional suppress-echo))
+(declare-function widget-type "wid-edit" (widget))
 
 (cl-defstruct erc-input
   string insertp sendp)
@@ -91,7 +97,7 @@
 ;; TODO move goodies modules here after 29 is released.
 (defconst erc--features-to-modules
   '((erc-pcomplete completion pcomplete)
-    (erc-capab capab-identify)
+    (erc-capab capab capab-identify)
     (erc-join autojoin)
     (erc-page page ctcp-page)
     (erc-sound sound ctcp-sound)
@@ -123,10 +129,19 @@ canonical name.")
   (setq symbol (intern (downcase (symbol-name symbol))))
   (or (cdr (assq symbol erc--module-name-migrations)) symbol))
 
+(defvar erc--inside-mode-toggle-p nil
+  "Non-nil when a mode toggle is updating module membership.
+This serves as a flag to inhibit the mutual recursion that
+otherwise occurs between an ERC-defined minor-mode function, such
+as `erc-services-mode', and the custom-set function for
+`erc-modules'.  For historical reasons, the latter calls
+`erc-update-modules', which, in turn, enables the minor-mode
+functions for all member modules.")
+
 (defun erc--assemble-toggle (localp name ablsym mode val body)
   (let ((arg (make-symbol "arg")))
     `(defun ,ablsym ,(if localp `(&optional ,arg) '())
-       ,(concat
+       ,(erc--fill-module-docstring
          (if val "Enable" "Disable")
          " ERC " (symbol-name name) " mode."
          (when localp
@@ -140,13 +155,105 @@ canonical name.")
                        (,ablsym))
                    (setq ,mode ,val)
                    ,@body)))
-           `(,(if val
-                  `(cl-pushnew ',(erc--normalize-module-symbol name)
-                               erc-modules)
-                `(setq erc-modules (delq ',(erc--normalize-module-symbol name)
-                                         erc-modules)))
+           `((unless erc--inside-mode-toggle-p
+               ,(if val
+                    `(cl-pushnew ',(erc--normalize-module-symbol name)
+                                 erc-modules)
+                  `(setq erc-modules
+                         (delq ',(erc--normalize-module-symbol name)
+                               erc-modules))))
              (setq ,mode ,val)
              ,@body)))))
+
+;; This is a migration helper that determines a module's `:group'
+;; keyword argument from its name or alias.  A (global) module's minor
+;; mode variable will appear under the group's Custom menu.  Like
+;; `erc--normalize-module-symbol', it must run when the module's
+;; definition (rather than that of `define-erc-module') is expanded.
+;; For corner cases where this fails and where the catch-all of `erc'
+;; is inappropriate, (global) modules can declare a top-level
+;;
+;;   (custom-add-to-group 'erc-foo 'erc-bar-mode 'custom-variable)
+;;
+;; *before* the module's definition.  If `define-erc-module' ever
+;; accepts arbitrary keywords, passing an explicit `:group' will
+;; obviously be preferable.
+
+(defun erc--find-group (&rest symbols)
+  (catch 'found
+    (while symbols
+      (when-let* ((s (pop symbols))
+                  (downed (concat "erc-" (downcase (symbol-name s))))
+                  (known (intern-soft downed)))
+        (when-let ((found (custom-group-of-mode known)))
+          (throw 'found found))
+        (when (or (get known 'group-documentation)
+                  (rassq known custom-current-group-alist))
+          (throw 'found known))))
+    'erc))
+
+(defun erc--custom-set-minor-mode (variable value)
+  (let ((name (get variable 'erc-module))
+        (erc--inside-mode-toggle-p t))
+    (customize-set-variable
+     'erc-modules
+     (if value (cl-pushnew name erc-modules) (delq name erc-modules)))
+    (custom-set-minor-mode variable value)))
+
+;; This exists as a separate, top-level function to prevent the byte
+;; compiler from warning about widget-related dependencies not being
+;; loaded at runtime.
+
+(defun erc--tick-module-checkbox (name &rest _) ; `name' must be normalized
+  (customize-variable-other-window 'erc-modules)
+  ;; Move to `erc-modules' section.
+  (while (not (eq (widget-type (widget-at)) 'checkbox))
+    (widget-move 1 t))
+  ;; This search for a checkbox can fail when `name' refers to a
+  ;; third-party module that modifies `erc-modules' (improperly) on
+  ;; load.
+  (let (w)
+    (while (and (eq (widget-type (widget-at)) 'checkbox)
+                (not (and (setq w (widget-get-sibling (widget-at)))
+                          (eq (widget-value w) name))))
+      (setq w nil)
+      (widget-move 1 t)) ; the `suppress-echo' arg exists in 27.2
+    (if w
+        (progn (widget-apply-action (widget-at))
+               (message "Hit %s to apply or %s to apply and save."
+                        (substitute-command-keys "\\[Custom-set]")
+                        (substitute-command-keys "\\[Custom-save]")))
+      (error "Failed to find %s in `erc-modules' checklist" name))))
+
+(defun erc--prepare-custom-module-type (name)
+  `(let* ((name (erc--normalize-module-symbol ',name))
+          (fmtd (format " `%s' " name)))
+     `(boolean
+       :button-face '(error custom-button)
+       :format "%{%t%}: %[Deprecated Toggle%] \n%d\n"
+       :doc ,(concat "Setting a module's minor-mode variable is "
+                     (propertize "ineffective" 'face 'error) ".\nPlease add"
+                     fmtd "directly to `erc-modules' instead.\nYou can do so"
+                     " now by clicking the scary button above.")
+       :help-echo ,(lambda (_)
+                     (let ((hasp (memq name erc-modules)))
+                       (concat (if hasp "Remove" "Add") fmtd
+                               (if hasp "from" "to") " `erc-modules'.")))
+       :action ,(apply-partially #'erc--tick-module-checkbox name))))
+
+(defun erc--fill-module-docstring (&rest strings)
+  (with-temp-buffer
+    (emacs-lisp-mode)
+    (insert "(defun foo ()\n"
+            (format "%S" (apply #'concat strings))
+            "\n(ignore))")
+    (goto-char (point-min))
+    (forward-line 2)
+    (let ((emacs-lisp-docstring-fill-column 65)
+          (sentence-end-double-space t))
+      (fill-paragraph))
+    (goto-char (point-min))
+    (nth 3 (read (current-buffer)))))
 
 (defmacro define-erc-module (name alias doc enable-body disable-body
                                   &optional local-p)
@@ -182,21 +289,20 @@ Example:
   (declare (doc-string 3) (indent defun))
   (let* ((sn (symbol-name name))
          (mode (intern (format "erc-%s-mode" (downcase sn))))
-         (group (intern (format "erc-%s" (downcase sn))))
          (enable (intern (format "erc-%s-enable" (downcase sn))))
          (disable (intern (format "erc-%s-disable" (downcase sn)))))
     `(progn
        (define-minor-mode
          ,mode
-         ,(format "Toggle ERC %S mode.
+         ,(erc--fill-module-docstring (format "Toggle ERC %s mode.
 With a prefix argument ARG, enable %s if ARG is positive,
 and disable it otherwise.  If called from Lisp, enable the mode
 if ARG is omitted or nil.
-%s" name name doc)
-         ;; FIXME: We don't know if this group exists, so this `:group' may
-         ;; actually just silence a valid warning about the fact that the var
-         ;; is not associated with any group.
-         :global ,(not local-p) :group (quote ,group)
+\n%s" name name doc))
+         :global ,(not local-p)
+         :group (erc--find-group ',name ,(and alias (list 'quote alias)))
+         ,@(unless local-p '(:set #'erc--custom-set-minor-mode))
+         ,@(unless local-p `(:type ,(erc--prepare-custom-module-type name)))
          (if ,mode
              (,enable)
            (,disable)))
