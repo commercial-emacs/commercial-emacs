@@ -1424,7 +1424,7 @@ Return t if the file exists and loads successfully.  */)
 	      && 0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s1, 0))
             {
 	      bool report_newer;
-	      SSET (efound, SBYTES (efound) - 1, 0);
+	      SSET (efound, SBYTES (efound) - 1, 0); /* .elc to .el */
               report_newer = (0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s2, 0)
 			      /* the "compile-first" make targets
 				 have their timestamps shunted to epoch.
@@ -1435,7 +1435,7 @@ Return t if the file exists and loads successfully.  */)
 						    })
 			      && 0 > timespec_cmp (get_stat_mtime (&s1),
 						   get_stat_mtime (&s2)));
-	      SSET (efound, SBYTES (efound) - 1, 'c');
+	      SSET (efound, SBYTES (efound) - 1, 'c'); /* back to .elc from .el */
               if (report_newer)
 		message_with_string ("Source file `%s' newer than byte-compiled file; using older file",
 				     Fsubstring (found, make_fixnum (0), make_fixnum (-1)), 1);
