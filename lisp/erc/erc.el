@@ -1818,7 +1818,7 @@ buffer rather than a server buffer.")
 
 (defcustom erc-modules '(netsplit fill button match track completion readonly
                                   networks ring autojoin noncommands irccontrols
-                                  move-to-prompt stamp menu list)
+                                  move-to-prompt stamp menu list imenu)
   "A list of modules which ERC should enable.
 If you set the value of this without using `customize' remember to call
 \(erc-update-modules) after you change it.  When using `customize', modules
@@ -1863,6 +1863,7 @@ removed from the list will be disabled."
     (const :tag "identd: Launch an identd server on port 8113" identd)
     (const :tag "irccontrols: Highlight or remove IRC control characters"
            irccontrols)
+    (const :tag "imenu: A simple Imenu integration" imenu)
     (const :tag "keep-place: Leave point above un-viewed text" keep-place)
     (const :tag "list: List channels in a separate buffer" list)
     (const :tag "log: Save buffers in logs" log)
@@ -1898,6 +1899,7 @@ removed from the list will be disabled."
     (const :tag "unmorse: Translate morse code in messages" unmorse)
     (const :tag "xdcc: Act as an XDCC file-server" xdcc)
     (repeat :tag "Others" :inline t symbol))
+  :package-version '(ERC . "5.5") ; FIXME sync on release
   :group 'erc)
 
 (defun erc-update-modules ()
