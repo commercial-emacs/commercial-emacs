@@ -3513,6 +3513,29 @@ This function is intended for use in `after-change-functions'."
   "Nodes that designate sentences in JavaScript.
 See `treesit-sentence-type-regexp' for more information.")
 
+(defvar js--treesit-sexp-nodes
+  '("expression"
+    "pattern"
+    "array"
+    "function"
+    "string"
+    "escape"
+    "template"
+    "regex"
+    "number"
+    "identifier"
+    "this"
+    "super"
+    "true"
+    "false"
+    "null"
+    "undefined"
+    "arguments"
+    "pair"
+    "jsx")
+  "Nodes that designate sexps in JavaScript.
+See `treesit-sexp-type-regexp' for more information.")
+
 ;;;###autoload
 (define-derived-mode js-json-mode js-mode "JSON"
   (setq-local js-enabled-frameworks nil)
