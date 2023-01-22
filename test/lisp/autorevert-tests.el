@@ -59,7 +59,6 @@
 (setq auto-revert-debug nil
       auto-revert-notify-exclude-dir-regexp "nothing-to-be-excluded"
       auto-revert-stop-on-user-input nil
-      file-notify-debug nil
       tramp-verbose 0)
 
 (defun auto-revert--timeout ()
@@ -262,7 +261,6 @@ This expects `auto-revert--messages' to be bound by
    (ert-with-temp-file tmpfile
      (let (;; Try to catch bug#32645.
            (auto-revert-debug (getenv "EMACS_HYDRA_CI"))
-           (file-notify-debug (getenv "EMACS_HYDRA_CI"))
            (times '(120 60 30 15))
            buf desc)
        (unwind-protect

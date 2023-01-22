@@ -175,8 +175,7 @@ Return nil when any other file notification watch is still active."
         file-notify--test-events nil
         file-notify--test-monitors nil))
 
-(setq file-notify-debug nil
-      password-cache-expiry nil
+(setq password-cache-expiry nil
       ;; tramp-verbose (if (getenv "EMACS_EMBA_CI") 10 0)
       tramp-verbose 0
       ;; When the remote user id is 0, Tramp refuses unsafe temporary files.
@@ -557,9 +556,6 @@ and the event to `file-notify--test-events'."
     (unless (string-match
 	     (regexp-quote ".#")
 	     (file-notify--test-event-file file-notify--test-event))
-      (when file-notify-debug
-        (message "file-notify--test-event-handler result: %s event: %S"
-                 (null (ert-test-failed-p result)) file-notify--test-event))
       (setq file-notify--test-events
 	    (append file-notify--test-events `(,file-notify--test-event))
 	    file-notify--test-results
@@ -571,22 +567,15 @@ and the event to `file-notify--test-events'."
 
 (defun file-notify--test-with-actions-check (actions)
   "Check whether received actions match one of the ACTIONS alternatives."
-  (let (result)
-    (dolist (elt actions result)
-      (setq result
-            (or result
-                (if (eq (car elt) :random)
-                    (equal (sort (cdr elt) 'string-lessp)
-                           (sort (file-notify--test-event-actions)
-                                 'string-lessp))
-                  (equal elt (file-notify--test-event-actions))))))
-    ;; Do not report result in case we debug.  Write messages instead.
-    (if file-notify-debug
-        (prog1 t
-          (if result
-              (message "Success\n%s" (file-notify--test-event-actions))
-            (message (file-notify--test-with-actions-explainer actions))))
-      result)))
+  (catch 'done
+    (dolist (elt actions)
+      (when-let ((equal-p
+                  (if (eq (car elt) :random)
+                      (equal (sort (cdr elt) 'string-lessp)
+                             (sort (file-notify--test-event-actions)
+                                   'string-lessp))
+                    (equal elt (file-notify--test-event-actions)))))
+        (throw 'done t)))))
 
 (defun file-notify--test-with-actions-explainer (actions)
   "Explain why `file-notify--test-with-actions-check' fails."
@@ -1143,8 +1132,8 @@ delivered."
           ;; chance for filenotify.el to remove the descriptor from
           ;; the internal hash table it maintains.  So we must remove
           ;; the descriptor manually.
-          (if (string-equal (file-notify--test-library) "w32notify")
-              (file-notify--rm-descriptor file-notify--test-desc))
+          (when (string-equal (file-notify--test-library) "w32notify")
+            (file-notify-rm-watch file-notify--test-desc))
 
           ;; The environment shall be cleaned up.
           (file-notify--test-cleanup-p)))
@@ -1203,8 +1192,8 @@ delivered."
 	 (file-notify--test-timeout)
 	 (not (file-notify-valid-p file-notify--test-desc)))
         (should-not (file-notify-valid-p file-notify--test-desc))
-        (if (string-equal (file-notify--test-library) "w32notify")
-            (file-notify--rm-descriptor file-notify--test-desc))
+        (when (string-equal (file-notify--test-library) "w32notify")
+          (file-notify-rm-watch file-notify--test-desc))
 
         ;; The environment shall be cleaned up.
         (file-notify--test-cleanup-p))
@@ -1278,9 +1267,9 @@ delivered."
             (file-notify--test-read-event)
             (delete-file file)))
         (delete-directory file-notify--test-tmpfile)
-        (if (or (string-equal (file-notify--test-library) "w32notify")
-                (getenv "EMACS_EMBA_CI"))
-            (file-notify--rm-descriptor file-notify--test-desc))
+        (when (or (string-equal (file-notify--test-library) "w32notify")
+                  (getenv "EMACS_EMBA_CI"))
+          (file-notify-rm-watch file-notify--test-desc))
 
         ;; The environment shall be cleaned up.
         (file-notify--test-cleanup-p))
@@ -1520,8 +1509,8 @@ the file watch."
           (should-not (file-notify-valid-p file-notify--test-desc2)))
         (when (or (string-equal (file-notify--test-library) "w32notify")
                   (getenv "EMACS_EMBA_CI"))
-          (file-notify--rm-descriptor file-notify--test-desc1)
-          (file-notify--rm-descriptor file-notify--test-desc2))
+          (file-notify-rm-watch file-notify--test-desc1)
+          (file-notify-rm-watch file-notify--test-desc2))
 
         ;; The environment shall be cleaned up.
         (file-notify--test-cleanup-p))
