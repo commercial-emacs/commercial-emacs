@@ -69,21 +69,15 @@ The key is a file name handler or a descriptor specific to the
   "A file system monitoring event, coming from the backends."
   -event -callback)
 
-;; This function is used by `inotify', `kqueue', `gfilenotify',
-;; `w32notify' and remote file system handlers.  Usually, we call the
-;; argument `event' for such handlers.  But in the following, `event'
-;; means a part of the argument only, so we call the argument `object'.
 ;;;###autoload
-(defun file-notify-handle-event (object)
-  "Handle a file system monitoring event, coming from backends.
-If OBJECT is a filewatch event, call its callback.
-Otherwise, signal a `file-notify-error'."
+(defun file-notify-handle-event (notify)
+  "Call NOTIFY's callback on NOTIFY's event."
   (declare (completion ignore))
   (interactive "e")
-  (if (file-notify-p object)
-      (funcall (file-notify--callback object) (file-notify--event object))
+  (if (file-notify-p notify)
+      (funcall (file-notify--callback notify) (file-notify--event notify))
     (signal 'file-notify-error
-	    (cons "Not a valid file-notify-event" object))))
+	    (cons "Not a valid file-notify-event" notify))))
 
 (cl-defstruct (file-notify--rename
                (:constructor nil)

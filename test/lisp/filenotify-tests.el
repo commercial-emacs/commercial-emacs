@@ -569,12 +569,11 @@ and the event to `file-notify--test-events'."
   "Check whether received actions match one of the ACTIONS alternatives."
   (catch 'done
     (dolist (elt actions)
-      (when-let ((equal-p
-                  (if (eq (car elt) :random)
-                      (equal (sort (cdr elt) 'string-lessp)
-                             (sort (file-notify--test-event-actions)
-                                   'string-lessp))
-                    (equal elt (file-notify--test-event-actions)))))
+      (when (if (eq (car elt) :random)
+                (equal (sort (cdr elt) #'string-lessp)
+                       (sort (file-notify--test-event-actions)
+                             #'string-lessp))
+              (equal elt (file-notify--test-event-actions)))
         (throw 'done t)))))
 
 (defun file-notify--test-with-actions-explainer (actions)
@@ -1218,7 +1217,7 @@ delivered."
 	  file-notify--test-tmpfile
 	  '(change) #'file-notify--test-event-handler)))
   (unwind-protect
-      (let ((n 10);00)
+      (let ((n 10)
             source-file-list target-file-list
             (default-directory file-notify--test-tmpfile))
         (dotimes (i n)
@@ -1417,7 +1416,7 @@ the file watch."
         (should (file-notify-valid-p file-notify--test-desc1))
         (should (file-notify-valid-p file-notify--test-desc2))
         (should-not (equal file-notify--test-desc1 file-notify--test-desc2))
-        (let ((n 10));0))
+        (let ((n 10))
           ;; Run the test.
           (file-notify--test-with-actions
               ;; There could be one or two `changed' events.

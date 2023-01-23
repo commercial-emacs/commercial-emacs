@@ -24,82 +24,51 @@
 
 ;;; Commentary:
 
-;; Introduction:
+;; File reverting is forcibly synchronizing a file buffer to its
+;; state on disk.  This is done manually via `revert-buffer'.
 ;;
-;; Whenever a file that Emacs is editing has been changed by another
-;; program the user normally has to execute the command `revert-buffer'
-;; to load the new content of the file into Emacs.
+;; Automatic file reverting, or "Auto-Revert", reverts unmodified buffers
+;; without prompting whenever Emacs detects an exogenous change on disk.
 ;;
-;; This package contains two minor modes: Global Auto-Revert Mode and
-;; Auto-Revert Mode.  Both modes automatically revert buffers
-;; whenever the corresponding files have been changed on disk and the
-;; buffer contains no unsaved changes.
+;; Under `global-auto-revert-mode', Emacs considers all file buffers.
+;; Otherwise, Emacs only considers file buffers asserting `auto-revert-mode'.
 ;;
-;; Auto-Revert Mode can be activated for individual buffers.  Global
-;; Auto-Revert Mode applies to all file buffers.  (If the user option
-;; `global-auto-revert-non-file-buffers' is non-nil, it also applies
-;; to some non-file buffers.  This option is disabled by default.)
+;; Non-file buffers supporting revert assert both
+;; `revert-buffer-function' and `buffer-stale-function'.  Under both
+;; `global-auto-revert-non-file-buffers' (default disabled) and
+;; `global-auto-revert-mode', Emacs checks all such non-file buffers.
+;; Otherwise, it only checks non-file buffers asserting
+;; `auto-revert-mode'.
 ;;
-;; Since checking a remote file is slow, these modes check or revert
-;; remote files only if the user option `auto-revert-remote-files' is
-;; non-nil.  It is recommended to disable version control for remote
-;; files.
+;; Under `auto-revert-remote-files' (default disabled), Emacs checks
+;; remote files (TRAMP).
 ;;
-;; Both modes operate by checking the time stamp of all files at
-;; intervals of `auto-revert-interval'.  The default is every five
-;; seconds.  The check is aborted whenever the user actually uses
-;; Emacs.  You should never even notice that this package is active
-;; (except that your buffers will be reverted, of course).
+;; Under `auto-revert-use-notify' (default enabled), Emacs detects
+;; disk changes via the system's file notification mechanism, e.g.,
+;; inotify, provided the system provides one known to Emacs, and
+;; Emacs's compilation flags do not explicitly disable support.
+;; Otherwise, Emacs naively polls for file timestamp changes every
+;; `auto-revert-interval' seconds.  The custom variable
+;; `auto-revert-notify-exclude-dir-regexp' defines a regular
+;; expression for directory names to exclude.
 ;;
-;; If the file exists, Auto-Revert Mode updates the buffer based on
-;; its (possibly empty) contents.  If the file no longer exists, then
-;; there is nothing to revert, so it does not modify the buffer.  Once
-;; a deleted file corresponding to a buffer in Auto-Revert Mode
-;; reappears, Auto-Revert Mode continues to work.
+;; A buffer whose file no longer exists is not reverted.  Auto-Revert
+;; behavior recommences should the deleted file reappear.
 ;;
-;; If Emacs is compiled with file notification support, notifications
-;; are used instead of checking the time stamp of the files.  You can
-;; disable this by setting the user option `auto-revert-use-notify' to
-;; nil.  Alternatively, a regular expression of directories to be
-;; excluded from file notifications can be specified by
-;; `auto-revert-notify-exclude-dir-regexp'.
+;; Both automatic and manual revert repositions point to the same
+;; place EXCEPT if point began at the end of the buffer.  In that
+;; case, Auto-Revert keeps point at the end of the buffer to
+;; effect "tailing" the file.  For non-file buffers, the
+;; behavior is mode dependent.
 ;;
-;; After reverting a file buffer, Auto-Revert Mode normally puts point
-;; at the same position that a regular manual revert would.  However,
-;; there is one exception to this rule.  If point is at the end of the
-;; buffer before reverting, it stays at the end.  Similarly if point
-;; is displayed at the end of a file buffer in any window, it will stay
-;; at the end of the buffer in that window, even if the window is not
-;; selected.  This way, you can use Auto-Revert Mode to `tail' a file.
-;; Just put point at the end of the buffer and it will stay there.
-;; These rules apply to file buffers.  For non-file buffers, the
-;; behavior may be mode dependent.
-;;
-;; While you can use Auto-Revert Mode to tail a file, this package
-;; contains a third minor mode, Auto-Revert Tail Mode, which does so
-;; more efficiently, as long as you are sure that the file will only
-;; change by growing at the end.  It only appends the new output,
-;; instead of reverting the entire buffer.  It does so even if the
-;; buffer contains unsaved changes.  (Because they will not be lost.)
+;; If the file is only ever appended to, `auto-revert-tail-mode' effects
+;; "tailing" more efficiently.
 
-;; Usage:
-;;
-;; Go to the appropriate buffer and press either of:
-;;   M-x auto-revert-mode RET
-;;   M-x auto-revert-tail-mode RET
-;;
-;; To activate Global Auto-Revert Mode, press:
-;;   M-x global-auto-revert-mode RET
-;;
-;; To activate Global Auto-Revert Mode every time Emacs is started
-;; customize the option `global-auto-revert-mode' or the following
-;; line could be added to your ~/.emacs:
-;;   (global-auto-revert-mode 1)
-;;
-;; The function `turn-on-auto-revert-mode' could be added to any major
-;; mode hook to activate Auto-Revert Mode for all buffers in that
-;; mode.  For example, the following line will activate Auto-Revert
-;; Mode in all C mode buffers:
+;; Like all globalized minor modes, `global-auto-revert-mode' can be
+;; made always active via `customize-option'.  For finer granularity,
+;; `turn-on-auto-revert-mode' can be added to a major mode hook.  For
+;; example, the following line will activate Auto-Revert in all C
+;; buffers:
 ;;
 ;; (add-hook 'c-mode-hook #'turn-on-auto-revert-mode)
 
@@ -138,7 +107,9 @@ Never set this variable directly, use the command
 (put 'auto-revert-tail-mode 'permanent-local t)
 
 (defvar auto-revert-timer nil
-  "Timer used by Auto-Revert Mode.")
+  "Global reference to auto-revert timer.
+This is superfluous state and deprecated.")
+(make-obsolete-variable 'auto-revert-timer nil "30.1")
 
 (defcustom auto-revert-interval 5
   "Time, in seconds, between Auto-Revert Mode file checks.
@@ -155,9 +126,7 @@ next editing session."
   :type 'number
   :set (lambda (variable value)
 	 (set-default variable value)
-	 (and (boundp 'auto-revert-timer)
-	      auto-revert-timer
-	      (auto-revert-set-timer))))
+	 (auto-revert-set-timer)))
 
 (defcustom auto-revert-stop-on-user-input t
   "When non-nil, user input temporarily interrupts Auto-Revert Mode.
@@ -601,41 +570,17 @@ Called after `set-visited-file-name'."
                  auto-revert-buffer-list))
         (t auto-revert-buffer-list)))
 
-;; Same as above in a boolean context, but cheaper.
-(defun auto-revert--need-polling-p ()
-  "Whether periodic polling is required."
-  (cond (global-auto-revert-mode
-         (or (not auto-revert-avoid-polling)
-             (cl-some
-              (lambda (buffer)
-                (and (not (buffer-local-value
-                           'auto-revert-notify-watch-descriptor buffer))
-                     (or (buffer-local-value 'auto-revert--global-mode buffer)
-                         (buffer-local-value 'auto-revert-mode buffer)
-                         (buffer-local-value 'auto-revert-tail-mode buffer))))
-              (buffer-list))))
-        (auto-revert-avoid-polling
-         (not (cl-every
-               (lambda (buffer)
-                 (buffer-local-value
-                  'auto-revert-notify-watch-descriptor buffer))
-               auto-revert-buffer-list)))
-        (t auto-revert-buffer-list)))
-
 (defun auto-revert-set-timer ()
-  "Restart or cancel the timer used by Auto-Revert Mode.
-If such a timer is active, cancel it.  Start a new timer if
-Global Auto-Revert Mode is active or if Auto-Revert Mode is active
-in some buffer.  Restarting the timer ensures that Auto-Revert Mode
-will use an up-to-date value of `auto-revert-interval'."
+  "Cancel existing revert timers, and restart."
   (interactive)
-  (if (timerp auto-revert-timer)
-      (cancel-timer auto-revert-timer))
-  (setq auto-revert-timer
-	(and (auto-revert--need-polling-p)
-	     (run-with-timer auto-revert-interval
-			     auto-revert-interval
-			     'auto-revert-buffers))))
+  (mapc (lambda (timer)
+          (when (eq (timer--function timer) #'auto-revert-buffers)
+            (cancel-timer timer)))
+        timer-list)
+  (setq auto-revert-timer (run-with-timer auto-revert-interval
+                                          auto-revert-interval
+                                          #'auto-revert-buffers)))
+(defalias 'auto-revert-reset-timer #'auto-revert-set-timer)
 
 (defun auto-revert-notify-rm-watch ()
   "Disable file notification for current buffer's associated file."
@@ -912,40 +857,17 @@ Auto-Revert Modes."
         (auto-revert-handler)))))
 
 (defun auto-revert-buffers ()
-  "Revert buffers as specified by Auto-Revert and Global Auto-Revert Mode.
 
-Should `global-auto-revert-mode' be active all file buffers are checked.
-
-Should `auto-revert-mode' be active in some buffers, those buffers
-are checked.
-
-Non-file buffers that have a custom `revert-buffer-function' and
-`buffer-stale-function' are reverted either when Auto-Revert
-Mode is active in that buffer, or when the variable
-`global-auto-revert-non-file-buffers' is non-nil and Global
-Auto-Revert Mode is active.
-
-This function stops whenever there is user input.  The buffers not
-checked are stored in the variable `auto-revert-remaining-buffers'.
-
-To avoid starvation, the buffers in `auto-revert-remaining-buffers'
-are checked first the next time this function is called.
-
-This function is also responsible for removing buffers no longer in
-Auto-Revert Mode from `auto-revert-buffer-list', and for canceling
-the timer when no buffers need to be checked."
   (save-match-data
-    (let ((bufs (auto-revert--buffer-candidates)))
+    (let (;; prioritizes `auto-revert-remaining-buffers'
+          (bufs (auto-revert--buffer-candidates)))
+      ;; Terminate checking loop upon receiving user input.
       (while (and bufs
-		  (not (and auto-revert-stop-on-user-input
-			    (input-pending-p))))
+		  (or (not auto-revert-stop-on-user-input)
+		      (not (input-pending-p))))
         (auto-revert-buffer (pop bufs)))
-      (setq auto-revert-remaining-buffers bufs)
-      ;; Check if we should cancel the timer.
-      (unless (auto-revert--need-polling-p)
-        (when (timerp auto-revert-timer)
-          (cancel-timer auto-revert-timer))
-	(setq auto-revert-timer nil)))))
+      ;; Remaining BUFS are prioritized next go-round.
+      (setq auto-revert-remaining-buffers bufs))))
 
 (provide 'autorevert)
 
