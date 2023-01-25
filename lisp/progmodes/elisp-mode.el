@@ -1190,12 +1190,13 @@ namespace but with lower confidence."
 
 (cl-defmethod xref-location-marker ((l xref-elisp-location))
   (pcase-let (((cl-struct xref-elisp-location symbol type file) l))
-    (let ((buffer-point (find-function-search-for-symbol symbol type file)))
-      (with-current-buffer (car buffer-point)
+    (cl-destructuring-bind (buffer . pt)
+        (find-function-search-for-symbol symbol type file)
+      (with-current-buffer buffer
         (save-excursion
           (save-restriction
             (widen)
-            (goto-char (or (cdr buffer-point) (point-min)))
+            (goto-char (or pt (point)))
             (point-marker)))))))
 
 (cl-defmethod xref-location-group ((l xref-elisp-location))
