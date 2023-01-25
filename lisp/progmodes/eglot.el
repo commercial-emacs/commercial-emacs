@@ -404,6 +404,11 @@ This can be useful when using docker to run a language server.")
 (when (assoc 'flex completion-styles-alist)
   (add-to-list 'completion-category-defaults '(eglot (styles flex basic))))
 
+(defcustom eglot-inlay-hints t
+  "If non-nil, activate inlay hints inside the buffer."
+  :type 'boolean)
+
+
 
 ;;; Constants
 ;;;
@@ -1624,7 +1629,8 @@ under cursor."
           (const :tag "Highlight links in document" :documentLinkProvider)
           (const :tag "Decorate color references" :colorProvider)
           (const :tag "Fold regions of buffer" :foldingRangeProvider)
-          (const :tag "Execute custom commands" :executeCommandProvider)))
+           (const :tag "Execute custom commands" :executeCommandProvider)
+           (const :tag "Inlay Hint" :inlayHintProvider)))
 
 (defun eglot--server-capable (&rest feats)
   "Determine if current server is capable of FEATS."
@@ -1845,6 +1851,9 @@ If it is activated, also signal textDocument/didOpen."
     (when (and buffer-file-name (eglot-current-server))
       (setq eglot--diagnostics nil)
       (eglot--managed-mode)
+      (unless (not eglot-inlay-hints)
+        (eglot-inlay-mode)
+        )
       (eglot--signal-textDocument/didOpen))))
 
 (add-hook 'find-file-hook 'eglot--maybe-activate-editing-mode)
@@ -3452,6 +3461,83 @@ If NOERROR, return predicate, else erroring function."
                               (hash-table-values eglot--servers-by-project))))
       (revert-buffer)
       (pop-to-buffer (current-buffer)))))
+
+(defface eglot-inlay-hint
+  '((t (:height 0.8 :inherit shadow)))
+  "Face used for inlay hint overlays.")
+
+(define-minor-mode eglot-inlay-mode
+  "Mode for displaying inlay hint."
+  :lighter " inlay"
+  (cond
+    (eglot--managed-mode
+      (add-hook 'after-save-hook 'eglot--update-hints nil t))
+    (t
+      (remove-hook 'after-save-hook 'eglot--update-hints t))
+    )
+  ;; Note: the public hook runs before the internal eglot--managed-mode-hook.
+  (run-hooks 'eglot-managed-mode-hook)
+  )
+
+(defun eglot--update-hints()
+  "Refresh inlay hints from LSP server."
+  (unless (eglot--server-capable :inlayHintProvider)
+    (error "Server does not support inlay hint."))
+  (mapc #'delete-overlay (overlays-in (point-min) (point-max)))
+  (let ((read-only-p buffer-read-only)
+	       overlays)
+	    (let ((lens-table (make-hash-table)))
+	      ;; Get the inlay hint objects.
+	      (mapc (lambda (inlayHint)
+		            (when (eglot--server-capable
+			                       :inlayHintProvider :resolveProvider)
+		              (setq inlayHint
+			              (jsonrpc-request (eglot--current-server-or-lose)
+					            :inlayHint/resolve inlayHint)))
+		            (let ((line (thread-first inlayHint
+					                    (plist-get :position)
+					                    (plist-get :line))))
+		              (puthash line
+			              (append (gethash line lens-table) (list inlayHint))
+			              lens-table)))
+		      (jsonrpc-request
+		        (eglot--current-server-or-lose)
+		        :textDocument/inlayHint
+            (list :textDocument (eglot--TextDocumentIdentifier) :range (list :start (list :line 0 :character 0) :end (list :line (count-lines (point-min) (point-max)) :character 0)))
+		        :deferred t))
+
+	      ;; Make overlays for them.
+	      (maphash
+	        (lambda (line values)
+            (cl-loop for value in values
+              do
+              (cl-loop for val being the elements of
+                (if (stringp (plist-get value :label))
+                  (list (plist-get value :label))
+                  (plist-get value :label))
+                do
+	              (eglot--widening
+	                (let ((c (plist-get (plist-get value :position) :character))
+		                     (text (propertize
+                                 (concat
+                                   (if (plist-get value :paddingLeft) " " "")
+                                   (if (stringp val) val (plist-get val :value))
+                                   (if (plist-get value :paddingRight) " " ""))
+                           'mouse-face 'highlight))
+                         )
+	              (goto-char (point-min))
+	              (forward-line line)
+	              (eglot-move-to-column c)
+	              (let ((ov (make-overlay (point) (point))))
+		              (push ov overlays)
+		              (overlay-put ov 'eglot-inlay-hint values)
+		              (overlay-put ov 'before-string (propertize text 'face 'eglot-inlay-hint))
+                  )))
+                )))
+	        lens-table)
+        )
+    ))
+
 
 
 ;;; Hacks
