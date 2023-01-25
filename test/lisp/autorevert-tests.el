@@ -56,8 +56,7 @@
 (require 'ert-x)
 (require 'autorevert)
 
-(setq auto-revert-debug nil
-      auto-revert-notify-exclude-dir-regexp "nothing-to-be-excluded"
+(setq auto-revert-exclude-dir-regexp "nothing-to-be-excluded"
       auto-revert-stop-on-user-input nil
       tramp-verbose 0)
 
@@ -260,7 +259,6 @@ This expects `auto-revert--messages' to be bound by
   (with-auto-revert-test
    (ert-with-temp-file tmpfile
      (let (;; Try to catch bug#32645.
-           (auto-revert-debug (getenv "EMACS_HYDRA_CI"))
            (times '(120 60 30 15))
            buf desc)
        (unwind-protect
@@ -268,24 +266,20 @@ This expects `auto-revert--messages' to be bound by
              (auto-revert-tests--write-file "any text" tmpfile (pop times))
              (setq buf (find-file-noselect tmpfile))
              (with-current-buffer buf
-               (should-not
-                (file-notify-valid-p auto-revert-notify-watch-descriptor))
+               (should-not (file-notify-valid-p auto-revert-watch-descriptor))
                (should (string-equal (buffer-string) "any text"))
                ;; `buffer-stale--default-function' checks for
                ;; `verify-visited-file-modtime'.  We must ensure that
                ;; it returns nil.
                (auto-revert-mode 1)
                (should auto-revert-mode)
-               (setq desc auto-revert-notify-watch-descriptor)
+               (setq desc auto-revert-watch-descriptor)
 
                ;; Remove file while reverting.  We simulate this by
                ;; modifying `before-revert-hook'.
                (add-hook
                 'before-revert-hook
-                (lambda ()
-                  (when auto-revert-debug
-                    (message "%s deleted" buffer-file-name))
-                  (delete-file buffer-file-name))
+                (lambda () (delete-file buffer-file-name))
                 nil t)
 
                (ert-with-message-capture auto-revert--messages
@@ -299,7 +293,7 @@ This expects `auto-revert--messages' to be bound by
                (or (eq file-notify--library 'w32notify)
                    (getenv "EMACS_EMBA_CI")
                    (should-not
-                    (file-notify-valid-p auto-revert-notify-watch-descriptor)))
+                    (file-notify-valid-p auto-revert-watch-descriptor)))
 
                ;; Once the file has been recreated, the buffer shall be
                ;; reverted.
@@ -313,7 +307,7 @@ This expects `auto-revert--messages' to be bound by
                ;; after recreation of the file.  We cannot expect that
                ;; the descriptor is the same, so we just check the
                ;; existence.
-               (should (eq (null desc) (null auto-revert-notify-watch-descriptor)))
+               (should (eq (null desc) (null auto-revert-watch-descriptor)))
 
                ;; An empty file shall still be reverted.
                (ert-with-message-capture auto-revert--messages
@@ -437,14 +431,13 @@ This expects `auto-revert--messages' to be bound by
 
 (defun auto-revert-test--instrument-kill-buffer-hook (buffer)
   "Instrument local `kill-buffer-hook' with messages."
-  (when auto-revert-debug
-    (with-current-buffer buffer
-      (add-hook
-       'kill-buffer-hook
-       (lambda ()
-         (message
-          "%s killed\n%s" (current-buffer) (with-output-to-string (backtrace))))
-       nil 'local))))
+  (with-current-buffer buffer
+    (add-hook
+     'kill-buffer-hook
+     (lambda ()
+       (message
+        "%s killed\n%s" (current-buffer) (with-output-to-string (backtrace))))
+     nil 'local)))
 
 (ert-deftest auto-revert-test05-global-notify ()
   "Test `global-auto-revert-mode' without polling."
@@ -472,9 +465,9 @@ This expects `auto-revert--messages' to be bound by
                  (global-auto-revert-mode 1) ; Turn it on.
 
                  (should (buffer-local-value
-                          'auto-revert-notify-watch-descriptor buf-1))
+                          'auto-revert-watch-descriptor buf-1))
                  (should (buffer-local-value
-                          'auto-revert-notify-watch-descriptor buf-2))
+                          'auto-revert-watch-descriptor buf-2))
 
                  ;; buf-1 should have been reverted immediately when the mode
                  ;; was enabled.
@@ -493,10 +486,10 @@ This expects `auto-revert--messages' to be bound by
                  ;; first poll cycle; wait for it.
                  (auto-revert-test--wait-for
                   (lambda () (buffer-local-value
-                              'auto-revert-notify-watch-descriptor buf-3))
+                              'auto-revert-watch-descriptor buf-3))
                   (auto-revert--timeout))
                  (should (buffer-local-value
-                          'auto-revert-notify-watch-descriptor buf-3))
+                          'auto-revert-watch-descriptor buf-3))
                  (auto-revert-test--write-file "3-a" file-3)
                  (auto-revert-test--wait-for-buffer-text buf-3 "3-a" 1)
                  (should (equal (auto-revert-test--buffer-string buf-3) "3-a"))
@@ -511,7 +504,7 @@ This expects `auto-revert--messages' to be bound by
                  (auto-revert-test--wait-for-buffer-text
                   buf-1 "1-b" (* 2 (auto-revert--timeout)))
                  (should (buffer-local-value
-                          'auto-revert-notify-watch-descriptor buf-1))
+                          'auto-revert-watch-descriptor buf-1))
 
                  ;; Write a buffer to a new file, then modify the new file on disk.
                  (with-current-buffer buf-2
@@ -521,7 +514,7 @@ This expects `auto-revert--messages' to be bound by
                  (auto-revert-test--wait-for-buffer-text
                   buf-2 "2-b" (auto-revert--timeout))
                  (should (buffer-local-value
-                          'auto-revert-notify-watch-descriptor buf-2)))
+                          'auto-revert-watch-descriptor buf-2)))
 
              ;; Clean up.
              (unless was-in-global-auto-revert-mode

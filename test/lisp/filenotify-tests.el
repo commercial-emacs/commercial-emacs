@@ -918,7 +918,7 @@ delivered."
   "Check file creation/change/removal notifications for remote files." t)
 
 (require 'autorevert)
-(setq auto-revert-notify-exclude-dir-regexp "nothing-to-be-excluded"
+(setq auto-revert-exclude-dir-regexp "nothing-to-be-excluded"
       auto-revert-remote-files t
       auto-revert-stop-on-user-input nil)
 
@@ -950,13 +950,13 @@ delivered."
 
 	    ;; `auto-revert-buffers' runs every 5".
 	    (with-timeout (timeout (ignore))
-	      (while (null auto-revert-notify-watch-descriptor)
+	      (while (null auto-revert-watch-descriptor)
 		(sleep-for 1)))
 
             ;; `file-notify--test-monitor' needs to know
             ;; `file-notify--test-desc' in order to compute proper
             ;; timeouts.
-            (setq file-notify--test-desc auto-revert-notify-watch-descriptor)
+            (setq file-notify--test-desc auto-revert-watch-descriptor)
 
 	    ;; GKqueueFileMonitor does not report the `changed' event.
 	    (skip-unless
@@ -965,7 +965,7 @@ delivered."
 	    ;; Check, that file notification has been used.
 	    (should auto-revert-mode)
 	    (should auto-revert-use-notify)
-	    (should auto-revert-notify-watch-descriptor)
+	    (should auto-revert-watch-descriptor)
 
 	    ;; Modify file.  We wait for a second, in order to have
             ;; another timestamp.
@@ -984,12 +984,11 @@ delivered."
                 (should (string-match "another text" (buffer-string)))))
 
             ;; Stop file notification.  Autorevert shall still work via polling.
-	    (file-notify-rm-watch auto-revert-notify-watch-descriptor)
+	    (file-notify-rm-watch auto-revert-watch-descriptor)
 	    (file-notify--test-wait-for-events
-	     timeout (null auto-revert-notify-watch-descriptor))
+	     timeout (null auto-revert-watch-descriptor))
 	    (should auto-revert-use-notify)
-	    (should-not
-             (file-notify-valid-p auto-revert-notify-watch-descriptor))
+	    (should-not (file-notify-valid-p auto-revert-watch-descriptor))
 
 	    ;; Modify file.  We wait for two seconds, in order to
 	    ;; have another timestamp.  One second seems to be too
