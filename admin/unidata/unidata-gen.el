@@ -88,7 +88,7 @@
 ;; CHAR-or-RANGE: a character code or a cons of character codes
 ;; PROPn: string representing the nth property value
 
-(eval-when-compile (require 'cl-lib))
+(require 'cl-lib)
 (require 'generate-lisp-file)
 
 (defvar unidata-list nil)

@@ -328,12 +328,11 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
 			          (expand-file-name default-directory)))
              (not (file-symlink-p (or buffer-file-name default-directory))))
     (setq auto-revert-watch-descriptor
-	  (condition-case err
-	      (file-notify-add-watch
-	       (expand-file-name (or buffer-file-name "") default-directory)
-               (if buffer-file-name '(change attribute-change) '(change))
-               #'auto-revert-handle-notification)
-            (error )))
+	  (ignore-errors
+	    (file-notify-add-watch
+	     (expand-file-name (or buffer-file-name "") default-directory)
+             (if buffer-file-name '(change attribute-change) '(change))
+             #'auto-revert-handle-notification)))
     (push (cons auto-revert-watch-descriptor (current-buffer))
           auto-revert--lookup-buffer)))
 
