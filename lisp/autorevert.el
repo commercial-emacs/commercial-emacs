@@ -76,7 +76,22 @@
   :type 'number
   :set (lambda (variable value)
 	 (set-default variable value)
-	 (auto-revert-reset-timer)))
+	 (auto-revert-set-timer)))
+
+(defun auto-revert-unset-timer ()
+  (mapc (lambda (timer)
+          (when (eq (timer--function timer) #'auto-revert--cycle)
+            (cancel-timer timer)))
+        timer-list))
+
+(defalias 'auto-revert-reset-timer #'auto-revert-set-timer)
+(defun auto-revert-set-timer ()
+  "Cancel existing revert timers, and restart."
+  (interactive) ; historical
+  (auto-revert-unset-timer)
+  (setq auto-revert-timer (run-with-timer auto-revert-interval
+                                          auto-revert-interval
+                                          #'auto-revert--cycle)))
 
 (defcustom auto-revert-stop-on-user-input t
   "Obsolesced.  auto-revert always defers to user input."
@@ -293,21 +308,6 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
   auto-revert-mode turn-on-auto-revert-mode
   :group 'auto-revert
   :version "30.1")
-
-(defun auto-revert-unset-timer ()
-  (mapc (lambda (timer)
-          (when (eq (timer--function timer) #'auto-revert--cycle)
-            (cancel-timer timer)))
-        timer-list))
-
-(defalias 'auto-revert-reset-timer #'auto-revert-set-timer)
-(defun auto-revert-set-timer ()
-  "Cancel existing revert timers, and restart."
-  (interactive) ; historical
-  (auto-revert-unset-timer)
-  (setq auto-revert-timer (run-with-timer auto-revert-interval
-                                          auto-revert-interval
-                                          #'auto-revert--cycle)))
 
 (defalias 'auto-revert-notify-rm-watch #'auto-revert-rm-watch)
 (defun auto-revert-rm-watch ()

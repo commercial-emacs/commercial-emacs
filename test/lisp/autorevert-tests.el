@@ -449,7 +449,6 @@ This expects `auto-revert--messages' to be bound by
      (ert-with-temp-file file-2
        (ert-with-temp-file file-3
          (let* ((auto-revert-use-notify t)
-                (auto-revert-avoid-polling t)
                 (was-in-global-auto-revert-mode global-auto-revert-mode)
                 (file-2b (concat file-2 "-b"))
                 require-final-newline buf-1 buf-2 buf-3)
