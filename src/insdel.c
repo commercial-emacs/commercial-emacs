@@ -1183,20 +1183,9 @@ insert_from_buffer (struct buffer *buf,
 {
   ptrdiff_t opoint = PT;
 
-#ifdef HAVE_TREE_SITTER
-  ptrdiff_t obyte = PT_BYTE;
-#endif
-
   insert_from_buffer_1 (buf, charpos, nchars, inherit);
   signal_after_change (opoint, 0, PT - opoint);
   update_compositions (opoint, PT, CHECK_BORDER);
-
-#ifdef HAVE_TREE_SITTER
-  eassert (PT_BYTE >= BEG_BYTE);
-  eassert (obyte >= BEG_BYTE);
-  eassert (PT_BYTE >= obyte);
-  treesit_record_change (obyte, obyte, PT_BYTE);
-#endif
 }
 
 static void
