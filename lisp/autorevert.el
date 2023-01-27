@@ -24,39 +24,39 @@
 
 ;;; Commentary:
 
-;; File reverting is forcibly synchronizing a file buffer to its
-;; state on disk.  This is done manually via `revert-buffer'.
-;;
-;; Automatic file reverting, or "auto-revert", reverts unmodified buffers
-;; without prompting whenever Emacs detects an exogenous change on disk.
+;; File reverting is forcibly synchronizing a file buffer to its state
+;; on disk.  The interactive command `revert-buffer' does this
+;; manually.  Automatic file reverting, or "auto-revert", does this
+;; without user prompting for unmodified buffers whose underlying
+;; files have been exogenously modified on disk. This is a "dwim"
+;; behavior for most users.
 ;;
 ;; Under `auto-revert-use-notify' (default enabled), Emacs detects
 ;; disk changes via the system's file notification mechanism, e.g.,
-;; inotify, assuming Emacs provides a support module and does not
-;; explicitly disable it during compilation.
+;; inotify.
 ;;
 ;; In the absence of system-level file notifications, Emacs naively
 ;; polls for file timestamp changes every `auto-revert-interval'
 ;; seconds.  The custom variable `auto-revert-exclude-dir-regexp'
 ;; defines a regular expression for directory names to exclude.
 ;;
-;; A buffer whose file no longer exists is not reverted.  auto-revert
+;; A buffer whose file no longer exists is not reverted.  Auto-revert
 ;; behavior recommences should the deleted file reappear.
 ;;
 ;; To preserve buffer markers, set
 ;; `revert-buffer-insert-file-contents-function' to the slower
-;; `revert-buffer-insert-file-contents-delicately'.
+;; `revert-buffer-insert-file-contents-delicately' (deprecated).
 ;;
-;; If the file is only ever appended to, `auto-revert-tail-mode'
-;; effects "tailing" more efficiently.
-
-;; Like all globalized minor modes, `global-auto-revert-mode' can be
-;; made always active via `customize-option'.  More granular
-;; application is possible.  A common idiom to cleave along major
-;; modes is to add `auto-revert-mode' to the mode's hook.  For
-;; example, the following activates auto-revert in all C buffers:
+;; If the file is only ever appended to, prefer
+;; `auto-revert-tail-mode' to `auto-revert-mode', as the former
+;; performs a parsimonious `tail` without reverting the entire file.
 ;;
-;; (add-hook 'c-mode-hook #'auto-revert-mode)
+;; Most users expect their text editor to auto-revert as a matter of
+;; course.  As is its wont, Emacs offers always-active auto-revert as
+;; an opt-in defcustom `global-auto-revert-mode'.  We do this partly
+;; to avoid surprising the fusty (and fussy) userbase who went without
+;; auto-revert for decades, and partly because we've not utmost
+;; confidence in the code.
 
 ;;; Code:
 
