@@ -1889,7 +1889,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
 	/* Store new value into the DEFAULT-VALUE slot.  */
 	XSETCDR (blv->defcell, value);
-	/* If the default binding is now loaded, set the REALVALUE slot too.  */
+	/* If default binding loaded, set the defvar-per-buffer slot too.  */
 	if (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
 	  symval_update_fwd (blv->fwd, value, NULL);
       }
@@ -2164,16 +2164,8 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
 	 Fcons (Fcons (variable, XCDR (SYMBOL_BLV (sym)->defcell)),
 		BVAR (current_buffer, local_var_alist)));
 
-      /* If the symbol forwards into a C variable, then load the binding
-         for this buffer now, to preserve the invariant that forwarded
-         variables must always hold the value corresponding to the
-         current buffer (they are swapped eagerly).
-         Otherwise, if C code modifies the variable before we load the
-         binding in, then that new value would clobber the default binding
-         the next time we unload it.  See bug#34318.
-
-	 (People need to learn how to write a comprehensible comment.
-	 Hint: brevity is key.) */
+      /* Eagerly reflect blv into defvar-per-buffer slot.
+         Bug#34318. */
       if (SYMBOL_BLV (sym)->fwd.fwdptr)
         symval_update_blv (variable, Fcurrent_buffer ());
     }

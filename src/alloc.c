@@ -5064,7 +5064,7 @@ static inline bool mark_stack_empty_p (void);
 void
 garbage_collect (void)
 {
-  static struct timespec gc_elapsed = {0, 0};
+  static struct timespec gc_elapsed = { 0, 0 };
   Lisp_Object tail, buffer;
   bool message_p = false;
   specpdl_ref count = SPECPDL_INDEX ();

@@ -2536,9 +2536,8 @@ make_uint (uintmax_t n)
   (EXPR_SIGNED (expr) ? make_int (expr) : make_uint (expr))
 
 
-/* Forwarding pointer to an int variable.
-   This is allowed only in the value cell of a symbol,
-   and it means that the symbol's value really lives in the
+/* Forwarding pointer allowed only in symbol's value cell.
+   Means symbol's value actually lives in the
    specified int variable.  */
 struct Lisp_Intfwd
   {
@@ -2546,28 +2545,22 @@ struct Lisp_Intfwd
     intmax_t *intvar;
   };
 
-/* Boolean forwarding pointer to an int variable.
-   This is like Lisp_Intfwd except that the ostensible
-   "value" of the symbol is t if the bool variable is true,
-   nil if it is false.  */
+/* Boolean forwarding pointer like Lisp_Intfwd.  */
 struct Lisp_Boolfwd
   {
     enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Bool */
     bool *boolvar;
   };
 
-/* Forwarding pointer to a Lisp_Object variable.
-   This is allowed only in the value cell of a symbol,
-   and it means that the symbol's value really lives in the
-   specified variable.  */
+/* Object forwarding pointer like Lisp_Intfwd.  */
 struct Lisp_Objfwd
   {
     enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Obj */
     Lisp_Object *objvar;
   };
 
-/* Like Lisp_Objfwd except that value lives in a slot in the
-   current buffer.  Value is byte index of slot within buffer.  */
+/* Like Lisp_Objfwd except value lives not in OBJVAR
+   bur rather the current buffer's slot at byte OFFSET.  */
 struct Lisp_Buffer_Objfwd
   {
     enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Buffer_Obj */
@@ -2576,9 +2569,8 @@ struct Lisp_Buffer_Objfwd
     Lisp_Object predicate;
   };
 
-/* Note so-called "slots" or "per-buffer" variables form a subset
-   of buffer-local variables, and are administered by Lisp_Buffer_Objfwd.  */
-
+/* Note slots or "per-buffer" variables form a subset of buffer-local
+   variables, and are administered by Lisp_Buffer_Objfwd.  */
 struct Lisp_Buffer_Local_Value
   {
     /* True means that merely setting the variable creates a local

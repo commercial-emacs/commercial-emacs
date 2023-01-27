@@ -4506,10 +4506,8 @@ timer_check_2 (Lisp_Object timers, Lisp_Object idle_timers)
 struct timespec
 timer_check (void)
 {
-  struct timespec nexttime;
-  Lisp_Object timers, idle_timers;
-
-  Lisp_Object tem = Vinhibit_quit;
+  struct timespec nexttime = { 0, 0 };
+  Lisp_Object timers, idle_timers, tem = Vinhibit_quit;
   Vinhibit_quit = Qt;
   block_input ();
   turn_on_atimers (false);

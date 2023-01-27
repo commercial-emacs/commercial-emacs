@@ -98,8 +98,8 @@ restore_thread (struct thread_state *self)
       specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, SPECPDL_LET);
 #endif /* ! MULTITHREADED */
 
-      /* Thread-private buffer variables require resetting, but
-	 set_buffer_internal(current_buffer) would be a no-op.  */
+      /* Contortion here because set_buffer_internal immediately
+	 returns if argument is current_buffer.  */
       struct buffer *b = current_buffer;
       current_buffer = NULL;
       set_buffer_internal (b);

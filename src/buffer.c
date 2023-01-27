@@ -1067,11 +1067,10 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
     bset_local_var_alist (b, Qnil);
   else
     {
-      Lisp_Object tmp, last = Qnil;
-      Lisp_Object buffer;
+      Lisp_Object buffer, last = Qnil;
       XSETBUFFER (buffer, b);
 
-      for (tmp = BVAR (b, local_var_alist); CONSP (tmp); tmp = XCDR (tmp))
+      for (Lisp_Object tmp = BVAR (b, local_var_alist); CONSP (tmp); tmp = XCDR (tmp))
         {
           Lisp_Object local_var = XCAR (XCAR (tmp));
           Lisp_Object prop = Fget (local_var, Qpermanent_local);
@@ -1254,8 +1253,9 @@ static Lisp_Object
 buffer_lisp_local_variables (struct buffer *buf, bool clone)
 {
   Lisp_Object result = Qnil;
-  Lisp_Object tail;
-  for (tail = BVAR (buf, local_var_alist); CONSP (tail); tail = XCDR (tail))
+  for (Lisp_Object tail = BVAR (buf, local_var_alist);
+       CONSP (tail);
+       tail = XCDR (tail))
     {
       Lisp_Object val, elt;
 
@@ -2126,7 +2126,6 @@ void
 set_buffer_internal (struct buffer *new_buf)
 {
   struct buffer *old_buf;
-  Lisp_Object tail;
 
 #ifdef USE_MMAP_FOR_BUFFERS
   if (new_buf->text->beg == NULL)
@@ -2162,14 +2161,15 @@ set_buffer_internal (struct buffer *new_buf)
       fetch_buffer_markers (current_buffer);
     }
 
-  /* Look down buffer's list of local Lisp variables
-     to find and update any that forward into C variables.  */
+  /* Update defvar_per_buffer variables.  */
   struct buffer *const arr[] = {old_buf, current_buffer};
   for (int i = 0; i < 2; ++i)
     {
       struct buffer *b = arr[i];
       if (b)
-	for (tail = BVAR (b, local_var_alist); CONSP (tail); tail = XCDR (tail))
+	for (Lisp_Object tail = BVAR (b, local_var_alist);
+	     CONSP (tail);
+	     tail = XCDR (tail))
 	  {
 	    Lisp_Object var = XCAR (XCAR (tail));
 	    struct Lisp_Symbol *sym = XSYMBOL (var);

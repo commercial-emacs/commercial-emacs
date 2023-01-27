@@ -20,6 +20,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* A slot is a Lisp_Object field in struct buffer, more specifically,
    one of the fields over which FOR_EACH_PER_BUFFER_OBJECT_AT iterates,
    (and excludes `undo_list_`).
+
+   Note so-called "slots" or "per-buffer" variables form a subset of
+   buffer-local variables, and are administered by Lisp_Buffer_Objfwd.
 */
 
 #ifndef EMACS_BUFFER_H
@@ -350,9 +353,8 @@ struct buffer
      point into this buffer or may point nowhere.  */
   Lisp_Object mark_;
 
-  /* Alist of elements (SYMBOL . VALUE-IN-THIS-BUFFER) for all
-     per-buffer variables of this buffer.  For locally unbound
-     symbols, just the symbol appears as the element.  */
+  /* Alist of elements (SYMBOL . VALUE-IN-THIS-BUFFER).  For locally
+     unbound symbols, just the symbol appears as the element.  */
   Lisp_Object local_var_alist_;
 
   /* Symbol naming major mode (e.g., lisp-mode).  */

@@ -155,9 +155,11 @@ Ask for user confirmation before signaling the thread."
   "Thread whose backtrace is displayed in the current buffer.")
 
 (defun thread-list-pop-to-backtrace ()
-  "Display the backtrace for the thread at point."
+  "Display the backtrace for current thread."
   (interactive)
-  (let ((thread (tabulated-list-get-id)))
+  (let ((thread (if (derived-mode-p 'thread-list-mode)
+                    (tabulated-list-get-id)
+                  (current-thread))))
     (if (thread-live-p thread)
         (let ((buffer (get-buffer-create "*Thread Backtrace*")))
           (pop-to-buffer buffer)
