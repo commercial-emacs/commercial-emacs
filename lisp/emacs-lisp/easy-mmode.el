@@ -490,7 +490,8 @@ on if the hook has explicitly disabled it.
 	  (intern (concat global-mode-name "-enable-in-buffers")))
 	 (MODE-check-buffers
 	  (intern (concat global-mode-name "-check-buffers")))
-	 (MODE-cmhh (intern (concat global-mode-name "-cmhh")))
+	 (MODE-change-major-mode
+          (intern (concat global-mode-name "-change-major-mode")))
 	 (minor-MODE-hook (intern (concat mode-name "-hook")))
 	 (MODE-set-explicitly (intern (concat mode-name "-set-explicitly")))
 	 (MODE-major-mode (intern (concat (symbol-name mode) "-major-mode")))
@@ -554,10 +555,10 @@ Disable the mode if ARG is a negative number.\n\n"
 	       (add-hook 'after-change-major-mode-hook
 			 #',MODE-enable-in-buffers)
 	       (add-hook 'find-file-hook #',MODE-check-buffers)
-	       (add-hook 'change-major-mode-hook #',MODE-cmhh))
+	       (add-hook 'change-major-mode-hook #',MODE-change-major-mode))
 	   (remove-hook 'after-change-major-mode-hook #',MODE-enable-in-buffers)
 	   (remove-hook 'find-file-hook #',MODE-check-buffers)
-	   (remove-hook 'change-major-mode-hook #',MODE-cmhh))
+	   (remove-hook 'change-major-mode-hook #',MODE-change-major-mode))
 
 	 ;; Go through existing buffers.
 	 (dolist (buf (buffer-list))
@@ -623,15 +624,14 @@ list."
        (put ',MODE-enable-in-buffers 'definition-name ',global-mode)
 
        (defun ,MODE-check-buffers ()
-	 (,MODE-enable-in-buffers)
+         (,MODE-enable-in-buffers)
 	 (remove-hook 'post-command-hook #',MODE-check-buffers))
        (put ',MODE-check-buffers 'definition-name ',global-mode)
 
-       ;; The function that catches kill-all-local-variables.
-       (defun ,MODE-cmhh ()
+       (defun ,MODE-change-major-mode ()
 	 (add-to-list ',MODE-buffers (current-buffer))
 	 (add-hook 'post-command-hook #',MODE-check-buffers))
-       (put ',MODE-cmhh 'definition-name ',global-mode))))
+       (put ',MODE-change-major-mode 'definition-name ',global-mode))))
 
 (defun easy-mmode--globalized-predicate-p (predicate)
   (cond

@@ -70,15 +70,7 @@
 (defvar auto-revert-timer nil "Obsolesced")
 (make-obsolete-variable 'auto-revert-timer nil "30.1")
 
-(defcustom auto-revert-interval 5
-  "Time in seconds between auto-revert checks."
-  :group 'auto-revert
-  :type 'number
-  :set (lambda (variable value)
-	 (set-default variable value)
-	 (auto-revert-set-timer)))
-
-(defun auto-revert-unset-timer ()
+(defsubst auto-revert-unset-timer ()
   (mapc (lambda (timer)
           (when (eq (timer--function timer) #'auto-revert--cycle)
             (cancel-timer timer)))
@@ -89,9 +81,18 @@
   "Cancel existing revert timers, and restart."
   (interactive) ; historical
   (auto-revert-unset-timer)
+  (defvar auto-revert-interval)
   (setq auto-revert-timer (run-with-timer auto-revert-interval
                                           auto-revert-interval
                                           #'auto-revert--cycle)))
+
+(defcustom auto-revert-interval 5
+  "Time in seconds between auto-revert checks."
+  :group 'auto-revert
+  :type 'number
+  :set (lambda (variable value)
+	 (set-default variable value)
+	 (auto-revert-set-timer)))
 
 (defcustom auto-revert-stop-on-user-input t
   "Obsolesced.  auto-revert always defers to user input."
@@ -128,8 +129,9 @@
 (defvaralias 'global-auto-revert-non-file-buffers 'auto-revert-non-file-buffers)
 (defcustom auto-revert-non-file-buffers nil
   "Activate experimental revert semantics for functional buffers.
-Currently `buffer-menu-mode' and `dired-mode' define
-`revert-buffer-function' and `buffer-stale-function' adapters."
+Currently `buffer-menu-mode' and `dired-mode' define the
+`revert-buffer-function' and `buffer-stale-function' methods
+necessary for non-file reverting."
   :group 'auto-revert
   :type 'boolean
   :link '(info-link "(emacs)Auto Revert"))
@@ -226,12 +228,13 @@ Currently `buffer-menu-mode' and `dired-mode' define
   "TOGGLE is nil or non-nil."
   (dolist (entry
            ;; [HOOKS HOOK]
-           '([after-set-visited-file-name-hook
-              (lambda ()
-                (auto-revert-mode 0)
-                (auto-revert-mode))]
+           `([after-set-visited-file-name-hook
+              ,(lambda ()
+                 (auto-revert-mode 0)
+                 (auto-revert-mode))]
              [kill-buffer-hook
-              (apply-partially #'auto-revert-mode 0)]))
+              ,(lambda ()
+                 (auto-revert-mode 0))]))
     (cl-destructuring-bind (hooks hook)
         (append entry nil)
       (if toggle
@@ -255,7 +258,6 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
     (auto-revert-add-watch)
     (auto-revert-set-timer)))
 
-;;;###autoload
 (defun turn-on-auto-revert-mode ()
   (when (or buffer-file-name
             (and auto-revert-non-file-buffers
@@ -268,10 +270,10 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
   "TOGGLE is nil or non-nil."
   (dolist (entry
            ;; [HOOKS HOOK]
-           '([before-save-hook ; prevent eating one's own poop
-              (apply-partially #'auto-revert-tail-mode 0)]
+           `([before-save-hook ; prevent eating one's own poop
+              ,(apply-partially #'auto-revert-tail-mode 0)]
              [kill-buffer-hook
-              (apply-partially #'auto-revert-tail-mode 0)]))
+              ,(apply-partially #'auto-revert-tail-mode 0)]))
     (cl-destructuring-bind (hooks hook)
         (append entry nil)
       (if toggle
