@@ -46,23 +46,26 @@
 ;; performs a parsimonious "tail" without reverting the entire file.
 ;;
 ;; Most users expect their text editor to auto-revert as a matter of
-;; course.  As is its wont, Emacs offers always-active auto-revert as
-;; an opt-in defcustom `global-auto-revert-mode'.  We do this partly
-;; to avoid surprising the fusty (and fussy) userbase who went without
-;; auto-revert for decades, and partly because we've not utmost
-;; confidence in the code.
+;; course.  Bucking convention as always, Emacs offers always-active
+;; auto-revert as an opt-in defcustom `global-auto-revert-mode'.  We
+;; do this partly to avoid surprising a fusty (and fussy) userbase who
+;; went without auto-revert for decades, and partly because we've not
+;; utmost confidence in the code.
 ;;
 ;; Why are certain variables marked permanent-local?
 ;;
-;; Under global-auto-revert-mode, auto-revert-mode activates through
-;; after-change-major-mode-hook, which is run liberally, for example
-;; in `normal-mode' and `run-mode-hooks'.  The natural means of
-;; avoiding repeated activation is checking if auto-revert-mode is
-;; already true.  However, that flag is liable to go poof because
-;; `kill-all-local-variables' is also called liberally, for example in
-;; `normal-mode' and `fundamental-mode'.  We thus rely on marking
-;; certain buffer-local state as permanent-local, a longtime crutch
-;; prone to errors of omission.
+;; Liberal, uncalculated invocations of after-change-major-mode-hook
+;; in `normal-mode' and `run-mode-hooks' threaten undesirable repeated
+;; activations of auto-revert-mode, which we avoid by checking if
+;; `auto-revert-mode' is already true.  Liberal, uncalculated
+;; invocations of `kill-all-local-variables' in `normal-mode' and
+;; `fundamental-mode' threaten to clear `auto-revert-mode'.  Marking a
+;; variable permanent-local insulates it against being so cleared.
+
+;; Rather than (correctly) sequencing calls to maintain state, Emacs
+;; has long wallowed in the strictly accretive ball-of-mud paradigm
+;; that never subtracts code in favor of adding crutches like
+;; permanent-local prone to errors of omission.
 
 ;;; Code:
 
@@ -76,21 +79,34 @@
 (defvar auto-revert-timer nil "Obsolesced")
 (make-obsolete-variable 'auto-revert-timer nil "30.1")
 
-(defsubst auto-revert-unset-timer ()
-  (mapc (lambda (timer)
-          (when (eq (timer--function timer) #'auto-revert--cycle)
-            (cancel-timer timer)))
-        timer-list))
+(defun auto-revert-buffer-p (buffer)
+  (defvar auto-revert-mode)
+  (defvar auto-revert-tail-mode)
+  (with-current-buffer buffer
+    (and (buffer-live-p buffer)
+         (or auto-revert-mode auto-revert-tail-mode))))
 
-(defalias 'auto-revert-reset-timer #'auto-revert-set-timer)
-(defun auto-revert-set-timer ()
-  "Cancel existing revert timers, and restart."
-  (interactive) ; historical
-  (auto-revert-unset-timer)
-  (defvar auto-revert-interval)
-  (setq auto-revert-timer (run-with-timer auto-revert-interval
-                                          auto-revert-interval
-                                          #'auto-revert--cycle)))
+(defsubst auto-revert-timer-p (timer)
+  (eq (timer--function timer) #'auto-revert--cycle))
+
+(define-obsolete-function-alias 'auto-revert-set-timer
+  #'auto-revert-ensure-timer "30.1")
+
+(defun auto-revert-ensure-timer ()
+  (interactive) ; historical from auto-revert-set-timer
+  (let ((need-timer-p (cl-some #'auto-revert-buffer-p (buffer-list)))
+        (timer-extant-p (cl-some #'auto-revert-timer-p timer-list)))
+    ;; Only take action if need-timer-p != timer-extant-p
+    (cond ((and (not need-timer-p) timer-extant-p)
+           (mapc (lambda (timer)
+                   (when (auto-revert-timer-p timer)
+                     (cancel-timer timer)))
+                 timer-list))
+          ((and need-timer-p (not timer-extant-p))
+           (defvar auto-revert-interval)
+           (setq auto-revert-timer (run-with-timer auto-revert-interval
+                                                   auto-revert-interval
+                                                   #'auto-revert--cycle))))))
 
 (defcustom auto-revert-interval 5
   "Time in seconds between auto-revert checks."
@@ -98,7 +114,8 @@
   :type 'number
   :set (lambda (variable value)
 	 (set-default variable value)
-	 (auto-revert-set-timer)))
+         (when (featurep 'autorevert) ; custom subsystem inception
+	   (auto-revert-ensure-timer))))
 
 (defcustom auto-revert-stop-on-user-input t
   "Obsolesced.  auto-revert always defers to user input."
@@ -198,18 +215,15 @@ necessary for non-file reverting."
   "Obsolesced."
   :group 'auto-revert
   :type 'boolean
-  :set (lambda (variable value)
-         (set-default variable value)
-	 (auto-revert-set-timer))
   :version "27.1")
 (make-obsolete-variable 'auto-revert-avoid-polling nil "30.1")
 
 (defvar auto-revert--proximal-start 0)
 
-(defvar auto-revert-buffer-list nil  "Obsolesced.")
+(defvar auto-revert-buffer-list nil "Obsolesced.")
 (make-obsolete-variable 'auto-revert-buffer-list nil "30.1")
 
-(defvar auto-revert-remaining-buffers ()
+(defvar auto-revert-remaining-buffers nil
   "Buffers not checked when user input stopped execution.")
 (make-obsolete-variable 'auto-revert-remaining-buffers nil "30.1")
 
@@ -255,15 +269,15 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
   :lighter nil
   (auto-revert-toggle-hooks nil)
   (auto-revert-rm-watch)
-  (auto-revert-unset-timer)
   (mapc #'kill-local-variable '())
   (when auto-revert-mode
     (auto-revert-tail-mode 0)
     (auto-revert-toggle-hooks t)
-    (auto-revert-add-watch)
-    (auto-revert-set-timer)))
+    (auto-revert-add-watch))
+  (auto-revert-ensure-timer))
 (put 'auto-revert-mode 'permanent-local t) ; see Commentary
 
+;;;###autoload
 (defun turn-on-auto-revert-mode ()
   (when (and (or buffer-file-name
                  (and auto-revert-non-file-buffers
@@ -302,8 +316,7 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
             (error "Buffer modified"))
           (auto-revert-tail-toggle-hooks t)
           ;; 1- for `point-max' being one past final char.
-          (setq auto-revert-tail-pos (1- (position-bytes (point-max))))
-          (auto-revert-set-timer))
+          (setq auto-revert-tail-pos (1- (position-bytes (point-max)))))
       (error (auto-revert-tail-mode 0)
              (error (error-message-string err))))))
 
@@ -438,19 +451,12 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
 (define-obsolete-function-alias 'auto-revert-buffers
   #'auto-revert--cycle "30.1")
 (defun auto-revert--cycle ()
-  (save-match-data ; historical
-    (while-no-input
-      (prog1 nil
-        (let ((bufs (cl-remove-if-not
-                     (lambda (b)
-                       (with-current-buffer b
-                         (and (buffer-live-p b)
-                              (or auto-revert-mode auto-revert-tail-mode))))
-                     (buffer-list))))
-          (dotimes (_i (length bufs))
-            (let ((index (% auto-revert--proximal-start (length bufs))))
-              (auto-revert--doit (nth index bufs))
-              (setq auto-revert--proximal-start (1+ index)))))))))
+  (while-no-input
+    (let ((bufs (cl-remove-if-not #'auto-revert-buffer-p (buffer-list))))
+      (dotimes (_i (length bufs))
+        (let ((index (% auto-revert--proximal-start (length bufs))))
+          (auto-revert--doit (nth index bufs))
+          (setq auto-revert--proximal-start (1+ index)))))))
 
 (provide 'autorevert)
 
