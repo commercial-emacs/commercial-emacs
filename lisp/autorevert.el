@@ -27,9 +27,8 @@
 ;; File reverting is forcibly synchronizing a file buffer to its state
 ;; on disk.  The interactive command `revert-buffer' does this
 ;; manually.  Automatic file reverting, or "auto-revert", does this
-;; without user prompting for unmodified buffers whose underlying
-;; files have been exogenously modified on disk. This is a "dwim"
-;; behavior for most users.
+;; silently for unmodified buffers whose underlying files changed from
+;; out beneath them.  This is a "dwim" behavior for most users.
 ;;
 ;; Under `auto-revert-use-notify' (default enabled), Emacs detects
 ;; disk changes via the system's file notification mechanism, e.g.,
@@ -37,19 +36,14 @@
 ;;
 ;; In the absence of system-level file notifications, Emacs naively
 ;; polls for file timestamp changes every `auto-revert-interval'
-;; seconds.  The custom variable `auto-revert-exclude-dir-regexp'
-;; defines a regular expression for directory names to exclude.
+;; seconds.
 ;;
 ;; A buffer whose file no longer exists is not reverted.  Auto-revert
 ;; behavior recommences should the deleted file reappear.
 ;;
-;; To preserve buffer markers, set
-;; `revert-buffer-insert-file-contents-function' to the slower
-;; `revert-buffer-insert-file-contents-delicately' (deprecated).
-;;
 ;; If the file is only ever appended to, prefer
 ;; `auto-revert-tail-mode' to `auto-revert-mode', as the former
-;; performs a parsimonious `tail` without reverting the entire file.
+;; performs a parsimonious "tail" without reverting the entire file.
 ;;
 ;; Most users expect their text editor to auto-revert as a matter of
 ;; course.  As is its wont, Emacs offers always-active auto-revert as
@@ -57,6 +51,18 @@
 ;; to avoid surprising the fusty (and fussy) userbase who went without
 ;; auto-revert for decades, and partly because we've not utmost
 ;; confidence in the code.
+;;
+;; Why are certain variables marked permanent-local?
+;;
+;; Under global-auto-revert-mode, auto-revert-mode activates through
+;; after-change-major-mode-hook, which is run liberally, for example
+;; in `normal-mode' and `run-mode-hooks'.  The natural means of
+;; avoiding repeated activation is checking if auto-revert-mode is
+;; already true.  However, that flag is liable to go poof because
+;; `kill-all-local-variables' is also called liberally, for example in
+;; `normal-mode' and `fundamental-mode'.  We thus rely on marking
+;; certain buffer-local state as permanent-local, a longtime crutch
+;; prone to errors of omission.
 
 ;;; Code:
 
@@ -203,20 +209,19 @@ necessary for non-file reverting."
 (defvar auto-revert-buffer-list nil  "Obsolesced.")
 (make-obsolete-variable 'auto-revert-buffer-list nil "30.1")
 
-(defvar-local auto-revert--global-mode nil
-  "Non-nil if buffer is handled by Global Auto-Revert mode.")
-
 (defvar auto-revert-remaining-buffers ()
   "Buffers not checked when user input stopped execution.")
 (make-obsolete-variable 'auto-revert-remaining-buffers nil "30.1")
 
 (defvar-local auto-revert-tail-pos nil
   "Position of last known end of file.")
+(put 'auto-revert-tail-pos 'permanent-local t) ; See Commentary
 
 (defvaralias 'auto-revert-notify-watch-descriptor
   'auto-revert-watch-descriptor)
 (defvar-local auto-revert-watch-descriptor nil
   "Each buffer references its watch descriptor.")
+(put 'auto-revert-watch-descriptor 'permanent-local t) ; See Commentary
 
 (defvar auto-revert--lookup-buffer nil
   "Alist of watch descriptor to buffer.")
@@ -251,19 +256,21 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
   (auto-revert-toggle-hooks nil)
   (auto-revert-rm-watch)
   (auto-revert-unset-timer)
-  (mapc #'kill-local-variable '(completion-styles))
+  (mapc #'kill-local-variable '())
   (when auto-revert-mode
     (auto-revert-tail-mode 0)
     (auto-revert-toggle-hooks t)
     (auto-revert-add-watch)
     (auto-revert-set-timer)))
+(put 'auto-revert-mode 'permanent-local t) ; see Commentary
 
 (defun turn-on-auto-revert-mode ()
-  (when (or buffer-file-name
-            (and auto-revert-non-file-buffers
-                 (not (string-prefix-p " " (buffer-name)))
-                 (local-variable-p 'buffer-stale-function)
-                 (local-variable-p 'revert-buffer-function)))
+  (when (and (or buffer-file-name
+                 (and auto-revert-non-file-buffers
+                      (not (string-prefix-p " " (buffer-name)))
+                      (local-variable-p 'buffer-stale-function)
+                      (local-variable-p 'revert-buffer-function)))
+             (not auto-revert-mode))
     (auto-revert-mode)))
 
 (defun auto-revert-tail-toggle-hooks (toggle)
@@ -311,16 +318,18 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
   :group 'auto-revert
   :version "30.1")
 
-(defalias 'auto-revert-notify-rm-watch #'auto-revert-rm-watch)
+(define-obsolete-function-alias 'auto-revert-notify-rm-watch
+  #'auto-revert-rm-watch "30.1")
 (defun auto-revert-rm-watch ()
   "Disable file notification for current buffer's associated file."
   (when-let ((desc auto-revert-watch-descriptor))
     (setq auto-revert--lookup-buffer
           (assoc-delete-all desc auto-revert--lookup-buffer))
-    (ignore-errors (file-notify-rm-watch desc))
+    (file-notify-rm-watch desc)
     (setq auto-revert-watch-descriptor nil)))
 
-(defalias 'auto-revert-notify-add-watch #'auto-revert-add-watch)
+(define-obsolete-function-alias 'auto-revert-notify-add-watch
+  #'auto-revert-add-watch "30.1")
 (defun auto-revert-add-watch ()
   (auto-revert-rm-watch)
   (when (and auto-revert-use-notify
@@ -330,11 +339,10 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
 			          (expand-file-name default-directory)))
              (not (file-symlink-p (or buffer-file-name default-directory))))
     (setq auto-revert-watch-descriptor
-	  (ignore-errors
-	    (file-notify-add-watch
-	     (expand-file-name (or buffer-file-name "") default-directory)
-             (if buffer-file-name '(change attribute-change) '(change))
-             #'auto-revert-handle-notification)))
+	  (file-notify-add-watch
+	   (expand-file-name (or buffer-file-name "") default-directory)
+           (if buffer-file-name '(change attribute-change) '(change))
+           #'auto-revert-handle-notification))
     (push (cons auto-revert-watch-descriptor (current-buffer))
           auto-revert--lookup-buffer)))
 
@@ -427,7 +435,8 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
            (setq auto-revert-tail-pos size))))
       (set-visited-file-modtime))))
 
-(defalias 'auto-revert-buffers #'auto-revert--cycle)
+(define-obsolete-function-alias 'auto-revert-buffers
+  #'auto-revert--cycle "30.1")
 (defun auto-revert--cycle ()
   (save-match-data ; historical
     (while-no-input
