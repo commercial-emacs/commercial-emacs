@@ -434,27 +434,27 @@ This mode essentially derives from `auto-revert-mode'
   (with-current-buffer buffer
     (let ((size (file-attribute-size (file-attributes buffer-file-name))))
       (when (/= auto-revert-tail-pos size)
-       (with-silent-modifications
-         (let ((inhibit-read-only t))
-           (run-hooks 'before-revert-hook)
-           (undo-boundary)
-           (save-restriction
-	     (widen)
-	     (save-excursion
-	       (goto-char (point-max))
-	       (insert-file-contents buffer-file-name nil
-				     (if (< auto-revert-tail-pos size)
-				         auto-revert-tail-pos
-                                       ;; Else SIZE < TAIL-POS, i.e.,
-                                       ;; file shrunk.  Append the whole
-                                       ;; file.  SIZE not equal to
-                                       ;; TAIL-POS because above
-                                       ;; conditional.
-                                       (ignore))
-				     size)))
-           (run-hooks 'after-revert-hook)
-           (undo-boundary)
-           (setq auto-revert-tail-pos size))))
+        (with-silent-modifications
+          (let ((inhibit-read-only t))
+            (run-hooks 'before-revert-hook)
+            (undo-boundary)
+            (save-restriction
+	      (widen)
+	      (save-excursion
+	        (goto-char (point-max))
+	        (insert-file-contents buffer-file-name nil
+				      (if (< auto-revert-tail-pos size)
+				          auto-revert-tail-pos
+                                        ;; Else SIZE < TAIL-POS, i.e.,
+                                        ;; file shrunk.  Append the whole
+                                        ;; file.  SIZE not equal to
+                                        ;; TAIL-POS because above
+                                        ;; conditional.
+                                        (ignore))
+				      size)))
+            (run-hooks 'after-revert-hook)
+            (undo-boundary)
+            (setq auto-revert-tail-pos size))))
       (set-visited-file-modtime))))
 
 (define-obsolete-function-alias 'auto-revert-buffers
