@@ -82,13 +82,11 @@
 (defun auto-revert-buffer-needs-timer-p (buffer)
   "Return t if BUFFER's revert is polling-based not event-based."
   (defvar auto-revert-mode)
-  (defvar auto-revert-tail-mode)
   (defvar auto-revert-watch-descriptor)
-  (with-current-buffer buffer
-    (and (buffer-live-p buffer)
-         (or auto-revert-tail-mode
-             (and auto-revert-mode
-                  (not auto-revert-watch-descriptor))))))
+  (and (buffer-live-p buffer)
+       (with-current-buffer buffer
+         (and auto-revert-mode
+              (not auto-revert-watch-descriptor)))))
 
 (defsubst auto-revert-timer-p (timer)
   (eq (timer--function timer) #'auto-revert--cycle))
@@ -97,15 +95,15 @@
   #'auto-revert-ensure-timer "30.1")
 (defun auto-revert-ensure-timer ()
   (interactive) ; historical from auto-revert-set-timer
-  (let ((need-timer-p (cl-some #'auto-revert-buffer-needs-timer-p (buffer-list)))
+  (let ((needs-timer-p (cl-some #'auto-revert-buffer-needs-timer-p (buffer-list)))
         (timer-extant-p (cl-some #'auto-revert-timer-p timer-list)))
-    ;; Only take action if need-timer-p != timer-extant-p
-    (cond ((and (not need-timer-p) timer-extant-p)
+    ;; Only take action if needs-timer-p != timer-extant-p
+    (cond ((and (not needs-timer-p) timer-extant-p)
            (mapc (lambda (timer)
                    (when (auto-revert-timer-p timer)
                      (cancel-timer timer)))
                  timer-list))
-          ((and need-timer-p (not timer-extant-p))
+          ((and needs-timer-p (not timer-extant-p))
            (defvar auto-revert-interval)
            (setq auto-revert-timer (run-with-timer auto-revert-interval
                                                    auto-revert-interval
@@ -278,7 +276,6 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
   (auto-revert-rm-watch)
   (mapc #'kill-local-variable '())
   (when auto-revert-mode
-    (auto-revert-tail-mode 0)
     (auto-revert-toggle-hooks t)
     (auto-revert-add-watch))
   (auto-revert-ensure-timer))
@@ -310,27 +307,28 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
 
 ;;;###autoload
 (define-minor-mode auto-revert-tail-mode
-  "Follow as with the shell command `tail -f`."
-  :group 'find-file :lighter " Tail"
+  "Follow as with the shell command `tail -f`.
+This mode essentially derives from `auto-revert-mode'
+(but `define-derived-mode' only applies to major modes)."
+  :group 'auto-revert :lighter " Tail"
   (auto-revert-tail-toggle-hooks nil)
+  (auto-revert-mode 0)
   (when auto-revert-tail-mode
     (condition-case err
         (progn
-          (auto-revert-mode 0)
           (unless buffer-file-name
             (error "This buffer is not visiting a file"))
           (when (buffer-modified-p)
             (error "Buffer modified"))
+          (auto-revert-mode)
           (auto-revert-tail-toggle-hooks t)
           ;; 1- for `point-max' being one past final char.
           (setq auto-revert-tail-pos (1- (position-bytes (point-max)))))
       (error (auto-revert-tail-mode 0)
              (error (error-message-string err))))))
 
-;;;###autoload
-(defun turn-on-auto-revert-tail-mode ()
-  (auto-revert-tail-mode))
-(make-obsolete 'turn-on-auto-revert-tail-mode nil "30.1")
+(define-obsolete-function-alias 'turn-on-auto-revert-tail-mode
+  #'auto-revert-tail-mode "30.1")
 
 ;;;###autoload
 (define-globalized-minor-mode global-auto-revert-mode
