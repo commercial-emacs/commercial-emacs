@@ -95,7 +95,6 @@
 
 (define-obsolete-function-alias 'auto-revert-set-timer
   #'auto-revert-ensure-timer "30.1")
-
 (defun auto-revert-ensure-timer ()
   (interactive) ; historical from auto-revert-set-timer
   (let ((need-timer-p (cl-some #'auto-revert-buffer-needs-timer-p (buffer-list)))
@@ -227,7 +226,7 @@ necessary for non-file reverting."
 
 (defvar auto-revert--proximal-start 0
   "A last-we-left-off index ensuring no buffers get
-short-changed due in auto-revert--cycle")
+short-changed in auto-revert--cycle")
 
 (defvar auto-revert-buffer-list nil "Obsolesced.")
 (make-obsolete-variable 'auto-revert-buffer-list nil "30.1")
