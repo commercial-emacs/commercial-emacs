@@ -458,50 +458,36 @@ This expects `auto-revert--messages' to be bound by
                  (auto-revert-test--instrument-kill-buffer-hook buf-1)
                  (setq buf-2 (find-file-noselect file-2))
                  (auto-revert-test--instrument-kill-buffer-hook buf-2)
-                 (auto-revert-test--write-file "1-a" file-1)
-                 (should (equal (auto-revert-test--buffer-string buf-1) ""))
 
                  (global-auto-revert-mode 1) ; Turn it on.
 
+                 ;; Alter file-1 that predates global-auto-revert-mode
                  (should (buffer-local-value
                           'auto-revert-watch-descriptor buf-1))
+                 (should (equal (auto-revert-test--buffer-string buf-1) ""))
+                 (auto-revert-test--write-file "1-a" file-1)
+                 (auto-revert-test--wait-for-buffer-text buf-1 "1-a" 1)
+
+                 ;; Again with file-2
                  (should (buffer-local-value
                           'auto-revert-watch-descriptor buf-2))
-
-                 ;; buf-1 should have been reverted immediately when the mode
-                 ;; was enabled.
-                 (should (equal (auto-revert-test--buffer-string buf-1) "1-a"))
-
-                 ;; Alter a file.
+                 (should (equal (auto-revert-test--buffer-string buf-2) ""))
                  (auto-revert-test--write-file "2-a" file-2)
-                 ;; Allow for some time to handle notification events.
                  (auto-revert-test--wait-for-buffer-text buf-2 "2-a" 1)
-                 (should (equal (auto-revert-test--buffer-string buf-2) "2-a"))
 
-                 ;; Visit a file, and modify it on disk.
+                 ;; Now a file opened after global-auto-revert-mode
                  (setq buf-3 (find-file-noselect file-3))
                  (auto-revert-test--instrument-kill-buffer-hook buf-3)
-                 ;; Newly opened buffers won't be use notification until the
-                 ;; first poll cycle; wait for it.
-                 (auto-revert-test--wait-for
-                  (lambda () (buffer-local-value
-                              'auto-revert-watch-descriptor buf-3))
-                  (auto-revert--timeout))
                  (should (buffer-local-value
                           'auto-revert-watch-descriptor buf-3))
                  (auto-revert-test--write-file "3-a" file-3)
                  (auto-revert-test--wait-for-buffer-text buf-3 "3-a" 1)
-                 (should (equal (auto-revert-test--buffer-string buf-3) "3-a"))
 
                  ;; Delete a visited file, and re-create it with new contents.
                  (delete-file file-1)
                  (should (equal (auto-revert-test--buffer-string buf-1) "1-a"))
                  (auto-revert-test--write-file "1-b" file-1)
-                 ;; Since the file is deleted, it needs at least
-                 ;; `auto-revert-interval' to recognize the new file,
-                 ;; while polling.  So increase the timeout.
-                 (auto-revert-test--wait-for-buffer-text
-                  buf-1 "1-b" (* 2 (auto-revert--timeout)))
+                 (auto-revert-test--wait-for-buffer-text buf-1 "1-b" 1)
                  (should (buffer-local-value
                           'auto-revert-watch-descriptor buf-1))
 
@@ -510,15 +496,13 @@ This expects `auto-revert--messages' to be bound by
                    (write-file file-2b))
                  (should (equal (auto-revert-test--buffer-string buf-2) "2-a"))
                  (auto-revert-test--write-file "2-b" file-2b)
-                 (auto-revert-test--wait-for-buffer-text
-                  buf-2 "2-b" (auto-revert--timeout))
+                 (auto-revert-test--wait-for-buffer-text buf-2 "2-b" 1)
                  (should (buffer-local-value
-                          'auto-revert-watch-descriptor buf-2)))
-
+                          'auto-revert-notify-watch-descriptor buf-2)))
              ;; Clean up.
              (unless was-in-global-auto-revert-mode
                (global-auto-revert-mode 0)) ; Turn it off.
-             (dolist (buf (list buf-1 buf-2 buf-3))
+             (dolist (buf (seq-keep #'identity (list buf-1 buf-2 buf-3)))
                (with-current-buffer buf (setq-local kill-buffer-hook nil))
                (ignore-errors (kill-buffer buf)))
              (ignore-errors (delete-file file-2b)))))))))
@@ -528,7 +512,6 @@ This expects `auto-revert--messages' to be bound by
 
 (ert-deftest auto-revert-test06-write-file ()
   "Verify that notification follows `write-file' correctly."
-  :tags (when (getenv "GITHUB_ACTIONS") '(:unstable))
   (skip-unless (or file-notify--library
                    (file-remote-p temporary-file-directory)))
   (with-auto-revert-test
@@ -549,8 +532,7 @@ This expects `auto-revert--messages' to be bound by
                (write-file file-2)
 
                (auto-revert-test--write-file "C" file-2)
-               (auto-revert-test--wait-for-buffer-text
-                buf "C" (auto-revert--timeout))
+               (auto-revert-test--wait-for-buffer-text buf "C" 1)
                (should (equal (buffer-string) "C"))))
 
          ;; Clean up.
@@ -638,7 +620,7 @@ This expects `auto-revert--messages' to be bound by
         (ignore-errors
           (dolist (buf buffers)
             (with-current-buffer buf (set-buffer-modified-p nil))
-            (kill-buffer buf)))))));)
+            (kill-buffer buf)))))))
 
 (auto-revert--deftest-remote auto-revert-test07-auto-revert-several-buffers
   "Check autorevert for several buffers visiting the same remote file.")

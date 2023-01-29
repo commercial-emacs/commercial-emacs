@@ -3501,7 +3501,9 @@ we don't actually set it to the same mode the buffer already has."
                                              re))))))))
 	  (set-auto-mode-0 done keep-mode-if-same)))
     (unless done
-      (set-buffer-major-mode (current-buffer)))))
+      (when (or (not keep-mode-if-same)
+                (not (eq major-mode (default-value 'major-mode))))
+        (set-buffer-major-mode (current-buffer))))))
 
 (defvar-local set-auto-mode--last nil
   "Remember the mode we have set via `set-auto-mode-0'.")
@@ -4819,22 +4821,21 @@ the old visited file has been renamed to the new name FILENAME."
 	 (not along-with-file)
 	 (set-buffer-modified-p t))
     ;; Update the major mode, if the file name determines it.
-    (condition-case nil
-	;; Don't change the mode if it is special.
-	(or (not change-major-mode-with-file-name)
-	    (get major-mode 'mode-class)
-	    ;; Don't change the mode if the local variable list specifies it.
-	    ;; The file name can influence whether the local variables apply.
-	    (and old-try-locals
-		 ;; h-l-v also checks it, but might as well be explicit.
-		 (not (inhibit-local-variables-p))
-		 (hack-local-variables t))
-	    ;; TODO consider making normal-mode handle this case.
-	    (let ((old major-mode))
-	      (set-auto-mode t)
-	      (or (eq old major-mode)
-		  (hack-local-variables))))
-      (error nil))
+    (ignore-errors
+      ;; Don't change the mode if it is special.
+      (or (not change-major-mode-with-file-name)
+	  (get major-mode 'mode-class)
+	  ;; Don't change the mode if the local variable list specifies it.
+	  ;; The file name can influence whether the local variables apply.
+	  (and old-try-locals
+	       ;; h-l-v also checks it, but might as well be explicit.
+	       (not (inhibit-local-variables-p))
+	       (hack-local-variables t))
+	  ;; TODO consider making normal-mode handle this case.
+	  (let ((old major-mode))
+	    (set-auto-mode t)
+	    (or (eq old major-mode)
+		(hack-local-variables)))))
     (run-hooks 'after-set-visited-file-name-hook)))
 
 (defun write-file (filename &optional confirm)

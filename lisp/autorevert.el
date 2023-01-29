@@ -382,12 +382,14 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
               (apply #'auto-revert-mode
                      ;; obfuscatory retoggling of minor mode
                      (unless auto-revert-mode (list 0)))
-            (when (string-equal
-                   (file-name-nondirectory buffer-file-name)
-                   (file-name-nondirectory
-                    (cond ((memq action '(renamed)) file1)
-                          ((memq action '(attribute-changed changed created)) file)
-                          (t ""))))
+            (when (if (null buffer-file-name)
+                      (memq action '(created renamed deleted))
+                    (string-equal
+                     (file-name-nondirectory buffer-file-name)
+                     (file-name-nondirectory
+                      (cond ((memq action '(renamed)) file1)
+                            ((memq action '(attribute-changed changed created)) file)
+                            (t "")))))
               (auto-revert--doit buffer))))))))
 
 (defun auto-revert--doit (buffer)
