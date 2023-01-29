@@ -471,9 +471,9 @@ set of images using the @command{gs} (GhostScript) or
 @command{pdfdraw}/@command{mutool draw} (MuPDF) commands and other
 external tools @footnote{PostScript files require GhostScript, DVI
 files require @code{dvipdf} or @code{dvipdfm}, OpenDocument and
-Microsoft Office documents require the @code{unoconv} tool, and EPUB,
-CBZ, FB2, XPS and OXPS files require @code{mutool} to be available.},
-and displaying those images.
+Microsoft Office documents require @code{soffice} or the
+@code{unoconv} tool, and EPUB, CBZ, FB2, XPS and OXPS files require
+@code{mutool} to be available.}, and displaying those images.
 
 @findex doc-view-toggle-display
 @findex doc-view-minor-mode
