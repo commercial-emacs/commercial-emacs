@@ -64,8 +64,8 @@
 
 ;; Rather than (correctly) sequencing calls to maintain state, Emacs
 ;; has long wallowed in the strictly accretive ball-of-mud paradigm
-;; that never subtracts code in favor of adding crutches like
-;; permanent-local prone to errors of omission.
+;; that eschews rearranging decades-old code when adding crutches like
+;; permanent-local is so much safer (and prone to errors of omission)!
 
 ;;; Code:
 
@@ -79,12 +79,16 @@
 (defvar auto-revert-timer nil "Obsolesced")
 (make-obsolete-variable 'auto-revert-timer nil "30.1")
 
-(defun auto-revert-buffer-p (buffer)
+(defun auto-revert-buffer-needs-timer-p (buffer)
+  "Return t if BUFFER's revert is polling-based not event-based."
   (defvar auto-revert-mode)
   (defvar auto-revert-tail-mode)
+  (defvar auto-revert-watch-descriptor)
   (with-current-buffer buffer
     (and (buffer-live-p buffer)
-         (or auto-revert-mode auto-revert-tail-mode))))
+         (or auto-revert-tail-mode
+             (and auto-revert-mode
+                  (not auto-revert-watch-descriptor))))))
 
 (defsubst auto-revert-timer-p (timer)
   (eq (timer--function timer) #'auto-revert--cycle))
@@ -94,7 +98,7 @@
 
 (defun auto-revert-ensure-timer ()
   (interactive) ; historical from auto-revert-set-timer
-  (let ((need-timer-p (cl-some #'auto-revert-buffer-p (buffer-list)))
+  (let ((need-timer-p (cl-some #'auto-revert-buffer-needs-timer-p (buffer-list)))
         (timer-extant-p (cl-some #'auto-revert-timer-p timer-list)))
     ;; Only take action if need-timer-p != timer-extant-p
     (cond ((and (not need-timer-p) timer-extant-p)
@@ -195,11 +199,14 @@ necessary for non-file reverting."
   :type 'boolean
   :set (lambda (variable value)
 	 (set-default variable value)
-	 (unless (symbol-value variable)
-	   (dolist (buf (buffer-list))
-	     (with-current-buffer buf
-	       (auto-revert-rm-watch)))))
-  :initialize 'custom-initialize-default
+         (when (featurep 'autorevert) ; custom subsystem inception
+           (dolist (buf (cl-remove-if-not
+                         (lambda (b)
+                           (defvar auto-revert-mode)
+                           (with-current-buffer b auto-revert-mode))
+                         (buffer-list)))
+             (with-current-buffer buf
+               (auto-revert-mode)))))
   :version "24.4")
 
 (defvaralias 'auto-revert-notify-exclude-dir-regexp
@@ -218,7 +225,9 @@ necessary for non-file reverting."
   :version "27.1")
 (make-obsolete-variable 'auto-revert-avoid-polling nil "30.1")
 
-(defvar auto-revert--proximal-start 0)
+(defvar auto-revert--proximal-start 0
+  "A last-we-left-off index ensuring no buffers get
+short-changed due in auto-revert--cycle")
 
 (defvar auto-revert-buffer-list nil "Obsolesced.")
 (make-obsolete-variable 'auto-revert-buffer-list nil "30.1")
@@ -249,7 +258,6 @@ necessary for non-file reverting."
            ;; [HOOKS HOOK]
            `([after-set-visited-file-name-hook
               ,(lambda ()
-                 (auto-revert-mode 0)
                  (auto-revert-mode))]
              [kill-buffer-hook
               ,(lambda ()
@@ -334,11 +342,10 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
 (define-obsolete-function-alias 'auto-revert-notify-rm-watch
   #'auto-revert-rm-watch "30.1")
 (defun auto-revert-rm-watch ()
-  "Disable file notification for current buffer's associated file."
   (when-let ((desc auto-revert-watch-descriptor))
     (setq auto-revert--lookup-buffer
           (assoc-delete-all desc auto-revert--lookup-buffer))
-    (file-notify-rm-watch desc)
+    (ignore-errors (file-notify-rm-watch desc))
     (setq auto-revert-watch-descriptor nil)))
 
 (define-obsolete-function-alias 'auto-revert-notify-add-watch
@@ -352,10 +359,11 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
 			          (expand-file-name default-directory)))
              (not (file-symlink-p (or buffer-file-name default-directory))))
     (setq auto-revert-watch-descriptor
-	  (file-notify-add-watch
-	   (expand-file-name (or buffer-file-name "") default-directory)
-           (if buffer-file-name '(change attribute-change) '(change))
-           #'auto-revert-handle-notification))
+	  (ignore-errors
+            (file-notify-add-watch
+	     (expand-file-name (or buffer-file-name "") default-directory)
+             (if buffer-file-name '(change attribute-change) '(change))
+             #'auto-revert-handle-notification)))
     (push (cons auto-revert-watch-descriptor (current-buffer))
           auto-revert--lookup-buffer)))
 
@@ -371,7 +379,9 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
       (when (buffer-live-p buffer)
         (with-current-buffer buffer
           (if (eq action 'stopped)
-             (auto-revert-rm-watch)
+              (apply #'auto-revert-mode
+                     ;; obfuscatory retoggling of minor mode
+                     (unless auto-revert-mode (list 0)))
             (when (string-equal
                    (file-name-nondirectory buffer-file-name)
                    (file-name-nondirectory
@@ -399,8 +409,8 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
                  (or auto-revert-tail-mode
                      (funcall buffer-stale-function :noconfirm)))))
         ;; Historically, if before the revert, the point (or the
-        ;; window point of any window) is at the end of buffer, it
-        ;; moves to the new end of buffer afterwards.
+        ;; window point of any window) is at eob, it moves to the new
+        ;; eob afterwards.
         (when buffer-file-name
           (setq eob-p (eobp))
           (walk-windows
@@ -452,8 +462,11 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
   #'auto-revert--cycle "30.1")
 (defun auto-revert--cycle ()
   (while-no-input
-    (let ((bufs (cl-remove-if-not #'auto-revert-buffer-p (buffer-list))))
+    (let ((bufs (cl-remove-if-not #'auto-revert-buffer-needs-timer-p
+                                  (buffer-list))))
       (dotimes (_i (length bufs))
+        ;; auto-revert--proximal-start ensures no buffers get
+        ;; short-changed due to while-no-input interruption.
         (let ((index (% auto-revert--proximal-start (length bufs))))
           (auto-revert--doit (nth index bufs))
           (setq auto-revert--proximal-start (1+ index)))))))
