@@ -512,6 +512,7 @@ This expects `auto-revert--messages' to be bound by
 
 (ert-deftest auto-revert-test06-write-file ()
   "Verify that notification follows `write-file' correctly."
+  :tags (when (getenv "GITHUB_ACTIONS") '(:unstable))
   (skip-unless (or file-notify--library
                    (file-remote-p temporary-file-directory)))
   (with-auto-revert-test
