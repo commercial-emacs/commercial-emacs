@@ -933,8 +933,8 @@ byte-compiled.  Run with dynamic binding."
        "his-fooness.el:9:6"
        "his-fooness.el:16:6"
        "his-fooness.el:20:6"
-       "his-fooness.el:24:11"
-       "his-fooness.el:24:11"
+       "his-fooness.el:23:2"
+       "his-fooness.el:27:11"
        "his-fooness.el:29:2" ;; let special form kicks back to defun
        "his-fooness.el:31:3"
        "his-fooness.el:32:2" ;; let special form kicks back to defun
