@@ -398,7 +398,7 @@ row_to_value (sqlite3_stmt *stmt)
   int len = sqlite3_column_count (stmt);
   Lisp_Object values = Qnil;
 
-  for (int i = 0; i < len; ++i)
+  for (int i = len - 1; 0 <= i; i--)
     {
       Lisp_Object v = Qnil;
 
@@ -433,7 +433,7 @@ row_to_value (sqlite3_stmt *stmt)
       values = Fcons (v, values);
     }
 
-  return Fnreverse (values);
+  return values;
 }
 
 static Lisp_Object
