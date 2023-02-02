@@ -233,20 +233,16 @@ read_file_name (Lisp_Object default_filename, Lisp_Object mustmatch,
 		mustmatch, initial, predicate);
 }
 
-/* BEWARE: Calling this directly from C would defeat the purpose!  */
 DEFUN ("funcall-interactively", Ffuncall_interactively, Sfuncall_interactively,
-       1, MANY, 0, doc: /* Like `funcall' but marks the call as interactive.
-I.e. arrange that within the called function `called-interactively-p' will
-return non-nil.
+       1, MANY, 0, doc: /* Differentiate from `funcall' to indicate interactive call.
+The function `called-interactively-p' looks for this very function token.
+This primitive should not be called from C since its very purpose
+is to appear as a literal token in the lisp call stack.
 usage: (funcall-interactively FUNCTION &rest ARGUMENTS)  */)
      (ptrdiff_t nargs, Lisp_Object *args)
 {
   specpdl_ref speccount = SPECPDL_INDEX ();
   temporarily_switch_to_single_kboard (NULL);
-
-  /* Nothing special to do here, all the work is inside
-     `called-interactively-p'.  Which will look for us as a marker in the
-     backtrace.  */
   return unbind_to (speccount, Ffuncall (nargs, args));
 }
 
