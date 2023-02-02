@@ -5878,10 +5878,10 @@ If knowing the calling context is critical, one must modify the
 containing function's lexical environment as described in Info
 node `(elisp)Distinguish Interactive'.
 
-If KIND is \\='interactive, the function always returns nil if
-either `executing-kbd-macro' or `noninteractive' is true.  This
-logic is deprecated in favor of checking those conditions outside
-this function."
+If KIND is \\='interactive, the function returns nil if either
+`executing-kbd-macro' or `noninteractive' is true.  The KIND
+argument is deprecated in favor of checking those conditions
+outside this function."
   (let ((kind-exception (and (eq kind 'interactive)
                              (or noninteractive executing-kbd-macro))))
     (unless kind-exception
