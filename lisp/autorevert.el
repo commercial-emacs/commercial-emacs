@@ -45,13 +45,6 @@
 ;; `auto-revert-tail-mode' to `auto-revert-mode', as the former
 ;; performs a parsimonious "tail" without reverting the entire file.
 ;;
-;; Most users expect their text editor to auto-revert as a matter of
-;; course.  Bucking convention as always, Emacs offers always-active
-;; auto-revert as an opt-in defcustom `global-auto-revert-mode'.  We
-;; do this partly to avoid surprising a fusty (and fussy) userbase who
-;; went without auto-revert for decades, and partly because we've not
-;; utmost confidence in the code.
-;;
 ;; Why are certain variables marked permanent-local?
 ;;
 ;; Liberal, uncalculated invocations of after-change-major-mode-hook
