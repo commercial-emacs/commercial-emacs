@@ -56,6 +56,7 @@ back to the top level.")
 (defvar-keymap edebug-tests-keymap
   :doc "Keys used by the keyboard macros in Edebug's tests."
   "@"       'edebug-tests-call-instrumented-func
+  "#"       'edebug-tests-call-interactively-instrumented-func
   "C-u"     'universal-argument
   "C-p"     'previous-line
   "C-n"     'next-line
@@ -268,6 +269,13 @@ ARGS.  EDEBUG-IT is passed through to `eval-defun'."
           edebug-tests-args args)
     (setq edebug-tests-@-result 'no-result)))
 
+(defun edebug-tests-call-interactively-instrumented-func ()
+  "Call interactively `edebug-tests-func' and save results."
+  (interactive)
+  (let ((result (call-interactively edebug-tests-func)))
+    (should (eq edebug-tests-@-result 'no-result))
+    (setq edebug-tests-@-result result)))
+
 (defun edebug-tests-call-instrumented-func ()
   "Call `edebug-tests-func' with `edebug-tests-args' and save the results."
   (interactive)
@@ -439,6 +447,14 @@ test and possibly others should be updated."
     "@"   (edebug-tests-should-be-at "fac" "start")
     "SPC" (edebug-tests-should-be-at "fac" "step")
     "g"   (should (equal edebug-tests-@-result 1)))))
+
+(ert-deftest edebug-tests-called-interactively-p ()
+  "`called-interactively-p' still works under edebug."
+  (edebug-tests-with-normal-env
+   (edebug-tests-setup-@ "called-interactively-p" '() t)
+   (edebug-tests-run-kbd-macro
+    "#"   (edebug-tests-should-be-at "called-interactively-p" "start")
+    "g"   (should (equal edebug-tests-@-result t)))))
 
 (ert-deftest edebug-tests-step-showing-evaluation-results ()
   "Edebug prints expression evaluation results to the echo area."

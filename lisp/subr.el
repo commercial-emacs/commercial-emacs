@@ -5872,32 +5872,16 @@ the number of frames to skip (minus 1).")
 Be warned the function may yield an incorrect result when the
 containing function is advised or instrumented for debugging, or
 when the call to `called-interactively-p' is enclosed in
-macros or special forms that wrap it in a lambda closure.
+macros or special forms which wrap it in a lambda closure.
 
-A more reliable method is adding to the containing function an
-optional argument with interactive spec \"p\" whose value is
-non-nil for interactive calls and nil otherwise.  For example,
-the following defun
-
-\(defun foo (bar)
-  (interactive (list \"bar\"))
-  (called-interactively-p))
-
-could be rewritten
-
-\(defun foo (bar &optional interactive-p)
-  (interactive \"i\\np\")
-  (when interactive-p
-    (setq bar \"bar\"))
-  interactive-p)
-
-at the cost of obfuscation.
+If knowing the calling context is critical, one must modify the
+containing function's lexical environment as described in Info
+node `(elisp)Distinguish Interactive'.
 
 If KIND is \\='interactive, the function always returns nil if
 either `executing-kbd-macro' or `noninteractive' is true.  This
-logic is deprecated in favor of explicitly checking for
-those conditions outside this function."
-  (declare (advertised-calling-convention (kind) "23.1"))
+logic is deprecated in favor of checking those conditions outside
+this function."
   (let ((kind-exception (and (eq kind 'interactive)
                              (or noninteractive executing-kbd-macro))))
     (unless kind-exception

@@ -906,61 +906,15 @@ completion rules.  You can toggle between these two modes by using the
 @cindex distinguish interactive calls
 @cindex is this call interactive
 
-  Sometimes a command should display additional visual feedback (such
-as an informative message in the echo area) for interactive calls
-only.  There are three ways to do this.  The recommended way to test
-whether the function was called using @code{call-interactively} is to
-give it an optional argument @code{print-message} and use the
-@code{interactive} spec to make it non-@code{nil} in interactive
-calls.  Here's an example:
-
-@example
-(defun foo (&optional print-message)
-  (interactive "p")
-  (when print-message
-    (message "foo")))
-@end example
-
-@noindent
-We use @code{"p"} because the numeric prefix argument is never
-@code{nil}.  Defined in this way, the function does display the
-message when called from a keyboard macro.
-
-  The above method with the additional argument is usually best,
-because it allows callers to say ``treat this call as interactive''.
-But you can also do the job by testing @code{called-interactively-p}.
-
-@defun called-interactively-p kind
-This function returns @code{t} when the calling function was called
-using @code{call-interactively}.
-
-The argument @var{kind} should be either the symbol @code{interactive}
-or the symbol @code{any}.  If it is @code{interactive}, then
-@code{called-interactively-p} returns @code{t} only if the call was
-made directly by the user---e.g., if the user typed a key sequence
-bound to the calling function, but @emph{not} if the user ran a
-keyboard macro that called the function (@pxref{Keyboard Macros}).  If
-@var{kind} is @code{any}, @code{called-interactively-p} returns
-@code{t} for any kind of interactive call, including keyboard macros.
-
-If in doubt, use @code{any}; the only known proper use of
-@code{interactive} is if you need to decide whether to display a
-helpful message while a function is running.
-
-A function is never considered to be called interactively if it was
-called via Lisp evaluation (or with @code{apply} or @code{funcall}).
-@end defun
-
-@noindent
-Here is an example of using @code{called-interactively-p}:
+  Generally, use @code{called-interactively-p} to determine whether
+the current function's context is interactive.
 
 @example
 @group
 (defun foo ()
   (interactive)
-  (when (called-interactively-p 'any)
-    (message "Interactive!")
-    'foo-called-interactively))
+  (when (called-interactively-p)
+    (message "Interactive!")))
 @end group
 
 @group
@@ -975,14 +929,13 @@ Here is an example of using @code{called-interactively-p}:
 @end example
 
 @noindent
-Here is another example that contrasts direct and indirect calls to
-@code{called-interactively-p}.
+Contrast direct and indirect calls to @code{called-interactively-p}.
 
 @example
 @group
 (defun bar ()
   (interactive)
-  (message "%s" (list (foo) (called-interactively-p 'any))))
+  (message "%s" (list (foo) (called-interactively-p))))
 @end group
 
 @group
@@ -990,6 +943,43 @@ Here is another example that contrasts direct and indirect calls to
      @print{} (nil t)
 @end group
 @end example
+
+  While the call site of @code{called-interactively-p} may lexically
+reside within the body of the subject function, nothing in the Lisp
+runtime links one to the other.  When @code{called-interactively-p} is
+invoked, tracing the stack frame of the subject function is fraught
+given how many intervening function calls could result from arbitrary
+macro expansions, special forms, and advices including those for
+debugging instrumentation.  The heuristics applied cannot guarantee a
+correct result under all conceivable conditions.
+
+  What is guaranteed is a function's lexical environment.  If
+distinguishing interactive is critical, instead add to the subject
+function an optional argument with interactive spec @code{p} (or
+another code that cannot take on a @code{nil} value).  This argument
+is thus assured to be non-@code{nil} when the subject function assigns
+arguments via the @code{interactive} form.  For example the following
+function:
+
+@example
+(defun foo (bar)
+  (interactive (list "bar"))
+  (called-interactively-p))
+@end example
+
+@noindent
+could be rewritten
+
+@example
+(defun foo (bar &optional interactive-p)
+  (interactive "i\np")
+  (when interactive-p
+    (setq bar "bar"))
+  interactive-p)
+@end example
+
+@noindent
+at the cost of obfuscation.
 
 @node Command Loop Info
 @section Information from the Command Loop

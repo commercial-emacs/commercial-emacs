@@ -33,6 +33,10 @@
       (* n (edebug-test-code-fac (1- n)))!mult!
     1))
 
+(defun edebug-test-code-called-interactively-p ()
+  (interactive)
+  !start!(called-interactively-p))
+
 (defun edebug-test-code-concat (a b flag)
   !start!(if flag!flag!
       !then-start!(concat a!then-a! b!then-b!)!then-concat!
