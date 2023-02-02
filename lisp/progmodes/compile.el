@@ -2502,7 +2502,9 @@ and runs `compilation-filter-hook'."
 	    (min (point-min-marker))
 	    (max (copy-marker (point-max) t))
 	    (compilation-filter-start (marker-position (process-mark proc)))
-            (color-string (ansi-color-apply string)))
+            (ansi-string (if compilation-filter-hook
+                             string
+                           (ansi-color-apply string))))
         (unwind-protect
             (progn
 	      (widen)
@@ -2511,8 +2513,8 @@ and runs `compilation-filter-hook'."
               ;; point at `process-mark' scroll along with the output, but we
               ;; now use window-point-insertion-type instead.
               (if (not compilation-max-output-line-length)
-                  (insert color-string)
-                (dolist (line (string-lines color-string nil t))
+                  (insert ansi-string)
+                (dolist (line (string-lines ansi-string nil t))
                   (compilation--insert-abbreviated-line
                    line compilation-max-output-line-length)))
               (when compilation-hidden-output
