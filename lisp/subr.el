@@ -5879,13 +5879,7 @@ optional argument with interactive spec \"p\".  This argument
 will always be non-nil if the containing function is called
 interactively, and nil otherwise.
 
-Note `called-interactively-p' can return t even when
-`noninteractive' is true if the containing function was
-programmatically called from a keybinding, or was called from a
-keyboard macro (`executing-kbd-macro' is true), or was
-explicitly passed to `call-interactively'.
-
-If KIND is \\='interactive, however, it always returns nil if
+If KIND is \\='interactive, the function always returns nil if
 either `executing-kbd-macro' or `noninteractive' is true."
   (declare (advertised-calling-convention (kind) "23.1"))
   (let ((kind-exception (and (eq kind 'interactive)
