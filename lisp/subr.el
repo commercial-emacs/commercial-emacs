@@ -5871,12 +5871,12 @@ the number of frames to skip (minus 1).")
   "Return t if the containing function was called interactively.
 Be warned the function may yield an incorrect result when the
 containing function is advised or instrumented for debugging, or
-when the call to `called-interactively-p' is enclosed in
-macros or special forms which wrap it in a lambda closure.
+when the call to `called-interactively-p' is enclosed in a
+macro or special form which wraps it in a lambda closure.
 
-If knowing the calling context is critical, one must modify the
-containing function's lexical environment as described in Info
-node `(elisp)Distinguish Interactive'.
+If knowledge of the calling context needs to be robust, one must
+modify the containing function's lexical environment as described
+in Info node `(elisp)Distinguish Interactive'.
 
 If KIND is \\='interactive, the function returns nil if either
 `executing-kbd-macro' or `noninteractive' is true.  The KIND

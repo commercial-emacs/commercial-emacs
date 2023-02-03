@@ -944,22 +944,22 @@ Contrast direct and indirect calls to @code{called-interactively-p}.
 @end group
 @end example
 
-  While the call site of @code{called-interactively-p} may lexically
-reside within the body of the subject function, nothing in the Lisp
-runtime links one to the other.  When @code{called-interactively-p} is
-invoked, tracing the stack frame of the subject function is fraught
-given how many intervening function calls could result from arbitrary
-macro expansions, special forms, and advices including those for
-debugging instrumentation.  The heuristics applied cannot guarantee a
-correct result under all conceivable conditions.
+  While the call site of @code{called-interactively-p} lexically
+resides within the subject function, nothing in the Lisp runtime links
+one to the other.  So in the preceding example, identifying the stack
+frame of ``bar'' from that of @code{called-interactively-p} is fraught
+given latent function calls resulting from debugging instrumentation,
+macro expansions, special forms, and advices.  The filtering
+heuristics applied cannot guarantee a correct result under all
+conceivable conditions.
 
   What is guaranteed is a function's lexical environment.  If
-distinguishing interactive is critical, instead add to the subject
-function an optional argument with interactive spec @code{p} (or
-another code that cannot take on a @code{nil} value).  This argument
-is thus assured to be non-@code{nil} when the subject function assigns
-arguments via the @code{interactive} form.  For example the following
-function:
+distinguishing interactive needs to be robust, instead add to the
+subject function an optional argument with interactive spec @code{p}
+(or another code that cannot take on a @code{nil} value).  This
+argument is thus assured to be non-@code{nil} when the subject
+function assigns arguments via the @code{interactive} form.  For
+example the following function:
 
 @example
 (defun foo (bar)
