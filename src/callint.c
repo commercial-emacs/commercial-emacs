@@ -233,11 +233,14 @@ read_file_name (Lisp_Object default_filename, Lisp_Object mustmatch,
 		mustmatch, initial, predicate);
 }
 
+/* This primitive should only be called from lisp and not C since its
+   very purpose is to appear as a literal token in the lisp call
+   stack.
+*/
+
 DEFUN ("funcall-interactively", Ffuncall_interactively, Sfuncall_interactively,
        1, MANY, 0, doc: /* Differentiate from `funcall' to indicate interactive call.
 The function `called-interactively-p' looks for this very function token.
-This primitive should not be called from C since its very purpose
-is to appear as a literal token in the lisp call stack.
 usage: (funcall-interactively FUNCTION &rest ARGUMENTS)  */)
      (ptrdiff_t nargs, Lisp_Object *args)
 {

@@ -5868,57 +5868,54 @@ the number of frames to skip (minus 1).")
   (symbol-function 'funcall-interactively))
 
 (defun called-interactively-p (&optional kind)
-  "Return t if the containing function was called interactively.
-Be warned the function may yield an incorrect result when the
-containing function is advised or instrumented for debugging, or
-when the call to `called-interactively-p' is enclosed in a
-macro or special form which wraps it in a lambda closure.
-
-If knowledge of the calling context needs to be robust, one must
-modify the containing function's lexical environment as described
-in Info node `(elisp)Distinguish Interactive'.
-
-If KIND is \\='interactive, the function returns nil if either
-`executing-kbd-macro' or `noninteractive' is true.  The KIND
-argument is deprecated in favor of checking those conditions
-outside this function."
-  (let ((kind-exception (and (eq kind 'interactive)
-                             (or noninteractive executing-kbd-macro))))
-    (unless kind-exception
-      ;; Call stack grows down with decreasing I.
-      ;; Walk up stack until containing function's frame reached.
-      (let* ((i 0)
-             (child (backtrace-frame i 'called-interactively-p))
-             (parent (backtrace-frame (1+ i) 'called-interactively-p))
-             (walk-up-stack
-              (lambda ()
-                (setq i (1+ i)
-                      child parent
-                      parent (backtrace-frame (1+ i) 'called-interactively-p)))))
-        (while (progn (funcall walk-up-stack)
-                      (or
-                       ;; Skip special forms from non-compiled code.
-                       (and child (null (car child)))
-                       ;; Skip package-specific stack-frames.
-                       (let ((skip (run-hook-with-args-until-success
-                                    'called-interactively-p-functions
-                                    (+ i 2) child parent)))
-                         (pcase skip
-                           ('nil nil)
-                           (0 t)
-                           (_ (setq i (1- (+ i skip)))
-                              (funcall walk-up-stack)))))))
-        ;; CHILD should now be containing function.
-        (pcase (cons child parent)
-          ;; checks if CHILD is built-in primitive (never interactive).
-          (`((,_ ,(pred (lambda (f) (subr-primitive-p (indirect-function f)))) . ,_) . ,_)
-           nil)
-          ;; checks if PARENT is `funcall_interactively'.
-          (`(,_ . (t ,(pred (lambda (f)
-                              (eq internal--funcall-interactively
-                                  (indirect-function f))))
-                     . ,_))
-           t))))))
+  "Deprecated.
+Refer to Info node `(elisp)Distinguish Interactive'."
+  (when (not (and (eq kind 'interactive)
+                  (or executing-kbd-macro noninteractive)))
+    (let* ((i 1) ;; 0 is the called-interactively-p frame.
+           frame nextframe
+           (get-next-frame
+            (lambda ()
+              (setq frame nextframe)
+              (setq nextframe (backtrace-frame i 'called-interactively-p))
+              ;; (message "Frame %d = %S" i nextframe)
+              (setq i (1+ i)))))
+      (funcall get-next-frame) ;; Get the first frame.
+      (while
+          ;; FIXME: The edebug and advice handling should be made modular and
+          ;; provided directly by edebug.el and nadvice.el.
+          (progn
+            ;; frame    =(backtrace-frame i-2)
+            ;; nextframe=(backtrace-frame i-1)
+            (funcall get-next-frame)
+            ;; `pcase' would be a fairly good fit here, but it sometimes moves
+            ;; branches within local functions, which then messes up the
+            ;; `backtrace-frame' data we get,
+            (or
+             ;; Skip special forms (from non-compiled code).
+             (and frame (null (car frame)))
+             ;; Skip also `interactive-p' (because we don't want to know if
+             ;; interactive-p was called interactively but if it's caller was).
+             (eq (nth 1 frame) 'interactive-p)
+             ;; Skip package-specific stack-frames.
+             (let ((skip (run-hook-with-args-until-success
+                          'called-interactively-p-functions
+                          i frame nextframe)))
+               (pcase skip
+                 ('nil nil)
+                 (0 t)
+                 (_ (setq i (+ i skip -1)) (funcall get-next-frame)))))))
+      ;; Now `frame' should be "the function from which we were called".
+      (pcase (cons frame nextframe)
+        ;; No subr calls `interactive-p', so we can rule that out.
+        (`((,_ ,(pred (lambda (f) (subr-primitive-p (indirect-function f)))) . ,_) . ,_) nil)
+        ;; In case #<subr funcall-interactively> without going through the
+        ;; `funcall-interactively' symbol (bug#3984).
+        (`(,_ . (t ,(pred (lambda (f)
+                            (eq internal--funcall-interactively
+                                (indirect-function f))))
+                   . ,_))
+         t)))))
 
 (define-obsolete-function-alias 'interactive-p
   #'called-interactively-p "23.2"

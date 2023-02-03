@@ -169,7 +169,7 @@ function being an around advice."
               (lambda (f &rest args)
                 (list (cons 1 (called-interactively-p))
                       (if (called-interactively-p)
-                          (call-interactively f)
+                          (apply #'funcall-interactively f args)
                         (apply f args)))))
   (should (equal (sm-test7.5) '((1 . nil) (1 . nil))))
   (should (equal (call-interactively 'sm-test7.5) '((1 . t) (1 . t)))))
