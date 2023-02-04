@@ -135,8 +135,6 @@
 # undef __attribute_returns_twice__
 # undef __attribute_used__
 # undef __attribute_warn_unused_result__
-# undef __bos
-# undef __bos0
 # undef __errordecl
 # undef __extension__
 # undef __extern_always_inline
@@ -149,8 +147,6 @@
 # undef __glibc_has_extension
 # undef __glibc_macro_warning
 # undef __glibc_macro_warning1
-# undef __glibc_objsize
-# undef __glibc_objsize0
 # undef __glibc_unlikely
 # undef __inline
 # undef __ptr_t
@@ -159,6 +155,19 @@
 # undef __va_arg_pack
 # undef __va_arg_pack_len
 # undef __warnattr
+# undef __wur
+# ifndef __GNULIB_CDEFS
+#  undef __bos
+#  undef __bos0
+#  undef __glibc_fortify
+#  undef __glibc_fortify_n
+#  undef __glibc_objsize
+#  undef __glibc_objsize0
+#  undef __glibc_safe_len_cond
+#  undef __glibc_safe_or_unknown_len
+#  undef __glibc_unsafe_len
+#  undef __glibc_unsigned_or_positive
+# endif
 
 /* Include our copy of glibc <sys/cdefs.h>.  */
 # include <cdefs.h>
