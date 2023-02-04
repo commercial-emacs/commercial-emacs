@@ -68,6 +68,7 @@
 #  --avoid=wchar \
 #  --avoid=wcrtomb \
 #  --avoid=wctype-h \
+#  alignasof \
 #  alloca-opt \
 #  binary-io \
 #  bitset \
@@ -147,7 +148,6 @@
 #  socklen \
 #  stat-time \
 #  std-gnu11 \
-#  stdalign \
 #  stdbool \
 #  stddef \
 #  stdio \
@@ -339,7 +339,7 @@ GL_GENERATE_GMP_H_CONDITION = @GL_GENERATE_GMP_H_CONDITION@
 GL_GENERATE_IEEE754_H_CONDITION = @GL_GENERATE_IEEE754_H_CONDITION@
 GL_GENERATE_LIMITS_H_CONDITION = @GL_GENERATE_LIMITS_H_CONDITION@
 GL_GENERATE_MINI_GMP_H_CONDITION = @GL_GENERATE_MINI_GMP_H_CONDITION@
-GL_GENERATE_STDALIGN_H_CONDITION = @GL_GENERATE_STDALIGN_H_CONDITION@
+GL_GENERATE_STDCKDINT_H_CONDITION = @GL_GENERATE_STDCKDINT_H_CONDITION@
 GL_GENERATE_STDDEF_H_CONDITION = @GL_GENERATE_STDDEF_H_CONDITION@
 GL_GENERATE_STDINT_H_CONDITION = @GL_GENERATE_STDINT_H_CONDITION@
 GL_GNULIB_ACCESS = @GL_GNULIB_ACCESS@
@@ -843,7 +843,6 @@ HAVE_SIGSET_T = @HAVE_SIGSET_T@
 HAVE_SLEEP = @HAVE_SLEEP@
 HAVE_SPAWN_H = @HAVE_SPAWN_H@
 HAVE_SQLITE3 = @HAVE_SQLITE3@
-HAVE_STDALIGN_H = @HAVE_STDALIGN_H@
 HAVE_STDINT_H = @HAVE_STDINT_H@
 HAVE_STPCPY = @HAVE_STPCPY@
 HAVE_STPNCPY = @HAVE_STPNCPY@
@@ -997,7 +996,6 @@ NEXT_AS_FIRST_DIRECTIVE_GETOPT_H = @NEXT_AS_FIRST_DIRECTIVE_GETOPT_H@
 NEXT_AS_FIRST_DIRECTIVE_INTTYPES_H = @NEXT_AS_FIRST_DIRECTIVE_INTTYPES_H@
 NEXT_AS_FIRST_DIRECTIVE_LIMITS_H = @NEXT_AS_FIRST_DIRECTIVE_LIMITS_H@
 NEXT_AS_FIRST_DIRECTIVE_SIGNAL_H = @NEXT_AS_FIRST_DIRECTIVE_SIGNAL_H@
-NEXT_AS_FIRST_DIRECTIVE_STDALIGN_H = @NEXT_AS_FIRST_DIRECTIVE_STDALIGN_H@
 NEXT_AS_FIRST_DIRECTIVE_STDDEF_H = @NEXT_AS_FIRST_DIRECTIVE_STDDEF_H@
 NEXT_AS_FIRST_DIRECTIVE_STDINT_H = @NEXT_AS_FIRST_DIRECTIVE_STDINT_H@
 NEXT_AS_FIRST_DIRECTIVE_STDIO_H = @NEXT_AS_FIRST_DIRECTIVE_STDIO_H@
@@ -1019,7 +1017,6 @@ NEXT_GETOPT_H = @NEXT_GETOPT_H@
 NEXT_INTTYPES_H = @NEXT_INTTYPES_H@
 NEXT_LIMITS_H = @NEXT_LIMITS_H@
 NEXT_SIGNAL_H = @NEXT_SIGNAL_H@
-NEXT_STDALIGN_H = @NEXT_STDALIGN_H@
 NEXT_STDDEF_H = @NEXT_STDDEF_H@
 NEXT_STDINT_H = @NEXT_STDINT_H@
 NEXT_STDIO_H = @NEXT_STDIO_H@
@@ -1265,7 +1262,7 @@ SMALL_JA_DIC = @SMALL_JA_DIC@
 SQLITE3_CFLAGS = @SQLITE3_CFLAGS@
 SQLITE3_LIBS = @SQLITE3_LIBS@
 SQLITE3_OBJ = @SQLITE3_OBJ@
-STDALIGN_H = @STDALIGN_H@
+STDCKDINT_H = @STDCKDINT_H@
 STDDEF_H = @STDDEF_H@
 STDINT_H = @STDINT_H@
 SUBDIR_MAKEFILES_IN = @SUBDIR_MAKEFILES_IN@
@@ -3151,34 +3148,28 @@ EXTRA_DIST += stat-time.h
 endif
 ## end   gnulib module stat-time
 
-## begin gnulib module stdalign
-ifeq (,$(OMIT_GNULIB_MODULE_stdalign))
+## begin gnulib module stdckdint
+ifeq (,$(OMIT_GNULIB_MODULE_stdckdint))
 
-BUILT_SOURCES += $(STDALIGN_H)
+BUILT_SOURCES += $(STDCKDINT_H)
 
-# We need the following in order to create <stdalign.h> when the system
-# doesn't have one that works.
-ifneq (,$(GL_GENERATE_STDALIGN_H_CONDITION))
-stdalign.h: stdalign.in.h $(top_builddir)/config.status
+# We need the following in order to create <stdckdint.h> when the system
+# doesn't have one that works with the given compiler.
+ifneq (,$(GL_GENERATE_STDCKDINT_H_CONDITION))
+stdckdint.h: stdckdint.in.h $(top_builddir)/config.status
 	$(gl_V_at)$(SED_HEADER_STDOUT) \
-	      -e 's|@''GUARD_PREFIX''@|GL|g' \
-	      -e 's|@''HAVE_STDALIGN_H''@|$(HAVE_STDALIGN_H)|g' \
-	      -e 's|@''INCLUDE_NEXT''@|$(INCLUDE_NEXT)|g' \
-	      -e 's|@''PRAGMA_SYSTEM_HEADER''@|@PRAGMA_SYSTEM_HEADER@|g' \
-	      -e 's|@''PRAGMA_COLUMNS''@|@PRAGMA_COLUMNS@|g' \
-	      -e 's|@''NEXT_STDALIGN_H''@|$(NEXT_STDALIGN_H)|g' \
-	      $(srcdir)/stdalign.in.h > $@-t
+	  $(srcdir)/stdckdint.in.h > $@-t
 	$(AM_V_at)mv $@-t $@
 else
-stdalign.h: $(top_builddir)/config.status
+stdckdint.h: $(top_builddir)/config.status
 	rm -f $@
 endif
-MOSTLYCLEANFILES += stdalign.h stdalign.h-t
+MOSTLYCLEANFILES += stdckdint.h stdckdint.h-t
 
-EXTRA_DIST += stdalign.in.h
+EXTRA_DIST += intprops-internal.h stdckdint.in.h
 
 endif
-## end   gnulib module stdalign
+## end   gnulib module stdckdint
 
 ## begin gnulib module stddef
 ifeq (,$(OMIT_GNULIB_MODULE_stddef))
