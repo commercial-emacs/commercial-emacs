@@ -523,7 +523,7 @@ _GL_FUNCDECL_SYS (futimens, int, (int fd, struct timespec const times[2]));
 #  endif
 _GL_CXXALIAS_SYS (futimens, int, (int fd, struct timespec const times[2]));
 # endif
-# if __GLIBC__ >= 2 && @HAVE_FUTIMENS@
+# if @HAVE_FUTIMENS@
 _GL_CXXALIASWARN (futimens);
 # endif
 #elif defined GNULIB_POSIXCHECK
@@ -728,9 +728,7 @@ _GL_FUNCDECL_SYS (mkfifoat, int, (int fd, char const *file, mode_t mode)
 #  endif
 _GL_CXXALIAS_SYS (mkfifoat, int, (int fd, char const *file, mode_t mode));
 # endif
-# if __GLIBC__ >= 2
 _GL_CXXALIASWARN (mkfifoat);
-# endif
 #elif defined GNULIB_POSIXCHECK
 # undef mkfifoat
 # if HAVE_RAW_DECL_MKFIFOAT
@@ -787,9 +785,7 @@ _GL_FUNCDECL_SYS (mknodat, int,
 _GL_CXXALIAS_SYS (mknodat, int,
                   (int fd, char const *file, mode_t mode, dev_t dev));
 # endif
-# if __GLIBC__ >= 2
 _GL_CXXALIASWARN (mknodat);
-# endif
 #elif defined GNULIB_POSIXCHECK
 # undef mknodat
 # if HAVE_RAW_DECL_MKNODAT
@@ -915,7 +911,7 @@ _GL_FUNCDECL_SYS (utimensat, int, (int fd, char const *name,
 _GL_CXXALIAS_SYS (utimensat, int, (int fd, char const *name,
                                    struct timespec const times[2], int flag));
 # endif
-# if __GLIBC__ >= 2 && @HAVE_UTIMENSAT@
+# if @HAVE_UTIMENSAT@
 _GL_CXXALIASWARN (utimensat);
 # endif
 #elif defined GNULIB_POSIXCHECK

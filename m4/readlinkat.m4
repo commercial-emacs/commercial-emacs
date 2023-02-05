@@ -1,4 +1,4 @@
-# serial 8
+# serial 6
 # See if we need to provide readlinkat replacement.
 
 dnl Copyright (C) 2009-2023 Free Software Foundation, Inc.
@@ -12,13 +12,10 @@ AC_DEFUN([gl_FUNC_READLINKAT],
 [
   AC_REQUIRE([gl_UNISTD_H_DEFAULTS])
   AC_REQUIRE([gl_USE_SYSTEM_EXTENSIONS])
-  gl_CHECK_FUNCS_ANDROID([readlinkat], [[#include <unistd.h>]])
+  AC_CHECK_FUNCS_ONCE([readlinkat])
   AC_REQUIRE([gl_FUNC_READLINK])
   if test $ac_cv_func_readlinkat = no; then
     HAVE_READLINKAT=0
-    case "$gl_cv_onwards_func_readlinkat" in
-      future*) REPLACE_READLINKAT=1 ;;
-    esac
   else
     AC_CACHE_CHECK([whether readlinkat signature is correct],
       [gl_cv_decl_readlinkat_works],

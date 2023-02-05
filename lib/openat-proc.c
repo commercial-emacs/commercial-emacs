@@ -30,11 +30,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#ifdef __KLIBC__ /* OS/2 */
+#ifdef __KLIBC__
 # include <InnoTekLIBC/backend.h>
-#endif
-#ifdef __MVS__ /* z/OS */
-# include <termios.h>
 #endif
 
 #include "intprops.h"
@@ -56,8 +53,7 @@ openat_proc_name (char buf[OPENAT_BUFFER_SIZE], int fd, char const *file)
       return buf;
     }
 
-#if !(defined __KLIBC__ || defined __MVS__)
-  /* Generic code for Linux, Solaris, and similar platforms.  */
+#ifndef __KLIBC__
 # define PROC_SELF_FD_FORMAT "/proc/self/fd/%d/"
   {
     enum {
@@ -111,29 +107,14 @@ openat_proc_name (char buf[OPENAT_BUFFER_SIZE], int fd, char const *file)
         dirlen = sprintf (result, PROC_SELF_FD_FORMAT, fd);
       }
   }
-#else /* (defined __KLIBC__ || defined __MVS__), i.e. OS/2 or z/OS */
+#else
   /* OS/2 kLIBC provides a function to retrieve a path from a fd.  */
   {
+    char dir[_MAX_PATH];
     size_t bufsize;
 
-# ifdef __KLIBC__
-    char dir[_MAX_PATH];
     if (__libc_Back_ioFHToPath (fd, dir, sizeof dir))
       return NULL;
-# endif
-# ifdef __MVS__
-    char dir[_XOPEN_PATH_MAX];
-    /* Documentation:
-       https://www.ibm.com/docs/en/zos/2.2.0?topic=functions-w-ioctl-w-pioctl-control-devices */
-    if (w_ioctl (fd, _IOCC_GPN, sizeof dir, dir) < 0)
-      return NULL;
-    /* Documentation:
-       https://www.ibm.com/docs/en/zos/2.2.0?topic=functions-e2a-l-convert-characters-from-ebcdic-ascii */
-    dirlen = __e2a_l (dir, strlen (dir));
-    if (dirlen < 0 || dirlen >= sizeof dir)
-      return NULL;
-    dir[dirlen] = '\0';
-# endif
 
     dirlen = strlen (dir);
     bufsize = dirlen + 1 + strlen (file) + 1; /* 1 for '/', 1 for null */

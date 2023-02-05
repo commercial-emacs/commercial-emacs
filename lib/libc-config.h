@@ -135,6 +135,8 @@
 # undef __attribute_returns_twice__
 # undef __attribute_used__
 # undef __attribute_warn_unused_result__
+# undef __bos
+# undef __bos0
 # undef __errordecl
 # undef __extension__
 # undef __extern_always_inline

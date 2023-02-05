@@ -5,11 +5,9 @@ dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
 
-dnl Written by Paul Eggert and Bruno Haible.
-
 # Prepare for substituting <stdalign.h> if it is not supported.
 
-AC_DEFUN([gl_ALIGNASOF],
+AC_DEFUN([gl_STDALIGN_H],
 [
   AC_CACHE_CHECK([for working stdalign.h],
     [gl_cv_header_working_stdalign_h],
@@ -55,22 +53,4 @@ AC_DEFUN([gl_ALIGNASOF],
   else
     GL_GENERATE_STDALIGN_H=true
   fi
-])
-
-AC_DEFUN([gl_STDALIGN_H],
-[
-  AC_REQUIRE([gl_ALIGNASOF])
-  if test "$gl_cv_header_working_stdalign_h" = no; then
-    GL_GENERATE_STDALIGN_H=true
-  else
-    GL_GENERATE_STDALIGN_H=false
-  fi
-
-  gl_CHECK_NEXT_HEADERS([stdalign.h])
-  if test $ac_cv_header_stdalign_h = yes; then
-    HAVE_STDALIGN_H=1
-  else
-    HAVE_STDALIGN_H=0
-  fi
-  AC_SUBST([HAVE_STDALIGN_H])
 ])
