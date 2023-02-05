@@ -1,4 +1,4 @@
-# Check for stdalign.h that conforms to C11.
+# Check for alignas and alignof that conform to C23.
 
 dnl Copyright 2011-2023 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
@@ -11,12 +11,18 @@ dnl Written by Paul Eggert and Bruno Haible.
 
 AC_DEFUN([gl_ALIGNASOF],
 [
-  AC_CACHE_CHECK([for working stdalign.h],
+  AC_CACHE_CHECK([for alignas and alignof],
     [gl_cv_header_working_stdalign_h],
-    [AC_COMPILE_IFELSE(
+    [gl_save_CFLAGS=$CFLAGS
+     for gl_working in "yes, keywords" "yes, <stdalign.h> macros"; do
+      AS_CASE([$gl_working],
+        [*stdalign.h*], [CFLAGS="$gl_save_CFLAGS -DINCLUDE_STDALIGN_H"])
+      AC_COMPILE_IFELSE(
        [AC_LANG_PROGRAM(
           [[#include <stdint.h>
-            #include <stdalign.h>
+            #ifdef INCLUDE_STDALIGN_H
+             #include <stdalign.h>
+            #endif
             #include <stddef.h>
 
             /* Test that alignof yields a result consistent with offsetof.
@@ -32,7 +38,7 @@ AC_DEFUN([gl_ALIGNASOF],
             char test_long[ao (long int) % _Alignof (long int) == 0 ? 1 : -1];
             char test_alignof[alignof (double) == _Alignof (double) ? 1 : -1];
 
-            /* Test _Alignas only on platforms where gnulib can help.  */
+            /* Test alignas only on platforms where gnulib can help.  */
             #if \
                 ((defined __cplusplus && 201103 <= __cplusplus) \
                  || (__TINYC__ && defined __attribute__) \
@@ -47,8 +53,8 @@ AC_DEFUN([gl_ALIGNASOF],
                                 ? 1 : -1];
             #endif
           ]])],
-       [gl_cv_header_working_stdalign_h=yes],
-       [gl_cv_header_working_stdalign_h=no])])
+       [gl_cv_header_working_stdalign_h=$gl_working],
+       [gl_cv_header_working_stdalign_h=no])
 
       CFLAGS=$gl_save_CFLAGS
       test "$gl_cv_header_working_stdalign_h" != no && break
