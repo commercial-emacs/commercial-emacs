@@ -57,13 +57,17 @@ Create the thumbnail directory if it does not exist."
       (message "Thumbnail directory created: %s" image-dired-dir))
     image-dired-dir))
 
+(defun image-dired-content-sha1 (filename)
+  "Compute the SHA-1 of a part of FILENAME."
+  (with-temp-buffer
+    (insert-file-contents filename nil 0 4096)
+    (sha1 (current-buffer))))
+
 (defun image-dired-thumb-name (file)
   "Return absolute file name for thumbnail FILE.
 Depending on the value of `image-dired-thumbnail-storage', the
 file name of the thumbnail will vary:
-- For `use-image-dired-dir', make a SHA1-hash of the image file's
-  directory name and add that to make the thumbnail file name
-  unique.
+- For `image-dired', make a SHA1-hash of some of the image file.
 - For `per-directory' storage, just add a subdirectory.
 - For `standard' storage, produce the file name according to the
   Thumbnail Managing Standard.  Among other things, an MD5-hash
@@ -85,7 +89,7 @@ See also `image-dired-thumbnail-storage'."
           ((or (eq 'image-dired image-dired-thumbnail-storage)
                ;; Maintained for backwards compatibility:
                (eq 'use-image-dired-dir image-dired-thumbnail-storage))
-           (expand-file-name (format "%s.jpg" (sha1 file))
+           (expand-file-name (format "%s.jpg" (image-dired-content-sha1 file))
                              (image-dired-dir)))
           ((eq 'per-directory image-dired-thumbnail-storage)
            (expand-file-name (format "%s.thumb.jpg"
