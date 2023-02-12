@@ -55,6 +55,7 @@
 
 (eval-when-compile (require 'cl-lib))
 (eval-when-compile (require 'subr-x))
+(declare-function emoji--init "emoji")
 
 ;; Some additional options and constants.
 

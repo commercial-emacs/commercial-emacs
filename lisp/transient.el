@@ -26,8 +26,6 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-;; This file is NOT part of GNU Emacs.
-
 ;;; Commentary:
 
 ;; Taking inspiration from prefix keys and prefix arguments, Transient
@@ -2198,76 +2196,69 @@ value.  Otherwise return CHILDREN as is."
              (remove-hook 'minibuffer-exit-hook ,exit)))
        ,@body)))
 
-(defun transient--post-command-hook ()
-  (run-hooks 'transient--post-command-hook))
+(defun transient--wrap-command ()
+  (let* ((prefix transient--prefix)
+         (suffix this-command)
+         (advice nil)
+         (advice-interactive
+          (lambda (spec)
+            (let ((abort t))
+              (unwind-protect
+	          (prog1 (advice-eval-interactive-spec spec)
+	            (setq abort nil))
+	        (when abort
+                  (when-let ((unwind (oref prefix unwind-suffix)))
+                    (transient--debug 'unwind-interactive)
+                    (funcall unwind suffix))
+                  (if (symbolp suffix)
+                      (advice-remove suffix advice)
+                    (remove-function suffix advice))
+                  (oset prefix unwind-suffix nil))))))
+         (advice-body
+          (lambda (fn &rest args)
+            (unwind-protect
+                (apply fn args)
+              (when-let ((unwind (oref prefix unwind-suffix)))
+                (transient--debug 'unwind-command)
+                (funcall unwind suffix))
+              (if (symbolp suffix)
+                  (advice-remove suffix advice)
+                (remove-function suffix advice))
+              (oset prefix unwind-suffix nil)))))
+    (setq advice `(lambda (fn &rest args)
+                    (interactive ,advice-interactive)
+                    (apply ',advice-body fn args)))
+    (if (symbolp suffix)
+        (advice-add suffix :around advice '((depth . -99)))
+      (add-function :around (var suffix) advice '((depth . -99))))))
 
-(add-hook 'post-command-hook #'transient--post-command-hook)
-
-(defun transient--delay-post-command (&optional abort-only)
-  (transient--debug 'delay-post-command)
-  (let ((depth (minibuffer-depth))
-        (command this-command)
-        (delayed (if transient--exitp
-                     (apply-partially #'transient--post-exit this-command)
-                   #'transient--resume-override))
-        outside-interactive post-command abort-minibuffer)
-    (unless abort-only
-      (setq post-command
-            (lambda () "@transient--delay-post-command"
-              (let ((act (and (not (zerop (length (this-command-keys-vector))))
-                              (or (eq this-command command)
-                                  ;; `execute-extended-command' was
-                                  ;; used to call another command
-                                  ;; that also uses the minibuffer.
-                                  (equal
-                                   (ignore-errors
-                                     (string-to-multibyte (this-command-keys)))
-                                   (format "\M-x%s\r" this-command))
-                                  ;; Minibuffer used outside `interactive'.
-                                  (and outside-interactive 'post-cmd)))))
-                (transient--debug 'post-command-hook "act: %s" act)
-                (when act
-                  (remove-hook 'transient--post-command-hook post-command)
-                  (remove-hook 'minibuffer-exit-hook abort-minibuffer)
-                  (funcall delayed)))))
-      (add-hook 'transient--post-command-hook post-command))
-    (setq abort-minibuffer
-          (lambda () "@transient--delay-post-command"
-            (let ((act (and (= (minibuffer-depth) depth)
-                            (or (memq this-command transient--abort-commands)
-                                (equal (this-command-keys) "")
-                                (prog1 nil
-                                  (setq outside-interactive t))))))
-              (transient--debug
-               'abort-minibuffer
-               "mini: %s|%s, act: %s" (minibuffer-depth) depth
-               (or act (and outside-interactive '->post-cmd)))
-              (when act
-                (remove-hook 'transient--post-command-hook post-command)
-                (remove-hook 'minibuffer-exit-hook abort-minibuffer)
-                (funcall delayed)))))
-    (add-hook 'minibuffer-exit-hook abort-minibuffer)))
+(defun transient--premature-post-command ()
+  (and (equal (this-command-keys-vector) [])
+       (= (minibuffer-depth)
+          (1+ transient--minibuffer-depth))
+       (progn
+         (transient--debug 'premature-post-command)
+         (transient--suspend-override)
+         (oset (or transient--prefix transient-current-prefix)
+               unwind-suffix
+               (if transient--exitp
+                   #'transient--post-exit
+                 #'transient--resume-override))
+         t)))
 
 (defun transient--post-command ()
-  (transient--debug 'post-command)
-  (transient--with-emergency-exit
-    (cond
-     ((and (zerop (length (this-command-keys-vector)))
-           (= (minibuffer-depth)
-              (1+ transient--minibuffer-depth)))
-      (transient--suspend-override)
-      (transient--delay-post-command (eq transient--exitp 'replace)))
-     (transient--exitp
-      (transient--post-exit))
-     ((eq this-command (oref transient--prefix command)))
-     (t
-      (let ((old transient--redisplay-map)
-            (new (transient--make-redisplay-map)))
-        (unless (equal old new)
-          (transient--pop-keymap 'transient--redisplay-map)
-          (setq transient--redisplay-map new)
-          (transient--push-keymap 'transient--redisplay-map)))
-      (transient--redisplay)))))
+  (unless (transient--premature-post-command)
+    (transient--debug 'post-command)
+    (transient--with-emergency-exit
+      (cond (transient--exitp (transient--post-exit))
+            ((eq this-command (oref transient--prefix command)))
+            ((let ((old transient--redisplay-map)
+                   (new (transient--make-redisplay-map)))
+               (unless (equal old new)
+                 (transient--pop-keymap 'transient--redisplay-map)
+                 (setq transient--redisplay-map new)
+                 (transient--push-keymap 'transient--redisplay-map))
+               (transient--redisplay)))))))
 
 (defun transient--post-exit (&optional command)
   (transient--debug 'post-exit)

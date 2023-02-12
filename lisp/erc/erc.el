@@ -1181,6 +1181,7 @@ which the local user typed."
   "Abbrev table used while in ERC mode.")
 (define-abbrev-table 'erc-mode-abbrev-table ())
 
+(declare-function erc-toggle-interpret-controls "erc-goodies")
 (defvar erc-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\C-m" #'erc-send-current-line)
@@ -6839,6 +6840,7 @@ shortened server name instead."
 
 ;; FIXME when 29.1 is cut and `format-spec' is added to ELPA Compat,
 ;; remove the function invocations from the spec form below.
+(declare-function erc-controls-strip "erc-goodies")
 (defun erc-update-mode-line-buffer (buffer)
   "Update the mode line in a single ERC buffer BUFFER."
   (with-current-buffer buffer
