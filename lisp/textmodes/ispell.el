@@ -2994,7 +2994,6 @@ With CLEAR, buffer session localwords are cleaned."
       (setq ispell-output-buffer nil
 	    ispell-session-buffer nil))
     (setq ispell-process nil)
-    (message "Ispell process killed")
     nil))
 
 (defvar ispell-change-dictionary-hook nil
