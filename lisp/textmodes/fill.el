@@ -42,12 +42,14 @@ Non-nil means changing indent doesn't end a paragraph.
 That mode can handle paragraphs with extra indentation on the first line,
 but it requires separator lines between paragraphs.
 A value of nil means that any change in indentation starts a new paragraph."
-  :type 'boolean)
+  :type 'boolean
+  :group 'fill)
 
 (defcustom colon-double-space nil
   "Non-nil means put two spaces after a colon when filling."
   :type 'boolean
-  :safe #'booleanp)
+  :safe #'booleanp
+  :group 'fill)
 
 (defcustom fill-separate-heterogeneous-words-with-space nil
   "Non-nil means to use a space to separate words of a different kind.
@@ -58,7 +60,8 @@ Whether to use a space to separate such words also depends on the entry
 in `fill-nospace-between-words-table' for the characters before and
 after the newline."
   :type 'boolean
-  :version "26.1")
+  :version "26.1"
+  :group 'fill)
 
 (defvar fill-paragraph-function nil
   "Mode-specific function to fill a paragraph, or nil if there is none.
@@ -76,7 +79,8 @@ such as `fill-forward-paragraph-function'.")
 Kinsoku processing is designed to prevent certain characters from being
 placed at the beginning or end of a line by filling.
 See the documentation of `kinsoku' for more information."
-  :type 'boolean)
+  :type 'boolean
+  :group 'fill)
 
 (defun set-fill-prefix ()
   "Set the fill prefix to the current line up to point.
@@ -96,7 +100,8 @@ reinserts the fill prefix in each resulting line."
 
 (defcustom adaptive-fill-mode t
   "Non-nil means determine a paragraph's fill prefix from its text."
-  :type 'boolean)
+  :type 'boolean
+  :group 'fill)
 
 (defcustom adaptive-fill-regexp
   ;; Added `!' for doxygen comments starting with `//!' or `/*!'.
@@ -112,7 +117,8 @@ standard indentation for the whole paragraph.
 If the paragraph has just one line, the indentation is taken from that
 line, but in that case `adaptive-fill-first-line-regexp' also plays
 a role."
-  :type 'regexp)
+  :type 'regexp
+  :group 'fill)
 
 (defcustom adaptive-fill-first-line-regexp (purecopy "\\`[ \t]*\\'")
   "Regexp specifying whether to set fill prefix from a one-line paragraph.
@@ -124,13 +130,95 @@ By default, this regexp matches sequences of just spaces and tabs.
 
 However, we never use a prefix from a one-line paragraph
 if it would act as a paragraph-starter on the second line."
-  :type 'regexp)
+  :type 'regexp
+  :group 'fill)
 
 (defcustom adaptive-fill-function #'ignore
   "Function to call to choose a fill prefix for a paragraph.
 A nil return value means the function has not determined the fill prefix."
   :version "27.1"
-  :type 'function)
+  :type 'function
+  :group 'fill)
+
+(defgroup balanced-fill nil
+  "Breaking lines to look more even and neat."
+  :link '(custom-manual "(emacs) Balanced Fill")
+  :group 'fill)
+
+(define-minor-mode balanced-fill-mode
+  "Toggle whether filling should try to neatly balance line lengths.
+
+When enabled, filling will try to optimally choose a set of line
+breaks to make a paragraph look tidier by considering the entire
+paragraph at a time.  This may place line breaks sooner than
+necessary if it improves later lines.  When disabled, filling
+uses the traditional greedy line breaking algorithm.
+
+See Info node `(emacs) Balanced Fill' for more details."
+  :global t
+  :version "30.1"
+  :type 'boolean
+  :group 'balanced-fill)
+
+(defcustom balanced-fill-word-limit 500
+  "Largest paragraph, in words, to apply balanced filling to.
+If the paragraph exceeds this limit, balanced filling will fall
+back to the standard greedy filling to keep filling quick."
+  :version "30.1"
+  :type 'integer
+  :group 'balanced-fill)
+
+(defcustom balanced-fill-margin-width 3
+  "Extra margin, in columns, for balanced filling to try to break lines at.
+Targetting a line length slightly short of the `fill-column' but
+being allowed to go all the way up to the `fill-column' can help
+balanced filling to make the lines more even in length."
+  :version "30.1"
+  :type 'integer
+  :group 'balanced-fill)
+
+(defcustom balanced-fill-runt-width 10
+  "Minimum width, in columns, allowed for the last lines of paragraphs.
+If this is set to a high number, then the balanced filling will
+try to make the last lines as full as all the others."
+  :version "30.1"
+  :type 'integer
+  :group 'balanced-fill)
+
+(defcustom balanced-fill-length-penalty 3
+  "Main tuning option for the balanced fill algorithm.
+Higher values cause balanced filling to prioritize (relative
+to other penalties) making each line exactly match the target
+length.  Typically this is set between 2 and 3."
+:version "30.1"
+  :type 'integer
+  :group 'balanced-fill)
+
+(defcustom balanced-fill-raggedness-penalty 40
+  "Penalty added for difference in length between adjacent lines.
+Higher values make balanced filling prioritize (relative to
+other penalties) reducing raggedness and keeping all lines as
+even as possible in length."
+  :version "30.1"
+  :type 'integer
+  :group 'balanced-fill)
+
+(defcustom balanced-fill-single-penalty 150
+  "Penalty added for leaving a word of a sentence alone on a line.
+Higher values make balanced filling prioritize (relative to
+other penalties) avoiding line breaks right after the first
+word of a sentence or before the last word of a sentence."
+  :version "30.1"
+  :type 'integer
+  :group 'balanced-fill)
+
+(defcustom balanced-fill-break-penalty 50
+  "Penalty added for each line break inserted.
+Higher values make balanced filling prioritize (relative to other
+penalties) making a paragraph fit in as few lines as possible."
+  :version "30.1"
+  :type 'integer
+  :group 'balanced-fill)
 
 (defvar fill-indent-according-to-mode nil ;Screws up CC-mode's filling tricks.
   "Whether or not filling should try to use the major mode's indentation.")
@@ -374,11 +462,13 @@ be tested.  If it returns a non-nil value, fill commands do not break
 the line there."
   :type 'hook
   :options '(fill-french-nobreak-p fill-single-word-nobreak-p
-             fill-single-char-nobreak-p))
+             fill-single-char-nobreak-p)
+  :group 'fill)
 
 (defcustom fill-nobreak-invisible nil
   "Non-nil means that fill commands do not break lines in invisible text."
-  :type 'boolean)
+  :type 'boolean
+  :group 'fill)
 
 (defun fill-nobreak-p ()
   "Return nil if breaking the line at point is allowed.
@@ -644,6 +734,137 @@ The break position will be always after LINEBEG and generally before point."
     (indent-line-to (current-left-margin))
     (put-text-property beg (point) 'face 'default)))
 
+(defun balanced-fill--break-lines (from to justify)
+  ;; (Line breaking implementation inspired by Knuth-Plass.)
+
+  ;; Abort (and fall back to greedy algorithm) if we have too many words.
+  ;; The algorithm below is worst-case quadratic (though usually not).
+  ;; Asymptotically faster algorithms exist, but are more complicated.
+  (if (> (count-words-region from to) balanced-fill-word-limit)
+      nil
+
+    ;; Build a table of visible word widths, with and without any preceding
+    ;; spaces, along with whether the word starts a new sentence.  We go by
+    ;; columns and not chars to handle invisible text (especially invisible
+    ;; spaces), etc.
+    (let ((words '())
+          (count 0)
+          (sentence-regexp (sentence-end)))
+      (goto-char to)
+      (while (> (point) from)
+        (let* ((previous (point))
+               (end (current-column))
+               (next (progn (fill-move-to-break-point from)
+                            ;; Needed for moving past some Org-mode links
+                            (skip-chars-backward " \t")
+                            (point)))
+               (with-space (current-column))
+               (without-space (progn (skip-chars-forward " \t")
+                                     (current-column)))
+               (new-sentence (looking-back sentence-regexp from)))
+          (goto-char next)
+          ;; If point didn't move, we're after the first word of the line.
+          (when (<= previous next)
+            (goto-char from)
+            (setq with-space (current-column)
+                  without-space (current-column)))
+          ;; Merge into previous entry when moving past invisible text.
+          (if (= end without-space)
+              (setq end (+ end (or (car (pop words)) 0))))
+          (push (list (- end with-space) (- end without-space) new-sentence)
+                words)))
+      (setq words (vconcat words))
+      (setq count (length words))
+
+      ;; Consider each word as a candidate to start a line, and build a
+      ;; table of which word the previous line would be best to start on
+      ;; and the width of the previous line.  Use dynamic programming to
+      ;; minimize a cost function.
+      (let ((starts (make-vector (1+ count) 0))
+            (widths (make-vector (1+ count) 0)))
+        (let* ((start 0)
+               (room (- fill-column (current-column)))
+               (costs (make-vector (1+ count) most-positive-fixnum))
+               (rags (make-vector (1+ count) balanced-fill-margin-width)))
+          (aset costs 0 0)
+          (while (< start count)
+            ;; The room for the first line may be different than the rest.
+            (if (= start 1)
+                (setq room (- fill-column
+                              (string-width (or fill-prefix "")))))
+            ;; Consider each word this new line might end on.  Don't test
+            ;; width against room yet; we want at least one word per line,
+            ;; so we need at least one iteration.
+            (let ((end start)
+                  (width 0))
+              (while (< end count)
+                ;; Don't add the space before the first word to the width.
+                (setq width (+ width (nth (if (= end start) 1 0)
+                                          (aref words end))))
+                ;; Our cost function is the sum of the best total cost for
+                ;; all the lines preceding the start of this one,
+                (let ((cost (+ (aref costs start)
+                               ;; plus the distance from the margin
+                               (expt (abs (- room balanced-fill-margin-width
+                                             width))
+                                     ;; exponentiated if not the last line
+                                     (if (or (/= (1+ end) count)
+                                             ;; or if we'd leave a runt,
+                                             (< width balanced-fill-runt-width))
+                                         balanced-fill-length-penalty 1))
+                               ;; plus a penalty for an uneven right side
+                               (* (abs (- room width
+                                          (aref rags start)))
+                                  ;; if not the last line
+                                  (if (or (/= (1+ end) count)
+                                          ;; unless the last line is longer,
+                                          (< (- room width)
+                                             (aref rags start)))
+                                      balanced-fill-raggedness-penalty 0))
+                               ;; plus a penalty if ending on the start of
+                               ;; a new sentence,
+                               (if (nth 2 (aref words end))
+                                   balanced-fill-single-penalty 0)
+                               ;; and a penalty if starting with a single
+                               ;; word and then a new sentence,
+                               (if (and (< (1+ start) count)
+                                        (nth 2 (aref words (1+ start))))
+                                   balanced-fill-single-penalty 0)
+                               ;; and a penalty for each break.
+                               balanced-fill-break-penalty)))
+                  ;; For ending after here, is this a better starting place?
+                  (when (and (<= cost (aref costs (1+ end)))
+                             (or (<= width room) (= end start)))
+                    (aset costs (1+ end) cost)
+                    (aset starts (1+ end) start)
+                    (aset widths (1+ end) width)
+                    (aset rags (1+ end) (- room width))))
+                ;; Break the inner (end) loop if we're out of room now.
+                (if (>= width room)
+                    (setq end count))
+                (setq end (1+ end))))
+            (setq start (1+ start))))
+
+        ;; Walk backwards from the end of the table to reconstruct a list
+        ;; of the optimal widths for each line.
+        (let (chosen)
+          (let ((end count))
+            (while (> end 0)
+              (if (< end count)
+                  (push (aref widths end) chosen))
+              (setq end (aref starts end))))
+
+          ;; Then insert those line breaks and justify each line.
+          (mapc (lambda (width)
+                  (move-to-column (+ (current-column) width))
+                  (fill-newline)
+                  (if justify
+                      (save-excursion
+                        (forward-line -1)
+                        (justify-current-line justify nil t))))
+                chosen)
+          (if justify (justify-current-line justify t t)))))))
+
 (defun fill-region-as-paragraph (from to &optional justify
 				      nosqueeze squeeze-after)
   "Fill the region as if it were a single paragraph.
@@ -762,6 +983,11 @@ space does not end a sentence, so don't break a line there."
 
 	;; This is the actual filling loop.
 	(goto-char from)
+        ;; Attempt to break into balanced lines if desired.
+        (when balanced-fill-mode
+          (balanced-fill--break-lines from to justify))
+        ;; Otherwise (if point is still at from), fall back to the standard
+        ;; greedy line breaking loop.
 	(let (linebeg)
           (while (< (point) to)
 	    (setq linebeg (point))
@@ -1116,7 +1342,8 @@ The `justification' text-property can locally override this variable."
 		 (const full)
 		 (const center)
 		 (const none))
-  :safe 'symbolp)
+  :safe 'symbolp
+  :group 'fill)
 (make-variable-buffer-local 'default-justification)
 
 (defun current-justification ()
