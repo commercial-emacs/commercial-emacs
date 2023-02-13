@@ -635,8 +635,7 @@ are both non-nil."
   ;; we bound flyspell action to hack-local-variables-hook
   (add-hook 'hack-local-variables-hook
 	    (function flyspell-hack-local-variables-hook) t t)
-  (add-hook 'kill-buffer-hook
-	    (apply-partially #'ispell-kill-ispell t) nil t)
+  (add-hook 'kill-buffer-hook #'flyspell-kill-ispell nil t)
   ;; set flyspell-generic-check-word-predicate based on the major mode
   (let ((mode-predicate (get major-mode 'flyspell-mode-predicate)))
     (if mode-predicate
@@ -727,6 +726,10 @@ has been used, the current word is not checked."
   (setq flyspell-pre-point  (point))
   (setq flyspell-pre-column (current-column)))
 
+(defun flyspell-kill-ispell ()
+  (let (inhibit-message t)
+    (ispell-kill-ispell t)))
+
 ;;*---------------------------------------------------------------------*/
 ;;*    flyspell-mode-off ...                                            */
 ;;*---------------------------------------------------------------------*/
@@ -739,8 +742,8 @@ has been used, the current word is not checked."
   (remove-hook 'after-change-functions 'flyspell-after-change-function t)
   (remove-hook 'hack-local-variables-hook
 	       (function flyspell-hack-local-variables-hook) t)
-  (remove-hook 'kill-buffer-hook (apply-partially #'ispell-kill-ispell t) t)
-  (ispell-kill-ispell t)
+  (remove-hook 'kill-buffer-hook #'flyspell-kill-ispell t)
+  (flyspell-kill-ispell)
   ;; We remove all the flyspell highlightings.
   (flyspell-delete-all-overlays)
   ;; We have to erase pre cache variables.
