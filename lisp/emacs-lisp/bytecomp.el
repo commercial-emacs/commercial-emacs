@@ -538,20 +538,19 @@ bytecomp-tests.el for interesting cases."
                                 expanded)))))
     (with-suppressed-warnings
         . ,(lambda (warnings &rest body)
-             ;; Bind `byte-compile--suppressed-warnings' here to
-             ;; affect the macroexpansion.  The byte-hunk-handler of
-             ;; `internal--with-suppressed-warnings' binds it again
-             ;; for the compilation itself.
+             ;; Bind `byte-compile--suppressed-warnings' once here for
+             ;; the macroexpansion, and once again later for the
+             ;; compilation via `byte-compile-suppressed-warnings'
              (if body
                  (let ((byte-compile--suppressed-warnings
                         (append warnings byte-compile--suppressed-warnings)))
-                   ;; This function doesn't exist, but is just a placeholder
-                   ;; symbol to hook up with the
-                   ;; `byte-hunk-handler'/`byte-defop-compiler-1' machinery.
                    `(internal--with-suppressed-warnings
                      ',warnings
-                     ,(macroexpand-all `(progn ,@body)
-                                       macroexpand-all-environment)))
+                     ,(macroexpand-all
+                       ;; not macroexp-progn because byte-compile-file-form-progn
+                       ;; assumes progn even for single expression.
+                       `(progn ,@body)
+                       macroexpand-all-environment)))
                (macroexp-warn-and-return
                 "`with-suppressed-warnings' with empty body"
                 nil '(empty-body with-suppressed-warnings) t)))))
@@ -2583,12 +2582,12 @@ in the input buffer (now current), not in the output buffer."
 (put 'internal--with-suppressed-warnings 'byte-hunk-handler
      'byte-compile-file-form-with-suppressed-warnings)
 (defun byte-compile-file-form-with-suppressed-warnings (form)
-  "FORM is (internal--with-suppressed-warnings (quote warnings) body)."
-  (cl-destructuring-bind (_token warnings-form &rest body)
+  "FORM is (internal--with-suppressed-warnings (quote warnings) progn)."
+  (cl-destructuring-bind (_token warnings-form progn)
       form
     (let ((byte-compile--suppressed-warnings
            (append (eval warnings-form) byte-compile--suppressed-warnings)))
-      (byte-compile-file-form-progn (cons warnings-form body)))))
+      (byte-compile-file-form-progn progn))))
 
 ;; Automatically evaluate define-obsolete-function-alias etc at top-level.
 (put 'make-obsolete 'byte-hunk-handler 'byte-compile-file-form-make-obsolete)
@@ -4771,15 +4770,17 @@ longer need to hew to its rules)."
 (byte-defop-compiler-1 with-no-warnings byte-compile-no-warnings)
 (defun byte-compile-no-warnings (form)
   (let (byte-compile-warnings)
-    (byte-compile-form (cons 'progn (cdr form)))))
+    (byte-compile-form (macroexp-progn (cdr form)))))
 
 (byte-defop-compiler-1 internal--with-suppressed-warnings
                        byte-compile-suppressed-warnings)
 (defun byte-compile-suppressed-warnings (form)
   "FORM is (internal--with-suppressed-warnings (quote warnings) body)."
-  (let ((byte-compile--suppressed-warnings
-         (append (eval (cl-second form)) byte-compile--suppressed-warnings)))
-    (byte-compile-form (macroexp-progn (cddr form)))))
+  (cl-destructuring-bind (_token warnings-form &rest body)
+      form
+    (let ((byte-compile--suppressed-warnings
+           (append (eval warnings-form) byte-compile--suppressed-warnings)))
+      (byte-compile-form (macroexp-progn body)))))
 
 ;; Warn about misuses of make-variable-buffer-local.
 (byte-defop-compiler-1 make-variable-buffer-local
