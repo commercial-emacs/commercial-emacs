@@ -2924,7 +2924,7 @@ for which LSP on-type-formatting should be requested."
                                     (window-buffer (minibuffer-selected-window))
                                   (current-buffer))
              (eglot--dbind ((CompletionItem) insertTextFormat
-                            insertText textEdit additionalTextEdits label)
+                            insertText textEdit additionalTextEdits label command)
                  (funcall
                   resolve-maybe
                   (or (get-text-property 0 'eglot--lsp-item proxy)
@@ -2964,6 +2964,9 @@ for which LSP on-type-formatting should be requested."
                  (when (cl-plusp (length additionalTextEdits))
                    (eglot--apply-text-edits additionalTextEdits)))
                (eglot--signal-textDocument/didChange)
+               (when command
+                 (eglot--dbind ((Command) command arguments) command
+                   (eglot-execute-command server (intern command) arguments)))
                (eldoc)))))))))
 
 (defun eglot--hover-info (contents &optional _range)
