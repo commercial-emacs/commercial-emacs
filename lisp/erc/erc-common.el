@@ -37,6 +37,7 @@
 (declare-function erc--get-isupport-entry "erc-backend" (key &optional single))
 (declare-function erc-get-buffer "erc" (target &optional proc))
 (declare-function erc-server-buffer "erc" nil)
+(declare-function cl--defsubst-expand "cl-macs")
 
 (cl-defstruct erc-input
   string insertp sendp)

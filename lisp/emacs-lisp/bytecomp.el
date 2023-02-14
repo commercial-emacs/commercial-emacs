@@ -2584,9 +2584,11 @@ in the input buffer (now current), not in the output buffer."
      'byte-compile-file-form-with-suppressed-warnings)
 (defun byte-compile-file-form-with-suppressed-warnings (form)
   "FORM is (internal--with-suppressed-warnings (quote warnings) body)."
-  (let ((byte-compile--suppressed-warnings
-         (append (eval (cl-second form)) byte-compile--suppressed-warnings)))
-    (byte-compile-file-form-progn (cdr form))))
+  (cl-destructuring-bind (_token warnings-form &rest body)
+      form
+    (let ((byte-compile--suppressed-warnings
+           (append (eval warnings-form) byte-compile--suppressed-warnings)))
+      (byte-compile-file-form-progn (cons warnings-form body)))))
 
 ;; Automatically evaluate define-obsolete-function-alias etc at top-level.
 (put 'make-obsolete 'byte-hunk-handler 'byte-compile-file-form-make-obsolete)

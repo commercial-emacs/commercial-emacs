@@ -727,7 +727,7 @@ has been used, the current word is not checked."
   (setq flyspell-pre-column (current-column)))
 
 (defun flyspell-kill-ispell ()
-  (let (inhibit-message t)
+  (let ((inhibit-message t))
     (ispell-kill-ispell t)))
 
 ;;*---------------------------------------------------------------------*/
