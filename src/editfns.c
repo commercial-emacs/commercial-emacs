@@ -2759,8 +2759,8 @@ save_restriction_save (void)
     }
 }
 
-void
-save_restriction_restore (Lisp_Object data)
+static void
+save_restriction_restore_1 (Lisp_Object data)
 {
   struct buffer *cur = NULL;
   struct buffer *buf = (CONSP (data)
@@ -2826,6 +2826,21 @@ save_restriction_restore (Lisp_Object data)
 
   if (cur)
     set_buffer_internal (cur);
+}
+
+Lisp_Object
+save_restriction_save (void)
+{
+  Lisp_Object restr = save_restriction_save_1 ();
+  Lisp_Object locks = narrowing_locks_save ();
+  return Fcons (restr, locks);
+}
+
+void
+save_restriction_restore (Lisp_Object data)
+{
+  narrowing_locks_restore (XCDR (data));
+  save_restriction_restore_1 (XCAR (data));
 }
 
 DEFUN ("save-restriction", Fsave_restriction, Ssave_restriction, 0, UNEVALLED, 0,

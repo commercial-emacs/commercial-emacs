@@ -11818,6 +11818,8 @@ syms_of_keyboard (void)
   /* Hooks to run before and after each command.  */
   DEFSYM (Qpre_command_hook, "pre-command-hook");
   DEFSYM (Qpost_command_hook, "post-command-hook");
+  DEFSYM (Qlong_line_optimizations_in_command_hooks,
+	  "long-line-optimizations-in-command-hooks");
 
   /* Hook run after the region is selected.  */
   DEFSYM (Qpost_select_region_hook, "post-select-region-hook");

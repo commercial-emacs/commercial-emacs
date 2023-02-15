@@ -32822,6 +32822,8 @@ be let-bound around code that needs to disable messages temporarily. */);
   DEFSYM (QCfile, ":file");
   DEFSYM (Qfontified, "fontified");
   DEFSYM (Qfontification_functions, "fontification-functions");
+  DEFSYM (Qlong_line_optimizations_in_fontification_functions,
+	  "long-line-optimizations-in-fontification-functions");
 
   Vtext_property_default_nonsticky
     = Fcons (Fcons (Qfontified, Qt), Vtext_property_default_nonsticky);
