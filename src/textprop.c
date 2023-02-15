@@ -415,7 +415,13 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 		  if (width_specified
 		      || EQ (sym1, Qdisplay)
 		      || EQ (sym1, Qinvisible)
-		      || EQ (sym1, Qcomposition))
+		      || EQ (sym1, Qcomposition)
+		      || ! NILP (Fmemq (sym1, (Fassq (Qdisplay,
+						      Vchar_property_alias_alist))))
+		      || ! NILP (Fmemq (sym1, (Fassq (Qinvisible,
+						      Vchar_property_alias_alist))))
+		      || ! NILP (Fmemq (sym1, (Fassq (Qcomposition,
+						      Vchar_property_alias_alist)))))
 		    /* Forbid algebraic short-cuts for long lines. */
 		    XBUFFER (object)->text->monospace = false;
 		}
