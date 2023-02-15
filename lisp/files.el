@@ -1007,6 +1007,7 @@ See `file-symlink-p' to distinguish symlinks."
 
 (defvar module-file-suffix)
 
+(declare-function cl-remove-if "cl-seq")
 (defun load-file (file)
   "Load the Lisp file named FILE."
   (interactive
