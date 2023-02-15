@@ -189,6 +189,12 @@ their customization options.
 This user option has been obsoleted in Emacs 27, use
 'remote-file-name-inhibit-cache' instead.
 
+---
+** User options 'eshell-NAME-unload-hook' are now obsolete.
+These hooks were named incorrectly, and so they never actually ran
+when unloading the correspending feature.  Instead, you should use
+hooks named after the feature name, like 'esh-mode-unload-hook'.
+
 
 * Lisp Changes in Emacs 30.1
 
