@@ -10550,7 +10550,7 @@ buffer, display it in another window."
 (defun org-agenda-diary-entry-in-org-file ()
   "Make a diary entry in the file `org-agenda-diary-file'."
   (let (d1 d2 char (text "") dp1 dp2)
-    (if (equal (buffer-name) "*Calendar*")
+    (if (equal (buffer-name) calendar-buffer)
 	(setq d1 (calendar-cursor-to-date t)
 	      d2 (car calendar-mark-ring))
       (setq dp1 (get-text-property (line-beginning-position) 'day))

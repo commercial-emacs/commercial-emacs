@@ -13710,7 +13710,7 @@ user."
 	    (calendar)
 	    (when (eq calendar-setup 'calendar-only)
 	      (setq cal-frame
-		    (window-frame (get-buffer-window "*Calendar*" 'visible)))
+		    (window-frame (get-buffer-window calendar-buffer 'visible)))
 	      (select-frame cal-frame))
 	    (org-eval-in-calendar '(setq cursor-type nil) t)
 	    (unwind-protect
@@ -13746,7 +13746,7 @@ user."
 		      (when org-read-date-overlay
 			(delete-overlay org-read-date-overlay)
 			(setq org-read-date-overlay nil)))))
-	      (bury-buffer "*Calendar*")
+	      (bury-buffer calendar-buffer)
 	      (when cal-frame
 		(delete-frame cal-frame)
 		(select-frame-set-input-focus cur-frame))))))
@@ -14103,7 +14103,7 @@ user function argument order change dependent on argument order."
 Unless KEEPDATE is non-nil, update `org-ans2' to the cursor date."
   (let ((sf (selected-frame))
 	(sw (selected-window)))
-    (select-window (get-buffer-window "*Calendar*" t))
+    (select-window (get-buffer-window calendar-buffer t))
     (eval form t)
     (when (and (not keepdate) (calendar-cursor-to-date))
       (let* ((date (calendar-cursor-to-date))
@@ -14952,7 +14952,7 @@ When SUPPRESS-TMP-DELAY is non-nil, suppress delays like
 			     (org-get-heading t t)))))))))
       ;; Try to recenter the calendar window, if any.
       (when (and org-calendar-follow-timestamp-change
-		 (get-buffer-window "*Calendar*" t)
+		 (get-buffer-window calendar-buffer t)
 		 (memq timestamp? '(day month year)))
 	(org-recenter-calendar (time-to-days time))))))
 
@@ -14995,7 +14995,7 @@ When SUPPRESS-TMP-DELAY is non-nil, suppress delays like
 
 (defun org-recenter-calendar (d)
   "If the calendar is visible, recenter it to date D."
-  (let ((cwin (get-buffer-window "*Calendar*" t)))
+  (let ((cwin (get-buffer-window calendar-buffer t)))
     (when cwin
       (let ((calendar-move-hook nil))
 	(with-selected-window cwin
@@ -15022,7 +15022,7 @@ A prefix ARG can be used to force the current date."
 
 (defun org-get-date-from-calendar ()
   "Return a list (month day year) of date at point in calendar."
-  (with-current-buffer "*Calendar*"
+  (with-current-buffer calendar-buffer
     (save-match-data
       (calendar-cursor-to-date))))
 
