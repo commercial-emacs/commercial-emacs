@@ -438,7 +438,7 @@ Only used if `diary-header-line-flag' is non-nil."
 (defun diary-live-p ()
   "Return non-nil if the diary is being displayed.
 The actual return value is a diary buffer."
-  (or (get-buffer diary-fancy-buffer)
+  (or (get-buffer diary-fancy-buffer-name)
       (and diary-file (find-buffer-visiting diary-file))))
 
 ;;;###cal-autoload
@@ -974,7 +974,7 @@ Returns a cons (NOENTRIES . HOLIDAY-STRING)."
                 (not holiday-list))
             (message "%s" msg)
           ;; holiday-list which is too wide for a message gets a buffer.
-          (calendar-in-read-only-buffer holiday-buffer
+          (calendar-in-read-only-buffer holiday-buffer-name
             (calendar-set-mode-line (format "Holidays for %s"
                                             diary--date-string))
             (insert (mapconcat #'identity holiday-list "\n")))
@@ -1055,7 +1055,7 @@ This is an option for `diary-display-function'."
     (diary-unhide-everything))
   (unless (car (diary-display-no-entries)) ; no entries
     ;; Prepare the fancy diary buffer.
-    (calendar-in-read-only-buffer diary-fancy-buffer
+    (calendar-in-read-only-buffer diary-fancy-buffer-name
       (calendar-set-mode-line "Diary Entries")
       (let ((holiday-list-last-month 1)
             (holiday-list-last-year 1)
@@ -1152,7 +1152,7 @@ If the fancy diary display is being used, just print the buffer.
 The hooks given by the variable `diary-print-entries-hook' are called to do
 the actual printing."
   (interactive)
-  (let ((diary-buffer (get-buffer diary-fancy-buffer))
+  (let ((diary-buffer (get-buffer diary-fancy-buffer-name))
         temp-buffer heading start end)
     (if diary-buffer
         (with-current-buffer diary-buffer
@@ -1235,8 +1235,8 @@ ensure that all relevant variables are set.
                   (concat "Diary entries generated "
                           (calendar-date-string (calendar-current-date))))
     (insert
-     (if (get-buffer diary-fancy-buffer)
-         (with-current-buffer diary-fancy-buffer (buffer-string))
+     (if (get-buffer diary-fancy-buffer-name)
+         (with-current-buffer diary-fancy-buffer-name (buffer-string))
        "No entries found"))
     (call-interactively (get mail-user-agent 'sendfunc))))
 
@@ -1470,7 +1470,7 @@ is marked.  See the documentation for the function `diary-list-sexp-entries'."
          (file-glob-attrs (nth 1 (diary-pull-attrs nil '())))
          m y first-date last-date date mark file-glob-attrs
          sexp-start sexp entry entry-start)
-    (with-current-buffer calendar-buffer
+    (with-current-buffer calendar-buffer-name
       (setq m displayed-month
             y displayed-year))
     (calendar-increment-month m y -1)
@@ -1522,7 +1522,7 @@ See also `diary-include-other-diary-files'."
   "Mark all dates in the calendar window that are day DAYNAME of the week.
 0 means all Sundays, 1 means all Mondays, and so on.
 Optional argument COLOR is passed to `calendar-mark-visible-date' as MARK."
-  (with-current-buffer calendar-buffer
+  (with-current-buffer calendar-buffer-name
     (let ((prev-month displayed-month)
           (prev-year displayed-year)
           (succ-month displayed-month)
@@ -1557,7 +1557,7 @@ Optional argument COLOR is passed to `calendar-mark-visible-date' as MARK."
   "Mark all dates in the calendar window that conform to MONTH/DAY/YEAR.
 A value of 0 in any position is a wildcard.  Optional argument COLOR is
 passed to `calendar-mark-visible-date' as MARK."
-  (with-current-buffer calendar-buffer
+  (with-current-buffer calendar-buffer-name
     (let ((m displayed-month)
           (y displayed-year))
       (calendar-increment-month m y -1)
@@ -1601,7 +1601,7 @@ Optional argument COLOR is passed to `calendar-mark-visible-date' as MARK."
 The function FROMABS converts absolute dates to the appropriate date system.
 The function TOABS carries out the inverse operation.  Optional argument
 COLOR is passed to `calendar-mark-visible-date' as MARK."
-  (with-current-buffer calendar-buffer
+  (with-current-buffer calendar-buffer-name
     (if (and (not (zerop month)) (not (zerop day)))
         (if (not (zerop year))
             ;; Fully specified date.
@@ -2241,7 +2241,7 @@ Prefix argument ARG makes the entry nonmarking."
 ;;; Diary mode.
 
 (defun diary-redraw-calendar ()
-  "If `calendar-buffer' is live and diary entries are marked, redraw it."
+  "If `calendar-buffer-name' is live and diary entries are marked, redraw it."
   (and calendar-mark-diary-entries-flag
        (save-excursion
          (calendar-redraw)))

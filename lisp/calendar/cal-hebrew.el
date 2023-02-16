@@ -614,7 +614,7 @@ A value of 0 in any position is a wildcard.  Optional argument COLOR is
 passed to `calendar-mark-visible-date' as MARK."
   ;; FIXME not the same as the Bahá’í and Islamic cases, so can't use
   ;; calendar-mark-1.
-  (with-current-buffer calendar-buffer
+  (with-current-buffer calendar-buffer-name
     (if (and (not (zerop month)) (not (zerop day)))
         (if (not (zerop year))
             ;; Fully specified Hebrew date.
@@ -679,7 +679,7 @@ When called interactively from the calendar window, the date of death is taken
 from the cursor position."
   (interactive
    (let* ((death-date
-           (if (equal (current-buffer) (get-buffer calendar-buffer))
+           (if (equal (current-buffer) (get-buffer calendar-buffer-name))
                (calendar-cursor-to-date t)
              (let* ((today (calendar-current-date))
                     (year (calendar-read-sexp
@@ -718,7 +718,7 @@ from the cursor position."
                   (calendar-absolute-from-gregorian death-date)))
          (h-year (calendar-extract-year h-date))
          (i (1- start-year)))
-    (calendar-in-read-only-buffer calendar-hebrew-yahrzeit-buffer
+    (calendar-in-read-only-buffer calendar-hebrew-yahrzeit-buffer-name
       (calendar-set-mode-line
        (format "Yahrzeit dates for %s = %s"
                (calendar-date-string death-date)

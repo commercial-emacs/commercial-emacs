@@ -97,10 +97,10 @@ Runs `calendar-after-frame-setup-hook', selects frame, iconifies if needed."
         (progn
           ;; If there are no diary entries, there won't be a buffer
           ;; to dedicate, so make a basic one.
-          (or (get-buffer diary-fancy-buffer)
-              (calendar-in-read-only-buffer diary-fancy-buffer
+          (or (get-buffer diary-fancy-buffer-name)
+              (calendar-in-read-only-buffer diary-fancy-buffer-name
                 (calendar-set-mode-line "Diary Entries")))
-          diary-fancy-buffer)
+          diary-fancy-buffer-name)
       (get-file-buffer diary-file)))
    t))
 
@@ -138,7 +138,7 @@ If PROMPT is non-nil, prompt for the month and year to use."
                                calendar-and-diary-frame-parameters
                              calendar-frame-parameters))))
         (calendar-basic-setup prompt (not (eq config 'one-frame)))
-        (set-window-buffer (selected-window) calendar-buffer)
+        (set-window-buffer (selected-window) calendar-buffer-name)
         (set-window-dedicated-p (selected-window) t)
         (if (eq config 'one-frame)
             (calendar-dedicate-diary))))))

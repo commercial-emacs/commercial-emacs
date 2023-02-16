@@ -369,7 +369,7 @@ use instead of point."
           (y2 displayed-year))
       (if (not holiday-list)
           (message "Looking up holidays...none found")
-        (calendar-in-read-only-buffer holiday-buffer
+        (calendar-in-read-only-buffer holiday-buffer-name
           (calendar-increment-month m1 y1 -1)
           (calendar-increment-month m2 y2 1)
           (calendar-set-mode-line
@@ -495,7 +495,7 @@ values."
       (setq s (calendar-absolute-from-gregorian
                (list displayed-month 1 displayed-year))))
     (save-current-buffer
-      (calendar-in-read-only-buffer holiday-buffer
+      (calendar-in-read-only-buffer holiday-buffer-name
         (calendar-set-mode-line
          (if (= y1 y2)
              (format "%s for %s" title y1)
@@ -576,7 +576,7 @@ cursor position.  EVENT specifies a buffer position to use for a date."
                                     (mapconcat 'identity holiday-list ";  "))))
               (frame-width))
           (message "%s" msg)
-        (calendar-in-read-only-buffer holiday-buffer
+        (calendar-in-read-only-buffer holiday-buffer-name
           (calendar-set-mode-line date-string)
           (insert (mapconcat 'identity holiday-list "\n")))
         (message "Checking holidays...done"))))))

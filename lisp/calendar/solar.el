@@ -882,7 +882,7 @@ Accurate to a few seconds."
          (title (format "Sunrise/sunset times for %s %d at %s"
                         (calendar-month-name month) year
                         (eval calendar-location-name))))
-    (calendar-in-read-only-buffer solar-sunrises-buffer
+    (calendar-in-read-only-buffer solar-sunrises-buffer-name
       (calendar-set-mode-line title)
       (insert title ":\n\n")
       (dotimes (i last)

@@ -232,7 +232,7 @@ use instead of point."
           (y2 displayed-year))
       (calendar-increment-month m1 y1 -1)
       (calendar-increment-month m2 y2 1)
-      (calendar-in-read-only-buffer lunar-phases-buffer
+      (calendar-in-read-only-buffer lunar-phases-buffer-name
         (calendar-set-mode-line
          (if (= y1 y2)
              (format "Phases of the Moon from %s to %s, %d%%-"

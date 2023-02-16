@@ -1079,26 +1079,68 @@ Otherwise, use symbolic time zones like \"CET\"."
 (defconst calendar-first-date-row 3
   "First row in the calendar with actual dates.")
 
-(defconst calendar-buffer "*Calendar*"
-  "Name of the buffer used for the calendar.")
+(make-obsolete-variable 'calendar-buffer
+                        'calendar-buffer-name
+                        "30.0.50")
+(defcustom calendar-buffer-name "*Calendar*"
+  "Name of the buffer used for the calendar."
+  :type 'string
+  :version "30.0.50"
+  :group 'calendar)
 
-(defconst holiday-buffer "*Holidays*"
-  "Name of the buffer used for the displaying the holidays.")
+(make-obsolete-variable 'holiday-buffer
+                        'holiday-buffer-name
+                        "30.0.50")
+(defcustom holiday-buffer-name "*Holidays*"
+  "Name of the buffer used for the displaying the holidays."
+  :type 'string
+  :version "30.0.50"
+  :group 'calendar)
 
-(defconst diary-fancy-buffer "*Fancy Diary Entries*"
-  "Name of the buffer used for the optional fancy display of the diary.")
+(make-obsolete-variable 'diary-fancy-buffer
+                        'diary-fancy-buffer-name
+                        "30.0.50")
+(defcustom diary-fancy-buffer-name "*Fancy Diary Entries*"
+  "Name of the buffer used for the optional fancy display of the diary."
+  :type 'string
+  :version "30.0.50"
+  :group 'calendar)
 
-(defconst calendar-other-calendars-buffer "*Other Calendars*"
-  "Name of the buffer used for the display of date on other calendars.")
+(make-obsolete-variable 'calendar-other-calendars-buffer
+                        'calendar-other-calendars-buffer-name
+                        "30.0.50")
+(defcustom calendar-other-calendars-buffer-name "*Other Calendars*"
+  "Name of the buffer used for the display of date on other calendars."
+  :type 'string
+  :version "30.0.50"
+  :group 'calendar)
 
-(defconst lunar-phases-buffer "*Phases of Moon*"
-  "Name of the buffer used for the lunar phases.")
+(make-obsolete-variable 'lunar-phases-buffer
+                        'lunar-phases-buffer-name
+                        "30.0.50")
+(defcustom lunar-phases-buffer-name "*Phases of Moon*"
+  "Name of the buffer used for the lunar phases."
+  :type 'string
+  :version "30.0.50"
+  :group 'calendar)
 
-(defconst solar-sunrises-buffer "*Sunrise/Sunset Times*"
-  "Name of buffer used for sunrise/sunset times.")
+(make-obsolete-variable 'solar-sunrises-buffer
+                        'solar-sunrises-buffer-name
+                        "30.0.50")
+(defcustom solar-sunrises-buffer-name "*Sunrise/Sunset Times*"
+  "Name of buffer used for sunrise/sunset times."
+  :type 'string
+  :version "30.0.50"
+  :group 'calendar)
 
-(defconst calendar-hebrew-yahrzeit-buffer "*Yahrzeits*"
-  "Name of the buffer used by `calendar-hebrew-list-yahrzeits'.")
+(make-obsolete-variable 'calendar-hebrew-yahrzeit-buffer
+                        'calendar-hebrew-yahrzeit-buffer-name
+                        "30.0.50")
+(defcustom calendar-hebrew-yahrzeit-buffer-name "*Yahrzeits*"
+  "Name of the buffer used by `calendar-hebrew-list-yahrzeits'."
+  :type 'string
+  :version "30.0.50"
+  :group 'calendar)
 
 (defmacro calendar-increment-month (mon yr n &optional nmonths)
   "Increment the variables MON and YR by N months.
@@ -1320,7 +1362,7 @@ and year, else uses the current date.  If NODISPLAY is non-nil, don't
 display the generated calendar."
   (interactive "P")
   (let ((buff (current-buffer)))
-    (set-buffer (get-buffer-create calendar-buffer))
+    (set-buffer (get-buffer-create calendar-buffer-name))
     (calendar-mode)
     (let* ((pop-up-windows t)
            ;; Not really needed now, but means we use exactly the same
@@ -1365,7 +1407,7 @@ display the generated calendar."
 	;; horizontally and we end up with three side-by-side windows.
         (when (window-splittable-p (selected-window) t)
 	  (split-window-right))
-        (pop-to-buffer calendar-buffer)
+        (pop-to-buffer calendar-buffer-name)
         ;; Has the window already been split vertically?
         (when (and (not (window-dedicated-p))
 		   (window-splittable-p (selected-window))
@@ -1404,7 +1446,7 @@ Optional integers MON and YR are used instead of today's date."
          (today-visible (or (not mon)
                             (<= (abs (calendar-interval mon yr month year)) 1)))
          (in-calendar-window (eq (window-buffer)
-                                 (get-buffer calendar-buffer))))
+                                 (get-buffer calendar-buffer-name))))
     (calendar-generate (or mon month) (or yr year))
     (calendar-update-mode-line)
     (calendar-cursor-to-visible-date
@@ -1544,10 +1586,10 @@ first INDENT characters on the line."
          (calendar-insert-at-column indent calendar-intermonth-text trunc))))))
 
 (defun calendar-redraw ()
-  "Redraw the calendar display, if `calendar-buffer' is live."
+  "Redraw the calendar display, if `calendar-buffer-name' is live."
   (interactive)
-  (when (get-buffer calendar-buffer)
-    (with-current-buffer calendar-buffer
+  (when (get-buffer calendar-buffer-name)
+    (with-current-buffer calendar-buffer-name
       (let ((cursor-date (calendar-cursor-to-nearest-date)))
         (calendar-generate-window displayed-month displayed-year)
         (calendar-cursor-to-visible-date cursor-date))
@@ -1833,8 +1875,8 @@ concatenated and the result truncated."
 (defun calendar-update-mode-line ()
   "Update the calendar mode line with the current date and date style."
   (if (and calendar-mode-line-format
-           (bufferp (get-buffer calendar-buffer)))
-      (with-current-buffer calendar-buffer
+           (bufferp (get-buffer calendar-buffer-name)))
+      (with-current-buffer calendar-buffer-name
         (let ((start (- calendar-left-margin 2)))
           (calendar-dlet ((date (condition-case nil
                                      (calendar-cursor-to-nearest-date)
@@ -1852,10 +1894,10 @@ concatenated and the result truncated."
 (defun calendar-buffer-list ()
   "List of all calendar-related buffers (as buffers, not strings)."
   (let (buffs)
-    (dolist (b (list calendar-hebrew-yahrzeit-buffer lunar-phases-buffer
-                     holiday-buffer diary-fancy-buffer solar-sunrises-buffer
+    (dolist (b (list calendar-hebrew-yahrzeit-buffer-name lunar-phases-buffer-name
+                     holiday-buffer-name diary-fancy-buffer-name solar-sunrises-buffer-name
                      (get-file-buffer diary-file)
-                     calendar-buffer calendar-other-calendars-buffer))
+                     calendar-buffer-name calendar-other-calendars-buffer-name))
       (and b (setq b (get-buffer b))
            (push b buffs)))
     buffs))
@@ -2394,7 +2436,7 @@ interpreted as BC; -1 being 1 BC, and so on."
   (interactive)
   (setq calendar-mark-holidays-flag nil
         calendar-mark-diary-entries-flag nil)
-  (with-current-buffer calendar-buffer
+  (with-current-buffer calendar-buffer-name
     (mapc #'delete-overlay (overlays-in (point-min) (point-max)))))
 
 (defun calendar-date-is-visible-p (date)
@@ -2506,7 +2548,7 @@ ATTRLIST is a list with elements of the form :face face :foreground color."
 MARK is a single-character string, a list of face attributes/values,
 or a face.  MARK defaults to `diary-entry-marker'."
   (if (calendar-date-is-valid-p date)
-      (with-current-buffer calendar-buffer
+      (with-current-buffer calendar-buffer-name
         (save-excursion
           (calendar-cursor-to-visible-date date)
           (setq mark
@@ -2683,7 +2725,7 @@ If called by a mouse-event, pops up a menu with the result."
         (and (setq selection (cal-menu-x-popup-menu event title
                                (mapcar #'list others)))
              (call-interactively selection))
-      (calendar-in-read-only-buffer calendar-other-calendars-buffer
+      (calendar-in-read-only-buffer calendar-other-calendars-buffer-name
         (calendar-set-mode-line title)
         (insert (mapconcat #'identity others "\n"))))))
 

@@ -5334,7 +5334,7 @@ of what a project is and how to check if it stuck, customize the variable
   "Get the (Emacs Calendar) diary entries for DATE."
   (require 'diary-lib)
   (declare-function diary-fancy-display "diary-lib" ())
-  (let* ((diary-fancy-buffer "*temporary-fancy-diary-buffer*")
+  (let* ((diary-fancy-buffer-name "*temporary-fancy-diary-buffer*")
 	 (diary-display-function #'diary-fancy-display)
 	 (pop-up-frames nil)
 	 (diary-list-entries-hook
@@ -5348,9 +5348,9 @@ of what a project is and how to check if it stuck, customize the variable
     (save-excursion
       (save-window-excursion
         (diary-list-entries date 1)))
-    (if (not (get-buffer diary-fancy-buffer))
+    (if (not (get-buffer diary-fancy-buffer-name))
 	(setq entries nil)
-      (with-current-buffer diary-fancy-buffer
+      (with-current-buffer diary-fancy-buffer-name
 	(setq buffer-read-only nil)
 	(if (zerop (buffer-size))
 	    ;; No entries
@@ -5369,7 +5369,7 @@ of what a project is and how to check if it stuck, customize the variable
 			(replace-match (concat "; " (match-string 1)))))
 		    (buffer-string)))))
 	(set-buffer-modified-p nil)
-	(kill-buffer diary-fancy-buffer)))
+	(kill-buffer diary-fancy-buffer-name)))
     (when entries
       (setq entries (org-split-string entries "\n"))
       (setq entries

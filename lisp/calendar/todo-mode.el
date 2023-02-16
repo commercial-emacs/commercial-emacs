@@ -2029,7 +2029,7 @@ their associated keys and their effects."
 	 (message "Put cursor on a date and type <return> to set it.")
 	 (recursive-edit)
 	 (unwind-protect
-	     (when (equal (buffer-name) calendar-buffer)
+	     (when (equal (buffer-name) calendar-buffer-name)
 	       (setq todo-date-from-calendar
 		     (calendar-date-string (calendar-cursor-to-date t) t t))
 	       (calendar-exit)
