@@ -32,7 +32,6 @@
 ;; Get the macro make-help-screen when this is compiled,
 ;; or run interpreted, but not when the compiled code is loaded.
 (eval-when-compile (require 'help-macro))
-(eval-when-compile (require 'emacs-news-mode))
 
 ;; This makes `with-output-to-temp-buffer' buffers use `help-mode'.
 (add-hook 'temp-buffer-setup-hook 'help-mode-setup)
