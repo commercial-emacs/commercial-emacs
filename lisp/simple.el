@@ -1756,6 +1756,7 @@ not at the start of a line.
 
 When IGNORE-INVISIBLE-LINES is non-nil, invisible lines are not
 included in the count."
+  (declare (side-effect-free t))
   (save-excursion
     (save-restriction
       (narrow-to-region start end)
@@ -6824,6 +6825,7 @@ is active, and returns an integer or nil in the usual way.
 
 If you are using this in an editing command, you are most likely making
 a mistake; see the documentation of `set-mark'."
+  (declare (side-effect-free t))
   (if (or force (not transient-mark-mode) mark-active mark-even-if-inactive)
       (marker-position (mark-marker))
     (signal 'mark-inactive nil)))
@@ -10795,6 +10797,7 @@ If the buffer doesn't exist, create it first."
 
 (defsubst string-empty-p (string)
   "Check whether STRING is empty."
+  (declare (pure t) (side-effect-free t))
   (string= string ""))
 
 (defun read-signal-name ()
@@ -10812,7 +10815,7 @@ If the buffer doesn't exist, create it first."
 
 (defun lax-plist-get (plist prop)
   "Extract a value from a property list, comparing with `equal'."
-  (declare (obsolete plist-get "29.1"))
+  (declare (pure t) (side-effect-free t) (obsolete plist-get "29.1"))
   (plist-get plist prop #'equal))
 
 (defun lax-plist-put (plist prop val)
