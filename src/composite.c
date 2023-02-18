@@ -106,12 +106,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    actually assigns a new copy of 'composition to problematic adjacent
    sequences).
 
-   The number of characters sharing a 'composition property in a
-   composition instance should only ever get shorter.  The property is
-   rear-nonsticky and update_compositions could only "break up" its
-   application to a given run of character.  Validity is readily
-   checked by comparing its LENGTH with the actual length of the
-   composition.
+   A run of characters sharing a 'composition property can only ever
+   get shorter since the property is rear-nonsticky, and
+   update_compositions never combines separate runs.  Validity is
+   readily checked by comparing its LENGTH with the actual length of
+   the composition.
 
    Automatic compositions
    ----------------------
