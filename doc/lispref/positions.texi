@@ -1036,7 +1036,7 @@ It is equivalent to the following expression:
 @example
 (narrow-to-region 1 (1+ (buffer-size)))
 @end example
-
+@end deffn
 
 @defun buffer-narrowed-p
 This function returns non-@code{nil} if the buffer is narrowed, and
