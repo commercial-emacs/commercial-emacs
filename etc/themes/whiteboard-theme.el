@@ -80,7 +80,7 @@
    `(minibuffer-prompt ((,class (:foreground "DodgerBlue4"))))
    `(mode-line ((,class (:background "gray75" :foreground "black" :box (:line-width 1 :style released-button)))))
    `(mode-line-buffer-id ((,class (:weight bold :background nil :foreground "blue4"))))
-   `(mode-line-inactive ((,class (:background "gray40" :foreground "black" :box (:line-width 1 :color "gray40" :style nil)))))
+   `(mode-line-inactive ((,class (:background "gray40" :foreground "black" :box (:line-width 1 :style flat-button)))))
    `(outline-1 ((,class (:foreground "Blue3"))))
    `(outline-2 ((,class (:foreground "DodgerBlue"))))
    `(outline-3 ((,class (:foreground "SteelBlue"))))
