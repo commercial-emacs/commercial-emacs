@@ -4473,7 +4473,7 @@ LAX-WHITESPACE: The value of `isearch-lax-whitespace' and
                 (lazy-highlight-cleanup))))
       (fset after-change
             (lambda (_beg _end _len)
-              (let ((inhibit-redisplay t) ;; Avoid cursor flickering
+              (let ((cursor-in-echo-area t) ;; Avoid cursor flickering
                     (string (minibuffer-contents)))
                 (with-minibuffer-selected-window
                   (let* ((isearch-forward t)
