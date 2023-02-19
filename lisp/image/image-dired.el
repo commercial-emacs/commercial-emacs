@@ -411,19 +411,20 @@ This affects the following commands:
 
 (defun image-dired--get-create-thumbnail-file (file)
   "Return the image descriptor for a thumbnail of image file FILE."
-  (unless (string-match-p (image-dired--file-name-regexp) file)
-    (error "%s is not a valid image file" file))
-  (let* ((thumb-file (image-dired-thumb-name file))
-         (thumb-attr (file-attributes thumb-file)))
-    (if (or (not thumb-attr)
-            (time-less-p (file-attribute-modification-time thumb-attr)
-                         (file-attribute-modification-time
-                          (file-attributes file))))
-        (image-dired-create-thumb file thumb-file)
-      (image-dired-debug "Found thumb for %s: %s"
-                         (file-name-nondirectory file)
-                         (file-name-nondirectory thumb-file)))
-    thumb-file))
+  (if (string-match-p (image-dired--file-name-regexp) file)
+      (let* ((thumb-file (image-dired-thumb-name file))
+             (thumb-attr (file-attributes thumb-file)))
+        (if (or (not thumb-attr)
+                (time-less-p (file-attribute-modification-time thumb-attr)
+                             (file-attribute-modification-time
+                              (file-attributes file))))
+            (image-dired-create-thumb file thumb-file)
+          (image-dired-debug "Found thumb for %s: %s"
+                             (file-name-nondirectory file)
+                             (file-name-nondirectory thumb-file)))
+        thumb-file)
+    (message "%s is not a valid image file" file)
+    (values)))
 
 (defun image-dired-insert-thumbnail ( file original-file-name
                            associated-dired-buffer image-number)
@@ -586,13 +587,15 @@ thumbnail buffer to be selected."
               (erase-buffer))
           (goto-char (point-max)))
         (dolist (file files)
-          (let ((thumb (image-dired--get-create-thumbnail-file file)))
+          (when-let ((thumb (image-dired--get-create-thumbnail-file file)))
             (image-dired-insert-thumbnail
              thumb file dired-buf
              (cl-incf image-dired--number-of-thumbnails)))))
-      (if do-not-pop
-          (display-buffer buf)
-        (pop-to-buffer buf))
+      (if (plusp image-dired--number-of-thumbnails)
+          (if do-not-pop
+              (display-buffer buf)
+            (pop-to-buffer buf))
+        (message "No images selected"))
       (image-dired--line-up-with-method)
       (image-dired--update-header-line))))
 
