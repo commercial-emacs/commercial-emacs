@@ -2152,9 +2152,8 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
 	/* Under NS, there is no system mechanism for choosing a new
 	   window to get focus -- it is left to application code.
 	   So the portion of THIS application interfacing with NS
-	   needs to know about it.  We call Fraise_frame, but the
-	   purpose is really to transfer focus.  */
-	Fraise_frame (frame1);
+	   needs to make the frame we switch to the key window.  */
+	ns_make_frame_key_window (XFRAME (frame1));
 #endif
 
       do_switch_frame (frame1, 1, Qnil);
