@@ -136,7 +136,7 @@ literals (Bug#20852)."
   (ert-with-temp-file file-name
     (write-region "?) ?( ?; ?\" ?[ ?]" nil file-name)
     (should (equal (load file-name nil :nomessage :nosuffix) t))
-    (should (equal (lread-tests--last-message)
+    (should (equal (format-message (lread-tests--last-message))
                    (format-message
                     (concat "Loading `%s': "
                             "unescaped character literals "
