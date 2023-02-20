@@ -61,6 +61,12 @@ This allows the user to customize the prompt that is appended by
 This is used for displaying the time and date components of
 'display-time-mode'.
 
+---
+** New face 'appt-notification'.
+This is used for the warning message when 'appt-display-mode-line' is
+non-nil.
+
+
 
 * Editing Changes in Emacs 30.1
 
