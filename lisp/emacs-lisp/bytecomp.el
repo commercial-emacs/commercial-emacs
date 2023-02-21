@@ -3196,7 +3196,7 @@ value should be byte-discard."
       (let* ((fn (car form))
              (handler (get fn 'byte-compile))
 	     (interactive-only
-	      (or (get fn 'interactive-only)
+	      (or (function-get fn 'interactive-only)
 		  (memq fn byte-compile-interactive-only-functions))))
         (when (memq fn '(set symbol-value run-hooks
                          add-hook remove-hook run-hook-with-args
