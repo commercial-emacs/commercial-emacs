@@ -4336,23 +4336,21 @@ run_timer (Lisp_Object timer)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object restore_deactivate_mark = Vdeactivate_mark;
-  ASET (timer, 0, Qt); // Mark the timer as handled
-  specbind (Qinhibit_quit, Qt);
-  call1 (Qtimer_event_handler, timer);
-  Vdeactivate_mark = restore_deactivate_mark;
-  timers_run++;
-  unbind_to (count, Qnil);
-}
 
-static void
-flush_pending_funcalls (void)
-{
+  /* First run the code that was delayed.  */
   while (CONSP (pending_funcalls))
     {
       Lisp_Object funcall = XCAR (pending_funcalls);
       pending_funcalls = XCDR (pending_funcalls);
       safe_call2 (Qapply, XCAR (funcall), XCDR (funcall));
     }
+
+  ASET (timer, 0, Qt); // Mark the timer as handled
+  specbind (Qinhibit_quit, Qt);
+  call1 (Qtimer_event_handler, timer);
+  Vdeactivate_mark = restore_deactivate_mark;
+  timers_run++;
+  unbind_to (count, Qnil);
 }
 
 /* Trigger any timers meeting their respective criteria.
@@ -4391,7 +4389,6 @@ timer_check (void)
 	    {
 	      if (timespec_cmp (time, bogey) <= 0)
 		{
-		  flush_pending_funcalls ();
 		  run_timer (XCAR (timers));
 		}
 	      else

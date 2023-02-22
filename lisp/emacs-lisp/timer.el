@@ -286,68 +286,42 @@ TIME is a Lisp time value."
 (defun timer-event-handler (timer)
   "Call the handler for the timer TIMER.
 This function is called, by name, directly by the C code."
-  (setq timer-event-last-2 timer-event-last-1)
-  (setq timer-event-last-1 timer-event-last)
-  (setq timer-event-last timer)
-  (let ((inhibit-quit t))
-    (timer--check timer)
-    (let ((retrigger nil)
-          (cell
-           ;; Delete from queue.  Record the cons cell that was used.
-           (cancel-timer-internal timer)))
-      ;; If `cell' is nil, it means the timer was already canceled, so we
-      ;; shouldn't be running it at all.  This can happen for example with the
-      ;; following scenario (bug#17392):
-      ;; - we run timers, starting with A (and remembering the rest as (B C)).
-      ;; - A runs and a does a sit-for.
-      ;; - during sit-for we run timer D which cancels timer B.
-      ;; - timer A finally finishes, so we move on to timers B and C.
-      (when cell
-        ;; Re-schedule if requested.
-        (if (timer--repeat-delay timer)
-            (if (timer--idle-delay timer)
-                (timer-activate-when-idle timer nil cell)
-              (timer-inc-time timer (timer--repeat-delay timer) 0)
-              ;; If real time has jumped forward,
-              ;; perhaps because Emacs was suspended for a long time,
-              ;; limit how many times things get repeated.
-              (if (and (numberp timer-max-repeats)
-		       (time-less-p (timer--time timer) nil))
-                  (let ((repeats (/ (timer-until timer nil)
-                                    (timer--repeat-delay timer))))
-                    (if (> repeats timer-max-repeats)
-                        (timer-inc-time timer (* (timer--repeat-delay timer)
-                                                 repeats)))))
-              ;; If we want integral multiples, we have to recompute
-              ;; the repetition.
-              (when (and (> (length timer) 9) ; Backwards compatible.
-                         (timer--integral-multiple timer)
-                         (not (timer--idle-delay timer)))
-                (setf (timer--time timer)
-                      (timer-next-integral-multiple-of-time
-		       nil (timer--repeat-delay timer))))
-              ;; Place it back on the timer-list before running
-              ;; timer--function, so it can cancel-timer itself.
-              (timer-activate timer t cell)
-              (setq retrigger t)))
-        ;; Run handler.
-        (condition-case-unless-debug err
-            ;; Timer functions should not change the current buffer.
-            ;; If they do, all kinds of nasty surprises can happen,
-            ;; and it can be hellish to track down their source.
-            (save-current-buffer
-              (apply (timer--function timer) (timer--args timer)))
-          (error (message "Error running timer%s: %S"
-                          (if (symbolp (timer--function timer))
-                              (format-message " `%s'" (timer--function timer))
-                            "")
-                          err)))
-        (when (and retrigger
-                   ;; If the timer's been canceled, don't "retrigger" it
-                   ;; since it might still be in the copy of timer-list kept
-                   ;; by keyboard.c:timer_check (bug#14156).
-                   (memq timer timer-list))
-          (setf (timer--triggered timer) nil))))))
+  (timer--check timer)
+  (setq timer-event-last-2 timer-event-last-1
+        timer-event-last-1 timer-event-last
+        timer-event-last timer)
+  ;; Before invoking its handler, first dequeue TIMER.
+  ;; Since the handler might want to `cancel-timer' its requeue,
+  ;; requeue a repeated TIMER before calling handler.
+  (when-let ((inhibit-quit t)
+             ;; Dequeues TIMER
+             (cell (cancel-timer-internal timer)))
+    (when (timer--repeat-delay timer)
+      ;; Requeues a repeated TIMER
+      (if (timer--idle-delay timer)
+          (timer-activate-when-idle timer nil cell)
+        (if (and (> (length timer) 9)   ; Backwards compatible.
+                 (timer--integral-multiple timer))
+            (setf (timer--time timer)
+                  (timer-next-integral-multiple-of-time
+		   nil (timer--repeat-delay timer)))
+          (timer-inc-time timer (timer--repeat-delay timer)))
+        (when (numberp timer-max-repeats)
+          ;; Limit repetitions in case emacs was unduly suspended
+          (let ((limit (time-subtract nil (* timer-max-repeats
+                                             (timer--repeat-delay timer)))))
+            (when (time-less-p (timer--time timer) limit)
+              (setf (timer--time timer) limit))))
+        (timer-activate timer t cell)))
+    (condition-case err
+        (save-current-buffer
+          ;; Run handler.
+          (apply (timer--function timer) (timer--args timer)))
+      (error (message "Error running timer%s: %s"
+                      (if (symbolp (timer--function timer))
+                          (format-message " '%s'" (timer--function timer))
+                        "")
+                      (error-message-string err))))))
 
 ;; This function is incompatible with the one in levents.el.
 (defun timeout-event-p (event)

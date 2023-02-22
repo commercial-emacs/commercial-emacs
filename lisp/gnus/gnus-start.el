@@ -1556,6 +1556,8 @@ backend check whether the group actually exists."
         (thread-signal thr 'error nil)))))
 
 (defun gnus-time-out-thread (started thread)
+  "Reinstall yourself every (gnus-thread-timeout-seconds / 2) seconds.
+Theoretically, in the timed-out case, we'll do this just twice."
   (interactive)
   (if (time-less-p nil (time-add started gnus-thread-timeout-seconds))
       (run-at-time
