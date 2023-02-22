@@ -759,7 +759,7 @@ the same empty object instead of its copy.  */)
       Lisp_Object val = Fcons (XCAR (arg), Qnil);
       Lisp_Object prev = val;
       Lisp_Object tail = XCDR (arg);
-      FOR_EACH_TAIL (tail)
+      FOR_EACH_TAIL_SAFE (tail)
 	{
 	  Lisp_Object c = Fcons (XCAR (tail), Qnil);
 	  XSETCDR (prev, c);

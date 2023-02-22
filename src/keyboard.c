@@ -4331,210 +4331,78 @@ decode_timer (Lisp_Object timer, struct timespec *result)
   return list4_to_timespec (vec[1], vec[2], vec[3], vec[8], result);
 }
 
-
-/* Check whether a timer has fired.  To prevent larger problems we simply
-   disregard elements that are not proper timers.  Do not make a circular
-   timer list for the time being.
-
-   Returns the time to wait until the next timer fires.  If a
-   timer is triggering now, return zero.
-   If no timer is active, return -1.
-
-   If a timer is ripe, we run it, with quitting turned off.
-   In that case we return 0 to indicate that a new timer_check_2 call
-   should be done.  */
-
-static struct timespec
-timer_check_2 (Lisp_Object timers, Lisp_Object idle_timers)
+static void
+run_timer (Lisp_Object timer)
 {
-  struct timespec nexttime;
-  struct timespec now;
-  struct timespec idleness_now;
-  Lisp_Object chosen_timer;
-
-  nexttime = invalid_timespec ();
-
-  chosen_timer = Qnil;
-
-  /* First run the code that was delayed.  */
-  while (CONSP (pending_funcalls))
-    {
-      Lisp_Object funcall = XCAR (pending_funcalls);
-      pending_funcalls = XCDR (pending_funcalls);
-      safe_call2 (Qapply, XCAR (funcall), XCDR (funcall));
-    }
-
-  if (CONSP (timers) || CONSP (idle_timers))
-    {
-      now = current_timespec ();
-      idleness_now = (timespec_valid_p (timer_idleness_start_time)
-		      ? timespec_sub (now, timer_idleness_start_time)
-		      : make_timespec (0, 0));
-    }
-
-  while (CONSP (timers) || CONSP (idle_timers))
-    {
-      Lisp_Object timer = Qnil, idle_timer = Qnil;
-      struct timespec timer_time, idle_timer_time;
-      struct timespec difference;
-      struct timespec timer_difference = invalid_timespec ();
-      struct timespec idle_timer_difference = invalid_timespec ();
-      bool ripe, timer_ripe = 0, idle_timer_ripe = 0;
-
-      /* Set TIMER and TIMER_DIFFERENCE
-	 based on the next ordinary timer.
-	 TIMER_DIFFERENCE is the distance in time from NOW to when
-	 this timer becomes ripe.
-         Skip past invalid timers and timers already handled.  */
-      if (CONSP (timers))
-	{
-	  timer = XCAR (timers);
-	  if (! decode_timer (timer, &timer_time))
-	    {
-	      timers = XCDR (timers);
-	      continue;
-	    }
-
-	  timer_ripe = timespec_cmp (timer_time, now) <= 0;
-	  timer_difference = (timer_ripe
-			      ? timespec_sub (now, timer_time)
-			      : timespec_sub (timer_time, now));
-	}
-
-      /* Likewise for IDLE_TIMER and IDLE_TIMER_DIFFERENCE
-	 based on the next idle timer.  */
-      if (CONSP (idle_timers))
-	{
-	  idle_timer = XCAR (idle_timers);
-	  if (! decode_timer (idle_timer, &idle_timer_time))
-	    {
-	      idle_timers = XCDR (idle_timers);
-	      continue;
-	    }
-
-	  idle_timer_ripe = timespec_cmp (idle_timer_time, idleness_now) <= 0;
-	  idle_timer_difference
-	    = (idle_timer_ripe
-	       ? timespec_sub (idleness_now, idle_timer_time)
-	       : timespec_sub (idle_timer_time, idleness_now));
-	}
-
-      /* Decide which timer is the next timer,
-	 and set CHOSEN_TIMER, DIFFERENCE, and RIPE accordingly.
-	 Also step down the list where we found that timer.  */
-
-      if (timespec_valid_p (timer_difference)
-	  && (! timespec_valid_p (idle_timer_difference)
-	      || idle_timer_ripe < timer_ripe
-	      || (idle_timer_ripe == timer_ripe
-		  && ((timer_ripe
-		       ? timespec_cmp (idle_timer_difference,
-				       timer_difference)
-		       : timespec_cmp (timer_difference,
-				       idle_timer_difference))
-		      < 0))))
-	{
-	  chosen_timer = timer;
-	  timers = XCDR (timers);
-	  difference = timer_difference;
-	  ripe = timer_ripe;
-	}
-      else
-	{
-	  chosen_timer = idle_timer;
-	  idle_timers = XCDR (idle_timers);
-	  difference = idle_timer_difference;
-	  ripe = idle_timer_ripe;
-	}
-
-      /* If timer is ripe, run it if it hasn't been run.  */
-      if (ripe)
-	{
-	  /* If we got here, presumably `decode_timer` has checked
-             that this timer has not yet been triggered.  */
-	  eassert (NILP (AREF (chosen_timer, 0)));
-	  /* In a production build, where assertions compile to
-	     nothing, we still want to play it safe here.  */
-	  if (NILP (AREF (chosen_timer, 0)))
-	    {
-	      specpdl_ref count = SPECPDL_INDEX ();
-	      Lisp_Object old_deactivate_mark = Vdeactivate_mark;
-
-	      /* Mark the timer as triggered to prevent problems if the lisp
-		 code fails to reschedule it right.  */
-	      ASET (chosen_timer, 0, Qt);
-
-	      specbind (Qinhibit_quit, Qt);
-
-	      call1 (Qtimer_event_handler, chosen_timer);
-	      Vdeactivate_mark = old_deactivate_mark;
-	      timers_run++;
-	      unbind_to (count, Qnil);
-
-	      /* Since we have handled the event,
-		 we don't need to tell the caller to wake up and do it.  */
-	      /* But the caller must still wait for the next timer, so
-		 return 0 to indicate that.  */
-	    }
-
-	  nexttime = make_timespec (0, 0);
-          break;
-	}
-      else
-	/* When we encounter a timer that is still waiting,
-	   return the amount of time to wait before it is ripe.  */
-	{
-	  return difference;
-	}
-    }
-
-  /* No timers are pending in the future.  */
-  /* Return 0 if we generated an event, and -1 if not.  */
-  return nexttime;
+  specpdl_ref count = SPECPDL_INDEX ();
+  Lisp_Object restore_deactivate_mark = Vdeactivate_mark;
+  ASET (timer, 0, Qt); // Mark the timer as handled
+  specbind (Qinhibit_quit, Qt);
+  call1 (Qtimer_event_handler, timer);
+  Vdeactivate_mark = restore_deactivate_mark;
+  timers_run++;
+  unbind_to (count, Qnil);
 }
 
+/* Trigger any timers meeting their respective criteria.
 
-/* Check whether a timer has fired.  To prevent larger problems we simply
-   disregard elements that are not proper timers.  Do not make a circular
-   timer list for the time being.
+   For ordinary timers, this means current time is at
+   or past their scheduled time.
 
-   Returns the time to wait until the next timer fires.
-   If no timer is active, return an invalid value.
+   For idle timers, this means the idled period exceeds
+   their idle threshold.
 
-   As long as any timer is ripe, we run it.  */
+   Return the time distance to the next upcoming timer.
+*/
 
 struct timespec
 timer_check (void)
 {
-  struct timespec nexttime = { 0, 0 };
-  Lisp_Object timers, idle_timers, tem = Vinhibit_quit;
-  Vinhibit_quit = Qt;
-  block_input ();
-  turn_on_atimers (false);
+  struct timespec now = current_timespec ();
+  struct timespec idled = timespec_valid_p (timer_idleness_start_time)
+    ? timespec_sub (now, timer_idleness_start_time)
+    : invalid_timespec ();
+  struct timespec until_next = invalid_timespec ();
+  Lisp_Object const lists[] = { Vtimer_list, Vtimer_idle_list };
+  struct timespec const bogeys[] = { now, idled };
 
-  /* We use copies of the timers' lists to allow a timer to add itself
-     again, without locking up Emacs if the newly added timer is
-     already ripe when added.  */
-
-  /* Always consider the ordinary timers.  */
-  timers = Fcopy_sequence (Vtimer_list);
-  /* Consider the idle timers only if Emacs is idle.  */
-  if (timespec_valid_p (timer_idleness_start_time))
-    idle_timers = Fcopy_sequence (Vtimer_idle_list);
-  else
-    idle_timers = Qnil;
-
-  turn_on_atimers (true);
-  unblock_input ();
-  Vinhibit_quit = tem;
-
-  do
+  for (int i = 0; i < 2; ++i)
     {
-      nexttime = timer_check_2 (timers, idle_timers);
-    }
-  while (nexttime.tv_sec == 0 && nexttime.tv_nsec == 0);
+      struct timespec bogey = bogeys[i];
+      if (! timespec_valid_p (bogey))
+	continue;
 
-  return nexttime;
+      Lisp_Object timers = Fcopy_sequence (lists[i]);
+      FOR_EACH_TAIL (timers)
+	{
+	  struct timespec time;
+	  while (CONSP (pending_funcalls))
+	    {
+	      /* First run the code that was delayed.  */
+	      Lisp_Object funcall = XCAR (pending_funcalls);
+	      pending_funcalls = XCDR (pending_funcalls);
+	      safe_call2 (Qapply, XCAR (funcall), XCDR (funcall));
+	    }
+
+	  if (decode_timer (XCAR (timers), &time))
+	    {
+	      if (timespec_cmp (time, bogey) <= 0)
+		{
+		  run_timer (XCAR (timers));
+		}
+	      else
+		{
+		  struct timespec diff = timespec_sub (time, bogey);
+		  if (! timespec_valid_p (until_next)
+		      || timespectod (diff) < timespectod (until_next))
+		    until_next = diff;
+		  break;
+		}
+	    }
+	}
+    }
+
+  return until_next;
 }
 
 DEFUN ("current-idle-time", Fcurrent_idle_time, Scurrent_idle_time, 0, 0, 0,
