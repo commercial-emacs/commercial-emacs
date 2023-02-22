@@ -4400,7 +4400,6 @@ timer_check (void)
 		  if (! timespec_valid_p (until_next)
 		      || timespectod (diff) < timespectod (until_next))
 		    until_next = diff;
-		  break;
 		}
 	    }
 	}
