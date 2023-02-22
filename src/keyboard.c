@@ -4344,6 +4344,17 @@ run_timer (Lisp_Object timer)
   unbind_to (count, Qnil);
 }
 
+static void
+flush_pending_funcalls (void)
+{
+  while (CONSP (pending_funcalls))
+    {
+      Lisp_Object funcall = XCAR (pending_funcalls);
+      pending_funcalls = XCDR (pending_funcalls);
+      safe_call2 (Qapply, XCAR (funcall), XCDR (funcall));
+    }
+}
+
 /* Trigger any timers meeting their respective criteria.
 
    For ordinary timers, this means current time is at
@@ -4373,21 +4384,14 @@ timer_check (void)
 	continue;
 
       Lisp_Object timers = Fcopy_sequence (lists[i]);
-      FOR_EACH_TAIL (timers)
+      FOR_EACH_TAIL_SAFE (timers)
 	{
 	  struct timespec time;
-	  while (CONSP (pending_funcalls))
-	    {
-	      /* First run the code that was delayed.  */
-	      Lisp_Object funcall = XCAR (pending_funcalls);
-	      pending_funcalls = XCDR (pending_funcalls);
-	      safe_call2 (Qapply, XCAR (funcall), XCDR (funcall));
-	    }
-
 	  if (decode_timer (XCAR (timers), &time))
 	    {
 	      if (timespec_cmp (time, bogey) <= 0)
 		{
+		  flush_pending_funcalls ();
 		  run_timer (XCAR (timers));
 		}
 	      else
