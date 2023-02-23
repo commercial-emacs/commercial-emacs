@@ -51,18 +51,18 @@
                 (let* ((time (timer--time timer))
                        (idle-p (timer--idle-delay timer))
                        (inverted-p (and (not idle-p)
-                                        (time-less-p time nil))))
-                  (format
-                   "%13s"
-                   (concat (if inverted-p "-" "")
-                           (format-seconds
-                            "%1dd %2hh %2mm %z%,1ss"
-		            (float-time
-		             (if idle-p
-			         time
-                               (if inverted-p
-                                   (time-subtract nil time)
-			         (time-subtract time nil))))))))
+                                        (time-less-p time nil)))
+                       (formatted (format-seconds
+                                   "%1dd %2hh %2mm %z%,1ss"
+		                   (float-time
+		                    (if idle-p
+			                time
+                                      (if inverted-p
+                                          (time-subtract nil time)
+			                (time-subtract time nil)))))))
+                  (when (equal formatted "0.0s")
+                    (setq inverted-p nil))
+                  (format "%13s" (concat (if inverted-p "-" "") formatted)))
                 'help-echo "Time until next invocation")
               ;; Repeat.
               ,(let ((repeat (timer--repeat-delay timer)))

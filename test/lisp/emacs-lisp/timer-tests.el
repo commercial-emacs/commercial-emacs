@@ -65,4 +65,30 @@
   (let ((nt (timer-next-integral-multiple-of-time '(32770 . 65539) 0.5)))
     (should (time-equal-p 1 nt))))
 
+(defvar timer-test-debug-on-error-delay 0.5)
+(defvar timer-test-debug-on-error-timer nil)
+
+(ert-deftest timer-test-debug-on-error-0 ()
+  "Set the trap."
+  :expected-result :failed
+  (setq timer-test-debug-on-error-timer
+        (run-at-time nil timer-test-debug-on-error-delay
+                     (lambda ()
+                       (setf (timer--function timer-test-debug-on-error-timer)
+                             #'ignore)
+                       (error "foo"))))
+  (sit-for 0.1 t))
+
+(ert-deftest timer-test-debug-on-error-1 ()
+  "Recover when `debug-on-error' leaves timer-event-handler in limbo."
+  (should debug-on-error)
+  (unwind-protect
+      (progn
+        (sit-for (* timer-test-debug-on-error-delay 3) t)
+        (should-not (timer--triggered timer-test-debug-on-error-timer))
+        (list-timers)
+        (with-current-buffer "*timer-list*"
+          (should-error (re-search-forward (regexp-quote "-1d ")))))
+    (cancel-timer timer-test-debug-on-error-timer)))
+
 ;;; timer-tests.el ends here
