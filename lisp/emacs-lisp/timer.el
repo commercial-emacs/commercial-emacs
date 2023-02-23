@@ -224,17 +224,15 @@ This function is called, by name, directly by the C code."
          (lambda (timer)
            (condition-case-unless-debug err
                (save-current-buffer
+                 (setf (timer--triggered timer) t)
                  (let ((restore-deactivate-mark deactivate-mark))
-                   (unwind-protect
-                       (apply (timer--function timer) (timer--args timer))
-                     ;; Commit d0bbfc9 wanted this.
-                     (setq deactivate-mark restore-deactivate-mark))))
+                   (apply (timer--function timer) (timer--args timer))
+                   (setq deactivate-mark restore-deactivate-mark)))
              (error (message "Error running timer%s: %s"
                              (if (symbolp (timer--function timer))
                                  (format-message " '%s'" (timer--function timer))
                                "")
-                             (error-message-string err))))
-           (setf (timer--triggered timer) t))))
+                             (error-message-string err)))))))
     (cond ((memq timer timer-list)
            (funcall run-handler timer)
            (if (not (timer--repeat-delay timer))
