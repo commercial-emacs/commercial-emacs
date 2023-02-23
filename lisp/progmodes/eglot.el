@@ -816,6 +816,9 @@ treated as in `eglot--dbind'."
                                        `(:valueSet
                                          [,@(mapcar
                                              #'car eglot--tag-faces)])))
+            :general
+            (list
+             :positionEncodings ["utf-32" "utf-8" "utf-16"])
             :experimental eglot--{})))
 
 (cl-defgeneric eglot-workspace-folders (server)
@@ -1439,20 +1442,26 @@ CONNECT-ARGS are passed as additional arguments to
   (let ((warning-minimum-level :error))
     (display-warning 'eglot (apply #'format format args) :warning)))
 
-(defun eglot-current-column () (- (point) (line-beginning-position)))
+(defun eglot-current-column ()
+  "Calculate current column, counting Unicode codepoints."
+  (- (point) (line-beginning-position)))
 
-(defvar eglot-current-column-function #'eglot-lsp-abiding-column
+(defun eglot--current-column-utf-8 ()
+  "Calculate current column, counting bytes."
+  (- (position-bytes (point)) (position-bytes (line-beginning-position))))
+
+(defvar eglot-current-column-function nil
   "Function to calculate the current column.
 
 This is the inverse operation of
 `eglot-move-to-column-function' (which see).  It is a function of
 no arguments returning a column number.  For buffers managed by
-fully LSP-compliant servers, this should be set to
-`eglot-lsp-abiding-column' (the default), and
-`eglot-current-column' for all others.")
+fully LSP-compliant servers, this should be nil.  For others, it
+can be set to `eglot-current-colum' or
+`eglot--current-column-utf-8'.")
 
 (defun eglot-lsp-abiding-column (&optional lbp)
-  "Calculate current COLUMN as defined by the LSP spec.
+  "Calculate current column, counting UTF-16 code units as in the original LSP spec.
 LBP defaults to `line-beginning-position'."
   (/ (- (length (encode-coding-region (or lbp (line-beginning-position))
                                       ;; Fix github#860
@@ -1462,13 +1471,19 @@ LBP defaults to `line-beginning-position'."
 
 (defun eglot--pos-to-lsp-position (&optional pos)
   "Convert point POS to LSP position."
-  (eglot--widening
-   ;; LSP line is zero-origin; emacs is one-origin.
-   (list :line (1- (line-number-at-pos pos t))
-         :character (progn (when pos (goto-char pos))
-                           (funcall eglot-current-column-function)))))
+  (let ((columnfn (or eglot-current-column-function
+                      (pcase (plist-get (eglot--capabilities (eglot-current-server))
+                                        :positionEncoding)
+                        ("utf-32" #'eglot-current-column)
+                        ("utf-8" #'eglot--current-column-utf-8)
+                        (_ #'eglot-lsp-abiding-column)))))
+    (eglot--widening
+     ;; LSP line is zero-origin; emacs is one-origin.
+     (list :line (1- (line-number-at-pos pos t))
+           :character (progn (when pos (goto-char pos))
+                             (funcall columnfn))))))
 
-(defvar eglot-move-to-column-function #'eglot-move-to-lsp-abiding-column
+(defvar eglot-move-to-column-function nil
   "Function to move to a column reported by the LSP server.
 
 According to the standard, LSP column/character offsets are based
@@ -1478,11 +1493,11 @@ where X is a multi-byte character, it actually means `b', not
 `c'. However, many servers don't follow the spec this closely.
 
 For buffers managed by fully LSP-compliant servers, this should
-be set to `eglot-move-to-lsp-abiding-column' (the default), and
-`eglot-move-to-column' for all others.")
+be letft nil.  For others, it can be set to
+`eglot-move-to-column' or `eglot--move-to-column-utf-8'.")
 
 (defun eglot-move-to-column (column)
-  "Move to COLUMN without closely following the LSP spec."
+  "Move to COLUMN, counting Unicode codepoints."
   ;; We cannot use `move-to-column' here, because it moves to *visual*
   ;; columns, which can be different from LSP columns in case of
   ;; `whitespace-mode', `prettify-symbols-mode', etc.  (github#296,
@@ -1490,8 +1505,14 @@ be set to `eglot-move-to-lsp-abiding-column' (the default), and
   (goto-char (min (+ (line-beginning-position) column)
                   (line-end-position))))
 
+(defun eglot--move-to-column-utf-8 (column)
+  "Move to COLUMN, regarded as a byte offset."
+  (goto-char (min (byte-to-position
+                   (+ (position-bytes (line-beginning-position)) column))
+                  (line-end-position))))
+
 (defun eglot-move-to-lsp-abiding-column (column)
-  "Move to COLUMN abiding by the LSP spec."
+  "Move to COLUMN, counting UTF-16 code units as in the original LSP spec."
   (save-restriction
     (cl-loop
      with lbp = (line-beginning-position)
@@ -1515,14 +1536,20 @@ If optional MARKER, return a marker instead"
       (forward-line (min most-positive-fixnum
                          (plist-get pos-plist :line)))
       (unless (eobp) ;; if line was excessive leave point at eob
-        (let ((tab-width 1)
+        (let ((movefn (or eglot-move-to-column-function
+                          (pcase (plist-get (eglot--capabilities (eglot-current-server))
+                                            :positionEncoding)
+                            ("utf-32" #'eglot-move-to-column)
+                            ("utf-8" #'eglot--move-to-column-utf-8)
+                            (_ #'eglot-move-to-lsp-abiding-column))))
+              (tab-width 1)
               (col (plist-get pos-plist :character)))
           (unless (wholenump col)
             (eglot--warn
              "Caution: LSP server sent invalid character position %s. Using 0 instead."
              col)
             (setq col 0))
-          (funcall eglot-move-to-column-function col)))
+          (funcall movefn col)))
       (if marker (copy-marker (point-marker)) (point)))))
 
 (defconst eglot--uri-path-allowed-chars
