@@ -219,19 +219,24 @@ This function is called, by name, directly by the C code."
   (setq timer-event-last-2 timer-event-last-1
         timer-event-last-1 timer-event-last
         timer-event-last timer)
-  (cl-flet ((run-handler
-              (timer)
-              (condition-case err
-                  (save-current-buffer
-                    (setf (timer--triggered timer) t)
-                    (apply (timer--function timer) (timer--args timer)))
-                (error (message "Error running timer%s: %s"
-                                (if (symbolp (timer--function timer))
-                                    (format-message " '%s'" (timer--function timer))
-                                  "")
-                                (error-message-string err))))))
+  (let ((inhibit-quit t)
+        (run-handler
+         (lambda (timer)
+           (condition-case-unless-debug err
+               (save-current-buffer
+                 (let ((restore-deactivate-mark deactivate-mark))
+                   (unwind-protect
+                       (apply (timer--function timer) (timer--args timer))
+                     ;; Commit d0bbfc9 wanted this.
+                     (setq deactivate-mark restore-deactivate-mark))))
+             (error (message "Error running timer%s: %s"
+                             (if (symbolp (timer--function timer))
+                                 (format-message " '%s'" (timer--function timer))
+                               "")
+                             (error-message-string err))))
+           (setf (timer--triggered timer) t))))
     (cond ((memq timer timer-list)
-           (run-handler timer)
+           (funcall run-handler timer)
            (if (not (timer--repeat-delay timer))
                ;; dequeue
                (cancel-timer timer)
@@ -249,7 +254,7 @@ This function is called, by name, directly by the C code."
                  (when (time-less-p (timer--time timer) limit)
                    (setf (timer--time timer) limit))))))
           ((memq timer timer-idle-list)
-           (run-handler timer)
+           (funcall run-handler timer)
            (unless (timer--repeat-delay timer)
              (cancel-timer timer))))))
 

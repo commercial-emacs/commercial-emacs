@@ -4318,9 +4318,6 @@ Lisp_Object pending_funcalls;
 static void
 trigger_timer (Lisp_Object timer)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
-  Lisp_Object restore_deactivate_mark = Vdeactivate_mark;
-
   /* First run the code that was delayed.  */
   while (CONSP (pending_funcalls))
     {
@@ -4328,13 +4325,8 @@ trigger_timer (Lisp_Object timer)
       pending_funcalls = XCDR (pending_funcalls);
       safe_call2 (Qapply, XCAR (funcall), XCDR (funcall));
     }
-
-  ASET (timer, 0, Qt); // Mark the timer as triggered
-  specbind (Qinhibit_quit, Qt);
   call1 (Qtimer_event_handler, timer);
-  Vdeactivate_mark = restore_deactivate_mark;
   timers_run++;
-  unbind_to (count, Qnil);
 }
 
 /* Trigger any timers meeting their respective criteria.
