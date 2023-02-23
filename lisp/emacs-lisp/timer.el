@@ -34,23 +34,34 @@
                (:constructor nil)
                (:copier nil)
                (:constructor timer--create ())
-               (:type vector) ; undefines timer-p (see timerp)
+               (:type vector)         ; undefines timer-p (see timerp)
                (:conc-name timer--))
+  ;; For ordinary timers, non-nil marks done.
+  ;; For idle timers, non-nil marks done for the current idle stretch,
+  ;; It is reset to nil after user input concludes the period.
   triggered
-  ;; Time of next trigger: for normal timers, absolute time, for idle timers,
-  ;; time relative to idle-start.
-  high-seconds low-seconds usecs
-  ;; For normal timers, time between repetitions, or nil.  For idle timers,
-  ;; non-nil iff repeated.
+  ;; For ordinary timers, absolute time to trigger.
+  ;; For idle timers, idle threshold to trigger.
+  high-seconds
+  low-seconds
+  usecs
+  ;; For normal timers, time between repetitions, or nil.  For idle
+  ;; timers, non-nil iff repeated
   repeat-delay
-  function args                         ;What to do when triggered.
-  idle-delay                            ;If non-nil, this is an idle-timer.
+  ;; Action to perform upon trigger
+  function
+  args
+  ;; Non-nil for idle timer
+  idle-delay
+  ;; Additional precision for times / durations
   psecs
-  ;; A timer may be created with t as the TIME, which means that we
-  ;; want to run at specific integral multiples of `repeat-delay'.  We
-  ;; then have to recompute this (because the machine may have gone to
-  ;; sleep, etc).
-  integral-multiple)
+  ;; Trigger on timer-next-integral-multiple-of-time with
+  ;; REPEAT-DELAY as gridwidth
+  integral-multiple
+  ;; Timers should be associated with struct thread_state since
+  ;; throw-catch handlerlists are thread-specific, but Vtimer_list
+  ;; preceded that realization.
+  thread)
 
 (defun timer-create ()
   ;; BEWARE: This is not an eta-redex, because `timer--create' is inlinable
@@ -63,7 +74,7 @@
 As the timer struct does not implicitly define a timer-p
 predicate (since it explicitly shunts to a vector type), we
 attempt an heuristic."
-  (and (vectorp object) (= (length object) 10)))
+  (and (vectorp object) (= (length object) 11)))
 
 (defsubst timer--check (timer)
   (or (and (timerp timer)
@@ -71,7 +82,8 @@ attempt an heuristic."
            (integerp (timer--low-seconds timer))
            (integerp (timer--usecs timer))
            (integerp (timer--psecs timer))
-           (timer--function timer))
+           (timer--function timer)
+           (threadp (timer--thread timer)))
       (error "Invalid timer %S" timer)))
 
 (defun timer--time-setter (timer time)
@@ -111,9 +123,9 @@ fire each time Emacs is idle for that many seconds."
   timer)
 
 (defun timer-next-integral-multiple-of-time (time secs)
-  "Yield the next value after TIME that is an integral multiple of SECS.
-More precisely, the next value, after TIME, that is an integral multiple
-of SECS seconds since the epoch.  SECS may be a fraction."
+  "Marking time since epoch in SECS-wide grids, return next grid after TIME.
+For example, a SECS of 60 rounds up to the nearest minute.  SECS
+may be less than one."
   (let* ((ticks-hz (time-convert time t))
 	 (ticks (car ticks-hz))
 	 (hz (cdr ticks-hz))
@@ -337,6 +349,7 @@ This function returns a timer object which you can use in
 
     (timer-set-time timer time repeat)
     (timer-set-function timer function args)
+    (setf (timer--thread timer) (current-thread))
     (timer-activate timer)
     timer))
 
@@ -370,6 +383,7 @@ or the internal time format returned by, e.g.,
 	 (intern (completing-read "Function: " obarray #'fboundp t))))
   (let ((timer (timer-create)))
     (timer-set-function timer function args)
+    (setf (timer--thread timer) (current-thread))
     (timer-set-idle-time timer secs repeat)
     (timer-activate-when-idle timer)
     timer))

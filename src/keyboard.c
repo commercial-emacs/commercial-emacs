@@ -4364,33 +4364,36 @@ timer_check (void)
 	  Lisp_Object *vec;
 	  CHECK_VECTOR (XCAR (timers));
 	  vec = XVECTOR (XCAR (timers))->contents;
-	  if (NILP (vec[0])) /* not yet triggered */
+	  if (EQ (vec[10], Fcurrent_thread ()))
 	    {
-	      if (list4_to_timespec (vec[1], vec[2], vec[3], vec[8], &time))
+	      if (NILP (vec[0])) /* not yet triggered */
 		{
-		  /* Trigger when:
-		     For ordinary timer, now is at or past trigger time.
-		     For idle timer, idled duration at or past threshold.  */
-		  if (timespec_cmp (bogey, time) >= 0)
+		  if (list4_to_timespec (vec[1], vec[2], vec[3], vec[8], &time))
 		    {
-		      trigger_timer (XCAR (timers));
-		    }
-		  else
-		    {
-		      struct timespec diff = timespec_sub (time, bogey);
-		      if (! timespec_valid_p (until_next)
-			  || timespectod (diff) < timespectod (until_next))
-			until_next = diff;
+		      /* Trigger when:
+			 For ordinary timer, now is at or past trigger time.
+			 For idle timer, idled duration at or past threshold.  */
+		      if (timespec_cmp (bogey, time) >= 0)
+			{
+			  trigger_timer (XCAR (timers));
+			}
+		      else
+			{
+			  struct timespec diff = timespec_sub (time, bogey);
+			  if (! timespec_valid_p (until_next)
+			      || timespectod (diff) < timespectod (until_next))
+			    until_next = diff;
+			}
 		    }
 		}
-	    }
-	  else /* was triggered */
-	    {
-	      /* Clean up timers that errored out.  */
-	      if (NILP (vec[4])) /* if not repeated, delete it.  */
-		*lists[i] = Fdelq (XCAR (timers), *lists[i]);
-	      else if (NILP (vec[7]) /* if not idle, reset it. */)
-		vec[0] = Qnil;
+	      else /* was triggered */
+		{
+		  /* Clean up timers that errored out.  */
+		  if (NILP (vec[4])) /* if not repeated, delete it.  */
+		    *lists[i] = Fdelq (XCAR (timers), *lists[i]);
+		  else if (NILP (vec[7]) /* if not idle, reset it. */)
+		    vec[0] = Qnil;
+		}
 	    }
 	}
     }
