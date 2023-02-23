@@ -2853,7 +2853,7 @@ Use 0 or negative value to blink forever."
         ;; during command execution) if they set blink-cursor-delay
         ;; to a very small or even zero value.
         (run-with-idle-timer (max 0.2 blink-cursor-delay)
-                             :repeat #'blink-cursor-start)))
+                             t #'blink-cursor-start)))
 
 (defun blink-cursor--start-timer ()
   "Start the `blink-cursor-timer'."

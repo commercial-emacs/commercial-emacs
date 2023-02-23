@@ -4315,24 +4315,8 @@ timer_resume_idle (void)
    ...).  Each element has the form (FUN . ARGS).  */
 Lisp_Object pending_funcalls;
 
-/* Return true if TIMER is a valid timer, placing its value into *RESULT.  */
-static bool
-decode_timer (Lisp_Object timer, struct timespec *result)
-{
-  Lisp_Object *vec;
-
-  if (! (VECTORP (timer) && ASIZE (timer) == 10))
-    return false;
-  vec = XVECTOR (timer)->contents;
-  if (! NILP (vec[0]))
-    return false;
-  if (! FIXNUMP (vec[2]))
-    return false;
-  return list4_to_timespec (vec[1], vec[2], vec[3], vec[8], result);
-}
-
 static void
-run_timer (Lisp_Object timer)
+trigger_timer (Lisp_Object timer)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object restore_deactivate_mark = Vdeactivate_mark;
@@ -4345,7 +4329,7 @@ run_timer (Lisp_Object timer)
       safe_call2 (Qapply, XCAR (funcall), XCDR (funcall));
     }
 
-  ASET (timer, 0, Qt); // Mark the timer as handled
+  ASET (timer, 0, Qt); // Mark the timer as triggered
   specbind (Qinhibit_quit, Qt);
   call1 (Qtimer_event_handler, timer);
   Vdeactivate_mark = restore_deactivate_mark;
@@ -4385,11 +4369,19 @@ timer_check (void)
       FOR_EACH_TAIL_SAFE (timers)
 	{
 	  struct timespec time;
-	  if (decode_timer (XCAR (timers), &time))
+	  Lisp_Object *vec;
+	  CHECK_VECTOR (XCAR (timers));
+	  vec = XVECTOR (XCAR (timers))->contents;
+	  if (NILP (vec[0]) /* not yet triggered, and... */
+	      && list4_to_timespec (vec[1], vec[2], /* well-formed time */
+				    vec[3], vec[8], &time))
 	    {
-	      if (timespec_cmp (time, bogey) <= 0)
+	      /* Trigger when:
+		 For ordinary timer, now is at or past trigger time.
+		 For idle timer, idled duration at or past threshold.  */
+	      if (timespec_cmp (bogey, time) >= 0)
 		{
-		  run_timer (XCAR (timers));
+		  trigger_timer (XCAR (timers));
 		}
 	      else
 		{

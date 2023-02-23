@@ -24,6 +24,8 @@
 
 ;;; Code:
 
+(require 'timer)
+
 (defvar cl-print-compiled)
 (defvar cl-print-compiled-button)
 
@@ -41,23 +43,29 @@
             nil
             `[ ;; Idle.
               ,(propertize
-                (if (aref timer 7) "   *" " ")
+                (if (timer--idle-delay timer) "   *" " ")
                 'help-echo "* marks idle timers"
                 'timer timer)
               ;; Next time.
               ,(propertize
-                (let ((time (list (aref timer 1)
-				  (aref timer 2)
-				  (aref timer 3))))
-                  (format "%12s"
-                          (format-seconds "%dd %hh %mm %z%,1ss"
-			                  (float-time
-			                   (if (aref timer 7)
-			                       time
-			                     (time-subtract time nil))))))
+                (let* ((time (timer--time timer))
+                       (idle-p (timer--idle-delay timer))
+                       (inverted-p (and (not idle-p)
+                                        (time-less-p time nil))))
+                  (format
+                   "%13s"
+                   (concat (if inverted-p "-" "")
+                           (format-seconds
+                            "%1dd %2hh %2mm %z%,1ss"
+		            (float-time
+		             (if idle-p
+			         time
+                               (if inverted-p
+                                   (time-subtract nil time)
+			         (time-subtract time nil))))))))
                 'help-echo "Time until next invocation")
               ;; Repeat.
-              ,(let ((repeat (aref timer 4)))
+              ,(let ((repeat (timer--repeat-delay timer)))
                  (cond
                   ((numberp repeat)
                    (propertize
@@ -73,7 +81,7 @@
                 (let ((cl-print-compiled 'static)
                       (cl-print-compiled-button nil)
                       (print-escape-newlines t))
-                  (cl-prin1-to-string (aref timer 5)))
+                  (cl-prin1-to-string (timer--function timer)))
                 'help-echo "Function called by timer")]))
          (append timer-list timer-idle-list)))
   (tabulated-list-print))
@@ -94,7 +102,7 @@
   (setq-local revert-buffer-function #'list-timers)
   (setq tabulated-list-format
         '[("Idle" 6 timer-list--idle-predicate)
-          ("Next" 12 timer-list--next-predicate :right-align t :pad-right 1)
+          ("Next" 13 timer-list--next-predicate :right-align t :pad-right 1)
           ("Repeat" 12 timer-list--repeat-predicate :right-align t :pad-right 1)
           ("Function" 10 timer-list--function-predicate)]))
 

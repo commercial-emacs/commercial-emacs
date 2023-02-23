@@ -28,19 +28,15 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
-
-;; If you change this structure, you also have to change `timerp'
-;; (below) and decode_timer in keyboard.c.
 (declare-function cl--defsubst-expand "cl-macs")
+
 (cl-defstruct (timer
                (:constructor nil)
                (:copier nil)
                (:constructor timer--create ())
-               (:type vector)
+               (:type vector) ; undefines timer-p (see timerp)
                (:conc-name timer--))
-  ;; nil if the timer is active (waiting to be triggered),
-  ;; non-nil if it is inactive ("already triggered", in theory).
-  (triggered t)
+  triggered
   ;; Time of next trigger: for normal timers, absolute time, for idle timers,
   ;; time relative to idle-start.
   high-seconds low-seconds usecs
@@ -62,18 +58,23 @@
   ;; hardcode the shape of timers in other .elc files.
   (timer--create))
 
-(defun timerp (object)
-  "Return t if OBJECT is a timer."
-  (and (vectorp object)
-       ;; Timers are now ten elements, but old .elc code may have
-       ;; shorter versions of `timer-create'.
-       (<= 9 (length object) 10)))
+(defsubst timerp (object)
+  "Return t if OBJECT appears to be a timer.
+As the timer struct does not implicitly define a timer-p
+predicate (since it explicitly shunts to a vector type), we
+attempt an heuristic."
+  (and (vectorp object) (= (length object) 10)))
 
 (defsubst timer--check (timer)
-  (or (timerp timer) (signal 'wrong-type-argument (list #'timerp timer))))
+  (or (and (timerp timer)
+           (integerp (timer--high-seconds timer))
+           (integerp (timer--low-seconds timer))
+           (integerp (timer--usecs timer))
+           (integerp (timer--psecs timer))
+           (timer--function timer))
+      (error "Invalid timer %S" timer)))
 
 (defun timer--time-setter (timer time)
-  (timer--check timer)
   (let ((lt (time-convert time 'list)))
     (setf (timer--high-seconds timer) (nth 0 lt))
     (setf (timer--low-seconds timer) (nth 1 lt))
@@ -154,99 +155,28 @@ SECS may be a fraction."
 
 (defun timer-set-function (timer function &optional args)
   "Make TIMER call FUNCTION with optional ARGS when triggering."
-  (timer--check timer)
   (setf (timer--function timer) function)
   (setf (timer--args timer) args)
   timer)
-
-(defun timer--activate (timer &optional triggered-p reuse-cell idle)
-  (let ((timers (if idle timer-idle-list timer-list))
-	last)
-    (cond
-     ((not (and (timerp timer)
-	        (integerp (timer--high-seconds timer))
-	        (integerp (timer--low-seconds timer))
-	        (integerp (timer--usecs timer))
-	        (integerp (timer--psecs timer))
-	        (timer--function timer)))
-      (error "Invalid or uninitialized timer"))
-     ;; FIXME: This is not reliable because `idle-delay' is only set late,
-     ;; by `timer-activate-when-idle' :-(
-     ;;((not (eq (not idle)
-     ;;          (not (timer--idle-delay timer))))
-     ;; (error "idle arg %S out of sync with idle-delay field of timer: %S"
-     ;;        idle timer))
-     ((memq timer timers)
-      (error "Timer already activated"))
-     (t
-      ;; Skip all timers to trigger before the new one.
-      (while (and timers (timer--time-less-p (car timers) timer))
-	(setq last timers
-	      timers (cdr timers)))
-      (if reuse-cell
-	  (progn
-	    (setcar reuse-cell timer)
-	    (setcdr reuse-cell timers))
-	(setq reuse-cell (cons timer timers)))
-      ;; Insert new timer after last which possibly means in front of queue.
-      (setf (cond (last (cdr last))
-                  (idle timer-idle-list)
-                  (t    timer-list))
-            reuse-cell)
-      (setf (timer--triggered timer) triggered-p)
-      (setf (timer--idle-delay timer) idle)
-      nil))))
 
-(defun timer-activate (timer &optional triggered-p reuse-cell)
-  "Insert TIMER into `timer-list'.
-If TRIGGERED-P is t, make TIMER inactive (put it on the list, but
-mark it as already triggered).  To remove it, use `cancel-timer'.
+(defsubst timer-activate (timer &optional _triggered-p _reuse-cell)
+  "Install TIMER."
+  (timer--check timer)
+  (cl-pushnew timer timer-list))
 
-REUSE-CELL, if non-nil, is a cons cell to reuse when inserting
-TIMER into `timer-list' (usually a cell removed from that list by
-`cancel-timer-internal'; using this reduces consing for repeat
-timers).  If nil, allocate a new cell."
-  (timer--activate timer triggered-p reuse-cell nil))
-
-(defun timer-activate-when-idle (timer &optional dont-wait reuse-cell)
-  "Insert TIMER into `timer-idle-list'.
-This arranges to activate TIMER whenever Emacs is next idle.
-If optional argument DONT-WAIT is non-nil, set TIMER to activate
-immediately \(see below), or at the right time, if Emacs is
-already idle.
-
-REUSE-CELL, if non-nil, is a cons cell to reuse when inserting
-TIMER into `timer-idle-list' (usually a cell removed from that
-list by `cancel-timer-internal'; using this reduces consing for
-repeat timers).  If nil, allocate a new cell.
-
-Using non-nil DONT-WAIT is not recommended when activating an
-idle timer from an idle timer handler, if the timer being
-activated has an idleness time that is smaller or equal to
-the time of the current timer.  That's because the activated
-timer will fire right away."
-  (timer--activate timer (not dont-wait) reuse-cell 'idle))
+(defsubst timer-activate-when-idle (timer &optional _dont-wait _reuse-cell)
+  "Install idle TIMER"
+  (setf (timer--idle-delay timer) 'idle)
+  (timer--check timer)
+  (cl-pushnew timer timer-idle-list))
 
 (defalias 'disable-timeout #'cancel-timer)
 
 (defun cancel-timer (timer)
   "Remove TIMER from the list of active timers."
-  (timer--check timer)
   (setq timer-list (delq timer timer-list))
   (setq timer-idle-list (delq timer timer-idle-list))
   nil)
-
-(defun cancel-timer-internal (timer)
-  "Remove TIMER from the list of active timers or idle timers.
-Only to be used in this file.  It returns the cons cell
-that was removed from the timer list."
-  (let ((cell1 (memq timer timer-list))
-	(cell2 (memq timer timer-idle-list)))
-    (if cell1
-	(setq timer-list (delq timer timer-list)))
-    (if cell2
-	(setq timer-idle-list (delq timer timer-idle-list)))
-    (or cell1 cell2)))
 
 (defun cancel-function-timers (function)
   "Cancel all timers which would run FUNCTION.
@@ -259,7 +189,7 @@ and idle timers such as are scheduled by `run-with-idle-timer'."
   (dolist (timer timer-idle-list)
     (if (eq (timer--function timer) function)
         (setq timer-idle-list (delq timer timer-idle-list)))))
-
+
 ;; Record the last few events, for debugging.
 (defvar timer-event-last nil
   "Last timer that was run.")
@@ -286,48 +216,48 @@ TIME is a Lisp time value."
 (defun timer-event-handler (timer)
   "Call the handler for the timer TIMER.
 This function is called, by name, directly by the C code."
-  (timer--check timer)
   (setq timer-event-last-2 timer-event-last-1
         timer-event-last-1 timer-event-last
         timer-event-last timer)
-  ;; Before invoking its handler, first dequeue TIMER.
-  ;; Since the handler might want to `cancel-timer' its requeue,
-  ;; requeue a repeated TIMER before calling handler.
-  (when-let ((inhibit-quit t)
-             ;; Dequeues TIMER
-             (cell (cancel-timer-internal timer)))
-    (when (timer--repeat-delay timer)
-      ;; Requeues a repeated TIMER
-      (if (timer--idle-delay timer)
-          (timer-activate-when-idle timer nil cell)
-        (if (and (> (length timer) 9)   ; Backwards compatible.
-                 (timer--integral-multiple timer))
-            (setf (timer--time timer)
-                  (timer-next-integral-multiple-of-time
-		   nil (timer--repeat-delay timer)))
-          (timer-inc-time timer (timer--repeat-delay timer)))
-        (when (numberp timer-max-repeats)
-          ;; Limit repetitions in case emacs was unduly suspended
-          (let ((limit (time-subtract nil (* timer-max-repeats
-                                             (timer--repeat-delay timer)))))
-            (when (time-less-p (timer--time timer) limit)
-              (setf (timer--time timer) limit))))
-        (timer-activate timer t cell)))
-    (condition-case err
-        (save-current-buffer
-          ;; Run handler.
-          (apply (timer--function timer) (timer--args timer)))
-      (error (message "Error running timer%s: %s"
-                      (if (symbolp (timer--function timer))
-                          (format-message " '%s'" (timer--function timer))
-                        "")
-                      (error-message-string err))))))
+  (cl-flet ((run-handler
+              (timer)
+              (condition-case err
+                  (save-current-buffer
+                    (setf (timer--triggered timer) t)
+                    (apply (timer--function timer) (timer--args timer)))
+                (error (message "Error running timer%s: %s"
+                                (if (symbolp (timer--function timer))
+                                    (format-message " '%s'" (timer--function timer))
+                                  "")
+                                (error-message-string err))))))
+    (cond ((memq timer timer-list)
+           (run-handler timer)
+           (if (not (timer--repeat-delay timer))
+               ;; dequeue
+               (cancel-timer timer)
+             ;; requeue at new time
+             (setf (timer--triggered timer) nil)
+             (if (timer--integral-multiple timer)
+                 (setf (timer--time timer)
+                       (timer-next-integral-multiple-of-time
+		        nil (timer--repeat-delay timer)))
+               (timer-inc-time timer (timer--repeat-delay timer)))
+             (when (numberp timer-max-repeats)
+               ;; Limit repetitions in case emacs was unduly suspended
+               (let ((limit (time-subtract nil (* timer-max-repeats
+                                                  (timer--repeat-delay timer)))))
+                 (when (time-less-p (timer--time timer) limit)
+                   (setf (timer--time timer) limit))))))
+          ((memq timer timer-idle-list)
+           (run-handler timer)
+           (unless (timer--repeat-delay timer)
+             (cancel-timer timer))))))
 
 ;; This function is incompatible with the one in levents.el.
 (defun timeout-event-p (event)
   "Non-nil if EVENT is a timeout event."
   (and (listp event) (eq (car event) 'timer-event)))
-
+
 
 (declare-function diary-entry-time "diary-lib" (s))
 
@@ -426,19 +356,11 @@ This function is for compatibility; see also `run-with-timer'."
   (run-with-timer secs repeat function object))
 
 (defun run-with-idle-timer (secs repeat function &rest args)
-  "Perform an action the next time Emacs is idle for SECS seconds.
-The action is to call FUNCTION with arguments ARGS.
-SECS may be an integer, a floating point number, or the internal
-time format returned by, e.g., `current-idle-time'.
-If Emacs is currently idle, and has been idle for N seconds (N < SECS),
-then it will call FUNCTION in SECS - N seconds from now.  Using
-SECS <= N is not recommended if this function is invoked from an idle
-timer, because FUNCTION will then be called immediately.
-
-If REPEAT is non-nil, do the action each time Emacs has been idle for
-exactly SECS seconds (that is, only once for each time Emacs becomes idle).
-
-This function returns a timer object which you can use in `cancel-timer'."
+  "Call FUNCTION on ARGS when idle for SECS seconds.
+If REPEAT is non-nil, repeat the behavior until cancelled via
+`cancel-timer'.  SECS may be an integer, a floating point number,
+or the internal time format returned by, e.g.,
+`current-idle-time'."
   (interactive
    (list (read-from-minibuffer "Run after idle (seconds): " nil nil t)
 	 (y-or-n-p "Repeat each time Emacs is idle? ")
@@ -446,9 +368,9 @@ This function returns a timer object which you can use in `cancel-timer'."
   (let ((timer (timer-create)))
     (timer-set-function timer function args)
     (timer-set-idle-time timer secs repeat)
-    (timer-activate-when-idle timer t)
+    (timer-activate-when-idle timer)
     timer))
-
+
 (defvar with-timeout-timers nil
   "List of all timers used by currently pending `with-timeout' calls.")
 
@@ -508,7 +430,7 @@ The argument should be a value previously returned by `with-timeout-suspend'."
 If the user does not answer after SECONDS seconds, return DEFAULT-VALUE."
   (with-timeout (seconds default-value)
     (y-or-n-p prompt)))
-
+
 (defconst timer-duration-words
   (list (cons "microsec" 0.000001)
 	(cons "microsecond" 0.000001)
@@ -553,9 +475,8 @@ If the user does not answer after SECONDS seconds, return DEFAULT-VALUE."
 (defun internal-timer-start-idle ()
   "Mark all idle-time timers as once again candidates for running."
   (dolist (timer timer-idle-list)
-    (if (timerp timer) ;; FIXME: Why test?
-        (setf (timer--triggered timer) nil))))
-
+    (setf (timer--triggered timer) nil)))
+
 (provide 'timer)
 
 ;;; timer.el ends here

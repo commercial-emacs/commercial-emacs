@@ -516,7 +516,7 @@ non-nil in a repeated invocation of this function."
       (when jit-lock-stealth-buffers
 	(timer-set-idle-time jit-lock-stealth-repeat-timer (current-idle-time))
 	(timer-inc-time jit-lock-stealth-repeat-timer delay)
-	(timer-activate-when-idle jit-lock-stealth-repeat-timer t)))))
+        (timer-activate-when-idle jit-lock-stealth-repeat-timer)))))
 
 ;;; Deferred fontification.
 
