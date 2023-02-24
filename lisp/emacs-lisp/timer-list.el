@@ -53,7 +53,7 @@
                        (inverted-p (and (not idle-p)
                                         (time-less-p time nil)))
                        (formatted (format-seconds
-                                   "%1dd %2hh %2mm %z%,1ss"
+                                   "%dd %hh %mm %z%,1ss"
 		                   (float-time
 		                    (if idle-p
 			                time

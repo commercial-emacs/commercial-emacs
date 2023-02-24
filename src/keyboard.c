@@ -4364,7 +4364,11 @@ timer_check (void)
 	  Lisp_Object *vec;
 	  CHECK_VECTOR (XCAR (timers));
 	  vec = XVECTOR (XCAR (timers))->contents;
-	  if (EQ (vec[10], Fcurrent_thread ()))
+	  if (! Fthread_live_p (vec[10]))
+	    {
+	      *lists[i] = Fdelq (XCAR (timers), *lists[i]);
+	    }
+	  else if (EQ (vec[10], Fcurrent_thread ()))
 	    {
 	      if (NILP (vec[0])) /* not yet triggered */
 		{
