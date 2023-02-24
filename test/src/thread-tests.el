@@ -552,4 +552,15 @@ The failure manifests only by being unable to exit the interactive emacs."
     (mapc (lambda (b) (kill-buffer b)) buffers))
   (should-not (thread-last-error)))
 
+(ert-deftest threads-test-catch-throw ()
+  "c41a8ed is supposed to make this work."
+  (skip-unless (featurep 'threads))
+  (let (timed-out)
+    (make-thread (lambda () (with-timeout (1 (setq timed-out t))
+                              (sleep-for 10))))
+    (cl-loop repeat 5
+             until timed-out
+             do (accept-process-output nil 0.3)
+             finally (should timed-out))))
+
 ;;; thread-tests.el ends here
