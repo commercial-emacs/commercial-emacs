@@ -4329,6 +4329,27 @@ trigger_timer (Lisp_Object timer)
   timers_run++;
 }
 
+/* A function deemed necessary for Bug#21380.  */
+
+static Lisp_Object
+copy_sequence_no_quit (Lisp_Object arg)
+{
+  if (NILP (arg)) return arg;
+
+  CHECK_CONS (arg);
+  Lisp_Object val = Fcons (XCAR (arg), Qnil);
+  Lisp_Object prev = val;
+  Lisp_Object tail = XCDR (arg);
+  FOR_EACH_TAIL_SAFE (tail)
+    {
+      Lisp_Object c = Fcons (XCAR (tail), Qnil);
+      XSETCDR (prev, c);
+      prev = c;
+    }
+  CHECK_LIST_END (tail, tail);
+  return val;
+}
+
 /* Trigger any timers meeting their respective criteria.
 
    For ordinary timers, this means current time is at
@@ -4357,7 +4378,7 @@ timer_check (void)
       if (! timespec_valid_p (bogey))
 	continue;
 
-      Lisp_Object timers = Fcopy_sequence (*lists[i]);
+      Lisp_Object timers = copy_sequence_no_quit (*lists[i]);
       FOR_EACH_TAIL_SAFE (timers)
 	{
 	  struct timespec time;
