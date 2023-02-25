@@ -1647,6 +1647,12 @@ as the constructs of Haddock, Javadoc and similar systems."
   "Font Lock mode face used to highlight function names."
   :group 'font-lock-faces)
 
+(defface font-lock-function-call-face
+  '((t :inherit font-lock-function-name-face))
+  "Font Lock mode face used to highlight function calls."
+  :group 'font-lock-faces
+  :version "29.1")
+
 (defface font-lock-variable-name-face
   '((((class grayscale) (background light))
      :foreground "Gray90" :weight bold :slant italic)
@@ -1660,6 +1666,12 @@ as the constructs of Haddock, Javadoc and similar systems."
     (t :weight bold :slant italic))
   "Font Lock mode face used to highlight variable names."
   :group 'font-lock-faces)
+
+(defface font-lock-variable-ref-face
+  '((t :inherit font-lock-variable-name-face))
+  "Font Lock mode face used to highlight variable references."
+  :group 'font-lock-faces
+  :version "29.1")
 
 (defface font-lock-type-face
   '((((class grayscale) (background light)) :foreground "Gray90" :weight bold)
