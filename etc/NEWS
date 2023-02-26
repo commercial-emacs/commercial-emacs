@@ -192,6 +192,14 @@ This command adds a docstring comment to the current defun.  If a
 comment already exists, point is only moved to the comment.  It is
 bound to 'C-c C-d' in 'go-ts-mode'.
 
+** DocView
+
+---
+*** New user option 'doc-view-svg-honor-theme'
+When set to non-nil, this option tells DocView to follow the current
+theme background and foreground colors instead of
+'doc-view-svg-background' and 'doc-view-svg-foreground'.
+
 
 * New Modes and Packages in Emacs 30.1
 
