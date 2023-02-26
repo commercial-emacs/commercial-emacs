@@ -60,7 +60,7 @@
 ;;
 ;; Transient project:
 ;;
-;; An instance of this type can be returned by `project-current' if no
+;; An instance of this type can be returned by `project-get-project' if no
 ;; project was detected automatically, and the user had to pick a
 ;; directory manually.  The fileset it describes is the whole
 ;; directory, with the exception of some standard ignored files and
@@ -202,38 +202,51 @@ CL struct.")
 When it is non-nil, `project-current' will always skip prompting too.")
 
 ;;;###autoload
-(defun project-current (&optional maybe-prompt directory)
-  "Return the project instance in DIRECTORY, defaulting to `default-directory'.
+(defun project-most-recent-project ()
+  (project--ensure-read-project-list)
+  (let ((pr (or (project-current)
+                (when-let ((mru (caar project--list)))
+                  (project--find-in-directory mru))
+                (project-get-project))))
+    (prog1 pr (project-remember-project pr))))
 
-When no project is found in that directory, the result depends on
-the value of MAYBE-PROMPT: if it is nil or omitted, return nil,
-else ask the user for a directory in which to look for the
-project, and if no project is found there, return a \"transient\"
-project instance.
-
-The \"transient\" project instance is a special kind of value
-which denotes a project rooted in that directory and includes all
-the files under the directory except for those that match entries
-in `vc-directory-exclusion-list' or `grep-find-ignored-files'.
-
-See the doc string of `project-find-functions' for the general form
-of the project instance object."
-  (unless directory (setq directory (or project-current-directory-override
-                                        default-directory)))
-  (let ((pr (project--find-in-directory directory)))
-    (cond
-     (pr)
-     ((unless project-current-directory-override
-        maybe-prompt)
+;;;###autoload
+(defun project-get-project (&optional directory)
+  "Return the project for DIRECTORY, and mark as most recently used.
+DIRECTORY defaults to `default-directory'.  If no project obtains
+from DIRECTORY, prompt the user for an alternate directory.  If
+no project obtains from the alternate, return the \"transient\"
+project instance and do not adjust recently used projects."
+  (let* ((directory (or directory
+                        project-current-directory-override
+                        default-directory))
+         (pr (project--find-in-directory directory)))
+    (when (and (not pr)
+               (not project-current-directory-override))
       (setq directory (project-prompt-project-dir)
-            pr (project--find-in-directory directory))))
-    (when maybe-prompt
-      (if pr
-          (project-remember-project pr)
+            pr (project--find-in-directory directory)))
+    (if pr
+        (prog1 pr
+          (project-remember-project pr))
+      (prog1 (cons 'transient directory)
         (project--remove-from-project-list
-         directory "Project `%s' not found; removed from list")
-        (setq pr (cons 'transient directory))))
-    pr))
+         directory "Project `%s' not found; removed from list")))))
+
+;;;###autoload
+(defun project-current (&optional maybe-prompt directory)
+  "Return the project for DIRECTORY.
+DIRECTORY defaults to `default-directory'.
+Under MAYBE-PROMPT, calls `project-get-project'."
+  ;; Gradually replace occurences of (project-current t)
+  ;; with (project-get-project), and replace (project-current nil dir)
+  ;; with (let ((default-directory dir)) (project-current))
+  (if maybe-prompt
+      (project-get-project directory)
+    (let ((pr (project--find-in-directory
+               (or directory
+                   project-current-directory-override
+                   default-directory))))
+      (prog1 pr (when pr (project-remember-project pr))))))
 
 (defun project--find-in-directory (dir)
   (run-hook-with-args-until-success 'project-find-functions dir))
@@ -922,7 +935,7 @@ requires quoting, e.g. `\\[quoted-insert]<space>'."
   (require 'xref)
   (require 'grep)
   (let* ((caller-dir default-directory)
-         (pr (project-current t))
+         (pr (project-most-recent-project))
          (default-directory (project-root pr))
          (files
           (if (not current-prefix-arg)
@@ -954,7 +967,7 @@ With \\[universal-argument] prefix, you can specify the file name
 pattern to search for."
   (interactive (list (project--read-regexp)))
   (require 'xref)
-  (let* ((pr (project-current t))
+  (let* ((pr (project-most-recent-project))
          (default-directory (project-root pr))
          (files
           (project-files pr (cons
@@ -990,7 +1003,7 @@ If INCLUDE-ALL is non-nil, or with prefix argument when called
 interactively, include all files under the project root, except
 for VCS directories listed in `vc-directory-exclusion-list'."
   (interactive "P")
-  (let* ((pr (project-current t))
+  (let* ((pr (project-most-recent-project))
          (root (project-root pr))
          (dirs (list root)))
     (project-find-file-in
@@ -1009,7 +1022,7 @@ If INCLUDE-ALL is non-nil, or with prefix argument when called
 interactively, include all files under the project root, except
 for VCS directories listed in `vc-directory-exclusion-list'."
   (interactive "P")
-  (let* ((pr (project-current t))
+  (let* ((pr (project-most-recent-project))
          (dirs (cons
                 (project-root pr)
                 (project-external-roots pr))))
@@ -1124,7 +1137,7 @@ directories listed in `vc-directory-exclusion-list'."
 (defun project-find-dir ()
   "Start Dired in a directory inside the current project."
   (interactive)
-  (let* ((project (project-current t))
+  (let* ((project (project-most-recent-project))
          (all-files (project-files project))
          (completion-ignore-case read-file-name-completion-ignore-case)
          ;; FIXME: This misses directories without any files directly
@@ -1144,13 +1157,13 @@ directories listed in `vc-directory-exclusion-list'."
 (defun project-dired ()
   "Start Dired in the current project's root."
   (interactive)
-  (dired (project-root (project-current t))))
+  (dired (project-root (project-most-recent-project))))
 
 ;;;###autoload
 (defun project-vc-dir ()
   "Run VC-Dir in the current project's root."
   (interactive)
-  (vc-dir (project-root (project-current t))))
+  (vc-dir (project-root (project-most-recent-project))))
 
 (declare-function comint-check-proc "comint")
 
@@ -1163,7 +1176,7 @@ With \\[universal-argument] prefix arg, create a new inferior shell buffer even
 if one already exists."
   (interactive)
   (require 'comint)
-  (let* ((default-directory (project-root (project-current t)))
+  (let* ((default-directory (project-root (project-most-recent-project)))
          (default-project-shell-name (project-prefixed-buffer-name "shell"))
          (shell-buffer (get-buffer default-project-shell-name)))
     (if (and shell-buffer (not current-prefix-arg))
@@ -1181,7 +1194,7 @@ With \\[universal-argument] prefix arg, create a new Eshell buffer even
 if one already exists."
   (interactive)
   (defvar eshell-buffer-name)
-  (let* ((default-directory (project-root (project-current t)))
+  (let* ((default-directory (project-root (project-most-recent-project)))
          (eshell-buffer-name (project-prefixed-buffer-name "eshell"))
          (eshell-buffer (get-buffer eshell-buffer-name)))
     (if (and eshell-buffer (not current-prefix-arg))
@@ -1193,7 +1206,7 @@ if one already exists."
   "Run `async-shell-command' in the current project's root directory."
   (declare (interactive-only async-shell-command))
   (interactive)
-  (let ((default-directory (project-root (project-current t))))
+  (let ((default-directory (project-root (project-most-recent-project))))
     (call-interactively #'async-shell-command)))
 
 ;;;###autoload
@@ -1201,7 +1214,7 @@ if one already exists."
   "Run `shell-command' in the current project's root directory."
   (declare (interactive-only shell-command))
   (interactive)
-  (let ((default-directory (project-root (project-current t))))
+  (let ((default-directory (project-root (project-most-recent-project))))
     (call-interactively #'shell-command)))
 
 (declare-function fileloop-continue "fileloop" ())
@@ -1214,7 +1227,7 @@ To continue searching for the next match, use the
 command \\[fileloop-continue]."
   (interactive "sSearch (regexp): ")
   (fileloop-initialize-search
-   regexp (project-files (project-current t)) 'default)
+   regexp (project-files (project-most-recent-project)) 'default)
   (fileloop-continue))
 
 ;;;###autoload
@@ -1237,7 +1250,10 @@ If you exit the `query-replace', you can later continue the
    ;; XXX: Filter out Git submodules, which are not regular files.
    ;; `project-files' can return those, which is arguably suboptimal,
    ;; but removing them eagerly has performance cost.
-   (cl-delete-if-not #'file-regular-p (project-files (project-current t)))
+   (cl-delete-if (lambda (file)
+                   (or (not (file-regular-p file))
+                       (find-file-name-handler file 'insert-file-contents)))
+                 (project-files (project-most-recent-project)))
    'default)
   (fileloop-continue))
 
@@ -1268,7 +1284,7 @@ If non-nil, it overrides `compilation-buffer-name-function' for
   "Run `compile' in the project root."
   (declare (interactive-only compile))
   (interactive)
-  (let ((default-directory (project-root (project-current t)))
+  (let ((default-directory (project-root (project-most-recent-project)))
         (compilation-buffer-name-function
          (or project-compilation-buffer-name-function
              compilation-buffer-name-function)))
@@ -1298,7 +1314,7 @@ general form of conditions."
   :package-version '(project . "0.8.2"))
 
 (defun project--read-project-buffer ()
-  (let* ((pr (project-current t))
+  (let* ((pr (project-most-recent-project))
          (current-buffer (current-buffer))
          (other-buffer (other-buffer current-buffer))
          (other-name (buffer-name other-buffer))
@@ -1363,7 +1379,7 @@ By default, all project buffers are listed except those whose names
 start with a space (which are for internal use).  With prefix argument
 ARG, show only buffers that are visiting files."
   (interactive "P")
-  (let* ((pr (project-current t))
+  (let* ((pr (project-most-recent-project))
          (buffer-list-function
           (lambda ()
             (seq-filter
@@ -1504,7 +1520,7 @@ interactively.
 
 Also see the `project-kill-buffers-display-buffer-list' variable."
   (interactive)
-  (let* ((pr (project-current t))
+  (let* ((pr (project-most-recent-project))
          (bufs (project--buffers-to-kill pr))
          (query-user (lambda ()
                        (yes-or-no-p
@@ -1621,19 +1637,17 @@ The project is chosen among projects known from the project list,
 see `project-list-file'.
 It's also possible to enter an arbitrary directory not in the list."
   (project--ensure-read-project-list)
-  (let* ((dir-choice "... (choose a dir)")
-         (choices
-          ;; XXX: Just using this for the category (for the substring
-          ;; completion style).
-          (project--file-completion-table
-           (append project--list `(,dir-choice))))
-         (pr-dir ""))
-    (while (equal pr-dir "")
-      ;; If the user simply pressed RET, do this again until they don't.
-      (setq pr-dir (completing-read "Select project: " choices nil t)))
-    (if (equal pr-dir dir-choice)
+  (let* (pr
+         (dir-choice "... (choose a dir)")
+         (choices (project--file-completion-table
+                   (append project--list `(,dir-choice)))))
+    (while (string-empty-p
+            ;; Even under require-match, `completing-read' allows RET
+            ;; to yield an empty string.
+            (setq pr (completing-read "Select project: " choices nil t))))
+    (if (equal pr dir-choice)
         (read-directory-name "Select directory: " default-directory nil t)
-      pr-dir)))
+      pr)))
 
 ;;;###autoload
 (defun project-known-project-roots ()
@@ -1646,7 +1660,7 @@ It's also possible to enter an arbitrary directory not in the list."
   "Execute an extended command in project root."
   (declare (interactive-only command-execute))
   (interactive)
-  (let ((default-directory (project-root (project-current t))))
+  (let ((default-directory (project-root (project-most-recent-project))))
     (call-interactively #'execute-extended-command)))
 
 (defun project-remember-projects-under (dir &optional recursive)
@@ -1816,18 +1830,22 @@ are legal even if they aren't listed in the dispatch menu."
 
 ;;;###autoload
 (defun project-switch-project (dir)
-  "\"Switch\" to another project by running an Emacs command.
+  "Switch to another project by running an Emacs command.
 The available commands are presented as a dispatch menu
 made from `project-switch-commands'.
 
 When called in a program, it will use the project corresponding
 to directory DIR."
   (interactive (list (project-prompt-project-dir)))
-  (let ((command (if (symbolp project-switch-commands)
-                     project-switch-commands
-                   (project--switch-project-command))))
-    (let ((project-current-directory-override dir))
-      (call-interactively command))))
+  (if-let ((pr (let ((default-directory dir))
+                 (project-current)))
+           (mru (car (project-buffers pr))))
+      (project-switch-to-buffer mru)
+    (let ((command (if (symbolp project-switch-commands)
+                       project-switch-commands
+                     (project--switch-project-command))))
+      (let ((project-current-directory-override dir))
+        (call-interactively command)))))
 
 (provide 'project)
 ;;; project.el ends here
