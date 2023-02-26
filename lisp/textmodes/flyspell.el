@@ -532,7 +532,18 @@ in your init file.
 	  (flyspell-mode-on (called-interactively-p 'interactive))
 	(error (message "Error enabling Flyspell mode:\n%s" (cdr err))
 	       (flyspell-mode -1)))
-    (flyspell-mode-off)))
+    (flyspell-mode-off))
+  (unless flyspell-synchronous
+    (if flyspell-mode
+        (jit-lock-register #'flyspell-async--schedule)
+      (jit-lock-unregister #'flyspell-async--schedule))
+    (remove-hook 'post-command-hook #'flyspell-post-command-hook t)
+    (remove-hook 'pre-command-hook #'flyspell-pre-command-hook t)
+    (remove-hook 'after-change-functions #'flyspell-after-change-function t)
+    (save-restriction
+      (widen)
+      (flyspell-delete-all-overlays)
+      (remove-text-properties (point-min) (point-max) '(flyspell-pending t)))))
 
 ;;;###autoload
 (defun turn-on-flyspell ()
@@ -2004,6 +2015,25 @@ spell-check."
           (setq flyspell-auto-correct-region nil))
       ;; Use the correct dictionary.
       (flyspell-accept-buffer-local-defs)
+      ;; Flyspell async case: populate suggestion list so we skip the
+      ;; else branch of the following `if' altogether.
+      (when-let* ((data (and (not flyspell-synchronous)
+                             (not flyspell-auto-correct-region)
+                             (get-char-property-and-overlay
+                              (point) 'flyspell-corrections)))
+                  (ov (cdr data))
+                  (corrections (car data))
+                  (word (buffer-substring-no-properties
+                                          (overlay-start ov)
+                                          (overlay-end ov)))
+                  (ring (setcdr (last corrections)
+                                (cons word corrections))))
+        (setq flyspell-auto-correct-pos (point)
+              flyspell-auto-correct-word word
+              flyspell-auto-correct-ring ring
+              flyspell-auto-correct-region (cons (overlay-start ov)
+                                                 (- (overlay-end ov)
+                                                    (overlay-start ov)))))
       (if (and (eq flyspell-auto-correct-pos pos)
                (consp flyspell-auto-correct-region))
           ;; We have already been using the function at the same location.
@@ -2387,6 +2417,183 @@ This function is meant to be added to `flyspell-incorrect-hook'."
 ;;*---------------------------------------------------------------------*/
 (defun flyspell-change-abbrev (table old new)
   (set (abbrev-symbol old table) new))
+
+;;; Asynchronous operation
+
+(defvar flyspell-synchronous t
+  "If non-nil, disable asynchronous Flyspell operation.")
+
+(defvar-local flyspell-async--current-request nil)
+(defvar-local flyspell-async--request-pool nil)
+(defvar-local flyspell-async--recheck-timer nil)
+(defvar flyspell-async--procs nil
+  "A collection of ispell processes for asynchronous Flyspell.")
+
+(defun flyspell-async-ignore-word-p (_start end)
+  (when flyspell-generic-check-word-predicate
+    (save-excursion
+      (goto-char end)
+      (not (funcall flyspell-generic-check-word-predicate)))))
+
+(defun flyspell-async--process-parameters ()
+  "Return a list of parameters for this buffer's ispell process.
+Buffers where this produces `equal' results can share their
+ispell process."
+  (list ispell-program-name
+        ispell-current-dictionary
+        ispell-current-personal-dictionary
+        ispell-extra-args))
+
+(defun flyspell-async--get-process ()
+  "Get an ispell process for the current buffer."
+  (let* ((params (flyspell-async--process-parameters))
+         (proc (plist-get flyspell-async--procs params #'equal)))
+    (if (process-live-p proc)
+        proc
+      (unless ispell-async-processp
+        (error "Asynchornous Flyspell requires `ispell-async-processp'"))
+      (setq proc (ispell-start-process))
+      (setq flyspell-async--procs
+            (plist-put flyspell-async--procs params proc #'equal))
+      (set-process-filter proc #'flyspell-async--process-filter)
+      (set-process-buffer proc (generate-new-buffer " *flyspell-async*"))
+      (process-send-string proc "!\n")  ;Enter terse mode
+      proc)))
+
+(defun flyspell-async--process-filter (proc string)
+  (with-current-buffer (process-buffer proc)
+    (save-excursion
+      (goto-char (point-max))
+      (insert string))
+    (when (re-search-forward "^\n" nil t)
+      (pcase-let ((`(,buffer ,tick ,start ,end)
+                   (process-get proc 'flyspell-async--current-request)))
+        (process-put proc 'flyspell-async--current-request nil)
+        (cond ((not (buffer-live-p buffer)))
+              ((not (eq tick (buffer-chars-modified-tick buffer)))
+               ;; Got a belated response, so schedule a retry
+               (flyspell-async--schedule-recheck buffer))
+              (t ;; Response is good, apply misspelling overlays
+               (let (misspellings)
+                 (goto-char (point-min))
+                 (while (re-search-forward
+                         (rx bol
+                             (or (seq (any "&?")
+                                      " " (group-n 1 (+ (not " ")))
+                                      " " (+ digit)
+                                      " " (group-n 2 (+ digit))
+                                      ":")
+                                 (seq "#"
+                                      " " (group-n 1 (+ (not " ")))
+                                      " " (group-n 2 (+ digit)))))
+                         nil t)
+                   (let ((word (match-string 1))
+                         (start (string-to-number (match-string 2)))
+                         corrections)
+                     (goto-char (match-end 0))
+                     (while (re-search-forward (rx (+ (not (any ", \n"))))
+                                               (pos-eol) t)
+                       (push (match-string 0) corrections))
+                     (push (list word start (nreverse corrections))
+                           misspellings)))
+                 (flyspell-async--put-overlays buffer start end misspellings))))
+        (delete-region (point-min) (point-max))
+        ;; Send next request to ispell process, if applicable
+        (let (request)
+          (while (and (setq request (pop (process-get proc 'flyspell-async--requests)))
+                      (pcase-let ((`(,buffer ,tick) request))
+                        (not (and (buffer-live-p buffer)
+                                  (eq tick (buffer-chars-modified-tick buffer))))))
+            (when (buffer-live-p buffer)
+              (flyspell-async--schedule-recheck (car request))))
+          (when request
+            (flyspell-async--send-request proc request)))))))
+
+(defun flyspell-async--put-overlays (buffer start end misspellings)
+  (with-current-buffer buffer
+    (with-silent-modifications
+      (put-text-property start end 'flyspell-pending nil)
+      (dolist (ov (overlays-in start end))
+        (when (eq 'flyspell-incorrect (overlay-get ov 'face))
+          (delete-overlay ov)))
+      (pcase-dolist (`(,word ,offset ,corrections) misspellings)
+        (when-let* ((wstart (+ start offset -1))
+                    (wend (+ wstart (length word)))
+                    (ov (unless (flyspell-async-ignore-word-p wstart wend)
+                          (make-flyspell-overlay wstart wend
+                                                 'flyspell-incorrect
+                                                 'highlight))))
+          ;; For debugging
+          (unless (equal word (buffer-substring-no-properties wstart wend))
+            (message "Shouldn't happen %s %s %s" word start (buffer-substring-no-properties wstart wend)))
+          (overlay-put ov 'flyspell-corrections corrections))))))
+
+(defun flyspell-async--send-request (proc request)
+  (process-put proc 'flyspell-async--current-request request)
+  (pcase-let ((`(,buffer _ ,start ,end) request))
+    (with-current-buffer buffer
+      (let ((text (buffer-substring-no-properties start end)))
+        ;; Redact control characters in `text'.
+        (dotimes (i (length text))
+          (when (< (aref text i) ?\s)
+            (aset text i ?\s)))
+        (process-send-string proc "^")
+        (process-send-string proc text)
+        (process-send-string proc "\n")))))
+
+(defun flyspell-async--schedule-recheck (buffer)
+  (message "Scheduled recheck") ;; For debugging
+  (with-current-buffer buffer
+    (when (timerp flyspell-async--recheck-timer)
+      (cancel-timer flyspell-async--recheck-timer))
+    (setq flyspell-async--recheck-timer
+          (run-with-idle-timer 0.1 nil #'flyspell-async--recheck buffer))))
+
+(defun flyspell-async--recheck (buffer)
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (let ((proc (flyspell-async--get-process))
+            (tick (buffer-chars-modified-tick))
+            (end (point-min))
+            (limit (point-max))
+            start)
+        (while (setq start (text-property-any end limit 'flyspell-pending t))
+          (setq end (or (text-property-not-all start limit 'flyspell-pending t)
+                        limit))
+          (push (list buffer tick start end) (process-get proc 'flyspell-async--requests)))
+        (when-let ((request (and (not (process-get proc 'flyspell-async--current-request))
+                                 (pop (process-get proc 'flyspell-async--requests)))))
+          (flyspell-async--send-request proc request))))))
+
+(defun flyspell-async--schedule (start end)
+  "Schedule a Flyspell check of region between START and END.
+This is intended be a member of `jit-lock-functions'."
+  (save-excursion ;; Extend region to include whole words
+    (goto-char start)
+    (setq start (if (re-search-backward "\\s-" nil t) (match-end 0) (point-min)))
+    (goto-char end)
+    (setq end (or (re-search-forward "\\s-" nil t) (point-max))))
+  (put-text-property start end 'flyspell-pending t)
+  (let ((proc (flyspell-async--get-process))
+        (request (list (current-buffer) (buffer-chars-modified-tick) start end)))
+    (if (process-get proc 'flyspell-async--current-request)
+        (push request (process-get proc 'flyspell-async--requests))
+      (flyspell-async--send-request proc request)))
+  `(jit-lock-bounds ,start . ,end))
+
+(define-minor-mode flyspell-async
+  "Asynchronous Flyspell"
+  :global nil :lighter " FlyAsync"
+  (flyspell-mode -1)
+  (if flyspell-async
+      (jit-lock-register #'flyspell-async--schedule)
+    (jit-lock-unregister #'flyspell-async--schedule))
+  (save-restriction
+    (widen)
+    (dolist (ov (overlays-in (point-min) (point-max)))
+        (when (eq 'flyspell-incorrect (overlay-get ov 'face))
+          (delete-overlay ov)))
+    (remove-text-properties (point-min) (point-max) '(flyspell-pending t))))
 
 (provide 'flyspell)
 
