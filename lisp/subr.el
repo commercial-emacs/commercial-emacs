@@ -762,7 +762,9 @@ one is kept.  See `seq-uniq' for non-destructive operation."
 (defun delete-consecutive-dups (list &optional circular)
   "Destructively remove `equal' consecutive duplicates from LIST.
 First and last elements are considered consecutive if CIRCULAR is
-non-nil."
+non-nil.
+Of several consecutive `equal' occurrences, the one earliest in
+the list is kept."
   (let ((tail list) last)
     (while (cdr tail)
       (if (equal (car tail) (cadr tail))
@@ -798,6 +800,7 @@ TO as (+ FROM (* N INC)) or use a variable whose value was
 computed with this exact expression.  Alternatively, you can,
 of course, also replace TO with a slightly larger value
 \(or a slightly more negative value if INC is negative)."
+  (declare (side-effect-free t))
   (if (or (not to) (= from to))
       (list from)
     (or inc (setq inc 1))
@@ -819,6 +822,7 @@ of course, also replace TO with a slightly larger value
 If TREE is a cons cell, this recursively copies both its car and its cdr.
 Contrast to `copy-sequence', which copies only along the cdrs.  With second
 argument VECP, this copies vectors as well as conses."
+  (declare (side-effect-free t))
   (if (consp tree)
       (let (result)
 	(while (consp tree)
@@ -5024,11 +5028,13 @@ wherever possible, since it is slow."
 (defsubst looking-at-p (regexp)
   "\
 Same as `looking-at' except this function does not change the match data."
+  (declare (side-effect-free t))
   (looking-at regexp t))
 
 (defsubst string-match-p (regexp string &optional start)
   "\
 Same as `string-match' except this function does not change the match data."
+  (declare (side-effect-free t))
   (string-match regexp string start t))
 
 (defun subregexp-context-p (regexp pos &optional start)
@@ -5299,7 +5305,7 @@ Upper-case and lower-case letters are treated as equal.
 Unibyte strings are converted to multibyte for comparison.
 
 See also `string-equal'."
-  (declare (pure t) (side-effect-free t))
+  (declare (side-effect-free t))
   (eq t (compare-strings string1 0 nil string2 0 nil t)))
 
 (defun string-prefix-p (prefix string &optional ignore-case)
@@ -5626,6 +5632,7 @@ integer that encodes the corresponding syntax class.  See Info
 node `(elisp)Syntax Table Internals' for a list of codes.
 
 If SYNTAX is nil, return nil."
+  (declare (pure t) (side-effect-free t))
   (and syntax (logand (car syntax) 65535)))
 
 ;; Utility motion commands
@@ -6430,6 +6437,7 @@ Note that a version specified by the list (1) is equal to (1 0),
 \(1 0 0), (1 0 0 0), etc.  That is, the trailing zeros are insignificant.
 Also, a version given by the list (1) is higher than (1 -1), which in
 turn is higher than (1 -2), which is higher than (1 -3)."
+  (declare (pure t) (side-effect-free t))
   (while (and l1 l2 (= (car l1) (car l2)))
     (setq l1 (cdr l1)
 	  l2 (cdr l2)))
@@ -6451,6 +6459,7 @@ Note that a version specified by the list (1) is equal to (1 0),
 \(1 0 0), (1 0 0 0), etc.  That is, the trailing zeros are insignificant.
 Also, a version given by the list (1) is higher than (1 -1), which in
 turn is higher than (1 -2), which is higher than (1 -3)."
+  (declare (pure t) (side-effect-free t))
   (while (and l1 l2 (= (car l1) (car l2)))
     (setq l1 (cdr l1)
 	  l2 (cdr l2)))
@@ -6472,6 +6481,7 @@ Note that integer list (1) is equal to (1 0), (1 0 0), (1 0 0 0),
 etc.  That is, the trailing zeroes are insignificant.  Also, integer
 list (1) is greater than (1 -1) which is greater than (1 -2)
 which is greater than (1 -3)."
+  (declare (pure t) (side-effect-free t))
   (while (and l1 l2 (= (car l1) (car l2)))
     (setq l1 (cdr l1)
 	  l2 (cdr l2)))
@@ -6489,6 +6499,7 @@ which is greater than (1 -3)."
   "Return the first non-zero element of LST, which is a list of integers.
 
 If all LST elements are zeros or LST is nil, return zero."
+  (declare (pure t) (side-effect-free t))
   (while (and lst (zerop (car lst)))
     (setq lst (cdr lst)))
   (if lst
@@ -6655,6 +6666,7 @@ REGEXP defaults to \"[ \\t\\n\\r]+\"."
   "Trim STRING of trailing string matching REGEXP.
 
 REGEXP defaults to  \"[ \\t\\n\\r]+\"."
+  (declare (side-effect-free t))
   (let ((i (string-match-p (concat "\\(?:" (or regexp "[ \t\n\r]+") "\\)\\'")
                            string)))
     (if i (substring string 0 i) string)))
@@ -6726,6 +6738,7 @@ sentence (see Info node `(elisp) Documentation Tips')."
   "Return OBJECT as a list.
 If OBJECT is already a list, return OBJECT itself.  If it's
 not a list, return a one-element list containing OBJECT."
+  (declare (side-effect-free error-free))
   (if (listp object)
       object
     (list object)))
@@ -6801,6 +6814,7 @@ is inserted before adjusting the number of empty lines."
 If OMIT-NULLS, empty lines will be removed from the results.
 If KEEP-NEWLINES, don't strip trailing newlines from the result
 lines."
+  (declare (side-effect-free t))
   (if (equal string "")
       (if omit-nulls
           nil
