@@ -1233,9 +1233,9 @@ If you exit the `query-replace', you can later continue the
    ;; XXX: Filter out Git submodules, which are not regular files.
    ;; `project-files' can return those, which is arguably suboptimal,
    ;; but removing them eagerly has performance cost.
-   (cl-delete-if (lambda (file)
-                   (or (not (file-regular-p file))
-                       (find-file-name-handler file 'insert-file-contents)))
+   (cl-delete-if-not (lambda (file)
+                       (and (file-regular-p file)
+                            (not (find-file-name-handler file 'insert-file-contents))))
                  (project-files (project-most-recent-project)))
    'default)
   (fileloop-continue))

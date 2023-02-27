@@ -110,6 +110,63 @@ When `project-ignores' includes a name matching project dir."
                      (list
                       (expand-file-name "some-file" dir)))))))
 
+(ert-deftest project-switch-project-extant-buffer ()
+  "Prefer just switching to the mru buffer of the switched-to project instead
+of bringing up `project-switch-commands'."
+  (ert-with-temp-directory dir1
+    (ert-with-temp-directory dir2
+      (cl-letf* ((switch-called-on nil)
+                 ((symbol-function 'switch-project)
+                  (lambda () (interactive)
+                    (setq default-directory project-current-directory-override
+                          switch-called-on default-directory)))
+                 (project1 (make-project-tests--trivial :root dir1))
+                 (project2 (make-project-tests--trivial :root dir2))
+                 (project-find-functions
+                  (list (lambda (dir)
+                          (assoc-default dir (list (cons dir1 project1)
+                                                   (cons dir2 project2))))))
+                 (project-switch-commands 'switch-project)
+                 (buf2 (progn
+                         (make-empty-file (expand-file-name "some-file" dir2))
+                         (find-file-noselect (expand-file-name "some-file" dir2)))))
+        (project-switch-project dir1)
+        (should (equal switch-called-on dir1))
+        (should (equal (project-root (project-current)) dir1))
+        (project-switch-project dir2)
+        (should (equal switch-called-on dir1)) ; not dir2
+        (should (equal (project-root (project-current)) dir2))
+        (should (eq (current-buffer) buf2))
+        (let (kill-buffer-query-functions) (kill-buffer buf2))))))
+
+(ert-deftest project-assume-mru-project ()
+  "Assume mru project if default-directory is project-less."
+  (ert-with-temp-directory dir1
+    (ert-with-temp-directory dir2
+      (cl-letf* ((project2 (make-project-tests--trivial :root dir2))
+                 (project-find-functions
+                  (list (lambda (dir)
+                          (assoc-default dir (list (cons dir2 project2))))))
+                 (buf1 (progn
+                         (make-empty-file (expand-file-name "some-file" dir1))
+                         (find-file-noselect (expand-file-name "some-file" dir1))))
+                 (buf2 (progn
+                         (make-empty-file (expand-file-name "some-file" dir2))
+                         (find-file-noselect (expand-file-name "some-file" dir2))))
+                 ((symbol-function 'read-buffer)
+                  (lambda (prompt other-buffer &rest _args)
+                    other-buffer)))
+        (switch-to-buffer buf1)
+        (should-not (project-current))
+        (switch-to-buffer buf2)
+        (should (equal (project-root (project-current)) dir2))
+        (switch-to-buffer buf1)
+        (call-interactively #'project-switch-to-buffer)
+        (should (eq (current-buffer) buf2))
+        (let (kill-buffer-query-functions)
+          (kill-buffer buf1)
+          (kill-buffer buf2))))))
+
 (defvar project-tests--this-file (or (bound-and-true-p byte-compile-current-file)
                                      (and load-in-progress load-file-name)
                                      buffer-file-name))
