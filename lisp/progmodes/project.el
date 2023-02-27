@@ -1031,7 +1031,7 @@ by the user at will."
               ""))
          (prompt (if (string-empty-p common-parent-directory)
                      prompt
-                   (format "%s in %s"
+                   (format "%s [s]"
                            prompt
                            (directory-file-name common-parent-directory))))
          (substrings (mapcar (lambda (s)
