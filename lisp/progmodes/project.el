@@ -618,9 +618,8 @@ See `project-vc-extra-root-markers' for the marker value format.")
                                 'project-vc-include-untracked
                                 dir))
             files)
-       (setq args (append args
-                          '("-c" "--exclude-standard")
-                          (and include-untracked '("-o"))))
+       (setq args (append args '("-c" "--exclude-standard")
+                          (when include-untracked '("-o"))))
        (when extra-ignores
          (setq args (append args
                             (cons "--"
@@ -665,8 +664,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
                        backend
                        extra-ignores)))
                   submodules)))
-           (setq files
-                 (apply #'nconc files sub-files))))
+           (setq files (apply #'nconc files sub-files))))
        ;; 'git ls-files' returns duplicate entries for merge conflicts.
        ;; XXX: Better solutions welcome, but this seems cheap enough.
        (delete-consecutive-dups files)))
@@ -679,16 +677,12 @@ See `project-vc-extra-root-markers' for the marker value format.")
                         "--no-status"
                         "-0")))
        (when extra-ignores
-         (setq args (nconc args
-                           (mapcan
-                            (lambda (i)
-                              (list "--exclude" i))
-                            extra-ignores))))
+         (setq args (nconc args (mapcan (lambda (i) (list "--exclude" i))
+                                        extra-ignores))))
        (with-temp-buffer
          (apply #'vc-hg-command t 0 "." "status" args)
-         (mapcar
-          (lambda (s) (concat (file-name-as-directory dir) s))
-          (split-string (buffer-string) "\0" t)))))))
+         (mapcar (lambda (s) (concat (file-name-as-directory dir) s))
+                 (split-string (buffer-string) "\0" t)))))))
 
 (defun project--vc-merge-submodules-p (dir)
   (project--value-in-dir
@@ -1029,36 +1023,36 @@ by the user at will."
                 (unless (zerop (length common-prefix))
                   (file-name-directory common-prefix)))
               ""))
-         (prompt (if (string-empty-p common-parent-directory)
-                     prompt
-                   (format "%s [%s]"
-                           prompt
-                           (directory-file-name common-parent-directory))))
-         (substrings (mapcar (lambda (s)
-                               (let ((rel (substring s (length common-parent-directory))))
-                                 (if (string-empty-p rel)
-                                     (file-name-as-directory ".")
-                                   rel)))
-                             all-files))
-         (new-collection (project--file-completion-table substrings))
-         (abbr-cpd (abbreviate-file-name common-parent-directory))
-         (abbr-cpd-length (length abbr-cpd))
-         (relname (cl-letf ((history-add-new-input nil)
-                            ((symbol-value hist)
-                             (mapcan
-                              (lambda (s)
-                                (and (string-prefix-p abbr-cpd s)
-                                     (not (eq abbr-cpd-length (length s)))
-                                     (list (substring s abbr-cpd-length))))
-                              (symbol-value hist))))
-                    (project--completing-read-strict prompt
-                                                     new-collection
-                                                     predicate
-                                                     hist mb-default)))
+         (relname (cl-letf* ((new-collection
+                              (project--file-completion-table
+                               (mapcar
+                                (lambda (file)
+                                  (let ((s (substring
+                                            file (length common-parent-directory))))
+                                    (if (string-empty-p s) "." s)))
+                                all-files)))
+                             (history-add-new-input nil)
+                             (abbr-cpd (abbreviate-file-name common-parent-directory))
+                             (abbr-cpd-length (length abbr-cpd))
+                             ((symbol-value hist)
+                              (mapcan
+                               (lambda (s)
+                                 (and (string-prefix-p abbr-cpd s)
+                                      (not (eq abbr-cpd-length (length s)))
+                                      (list (substring s abbr-cpd-length))))
+                               (symbol-value hist))))
+                    (project--completing-read-strict
+                     (concat prompt
+                             (unless (string-empty-p common-parent-directory)
+                               (format " [%s]" (directory-file-name
+                                                common-parent-directory))))
+                     new-collection
+                     predicate
+                     hist mb-default)))
          (absname (expand-file-name relname common-parent-directory)))
-    (when (and hist history-add-new-input)
-      (add-to-history hist (abbreviate-file-name absname)))
-    absname))
+    (prog1 absname
+      (when (and hist history-add-new-input)
+        (add-to-history hist (abbreviate-file-name absname))))))
 
 (defun project--read-file-absolute (prompt
                                     all-files &optional predicate
@@ -1081,12 +1075,11 @@ directories listed in `vc-directory-exclusion-list'."
                            (lambda (dir)
                              (concat dir "/"))
                            vc-directory-exclusion-list))
-         (all-files
-          (if include-all
-              (mapcan
-               (lambda (dir) (project--files-in-directory dir vc-dirs-ignores))
-               dirs)
-            (project-files project dirs)))
+         (all-files (if include-all
+                        (mapcan (lambda (dir)
+                                  (project--files-in-directory dir vc-dirs-ignores))
+                                dirs)
+                      (project-files project dirs)))
          (completion-ignore-case read-file-name-completion-ignore-case)
          (file (funcall project-read-file-name-function
                         "Find file" all-files nil 'file-name-history
