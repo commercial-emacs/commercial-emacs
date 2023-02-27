@@ -14450,6 +14450,12 @@ Here's an example method that's more complex:
 @item nnimap-address
 The address of the server, like @samp{imap.gmail.com}.
 
+@item nnimap-user
+Username to use for authentication to the @acronym{IMAP} server.  This
+corresponds to the value of the @samp{login} token in your
+@file{~/.authinfo} file.  Set this variable if you want to access
+multiple accounts from the same @acronym{IMAP} server.
+
 @item nnimap-server-port
 If the server uses a non-standard port, that can be specified here.  A
 typical port would be @code{"imap"} or @code{"imaps"}.
