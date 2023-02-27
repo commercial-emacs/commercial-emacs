@@ -1824,7 +1824,7 @@ to directory DIR."
   (interactive (list (project-prompt-project-dir)))
   (if-let ((pr (let ((default-directory dir))
                  (project-current)))
-           (mru (car (project-buffers pr))))
+           (mru (cl-find-if #'buffer-file-name (project-buffers pr))))
       (project-switch-to-buffer mru)
     (let ((command (if (symbolp project-switch-commands)
                        project-switch-commands
