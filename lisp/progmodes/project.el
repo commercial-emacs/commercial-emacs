@@ -202,15 +202,6 @@ CL struct.")
 When it is non-nil, `project-current' will always skip prompting too.")
 
 ;;;###autoload
-(defun project-most-recent-project ()
-  (project--ensure-read-project-list)
-  (let ((pr (or (project-current)
-                (when-let ((mru (caar project--list)))
-                  (project--find-in-directory mru))
-                (project-get-project))))
-    (prog1 pr (project-remember-project pr))))
-
-;;;###autoload
 (defun project-get-project (&optional directory)
   "Return the project for DIRECTORY, and mark as most recently used.
 DIRECTORY defaults to `default-directory'.  If no project obtains
@@ -1579,6 +1570,15 @@ With some possible metadata (to be decided).")
             (print-level nil))
         (pp project--list (current-buffer)))
       (write-region nil nil filename nil 'silent))))
+
+;;;###autoload
+(defun project-most-recent-project ()
+  (project--ensure-read-project-list)
+  (let ((pr (or (project-current)
+                (when-let ((mru (caar project--list)))
+                  (project--find-in-directory mru))
+                (project-get-project))))
+    (prog1 pr (project-remember-project pr))))
 
 ;;;###autoload
 (defun project-remember-project (pr &optional _no-write)
