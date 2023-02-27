@@ -1040,7 +1040,9 @@ by the user at will."
               ""))
          (prompt (if (string-empty-p common-parent-directory)
                      prompt
-                   (concat prompt (format " in %s" common-parent-directory))))
+                   (format "%s in %s"
+                           prompt
+                           (directory-file-name common-parent-directory))))
          (substrings (mapcar (lambda (s)
                                (let ((rel (substring s (length common-parent-directory))))
                                  (if (string-empty-p rel)
