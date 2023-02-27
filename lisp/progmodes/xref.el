@@ -1900,7 +1900,7 @@ to control which program to use when looking for matches."
     (with-current-buffer output
       (erase-buffer)
       (with-temp-buffer
-        (insert (mapconcat #'identity files "\0"))
+        (insert (mapconcat #'expand-file-name files "\0"))
         (setq default-directory dir)
         (setq status
               (xref--with-connection-local-variables

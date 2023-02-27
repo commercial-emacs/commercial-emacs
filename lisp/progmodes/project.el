@@ -237,7 +237,7 @@ project instance and do not adjust recently used projects."
   "Return the project for DIRECTORY.
 DIRECTORY defaults to `default-directory'.
 Under MAYBE-PROMPT, calls `project-get-project'."
-  ;; Gradually replace occurences of (project-current t)
+  ;; Gradually replace occurrences of (project-current t)
   ;; with (project-get-project), and replace (project-current nil dir)
   ;; with (let ((default-directory dir)) (project-current))
   (if maybe-prompt
@@ -340,11 +340,6 @@ to find the list of ignores for each directory."
   (require 'find-dired)
   (require 'xref)
   (let* ((default-directory dir)
-         ;; Make sure ~/ etc. in local directory name is
-         ;; expanded and not left for the shell command
-         ;; to interpret.
-         (localdir (file-name-unquote (file-local-name (expand-file-name dir))))
-         (dfn (directory-file-name localdir))
          (command (format "%s -H . %s -type f %s -print0"
                           find-program
                           (xref--find-ignores-arguments ignores "./")
@@ -360,14 +355,12 @@ to find the list of ignores for each directory."
                             "")))
          res)
     (with-temp-buffer
-      (let ((status
-             (process-file-shell-command command nil t))
+      (let ((status (process-file-shell-command command nil t))
             (pt (point-min)))
         (unless (zerop status)
           (goto-char (point-min))
-          (if (and
-               (not (eql status 127))
-               (search-forward "Permission denied\n" nil t))
+          (if (and (not (eql status 127))
+                   (search-forward "Permission denied\n" nil t))
               (let ((end (1- (point))))
                 (re-search-backward "\\`\\|\0")
                 (error "File listing failed: %s"
@@ -378,21 +371,17 @@ to find the list of ignores for each directory."
           (push (buffer-substring-no-properties (1+ pt) (1- (point)))
                 res)
           (setq pt (point)))))
-    (project--remote-file-names
-     (mapcar (lambda (s) (concat dfn s))
-             (sort res #'string<)))))
-
-(defun project--remote-file-names (local-files)
-  "Return LOCAL-FILES as if they were on the system of `default-directory'.
-Also quote LOCAL-FILES if `default-directory' is quoted."
-  (let ((remote-id (file-remote-p default-directory)))
-    (if (not remote-id)
-        (if (file-name-quoted-p default-directory)
-            (mapcar #'file-name-quote local-files)
-          local-files)
-      (mapcar (lambda (file)
-                (concat remote-id file))
-              local-files))))
+    (setq res (sort res #'string<))
+    (if-let ((remote-id (file-remote-p default-directory)))
+        (mapcar (lambda (file)
+                  (concat remote-id
+                          (directory-file-name
+                           (file-name-unquote
+                            (file-local-name
+                             (expand-file-name default-directory))))
+                          file))
+                res)
+      (mapcar (lambda (s) (concat (directory-file-name default-directory) s)) res))))
 
 (cl-defgeneric project-buffers (project)
   "Return the list of all live buffers that belong to PROJECT.
@@ -615,18 +604,13 @@ See `project-vc-extra-root-markers' for the marker value format.")
        (when backend
          (require (intern (concat "vc-" (downcase (symbol-name backend))))))
        (if (and (file-equal-p dir (nth 2 project))
-                (cond
-                 ((eq backend 'Hg))
-                 ((and (eq backend 'Git)
-                       (or
-                        (not ignores)
-                        (version<= "1.9" (vc-git--program-version)))))))
+                (or (eq backend 'Hg)
+                    (and (eq backend 'Git)
+                         (or (not ignores)
+                             (version<= "1.9" (vc-git--program-version))))))
            (project--vc-list-files dir backend ignores)
-         (project--files-in-directory
-          dir
-          (project--dir-ignores project dir)))))
-   (or dirs
-       (list (project-root project)))))
+         (project--files-in-directory dir (project--dir-ignores project dir)))))
+   (or dirs (list (project-root project)))))
 
 (declare-function vc-git--program-version "vc-git")
 (declare-function vc-git--run-command-string "vc-git")
@@ -636,7 +620,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
   (defvar vc-git-use-literal-pathspecs)
   (pcase backend
     (`Git
-     (let* ((default-directory (expand-file-name (file-name-as-directory dir)))
+     (let* ((default-directory dir)
             (args '("-z"))
             (vc-git-use-literal-pathspecs nil)
             (include-untracked (project--value-in-dir
@@ -674,7 +658,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
                                    extra-ignores)))))
        (setq files
              (mapcar
-              (lambda (file) (concat default-directory file))
+              (lambda (file) (concat (file-name-as-directory dir) file))
               (split-string
                (apply #'vc-git--run-command-string nil "ls-files" args)
                "\0" t)))
@@ -686,7 +670,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
                   (lambda (module)
                     (when (file-directory-p module)
                       (project--vc-list-files
-                       (concat default-directory module)
+                       (concat (file-name-as-directory dir) module)
                        backend
                        extra-ignores)))
                   submodules)))
@@ -696,7 +680,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
        ;; XXX: Better solutions welcome, but this seems cheap enough.
        (delete-consecutive-dups files)))
     (`Hg
-     (let* ((default-directory (expand-file-name (file-name-as-directory dir)))
+     (let* ((default-directory dir)
             (include-untracked (project--value-in-dir
                                 'project-vc-include-untracked
                                 dir))
@@ -712,7 +696,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
        (with-temp-buffer
          (apply #'vc-hg-command t 0 "." "status" args)
          (mapcar
-          (lambda (s) (concat default-directory s))
+          (lambda (s) (concat (file-name-as-directory dir) s))
           (split-string (buffer-string) "\0" t)))))))
 
 (defun project--vc-merge-submodules-p (dir)
@@ -1050,20 +1034,19 @@ PREDICATE and HIST have the same meaning as in `completing-read'.
 MB-DEFAULT is used as part of \"future history\", to be inserted
 by the user at will."
   (let* ((common-parent-directory
-          (let ((common-prefix (try-completion "" all-files)))
-            (if (> (length common-prefix) 0)
-                (file-name-directory common-prefix))))
-         (cpd-length (length common-parent-directory))
-         (prompt (if (zerop cpd-length)
+          (or (let ((common-prefix (try-completion "" all-files)))
+                (unless (zerop (length common-prefix))
+                  (file-name-directory common-prefix)))
+              ""))
+         (prompt (if (string-empty-p common-parent-directory)
                      prompt
                    (concat prompt (format " in %s" common-parent-directory))))
-         (included-cpd (when (member common-parent-directory all-files)
-                         (setq all-files
-                               (delete common-parent-directory all-files))
-                         t))
-         (substrings (mapcar (lambda (s) (substring s cpd-length)) all-files))
-         (_ (when included-cpd
-              (setq substrings (cons "./" substrings))))
+         (substrings (mapcar (lambda (s)
+                               (let ((rel (substring s (length common-parent-directory))))
+                                 (if (string-empty-p rel)
+                                     (file-name-as-directory ".")
+                                   rel)))
+                             all-files))
          (new-collection (project--file-completion-table substrings))
          (abbr-cpd (abbreviate-file-name common-parent-directory))
          (abbr-cpd-length (length abbr-cpd))
@@ -1115,7 +1098,7 @@ directories listed in `vc-directory-exclusion-list'."
          (file (funcall project-read-file-name-function
                         "Find file" all-files nil 'file-name-history
                         suggested-filename)))
-    (if (string= file "")
+    (if (string-empty-p file)
         (user-error "You didn't specify the file")
       (find-file file))))
 
@@ -1596,19 +1579,19 @@ With some possible metadata (to be decided).")
       (write-region nil nil filename nil 'silent))))
 
 ;;;###autoload
-(defun project-remember-project (pr &optional no-write)
+(defun project-remember-project (pr &optional _no-write)
   "Add project PR to the front of the project list.
 Save the result in `project-list-file' if the list of projects
 has changed, and NO-WRITE is nil."
   (project--ensure-read-project-list)
-  (let ((dir (project-root pr)))
-    (unless (equal (caar project--list) dir)
-      (dolist (ent project--list)
-        (when (equal dir (car ent))
-          (setq project--list (delq ent project--list))))
-      (push (list dir) project--list)
-      (unless no-write
-        (project--write-project-list)))))
+  (let* ((dir (project-root pr))
+         (extant (cl-find-if (lambda (entry) (equal dir (car entry)))
+                             project--list)))
+    (setq project--list (delq extant project--list))
+    (push (list dir) project--list)
+    (when (and (not extant)
+               (not (bound-and-true-p ert--running-tests)))
+      (project--write-project-list))))
 
 (defun project--remove-from-project-list (project-root report-message)
   "Remove directory PROJECT-ROOT of a missing project from the project list.
@@ -1684,7 +1667,7 @@ projects."
         (when-let ((project (project--find-in-directory subdir))
                    (project-root (project-root project))
                    ((not (gethash project-root known))))
-          (project-remember-project project t)
+          (project-remember-project project)
           (puthash project-root t known)
           (message "Found %s..." project-root)
           (setq count (1+ count)))
