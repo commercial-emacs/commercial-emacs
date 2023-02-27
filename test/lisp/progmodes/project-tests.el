@@ -154,7 +154,7 @@ of bringing up `project-switch-commands'."
                          (make-empty-file (expand-file-name "some-file" dir2))
                          (find-file-noselect (expand-file-name "some-file" dir2))))
                  ((symbol-function 'read-buffer)
-                  (lambda (prompt other-buffer &rest _args)
+                  (lambda (_prompt other-buffer &rest _args)
                     other-buffer)))
         (switch-to-buffer buf1)
         (should-not (project-current))
