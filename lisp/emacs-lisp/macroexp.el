@@ -324,7 +324,7 @@ Assumes the caller has bound `macroexpand-all-environment'."
       (`(condition-case . ,(or `(,err ,body . ,handlers) pcase--dontcare))
        (let ((exp-body (macroexp--expand-all body)))
          (if handlers
-             (macroexp--cons fn
+             (macroexp--cons 'condition-case
                              (macroexp--cons
                               err (macroexp--cons
                                    exp-body
@@ -334,7 +334,7 @@ Assumes the caller has bound `macroexpand-all-environment'."
                              form)
            (macroexp-warn-and-return
             (format-message "`condition-case' without handlers")
-            exp-body (list 'suspicious 'condition-case) t form))))
+            exp-body (list 'suspicious 'condition-case) t))))
       (`(,(or 'defvar 'defconst) ,(and name (pred symbolp)) . ,_)
        (push name macroexp--dynvars)
        (macroexp--all-forms form 2))
