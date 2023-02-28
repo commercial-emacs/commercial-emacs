@@ -1667,7 +1667,7 @@ as the constructs of Haddock, Javadoc and similar systems."
   "Font Lock mode face used to highlight variable names."
   :group 'font-lock-faces)
 
-(defface font-lock-variable-ref-face
+(defface font-lock-variable-use-face
   '((t :inherit font-lock-variable-name-face))
   "Font Lock mode face used to highlight variable references."
   :group 'font-lock-faces
