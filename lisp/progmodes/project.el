@@ -359,20 +359,18 @@ to find the list of ignores for each directory."
             (error "File listing failed: %s" (buffer-string))))
         (goto-char pt)
         (while (search-forward "\0" nil t)
-          (push (buffer-substring-no-properties (1+ pt) (1- (point)))
-                res)
-          (setq pt (point)))))
-    (setq res (sort res #'string<))
-    (if-let ((remote-id (file-remote-p default-directory)))
-        (mapcar (lambda (file)
-                  (concat remote-id
-                          (directory-file-name
-                           (file-name-unquote
-                            (file-local-name
-                             (expand-file-name default-directory))))
-                          file))
-                res)
-      (mapcar (lambda (s) (concat (directory-file-name default-directory) s)) res))))
+          (push (buffer-substring-no-properties (1+ pt) (1- (point))) res)
+          (setq pt (point)))
+        (setq res (sort res #'string<))))
+    (let* ((remote-id (file-remote-p default-directory))
+           (path (if remote-id
+                     (concat remote-id
+                             (directory-file-name
+                              (file-name-unquote
+                               (file-local-name
+                                (expand-file-name default-directory)))))
+                   (directory-file-name default-directory))))
+      (mapcar (lambda (file) (concat path file)) res))))
 
 (cl-defgeneric project-buffers (project)
   "Return the list of all live buffers that belong to PROJECT.
