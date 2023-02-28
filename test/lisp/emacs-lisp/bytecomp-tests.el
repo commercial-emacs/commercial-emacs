@@ -1570,7 +1570,7 @@ literals (Bug#20852)."
    '(defun zot (x)
       (condition-case nil (list x)))
    '((suspicious condition-case))
-   "Warning: `condition-case' without handlers")
+   "Warning: .condition-case. without handlers")
 
   (test-suppression
    '(defun zot ()
