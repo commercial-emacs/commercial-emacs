@@ -289,6 +289,11 @@ If this variable is nil, all regions are treated as small."
   "The key binding for flyspell auto correction."
   :type 'key-sequence)
 
+(defcustom flyspell-check-changes nil
+  "Check only edited text."
+  :type 'boolean
+  :version "30.1")
+
 ;;*---------------------------------------------------------------------*/
 ;;*    Mode specific options                                            */
 ;;*    -------------------------------------------------------------    */
@@ -627,7 +632,9 @@ are both non-nil."
   ;; we put the `flyspell-deplacement' property on some commands
   (flyspell-deplacement-commands)
   ;; we bound flyspell action to post-command hook
-  (add-hook 'post-command-hook (function flyspell-post-command-hook) t t)
+  (if flyspell-check-changes
+      (add-hook 'post-command-hook (function flyspell-check-changes) t t)
+    (add-hook 'post-command-hook (function flyspell-post-command-hook) t t))
   ;; we bound flyspell action to pre-command hook
   (add-hook 'pre-command-hook (function flyspell-pre-command-hook) t t)
   ;; we bound flyspell action to after-change hook
@@ -737,6 +744,7 @@ has been used, the current word is not checked."
 (defun flyspell-mode-off ()
   "Turn Flyspell mode off."
   ;; We remove the hooks.
+  (remove-hook 'post-command-hook (function flyspell-check-changes) t)
   (remove-hook 'post-command-hook (function flyspell-post-command-hook) t)
   (remove-hook 'pre-command-hook (function flyspell-pre-command-hook) t)
   (remove-hook 'after-change-functions 'flyspell-after-change-function t)
@@ -1022,6 +1030,20 @@ Mostly we check word delimiters."
                   (flyspell-word)))
             (setq flyspell-changes (cdr flyspell-changes))))
         (setq flyspell-previous-command command)))))
+
+(defun flyspell-check-changes ()
+  "The `post-command-hook' used by flyspell to check only edits."
+  (when flyspell-mode
+    (with-local-quit
+      (when (consp flyspell-changes)
+        (let ((start (car (car flyspell-changes)))
+              (stop  (cdr (car flyspell-changes)))
+              (word (save-excursion (flyspell-get-word))))
+          (unless (and word (<= (nth 1 word) start) (>= (nth 2 word) stop))
+            (save-excursion
+              (goto-char start)
+              (flyspell-word))
+            (setq flyspell-changes nil)))))))
 
 ;;*---------------------------------------------------------------------*/
 ;;*    flyspell-notify-misspell ...                                     */
