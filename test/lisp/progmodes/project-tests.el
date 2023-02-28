@@ -33,6 +33,9 @@
 (require 'grep)
 (require 'xref)
 (require 'vc)
+(require 'vc-git)
+(require 'log-edit)
+
 
 (ert-deftest project/quoted-directory ()
   "Check that `project-files' and `project-find-regexp' deal with
@@ -166,6 +169,42 @@ of bringing up `project-switch-commands'."
         (let (kill-buffer-query-functions)
           (kill-buffer buf1)
           (kill-buffer buf2))))))
+
+(defmacro project-tests--mock-repo (&rest body)
+  (declare (indent defun))
+  `(let* ((dir (make-temp-file "project-tests" t))
+          (default-directory dir))
+     (unwind-protect
+         (progn
+           (vc-git-create-repo)
+           (vc-git-command nil 0 nil "config" "--add" "user.name" "frou")
+           (vc-git-command nil 0 nil "config" "--add" "user.email" "frou@frou.org")
+           ,@body)
+       (delete-directory dir t))))
+
+(ert-deftest project-implicit-project-absorption ()
+  "Running a project command should register the project without further ado."
+  (skip-unless (executable-find vc-git-program))
+  (project-tests--mock-repo
+    (with-temp-file "foo")
+    (condition-case err
+        (progn
+          (vc-git-register (split-string "foo"))
+          (vc-git-checkin (split-string "foo") "No-Verify: yes
+his fooness")
+          (vc-git-checkout nil (vc-git--rev-parse "HEAD")))
+      (error (signal (car err) (with-current-buffer "*vc*" (buffer-string)))))
+    (cl-letf (((symbol-function 'read-buffer)
+               (lambda (&rest _args)
+                 (current-buffer))))
+      (switch-to-buffer (find-file-noselect "foo"))
+      (should-not (cl-some (lambda (project)
+                             (equal default-directory (car project)))
+                           project--list))
+      (call-interactively #'project-switch-to-buffer)
+      (should (cl-some (lambda (project)
+                         (equal default-directory (car project)))
+                       project--list)))))
 
 (defvar project-tests--this-file (or (bound-and-true-p byte-compile-current-file)
                                      (and load-in-progress load-file-name)
