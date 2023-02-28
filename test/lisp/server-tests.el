@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2022-2023 Free Software Foundation, Inc.
 
-;; This file is part of GNU Emacs.
+;; This file is NOT part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -85,8 +85,8 @@ cases like that, we just skip the test.")
          (let ((inhibit-message t))
            (server-start t t))
          (delete-directory temporary-file-directory t)
-         (should (null server-process))
-         (should (null server-clients))))))
+         (should-not server-process)
+         (should-not server-clients)))))
 
 (defmacro server-tests/with-client (client-symbol args exit-status &rest body)
   "Start an Emacs client with ARGS and evaluate BODY.
@@ -123,14 +123,14 @@ process's status matches it."
     (should (eq server-mode t))
     (should (memq 'server-mode global-minor-modes)))
   ;; Make sure stopping the server deactivates the minor mode.
-  (should (eq server-mode nil))
+  (should-not server-mode)
   (should-not (memq 'server-mode global-minor-modes)))
 
 (ert-deftest server-tests/server-start/stop-prompt-with-client ()
   "Ensure that stopping the server prompts when there are clients."
   (skip-unless server-tests/can-create-frames-p)
   (server-tests/with-server
-    (server-tests/with-client emacsclient '("-t") 'exit
+    (server-tests/with-client emacsclient `(,(if noninteractive "-t" "-c")) 'exit
       (should (length= (frame-list) 2))
       (cl-letf* ((yes-or-no-p-called nil)
                  ((symbol-function 'yes-or-no-p)
@@ -164,7 +164,7 @@ process's status matches it."
   (skip-unless server-tests/can-create-frames-p)
   (let ((starting-frame-count (length (frame-list))))
     (server-tests/with-server
-      (server-tests/with-client emacsclient '("-t") nil
+      (server-tests/with-client emacsclient `(,(if noninteractive "-t" "-c")) nil
       (should (length= (frame-list) (1+ starting-frame-count)))
       (should (eq (process-status emacsclient) 'run))
       (should (eq (frame-parameter (car (frame-list)) 'client)
@@ -195,7 +195,7 @@ long as this works, the problem in bug#58877 shouldn't occur."
          terminal)
     (unwind-protect
         (server-tests/with-server
-          (server-tests/with-client emacsclient '("-t") 'exit
+          (server-tests/with-client emacsclient `(,(if noninteractive "-t" "-c")) 'exit
             (should (eq (process-status emacsclient) 'run))
             (should (length= (frame-list) (1+ starting-frame-count)))
 
