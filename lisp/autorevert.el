@@ -276,12 +276,14 @@ Use `auto-revert-tail-mode' to effect tailing a buffer."
 
 ;;;###autoload
 (defun turn-on-auto-revert-mode ()
-  (when (and (or buffer-file-name
+  (when (and (not auto-revert-mode)
+             ;; weak substitute for non-nil inhibit_buffer_hooks
+             (not (eq (aref (buffer-name) 0) ? ))
+             (or buffer-file-name
                  (and auto-revert-non-file-buffers
                       (not (string-prefix-p " " (buffer-name)))
                       (local-variable-p 'buffer-stale-function)
-                      (local-variable-p 'revert-buffer-function)))
-             (not auto-revert-mode))
+                      (local-variable-p 'revert-buffer-function))))
     (auto-revert-mode)))
 
 (defun auto-revert-tail-toggle-hooks (toggle)

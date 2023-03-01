@@ -5802,10 +5802,9 @@ all parts."
 	(window (selected-window))
 	(mail-parse-charset gnus-newsgroup-charset)
 	(mail-parse-ignored-charsets
-	 (if (gnus-buffer-live-p gnus-summary-buffer)
-	     (with-current-buffer gnus-summary-buffer
-	       gnus-newsgroup-ignored-charsets)
-	   nil))
+	 (when (gnus-buffer-live-p gnus-summary-buffer)
+	   (with-current-buffer gnus-summary-buffer
+	     gnus-newsgroup-ignored-charsets)))
 	start retval)
     (unwind-protect
 	(progn
@@ -5821,8 +5820,7 @@ all parts."
 	      (setq point (copy-marker point)
 		    retval (mm-display-part handle))
 	    (let ((part (or (and (mm-inlinable-p handle)
-				 (mm-inlined-p handle)
-				 t)
+				 (mm-inlined-p handle))
 			    (with-temp-buffer
 			      (gnus-bind-mm-vars
 			       (setq retval (mm-display-part handle)))
