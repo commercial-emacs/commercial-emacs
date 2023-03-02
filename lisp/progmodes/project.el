@@ -174,8 +174,7 @@
 ;;; Code:
 
 (require 'cl-lib)
-(require 'seq)
-(eval-when-compile (require 'subr-x))
+(require 'compile)
 
 (defgroup project nil
   "Operations on the current project."
@@ -1579,8 +1578,9 @@ has changed, and NO-WRITE is nil."
   (let* ((dir (project-root pr))
          (extant (cl-find-if (lambda (entry) (equal dir (car entry)))
                              project--list)))
-    (setq project--list (delq extant project--list))
-    (push (list dir) project--list)
+    (when (eq (current-buffer) (window-buffer))
+      (setq project--list (delq extant project--list))
+      (push (list dir) project--list))
     (when (and (not extant)
                (not (bound-and-true-p ert--running-tests)))
       (project--write-project-list))))
@@ -1608,11 +1608,15 @@ the project list."
 
 (defun project--prev-buffer (predicate)
   "Return previous buffer satisfying PREDICATE which takes buffer."
-  (let ((switch-to-prev-buffer-skip
-         (lambda (_window buffer _bury-or-kill)
-           "Skip plus not is a double negative."
-           (not (funcall predicate buffer)))))
-    (save-window-excursion (switch-to-prev-buffer))))
+  (let* ((switch-to-prev-buffer-skip
+          (lambda (_window buffer _bury-or-kill)
+            "Skip plus not is a double negative."
+            (not (funcall predicate buffer))))
+         (prev-buffer (save-window-excursion (switch-to-prev-buffer))))
+    ;; `switch-to-prev-buffer' won't return nil if predicate cannot be met.
+    ;; Thus, this end-run predicate check.
+    (when (funcall predicate prev-buffer)
+      prev-buffer)))
 
 (defun project-prompt-project-dir ()
   "Prompt the user for a directory that is one of the known project roots.
@@ -1626,9 +1630,10 @@ It's also possible to enter an arbitrary directory not in the list."
          (default (when-let ((prev-buffer
                               (project--prev-buffer
                                (lambda (buffer)
-                                 (with-current-buffer buffer
-                                   (when-let ((project (project-current)))
-                                     (not (equal from project))))))))
+                                 (when buffer
+                                   (with-current-buffer buffer
+                                     (when-let ((project (project-current)))
+                                       (not (equal from project)))))))))
                     (with-current-buffer prev-buffer
                       (project-root (project-current))))))
     (while (string-empty-p
