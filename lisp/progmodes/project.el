@@ -1300,15 +1300,17 @@ general form of conditions."
 (defun project--read-project-buffer ()
   (let* ((pr (project-most-recent-project))
          (buffers (funcall (project--list-buffers-closure pr)))
-         ret)
-    (while (string-empty-p
-            (progn (setq ret (read-buffer (project--annotate-prompt pr "Switch to: ")
-                                          (buffer-name (car buffers))
-                                          'confirm))
-                   (if (bufferp ret)
-                       (buffer-name ret)
-                     ret))))
-    ret))
+         (name (read-buffer
+                (project--annotate-prompt pr "Switch to: ")
+                (buffer-name (car buffers))
+                'confirm
+                (lambda (buffer)
+                  "BUFFER is an entry (BUF-NAME . BUF-OBJ)"
+                  (and (memq (cdr buffer) buffers)
+                       (not (project--buffer-check
+                             (cdr buffer)
+                             project-ignore-buffer-conditions)))))))
+    (if (bufferp name) (buffer-name name) name)))
 
 ;;;###autoload
 (defun project-switch-to-buffer (buffer-or-name)
