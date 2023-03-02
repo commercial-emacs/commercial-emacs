@@ -1974,6 +1974,13 @@ this can be controlled by using this variable, which is a list of
 symbols.
 @end defvar
 
+@defvar safe-local-variable-directories
+This is a list of directories where local variables are always enabled.
+Directory-local variables loaded from these directories, such as the
+variables in @file{.dir-locals.el}, will be enabled even if they are
+risky.
+@end defvar
+
 @defun hack-local-variables &optional handle-mode
 This function parses, and binds or evaluates as appropriate, any local
 variables specified by the contents of the current buffer.  The variable

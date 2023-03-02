@@ -238,6 +238,11 @@ hooks named after the feature name, like 'esh-mode-unload-hook'.
 
 * Lisp Changes in Emacs 30.1
 
++++
+** New variable 'safe-local-variable-directories'.
+This variable is used to to permanently trust directories containing
+risky directory-local variables.
+
 ** Functions and variables to transpose sexps
 
 +++
