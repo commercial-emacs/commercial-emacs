@@ -4742,7 +4742,7 @@ purecopy (Lisp_Object obj)
       memcpy (vec, objp, nbytes);
       for (i = 0; i < size; i++)
 	vec->contents[i] = purecopy (vec->contents[i]);
-      // Byte code strings must be pinned.
+      /* Byte code strings must be pinned.  */
       if (COMPILEDP (obj) && size >= 2 && STRINGP (vec->contents[1])
 	  && !STRING_MULTIBYTE (vec->contents[1]))
 	pin_string (vec->contents[1]);
