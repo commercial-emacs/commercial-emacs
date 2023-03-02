@@ -229,7 +229,7 @@ project instance and do not adjust recently used projects."
 DIRECTORY defaults to `default-directory'.
 Under MAYBE-PROMPT, calls `project-get-project'."
   ;; Gradually replace occurrences of (project-current t)
-  ;; with (project-get-project), and replace (project-current nil dir)
+  ;; with (project-most-recent-project), and replace (project-current nil dir)
   ;; with (let ((default-directory dir)) (project-current))
   (if maybe-prompt
       (project-get-project directory)
@@ -284,6 +284,11 @@ headers search path, load path, class path, and so on."
   "A human-readable name for the project.
 Nominally unique, but not enforced."
   (file-name-nondirectory (directory-file-name (project-root project))))
+
+(defsubst project--annotate-prompt (project prompt)
+  (if project
+      (format "[%s] %s" (project-name project) prompt)
+    prompt))
 
 (cl-defgeneric project-ignores (_project _dir)
   "Return the list of glob patterns to ignore inside DIR.
@@ -770,9 +775,8 @@ DIRS must contain directory names."
   (let* ((root (expand-file-name (file-name-as-directory (project-root project))))
          (modules (unless (or (project--vc-merge-submodules-p root)
                               (project--submodule-p root))
-                    (mapcar
-                     (lambda (m) (format "%s%s/" root m))
-                     (project--git-submodules))))
+                    (mapcar (lambda (m) (format "%s%s/" root m))
+                            (project--git-submodules))))
          dd
          bufs)
     (dolist (buf (buffer-list))
@@ -787,7 +791,7 @@ DIRS must contain directory names."
   (or project-vc-name
       (cl-call-next-method)))
 
-
+
 ;;; Project commands
 
 ;;;###autoload
@@ -909,9 +913,8 @@ requires quoting, e.g. `\\[quoted-insert]<space>'."
               (project-files pr)
             (let ((dir (read-directory-name "Base directory: "
                                             caller-dir nil t)))
-              (project--files-in-directory dir
-                                           nil
-                                           (grep-read-files regexp))))))
+              (project--files-in-directory
+               dir nil (grep-read-files regexp))))))
     (xref-show-xrefs
      (apply-partially #'project--find-regexp-in-files regexp files)
      nil)))
@@ -956,7 +959,8 @@ pattern to search for."
 
 (defun project--read-regexp ()
   (let ((sym (thing-at-point 'symbol t)))
-    (read-regexp "Find regexp" (and sym (regexp-quote sym))
+    (read-regexp (project--annotate-prompt (project-most-recent-project) "Find regexp")
+                 (when sym (regexp-quote sym))
                  project-regexp-history-variable)))
 
 ;;;###autoload
@@ -1042,7 +1046,7 @@ by the user at will."
                     (project--completing-read-strict
                      (concat prompt
                              (unless (string-empty-p common-parent-directory)
-                               (format " [%s]" (directory-file-name
+                               (format " (in %s)" (directory-file-name
                                                 common-parent-directory))))
                      new-collection
                      predicate
@@ -1080,7 +1084,9 @@ directories listed in `vc-directory-exclusion-list'."
                       (project-files project dirs)))
          (completion-ignore-case read-file-name-completion-ignore-case)
          (file (funcall project-read-file-name-function
-                        "Find file" all-files nil 'file-name-history
+                        (project--annotate-prompt
+                         (project-most-recent-project) "Find file")
+                        all-files nil 'file-name-history
                         suggested-filename)))
     (if (string-empty-p file)
         (user-error "You didn't specify the file")
@@ -1114,7 +1120,7 @@ directories listed in `vc-directory-exclusion-list'."
          ;; implementation.
          (all-dirs (mapcar #'file-name-directory all-files))
          (dir (funcall project-read-file-name-function
-                       "Dired"
+                       (project--annotate-prompt project "Dired")
                        ;; Some completion UIs show duplicates.
                        (delete-dups all-dirs)
                        nil 'file-name-history)))
@@ -1210,7 +1216,9 @@ If you exit the `query-replace', you can later continue the
   (interactive
    (let ((query-replace-read-from-regexp-default 'find-tag-default-as-regexp))
      (pcase-let ((`(,from ,to)
-                  (query-replace-read-args "Query replace (regexp)" t t)))
+                  (query-replace-read-args (project--annotate-prompt
+                                            (project-most-recent-project)
+                                            "Query replace (regexp)") t t)))
        (list from to))))
   (fileloop-initialize-replace
    from to
@@ -1251,11 +1259,21 @@ If non-nil, it overrides `compilation-buffer-name-function' for
   "Run `compile' in the project root."
   (declare (interactive-only compile))
   (interactive)
-  (let ((default-directory (project-root (project-most-recent-project)))
-        (compilation-buffer-name-function
-         (or project-compilation-buffer-name-function
-             compilation-buffer-name-function)))
-    (call-interactively #'compile)))
+  (when-let ((project (project-most-recent-project))
+             (default-directory (project-root project))
+             (compilation-buffer-name-function
+              (or project-compilation-buffer-name-function
+                  compilation-buffer-name-function)))
+    (compile (let ((command (eval compile-command)))
+               (if (or compilation-read-command current-prefix-arg)
+                   (read-shell-command
+                    (project--annotate-prompt project "Compile with: ")
+                    command
+                    (if (equal (car compile-history) command)
+                        '(compile-history . 1)
+                      'compile-history))
+	         command))
+             (consp current-prefix-arg))))
 
 (defcustom project-ignore-buffer-conditions nil
   "List of conditions to filter the buffers to be switched to.
@@ -1282,23 +1300,16 @@ general form of conditions."
 
 (defun project--read-project-buffer ()
   (let* ((pr (project-most-recent-project))
-         (current-buffer (current-buffer))
-         (other-buffer (other-buffer current-buffer))
-         (other-name (buffer-name other-buffer))
-         (buffers (project-buffers pr))
-         (predicate
-          (lambda (buffer)
-            ;; BUFFER is an entry (BUF-NAME . BUF-OBJ) of Vbuffer_alist.
-            (and (memq (cdr buffer) buffers)
-                 (not
-                  (project--buffer-check
-                   (cdr buffer) project-ignore-buffer-conditions))))))
-    (read-buffer
-     "Switch to buffer: "
-     (when (funcall predicate (cons other-name other-buffer))
-       other-name)
-     nil
-     predicate)))
+         (buffers (funcall (project--list-buffers-closure pr)))
+         ret)
+    (while (string-empty-p
+            (progn (setq ret (read-buffer (project--annotate-prompt pr "Switch to: ")
+                                          (buffer-name (car buffers))
+                                          'confirm))
+                   (if (bufferp ret)
+                       (buffer-name ret)
+                     ret))))
+    ret))
 
 ;;;###autoload
 (defun project-switch-to-buffer (buffer-or-name)
@@ -1337,6 +1348,18 @@ displayed."
   (interactive (list (project--read-project-buffer)))
   (display-buffer-other-frame buffer-or-name))
 
+(defun project--list-buffers-closure (&optional pr)
+  (apply-partially
+   (lambda (pr*)
+     (seq-filter
+      (lambda (buffer)
+        (and (not (eq buffer (current-buffer)))
+             (or (buffer-file-name buffer)
+                 (and (not (eq (aref (buffer-name buffer) 0) ? ))
+                      (not Buffer-menu-files-only)))))
+      (project-buffers pr*)))
+   (or pr (project-most-recent-project))))
+
 ;;;###autoload
 (defun project-list-buffers (&optional arg)
   "Display a list of project buffers.
@@ -1346,33 +1369,7 @@ By default, all project buffers are listed except those whose names
 start with a space (which are for internal use).  With prefix argument
 ARG, show only buffers that are visiting files."
   (interactive "P")
-  (let* ((pr (project-most-recent-project))
-         (buffer-list-function
-          (lambda ()
-            (seq-filter
-             (lambda (buffer)
-               (let ((name (buffer-name buffer))
-                     (file (buffer-file-name buffer)))
-                 (and (or (not (string= (substring name 0 1) " "))
-                          file)
-                      (not (eq buffer (current-buffer)))
-                      (or file (not Buffer-menu-files-only)))))
-             (project-buffers pr)))))
-    (display-buffer
-     (if (version< emacs-version "29.0.50")
-         (let ((buf (list-buffers-noselect
-                     arg (with-current-buffer
-                             (get-buffer-create "*Buffer List*")
-                           (let ((Buffer-menu-files-only arg))
-                             (funcall buffer-list-function))))))
-           (with-current-buffer buf
-             (setq-local revert-buffer-function
-                         (lambda (&rest _ignored)
-                           (list-buffers--refresh
-                            (funcall buffer-list-function))
-                           (tabulated-list-print t))))
-           buf)
-       (list-buffers-noselect arg buffer-list-function)))))
+  (display-buffer (list-buffers-noselect arg (project--list-buffers-closure))))
 
 (defcustom project-kill-buffer-conditions
   '(buffer-file-name    ; All file-visiting buffers are included.
@@ -1491,9 +1488,11 @@ Also see the `project-kill-buffers-display-buffer-list' variable."
          (bufs (project--buffers-to-kill pr))
          (query-user (lambda ()
                        (yes-or-no-p
-                        (format "Kill %d buffers in %s? "
-                                (length bufs)
-                                (project-root pr))))))
+                        (project--annotate-prompt
+                         pr
+                         (format "Kill %d buffers in %s? "
+                                 (length bufs)
+                                 (project-root pr)))))))
     (cond (no-confirm
            (mapc #'kill-buffer bufs))
           ((null bufs)
@@ -1519,7 +1518,7 @@ Also see the `project-kill-buffers-display-buffer-list' variable."
           ((funcall query-user)
            (mapc #'kill-buffer bufs)))))
 
-
+
 ;;; Project list
 
 (defcustom project-list-file (locate-user-emacs-file "projects")
@@ -1607,23 +1606,46 @@ the project list."
   (project--remove-from-project-list
    project-root "Project `%s' removed from known projects"))
 
+(defun project--prev-buffer (predicate)
+  "Return previous buffer satisfying PREDICATE which takes buffer."
+  (let ((switch-to-prev-buffer-skip
+         (lambda (_window buffer _bury-or-kill)
+           "Skip plus not is a double negative."
+           (not (funcall predicate buffer)))))
+    (save-window-excursion (switch-to-prev-buffer))))
+
 (defun project-prompt-project-dir ()
   "Prompt the user for a directory that is one of the known project roots.
-The project is chosen among projects known from the project list,
-see `project-list-file'.
 It's also possible to enter an arbitrary directory not in the list."
   (project--ensure-read-project-list)
-  (let* (pr
+  (let* (dir
+         (from (project-most-recent-project))
          (dir-choice "... (choose a dir)")
          (choices (project--file-completion-table
-                   (append project--list `(,dir-choice)))))
+                   (append project--list `(,dir-choice))))
+         (default (when-let ((prev-buffer
+                              (project--prev-buffer
+                               (lambda (buffer)
+                                 (with-current-buffer buffer
+                                   (when-let ((project (project-current)))
+                                     (not (equal from project))))))))
+                    (with-current-buffer prev-buffer
+                      (project-root (project-current))))))
     (while (string-empty-p
             ;; Even under require-match, `completing-read' allows RET
             ;; to yield an empty string.
-            (setq pr (completing-read "Select project: " choices nil t))))
-    (if (equal pr dir-choice)
-        (read-directory-name "Select directory: " default-directory nil t)
-      pr)))
+            (setq dir (completing-read
+                       (project--annotate-prompt
+                        from
+                        (format "Select project%s: "
+                                (if default
+                                    (format " (default %s)" default)
+                                  "")))
+                       choices nil t nil nil default))))
+    (if (equal dir dir-choice)
+        (read-directory-name (project--annotate-prompt from "Select directory: ")
+                             default-directory nil t)
+      dir)))
 
 ;;;###autoload
 (defun project-known-project-roots ()
@@ -1709,7 +1731,7 @@ forgotten projects."
                count (if (= count 1) "" "s")))
     count))
 
-
+
 ;;; Project switching
 
 (defcustom project-switch-commands
