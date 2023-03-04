@@ -620,7 +620,7 @@ enum
   /* Arbitrarily set in 2012 in commit 0dd6d66.  */
   GC_DEFAULT_THRESHOLD = (1 << 17) * word_size,
 
-  BLOCK_NBITS = 10,
+  BLOCK_NBITS = 15,
   BLOCK_ALIGN = 1 << BLOCK_NBITS,
   BLOCK_NBYTES = BLOCK_ALIGN - sizeof (uintptr_t), // subtract next ptr
   BLOCK_NINTERVALS = (BLOCK_NBYTES) / sizeof (struct interval),
