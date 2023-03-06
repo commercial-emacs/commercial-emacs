@@ -466,7 +466,7 @@ places where they originally did not directly appear."
                                  branch))
                        cond-forms)))
 
-    (`(function (lambda ,args . ,body) . ,_)
+    (`(function (lambda ,args . ,body) . ,rest)
      (let* ((docstring (if (eq :documentation (car-safe (car body)))
                            (cconv-convert (cadr (pop body)) env extend)))
             (bf (if (stringp (car body)) (cdr body) body))
