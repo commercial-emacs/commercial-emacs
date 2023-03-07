@@ -591,7 +591,9 @@ places where they originally did not directly appear."
     ;; The form (if any) is converted beforehand as part of the `lambda' case.
     (`(interactive . ,_) form)
 
-    (`(declare . ,_) form) ;; args don't contain code.
+    ;; `declare' should now be macro-expanded away (and if they're not, we're
+    ;; in trouble because they *can* contain code nowadays).
+    ;; (`(declare . ,_) form)              ;The args don't contain code.
 
     (`(oclosure--fix-type (ignore . ,vars) ,exp)
      (dolist (var vars)
@@ -748,7 +750,8 @@ This function does not return anything but instead fills the
        (when (eq 'interactive (car-safe (car bf)))
          (let ((if (cadr (car bf))))
            (unless (macroexp-const-p if) ;Optimize this common case.
-             (let ((f `#'(lambda () ,if)))
+             (let ((f (if (eq 'function (car-safe if)) if
+                        `#'(lambda (&rest _cconv--dummy) ,if))))
                (setf (gethash form cconv--interactive-form-funs) f)
                (cconv-analyze-form f env))))))
      (cconv--analyze-function vrs body-forms env form))
