@@ -1045,8 +1045,8 @@ by the user at will."
                     (project--completing-read-strict
                      (concat prompt
                              (unless (string-empty-p common-parent-directory)
-                               (format " (in %s)" (directory-file-name
-                                                common-parent-directory))))
+                               (format " in %s" (directory-file-name
+                                                 common-parent-directory))))
                      new-collection
                      predicate
                      hist mb-default)))
@@ -1255,24 +1255,29 @@ If non-nil, it overrides `compilation-buffer-name-function' for
 
 ;;;###autoload
 (defun project-compile ()
-  "Run `compile' in the project root."
+  "Compile in the project root.
+Note rather than utilize `compile-history', compile.el reassigns
+`compilation-directory' and `compilation-command' for the benefit
+of the `recompile' command."
   (declare (interactive-only compile))
   (interactive)
   (when-let ((project (project-most-recent-project))
              (default-directory (project-root project))
              (compilation-buffer-name-function
               (or project-compilation-buffer-name-function
-                  compilation-buffer-name-function)))
-    (compile (let ((command (eval compile-command)))
-               (if (or compilation-read-command current-prefix-arg)
-                   (read-shell-command
-                    (project--annotate-prompt project "Compile with: ")
-                    command
-                    (if (equal (car compile-history) command)
-                        '(compile-history . 1)
-                      'compile-history))
-	         command))
-             (consp current-prefix-arg))))
+                  compilation-buffer-name-function))
+             (command (let ((eval-command (eval compile-command)))
+                        (if (or (null eval-command)
+                                compilation-read-command
+                                current-prefix-arg)
+                            (read-shell-command
+                             (project--annotate-prompt
+                              project
+                              (format "Run in %s: " default-directory))
+                             eval-command
+                             compile-history)
+	                  eval-command))))
+    (compile command (consp current-prefix-arg))))
 
 (defcustom project-ignore-buffer-conditions nil
   "List of conditions to filter the buffers to be switched to.
