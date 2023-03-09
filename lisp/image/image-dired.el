@@ -748,6 +748,22 @@ On reaching end or beginning of buffer, stop and show a message."
   (interactive nil image-dired-thumbnail-mode)
   (image-dired--movement-command (pos-eol) 'reverse))
 
+(defun image-dired-scroll-up ()
+  "Scroll up the in thumbnail buffer."
+  (interactive nil image-dired-thumbnail-mode)
+  (scroll-up)
+  ;; move a bit to update tracking and header
+  (image-dired-next-line)
+  (image-dired-previous-line))
+
+(defun image-dired-scroll-down ()
+  "Scroll down the in thumbnail buffer."
+  (interactive nil image-dired-thumbnail-mode)
+  (scroll-down)
+  ;; move a bit to update tracking and header
+  (image-dired-previous-line)
+  (image-dired-next-line))
+
 
 ;;; Header line
 
@@ -958,6 +974,8 @@ You probably want to use this together with
   "<remap> <end-of-buffer>"          #'image-dired-end-of-buffer
   "<remap> <move-beginning-of-line>" #'image-dired-move-beginning-of-line
   "<remap> <move-end-of-line>"       #'image-dired-move-end-of-line
+  "<remap> <scroll-up-command>"      #'image-dired-scroll-up
+  "<remap> <scroll-down-command>"    #'image-dired-scroll-down
 
   :menu
   '("Image-Dired"
