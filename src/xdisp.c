@@ -8898,7 +8898,7 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op,
 	  max_current_x = it->last_visible_x;
 	  if (behaved_p (it))
 	    {
-	      ptrdiff_t npos = 0, counted = 0,
+	      ptrdiff_t counted = 0,
 		term = find_newline (IT_CHARPOS (*it), IT_BYTEPOS (*it),
 				     max (to_charpos, 0), -1, 1,
 				     &counted, NULL, 0);
@@ -8926,18 +8926,18 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op,
 
 	      if (op & (MOVE_TO_VPOS | MOVE_TO_POS | MOVE_TO_Y))
 		{
+		  ptrdiff_t npos = 0, nbpos = 0;
 		  /* Subtract for the present row */
 		  full_rows = max (0, full_rows - 1);
 		  npos = IT_CHARPOS (*it) + full_rows * nchars_per_sline;
-		  /* fprintf (stderr, */
-		  /* 	   "nfr=%d tfr=%ld\n", */
-		  /* 	   full_rows, npos); */
+		  nbpos = CHAR_TO_BYTE (npos);
 		  it->continuation_lines_width +=
 		    full_rows * (it->last_visible_x - it->first_visible_x);
-		  SET_TEXT_POS (it->position, npos, CHAR_TO_BYTE (npos));
+		  SET_TEXT_POS (it->position, npos, nbpos);
 		  IT_CHARPOS (*it) = npos;
-		  IT_BYTEPOS (*it) = CHAR_TO_BYTE (npos);
-		  move_it_forward (it, npos, -1, MOVE_TO_POS, NULL);
+		  IT_BYTEPOS (*it) = nbpos;
+		  if (full_rows > 0) /* else move_it_forward infloops */
+		    move_it_forward (it, npos, -1, MOVE_TO_POS, NULL);
 		  if (it->bidi_p)
 		    bidi_reseat (it);
 		  last_height = it->max_ascent + it->max_descent;

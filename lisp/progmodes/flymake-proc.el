@@ -240,7 +240,7 @@ If the FILE-NAME matches a regexp from `flymake-proc-ignored-file-name-regexps',
 
 (defun flymake-proc--get-init-function (file-name)
   "Return init function to be used for the file."
-  (let* ((init-f  (nth 0 (flymake-proc--get-file-name-mode-and-masks file-name))))
+  (let* ((init-f (nth 0 (flymake-proc--get-file-name-mode-and-masks file-name))))
     ;;(flymake-log 0 "calling %s" init-f)
     ;;(funcall init-f (current-buffer))
     init-f))
