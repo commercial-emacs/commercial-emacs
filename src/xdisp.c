@@ -8936,7 +8936,7 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op,
 		  SET_TEXT_POS (it->position, npos, nbpos);
 		  IT_CHARPOS (*it) = npos;
 		  IT_BYTEPOS (*it) = nbpos;
-		  if (full_rows > 0) /* else move_it_forward infloops */
+		  if (full_rows > 0) /* else move_it_forward recurses forever */
 		    move_it_forward (it, npos, -1, MOVE_TO_POS, NULL);
 		  if (it->bidi_p)
 		    bidi_reseat (it);
