@@ -49,13 +49,7 @@ static const struct hash_table_test hashtest_profiler =
    hashfn_profiler,
   };
 
-struct profiler_log {
-  Lisp_Object log;
-  EMACS_INT gc_count;  /* Samples taken during GC.  */
-  EMACS_INT discarded; /* Samples evicted during table overflow.  */
-};
-
-static struct profiler_log
+static Lisp_Object
 make_log (void)
 {
   /* We use a standard Elisp hash-table object, but we use it in
@@ -66,13 +60,11 @@ make_log (void)
     = clip_to_bounds (0, profiler_log_size, MOST_POSITIVE_FIXNUM);
   ptrdiff_t max_stack_depth
     = clip_to_bounds (0, profiler_max_stack_depth, PTRDIFF_MAX);;
-  struct profiler_log log
-    = { make_hash_table (hashtest_profiler, heap_size,
-			 DEFAULT_REHASH_SIZE,
-			 DEFAULT_REHASH_THRESHOLD,
-			 Qnil, false),
-	0, 0 };
-  struct Lisp_Hash_Table *h = XHASH_TABLE (log.log);
+  Lisp_Object log = make_hash_table (hashtest_profiler, heap_size,
+				     DEFAULT_REHASH_SIZE,
+				     DEFAULT_REHASH_THRESHOLD,
+				     Qnil, false);
+  struct Lisp_Hash_Table *h = XHASH_TABLE (log);
 
   /* What is special about our hash-tables is that the values are pre-filled
      with the vectors we'll use as keys.  */
@@ -124,9 +116,8 @@ static EMACS_INT approximate_median (log_t *log,
     }
 }
 
-static void evict_lower_half (struct profiler_log *plog)
+static void evict_lower_half (log_t *log)
 {
-  log_t *log = XHASH_TABLE (plog->log);
   ptrdiff_t size = ASIZE (log->key_and_value) / 2;
   EMACS_INT median = approximate_median (log, 0, size);
 
@@ -136,8 +127,6 @@ static void evict_lower_half (struct profiler_log *plog)
     if (XFIXNUM (HASH_VALUE (log, i)) <= median)
       {
 	Lisp_Object key = HASH_KEY (log, i);
-	EMACS_INT count = XFIXNUM (HASH_VALUE (log, i));
-	plog->discarded = saturated_add (plog->discarded, count);
 	{ /* FIXME: we could make this more efficient.  */
 	  Lisp_Object tmp;
 	  XSET_HASH_TABLE (tmp, log); /* FIXME: Use make_lisp_ptr.  */
@@ -159,12 +148,12 @@ static void evict_lower_half (struct profiler_log *plog)
    size for memory.  */
 
 static void
-record_backtrace (struct profiler_log *plog, EMACS_INT count)
+record_backtrace (log_t *log, EMACS_INT count)
 {
-  eassert (HASH_TABLE_P (plog->log));
-  log_t *log = XHASH_TABLE (plog->log);
   if (log->next_free < 0)
-    evict_lower_half (plog);
+    /* FIXME: transfer the evicted counts to a special entry rather
+       than dropping them on the floor.  */
+    evict_lower_half (log);
   ptrdiff_t index = log->next_free;
 
   /* Get a "working memory" vector.  */
@@ -233,10 +222,10 @@ static enum profiler_cpu_running
   profiler_cpu_running;
 
 /* Hash-table log of CPU profiler.  */
-static struct profiler_log cpu;
+static Lisp_Object cpu_log;
 
-/* Hash-table log of Memory profiler.  */
-static struct profiler_log memory;
+/* Separate counter for the time spent in the GC.  */
+static EMACS_INT cpu_gc_count;
 
 /* The current sampling interval in nanoseconds.  */
 static EMACS_INT current_sampling_interval;
@@ -244,34 +233,30 @@ static EMACS_INT current_sampling_interval;
 /* Signal handler for sampling profiler.  */
 
 static void
-add_sample (struct profiler_log *plog, EMACS_INT count)
+handle_profiler_signal (int signal)
 {
-  if (EQ (backtrace_top_function (), QAutomatic_GC)) /* bug#60237 */
+  if (EQ (backtrace_top_function (), QAutomatic_GC))
     /* Special case the time-count inside GC because the hash-table
        code is not prepared to be used while the GC is running.
        More specifically it uses ASIZE at many places where it does
        not expect the ARRAY_MARK_FLAG to be set.  We could try and
        harden the hash-table code, but it doesn't seem worth the
        effort.  */
-    plog->gc_count = saturated_add (plog->gc_count, count);
+    cpu_gc_count = saturated_add (cpu_gc_count, 1);
   else
-    record_backtrace (plog, count);
-}
-
-
-static void
-handle_profiler_signal (int signal)
-{
-  EMACS_INT count = 1;
-#if defined HAVE_ITIMERSPEC && defined HAVE_TIMER_GETOVERRUN
-  if (profiler_timer_ok)
     {
-      int overruns = timer_getoverrun (profiler_timer);
-      eassert (overruns >= 0);
-      count += overruns;
-    }
+      EMACS_INT count = 1;
+#if defined HAVE_ITIMERSPEC && defined HAVE_TIMER_GETOVERRUN
+      if (profiler_timer_ok)
+	{
+	  int overruns = timer_getoverrun (profiler_timer);
+	  eassert (overruns >= 0);
+	  count += overruns;
+	}
 #endif
-  add_sample (&cpu, count);
+      eassert (HASH_TABLE_P (cpu_log));
+      record_backtrace (XHASH_TABLE (cpu_log), count);
+    }
 }
 
 static void
@@ -358,8 +343,11 @@ See also `profiler-log-size' and `profiler-max-stack-depth'.  */)
   if (profiler_cpu_running)
     error ("CPU profiler is already running");
 
-  if (NILP (cpu.log))
-    cpu = make_log ();
+  if (NILP (cpu_log))
+    {
+      cpu_gc_count = 0;
+      cpu_log = make_log ();
+    }
 
   int status = setup_cpu_timer (sampling_interval);
   if (status < 0)
@@ -421,26 +409,6 @@ DEFUN ("profiler-cpu-running-p",
   return profiler_cpu_running ? Qt : Qnil;
 }
 
-static Lisp_Object
-export_log (struct profiler_log *log)
-{
-  Lisp_Object result = log->log;
-  if (log->gc_count)
-    Fputhash (CALLN (Fvector, QAutomatic_GC, Qnil),
-	      make_fixnum (log->gc_count),
-	      result);
-  if (log->discarded)
-    Fputhash (CALLN (Fvector, QDiscarded_Samples, Qnil),
-	      make_fixnum (log->discarded),
-	      result);
-  /* Here we're making the log visible to Elisp, so it's not safe any
-     more for our use afterwards since we can't rely on its special
-     pre-allocated keys anymore.  So we have to allocate a new one.  */
-  if (profiler_cpu_running)
-    *log = make_log ();
-  return result;
-}
-
 DEFUN ("profiler-cpu-log", Fprofiler_cpu_log, Sprofiler_cpu_log,
        0, 0, 0,
        doc: /* Return the current cpu profiler log.
@@ -468,6 +436,8 @@ Before returning, a new log is allocated for future samples.  */)
 /* True if memory profiler is running.  */
 bool profiler_memory_running;
 
+static Lisp_Object memory_log;
+
 DEFUN ("profiler-memory-start", Fprofiler_memory_start, Sprofiler_memory_start,
        0, 0, 0,
        doc: /* Start/restart the memory profiler.
@@ -480,8 +450,8 @@ See also `profiler-log-size' and `profiler-max-stack-depth'.  */)
   if (profiler_memory_running)
     error ("Memory profiler is already running");
 
-  if (NILP (memory.log))
-    memory = make_log ();
+  if (NILP (memory_log))
+    memory_log = make_log ();
 
   profiler_memory_running = true;
 
@@ -520,7 +490,12 @@ of functions, where the last few elements may be nil.
 Before returning, a new log is allocated for future samples.  */)
   (void)
 {
-  return (export_log (&memory));
+  Lisp_Object result = memory_log;
+  /* Here we're making the log visible to Elisp , so it's not safe any
+     more for our use afterwards since we can't rely on its special
+     pre-allocated keys anymore.  So we have to allocate a new one.  */
+  memory_log = profiler_memory_running ? make_log () : Qnil;
+  return result;
 }
 
 
@@ -530,7 +505,11 @@ Before returning, a new log is allocated for future samples.  */)
 void
 malloc_probe (size_t size)
 {
-  add_sample (&memory, min (size, MOST_POSITIVE_FIXNUM));
+  if (EQ (backtrace_top_function (), QAutomatic_GC)) /* bug#60237 */
+    /* FIXME: We should do something like what we did with `cpu_gc_count`.  */
+    return;
+  eassert (HASH_TABLE_P (memory_log));
+  record_backtrace (XHASH_TABLE (memory_log), min (size, MOST_POSITIVE_FIXNUM));
 }
 
 DEFUN ("function-equal", Ffunction_equal, Sfunction_equal, 2, 2, 0,
@@ -610,22 +589,21 @@ to make room for new entries.  */);
   profiler_log_size = 10000;
 
   DEFSYM (Qprofiler_backtrace_equal, "profiler-backtrace-equal");
-  DEFSYM (QDiscarded_Samples, "Discarded Samples");
 
   defsubr (&Sfunction_equal);
 
 #ifdef PROFILER_CPU_SUPPORT
   profiler_cpu_running = NOT_RUNNING;
-  cpu.log = Qnil;
-  staticpro (&cpu.log);
+  cpu_log = Qnil;
+  staticpro (&cpu_log);
   defsubr (&Sprofiler_cpu_start);
   defsubr (&Sprofiler_cpu_stop);
   defsubr (&Sprofiler_cpu_running_p);
   defsubr (&Sprofiler_cpu_log);
 #endif
   profiler_memory_running = false;
-  memory.log = Qnil;
-  staticpro (&memory.log);
+  memory_log = Qnil;
+  staticpro (&memory_log);
   defsubr (&Sprofiler_memory_start);
   defsubr (&Sprofiler_memory_stop);
   defsubr (&Sprofiler_memory_running_p);
@@ -640,16 +618,16 @@ syms_of_profiler_for_pdumper (void)
   if (dumped_with_pdumper_p ())
     {
 #ifdef PROFILER_CPU_SUPPORT
-      cpu.log = Qnil;
+      cpu_log = Qnil;
 #endif
-      memory.log = Qnil;
+      memory_log = Qnil;
     }
   else
     {
 #ifdef PROFILER_CPU_SUPPORT
-      eassert (NILP (cpu.log));
+      eassert (NILP (cpu_log));
 #endif
-      eassert (NILP (memory.log));
+      eassert (NILP (memory_log));
     }
 
 }
