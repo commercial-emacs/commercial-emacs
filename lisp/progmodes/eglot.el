@@ -819,6 +819,7 @@ treated as in `eglot--dbind'."
                                          [,@(mapcar
                                              #'car eglot--tag-faces)])))
             :general (list :positionEncodings ["utf-32" "utf-8" "utf-16"])
+            :window '(:showDocument (:support t))
             :experimental eglot--{})))
 
 (cl-defgeneric eglot-workspace-folders (server)
@@ -2142,6 +2143,44 @@ COMMAND is a symbol naming the command."
 (cl-defmethod eglot-handle-notification
   (_server (_method (eql window/logMessage)) &key _type _message)
   "Handle notification window/logMessage.") ;; noop, use events buffer
+
+(cl-defmethod eglot-handle-request
+  (_server (_method (eql window/showDocument)) &key uri external takeFocus selection
+           &allow-other-keys)
+  "Handle a window/showDocument server->client request by opening the
+URL in a browser or within Emacs."
+  ;; Note: browse-url on a "file:" URL will execute open(1) or xdg-open(1),
+  ;; which may end up opening the file in Emacs (or some other editor that
+  ;; has registered the *.go extension), ignoring the optional selection.
+  ;; Typically servers send "External: false" for files.
+  (if (and external (not (eq external :json-false)))
+      (browse-url uri)
+    ;; Don't call find-file immediately (within the RPC handler) since
+    ;; find-file's go-mode hooks issue more LSP RPCs (e.g.
+    ;; textDocument/documentSymbol) from within this one, which then
+    ;; gets stuck. (Is that a bug in gopls?)
+    ;; So, make the call asynchronously from the idle loop.
+    ;; Of course this means we can't respond with the proper success value.
+    (run-with-idle-timer 0 nil
+                         #'(lambda (filename noselect selection)
+                                   (with-current-buffer (if noselect
+                                                            (find-file-noselect filename)
+                                                          (x-focus-frame nil)
+                                                          (find-file filename))
+                                     (when selection
+                                       (save-restriction
+                                         (widen)
+                                         (pcase-let ((`(,beg . ,end) (eglot--range-region selection)))
+                                           (if (equal beg end)
+                                               (goto-char beg)
+                                             (goto-char end)
+                                             (set-mark-command nil)
+                                             (goto-char beg))
+                                           (recenter))))))
+                         (eglot--uri-to-path uri) ; filename
+                         (or (null takeFocus) (eq takeFocus :json-false)) ; noselect
+                         selection))
+  '(:success t))
 
 (cl-defmethod eglot-handle-notification
   (_server (_method (eql telemetry/event)) &rest _any)
