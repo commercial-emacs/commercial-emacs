@@ -1522,8 +1522,12 @@ function's documentation in the Info manual"))
     (insert "\n")
     (add-face-text-property start-section (point) 'shortdoc-section t)
     (let ((print-escape-newlines t)
-          (double-arrow "⇒")
-          (single-arrow "→")
+          (double-arrow (if (char-displayable-p ?⇒)
+                            "⇒"
+                          "=>"))
+          (single-arrow (if (char-displayable-p ?→)
+                            "→"
+                          "->"))
           (start-example (point)))
       (cl-loop for (type value) on data by #'cddr
                do
@@ -1630,9 +1634,15 @@ by \\[describe-function]."
                  (count 0)
                  (pos 0)
                  (end (length text))
-                 (double-arrow "    ⇒")
-                 (double-arrow-example "    e.g. ⇒")
-                 (single-arrow "    →"))
+                 (double-arrow (if (char-displayable-p ?⇒)
+                                   "    ⇒"
+                                 "    =>"))
+                 (single-arrow (if (char-displayable-p ?→)
+                                   "    →"
+                                 "    ->"))
+                 (double-arrow-example (if (char-displayable-p ?⇒)
+                                           "    e.g. ⇒"
+                                         "    e.g. =>")))
             (while (and (< pos end)
                         (or (string-match double-arrow text pos)
                             (string-match double-arrow-example text pos)
