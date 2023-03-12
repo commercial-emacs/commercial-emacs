@@ -506,6 +506,42 @@ bytecomp-tests.el for interesting cases."
                       (cdr form*)))
       (funcall func form*))))
 
+
+(defvar bytecomp--copy-tree-seen)
+
+(defun bytecomp--copy-tree-1 (tree)
+  ;; TREE must be a cons.
+  (or (gethash tree bytecomp--copy-tree-seen)
+      (let* ((next (cdr tree))
+             (result (cons nil next))
+             (copy result))
+        (while (progn
+                 (puthash tree copy bytecomp--copy-tree-seen)
+                 (let ((a (car tree)))
+                   (setcar copy (if (consp a)
+                                    (bytecomp--copy-tree-1 a)
+                                  a)))
+                 (and (consp next)
+                      (let ((tail (gethash next bytecomp--copy-tree-seen)))
+                        (if tail
+                            (progn (setcdr copy tail)
+                                   nil)
+                          (setq tree next)
+                          (setq next (cdr next))
+                          (let ((prev copy))
+                            (setq copy (cons nil next))
+                            (setcdr prev copy)
+                            t))))))
+        result)))
+
+(defun bytecomp--copy-tree (tree)
+  "Make a copy of TREE, preserving any circular structure therein.
+Only conses are traversed and duplicated, not arrays or any other structure."
+  (if (consp tree)
+      (let ((bytecomp--copy-tree-seen (make-hash-table :test #'eq)))
+        (bytecomp--copy-tree-1 tree))
+    tree))
+
 (defconst byte-compile-initial-macro-environment
   `((declare-function . byte-compile-macroexpand-declare-function)
     (eval-when-compile . ,(lambda (&rest body)
