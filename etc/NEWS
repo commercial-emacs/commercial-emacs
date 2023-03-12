@@ -242,6 +242,15 @@ following to you init file:
 * New Modes and Packages in Emacs 30.1
 
 ---
+*** New major mode heex-ts-mode'.
+A major mode based on the tree-sitter library for editing HEEx files.
+
+---
+*** New major mode elixir-ts-mode'.
+A major mode based on the tree-sitter library for editing Elixir
+files.
+
+---
 ** The highly accessible Modus themes collection has six items.
 The 'modus-operandi' and 'modus-vivendi' are the main themes that have
 been part of Emacs since version 28.  The former is light, the latter
