@@ -1561,6 +1561,7 @@ also elsewhere in CC Mode to tell types from other identifiers."))
 ;; (as opposed to the *-font-lock-keywords-* variables) since the old
 ;; values work fairly well anyway.
 
+;;;###autoload
 (defun c-list-of-strings (obj)
   "Return non-nil when OBJ is a list of strings (including the empty list)."
   (and
