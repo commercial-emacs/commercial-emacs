@@ -4,7 +4,7 @@
 
 ;; Author: João Távora <joaotavora@gmail.com>
 ;; Keywords: processes, languages, extensions
-;; Version: 1.0.16
+;; Version: 1.0.17
 ;; Package-Requires: ((emacs "25.2"))
 
 ;; This is a GNU ELPA :core package.  Avoid functionality that is not
@@ -150,6 +150,14 @@ immediately."
 (defun jsonrpc-forget-pending-continuations (connection)
   "Stop waiting for responses from the current JSONRPC CONNECTION."
   (clrhash (jsonrpc--request-continuations connection)))
+
+(defvar jsonrpc-inhibit-debug-on-error nil
+  "Inhibit `debug-on-error' when answering requests.
+Some extensions, notably ert.el, set `debug-on-error' to non-nil,
+which makes it hard to test the behaviour of catching the Elisp
+error and replying to the endpoint with an JSONRPC-error.  This
+variable can be set around calls like `jsonrpc-request' to
+circumvent that.")
 
 (defun jsonrpc-connection-receive (connection message)
   "Process MESSAGE just received from CONNECTION.
