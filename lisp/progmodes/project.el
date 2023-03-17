@@ -317,6 +317,14 @@ end it with `/'.  DIR must be either `project-root' or one of
 (cl-defmethod project-root ((project (head transient)))
   (cdr project))
 
+(defsubst project--filter-meta-files (files)
+  "Return FILES without autosave or backup entries."
+  (cl-remove-if
+   (lambda (name)
+     (or (backup-file-name-p (file-name-nondirectory name))
+         (auto-save-file-name-p (file-name-nondirectory name))))
+   files))
+
 (cl-defgeneric project-files (project &optional dirs)
   "Return a list of files in directories DIRS in PROJECT.
 DIRS is a list of absolute directories; it should be some
@@ -324,12 +332,10 @@ subset of the project root and external roots.
 
 The default implementation uses `find-program'.  PROJECT is used
 to find the list of ignores for each directory."
-  (mapcan
-   (lambda (dir)
-     (project--files-in-directory dir
-                                  (project--dir-ignores project dir)))
-   (or dirs
-       (list (project-root project)))))
+  (project--filter-meta-files
+   (mapcan (lambda (dir)
+             (project--files-in-directory dir (project--dir-ignores project dir)))
+           (or dirs (list (project-root project))))))
 
 (defun project--files-in-directory (dir ignores &optional files)
   (require 'find-dired)
@@ -596,10 +602,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
            (backend (cadr project)))
        (when backend
          (require (intern (concat "vc-" (downcase (symbol-name backend))))))
-       (cl-remove-if
-        (lambda (name)
-          (or (backup-file-name-p name)
-              (auto-save-file-name-p name)))
+       (project--filter-meta-files
         (if (and (file-equal-p dir (nth 2 project))
                  (or (eq backend 'Hg)
                      (and (eq backend 'Git)
