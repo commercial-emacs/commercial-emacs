@@ -596,13 +596,17 @@ See `project-vc-extra-root-markers' for the marker value format.")
            (backend (cadr project)))
        (when backend
          (require (intern (concat "vc-" (downcase (symbol-name backend))))))
-       (if (and (file-equal-p dir (nth 2 project))
-                (or (eq backend 'Hg)
-                    (and (eq backend 'Git)
-                         (or (not ignores)
-                             (version<= "1.9" (vc-git--program-version))))))
-           (project--vc-list-files dir backend ignores)
-         (project--files-in-directory dir (project--dir-ignores project dir)))))
+       (cl-remove-if
+        (lambda (name)
+          (or (backup-file-name-p name)
+              (auto-save-file-name-p name)))
+        (if (and (file-equal-p dir (nth 2 project))
+                 (or (eq backend 'Hg)
+                     (and (eq backend 'Git)
+                          (or (not ignores)
+                              (version<= "1.9" (vc-git--program-version))))))
+            (project--vc-list-files dir backend ignores)
+          (project--files-in-directory dir (project--dir-ignores project dir))))))
    (or dirs (list (project-root project)))))
 
 (declare-function vc-git--program-version "vc-git")
@@ -1221,10 +1225,8 @@ If you exit the `query-replace', you can later continue the
        (list from to))))
   (fileloop-initialize-replace
    from to
-   ;; XXX: Filter out Git submodules, which are not regular files.
-   ;; `project-files' can return those, which is arguably suboptimal,
-   ;; but removing them eagerly has performance cost.
    (cl-delete-if-not (lambda (file)
+                       "Filter out git submodules, gpg keyfiles, etc."
                        (and (file-regular-p file)
                             (not (find-file-name-handler file 'insert-file-contents))))
                  (project-files (project-most-recent-project)))
