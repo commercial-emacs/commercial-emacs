@@ -6003,20 +6003,20 @@ auto_save_1 (void)
   struct stat st;
   Lisp_Object modes;
 
-  auto_save_mode_bits = 0666;
+  auto_save_mode_bits = 0600;
 
-  /* Get visited file's mode to become the auto save file's mode.  */
+  /* Get visited file's user mode to become the auto save file's mode.  */
   if (! NILP (BVAR (current_buffer, filename)))
     {
       if (emacs_fstatat (AT_FDCWD, SSDATA (BVAR (current_buffer, filename)),
 			 &st, 0)
 	  == 0)
 	/* But make sure we can overwrite it later!  */
-	auto_save_mode_bits = (st.st_mode | 0600) & 0777;
+	auto_save_mode_bits = (st.st_mode | 0600) & 0700;
       else if (modes = Ffile_modes (BVAR (current_buffer, filename), Qnil),
 	       FIXNUMP (modes))
 	/* Remote files don't cooperate with fstatat.  */
-	auto_save_mode_bits = (XFIXNUM (modes) | 0600) & 0777;
+	auto_save_mode_bits = (XFIXNUM (modes) | 0600) & 0700;
     }
 
   return
