@@ -8,7 +8,7 @@
 ;; Package-Requires: ((emacs "28.0") (transient "0.3.7"))
 ;; Package-Version: 0.1
 
-;; This file is part of GNU Emacs.
+;; This file is NOT part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
