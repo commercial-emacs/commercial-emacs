@@ -2854,17 +2854,17 @@ which in turn triggers `blink-cursor-timer-function' every
   :initialize #'custom-initialize-delay
   :group 'cursor
   :global t
-  (cancel-timer blink-cursor-idle-timer)
   (remove-hook 'after-delete-frame-functions #'blink-cursor--refocus)
   (remove-function after-focus-change-function #'blink-cursor--refocus)
   (when blink-cursor-mode
     (add-function :after after-focus-change-function #'blink-cursor--refocus)
-    (add-hook 'after-delete-frame-functions #'blink-cursor--refocus)
-    (blink-cursor--reinstall-idle-timer)))
+    (add-hook 'after-delete-frame-functions #'blink-cursor--refocus))
+  (blink-cursor--reset-idle-timer))
 
-(defsubst blink-cursor--reinstall-idle-timer ()
-  (unless blink-cursor-idle-timer
-    (remove-hook 'post-command-hook #'blink-cursor--reinstall-idle-timer)
+(defsubst blink-cursor--reset-idle-timer ()
+  (remove-hook 'post-command-hook #'blink-cursor--reset-idle-timer)
+  (cancel-timer blink-cursor-idle-timer)
+  (when blink-cursor-mode
     (setq blink-cursor-idle-timer
           (run-with-idle-timer
            (max 0.2 blink-cursor-delay)  ; disallow too small values
@@ -2896,19 +2896,20 @@ which in turn triggers `blink-cursor-timer-function' every
 (defun blink-cursor-end ()
   "Transition from `blink-cursor-timer' back to `blink-cursor-idle-timer'."
   (remove-hook 'pre-command-hook #'blink-cursor-end)
-  (add-hook 'post-command-hook #'blink-cursor--reinstall-idle-timer)
+  (add-hook 'post-command-hook #'blink-cursor--reset-idle-timer)
   (internal-show-cursor nil t)
   (setq blink-cursor-timer (cancel-timer blink-cursor-timer)))
 
 (define-obsolete-function-alias 'blink-cursor-check 'blink-cursor--refocus "30.1")
 (defun blink-cursor--refocus ()
   (let ((frame-list (frame-list)))
-    (unless (catch 'focus-p
-              (while frame-list
-                (let ((frame (pop frame-list)))
-                  (when (and (display-graphic-p frame)
-                             (frame-focus-state frame))
-                    (throw 'focus-p t)))))
+    (if (catch 'focus-p
+          (while frame-list
+            (let ((frame (pop frame-list)))
+              (when (and (display-graphic-p frame)
+                         (frame-focus-state frame))
+                (throw 'focus-p t)))))
+        (blink-cursor--reset-idle-timer)
       (blink-cursor-end))))
 
 ;; Frame maximization/fullscreen
