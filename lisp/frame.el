@@ -2880,10 +2880,7 @@ which in turn triggers `blink-cursor-timer-function' every
     (blink-cursor-end)))
 
 (defun blink-cursor-start ()
-  "Timer function called from the timer `blink-cursor-idle-timer'.
-This starts the timer `blink-cursor-timer', which makes the cursor blink
-if appropriate.  It also arranges to cancel that timer when the next
-command starts, by installing a pre-command hook."
+  "Transition from `blink-cursor-idle-timer' to `blink-cursor-timer'."
   (if blink-cursor-mode
       (progn
         (setq blink-cursor--blinks-done 1)
@@ -2897,12 +2894,13 @@ command starts, by installing a pre-command hook."
 
 (define-obsolete-function-alias 'blink-cursor-suspend 'blink-cursor-end "30.1")
 (defun blink-cursor-end ()
-  "Stop cursor blinking, reinitialize recheck pipeline."
+  "Transition from `blink-cursor-timer' back to `blink-cursor-idle-timer'."
   (remove-hook 'pre-command-hook #'blink-cursor-end)
   (add-hook 'post-command-hook #'blink-cursor--reinstall-idle-timer)
   (internal-show-cursor nil t)
   (setq blink-cursor-timer (cancel-timer blink-cursor-timer)))
 
+(define-obsolete-function-alias 'blink-cursor-check 'blink-cursor--refocus "30.1")
 (defun blink-cursor--refocus ()
   (let ((frame-list (frame-list)))
     (unless (catch 'focus-p
@@ -2912,7 +2910,6 @@ command starts, by installing a pre-command hook."
                              (frame-focus-state frame))
                     (throw 'focus-p t)))))
       (blink-cursor-end))))
-(define-obsolete-function-alias 'blink-cursor-check 'blink-cursor--refocus "30.1")
 
 ;; Frame maximization/fullscreen
 
