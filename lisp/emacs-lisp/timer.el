@@ -186,9 +186,9 @@ SECS may be a fraction."
 
 (defun cancel-timer (timer)
   "Remove TIMER from the list of active timers."
-  (setq timer-list (delq timer timer-list))
-  (setq timer-idle-list (delq timer timer-idle-list))
-  nil)
+  (prog1 nil
+    (setq timer-list (delq timer timer-list))
+    (setq timer-idle-list (delq timer timer-idle-list))))
 
 (defun cancel-function-timers (function)
   "Cancel all timers which would run FUNCTION.

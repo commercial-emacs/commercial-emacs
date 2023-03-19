@@ -240,7 +240,7 @@ This function runs the abnormal hook `move-frame-functions'."
   (interactive "e")
   (let ((frame (posn-window (event-start event))))
     (run-hook-with-args 'move-frame-functions frame)))
-
+
 ;;;; Arrangement of frames at startup
 
 ;; 1) Load the window system startup file from the lisp library and read the
@@ -1164,7 +1164,7 @@ If there is no frame by that name, signal an error."
              (throw 'done frame))))
        (error "There is no frame named `%s'" name))))
 
-
+
 ;;;; Background mode.
 
 (defcustom frame-background-mode nil
@@ -1309,7 +1309,7 @@ the `background-mode' terminal parameter."
 ;;                         :background (face-attribute 'default :foreground))
 ;;     (frame-set-background-mode (selected-frame))))
 
-
+
 ;;;; Frame configurations
 
 (defun current-frame-configuration ()
@@ -1370,7 +1370,7 @@ is given and non-nil, the unwanted frames are iconified instead."
               'iconify-frame
             'delete-frame)
           frames-to-delete)))
-
+
 ;;;; Convenience functions for accessing and interactively changing
 ;;;; frame parameters.
 
@@ -2092,7 +2092,7 @@ for FRAME."
     (or (/= (window-old-pixel-width root) (window-pixel-width root))
         (/= (+ (window-old-pixel-height root) mini-old-height)
             (+ (window-pixel-height root) mini-height)))))
-
+
 ;;;; Frame/display capabilities.
 
 ;; These functions should make the features they test explicit in
@@ -2520,7 +2520,7 @@ symbols."
               ((string= name "Virtual core keyboard")
                'core-keyboard))))))
 
-
+
 ;;;; Frame geometry values
 
 (defun frame-geom-value-cons (type value &optional frame)
@@ -2582,7 +2582,7 @@ Examples (measures in pixels) -
 In the 3rd, 4th, and 6th examples, the returned value is relative to
 the opposite frame edge from the edge indicated in the input spec."
   (cons (car spec) (frame-geom-value-cons (car spec) (cdr spec) frame)))
-
+
 (defun delete-other-frames (&optional frame iconify)
   "Delete all frames on FRAME's terminal, except FRAME.
 If FRAME uses another frame's minibuffer, the minibuffer frame is
@@ -2692,7 +2692,7 @@ When called from Lisp, returns the new frame."
                 (window-state-put (nth 2 frame-data) (frame-root-window frame) 'safe)
                 (select-frame-set-input-focus frame)
                 frame))))))))
-
+
 ;;; Window dividers.
 (defgroup window-divider nil
   "Window dividers."
@@ -2805,17 +2805,8 @@ widths."
   :group 'window-divider
   :global t
   (window-divider-mode-apply window-divider-mode))
-
+
 ;; Blinking cursor
-
-(defvar blink-cursor-idle-timer nil
-  "Timer started after `blink-cursor-delay' seconds of Emacs idle time.
-The function `blink-cursor-start' is called when the timer fires.")
-
-(defvar blink-cursor-timer nil
-  "Timer started from `blink-cursor-start'.
-This timer calls `blink-cursor-timer-function' every
-`blink-cursor-interval' seconds.")
 
 (defgroup cursor nil
   "Displaying text cursors."
@@ -2823,156 +2814,106 @@ This timer calls `blink-cursor-timer-function' every
   :group 'frames)
 
 (defcustom blink-cursor-delay 0.5
-  "Seconds of idle time before the first blink of the cursor.
+  "Idle seconds before cursor begins blinking.
 Values smaller than 0.2 sec are treated as 0.2 sec."
   :type 'number
-  :group 'cursor
-  :set (lambda (symbol value)
-         (set-default symbol value)
-         (when blink-cursor-idle-timer (blink-cursor--start-idle-timer))))
+  :group 'cursor)
 
 (defcustom blink-cursor-interval 0.5
-  "Length of cursor blink interval in seconds."
+  "Seconds between cursor blinks."
   :type 'number
-  :group 'cursor
-  :set (lambda (symbol value)
-         (set-default symbol value)
-         (when blink-cursor-timer (blink-cursor--start-timer))))
+  :group 'cursor)
 
 (defcustom blink-cursor-blinks 10
-  "How many times to blink before using a solid cursor on NS, X, and MS-Windows.
-Use 0 or negative value to blink forever."
+  "Number of times to blink the cursor.
+Use a non-positive value to blink indefinitely."
   :version "24.4"
   :type 'natnum
   :group 'cursor)
 
-(defvar blink-cursor-blinks-done 1
-  "Number of blinks done since we started blinking on NS, X, and MS-Windows.")
+(defvar blink-cursor-idle-timer nil
+  "Triggers `blink-cursor-timer' after `blink-cursor-delay' idle seconds.")
 
-(defun blink-cursor--start-idle-timer ()
-  "Start the `blink-cursor-idle-timer'."
-  (when blink-cursor-idle-timer (cancel-timer blink-cursor-idle-timer))
-  (setq blink-cursor-idle-timer
-        ;; The 0.2 sec limitation from below is to avoid erratic
-        ;; behavior (or downright failure to display the cursor
-        ;; during command execution) if they set blink-cursor-delay
-        ;; to a very small or even zero value.
-        (run-with-idle-timer (max 0.2 blink-cursor-delay)
-                             t #'blink-cursor-start)))
+(defvar blink-cursor-timer nil
+  "Triggers `blink-cursor-timer-function' every `blink-cursor-interval' seconds.")
 
-(defun blink-cursor--start-timer ()
-  "Start the `blink-cursor-timer'."
-  (when blink-cursor-timer (cancel-timer blink-cursor-timer))
-  (setq blink-cursor-timer
-        (run-with-timer blink-cursor-interval blink-cursor-interval
-                        #'blink-cursor-timer-function)))
+(define-obsolete-variable-alias 'blink-cursor-blinks-done
+  'blink-cursor--blinks-done "30.1")
+(defvar blink-cursor--blinks-done 1)
+
+(define-minor-mode blink-cursor-mode
+  "Toggle cursor blinking.  Applies only to graphical displays.
+
+Two timers are involved.  After `blink-cursor-delay' idle seconds,
+`blink-cursor-idle-timer' triggers `blink-cursor-timer'
+which in turn triggers `blink-cursor-timer-function' every
+`blink-cursor-interval' seconds."
+  :init-value (and (not noninteractive)
+		   (not no-blinking-cursor)
+		   (not (eq system-type 'ms-dos)))
+  :initialize #'custom-initialize-delay
+  :group 'cursor
+  :global t
+  (cancel-timer blink-cursor-idle-timer)
+  (remove-hook 'after-delete-frame-functions #'blink-cursor--refocus)
+  (remove-function after-focus-change-function #'blink-cursor--refocus)
+  (when blink-cursor-mode
+    (add-function :after after-focus-change-function #'blink-cursor--refocus)
+    (add-hook 'after-delete-frame-functions #'blink-cursor--refocus)
+    (blink-cursor--reinstall-idle-timer)))
+
+(defsubst blink-cursor--reinstall-idle-timer ()
+  (unless blink-cursor-idle-timer
+    (remove-hook 'post-command-hook #'blink-cursor--reinstall-idle-timer)
+    (setq blink-cursor-idle-timer
+          (run-with-idle-timer
+           (max 0.2 blink-cursor-delay)  ; disallow too small values
+           t #'blink-cursor-start))))
+
+(defun blink-cursor-timer-function ()
+  "Render the blink.  Stop after `blink-cursor-blinks' iterations."
+  (internal-show-cursor nil (not (internal-show-cursor-p)))
+  (cl-incf blink-cursor--blinks-done)
+  (when-let ((limitable-p (> blink-cursor-blinks 0))
+             (limit-blinks (* 2 blink-cursor-blinks)) ; on and off is one "blink"
+             (limit-p (> blink-cursor--blinks-done limit-blinks)))
+    (blink-cursor-end)))
 
 (defun blink-cursor-start ()
   "Timer function called from the timer `blink-cursor-idle-timer'.
 This starts the timer `blink-cursor-timer', which makes the cursor blink
 if appropriate.  It also arranges to cancel that timer when the next
 command starts, by installing a pre-command hook."
-  (cond
-   ((null blink-cursor-mode) (blink-cursor-mode -1))
-   ((null blink-cursor-timer)
-    ;; Set up the timer first, so that if this signals an error,
-    ;; blink-cursor-end is not added to pre-command-hook.
-    (setq blink-cursor-blinks-done 1)
-    (blink-cursor--start-timer)
-    (add-hook 'pre-command-hook #'blink-cursor-end)
-    (internal-show-cursor nil nil))))
+  (if blink-cursor-mode
+      (progn
+        (setq blink-cursor--blinks-done 1)
+        (cancel-timer blink-cursor-timer)
+        (setq blink-cursor-timer
+              (run-with-timer blink-cursor-interval blink-cursor-interval
+                              #'blink-cursor-timer-function))
+        (add-hook 'pre-command-hook #'blink-cursor-end)
+        (internal-show-cursor nil nil))
+    (blink-cursor-end)))
 
-(defun blink-cursor-timer-function ()
-  "Timer function of timer `blink-cursor-timer'."
-  (internal-show-cursor nil (not (internal-show-cursor-p)))
-  ;; Suspend counting blinks when the w32 menu-bar menu is displayed,
-  ;; since otherwise menu tooltips will behave erratically.
-  (or (and (fboundp 'w32--menu-bar-in-use)
-	   (w32--menu-bar-in-use))
-      (setq blink-cursor-blinks-done (1+ blink-cursor-blinks-done)))
-  ;; Each blink is two calls to this function.
-  (when (and (> blink-cursor-blinks 0)
-             (<= (* 2 blink-cursor-blinks) blink-cursor-blinks-done))
-    (blink-cursor-suspend)
-    (add-hook 'post-command-hook #'blink-cursor-check)))
-
+(define-obsolete-function-alias 'blink-cursor-suspend 'blink-cursor-end "30.1")
 (defun blink-cursor-end ()
-  "Stop cursor blinking.
-This is installed as a pre-command hook by `blink-cursor-start'.
-When run, it cancels the timer `blink-cursor-timer' and removes
-itself as a pre-command hook."
+  "Stop cursor blinking, reinitialize recheck pipeline."
   (remove-hook 'pre-command-hook #'blink-cursor-end)
+  (add-hook 'post-command-hook #'blink-cursor--reinstall-idle-timer)
   (internal-show-cursor nil t)
-  (when blink-cursor-timer
-    (cancel-timer blink-cursor-timer)
-    (setq blink-cursor-timer nil)))
+  (setq blink-cursor-timer (cancel-timer blink-cursor-timer)))
 
-(defun blink-cursor-suspend ()
-  "Suspend cursor blinking.
-This is called when no frame has focus and timers can be suspended.
-Timers are restarted by `blink-cursor-check', which is called when a
-frame receives focus."
-  (blink-cursor-end)
-  (when blink-cursor-idle-timer
-    (cancel-timer blink-cursor-idle-timer)
-    (setq blink-cursor-idle-timer nil)))
+(defun blink-cursor--refocus ()
+  (let ((frame-list (frame-list)))
+    (unless (catch 'focus-p
+              (while frame-list
+                (let ((frame (pop frame-list)))
+                  (when (and (display-graphic-p frame)
+                             (frame-focus-state frame))
+                    (throw 'focus-p t)))))
+      (blink-cursor-end))))
+(define-obsolete-function-alias 'blink-cursor-check 'blink-cursor--refocus "30.1")
 
-(defun blink-cursor--should-blink ()
-  "Determine whether we should be blinking.
-Returns whether we have any focused non-TTY frame."
-  (and blink-cursor-mode
-       (let ((frame-list (frame-list))
-             (any-graphical-focused nil))
-         (while frame-list
-           (let ((frame (pop frame-list)))
-             (when (and (display-graphic-p frame) (frame-focus-state frame))
-               (setf any-graphical-focused t)
-               (setf frame-list nil))))
-         any-graphical-focused)))
-
-(defun blink-cursor-check ()
-  "Check if cursor blinking shall be restarted.
-This is done when a frame gets focus.  Blink timers may be
-stopped by `blink-cursor-suspend'.  Internally calls
-`blink-cursor--should-blink' and returns its result."
-  (let ((should-blink (blink-cursor--should-blink)))
-    (when (and should-blink (not blink-cursor-idle-timer))
-      (remove-hook 'post-command-hook #'blink-cursor-check)
-      (blink-cursor--start-idle-timer))
-    should-blink))
-
-(defun blink-cursor--rescan-frames (&optional _ign)
-  "Called when the set of focused frames changes or when we delete a frame."
-  (unless (blink-cursor-check)
-    (blink-cursor-suspend)))
-
-(define-minor-mode blink-cursor-mode
-  "Toggle cursor blinking (Blink Cursor mode).
-
-If the value of `blink-cursor-blinks' is positive (10 by default),
-the cursor stops blinking after that number of blinks, if Emacs
-gets no input during that time.
-
-See also `blink-cursor-interval' and `blink-cursor-delay'.
-
-This command is effective only on graphical frames.  On text-only
-terminals, cursor blinking is controlled by the terminal."
-  :init-value (not (or noninteractive
-		       no-blinking-cursor
-		       (eq system-type 'ms-dos)))
-  :initialize #'custom-initialize-delay
-  :group 'cursor
-  :global t
-  (blink-cursor-suspend)
-  (remove-hook 'after-delete-frame-functions #'blink-cursor--rescan-frames)
-  (remove-function after-focus-change-function #'blink-cursor--rescan-frames)
-  (when blink-cursor-mode
-    (add-function :after after-focus-change-function
-                  #'blink-cursor--rescan-frames)
-    (add-hook 'after-delete-frame-functions #'blink-cursor--rescan-frames)
-    (blink-cursor-check)))
-
-
 ;; Frame maximization/fullscreen
 
 (defun toggle-frame-maximized (&optional frame)
@@ -3033,7 +2974,7 @@ See also `toggle-frame-maximized'."
       (modify-frame-parameters
        frame `((fullscreen . fullboth) (fullscreen-restore . ,fullscreen))))))
 
-
+
 ;;;; Key bindings
 
 (define-key ctl-x-5-map "2" #'make-frame-command)
@@ -3047,7 +2988,7 @@ See also `toggle-frame-maximized'."
 (define-key global-map [(meta f10)] #'toggle-frame-maximized)
 (define-key esc-map    [f10]        #'toggle-frame-maximized)
 
-
+
 ;; Misc.
 
 (make-variable-buffer-local 'show-trailing-whitespace)
