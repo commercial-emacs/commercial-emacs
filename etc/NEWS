@@ -61,6 +61,11 @@ This allows the user to customize the prompt that is appended by
 This is used for displaying the time and date components of
 'display-time-mode'.
 
+** New user option 'describe-bindings-show-prefixes'.
+If true (the default is false), restores the "Prefix Command" entries
+in 'describe-binding' ('C-h b') output for keys that are prefixes, the
+details of which are shown later (regardless of this option setting).
+
 
 * Editing Changes in Emacs 30.1
 

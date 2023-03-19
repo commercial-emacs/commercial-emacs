@@ -717,6 +717,12 @@ Return nil if KEYS is nil."
   :group 'help
   :version "29.1")
 
+(defcustom describe-bindings-show-prefixes nil
+  "Non-nil shows prefixes in the output buffer of `describe-bindings'."
+  :type 'boolean
+  :group 'help
+  :version "30.1")
+
 (declare-function outline-hide-subtree "outline")
 
 (defun describe-bindings (&optional prefix buffer)
@@ -1694,6 +1700,7 @@ in `describe-map-tree'."
               (setq vect (cdr vect))
               (setq end (caar vect))))
           (when (or (not (eq start end))
+                    describe-bindings-show-prefixes
                     ;; Don't output keymap prefixes.
                     (not (keymapp definition)))
             (when first
