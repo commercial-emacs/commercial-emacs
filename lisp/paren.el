@@ -222,7 +222,7 @@ the position following a closing paren."
             (show-paren--categorize-paren (1- eol-pos)))))))))
 
 (defvar show-paren-data-function #'show-paren--default
-  "Function to find the opener/closer \"near\" point and its match.
+  "Function to find the opener/closer near point and its match.
 The function is called with no argument and should return either nil
 if there's no opener/closer near point, or a list of the form
 \(HERE-BEG HERE-END THERE-BEG THERE-END MISMATCH)
