@@ -2814,8 +2814,7 @@ widths."
   :group 'frames)
 
 (defcustom blink-cursor-delay 0.5
-  "Idle seconds before cursor begins blinking.
-Values smaller than 0.2 sec are treated as 0.2 sec."
+  "Idle seconds before cursor begins blinking."
   :type 'number
   :group 'cursor)
 
@@ -2866,9 +2865,7 @@ which in turn triggers `blink-cursor-timer-function' every
   (cancel-timer blink-cursor-idle-timer)
   (when blink-cursor-mode
     (setq blink-cursor-idle-timer
-          (run-with-idle-timer
-           (max 0.2 blink-cursor-delay)  ; disallow too small values
-           t #'blink-cursor-start))))
+          (run-with-idle-timer blink-cursor-delay nil #'blink-cursor-start))))
 
 (defun blink-cursor-timer-function ()
   "Render the blink.  Stop after `blink-cursor-blinks' iterations."
