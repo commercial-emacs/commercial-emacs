@@ -64,6 +64,17 @@
         (when buf
           (kill-buffer buf))))))
 
+(defun shortdoc-tests--to-ascii (x)
+  "Translate Unicode arrows to ASCII for making the test work everywhere."
+  (cond ((consp x)
+         (cons (shortdoc-tests--to-ascii (car x))
+               (shortdoc-tests--to-ascii (cdr x))))
+        ((stringp x)
+         (thread-last x
+                      (string-replace "⇒" "=>")
+                      (string-replace "→" "->")))
+        (t x)))
+
 (ert-deftest shortdoc-function-examples-test ()
   "Test the extraction of usage examples of some Elisp functions."
   (cl-letf (((symbol-function 'char-displayable-p) #'ignore))
