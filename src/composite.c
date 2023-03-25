@@ -1012,20 +1012,15 @@ inhibit_auto_composition (void)
   return false;
 }
 
-/* Update cmp_it->stop_pos to the next position after CHARPOS (and
-   BYTEPOS) where character composition may happen.  If BYTEPOS is
-   negative, compute it.  ENDPOS is a limit of searching.  If it is
-   less than CHARPOS, search backward to ENDPOS+1 assuming that
-   set_iterator_to_next works in reverse order.  In this case, if a
-   composition closest to CHARPOS is found, set cmp_it->stop_pos to
-   the last character of the composition.  STRING, if non-nil, is
-   the string (as opposed to a buffer) whose characters should be
-   tested for being composable.
+/* Update cmp_it->stop_pos to the next composition checkpoint between
+   CHARPOS and ENDPOS inclusive.
 
-   If no composition is found, set cmp_it->ch to -2.  If a static
-   composition is found, set cmp_it->ch to -1.  Otherwise, set
-   cmp_it->ch to the character that triggers the automatic
-   composition.  */
+   BYTEPOS may be negative, in which case we compute it.
+
+   If STRING is non-nil, act on it instead of the current buffer.
+
+   Set cmp_it->ch to the automatic composition character, or -1 for a
+   static composition, or -2 if neither.  */
 
 void
 composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
@@ -1033,52 +1028,42 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 			      Lisp_Object string)
 {
   ptrdiff_t start, end;
-  int c;
-  Lisp_Object prop, val;
+  Lisp_Object prop;
   cmp_it->id = -1;
   cmp_it->ch = -2;
-  cmp_it->reversed_p = 0;
-  cmp_it->stop_pos = endpos;
-  if (charpos < cmp_it->stop_pos)
-    // 3ffdafc blamed cafafe0 for the hardcoded constant
-    cmp_it->stop_pos = min (cmp_it->stop_pos, charpos + 500);
-  else if (charpos > cmp_it->stop_pos)
-    cmp_it->stop_pos = max (NILP (string) ? BEGV - 1 : -1, cmp_it->stop_pos);
-  if (charpos == cmp_it->stop_pos)
-    return;
-  if (charpos < cmp_it->stop_pos
+  cmp_it->reversed_p = false;
+  cmp_it->stop_pos = (charpos < endpos)
+    ? min (endpos, charpos + 500) // 3ffdafc blamed cafafe0 for hardcoding
+    : max (endpos, NILP (string) ? BEGV - 1 : -1);
+  if (charpos < cmp_it->stop_pos // R2L doesn't admit static composition
       && find_composition (charpos, cmp_it->stop_pos, &start, &end, &prop, string)
-      && start >= charpos
+      && start >= charpos // static composition found
       && composition_valid_p (start, end, prop))
     {
-      cmp_it->stop_pos = start;
       cmp_it->ch = -1;
+      cmp_it->stop_pos = start;
+      return;
     }
   if ((NILP (string)
        && NILP (BVAR (current_buffer, enable_multibyte_characters)))
       || (STRINGP (string) && ! STRING_MULTIBYTE (string))
       || inhibit_auto_composition ())
     return;
-  if (bytepos < 0)
+  if (bytepos < 0) // then compute it
     bytepos = NILP (string)
       ? CHAR_TO_BYTE (charpos)
       : string_char_to_byte (string, charpos);
-
-  start = charpos;
-  if (charpos < cmp_it->stop_pos)
+  if (charpos < cmp_it->stop_pos) // L2R
     {
-      /* Forward search.  */
+      ptrdiff_t initpos = charpos;
       while (charpos < cmp_it->stop_pos)
 	{
-	  c = (STRINGP (string)
-	       ? fetch_string_char_advance (string, &charpos, &bytepos)
-	       : fetch_char_advance (&charpos, &bytepos));
+	  int c = STRINGP (string)
+	    ? fetch_string_char_advance (string, &charpos, &bytepos)
+	    : fetch_char_advance (&charpos, &bytepos);
+	  Lisp_Object val = CHAR_TABLE_REF (Vcomposition_function_table, c);
 	  if (c == '\n')
-	    {
-	      cmp_it->ch = -2;
-	      break;
-	    }
-	  val = CHAR_TABLE_REF (Vcomposition_function_table, c);
+	    break;
 	  if (! NILP (val))
 	    {
 	      for (EMACS_INT ridx = 0; CONSP (val); val = XCDR (val), ridx++)
@@ -1086,7 +1071,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 		  Lisp_Object elt = XCAR (val);
 		  if (VECTORP (elt) && ASIZE (elt) == 3
 		      && FIXNATP (AREF (elt, 1))
-		      && charpos - 1 - XFIXNAT (AREF (elt, 1)) >= start)
+		      && charpos - 1 - XFIXNAT (AREF (elt, 1)) >= initpos)
 		    {
 		      cmp_it->rule_idx = ridx;
 		      cmp_it->lookback = XFIXNAT (AREF (elt, 1));
@@ -1101,33 +1086,18 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	  && ! (STRINGP (string) && cmp_it->stop_pos == SCHARS (string)))
 	/* Characters after CMP_IT->STOP_POS could be composed with ones before;
 	   so stop at the safest offset preceding CMP_IT->STOP_POS.  */
-	charpos = max (start, cmp_it->stop_pos - MAX_AUTO_COMPOSITION_LOOKBACK);
+	charpos = max (initpos, cmp_it->stop_pos - MAX_AUTO_COMPOSITION_LOOKBACK);
       cmp_it->stop_pos = charpos;
     }
-  else if (charpos > cmp_it->stop_pos)
+  else if (charpos > cmp_it->stop_pos) // best-efforts R2L
     {
-      /* Search backward for a pattern that may be composed and the
-	 position of (possibly) the last character of the match is
-	 closest to (but not after) START.  The reason for the last
-	 character is that set_iterator_to_next works in reverse order,
-	 and thus we must stop at the last character for composition
-	 check.  */
-      unsigned char *p;
-      int len;
-      /* Limit byte position used in fast_looking_at.  This is the
-	 byte position of the character after START. */
-      ptrdiff_t limit;
-      ptrdiff_t ostop_pos = cmp_it->stop_pos;
-
-      if (NILP (string))
-	p = BYTE_POS_ADDR (bytepos);
-      else
-	p = SDATA (string) + bytepos;
-      c = string_char_and_length (p, &len);
-      limit = bytepos + len;
+      const ptrdiff_t initpos = charpos, ostop_pos = cmp_it->stop_pos;
+      unsigned char *p = NILP (string) ? BYTE_POS_ADDR (bytepos) : SDATA (string) + bytepos;
+      int len, c = string_char_and_length (p, &len);
+      const ptrdiff_t blimit = bytepos + len;
       while (char_composable_p (c))
 	{
-	  val = CHAR_TABLE_REF (Vcomposition_function_table, c);
+	  Lisp_Object val = CHAR_TABLE_REF (Vcomposition_function_table, c);
 	  for (EMACS_INT ridx = 0; CONSP (val); val = XCDR (val), ridx++)
 	    {
 	      Lisp_Object elt = XCAR (val);
@@ -1136,18 +1106,16 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 		  && charpos - XFIXNAT (AREF (elt, 1)) > ostop_pos)
 		{
 		  ptrdiff_t back = XFIXNAT (AREF (elt, 1));
-		  ptrdiff_t cpos = charpos - back, bpos;
-
-		  if (back == 0)
-		    bpos = bytepos;
-		  else
-		    bpos = (NILP (string) ? CHAR_TO_BYTE (cpos)
-			    : string_char_to_byte (string, cpos));
-		  ptrdiff_t blen
-		    = (STRINGP (AREF (elt, 0))
-		       ? fast_looking_at (AREF (elt, 0), cpos, bpos,
-					  start + 1, limit, string)
-		       : 1);
+		  ptrdiff_t cpos = charpos - back;
+		  ptrdiff_t bpos = (back == 0)
+		    ? bytepos
+		    : (NILP (string)
+		       ? CHAR_TO_BYTE (cpos)
+		       : string_char_to_byte (string, cpos));
+		  ptrdiff_t blen = STRINGP (AREF (elt, 0))
+		    ? fast_looking_at (AREF (elt, 0), cpos, bpos, initpos + 1,
+				       blimit, string)
+		    : 1;
 		  if (blen > 0)
 		    {
 		      /* Make CPOS point to the last character of
@@ -1155,10 +1123,9 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 		      if (blen > 1)
 			{
 			  bpos += blen;
-			  if (NILP (string))
-			    cpos = BYTE_TO_CHAR (bpos) - 1;
-			  else
-			    cpos = string_byte_to_char (string, bpos) - 1;
+			  cpos = NILP (string)
+			    ? BYTE_TO_CHAR (bpos) - 1
+			    : string_byte_to_char (string, bpos) - 1;
 			}
 		      back = cpos - (charpos - back);
 		      if (cmp_it->stop_pos < cpos
@@ -1215,7 +1182,6 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	}
       cmp_it->stop_pos = charpos;
     }
-  eassert (cmp_it->stop_pos == charpos);
 }
 
 /* Check if the character at CHARPOS (and BYTEPOS) is composed
@@ -1296,13 +1262,13 @@ composition_reseat_it (struct composition_it *cmp_it, ptrdiff_t charpos,
 		 support sufficient range of characters.  Try the
 		 other composition rules if any.  */
 	    }
-	  cmp_it->reversed_p = 0;
+	  cmp_it->reversed_p = false;
 	}
       else
 	{
 	  ptrdiff_t cpos = charpos, bpos = bytepos;
 
-	  cmp_it->reversed_p = 1;
+	  cmp_it->reversed_p = true;
 	  elt = XCAR (val);
 	  if (cmp_it->lookback > 0)
 	    {
