@@ -353,7 +353,14 @@ may have changed) back to `save-place-alist'."
   "Function added to `find-file-hook' by `save-place-mode'.
 It runs the hook `save-place-after-find-file-hook'."
   (or save-place-loaded (save-place-load-alist-from-file))
-  (let ((cell (assoc buffer-file-name save-place-alist)))
+  (let ((cell (and (stringp buffer-file-name)
+                   (if save-place-abbreviate-file-names
+                       (or (assoc (abbreviate-file-name buffer-file-name)
+                                  save-place-alist)
+                           (assoc buffer-file-name save-place-alist))
+                     (or (assoc buffer-file-name save-place-alist)
+                         (assoc (abbreviate-file-name buffer-file-name)
+                                save-place-alist))))))
     (if cell
 	(progn
 	  (or revert-buffer-in-progress-p
