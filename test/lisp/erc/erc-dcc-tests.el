@@ -100,7 +100,7 @@
 (ert-deftest erc-dcc-handle-ctcp-send--turbo ()
   (erc-dcc-tests--dcc-handle-ctcp-send t))
 
-(ert-deftest erc-dcc-do-GET-command ()
+(defun erc-dcc-tests--erc-dcc-do-GET-command (file)
   (with-temp-buffer
     (let* ((proc (start-process "fake" (current-buffer) "sleep" "10"))
            (elt (list :nick "tester!~tester@fake.irc"
@@ -109,7 +109,7 @@
                       :parent proc
                       :ip "127.0.0.1"
                       :port "9899"
-                      :file "foo.bin"
+                      :file file
                       :size 1405135128))
            (erc-dcc-list (list elt))
            ;;
@@ -124,7 +124,7 @@
             erc-server-current-nick "dummy")
       (set-process-query-on-exit-flag proc nil)
       (cl-letf (((symbol-function 'read-file-name)
-                 (lambda (&rest _) "foo.bin"))
+                 (lambda (&rest _) file))
                 ((symbol-function 'erc-dcc-get-file)
                  (lambda (&rest r) (push r calls))))
         (goto-char (point-max))
@@ -134,36 +134,41 @@
         (ert-info ("No turbo")
           (should-not (plist-member elt :turbo))
           (goto-char erc-input-marker)
-          (insert "/dcc GET tester foo.bin")
+          (insert "/dcc GET tester " file)
           (erc-send-current-line)
           (should-not (plist-member (car erc-dcc-list) :turbo))
-          (should (equal (pop calls) (list elt "foo.bin" proc))))
+          (should (equal (pop calls) (list elt file proc))))
 
         (ert-info ("Arg turbo in pos 2")
           (should-not (plist-member elt :turbo))
           (goto-char erc-input-marker)
-          (insert "/dcc GET -t tester foo.bin")
+          (insert "/dcc GET -t tester " file)
           (erc-send-current-line)
           (should (eq t (plist-get (car erc-dcc-list) :turbo)))
-          (should (equal (pop calls) (list elt "foo.bin" proc))))
+          (should (equal (pop calls) (list elt file proc))))
 
         (ert-info ("Arg turbo in pos 4")
           (setq elt (plist-put elt :turbo nil)
                 erc-dcc-list (list elt))
           (goto-char erc-input-marker)
-          (insert "/dcc GET tester -t foo.bin")
+          (insert "/dcc GET tester -t " file)
           (erc-send-current-line)
           (should (eq t (plist-get (car erc-dcc-list) :turbo)))
-          (should (equal (pop calls) (list elt "foo.bin" proc))))
+          (should (equal (pop calls) (list elt file proc))))
 
         (ert-info ("Arg turbo in pos 6")
           (setq elt (plist-put elt :turbo nil)
                 erc-dcc-list (list elt))
           (goto-char erc-input-marker)
-          (insert "/dcc GET tester foo.bin -t")
+          (insert "/dcc GET tester " file " -t")
           (erc-send-current-line)
           (should (eq t (plist-get (car erc-dcc-list) :turbo)))
-          (should (equal (pop calls) (list elt "foo.bin" proc))))))))
+          (should (equal (pop calls) (list elt file proc))))))))
+
+(ert-deftest erc-dcc-do-GET-command ()
+  (erc-dcc-tests--erc-dcc-do-GET-command "foo.bin")
+  (erc-dcc-tests--erc-dcc-do-GET-command "foo - file.bin")
+  (erc-dcc-tests--erc-dcc-do-GET-command "foo -t file.bin"))
 
 (defun erc-dcc-tests--pcomplete-common (test-fn)
   (with-current-buffer (get-buffer-create "*erc-dcc-do-GET-command*")

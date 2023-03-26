@@ -504,18 +504,32 @@ At least one of TYPE and NICK must be provided."
            ?n (erc-extract-nick (plist-get ret :nick))))))
     t))
 
-(defun erc-dcc-do-GET-command (proc nick &rest file)
-  "Do a DCC GET command.  NICK is the person who is sending the file.
-FILE is the filename.  If FILE is split into multiple arguments,
-re-join the arguments, separated by a space.
+(defun erc-dcc-do-GET-command (proc &rest args)
+  "Do a DCC GET command.
+ARGS are expected to contain:
+  nick     The person who is sending the file.
+  filename The filename to be downloaded. Can be split into multiple arguments
+           which is then joined by a space.
+  flags    \"-t\" sets `:turbo' see `erc-dcc-list'
+           \"-s\" sets `:secure' see `erc-dcc-list'
+ARGS are parsed as follows:
+  [flag] nick [flag] filename [flag]
 PROC is the server process."
-  (let* ((args (seq-group-by (lambda (s) (eq ?- (aref s 0))) (cons nick file)))
-         (flags (prog1 (cdr (assq t args))
-                  (setq args (cdr (assq nil args))
-                        nick (pop args)
-                        file (and args (mapconcat #'identity args " ")))))
-         (elt (erc-dcc-member :nick nick :type 'GET :file file))
-         (filename (or file (plist-get elt :file) "unknown")))
+  (let ((possible-flags '("-s" "-t"))
+        flags nick elt possible-files filename)
+    ;; Get flags between get and nick
+    (while (seq-contains-p possible-flags (car args) 'equal)
+      (setq flags (cons (pop args) flags)))
+    (setq nick (or (pop args) ""))
+    ;; Get flags between nick and filename
+    (while (seq-contains-p possible-flags (car args) 'equal)
+      (setq flags (cons (pop args) flags)))
+    ;; Get flags after filename
+    (setq args (reverse args))
+    (while (seq-contains-p possible-flags (car args) 'equal)
+      (setq flags (cons (pop args) flags)))
+    (setq filename (or (mapconcat #'identity (reverse args) " ") "")
+          elt (erc-dcc-member :nick nick :type 'GET :file filename))
     (if elt
         (let* ((file (read-file-name
                       (format-prompt "Local filename"
