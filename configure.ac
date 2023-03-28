@@ -630,7 +630,7 @@ AC_ARG_ENABLE([profiling],
                 all platforms.  Stops profiler.el working.])],
 [ac_enable_profiling="${enableval}"],[])
 if test x$ac_enable_profiling != x ; then
-   PROFILING_CFLAGS="-DPROFILING=1 -pg"
+   PROFILING_CFLAGS="-pg"
 else
    PROFILING_CFLAGS=
 fi

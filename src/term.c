@@ -1577,28 +1577,25 @@ produce_glyphs (struct it *it)
 	       * it->tab_width);
 	  if (!NILP (Vdisplay_line_numbers) && it->line_number_produced_p)
 	    next_tab_x += it->lnum_pixel_width;
-	  int nspaces;
 
 	  /* If part of the TAB has been displayed on the previous line
 	     which is continued now, continuation_lines_width will have
 	     been incremented already by the part that fitted on the
 	     continued line.  So, we will get the right number of spaces
 	     here.  */
-	  nspaces = next_tab_x - x0;
-
+	  int nspaces = next_tab_x - x0;
 	  if (it->glyph_row)
 	    {
-	      int n = nspaces;
-
 	      it->char_to_display = ' ';
 	      it->pixel_width = it->len = 1;
-
-	      while (n--)
+	      for (int i = nspaces; i > 0; --i)
 		append_glyph (it);
 	    }
 
 	  it->pixel_width = nspaces;
 	  it->nglyphs = nspaces;
+	  if (it->nglyphs > 1)
+	    XBUFFER (it->object)->text->monospace = false;
 	}
       else if (CHAR_BYTE8_P (it->char_to_display))
 	{

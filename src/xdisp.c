@@ -16270,7 +16270,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 }
 
 
-/* Compute new W->start the leftmost charpos of sline nearest the old
+/* Compute new W->start, the leftmost charpos of sline nearest the old
    W->start, still before point.  Return true if successful.
 
    Not applicable to W->start already at a (textual) line start.
@@ -16318,7 +16318,7 @@ left_align_window_start (struct window *w)
     {
       for (int distance = eabs (CHARPOS (old_pos) - IT_CHARPOS (it)),
 	     min_distance = DISP_INFINITY;
-	   IT_CHARPOS (it) <= PT && distance < min_distance;
+	   IT_CHARPOS (it) <= window_point (w)  && distance < min_distance;
 	   min_distance = distance,
 	     distance = eabs (CHARPOS (old_pos) - IT_CHARPOS (it)))
 	{
@@ -28576,6 +28576,10 @@ gui_produce_glyphs (struct it *it)
               int tab_width = it->tab_width * font->space_width;
               int x = it->current_x + it->continuation_lines_width;
               int x0 = x;
+
+	      if (it->tab_width > 1)
+		XBUFFER (it->object)->text->monospace = false;
+
               /* Adjust for line numbers, if needed.   */
               if (! NILP (Vdisplay_line_numbers) && it->line_number_produced_p)
                 {
@@ -28628,6 +28632,7 @@ gui_produce_glyphs (struct it *it)
                       it->ascent = font->pixel_size + boff - 1;
                       it->descent = -boff + 1;
                     }
+
                   if (it->ascent < 0)
                     it->ascent = 0;
                   if (it->descent < 0)
@@ -28640,12 +28645,9 @@ gui_produce_glyphs (struct it *it)
                 }
               it->phys_ascent = it->ascent;
               it->phys_descent = it->descent;
-
               if (it->glyph_row)
-                {
-                  append_stretch_glyph (it, it->object, it->pixel_width,
-                                        it->ascent + it->descent, it->ascent);
-                }
+		append_stretch_glyph (it, it->object, it->pixel_width,
+				      it->ascent + it->descent, it->ascent);
             }
           else
             {
