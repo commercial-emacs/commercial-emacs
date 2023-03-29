@@ -1594,7 +1594,7 @@ produce_glyphs (struct it *it)
 
 	  it->pixel_width = nspaces;
 	  it->nglyphs = nspaces;
-	  if (it->nglyphs > 1)
+	  if (it->nglyphs > 1 && BUFFERP (it->object))
 	    XBUFFER (it->object)->text->monospace = false;
 	}
       else if (CHAR_BYTE8_P (it->char_to_display))

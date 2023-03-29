@@ -28577,7 +28577,7 @@ gui_produce_glyphs (struct it *it)
               int x = it->current_x + it->continuation_lines_width;
               int x0 = x;
 
-	      if (it->tab_width > 1)
+	      if (it->tab_width > 1 && BUFFERP (it->object))
 		XBUFFER (it->object)->text->monospace = false;
 
               /* Adjust for line numbers, if needed.   */
