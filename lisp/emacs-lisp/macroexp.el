@@ -361,6 +361,16 @@ Assumes the caller has bound `macroexpand-all-environment'."
              (macroexp--all-forms body))
            (cdr form))
           form)))
+      (`(while)
+       (macroexp-warn-and-return
+        (format-message "missing `while' condition")
+        `(signal 'wrong-number-of-arguments '(while 0))
+        nil 'compile-only))
+      (`(unwind-protect ,expr)
+       (macroexp-warn-and-return
+        (format-message "`unwind-protect' without unwind forms")
+        (macroexp--expand-all expr)
+        (list 'suspicious 'unwind-protect) t))
       (`(setq ,(and var (pred symbolp)
                     (pred (not booleanp)) (pred (not keywordp)))
               ,expr)
