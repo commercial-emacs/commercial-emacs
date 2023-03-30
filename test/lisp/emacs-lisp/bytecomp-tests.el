@@ -1585,7 +1585,7 @@ literals (Bug#20852)."
    '(defun zot (x)
       (unwind-protect (print x)))
    '((suspicious unwind-protect))
-   "Warning: `unwind-protect' without unwind forms")
+   "Warning: .unwind-protect. without unwind forms")
 
   (test-suppression
    '(defun zot ()

@@ -73,13 +73,11 @@
      (proced--assert-emacs-pid-in-buffer))))
 
 (ert-deftest proced-refine-test ()
-  ;;(skip-unless (memq system-type '(gnu/linux gnu/kfreebsd darwin)))
+  "Refinement appears to mean filtering out processes that are not PID."
+  :expected-result (if (getenv "CI") t :passed) ; macos signals not taking
   (proced--within-buffer
    'medium
    'user
-   ;; When refining on PID for process A, a process is kept if and only
-   ;; if its PID are the same as process A, which more or less guarentees
-   ;; the refinement will remove some processes.
    (proced--move-to-column "PID")
    (let ((pid (word-at-point)))
      (proced-refine)
@@ -89,7 +87,8 @@
        (forward-line)))))
 
 (ert-deftest proced-refine-with-update-test ()
-  :expected-result (if (getenv "CI") t :passed)
+  "Like `proced-refine-test' but with reverting, whatever that means."
+  :expected-result (if (getenv "CI") t :passed) ; macos signals not taking
   (proced--within-buffer
    'medium
    'user
