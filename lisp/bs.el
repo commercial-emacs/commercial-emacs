@@ -126,6 +126,8 @@
 ;; Globals for customization
 ;; ----------------------------------------------------------------------
 
+(require 'project)
+
 (defgroup bs nil
   "Buffer Selection: Maintaining buffers by buffer menu."
   :version "21.1"
@@ -255,6 +257,7 @@ See also `bs-maximal-buffer-name-column'."
 (defcustom bs-configurations
   '(("all" nil nil nil nil nil)
     ("files" nil nil nil bs-visits-non-file bs-sort-buffer-interns-are-last)
+    ("project" nil nil nil bs-visits-current-project bs-sort-buffer-interns-are-last)
     ("files-and-scratch" "^\\*scratch\\*$" nil nil bs-visits-non-file
      bs-sort-buffer-interns-are-last)
     ("all-intern-last" nil nil nil nil bs-sort-buffer-interns-are-last))
@@ -1038,6 +1041,12 @@ If at end of buffer list go to first line."
 A value of t means BUFFER belongs to no file.
 A value of nil means BUFFER belongs to a file."
   (not (buffer-file-name buffer)))
+
+(defun bs-visits-current-project (buffer)
+  "Return whether BUFFER is in the current project."
+  (not (and-let* ((project (project-current))
+                  (file (buffer-file-name buffer)))
+         (file-in-directory-p file (project-root project)))))
 
 (defun bs-sort-buffer-interns-are-last (_b1 b2)
   "Function for sorting internal buffers at the end of all buffers."
