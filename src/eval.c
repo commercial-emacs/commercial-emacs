@@ -3362,6 +3362,7 @@ let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol)
 	struct Lisp_Symbol *let_bound_symbol = XSYMBOL (specpdl_symbol (p));
 	eassert (let_bound_symbol->u.s.redirect != SYMBOL_VARALIAS);
 	if (symbol == let_bound_symbol
+	    && p->kind != SPECPDL_LET_LOCAL /* bug#62419 */
 	    && EQ (specpdl_where (p), buf))
 	  return true;
       }
