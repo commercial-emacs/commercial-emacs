@@ -783,13 +783,13 @@ DIRS must contain directory names."
                               (project--submodule-p root))
                     (mapcar (lambda (m) (format "%s%s/" root m))
                             (project--git-submodules))))
-         dd
          bufs)
     (dolist (buf (buffer-list))
-      (setq dd (expand-file-name (buffer-local-value 'default-directory buf)))
-      (when (and (string-prefix-p root dd)
-                 (not (cl-find-if (lambda (module) (string-prefix-p module dd))
-                                  modules)))
+      (when-let ((dir (expand-file-name (buffer-local-value 'default-directory buf)))
+                 (project-p (equal project (project-current nil dir)))
+                 (not-submod-p (cl-every (lambda (module)
+                                           (not (string-prefix-p module dir)))
+                                         modules)))
         (push buf bufs)))
     (nreverse bufs)))
 
