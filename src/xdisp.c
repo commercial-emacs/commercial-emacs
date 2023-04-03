@@ -14406,7 +14406,7 @@ redisplay_internal (void)
   FOR_EACH_FRAME (tail, frame)
     {
       struct frame *f = XFRAME (frame);
-      if (FRAME_VISIBLE_P (f))
+      if (FRAME_REDISPLAY_P (f))
 	{
 	  ++number_of_visible_frames;
 	  if (f->fonts_changed)
@@ -14503,7 +14503,7 @@ redisplay_internal (void)
       && ! w->update_mode_line
       && ! current_buffer->clip_changed
       && ! current_buffer->prevent_redisplay_optimizations_p
-      && FRAME_VISIBLE_P (XFRAME (w->frame))
+      && FRAME_REDISPLAY_P (XFRAME (w->frame))
       && ! FRAME_OBSCURED_P (XFRAME (w->frame))
       && ! XFRAME (w->frame)->cursor_type_changed
       && ! XFRAME (w->frame)->face_change
@@ -14850,7 +14850,7 @@ redisplay_internal (void)
 	    }
 	}
     }
-  else if (FRAME_VISIBLE_P (sf) && ! FRAME_OBSCURED_P (sf))
+  else if (FRAME_REDISPLAY_P (sf) && ! FRAME_OBSCURED_P (sf))
     {
       sf->inhibit_clear_image_cache = true;
       displayed_buffer = XBUFFER (XWINDOW (selected_window)->contents);
