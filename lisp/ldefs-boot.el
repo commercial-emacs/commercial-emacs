@@ -1553,22 +1553,10 @@ it is disabled.
 ;;; Generated autoloads from autorevert.el
 
 (autoload 'auto-revert-mode "autorevert" "\
-Toggle reverting buffer when the file changes (Auto-Revert Mode).
+Reverts unmodified buffer when file on disk changes.
 
-Auto-Revert Mode is a minor mode that affects only the current
-buffer.  When enabled, it reverts the buffer when the file on
-disk changes.
-
-When a buffer is reverted, a message is generated.  This can be
-suppressed by setting `auto-revert-verbose' to nil.
-
-Reverting can sometimes fail to preserve all the markers in the buffer.
-To avoid that, set `revert-buffer-insert-file-contents-function' to
-the slower function `revert-buffer-insert-file-contents-delicately'.
-
-Use `global-auto-revert-mode' to automatically revert all buffers.
-Use `auto-revert-tail-mode' if you know that the file will only grow
-without being changed in the part that is already in the buffer.
+Customize `global-auto-revert-mode' to enable universally.
+Use `auto-revert-tail-mode' to effect tailing a buffer.
 
 This is a minor mode.  If called interactively, toggle the
 `Auto-Revert mode' mode.  If the prefix argument is positive,
@@ -1585,28 +1573,12 @@ The mode's hook is called both when the mode is enabled and when
 it is disabled.
 
 (fn &optional ARG)" t)
-(autoload 'turn-on-auto-revert-mode "autorevert" "\
-Turn on Auto-Revert Mode.
-
-This function is designed to be added to hooks, for example:
-  (add-hook \\='c-mode-hook #\\='turn-on-auto-revert-mode)")
+(autoload 'turn-on-auto-revert-mode "autorevert")
 (autoload 'auto-revert-tail-mode "autorevert" "\
-Toggle reverting tail of buffer when the file grows.
+Follow as with the shell command `tail -f`.
 
-When Auto-Revert Tail Mode is enabled, the tail of the file is
-constantly followed, as with the shell command `tail -f'.  This
-means that whenever the file grows on disk (presumably because
-some background process is appending to it from time to time),
-this is reflected in the current buffer.
-
-You can edit the buffer and turn this mode off and on again as
-you please.  But make sure the background process has stopped
-writing before you save the file!
-
-When a buffer is reverted, a message is generated.  This can be
-suppressed by setting `auto-revert-verbose' to nil.
-
-Use `auto-revert-mode' for changes other than appends!
+This mode essentially derives from `auto-revert-mode'
+(but `define-derived-mode' only applies to major modes).
 
 This is a minor mode.  If called interactively, toggle the
 `Auto-Revert-Tail mode' mode.  If the prefix argument is
@@ -1624,11 +1596,7 @@ The mode's hook is called both when the mode is enabled and when
 it is disabled.
 
 (fn &optional ARG)" t)
-(autoload 'turn-on-auto-revert-tail-mode "autorevert" "\
-Turn on Auto-Revert Tail Mode.
-
-This function is designed to be added to hooks, for example:
-  (add-hook \\='my-logfile-mode-hook #\\='turn-on-auto-revert-tail-mode)")
+(put 'global-auto-revert-mode 'globalized-minor-mode t)
 (defvar global-auto-revert-mode nil "\
 Non-nil if Global Auto-Revert mode is enabled.
 See the `global-auto-revert-mode' command
@@ -1638,39 +1606,18 @@ either customize it (see the info node `Easy Customization')
 or call the function `global-auto-revert-mode'.")
 (custom-autoload 'global-auto-revert-mode "autorevert" nil)
 (autoload 'global-auto-revert-mode "autorevert" "\
-Toggle Global Auto-Revert Mode.
+Toggle Auto-Revert mode in all buffers.
+With prefix ARG, enable Global Auto-Revert mode if ARG is positive;
+otherwise, disable it.
 
-Global Auto-Revert Mode is a global minor mode that reverts any
-buffer associated with a file when the file changes on disk.  Use
-`auto-revert-mode' to revert a particular buffer.
-
-If `global-auto-revert-non-file-buffers' is non-nil, this mode
-may also revert some non-file buffers, as described in the
-documentation of that variable.  It ignores buffers with modes
-matching `global-auto-revert-ignore-modes', and buffers with a
-non-nil value of `global-auto-revert-ignore-buffer'.
-
-When a buffer is reverted, a message is generated.  This can be
-suppressed by setting `auto-revert-verbose' to nil.
-
-This function calls the hook `global-auto-revert-mode-hook'.
-It displays the text that `global-auto-revert-mode-text'
-specifies in the mode line.
-
-This is a global minor mode.  If called interactively, toggle the
-`Global Auto-Revert mode' mode.  If the prefix argument is
-positive, enable the mode, and if it is zero or negative, disable
-the mode.
-
-If called from Lisp, toggle the mode if ARG is `toggle'.  Enable
-the mode if ARG is nil, omitted, or is a positive number.
+If called from Lisp, toggle the mode if ARG is `toggle'.
+Enable the mode if ARG is nil, omitted, or is a positive number.
 Disable the mode if ARG is a negative number.
 
-To check whether the minor mode is enabled in the current buffer,
-evaluate `(default-value \\='global-auto-revert-mode)'.
+Auto-Revert mode is enabled in all buffers where
+`turn-on-auto-revert-mode' would do it.
 
-The mode's hook is called both when the mode is enabled and when
-it is disabled.
+See `auto-revert-mode' for more information on Auto-Revert mode.
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "autorevert" '("auto-revert-" "global-auto-revert-"))
@@ -1835,8 +1782,7 @@ to call it without any argument.
 
 (fn REPETITIONS FORM)" t)
 (autoload 'benchmark-progn "benchmark" "\
-Evaluate BODY and message the time taken.
-The return value is the value of the final form in BODY.
+Deprecated no-op.
 
 (fn &rest BODY)" nil t)
 (function-put 'benchmark-progn 'lisp-indent-function 0)
@@ -2809,11 +2755,6 @@ Normally you should let-bind `byte-compile-warnings' before calling this,
 else the global value will be modified.
 
 (fn WARNING)")
-(autoload 'byte-compile-warn-obsolete "bytecomp" "\
-Warn that SYMBOL (a variable, function or generalized variable) is obsolete.
-TYPE is a string that say which one of these three types it is.
-
-(fn SYMBOL TYPE)")
 (autoload 'byte-force-recompile "bytecomp" "\
 Recompile every `.el' file in DIRECTORY that already has a `.elc' file.
 Files in subdirectories of DIRECTORY are processed also.
@@ -2860,8 +2801,8 @@ With argument ARG, insert value in current buffer after the form.
 
 (fn &optional ARG)" t)
 (autoload 'byte-compile "bytecomp" "\
-If FORM is a symbol, byte-compile its function definition.
-If FORM is a lambda or a macro, byte-compile it as a function.
+If FORM is a symbol, compile its function definition.
+If FORM is a lambda or a macro, compile into a function.
 
 (fn FORM)")
 (autoload 'display-call-tree "bytecomp" "\
@@ -2917,67 +2858,6 @@ and corresponding effects.
 ;;; Generated autoloads from cedet/semantic/bovine/c.el
 
 (register-definition-prefixes "semantic/bovine/c" '("semantic"))
-
-
-;;; Generated autoloads from progmodes/c-ts-common.el
-
-(register-definition-prefixes "c-ts-common" '("c-ts-common-"))
-
-
-;;; Generated autoloads from progmodes/c-ts-mode.el
-
-(autoload 'c-ts-base-mode "c-ts-mode" "\
-Major mode for editing C, powered by tree-sitter.
-
-\\{c-ts-base-mode-map}
-
-(fn)" t)
-(autoload 'c-ts-mode "c-ts-mode" "\
-Major mode for editing C, powered by tree-sitter.
-
-This mode is independent from the classic cc-mode.el based
-`c-mode', so configuration variables of that mode, like
-`c-basic-offset', doesn't affect this mode.
-
-To use tree-sitter C/C++ modes by default, evaluate
-
-    (add-to-list \\='major-mode-remap-alist \\='(c-mode . c-ts-mode))
-    (add-to-list \\='major-mode-remap-alist \\='(c++-mode . c++-ts-mode))
-    (add-to-list \\='major-mode-remap-alist
-                 \\='(c-or-c++-mode . c-or-c++-ts-mode))
-
-in your configuration.
-
-(fn)" t)
-(autoload 'c++-ts-mode "c-ts-mode" "\
-Major mode for editing C++, powered by tree-sitter.
-
-This mode is independent from the classic cc-mode.el based
-`c++-mode', so configuration variables of that mode, like
-`c-basic-offset', don't affect this mode.
-
-To use tree-sitter C/C++ modes by default, evaluate
-
-    (add-to-list \\='major-mode-remap-alist \\='(c-mode . c-ts-mode))
-    (add-to-list \\='major-mode-remap-alist \\='(c++-mode . c++-ts-mode))
-    (add-to-list \\='major-mode-remap-alist
-                 \\='(c-or-c++-mode . c-or-c++-ts-mode))
-
-in your configuration.
-
-(fn)" t)
-(autoload 'c-or-c++-ts-mode "c-ts-mode" "\
-Analyze buffer and enable either C or C++ mode.
-
-Some people and projects use .h extension for C++ header files
-which is also the one used for C header files.  This makes
-matching on file name insufficient for detecting major mode that
-should be used.
-
-This function attempts to use file contents to determine whether
-the code is C or C++ and based on that chooses whether to enable
-`c-ts-mode' or `c++-ts-mode'." t)
-(register-definition-prefixes "c-ts-mode" '("c-ts-"))
 
 
 ;;; Generated autoloads from calendar/cal-bahai.el
@@ -3785,6 +3665,10 @@ Return non-nil if VAL is a list of strings.
 (fn VAL)")
 (put 'c-basic-offset 'safe-local-variable 'integerp)
 (put 'c-backslash-column 'safe-local-variable 'integerp)
+(autoload 'c-list-of-strings "cc-vars" "\
+Return non-nil when OBJ is a list of strings (including the empty list).
+
+(fn OBJ)")
  (put 'c-font-lock-extra-types 'safe-local-variable #'c-string-list-p)
  (put 'c++-font-lock-extra-types 'safe-local-variable #'c-string-list-p)
  (put 'objc-font-lock-extra-types 'safe-local-variable #'c-string-list-p)
@@ -4698,15 +4582,6 @@ For use inside Lisp programs, see also `c-macro-expansion'.
 (register-definition-prefixes "cmacexp" '("c-macro-"))
 
 
-;;; Generated autoloads from progmodes/cmake-ts-mode.el
-
-(autoload 'cmake-ts-mode "cmake-ts-mode" "\
-Major mode for editing CMake files, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "cmake-ts-mode" '("cmake-ts-mode-"))
-
-
 ;;; Generated autoloads from cmuscheme.el
 
 (autoload 'run-scheme "cmuscheme" "\
@@ -5129,8 +5004,6 @@ evaluate `compilation-shell-minor-mode'.
 The mode's hook is called both when the mode is enabled and when
 it is disabled.
 
-\\{compilation-shell-minor-mode-map}
-
 (fn &optional ARG)" t)
 (autoload 'compilation-minor-mode "compile" "\
 Toggle Compilation minor mode.
@@ -5153,8 +5026,6 @@ evaluate `compilation-minor-mode'.
 
 The mode's hook is called both when the mode is enabled and when
 it is disabled.
-
-\\{compilation-minor-mode-map}
 
 (fn &optional ARG)" t)
 (autoload 'compilation-next-error-function "compile" "\
@@ -5680,49 +5551,8 @@ with empty strings removed.
 (register-definition-prefixes "semantic/symref/cscope" '("semantic-symref-cscope--line-re"))
 
 
-;;; Generated autoloads from progmodes/csharp-mode.el
-
-(add-to-list 'auto-mode-alist '("\\.cs\\'" . csharp-mode))
-(autoload 'csharp-mode "csharp-mode" "\
-Major mode for editing Csharp code.
-
-Key bindings:
-\\{csharp-mode-map}
-
-(fn)" t)
-(autoload 'csharp-ts-mode "csharp-mode" "\
-Major mode for editing C# code.
-
-(fn)" t)
-(register-definition-prefixes "csharp-mode" '("codedoc-font-lock-" "csharp-"))
-
-
 ;;; Generated autoloads from textmodes/css-mode.el
 
-(autoload 'css-ts-mode "css-mode" "\
-Major mode to edit Cascading Style Sheets (CSS).
-\\<css-ts-mode-map>
-
-This mode provides syntax highlighting, indentation, completion,
-and documentation lookup for CSS, based on the tree-sitter
-library.
-
-Use `\\[completion-at-point]' to complete CSS properties,
-property values, pseudo-elements, pseudo-classes, at-rules,
-bang-rules, and HTML tags, classes and IDs.  Completion
-candidates for HTML class names and IDs are found by looking
-through open HTML mode buffers.
-
-Use `\\[info-lookup-symbol]' to look up documentation of CSS
-properties, at-rules, pseudo-classes, and pseudo-elements on the
-Mozilla Developer Network (MDN).
-
-Use `\\[fill-paragraph]' to reformat CSS declaration blocks.  It
-can also be used to fill comments.
-
-\\{css-mode-map}
-
-(fn)" t)
 (autoload 'css-mode "css-mode" "\
 Major mode to edit Cascading Style Sheets (CSS).
 \\<css-mode-map>
@@ -6586,15 +6416,11 @@ There is some minimal font-lock support (see vars
 (setq debugger 'debug)
 (autoload 'debug "debug" "\
 Enter debugger.  \\<debugger-mode-map>`\\[debugger-continue]' returns from the debugger.
-Arguments are mainly for use when this is called from the internals
-of the evaluator.
 
-You may call with no args, or you may pass nil as the first arg and
-any other args you like.  In that case, the list of args after the
-first will be printed into the backtrace buffer.
+ARGS are for internal use of the evaluator, which inserts the
+symbol \\='debug to avoid printing extraneous debugger stack frames.
 
-If `inhibit-redisplay' is non-nil when this function is called,
-the debugger will not be entered.
+A non-nil `inhibit-redisplay' precludes any action.
 
 (fn &rest ARGS)" t)
 (autoload 'debug-on-entry "debug" "\
@@ -8075,15 +7901,6 @@ it is disabled.
 (register-definition-prefixes "doc-view" '("doc-view-"))
 
 
-;;; Generated autoloads from progmodes/dockerfile-ts-mode.el
-
-(autoload 'dockerfile-ts-mode "dockerfile-ts-mode" "\
-Major mode for editing Dockerfiles, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "dockerfile-ts-mode" '("dockerfile-ts-mode--"))
-
-
 ;;; Generated autoloads from play/doctor.el
 
 (autoload 'doctor "doctor" "\
@@ -8618,7 +8435,7 @@ A second call of this function without changing point inserts the next match.
 A call with prefix PREFIX reads the symbol to insert from the minibuffer with
 completion.
 
-(fn PREFIX)" t)
+(fn PREFIX)" '("P"))
 (autoload 'ebrowse-tags-loop-continue "ebrowse" "\
 Repeat last operation on files in tree.
 FIRST-TIME non-nil means this is not a repetition, but the first time.
@@ -9230,7 +9047,7 @@ Turn on EDT Emulation." t)
 
 ;;; Generated autoloads from progmodes/eglot.el
 
-(push (purecopy '(eglot 1 13)) package--builtin-versions)
+(push (purecopy '(eglot 1 14)) package--builtin-versions)
 (autoload 'eglot "eglot" "\
 Start LSP server in support of PROJECT's buffers under MANAGED-MAJOR-MODE.
 
@@ -9400,7 +9217,7 @@ Describe CTR if it is a class constructor.
 
 ;;; Generated autoloads from emacs-lisp/eldoc.el
 
-(push (purecopy '(eldoc 1 13 0)) package--builtin-versions)
+(push (purecopy '(eldoc 1 14 0)) package--builtin-versions)
 
 
 ;;; Generated autoloads from elec-pair.el
@@ -9525,15 +9342,6 @@ optional prefix argument REINIT is non-nil.
 
 (fn &optional REINIT)" t)
 (register-definition-prefixes "elint" '("elint-"))
-
-
-;;; Generated autoloads from progmodes/elixir-ts-mode.el
-
-(autoload 'elixir-ts-mode "elixir-ts-mode" "\
-Major mode for editing Elixir, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "elixir-ts-mode" '("elixir-ts-"))
 
 
 ;;; Generated autoloads from emacs-lisp/elp.el
@@ -9830,6 +9638,8 @@ FACTOR is the multiplication factor for the size.
 (fn &optional FACTOR)" t)
 (autoload 'emoji-zoom-decrease "emoji" "\
 Decrease the size of the character under point." t)
+(autoload 'emoji-zoom-reset "emoji" "\
+Reset the size of the character under point." t)
 (register-definition-prefixes "emoji" '("emoji-"))
 
 
@@ -10235,7 +10045,7 @@ for the values of the other parameters.
 
 See `erc-tls' for the meaning of ID.
 
-(fn &key (SERVER (erc-compute-server)) (PORT (erc-compute-port)) (NICK (erc-compute-nick)) (USER (erc-compute-user)) PASSWORD (FULL-NAME (erc-compute-full-name)) ID)" t)
+(fn &key (SERVER (erc-compute-server)) (PORT (erc-compute-port)) (NICK (erc-compute-nick)) (USER (erc-compute-user)) PASSWORD (FULL-NAME (erc-compute-full-name)) ID)" '((erc-select-read-args)))
 (defalias 'erc-select #'erc)
 (autoload 'erc-tls "erc" "\
 ERC is a powerful, modular, and extensible IRC client.
@@ -10283,7 +10093,7 @@ See Info node `(erc) Network Identifier' for details.  Like USER
 and CLIENT-CERTIFICATE, this parameter cannot be specified
 interactively.
 
-(fn &key (SERVER (erc-compute-server)) (PORT (erc-compute-port \\='ircs-u)) (NICK (erc-compute-nick)) (USER (erc-compute-user)) PASSWORD (FULL-NAME (erc-compute-full-name)) CLIENT-CERTIFICATE ID)" t)
+(fn &key (SERVER (erc-compute-server)) (PORT (erc-compute-port \\='ircs-u)) (NICK (erc-compute-nick)) (USER (erc-compute-user)) PASSWORD (FULL-NAME (erc-compute-full-name)) CLIENT-CERTIFICATE ID)" '((let ((erc-default-port erc-default-port-tls)) (erc-select-read-args))))
 (autoload 'erc-handle-irc-url "erc" "\
 Use ERC to IRC on HOST:PORT in CHANNEL.
 If ERC is already connected to HOST:PORT, simply /join CHANNEL.
@@ -10512,9 +10322,7 @@ it has to be wrapped in `(eval (quote ...))'.
 If NAME is already defined as a test and Emacs is running
 in batch mode, an error is signaled.
 
-(fn NAME () [DOCSTRING] [:expected-result RESULT-TYPE] [:tags \\='(TAG...)] BODY...)" nil t)
-(function-put 'ert-deftest 'doc-string-elt 3)
-(function-put 'ert-deftest 'lisp-indent-function 2)
+(fn NAME () [DOCSTRING] [:expected-result RESULT-TYPE] [:tags \\='(TAG...)] BODY...)" nil 'macro)
 (autoload 'ert-run-tests-batch "ert" "\
 Run the tests specified by SELECTOR, printing results to the terminal.
 
@@ -10649,9 +10457,10 @@ information on Eshell, see Info node `(eshell)Top'.
 (fn &optional ARG)" t)
 (autoload 'eshell-command "eshell" "\
 Execute the Eshell command string COMMAND.
-With prefix ARG, insert output into the current buffer at point.
+If TO-CURRENT-BUFFER is non-nil (interactively, with the prefix
+argument), then insert output into the current buffer at point.
 
-(fn &optional COMMAND ARG)" t)
+(fn COMMAND &optional TO-CURRENT-BUFFER)" t)
 (autoload 'eshell-command-result "eshell" "\
 Execute the given Eshell COMMAND, and return the result.
 The result might be any Lisp object.
@@ -12050,11 +11859,9 @@ DELIMITED if non-nil means replace only word-delimited matches.
 ;;; Generated autoloads from filenotify.el
 
 (autoload 'file-notify-handle-event "filenotify" "\
-Handle a file system monitoring event, coming from backends.
-If OBJECT is a filewatch event, call its callback.
-Otherwise, signal a `file-notify-error'.
+Call NOTIFY's callback on NOTIFY's event.
 
-(fn OBJECT)" t)
+(fn NOTIFY)" t)
 (function-put 'file-notify-handle-event 'completion-predicate #'ignore)
 (register-definition-prefixes "filenotify" '("file-notify-"))
 
@@ -12424,14 +12231,16 @@ See `find-library' for more details.
 
 (fn LIBRARY)" t)
 (autoload 'find-function-search-for-symbol "find-func" "\
-Search for SYMBOL's definition of type TYPE in LIBRARY.
-Visit the library in a buffer, and return a cons cell (BUFFER . POSITION),
-or just (BUFFER . nil) if the definition can't be found in the file.
+Find SYMBOL's defun, or other definitional TYPE, in LIBRARY.
+When TYPE is a non-nil key in `find-function-regexp-alist',
+interpret SYMBOL according to the corresponding definitional,
+e.g., defvar or defface.
 
-If TYPE is nil, look for a function definition.
-Otherwise, TYPE specifies the kind of definition,
-and it is interpreted via `find-function-regexp-alist'.
-The search is done in the source for library LIBRARY.
+After visiting file LIBRARY, return a cons cell (BUFFER
+. POS), where POS is the character position of the definition,
+or nil if not found.
+
+LIBRARY can be an absolute or relative file name.
 
 (fn SYMBOL TYPE LIBRARY)")
 (autoload 'find-function-noselect "find-func" "\
@@ -12718,8 +12527,6 @@ evaluate `flymake-mode'.
 
 The mode's hook is called both when the mode is enabled and when
 it is disabled.
-
-\\{flymake-mode-map}
 
 (fn &optional ARG)" t)
 (autoload 'flymake-mode-on "flymake" "\
@@ -13702,7 +13509,7 @@ DEFAULT-MAP specifies the default key map for ICON-LIST.
 
 ;;; Generated autoloads from gnus/gnus.el
 
-(push (purecopy '(gnus 5 13)) package--builtin-versions)
+(push (purecopy '(gnus 5 14)) package--builtin-versions)
 (custom-autoload 'gnus-select-method "gnus")
 (autoload 'gnus-child-no-server "gnus" "\
 Read network news as a child, without connecting to the local server.
@@ -14459,21 +14266,6 @@ Add the window configuration CONF to `gnus-buffer-configuration'.
 (register-definition-prefixes "gnutls" '("gnutls-" "open-gnutls-stream"))
 
 
-;;; Generated autoloads from progmodes/go-ts-mode.el
-
-(autoload 'go-ts-mode "go-ts-mode" "\
-Major mode for editing Go, powered by tree-sitter.
-
-\\{go-ts-mode-map}
-
-(fn)" t)
-(autoload 'go-mod-ts-mode "go-ts-mode" "\
-Major mode for editing go.mod files, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "go-ts-mode" '("go-"))
-
-
 ;;; Generated autoloads from play/gomoku.el
 
 (autoload 'gomoku "gomoku" "\
@@ -15128,15 +14920,6 @@ Prefix arg sets default accept amount temporarily.
 (register-definition-prefixes "hashcash" '("hashcash-"))
 
 
-;;; Generated autoloads from progmodes/heex-ts-mode.el
-
-(autoload 'heex-ts-mode "heex-ts-mode" "\
-Major mode for editing HEEx, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "heex-ts-mode" '("heex-ts-"))
-
-
 ;;; Generated autoloads from help-at-pt.el
 
 (autoload 'help-at-pt-string "help-at-pt" "\
@@ -15275,8 +15058,8 @@ When called from Lisp, COMMAND may also be a function object.
 (fn COMMAND)" t)
 (autoload 'help-C-file-name "help-fns" "\
 Return the name of the C file where SUBR-OR-VAR is defined.
-KIND should be `var' for a variable or `subr' for a subroutine.
-If we can't find the file name, nil is returned.
+KIND should be \\='var for a variable or \\='subr for a
+subroutine.  If we can't find the file name, nil is returned.
 
 (fn SUBR-OR-VAR KIND)")
 (autoload 'find-lisp-object-file-name "help-fns" "\
@@ -15640,10 +15423,7 @@ or add (global-hi-lock-mode 1) to your init file.
 In buffers where Font Lock mode is enabled, patterns are
 highlighted using font lock.  In buffers where Font Lock mode is
 disabled, patterns are applied using overlays; in this case, the
-highlighting will not be updated as you type.  The Font Lock mode
-is considered \"enabled\" in a buffer if its `major-mode'
-causes `font-lock-specified-p' to return non-nil, which means
-the major mode specifies support for Font Lock.
+highlighting will not be updated as you type.
 
 When Hi Lock mode is enabled, a \"Regexp Highlighting\" submenu
 is added to the \"Edit\" menu.  The commands in the submenu,
@@ -15766,10 +15546,7 @@ and `search-upper-case' is non-nil, the matching is case-sensitive.
 
 Use Font lock mode, if enabled, to highlight REGEXP.  Otherwise,
 use overlays for highlighting.  If overlays are used, the
-highlighting will not update as you type.  The Font Lock mode
-is considered \"enabled\" in a buffer if its `major-mode'
-causes `font-lock-specified-p' to return non-nil, which means
-the major mode specifies support for Font Lock.
+highlighting will not update as you type.
 
 (fn REGEXP &optional FACE SUBEXP LIGHTER)" t)
 (defalias 'highlight-phrase 'hi-lock-face-phrase-buffer)
@@ -15784,10 +15561,7 @@ Also set `search-spaces-regexp' to the value of `search-whitespace-regexp'.
 
 Use Font lock mode, if enabled, to highlight REGEXP.  Otherwise,
 use overlays for highlighting.  If overlays are used, the
-highlighting will not update as you type.  The Font Lock mode
-is considered \"enabled\" in a buffer if its `major-mode'
-causes `font-lock-specified-p' to return non-nil, which means
-the major mode specifies support for Font Lock.
+highlighting will not update as you type.
 
 (fn REGEXP &optional FACE)" t)
 (defalias 'highlight-symbol-at-point 'hi-lock-face-symbol-at-point)
@@ -15801,10 +15575,7 @@ If REGEXP contains upper case characters (excluding those preceded by `\\')
 and `search-upper-case' is non-nil, the matching is case-sensitive.
 
 This uses Font lock mode if it is enabled; otherwise it uses overlays,
-in which case the highlighting will not update as you type.  The Font
-Lock mode is considered \"enabled\" in a buffer if its `major-mode'
-causes `font-lock-specified-p' to return non-nil, which means
-the major mode specifies support for Font Lock." t)
+in which case the highlighting will not update as you type." t)
 (defalias 'unhighlight-regexp 'hi-lock-unface-buffer)
 (autoload 'hi-lock-unface-buffer "hi-lock" "\
 Remove highlighting of each match to REGEXP set by hi-lock.
@@ -16145,17 +15916,7 @@ argument VERBOSE non-nil makes the function verbose.
 ;;; Generated autoloads from hl-line.el
 
 (autoload 'hl-line-mode "hl-line" "\
-Toggle highlighting of the current line (Hl-Line mode).
-
-Hl-Line mode is a buffer-local minor mode.  If
-`hl-line-sticky-flag' is non-nil, Hl-Line mode highlights the
-line about the buffer's point in all windows.  Caveat: the
-buffer's point might be different from the point of a
-non-selected window.  Hl-Line mode uses the function
-`hl-line-highlight' on `post-command-hook' in this case.
-
-When `hl-line-sticky-flag' is nil, Hl-Line mode highlights the
-line about point in the selected window only.
+Toggle highlighting of the current line.
 
 This is a minor mode.  If called interactively, toggle the
 `Hl-Line mode' mode.  If the prefix argument is positive, enable
@@ -16172,6 +15933,7 @@ The mode's hook is called both when the mode is enabled and when
 it is disabled.
 
 (fn &optional ARG)" t)
+(put 'global-hl-line-mode 'globalized-minor-mode t)
 (defvar global-hl-line-mode nil "\
 Non-nil if Global Hl-Line mode is enabled.
 See the `global-hl-line-mode' command
@@ -16181,31 +15943,21 @@ either customize it (see the info node `Easy Customization')
 or call the function `global-hl-line-mode'.")
 (custom-autoload 'global-hl-line-mode "hl-line" nil)
 (autoload 'global-hl-line-mode "hl-line" "\
-Toggle line highlighting in all buffers (Global Hl-Line mode).
+Toggle Hl-Line mode in all buffers.
+With prefix ARG, enable Global Hl-Line mode if ARG is positive;
+otherwise, disable it.
 
-If `global-hl-line-sticky-flag' is non-nil, Global Hl-Line mode
-highlights the line about the current buffer's point in all live
-windows.
-
-Global-Hl-Line mode uses the function `global-hl-line-highlight'
-on `post-command-hook'.
-
-This is a global minor mode.  If called interactively, toggle the
-`Global Hl-Line mode' mode.  If the prefix argument is positive,
-enable the mode, and if it is zero or negative, disable the mode.
-
-If called from Lisp, toggle the mode if ARG is `toggle'.  Enable
-the mode if ARG is nil, omitted, or is a positive number.
+If called from Lisp, toggle the mode if ARG is `toggle'.
+Enable the mode if ARG is nil, omitted, or is a positive number.
 Disable the mode if ARG is a negative number.
 
-To check whether the minor mode is enabled in the current buffer,
-evaluate `(default-value \\='global-hl-line-mode)'.
+Hl-Line mode is enabled in all buffers where `hl-line-turn-on' would
+do it.
 
-The mode's hook is called both when the mode is enabled and when
-it is disabled.
+See `hl-line-mode' for more information on Hl-Line mode.
 
 (fn &optional ARG)" t)
-(register-definition-prefixes "hl-line" '("global-hl-line-" "hl-line-"))
+(register-definition-prefixes "hl-line" '("hl-line-"))
 
 
 ;;; Generated autoloads from net/hmac-def.el
@@ -16307,15 +16059,6 @@ values.
 (register-definition-prefixes "semantic/html" '("semantic-"))
 
 
-;;; Generated autoloads from textmodes/html-ts-mode.el
-
-(autoload 'html-ts-mode "html-ts-mode" "\
-Major mode for editing Html, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "html-ts-mode" '("html-ts-mode-"))
-
-
 ;;; Generated autoloads from htmlfontify.el
 
 (push (purecopy '(htmlfontify 0 21)) package--builtin-versions)
@@ -16388,8 +16131,7 @@ inlined into the compiled format versions.  This means that if you
 change its definition, you should explicitly call
 `ibuffer-recompile-formats'.
 
-(fn SYMBOL (&key NAME INLINE PROPS SUMMARIZER) &rest BODY)" nil t)
-(function-put 'define-ibuffer-column 'lisp-indent-function 'defun)
+(fn SYMBOL (&key NAME INLINE PROPS SUMMARIZER) &rest BODY)" nil 'macro)
 (autoload 'define-ibuffer-sorter "ibuf-macs" "\
 Define a method of sorting named NAME.
 DOCUMENTATION is the documentation of the function, which will be called
@@ -16400,9 +16142,7 @@ For sorting, the forms in BODY will be evaluated with `a' bound to one
 buffer object, and `b' bound to another.  BODY should return a non-nil
 value if and only if `a' is \"less than\" `b'.
 
-(fn NAME DOCUMENTATION (&key DESCRIPTION) &rest BODY)" nil t)
-(function-put 'define-ibuffer-sorter 'lisp-indent-function 1)
-(function-put 'define-ibuffer-sorter 'doc-string-elt 2)
+(fn NAME DOCUMENTATION (&key DESCRIPTION) &rest BODY)" nil 'macro)
 (autoload 'define-ibuffer-op "ibuf-macs" "\
 Generate a function which operates on a buffer.
 OP becomes the name of the function; if it doesn't begin with
@@ -16441,9 +16181,7 @@ BODY define the operation; they are forms to evaluate per each
 marked buffer.  BODY is evaluated with `buf' bound to the
 buffer object.
 
-(fn OP ARGS DOCUMENTATION (&key INTERACTIVE MARK MODIFIER-P DANGEROUS OPSTRING ACTIVE-OPSTRING BEFORE AFTER COMPLEX) &rest BODY)" nil t)
-(function-put 'define-ibuffer-op 'lisp-indent-function 2)
-(function-put 'define-ibuffer-op 'doc-string-elt 3)
+(fn OP ARGS DOCUMENTATION (&key INTERACTIVE MARK MODIFIER-P DANGEROUS OPSTRING ACTIVE-OPSTRING BEFORE AFTER COMPLEX) &rest BODY)" nil 'macro)
 (autoload 'define-ibuffer-filter "ibuf-macs" "\
 Define a filter named NAME.
 DOCUMENTATION is the documentation of the function.
@@ -16458,9 +16196,7 @@ not a particular buffer should be displayed or not.  The forms in BODY
 will be evaluated with BUF bound to the buffer object, and QUALIFIER
 bound to the current value of the filter.
 
-(fn NAME DOCUMENTATION (&key READER DESCRIPTION) &rest BODY)" nil t)
-(function-put 'define-ibuffer-filter 'lisp-indent-function 2)
-(function-put 'define-ibuffer-filter 'doc-string-elt 2)
+(fn NAME DOCUMENTATION (&key READER DESCRIPTION) &rest BODY)" nil 'macro)
 (register-definition-prefixes "ibuf-macs" '("ibuffer-"))
 
 
@@ -17271,8 +17007,8 @@ Put image IMAGE in front of POS in the current buffer.
 IMAGE must be an image created with `create-image' or `defimage'.
 IMAGE is displayed by putting an overlay into the current buffer with a
 `before-string' STRING that has a `display' property whose value is the
-image.  STRING is defaulted if you omit it.
-The overlay created will have the `put-image' property set to t.
+image.  STRING defaults to \"x\" if it's nil or omitted.
+The overlay created by this function has the `put-image' property set to t.
 POS may be an integer or marker.
 AREA is where to display the image.  AREA nil or omitted means
 display it in the text area, a value of `left-margin' means
@@ -18686,15 +18422,6 @@ If non-nil, second arg INITIAL-INPUT is a string to insert before reading.
 (register-definition-prefixes "semantic/wisent/java-tags" '("semantic-" "wisent-java-parse-error"))
 
 
-;;; Generated autoloads from progmodes/java-ts-mode.el
-
-(autoload 'java-ts-mode "java-ts-mode" "\
-Major mode for editing Java, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "java-ts-mode" '("java-ts-mode-"))
-
-
 ;;; Generated autoloads from cedet/semantic/wisent/javascript.el
 
 (register-definition-prefixes "semantic/wisent/javascript" '("semantic-" "wisent-javascript-jv-expand-tag"))
@@ -18721,21 +18448,8 @@ by `jka-compr-install'.")
 ;;; Generated autoloads from progmodes/js.el
 
 (push (purecopy '(js 9)) package--builtin-versions)
-(autoload 'js-base-mode "js" "\
-Generic major mode for editing JavaScript.
-
-This mode is intended to be inherited by concrete major modes.
-Currently there are `js-mode' and `js-ts-mode'.
-
-(fn)" t)
 (autoload 'js-mode "js" "\
 Major mode for editing JavaScript.
-
-(fn)" t)
-(autoload 'js-ts-mode "js" "\
-Major mode for editing JavaScript.
-
-\\<js-ts-mode-map>
 
 (fn)" t)
 (autoload 'js-json-mode "js" "\
@@ -18765,15 +18479,6 @@ one of the aforementioned options instead of using this mode.
 
 (push (purecopy '(json 1 5)) package--builtin-versions)
 (register-definition-prefixes "json" '("json-"))
-
-
-;;; Generated autoloads from progmodes/json-ts-mode.el
-
-(autoload 'json-ts-mode "json-ts-mode" "\
-Major mode for editing JSON, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "json-ts-mode" '("json-ts-"))
 
 
 ;;; Generated autoloads from jsonrpc.el
@@ -19387,6 +19092,41 @@ Major mode for browsing CVS log output.
 (autoload 'log-view-get-marked "log-view" "\
 Return the list of tags for the marked log entries.")
 (register-definition-prefixes "log-view" '("log-view-"))
+
+
+;;; Generated autoloads from longlines.el
+
+(autoload 'longlines-mode "longlines" "\
+Toggle Long Lines mode in this buffer.
+
+When Long Lines mode is enabled, long lines are wrapped if they
+extend beyond `fill-column'.  The soft newlines used for line
+wrapping will not show up when the text is yanked or saved to
+disk.
+
+If the variable `longlines-auto-wrap' is non-nil, lines are
+automatically wrapped whenever the buffer is changed.  You can
+always call `fill-paragraph' to fill individual paragraphs.
+
+If the variable `longlines-show-hard-newlines' is non-nil, hard
+newlines are indicated with a symbol.
+
+This is a minor mode.  If called interactively, toggle the
+`Longlines mode' mode.  If the prefix argument is positive,
+enable the mode, and if it is zero or negative, disable the mode.
+
+If called from Lisp, toggle the mode if ARG is `toggle'.  Enable
+the mode if ARG is nil, omitted, or is a positive number.
+Disable the mode if ARG is a negative number.
+
+To check whether the minor mode is enabled in the current buffer,
+evaluate `longlines-mode'.
+
+The mode's hook is called both when the mode is enabled and when
+it is disabled.
+
+(fn &optional ARG)" t)
+(register-definition-prefixes "longlines" '("longlines-"))
 
 
 ;;; Generated autoloads from lpr.el
@@ -20289,7 +20029,7 @@ Major mode for editing MetaPost sources.
 
 ;;; Generated autoloads from mh-e/mh-acros.el
 
-(register-definition-prefixes "mh-acros" '("defmacro-mh" "defun-mh" "mh-" "with-mh-folder-updating"))
+(register-definition-prefixes "mh-acros" '("defmacro-mh" "mh-" "with-mh-folder-updating"))
 
 
 ;;; Generated autoloads from mh-e/mh-alias.el
@@ -21674,8 +21414,8 @@ a greeting from the server.
 :nowait, if non-nil, says the connection should be made
 asynchronously, if possible.
 
-:noquery - when exiting Emacs and the network process is running,
-don't query the user if it's non-nil.
+:sndtimeo, if a list of seconds and microseconds, specifies the
+connect(2) timeout.
 
 :shell-command is a `format-spec' string that can be used if
 :type is `shell'.  It has two specs, %s for host and %p for port
@@ -22466,7 +22206,7 @@ Coloring:
 
 ;;; Generated autoloads from org/org.el
 
-(push (purecopy '(org 9 6 2)) package--builtin-versions)
+(push (purecopy '(org 9 6 3)) package--builtin-versions)
 (autoload 'org-babel-do-load-languages "org" "\
 Load the languages defined in `org-babel-load-languages'.
 
@@ -24467,36 +24207,6 @@ The mode's hook is called both when the mode is enabled and when
 it is disabled.
 
 (fn &optional ARG)" t)
-(defvar pixel-scroll-precision-mode nil "\
-Non-nil if Pixel-Scroll-Precision mode is enabled.
-See the `pixel-scroll-precision-mode' command
-for a description of this minor mode.
-Setting this variable directly does not take effect;
-either customize it (see the info node `Easy Customization')
-or call the function `pixel-scroll-precision-mode'.")
-(custom-autoload 'pixel-scroll-precision-mode "pixel-scroll" nil)
-(autoload 'pixel-scroll-precision-mode "pixel-scroll" "\
-Toggle pixel scrolling.
-
-When enabled, this minor mode allows to scroll the display
-precisely, according to the turning of the mouse wheel.
-
-This is a global minor mode.  If called interactively, toggle the
-`Pixel-Scroll-Precision mode' mode.  If the prefix argument is
-positive, enable the mode, and if it is zero or negative, disable
-the mode.
-
-If called from Lisp, toggle the mode if ARG is `toggle'.  Enable
-the mode if ARG is nil, omitted, or is a positive number.
-Disable the mode if ARG is a negative number.
-
-To check whether the minor mode is enabled in the current buffer,
-evaluate `(default-value \\='pixel-scroll-precision-mode)'.
-
-The mode's hook is called both when the mode is enabled and when
-it is disabled.
-
-(fn &optional ARG)" t)
 (register-definition-prefixes "pixel-scroll" '("pixel-"))
 
 
@@ -25196,22 +24906,18 @@ Open profile FILENAME.
 ;;; Generated autoloads from progmodes/project.el
 
 (push (purecopy '(project 0 9 8)) package--builtin-versions)
+(autoload 'project-get-project "project" "\
+Return the project for DIRECTORY, and mark as most recently used.
+DIRECTORY defaults to `default-directory'.  If no project obtains
+from DIRECTORY, prompt the user for an alternate directory.  If
+no project obtains from the alternate, return the \"transient\"
+project instance and do not adjust recently used projects.
+
+(fn &optional DIRECTORY)")
 (autoload 'project-current "project" "\
-Return the project instance in DIRECTORY, defaulting to `default-directory'.
-
-When no project is found in that directory, the result depends on
-the value of MAYBE-PROMPT: if it is nil or omitted, return nil,
-else ask the user for a directory in which to look for the
-project, and if no project is found there, return a \"transient\"
-project instance.
-
-The \"transient\" project instance is a special kind of value
-which denotes a project rooted in that directory and includes all
-the files under the directory except for those that match entries
-in `vc-directory-exclusion-list' or `grep-find-ignored-files'.
-
-See the doc string of `project-find-functions' for the general form
-of the project instance object.
+Return the project for DIRECTORY.
+DIRECTORY defaults to `default-directory'.
+Under MAYBE-PROMPT, calls `project-get-project'.
 
 (fn &optional MAYBE-PROMPT DIRECTORY)")
 (defvar project-prefix-map (let ((map (make-sparse-keymap))) (define-key map "!" 'project-shell-command) (define-key map "&" 'project-async-shell-command) (define-key map "f" 'project-find-file) (define-key map "F" 'project-or-external-find-file) (define-key map "b" 'project-switch-to-buffer) (define-key map "s" 'project-shell) (define-key map "d" 'project-find-dir) (define-key map "D" 'project-dired) (define-key map "v" 'project-vc-dir) (define-key map "c" 'project-compile) (define-key map "e" 'project-eshell) (define-key map "k" 'project-kill-buffers) (define-key map "p" 'project-switch-project) (define-key map "g" 'project-find-regexp) (define-key map "G" 'project-or-external-find-regexp) (define-key map "r" 'project-query-replace-regexp) (define-key map "x" 'project-execute-extended-command) (define-key map "\2" 'project-list-buffers) map) "\
@@ -25321,7 +25027,10 @@ If you exit the `query-replace', you can later continue the
 
 (fn FROM TO)" t)
 (autoload 'project-compile "project" "\
-Run `compile' in the project root." t)
+Compile in the project root.
+Note rather than utilize `compile-history', compile.el reassigns
+`compilation-directory' and `compilation-command' for the benefit
+of the `recompile' command." t)
 (function-put 'project-compile 'interactive-only 'compile)
 (autoload 'project-switch-to-buffer "project" "\
 Display buffer BUFFER-OR-NAME in the selected window.
@@ -25376,6 +25085,7 @@ interactively.
 Also see the `project-kill-buffers-display-buffer-list' variable.
 
 (fn &optional NO-CONFIRM)" t)
+(autoload 'project-most-recent-project "project")
 (autoload 'project-remember-project "project" "\
 Add project PR to the front of the project list.
 Save the result in `project-list-file' if the list of projects
@@ -25394,7 +25104,7 @@ Return the list of root directories of all known projects.")
 Execute an extended command in project root." t)
 (function-put 'project-execute-extended-command 'interactive-only 'command-execute)
 (autoload 'project-switch-project "project" "\
-\"Switch\" to another project by running an Emacs command.
+Switch to another project by running an Emacs command.
 The available commands are presented as a dispatch menu
 made from `project-switch-commands'.
 
@@ -25746,24 +25456,10 @@ asking.
 Sort Python imports in the current buffer." t)
 (autoload 'python-fix-imports "python" "\
 Add missing imports and remove unused ones from the current buffer." t)
-(autoload 'python-base-mode "python" "\
-Generic major mode for editing Python files.
-
-This is a generic major mode intended to be inherited by
-concrete implementations.  Currently there are two concrete
-implementations: `python-mode' and `python-ts-mode'.
-
-(fn)" t)
 (autoload 'python-mode "python" "\
 Major mode for editing Python files.
 
 \\{python-mode-map}
-
-(fn)" t)
-(autoload 'python-ts-mode "python" "\
-Major mode for editing Python files, using tree-sitter library.
-
-\\{python-ts-mode-map}
 
 (fn)" t)
 (register-definition-prefixes "python" '("inferior-python-mode" "python-" "run-python-internal"))
@@ -26279,8 +25975,6 @@ evaluate `rectangle-mark-mode'.
 
 The mode's hook is called both when the mode is enabled and when
 it is disabled.
-
-\\{rectangle-mark-mode-map}
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "rect" '("apply-on-rectangle" "clear-rectangle-line" "delete-" "extract-rectangle-" "killed-rectangle" "ope" "rectangle-" "spaces-string" "string-rectangle-"))
@@ -27440,16 +27134,6 @@ Major mode for editing Ruby code.
 (register-definition-prefixes "ruby-mode" '("ruby-"))
 
 
-;;; Generated autoloads from progmodes/ruby-ts-mode.el
-
-(push (purecopy '(ruby-ts-mode 0 2)) package--builtin-versions)
-(autoload 'ruby-ts-mode "ruby-ts-mode" "\
-Major mode for editing Ruby, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "ruby-ts-mode" '("ruby-ts-"))
-
-
 ;;; Generated autoloads from ruler-mode.el
 
 (defvar-local ruler-mode nil "\
@@ -27474,15 +27158,6 @@ it is disabled.
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "ruler-mode" '("ruler-"))
-
-
-;;; Generated autoloads from progmodes/rust-ts-mode.el
-
-(autoload 'rust-ts-mode "rust-ts-mode" "\
-Major mode for editing Rust, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "rust-ts-mode" '("rust-ts-mode-"))
 
 
 ;;; Generated autoloads from emacs-lisp/rx.el
@@ -28495,14 +28170,6 @@ To work around that, do:
 ;;; Generated autoloads from progmodes/sh-script.el
 
 (put 'sh-shell 'safe-local-variable 'symbolp)
-(autoload 'sh-base-mode "sh-script" "\
-Generic major mode for editing shell scripts.
-
-This is a generic major mode intended to be inherited by concrete
-implementations.  Currently there are two: `sh-mode' and
-`bash-ts-mode'.
-
-(fn)" t)
 (autoload 'sh-mode "sh-script" "\
 Major mode for editing shell scripts.
 This mode works for many shells, since they all have roughly the same syntax,
@@ -28557,12 +28224,6 @@ with your script for an edit-interpret-debug cycle.
 
 (fn)" t)
 (defalias 'shell-script-mode 'sh-mode)
-(autoload 'bash-ts-mode "sh-script" "\
-Major mode for editing Bash shell scripts.
-This mode automatically falls back to `sh-mode' if the buffer is
-not written in Bash or sh.
-
-(fn)" t)
 (register-definition-prefixes "sh-script" '("sh-"))
 
 
@@ -32529,15 +32190,6 @@ Mode for displaying and reprioritizing top priority Todo.
 (register-definition-prefixes "todo-mode" '("todo-"))
 
 
-;;; Generated autoloads from textmodes/toml-ts-mode.el
-
-(autoload 'toml-ts-mode "toml-ts-mode" "\
-Major mode for editing TOML, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "toml-ts-mode" '("toml-ts-mode-"))
-
-
 ;;; Generated autoloads from tool-bar.el
 
 (autoload 'toggle-tool-bar-mode-from-frame "tool-bar" "\
@@ -32910,6 +32562,89 @@ See info node `(transient)Modifying Existing Transients'.
 (register-definition-prefixes "transient" '("transient"))
 
 
+;;; Generated autoloads from tree-sitter.el
+
+(defvar tree-sitter-resources-dir (if-let ((interactive (not noninteractive)) (proper-dir (ignore-errors (file-name-directory (directory-file-name (with-temp-buffer (let ((proc (start-process "tree-sitter-resources-dir" (current-buffer) "tree-sitter" "dump-libpath"))) (cl-loop repeat 10 while (process-live-p proc) do (sleep-for 0 100) finally (when (process-live-p proc) (kill-process proc))) (car (split-string (buffer-substring-no-properties (point-min) (point-max))))))))))) proper-dir (concat (file-name-as-directory (or (getenv "XDG_CACHE_HOME") (expand-file-name ".cache" "~"))) "tree-sitter")) "\
+Follows dirs::cache_dir in the Rust dirs crate.
+On Linux systems this is $XDG_CACHE_HOME/tree-sitter.")
+(custom-autoload 'tree-sitter-resources-dir "tree-sitter" t)
+(defvar tree-sitter-mode-alist '((c++-mode . "cpp") (rust-mode . "rust") (rustic-mode . "rust") (emacs-lisp-mode . "elisp") (csharp-mode . "sharp") (haskell-mode . "haskell") (go-mode . "go") (sh-mode . "bash") (c-mode . "c") (html-mode . "html") (makefile-gmake-mode . "make") (makefile-mode . "make") (php-mode . "php") (ess-mode . "r") (sql-mode . "sql") (conf-toml-mode . "toml") (vhdl-mode . "vhdl") (java-mode . "java") (js-mode . "javascript") (python-mode . "python") (ruby-mode . "ruby") (tree-sitter-ruby-mode . "ruby") (tree-sitter-elisp-mode . "elisp") (tree-sitter-c-mode . "c") (tree-sitter-lisp-mode . "commonlisp") (tree-sitter-typescript-mode . "typescript")) "\
+Map prog-mode to tree-sitter grammar.")
+(custom-autoload 'tree-sitter-mode-alist "tree-sitter" t)
+(defvar tree-sitter-indent-alist '((tree-sitter-c-mode . "gnu.scm")) "\
+Map prog-mode to indent scm file.")
+(custom-autoload 'tree-sitter-indent-alist "tree-sitter" t)
+(defvar tree-sitter-highlight-alist '(("constant" . font-lock-constant-face) ("type.builtin" . font-lock-type-face) ("operator" . font-lock-builtin-face) ("variable.parameter" . font-lock-variable-name-face) ("function.builtin" . font-lock-function-name-face) ("attribute" . font-lock-variable-name-face) ("string" . font-lock-string-face) ("variable.builtin" . font-lock-builtin-face) ("comment" . font-lock-comment-face) ("number" . font-lock-constant-face) ("type" . font-lock-type-face) ("embedded" . font-lock-builtin-face) ("function" . font-lock-function-name-face) ("keyword" . font-lock-keyword-face) ("constructor" . font-lock-function-name-face) ("property" . font-lock-variable-name-face) ("tag" . font-lock-type-face) ("string.special" . font-lock-string-face) ("constant.builtin" . font-lock-constant-face)) "\
+Map tree-sitter highlight name to font lock face.")
+(custom-autoload 'tree-sitter-highlight-alist "tree-sitter" nil)
+(autoload 'tree-sitter-lock-mode "tree-sitter" "\
+Tree-sitter font-lock minor mode.
+
+This is a minor mode.  If called interactively, toggle the
+`Tree-Sitter-Lock mode' mode.  If the prefix argument is
+positive, enable the mode, and if it is zero or negative, disable
+the mode.
+
+If called from Lisp, toggle the mode if ARG is `toggle'.  Enable
+the mode if ARG is nil, omitted, or is a positive number.
+Disable the mode if ARG is a negative number.
+
+To check whether the minor mode is enabled in the current buffer,
+evaluate `tree-sitter-lock-mode'.
+
+The mode's hook is called both when the mode is enabled and when
+it is disabled.
+
+(fn &optional ARG)" t)
+(register-definition-prefixes "tree-sitter" '("tree-sitter-"))
+
+
+;;; Generated autoloads from progmodes/tree-sitter-c-mode.el
+
+(autoload 'tree-sitter-c-mode "tree-sitter-c-mode" "\
+Have tree-sitter replace syntax-ppss.
+
+(fn)" t)
+(register-definition-prefixes "tree-sitter-c-mode" '("tree-sitter-c-"))
+
+
+;;; Generated autoloads from progmodes/tree-sitter-elisp-mode.el
+
+(autoload 'tree-sitter-elisp-mode "tree-sitter-elisp-mode" "\
+Have tree-sitter replace syntax-ppss.
+
+(fn)" t)
+
+
+;;; Generated autoloads from progmodes/tree-sitter-lisp-mode.el
+
+(autoload 'tree-sitter-lisp-mode "tree-sitter-lisp-mode" "\
+Have tree-sitter replace syntax-ppss.
+
+(fn)" t)
+
+
+;;; Generated autoloads from progmodes/tree-sitter-prog-mode.el
+
+(register-definition-prefixes "tree-sitter-prog-mode" '("tree-sitter-prog-mode"))
+
+
+;;; Generated autoloads from progmodes/tree-sitter-ruby-mode.el
+
+(autoload 'tree-sitter-ruby-mode "tree-sitter-ruby-mode" "\
+Have tree-sitter replace syntax-ppss.
+
+(fn)" t)
+
+
+;;; Generated autoloads from progmodes/tree-sitter-typescript-mode.el
+
+(autoload 'tree-sitter-typescript-mode "tree-sitter-typescript-mode" "\
+Have tree-sitter replace syntax-ppss.
+
+(fn)" t)
+
+
 ;;; Generated autoloads from tree-widget.el
 
 (register-definition-prefixes "tree-widget" '("tree-widget-"))
@@ -33126,23 +32861,6 @@ FRAC should be the inverse of the fractional value; for example, a value of
 (register-definition-prefixes "type-break" '("type-break-"))
 
 
-;;; Generated autoloads from progmodes/typescript-ts-mode.el
-
-(autoload 'typescript-ts-base-mode "typescript-ts-mode" "\
-Major mode for editing TypeScript.
-
-(fn)" t)
-(autoload 'typescript-ts-mode "typescript-ts-mode" "\
-Major mode for editing TypeScript.
-
-(fn)" t)
-(autoload 'tsx-ts-mode "typescript-ts-mode" "\
-Major mode for editing TypeScript.
-
-(fn)" t)
-(register-definition-prefixes "typescript-ts-mode" '("typescript-ts-mode-"))
-
-
 ;;; Generated autoloads from international/ucs-normalize.el
 
 (autoload 'string-glyph-compose "ucs-normalize" "\
@@ -33269,10 +32987,11 @@ take effect.
 If SILENT, then don't message progress reports and the like.
 If INHIBIT-COOKIES, cookies will neither be stored nor sent to
 the server.
+TIMEOUT is optional seconds.
 If URL is a multibyte string, it will be encoded as utf-8 and
 URL-encoded before it's used.
 
-(fn URL CALLBACK &optional CBARGS SILENT INHIBIT-COOKIES)")
+(fn URL CALLBACK &optional CBARGS SILENT INHIBIT-COOKIES &key TIMEOUT)")
 (autoload 'url-retrieve-synchronously "url" "\
 Retrieve URL synchronously.
 Return the buffer containing the data, or nil if there are no data
@@ -33432,8 +33151,9 @@ Might do a non-blocking connection; use `process-status' to check.
 
 Optional arg GATEWAY-METHOD specifies the gateway to be used,
 overriding the value of `url-gateway-method'.
+Optional key TIMEOUT is a list of seconds and microseconds.
 
-(fn NAME BUFFER HOST SERVICE &optional GATEWAY-METHOD)")
+(fn NAME BUFFER HOST SERVICE &optional GATEWAY-METHOD &key TIMEOUT)")
 (register-definition-prefixes "url-gw" '("url-"))
 
 
@@ -37082,15 +36802,6 @@ a new xwidget-webkit session, otherwise use an existing session.
 
 (fn BOOKMARK)")
 (register-definition-prefixes "xwidget" '("xwidget-"))
-
-
-;;; Generated autoloads from textmodes/yaml-ts-mode.el
-
-(autoload 'yaml-ts-mode "yaml-ts-mode" "\
-Major mode for editing YAML, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "yaml-ts-mode" '("yaml-ts-mode--"))
 
 
 ;;; Generated autoloads from yank-media.el
