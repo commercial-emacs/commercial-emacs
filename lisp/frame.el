@@ -2853,11 +2853,11 @@ which in turn triggers `blink-cursor-timer-function' every
   :initialize #'custom-initialize-delay
   :group 'cursor
   :global t
-  (remove-hook 'after-delete-frame-functions #'blink-cursor--refocus)
+  (remove-hook 'after-delete-frame-functions (lambda (_frame) (blink-cursor--refocus)))
   (remove-function after-focus-change-function #'blink-cursor--refocus)
   (when blink-cursor-mode
     (add-function :after after-focus-change-function #'blink-cursor--refocus)
-    (add-hook 'after-delete-frame-functions #'blink-cursor--refocus))
+    (add-hook 'after-delete-frame-functions (lambda (_frame) (blink-cursor--refocus))))
   (blink-cursor--reset-idle-timer))
 
 (defsubst blink-cursor--reset-idle-timer ()
