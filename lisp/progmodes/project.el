@@ -1572,12 +1572,15 @@ With some possible metadata (to be decided).")
         (pp project--list (current-buffer)))
       (write-region nil nil filename nil 'silent))))
 
+(defsubst project--most-recent-project ()
+  (or (project-current)
+      (when-let ((mru (caar project--list)))
+        (project--find-in-directory mru))))
+
 ;;;###autoload
 (defun project-most-recent-project ()
   (project--ensure-read-project-list)
-  (let ((pr (or (project-current)
-                (when-let ((mru (caar project--list)))
-                  (project--find-in-directory mru))
+  (let ((pr (or (project--most-recent-project)
                 (project-get-project))))
     (prog1 pr (project-remember-project pr))))
 
@@ -1635,7 +1638,7 @@ the project list."
 It's also possible to enter an arbitrary directory not in the list."
   (project--ensure-read-project-list)
   (let* (dir
-         (from (project-most-recent-project))
+         (from (project--most-recent-project))
          (dir-choice "... (choose a dir)")
          (choices (project--file-completion-table
                    (append project--list `(,dir-choice))))
