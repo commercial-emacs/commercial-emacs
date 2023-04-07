@@ -16155,9 +16155,9 @@ x_scroll_bar_set_handle (struct scroll_bar *bar, int start, int end,
      that many pixels tall.  */
   end += VERTICAL_SCROLL_BAR_MIN_HANDLE;
 
-  /* Draw the empty space above the handle.  Note that we can't clear
-     zero-height areas; that means "clear to end of window."  */
-  if ((inside_width > 0) && (start > 0))
+  /* Clear all scroll bar area.  Note that we can't clear zero-height
+     areas; that means "clear to end of window."  */
+  if ((inside_width > 0) && (inside_height > 0))
     {
       if (f->output_data.x->scroll_bar_background_pixel != -1)
 	XSetForeground (FRAME_X_DISPLAY (f), gc,
@@ -16169,7 +16169,7 @@ x_scroll_bar_set_handle (struct scroll_bar *bar, int start, int end,
       XFillRectangle (FRAME_X_DISPLAY (f), w, gc,
 		      bar->left + VERTICAL_SCROLL_BAR_LEFT_BORDER,
 		      bar->top + VERTICAL_SCROLL_BAR_TOP_BORDER,
-		      inside_width, start);
+		      inside_width, inside_height);
 
       XSetForeground (FRAME_X_DISPLAY (f), gc,
 		      FRAME_FOREGROUND_PIXEL (f));
@@ -16186,27 +16186,6 @@ x_scroll_bar_set_handle (struct scroll_bar *bar, int start, int end,
 		  bar->left + VERTICAL_SCROLL_BAR_LEFT_BORDER,
 		  bar->top + VERTICAL_SCROLL_BAR_TOP_BORDER + start,
 		  inside_width, end - start);
-
-
-  /* Draw the empty space below the handle.  Note that we can't
-     clear zero-height areas; that means "clear to end of window." */
-  if ((inside_width > 0) && (end < inside_height))
-    {
-      if (f->output_data.x->scroll_bar_background_pixel != -1)
-	XSetForeground (FRAME_X_DISPLAY (f), gc,
-			f->output_data.x->scroll_bar_background_pixel);
-      else
-	XSetForeground (FRAME_X_DISPLAY (f), gc,
-			FRAME_BACKGROUND_PIXEL (f));
-
-      XFillRectangle (FRAME_X_DISPLAY (f), w, gc,
-		      bar->left + VERTICAL_SCROLL_BAR_LEFT_BORDER,
-		      bar->top + VERTICAL_SCROLL_BAR_TOP_BORDER + end,
-		      inside_width, inside_height - end);
-
-      XSetForeground (FRAME_X_DISPLAY (f), gc,
-		      FRAME_FOREGROUND_PIXEL (f));
-    }
 
   /* Restore the foreground color of the GC if we changed it above.  */
   if (f->output_data.x->scroll_bar_foreground_pixel != -1)
