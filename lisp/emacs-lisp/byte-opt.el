@@ -502,13 +502,9 @@ for speeding up processing.")
        form)
 
       ((guard (when for-effect
-		(if-let ((tmp (byte-opt--fget fn 'side-effect-free)))
-		    (or byte-compile-delete-errors
-		        (eq tmp 'error-free)
-		        (progn
-			  (byte-compile-warn "value returned from %s is unused"
-					     (prin1-to-string form))
-			  nil)))))
+		(when-let ((tmp (byte-opt--fget fn 'side-effect-free)))
+		  (or byte-compile-delete-errors
+		      (eq tmp 'error-free)))))
        (byte-compile-log "  %s called for effect; deleted" fn)
        (byte-optimize-form (cons 'progn (cdr form)) t))
 

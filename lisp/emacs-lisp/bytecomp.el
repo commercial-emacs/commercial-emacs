@@ -321,7 +321,9 @@ Elements of the list may be:
   lexical-dynamic
               lexically bound variable declared dynamic elsewhere
   make-local  calls to `make-variable-buffer-local' that may be incorrect.
-  mapcar      mapcar called for effect.
+  ignored-return-value
+              function called without using the return value where this
+              is likely to be a mistake
   not-unused  warning about using variables with symbol names starting with _.
   constants   let-binding of, or assignment to, constants/nonvariables.
   docstrings  docstrings that are too wide (longer than
@@ -334,7 +336,7 @@ Elements of the list may be:
   empty-body  body argument to a special form or macro is empty.
 
 If the list begins with `not', then the remaining elements specify warnings to
-suppress.  For example, (not mapcar) will suppress warnings about mapcar.
+suppress.  For example, (not free-vars) will suppress the `free-vars' warning.
 
 The t value means \"all non experimental warning types\", and
 excludes the types in `byte-compile--emacs-build-warning-types'.
@@ -3269,6 +3271,25 @@ value should be byte-discard."
           (setq byte-compile-abort-elc t)
           (byte-compile-warn "macro `%s' defined after use in %S (missing require?)"
                              (car form) form))
+        (when byte-compile--for-effect
+          (let ((sef (function-get (car form) 'side-effect-free)))
+            (cond
+             ((and sef (or (eq sef 'error-free)
+                           byte-compile-delete-errors))
+              ;; This transform is normally done in the Lisp optimiser,
+              ;; so maybe we don't need to bother about it here?
+              (setq form (cons 'progn (cdr form)))
+              (setq handler #'byte-compile-progn))
+             ((and (or sef (eq (car form) 'mapcar))
+                   (byte-compile-warning-enabled-p
+                    'ignored-return-value (car form)))
+              (byte-compile-warn-x
+               (car form)
+               "value from call to `%s' is unused%s"
+               (car form)
+               (cond ((eq (car form) 'mapcar)
+                      "; use `mapc' or `dolist' instead")
+                     (t "")))))))
         (if handler
             (funcall handler form)
           (byte-compile-normal-call form))))
@@ -3294,13 +3315,7 @@ value should be byte-discard."
     (byte-compile-callargs-warn form))
   (when byte-compile-generate-call-tree
     (byte-compile-annotate-call-tree form))
-  (when (and byte-compile--for-effect (eq (car form) 'mapcar)
-             (byte-compile-warning-enabled-p 'mapcar 'mapcar))
-    (byte-compile-warn
-     "`mapcar' called for effect; use `mapc' or `dolist' instead"))
-  (when (and (eq (car form) 'lsh)
-             (byte-compile-warning-enabled-p 'suspicious 'lsh))
-    (byte-compile-warn "avoid `lsh'; use `ash' instead"))
+
   (byte-compile-push-constant (car form))
   (mapc #'byte-compile-form (cdr form))
   (byte-compile-out 'byte-call (length (cdr form))))
@@ -4101,7 +4116,11 @@ and \(funcall (function foo)) will lose with autoloads."
 
 (defun byte-compile-ignore (form)
   (dolist (arg (cdr form))
-    (byte-compile-form arg t))
+    ;; Compile args for value (to avoid warnings about unused values),
+    ;; emit a discard after each, and trust the LAP peephole optimiser
+    ;; to annihilate useless ops.
+    (byte-compile-form arg)
+    (byte-compile-discard))
   (byte-compile-form nil))
 
 (defun byte-compile-find-bound-condition (condition-param

@@ -581,8 +581,10 @@ in `byte-compile-warning-types'; see the variable
 `byte-compile-warnings' for a fuller explanation of the warning
 types.  The types that can be suppressed with this macro are
 `free-vars', `callargs', `redefine', `obsolete',
-`interactive-only', `lexical', `mapcar', `constants' and
-`suspicious'."
+`interactive-only', `lexical', `ignored-return-value', `constants',
+`suspicious' and `empty-body'."
+  ;; Note: during compilation, this definition is overridden by the one in
+  ;; byte-compile-initial-macro-environment.
   (declare (debug (sexp body)) (indent 1))
   ;; Defining this macro in bytecomp.el (where
   ;; `byte-compile--suppressed-warnings' is defined) breaks bootstrap.
