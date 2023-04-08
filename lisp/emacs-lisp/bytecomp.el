@@ -321,7 +321,9 @@ Elements of the list may be:
   lexical-dynamic
               lexically bound variable declared dynamic elsewhere
   make-local  calls to `make-variable-buffer-local' that may be incorrect.
-  mapcar      mapcar called for effect.
+  ignored-return-value
+              function called without using the return value where this
+              is likely to be a mistake
   not-unused  warning about using variables with symbol names starting with _.
   constants   let-binding of, or assignment to, constants/nonvariables.
   docstrings  docstrings that are too wide (longer than
@@ -334,7 +336,7 @@ Elements of the list may be:
   empty-body  body argument to a special form or macro is empty.
 
 If the list begins with `not', then the remaining elements specify warnings to
-suppress.  For example, (not mapcar) will suppress warnings about mapcar.
+suppress.  For example, (not free-vars) will suppress the `free-vars' warning.
 
 The t value means \"all non experimental warning types\", and
 excludes the types in `byte-compile--emacs-build-warning-types'.
@@ -4101,7 +4103,11 @@ and \(funcall (function foo)) will lose with autoloads."
 
 (defun byte-compile-ignore (form)
   (dolist (arg (cdr form))
-    (byte-compile-form arg t))
+    ;; Compile args for value (to avoid warnings about unused values),
+    ;; emit a discard after each, and trust the LAP peephole optimiser
+    ;; to annihilate useless ops.
+    (byte-compile-form arg)
+    (byte-compile-discard))
   (byte-compile-form nil))
 
 (defun byte-compile-find-bound-condition (condition-param
