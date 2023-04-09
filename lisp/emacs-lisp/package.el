@@ -1093,7 +1093,8 @@ untar into a directory named DIR; otherwise, signal an error."
         ;; the load path.  We don't hard-code `pkg-dir', to avoid
         ;; issues if the package directory is moved around.
         (or (and load-file-name (file-name-directory load-file-name))
-            (car load-path)))))
+            (car load-path))))
+     nil t)
     (let ((buf (find-buffer-visiting output-file)))
       (when buf (kill-buffer buf)))
     auto-name))
