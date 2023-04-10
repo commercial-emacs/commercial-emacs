@@ -3283,8 +3283,7 @@ value should be byte-discard."
              ((and (or sef (eq (car form) 'mapcar))
                    (byte-compile-warning-enabled-p
                     'ignored-return-value (car form)))
-              (byte-compile-warn-x
-               (car form)
+              (byte-compile-warn
                "value from call to `%s' is unused%s"
                (car form)
                (cond ((eq (car form) 'mapcar)
