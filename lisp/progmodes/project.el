@@ -975,10 +975,15 @@ pattern to search for."
 (defvar project-regexp-history-variable 'grep-regexp-history)
 
 (defun project--read-regexp ()
-  (let ((sym (thing-at-point 'symbol t)))
-    (read-regexp (project--annotate-prompt (project-most-recent-project) "Find regexp")
-                 (when sym (regexp-quote sym))
-                 project-regexp-history-variable)))
+  (let ((result "")
+        (sym (thing-at-point 'symbol t)))
+    (while (string-empty-p
+            (setq result (read-regexp
+                          (project--annotate-prompt
+                           (project-most-recent-project) "Find regexp")
+                          (when sym (regexp-quote sym))
+                          project-regexp-history-variable))))
+    result))
 
 ;;;###autoload
 (defun project-find-file (&optional include-all)
