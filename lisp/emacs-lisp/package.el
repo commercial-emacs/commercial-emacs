@@ -890,10 +890,9 @@ correspond to previously loaded files."
         (add-to-list 'load-path (directory-file-name pkg-dir)))
       ;; Add info node.
       (when (file-exists-p (expand-file-name "dir" pkg-dir))
-        ;; FIXME: not the friendliest, but simple.
-        (require 'info)
-        (info-initialize)
-        (add-to-list 'Info-directory-list pkg-dir))
+        (with-eval-after-load 'info
+          (info-initialize)
+          (add-to-list 'Info-directory-list pkg-dir)))
       (push name package-activated-list)
       ;; Don't return nil.
       t)))
