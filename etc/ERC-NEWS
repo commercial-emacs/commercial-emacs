@@ -183,10 +183,13 @@ example, requiring the use of 'insert-before-markers' instead of
 changes are encouraged to voice their concerns on the bug list.
 
 *** Miscellaneous changes
-For autoloading purposes, 'Info-goto-node' has been supplanted by
-plain old 'info' in 'erc-button-alist', and two helper macros from GNU
-ELPA's Compat library are now available to third-party modules as
-'erc-compat-call' and 'erc-compat-function'.
+Two helper macros from GNU ELPA's Compat library are now available to
+third-party modules as 'erc-compat-call' and 'erc-compat-function'.
+In the area of buttons, 'Info-goto-node' has been supplanted by plain
+old 'info' in 'erc-button-alist', primarily for autoloading purposes.
+And the "TAB" key is now bound to a new command, 'erc-tab', that only
+calls 'completion-at-point' when point is in the input area and
+module-specific commands, like 'erc-button-next', otherwise.
 
 
 * Changes in ERC 5.5
