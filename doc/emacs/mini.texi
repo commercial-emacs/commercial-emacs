@@ -326,6 +326,20 @@ argument @samp{auto-fill-mode} into the minibuffer.
   Hence, typing just @kbd{a u @key{TAB} - f @key{TAB}} allows you to
 enter @samp{auto-fill-mode}.
 
+  @key{TAB} also works while point is not at the end of the
+minibuffer.  If you type @kbd{M-x a u t o c m o d e}, then @kbd{C-b}
+several times to move point back before the @samp{mode}, you can hit
+@key{TAB} to insert text between @samp{autoc} and @samp{mode}
+so that the minibuffer contains @code{autoconf-mode}.
+
+  When point is not at the end of the minibuffer and you hit
+@kbd{TAB}, completion will fill in text both at point and at the end
+of the minibuffer.  So you could also type @kbd{M-x a u t o c m o},
+@kbd{C-b} twice to move point back before the @samp{mo}, and then
+@key{TAB} will insert the text @samp{onf-} at point and @samp{de} at
+the end of the minibuffer, so that the minibuffer contains
+@code{autoconf-mode}.
+
 @node Completion Commands
 @subsection Completion Commands
 
