@@ -1321,20 +1321,51 @@ The value, if non-nil, is a list of mode name symbols.  */)
 		Getting and Setting Values of Symbols
  ***********************************************************************/
 
+/* Return the symbol holding SYMBOL's value.  Signal
+   `cyclic-variable-indirection' if SYMBOL's chain of variable
+   indirections contains a loop.  */
+
+struct Lisp_Symbol *
+indirect_variable (struct Lisp_Symbol *symbol)
+{
+  struct Lisp_Symbol *tortoise, *hare;
+
+  hare = tortoise = symbol;
+
+  while (hare->u.s.redirect == SYMBOL_VARALIAS)
+    {
+      hare = SYMBOL_ALIAS (hare);
+      if (hare->u.s.redirect != SYMBOL_VARALIAS)
+	break;
+
+      hare = SYMBOL_ALIAS (hare);
+      tortoise = SYMBOL_ALIAS (tortoise);
+
+      if (hare == tortoise)
+	{
+	  Lisp_Object tem;
+	  XSETSYMBOL (tem, symbol);
+	  xsignal1 (Qcyclic_variable_indirection, tem);
+	}
+    }
+
+  return hare;
+}
+
+
 DEFUN ("indirect-variable", Findirect_variable, Sindirect_variable, 1, 1, 0,
        doc: /* Return the variable at the end of OBJECT's variable chain.
 If OBJECT is a symbol, follow its variable indirections (if any), and
 return the variable at the end of the chain of aliases.  See Info node
 `(elisp)Variable Aliases'.
 
-If OBJECT is not a symbol, just return it.  */)
+If OBJECT is not a symbol, just return it.  If there is a loop in the
+chain of aliases, signal a `cyclic-variable-indirection' error.  */)
   (Lisp_Object object)
 {
   if (SYMBOLP (object))
     {
-      struct Lisp_Symbol *sym = XSYMBOL (object);
-      while (sym->u.s.redirect == SYMBOL_VARALIAS)
-	sym = SYMBOL_ALIAS (sym);
+      struct Lisp_Symbol *sym = indirect_variable (XSYMBOL (object));
       XSETSYMBOL (object, sym);
     }
   return object;
