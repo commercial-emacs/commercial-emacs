@@ -1016,7 +1016,8 @@ See `file-symlink-p' to distinguish symlinks."
            (lambda (ext) (member ext `(".elc" ,module-file-suffix)))
            completion-ignored-extensions)))
      (list (read-file-name "Load file: " nil nil 'lambda
-                           (file-name-nondirectory buffer-file-name)))))
+                           (when buffer-file-name
+                             (file-name-nondirectory buffer-file-name))))))
   (load (expand-file-name file) nil nil t))
 
 (defvar comp-eln-to-el-h)
