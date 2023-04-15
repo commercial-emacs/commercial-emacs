@@ -280,7 +280,7 @@ DECLS is a list of elements of the form (PROP . VALUES).  These are
 interpreted according to `macro-declarations-alist'.
 The return value is undefined.
 
-\(fn NAME ARGLIST &optional DOCSTRING DECL &rest BODY)"
+\(fn NAME ARGLIST [DOCSTRING] [DECL] BODY...)"
        (let* ((parse (byte-run--parse-body body nil))
               (docstring (nth 0 parse))
               (declare-form (nth 1 parse))

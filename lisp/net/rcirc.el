@@ -2059,7 +2059,6 @@ connection."
                              (point-min)))
               (when (let ((then (get-text-property (point) 'rcirc-time)))
                       (and then (not (time-less-p time then))))
-                (next-single-property-change (point) 'hard)
                 (forward-char 1)
                 (throw 'exit nil))))
           (goto-char (line-beginning-position))

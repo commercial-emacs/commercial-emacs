@@ -1909,13 +1909,15 @@ See `add-log-current-defun-function'."
               (progn
                 (unless (string-equal "self" (car mn)) ; def self.foo
                   ;; def C.foo
-                  (let ((ml (nreverse mlist)))
+                  (let ((ml (reverse mlist)))
                     ;; If the method name references one of the
                     ;; containing modules, drop the more nested ones.
-                    (while ml
-                      (if (string-equal (car ml) (car mn))
-                          (setq mlist (nreverse (cdr ml)) ml nil))
-                      (or (setq ml (cdr ml)) (nreverse mlist))))
+                    (catch 'done
+                      (while ml
+                        (when (string-equal (car ml) (car mn))
+                          (setq mlist (cdr ml))
+                          (throw 'done nil))
+                        (setq ml (cdr ml)))))
                   (if mlist
                       (setcdr (last mlist) (butlast mn))
                     (setq mlist (butlast mn))))

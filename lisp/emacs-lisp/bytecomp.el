@@ -490,7 +490,7 @@ Entries are of the form \(UNDEFINED-FUNC CHARPOS . ARITIES).
 CHARPOS is the best-efforts file position that lread.c first
 found a call.  Each direct call adds its argument count to the
 list ARITIES for the purpose of flagging inconsistent arities.
-ARITIES is the constant t if the function is only called
+ARITIES is the literal t if the function is only called
 indirectly.")
 
 (defvar byte-compile--noruntime-funcs nil
@@ -1585,15 +1585,30 @@ extra args."
 (dolist (elt '(format message format-message error))
   (put elt 'byte-compile-format-like t))
 
+(defun byte-compile--suspicious-defcustom-choice (type)
+  "Catch oddities like (choice (const :tag \"foo\" ;; \\='bar))."
+  (when (and (consp type) (proper-list-p type))
+    (if (memq (car type) '(const other))
+        (assq 'quote type)
+      (catch 'found
+        (dolist (elem type)
+          (when (byte-compile--suspicious-defcustom-choice elem)
+            (throw 'found t)))))))
+
 (defun byte-compile-nogroup-warn (form)
   "Warn if a custom definition fails to specify :group, or :type."
   (let ((keyword-args (cdr (cdr (cdr (cdr form)))))
 	(name (cadr form)))
     (when (eq (car-safe name) 'quote)
-      (or (not (eq (car form) 'custom-declare-variable))
-	  (plist-get keyword-args :type)
-	  (byte-compile-warn
-	   "defcustom for `%s' fails to specify type" (cadr name)))
+      (when (eq (car form) 'custom-declare-variable)
+        (let ((type (plist-get keyword-args :type)))
+	  (cond
+           ((not type)
+	    (byte-compile-warn "defcustom for `%s' fails to specify type"
+                               (cadr name)))
+           ((byte-compile--suspicious-defcustom-choice type)
+	    (byte-compile-warn "defcustom for `%s' has syntactically odd type `%s'"
+                               (cadr name) type)))))
       (if (and (memq (car form) '(custom-declare-face custom-declare-variable))
 	       byte-compile-current-group)
 	  ;; The group will be provided implicitly.
@@ -1614,37 +1629,31 @@ extra args."
 	  (setq byte-compile-current-group (cadr name)))))))
 
 (defun byte-compile-arglist-warn (name arglist macrop)
-  "Warn if the function or macro is being redefined with a different
-number of arguments."
-  (let ((calls (assq name byte-compile--undefined-funcs))
-        nums sig min max)
-    (when (and calls macrop)
+  "Warn if function or macro being redefined with different arity."
+  ;; This is the first definition.  See if previous calls are compatible.
+  (when-let ((calls (assq name byte-compile--undefined-funcs)))
+    (when macrop
       (byte-compile-warn "macro `%s' defined too late" name))
     (setq byte-compile--undefined-funcs
           (delq calls byte-compile--undefined-funcs))
-    (setq calls (delq t calls)) ; Ignore higher-order uses of the function.
-    (when (cddr calls)
+    (when-let ((nums (delq t (cddr calls))))  ; Ignore higher-order uses.
       (when (and (symbolp name)
                  (eq (function-get name 'byte-optimizer)
                      'byte-compile-inline-expand))
-        (byte-compile-warn "defsubst `%s' was used before it was defined"
-                           name))
-      (setq sig (byte-compile-arglist-signature arglist)
-            nums (sort (copy-sequence (cddr calls)) (function <))
-            min (car nums)
-            max (car (nreverse nums)))
-      (when (or (< min (car sig))
-                (and (cdr sig) (> max (cdr sig))))
-        (byte-compile-warn
-         "%s being defined to take %s%s, but was previously called with %s"
-         name
-         (byte-compile-arglist-signature-string sig)
-         (if (equal sig '(1 . 1)) " arg" " args")
-         (byte-compile-arglist-signature-string (cons min max))))))
-  (let* ((old (byte-compile-fdefinition name macrop))
-         (initial (and macrop
-                       (cdr (assq name
-                                  byte-compile-initial-macro-environment)))))
+        (byte-compile-warn "defsubst `%s' was used before it was defined" name))
+      (let ((sig (byte-compile-arglist-signature arglist))
+            (min (apply #'min nums))
+            (max (apply #'max nums)))
+        (when (or (< min (car sig))
+                  (and (cdr sig) (> max (cdr sig))))
+          (byte-compile-warn
+           "%s being defined to take %s%s, but was previously called with %s"
+           name
+           (byte-compile-arglist-signature-string sig)
+           (if (equal sig '(1 . 1)) " arg" " args")
+           (byte-compile-arglist-signature-string (cons min max)))))))
+  (let ((old (byte-compile-fdefinition name macrop))
+        (initial (when macrop (cdr (assq name byte-compile-initial-macro-environment)))))
     (when (and initial (symbolp initial))
       ;; Assume a symbol in byte-compile-initial-macro-env points to a
       ;; defined function.  (Bug#8646)
@@ -1747,14 +1756,27 @@ It is too wide if it has any lines longer than the largest of
       (setq name (if name (format " `%s' " name) ""))
       (when (and kind docs (stringp docs))
         (when (byte-compile--wide-docstring-p docs col)
-          (byte-compile-warn "%s%sdocstring wider than %s characters"
-                             kind name col))
+          (byte-compile-warn
+           "%s%sdocstring wider than %s characters"
+           kind name col))
         ;; There's a "naked" ' character before a symbol/list, so it
         ;; should probably be quoted with \=.
-        (when (string-match-p "\\( \"\\|[ \t]\\|^\\)'[a-z(]" docs)
+        (when (string-match-p (rx (| (in " \t") bol)
+                                  (? (in "\"#"))
+                                  "'"
+                                  (in "A-Za-z" "("))
+                              docs)
           (byte-compile-warn
-           "%s%sdocstring has wrong usage of unescaped single quotes (use \\= or different quoting)"
-           kind name)))))
+           (concat "%s%sdocstring has wrong usage of unescaped single quotes"
+                   " (use \\=%c or different quoting such as %c...%c)")
+           kind name ?' ?` ?'))
+        ;; There's a "Unicode quote" in the string -- it should probably
+        ;; be an ASCII one instead.
+        (when (byte-compile-warning-enabled-p 'docstrings-non-ascii-quotes)
+          (when (string-match-p "\\( \"\\|[ \t]\\|^\\)[‘’]" docs)
+            (byte-compile-warn
+             "%s%sdocstring has wrong usage of \"fancy\" single quotation marks"
+             kind name))))))
   form)
 
 (defun byte-compile-warn--undefined-funcs ()
@@ -3126,7 +3148,7 @@ OUTPUT-TYPE advises how form will be used,
   ;;	lambda	-> never.  The compiled form is always faster.
   ;;	eval	-> atom, quote or (function atom atom atom)
   ;;	file	-> as progn, but takes both quotes and atoms, and longer forms.
-  (let ((maycall (not (eq output-type 'lambda))) ;; t if we may make a funcall.
+  (let ((maycall (not (eq output-type 'lambda))) ; t if we may make a funcall.
         rest tmp body)
     (cond
      ;; This should be split into byte-compile-nontrivial-function-p.
@@ -3158,7 +3180,7 @@ OUTPUT-TYPE advises how form will be used,
                                 (eql (length body) (cdr (car rest))) ;bug#34757
                                 (eq (car (nth 1 rest)) 'byte-discard)
                                 (progn (setq rest (cdr rest)) t))))
-                  (setq maycall nil) ;; Only allow one real function call.
+                  (setq maycall nil) ; Only allow one real function call.
                   (setq body (nreverse body))
                   (setq body (list
                               (if (and (eq tmp 'funcall)
@@ -3343,8 +3365,7 @@ value should be byte-discard."
                                )))
                    ;; Don't warn for arguments to `ignore'.
                    (not (eq byte-compile--for-effect 'for-effect-no-warn))
-                   (byte-compile-warning-enabled-p
-                    'ignored-return-value (car form)))
+                   (byte-compile-warning-enabled-p 'ignored-return-value (car form)))
               (byte-compile-warn
                "value from call to `%s' is unused%s"
                (car form)
@@ -4894,7 +4915,8 @@ longer need to hew to its rules)."
       form
     (let ((byte-compile--suppressed-warnings
            (append (eval warnings-form) byte-compile--suppressed-warnings)))
-      (byte-compile-form (macroexp-progn body)))))
+      (byte-compile-form (macroexp-progn body) byte-compile--for-effect)
+      (setq byte-compile--for-effect nil))))
 
 ;; Warn about misuses of make-variable-buffer-local.
 (byte-defop-compiler-1 make-variable-buffer-local
@@ -5236,7 +5258,8 @@ Use with caution."
         (message "Can't find %s to refresh preloaded Lisp files" argv0)
       (dolist (f (reverse load-history))
         (setq f (car f))
-        (if (string-match "elc\\'" f) (setq f (substring f 0 -1)))
+        (when (string-match-p "elc\\'" f)
+          (setq f (substring f 0 -1)))
         (when (and (file-readable-p f)
                    (file-newer-than-file-p f emacs-file))
           (message "Loading newer %s over pdumped version" (file-name-nondirectory f))

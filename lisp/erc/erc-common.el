@@ -38,6 +38,11 @@
 (declare-function erc--get-isupport-entry "erc-backend" (key &optional single))
 (declare-function erc-get-buffer "erc" (target &optional proc))
 (declare-function erc-server-buffer "erc" nil)
+(declare-function widget-apply-action "wid-edit" (widget &optional event))
+(declare-function widget-at "wid-edit" (&optional pos))
+(declare-function widget-get-sibling "wid-edit" (widget))
+(declare-function widget-move "wid-edit" (arg &optional suppress-echo))
+(declare-function widget-type "wid-edit" (widget))
 (declare-function cl--defsubst-expand "cl-macs")
 
 (cl-defstruct erc-input

@@ -1059,6 +1059,7 @@ Responsible for handling and, or, and parenthetical expressions.")
 
 (autoload 'nnselect-categorize "nnselect")
 (autoload 'nnselect-get-artlist "nnselect" nil nil 'macro)
+(autoload 'nnselect-generate-artlist "nnselect" nil nil 'macro)
 (autoload 'ids-by-group "nnselect")
 ;; nnselect interface
 (cl-defmethod gnus-search-run-search ((_engine gnus-search-nnselect)
@@ -1066,14 +1067,12 @@ Responsible for handling and, or, and parenthetical expressions.")
   (let ((artlist []))
     (dolist (group groups)
       (let* ((gnus-newsgroup-selection
-              (or
-               (nnselect-get-artlist group) (nnselect-generate-artlist group)))
+              (or (nnselect-get-artlist group) (nnselect-generate-artlist group)))
              (group-spec
               (nnselect-categorize
                (mapcar 'car
                        (ids-by-group
-                        (number-sequence 1
-                                         (length gnus-newsgroup-selection))))
+                        (number-sequence 1 (length gnus-newsgroup-selection))))
                (lambda (x)
                  (gnus-group-server x)))))
         (setq artlist

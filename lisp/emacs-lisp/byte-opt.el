@@ -1389,9 +1389,6 @@ See Info node `(elisp) Integer Basics'."
       (list 'progn condition nil)))))
 
 (defun byte-optimize-while (form)
-  ;; FIXME: This check does not belong here, move!
-  (when (< (length form) 2)
-    (byte-compile-warn "too few arguments for `while'"))
   (let ((condition (nth 1 form)))
     (if (byte-compile-nilconstp condition)
         condition
@@ -1400,7 +1397,7 @@ See Info node `(elisp) Integer Basics'."
 (defun byte-optimize-not (form)
   (and (= (length form) 2)
        (let ((arg (nth 1 form)))
-        (cond ((null arg) t)
+         (cond ((null arg) t)
                ((macroexp-const-p arg) nil)
                ((byte-compile-nilconstp arg) `(progn ,arg t))
                ((byte-compile-trueconstp arg) `(progn ,arg nil))
@@ -1429,24 +1426,29 @@ See Info node `(elisp) Integer Basics'."
       form)))
 
 (defun byte-optimize-apply (form)
-  ;; If the last arg is a literal constant, turn this into a funcall.
-  ;; The funcall optimizer can then transform (funcall 'foo ...) -> (foo ...).
-  (if (= (length form) 2)
-      ;; single-argument `apply' is not worth optimizing (bug#40968)
-      form
-    (let ((fn (nth 1 form))
-	  (last (nth (1- (length form)) form))) ; I think this really is fastest
-      (or (if (or (null last)
-		  (eq (car-safe last) 'quote))
-	      (if (listp (nth 1 last))
-		  (let ((butlast (nreverse (cdr (reverse (cdr (cdr form)))))))
-		    (nconc (list 'funcall fn) butlast
-			   (mapcar (lambda (x) (list 'quote x)) (nth 1 last))))
-	        (byte-compile-warn
-	         "last arg to apply can't be a literal atom: `%s'"
-	         (prin1-to-string last))
-	        nil))
-	  form))))
+  (let ((len (length form)))
+    (if (>= len 2)
+        (let ((fn (nth 1 form))
+	      (last (nth (1- len) form)))
+          (cond
+           ;; (apply F ... '(X Y ...)) -> (funcall F ... 'X 'Y ...)
+           ((or (null last)
+                (eq (car-safe last) 'quote))
+            (let ((last-value (nth 1 last)))
+	      (if (listp last-value)
+                  `(funcall ,fn ,@(butlast (cddr form))
+                            ,@(mapcar (lambda (x) (list 'quote x)) last-value))
+	        (prog1 nil
+                  (byte-compile-warn
+                   "last arg to apply can't be a literal atom: `%s'" last)))))
+           ;; (apply F ... (list X Y ...)) -> (funcall F ... X Y ...)
+           ((eq (car-safe last) 'list)
+            `(funcall ,fn ,@(butlast (cddr form)) ,@(cdr last)))
+           ;; (apply F ... (cons X Y)) -> (apply F ... X Y)
+           ((eq (car-safe last) 'cons)
+            (append (butlast form) (cdr last)))
+           (t form)))
+      form)))
 
 (put 'funcall 'byte-optimizer #'byte-optimize-funcall)
 (put 'apply   'byte-optimizer #'byte-optimize-apply)

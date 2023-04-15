@@ -241,38 +241,37 @@ Optional key TIMEOUT is a list of seconds and microseconds."
       (if url-gateway-broken-resolution
 	  (setq host (url-gateway-nslookup-host host)))
 
-      (condition-case nil
-	  ;; This is a clean way to ensure the new process inherits the
-	  ;; right coding systems in both Emacs and XEmacs.
-	  (let ((coding-system-for-read 'binary)
-		(coding-system-for-write 'binary))
-	    (setq conn (pcase gw-method
-			 ((or 'tls 'ssl 'native)
-			  (if (eq gw-method 'native)
-			      (setq gw-method 'plain))
-			  (apply #'open-network-stream
-			         name buffer host service
-			         :type gw-method
-                                 (append
-                                  (when (and (featurep 'make-network-process)
-                                             (url-asynchronous url-current-object))
-                                    (cons :nowait (list '(:nowait t))))
-                                  (when (and (featurep 'make-network-process)
-                                             timeout)
-                                    (cons :sndtimeo (list timeout))))))
-                         ('socks
-			  (socks-open-network-stream name buffer host service))
-			 ('telnet
-			  (url-open-telnet name buffer host service))
-			 ('rlogin
-                          (unless url-gw-rlogin-obsolete-warned-once
-                            (lwarn 'url :error "Setting `url-gateway-method' to `rlogin' is obsolete")
-                            (setq url-gw-rlogin-obsolete-warned-once t))
-                          (with-suppressed-warnings ((obsolete url-open-rlogin))
-                            (url-open-rlogin name buffer host service)))
-			 (_
-			  (error "Bad setting of url-gateway-method: %s"
-				 url-gateway-method))))))
+      ;; This is a clean way to ensure the new process inherits the
+      ;; right coding systems in both Emacs and XEmacs.
+      (let ((coding-system-for-read 'binary)
+	    (coding-system-for-write 'binary))
+	(setq conn (pcase gw-method
+		     ((or 'tls 'ssl 'native)
+		      (if (eq gw-method 'native)
+			  (setq gw-method 'plain))
+		      (apply #'open-network-stream
+			     name buffer host service
+			     :type gw-method
+                             (append
+                              (when (and (featurep 'make-network-process)
+                                         (url-asynchronous url-current-object))
+                                (cons :nowait (list '(:nowait t))))
+                              (when (and (featurep 'make-network-process)
+                                         timeout)
+                                (cons :sndtimeo (list timeout))))))
+                     ('socks
+		      (socks-open-network-stream name buffer host service))
+		     ('telnet
+		      (url-open-telnet name buffer host service))
+		     ('rlogin
+                      (unless url-gw-rlogin-obsolete-warned-once
+                        (lwarn 'url :error "Setting `url-gateway-method' to `rlogin' is obsolete")
+                        (setq url-gw-rlogin-obsolete-warned-once t))
+                      (with-suppressed-warnings ((obsolete url-open-rlogin))
+                        (url-open-rlogin name buffer host service)))
+		     (_
+		      (error "Bad setting of url-gateway-method: %s"
+			     url-gateway-method)))))
       conn)))
 
 (provide 'url-gw)

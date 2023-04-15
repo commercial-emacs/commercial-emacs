@@ -11902,10 +11902,10 @@ Ignores WHITESPACE if t, and writes output to stdout if SHOW."
                               ;; Print out results.  Alternatively we could have call-processed
                               ;; ourself, but this way we can reuse diff switches
                               (when show
-                                (with-current-buffer outbuf (message "%s" (buffer-string))))))
-                        (sit-for 0)
-                        (when (file-exists-p f2)
-                          (delete-file f2))))))
+                                (with-current-buffer outbuf (message "%s" (buffer-string)))))
+                          (when (file-exists-p f2)
+                            (delete-file f2)))
+                        (sit-for 0)))))
 
 (defun verilog-diff-report (b1 b2 diffpt)
   "Report differences detected with `verilog-diff-auto'.
