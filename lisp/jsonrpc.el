@@ -530,7 +530,7 @@ With optional CLEANUP, kill any associated buffers."
         ;; Insert the text, advancing the process marker.
         (save-excursion
           (goto-char (process-mark proc))
-          (insert string)
+          (let ((inhibit-read-only t)) (insert string))
           (set-marker (process-mark proc) (point)))
         (catch 'done
           (while t
