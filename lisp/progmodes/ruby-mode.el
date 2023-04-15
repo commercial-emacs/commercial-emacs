@@ -1915,7 +1915,7 @@ See `add-log-current-defun-function'."
                     (catch 'done
                       (while ml
                         (when (string-equal (car ml) (car mn))
-                          (setq mlist (cdr ml))
+                          (setq mlist (reverse (cdr ml)))
                           (throw 'done nil))
                         (setq ml (cdr ml)))))
                   (if mlist
