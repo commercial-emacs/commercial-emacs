@@ -407,29 +407,28 @@ BEGINNING-P   ARG         MOTION
                                (set-marker-insertion-type m t)
                                (set-marker m (point))))))
       (save-excursion
-        (unwind-protect
-           (cl-loop with t1 = (current-time)
-                    for outer-node = (outermost (tree-sitter-node-at region-beg))
-                    then (tree-sitter-node-next-sibling
-                          (outermost (tree-sitter-node-at (point))))
-                    while outer-node
-                    for node-beg = (tree-sitter-node-start outer-node)
-                    for calc-beg = (max node-beg region-beg)
-                    for calc-end = (min (tree-sitter-node-end outer-node) region-end)
-                    until (>= calc-beg region-end)
-                    do (goto-char node-beg)
-                    do (when (> (float-time (time-since t1)) 1.5)
-                         (message "Indenting region...%s%%"
-                                  (/ (* (- (point) region-beg) 100)
-                                     (- region-end region-beg))))
-                    do (save-excursion
-                         (mapc
-                          (lambda (elem)
-                            "ELEM is (LINE . SPACES)"
-                            (goto-char node-beg)
-                            (forward-line (car elem))
-                            (indent-line-to (cdr elem)))
-                          (tree-sitter-calculate-indent outer-node calc-beg calc-end)))))
+        (cl-loop with t1 = (current-time)
+                 for outer-node = (outermost (tree-sitter-node-at region-beg))
+                 then (tree-sitter-node-next-sibling
+                       (outermost (tree-sitter-node-at (point))))
+                 while outer-node
+                 for node-beg = (tree-sitter-node-start outer-node)
+                 for calc-beg = (max node-beg region-beg)
+                 for calc-end = (min (tree-sitter-node-end outer-node) region-end)
+                 until (>= calc-beg region-end)
+                 do (goto-char node-beg)
+                 do (when (> (float-time (time-since t1)) 1.5)
+                      (message "Indenting region...%s%%"
+                               (/ (* (- (point) region-beg) 100)
+                                  (- region-end region-beg))))
+                 do (save-excursion
+                      (mapc
+                       (lambda (elem)
+                         "ELEM is (LINE . SPACES)"
+                         (goto-char node-beg)
+                         (forward-line (car elem))
+                         (indent-line-to (cdr elem)))
+                       (tree-sitter-calculate-indent outer-node calc-beg calc-end))))
           (when hack-eob-marker
             (save-excursion
               (goto-char hack-eob-marker)
