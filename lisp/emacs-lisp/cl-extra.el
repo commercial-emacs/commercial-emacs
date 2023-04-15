@@ -567,7 +567,6 @@ too large if positive or too small if negative)."
 ;;;###autoload
 (defun cl-revappend (x y)
   "Equivalent to (append (reverse X) Y)."
-  (declare (side-effect-free t))
   (nconc (reverse x) y))
 
 ;;;###autoload
