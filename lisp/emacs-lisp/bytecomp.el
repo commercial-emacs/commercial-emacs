@@ -4175,8 +4175,11 @@ and \(funcall (function foo)) will lose with autoloads."
 
 (defun byte-compile-ignore (form)
   (dolist (arg (cdr form))
-    ;; Compile each argument for-effect but suppress unused-value warnings.
-    (byte-compile-form arg 'for-effect-no-warn))
+    ;; Compile args for value (to avoid warnings about unused values),
+    ;; emit a discard after each, and trust the LAP peephole optimiser
+    ;; to annihilate useless ops.
+    (byte-compile-form arg)
+    (byte-compile-discard))
   (byte-compile-form nil))
 
 (defun byte-compile-find-bound-condition (condition-param
