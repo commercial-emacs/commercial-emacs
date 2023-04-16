@@ -681,24 +681,24 @@ typedef struct { void const *fwdptr; } lispfwd;
 
 enum symbol_interned
 {
-  SYMBOL_UNINTERNED = 0,
-  SYMBOL_INTERNED = 1,
-  SYMBOL_INTERNED_IN_INITIAL_OBARRAY = 2
+  SYMBOL_UNINTERNED,		      /* not interned anywhere */
+  SYMBOL_INTERNED,		      /* interned but not in initial obarray */
+  SYMBOL_INTERNED_IN_INITIAL_OBARRAY  /* interned in initial obarray */
 };
 
 enum symbol_redirect
 {
-  SYMBOL_PLAINVAL  = 4,
-  SYMBOL_VARALIAS  = 1,
-  SYMBOL_LOCALIZED = 2,
-  SYMBOL_FORWARDED = 3
+  SYMBOL_PLAINVAL,   /* plain var, value is in the `value' field */
+  SYMBOL_VARALIAS,   /* var alias, value is really in the `alias' symbol */
+  SYMBOL_LOCALIZED,  /* localized var, value is in the `blv' object */
+  SYMBOL_FORWARDED   /* forwarding var, value is in `forward' */
 };
 
 enum symbol_trapped_write
 {
-  SYMBOL_UNTRAPPED_WRITE = 0,
-  SYMBOL_NOWRITE = 1,
-  SYMBOL_TRAPPED_WRITE = 2
+  SYMBOL_UNTRAPPED_WRITE,  /* normal case, just set the value */
+  SYMBOL_NOWRITE,          /* constant, cannot set, e.g. nil, t, :keyword */
+  SYMBOL_TRAPPED_WRITE     /* trap the write, call watcher functions */
 };
 
 struct Lisp_Symbol
@@ -717,9 +717,6 @@ struct Lisp_Symbol
       */
       ENUM_BF (symbol_redirect) redirect : 3;
 
-      /* 0 : normal case, just set the value
-	 1 : constant, cannot set, e.g. nil, t, :keywords.
-	 2 : trap the write, call watcher functions.  */
       ENUM_BF (symbol_trapped_write) trapped_write : 2;
 
       /* Value among enum symbol_interned.  */
