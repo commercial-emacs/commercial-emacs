@@ -1059,7 +1059,10 @@ Responsible for handling and, or, and parenthetical expressions.")
 
 (autoload 'nnselect-categorize "nnselect")
 (autoload 'nnselect-get-artlist "nnselect" nil nil 'macro)
-(autoload 'nnselect-generate-artlist "nnselect" nil nil 'macro)
+(autoload 'nnselect-generate-artlist "nnselect")
+(autoload 'nnselect-artitem-number "nnselect")
+(autoload 'nnselect-artitem-group "nnselect")
+(autoload 'nnselect-artlist-length "nnselect")
 (autoload 'ids-by-group "nnselect")
 ;; nnselect interface
 (cl-defmethod gnus-search-run-search ((_engine gnus-search-nnselect)
