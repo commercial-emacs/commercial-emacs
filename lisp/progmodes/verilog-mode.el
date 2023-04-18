@@ -356,7 +356,9 @@ wherever possible, since it is slow."
 (eval-and-compile
   ;; Both xemacs and emacs
   (condition-case nil
-      (require 'diff)  ; diff-command and diff-switches
+      ;; `diff-command' and `diff-switches',
+      ;; although XEmacs lacks the former.
+      (require 'diff)
     (error nil))
   (condition-case nil
       (require 'compile)  ; compilation-error-regexp-alist-alist
@@ -11881,9 +11883,9 @@ If optional REGEXP, ignore differences matching it."
 This requires the external program `diff-command' to be in your `exec-path',
 and uses `diff-switches' in which you may want to have \"-u\" flag.
 Ignores WHITESPACE if t, and writes output to stdout if SHOW."
-  ;; Similar to `diff-buffer-with-file' but works on XEmacs, and doesn't
-  ;; call `diff' as `diff' has different calling semantics on different
-  ;; versions of Emacs.
+  ;; Similar to `diff-buffer-with-file' but works on Emacs 21, and
+  ;; doesn't call `diff' as `diff' has different calling semantics on
+  ;; different versions of Emacs.
   (if (not (file-exists-p f1))
       (message "Buffer `%s' has no associated file on disk" (buffer-name b2))
     (with-temp-buffer "*Verilog-Diff*"
