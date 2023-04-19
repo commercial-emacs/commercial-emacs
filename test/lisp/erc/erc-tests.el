@@ -1044,6 +1044,48 @@
     (kill-buffer "*erc-protocol*")
     (should-not erc-debug-irc-protocol)))
 
+(ert-deftest erc--split-line ()
+  (let ((erc-default-recipients '("#chan"))
+        (erc-split-line-length 10))
+    (should (equal (erc--split-line "") '("")))
+    (should (equal (erc--split-line "0123456789") '("0123456789")))
+    (should (equal (erc--split-line "0123456789a") '("0123456789" "a")))
+
+    (should (equal (erc--split-line "0123456789 ") '("0123456789" " ")))
+    (should (equal (erc--split-line "01234567 89") '("01234567 " "89")))
+    (should (equal (erc--split-line "0123456 789") '("0123456 " "789")))
+    (should (equal (erc--split-line "0 123456789") '("0 " "123456789")))
+    (should (equal (erc--split-line " 0123456789") '(" " "0123456789")))
+    (should (equal (erc--split-line "012345678 9a") '("012345678 " "9a")))
+    (should (equal (erc--split-line "0123456789 a") '("0123456789" " a")))
+
+    ;; UTF-8 vs. KOI-8
+    (should (= 10 (string-bytes "Русск"))) ; utf-8
+    (should (equal (erc--split-line "Русск") '("Русск")))
+    (should (equal (erc--split-line "РусскийТекст") '("Русск" "ийТек" "ст")))
+    (should (equal (erc--split-line "Русский Текст") '("Русск" "ий " "Текст")))
+    (let ((erc-encoding-coding-alist '(("#chan" . cyrillic-koi8))))
+      (should (equal (erc--split-line "Русск") '("Русск")))
+      (should (equal (erc--split-line "РусскийТекст") '("РусскийТек" "ст")))
+      (should (equal (erc--split-line "Русский Текст") '("Русский " "Текст"))))
+
+    ;; UTF-8 vs. Latin 1
+    (should (= 17 (string-bytes "Hyvää päivää")))
+    (should (equal (erc--split-line "Hyvää päivää") '("Hyvää " "päivää")))
+    (should (equal (erc--split-line "HyvääPäivää") '("HyvääPä" "ivää")))
+    (let ((erc-encoding-coding-alist '(("#chan" . latin-1))))
+      (should (equal (erc--split-line "Hyvää päivää") '("Hyvää " "päivää")))
+      (should (equal (erc--split-line "HyvääPäivää") '("HyvääPäivä" "ä"))))
+
+    ;; Combining characters
+    (should (= 10 (string-bytes "Åström")))
+    (should (equal (erc--split-line "_Åström") '("_Åströ" "m")))
+    (should (equal (erc--split-line "__Åström") '("__Åstr" "öm")))
+    (should (equal (erc--split-line "___Åström") '("___Åstr" "öm")))
+    (when (> emacs-major-version 27)
+      (should (equal (erc--split-line "🏁🚩🎌🏴🏳️🏳️‍🌈🏳️‍⚧️🏴‍☠️")
+                     '("🏁🚩" "🎌🏴" "🏳️" "🏳️‍🌈" "🏳️‍⚧️" "🏴‍☠️"))))))
+
 (ert-deftest erc--input-line-delim-regexp ()
   (let ((p erc--input-line-delim-regexp))
     ;; none
@@ -1181,8 +1223,9 @@
        (ert-info ("Input cleared")
          (erc-bol)
          (should (eq (point) (point-max))))
-       ;; Commands are forced (no flood protection)
-       (should (equal (funcall next) '("/msg #chan hi\n" t nil))))
+       ;; The flood argument is irrelevant here because it can't
+       ;; influence dispatched handlers, such as `erc-cmd-MSG'.
+       (should (equal (funcall next) '("/msg #chan hi\n" nil nil))))
 
      (ert-info ("Simple non-command")
        (insert "hi")
@@ -1236,15 +1279,22 @@
        (pcase-dolist (`(,p . ,q)
                       '(("/a b\r" "/a b\n") ("/a b\n" "/a b\n")
                         ("/a b\n\n" "/a b\n") ("/a b\r\n" "/a b\n")
-                        ("a b\nc\n\n" "c\n" "a b\n")
-                        ("/a b\nc\n\n" "c\n" "/a b\n")
-                        ("/a b\n\nc\n\n" "c\n" "\n" "/a b\n")))
+                        ("/a b\n\n\n" "/a b\n")))
          (insert p)
          (erc-send-current-line)
          (erc-bol)
          (should (eq (point) (point-max)))
          (while q
-           (should (equal (funcall next) (list (pop q) nil t))))
+           (should (equal (funcall next) (list (pop q) nil nil))))
+         (should-not (funcall next))))
+
+     (ert-info ("Multiline non-command with trailing blank errors")
+       (dolist (p '("/a b\nc\n\n" "/a b\n/c\n\n" "/a b\n\nc\n\n"
+                    "/a\n c\n" "/a \n \n"))
+         (insert p)
+         (should-error (erc-send-current-line))
+         (goto-char erc-input-marker)
+         (delete-region (point) (point-max))
          (should-not (funcall next))))
 
      (ert-info ("Multiline hunk with trailing whitespace not filtered")

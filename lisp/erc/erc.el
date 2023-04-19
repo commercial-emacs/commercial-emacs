@@ -1101,7 +1101,8 @@ The struct has three slots:
 ;; remove this hook and the struct completely.  IOW, if you need this,
 ;; please say so.
 
-(defvar erc--pre-send-split-functions '(erc--discard-trailing-multiline-nulls)
+(defvar erc--pre-send-split-functions '(erc--discard-trailing-multiline-nulls
+                                        erc--split-lines)
   "Special hook for modifying individual lines in multiline prompt input.
 The functions are called with one argument, an `erc--input-split'
 struct, which they can optionally modify.
@@ -6006,6 +6007,9 @@ submitted line to be intentional."
 
 (defvar erc--input-line-delim-regexp (rx (| (: (? ?\r) ?\n) ?\r)))
 
+(defvar erc-command-regexp "^/\\([A-Za-z']+\\)\\(\\s-+.*\\|\\s-*\\)$"
+  "Regular expression used for matching commands in ERC.")
+
 (defun erc--blank-in-multiline-input-p (lines)
   "Detect whether LINES contains a blank line.
 When `erc-send-whitespace-lines' is in effect, return nil if
@@ -6055,11 +6059,19 @@ is empty or consists of one or more spaces, tabs, or form-feeds."
               (erc-command-no-process-p string))
     "ERC: No process running"))
 
+(defun erc--check-prompt-input-for-multiline-command (line lines)
+  "Return non-nil when non-blank lines follow a command line."
+  (when (and (cdr lines)
+             (string-match erc-command-regexp line)
+             (seq-drop-while #'string-empty-p (reverse (cdr lines))))
+    "Excess input after command line"))
+
 (defvar erc--check-prompt-input-functions
   '(erc--check-prompt-input-for-point-in-bounds
     erc--check-prompt-input-for-multiline-blanks
     erc--check-prompt-input-for-running-process
-    erc--check-prompt-input-for-excess-lines)
+    erc--check-prompt-input-for-excess-lines
+    erc--check-prompt-input-for-multiline-command)
   "Validators for user input typed at prompt.
 Called with latest input string submitted by user and the list of
 lines produced by splitting it.  If any member function returns
@@ -6114,19 +6126,21 @@ When the returned value is a string, pass it to `erc-error'.")
    erc-input-marker
    (erc-end-of-input-line)))
 
-(defvar erc-command-regexp "^/\\([A-Za-z']+\\)\\(\\s-+.*\\|\\s-*\\)$"
-  "Regular expression used for matching commands in ERC.")
-
 (defun erc--discard-trailing-multiline-nulls (state)
   "Ensure last line of STATE's string is non-null.
 But only when `erc-send-whitespace-lines' is non-nil.  STATE is
 an `erc--input-split' object."
   (when (and erc-send-whitespace-lines (erc--input-split-lines state))
     (let ((reversed (nreverse (erc--input-split-lines state))))
-      (when (string-empty-p (car reversed))
-        (pop reversed)
-        (setf (erc--input-split-cmdp state) nil))
-      (nreverse (seq-drop-while #'string-empty-p reversed)))))
+      (while (and reversed (string-empty-p (car reversed)))
+        (setq reversed (cdr reversed)))
+      (setf (erc--input-split-lines state) (nreverse reversed)))))
+
+(defun erc--split-lines (state)
+  "Partition input lines when flood protection is enabled."
+  (when (and erc-flood-protect (not (erc--input-split-cmdp state)))
+    (setf (erc--input-split-lines state)
+          (mapcan #'erc--split-line (erc--input-split-lines state)))))
 
 (defun erc-send-input (input &optional skip-ws-chk)
   "Treat INPUT as typed in by the user.
@@ -6169,17 +6183,15 @@ Return non-nil only if we actually send anything."
       (run-hook-with-args 'erc--pre-send-split-functions state)
       (when (and (erc-input-sendp state)
                  erc-send-this)
-        (let ((lines (erc--input-split-lines state)))
-          (if (and (erc--input-split-cmdp state) (not (cdr lines)))
-              (erc-process-input-line (concat (car lines) "\n") t nil)
-            (dolist (line lines)
-              (dolist (line (or (and erc-flood-protect (erc-split-line line))
-                                (list line)))
-                (when (erc-input-insertp state)
-                  (erc-display-msg line))
-                (erc-process-input-line (concat line "\n")
-                                        (null erc-flood-protect) t))))
-          t)))))
+        (dolist (line (erc--input-split-lines state))
+          (if (erc--input-split-cmdp state)
+              (cl-assert (not (cdr (erc--input-split-lines state))))
+            (when (erc-input-insertp state)
+              (erc-display-msg line)))
+          (erc-process-input-line (concat line "\n")
+                                  (null erc-flood-protect)
+                                  (not (erc--input-split-cmdp state))))
+        t))))
 
 (defun erc-display-msg (line)
   "Display LINE as a message of the user to the current target at point."
