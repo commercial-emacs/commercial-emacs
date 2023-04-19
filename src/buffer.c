@@ -1358,7 +1358,7 @@ header lines.  This function also forces recomputation of the
 menu bar menus and the frame title.  */)
      (Lisp_Object all)
 {
-  if (!NILP (all))
+  if (! NILP (all))
     {
       update_mode_lines = 10;
       /* FIXME: This can't be right.  */

@@ -2472,34 +2472,27 @@ commands of Compilation major mode are available.  See
     ;; Record where we put the message, so we can ignore it later on.
     (goto-char omax)
     (compilation-insert-annotation ?\n mode-name " " (car status))
-    (if (and (numberp compilation-window-height)
-	     (zerop compilation-window-height))
-	(message "%s" (cdr status)))
-    (if (bolp)
-	(forward-char -1))
+    (when (bolp)
+      (forward-char -1))
     (compilation-insert-annotation " at " (substring (current-time-string) 0 19))
     (goto-char (point-max))
-    ;; Prevent that message from being recognized as a compilation error.
-    (add-text-properties omax (point)
-			 (append '(compilation-handle-exit t) nil))
-    (redisplay)
+    ;; Prevent just inserted text from being included in compilation error.
+    (add-text-properties omax (point) '(compilation-handle-exit t))
     (setq mode-line-process
           (list
-           (let ((out-string (format ":%s [%s]" process-status (cdr status)))
-                 (msg (format "%s %s" mode-name
-                              (replace-regexp-in-string "\n?$" ""
-                                                        (car status)))))
-             (message "%s" msg)
-             (propertize out-string
-                         'help-echo msg
-                         'face (if (> exit-status 0)
-                                   'compilation-mode-line-fail
-                                 'compilation-mode-line-exit)))
+           (propertize (format ":%s [%s]" process-status (cdr status))
+                       'help-echo
+                       (message "%s %s"
+                                mode-name
+                                (replace-regexp-in-string "\n?$" "" (car status)))
+                       'face
+                       (if (> exit-status 0)
+                           'compilation-mode-line-fail
+                         'compilation-mode-line-exit))
            compilation-mode-line-errors))
-    ;; Force mode line redisplay soon.
     (force-mode-line-update)
-    (if (and opoint (< opoint omax))
-	(goto-char opoint))
+    (when (and opoint (< opoint omax))
+      (goto-char opoint))
     (run-hook-with-args 'compilation-finish-functions cur-buffer msg)))
 
 ;; Called when compilation process changes state.

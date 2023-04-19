@@ -1096,26 +1096,23 @@ find_glyph_row_slice (struct glyph_matrix *window_matrix,
 
 #endif /* 0 */
 
-/* Prepare ROW for display in windows W.  Desired rows are cleared
-   lazily, i.e. they are only marked as to be cleared by setting their
-   enabled_p flag to zero.  When a row is to be displayed, a prior
-   call to this function really clears it.  In addition, this function
-   makes sure the marginal areas of ROW are in sync with the window's
-   display margins.  MODE_LINE_P non-zero means we are preparing a
-   glyph row for tab/header line or mode line.  */
+/* Prepare ROW for display in window W.  */
 
 void
-prepare_desired_row (struct window *w, struct glyph_row *row, bool mode_line_p)
+prepare_desired_row (struct window *w, struct glyph_row *row)
 {
-  if (!row->enabled_p)
+  if (! row->enabled_p)
     {
-      bool rp = row->reversed_p;
-
+      /* Emacs lazily marks rows for clearing by setting enabled_p to
+	 false.  They get actually cleared now, then re-enabled. */
+      bool reversed_p = row->reversed_p, mode_line_p = row->mode_line_p;
       clear_glyph_row (row);
       row->enabled_p = true;
-      row->reversed_p = rp;
+      row->reversed_p = reversed_p;
+      row->mode_line_p = mode_line_p;
     }
-  if (mode_line_p)
+
+  if (row->mode_line_p)
     {
       /* Mode and header/tab lines, if displayed, never have marginal
 	 areas.  If we are called with MODE_LINE_P non-zero, we are

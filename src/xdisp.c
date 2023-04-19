@@ -21353,8 +21353,7 @@ display_sline (struct it *it, int cursor_vpos)
       return false;
     }
 
-  /* Clear the result glyph row and enable it.  */
-  prepare_desired_row (it->w, row, false);
+  prepare_desired_row (it->w, row);
 
   row->y = it->current_y;
   row->start = it->start;
@@ -23371,8 +23370,8 @@ display_mode_lines (struct window *w)
       Lisp_Object default_help =
 	WINDOW_BUFFER_LOCAL_VALUE (Qmode_line_default_help_echo, w);
 
-      /* Set up mode line help echo.  Do this before selecting w so it
-	 can reasonably tell whether a mouse click will select w.  */
+      /* Set mode line help echo before selecting W to preserve
+	 distinguishing whether a mouse click selects W.  */
       XSETWINDOW (window, w);
       if (FUNCTIONP (default_help))
 	wset_mode_line_help_echo (w, safe_call1 (default_help, window));
@@ -23383,12 +23382,9 @@ display_mode_lines (struct window *w)
     }
 
   selected_frame = new_frame;
-  /* FIXME: If we were to allow the mode-line's computation changing the buffer
-     or window's point, then we'd need select_window_1 here as well.  */
   XSETWINDOW (selected_window, w);
   XFRAME (new_frame)->selected_window = selected_window;
 
-  /* These will be set while the mode line specs are processed.  */
   line_number_displayed = false;
   w->column_number_displayed = -1;
 
@@ -23397,8 +23393,6 @@ display_mode_lines (struct window *w)
       Lisp_Object window_mode_line_format
 	= window_parameter (w, Qmode_line_format);
       struct window *sel_w = XWINDOW (old_selected_window);
-
-      /* Select mode line face based on the real selected window.  */
       display_mode_line (w,
 			 CURRENT_MODE_LINE_ACTIVE_FACE_ID_3 (sel_w, sel_w, w),
 			 NILP (window_mode_line_format)
@@ -23411,7 +23405,6 @@ display_mode_lines (struct window *w)
     {
       Lisp_Object window_tab_line_format
 	= window_parameter (w, Qtab_line_format);
-
       display_mode_line (w, TAB_LINE_FACE_ID,
 			 NILP (window_tab_line_format)
 			 ? BVAR (current_buffer, tab_line_format)
@@ -23423,7 +23416,6 @@ display_mode_lines (struct window *w)
     {
       Lisp_Object window_header_line_format
 	= window_parameter (w, Qheader_line_format);
-
       display_mode_line (w, HEADER_LINE_FACE_ID,
 			 NILP (window_header_line_format)
 			 ? BVAR (current_buffer, header_line_format)
@@ -23432,7 +23424,6 @@ display_mode_lines (struct window *w)
     }
 
   unbind_to (count, Qnil);
-
   if (n > 0)
     w->must_be_updated_p = true;
   return n;
@@ -23453,12 +23444,13 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
   specpdl_ref count = SPECPDL_INDEX ();
 
   init_iterator (&it, w, -1, -1, NULL, face_id);
-  /* When called from window_start_coordinates, prevent extending a previously
-     drawn mode-line.  */
-  it.glyph_row->enabled_p = false;
-  prepare_desired_row (w, it.glyph_row, true);
 
+  /* prepare_desired_row does unexpected things with enabled_p.  */
+  it.glyph_row->enabled_p = false;
   it.glyph_row->mode_line_p = true;
+  prepare_desired_row (w, it.glyph_row);
+  eassert (it.glyph_row->enabled_p);
+
   if (face_id == TAB_LINE_FACE_ID)
     {
       it.glyph_row->tab_line_p = true;
@@ -23467,23 +23459,21 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
   else if (face_id == HEADER_LINE_FACE_ID)
     w->desired_matrix->header_line_p = true;
 
-  /* FIXME: This should be controlled by a user option.  But
-     supporting such an option is not trivial, since the mode line is
-     made up of many separate strings.  */
+  /* EZ admits punting on user configurability of this.  */
   it.paragraph_embedding = L2R;
 
   record_unwind_protect (unwind_format_mode_line,
 			 format_mode_line_unwind_data (NULL, NULL,
 						       Qnil, false));
 
-  /* Temporarily make frame's keyboard the current kboard so that
-     kboard-local variables in the mode_line_format will get the right
-     values.  */
+  /* kboard-local variables in mode_line_format should refer to
+     current frame's keyboard.  */
   push_kboard (FRAME_KBOARD (it.f));
   record_unwind_save_match_data ();
 
   if (NILP (Vmode_line_compact)
-      || face_id == HEADER_LINE_FACE_ID || face_id == TAB_LINE_FACE_ID)
+      || face_id == HEADER_LINE_FACE_ID
+      || face_id == TAB_LINE_FACE_ID)
     {
       mode_line_target = MODE_LINE_DISPLAY;
       display_mode_element (&it, 0, 0, 0, format, Qnil, false);
@@ -23494,8 +23484,7 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
       if (EQ (Vmode_line_compact, Qlong)
 	  && WINDOW_TOTAL_COLS (w) >= SCHARS (mode_string))
 	{
-	  /* The window is wide enough; just display the mode line we
-	     just computed. */
+	  /* Window wide enough; display just computed mode line. */
 	  display_string (NULL, mode_string, Qnil,
 			  0, 0, &it, 0, 0, 0,
 			  STRING_MULTIBYTE (mode_string));
@@ -23534,10 +23523,9 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
 	}
     }
   pop_kboard ();
-
   unbind_to (count, Qnil);
 
-  /* Fill up with spaces.  */
+  /* Space-fill.  */
   display_string (" ", Qnil, Qnil, 0, 0, &it, 10000, -1, -1, 0);
 
   compute_line_metrics (&it);
@@ -23546,7 +23534,7 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
   it.glyph_row->truncated_on_left_p = false;
   it.glyph_row->truncated_on_right_p = false;
 
-  /* Make a 3D mode-line have a shadow at its right end.  */
+  /* Render shadow for 3D mode-line.  */
   face = FACE_FROM_ID (it.f, face_id);
   extend_face_to_end_of_line (&it);
   if (face->box != FACE_NO_BOX)
@@ -23565,7 +23553,6 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
 	last->pixel_width += max (0, (box_thickness
 				      - (it.current_x - it.last_visible_x)));
     }
-
   return it.glyph_row->height;
 }
 
