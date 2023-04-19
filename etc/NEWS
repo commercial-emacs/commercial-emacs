@@ -219,6 +219,11 @@ the new argument NEW-BUFFER non-nil, it will use a new buffer instead.
 Interactively, invoke 'eww-open-file' with a prefix argument to
 activate this behavior.
 
++++
+*** 'eww' now has completion when prompting for a URL or keywords.
+The interactive minibuffer prompt when invoking 'eww' now has support
+for completion.
+
 ** go-ts-mode
 
 +++

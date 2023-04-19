@@ -378,9 +378,10 @@ killed after rendering.
 For more information, see Info node `(eww) Top'."
   (interactive
    (let ((uris (eww-suggested-uris)))
-     (list (read-string (format-prompt "Enter URL or keywords"
-                                       (and uris (car uris)))
-                        nil 'eww-prompt-history uris)
+     (list (completing-read (format-prompt "Enter URL or keywords"
+                                           (and uris (car uris)))
+                            eww-prompt-history nil nil nil
+                            'eww-prompt-history uris)
            current-prefix-arg)))
   (setq url (eww--dwim-expand-url url))
   (pop-to-buffer-same-window
