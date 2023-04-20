@@ -5166,7 +5166,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	      if (timers_run != old_timers_run && do_display)
 		/* We must retry, since a timer may have requeued itself
 		   and that could alter the time_delay.  */
-		  redisplay_preserve_echo_area (9);
+		redisplay_preserve_echo_area (9);
 	      else
 		break;
 	    }
