@@ -21346,7 +21346,8 @@ display_sline (struct it *it, int cursor_vpos)
       return false;
     }
 
-  prepare_desired_row (it->w, row);
+  reenable_glyph_row (row);
+  sync_glyph_row_margins (it->w, row);
 
   row->y = it->current_y;
   row->start = it->start;
@@ -23439,10 +23440,9 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
   init_iterator (&it, w, -1, -1, NULL, face_id);
 
   /* prepare_desired_row does unexpected things with enabled_p.  */
-  it.glyph_row->enabled_p = false;
+  reenable_glyph_row (it.glyph_row);
   it.glyph_row->mode_line_p = true;
-  prepare_desired_row (w, it.glyph_row);
-  eassert (it.glyph_row->enabled_p);
+  sync_glyph_row_margins (w, it.glyph_row);
 
   if (face_id == TAB_LINE_FACE_ID)
     {

@@ -1096,22 +1096,23 @@ find_glyph_row_slice (struct glyph_matrix *window_matrix,
 
 #endif /* 0 */
 
-/* Prepare ROW for display in window W.  */
-
 void
-prepare_desired_row (struct window *w, struct glyph_row *row)
+reenable_glyph_row (struct glyph_row *row)
 {
   if (! row->enabled_p)
     {
-      /* Emacs lazily marks rows for clearing by setting enabled_p to
-	 false.  They get actually cleared now, then re-enabled. */
-      bool reversed_p = row->reversed_p, mode_line_p = row->mode_line_p;
+      /* Emacs marks rows for clearing by setting enabled_p to false.
+	 They get actually cleared now, then re-enabled. */
+      bool restore_reversed_p = row->reversed_p;
       clear_glyph_row (row);
       row->enabled_p = true;
-      row->reversed_p = reversed_p;
-      row->mode_line_p = mode_line_p;
+      row->reversed_p = restore_reversed_p;
     }
+}
 
+void
+sync_glyph_row_margins (struct window *w, struct glyph_row *row)
+{
   if (row->mode_line_p)
     {
       /* Mode and header/tab lines, if displayed, never have marginal
@@ -1145,8 +1146,8 @@ prepare_desired_row (struct window *w, struct glyph_row *row)
 	{
 	  row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[LAST_AREA] - right;
 	  /* Leave room for a border glyph.  */
-	  if (!FRAME_WINDOW_P (XFRAME (w->frame))
-	      && !WINDOW_RIGHTMOST_P (w)
+	  if (! FRAME_WINDOW_P (XFRAME (w->frame))
+	      && ! WINDOW_RIGHTMOST_P (w)
 	      && right > 0)
 	    row->glyphs[RIGHT_MARGIN_AREA] -= 1;
 	}

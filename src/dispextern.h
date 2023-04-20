@@ -3674,7 +3674,8 @@ void increment_matrix_positions (struct glyph_matrix *,
 void blank_row (struct window *, struct glyph_row *, int);
 void clear_glyph_matrix_rows (struct glyph_matrix *, int, int);
 void clear_glyph_row (struct glyph_row *);
-void prepare_desired_row (struct window *, struct glyph_row *);
+void reenable_glyph_row (struct glyph_row *);
+void sync_glyph_row_margins (struct window *, struct glyph_row *);
 void update_single_window (struct window *);
 #ifdef HAVE_WINDOW_SYSTEM
 extern void gui_update_window_begin (struct window *);
