@@ -820,8 +820,8 @@ DIRS must contain directory names."
     (define-key map "F" 'project-or-external-find-file)
     (define-key map "b" 'project-switch-to-buffer)
     (define-key map "s" 'project-shell)
-    (define-key map "d" 'project-find-dir)
-    (define-key map "D" 'project-dired)
+    (define-key map "D" 'project-find-dir)
+    (define-key map "d" 'project-dired)
     (define-key map "v" 'project-vc-dir)
     (define-key map "c" 'project-compile)
     (define-key map "e" 'project-eshell)
@@ -1801,7 +1801,7 @@ forgotten projects."
 (defcustom project-switch-commands
   '((project-find-file "Find file")
     (project-find-regexp "Find regexp")
-    (project-find-dir "Find directory")
+    (project-dired "Dired")
     (project-vc-dir "VC-Dir")
     (project-eshell "Eshell"))
   "Alist mapping commands to descriptions.
