@@ -5162,13 +5162,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	  do
 	    {
 	      unsigned old_timers_run = timers_run;
-
 	      timer_delay = timer_check ();
-
 	      if (timers_run != old_timers_run && do_display)
 		/* We must retry, since a timer may have requeued itself
 		   and that could alter the time_delay.  */
-		redisplay_preserve_echo_area (9);
+		  redisplay_preserve_echo_area (9);
 	      else
 		break;
 	    }
@@ -5181,6 +5179,8 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
         }
 
       status_notify (NULL);
+      if (do_display)
+	redisplay_preserve_echo_area (13);
 
       /* `set_waiting_for_input' is a Blandyism that claims to have emacs
 	 react immediately to C-g and signals.

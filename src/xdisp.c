@@ -15066,16 +15066,9 @@ redisplay_preserve_echo_area (int from_where)
   block_buffer_flips ();
   unblock_input ();
 
-  if (!NILP (echo_area_buffer[1]))
-    {
-      /* We have a previously displayed message, but no current
-	 message.  Redisplay the previous message.  */
-      display_last_displayed_message_p = true;
-      redisplay_internal ();
-      display_last_displayed_message_p = false;
-    }
-  else
-    redisplay_internal ();
+  display_last_displayed_message_p = ! NILP (echo_area_buffer[1]);
+  redisplay_internal ();
+  display_last_displayed_message_p = false;
 
   flush_frame (SELECTED_FRAME ());
   unbind_to (count, Qnil);
