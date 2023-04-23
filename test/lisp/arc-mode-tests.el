@@ -99,19 +99,26 @@
               (funcall mod-fn zip)
               (should-not (file-has-changed-p zip-base tag))
               (should (file-has-changed-p zip tag))))))
-    ;; setup: make two zip files with different contents
-    (mapc make-file (append content-1 content-2))
-    (mapc (lambda (args) (apply make-zip args))
-          (list (list base-zip-1 content-1)
-                (list base-zip-2 content-2)))
-    ;; test 1: with "test-update" and "test-update.zip", update
-    ;; "test-update": (1) ensure only "test-update" is modified, (2)
-    ;; ensure the contents of the new member is expected.
-    (funcall test-modify "test-update" update-fn)
-    ;; test 2: with "test-delete" and "test-delete.zip", delete entry
-    ;; from "test-delete": (1) ensure only "test-delete" is modified,
-    ;; (2) ensure the file list is reduced as expected.
-    (funcall test-modify "test-delete" delete-fn)))
+    (unwind-protect
+        (progn
+          ;; setup: make two zip files with different contents
+          (mapc make-file (append content-1 content-2))
+          (mapc (lambda (args) (apply make-zip args))
+                (list (list base-zip-1 content-1)
+                      (list base-zip-2 content-2)))
+          ;; test 1: with "test-update" and "test-update.zip", update
+          ;; "test-update": (1) ensure only "test-update" is modified, (2)
+          ;; ensure the contents of the new member is expected.
+          (funcall test-modify "test-update" update-fn)
+          ;; test 2: with "test-delete" and "test-delete.zip", delete entry
+          ;; from "test-delete": (1) ensure only "test-delete" is modified,
+          ;; (2) ensure the file list is reduced as expected.
+          (funcall test-modify "test-delete" delete-fn))
+      (dolist (file (append content-1 content-2
+                            (list base-zip-1 base-zip-2
+                                  "test-delete" "test-update"
+                                  "test-delete.zip" "test-update.zip")))
+        (ignore-errors (delete-file file))))))
 
 (provide 'arc-mode-tests)
 
