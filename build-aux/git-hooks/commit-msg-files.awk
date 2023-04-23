@@ -103,10 +103,12 @@ BEGIN {
 
 END {
   if (status != 0) {
-    if (reason == "pre-push")
-      error_msg = "Push aborted"
-    else
+    if (reason == "pre-push") {
+      error_msg = "Push sucks"
+      status = 0
+    } else {
       error_msg = "Bad commit message"
+    }
     printf("%s; please see the file 'CONTRIBUTE'\n", error_msg)
   }
   exit status

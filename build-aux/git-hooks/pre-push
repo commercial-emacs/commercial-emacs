@@ -25,9 +25,9 @@
 # helps ensure that the resulting change logs are correct, which
 # should prevent errors when generating etc/AUTHORS.
 
-# These checks also happen in the "post-commit" hook (which see), but
-# that hook can't abort a commit; it just advises the committer to fix
-# the commit so that this hook runs without errors.
+# These checks also happen in the "post-commit" hook, but that hook
+# can't abort a commit; it just advises the committer to fix the
+# commit so that this hook runs without errors.
 
 ### Code:
 
