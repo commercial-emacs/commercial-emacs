@@ -246,27 +246,29 @@ This function is called, by name, directly by the C code."
                                "")
                              (error-message-string err)))))))
     (cond ((memq timer timer-list)
-           (funcall run-handler timer)
-           (if (not (timer--repeat-delay timer))
-               ;; dequeue
-               (cancel-timer timer)
-             ;; requeue at new time
-             (setf (timer--triggered timer) nil)
-             (if (timer--integral-multiple timer)
-                 (setf (timer--time timer)
-                       (timer-next-integral-multiple-of-time
-		        nil (timer--repeat-delay timer)))
-               (timer-inc-time timer (timer--repeat-delay timer)))
-             (when (numberp timer-max-repeats)
-               ;; Limit repetitions in case emacs was unduly suspended
-               (let ((limit (time-subtract nil (* timer-max-repeats
-                                                  (timer--repeat-delay timer)))))
-                 (when (time-less-p (timer--time timer) limit)
-                   (setf (timer--time timer) limit))))))
+           (unwind-protect
+               (funcall run-handler timer)
+             (if (not (timer--repeat-delay timer))
+                 ;; dequeue
+                 (cancel-timer timer)
+               ;; requeue at new time
+               (setf (timer--triggered timer) nil)
+               (if (timer--integral-multiple timer)
+                   (setf (timer--time timer)
+                         (timer-next-integral-multiple-of-time
+		          nil (timer--repeat-delay timer)))
+                 (timer-inc-time timer (timer--repeat-delay timer)))
+               (when (numberp timer-max-repeats)
+                 ;; Limit repetitions in case emacs was unduly suspended
+                 (let ((limit (time-subtract nil (* timer-max-repeats
+                                                    (timer--repeat-delay timer)))))
+                   (when (time-less-p (timer--time timer) limit)
+                     (setf (timer--time timer) limit)))))))
           ((memq timer timer-idle-list)
-           (funcall run-handler timer)
-           (unless (timer--repeat-delay timer)
-             (cancel-timer timer))))))
+           (unwind-protect
+               (funcall run-handler timer)
+             (unless (timer--repeat-delay timer)
+               (cancel-timer timer)))))))
 
 ;; This function is incompatible with the one in levents.el.
 (defun timeout-event-p (event)
