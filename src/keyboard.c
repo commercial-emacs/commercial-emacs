@@ -4398,13 +4398,10 @@ timer_check (void)
 			}
 		    }
 		}
-	      else /* was triggered */
+	      else if (NILP (vec[4])) /* triggered and not repeated.  */
 		{
-		  /* Clean up timers that errored out.  */
-		  if (NILP (vec[4])) /* if not repeated, delete it.  */
-		    *lists[i] = Fdelq (XCAR (timers), *lists[i]);
-		  else if (NILP (vec[7]) /* if not idle, reset it. */)
-		    vec[0] = Qnil;
+		  /* Presumably a timer that errored out.  */
+		  *lists[i] = Fdelq (XCAR (timers), *lists[i]);
 		}
 	    }
 	}
