@@ -1298,7 +1298,9 @@ of the `recompile' command."
                               project
                               (format "Run in %s: " default-directory))
                              eval-command
-                             compile-history)
+                             (if (equal (car compile-history) eval-command)
+                                 '(compile-history . 1)
+                               'compile-history))
 	                  eval-command))))
     (compile command (consp current-prefix-arg))))
 

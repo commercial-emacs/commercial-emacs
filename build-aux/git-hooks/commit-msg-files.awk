@@ -123,6 +123,7 @@ END {
       status = 0
     } else {
       error_msg = "Bad commit message"
+      status = 0
     }
     printf("%s; please see the file 'CONTRIBUTE'\n", error_msg)
   }

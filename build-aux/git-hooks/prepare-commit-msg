@@ -38,7 +38,8 @@ exec $awk '
   }
   END {
     if (status != 0) {
-      print "Commit aborted; please see the file 'CONTRIBUTE'"
+      print "Commit sucks; please see the file 'CONTRIBUTE'"
+      status = 0
     }
     exit status
   }

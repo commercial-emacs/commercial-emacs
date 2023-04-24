@@ -5178,9 +5178,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	    break;
         }
 
-      status_notify (NULL);
-      if (do_display)
-	redisplay_preserve_echo_area (13);
+      got_some_output = max (got_some_output, status_notify (wait_proc));
 
       /* `set_waiting_for_input' is a Blandyism that claims to have emacs
 	 react immediately to C-g and signals.
@@ -5190,6 +5188,13 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       */
       if (read_kbd < 0)
 	set_waiting_for_input (&timeout);
+
+      static EMACS_INT was_tick = 0;
+      if (was_tick != process_tick)
+	{
+	  was_tick = process_tick;
+	  if (do_display) redisplay_preserve_echo_area (13);
+	}
 
       /* Don't wait for output from a non-running process.  Just
 	 read whatever data has already been received.  */
