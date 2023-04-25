@@ -9049,22 +9049,23 @@ Turn on EDT Emulation." t)
 
 (push (purecopy '(eglot 1 14)) package--builtin-versions)
 (autoload 'eglot "eglot" "\
-Start LSP server in support of PROJECT's buffers under MANAGED-MAJOR-MODE.
+Start LSP server for PROJECT's buffers under MANAGED-MAJOR-MODES.
 
-This starts a Language Server Protocol (LSP) server suitable for the
-buffers of PROJECT whose `major-mode' is MANAGED-MAJOR-MODE.
-CLASS is the class of the LSP server to start and CONTACT specifies
-how to connect to the server.
+This starts a Language Server Protocol (LSP) server suitable for
+the buffers of PROJECT whose `major-mode' is among
+MANAGED-MAJOR-MODES.  CLASS is the class of the LSP server to
+start and CONTACT specifies how to connect to the server.
 
-Interactively, the command attempts to guess MANAGED-MAJOR-MODE
-from the current buffer's `major-mode', CLASS and CONTACT from
-`eglot-server-programs' looked up by the major mode, and PROJECT from
-`project-find-functions'.  The search for active projects in this
-context binds `eglot-lsp-context' (which see).
+Interactively, the command attempts to guess MANAGED-MAJOR-MODES,
+CLASS, CONTACT, and LANGUAGE-IDS from `eglot-server-programs',
+according to the current buffer's `major-mode'.  PROJECT is
+guessed from `project-find-functions'.  The search for active
+projects in this context binds `eglot-lsp-context' (which see).
 
-If it can't guess, it prompts the user for the mode and the server.
-With a single \\[universal-argument] prefix arg, it always prompts for COMMAND.
-With two \\[universal-argument], it also always prompts for MANAGED-MAJOR-MODE.
+If it can't guess, it prompts the user for the mode and the
+server.  With a single \\[universal-argument] prefix arg, it
+always prompts for COMMAND.  With two \\[universal-argument], it
+also always prompts for MANAGED-MAJOR-MODE.
 
 The LSP server of CLASS is started (or contacted) via CONTACT.
 If this operation is successful, current *and future* file
@@ -9082,12 +9083,12 @@ CONTACT specifies how to contact the server.  It is a
 keyword-value plist used to initialize CLASS or a plain list as
 described in `eglot-server-programs', which see.
 
-LANGUAGE-ID is the language ID string to send to the server for
-MANAGED-MAJOR-MODE, which matters to a minority of servers.
+LANGUAGE-IDS is a list of language ID string to send to the
+server for each element in MANAGED-MAJOR-MODES.
 
 INTERACTIVE is ignored and provided for backward compatibility.
 
-(fn MANAGED-MAJOR-MODE PROJECT CLASS CONTACT LANGUAGE-ID &optional INTERACTIVE)" t)
+(fn MANAGED-MAJOR-MODES PROJECT CLASS CONTACT LANGUAGE-IDS &optional INTERACTIVE)" t)
 (autoload 'eglot-ensure "eglot" "\
 Start Eglot session for current buffer if there isn't one.")
 (put 'eglot-workspace-configuration 'safe-local-variable 'listp)
@@ -10017,9 +10018,10 @@ Look at CONFIG and try to expand GROUP.
 
 ;;; Generated autoloads from erc/erc.el
 
-(push (purecopy '(erc 5 5)) package--builtin-versions)
+(push (purecopy '(erc 5 6 -4)) package--builtin-versions)
 (autoload 'erc-select-read-args "erc" "\
-Prompt the user for values of nick, server, port, and password.")
+Prompt the user for values of nick, server, port, and password.
+With prefix arg, also prompt for user and full name.")
 (autoload 'erc "erc" "\
 ERC is a powerful, modular, and extensible IRC client.
 This function is the main entry point for ERC.
@@ -10089,8 +10091,8 @@ Example usage:
 
 When present, ID should be a symbol or a string to use for naming
 the server buffer and identifying the connection unequivocally.
-See Info node `(erc) Network Identifier' for details.  Like USER
-and CLIENT-CERTIFICATE, this parameter cannot be specified
+See Info node `(erc) Network Identifier' for details.  Like
+CLIENT-CERTIFICATE, this parameter cannot be specified
 interactively.
 
 (fn &key (SERVER (erc-compute-server)) (PORT (erc-compute-port \\='ircs-u)) (NICK (erc-compute-nick)) (USER (erc-compute-user)) PASSWORD (FULL-NAME (erc-compute-full-name)) CLIENT-CERTIFICATE ID)" '((let ((erc-default-port erc-default-port-tls)) (erc-select-read-args))))
@@ -10173,7 +10175,7 @@ Customize `erc-url-connect-function' to override this.
 
 ;;; Generated autoloads from erc/erc-imenu.el
 
-(register-definition-prefixes "erc-imenu" '("erc-unfill-notice"))
+(register-definition-prefixes "erc-imenu" '("erc-"))
 
 
 ;;; Generated autoloads from erc/erc-join.el
@@ -12159,7 +12161,7 @@ Variables of interest include:
    If non-nil, always attempt to create the other file if it was not found.
 
  - `ff-quiet-mode'
-   If non-nil, traces which directories are being searched.
+   If non-nil, does not trace which directories are being searched.
 
  - `ff-special-constructs'
    A list of regular expressions specifying how to recognize special
@@ -12429,7 +12431,7 @@ lines.
 
 ;;; Generated autoloads from progmodes/flymake.el
 
-(push (purecopy '(flymake 1 2 2)) package--builtin-versions)
+(push (purecopy '(flymake 1 3 4)) package--builtin-versions)
 (autoload 'flymake-log "flymake" "\
 Log, at level LEVEL, the message MSG formatted with ARGS.
 LEVEL is passed to `display-warning', which is used to display
@@ -17142,14 +17144,12 @@ Cut a rectangle from the image under point, filling it with COLOR.
 COLOR defaults to the value of `image-cut-color'.
 Interactively, with prefix argument, prompt for COLOR to use.
 
-(fn &optional COLOR)" t)
-(autoload 'image-crop "image-crop" "\
-Crop the image under point.
-If CUT is non-nil, remove a rectangle from the image instead of
-cropping the image.  In that case CUT should be the name of a
-color to fill the rectangle.
+This command presents the image with a rectangular area superimposed
+on it, and allows moving and resizing the area to define which
+part of it to cut.
 
-While cropping the image, the following key bindings are available:
+While moving/resizing the cutting area, the following key bindings
+are available:
 
 `q':   Exit without changing anything.
 `RET': Crop/cut the image.
@@ -17157,8 +17157,31 @@ While cropping the image, the following key bindings are available:
        rectangle shape.
 `s':   Same as `m', but make the rectangle into a square first.
 
-After cropping an image, you can save it by `M-x image-save' or
+After cutting the image, you can save it by `M-x image-save' or
 \\<image-map>\\[image-save] when point is over the image.
+
+(fn &optional COLOR)" t)
+(autoload 'image-crop "image-crop" "\
+Crop the image under point.
+This command presents the image with a rectangular area superimposed
+on it, and allows moving and resizing the area to define which
+part of it to crop.
+
+While moving/resizing the cropping area, the following key bindings
+are available:
+
+`q':   Exit without changing anything.
+`RET': Crop/cut the image.
+`m':   Make mouse movements move the rectangle instead of altering the
+       rectangle shape.
+`s':   Same as `m', but make the rectangle into a square first.
+
+After cropping the image, you can save it by `M-x image-save' or
+\\<image-map>\\[image-save] when point is over the image.
+
+When called from Lisp, if CUT is non-nil, remove a rectangle from
+the image instead of cropping the image.  In that case, CUT should
+be the name of a color to fill the rectangle.
 
 (fn &optional CUT)" t)
 (register-definition-prefixes "image-crop" '("image-c"))
@@ -18269,6 +18292,11 @@ If optional INTERIOR-FRAG is non-nil, then the word may be a character
 sequence inside of a word.
 
 Standard ispell choices are then available.
+
+This command uses a word-list file specified
+by `ispell-alternate-dictionary' or by `ispell-complete-word-dict';
+if none of those name an existing word-list file, this command
+signals an error.
 
 (fn &optional INTERIOR-FRAG)" t)
 (autoload 'ispell-complete-word-interior-frag "ispell" "\
@@ -23198,8 +23226,7 @@ If PACKAGE is a `package-desc' object, MIN-VERSION is ignored.
 (autoload 'package-install "package" "\
 Install the package PKG.
 PKG can be a `package-desc' or a symbol naming one of the
-available packages in an archive in `package-archives'.  When
-called interactively, prompt for the package name.
+available packages in an archive in `package-archives'.
 
 Mark the installed package as selected by adding it to
 `package-selected-packages'.
@@ -23210,6 +23237,10 @@ non-nil, install the package but do not add it to
 
 If PKG is a `package-desc' and it is already installed, don't try
 to install it but still mark it as selected.
+
+If the command is invoked with a prefix argument, it will allow
+upgrading of built-in packages, as if `package-install-upgrade-built-in'
+had been enabled.
 
 (fn PKG &optional DONT-SELECT)" t)
 (autoload 'package-update "package" "\
@@ -24172,6 +24203,11 @@ Note that Picture mode commands will work outside of Picture mode, but
 they are not by default assigned to keys." t)
 (defalias 'edit-picture 'picture-mode)
 (register-definition-prefixes "picture" '("picture-"))
+
+
+;;; Generated autoloads from language/pinyin.el
+
+(register-definition-prefixes "pinyin" '("pinyin-character-map"))
 
 
 ;;; Generated autoloads from textmodes/pixel-fill.el
@@ -36854,6 +36890,48 @@ run a specific program.  The program must be a member of
 
 (fn &optional PGM)" t)
 (register-definition-prefixes "zone" '("zone-"))
+
+
+;;; Generated autoloads from progmodes/ruby-ts-mode.el
+
+(push (purecopy '(ruby-ts-mode 0 2)) package--builtin-versions)
+(autoload 'ruby-ts-mode "ruby-ts-mode" "\
+Major mode for editing Ruby, powered by tree-sitter.
+
+(fn)" t)
+(register-definition-prefixes "ruby-ts-mode" '("ruby-ts-"))
+
+
+;;; Generated autoloads from textmodes/html-ts-mode.el
+
+(autoload 'html-ts-mode "html-ts-mode" "\
+Major mode for editing Html, powered by tree-sitter.
+
+(fn)" t)
+(register-definition-prefixes "html-ts-mode" '("html-ts-mode-"))
+
+
+;;; Generated autoloads from progmodes/c-ts-common.el
+
+(register-definition-prefixes "c-ts-common" '("c-ts-common-"))
+
+
+;;; Generated autoloads from progmodes/elixir-ts-mode.el
+
+(autoload 'elixir-ts-mode "elixir-ts-mode" "\
+Major mode for editing Elixir, powered by tree-sitter.
+
+(fn)" t)
+(register-definition-prefixes "elixir-ts-mode" '("elixir-ts-"))
+
+
+;;; Generated autoloads from progmodes/heex-ts-mode.el
+
+(autoload 'heex-ts-mode "heex-ts-mode" "\
+Major mode for editing HEEx, powered by tree-sitter.
+
+(fn)" t)
+(register-definition-prefixes "heex-ts-mode" '("heex-ts-"))
 
 ;;; End of scraped data
 
