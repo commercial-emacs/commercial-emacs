@@ -982,7 +982,7 @@ AC_ARG_ENABLE([gcc-warnings],
    # however, if there is also a .tarball-version file it is probably
    # just a release imported into Git for patch management.
    gl_gcc_warnings=no
-   if test -d "$srcdir"/.git && test ! -f "$srcdir"/.tarball-version; then
+   if test -e "$srcdir"/.git && test ! -f "$srcdir"/.tarball-version; then
       # Clang typically identifies itself as GCC 4.2 or something similar
       # even if it is recent enough to accept the warnings we enable.
       AS_IF([test "$emacs_cv_clang" = yes],
@@ -3944,7 +3944,7 @@ module_env_snippet_27="$srcdir/src/module-env-27.h"
 module_env_snippet_28="$srcdir/src/module-env-28.h"
 module_env_snippet_29="$srcdir/src/module-env-29.h"
 module_env_snippet_30="$srcdir/src/module-env-30.h"
-emacs_major_version="${upstream_version%%.*}"
+emacs_major_version=`AS_ECHO([$upstream_version]) | sed 's/[[.]].*//'`
 AC_SUBST([emacs_major_version])
 
 ### Emacs Lisp native compiler support
