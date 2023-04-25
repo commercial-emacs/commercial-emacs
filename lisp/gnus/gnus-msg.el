@@ -1254,7 +1254,8 @@ For the \"inline\" alternatives, also see the variable
        (t
 	(setq message-forward-as-mime (not message-forward-as-mime))))
       (let* ((gnus-article-reply (gnus-summary-article-number))
-	     (gnus-article-yanked-articles (list gnus-article-reply)))
+	     (gnus-article-yanked-articles (when gnus-article-reply
+                                             (list gnus-article-reply))))
 	(gnus-setup-message 'forward
 	  (gnus-summary-select-article)
 	  (let ((mail-parse-charset
