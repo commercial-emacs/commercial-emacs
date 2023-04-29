@@ -563,7 +563,7 @@ scan_for_column (ptrdiff_t *endpos, EMACS_INT *goalcol,
 
   memset (&cmp_it, 0, sizeof cmp_it);
   cmp_it.id = -1;
-  composition_compute_stop_pos (&cmp_it, scan, scan_byte, end, Qnil);
+  composition_compute_stop_pos (&cmp_it, scan, scan_byte, end, Qnil, true);
 
   /* Scan forward to the target position.  */
   while (scan < end)
@@ -628,7 +628,7 @@ scan_for_column (ptrdiff_t *endpos, EMACS_INT *goalcol,
 	    {
 	      cmp_it.id = -1;
 	      composition_compute_stop_pos (&cmp_it, scan, scan_byte, end,
-					    Qnil);
+					    Qnil, true);
 	    }
 	  else
 	    cmp_it.from = cmp_it.to;
@@ -1239,7 +1239,7 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
   prev_tab_offset = tab_offset;
   memset (&cmp_it, 0, sizeof cmp_it);
   cmp_it.id = -1;
-  composition_compute_stop_pos (&cmp_it, pos, pos_byte, to, Qnil);
+  composition_compute_stop_pos (&cmp_it, pos, pos_byte, to, Qnil, true);
 
   unsigned short int quit_count = 0;
 
@@ -1549,7 +1549,7 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
 		{
 		  cmp_it.id = -1;
 		  composition_compute_stop_pos (&cmp_it, pos, pos_byte, to,
-						Qnil);
+						Qnil, true);
 		}
 	      else
 		cmp_it.from = cmp_it.to;

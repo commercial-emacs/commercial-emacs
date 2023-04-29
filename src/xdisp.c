@@ -3460,7 +3460,10 @@ compute_stop_pos (struct it *it)
 	}
     }
 
-  if (it->cmp_it.id < 0)
+  if (it->cmp_it.id < 0
+      && (STRINGP (it->string)
+	  || ((!it->bidi_p || it->bidi_it.scan_dir >= 0)
+	      && it->cmp_it.stop_pos <= IT_CHARPOS (*it))))
     {
       composition_compute_stop_pos
 	(&it->cmp_it, charpos, bytepos,
@@ -6657,7 +6660,7 @@ reseat_to_string (struct it *it, const char *s, Lisp_Object string,
       if (endpos > it->end_charpos)
 	endpos = it->end_charpos;
       composition_compute_stop_pos (&it->cmp_it, charpos, -1, endpos,
-				    it->string);
+				    it->string, true);
     }
 }
 
@@ -7282,7 +7285,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 		 If we're now scanning backward, all bets are off.  */
 	      ptrdiff_t stop = (it->bidi_it.scan_dir < 0) ? -1 : it->end_charpos;
 	      composition_compute_stop_pos (&it->cmp_it, IT_CHARPOS (*it),
-					    IT_BYTEPOS (*it), stop, Qnil);
+					    IT_BYTEPOS (*it), stop, Qnil, true);
 	    }
 	}
       else   /* Not a composition.  */
@@ -7309,7 +7312,8 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 		  /* Direction switched; recompute composition stop */
 		  ptrdiff_t stop = (it->bidi_it.scan_dir < 0) ? -1 : it->end_charpos;
 		  composition_compute_stop_pos (&it->cmp_it, IT_CHARPOS (*it),
-						IT_BYTEPOS (*it), stop, Qnil);
+						IT_BYTEPOS (*it), stop, Qnil,
+						true);
 		}
 	    }
 	  eassert (IT_BYTEPOS (*it) == CHAR_TO_BYTE (IT_CHARPOS (*it)));
@@ -7433,7 +7437,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	      composition_compute_stop_pos (&it->cmp_it,
 					    IT_STRING_CHARPOS (*it),
 					    IT_STRING_BYTEPOS (*it), stop,
-					    it->string);
+					    it->string, true);
 	    }
 	}
       else if (! it->bidi_p
@@ -7674,7 +7678,7 @@ bidi_reseat (struct it *it)
       if (it->bidi_it.scan_dir < 0)
 	stop = -1;
       composition_compute_stop_pos (&it->cmp_it, charpos, bytepos, stop,
-				    it->string);
+				    it->string, true);
     }
 }
 

@@ -1025,7 +1025,7 @@ inhibit_auto_composition (void)
 void
 composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 			      ptrdiff_t bytepos, ptrdiff_t endpos,
-			      Lisp_Object string)
+			      Lisp_Object string, bool include_static)
 {
   ptrdiff_t start, end;
   Lisp_Object prop;
@@ -1206,7 +1206,8 @@ composition_reseat_it (struct composition_it *cmp_it, ptrdiff_t charpos,
 {
   if (cmp_it->ch == -2)
     {
-      composition_compute_stop_pos (cmp_it, charpos, bytepos, endpos, string);
+      composition_compute_stop_pos (cmp_it, charpos, bytepos, endpos, string,
+				    true);
       if (cmp_it->ch == -2 || cmp_it->stop_pos != charpos)
 	/* The current position is not composed.  */
 	return 0;
@@ -1345,7 +1346,7 @@ composition_reseat_it (struct composition_it *cmp_it, ptrdiff_t charpos,
     }
   if (cmp_it->reversed_p)
     endpos = -1;
-  composition_compute_stop_pos (cmp_it, charpos, bytepos, endpos, string);
+  composition_compute_stop_pos (cmp_it, charpos, bytepos, endpos, string, true);
   return 0;
 }
 
