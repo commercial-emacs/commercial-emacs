@@ -665,6 +665,10 @@ callback data (if any)."
 			     :sentinel #'ignore
 			     :noquery t))
     (setf (epg-context-error-buffer context) (process-buffer error-process))
+    (message "the fuq %S" (cons (epg-context-program context) args))
+    (princ (format "the fuq %S" (cons (epg-context-program context) args))
+           #'external-debugging-output)
+
     (with-existing-directory
       (with-file-modes 448
         (setq process (make-process :name "epg"
