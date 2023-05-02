@@ -9177,6 +9177,21 @@ it skips the contents of comments that end before point."
   :type 'boolean
   :group 'paren-blinking)
 
+(defcustom blink-matching-paren-highlight-offscreen nil
+  "If non-nil, highlight matched off-screen open paren in the echo area.
+This highlighting uses the `blink-matching-paren-offscreen' face."
+  :type 'boolean
+  :version "30.1"
+  :group 'paren-blinking)
+
+(defface blink-matching-paren-offscreen
+  '((t :foreground "green"))
+  "Face for showing in the echo area matched open paren that is off-screen.
+This face is used only when `blink-matching-paren-highlight-offscreen'
+is non-nil."
+  :version "30.1"
+  :group 'paren-blinking)
+
 (defun blink-matching-check-mismatch (start end)
   "Return whether or not START...END are matching parens.
 END is the current point and START is the blink position.
@@ -9274,12 +9289,15 @@ The function should return non-nil if the two tokens do not match.")
                  (delete-overlay blink-matching--overlay)))))
        ((not show-paren-context-when-offscreen)
         (minibuffer-message
-         "Matches %s"
-         (substring-no-properties
-          (blink-paren-open-paren-line-string blinkpos))))))))
+         #("Matches %s"
+           ;; Make the following text (i.e., %s) prominent.
+           0 7 (face shadow))
+         (blink-paren-open-paren-line-string blinkpos)))))))
 
 (defun blink-paren-open-paren-line-string (pos)
-  "Return the line string that contains the openparen at POS."
+  "Return the line string that contains the openparen at POS.
+Remove the line string's properties but give the openparen a distinct
+face if `blink-matching-paren-highlight-offscreen' is non-nil."
   (save-excursion
     (goto-char pos)
     ;; Show what precedes the open in its line, if anything.
