@@ -85,6 +85,7 @@ jobs:
       run: |
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local
+        make -j4
         make test/lisp/epg-tests
     - name: make-macos
       if: startsWith(runner.os, 'macOS')
