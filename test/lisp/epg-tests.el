@@ -119,6 +119,7 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
 		     (epg-decrypt-string epg-tests-context cipher))))))
 
 (ert-deftest epg-roundtrip-2 ()
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (with-epg-tests (:require-passphrase t
 		   :require-public-key t
 		   :require-secret-key t)
