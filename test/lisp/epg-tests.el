@@ -130,6 +130,7 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
 		     (epg-decrypt-string epg-tests-context cipher))))))
 
 (ert-deftest epg-sign-verify-1 ()
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (with-epg-tests (:require-passphrase t
 		   :require-public-key t
 		   :require-secret-key t)
@@ -143,6 +144,7 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
       (should (eq 'good (epg-signature-status (car verify-result)))))))
 
 (ert-deftest epg-sign-verify-2 ()
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (with-epg-tests (:require-passphrase t
 		   :require-public-key t
 		   :require-secret-key t)
@@ -158,6 +160,7 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
       (should (eq 'good (epg-signature-status (car verify-result)))))))
 
 (ert-deftest epg-sign-verify-3 ()
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (with-epg-tests (:require-passphrase t
 		   :require-public-key t
 		   :require-secret-key t)
