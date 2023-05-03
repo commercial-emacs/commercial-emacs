@@ -3315,8 +3315,8 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 (ert-deftest tramp-test17-dired-with-wildcards ()
   "Check `dired' with wildcards."
   ;; `separate' syntax and IPv6 host name syntax do not work.
-  (skip-unless
-   (not (string-match-p (rx "[") ert-remote-temporary-file-directory)))
+  (skip-unless (tramp--test-macos-p))
+  (skip-unless (not (string-match-p (rx "[") ert-remote-temporary-file-directory)))
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
@@ -3429,6 +3429,7 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 ;; The following test is inspired by Bug#45691.
 (ert-deftest tramp-test17-insert-directory-one-file ()
   "Check `insert-directory' inside directory listing."
+  (skip-unless (tramp--test-macos-p))
   (skip-unless (tramp--test-enabled))
   ;; Relative file names in dired are not supported in tramp-crypt.el.
   (skip-unless (not (tramp--test-crypt-p)))
