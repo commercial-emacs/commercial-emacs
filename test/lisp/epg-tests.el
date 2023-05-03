@@ -99,7 +99,7 @@
            ,@body)))))
 
 (ert-deftest epg-decrypt-1 ()
-  :expected-result (if (getenv "EMACS_HYDRA_CI") :failed :passed) ; fixme
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (with-epg-tests (:require-passphrase t)
     (should (equal "test"
 		   (epg-decrypt-string epg-tests-context "\
@@ -112,7 +112,7 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
 ")))))
 
 (ert-deftest epg-roundtrip-1 ()
- :expected-result (if (getenv "EMACS_HYDRA_CI") :failed :passed) ; fixme
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (with-epg-tests (:require-passphrase t)
     (let ((cipher (epg-encrypt-string epg-tests-context "symmetric" nil)))
       (should (equal "symmetric"

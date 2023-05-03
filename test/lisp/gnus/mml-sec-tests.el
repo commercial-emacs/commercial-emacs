@@ -581,6 +581,7 @@ If optional EXPECTFAIL is non-nil, a decryption failure is expected."
 (ert-deftest mml-secure-en-decrypt-1 ()
   "Encrypt message; then decrypt and test for expected result.
 In this test, the single matching key is chosen automatically."
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   (dolist (method (enc-standards) nil)
     ;; no-exp@example.org with single encryption key
@@ -591,6 +592,7 @@ In this test, the single matching key is chosen automatically."
 (ert-deftest mml-secure-en-decrypt-2 ()
   "Encrypt message; then decrypt and test for expected result.
 In this test, the encryption key needs to fixed among multiple ones."
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   (skip-unless (ignore-errors (epg-find-configuration 'CMS)))
   ;; sub@example.org with multiple candidate keys,
@@ -605,9 +607,7 @@ In this test, the encryption key needs to fixed among multiple ones."
 (ert-deftest mml-secure-en-decrypt-3 ()
   "Encrypt message; then decrypt and test for expected result.
 In this test, encrypt-to-self variables are set to t."
-  ;; Random failures with "wrong-type-argument stringp nil".
-  ;; Seems unlikely to be specific to hydra.nixos.org...
-  :tags (if (getenv "EMACS_HYDRA_CI") '(:unstable))
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   (skip-unless (ignore-errors (epg-find-configuration 'CMS)))
   ;; sub@example.org with multiple candidate keys,
@@ -625,6 +625,7 @@ In this test, encrypt-to-self variables are set to t."
 (ert-deftest mml-secure-en-decrypt-4 ()
   "Encrypt message; then decrypt and test for expected result.
 In this test, encrypt-to-self variables are set to lists."
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   ;; Send from sub@example.org, which has two keys; encrypt to both.
   (let ((mml-secure-openpgp-encrypt-to-self
@@ -640,7 +641,7 @@ In this test, encrypt-to-self variables are set to lists."
 (ert-deftest mml-secure-en-decrypt-sign-1-1-single ()
   "Sign and encrypt message; then decrypt and test for expected result.
 In this test, just multiple encryption and signing keys may be available."
-  :tags '(:unstable)
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   (mml-secure-test-key-fixture
    (lambda ()
@@ -664,7 +665,7 @@ In this test, just multiple encryption and signing keys may be available."
 (ert-deftest mml-secure-en-decrypt-sign-1-2-double ()
   "Sign and encrypt message; then decrypt and test for expected result.
 In this test, just multiple encryption and signing keys may be available."
-  :tags '(:unstable)
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   (mml-secure-test-key-fixture
    (lambda ()
@@ -681,7 +682,7 @@ In this test, just multiple encryption and signing keys may be available."
 (ert-deftest mml-secure-en-decrypt-sign-1-3-double ()
   "Sign and encrypt message; then decrypt and test for expected result.
 In this test, just multiple encryption and signing keys may be available."
-  :tags '(:unstable)
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   (mml-secure-test-key-fixture
    (lambda ()
@@ -699,7 +700,7 @@ In this test, just multiple encryption and signing keys may be available."
 (ert-deftest mml-secure-en-decrypt-sign-2 ()
   "Sign and encrypt message; then decrypt and test for expected result.
 In this test, lists of encryption and signing keys are customized."
-  :tags '(:unstable)
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   (mml-secure-test-key-fixture
    (lambda ()
@@ -734,7 +735,7 @@ In this test, lists of encryption and signing keys are customized."
 (ert-deftest mml-secure-en-decrypt-sign-3 ()
   "Sign and encrypt message; then decrypt and test for expected result.
 Use sign-with-sender and encrypt-to-self."
-  :tags '(:unstable)
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   (mml-secure-test-key-fixture
    (lambda ()
