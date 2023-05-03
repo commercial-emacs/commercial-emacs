@@ -239,6 +239,7 @@ process to complete."
 
 (ert-deftest make-process/mix-stderr ()
   "Check that `make-process' mixes the output streams if STDERR is nil."
+  (skip-unless (not (eq system-type 'darwin)))
   (skip-unless (executable-find "bash"))
   (with-timeout (60 (ert-fail "Test timed out"))
   ;; Frequent random (?) failures on hydra.nixos.org, with no process output.

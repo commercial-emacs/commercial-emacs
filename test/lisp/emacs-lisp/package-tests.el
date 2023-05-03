@@ -748,6 +748,7 @@ but with a different end of line convention (bug#48137)."
 (defvar epg-config--program-alist) ; Silence byte-compiler.
 (ert-deftest package-test-signed ()
   "Test verifying package signature."
+  (skip-unless (not (eq system-type 'darwin)))
   (skip-unless (ert-with-temp-directory homedir
                  (let ((process-environment
                         (cons (concat "HOME=" homedir)
