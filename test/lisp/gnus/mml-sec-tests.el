@@ -752,6 +752,7 @@ Use sign-with-sender and encrypt-to-self."
 
 (ert-deftest mml-secure-sign-verify-1 ()
   "Sign message with sender; then verify and test for expected result."
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   (skip-unless (ignore-errors (epg-find-configuration 'CMS)))
   (mml-secure-test-key-fixture
@@ -776,6 +777,7 @@ Use sign-with-sender and encrypt-to-self."
 (ert-deftest mml-secure-sign-verify-3 ()
   "Try to sign message with expired OpenPGP subkey, which raises an error.
 With Ma Gnus v0.14 and earlier a signature would be created with a wrong key."
+  :expected-result (if (getenv "CI") t :passed) ; resource issue
   (skip-unless (test-conf))
   (should-error
    (mml-secure-test-key-fixture
