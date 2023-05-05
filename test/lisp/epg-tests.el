@@ -99,7 +99,7 @@
            ,@body)))))
 
 (ert-deftest epg-decrypt-1 ()
-  (skip-unless (or (not (getenv "CI")) (not (eq system-type 'darwin))))
+  (skip-unless (not (getenv "CI")))
   (with-epg-tests (:require-passphrase t)
     (should (equal "test"
 		   (epg-decrypt-string epg-tests-context "\
@@ -112,14 +112,14 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
 ")))))
 
 (ert-deftest epg-roundtrip-1 ()
-  (skip-unless (or (not (getenv "CI")) (not (eq system-type 'darwin))))
+  (skip-unless (not (getenv "CI")))
   (with-epg-tests (:require-passphrase t)
     (let ((cipher (epg-encrypt-string epg-tests-context "symmetric" nil)))
       (should (equal "symmetric"
 		     (epg-decrypt-string epg-tests-context cipher))))))
 
 (ert-deftest epg-roundtrip-2 ()
-  (skip-unless (or (not (getenv "CI")) (not (eq system-type 'darwin))))
+  (skip-unless (not (getenv "CI")))
   (with-epg-tests (:require-passphrase t
 		   :require-public-key t
 		   :require-secret-key t)
@@ -130,7 +130,7 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
 		     (epg-decrypt-string epg-tests-context cipher))))))
 
 (ert-deftest epg-sign-verify-1 ()
-  (skip-unless (or (not (getenv "CI")) (not (eq system-type 'darwin))))
+  (skip-unless (not (getenv "CI")))
   (with-epg-tests (:require-passphrase t
 		   :require-public-key t
 		   :require-secret-key t)
@@ -144,7 +144,7 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
       (should (eq 'good (epg-signature-status (car verify-result)))))))
 
 (ert-deftest epg-sign-verify-2 ()
-  (skip-unless (or (not (getenv "CI")) (not (eq system-type 'darwin))))
+  (skip-unless (not (getenv "CI")))
   (with-epg-tests (:require-passphrase t
 		   :require-public-key t
 		   :require-secret-key t)
@@ -160,7 +160,7 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
       (should (eq 'good (epg-signature-status (car verify-result)))))))
 
 (ert-deftest epg-sign-verify-3 ()
-  (skip-unless (or (not (getenv "CI")) (not (eq system-type 'darwin))))
+  (skip-unless (not (getenv "CI")))
   (with-epg-tests (:require-passphrase t
 		   :require-public-key t
 		   :require-secret-key t)
@@ -175,7 +175,7 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
       (should (eq 'good (epg-signature-status (car verify-result)))))))
 
 (ert-deftest epg-import-1 ()
-  (skip-unless (or (not (getenv "CI")) (not (eq system-type 'darwin))))
+  (skip-unless (not (getenv "CI")))
   (with-epg-tests (:require-passphrase nil)
     (should (= 0 (length (epg-list-keys epg-tests-context))))
     (should (= 0 (length (epg-list-keys epg-tests-context nil t)))))
