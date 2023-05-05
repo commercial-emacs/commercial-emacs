@@ -183,12 +183,6 @@ else
 testloadfile = $*
 endif
 
-%.log: %.elc
-	$(AM_V_at)${MKDIR_P} $(dir $@)
-	$(AM_V_GEN)HOME=$(TEST_HOME) $(emacs_env) $(GDB) $(emacs) \
-	  -l ert ${ert_opts} -l $(testloadfile) \
-	  $(TEST_RUN_ERT)
-
 ifeq (@HAVE_MODULES@, yes)
 maybe_exclude_module_tests :=
 else
@@ -199,7 +193,17 @@ ifeq ($(GITHUB_ACTIONS),true)
 ifeq (@SYSTEM_TYPE@, darwin)
 maybe_exclude_module_tests := -name emacs-module-tests.el -prune -o
 endif
+echo_done_test := @echo "  DONE    "
+else
+echo_done_test := @true
 endif
+
+%.log: %.elc
+	$(AM_V_at)${MKDIR_P} $(dir $@)
+	$(AM_V_GEN)HOME=$(TEST_HOME) $(emacs_env) $(GDB) $(emacs) \
+	  -l ert ${ert_opts} -l $(testloadfile) \
+	  $(TEST_RUN_ERT)
+	${echo_done_test} $@
 
 ## Optional list of .el files to exclude from testing.
 ## Intended for use in automated testing where one or more files
