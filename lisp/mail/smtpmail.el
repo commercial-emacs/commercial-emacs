@@ -205,217 +205,214 @@ for `smtpmail-try-auth-method'.")
   "Value to use for envelope-from address for mail from ambient buffer.")
 
 ;;; Functions
+(defun smtpmail-prepare-mail (tembuf smtpmail-code-conv-from)
+    (let ((case-fold-search nil)
+	  delimline
+	  (mailbuf (current-buffer))
+         ;; Examine this variable now, so that
+	 ;; local binding in the mail buffer will take effect.
+	 (smtpmail-mail-address
+          (save-restriction
+            ;; Only look at the headers when fetching the
+            ;; envelope address.
+            (message-narrow-to-headers)
+            (or (and mail-specify-envelope-from (mail-envelope-from))
+                (let ((from (mail-fetch-field "from")))
+	          (and from
+		       (cadr (mail-extract-address-components from))))
+	        (smtpmail-user-mail-address)))))
+    (with-current-buffer tembuf
+      (erase-buffer)
+      ;; Use the same `buffer-file-coding-system' as in the mail
+      ;; buffer, otherwise any `write-region' invocations (e.g., in
+      ;; mail-do-fcc below) will annoy with asking for a suitable
+      ;; encoding.
+      (set-buffer-file-coding-system smtpmail-code-conv-from nil t)
+      (insert-buffer-substring mailbuf)
+      (goto-char (point-max))
+      ;; require one newline at the end.
+      (or (= (preceding-char) ?\n)
+	  (insert ?\n))
+      ;; Change header-delimiter to be what sendmail expects.
+      (mail-sendmail-undelimit-header)
+      (setq delimline (point-marker))
+      (if mail-aliases
+	  (expand-mail-aliases (point-min) delimline))
+      (goto-char (point-min))
+      ;; ignore any blank lines in the header
+      (while (and (re-search-forward "\n\n\n*" delimline t)
+		  (< (point) delimline))
+	(replace-match "\n"))
+      (let ((case-fold-search t))
+	;; We used to process Resent-... headers here,
+	;; but it was not done properly, and the job
+	;; is done correctly in `smtpmail-deduce-address-list'.
+	;; Don't send out a blank subject line
+	(goto-char (point-min))
+	(if (re-search-forward "^Subject:\\([ \t]*\n\\)+\\b" delimline t)
+	    (replace-match "")
+	  ;; This one matches a Subject just before the header delimiter.
+	  (if (and (re-search-forward "^Subject:\\([ \t]*\n\\)+" delimline t)
+		   (= (match-end 0) delimline))
+	      (replace-match "")))
+	;; Put the "From:" field in unless for some odd reason
+	;; they put one in themselves.
+	(goto-char (point-min))
+	(if (not (re-search-forward "^From:" delimline t))
+	    (let* ((login smtpmail-mail-address)
+		   (fullname (user-full-name)))
+	      (cond ((eq mail-from-style 'angles)
+		     (insert "From: " fullname)
+		     (let ((fullname-start (+ (point-min) 6))
+			   (fullname-end (point-marker)))
+		       (goto-char fullname-start)
+		       ;; Look for a character that cannot appear unquoted
+		       ;; according to RFC 822 or its successors.
+		       (if (re-search-forward "[^- !#-'*+/-9=?A-Z^-~]"
+					      fullname-end 1)
+			   (progn
+			     ;; Quote fullname, escaping specials.
+			     (goto-char fullname-start)
+			     (insert "\"")
+			     (while (re-search-forward "[\"\\]"
+						       fullname-end 1)
+			       (replace-match "\\\\\\&" t))
+			     (insert "\""))))
+		     (insert " <" login ">\n"))
+		    ((eq mail-from-style 'parens)
+		     (insert "From: " login " (")
+		     (let ((fullname-start (point)))
+		       (insert fullname)
+		       (let ((fullname-end (point-marker)))
+			 (goto-char fullname-start)
+			 ;; RFC 822 and its successors say \ and
+			 ;; nonmatching parentheses must be
+			 ;; escaped in comments.
+			 ;; Escape every instance of ()\ ...
+			 (while (re-search-forward "[()\\]" fullname-end 1)
+			   (replace-match "\\\\\\&" t))
+			 ;; ... then undo escaping of matching parentheses,
+			 ;; including matching nested parentheses.
+			 (goto-char fullname-start)
+			 (while (re-search-forward
+				 "\\(\\=\\|[^\\]\\(\\\\\\\\\\)*\\)\\\\(\\(\\([^\\]\\|\\\\\\\\\\)*\\)\\\\)"
+				 fullname-end 1)
+			   (replace-match "\\1(\\3)" t)
+			   (goto-char fullname-start))))
+		     (insert ")\n"))
+		    ((null mail-from-style)
+		     (insert "From: " login "\n")))))
+	;; Insert a `Message-Id:' field if there isn't one yet.
+	(goto-char (point-min))
+	(unless (re-search-forward "^Message-Id:" delimline t)
+	  (insert "Message-Id: " (message-make-message-id) "\n"))
+	;; Insert a `Date:' field if there isn't one yet.
+	(goto-char (point-min))
+	(unless (re-search-forward "^Date:" delimline t)
+	  (insert "Date: " (message-make-date) "\n"))
+	;; Possibly add a MIME header for the current coding system
+	(let (charset)
+	  (goto-char (point-min))
+	  (and (eq mail-send-nonascii 'mime)
+	       (not (re-search-forward "^MIME-version:" delimline t))
+	       (progn (skip-chars-forward "\0-\177")
+		      (/= (point) (point-max)))
+	       smtpmail-code-conv-from
+	       (setq charset
+		     (coding-system-get smtpmail-code-conv-from
+					'mime-charset))
+	       (goto-char delimline)
+	       (insert "MIME-version: 1.0\n"
+		       "Content-type: text/plain; charset="
+		       (symbol-name charset)
+		       "\nContent-Transfer-Encoding: 8bit\n")))
+	;; Insert an extra newline if we need it to work around
+	;; Sun's bug that swallows newlines.
+	(goto-char (1+ delimline))
+	;; Find and handle any Fcc fields.
+	(goto-char (point-min))
+	(if (re-search-forward "^Fcc:" delimline t)
+	    ;; Force `mail-do-fcc' to use the encoding of the mail
+	    ;; buffer to encode outgoing messages on Fcc files.
+	    (let ((coding-system-for-write
+		   ;; mbox files must have Unix EOLs.
+		   (coding-system-change-eol-conversion
+		    smtpmail-code-conv-from 'unix)))
+	      (mail-do-fcc delimline))))
+      ;; Encode the header according to RFC2047.
+      (mail-encode-header (point-min) delimline)
+      ;;
+      (setq smtpmail-address-buffer (generate-new-buffer "*smtp-mail*"))
+      (setq smtpmail-recipient-address-list
+            (smtpmail-deduce-address-list tembuf (point-min) delimline))
+      (kill-buffer smtpmail-address-buffer)
+
+      (smtpmail-do-bcc delimline))))
+
+(defun smtpmail-queue-mail (tembuf smtpmail-code-conv-from)
+  (let* ((file-data
+	  (expand-file-name
+	   (format "%s_%i"
+		   (format-time-string "%Y-%m-%d_%H:%M:%S")
+		   (setq smtpmail-queue-counter
+			 (1+ smtpmail-queue-counter)))
+	   smtpmail-queue-dir))
+	 (file-data (convert-standard-filename file-data))
+	 (file-elisp (concat file-data ".el"))
+	 (buffer-data (create-file-buffer file-data)))
+    (unless (file-exists-p smtpmail-queue-dir)
+      (make-directory smtpmail-queue-dir t))
+    (with-current-buffer buffer-data
+      (erase-buffer)
+      (set-buffer-file-coding-system
+       ;; We will be reading the file with no-conversion in
+       ;; smtpmail-send-queued-mail below, so write it out
+       ;; with Unix EOLs.
+       (coding-system-change-eol-conversion
+	(or smtpmail-code-conv-from 'undecided)
+	'unix)
+       nil t)
+      (insert-buffer-substring tembuf)
+      (write-file file-data)
+      (let ((coding-system-for-write 'utf-8))
+        (with-temp-buffer
+          (insert "(setq ")
+          (dolist (var (cons 'smtpmail-recipient-address-list
+                             ;; Perhaps store the server etc.
+                             (and smtpmail-store-queue-variables
+                                  smtpmail--stored-queue-variables)))
+            (insert (format "     %s %S\n" var (symbol-value var))))
+          (insert ")\n")
+          (write-region (point-min) (point-max) file-elisp
+                        nil 'silent)))
+      (write-region (concat file-data "\n") nil
+                    (expand-file-name smtpmail-queue-index-file
+                                      smtpmail-queue-dir)
+                    t 'silent))
+    (kill-buffer buffer-data)))
+
+(defun smtpmail-send-mail (tembuf)
+  (if (not (null smtpmail-recipient-address-list))
+      (when (setq result
+                  (smtpmail-via-smtp
+                   smtpmail-recipient-address-list tembuf))
+        (error "Sending failed: %s"
+               (smtpmail--sanitize-error-message result)))
+    (error "Sending failed; no recipients")))
 
 ;;;###autoload
 (defun smtpmail-send-it ()
-  (let ((errbuf (if mail-interactive
-		    (generate-new-buffer " smtpmail errors")
-		  0))
-	(tembuf (generate-new-buffer " smtpmail temp"))
-	(case-fold-search nil)
-	delimline
-	result
-	(mailbuf (current-buffer))
-        ;; Examine this variable now, so that
-	;; local binding in the mail buffer will take effect.
-	(smtpmail-mail-address
-         (save-restriction
-           ;; Only look at the headers when fetching the
-           ;; envelope address.
-           (message-narrow-to-headers)
-           (or (and mail-specify-envelope-from (mail-envelope-from))
-               (let ((from (mail-fetch-field "from")))
-	         (and from
-		      (cadr (mail-extract-address-components from))))
-	       (smtpmail-user-mail-address))))
-	(smtpmail-code-conv-from
-	 (if enable-multibyte-characters
-	     (let ((sendmail-coding-system smtpmail-code-conv-from))
-	       (select-message-coding-system)))))
+  (let ((tembuf (generate-new-buffer " smtpmail temp")))
     (unwind-protect
-	(with-current-buffer tembuf
-	  (erase-buffer)
-	  ;; Use the same `buffer-file-coding-system' as in the mail
-	  ;; buffer, otherwise any `write-region' invocations (e.g., in
-	  ;; mail-do-fcc below) will annoy with asking for a suitable
-	  ;; encoding.
-	  (set-buffer-file-coding-system smtpmail-code-conv-from nil t)
-	  (insert-buffer-substring mailbuf)
-	  (goto-char (point-max))
-	  ;; require one newline at the end.
-	  (or (= (preceding-char) ?\n)
-	      (insert ?\n))
-	  ;; Change header-delimiter to be what sendmail expects.
-	  (mail-sendmail-undelimit-header)
-	  (setq delimline (point-marker))
-          ;; (sendmail-synch-aliases)
-	  (if mail-aliases
-	      (expand-mail-aliases (point-min) delimline))
-	  (goto-char (point-min))
-	  ;; ignore any blank lines in the header
-	  (while (and (re-search-forward "\n\n\n*" delimline t)
-		      (< (point) delimline))
-	    (replace-match "\n"))
-	  (let ((case-fold-search t))
-	    ;; We used to process Resent-... headers here,
-	    ;; but it was not done properly, and the job
-	    ;; is done correctly in `smtpmail-deduce-address-list'.
-	    ;; Don't send out a blank subject line
-	    (goto-char (point-min))
-	    (if (re-search-forward "^Subject:\\([ \t]*\n\\)+\\b" delimline t)
-		(replace-match "")
-	      ;; This one matches a Subject just before the header delimiter.
-	      (if (and (re-search-forward "^Subject:\\([ \t]*\n\\)+" delimline t)
-		       (= (match-end 0) delimline))
-		  (replace-match "")))
-	    ;; Put the "From:" field in unless for some odd reason
-	    ;; they put one in themselves.
-	    (goto-char (point-min))
-	    (if (not (re-search-forward "^From:" delimline t))
-		(let* ((login smtpmail-mail-address)
-		       (fullname (user-full-name)))
-		  (cond ((eq mail-from-style 'angles)
-			 (insert "From: " fullname)
-			 (let ((fullname-start (+ (point-min) 6))
-			       (fullname-end (point-marker)))
-			   (goto-char fullname-start)
-			   ;; Look for a character that cannot appear unquoted
-			   ;; according to RFC 822 or its successors.
-			   (if (re-search-forward "[^- !#-'*+/-9=?A-Z^-~]"
-						  fullname-end 1)
-			       (progn
-				 ;; Quote fullname, escaping specials.
-				 (goto-char fullname-start)
-				 (insert "\"")
-				 (while (re-search-forward "[\"\\]"
-							   fullname-end 1)
-				   (replace-match "\\\\\\&" t))
-				 (insert "\""))))
-			 (insert " <" login ">\n"))
-			((eq mail-from-style 'parens)
-			 (insert "From: " login " (")
-			 (let ((fullname-start (point)))
-			   (insert fullname)
-			   (let ((fullname-end (point-marker)))
-			     (goto-char fullname-start)
-			     ;; RFC 822 and its successors say \ and
-			     ;; nonmatching parentheses must be
-			     ;; escaped in comments.
-			     ;; Escape every instance of ()\ ...
-			     (while (re-search-forward "[()\\]" fullname-end 1)
-			       (replace-match "\\\\\\&" t))
-			     ;; ... then undo escaping of matching parentheses,
-			     ;; including matching nested parentheses.
-			     (goto-char fullname-start)
-			     (while (re-search-forward
-				     "\\(\\=\\|[^\\]\\(\\\\\\\\\\)*\\)\\\\(\\(\\([^\\]\\|\\\\\\\\\\)*\\)\\\\)"
-				     fullname-end 1)
-			       (replace-match "\\1(\\3)" t)
-			       (goto-char fullname-start))))
-			 (insert ")\n"))
-			((null mail-from-style)
-			 (insert "From: " login "\n")))))
-	    ;; Insert a `Message-Id:' field if there isn't one yet.
-	    (goto-char (point-min))
-	    (unless (re-search-forward "^Message-Id:" delimline t)
-	      (insert "Message-Id: " (message-make-message-id) "\n"))
-	    ;; Insert a `Date:' field if there isn't one yet.
-	    (goto-char (point-min))
-	    (unless (re-search-forward "^Date:" delimline t)
-	      (insert "Date: " (message-make-date) "\n"))
-	    ;; Possibly add a MIME header for the current coding system
-	    (let (charset)
-	      (goto-char (point-min))
-	      (and (eq mail-send-nonascii 'mime)
-		   (not (re-search-forward "^MIME-version:" delimline t))
-		   (progn (skip-chars-forward "\0-\177")
-			  (/= (point) (point-max)))
-		   smtpmail-code-conv-from
-		   (setq charset
-			 (coding-system-get smtpmail-code-conv-from
-					    'mime-charset))
-		   (goto-char delimline)
-		   (insert "MIME-version: 1.0\n"
-			   "Content-type: text/plain; charset="
-			   (symbol-name charset)
-			   "\nContent-Transfer-Encoding: 8bit\n")))
-	    ;; Insert an extra newline if we need it to work around
-	    ;; Sun's bug that swallows newlines.
-	    (goto-char (1+ delimline))
-	    ;; Find and handle any Fcc fields.
-	    (goto-char (point-min))
-	    (if (re-search-forward "^Fcc:" delimline t)
-		;; Force `mail-do-fcc' to use the encoding of the mail
-		;; buffer to encode outgoing messages on Fcc files.
-		(let ((coding-system-for-write
-		       ;; mbox files must have Unix EOLs.
-		       (coding-system-change-eol-conversion
-			smtpmail-code-conv-from 'unix)))
-		  (mail-do-fcc delimline)))
-	    (if mail-interactive
-		(with-current-buffer errbuf
-		  (erase-buffer))))
-	  ;; Encode the header according to RFC2047.
-	  (mail-encode-header (point-min) delimline)
-	  ;;
-	  (setq smtpmail-address-buffer (generate-new-buffer "*smtp-mail*"))
-	  (setq smtpmail-recipient-address-list
-                (smtpmail-deduce-address-list tembuf (point-min) delimline))
-	  (kill-buffer smtpmail-address-buffer)
-
-	  (smtpmail-do-bcc delimline)
-          ;; Send or queue
-	  (if (not smtpmail-queue-mail)
-	      (if (not (null smtpmail-recipient-address-list))
-		  (when (setq result
-			      (smtpmail-via-smtp
-			       smtpmail-recipient-address-list tembuf))
-		    (error "Sending failed: %s"
-                           (smtpmail--sanitize-error-message result)))
-		(error "Sending failed; no recipients"))
-	    (let* ((file-data
-		    (expand-file-name
-		     (format "%s_%i"
-			     (format-time-string "%Y-%m-%d_%H:%M:%S")
-			     (setq smtpmail-queue-counter
-				   (1+ smtpmail-queue-counter)))
-		     smtpmail-queue-dir))
-		   (file-data (convert-standard-filename file-data))
-		   (file-elisp (concat file-data ".el"))
-		   (buffer-data (create-file-buffer file-data)))
-	      (unless (file-exists-p smtpmail-queue-dir)
-		(make-directory smtpmail-queue-dir t))
-	      (with-current-buffer buffer-data
-		(erase-buffer)
-		(set-buffer-file-coding-system
-		 ;; We will be reading the file with no-conversion in
-		 ;; smtpmail-send-queued-mail below, so write it out
-		 ;; with Unix EOLs.
-		 (coding-system-change-eol-conversion
-		  (or smtpmail-code-conv-from 'undecided)
-		  'unix)
-		 nil t)
-		(insert-buffer-substring tembuf)
-		(write-file file-data)
-                (let ((coding-system-for-write 'utf-8))
-                  (with-temp-buffer
-                    (insert "(setq ")
-                    (dolist (var (cons 'smtpmail-recipient-address-list
-                                       ;; Perhaps store the server etc.
-                                       (and smtpmail-store-queue-variables
-                                            smtpmail--stored-queue-variables)))
-                      (insert (format "     %s %S\n" var (symbol-value var))))
-                    (insert ")\n")
-                    (write-region (point-min) (point-max) file-elisp
-                                  nil 'silent)))
-		(write-region (concat file-data "\n") nil
-                              (expand-file-name smtpmail-queue-index-file
-                                                smtpmail-queue-dir)
-                              t 'silent))
-	      (kill-buffer buffer-data))))
-      (kill-buffer tembuf)
-      (if (bufferp errbuf)
-	  (kill-buffer errbuf)))))
+        (let ((smtpmail-code-conv-from
+	       (if enable-multibyte-characters
+	           (let ((sendmail-coding-system smtpmail-code-conv-from))
+	             (select-message-coding-system)))))
+          (smtpmail-prepare-mail tembuf smtpmail-code-conv-from)
+          (if smtpmail-queue-mail
+              (smtpmail-queue-mail tembuf smtpmail-code-conv-from)
+            (smtpmail-send-mail tembuf)))
+      (kill-buffer tembuf))))
 
 ;;;###autoload
 (defun smtpmail-send-queued-mail ()
