@@ -171,10 +171,16 @@ else
 WRITE_LOG =
 endif
 endif
-## On Emba, always show logs for certain problematic tests.
+
+## Always show logs for certain problematic tests.
 ifdef EMACS_EMBA_CI
 lisp/filenotify-tests.log lisp/net/tramp-tests.log src/emacs-module-tests.log \
 : WRITE_LOG = 2>&1 | tee $@
+endif
+
+## Temporary until we figure this out
+ifeq ($(GITHUB_ACTIONS),true)
+src/process-tests.log : WRITE_LOG = 2>&1 | tee $@
 endif
 
 ifeq ($(TEST_LOAD_EL), yes)
