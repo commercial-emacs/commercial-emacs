@@ -908,8 +908,8 @@ have written output."
                            (list (list process "finished\n"))))))))))
 
 (ert-deftest process-tests/multiple-threads-waiting ()
-  :tags (if (getenv "EMACS_EMBA_CI") '(:unstable))
   (skip-unless (fboundp 'make-thread))
+  (skip-unless (not (getenv "CI")))
   (with-timeout (60 (ert-fail "Test timed out"))
     (process-tests--with-processes processes
       (let ((threads ())
@@ -1028,7 +1028,7 @@ Return nil if FILENAME doesn't exist."
 
 (ert-deftest process-async-https-with-delay ()
   "Bug#49449: asynchronous TLS connection with delayed completion."
-  :tags (when (getenv "CI") '(:unstable))
+  (skip-unless (not (getenv "CI")))
   (skip-unless (and internet-is-working (gnutls-available-p)))
   (let* (status
          (network-security-level 'low)
