@@ -76,7 +76,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    where each successive RULE describes how to compose its CHARACTER
    with those preceding it in the sequence.
 
-   COMPONENTS-VEC is  vector of characters (integers) to be
+   COMPONENTS-VEC is a vector of characters (integers) to be
    composed in a relative composition (see above), or a facsimile
    of COMPONENTS otherwise.
 
