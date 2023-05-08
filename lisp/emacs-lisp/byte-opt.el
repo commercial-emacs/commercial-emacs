@@ -1887,8 +1887,6 @@ See Info node `(elisp) Integer Basics'."
          ;; window.c
          selected-window window-configuration-p window-live-p window-valid-p
          windowp
-         ;; xdisp.c
-         long-line-optimizations-p
          )))
   (while side-effect-free-fns
     (put (car side-effect-free-fns) 'side-effect-free t)
