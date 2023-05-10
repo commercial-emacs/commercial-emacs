@@ -2930,16 +2930,6 @@ Return value is undefined if the last search failed.  */)
   return reuse;
 }
 
-/* We used to have an internal use variant of `reseat' described as:
-
-      If RESEAT is `evaporate', put the markers back on the free list
-      immediately.  No other references to the markers must exist in this
-      case, so it is used only internally on the unwind stack and
-      save-match-data from Lisp.
-
-   But it was ill-conceived: those supposedly-internal markers get exposed via
-   the undo-list, so freeing them here is unsafe.  */
-
 DEFUN ("set-match-data", Fset_match_data, Sset_match_data, 1, 2, 0,
        doc: /* Set internal data on last search match from elements of LIST.
 LIST should have been created by calling `match-data' previously.

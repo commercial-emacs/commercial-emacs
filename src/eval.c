@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "pdumper.h"
 #include "atimer.h"
+#include "syntax.h"
 
 /* CACHEABLE is ordinarily nothing, except it is 'volatile' if
    necessary to cajole GCC into not warning incorrectly that a
@@ -500,7 +501,7 @@ usage: (setq [SYM VAL]...)  */)
   return val;
 }
 
-DEFUN ("quote", Fquote, Squote, 1, UNEVALLED, 0,
+DEFUN ("quote", Fquote, Squote_, 1, UNEVALLED, 0,
        doc: /* Return the argument, without evaluating it.  `(quote x)' yields `x'.
 Warning: `quote' does not construct its return value, but just returns
 the value that was pre-constructed by the Lisp reader (see info node
@@ -1068,7 +1069,9 @@ usage: (while TEST BODY...)  */)
 static void
 with_delayed_message_display (struct atimer *timer)
 {
+  const struct gl_state_s restore_gl_state = gl_state;
   message3 (build_string (timer->client_data));
+  gl_state = restore_gl_state;
 }
 
 static void
@@ -4347,7 +4350,7 @@ alist of active lexical bindings.  */);
   defsubr (&Sprogn);
   defsubr (&Sprog1);
   defsubr (&Ssetq);
-  defsubr (&Squote);
+  defsubr (&Squote_);
   defsubr (&Sfunction);
   defsubr (&Sdefault_toplevel_value);
   defsubr (&Sset_default_toplevel_value);
