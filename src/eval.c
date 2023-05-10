@@ -1067,11 +1067,19 @@ usage: (while TEST BODY...)  */)
 }
 
 static void
+restore_gl_state (void *state)
+{
+  gl_state = *(struct gl_state_s *)state;
+}
+
+static void
 with_delayed_message_display (struct atimer *timer)
 {
-  const struct gl_state_s restore_gl_state = gl_state;
+  specpdl_ref count = SPECPDL_INDEX ();
+  struct gl_state_s restore_state = gl_state;
+  record_unwind_protect_ptr (restore_gl_state, &restore_state);
   message3 (build_string (timer->client_data));
-  gl_state = restore_gl_state;
+  unbind_to (count, Qnil);
 }
 
 static void
