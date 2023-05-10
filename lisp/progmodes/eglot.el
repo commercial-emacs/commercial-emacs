@@ -854,6 +854,37 @@ ACTION is an LSP object of either `CodeAction' or `Command' type."
                      :name (abbreviate-file-name dir)))
              `(,(project-root project) ,@(project-external-roots project))))))
 
+(cl-defgeneric eglot-apply-text-edits (_server edits &optional version)
+  "Apply EDITS for current buffer if at VERSION, or if it's nil."
+  (when edits
+    (unless (or (not version) (equal version eglot--versioned-identifier))
+      (jsonrpc-error "Edits on `%s' require version %d, you have %d"
+                     (current-buffer) version eglot--versioned-identifier))
+    (atomic-change-group
+      (let* ((change-group (prepare-change-group))
+             (howmany (length edits))
+             (reporter (make-progress-reporter
+                        (format "[eglot] applying %s edits to `%s'..."
+                                howmany (current-buffer))
+                        0 howmany))
+             (done 0))
+        (mapc (pcase-lambda (`(,newText ,beg . ,end))
+                (let ((source (current-buffer)))
+                  (with-temp-buffer
+                    (insert newText)
+                    (let ((temp (current-buffer)))
+                      (with-current-buffer source
+                        (save-excursion
+                          (save-restriction
+                            (narrow-to-region beg end)
+                            (replace-buffer-contents temp)))
+                        (eglot--reporter-update reporter (cl-incf done)))))))
+              (mapcar (eglot--lambda ((TextEdit) range newText)
+                        (cons newText (eglot--range-region range 'markers)))
+                      (reverse edits)))
+        (undo-amalgamate-change-group change-group)
+        (progress-reporter-done reporter)))))
+
 (defclass eglot-lsp-server (jsonrpc-process-connection)
   ((project-nickname
     :documentation "Short nickname for the associated project."
@@ -2653,9 +2684,9 @@ When called interactively, use the currently active server"
       (jsonrpc-notify server :textDocument/willSave params))
     (when (eglot--server-capable :textDocumentSync :willSaveWaitUntil)
       (ignore-errors
-        (eglot--apply-text-edits
-         (eglot--request server :textDocument/willSaveWaitUntil params
-                         :timeout 0.5))))))
+        (eglot-apply-text-edits
+         server (eglot--request server :textDocument/willSaveWaitUntil params
+                                :timeout 0.5))))))
 
 (defun eglot--signal-textDocument/didSave ()
   "Maybe send textDocument/didSave to server."
@@ -2918,11 +2949,13 @@ for which LSP on-type-formatting should be requested."
                    (:range ,(list :start (eglot--pos-to-lsp-position beg)
                                   :end (eglot--pos-to-lsp-position end)))))
                 (t
-                 '(:textDocument/formatting :documentFormattingProvider nil)))))
+                 '(:textDocument/formatting :documentFormattingProvider nil))))
+              (server (eglot--current-server-or-lose)))
     (eglot--server-capable-or-lose cap)
-    (eglot--apply-text-edits
+    (eglot-apply-text-edits
+     server
      (eglot--request
-      (eglot--current-server-or-lose)
+      server
       method
       (cl-list*
        :textDocument (eglot--TextDocumentIdentifier)
@@ -3145,7 +3178,7 @@ for which LSP on-type-formatting should be requested."
                         (delete-region (- (point) (length proxy)) (point))
                         (funcall snippet-fn (or insertText label))))
                  (when (cl-plusp (length additionalTextEdits))
-                   (eglot--apply-text-edits additionalTextEdits)))
+                   (eglot-apply-text-edits server additionalTextEdits)))
                (eglot--signal-textDocument/didChange)))))))))
 
 (defun eglot--hover-info (contents &optional _range)
@@ -3324,37 +3357,6 @@ Returns a list as described in docstring of `imenu--index-alist'."
         (((SymbolInformation)) (eglot--imenu-SymbolInformation res))
         (((DocumentSymbol)) (eglot--imenu-DocumentSymbol res))))))
 
-(cl-defun eglot--apply-text-edits (edits &optional version)
-  "Apply EDITS for current buffer if at VERSION, or if it's nil."
-  (unless edits (cl-return-from eglot--apply-text-edits))
-  (unless (or (not version) (equal version eglot--versioned-identifier))
-    (jsonrpc-error "Edits on `%s' require version %d, you have %d"
-                   (current-buffer) version eglot--versioned-identifier))
-  (atomic-change-group
-    (let* ((change-group (prepare-change-group))
-           (howmany (length edits))
-           (reporter (make-progress-reporter
-                      (format "[eglot] applying %s edits to `%s'..."
-                              howmany (current-buffer))
-                      0 howmany))
-           (done 0))
-      (mapc (pcase-lambda (`(,newText ,beg . ,end))
-              (let ((source (current-buffer)))
-                (with-temp-buffer
-                  (insert newText)
-                  (let ((temp (current-buffer)))
-                    (with-current-buffer source
-                      (save-excursion
-                        (save-restriction
-                          (narrow-to-region beg end)
-                          (replace-buffer-contents temp)))
-                      (eglot--reporter-update reporter (cl-incf done)))))))
-            (mapcar (eglot--lambda ((TextEdit) range newText)
-                      (cons newText (eglot--range-region range 'markers)))
-                    (reverse edits)))
-      (undo-amalgamate-change-group change-group)
-      (progress-reporter-done reporter))))
-
 (defun eglot--apply-workspace-edit (wedit &optional confirm)
   "Apply the workspace edit WEDIT.  If CONFIRM, ask user first."
   (eglot--dbind ((WorkspaceEdit) changes documentChanges) wedit
@@ -3380,7 +3382,8 @@ Returns a list as described in docstring of `imenu--index-alist'."
       (cl-loop for edit in prepared
                for (path edits version) = edit
                do (with-current-buffer (find-file-noselect path)
-                    (eglot--apply-text-edits edits version))
+                    (eglot-apply-text-edits (eglot--current-server-or-lose)
+                                            edits version))
                finally (eldoc) (eglot--message "Edit successful!")))))
 
 (defun eglot-rename (newname)
