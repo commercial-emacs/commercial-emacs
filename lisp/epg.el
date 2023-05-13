@@ -726,10 +726,10 @@ callback data (if any)."
   (with-temp-buffer
     (if (fboundp 'set-buffer-multibyte)
 	(set-buffer-multibyte nil))
-    (if (file-exists-p (epg-context-output-file context))
-	(let ((coding-system-for-read 'binary))
-	  (insert-file-contents (epg-context-output-file context))
-	  (buffer-string)))))
+    (when (file-exists-p (epg-context-output-file context))
+      (let ((coding-system-for-read 'binary))
+	(insert-file-contents (epg-context-output-file context))
+	(buffer-string)))))
 
 (defun epg-wait-for-status (context status-list)
   "Wait until one of elements in STATUS-LIST arrives."
@@ -744,26 +744,29 @@ callback data (if any)."
 	 (cons '(exit)
 	       (epg-context-result-for context 'error))))))
 
-(defun epg-wait-for-completion (context)
+(defmacro epg-wait-for-completion (context &rest body)
   "Wait until the `epg-gpg-program' process completes."
-  (while (eq (process-status (epg-context-process context)) 'run)
-    (accept-process-output (epg-context-process context) 1))
-  ;; This line is needed to run the process-filter right now.
-  (sleep-for 0.1)
-  ;; Restore Emacs frame on text terminal, when pinentry-curses has terminated.
-  (if (with-current-buffer (process-buffer (epg-context-process context))
-	(and epg-agent-file
-	     (time-less-p epg-agent-mtime
-			  (or (file-attribute-modification-time
-			       (file-attributes epg-agent-file))
-			      0))))
-      (redraw-frame))
-  (epg-context-set-result-for
-   context 'error
-   (nreverse (epg-context-result-for context 'error)))
-  (setf (epg-context-error-output context)
-	(with-current-buffer (epg-context-error-buffer context)
-	  (buffer-string))))
+  (declare (indent defun))
+  `(progn
+     ,@body
+     (while (eq (process-status (epg-context-process ,context)) 'run)
+       (accept-process-output (epg-context-process ,context) 0.3))
+     (when-let ((output-file (epg-context-output-file ,context)))
+       (while (not (file-exists-p output-file))
+         (accept-process-output (epg-context-process ,context) 0.3)))
+     ;; Restore Emacs frame on text terminal, when pinentry-curses has terminated.
+     (when (with-current-buffer (process-buffer (epg-context-process ,context))
+	     (when-let ((agent-p epg-agent-file)
+                        (mtime (file-attribute-modification-time
+			        (file-attributes epg-agent-file))))
+               (time-less-p epg-agent-mtime mtime)))
+       (redraw-frame))
+     (epg-context-set-result-for
+      ,context 'error
+      (nreverse (epg-context-result-for ,context 'error)))
+     (setf (epg-context-error-output ,context)
+	   (with-current-buffer (epg-context-error-buffer ,context)
+	     (buffer-string)))))
 
 (defun epg-reset (context)
   "Reset the CONTEXT."
@@ -777,9 +780,9 @@ callback data (if any)."
 
 (defun epg-delete-output-file (context)
   "Delete the output file of CONTEXT."
-  (if (and (epg-context-output-file context)
-	   (file-exists-p (epg-context-output-file context)))
-      (delete-file (epg-context-output-file context))))
+  (when (and (epg-context-output-file context)
+	     (file-exists-p (epg-context-output-file context)))
+    (delete-file (epg-context-output-file context))))
 
 (defun epg--status-USERID_HINT (_context string)
   (if (string-match "\\`\\([^ ]+\\) \\(.*\\)" string)
@@ -1465,8 +1468,8 @@ If PLAIN is nil, it returns the result as a string."
       (progn
 	(setf (epg-context-output-file context)
               (or plain (make-temp-file "epg-output")))
-	(epg-start-decrypt context (epg-make-data-from-file cipher))
-	(epg-wait-for-completion context)
+	(epg-wait-for-completion context
+          (epg-start-decrypt context (epg-make-data-from-file cipher)))
 	(epg--check-error-for-decrypt context)
 	(unless plain
 	  (epg-read-output context)))
@@ -1483,8 +1486,8 @@ If PLAIN is nil, it returns the result as a string."
 	  (write-region cipher nil input-file nil 'quiet)
 	  (setf (epg-context-output-file context)
                 (make-temp-file "epg-output"))
-	  (epg-start-decrypt context (epg-make-data-from-file input-file))
-	  (epg-wait-for-completion context)
+          (epg-wait-for-completion context
+	    (epg-start-decrypt context (epg-make-data-from-file input-file)))
 	  (epg--check-error-for-decrypt context)
 	  (epg-read-output context))
       (epg-delete-output-file context)
@@ -1550,13 +1553,13 @@ which will return a list of `epg-signature' object."
       (progn
         (setf (epg-context-output-file context)
               (or plain (make-temp-file "epg-output")))
-	(if signed-text
+        (epg-wait-for-completion context
+	  (if signed-text
+	      (epg-start-verify context
+			        (epg-make-data-from-file signature)
+			        (epg-make-data-from-file signed-text))
 	    (epg-start-verify context
-			      (epg-make-data-from-file signature)
-			      (epg-make-data-from-file signed-text))
-	  (epg-start-verify context
-			    (epg-make-data-from-file signature)))
-	(epg-wait-for-completion context)
+			      (epg-make-data-from-file signature))))
 	(unless plain
 	  (epg-read-output context)))
     (unless plain
@@ -1587,15 +1590,15 @@ which will return a list of `epg-signature' object."
 	(progn
 	  (setf (epg-context-output-file context)
                 (make-temp-file "epg-output"))
-	  (if signed-text
-	      (progn
-		(setq input-file (make-temp-file "epg-signature"))
-		(write-region signature nil input-file nil 'quiet)
-		(epg-start-verify context
-				  (epg-make-data-from-file input-file)
-				  (epg-make-data-from-string signed-text)))
-	    (epg-start-verify context (epg-make-data-from-string signature)))
-	  (epg-wait-for-completion context)
+          (epg-wait-for-completion context
+	    (if signed-text
+	        (progn
+		  (setq input-file (make-temp-file "epg-signature"))
+		  (write-region signature nil input-file nil 'quiet)
+		  (epg-start-verify context
+				    (epg-make-data-from-file input-file)
+				    (epg-make-data-from-string signed-text)))
+	      (epg-start-verify context (epg-make-data-from-string signature))))
 	  (epg-read-output context))
       (epg-delete-output-file context)
       (if (and input-file
@@ -1661,12 +1664,12 @@ If it is nil or `normal', it makes a normal signature.
 Otherwise, it makes a cleartext signature."
   (unwind-protect
       (progn
-        (setf (epg-context-output-file context)
-              (or signature (make-temp-file "epg-output")))
-	(epg-start-sign context (epg-make-data-from-file plain) mode)
-	(epg-wait-for-completion context)
+        (when signature
+          (setf (epg-context-output-file context) signature))
+        (epg-wait-for-completion context
+	  (epg-start-sign context (epg-make-data-from-file plain) mode))
 	(unless (epg-context-result-for context 'sign)
-	  (let ((errors (epg-context-result-for context 'error)))
+	  (when-let ((errors (epg-context-result-for context 'error)))
 	    (signal 'epg-error
 		    (list "Sign failed" (epg-errors-to-string errors)))))
 	(unless signature
@@ -1688,17 +1691,17 @@ Otherwise, it makes a cleartext signature."
 	(progn
 	  (setf (epg-context-output-file context)
                 (make-temp-file "epg-output"))
-	  (if input-file
-	      (write-region plain nil input-file nil 'quiet))
-	  (epg-start-sign context
-			  (if input-file
-			      (epg-make-data-from-file input-file)
-			    (epg-make-data-from-string plain))
-			  mode)
-	  (epg-wait-for-completion context)
+	  (when input-file
+	    (write-region plain nil input-file nil 'quiet))
+          (epg-wait-for-completion context
+	    (epg-start-sign context
+			    (if input-file
+			        (epg-make-data-from-file input-file)
+			      (epg-make-data-from-string plain))
+			    mode))
 	  (unless (epg-context-result-for context 'sign)
 	    (if (epg-context-result-for context 'error)
-		(let ((errors (epg-context-result-for context 'error)))
+		(when-let ((errors (epg-context-result-for context 'error)))
 		  (signal 'epg-error
 			  (list "Sign failed" (epg-errors-to-string errors))))
               (signal 'epg-error '("Signing failed (unknown reason)"))))
@@ -1772,17 +1775,17 @@ If RECIPIENTS is nil, it performs symmetric encryption."
       (progn
         (setf (epg-context-output-file context)
               (or cipher (make-temp-file "epg-output")))
-	(epg-start-encrypt context (epg-make-data-from-file plain)
-			   recipients sign always-trust)
-	(epg-wait-for-completion context)
+        (epg-wait-for-completion context
+	  (epg-start-encrypt context (epg-make-data-from-file plain)
+			     recipients sign always-trust))
 	(let ((errors (epg-context-result-for context 'error)))
-	  (if (and sign
-		   (not (epg-context-result-for context 'sign)))
-	      (signal 'epg-error
-		      (list "Sign failed" (epg-errors-to-string errors))))
-	  (if errors
-	      (signal 'epg-error
-		      (list "Encrypt failed" (epg-errors-to-string errors)))))
+	  (when (and sign
+		     (not (epg-context-result-for context 'sign)))
+	    (signal 'epg-error
+		    (list "Sign failed" (epg-errors-to-string errors))))
+	  (when errors
+	    (signal 'epg-error
+		    (list "Encrypt failed" (epg-errors-to-string errors)))))
 	(unless cipher
 	  (epg-read-output context)))
     (unless cipher
@@ -1802,22 +1805,22 @@ If RECIPIENTS is nil, it performs symmetric encryption."
 	(progn
 	  (setf (epg-context-output-file context)
                 (make-temp-file "epg-output"))
-	  (if input-file
-	      (write-region plain nil input-file nil 'quiet))
-	  (epg-start-encrypt context
-			     (if input-file
-				 (epg-make-data-from-file input-file)
-			       (epg-make-data-from-string plain))
-			     recipients sign always-trust)
-	  (epg-wait-for-completion context)
+	  (when input-file
+	    (write-region plain nil input-file nil 'quiet))
+          (epg-wait-for-completion context
+	    (epg-start-encrypt context
+			       (if input-file
+				   (epg-make-data-from-file input-file)
+			         (epg-make-data-from-string plain))
+			       recipients sign always-trust))
 	  (let ((errors (epg-context-result-for context 'error)))
-	    (if (and sign
-		     (not (epg-context-result-for context 'sign)))
-		(signal 'epg-error
-			(list "Sign failed" (epg-errors-to-string errors))))
-	    (if errors
-		(signal 'epg-error
-			(list "Encrypt failed" (epg-errors-to-string errors)))))
+	    (when (and sign
+		       (not (epg-context-result-for context 'sign)))
+	      (signal 'epg-error
+		      (list "Sign failed" (epg-errors-to-string errors))))
+	    (when errors
+	      (signal 'epg-error
+		      (list "Encrypt failed" (epg-errors-to-string errors)))))
 	  (epg-read-output context))
       (epg-delete-output-file context)
       (if input-file
@@ -1847,13 +1850,12 @@ If you are unsure, use synchronous version of this function
       (progn
 	(setf (epg-context-output-file context)
               (or file (make-temp-file "epg-output")))
-	(epg-start-export-keys context keys)
-	(epg-wait-for-completion context)
-	(let ((errors (epg-context-result-for context 'error)))
-	  (if errors
-	      (signal 'epg-error
-		      (list "Export keys failed"
-			    (epg-errors-to-string errors)))))
+        (epg-wait-for-completion context
+	  (epg-start-export-keys context keys))
+	(when-let ((errors (epg-context-result-for context 'error)))
+	  (signal 'epg-error
+		  (list "Export keys failed"
+			(epg-errors-to-string errors))))
 	(unless file
 	  (epg-read-output context)))
     (unless file
@@ -1888,13 +1890,12 @@ If you are unsure, use synchronous version of this function
 (defun epg--import-keys-1 (context keys)
   (unwind-protect
       (progn
-	(epg-start-import-keys context keys)
-	(epg-wait-for-completion context)
-	(let ((errors (epg-context-result-for context 'error)))
-	  (if errors
-	      (signal 'epg-error
-		      (list "Import keys failed"
-			    (epg-errors-to-string errors))))))
+        (epg-wait-for-completion context
+	  (epg-start-import-keys context keys))
+	(when-let ((errors (epg-context-result-for context 'error)))
+	  (signal 'epg-error
+		  (list "Import keys failed"
+			(epg-errors-to-string errors)))))
     (epg-reset context)))
 
 (defun epg-import-keys-from-file (context keys)
@@ -1923,13 +1924,12 @@ If you are unsure, use synchronous version of this function
 KEYS is a list of key IDs."
   (unwind-protect
       (progn
-	(epg-start-receive-keys context keys)
-	(epg-wait-for-completion context)
-	(let ((errors (epg-context-result-for context 'error)))
-	  (if errors
-	      (signal 'epg-error
-		      (list "Receive keys failed"
-			    (epg-errors-to-string errors))))))
+        (epg-wait-for-completion context
+	  (epg-start-receive-keys context keys))
+	(when-let ((errors (epg-context-result-for context 'error)))
+	  (signal 'epg-error
+		  (list "Receive keys failed"
+			(epg-errors-to-string errors)))))
     (epg-reset context)))
 
 (defalias 'epg-import-keys-from-server 'epg-receive-keys)
@@ -1957,13 +1957,12 @@ If you are unsure, use synchronous version of this function
   "Delete KEYS from the key ring."
   (unwind-protect
       (progn
-	(epg-start-delete-keys context keys allow-secret)
-	(epg-wait-for-completion context)
-	(let ((errors (epg-context-result-for context 'error)))
-	  (if errors
-	      (signal 'epg-error
-		      (list "Delete keys failed"
-			    (epg-errors-to-string errors))))))
+        (epg-wait-for-completion context
+	  (epg-start-delete-keys context keys allow-secret))
+	(when-let ((errors (epg-context-result-for context 'error)))
+	  (signal 'epg-error
+		  (list "Delete keys failed"
+			(epg-errors-to-string errors)))))
     (epg-reset context)))
 
 (defun epg-start-generate-key (context parameters)
@@ -1994,13 +1993,12 @@ If you are unsure, use synchronous version of this function
 PARAMETERS is a file which tells how to create the key."
   (unwind-protect
       (progn
-	(epg-start-generate-key context (epg-make-data-from-file parameters))
-	(epg-wait-for-completion context)
-	(let ((errors (epg-context-result-for context 'error)))
-	  (if errors
-	      (signal 'epg-error
-		      (list "Generate key failed"
-			    (epg-errors-to-string errors))))))
+        (epg-wait-for-completion context
+	  (epg-start-generate-key context (epg-make-data-from-file parameters)))
+	(when-let ((errors (epg-context-result-for context 'error)))
+	  (signal 'epg-error
+		  (list "Generate key failed"
+			(epg-errors-to-string errors)))))
     (epg-reset context)))
 
 (defun epg-generate-key-from-string (context parameters)
@@ -2008,13 +2006,12 @@ PARAMETERS is a file which tells how to create the key."
 PARAMETERS is a string which tells how to create the key."
   (unwind-protect
       (progn
-	(epg-start-generate-key context (epg-make-data-from-string parameters))
-	(epg-wait-for-completion context)
-	(let ((errors (epg-context-result-for context 'error)))
-	  (if errors
-	      (signal 'epg-error
-		      (list "Generate key failed"
-			    (epg-errors-to-string errors))))))
+        (epg-wait-for-completion context
+	  (epg-start-generate-key context (epg-make-data-from-string parameters)))
+	(when-let ((errors (epg-context-result-for context 'error)))
+	  (signal 'epg-error
+		  (list "Generate key failed"
+			(epg-errors-to-string errors)))))
     (epg-reset context)))
 
 (defun epg-start-edit-key (context key edit-callback handback)
@@ -2040,13 +2037,12 @@ If you are unsure, use synchronous version of this function
   "Edit KEY in the keyring."
   (unwind-protect
       (progn
-	(epg-start-edit-key context key edit-callback handback)
-	(epg-wait-for-completion context)
-	(let ((errors (epg-context-result-for context 'error)))
-	  (if errors
-	      (signal 'epg-error
-		      (list "Edit key failed"
-			    (epg-errors-to-string errors))))))
+        (epg-wait-for-completion context
+	  (epg-start-edit-key context key edit-callback handback))
+	(when-let ((errors (epg-context-result-for context 'error)))
+	  (signal 'epg-error
+		  (list "Edit key failed"
+			(epg-errors-to-string errors)))))
     (epg-reset context)))
 
 ;;; Decode Functions
