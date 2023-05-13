@@ -776,8 +776,7 @@ With Ma Gnus v0.14 and earlier a signature would be created with a wrong key."
 	    (mml-secure-openpgp-signers '("2DD796DBDAC43424")))
 	(dolist (method (sign-standards) nil)
 	  (mml-secure-test-en-decrypt
-	   method "no-exp@example.org" "sign@example.org" 1 nil)
-	  ))))))
+	   method "no-exp@example.org" "sign@example.org" 1 nil)))))))
 
 ;; TODO Passphrase passing and caching in Emacs does not seem to work
 ;; with gpgsm at all.
