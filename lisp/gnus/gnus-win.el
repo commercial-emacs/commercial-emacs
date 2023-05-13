@@ -429,7 +429,8 @@ Formerly `gnus-configure-frame'.  Wasn't thread-safe."
                       (gnus-delete-windows-in-gnusey-frames)
                     ;; This is not a `frame' split, so we ignore the
                     ;; other frames.
-                    (delete-other-windows))
+                    (unless (window-minibuffer-p (selected-window))
+                      (delete-other-windows)))
                 ;; Just remove some windows.
                 (gnus-remove-some-windows)
                 (set-buffer nntp-server-buffer))
