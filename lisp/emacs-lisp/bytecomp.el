@@ -334,6 +334,8 @@ Elements of the list may be:
                               This depends on the `docstrings' warning type.
   suspicious  constructs that usually don't do what the coder wanted.
   empty-body  body argument to a special form or macro is empty.
+  mutate-constant
+              code that mutates program constants such as quoted lists
 
 If the list begins with `not', then the remaining elements specify warnings to
 suppress.  For example, (not free-vars) will suppress the `free-vars' warning.
