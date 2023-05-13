@@ -494,7 +494,7 @@ don't include."
             (push name prefs)))))
     (loaddefs-generate--make-prefixes prefs load-name)))
 
-(defun loaddefs-generate--rubric (file &optional type feature compile)
+(defun loaddefs-generate--rubric (file &optional type feature compile shorthands)
   "Return a string giving the appropriate autoload rubric for FILE.
 TYPE (default \"autoloads\") is a string stating the type of
 information contained in FILE.  TYPE \"package\" acts like the default,
@@ -520,7 +520,8 @@ If COMPILE, don't include a \"don't compile\" cookie."
        file :provide (and (stringp feature) feature)
        :compile compile
        :inhibit-native-compile t
-       :inhibit-provide (not feature))
+       :inhibit-provide (not feature)
+       :shorthands shorthands)
       (buffer-string))))
 
 ;;;###autoload
@@ -565,7 +566,7 @@ instead of just updating them with the new/changed autoloads."
                                                   t files-re))
 			       (if (consp dir) dir (list dir)))))
          (updating (and (file-exists-p output-file) (not generate-full)))
-         (defs nil))
+         defs shorthands)
 
     ;; Allow the excluded files to be relative.
     (setq excluded-files
@@ -594,7 +595,11 @@ instead of just updating them with the new/changed autoloads."
             (when (or package-data (not excluded))
               (setq defs (nconc (loaddefs-generate--parse-file
                                  file output-file package-data)
-                                defs))))))
+                                defs)
+                    shorthands (nconc (with-temp-buffer
+                                        (save-excursion (insert-file-contents file))
+                                        (hack-read-symbol-shorthands))
+                                      shorthands))))))
       (progress-reporter-done progress))
 
     ;; First group per output file.
@@ -606,7 +611,7 @@ instead of just updating them with the new/changed autoloads."
           (if (and updating (file-exists-p loaddefs-file))
               (insert-file-contents loaddefs-file)
             (insert (loaddefs-generate--rubric
-                     loaddefs-file nil t include-package-version))
+                     loaddefs-file nil t include-package-version shorthands))
             (search-backward "\f")
             (when extra-data
               (insert extra-data)

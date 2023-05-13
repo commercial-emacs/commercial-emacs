@@ -63,7 +63,8 @@ inserted."
 
 (cl-defun generate-lisp-file-trailer (file &key version inhibit-provide
                                       (coding 'utf-8-emacs-unix) autoloads
-                                      compile provide inhibit-native-compile)
+                                      compile provide inhibit-native-compile
+                                      shorthands)
   "Insert a standard trailer for FILE.
 By default, this trailer inhibits version control, byte
 compilation, updating autoloads, and uses a `utf-8-emacs-unix'
@@ -81,7 +82,7 @@ instead of using FILE as the basis.
 If `standard-output' is bound to a buffer, insert in that buffer.
 If no, insert at point in the current buffer.
 
-If INHITBIT-NATIVE-COMPILE is non-nil, add a cookie to inhibit
+If INHIBIT-NATIVE-COMPILE is non-nil, add a cookie to inhibit
 native compilation.  (By default, a file will be native-compiled
 if it's also byte-compiled)."
   (with-current-buffer (if (bufferp standard-output)
@@ -110,6 +111,8 @@ if it's also byte-compiled)."
                       (if (eq coding t)
                           'utf-8-emacs-unix
                         coding))))
+    (when shorthands
+      (insert (format ";; read-symbol-shorthands: %S\n" shorthands)))
     (insert
      ";; End:\n\n"
      ";;; " (file-name-nondirectory file) " ends here\n")))
