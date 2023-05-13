@@ -1106,7 +1106,6 @@ usage: (call-process-region START END PROGRAM &optional DELETE BUFFER DISPLAY &r
         {
           /* No need to save restrictions since we delete everything
              anyway.  */
-          labeled_restrictions_remove_in_current_buffer ();
           Fwiden ();
           del_range (BEG, Z);
         }
