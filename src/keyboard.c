@@ -317,6 +317,8 @@ static void recursive_edit_unwind (Lisp_Object buffer);
 static void echo_now (void);
 static ptrdiff_t echo_length (void);
 
+static void safe_run_hooks_maybe_narrowed (Lisp_Object, struct window *);
+
 /* Incremented whenever a timer is run.  */
 unsigned timers_run;
 
