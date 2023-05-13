@@ -139,33 +139,37 @@ Pass optional INTERACTIVE to mml-secure-test-fixture."
 	 (re-search-forward
 	  (concat "^" (regexp-quote mail-header-separator) "\n"))
 	 (replace-match "\n")
-	 ;; The following treatment of handles, plainbuf, and multipart
-	 ;; resulted from trial-and-error.
-	 ;; Someone with more knowledge on how to decrypt messages and verify
-	 ;; signatures might know more appropriate functions to invoke
-	 ;; instead.
-	 (let* ((handles (or (mm-dissect-buffer)
-			     (mm-uu-dissect)))
-		(isplain (bufferp (car handles)))
-		(ismultipart (equal (car handles) "multipart/mixed"))
-		(plainbuf (if isplain
-			      (car handles)
-			    (if ismultipart
-				(car (cadadr handles))
-			      (caadr handles))))
-		(decrypted
-		 (with-current-buffer plainbuf (buffer-string)))
-		(gnus-info
-		 (if isplain
-		     nil
-		   (if ismultipart
-		       (or (mm-handle-multipart-ctl-parameter
-			    (cadr handles) 'gnus-details)
-			   (mm-handle-multipart-ctl-parameter
-			    (cadr handles) 'gnus-info))
-		     (mm-handle-multipart-ctl-parameter
-		      handles 'gnus-info)))))
-	   (funcall body2 gnus-info plaintext decrypted)))))
+         (let ((retval (or (mm-dissect-buffer) (mm-uu-dissect))))
+           ;; Teenage Lars overloaded the shit out of return values.
+           (cond ((bufferp (car retval))
+                  ;; in plain, return value is just the handle
+                  (let ((plainbuf (car retval)))
+                    (funcall body2 nil plaintext
+                             (with-current-buffer plainbuf
+                               (buffer-string)))))
+                 ((equal (car retval) "multipart/mixed")
+                  ;; in multipart, first element distinguishes "multipart/mixed"
+                  ;; and rest is list of handles.
+                  (let* ((handles (cdr retval))
+                         (first-handle (car handles))
+                         (gnus-info (or (mm-handle-multipart-ctl-parameter
+			                 first-handle 'gnus-details)
+			                (mm-handle-multipart-ctl-parameter
+			                 first-handle 'gnus-info)))
+                         (car-is-buffer (cl-second first-handle))
+                         (plainbuf (car car-is-buffer)))
+                    (funcall body2 gnus-info plaintext
+                             (with-current-buffer plainbuf
+                               (buffer-string)))))
+                 (t
+                  (let* ((no-effing-clue (cdr retval))
+                         (car-is-buffer (car no-effing-clue))
+                         (plainbuf (car car-is-buffer)))
+                    (funcall body2
+                             (mm-handle-multipart-ctl-parameter retval 'gnus-info)
+                             plaintext
+                             (with-current-buffer plainbuf
+                               (buffer-string))))))))))
    interactive))
 
 ;; TODO If the variable BODY3 is renamed to BODY, an infinite recursion
@@ -572,12 +576,10 @@ If optional EXPECTFAIL is non-nil, a decryption failure is expected."
   (let ((mml-secure-cache-passphrase do-cache)
 	(mml1991-cache-passphrase do-cache)
 	(mml2015-cache-passphrase do-cache)
-	(mml-smime-cache-passphrase do-cache)
-	)
+	(mml-smime-cache-passphrase do-cache))
     (cl-letf (((symbol-function 'read-passwd)
                (lambda (_prompt &optional _confirm _default) jl-passphrase)))
-      (mml-secure-test-en-decrypt method to from checksig t enc-keys expectfail)
-      )))
+      (mml-secure-test-en-decrypt method to from checksig t enc-keys expectfail))))
 
 (ert-deftest mml-secure-en-decrypt-1 ()
   "Encrypt message; then decrypt and test for expected result.
@@ -655,8 +657,7 @@ In this test, just multiple encryption and signing keys may be available."
 	  method "no-exp@example.org" "sub@example.org" 1 t)
 	 ;; customized choice for both keys
 	 (mml-secure-test-en-decrypt
-	  method "sub@example.org" "sub@example.org" 1 t)
-	 )))))
+	  method "sub@example.org" "sub@example.org" 1 t))))))
 
 (ert-deftest mml-secure-en-decrypt-sign-1-2-double ()
   "Sign and encrypt message; then decrypt and test for expected result.
@@ -682,12 +683,10 @@ In this test, just multiple encryption and signing keys may be available."
    (lambda ()
      ;; Now use both keys for sub@example.org to sign an e-mail from
      ;; a different address (without associated keys).
-     (let ((mml-secure-openpgp-sign-with-sender nil)
-	   (mml-secure-smime-sign-with-sender nil)
-	   (mml-secure-openpgp-signers
-	    '("8E7FEE76BB1FB195" "2FAF8726121EB3C6"))
-	   (mml-secure-smime-signers '("0x5F88E9FC" "0x479DC6E2")))
-       (dolist (method (enc-sign-standards) nil)
+     (let ((mml-secure-openpgp-signers '("8E7FEE76BB1FB195" "2FAF8726121EB3C6"))
+	   (mml-secure-smime-signers '("0x5F88E9FC" "0x479DC6E2"))
+           mml-secure-openpgp-sign-with-sender mml-secure-smime-sign-with-sender)
+       (dolist (method (enc-sign-standards))
 	 (mml-secure-test-en-decrypt
 	  method "no-exp@example.org" "no-keys@example.org" 2 t))))))
 
