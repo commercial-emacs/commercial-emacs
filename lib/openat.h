@@ -19,6 +19,12 @@
 #ifndef _GL_HEADER_OPENAT
 #define _GL_HEADER_OPENAT
 
+/* This file uses _GL_INLINE_HEADER_BEGIN, _GL_INLINE, _Noreturn,
+   _GL_ATTRIBUTE_DEPRECATED, HAVE_OPENAT.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
+
 #include <fcntl.h>
 
 #include <sys/types.h>
@@ -26,9 +32,6 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-#ifndef _GL_INLINE_HEADER_BEGIN
- #error "Please include config.h first."
-#endif
 _GL_INLINE_HEADER_BEGIN
 
 #if !HAVE_OPENAT
