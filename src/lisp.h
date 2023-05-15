@@ -51,6 +51,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <limits.h>
 
 #include <attribute.h>
+#include <count-leading-zeros.h>
 #include <intprops.h>
 #include <verify.h>
 
@@ -3588,6 +3589,20 @@ integer_to_uintmax (Lisp_Object num, uintmax_t *n)
       return i != 0;
     }
 }
+
+/* Return floor (log2 (N)) as an int, where 0 < N <= ULLONG_MAX.  */
+#if (201112 <= __STDC_VERSION__ && INT_MAX <= UINT_MAX \
+     && LONG_MAX <= ULONG_MAX && LLONG_MAX <= ULLONG_MAX)
+# define elogb(n) \
+    _Generic (+(n), \
+	      int:           UINT_WIDTH   - 1 - count_leading_zeros    (n), \
+	      unsigned int:  UINT_WIDTH   - 1 - count_leading_zeros    (n), \
+	      long:          ULONG_WIDTH  - 1 - count_leading_zeros_l  (n), \
+	      unsigned long: ULONG_WIDTH  - 1 - count_leading_zeros_l  (n), \
+	      default:       ULLONG_WIDTH - 1 - count_leading_zeros_ll (n))
+#else
+# define elogb(n) (ULLONG_WIDTH - 1 - count_leading_zeros_ll (n))
+#endif
 
 /* A modification count.  These are wide enough, and incremented
    rarely enough, so that they should never overflow a 60-bit counter
