@@ -74,11 +74,6 @@
 #ifndef _@GUARD_PREFIX@_FCNTL_H
 #define _@GUARD_PREFIX@_FCNTL_H
 
-/* This file uses GNULIB_POSIXCHECK, HAVE_RAW_DECL_*.  */
-#if !_GL_CONFIG_H_INCLUDED
- #error "Please include config.h first."
-#endif
-
 #ifndef __GLIBC__ /* Avoid namespace pollution on glibc systems.  */
 # include <unistd.h>
 #endif

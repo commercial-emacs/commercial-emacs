@@ -2159,7 +2159,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
   char buf[max (sizeof "from..to..in " + 2 * INT_STRLEN_BOUND (EMACS_INT),
 		max (sizeof " . #" + INT_STRLEN_BOUND (intmax_t),
 		     max ((sizeof " with data 0x"
-			   + (UINTMAX_WIDTH + 4 - 1) / 4),
+			   + (sizeof (uintmax_t) * CHAR_BIT + 4 - 1) / 4),
 			  40)))];
   /* As print_object() is highly recursive, 9dee1c8 updates stack_top
      for the benefit of stack_overflow().  */

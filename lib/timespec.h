@@ -19,14 +19,11 @@
 #if ! defined TIMESPEC_H
 #define TIMESPEC_H
 
-/* This file uses _GL_INLINE_HEADER_BEGIN, _GL_INLINE, _GL_ATTRIBUTE_CONST,
-   _GL_ATTRIBUTE_PURE, _GL_CMP.  */
-#if !_GL_CONFIG_H_INCLUDED
- #error "Please include config.h first."
-#endif
-
 #include <time.h>
 
+#ifndef _GL_INLINE_HEADER_BEGIN
+ #error "Please include config.h first."
+#endif
 _GL_INLINE_HEADER_BEGIN
 #ifndef _GL_TIMESPEC_INLINE
 # define _GL_TIMESPEC_INLINE _GL_INLINE

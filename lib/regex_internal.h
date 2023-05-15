@@ -823,7 +823,7 @@ re_string_elem_size_at (const re_string_t *pstr, Idx idx)
 }
 
 #ifdef _LIBC
-# if __glibc_has_attribute (__fallthrough__)
+# if __GNUC__ >= 7
 #  define FALLTHROUGH __attribute__ ((__fallthrough__))
 # else
 #  define FALLTHROUGH ((void) 0)

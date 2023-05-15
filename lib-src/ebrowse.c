@@ -3767,9 +3767,8 @@ main (int argc, char **argv)
 	  if (n_input_files == input_filenames_size)
 	    {
 	      input_filenames_size = max (10, 2 * input_filenames_size);
-	      input_filenames = xrealloc (input_filenames,
-					  (input_filenames_size
-					   * sizeof *input_filenames));
+	      input_filenames = (char **) xrealloc ((void *)input_filenames,
+						    input_filenames_size);
 	    }
           input_filenames[n_input_files++] = xstrdup (optarg);
           break;

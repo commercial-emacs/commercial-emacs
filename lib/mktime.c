@@ -46,7 +46,6 @@
 #include <errno.h>
 #include <limits.h>
 #include <stdbool.h>
-#include <stdckdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -380,7 +379,7 @@ __mktime_internal (struct tm *tp,
   /* Invert CONVERT by probing.  First assume the same offset as last
      time.  */
 
-  ckd_sub (&negative_offset_guess, 0, off);
+  INT_SUBTRACT_WRAPV (0, off, &negative_offset_guess);
   long_int t0 = ydhms_diff (year, yday, hour, min, sec,
 			    EPOCH_YEAR - TM_YEAR_BASE, 0, 0, 0,
 			    negative_offset_guess);
@@ -466,7 +465,7 @@ __mktime_internal (struct tm *tp,
 	for (direction = -1; direction <= 1; direction += 2)
 	  {
 	    long_int ot;
-	    if (! ckd_add (&ot, t, delta * direction))
+	    if (! INT_ADD_WRAPV (t, delta * direction, &ot))
 	      {
 		struct tm otm;
 		if (! ranged_convert (convert, &ot, &otm))
@@ -504,8 +503,8 @@ __mktime_internal (struct tm *tp,
   /* Set *OFFSET to the low-order bits of T - T0 - NEGATIVE_OFFSET_GUESS.
      This is just a heuristic to speed up the next mktime call, and
      correctness is unaffected if integer overflow occurs here.  */
-  ckd_sub (offset, t, t0);
-  ckd_sub (offset, *offset, negative_offset_guess);
+  INT_SUBTRACT_WRAPV (t, t0, offset);
+  INT_SUBTRACT_WRAPV (*offset, negative_offset_guess, offset);
 
   if (LEAP_SECONDS_POSSIBLE && sec_requested != tm.tm_sec)
     {
@@ -514,7 +513,7 @@ __mktime_internal (struct tm *tp,
       long_int sec_adjustment = sec == 0 && tm.tm_sec == 60;
       sec_adjustment -= sec;
       sec_adjustment += sec_requested;
-      if (ckd_add (&t, t, sec_adjustment)
+      if (INT_ADD_WRAPV (t, sec_adjustment, &t)
 	  || ! (mktime_min <= t && t <= mktime_max))
 	{
 	  __set_errno (EOVERFLOW);

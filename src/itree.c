@@ -817,13 +817,14 @@ itree_remove_fix (struct itree_tree *tree,
 	{
 	  struct itree_node *other = parent->right;
 
-	  if (other->red) /* case 1.a */
+	  if (null_safe_is_red (other)) /* case 1.a */
 	    {
 	      other->red = false;
 	      parent->red = true;
 	      itree_rotate_left (tree, parent);
 	      other = parent->right;
 	    }
+	  eassume (other != NULL);
 
 	  if (null_safe_is_black (other->left) /* 2.a */
 	      && null_safe_is_black (other->right))
@@ -854,13 +855,14 @@ itree_remove_fix (struct itree_tree *tree,
 	{
 	  struct itree_node *other = parent->left;
 
-	  if (other->red) /* 1.b */
+	  if (null_safe_is_red (other)) /* 1.b */
 	    {
 	      other->red = false;
 	      parent->red = true;
 	      itree_rotate_right (tree, parent);
 	      other = parent->left;
 	    }
+	  eassume (other != NULL);
 
 	  if (null_safe_is_black (other->right) /* 2.b */
 	      && null_safe_is_black (other->left))
