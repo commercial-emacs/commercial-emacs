@@ -236,6 +236,8 @@ AC_DEFUN([gl_EARLY],
   # Code from module xalloc:
   # Code from module xalloc-die:
   # Code from module xalloc-oversized:
+  # Code from module year2038:
+  AC_REQUIRE([AC_SYS_YEAR2038])
 ])
 
 # This macro should be invoked from ./configure.ac, in the section
