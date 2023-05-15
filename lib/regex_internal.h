@@ -30,6 +30,7 @@
 #include <wchar.h>
 #include <wctype.h>
 #include <stdbool.h>
+#include <stdckdint.h>
 #include <stdint.h>
 
 #ifndef _LIBC
@@ -823,7 +824,7 @@ re_string_elem_size_at (const re_string_t *pstr, Idx idx)
 }
 
 #ifdef _LIBC
-# if __GNUC__ >= 7
+# if __glibc_has_attribute (__fallthrough__)
 #  define FALLTHROUGH __attribute__ ((__fallthrough__))
 # else
 #  define FALLTHROUGH ((void) 0)
