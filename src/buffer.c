@@ -50,6 +50,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "w32heap.h"		/* for mmap_* */
 #endif
 
+/* Work around GCC bug 109847
+   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109847
+   which causes GCC to mistakenly complain about
+   AUTO_STRING with "*scratch*".  */
+#if GNUC_PREREQ (13, 0, 0)
+# pragma GCC diagnostic ignored "-Wanalyzer-out-of-bounds"
+#endif
+
 struct buffer buffer_slot_defaults;
 struct buffer buffer_slot_map;
 struct buffer buffer_slot_symbols;
