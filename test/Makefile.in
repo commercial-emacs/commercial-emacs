@@ -178,11 +178,6 @@ lisp/filenotify-tests.log lisp/net/tramp-tests.log src/emacs-module-tests.log \
 : WRITE_LOG = 2>&1 | tee $@
 endif
 
-## Temporary until we figure this out
-ifeq ($(GITHUB_ACTIONS),true)
-src/process-tests.log : WRITE_LOG = 2>&1 | tee $@
-endif
-
 ifeq ($(TEST_LOAD_EL), yes)
 testloadfile = $*.el
 else
