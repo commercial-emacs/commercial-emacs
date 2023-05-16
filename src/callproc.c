@@ -1427,7 +1427,7 @@ emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,
     {
       /* Initialize optional attributes before blocking. */
       int error = emacs_posix_spawn_init_actions (&actions, std_in,
-                                              std_out, std_err, cwd);
+						  std_out, std_err, cwd);
       if (error != 0)
 	return error;
 

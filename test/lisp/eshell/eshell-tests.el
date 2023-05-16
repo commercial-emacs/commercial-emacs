@@ -140,6 +140,7 @@ This test uses a pipeline for the command."
       (with-temp-buffer
         (eshell-command "*echo hi &" t)
         (eshell-wait-for (lambda () (equal (process-list) orig-processes)))
+        (accept-process-output)
         (should (equal (buffer-string) "hi\n"))))))
 
 (ert-deftest eshell-test/eshell-command/background-pipeline ()
@@ -153,6 +154,7 @@ This test uses a pipeline for the command."
       (with-temp-buffer
         (eshell-command "*echo hi | *cat &" t)
         (eshell-wait-for (lambda () (equal (process-list) orig-processes)))
+        (accept-process-output)
         (should (equal (buffer-string) "hi\n"))))))
 
 (ert-deftest eshell-test/command-running-p ()
