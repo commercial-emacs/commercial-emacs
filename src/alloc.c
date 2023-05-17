@@ -408,7 +408,7 @@ xnmalloc (ptrdiff_t nitems, ptrdiff_t item_size)
 {
   eassert (0 <= nitems && 0 < item_size);
   ptrdiff_t nbytes;
-  if (INT_MULTIPLY_WRAPV (nitems, item_size, &nbytes) || SIZE_MAX < nbytes)
+  if (ckd_mul (&nbytes, nitems, item_size) || SIZE_MAX < nbytes)
     memory_full (SIZE_MAX);
   return xmalloc (nbytes);
 }
@@ -421,7 +421,7 @@ xnrealloc (void *pa, ptrdiff_t nitems, ptrdiff_t item_size)
 {
   eassert (0 <= nitems && 0 < item_size);
   ptrdiff_t nbytes;
-  if (INT_MULTIPLY_WRAPV (nitems, item_size, &nbytes) || SIZE_MAX < nbytes)
+  if (ckd_mul (&nbytes, nitems, item_size) || SIZE_MAX < nbytes)
     memory_full (SIZE_MAX);
   return xrealloc (pa, nbytes);
 }
@@ -467,13 +467,13 @@ xpalloc (void *pa, ptrdiff_t *nitems, ptrdiff_t nitems_incr_min,
      NITEMS_MAX, and what the C language can represent safely.  */
 
   ptrdiff_t n, nbytes;
-  if (INT_ADD_WRAPV (n0, n0 >> 1, &n))
+  if (ckd_add (&n, n0, n0 >> 1))
     n = PTRDIFF_MAX;
   if (0 <= nitems_max && nitems_max < n)
     n = nitems_max;
 
   ptrdiff_t adjusted_nbytes
-    = ((INT_MULTIPLY_WRAPV (n, item_size, &nbytes) || SIZE_MAX < nbytes)
+    = ((ckd_mul (&nbytes, n, item_size) || SIZE_MAX < nbytes)
        ? min (PTRDIFF_MAX, SIZE_MAX)
        : nbytes < DEFAULT_MXFAST ? DEFAULT_MXFAST : 0);
   if (adjusted_nbytes)
@@ -485,9 +485,9 @@ xpalloc (void *pa, ptrdiff_t *nitems, ptrdiff_t nitems_incr_min,
   if (! pa)
     *nitems = 0;
   if (n - n0 < nitems_incr_min
-      && (INT_ADD_WRAPV (n0, nitems_incr_min, &n)
+      && (ckd_add (&n, n0, nitems_incr_min)
 	  || (0 <= nitems_max && nitems_max < n)
-	  || INT_MULTIPLY_WRAPV (n, item_size, &nbytes)))
+	  || ckd_mul (&nbytes, n, item_size)))
     memory_full (SIZE_MAX);
   pa = xrealloc (pa, nbytes);
   *nitems = n;

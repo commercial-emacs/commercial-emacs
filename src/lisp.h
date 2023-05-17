@@ -44,6 +44,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <setjmp.h>
 #include <stdalign.h>
 #include <stdarg.h>
+#include <stdckdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <float.h>
@@ -5038,8 +5039,8 @@ safe_free_unbind_to (specpdl_ref count, specpdl_ref sa_count, Lisp_Object val)
 #define SAFE_ALLOCA_LISP_EXTRA(buf, nelt, extra)	       \
   do {							       \
     ptrdiff_t alloca_nbytes;				       \
-    if (INT_MULTIPLY_WRAPV (nelt, word_size, &alloca_nbytes)   \
-	|| INT_ADD_WRAPV (alloca_nbytes, extra, &alloca_nbytes) \
+    if (ckd_mul (&alloca_nbytes, nelt, word_size)	       \
+	|| ckd_add (&alloca_nbytes, alloca_nbytes, extra)      \
 	|| SIZE_MAX < alloca_nbytes)			       \
       memory_full (SIZE_MAX);				       \
     else if (alloca_nbytes <= sa_avail)			       \
