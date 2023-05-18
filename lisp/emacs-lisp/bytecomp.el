@@ -3342,7 +3342,7 @@ value should be byte-discard."
 
          ;; Adding these functions causes many warnings;
          ;; evaluate how many of them are false first.
-         ;;delq delete
+         delq delete
          ;;nconc plist-put
          )))
   (dolist (fn important-return-value-fns)
