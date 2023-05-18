@@ -326,7 +326,7 @@ instead."
     (define-key map "\C-c\C-l" #'python-shell-send-file)
     (define-key map "\C-c\C-z" #'python-shell-switch-to-shell)
     ;; Some util commands
-    (define-key map "\C-c\C-v" #'python-check)
+    (define-key map "\C-c\C-v" #'python-keymap-check)
     (define-key map "\C-c\C-f" #'python-eldoc-at-point)
     (define-key map "\C-c\C-d" #'python-describe-at-point)
     ;; Import management
@@ -374,7 +374,7 @@ instead."
          :help "Eval file in inferior Python session"]
         ["Debugger" pdb :help "Run pdb under GUD"]
         "----"
-        ["Check file" python-check
+        ["Check file" python-keymap-check
          :help "Check file for errors"]
         ["Help on symbol" python-eldoc-at-point
          :help "Get help on symbol at point"]
@@ -4928,20 +4928,26 @@ def __FFAP_get_module_path(objstr):
 ;; XXX: Avoid `defvar-local' for compat with Emacs<24.3
 (make-variable-buffer-local 'python-check-custom-command)
 
+(defsubst python--check-default ()
+  (or python-check-custom-command
+      (concat python-check-command " "
+              (shell-quote-argument
+               (when-let ((name (buffer-file-name)))
+                 (file-name-nondirectory name))))))
+
+(defun python-keymap-check (arg)
+  "Deal with grandfathered clumsiness of `python-check'."
+  (interactive "P")
+  (if arg
+      (call-interactively #'python-check)
+    (python-check (python--check-default))))
+
 (defun python-check (command)
   "Check a Python file (default current buffer's file).
 Runs COMMAND, a shell command, as if by `compile'.
 See `python-check-command' for the default."
   (interactive
-   (list (read-string "Check command: "
-                      (or python-check-custom-command
-                          (concat python-check-command " "
-                                  (shell-quote-argument
-                                   (or
-                                    (let ((name (buffer-file-name)))
-                                      (and name
-                                           (file-name-nondirectory name)))
-                                    "")))))))
+   (list (read-string "Check command: " (python--check-default))))
   (setq python-check-custom-command command)
   (save-some-buffers (not compilation-ask-about-save) nil)
   (python-shell-with-environment

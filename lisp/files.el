@@ -3246,7 +3246,7 @@ and `inhibit-local-variables-suffixes'.  If
 
 (defvar auto-mode-interpreter-regexp
   (purecopy "#![ \t]?\\([^ \t\n]*\
-/bin/env[ \t]\\)?\\([^ \t\n]+\\)")
+/bin/env[ \t]\\)?\\s-*\\(?:-+\\S-+\\s-+\\)*\\([^ \t\n]+\\)")
   "Regexp matching interpreters, for file mode determination.
 This regular expression is matched against the first line of a file
 to determine the file's mode in `set-auto-mode'.  If it matches, the file
