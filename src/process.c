@@ -606,7 +606,7 @@ decode_status (Lisp_Object l, Lisp_Object *symbol, Lisp_Object *code,
       tem = XCDR (l);
       *code = XCAR (tem);
       tem = XCDR (tem);
-      *coredump = !NILP (tem);
+      *coredump = ! NILP (tem);
     }
 }
 
@@ -1163,7 +1163,7 @@ is_pty_from_symbol (Lisp_Object symbol)
   else if (EQ (symbol, Qpipe))
     return false;
   else if (NILP (symbol))
-    return !NILP (Vprocess_connection_type);
+    return ! NILP (Vprocess_connection_type);
   else
     report_file_error ("Unknown connection type", symbol);
 }
@@ -1177,7 +1177,7 @@ Return BUFFER.  */)
   struct Lisp_Process *p;
 
   CHECK_PROCESS (process);
-  if (!NILP (buffer))
+  if (! NILP (buffer))
     CHECK_BUFFER (buffer);
   p = XPROCESS (process);
   if (!EQ (p->buffer, buffer))
@@ -1212,29 +1212,15 @@ DEFUN ("process-mark", Fprocess_mark, Sprocess_mark,
 
 DEFUN ("set-process-filter", Fset_process_filter, Sset_process_filter,
        2, 2, 0,
-       doc: /* Give PROCESS the filter function FILTER; nil means default.
-A value of t means stop accepting output from the process.
-
-When a process has a non-default filter, its buffer is not used for output.
-Instead, each time it does output, the entire string of output is
-passed to the filter.
-
-The filter gets two arguments: the process and the string of output.
-The string argument is normally a multibyte string, except:
-- if the process's input coding system is no-conversion or raw-text,
-  it is a unibyte string (the non-converted input).  */)
+       doc: /* Give PROCESS the filter function FILTER.
+A null FILTER selects the default filter.
+A FILTER of t halts output processing.
+Otherwise the provided FILTER must take two arguments:
+the process and the current string output.  */)
   (Lisp_Object process, Lisp_Object filter)
 {
   CHECK_PROCESS (process);
   struct Lisp_Process *p = XPROCESS (process);
-
-  /* Don't signal an error if the process's input file descriptor
-     is closed.  This could make debugging Lisp more difficult,
-     for example when doing something like
-
-     (setq process (start-process ...))
-     (debug)
-     (set-process-filter process ...)  */
 
   if (NILP (filter))
     filter = Qinternal_default_process_filter;
@@ -1242,12 +1228,11 @@ The string argument is normally a multibyte string, except:
   if (p->infd >= 0)
     {
       /* If p->filter WILL be t, stop reading output.  */
-      if (EQ (filter, Qt) && !EQ (p->status, Qlisten))
+      if (EQ (filter, Qt) && ! EQ (p->status, Qlisten))
         delete_read_fd (p->infd);
-      else if (/* If p->filter WAS t, then resume reading output.  */
-               EQ (p->filter, Qt)
-               /* Network or serial process not stopped:  */
-               && !EQ (p->command, Qt))
+      /* If p->filter WAS t (and network proc not stopped), then
+	 resume reading output.  */
+      else if (EQ (p->filter, Qt) && ! EQ (p->command, Qt))
         add_process_read_fd (p->infd);
     }
 
@@ -1367,7 +1352,7 @@ This function returns FLAG.  */)
   (register Lisp_Object process, Lisp_Object flag)
 {
   CHECK_PROCESS (process);
-  XPROCESS (process)->inherit_coding_system_flag = !NILP (flag);
+  XPROCESS (process)->inherit_coding_system_flag = ! NILP (flag);
   return flag;
 }
 
@@ -1423,7 +1408,7 @@ waiting for the process to be fully set up.*/)
     {
       /* Usually wait for the network process to finish being set
        * up. */
-      if (!NILP (no_block))
+      if (! NILP (no_block))
 	return Qnil;
 
       wait_for_socket_fds (process, "process-contact");
@@ -1509,7 +1494,7 @@ Return nil if format of ADDRESS is invalid.  */)
       int nargs, i;
       char const *format;
 
-      if (size == 4 || (size == 5 && !NILP (omit_port)))
+      if (size == 4 || (size == 5 && ! NILP (omit_port)))
 	{
 	  format = "%d.%d.%d.%d";
 	  nargs = 4;
@@ -1519,7 +1504,7 @@ Return nil if format of ADDRESS is invalid.  */)
 	  format = "%d.%d.%d.%d:%d";
 	  nargs = 5;
 	}
-      else if (size == 8 || (size == 9 && !NILP (omit_port)))
+      else if (size == 8 || (size == 9 && ! NILP (omit_port)))
 	{
 	  format = "%x:%x:%x:%x:%x:%x:%x:%x";
 	  nargs = 8;
@@ -1641,17 +1626,17 @@ usage: (make-process &rest ARGS)  */)
   /* Save arguments for process-contact and clone-process.  */
   contact = Flist (nargs, args);
 
-  if (!NILP (plist_get (contact, QCfile_handler)))
+  if (! NILP (plist_get (contact, QCfile_handler)))
     {
       Lisp_Object file_handler
         = Ffind_file_name_handler (BVAR (current_buffer, directory),
                                    Qmake_process);
-      if (!NILP (file_handler))
+      if (! NILP (file_handler))
         return CALLN (Fapply, file_handler, Qmake_process, contact);
     }
 
   buffer = plist_get (contact, QCbuffer);
-  if (!NILP (buffer))
+  if (! NILP (buffer))
     buffer = Fget_buffer_create (buffer, Qnil);
 
   /* Make sure that the child will be able to chdir to the current
@@ -1669,7 +1654,7 @@ usage: (make-process &rest ARGS)  */)
   else
     program = Qnil;
 
-  if (!NILP (program))
+  if (! NILP (program))
     CHECK_STRING (program);
 
   bool query_on_exit = NILP (plist_get (contact, QCnoquery));
@@ -1682,7 +1667,7 @@ usage: (make-process &rest ARGS)  */)
 	error ("Process is not a pipe process");
       stderrproc = xstderr;
     }
-  else if (!NILP (xstderr))
+  else if (! NILP (xstderr))
     {
       CHECK_STRING (program);
       stderrproc = CALLN (Fmake_pipe_process,
@@ -1724,7 +1709,7 @@ usage: (make-process &rest ARGS)  */)
 	is_pty_from_symbol (tem);
     }
 
-  if (!NILP (stderrproc))
+  if (! NILP (stderrproc))
     pset_stderrproc (XPROCESS (proc), stderrproc);
 
 #ifdef HAVE_GNUTLS
@@ -1753,7 +1738,7 @@ usage: (make-process &rest ARGS)  */)
     Lisp_Object val, *args2;
 
     tem = plist_get (contact, QCcoding);
-    if (!NILP (tem))
+    if (! NILP (tem))
       {
 	val = tem;
 	if (CONSP (val))
@@ -1772,7 +1757,7 @@ usage: (make-process &rest ARGS)  */)
 	args2[i++] = buffer;
 	for (tem2 = command; CONSP (tem2); tem2 = XCDR (tem2))
 	  args2[i++] = XCAR (tem2);
-	if (!NILP (program))
+	if (! NILP (program))
 	  coding_systems = Ffind_operation_coding_system (nargs2, args2);
 	if (CONSP (coding_systems))
 	  val = XCAR (coding_systems);
@@ -1781,7 +1766,7 @@ usage: (make-process &rest ARGS)  */)
       }
     pset_decode_coding_system (XPROCESS (proc), val);
 
-    if (!NILP (tem))
+    if (! NILP (tem))
       {
 	val = tem;
 	if (CONSP (val))
@@ -1802,7 +1787,7 @@ usage: (make-process &rest ARGS)  */)
 	    args2[i++] = buffer;
 	    for (tem2 = command; CONSP (tem2); tem2 = XCDR (tem2))
 	      args2[i++] = XCAR (tem2);
-	    if (!NILP (program))
+	    if (! NILP (program))
 	      coding_systems = Ffind_operation_coding_system (nargs2, args2);
 	  }
 	if (CONSP (coding_systems))
@@ -1826,7 +1811,7 @@ usage: (make-process &rest ARGS)  */)
   XPROCESS (proc)->inherit_coding_system_flag
     = !(NILP (buffer) || !inherit_process_coding_system);
 
-  if (!NILP (program))
+  if (! NILP (program))
     {
       Lisp_Object program_args = XCDR (command);
 
@@ -1845,7 +1830,7 @@ usage: (make-process &rest ARGS)  */)
 	}
       else
 	{
-	  if (!NILP (Ffile_directory_p (program)))
+	  if (! NILP (Ffile_directory_p (program)))
 	    error ("Specified program for new process is a directory");
 	  tem = program;
 	}
@@ -2030,7 +2015,7 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
 #endif
     }
 
-  if (!NILP (p->stderrproc))
+  if (! NILP (p->stderrproc))
     {
       struct Lisp_Process *pp = XPROCESS (p->stderrproc);
 
@@ -2067,8 +2052,8 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
   p->pty_out = pty_out;
   pset_status (p, Qrun);
 
-  if (!EQ (p->command, Qt)
-      && !EQ (p->filter, Qt))
+  if (! EQ (p->command, Qt)
+      && ! EQ (p->filter, Qt))
     add_process_read_fd (inchannel);
 
   specpdl_ref count = SPECPDL_INDEX ();
@@ -2133,7 +2118,7 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
 	close_process_fd (&p->open_fd[READ_FROM_EXEC_MONITOR]);
       }
 #endif
-      if (!NILP (p->stderrproc))
+      if (! NILP (p->stderrproc))
 	{
 	  struct Lisp_Process *pp = XPROCESS (p->stderrproc);
 	  close_process_fd (&pp->open_fd[SUBPROCESS_STDOUT]);
@@ -2188,7 +2173,7 @@ create_pty (Lisp_Object process)
       pset_status (p, Qrun);
       setup_process_coding_systems (process);
 
-      if (!EQ (p->filter, Qt))
+      if (! EQ (p->filter, Qt))
 	add_process_read_fd (pty_fd);
 
       pset_tty_name (p, build_string (pty_name));
@@ -2288,14 +2273,14 @@ usage:  (make-pipe-process &rest ARGS)  */)
   pset_sentinel (p, plist_get (contact, QCsentinel));
   pset_filter (p, plist_get (contact, QCfilter));
   eassert (NILP (p->log));
-  if (tem = plist_get (contact, QCnoquery), !NILP (tem))
+  if (tem = plist_get (contact, QCnoquery), ! NILP (tem))
     p->kill_without_query = 1;
-  if (tem = plist_get (contact, QCstop), !NILP (tem))
+  if (tem = plist_get (contact, QCstop), ! NILP (tem))
     pset_command (p, Qt);
   eassert (! p->pty_in && ! p->pty_out);
 
-  if (!EQ (p->command, Qt)
-      && !EQ (p->filter, Qt))
+  if (! EQ (p->command, Qt)
+      && ! EQ (p->filter, Qt))
     add_process_read_fd (inchannel);
   p->adaptive_read_buffering
     = (NILP (Vprocess_adaptive_read_buffering) ? 0
@@ -2313,15 +2298,15 @@ usage:  (make-pipe-process &rest ARGS)  */)
 
     tem = plist_get (contact, QCcoding);
     val = Qnil;
-    if (!NILP (tem))
+    if (! NILP (tem))
       {
 	val = tem;
 	if (CONSP (val))
 	  val = XCAR (val);
       }
-    else if (!NILP (Vcoding_system_for_read))
+    else if (! NILP (Vcoding_system_for_read))
       val = Vcoding_system_for_read;
-    else if ((!NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
+    else if ((! NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
 	     || (NILP (buffer) && NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))))
       /* We dare not decode end-of-line format by setting VAL to
 	 Qraw_text, because the existing Emacs Lisp libraries
@@ -2339,13 +2324,13 @@ usage:  (make-pipe-process &rest ARGS)  */)
       }
     pset_decode_coding_system (p, val);
 
-    if (!NILP (tem))
+    if (! NILP (tem))
       {
 	val = tem;
 	if (CONSP (val))
 	  val = XCDR (val);
       }
-    else if (!NILP (Vcoding_system_for_write))
+    else if (! NILP (Vcoding_system_for_write))
       val = Vcoding_system_for_write;
     else if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
       val = Qnil;
@@ -2758,7 +2743,7 @@ set_socket_option (int s, Lisp_Object opt, Lisp_Object val)
 	memset (devname, 0, sizeof devname);
 	if (STRINGP (val))
 	  memcpy (devname, SDATA (val), min (SBYTES (val), IFNAMSIZ));
-	else if (!NILP (val))
+	else if (! NILP (val))
 	  error ("Bad option value for %s", name);
 	ret = setsockopt (s, sopt->optlevel, sopt->optnum,
 			  devname, IFNAMSIZ);
@@ -3016,7 +3001,7 @@ usage:  (make-serial-process &rest ARGS)  */)
 
   if (NILP (plist_member (contact, QCspeed)))
     error (":speed not specified");
-  if (!NILP (plist_get (contact, QCspeed)))
+  if (! NILP (plist_get (contact, QCspeed)))
     CHECK_FIXNUM (plist_get (contact, QCspeed));
 
   name = plist_get (contact, QCname);
@@ -3051,14 +3036,14 @@ usage:  (make-serial-process &rest ARGS)  */)
   pset_sentinel (p, plist_get (contact, QCsentinel));
   pset_filter (p, plist_get (contact, QCfilter));
   eassert (NILP (p->log));
-  if (tem = plist_get (contact, QCnoquery), !NILP (tem))
+  if (tem = plist_get (contact, QCnoquery), ! NILP (tem))
     p->kill_without_query = 1;
-  if (tem = plist_get (contact, QCstop), !NILP (tem))
+  if (tem = plist_get (contact, QCstop), ! NILP (tem))
     pset_command (p, Qt);
   eassert (! p->pty_in && ! p->pty_out);
 
-  if (!EQ (p->command, Qt)
-      && !EQ (p->filter, Qt))
+  if (! EQ (p->command, Qt)
+      && ! EQ (p->filter, Qt))
     add_process_read_fd (fd);
 
   update_process_mark (p);
@@ -3066,29 +3051,29 @@ usage:  (make-serial-process &rest ARGS)  */)
   tem = plist_get (contact, QCcoding);
 
   val = Qnil;
-  if (!NILP (tem))
+  if (! NILP (tem))
     {
       val = tem;
       if (CONSP (val))
 	val = XCAR (val);
     }
-  else if (!NILP (Vcoding_system_for_read))
+  else if (! NILP (Vcoding_system_for_read))
     val = Vcoding_system_for_read;
-  else if ((!NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
+  else if ((! NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
 	   || (NILP (buffer) && NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))))
     val = Qnil;
   pset_decode_coding_system (p, val);
 
   val = Qnil;
-  if (!NILP (tem))
+  if (! NILP (tem))
     {
       val = tem;
       if (CONSP (val))
 	val = XCDR (val);
     }
-  else if (!NILP (Vcoding_system_for_write))
+  else if (! NILP (Vcoding_system_for_write))
     val = Vcoding_system_for_write;
-  else if ((!NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
+  else if ((! NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
 	   || (NILP (buffer) && NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))))
     val = Qnil;
   pset_encode_coding_system (p, val);
@@ -3098,7 +3083,7 @@ usage:  (make-serial-process &rest ARGS)  */)
   eassert (p->decoding_carryover == 0);
   pset_encoding_buf (p, empty_unibyte_string);
   p->inherit_coding_system_flag
-    = !(!NILP (tem) || NILP (buffer) || !inherit_process_coding_system);
+    = (NILP (tem) && ! NILP (buffer) && inherit_process_coding_system);
 
   Fserial_process_configure (nargs, args);
 
@@ -3122,15 +3107,15 @@ set_network_socket_coding_system (Lisp_Object proc, Lisp_Object host,
   /* Setup coding systems for communicating with the network stream.  */
   /* Qt denotes we have not yet called Ffind_operation_coding_system.  */
 
-  if (!NILP (tem))
+  if (! NILP (tem))
     {
       val = tem;
       if (CONSP (val))
 	val = XCAR (val);
     }
-  else if (!NILP (Vcoding_system_for_read))
+  else if (! NILP (Vcoding_system_for_read))
     val = Vcoding_system_for_read;
-  else if ((!NILP (p->buffer)
+  else if ((! NILP (p->buffer)
 	    && NILP (BVAR (XBUFFER (p->buffer), enable_multibyte_characters)))
 	   || (NILP (p->buffer)
 	       && NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))))
@@ -3156,13 +3141,13 @@ set_network_socket_coding_system (Lisp_Object proc, Lisp_Object host,
     }
   pset_decode_coding_system (p, val);
 
-  if (!NILP (tem))
+  if (! NILP (tem))
     {
       val = tem;
       if (CONSP (val))
 	val = XCDR (val);
     }
-  else if (!NILP (Vcoding_system_for_write))
+  else if (! NILP (Vcoding_system_for_write))
     val = Vcoding_system_for_write;
   else if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     val = Qnil;
@@ -3191,7 +3176,7 @@ set_network_socket_coding_system (Lisp_Object proc, Lisp_Object host,
   pset_encoding_buf (p, empty_unibyte_string);
 
   p->inherit_coding_system_flag
-    = !(!NILP (tem) || NILP (p->buffer) || !inherit_process_coding_system);
+    = (NILP (tem) && ! NILP (p->buffer) && inherit_process_coding_system);
 }
 
 #ifdef HAVE_GNUTLS
@@ -3202,7 +3187,7 @@ handshaked_callback (Lisp_Object proc)
   Lisp_Object contact = p->childp;
   Lisp_Object result = Qt;
 
-  if (!NILP (Ffboundp (Qnsm_verify_connection)))
+  if (! NILP (Ffboundp (Qnsm_verify_connection)))
     result = call3 (Qnsm_verify_connection,
 		    proc,
 		    plist_get (contact, QChost),
@@ -3273,7 +3258,7 @@ connected_callback (Lisp_Object proc)
       exec_sentinel (proc, build_string ("open\n"));
       if (EQ (p->filter, Qt))
 	delete_read_fd (p->infd);
-      else if (!EQ (p->command, Qt))
+      else if (! EQ (p->command, Qt))
 	add_process_read_fd(p->infd);
     }
   return retry;
@@ -3313,7 +3298,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
   record_unwind_protect_nothing ();
   specpdl_ref count1 = SPECPDL_INDEX ();
 
-  while (!NILP (addrinfos))
+  while (! NILP (addrinfos))
     {
       Lisp_Object addrinfo = XCAR (addrinfos);
       addrinfos = XCDR (addrinfos);
@@ -3378,7 +3363,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       {
 	Lisp_Object params = contact, key, val;
 
-	while (!NILP (params))
+	while (! NILP (params))
 	  {
 	    key = XCAR (params);
 	    params = XCDR (params);
@@ -3532,7 +3517,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	{
 	  Lisp_Object remote;
 	  memset (datagram_address[s].sa, 0, addrlen);
-	  if (remote = plist_get (contact, QCremote), !NILP (remote))
+	  if (remote = plist_get (contact, QCremote), ! NILP (remote))
 	    {
 	      int rfamily;
 	      ptrdiff_t rlen = get_lisp_to_sockaddr_size (remote, &rfamily);
@@ -3834,9 +3819,9 @@ usage: (make-network-process &rest ARGS)  */)
   sentinel = plist_get (contact, QCsentinel);
   use_external_socket_p = plist_get (contact, QCuse_external_socket);
   Lisp_Object server = plist_get (contact, QCserver);
-  bool nowait = !NILP (plist_get (contact, QCnowait));
+  bool nowait = ! NILP (plist_get (contact, QCnowait));
 
-  if (!NILP (server) && nowait)
+  if (! NILP (server) && nowait)
     error ("`:server' is incompatible with `:nowait'");
   CHECK_STRING (name);
 
@@ -3845,7 +3830,7 @@ usage: (make-network-process &rest ARGS)  */)
     address = plist_get (contact, QCremote);
   else
     address = plist_get (contact, QClocal);
-  if (!NILP (address))
+  if (! NILP (address))
     {
       host = service = Qnil;
 
@@ -3921,7 +3906,7 @@ usage: (make-network-process &rest ARGS)  */)
 #ifdef HAVE_LOCAL_SOCKETS
   if (family == AF_LOCAL)
     {
-      if (!NILP (host))
+      if (! NILP (host))
 	{
 	  message (":family local ignores the :host property");
 	  contact = plist_put (contact, QChost, Qnil);
@@ -3946,7 +3931,7 @@ usage: (make-network-process &rest ARGS)  */)
     }
 #endif
 
-  if (!NILP (host))
+  if (! NILP (host))
     {
       MAYBE_UNUSED ptrdiff_t portstringlen;
 
@@ -4004,7 +3989,7 @@ usage: (make-network-process &rest ARGS)  */)
   /* If we have a host, use getaddrinfo to resolve both host and service.
      Otherwise, use getservbyname to lookup the service.  */
 
-  if (!NILP (host))
+  if (! NILP (host))
     {
       struct addrinfo *res, *lres;
       Lisp_Object msg;
@@ -4068,7 +4053,7 @@ usage: (make-network-process &rest ARGS)  */)
 
  open_socket:
 
-  if (!NILP (buffer))
+  if (! NILP (buffer))
     buffer = Fget_buffer_create (buffer, Qnil);
 
   /* Unwind bind_polling_period.  */
@@ -4085,9 +4070,9 @@ usage: (make-network-process &rest ARGS)  */)
   pset_sentinel (p, sentinel);
   pset_filter (p, filter);
   pset_log (p, plist_get (contact, QClog));
-  if (tem = plist_get (contact, QCnoquery), !NILP (tem))
+  if (tem = plist_get (contact, QCnoquery), ! NILP (tem))
     p->kill_without_query = 1;
-  if ((tem = plist_get (contact, QCstop), !NILP (tem)))
+  if ((tem = plist_get (contact, QCstop), ! NILP (tem)))
     pset_command (p, Qt);
   eassert (p->pid == 0);
   p->backlog = 5;
@@ -4106,7 +4091,7 @@ usage: (make-network-process &rest ARGS)  */)
   set_network_socket_coding_system (proc, host, service, name);
 
   /* :server QLEN */
-  p->is_server = !NILP (server);
+  p->is_server = ! NILP (server);
   if (TYPE_RANGED_FIXNUMP (int, server))
     p->backlog = XFIXNUM (server);
 
@@ -4581,7 +4566,7 @@ returned from the lookup.  */)
 
   if (EQ (hint, Qnumeric))
     hints.ai_flags = AI_NUMERICHOST;
-  else if (!NILP (hint))
+  else if (! NILP (hint))
     error ("Unsupported hints value");
 
   msg = network_lookup_address_info_1 (name, NULL, &hints, &res);
@@ -4682,7 +4667,7 @@ corresponding connection was closed.  */)
 
       /* Can't wait for a process that is dedicated to a different
 	 thread.  */
-      if (!NILP (proc->thread) && !EQ (proc->thread, Fcurrent_thread ()))
+      if (! NILP (proc->thread) && !EQ (proc->thread, Fcurrent_thread ()))
 	{
 	  Lisp_Object proc_thread_name = XTHREAD (proc->thread)->name;
 
@@ -4696,7 +4681,7 @@ corresponding connection was closed.  */)
   else
     just_this_one = Qnil;
 
-  if (!NILP (millisec))
+  if (! NILP (millisec))
     { /* Obsolete calling convention using integers rather than floats.  */
       CHECK_FIXNUM (millisec);
       if (NILP (seconds))
@@ -4711,7 +4696,7 @@ corresponding connection was closed.  */)
   secs = 0;
   nsecs = -1;
 
-  if (!NILP (seconds))
+  if (! NILP (seconds))
     {
       if (FIXNUMP (seconds))
 	{
@@ -4736,13 +4721,10 @@ corresponding connection was closed.  */)
   else if (! NILP (process))
     nsecs = 0;
 
-  return
-    ((wait_reading_process_output (secs, nsecs, 0, 0,
-				   !NILP (process) ? XPROCESS (process) : NULL,
-				   (NILP (just_this_one) ? 0
-				    : !FIXNUMP (just_this_one) ? 1 : -1))
-      <= 0)
-     ? Qnil : Qt);
+  return 0 < wait_reading_process_output (secs, nsecs, 0, 0,
+					  NILP (process) ? NULL : XPROCESS (process),
+					  NILP (just_this_one) ? 0 : (FIXNUMP (just_this_one) ? -1 : 1))
+    ? Qt : Qnil;
 }
 
 /* Accept a connection for server process SERVER on CHANNEL.  */
@@ -4772,7 +4754,7 @@ server_accept_connection (Lisp_Object server, int channel)
   if (s < 0)
     {
       int code = errno;
-      if (!would_block (code) && !NILP (ps->log))
+      if (!would_block (code) && ! NILP (ps->log))
 	call3 (ps->log, server, Qnil,
 	       concat3 (build_string ("accept failed with code"),
 			Fnumber_to_string (make_fixnum (code)),
@@ -4837,27 +4819,21 @@ server_accept_connection (Lisp_Object server, int channel)
       break;
     }
 
-  /* Create a new buffer name for this process if it doesn't have a
-     filter.  The new buffer name is based on the buffer name or
-     process name of the server process concatenated with the caller
-     identification.  */
-
-  if (!(EQ (ps->filter, Qinternal_default_process_filter)
-	|| EQ (ps->filter, Qt)))
-    buffer = Qnil;
-  else
+  if (EQ (ps->filter, Qinternal_default_process_filter)
+      || EQ (ps->filter, Qt))
     {
-      buffer = ps->buffer;
-      if (!NILP (buffer))
-	buffer = Fbuffer_name (buffer);
-      else
-	buffer = ps->name;
-      if (!NILP (buffer))
+      /* The trivial filters dump to a buffer named after the process
+	 buffer or, failing that, the process name.  */
+      buffer = NILP (ps->buffer) ? ps->name : Fbuffer_name (ps->buffer);
+      if (! NILP (buffer))
 	{
 	  args[1] = buffer;
 	  buffer = Fget_buffer_create (Fformat (nargs, args), Qnil);
 	}
     }
+  else
+    /* user supplied filter */
+    buffer = Qnil;
 
   /* Generate a unique name for the new server process.  Combine the
      server process name with the caller identification.  */
@@ -4877,7 +4853,7 @@ server_accept_connection (Lisp_Object server, int channel)
   contact = Fcopy_sequence (ps->childp);
   contact = plist_put (contact, QCserver, Qnil);
   contact = plist_put (contact, QChost, host);
-  if (!NILP (service))
+  if (! NILP (service))
     contact = plist_put (contact, QCservice, service);
   contact = plist_put (contact, QCremote,
 		       conv_sockaddr_to_lisp (&saddr.sa, len));
@@ -4907,7 +4883,7 @@ server_accept_connection (Lisp_Object server, int channel)
   pset_status (p, Qrun);
 
   /* Client processes for accepted connections are not stopped initially.  */
-  if (!EQ (p->filter, Qt))
+  if (! EQ (p->filter, Qt))
     add_process_read_fd (s);
   if (s > max_desc)
     max_desc = s;
@@ -4932,7 +4908,7 @@ server_accept_connection (Lisp_Object server, int channel)
   AUTO_STRING (nl, "\n");
   Lisp_Object host_string = STRINGP (host) ? host : dash;
 
-  if (!NILP (ps->log))
+  if (! NILP (ps->log))
     {
       AUTO_STRING (accept_from, "accept from ");
       call3 (ps->log, server, proc, concat3 (accept_from, host_string, nl));
@@ -5136,7 +5112,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		if (p->dns_request)
 		  {
 		    Lisp_Object addrinfos = check_for_dns (aproc);
-		    if (!NILP (addrinfos) && !EQ (addrinfos, Qt))
+		    if (! NILP (addrinfos) && !EQ (addrinfos, Qt))
 		      connect_network_socket (aproc, addrinfos, Qnil);
 		    else
 		      retry_for_async = true;
@@ -5218,18 +5194,15 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		{
 		  int nread = read_process_output (proc, wait_proc->infd);
 		  rarely_quit (++count);
-		  if (nread < 0)
-		    {
-		      if (errno != EINTR)
-			break;
-		    }
-		  else
+		  if (nread >= 0)
 		    {
 		      got_some_output = max (got_some_output, nread);
 		      if (nread == 0)
 			break;
 		      read_some_bytes = true;
 		    }
+		  else if (errno != EINTR)
+		    break;
 		}
 	    }
 
@@ -5301,7 +5274,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		  Lisp_Object proc = chan_process[channel];
 		  /* Find minimum non-zero read_output_delay among the
 		     processes with non-zero read_output_skip.  */
-		  if (!NILP (proc)
+		  if (! NILP (proc)
 		      && XPROCESS (proc)->read_output_skip)
 		    {
 		      XPROCESS (proc)->read_output_skip = 0;
@@ -5325,10 +5298,10 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	      && timespec_valid_p (timer_delay)
 	      && timespec_cmp (timer_delay, timeout) < 0)
 	    {
-	      if (!timespec_valid_p (now))
+	      if (! timespec_valid_p (now))
 		now = current_timespec ();
 	      struct timespec timeout_abs = timespec_add (now, timeout);
-	      if (!timespec_valid_p (got_output_end_time)
+	      if (! timespec_valid_p (got_output_end_time)
 		  || timespec_cmp (timeout_abs, got_output_end_time) < 0)
 		got_output_end_time = timeout_abs;
 	      timeout = timer_delay;
@@ -5830,7 +5803,7 @@ Otherwise it discards the output.  */)
   p = XPROCESS (proc);
   CHECK_STRING (text);
 
-  if (!NILP (p->buffer) && BUFFER_LIVE_P (XBUFFER (p->buffer)))
+  if (! NILP (p->buffer) && BUFFER_LIVE_P (XBUFFER (p->buffer)))
     {
       Lisp_Object old_read_only;
       ptrdiff_t old_begv, old_zv;
@@ -6016,7 +5989,7 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 
   if ((STRINGP (object) && STRING_MULTIBYTE (object))
       || (BUFFERP (object)
-	  && !NILP (BVAR (XBUFFER (object), enable_multibyte_characters)))
+	  && ! NILP (BVAR (XBUFFER (object), enable_multibyte_characters)))
       || EQ (object, Qt))
     {
       pset_encode_coding_system
@@ -6098,10 +6071,10 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 
   /* If there is already data in the write_queue, put the new data
      in the back of queue.  Otherwise, ignore it.  */
-  if (!NILP (p->write_queue))
+  if (! NILP (p->write_queue))
     write_queue_push (p, object, buf, len, 0);
 
-  do   /* while !NILP (p->write_queue) */
+  do   /* while ! NILP (p->write_queue) */
     {
       ptrdiff_t cur_len = -1;
       const char *cur_buf;
@@ -6213,7 +6186,7 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 	  cur_len -= written;
 	}
     }
-  while (!NILP (p->write_queue));
+  while (! NILP (p->write_queue));
 }
 
 DEFUN ("process-send-region", Fprocess_send_region, Sprocess_send_region,
@@ -6576,7 +6549,7 @@ traffic.  */)
       eassert (p->infd < FD_SETSIZE);
       if (EQ (p->command, Qt)
 	  && p->infd >= 0
-	  && (!EQ (p->filter, Qt) || EQ (p->status, Qlisten)))
+	  && (! EQ (p->filter, Qt) || EQ (p->status, Qlisten)))
 	{
 	  add_process_read_fd (p->infd);
 #ifdef WINDOWSNT
@@ -7136,7 +7109,7 @@ This inserts a status message into the process's buffer, if there is one.  */)
   if (CONSP (symbol))
     symbol = XCAR (symbol);
 
-  if (!EQ (symbol, Qrun) && !NILP (buffer))
+  if (!EQ (symbol, Qrun) && ! NILP (buffer))
     {
       Lisp_Object tem;
       struct buffer *old = current_buffer;
@@ -7332,19 +7305,17 @@ setup_process_coding_systems (Lisp_Object process)
     return;
 
   eassert (0 <= inch && inch < FD_SETSIZE);
-  if (!proc_decode_coding_system[inch])
+  if (! proc_decode_coding_system[inch])
     proc_decode_coding_system[inch] = xmalloc (sizeof (struct coding_system));
   coding_system = p->decode_coding_system;
   if (EQ (p->filter, Qinternal_default_process_filter)
-      && BUFFERP (p->buffer))
-    {
-      if (NILP (BVAR (XBUFFER (p->buffer), enable_multibyte_characters)))
-	coding_system = raw_text_coding_system (coding_system);
-    }
+      && BUFFERP (p->buffer)
+      && NILP (BVAR (XBUFFER (p->buffer), enable_multibyte_characters)))
+    coding_system = raw_text_coding_system (coding_system);
   setup_coding_system (coding_system, proc_decode_coding_system[inch]);
 
   eassert (0 <= outch && outch < FD_SETSIZE);
-  if (!proc_encode_coding_system[outch])
+  if (! proc_encode_coding_system[outch])
     proc_encode_coding_system[outch] = xmalloc (sizeof (struct coding_system));
   setup_coding_system (p->encode_coding_system,
 		       proc_encode_coding_system[outch]);
@@ -7447,7 +7418,7 @@ See `process-attributes' for getting attributes of a process given its ID.  */)
   Lisp_Object handler
     = Ffind_file_name_handler (BVAR (current_buffer, directory),
 			       Qlist_system_processes);
-  if (!NILP (handler))
+  if (! NILP (handler))
     return call1 (handler, Qlist_system_processes);
 
   return list_system_processes ();
@@ -7511,7 +7482,7 @@ integer or floating point values.
   Lisp_Object handler
     = Ffind_file_name_handler (BVAR (current_buffer, directory),
 			       Qprocess_attributes);
-  if (!NILP (handler))
+  if (! NILP (handler))
     return call2 (handler, Qprocess_attributes, pid);
 
   return system_process_attributes (pid);

@@ -231,15 +231,14 @@ process to complete."
   (while (and output (let ((ins inputs))
                        (while (and ins (not (eq (car (car ins)) (car output))))
                          (setq ins (cdr ins)))
-                       (if ins
-                           (setcar ins (cdr (car ins))))
+                       (when ins
+                         (setcar ins (cdr (car ins))))
                        ins))
     (setq output (cdr output)))
   (not (apply #'append output inputs)))
 
 (ert-deftest make-process/mix-stderr ()
   "Check that `make-process' mixes the output streams if STDERR is nil."
-  (skip-unless (not (eq system-type 'darwin)))
   (skip-unless (executable-find "bash"))
   (with-timeout (60 (ert-fail "Test timed out"))
   ;; Frequent random (?) failures on hydra.nixos.org, with no process output.
@@ -254,10 +253,10 @@ process to complete."
                     :sentinel #'ignore
                     :noquery t
                     :connection-type 'pipe)))
-      (while (or (accept-process-output process)
-		 (process-live-p process)))
-      (should (eq (process-status process) 'exit))
-      (should (eq (process-exit-status process) 0))
+      (while (process-live-p process))
+      (accept-process-output)
+      (should (eq 'exit (process-status process)))
+      (should (zerop (process-exit-status process)))
       (should (process-tests--mixable (string-to-list (buffer-string))
                                       (string-to-list "stdout\n")
                                       (string-to-list "stderr\n")))))))

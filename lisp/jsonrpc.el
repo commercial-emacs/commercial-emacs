@@ -163,44 +163,37 @@ circumvent that.")
   "Process MESSAGE just received from CONNECTION.
 This function will destructure MESSAGE and call the appropriate
 dispatcher in CONNECTION."
-  (cl-destructuring-bind (&key method id error params result _jsonrpc)
+  (cl-destructuring-bind (&key method id error params result &allow-other-keys
+                          &aux continuations)
       message
-    (let (continuations)
-      (jsonrpc--log-event connection message 'server)
-      (setf (jsonrpc-last-error connection) error)
-      (cond
-       (;; A remote request
-        (and method id)
-        (let* ((reply
-                (condition-case-unless-debug _ignore
-                    (condition-case oops
-                        `(:result ,(funcall (jsonrpc--request-dispatcher connection)
-                                            connection (intern method) params))
-                      (jsonrpc-error
-                       `(:error
-                         (:code
-                          ,(or (alist-get 'jsonrpc-error-code (cdr oops)) -32603)
-                          :message ,(or (alist-get 'jsonrpc-error-message
-                                                   (cdr oops))
-                                        "Internal error")))))
+    (jsonrpc--log-event connection message 'server)
+    (setf (jsonrpc-last-error connection) error)
+    (cond
+     ;; A remote request
+     ((and method id)
+      (apply #'jsonrpc--reply connection
+             id (condition-case err
+                    `(:result ,(funcall (jsonrpc--request-dispatcher connection)
+                                        connection (intern method) params))
                   (error
-                   '(:error (:code -32603 :message "Internal error"))))))
-          (apply #'jsonrpc--reply connection id reply)))
-       ;; A remote notification
-       (method
-        (funcall (jsonrpc--notification-dispatcher connection)
-                 connection (intern method) params))
-       ;; A remote response
-       ((setq continuations
-              (and id (gethash id (jsonrpc--request-continuations connection))))
-        (when-let ((timer (nth 2 continuations)))
-          (cancel-timer timer))
-        (remhash id (jsonrpc--request-continuations connection))
-        (if error
-            (funcall (nth 1 continuations) error)
-          (funcall (nth 0 continuations) result))))
-      (jsonrpc--call-deferred connection))))
-
+                   (let ((code (alist-get 'jsonrpc-error-code (cdr err))))
+                     `(:error (:code
+                               ,(or code -32603)
+                               :message
+                               ,(or code "Internal error"))))))))
+     ;; A remote notification
+     (method
+      (funcall (jsonrpc--notification-dispatcher connection)
+               connection (intern method) params))
+     ;; A remote response
+     ((setq continuations
+            (and id (gethash id (jsonrpc--request-continuations connection))))
+      (cancel-timer (nth 2 continuations))
+      (remhash id (jsonrpc--request-continuations connection))
+      (if error
+          (funcall (nth 1 continuations) error)
+        (funcall (nth 0 continuations) result))))
+    (jsonrpc--call-deferred connection)))
 
 ;;; Contacting the remote endpoint
 ;;;
@@ -245,7 +238,7 @@ called again with identical buffer and DEFERRED value before the
 request is issued, the request is dropped."
   (prog1 nil
     (ignore success-fn error-fn timeout-fn timeout deferred)
-    (apply #'jsonrpc--async-request-1 connection method params args)))
+    (apply #'jsonrpc--async-request connection method params args)))
 
 (cl-defun jsonrpc-request (connection method params
                            &key deferred timeout
@@ -261,7 +254,7 @@ dropped."
   (let ((deferred-key (list deferred (current-buffer)))
         done-p error-p retval)
     (cl-destructuring-bind (id timer)
-        (apply #'jsonrpc--async-request-1
+        (apply #'jsonrpc--async-request
                connection method params
                :success-fn
                (lambda (result)
@@ -409,7 +402,9 @@ invisible by renaming to \" *[CONN name] stderr*\"."
                                        &rest args)
   (setq args (jsonrpc--stringify-method args))
   (let* ((message `(:jsonrpc "2.0" ,@args))
-         (json (jsonrpc--json-encode message))
+         (json (json-serialize message
+                               :false-object :json-false
+                               :null-object nil))
          (headers `(("Content-Length" . ,(format "%d" (string-bytes json))))))
     (jsonrpc--log-event connection message 'client)
     (process-send-string
@@ -447,40 +442,7 @@ With optional CLEANUP, kill any associated buffers."
   "Get CONN's standard error buffer, if any."
   (process-get (jsonrpc--process conn) 'jsonrpc-stderr))
 
-
-;;; Private stuff
-;;;
 (define-error 'jsonrpc-error "jsonrpc-error")
-
-(defalias 'jsonrpc--json-read
-  (if (fboundp 'json-parse-buffer)
-      (lambda ()
-        (json-parse-buffer :object-type 'plist
-                           :null-object nil
-                           :false-object :json-false))
-    (require 'json)
-    (defvar json-object-type)
-    (declare-function json-read "json" ())
-    (lambda ()
-      (let ((json-object-type 'plist))
-        (json-read))))
-  "Read JSON object in buffer, move point to end of buffer.")
-
-(defalias 'jsonrpc--json-encode
-  (if (fboundp 'json-serialize)
-      (lambda (object)
-        (json-serialize object
-                        :false-object :json-false
-                        :null-object nil))
-    (require 'json)
-    (defvar json-false)
-    (defvar json-null)
-    (declare-function json-encode "json" (object))
-    (lambda (object)
-      (let ((json-false :json-false)
-            (json-null nil))
-        (json-encode object))))
-  "Encode OBJECT into a JSON string.")
 
 (cl-defun jsonrpc--reply
     (connection id &key (result nil result-supplied-p) (error nil error-supplied-p))
@@ -557,7 +519,9 @@ With optional CLEANUP, kill any associated buffers."
                       (narrow-to-region (point) message-end)
                       (when-let ((json-message
                                   (condition-case err
-                                      (jsonrpc--json-read)
+                                      (json-parse-buffer :object-type 'plist
+                                                         :null-object nil
+                                                         :false-object :json-false)
                                     (error
                                      (prog1 nil
                                        (jsonrpc--warn "Invalid JSON: %s %s"
@@ -575,7 +539,7 @@ With optional CLEANUP, kill any associated buffers."
                       (delete-region (point-min) (point))
                       (setf (jsonrpc--expected-bytes connection) nil))))))))))))
 
-(cl-defun jsonrpc--async-request-1 (connection method params
+(cl-defun jsonrpc--async-request (connection method params
                                     &rest args
                                     &key success-fn error-fn timeout-fn deferred
                                     (timeout jsonrpc-default-request-timeout)
