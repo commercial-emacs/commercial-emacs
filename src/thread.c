@@ -478,15 +478,14 @@ internal_select (void *arg)
   sigset_t oldset;
 
   block_interrupt_signal (&oldset);
-  sys_mutex_unlock (&global_lock);
+  release_global_lock ();
   restore_signal_mask (&oldset);
 
   sa->result = (sa->func) (sa->max_fds, sa->rfds, sa->wfds, sa->efds,
 			   sa->timeout, sa->sigmask);
 
   block_interrupt_signal (&oldset);
-  sys_mutex_lock (&global_lock);
-  restore_thread (self);
+  acquire_global_lock (self);
   restore_signal_mask (&oldset);
 }
 
@@ -569,10 +568,21 @@ static void
 yield_callback (void *ignore)
 {
   struct thread_state *self = current_thread; // current_thread changes!
+  release_global_lock ();
+  acquire_global_lock (self);
+}
+
+void
+release_global_lock (void)
+{
   sys_mutex_unlock (&global_lock);
-  sys_thread_yield ();
+  sys_thread_yield (); // mostly no-op
+}
+
+void acquire_global_lock (struct thread_state *state)
+{
   sys_mutex_lock (&global_lock);
-  restore_thread (self);
+  restore_thread (state);
 }
 
 DEFUN ("thread-yield", Fthread_yield, Sthread_yield, 0, 0, 0,
@@ -618,10 +628,7 @@ run_thread (void *state)
     sys_thread_set_name (self->thread_name);
 
   if (self->cooperative)
-    {
-      sys_mutex_lock (&global_lock);
-      restore_thread (self);
-    }
+    acquire_global_lock (self);
 
   /* Put a dummy catcher at top-level so that handlerlist is never NULL.
      This is important since handlerlist->nextfree holds the freelist
@@ -672,7 +679,7 @@ run_thread (void *state)
     }
 
   if (self->cooperative)
-    sys_mutex_unlock (&global_lock);
+    release_global_lock ();
 
   return NULL;
 }

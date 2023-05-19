@@ -265,6 +265,8 @@ int thread_select  (select_func *func, int max_fds, fd_set *rfds,
 		    sigset_t *sigmask);
 
 bool thread_check_current_buffer (struct buffer *);
+void release_global_lock (void);
+void acquire_global_lock (struct thread_state *);
 
 INLINE_HEADER_END
 

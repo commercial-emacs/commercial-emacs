@@ -36,8 +36,9 @@ INLINE_HEADER_BEGIN
 
 enum { PROCESS_OPEN_FDS = 6 };
 
-/* This structure records information about a subprocess
-   or network connection.  */
+/* This structure records information about a subprocess or network
+   connection. As for all vectorlikes, Lisp_Objects must precede non
+   Lisp fields */
 
 struct Lisp_Process
   {
@@ -117,7 +118,6 @@ struct Lisp_Process
 
     /* The thread a process is linked to, or nil for any thread.  */
     Lisp_Object thread;
-    /* After this point, there are no Lisp_Objects.  */
 
     /* Process ID.  A positive value is a child process ID.
        Zero is for pseudo-processes such as network or serial connections,
@@ -129,7 +129,6 @@ struct Lisp_Process
     int infd;
     /* Byte-count for process output read on `infd'.  */
     uintmax_t nbytes_read;
-
     /* Descriptor by which we write to this process.  */
     int outfd;
     /* Descriptors that were created for this process and that need
@@ -171,12 +170,12 @@ struct Lisp_Process
        flag indicates that `raw_status' contains a new status that still
        needs to be synced to `status'.  */
     bool_bf raw_status_new : 1;
-
     /* Block until connection established */
     bool_bf blocking_connect : 1;
-
     /* Whether this is a server or a client socket. */
     bool_bf is_server : 1;
+    /* Whether to skip in wait_reading_process_output().  */
+    bool_bf thread_managed : 1;
     int raw_status;
     /* The length of the socket backlog. */
     int backlog;

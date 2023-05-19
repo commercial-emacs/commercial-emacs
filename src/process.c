@@ -245,7 +245,7 @@ static bool keyboard_bit_set (fd_set *);
 #endif
 static void deactivate_process (Lisp_Object);
 static int status_notify (struct Lisp_Process *);
-static int read_process_output (Lisp_Object, int);
+static int read_process_output (Lisp_Object);
 static void create_pty (Lisp_Object);
 static void exec_sentinel (Lisp_Object, Lisp_Object);
 
@@ -390,12 +390,6 @@ static void
 pset_stderrproc (struct Lisp_Process *p, Lisp_Object val)
 {
   p->stderrproc = val;
-}
-
-static Lisp_Object
-make_lisp_proc (struct Lisp_Process *p)
-{
-  return make_lisp_ptr (p, Lisp_Vectorlike);
 }
 
 enum fd_bits
@@ -1550,6 +1544,41 @@ DEFUN ("process-list", Fprocess_list, Sprocess_list, 0, 0, 0,
   (void)
 {
   return Fmapcar (Qcdr, Vprocess_alist);
+}
+
+DEFUN ("jsonrpc--thunk", Fjsonrpc__thunk, Sjsonrpc__thunk, 2, 2, 0,
+       doc: /* PIPE and HANDLER.  */)
+  (Lisp_Object pipe, Lisp_Object handler)
+{
+  struct Lisp_Process *p;
+  CHECK_PROCESS (pipe);
+  eassume (PIPECONN_P (pipe));
+  p = XPROCESS (pipe);
+  p->thread_managed = 1; /* Marks skip in wait_reading_process_output().  */
+  while (EQ (p->status, Qrun))
+    {
+      /* Replicate song and dance from wait_reading_process_output().  */
+      if (0 == read_process_output (pipe)
+	  || (errno && ! would_block (errno)))
+	{
+	  p->tick = ++process_tick; // static variable consistency issue
+	  deactivate_process (pipe);
+	  if (p->raw_status_new)
+	    update_status (p);
+	  if (EQ (p->status, Qrun))
+	    pset_status (p, list2 (Qexit, make_fixnum (0)));
+	}
+    }
+  return Qnil;
+}
+
+DEFUN ("jsonrpc-thread", Fjsonrpc_thread, Sjsonrpc_thread, 1, 3, 0,
+       doc: /* Start new thread whose lifetime is that of running PIPE.
+A non-nil NAME string is assigned to the thread.
+*/)
+  (Lisp_Object pipe, Lisp_Object handler, Lisp_Object name)
+{
+  return Fmake_thread (Fjsonrpc__thunk (pipe, handler), name, Qnil);
 }
 
 /* Starting asynchronous inferior processes.  */
@@ -3220,14 +3249,9 @@ connected_callback (Lisp_Object proc)
 #ifdef HAVE_GNUTLS
   Lisp_Object params = p->gnutls_boot_parameters;
 
-  /* Surprising, out-of-band calls to gnutls-negotiate()
-     confound reasoning about control flow.  Ideally,
-     all handshaking happens here, but too many cooks
-     (or just one cut-rate one) spoil the broth.
-  */
   handshaked = NILP (p->gnutls_boot_parameters)
     || (p->gnutls_initstage >= GNUTLS_STAGE_READY);
-  if (!handshaked)
+  if (! handshaked)
     {
       Lisp_Object retval = (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED)
 	? gnutls_handshake_and_verify (proc, XCDR (params), p->blocking_connect ? Qt : Qnil)
@@ -3350,7 +3374,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	}
 
 #ifdef DATAGRAM_SOCKETS
-      if (!p->is_server && p->socktype == SOCK_DGRAM)
+      if (! p->is_server && p->socktype == SOCK_DGRAM)
 	break;
 #endif
 
@@ -3536,7 +3560,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 		       conv_sockaddr_to_lisp (sa, addrlen));
 
 #ifdef HAVE_GETSOCKNAME
-  if (!p->is_server)
+  if (! p->is_server)
     {
       struct sockaddr_storage sa1;
       socklen_t len1 = sizeof (sa1);
@@ -4657,20 +4681,21 @@ corresponding connection was closed.  */)
   (Lisp_Object process, Lisp_Object seconds, Lisp_Object millisec,
    Lisp_Object just_this_one)
 {
-  intmax_t secs;
-  int nsecs;
+  intmax_t secs = 0;
+  int nsecs = -1;
 
-  if (! NILP (process))
+  if (NILP (process))
+    just_this_one = Qnil;
+  else
     {
       CHECK_PROCESS (process);
       struct Lisp_Process *proc = XPROCESS (process);
-
-      /* Can't wait for a process that is dedicated to a different
-	 thread.  */
-      if (! NILP (proc->thread) && !EQ (proc->thread, Fcurrent_thread ()))
+      /* This restriction makes little sense since main thread reads
+	 output from all processes regardless of their owning thread
+	 in wait_reading_process_output().  */
+      if (! NILP (proc->thread) && ! EQ (proc->thread, Fcurrent_thread ()))
 	{
 	  Lisp_Object proc_thread_name = XTHREAD (proc->thread)->name;
-
 	  error ("Attempt to accept output from process %s locked to thread %s",
 		 SDATA (proc->name),
 		 STRINGP (proc_thread_name)
@@ -4678,11 +4703,10 @@ corresponding connection was closed.  */)
 		 : SDATA (Fprin1_to_string (proc->thread, Qt, Qnil)));
 	}
     }
-  else
-    just_this_one = Qnil;
 
   if (! NILP (millisec))
-    { /* Obsolete calling convention using integers rather than floats.  */
+    {
+      /* Obsolete calling convention using integers rather than floats.  */
       CHECK_FIXNUM (millisec);
       if (NILP (seconds))
 	seconds = make_float (XFIXNUM (millisec) / 1000.0);
@@ -4692,9 +4716,6 @@ corresponding connection was closed.  */)
 	  seconds = make_float (XFIXNUM (millisec) / 1000.0 + XFIXNUM (seconds));
 	}
     }
-
-  secs = 0;
-  nsecs = -1;
 
   if (! NILP (seconds))
     {
@@ -5192,7 +5213,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
 	      while (true)
 		{
-		  int nread = read_process_output (proc, wait_proc->infd);
+		  int nread = read_process_output (proc);
 		  rarely_quit (++count);
 		  if (nread >= 0)
 		    {
@@ -5489,6 +5510,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	      && ! (fd_callback_info[channel].flags & KEYBOARD_FD))
 	    {
 	      Lisp_Object proc = chan_process[channel];
+	      struct Lisp_Process *p = XPROCESS (proc);
 	      if (NILP (proc))
 		{
 		  delete_read_fd (channel);
@@ -5498,23 +5520,20 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		{
 		  server_accept_connection (proc, channel);
 		}
-	      else
+	      else if (! p->thread_managed)
 		{
 		  int nread;
-		  struct Lisp_Process *p = XPROCESS (proc);
+		  bool terminate_on_empty_read = (NETCONN_P (proc)
+						  || SERIALCONN_P (proc)
+						  || PIPECONN_P (proc));
 		  errno = 0;
-		  nread = read_process_output (proc, channel);
+		  nread = read_process_output (proc);
 		  xerrno = errno;
-
-		  bool terminate_on_empty_read =
-		    NETCONN_P (proc)
-		    || SERIALCONN_P (proc)
-		    || PIPECONN_P (proc);
 
 		  if (nread > 0)
 		    {
 		      last_read_channel = channel;
-		      if (!wait_proc || wait_proc == XPROCESS (proc))
+		      if (! wait_proc || wait_proc == XPROCESS (proc))
 			got_some_output = max (got_some_output, nread);
 		      if (do_display)
 			redisplay_preserve_echo_area (12);
@@ -5545,18 +5564,16 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		    }
 #endif /* HAVE_PTYS */
 		  else if ((nread == 0 && terminate_on_empty_read)
-			   ||
-			   (xerrno && ! would_block (xerrno)))
+			   || (xerrno && ! would_block (xerrno)))
 		    {
 		      p->tick = ++process_tick;
 		      deactivate_process (proc);
 		      if (p->raw_status_new)
 			update_status (p);
 		      if (EQ (p->status, Qrun))
-			pset_status (p,
-				     list2 (Qexit,
-					    make_fixnum (PIPECONN_P (proc)
-							 ? 0 : 256)));
+			pset_status (p, list2 (Qexit,
+					       make_fixnum (PIPECONN_P (proc)
+							    ? 0 : 256)));
 		    }
 		}
 	    }
@@ -5660,16 +5677,17 @@ read_process_output_error_handler (Lisp_Object error_val)
 }
 
 /* Read pending output from the process channel.  Return number of
-   decoded characters read, or -1 (setting errno) upon error.
+   decoded characters read, or -1 upon error.
 
-   Reads at most read_process_output_max bytes, so must be repeated
-   until returning zero for all subprocess output to be read.  */
+   Reads at most read_process_output_max bytes, so repeat until
+   returning zero to read all output.  */
 
 static int
-read_process_output (Lisp_Object proc, int channel)
+read_process_output (Lisp_Object proc)
 {
   ssize_t nbytes;
   struct Lisp_Process *p = XPROCESS (proc);
+  int channel = p->infd;
   eassert (0 <= channel && channel < FD_SETSIZE);
   struct coding_system *coding = proc_decode_coding_system[channel];
   const int carryover = p->decoding_carryover;
@@ -5677,6 +5695,15 @@ read_process_output (Lisp_Object proc, int channel)
   const specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object restore_deactivate;
   char *chars;
+  struct thread_state *self = current_thread;
+  bool behaved_p = ! NILP (Fprocess_thread (proc));
+
+  /* Allow other process-reading threads to run concurrently
+     if we're assured they won't contend on CHANNEL.  */
+  if (behaved_p)
+    release_global_lock ();
+
+  /* !! NO LISP ZONE ON */
 
   USE_SAFE_ALLOCA;
   chars = SAFE_ALLOCA (sizeof coding->carryover + readmax);
@@ -5717,6 +5744,11 @@ read_process_output (Lisp_Object proc, int channel)
 	    p->read_output_skip = 1;
 	}
     }
+
+  if (behaved_p)
+    acquire_global_lock (self);
+
+  /* !! NO LISP OFF */
 
   p->decoding_carryover = 0;
 
@@ -5777,12 +5809,10 @@ read_process_output (Lisp_Object proc, int channel)
     }
 
   if (SBYTES (coding->dst_object) > 0)
-    internal_condition_case_1 (read_process_output_call,
-			       list3 (p->filter, make_lisp_proc (p),
-                                      coding->dst_object),
-			       ! NILP (Vdebug_on_error) ? Qnil : Qerror,
-			       read_process_output_error_handler);
-
+      internal_condition_case_1 (read_process_output_call,
+				 list3 (p->filter, proc, coding->dst_object),
+				 NILP (Vdebug_on_error) ? Qerror : Qnil,
+				 read_process_output_error_handler);
   Vdeactivate_mark = restore_deactivate;
 
   SAFE_FREE_UNBIND_TO (count, Qnil);
@@ -7058,7 +7088,7 @@ status_notify (struct Lisp_Process *deleting_process)
 		 && p->infd >= 0
 		 && p != deleting_process)
 	    {
-	      int nread = read_process_output (proc, p->infd);
+	      int nread = read_process_output (proc);
 	      got_some_output = max(got_some_output, nread);
 	      if (nread <= 0)
 		break;
@@ -7890,6 +7920,8 @@ sentinel or a process filter function has an error.  */);
   defsubr (&Sset_process_plist);
   defsubr (&Sprocess_list);
   defsubr (&Smake_process);
+  defsubr (&Sjsonrpc_thread);
+  defsubr (&Sjsonrpc__thunk);
   defsubr (&Smake_pipe_process);
   defsubr (&Sserial_process_configure);
   defsubr (&Smake_serial_process);
