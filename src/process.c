@@ -5701,9 +5701,7 @@ read_process_output (Lisp_Object proc)
   /* Allow other process-reading threads to run concurrently
      if we're assured they won't contend on CHANNEL.  */
   if (behaved_p)
-    release_global_lock ();
-
-  /* !! NO LISP ZONE ON */
+    with_flushed_stack (release_global_lock, self);
 
   USE_SAFE_ALLOCA;
   chars = SAFE_ALLOCA (sizeof coding->carryover + readmax);
@@ -5748,8 +5746,6 @@ read_process_output (Lisp_Object proc)
   if (behaved_p)
     acquire_global_lock (self);
 
-  /* !! NO LISP OFF */
-
   p->decoding_carryover = 0;
 
   if (nbytes <= 0)
@@ -5770,6 +5766,7 @@ read_process_output (Lisp_Object proc)
   nbytes += carryover;
 
   restore_deactivate = Vdeactivate_mark;
+
   record_unwind_current_buffer ();
 
   /* We inhibit quit to avoid disrupting a filter.  */
@@ -5814,7 +5811,6 @@ read_process_output (Lisp_Object proc)
 				 NILP (Vdebug_on_error) ? Qerror : Qnil,
 				 read_process_output_error_handler);
   Vdeactivate_mark = restore_deactivate;
-
   SAFE_FREE_UNBIND_TO (count, Qnil);
   return nbytes;
 }

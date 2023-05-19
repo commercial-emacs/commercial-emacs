@@ -217,7 +217,6 @@ ptrdiff_t point_before_last_command_or_undo;
 struct buffer *buffer_before_last_command_or_undo;
 
 /* Value of num_nonmacro_input_events as of last auto save.  */
-
 static intmax_t last_auto_save;
 
 /* The value of point when the last command was started. */
@@ -231,70 +230,33 @@ static ptrdiff_t last_point_position;
 
    FIXME: This is modified by a signal handler so it should be volatile.
    It's exported to Lisp, though, so it can't simply be marked
-   'volatile' here.  */
+   volatile here.  */
 Lisp_Object internal_last_event_frame;
 
-/* `read_key_sequence' stores here the command definition of the
-   key sequence that it reads.  */
+/* read_key_sequence() stores the command definition of the
+   key sequence here.  */
 static Lisp_Object read_key_sequence_cmd;
 static Lisp_Object read_key_sequence_remapped;
 
 /* File in which we write all commands we read.  */
 static FILE *dribble;
 
-/* True if input is available.  */
+
+/* Input is available.  */
 bool input_pending;
 
-/* True if more input was available last time we read an event.
+/* The value of input_pending /before/ running a command, used
+   to skip redisplay.
 
-   Since redisplay can take a significant amount of time and is not
-   indispensable to perform the user's commands, when input arrives
-   "too fast", Emacs skips redisplay.  More specifically, if the next
-   command has already been input when we finish the previous command,
-   we skip the intermediate redisplay.
-
-   This is useful to try and make sure Emacs keeps up with fast input
-   rates, such as auto-repeating keys.  But in some cases, this proves
-   too conservative: we may end up disabling redisplay for the whole
-   duration of a key repetition, even though we could afford to
-   redisplay every once in a while.
-
-   So we "sample" the input_pending flag before running a command and
-   use *that* value after running the command to decide whether to
-   skip redisplay or not.  This way, we only skip redisplay if we
-   really can't keep up with the repeat rate.
-
-   This only makes a difference if the next input arrives while running the
-   command, which is very unlikely if the command is executed quickly.
-   IOW this tends to avoid skipping redisplay after a long running command
-   (which is a case where skipping redisplay is not very useful since the
-   redisplay time is small compared to the time it took to run the command).
-
-   A typical use case is when scrolling.  Scrolling time can be split into:
-   - Time to do jit-lock on the newly displayed portion of buffer.
-   - Time to run the actual scroll command.
-   - Time to perform the redisplay.
-   Jit-lock can happen either during the command or during the redisplay.
-   In the most painful cases, the jit-lock time is the one that dominates.
-   Also jit-lock can be tweaked (via jit-lock-defer) to delay its job, at the
-   cost of temporary inaccuracy in display and scrolling.
-   So without input_was_pending, what typically happens is the following:
-   - when the command starts, there's no pending input (yet).
-   - the scroll command triggers jit-lock.
-   - during the long jit-lock time the next input arrives.
-   - at the end of the command, we check input_pending and hence decide to
-     skip redisplay.
-   - we read the next input and start over.
-   End result: all the hard work of jit-locking is "wasted" since redisplay
-   doesn't actually happens (at least not before the input rate slows down).
-   With input_was_pending redisplay is still skipped if Emacs can't keep up
-   with the input rate, but if it can keep up just enough that there's no
-   input_pending when we begin the command, then redisplay is not skipped
-   which results in better feedback to the user.  */
+   Generally, if inputs are pending we want to skip redisplay, but
+   checking input_pending after the command resulted in too few
+   redisplays, particularly after a long-running command when a
+   redisplay is overdue and during which the user had ample time to
+   flag input_pending.
+*/
 bool input_was_pending;
 
 /* Circular buffer for pre-read keyboard input.  */
-
 union buffered_input_event kbd_buffer[KBD_BUFFER_SIZE];
 
 /* Pointer to next available character in kbd_buffer.
@@ -2067,7 +2029,7 @@ read_event_from_main_queue (struct timespec *end_time,
   save_getcjmp (save_jump);
   record_unwind_protect_ptr (restore_getcjmp, save_jump);
   restore_getcjmp (local_getcjmp);
-  if (!end_time)
+  if (! end_time)
     timer_start_idle ();
   c = kbd_buffer_get_event (&kb, used_mouse_menu, end_time);
   unbind_to (count, Qnil);
@@ -2079,10 +2041,10 @@ read_event_from_main_queue (struct timespec *end_time,
         {
           while (CONSP (XCDR (last)))
 	    last = XCDR (last);
-          if (!NILP (XCDR (last)))
+          if (! NILP (XCDR (last)))
 	    emacs_abort ();
         }
-      if (!CONSP (last))
+      if (! CONSP (last))
         kset_kbd_queue (kb, list1 (c));
       else
         XSETCDR (last, list1 (c));
@@ -2117,7 +2079,7 @@ read_event_from_main_queue (struct timespec *end_time,
 
 
 
-/* Like `read_event_from_main_queue' but applies keyboard-coding-system
+/* Like read_event_from_main_queue() but applies keyboard-coding-system
    to tty input.  */
 static Lisp_Object
 read_decoded_event_from_main_queue (struct timespec *end_time,
@@ -2144,15 +2106,13 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
 #else
       struct frame *frame = XFRAME (selected_frame);
       struct terminal *terminal = frame->terminal;
-      if (!((FRAME_TERMCAP_P (frame) || FRAME_MSDOS_P (frame))
-            /* Don't apply decoding if we're just reading a raw event
-               (e.g. reading bytes sent by the xterm to specify the position
-               of a mouse click).  */
-            && (!EQ (prev_event, Qt))
-	    && (TERMINAL_KEYBOARD_CODING (terminal)->common_flags
-		& CODING_REQUIRE_DECODING_MASK)))
-	return nextevt;		/* No decoding needed.  */
-      else
+      if ((FRAME_TERMCAP_P (frame) || FRAME_MSDOS_P (frame))
+	  /* Don't apply decoding if we're just reading a raw event
+             (e.g. reading bytes sent by the xterm to specify the position
+             of a mouse click).  */
+	  && ! EQ (prev_event, Qt)
+	  && (TERMINAL_KEYBOARD_CODING (terminal)->common_flags
+	      & CODING_REQUIRE_DECODING_MASK))
 	{
 	  int meta_key = terminal->display_info.tty->meta_key;
 	  eassert (n < MAX_ENCODED_BYTES);
@@ -2228,6 +2188,9 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
 	      = Fcons (events[--n], Vunread_command_events);
 	  return events[0];
 	}
+      else
+	return nextevt;		/* No decoding needed.  */
+
 #endif
     }
 }
@@ -2265,20 +2228,15 @@ read_char (int commandflag, Lisp_Object map,
 	   Lisp_Object prev_event,
 	   bool *used_mouse_menu, struct timespec *end_time)
 {
-  Lisp_Object c;
+  Lisp_Object c = Qnil;
   sys_jmp_buf local_getcjmp;
   sys_jmp_buf save_jump;
   Lisp_Object tem, save;
-  volatile Lisp_Object previous_echo_area_message;
-  volatile Lisp_Object also_record;
+  volatile Lisp_Object previous_echo_area_message = Qnil;
+  volatile Lisp_Object also_record = Qnil;
   volatile bool reread, recorded;
   bool volatile polling_stopped_here = false;
   struct kboard *orig_kboard = current_kboard;
-
-  also_record = Qnil;
-
-  c = Qnil;
-  previous_echo_area_message = Qnil;
 
  retry:
 
@@ -2287,8 +2245,7 @@ read_char (int commandflag, Lisp_Object map,
   if (CONSP (Vunread_post_input_method_events))
     {
       c = XCAR (Vunread_post_input_method_events);
-      Vunread_post_input_method_events
-	= XCDR (Vunread_post_input_method_events);
+      Vunread_post_input_method_events = XCDR (Vunread_post_input_method_events);
 
       /* Undo what read_char_x_menu_prompt did when it unread
 	 additional keys returned by Fx_popup_menu.  */
@@ -2364,7 +2321,7 @@ read_char (int commandflag, Lisp_Object map,
       goto reread_for_input_method;
     }
 
-  if (!NILP (Vexecuting_kbd_macro))
+  if (! NILP (Vexecuting_kbd_macro))
     {
       /* We set this to Qmacro; since that's not a frame, nobody will
 	 try to switch frames on us, and the selected window will
@@ -2398,7 +2355,7 @@ read_char (int commandflag, Lisp_Object map,
       goto from_macro;
     }
 
-  if (!NILP (unread_switch_frame))
+  if (! NILP (unread_switch_frame))
     {
       c = unread_switch_frame;
       unread_switch_frame = Qnil;
@@ -2429,7 +2386,7 @@ read_char (int commandflag, Lisp_Object map,
 	  else
 	    redisplay ();
 
-	  if (!input_pending)
+	  if (! input_pending)
 	    /* Normal case: no input arrived during redisplay.  */
 	    break;
 
@@ -2443,7 +2400,6 @@ read_char (int commandflag, Lisp_Object map,
 	 from messing up echoing of the input after the prompt.  */
       if (commandflag == 0 && echo_current)
 	echo_message_buffer = echo_area_buffer[0];
-
     }
 
   /* Message turns off echoing unless more keystrokes turn it on again.
@@ -2472,7 +2428,7 @@ read_char (int commandflag, Lisp_Object map,
      current one.  */
 
   if (/* There currently is something in the echo area.  */
-      !NILP (echo_area_buffer[0])
+      ! NILP (echo_area_buffer[0])
       && (/* It's an echo from a different kboard.  */
 	  echo_kboard != current_kboard
 	  /* Or we explicitly allow overwriting whatever there is.  */
@@ -2488,10 +2444,10 @@ read_char (int commandflag, Lisp_Object map,
      after a mouse event so don't try a minibuf menu.  */
   c = Qnil;
   if (KEYMAPP (map) && INTERACTIVE
-      && !NILP (prev_event) && ! EVENT_HAS_PARAMETERS (prev_event)
+      && ! NILP (prev_event) && ! EVENT_HAS_PARAMETERS (prev_event)
       /* Don't bring up a menu if we already have another event.  */
-      && !CONSP (Vunread_command_events)
-      && !detect_input_pending_run_timers (0))
+      && ! CONSP (Vunread_command_events)
+      && ! detect_input_pending_run_timers (0))
     {
       c = read_char_minibuf_menu_prompt (commandflag, map);
 
@@ -2559,17 +2515,17 @@ read_char (int commandflag, Lisp_Object map,
      if a time limit is supplied to avoid an infinite recursion in the
      situation where an idle timer calls `sit-for'.  */
 
-  if (!end_time)
+  if (! end_time)
     timer_start_idle ();
 
   /* If in middle of key sequence and minibuffer not active,
      start echoing if enough time elapses.  */
 
   if (minibuf_level == 0
-      && !end_time
-      && !current_kboard->immediate_echo
+      && ! end_time
+      && ! current_kboard->immediate_echo
       && (this_command_key_count > 0
-	  || !NILP (call0 (Qinternal_echo_keystrokes_prefix)))
+	  || ! NILP (call0 (Qinternal_echo_keystrokes_prefix)))
       && ! noninteractive
       && echo_keystrokes_p ()
       && (/* No message.  */
@@ -2605,7 +2561,8 @@ read_char (int commandflag, Lisp_Object map,
 
   /* Maybe auto save due to number of keystrokes.  */
 
-  if (commandflag != 0 && commandflag != -2
+  if (commandflag != 0
+      && commandflag != -2
       && auto_save_interval > 0
       && num_nonmacro_input_events - last_auto_save > max (auto_save_interval, 20)
       && !detect_input_pending_run_timers (0))
@@ -2621,18 +2578,18 @@ read_char (int commandflag, Lisp_Object map,
      does not pass on any keymaps.  */
 
   if (KEYMAPP (map) && INTERACTIVE
-      && !NILP (prev_event)
+      && ! NILP (prev_event)
       && EVENT_HAS_PARAMETERS (prev_event)
-      && !EQ (XCAR (prev_event), Qmenu_bar)
-      && !EQ (XCAR (prev_event), Qtab_bar)
-      && !EQ (XCAR (prev_event), Qtool_bar)
+      && ! EQ (XCAR (prev_event), Qmenu_bar)
+      && ! EQ (XCAR (prev_event), Qtab_bar)
+      && ! EQ (XCAR (prev_event), Qtool_bar)
       /* Don't bring up a menu if we already have another event.  */
-      && !CONSP (Vunread_command_events))
+      && ! CONSP (Vunread_command_events))
     {
       c = read_char_x_menu_prompt (map, prev_event, used_mouse_menu);
 
       /* Now that we have read an event, Emacs is not idle.  */
-      if (!end_time)
+      if (! end_time)
 	timer_stop_idle ();
 
       goto exit;
@@ -2724,7 +2681,7 @@ read_char (int commandflag, Lisp_Object map,
     {
       if (current_kboard->kbd_queue_has_data)
 	{
-	  if (!CONSP (KVAR (current_kboard, kbd_queue)))
+	  if (! CONSP (KVAR (current_kboard, kbd_queue)))
 	    emacs_abort ();
 	  c = XCAR (KVAR (current_kboard, kbd_queue));
 	  kset_kbd_queue (current_kboard,
@@ -2747,7 +2704,7 @@ read_char (int commandflag, Lisp_Object map,
      have already been seen here, and therefore are not a complete command,
      the kbd_queue_has_data field is 0, so we skip that kboard here.
      That's to avoid an infinite loop switching between kboards here.  */
-  if (NILP (c) && !single_kboard)
+  if (NILP (c) && ! single_kboard)
     {
       KBOARD *kb;
       for (kb = all_kboards; kb; kb = kb->next_kboard)
@@ -3747,7 +3704,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 
       /* If the quit flag is set, then read_char will return
 	 quit_char, so that counts as "available input."  */
-      if (!NILP (Vquit_flag))
+      if (! NILP (Vquit_flag))
 	quit_throw_to_read_char (0);
 
       /* One way or another, wait until input is available; then, if
@@ -3798,7 +3755,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 	  wait_reading_process_output (0, 0, -1, do_display, NULL, 0);
 	}
 
-      if (!interrupt_input && kbd_fetch_ptr == kbd_store_ptr)
+      if (! interrupt_input && kbd_fetch_ptr == kbd_store_ptr)
 	gobble_input ();
     }
 
@@ -3962,8 +3919,8 @@ kbd_buffer_get_event (KBOARD **kbp,
 	  if (! NILP (focus))
 	    frame = focus;
 
-	  if (!EQ (frame, internal_last_event_frame)
-	      && !EQ (frame, selected_frame))
+	  if (! EQ (frame, internal_last_event_frame)
+	      && ! EQ (frame, selected_frame))
 	    obj = make_lispy_switch_frame (frame);
 	  internal_last_event_frame = frame;
 
@@ -4032,7 +3989,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 					maybe_event->ie.arg),
 			       make_float (fmod (pinch_angle, 360.0)));
 
-		      if (!EQ (maybe_event->ie.device, Qt))
+		      if (! EQ (maybe_event->ie.device, Qt))
 			Vlast_event_device = maybe_event->ie.device;
 
 		      maybe_event = next_kbd_event (event);
@@ -4052,7 +4009,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 		  if (NILP (str))
 		    str = event->ie.arg;
 
-		  if (!SCHARS (str))
+		  if (! SCHARS (str))
 		    {
 		      kbd_fetch_ptr = next_kbd_event (event);
 		      obj = Qnil;
@@ -4157,10 +4114,10 @@ kbd_buffer_get_event (KBOARD **kbp,
 
       /* If we didn't decide to make a switch-frame event, go ahead and
 	 return a mouse-motion event.  */
-      if (!NILP (x) && NILP (obj))
+      if (! NILP (x) && NILP (obj))
 	obj = make_lispy_movement (f, bar_window, part, x, y, t);
 
-      if (!NILP (obj))
+      if (! NILP (obj))
 	Vlast_event_device = (STRINGP (movement_frame->last_mouse_device)
 			      ? movement_frame->last_mouse_device
 			      : virtual_core_pointer_name);

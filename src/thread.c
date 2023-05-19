@@ -478,7 +478,7 @@ internal_select (void *arg)
   sigset_t oldset;
 
   block_interrupt_signal (&oldset);
-  release_global_lock ();
+  release_global_lock (NULL);
   restore_signal_mask (&oldset);
 
   sa->result = (sa->func) (sa->max_fds, sa->rfds, sa->wfds, sa->efds,
@@ -568,12 +568,12 @@ static void
 yield_callback (void *ignore)
 {
   struct thread_state *self = current_thread; // current_thread changes!
-  release_global_lock ();
+  release_global_lock (self);
   acquire_global_lock (self);
 }
 
 void
-release_global_lock (void)
+release_global_lock (void *ignore)
 {
   sys_mutex_unlock (&global_lock);
   sys_thread_yield (); // mostly no-op
@@ -679,7 +679,7 @@ run_thread (void *state)
     }
 
   if (self->cooperative)
-    release_global_lock ();
+    release_global_lock (self);
 
   return NULL;
 }

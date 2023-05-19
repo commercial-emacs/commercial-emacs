@@ -1069,7 +1069,7 @@ usage: (json-parse-buffer &rest args) */)
   struct json_read_buffer_data data = {.point = point};
   json_error_t error;
 
-  release_global_lock ();
+  release_global_lock (NULL);
   json_t *object
     = json_load_callback (json_read_buffer_callback, &data,
                           JSON_DECODE_ANY
