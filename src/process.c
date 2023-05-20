@@ -1683,7 +1683,7 @@ usage: (make-process &rest ARGS)  */)
   xstderr = plist_get (contact, QCstderr);
   if (PROCESSP (xstderr))
     {
-      if (!PIPECONN_P (xstderr))
+      if (! PIPECONN_P (xstderr))
 	error ("Process is not a pipe process");
       stderrproc = xstderr;
     }
@@ -1710,7 +1710,7 @@ usage: (make-process &rest ARGS)  */)
   pset_filter (XPROCESS (proc), plist_get (contact, QCfilter));
   pset_command (XPROCESS (proc), Fcopy_sequence (command));
 
-  if (!query_on_exit)
+  if (! query_on_exit)
     XPROCESS (proc)->kill_without_query = 1;
   tem = plist_get (contact, QCstop);
   /* Normal processes can't be started in a stopped state, see
@@ -1823,23 +1823,30 @@ usage: (make-process &rest ARGS)  */)
        the process.  */
   }
 
-
   pset_decoding_buf (XPROCESS (proc), empty_unibyte_string);
   eassert (XPROCESS (proc)->decoding_carryover == 0);
   pset_encoding_buf (XPROCESS (proc), empty_unibyte_string);
 
   XPROCESS (proc)->inherit_coding_system_flag
-    = !(NILP (buffer) || !inherit_process_coding_system);
+    = (! NILP (buffer) && inherit_process_coding_system);
 
-  if (! NILP (program))
+  if (NILP (program))
+    create_pty (proc);
+  else
     {
       Lisp_Object program_args = XCDR (command);
 
       /* If program file name is not absolute, search our path for it.
 	 Put the name we will really use in TEM.  */
-      if (!IS_DIRECTORY_SEP (SREF (program, 0))
-	  && !(SCHARS (program) > 1
-	       && IS_DEVICE_SEP (SREF (program, 1))))
+      if (IS_DIRECTORY_SEP (SREF (program, 0))
+	  || (SCHARS (program) > 1
+	      && IS_DEVICE_SEP (SREF (program, 1))))
+	{
+	  if (! NILP (Ffile_directory_p (program)))
+	    error ("Specified program for new process is a directory");
+	  tem = program;
+	}
+      else
 	{
 	  tem = Qnil;
 	  openp (Vexec_path, program, Vexec_suffixes, &tem,
@@ -1847,12 +1854,6 @@ usage: (make-process &rest ARGS)  */)
 	  if (NILP (tem))
 	    report_file_error ("Searching for program", program);
 	  tem = Fexpand_file_name (tem, Qnil);
-	}
-      else
-	{
-	  if (! NILP (Ffile_directory_p (program)))
-	    error ("Specified program for new process is a directory");
-	  tem = program;
 	}
 
       /* Remove "/:" from TEM.  */
@@ -1899,8 +1900,6 @@ usage: (make-process &rest ARGS)  */)
 
       create_process (proc, new_argv, current_dir);
     }
-  else
-    create_pty (proc);
 
   return SAFE_FREE_UNBIND_TO (count, proc);
 }
@@ -1980,8 +1979,7 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
   int ptychannel = -1, pty_tty = -1;
   sigset_t oldset;
 
-  /* Ensure that the SIGCHLD handler can notify
-     `wait_reading_process_output'.  */
+  /* Ensure that the SIGCHLD handler can notify wait_reading_process_output().  */
   child_signal_init ();
 
   if (p->pty_in || p->pty_out)
@@ -7134,7 +7132,7 @@ This inserts a status message into the process's buffer, if there is one.  */)
   if (CONSP (symbol))
     symbol = XCAR (symbol);
 
-  if (!EQ (symbol, Qrun) && ! NILP (buffer))
+  if (! EQ (symbol, Qrun) && ! NILP (buffer))
     {
       Lisp_Object tem;
       struct buffer *old = current_buffer;
@@ -7143,7 +7141,7 @@ This inserts a status message into the process's buffer, if there is one.  */)
 
       /* Avoid error if buffer is deleted
 	 (probably that's why the process is dead, too).  */
-      if (!BUFFER_LIVE_P (XBUFFER (buffer)))
+      if (! BUFFER_LIVE_P (XBUFFER (buffer)))
 	return Qnil;
       Fset_buffer (buffer);
 

@@ -142,8 +142,7 @@ immediately."
         probe
       (with-current-buffer
           (get-buffer-create (format "*%s events*" (jsonrpc-name connection)))
-        (buffer-disable-undo)
-        (setq buffer-read-only t)
+        (special-mode)
         (setf (jsonrpc--events-buffer connection)
               (current-buffer))))))
 
@@ -326,59 +325,63 @@ expected to understand JSONRPC messages with basic HTTP-style
 enveloping headers such as \"Content-Length:\".
 
 :ON-SHUTDOWN (optional), a function of one argument, the
-connection object, called when the process dies.")
+connection object, called when the process dies.
+
+Needs to be rewritten since `initialize-instance' proceeds
+to erase whatever the process wrote to its process buffer.")
 
 (cl-defmethod initialize-instance ((conn jsonrpc-process-connection) _slots)
-  "Strongarm buffers of CONN's process to satisfy eglot.
+  "Compatibility for rogue eglot guy's obfuscated buffer naming.
 CONN's extant process buffer, if any, is potentially orphaned and
 replaced with an invisible buffer \" *[CONN name] output*\".  If
 :stderr of CONN's process is named '*[CONN name] stderr*', it is
 modified to replicate messages to CONN's event buffer, and made
-invisible by renaming to \" *[CONN name] stderr*\"."
+invisible by renaming to \" *[CONN name] stderr*\".
+
+Needs to be rewritten."
   (cl-call-next-method)
   (when (functionp (jsonrpc--process conn))
     (setf (jsonrpc--process conn) (funcall (jsonrpc--process conn))))
   (process-put (jsonrpc--process conn) 'jsonrpc-connection conn)
   (set-process-filter (jsonrpc--process conn) #'jsonrpc--process-filter)
   (set-process-sentinel (jsonrpc--process conn) #'jsonrpc--process-sentinel)
-  (cl-macrolet ((render-log-like (buffer)
-                  `(with-current-buffer ,buffer
-                     (let ((inhibit-read-only t))
-                       (erase-buffer))
-                     (buffer-disable-undo)
-                     (setq buffer-read-only t))))
-    (let ((stdout-buffer (get-buffer-create
-                          (format " *%s output*" (jsonrpc-name conn)))))
-      (render-log-like stdout-buffer)
-      (set-process-buffer (jsonrpc--process conn) stdout-buffer)
-      (with-current-buffer stdout-buffer
-        (set-marker (process-mark (jsonrpc--process conn)) (point-min))))
-    (when-let ((stderr-buffer
-                (get-buffer (format "*%s stderr*" (jsonrpc-name conn))))
-               (invisible-name (concat " " (buffer-name stderr-buffer))))
-      (render-log-like stderr-buffer)
-      (process-put (jsonrpc--process conn) 'jsonrpc-stderr stderr-buffer)
-      (when-let ((detritus (get-buffer invisible-name)))
-        (let (kill-buffer-query-functions)
-          (kill-buffer detritus)))
-      (with-current-buffer stderr-buffer
-        (rename-buffer invisible-name)
-        (add-hook
-         'after-change-functions
-         (lambda (beg _end _pre-change-len)
-           "Mimeograph stderr to events."
-           (cl-loop initially (goto-char beg)
-                    do (forward-line)
-                    when (bolp)
-                    for line = (buffer-substring
-                                (line-beginning-position 0)
-                                (line-end-position 0))
-                    do (with-current-buffer (jsonrpc-events-buffer conn)
-                         (goto-char (point-max))
-                         (let ((inhibit-read-only t))
-                           (insert (format "[stderr] %s\n" line))))
-                    until (eobp)))
-         nil t)))))
+  (let ((stdout-buffer (get-buffer-create
+                        (format " *%s output*" (jsonrpc-name conn)))))
+    (set-process-buffer (jsonrpc--process conn) stdout-buffer)
+    (with-current-buffer stdout-buffer
+      (special-mode)
+      (let ((inhibit-read-only t))
+        (erase-buffer))
+      (set-marker (process-mark (jsonrpc--process conn)) (point-min))))
+  (when-let ((stderr-buffer
+              (get-buffer (format "*%s stderr*" (jsonrpc-name conn))))
+             (invisible-name (concat " " (buffer-name stderr-buffer))))
+    (with-current-buffer stderr-buffer
+      (special-mode)
+      (let ((inhibit-read-only t))
+        (erase-buffer)))
+    (process-put (jsonrpc--process conn) 'jsonrpc-stderr stderr-buffer)
+    (when-let ((detritus (get-buffer invisible-name)))
+      (let (kill-buffer-query-functions)
+        (kill-buffer detritus)))
+    (with-current-buffer stderr-buffer
+      (rename-buffer invisible-name)
+      (add-hook
+       'after-change-functions
+       (lambda (beg _end _pre-change-len)
+         "Mimeograph stderr to events."
+         (cl-loop initially (goto-char beg)
+                  do (forward-line)
+                  when (bolp)
+                  for line = (buffer-substring
+                              (line-beginning-position 0)
+                              (line-end-position 0))
+                  do (with-current-buffer (jsonrpc-events-buffer conn)
+                       (goto-char (point-max))
+                       (let ((inhibit-read-only t))
+                         (insert (format "[stderr] %s\n" line))))
+                  until (eobp)))
+       nil t))))
 
 (defun jsonrpc--stringify-method (args)
   "Normalize :method in ARGS."
