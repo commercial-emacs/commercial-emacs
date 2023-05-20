@@ -886,6 +886,7 @@ Non-strings in LIST are ignored."
 Compare keys with TEST.  Defaults to `equal'.
 Return the modified alist.
 Elements of ALIST that are not conses are ignored."
+  (declare (important-return-value t))
   (unless test (setq test #'equal))
   (while (and (consp (car alist))
 	      (funcall test (caar alist) key))
@@ -902,12 +903,14 @@ Elements of ALIST that are not conses are ignored."
   "Delete from ALIST all elements whose car is `eq' to KEY.
 Return the modified alist.
 Elements of ALIST that are not conses are ignored."
+  (declare (important-return-value t))
   (assoc-delete-all key alist #'eq))
 
 (defun rassq-delete-all (value alist)
   "Delete from ALIST all elements whose cdr is `eq' to VALUE.
 Return the modified alist.
 Elements of ALIST that are not conses are ignored."
+  (declare (important-return-value t))
   (while (and (consp (car alist))
 	      (eq (cdr (car alist)) value))
     (setq alist (cdr alist)))
@@ -950,6 +953,7 @@ Example:
   (setf (alist-get \\='b foo nil \\='remove) nil)
 
   foo => ((a . 1))"
+  (declare (important-return-value t))
   (ignore remove) ;;Silence byte-compiler.
   (let ((x (if (not testfn)
                (assq key alist)
@@ -6676,7 +6680,10 @@ returned list are in the same order as in TREE.
   "Trim STRING of leading string matching REGEXP.
 
 REGEXP defaults to \"[ \\t\\n\\r]+\"."
-  (if (string-match (concat "\\`\\(?:" (or regexp "[ \t\n\r]+") "\\)") string)
+  (if (string-match (if regexp
+                        (concat "\\`\\(?:" regexp "\\)")
+                      "\\`[ \t\n\r]+")
+                    string)
       (substring string (match-end 0))
     string))
 
@@ -6685,7 +6692,9 @@ REGEXP defaults to \"[ \\t\\n\\r]+\"."
 
 REGEXP defaults to  \"[ \\t\\n\\r]+\"."
   (declare (side-effect-free t))
-  (let ((i (string-match-p (concat "\\(?:" (or regexp "[ \t\n\r]+") "\\)\\'")
+  (let ((i (string-match-p (if regexp
+                               (concat "\\(?:" regexp "\\)\\'")
+                             "[ \t\n\r]+\\'")
                            string)))
     (if i (substring string 0 i) string)))
 
