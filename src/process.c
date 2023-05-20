@@ -1546,13 +1546,13 @@ DEFUN ("process-list", Fprocess_list, Sprocess_list, 0, 0, 0,
   return Fmapcar (Qcdr, Vprocess_alist);
 }
 
-DEFUN ("jsonrpc--thunk", Fjsonrpc__thunk, Sjsonrpc__thunk, 2, 2, 0,
-       doc: /* PIPE and HANDLER.  */)
-  (Lisp_Object pipe, Lisp_Object handler)
+DEFUN ("make-pipe-thread--body", Fmake_pipe_thread__body,
+       Smake_pipe_thread__body, 1, 1, 0,
+       doc: /* PIPE.  */)
+  (Lisp_Object pipe)
 {
   struct Lisp_Process *p;
   CHECK_PROCESS (pipe);
-  eassume (PIPECONN_P (pipe));
   p = XPROCESS (pipe);
   p->thread_managed = 1; /* Marks skip in wait_reading_process_output().  */
   while (EQ (p->status, Qrun))
@@ -1561,7 +1561,7 @@ DEFUN ("jsonrpc--thunk", Fjsonrpc__thunk, Sjsonrpc__thunk, 2, 2, 0,
       if (0 == read_process_output (pipe)
 	  || (errno && ! would_block (errno)))
 	{
-	  p->tick = ++process_tick; // static variable consistency issue
+	  p->tick = ++process_tick; /* static variable consistency issue */
 	  deactivate_process (pipe);
 	  if (p->raw_status_new)
 	    update_status (p);
@@ -1570,15 +1570,6 @@ DEFUN ("jsonrpc--thunk", Fjsonrpc__thunk, Sjsonrpc__thunk, 2, 2, 0,
 	}
     }
   return Qnil;
-}
-
-DEFUN ("jsonrpc-thread", Fjsonrpc_thread, Sjsonrpc_thread, 1, 3, 0,
-       doc: /* Start new thread whose lifetime is that of running PIPE.
-A non-nil NAME string is assigned to the thread.
-*/)
-  (Lisp_Object pipe, Lisp_Object handler, Lisp_Object name)
-{
-  return Fmake_thread (Fjsonrpc__thunk (pipe, handler), name, Qnil);
 }
 
 /* Starting asynchronous inferior processes.  */
@@ -5676,6 +5667,11 @@ read_process_output_error_handler (Lisp_Object error_val)
   return Qt;
 }
 
+static void
+for_side_effect (void *)
+{
+}
+
 /* Read pending output from the process channel.  Return number of
    decoded characters read, or -1 upon error.
 
@@ -5701,7 +5697,10 @@ read_process_output (Lisp_Object proc)
   /* Allow other process-reading threads to run concurrently
      if we're assured they won't contend on CHANNEL.  */
   if (behaved_p)
-    with_flushed_stack (release_global_lock, self);
+    {
+      with_flushed_stack (for_side_effect, NULL);
+      release_global_lock ();
+    }
 
   USE_SAFE_ALLOCA;
   chars = SAFE_ALLOCA (sizeof coding->carryover + readmax);
@@ -7916,8 +7915,7 @@ sentinel or a process filter function has an error.  */);
   defsubr (&Sset_process_plist);
   defsubr (&Sprocess_list);
   defsubr (&Smake_process);
-  defsubr (&Sjsonrpc_thread);
-  defsubr (&Sjsonrpc__thunk);
+  defsubr (&Smake_pipe_thread__body);
   defsubr (&Smake_pipe_process);
   defsubr (&Sserial_process_configure);
   defsubr (&Smake_serial_process);
