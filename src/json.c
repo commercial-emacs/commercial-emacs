@@ -1054,7 +1054,6 @@ represent a JSON false value.  It defaults to `:false'.
 usage: (json-parse-buffer &rest args) */)
      (ptrdiff_t nargs, Lisp_Object *args)
 {
-  struct thread_state *self = current_thread;
   specpdl_ref count = SPECPDL_INDEX ();
 
 #ifdef WINDOWSNT
@@ -1069,14 +1068,12 @@ usage: (json-parse-buffer &rest args) */)
   struct json_read_buffer_data data = {.point = point};
   json_error_t error;
 
-  release_global_lock ();
   json_t *object
     = json_load_callback (json_read_buffer_callback, &data,
                           JSON_DECODE_ANY
 			  | JSON_DISABLE_EOF_CHECK
 			  | JSON_ALLOW_NUL,
                           &error);
-  acquire_global_lock (self);
 
   if (object == NULL)
     json_parse_error (&error);

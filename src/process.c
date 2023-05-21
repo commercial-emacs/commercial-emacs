@@ -5692,6 +5692,9 @@ read_process_output (Lisp_Object proc)
   struct thread_state *self = current_thread;
   bool behaved_p = ! NILP (Fprocess_thread (proc));
 
+  USE_SAFE_ALLOCA;
+  chars = SAFE_ALLOCA (sizeof coding->carryover + readmax);
+
   /* Allow other process-reading threads to run concurrently
      if we're assured they won't contend on CHANNEL.  */
   if (behaved_p)
@@ -5699,9 +5702,6 @@ read_process_output (Lisp_Object proc)
       with_flushed_stack (for_side_effect, NULL);
       release_global_lock ();
     }
-
-  USE_SAFE_ALLOCA;
-  chars = SAFE_ALLOCA (sizeof coding->carryover + readmax);
 
   if (carryover)
     memcpy (chars, SDATA (p->decoding_buf), carryover);
