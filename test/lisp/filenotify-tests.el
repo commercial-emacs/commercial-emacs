@@ -927,10 +927,13 @@ delivered."
   :tags '(:expensive-test)
   (skip-unless (file-notify--test-local-enabled))
 
-  ;; `auto-revert-buffers' runs every 5".  And we must wait, until the
-  ;; file has been reverted.
-  (let ((timeout (if (file-remote-p temporary-file-directory) 60 10))
-        buf)
+  ;; Run with shortened `auto-revert-interval' for a faster test.
+  (let* ((auto-revert-interval 1)
+         (timeout (if (file-remote-p temporary-file-directory)
+                      60   ; FIXME: can this be shortened?
+                    (* auto-revert-interval 2.5)))
+         buf)
+    (auto-revert-set-timer)
     (unwind-protect
 	(progn
           ;; In the remote case, `vc-refresh-state' returns undesired
@@ -948,7 +951,6 @@ delivered."
             (sleep-for 1)
 	    (auto-revert-mode 1)
 
-	    ;; `auto-revert-buffers' runs every 5".
 	    (with-timeout (timeout (ignore))
 	      (while (null auto-revert-watch-descriptor)
 		(sleep-for 1)))
