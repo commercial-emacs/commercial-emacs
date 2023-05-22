@@ -1822,10 +1822,6 @@ If RECURSIVE, search recursively."
 	    (insert "Error!  Result from decryption:\n\n"
 		    (or (get-text-property 0 'gnus-details
 					   (car mm-security-handle))
-			"")
-		    "\n\n"
-		    (or (get-text-property 0 'gnus-details
-					   (car mm-security-handle))
 			""))
 	    (current-buffer))
 	  '("text/plain")))))))
