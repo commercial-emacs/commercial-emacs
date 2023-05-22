@@ -5690,14 +5690,14 @@ read_process_output (Lisp_Object proc)
   Lisp_Object restore_deactivate;
   char *chars;
   struct thread_state *self = current_thread;
-  bool behaved_p = ! NILP (Fprocess_thread (proc));
+  bool releasable = ! NILP (Fprocess_thread (proc)); /* is not rogue */
 
   USE_SAFE_ALLOCA;
   chars = SAFE_ALLOCA (sizeof coding->carryover + readmax);
 
   /* Allow other process-reading threads to run concurrently
      if we're assured they won't contend on CHANNEL.  */
-  if (behaved_p)
+  if (releasable)
     {
       with_flushed_stack (for_side_effect, NULL);
       release_global_lock ();
@@ -5740,18 +5740,17 @@ read_process_output (Lisp_Object proc)
 	}
     }
 
-  if (behaved_p)
+  if (releasable)
     acquire_global_lock (self);
 
   p->decoding_carryover = 0;
 
-  if (nbytes <= 0)
+  if (nbytes < 0)
+    goto done;
+  else if (nbytes == 0)
     {
-      if (nbytes < 0 || coding->mode & CODING_MODE_LAST_BLOCK)
-	{
-	  SAFE_FREE_UNBIND_TO (count, Qnil);
-	  return nbytes;
-	}
+      if (coding->mode & CODING_MODE_LAST_BLOCK)
+	goto done;
       coding->mode |= CODING_MODE_LAST_BLOCK;
     }
 
@@ -5808,6 +5807,8 @@ read_process_output (Lisp_Object proc)
 				 NILP (Vdebug_on_error) ? Qerror : Qnil,
 				 read_process_output_error_handler);
   Vdeactivate_mark = restore_deactivate;
+
+ done:
   SAFE_FREE_UNBIND_TO (count, Qnil);
   return nbytes;
 }
