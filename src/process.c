@@ -5690,7 +5690,7 @@ read_process_output (Lisp_Object proc)
   Lisp_Object restore_deactivate;
   char *chars;
   struct thread_state *self = current_thread;
-  bool releasable = ! NILP (Fprocess_thread (proc)); /* is not rogue */
+  bool releasable = false && ! NILP (Fprocess_thread (proc)); /* is not rogue */
 
   USE_SAFE_ALLOCA;
   chars = SAFE_ALLOCA (sizeof coding->carryover + readmax);
