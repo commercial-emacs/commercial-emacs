@@ -405,9 +405,7 @@ Needs to be rewritten."
                                        &rest args)
   (setq args (jsonrpc--stringify-method args))
   (let* ((message `(:jsonrpc "2.0" ,@args))
-         (json (json-serialize message
-                               :false-object :json-false
-                               :null-object nil))
+         (json (jsonrpc--json-encode message))
          (headers `(("Content-Length" . ,(format "%d" (string-bytes json))))))
     (jsonrpc--log-event connection message 'client)
     (process-send-string
@@ -446,6 +444,36 @@ With optional CLEANUP, kill any associated buffers."
   (process-get (jsonrpc--process conn) 'jsonrpc-stderr))
 
 (define-error 'jsonrpc-error "jsonrpc-error")
+
+(defalias 'jsonrpc--json-read
+  (if (fboundp 'json-parse-buffer)
+      (lambda ()
+        (json-parse-buffer :object-type 'plist
+                           :null-object nil
+                           :false-object :json-false))
+    (require 'json)
+    (defvar json-object-type)
+    (declare-function json-read "json" ())
+    (lambda ()
+      (let ((json-object-type 'plist))
+        (json-read))))
+  "Read JSON object in buffer, move point to end of buffer.")
+
+(defalias 'jsonrpc--json-encode
+  (if (fboundp 'json-serialize)
+      (lambda (object)
+        (json-serialize object
+                        :false-object :json-false
+                        :null-object nil))
+    (require 'json)
+    (defvar json-false)
+    (defvar json-null)
+    (declare-function json-encode "json" (object))
+    (lambda (object)
+      (let ((json-false :json-false)
+            (json-null nil))
+        (json-encode object))))
+  "Encode OBJECT into a JSON string.")
 
 (cl-defun jsonrpc--reply
     (connection id &key (result nil result-supplied-p) (error nil error-supplied-p))
@@ -522,9 +550,7 @@ With optional CLEANUP, kill any associated buffers."
                       (narrow-to-region (point) message-end)
                       (when-let ((json-message
                                   (condition-case err
-                                      (json-parse-buffer :object-type 'plist
-                                                         :null-object nil
-                                                         :false-object :json-false)
+                                      (jsonrpc--json-read)
                                     (error
                                      (prog1 nil
                                        (jsonrpc--warn "Invalid JSON: %s %s"
