@@ -509,9 +509,6 @@ was called."
   (lambda (&rest args2)
     (apply fun (append args args2))))
 
-(defun make-pipe-thread (name pipe)
-  (make-thread (apply-partially #'make-pipe-thread--body pipe) name))
-
 (defun zerop (number)
   "Return t if NUMBER is zero."
   ;; Used to be in C, but it's pointless since (= 0 n) is faster anyway because
