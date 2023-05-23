@@ -131,7 +131,12 @@ PREDICATE is called with the node as its only parameter."
 
 (defun dom-by-class (dom match)
   "Return elements in DOM that have a class name that matches regexp MATCH."
-  (dom-elements dom 'class match))
+  (dom-search dom
+              (lambda (d)
+                (if-let ((class-attr (dom-attr d 'class)))
+                    (seq-find
+                     (apply-partially #'string-match match)
+                     (split-string class-attr " "))))))
 
 (defun dom-by-style (dom match)
   "Return elements in DOM that have a style that matches regexp MATCH."
