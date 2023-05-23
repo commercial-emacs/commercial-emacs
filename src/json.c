@@ -1123,48 +1123,56 @@ read_json_output_forever (Lisp_Object proc)
 
   while (EQ (p->status, Qrun))
     {
-      ssize_t nbytes;
-
-      if (strlen (buffer) >= factor * read_process_output_max)
-	buffer = xrealloc (buffer, ++factor * read_process_output_max + 1);
-
+      ssize_t nbytes, extant = strlen (buffer);
+      int extant_frame = (1 + extant / read_process_output_max);
+      int to_read = extant_frame * read_process_output_max - extant;
+      if (factor < extant_frame)
+	{
+	  factor = extant_frame;
+	  buffer = xrealloc (buffer, factor * read_process_output_max + 1);
+	}
 #ifdef HAVE_GNUTLS
       if (p->gnutls_state)
-	nbytes = emacs_gnutls_read (p, buffer + strlen (buffer), factor * read_process_output_max - strlen (buffer));
+	nbytes = emacs_gnutls_read (p, buffer + extant, to_read);
       else
 #endif
-	nbytes = emacs_read (channel, buffer + strlen (buffer), factor * read_process_output_max - strlen (buffer));
-
+	nbytes = emacs_read (channel, buffer + extant, to_read);
       if (nbytes == 0)
 	break;
       else if (nbytes > 0)
 	{
-	  char *ptr = strtok (ptr, "\n");
+	  char *ptr;
+	  buffer[extant + nbytes] = '\0';
+	  ptr = strtok (buffer, "\n");
 	  p->nbytes_read += nbytes;
 	  for (; ptr != NULL;
 	       ptr = strtok (NULL, "\n"))
 	    {
-	      if (ptr[strlen(ptr)-1] != '\r')
+	      if (ptr[strlen(ptr)-1] != '\r') /* fragment */
 		{
 		  memmove (buffer, ptr, strlen (ptr) + 1);
+		  eassert (NULL == strtok (NULL, "\n"));
+		  break;
 		}
-	      else if (ptr[0] == 'C')
-		{
-		  content_length = strtol (ptr + 15, NULL, 0);
-		}
+	      ptr[strlen(ptr) - 1] = '\0';
+	      if (ptr[0] == 'C')
+		content_length = strtol (ptr + 15, NULL, 0);
 	      else if (strlen (ptr) == content_length)
 		{
-		  Lisp_Object msg;
 		  json_error_t err;
-		  struct json_configuration conf =
-		    {json_object_hashtable, json_array_array, QCnull, QCfalse};
-		  json_t *json = json_loads (ptr, JSON_DECODE_ANY | JSON_ALLOW_NUL, &err);
-
+		  json_t *json =
+		    json_loads (ptr, JSON_DECODE_ANY | JSON_ALLOW_NUL, &err);
 		  if (releasable)
 		    acquire_global_lock (self);
-		  msg = json_to_lisp (json, &conf);
-		  free (json);
-		  call_process_filter (proc, msg);
+		  if (json)
+		    {
+		      const struct json_configuration conf =
+			{json_object_plist, json_array_array, QCnull, QCfalse};
+		      call_process_filter (proc, json_to_lisp (json, &conf));
+		      free (json);
+		    }
+		  else
+		    json_parse_error (&err);
 		  if (releasable)
 		    {
 		      with_flushed_stack (for_side_effect, NULL);
@@ -1172,6 +1180,8 @@ read_json_output_forever (Lisp_Object proc)
 		    }
 		}
 	    }
+	  if (ptr == NULL)
+	    buffer[0] = '\0';
 	}
     }
 
