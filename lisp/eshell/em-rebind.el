@@ -48,6 +48,8 @@ the behavior of normal shells while the user editing new input text."
   :type 'hook
   :group 'eshell-rebind)
 
+;; TODO: this type is used multiple times.  Is it worth it to extract
+;; it into a `define-widget'?
 (defcustom eshell-rebind-keys-alist
   '(([(control ?d)] . eshell-delchar-or-maybe-eof)
     ([backspace]    . eshell-delete-backward-char)
@@ -55,8 +57,10 @@ the behavior of normal shells while the user editing new input text."
     ([(control ?w)] . backward-kill-word)
     ([(control ?u)] . eshell-kill-input))
   "Bind some keys differently if point is in input text."
+  ;; Waiting for response on the TODO.  The other place has changes to
+  ;; :type.
   :type '(repeat (cons (vector :tag "Keys to bind"
-			       (repeat :inline t sexp))
+                               (repeat :inline t sexp))
 		       (function :tag "Command")))
   :group 'eshell-rebind)
 

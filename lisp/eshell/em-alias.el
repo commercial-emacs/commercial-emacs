@@ -112,7 +112,7 @@ gained by using this module."
 
 (defcustom eshell-bad-command-tolerance 3
   "The number of failed commands to ignore before creating an alias."
-  :type 'integer
+  :type 'natnum
   ;; :link '(custom-manual "(eshell)Auto-correction of bad commands")
   :group 'eshell-alias)
 

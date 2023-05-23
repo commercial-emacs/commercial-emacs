@@ -91,6 +91,7 @@ it to get a real sense of how it works."
   :type 'hook
   :group 'eshell-smart)
 
+;; TODO: λ's to helper function?  Obsolete defcustom though.
 (defcustom eshell-smart-unload-hook
   (list
    (lambda ()
