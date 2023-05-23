@@ -96,7 +96,7 @@
       ;; During bootstrapping the byte-compiler is run interpreted
       ;; when compiling itself, which uses a lot more stack
       ;; than usual.
-      (setq max-lisp-eval-depth 2200)))
+      (setq max-lisp-eval-depth 3400)))
 
 (message "Using load-path %s" load-path)
 
