@@ -1546,32 +1546,6 @@ DEFUN ("process-list", Fprocess_list, Sprocess_list, 0, 0, 0,
   return Fmapcar (Qcdr, Vprocess_alist);
 }
 
-DEFUN ("make-pipe-thread--body", Fmake_pipe_thread__body,
-       Smake_pipe_thread__body, 1, 1, 0,
-       doc: /* PIPE.  */)
-  (Lisp_Object pipe)
-{
-  struct Lisp_Process *p;
-  CHECK_PROCESS (pipe);
-  p = XPROCESS (pipe);
-  p->thread_managed = 1; /* Marks skip in wait_reading_process_output().  */
-  while (EQ (p->status, Qrun))
-    {
-      /* Replicate song and dance from wait_reading_process_output().  */
-      if (0 == read_process_output (pipe)
-	  || (errno && ! would_block (errno)))
-	{
-	  p->tick = ++process_tick; /* static variable consistency issue */
-	  deactivate_process (pipe);
-	  if (p->raw_status_new)
-	    update_status (p);
-	  if (EQ (p->status, Qrun))
-	    pset_status (p, list2 (Qexit, make_fixnum (0)));
-	}
-    }
-  return Qnil;
-}
-
 /* Starting asynchronous inferior processes.  */
 
 DEFUN ("make-process", Fmake_process, Smake_process, 0, MANY, 0,
@@ -5665,12 +5639,6 @@ read_process_output_error_handler (Lisp_Object error_val)
   return Qt;
 }
 
-static void
-for_side_effect (void *arg)
-{
-  (void) arg;
-}
-
 /* Read pending output from the process channel.  Return number of
    decoded characters read, or -1 upon error.
 
@@ -5690,19 +5658,9 @@ read_process_output (Lisp_Object proc)
   const specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object restore_deactivate;
   char *chars;
-  struct thread_state *self = current_thread;
-  bool releasable = false && ! NILP (Fprocess_thread (proc)); /* is not rogue */
 
   USE_SAFE_ALLOCA;
   chars = SAFE_ALLOCA (sizeof coding->carryover + readmax);
-
-  /* Allow other process-reading threads to run concurrently
-     if we're assured they won't contend on CHANNEL.  */
-  if (releasable)
-    {
-      with_flushed_stack (for_side_effect, NULL);
-      release_global_lock ();
-    }
 
   if (carryover)
     memcpy (chars, SDATA (p->decoding_buf), carryover);
@@ -5740,9 +5698,6 @@ read_process_output (Lisp_Object proc)
 	    p->read_output_skip = 1;
 	}
     }
-
-  if (releasable)
-    acquire_global_lock (self);
 
   p->decoding_carryover = 0;
 
@@ -5803,10 +5758,7 @@ read_process_output (Lisp_Object proc)
     }
 
   if (SBYTES (coding->dst_object) > 0)
-      internal_condition_case_1 (read_process_output_call,
-				 list3 (p->filter, proc, coding->dst_object),
-				 NILP (Vdebug_on_error) ? Qerror : Qnil,
-				 read_process_output_error_handler);
+    call_process_filter (proc, coding->dst_object);
   Vdeactivate_mark = restore_deactivate;
 
  done:
@@ -7603,6 +7555,35 @@ open_channel_for_module (Lisp_Object process)
 #endif
 }
 
+Lisp_Object
+call_process_filter (Lisp_Object process, Lisp_Object string)
+{
+  CHECK_PROCESS (process);
+  return internal_condition_case_1 (read_process_output_call,
+				    list3 (XPROCESS (process)->filter, process, string),
+				    NILP (Vdebug_on_error) ? Qerror : Qnil,
+				    read_process_output_error_handler);
+}
+
+#ifdef HAVE_JSON
+DEFUN ("make-pipe-thread--body", Fmake_pipe_thread__body,
+       Smake_pipe_thread__body, 1, 1, 0,
+       doc: /* PIPE.  */)
+  (Lisp_Object pipe)
+{
+  struct Lisp_Process *p;
+  CHECK_PROCESS (pipe);
+  p = XPROCESS (pipe);
+  p->thread_managed = 1; /* Marks skip in wait_reading_process_output().  */
+  read_json_output_forever (pipe);
+  eassert (! EQ (p->status, Qrun));
+  p->tick = ++process_tick; /* static variable consistency issue */
+  deactivate_process (pipe);
+  if (p->raw_status_new)
+    update_status (p);
+  return Qnil;
+}
+#endif
 
 /* This is not called "init_process" because that is the name of a
    Mach system call, so it would cause problems on Darwin systems.  */
@@ -7915,7 +7896,6 @@ sentinel or a process filter function has an error.  */);
   defsubr (&Sset_process_plist);
   defsubr (&Sprocess_list);
   defsubr (&Smake_process);
-  defsubr (&Smake_pipe_thread__body);
   defsubr (&Smake_pipe_process);
   defsubr (&Sserial_process_configure);
   defsubr (&Smake_serial_process);
@@ -7987,4 +7967,7 @@ sentinel or a process filter function has an error.  */);
   defsubr (&Sprocess_attributes);
   defsubr (&Snum_processors);
   defsubr (&Ssignal_names);
+#ifdef HAVE_JSON
+  defsubr (&Smake_pipe_thread__body);
+#endif
 }
