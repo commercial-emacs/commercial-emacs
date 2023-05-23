@@ -258,6 +258,15 @@ to set this in a mode hook, rather than customize the default value."
 		 file)
   :group 'comint)
 
+(defcustom comint-pager "cat"
+  "If non-nil, the value to use for PAGER.
+gWhen this is nil, comint doesn't set PAGER at all."
+  :version "30.1"
+  :type '(choice (const :tag "Don't set PAGER" nil)
+                 (const :tag "cat" "cat")
+		 string)
+  :group 'comint)
+
 (defvar comint-input-ring-file-prefix nil
   "The prefix to skip when parsing the input ring file.
 This is useful in Zsh when the extended_history option is on.")
@@ -865,6 +874,7 @@ series of processes in the same Comint buffer.  The hook
 	 (nconc
           (comint-term-environment)
 	  (list (format "INSIDE_EMACS=%s,comint" emacs-version))
+          (when comint-pager (list (format "PAGER=%s" comint-pager)))
 	  process-environment))
 	(default-directory
 	  (if (file-accessible-directory-p default-directory)
