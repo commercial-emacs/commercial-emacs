@@ -5666,8 +5666,9 @@ read_process_output_error_handler (Lisp_Object error_val)
 }
 
 static void
-for_side_effect (void *)
+for_side_effect (void *arg)
 {
+  (void) arg;
 }
 
 /* Read pending output from the process channel.  Return number of
