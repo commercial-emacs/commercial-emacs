@@ -263,6 +263,12 @@ enum
   EXIT_ENOENT = 127 /* Could not find program to exec.  */
 };
 
+#ifdef HAVE_JSON
+/* Defined in json.c.  */
+
+extern void read_json_output_forever (Lisp_Object proc);
+#endif
+
 /* Defined in callproc.c.  */
 
 extern Lisp_Object get_current_directory (bool);
@@ -303,6 +309,7 @@ extern void update_processes_for_thread_death (const struct thread_state *);
 extern void dissociate_controlling_tty (void);
 
 extern int open_channel_for_module (Lisp_Object);
+extern Lisp_Object call_process_filter (Lisp_Object, Lisp_Object);
 
 INLINE_HEADER_END
 

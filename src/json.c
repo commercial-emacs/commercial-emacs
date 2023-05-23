@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "buffer.h"
 #include "coding.h"
+#include "process.h"
 
 #define JSON_HAS_ERROR_CODE (JANSSON_VERSION_HEX >= 0x020B00)
 
@@ -1089,6 +1090,94 @@ usage: (json-parse-buffer &rest args) */)
   SET_PT_BOTH (BYTE_TO_CHAR (point), point);
 
   return unbind_to (count, lisp);
+}
+
+static void
+for_side_effect (void *arg)
+{
+  (void) arg;
+}
+
+/* Like read_process_output but json-specific.  */
+
+void
+read_json_output_forever (Lisp_Object proc)
+{
+  struct Lisp_Process *p = XPROCESS (proc);
+  struct thread_state *self = current_thread;
+  bool releasable = ! NILP (Fprocess_thread (proc)); /* is not rogue */
+  int channel = p->infd;
+  eassert (0 <= channel && channel < FD_SETSIZE);
+  int factor = 1;
+  long content_length = -1;
+  char *buffer = xmalloc (factor * read_process_output_max + 1);
+  buffer[0] = '\0';
+
+  /* Allow other process-reading threads to run concurrently
+     if we're assured they won't contend on CHANNEL.  */
+  if (releasable)
+    {
+      with_flushed_stack (for_side_effect, NULL);
+      release_global_lock ();
+    }
+
+  while (EQ (p->status, Qrun))
+    {
+      ssize_t nbytes;
+
+      if (strlen (buffer) >= factor * read_process_output_max)
+	buffer = xrealloc (buffer, ++factor * read_process_output_max + 1);
+
+#ifdef HAVE_GNUTLS
+      if (p->gnutls_state)
+	nbytes = emacs_gnutls_read (p, buffer + strlen (buffer), factor * read_process_output_max - strlen (buffer));
+      else
+#endif
+	nbytes = emacs_read (channel, buffer + strlen (buffer), factor * read_process_output_max - strlen (buffer));
+
+      if (nbytes == 0)
+	break;
+      else if (nbytes > 0)
+	{
+	  char *ptr = strtok (ptr, "\n");
+	  p->nbytes_read += nbytes;
+	  for (; ptr != NULL;
+	       ptr = strtok (NULL, "\n"))
+	    {
+	      if (ptr[strlen(ptr)-1] != '\r')
+		{
+		  memmove (buffer, ptr, strlen (ptr) + 1);
+		}
+	      else if (ptr[0] == 'C')
+		{
+		  content_length = strtol (ptr + 15, NULL, 0);
+		}
+	      else if (strlen (ptr) == content_length)
+		{
+		  Lisp_Object msg;
+		  json_error_t err;
+		  struct json_configuration conf =
+		    {json_object_hashtable, json_array_array, QCnull, QCfalse};
+		  json_t *json = json_loads (ptr, JSON_DECODE_ANY | JSON_ALLOW_NUL, &err);
+
+		  if (releasable)
+		    acquire_global_lock (self);
+		  msg = json_to_lisp (json, &conf);
+		  free (json);
+		  call_process_filter (proc, msg);
+		  if (releasable)
+		    {
+		      with_flushed_stack (for_side_effect, NULL);
+		      release_global_lock ();
+		    }
+		}
+	    }
+	}
+    }
+
+  xfree (buffer);
+  if (releasable)
+    acquire_global_lock (self);
 }
 
 void
