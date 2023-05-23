@@ -685,15 +685,21 @@ Examples:
   :type '(repeat (cons (string :tag "Op")
                        sexp)))
 
+(defvar-local erc--nick-popup-alist nil
+  "Internally controlled items for `erc-nick-popup-alist'.")
+
 (defun erc-nick-popup (nick)
   (let* ((completion-ignore-case t)
+         (alist (append erc-nick-popup-alist erc--nick-popup-alist))
          (action (completing-read (format-message
                                    "What action to take on `%s'? " nick)
-                                  erc-nick-popup-alist))
-         (code (cdr (assoc action erc-nick-popup-alist))))
+                                  alist))
+         (code (cdr (assoc action alist))))
     (when code
       (erc-set-active-buffer (current-buffer))
-      (eval code `((nick . ,nick))))))
+      (if (functionp code)
+          (funcall code nick)
+        (eval code `((nick . ,nick)))))))
 
 ;;; Callback functions
 (defun erc-button-describe-symbol (symbol-name)
