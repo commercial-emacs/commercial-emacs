@@ -23,6 +23,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <fcntl.h>
 
 #include <jansson.h>
 
@@ -1107,7 +1108,9 @@ read_jsonrpc_forever (Lisp_Object proc)
   struct thread_state *self = current_thread;
   bool releasable = ! NILP (Fprocess_thread (proc)); /* is not rogue */
   int channel = p->infd;
-  eassert (0 <= channel && channel < FD_SETSIZE);
+  eassert (0 <= channel
+	   && channel < FD_SETSIZE
+	   && ! (fcntl (channel, F_GETFL) & O_NONBLOCK));
   int factor = 1;
   long content_length = -1;
   char *buffer = xmalloc (factor * read_process_output_max + 1);
@@ -1137,8 +1140,11 @@ read_jsonrpc_forever (Lisp_Object proc)
       else
 #endif
 	nbytes = emacs_read (channel, buffer + extant, to_read);
+
       if (nbytes == 0)
-	break;
+	{
+	  break;
+	}
       else if (nbytes > 0)
 	{
 	  char *ptr = buffer;

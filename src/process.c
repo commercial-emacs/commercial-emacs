@@ -7576,16 +7576,21 @@ call_process_filter (Lisp_Object process, Lisp_Object string)
 DEFUN ("make-jsonrpc-thread", Fmake_jsonrpc_thread, Smake_jsonrpc_thread,
        2, 2, 0,
        doc: /* Manage PROCESS in a separate thread.  */)
-  (Lisp_Object name, Lisp_Object process)
+  (Lisp_Object name, Lisp_Object proc)
 {
-  struct Lisp_Process *proc;
-
-  CHECK_PROCESS (process);
-  proc = XPROCESS (process);
-  pset_thread_managed (proc, Qt);
+  int flags;
+  struct Lisp_Process *p;
+  CHECK_PROCESS (proc);
+  p = XPROCESS (proc);
+  pset_thread_managed (p, Qt);
+  flags = fcntl (p->infd, F_GETFL);
+  if (flags == -1)
+    report_file_error ("Bad file descriptor", name);
+  else
+    fcntl(p->infd, F_SETFL, flags & ~O_NONBLOCK);
   return Fmake_thread (call2 (intern ("apply-partially"),
 			      intern ("make-jsonrpc-thread--body"),
-			      process),
+			      proc),
 		       name, Qnil);
 }
 
