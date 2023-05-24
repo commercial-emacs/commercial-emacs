@@ -266,7 +266,7 @@ enum
 #ifdef HAVE_JSON
 /* Defined in json.c.  */
 
-extern void read_json_output_forever (Lisp_Object proc);
+extern void read_jsonrpc_forever (Lisp_Object proc);
 #endif
 
 /* Defined in callproc.c.  */
