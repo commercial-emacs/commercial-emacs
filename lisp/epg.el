@@ -1458,6 +1458,7 @@ If you are unsure, use synchronous version of this function
 	(signal 'epg-error
 		(list "Decryption failed" (epg-errors-to-string errors))))
     (unless (epg-context-result-for context 'decryption-okay)
+      (message "wtf %S" (epg-errors-to-string errors))
       (signal 'epg-error
 	      (list "Can't decrypt" (epg-errors-to-string errors))))))
 
@@ -1479,20 +1480,23 @@ If PLAIN is nil, it returns the result as a string."
 
 (defun epg-decrypt-string (context cipher)
   "Decrypt a string CIPHER and return the plain text."
-  (let ((input-file (make-temp-file "epg-input"))
+  (let ((input-file (make-temp-name "epg-input"))
 	(coding-system-for-write 'binary))
     (unwind-protect
 	(progn
-	  (write-region cipher nil input-file nil 'quiet)
-	  (setf (epg-context-output-file context)
-                (make-temp-file "epg-output"))
+	  (write-region cipher nil input-file nil 'quiet nil 'excl)
+	  (setf (epg-context-output-file context) (make-temp-name "epg-output"))
           (epg-wait-for-completion context
 	    (epg-start-decrypt context (epg-make-data-from-file input-file)))
 	  (epg--check-error-for-decrypt context)
 	  (epg-read-output context))
-      (epg-delete-output-file context)
-      (if (file-exists-p input-file)
-	  (delete-file input-file))
+      (if (cl-search "BEGIN PGP" (epg-read-output context))
+          (message "!!!!!!!! the fuq %S %S"
+                   (epg-context-output-file context)
+                   input-file)
+        (epg-delete-output-file context)
+        (when (file-exists-p input-file)
+	  (delete-file input-file)))
       (epg-reset context))))
 
 (defun epg-start-verify (context signature &optional signed-text)

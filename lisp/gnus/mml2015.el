@@ -783,16 +783,8 @@ If set, it overrides the setting of `mml2015-sign-with-sender'."
 	  (epg-context-set-passphrase-callback
 	   context
 	   (cons 'mml-secure-passphrase-callback 'OpenPGP)))
-      (condition-case error
-	  (setq plain (epg-decrypt-string context (mm-get-part child))
-		mml-secure-secret-key-id-list nil)
-	(error
-	 (mml-secure-clear-secret-key-id-list)
-	 (mm-sec-error 'gnus-info "Failed")
-	 (if (eq (car error) 'quit)
-	     (mm-sec-status 'gnus-details "Quit.")
-	   (mm-sec-status 'gnus-details (mml2015-format-error error)))
-	 (throw 'error handle)))
+      (setq plain (epg-decrypt-string context (mm-get-part child))
+	    mml-secure-secret-key-id-list nil)
       (with-temp-buffer
 	(insert plain)
 	(goto-char (point-min))
