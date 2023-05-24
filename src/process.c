@@ -7573,7 +7573,7 @@ call_process_filter (Lisp_Object process, Lisp_Object string)
 }
 
 #ifdef HAVE_JSON
-DEFUN ("make-json-thread", Fmake_json_thread, Smake_json_thread,
+DEFUN ("make-jsonrpc-thread", Fmake_jsonrpc_thread, Smake_jsonrpc_thread,
        2, 2, 0,
        doc: /* Manage PROCESS in a separate thread.  */)
   (Lisp_Object name, Lisp_Object process)
@@ -7584,20 +7584,20 @@ DEFUN ("make-json-thread", Fmake_json_thread, Smake_json_thread,
   proc = XPROCESS (process);
   pset_thread_managed (proc, Qt);
   return Fmake_thread (call2 (intern ("apply-partially"),
-			      intern ("make-json-thread--body"),
+			      intern ("make-jsonrpc-thread--body"),
 			      process),
 		       name, Qnil);
 }
 
-DEFUN ("make-json-thread--body", Fmake_json_thread__body,
-       Smake_json_thread__body, 1, 1, 0,
+DEFUN ("make-jsonrpc-thread--body", Fmake_jsonrpc_thread__body,
+       Smake_jsonrpc_thread__body, 1, 1, 0,
        doc: /* PIPE.  */)
   (Lisp_Object pipe)
 {
   struct Lisp_Process *p;
   CHECK_PROCESS (pipe);
   p = XPROCESS (pipe);
-  read_json_output_forever (pipe);
+  read_jsonrpc_forever (pipe);
   p->tick = ++process_tick; /* static variable consistency issue */
   deactivate_process (pipe);
   if (p->raw_status_new)
@@ -7991,7 +7991,7 @@ sentinel or a process filter function has an error.  */);
   defsubr (&Snum_processors);
   defsubr (&Ssignal_names);
 #ifdef HAVE_JSON
-  defsubr (&Smake_json_thread);
-  defsubr (&Smake_json_thread__body);
+  defsubr (&Smake_jsonrpc_thread);
+  defsubr (&Smake_jsonrpc_thread__body);
 #endif
 }

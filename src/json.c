@@ -1101,7 +1101,7 @@ for_side_effect (void *arg)
 /* Like read_process_output but json-specific.  */
 
 void
-read_json_output_forever (Lisp_Object proc)
+read_jsonrpc_forever (Lisp_Object proc)
 {
   struct Lisp_Process *p = XPROCESS (proc);
   struct thread_state *self = current_thread;
