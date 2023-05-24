@@ -1141,74 +1141,67 @@ read_jsonrpc_forever (Lisp_Object proc)
 	break;
       else if (nbytes > 0)
 	{
-	  bool frag = false;
-	  char *ptr;
-	  buffer[extant + nbytes] = '\0';
-	  ptr = strtok (buffer, "\n");
+	  char *ptr = buffer;
+	  char *end = buffer + extant + nbytes;
+	  *end = '\0';
 	  p->nbytes_read += nbytes;
-	  while (! frag && ptr != NULL)
+	  for (;;)
 	    {
 	      /* State 1: get content length.  */
-	      for (; content_length < 0 && ptr != NULL;
-		   ptr = strtok (NULL, "\n"))
+	      if (content_length < 0)
 		{
-		  if (ptr[strlen(ptr)-1] != '\r')
+		  char *header = strstr (ptr, "Content-Length:");
+		  char *newline = header ? strstr (header, "\n") : NULL;
+		  if (header && newline)
 		    {
-		      /* fragment Content-Length */
-		      memmove (buffer, ptr, strlen (ptr) + 1);
-		      frag = true;
-		    }
-		  else if (ptr[0] == 'C')
-		    {
-		      ptr[strlen(ptr) - 1] = '\0';
-		      content_length = strtol (ptr + 15, NULL, 0);
-		    }
-		}
-	      if (frag)
-		eassert (ptr == NULL);
-
-	      /* State 2: get content.  */
-	      for (; content_length > 0 && ptr != NULL;
-		   ptr = strtok (NULL, "\n"))
-		{
-		  if (ptr[0] == '\r') /* Overall header delimiter.  */
-		    continue;
-		  if (strlen (ptr) == content_length)
-		    {
-		      json_error_t err;
-		      content_length = -1;
-		      json_t *json =
-			json_loads (ptr, JSON_DECODE_ANY | JSON_ALLOW_NUL, &err);
-		      if (releasable)
-			acquire_global_lock (self);
-		      if (json)
-			{
-			  const struct json_configuration conf =
-			    {json_object_plist, json_array_array, QCnull, QCfalse};
-			  call_process_filter (proc, json_to_lisp (json, &conf));
-			  free (json);
-			}
-		      else
-			json_parse_error (&err);
-		      if (releasable)
-			{
-			  with_flushed_stack (for_side_effect, NULL);
-			  release_global_lock ();
-			}
+		      content_length = strtol (header + 15, NULL, 0);
+		      ptr = min (newline + 1, end);
 		    }
 		  else
 		    {
-		      /* fragment content */
-		      memmove (buffer, ptr, strlen (ptr) + 1);
-		      eassert (NULL == strtok (NULL, "\n"));
-		      frag = true;
+		      /* fragment Content-Length */
+		      break;
 		    }
 		}
-	      if (frag)
-		eassert (ptr == NULL);
+
+	      /* State 2: get content.  */
+	      while (ptr < end && (*ptr == '\r' || *ptr == '\n'))
+		++ptr;
+
+	      if (ptr + content_length <= end)
+		{
+		  json_error_t err;
+		  char restore = ptr[content_length];
+		  ptr[content_length] = '\0';
+		  json_t *json =
+		    json_loads (ptr, JSON_DECODE_ANY | JSON_ALLOW_NUL, &err);
+		  ptr[content_length] = restore;
+		  if (releasable)
+		    acquire_global_lock (self);
+		  if (json)
+		    {
+		      const struct json_configuration conf =
+			{json_object_plist, json_array_array, QCnull, QCfalse};
+		      call_process_filter (proc, json_to_lisp (json, &conf));
+		      free (json);
+		    }
+		  else
+		    json_parse_error (&err);
+		  if (releasable)
+		    {
+		      with_flushed_stack (for_side_effect, NULL);
+		      release_global_lock ();
+		    }
+		  ptr += content_length;
+		  content_length = -1;
+		}
+	      else
+		{
+		  /* fragment content */
+		  break;
+		}
 	    }
-	  if (! frag)
-	    buffer[0] = '\0';
+	  memmove (buffer, ptr, end - ptr + 1);
 	}
     }
 
