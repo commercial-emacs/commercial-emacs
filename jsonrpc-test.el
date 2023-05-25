@@ -1,7 +1,6 @@
 ;;; -*- lexical-binding:t -*-
 
 (require 'cl-lib)
-(require 'xlsp)
 
 (defconst json-1 "{\"id\":12,\"jsonrpc\":\"2.0\",\"result\":[{\"newText\":\"\\n  \",\"range\":{\"end\":{\"character\":0,\"line\":12},\"start\":{\"character\":25,\"line\":11}}},{\"newText\":\"\",\"range\":{\"end\":{\"character\":7,\"line\":12},\"start\":{\"character\":6,\"line\":12}}},{\"newText\":\"\\n      \",\"range\":{\"end\":{\"character\":0,\"line\":13},\"start\":{\"character\":16,\"line\":12}}},{\"newText\":\"\",\"range\":{\"end\":{\"character\":2,\"line\":13},\"start\":{\"character\":0,\"line\":13}}}]}")
 (defconst json-2 "{\"id\":13,\"jsonrpc\":\"2.0\",\"result\":[{\"range\":{\"end\":{\"character\":0,\"line\":0},\"start\":{\"character\":0,\"line\":0}},\"uri\":\"file:///tmp/test-xlsppQqQKF/foo.h\"}]}")
@@ -94,6 +93,7 @@
         (make-jsonrpc-thread "foo" process)))))
 
 (defun test-dribs (control)
+  (require 'xlsp)
   (when control
     (fmakunbound 'make-jsonrpc-thread))
   (with-current-buffer (find-file "src/json.c")
