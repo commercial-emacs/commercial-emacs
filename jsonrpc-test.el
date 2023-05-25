@@ -94,29 +94,30 @@
 
 (defun test-dribs (control)
   (require 'xlsp)
+  (find-file "src/json.c")
+  (sleep-for 7)
   (when control
     (fmakunbound 'make-jsonrpc-thread))
-  (with-current-buffer (find-file "src/json.c")
-    (cl-letf (((symbol-function 'xlsp-heuristic-reuse-matches-p) #'ignore))
-      (let* ((time*)
-             (times*)
-             (start (lambda (&rest _args) (setq time* (float-time))))
-             (stop (lambda (&rest _args)
-                     (when time*
-                       (push (- (float-time) time*) times*)
-                       (setq time* nil))))
-             (completion-setup-hook))
-        (unwind-protect
-            (progn
-              (add-function :after (symbol-function 'jsonrpc-connection-send) start)
-              (add-function :before (symbol-function 'xlsp-completion-callback) stop)
-              (dotimes (i 30)
-                (goto-char 37036)
-                (save-excursion
-                  (insert (make-string i ? ))
-                  (insert "emacs_")
-                  (call-interactively #'completion-at-point))
-                (kill-line)))
-          (print-out times*)
-          (remove-function (symbol-function 'jsonrpc-connection-send) start)
-          (remove-function (symbol-function 'xlsp-completion-callback) stop))))))
+  (cl-letf (((symbol-function 'xlsp-heuristic-reuse-matches-p) #'ignore))
+    (let* ((time*)
+           (times*)
+           (start (lambda (&rest _args) (setq time* (float-time))))
+           (stop (lambda (&rest _args)
+                   (when time*
+                     (push (- (float-time) time*) times*)
+                     (setq time* nil))))
+           (completion-setup-hook))
+      (unwind-protect
+          (progn
+            (add-function :after (symbol-function 'jsonrpc-connection-send) start)
+            (add-function :before (symbol-function 'xlsp-completion-callback) stop)
+            (dotimes (i 30)
+              (goto-char 37036)
+              (save-excursion
+                (insert (make-string i ? ))
+                (insert "emacs_")
+                (call-interactively #'completion-at-point))
+              (kill-line)))
+        (print-out times*)
+        (remove-function (symbol-function 'jsonrpc-connection-send) start)
+        (remove-function (symbol-function 'xlsp-completion-callback) stop)))))
