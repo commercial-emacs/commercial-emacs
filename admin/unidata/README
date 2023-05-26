@@ -64,3 +64,7 @@ https://www.unicode.org/Public/UCD/latest/ucd/PropertyValueAliases.txt
 IdnaMappingTable.txt
 https://www.unicode.org/Public/idna/latest/IdnaMappingTable.txt
 2022-01-18
+
+emoji-variation-sequences.txt
+https://www.unicode.org/Public/14.0.0/ucd/emoji/emoji-variation-sequences.txt
+2023-05-25

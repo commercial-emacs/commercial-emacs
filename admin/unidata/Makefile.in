@@ -116,7 +116,7 @@ emoji-zwj.el: ${unidir}/emoji-zwj.el
 
 zwj = ${srcdir}/emoji-zwj.awk
 
-${unidir}/emoji-zwj.el: ${srcdir}/emoji-zwj-sequences.txt $(srcdir)/emoji-sequences.txt ${zwj}
+${unidir}/emoji-zwj.el: ${srcdir}/emoji-zwj-sequences.txt ${srcdir}/emoji-sequences.txt ${srcdir}/emoji-variation-sequences.txt ${zwj}
 	$(AM_V_GEN)$(AWK) -f ${zwj} $^ > $@
 
 .PHONY: clean bootstrap-clean distclean maintainer-clean gen-clean
