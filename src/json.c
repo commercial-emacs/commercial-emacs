@@ -1110,7 +1110,10 @@ read_jsonrpc_forever (Lisp_Object proc)
   int channel = p->infd;
   eassert (0 <= channel
 	   && channel < FD_SETSIZE
-	   && ! (fcntl (channel, F_GETFL) & O_NONBLOCK));
+#ifndef WINDOWSNT
+	   && ! (fcntl (channel, F_GETFL) & O_NONBLOCK)
+#endif
+	   );
   int factor = 1;
   long content_length = -1;
   char *buffer = xmalloc (factor * read_process_output_max + 1);

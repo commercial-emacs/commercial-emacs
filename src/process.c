@@ -7578,12 +7578,14 @@ DEFUN ("make-jsonrpc-thread", Fmake_jsonrpc_thread, Smake_jsonrpc_thread,
        doc: /* Manage PROCESS in a separate thread.  */)
   (Lisp_Object name, Lisp_Object proc)
 {
-  int flags;
+  int flags = 0;
   struct Lisp_Process *p;
   CHECK_PROCESS (proc);
   p = XPROCESS (proc);
   pset_thread_managed (p, Qt);
+#ifndef WINDOWSNT
   flags = fcntl (p->infd, F_GETFL);
+#endif
   if (flags == -1)
     report_file_error ("Bad file descriptor", name);
   else
