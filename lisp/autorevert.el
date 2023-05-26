@@ -416,8 +416,8 @@ This mode essentially derives from `auto-revert-mode'
            'no-mini t))
         (if auto-revert-tail-mode
             (auto-revert-tail--doit buffer)
-          (ignore-errors    ; insulate against deleted file (Bug#23276)
-            (revert-buffer 'ignore-auto 'dont-ask 'preserve-modes)))
+          ;; ignore errors for deleted files (Bug#23276)
+          (ignore-errors (revert-buffer 'ignore-auto 'dont-ask)))
         (when buffer-file-name
           (when eob-p (goto-char (point-max)))
           (dolist (window eob-windows)
