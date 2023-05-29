@@ -1587,15 +1587,20 @@ extra args."
 (dolist (elt '(format message format-message error))
   (put elt 'byte-compile-format-like t))
 
-(defun byte-compile--suspicious-defcustom-choice (type)
-  "Catch oddities like (choice (const :tag \"foo\" ;; \\='bar))."
-  (when (and (consp type) (proper-list-p type))
-    (if (memq (car type) '(const other))
-        (assq 'quote type)
-      (catch 'found
-        (dolist (elem type)
-          (when (byte-compile--suspicious-defcustom-choice elem)
-            (throw 'found t)))))))
+(defun byte-compile--defcustom-type-quoted (type)
+  "Whether defcustom TYPE contains an accidentally quoted value."
+  ;; Detect mistakes such as (const 'abc).
+  ;; We don't actually follow the syntax for defcustom types, but this
+  ;; should be good enough.
+  (and (consp type)
+       (proper-list-p type)
+       (if (memq (car type) '(const other))
+           (assq 'quote type)
+         (let ((elts (cdr type)))
+           (while (and elts (not (byte-compile--defcustom-type-quoted
+                                  (car elts))))
+             (setq elts (cdr elts)))
+           elts))))
 
 (defun byte-compile-nogroup-warn (form)
   "Warn if a custom definition fails to specify :group, or :type."
@@ -1608,9 +1613,10 @@ extra args."
            ((not type)
 	    (byte-compile-warn "defcustom for `%s' fails to specify type"
                                (cadr name)))
-           ((byte-compile--suspicious-defcustom-choice type)
-	    (byte-compile-warn "defcustom for `%s' has syntactically odd type `%s'"
-                               (cadr name) type)))))
+           ((byte-compile--defcustom-type-quoted type)
+	    (byte-compile-warn
+	     "defcustom for `%s' may have accidentally quoted value in type `%s'"
+             (cadr name) type)))))
       (if (and (memq (car form) '(custom-declare-face custom-declare-variable))
 	       byte-compile-current-group)
 	  ;; The group will be provided implicitly.
