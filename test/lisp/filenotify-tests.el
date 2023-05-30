@@ -933,7 +933,7 @@ delivered."
                       60   ; FIXME: can this be shortened?
                     (* auto-revert-interval 2.5)))
          buf)
-    (auto-revert-set-timer)
+    (auto-revert-ensure-timer)
     (unwind-protect
 	(progn
           ;; In the remote case, `vc-refresh-state' returns undesired

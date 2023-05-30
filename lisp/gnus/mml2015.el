@@ -779,10 +779,10 @@ If set, it overrides the setting of `mml2015-sign-with-sender'."
 	(mm-sec-error 'gnus-info "Corrupted")
 	(throw 'error handle))
       (setq context (epg-make-context))
-      (if (or mml2015-cache-passphrase mml-secure-cache-passphrase)
-	  (epg-context-set-passphrase-callback
-	   context
-	   (cons 'mml-secure-passphrase-callback 'OpenPGP)))
+      (when (or mml2015-cache-passphrase mml-secure-cache-passphrase)
+	(epg-context-set-passphrase-callback
+	 context
+	 (cons 'mml-secure-passphrase-callback 'OpenPGP)))
       (setq plain (epg-decrypt-string context (mm-get-part child))
 	    mml-secure-secret-key-id-list nil)
       (with-temp-buffer
