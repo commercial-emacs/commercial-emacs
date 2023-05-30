@@ -1888,11 +1888,11 @@ EXPECTED-POINT BINDINGS (MODES \\='\\='(ruby-mode js-mode python-mode)) \
 (TEST-IN-COMMENTS t) (TEST-IN-STRINGS t) (TEST-IN-CODE t) \
 (FIXTURE-FN \\='#\\='electric-pair-mode))" fill-column)))
 
-(ert-deftest bytecomp-test-defcustom-type-quoted ()
-  (should-not (byte-compile--defcustom-type-quoted 'integer))
-  (should-not (byte-compile--defcustom-type-quoted
+(defun test-bytecomp-defgroup-choice ()
+  (should-not (byte-compile--suspicious-defcustom-choice 'integer))
+  (should-not (byte-compile--suspicious-defcustom-choice
                '(choice (const :tag "foo" bar))))
-  (should (byte-compile--defcustom-type-quoted
+  (should (byte-compile--suspicious-defcustom-choice
            '(choice (const :tag "foo" 'bar)))))
 
 (ert-deftest bytecomp-function-attributes ()
