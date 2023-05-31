@@ -1453,14 +1453,11 @@ If you are unsure, use synchronous version of this function
     (epg-wait-for-status context '("BEGIN_DECRYPTION"))))
 
 (defun epg--check-error-for-decrypt (context)
-  (let ((errors (epg-context-result-for context 'error)))
-    (if (epg-context-result-for context 'decryption-failed)
-	(signal 'epg-error
-		(list "Decryption failed" (epg-errors-to-string errors))))
-    (unless (epg-context-result-for context 'decryption-okay)
-      (message "wtf %S" (epg-errors-to-string errors))
-      (signal 'epg-error
-	      (list "Can't decrypt" (epg-errors-to-string errors))))))
+  (when (epg-context-result-for context 'decryption-failed)
+    (signal 'epg-error (list "Decryption failed"
+                             (epg-errors-to-string
+                              (epg-context-result-for context 'error)))))
+  (not (epg-context-result-for context 'decryption-okay)))
 
 (defun epg-decrypt-file (context cipher plain)
   "Decrypt a file CIPHER and store the result to a file PLAIN.
@@ -1469,9 +1466,10 @@ If PLAIN is nil, it returns the result as a string."
       (progn
 	(setf (epg-context-output-file context)
               (or plain (make-temp-file "epg-output")))
-	(epg-wait-for-completion context
-          (epg-start-decrypt context (epg-make-data-from-file cipher)))
-	(epg--check-error-for-decrypt context)
+        (cl-loop repeat 2
+                 do (epg-wait-for-completion context
+                      (epg-start-decrypt context (epg-make-data-from-file cipher)))
+                 while (epg--check-error-for-decrypt context))
 	(unless plain
 	  (epg-read-output context)))
     (unless plain
@@ -1486,14 +1484,12 @@ If PLAIN is nil, it returns the result as a string."
 	(progn
 	  (write-region cipher nil input-file nil 'quiet nil 'excl)
 	  (setf (epg-context-output-file context) (make-temp-name "epg-output"))
-          (epg-wait-for-completion context
-	    (epg-start-decrypt context (epg-make-data-from-file input-file)))
-	  (epg--check-error-for-decrypt context)
+          (cl-loop repeat 2
+                   do (epg-wait-for-completion context
+	                (epg-start-decrypt context (epg-make-data-from-file input-file)))
+                   while (epg--check-error-for-decrypt context))
 	  (epg-read-output context))
-      (if (cl-search "BEGIN PGP" (epg-read-output context))
-          (message "!!!!!!!! the fuq %S %S"
-                   (epg-context-output-file context)
-                   input-file)
+      (unless (cl-search "BEGIN PGP" (epg-read-output context))
         (epg-delete-output-file context)
         (when (file-exists-p input-file)
 	  (delete-file input-file)))
