@@ -1593,7 +1593,7 @@ which will return a list of `epg-signature' object."
           (epg-wait-for-completion context
 	    (if signed-text
 	        (progn
-		  (setq input-file (make-temp-file "epg-signature"))
+		  (setq input-file (make-temp-name "epg-signature"))
 		  (write-region signature nil input-file nil 'quiet)
 		  (epg-start-verify context
 				    (epg-make-data-from-file input-file)
@@ -1685,7 +1685,7 @@ If it is nil or `normal', it makes a normal signature.
 Otherwise, it makes a cleartext signature."
   (let ((input-file
 	 (unless (eq (epg-context-protocol context) 'CMS)
-	   (make-temp-file "epg-input")))
+	   (make-temp-name "epg-input")))
 	(coding-system-for-write 'binary))
     (unwind-protect
 	(progn
@@ -1797,9 +1797,8 @@ If RECIPIENTS is nil, it performs symmetric encryption."
   "Encrypt a string PLAIN.
 If RECIPIENTS is nil, it performs symmetric encryption."
   (let ((input-file
-	 (unless (or (not sign)
-		     (eq (epg-context-protocol context) 'CMS))
-	   (make-temp-file "epg-input")))
+	 (when (and sign (not (eq 'CMS (epg-context-protocol context))))
+	   (make-temp-name "epg-input")))
 	(coding-system-for-write 'binary))
     (unwind-protect
 	(progn
@@ -1823,8 +1822,8 @@ If RECIPIENTS is nil, it performs symmetric encryption."
 		      (list "Encrypt failed" (epg-errors-to-string errors)))))
 	  (epg-read-output context))
       (epg-delete-output-file context)
-      (if input-file
-	  (delete-file input-file))
+      (when input-file
+	(delete-file input-file))
       (epg-reset context))))
 
 (defun epg-start-export-keys (context keys)
