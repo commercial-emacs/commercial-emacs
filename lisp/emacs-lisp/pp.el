@@ -74,11 +74,103 @@ to make output that `read' can handle, whenever this is possible."
       (pp-buffer)
       (buffer-string))))
 
+(defun pp--within-fill-column-p ()
+  "Return non-nil if point is within `fill-column'."
+  ;; Try and make it O(fill-column) rather than O(current-column),
+  ;; so as to avoid major slowdowns on long lines.
+  ;; FIXME: This doesn't account for invisible text or `display' properties :-(
+  (and (save-excursion
+         (re-search-backward
+          "^\\|\n" (max (point-min) (- (point) fill-column)) t))
+       (<= (current-column) fill-column)))
+
+(defun pp-region (beg end)
+  "Insert newlines in BEG..END to try and fit within `fill-column'.
+Presumes the current buffer contains Lisp code and has indentation properly
+configured for that.
+Designed under the assumption that the region occupies a single line,
+tho it should also work if that's not the case."
+  (interactive "r")
+  (goto-char beg)
+  (let ((end (copy-marker end t)))
+    (while (< (point) end)
+      (forward-comment (point-max))
+      (let ((beg (point))
+            ;; Whether we're in front of an element with paired delimiters.
+            ;; Can be something funky like #'(lambda ..) or ,'#s(...).
+            (paired (when (looking-at "['`,#]*[[:alpha:]]*\\([({[\"]\\)")
+                      (match-beginning 1))))
+        ;; Go to the end of the sexp.
+        (goto-char (or (scan-sexps (or paired (point)) 1) end))
+        (unless
+            (and
+             ;; The sexp is all on a single line.
+             (save-excursion (not (search-backward "\n" beg t)))
+             ;; And its end is within `fill-column'.
+             (or (pp--within-fill-column-p)
+                 ;; If the end of the sexp is beyond `fill-column',
+                 ;; try to move the sexp to its own line.
+                 (and
+                  (save-excursion
+                    (goto-char beg)
+                    (if (save-excursion (skip-chars-backward " \t({[',") (bolp))
+                        ;; The sexp was already on its own line.
+                        nil
+                      (skip-chars-backward " \t")
+                      (setq beg (copy-marker beg t))
+                      (if paired (setq paired (copy-marker paired t)))
+                      ;; We could try to undo this insertion if it
+                      ;; doesn't reduce the indentation depth, but I'm
+                      ;; not sure it's worth the trouble.
+                      (insert "\n") (indent-according-to-mode)
+                      t))
+                  ;; Check again if we moved the whole exp to a new line.
+                  (pp--within-fill-column-p))))
+          ;; The sexp is spread over several lines, and/or its end is
+          ;; (still) beyond `fill-column'.
+          (when (and paired (not (eq ?\" (char-after paired))))
+            ;; The sexp has sub-parts, so let's try and spread
+            ;; them over several lines.
+            (save-excursion
+              (goto-char beg)
+              (when (looking-at "(\\([^][()\" \t\n]+\\)")
+                ;; Inside an expression of the form (SYM ARG1
+                ;; ARG2 ... ARGn) where SYM has a `lisp-indent-function'
+                ;; property that's a number, insert a newline after
+                ;; the corresponding ARGi, because it tends to lead to
+                ;; more natural and less indented code.
+                (let* ((sym (intern-soft (match-string 1)))
+                       (lif (and sym (get sym 'lisp-indent-function))))
+                  (when (natnump lif)
+                    (goto-char (match-end 0))
+                    (forward-sexp lif)
+                    (insert "\n")
+                    (indent-according-to-mode)))))
+            (save-excursion
+              (pp-region (1+ paired) (1- (point)))))
+          ;; Now the sexp either ends beyond `fill-column' or is
+          ;; spread over several lines (or both).  Either way, the rest of the
+          ;; line should be moved to its own line.
+          (skip-chars-forward ")]}")
+          (unless (eolp) (insert "\n") (indent-according-to-mode)))))))
+
+(defcustom pp-buffer-use-pp-region nil
+  "If non-nil, `pp-buffer' uses the new `pp-region' code."
+  :type 'boolean)
+
 ;;;###autoload
 (defun pp-buffer ()
   "Prettify the current buffer with printed representation of a Lisp object."
   (interactive)
   (goto-char (point-min))
+  (if pp-buffer-use-pp-region
+      (with-syntax-table emacs-lisp-mode-syntax-table
+        (let ((fill-column (max fill-column 70))
+              (indent-line-function
+               (if (local-variable-p 'indent-line-function)
+                   indent-line-function
+                 #'lisp-indent-line)))
+          (pp-region (point-min) (point-max))))
   (while (not (eobp))
     (cond
      ((ignore-errors (down-list 1) t)
@@ -98,7 +190,7 @@ to make output that `read' can handle, whenever this is possible."
       (insert ?\n))
      (t (goto-char (point-max)))))
   (goto-char (point-min))
-  (indent-sexp))
+  (indent-sexp)))
 
 ;;;###autoload
 (defun pp (object &optional stream)
