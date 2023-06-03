@@ -299,13 +299,6 @@ p = (1 + 2)
    "def 1func():"
    '((1 . font-lock-keyword-face) (4))))
 
-(ert-deftest python-font-lock-keywords-level-1-3 ()
-  (python-tests-assert-faces
-   "def \\
-        func():"
-   '((1 . font-lock-keyword-face) (4)
-     (15 . font-lock-function-name-face) (19))))
-
 (ert-deftest python-font-lock-assignment-statement-1 ()
   (python-tests-assert-faces
    "a, b, c = 1, 2, 3"

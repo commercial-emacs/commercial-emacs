@@ -400,7 +400,6 @@ instead."
   "Python mode specialized rx macro.
 This variant of `rx' supports common Python named REGEXPS."
   `(rx-let ((sp-bsnl (or space (and ?\\ ?\n)))
-            (sp-nl (or space (and (? ?\\) ?\n)))
             (block-start       (seq symbol-start
                                     (or "def" "class" "if" "elif" "else" "try"
                                         "except" "finally" "for" "while" "with"
@@ -635,9 +634,9 @@ the {...} holes that appear within f-strings."
              finally return (and result-valid result))))
 
 (defvar python-font-lock-keywords-level-1
-  `((,(python-rx symbol-start "def" (1+ sp-bsnl) (group symbol-name))
+  `((,(python-rx symbol-start "def" (1+ space) (group symbol-name))
      (1 font-lock-function-name-face))
-    (,(python-rx symbol-start "class" (1+ sp-bsnl) (group symbol-name))
+    (,(python-rx symbol-start "class" (1+ space) (group symbol-name))
      (1 font-lock-type-face)))
   "Font lock keywords to use in `python-mode' for level 1 decoration.
 
@@ -777,12 +776,12 @@ sign in chained assignment."
     ;;   [*a] = 5, 6
     ;; are handled separately below
     (,(python-font-lock-assignment-matcher
-        (python-rx (? (or "[" "(") (* sp-nl))
-                   grouped-assignment-target (* sp-nl) ?, (* sp-nl)
-                   (* assignment-target (* sp-nl) ?, (* sp-nl))
-                   (? assignment-target (* sp-nl))
-                   (? ?, (* sp-nl))
-                   (? (or ")" "]") (* sp-bsnl))
+        (python-rx (? (or "[" "(") (* space))
+                   grouped-assignment-target (* space) ?, (* space)
+                   (* assignment-target (* space) ?, (* space))
+                   (? assignment-target (* space))
+                   (? ?, (* space))
+                   (? (or ")" "]") (* space))
                    (group assignment-operator)))
      (1 font-lock-variable-name-face)
      (2 'font-lock-operator-face)
@@ -798,9 +797,9 @@ sign in chained assignment."
     ;;   c: Collection = {1, 2, 3}
     ;;   d: Mapping[int, str] = {1: 'bar', 2: 'baz'}
     (,(python-font-lock-assignment-matcher
-       (python-rx (or line-start ?\;) (* sp-bsnl)
-                  grouped-assignment-target (* sp-bsnl)
-                  (? ?: (* sp-bsnl) (+ not-simple-operator) (* sp-bsnl))
+       (python-rx (or line-start ?\;) (* space)
+                  grouped-assignment-target (* space)
+                  (? ?: (* space) (+ not-simple-operator) (* space))
                   (group assignment-operator)))
      (1 font-lock-variable-name-face)
      (2 'font-lock-operator-face))
@@ -809,10 +808,10 @@ sign in chained assignment."
     ;;   [a] = 5,
     ;;   [*a] = 5, 6
     (,(python-font-lock-assignment-matcher
-       (python-rx (or line-start ?\; ?=) (* sp-bsnl)
-                  (or "[" "(") (* sp-nl)
-                  grouped-assignment-target (* sp-nl)
-                  (or ")" "]") (* sp-bsnl)
+       (python-rx (or line-start ?\; ?=) (* space)
+                  (or "[" "(") (* space)
+                  grouped-assignment-target (* space)
+                  (or ")" "]") (* space)
                   (group assignment-operator)))
      (1 font-lock-variable-name-face)
      (2 'font-lock-operator-face))
@@ -854,22 +853,6 @@ decorators, exceptions, and assignments.")
 Which one will be chosen depends on the value of
 `font-lock-maximum-decoration'.")
 
-(defvar font-lock-beg)
-(defvar font-lock-end)
-(defun python-font-lock-extend-region ()
-  "Extend font-lock region to statement boundaries."
-  (let ((beg font-lock-beg)
-        (end font-lock-end))
-    (goto-char beg)
-    (python-nav-beginning-of-statement)
-    (beginning-of-line)
-    (when (< (point) beg)
-      (setq font-lock-beg (point)))
-    (goto-char end)
-    (python-nav-end-of-statement)
-    (when (< end (point))
-      (setq font-lock-end (point)))
-    (or (/= beg font-lock-beg) (/= end font-lock-end))))
 
 (defconst python-syntax-propertize-function
   (syntax-propertize-rules
@@ -5774,7 +5757,8 @@ Optional argument REGEXP selects variables to clone and defaults
 to \"^python-\"."
   (mapc
    (lambda (pair)
-     (and (symbolp (car pair))
+     (and (consp pair)
+          (symbolp (car pair))
           (string-match (or regexp "^python-")
                         (symbol-name (car pair)))
           (set (make-local-variable (car pair))
