@@ -37,6 +37,7 @@
 (require 'help-mode)
 (require 'radix-tree)
 (require 'subr-x)
+(require 'comp)
 
 (defvar help-fns-describe-function-functions nil
   "List of functions to run in help buffer in `describe-function'.
@@ -709,14 +710,13 @@ the C sources, too."
           (unless (and (symbolp function)
                        (get function 'reader-construct))
             (insert high-usage "\n")
-            (when-let* ((res (comp-function-type-spec function))
-                        (type-spec (car res))
-                        (kind (cdr res)))
-              (insert (format
-                       (if (eq kind 'inferred)
-                           "\nInferred type: %s\n"
-                         "\nType: %s\n")
-                       type-spec))))
+            (when (and (featurep 'native-compile)
+                       (subr-native-elisp-p (symbol-function function)))
+              (cl-destructuring-bind (type-spec . kind)
+                  (comp-function-type-spec function)
+                (insert (format "\n%s: %s\n"
+                                (if (eq kind 'inferred) "Inferred type" "Type")
+                                type-spec)))))
           (fill-region fill-begin (point))
           high-doc)))))
 

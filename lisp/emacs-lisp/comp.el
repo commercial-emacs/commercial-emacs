@@ -4429,24 +4429,13 @@ of (commands) to run simultaneously."
 
 ;;;###autoload
 (defun comp-function-type-spec (function)
-  "Return the type specifier of FUNCTION.
+  "Return a cons (TYPE-SPEC . ANNOT) for FUNCTION.
 
-This function returns a cons cell whose car is the function
-specifier, and cdr is a symbol, either `inferred' or `know'.
-If the symbol is `inferred', the type specifier is automatically
-inferred from the code itself by the native compiler; if it is
-`know', the type specifier comes from `comp-known-type-specifiers'."
-  (let ((kind 'know)
-        type-spec )
-    (when-let ((res (gethash function comp-known-func-cstr-h)))
-      (setf type-spec (comp-cstr-to-type-spec res)))
-    (let ((f (symbol-function function)))
-      (when (and (null type-spec)
-                 (subr-native-elisp-p f))
-        (setf kind 'inferred
-              type-spec (subr-type f))))
-    (when type-spec
-        (cons type-spec kind))))
+ANNOT is \\='inferred if TYPE-SPEC is inferred by the native
+compiler, or is \\='know if amongst `comp-known-type-specifiers'."
+  (if-let ((res (gethash function comp-known-func-cstr-h)))
+      (cons (comp-cstr-to-type-spec res) 'know)
+    (cons (subr-type (symbol-function function) 'inferred))))
 
 (provide 'comp)
 
