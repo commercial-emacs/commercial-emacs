@@ -710,10 +710,9 @@ the C sources, too."
           (unless (and (symbolp function)
                        (get function 'reader-construct))
             (insert high-usage "\n")
-            (when (and (featurep 'native-compile)
-                       (subr-native-elisp-p (symbol-function function)))
+            (when-let ((res (comp-function-type-spec function)))
               (cl-destructuring-bind (type-spec . kind)
-                  (comp-function-type-spec function)
+                  res
                 (insert (format "\n%s: %s\n"
                                 (if (eq kind 'inferred) "Inferred type" "Type")
                                 type-spec)))))

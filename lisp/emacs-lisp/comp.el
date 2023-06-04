@@ -4433,9 +4433,11 @@ of (commands) to run simultaneously."
 
 ANNOT is \\='inferred if TYPE-SPEC is inferred by the native
 compiler, or is \\='know if amongst `comp-known-type-specifiers'."
-  (if-let ((res (gethash function comp-known-func-cstr-h)))
-      (cons (comp-cstr-to-type-spec res) 'know)
-    (cons (subr-type (symbol-function function) 'inferred))))
+  (when (featurep 'native-compile)
+    (if-let ((res (gethash function comp-known-func-cstr-h)))
+        (cons (comp-cstr-to-type-spec res) 'know)
+      (when (subr-native-elisp-p (symbol-function function))
+        (cons (subr-type (symbol-function function) 'inferred))))))
 
 (provide 'comp)
 
