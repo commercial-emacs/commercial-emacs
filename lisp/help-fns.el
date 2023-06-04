@@ -36,7 +36,7 @@
 (require 'seq)
 (require 'help-mode)
 (require 'radix-tree)
-(eval-when-compile (require 'subr-x))   ;For when-let.
+(require 'subr-x)
 
 (defvar help-fns-describe-function-functions nil
   "List of functions to run in help buffer in `describe-function'.
