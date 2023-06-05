@@ -1184,6 +1184,7 @@ command_loop (void)
       prev_buffer = current_buffer;
       prev_modiff = MODIFF;
       last_point_position = PT;
+      ptrdiff_t last_pt = PT;
 
       /* Re-enable adjusting point to a tangibility boundary (e.g.,
          composition, display).  */
