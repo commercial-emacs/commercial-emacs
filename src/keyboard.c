@@ -219,9 +219,6 @@ struct buffer *buffer_before_last_command_or_undo;
 /* Value of num_nonmacro_input_events as of last auto save.  */
 static intmax_t last_auto_save;
 
-/* The value of point when the last command was started. */
-static ptrdiff_t last_point_position;
-
 /* The frame in which the last input event occurred, or Qmacro if the
    last event came from a macro.  We use this to determine when to
    generate switch-frame events.  This may be cleared by functions
@@ -1087,6 +1084,7 @@ command_loop (void)
   for (;;)
     {
       Lisp_Object cmd;
+      ptrdiff_t orig_pt = PT;
 
       if (! FRAME_LIVE_P (XFRAME (selected_frame)))
 	Fkill_emacs (Qnil, Qnil);
@@ -1183,8 +1181,7 @@ command_loop (void)
 
       prev_buffer = current_buffer;
       prev_modiff = MODIFF;
-      last_point_position = PT;
-      ptrdiff_t last_pt = PT;
+      orig_pt = PT;
 
       /* Re-enable adjusting point to a tangibility boundary (e.g.,
          composition, display).  */
@@ -1317,16 +1314,16 @@ command_loop (void)
 
       if (current_buffer == prev_buffer
 	  && XBUFFER (XWINDOW (selected_window)->contents) == current_buffer
-	  && last_point_position != PT)
+	  && orig_pt != PT)
 	{
 	  if (NILP (Vdisable_point_adjustment)
 	      && NILP (Vglobal_disable_point_adjustment)
 	      && !composition_break_at_point)
-	    adjust_point_for_property (last_point_position,
+	    adjust_point_for_property (orig_pt,
 				       MODIFF != prev_modiff);
 	  else if (PT > BEGV
                    && PT < ZV
-		   && PT != composition_adjust_point (last_point_position, PT))
+		   && PT != composition_adjust_point (orig_pt, PT))
 	    /* Point is within a multibyte glyph.  Updating display
                decomposes glyph so that cursor finds point.  */
             windows_or_buffers_changed = 39;
