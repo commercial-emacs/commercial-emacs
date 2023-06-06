@@ -1693,12 +1693,14 @@ Otherwise, it makes a cleartext signature."
                 (make-temp-file "epg-output"))
 	  (when input-file
 	    (write-region plain nil input-file nil 'quiet))
-          (epg-wait-for-completion context
-	    (epg-start-sign context
+          (cl-loop repeat 2
+                   do (epg-wait-for-completion context
+	                (epg-start-sign context
 			    (if input-file
 			        (epg-make-data-from-file input-file)
 			      (epg-make-data-from-string plain))
 			    mode))
+                   until (epg-context-result-for context 'sign))
 	  (unless (epg-context-result-for context 'sign)
 	    (if (epg-context-result-for context 'error)
 		(when-let ((errors (epg-context-result-for context 'error)))
