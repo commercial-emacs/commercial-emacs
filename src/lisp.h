@@ -3855,7 +3855,6 @@ extern void init_xdisp (void);
 extern void syms_of_bidi (void);
 extern bool bidi_initialize (void);
 extern Lisp_Object safe_eval (Lisp_Object);
-extern Lisp_Object safe_eval_inhibit_quit (Lisp_Object);
 extern bool window_start_coordinates (struct window *, ptrdiff_t, int *,
 				      int *, int *, int *, int *, int *);
 

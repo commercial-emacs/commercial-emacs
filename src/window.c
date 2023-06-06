@@ -5466,48 +5466,30 @@ window_wants_mode_line (struct window *w)
 	  && WINDOW_PIXEL_HEIGHT (w) > WINDOW_FRAME_LINE_HEIGHT (w));
 }
 
-
-/**
- * null_header_line_format:
- *
- * Return non-zero when header line format FMT indicates that the
- * header line should not be displayed at all, for windows on frame F.
- *
- * This is when FMT is nil, or if FMT is a cons cell and either its
- * car is a symbol whose value as a variable is nil or void, or its
- * car is the symbol ':eval' and its cadr evaluates to nil.
+/*
+ * Dispense with header line if FMT is '(:eval nil) or
+ * is otherwise degenerate.
  */
+
 static bool
-null_header_line_format (Lisp_Object fmt, struct frame *f)
+null_header_line_format (Lisp_Object fmt)
 {
-  Lisp_Object car;
-  Lisp_Object val;
-
-  if (NILP (fmt))
-    return true;
-
+  Lisp_Object val = fmt;
   if (CONSP (fmt))
     {
-      car = XCAR (fmt);
-      if (SYMBOLP (car))
+      Lisp_Object car = XCAR (fmt);
+      if (EQ (car, QCeval))
 	{
-	  if (EQ (car, QCeval))
-	    {
-	      val = safe_eval_inhibit_quit (XCAR (XCDR (fmt)));
-	      if (!FRAME_LIVE_P (f))
-		signal_error (":eval deleted the frame being displayed", fmt);
-	      return NILP (val);
-	    }
-	  val = find_symbol_value (car);
-	  return (SYMBOLP (car)
-		  && (EQ (val, Qunbound)
-		      || NILP (val)));
+	  specpdl_ref count = SPECPDL_INDEX ();
+	  specbind (Qinhibit_quit, Qt);
+	  val = safe_eval (XCAR (XCDR (fmt)));
+	  unbind_to (count, Qnil);
 	}
+      else if (SYMBOLP (car))
+	val = find_symbol_value (car, NULL);
     }
-
-  return false;
+  return EQ (val, Qunbound) || NILP (val);
 }
-
 
 /**
  * window_wants_header_line:
@@ -5526,18 +5508,14 @@ null_header_line_format (Lisp_Object fmt, struct frame *f)
 bool
 window_wants_header_line (struct window *w)
 {
-  Lisp_Object window_header_line_format
-    = window_parameter (w, Qheader_line_format);
-
-  struct frame *f = WINDOW_XFRAME(w);
-
+  Lisp_Object window_format = window_parameter (w, Qheader_line_format),
+    buffer_format = BVAR (XBUFFER (WINDOW_BUFFER (w)), header_line_format);
   return (WINDOW_LEAF_P (w)
 	  && !MINI_WINDOW_P (w)
 	  && !WINDOW_PSEUDO_P (w)
-	  && !EQ (window_header_line_format, Qnone)
-	  && (!null_header_line_format (window_header_line_format, f)
-	      || !null_header_line_format (BVAR (XBUFFER (WINDOW_BUFFER (w)),
-						 header_line_format), f))
+	  && !EQ (window_format, Qnone)
+	  && (!null_header_line_format (window_format)
+	      || !null_header_line_format (buffer_format))
 	  && (WINDOW_PIXEL_HEIGHT (w)
 	      > (window_wants_mode_line (w)
 		 ? 2 * WINDOW_FRAME_LINE_HEIGHT (w)
