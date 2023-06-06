@@ -5462,7 +5462,7 @@ window_wants_mode_line (struct window *w)
 	  && !WINDOW_PSEUDO_P (w)
 	  && !EQ (window_mode_line_format, Qnone)
 	  && (!NILP (window_mode_line_format)
-	      || !NILP (BVAR (XBUFFER (WINDOW_BUFFER (w)), mode_line_format)))
+	      || !NILP (BVAR (XBUFFER (w->contents), mode_line_format)))
 	  && WINDOW_PIXEL_HEIGHT (w) > WINDOW_FRAME_LINE_HEIGHT (w));
 }
 
@@ -5508,14 +5508,13 @@ null_header_line_format (Lisp_Object fmt)
 bool
 window_wants_header_line (struct window *w)
 {
-  Lisp_Object window_format = window_parameter (w, Qheader_line_format),
-    buffer_format = BVAR (XBUFFER (WINDOW_BUFFER (w)), header_line_format);
+  Lisp_Object window_format = window_parameter (w, Qheader_line_format);
   return (WINDOW_LEAF_P (w)
 	  && !MINI_WINDOW_P (w)
 	  && !WINDOW_PSEUDO_P (w)
 	  && !EQ (window_format, Qnone)
 	  && (!null_header_line_format (window_format)
-	      || !null_header_line_format (buffer_format))
+	      || !null_header_line_format (BVAR (XBUFFER (w->contents), header_line_format)))
 	  && (WINDOW_PIXEL_HEIGHT (w)
 	      > (window_wants_mode_line (w)
 		 ? 2 * WINDOW_FRAME_LINE_HEIGHT (w)
@@ -5549,7 +5548,7 @@ window_wants_tab_line (struct window *w)
 	  && !WINDOW_PSEUDO_P (w)
 	  && !EQ (window_tab_line_format, Qnone)
 	  && (!NILP (window_tab_line_format)
-	      || !NILP (BVAR (XBUFFER (WINDOW_BUFFER (w)), tab_line_format)))
+	      || !NILP (BVAR (XBUFFER (w->contents), tab_line_format)))
 	  && (WINDOW_PIXEL_HEIGHT (w)
 	      > (((window_wants_mode_line (w) ? 1 : 0)
 		  + (window_wants_header_line (w) ? 1 : 0)
