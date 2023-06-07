@@ -1,12 +1,10 @@
-# manywarnings.m4 serial 24
+# manywarnings.m4 serial 23
 dnl Copyright (C) 2008-2023 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
 
 dnl From Simon Josefsson
-
-AC_PREREQ([2.64])
 
 # gl_MANYWARN_COMPLEMENT(OUTVAR, LISTVAR, REMOVEVAR)
 # --------------------------------------------------
@@ -23,7 +21,7 @@ AC_DEFUN([gl_MANYWARN_COMPLEMENT],
       *" $gl_warn_item "*)
         ;;
       *)
-        AS_VAR_APPEND([gl_warn_set], [" $gl_warn_item"])
+        gl_AS_VAR_APPEND([gl_warn_set], [" $gl_warn_item"])
         ;;
     esac
   done
@@ -49,29 +47,40 @@ AC_DEFUN([gl_MANYWARN_ALL_GCC(C)],
   dnl gcc warning categories.
   AC_REQUIRE([AC_PROG_CC])
   AS_IF([test -n "$GCC"], [
-    AC_CACHE_CHECK([whether -Wno-missing-field-initializers is needed],
-      [gl_cv_cc_nomfi_needed],
-      [gl_cv_cc_nomfi_needed=no
-       gl_save_CFLAGS="$CFLAGS"
-       CFLAGS="$CFLAGS -Wextra -Werror"
+    dnl Check if -Wextra -Werror -Wno-missing-field-initializers is supported
+    dnl with the current $CC $CFLAGS $CPPFLAGS.
+    AC_CACHE_CHECK([whether -Wno-missing-field-initializers is supported],
+      [gl_cv_cc_nomfi_supported],
+      [gl_save_CFLAGS="$CFLAGS"
+       CFLAGS="$CFLAGS -Wextra -Werror -Wno-missing-field-initializers"
        AC_COMPILE_IFELSE(
-         [AC_LANG_PROGRAM(
-            [[struct file_data { int desc, name; };
-              struct cmp { struct file_data file[1]; };
-              void f (struct cmp *r)
-              {
-                typedef struct { int a; int b; } s_t;
-                s_t s1 = { 0, };
-                struct cmp cmp = { .file[0].desc = r->file[0].desc + s1.a };
-                *r = cmp;
-              }
-            ]],
-            [[]])],
-         [],
-         [CFLAGS="$CFLAGS -Wno-missing-field-initializers"
-          AC_COMPILE_IFELSE([],
-            [gl_cv_cc_nomfi_needed=yes])])
+         [AC_LANG_PROGRAM([[]], [[]])],
+         [gl_cv_cc_nomfi_supported=yes],
+         [gl_cv_cc_nomfi_supported=no])
        CFLAGS="$gl_save_CFLAGS"
+      ])
+
+    AS_IF([test "$gl_cv_cc_nomfi_supported" = yes], [
+      dnl Now check whether -Wno-missing-field-initializers is needed
+      dnl for the { 0, } construct.
+      AC_CACHE_CHECK([whether -Wno-missing-field-initializers is needed],
+        [gl_cv_cc_nomfi_needed],
+        [gl_save_CFLAGS="$CFLAGS"
+         CFLAGS="$CFLAGS -Wextra -Werror"
+         AC_COMPILE_IFELSE(
+           [AC_LANG_PROGRAM(
+              [[int f (void)
+                {
+                  typedef struct { int a; int b; } s_t;
+                  s_t s1 = { 0, };
+                  return s1.b;
+                }
+              ]],
+              [[]])],
+           [gl_cv_cc_nomfi_needed=no],
+           [gl_cv_cc_nomfi_needed=yes])
+         CFLAGS="$gl_save_CFLAGS"
+        ])
     ])
 
     dnl Next, check if -Werror -Wuninitialized is useful with the
@@ -150,7 +159,7 @@ AC_DEFUN([gl_MANYWARN_ALL_GCC(C)],
     -Wwrite-strings \
     \
     ; do
-    AS_VAR_APPEND([$1], [" $gl_manywarn_item"])
+    gl_AS_VAR_APPEND([$1], [" $gl_manywarn_item"])
   done
 
   # gcc --help=warnings outputs an unusual form for these options; list
@@ -170,29 +179,29 @@ AC_DEFUN([gl_MANYWARN_ALL_GCC(C)],
     case $gl_gcc_version in
       'gcc (GCC) '[[0-3]].* | \
       'gcc (GCC) '4.[[0-7]].*)
-        AS_VAR_APPEND([$1], [' -fdiagnostics-show-option'])
-        AS_VAR_APPEND([$1], [' -funit-at-a-time'])
+        gl_AS_VAR_APPEND([$1], [' -fdiagnostics-show-option'])
+        gl_AS_VAR_APPEND([$1], [' -funit-at-a-time'])
           ;;
     esac
     case $gl_gcc_version in
       'gcc (GCC) '[[0-9]].*)
-        AS_VAR_APPEND([$1], [' -fno-common'])
+        gl_AS_VAR_APPEND([$1], [' -fno-common'])
           ;;
     esac
   fi
 
   # Disable specific options as needed.
   if test "$gl_cv_cc_nomfi_needed" = yes; then
-    AS_VAR_APPEND([$1], [' -Wno-missing-field-initializers'])
+    gl_AS_VAR_APPEND([$1], [' -Wno-missing-field-initializers'])
   fi
 
   if test "$gl_cv_cc_uninitialized_supported" = no; then
-    AS_VAR_APPEND([$1], [' -Wno-uninitialized'])
+    gl_AS_VAR_APPEND([$1], [' -Wno-uninitialized'])
   fi
 
   # This warning have too many false alarms in GCC 11.2.1.
   # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=101713
-  AS_VAR_APPEND([$1], [' -Wno-analyzer-malloc-leak'])
+  gl_AS_VAR_APPEND([$1], [' -Wno-analyzer-malloc-leak'])
 
   AC_LANG_POP([C])
 ])

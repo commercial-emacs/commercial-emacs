@@ -48,10 +48,6 @@
      OFFSET                  A signed integer type sufficient to hold the
                              difference between two indices.  Usually
                              something like ptrdiff_t.
-     OFFSET_MAX              (Optional) The maximum value of OFFSET (e.g.,
-                             PTRDIFF_MAX).  If omitted, it is inferred in a
-                             way portable to the vast majority of C platforms,
-                             as they lack padding bits.
      EXTRA_CONTEXT_FIELDS    Declarations of fields for 'struct context'.
      NOTE_DELETE(ctxt, xoff) Record the removal of the object xvec[xoff].
      NOTE_INSERT(ctxt, yoff) Record the insertion of the object yvec[yoff].
@@ -79,10 +75,8 @@
  */
 
 /* Maximum value of type OFFSET.  */
-#ifndef OFFSET_MAX
-# define OFFSET_MAX \
-   ((((OFFSET) 1 << (sizeof (OFFSET) * CHAR_BIT - 2)) - 1) * 2 + 1)
-#endif
+#define OFFSET_MAX \
+  ((((OFFSET)1 << (sizeof (OFFSET) * CHAR_BIT - 2)) - 1) * 2 + 1)
 
 /* Default to no early abort.  */
 #ifndef EARLY_ABORT
@@ -95,17 +89,11 @@
 
 /* Use this to suppress gcc's "...may be used before initialized" warnings.
    Beware: The Code argument must not contain commas.  */
-#if __GNUC__ + (__GNUC_MINOR__ >= 7) > 4
-# pragma GCC diagnostic push
-#endif
 #ifndef IF_LINT
 # if defined GCC_LINT || defined lint
 #  define IF_LINT(Code) Code
 # else
 #  define IF_LINT(Code) /* empty */
-#  if __GNUC__ + (__GNUC_MINOR__ >= 7) > 4
-#   pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-#  endif
 # endif
 #endif
 
@@ -568,10 +556,6 @@ compareseq (OFFSET xoff, OFFSET xlim, OFFSET yoff, OFFSET ylim,
   return false;
   #undef XREF_YREF_EQUAL
 }
-
-#if __GNUC__ + (__GNUC_MINOR__ >= 7) > 4
-# pragma GCC diagnostic pop
-#endif
 
 #undef ELEMENT
 #undef EQUAL
