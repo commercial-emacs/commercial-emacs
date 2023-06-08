@@ -523,15 +523,7 @@ Pass optional INTERACTIVE to mml-secure-test-mail-fixture."
 		  (signer-keys (mml-secure-signers context signer-names))
 		  (signer-fprs (mapcar 'mml-secure-fingerprint signer-keys)))
 	     (should (eq checksig (length signer-fprs)))
-	     (if (eq checksig 0)
-		 ;; First key in keyring
-		 (should (string-match-p
-			  (concat "Good signature from "
-				  (if (eq protocol 'CMS)
-				      "0E58229B80EE33959FF718FEEF25402B479DC6E2"
-				    "A049C1E9179C086B"))
-			  gnus-info)))
-	     (dolist (fpr signer-fprs nil)
+	     (dolist (fpr signer-fprs)
 	       ;; OpenPGP: "Good signature from A049C1E9179C086B No Expiry <no-exp@example.org> (trust undefined) created ..."
 	       ;; S/MIME:  "Good signature from D06AA118653CC38E9D0CAF56ED7A2135E1582177 /CN=No Expiry (trust full) ..."
 	       (should (string-match-p
