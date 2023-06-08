@@ -3340,7 +3340,7 @@ value should be byte-discard."
          ;; These functions are side-effect-free except for the
          ;; behaviour of functions passed as argument.
          mapcar mapcan mapconcat
-         assoc assoc-string plist-get plist-member
+         assoc plist-get plist-member
 
          ;; It's safe to ignore the value of `sort' and `nreverse'
          ;; when used on arrays, but most calls pass lists.
@@ -3727,6 +3727,7 @@ defaults to byte-compile-FUNCTION."
 (byte-defop-compiler cons		2)
 (byte-defop-compiler aref		2)
 (byte-defop-compiler set		2)
+(byte-defop-compiler fset		2)
 (byte-defop-compiler (= byte-eqlsign)	2-cmp)
 (byte-defop-compiler (< byte-lss)	2-cmp)
 (byte-defop-compiler (> byte-gtr)	2-cmp)
@@ -3972,7 +3973,6 @@ discarding."
 (byte-defop-compiler backward-word)
 (byte-defop-compiler list)
 (byte-defop-compiler concat)
-(byte-defop-compiler fset)
 (byte-defop-compiler (indent-to-column byte-indent-to) byte-compile-indent-to)
 (byte-defop-compiler indent-to)
 (byte-defop-compiler insert)
