@@ -74,7 +74,7 @@
 
 (ert-deftest proced-refine-test ()
   "Refinement appears to mean filtering out processes that are not PID."
-  :expected-result (if (getenv "CI") t :passed) ; macos signals not taking
+  (skip-unless (not (getenv "CI"))) ; macos signals not taking
   (proced--within-buffer
    'medium
    'user
@@ -88,7 +88,7 @@
 
 (ert-deftest proced-refine-with-update-test ()
   "Like `proced-refine-test' but with reverting, whatever that means."
-  :expected-result (if (getenv "CI") t :passed) ; macos signals not taking
+  (skip-unless (not (getenv "CI"))) ; macos signals not taking
   (proced--within-buffer
    'medium
    'user
