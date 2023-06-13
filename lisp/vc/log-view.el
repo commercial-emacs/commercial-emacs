@@ -522,9 +522,11 @@ If called interactively, visit the version at point."
 (defun log-view-extract-comment ()
   "Parse comment from around the current point in the log."
   (save-excursion
-    (let (st en (backend (vc-backend (log-view-current-file))))
+    (let (st en (backend log-view-vc-backend))
+      (unless (get-text-property (car (log-view-current-entry)) 'log-view-entry-expanded)
+        (log-view-toggle-entry-display))
       (log-view-end-of-defun)
-      (cond ((eq backend 'SVN)
+      (cond ((memq backend '(SVN Git))
 	     (forward-line -1)))
       (setq en (point))
       (or (log-view-current-entry nil t)
@@ -533,7 +535,10 @@ If called interactively, visit the version at point."
 	     (forward-line 2))
 	    ((eq backend 'Hg)
 	     (forward-line 4)
-	     (re-search-forward "summary: *" nil t)))
+	     (re-search-forward "summary: *" nil t))
+            ((eq backend 'Git)
+             (re-search-forward "^$" nil t)
+             (forward-line 1)))
       (setq st (point))
       (buffer-substring st en))))
 

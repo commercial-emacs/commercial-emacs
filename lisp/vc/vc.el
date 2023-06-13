@@ -699,16 +699,6 @@
 ;; - The git backend supports amending, but in a different
 ;;   way (press `C-c C-e' in log-edit buffer, when making a new commit).
 ;;
-;; - Second, `log-view-modify-change-comment' doesn't seem to support
-;;   modern backends at all because `log-view-extract-comment'
-;;   unconditionally calls `log-view-current-file'.  This should be easy to
-;;   fix.
-;;
-;; - Third, doing message editing in log-view might be a natural way to go
-;;   about it, but editing any but the last commit (and even it, if it's
-;;   been pushed) is a dangerous operation in Git, which we shouldn't make
-;;   too easy for users to perform.
-;;
 ;;   There should be a check that the given comment is not reachable
 ;;   from any of the "remote" refs?
 ;;
