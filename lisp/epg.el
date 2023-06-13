@@ -766,7 +766,13 @@ callback data (if any)."
       (nreverse (epg-context-result-for ,context 'error)))
      (setf (epg-context-error-output ,context)
 	   (with-current-buffer (epg-context-error-buffer ,context)
-	     (buffer-string)))))
+	     (buffer-string)))
+     (when (and epg-debug epg-debug-buffer)
+       (with-current-buffer epg-debug-buffer
+	 (goto-char (point-max))
+	 (insert (format "Result: %S\nStderr: %S\n"
+                         (epg-context-result-for ,context 'error)
+                         (epg-context-error-output ,context)))))))
 
 (defun epg-reset (context)
   "Reset the CONTEXT."
@@ -1466,10 +1472,8 @@ If PLAIN is nil, it returns the result as a string."
       (progn
 	(setf (epg-context-output-file context)
               (or plain (make-temp-file "epg-output")))
-        (cl-loop repeat 2
-                 do (epg-wait-for-completion context
-                      (epg-start-decrypt context (epg-make-data-from-file cipher)))
-                 while (epg--check-error-for-decrypt context))
+        (epg-wait-for-completion context
+          (epg-start-decrypt context (epg-make-data-from-file cipher)))
 	(unless plain
 	  (epg-read-output context)))
     (unless plain
@@ -1484,10 +1488,8 @@ If PLAIN is nil, it returns the result as a string."
 	(progn
 	  (write-region cipher nil input-file nil 'quiet nil 'excl)
 	  (setf (epg-context-output-file context) (make-temp-name "epg-output"))
-          (cl-loop repeat 2
-                   do (epg-wait-for-completion context
-	                (epg-start-decrypt context (epg-make-data-from-file input-file)))
-                   while (epg--check-error-for-decrypt context))
+          (epg-wait-for-completion context
+	    (epg-start-decrypt context (epg-make-data-from-file input-file)))
 	  (epg-read-output context))
       (unless (cl-search "BEGIN PGP" (epg-read-output context))
         (epg-delete-output-file context)
@@ -1693,14 +1695,12 @@ Otherwise, it makes a cleartext signature."
                 (make-temp-file "epg-output"))
 	  (when input-file
 	    (write-region plain nil input-file nil 'quiet))
-          (cl-loop repeat 2
-                   do (epg-wait-for-completion context
-	                (epg-start-sign context
+          (epg-wait-for-completion context
+	    (epg-start-sign context
 			    (if input-file
 			        (epg-make-data-from-file input-file)
 			      (epg-make-data-from-string plain))
 			    mode))
-                   until (epg-context-result-for context 'sign))
 	  (unless (epg-context-result-for context 'sign)
 	    (if (epg-context-result-for context 'error)
 		(when-let ((errors (epg-context-result-for context 'error)))

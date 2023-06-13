@@ -45,6 +45,7 @@
   (move-to-column (string-match attribute proced-header-line)))
 
 (ert-deftest proced-format-test ()
+  (skip-unless (not (getenv "CI"))) ; macos signals not taking
   (dolist (format '(short medium long verbose))
     (proced--within-buffer
      format
@@ -52,6 +53,7 @@
      (proced--assert-emacs-pid-in-buffer))))
 
 (ert-deftest proced-update-test ()
+  (skip-unless (not (getenv "CI"))) ; macos signals not taking
   (proced--within-buffer
    'short
    'user
@@ -59,6 +61,7 @@
    (proced--assert-emacs-pid-in-buffer)))
 
 (ert-deftest proced-revert-test ()
+  (skip-unless (not (getenv "CI"))) ; macos signals not taking
   (proced--within-buffer
    'short
    'user
@@ -66,6 +69,7 @@
    (proced--assert-emacs-pid-in-buffer)))
 
 (ert-deftest proced-color-test ()
+  (skip-unless (not (getenv "CI"))) ; macos signals not taking
   (let ((proced-enable-color-flag t))
     (proced--within-buffer
      'short
@@ -106,6 +110,7 @@
        (forward-line)))))
 
 (ert-deftest proced-update-preserves-pid-at-point-test ()
+  (skip-unless (not (getenv "CI"))) ; macos signals not taking
   (proced--within-buffer
    'medium
    'user

@@ -87,7 +87,10 @@ instead of gpg-agent."
 	  (setenv "GNUPGHOME" epg-gpg-home-directory)
           (unwind-protect
 	      (funcall body)
-            (mml-sec-test--kill-gpg-agent)))
+            (mml-sec-test--kill-gpg-agent))
+          (message "epg-debug-buffer:\n%S"
+                   (with-current-buffer epg-debug-buffer
+                     (buffer-string))))
       (setenv "GPG_AGENT_INFO" agent-info)
       (setenv "GNUPGHOME" gpghome))))
 
