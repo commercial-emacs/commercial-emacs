@@ -2227,7 +2227,10 @@ are available:
          This excludes from completion candidates those commands
          which have been marked specific to modes other than the
          current buffer's mode.  Commands that are not specific
-         to any mode are included.
+         to any mode are included.  If there's a
+         `completion-predicate' for a command, this command is
+         excluded as well if the result calling from its predicate
+         is nil.
 
   `command-completion-using-modes-p'
          This includes in completion candidates only commands
