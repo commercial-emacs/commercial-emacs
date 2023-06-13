@@ -591,7 +591,7 @@ callback data (if any)."
 			   (list "--homedir"
 				 (epg-context-home-directory context)))
 		       (unless (eq (epg-context-protocol context) 'CMS)
-			 '("--command-fd" "0"))
+		         '("--command-fd" "0"))
 		       (if (epg-context-armor context) '("--armor"))
 		       (if (epg-context-textmode context) '("--textmode"))
 		       (if (epg-context-output-file context)
@@ -670,7 +670,7 @@ callback data (if any)."
         (setq process (make-process :name "epg"
 				    :buffer buffer
 				    :command (cons (epg-context-program context)
-						   args)
+                                                   args)
 				    :connection-type 'pipe
 				    :coding 'raw-text
 				    :filter #'epg--process-filter
@@ -754,6 +754,7 @@ callback data (if any)."
      (when-let ((output-file (epg-context-output-file ,context)))
        (while (not (file-exists-p output-file))
          (accept-process-output (epg-context-process ,context) 0.3)))
+
      ;; Restore Emacs frame on text terminal, when pinentry-curses has terminated.
      (when (with-current-buffer (process-buffer (epg-context-process ,context))
 	     (when-let ((agent-p epg-agent-file)
@@ -766,13 +767,7 @@ callback data (if any)."
       (nreverse (epg-context-result-for ,context 'error)))
      (setf (epg-context-error-output ,context)
 	   (with-current-buffer (epg-context-error-buffer ,context)
-	     (buffer-string)))
-     (when (and epg-debug epg-debug-buffer)
-       (with-current-buffer epg-debug-buffer
-	 (goto-char (point-max))
-	 (insert (format "Result: %S\nStderr: %S\n"
-                         (epg-context-result-for ,context 'error)
-                         (epg-context-error-output ,context)))))))
+	     (buffer-string)))))
 
 (defun epg-reset (context)
   "Reset the CONTEXT."

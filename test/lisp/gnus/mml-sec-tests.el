@@ -85,12 +85,12 @@ instead of gpg-agent."
 	  ;; not look in the proper places otherwise, see:
 	  ;; https://bugs.gnupg.org/gnupg/issue2126
 	  (setenv "GNUPGHOME" epg-gpg-home-directory)
-          (unwind-protect
-	      (funcall body)
-            (mml-sec-test--kill-gpg-agent))
-          (message "epg-debug-buffer:\n%S"
-                   (with-current-buffer epg-debug-buffer
-                     (buffer-string))))
+          (condition-case err
+              (funcall body)
+            (error (message "%s" (with-current-buffer epg-debug-buffer
+                                   (buffer-string)))
+                   (signal (car err) (cdr err)))))
+      (ignore-errors (mml-sec-test--kill-gpg-agent))
       (setenv "GPG_AGENT_INFO" agent-info)
       (setenv "GNUPGHOME" gpghome))))
 
@@ -716,8 +716,7 @@ In this test, lists of encryption and signing keys are customized."
 	  method "no-exp@example.org" "sub@example.org" 2 t)
 	 ;; customized choice for both keys
 	 (mml-secure-test-en-decrypt
-	  method "sub@example.org" "sub@example.org" 2 t)
-	 )))))
+	  method "sub@example.org" "sub@example.org" 2 t))))))
 
 (ert-deftest mml-secure-en-decrypt-sign-3 ()
   "Sign and encrypt message; then decrypt and test for expected result.
