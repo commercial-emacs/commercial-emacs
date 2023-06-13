@@ -484,6 +484,19 @@ Assumes the caller has bound `macroexpand-all-environment'."
                (macroexp--expand-all newform))))))
       (_ form))))
 
+;; Record which arguments expect functions, so we can warn when those
+;; are accidentally quoted with ' rather than with #'
+(dolist (f '( funcall apply mapcar mapatoms mapconcat mapc cl-mapcar maphash
+              mapcan map-char-table map-keymap map-keymap-internal))
+  (put f 'funarg-positions '(1)))
+(dolist (f '( add-hook remove-hook advice-remove advice--remove-function
+              defalias fset global-set-key run-after-idle-timeout
+              set-process-filter set-process-sentinel sort))
+  (put f 'funarg-positions '(2)))
+(dolist (f '( advice-add define-key
+              run-at-time run-with-idle-timer run-with-timer ))
+  (put f 'funarg-positions '(3)))
+
 ;;;###autoload
 (defun macroexpand-all (form &optional environment)
   "Return result of expanding macros at all levels in FORM.
