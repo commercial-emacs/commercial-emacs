@@ -444,19 +444,7 @@ Assumes the caller has bound `macroexpand-all-environment'."
            (_ `(funcall ,eexp . ,eargs)))))
       (`(funcall . ,_) form)            ;bug#53227
       (`(,func . ,_)
-       (let ((handler (function-get func 'compiler-macro))
-             (funargs (function-get func 'funarg-positions)))
-         ;; Check functions quoted with ' rather than with #'
-         (dolist (funarg funargs)
-           (let ((arg (nth funarg form)))
-             (when (and (eq 'quote (car-safe arg))
-                        (eq 'lambda (car-safe (cadr arg))))
-               (setcar (nthcdr funarg form)
-                       (macroexp-warn-and-return
-                        (format "%S quoted with ' rather than with #'"
-                                (let ((f (cadr arg)))
-                                  (if (symbolp f) f `(lambda ,(nth 1 f) ...))))
-                        arg)))))
+       (let ((handler (function-get func 'compiler-macro)))
          ;; Macro expand compiler macros.  This cannot be delayed to
          ;; byte-optimize-form because the output of the compiler-macro can
          ;; use macros.
@@ -483,19 +471,6 @@ Assumes the caller has bound `macroexpand-all-environment'."
                      (macroexp--expand-all form)))
                (macroexp--expand-all newform))))))
       (_ form))))
-
-;; Record which arguments expect functions, so we can warn when those
-;; are accidentally quoted with ' rather than with #'
-(dolist (f '( funcall apply mapcar mapatoms mapconcat mapc cl-mapcar maphash
-              mapcan map-char-table map-keymap map-keymap-internal))
-  (put f 'funarg-positions '(1)))
-(dolist (f '( add-hook remove-hook advice-remove advice--remove-function
-              defalias fset global-set-key run-after-idle-timeout
-              set-process-filter set-process-sentinel sort))
-  (put f 'funarg-positions '(2)))
-(dolist (f '( advice-add define-key
-              run-at-time run-with-idle-timer run-with-timer ))
-  (put f 'funarg-positions '(3)))
 
 ;;;###autoload
 (defun macroexpand-all (form &optional environment)
