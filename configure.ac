@@ -2991,7 +2991,10 @@ TREE_SITTER_OBJ=
 NEED_DYNLIB=no
 
 if test "${with_tree_sitter}" = "yes"; then
-  EMACS_CHECK_MODULES([TREE_SITTER], [tree-sitter >= v0.20.8alpha2])
+  EMACS_CHECK_MODULES([TREE_SITTER], [tree-sitter = v0.20.8alpha2])
+  if test "${HAVE_TREE_SITTER}" != yes; then
+    EMACS_CHECK_MODULES([TREE_SITTER], [tree-sitter = v0.20.10beta1])
+  fi
   if test "${HAVE_TREE_SITTER}" = yes; then
     AC_DEFINE(HAVE_TREE_SITTER, 1, [Define if using tree-sitter.])
     TREE_SITTER_OBJ="tree-sitter.o"
