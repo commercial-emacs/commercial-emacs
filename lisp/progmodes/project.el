@@ -567,7 +567,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
           (let* ((parent (file-name-directory (directory-file-name root))))
             (setq root (vc-call-backend 'Git 'root parent))))
         (when root
-          (setq project (list 'vc backend root))
+          (setq project (list 'vc backend (expand-file-name root)))
           ;; FIXME: Cache for a shorter time.
           (vc-file-setprop dir 'project-vc project)
           project))))
