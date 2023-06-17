@@ -91,7 +91,7 @@ name.")
 
 (defconst js--plain-method-re
   (concat "^\\s-*?\\(" js--dotted-name-re "\\)\\.prototype"
-          "\\.\\(" js--name-re "\\)\\s-*?=\\s-*?\\(\\(:?async[ \t\n]+\\)function\\)\\_>")
+          "\\.\\(" js--name-re "\\)\\s-*?=\\s-*?\\(\\(?:async[ \t\n]+\\)function\\)\\_>")
   "Regexp matching an explicit JavaScript prototype \"method\" declaration.
 Group 1 is a (possibly-dotted) class name, group 2 is a method name,
 and group 3 is the `function' keyword.")
