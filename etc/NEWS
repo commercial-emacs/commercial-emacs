@@ -253,6 +253,11 @@ The interactive minibuffer prompt when invoking 'eww' now provides
 completions from 'eww-suggest-uris'.  'eww-suggest-uris' now includes
 bookmark URIs.
 
++++
+*** New command 'eww-copy-alternate-url'.
+It copies an alternate link to the page currently visited in EWW into
+the kill ring.
+
 ** go-ts-mode
 
 +++
