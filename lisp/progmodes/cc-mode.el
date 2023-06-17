@@ -2828,7 +2828,7 @@ Key bindings:
                                      "\\|" id "::"
                                      "\\|" id ws-maybe "=\\)"
               "\\|" "\\(?:inline" ws "\\)?namespace"
-                    "\\(:?" ws "\\(?:" id "::\\)*" id "\\)?" ws-maybe "{"
+                    "\\(?:" ws "\\(?:" id "::\\)*" id "\\)?" ws-maybe "{"
               "\\|" "class"     ws id
                     "\\(?:" ws "final" "\\)?" ws-maybe "[:{;\n]"
               "\\|" "struct"     ws id "\\(?:" ws "final" ws-maybe "[:{\n]"
