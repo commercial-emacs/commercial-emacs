@@ -2931,11 +2931,11 @@ nodes that belong to @var{category}.  @var{pred} should be either
 return non-@code{nil} if the node is a valid node for @var{category},
 or @code{nil} if not.
 
-@var{category} could also be @code{nil}.  In which case the entries
+@var{category} could also be @code{nil}, in which case the entries
 matched by @var{regexp} and @var{pred} are not grouped under
 @var{category}.
 
-@var{name-fn} should be either @var{nil} or a function that takes a
+@var{name-fn} should be either @code{nil} or a function that takes a
 defun node and returns the name of that defun, e.g., the function name
 for a function definition.  If @var{name-fn} is @var{nil},
 @code{treesit-defun-name} is used instead.
@@ -3445,7 +3445,7 @@ This condition matches any element of Font Lock keywords for which
 non-@code{nil}.
 
 @item @code{(not @var{condition})}
-This matches if @var{condition} doesn’t.
+This matches if @var{condition} doesn't.
 
 @item @code{(and @var{condition} @dots{})}
 This matches if each of the @var{condition}s matches.
