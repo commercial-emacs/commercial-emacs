@@ -107,7 +107,8 @@ within that region.  Returns the result as a string."
 OBJECT-FUNCTION is called with a single object as argument
 and should pretty print it at point into the current buffer."
   (save-excursion
-    (with-restriction beg end
+    (save-restriction
+      (narrow-to-region beg end)
       (goto-char (point-min))
       (while
           (progn
@@ -116,7 +117,7 @@ and should pretty print it at point into the current buffer."
             (forward-comment (point-max))
             (let ((beg (point))
                   (object (ignore-error end-of-buffer
-                              (list (read (current-buffer))))))
+                            (list (read (current-buffer))))))
               (when (consp object)
                 (delete-region beg (point))
                 (funcall object-function (car object))
