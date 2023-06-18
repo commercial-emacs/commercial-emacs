@@ -61,6 +61,7 @@ called EasyPG Library.
 * Quick start::
 * Commands::
 * GnuPG version compatibility::
+* GnuPG Pinentry::
 * Caching Passphrases::
 * Bug Reports::
 * GNU Free Documentation License::  The license for this documentation.
@@ -72,7 +73,8 @@ called EasyPG Library.
 @node Overview
 @chapter Overview
 
-EasyPG Assistant provides the following features.
+EasyPG Assistant is an Emacs frontend application to @acronym{GnuPG,
+GNU Privacy Guard} that provides the following features:
 
 @itemize @bullet
 @item Key management.
@@ -85,6 +87,16 @@ EasyPG Assistant provides the following features.
 
 @node Quick start
 @chapter Quick start
+
+You can use EasyPG Assistant without any Emacs or GnuPG configuration
+whatsoever, for example to encrypt and decrypt files automatically
+with symmetric encryption, @xref{Encrypting/decrypting gpg files}.
+However, to use the full set of EasyPG Assistant's functions you
+should have at least some minimum GnuPG configuration in place.
+
+John Michael Ashley's GNU Privacy Handbook, available online as part
+of @url{https://gnupg.org/documentation/guides.html, the GnuPG user
+guides}, provides an introduction to GnuPG use and configuration.
 
 EasyPG Assistant commands are prefixed by @samp{epa-}.  For example,
 
@@ -368,6 +380,39 @@ decrypted text is inserted in the buffer rather than encrypted one.
 Similarly, when you save the buffer to a @file{foo.gpg} file,
 encrypted data is written.
 
+When you save a buffer, say, to file @file{foo.gpg} for the first
+time, EasyPG Assistant presents you a list of keys in a new buffer
+@file{*Keys*} where you can select recipients for encryption.
+@xref{Key management} for a description of the format of that buffer.
+You can streamline this recipient selection step by customizing
+variables @code{epa-file-encrypt-to} and @code{epa-file-select-keys},
+see below.
+
+If you do not select any recipient during this step, EasyPG Assistant
+uses symmetric encryption.  As a consequence, you have to enter the
+passphrase twice for every buffer save and every so often for file
+reads, since the gpg-agent caches your passphrase for file reads at
+least for some time, but not for buffer saves.
+
+If you have created your own keypair@footnote{For encryption and
+decryption of files you do not intend to share you do not have to use
+an email address as recipient during creation of the keypair.  You can
+also use some free-form string that gives information on the use of
+the keypair, like @code{backup} or @code{account database}.} you can
+select that as recipient, and EasyPG Assistant uses public key
+encryption for that file.  Since encryption is performed with your
+public key, no passphrase is prompted for the buffer save, but you
+will be prompted for your passphrase for file reads every now and
+then, depending on the gpg-agent cache configuration.
+
+To encrypt and decrypt files as described above EasyPG Assistant under
+certain circumstances uses intermediate tempory files that contain the
+plain-text contents of the files to be encrypted or decrypted.  It
+creates them below the directory returned by function
+@code{temporary-file-directory}.  If you want to be sure not to leave
+any plain-text traces, use an encrypted file systems at least for that
+directory.
+
 The file name pattern for encrypted files can be controlled by
 @code{epa-file-name-regexp}.
 
@@ -436,6 +481,11 @@ behavior are below.
 @defvar epa-file-cache-passphrase-for-symmetric-encryption
 If non-@code{nil}, cache passphrase for symmetric encryption.  The
 default value is @code{nil}.
+
+For security reasons, this option is turned off by default and not
+recommended to use.  Instead, consider using the gpg-agent, which in
+many cases can do the same job, and does it in a safer way.
+@xref{Caching Passphrases} for more information.
 @end defvar
 
 @defvar epa-file-inhibit-auto-save
@@ -461,8 +511,8 @@ The @code{epa-keyserver} variable says which server to query.
 @node GnuPG version compatibility
 @chapter GnuPG version compatibility
 
-As of February 2016, there are three active branches of GnuPG: 2.1,
-2.0, and 1.4.  All those branches should work flawlessly with Emacs
+As of June 2023, there are three active branches of GnuPG: 2.4,
+2.2, and 1.4.  All those branches should work flawlessly with Emacs
 with basic use-cases.  They have, however, some incompatible
 characteristics, which might be visible when used from Emacs.
 
@@ -490,17 +540,71 @@ specifically, with 2.0 (as of 2.0.29), there is no way to avoid the
 graphical prompt.
 @end itemize
 
+
+@node GnuPG Pinentry
+@chapter GnuPG Pinentry
+
+An important component of the GnuPG suite is the Pinentry, which
+allows for secure entry of passphrases requests by GnuPG.  GnuPG
+delivers various different programs as Pinentry, ranging from bland
+TTY-only @samp{pinentry-tty} to fancy graphical dialogues for various
+desktop environments, like @samp{pinentry-gnome3}.  Your operating
+system usually determines which of these is used by default.
+
+With some configuration Emacs can also play the role of a Pinentry.
+There are three different scenarios possible@footnote{Not all
+operating systems and distributions support all of the above
+scenarios.  As of June 2023 Debian GNU/Linux, for example, supports
+only the first of them due to security concerns.}:
+
+@enumerate
+@item Use Emacs only for GnuPG requests that are triggered by Emacs itself,
+@item use Emacs for all GnuPG requests, or
+@item use Emacs for all GnuPG requests with other Pinentry as fallback.
+@end enumerate
+
+FIXME: Brush the following paragraphs up.
+
+1.: Ensure allow-loopback-pinentry is is configured for the GPG agent,
+which should be the default.  Configure epg-pinentry-mode to
+`loopback.
+
+2.: Make pinentry-emacs the default pinentry by means of your
+operating system.  Install package pinentry from GNU ELPA and execute
+M-x pinentry-start to start the Pinentry service.  All GnuPG
+passphrase requests should result in a minibuffer prompt in the
+running Emacs.  If Emacs or pinentry service are not running,
+passphrase requests fail.
+
+3.: Ensure other Pinentry supports Emacs prompt.  pinentry-curses
+does, for example.  Configure option allow-emacs-pinentry in
+gpg-agent.conf.  Set environment variable INSIDE_EMACS for the calling
+process.  Install package pinentry.  Now if Emacs is running and
+pinentry-start has been exeucted, all GnuPG passphrase requests should
+result in a minibuffer prompt in the running Emacs.  If Emacs or
+Pinentry service are not running, GnuPG uses the regular Pinentry
+instead.
+
+First alternative can be configured in addition to onw of the others:
+Requests triggered from within Emacs (like opening a gpg-encrypted
+file) are handled through loopback pinentry, Requests outside of emacs
+through pinentry feature.
+
+Note that the selection of a concrete Pinentry program determines only
+@emph{how} GnuPG queries for passphrases and not @emph{how often}.
+For the latter question @xref{Caching Passphrases}.
+
 @node Caching Passphrases
 @chapter Caching Passphrases
 
 Typing passphrases is a troublesome task if you frequently open and
 close the same file.  GnuPG and EasyPG Assistant provide mechanisms to
 remember your passphrases for a limited time.  Using these, you only
-need to re-enter the passphrase occasionally.
-However, the configuration is a bit
-confusing since it depends on your GnuPG installation@xref{GnuPG
-version compatibility}, encryption method (symmetric or public key),
-and whether or not you want to use gpg-agent.  Here are some
+need to re-enter the passphrase occasionally.  However, the
+configuration is a bit confusing since it depends on your GnuPG
+installation @xref{GnuPG version compatibility}, encryption method
+(symmetric or public key), and whether or not you want to use
+gpg-agent (which is mandatory for GnuPG 2.0 and later).  Here are some
 questions:
 
 @enumerate
