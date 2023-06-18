@@ -48,7 +48,7 @@
   "Test that `eshell-stringify' correctly stringifies lists."
   (should (equal (eshell-stringify '(1 2 3)) "(1 2 3)"))
   (should (equal (eshell-stringify '((1 2) (3 . 4)))
-                 "((1 2)\n (3 . 4))")))
+                 "((1 2) (3 . 4))")))
 
 (ert-deftest esh-util-test/eshell-stringify/complex ()
   "Test that `eshell-stringify' correctly stringifies complex objects."
