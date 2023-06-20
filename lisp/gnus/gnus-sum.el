@@ -8828,7 +8828,6 @@ is non-numeric or nil fetch the number specified by the
          (id (mail-header-id header))
          (gnus-inhibit-demon t)
          (gnus-summary-ignore-duplicates t)
-         (gnus-read-all-available-headers t)
          (gnus-refer-thread-use-search
           (if (or (null limit) (numberp limit))
               gnus-refer-thread-use-search
@@ -8848,7 +8847,8 @@ is non-numeric or nil fetch the number specified by the
             (gnus-search-thread header))
            ;; Otherwise just retrieve some headers.
            (t
-            (let* ((limit (if (numberp limit)
+            (let* ((gnus-read-all-available-headers t)
+                   (limit (if (numberp limit)
                               limit
                             gnus-refer-thread-limit))
                    (last (if (numberp limit)
