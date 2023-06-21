@@ -998,21 +998,21 @@ default_pixels_per_inch_y (void)
    frame, else 0.  */
 
 #define FRAME_TOOL_BAR_TOP_HEIGHT(f)			\
-  ((BASE_EQ ((f)->tool_bar_position, Qtop))		\
+  ((EQ ((f)->tool_bar_position, Qtop))		\
    ? (f)->tool_bar_height : 0)
 
 #define FRAME_TOOL_BAR_TOP_LINES(f)			\
-  ((BASE_EQ ((f)->tool_bar_position, Qtop))		\
+  ((EQ ((f)->tool_bar_position, Qtop))		\
    ? (f)->tool_bar_height : 0)
 
 /* Size of F's tool bar if it is placed at the bottom of the
    frame.  */
 #define FRAME_TOOL_BAR_BOTTOM_HEIGHT(f)			\
-  ((BASE_EQ ((f)->tool_bar_position, Qbottom))		\
+  ((EQ ((f)->tool_bar_position, Qbottom))		\
    ? (f)->tool_bar_height : 0)
 
 #define FRAME_TOOL_BAR_BOTTOM_LINES(f)			\
-  ((BASE_EQ ((f)->tool_bar_position, Qbottom))		\
+  ((EQ ((f)->tool_bar_position, Qbottom))		\
    ? (f)->tool_bar_lines : 0)
 
 /* Height of frame F's top margin in frame lines.  */
