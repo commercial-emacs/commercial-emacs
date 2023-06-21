@@ -1715,7 +1715,8 @@ regex_compile (re_char *pattern, ptrdiff_t size,
 
   /* Address of start of the most recently finished expression.
      This tells, e.g., postfix * where to find the start of its
-     operand.  Reset at the beginning of groups and alternatives.  */
+     operand.  Reset at the beginning of groups and alternatives,
+     and after ^ and \` for dusty-deck compatibility.  */
   unsigned char *laststart = 0;
 
   /* Address of beginning of regexp, or inside of last group.  */
@@ -1846,12 +1847,16 @@ regex_compile (re_char *pattern, ptrdiff_t size,
 	case '^':
 	  if (! (p == pattern + 1 || at_begline_loc_p (pattern, p)))
 	    goto normal_char;
+	  /* Special case for compatibility: postfix ops after ^ become
+	     literals.  */
+	  laststart = 0;
 	  BUF_PUSH (begline);
 	  break;
 
 	case '$':
 	  if (! (p == pend || at_endline_loc_p (p, pend)))
 	    goto normal_char;
+	  laststart = b;
 	  BUF_PUSH (endline);
 	  break;
 
@@ -1891,7 +1896,7 @@ regex_compile (re_char *pattern, ptrdiff_t size,
 
 	    /* Star, etc. applied to an empty pattern is equivalent
 	       to an empty pattern.  */
-	    if (!laststart || laststart == b)
+	    if (laststart == b)
 	      break;
 
 	    /* Now we know whether or not zero matches is allowed
@@ -2543,18 +2548,24 @@ regex_compile (re_char *pattern, ptrdiff_t size,
               break;
 
 	    case 'b':
+	      laststart = b;
 	      BUF_PUSH (wordbound);
 	      break;
 
 	    case 'B':
+	      laststart = b;
 	      BUF_PUSH (notwordbound);
 	      break;
 
 	    case '`':
+	      /* Special case for compatibility: postfix ops after \` become
+		 literals, as for ^ (see above).  */
+	      laststart = 0;
 	      BUF_PUSH (begbuf);
 	      break;
 
 	    case '\'':
+	      laststart = b;
 	      BUF_PUSH (endbuf);
 	      break;
 
