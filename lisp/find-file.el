@@ -192,7 +192,7 @@ filename that EXTRACT returned."
 The value could be an alist or a symbol whose value is an alist.
 Each element of the alist has the form
 
-   (REGEXP (EXTENSION...))
+   (REGEXP (EXTENSION...) [CREATE-EXTENSION])
 
 where REGEXP is the regular expression matching a file's extension,
 and EXTENSIONs is the list of literal file-name extensions to search
@@ -202,7 +202,7 @@ through each directory specified in `ff-search-directories'.
 
 Alist elements can also be of the form
 
-   (REGEXP FUNCTION)
+   (REGEXP FUNCTION [CREATE-EXTENSION])
 
 where FUNCTION is a function of one argument, the current file's name,
 that returns the list of possible names of the corresponding files, with
@@ -210,16 +210,25 @@ or without leading directories.  Note the difference: FUNCTION returns
 the list of file names, not their extensions.  This is for the case when
 REGEXP is not enough to determine the file name of the other file.
 
-If a file is not found, a new one is created with the first
-matching extension or name (e.g., `.cc' yields `.hh').
+If a file is not found, a new one is created with the first matching
+extension or name (e.g., `.cc' yields `.hh').  If [CREATE-EXTENSION]
+is present, it is used instead of the first extension.  If
+[CREATE-EXTENSION] is a function, it is called with a single argument,
+the current file's name, and the name it returns is used instead.
 
 This alist should be set by the major mode.
 
-Note: if an element of the alist names a FUNCTION as its cdr, that
-function must return a non-nil list of file-names.  It cannot
-return nil, nor can it signal in any way a failure to find a suitable
-list of file names."
-  :type '(choice (repeat (list regexp (choice (repeat string) function)))
+Note: if an element of the alist names a FUNCTION as its cadr,
+that function must return a non-nil list of file-names.  It
+cannot return nil, nor can it signal in any way a failure to find
+a suitable list of file names."
+  :type '(choice (repeat (list regexp
+                               (choice :tag "Extensions to try"
+                                       (repeat string)
+                                       function)
+                               (choice :tag "Extension to create"
+                                       (list :inline t :tag "string" string)
+                                       (list :inline t :tag "function" function))))
 		 symbol))
 
 (defcustom ff-search-directories 'cc-search-directories
@@ -465,15 +474,19 @@ If optional IN-OTHER-WINDOW is non-nil, find the file in another window."
         ;; otherwise, suffixes contains what we need
         (setq suffixes (car (cdr match))
               action (car (cdr match))
-              found nil)
+              found nil
+              default-name (caddr match))
+
+        (when (functionp default-name)
+          (setq default-name (funcall default-name (ff-buffer-file-name))))
 
         ;; if we have a function to generate new names,
         ;; invoke it with the name of the current file
-        (if (and (atom action) (fboundp action))
+        (if (functionp action)
             (setq suffixes (funcall action (ff-buffer-file-name))
                   match (cons (car match) (list suffixes))
                   stub nil
-                  default-name (car suffixes))
+                  default-name (or default-name (car suffixes)))
 
           ;; otherwise build our filename stub
           (cond
@@ -493,7 +506,7 @@ If optional IN-OTHER-WINDOW is non-nil, find the file in another window."
 
           ;; if we find nothing, we should try to get a file like this one
           (setq default-name
-                (concat stub (car (car (cdr match))))))
+                (concat stub (or default-name (car (car (cdr match)))))))
 
         ;; do the real work - find the file
         (setq found
