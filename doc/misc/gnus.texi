@@ -715,6 +715,7 @@ Browsing the Web
 
 * Web Searches::                Creating groups from articles that match a string.
 * RSS::                         Reading RDF site summary.
+* Atom::                        Reading Atom Syndication Format feeds.
 
 Other Sources
 
@@ -17188,6 +17189,7 @@ interfaces to these sources.
 @menu
 * Web Searches::                Creating groups from articles that match a string.
 * RSS::                         Reading RDF site summary.
+* Atom::     Reading Atom Syndication Format feeds.
 @end menu
 
 The main caveat with all these web sources is that they probably won't
@@ -17430,6 +17432,46 @@ Parameters}) in order to display @samp{text/html} parts only in
  'gnus-parameters
  '("\\`nnrss:" (mm-discouraged-alternatives nil)))
 @end lisp
+
+
+@node Atom
+@subsection Atom
+@cindex nnatom
+@cindex Atom
+
+Some web sites provide an Atom Syndication Format feed.  Atom is a web
+feed format similar in function to RDF Site Summary (@xref{RSS}).
+
+The @code{nnatom} back end allows you to add HTTP or local Atom feeds
+as Gnus servers (with a single group), as you would with any other
+method, by supplying the location of the feed as the server address.
+Note, however, that the server address shouldn't be prefixed with
+@code{http://} or @code{https://}.
+
+The @code{nnatom} back end saves a server data file in the
+@code{atom} sub-directory of @code{gnus-directory} for each feed.
+
+The @code{nnatom} back end generates an article part for both the
+summary and content of each article in the feed.
+
+@code{nnatom} has been designed to be very modular, and theoretically
+supports many features which aren't available in the Atom Syndication
+Format, in an effort to reduce the work required to build back ends
+for other web feed formats.
+
+Every parsing step is handled by a function stored in a server
+variable; these are all called @code{nnatom-read-*-function}, and
+their requirements are detailed in their docstrings.
+
+The function responsible for printing the content of each article part
+is stored in a server variable (@code{nnatom-print-content-function}).
+The default function only handles (X)HTML and plain text content.
+
+@defmac nnatom-define-basic-backend-interface backend
+Define server variables expected by @code{nnatom} and import its back
+end functions for BACKEND.  This macro (or code similar to it) should
+be used by any inheriting back end.
+@end defmac
 
 
 @node Other Sources

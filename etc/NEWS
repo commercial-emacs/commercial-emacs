@@ -324,6 +324,13 @@ distracting and easily confused with actual code, or a significant
 early aid that relieves you from moving the buffer or reaching for the
 mouse to consult an error message.
 
+** Gnus
+
++++
+*** New back end 'nnatom'.
+This allow users to add Atom Syndication Format feeds to Gnus as
+servers.
+
 ** Python Mode
 
 ---
