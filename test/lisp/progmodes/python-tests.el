@@ -688,7 +688,7 @@ def long_function_name(
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "var_four):")
    (should (eq (car (python-indent-context))
-               :inside-paren-newline-start-from-block))
+               :inside-paren-continuation-line))
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "print (var_one)")
    (should (eq (car (python-indent-context))
@@ -712,8 +712,8 @@ foo = long_function_name(
    (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "var_three, var_four)")
-   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
-   (should (= (python-indent-calculate-indentation) 4))))
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
+   (should (= (python-indent-calculate-indentation) 2))))
 
 (ert-deftest python-indent-hanging-close-paren ()
   "Like first pep8 case, but with hanging close paren." ;; See Bug#20742.
@@ -869,7 +869,7 @@ data = {
    (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "{")
-   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "'objlist': [")
    (should (eq (car (python-indent-context)) :inside-paren-newline-start))
@@ -881,20 +881,20 @@ data = {
    (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 16))
    (python-tests-look-at "'name': 'first',")
-   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
    (should (= (python-indent-calculate-indentation) 16))
    (python-tests-look-at "},")
    (should (eq (car (python-indent-context))
                :inside-paren-at-closing-nested-paren))
    (should (= (python-indent-calculate-indentation) 12))
    (python-tests-look-at "{")
-   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
    (should (= (python-indent-calculate-indentation) 12))
    (python-tests-look-at "'pk': 2,")
    (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 16))
    (python-tests-look-at "'name': 'second',")
-   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
    (should (= (python-indent-calculate-indentation) 16))
    (python-tests-look-at "}")
    (should (eq (car (python-indent-context))
@@ -938,7 +938,7 @@ data = {'key': {
    (should (eq (car (python-indent-context)) :inside-paren))
    (should (= (python-indent-calculate-indentation) 9))
    (python-tests-look-at "{'pk': 2,")
-   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "'name': 'second'}")
    (should (eq (car (python-indent-context)) :inside-paren))
@@ -971,10 +971,10 @@ data = ('these',
    (should (eq (car (python-indent-context)) :inside-paren))
    (should (= (python-indent-calculate-indentation) 8))
    (forward-line 1)
-   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
    (should (= (python-indent-calculate-indentation) 8))
    (forward-line 1)
-   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
    (should (= (python-indent-calculate-indentation) 8))))
 
 (ert-deftest python-indent-inside-paren-4 ()
@@ -1028,7 +1028,7 @@ CHOICES = (('some', 'choice'),
    (should (eq (car (python-indent-context)) :inside-paren))
    (should (= (python-indent-calculate-indentation) 11))
    (forward-line 1)
-   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
    (should (= (python-indent-calculate-indentation) 11))))
 
 (ert-deftest python-indent-inside-paren-7 ()
@@ -1038,6 +1038,71 @@ CHOICES = (('some', 'choice'),
    (goto-char (point-max))
    ;; This signals an error if the test fails
    (should (eq (car (python-indent-context)) :inside-paren-newline-start))))
+
+(ert-deftest python-indent-inside-paren-8 ()
+  "Test for Bug#63959."
+  (python-tests-with-temp-buffer
+   "
+for a in [  # comment
+          'some',  # Manually indented.
+          'thing']:  # Respect indentation of the previous line.
+"
+   (python-tests-look-at "for a in [  # comment")
+   (should (eq (car (python-indent-context)) :no-indent))
+   (should (= (python-indent-calculate-indentation) 0))
+   (forward-line 1)
+   (should (eq (car (python-indent-context))
+               :inside-paren-newline-start-from-block))
+   (should (= (python-indent-calculate-indentation) 8))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
+   (should (= (python-indent-calculate-indentation) 10))))
+
+(ert-deftest python-indent-inside-paren-9 ()
+  "Test `:inside-paren-continuation-line'."
+  (python-tests-with-temp-buffer
+   "
+a = (((
+    1, 2),
+      3),  # Do not respect the indentation of the previous line
+     4)  # Do not respect the indentation of the previous line
+b = ((
+        1, 2),  # Manually indented
+     3,  # Do not respect the indentation of the previous line
+     4,  # Respect the indentation of the previous line
+        5,  # Manually indented
+        6)  # Respect the indentation of the previous line
+"
+   (python-tests-look-at "a = (((")
+   (should (eq (car (python-indent-context)) :no-indent))
+   (should (= (python-indent-calculate-indentation) 0))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
+   (should (= (python-indent-calculate-indentation) 4))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (= (python-indent-calculate-indentation) 6))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (= (python-indent-calculate-indentation) 5))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
+   (should (= (python-indent-calculate-indentation) 4))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (= (python-indent-calculate-indentation) 5))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
+   (should (= (python-indent-calculate-indentation) 5))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
+   (should (= (python-indent-calculate-indentation) 5))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
+   (should (= (python-indent-calculate-indentation) 8))))
 
 (ert-deftest python-indent-inside-paren-block-1 ()
   "`python-indent-block-paren-deeper' set to nil (default).
@@ -1276,7 +1341,7 @@ objects = Thing.objects.all() \\
    (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 27))
    (python-tests-look-at "status='bought'")
-   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
+   (should (eq (car (python-indent-context)) :inside-paren-continuation-line))
    (should (= (python-indent-calculate-indentation) 27))
    (python-tests-look-at ") \\")
    (should (eq (car (python-indent-context)) :inside-paren-at-closing-paren))
