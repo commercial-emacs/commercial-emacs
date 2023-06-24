@@ -173,7 +173,10 @@ Earlier variables shadow later ones with the same name.")
        ;; making the build more reproducible.
        (if (eq fn localfn)
            ;; From the same file => same mode.
-           (macroexp--unfold-lambda `(,fn ,@(cdr form)))
+           (let* ((newform `(,fn ,@(cdr form)))
+                  (unfolded (macroexp--unfold-lambda newform)))
+             ;; Use the newform only if it could be optimized.
+             (if (eq unfolded newform) form unfolded))
          ;; Since we are called from inside the optimizer, we need to make
          ;; sure not to propagate lexvar values.
          (let ((byte-optimize--lexvars nil)
@@ -448,13 +451,6 @@ for speeding up processing.")
        (if for-effect
            `(progn ,@(byte-optimize-body env t))
          `(,fn ,vars ,(mapcar #'byte-optimize-form env) . ,rest)))
-
-      (`((lambda . ,_) . ,_)
-       (let ((newform (macroexp--unfold-lambda form)))
-	 (if (eq newform form)
-	     ;; Some error occurred, avoid infinite recursion.
-	     form
-	   (byte-optimize-form newform for-effect))))
 
       (`(setq ,var ,expr)
        (let ((lexvar (assq var byte-optimize--lexvars))
@@ -1410,15 +1406,15 @@ See Info node `(elisp) Integer Basics'."
 
 
 (defun byte-optimize-funcall (form)
-  ;; (funcall #'(lambda ...) ...) -> ((lambda ...) ...)
+  ;; (funcall #'(lambda ...) ...) -> (let ...)
   ;; (funcall #'SYM ...) -> (SYM ...)
   ;; (funcall 'SYM ...)  -> (SYM ...)
-  (let* ((fn (nth 1 form))
-         (head (car-safe fn)))
-    (if (or (eq head 'function)
-            (and (eq head 'quote) (symbolp (nth 1 fn))))
-	(cons (nth 1 fn) (cdr (cdr form)))
-      form)))
+  (pcase form
+    (`(,_ #'(lambda . ,_) . ,_)
+     (macroexp--unfold-lambda form))
+    (`(,_ ,(or `#',f `',(and f (pred symbolp))) . ,actuals)
+     `(,f ,@actuals))
+    (_ form)))
 
 (defun byte-optimize-apply (form)
   (let ((len (length form)))
