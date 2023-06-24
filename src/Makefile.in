@@ -896,6 +896,9 @@ elnlisp := $(addprefix ${lispsource}/,${elnlisp}) $(lisp:.elc=.eln)
 		--bin-dest $(BIN_DESTDIR) --eln-dest $(ELN_DESTDIR) \
 	  && cp -f emacs$(EXEEXT) bootstrap-emacs$(EXEEXT) \
 	  && cp -f $(pdmp) $(bootstrap_pdmp); \
+	  if test $(NATIVE_COMPILATION_AOT) = yes; then \
+	    $(MAKE) $(AM_V_NO_PD) -C ../lisp compile-eln-aot EMACS="../src/emacs$(EXEEXT)" ELNDONE="$(addprefix %,$(notdir $(elnlisp))))"; \
+	  fi; \
 	fi
 endif
 
