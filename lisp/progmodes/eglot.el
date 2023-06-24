@@ -3347,16 +3347,17 @@ for which LSP on-type-formatting should be requested."
 (defun eglot-imenu ()
   "Eglot's `imenu-create-index-function'.
 Returns a list as described in docstring of `imenu--index-alist'."
-  (let* ((res (eglot--request (eglot--current-server-or-lose)
-                              :textDocument/documentSymbol
-                              `(:textDocument
-                                ,(eglot--TextDocumentIdentifier))
-                              :cancel-on-input non-essential))
-         (head (and (cl-plusp (length res)) (elt res 0))))
-    (when head
-      (eglot--dcase head
-        (((SymbolInformation)) (eglot--imenu-SymbolInformation res))
-        (((DocumentSymbol)) (eglot--imenu-DocumentSymbol res))))))
+  (when (eglot--server-capable :textDocument/documentSymbol)
+    (let* ((res (eglot--request (eglot--current-server-or-lose)
+                                :textDocument/documentSymbol
+                                `(:textDocument
+                                  ,(eglot--TextDocumentIdentifier))
+                                :cancel-on-input non-essential))
+           (head (and (cl-plusp (length res)) (elt res 0))))
+      (when head
+        (eglot--dcase head
+          (((SymbolInformation)) (eglot--imenu-SymbolInformation res))
+          (((DocumentSymbol)) (eglot--imenu-DocumentSymbol res)))))))
 
 (cl-defun eglot--apply-text-edits (edits &optional version)
   "Apply EDITS for current buffer if at VERSION, or if it's nil."
