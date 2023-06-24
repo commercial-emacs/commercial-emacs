@@ -3355,11 +3355,6 @@ value should be byte-discard."
      ((and (byte-code-function-p (car form))
            (memq byte-optimize '(t lap)))
       (byte-compile-unfold-byte-code-function form))
-     ((and (eq (car-safe (car form)) 'lambda)
-           ;; FORM must be different after unfold, else malformed
-           (not (eq form (setq form (macroexp--unfold-lambda form)))))
-      (byte-compile-form form byte-compile--for-effect)
-      (setq byte-compile--for-effect nil))
      (t (byte-compile-normal-call form)))
     (when byte-compile--for-effect
       (byte-compile-discard))))
