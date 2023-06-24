@@ -231,6 +231,10 @@ is executed without being compiled first."
       new-form)))
 
 (defun macroexp--unfold-lambda (form &optional name)
+  ;; In lexical-binding mode, let and functions don't bind vars in the same way
+  ;; (let obey special-variable-p, but functions don't).  But luckily, this
+  ;; doesn't matter here, because function's behavior is underspecified so it
+  ;; can safely be turned into a `let', even though the reverse is not true.
   (or name (setq name "anonymous lambda"))
   (let* ((lambda (car form))
          (values (cdr form))
