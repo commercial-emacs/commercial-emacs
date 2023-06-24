@@ -246,8 +246,11 @@ The name is made by appending a number to PREFIX, default \"T\"."
 (defun cl--slet (bindings body)
   "Like `cl--slet*' but for \"parallel let\"."
   (cond
-   ((seq-some (lambda (binding) (macroexp--dynamic-variable-p (car binding)))
-              bindings)
+   ((catch 'cl--slet-break
+      (dolist (binding bindings)
+        (when (macroexp--dynamic-variable-p (car binding))
+          (throw 'cl--slet-break t)))
+      nil)
     ;; FIXME: We use `identity' to obfuscate the code enough to
     ;; circumvent the known bug in `macroexp--unfold-lambda' :-(
     `(funcall (identity (lambda (,@(mapcar #'car bindings))
