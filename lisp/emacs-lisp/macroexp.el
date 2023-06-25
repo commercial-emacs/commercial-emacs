@@ -231,14 +231,12 @@ is executed without being compiled first."
       new-form)))
 
 (defun macroexp--unfold-lambda (form &optional name)
-  (or name (setq name "anonymous lambda"))
+  (unless name (setq name "anonymous lambda"))
   (pcase form
     ((or `(funcall (function ,lambda) . ,actuals) `(,lambda . ,actuals))
      (let* ((formals (nth 1 lambda))
             (body (cdr (macroexp-parse-body (cddr lambda))))
-            optionalp restp
-            (dynboundarg nil)
-            bindings)
+            optionalp restp dynboundarg bindings)
        ;; FIXME: The checks below do not belong in an optimization phase.
        (while formals
          (if (macroexp--dynamic-variable-p (car formals))
@@ -251,9 +249,8 @@ is executed without being compiled first."
                     (error "Nothing after &optional in %s" name))
                 (setq optionalp t))
                ((eq (car formals) '&rest)
-                ;; ...but it is by no stretch of the imagination a reasonable
-                ;; thing that funcall_lambda() allows (&rest x y) and
-                ;; (&rest x &optional y) in formalss.
+                ;; funcall_lambda() should never allow (&rest x y) and
+                ;; (&rest x &optional y) in FORMALS.
                 (if (null (cdr formals))
                     (error "Nothing after &rest in %s" name))
                 (if (cdr (cdr formals))
@@ -429,7 +426,8 @@ Assumes the caller has bound `macroexpand-all-environment'."
              ((and `#',f
                    (guard (and (symbolp f)
                                ;; bug#46636
-                               (not (or (special-form-p f) (macrop f))))))
+                               (not (special-form-p f))
+                               (not (macrop f)))))
               (macroexp--expand-all `(,f . ,eargs)))
              (`#'(lambda . ,_)
               (macroexp--unfold-lambda `(,fn ,eexp . ,eargs)))

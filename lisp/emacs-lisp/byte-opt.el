@@ -173,10 +173,10 @@ Earlier variables shadow later ones with the same name.")
        ;; making the build more reproducible.
        (if (eq fn localfn)
            ;; From the same file => same mode.
-           (let* ((newform `(,fn ,@(cdr form)))
-                  (unfolded (macroexp--unfold-lambda newform)))
+           (let* ((unoptimized `(,fn ,@(cdr form)))
+                  (newform (macroexp--unfold-lambda unoptimized)))
              ;; Use the newform only if it could be optimized.
-             (if (eq unfolded newform) form unfolded))
+             (if (eq unoptimized newform) form newform))
          ;; Since we are called from inside the optimizer, we need to make
          ;; sure not to propagate lexvar values.
          (let ((byte-optimize--lexvars nil)
