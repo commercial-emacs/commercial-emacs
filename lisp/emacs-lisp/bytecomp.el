@@ -2903,8 +2903,7 @@ If FORM is a lambda or a macro, compile into a function."
 	                  (cconv--not-lexical-var-p
 	                   arg byte-compile-bound-variables)
 	                  (byte-compile-warning-enabled-p 'lexical arg))
-	         (byte-compile-warn-x
-	          arg
+	         (byte-compile-warn
 	          "Lexical argument shadows the dynamic variable %S"
 	          arg))
 	       (push arg vars))))
