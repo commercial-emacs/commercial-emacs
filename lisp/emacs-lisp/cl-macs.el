@@ -243,7 +243,7 @@ The name is made by appending a number to PREFIX, default \"T\"."
 (defvar cl--bind-enquote)      ;Non-nil if &cl-quote was in the formal arglist!
 (defvar cl--bind-lets) (defvar cl--bind-forms)
 
-(defun cl--slet (bindings body)
+(defun cl--slet (bindings body &optional nowarn)
   "Like `cl--slet*' but for \"parallel let\"."
   (cond
    ((catch 'cl--slet-break
@@ -2919,7 +2919,7 @@ The function's arguments should be treated as immutable.
   (if (and whole (not (cl--safe-expr-p (macroexp-progn argvs))))
       whole
     ;; Function arguments are unconditionally statically scoped (bug#47552).
-    (cl--slet (cl-mapcar #'list argns argvs) body)))
+    (cl--slet (cl-mapcar #'list argns argvs) body 'nowarn)))
 
 ;;; Structures.
 
@@ -3011,6 +3011,7 @@ To see the documentation for a defined struct type, use
          (defsym (if cl--struct-inline 'cl-defsubst 'defun))
 	 (forms nil)
          (docstring (if (stringp (car descs)) (pop descs)))
+         (dynbound-slotnames '())
 	 pred-form pred-check)
     ;; Can't use `cl-check-type' yet.
     (unless (cl--struct-name-p name)
@@ -3130,6 +3131,8 @@ To see the documentation for a defined struct type, use
       (while descp
 	(let* ((desc (pop descp))
 	       (slot (pop desc)))
+	  (when (macroexp--dynamic-variable-p slot)
+	    (push slot dynbound-slotnames))
 	  (if (memq slot '(cl-tag-slot cl-skip-slot))
 	      (progn
 		(push nil slots)
@@ -3258,7 +3261,10 @@ To see the documentation for a defined struct type, use
     ;;          forms))
     `(progn
        (defvar ,tag-symbol)
-       ,@(nreverse forms)
+       ,@(if (null dynbound-slotnames)
+             (nreverse forms)
+           `((with-suppressed-warnings ((lexical . ,dynbound-slotnames))
+               ,@(nreverse forms))))
        :autoload-end
        ;; Call cl-struct-define during compilation as well, so that
        ;; a subsequent cl-defstruct in the same file can correctly include this

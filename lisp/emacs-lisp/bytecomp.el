@@ -2899,6 +2899,14 @@ If FORM is a lambda or a macro, compile into a function."
 	            (not (string-match "\\`_" (symbol-name arg))))
 	       (byte-compile-warn "repeated variable %s in lambda-list" arg))
 	      (t
+	       (when (and lexical-binding
+	                  (cconv--not-lexical-var-p
+	                   arg byte-compile-bound-variables)
+	                  (byte-compile-warning-enabled-p 'lexical arg))
+	         (byte-compile-warn-x
+	          arg
+	          "Lexical argument shadows the dynamic variable %S"
+	          arg))
 	       (push arg vars))))
       (setq list (cdr list)))))
 
