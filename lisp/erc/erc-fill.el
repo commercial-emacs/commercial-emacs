@@ -428,8 +428,16 @@ See `erc-fill-wrap-mode' for details."
     (let ((len (or (and erc-fill--wrap-length-function
                         (funcall erc-fill--wrap-length-function))
                    (progn
+                     (when-let ((b (next-single-property-change
+                                    (point) 'erc-speaker nil (pos-eol)))
+                                ((not (= (pos-eol) b)))
+                                ;; String vals `eq' along same stretch
+                                (e (text-property-not-all
+                                    b (pos-eol) 'erc-speaker
+                                    (get-text-property b 'erc-speaker))))
+                       (goto-char e))
                      (skip-syntax-forward "^-")
-                     (forward-char)
+                     (skip-syntax-forward "-")
                      ;; Using the `invisible' property might make more
                      ;; sense, but that would require coordination
                      ;; with other modules, like `erc-match'.

@@ -2725,9 +2725,11 @@ If ARG is non-nil, show the *erc-protocol* buffer."
   (let ((erc-insert-pre-hook
          (cons (lambda (s) ; Leave newline be.
                  (put-text-property 0 (1- (length s)) 'erc-command 'PRIVMSG s))
-               erc-insert-pre-hook)))
+               erc-insert-pre-hook))
+        (nick (erc-current-nick)))
+    (setq nick (propertize nick 'erc-speaker nick))
     (erc-display-message nil 'input (current-buffer)
-                         'ACTION ?n (erc-current-nick) ?a str ?u "" ?h "")))
+                         'ACTION ?n nick ?a str ?u "" ?h "")))
 
 ;; Display interface
 
@@ -4533,7 +4535,7 @@ Eventually add a # in front of it, if that turns it into a valid channel name."
     (concat "#" channel)))
 
 (defvar erc--own-property-names
-  '( tags erc-parsed display ; core
+  '( tags erc-speaker erc-parsed display ; core
      ;; `erc-display-prompt'
      rear-nonsticky erc-prompt field front-sticky read-only
      ;; stamp
@@ -5038,11 +5040,18 @@ the parsed NUH, and the original `erc-response' object.")
          (mark-e (if msgp (if privp "*" ">") "-"))
          (str    (format "%s%s%s %s" mark-s nick mark-e msg))
          (nick-face (if privp 'erc-nick-msg-face 'erc-nick-default-face))
+         (nick-prefix-face (get-text-property 0 'font-lock-face nick))
+         (prefix-len (or (text-property-not-all 0 (length nick) 'font-lock-face
+                                                nick-prefix-face nick)
+                         0))
          (msg-face (if privp 'erc-direct-msg-face 'erc-default-face)))
     ;; add text properties to text before the nick, the nick and after the nick
     (erc-put-text-property 0 (length mark-s) 'font-lock-face msg-face str)
-    (erc-put-text-property (length mark-s) (+ (length mark-s) (length nick))
-                           'font-lock-face nick-face str)
+    (erc-put-text-properties (+ (length mark-s) prefix-len)
+                             (+ (length mark-s) (length nick))
+                             '(font-lock-face erc-speaker) str
+                             (list nick-face
+                                   (substring-no-properties nick prefix-len)))
     (erc-put-text-property (+ (length mark-s) (length nick)) (length str)
                            'font-lock-face msg-face str)
     str))
@@ -5094,7 +5103,7 @@ also `erc-format-nick-function'."
         (concat
          (propertize open 'font-lock-face 'erc-default-face)
          (propertize mode 'font-lock-face 'erc-my-nick-prefix-face)
-         (propertize nick 'font-lock-face 'erc-my-nick-face)
+         (propertize nick 'font-lock-face 'erc-my-nick-face 'erc-speaker nick)
          (propertize close 'font-lock-face 'erc-default-face)))
     (let ((prefix "> "))
       (propertize prefix 'font-lock-face 'erc-default-face))))
@@ -5367,6 +5376,7 @@ See also `erc-display-message'."
           (buf (or (erc-get-buffer to proc)
                    (erc-get-buffer nick proc)
                    (process-buffer proc))))
+      (setq nick (propertize nick 'erc-speaker nick))
       (erc-display-message
        parsed 'action buf
        'ACTION ?n nick ?u login ?h host ?a s))))
