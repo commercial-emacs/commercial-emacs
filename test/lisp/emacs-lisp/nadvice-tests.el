@@ -151,6 +151,7 @@ function being an around advice."
 (ert-deftest advice-test-called-interactively-p-filter-args ()
   "Check interaction between filter-args advice and called-interactively-p."
   (defun sm-test7.3 () (interactive) (cons 1 (called-interactively-p)))
+  (declare-function sm-test7.3 nil)
   (advice-add 'sm-test7.3 :filter-args #'identity)
   (should (equal (sm-test7.3) '(1 . nil)))
   (should (equal (call-interactively 'sm-test7.3) '(1 . t))))
@@ -172,6 +173,7 @@ function being an around advice."
 (ert-deftest advice-test-called-interactively-p-around-careful ()
   "Like sm-test7.2 but defensively preserve interactive context."
   (defun sm-test7.5 () (interactive) (cons 1 (called-interactively-p)))
+  (declare-function sm-test7.5 nil)
   (advice-add 'sm-test7.5 :around
               (lambda (f &rest args)
                 (list (cons 1 (called-interactively-p))
