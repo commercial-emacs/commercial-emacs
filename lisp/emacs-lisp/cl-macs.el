@@ -245,18 +245,21 @@ The name is made by appending a number to PREFIX, default \"T\"."
 
 (defun cl--slet (bindings body &optional nowarn)
   "Like `cl--slet*' but for \"parallel let\"."
-  (cond
-   ((catch 'cl--slet-break
-      (dolist (binding bindings)
+  (let ((dyns nil)) ;Vars declared as dynbound among the bindings?
+    (when lexical-binding
+      (dolist (binding bindings) ;; `seq-some' lead to bootstrap problems.
         (when (macroexp--dynamic-variable-p (car binding))
-          (throw 'cl--slet-break t)))
-      nil)
-    `(funcall (lambda (,@(mapcar #'car bindings))
-                ,@(macroexp-unprogn body))
-              ,@(mapcar #'cadr bindings)))
-   ((null (cdr bindings))
-    (macroexp-let* bindings body))
-   (t `(let ,bindings ,@(macroexp-unprogn body)))))
+          (push (car binding) dyns))))
+    (cond
+     (dyns
+      (let ((form `(funcall (lambda (,@(mapcar #'car bindings))
+                              ,@(macroexp-unprogn body))
+                            ,@(mapcar #'cadr bindings))))
+        (if (not nowarn) form
+          `(with-suppressed-warnings ((lexical ,@dyns)) ,form))))
+     ((null (cdr bindings))
+      (macroexp-let* bindings body))
+     (t `(let ,bindings ,@(macroexp-unprogn body))))))
 
 (defun cl--slet* (bindings body)
   "Like `macroexp-let*' but uses static scoping for all the BINDINGS."

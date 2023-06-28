@@ -3279,7 +3279,8 @@ value should be byte-discard."
                          run-hook-with-args-until-failure))
           (pcase (cdr form)
             (`(',var . ,_)
-             (when (memq var byte-compile-lexical-variables)
+             (when (and (memq var byte-compile-lexical-variables)
+                        (byte-compile-warning-enabled-p 'lexical var))
                (prog1 nil
                  (setq byte-compile-abort-elc t)
                  (byte-compile-warn "%s cannot use lexical var `%s'" fn var))))))
