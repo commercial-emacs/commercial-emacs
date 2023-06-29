@@ -24,6 +24,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'misc)
 
 (defmacro with-misc-test (original result &rest body)
   (declare (indent 2))
@@ -80,7 +81,7 @@
     (backward-to-word 3)
     (should (equal (point) 1))))
 
-(ert-deftest misc--duplicate-line ()
+(ert-deftest misc-test-duplicate-line ()
   ;; Duplicate a line (twice).
   (with-temp-buffer
     (insert "abc\ndefg\nh\n")
@@ -112,7 +113,7 @@
 
 (require 'rect)
 
-(ert-deftest misc--duplicate-dwim ()
+(ert-deftest misc-test-duplicate-dwim ()
   ;; Duplicate a line.
   (with-temp-buffer
     (insert "abc\ndefg\nh\n")
