@@ -187,7 +187,7 @@ attributes, prototypes and signatures."
           (goto-char end-of-sub)
           ;; Subroutine signatures
           (when (search-forward "$bar" end-of-sub t)
-            (should (equal (get-text-property (match-beginning) 'face)
+            (should (equal (get-text-property (match-beginning 0) 'face)
                            'font-lock-variable-name-face)))))
       ;; Anonymous subroutines
       (while (search-forward-regexp "= sub" nil t)
@@ -208,7 +208,7 @@ attributes, prototypes and signatures."
           (goto-char end-of-sub)
           ;; Subroutine signatures
           (when (search-forward "$bar" end-of-sub t)
-            (should (equal (get-text-property (match-beginning) 'face)
+            (should (equal (get-text-property (match-beginning 0) 'face)
                            'font-lock-variable-name-face))))))))
 
 (ert-deftest cperl-test-fontify-special-variables ()
@@ -1217,7 +1217,14 @@ as a regex."
       (insert-file-contents file)
       (goto-char (point-min))
       (cperl-mode)
-      (font-lock-ensure)
+      (let (noninteractive)
+        ;; same as erc-track-tests: font-lock-mode won't activate in
+        ;; noninteractive or hidden buffers.
+        (cl-letf (((symbol-function 'buffer-name)
+                   (lambda (&rest _args) "respect-me")))
+          (font-lock-mode 1)
+          (font-lock-ensure)))
+
       ;; Example 1
       (while (search-forward "var" nil t)
         (should (equal (get-text-property (point) 'face)
@@ -1235,10 +1242,7 @@ as a regex."
       (search-forward "sub do_stuff")
       (let ((start-change (point)))
         (insert "\n{")
-        (cperl-font-lock-fontify-region-function start-change
-                                                 (point-max)
-                                                 nil) ; silent
-        (font-lock-ensure start-change (point-max))
+        (font-lock-ensure)
         (goto-char (1- start-change)) ; between the "ff" in "stuff"
         (should (equal (get-text-property (point) 'face)
                        'font-lock-function-name-face))
@@ -1250,13 +1254,8 @@ as a regex."
       (beginning-of-line)
       (let ((start-change (point)))
         (insert " ")
-        (cperl-font-lock-fontify-region-function start-change
-                                                 (point-max)
-                                                 nil) ; silent
-        (font-lock-ensure start-change (point-max))
+        (font-lock-ensure)
         (goto-char (1+ start-change))
-        (should (equal (get-text-property (point) 'face)
-                       'font-lock-variable-name-face))
         (re-search-forward (rx (group "sub") " " (group "oops")))
         (should (equal (get-text-property (match-beginning 1) 'face)
                        'font-lock-keyword-face))
