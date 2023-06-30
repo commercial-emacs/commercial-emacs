@@ -281,7 +281,7 @@ Initialization options:\n\
 #if SECCOMP_USABLE
     "\
 --seccomp=FILE              read Seccomp BPF filter from FILE\n\
-"
+",
 #endif
     "\
 --no-build-details          do not add build details such as time stamps\n\
