@@ -2623,6 +2623,9 @@ It returns the number of characters changed.  */)
 		  string = make_multibyte_string ((char *) str, 1, str_len);
 		  replace_range (pos, pos + 1, string,
 				 true, false, true, false, false);
+#ifdef HAVE_TREE_SITTER
+		  /* tree_sitter_record_change() implicit in replace_range() */
+#endif
 		  len = str_len;
 		}
 	      else
