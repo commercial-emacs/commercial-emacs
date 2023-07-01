@@ -3608,10 +3608,9 @@ Should be called with the point before leading colon of an attribute."
     (when start
       (put-text-property start (point)
                          'attrib-group (if (looking-at "{") t 0))
-      (when (and pos (< 1 (count-lines (+ 3 pos) (point))))
-        ;; Propertize multiline `sub` declaration
-        (put-text-property (+ 3 pos) (cperl-1+ (point))
-		           'syntax-type 'sub-decl)))
+      ;; Propertize multiline `sub` declaration
+      (when pos (put-text-property (+ 3 pos) (cperl-1+ (point))
+		                   'syntax-type 'sub-decl)))
     ;; now restore the initial state
     (if st
 	(progn
