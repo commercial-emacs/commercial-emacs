@@ -1256,6 +1256,8 @@ as a regex."
         (insert " ")
         (font-lock-ensure)
         (goto-char (1+ start-change))
+        (should (equal (get-text-property (point) 'face)
+                       'font-lock-variable-name-face))
         (re-search-forward (rx (group "sub") " " (group "oops")))
         (should (equal (get-text-property (match-beginning 1) 'face)
                        'font-lock-keyword-face))
