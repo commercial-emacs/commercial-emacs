@@ -60,7 +60,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif
 
 #ifdef HAVE_TREE_SITTER
-#include "treesit.h"
+#include "tree-sitter.h"
 #endif
 
 static void update_buffer_properties (ptrdiff_t, ptrdiff_t);
@@ -2410,6 +2410,9 @@ Both characters must have the same length of multi-byte form.  */)
 		 but it handles combining correctly.  */
 	      replace_range (pos, pos + 1, string,
 			     false, false, true, false, false);
+#ifdef HAVE_TREE_SITTER
+	      /* tree_sitter_record_change() implicit in replace_range() */
+#endif
 	      pos_byte_next = CHAR_TO_BYTE (pos);
 	      if (pos_byte_next > pos_byte)
 		/* Before combining happened.  We should not increment
@@ -2427,16 +2430,11 @@ Both characters must have the same length of multi-byte form.  */)
 	      if (NILP (noundo))
 		record_change (pos, 1);
 	      for (i = 0; i < len; i++) *p++ = tostr[i];
-
 #ifdef HAVE_TREE_SITTER
-	      /* In the previous branch, replace_range() notifies
-                 changes to tree-sitter, but in this branch, we
-                 modified buffer content manually, so we need to
-                 notify tree-sitter manually.  */
-	      treesit_record_change (pos_byte, pos_byte + len, pos_byte + len);
+	      tree_sitter_record_change (pos, pos + 1, BUFFER_TO_SITTER (pos + 1), pos + 1);
 #endif
 	    }
-	  last_changed =  pos + 1;
+	  last_changed = pos + 1;
 	}
       pos_byte = pos_byte_next;
       pos++;
@@ -2634,14 +2632,9 @@ It returns the number of characters changed.  */)
 		    *p++ = *str++;
 		  signal_after_change (pos, 1, 1);
 		  update_compositions (pos, pos + 1, CHECK_BORDER);
-
 #ifdef HAVE_TREE_SITTER
-		  /* In the previous branch, replace_range() notifies
-                     changes to tree-sitter, but in this branch, we
-                     modified buffer content manually, so we need to
-                     notify tree-sitter manually.  */
-		  treesit_record_change (pos_byte, pos_byte + len,
-					 pos_byte + len);
+		  tree_sitter_record_change (pos, pos + 1,
+					     BUFFER_TO_SITTER (pos + 1), pos + 1);
 #endif
 		}
 	      characters_changed++;
@@ -4505,10 +4498,10 @@ ring.  */)
     }
 
 #ifdef HAVE_TREE_SITTER
-  /* I don't think it's common to transpose two far-apart regions, so
-     amalgamating the edit into one should be fine.  This is what the
-     signal_after_change below does, too.  */
-  treesit_record_change (start1_byte, end2_byte, end2_byte);
+  /* Amalgamating into a single edit is also what signal_after_change
+     below does.  Should be fine as transposing two distant regions is
+     uncommon.  */
+  tree_sitter_record_change (start1, end2, BUFFER_TO_SITTER (end2), end2);
 #endif
 
   signal_after_change (start1, end2 - start1, end2 - start1);
