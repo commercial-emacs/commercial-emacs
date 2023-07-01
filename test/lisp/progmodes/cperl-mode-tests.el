@@ -184,8 +184,8 @@ attributes, prototypes and signatures."
             (when (match-beginning 2)
               (should (equal (get-text-property (match-beginning 2) 'face)
                              'font-lock-string-face))))
+          (goto-char end-of-sub)
           ;; Subroutine signatures
-          (goto-char start-of-sub)
           (when (search-forward "$bar" end-of-sub t)
             (should (equal (get-text-property (match-beginning 0) 'face)
                            'font-lock-variable-name-face)))))
@@ -205,8 +205,8 @@ attributes, prototypes and signatures."
             (when (match-beginning 2)
               (should (equal (get-text-property (match-beginning 2) 'face)
                              'font-lock-string-face))))
+          (goto-char end-of-sub)
           ;; Subroutine signatures
-          (goto-char start-of-sub)
           (when (search-forward "$bar" end-of-sub t)
             (should (equal (get-text-property (match-beginning 0) 'face)
                            'font-lock-variable-name-face))))))))
@@ -314,7 +314,6 @@ issued by CPerl mode."
 
 (defvar perl-continued-statement-offset)
 (defvar perl-indent-level)
-(defvar perl-indent-parens-as-block)
 
 (defconst cperl--tests-heredoc-face
   (if (equal cperl-test-mode 'perl-mode) 'perl-heredoc
