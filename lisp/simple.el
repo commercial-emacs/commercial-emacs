@@ -9729,6 +9729,9 @@ makes it easier to edit it."
     (define-key map [right] 'next-completion)
     (define-key map [?\t] 'next-completion)
     (define-key map [backtab] 'previous-completion)
+    (define-key map (kbd "M-<up>") 'minibuffer-previous-completion)
+    (define-key map (kbd "M-<down>") 'minibuffer-next-completion)
+    (define-key map (kbd "M-RET") 'minibuffer-choose-completion)
     (define-key map "z" 'kill-current-buffer)
     (define-key map "n" 'next-completion)
     (define-key map "p" 'previous-completion)
@@ -10123,11 +10126,13 @@ Called from `temp-buffer-show-hook'."
       ;; Maybe insert help string.
       (when completion-show-help
 	(goto-char (point-min))
-	(if (display-mouse-p)
-	    (insert "Click on a completion to select it.\n"))
-	(insert (substitute-command-keys
-		 "In this buffer, type \\[choose-completion] to \
-select the completion near point.\n\n"))))))
+        (insert (substitute-command-keys
+	         (if (display-mouse-p)
+	             "Click or type \\[minibuffer-choose-completion] on a completion to select it.\n"
+                   "Type \\[minibuffer-choose-completion] on a completion to select it.\n")))
+        (insert (substitute-command-keys
+		 "Type \\[minibuffer-next-completion] or \\[minibuffer-previous-completion] \
+to move point between completions.\n\n"))))))
 
 (add-hook 'completion-setup-hook #'completion-setup-function)
 
