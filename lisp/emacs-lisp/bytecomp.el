@@ -4834,8 +4834,7 @@ binding slots have been popped."
            "`condition-case' condition should not be quoted: %S"
            condition))
         (when (and (consp condition) (memq :success condition))
-          (byte-compile-warn-x
-           condition
+          (byte-compile-warn
            "`:success' must be the first element of a `condition-case' handler"))
         (unless (consp condition) (setq condition (list condition)))
         (dolist (c condition)
