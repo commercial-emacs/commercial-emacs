@@ -23849,7 +23849,7 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 		    ptrdiff_t nchars, mb_nbytes;
 		    parse_str_as_multibyte ((const unsigned char *)spec, nbytes,
 					    &nchars, &mb_nbytes);
-		    if (!(nbytes == nchars || nbytes != mb_nbytes))
+		    if (nbytes != nchars && nbytes == mb_nbytes)
 		      multibyte = true;
 
 		    switch (mode_line_target)
