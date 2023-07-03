@@ -9118,6 +9118,7 @@ presented."
   "When nil, `auto-save-mode' will auto-save remote files.
 Any other value means that it will not."
   :group 'auto-save
+  :group 'tramp
   :type 'boolean
   :version "30.1")
 
