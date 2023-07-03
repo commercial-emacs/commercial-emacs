@@ -1254,5 +1254,16 @@ final or penultimate step during initialization."))
                              "((a b) (a b) #2# #2# #3# #3#)"
                              "((a b) (a b) [c d] [c d] #s(e f) #s(e f))")))))))
 
+(ert-deftest condition-case-unless-debug-success ()
+  "Test `condition-case-unless-debug' with :success (bug#64404)."
+  (should (= 1 (condition-case-unless-debug nil
+                   0
+                 (:success 1)
+                 (t 2))))
+  (should (= 1 (condition-case-unless-debug var
+                   0
+                 (:success (1+ var))
+                 (t var)))))
+
 (provide 'subr-tests)
 ;;; subr-tests.el ends here
