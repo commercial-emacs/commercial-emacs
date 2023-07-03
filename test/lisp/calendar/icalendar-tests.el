@@ -67,7 +67,16 @@
     :suffix "-export.ics"
     (with-temp-buffer
       (insert diary-string)
-      (icalendar-export-region (point-min) (point-max) file))
+      (let ((tare-date (lambda (orig-args)
+                         (append orig-args
+                                 (list (time-convert (date-to-time "20230101") 'list))))))
+        (unwind-protect
+            (progn
+              (add-function :filter-args
+                            (symbol-function 'icalendar--convert-sexp-to-ical)
+                            tare-date)
+              (icalendar-export-region (point-min) (point-max) file))
+          (remove-function (symbol-function 'icalendar--convert-sexp-to-ical) tare-date))))
     (with-current-buffer (get-buffer "*icalendar-errors*")
       (buffer-string))))
 
@@ -1001,8 +1010,8 @@ END:VALARM
   "See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=56241#5"
   (let ((icalendar-export-sexp-enumeration-days 366))
     (mapc (lambda (diary-string)
-            (should (string= "" (icalendar-tests--get-error-string-for-export
-                                 diary-string))))
+            (should (zerop (length (icalendar-tests--get-error-string-for-export
+                                    diary-string)))))
           '("%%(diary-float 7 0 1) First Sunday in July 1"
             "%%(icalendar-tests--diary-float 7 0 1) First Sunday in July 2"))))
 
