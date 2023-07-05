@@ -1355,6 +1355,11 @@ Negative TAB-NUMBER counts tabs from the end of the tab bar."
          (to-index (1- (max 1 (min to-number (length tabs)))))
          (minibuffer-was-active (minibuffer-window-active-p (selected-window))))
 
+    (when (and read-minibuffer-restore-windows minibuffer-was-active
+               (not tab-bar-minibuffer-restore-tab))
+      (setq tab-bar-minibuffer-restore-tab (1+ from-index))
+      (add-hook 'minibuffer-exit-hook 'tab-bar-minibuffer-restore-tab))
+
     (unless (eq from-index to-index)
       (let* ((from-tab (tab-bar--tab))
              (to-tab (nth to-index tabs))
