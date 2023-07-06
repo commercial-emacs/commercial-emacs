@@ -1133,7 +1133,8 @@ with `message'.  Otherwise, log with `comp-log-to-buffer'."
          (log-buffer
              (or (get-buffer comp-log-buffer-name)
                  (with-current-buffer (get-buffer-create comp-log-buffer-name)
-                   (setf buffer-read-only t)
+                   (unless (derived-mode-p 'compilation-mode)
+                     (emacs-lisp-compilation-mode))
                    (current-buffer))))
          (log-window (get-buffer-window log-buffer))
          (inhibit-read-only t)
@@ -4082,7 +4083,8 @@ display a message."
                              :buffer (with-current-buffer
                                          (get-buffer-create
                                           comp-async-buffer-name)
-                                       (setf buffer-read-only t)
+                                       (unless (derived-mode-p 'compilation-mode)
+                                         (emacs-lisp-compilation-mode))
 			               (current-buffer))
                              :command (list
                                        (expand-file-name invocation-name
@@ -4116,6 +4118,8 @@ display a message."
     (run-hooks 'native-comp-async-all-done-hook)
     (with-current-buffer (get-buffer-create comp-async-buffer-name)
       (save-excursion
+        (unless (derived-mode-p 'compilation-mode)
+          (emacs-lisp-compilation-mode))
         (let ((inhibit-read-only t))
           (goto-char (point-max))
           (insert "Compilation finished.\n"))))
