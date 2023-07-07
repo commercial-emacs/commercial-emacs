@@ -1910,9 +1910,10 @@ structure is extracted by `doc-view--imenu-subtree'."
   (let ((fn (or file-name (buffer-file-name))))
     (when fn
       (let ((outline nil)
-            (fn (shell-quote-argument (expand-file-name fn))))
+            (fn (expand-file-name fn)))
         (with-temp-buffer
-          (insert (shell-command-to-string (format "mutool show %s outline" fn)))
+          (unless (= 0 (call-process "mutool" nil (current-buffer) nil "show" fn "outline"))
+            (error "Unable to create imenu index using `mutool'"))
           (goto-char (point-min))
           (while (re-search-forward doc-view--outline-rx nil t)
             (push `((level . ,(length (match-string 1)))
@@ -1961,7 +1962,7 @@ GOTO-PAGE-FN other than `doc-view-goto-page'."
 
 (defun doc-view-imenu-setup ()
   "Set up local state in the current buffer for imenu, if needed."
-  (when (and doc-view-imenu-enabled (executable-find "mutool"))
+  (when (and doc-view-imenu-enabled (eq 'pdf doc-view-doc-type))
     (setq-local imenu-create-index-function #'doc-view-imenu-index
                 imenu-submenus-on-top nil
                 imenu-sort-function nil
