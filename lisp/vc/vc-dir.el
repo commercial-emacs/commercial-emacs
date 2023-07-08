@@ -353,6 +353,7 @@ See `run-hooks'."
     (define-key map (kbd "M-s a C-s")   #'vc-dir-isearch)
     (define-key map (kbd "M-s a M-C-s") #'vc-dir-isearch-regexp)
     (define-key map "G" #'vc-dir-ignore)
+    (define-key map "w" #'vc-dir-copy-filename-as-kill)
 
     (let ((branch-map (make-sparse-keymap)))
       (define-key map "b" branch-map)
@@ -929,6 +930,24 @@ system."
   "Examine a file on the current line in view mode."
   (interactive)
   (view-file (vc-dir-current-file)))
+
+(defun vc-dir-copy-filename-as-kill (&optional absolutep)
+  "Copy names of marked files (or file under cursor) into the kill ring.
+If there are severals names, they will be separated by a space.
+Names are always quoted using `shell-quote-argument'.
+
+If ABSOLUTEP use the absolute names, otherwise names are relative
+to the `default-directory'."
+  (interactive "P")
+  (let ((files (or (vc-dir-marked-files)
+                   (list (vc-dir-current-file)))))
+    (unless absolutep
+      (setq files (mapcar #'file-relative-name files)))
+    (let ((string (mapconcat #'shell-quote-argument files " ")))
+      (if (eq last-command 'kill-region)
+          (kill-append string nil)
+        (kill-new string))
+      (message "%s" string))))
 
 (defun vc-dir-isearch ()
   "Search for a string through all marked buffers using Isearch."
