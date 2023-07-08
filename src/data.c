@@ -272,6 +272,8 @@ for example, (type-of 1) returns `integer'.  */)
           return Qxwidget_view;
 	case PVEC_SQLITE:
           return Qsqlite;
+        case PVEC_SUB_CHAR_TABLE:
+          return Qsub_char_table;
 	case PVEC_TREE_SITTER:
 	  return Qtree_sitter;
 	case PVEC_TREE_SITTER_NODE:
