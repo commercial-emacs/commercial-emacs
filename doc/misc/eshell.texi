@@ -338,7 +338,7 @@ example, @code{\$10} means the literal string @code{$10}.
 Inside of double quotes, most characters have no special meaning.
 However, @samp{\}, @samp{"}, and @samp{$} are still special; to escape
 them, use backslash as above.  Thus, if the value of the variable
-@var{answer} is @code{42}, then @code{"The answer is: \"$answer\""}
+@var{answer} is @code{42}, then @code{"The answer is: \"$@var{answer}\""}
 returns the string @code{The answer is: "42"}.  However, when escaping
 characters with no special meaning, the result is the full
 @code{\@var{c}} sequence.  For example, @code{"foo\bar"} means the
@@ -992,6 +992,13 @@ This returns the effective @acronym{UID} for the current user.  This
 variable is connection-aware, so when the current directory is remote,
 its value will be @acronym{UID} for the user associated with that
 remote connection.
+
+@vindex $GID
+@item $GID
+This returns the effective @acronym{GID} for the current user.  Like
+@code{$UID}, this variable is connection-aware, so when the current
+directory is remote, its value will be @acronym{GID} for the user
+associated with that remote connection.
 
 @vindex $_
 @item $_
@@ -2145,12 +2152,12 @@ An implementation of @command{expr} using the Calc package.
 @item ff
 @cmindex ff
 Shorthand for the the function @code{find-name-dired} (@pxref{Dired
-and Find, , , elisp, The Emacs Lisp Reference Manual}).
+and Find, , , emacs, The Emacs Editor}).
 
 @item gf
 @cmindex gf
 Shorthand for the the function @code{find-grep-dired} (@pxref{Dired
-and Find, , , elisp, The Emacs Lisp Reference Manual}).
+and Find, , , emacs, The Emacs Editor}).
 
 @item intersection
 @cmindex intersection
