@@ -4646,6 +4646,7 @@ DESC must be a `package-desc' object."
                    (boundp (car ent))
                    (not (eq (custom--standard-value (car ent))
                             (default-toplevel-value (car ent))))
+                   (car group)
                    (file-in-directory-p (car group) (package-desc-dir desc)))
           (push (car ent) vars))))
     (dlet ((reporter-prompt-for-summary-p t))
