@@ -37,7 +37,6 @@
 (require 'help-mode)
 (require 'radix-tree)
 (require 'subr-x)
-(require 'comp)
 
 (defvar help-fns-describe-function-functions nil
   "List of functions to run in help buffer in `describe-function'.
