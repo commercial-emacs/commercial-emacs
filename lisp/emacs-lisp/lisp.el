@@ -335,6 +335,17 @@ This command assumes point is not in a string or comment."
           (insert current-sexp))
       (user-error "Not at a sexp"))))
 
+(defcustom beginning-of-defun-go-bol t
+  "If non-nil, `beginning-of-defun' moves to beginning of line.
+
+By default, `beginning-of-defun' point moves to the beginning of
+the line where a defun starts.  For languages where defuns may be
+indented inside nested structures like classes or modules, this
+behavior may be undesirable."
+  :type '(choice (const :tag "Don't go to BOL in beginning-of-defun" nil)
+                 (const :tag "Go to BOL in beginning-of-defun" t))
+  :group 'lisp)
+
 (defvar beginning-of-defun-function nil
   "If non-nil, function for `beginning-of-defun-raw' to call.
 This is used to find the beginning of the defun instead of using the
@@ -367,16 +378,17 @@ If the variable `beginning-of-defun-function' is non-nil, its
 value is called as a function, with argument ARG, to find the
 defun's beginning.
 
-Regardless of the values of `defun-prompt-regexp' and
-`beginning-of-defun-function', point always moves to the
-beginning of the line whenever the search is successful."
+If `beginning-of-defun-go-bol' is non-nil, point moves to the
+beginning of the line if the search is successful."
   (interactive "^p")
   (or (not (eq this-command 'beginning-of-defun))
       (eq last-command 'beginning-of-defun)
       (and transient-mark-mode mark-active)
       (push-mark))
   (and (beginning-of-defun-raw arg)
-       (progn (beginning-of-line) t)))
+       (progn (when beginning-of-defun-go-bol
+                (beginning-of-line))
+              t)))
 
 (defun beginning-of-defun-raw (&optional arg)
   "Move point to the character that starts a defun.
