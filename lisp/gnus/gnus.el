@@ -1035,14 +1035,80 @@ Check the NNTPSERVER environment variable and the
   "This variable is deprecated in favor of `gnus-select-methods'."
   :group 'gnus-server
   :group 'gnus-start
-  :initialize 'custom-initialize-default
+  :initialize 'custom-initialize-reset
   :set (lambda (symbol value)
          (set-default symbol value)
-         (setq gnus-select-methods (cons value gnus-secondary-select-methods)))
+         (when (featurep 'gnus)
+           (setq gnus-select-methods (cons value gnus-secondary-select-methods))))
   :type 'gnus-select-method)
 (make-obsolete-variable 'gnus-select-method 'gnus-select-methods "28.1" 'set)
 (add-variable-watcher
  'gnus-select-method
+ (lambda (symbol newval operation _where)
+   (pcase operation
+     ((or 'set 'let 'unlet)
+      (custom-set-variables `(,symbol (quote ,newval)))))))
+
+(defcustom gnus-secondary-select-methods nil
+  "This variable is deprecated in favor of `gnus-select-methods'."
+  :group 'gnus-server
+  :initialize 'custom-initialize-reset
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (when (featurep 'gnus)
+           (setq gnus-select-methods (cons gnus-select-method value))))
+  :type '(repeat gnus-select-method))
+(make-obsolete-variable 'gnus-secondary-select-methods 'gnus-select-methods "28.1" 'set)
+(add-variable-watcher
+ 'gnus-secondary-select-methods
+ (lambda (symbol newval operation _where)
+   (pcase operation
+     ((or 'set 'let 'unlet)
+      (custom-set-variables `(,symbol (quote ,newval)))))))
+
+(defcustom gnus-select-methods (cons gnus-select-method gnus-secondary-select-methods)
+  "((BACKEND1 SERVER1) (BACKEND2 SERVER2) ... ) where BACKEND is a symbol, e.g.,
+nntp, and SERVER is a string, e.g., \"news.gmane.io\".
+
+For example, these settings specify gmane over nntp, and a home
+dovecot imap server.
+
+Method: nntp
+Server: \"news.gmane.io\"
+
+Method: nnimap
+Server: \"dovecot\"
+Options:
+Variable: nnimap-address
+   Value: \"localhost\"
+Variable: nnimap-stream
+   Value: network
+Variable: nnimap-server-port
+   Value: 143
+Variable: nnimap-inbox
+   Value: \"INBOX\"
+
+Or equivalently,
+
+\(custom-set-variables \\=`(gnus-select-methods
+                        \\='((nntp \"news.gmane.io\")
+                          (nnimap \"dovecot\"
+                           (nnimap-address \"localhost\")
+                           (nnimap-stream network)
+                           (nnimap-server-port 143)
+                           (nnimap-inbox \"INBOX\")))))
+"
+  :group 'gnus-server
+  :initialize 'custom-initialize-reset
+  :set (lambda (symbol value)
+         (unless (listp (car value))
+           (setq value (list value)))
+         (set-default symbol value)
+         (setq gnus-select-method (car value)
+               gnus-secondary-select-methods (cdr value)))
+  :type '(repeat gnus-select-method))
+(add-variable-watcher
+ 'gnus-select-methods
  (lambda (symbol newval operation _where)
    (pcase operation
      ((or 'set 'let 'unlet)
@@ -1103,69 +1169,6 @@ that case, just return a fully prefixed name of the group --
 		 function
 		 sexp
 		 string))
-
-(defcustom gnus-secondary-select-methods nil
-  "This variable is deprecated in favor of `gnus-select-methods'."
-  :group 'gnus-server
-  :set (lambda (symbol value)
-         (set-default symbol value)
-         (setq gnus-select-methods (cons gnus-select-method value)))
-  :type '(repeat gnus-select-method))
-(make-obsolete-variable 'gnus-secondary-select-methods 'gnus-select-methods "28.1" 'set)
-(add-variable-watcher
- 'gnus-secondary-select-methods
- (lambda (symbol newval operation _where)
-   (pcase operation
-     ((or 'set 'let 'unlet)
-      (custom-set-variables `(,symbol (quote ,newval)))))))
-
-(defcustom gnus-select-methods (cons gnus-select-method gnus-secondary-select-methods)
-  "((BACKEND1 SERVER1) (BACKEND2 SERVER2) ... ) where BACKEND is a symbol, e.g.,
-nntp, and SERVER is a string, e.g., \"news.gmane.io\".
-
-For example, these settings specify gmane over nntp, and a home
-dovecot imap server.
-
-Method: nntp
-Server: \"news.gmane.io\"
-
-Method: nnimap
-Server: \"dovecot\"
-Options:
-Variable: nnimap-address
-   Value: \"localhost\"
-Variable: nnimap-stream
-   Value: network
-Variable: nnimap-server-port
-   Value: 143
-Variable: nnimap-inbox
-   Value: \"INBOX\"
-
-Or equivalently,
-
-\(custom-set-variables \\=`(gnus-select-methods
-                        \\='((nntp \"news.gmane.io\")
-                          (nnimap \"dovecot\"
-                           (nnimap-address \"localhost\")
-                           (nnimap-stream network)
-                           (nnimap-server-port 143)
-                           (nnimap-inbox \"INBOX\")))))
-"
-  :group 'gnus-server
-  :initialize 'custom-initialize-default
-  :set (lambda (symbol value)
-         (unless (listp (car value))
-           (setq value (list value)))
-         (set-default symbol value)
-         (setq gnus-select-method (car value))
-         (setq gnus-secondary-select-methods (cdr value)))
-  :type '(repeat gnus-select-method))
-(add-variable-watcher
- 'gnus-select-methods
- (lambda (symbol newval operation _where)
-   (pcase operation
-     ((or 'set 'let 'unlet)
-      (custom-set-variables `(,symbol (quote ,newval)))))))
 
 ;; Customization variables
 
