@@ -639,7 +639,10 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  if (CONSP (TOP))
 	    TOP = XCAR (TOP);
 	  else if (!NILP (TOP))
-	    wrong_type_argument (Qlistp, TOP);
+	    {
+	      record_in_backtrace (Qcar, &TOP, 1);
+	      wrong_type_argument (Qlistp, TOP);
+	    }
 	  NEXT;
 
 	CASE (Beq):
@@ -661,7 +664,10 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	    if (CONSP (TOP))
 	      TOP = XCDR (TOP);
 	    else if (!NILP (TOP))
-	      wrong_type_argument (Qlistp, TOP);
+	      {
+		record_in_backtrace (Qcdr, &TOP, 1);
+		wrong_type_argument (Qlistp, TOP);
+	      }
 	    NEXT;
 	  }
 
@@ -1025,7 +1031,15 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	      {
 		for (EMACS_INT n = XFIXNUM (v1); 0 < n && CONSP (v2); n--)
 		  v2 = XCDR (v2);
-		TOP = CAR (v2);
+		if (CONSP (v2))
+		  TOP = XCAR (v2);
+		else if (NILP (v2))
+		  TOP = Qnil;
+		else
+		  {
+		    record_in_backtrace (Qnth, &TOP, 2);
+		    wrong_type_argument (Qlistp, v2);
+		  }
 	      }
 	    else
 	      TOP = Fnth (v1, v2);
@@ -1549,7 +1563,15 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 		/* Like the fast case for Bnth, but with args reversed.  */
 		for (EMACS_INT n = XFIXNUM (v2); 0 < n && CONSP (v1); n--)
 		  v1 = XCDR (v1);
-		TOP = CAR (v1);
+		if (CONSP (v1))
+		  TOP = XCAR (v1);
+		else if (NILP (v1))
+		  TOP = Qnil;
+		else
+		  {
+		    record_in_backtrace (Qelt, &TOP, 2);
+		    wrong_type_argument (Qlistp, v1);
+		  }
 	      }
 	    else
 	      TOP = Felt (v1, v2);
@@ -1578,7 +1600,11 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  {
 	    Lisp_Object newval = POP;
 	    Lisp_Object cell = TOP;
-	    CHECK_CONS (cell);
+	    if (!CONSP (cell))
+	      {
+		record_in_backtrace (Qsetcar, &TOP, 2);
+		wrong_type_argument (Qconsp, cell);
+	      }
 	    CHECK_IMPURE (cell, XCONS (cell));
 	    XSETCAR (cell, newval);
 	    TOP = newval;
@@ -1589,7 +1615,11 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  {
 	    Lisp_Object newval = POP;
 	    Lisp_Object cell = TOP;
-	    CHECK_CONS (cell);
+	    if (!CONSP (cell))
+	      {
+		record_in_backtrace (Qsetcdr, &TOP, 2);
+		wrong_type_argument (Qconsp, cell);
+	      }
 	    CHECK_IMPURE (cell, XCONS (cell));
 	    XSETCDR (cell, newval);
 	    TOP = newval;

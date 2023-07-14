@@ -4026,7 +4026,12 @@ syms_of_data (void)
   DEFSYM (Qunevalled, "unevalled");
   DEFSYM (Qmany, "many");
 
+  DEFSYM (Qcar, "car");
   DEFSYM (Qcdr, "cdr");
+  DEFSYM (Qnth, "nth");
+  DEFSYM (Qelt, "elt");
+  DEFSYM (Qsetcar, "setcar");
+  DEFSYM (Qsetcdr, "setcdr");
 
   error_tail = pure_cons (Qerror, Qnil);
 
