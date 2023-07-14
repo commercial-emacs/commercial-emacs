@@ -25,7 +25,6 @@
 ;;; Code:
 
 (require 'ert)
-(require 'cl-print)
 
 (cl-defstruct (cl-print-tests-struct
                (:constructor cl-print-tests-con))
@@ -114,7 +113,7 @@
     (should pos)
     (setq value (get-text-property pos 'cl-print-ellipsis result))
     (should (equal expected result))
-    (should (equal expanded (with-output-to-string (cl-print--expand-ellipsis
+    (should (equal expanded (with-output-to-string (cl-print-expand-ellipsis
                                                     value nil))))))
 
 (defun cl-print-tests-check-ellipsis-expansion-rx (obj expected expanded)
@@ -123,7 +122,7 @@
          (value (get-text-property pos 'cl-print-ellipsis result)))
     (should (string-match expected result))
     (should (string-match expanded (with-output-to-string
-                                     (cl-print--expand-ellipsis value nil))))))
+                                     (cl-print-expand-ellipsis value nil))))))
 
 (ert-deftest cl-print-tests-print-to-string-with-limit ()
   (let* ((thing10 (make-list 10 'a))
