@@ -418,8 +418,8 @@ Set it to VALUE unless the button is a `cl-print-ellipsis' button."
   (let ((inhibit-read-only t))
     (setq beg (next-button beg))
     (while (and beg (< beg end))
-      (unless (eq (button-type beg) cl-print-ellipsis)
-          (button-put beg 'skip value))
+      (unless (eq (button-type beg) 'cl-print-ellipsis)
+        (button-put beg 'skip value))
       (setq beg (next-button beg)))))
 
 (defun backtrace-toggle-print-circle (&optional all)
