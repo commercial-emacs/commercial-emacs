@@ -413,7 +413,7 @@ the buffer."
       (overlay-put o 'evaporate t))))
 
 (defun backtrace--change-button-skip (beg end value)
-  "Change the skip property on all buttons between BEG and END.
+  "Change the `skip' property on all buttons between BEG and END.
 Set it to VALUE unless the button is a `cl-print-ellipsis' button."
   (let ((inhibit-read-only t))
     (setq beg (next-button beg))
