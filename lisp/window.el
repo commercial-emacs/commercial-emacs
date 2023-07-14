@@ -7463,6 +7463,20 @@ Return WINDOW if BUFFER and WINDOW are live."
 The actual non-nil value of this variable will be copied to the
 `window-dedicated-p' flag.")
 
+(defun toggle-window-dedicated (&optional window interactive)
+  "Toggle whether WINDOW is dedicated.
+
+See `set-window-dedicated-p' for more details.  WINDOW defaults
+to the currently selected window."
+  (interactive "i\np")
+  (setq window (window-normalize-window window))
+  (if (window-dedicated-p window)
+      (progn
+        (set-window-dedicated-p window nil)
+        (when interactive (message "Window can now be used to display other buffers")))
+    (set-window-dedicated-p window 'dedicated)
+    (when interactive (message "Window will now display only its current buffer"))))
+
 (defconst display-buffer--action-function-custom-type
   '(choice :tag "Function"
 	   (const :tag "--" ignore) ; default for insertion
@@ -10731,6 +10745,7 @@ Used in `repeat-mode'."
   "2" #'split-root-window-below
   "3" #'split-root-window-right
   "s" #'window-toggle-side-windows
+  "d" #'toggle-window-dedicated
   "^ f" #'tear-off-window
   "^ t" #'tab-window-detach
   "-" #'fit-window-to-buffer
