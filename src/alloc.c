@@ -5075,6 +5075,8 @@ garbage_collect (void)
   if (gc_inhibited || gc_in_progress)
     return;
 
+  block_input ();
+
   gc_in_progress = true;
 
   eassert (mark_stack_empty_p ());
@@ -5101,8 +5103,6 @@ garbage_collect (void)
 
   if (garbage_collection_messages)
     message1_nolog ("Garbage collecting...");
-
-  block_input ();
 
   shrink_regexp_cache ();
 
@@ -5167,6 +5167,8 @@ garbage_collect (void)
 
   update_bytes_between_gc ();
 
+  gc_in_progress = false;
+
   /* Unblock as late as possible since it could signal (Bug#43389).  */
   unblock_input ();
 
@@ -5190,7 +5192,6 @@ garbage_collect (void)
       unbind_to (gc_count, Qnil);
     }
 
-  gc_in_progress = false;
   gc_elapsed = timespec_add (gc_elapsed,
 			     timespec_sub (current_timespec (), start));
   Vgc_elapsed = make_float (timespectod (gc_elapsed));

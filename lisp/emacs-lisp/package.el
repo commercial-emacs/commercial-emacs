@@ -3016,7 +3016,7 @@ function is a convenience wrapper used by `describe-package-1'."
 
 (defun package--print-email-button (recipient)
   "Insert a button whose action will send an email to RECIPIENT.
-NAME should have the form (FULLNAME . EMAIL) where FULLNAME is
+RECIPIENT should have the form (FULLNAME . EMAIL) where FULLNAME is
 either a full name or nil, and EMAIL is a valid email address."
   (when (car recipient)
     (insert (car recipient)))
