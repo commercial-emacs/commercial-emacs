@@ -23703,7 +23703,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      x_display_set_last_user_time (dpyinfo, xev->time,
 					    xev->send_event, true);
 
-	      if (!device)
+	      /* Don't process touch sequences from this device if
+	         it's a master pointer.  Touch sequences aren't
+	         canceled by the X server if a slave device is
+	         detached, and master pointers may also represent
+	         dependent touch devices.  */
+
+	      if (!device || device->use == XIMasterPointer)
 		goto XI_OTHER;
 
 	      if (xi_find_touch_point (device, xev->detail))
@@ -23864,12 +23870,22 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      x_display_set_last_user_time (dpyinfo, xev->time,
 					    xev->send_event, true);
 
+	      /* Don't process touch sequences from this device if
+	         it's a master pointer.  Touch sequences aren't
+	         canceled by the X server if a slave device is
+	         detached, and master pointers may also represent
+	         dependent touch devices.  */
+
 	      if (!device)
 		goto XI_OTHER;
 
 	      touchpoint = xi_find_touch_point (device, xev->detail);
 
-	      if (!touchpoint)
+	      if (!touchpoint
+		  /* Don't send this event if nothing has changed
+		     either.  */
+		  || (touchpoint->x == (int) xev->event_x
+		      && touchpoint->y == (int) xev->event_y))
 		goto XI_OTHER;
 
 	      touchpoint->x = xev->event_x;
@@ -23912,7 +23928,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      x_display_set_last_user_time (dpyinfo, xev->time,
 					    xev->send_event, true);
 
-	      if (!device)
+	      /* Don't process touch sequences from this device if
+	         it's a master pointer.  Touch sequences aren't
+	         canceled by the X server if a slave device is
+	         detached, and master pointers may also represent
+	         dependent touch devices.  */
+
+	      if (!device || device->use == XIMasterPointer)
 		goto XI_OTHER;
 
 	      unlinked_p = xi_unlink_touch_point (xev->detail, device);
@@ -23980,7 +24002,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      x_display_set_last_user_time (dpyinfo, pev->time,
 					    pev->send_event, true);
 
-	      if (!device)
+	      if (!device || device->use != XIMasterPointer)
 		goto XI_OTHER;
 
 #ifdef HAVE_XWIDGETS
