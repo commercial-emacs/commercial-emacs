@@ -23883,27 +23883,19 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	  case XI_TouchOwnership:
 	    {
-	      struct xi_device_t *device;
-	      struct xi_touch_point_t *touchpoint;
-	      XITouchOwnershipEvent *event;
+	      XITouchOwnershipEvent *event = (XITouchOwnershipEvent *) xi_event;
+	      struct xi_device_t *device = xi_device_from_id (dpyinfo, event->deviceid);
 
-	      /* All grabbing clients have decided to reject ownership
-		 of this touch sequence.  */
-
-	      event  = (XITouchOwnershipEvent *) xi_event;
-	      device = xi_device_from_id (dpyinfo, event->deviceid);
-
-	      if (!device || device->use == XIMasterPointer)
-		goto XI_OTHER;
-
-	      touchpoint = xi_find_touch_point (device, event->touchid);
-
-	      if (!touchpoint)
-		goto XI_OTHER;
-
-	      /* As a result, Emacs should complete whatever editing
-		 operations result from this touch sequence.  */
-	      touchpoint->ownership = TOUCH_OWNERSHIP_SELF;
+	      if (device && device->use != XIMasterPointer)
+		{
+		  struct xi_touch_point_t *touchpoint =
+		    xi_find_touch_point (device, event->touchid);
+		  if (touchpoint)
+		    /* Complete whatever editing ops results from touch
+		       sequence as all grabbing clients refuse owning it.  */
+		    touchpoint->ownership = TOUCH_OWNERSHIP_SELF;
+		}
+	      goto XI_OTHER;
 	    }
 
 	  case XI_TouchUpdate:
