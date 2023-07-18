@@ -9690,6 +9690,8 @@ WINDOW.  */)
 
   set_buffer_internal (b);
 
+  ptrdiff_t base_line_pos = w->base_line_pos;
+  int end_valid = w->window_end_valid;
   if (!EQ (buffer, w->contents))
     {
       wset_buffer (w, buffer);
@@ -9700,6 +9702,11 @@ WINDOW.  */)
   value = window_text_pixel_size (window, Qnil, Qnil, x_limit, y_limit, Qnil);
 
   unbind_to (count, Qnil);
+
+  /* Restore original values.  This is important if this function is
+     called from some ':eval' form in the middle of redisplay.  */
+  w->base_line_pos = base_line_pos;
+  w->window_end_valid = end_valid;
 
   return value;
 }
