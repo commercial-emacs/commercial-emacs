@@ -4151,56 +4151,70 @@ the deferred compilation mechanism."
               (stringp function-or-file))
     (signal 'native-compiler-error
             (list "Not a function symbol or file" function-or-file)))
-  (catch 'no-native-compile
-    (let* ((data function-or-file)
-           (comp-native-compiling t)
-           (byte-native-qualities nil)
-           (byte-compile-error-on-warn t)
-           (comp-ctxt (make-comp-ctxt :output output
-                                      :with-late-load with-late-load)))
-      (comp-log "\n\n" 1)
-      (condition-case err
-          (cl-loop
-           with report = nil
-           for t0 = (current-time)
-           for pass in comp-passes
-           unless (memq pass comp-disabled-passes)
-           do
-           (comp-log (format "(%s) Running pass %s:\n"
-                             function-or-file pass)
-                     2)
-           (setf data (funcall pass data))
-           (push (cons pass (float-time (time-since t0))) report)
-           (cl-loop for f in (alist-get pass comp-post-pass-hooks)
-                    do (funcall f data))
-           finally
-           (when comp-log-time-report
-             (comp-log (format "Done compiling %s" data) 0)
-             (cl-loop for (pass . time) in (reverse report)
-                      do (comp-log (format "Pass %s took: %fs." pass time) 0))))
-        (native-compiler-skip)
-        (t
-         (let ((err-val (cdr err)))
-           ;; If we are doing an async native compilation print the
-           ;; error in the correct format so is parsable and abort.
-           (if (and comp-async-compilation
-                    (not (eq (car err) 'native-compiler-error)))
-               (progn
-                 (message (if err-val
-                              "%s: Error: %s %s"
-                            "%s: Error %s")
-                          function-or-file
-                          (get (car err) 'error-message)
-                          (car-safe err-val))
-                 (kill-emacs -1))
-             ;; Otherwise re-signal it adding the compilation input.
-	     (signal (car err) (if (consp err-val)
-			           (cons function-or-file err-val)
-			         (list function-or-file err-val)))))))
-      (if (stringp function-or-file)
-          data
-        ;; So we return the compiled function.
-        (native-elisp-load data)))))
+  (when (or (null comp-no-spawn) comp-async-compilation)
+    (catch 'no-native-compile
+      (let* ((data function-or-file)
+             (comp-native-compiling t)
+             (byte-native-qualities nil)
+             (byte-compile-error-on-warn t)
+             (comp-ctxt (make-comp-ctxt :output output
+                                        :with-late-load with-late-load)))
+        (comp-log "\n\n" 1)
+        (unwind-protect
+            (progn
+              (condition-case err
+                  (cl-loop
+                   with report = nil
+                   for t0 = (current-time)
+                   for pass in comp-passes
+                   unless (memq pass comp-disabled-passes)
+                   do
+                   (comp-log (format "(%s) Running pass %s:\n"
+                                     function-or-file pass)
+                             2)
+                   (setf data (funcall pass data))
+                   (push (cons pass (float-time (time-since t0))) report)
+                   (cl-loop for f in (alist-get pass comp-post-pass-hooks)
+                            do (funcall f data))
+                   finally
+                   (when comp-log-time-report
+                     (comp-log (format "Done compiling %s" data) 0)
+                     (cl-loop for (pass . time) in (reverse report)
+                              do (comp-log (format "Pass %s took: %fs."
+                                                   pass time) 0))))
+                (native-compiler-skip)
+                (t
+                 (let ((err-val (cdr err)))
+                   ;; If we are doing an async native compilation print the
+                   ;; error in the correct format so is parsable and abort.
+                   (if (and comp-async-compilation
+                            (not (eq (car err) 'native-compiler-error)))
+                       (progn
+                         (message (if err-val
+                                      "%s: Error: %s %s"
+                                    "%s: Error %s")
+                                  function-or-file
+                                  (get (car err) 'error-message)
+                                  (car-safe err-val))
+                         (kill-emacs -1))
+                     ;; Otherwise re-signal it adding the compilation input.
+	             (signal (car err) (if (consp err-val)
+			                   (cons function-or-file err-val)
+			                 (list function-or-file err-val)))))))
+                      (if (stringp function-or-file)
+                          data
+                        ;; So we return the compiled function.
+                        (native-elisp-load data)))
+          (when (and (not (stringp function-or-file))
+                     (not output)
+                     comp-ctxt
+                     (comp-ctxt-output comp-ctxt)
+                     (file-exists-p (comp-ctxt-output comp-ctxt)))
+            ;; NOTE: Not sure if we want to remove this or being cautious.
+            (cond ((eq 'windows-nt system-type)
+                   ;; We may still be using the temporary .eln file.
+                   (ignore-errors (delete-file (comp-ctxt-output comp-ctxt))))
+                  (t (delete-file (comp-ctxt-output comp-ctxt))))))))))
 
 (defun native-compile-async-skip-p (file load selector)
   "Return non-nil if FILE's compilation should be skipped.
@@ -4457,14 +4471,24 @@ of (commands) to run simultaneously."
 
 ;;;###autoload
 (defun comp-function-type-spec (function)
-  "Return a cons (TYPE-SPEC . ANNOT) for FUNCTION.
+  "Return the type specifier of FUNCTION.
 
-ANNOT is \\='inferred if TYPE-SPEC is inferred by the native
-compiler, or is \\='know if amongst `comp-known-type-specifiers'."
-  (if-let ((res (gethash function comp-known-func-cstr-h)))
-      (cons (comp-cstr-to-type-spec res) 'know)
-    (when (subr-native-elisp-p (symbol-function function))
-      (cons (subr-type (symbol-function function) 'inferred)))))
+This function returns a cons cell whose car is the function
+specifier, and cdr is a symbol, either `inferred' or `know'.
+If the symbol is `inferred', the type specifier is automatically
+inferred from the code itself by the native compiler; if it is
+`know', the type specifier comes from `comp-known-type-specifiers'."
+  (let ((kind 'know)
+        type-spec )
+    (when-let ((res (gethash function comp-known-func-cstr-h)))
+      (setf type-spec (comp-cstr-to-type-spec res)))
+    (let ((f (symbol-function function)))
+      (when (and (null type-spec)
+                 (subr-native-elisp-p f))
+        (setf kind 'inferred
+              type-spec (subr-type f))))
+    (when type-spec
+        (cons type-spec kind))))
 
 (provide 'comp)
 
