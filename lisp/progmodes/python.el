@@ -286,8 +286,11 @@
 
 (defcustom python-interpreter "python"
   "Python interpreter for noninteractive use.
-To customize the Python shell, modify `python-shell-interpreter'
-instead."
+Some Python interpreters also require changes to
+`python-interpreter-args'.
+
+To customize the Python interpreter for interactive use, modify
+`python-shell-interpreter' instead."
   :version "29.1"
   :type 'string)
 
@@ -2273,7 +2276,7 @@ position, else returns nil."
   (cond ((executable-find "python3") "python3")
         ((executable-find "python") "python")
         (t "python3"))
-  "Default Python interpreter for shell.
+  "Python interpreter for interactive use.
 
 Some Python interpreters also require changes to
 `python-shell-interpreter-args'.  In particular, setting
@@ -2288,11 +2291,12 @@ Some Python interpreters also require changes to
   :safe 'stringp)
 
 (defcustom python-shell-interpreter-args "-i"
-  "Default arguments for the Python interpreter."
+  "Arguments for the Python interpreter for interactive use."
   :type 'string)
 
 (defcustom python-shell-interpreter-interactive-arg "-i"
-  "Interpreter argument to force it to run interactively."
+  "Interpreter argument to force it to run interactively.
+This is used only for prompt detection."
   :type 'string
   :version "24.4")
 
@@ -6108,18 +6112,25 @@ recursively."
       (let* ((temp (current-buffer))
              (status (if (bufferp source)
                          (with-current-buffer source
-                           (call-process-region (point-min) (point-max)
-                                                python-interpreter
-                                                nil (list temp nil) nil
-                                                "-c" python--list-imports
-                                                (or name "")))
+                           (apply #'call-process-region
+                                  (point-min) (point-max)
+                                  python-interpreter
+                                  nil (list temp nil) nil
+                                  (append
+                                   (split-string-shell-command
+                                    python-interpreter-args)
+                                   `("-c" ,python--list-imports)
+                                    (list (or name "")))))
                        (with-current-buffer buffer
                          (apply #'call-process
                                 python-interpreter
                                 nil (list temp nil) nil
-                                "-c" python--list-imports
-                                (or name "")
-                                (mapcar #'file-local-name source)))))
+                                (append
+                                 (split-string-shell-command
+                                  python-interpreter-args)
+                                 `("-c" ,python--list-imports)
+                                 (list (or name ""))
+                                 (mapcar #'file-local-name source))))))
              lines)
         (python--list-imports-check-status status)
         (goto-char (point-min))
@@ -6162,7 +6173,11 @@ Return non-nil if the buffer was actually modified."
                                (point-min) (point-max)
                                python-interpreter
                                nil (list temp nil) nil
-                               "-m" "isort" "-" args))
+                               (append
+                                 (split-string-shell-command
+                                  python-interpreter-args)
+                                 '("-m" "isort" "-")
+                                 args)))
                 (tick (buffer-chars-modified-tick)))
             (unless (eq 0 status)
               (error "%s exited with status %s (maybe isort is missing?)"
@@ -6232,10 +6247,14 @@ asking."
     (with-temp-buffer
       (let ((temp (current-buffer)))
         (with-current-buffer buffer
-          (call-process-region (point-min) (point-max)
-                               python-interpreter
-                               nil temp nil
-                               "-m" "pyflakes"))
+          (apply #'call-process-region
+                  (point-min) (point-max)
+                  python-interpreter
+                  nil temp nil
+                  (append
+                   (split-string-shell-command
+                    python-interpreter-args)
+                   '("-m" "pyflakes"))))
         (goto-char (point-min))
         (when (looking-at-p ".* No module named pyflakes$")
           (error "%s couldn't find pyflakes" python-interpreter))
