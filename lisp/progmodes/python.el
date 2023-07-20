@@ -294,6 +294,11 @@ To customize the Python interpreter for interactive use, modify
   :version "29.1"
   :type 'string)
 
+(defcustom python-interpreter-args ""
+  "Arguments for the Python interpreter for noninteractive use."
+  :version "30.1"
+  :type 'string)
+
 
 ;;; Bindings
 
