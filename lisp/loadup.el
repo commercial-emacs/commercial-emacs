@@ -392,25 +392,18 @@
 (when (and dump-mode (multibyte-string-p default-directory))
   (error "default-directory must be unibyte when dumping Emacs!"))
 
-;; Determine which build number to use
-;; based on the executables that now exist.
-(when (and (or
-            (and (equal dump-mode "dump")
-                 (fboundp 'dump-emacs))
-            (and (equal dump-mode "pdump")
-                 (fboundp 'dump-emacs-portable)))
-	   (not (eq system-type 'ms-dos)))
+(when (and dump-mode (not (eq system-type 'ms-dos)))
+  (setq emacs-repository-version (ignore-errors (emacs-repository-get-version))
+        emacs-repository-branch (ignore-errors (emacs-repository-get-branch))
+        emacs-repository-get-tag (ignore-errors (emacs-repository-get-tag)))
   (let* ((base (concat "emacs-" emacs-version "."))
-	 (exelen (if (eq system-type 'windows-nt) -4))
-	 (files (file-name-all-completions base default-directory))
 	 (versions (mapcar (lambda (name)
                              (string-to-number
-                              (substring name (length base) exelen)))
-			   files)))
-    (setq emacs-repository-version (ignore-errors (emacs-repository-get-version))
-          emacs-repository-branch (ignore-errors (emacs-repository-get-branch))
-          emacs-repository-get-tag (ignore-errors (emacs-repository-get-tag)))
-    ;; A constant, so we shouldn't change it with `setq'.
+                              (substring name (length base)
+                                         (when (eq system-type 'windows-nt) -4))))
+			   (file-name-all-completions base default-directory))))
+    ;; Unless --dumping-overwrite, multiple binaries cumulate, each
+    ;; distinguished by a "build number" suffix.
     (defconst emacs-build-number
       (if versions (1+ (apply #'max versions)) 1))))
 
