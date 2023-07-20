@@ -336,6 +336,10 @@ options to pick a fringe bitmap."
     (put symbol 'fringe (get value 'fringe))
     (force-window-update)))
 
+(global-set-key [left-fringe] #'ignore)
+(global-set-key [right-fringe] #'ignore)
+(global-set-key [nil] #'ignore)
+
 (provide 'fringe)
 
 ;;; fringe.el ends here
