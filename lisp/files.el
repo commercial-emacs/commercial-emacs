@@ -30,6 +30,7 @@
 
 (eval-when-compile
   (require 'pcase)
+  (require 'rx)
   (require 'easy-mmode)) ; For `define-minor-mode'.
 
 (defvar font-lock-keywords)
@@ -7800,9 +7801,12 @@ If DIR's free space cannot be obtained, this function returns nil."
          ;; parentheses:
          ;; -rw-r--r-- (modified) 2005-10-22 21:25 files.el
          ;; This is not supported yet.
-    (purecopy (concat "\\([0-9][BkKMGTPEZYRQ]? " iso
-		      "\\|.*[0-9][BkKMGTPEZYRQ]? "
-	              "\\(" western "\\|" western-comma
+    (purecopy (concat "\\("
+                      ;; Five columns before modification time: mode,
+                      ;; links, owner, group and size
+                      (rx (repeat 5 (and (one-or-more graph)
+				         (one-or-more space))))
+	              "\\(" iso "\\|" western "\\|" western-comma
                       "\\|" DD-MMM-YYYY "\\|" east-asian "\\)"
 		      "\\) +")))
   "Regular expression to match up to the file name in a directory listing.
