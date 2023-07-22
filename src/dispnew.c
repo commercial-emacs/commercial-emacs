@@ -6587,14 +6587,6 @@ predicates which report frame's specific UI-related capabilities.  */);
   DEFVAR_BOOL ("cursor-in-echo-area", cursor_in_echo_area,
 	       doc: /* Non-nil means put cursor in minibuffer, at end of any message there.  */);
 
-  DEFVAR_BOOL ("mouse-prefer-closest-glyph", mouse_prefer_closest_glyph,
-	       doc: /* Non-nil means mouse click position is taken from glyph closest to click.
-
-When non-nil, mouse position lists will report buffer position set to
-the position of the glyph that is the closest to the mouse pointer
-at the time of the click, instead of the glyph immediately under it.  */);
-  mouse_prefer_closest_glyph = false;
-
   DEFVAR_LISP ("glyph-table", Vglyph_table,
 	       doc: /* Table defining how to output a glyph code to the frame.
 If not nil, this is a vector indexed by glyph code to define the glyph.

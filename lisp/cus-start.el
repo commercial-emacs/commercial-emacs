@@ -231,7 +231,6 @@ Leaving \"Default\" unchecked is equivalent with specifying a default of
 	     (inverse-video display boolean)
 	     (visible-bell display boolean)
 	     (no-redraw-on-reenter display boolean)
-	     (mouse-prefer-closest-glyph display boolean)
 
              ;; doc.c
              (text-quoting-style display
