@@ -1843,6 +1843,9 @@ listed in the dispatch menu produced from `project-switch-commands'."
   :group 'project
   :version "28.1")
 
+(defface project-prompt-key '((t :inherit bold))
+  "Face for keys in the Project switch commands prompt.")
+
 (defun project--keymap-prompt ()
   "Return a prompt for the project switching dispatch menu."
   (mapconcat
@@ -1856,7 +1859,7 @@ listed in the dispatch menu produced from `project-switch-commands'."
                     (vector key)
                   (where-is-internal cmd (list project-prefix-map) t))))
        (format "[%s] %s"
-               (propertize (key-description key) 'face 'bold)
+               (propertize (key-description key) 'face 'project-prompt-key)
                label)))
    project-switch-commands
    "  "))
