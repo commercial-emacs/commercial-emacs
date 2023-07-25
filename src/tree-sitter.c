@@ -1375,14 +1375,24 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			    &error_offset, &error_type);
       if (query == NULL)
 	{
-	  Lisp_Object args[4];
+	  Lisp_Object args[5];
 	  args[0] = build_string
-	    ("ts_query_new() of %s returned %d at offset %d");
+	    ("ts_query_new() of %s returned %d offset %d%s");
 	  args[1] = indents_scm;
 	  args[2] = make_fixnum ((EMACS_INT) error_type);
-	  args[3] = make_fixnum ((EMACS_INT) (error_offset - scm_offset));
+	  if (error_offset < scm_offset)
+	    {
+	      // error was in the `inherits` portion
+	      args[3] = make_fixnum ((EMACS_INT) (error_offset));
+	      args[4] = build_string (" of inherited scm");
+	    }
+	  else
+	    {
+	      args[3] = make_fixnum ((EMACS_INT) (error_offset - scm_offset));
+	      args[4] = empty_multibyte_string;
+	    }
 	  xfree (query_buf);
-	  xsignal1 (Qtree_sitter_language_error, Fformat (4, args));
+	  xsignal1 (Qtree_sitter_language_error, Fformat (5, args));
 	}
       else
 	{
