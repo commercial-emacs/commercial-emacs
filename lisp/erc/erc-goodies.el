@@ -52,33 +52,92 @@ argument to `recenter'."
 (define-erc-module scrolltobottom nil
   "This mode causes the prompt to stay at the end of the window."
   ((add-hook 'erc-mode-hook #'erc-add-scroll-to-bottom)
-   (add-hook 'erc-insert-done-hook #'erc-possibly-scroll-to-bottom)
+   (add-hook 'erc-insert-pre-hook #'erc--on-pre-insert)
+   (add-hook 'erc-insert-done-hook #'erc--scroll-to-bottom-all)
+   (add-hook 'erc-send-completed-hook #'erc--scroll-to-bottom-all)
    (unless erc--updating-modules-p (erc-buffer-do #'erc-add-scroll-to-bottom)))
   ((remove-hook 'erc-mode-hook #'erc-add-scroll-to-bottom)
-   (remove-hook 'erc-insert-done-hook #'erc-possibly-scroll-to-bottom)
-   (dolist (buffer (erc-buffer-list))
-     (with-current-buffer buffer
-       (remove-hook 'post-command-hook #'erc-scroll-to-bottom t)))))
+   (remove-hook 'erc-insert-pre-hook #'erc--on-pre-insert)
+   (remove-hook 'erc-insert-done-hook #'erc--scroll-to-bottom-all)
+   (remove-hook 'erc-send-completed-hook #'erc--scroll-to-bottom-all)
+   (erc-buffer-do #'erc-add-scroll-to-bottom)))
+
+(defvar-local erc--scroll-to-bottom-debounce-expire nil
+  "Time after which `scrolltobottom' is allowed to run.
+Set to a fraction of a second in the future on every refresh.")
+
+(defvar-local erc--scroll-to-bottom-last-window-start nil
+  "A cons of a window and a starting position.")
 
 (defun erc-possibly-scroll-to-bottom ()
   "Like `erc-add-scroll-to-bottom', but only if window is selected."
   (when (eq (selected-window) (get-buffer-window))
     (erc-scroll-to-bottom)))
 
+(defun erc--possibly-scroll-to-bottom ()
+  "Call `erc-scroll-to-bottom' when buffer occupies selected window.
+Skip when `erc--scroll-to-bottom-debounce-expire' has not yet
+arrived."
+  (when (eq (selected-window) (get-buffer-window))
+    (unless (eq this-command 'recenter-top-bottom)
+      (let (erc--scroll-to-bottom-last-window-start)
+        (erc--scroll-to-bottom)))))
+
+(defun erc--scroll-to-bottom-all (&rest _)
+  "Run `erc-scroll-to-bottom' in all windows showing current buffer."
+  (dolist (window (get-buffer-window-list nil nil 'visible))
+    (with-selected-window window
+      (erc--scroll-to-bottom))))
+
 (defun erc-add-scroll-to-bottom ()
-  "A hook function for `erc-mode-hook' to recenter output at bottom of window.
+  "Arrange for `scrolltobottom' to refresh on window configuration changes.
+Undo that arrangement when `erc-scrolltobottom-mode' is disabled.
 
 If you find that ERC hangs when using this function, try customizing
 the value of `erc-input-line-position'.
 
-This works whenever scrolling happens, so it's added to
-`window-scroll-functions' rather than `erc-insert-post-hook'."
-  (add-hook 'post-command-hook #'erc-scroll-to-bottom nil t))
+Note that the prior suggestion comes from a time when this
+function used `window-scroll-functions', which was replaced by
+`post-command-hook' in ERC 5.3."
+  (if erc-scrolltobottom-mode
+      (progn
+        (add-hook 'window-configuration-change-hook
+                  #'erc--possibly-scroll-to-bottom nil t)
+        (add-hook 'post-command-hook
+                  #'erc--possibly-scroll-to-bottom nil t))
+    (remove-hook 'window-configuration-change-hook
+                 #'erc--possibly-scroll-to-bottom t)
+    (remove-hook 'post-command-hook
+                 #'erc--possibly-scroll-to-bottom t)))
+
+(defun erc--on-pre-insert (&rest _)
+  (when (eq (selected-window) (get-buffer-window))
+    (setq erc--scroll-to-bottom-last-window-start
+          (cons (selected-window) (window-start)))))
+
+(defun erc--scroll-to-bottom ()
+  "Like `erc-scroll-to-bottom', but use `window-point'.
+Expect to run in some window, not necessarily the user-selected
+one."
+  (when erc-insert-marker
+    (let ((resize-mini-windows nil))
+      (save-restriction
+        (widen)
+        (if (>= (window-point) erc-input-marker)
+            (save-excursion
+              (goto-char (point-max))
+              (recenter (or erc-input-line-position -1)))
+          (when (and erc--scroll-to-bottom-last-window-start
+                     ;; `selected-window' means the one being visited.
+                     (eq (selected-window)
+                         (car erc--scroll-to-bottom-last-window-start)))
+            (save-excursion
+              (goto-char (cdr erc--scroll-to-bottom-last-window-start))
+              (let ((recenter-positions '(top)))
+                (recenter-top-bottom)))))))))
 
 (defun erc-scroll-to-bottom ()
   "Recenter WINDOW so that `point' is on the last line.
-
-This is added to `window-scroll-functions' by `erc-add-scroll-to-bottom'.
 
 You can control which line is recentered to by customizing the
 variable `erc-input-line-position'."
