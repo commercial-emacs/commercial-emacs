@@ -1112,12 +1112,22 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	      = ((VECTORP (arrayval) || RECORDP (arrayval))
 		 ? PVSIZE (arrayval)
 		 : -1);
-	    ptrdiff_t idx;
-	    if (size >= 0
-		&& FIXNUMP (idxval)
-		&& (idx = XFIXNUM (idxval),
-		    idx >= 0 && idx < size))
-	      TOP = AREF (arrayval, idx);
+	    if (! FIXNUMP (idxval))
+	      {
+		record_in_backtrace (Qaref, &TOP, 2);
+		wrong_type_argument (Qfixnump, idxval);
+	      }
+	    else if (size >= 0)
+	      {
+		ptrdiff_t idx = XFIXNUM (idxval);
+		if (idx >= 0 && idx < size)
+		  TOP = AREF (arrayval, idx);
+		else
+		  {
+		    record_in_backtrace (Qaref, &TOP, 2);
+		    args_out_of_range (arrayval, idxval);
+		  }
+	      }
 	    else
 	      TOP = Faref (arrayval, idxval);
 	    NEXT;
@@ -1132,14 +1142,24 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	      = ((VECTORP (arrayval) || RECORDP (arrayval))
 		 ? PVSIZE (arrayval)
 		 : -1);
-	    ptrdiff_t idx;
-	    if (size >= 0
-		&& FIXNUMP (idxval)
-		&& (idx = XFIXNUM (idxval),
-		    idx >= 0 && idx < size))
+	    if (! FIXNUMP (idxval))
 	      {
-		ASET (arrayval, idx, newelt);
-		TOP = newelt;
+		record_in_backtrace (Qaset, &TOP, 3);
+		wrong_type_argument (Qfixnump, idxval);
+	      }
+	    ekse if (size >= 0)
+	      {
+		ptrdiff_t idx = XFIXNUM (idxval);
+		if (idx >= 0 && idx < size)
+		  {
+		    ASET (arrayval, idx, newelt);
+		    TOP = newelt;
+		  }
+		else
+		  {
+		    record_in_backtrace (Qaset, &TOP, 3);
+		    args_out_of_range (arrayval, idxval);
+		  }
 	      }
 	    else
 	      TOP = Faset (arrayval, idxval, newelt);
