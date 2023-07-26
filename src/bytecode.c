@@ -1138,8 +1138,17 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 		&& (idx = XFIXNUM (idxval),
 		    idx >= 0 && idx < size))
 	      {
-		ASET (arrayval, idx, newelt);
-		TOP = newelt;
+		ptrdiff_t idx = XFIXNUM (idxval);
+		if (idx >= 0 && idx < size)
+		  {
+		    ASET (arrayval, idx, newelt);
+		    TOP = newelt;
+		  }
+		else
+		  {
+		    record_in_backtrace (Qaset, &TOP, 3);
+		    args_out_of_range (arrayval, idxval);
+		  }
 	      }
 	    else
 	      TOP = Faset (arrayval, idxval, newelt);
