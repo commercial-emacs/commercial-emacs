@@ -971,7 +971,7 @@ for speeding up processing.")
   (let ((nargs (length (cdr form))))
     (cond
      ((= nargs 1)
-      `(progn (cadr form) t))
+      `(progn ,(cadr form) t))
      ((>= nargs 3)
       ;; At least 3 arguments: transform to N-1 binary comparisons,
       ;; since those have their own byte-ops which are particularly

@@ -1147,7 +1147,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 		record_in_backtrace (Qaset, &TOP, 3);
 		wrong_type_argument (Qfixnump, idxval);
 	      }
-	    ekse if (size >= 0)
+	    else if (size >= 0)
 	      {
 		ptrdiff_t idx = XFIXNUM (idxval);
 		if (idx >= 0 && idx < size)

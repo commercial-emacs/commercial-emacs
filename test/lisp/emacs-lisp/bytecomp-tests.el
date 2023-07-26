@@ -780,6 +780,11 @@ inner loops respectively."
     ;; (+ 0 -0.0) etc
     (let ((x (bytecomp-test-identity -0.0)))
       (list x (+ x) (+ 0 x) (+ x 0) (+ 1 2 -3 x) (+ 0 x 0)))
+
+    ;; Unary comparisons: keep side-effect, return t
+    (let ((x 0))
+      (list (= (setq x 1))
+            x))
     )
   "List of expressions for cross-testing interpreted and compiled code.")
 
@@ -955,7 +960,7 @@ byte-compiled.  Run with dynamic binding."
        "his-fooness.el:9:6"
        "his-fooness.el:16:6"
        "his-fooness.el:20:6"
-       "his-fooness.el:23:2"
+       "his-fooness.el:24:11"
        "his-fooness.el:27:11"
        "his-fooness.el:29:2" ;; let special form kicks back to defun
        "his-fooness.el:31:3"
