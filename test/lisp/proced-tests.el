@@ -44,6 +44,17 @@
   "Move to the column under ATTRIBUTE in the current proced buffer."
   (move-to-column (string-match attribute proced-header-line)))
 
+(defun proced--assert-process-valid-pid-refinement (pid)
+  "Fail unless the process at point could be present after a refinment using PID."
+  (proced--move-to-column "PID")
+  (let ((pid-equal (string= pid (word-at-point))))
+    (should
+     (or pid-equal
+         ;; Guard against the unlikely event a platform doesn't support PPID
+         (when (string-match "PPID" proced-header-line)
+           (proced--move-to-column "PPID")
+           (string= pid (word-at-point)))))))
+
 (ert-deftest proced-format-test ()
   (skip-unless (not (getenv "CI"))) ; macos signals not taking
   (dolist (format '(short medium long verbose))
@@ -80,21 +91,20 @@
   "Refinement appears to mean filtering out processes that are not PID."
   (skip-unless (not (getenv "CI"))) ; macos signals not taking
   (proced--within-buffer
-   'medium
+   'verbose
    'user
    (proced--move-to-column "PID")
    (let ((pid (word-at-point)))
      (proced-refine)
      (while (not (eobp))
-       (proced--move-to-column "PID")
-       (should (string= pid (word-at-point)))
+       (proced--assert-process-valid-pid-refinement pid)
        (forward-line)))))
 
 (ert-deftest proced-refine-with-update-test ()
   "Like `proced-refine-test' but with reverting, whatever that means."
   (skip-unless (not (getenv "CI"))) ; macos signals not taking
   (proced--within-buffer
-   'medium
+   'verbose
    'user
    (proced--move-to-column "PID")
    (let ((pid (word-at-point)))
@@ -105,8 +115,7 @@
      ;; processes again, causing the test to fail.
      (proced-update)
      (while (not (eobp))
-       (proced--move-to-column "PID")
-       (should (string= pid (word-at-point)))
+       (proced--assert-process-valid-pid-refinement pid)
        (forward-line)))))
 
 (ert-deftest proced-update-preserves-pid-at-point-test ()
