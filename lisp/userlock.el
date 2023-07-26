@@ -109,41 +109,28 @@ You can <\\`q'>uit; don't modify this file."))
 (define-error 'file-supersession nil 'file-error)
 
 (defun userlock--check-content-unchanged (filename)
+  "Return \\='unchanged if FILENAME's contents same as current buffer."
   (with-demoted-errors "Unchanged content check: %S"
-    ;; Even tho we receive `filename', we know that `filename' refers
-    ;; to the current buffer's file.
-    (cl-assert (or (null buffer-file-truename) ; temporary buffer
-                   (equal (expand-file-name filename)
-                          (expand-file-name buffer-file-truename))))
-    ;; Note: rather than read the file and compare to the buffer, we could save
-    ;; the buffer and compare to the file, but for encrypted data this
-    ;; wouldn't work well (and would risk exposing the data).
     (save-restriction
       (widen)
-      (let ((buf (current-buffer))
-            (cs buffer-file-coding-system)
-            (start (point-min))
-            (end (point-max)))
-        ;; FIXME: To avoid a slow `insert-file-contents' on large or
-        ;; remote files, it'd be good to include file size in the
-        ;; "visited-modtime" check.
-        (when (with-temp-buffer
+      (let* ((buf (current-buffer))
+             (cs buffer-file-coding-system)
+             (start (point-min))
+             (end (point-max))
+             (unchanged-p
+              (with-temp-buffer
                 (let ((coding-system-for-read cs)
                       (non-essential t))
                   (insert-file-contents filename))
                 (when (= (buffer-size) (- end start)) ;Minor optimization.
-                  (= 0 (let ((case-fold-search nil))
-                         (compare-buffer-substrings
-                          buf start end
-                          (current-buffer) (point-min) (point-max))))))
-          ;; We know that some buffer visits FILENAME, because our
-          ;; caller (see lock_file) verified that.  Thus, we set the
-          ;; modtime in that buffer, to cater to use case where the
-          ;; file is about to be written to from some buffer that
-          ;; doesn't visit any file, like a temporary buffer.
-          (with-current-buffer (get-file-buffer (file-truename filename))
-            (set-visited-file-modtime))
-          'unchanged)))))
+                  (zerop (let (case-fold-search)
+                           (compare-buffer-substrings
+                            buf start end
+                            (current-buffer) (point-min) (point-max))))))))
+        (when unchanged-p
+          (prog1 'unchanged
+            (when buffer-file-name
+              (set-visited-file-modtime))))))))
 
 ;;;###autoload
 (defun userlock--ask-user-about-supersession-threat (filename)
