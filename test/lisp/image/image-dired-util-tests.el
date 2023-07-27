@@ -68,9 +68,9 @@
     ;; but the drive letter on MS-Windows.
     (should (equal (cdr (file-name-split
                          (image-dired-thumb-name "/tmp/foo.jpg")))
-                   '("tmp" ".image-dired" "foo.jpg.thumb.jpg")))
+                   `("tmp" ".image-dired" ,(concat (sha1 "foo.jpg") ".jpg"))))
     (should (equal (file-name-nondirectory
                     (image-dired-thumb-name "foo.jpg"))
-                   "foo.jpg.thumb.jpg"))))
+                   (concat (sha1 "foo.jpg") ".jpg")))))
 
 ;;; image-dired-util-tests.el ends here
