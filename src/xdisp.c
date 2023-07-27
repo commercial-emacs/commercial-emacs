@@ -23685,7 +23685,7 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 
 		    oprops = Fcopy_sequence (oprops);
 		    tem = props;
-		    while (CONSP (tem))
+		    while (CONSP (tem) && CONSP (XCDR (tem)))
 		      {
 			oprops = plist_put (oprops, XCAR (tem),
 					    XCAR (XCDR (tem)));
