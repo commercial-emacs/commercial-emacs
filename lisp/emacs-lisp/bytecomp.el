@@ -5483,6 +5483,28 @@ and corresponding effects."
 (put 'remq  'compiler-macro #'bytecomp--check-memq-args)
 (put 'delq  'compiler-macro #'bytecomp--check-memq-args)
 
+;; Implement `char-before', `backward-char' and `backward-word' in
+;; terms of `char-after', `forward-char' and `forward-word' which have
+;; their own byte-ops.
+
+(put 'char-before 'compiler-macro #'bytecomp--char-before)
+(defun bytecomp--char-before (form &optional arg &rest junk-args)
+  (if junk-args
+      form    ; arity error
+    `(char-after (1- (or ,arg (point))))))
+
+(put 'backward-char 'compiler-macro #'bytecomp--backward-char)
+(defun bytecomp--backward-char (form &optional arg &rest junk-args)
+  (if junk-args
+      form    ; arity error
+    `(forward-char (- (or ,arg 1)))))
+
+(put 'backward-word 'compiler-macro #'bytecomp--backward-word)
+(defun bytecomp--backward-word (form &optional arg &rest junk-args)
+  (if junk-args
+      form    ; arity error
+    `(forward-word (- (or ,arg 1)))))
+
 (provide 'byte-compile)
 (provide 'bytecomp)
 
