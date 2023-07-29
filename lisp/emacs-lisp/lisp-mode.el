@@ -870,14 +870,12 @@ function is `common-lisp-indent-function'."
 
 (defun lisp-ppss (&optional pos)
   "Return parse-partial-sexp state of sexp enclosing POS."
-  (let* ((pos (or pos (point)))
-         (ppss-base (syntax-ppss pos))
-         (sexp-start (nth 1 ppss-base)))
-    (if (null (fixnump sexp-start))
-        ppss-base
-      (let ((ppss-sexp (parse-partial-sexp sexp-start pos nil nil
-                                           (syntax-ppss sexp-start))))
-        ppss-sexp))))
+  (unless pos (setq pos (point)))
+  (let ((pss (syntax-ppss pos)))
+    (if (and (not (nth 2 pss)) (nth 9 pss))
+        (let ((sexp-start (car (last (nth 9 pss)))))
+          (parse-partial-sexp sexp-start pos nil nil (syntax-ppss sexp-start)))
+      pss)))
 
 (declare-function cl--defsubst-expand "cl-macs")
 (cl-defstruct (lisp-indent-state
