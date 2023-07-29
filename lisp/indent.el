@@ -103,6 +103,9 @@ This variable has no effect unless `tab-always-indent' is `complete'."
       (widen))
     (syntax-propertize (line-end-position))
     (unless (indent--align-inside-comment)
+      ;; Indentation requires iterating `syntax-ppss'
+      ;; from a clean slate as it's rife with side effects.
+      (syntax-ppss-invalidate-cache (point))
       (funcall indent-line-function))))
 
 (defun indent--align-inside-comment ()
