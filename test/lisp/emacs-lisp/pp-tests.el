@@ -21,6 +21,7 @@
 
 (require 'pp)
 (require 'ert-x)
+(require 'benchmark)
 
 (ert-deftest pp-print-quote ()
   (should (string= (pp-to-string 'quote) "quote\n"))
@@ -35,5 +36,9 @@
 
 (ert-deftest test-indentation ()
   (ert-test-erts-file (ert-resource-file "code-formats.erts")))
+
+(ert-deftest test-pp-obarray ()
+  "Make sure it's not quadratic."
+  (should (< (benchmark-elapse (pp-to-string obarray)) 3.5)))
 
 ;;; pp-tests.el ends here.
