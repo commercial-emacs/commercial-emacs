@@ -102,14 +102,10 @@ This variable has no effect unless `tab-always-indent' is `complete'."
     (unless inhibit-widen
       (widen))
     (syntax-propertize (line-end-position))
-    (unless (indent--align-inside-comment)
-      ;; Indentation requires iterating `syntax-ppss'
-      ;; from a clean slate as it's rife with side effects.
-      (syntax-ppss-invalidate-cache (point))
-      (funcall indent-line-function))))
+    (funcall indent-line-function)))
 
 (defun indent--align-inside-comment ()
-  "Appears to line up point with comment on preceding line."
+  "Line up point with comment on preceding line."
   (when (and (<= (current-column) (current-indentation))
              (not (eq this-command last-command)))
     (let ((ppss (syntax-ppss)))
@@ -176,7 +172,8 @@ region."
         (call-interactively #'completion-at-point))))
    (t
     (let ((old-indent (current-indentation)))
-      (indent-according-to-mode)
+      (unless (indent--align-inside-comment)
+        (indent-according-to-mode))
       (when arg
         (let ((indentation-change (- (current-indentation) old-indent))
               (end-marker (save-excursion
