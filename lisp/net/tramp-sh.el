@@ -32,7 +32,6 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
-(require 'cl-seq)
 (require 'tramp)
 
 ;; `dired-*' declarations can be removed, starting with Emacs 29.1.
@@ -617,13 +616,6 @@ if (!$result) {
     $result = File::Spec->catpath($vol, File::Spec->catdir(@dirs), \"\");
 }
 
-if (-l $ARGV[0]) {
-    print \"t\\n\";
-    }
-else {
-    print \"nil\\n\";
-    }
-
 $result =~ s/\"/\\\\\"/g;
 print \"\\\"$result\\\"\\n\";
 ' \"$1\" %n"
@@ -707,11 +699,11 @@ characters need to be doubled.")
     " '((%s%%%%N%s) %%%%h (%s%%%%U%s . %%%%u) (%s%%%%G%s . %%%%g)"
     " %%%%X %%%%Y %%%%Z %%%%s %s%%%%A%s t %%%%i -1)' \"$1\" %%n || echo nil) |"
     " sed -e 's/\"/\\\\\"/g' -e 's/%s/\"/g'")
-   tramp-stat-marker tramp-stat-marker ; %%N
-   tramp-stat-marker tramp-stat-marker ; %%U
-   tramp-stat-marker tramp-stat-marker ; %%G
-   tramp-stat-marker tramp-stat-marker ; %%A
-   tramp-stat-quoted-marker)
+    tramp-stat-marker tramp-stat-marker ; %%N
+    tramp-stat-marker tramp-stat-marker ; %%U
+    tramp-stat-marker tramp-stat-marker ; %%G
+    tramp-stat-marker tramp-stat-marker ; %%A
+    tramp-stat-quoted-marker)
   "Shell function to produce output suitable for use with `file-attributes'
 on the remote file system.
 Format specifiers are replaced by `tramp-expand-script', percent
@@ -1023,7 +1015,7 @@ BEGIN {
 Format specifiers are replaced by `tramp-expand-script', percent
 characters need to be doubled.")
 
-(defconst tramp-bundle-read-file-names
+(defconst tramp-vc-registered-read-file-names
   "echo \"(\"
 while read file; do
     quoted=`echo \"$file\" | sed -e \"s/\\\"/\\\\\\\\\\\\\\\\\\\"/\"`
@@ -1037,18 +1029,13 @@ while read file; do
     else
 	echo \"(\\\"$quoted\\\" \\\"file-readable-p\\\" nil)\"
     fi
-    if %s \"$file\"; then
-	echo \"(\\\"$quoted\\\" \\\"file-directory-p\\\" t)\"
-    else
-	echo \"(\\\"$quoted\\\" \\\"file-directory-p\\\" nil)\"
-    fi
 done
 echo \")\""
-  "Script to check file attributes of a bundle of files.
-It must be sent formatted with three strings; the tests for file
-existence, file readability, and file directory.  Input shall be
-read via here-document, otherwise the command could exceed
-maximum length of command line.
+  "Script to check existence of VC related files.
+It must be send formatted with two strings; the tests for file
+existence, and file readability.  Input shall be read via
+here-document, otherwise the command could exceed maximum length
+of command line.
 Format specifiers \"%s\" are replaced before the script is used.")
 
 ;; New handlers should be added here.
@@ -1158,17 +1145,19 @@ Operations not mentioned here will be handled by the normal Emacs functions.")
        (concat "Making a symbolic link: "
 	       "ln(1) does not exist on the remote host"))))
 
-  (tramp-skeleton-make-symbolic-link target linkname ok-if-already-exists
-    (tramp-send-command-and-check
-     v (format
-	"cd %s && %s -sf %s %s"
-	(tramp-shell-quote-argument (file-name-directory localname))
-	(tramp-get-remote-ln v)
-	(tramp-shell-quote-argument target)
-	;; The command could exceed PATH_MAX, so we use relative
-	;; file names.
-	(tramp-shell-quote-argument
-         (concat "./" (file-name-nondirectory localname)))))))
+  (tramp-skeleton-handle-make-symbolic-link target linkname ok-if-already-exists
+    (and (tramp-send-command-and-check
+	  v (format
+	     "cd %s"
+	     (tramp-shell-quote-argument (file-name-directory localname))))
+         (tramp-send-command-and-check
+	  v (format
+	     "%s -sf %s %s" (tramp-get-remote-ln v)
+	     (tramp-shell-quote-argument target)
+	     ;; The command could exceed PATH_MAX, so we use relative
+	     ;; file names.
+	     (tramp-shell-quote-argument
+              (concat "./" (file-name-nondirectory localname))))))))
 
 (defun tramp-sh-handle-file-truename (filename)
   "Like `file-truename' for Tramp files."
@@ -1177,20 +1166,12 @@ Operations not mentioned here will be handled by the normal Emacs functions.")
      ;; Use GNU readlink --canonicalize-missing where available.
      ((tramp-get-remote-readlink v)
       (tramp-send-command-and-check
-       v (format
-	  (concat
-	   "(if %s -h \"%s\"; then echo t; else echo nil; fi) && "
-	   "%s --canonicalize-missing %s")
-	  (tramp-get-test-command v)
-	  (tramp-shell-quote-argument localname)
-	  (tramp-get-remote-readlink v)
-	  (tramp-shell-quote-argument localname)))
+       v (format "%s --canonicalize-missing %s"
+		 (tramp-get-remote-readlink v)
+		 (tramp-shell-quote-argument localname)))
       (with-current-buffer (tramp-get-connection-buffer v)
 	(goto-char (point-min))
-	(tramp-set-file-property v localname "file-symlink-marker" (read (current-buffer)))
-	;; We cannote call `read', the file name isn't quoted.
-	(forward-line)
-	(buffer-substring (point) (line-end-position))))
+	(buffer-substring (point-min) (line-end-position))))
 
      ;; Use Perl implementation.
      ((and (tramp-get-remote-perl v)
@@ -1198,13 +1179,9 @@ Operations not mentioned here will be handled by the normal Emacs functions.")
 	   (tramp-get-connection-property v "perl-cwd-realpath"))
       (tramp-maybe-send-script
        v tramp-perl-file-truename "tramp_perl_file_truename")
-      (tramp-send-command-and-check
+      (tramp-send-command-and-read
        v (format "tramp_perl_file_truename %s"
-		 (tramp-shell-quote-argument localname)))
-      (with-current-buffer (tramp-get-connection-buffer v)
-        (goto-char (point-min))
-	(tramp-set-file-property v localname "file-symlink-marker" (read (current-buffer)))
-	(read (current-buffer))))
+		 (tramp-shell-quote-argument localname))))
 
      ;; Do it yourself.
      (t (tramp-file-local-name
@@ -1698,8 +1675,8 @@ ID-FORMAT valid values are `string' and `integer'."
 	(with-tramp-file-property v localname "file-directory-p"
 	  (if-let
 	      ((truename (tramp-get-file-property v localname "file-truename"))
-	       ((tramp-file-property-p
-		 v (tramp-file-local-name truename) "file-attributes")))
+	       (attr-p (tramp-file-property-p
+			v (tramp-file-local-name truename) "file-attributes")))
 	      (eq (file-attribute-type
 		   (tramp-get-file-property
 		    v (tramp-file-local-name truename) "file-attributes"))
@@ -1711,9 +1688,9 @@ ID-FORMAT valid values are `string' and `integer'."
   (with-parsed-tramp-file-name (expand-file-name filename) nil
     (with-tramp-file-property v localname "file-writable-p"
       (if (file-exists-p filename)
-	  ;; Examine `file-attributes' cache to see if request can be
-	  ;; satisfied without remote operation.
 	  (if (tramp-file-property-p v localname "file-attributes")
+	      ;; Examine `file-attributes' cache to see if request can
+	      ;; be satisfied without remote operation.
 	      (tramp-check-cached-permissions v ?w)
 	    (tramp-run-test v "-w" localname))
 	;; If file doesn't exist, check if directory is writable.
@@ -1812,7 +1789,7 @@ ID-FORMAT valid values are `string' and `integer'."
 			       "cd %s 2>&1 && %s -a 2>%s"
 			       " | while IFS= read f; do"
 			       " if %s -d \"$f\" 2>%s;"
-			       " then echo \"$f/\"; else echo \"$f\"; fi;"
+			       " then \\echo \"$f/\"; else \\echo \"$f\"; fi;"
 			       " done")
 			      (tramp-shell-quote-argument localname)
 			      (tramp-get-ls-command v)
@@ -3548,41 +3525,6 @@ implementation will be used."
 	  (when coding-system-used
 	    (setq last-coding-system-used coding-system-used)))))))
 
-(defun tramp-bundle-read-file-names (vec files)
-  "Read file attributes of FILES and with one command fill the cache.
-FILES must be the local names only.  The cache attributes to be
-filled are described in `tramp-bundle-read-file-names'."
-  (when files
-    (tramp-maybe-send-script
-     vec
-     (format tramp-bundle-read-file-names
-	     (tramp-get-file-exists-command vec)
-	     (format "%s -r" (tramp-get-test-command vec))
-	     (format "%s -d" (tramp-get-test-command vec)))
-     "tramp_bundle_read_file_names")
-
-    (dolist
-	(elt
-	 (ignore-errors
-	   ;; We cannot use `tramp-send-command-and-read', because
-	   ;; this does not cooperate well with heredoc documents.
-	   (tramp-send-command
-	    vec
-	    (format
-	     "tramp_bundle_read_file_names <<'%s'\n%s\n%s\n"
-	     tramp-end-of-heredoc
-	     (mapconcat #'tramp-shell-quote-argument
-			files
-			"\n")
-	     tramp-end-of-heredoc))
-	   (with-current-buffer (tramp-get-connection-buffer vec)
-	     ;; Read the expression.
-	     (goto-char (point-min))
-	     (read (current-buffer)))))
-
-      (tramp-set-file-property
-       vec (car elt) (cadr elt) (cadr (cdr elt))))))
-
 (defvar tramp-vc-registered-file-names nil
   "List used to collect file names, which are checked during `vc-registered'.")
 
@@ -3628,7 +3570,36 @@ filled are described in `tramp-bundle-read-file-names'."
 	      (tramp-message v 10 "\n%s" tramp-vc-registered-file-names)
 
 	      ;; Send just one command, in order to fill the cache.
-	      (tramp-bundle-read-file-names v tramp-vc-registered-file-names))
+	      (when tramp-vc-registered-file-names
+		(tramp-maybe-send-script
+		 v
+		 (format tramp-vc-registered-read-file-names
+			 (tramp-get-file-exists-command v)
+			 (format "%s -r" (tramp-get-test-command v)))
+		 "tramp_vc_registered_read_file_names")
+
+		(dolist
+		    (elt
+		     (ignore-errors
+		       ;; We cannot use `tramp-send-command-and-read',
+		       ;; because this does not cooperate well with
+		       ;; heredoc documents.
+		       (tramp-send-command
+			v
+			(format
+			 "tramp_vc_registered_read_file_names <<'%s'\n%s\n%s\n"
+			 tramp-end-of-heredoc
+			 (mapconcat #'tramp-shell-quote-argument
+				    tramp-vc-registered-file-names
+				    "\n")
+			 tramp-end-of-heredoc))
+		       (with-current-buffer (tramp-get-connection-buffer v)
+			 ;; Read the expression.
+			 (goto-char (point-min))
+			 (read (current-buffer)))))
+
+	          (tramp-set-file-property
+	           v (car elt) (cadr elt) (cadr (cdr elt))))))
 
 	    ;; Second run.  Now all `file-exists-p' or `file-readable-p'
 	    ;; calls shall be answered from the file cache.  We unset
@@ -4283,8 +4254,6 @@ file exists and nonzero exit status otherwise."
        "`tramp-histfile-override' uses invalid file `%s'"
        tramp-histfile-override))
 
-    (tramp-flush-connection-property
-     (tramp-get-connection-process vec) "scripts")
     (tramp-set-connection-property
      (tramp-get-connection-process vec) "remote-shell" shell)))
 
@@ -4366,10 +4335,12 @@ process to set up.  VEC specifies the connection."
     (tramp-open-shell vec (tramp-get-method-parameter vec 'tramp-remote-shell))
     (tramp-message vec 5 "Setting up remote shell environment")
 
-    ;; Disable line editing.  Dump option settings in the traces.
-    (tramp-send-command
-     vec
-     (if (>= tramp-verbose 9) "set +o vi +o emacs -o" "set +o vi +o emacs") t)
+    ;; Disable line editing.
+    (tramp-send-command vec "set +o vi +o emacs" t)
+
+    ;; Dump option settings in the traces.
+    (when (>= tramp-verbose 9)
+      (tramp-send-command vec "set -o" t))
 
     ;; Disable echo expansion.
     (tramp-send-command
@@ -5583,16 +5554,22 @@ Nonexistent directories are removed from spec."
 	  (setq remote-path (delq 'tramp-own-remote-path remote-path)))
 
 	;; Remove double entries.
-	(setq remote-path
-	      (cl-remove-duplicates
-	       remote-path :test #'string-equal :from-end t))
+	(setq elt1 remote-path)
+	(while (consp elt1)
+	  (while (and (car elt1) (setq elt2 (member (car elt1) (cdr elt1))))
+	    (setcar elt2 nil))
+	  (setq elt1 (cdr elt1)))
 
 	;; Remove non-existing directories.
-	(let ((remote-file-name-inhibit-cache nil))
-	  (tramp-bundle-read-file-names vec remote-path)
-	  (cl-remove-if
-	   (lambda (x) (not (tramp-get-file-property vec x "file-directory-p")))
-	   remote-path))))))
+	(delq
+	 nil
+	 (mapcar
+	  (lambda (x)
+	    (and
+	     (stringp x)
+	     (file-directory-p (tramp-make-tramp-file-name vec x))
+	     x))
+	  remote-path))))))
 
 (defun tramp-get-remote-locale (vec)
   "Determine remote locale, supporting UTF8 if possible."
