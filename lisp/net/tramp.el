@@ -3963,14 +3963,16 @@ Let-bind it when necessary.")
 
 (defun tramp-handle-file-symlink-p (filename)
   "Like `file-symlink-p' for Tramp files."
-  (with-parsed-tramp-file-name (expand-file-name filename) nil
-    ;; Some operations, like `file-truename', set the file property
-    ;; "file-symlink-marker".  We can use it as indicator, and avoid a
-    ;; possible call of `file-attributes'.
-    (when (or (tramp-get-file-property v localname "file-symlink-marker")
-	      (not (tramp-file-property-p v localname "file-symlink-marker")))
-      (let ((x (file-attribute-type (file-attributes filename))))
-	(and (stringp x) x)))))
+  (let ((expressly-not-symlink
+         ;; save a call to file-attributes if ops like `file-truename'
+         ;; expressly set the file-symlink-marker to nil
+         (and (tramp-tramp-file-p filename)
+              (with-parsed-tramp-file-name (expand-file-name filename) nil
+                (and (tramp-file-property-p v localname "file-symlink-marker")
+                     (not (tramp-get-file-property v localname "file-symlink-marker")))))))
+    (unless expressly-not-symlink
+      (when-let ((target (file-attribute-type (file-attributes filename))))
+        (and (stringp target) target)))))
 
 (defun tramp-handle-file-truename (filename)
   "Like `file-truename' for Tramp files."
