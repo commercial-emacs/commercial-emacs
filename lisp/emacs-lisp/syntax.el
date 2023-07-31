@@ -487,7 +487,7 @@ POS modulo unpopulated values at indices 2 and 6."
                   (< (- pos pt-last) 2500))
              ;; Hack to deal with difficult constructs like perl
              ;; heredocs.  Sufficiently close iterations of
-             ;; `syntax-ppss' reparses from PT-LAST and do not modify
+             ;; `syntax-ppss' reparse from PT-LAST and do not modify
              ;; syntax-ppss--data.
              (parse-partial-sexp pt-last pos nil nil ppss-last))
             (t
