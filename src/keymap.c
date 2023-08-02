@@ -99,13 +99,13 @@ without modifiers.  All entries in it are initially nil, meaning
 function keys, mouse events, and any other things that appear in the
 input stream.  Initially, ALIST is nil.
 
-The optional arg STRING supplies a menu name for the keymap
-in case you use it as a menu with `x-popup-menu'.  */)
-  (Lisp_Object string)
+The optional arg NAME is a string or function supplying an echo
+area annotation or `x-popup-menu' title.  */)
+  (Lisp_Object name)
 {
-  Lisp_Object tail = !NILP (string) ? list1 (string) : Qnil;
-  return Fcons (Qkeymap,
-		Fcons (Fmake_char_table (Qkeymap, Qnil), tail));
+  return NILP (name)
+    ? list2 (Qkeymap, Fmake_char_table (Qkeymap, Qnil))
+    : list3 (Qkeymap, Fmake_char_table (Qkeymap, Qnil), name);
 }
 
 DEFUN ("make-sparse-keymap", Fmake_sparse_keymap, Smake_sparse_keymap, 0, 1, 0,
@@ -115,17 +115,11 @@ which binds the character CHAR to DEFINITION, or (SYMBOL . DEFINITION),
 which binds the function key or mouse event SYMBOL to DEFINITION.
 Initially the alist is nil.
 
-The optional arg STRING supplies a menu name for the keymap
-in case you use it as a menu with `x-popup-menu'.  */)
-  (Lisp_Object string)
+The optional arg NAME is a string or function supplying an echo
+area annotation or `x-popup-menu' title.  */)
+  (Lisp_Object name)
 {
-  if (!NILP (string))
-    {
-      if (! NILP (Vloadup_pure_table))
-	string = Fpurecopy (string);
-      return list2 (Qkeymap, string);
-    }
-  return list1 (Qkeymap);
+  return NILP (name) ? list1 (Qkeymap) : list2 (Qkeymap, name);
 }
 
 void
@@ -160,6 +154,8 @@ when reading a key-sequence to be looked-up in this keymap.  */)
       Lisp_Object tem = XCAR (map);
       if (STRINGP (tem))
 	return tem;
+      else if (FUNCTIONP (tem))
+	return call0 (tem);
       else if (KEYMAPP (tem))
 	{
 	  tem = Fkeymap_prompt (tem);

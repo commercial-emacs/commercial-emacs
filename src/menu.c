@@ -1437,8 +1437,8 @@ If POSITION is t, it means to use the current mouse position.
 MENU is a specifier for a menu.  For the simplest case, MENU is a keymap.
 The menu items come from key bindings that have a menu string as well as
 a definition; actually, the "definition" in such a key binding looks like
-\(STRING . REAL-DEFINITION).  To give the menu a title, put a string into
-the keymap as a top-level element.
+\(STRING . REAL-DEFINITION).  To give the menu a title, put a string
+or function returning a string into the keymap as a top-level element.
 
 If REAL-DEFINITION is nil, that puts a nonselectable string in the menu.
 Otherwise, REAL-DEFINITION should be a valid key binding definition.

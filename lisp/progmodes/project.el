@@ -813,7 +813,10 @@ DIRS must contain directory names."
 
 ;;;###autoload
 (defvar project-prefix-map
-  (let ((map (make-sparse-keymap)))
+  (let ((map (make-sparse-keymap
+              (lambda ()
+                (when-let ((pr (project-most-recent-project)))
+                  (format "[%s]" (project-name pr)))))))
     (define-key map "!" 'project-shell-command)
     (define-key map "&" 'project-async-shell-command)
     (define-key map "f" 'project-find-file)
@@ -837,11 +840,6 @@ DIRS must contain directory names."
 
 ;;;###autoload (define-key ctl-x-map "p" project-prefix-map)
 
-;; We can't have these place-specific maps inherit from
-;; project-prefix-map because project--other-place-command needs to
-;; know which map the key binding came from, as if it came from one of
-;; these maps, we don't want to set display-buffer-overriding-action
-
 (defvar project-other-window-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\C-o" #'project-display-buffer)
@@ -859,6 +857,9 @@ DIRS must contain directory names."
          (place-cmd (lookup-key map key))
          (generic-cmd (lookup-key project-prefix-map key))
          (switch-to-buffer-obey-display-actions t)
+         ;; Don't override if KEY is frame- or window-specifically mapped.
+         ;; This condition precludes place-specific maps from inheriting
+         ;; from project-prefix-map (bug#42210)
          (display-buffer-overriding-action (unless place-cmd action)))
     (if-let ((cmd (or place-cmd generic-cmd)))
         (call-interactively cmd)
