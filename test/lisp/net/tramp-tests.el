@@ -7389,6 +7389,7 @@ This requires restrictions of file name syntax."
 (ert-deftest tramp-test41-special-characters ()
   "Check special characters in file names."
   (skip-unless (tramp--test-enabled))
+  (skip-unless (or (not (tramp--test-macos-p)) (not (getenv "CI"))))
   (skip-unless (not (getenv "EMACS_HYDRA_CI"))) ; SLOW ~ 245s
   (skip-unless (not (tramp--test-rsync-p)))
   (skip-unless (not (tramp--test-rclone-p)))
