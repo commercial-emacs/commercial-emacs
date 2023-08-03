@@ -7459,6 +7459,7 @@ This requires restrictions of file name syntax."
 (ert-deftest tramp-test42-utf8 ()
   "Check UTF8 encoding in file names and file contents."
   (skip-unless (tramp--test-enabled))
+  (skip-unless (or (not (tramp--test-macos-p)) (not (getenv "CI"))))
   (skip-unless (not (getenv "EMACS_HYDRA_CI"))) ; SLOW ~ 620s
   (skip-unless (not (tramp--test-container-p)))
   (skip-unless (not (tramp--test-rsync-p)))
