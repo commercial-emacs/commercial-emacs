@@ -676,6 +676,7 @@ command."
 
   (setq comint-prompt-regexp shell-prompt-pattern)
   (shell-completion-vars)
+  (setq-local bookmark-make-record-function #'shell-bookmark-make-record)
   (setq-local paragraph-separate "\\'")
   (setq-local paragraph-start comint-prompt-regexp)
   (setq-local font-lock-defaults '(shell-font-lock-keywords t))
@@ -1811,6 +1812,31 @@ this function when switching `comint-fontify-input-mode' in order
 to make `shell-highlight-undef-mode' redo its setup."
   (when shell-highlight-undef-mode
     (shell-highlight-undef-mode 1)))
+
+;;; Bookmark support
+
+;; Adapted from esh-mode.el
+(declare-function bookmark-prop-get "bookmark" (bookmark prop))
+
+(defun shell-bookmark-name ()
+  (format "shell-%s"
+          (file-name-nondirectory
+           (directory-file-name
+            (file-name-directory default-directory)))))
+
+(defun shell-bookmark-make-record ()
+  "Create a bookmark for the current Shell buffer."
+  `(,(shell-bookmark-name)
+    (location . ,default-directory)
+    (handler . shell-bookmark-jump)))
+
+;;;###autoload
+(defun shell-bookmark-jump (bookmark)
+  "Default bookmark handler for Shell buffers."
+  (let ((default-directory (bookmark-prop-get bookmark 'location)))
+    (shell)))
+
+(put 'shell-bookmark-jump 'bookmark-handler-type "Shell")
 
 (provide 'shell)
 
