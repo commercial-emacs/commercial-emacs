@@ -275,6 +275,12 @@ When this user option is non-nil, 'shell-get-old-input' ('C-RET')
 includes multiple shell "\" continuation lines from command output.
 Default is nil.
 
+---
+*** Bookmark handler for 'shell' buffers
+Now the 'bookmark-set' command will record 'shell' buffers.  This
+means that 'bookmark-jump' will create the 'shell' buffer in the
+directory it was in.
+
 ** Prog Mode
 
 +++
