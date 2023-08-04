@@ -1877,6 +1877,9 @@ Files in subdirectories of DIRECTORY are processed also."
   (interactive "DByte force recompile (directory): ")
   (byte-recompile-directory directory nil t))
 
+(defvar byte-compile-ignore-files nil
+  "List of regexps for files to ignore during byte compilation.")
+
 ;;;###autoload
 (defun byte-recompile-directory (directory &optional arg force follow-symlinks)
   "Recompile every `.el' file in DIRECTORY that needs recompilation.
@@ -1935,6 +1938,7 @@ also be compiled."
 		      ;; This file is a subdirectory.  Handle them differently.
 		      (or (null arg) (eq 0 arg)
 			  (y-or-n-p (concat "Check " source "? ")))
+                      (not (string-match-p ignore-files-regexp source))
 		      (setq directories (nconc directories (list source))))
                ;; It is an ordinary file.  Decide whether to compile it.
                (if (and (string-match emacs-lisp-file-regexp source)
@@ -1942,7 +1946,8 @@ also be compiled."
                         (file-readable-p source)
 			(not (string-match "\\`\\.#" file))
                         (not (auto-save-file-name-p source))
-                        (not (member source (dir-locals--all-files directory))))
+                        (not (member source (dir-locals--all-files directory)))
+                        (not (string-match-p ignore-files-regexp source)))
                    (progn (cl-incf
                            (pcase (byte-recompile-file source force arg)
                              ('no-byte-compile skip-count)
