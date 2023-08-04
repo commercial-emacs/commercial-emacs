@@ -1914,6 +1914,8 @@ also be compiled."
       (emacs-lisp-compilation-mode))
     (let ((directories (list default-directory))
 	  (default-directory default-directory)
+          (ignore-files-regexp
+           (mapconcat #'identity byte-compile-ignore-files "\\|"))
 	  (skip-count 0)
 	  (fail-count 0)
 	  (file-count 0)
