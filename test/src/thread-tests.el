@@ -563,4 +563,13 @@ The failure manifests only by being unable to exit the interactive emacs."
              do (accept-process-output nil 0.3)
              finally (should timed-out))))
 
+(ert-deftest threads-test-backgrounded-buffers-still-killable ()
+  "0e2d256 is supposed to make this work (Bug#65095)."
+  (skip-unless (featurep 'threads))
+  (let (buf)
+    (with-temp-buffer
+      (setq buf (current-buffer))
+      (make-thread (lambda ())))
+    (should-not (buffer-live-p buf))))
+
 ;;; thread-tests.el ends here
