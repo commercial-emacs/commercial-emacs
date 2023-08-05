@@ -1758,9 +1758,6 @@ cleaning up all windows currently displaying the buffer to be killed. */)
   if (!BUFFER_LIVE_P (b))
     return Qnil;
 
-  if (thread_check_current_buffer (b))
-    return Qnil;
-
   /* Run hooks with the buffer to be killed as the current buffer.  */
   {
     specpdl_ref count = SPECPDL_INDEX ();

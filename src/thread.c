@@ -938,25 +938,6 @@ If CLEANUP is non-nil, remove this error form from history.  */)
   return result;
 }
 
-
-
-bool
-thread_check_current_buffer (struct buffer *buffer)
-{
-  struct thread_state *iter;
-
-  for (iter = all_threads; iter; iter = iter->next_thread)
-    {
-      if (iter == current_thread)
-	continue;
-
-      if (iter->m_current_buffer == buffer)
-	return true;
-    }
-
-  return false;
-}
-
 bool
 main_thread_p (const void *ptr)
 {
