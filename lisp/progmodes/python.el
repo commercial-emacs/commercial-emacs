@@ -6478,7 +6478,7 @@ Add import for undefined name `%s' (empty to skip): "
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist
-             '('"/\\(?:Pipfile\\|\\.?flake8\\)\\'" . conf-mode))
+             '("/\\(?:Pipfile\\|\\.?flake8\\)\\'" . conf-mode))
 
 (provide 'python)
 
