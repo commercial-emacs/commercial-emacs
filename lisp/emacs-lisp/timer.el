@@ -1,6 +1,6 @@
 ;;; timer.el --- run a function with args at some time in future -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996, 2001-2023 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2023 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Package: emacs
@@ -182,8 +182,6 @@ SECS may be a fraction."
   (timer--check timer)
   (cl-pushnew timer timer-idle-list))
 
-(defalias 'disable-timeout #'cancel-timer)
-
 (defun cancel-timer (timer)
   "Remove TIMER from the list of active timers."
   (prog1 nil
@@ -270,7 +268,6 @@ This function is called, by name, directly by the C code."
              (unless (timer--repeat-delay timer)
                (cancel-timer timer)))))))
 
-;; This function is incompatible with the one in levents.el.
 (defun timeout-event-p (event)
   "Non-nil if EVENT is a timeout event."
   (and (listp event) (eq (car event) 'timer-event)))
@@ -371,6 +368,7 @@ If REPEAT is non-nil, repeat the timer every REPEAT seconds.
 
 This function returns a timer object which you can use in `cancel-timer'.
 This function is for compatibility; see also `run-with-timer'."
+  (declare (obsolete run-with-timer "30.1"))
   (run-with-timer secs repeat function object))
 
 (defun run-with-idle-timer (secs repeat function &rest args)
@@ -496,6 +494,7 @@ If the user does not answer after SECONDS seconds, return DEFAULT-VALUE."
   (dolist (timer timer-idle-list)
     (setf (timer--triggered timer) nil)))
 
+(define-obsolete-function-alias 'disable-timeout #'cancel-timer "30.1")
 (provide 'timer)
 
 ;;; timer.el ends here
