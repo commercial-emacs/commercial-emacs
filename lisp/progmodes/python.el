@@ -6476,6 +6476,10 @@ Add import for undefined name `%s' (empty to skip): "
                python-shell-completion-complete-or-indent))
   (function-put sym 'command-modes '(python-base-mode inferior-python-mode)))
 
+;;;###autoload
+(add-to-list 'auto-mode-alist
+             '('"/\\(?:Pipfile\\|\\.?flake8\\)\\'" . conf-mode))
+
 (provide 'python)
 
 ;;; python.el ends here
