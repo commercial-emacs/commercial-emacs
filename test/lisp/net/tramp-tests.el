@@ -5370,8 +5370,6 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
     (let ((default-directory ert-remote-temporary-file-directory)
 	  (tmp-name (tramp--test-make-temp-name nil quoted))
 	  kill-buffer-query-functions command proc)
-      (should-not (make-process))
-
       ;; Simple process.
       (unwind-protect
 	  (with-temp-buffer

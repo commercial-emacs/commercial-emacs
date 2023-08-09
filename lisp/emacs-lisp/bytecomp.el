@@ -5481,19 +5481,19 @@ and corresponding effects."
 
 (defun bytecomp--check-keyword-args (form arglist allowed-keys required-keys)
   (let ((fun (car form)))
-    (cl-flet ((missing (form keyword)
+    (cl-flet ((missing (keyword)
 		(byte-compile-warn
 		 "`%S´ called without required keyword argument %S"
 		 fun keyword))
-	      (unrecognized (form keyword)
+	      (unrecognized (keyword)
 		(byte-compile-warn
 		 "`%S´ called with unknown keyword argument %S"
 		 fun keyword))
-	      (duplicate (form keyword)
+	      (duplicate (keyword)
 		(byte-compile-warn
 		 "`%S´ called with repeated keyword argument %S"
 		 fun keyword))
-              (missing-val (form keyword)
+              (missing-val (keyword)
 		(byte-compile-warn
 		 "missing value for keyword argument %S"
 		 keyword)))
@@ -5503,16 +5503,16 @@ and corresponding effects."
 	  (let ((key (car l)))
 	    (cond ((and (keywordp key) (memq key allowed-keys))
 		   (cond ((memq key seen)
-			  (duplicate l key))
+			  (duplicate key))
 			 (t
 			  (push key seen))))
-		  (t (unrecognized l key)))
+		  (t (unrecognized key)))
             (when (null (cdr l))
-              (missing-val l key)))
+              (missing-val key)))
 	  (setq l (cddr l)))
         (dolist (key required-keys)
 	  (unless (memq key seen)
-	    (missing form key))))))
+	    (missing key))))))
   form)
 
 (put 'make-process 'compiler-macro
