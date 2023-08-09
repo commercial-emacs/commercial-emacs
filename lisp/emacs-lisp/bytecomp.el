@@ -5540,7 +5540,7 @@ and corresponding effects."
             :nowait :noquery :stop :filter :filter-multibyte :sentinel
             :log :plist :tls-parameters :server :broadcast :dontroute
             :keepalive :linger :oobinline :priority :reuseaddr :bindtodevice
-            :use-external-socket)
+            :tcpnodelay :sndbuf :rcvbuf :sndtimeo :rcvtimeo :use-external-socket)
           '(:name :service))))
 
 (provide 'byte-compile)
