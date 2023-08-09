@@ -55,12 +55,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <utmp.h>
 #endif
 
-/* A file whose last-modified time is just after the most recent boot.
-   Define this to be NULL to disable checking for this file.  */
-#ifndef BOOT_TIME_FILE
-#define BOOT_TIME_FILE "/var/run/random-seed"
-#endif
-
 #if !defined WTMP_FILE && !defined WINDOWSNT && defined BOOT_TIME
 #define WTMP_FILE "/var/log/wtmp"
 #endif
