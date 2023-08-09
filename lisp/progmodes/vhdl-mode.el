@@ -6190,7 +6190,7 @@ of an identifier that just happens to contain an \"end\" keyword."
 		      (vhdl-first-word pos)
 		      "else\\|then\\|use" nil))
 	     ;; "end component":
-	     ((looking-at "component\\b[^_]")
+	     ((looking-at "\\(component\\)\\b[^_]")
 	      (vector (buffer-substring (match-beginning 1)
 					(match-end 1))
 		      (vhdl-first-word pos)
