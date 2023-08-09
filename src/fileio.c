@@ -4942,13 +4942,11 @@ by calling `format-decode', which see.  */)
 	  Funlock_file (filename);
 	}
 
-#if !defined HAVE_ANDROID || defined ANDROID_STUBIFY
       /* Under Android, modtime and st.st_size can be valid even if FD
 	 is not a regular file.  */
       if (!regular)
 	xsignal2 (Qfile_error,
 		  build_string ("not a regular file"), orig_filename);
-#endif /* !defined HAVE_ANDROID || defined ANDROID_STUBIFY */
     }
 
   if (set_coding_system)
