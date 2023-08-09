@@ -302,6 +302,7 @@ usage: (defadvice FUNCTION (CLASS NAME [POSITION] [ARGLIST] FLAG...)
 (fn FUNCTION ARGS &rest BODY)" nil t)
 (function-put 'defadvice 'doc-string-elt 3)
 (function-put 'defadvice 'lisp-indent-function 2)
+(make-obsolete 'defadvice '"use advice-add or define-advice" "30.1")
 (register-definition-prefixes "advice" '("ad-"))
 
 
@@ -4525,12 +4526,6 @@ But if you just want to print something, don't call this directly:
 call other entry points instead, such as `cl-prin1'.
 
 (fn OBJECT STREAM)")
-(autoload 'cl-print-expand-ellipsis "cl-print" "\
-Print the expansion of an ellipsis to STREAM.
-VALUE should be the value of the `cl-print-ellipsis' text property
-which was attached to the ellipsis by `cl-prin1'.
-
-(fn VALUE STREAM)")
 (autoload 'cl-prin1 "cl-print" "\
 Print OBJECT on STREAM according to its type.
 Output is further controlled by the variables
@@ -4551,13 +4546,12 @@ characters with appropriate settings of `print-level' and
 the arguments VALUE and STREAM and which should respect
 `print-length' and `print-level'.  LIMIT may be nil or zero in
 which case PRINT-FUNCTION will be called with `print-level' and
-`print-length' bound to nil.
+`print-length' bound to nil, and it can also be t in which case
+PRINT-FUNCTION will be called with the current values of `print-level'
+and `print-length'.
 
 Use this function with `cl-prin1' to print an object,
-abbreviating it with ellipses to fit within a size limit.  Use
-this function with `cl-prin1-expand-ellipsis' to expand an
-ellipsis, abbreviating the expansion to stay within a size
-limit.
+abbreviating it with ellipses to fit within a size limit.
 
 (fn PRINT-FUNCTION VALUE LIMIT)")
 (register-definition-prefixes "cl-print" '("cl-print-" "help-byte-code"))
@@ -4744,6 +4738,36 @@ The files to be removed are those produced from the original source
 filename (including FILE).
 
 (fn FILE)")
+(autoload 'native--compile-async "comp" "\
+Compile FILES asynchronously.
+FILES is one filename or a list of filenames or directories.
+
+If optional argument RECURSIVELY is non-nil, recurse into
+subdirectories of given directories.
+
+If optional argument LOAD is non-nil, request to load the file
+after compiling.
+
+The optional argument SELECTOR has the following valid values:
+
+nil -- Select all files.
+a string -- A regular expression selecting files with matching names.
+a function -- A function selecting files with matching names.
+
+The variable `native-comp-async-jobs-number' specifies the number
+of (commands) to run simultaneously.
+
+LOAD can also be the symbol `late'.  This is used internally if
+the byte code has already been loaded when this function is
+called.  It means that we request the special kind of load
+necessary in that situation, called \"late\" loading.
+
+During a \"late\" load, instead of executing all top-level forms
+of the original files, only function definitions are
+loaded (paying attention to have these effective only if the
+bytecode definition was not changed in the meantime).
+
+(fn FILES &optional RECURSIVELY LOAD SELECTOR)")
 (autoload 'comp-lookup-eln "comp" "\
 Given a Lisp source FILENAME return the corresponding .eln file if found.
 Search happens in `native-comp-eln-load-path'.
@@ -4810,7 +4834,7 @@ inferred from the code itself by the native compiler; if it is
 `know', the type specifier comes from `comp-known-type-specifiers'.
 
 (fn FUNCTION)")
-(register-definition-prefixes "comp" '("comp-" "make-comp-edge" "native-" "no-native-compile"))
+(register-definition-prefixes "comp" '("comp-" "make-comp-edge" "native-comp" "no-native-compile"))
 
 
 ;;; Generated autoloads from cedet/semantic/wisent/comp.el
@@ -5509,7 +5533,7 @@ Run `perldoc' on WORD.
 (fn WORD)" t)
 (autoload 'cperl-perldoc-at-point "cperl-mode" "\
 Run a `perldoc' on the word around point." t)
-(register-definition-prefixes "cperl-mode" '("cperl-"))
+(register-definition-prefixes "cperl-mode" '("cperl-" "imenu-max-items"))
 
 
 ;;; Generated autoloads from progmodes/cpp.el
@@ -7988,7 +8012,6 @@ Switch to *dungeon* buffer and start game." t)
 
 ;;; Generated autoloads from emacs-lisp/easy-mmode.el
 
-(defalias 'easy-mmode-define-minor-mode #'define-minor-mode)
 (autoload 'define-minor-mode "easy-mmode" "\
 Define a new minor mode MODE.
 This defines the toggle command MODE and (by default) a control variable
@@ -8063,7 +8086,6 @@ INIT-VALUE LIGHTER KEYMAP.
 (fn MODE DOC [KEYWORD VAL ... &rest BODY])" nil t)
 (function-put 'define-minor-mode 'doc-string-elt 2)
 (function-put 'define-minor-mode 'lisp-indent-function 'defun)
-(defalias 'easy-mmode-define-global-mode #'define-globalized-minor-mode)
 (defalias 'define-global-minor-mode #'define-globalized-minor-mode)
 (autoload 'define-globalized-minor-mode "easy-mmode" "\
 Make a global mode GLOBAL-MODE corresponding to buffer-local minor MODE.
@@ -8071,14 +8093,17 @@ TURN-ON is a function that will be called with no args in every buffer
 and that should try to turn MODE on if applicable for that buffer.
 
 Each of KEY VALUE is a pair of CL-style keyword arguments.
-The :predicate argument specifies in which major modes should the
+The :predicate key specifies in which major modes should the
 globalized minor mode be switched on.  The value should be t (meaning
 switch on the minor mode in all major modes), nil (meaning don't
 switch on in any major mode), a list of modes (meaning switch on only
 in those modes and their descendants), or a list (not MODES...),
 meaning switch on in any major mode except MODES.  The value can also
 mix all of these forms, see the info node `Defining Minor Modes' for
-details.
+details.  The :predicate key causes the macro to create a user option
+named the same as MODE, but ending with \"-modes\" instead of \"-mode\".
+That user option can then be used to customize in which modes this
+globalized minor mode will be switched on.
 As the minor mode defined by this function is always global, any
 :global keyword is ignored.
 Other keywords have the same meaning as in `define-minor-mode',
@@ -8142,6 +8167,8 @@ CSS contains a list of syntax specifications of the form (CHAR . SYNTAX).
 (fn ST CSS DOC &rest ARGS)" nil t)
 (function-put 'easy-mmode-defsyntax 'doc-string-elt 3)
 (function-put 'easy-mmode-defsyntax 'lisp-indent-function 1)
+(define-obsolete-function-alias 'easy-mmode-define-minor-mode #'define-minor-mode "30.1")
+(define-obsolete-function-alias 'easy-mmode-define-global-mode #'define-globalized-minor-mode "30.1")
 (register-definition-prefixes "easy-mmode" '("easy-mmode-"))
 
 
@@ -9064,22 +9091,23 @@ Turn on EDT Emulation." t)
 
 (push (purecopy '(eglot 1 15)) package--builtin-versions)
 (autoload 'eglot "eglot" "\
-Start LSP server in support of PROJECT's buffers under MANAGED-MAJOR-MODE.
+Start LSP server for PROJECT's buffers under MANAGED-MAJOR-MODES.
 
-This starts a Language Server Protocol (LSP) server suitable for the
-buffers of PROJECT whose `major-mode' is MANAGED-MAJOR-MODE.
-CLASS is the class of the LSP server to start and CONTACT specifies
-how to connect to the server.
+This starts a Language Server Protocol (LSP) server suitable for
+the buffers of PROJECT whose `major-mode' is among
+MANAGED-MAJOR-MODES.  CLASS is the class of the LSP server to
+start and CONTACT specifies how to connect to the server.
 
-Interactively, the command attempts to guess MANAGED-MAJOR-MODE
-from the current buffer's `major-mode', CLASS and CONTACT from
-`eglot-server-programs' looked up by the major mode, and PROJECT from
-`project-find-functions'.  The search for active projects in this
-context binds `eglot-lsp-context' (which see).
+Interactively, the command attempts to guess MANAGED-MAJOR-MODES,
+CLASS, CONTACT, and LANGUAGE-IDS from `eglot-server-programs',
+according to the current buffer's `major-mode'.  PROJECT is
+guessed from `project-find-functions'.  The search for active
+projects in this context binds `eglot-lsp-context' (which see).
 
-If it can't guess, it prompts the user for the mode and the server.
-With a single \\[universal-argument] prefix arg, it always prompts for COMMAND.
-With two \\[universal-argument], it also always prompts for MANAGED-MAJOR-MODE.
+If it can't guess, it prompts the user for the mode and the
+server.  With a single \\[universal-argument] prefix arg, it
+always prompts for COMMAND.  With two \\[universal-argument], it
+also always prompts for MANAGED-MAJOR-MODE.
 
 The LSP server of CLASS is started (or contacted) via CONTACT.
 If this operation is successful, current *and future* file
@@ -9097,12 +9125,12 @@ CONTACT specifies how to contact the server.  It is a
 keyword-value plist used to initialize CLASS or a plain list as
 described in `eglot-server-programs', which see.
 
-LANGUAGE-ID is the language ID string to send to the server for
-MANAGED-MAJOR-MODE, which matters to a minority of servers.
+LANGUAGE-IDS is a list of language ID string to send to the
+server for each element in MANAGED-MAJOR-MODES.
 
 INTERACTIVE is ignored and provided for backward compatibility.
 
-(fn MANAGED-MAJOR-MODE PROJECT CLASS CONTACT LANGUAGE-ID &optional INTERACTIVE)" t)
+(fn MANAGED-MAJOR-MODES PROJECT CLASS CONTACT LANGUAGE-IDS &optional INTERACTIVE)" t)
 (autoload 'eglot-ensure "eglot" "\
 Start Eglot session for current buffer if there isn't one.")
 (autoload 'eglot-upgrade-eglot "eglot" "\
@@ -9362,15 +9390,6 @@ optional prefix argument REINIT is non-nil.
 
 (fn &optional REINIT)" t)
 (register-definition-prefixes "elint" '("elint-"))
-
-
-;;; Generated autoloads from progmodes/elixir-ts-mode.el
-
-(autoload 'elixir-ts-mode "elixir-ts-mode" "\
-Major mode for editing Elixir, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "elixir-ts-mode" '("elixir-ts-"))
 
 
 ;;; Generated autoloads from emacs-lisp/elp.el
@@ -10046,9 +10065,13 @@ Look at CONFIG and try to expand GROUP.
 
 ;;; Generated autoloads from erc/erc.el
 
-(push (purecopy '(erc 5 5)) package--builtin-versions)
+(push (purecopy '(erc 5 6 -4)) package--builtin-versions)
 (autoload 'erc-select-read-args "erc" "\
-Prompt the user for values of nick, server, port, and password.")
+Prompt the user for values of nick, server, port, and password.
+With prefix arg, also prompt for user and full name.")
+(autoload 'erc-server-select "erc" "\
+Interactively connect to a server from `erc-server-alist'." t)
+(make-obsolete 'erc-server-select 'erc-tls "30.1")
 (autoload 'erc "erc" "\
 ERC is a powerful, modular, and extensible IRC client.
 This function is the main entry point for ERC.
@@ -10074,7 +10097,7 @@ for the values of the other parameters.
 
 See `erc-tls' for the meaning of ID.
 
-(fn &key (SERVER (erc-compute-server)) (PORT (erc-compute-port)) (NICK (erc-compute-nick)) (USER (erc-compute-user)) PASSWORD (FULL-NAME (erc-compute-full-name)) ID)" '((erc-select-read-args)))
+(fn &key SERVER PORT NICK USER PASSWORD FULL-NAME ID)" '((let ((erc--display-context `((erc-interactive-display . erc) ,@erc--display-context))) (erc-select-read-args))))
 (defalias 'erc-select #'erc)
 (autoload 'erc-tls "erc" "\
 ERC is a powerful, modular, and extensible IRC client.
@@ -10118,11 +10141,11 @@ Example usage:
 
 When present, ID should be a symbol or a string to use for naming
 the server buffer and identifying the connection unequivocally.
-See Info node `(erc) Network Identifier' for details.  Like USER
-and CLIENT-CERTIFICATE, this parameter cannot be specified
+See Info node `(erc) Network Identifier' for details.  Like
+CLIENT-CERTIFICATE, this parameter cannot be specified
 interactively.
 
-(fn &key (SERVER (erc-compute-server)) (PORT (erc-compute-port \\='ircs-u)) (NICK (erc-compute-nick)) (USER (erc-compute-user)) PASSWORD (FULL-NAME (erc-compute-full-name)) CLIENT-CERTIFICATE ID)" '((let ((erc-default-port erc-default-port-tls)) (erc-select-read-args))))
+(fn &key SERVER PORT NICK USER PASSWORD FULL-NAME CLIENT-CERTIFICATE ID)" '((let ((erc-default-port erc-default-port-tls) (erc--display-context `((erc-interactive-display . erc-tls) ,@erc--display-context))) (erc-select-read-args))))
 (autoload 'erc-handle-irc-url "erc" "\
 Use ERC to IRC on HOST:PORT in CHANNEL.
 If ERC is already connected to HOST:PORT, simply /join CHANNEL.
@@ -10202,7 +10225,7 @@ Customize `erc-url-connect-function' to override this.
 
 ;;; Generated autoloads from erc/erc-imenu.el
 
-(register-definition-prefixes "erc-imenu" '("erc-unfill-notice"))
+(register-definition-prefixes "erc-imenu" '("erc-"))
 
 
 ;;; Generated autoloads from erc/erc-join.el
@@ -10247,9 +10270,12 @@ Return the name of the network or \"Unknown\" as a symbol.
 Use the server parameter NETWORK if provided, otherwise parse the
 server name and search for a match in `erc-networks-alist'.")
 (make-obsolete 'erc-determine-network '"maybe see `erc-networks--determine'" "29.1")
-(autoload 'erc-server-select "erc-networks" "\
-Interactively select a server to connect to using `erc-server-alist'." t)
 (register-definition-prefixes "erc-networks" '("erc-"))
+
+
+;;; Generated autoloads from erc/erc-nicks.el
+
+(register-definition-prefixes "erc-nicks" '("erc-nicks-"))
 
 
 ;;; Generated autoloads from erc/erc-notify.el
@@ -12188,7 +12214,7 @@ Variables of interest include:
    If non-nil, always attempt to create the other file if it was not found.
 
  - `ff-quiet-mode'
-   If non-nil, traces which directories are being searched.
+   If non-nil, does not trace which directories are being searched.
 
  - `ff-special-constructs'
    A list of regular expressions specifying how to recognize special
@@ -12458,7 +12484,7 @@ lines.
 
 ;;; Generated autoloads from progmodes/flymake.el
 
-(push (purecopy '(flymake 1 2 2)) package--builtin-versions)
+(push (purecopy '(flymake 1 3 4)) package--builtin-versions)
 (autoload 'flymake-log "flymake" "\
 Log, at level LEVEL, the message MSG formatted with ARGS.
 LEVEL is passed to `display-warning', which is used to display
@@ -14630,9 +14656,8 @@ to specify a command to run.
 If CONFIRM is non-nil, the user will be given an opportunity to edit the
 command before it's run.
 
-Interactively, the user can use the \\`M-c' command while entering
-the regexp to indicate whether the grep should be case sensitive
-or not.
+Interactively, the user can use \\<read-regexp-map>\\[read-regexp-toggle-case-fold] while entering the regexp
+to indicate whether the grep should be case sensitive or not.
 
 (fn REGEXP &optional FILES DIR CONFIRM)" t)
 (autoload 'zrgrep "grep" "\
@@ -14947,15 +14972,6 @@ Prefix arg sets default accept amount temporarily.
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "hashcash" '("hashcash-"))
-
-
-;;; Generated autoloads from progmodes/heex-ts-mode.el
-
-(autoload 'heex-ts-mode "heex-ts-mode" "\
-Major mode for editing HEEx, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "heex-ts-mode" '("heex-ts-"))
 
 
 ;;; Generated autoloads from help-at-pt.el
@@ -16097,15 +16113,6 @@ values.
 (register-definition-prefixes "semantic/html" '("semantic-"))
 
 
-;;; Generated autoloads from textmodes/html-ts-mode.el
-
-(autoload 'html-ts-mode "html-ts-mode" "\
-Major mode for editing Html, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "html-ts-mode" '("html-ts-mode-"))
-
-
 ;;; Generated autoloads from htmlfontify.el
 
 (push (purecopy '(htmlfontify 0 21)) package--builtin-versions)
@@ -17189,14 +17196,12 @@ Cut a rectangle from the image under point, filling it with COLOR.
 COLOR defaults to the value of `image-cut-color'.
 Interactively, with prefix argument, prompt for COLOR to use.
 
-(fn &optional COLOR)" t)
-(autoload 'image-crop "image-crop" "\
-Crop the image under point.
-If CUT is non-nil, remove a rectangle from the image instead of
-cropping the image.  In that case CUT should be the name of a
-color to fill the rectangle.
+This command presents the image with a rectangular area superimposed
+on it, and allows moving and resizing the area to define which
+part of it to cut.
 
-While cropping the image, the following key bindings are available:
+While moving/resizing the cutting area, the following key bindings
+are available:
 
 `q':   Exit without changing anything.
 `RET': Crop/cut the image.
@@ -17204,8 +17209,31 @@ While cropping the image, the following key bindings are available:
        rectangle shape.
 `s':   Same as `m', but make the rectangle into a square first.
 
-After cropping an image, you can save it by `M-x image-save' or
+After cutting the image, you can save it by `M-x image-save' or
 \\<image-map>\\[image-save] when point is over the image.
+
+(fn &optional COLOR)" t)
+(autoload 'image-crop "image-crop" "\
+Crop the image under point.
+This command presents the image with a rectangular area superimposed
+on it, and allows moving and resizing the area to define which
+part of it to crop.
+
+While moving/resizing the cropping area, the following key bindings
+are available:
+
+`q':   Exit without changing anything.
+`RET': Crop/cut the image.
+`m':   Make mouse movements move the rectangle instead of altering the
+       rectangle shape.
+`s':   Same as `m', but make the rectangle into a square first.
+
+After cropping the image, you can save it by `M-x image-save' or
+\\<image-map>\\[image-save] when point is over the image.
+
+When called from Lisp, if CUT is non-nil, remove a rectangle from
+the image instead of cropping the image.  In that case, CUT should
+be the name of a color to fill the rectangle.
 
 (fn &optional CUT)" t)
 (register-definition-prefixes "image-crop" '("image-c"))
@@ -18317,6 +18345,11 @@ sequence inside of a word.
 
 Standard ispell choices are then available.
 
+This command uses a word-list file specified
+by `ispell-alternate-dictionary' or by `ispell-complete-word-dict';
+if none of those name an existing word-list file, this command
+signals an error.
+
 (fn &optional INTERIOR-FRAG)" t)
 (autoload 'ispell-complete-word-interior-frag "ispell" "\
 Completes word matching character sequence inside a word." t)
@@ -18666,7 +18699,7 @@ The macro is now available for use via \\[kmacro-call-macro],
 or it can be given a name with \\[kmacro-name-last-macro] and then invoked
 under that name.
 
-With numeric arg, repeat macro now that many times,
+With numeric ARG, repeat the macro that many times,
 counting the definition just completed as the first repetition.
 An argument of zero means repeat until error.
 
@@ -18891,7 +18924,7 @@ A major mode to edit GNU ld script files.
 (put 'less-css-input-file-name 'safe-local-variable #'stringp)
  (add-to-list 'auto-mode-alist '("\\.less\\'" . less-css-mode))
 (autoload 'less-css-mode "less-css-mode" "\
-Major mode for editing Less files (http://lesscss.org/).
+Major mode for editing Less files (https://lesscss.org/).
 Special commands:
 \\{less-css-mode-map}
 
@@ -20453,6 +20486,8 @@ Also see the `duplicate-line' command.
 (autoload 'duplicate-line "misc" "\
 Duplicate the current line N times.
 Interactively, N is the prefix numeric argument, and defaults to 1.
+The user option `duplicate-line-final-position' specifies where to
+move point after duplicating the line.
 Also see the `copy-from-above-command' command.
 
 (fn &optional N)" t)
@@ -20462,6 +20497,9 @@ If the region is inactive, duplicate the current line (like `duplicate-line').
 Otherwise, duplicate the region, which remains active afterwards.
 If the region is rectangular, duplicate on its right-hand side.
 Interactively, N is the prefix numeric argument, and defaults to 1.
+The variables `duplicate-line-final-position' and
+`duplicate-region-final-position' control the position of point
+and the region after the duplication.
 
 (fn &optional N)" t)
 (autoload 'zap-up-to-char "misc" "\
@@ -20513,7 +20551,7 @@ Optional argument BUFFER specifies a buffer to use, instead of
 The return value is always nil.
 
 (fn &optional LOADED-ONLY-P BUFFER)" t)
-(register-definition-prefixes "misc" '("list-dynamic-libraries--"))
+(register-definition-prefixes "misc" '("duplicate-" "list-dynamic-libraries--"))
 
 
 ;;; Generated autoloads from misearch.el
@@ -22255,7 +22293,7 @@ Coloring:
 
 ;;; Generated autoloads from org/org.el
 
-(push (purecopy '(org 9 6 3)) package--builtin-versions)
+(push (purecopy '(org 9 6 7)) package--builtin-versions)
 (autoload 'org-babel-do-load-languages "org" "\
 Load the languages defined in `org-babel-load-languages'.
 
@@ -23247,8 +23285,7 @@ If PACKAGE is a `package-desc' object, MIN-VERSION is ignored.
 (autoload 'package-install "package" "\
 Install the package PKG.
 PKG can be a `package-desc' or a symbol naming one of the
-available packages in an archive in `package-archives'.  When
-called interactively, prompt for the package name.
+available packages in an archive in `package-archives'.
 
 Mark the installed package as selected by adding it to
 `package-selected-packages'.
@@ -23259,6 +23296,10 @@ non-nil, install the package but do not add it to
 
 If PKG is a `package-desc' and it is already installed, don't try
 to install it but still mark it as selected.
+
+If the command is invoked with a prefix argument, it will allow
+upgrading of built-in packages, as if `package-install-upgrade-built-in'
+had been enabled.
 
 (fn PKG &optional DONT-SELECT)" t)
 (autoload 'package-upgrade "package" "\
@@ -24327,8 +24368,9 @@ Use streaming commands.
 Return a string containing the pretty-printed representation of OBJECT.
 OBJECT can be any Lisp object.  Quoting characters are used as needed
 to make output that `read' can handle, whenever this is possible.
+Optional argument PP-FUNCTION overrides `pp-default-function'.
 
-(fn OBJECT)")
+(fn OBJECT &optional PP-FUNCTION)")
 (autoload 'pp-buffer "pp" "\
 Prettify the current buffer with printed representation of a Lisp object." t)
 (autoload 'pp "pp" "\
@@ -24336,11 +24378,7 @@ Output the pretty-printed representation of OBJECT, any Lisp object.
 Quoting characters are printed as needed to make output that `read'
 can handle, whenever this is possible.
 
-This function does not apply special formatting rules for Emacs
-Lisp code.  See `pp-emacs-lisp-code' instead.
-
-By default, this function won't limit the line length of lists
-and vectors.  Bind `pp-use-max-width' to a non-nil value to do so.
+Uses the pretty-printing code specified in `pp-default-function'.
 
 Output stream is STREAM, or value of `standard-output' (which see).
 
@@ -24378,8 +24416,10 @@ Ignores leading comment characters.
 Insert SEXP into the current buffer, formatted as Emacs Lisp code.
 Use the `pp-max-width' variable to control the desired line length.
 Note that this could be slow for large SEXPs.
+Can also be called with two arguments, in which case they're taken to be
+the bounds of a region containing Lisp code to pretty-print.
 
-(fn SEXP)")
+(fn SEXP &optional END)")
 (register-definition-prefixes "pp" '("pp-"))
 
 
@@ -24984,7 +25024,7 @@ Under MAYBE-PROMPT, calls `project-get-project'.
 (put 'project-vc-include-untracked 'safe-local-variable #'booleanp)
 (put 'project-vc-name 'safe-local-variable #'stringp)
 (put 'project-vc-extra-root-markers 'safe-local-variable (lambda (val) (and (listp val) (not (memq nil (mapcar #'stringp val))))))
-(defvar project-prefix-map (let ((map (make-sparse-keymap))) (define-key map "!" 'project-shell-command) (define-key map "&" 'project-async-shell-command) (define-key map "f" 'project-find-file) (define-key map "F" 'project-or-external-find-file) (define-key map "b" 'project-switch-to-buffer) (define-key map "s" 'project-shell) (define-key map "d" 'project-find-dir) (define-key map "D" 'project-dired) (define-key map "v" 'project-vc-dir) (define-key map "c" 'project-compile) (define-key map "e" 'project-eshell) (define-key map "k" 'project-kill-buffers) (define-key map "p" 'project-switch-project) (define-key map "g" 'project-find-regexp) (define-key map "G" 'project-or-external-find-regexp) (define-key map "r" 'project-query-replace-regexp) (define-key map "x" 'project-execute-extended-command) (define-key map "\2" 'project-list-buffers) map) "\
+(defvar project-prefix-map (let ((map (make-sparse-keymap (lambda nil (when-let ((pr (project-most-recent-project))) (format "[%s]" (project-name pr))))))) (define-key map "!" 'project-shell-command) (define-key map "&" 'project-async-shell-command) (define-key map "f" 'project-find-file) (define-key map "F" 'project-or-external-find-file) (define-key map "b" 'project-switch-to-buffer) (define-key map "s" 'project-shell) (define-key map "D" 'project-find-dir) (define-key map "d" 'project-dired) (define-key map "v" 'project-vc-dir) (define-key map "c" 'project-compile) (define-key map "e" 'project-eshell) (define-key map "k" 'project-kill-buffers) (define-key map "p" 'project-switch-project) (define-key map "g" 'project-find-regexp) (define-key map "G" 'project-or-external-find-regexp) (define-key map "r" 'project-query-replace-regexp) (define-key map "x" 'project-execute-extended-command) (define-key map "\2" 'project-list-buffers) map) "\
 Keymap for project commands.")
  (define-key ctl-x-map "p" project-prefix-map)
 (autoload 'project-other-window-command "project" "\
@@ -25177,6 +25217,15 @@ When called in a program, it will use the project corresponding
 to directory DIR.
 
 (fn DIR)" t)
+(autoload 'project-uniquify-dirname-transform "project" "\
+Uniquify name of directory DIRNAME using `project-name', if in a project.
+
+If you set `uniquify-dirname-transform' to this function,
+slash-separated components from `project-name' will be appended to
+the buffer's directory name when buffers from two different projects
+would otherwise have the same name.
+
+(fn DIRNAME)")
 (register-definition-prefixes "project" '("project-"))
 
 
@@ -25527,6 +25576,7 @@ Major mode for editing Python files.
 \\{python-mode-map}
 
 (fn)" t)
+(add-to-list 'auto-mode-alist '("/\\(?:Pipfile\\|\\.?flake8\\)\\'" . conf-mode))
 (register-definition-prefixes "python" '("inferior-python-mode" "python-" "run-python-internal"))
 
 
@@ -27196,19 +27246,9 @@ Currently there are `ruby-mode' and `ruby-ts-mode'.
 Major mode for editing Ruby code.
 
 (fn)" t)
-(add-to-list 'auto-mode-alist (cons (purecopy (concat "\\(?:\\.\\(?:" "rbw?\\|ru\\|rake\\|thor" "\\|jbuilder\\|rabl\\|gemspec\\|podspec" "\\)" "\\|/" "\\(?:Gem\\|Rake\\|Cap\\|Thor" "\\|Puppet\\|Berks\\|Brew" "\\|Vagrant\\|Guard\\|Pod\\)file" "\\)\\'")) 'ruby-mode))
-(dolist (name (list "ruby" "rbx" "jruby" "ruby1.9" "ruby1.8")) (add-to-list 'interpreter-mode-alist (cons (purecopy name) 'ruby-mode)))
+(add-to-list 'auto-mode-alist (cons (purecopy (concat "\\(?:\\.\\(?:" "rbw?\\|ru\\|rake\\|thor\\|axlsx" "\\|jbuilder\\|rabl\\|gemspec\\|podspec" "\\)" "\\|/" "\\(?:Gem\\|Rake\\|Cap\\|Thor" "\\|Puppet\\|Berks\\|Brew\\|Fast" "\\|Vagrant\\|Guard\\|Pod\\)file" "\\)\\'")) 'ruby-mode))
+(dolist (name (list "ruby" "rbx" "jruby" "j?ruby\\(?:[0-9.]+\\)")) (add-to-list 'interpreter-mode-alist (cons (purecopy name) 'ruby-mode)))
 (register-definition-prefixes "ruby-mode" '("ruby-"))
-
-
-;;; Generated autoloads from progmodes/ruby-ts-mode.el
-
-(push (purecopy '(ruby-ts-mode 0 2)) package--builtin-versions)
-(autoload 'ruby-ts-mode "ruby-ts-mode" "\
-Major mode for editing Ruby, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "ruby-ts-mode" '("ruby-ts-"))
 
 
 ;;; Generated autoloads from ruler-mode.el
@@ -30105,7 +30145,7 @@ this defaults to the current buffer.
 Query the user for a process and return the process object.
 
 (fn PROMPT)")
-(register-definition-prefixes "subr-x" '("emacs-etc--hide-local-variables" "eval-command-interactive-spec" "hash-table-" "internal--thread-argument" "replace-region-contents" "string-" "thread-" "with-buffer-unmodified-if-unchanged"))
+(register-definition-prefixes "subr-x" '("emacs-etc--hide-local-variables" "hash-table-" "internal--thread-argument" "replace-region-contents" "string-" "thread-" "with-buffer-unmodified-if-unchanged"))
 
 
 ;;; Generated autoloads from progmodes/subword.el
@@ -30979,7 +31019,7 @@ See also: variables `tar-update-datestamp' and `tar-anal-blocksize'.
 \\{tar-mode-map}
 
 (fn)" t)
-(register-definition-prefixes "tar-mode" '("tar-"))
+(register-definition-prefixes "tar-mode" '("pax-" "tar-"))
 
 
 ;;; Generated autoloads from progmodes/tcl.el
@@ -32434,6 +32474,11 @@ Add Tramp file name handlers to `file-name-handler-alist' during autoload." (unl
  (tramp-register-autoload-file-name-handlers)
 (defun tramp-unload-file-name-handlers nil "\
 Unload Tramp file name handlers from `file-name-handler-alist'." (dolist (fnh file-name-handler-alist) (when (and (symbolp (cdr fnh)) (string-prefix-p "tramp-" (symbol-name (cdr fnh)))) (setq file-name-handler-alist (delq fnh file-name-handler-alist)))))
+(defun inhibit-remote-files nil "\
+Deactivate remote file names." (interactive) (when (fboundp 'tramp-cleanup-all-connections) (funcall 'tramp-cleanup-all-connections)) (tramp-unload-file-name-handlers) (setq tramp-mode nil))
+(defmacro without-remote-files (&rest body) "\
+Deactivate remote file names temporarily.
+Run BODY." (declare (indent 0) (debug ((form body) body))) `(let ((file-name-handler-alist (copy-tree file-name-handler-alist)) tramp-mode) (tramp-unload-file-name-handlers) ,@body))
 (defun tramp-unload-tramp nil "\
 Discard Tramp from loading remote files." (interactive) (ignore-errors (unload-feature 'tramp 'force)))
 (register-definition-prefixes "tramp" '("tramp-" "with-"))
@@ -32508,6 +32553,11 @@ Add archive file name handler to `file-name-handler-alist'." (when (and tramp-ar
 ;;; Generated autoloads from net/tramp-integration.el
 
 (register-definition-prefixes "tramp-integration" '("tramp-"))
+
+
+;;; Generated autoloads from net/tramp-message.el
+
+(register-definition-prefixes "tramp-message" '("tramp-" "with-tramp-debug-message"))
 
 
 ;;; Generated autoloads from net/tramp-rclone.el
@@ -36967,9 +37017,9 @@ run a specific program.  The program must be a member of
 (provide 'loaddefs)
 
 ;; Local Variables:
+;; no-byte-compile: t
 ;; version-control: never
 ;; no-update-autoloads: t
-;; no-byte-compile: t
 ;; no-native-compile: t
 ;; coding: utf-8-emacs-unix
 ;; End:

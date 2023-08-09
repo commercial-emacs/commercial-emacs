@@ -4942,8 +4942,6 @@ by calling `format-decode', which see.  */)
 	  Funlock_file (filename);
 	}
 
-      /* Under Android, modtime and st.st_size can be valid even if FD
-	 is not a regular file.  */
       if (!regular)
 	xsignal2 (Qfile_error,
 		  build_string ("not a regular file"), orig_filename);
