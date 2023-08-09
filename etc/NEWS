@@ -662,6 +662,35 @@ See (info "(elisp)Porting Old Advice") for help converting them
 to use `advice-add` or `define-advice instead.
 
 +++
+** New value 'if-regular' for the REPLACE argument to 'insert-file-contents'.
+It results in 'insert-file-contents' erasing the buffer instead of
+preserving markers if the file being inserted is not a regular file,
+rather than signaling an error.
+
++++
+** New variable 'current-key-remap-sequence'.
+It is bound to the key sequence that caused a call to a function bound
+within `function-key-map' or `input-decode-map' around those calls.
+
++++
+** New variables describing the names of built in programs.
+The new variables 'ctags-program-name', 'ebrowse-program-name',
+'etags-program-name', 'hexl-program-name', 'emacsclient-program-name'
+and 'movemail-program-name' should be used instead of "ctags",
+"ebrowse", "etags", "hexl", and "emacsclient", when starting one of
+these built in programs in a subprocess.
+
++++
+** 'x-popup-menu' now understands touch screen events.
+When a 'touchscreen-begin' or 'touchscreen-end' event is passed as the
+POSITION argument, it will behave as if that event was a mouse event.
+
++++
+** New functions for handling touch screen events.
+The new functions 'touch-screen-track-tap' and
+'touch-screen-track-drag' handle tracking common touch screen gestures
+from within a command.
+
 ** New user option 'safe-local-variable-directories'.
 This user option names directories in which Emacs will treat all
 directory-local variables as safe.

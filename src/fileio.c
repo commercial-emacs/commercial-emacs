@@ -2231,13 +2231,13 @@ permissions.  */)
   if (!NILP (preserve_permissions))
     {
 #if HAVE_LIBSELINUX
-      if (is_selinux_enabled ())
+      if (is_selinux_enabled () && ifd != -1)
 	{
 	  conlength = fgetfilecon (ifd, &con);
 	  if (conlength == -1)
 	    report_file_error ("Doing fgetfilecon", file);
 	}
-#endif
+#endif /* HAVE_LIBSELINUX */
     }
 
   /* We can copy only regular files.  */
@@ -3331,6 +3331,7 @@ or if SELinux is disabled, or if Emacs lacks SELinux support.  */)
 {
   Lisp_Object user = Qnil, role = Qnil, type = Qnil, range = Qnil;
   Lisp_Object absname = expand_and_dir_to_file (filename);
+  const char *file;
 
   /* If the file name has special constructs in it,
      call the corresponding file name handler.  */
@@ -3339,11 +3340,13 @@ or if SELinux is disabled, or if Emacs lacks SELinux support.  */)
   if (!NILP (handler))
     return call2 (handler, Qfile_selinux_context, absname);
 
+  file = SSDATA (ENCODE_FILE (absname));
+
 #if HAVE_LIBSELINUX
   if (is_selinux_enabled ())
     {
       char *con;
-      int conlength = lgetfilecon (SSDATA (ENCODE_FILE (absname)), &con);
+      int conlength = lgetfilecon (file, &con);
       if (conlength > 0)
 	{
 	  context_t context = context_new (con);
@@ -3362,7 +3365,7 @@ or if SELinux is disabled, or if Emacs lacks SELinux support.  */)
 		  || errno == ENOTSUP))
 	report_file_error ("getting SELinux context", absname);
     }
-#endif
+#endif /* HAVE_LIBSELINUX */
 
   return list4 (user, role, type, range);
 }
@@ -3382,7 +3385,6 @@ or if Emacs was not compiled with SELinux support.  */)
   Lisp_Object absname;
   Lisp_Object handler;
 #if HAVE_LIBSELINUX
-  Lisp_Object encoded_absname;
   Lisp_Object user = CAR_SAFE (context);
   Lisp_Object role = CAR_SAFE (CDR_SAFE (context));
   Lisp_Object type = CAR_SAFE (CDR_SAFE (CDR_SAFE (context)));
@@ -3391,7 +3393,7 @@ or if Emacs was not compiled with SELinux support.  */)
   bool fail;
   int conlength;
   context_t parsed_con;
-#endif
+#endif /* HAVE_LIBSELINUX */
 
   absname = Fexpand_file_name (filename, BVAR (current_buffer, directory));
 
@@ -3402,10 +3404,11 @@ or if Emacs was not compiled with SELinux support.  */)
     return call3 (handler, Qset_file_selinux_context, absname, context);
 
 #if HAVE_LIBSELINUX
+
   if (is_selinux_enabled ())
     {
+      Lisp_Object encoded_absname = ENCODE_FILE (absname);
       /* Get current file context. */
-      encoded_absname = ENCODE_FILE (absname);
       conlength = lgetfilecon (SSDATA (encoded_absname), &con);
       if (conlength > 0)
 	{
@@ -3447,7 +3450,7 @@ or if Emacs was not compiled with SELinux support.  */)
       else
 	report_file_error ("Doing lgetfilecon", absname);
     }
-#endif
+#endif /* HAVE_LIBSELINUX */
 
   return Qnil;
 }
@@ -3830,11 +3833,12 @@ static Lisp_Object
 read_non_regular (Lisp_Object state)
 {
   union read_non_regular *data = XFIXNUMPTR (state);
-  int nbytes = emacs_read_quit (data->s.fd,
-				((char *) BEG_ADDR + PT_BYTE - BEG_BYTE
-				 + data->s.inserted),
-				data->s.trytry);
-  return make_fixnum (nbytes);
+  ptrdiff_t nbytes
+    = emacs_read_quit (data->s.fd,
+		       ((char *) BEG_ADDR + PT_BYTE - BEG_BYTE
+			+ data->s.inserted),
+		       data->s.trytry);
+  return make_int (nbytes);
 }
 
 
@@ -3972,13 +3976,19 @@ at the start and end of the buffer) and (2) it puts less data in the
 undo list.  When REPLACE is non-nil, the second return value is the
 number of characters that replace previous buffer contents.
 
+If REPLACE is the symbol `if-regular', then eschew preserving marker
+positions or the undo list if REPLACE is nil if FILENAME is not a
+regular file.  Otherwise, signal an error if REPLACE is non-nil and
+FILENAME is not a regular file.
+
 This function does code conversion according to the value of
 `coding-system-for-read' or `file-coding-system-alist', and sets the
 variable `last-coding-system-used' to the coding system actually used.
 
 In addition, this function decodes the inserted text from known formats
 by calling `format-decode', which see.  */)
-  (Lisp_Object filename, Lisp_Object visit, Lisp_Object beg, Lisp_Object end, Lisp_Object replace)
+  (Lisp_Object filename, Lisp_Object visit, Lisp_Object beg, Lisp_Object end,
+   Lisp_Object replace)
 {
   struct stat st;
   struct timespec mtime;
@@ -4093,28 +4103,32 @@ by calling `format-decode', which see.  */)
     report_file_error ("Input file status", orig_filename);
   mtime = get_stat_mtime (&st);
 
-  /* This code will need to be changed in order to work on named
-     pipes, and it's probably just not worth it.  So we should at
-     least signal an error.  */
+  /* The REPLACE code will need to be changed in order to work on
+     named pipes, and it's probably just not worth it.  So we should
+     at least signal an error.  */
+
   if (!S_ISREG (st.st_mode))
     {
       regular = false;
+      seekable = lseek (fd, 0, SEEK_CUR) != (off_t) -1;
 
-      if (! NILP (visit))
-        {
-          eassert (inserted == 0);
-	  goto notfound;
-        }
-
-      if (!NILP (replace))
-	xsignal2 (Qfile_error,
-		  build_string ("not a regular file"), orig_filename);
-
-      seekable = lseek (fd, 0, SEEK_CUR) < 0;
-      if (!NILP (beg) && !seekable)
-	xsignal2 (Qfile_error,
-		  build_string ("cannot use a start position in a non-seekable file/device"),
-		  orig_filename);
+      if (!NILP (beg))
+	{
+	  xsignal2 (Qfile_error,
+		    build_string ("cannot use a start position in a non-seekable file/device"),
+		    orig_filename);
+	}
+      else if (!NILP (replace))
+	{
+	  if (!EQ (replace, Qif_regular))
+	    xsignal2 (Qfile_error,
+		      build_string ("not a regular file"), orig_filename);
+	  else
+	    /* Set REPLACE to Qunbound, indicating that we are trying
+	       to replace the buffer contents with that of a
+	       non-regular file.  */
+	    replace = Qunbound;
+	}
     }
 
   if (end_offset < 0)
@@ -4286,7 +4300,8 @@ by calling `format-decode', which see.  */)
      method and hope for the best.
      But if we discover the need for conversion, we give up on this method
      and let the following if-statement handle the replace job.  */
-  if (!NILP (replace)
+  if (! NILP (replace)
+      && ! EQ (replace, Qunbound)
       && BEGV < ZV
       && (NILP (coding_system)
 	  || ! CODING_REQUIRE_DECODING (&coding)))
@@ -4473,7 +4488,10 @@ by calling `format-decode', which see.  */)
      is needed, in a simple way that needs a lot of memory.
      The preceding if-statement handles the case of no conversion
      in a more optimized way.  */
-  if (!NILP (replace) && ! replace_handled && BEGV < ZV)
+  if (! NILP (replace)
+      && ! EQ (replace, Qunbound)
+      && ! replace_handled
+      && BEGV < ZV)
     {
       ptrdiff_t same_at_start_charpos;
       ptrdiff_t inserted_chars;
@@ -4658,6 +4676,12 @@ by calling `format-decode', which see.  */)
       prepare_to_modify_buffer (PT, PT, NULL);
     }
 
+  /* If REPLACE is Qunbound, buffer contents are being replaced with
+     text read from a FIFO.  Erase the entire buffer.  */
+
+  if (EQ (replace, Qunbound))
+    del_range (BEG, Z);
+
   move_gap_both (PT, PT_BYTE);
 
   /* Ensure the gap is at least one byte larger than needed for the
@@ -4666,7 +4690,8 @@ by calling `format-decode', which see.  */)
   if (GAP_SIZE <= total)
     make_gap (total - GAP_SIZE + 1);
 
-  if (beg_offset != 0 || !NILP (replace))
+  if (beg_offset != 0 || (!NILP (replace)
+			  && !EQ (replace, Qunbound)))
     {
       if (lseek (fd, beg_offset, SEEK_SET) < 0)
 	report_file_error ("Setting file position", orig_filename);
@@ -4699,6 +4724,7 @@ by calling `format-decode', which see.  */)
 	if (!seekable && NILP (end))
 	  {
 	    Lisp_Object nbytes;
+	    intmax_t number;
 
 	    /* Read from the file, capturing `quit'.  When an
 	       error occurs, end the loop, and arrange for a quit
@@ -4714,7 +4740,11 @@ by calling `format-decode', which see.  */)
 		break;
 	      }
 
-	    this = XFIXNUM (nbytes);
+	    if (!integer_to_intmax (nbytes, &number)
+		&& number > PTRDIFF_MAX)
+	      buffer_overflow ();
+
+	    this = number;
 	  }
 	else
 	  {
@@ -4910,9 +4940,14 @@ by calling `format-decode', which see.  */)
 	    Funlock_file (BVAR (current_buffer, file_truename));
 	  Funlock_file (filename);
 	}
+
+#if !defined HAVE_ANDROID || defined ANDROID_STUBIFY
+      /* Under Android, modtime and st.st_size can be valid even if FD
+	 is not a regular file.  */
       if (!regular)
 	xsignal2 (Qfile_error,
 		  build_string ("not a regular file"), orig_filename);
+#endif /* !defined HAVE_ANDROID || defined ANDROID_STUBIFY */
     }
 
   if (set_coding_system)
@@ -6762,9 +6797,11 @@ This includes interactive calls to `delete-file' and
 
 #ifndef DOS_NT
   defsubr (&Sfile_system_info);
-#endif
+#endif /* DOS_NT */
 
 #ifdef HAVE_SYNC
   defsubr (&Sunix_sync);
-#endif
+#endif /* HAVE_SYNC */
+
+  DEFSYM (Qif_regular, "if-regular");
 }
