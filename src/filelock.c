@@ -155,7 +155,7 @@ get_boot_time (void)
   }
 #endif /* defined (CTL_KERN) && defined (KERN_BOOTTIME) */
 
-  if (BOOT_TIME_FILE)
+#ifdef BOOT_TIME_FILE
     {
       struct stat st;
       if (stat (BOOT_TIME_FILE, &st) == 0)
@@ -164,6 +164,7 @@ get_boot_time (void)
 	  return boot_time;
 	}
     }
+#endif /* BOOT_TIME_FILE */
 
 #if defined (BOOT_TIME)
   /* The utmp routines maintain static state.  Don't touch that state
