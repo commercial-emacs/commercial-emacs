@@ -3827,7 +3827,6 @@ Prepare every function for final compilation and drive the C back-end."
 
 ;; Primitive function advice machinery
 
-(defvar native-comp-eln-load-path)
 (defun comp-eln-load-path-eff ()
   "Return a list of effective eln load directories.
 Account for `native-comp-eln-load-path' and `comp-native-version-dir'."
