@@ -577,9 +577,6 @@ element, for the listed directory.")
   "Keeps track of which switches to use for inserted subdirectories.
 This is an alist of the form (SUBDIR . SWITCHES).")
 
-(defvaralias 'dired-move-to-filename-regexp
-  'directory-listing-before-filename-regexp)
-
 (defvar dired-subdir-regexp "^. \\(.+\\)\\(:\\)\n"
   "Regexp matching a maybe hidden subdirectory line in `ls -lR' output.
 Subexpression 1 is the subdirectory proper, no trailing colon.

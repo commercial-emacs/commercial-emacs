@@ -7773,7 +7773,6 @@ If DIR's free space cannot be obtained, this function returns nil."
       (if avail
           (funcall byte-count-to-string-function avail)))))
 
-;; The following expression replaces `dired-move-to-filename-regexp'.
 (defvar directory-listing-before-filename-regexp
   (let* ((l "\\([A-Za-z]\\|[^\0-\177]\\)")
 	 (l-or-quote "\\([A-Za-z']\\|[^\0-\177]\\)")
