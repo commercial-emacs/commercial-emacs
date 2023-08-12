@@ -997,7 +997,7 @@ for VCS directories listed in `vc-directory-exclusion-list'."
          (dirs (list root)))
     (project-find-file-in
      (or (thing-at-point 'filename)
-         (and buffer-file-name (file-relative-name buffer-file-name root)))
+         buffer-file-name)
      dirs pr include-all)))
 
 ;;;###autoload
