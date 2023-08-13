@@ -51,14 +51,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifndef MSDOS
 
-#ifdef HAVE_UTMP_H
-#include <utmp.h>
-#endif
-
-#if !defined WTMP_FILE && !defined WINDOWSNT && defined BOOT_TIME
-#define WTMP_FILE "/var/log/wtmp"
-#endif
-
 /* Normally use a symbolic link to represent a lock.
    The strategy: to lock a file FN, create a symlink .#FN in FN's
    directory, with link data USER@HOST.PID:BOOT.  This avoids a single
