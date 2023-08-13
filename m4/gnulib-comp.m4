@@ -1602,6 +1602,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/read.c
   lib/readlink.c
   lib/readlinkat.c
+  lib/readutmp.h
   lib/realloc.c
   lib/reallocarray.c
   lib/regcomp.c
@@ -1783,6 +1784,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/read.m4
   m4/readlink.m4
   m4/readlinkat.m4
+  m4/readutmp.m4
   m4/realloc.m4
   m4/reallocarray.m4
   m4/regex.m4

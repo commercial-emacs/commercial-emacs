@@ -36,13 +36,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/file.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#ifdef __FreeBSD__
-#include <sys/sysctl.h>
-#endif /* __FreeBSD__ */
-
 #include <errno.h>
 
+#include <boot-time.h>
 #include <c-ctype.h>
 
 #include "lisp.h"
@@ -123,51 +119,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Return the time of the last system boot.  */
 
-static time_t boot_time;
-static bool boot_time_initialized;
-
-#ifdef BOOT_TIME
-static void get_boot_time_1 (const char *, bool);
-#endif
-
 static time_t
-get_boot_time (void)
+get_boot_sec (void)
 {
-  if (boot_time_initialized)
-    return boot_time;
-  boot_time_initialized = 1;
-
-#if defined (CTL_KERN) && defined (KERN_BOOTTIME)
-  {
-    int mib[2];
-    size_t size;
-    struct timeval boottime_val;
-
-    mib[0] = CTL_KERN;
-    mib[1] = KERN_BOOTTIME;
-    size = sizeof (boottime_val);
-
-    if (sysctl (mib, 2, &boottime_val, &size, NULL, 0) >= 0 && size != 0)
-      {
-	boot_time = boottime_val.tv_sec;
-	return boot_time;
-      }
-  }
-#endif /* defined (CTL_KERN) && defined (KERN_BOOTTIME) */
-
-#ifdef BOOT_TIME_FILE
-    {
-      struct stat st;
-      if (stat (BOOT_TIME_FILE, &st) == 0)
-	{
-	  boot_time = st.st_mtime;
-	  return boot_time;
-	}
-    }
-#endif /* BOOT_TIME_FILE */
-
-#if defined (BOOT_TIME)
-  /* The utmp routines maintain static state.  Don't touch that state
+  /* get_boot_time maintains static state.  Don't touch that state
      if we are going to dump, since it might not survive dumping.  */
   if (will_dump_p ())
     return boot_time;
@@ -226,50 +181,11 @@ get_boot_time (void)
 #endif
 }
 
-#ifdef BOOT_TIME
-/* Try to get the boot time from wtmp file FILENAME.
-   This succeeds if that file contains a reboot record.
-
-   If FILENAME is zero, use the same file as before;
-   if no FILENAME has ever been specified, this is the utmp file.
-   Use the newest reboot record if NEWEST,
-   the first reboot record otherwise.
-   Ignore all reboot records on or before BOOT_TIME.
-   Success is indicated by setting BOOT_TIME to a larger value.  */
-
-void
-get_boot_time_1 (const char *filename, bool newest)
-{
-  struct utmp ut, *utp;
-
-  if (filename)
-    utmpname (filename);
-
-  setutent ();
-
-  while (1)
-    {
-      /* Find the next reboot record.  */
-      ut.ut_type = BOOT_TIME;
-      utp = getutid (&ut);
-      if (! utp)
-	break;
-      /* Compare reboot times and use the newest one.  */
-      if (utp->ut_time > boot_time)
-	{
-	  boot_time = utp->ut_time;
-	  if (! newest)
-	    break;
-	}
-      /* Advance on element in the file
-	 so that getutid won't repeat the same one.  */
-      utp = getutent ();
-      if (! utp)
-	break;
-    }
-  endutent ();
+  struct timespec boot_time;
+  boot_time.tv_sec = 0;
+  get_boot_time (&boot_time);
+  return boot_time.tv_sec;
 }
-#endif /* BOOT_TIME */
 
 /* An arbitrary limit on lock contents length.  8 K should be plenty
    big enough in practice.  */
@@ -413,7 +329,7 @@ create_lock_file (char *lfname, char *lock_info_str, bool force)
 static int
 lock_file_1 (Lisp_Object lfname, bool force)
 {
-  intmax_t boot = get_boot_time ();
+  intmax_t boot = get_boot_sec ();
   Lisp_Object luser_name = Fuser_login_name (Qnil);
   Lisp_Object lhost_name = Fsystem_name ();
 
@@ -599,7 +515,7 @@ current_lock_owner (lock_info_type *owner, Lisp_Object lfname)
                && (kill (pid, 0) >= 0 || errno == EPERM)
 	       && (boot_time == 0
 		   || (boot_time <= TYPE_MAXIMUM (time_t)
-		       && within_one_second (boot_time, get_boot_time ()))))
+		       && within_one_second (boot_time, get_boot_sec ()))))
         return ANOTHER_OWNS_IT;
       /* The owner process is dead or has a strange pid, so try to
          zap the lockfile.  */
