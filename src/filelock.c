@@ -122,12 +122,6 @@ get_boot_sec (void)
   if (will_dump_p ())
     return 0;
 
-  struct timespec boot_time;
-  boot_time.tv_sec = 0;
-  get_boot_time (&boot_time);
-  return boot_time.tv_sec;
-}
-
 #ifndef MSDOS
   {
     struct timespec boot_time;
