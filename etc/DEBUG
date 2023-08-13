@@ -1063,7 +1063,7 @@ recovering the contents of Emacs buffers from a core dump file.  You
 might also find those commands useful for displaying the list of
 buffers in human-readable format from within the debugger.
 
-*** Debugging Emacs with LLDB
+** Debugging Emacs with LLDB
 
 On systems where GDB is not available, like macOS with M1 chip, you
 can also use LLDB for Emacs debugging.
