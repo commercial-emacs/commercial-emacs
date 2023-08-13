@@ -1943,12 +1943,11 @@ entries for git.gnus.org:
                                collect (nth i spec)))
          ;; If a search key value is nil or t (match anything), we skip it
          (search-spec (apply #'append (mapcar
-                                      (lambda (k)
-                                        (if (or (null (plist-get spec k))
-                                                (eq t (plist-get spec k)))
-                                            nil
-                                          (list k (plist-get spec k))))
-                                      search-keys)))
+                                       (lambda (k)
+                                         (when (and (plist-get spec k)
+                                                    (not (eq t (plist-get spec k))))
+                                           (list k (plist-get spec k))))
+                                       search-keys)))
          ;; needed keys (always including host, login, port, and secret)
          (returned-keys (delete-dups (append
 				      '(:host :login :port :secret)
@@ -1958,23 +1957,22 @@ entries for git.gnus.org:
          (hosts (if (and hosts (listp hosts)) hosts `(,hosts)))
          (ports (plist-get spec :port))
          (ports (if (and ports (listp ports)) ports `(,ports)))
-         (users (plist-get spec :user))
-         (users (if (and users (listp users)) users `(,users)))
+         (users (when-let ((users* (plist-get spec :user)))
+                  (if (atom users*) (list users*) users*)))
          ;; Loop through all combinations of host/port and pass each of these to
          ;; auth-source-macos-keychain-search-items
          (items (catch 'match
                   (dolist (host hosts)
                     (dolist (port ports)
                       (dolist (user users)
-                        (let ((items (apply
-                                      #'auth-source-macos-keychain-search-items
-                                      coll
-                                      type
-                                      max
-                                      host port user
-                                      search-spec)))
-                          (when items
-                            (throw 'match items))))))))
+                        (when-let ((items (apply
+                                           #'auth-source-macos-keychain-search-items
+                                           coll
+                                           type
+                                           max
+                                           host port user
+                                           search-spec)))
+                          (throw 'match items)))))))
 
          ;; ensure each item has each key in `returned-keys'
          (items (mapcar (lambda (plist)
@@ -2006,8 +2004,7 @@ entries for git.gnus.org:
                      collect var))
      'utf-8)))
 
-(cl-defun auth-source-macos-keychain-search-items (coll _type _max
-                                                        host port user
+(cl-defun auth-source-macos-keychain-search-items (coll _type _max host port user
                                                    &key label type
                                                    &allow-other-keys)
   (let* ((keychain-generic (eq type 'macos-keychain-generic))

@@ -3183,50 +3183,48 @@ OPERATION-NAME and PARAMETERS are as described in `soap-invoke'."
                           "\""))
             (cons "Content-Type"
                   "text/xml; charset=utf-8"))))
-      (if callback
-          (url-retrieve
-           (soap-port-service-url port)
-           (lambda (status)
-             (let ((buffer (current-buffer))
-                   err-p)
-               (unwind-protect
-                   (condition-case err
-                       (let ((error-status (plist-get status :error)))
-                         (if error-status
-                             (signal (car error-status) (cdr error-status))
-                           (apply callback
-                                  (soap-parse-envelope
-                                   (soap-parse-server-response)
-                                   operation wsdl)
-                                  cbargs)))
-                     (error (setq err-p t)
-                            (signal (car err) (cdr err))))
-                 (when (and (buffer-live-p buffer)
-                            (or (not err-p) (not soap-debug)))
-                   (let (kill-buffer-query-functions)
-                     (kill-buffer buffer)))))))
-        (let ((buffer (url-retrieve-synchronously
-                       (soap-port-service-url port)))
-              err-p)
-          (unwind-protect
-              (condition-case err
-                  (with-current-buffer buffer
-                    (unless url-http-response-status
-                      (error "No HTTP response from server"))
-                    (when (and soap-debug (> url-http-response-status 299))
-                      ;; This is a warning because some SOAP errors come
-                      ;; back with a HTTP response 500 (internal server
-                      ;; error)
-                      (warn "Error in SOAP response: HTTP code %s"
-                            url-http-response-status))
-                    (soap-parse-envelope (soap-parse-server-response)
-                                         operation wsdl))
-                (error (setq err-p t)
-                       (signal (car err) (cdr err))))
-            (when (and (buffer-live-p buffer)
-                       (or (not err-p) (not soap-debug)))
-              (let (kill-buffer-query-functions)
-                (kill-buffer buffer)))))))))
+      (cl-macrolet ((kill-working-buffer-unless-debug
+                      (buffer &rest body)
+                      `(let (err-p)
+                         (unwind-protect
+                             (condition-case err
+                                 ,(macroexp-progn body)
+                               (error (setq err-p t)
+                                      (signal (car err) (cdr err))))
+                           (when (and (buffer-live-p ,buffer)
+                                      (or (not err-p) (not soap-debug)))
+                             (let (kill-buffer-query-functions)
+                               (kill-buffer ,buffer)))))))
+        (if callback
+            (url-retrieve
+             (soap-port-service-url port)
+             (lambda (status)
+               (let ((buffer (current-buffer)))
+                 (kill-working-buffer-unless-debug
+                  buffer
+                  (let ((error-status (plist-get status :error)))
+                    (if error-status
+                        (signal (car error-status) (cdr error-status))
+                      (apply callback
+                             (soap-parse-envelope
+                              (soap-parse-server-response)
+                              operation wsdl)
+                             cbargs)))))))
+          (let ((buffer (url-retrieve-synchronously
+                         (soap-port-service-url port))))
+            (kill-working-buffer-unless-debug
+             buffer
+             (with-current-buffer buffer
+               (unless url-http-response-status
+                 (error "No HTTP response from server"))
+               (when (and soap-debug (> url-http-response-status 299))
+                 ;; This is a warning because some SOAP errors come
+                 ;; back with a HTTP response 500 (internal server
+                 ;; error)
+                 (warn "Error in SOAP response: HTTP code %s"
+                       url-http-response-status))
+               (soap-parse-envelope (soap-parse-server-response)
+                                    operation wsdl)))))))))
 
 (defun soap-invoke (wsdl service operation-name &rest parameters)
   "Invoke a SOAP operation and return the result.
