@@ -77,6 +77,7 @@
 #  alloca-opt \
 #  binary-io \
 #  bitset \
+#  boot-time \
 #  byteswap \
 #  c-ctype \
 #  c-strcase \
@@ -1572,6 +1573,16 @@ EXTRA_DIST += bitset.h bitset/array.h bitset/base.h bitset/list.h bitset/stats.h
 
 endif
 ## end   gnulib module bitset
+
+## begin gnulib module boot-time
+ifeq (,$(OMIT_GNULIB_MODULE_boot-time))
+
+libgnu_a_SOURCES += boot-time.c
+
+EXTRA_DIST += boot-time-aux.h boot-time.h readutmp.h
+
+endif
+## end   gnulib module boot-time
 
 ## begin gnulib module byteswap
 ifeq (,$(OMIT_GNULIB_MODULE_byteswap))

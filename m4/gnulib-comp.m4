@@ -52,6 +52,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module basename-lgpl:
   # Code from module binary-io:
   # Code from module bitset:
+  # Code from module boot-time:
   # Code from module builtin-expect:
   # Code from module byteswap:
   # Code from module c-ctype:
@@ -264,7 +265,11 @@ AC_DEFUN([gl_INIT],
   gl_FUNC_ALLOCA
   gl_CONDITIONAL_HEADER([alloca.h])
   AC_PROG_MKDIR_P
+  gl_ASSERT_H
+  gl_CONDITIONAL_HEADER([assert.h])
+  AC_PROG_MKDIR_P
   AC_REQUIRE([AC_C_INLINE])
+  gl_PREREQ_READUTMP_H
   gl___BUILTIN_EXPECT
   gl_BYTESWAP
   gl_CONDITIONAL_HEADER([byteswap.h])
@@ -1448,6 +1453,9 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/bitset/table.h
   lib/bitset/vector.c
   lib/bitset/vector.h
+  lib/boot-time-aux.h
+  lib/boot-time.c
+  lib/boot-time.h
   lib/byteswap.in.h
   lib/c++defs.h
   lib/c-ctype.c

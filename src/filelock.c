@@ -126,60 +126,12 @@ get_boot_sec (void)
   /* get_boot_time maintains static state.  Don't touch that state
      if we are going to dump, since it might not survive dumping.  */
   if (will_dump_p ())
-    return boot_time;
+    return 0;
 
-  /* Try to get boot time from utmp before wtmp,
-     since utmp is typically much smaller than wtmp.
-     Passing a null pointer causes get_boot_time_1
-     to inspect the default file, namely utmp.  */
-  get_boot_time_1 (0, 0);
-  if (boot_time)
-    return boot_time;
-
-  /* Try to get boot time from the current wtmp file.  */
-  get_boot_time_1 (WTMP_FILE, 1);
-
-  /* If we did not find a boot time in wtmp, look at wtmp.1,
-     wtmp.1.gz, wtmp.2, wtmp.2.gz, and so on.  */
-  for (int counter = 0; counter < 20 && ! boot_time; counter++)
-    {
-      Lisp_Object filename = Qnil;
-      bool delete_flag = false;
-      char cmd_string[sizeof WTMP_FILE ".19.gz"];
-      AUTO_STRING_WITH_LEN (tempname, cmd_string,
-			    sprintf (cmd_string, "%s.%d", WTMP_FILE, counter));
-      if (! NILP (Ffile_exists_p (tempname)))
-	filename = tempname;
-      else
-	{
-	  tempname = make_formatted_string (cmd_string, "%s.%d.gz",
-					    WTMP_FILE, counter);
-	  if (! NILP (Ffile_exists_p (tempname)))
-	    {
-	      /* The utmp functions on older systems accept only file
-		 names up to 8 bytes long.  Choose a 2 byte prefix, so
-		 the 6-byte suffix does not make the name too long.  */
-	      filename = Fmake_temp_file_internal (build_string ("wt"), Qnil,
-						   empty_unibyte_string, Qnil);
-	      CALLN (Fcall_process, build_string ("gzip"), Qnil,
-		     list2 (QCfile, filename), Qnil,
-		     build_string ("-cd"), tempname);
-	      delete_flag = true;
-	    }
-	}
-
-      if (! NILP (filename))
-	{
-	  get_boot_time_1 (SSDATA (filename), 1);
-	  if (delete_flag)
-	    unlink (SSDATA (filename));
-	}
-    }
-
-  return boot_time;
-#else
-  return 0;
-#endif
+  struct timespec boot_time;
+  boot_time.tv_sec = 0;
+  get_boot_time (&boot_time);
+  return boot_time.tv_sec;
 }
 
 #ifndef MSDOS
