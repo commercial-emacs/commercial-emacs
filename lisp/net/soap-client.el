@@ -3190,7 +3190,7 @@ OPERATION-NAME and PARAMETERS are as described in `soap-invoke'."
              (let ((buffer (current-buffer))
                    err-p)
                (unwind-protect
-                   (condition-case nil
+                   (condition-case err
                        (let ((error-status (plist-get status :error)))
                          (if error-status
                              (signal (car error-status) (cdr error-status))
@@ -3199,7 +3199,8 @@ OPERATION-NAME and PARAMETERS are as described in `soap-invoke'."
                                    (soap-parse-server-response)
                                    operation wsdl)
                                   cbargs)))
-                     (error (setq err-p t)))
+                     (error (setq err-p t)
+                            (signal (car err) (cdr err))))
                  (when (and (buffer-live-p buffer)
                             (or (not err-p) (not soap-debug)))
                    (let (kill-buffer-query-functions)
@@ -3208,7 +3209,7 @@ OPERATION-NAME and PARAMETERS are as described in `soap-invoke'."
                        (soap-port-service-url port)))
               err-p)
           (unwind-protect
-              (condition-case nil
+              (condition-case err
                   (with-current-buffer buffer
                     (unless url-http-response-status
                       (error "No HTTP response from server"))
@@ -3220,7 +3221,8 @@ OPERATION-NAME and PARAMETERS are as described in `soap-invoke'."
                             url-http-response-status))
                     (soap-parse-envelope (soap-parse-server-response)
                                          operation wsdl))
-                (error (setq err-p t)))
+                (error (setq err-p t)
+                       (signal (car err) (cdr err))))
             (when (and (buffer-live-p buffer)
                        (or (not err-p) (not soap-debug)))
               (let (kill-buffer-query-functions)
