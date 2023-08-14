@@ -684,11 +684,11 @@ typedef struct {
    Helper functions called by the run-time.
 */
 
-static void helper_unwind_protect (Lisp_Object handler);
-//Lisp_Object helper_temp_output_buffer_setup (Lisp_Object x);
-static Lisp_Object helper_unbind_n (Lisp_Object n);
-static void helper_save_restriction (void);
-static bool helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code);
+void helper_unwind_protect (Lisp_Object handler);
+Lisp_Object helper_temp_output_buffer_setup (Lisp_Object x);
+Lisp_Object helper_unbind_n (Lisp_Object n);
+void helper_save_restriction (void);
+bool helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code);
 
 void *helper_link_table[] =
   { wrong_type_argument,
@@ -702,7 +702,7 @@ void *helper_link_table[] =
     set_internal,
     helper_unwind_protect,
     specbind,
-    /*garbage_collect, *//*maybe_gc,*/
+    maybe_gc,
     maybe_quit };
 
 
