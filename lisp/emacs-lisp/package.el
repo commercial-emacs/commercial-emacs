@@ -2931,24 +2931,26 @@ Helper function for `describe-package'."
             ;; installed files.
             (insert (package--get-description desc))
 
-          ;; For non-built-in, non-installed packages, get description from
-          ;; the archive.
-          (let* ((basename (format "%s-readme.txt" name))
-                 readme-string)
+          (if (not (package-archive-base desc))
+              (insert "No archive.")
+            ;; For non-built-in, non-installed packages, get description from
+            ;; the archive.
+            (let* ((basename (format "%s-readme.txt" name))
+                   readme-string)
 
-            (package--with-response-buffer (package-archive-base desc)
-              :file basename :noerror t
-              (save-excursion
-                (goto-char (point-max))
-                (unless (bolp)
-                  (insert ?\n)))
-              (cl-assert (not enable-multibyte-characters))
-              (setq readme-string
-                    ;; The readme.txt files are defined to contain utf-8 text.
-                    (decode-coding-region (point-min) (point-max) 'utf-8 t))
-              t)
-            (insert (or readme-string
-                        "This package does not provide a description.")))))
+              (package--with-response-buffer (package-archive-base desc)
+                :file basename :noerror t
+                (save-excursion
+                  (goto-char (point-max))
+                  (unless (bolp)
+                    (insert ?\n)))
+                (cl-assert (not enable-multibyte-characters))
+                (setq readme-string
+                      ;; The readme.txt files are defined to contain utf-8 text.
+                      (decode-coding-region (point-min) (point-max) 'utf-8 t))
+                t)
+              (insert (or readme-string
+                          "This package does not provide a description."))))))
 
       ;; Insert news if available.
       (when news
