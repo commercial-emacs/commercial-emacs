@@ -238,7 +238,7 @@ Must called from within a `tar-mode' buffer."
     (unwind-protect
         (should (equal (package-tar-file-info) multi-file-desc))
       (when (local-variable-p 'tar-data-buffer)
-        (funcall #'tar-mode-kill-buffer-hook)))))
+        (tar-mode-kill-buffer-hook)))))
 
 (ert-deftest package-test-install-single ()
   "Install a single file without using an archive."

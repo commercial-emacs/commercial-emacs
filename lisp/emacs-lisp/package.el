@@ -978,7 +978,7 @@ untar into a directory named DIR; otherwise, signal an error."
                   (error "Package does not untar cleanly into directory %s/" dir)))))
         (tar-untar-buffer))
     (when (local-variable-p 'tar-data-buffer)
-      (funcall #'tar-mode-kill-buffer-hook))))
+      (tar-mode-kill-buffer-hook))))
 
 (defun package--alist-to-plist-args (alist)
   (mapcar #'macroexp-quote
@@ -2429,7 +2429,7 @@ directory."
     (unwind-protect
         (package-install-from-buffer)
       (when (local-variable-p 'tar-data-buffer)
-        (funcall #'tar-mode-kill-buffer-hook)))))
+        (tar-mode-kill-buffer-hook)))))
 
 ;;;###autoload
 (defun package-install-selected-packages (&optional noconfirm)
