@@ -42,7 +42,6 @@
 (require 'ert-x)
 (require 'cl-lib)
 
-
 (setq package-menu-async nil)
 
 (defvar package-test-user-dir nil

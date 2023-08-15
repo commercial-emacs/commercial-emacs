@@ -957,6 +957,7 @@ Newer versions are always activated, regardless of FORCE."
 (declare-function tar-untar-buffer "tar-mode" ())
 (declare-function tar-header-name "tar-mode" (tar-header) t)
 (declare-function tar-header-link-type "tar-mode" (tar-header) t)
+(declare-function tar-mode-kill-buffer-hook "tar-mode")
 
 (defun package-untar-buffer (dir)
   "Untar the current buffer.
