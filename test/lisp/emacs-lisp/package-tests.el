@@ -42,6 +42,7 @@
 (require 'ert-x)
 (require 'cl-lib)
 
+
 (setq package-menu-async nil)
 
 (defvar package-test-user-dir nil
@@ -149,8 +150,8 @@
                (with-temp-buffer
                  ,(if file
                       `(insert-file-contents ,file))
-                 ,@body)))
-
+                 ,@body))
+             (should-not (cl-some (apply-partially #'string-match-p (regexp-quote " *tar-data")) (mapcar #'buffer-name (buffer-list)))))
          (when ,upload-base
            (dolist (f '("archive-contents"
                         "simple-single-1.3.el"
@@ -184,6 +185,7 @@
 
 (defvar tar-parse-info)
 (declare-function tar-header-name "tar-mode" (cl-x) t) ; defstruct
+(declare-function tar-mode-kill-buffer-hook "tar-mode")
 
 (defun package-test-search-tar-file (filename)
   "Search the current buffer's `tar-parse-info' variable for FILENAME.
@@ -233,7 +235,10 @@ Must called from within a `tar-mode' buffer."
   (with-package-test (:basedir (ert-resource-directory)
                                :file "multi-file-0.2.3.tar")
     (tar-mode)
-    (should (equal (package-tar-file-info) multi-file-desc))))
+    (unwind-protect
+        (should (equal (package-tar-file-info) multi-file-desc))
+      (when (local-variable-p 'tar-data-buffer)
+        (funcall #'tar-mode-kill-buffer-hook)))))
 
 (ert-deftest package-test-install-single ()
   "Install a single file without using an archive."

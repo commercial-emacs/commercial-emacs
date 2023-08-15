@@ -157,15 +157,14 @@ This information is useful, but it takes screen space away from file names."
 
 (defun tar-data-swapped-p ()
   "Return non-nil if the tar-data is in `tar-data-buffer'."
-  (and (buffer-live-p tar-data-buffer)
-       ;; Sanity check to try and make sure tar-data-swapped tracks the swap
-       ;; state correctly: the raw data is expected to be always larger than
-       ;; the summary.
-       (progn
-	 (cl-assert (or (= (buffer-size tar-data-buffer) (buffer-size))
-                     (eq tar-data-swapped
-                         (> (buffer-size tar-data-buffer) (buffer-size)))))
-	 tar-data-swapped)))
+  (when (buffer-live-p tar-data-buffer)
+    ;; Sanity check to try and make sure tar-data-swapped tracks the swap
+    ;; state correctly: the raw data is expected to be always larger than
+    ;; the summary.
+    (cl-assert (or (= (buffer-size tar-data-buffer) (buffer-size))
+                   (eq tar-data-swapped
+                       (> (buffer-size tar-data-buffer) (buffer-size)))))
+    tar-data-swapped))
 
 (defun tar-swap-data ()
   "Swap buffer contents between current buffer and `tar-data-buffer'.
@@ -816,7 +815,7 @@ For instance, if mode is #o700, then it produces `rwx------'."
   (when (buffer-live-p tar-data-buffer) (kill-buffer tar-data-buffer)))
 
 (defun tar-mode-kill-buffer-hook ()
-  (if (buffer-live-p tar-data-buffer) (kill-buffer tar-data-buffer)))
+  (when (buffer-live-p tar-data-buffer) (kill-buffer tar-data-buffer)))
 
 ;;;###autoload
 (define-derived-mode tar-mode special-mode "Tar"
@@ -865,17 +864,19 @@ See also: variables `tar-update-datestamp' and `tar-anal-blocksize'.
                                (format " *tar-data %s*"
                                        (file-name-nondirectory
                                         (or buffer-file-name (buffer-name))))))
-  (condition-case err
-      (progn
-        (tar-swap-data)
-        (tar-summarize-buffer)
-        (tar-next-line 0))
-    (error
-     ;; If summarizing caused an error, then maybe the buffer doesn't contain
-     ;; tar data.  Rather than show a mysterious empty buffer, let's
-     ;; revert to fundamental-mode.
-     (fundamental-mode)
-     (signal (car err) (cdr err)))))
+  (let ((revert-on-err (apply-partially
+                        (lambda (buffer*)
+                          (with-current-buffer buffer*
+                            (fundamental-mode)))
+                        (current-buffer))))
+    (condition-case err
+        (progn
+          (tar-swap-data)
+          (tar-summarize-buffer)
+          (tar-next-line 0))
+      (error
+       (funcall revert-on-err) ; Avoid showing empty buffer
+       (signal (car err) (cdr err))))))
 
 (autoload 'woman-tar-extract-file "woman"
   "In tar mode, run the WoMan man-page browser on this file." t)
@@ -903,13 +904,13 @@ actually appear on disk when you save the tar-file's buffer."
 ;; Revert the buffer and recompute the dired-like listing.
 (defun tar-mode-revert (&optional no-auto-save no-confirm)
   (unwind-protect
-      (let ((revert-buffer-function nil))
-        (if (tar-data-swapped-p) (tar-swap-data))
+      (let (revert-buffer-function)
+        (when (tar-data-swapped-p) (tar-swap-data))
         ;; FIXME: If we ask for confirmation, the user will be temporarily
         ;; looking at the raw data.
         (revert-buffer no-auto-save no-confirm 'preserve-modes)
         ;; Recompute the summary.
-        (if (buffer-live-p tar-data-buffer) (kill-buffer tar-data-buffer))
+        (when (buffer-live-p tar-data-buffer) (kill-buffer tar-data-buffer))
         (tar-mode))
     (unless (tar-data-swapped-p) (tar-swap-data))))
 

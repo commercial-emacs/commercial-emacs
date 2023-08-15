@@ -962,19 +962,23 @@ Newer versions are always activated, regardless of FORCE."
   "Untar the current buffer.
 This uses `tar-untar-buffer' from Tar mode.  All files should
 untar into a directory named DIR; otherwise, signal an error."
-  (tar-mode)
-  ;; Make sure everything extracts into DIR.
-  (let ((regexp (concat "\\`" (regexp-quote (expand-file-name dir)) "/"))
-        (case-fold-search (file-name-case-insensitive-p dir)))
-    (dolist (tar-data tar-parse-info)
-      (let ((name (expand-file-name (tar-header-name tar-data))))
-        (or (string-match regexp name)
-            ;; Tarballs created by some utilities don't list
-            ;; directories with a trailing slash (Bug#13136).
-            (and (string-equal (expand-file-name dir) name)
-                 (eq (tar-header-link-type tar-data) 5))
-            (error "Package does not untar cleanly into directory %s/" dir)))))
-  (tar-untar-buffer))
+  (unwind-protect
+      (progn
+        (tar-mode)
+        ;; Make sure everything extracts into DIR.
+        (let ((regexp (concat "\\`" (regexp-quote (expand-file-name dir)) "/"))
+              (case-fold-search (file-name-case-insensitive-p dir)))
+          (dolist (tar-data tar-parse-info)
+            (let ((name (expand-file-name (tar-header-name tar-data))))
+              (or (string-match regexp name)
+                  ;; Tarballs created by some utilities don't list
+                  ;; directories with a trailing slash (Bug#13136).
+                  (and (string-equal (expand-file-name dir) name)
+                       (eq (tar-header-link-type tar-data) 5))
+                  (error "Package does not untar cleanly into directory %s/" dir)))))
+        (tar-untar-buffer))
+    (when (local-variable-p 'tar-data-buffer)
+      (funcall #'tar-mode-kill-buffer-hook))))
 
 (defun package--alist-to-plist-args (alist)
   (mapcar #'macroexp-quote
@@ -2420,8 +2424,12 @@ directory."
       (insert-file-contents-literally file)
       (set-visited-file-name file)
       (set-buffer-modified-p nil)
-      (when (string-match "\\.tar\\'" file) (tar-mode)))
-    (package-install-from-buffer)))
+      (when (string-match "\\.tar\\'" file)
+        (tar-mode)))
+    (unwind-protect
+        (package-install-from-buffer)
+      (when (local-variable-p 'tar-data-buffer)
+        (funcall #'tar-mode-kill-buffer-hook)))))
 
 ;;;###autoload
 (defun package-install-selected-packages (&optional noconfirm)
