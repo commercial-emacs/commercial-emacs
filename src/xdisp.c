@@ -6457,7 +6457,6 @@ reseat (struct it *it, struct text_pos pos, bool force_p)
 	  handle_stop (it);
 	  it->prev_stop = it->base_level_stop = 0;
 	}
-
     }
 }
 
