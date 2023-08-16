@@ -1088,7 +1088,8 @@ It must be sent formatted with three strings; the tests for file
 existence, file readability, and file directory.  Input shall be
 read via here-document, otherwise the command could exceed
 maximum length of command line.
-Format specifiers \"%s\" are replaced before the script is used.")
+Format specifiers \"%s\" are replaced before the script is used,
+percent characters need to be doubled.")
 
 ;; New handlers should be added here.
 ;;;###tramp-autoload
