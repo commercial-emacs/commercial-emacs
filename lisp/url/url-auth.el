@@ -486,19 +486,16 @@ TYPE   is the type of authentication to be returned.  This is either a string
        what type of auth to use
 PROMPT is boolean - specifies whether to ask the user for a username/password
        if one cannot be found in the cache"
-  (if (not realm)
-      (setq realm (cdr-safe (assoc "realm" args))))
-  (if (equal realm "")
-      (setq realm nil))
-  (if (stringp url)
-      (setq url (url-generic-parse-url url)))
+  (setq realm (or realm (cdr-safe (assoc "realm" args))))
+  (when (zerop (length realm))
+    (setq realm nil))
+  (when (stringp url)
+    (setq url (url-generic-parse-url url)))
   (if (or (null type) (eq type 'any))
-      ;; Whooo doogies!
-      ;; Go through and get _all_ the authorization strings that could apply
-      ;; to this URL, store them along with the 'rating' we have in the list
-      ;; of schemes, then sort them so that the 'best' is at the front of the
-      ;; list, then get the car, then get the cdr.
-      ;; Zooom zooom zoooooom
+      ;; `url-registered-auth-schemes' contains entries like
+      ;; (NAME . (FUNC . PREFERENCE)), e.g., ("basic" url-basic-auth . 4).
+      ;; Return the highest PREFERENCE, non-null return value
+      ;; of FUNC applied to URL.
       (cdr-safe
        (car-safe
 	(sort
@@ -516,15 +513,15 @@ PROMPT is boolean - specifies whether to ask the user for a username/password
             ((and (cdr x) (cdr y))
              (>= (car x) (car y)))
             (t nil))))))
-    (if (symbolp type) (setq type (symbol-name type)))
-    (let* ((scheme (car-safe
-		    (cdr-safe (assoc (downcase type)
-				     url-registered-auth-schemes)))))
-      (if (and scheme (fboundp scheme))
-	  (funcall scheme url prompt
-		   (and prompt
-			(funcall scheme url nil nil realm args))
-		   realm args)))))
+    (when (symbolp type) (setq type (symbol-name type)))
+    (when-let ((scheme (car-safe
+		        (cdr-safe (assoc (downcase type)
+				         url-registered-auth-schemes)))))
+      (when (fboundp scheme)
+	(funcall scheme url prompt
+		 (when prompt
+		   (funcall scheme url nil nil realm args))
+		 realm args)))))
 
 ;;;###autoload
 (defun url-register-auth-scheme (type &optional function rating)

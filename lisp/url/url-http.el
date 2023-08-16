@@ -293,12 +293,8 @@ Use `url-http-referer' as the Referer-header (subject to `url-privacy-level')."
 			 (url-get-authentication url-http-proxy nil 'any nil))))
 	 (real-fname (url-filename url-http-target-url))
 	 (host (url-host url-http-target-url))
-	 (auth (if (cdr-safe (assoc "Authorization" url-http-extra-headers))
-		   nil
-		 (url-get-authentication (or
-					  (and (boundp 'proxy-info)
-					       proxy-info)
-					  url-http-target-url) nil 'any nil)))
+	 (auth (unless (cdr-safe (assoc "Authorization" url-http-extra-headers))
+		 (url-get-authentication url-http-target-url nil 'any nil)))
          (ref-url (url-http--encode-string url-http-referer)))
     (if (equal "" real-fname)
 	(setq real-fname "/"))
