@@ -1077,9 +1077,9 @@ characters need to be doubled.")
   "echo \"(\"
 while read file; do
     quoted=`echo \"$file\" | sed -e \"s/\\\"/\\\\\\\\\\\\\\\\\\\"/\"`
-    echo -n \"(\\\"$quoted\\\"\"
-    if %s \"$file\"; then echo -n \" t\"; else echo -n \" nil\"; fi
-    if %s \"$file\"; then echo -n \" t\"; else echo -n \" nil\"; fi
+    printf \"(\\\"$quoted\\\"\"
+    if %s \"$file\"; then printf \" t\"; else printf \" nil\"; fi
+    if %s \"$file\"; then printf \" t\"; else printf \" nil\"; fi
     if %s \"$file\"; then echo \" t)\"; else echo \" nil)\"; fi
 done
 echo \")\""
