@@ -4746,7 +4746,7 @@ getrlimit setrlimit shutdown \
 pthread_sigmask strsignal setitimer \
 sendto recvfrom getsockname getifaddrs freeifaddrs \
 gai_strerror sync \
-getpwent endpwent getgrent endgrent \
+endpwent getgrent endgrent \
 renameat2 \
 cfmakeraw cfsetspeed __executable_start log2 pthread_setname_np \
 pthread_set_name_np])

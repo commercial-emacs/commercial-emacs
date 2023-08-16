@@ -2735,6 +2735,7 @@ close_output_streams (void)
 	     ? fflush (stderr) != 0 || ferror (stderr)
 	     : close_stream (stderr) != 0))
     _exit (EXIT_FAILURE);
+#endif /* __ANDROID__ */
 }
 
 #ifndef DOS_NT
