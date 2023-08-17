@@ -1285,5 +1285,15 @@ final or penultimate step during initialization."))
                      (t x) (:success (1+ x)))
                    '(error "")))))
 
+(ert-deftest with-local-quit-rms-thing ()
+  "What was RMS trying to accomplish with `with-local-quit'?"
+  (should-not (let ((inhibit-quit t))
+                (run-at-time 1 nil #'keyboard-quit)
+                (prog1 (with-local-quit (sleep-for 4) t)
+                  (setq quit-flag nil))))
+  (should-error (progn
+                  (run-at-time 1 nil #'keyboard-quit)
+                  (with-local-quit (sleep-for 4) t))))
+
 (provide 'subr-tests)
 ;;; subr-tests.el ends here
