@@ -810,7 +810,7 @@ DIRS must contain directory names."
 (defvar project-prefix-map
   (let ((map (make-sparse-keymap
               (lambda ()
-                (when-let ((pr (project-most-recent-project)))
+                (when-let ((pr (project-current)))
                   (format "[%s]" (project-name pr)))))))
     (define-key map "!" 'project-shell-command)
     (define-key map "&" 'project-async-shell-command)
