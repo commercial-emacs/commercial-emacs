@@ -1862,6 +1862,9 @@ process from additional information inserted by Emacs."
     (apply #'insert args)
     (put-text-property start (point) 'compilation-annotation t)))
 
+(defvar-local compilation--start-time nil
+  "The time when the compilation started as returned by `float-time'.")
+
 ;;;###autoload
 (defun compilation-start (command &optional mode name-function highlight-regexp
                                   continue)
@@ -1993,6 +1996,7 @@ Returns the compilation buffer created."
                  mode-name
 		 (substring (current-time-string) 0 19))
 	 command "\n")
+        (setq compilation--start-time (float-time))
 	(setq thisdir default-directory))
       (set-buffer-modified-p nil))
     ;; Pop up the compilation buffer.
@@ -2472,9 +2476,19 @@ commands of Compilation major mode are available.  See
     ;; Record where we put the message, so we can ignore it later on.
     (goto-char omax)
     (compilation-insert-annotation ?\n mode-name " " (car status))
-    (when (bolp)
-      (forward-char -1))
-    (compilation-insert-annotation " at " (substring (current-time-string) 0 19))
+    (if (and (numberp compilation-window-height)
+	     (zerop compilation-window-height))
+	(message "%s" (cdr status)))
+    (if (bolp)
+	(forward-char -1))
+    (compilation-insert-annotation
+     " at "
+     (substring (current-time-string) 0 19)
+     ", duration "
+     (let ((elapsed (- (float-time) compilation--start-time)))
+       (cond ((< elapsed 10) (format "%.2f s" elapsed))
+             ((< elapsed 60) (format "%.1f s" elapsed))
+             (t (format-seconds "%h:%02m:%02s" elapsed)))))
     (goto-char (point-max))
     ;; Prevent just inserted text from being included in compilation error.
     (add-text-properties omax (point) '(compilation-handle-exit t))
