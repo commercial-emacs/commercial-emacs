@@ -3345,31 +3345,29 @@ extern Lisp_Object Vmemory_full;
 
 extern bool volatile pending_signals;
 extern void process_pending_signals (void);
-extern void probably_quit (void);
+extern void process_quit (void);
 
-/* Check quit-flag and quit if it is non-nil.  Typing C-g does not
-   directly cause a quit; it only sets Vquit_flag.  So the program
-   needs to call maybe_quit at times when it is safe to quit.  Every
-   loop that might run for a long time or might not exit ought to call
-   maybe_quit at least once, at a safe place.  Unless that is
-   impossible, of course.  But it is very desirable to avoid creating
-   loops where maybe_quit is impossible.
+/* Someone decided this inlined layer of indirection was worth it
+   to save a call-stack push that directly calling process_quit() or
+   process_pending_signals() would incur.
 
-   If quit-flag is set to `kill-emacs' the SIGINT handler has received
-   a request to exit Emacs when it is safe to do.
-
-   When not quitting, process any pending signals.  */
+   In the same way user code manually invokes redisplay(), we rely on
+   programmers to liberally sprinkle maybe_quit calls (particularly
+   within long-running loops), and to determine when such calls are
+   safe.
+*/
 
 INLINE void
 maybe_quit (void)
 {
-  if (!NILP (Vquit_flag) || pending_signals)
-    probably_quit ();
+  if (QUITP)
+    process_quit ();
+  else if (pending_signals)
+    process_pending_signals ();
 }
 
-/* Process a quit rarely, based on a counter COUNT, for efficiency.
-   "Rarely" means once per USHRT_MAX + 1 times; this is somewhat
-   arbitrary, but efficient.  */
+/* Process a quit only once per USHRT_MAX + 1 times for efficiency
+   reasons.  */
 
 INLINE void
 rarely_quit (unsigned short int count)

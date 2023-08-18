@@ -914,7 +914,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
       ccl_backtrace_table[ccl_backtrace_idx] = 0;
 #endif
 
-      if (!NILP (Vquit_flag) && NILP (Vinhibit_quit))
+      if (QUITP)
 	{
 	  /* We can't just signal Qquit, instead break the loop as if
              the whole data is processed.  Don't reset Vquit_flag, it

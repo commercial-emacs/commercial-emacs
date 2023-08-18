@@ -2571,8 +2571,7 @@ emacs_full_write (int fd, char const *buf, ptrdiff_t nbyte,
 	    {
 	      if (0 < interruptible)
 		maybe_quit ();
-	      if (pending_signals)
-		process_pending_signals ();
+	      process_pending_signals ();
 	    }
 	}
       else

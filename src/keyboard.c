@@ -158,7 +158,7 @@ static Lisp_Object recover_top_level_message;
 /* Message normally displayed by Vtop_level.  */
 static Lisp_Object regular_top_level_message;
 
-/* True while displaying for echoing.   Delays C-g throwing.  */
+/* True while displaying for echoing.  Delays C-g throwing.  */
 
 static bool echoing;
 
@@ -7236,9 +7236,29 @@ handle_async_input (void)
 void
 process_pending_signals (void)
 {
-  pending_signals = false;
-  handle_async_input ();
-  do_pending_atimers ();
+  if (pending_signals)
+    {
+      pending_signals = false;
+      handle_async_input ();
+      do_pending_atimers ();
+    }
+}
+
+void
+process_quit (void)
+{
+  if (QUITP)
+    {
+      specpdl_ref gc_count = inhibit_garbage_collection ();
+      Lisp_Object flag = Vquit_flag;
+      Vquit_flag = Qnil;
+      if (EQ (flag, Qkill_emacs))
+	Fkill_emacs (Qnil, Qnil);
+      else if (! NILP (Vthrow_on_input) && EQ (Vthrow_on_input, flag))
+	Fthrow (Vthrow_on_input, Qt);
+      quit ();
+      unbind_to (gc_count, Qnil);
+    }
 }
 
 /* Undo any number of BLOCK_INPUT calls down to level LEVEL,
@@ -7251,9 +7271,8 @@ unblock_input_to (int level)
   interrupt_input_blocked = level;
   if (interrupt_input_blocked < 0)
     emacs_abort ();
-  if (interrupt_input_blocked == 0
-      && ! fatal_error_in_progress
-      && pending_signals)
+  else if (interrupt_input_blocked == 0
+	   && ! fatal_error_in_progress)
     process_pending_signals ();
 }
 
@@ -10918,9 +10937,6 @@ read_stdin (void)
   return read (STDIN_FILENO, &c, 1) == 1 ? c : EOF;
 }
 
-/* If Emacs is stuck because `inhibit-quit' is true, then keep track
-   of the number of times C-g has been requested.  If C-g is pressed
-   enough times, then quit anyway.  See bug#6585.  */
 static int volatile force_quit_count;
 
 /* Called from handle_sigint or kbd_buffer_store_event in response to C-g.
@@ -10931,10 +10947,10 @@ static int volatile force_quit_count;
 static void
 handle_keyboard_quit (bool in_signal_handler)
 {
-  char c;
   cancel_echoing ();
   if (! NILP (Vquit_flag) && get_named_terminal (DEV_TTY))
     {
+      char c;
       if (! in_signal_handler)
 	{
 	  /* If SIGINT isn't blocked, don't let us be interrupted by
@@ -11025,12 +11041,14 @@ handle_keyboard_quit (bool in_signal_handler)
     }
   else
     {
-      /* Request quit when it's safe.  */
-      int count = NILP (Vquit_flag) ? 1 : force_quit_count + 1;
-      force_quit_count = count;
-      if (count == 3)
-	Vinhibit_quit = Qnil;
+      /* The current maintainers decided in 2010 that three C-g's should
+	 cancel `inhibit-quit', a hamfisted approach that's not surprising
+	 given they were adolescents at the time.  Bug#6585.
+      */
+      force_quit_count = NILP (Vquit_flag) ? 1 : force_quit_count + 1;
       Vquit_flag = Qt;
+      if (force_quit_count >= 3)
+	Vinhibit_quit = Qnil;
     }
 
   pthread_sigmask (SIG_SETMASK, &empty_mask, 0);
@@ -12477,9 +12495,9 @@ If the value is not a number, such messages never time out.  */);
   Vminibuffer_message_timeout = make_fixnum (2);
 
   DEFVAR_LISP ("throw-on-input", Vthrow_on_input,
-	       doc: /* If non-nil, any keyboard input throws to this symbol.
-The value of that variable is passed to `quit-flag' and later causes a
-peculiar kind of quitting.  */);
+	       doc: /* Doubles as activator and catch tag for `while-no-input'.
+When assigned a non-nil value (of type symbol), input processing throws to the
+catch tag of that value upon receiving keyboard input.  */);
   Vthrow_on_input = Qnil;
 
   DEFVAR_LISP ("command-error-function", Vcommand_error_function,

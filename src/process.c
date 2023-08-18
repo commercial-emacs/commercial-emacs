@@ -5092,7 +5092,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	 Otherwise, do pending quit if requested.  */
       if (read_kbd >= 0)
 	maybe_quit ();
-      else if (pending_signals)
+      else
 	process_pending_signals ();
 
       eassert (max_desc < FD_SETSIZE);
@@ -6100,8 +6100,7 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 			       datagram_address[outfd].len);
 		  if (! (rv < 0 && errno == EINTR))
 		    break;
-		  if (pending_signals)
-		    process_pending_signals ();
+		  process_pending_signals ();
 		}
 
 	      if (rv >= 0)

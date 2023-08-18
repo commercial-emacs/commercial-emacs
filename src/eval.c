@@ -1660,29 +1660,6 @@ static Lisp_Object find_handler_clause (Lisp_Object, Lisp_Object);
 static bool maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig,
 				 Lisp_Object data);
 
-static void
-process_quit_flag (void)
-{
-  Lisp_Object flag = Vquit_flag;
-  Vquit_flag = Qnil;
-  if (EQ (flag, Qkill_emacs))
-    Fkill_emacs (Qnil, Qnil);
-  if (EQ (Vthrow_on_input, flag))
-    Fthrow (Vthrow_on_input, Qt);
-  quit ();
-}
-
-void
-probably_quit (void)
-{
-  specpdl_ref gc_count = inhibit_garbage_collection ();
-  if (!NILP (Vquit_flag) && NILP (Vinhibit_quit))
-    process_quit_flag ();
-  else if (pending_signals)
-    process_pending_signals ();
-  unbind_to (gc_count, Qnil);
-}
-
 DEFUN ("signal", Fsignal, Ssignal, 2, 2, 0,
        doc: /* Signal an error.  Args are ERROR-SYMBOL and associated DATA.
 This function does not return.
@@ -1818,16 +1795,14 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
     {
       Lisp_Object unwind_data
 	= (NILP (error_symbol) ? data : Fcons (error_symbol, data));
-
       unwind_to_catch (h, NONLOCAL_EXIT_SIGNAL, unwind_data);
     }
-  else
+  else if (handlerlist != handlerlist_sentinel)
     {
-      if (handlerlist != handlerlist_sentinel)
-	/* FIXME: This will come right back here if there's no `top-level'
-	   catcher.  A better solution would be to abort here, and instead
-	   add a catch-all condition handler so we never come here.  */
-	Fthrow (Qtop_level, Qt);
+      /* FIXME: This will come right back here if there's no `top-level'
+	 catcher.  A better solution would be to abort here, and instead
+	 add a catch-all condition handler so we never come here.  */
+      Fthrow (Qtop_level, Qt);
     }
 
   if (! NILP (error_symbol))
@@ -4187,20 +4162,16 @@ if that proves inconveniently small.  However, if you increase it too far,
 Emacs could overflow the real C stack, and crash.  */);
 
   DEFVAR_LISP ("quit-flag", Vquit_flag,
-	       doc: /* Non-nil causes `eval' to abort, unless `inhibit-quit' is non-nil.
-If the value is t, that means do an ordinary quit.
-If the value equals `throw-on-input', that means quit by throwing
-to the tag specified in `throw-on-input'; it's for handling `while-no-input'.
-Typing C-g sets `quit-flag' to t, regardless of `inhibit-quit',
-but `inhibit-quit' non-nil prevents anything from taking notice of that.  */);
+	       doc: /* Non-nil causes `eval' to signal quit.
+Takes on the values nil, t, and in the special case of
+`while-no-input', the symbol value of 'throw-on-quit.  */);
   Vquit_flag = Qnil;
 
   DEFVAR_LISP ("inhibit-quit", Vinhibit_quit,
-	       doc: /* Non-nil inhibits C-g quitting from happening immediately.
-Note that `quit-flag' will still be set by typing C-g,
-so a quit will be signaled as soon as `inhibit-quit' is nil.
-To prevent this happening, set `quit-flag' to nil
-before making `inhibit-quit' nil.  */);
+	       doc: /* Non-nil belays normal processing of `quit-flag'.
+Note `quit-flag' is set by C-g regardless so that a quit is signalled
+as soon as `inhibit-quit' becomes nil.  This can be averted by
+clearing `quit-flag' before clearing `inhibit-quit'.  */);
   Vinhibit_quit = Qnil;
 
   DEFSYM (Qsetq, "setq");

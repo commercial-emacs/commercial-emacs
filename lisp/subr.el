@@ -4864,49 +4864,50 @@ of that nature."
        (kill-buffer standard-output))))
 
 (defmacro with-local-quit (&rest body)
-  "Execute BODY, allowing quits to terminate BODY but not escape further."
+  "Largely a no-op.
+
+If the caller has not set `inhibit-quit', a `keyboard-quit'
+interrupts BODY, and control returns to the command loop as
+normal (macro never returns).
+
+Otherwise, a `keyboard-quit' ignores the prevailing `inhibit-quit',
+interrupts BODY, buffers a quit signal for the caller, and returns nil.
+
+This is the way RMS wanted it in 2006.  No one knows why."
   (declare (debug t) (indent 0))
   `(condition-case nil
-       (let ((inhibit-quit nil))
+       (let (inhibit-quit)
 	 ,@body)
      (quit (setq quit-flag t)
-           ;; A dummy eval call opens the door for quit_throw_to_read_char().
-	   (eval '(ignore nil) t))))
+           ;; Dummy eval call triggers quit_throw_to_read_char().
+           ;; If `inhibit-quit' is nil, quits as normal.
+           ;; Otherwise, we return to caller with `quit-flag' set.
+	   (eval '(ignore) t))))
 
 (defmacro while-no-input (&rest body)
-  "Execute BODY only as long as there's no pending input.
-If input arrives, that ends the execution of BODY,
-and `while-no-input' returns t.  Quitting makes it return nil.
-If BODY finishes, `while-no-input' returns whatever value BODY produced."
+  "Execute BODY until input arrives, whereupon immediately return t.
+
+A `keyboard-quit' during BODY always interrupts BODY regardless
+of any prevailing `inhibit-quit'.  If the caller had set
+`inhibit-quit', a quit signal is buffered, and we return nil.
+
+Otherwise, if no input or quit occurs, return the evaluation of BODY."
   (declare (debug t) (indent 0))
   (let ((catch-sym (make-symbol "input")))
     `(with-local-quit
        (catch ',catch-sym
-	 (let ((throw-on-input ',catch-sym)
-               val)
-           (setq val (or (input-pending-p)
-	                 (progn ,@body)))
-           (cond
-            ;; When input arrives while throw-on-input is non-nil,
-            ;; kbd_buffer_store_buffered_event sets quit-flag to the
-            ;; value of throw-on-input.  If, when BODY finishes,
-            ;; quit-flag still has the same value as throw-on-input, it
-            ;; means BODY never tested quit-flag, and therefore ran to
-            ;; completion even though input did arrive before it
-            ;; finished.  In that case, we must manually simulate what
-            ;; 'throw' in process_quit_flag would do, and we must
-            ;; reset quit-flag, because leaving it set will cause us
-            ;; quit to top-level, which has undesirable consequences,
-            ;; such as discarding input etc.  We return t in that case
-            ;; because input did arrive during execution of BODY.
-            ((eq quit-flag throw-on-input)
-             (setq quit-flag nil)
-             t)
-            ;; This is for when the user actually QUITs during
-            ;; execution of BODY.
-            (quit-flag
-             nil)
-            (t val)))))))
+	 (let* ((throw-on-input ',catch-sym)
+                (val (or (input-pending-p) (progn ,@body))))
+           ;; BODY finished.  A QUIT-FLAG assigned to THROW-ON-INPUT's
+           ;; value means kbd_buffer_store_buffered_event() saw input
+           ;; but BODY never called maybe_quit() and thus never
+           ;; cleared QUIT-FLAG.  Return t because input /did/ arrive,
+           ;; and simulate maybe_quit().  Not doing so results in
+           ;; bug#31692 whereby an uncleared QUIT-FLAG throws to
+           ;; top-level, dropping inputs.
+           (if (eq quit-flag throw-on-input)
+               (prog1 t (setq quit-flag nil))
+             val))))))
 
 (defmacro condition-case-unless-debug (var bodyform &rest handlers)
   "Like `condition-case' except that it does not prevent debugging.
