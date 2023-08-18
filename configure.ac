@@ -4880,7 +4880,7 @@ TERMINFO=yes
 ## LIBS_TERMCAP="-lncurses", this overrides LIBS_TERMCAP = -ltinfo,
 ## if that was found above to have tputs.
 ## Should we use the gnu* logic everywhere?
-case "$opsys$REALLY_ANDROID" in
+case "$opsys" in
   ## darwin: Prevents crashes when running Emacs in Terminal.app under 10.2.
   ##  The ncurses library has been moved out of the System framework in
   ##  Mac OS X 10.2.  So if configure detects it, set the command-line
