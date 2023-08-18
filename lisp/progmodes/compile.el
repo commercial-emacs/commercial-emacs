@@ -1862,6 +1862,9 @@ process from additional information inserted by Emacs."
     (apply #'insert args)
     (put-text-property start (point) 'compilation-annotation t)))
 
+(defvar-local compilation--start-time nil
+  "The time when the compilation started as returned by `float-time'.")
+
 ;;;###autoload
 (defun compilation-start (command &optional mode name-function highlight-regexp
                                   continue)
@@ -1993,6 +1996,7 @@ Returns the compilation buffer created."
                  mode-name
 		 (substring (current-time-string) 0 19))
 	 command "\n")
+        (setq compilation--start-time (float-time))
 	(setq thisdir default-directory))
       (set-buffer-modified-p nil))
     ;; Pop up the compilation buffer.
