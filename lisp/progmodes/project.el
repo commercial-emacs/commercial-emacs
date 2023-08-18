@@ -810,7 +810,7 @@ DIRS must contain directory names."
 (defvar project-prefix-map
   (let ((map (make-sparse-keymap
               (lambda ()
-                (when-let ((pr (project-current)))
+                (when-let ((pr (project--most-recent-project)))
                   (format "[%s]" (project-name pr)))))))
     (define-key map "!" 'project-shell-command)
     (define-key map "&" 'project-async-shell-command)
@@ -1564,29 +1564,20 @@ Also see the `project-kill-buffers-display-buffer-list' variable."
   :version "28.1"
   :group 'project)
 
-(defvar project--list 'unset
+(defvar project--list (let ((prospective
+                             (when (file-exists-p project-list-file)
+                               (with-temp-buffer
+                                 (insert-file-contents project-list-file)
+                                 (read (current-buffer))))))
+                          (if (cl-every
+                               (lambda (elt) (stringp (car-safe elt)))
+                               prospective)
+                              prospective
+                            (prog1 nil
+                              (warn "Contents of %s are in wrong format, resetting"
+                                    project-list-file))))
   "List structure containing root directories of known projects.
 With some possible metadata (to be decided).")
-
-(defun project--read-project-list ()
-  "Initialize `project--list' using contents of `project-list-file'."
-  (let ((filename project-list-file))
-    (setq project--list
-          (when (file-exists-p filename)
-            (with-temp-buffer
-              (insert-file-contents filename)
-              (read (current-buffer)))))
-    (unless (seq-every-p
-             (lambda (elt) (stringp (car-safe elt)))
-             project--list)
-      (warn "Contents of %s are in wrong format, resetting"
-            project-list-file)
-      (setq project--list nil))))
-
-(defun project--ensure-read-project-list ()
-  "Initialize `project--list' if it isn't already initialized."
-  (when (eq project--list 'unset)
-    (project--read-project-list)))
 
 (defun project--write-project-list ()
   "Save `project--list' in `project-list-file'."
@@ -1605,7 +1596,6 @@ With some possible metadata (to be decided).")
 
 ;;;###autoload
 (defun project-most-recent-project ()
-  (project--ensure-read-project-list)
   (let ((pr (or (project--most-recent-project)
                 (project-get-project))))
     (prog1 pr (project-remember-project pr))))
@@ -1615,7 +1605,6 @@ With some possible metadata (to be decided).")
   "Add project PR to the front of the project list.
 Save the result in `project-list-file' if the list of projects
 has changed, and NO-WRITE is nil."
-  (project--ensure-read-project-list)
   (let* ((dir (project-root pr))
          (extant (cl-find-if (lambda (entry) (equal dir (car entry)))
                              project--list)))
@@ -1632,7 +1621,6 @@ If the directory was in the list before the removal, save the
 result in `project-list-file'.  Announce the project's removal
 from the list using REPORT-MESSAGE, which is a format string
 passed to `message' as its first argument."
-  (project--ensure-read-project-list)
   (when-let ((ent (assoc project-root project--list)))
     (setq project--list (delq ent project--list))
     (message report-message project-root)
@@ -1662,7 +1650,6 @@ the project list."
 (defun project-prompt-project-dir ()
   "Prompt the user for a directory that is one of the known project roots.
 It's also possible to enter an arbitrary directory not in the list."
-  (project--ensure-read-project-list)
   (let* (dir
          (from (project--most-recent-project))
          (dir-choice "... (choose a dir)")
@@ -1723,7 +1710,6 @@ It's also possible to enter an arbitrary directory not in the list."
 ;;;###autoload
 (defun project-known-project-roots ()
   "Return the list of root directories of all known projects."
-  (project--ensure-read-project-list)
   (mapcar #'car project--list))
 
 ;;;###autoload
@@ -1741,7 +1727,6 @@ more projects.  After finishing, a message is printed summarizing
 the progress.  The function returns the number of detected
 projects."
   (interactive "DDirectory: \nP")
-  (project--ensure-read-project-list)
   (let ((queue (list dir))
         (count 0)
         (known (make-hash-table
