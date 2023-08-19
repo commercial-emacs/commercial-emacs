@@ -3514,12 +3514,7 @@ There is no need to explicitly add `help-char' to CHARS;
                 read-char-from-minibuffer-map))
          ;; Protect this-command when called from pre-command-hook (bug#45029)
          (this-command this-command)
-         (result (progn
-                   ;; Disable text conversion if it is enabled.
-                   ;; (bug#65370)
-                   (when (fboundp 'set-text-conversion-style)
-                     (set-text-conversion-style text-conversion-style))
-                   (read-from-minibuffer prompt nil map nil (or history t))))
+         (result (read-from-minibuffer prompt nil map nil (or history t)))
          (char
           (if (> (length result) 0)
               ;; We have a string (with one character), so return the first one.
