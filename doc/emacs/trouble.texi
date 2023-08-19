@@ -1336,6 +1336,13 @@ Please help us keep up with the workload by designing the patch in a
 form that is clearly safe to install.
 @end itemize
 
+@vindex submit-emacs-patch-display-help
+By default, @kbd{M-x submit-emacs-patch} displays a buffer with some
+instructions alongside the Message mode buffer.  If you're already
+familiar with these instructions after submitting a patch or two, you
+can disable this help by customizing the user option
+@code{submit-emacs-patch-display-help} to @code{nil}.
+
 @node Contributing
 @section Contributing to Emacs Development
 @cindex contributing to Emacs

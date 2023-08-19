@@ -50,6 +50,10 @@
   "If non-nil, suppress the explanations given for the sake of novice users."
   :type 'boolean)
 
+(defcustom submit-emacs-patch-display-help t
+  "If non-nil, `submit-emacs-patch' displays some help in another buffer."
+  :type 'boolean)
+
 ;; User options end here.
 
 (defvar report-emacs-bug-orig-text nil
@@ -505,26 +509,27 @@ Message buffer where you can explain more about the patch."
      (list (read-string (format-prompt "This patch is about" guess)
                         nil nil guess)
            file)))
-  (switch-to-buffer "*Patch Help*")
-  (let ((inhibit-read-only t))
-    (erase-buffer)
-    (insert "Thank you for considering submitting a patch to the Emacs project.\n\n"
-            "Please describe what the patch fixes (or, if it's a new feature, what it\n"
-            "implements) in the mail buffer below.  When done, use the "
-            (substitute-command-keys "\\<message-mode-map>\\[message-send-and-exit] command\n")
-            "to send the patch as an email to the Emacs issue tracker.\n\n"
-            "If this is the first time you're submitting an Emacs patch, please\n"
-            "read the ")
-    (insert-text-button
-     "CONTRIBUTE"
-     'action (lambda (_)
-               (view-buffer
-                (find-file-noselect
-                 (expand-file-name "CONTRIBUTE" installation-directory)))))
-    (insert " file first.\n")
-    (goto-char (point-min))
-    (view-mode 1)
-    (button-mode 1))
+  (when submit-emacs-patch-display-help
+    (switch-to-buffer "*Patch Help*")
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert "Thank you for considering submitting a patch to the Emacs project.\n\n"
+              "Please describe what the patch fixes (or, if it's a new feature, what it\n"
+              "implements) in the mail buffer below.  When done, use the "
+              (substitute-command-keys "\\<message-mode-map>\\[message-send-and-exit] command\n")
+              "to send the patch as an email to the Emacs issue tracker.\n\n"
+              "If this is the first time you're submitting an Emacs patch, please\n"
+              "read the ")
+      (insert-text-button
+       "CONTRIBUTE"
+       'action (lambda (_)
+                 (view-buffer
+                  (find-file-noselect
+                   (expand-file-name "CONTRIBUTE" installation-directory)))))
+      (insert " file first.\n")
+      (goto-char (point-min))
+      (view-mode 1)
+      (button-mode 1)))
   (compose-mail-other-window report-emacs-bug-address subject)
   (message-goto-body)
   (insert "\n\n\n")
