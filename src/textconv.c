@@ -46,14 +46,14 @@ static struct textconv_interface *text_interface;
 
 
 
-/* Copy the portion of the current buffer described by BEG, BEG_BYTE,
-   END, END_BYTE to the buffer BUFFER, which is END_BYTE - BEG_BYTEs
-   long.  */
+/* Copy the portion of the current buffer's text described by BEG,
+   BEG_BYTE, END, END_BYTE to the char * buffer BUFFER, which should
+   be at least END_BYTE - BEG_BYTEs long.  */
 
 static void
-copy_buffer (ptrdiff_t beg, ptrdiff_t beg_byte,
-	     ptrdiff_t end, ptrdiff_t end_byte,
-	     char *buffer)
+copy_buffer_text (ptrdiff_t beg, ptrdiff_t beg_byte,
+		  ptrdiff_t end, ptrdiff_t end_byte,
+		  char *buffer)
 {
   ptrdiff_t beg0, end0, beg1, end1, size;
 
@@ -87,8 +87,8 @@ copy_buffer (ptrdiff_t beg, ptrdiff_t beg_byte,
 /* Perform the text conversion operation specified in QUERY and return
    the results.
 
-   Find the text between QUERY->position from point on F's selected
-   window and QUERY->factor times QUERY->direction from that
+   Find the text between QUERY->position from point on frame F's
+   selected window and QUERY->factor times QUERY->direction from that
    position.  Return it in QUERY->text.
 
    Then, either delete that text from the buffer if QUERY->operation
@@ -160,7 +160,7 @@ textconv_query (struct frame *f, struct textconv_callback_struct *query)
       break;
 
     case TEXTCONV_FORWARD_WORD:
-      /* Move forward by query->factor word.  */
+      /* Move forward by query->factor words.  */
       end = scan_words (pos, (EMACS_INT) query->factor);
 
       if (!end)
@@ -174,7 +174,7 @@ textconv_query (struct frame *f, struct textconv_callback_struct *query)
       break;
 
     case TEXTCONV_BACKWARD_WORD:
-      /* Move backwards by query->factor word.  */
+      /* Move backwards by query->factor words.  */
       end = scan_words (pos, 0 - (EMACS_INT) query->factor);
 
       if (!end)
@@ -261,7 +261,7 @@ textconv_query (struct frame *f, struct textconv_callback_struct *query)
 
   /* Return the string first.  */
   buffer = xmalloc (end_byte - pos_byte);
-  copy_buffer (pos, pos_byte, end, end_byte, buffer);
+  copy_buffer_text (pos, pos_byte, end, end_byte, buffer);
   query->text.text = buffer;
   query->text.length = end - pos;
   query->text.bytes = end_byte - pos_byte;
