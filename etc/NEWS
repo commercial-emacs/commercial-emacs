@@ -199,6 +199,13 @@ This allows changing which type of whitespace changes are ignored when
 regenerating hunks with 'diff-ignore-whitespace-hunk'.  Defaults to
 the previously hard-coded "-b".
 
+---
+*** New command 'diff-kill-ring-save'.
+This command behaves like 'kill-ring-save', but removes change
+indicators ("+", "-") from the beginning of a line.  This is useful
+when you wish to copy part of the contents of a diff, but not the diff
+itself.
+
 ** Ediff
 
 ---
