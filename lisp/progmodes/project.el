@@ -1509,7 +1509,12 @@ Also see the `project-kill-buffers-display-buffer-list' variable."
                              (when (file-exists-p project-list-file)
                                (with-temp-buffer
                                  (insert-file-contents project-list-file)
-                                 (read (current-buffer))))))
+				 (mapcar
+				  (lambda (elem)
+				    (let ((name (car elem)))
+				      (list (if (file-remote-p name) name
+					      (abbreviate-file-name name)))))
+				  (read (current-buffer)))))))
                           (if (seq-every-p
                                (lambda (elt) (stringp (car-safe elt)))
                                prospective)
@@ -1527,7 +1532,12 @@ With some possible metadata (to be decided).")
       (insert ";;; -*- lisp-data -*-\n")
       (let ((print-length nil)
             (print-level nil))
-        (pp project--list (current-buffer)))
+        (pp (mapcar (lambda (elem)
+                      (let ((name (car elem)))
+                        (list (if (file-remote-p name) name
+                                (expand-file-name name)))))
+                    project--list)
+            (current-buffer)))
       (write-region nil nil filename nil 'silent))))
 
 (defsubst project--most-recent-project ()
@@ -1546,7 +1556,7 @@ With some possible metadata (to be decided).")
   "Add project PR to the front of the project list.
 Save the result in `project-list-file' if the list of projects
 has changed, and NO-WRITE is nil."
-  (let* ((dir (project-root pr))
+  (let* ((dir (abbreviate-file-name (project-root pr)))
          (extant (cl-find-if (lambda (entry) (equal dir (car entry)))
                              project--list)))
     (when (eq (current-buffer) (window-buffer))
@@ -1562,7 +1572,7 @@ If the directory was in the list before the removal, save the
 result in `project-list-file'.  Announce the project's removal
 from the list using REPORT-MESSAGE, which is a format string
 passed to `message' as its first argument."
-  (when-let ((ent (assoc project-root project--list)))
+  (when-let ((ent (assoc (abbreviate-file-name project-root) project--list)))
     (setq project--list (delq ent project--list))
     (message report-message project-root)
     (project--write-project-list)))
