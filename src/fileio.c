@@ -2382,14 +2382,7 @@ permissions.  */)
       /* Set the modified context back to the file.  */
       bool fail = fsetfilecon (ofd, con) != 0;
       /* See https://debbugs.gnu.org/11245 for ENOTSUP.  */
-      if (fail
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-	  /* Treat SELinux errors copying files leniently on Android,
-	     since the system usually forbids user programs from
-	     changing file contexts.  */
-	  && errno != EACCES
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
-	  && errno != ENOTSUP)
+      if (fail && errno != ENOTSUP)
 	report_file_error ("Doing fsetfilecon", newname);
 
       freecon (con);
@@ -2962,29 +2955,15 @@ If there is no error, returns nil.  */)
 
 /* Relative to directory FD, return the symbolic link value of FILENAME.
    On failure, return nil (setting errno).  */
-
 static Lisp_Object
 emacs_readlinkat (int fd, char const *filename)
 {
-  static struct allocator const emacs_norealloc_allocator = {
-    xmalloc,
-    NULL,
-    xfree,
-    memory_full,
-  };
-
+  static struct allocator const emacs_norealloc_allocator =
+    { xmalloc, NULL, xfree, memory_full };
   Lisp_Object val;
   char readlink_buf[1024];
-  char *buf;
-
-  buf = careadlinkat (fd, filename, readlink_buf, sizeof readlink_buf,
-		      &emacs_norealloc_allocator,
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-		      android_readlinkat
-#else /* !HAVE_ANDROID || ANDROID_STUBIFY */
-		      readlinkat
-#endif /* HAVE_ANDROID && !ANDROID_STUBIFY */
-		      );
+  char *buf = careadlinkat (fd, filename, readlink_buf, sizeof readlink_buf,
+			    &emacs_norealloc_allocator, readlinkat);
   if (!buf)
     return Qnil;
 
