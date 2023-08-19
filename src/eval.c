@@ -4164,7 +4164,7 @@ Emacs could overflow the real C stack, and crash.  */);
   DEFVAR_LISP ("quit-flag", Vquit_flag,
 	       doc: /* Non-nil causes `eval' to signal quit.
 Takes on the values nil, t, 'kill-emacs, and in the special case of
-`while-no-input', the symbol value of 'throw-on-quit.  */);
+`while-no-input', the symbol value of 'throw-on-input.  */);
   Vquit_flag = Qnil;
 
   DEFVAR_LISP ("inhibit-quit", Vinhibit_quit,

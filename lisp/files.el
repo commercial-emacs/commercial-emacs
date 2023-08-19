@@ -1121,33 +1121,25 @@ The default regexp prevents fruitless and time-consuming attempts to find
 special files in directories in which file names are interpreted as host names,
 or mount points potentially requiring authentication as a different user.")
 
-(defun locate-dominating-file (file name)
-  "Starting at FILE, look up directory hierarchy for directory containing NAME.
-FILE can be a file or a directory.  If it's a file, its directory will
-serve as the starting point for searching the hierarchy of directories.
-Stop at the first parent directory containing a file NAME,
-and return the directory.  Return nil if not found.
-Instead of a string, NAME can also be a predicate taking one argument
-\(a directory) and returning a non-nil value if that directory is the one for
-which we're looking.  The predicate will be called with every file/directory
-the function needs to examine, starting with FILE."
-  ;; Represent /home/luser/foo as ~/foo so that we don't try to look for
-  ;; `name' in /home or in /.
-  (setq file (abbreviate-file-name (expand-file-name file)))
-  (let ((root nil)
-        try)
-    (while (not (or root
-                    (null file)
-                    (string-match locate-dominating-stop-dir-regexp file)))
-      (setq try (if (stringp name)
-                    (and (file-directory-p file)
-                         (file-exists-p (expand-file-name name file)))
-                  (funcall name file)))
-      (cond (try (setq root file))
-            ((equal file (setq file (file-name-directory
-                                     (directory-file-name file))))
-             (setq file nil))))
-    (if root (file-name-as-directory root))))
+(defun locate-dominating-file (from bogey)
+  "Return ancestor directory of FROM containing file named BOGEY.
+BOGEY can be a predicate returning non-nil when its argument is
+the desired directory."
+  (let ((dir (abbreviate-file-name (expand-file-name from))))
+    (catch 'done
+      (while (not (string-match-p locate-dominating-stop-dir-regexp dir))
+        (when (if (functionp bogey)
+                  (funcall bogey dir)
+                (when (file-directory-p dir)
+                  (file-exists-p (expand-file-name bogey dir))))
+          (throw 'done (file-name-as-directory dir)))
+        (let ((parent (file-name-directory (directory-file-name dir))))
+          ;; `abbreviate-file-name' introduced "~/" for "/home/user/".
+          ;; The PARENT of "~" is nil, thus keeping loop from
+          ;; traversing above "/home/user/"
+          (if (or (null parent) (equal dir parent))
+              (throw 'done nil)
+            (setq dir parent)))))))
 
 (defcustom user-emacs-directory-warning t
   "Non-nil means warn if unable to access or create `user-emacs-directory'.

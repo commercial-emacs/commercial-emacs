@@ -170,6 +170,7 @@
 
 (require 'cl-lib)
 (require 'compile)
+(require 'vc-svn)
 
 (defgroup project nil
   "Operations on the current project."
@@ -177,14 +178,11 @@
   :group 'tools)
 
 (defvar project-find-functions (list #'project-try-vc)
-  "Special hook to find the project containing a given directory.
-Each functions on this hook is called in turn with one
-argument, the directory in which to look, and should return
-either nil to mean that it is not applicable, or a project instance.
-The exact form of the project instance is up to each respective
-function; the only practical limitation is to use values that
-`cl-defmethod' can dispatch on, like a cons cell, or a list, or a
-CL struct.")
+  "Identify project for prevailing directory.
+Functions added to this abnormal hook must accept
+a directory and return a project instance, the
+type of which must be dispatchable by `cl-defmethod',
+i.e., a cons or cl-struct.")
 
 (define-obsolete-variable-alias
   'project-current-inhibit-prompt
@@ -244,7 +242,7 @@ Under MAYBE-PROMPT, calls `project-get-project'."
                    default-directory))))
       (prog1 pr (when pr (project-remember-project pr))))))
 
-(defun project--find-in-directory (dir)
+(defsubst project--find-in-directory (dir)
   (run-hook-with-args-until-success 'project-find-functions dir))
 
 (defvar project--within-roots-fallback nil)
@@ -438,60 +436,16 @@ its name, is by setting this in .dir-locals.el."
   :package-version '(project . "0.9.0"))
 ;;;###autoload(put 'project-vc-name 'safe-local-variable #'stringp)
 
-;; Not using regexps because these wouldn't work in Git pathspecs, in
-;; case we decide we need to be able to list nested projects.
 (defcustom project-vc-extra-root-markers nil
-  "List of additional markers to signal project roots.
+  "Identify a project that isn't version-controlled.
 
-A marker is either a base file name or a glob pattern for such.
-
-A directory containing such a marker file or a file matching a
-marker pattern will be recognized as the root of a VC-aware
-project.
-
-Example values: \".dir-locals.el\", \"package.json\", \"pom.xml\",
-\"requirements.txt\", \"Gemfile\", \"*.gemspec\", \"autogen.sh\".
-
-These will be used in addition to regular directory markers such
-as \".git\", \".hg\", and so on, depending on the value of
-`vc-handled-backends'.  It is most useful when a project has
-subdirectories inside it that need to be considered as separate
-projects.  It can also be used for projects outside of VC
-repositories.
-
-In either case, their behavior will still obey the relevant
-variables, such as `project-vc-ignores' or `project-vc-name'."
+Examples include \".dir-locals.el\", \"package.json\", \"pom.xml\",
+\"requirements.txt\", \"Gemfile\", \"*.gemspec\", \"autogen.sh\"."
   :type '(repeat string)
   :version "29.1"
   :package-version '(project . "0.9.0"))
 ;;;###autoload(put 'project-vc-extra-root-markers 'safe-local-variable (lambda (val) (and (listp val) (not (memq nil (mapcar #'stringp val))))))
 
-;; FIXME: Using the current approach, major modes are supposed to set
-;; this variable to a buffer-local value.  So we don't have access to
-;; the "external roots" of language A from buffers of language B, which
-;; seems desirable in multi-language projects, at least for some
-;; potential uses, like "jump to a file in project or external dirs".
-;;
-;; We could add a second argument to this function: a file extension,
-;; or a language name.  Some projects will know the set of languages
-;; used in them; for others, like the VC-aware type, we'll need
-;; auto-detection.  I see two options:
-;;
-;; - That could be implemented as a separate second hook, with a
-;;   list of functions that return file extensions.
-;;
-;; - This variable will be turned into a hook with "append" semantics,
-;;   and each function in it will perform auto-detection when passed
-;;   nil instead of an actual file extension.  Then this hook will, in
-;;   general, be modified globally, and not from major mode functions.
-;;
-;; The second option seems simpler, but the first one has the
-;; advantage that the user could override the list of languages used
-;; in a project via a directory-local variable, thus skipping
-;; languages they're not working on personally (in a big project), or
-;; working around problems in language detection (the detection logic
-;; might be imperfect for the project in question, or it might work
-;; too slowly for the user's taste).
 (defvar project-vc-external-roots-function (lambda () tags-table-list)
   "Function that returns a list of external roots.
 
@@ -505,67 +459,50 @@ project backend implementation of `project-external-roots'.")
   `((Git . ".git")
     (Hg . ".hg")
     (Bzr . ".bzr")
-    ;; See the comment above `vc-svn-admin-directory' for why we're
-    ;; duplicating the definition.
-    (SVN . ,(if (and (memq system-type '(cygwin windows-nt ms-dos))
-                     (getenv "SVN_ASP_DOT_NET_HACK"))
-                "_svn"
-              ".svn"))
+    (SVN . ,vc-svn-admin-directory)
     (DARCS . "_darcs")
     (Fossil . ".fslckout")
     (Got . ".got"))
   "Associative list assigning root markers to VC backend symbols.
-
 See `project-vc-extra-root-markers' for the marker value format.")
 
 (defun project-try-vc (dir)
-  ;; FIXME: Learn to invalidate when the value of
-  ;; `project-vc-merge-submodules' or `project-vc-extra-root-markers'
-  ;; changes.
-  (or (vc-file-getprop dir 'project-vc)
-      (let* ((backend-markers
-              (delete
-               nil
-               (mapcar
-                (lambda (b) (assoc-default b project-vc-backend-markers-alist))
-                vc-handled-backends)))
-             (marker-re
-              (concat
-               "\\`"
-               (mapconcat
-                (lambda (m) (format "\\(%s\\)" (wildcard-to-regexp m)))
-                (append backend-markers
-                        (project--value-in-dir 'project-vc-extra-root-markers dir))
-                "\\|")
-               "\\'"))
-             (locate-dominating-stop-dir-regexp
-              (or vc-ignore-dir-regexp locate-dominating-stop-dir-regexp))
-             last-matches
-             (root
-              (locate-dominating-file
-               dir
-               (lambda (d)
-                 ;; Maybe limit count to 100 when we can drop Emacs < 28.
-                 (when (file-directory-p d)
-                   (setq last-matches (directory-files d nil marker-re t))))))
-             (backend
-              (cl-find-if
-               (lambda (b)
-                 (member (assoc-default b project-vc-backend-markers-alist)
-                         last-matches))
-               vc-handled-backends))
-             project)
-        (when (and
-               (eq backend 'Git)
-               (project--vc-merge-submodules-p root)
-               (project--submodule-p root))
-          (let* ((parent (file-name-directory (directory-file-name root))))
-            (setq root (vc-call-backend 'Git 'root parent))))
-        (when root
-          (setq project (list 'vc backend root))
-          ;; FIXME: Cache for a shorter time.
-          (vc-file-setprop dir 'project-vc project)
-          project))))
+  "Return DIR's \\='project-vc property consisting of backend and root."
+  (let* ((locate-dominating-stop-dir-regexp
+          (or vc-ignore-dir-regexp locate-dominating-stop-dir-regexp))
+         (extra-markers (project--value-in-dir 'project-vc-extra-root-markers dir))
+         (marker-p
+          (lambda (d)
+            (when-let ((prop
+                        (or (vc-file-getprop d 'project-vc)
+                            (when-let ((files (when (file-directory-p d)
+                                                (directory-files d nil nil 'nosort))))
+                              (catch 'done
+                                (dolist (pair project-vc-backend-markers-alist)
+                                  (cl-destructuring-bind (backend . marker) pair
+                                    (when (cl-some
+                                           (let (case-fold-search)
+                                             (apply-partially #'string-match-p
+                                                              (wildcard-to-regexp marker)))
+                                           files)
+                                      (let ((root d))
+                                        (when (and (eq backend 'Git)
+                                                   (project--vc-merge-submodules-p root)
+                                                   (project--submodule-p root))
+                                          (setq root (vc-call-backend
+                                                      'Git 'root
+                                                      (file-name-directory (directory-file-name root)))))
+                                        (throw 'done (list 'vc backend root))))))
+                                (dolist (marker extra-markers)
+                                  (when (cl-some
+                                         (let (case-fold-search)
+                                           (apply-partially #'string-match-p
+                                                            (wildcard-to-regexp marker)))
+                                         files)
+                                    (throw 'done (list 'vc nil d)))))))))
+              (prog1 t (vc-file-setprop dir 'project-vc prop))))))
+    (locate-dominating-file dir marker-p))
+  (vc-file-getprop dir 'project-vc))
 
 (defun project--submodule-p (root)
   ;; XXX: We only support Git submodules for now.
@@ -783,15 +720,18 @@ DIRS must contain directory names."
       (hack-dir-local-variables-non-file-buffer))
     (symbol-value var)))
 
+(declare-function tramp-tramp-file-p "tramp")
 (cl-defmethod project-buffers ((project (head vc)))
   (let* ((root (expand-file-name (file-name-as-directory (project-root project))))
-         (modules (unless (or (project--vc-merge-submodules-p root)
-                              (project--submodule-p root))
+         (modules (when (and (not (project--vc-merge-submodules-p root))
+                             (not (project--submodule-p root)))
                     (mapcar (lambda (m) (format "%s%s/" root m))
                             (project--git-submodules))))
          bufs)
     (dolist (buf (buffer-list))
       (when-let ((dir (expand-file-name (buffer-local-value 'default-directory buf)))
+                 (not-tramp-p (or (not (fboundp 'tramp-tramp-file-p))
+                                  (not (funcall #'tramp-tramp-file-p dir))))
                  (project-p (equal project (project-current nil dir)))
                  (not-submod-p (cl-every (lambda (module)
                                            (not (string-prefix-p module dir)))
