@@ -1569,7 +1569,7 @@ Also see the `project-kill-buffers-display-buffer-list' variable."
                                (with-temp-buffer
                                  (insert-file-contents project-list-file)
                                  (read (current-buffer))))))
-                          (if (cl-every
+                          (if (seq-every-p
                                (lambda (elt) (stringp (car-safe elt)))
                                prospective)
                               prospective
