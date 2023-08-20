@@ -2381,11 +2381,11 @@ permissions.  */)
     {
       /* Set the modified context back to the file.  */
       bool fail = fsetfilecon (ofd, con) != 0;
+      freecon (con);
+
       /* See https://debbugs.gnu.org/11245 for ENOTSUP.  */
       if (fail && errno != ENOTSUP)
 	report_file_error ("Doing fsetfilecon", newname);
-
-      freecon (con);
     }
 #endif
 
@@ -3440,12 +3440,12 @@ or if Emacs was not compiled with SELinux support.  */)
 	  fail = (lsetfilecon (SSDATA (encoded_absname),
 			       context_str (parsed_con))
 		  != 0);
+	  context_free (parsed_con);
+	  freecon (con);
+
           /* See https://debbugs.gnu.org/11245 for ENOTSUP.  */
 	  if (fail && errno != ENOTSUP)
 	    report_file_error ("Doing lsetfilecon", absname);
-
-	  context_free (parsed_con);
-	  freecon (con);
 	  return fail ? Qnil : Qt;
 	}
       else
