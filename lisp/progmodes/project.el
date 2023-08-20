@@ -1408,6 +1408,7 @@ Used by `project-kill-buffers'."
   :package-version '(project . "0.8.2"))
 ;;;###autoload(put 'project-kill-buffers-display-buffer-list 'safe-local-variable #'booleanp)
 
+;; FIXME: Could this be replaced by `buffer-match-p' in Emacs 29+?
 (defun project--buffer-check (buf conditions)
   "Check if buffer BUF matches any element of the list CONDITIONS.
 See `project-kill-buffer-conditions' or
