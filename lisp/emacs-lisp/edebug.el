@@ -1054,6 +1054,7 @@ circular objects.  Let `read' read everything else."
 (defvar edebug-top-window-data)
 
 (defvar edebug-gate nil) ;; whether no-match forces an error.
+(defvar edebug-within-or nil) ;; Disregard edebug-gate; don't error on no-match.
 
 (defvar edebug-def-name nil) ; name of definition, used by interactive-form
 (defvar edebug-old-def-name nil) ; previous name of containing definition.
@@ -1591,7 +1592,7 @@ contains a circular object."
   (setq edebug-error-point (or edebug-error-point
 			       (edebug-before-offset cursor))
 	edebug-best-error (or edebug-best-error args))
-  (if edebug-gate
+  (if (and edebug-gate (not edebug-within-or))
       (progn
 	(if edebug-error-point
 	    (goto-char edebug-error-point))
@@ -1780,7 +1781,8 @@ contains a circular object."
   ;; This needs to be optimized since most specs spend time here.
   (let ((original-specs specs)
 	(this-form (edebug-cursor-expressions cursor))
-	(this-offset (edebug-cursor-offsets cursor)))
+	(this-offset (edebug-cursor-offsets cursor))
+        (edebug-within-or t))
     (catch 'matched
       (while specs
 	(catch 'no-match
@@ -1862,7 +1864,6 @@ a sequence of elements."
   ;; Simply set the gate to prevent backtracking at this level.
   (setq edebug-gate t)
   nil)
-
 
 (defun edebug-match-list (cursor specs)
   ;; The spec is a list, but what kind of list, and what context?

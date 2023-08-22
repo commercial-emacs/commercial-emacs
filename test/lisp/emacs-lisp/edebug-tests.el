@@ -1042,11 +1042,16 @@ clashes (Bug#41853)."
                      ;; FIXME: We'd rather have names such as
                      ;; `edebug-tests-cl-flet-1@inner@cl-flet@10000',
                      ;; but that requires further changes to Edebug.
-                     (format "%s" '(inner@cl-flet@10000
+                     (format "%s" '(
+                                    inner@cl-flet@10000
                                     inner@cl-flet@10001
-                                    edebug-tests-cl-flet-1
                                     inner@cl-flet@10002
-                                    edebug-tests-cl-flet-2)))))))
+                                    inner@cl-flet@10003
+                                    edebug-tests-cl-flet-1
+                                    inner@cl-flet@10004
+                                    inner@cl-flet@10005
+                                    edebug-tests-cl-flet-2
+)))))))
 
 (defmacro edebug-tests--duplicate-symbol-backtrack (arg)
   "Helper macro that exemplifies Bug#42701.
@@ -1093,9 +1098,15 @@ The Edebug specification is similar to the one used by `cl-flet'
 previously; see Bug#41988."
   (declare (debug (&or (&define name function-form) (defun)))))
 
+(defmacro edebug-tests--unduplicate-&define (_arg)
+  "Helper macro for the ERT test `edebug-tests-duplicate-&define'.
+The Edebug specification is similar to the one used by `cl-flet'
+previously; see Bug#41988."
+  (declare (debug (&or (&define [&name symbolp "@cl-flet@"]
+                                [&name [] gensym] function-form) (defun)))))
+
 (ert-deftest edebug-tests-duplicate-&define ()
-  "Check that Edebug doesn't backtrack out of `&define' forms.
-This avoids potential duplicate definitions (Bug#41988)."
+  "Or'ing &define's produces duplicate definitions."
   (with-temp-buffer
     (print '(defun edebug-tests-duplicate-&define ()
               (edebug-tests--duplicate-&define
@@ -1107,10 +1118,28 @@ This avoids potential duplicate definitions (Bug#41988)."
            (edebug-new-definition-function
             (lambda (name)
               (when (memq name instrumented-names)
-                (error "Duplicate definition of `%s'" name))
+                (signal 'invalid-function (format "Duplicate definition of `%s'" name)))
               (push name instrumented-names)
               (edebug-new-definition name))))
-      (should-error (eval-buffer) :type 'invalid-read-syntax))))
+      (should-error (eval-buffer) :type 'invalid-function))))
+
+(ert-deftest edebug-tests-unduplicate-&define ()
+  "Or'ing &define's with gensym averts Bug#41988."
+  (with-temp-buffer
+    (print '(defun edebug-tests-unduplicate-&define ()
+              (edebug-tests--unduplicate-&define
+               (edebug-tests-duplicate-&define-inner () nil)))
+           (current-buffer))
+    (let* ((edebug-all-defs t)
+           (edebug-initial-mode 'Go-nonstop)
+           (instrumented-names ())
+           (edebug-new-definition-function
+            (lambda (name)
+              (when (memq name instrumented-names)
+                (signal 'invalid-function (format "Duplicate definition of `%s'" name)))
+              (push name instrumented-names)
+              (edebug-new-definition name))))
+      (eval-buffer))))
 
 (ert-deftest edebug-tests-inline ()
   "Check that Edebug can instrument inline functions (Bug#53068)."

@@ -2065,12 +2065,12 @@ info node `(cl) Function Bindings' for details.
 \(fn ((FUNC ARGLIST BODY...) ...) FORM...)"
   (declare (indent 1)
            (debug ((&rest [&or
-                           ;; This spec must come first so that a
-                           ;; binding of the form (FN FORM) is always
-                           ;; interpreted as FORM being a form
-                           ;; returning a function, instead of FORM
-                           ;; being a cl-lambda-list and FN returning
-                           ;; nil.
+                           ;; Parsing ambiguity between (FN FORM)
+                           ;; and (FN CL-LAMBDA-LIST), where the
+                           ;; former assigns FORM to FN, and the
+                           ;; latter defines an FN with parameters
+                           ;; CL-LAMBDA-LIST returning nil.  Favor
+                           ;; former.
                            (&define [&name symbolp "@cl-flet@"]
                                     [&name [] gensym] ;Make it unique!
                                     def-form)
