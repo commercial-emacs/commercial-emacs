@@ -70,9 +70,7 @@
 
 (require 'esh-arg)
 (require 'esh-util)
-
-(eval-when-compile
-  (require 'cl-lib))
+(require 'cl-lib)
 
 (declare-function eshell-interactive-print "esh-mode" (string))
 
