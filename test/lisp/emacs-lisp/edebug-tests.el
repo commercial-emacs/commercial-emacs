@@ -1099,7 +1099,7 @@ previously; see Bug#41988."
   (declare (debug (&or (&define name function-form) (defun)))))
 
 (defmacro edebug-tests--unduplicate-&define (_arg)
-  "Helper macro for the ERT test `edebug-tests-duplicate-&define'.
+  "Helper macro for the ERT test `edebug-tests-unduplicate-&define'.
 The Edebug specification is similar to the one used by `cl-flet'
 previously; see Bug#41988."
   (declare (debug (&or (&define [&name symbolp "@cl-flet@"]
