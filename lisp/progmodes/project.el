@@ -1115,7 +1115,7 @@ directories listed in `vc-directory-exclusion-list'."
                          (project-most-recent-project) "Find file")
                 all-files nil 'file-name-history
                 suggested-filename)))
-    (if (string-empty-p file "")
+    (if (string-empty-p file)
         (user-error "You didn't specify the file")
       (find-file file))))
 
