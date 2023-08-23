@@ -921,6 +921,23 @@ pattern to search for."
                           project-regexp-history-variable))))
     result))
 
+(defun project--find-default-from (filename project)
+  "Ensure FILENAME is in PROJECT.
+
+Usually, just return FILENAME.  But if
+`project-current-directory-override' is set, adjust it to be
+relative to PROJECT instead.
+
+This supports using a relative file name from the current buffer
+when switching projects with `project-switch-project' and then
+using a command like `project-find-file'."
+  (if-let (filename-proj (and project-current-directory-override
+                            (project-current nil default-directory)))
+      ;; file-name-concat requires Emacs 28+
+      (concat (file-name-as-directory (project-root project))
+              (file-relative-name filename (project-root filename-proj)))
+    filename))
+
 ;;;###autoload
 (defun project-find-file (&optional include-all)
   "Visit a file (with completion) in the current project.
@@ -938,16 +955,7 @@ for VCS directories listed in `vc-directory-exclusion-list'."
          (dirs (list root)))
     (project-find-file-in
      (or (thing-at-point 'filename)
-         (and buffer-file-name
-              (if-let (buffer-proj (and project-current-directory-override
-                                        (project-current nil default-directory)))
-                  ;; Allow using the relative file name of the current
-                  ;; buffer in "other project" as well.
-                  (let ((buffer-root (project-root buffer-proj)))
-                    ;; file-name-concat requires Emacs 28+
-                    (concat (file-name-as-directory root)
-                            (file-relative-name buffer-file-name buffer-root)))
-                buffer-file-name)))
+         (and buffer-file-name (project--find-default-from buffer-file-name pr)))
      dirs pr include-all)))
 
 ;;;###autoload
@@ -955,7 +963,8 @@ for VCS directories listed in `vc-directory-exclusion-list'."
   "Visit a file (with completion) in the current project or external roots.
 
 The filename at point (determined by `thing-at-point'), if any,
-is available as part of \"future history\".
+is available as part of \"future history\".  If none, the current
+buffer's file name is used.
 
 If INCLUDE-ALL is non-nil, or with prefix argument when called
 interactively, include all files under the project root, except
@@ -964,8 +973,12 @@ for VCS directories listed in `vc-directory-exclusion-list'."
   (let* ((pr (project-most-recent-project))
          (dirs (cons
                 (project-root pr)
-                (project-external-roots pr))))
-    (project-find-file-in (thing-at-point 'filename) dirs pr include-all)))
+                (project-external-roots pr)))
+         (project-file-history-behavior t))
+    (project-find-file-in
+     (or (thing-at-point 'filename)
+         (and buffer-file-name (project--find-default-from buffer-file-name pr)))
+     dirs pr include-all)))
 
 (defcustom project-read-file-name-function #'project--read-file-cpd-relative
   "Function to call to read a file name from a list.
@@ -977,6 +990,26 @@ For the arguments list, see `project--read-file-cpd-relative'."
                  (function :tag "Custom function" nil))
   :group 'project
   :version "27.1")
+
+(defcustom project-file-history-behavior t
+  "If `relativize', entries in `file-name-history' are adjusted.
+
+History entries shown in `project-find-file', `project-find-dir',
+(from `file-name-history') are adjusted to be relative to the
+current project root, instead of the project which added those
+paths.  This only affects history entries added by earlier calls
+to `project-find-file' or `project-find-dir'.
+
+This has the effect of sharing more history between projects."
+  :type '(choice (const t :tag "Default behavior")
+                 (const relativize :tag "Adjust to be relative to current")))
+
+(defun project--transplant-file-name (filename project)
+  (when-let ((old-root (get-text-property 0 'project filename)))
+    (abbreviate-file-name
+     (expand-file-name
+      (file-relative-name filename old-root)
+      (project-root project)))))
 
 (defun project--read-file-cpd-relative (prompt
                                         all-files &optional predicate
@@ -1032,6 +1065,29 @@ by the user at will."
                                    predicate
                                    hist mb-default))
 
+(defun project--read-file-name ( project prompt
+                                 all-files &optional predicate
+                                 hist mb-default)
+  "Call `project-read-file-name-function' with appropriate history.
+
+Depending on `project-file-history-behavior', entries are made
+project-relative where possible."
+  (let ((file
+         (cl-letf ((history-add-new-input nil)
+                   ((symbol-value hist)
+                    (if (eq project-file-history-behavior 'relativize)
+                        (mapcar
+                         (lambda (f)
+                           (or (project--transplant-file-name f project) f))
+                         (symbol-value hist))
+                      (symbol-value hist))))
+           (funcall project-read-file-name-function
+                    prompt all-files predicate hist mb-default))))
+    (when (and hist history-add-new-input)
+      (add-to-history hist
+                      (propertize file 'project (project-root project))))
+    file))
+
 (defun project-find-file-in (suggested-filename dirs project &optional include-all)
   "Complete a file name in DIRS in PROJECT and visit the result.
 
@@ -1076,7 +1132,10 @@ directories listed in `vc-directory-exclusion-list'."
 
 ;;;###autoload
 (defun project-find-dir ()
-  "Start Dired in a directory inside the current project."
+  "Start Dired in a directory inside the current project.
+
+The current buffer's `default-directory' is available as part of
+\"future history\"."
   (interactive)
   (let* ((project (project-most-recent-project))
          (all-files (project-files project))
