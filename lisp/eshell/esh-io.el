@@ -595,7 +595,7 @@ If status is nil, prompt before killing."
   ;; details.
   (catch 'done
     (dotimes (_ (if (process-tty-name target 'stdin) 3 1))
-      (unless (process-live-p target)
+      (unless (eq (process-status target) 'run)
         (throw 'done nil))
       (process-send-eof target))))
 
@@ -648,7 +648,8 @@ Returns what was actually sent, or nil if nothing was sent.")
      ;; If `process-send-string' raises an error and the process has
      ;; finished, treat it as a broken pipe.  Otherwise, just
      ;; re-throw the signal.
-     (if (process-live-p target)
+     (if (memq (process-status target)
+               '(run stop open closed))
          (signal (car err) (cdr err))
        (signal 'eshell-pipe-broken (list target)))))
   object)
