@@ -105,8 +105,8 @@
 (ert-deftest eshell-test/lisp-reset-in-pipeline ()
   "Check that interpolated Lisp forms reset `eshell-in-pipeline-p'."
   (skip-unless (executable-find "cat"))
-  (dolist (template '("{ echo (%s) ; sleep 1} | *cat"
-                      "{ echo $(%s) ; sleep 1} | *cat"))
+  (dolist (template '("echo (%s) | *cat"
+                      "echo $(%s) | *cat"))
     (eshell-command-result-equal
      (format template "format \"%s\" eshell-in-pipeline-p")
      "nil")))
