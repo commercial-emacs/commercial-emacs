@@ -317,20 +317,20 @@ stdout originally pointed (the terminal)."
 (ert-deftest esh-io-test/pipeline/default ()
   "Check that `|' only pipes stdout."
   (skip-unless (executable-find "rev"))
-  (eshell-command-result-equal "test-output | rev"
+  (eshell-command-result-equal "{ test-output ; sleep 1 } | rev"
                                "stderr\ntuodts\n"))
 
 
 (ert-deftest esh-io-test/pipeline/all ()
   "Check that `|&' only pipes stdout and stderr."
   (skip-unless (executable-find "rev"))
-  (eshell-command-result-equal "test-output |& rev"
+  (eshell-command-result-equal "{ test-output ; sleep 1 } |& rev"
                                "tuodts\nrredts\n"))
 
 (ert-deftest esh-io-test/pipeline/subcommands ()
   "Chek that all commands in a subcommand are properly piped."
   (skip-unless (executable-find "rev"))
-  (eshell-command-result-equal "{echo foo; echo bar} | rev"
+  (eshell-command-result-equal "{ echo foo ; echo bar ; sleep 1 } | rev"
                                "raboof"))
 
 
