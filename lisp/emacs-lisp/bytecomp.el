@@ -1831,8 +1831,6 @@ and cl-macs.el.")
          (byte-compile-dynamic byte-compile-dynamic)
          (byte-compile-dynamic-docstrings
           byte-compile-dynamic-docstrings)
-         ;; 		(byte-compile-generate-emacs19-bytecodes
-         ;; 		 byte-compile-generate-emacs19-bytecodes)
          (byte-compile-warnings byte-compile-warnings)
          ;; Indicate that we're not currently loading some file.
          ;; This is used in `macroexp-file-name' to make sure that
