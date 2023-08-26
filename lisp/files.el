@@ -6643,12 +6643,10 @@ into NEWNAME instead."
 	      (times (and keep-time (file-attribute-modification-time
 				     (file-attributes directory))))
 	      (follow-flag (unless follow 'nofollow)))
-	  (if modes (set-file-modes newname modes follow-flag))
+	  (when modes
+            (set-file-modes newname modes follow-flag))
 	  (when times
-            ;; Don't didactically fail if file times can't be set, as
-            ;; some file systems forbid modifying them.
-            (with-demoted-errors "Setting file times: %s"
-              (set-file-times newname times follow-flag))))))))
+            (set-file-times newname times follow-flag)))))))
 
 
 ;; At time of writing, only info uses this.
