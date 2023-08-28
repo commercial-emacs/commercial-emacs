@@ -111,6 +111,13 @@ jA0ECQMCdW8+qtS9Tin/0jUBO1/9Oz69BWPmtFKEeBM62WpFP4o1+bNzdxogdyeg
 -----END PGP MESSAGE-----
 ")))))
 
+(defun epg--gnupg-version-is-not-buggy ()
+  ;; We need to skip some versions of GnuPG, as they make tests hang.
+  ;; See Bug#63256 and https://dev.gnupg.org/T6481 as well as PROBLEMS.
+  ;; Known bad versions for now are 2.4.1--2.4.3.
+  (not (string-match (rx bos "gpg (GnuPG) 2.4." (+ digit))
+                     (shell-command-to-string "gpg --version"))))
+
 (ert-deftest epg-roundtrip-1 ()
   (skip-unless (not (getenv "CI")))
   (with-epg-tests (:require-passphrase t)
