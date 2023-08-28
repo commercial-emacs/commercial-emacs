@@ -650,7 +650,8 @@ If SLOT is unbound, bind it to the list containing ITEM."
 	(setq ov (list item))
       (setq ov (eieio-oref object slot))
       ;; turn it into a list.
-      (setq ov (ensure-list ov))
+      (unless (listp ov)
+	(setq ov (list ov)))
       ;; Do the combination
       (if (not (member item ov))
 	  (setq ov

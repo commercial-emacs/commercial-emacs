@@ -973,7 +973,8 @@ it as the third element in the list."
 	  (let ((prop (get var 'variable-interactive))
 		(type (get var 'custom-type))
 		(prompt (format prompt-val var)))
-            (setq type (ensure-list type))
+	    (unless (listp type)
+	      (setq type (list type)))
 	    (cond (prop
 		   ;; Use VAR's `variable-interactive' property
 		   ;; as an interactive spec for prompting.
@@ -5140,7 +5141,8 @@ This function does not save the buffer."
 (defun custom-variable-menu-create (_widget symbol)
   "Ignoring WIDGET, create a menu entry for customization variable SYMBOL."
   (let ((type (get symbol 'custom-type)))
-    (setq type (ensure-list type))
+    (unless (listp type)
+      (setq type (list type)))
     (if (and type (widget-get type :custom-menu))
 	(widget-apply type :custom-menu symbol)
       (vector (custom-unlispify-menu-entry symbol)

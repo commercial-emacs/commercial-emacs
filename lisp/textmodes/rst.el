@@ -170,7 +170,8 @@ When FUN is called match data is just set by `looking-at' and
 point is at the beginning of the line.  Return nil if moving
 forward failed or otherwise the return value of FUN.  Preserve
 global match data, point, mark and current buffer."
-  (setq rst-re-args (ensure-list rst-re-args))
+  (unless (listp rst-re-args)
+    (setq rst-re-args (list rst-re-args)))
   (unless fun
     (setq fun #'identity))
   (save-match-data

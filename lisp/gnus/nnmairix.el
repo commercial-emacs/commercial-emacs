@@ -741,7 +741,8 @@ called interactively, user will be asked for parameters."
   (when (and (stringp query)
 	     (string-match "\\s-" query))
     (setq query (split-string query)))
-  (setq query (ensure-list query))
+  (when (not (listp query))
+    (setq query (list query)))
   (when (and server group query)
     (let ((groupname (gnus-group-prefixed-name group server))
           ) ;; info

@@ -1745,7 +1745,8 @@ If FRAME is omitted or nil, use the selected frame."
 		     (called-interactively-p 'interactive))
     (unless face
       (setq face 'default))
-    (setq face (ensure-list face))
+    (if (not (listp face))
+        (setq face (list face)))
     (with-help-window (help-buffer)
       (with-current-buffer standard-output
         (dolist (f face (buffer-string))

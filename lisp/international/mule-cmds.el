@@ -867,7 +867,8 @@ overrides ACCEPT-DEFAULT-P.
 
 Kludgy feature: if FROM is a string, the string is the target text,
 and TO is ignored."
-  (setq default-coding-system (ensure-list default-coding-system))
+  (if (not (listp default-coding-system))
+      (setq default-coding-system (list default-coding-system)))
 
   (let ((no-other-defaults nil)
 	auto-cs)

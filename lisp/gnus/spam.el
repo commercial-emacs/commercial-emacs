@@ -1375,7 +1375,8 @@ In the case of mover backends, checks the setting of
   (when (and (car-safe groups) (listp (car-safe groups)))
     (setq groups (pop groups)))
 
-  (setq groups (ensure-list groups))
+  (unless (listp groups)
+    (setq groups (list groups)))
 
     ;; remove the current process mark
   (gnus-summary-kill-process-mark)

@@ -899,7 +899,8 @@ Remove trailing \": \"."
 (defun auth-source-ensure-strings (values)
   (if (eq values t)
       values
-    (setq values (ensure-list values))
+    (unless (listp values)
+      (setq values (list values)))
     (mapcar (lambda (value)
 	      (if (numberp value)
 		  (format "%s" value)

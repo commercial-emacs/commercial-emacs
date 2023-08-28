@@ -785,7 +785,8 @@ MARK-FILES should be a list of absolute filenames."
 
 (defun vc-dir-mark-state-files (states)
   "Mark files that are in the state specified by the list in STATES."
-  (setq states (ensure-list states))
+  (unless (listp states)
+    (setq states (list states)))
   (ewoc-map
    (lambda (filearg)
      (when (memq (vc-dir-fileinfo->state filearg) states)

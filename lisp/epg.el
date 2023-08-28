@@ -1269,7 +1269,8 @@ callback data (if any)."
 	keys string field index)
     (if name
 	(progn
-          (setq name (ensure-list name))
+	  (unless (listp name)
+	    (setq name (list name)))
 	  (while name
 	    (setq args (append args (list list-keys-option (car name)))
 		  name (cdr name))))
