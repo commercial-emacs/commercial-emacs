@@ -795,38 +795,6 @@ Function gets one argument: a tab."
 (defun tab-bar-tab-face-default (tab)
   (if (eq (car tab) 'current-tab) 'tab-bar-tab 'tab-bar-tab-inactive))
 
-(defun tab-bar-tab-name-format-face (name tab _i)
-  "Apply the face to the tab name.
-It uses the function `tab-bar-tab-face-function'."
-  (add-face-text-property
-   0 (length name) (funcall tab-bar-tab-face-function tab) t name)
-  name)
-
-(defcustom tab-bar-tab-name-format-functions
-  '(tab-bar-tab-name-format-hints
-    tab-bar-tab-name-format-close-button
-    tab-bar-tab-name-format-face)
-  "Functions called to modify the tab name.
-Each function is called with three arguments: the name returned
-by the previously called modifier, the tab and its number.
-It should return the formatted tab name to display in the tab bar."
-  :type '(repeat
-          (choice (function-item tab-bar-tab-name-format-truncated)
-                  (function-item tab-bar-tab-name-format-hints)
-                  (function-item tab-bar-tab-name-format-close-button)
-                  (function-item tab-bar-tab-name-format-face)
-                  (function :tag "Custom function")))
-  :group 'tab-bar
-  :version "30.1")
-
-(defun tab-bar-tab-name-format-default (tab i)
-  (let ((name (copy-sequence (alist-get 'name tab))))
-    (run-hook-wrapped 'tab-bar-tab-name-format-functions
-                      (lambda (fun)
-                        (setq name (funcall fun name tab i))
-                        nil))
-    name))
-
 (defcustom tab-bar-tab-name-format-function #'tab-bar-tab-name-format-default
   "Function to format a tab name.
 Function gets two arguments, the tab and its number, and should return
@@ -838,6 +806,19 @@ the formatted tab name to display in the tab bar."
          (force-mode-line-update))
   :group 'tab-bar
   :version "28.1")
+
+(defun tab-bar-tab-name-format-default (tab i)
+  (let* ((current-p (eq (car tab) 'current-tab))
+         (name (concat (if tab-bar-tab-hints (format "%d " i) "")
+                       (alist-get 'name tab)
+                       (or (and tab-bar-close-button-show
+                                (not (eq tab-bar-close-button-show
+                                         (if current-p 'non-selected 'selected)))
+                                tab-bar-close-button)
+                           ""))))
+    (add-face-text-property
+     0 (length name) (funcall tab-bar-tab-face-function tab) t name)
+    name))
 
 (defcustom tab-bar-format '(tab-bar-format-history
                             tab-bar-format-tabs
