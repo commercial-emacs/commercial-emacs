@@ -1573,23 +1573,18 @@ Also see the `project-kill-buffers-display-buffer-list' variable."
   :version "28.1"
   :group 'project)
 
-(defvar project--list (let ((prospective
-                             (when (file-exists-p project-list-file)
-                               (with-temp-buffer
-                                 (insert-file-contents project-list-file)
-				 (mapcar
-				  (lambda (elem)
-				    (let ((name (car elem)))
-				      (list (if (file-remote-p name) name
-					      (abbreviate-file-name name)))))
-				  (read (current-buffer)))))))
-                          (if (seq-every-p
-                               (lambda (elt) (stringp (car-safe elt)))
-                               prospective)
-                              prospective
-                            (prog1 nil
-                              (warn "Contents of %s are in wrong format, resetting"
-                                    project-list-file))))
+(defvar project--list (when (file-exists-p project-list-file)
+                        (with-temp-buffer
+                          (insert-file-contents project-list-file)
+                          (cl-remove-duplicates
+			   (seq-keep
+			    (lambda (elem)
+			      (when-let ((name (car-safe elem))
+                                         (string-p (stringp name)))
+			        (list (if (file-remote-p name) name
+				        (abbreviate-file-name name)))))
+			    (read (current-buffer)))
+                           :test #'equal)))
   "List structure containing root directories of known projects.
 With some possible metadata (to be decided).")
 
@@ -1630,6 +1625,7 @@ has changed, and NO-WRITE is nil."
     (when (eq (current-buffer) (window-buffer))
       (setq project--list (delq extant project--list))
       (push (list dir) project--list))
+    ;; Decided against writing to disk to update most recent project.
     (when (and (not extant)
                (not (bound-and-true-p ert--running-tests)))
       (project--write-project-list))))
