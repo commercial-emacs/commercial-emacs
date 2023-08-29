@@ -34,6 +34,25 @@
 
 ;;; Tests:
 
+(ert-deftest em-prompt-test/after-failure ()
+  "Check that current prompt shows the exit code of the last failed command."
+  (with-temp-eshell
+   (let ((debug-on-error nil))
+     (eshell-insert-command "(zerop \"foo\")"))
+   (let ((current-prompt (field-string (1- (point)))))
+     (should (equal-including-properties
+              current-prompt
+              (propertize
+               (concat (directory-file-name default-directory)
+                       (unless (eshell-exit-success-p)
+                         (format " [%d]" eshell-last-command-status))
+                       (if (= (file-user-uid) 0) " # " " $ "))
+               'read-only t
+               'field 'prompt
+               'font-lock-face 'eshell-prompt
+               'front-sticky '(read-only field font-lock-face)
+               'rear-nonsticky '(read-only field font-lock-face)))))))
+
 (ert-deftest em-prompt-test/field-properties ()
   "Check that field properties are properly set on Eshell output/prompts."
   (with-temp-eshell
@@ -88,6 +107,8 @@ This tests the case when `eshell-highlight-prompt' is nil."
 (defun em-prompt-test/next-previous-prompt-with ()
   "Helper for checking forward/backward navigation of old prompts."
   (with-temp-eshell
+   (let ((debug-on-error nil))
+     (eshell-insert-command "(zerop \"foo\")")) ; A failed command.
    (eshell-insert-command "echo one")
    (eshell-insert-command "echo two")
    (eshell-insert-command "echo three")
@@ -99,8 +120,11 @@ This tests the case when `eshell-highlight-prompt' is nil."
    (end-of-line)
    (eshell-previous-prompt 2)
    (should (equal (eshell-get-old-input) "echo one"))
-   ;; Go forward three prompts.
-   (eshell-next-prompt 3)
+   ;; Go back one prompt.
+   (eshell-previous-prompt 1)
+   (should (equal (eshell-get-old-input) "(zerop \"foo\")"))
+   ;; Go forward four prompts.
+   (eshell-next-prompt 4)
    (should (equal (eshell-get-old-input) "echo fou"))))
 
 (ert-deftest em-prompt-test/next-previous-prompt ()
@@ -115,6 +139,8 @@ This tests the case when `eshell-highlight-prompt' is nil."
 (defun em-prompt-test/forward-backward-matching-input-with ()
   "Helper for checking forward/backward navigation via regexps."
   (with-temp-eshell
+   (let ((debug-on-error nil))
+     (eshell-insert-command "(zerop \"foo\")")) ; A failed command.
    (eshell-insert-command "echo one")
    (eshell-insert-command "printnl something else")
    (eshell-insert-command "echo two")
@@ -127,8 +153,11 @@ This tests the case when `eshell-highlight-prompt' is nil."
    (end-of-line)
    (eshell-backward-matching-input "echo" 2)
    (should (equal (eshell-get-old-input) "echo one"))
-   ;; Go forward three prompts.
-   (eshell-forward-matching-input "echo" 3)
+   ;; Go back one prompt.
+   (eshell-previous-prompt 1)
+   (should (equal (eshell-get-old-input) "(zerop \"foo\")"))
+   ;; Go forward four prompts.
+   (eshell-forward-matching-input "echo" 4)
    (should (equal (eshell-get-old-input) "echo fou"))))
 
 (ert-deftest em-prompt-test/forward-backward-matching-input ()

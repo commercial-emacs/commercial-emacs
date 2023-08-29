@@ -293,6 +293,9 @@ to load the edited aliases.
 Running 'rgrep' in Eshell now uses the Emacs grep facility instead of
 calling external rgrep.
 
+---
+*** The Eshell prompt now shows the exit code if the last command failed.
+
 ** Pcomplete
 
 ---
