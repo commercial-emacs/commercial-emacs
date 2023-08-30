@@ -2656,22 +2656,44 @@ Otherwise, toggle `read-only-mode'."
       (wdired-change-to-wdired-mode)
     (read-only-mode 'toggle)))
 
+(defun dired-filename-line-p ()
+  "Return t if the current line is a filename line."
+  (save-excursion
+    (dired-move-to-filename)
+    (get-char-property (point) 'dired-filename)))
+
 (defun dired-next-line (arg)
   "Move down lines then position at filename.
-Optional prefix ARG says how many lines to move; default is one line."
+Optional prefix ARG says how many lines to move; default is one line.
+
+Point won't go to the dired-header line or the last empty line.  If
+you really want to move there, use `next-line' instead."
   (interactive "^p")
-  (let ((line-move-visual)
-	(goal-column))
-    (line-move arg t))
-  ;; We never want to move point into an invisible line.
-  (while (and (invisible-p (point))
-	      (not (if (and arg (< arg 0)) (bobp) (eobp))))
-    (forward-char (if (and arg (< arg 0)) -1 1)))
-  (dired-move-to-filename))
+  (let ((old-line-has-filename (dired-filename-line-p)))
+    (let ((line-move-visual)
+          (goal-column))
+      (line-move arg t))
+    ;; We never want to move point into an invisible line.
+    (while (and (invisible-p (point))
+                (not (if (and arg (< arg 0)) (bobp) (eobp))))
+      (forward-char (if (and arg (< arg 0)) -1 1)))
+    (dired-move-to-filename)
+    ;; If there's a line (or one of its succeeding lines) that we can
+    ;; go back to,
+    (when old-line-has-filename
+      ;; and the current line doesn't contain a filename,
+      (unless (dired-filename-line-p)
+        ;; then let's move back.
+        (dired-next-line (if (natnump arg)
+                             -1
+                           1))))))
 
 (defun dired-previous-line (arg)
   "Move up lines then position at filename.
-Optional prefix ARG says how many lines to move; default is one line."
+Optional prefix ARG says how many lines to move; default is one line.
+
+Point won't go to the dired-header line or the last empty line.  If
+you really want to move there, use `previous-line' instead."
   (interactive "^p")
   (dired-next-line (- (or arg 1))))
 
