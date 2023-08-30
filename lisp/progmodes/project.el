@@ -407,7 +407,8 @@ the buffer's value of `default-directory'."
 (defcustom project-vc-ignores nil
   "List of patterns to add to `project-ignores'."
   :type '(repeat string))
-;;;###autoload(put 'project-vc-ignores 'safe-local-variable #'listp)
+;; Change to `list-of-strings-p' when support for Emacs 28 is dropped.
+;;;###autoload(put 'project-vc-ignores 'safe-local-variable (lambda (val) (and (listp val) (not (memq nil (mapcar #'stringp val))))))
 
 (defcustom project-vc-merge-submodules t
   "Non-nil to consider submodules part of the parent project.
@@ -444,6 +445,7 @@ Examples include \".dir-locals.el\", \"package.json\", \"pom.xml\",
   :type '(repeat string)
   :version "29.1"
   :package-version '(project . "0.9.0"))
+;; Change to `list-of-strings-p' when support for Emacs 28 is dropped.
 ;;;###autoload(put 'project-vc-extra-root-markers 'safe-local-variable (lambda (val) (and (listp val) (not (memq nil (mapcar #'stringp val))))))
 
 (defvar project-vc-external-roots-function (lambda () tags-table-list)
