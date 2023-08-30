@@ -152,13 +152,12 @@ Strips out default port numbers, etc."
 (defun url-lazy-message (&rest args)
   "Just like `message', but is a no-op if called more than once a second.
 Will not do anything if `url-show-status' is nil."
-  (if (or (and url-current-object
-	       (url-silent url-current-object))
-	  (null url-show-status)
-	  (active-minibuffer-window)
-	  (= url-lazy-message-time
-	     (setq url-lazy-message-time (time-convert nil 'integer))))
-      nil
+  (when (and (or (not url-current-object)
+	         (not (url-silent url-current-object)))
+	     url-show-status
+	     (not (active-minibuffer-window))
+	     (not (= url-lazy-message-time
+	             (setq url-lazy-message-time (time-convert nil 'integer)))))
     (apply #'message args)))
 
 ;;;###autoload
