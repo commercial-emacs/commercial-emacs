@@ -57,6 +57,12 @@ beginning of the test file."
        (let* (;; We want no history file, so prevent Eshell from falling
               ;; back on $HISTFILE.
               (process-environment (cons "HISTFILE" process-environment))
+              ;; Enable process debug instrumentation.  We may be able
+              ;; to remove this eventually once we're confident that
+              ;; all the process bugs have been worked out.  (At that
+              ;; point, we can just enable this selectively when
+              ;; needed.)
+              (eshell-debug-command (cons 'process eshell-debug-command))
               (eshell-history-file-name nil)
               (eshell-last-dir-ring-file-name nil)
               (eshell-buffer (eshell t)))
@@ -99,6 +105,13 @@ raise an error."
    (lambda ()
      (not (if all eshell-process-list (eshell-interactive-process-p))))))
 
+(defun eshell-get-debug-logs ()
+  "Get debug command logs for displaying on test failures."
+  (when (get-buffer eshell-debug-command-buffer)
+    (let ((separator (make-string 40 ?-)))
+      (with-current-buffer eshell-debug-command-buffer
+        (string-replace "\f" separator (buffer-string))))))
+
 (defun eshell-insert-command (command &optional func)
   "Insert a COMMAND at the end of the buffer.
 After inserting, call FUNC.  If FUNC is nil, instead call
@@ -138,10 +151,11 @@ FUNC is the function to call after inserting the text (see
 
 If IGNORE-ERRORS is non-nil, ignore any errors signaled when
 inserting the command."
-  (let ((debug-on-error (and (not ignore-errors) debug-on-error)))
-    (eshell-insert-command command func))
-  (eshell-wait-for-subprocess)
-  (should (eshell-match-output regexp)))
+  (ert-info (#'eshell-get-debug-logs :prefix "Command logs: ")
+    (let ((debug-on-error (and (not ignore-errors) debug-on-error)))
+      (eshell-insert-command command func))
+    (eshell-wait-for-subprocess)
+    (should (eshell-match-output regexp))))
 
 (defvar eshell-history-file-name)
 
@@ -169,15 +183,11 @@ inserting the command."
 
 (defun eshell-command-result-equal (command result)
   "Execute COMMAND non-interactively and compare it to RESULT."
-  (condition-case err
-      (should (eshell-command-result--equal
-               command
-               (eshell-test-command-result command)
-               result))
-    (error (if (zerop (1+ (cl-decf eshell-test--max-allowable-errors)))
-               (signal (car err) (cdr err))
-             (message "%s" (error-message-string err))
-             (ert-pass)))))
+  (ert-info (#'eshell-get-debug-logs :prefix "Command logs: ")
+    (should (eshell-command-result--equal
+             command
+             (eshell-test-command-result command)
+             result))))
 
 (provide 'eshell-tests-helpers)
 

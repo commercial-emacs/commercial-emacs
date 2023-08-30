@@ -335,6 +335,8 @@ Used only on systems which do not support async subprocesses.")
                :connection-type conn-type
                :stderr stderr-proc
                :file-handler t)))
+      (eshell-debug-command
+       'process (format-message "started external process `%s'" proc))
       (eshell-record-process-object proc)
       (eshell-record-process-properties proc)
       (run-hook-with-args 'eshell-exec-hook proc)
@@ -413,6 +415,9 @@ Used only on systems which do not support async subprocesses.")
   "Send the output from PROCESS (STRING) to the interactive display.
 This is done after all necessary filtering has been done."
   (when string
+    (eshell-debug-command
+     'process (format-message "received output from process `%s'\n\n%s"
+                              process string))
     (eshell--mark-as-output 0 (length string) string)
     (require 'esh-mode)
     (declare-function eshell-interactive-filter "esh-mode" (buffer string))
@@ -439,6 +444,9 @@ output."
                 (data (process-get proc :eshell-pending)))
             (process-put proc :eshell-pending nil)
             (process-put proc :eshell-busy t)
+            (eshell-debug-command
+             'process (format-message "received output from process `%s'\n\n%s"
+                                      proc string))
             (unwind-protect
                 (condition-case nil
                     (eshell-output-object data index handles)
@@ -463,6 +471,9 @@ output."
 (defun eshell-sentinel (proc string)
   "Generic sentinel for command processes.  Reports only signals.
 PROC is the process that's exiting.  STRING is the exit message."
+  (eshell-debug-command
+   'process (format-message "sentinel for external process `%s': %S"
+                            proc string))
   (when (buffer-live-p (process-buffer proc))
     (with-current-buffer (process-buffer proc)
       (unwind-protect
