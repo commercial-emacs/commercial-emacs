@@ -409,36 +409,37 @@ prepared."
   "Build documentation for package PKG-DESC from documentation source in FILE.
 FILE can be an Org file, indicated by its \".org\" extension,
 otherwise it's assumed to be an Info file."
-  (let* ((pkg-name (package-desc-name pkg-desc))
-         (default-directory (package-desc-dir pkg-desc))
-         (docs-directory (file-name-directory (expand-file-name file)))
-         (output (expand-file-name (format "%s.info" pkg-name)))
-         clean-up)
-    (when (string-match-p "\\.org\\'" file)
-      (require 'ox)
-      (require 'ox-texinfo)
-      (with-temp-buffer
-        (insert-file-contents file)
-        (setq file (make-temp-file "ox-texinfo-"))
-        (let ((default-directory docs-directory))
-          (org-export-to-file 'texinfo file))
-        (setq clean-up t)))
-    (with-current-buffer (get-buffer-create " *package-vc doc*")
-      (erase-buffer)
-      (cond
-       ((/= 0 (call-process "makeinfo" nil t nil
-                            "-I" docs-directory
-                            "--no-split" file
-                            "-o" output))
-        (message "Failed to build manual %s, see buffer %S"
-                 file (buffer-name)))
-       ((/= 0 (call-process "install-info" nil t nil
-                            output (expand-file-name "dir")))
-        (message "Failed to install manual %s, see buffer %S"
-                 output (buffer-name)))
-       ((kill-buffer))))
-    (when clean-up
-      (delete-file file))))
+  (with-demoted-errors "package-vc: Could not build documentation: %S"
+    (let* ((pkg-name (package-desc-name pkg-desc))
+           (default-directory (package-desc-dir pkg-desc))
+           (docs-directory (file-name-directory (expand-file-name file)))
+           (output (expand-file-name (format "%s.info" pkg-name)))
+           clean-up)
+      (when (string-match-p "\\.org\\'" file)
+        (require 'ox)
+        (require 'ox-texinfo)
+        (with-temp-buffer
+          (insert-file-contents file)
+          (setq file (make-temp-file "ox-texinfo-"))
+          (let ((default-directory docs-directory))
+            (org-export-to-file 'texinfo file))
+          (setq clean-up t)))
+      (with-current-buffer (get-buffer-create " *package-vc doc*")
+        (erase-buffer)
+        (cond
+         ((/= 0 (call-process "makeinfo" nil t nil
+                              "-I" docs-directory
+                              "--no-split" file
+                              "-o" output))
+          (message "Failed to build manual %s, see buffer %S"
+                   file (buffer-name)))
+         ((/= 0 (call-process "install-info" nil t nil
+                              output (expand-file-name "dir")))
+          (message "Failed to install manual %s, see buffer %S"
+                   output (buffer-name)))
+         ((kill-buffer))))
+      (when clean-up
+        (delete-file file)))))
 
 (defun package-vc-install-dependencies (deps)
   "Install missing dependencies according to DEPS.
