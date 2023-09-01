@@ -392,27 +392,31 @@ done by `eglot-reconnect'."
   "Control if changes proposed by LSP should be confirmed with user.
 
 If this variable's value is the symbol `diff', a diff buffer is
-popped up, allowing the user to apply each change individually.
-If the symbol `summary' or any other non-nil value a short
-summary of changes is presented to the user in a
-minibuffer-prompt.  The symbols `maybe-diff' and `maybe-summary'
-are also accepted and mean that the confirmation is presented to
-the user if the changes target visited files only.  A nil value
-means the change is applied directly to visited and non-visited
-files, without any confirmation.
+pops up, allowing the user to apply each change individually.  If
+the symbol `summary' or any other non-nil value, the user is
+prompted in the minibuffer with aa short summary of changes.  The
+symbols `maybe-diff' and `maybe-summary' mean that the
+confirmation is offered to the user only if the changes target
+files visited in buffers.  Finally, a nil value means all changes
+are applied directly without any confirmation.
 
-If this variable's value is a list, it should be an
-alist ((COMMAND . ACTION) ...) where COMMAND is a symbol
-designating a command, such as `eglot-rename',
-`eglot-code-actions', `eglot-code-action-quickfix', etc.  ACTION
-is one of the symbols described above.  The value `t' for COMMAND
-is accepted and its ACTION is the default value."
-  :type '(choice (const :tag "Use diff" diff)
+If this variable's value can also be an alist ((COMMAND . ACTION)
+...) where COMMAND is a symbol designating a command, such as
+`eglot-rename', `eglot-code-actions',
+`eglot-code-action-quickfix', etc.  ACTION is one of the symbols
+described above.  The value `t' for COMMAND is accepted and its
+ACTION is the default value for commands not in the alist."
+  :type (let ((basic-choices
+               '((const :tag "Use diff" diff)
                  (const :tag "Summarize and prompt" summary)
                  (const :tag "Maybe use diff" maybe-diff)
                  (const :tag "Maybe summarize and prompt" maybe-summary)
-                 (const :tag "Don't confirm" nil)
-                 (alist :tag "Per-command alist")))
+                 (const :tag "Don't confirm" nil))))
+          `(choice ,@basic-choices
+                   (alist :tag "Per-command alist"
+                          :key-type (choice (function :tag "Command")
+                                            (const :tag "Default" t))
+                          :value-type (choice . ,basic-choices)))))
 
 (defcustom eglot-extend-to-xref nil
   "If non-nil, activate Eglot in cross-referenced non-project files."
@@ -3453,6 +3457,10 @@ If SILENT, don't echo progress in mode-line."
         (progress-reporter-done reporter)))))
 
 (defun eglot--confirm-server-edits (origin _prepared)
+  "Helper for `eglot--apply-workspace-edit.
+ORIGIN is a symbol designating a command.  Reads the
+`eglot-confirm-server-edits' user option and returns a symbol
+like `diff', `summary' or nil."
   (let (v)
     (cond ((symbolp eglot-confirm-server-edits) eglot-confirm-server-edits)
           ((setq v (assoc origin eglot-confirm-server-edits)) (cdr v))
@@ -3460,7 +3468,9 @@ If SILENT, don't echo progress in mode-line."
 
 (defun eglot--propose-changes-as-diff (prepared)
   "Helper for `eglot--apply-workspace-edit'.
-PREPARED is a list ((FILENAME EDITS VERSION)...)."
+Goal is to popup a `diff-mode' buffer containing all the changes
+of PREPARED, ready to apply with C-c C-a.  PREPARED is a
+list ((FILENAME EDITS VERSION)...)."
   (with-current-buffer (get-buffer-create "*EGLOT proposed server changes*")
     (buffer-disable-undo (current-buffer))
     (let ((buffer-read-only t))
@@ -3470,12 +3480,30 @@ PREPARED is a list ((FILENAME EDITS VERSION)...)."
       (erase-buffer)
       (pcase-dolist (`(,path ,edits ,_) prepared)
         (with-temp-buffer
-          (let ((diff (current-buffer)))
+          (let* ((diff (current-buffer))
+                 (existing-buf (find-buffer-visiting path))
+                 (existing-buf-label (prin1-to-string existing-buf)))
+            ;; `existing-buf' might be an unsaved buffer, so we do
+            ;; this complicated little dance to diff it with a
+            ;; temporary file with the proposed changes applied.
             (with-temp-buffer
-              (insert-file-contents path)
-              (eglot--apply-text-edits edits)
-              (diff-no-select path (current-buffer)
-                              nil t diff))
+              (if existing-buf
+                  (let ((temp (current-buffer)))
+                    (with-current-buffer existing-buf
+                      (copy-to-buffer temp (point-min) (point-max))))
+                (insert-file-contents path))
+              (eglot--apply-text-edits edits nil t)
+              (diff-no-select (or existing-buf path) (current-buffer)
+                              nil t diff)
+              (when existing-buf
+                ;; Here we have to pretend the label of the unsaved
+                ;; buffer is the actual file, just so that we can
+                ;; diff-apply without troubles.  If there's a better
+                ;; way, it probably involves changes to `diff.el'.
+                (with-current-buffer diff
+                  (goto-char (point-min))
+                  (while (search-forward existing-buf-label nil t)
+                    (replace-match (buffer-file-name existing-buf))))))
             (with-current-buffer target
               (insert-buffer-substring diff))))))
     (setq-local buffer-read-only t)
@@ -3485,7 +3513,7 @@ PREPARED is a list ((FILENAME EDITS VERSION)...)."
     (font-lock-ensure)))
 
 (defun eglot--apply-workspace-edit (wedit origin)
-  "Apply the workspace edit WEDIT.
+  "Apply (or offer to apply) the workspace edit WEDIT.
 ORIGIN is a symbol designating the command that originated this
 edit proposed by the server."
   (eglot--dbind ((WorkspaceEdit) changes documentChanges) wedit
@@ -3504,16 +3532,15 @@ edit proposed by the server."
       (cl-flet ((notevery-visited-p ()
                   (cl-notevery #'find-buffer-visiting
                                (mapcar #'car prepared)))
-                (prompt ()
-                  (unless (y-or-n-p
-                           (format "[eglot] Server wants to edit:\n%sProceed? "
-                                   (cl-loop
-                                    for (f eds _) in prepared
-                                    concat (format
-                                            "  %s (%d change%s)\n"
-                                            f (length eds)
-                                            (if (> (length eds) 1) "s" "")))))
-                    (jsonrpc-error "User canceled server edit")))
+                (accept-p ()
+                  (y-or-n-p
+                   (format "[eglot] Server wants to edit:\n%sProceed? "
+                           (cl-loop
+                            for (f eds _) in prepared
+                            concat (format
+                                    "  %s (%d change%s)\n"
+                                    f (length eds)
+                                    (if (> (length eds) 1) "s" ""))))))
                 (apply ()
                   (cl-loop for edit in prepared
                    for (path edits version) = edit
@@ -3525,10 +3552,9 @@ edit proposed by the server."
            ((or (eq decision 'diff)
                 (and (eq decision 'maybe-diff) (notevery-visited-p)))
             (eglot--propose-changes-as-diff prepared))
-           ((or (eq decision 'summary)
+           ((or (memq decision '(t summary))
                 (and (eq decision 'maybe-summary) (notevery-visited-p)))
-            (prompt)
-            (apply))
+            (when (accept-p) (apply)))
            (t
             (apply))))))))
 
