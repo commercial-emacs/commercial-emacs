@@ -250,6 +250,7 @@ and can restore them."
     (define-icon tab-bar-new nil
       `((image "symbols/plus_16.svg" "tabs/new.xpm"
                :face shadow
+               :height (1.0 . em)
                :margin ,tab-bar-button-margin
                :ascent center)
         ;; (emoji "➕")
@@ -279,6 +280,7 @@ and can restore them."
   (unless (iconp 'tab-bar-menu-bar)
     (define-icon tab-bar-menu-bar nil
       `((image "symbols/menu_16.svg"
+               :height (1.0 . em)
                :margin ,tab-bar-button-margin
                :ascent center)
         ;; (emoji "🍔")
