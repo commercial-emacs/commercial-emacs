@@ -1464,38 +1464,34 @@ The meanings of both arguments are the same as documented in
 (defun xref--show-xrefs (fetcher display-action &optional _always-show-list)
   (unless (functionp fetcher)
     ;; Old convention.
-    (let ((xrefs fetcher))
-      (setq fetcher
+    (setq fetcher
+          (let ((fetcher* fetcher))
             (lambda ()
-              (if (eq xrefs 'called-already)
+              (if (null fetcher*)
                   (user-error "Refresh is not supported")
-                (prog1
-                    xrefs
-                  (setq xrefs 'called-already)))))))
-  (let ((cb (current-buffer))
-        (pt (point)))
-    (funcall xref-show-xrefs-function fetcher
-             `((window . ,(selected-window))
-               (display-action . ,display-action)
-               (auto-jump . ,xref-auto-jump-to-first-xref)))
-    (xref--push-markers cb pt)))
+                (prog1 fetcher*
+                  (setq fetcher* nil)))))))
+  (xref--push-markers)
+  (condition-case nil
+      (funcall xref-show-xrefs-function fetcher
+               `((window . ,(selected-window))
+                 (display-action . ,display-action)
+                 (auto-jump . ,xref-auto-jump-to-first-xref)))
+    (user-error (xref-go-back) (user-error (error-message-string err)))))
 
 (defun xref--show-defs (xrefs display-action)
-  (let ((cb (current-buffer))
-        (pt (point)))
-    (funcall xref-show-definitions-function xrefs
-             `((window . ,(selected-window))
-               (display-action . ,display-action)
-               (auto-jump . ,xref-auto-jump-to-first-definition)))
-    (xref--push-markers cb pt)))
+  (xref--push-markers)
+  (condition-case err
+      (funcall xref-show-definitions-function xrefs
+               `((window . ,(selected-window))
+                 (display-action . ,display-action)
+                 (auto-jump . ,xref-auto-jump-to-first-definition)))
+    (user-error (xref-go-back) (user-error (error-message-string err)))))
 
-(defun xref--push-markers (buf pt)
-  (when (buffer-live-p buf)
-    (save-excursion
-      (with-no-warnings (set-buffer buf))
-      (goto-char pt)
-      (unless (region-active-p) (push-mark nil t))
-      (xref-push-marker-stack))))
+(defun xref--push-markers ()
+  (unless (region-active-p)
+    (push-mark nil t))
+  (xref-push-marker-stack))
 
 (defun xref--prompt-p (command)
   (or (eq xref-prompt-for-identifier t)

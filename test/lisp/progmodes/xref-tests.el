@@ -167,4 +167,10 @@
               "xref-resources/file1.txt"
               "xref-resources/file2.txt")))))
 
+(ert-deftest xref--undo-push-on-error ()
+  (with-temp-buffer
+    (emacs-lisp-mode)
+    (should-error (xref-find-definitions "hello"))
+    (should-error (call-interactively #'xref-go-back))))
+
 ;;; xref-tests.el ends here
