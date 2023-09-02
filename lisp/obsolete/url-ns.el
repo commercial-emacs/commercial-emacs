@@ -39,13 +39,14 @@
 
 ;;;###autoload
 (defun dnsResolve (host)
-  (url-gateway-nslookup-host host))
+  (with-suppressed-warnings ((obsolete url-gateway-nslookup-host))
+    (url-gateway-nslookup-host host)))
 
 ;;;###autoload
 (defun isResolvable (host)
-  (if (string-match "^[0-9.]+$" host)
-      t
-    (not (string= host (url-gateway-nslookup-host host)))))
+  (or (string-match-p "^[0-9.]+$" host)
+      (not (string= host (with-suppressed-warnings ((obsolete url-gateway-nslookup-host))
+                           (url-gateway-nslookup-host host))))))
 
 ;;;###autoload
 (defun isInNet (ip net mask)
