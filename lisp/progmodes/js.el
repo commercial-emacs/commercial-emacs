@@ -3518,7 +3518,7 @@ This function is intended for use in `after-change-functions'."
     "jsx_element"
     "jsx_self_closing_element")
   "Nodes that designate sentences in JavaScript.
-See `treesit-sentence-type-regexp' for more information.")
+See `treesit-thing-settings' for more information.")
 
 (defvar js--treesit-sexp-nodes
   '("expression"
