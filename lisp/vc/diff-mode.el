@@ -195,6 +195,7 @@ The default \"-b\" means to ignore whitespace-only changes,
   "RET" #'diff-goto-source
   "<mouse-2>" #'diff-goto-source
   "W" #'widen
+  "w" #'diff-kill-ring-save
   "o" #'diff-goto-source                ; other-window
   "A" #'diff-ediff-patch
   "r" #'diff-restrict-view
@@ -207,7 +208,7 @@ The default \"-b\" means to ignore whitespace-only changes,
           ;; We want to inherit most bindings from
           ;; `diff-mode-shared-map', but not all since they may hide
           ;; useful `M-<foo>' global bindings when editing.
-          (dolist (key '("A" "r" "R" "g" "q" "W" "z"))
+          (dolist (key '("A" "r" "R" "g" "q" "W" "w" "z"))
             (keymap-set map key nil))
           map)
   ;; From compilation-minor-mode.
@@ -2076,6 +2077,27 @@ revision of the file otherwise."
       (goto-char (+ (car pos) (cdr src)))
       (when buffer (next-error-found buffer (current-buffer))))))
 
+(defun diff-kill-ring-save (beg end)
+  "Save contents of the region between BEG and END akin to `kill-ring-save'.
+The contents of a region will not include diff indicators at the
+beginning of each line."
+  (interactive (list (region-beginning) (region-end)))
+  (let ((at-bol (save-excursion (goto-char beg) (bolp)))
+        lines)
+    (save-restriction
+      (narrow-to-region beg end)
+      (goto-char (point-min))
+      (while (not (eobp))
+        (let ((line (thing-at-point 'line t)))
+          ;; In case the user has selected a region that begins
+          ;; mid-line, we should not chomp off the first character.
+          (if (and (null lines) (not at-bol))
+              (push line lines)
+            (push (substring line 1) lines)))
+        (forward-line)))
+    (let ((region-extract-function
+           (lambda (_) (apply #'concat (nreverse lines)))))
+      (kill-ring-save beg end t))))
 
 (defun diff-current-defun ()
   "Find the name of function at point.
