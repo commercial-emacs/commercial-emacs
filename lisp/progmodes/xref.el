@@ -1472,7 +1472,7 @@ The meanings of both arguments are the same as documented in
                 (prog1 fetcher*
                   (setq fetcher* nil)))))))
   (xref--push-markers)
-  (condition-case nil
+  (condition-case err
       (funcall xref-show-xrefs-function fetcher
                `((window . ,(selected-window))
                  (display-action . ,display-action)
