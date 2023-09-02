@@ -2827,7 +2827,7 @@ widths."
   "Number of times to blink the cursor.
 Use a non-positive value to blink indefinitely."
   :version "24.4"
-  :type 'natnum
+  :type 'integer
   :group 'cursor)
 
 (defvar blink-cursor-idle-timer nil
