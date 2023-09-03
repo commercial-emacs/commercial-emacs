@@ -7611,6 +7611,7 @@ bidi_reseat (struct it *it)
 {
   bool string_p = STRINGP (it->string) || it->s;
   ptrdiff_t eob = (string_p ? it->bidi_it.string.schars : ZV);
+  ptrdiff_t bob = (string_p ? 0 : BEGV);
 
   if (STRINGP (it->string))
     {
@@ -7623,7 +7624,22 @@ bidi_reseat (struct it *it)
       it->bidi_it.bytepos = IT_BYTEPOS (*it);
     }
 
-  if (it->bidi_it.charpos != eob)
+  if (it->bidi_it.charpos == eob)
+    {
+      // Ensure side effect of uncalled bidi_paragraph_init()
+      it->bidi_it.first_elt = false;
+    }
+  else if (it->bidi_it.charpos == bob
+	   || (! string_p
+	       && (FETCH_BYTE (it->bidi_it.bytepos - 1) == '\n'
+		   || FETCH_BYTE (it->bidi_it.bytepos) == '\n')))
+    {
+      /* If we are at the beginning of a line/string, we can produce
+	 the next element right away.  */
+      bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
+      bidi_next (&it->bidi_it);
+    }
+  else
     {
       /* Bidi-traverse character-by-character from preceding newline
 	 to current position.  EZ kowtows to Levantine languages, long
