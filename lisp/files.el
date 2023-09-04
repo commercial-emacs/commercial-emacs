@@ -8158,6 +8158,15 @@ the low level primitive, does not.  See also `kill-emacs-hook'."
   :version "26.1"
   :group 'convenience)
 
+(defcustom restart-emacs-query-functions nil
+  "Functions to call with no arguments to query about restarting
+Emacs. If any of these functions returns nil, restarting Emacs is
+canceled. `save-buffers-kill-emacs' calls these functions when passed
+`restart'.  See also `kill-emacs-hook'."
+  :type 'hook
+  :version "30.1"
+  :group 'convenience)
+
 (defcustom confirm-kill-emacs nil
   "How to ask for confirmation when leaving Emacs.
 If nil, the default, don't ask at all.  If the value is non-nil, it should
@@ -8243,6 +8252,10 @@ If RESTART, restart Emacs after killing the current Emacs process."
                             (yes-or-no-p "Active processes exist; kill them and exit anyway? "))
                         (when (window-live-p window)
                           (quit-restore-window window 'kill)))))))))
+     ;; Only call these when restarting
+     (when restart
+       (run-hook-with-args-until-failure 'restart-emacs-query-functions))
+
      ;; Query the user for other things, perhaps.
      (run-hook-with-args-until-failure 'kill-emacs-query-functions)
      (or (null confirm)
