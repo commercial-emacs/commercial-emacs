@@ -674,6 +674,13 @@ the current project.
 The look of the key prompt in the project switcher has been changed
 slightly.  To get the previous one, set this option to 'brackets'.
 
+** Files
+
+*** New user option 'restart-emacs-query-functions'.
+Equivalent to 'kill-emacs-query-functions', this hook is called when
+'save-buffers-kill-emacs' is called with the 'restart' flag; if
+invoked from say 'M-x restart-emacs'.
+
 
 * Incompatible Lisp Changes in Emacs 30.1
 
