@@ -338,6 +338,8 @@
 ;; elisp-mode.elc is outdated.
 (load "progmodes/elisp-mode")
 
+(load "emacs-lisp/avl-tree-core")
+(load "emacs-lisp/transitive-closure")
 ;; Preload some constants and floating point functions.
 (load "emacs-lisp/float-sup")
 

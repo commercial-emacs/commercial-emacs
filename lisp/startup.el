@@ -280,6 +280,9 @@ and VALUE is the value which is given to that frame parameter
 (defvar before-init-hook nil
   "Normal hook run after handling urgent options but before loading init files.")
 
+(defvar before-init-with-frame-hook nil
+  "Normal hook run after setting up the frame but before loading init files.")
+
 (defvar after-init-hook nil
   "Normal hook run after initializing the Emacs session.
 It is run after Emacs loads the init file, `default' library, the
@@ -1301,8 +1304,9 @@ please check its value")
       (mapc #'custom-reevaluate-setting
             ;; Initialize them in the same order they were loaded, in
             ;; case there are dependencies between them.
-            (reverse custom-delayed-init-variables))))
-  (setq custom-delayed-init-variables t)
+            (reverse custom-delayed-init-variables))
+      (setq custom-delayed-init-variables t))
+    (custom-do-startup-settings))
 
   ;; Warn for invalid user name.
   (when init-file-user
@@ -1452,6 +1456,10 @@ please check its value")
   ;; window-system-initialization.
   (or (eq initial-window-system 'pc)
       (tty-register-default-colors))
+
+  ;; allow hooks to run once the frame has been setup
+  ;; needed for loading wid-edit
+  (run-hooks 'before-init-with-frame-hook)
 
   (let ((old-scalable-fonts-allowed scalable-fonts-allowed)
 	(old-face-ignored-fonts face-ignored-fonts))
