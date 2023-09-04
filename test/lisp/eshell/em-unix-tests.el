@@ -49,6 +49,36 @@
   (eshell-command-result-equal "compile echo hello"
                                "hello\n"))
 
+(ert-deftest em-unix-test/compile/noninteractive1 ()
+  "Check that `eshell/compile' writes to stdout noninteractively."
+  (skip-unless (executable-find "echo"))
+  (eshell-command-result-equal "compile echo hello"
+                               "hello\n"))
+
+(ert-deftest em-unix-test/compile/noninteractive2 ()
+  "Check that `eshell/compile' writes to stdout noninteractively."
+  (skip-unless (executable-find "echo"))
+  (eshell-command-result-equal "compile echo hello"
+                               "hello\n"))
+
+(ert-deftest em-unix-test/compile/noninteractive3 ()
+  "Check that `eshell/compile' writes to stdout noninteractively."
+  (skip-unless (executable-find "echo"))
+  (eshell-command-result-equal "compile echo hello"
+                               "hello\n"))
+
+(ert-deftest em-unix-test/compile/noninteractive4 ()
+  "Check that `eshell/compile' writes to stdout noninteractively."
+  (skip-unless (executable-find "echo"))
+  (eshell-command-result-equal "compile echo hello"
+                               "hello\n"))
+
+(ert-deftest em-unix-test/compile/noninteractive5 ()
+  "Check that `eshell/compile' writes to stdout noninteractively."
+  (skip-unless (executable-find "echo"))
+  (eshell-command-result-equal "compile echo hello"
+                               "hello\n"))
+
 (ert-deftest em-unix-test/compile/pipeline ()
   "Check that `eshell/compile' writes to stdout from a pipeline."
   (skip-unless (and (executable-find "echo")

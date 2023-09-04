@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-20.04, ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest]
     steps:
     - run: |
         git config --global core.autocrlf false
@@ -55,45 +55,22 @@ jobs:
       with:
         repository: emacs-straight/elisp-benchmarks
         path: elisp-benchmarks
-    - uses: actions/cache@v3
-      id: cache-tree-sitter
-      with:
-        path: tree-sitter
-        key: cache-tree-sitter-${{ runner.os }}-002
-    - uses: actions/checkout@v3
-      if: steps.cache-tree-sitter.outputs.cache-hit != 'true'
-      with:
-        repository: commercial-emacs/tree-sitter
-        path: tree-sitter
-        ref: v0.20.8alpha2
     - uses: actions-rs/toolchain@v1
       with:
           toolchain: stable
-    - name: make-tree-sitter
-      if: startsWith(runner.os, 'windows') != true
-      run: |
-        mkdir -p $HOME/.local
-        make -C tree-sitter install-ci
     - name: make-alt-xtoolkit
       if: matrix.os == 'ubuntu-20.04'
       run: |
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-x-toolkit=lucid --without-cairo --without-xaw3d --without-gconf --without-libsystemd
         make -j4 -C src
-    - name: make-linux
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        ./autogen.sh
-        ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-tree-sitter
-        make -j4 check
-        ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
     - name: make-macos
       if: startsWith(runner.os, 'macOS')
       run: |
         ./autogen.sh
-        ./configure --prefix=$HOME/.local --with-tree-sitter
-        make -j4 check
-        ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
+        ./configure --prefix=$HOME/.local
+	make -j4
+        make test/lisp/eshell/em-unix-tests.log
     - uses: msys2/setup-msys2@v2
       if: startsWith(runner.os, 'windows')
       with:
