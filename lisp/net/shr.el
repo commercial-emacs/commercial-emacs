@@ -2619,12 +2619,10 @@ flags that control whether to collect or render objects."
     columns))
 
 (defun shr-count (dom elem)
-  (let ((i 0))
-    (dolist (sub (dom-children dom))
-      (when (and (not (stringp sub))
-		 (eq (dom-tag sub) elem))
-	(setq i (1+ i))))
-    i))
+  (seq-count (lambda (sub)
+               (and (not (stringp sub))
+                    (eq (dom-tag sub) elem)))
+             (dom-children dom)))
 
 (defun shr-max-columns (dom)
   (let ((max 0)

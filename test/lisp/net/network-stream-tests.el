@@ -316,7 +316,7 @@
   :expected-result t
   (skip-unless (executable-find "gnutls-serv"))
   (skip-unless (gnutls-available-p))
-  (skip-unless (not (eq system-type 'windows-nt)))
+  (skip-when (eq system-type 'windows-nt))
   (skip-unless (featurep 'make-network-process '(:family ipv6)))
   (network-stream-tests-make-network-process
    nil

@@ -105,7 +105,7 @@ the case)."
 
 (ert-deftest filelock-tests-lock-spoiled ()
   "Check `lock-buffer'."
-  (skip-unless (not (eq system-type 'ms-dos))) ; no filelock support
+  (skip-when (eq system-type 'ms-dos)) ; no filelock support
   (filelock-tests--fixture
    (filelock-tests--spoil-lock-file buffer-file-truename)
    ;; FIXME: errors when locking a file are ignored; should they be?
@@ -115,7 +115,7 @@ the case)."
 
 (ert-deftest filelock-tests-file-locked-p-spoiled ()
   "Check that `file-locked-p' fails if the lockfile is \"spoiled\"."
-  (skip-unless (not (eq system-type 'ms-dos))) ; no filelock support
+  (skip-when (eq system-type 'ms-dos)) ; no filelock support
   (filelock-tests--fixture
    (filelock-tests--spoil-lock-file buffer-file-truename)
    (let ((err (should-error (file-locked-p (buffer-file-name)))))
@@ -126,7 +126,7 @@ the case)."
 
 (ert-deftest filelock-tests-unlock-spoiled ()
   "Check that `unlock-buffer' fails if the lockfile is \"spoiled\"."
-  (skip-unless (not (eq system-type 'ms-dos))) ; no filelock support
+  (skip-when (eq system-type 'ms-dos)) ; no filelock support
   (filelock-tests--fixture
    ;; Set the buffer modified with file locking temporarily disabled.
    (let ((create-lockfiles nil))
@@ -146,7 +146,7 @@ the case)."
 
 (ert-deftest filelock-tests-kill-buffer-spoiled ()
   "Check that `kill-buffer' fails if a lockfile is \"spoiled\"."
-  (skip-unless (not (eq system-type 'ms-dos))) ; no filelock support
+  (skip-when (eq system-type 'ms-dos)) ; no filelock support
   (filelock-tests--fixture
    ;; Set the buffer modified with file locking temporarily disabled.
    (let ((create-lockfiles nil))
@@ -172,7 +172,7 @@ the case)."
 
 (ert-deftest filelock-tests-detect-external-change ()
   "Check that an external file modification is reported."
-  (skip-unless (not (eq system-type 'ms-dos))) ; no filelock support
+  (skip-when (eq system-type 'ms-dos)) ; no filelock support
   (skip-unless (executable-find "touch"))
   (skip-unless (executable-find "echo"))
   (dolist (cl '(t nil))

@@ -781,7 +781,7 @@ This checks also `vc-backend' and `vc-responsible-backend'."
           ;; CVS calls vc-delete-file, which insists on prompting
           ;; "Really want to delete ...?", and `vc-mtn.el' does not implement
           ;; `delete-file' at all.
-          (skip-unless (not (memq ',backend '(CVS Mtn))))
+          (skip-when (memq ',backend '(CVS Mtn)))
           (vc-test--rename-file ',backend))
 
         (ert-deftest
