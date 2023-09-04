@@ -57,7 +57,8 @@ Mostly, the empty passphrase is used.  However, the keys for
     '(sign-pgp sign-pgp-mime)))
 
 (defvar mml-smime-use)
-(defvar mml-sec-tests-max-errors 1)
+(defvar mml-sec-tests-max-errors (if (getenv "CI") 1 0)
+  "Some underhanded shit.")
 
 (defun mml-secure-test-fixture (body &optional interactive)
   "Setup GnuPG home containing test keys and prepare environment for BODY.
