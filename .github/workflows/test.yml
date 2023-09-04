@@ -69,7 +69,7 @@ jobs:
       run: |
         ./autogen.sh
         ./configure --prefix=$HOME/.local
-	make -j4
+        make -j4
         make test/lisp/eshell/em-unix-tests.log
     - uses: msys2/setup-msys2@v2
       if: startsWith(runner.os, 'windows')
