@@ -2348,7 +2348,7 @@ frame's terminal). */)
 
       if (!O_IGNORE_CTTY && strcmp (t->display_info.tty->name, DEV_TTY) != 0)
         dissociate_if_controlling_tty (fd);
-#endif
+#endif /* MSDOS */
 
       add_keyboard_wait_descriptor (fd);
 
