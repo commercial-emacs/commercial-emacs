@@ -2121,6 +2121,12 @@ keymap value."
     (when used-gentemp
       (makunbound keymap))))
 
+(defcustom describe-mode-outline t
+  "Non-nil enables outlines in the output buffer of `describe-mode'."
+  :type 'boolean
+  :group 'help
+  :version "30.1")
+
 ;;;###autoload
 (defun describe-mode (&optional buffer)
   "Display documentation of current major mode and minor modes.
@@ -2146,7 +2152,7 @@ documentation for the major and minor modes of that buffer."
     (with-help-window (help-buffer)
       (with-current-buffer (help-buffer)
         ;; Add the local minor modes at the start.
-        (when local-minors
+        (when (and local-minors (not describe-mode-outline))
           (insert (format "Minor mode%s enabled in this buffer:"
                           (if (length> local-minors 1)
                               "s" "")))
@@ -2173,6 +2179,10 @@ documentation for the major and minor modes of that buffer."
           (insert (help-split-fundoc (documentation major) nil 'doc)
                   (with-current-buffer buffer
                     (help-fns--list-local-commands)))
+          (when describe-mode-outline
+            (save-excursion
+              (goto-char (point-min))
+              (put-text-property (pos-bol) (pos-eol) 'outline-level 1)))
           (ensure-empty-lines 1)
 
           ;; Insert the global minor modes after the major mode.
@@ -2184,6 +2194,23 @@ documentation for the major and minor modes of that buffer."
             (when (re-search-forward "^\f")
               (beginning-of-line)
               (ensure-empty-lines 1)))
+
+          (when describe-mode-outline
+            (setq-local outline-search-function #'outline-search-level)
+            (setq-local outline-level (lambda () 1))
+            (setq-local outline-minor-mode-cycle t
+                        outline-minor-mode-highlight t
+                        outline-minor-mode-use-buttons 'insert
+                        outline--cycle-buffer-state 'show-all)
+            (outline-minor-mode 1)
+            (save-excursion
+              (goto-char (point-min))
+              (let ((inhibit-read-only t))
+                ;; Hide ^Ls.
+                (while (search-forward "\n\f\n" nil t)
+		  (put-text-property (1+ (match-beginning 0)) (1- (match-end 0))
+                                     'invisible t)))))
+
           ;; For the sake of IELM and maybe others
           nil)))))
 
@@ -2219,6 +2246,10 @@ documentation for the major and minor modes of that buffer."
 			      "no indicator"
 			    (format "indicator%s"
 				    indicator)))))
+        (when describe-mode-outline
+          (save-excursion
+            (forward-line -1)
+            (put-text-property (pos-bol) (pos-eol) 'outline-level 1)))
 	(insert (or (help-split-fundoc (documentation mode) nil 'doc)
 	            "No docstring")))))
   (forward-line -1)
