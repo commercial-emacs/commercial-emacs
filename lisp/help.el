@@ -127,7 +127,7 @@ buffer.")
 ;; insert-button makes the action nil if it is not store somewhere
 (defvar help-button-cache nil)
 
-
+
 
 (defvar help-quick-sections
   '(("File"
@@ -271,62 +271,43 @@ This is a list
  (WINDOW . quit-window)    do quit-window, then select WINDOW.
  (WINDOW BUF START POINT)  display BUF at START, POINT, then select WINDOW.")
 
-(defun help-print-return-message (&optional function)
-  "Display or return message saying how to restore windows after help command.
-This function assumes that `standard-output' is the help buffer.
-It computes a message, and applies the optional argument FUNCTION to it.
-If FUNCTION is nil, it applies `message', thus displaying the message.
-In addition, this function sets up `help-return-method', which see, that
-specifies what to do when the user exits the help buffer.
-
-Do not call this in the scope of `with-help-window'."
-  (and (not (get-buffer-window standard-output))
-       (let ((first-message
-	      (cond ((or
-		      pop-up-frames
-		      (special-display-p (buffer-name standard-output)))
-		     (setq help-return-method (cons (selected-window) t))
-		     ;; If the help output buffer is a special display buffer,
-		     ;; don't say anything about how to get rid of it.
-		     ;; First of all, the user will do that with the window
-		     ;; manager, not with Emacs.
-		     ;; Secondly, the buffer has not been displayed yet,
-		     ;; so we don't know whether its frame will be selected.
-		     nil)
-		    ((not (one-window-p t))
-		     (setq help-return-method
-			   (cons (selected-window) 'quit-window))
-		     "Type \\[display-buffer] RET to restore the other window.")
-		    (pop-up-windows
-		     (setq help-return-method (cons (selected-window) t))
-		     "Type \\[delete-other-windows] to remove help window.")
-		    (t
-		     (setq help-return-method
-			   (list (selected-window) (window-buffer)
-				 (window-start) (window-point)))
-		     "Type \\[switch-to-buffer] RET to remove help window."))))
-	 (funcall (or function 'message)
-		  (concat
-		   (if first-message
-		       (substitute-command-keys first-message))
-		   (if first-message "  ")
-		   ;; If the help buffer will go in a separate frame,
-		   ;; it's no use mentioning a command to scroll, so don't.
-		   (if (or pop-up-windows
-			   (special-display-p (buffer-name standard-output)))
-		       nil
-		     (if (same-window-p (buffer-name standard-output))
-			 ;; Say how to scroll this window.
-			 (substitute-command-keys
-                          "\\[scroll-up-command] to scroll the help.")
-		       ;; Say how to scroll some other window.
-		       (substitute-command-keys
-			"\\[scroll-other-window] to scroll the help."))))))))
+(defun help-print-return-message (&optional mesg)
+  "Call MESG on message describing how to restore windows.
+Side effects include assigning `help-return-method' for actions
+taken after exiting the help buffer."
+  (when (and (bufferp standard-output)
+             (not (get-buffer-window standard-output)))
+    (if (or pop-up-frames
+	    (special-display-p (buffer-name standard-output)))
+	;; No guidance for a special display buffer.
+        (setq help-return-method (cons (selected-window) t))
+      (funcall (or mesg #'message)
+	       (concat
+	        (substitute-command-keys
+                 (cond ((not (one-window-p t))
+	                (setq help-return-method (cons (selected-window) 'quit-window))
+	                "Type \\[display-buffer] RET to restore the other window.")
+	               (pop-up-windows
+	                (setq help-return-method (cons (selected-window) t))
+	                "Type \\[delete-other-windows] to remove help window.")
+	               (t
+	                (setq help-return-method (list (selected-window)
+                                                       (window-buffer)
+		                                       (window-start)
+                                                       (window-point)))
+	                "Type \\[switch-to-buffer] RET to remove help window.")))
+	        "  "
+	        (unless pop-up-windows
+                  (substitute-command-keys
+                   (format "%s to scroll the help."
+                           (if (same-window-p (buffer-name standard-output))
+                               "\\[scroll-up-command]"
+                             "\\[scroll-other-window]")))))))))
 
 ;; So keyboard macro definitions are documented correctly
 (fset 'defining-kbd-macro (symbol-function 'start-kbd-macro))
 
-
+
 ;;; Help for help.  (a.k.a. `C-h C-h')
 
 (defvar help-for-help-buffer-name " *Metahelp*"
@@ -446,7 +427,7 @@ Do not call this in the scope of `with-help-window'."
   help-map
   help-for-help-buffer-name)
 
-
+
 
 (defun function-called-at-point ()
   "Return a function around point or else called by the list containing point.
@@ -488,7 +469,7 @@ If that doesn't give a function, return nil."
                 (setq sym (intern-soft (match-string 1 str)))
                 (and (fboundp sym) sym))))))))
 
-
+
 ;;; `User' help functions
 
 (defun view-help-file (file &optional dir)
@@ -700,7 +681,7 @@ To record all your input, use `open-dribble-file'."
 	;; Show point near the end of "lossage", as we did in Emacs 24.
 	(set-marker help-window-point-marker (point))))))
 
-
+
 ;; Key bindings
 
 (defun help--key-description-fontified (keys &optional prefix)
@@ -1165,7 +1146,7 @@ current buffer."
               (insert (format " (found in %s)" locus)))
             (insert ", which is ")
 	    (describe-function-1 defn)))))))
-
+
 (defun search-forward-help-for-help ()
   "Search forward in the help-for-help window.
 This command is meant to be used after issuing the \\[help-for-help] command."
@@ -1311,7 +1292,7 @@ mode lighter was clicked."
 	  (setq minor-modes (cdr minor-modes)))))
     result))
 
-
+
 (defcustom help-link-key-to-documentation t
   "Non-nil means link keys to their command in *Help* buffers.
 This affects \\\\=\\[command] substitutions in documentation
@@ -1930,7 +1911,7 @@ in `describe-map-tree'."
 ;;             (goto-char (1+ (point))))))
 ;;       (setq idx (1+ idx)))))
 
-
+
 (declare-function x-display-pixel-height "xfns.c" (&optional terminal))
 (declare-function x-display-pixel-width "xfns.c" (&optional terminal))
 
@@ -2193,41 +2174,27 @@ Return VALUE."
     ;; Return VALUE.
     value))
 
-(defmacro with-help-window (buffer-or-name &rest body)
-  "Evaluate BODY, send output to BUFFER-OR-NAME and show in a help window.
-The return value from BODY will be returned.
-
-The help window will be selected if `help-window-select' is
-non-nil.
-
-The `temp-buffer-window-setup-hook' hook is called."
+(defmacro with-help-window (name &rest body)
+  "Evaluate BODY, sending output to buffer named NAME."
   (declare (indent 1) (debug t))
-  `(help--window-setup ,buffer-or-name (lambda () ,@body)))
-
-(defun help--window-setup (buffer callback)
-  ;; Make `help-window-point-marker' point nowhere.  The only place
-  ;; where this should be set to a buffer position is within BODY.
-  (set-marker help-window-point-marker nil)
-  (with-current-buffer (get-buffer-create buffer)
-    (unless (derived-mode-p 'help-mode)
-      (help-mode))
-    (setq buffer-read-only t
-          buffer-file-name nil)
-    (setq-local help-mode--current-data nil)
-    (buffer-disable-undo)
-    (let ((inhibit-read-only t)
-	  (inhibit-modification-hooks t))
-      (erase-buffer)
-      (delete-all-overlays)
-      (prog1
-          (let ((standard-output (current-buffer)))
-            (prog1
-                (funcall callback)
-              (run-hooks 'temp-buffer-window-setup-hook)))
-        (help-make-xrefs (current-buffer))
-        ;; This must be done after the buffer has been completely
-        ;; generated, since `temp-buffer-resize-mode' may be enabled.
-        (help-window-setup (temp-buffer-window-show (current-buffer)))))))
+  `(with-current-buffer (get-buffer-create ,name)
+     (set-marker help-window-point-marker nil) ; only ever set in BODY
+     (unless (derived-mode-p 'help-mode)
+       (help-mode))
+     (setq buffer-read-only t
+           buffer-file-name nil)
+     (setq-local help-mode--current-data nil)
+     (buffer-disable-undo)
+     (let ((inhibit-read-only t)
+	   (inhibit-modification-hooks t))
+       (erase-buffer)
+       (delete-all-overlays)
+       (prog1 (let ((standard-output (current-buffer)))
+                (prog1 (progn ,@body)
+                  (run-hooks 'temp-buffer-window-setup-hook)))
+         (help-make-xrefs (current-buffer))
+         ;; Do after buffer made in case `temp-buffer-resize-mode' enabled
+         (help-window-setup (temp-buffer-window-show (current-buffer)))))))
 
 ;; Called from C, on encountering `help-char' when reading a char.
 ;; Don't print to *Help*; that would clobber Help history.
@@ -2238,7 +2205,7 @@ The `temp-buffer-window-setup-hook' hook is called."
 	(with-output-to-temp-buffer " *Char Help*"
 	  (princ msg)))))
 
-
+
 (defun help--docstring-quote (string)
   "Return a doc string that represents STRING.
 The result, when formatted by `substitute-command-keys', should equal STRING."
@@ -2383,7 +2350,7 @@ the same names as used in the original source code, when possible."
   (let ((print-escape-newlines t))
     (help--docstring-quote (format "%S" (help--make-usage fn arglist)))))
 
-
+
 
 ;; Just some quote-like characters for now.  TODO: generate this stuff
 ;; from official Unicode data.
@@ -2448,7 +2415,7 @@ the suggested string to use instead.  See
 
 (define-obsolete-function-alias 'help-for-help-internal #'help-for-help "28.1")
 
-
+
 (provide 'help)
 
 ;;; help.el ends here
