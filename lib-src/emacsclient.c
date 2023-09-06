@@ -618,7 +618,6 @@ decode_options (int argc, char **argv)
      display in DISPLAY (if any).  */
   if (create_frame && !tty && !display)
     {
-#ifndef HAVE_ANDROID
       /* Set these here so we use a default_display only when the user
          didn't give us an explicit display.  */
 #if defined (NS_IMPL_COCOA)
@@ -632,17 +631,9 @@ decode_options (int argc, char **argv)
 #ifdef HAVE_PGTK
       display = egetenv ("WAYLAND_DISPLAY");
       alt_display = egetenv ("DISPLAY");
-#else /* !HAVE_PGTK */
+#else
       display = egetenv ("DISPLAY");
-#endif /* HAVE_PGTK */
-#else /* HAVE_ANDROID */
-      /* Disregard the DISPLAY environment variable under Android.
-         Several terminal emulator programs furnish their own X
-         servers and set DISPLAY, but an Android build is incapable of
-         displaying X frames.  */
-      alt_display = NULL;
-      display = "android";
-#endif /* !HAVE_ANDROID */
+#endif
     }
 
   if (!display)
