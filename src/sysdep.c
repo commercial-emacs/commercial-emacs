@@ -3190,7 +3190,7 @@ make_lisp_timeval (struct timeval t)
 
 #endif
 
-#if defined (GNU_LINUX) || defined (CYGWIN) || defined __ANDROID__
+#if defined (GNU_LINUX) || defined (CYGWIN)
 
 static Lisp_Object
 time_from_jiffies (unsigned long long ticks, Lisp_Object hz, Lisp_Object form)
@@ -3238,7 +3238,7 @@ get_up_time (void)
   return up;
 }
 
-# if defined GNU_LINUX || defined __ANDROID__
+# ifdef GNU_LINUX
 #define MAJOR(d) (((unsigned)(d) >> 8) & 0xfff)
 #define MINOR(d) (((unsigned)(d) & 0xff) | (((unsigned)(d) & 0xfff00000) >> 12))
 
@@ -3284,7 +3284,7 @@ procfs_ttyname (int rdev)
   unblock_input ();
   return build_string (name);
 }
-# endif	/* GNU_LINUX || __ANDROID__ */
+# endif	/* GNU_LINUX */
 
 static uintmax_t
 procfs_get_total_memory (void)
@@ -3433,9 +3433,9 @@ system_process_attributes (Lisp_Object pid)
 	  attrs = Fcons (Fcons (Qppid, INT_TO_INTEGER (ppid)), attrs);
 	  attrs = Fcons (Fcons (Qpgrp, INT_TO_INTEGER (pgrp)), attrs);
 	  attrs = Fcons (Fcons (Qsess, INT_TO_INTEGER (sess)), attrs);
-# if defined GNU_LINUX || defined __ANDROID__
+# ifdef GNU_LINUX
 	  attrs = Fcons (Fcons (Qttname, procfs_ttyname (tty)), attrs);
-# endif /* GNU_LINUX || __ANDROID__ */
+# endif
 	  attrs = Fcons (Fcons (Qtpgid, INT_TO_INTEGER (tpgid)), attrs);
 	  attrs = Fcons (Fcons (Qminflt, INT_TO_INTEGER (minflt)), attrs);
 	  attrs = Fcons (Fcons (Qmajflt, INT_TO_INTEGER (majflt)), attrs);

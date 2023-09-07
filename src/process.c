@@ -2020,10 +2020,9 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
       inchannel = p->open_fd[READ_FROM_SUBPROCESS];
       forkout = p->open_fd[SUBPROCESS_STDOUT];
 
-#if (defined (GNU_LINUX) || defined __ANDROID__)	\
-  && defined (F_SETPIPE_SZ)
+#if defined(GNU_LINUX) && defined(F_SETPIPE_SZ)
       fcntl (inchannel, F_SETPIPE_SZ, read_process_output_max);
-#endif /* (GNU_LINUX || __ANDROID__) && F_SETPIPE_SZ */
+#endif
     }
 
   if (! NILP (p->stderrproc))
