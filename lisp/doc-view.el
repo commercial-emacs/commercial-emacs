@@ -2190,15 +2190,8 @@ toggle between displaying the document or editing it as text.
                   ;; supposed to return nil for things like local files accessed
                   ;; via `su' or via file://...
                   ((let ((file-name-handler-alist nil))
-                     (or (not (and buffer-file-name
-                                   (file-readable-p buffer-file-name)))
-                         ;; If the system is Android and the file name
-                         ;; begins with /content or /assets, it's not
-                         ;; readable by local processes.
-                         (and (eq system-type 'android)
-                              (string-match-p "/\\(content\\|assets\\)[/$]"
-                                              (expand-file-name
-                                               buffer-file-name)))))
+                     (not (and buffer-file-name
+                               (file-readable-p buffer-file-name))))
                    ;; FIXME: there's a risk of name conflicts here.
                    (expand-file-name
                     (if buffer-file-name
