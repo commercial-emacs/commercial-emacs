@@ -1639,7 +1639,7 @@ literals (Bug#20852)."
        (t 'nonzero)
        (happy puppy)))
    '((suspicious cond))
-   "Warning: Useless clause following default `cond' clause")
+   "Warning: Useless clause following default .cond. clause")
 
   (test-suppression
    '(defun zot ()
