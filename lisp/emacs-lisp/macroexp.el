@@ -338,7 +338,7 @@ Assumes the caller has bound `macroexpand-all-environment'."
                  (macroexp-warn-and-return
                   (format-message
                    "Useless clause following default `cond' clause")
-                  expanded-form '(suspicious cond) t default-tail)
+                  expanded-form '(suspicious cond) t)
                expanded-form))))
         (`(condition-case . ,(or `(,err ,body . ,handlers) pcase--dontcare))
          (let ((exp-body (macroexp--expand-all body)))
