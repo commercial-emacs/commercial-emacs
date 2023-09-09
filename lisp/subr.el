@@ -2014,6 +2014,22 @@ instead; it will indirectly limit the specpdl stack size as well.")
 (defalias 'mkdir #'make-directory)
 (defalias 'wholenump #'natnump)
 
+(defmacro with-restriction (start end &rest rest)
+  "Null adapter for GNU Emacs."
+  (declare (indent 2) (debug t))
+  (if (eq (car rest) :label)
+      `(save-restriction
+         (narrow-to-region ,start ,end)
+         ,@(cddr rest))
+    `(save-restriction (narrow-to-region ,start ,end) ,@rest)))
+
+(defmacro without-restriction (&rest rest)
+  "Null adapter for GNU Emacs."
+  (declare (indent 0) (debug t))
+  (if (eq (car rest) :label)
+      `(save-restriction (widen) ,@(cddr rest))
+    `(save-restriction (widen) ,@rest)))
+
 ;; These were the XEmacs names, now obsolete:
 (defalias 'point-at-eol #'line-end-position)
 (make-obsolete 'point-at-eol "use `line-end-position' or `pos-eol' instead." "29.1")
