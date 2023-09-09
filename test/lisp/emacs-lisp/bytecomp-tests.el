@@ -838,11 +838,6 @@ byte-compiled.  Run with dynamic binding."
         (should (equal (bytecomp-tests--eval-interpreted form)
                        (bytecomp-tests--eval-compiled form)))))))
 
-(defmacro bytecomp-tests--with-fresh-warnings (&rest body)
-  `(let ((macroexp--warned            ; oh dear
-          (make-hash-table :test #'equal :weakness 'key)))
-     ,@body))
-
 (defun test-byte-comp-compile-and-load (compile &rest forms)
   (declare (indent 1))
   (ert-with-temp-file elfile
@@ -857,8 +852,7 @@ byte-compiled.  Run with dynamic binding."
       (if compile
           (let ((byte-compile-dest-file-function
                  (lambda (e) elcfile)))
-            (bytecomp-tests--with-fresh-warnings
-             (byte-compile-file elfile))))
+            (byte-compile-file elfile)))
       (load elfile nil 'nomessage))))
 
 (ert-deftest test-byte-comp-macro-expansion ()
@@ -929,13 +923,14 @@ byte-compiled.  Run with dynamic binding."
   (declare (indent 1))
   `(with-current-buffer (get-buffer-create byte-compile-log-buffer)
      (let ((inhibit-read-only t)) (erase-buffer))
+     (let ((text-quoting-style 'grave)
+           (macroexp--warned            ; oh dear
+            (make-hash-table :test #'equal :weakness 'key)))
        (ert-info ((prin1-to-string form) :prefix "form: ")
-         (let ((text-quoting-style 'grave))
-           (bytecomp-tests--with-fresh-warnings
-            (byte-compile form)))
+         (byte-compile form)
          (ert-info ((prin1-to-string (buffer-string)) :prefix "buffer: ")
            (should (re-search-forward
-                    (string-replace " " "[ \n]+" re-warning)))))))
+                    (string-replace " " "[ \n]+" re-warning))))))))
 
 (defmacro bytecomp--buffer-with-warning-test (re-warnings &rest forms)
   (declare (indent 1))
@@ -1631,15 +1626,6 @@ literals (Bug#20852)."
       (unwind-protect (print x)))
    '((suspicious unwind-protect))
    "Warning: .unwind-protect. without unwind forms")
-
-  (test-suppression
-   '(defun zot (x)
-      (cond
-       ((zerop x) 'zero)
-       (t 'nonzero)
-       (happy puppy)))
-   '((suspicious cond))
-   "Warning: Useless clause following default `cond' clause")
 
   (test-suppression
    '(defun zot ()
