@@ -21,7 +21,7 @@
 
 ;;; Code:
 
-(require 'ert)
+(require 'ert-x)
 (require 'socks)
 (require 'url-http)
 
@@ -137,13 +137,14 @@ Vectors must match verbatim.  Strings are considered regex patterns.")
          (pats socks-tests-canned-server-patterns)
          (filt (lambda (proc line)
                  (pcase-let ((`(,pat . ,resp) (pop pats)))
+                   (setq resp (apply #'unibyte-string (append resp nil)))
                    (unless (or (and (vectorp pat) (equal pat (vconcat line)))
                                (string-match-p pat line))
                      (error "Unknown request: %s" line))
                    (let ((print-escape-control-characters t))
                      (message "[%s] <- %s" name (prin1-to-string line))
                      (message "[%s] -> %s" name (prin1-to-string resp)))
-                   (process-send-string proc (concat resp)))))
+                   (process-send-string proc resp))))
          (serv (make-network-process :server 1
                                      :buffer (get-buffer-create name)
                                      :filter filt
@@ -203,6 +204,19 @@ Vectors must match verbatim.  Strings are considered regex patterns.")
                    (should (equal host "example.com"))
                    (list 93 184 216 34)))
                 ((symbol-function 'user-full-name)
+                 (lambda (&optional _) "foo")))
+        (socks-tests-perform-hello-world-http-request)))))
+
+(ert-deftest socks-tests-v4a-basic ()
+  "Show correct preparation of SOCKS4a connect command."
+  (let ((socks-server '("server" "127.0.0.1" 10083 4a))
+        (url-user-agent "Test/4a-basic")
+        (socks-tests-canned-server-patterns
+         `(([4 1 0 80 0 0 0 1 ?f ?o ?o 0 ?e ?x ?a ?m ?p ?l ?e ?. ?c ?o ?m 0]
+            . [0 90 0 0 0 0 0 0])
+           ,socks-tests--hello-world-http-request-pattern)))
+    (ert-info ("Make HTTP request over SOCKS4A")
+      (cl-letf (((symbol-function 'user-full-name)
                  (lambda (&optional _) "foo")))
         (socks-tests-perform-hello-world-http-request)))))
 
@@ -280,5 +294,92 @@ Vectors must match verbatim.  Strings are considered regex patterns.")
     (ert-info ("Make HTTP request over SOCKS5 with no auth method")
       (socks-tests-perform-hello-world-http-request)))
   (should (assq 2 socks-authentication-methods)))
+
+(ert-deftest tor-resolve-4a ()
+  "Make request to TOR resolve service over SOCKS4a"
+  (let* ((socks-server '("server" "127.0.0.1" 19050 4a))
+         (socks-tests-canned-server-patterns
+          '(([4 #xf0 0 80 0 0 0 1 ?f ?o ?o 0 ?e ?x ?a ?m ?p ?l ?e ?. ?c ?o ?m 0]
+             . [0 90 0 0 93 184 216 34])))
+         (inhibit-message noninteractive)
+         (server (socks-tests-canned-server-create)))
+    (ert-info ("Query TOR RESOLVE service over SOCKS4")
+      (cl-letf (((symbol-function 'user-full-name)
+                 (lambda (&optional _) "foo")))
+        (should (equal '([93 184 216 34 0])
+                       (socks-tor-resolve "example.com")))))
+    (kill-buffer (process-buffer server))
+    (delete-process server)))
+
+(ert-deftest tor-resolve-5 ()
+  "Make request to TOR resolve service over SOCKS5"
+  (let* ((socks-server '("server" "127.0.0.1" 19051 5))
+         (socks-username "foo")
+         (socks-authentication-methods (append socks-authentication-methods
+                                               nil))
+         (inhibit-message noninteractive)
+         (socks-tests-canned-server-patterns
+          '(([5 2 0 2] . [5 2])
+            ([1 3 ?f ?o ?o 0] . [1 0])
+            ([5 #xf0 0 3 11 ?e ?x ?a ?m ?p ?l ?e ?. ?c ?o ?m 0 80]
+             . [5 0 0 1 93 184 216 34 0 0])))
+         (server (socks-tests-canned-server-create)))
+    (ert-info ("Query TOR RESOLVE service over SOCKS5")
+      (should (equal '([93 184 216 34 0]) (socks-tor-resolve "example.com"))))
+    (kill-buffer (process-buffer server))
+    (delete-process server)))
+
+(defvar test-socks-service ; "127.0.0.1:1080" -> ("127.0.0.1", 1080)
+  (when-let ((present (getenv "TEST_SOCKS_SERVICE"))
+             (parts (split-string present ":")))
+    (list (car parts) (string-to-number (cadr parts)))))
+
+(declare-function gnutls-negotiate "gnutls"
+                  (&rest spec
+                         &key process type hostname priority-string
+                         trustfiles crlfiles keylist min-prime-bits
+                         verify-flags verify-error verify-hostname-error
+                         &allow-other-keys))
+
+(ert-deftest test-socks-https-poc ()
+  :tags '(:unstable)
+  (unless test-socks-service (ert-skip "SOCKS service missing"))
+  (unless (gnutls-available-p) (ert-skip "SOCKS resolve test needs GNUTLS"))
+  (ert-with-temp-file tempfile
+    :prefix "emacs-test-socks-network-security-"
+    (let* ((socks-server `("tor" ,@test-socks-service 5))
+           (socks-password "")
+           (nsm-settings-file tempfile)
+           (url-gateway-method 'socks)
+           (id "sha1:df77269389e537fcc9a5fe61667133b5bb97d42e")
+           (host "check.torproject.org")
+           (url (url-generic-parse-url "https://check.torproject.org"))
+           ;;
+           done
+           ;;
+           (cb (lambda (&rest _r)
+                 (goto-char (point-min))
+                 (should (search-forward "Congratulations" nil t))
+                 (setq done t)))
+           (orig (symbol-function #'socks--open-network-stream)))
+      (cl-letf (((symbol-function 'socks--open-network-stream)
+                 (lambda (&rest rest)
+                   (let ((proc (apply orig rest)))
+                     (gnutls-negotiate :process proc :hostname host)
+                     (should (nsm-verify-connection proc host 443 t))))))
+        (ert-info ("Connect to HTTPS endpoint over Tor SOCKS proxy")
+          (unwind-protect
+              (progn
+                (advice-add 'network-lookup-address-info :override
+                            #'socks-tor-resolve)
+                (should-not (nsm-host-settings id))
+                (url-http url cb '(nil))
+                (should (nsm-host-settings id))
+                (ert-info ("Wait for response")
+                  (with-timeout (3 (error "Request timed out"))
+                    (unless done
+                      (sleep-for 0.1)))))
+            (advice-remove 'network-lookup-address-info
+                           #'socks-tor-resolve)))))))
 
 ;;; socks-tests.el ends here
