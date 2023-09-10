@@ -857,19 +857,35 @@ typedef EMACS_UINT Lisp_Word_tag;
    for general overview.  */
 union vectorlike_header
   {
-    /* The grossly misnamed SIZE contains (starting from msb).
-       - ARRAY_MARK_FLAG is the gc mark bit.
-       - PSEUDOVECTOR_FLAG is 1 for pseudovector and 0 for normal vector.
-       - If normal vector, remainder holds number of slots.
-       - If pseudovector, remainder subdivided into:
-         - a) pvtype (e.g. PVEC_BUFFER) masked by PVEC_TYPE_MASK;
-         - b) pvsize, or the number of Lisp Objects, masked by
-              PSEUDOVECTOR_SIZE_MASK;
-         - c) size in words of non-Lisp fields, masked by PSEUDOVECTOR_REST_MASK.
-       There are some exceptions.  For PVEC_FREE, b) is zero.  For
-       PVEC_BOOL_VECTOR and PVEC_SUBR, both b) and c) are zero.
-       On current machines, this caps (a) to 63, (b) to 4095,
-       and (c) to 4095.  */
+    /* The `size' header word, W bits wide, has one of two forms
+       discriminated by the second-highest bit (PSEUDOVECTOR_FLAG):
+
+         1   1                    W-2
+       +---+---+-------------------------------------+
+       | M | 0 |                 SIZE                |  vector
+       +---+---+-------------------------------------+
+
+         1   1    W-32      6       12         12
+       +---+---+--------+------+----------+----------+
+       | M | 1 | unused | TYPE | RESTSIZE | LISPSIZE |  pseudovector
+       +---+---+--------+------+----------+----------+
+
+       M (ARRAY_MARK_FLAG) holds the GC mark bit.
+
+       SIZE     is the length (number of slots) of a regular Lisp vector,
+                and the object layout is struct Lisp_Vector.
+
+       TYPE     is the pseudovector subtype (enum pvec_type).
+
+       LISPSIZE is the number of Lisp_Object fields at the beginning of the
+                object (after the header).  These are always traced by the GC.
+
+       RESTSIZE is the number of fields (in word_size units) following.
+                These are not automatically traced by the GC.
+                For PVEC_BOOL and statically allocated PVEC_SUBR, RESTSIZE is 0.
+                (The block size for PVEC_BOOL is computed from its own size
+                field, to avoid being restricted by the 12-bit RESTSIZE field.)
+    */
     ptrdiff_t size;
   };
 
