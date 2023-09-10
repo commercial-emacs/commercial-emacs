@@ -1872,7 +1872,8 @@ the buffer object itself and the current mark symbol."
 	    (let ((result
 		   (if (buffer-live-p (ibuffer-current-buffer))
 		       (when (or (null group)
-                                 (when-let ((it (get-text-property (point) 'ibuffer-filter-group)))
+                                 (when-let ((it (get-text-property
+                                                 (point) 'ibuffer-filter-group)))
                                    (equal group it)))
 			 (save-excursion
 			   (funcall function
@@ -1897,7 +1898,9 @@ the buffer object itself and the current mark symbol."
 		    (t
 		     (cl-incf ibuffer-map-lines-count)
 		     (forward-line 1)))))
-	  ibuffer-map-lines-count)
+	  (if (and (featurep 'ibuf-ext) ibuffer-auto-mode)
+              (1- ibuffer-map-lines-count)
+            ibuffer-map-lines-count))
       (progn
 	(setq buffer-read-only t)
 	(unless nomodify
