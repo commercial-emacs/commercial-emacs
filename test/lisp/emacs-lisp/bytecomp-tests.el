@@ -1063,6 +1063,19 @@ byte-compiled.  Run with dynamic binding."
            (circular-list (equal (safe-length annotated-read)
                                  (safe-length just-read)))))))))
 
+(defun bytecomp--without-warning-test (form)
+  (bytecomp--with-warning-test "\\`\\'" form))
+
+(ert-deftest bytecomp-warn--ignore ()
+  (bytecomp--with-warning-test "unused"
+    '(lambda (y) 6))
+  (bytecomp--without-warning-test
+    '(lambda (y) (ignore y) 6))
+  (bytecomp--with-warning-test "assq"
+    '(lambda (x y) (progn (assq x y) 5)))
+  (bytecomp--without-warning-test
+    '(lambda (x y) (progn (ignore (assq x y)) 5))))
+
 (ert-deftest bytecomp-warn-wrong-args ()
   (bytecomp--with-warning-test "remq.*3.*2"
     '(remq 1 2 3)))
