@@ -280,7 +280,7 @@
   (insert (propertize "abc" 'erc-timestamp 433483200))
   (goto-char (point-min))
   (let ((inhibit-message t)
-        (erc-echo-timestamp-format "%Y-%m-%d %H:%M:%S %Z")
+        (erc-echo-timestamp-format "%Y-%m-%d %H:%M:%S %z")
         (erc-echo-timestamp-zone (list (* 60 60 -4) "EDT")))
 
     ;; No-op when non-interactive and option is nil
@@ -290,18 +290,18 @@
     ;; Non-interactive (cursor sensor function)
     (let ((erc-echo-timestamps t))
       (should (equal (erc--echo-ts-csf nil nil 'entered)
-                     "1983-09-27 00:00:00 EDT")))
+                     "1983-09-27 00:00:00 -0400")))
     (should (= 433483200 erc-stamp--last-stamp))
 
     ;; Interactive
     (should (equal (call-interactively #'erc-echo-timestamp)
-                   "1983-09-27 00:00:00 EDT"))
+                   "1983-09-27 00:00:00 -0400"))
     ;; Interactive with zone
     (let ((current-prefix-arg '(4)))
       (should (equal (call-interactively #'erc-echo-timestamp)
-                     "1983-09-27 04:00:00 GMT")))
+                     "1983-09-27 04:00:00 +0000")))
     (let ((current-prefix-arg -7))
       (should (equal (call-interactively #'erc-echo-timestamp)
-                     "1983-09-26 21:00:00 -07")))))
+                     "1983-09-26 21:00:00 -0700")))))
 
 ;;; erc-stamp-tests.el ends here
