@@ -1539,6 +1539,7 @@ Defaults to the server buffer."
   (setq-local paragraph-start
               (concat "\\(" (regexp-quote (erc-prompt)) "\\)"))
   (setq-local completion-ignore-case t)
+  (add-hook 'post-command-hook #'erc-check-text-conversion nil t)
   (add-hook 'kill-buffer-hook #'erc-kill-buffer-function nil t)
   (add-hook 'completion-at-point-functions #'erc-complete-word-at-point nil t))
 
@@ -6317,12 +6318,22 @@ EmacsSpeak support."
 
 (defalias 'erc-list 'ensure-list)
 
+(defconst erc--parse-user-regexp-pedantic
+  (rx bot (group (* (not (any "!\r\n"))))
+      "!" (group (* nonl))
+      "@" (group (* nonl)) eot))
+
+(defconst erc--parse-user-regexp-legacy
+  "^\\([^!\n]*\\)!\\([^@\n]*\\)@\\(.*\\)$")
+
+(defvar erc--parse-user-regexp erc--parse-user-regexp-legacy)
+
 (defun erc-parse-user (string)
   "Parse STRING as a user specification (nick!login@host).
 
 Return a list of the three separate tokens."
   (cond
-   ((string-match "^\\([^!\n]*\\)!\\([^@\n]*\\)@\\(.*\\)$" string)
+   ((string-match erc--parse-user-regexp string)
     (list (match-string 1 string)
           (match-string 2 string)
           (match-string 3 string)))
@@ -8023,6 +8034,22 @@ or `erc-kill-buffer-hook' if any other buffer."
       (run-hooks 'erc-kill-channel-hook))
      (t
       (run-hooks 'erc-kill-buffer-hook)))))
+
+(declare-function set-text-conversion-style "textconv.c")
+
+(defun erc-check-text-conversion ()
+  "Check if point is within the ERC prompt and toggle text conversion.
+If `text-conversion-style' is not `action' if point is within the
+prompt or `nil' otherwise, set it to such a value, so as to
+guarantee that the input method functions properly for the
+purpose of typing within the ERC prompt."
+  (when (and (eq major-mode 'erc-mode)
+             (boundp set-text-conversion-style))
+    (if (>= (point) (erc-beg-of-input-line))
+        (unless (eq text-conversion-style 'action)
+          (set-text-conversion-style 'action))
+      (unless (not text-conversion-style)
+        (set-text-conversion-style nil)))))
 
 (defun erc-kill-server ()
   "Sends a QUIT command to the server when the server buffer is killed.
