@@ -986,11 +986,11 @@ SEQ must be a list, vector, or string.  The comparison is done with `equal'.
 Contrary to `delete', this does not use side-effects, and the argument
 SEQ is not modified."
   (declare (side-effect-free t))
-  (if (nlistp seq)
-      ;; If SEQ isn't a list, there's no need to copy SEQ because
-      ;; `delete' will return a new object.
-      (delete elt seq)
-    (delete elt (copy-sequence seq))))
+  (delete elt (if (nlistp seq)
+                  ;; If SEQ isn't a list, there's no need to copy SEQ because
+                  ;; `delete' will return a new object.
+                  seq
+                (copy-sequence seq))))
 
 (defun remq (elt list)
   "Return LIST with all occurrences of ELT removed.
@@ -3471,7 +3471,7 @@ If there is a natural number at point, use it as default."
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
 
-    (define-key map [remap self-insert-command] #'read-char-from-minibuffer-insert-char)
+    ;; (define-key map [remap self-insert-command] #'read-char-from-minibuffer-insert-char)
     (define-key map [remap exit-minibuffer] #'read-char-from-minibuffer-insert-other)
 
     (define-key map [remap recenter-top-bottom] #'minibuffer-recenter-top-bottom)
@@ -3502,7 +3502,7 @@ allowed to type into the minibuffer.  When the user types any
 such key, this command discard all minibuffer input and displays
 an error message."
   (interactive)
-  (when (minibufferp)
+  (when (minibufferp) ;;FIXME: Why?
     (delete-minibuffer-contents)
     (ding)
     (discard-input)
@@ -3550,7 +3550,16 @@ There is no need to explicitly add `help-char' to CHARS;
                 read-char-from-minibuffer-map))
          ;; Protect this-command when called from pre-command-hook (bug#45029)
          (this-command this-command)
-         (result (read-from-minibuffer prompt nil map nil (or history t)))
+         (result (minibuffer-with-setup-hook
+		     (lambda ()
+		       (add-hook 'post-command-hook
+				 (lambda ()
+				   ;; FIXME: Should we use `<='?
+				   (if (= (1+ (minibuffer-prompt-end))
+					  (point-max))
+                                       (exit-minibuffer)))
+				 nil 'local))
+                   (read-from-minibuffer prompt nil map nil (or history t))))
          (char
           (if (> (length result) 0)
               ;; We have a string (with one character), so return the first one.
@@ -5502,8 +5511,8 @@ Return nil if there isn't one."
 	 (load-elt (and loads (car loads))))
     (save-match-data
       (while (and loads
-		  (or (null (car load-elt))
-		      (not (string-match file-regexp (car load-elt)))))
+		  (not (and (car load-elt)
+                            (string-match file-regexp (car load-elt)))))
 	(setq loads (cdr loads)
 	      load-elt (and loads (car loads)))))
     load-elt))
@@ -6052,7 +6061,7 @@ Refer to Info node `(elisp)Distinguish Interactive'."
              ;; Skip special forms (from non-compiled code).
              (and frame (null (car frame)))
              ;; Skip also `interactive-p' (because we don't want to know if
-             ;; interactive-p was called interactively but if it's caller was).
+             ;; interactive-p was called interactively but if its caller was).
              (eq (nth 1 frame) 'interactive-p)
              ;; Skip package-specific stack-frames.
              (let ((skip (run-hook-with-args-until-success
@@ -6275,7 +6284,6 @@ effectively rounded up."
   (unless min-time
     (setq min-time 0.2))
   (let ((reporter
-	 ;; Force a call to `message' now
 	 (cons (or min-value 0)
 	       (vector (if (>= min-time 0.02)
 			   (float-time) nil)
@@ -6286,6 +6294,7 @@ effectively rounded up."
                        min-time
                        ;; SUFFIX
                        nil))))
+    ;; Force a call to `message' now.
     (progress-reporter-update reporter (or current-value min-value))
     reporter))
 
