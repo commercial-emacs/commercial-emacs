@@ -5185,13 +5185,6 @@ garbage_collect (void)
   /* GC is complete: now we can run our finalizer callbacks.  */
   run_finalizers (&doomed_finalizers);
 
-  if (! NILP (Vpost_gc_hook))
-    {
-      specpdl_ref gc_count = inhibit_garbage_collection ();
-      safe_run_hooks (Qpost_gc_hook);
-      unbind_to (gc_count, Qnil);
-    }
-
   gc_elapsed = timespec_add (gc_elapsed,
 			     timespec_sub (current_timespec (), start));
   Vgc_elapsed = make_float (timespectod (gc_elapsed));
@@ -5203,6 +5196,13 @@ garbage_collect (void)
       size_t tot_after = total_bytes_of_live_objects ();
       if (tot_after < tot_before)
 	malloc_probe (min (tot_before - tot_after, SIZE_MAX));
+    }
+
+  if (!NILP (Vpost_gc_hook))
+    {
+      specpdl_ref gc_count = inhibit_garbage_collection ();
+      safe_run_hooks (Qpost_gc_hook);
+      unbind_to (gc_count, Qnil);
     }
 }
 
