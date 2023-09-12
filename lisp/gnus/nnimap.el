@@ -228,16 +228,10 @@ during splitting, which may be slow."
   (nnimap-assert-context)
   (format nnimap--process-buffer-fmt
           (mapconcat (apply-partially #'format "%s")
-                     `(,(nnoo-current-server 'nnimap)
-                       ,nnimap-address
-                       ,nnimap-server-port
-                       ,@(unless (eq main-thread (current-thread))
-                           (list (or (thread-name (current-thread))
-                                     (cl-remove-if-not
-                                      (lambda (c)
-                                        (or (and (>= c ?0) (<= c ?9))
-                                            (and (>= c ?A) (<= c ?z))))
-                                      (format "%s" (current-thread)))))))
+                     (list
+                      (nnoo-current-server 'nnimap)
+                      nnimap-address
+                      nnimap-server-port)
                      " ")))
 
 (defun nnimap-group-to-imap (group)
