@@ -1580,10 +1580,7 @@ Errors need to be trapped for a clean exit.
 Else we get unblocked but permanently yielded threads."
   (let* ((run-name (concat thread-group "-" label))
          (working (get-buffer-create (format " *%s*" run-name)))
-         (inhibit-debugger t)
-         (gnus-add-timestamp-to-message 'log)
-         debug-on-quit
-         debug-on-error)
+         (gnus-add-timestamp-to-message 'log))
     ;; once context switch occurs handlerlist in eval.c(throw) is lost
     (unwind-protect
         (condition-case err
@@ -1594,7 +1591,7 @@ Else we get unblocked but permanently yielded threads."
                     current-fn
                     (gnus-inhibit-demon t)
                     (nntp-server-buffer (current-buffer)))
-                (condition-case err
+                (condition-case-unless-debug err
                     ;; with-timeout doesn't work in non-main thread
                     ;; i.e., (no-catch timeout timeout)
                     (dolist (fn fns)
@@ -1707,11 +1704,16 @@ Sets up `gnus-get-unread-articles--doit'."
 (defun gnus-get-unread-articles--doit (infos-by-method requested-level)
   "Workhorse of `gnus-get-unread-articles'."
   (let* (methods
-         debug-on-quit
-         debug-on-error
-         (inhibit-debugger t)
+         ;; disallow debugger if backgrounded
+         (inhibit-debugger (if gnus-background-get-unread-articles
+                               t
+                             inhibit-debugger))
+         (debug-on-quit (unless gnus-background-get-unread-articles
+                          debug-on-quit))
+         (debug-on-error (unless gnus-background-get-unread-articles
+                           debug-on-error))
          (level (gnus-group-default-level requested-level t)))
-    (condition-case err
+    (condition-case-unless-debug err
         (mapc (lambda (elem)
                 (cl-destructuring-bind
                     (method &rest infos

@@ -160,6 +160,7 @@
 
 (eval-when-compile (require 'cl-lib))
 (require 'gnus)
+(require 'nnimap)
 
 ;;; Internal Variables:
 
@@ -547,7 +548,7 @@ extensions."
 		(condition-case ()
 		    (when (nnimap-change-group
 			   (gnus-group-short-name group) server)
-		      (with-current-buffer (nnimap-process-buffer)
+		      (nnimap-with-process-buffer
 			(message "Searching %s..." group)
 			(let ((arts 0)
 			      (result (nnimap-command "UID SEARCH %s"
