@@ -353,13 +353,6 @@ Used only on systems which do not support async subprocesses.")
        'process (format-message "started external process `%s'" proc))
       (eshell-record-process-object proc)
       (eshell-record-process-properties proc)
-      (when stderr-proc
-        ;; Provide a shared flag between the primary and stderr
-        ;; processes.  This lets the primary process wait to clean up
-        ;; until stderr is totally finished (see `eshell-sentinel').
-        (let ((stderr-live (list t)))
-          (process-put proc :eshell-stderr-live stderr-live)
-          (process-put stderr-proc :eshell-stderr-live stderr-live)))
       (run-hook-with-args 'eshell-exec-hook proc)
       (when (fboundp 'process-coding-system)
 	(let ((coding-systems (process-coding-system proc)))
@@ -495,23 +488,13 @@ PROC is the process that's exiting.  STRING is the exit message."
   (eshell-debug-command
    'process (format-message "sentinel for external process `%s': %S"
                             proc string))
-  (when (and (buffer-live-p (process-buffer proc))
-             (not (string= string "run")))
+  (when (buffer-live-p (process-buffer proc))
     (with-current-buffer (process-buffer proc)
       (unwind-protect
-          (let* ((handles (process-get proc :eshell-handles))
-                 (index (process-get proc :eshell-handle-index))
-                 (primary (= index eshell-output-handle))
-                 (data (process-get proc :eshell-pending))
-                 ;; Only get the status for the primary subprocess,
-                 ;; not the pipe process (if any).
-                 (status (when primary (process-exit-status proc)))
-                 (stderr-live (process-get proc :eshell-stderr-live)))
-            ;; Write the exit message for the last process in the
-            ;; foreground pipeline if its status is abnormal and
-            ;; stderr is already writing to the terminal.
+          (unless (string= string "run")
+            ;; Write the exit message if the status is abnormal and
+            ;; the process is already writing to the terminal.
             (when (and (eq proc (eshell-tail-process))
-                       (eshell-interactive-output-p eshell-error-handle handles)
                        (not (string-match "^\\(finished\\|exited\\)"
                                           string)))
               (funcall (process-filter proc) proc string))
