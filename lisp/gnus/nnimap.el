@@ -933,10 +933,10 @@ the key of the front-line assoc list to incorporate SERVER."
     (nnimap-with-context nntp-server-buffer
       (when result
 	(when (or (not dont-check)
-		  (not (setq active
-			     (nth 2 (assoc group nnimap-current-infos)))))
-	  (nnimap-retrieve-group-data server info)
-	  (setq active (nth 2 (assoc group nnimap-current-infos))))
+		  (not (setq active (nth 2 (assoc group nnimap-current-infos)))))
+	  (let ((sequences (nnimap-retrieve-group-data-early server info)))
+	    (nnimap-finish-retrieve-group-infos server info sequences t)
+	    (setq active (nth 2 (assoc group nnimap-current-infos)))))
 	(setq active (or active '(0 . 1)))
 	(erase-buffer)
 	(insert (format "211 %d %d %d %S\n"
@@ -1486,13 +1486,14 @@ If LIMIT, first try to limit the search to the N last articles."
 	  (insert (format "%S 0 1 y\n" group))))
       t)))
 
-(deffoo nnimap-retrieve-group-data (server infos)
+(deffoo nnimap-retrieve-group-data-early (server infos)
   (when (nnimap-change-group nil server)
     (nnimap-with-process-buffer
       (setf (nnimap-group nnimap-object) nil)
       (setf (nnimap-initial-resync nnimap-object) 0)
       (let ((qresyncp (nnimap-capability "QRESYNC"))
-	    params sequences active uidvalidity modseq group unexist)
+	    params sequences active uidvalidity modseq group
+	    unexist)
 	;; Go through the infos and gather the data needed to know
 	;; what and how to request the data.
 	(dolist (info infos)
@@ -1536,19 +1537,36 @@ If LIMIT, first try to limit the search to the N last articles."
 			  (nnimap-send-command "UID FETCH %d:* FLAGS" start)
 			  start group command)
 		    sequences))))
-        (when (and sequences
-                   ;; Wait for the final data to trickle in.
-                   (nnimap-wait-for-response (if (eq (cadar sequences) 'qresync)
-					         (caar sequences)
-					       (cadar sequences))
-				             t))
-          ;; Now we should have most of the data we need, no matter
-	  ;; whether we're QRESYNCING, fetching all the flags from
-	  ;; scratch, or just fetching the last 100 flags per group.
-	  (nnimap-update-infos (nnimap-flags-to-marks
-			        (nnimap-parse-flags
-			         (nreverse sequences)))
-			       infos))))))
+	sequences))))
+
+(deffoo nnimap-finish-retrieve-group-infos (server infos sequences &optional dont-insert)
+  (when (and sequences (nnimap-change-group nil server t))
+    (nnimap-with-process-buffer
+      ;; Wait for the final data to trickle in.
+      (when (nnimap-wait-for-response (if (eq (cadar sequences) 'qresync)
+					  (caar sequences)
+					(cadar sequences))
+				      t)
+	;; Now we should have most of the data we need, no matter
+	;; whether we're QRESYNCING, fetching all the flags from
+	;; scratch, or just fetching the last 100 flags per group.
+	(nnimap-update-infos (nnimap-flags-to-marks
+			      (nnimap-parse-flags
+			       (nreverse sequences)))
+			     infos)
+	(unless dont-insert
+	  ;; Finally, just return something resembling an active file in
+	  ;; the nntp buffer, so that the agent can save the info, too.
+	  (nnimap-with-context nntp-server-buffer
+	    (erase-buffer)
+	    (dolist (info infos)
+	      (let* ((group (gnus-info-group info))
+		     (active (gnus-active group)))
+		(when active
+		  (insert (format "%S %d %d y\n"
+				  (gnus-group-real-name group)
+				  (cdr active)
+				  (car active))))))))))))
 
 (defun nnimap-quirk (command)
   (let ((quirk (assoc command nnimap-quirks)))
