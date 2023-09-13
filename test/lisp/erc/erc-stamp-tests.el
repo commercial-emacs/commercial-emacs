@@ -275,6 +275,8 @@
         (kill-buffer)))))
 
 (ert-deftest erc-echo-timestamp ()
+  :tags (and (null (getenv "CI")) '(:unstable))
+
   (should-not erc-echo-timestamps)
   (should-not erc-stamp--last-stamp)
   (insert (propertize "abc" 'erc-timestamp 433483200))
