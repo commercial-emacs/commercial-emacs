@@ -546,8 +546,7 @@ PROC is the process that's exiting.  STRING is the exit message."
                             (setcar stderr-live nil))))))
               (funcall finish-io)))
         (when-let ((entry (assq proc eshell-process-list)))
-          (eshell-remove-process-entry entry))
-        (eshell-kill-process-function proc string)))))
+          (eshell-remove-process-entry entry))))))
 
 (defun eshell-process-interact (func &optional all query)
   "Interact with a process, using PROMPT if more than one, via FUNC.
@@ -555,16 +554,14 @@ If ALL is non-nil, background processes will be interacted with as well.
 If QUERY is non-nil, query the user with QUERY before calling FUNC."
   (let (defunct result)
     (dolist (entry eshell-process-list)
-      (if (and (memq (process-status (car entry))
-		    '(run stop open closed))
+      (if (and (process-live-p (car entry))
 	       (or all
 		   (not (cdr entry)))
 	       (or (not query)
 		   (y-or-n-p (format-message query
 					     (process-name (car entry))))))
 	  (setq result (funcall func (car entry))))
-      (unless (memq (process-status (car entry))
-		    '(run stop open closed))
+      (unless (process-live-p (car entry))
 	(setq defunct (cons entry defunct))))
     ;; clean up the process list; this can get dirty if an error
     ;; occurred that brought the user into the debugger, and then they
