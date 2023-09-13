@@ -3189,10 +3189,7 @@ To see the documentation for a defined struct type, use
                            ;; can't have a perfect result here, and
                            ;; choose to avoid the byte-compiler
                            ;; warnings.
-                           (if (>= (length long-docstring)
-                                   (or (and (boundp 'byte-compile-docstring-max-column)
-                                            byte-compile-docstring-max-column)
-                                       80))
+                           (if (>= (length long-docstring) byte-compile-docstring-max-column)
                                (concat
                                 (internal--format-docstring-line
                                  "Access slot \"%s\" of CL-X." slot)
