@@ -878,6 +878,17 @@ Server mode runs a process that accepts commands from the
                        (point-min) (point-max))))
             (server-reply-print (server-quote-arg text) proc)))))))
 
+(defun server-funcall-and-print (func args proc)
+  "Call FUNC on ARGS and send the result back to client PROC."
+  (let ((v (with-local-quit (eval (apply (intern func) args) t))))
+    (when proc
+      (with-temp-buffer
+        (let ((standard-output (current-buffer)))
+          (pp v)
+          (let ((text (buffer-substring-no-properties
+                       (point-min) (point-max))))
+            (server-reply-print (server-quote-arg text) proc)))))))
+
 (defconst server-msg-size 1024
   "Maximum size of a message sent to a client.")
 
@@ -1201,6 +1212,7 @@ The following commands are accepted by the client:
 		tty-type   ; string.
 		files
 		filepos
+		funcallargs
 		args-left)
 	    ;; Remove this line from STRING.
 	    (setq string (substring string (match-end 0)))
@@ -1326,6 +1338,28 @@ The following commands are accepted by the client:
                        (setq expr (decode-coding-string expr coding-system)))
                    (push (lambda () (server-eval-and-print expr proc))
                          commands)
+                   (setq filepos nil)))
+
+                ;; -funcall FUNC:  Call a function on arguments.
+                ("-funcall"
+                 (if use-current-frame
+                     (setq use-current-frame 'always))
+                 (let ((func (pop args-left)))
+                   (if coding-system
+                       (setq func (decode-coding-string func coding-system)))
+                   (push (lambda () (server-funcall-and-print func funcallargs proc))
+                         commands)
+                   (setq funcallargs nil)
+                   (setq filepos nil)))
+
+                ;; -funcallarg ARG:  Add an argument for later -funcall.
+                ("-funcallarg"
+                 (if use-current-frame
+                     (setq use-current-frame 'always))
+                 (let ((arg (pop args-left)))
+                   (if coding-system
+                       (setq arg (decode-coding-string arg coding-system)))
+                   (push arg funcallargs)
                    (setq filepos nil)))
 
                 ;; -env NAME=VALUE:  An environment variable.

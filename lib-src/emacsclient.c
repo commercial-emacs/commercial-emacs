@@ -116,6 +116,9 @@ static bool suppress_output;
 /* True means args are expressions to be evaluated.  --eval.  */
 static bool eval;
 
+/* The function to call.  Other arguments are passed as strings.  --funcall.  */
+static char *funcall;
+
 /* True means open a new frame.  --create-frame etc.  */
 static bool create_frame;
 
@@ -169,6 +172,7 @@ static struct option const longopts[] =
   { "quiet",	no_argument,	   NULL, 'q' },
   { "suppress-output", no_argument, NULL, 'u' },
   { "eval",	no_argument,	   NULL, 'e' },
+  { "funcall",	required_argument, NULL, 'l' },
   { "help",	no_argument,	   NULL, 'H' },
   { "version",	no_argument,	   NULL, 'V' },
   { "tty",	no_argument,       NULL, 't' },
@@ -552,6 +556,10 @@ decode_options (int argc, char **argv)
 	  eval = true;
 	  break;
 
+	case 'l':
+	  funcall = optarg;
+	  break;
+
 	case 'q':
 	  quiet = true;
 	  break;
@@ -690,6 +698,7 @@ The following OPTIONS are accepted:\n\
 -F ALIST, --frame-parameters=ALIST\n\
 			Set the parameters of a new frame\n\
 -e, --eval    		Evaluate the FILE arguments as ELisp expressions\n\
+-l, --funcall FUNC	Call ELisp FUNC, passing FILE arguments as strings\n\
 -n, --no-wait		Don't wait for the server to return\n\
 -w, --timeout=SECONDS	Seconds to wait before timing out\n\
 -q, --quiet		Don't display messages on success\n\
@@ -1953,9 +1962,17 @@ main (int argc, char **argv)
   /* Process options.  */
   decode_options (argc, argv);
 
-  if (! (optind < argc || eval || create_frame))
+  if (! (optind < argc || eval || funcall || create_frame))
     {
       message (true, ("%s: file name or argument required\n"
+		      "Try '%s --help' for more information\n"),
+	       progname, progname);
+      exit (EXIT_FAILURE);
+    }
+
+  if (eval && funcall)
+    {
+      message (true, ("%s: can't pass both --eval and --funcall\n"
 		      "Try '%s --help' for more information\n"),
 	       progname, progname);
       exit (EXIT_FAILURE);
@@ -2080,6 +2097,13 @@ main (int argc, char **argv)
               send_to_emacs (emacs_socket, " ");
               continue;
             }
+	  else if (funcall)
+	    {
+              send_to_emacs (emacs_socket, "-funcallarg ");
+              quote_argument (emacs_socket, argv[i]);
+              send_to_emacs (emacs_socket, " ");
+              continue;
+	    }
 
 	  char *p = argv[i];
 	  if (*p == '+')
@@ -2136,10 +2160,18 @@ main (int argc, char **argv)
       send_to_emacs (emacs_socket, " ");
     }
 
+  if (funcall)
+    {
+      send_to_emacs (emacs_socket, "-funcall ");
+      quote_argument (emacs_socket, funcall);
+      send_to_emacs (emacs_socket, " ");
+    }
+
+
   send_to_emacs (emacs_socket, "\n");
 
   /* Wait for an answer. */
-  if (!eval && !tty && !nowait && !quiet && 0 <= process_grouping ())
+  if (!eval && !funcall && !tty && !nowait && !quiet && 0 <= process_grouping ())
     {
       printf ("Waiting for Emacs...");
       skiplf = false;
