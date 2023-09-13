@@ -294,8 +294,9 @@ contain the mode-specific abbrevs.
 word at the beginning of the line is the abbrev.  The number that
 follows is the number of times the abbrev has been expanded.  Emacs
 keeps track of this to help you see which abbrevs you actually use, so
-that you can eliminate those that you don't use often.  The string at
-the end of the line is the expansion.
+that you can eliminate those that you don't use often.  The string that
+follows the number is the expansion.  If the abbrev is associated with
+a hook (*note (elisp)Defining Abbrevs::), the hook follows.
 
   Some abbrevs are marked with @samp{(sys)}.  These @dfn{system abbrevs}
 (@pxref{Abbrevs,,, elisp, The Emacs Lisp Reference Manual}) are
