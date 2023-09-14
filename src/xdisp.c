@@ -8321,32 +8321,26 @@ get_element_from_composition (struct it *it)
      MOVE_TO_X: Stop upon reaching x-position TO_X.
      MOVE_TO_POS: Stop upon reaching buffer or string position TO_CHARPOS.
 
-   Stop upon reaching the earlier of OP's instruction and the end of
-   the screen line.
+   TO_X lies in the closed interval [0, IT->last_visible_x] and is
+   inclusive of the window's horizontal scroll amount.
 
-   TO_X is normally a value 0 <= TO_X <= IT->last_visible_x.  TO_X is
-   inclusive of window's horizontal scroll amount.
-
-   The return value has several possible values that
-   say what condition caused the scan to stop:
+   Return reason for scan termination.
 
    MOVE_POS_MATCH_OR_ZV
-     - when TO_POS or ZV was reached.
+     - reached TO_POS or ZV.
 
    MOVE_X_REACHED
-     - when TO_X was reached before TO_POS or ZV were reached.
+     - reached TO_X before TO_POS or ZV was reached.
 
    MOVE_LINE_CONTINUED
-     - when we reached the end of the display area and the line must
-     be continued.
+     - reached the screen line end on a continued line.
 
    MOVE_LINE_TRUNCATED
-     - when we reached the end of the display area and the line is
-     truncated.
+     - reached the screen line end on a truncated line.
 
    MOVE_NEWLINE_OR_CR
-     - when we stopped at a line end, i.e. a newline or a CR and selective
-     display is on.  */
+     - reached a newline (and selective display was on).
+*/
 
 enum move_it_result
 emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
@@ -8733,9 +8727,8 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 
       /* Awkward:
 
-	 (i == 0) Goto done if past edge
-	 (i == 0) Advance iterator
-	 (i == 1) Goto done if past edge
+	 When i == 0, if past edge, goto done, else advance iterator
+	 When i == 1, if past edge, goto done
 
 	 Look in git history for OVERWIDE_PREFIX how this was
 	 previously done.  */
@@ -8970,8 +8963,8 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op,
 		}
 	      goto move_it_forward_continued;
 	    }
-	  else if (it->c == '\t' &&
-		   it->last_visible_x != it->current_x)
+	  else if (it->c == '\t'
+		   && it->last_visible_x != it->current_x)
 	    {
 	      /* Some brutal TAB patchery by CYD and EZ.  */
 	      it->continuation_lines_width += it->last_visible_x;
@@ -9490,7 +9483,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
       while (bpos < ZV_BYTE)
 	{
 	  c = FETCH_BYTE (bpos);
-	  if (!(c == ' ' || c == '\t' || c == '\n' || c == '\r'))
+	  if (c != ' ' && c != '\t' && c != '\n' && c != '\r')
 	    break;
 	  inc_both (&start, &bpos);
 	}
@@ -9498,7 +9491,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
 	{
 	  dec_both (&start, &bpos);
 	  c = FETCH_BYTE (bpos);
-	  if (!(c == ' ' || c == '\t'))
+	  if (c != ' ' && c != '\t')
 	    break;
 	}
     }
@@ -9520,7 +9513,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
 	{
 	  dec_both (&end, &bpos);
 	  c = FETCH_BYTE (bpos);
-	  if (!(c == ' ' || c == '\t' || c == '\n' || c == '\r'))
+	  if (c != ' ' && c != '\t' && c != '\n' && c != '\r')
             {
 	      inc_both (&end, &bpos);
 	      break;
@@ -9529,7 +9522,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
       while (bpos < ZV_BYTE)
 	{
 	  c = fetch_char_advance (&end, &bpos);
-	  if (!(c == ' ' || c == '\t'))
+	  if (c != ' ' && c != '\t')
 	    break;
 	}
     }
@@ -9550,7 +9543,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
   x = move_it_forward (&it, end, max_y, MOVE_TO_POS | MOVE_TO_Y, NULL);
   x = min (x, max_x);
 
-  /* Subtract header- and tab-line included by start_move_it().  */
+  /* Subtract tab- and header-line included by start_move_it().  */
   y = it.current_y + it.max_ascent + it.max_descent
     - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
   y = min (y, max_y);
@@ -9603,59 +9596,24 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
 }
 
 DEFUN ("window-text-pixel-size", Fwindow_text_pixel_size, Swindow_text_pixel_size, 0, 6, 0,
-       doc: /* Return the size of the text of WINDOW's buffer in pixels.
-WINDOW must be a live window and defaults to the selected one.  The
-return value is a cons of the maximum pixel-width of any text line and
-the pixel-height of all the text lines in the accessible portion of
-buffer text.
+       doc: /* Return cons of the width and height in pixels
+of the text in WINDOW from FROM to TO.
 
-If FROM is a cons cell, the return value includes, in addition to the
-dimensions, also a third element that provides the buffer position
-from which measuring of the text dimensions was actually started.
+A FROM of value t signifies the start of the first non-empty line.
+A TO of value t is the end of the last non-empty line.
 
-This function exists to allow Lisp programs to adjust the dimensions
-of WINDOW to the buffer text it needs to display.
+X-LIMIT specifies the maximum X coordinate beyond which text is
+ignored (and thus caps the return width).  X-LIMIT defaults to
+WINDOW's pixel width, which means text beyond WINDOW's width (as for
+truncated lines) is ignored.  Specify an X-LIMIT larger than the
+WINDOW pixel width to account for truncated lines.
 
-The optional argument FROM, if non-nil, specifies the first text
-position to consider, and defaults to the minimum accessible position
-of the buffer.  If FROM is a cons, its car specifies a buffer
-position, and its cdr specifies the vertical offset in pixels from
-that position to the first screen line to be measured.  If FROM is t,
-it stands for the minimum accessible position that starts a non-empty
-line.  TO, if non-nil, specifies the last text position and defaults
-to the maximum accessible position of the buffer.  If TO is t, it
-stands for the maximum accessible position that ends a non-empty line.
+Y-LIMIT specifies the maximum Y coordinate beyond which text is
+ignored (and thus caps the return height).
 
-The optional argument X-LIMIT, if non-nil, specifies the maximum X
-coordinate beyond which the text should be ignored.  It is therefore
-also the maximum width that the function can return.  X-LIMIT nil or
-omitted means to use the pixel-width of WINDOW's body.  This default
-means text of truncated lines wider than the window will be ignored;
-specify a non-nil value for X-LIMIT if lines are truncated and you need
-to account for the truncated text.
-
-Use nil for X-LIMIT if you want to know how high WINDOW should become in
-order to fit all of its buffer's text with the width of WINDOW
-unaltered.  Use the maximum width WINDOW may assume if you intend to
-change WINDOW's width.  Use t for the maximum possible value.  Since
-calculating the width of long lines can take some time, it's always a
-good idea to make this argument as small as possible; in particular, if
-the buffer contains long lines that shall be truncated anyway.
-
-The optional argument Y-LIMIT, if non-nil, specifies the maximum Y
-coordinate beyond which the text is to be ignored; it is therefore
-also the maximum height that the function can return (excluding the
-height of the mode- or header-line, if any).  Y-LIMIT nil or omitted
-means consider all of the accessible portion of buffer text up to the
-position specified by TO.  Since calculating the text height of a
-large buffer can take some time, it makes sense to specify this
-argument if the size of the buffer is large or unknown.
-
-Optional argument MODE-LINES nil or omitted means do not include the
-height of the mode-, tab- or header-line of WINDOW in the return value.
-If it is the symbol `mode-line', `tab-line' or `header-line', include
-only the height of that line, if present, in the return value.  If t,
-include the height of any of these, if present, in the return value.  */)
+A MODE-LINES value of the symbol \\='mode-line', \\='tab-line, or
+\\='header-line adds the height of the specified line.  A MODE-LINES
+value of t adds all their heights.  */)
   (Lisp_Object window, Lisp_Object from, Lisp_Object to, Lisp_Object x_limit,
    Lisp_Object y_limit, Lisp_Object mode_lines)
 {
