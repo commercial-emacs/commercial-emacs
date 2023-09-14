@@ -8308,9 +8308,11 @@ get_element_from_composition (struct it *it)
   }								\
   while (false)
 
-#define IT_RESET_X_ASCENT_DESCENT(IT)			\
-  ((IT)->current_x = x, (IT)->max_ascent = ascent,	\
-   (IT)->max_descent = descent)
+#define IT_PUSH_X_ASCENT_DESCENT(IT)		\
+  (ascent = (IT)->max_ascent, descent = (IT)->max_descent, x = (IT)->current_x)
+
+#define IT_POP_X_ASCENT_DESCENT(IT)					\
+  ((IT)->current_x = x, (IT)->max_descent = descent, (IT)->max_ascent = ascent)
 
 /* Move iterator IT forward one screen line without producing glyphs.
 
@@ -8435,10 +8437,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  may_wrap = char_can_wrap_after (it);
 	}
 
-      ascent = it->max_ascent;
-      descent = it->max_descent;
-      x = it->current_x;
-
+      IT_PUSH_X_ASCENT_DESCENT (it);
       PRODUCE_GLYPHS (it);
 
       if (it->area != TEXT_AREA)
@@ -8485,7 +8484,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 		      if (atpos_it.sp < 0)
 			{
 			  SAVE_IT (atpos_it, *it, atpos_data);
-			  IT_RESET_X_ASCENT_DESCENT (&atpos_it);
+			  IT_POP_X_ASCENT_DESCENT (&atpos_it);
 			}
 		    }
 		  else
@@ -8499,7 +8498,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 		      if (atx_it.sp < 0)
 			{
 			  SAVE_IT (atx_it, *it, atx_data);
-			  IT_RESET_X_ASCENT_DESCENT (&atx_it);
+			  IT_POP_X_ASCENT_DESCENT (&atx_it);
 			}
 		    }
 		}
@@ -8617,7 +8616,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 			}
 		    }
 		  else
-		    IT_RESET_X_ASCENT_DESCENT (it);
+		    IT_POP_X_ASCENT_DESCENT (it);
 
 		  /* may_wrap meant previous character affirmed
 		     char_can_wrap_after(), but current character
@@ -8659,7 +8658,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 		    {
 		      eassert (it->line_wrap == WORD_WRAP);
 		      SAVE_IT (atpos_it, *it, atpos_data);
-		      IT_RESET_X_ASCENT_DESCENT (&atpos_it);
+		      IT_POP_X_ASCENT_DESCENT (&atpos_it);
 		    }
 		}
 
@@ -8683,7 +8682,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
       else if (BUFFER_POS_REACHED_P ())
 	{
 	buffer_pos_reached:
-	  IT_RESET_X_ASCENT_DESCENT (it);
+	  IT_POP_X_ASCENT_DESCENT (it);
 	  result = MOVE_POS_MATCH_OR_ZV;
 	  goto done;
 	}
@@ -8799,7 +8798,8 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
   return result;
 }
 
-#undef IT_RESET_X_ASCENT_DESCENT
+#undef IT_PUSH_X_ASCENT_DESCENT
+#undef IT_POP_X_ASCENT_DESCENT
 #undef BUFFER_POS_REACHED_P
 #undef SET_CLOSEST_PAST_CHARPOS
 
@@ -29206,8 +29206,6 @@ gui_produce_glyphs (struct it *it)
     produce_xwidget_glyph (it);
 
  done:
-  /* Accumulate dimensions.  Note: can't assume that it->descent > 0
-     because this isn't true for images with `:ascent 100'.  */
   eassert (it->ascent >= 0 && it->descent >= 0);
   if (it->area == TEXT_AREA)
     it->current_x += it->pixel_width;
