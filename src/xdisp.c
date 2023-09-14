@@ -8286,6 +8286,7 @@ get_element_from_composition (struct it *it)
 	       || (IT_CHARPOS (*it) < to_charpos		\
 		   && to_charpos <= it->cmp_it.charpos))))	\
    && (it->method == GET_FROM_BUFFER				\
+       || it->method == GET_FROM_IMAGE				\
        || (it->method == GET_FROM_DISPLAY_VECTOR		\
 	   && it->dpvec + it->current.dpvec_index + 1 >= it->dpend)))
 
@@ -8307,12 +8308,6 @@ get_element_from_composition (struct it *it)
     SET_CLOSEST_PAST_CHARPOS ((IT));				\
   }								\
   while (false)
-
-#define IT_SAVE_X_ASCENT_DESCENT(IT)		\
-  (ascent = (IT)->max_ascent, descent = (IT)->max_descent, x = (IT)->current_x)
-
-#define IT_RESTORE_X_ASCENT_DESCENT(IT)					\
-  ((IT)->current_x = x, (IT)->max_descent = descent, (IT)->max_ascent = ascent)
 
 /* Move iterator IT forward one screen line without producing glyphs.
 
@@ -8392,8 +8387,6 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 
   for (;;)
     {
-      int x, i, ascent = 0, descent = 0;
-
       if (! get_display_element (it))
 	{
 	  result = MOVE_POS_MATCH_OR_ZV;
@@ -8437,7 +8430,11 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  may_wrap = char_can_wrap_after (it);
 	}
 
-      IT_SAVE_X_ASCENT_DESCENT (it);
+      struct it it_prev; // previous to PRODUCE_GLYPHS
+      it_prev.current_x = it->current_x;
+      it_prev.max_ascent = it->max_ascent;
+      it_prev.max_descent = it->max_descent;
+
       PRODUCE_GLYPHS (it);
 
       if (it->area != TEXT_AREA)
@@ -8467,14 +8464,14 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
       if (it->nglyphs)
 	{
 	  int single_glyph_width = it->pixel_width / it->nglyphs;
-	  int new_x;
-	  int x_before_char = x;
+	  int x_before_char = it_prev.current_x;
 	  int hpos_before_char = it->hpos;
 
-	  for (i = 0; i < it->nglyphs; ++i, x = new_x)
+	  for (int i = 0, old_x = x_before_char,
+		 new_x = x_before_char + single_glyph_width;
+	       i < it->nglyphs;
+	       ++i, old_x = new_x, new_x = old_x + single_glyph_width)
 	    {
-	      new_x = x + single_glyph_width;
-
 	      if ((op & MOVE_TO_X) && new_x > to_x)
 		{
 		  if (BUFFER_POS_REACHED_P ())
@@ -8484,21 +8481,25 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 		      if (atpos_it.sp < 0)
 			{
 			  SAVE_IT (atpos_it, *it, atpos_data);
-			  IT_RESTORE_X_ASCENT_DESCENT (&atpos_it);
+			  it->current_x = old_x;
+			  it->max_descent = it_prev.max_descent;
+			  it->max_ascent = it_prev.max_ascent;
 			}
 		    }
 		  else
 		    {
 		      if (it->line_wrap != WORD_WRAP || wrap_it.sp < 0)
 			{
-			  it->current_x = x;
+			  it->current_x = old_x;
 			  result = MOVE_X_REACHED;
 			  break;
 			}
 		      if (atx_it.sp < 0)
 			{
 			  SAVE_IT (atx_it, *it, atx_data);
-			  IT_RESTORE_X_ASCENT_DESCENT (&atx_it);
+			  it->current_x = old_x;
+			  it->max_descent = it_prev.max_descent;
+			  it->max_ascent = it_prev.max_ascent;
 			}
 		    }
 		}
@@ -8615,8 +8616,11 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 			    }
 			}
 		    }
-		  else
-		    IT_RESTORE_X_ASCENT_DESCENT (it);
+		  else {
+		    it->current_x = old_x;
+		    it->max_descent = it_prev.max_descent;
+		    it->max_ascent = it_prev.max_ascent;
+		  }
 
 		  /* may_wrap meant previous character affirmed
 		     char_can_wrap_after(), but current character
@@ -8658,7 +8662,9 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 		    {
 		      eassert (it->line_wrap == WORD_WRAP);
 		      SAVE_IT (atpos_it, *it, atpos_data);
-		      IT_RESTORE_X_ASCENT_DESCENT (&atpos_it);
+		      it->current_x = old_x;
+		      it->max_descent = it_prev.max_descent;
+		      it->max_ascent = it_prev.max_ascent;
 		    }
 		}
 
@@ -8682,7 +8688,9 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
       else if (BUFFER_POS_REACHED_P ())
 	{
 	buffer_pos_reached:
-	  IT_RESTORE_X_ASCENT_DESCENT (it);
+	  it->current_x = it_prev.current_x;
+	  it->max_descent = it_prev.max_descent;
+	  it->max_ascent = it_prev.max_ascent;
 	  result = MOVE_POS_MATCH_OR_ZV;
 	  goto done;
 	}
@@ -8798,8 +8806,6 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
   return result;
 }
 
-#undef IT_SAVE_X_ASCENT_DESCENT
-#undef IT_RESTORE_X_ASCENT_DESCENT
 #undef BUFFER_POS_REACHED_P
 #undef SET_CLOSEST_PAST_CHARPOS
 
