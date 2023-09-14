@@ -8464,11 +8464,8 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
       if (it->nglyphs)
 	{
 	  int single_glyph_width = it->pixel_width / it->nglyphs;
-	  int x_before_char = it_prev.current_x;
-	  int hpos_before_char = it->hpos;
-
-	  for (int i = 0, old_x = x_before_char,
-		 new_x = x_before_char + single_glyph_width;
+	  for (int i = 0, old_hpos = it->hpos, old_x = it_prev.current_x,
+		 new_x = it_prev.current_x + single_glyph_width;
 	       i < it->nglyphs;
 	       ++i, old_x = new_x, new_x = old_x + single_glyph_width)
 	    {
@@ -8562,8 +8559,8 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 				  || (may_wrap && can_wrap
 				      && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it)))
 				{
-				  it->hpos = hpos_before_char;
-				  it->current_x = x_before_char;
+				  it->hpos = old_hpos;
+				  it->current_x = it_prev.current_x;
 				  result = MOVE_POS_MATCH_OR_ZV;
 				  break;
 				}
@@ -8571,8 +8568,8 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 				  && atpos_it.sp < 0)
 				{
 				  SAVE_IT (atpos_it, *it, atpos_data);
-				  atpos_it.current_x = x_before_char;
-				  atpos_it.hpos = hpos_before_char;
+				  atpos_it.current_x = it_prev.current_x;
+				  atpos_it.hpos = old_hpos;
 				}
 			    }
 
