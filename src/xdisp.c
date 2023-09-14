@@ -9607,9 +9607,8 @@ A TO of value t is the end of the last non-empty line.
 
 X-LIMIT specifies the maximum X coordinate beyond which text is
 ignored (and thus caps the return width).  X-LIMIT defaults to
-WINDOW's pixel width, which means text beyond WINDOW's width (as for
-truncated lines) is ignored.  Specify an X-LIMIT larger than the
-WINDOW pixel width to account for truncated lines.
+WINDOW's pixel width, which means the truncated portion
+under `truncate-lines' is excluded.
 
 Y-LIMIT specifies the maximum Y coordinate beyond which text is
 ignored (and thus caps the return height).
