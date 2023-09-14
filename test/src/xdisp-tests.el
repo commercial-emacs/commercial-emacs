@@ -365,7 +365,36 @@ bidi_it.charpos without also fetching its char."
     (call-interactively #'previous-line)
     (should (looking-at (regexp-quote "ְ")))))
 
-(ert-deftest xdisp-tests--char-pos-reached-within-image ()
+(ert-deftest xdisp-tests--char-pos-reached-within-image-after-images ()
+  "Bug#65899."
+  (skip-unless (not noninteractive))
+  (let* ((width 20)
+         (height (line-pixel-height))
+         (data (with-temp-buffer
+                 (insert (format "P1\n%s %s\n" width height))
+                 (dotimes (_ height)
+                   (insert (make-string width ?1) "\n"))
+                 (buffer-string))))
+    (save-current-buffer
+      (let ((visible-buffer (get-buffer-create
+                             (symbol-name
+                              (ert-test-name (ert-running-test))))))
+        (unwind-protect
+            (progn (switch-to-buffer visible-buffer)
+                   (dotimes (i 3)
+                     (erase-buffer)
+                     (dotimes (_ i)
+                       (insert-image `(image :type pbm
+                                             :data ,"P1\n1 10\n1111111111"
+                                             :ascent center)
+                                     "t"))
+                     (let ((from (point)))
+                       (insert-image `(image :type pbm :data ,data :ascent center) "t")
+                       (should (equal width (car (window-text-pixel-size nil from (point))))))))
+          (let (kill-buffer-query-functions)
+            (kill-buffer visible-buffer)))))))
+
+(ert-deftest xdisp-tests--char-pos-reached-within-image-after-spaces ()
   "Bug#54862."
   (skip-unless (not noninteractive))
   (let* ((width 20)
@@ -385,9 +414,12 @@ bidi_it.charpos without also fetching its char."
                      (erase-buffer)
                      (insert (make-string i ? ))
                      (let ((from (point)))
-                       (insert-image `(image :type pbm :data ,data :ascent center) "t")
-                       (should (equal width (car (window-text-pixel-size nil from (point))))))))
+                       (insert-image `(image :type pbm
+                                             :data ,data
+                                             :ascent center)
+                                     "t")
+                       (should (equal width (car (window-text-pixel-size nil from (point)))))))
           (let (kill-buffer-query-functions)
-            (kill-buffer visible-buffer)))))))
+            (kill-buffer visible-buffer))))))))
 
 ;;; xdisp-tests.el ends here
