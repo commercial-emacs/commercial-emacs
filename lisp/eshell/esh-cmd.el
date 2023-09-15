@@ -424,7 +424,8 @@ hooks should be run before and after the command."
 
 (defun eshell-debug-show-parsed-args (terms)
   "Display parsed arguments in the debug buffer."
-  (ignore (eshell-debug-command 'form "parsed arguments" terms)))
+  (ignore (eshell-debug-command 'form
+            "parsed arguments\n\n%s" (eshell-stringify terms))))
 
 (defun eshell-no-command-conversion (terms)
   "Don't convert the command argument."
@@ -1031,10 +1032,11 @@ process(es) in a cons cell like:
     `(if (not (memq 'form eshell-debug-command))
          (progn ,@body)
        (let ((,tag-symbol ,tag))
-         (eshell-debug-command 'form ,tag-symbol ,form 'always)
+         (eshell-always-debug-command 'form
+           "%s\n\n%s" ,tag-symbol ,(eshell-stringify form))
          ,@body
-         (eshell-debug-command 'form (concat "done " ,tag-symbol) ,form
-                               'always)))))
+         (eshell-always-debug-command 'form
+           "done %s\n\n%s " ,tag-symbol ,(eshell-stringify form))))))
 
 (defun eshell-do-eval (form &optional synchronous-p)
   "Evaluate FORM, simplifying it as we go.
@@ -1098,16 +1100,23 @@ have been replaced by constants."
                 eshell--test-body (copy-tree (car args)))))
        ((eq (car form) 'if)
         (eshell-manipulate form "evaluating if condition"
-          (setcar args (eshell-do-eval (car args) synchronous-p)))
-        (eshell-do-eval
-         (cond
-          ((eval (car args))            ; COND is non-nil
-           (cadr args))
-          ((cdddr args)                 ; Multiple ELSE forms
-           `(progn ,@(cddr args)))
-          (t                            ; Zero or one ELSE forms
-           (caddr args)))
-         synchronous-p))
+          ;; Evaluate the condition and replace our `if' form with
+          ;; THEN or ELSE as appropriate.
+          (let ((new-form
+                 (cond
+                  ((cadr (eshell-do-eval (car args) synchronous-p))
+                   (cadr args))            ; COND is non-nil
+                  ((cdddr args)
+                   `(progn ,@(cddr args))) ; Multiple ELSE forms
+                  (t
+                   (caddr args)))))        ; Zero or one ELSE forms
+            (if (consp new-form)
+                (progn
+                  (setcar form (car new-form))
+                  (setcdr form (cdr new-form)))
+              (setcar form 'progn)
+              (setcdr form new-form))))
+        (eshell-do-eval form synchronous-p))
        ((eq (car form) 'setcar)
 	(setcar (cdr args) (eshell-do-eval (cadr args) synchronous-p))
 	(eval form))
