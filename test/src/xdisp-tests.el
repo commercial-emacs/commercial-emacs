@@ -380,17 +380,18 @@ bidi_it.charpos without also fetching its char."
                              (symbol-name
                               (ert-test-name (ert-running-test))))))
         (unwind-protect
-            (progn (switch-to-buffer visible-buffer)
-                   (dotimes (i 3)
-                     (erase-buffer)
-                     (dotimes (_ i)
-                       (insert-image `(image :type pbm
-                                             :data ,"P1\n1 10\n1111111111"
-                                             :ascent center)
-                                     "t"))
-                     (let ((from (point)))
-                       (insert-image `(image :type pbm :data ,data :ascent center) "t")
-                       (should (equal width (car (window-text-pixel-size nil from (point))))))))
+            (progn
+	      (switch-to-buffer visible-buffer)
+              (dotimes (i 3)
+                (erase-buffer)
+                (dotimes (_ i)
+                  (insert-image `(image :type pbm
+                                        :data ,"P1\n1 10\n1111111111"
+                                        :ascent center)
+                                "t"))
+                (let ((from (point)))
+                  (insert-image `(image :type pbm :data ,data :ascent center) "t")
+                  (should (equal width (car (window-text-pixel-size nil from (point))))))))
           (let (kill-buffer-query-functions)
             (kill-buffer visible-buffer)))))))
 
@@ -409,17 +410,18 @@ bidi_it.charpos without also fetching its char."
                              (symbol-name
                               (ert-test-name (ert-running-test))))))
         (unwind-protect
-            (progn (switch-to-buffer visible-buffer)
-                   (dotimes (i 3)
-                     (erase-buffer)
-                     (insert (make-string i ? ))
-                     (let ((from (point)))
-                       (insert-image `(image :type pbm
-                                             :data ,data
-                                             :ascent center)
-                                     "t")
-                       (should (equal width (car (window-text-pixel-size nil from (point)))))))
+            (progn
+              (switch-to-buffer visible-buffer)
+              (dotimes (i 3)
+                (erase-buffer)
+                (insert (make-string i ? ))
+                (let ((from (point)))
+                  (insert-image `(image :type pbm
+                                        :data ,data
+                                        :ascent center)
+                                "t")
+                  (should (equal width (car (window-text-pixel-size nil from (point))))))))
           (let (kill-buffer-query-functions)
-            (kill-buffer visible-buffer))))))))
+            (kill-buffer visible-buffer)))))))
 
 ;;; xdisp-tests.el ends here
