@@ -3369,7 +3369,6 @@ int window_box_left (struct window *, enum glyph_row_area);
 int window_box_left_offset (struct window *, enum glyph_row_area);
 int window_box_right (struct window *, enum glyph_row_area);
 int estimate_mode_line_height (struct frame *, enum face_id);
-void move_it_eob_no_newline (struct it *it);
 int move_it_forward (struct it *, ptrdiff_t, int, int, bool *);
 void move_it_backward (struct it *, int, int);
 void pixel_to_glyph_coords (struct frame *, int, int, int *, int *,
@@ -3385,7 +3384,6 @@ void init_iterator_to_row_start (struct it *, struct window *,
 void start_move_it (struct it *, struct window *, struct text_pos);
 void move_it_dy (struct it *, int);
 void move_it_dvpos (struct it *, ptrdiff_t);
-void move_it_past_eol (struct it *);
 void move_it_x (struct it *it, int to_x);
 int partial_line_height (struct it *it_origin);
 bool in_display_vector_p (struct it *);

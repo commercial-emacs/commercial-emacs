@@ -7243,7 +7243,7 @@ get_display_element (struct it *it)
 
 
 /* Actually increment IT.
-   RESEAT_P skips to the visible line end.  */
+   RESEAT_P apparently skips to line end.  */
 
 void
 set_iterator_to_next (struct it *it, bool reseat_p)
@@ -9248,19 +9248,6 @@ move_it_backward (struct it *it, int op_to, int op)
       break;
     }
 }
-
-/* Move iterator IT past the end of the text line it is in.  */
-
-void
-move_it_past_eol (struct it *it)
-{
-  enum move_it_result rc;
-
-  rc = emulate_display_sline (it, Z, 0, MOVE_TO_POS);
-  if (rc == MOVE_NEWLINE_OR_CR)
-    set_iterator_to_next (it, false);
-}
-
 
 /* Return window object ("target") under pixel position (X, Y).  This
    is usually the buffer itself unless the target happens to be a

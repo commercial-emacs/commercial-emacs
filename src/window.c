@@ -1798,70 +1798,49 @@ have been if redisplay had finished, do this:
       (point))")  */
 
 DEFUN ("window-end", Fwindow_end, Swindow_end, 0, 2, 0,
-       doc: /* Return position at which display currently ends in WINDOW.
-This is the position after the final character in WINDOW.
-
-WINDOW must be a live window and defaults to the selected one.  This
-is updated by redisplay, when it runs to completion.  Simply changing
-the buffer text or setting `window-start' does not update this value.
-
-Return nil if there is no recorded value.  (This can happen if the
-last redisplay of WINDOW was preempted, and did not finish.)  If
-UPDATE is non-nil, compute the up-to-date position if it isn't already
-recorded.  */)
+       doc: /* Return position after final character in WINDOW.
+If UPDATE, recompute that position.  */)
   (Lisp_Object window, Lisp_Object update)
 {
   Lisp_Object value;
-  struct window *w = decode_live_window (window);
-  Lisp_Object buf;
   struct buffer *b;
+  struct window *w = decode_live_window (window);
 
-  buf = w->contents;
-  CHECK_BUFFER (buf);
-  b = XBUFFER (buf);
+  CHECK_BUFFER (w->contents);
+  b = XBUFFER (w->contents);
 
   if (! NILP (update)
+      && ! noninteractive
       && (windows_or_buffers_changed
-	  || !w->window_end_valid
+	  || ! w->window_end_valid
 	  || b->clip_changed
 	  || b->prevent_redisplay_optimizations_p
 	  || window_outdated (w))
-      /* Don't call display routines if we didn't yet create any real
-	 frames, because the glyph matrices are not yet allocated in
-	 that case.  This could happen in some code that runs in the
-	 daemon during initialization (e.g., see bug#20565).  */
-      && !(noninteractive || FRAME_INITIAL_P (WINDOW_XFRAME (w))))
+      /* i.e., not daemon (Bug#20565).  */
+      && ! FRAME_INITIAL_P (WINDOW_XFRAME (w)))
     {
       struct text_pos startp;
       struct it it;
-      struct buffer *old_buffer = NULL;
+      struct buffer *restore_current = NULL;
       void *itdata = NULL;
 
-      /* Cannot use Fvertical_motion because that function doesn't
-	 cope with variable-height lines.  */
       if (b != current_buffer)
 	{
-	  old_buffer = current_buffer;
+	  restore_current = current_buffer;
 	  set_buffer_internal (b);
 	}
 
-      /* In case W->start is out of the range, use something
-         reasonable.  This situation occurred when loading a file with
-         `-l' containing a call to `rmail' with subsequent other
-         commands.  At the end, W->start happened to be BEG, while
-         rmail had already narrowed the buffer.  */
       CLIP_TEXT_POS_FROM_MARKER (startp, w->start);
 
       itdata = bidi_shelve_cache ();
       start_move_it (&it, w, startp);
       move_it_dy (&it, window_box_height (w));
-      if (it.current_y < it.last_visible_y)
-	move_it_past_eol (&it);
+      move_it_dvpos (&it, 1); /* formerly move_it_past_eol.  */
       value = make_fixnum (IT_CHARPOS (it));
       bidi_unshelve_cache (itdata, false);
 
-      if (old_buffer)
-	set_buffer_internal (old_buffer);
+      if (restore_current)
+	set_buffer_internal (restore_current);
     }
   else
     XSETINT (value, BUF_Z (b) - w->window_end_pos);
