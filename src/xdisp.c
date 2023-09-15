@@ -9600,7 +9600,7 @@ under `truncate-lines' is excluded.
 Y-LIMIT specifies the maximum Y coordinate beyond which text is
 ignored (and thus caps the return height).
 
-A MODE-LINES value of the symbol \\='mode-line', \\='tab-line, or
+A MODE-LINES value of the symbol \\='mode-line, \\='tab-line, or
 \\='header-line adds the height of the specified line.  A MODE-LINES
 value of t adds all their heights.  */)
   (Lisp_Object window, Lisp_Object from, Lisp_Object to, Lisp_Object x_limit,
