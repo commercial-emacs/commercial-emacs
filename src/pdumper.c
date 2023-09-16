@@ -2415,7 +2415,7 @@ static dump_off
 dump_vectorlike_generic (struct dump_context *ctx,
 			 const union vectorlike_header *header)
 {
-#if CHECK_STRUCTS && !defined (HASH_vectorlike_header_00A5A4BFB2)
+#if CHECK_STRUCTS && !defined (HASH_vectorlike_header_785E52047B)
 # error "vectorlike_header changed. See CHECK_STRUCTS comment in config.h."
 #endif
   const struct Lisp_Vector *v = (const struct Lisp_Vector *) header;
