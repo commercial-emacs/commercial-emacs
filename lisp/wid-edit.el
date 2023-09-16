@@ -3662,9 +3662,7 @@ match-alternatives: %S"
                           :warning)
                          ;; Make sure we will `read' a string.
                          (setq value (prin1-to-string value)))
-                       (if (string-empty-p value)
-                           value
-                       (read value))))
+                       (read value)))
 
 (defun widget-restricted-sexp-match (widget value)
   (let ((alternatives (widget-get widget :match-alternatives))
