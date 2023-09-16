@@ -347,7 +347,8 @@ bidi_it.charpos without also fetching its char."
       (should (equal (current-message) dont)))))
 
 (ert-deftest xdisp-tests--find-automatic-composition ()
-  "`find-automatic-composition' could stand yet another rewrite."
+  "`find-automatic-composition' could stand yet another rewrite.
+Bug present here and in GNU since it doesn't sustain a rerun."
   (skip-unless (not noninteractive))
   (xdisp-tests--visible-buffer
     (save-excursion
@@ -356,72 +357,56 @@ bidi_it.charpos without also fetching its char."
     (dotimes (_i 11)
       (call-interactively #'forward-char))
     (call-interactively #'backward-char)
-    (should (looking-at (regexp-quote "בְ")))
+    (should (equal (char-after) (string-to-char "בְ")))
     (call-interactively #'forward-char)
     (call-interactively #'next-line)
-    (should (looking-at (regexp-quote ")")))
+    (should (equal (char-after) ?\)))
     (call-interactively #'forward-char)
     (call-interactively #'forward-char)
     (call-interactively #'previous-line)
-    (should (looking-at (regexp-quote "ְ")))))
+    (should (equal (char-after) (string-to-char "ְ")))))
 
 (ert-deftest xdisp-tests--char-pos-reached-within-image-after-images ()
   "Bug#65899."
   (skip-unless (not noninteractive))
-  (let* ((width 20)
-         (height (line-pixel-height))
-         (data (with-temp-buffer
-                 (insert (format "P1\n%s %s\n" width height))
-                 (dotimes (_ height)
-                   (insert (make-string width ?1) "\n"))
-                 (buffer-string))))
-    (save-current-buffer
-      (let ((visible-buffer (get-buffer-create
-                             (symbol-name
-                              (ert-test-name (ert-running-test))))))
-        (unwind-protect
-            (progn
-	      (switch-to-buffer visible-buffer)
-              (dotimes (i 3)
-                (erase-buffer)
-                (dotimes (_ i)
-                  (insert-image `(image :type pbm
-                                        :data ,"P1\n1 10\n1111111111"
-                                        :ascent center)
-                                "t"))
-                (let ((from (point)))
-                  (insert-image `(image :type pbm :data ,data :ascent center) "t")
-                  (should (equal width (car (window-text-pixel-size nil from (point))))))))
-          (let (kill-buffer-query-functions)
-            (kill-buffer visible-buffer)))))))
+  (xdisp-tests--visible-buffer
+    (let* ((width 20)
+           (height (line-pixel-height))
+           (data (with-temp-buffer
+                   (insert (format "P1\n%s %s\n" width height))
+                   (dotimes (_ height)
+                     (insert (make-string width ?1) "\n"))
+                   (buffer-string))))
+      (dotimes (i 3)
+        (erase-buffer)
+        (dotimes (_ i)
+          (insert-image `(image :type pbm
+                                :data ,"P1\n1 10\n1111111111"
+                                :ascent center)
+                        "t"))
+        (let ((from (point)))
+          (insert-image `(image :type pbm :data ,data :ascent center) "t")
+          (should (equal width (car (window-text-pixel-size nil from (point))))))))))
 
 (ert-deftest xdisp-tests--char-pos-reached-within-image-after-spaces ()
   "Bug#54862."
   (skip-unless (not noninteractive))
-  (let* ((width 20)
-         (height (line-pixel-height))
-         (data (with-temp-buffer
-                 (insert (format "P1\n%s %s\n" width height))
-                 (dotimes (_ height)
-                   (insert (make-string width ?1) "\n"))
-                 (buffer-string))))
-    (save-current-buffer
-      (let ((visible-buffer (get-buffer-create
-                             (symbol-name
-                              (ert-test-name (ert-running-test))))))
-        (unwind-protect
-            (progn
-              (switch-to-buffer visible-buffer)
-              (dotimes (i 3)
-                (erase-buffer)
-                (insert (make-string i ? ))
-                (let ((from (point)))
-                  (insert-image `(image :type pbm
-                                        :data ,data
-                                        :ascent center)
-                                "t")
-                  (should (equal width (car (window-text-pixel-size nil from (point))))))))
-          (let (kill-buffer-query-functions)
-            (kill-buffer visible-buffer)))))))
+  (xdisp-tests--visible-buffer
+    (let* ((width 20)
+           (height (line-pixel-height))
+           (data (with-temp-buffer
+                   (insert (format "P1\n%s %s\n" width height))
+                   (dotimes (_ height)
+                     (insert (make-string width ?1) "\n"))
+                   (buffer-string))))
+      (dotimes (i 3)
+        (erase-buffer)
+        (insert (make-string i ? ))
+        (let ((from (point)))
+          (insert-image `(image :type pbm
+                                :data ,data
+                                :ascent center)
+                        "t")
+          (should (equal width (car (window-text-pixel-size nil from (point))))))))))
 
 ;;; xdisp-tests.el ends here
