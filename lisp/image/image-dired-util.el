@@ -4,6 +4,7 @@
 
 ;; Author: Mathias Dahl <mathias.rem0veth1s.dahl@gmail.com>
 ;; Maintainer: Stefan Kangas <stefankangas@gmail.com>
+;; Package: image-dired
 
 ;; This file is NOT part of GNU Emacs.
 

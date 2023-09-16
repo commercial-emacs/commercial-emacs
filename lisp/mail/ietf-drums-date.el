@@ -3,6 +3,7 @@
 ;; Copyright (C) 2022-2023 Free Software Foundation, Inc.
 
 ;; Author: Bob Rogers <rogers@rgrjr.com>
+;; Package: ietf-drums
 ;; Keywords: mail, util
 
 ;; This file is NOT part of GNU Emacs.
