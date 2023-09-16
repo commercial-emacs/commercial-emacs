@@ -26,6 +26,7 @@
 (require 'epg)
 
 (defvar epg-tests-context nil)
+(defvar epg-tests-max-errors 1 "Some underhanded shit.")
 
 (defconst epg-tests--config-program-alist
   ;; The default `epg-config--program-alist' requires gpg2 2.1 or
@@ -66,7 +67,9 @@
              (append
               (list "GPG_AGENT_INFO"
                     (format "GNUPGHOME=%s" epg-tests-home-directory))
-              process-environment)))
+              process-environment))
+	    (epg-debug t)
+	    (epg-debug-buffer (get-buffer-create " *epg-test*")))
        ;; GNUPGHOME is needed to find a usable gpg, so we can't
        ;; check whether to skip any earlier (Bug#23561).
        (let ((epg-config (or (epg-tests-find-usable-gpg-configuration
@@ -96,7 +99,12 @@
                 (ert-resource-file "seckey.asc")))
          (with-temp-buffer
            (setq-local epg-tests-context context)
-           ,@body)))))
+           (condition-case err
+               (progn ,@body)
+             (error (message "%s" (with-current-buffer epg-debug-buffer
+                                    (buffer-string)))
+                    (when (zerop (1+ (cl-decf epg-tests-max-errors)))
+                      (signal (car err) (cdr err))))))))))
 
 (ert-deftest epg-decrypt-1 ()
   (skip-unless (not (getenv "CI")))
