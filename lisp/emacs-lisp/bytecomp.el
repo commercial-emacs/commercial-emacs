@@ -4991,7 +4991,7 @@ FORM is used to provide location, `bytecomp--cus-function' and
                          (if bytecomp--cus-name
                              (format " for `%s'" bytecomp--cus-name)
                            ""))))
-    (apply #'byte-compile-warn-x form (concat prefix format) args)))
+    (apply #'byte-compile-warn (concat prefix format) args)))
 
 (defun bytecomp--check-cus-type (type)
   "Warn about common mistakes in the `defcustom' type TYPE."
