@@ -2505,7 +2505,7 @@ Equivalent key-bindings are also shown in the completion list of
   :group 'keyboard
   :type '(choice (const :tag "off" nil)
                  (natnum :tag "time" 2)
-                 (other :tag "on")))
+                 (other :tag "on" t)))
 
 (defcustom extended-command-suggest-shorter t
   "If non-nil, show a shorter \\[execute-extended-command] invocation \
