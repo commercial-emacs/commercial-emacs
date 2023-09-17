@@ -2881,7 +2881,7 @@ You type        Translation\n\
     {
       Lisp_Object msg = build_unibyte_string ("Key translations");
       CALLN (Ffuncall,
-	     Qdescribe_map_tree,
+	     Qhelp__describe_map_tree,
 	     Vkey_translation_map, Qnil, Qnil, prefix,
 	     msg, nomenu, Qt, Qnil, Qnil, buffer);
     }
@@ -2895,7 +2895,7 @@ You type        Translation\n\
     {
       Lisp_Object msg = build_unibyte_string ("\f\nOverriding Bindings");
       CALLN (Ffuncall,
-	     Qdescribe_map_tree,
+	     Qhelp__describe_map_tree,
 	     start1, Qt, shadow, prefix,
 	     msg, nomenu, Qnil, Qnil, Qnil, buffer);
       shadow = Fcons (start1, shadow);
@@ -2908,7 +2908,7 @@ You type        Translation\n\
     {
       Lisp_Object msg = build_unibyte_string ("\f\nOverriding Bindings");
       CALLN (Ffuncall,
-	     Qdescribe_map_tree,
+	     Qhelp__describe_map_tree,
 	     start1, Qt, shadow, prefix,
 	     msg, nomenu, Qnil, Qnil, Qnil, buffer);
       shadow = Fcons (start1, shadow);
@@ -2931,7 +2931,7 @@ You type        Translation\n\
 	{
 	  Lisp_Object msg = build_unibyte_string ("\f\n`keymap' Property Bindings");
 	  CALLN (Ffuncall,
-		 Qdescribe_map_tree,
+		 Qhelp__describe_map_tree,
 		 start1, Qt, shadow, prefix,
 		 msg, nomenu, Qnil, Qnil, Qnil, buffer);
 	  shadow = Fcons (start1, shadow);
@@ -2942,7 +2942,7 @@ You type        Translation\n\
 	{
 	  /* The title for a minor mode keymap
 	     is constructed at run time.
-	     We let describe-map-tree do the actual insertion
+	     We let `help--describe-map-tree' do the actual insertion
 	     because it takes care of other features when doing so.  */
 	  char *title, *p;
 
@@ -2964,7 +2964,7 @@ You type        Translation\n\
 
 	  Lisp_Object msg = build_unibyte_string (title);
 	  CALLN (Ffuncall,
-		 Qdescribe_map_tree,
+		 Qhelp__describe_map_tree,
 		 maps[i], Qt, shadow, prefix,
 		 msg, nomenu, Qnil, Qnil, Qnil, buffer);
 	  shadow = Fcons (maps[i], shadow);
@@ -2982,7 +2982,7 @@ You type        Translation\n\
 		       build_unibyte_string ("\f\n`%s' Major Mode Bindings"),
 		       XBUFFER (buffer)->major_mode_);
 	      CALLN (Ffuncall,
-		     Qdescribe_map_tree,
+		     Qhelp__describe_map_tree,
 		     start1, Qt, shadow, prefix,
 		     msg, nomenu, Qnil, Qnil, Qnil, buffer);
 	    }
@@ -2990,7 +2990,7 @@ You type        Translation\n\
 	    {
 	      Lisp_Object msg = build_unibyte_string ("\f\n`local-map' Property Bindings");
 	      CALLN (Ffuncall,
-		     Qdescribe_map_tree,
+		     Qhelp__describe_map_tree,
 		     start1, Qt, shadow, prefix,
 		     msg, nomenu, Qnil, Qnil, Qnil, buffer);
 	    }
@@ -3001,7 +3001,7 @@ You type        Translation\n\
 
   Lisp_Object msg = build_unibyte_string ("\f\nGlobal Bindings");
   CALLN (Ffuncall,
-	 Qdescribe_map_tree,
+	 Qhelp__describe_map_tree,
 	 current_global_map, Qt, shadow, prefix,
 	 msg, nomenu, Qnil, Qt, Qnil, buffer);
 
@@ -3010,7 +3010,7 @@ You type        Translation\n\
     {
       Lisp_Object msg = build_unibyte_string ("\f\nFunction key map translations");
       CALLN (Ffuncall,
-	     Qdescribe_map_tree,
+	     Qhelp__describe_map_tree,
 	     KVAR (current_kboard, Vlocal_function_key_map), Qnil, Qnil, prefix,
 	     msg, nomenu, Qt, Qnil, Qnil, buffer);
     }
@@ -3020,7 +3020,7 @@ You type        Translation\n\
     {
       Lisp_Object msg = build_unibyte_string ("\f\nInput decoding map translations");
       CALLN (Ffuncall,
-	     Qdescribe_map_tree,
+	     Qhelp__describe_map_tree,
 	     KVAR (current_kboard, Vinput_decode_map), Qnil, Qnil, prefix,
 	     msg, nomenu, Qt, Qnil, Qnil, buffer);
     }
@@ -3337,7 +3337,7 @@ void
 syms_of_keymap (void)
 {
   DEFSYM (Qkeymap, "keymap");
-  DEFSYM (Qdescribe_map_tree, "describe-map-tree");
+  DEFSYM (Qhelp__describe_map_tree, "help--describe-map-tree");
 
   DEFSYM (Qkeymap_canonicalize, "keymap-canonicalize");
 
