@@ -494,7 +494,10 @@ The default is nil.
 
 See variable `term-scroll-show-maximum-output'.
 This variable is buffer-local."
-  :type 'boolean
+  :type '(choice (const :tag "Don't scroll" nil)
+                 (const :tag "Scroll selected window only" this)
+                 (const :tag "Scroll unselected windows" others)
+                 (other :tag "Scroll all windows" t))
   :group 'term)
 
 (defcustom term-scroll-snap-to-bottom t
