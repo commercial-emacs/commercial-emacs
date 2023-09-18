@@ -263,6 +263,7 @@ command line.")
 
 ;;; Internal Variables:
 
+(defvar-local eshell-deferred-commands nil)
 (defvar eshell-current-command nil)
 (defvar eshell-command-name nil)
 (defvar eshell-command-arguments nil)
@@ -418,8 +419,6 @@ command hooks should be run before and after the command."
        (lambda (cmd)
          (let ((sep (pop sep-terms)))
            (setq cmd (eshell-parse-pipeline cmd))
-           (when (equal sep "&")
-             (setq cmd `(eshell-do-subjob (cons :eshell-background ,cmd))))
            (unless eshell-in-pipeline-p
              (setq cmd `(eshell-trap-errors ,cmd)))
            ;; Copy I/O handles so each full statement can manipulate
@@ -427,6 +426,8 @@ command hooks should be run before and after the command."
            ;; command in the list; we won't use the originals again
            ;; anyway.
            (setq cmd `(eshell-with-copied-handles ,cmd ,(not sep)))
+           (when (equal sep "&")
+             (setq cmd `(eshell-do-subjob ,cmd)))
            cmd))
        sub-chains)))
     (if toplevel
@@ -750,10 +751,13 @@ if none)."
 
 (defmacro eshell-do-subjob (object)
   "Evaluate a command OBJECT as a subjob.
-We indicate that the process was run in the background by returning it
-ensconced in a list."
-  `(let ((eshell-current-subjob-p t))
-     ,object))
+We indicate that the process was run in the background by
+returning it as (:eshell-background . PROCS)."
+  `(let ((eshell-current-subjob-p t)
+         ;; Print subjob messages.  This could have been cleared
+         ;; (e.g. by `eshell-source-file', which see).
+         (eshell-subjob-messages t))
+     (eshell-resume-eval ',object 'background)))
 
 (defmacro eshell-commands (object &optional silent)
   "Place a valid set of handles, and context, around command OBJECT."
@@ -988,7 +992,7 @@ Return the process (or head and tail processes) created by
 COMMAND, if any.  If COMMAND is a background command, return the
 process(es) in a cons cell like:
 
-  (:eshell-background . PROCESS)"
+  (:eshell-background . PROCS)"
   (if eshell-current-command
       ;; We can just stick the new command at the end of the current
       ;; one, and everything will happen as it should.
@@ -1003,40 +1007,51 @@ process(es) in a cons cell like:
     (setq eshell-current-command command)
     (let* (result
            (delim (catch 'eshell-incomplete
-                    (ignore (setq result (eshell-resume-eval))))))
+                    (ignore (setq result (eshell-resume-eval
+                                          eshell-current-command))))))
       (when delim
         (error "Unmatched delimiter: %S" delim))
       result)))
 
 (defun eshell-resume-command (proc status)
-  "Resume the current command when a pipeline ends."
-  (when (and proc
-             ;; Make sure STATUS is something we want to handle.
-             (stringp status)
-             (not (string= "stopped" status))
-             (not (string-match eshell-reset-signals status))
-             ;; Make sure PROC is one of our foreground processes and
-             ;; that all of those processes are now dead.
-             (member proc eshell-last-async-procs)
-             (not (seq-some #'process-live-p eshell-last-async-procs)))
-    (eshell-resume-eval)))
+  "Resume the current command when a pipeline ends.
+PROC is the process that invoked this from its sentinel, and
+STATUS is its status."
+  (when-let (proc
+             ((stringp status))
+             ((not (string= "stopped" status)))
+             ((not (string-match eshell-reset-signals status)))
+             ;; Find the deferred command associated with this process.
+             (deferred (assoc proc eshell-deferred-commands
+                              (lambda (i j) (memq j i))))
+             ;; Make sure that all of the processes in this pipeline
+             ;; are now dead.
+             ((not (seq-some #'process-live-p (car deferred)))))
+    ;; Remove this command from `eshell-deferred-commands'.  If it
+    ;; gets deferred again, `eshell-resume-eval' will re-add it.
+    (setq eshell-deferred-commands (delq deferred eshell-deferred-commands))
+    (apply #'eshell-resume-eval (cdr deferred))))
 
-(defun eshell-resume-eval ()
-  "Destructively evaluate a form which may need to be deferred."
-  (setq eshell-last-async-procs nil)
-  (when eshell-current-command
-    (eshell-condition-case err
-        (let* (retval
-               (procs (catch 'eshell-defer
-                        (ignore
-                         (setq retval
-                               (eshell-do-eval
-                                eshell-current-command))))))
-          (if retval
-              (cadr retval)
-            (ignore (setq eshell-last-async-procs procs))))
-      (error
-       (error (error-message-string err))))))
+(defun eshell-resume-eval (command &optional background)
+  "Destructively evaluate a COMMAND form which may need to be deferred.
+Return the result of COMMAND if it wasn't deferred.  If
+BACKGROUND is non-nil and Eshell defers COMMAND, return a list of
+the form (:eshell-background . PROCS)."
+  (unless background
+    (setq eshell-last-async-procs nil))
+  (eshell-condition-case err
+      (let* (retval
+             (procs (catch 'eshell-defer
+                      (ignore (setq retval (eshell-do-eval command))))))
+        (if retval
+            (cadr retval)
+          (push (list procs command background)
+                eshell-deferred-commands)
+          (if background
+              (cons :eshell-background procs)
+            (ignore (setq eshell-last-async-procs procs)))))
+    (error
+     (error (error-message-string err)))))
 
 (defmacro eshell-manipulate (form tag &rest body)
   "Manipulate a command FORM with BODY, using TAG as a debug identifier."
@@ -1244,13 +1259,12 @@ have been replaced by constants."
 		    (setcdr form (cdr new-form)))
 		  (eshell-do-eval form synchronous-p))
               (if-let (((memq (car form) eshell-deferrable-commands))
-                       ((not eshell-current-subjob-p))
                        (procs (eshell-make-process-list result)))
                   (if synchronous-p
 		      (apply #'eshell/wait procs)
 		    (eshell-manipulate form "inserting ignore form"
 		      (setcar form 'ignore)
-		      (setcdr form nil))
+		      (setcdr form nul))
 		    (throw 'eshell-defer procs))
                 (list 'quote result))))))))))))
 
