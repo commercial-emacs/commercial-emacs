@@ -266,7 +266,13 @@ This requires the external program `diff' to be in your `exec-path'."
     (with-current-buffer (or (buffer-base-buffer buf) buf)
       (unless buffer-file-name
         (error "Buffer is not visiting a file"))
-      (diff buffer-file-name (current-buffer) nil 'noasync))))
+      ;; If the buffer is unmodified, then the file version may be
+      ;; newer, so use the buffer as the old version.
+      (if (buffer-modified-p)
+          ;; Assume the buffer is newer (though both could be modified).
+          (diff buffer-file-name (current-buffer) nil 'noasync)
+        ;; Disk version may be newer.
+        (diff (current-buffer) buffer-file-name nil 'noasync)))))
 
 ;;;###autoload
 (defun diff-buffers (old new &optional switches no-async)
