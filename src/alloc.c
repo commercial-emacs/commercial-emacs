@@ -203,31 +203,6 @@ static ptrdiff_t pure_bytes_used_non_lisp;
 
 const char *pending_malloc_warning;
 
-/* Pointer sanity only on request.  FIXME: Code depending on
-   SUSPICIOUS_OBJECT_CHECKING is obsolete; remove it entirely.  */
-#ifdef ENABLE_CHECKING
-#define SUSPICIOUS_OBJECT_CHECKING 1
-#endif
-
-#ifdef SUSPICIOUS_OBJECT_CHECKING
-struct suspicious_free_record
-{
-  void *suspicious_object;
-  void *backtrace[128];
-};
-static void *suspicious_objects[32];
-static int suspicious_object_index;
-struct suspicious_free_record suspicious_free_history[64] EXTERNALLY_VISIBLE;
-static int suspicious_free_history_index;
-/* Find the first currently-monitored suspicious pointer in range
-   [begin,end) or NULL if no such pointer exists.  */
-static void *find_suspicious_object_in_range (void *begin, void *end);
-static void detect_suspicious_free (void *ptr);
-#else
-# define find_suspicious_object_in_range(begin, end) ((void *) NULL)
-# define detect_suspicious_free(ptr) ((void) 0)
-#endif
-
 static void unchain_finalizer (struct Lisp_Finalizer *);
 static void mark_terminals (void);
 static void gc_sweep (void);
@@ -2355,8 +2330,6 @@ vectorlike_nbytes (const union vectorlike_header *hdr)
 static void
 free_by_pvtype (struct Lisp_Vector *vector)
 {
-  detect_suspicious_free (vector);
-
   switch (PVTYPE (vector))
     {
     case PVEC_BIGNUM:
@@ -2651,9 +2624,6 @@ allocate_vector (ptrdiff_t len, bool q_clear)
       if (q_clear)
 	memclear (p, nbytes);
     }
-
-  if (find_suspicious_object_in_range (p, (char *) p + nbytes))
-    emacs_abort ();
 
   bytes_since_gc += nbytes;
   vector_cells_consed += len;
@@ -6592,78 +6562,6 @@ which_symbols (Lisp_Object obj, EMACS_INT find_max)
    return unbind_to (gc_count, found);
 }
 
-#ifdef SUSPICIOUS_OBJECT_CHECKING
-
-static void *
-find_suspicious_object_in_range (void *begin, void *end)
-{
-  char *begin_a = begin;
-  char *end_a = end;
-  int i;
-
-  for (i = 0; i < ARRAYELTS (suspicious_objects); ++i)
-    {
-      char *suspicious_object = suspicious_objects[i];
-      if (begin_a <= suspicious_object && suspicious_object < end_a)
-	return suspicious_object;
-    }
-
-  return NULL;
-}
-
-static void
-note_suspicious_free (void *ptr)
-{
-  struct suspicious_free_record *rec;
-
-  rec = &suspicious_free_history[suspicious_free_history_index++];
-  if (suspicious_free_history_index ==
-      ARRAYELTS (suspicious_free_history))
-    {
-      suspicious_free_history_index = 0;
-    }
-
-  memset (rec, 0, sizeof (*rec));
-  rec->suspicious_object = ptr;
-  backtrace (&rec->backtrace[0], ARRAYELTS (rec->backtrace));
-}
-
-static void
-detect_suspicious_free (void *ptr)
-{
-  int i;
-
-  eassert (ptr != NULL);
-
-  for (i = 0; i < ARRAYELTS (suspicious_objects); ++i)
-    if (suspicious_objects[i] == ptr)
-      {
-        note_suspicious_free (ptr);
-        suspicious_objects[i] = NULL;
-      }
-}
-
-#endif /* SUSPICIOUS_OBJECT_CHECKING */
-
-DEFUN ("suspicious-object", Fsuspicious_object, Ssuspicious_object, 1, 1, 0,
-       doc: /* Return OBJ, maybe marking it for extra scrutiny.
-If Emacs is compiled with suspicious object checking, capture
-a stack trace when OBJ is freed in order to help track down
-garbage collection bugs.  Otherwise, do nothing and return OBJ.   */)
-   (Lisp_Object obj)
-{
-#ifdef SUSPICIOUS_OBJECT_CHECKING
-  /* Right now, we care only about vectors.  */
-  if (VECTORLIKEP (obj))
-    {
-      suspicious_objects[suspicious_object_index++] = XVECTOR (obj);
-      if (suspicious_object_index == ARRAYELTS (suspicious_objects))
-	suspicious_object_index = 0;
-    }
-#endif
-  return obj;
-}
-
 #ifdef ENABLE_CHECKING
 
 bool suppress_checking;
@@ -6889,8 +6787,6 @@ N should be nonnegative.  */);
 #ifdef HAVE_MALLOC_TRIM
   defsubr (&Smalloc_trim);
 #endif
-  defsubr (&Ssuspicious_object);
-
   Lisp_Object watcher;
 
   static union Aligned_Lisp_Subr Swatch_gc_cons_threshold =
