@@ -189,7 +189,7 @@ If the value is a function, call it with no arguments."
 (define-icon tab-line-new nil
   `((image "symbols/plus_16.svg" "tabs/new.xpm"
            :face shadow
-           :height (1.0 . em)
+           :height (1 . em)
            :margin (2 . 0)
            :ascent center)
     (text " + "))
@@ -225,7 +225,7 @@ If nil, don't show it at all."
 (define-icon tab-line-close nil
   `((image "symbols/cross_16.svg" "tabs/close.xpm"
            :face shadow
-           :height (1.0 . em)
+           :height (1 . em)
            :margin (2 . 0)
            :ascent center)
     (text " x"))
@@ -244,7 +244,7 @@ If nil, don't show it at all."
 (define-icon tab-line-left nil
   `((image "symbols/chevron_left_16.svg" "tabs/left-arrow.xpm"
            :face shadow
-           :height (1.0 . em)
+           :height (1 . em)
            :margin (2 . 0)
            :ascent center)
     (text " <"))
@@ -262,7 +262,7 @@ If nil, don't show it at all."
 (define-icon tab-line-right nil
   `((image "symbols/chevron_right_16.svg" "tabs/right-arrow.xpm"
            :face shadow
-           :height (1.0 . em)
+           :height (1 . em)
            :margin (2 . 0)
            :ascent center)
     (text "> "))
