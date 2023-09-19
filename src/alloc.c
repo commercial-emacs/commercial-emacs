@@ -57,17 +57,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "alloc.h"
 
-/* MALLOC_SIZE_NEAR (N) is a good number to pass to malloc when
-   allocating a block of memory with size close to N bytes.
-   For best results N should be a power of 2.
-
-   When calculating how much memory to allocate, GNU malloc (SIZE)
-   adds sizeof (size_t) to SIZE for internal overhead, and then rounds
-   up to a multiple of MALLOC_ALIGNMENT.  Emacs can improve
-   performance a bit on GNU platforms by arranging for the resulting
-   size to be a power of two.  This heuristic is good for glibc 2.26
-   (2017) and later, and does not affect correctness on other
-   platforms.  */
+/* At least for glibc 2.26, malloc adds "sizeof size_t" for internal
+   overhead, then rounds up to a multiple of MALLOC_ALIGNMENT.  Eggert
+   claims a perf fillip if the final sum is a power of two.  */
 
 #define MALLOC_SIZE_NEAR(n) \
   (ROUNDUP (max (n, sizeof (size_t)), MALLOC_ALIGNMENT) - sizeof (size_t))

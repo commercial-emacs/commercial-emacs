@@ -4977,7 +4977,7 @@ longer need to hew to its rules)."
 (defvar bytecomp--cus-function)
 (defvar bytecomp--cus-name)
 
-(defun bytecomp--cus-warn (form format &rest args)
+(defun bytecomp--cus-warn (format &rest args)
   "Emit a warning about a `defcustom' type.
 FORM is used to provide location, `bytecomp--cus-function' and
 `bytecomp--cus-name' for context."
@@ -5022,13 +5022,12 @@ FORM is used to provide location, `bytecomp--cus-function' and
                    (while (and tl (not (keywordp (car tl))))
                      (setq tl (cdr tl)))
                    (and tl
-                        (progn
-                          (bytecomp--cus-warn
-                           tl "misplaced %s keyword in `%s' type" (car tl) head)
-                          t))))))
+                        (prog1 t
+                          (bytecomp--cus-warn "misplaced %s keyword in `%s' type"
+                                              (car tl) head)))))))
          ((memq head '(choice radio))
           (unless tail
-            (bytecomp--cus-warn type "`%s' without any types inside" head))
+            (bytecomp--cus-warn "`%s' without any types inside" head))
           (let ((clauses tail)
                 (constants nil)
                 (tags nil))
@@ -5036,7 +5035,7 @@ FORM is used to provide location, `bytecomp--cus-function' and
               (let* ((ty (car clauses))
                      (ty-head (car-safe ty)))
                 (when (and (eq ty-head 'other) (cdr clauses))
-                  (bytecomp--cus-warn ty "`other' not last in `%s'" head))
+                  (bytecomp--cus-warn "`other' not last in `%s'" head))
                 (when (memq ty-head '(const other))
                   (let ((ty-tail (cdr ty))
                         (val nil))
@@ -5047,26 +5046,24 @@ FORM is used to provide location, `bytecomp--cus-function' and
                     (when ty-tail
                       (setq val (car ty-tail)))
                     (when (member val constants)
-                      (bytecomp--cus-warn
-                       ty "duplicated value in `%s': `%S'" head val))
+                      (bytecomp--cus-warn "duplicated value in `%s': `%S'" head val))
                     (push val constants)))
                 (let ((tag (and (consp ty) (plist-get (cdr ty) :tag))))
                   (when (stringp tag)
                     (when (member tag tags)
-                      (bytecomp--cus-warn
-                       ty "duplicated :tag string in `%s': %S" head tag))
+                      (bytecomp--cus-warn "duplicated :tag string in `%s': %S" head tag))
                     (push tag tags)))
                 (bytecomp--check-cus-type ty))
               (setq clauses (cdr clauses)))))
          ((eq head 'cons)
           (unless (= (length tail) 2)
-            (bytecomp--cus-warn
-             type "`cons' requires 2 type specs, found %d" (length tail)))
+            (bytecomp--cus-warn "`cons' requires 2 type specs, found %d"
+                                (length tail)))
           (dolist (ty tail)
             (bytecomp--check-cus-type ty)))
          ((memq head '(list group vector set repeat))
           (unless tail
-            (bytecomp--cus-warn type "`%s' without type specs" head))
+            (bytecomp--cus-warn "`%s' without type specs" head))
           (dolist (ty tail)
             (bytecomp--check-cus-type ty)))
          ((memq head '(alist plist))
@@ -5082,32 +5079,27 @@ FORM is used to provide location, `bytecomp--cus-function' and
                  (val (car tail)))
             (cond
              ((or (> n 1) (and value-tag tail))
-              (bytecomp--cus-warn type "`%s' with too many values" head))
-             (value-tag
-              (setq val (cadr value-tag)))
-             ;; ;; This is a useful check but it results in perhaps
-             ;; ;; a bit too many complaints.
-             ;; ((null tail)
+              (bytecomp--cus-warn "`%s' with too many values" head))
+             ;; ((null tail) ; good but too common to be uncommented
              ;;  (bytecomp--cus-warn
              ;;   type "`%s' without value is implicitly nil" head))
-             )
+             (value-tag
+              (setq val (cadr value-tag))))
             (when (memq (car-safe val) '(quote function))
-              (bytecomp--cus-warn type "`%s' with quoted value: %S" head val))))
+              (bytecomp--cus-warn "`%s' with quoted value: %S" head val))))
          ((eq head 'quote)
-          (bytecomp--cus-warn type "type should not be quoted: %s" (cadr type)))
+          (bytecomp--cus-warn "type should not be quoted: %s" (cadr type)))
          ((memq head invalid-types)
-          (bytecomp--cus-warn type "`%s' is not a valid type" head))
+          (bytecomp--cus-warn "`%s' is not a valid type" head))
          ((or (not (symbolp head)) (keywordp head))
-          (bytecomp--cus-warn type "irregular type `%S'" head))
-         )))
+          (bytecomp--cus-warn "irregular type `%S'" head)))))
      ((or (not (symbolp type)) (keywordp type))
-      (bytecomp--cus-warn type "irregular type `%S'" type))
+      (bytecomp--cus-warn "irregular type `%S'" type))
      ((memq type '( list cons group vector choice radio const other
                     function-item variable-item set repeat restricted-sexp))
-      (bytecomp--cus-warn type "`%s' without arguments" type))
+      (bytecomp--cus-warn "`%s' without arguments" type))
      ((memq type invalid-types)
-      (bytecomp--cus-warn type "`%s' is not a valid type" type))
-     )))
+      (bytecomp--cus-warn "`%s' is not a valid type" type)))))
 
 ;; Unified handler for multiple functions with similar arguments:
 ;; (NAME SOMETHING DOC KEYWORD-ARGS...)
@@ -5132,11 +5124,9 @@ FORM is used to provide location, `bytecomp--cus-function' and
           (if (null type-tag)
               ;; :type only mandatory for `defcustom'
               (when (eq fun 'custom-declare-variable)
-                (bytecomp--cus-warn form "missing :type keyword parameter"))
-            (let ((dup-type (memq :type (cdr type-tag))))
-              (when dup-type
-                (bytecomp--cus-warn
-                 dup-type "duplicated :type keyword argument")))
+                (bytecomp--cus-warn "missing :type keyword parameter"))
+            (when (memq :type (cdr type-tag))
+              (bytecomp--cus-warn "duplicated :type keyword argument"))
             (let ((type-arg (cadr type-tag)))
               (when (or (null type-arg)
                         (eq (car-safe type-arg) 'quote))
@@ -5149,14 +5139,13 @@ FORM is used to provide location, `bytecomp--cus-function' and
              ((eq fun 'custom-declare-group)
               (not (eq name 'emacs))))
         (unless (plist-get keyword-args :group)
-          (bytecomp--cus-warn form "fails to specify containing group")))
+          (bytecomp--cus-warn "fails to specify containing group")))
 
       ;; Update current group
       (when (and name
                  byte-compile-current-file  ; only when compiling a whole file
 		 (eq fun 'custom-declare-group))
 	(setq byte-compile-current-group name))))
-
   (byte-compile-normal-call form))
 
 
