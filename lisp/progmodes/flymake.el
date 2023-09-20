@@ -356,7 +356,10 @@ otherwise if BEG is non-nil and END is nil, consider only
 diagnostics at BEG."
   (save-restriction
     (widen)
-    (cl-loop for o in (overlays-in (or beg (point-min)) (or end (point-max)))
+    (cl-loop for o in
+             (cond (end (overlays-in beg end))
+                   (beg (overlays-at beg))
+                   (t (overlays-in (point-min) (point-max))))
              when (overlay-get o 'flymake-diagnostic) collect it)))
 
 (defmacro flymake--diag-accessor (public internal thing)
@@ -433,7 +436,7 @@ verify FILTER, a function, and sort them by COMPARE (using KEY)."
   :package-version '(Flymake . "1.3.4"))
 
 (defface flymake-note-echo
-  '((t :inherit flymake-note))
+  '((t :inherit compilation-info))
   "Face used for showing summarized descriptions of notes."
   :package-version '(Flymake . "1.3.4"))
 
@@ -454,7 +457,7 @@ See variable `flymake-show-diagnostics-at-end-of-line'."
   :package-version '(Flymake . "1.3.5"))
 
 (defface flymake-note-echo-at-eol
-  '((t :inherit (flymake-end-of-line-diagnostics-face flymake-note)))
+  '((t :inherit (flymake-end-of-line-diagnostics-face compilation-info)))
   "Face like `flymake-note-echo', but for end-of-line overlays."
   :package-version '(Flymake . "1.3.5"))
 
