@@ -923,12 +923,16 @@ repository.  If REV has the special value
 `:last-release' (interactively, the prefix argument), that stands
 for the last released version of the package."
   (interactive
-   (let* ((name (package-vc--read-package-name "Fetch package source: ")))
-     (list (cadr (assoc name package-archive-contents #'string=))
-           (read-file-name "Clone into new or empty directory: " nil nil t nil
-                           (lambda (dir) (or (not (file-exists-p dir))
-                                             (directory-empty-p dir))))
-           (and current-prefix-arg :last-release))))
+   (let* ((name (package-vc--read-package-name "Fetch package source: "))
+          (desc (cadr (assoc name package-archive-contents #'string=)))
+          (dir (read-directory-name "Clone into new or empty directory: ")))
+     (when (and (file-exists-p dir) (not (directory-empty-p dir)))
+       (let ((subdir (expand-file-name (package-desc-full-name desc) dir)))
+         (if (and (not (file-exists-p subdir))
+                  (y-or-n-p (format "Create new directory %s ?" subdir)))
+             (setf dir subdir)
+           (user-error "Directory not empty: %S" (expand-file-name dir)))))
+     (list desc dir (and current-prefix-arg :last-release))))
   (package-vc--archives-initialize)
   (let ((pkg-spec (or (package-vc--desc->spec pkg-desc)
                       (and-let* ((extras (package-desc-extras pkg-desc))
