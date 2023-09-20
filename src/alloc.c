@@ -148,15 +148,6 @@ struct mem_node
 struct mem_node mem_z;
 #define MEM_NIL &mem_z
 
-/* True if malloc (N) is known to return storage suitably aligned for
-   Lisp objects whenever N is a multiple of LISP_ALIGNMENT, or,
-   equivalently when alignof (max_align_t) is a multiple of
-   LISP_ALIGNMENT.  This works even for buggy platforms like MinGW
-   circa 2020, where alignof (max_align_t) is 16 even though the
-   malloc alignment is only 8, and where Emacs still works because it
-   never does anything that requires an alignment of 16.  */
-enum { MALLOC_IS_LISP_ALIGNED = alignof (max_align_t) % LISP_ALIGNMENT == 0 };
-
 #define MALLOC_PROBE(size)			\
   do {						\
     if (profiler_memory_running)		\
@@ -304,14 +295,19 @@ display_malloc_warning (void)
   pending_malloc_warning = 0;
 }
 
-/* True if a malloc-returned pointer P is suitably aligned for SIZE,
-   where Lisp object alignment may be needed if SIZE is a multiple of
-   LISP_ALIGNMENT.  */
+static inline bool
+malloc_laligned (void)
+{
+  return 0 == alignof (max_align_t) % LISP_ALIGNMENT;
+}
 
-static bool
+/* Return true if malloc-returned P is lisp-aligned, or
+   if SIZE doesn't require P to be lisp-aligned.  */
+
+static inline bool
 laligned (void *p, size_t size)
 {
-  return (MALLOC_IS_LISP_ALIGNED
+  return (malloc_laligned ()
 	  || (intptr_t) p % LISP_ALIGNMENT == 0
 	  || size % LISP_ALIGNMENT != 0);
 }
@@ -635,12 +631,12 @@ aligned_alloc (size_t alignment, size_t size)
   /* Permit suspect assumption that ALIGNMENT is either BLOCK_ALIGN or
      LISP_ALIGNMENT since we'll rarely get here.  */
   eassume (alignment == BLOCK_ALIGN
-	   || (! MALLOC_IS_LISP_ALIGNED && alignment == LISP_ALIGNMENT));
+	   || (! malloc_laligned () && alignment == LISP_ALIGNMENT));
 
   /* Verify POSIX invariant ALIGNMENT = (2^x) * sizeof (void *).  */
   verify (BLOCK_ALIGN % sizeof (void *) == 0
 	  && POWER_OF_2 (BLOCK_ALIGN / sizeof (void *)));
-  verify (MALLOC_IS_LISP_ALIGNED
+  verify (malloc_laligned ()
 	  || (LISP_ALIGNMENT % sizeof (void *) == 0
 	      && POWER_OF_2 (LISP_ALIGNMENT / sizeof (void *))));
 
@@ -667,11 +663,11 @@ lmalloc (size_t size, bool q_clear)
      == 0.  So, if ! MALLOC_0_IS_NONNULL, must avoid malloc'ing 0.  */
   size_t adjsize = MALLOC_0_IS_NONNULL ? size : max (size, LISP_ALIGNMENT);
 
-  /* Prefer malloc() but if ! MALLOC_IS_LISP_ALIGNED, an exceptional
+  /* Prefer malloc() but if ! malloc_laligned (), an exceptional
      case, then prefer aligned_alloc(), provided SIZE is a multiple of
      ALIGNMENT which aligned_alloc() requires.  */
 #ifdef USE_ALIGNED_ALLOC
-  if (! MALLOC_IS_LISP_ALIGNED)
+  if (! malloc_laligned ())
     {
       if (adjsize % LISP_ALIGNMENT == 0)
 	{
@@ -691,7 +687,7 @@ lmalloc (size_t size, bool q_clear)
   for (;;)
     {
       p = q_clear ? calloc (1, adjsize) : malloc (adjsize);
-      if (! p || MALLOC_IS_LISP_ALIGNED || laligned (p, adjsize))
+      if (! p || laligned (p, adjsize))
 	break;
       free (p);
       adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
@@ -710,7 +706,7 @@ lrealloc (void *p, size_t size)
   for (;;)
     {
       newp = realloc (newp, adjsize);
-      if (! adjsize || ! newp || MALLOC_IS_LISP_ALIGNED || laligned (newp, adjsize))
+      if (! adjsize || ! newp || laligned (newp, adjsize))
 	break;
       adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
     }
@@ -5020,154 +5016,6 @@ watch_gc_cons_percentage (Lisp_Object symbol, Lisp_Object newval,
   return Qnil;
 }
 
-static inline bool mark_stack_empty_p (void);
-
-/* Subroutine of Fgarbage_collect that does most of the work.  */
-void
-garbage_collect (void)
-{
-  static struct timespec gc_elapsed = { 0, 0 };
-  Lisp_Object tail, buffer;
-  bool message_p = false;
-  specpdl_ref count = SPECPDL_INDEX ();
-  struct timespec start;
-
-  eassert (weak_hash_tables == NULL);
-
-  if (gc_inhibited || gc_in_progress)
-    return;
-
-  block_input ();
-
-  gc_in_progress = true;
-
-  eassert (mark_stack_empty_p ());
-
-  /* Show up in profiler.  */
-  record_in_backtrace (QAutomatic_GC, 0, 0);
-
-  /* Do this early in case user quits.  */
-  FOR_EACH_LIVE_BUFFER (tail, buffer)
-    compact_buffer (XBUFFER (buffer));
-
-  size_t tot_before = (profiler_memory_running
-		       ? total_bytes_of_live_objects ()
-		       : (size_t) -1);
-
-  start = current_timespec ();
-
-  /* Restore what's currently displayed in the echo area.  */
-  if (NILP (Vmemory_full))
-    {
-      message_p = push_message ();
-      record_unwind_protect_void (pop_message_unwind);
-    }
-
-  if (garbage_collection_messages)
-    message1_nolog ("Garbage collecting...");
-
-  shrink_regexp_cache ();
-
-  mark_most_objects ();
-  mark_pinned_objects ();
-  mark_pinned_symbols ();
-  mark_lread ();
-  mark_terminals ();
-  mark_kboards ();
-  mark_threads ();
-
-#ifdef HAVE_PGTK
-  mark_pgtkterm ();
-#endif
-
-#ifdef USE_GTK
-  xg_mark_data ();
-#endif
-
-#ifdef HAVE_HAIKU
-  mark_haiku_display ();
-#endif
-
-#ifdef HAVE_WINDOW_SYSTEM
-  mark_fringe_data ();
-#endif
-
-#ifdef HAVE_X_WINDOWS
-  mark_xterm ();
-  mark_xselect ();
-#endif
-
-  /* Everything is now marked, except for font caches, undo lists, and
-     finalizers.  The first two admit compaction before marking.
-     All finalizers, even unmarked ones, need to run after sweep,
-     so survive the unmarked ones in doomed_finalizers.  */
-
-  compact_font_caches ();
-
-  FOR_EACH_LIVE_BUFFER (tail, buffer)
-    {
-      struct buffer *b = XBUFFER (buffer);
-      if (! EQ (BVAR (b, undo_list), Qt))
-	bset_undo_list (b, compact_undo_list (BVAR (b, undo_list)));
-      mark_object (&BVAR (b, undo_list));
-    }
-
-  queue_doomed_finalizers (&doomed_finalizers, &finalizers);
-  mark_finalizer_list (&doomed_finalizers);
-
-  /* Must happen after all other marking and before gc_sweep.  */
-  mark_and_sweep_weak_table_contents ();
-  eassert (weak_hash_tables == NULL);
-
-  eassert (mark_stack_empty_p ());
-
-  gc_sweep ();
-
-  unmark_main_thread ();
-
-  bytes_since_gc = 0;
-
-  update_bytes_between_gc ();
-
-  gc_in_progress = false;
-
-  /* Unblock as late as possible since it could signal (Bug#43389).  */
-  unblock_input ();
-
-  if (garbage_collection_messages && NILP (Vmemory_full))
-    {
-      if (message_p || minibuf_level > 0)
-	restore_message ();
-      else
-	message1_nolog ("Garbage collecting...done");
-    }
-
-  unbind_to (count, Qnil);
-
-  /* GC is complete: now we can run our finalizer callbacks.  */
-  run_finalizers (&doomed_finalizers);
-
-  gc_elapsed = timespec_add (gc_elapsed,
-			     timespec_sub (current_timespec (), start));
-  Vgc_elapsed = make_float (timespectod (gc_elapsed));
-  gcs_done++;
-
-  /* Collect profiling data.  */
-  if (tot_before != (size_t) -1)
-    {
-      size_t tot_after = total_bytes_of_live_objects ();
-      if (tot_after < tot_before)
-	malloc_probe (min (tot_before - tot_after, SIZE_MAX));
-    }
-
-  if (!NILP (Vpost_gc_hook))
-    {
-      specpdl_ref gc_count = inhibit_garbage_collection ();
-      safe_run_hooks (Qpost_gc_hook);
-      unbind_to (gc_count, Qnil);
-    }
-}
-
 DEFUN ("garbage-collect", Fgarbage_collect, Sgarbage_collect, 0, 0, "",
        doc: /* Reclaim storage for no longer referenced objects.
 For further details, see Info node `(elisp)Garbage Collection'.  */)
@@ -5538,6 +5386,152 @@ static inline void
 mark_stack_push (Lisp_Object *value)
 {
   return mark_stack_push_n (value, 1);
+}
+
+/* Subroutine of Fgarbage_collect that does most of the work.  */
+void
+garbage_collect (void)
+{
+  static struct timespec gc_elapsed = { 0, 0 };
+  Lisp_Object tail, buffer;
+  bool message_p = false;
+  specpdl_ref count = SPECPDL_INDEX ();
+  struct timespec start;
+
+  eassert (weak_hash_tables == NULL);
+
+  if (gc_inhibited || gc_in_progress)
+    return;
+
+  block_input ();
+
+  gc_in_progress = true;
+
+  eassert (mark_stack_empty_p ());
+
+  /* Show up in profiler.  */
+  record_in_backtrace (QAutomatic_GC, 0, 0);
+
+  /* Do this early in case user quits.  */
+  FOR_EACH_LIVE_BUFFER (tail, buffer)
+    compact_buffer (XBUFFER (buffer));
+
+  size_t tot_before = (profiler_memory_running
+		       ? total_bytes_of_live_objects ()
+		       : (size_t) -1);
+
+  start = current_timespec ();
+
+  /* Restore what's currently displayed in the echo area.  */
+  if (NILP (Vmemory_full))
+    {
+      message_p = push_message ();
+      record_unwind_protect_void (pop_message_unwind);
+    }
+
+  if (garbage_collection_messages)
+    message1_nolog ("Garbage collecting...");
+
+  shrink_regexp_cache ();
+
+  mark_most_objects ();
+  mark_pinned_objects ();
+  mark_pinned_symbols ();
+  mark_lread ();
+  mark_terminals ();
+  mark_kboards ();
+  mark_threads ();
+
+#ifdef HAVE_PGTK
+  mark_pgtkterm ();
+#endif
+
+#ifdef USE_GTK
+  xg_mark_data ();
+#endif
+
+#ifdef HAVE_HAIKU
+  mark_haiku_display ();
+#endif
+
+#ifdef HAVE_WINDOW_SYSTEM
+  mark_fringe_data ();
+#endif
+
+#ifdef HAVE_X_WINDOWS
+  mark_xterm ();
+  mark_xselect ();
+#endif
+
+  /* Everything is now marked, except for font caches, undo lists, and
+     finalizers.  The first two admit compaction before marking.
+     All finalizers, even unmarked ones, need to run after sweep,
+     so survive the unmarked ones in doomed_finalizers.  */
+
+  compact_font_caches ();
+
+  FOR_EACH_LIVE_BUFFER (tail, buffer)
+    {
+      struct buffer *b = XBUFFER (buffer);
+      if (! EQ (BVAR (b, undo_list), Qt))
+	bset_undo_list (b, compact_undo_list (BVAR (b, undo_list)));
+      mark_object (&BVAR (b, undo_list));
+    }
+
+  queue_doomed_finalizers (&doomed_finalizers, &finalizers);
+  mark_finalizer_list (&doomed_finalizers);
+
+  /* Must happen after all other marking and before gc_sweep.  */
+  mark_and_sweep_weak_table_contents ();
+  eassert (weak_hash_tables == NULL);
+
+  eassert (mark_stack_empty_p ());
+
+  gc_sweep ();
+
+  unmark_main_thread ();
+
+  bytes_since_gc = 0;
+
+  update_bytes_between_gc ();
+
+  gc_in_progress = false;
+
+  /* Unblock as late as possible since it could signal (Bug#43389).  */
+  unblock_input ();
+
+  if (garbage_collection_messages && NILP (Vmemory_full))
+    {
+      if (message_p || minibuf_level > 0)
+	restore_message ();
+      else
+	message1_nolog ("Garbage collecting...done");
+    }
+
+  unbind_to (count, Qnil);
+
+  /* GC is complete: now we can run our finalizer callbacks.  */
+  run_finalizers (&doomed_finalizers);
+
+  gc_elapsed = timespec_add (gc_elapsed,
+			     timespec_sub (current_timespec (), start));
+  Vgc_elapsed = make_float (timespectod (gc_elapsed));
+  gcs_done++;
+
+  /* Collect profiling data.  */
+  if (tot_before != (size_t) -1)
+    {
+      size_t tot_after = total_bytes_of_live_objects ();
+      if (tot_after < tot_before)
+	malloc_probe (min (tot_before - tot_after, SIZE_MAX));
+    }
+
+  if (!NILP (Vpost_gc_hook))
+    {
+      specpdl_ref gc_count = inhibit_garbage_collection ();
+      safe_run_hooks (Qpost_gc_hook);
+      unbind_to (gc_count, Qnil);
+    }
 }
 
 static void
