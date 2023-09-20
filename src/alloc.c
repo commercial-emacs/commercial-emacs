@@ -2379,6 +2379,8 @@ free_by_pvtype (struct Lisp_Vector *vector)
       }
       break;
 #endif
+      break;
+    case PVEC_NATIVE_COMP_UNIT:
 #ifdef HAVE_NATIVE_COMP
     case PVEC_NATIVE_COMP_UNIT:
       {
