@@ -137,10 +137,6 @@ efficient.  */)
 
   if (STRINGP (sequence))
     val = SCHARS (sequence);
-  else if (CONSP (sequence))
-    val = list_length (sequence);
-  else if (NILP (sequence))
-    val = 0;
   else if (VECTORP (sequence))
     val = ASIZE (sequence);
   else if (CHAR_TABLE_P (sequence))
@@ -149,6 +145,10 @@ efficient.  */)
     val = bool_vector_size (sequence);
   else if (COMPILEDP (sequence) || RECORDP (sequence))
     val = PVSIZE (sequence);
+  else if (CONSP (sequence))
+    val = list_length (sequence);
+  else if (NILP (sequence))
+    val = 0;
   else
     wrong_type_argument (Qsequencep, sequence);
 
@@ -2117,27 +2117,7 @@ changing the value of a sequence `foo'.  See also `remove', which
 does not modify the argument.  */)
   (Lisp_Object elt, Lisp_Object seq)
 {
-  if (NILP (seq))
-    ;
-  else if (CONSP (seq))
-    {
-      Lisp_Object prev = Qnil, tail = seq;
-
-      FOR_EACH_TAIL (tail)
-	{
-	  if (!NILP (Fequal (elt, XCAR (tail))))
-	    {
-	      if (NILP (prev))
-		seq = XCDR (tail);
-	      else
-		Fsetcdr (prev, XCDR (tail));
-	    }
-	  else
-	    prev = tail;
-	}
-      CHECK_LIST_END (tail, seq);
-    }
-  else if (VECTORP (seq))
+  if (VECTORP (seq))
     {
       ptrdiff_t n = 0;
       ptrdiff_t size = ASIZE (seq);
@@ -2255,6 +2235,8 @@ This function may destructively modify SEQ to produce the value.  */)
 {
   if (NILP (seq))
     return seq;
+  else if (STRINGP (seq))
+    return Freverse (seq);
   else if (CONSP (seq))
     {
       Lisp_Object prev, tail, next;
@@ -2294,8 +2276,6 @@ This function may destructively modify SEQ to produce the value.  */)
 	  bool_vector_set (seq, size - i - 1, tem);
 	}
     }
-  else if (STRINGP (seq))
-    return Freverse (seq);
   else
     wrong_type_argument (Qarrayp, seq);
   return seq;

@@ -2915,7 +2915,7 @@ blocks."
                           finger2 (comp-block-post-num b2))))
                 b1))
             (first-processed (l)
-              (if-let ((p (cl-find-if #'comp-block-idom l)))
+              (if-let ((p (cl-find-if (lambda (p) (comp-block-idom p)) l)))
                   p
                 (signal 'native-ice '("can't find first preprocessed")))))
 
