@@ -966,7 +966,9 @@ init_threads (void)
   main_thread.s.thread_id = sys_thread_self ();
   main_thread.s.cooperative = true;
   init_bc_thread (&main_thread.s.bc);
+#ifdef HAVE_GCC_TLS
   this_thread = current_thread;
+#endif
 }
 
 void
