@@ -30,16 +30,15 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "systime.h"
 #include "process.h"
 
-/* `xg_select' is a `pselect' replacement.  Why do we need a separate function?
-   1. Timeouts.  Glib and Gtk rely on timer events.  If we did pselect
-      with a greater timeout then the one scheduled by Glib, we would
-      not allow Glib to process its timer events.  We want Glib to
-      work smoothly, so we need to reduce our timeout to match Glib.
-   2. Descriptors.  Glib may listen to more file descriptors than we do.
-      So we add Glib descriptors to our pselect pool, but we don't change
-      the value returned by the function.  The return value  matches only
-      the descriptors passed as arguments, making it compatible with
-      plain pselect.  */
+/* xg_select() augments pselect() for Glib.
+
+   1. Glib has its own timers.  If we pselect with a longer timeout
+      than Glib's, we'd starve Glib's timers.  So reduce our timeout
+      to match Glib's.
+
+   2. Glib has its own descriptors.  Add them to our select pool but
+      ensure return value only reflects those descriptors passed as
+      arguments. */
 
 int
 xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
@@ -199,9 +198,10 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   if (need_to_dispatch && context_acquired)
     {
       int pselect_errno = errno;
-      /* Prevent g_main_dispatch recursion, that would occur without
-         block_input wrapper, because event handlers call
-         unblock_input.  Event loop recursion was causing Bug#15801.  */
+      /* Czekalski: Callbacks within g_main_context_dispatch()
+	 containing block/unblock result in event loop recursion,
+	 unless we apply this encompassing block/unblock pair
+	 (Bug#15801).  */
       block_input ();
       while (g_main_context_pending (context))
         g_main_context_dispatch (context);
