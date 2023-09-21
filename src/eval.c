@@ -1376,7 +1376,7 @@ Lisp_Object
 internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 			      Lisp_Object handlers)
 {
-  struct handler *oldhandlerlist = handlerlist;
+  struct handler *oldhandlerlist = current_thread->m_handlerlist; // not thread-safe
   ptrdiff_t CACHEABLE clausenb = 0;
 
   CHECK_SYMBOL (var);
@@ -3382,7 +3382,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       XSETSYMBOL (symbol, xsymbol);
     }
 
-#ifdef MULTITHREADED
+#ifdef HAVE_MULTITHREADED
   if (! main_thread_p (current_thread))
     {
       symbol = Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray);
@@ -3398,7 +3398,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 	  xsymbol = XSYMBOL (symbol);
 	}
     }
-#endif /* MULTITHREADED */
+#endif /* HAVE_MULTITHREADED */
 
   /* First, qualify what kind of binding.  */
   switch (xsymbol->u.s.redirect)

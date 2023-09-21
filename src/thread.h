@@ -58,7 +58,12 @@ struct thread_state
   /* Buffer where last search was performed, or Qt if done in a
      string, or Qnil if no last search.  */
   Lisp_Object m_last_thing_searched;
-#define last_thing_searched (current_thread->m_last_thing_searched)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define last_thing_searched (*(! this_thread || this_thread->cooperative ? &current_thread->m_last_thing_searched : &this_thread->m_last_thing_searched))
+#else
+# define last_thing_searched (current_thread->m_last_thing_searched)
+#endif
 
   Lisp_Object name;
   Lisp_Object function;
@@ -79,38 +84,83 @@ struct thread_state
   /* !!! Adjust ALLOCATE_ZEROED_PSEUDOVECTOR for new Lisp fields.  */
 
   char const *m_stack_bottom;
-#define stack_bottom (current_thread->m_stack_bottom)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define stack_bottom (*(! this_thread || this_thread->cooperative ? &current_thread->m_stack_bottom : &this_thread->m_stack_bottom))
+#else
+# define stack_bottom (current_thread->m_stack_bottom)
+#endif
 
   void const *stack_top;
 
   struct catchtag *m_catchlist;
-#define catchlist (current_thread->m_catchlist)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define catchlist (*(! this_thread || this_thread->cooperative ? &current_thread->m_catchlist : &this_thread->m_catchlist))
+#else
+# define catchlist (current_thread->m_catchlist)
+#endif
 
   /* Handlers pushed by Fcondition_case and internal_condition_case.  */
   struct handler *m_handlerlist;
-#define handlerlist (current_thread->m_handlerlist)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define handlerlist (*(! this_thread || this_thread->cooperative ? &current_thread->m_handlerlist : &this_thread->m_handlerlist))
+#else
+# define handlerlist (current_thread->m_handlerlist)
+#endif
 
   struct handler *m_handlerlist_sentinel;
-#define handlerlist_sentinel (current_thread->m_handlerlist_sentinel)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define handlerlist_sentinel (*(! this_thread || this_thread->cooperative ? &current_thread->m_handlerlist_sentinel : &this_thread->m_handlerlist_sentinel))
+#else
+# define handlerlist_sentinel (current_thread->m_handlerlist_sentinel)
+#endif
 
   /* Bottom of specpdl, not to be confused with m_stack_bottom which
      references the C stack.  */
   union specbinding *m_specpdl;
-#define specpdl (current_thread->m_specpdl)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define specpdl (*(! this_thread || this_thread->cooperative ? &current_thread->m_specpdl : &this_thread->m_specpdl))
+#else
+# define specpdl (current_thread->m_specpdl)
+#endif
 
   /* Sentinel just beyond specpdl capacity for grow_specpdl().  */
   union specbinding *m_specpdl_end;
-#define specpdl_end (current_thread->m_specpdl_end)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define specpdl_end (*(! this_thread || this_thread->cooperative ? &current_thread->m_specpdl_end : &this_thread->m_specpdl_end))
+#else
+# define specpdl_end (current_thread->m_specpdl_end)
+#endif
 
   /* Top of specpdl.  */
   union specbinding *m_specpdl_ptr;
-#define specpdl_ptr (current_thread->m_specpdl_ptr)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define specpdl_ptr (*(! this_thread || this_thread->cooperative ? &current_thread->m_specpdl_ptr : &this_thread->m_specpdl_ptr))
+#else
+# define specpdl_ptr (current_thread->m_specpdl_ptr)
+#endif
 
   intmax_t m_lisp_eval_depth;
-#define lisp_eval_depth (current_thread->m_lisp_eval_depth)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define lisp_eval_depth (*(! this_thread || this_thread->cooperative ? &current_thread->m_lisp_eval_depth : &this_thread->m_lisp_eval_depth))
+#else
+# define lisp_eval_depth (current_thread->m_lisp_eval_depth)
+#endif
 
   struct buffer *m_current_buffer;
-#define current_buffer (current_thread->m_current_buffer)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define current_buffer (*(! this_thread || this_thread->cooperative ? &current_thread->m_current_buffer : &this_thread->m_current_buffer))
+#else
+# define current_buffer (current_thread->m_current_buffer)
+#endif
 
   /* Every call to re_search, etc., must pass &search_regs as the regs
      argument unless you can show it is unnecessary (i.e., if re_search
@@ -130,14 +180,24 @@ struct thread_state
      setting the match registers, so that the regex functions will be
      able to free or re-allocate it properly.  */
   struct re_registers m_search_regs;
-#define search_regs (current_thread->m_search_regs)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define search_regs (*(! this_thread || this_thread->cooperative ? &current_thread->m_search_regs : &this_thread->m_search_regs))
+#else
+# define search_regs (current_thread->m_search_regs)
+#endif
 
   /* For longjmp to where kbd input is being done.  This is per-thread
      so that if more than one thread calls read_char, they don't
      clobber each other's getcjmp, which will cause
      quit_throw_to_read_char crash due to using a wrong stack.  */
   sys_jmp_buf m_getcjmp;
-#define getcjmp (current_thread->m_getcjmp)
+#ifdef HAVE_GCC_TLS
+// Do the *& no-op to yield an lval
+# define getcjmp (*(! this_thread || this_thread->cooperative ? &current_thread->m_getcjmp : &this_thread->m_getcjmp))
+#else
+# define getcjmp (current_thread->m_getcjmp)
+#endif
 
   /* The OS identifier for this thread.  */
   sys_thread_t thread_id;
@@ -247,7 +307,9 @@ XCONDVAR (Lisp_Object a)
 }
 
 extern struct thread_state *current_thread;
-
+#ifdef HAVE_GCC_TLS
+extern __thread struct thread_state *this_thread;
+#endif
 extern void finalize_one_thread (struct thread_state *state);
 extern void finalize_one_mutex (struct Lisp_Mutex *);
 extern void finalize_one_condvar (struct Lisp_CondVar *);

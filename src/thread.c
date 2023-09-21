@@ -64,6 +64,10 @@ static union aligned_thread_state main_thread
 
 struct thread_state *current_thread = &main_thread.s;
 
+#ifdef HAVE_GCC_TLS
+__thread struct thread_state *this_thread;
+#endif
+
 static struct thread_state *all_threads = &main_thread.s;
 
 static sys_mutex_t global_lock;
@@ -89,14 +93,14 @@ restore_thread (struct thread_state *self)
   current_thread = self;
   if (prev_thread != current_thread)
     {
-#ifndef MULTITHREADED
+#ifndef HAVE_MULTITHREADED
       /* Tromey specpdl swap under thread-at-a-time conservatism.  */
       if (prev_thread != NULL)
 	specpdl_unwind (prev_thread->m_specpdl_ptr,
 			prev_thread->m_specpdl_ptr - prev_thread->m_specpdl,
 			SPECPDL_LET);
       specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, SPECPDL_LET);
-#endif /* ! MULTITHREADED */
+#endif /* ! HAVE_MULTITHREADED */
 
       /* Contortion here because set_buffer_internal immediately
 	 returns if argument is current_buffer.  */
@@ -960,7 +964,9 @@ init_threads (void)
   sys_mutex_lock (&global_lock);
   current_thread = &main_thread.s;
   main_thread.s.thread_id = sys_thread_self ();
+  main_thread.s.cooperative = true;
   init_bc_thread (&main_thread.s.bc);
+  this_thread = current_thread;
 }
 
 void

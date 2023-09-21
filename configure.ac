@@ -2437,7 +2437,7 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([#if defined(__GNUC__) && ((__GNUC__ < 4) || (__
 #error AIX thread support is known to call malloc which makes it unsafe to use from malloc replacement
 #endif
 ], [static __thread int p = 0])],
-   [AC_DEFINE(HAVE_TLS, 1, [Define to 1 if compiler supports __thread]) have_tls=yes],
+   [AC_DEFINE(HAVE_GCC_TLS, 1, [Define to 1 if compiler supports __thread]) have_tls=yes],
    [have_tls=no])
 AC_MSG_RESULT([$have_tls])
 

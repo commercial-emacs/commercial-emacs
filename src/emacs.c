@@ -1244,7 +1244,7 @@ main (int argc, char **argv)
   char const *original_pwd = 0;
 
   /* Record (approximately) where the stack begins.  */
-  stack_bottom = (char *) &stack_bottom_variable;
+  current_thread->m_stack_bottom = (char *) &stack_bottom_variable;
 
   const char *dump_mode = NULL;
   int skip_args = 0;

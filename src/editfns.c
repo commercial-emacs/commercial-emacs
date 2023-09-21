@@ -1996,7 +1996,7 @@ performed.  Otherwise, i.e., if MAX-SECS was exceeded, it returns
 nil.  */)
   (Lisp_Object source, Lisp_Object max_secs, Lisp_Object max_costs)
 {
-  struct buffer *a = current_buffer;
+  struct buffer *a = current_thread->m_current_buffer; // not thread-safe
   Lisp_Object source_buffer = Fget_buffer (source);
   if (NILP (source_buffer))
     nsberror (source);
