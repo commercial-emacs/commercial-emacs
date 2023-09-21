@@ -237,28 +237,17 @@ sys_thread_create (sys_thread_t *thread_ptr, thread_creation_function *func,
                    void *arg)
 {
   pthread_attr_t attr;
-  bool result = false;
-
-  if (pthread_attr_init (&attr))
-    return false;
-
-  /* Avoid crash on macOS with deeply nested GC (Bug#30364).  */
-  size_t stack_size;
-  size_t required_stack_size = sizeof (void *) * 1024 * 1024;
-  if (pthread_attr_getstacksize (&attr, &stack_size) == 0
-      && stack_size < required_stack_size)
-    {
-      if (pthread_attr_setstacksize (&attr, required_stack_size) != 0)
-        goto out;
-    }
-
-  if (pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED) == 0)
-    result = pthread_create (thread_ptr, &attr, func, arg) == 0;
-
- out: ;
-  int error = pthread_attr_destroy (&attr);
-  eassert (error == 0);
-
+  /* Required stack size for GC discussed Bug#30364.  */
+  size_t stack_size, required_stack_size = sizeof (void *) * 1024 * 1024;
+  bool initialized = (0 == pthread_attr_init (&attr));
+  bool result = (initialized
+		 && 0 == pthread_attr_getstacksize (&attr, &stack_size)
+		 && (stack_size >= required_stack_size
+		     || 0 == pthread_attr_setstacksize (&attr, required_stack_size))
+		 && 0 == pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED)
+		 && 0 == pthread_create (thread_ptr, &attr, func, arg));
+  if (initialized)
+    pthread_attr_destroy (&attr);
   return result;
 }
 

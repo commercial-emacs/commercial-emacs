@@ -707,9 +707,9 @@ finalize_one_thread (struct thread_state *state)
 }
 
 DEFUN ("make-thread", Fmake_thread, Smake_thread, 1, 3, 0,
-       doc: /* Start new thread whose lifetime is that of running FUNCTION.
+       doc: /* Spawn thread running FUNCTION.
 A non-nil NAME string is assigned to the thread.
-A non-nil UNCOOPERATIVE currently does nothing.
+A non-nil UNCOOPERATIVE halts and catches fire.
 */)
   (Lisp_Object function, Lisp_Object name, Lisp_Object uncooperative)
 {
