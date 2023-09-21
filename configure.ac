@@ -455,7 +455,6 @@ AC_ARG_WITH([ns],[AS_HELP_STRING([--with-ns],
 On by default on macOS.])],[],[with_ns=maybe])
 OPTION_DEFAULT_OFF([w32], [use native MS Windows GUI in a Cygwin build])
 OPTION_DEFAULT_OFF([pgtk], [use GTK to support window systems other than X])
-OPTION_DEFAULT_OFF([multithreaded], [experimental multithreading])
 
 OPTION_DEFAULT_ON([gpm],[don't use -lgpm for mouse support on a GNU/Linux console])
 OPTION_DEFAULT_ON([dbus],[don't compile with D-Bus support])
@@ -2440,18 +2439,6 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([#if defined(__GNUC__) && ((__GNUC__ < 4) || (__
    [AC_DEFINE(HAVE_GCC_TLS, 1, [Define to 1 if compiler supports __thread]) have_tls=yes],
    [have_tls=no])
 AC_MSG_RESULT([$have_tls])
-
-if test "${with_multithreaded}" != "no"; then
-   if test "$threads_enabled" != yes; then
-      AC_MSG_ERROR([Multithreaded requires threads_enabled=yes])
-   elif test "$have_tls" != yes; then
-      AC_MSG_ERROR([Multithreaded requires have_tls=yes])
-   else
-      AC_DEFINE([HAVE_MULTITHREADED], [1],
-                [Define to enable multithreading])
-      AC_MSG_RESULT([enable multithreading])
-   fi
-fi
 
 dnl Check for need for bigtoc support on IBM AIX
 
