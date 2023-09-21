@@ -4977,11 +4977,11 @@ mark_and_sweep_weak_table_contents (void)
 static void
 update_bytes_between_gc (void)
 {
-  intmax_t threshold0 = gc_cons_threshold;
-  intmax_t threshold1 = FLOATP (Vgc_cons_percentage)
-    ? XFLOAT_DATA (Vgc_cons_percentage) * total_bytes_of_live_objects ()
-    : threshold0;
-  bytes_between_gc = max (threshold0, threshold1);
+  bytes_between_gc = gc_cons_threshold;
+  if (FLOATP (Vgc_cons_percentage))
+    bytes_between_gc = max (bytes_between_gc,
+			    XFLOAT_DATA (Vgc_cons_percentage) *
+			    total_bytes_of_live_objects ());
 }
 
 /* Immediately adjust bytes_between_gc for changes to

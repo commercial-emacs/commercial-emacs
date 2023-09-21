@@ -89,24 +89,24 @@ clear_thread (void *arg)
 static void
 restore_thread (struct thread_state *self)
 {
-  struct thread_state *prev_thread = current_thread;
-  current_thread = self;
-  if (prev_thread != current_thread)
+  if (self->cooperative)
     {
-#ifndef HAVE_MULTITHREADED
-      /* Tromey specpdl swap under thread-at-a-time conservatism.  */
-      if (prev_thread != NULL)
-	specpdl_unwind (prev_thread->m_specpdl_ptr,
-			prev_thread->m_specpdl_ptr - prev_thread->m_specpdl,
-			SPECPDL_LET);
-      specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, SPECPDL_LET);
-#endif /* ! HAVE_MULTITHREADED */
-
-      /* Contortion here because set_buffer_internal immediately
-	 returns if argument is current_buffer.  */
-      struct buffer *b = current_buffer;
-      current_buffer = NULL;
-      set_buffer_internal (b);
+      struct thread_state *prev_thread = current_thread;
+      current_thread = self;
+      if (prev_thread != current_thread)
+	{
+	  /* Tromey specpdl swap under thread-at-a-time conservatism.  */
+	  if (prev_thread != NULL)
+	    specpdl_unwind (prev_thread->m_specpdl_ptr,
+			    prev_thread->m_specpdl_ptr - prev_thread->m_specpdl,
+			    SPECPDL_LET);
+	  specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, SPECPDL_LET);
+	  /* Contortion here because set_buffer_internal immediately
+	     returns if argument is current_buffer.  */
+	  struct buffer *b = current_buffer;
+	  current_buffer = NULL;
+	  set_buffer_internal (b);
+	}
     }
 
   if (! NILP (current_thread->error_symbol) && handlerlist)
@@ -624,6 +624,11 @@ run_thread (void *state)
 
   struct thread_state *self = state;
   union { char c; GCALIGNED_UNION_MEMBER } stack_pos;
+
+#ifdef HAVE_GCC_TLS
+  if (! this_thread)
+    this_thread = self;
+#endif
 
   self->m_stack_bottom = self->stack_top = &stack_pos.c;
   self->thread_id = sys_thread_self ();
