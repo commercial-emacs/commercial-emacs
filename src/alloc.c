@@ -4233,7 +4233,7 @@ with_flushed_stack (void (*func) (void *arg), void *arg)
 #endif
 
   func (arg);
-  eassert (current_thread == self);
+  eassume (current_thread == self);
 }
 
 /* Determine whether it is safe to access memory at address P.  */

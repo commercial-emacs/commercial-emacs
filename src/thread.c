@@ -62,10 +62,11 @@ static union aligned_thread_state main_thread
       .event_object = LISPSYM_INITIALLY (Qnil),
     }};
 
-struct thread_state *current_thread = &main_thread.s;
-
 #ifdef HAVE_GCC_TLS
-__thread struct thread_state *this_thread;
+__thread struct thread_state *current_thread = &main_thread.s;
+struct thread_state *prevailing_thread = &main_thread.s;
+#else
+struct thread_state *current_thread = &main_thread.s;
 #endif
 
 static struct thread_state *all_threads = &main_thread.s;
@@ -89,10 +90,18 @@ clear_thread (void *arg)
 static void
 restore_thread (struct thread_state *self)
 {
+#ifdef HAVE_GCC_TLS
+  eassume (current_thread == self);
   if (self->cooperative)
+#endif
     {
+#ifdef HAVE_GCC_TLS
+      struct thread_state *prev_thread = prevailing_thread;
+      prevailing_thread = self;
+#else
       struct thread_state *prev_thread = current_thread;
       current_thread = self;
+#endif
       if (prev_thread != current_thread)
 	{
 	  /* Tromey specpdl swap under thread-at-a-time conservatism.  */
@@ -626,8 +635,7 @@ run_thread (void *state)
   union { char c; GCALIGNED_UNION_MEMBER } stack_pos;
 
 #ifdef HAVE_GCC_TLS
-  if (! this_thread)
-    this_thread = self;
+  current_thread = self;
 #endif
 
   self->m_stack_bottom = self->stack_top = &stack_pos.c;
@@ -636,7 +644,9 @@ run_thread (void *state)
   if (self->thread_name)
     sys_thread_set_name (self->thread_name);
 
+#ifdef HAVE_GCC_TLS
   if (self->cooperative)
+#endif
     acquire_global_lock (self);
 
   /* Put a dummy catcher at top-level so that handlerlist is never NULL.
@@ -666,8 +676,6 @@ run_thread (void *state)
     }
 
   xfree (self->thread_name);
-  if (current_thread == self)
-    current_thread = NULL;
   sys_cond_broadcast (&self->thread_condvar);
 
 #ifdef HAVE_NS
@@ -687,7 +695,9 @@ run_thread (void *state)
 	}
     }
 
+#ifdef HAVE_GCC_TLS
   if (self->cooperative)
+#endif
     release_global_lock ();
 
   return NULL;
@@ -735,7 +745,13 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   new_thread->name = name;
   new_thread->function = function;
   new_thread->obarray = initialize_vector (OBARRAY_SIZE / 10, make_fixnum (0));
+#ifdef HAVE_GCC_TLS
   new_thread->cooperative = NILP (uncooperative);
+#else
+  new_thread->cooperative = true;
+  if (! NILP (uncooperative))
+    error ("This emacs lacks gcc tls");
+#endif
   new_thread->m_current_buffer = current_thread->m_current_buffer;
 
   /* 1+ for unreachable dummy entry */
@@ -953,27 +969,17 @@ main_thread_p (const void *ptr)
   return ptr == &main_thread.s;
 }
 
-bool
-in_current_thread (void)
-{
-  return current_thread == NULL
-    ? false
-    : sys_thread_equal (sys_thread_self (), current_thread->thread_id);
-}
-
 void
 init_threads (void)
 {
   sys_cond_init (&main_thread.s.thread_condvar);
   sys_mutex_init (&global_lock);
   sys_mutex_lock (&global_lock);
-  current_thread = &main_thread.s;
+  if (current_thread != &main_thread.s)
+    emacs_abort ();
   main_thread.s.thread_id = sys_thread_self ();
   main_thread.s.cooperative = true;
   init_bc_thread (&main_thread.s.bc);
-#ifdef HAVE_GCC_TLS
-  this_thread = current_thread;
-#endif
 }
 
 void

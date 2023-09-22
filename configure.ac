@@ -2424,21 +2424,28 @@ if test "$with_threads" = yes; then
 fi
 AC_MSG_RESULT([$threads_enabled])
 
-# from github.com/gperftools/configure.ac
-AC_MSG_CHECKING([for __thread])
-AC_LINK_IFELSE([AC_LANG_PROGRAM([#if defined(__GNUC__) && ((__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 1) || (__GNUC__ == 4 && __GNUC_MINOR__ == 1 && __GNUC_PATCHLEVEL__ < 2))
-#error gcc has this bug: http://gcc.gnu.org/ml/gcc-bugs/2006-09/msg02275.html
-#elif defined(__MINGW32__)
-#error mingw doesnt really support tls
-#elif defined(__APPLE__)
-#error OSX __thread support is known to call malloc which makes it unsafe to use from malloc replacement
-#elif defined(_AIX)
-#error AIX thread support is known to call malloc which makes it unsafe to use from malloc replacement
-#endif
-], [static __thread int p = 0])],
-   [AC_DEFINE(HAVE_GCC_TLS, 1, [Define to 1 if compiler supports __thread]) have_tls=yes],
-   [have_tls=no])
-AC_MSG_RESULT([$have_tls])
+check_gcc_tls=yes
+AC_ARG_ENABLE([multithreading],
+  [AS_HELP_STRING([--disable-multithreading], [disallow multithreading])],
+  [test "$enableval" = no && check_gcc_tls=no])
+have_gcc_tls=no
+if test "$check_gcc_tls" = yes; then
+  AC_MSG_CHECKING([for __thread declaration])
+  # from github.com/gperftools/configure.ac
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([#if defined(__GNUC__) && ((__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 1) || (__GNUC__ == 4 && __GNUC_MINOR__ == 1 && __GNUC_PATCHLEVEL__ < 2))
+  #error gcc has this bug: http://gcc.gnu.org/ml/gcc-bugs/2006-09/msg02275.html
+  #elif defined(__MINGW32__)
+  #error mingw doesnt really support tls
+  #elif defined(__APPLE__)
+  #error OSX __thread support is known to call malloc which makes it unsafe to use from malloc replacement
+  #elif defined(_AIX)
+  #error AIX thread support is known to call malloc which makes it unsafe to use from malloc replacement
+  #endif
+  ], [static __thread int p = 0])],
+     [AC_DEFINE(HAVE_GCC_TLS, 1, [Define to 1 if compiler supports __thread]) have_gcc_tls=yes],
+     [have_gcc_tls=no])
+  AC_MSG_RESULT([$have_gcc_tls])
+fi
 
 dnl Check for need for bigtoc support on IBM AIX
 
@@ -6391,7 +6398,8 @@ AS_ECHO(["  Does Emacs use -lXaw3d?                                 ${HAVE_XAW3D
   Does Emacs have dynamic modules support?                ${HAVE_MODULES}
   Does Emacs use toolkit scroll bars?                     ${USE_TOOLKIT_SCROLL_BARS}
   Does Emacs support Xwidgets?                            ${HAVE_XWIDGETS}
-  Does Emacs have threading support in lisp?              ${threads_enabled}
+  Does Emacs support cooperative lisp threads?            ${threads_enabled}
+  Does Emacs support preemptive lisp threads?             ${have_gcc_tls}
   Does Emacs support the portable dumper?                 ${with_pdumper}
   Which dumping strategy does Emacs use?                  ${with_dumping}
   Does Emacs have native lisp compiler?                   ${HAVE_NATIVE_COMP}

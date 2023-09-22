@@ -20,7 +20,13 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-20.04, ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        gearing: [standard]
+        include:
+          - os: ubuntu-latest
+            gearing: no-multithread
+          - os: ubuntu-latest
+            gearing: alt-x
     steps:
     - run: |
         git config --global core.autocrlf false
@@ -61,27 +67,35 @@ jobs:
         path: tree-sitter
         key: cache-tree-sitter-${{ runner.os }}-002
     - uses: actions/checkout@v3
-      if: steps.cache-tree-sitter.outputs.cache-hit != 'true'
+      if: steps.cache-tree-sitter.outputs.cache-hit != 'true' && matrix.gearing == 'standard' && startsWith(runner.os, 'windows') != true
       with:
         repository: commercial-emacs/tree-sitter
         path: tree-sitter
         ref: v0.20.8alpha2
     - uses: actions-rs/toolchain@v1
+      if: matrix.gearing == 'standard' && startsWith(runner.os, 'windows') != true
       with:
           toolchain: stable
     - name: make-tree-sitter
-      if: startsWith(runner.os, 'windows') != true
+      if: matrix.gearing == 'standard' && startsWith(runner.os, 'windows') != true
       run: |
         mkdir -p $HOME/.local
         make -C tree-sitter install-ci
     - name: make-alt-xtoolkit
-      if: matrix.os == 'ubuntu-20.04'
+      if: matrix.gearing == 'alt-x'
       run: |
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-x-toolkit=lucid --without-cairo --without-xaw3d --without-gconf --without-libsystemd
         make -j4 -C src
+    - name: make-no-multithread
+      if: matrix.gearing == 'no-multithread'
+      run: |
+        ./autogen.sh
+        ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --disable-multithreading
+        make -j4
+        make test/src/thread-tests
     - name: make-linux
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.gearing == 'standard' && startsWith(runner.os, 'Linux')
       run: |
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-tree-sitter
@@ -122,6 +136,6 @@ jobs:
         bash ./configure --prefix=$HOME/.local --without-dbus
         make -j4 -C src
     - name: elisp-benchmarks
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.gearing == 'standard' && startsWith(runner.os, 'Linux')
       run: |
         src/emacs -batch -l ./elisp-benchmarks/elisp-benchmarks.el --eval "(custom-set-variables (quote (elb-runs 1)))" -f elisp-benchmarks-run

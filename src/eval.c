@@ -3340,12 +3340,12 @@ specbind (Lisp_Object argsym, Lisp_Object value)
     }
 
 #ifdef HAVE_GCC_TLS
-  if (this_thread && ! this_thread->cooperative)
+  if (! current_thread->cooperative)
     {
-      symbol = Fintern_soft (SYMBOL_NAME (symbol), this_thread->obarray);
+      symbol = Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray);
       if (NILP (symbol))
 	{
-	  symbol = Fintern (SYMBOL_NAME (symbol), this_thread->obarray);
+	  symbol = Fintern (SYMBOL_NAME (symbol), current_thread->obarray);
 	  XSYMBOL (symbol)->u.s.redirect = xsymbol->u.s.redirect;
 	  XSYMBOL (symbol)->u.s.trapped_write = xsymbol->u.s.trapped_write;
 	  XSYMBOL (symbol)->u.s.declared_special = xsymbol->u.s.declared_special;
@@ -3355,7 +3355,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 	  xsymbol = XSYMBOL (symbol);
 	}
     }
-#endif /* HAVE_GCC_TLS */
+#endif
 
   /* First, qualify what kind of binding.  */
   switch (xsymbol->u.s.redirect)

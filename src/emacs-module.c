@@ -1227,9 +1227,6 @@ module_assert_thread (void)
 {
   if (!module_assertions)
     return;
-  if (!in_current_thread ())
-    module_abort ("Module function called from outside "
-                  "the current Lisp thread");
   if (gc_in_progress)
     module_abort ("Module function called during garbage collection");
 }
