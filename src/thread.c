@@ -96,18 +96,18 @@ restore_thread (struct thread_state *self)
 #endif
     {
 #ifdef HAVE_GCC_TLS
-      struct thread_state *prev_thread = prevailing_thread;
+      struct thread_state *previous_thread = prevailing_thread;
       prevailing_thread = self;
 #else
-      struct thread_state *prev_thread = current_thread;
+      struct thread_state *previous_thread = current_thread;
       current_thread = self;
 #endif
-      if (prev_thread != current_thread)
+      if (previous_thread != current_thread)
 	{
 	  /* Tromey specpdl swap under thread-at-a-time conservatism.  */
-	  if (prev_thread != NULL)
-	    specpdl_unwind (prev_thread->m_specpdl_ptr,
-			    prev_thread->m_specpdl_ptr - prev_thread->m_specpdl,
+	  if (previous_thread != NULL)
+	    specpdl_unwind (previous_thread->m_specpdl_ptr,
+			    previous_thread->m_specpdl_ptr - previous_thread->m_specpdl,
 			    SPECPDL_LET);
 	  specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, SPECPDL_LET);
 	  /* Contortion here because set_buffer_internal immediately
@@ -489,17 +489,24 @@ internal_select (void *arg)
   struct select_args *sa = arg;
   struct thread_state *self = current_thread; // current_thread changes!
   sigset_t oldset;
-
-  block_interrupt_signal (&oldset);
-  release_global_lock ();
-  restore_signal_mask (&oldset);
-
+#ifdef HAVE_GCC_TLS
+  if (self->cooperative)
+#endif
+    {
+      block_interrupt_signal (&oldset);
+      release_global_lock ();
+      restore_signal_mask (&oldset);
+    }
   sa->result = (sa->func) (sa->max_fds, sa->rfds, sa->wfds, sa->efds,
 			   sa->timeout, sa->sigmask);
-
-  block_interrupt_signal (&oldset);
-  acquire_global_lock (self);
-  restore_signal_mask (&oldset);
+#ifdef HAVE_GCC_TLS
+  if (self->cooperative)
+#endif
+    {
+      block_interrupt_signal (&oldset);
+      acquire_global_lock (self);
+      restore_signal_mask (&oldset);
+    }
 }
 
 int
@@ -581,8 +588,13 @@ static void
 yield_callback (void *ignore)
 {
   struct thread_state *self = current_thread; // current_thread changes!
-  release_global_lock ();
-  acquire_global_lock (self);
+#ifdef HAVE_GCC_TLS
+  if (self->cooperative)
+#endif
+    {
+      release_global_lock ();
+      acquire_global_lock (self);
+    }
 }
 
 void

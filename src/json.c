@@ -1124,7 +1124,10 @@ read_jsonrpc_forever (Lisp_Object proc)
   if (releasable)
     {
       with_flushed_stack (for_side_effect, NULL);
-      release_global_lock ();
+#ifdef HAVE_GCC_TLS
+      if (self->cooperative)
+#endif
+	release_global_lock ();
     }
 
   while (EQ (p->status, Qrun))
@@ -1186,7 +1189,10 @@ read_jsonrpc_forever (Lisp_Object proc)
 		    json_loads (ptr, JSON_DECODE_ANY | JSON_ALLOW_NUL, &err);
 		  ptr[content_length] = restore;
 		  if (releasable)
-		    acquire_global_lock (self);
+#ifdef HAVE_GCC_TLS
+		    if (self->cooperative)
+#endif
+		      acquire_global_lock (self);
 		  if (json)
 		    {
 		      const struct json_configuration conf =
@@ -1199,7 +1205,10 @@ read_jsonrpc_forever (Lisp_Object proc)
 		  if (releasable)
 		    {
 		      with_flushed_stack (for_side_effect, NULL);
-		      release_global_lock ();
+#ifdef HAVE_GCC_TLS
+		      if (self->cooperative)
+#endif
+			release_global_lock ();
 		    }
 		  ptr += content_length;
 		  content_length = -1;
@@ -1216,7 +1225,10 @@ read_jsonrpc_forever (Lisp_Object proc)
 
   xfree (buffer);
   if (releasable)
-    acquire_global_lock (self);
+#ifdef HAVE_GCC_TLS
+    if (self->cooperative)
+#endif
+      acquire_global_lock (self);
 }
 
 void
