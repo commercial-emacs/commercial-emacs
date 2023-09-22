@@ -5233,6 +5233,15 @@ maybe_garbage_collect (void)
 void
 define_error (Lisp_Object name, const char *message, Lisp_Object parent);
 
+/* CACHEABLE is ordinarily nothing, except it is 'volatile' if
+   necessary to cajole GCC into not warning incorrectly that a
+   variable should be volatile.  */
+#if defined GCC_LINT || defined lint
+# define CACHEABLE volatile
+#else
+# define CACHEABLE /* empty */
+#endif
+
 INLINE_HEADER_END
 
 #endif /* EMACS_LISP_H */

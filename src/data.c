@@ -1448,6 +1448,7 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
   symbol = argsym;
   xsymbol = XSYMBOL (symbol);
 
+#ifdef HAVE_GCC_TLS
   if (this_thread && ! NILP (this_thread->obarray))
     {
       Lisp_Object found = oblookup (this_thread->obarray,
@@ -1461,6 +1462,7 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
 	  eassert (xsymbol->u.s.redirect != SYMBOL_VARALIAS);
 	}
     }
+#endif /* HAVE_GCC_TLS */
 
  start:
   switch (xsymbol->u.s.redirect)

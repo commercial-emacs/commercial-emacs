@@ -735,7 +735,7 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   new_thread->name = name;
   new_thread->function = function;
   new_thread->obarray = initialize_vector (OBARRAY_SIZE / 10, make_fixnum (0));
-  new_thread->cooperative = true;
+  new_thread->cooperative = NILP (uncooperative);
   new_thread->m_current_buffer = current_thread->m_current_buffer;
 
   /* 1+ for unreachable dummy entry */

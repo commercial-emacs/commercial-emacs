@@ -31,15 +31,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "atimer.h"
 #include "syntax.h"
 
-/* CACHEABLE is ordinarily nothing, except it is 'volatile' if
-   necessary to cajole GCC into not warning incorrectly that a
-   variable should be volatile.  */
-#if defined GCC_LINT || defined lint
-# define CACHEABLE volatile
-#else
-# define CACHEABLE /* empty */
-#endif
-
 /* Non-nil means record all fset's and provide's, to be undone
    if the file being autoloaded is not fully loaded.
    They are recorded by being consed onto the front of Vautoload_queue:
@@ -1364,115 +1355,81 @@ usage: (condition-case VAR BODYFORM &rest HANDLERS)  */)
 {
   Lisp_Object var = XCAR (args);
   Lisp_Object bodyform = XCAR (XCDR (args));
-  Lisp_Object handlers = XCDR (XCDR (args));
+  Lisp_Object clauses = XCDR (XCDR (args));
 
-  return internal_lisp_condition_case (var, bodyform, handlers);
+  return internal_lisp_condition_case (var, bodyform, clauses);
 }
-
-/* Like Fcondition_case, but the args are separate
-   rather than passed in a list.  Used by Fbyte_code.  */
 
 Lisp_Object
 internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
-			      Lisp_Object handlers)
+			      Lisp_Object clauses)
 {
-  struct handler *oldhandlerlist = current_thread->m_handlerlist; // not thread-safe
-  ptrdiff_t CACHEABLE clausenb = 0;
+  Lisp_Object CACHEABLE triggered_clause = Qnil,
+    success_clause = Qnil, result = Qnil, rev = Qnil;
 
   CHECK_SYMBOL (var);
 
-  Lisp_Object success_handler = Qnil;
-
-  for (Lisp_Object tail = handlers; CONSP (tail); tail = XCDR (tail))
+  for (Lisp_Object tail = clauses; CONSP (tail); tail = XCDR (tail))
     {
-      Lisp_Object tem = XCAR (tail);
-      if (! (NILP (tem)
-	     || (CONSP (tem)
-		 && (SYMBOLP (XCAR (tem))
-		     || CONSP (XCAR (tem))))))
+      Lisp_Object clause = XCAR (tail);
+      if (! (NILP (clause)
+	     || (CONSP (clause)
+		 && (SYMBOLP (XCAR (clause))
+		     || CONSP (XCAR (clause))))))
 	error ("Invalid condition handler: %s",
-	       SDATA (Fprin1_to_string (tem, Qt, Qnil)));
-      if (CONSP (tem) && EQ (XCAR (tem), QCsuccess))
-	success_handler = tem;
+	       SDATA (Fprin1_to_string (clause, Qt, Qnil)));
+      if (CONSP (clause) && EQ (XCAR (clause), QCsuccess))
+	success_clause = clause;
       else
-	clausenb++;
+	/* Reverse since push_handler() reverses again.  */
+	rev = Fcons (clause, rev);
     }
 
-  /* The first clause is the one that should be checked first, so it
-     should be added to handlerlist last.  So build in CLAUSES a table
-     that contains HANDLERS but in reverse order.  CLAUSES is pointer
-     to volatile to avoid issues with setjmp and local storage.
-     SAFE_ALLOCA won't work here due to the setjmp, so impose a
-     MAX_ALLOCA limit.  */
-  if (MAX_ALLOCA / word_size < clausenb)
-    memory_full (SIZE_MAX);
-  Lisp_Object volatile *clauses = alloca (clausenb * sizeof *clauses);
-  clauses += clausenb;
-  for (Lisp_Object tail = handlers; CONSP (tail); tail = XCDR (tail))
+  struct handler *oldhandlerlist = handlerlist;
+  for (Lisp_Object tail = rev; CONSP (tail); tail = XCDR (tail))
     {
-      Lisp_Object tem = XCAR (tail);
-      if (!(CONSP (tem) && EQ (XCAR (tem), QCsuccess)))
-	*--clauses = tem;
-    }
-  for (ptrdiff_t i = 0; i < clausenb; i++)
-    {
-      Lisp_Object clause = clauses[i];
+      Lisp_Object clause = XCAR (tail);
       Lisp_Object condition = CONSP (clause) ? XCAR (clause) : Qnil;
-      if (!CONSP (condition))
+      if (! CONSP (condition))
 	condition = list1 (condition);
       struct handler *c = push_handler (condition, CONDITION_CASE);
       if (sys_setjmp (c->jmp))
 	{
-	  Lisp_Object val = handlerlist->val;
-	  Lisp_Object volatile *chosen_clause = clauses;
-	  for (struct handler *h = handlerlist->next; h != oldhandlerlist;
+	  result = handlerlist->val;
+	  /* The clause index jmped to is however many outer catches back to
+	     oldhanderlist.  */
+	  Lisp_Object tail = rev;
+	  for (struct handler *h = handlerlist->next;
+	       h != oldhandlerlist;
 	       h = h->next)
-	    chosen_clause++;
-	  Lisp_Object handler_body = XCDR (*chosen_clause);
-	  handlerlist = oldhandlerlist;
-
-	  if (NILP (var))
-	    return Fprogn (handler_body);
-
-	  Lisp_Object handler_var = var;
-	  if (!NILP (Vinternal_interpreter_environment))
-	    {
-	      val = Fcons (Fcons (var, val),
-			   Vinternal_interpreter_environment);
-	      handler_var = Qinternal_interpreter_environment;
-	    }
-
-	  /* Bind HANDLER_VAR to VAL while evaluating HANDLER_BODY.
-	     The unbind_to undoes just this binding; whoever longjumped
-	     to us unwound the stack to C->pdlcount before throwing.  */
-	  specpdl_ref count = SPECPDL_INDEX ();
-	  specbind (handler_var, val);
-	  return unbind_to (count, Fprogn (handler_body));
+	    tail = XCDR (tail);
+	  triggered_clause = XCAR (tail);
+	  goto done;
 	}
     }
 
-  Lisp_Object CACHEABLE result = eval_sub (bodyform);
+  result = eval_sub (bodyform);
+ done: ;
   handlerlist = oldhandlerlist;
-  if (!NILP (success_handler))
+  Lisp_Object clause = NILP (triggered_clause) ? success_clause : triggered_clause;
+  if (! NILP (clause))
     {
       if (NILP (var))
-	return Fprogn (XCDR (success_handler));
-
-      Lisp_Object handler_var = var;
-      if (!NILP (Vinternal_interpreter_environment))
+	result = Fprogn (XCDR (clause));
+      else
 	{
-	  result = Fcons (Fcons (var, result),
-		       Vinternal_interpreter_environment);
-	  handler_var = Qinternal_interpreter_environment;
+	  specpdl_ref count = SPECPDL_INDEX ();
+	  if (! NILP (Vinternal_interpreter_environment))
+	    specbind (Qinternal_interpreter_environment,
+		      Fcons (Fcons (var, result),
+			     Vinternal_interpreter_environment));
+	  else
+	    specbind (var, result);
+	  result = unbind_to (count, Fprogn (XCDR (clause)));
 	}
-
-      specpdl_ref count = SPECPDL_INDEX ();
-      specbind (handler_var, result);
-      return unbind_to (count, Fprogn (XCDR (success_handler)));
     }
   return result;
 }
-
 /* Call the function BFUN with no arguments, catching errors within it
    according to HANDLERS.  If there is an error, call HFUN with
    one argument which is the data that describes the error:
@@ -3382,6 +3339,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       XSETSYMBOL (symbol, xsymbol);
     }
 
+#ifdef HAVE_GCC_TLS
   if (this_thread && ! this_thread->cooperative)
     {
       symbol = Fintern_soft (SYMBOL_NAME (symbol), this_thread->obarray);
@@ -3397,6 +3355,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 	  xsymbol = XSYMBOL (symbol);
 	}
     }
+#endif /* HAVE_GCC_TLS */
 
   /* First, qualify what kind of binding.  */
   switch (xsymbol->u.s.redirect)
