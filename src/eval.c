@@ -1396,8 +1396,8 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
       if (sys_setjmp (c->jmp))
 	{
 	  result = handlerlist->val;
-	  /* The clause index jmped to is however many outer catches back to
-	     oldhanderlist.  */
+	  /* The jmped to clause index is however many outer catches
+	     back to oldhandlerlist.  */
 	  Lisp_Object tail = rev;
 	  for (struct handler *h = handlerlist->next;
 	       h != oldhandlerlist;
