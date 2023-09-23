@@ -533,20 +533,12 @@ extern struct gflags
      dump.  */
   bool dumped_with_pdumper_ : 1;
 #endif
-#ifdef HAVE_UNEXEC
-  bool will_dump_with_unexec_ : 1;
-  /* Set in an Emacs process that has been restored from an unexec
-     dump.  */
-  bool dumped_with_unexec_ : 1;
-  /* We promise not to unexec: useful for hybrid malloc.  */
-  bool will_not_unexec_ : 1;
-#endif
 } gflags;
 
 INLINE bool
 will_dump_p (void)
 {
-#if HAVE_PDUMPER || defined HAVE_UNEXEC
+#if HAVE_PDUMPER
   return gflags.will_dump_;
 #else
   return false;
@@ -556,7 +548,7 @@ will_dump_p (void)
 INLINE bool
 will_bootstrap_p (void)
 {
-#if HAVE_PDUMPER || defined HAVE_UNEXEC
+#if HAVE_PDUMPER
   return gflags.will_bootstrap_;
 #else
   return false;
@@ -580,39 +572,6 @@ dumped_with_pdumper_p (void)
   return gflags.dumped_with_pdumper_;
 #else
   return false;
-#endif
-}
-
-INLINE bool
-will_dump_with_unexec_p (void)
-{
-#ifdef HAVE_UNEXEC
-  return gflags.will_dump_with_unexec_;
-#else
-  return false;
-#endif
-}
-
-INLINE bool
-dumped_with_unexec_p (void)
-{
-#ifdef HAVE_UNEXEC
-  return gflags.dumped_with_unexec_;
-#else
-  return false;
-#endif
-}
-
-/* This function is the opposite of will_dump_with_unexec_p(), except
-   that it returns false before main runs.  It's important to use
-   gmalloc for any pre-main allocations if we're going to unexec.  */
-INLINE bool
-definitely_will_not_unexec_p (void)
-{
-#ifdef HAVE_UNEXEC
-  return gflags.will_not_unexec_;
-#else
-  return true;
 #endif
 }
 
@@ -2862,15 +2821,11 @@ CHECK_SUBR (Lisp_Object x)
 /* If we're not dumping using the legacy dumper and we might be using
    the portable dumper, try to bunch all the subr structures together
    for more efficient dump loading.  */
-#ifndef HAVE_UNEXEC
 # ifdef DARWIN_OS
 #  define SUBR_SECTION_ATTRIBUTE ATTRIBUTE_SECTION ("__DATA,subrs")
 # else
 #  define SUBR_SECTION_ATTRIBUTE ATTRIBUTE_SECTION (".subrs")
 # endif
-#else
-# define SUBR_SECTION_ATTRIBUTE
-#endif
 
 /* Define a built-in function for calling from Lisp.
  `lname' should be the name to give the function in Lisp,
@@ -3885,8 +3840,6 @@ extern void malloc_warning (const char *);
 extern AVOID memory_full (size_t);
 extern bool survives_gc_p (Lisp_Object);
 extern void mark_objects (Lisp_Object *, ptrdiff_t);
-extern void alloc_unexec_pre (void);
-extern void alloc_unexec_post (void);
 extern void mark_memory (void const *start, void const *end);
 
 INLINE void
@@ -4257,14 +4210,6 @@ extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
 void do_debug_on_call (Lisp_Object code, specpdl_ref count);
 Lisp_Object funcall_general (Lisp_Object fun,
 			     ptrdiff_t numargs, Lisp_Object *args);
-
-/* Defined in unexmacosx.c.  */
-#if defined DARWIN_OS && defined HAVE_UNEXEC
-extern void unexec_init_emacs_zone (void);
-extern void *unexec_malloc (size_t);
-extern void *unexec_realloc (void *, size_t);
-extern void unexec_free (void *);
-#endif
 
 INLINE AVOID string_overflow (void)
 {

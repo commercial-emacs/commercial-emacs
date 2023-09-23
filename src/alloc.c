@@ -154,11 +154,7 @@ struct mem_node mem_z;
       malloc_probe (size);			\
   } while (0)
 
-/* Initialize it to a nonzero value to force it into data space
-   (rather than bss space).  That way unexec will remap it into text
-   space (pure), on some systems.  We have not implemented the
-   remapping on more recent systems because this is less important
-   nowadays than in the days of small memories and timesharing.  */
+/* Initializing nonzero forces it into data space instead of bss space. */
 
 EMACS_INT pure[(PURESIZE + sizeof (EMACS_INT) - 1) / sizeof (EMACS_INT)] = {1,};
 #define PUREBEG (char *) pure
@@ -167,11 +163,6 @@ EMACS_INT pure[(PURESIZE + sizeof (EMACS_INT) - 1) / sizeof (EMACS_INT)] = {1,};
 
 static char *purebeg;
 static ptrdiff_t pure_size;
-
-/* Number of bytes of pure storage used before pure storage overflowed.
-   If this is non-zero, this implies that an overflow occurred.  */
-
-static ptrdiff_t pure_bytes_used_before_overflow;
 
 /* Index in pure at which next pure Lisp object will be allocated..  */
 
@@ -225,10 +216,6 @@ static void mem_rotate_left (struct mem_node *);
 static void mem_rotate_right (struct mem_node *);
 static void mem_delete (struct mem_node *);
 static void mem_delete_fixup (struct mem_node *);
-
-/* Addresses of staticpro'd variables.  Initialize it to a nonzero
-   value if we might unexec; otherwise some compilers put it into
-   BSS.  */
 
 Lisp_Object const *staticvec[NSTATICS];
 
@@ -4394,7 +4381,6 @@ pure_alloc (size_t size, int type)
   eassert (size <= small_amount - LISP_ALIGNMENT);
   purebeg = xzalloc (small_amount);
   pure_size = small_amount;
-  pure_bytes_used_before_overflow += pure_bytes_used - size;
   pure_bytes_used = 0;
   pure_bytes_used_lisp = pure_bytes_used_non_lisp = 0;
 

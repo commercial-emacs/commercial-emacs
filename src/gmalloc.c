@@ -1489,12 +1489,6 @@ extern void *__sbrk (ptrdiff_t increment);
 static void *
 gdefault_morecore (ptrdiff_t increment)
 {
-#ifdef HYBRID_MALLOC
-  if (!definitely_will_not_unexec_p ())
-    {
-      return bss_sbrk (increment);
-    }
-#endif
 #ifdef HAVE_SBRK
   void *result = (void *) __sbrk (increment);
   if (result != (void *) -1)
@@ -1710,17 +1704,13 @@ allocated_via_gmalloc (void *ptr)
 void *
 hybrid_malloc (size_t size)
 {
-  if (definitely_will_not_unexec_p ())
-    return malloc (size);
-  return gmalloc (size);
+  return malloc (size);
 }
 
 void *
 hybrid_calloc (size_t nmemb, size_t size)
 {
-  if (definitely_will_not_unexec_p ())
-    return calloc (nmemb, size);
-  return gcalloc (nmemb, size);
+  return calloc (nmemb, size);
 }
 
 static void
@@ -1754,8 +1744,6 @@ hybrid_free (void *ptr)
 void *
 hybrid_aligned_alloc (size_t alignment, size_t size)
 {
-  if (!definitely_will_not_unexec_p ())
-    return galigned_alloc (alignment, size);
   /* The following is copied from alloc.c */
 #ifdef HAVE_ALIGNED_ALLOC
   return aligned_alloc (alignment, size);
@@ -1777,8 +1765,6 @@ hybrid_realloc (void *ptr, size_t size)
     return hybrid_malloc (size);
   if (!allocated_via_gmalloc (ptr))
     return realloc (ptr, size);
-  if (!definitely_will_not_unexec_p ())
-    return grealloc (ptr, size);
 
   /* The dumped emacs is trying to realloc storage allocated before
      dumping via gmalloc.  Allocate new space and copy the data.  Do

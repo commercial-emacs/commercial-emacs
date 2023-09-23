@@ -98,24 +98,10 @@ typedef bool bool_bf;
    'free' to its replacement, and we want to avoid that in unexec
    builds.  Including it here will render its inclusion after config.h
    a no-op.  */
-# if (defined DARWIN_OS && defined HAVE_UNEXEC) || defined HYBRID_MALLOC
+# if defined HYBRID_MALLOC
 #  include <stdlib.h>
 # endif
 #endif	/* emacs */
-
-#if defined DARWIN_OS && defined emacs && defined HAVE_UNEXEC
-# undef malloc
-# define malloc unexec_malloc
-# undef realloc
-# define realloc unexec_realloc
-# undef free
-# define free unexec_free
-
-extern void *unexec_malloc (size_t);
-extern void *unexec_realloc (void *, size_t);
-extern void unexec_free (void *);
-
-#endif
 
 /* If HYBRID_MALLOC is defined (e.g., on Cygwin), emacs will use
    gmalloc before dumping and the system malloc after dumping.

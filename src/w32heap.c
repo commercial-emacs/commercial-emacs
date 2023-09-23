@@ -115,17 +115,9 @@ typedef struct _RTL_HEAP_PARAMETERS {
    than half of the size stated below.  It would be nice to find a way
    to build only the first bootstrap-emacs.exe with the large size,
    and reset that to a lower value afterwards.  */
-#ifndef HAVE_UNEXEC
-/* We don't use dumped_data[], so define to a small size that won't
+a/* We don't use dumped_data[], so define to a small size that won't
    matter.  */
 # define DUMPED_HEAP_SIZE 10
-#else
-# if defined _WIN64 || defined WIDE_EMACS_INT
-#  define DUMPED_HEAP_SIZE (28*1024*1024)
-# else
-#  define DUMPED_HEAP_SIZE (24*1024*1024)
-# endif
-#endif
 
 static unsigned char dumped_data[DUMPED_HEAP_SIZE];
 
@@ -616,31 +608,6 @@ sys_calloc (size_t number, size_t size)
     memset (ptr, 0, nbytes);
   return ptr;
 }
-
-#if defined HAVE_UNEXEC && defined ENABLE_CHECKING
-void
-report_temacs_memory_usage (void)
-{
-  DWORD blocks_used = 0;
-  size_t large_mem_used = 0;
-  int i;
-
-  for (i = 0; i < blocks_number; i++)
-    if (blocks[i].occupied)
-      {
-	blocks_used++;
-	large_mem_used += blocks[i].size;
-      }
-
-  /* Emulate 'message', which writes to stderr in non-interactive
-     sessions.  */
-  fprintf (stderr,
-	   "Dump memory usage: Heap: %" PRIu64 "  Large blocks(%lu/%lu): %" PRIu64 "/%" PRIu64 "\n",
-	   (unsigned long long)committed, blocks_used, blocks_number,
-	   (unsigned long long)large_mem_used,
-	   (unsigned long long)(dumped_data + DUMPED_HEAP_SIZE - bc_limit));
-}
-#endif
 
 /* Emulate getpagesize. */
 int
