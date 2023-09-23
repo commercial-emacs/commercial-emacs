@@ -619,7 +619,7 @@ DEFUN ("thread-yield", Fthread_yield, Sthread_yield, 0, 0, 0,
 }
 
 static Lisp_Object
-invoke_thread_function (void)
+invoke_thread (void)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   current_thread->result = Ffuncall (1, &current_thread->function);
@@ -671,7 +671,7 @@ run_thread (void *state)
   handlerlist_sentinel->nextfree = NULL;
   handlerlist_sentinel->next = NULL;
 
-  internal_condition_case (invoke_thread_function, Qt, record_thread_error);
+  internal_condition_case (invoke_thread, Qt, record_thread_error);
 
   update_processes_for_thread_death (self);
 
@@ -681,10 +681,11 @@ run_thread (void *state)
   self->m_specpdl_ptr = NULL;
   self->m_specpdl_end = NULL;
 
-  for (struct handler *c_next, *c = handlerlist_sentinel; c != NULL; c = c_next)
+  for (struct handler *h = handlerlist_sentinel; h != NULL; )
     {
-      c_next = c->nextfree;
-      xfree (c);
+      struct handler *next = h->nextfree;
+      xfree (h);
+      h = next;
     }
 
   xfree (self->thread_name);

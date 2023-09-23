@@ -802,9 +802,7 @@ remove_process (register Lisp_Object proc)
 void
 update_processes_for_thread_death (const struct thread_state *thread)
 {
-  Lisp_Object pair;
-
-  for (pair = Vprocess_alist; ! NILP (pair); pair = XCDR (pair))
+  for (Lisp_Object pair = Vprocess_alist; ! NILP (pair); pair = XCDR (pair))
     {
       Lisp_Object process = XCDR (XCAR (pair));
       if (! NILP (XPROCESS (process)->thread)
