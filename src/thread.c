@@ -762,7 +762,7 @@ A non-nil UNCOOPERATIVE halts and catches fire.
 #else
   new_thread->cooperative = true;
   if (! NILP (uncooperative))
-    error ("This emacs lacks gcc tls");
+    error ("No gcc tls support");
 #endif
   new_thread->m_current_buffer = current_thread->m_current_buffer;
 
