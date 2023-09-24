@@ -1985,6 +1985,4 @@ some of this variable's contents the diagnostic listings.")
 
 (provide 'flymake)
 
-(require 'flymake-proc)
-
 ;;; flymake.el ends here
