@@ -183,7 +183,7 @@ endif
 FLOCK =
 ifeq ($(GDB),)
 ifneq ($(shell which flock),)
-lisp/gnus/mml-sec-tests.log lisp/epg-tests.log lisp/emacs-lisp/package-tests.log \
+lisp/proced-tests.log lisp/eshell/esh-proc-tests.log lisp/gnus/mml-sec-tests.log lisp/epg-tests.log lisp/emacs-lisp/package-tests.log \
 : FLOCK = flock -w 180 .
 endif
 endif
