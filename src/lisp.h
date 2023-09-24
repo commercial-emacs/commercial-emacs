@@ -303,27 +303,6 @@ typedef struct Lisp_X *Lisp_Word;
 typedef EMACS_INT Lisp_Word;
 #endif
 
-/* With lisp_h_OP containing the core implementation, OP is exposed as
-   a macro for un-optimized builds which disable function inlining,
-
-     #define OP(x) lisp_h_OP (x)
-
-   or an inlined function otherwise,
-
-     Lisp_Object (OP) (Lisp_Object x) { return lisp_h_OP (x); }
-
-   FIXME: Now that "gcc -Og" (new to GCC 4.8) works well enough, we
-   no longer need this indirection.  See Bug#11935.
-*/
-#ifndef DEFINE_KEY_OPS_AS_MACROS
-# if (defined __NO_INLINE__ \
-      && ! defined __OPTIMIZE__ && ! defined __OPTIMIZE_SIZE__)
-#  define DEFINE_KEY_OPS_AS_MACROS true
-# else
-#  define DEFINE_KEY_OPS_AS_MACROS false
-# endif
-#endif
-
 /* Convert among the various Lisp-related types: I for EMACS_INT, L
    for Lisp_Object, P for void *.
 
@@ -401,36 +380,6 @@ typedef EMACS_INT Lisp_Word;
 # endif
 # define lisp_h_XFIXNUM_RAW(a) (XLI (a) >> INTTYPEBITS)
 # define lisp_h_XTYPE(a) ((enum Lisp_Type) (XLI (a) & ~VALMASK))
-#endif
-
-#if DEFINE_KEY_OPS_AS_MACROS
-# define XLI(o) lisp_h_XLI (o)
-# define XIL(i) lisp_h_XIL (i)
-# define XLP(o) lisp_h_XLP (o)
-# define CHECK_FIXNUM(x) lisp_h_CHECK_FIXNUM (x)
-# define CHECK_SYMBOL(x) lisp_h_CHECK_SYMBOL (x)
-# define CHECK_TYPE(ok, predicate, x) lisp_h_CHECK_TYPE (ok, predicate, x)
-# define CONSP(x) lisp_h_CONSP (x)
-# define EQ(x, y) lisp_h_EQ (x, y)
-# define FLOATP(x) lisp_h_FLOATP (x)
-# define FIXNUMP(x) lisp_h_FIXNUMP (x)
-# define NILP(x) lisp_h_NILP (x)
-# define SET_SYMBOL_VAL(sym, v) lisp_h_SET_SYMBOL_VAL (sym, v)
-# define SYMBOL_CONSTANT_P(sym) lisp_h_SYMBOL_CONSTANT_P (sym)
-# define SYMBOL_TRAPPED_WRITE_P(sym) lisp_h_SYMBOL_TRAPPED_WRITE_P (sym)
-# define SYMBOL_VAL(sym) lisp_h_SYMBOL_VAL (sym)
-# define SYMBOLP(x) lisp_h_SYMBOLP (x)
-# define TAGGEDP(a, tag) lisp_h_TAGGEDP (a, tag)
-# define VECTORLIKEP(x) lisp_h_VECTORLIKEP (x)
-# define XCAR(c) lisp_h_XCAR (c)
-# define XCDR(c) lisp_h_XCDR (c)
-# define XCONS(a) lisp_h_XCONS (a)
-# define XHASH(a) lisp_h_XHASH (a)
-# if USE_LSB_TAG
-#  define make_fixnum(n) lisp_h_make_fixnum (n)
-#  define XFIXNUM_RAW(a) lisp_h_XFIXNUM_RAW (a)
-#  define XTYPE(a) lisp_h_XTYPE (a)
-# endif
 #endif
 
 #define INTMASK (EMACS_INT_MAX >> (INTTYPEBITS - 1))

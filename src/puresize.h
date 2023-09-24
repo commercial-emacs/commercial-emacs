@@ -63,18 +63,8 @@ INLINE_HEADER_BEGIN
 #endif
 #endif
 
-#ifdef ENABLE_CHECKING
-/* ENABLE_CHECKING somehow increases the purespace used, probably because
-   it tends to cause some macro arguments to be evaluated twice.  This is
-   a bug, but it's difficult to track it down.  */
-#define PURESIZE_CHECKING_RATIO 12 / 10	/* Don't surround with `()'.  */
-#else
-#define PURESIZE_CHECKING_RATIO 1
-#endif
-
-/* This is the actual size in bytes to allocate.  */
 #ifndef PURESIZE
-#define PURESIZE  (BASE_PURESIZE * PURESIZE_RATIO * PURESIZE_CHECKING_RATIO)
+#define PURESIZE  (BASE_PURESIZE * PURESIZE_RATIO)
 #endif
 
 extern AVOID pure_write_error (Lisp_Object);
@@ -82,8 +72,6 @@ extern AVOID pure_write_error (Lisp_Object);
 extern EMACS_INT pure[];
 
 /* The puresize_h_* macros are private to this include file.  */
-
-/* True if PTR is pure.  */
 
 #define puresize_h_PURE_P(ptr) \
   ((uintptr_t) (ptr) - (uintptr_t) pure <= PURESIZE)
@@ -104,11 +92,6 @@ CHECK_IMPURE (Lisp_Object obj, void *ptr)
 {
   puresize_h_CHECK_IMPURE (obj, ptr);
 }
-
-#if DEFINE_KEY_OPS_AS_MACROS
-# define PURE_P(ptr) puresize_h_PURE_P (ptr)
-# define CHECK_IMPURE(obj, ptr) puresize_h_CHECK_IMPURE (obj, ptr)
-#endif
 
 INLINE_HEADER_END
 
