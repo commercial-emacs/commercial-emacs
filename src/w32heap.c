@@ -115,7 +115,7 @@ typedef struct _RTL_HEAP_PARAMETERS {
    than half of the size stated below.  It would be nice to find a way
    to build only the first bootstrap-emacs.exe with the large size,
    and reset that to a lower value afterwards.  */
-a/* We don't use dumped_data[], so define to a small size that won't
+/* We don't use dumped_data[], so define to a small size that won't
    matter.  */
 # define DUMPED_HEAP_SIZE 10
 
