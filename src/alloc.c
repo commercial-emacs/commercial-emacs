@@ -69,7 +69,12 @@ enum { MALLOC_ALIGNMENT = 16 };
 enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 #endif
 
+#ifdef HAVE_GCC_TLS
+__thread bool gc_inhibited;
+#else
 static bool gc_inhibited;
+#endif
+
 struct Lisp_String *(*static_string_allocator) (void);
 struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t len, bool q_clear);
 INTERVAL (*static_interval_allocator) (void);
@@ -6409,9 +6414,7 @@ which_symbols (Lisp_Object obj, EMACS_INT find_max)
        for (sblk = symbol_block; sblk; sblk = sblk->next)
 	 {
 	   struct Lisp_Symbol *asym = sblk->symbols;
-	   int bn;
-
-	   for (bn = 0; bn < BLOCK_NSYMBOLS; bn++, asym++)
+	   for (int bn = 0; bn < BLOCK_NSYMBOLS; bn++, asym++)
 	     {
 	       if (sblk == symbol_block && bn >= symbol_block_index)
 		 break;
