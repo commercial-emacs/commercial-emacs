@@ -572,8 +572,8 @@ enum
   LISP_VECTOR_MIN = header_size + sizeof (Lisp_Object), // vector of one
   LARGE_VECTOR_THRESH = (VBLOCK_NBYTES >> 1) - word_size,
 
-  /* Amazingly, free list per vector word-length.  */
-  VBLOCK_NFREE_LISTS = 1 + (VBLOCK_NBYTES - LISP_VECTOR_MIN) / word_size,
+  /* See free_slot() for sizing rationale.  */
+  VBLOCK_NFREE_LISTS = 1 + (LARGE_VECTOR_THRESH - LISP_VECTOR_MIN) / word_size,
 
   SBLOCK_NBITS = 13,
   SBLOCK_NBYTES = MALLOC_SIZE_NEAR(1 << SBLOCK_NBITS),
@@ -2125,11 +2125,27 @@ ADVANCE (struct Lisp_Vector *v, ptrdiff_t nbytes)
   return p;
 }
 
+/*
+   Each SLOT (index) in vector_free_lists points to a chain of vectors
+   of word-length SLOT+1.
+
+   When a new block of VBLOCK_NBYTES is requisitioned, its free list
+   slot gradually percolates downwards as subsequent allocation
+   requests consume it piecemeal.  Thus, vector_free_lists before
+   LARGE_VECTOR_THRESH would be sparse (requests beyond the threshold
+   eschew vector_free_lists altogether).
+
+   To avoid scanning a sparse range we size VBLOCK_NFREE_LISTS as
+   LARGE_VECTOR_THRESH-words, and reserve the final index
+   VBLOCK_NFREE_LISTS - 1 as an omnibus slot for free vectors sized
+   LARGE_VECTOR_THRESH and greater.
+*/
+
 static ptrdiff_t
-VINDEX (ptrdiff_t nbytes)
+free_slot (ptrdiff_t nbytes)
 {
   eassume (LISP_VECTOR_MIN <= nbytes);
-  return (nbytes - LISP_VECTOR_MIN) / word_size;
+  return min ((nbytes - LISP_VECTOR_MIN) / word_size, VBLOCK_NFREE_LISTS - 1);
 }
 
 /* So-called large vectors are managed outside vector blocks.
@@ -2169,7 +2185,7 @@ struct vector_block
 
 static struct vector_block *vector_blocks;
 
-/* Each IDX points to a chain of vectors of word-length IDX+1.  */
+/* See free_slot() for rationale.  */
 
 static struct Lisp_Vector *vector_free_lists[VBLOCK_NFREE_LISTS];
 
@@ -2194,8 +2210,6 @@ Lisp_Object zero_vector;
 # define ASAN_UNPOISON_VECTOR_BLOCK(b) ((void) 0)
 #endif
 
-/* Common shortcut to setup vector on a free list.  */
-
 static void
 add_vector_free_lists (struct Lisp_Vector *v, ptrdiff_t nbytes)
 {
@@ -2203,8 +2217,7 @@ add_vector_free_lists (struct Lisp_Vector *v, ptrdiff_t nbytes)
   ptrdiff_t nwords = (nbytes - header_size) / word_size;
   XSETPVECTYPESIZE (v, PVEC_FREE, 0, nwords);
   eassert (nbytes % word_size == 0);
-  ptrdiff_t vindex = VINDEX (nbytes);
-  eassert (vindex < VBLOCK_NFREE_LISTS);
+  ptrdiff_t vindex = free_slot (nbytes);
   set_next_vector (v, vector_free_lists[vindex]);
   ASAN_POISON_VECTOR_CONTENTS (v, nbytes - header_size);
   vector_free_lists[vindex] = v;
@@ -2236,6 +2249,14 @@ init_vectors (void)
   ((char *) (vector) <= (block)->data		\
    + VBLOCK_NBYTES - LISP_VECTOR_MIN)
 
+/* Memory footprint in bytes of a pseudovector other than a bool-vector.  */
+static ptrdiff_t
+pv_nwords (const union vectorlike_header *hdr)
+{
+  return ((hdr->size & PSEUDOVECTOR_SIZE_MASK)
+	  + ((hdr->size & PSEUDOVECTOR_REST_MASK) >> PSEUDOVECTOR_SIZE_BITS));
+}
+
 /* Return nbytes of vector with HDR.  */
 
 ptrdiff_t
@@ -2261,12 +2282,10 @@ vectorlike_nbytes (const union vectorlike_header *hdr)
       break;
     default:
       eassert (size & PSEUDOVECTOR_FLAG);
-      nwords = ((size & PSEUDOVECTOR_SIZE_MASK)
-		+ ((size & PSEUDOVECTOR_REST_MASK)
-		   >> PSEUDOVECTOR_SIZE_BITS));
+      nwords = pv_nwords (hdr);
       break;
     }
-  return header_size + word_size * nwords;
+  return header_size + (word_size * nwords);
 }
 
 /* Convert a pseudovector pointer P to its underlying struct T pointer.
@@ -2513,8 +2532,7 @@ sweep_vectors (void)
 
    For whatever reason, LEN words consuming more than half VBLOCK_NBYTES
    is considered "large."
-  */
-
+*/
 static struct Lisp_Vector *
 allocate_vector (ptrdiff_t len, bool q_clear)
 {
@@ -2542,22 +2560,26 @@ allocate_vector (ptrdiff_t len, bool q_clear)
       eassume (LISP_VECTOR_MIN <= nbytes && nbytes <= LARGE_VECTOR_THRESH);
       eassume (nbytes % word_size == 0);
 
-      for (ptrdiff_t exact = VINDEX (nbytes), index = exact;
+      for (ptrdiff_t exact = free_slot (nbytes), index = exact;
 	   index < VBLOCK_NFREE_LISTS; ++index)
 	{
-	  restbytes = index * word_size + LISP_VECTOR_MIN - nbytes;
-	  eassert (restbytes || index == exact);
-	  /* Either leave no residual or one big enough to sustain a
-	     non-degenerate vector.  A hanging chad of MEM_TYPE_VBLOCK
-	     triggers all manner of ENABLE_CHECKING failures.  */
-	  if (! restbytes || restbytes >= LISP_VECTOR_MIN)
-	    if (vector_free_lists[index])
-	      {
-		p = vector_free_lists[index];
-                ASAN_UNPOISON_VECTOR_CONTENTS (p, nbytes - header_size);
-		vector_free_lists[index] = next_vector (p);
-		break;
-	      }
+	  p = vector_free_lists[index];
+	  if (p != NULL)
+	    {
+	      ptrdiff_t nwords = pv_nwords (&p->header);
+	      restbytes = header_size + (nwords * word_size) - nbytes;
+	      eassert (restbytes || index == exact);
+	      /* Either leave no residual or one big enough to sustain a
+		 non-degenerate vector.  A hanging chad of MEM_TYPE_VBLOCK
+		 triggers all manner of ENABLE_CHECKING failures.  */
+	      if (! restbytes || restbytes >= LISP_VECTOR_MIN)
+		{
+		  ASAN_UNPOISON_VECTOR_CONTENTS (p, nbytes - header_size);
+		  vector_free_lists[index] = next_vector (p);
+		  break;
+		}
+	      p = NULL;
+	    }
 	}
 
       if (! p)
@@ -2569,7 +2591,7 @@ allocate_vector (ptrdiff_t len, bool q_clear)
 
       if (restbytes)
 	{
-	  /* Tack onto free list corresponding to VINDEX(RESTBYTES).  */
+	  /* Tack onto free list corresponding to free_slot(RESTBYTES).  */
 	  eassert (restbytes % word_size == 0);
 	  eassert (restbytes >= LISP_VECTOR_MIN);
 	  add_vector_free_lists (ADVANCE (p, nbytes), restbytes);
