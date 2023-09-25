@@ -129,8 +129,7 @@ enum _GL_ATTRIBUTE_PACKED sdata_type
 
 struct mem_node
 {
-  /* Children of this node.  These pointers are never NULL.  When there
-     is no child, the value is CMEM_NIL, which points to a dummy node.  */
+  /* Children of node, or mem_nil (but not NULL).  */
   struct mem_node *left, *right;
 
   /* The parent of this node.  In the root node, this is NULL.  */
@@ -146,8 +145,7 @@ struct mem_node
   enum mem_type type;
 };
 
-struct mem_node mem_z;
-#define MEM_NIL &mem_z
+static struct mem_node _mem_nil, *mem_nil = &_mem_nil;
 
 #define MALLOC_PROBE(size)			\
   do {						\
@@ -3242,33 +3240,23 @@ memory_full (size_t nbytes)
   xsignal (Qnil, Vmemory_signal_data);
 }
 
-static void
-mem_init (void)
-{
-  mem_z.left = mem_z.right = MEM_NIL;
-  mem_z.parent = NULL;
-  mem_z.color = MEM_BLACK;
-  mem_z.start = mem_z.end = NULL;
-  mem_root = MEM_NIL;
-}
-
-/* Return mem_node containing START or failing that, MEM_NIL.  */
+/* Return mem_node containing START or failing that, mem_nil.  */
 
 struct mem_node *
 mem_find (void *start)
 {
-  struct mem_node *p;
-
+  struct mem_node *p = mem_root;
   if (start < min_heap_address || start > max_heap_address)
-    return MEM_NIL;
-
-  /* Make the search always successful to speed up the loop below.  */
-  mem_z.start = start;
-  mem_z.end = (char *) start + 1;
-
-  p = mem_root;
-  while (start < p->start || start >= p->end)
-    p = start < p->start ? p->left : p->right;
+    p = mem_nil;
+  while (p != mem_nil)
+    {
+      if (start < p->start)
+	p = p->left;
+      else if (start >= p->end)
+	p = p->right;
+      else
+	break;
+    }
   return p;
 }
 
@@ -3291,7 +3279,7 @@ mem_insert (void *start, void *end, enum mem_type type)
   c = mem_root;
   parent = NULL;
 
-  while (c != MEM_NIL)
+  while (c != mem_nil)
     {
       parent = c;
       c = start < c->start ? c->left : c->right;
@@ -3303,7 +3291,7 @@ mem_insert (void *start, void *end, enum mem_type type)
   x->end = end;
   x->type = type;
   x->parent = parent;
-  x->left = x->right = MEM_NIL;
+  x->left = x->right = mem_nil;
   x->color = MEM_RED;
 
   /* Insert it as child of PARENT or install it as root.  */
@@ -3410,11 +3398,11 @@ mem_rotate_left (struct mem_node *x)
   /* Turn y's left sub-tree into x's right sub-tree.  */
   y = x->right;
   x->right = y->left;
-  if (y->left != MEM_NIL)
+  if (y->left != mem_nil)
     y->left->parent = x;
 
   /* Y's parent was x's parent.  */
-  if (y != MEM_NIL)
+  if (y != mem_nil)
     y->parent = x->parent;
 
   /* Get the parent to point to y instead of x.  */
@@ -3430,7 +3418,7 @@ mem_rotate_left (struct mem_node *x)
 
   /* Put x on y's left.  */
   y->left = x;
-  if (x != MEM_NIL)
+  if (x != mem_nil)
     x->parent = y;
 }
 
@@ -3446,10 +3434,10 @@ mem_rotate_right (struct mem_node *x)
   struct mem_node *y = x->left;
 
   x->left = y->right;
-  if (y->right != MEM_NIL)
+  if (y->right != mem_nil)
     y->right->parent = x;
 
-  if (y != MEM_NIL)
+  if (y != mem_nil)
     y->parent = x->parent;
   if (x->parent)
     {
@@ -3462,7 +3450,7 @@ mem_rotate_right (struct mem_node *x)
     mem_root = y;
 
   y->right = x;
-  if (x != MEM_NIL)
+  if (x != mem_nil)
     x->parent = y;
 }
 
@@ -3471,19 +3459,19 @@ mem_delete (struct mem_node *z)
 {
   struct mem_node *x, *y;
 
-  if (!z || z == MEM_NIL)
+  if (!z || z == mem_nil)
     return;
 
-  if (z->left == MEM_NIL || z->right == MEM_NIL)
+  if (z->left == mem_nil || z->right == mem_nil)
     y = z;
   else
     {
       y = z->right;
-      while (y->left != MEM_NIL)
+      while (y->left != mem_nil)
 	y = y->left;
     }
 
-  if (y->left != MEM_NIL)
+  if (y->left != mem_nil)
     x = y->left;
   else
     x = y->right;
@@ -3929,7 +3917,7 @@ mark_maybe_pointer (void *const * p)
       INT_SUBTRACT_WRAPV ((uintptr_t) *p, (uintptr_t) xpntr, &offset);
       INT_ADD_WRAPV ((uintptr_t) forwarded, offset, (uintptr_t *) p);
     }
-  else if ((m = mem_find (*p)) != MEM_NIL)
+  else if ((m = mem_find (*p)) != mem_nil)
     {
       switch (m->type)
 	{
@@ -4006,7 +3994,7 @@ mark_maybe_pointer (void *const * p)
 	  emacs_abort ();
 	}
     }
-  else if ((m = mem_find (p_sym)) != MEM_NIL && m->type == MEM_TYPE_SYMBOL)
+  else if ((m = mem_find (p_sym)) != mem_nil && m->type == MEM_TYPE_SYMBOL)
     {
       struct Lisp_Symbol *h = live_symbol_holding (m, p_sym);
       if (h)
@@ -4266,7 +4254,7 @@ valid_lisp_object_p (Lisp_Object obj)
 
   struct mem_node *m = mem_find (p);
 
-  if (m == MEM_NIL)
+  if (m == mem_nil)
     {
       int valid = valid_pointer_p (p);
       if (valid <= 0)
@@ -5496,7 +5484,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	    || mgc_xpntr_p (xpntr))			\
 	  break;					\
 	m = mem_find (xpntr);				\
-	if (m == MEM_NIL)				\
+	if (m == mem_nil)				\
 	  emacs_abort ();				\
       } while (0)
 
@@ -5574,7 +5562,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		    && ! main_thread_p (xpntr))
 		  {
 		    m = mem_find (xpntr);
-		    if (m == MEM_NIL)
+		    if (m == mem_nil)
 		      emacs_abort ();
 		    if (m->type == MEM_TYPE_VECTORLIKE)
 		      CHECK_LIVE (live_large_vector_p, MEM_TYPE_VECTORLIKE);
@@ -6503,7 +6491,11 @@ init_runtime (void)
   static_string_allocator = &allocate_string;
   static_vector_allocator = &allocate_vector;
   static_interval_allocator = &allocate_interval;
-  mem_init ();
+  mem_root = mem_nil;
+  mem_nil->left = mem_nil->right = mem_nil;
+  mem_nil->parent = NULL;
+  mem_nil->color = MEM_BLACK;
+  mem_nil->start = mem_nil->end = NULL;
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);
   mgc_initialize_spaces ();
