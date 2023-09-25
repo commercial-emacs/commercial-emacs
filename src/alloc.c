@@ -6442,14 +6442,9 @@ die (const char *msg, const char *file, int line)
 static void
 verify_alloca (void)
 {
-  int i;
-  enum { ALLOCA_CHECK_MAX = 256 };
-  /* Start from size of the smallest Lisp object.  */
-  for (i = sizeof (struct Lisp_Cons); i <= ALLOCA_CHECK_MAX; i++)
-    {
-      void *ptr = alloca (i);
-      make_lisp_ptr (ptr, Lisp_Cons);
-    }
+  /* Start from smallest Lisp object.  */
+  for (int i = sizeof (struct Lisp_Cons); i <= (1 << 8); ++i)
+    make_lisp_ptr (alloca (i), Lisp_Cons);
 }
 
 #else /* not ENABLE_CHECKING && USE_STACK_LISP_OBJECTS */
