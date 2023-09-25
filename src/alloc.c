@@ -2131,12 +2131,12 @@ ADVANCE (struct Lisp_Vector *v, ptrdiff_t nbytes)
 
    When a new block of VBLOCK_NBYTES is requisitioned, its free list
    slot gradually percolates downwards as subsequent allocation
-   requests consume it piecemeal.  Thus, vector_free_lists before
-   LARGE_VECTOR_THRESH would be sparse (requests beyond the threshold
-   eschew vector_free_lists altogether).
+   requests consume it piecemeal.  Thus, vector_free_lists slots after
+   LARGE_VECTOR_THRESH_WORDS would be sparse (requests beyond the
+   threshold eschew vector_free_lists altogether).
 
    To avoid scanning a sparse range we size VBLOCK_NFREE_LISTS as
-   LARGE_VECTOR_THRESH-words, and reserve the final index
+   LARGE_VECTOR_THRESH_WORDS, and reserve the final index
    VBLOCK_NFREE_LISTS - 1 as an omnibus slot for free vectors sized
    LARGE_VECTOR_THRESH and greater.
 */
