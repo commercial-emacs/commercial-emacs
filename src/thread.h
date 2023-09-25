@@ -247,10 +247,15 @@ XCONDVAR (Lisp_Object a)
 }
 
 #ifdef HAVE_GCC_TLS
-extern __thread struct thread_state *current_thread;
+# define PER_THREAD __thread
+# define PER_THREAD_STATIC __thread
 #else
-extern struct thread_state *current_thread;
+# define PER_THREAD /* empty */
+# define PER_THREAD_STATIC static
 #endif
+
+extern PER_THREAD struct thread_state *current_thread;
+
 extern void finalize_one_thread (struct thread_state *state);
 extern void finalize_one_mutex (struct Lisp_Mutex *);
 extern void finalize_one_condvar (struct Lisp_CondVar *);

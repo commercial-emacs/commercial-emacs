@@ -62,11 +62,10 @@ static union aligned_thread_state main_thread
       .event_object = LISPSYM_INITIALLY (Qnil),
     }};
 
+PER_THREAD struct thread_state *current_thread = &main_thread.s;
+
 #ifdef HAVE_GCC_TLS
-__thread struct thread_state *current_thread = &main_thread.s;
 struct thread_state *prevailing_thread = &main_thread.s;
-#else
-struct thread_state *current_thread = &main_thread.s;
 #endif
 
 static struct thread_state *all_threads = &main_thread.s;
