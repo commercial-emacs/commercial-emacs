@@ -2208,7 +2208,6 @@ add_vector_free_lists (struct Lisp_Vector *v, ptrdiff_t nbytes)
   set_next_vector (v, vector_free_lists[vindex]);
   ASAN_POISON_VECTOR_CONTENTS (v, nbytes - header_size);
   vector_free_lists[vindex] = v;
-  last_inserted_vector_free_idx = vindex;
 }
 
 static struct vector_block *
@@ -2409,7 +2408,6 @@ static void
 sweep_vectors (void)
 {
   memset (vector_free_lists, 0, sizeof (vector_free_lists));
-  last_inserted_vector_free_idx = VECTOR_FREE_LIST_ARRAY_SIZE;
 
   gcstat.total_vectors =
     gcstat.total_vector_slots =
