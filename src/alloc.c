@@ -2189,6 +2189,11 @@ static struct vector_block *vector_blocks;
 
 static struct Lisp_Vector *vector_free_lists[VBLOCK_NFREE_LISTS];
 
+/* The last free list where we found large enough vector.  Trade
+   fragmentation risk for speed by commencing here on subsequenct
+   searches.  */
+static ptrdiff_t most_recent_free_slot = VBLOCK_NFREE_LISTS;
+
 /* Singly-linked list of large vectors.  */
 
 static struct large_vector *large_vectors;
@@ -2217,10 +2222,11 @@ add_vector_free_lists (struct Lisp_Vector *v, ptrdiff_t nbytes)
   ptrdiff_t nwords = (nbytes - header_size) / word_size;
   XSETPVECTYPESIZE (v, PVEC_FREE, 0, nwords);
   eassert (nbytes % word_size == 0);
-  ptrdiff_t vindex = free_slot (nbytes);
-  set_next_vector (v, vector_free_lists[vindex]);
+  ptrdiff_t slot = free_slot (nbytes);
+  set_next_vector (v, vector_free_lists[slot]);
   ASAN_POISON_VECTOR_CONTENTS (v, nbytes - header_size);
-  vector_free_lists[vindex] = v;
+  vector_free_lists[slot] = v;
+  most_recent_free_slot = slot;
 }
 
 static struct vector_block *
@@ -2427,6 +2433,7 @@ static void
 sweep_vectors (void)
 {
   memset (vector_free_lists, 0, sizeof (vector_free_lists));
+  most_recent_free_slot = VBLOCK_NFREE_LISTS;
 
   gcstat.total_vectors =
     gcstat.total_vector_slots =
@@ -2560,7 +2567,8 @@ allocate_vector (ptrdiff_t len, bool q_clear)
       eassume (LISP_VECTOR_MIN <= nbytes && nbytes <= LARGE_VECTOR_THRESH);
       eassume (nbytes % word_size == 0);
 
-      for (ptrdiff_t exact = free_slot (nbytes), index = exact;
+      for (ptrdiff_t exact = free_slot (nbytes),
+	     index = max (exact, most_recent_free_slot);
 	   index < VBLOCK_NFREE_LISTS; ++index)
 	{
 	  p = vector_free_lists[index];
