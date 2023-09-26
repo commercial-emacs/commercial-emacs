@@ -194,11 +194,11 @@ static void mem_rotate_right (struct mem_node *);
 static void mem_delete (struct mem_node *);
 static void mem_delete_fixup (struct mem_node *);
 
-Lisp_Object const *staticvec[NSTATICS];
+PER_THREAD Lisp_Object const *staticvec[NSTATICS];
 
 /* Index of next unused slot in staticvec.  */
 
-int staticidx;
+PER_THREAD int staticidx;
 
 /* Return PTR rounded up to the next multiple of ALIGNMENT.  */
 
@@ -4038,8 +4038,8 @@ test_setjmp (void)
 }
 # else
 
-PER_THREAD_STATIC bool setjmp_tested_p;
-PER_THREAD_STATIC int longjmps_done;
+static bool setjmp_tested_p;
+static int longjmps_done;
 
 /* Perform a quick check if it looks like setjmp saves registers in a
    jmp_buf.  Print a message to stderr saying so.  When this test
@@ -4142,12 +4142,6 @@ valid_pointer_p (void *p)
     return p ? -1 : 0;
 
   int fd[2];
-  static int under_rr_state;
-
-  if (!under_rr_state)
-    under_rr_state = getenv ("RUNNING_UNDER_RR") ? -1 : 1;
-  if (under_rr_state < 0)
-    return under_rr_state;
 
   /* Obviously, we cannot just access it (we would SEGV trying), so we
      trick the o/s to tell us whether p is a valid pointer.
@@ -5122,7 +5116,7 @@ struct mark_stack
   ptrdiff_t sp;			/* current number of entries */
 };
 
-static struct mark_stack mark_stk = {NULL, 0, 0};
+PER_THREAD_STATIC struct mark_stack mark_stk = {NULL, 0, 0};
 
 static inline bool
 mark_stack_empty_p (void)
@@ -5182,7 +5176,7 @@ mark_stack_push (Lisp_Object *value)
 void
 garbage_collect (void)
 {
-  static struct timespec gc_elapsed = { 0, 0 };
+  PER_THREAD_STATIC struct timespec gc_elapsed = { 0, 0 };
   Lisp_Object tail, buffer;
   bool message_p = false;
   specpdl_ref count = SPECPDL_INDEX ();
