@@ -487,9 +487,8 @@ lisp_malloc (size_t nbytes, bool q_clear, enum mem_type type)
   val = lmalloc (nbytes, q_clear);
 
 #if ! USE_LSB_TAG
-  /* If the memory just allocated cannot be addressed thru a Lisp
-     object's pointer, and it needs to be, that's equivalent to
-     running out of memory.  */
+  /* An lisp VAL unaddressable by a Lisp_Object pointer is tantamount
+     to running out of memory.  */
   if (val && type != MEM_TYPE_NON_LISP)
     {
       Lisp_Object tem;
@@ -3290,44 +3289,37 @@ mem_find (void *start)
 static struct mem_node *
 mem_insert (void *start, void *end, enum mem_type type)
 {
-  struct mem_node *c, *parent, *x;
-
-  /* See where in the tree a node for START belongs.  In this
-     particular application, it shouldn't happen that a node is already
-     present.  For debugging purposes, let's check that.  */
-  c = mem_root;
-  parent = NULL;
-
-  while (c != mem_nil)
+  for (struct mem_node *node = mem_root, *parent = NULL; ; )
     {
-      parent = c;
-      c = start < c->start ? c->left : c->right;
-    }
+      if (node == mem_nil)
+	{
+	  // insert here
+	  struct mem_node *x = xmalloc (sizeof *x);
+	  x->parent = parent;
+	  x->start = start;
+	  x->end = end;
+	  x->type = type;
+	  x->left = x->right = mem_nil;
+	  x->color = MEM_RED;
 
-  /* Create a new node.  */
-  x = xmalloc (sizeof *x);
-  x->start = start;
-  x->end = end;
-  x->type = type;
-  x->parent = parent;
-  x->left = x->right = mem_nil;
-  x->color = MEM_RED;
+	  // establish linkages
+	  if (node == mem_root)
+	    mem_root = x;
+	  else if (start < parent->start)
+	    parent->left = x;
+	  else
+	    parent->right = x;
 
-  /* Insert it as child of PARENT or install it as root.  */
-  if (parent)
-    {
-      if (start < parent->start)
-	parent->left = x;
+	  mem_insert_fixup (x);
+	  return x;
+	}
       else
-	parent->right = x;
+	{
+	  parent = node;
+	  node = start < node->start ? node->left : node->right;
+	}
     }
-  else
-    mem_root = x;
-
-  /* Re-establish red-black tree properties.  */
-  mem_insert_fixup (x);
-
-  return x;
+  emacs_abort (); // should have returned by now
 }
 
 /* Insert node X, then rebalance red-black tree.  X is always red.  */
@@ -3337,20 +3329,16 @@ mem_insert_fixup (struct mem_node *x)
 {
   while (x != mem_root && x->parent->color == MEM_RED)
     {
-      /* X is red and its parent is red.  This is a violation of
-	 red-black tree property #3.  */
-
+      /* Ensure property 3, if node is red, children black. */
       if (x->parent == x->parent->parent->left)
 	{
-	  /* We're on the left side of our grandparent, and Y is our
-	     "uncle".  */
+	  /* X is a left grand-child, and Y is uncle.  */
 	  struct mem_node *y = x->parent->parent->right;
 
 	  if (y->color == MEM_RED)
 	    {
-	      /* Uncle and parent are red but should be black because
-		 X is red.  Change the colors accordingly and proceed
-		 with the grandparent.  */
+	      /* Parent and uncle are red.  Change both to black
+		 because X is red.  Then proceed with grandparent.  */
 	      x->parent->color = MEM_BLACK;
 	      y->color = MEM_BLACK;
 	      x->parent->parent->color = MEM_RED;
@@ -3358,10 +3346,10 @@ mem_insert_fixup (struct mem_node *x)
             }
 	  else
 	    {
-	      /* Parent and uncle have different colors; parent is
-		 red, uncle is black.  */
+	      /* Parent is red but uncle is black.  */
 	      if (x == x->parent->right)
 		{
+		  /* collapsing a degenerate self-sibling? */
 		  x = x->parent;
 		  mem_rotate_left (x);
                 }
@@ -3373,7 +3361,7 @@ mem_insert_fixup (struct mem_node *x)
         }
       else
 	{
-	  /* This is the symmetrical case of above.  */
+	  /* Symmetrical where X is right grand-child  */
 	  struct mem_node *y = x->parent->parent->left;
 
 	  if (y->color == MEM_RED)
@@ -3397,10 +3385,7 @@ mem_insert_fixup (struct mem_node *x)
             }
         }
     }
-
-  /* The root may have been changed to red due to the algorithm.  Set
-     it to black so that property #5 is satisfied.  */
-  mem_root->color = MEM_BLACK;
+  mem_root->color = MEM_BLACK;   /* Invariant: root is black.  */
 }
 
 /*   (x)                   (y)
