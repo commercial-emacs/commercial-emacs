@@ -24,8 +24,6 @@ jobs:
         gearing: [standard]
         include:
           - os: ubuntu-latest
-            gearing: no-multithread
-          - os: ubuntu-latest
             gearing: alt-x
     steps:
     - run: |
@@ -87,13 +85,12 @@ jobs:
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-x-toolkit=lucid --without-cairo --without-xaw3d --without-gconf --without-libsystemd
         make -j4 -C src
-    - name: make-no-multithread
-      if: matrix.gearing == 'no-multithread'
+    - name: make-multithread
+      if: matrix.gearing == 'multithread'
       run: |
         ./autogen.sh
-        ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --disable-multithreading
-        make -j4
-        make test/src/thread-tests
+        ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --enable-multithreading
+        make -j4 check
     - name: make-linux
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'Linux')
       run: |
