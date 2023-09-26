@@ -194,11 +194,11 @@ static void mem_rotate_right (struct mem_node *);
 static void mem_delete (struct mem_node *);
 static void mem_delete_fixup (struct mem_node *);
 
-PER_THREAD Lisp_Object const *staticvec[NSTATICS];
+Lisp_Object const *staticvec[NSTATICS];
 
 /* Index of next unused slot in staticvec.  */
 
-PER_THREAD int staticidx;
+int staticidx;
 
 /* Return PTR rounded up to the next multiple of ALIGNMENT.  */
 
@@ -4535,8 +4535,6 @@ purecopy (Lisp_Object obj)
   return obj;
 }
 
-
-
 /* Put an entry in staticvec, pointing at the variable with address
    VARADDRESS.  */
 
@@ -5176,7 +5174,7 @@ mark_stack_push (Lisp_Object *value)
 void
 garbage_collect (void)
 {
-  PER_THREAD_STATIC struct timespec gc_elapsed = { 0, 0 };
+  static struct timespec gc_elapsed = { 0, 0 };
   Lisp_Object tail, buffer;
   bool message_p = false;
   specpdl_ref count = SPECPDL_INDEX ();
@@ -5297,10 +5295,12 @@ garbage_collect (void)
   /* GC is complete: now we can run our finalizer callbacks.  */
   run_finalizers (&doomed_finalizers);
 
-  gc_elapsed = timespec_add (gc_elapsed,
-			     timespec_sub (current_timespec (), start));
-  Vgc_elapsed = make_float (timespectod (gc_elapsed));
-  gcs_done++;
+  if (main_thread_p (current_thread))
+    {
+      gc_elapsed = timespec_add (gc_elapsed, timespec_sub (current_timespec (), start));
+      Vgc_elapsed = make_float (timespectod (gc_elapsed));
+      gcs_done++;
+    }
 
   /* Collect profiling data.  */
   if (tot_before != (size_t) -1)

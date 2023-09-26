@@ -83,9 +83,8 @@ static void call_overlay_mod_hooks (Lisp_Object list, Lisp_Object overlay,
                                     Lisp_Object arg2, Lisp_Object arg3);
 static void reset_buffer_local_variables (struct buffer *, bool);
 
-/* Alist of all buffer names vs the buffers.  This used to be
-   a Lisp-visible variable, but is no longer, to prevent lossage
-   due to user rplac'ing this alist or its elements.  */
+/* Alist of buffer names to buffers.  Purposely not manipulable
+   (i.e., corruptible) from Lisp.  */
 Lisp_Object Vbuffer_alist;
 
 static Lisp_Object QSFundamental;	/* A string "Fundamental".  */
