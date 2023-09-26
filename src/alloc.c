@@ -462,8 +462,9 @@ xputenv (char const *string)
     memory_full (0);
 }
 
-/* Return a newly allocated memory block of SIZE bytes, remembering
-   to free it when unwinding.  */
+/* Return a block of SIZE bytes, remembering to free it when
+   unwinding.  */
+
 void *
 record_xmalloc (size_t size)
 {
@@ -472,41 +473,17 @@ record_xmalloc (size_t size)
   return p;
 }
 
-/* Like malloc but used for allocating Lisp data.  NBYTES is the
-   number of bytes to allocate, TYPE describes the intended use of the
-   allocated memory block (for strings, for conses, ...).  */
-
-#if ! USE_LSB_TAG
-void *lisp_malloc_loser EXTERNALLY_VISIBLE;
-#endif
+/* Return a lisp-aligned block of NBYTES, registering it to the
+   red-black reverse lookup.  */
 
 static void *
 lisp_malloc (size_t nbytes, bool q_clear, enum mem_type type)
 {
-  register void *val;
-  val = lmalloc (nbytes, q_clear);
-
-#if ! USE_LSB_TAG
-  /* An lisp VAL unaddressable by a Lisp_Object pointer is tantamount
-     to running out of memory.  */
-  if (val && type != MEM_TYPE_NON_LISP)
-    {
-      Lisp_Object tem;
-      XSETCONS (tem, (char *) val + nbytes - 1);
-      if ((char *) XCONS (tem) != (char *) val + nbytes - 1)
-	{
-	  lisp_malloc_loser = val;
-	  free (val);
-	  val = 0;
-	}
-    }
-#endif
-
-  if (val && type != MEM_TYPE_NON_LISP)
-    mem_insert (val, (char *) val + nbytes, type);
-
+  void *val = lmalloc (nbytes, q_clear);
   if (! val)
     memory_full (nbytes);
+  else if (type != MEM_TYPE_NON_LISP)
+    mem_insert (val, (char *) val + nbytes, type);
   MALLOC_PROBE (nbytes);
   return val;
 }
@@ -606,13 +583,7 @@ aligned_alloc (size_t alignment, size_t size)
 }
 #endif
 
-/* Request at least SIZE bytes from malloc, ensuring returned
-   pointer is Lisp-aligned.
-
-   If T is an enum Lisp_Type and L = make_lisp_ptr (P, T), then
-   code seeking P such that XPNTR (L) == P and XTYPE (L) == T, or,
-   in less formal terms, seeking to allocate a Lisp object, should
-   call lmalloc().
+/* Return allocation of at least SIZE bytes, ensuring Lisp alignment.
 
    Q_CLEAR uses calloc() instead of malloc().
 */
@@ -620,40 +591,31 @@ aligned_alloc (size_t alignment, size_t size)
 void *
 lmalloc (size_t size, bool q_clear)
 {
-  /* xrealloc() relies on lmalloc() returning non-NULL even for SIZE
-     == 0.  So, if ! MALLOC_0_IS_NONNULL, must avoid malloc'ing 0.  */
+  /* Callers assume a non-NULL return value, even for zero SIZE.  */
   size_t adjsize = MALLOC_0_IS_NONNULL ? size : max (size, LISP_ALIGNMENT);
-
-  /* Prefer malloc() but if ! malloc_laligned (), an exceptional
-     case, then prefer aligned_alloc(), provided SIZE is a multiple of
-     ALIGNMENT which aligned_alloc() requires.  */
-#ifdef USE_ALIGNED_ALLOC
-  if (! malloc_laligned ())
-    {
-      if (adjsize % LISP_ALIGNMENT == 0)
-	{
-	  void *p = aligned_alloc (LISP_ALIGNMENT, adjsize);
-	  if (q_clear && p && adjsize)
-	    memclear (p, adjsize);
-	  return p;
-	}
-      else
-	{
-	  /* Otherwise resign ourselves to loop that may never
-	     terminate.  */
-	}
-    }
-#endif
   void *p = NULL;
-  for (;;)
+
+#ifdef USE_ALIGNED_ALLOC
+  /* When not malloc_laligned (rare), else-clause risks infloop.  */
+  if (! malloc_laligned () && (adjsize % LISP_ALIGNMENT == 0))
     {
-      p = q_clear ? calloc (1, adjsize) : malloc (adjsize);
-      if (! p || laligned (p, adjsize))
-	break;
-      free (p);
-      adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
+      p = aligned_alloc (LISP_ALIGNMENT, adjsize);
+      if (q_clear && p && adjsize)
+	memclear (p, adjsize);
     }
-  eassert (! p || laligned (p, adjsize));
+  else
+#endif
+    {
+      for (;;)
+	{
+	  p = q_clear ? calloc (1, adjsize) : malloc (adjsize);
+	  if (p == NULL || laligned (p, adjsize))
+	    break;
+	  free (p);
+	  adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
+	}
+    }
+  eassert (p == NULL || laligned (p, adjsize));
   return p;
 }
 
@@ -761,24 +723,6 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
       aligned = (base == abase);
       if (! aligned)
 	((void **) abase)[-1] = base;
-
-#if ! USE_LSB_TAG
-      /* If the memory just allocated cannot be addressed thru a Lisp
-	 object's pointer, and it needs to be, that's equivalent to
-	 running out of memory.  */
-      if (type != MEM_TYPE_NON_LISP)
-	{
-	  Lisp_Object tem;
-	  char *end = (char *) base + sizeof (struct ablocks) - 1;
-	  XSETCONS (tem, end);
-	  if ((char *) XCONS (tem) != end)
-	    {
-	      lisp_malloc_loser = base;
-	      free (base);
-	      memory_full (SIZE_MAX);
-	    }
-	}
-#endif
 
       /* Initialize the blocks and put them on the free list.
 	 If BASE was not properly aligned, we can't use the last block.  */
