@@ -1787,9 +1787,9 @@ struct float_block
 
 /* Current float_block.  */
 
-static struct float_block *float_block;
-static int float_block_index = BLOCK_NFLOATS;
-static struct Lisp_Float *float_free_list;
+PER_THREAD_STATIC struct float_block *float_block;
+PER_THREAD_STATIC int float_block_index = BLOCK_NFLOATS;
+PER_THREAD_STATIC struct Lisp_Float *float_free_list;
 
 Lisp_Object
 make_float (double float_value)
@@ -1850,9 +1850,9 @@ struct cons_block
 #define XUNMARK_CONS(fptr) \
   UNSETMARKBIT (CONS_BLOCK (fptr), CONS_INDEX ((fptr)))
 
-static struct cons_block *cons_block;
-static int cons_block_index = BLOCK_NCONS;
-static struct Lisp_Cons *cons_free_list;
+PER_THREAD_STATIC struct cons_block *cons_block;
+PER_THREAD_STATIC int cons_block_index = BLOCK_NCONS;
+PER_THREAD_STATIC struct Lisp_Cons *cons_free_list;
 
 #if GC_ASAN_POISON_OBJECTS
 # define ASAN_POISON_CONS_BLOCK(b) \
@@ -2112,20 +2112,20 @@ struct vector_block
 
 /* Chain of vector blocks.  */
 
-static struct vector_block *vector_blocks;
+PER_THREAD_STATIC struct vector_block *vector_blocks;
 
 /* See free_slot() for rationale.  */
 
-static struct Lisp_Vector *vector_free_lists[VBLOCK_NFREE_LISTS];
+PER_THREAD_STATIC struct Lisp_Vector *vector_free_lists[VBLOCK_NFREE_LISTS];
 
 /* The last free list where we found large enough vector.  Trade
    fragmentation risk for speed by commencing here on subsequenct
    searches.  */
-static ptrdiff_t most_recent_free_slot = VBLOCK_NFREE_LISTS;
+PER_THREAD_STATIC ptrdiff_t most_recent_free_slot = VBLOCK_NFREE_LISTS;
 
 /* Singly-linked list of large vectors.  */
 
-static struct large_vector *large_vectors;
+PER_THREAD_STATIC struct large_vector *large_vectors;
 
 /* The only vector with 0 slots, allocated from pure space.  */
 
@@ -2743,16 +2743,16 @@ struct symbol_block
 /* Current symbol block and index of first unused Lisp_Symbol
    structure in it.  */
 
-static struct symbol_block *symbol_block;
-static int symbol_block_index = BLOCK_NSYMBOLS;
+PER_THREAD_STATIC struct symbol_block *symbol_block;
+PER_THREAD_STATIC int symbol_block_index = BLOCK_NSYMBOLS;
 /* Pointer to the first symbol_block that contains pinned symbols.
    Tests for 24.4 showed that at dump-time, Emacs contains about 15K symbols,
    10K of which are pinned (and all but 250 of them are interned in obarray),
    whereas a "typical session" has in the order of 30K symbols.
    symbol_block_pinned lets mark_pinned_symbols scan only 15K symbols rather
    than 30K to find the 10K symbols we need to mark.  */
-static struct symbol_block *symbol_block_pinned;
-static struct Lisp_Symbol *symbol_free_list;
+PER_THREAD_STATIC struct symbol_block *symbol_block_pinned;
+PER_THREAD_STATIC struct Lisp_Symbol *symbol_free_list;
 
 static void
 set_symbol_name (Lisp_Object sym, Lisp_Object name)
@@ -4038,8 +4038,8 @@ test_setjmp (void)
 }
 # else
 
-static bool setjmp_tested_p;
-static int longjmps_done;
+PER_THREAD_STATIC bool setjmp_tested_p;
+PER_THREAD_STATIC int longjmps_done;
 
 /* Perform a quick check if it looks like setjmp saves registers in a
    jmp_buf.  Print a message to stderr saying so.  When this test
@@ -4753,7 +4753,7 @@ mark_most_objects (void)
 
 /* List of weak hash tables we found during marking the Lisp heap.
    NULL on entry to garbage_collect and after it returns.  */
-static struct Lisp_Hash_Table *weak_hash_tables;
+PER_THREAD_STATIC struct Lisp_Hash_Table *weak_hash_tables;
 
 static void
 mark_and_sweep_weak_table_contents (void)
@@ -4921,26 +4921,6 @@ mark_glyph_matrix (struct glyph_matrix *matrix)
 	  }
       }
 }
-
-/* Whether to remember a few of the last marked values for debugging.  */
-#define GC_REMEMBER_LAST_MARKED 0
-
-#if GC_REMEMBER_LAST_MARKED
-enum { LAST_MARKED_SIZE = 1 << 9 }; /* Must be a power of 2.  */
-Lisp_Object last_marked[LAST_MARKED_SIZE] EXTERNALLY_VISIBLE;
-static int last_marked_index;
-#endif
-
-/* Whether to enable the mark_object_loop_halt debugging feature.  */
-#define GC_CDR_COUNT 0
-
-#if GC_CDR_COUNT
-/* For debugging--call abort when we cdr down this many
-   links of a list, in mark_object.  In debugging,
-   the call to abort will hit a breakpoint.
-   Normally this is zero and the check never goes off.  */
-ptrdiff_t mark_object_loop_halt EXTERNALLY_VISIBLE;
-#endif
 
 static void
 mark_vectorlike (union vectorlike_header *header)
@@ -5386,12 +5366,8 @@ process_mark_stack (ptrdiff_t base_sp)
 #if GC_CHECK_MARKED_OBJECTS
   struct mem_node *m = NULL;
 #endif
-#if GC_CDR_COUNT
-  ptrdiff_t cdr_count = 0;
-#endif
 
   eassume (mark_stk.sp >= base_sp && base_sp >= 0);
-
   while (mark_stk.sp > base_sp)
     {
       Lisp_Object *objp = mark_stack_pop ();
@@ -5399,11 +5375,6 @@ process_mark_stack (ptrdiff_t base_sp)
       void *xpntr = XPNTR (*objp);
       if (PURE_P (xpntr))
 	continue;
-
-#if GC_REMEMBER_LAST_MARKED
-      last_marked[last_marked_index++] = *objp;
-      last_marked_index &= LAST_MARKED_SIZE - 1;
-#endif
 
 #if GC_CHECK_MARKED_OBJECTS
 
@@ -5690,13 +5661,7 @@ process_mark_stack (ptrdiff_t base_sp)
 
 	    /* Put cdr, then car onto stack.  */
 	    if (! NILP (ptr->u.s.u.cdr))
-	      {
-		mark_stack_push (&ptr->u.s.u.cdr);
-#if GC_CDR_COUNT
-		if (++cdr_count >= mark_object_loop_halt)
-		  emacs_abort ();
-#endif
-	      }
+	      mark_stack_push (&ptr->u.s.u.cdr);
 	    mark_stack_push (&ptr->u.s.car);
 	  }
 	  break;
