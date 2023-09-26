@@ -185,10 +185,6 @@ deadp (Lisp_Object x)
 
 static struct mem_node *mem_root;
 
-/* Lowest and highest known address in the heap.  */
-
-static void *min_heap_address, *max_heap_address;
-
 /* Sentinel node of the tree.  */
 
 static struct mem_node *mem_insert (void *, void *, enum mem_type);
@@ -3276,8 +3272,6 @@ struct mem_node *
 mem_find (void *start)
 {
   struct mem_node *p = mem_root;
-  if (start < min_heap_address || start > max_heap_address)
-    p = mem_nil;
   while (p != mem_nil)
     {
       if (start < p->start)
@@ -3297,11 +3291,6 @@ static struct mem_node *
 mem_insert (void *start, void *end, enum mem_type type)
 {
   struct mem_node *c, *parent, *x;
-
-  if (min_heap_address == NULL || start < min_heap_address)
-    min_heap_address = start;
-  if (max_heap_address == NULL || end > max_heap_address)
-    max_heap_address = end;
 
   /* See where in the tree a node for START belongs.  In this
      particular application, it shouldn't happen that a node is already
