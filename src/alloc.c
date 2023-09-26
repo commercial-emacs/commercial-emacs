@@ -474,7 +474,7 @@ record_xmalloc (size_t size)
 }
 
 /* Return a lisp-aligned block of NBYTES, registering it to the
-   red-black reverse lookup.  */
+   address-to-block lookup.  */
 
 static void *
 lisp_malloc (size_t nbytes, bool q_clear, enum mem_type type)
@@ -936,10 +936,10 @@ struct string_block
 
 #define NEXT_FREE_LISP_STRING(S) ((S)->u.next)
 
-static struct sblock *oldest_sblock, *current_sblock;
-static struct sblock *large_sblocks;
-static struct string_block *string_blocks;
-static struct Lisp_String *string_free_list;
+PER_THREAD_STATIC struct sblock *oldest_sblock, *current_sblock;
+PER_THREAD_STATIC struct sblock *large_sblocks;
+PER_THREAD_STATIC struct string_block *string_blocks;
+PER_THREAD_STATIC struct Lisp_String *string_free_list;
 
 #ifdef GC_CHECK_STRING_OVERRUN
 
@@ -972,11 +972,8 @@ sdata_size (ptrdiff_t n)
 /* Extra bytes to allocate for each string.  */
 #define GC_STRING_EXTRA GC_STRING_OVERRUN_COOKIE_SIZE
 
-/* Exact bound on the number of bytes in a string, not counting the
-   terminating null.  A string cannot contain more bytes than
-   STRING_BYTES_BOUND, nor can it be so long that the size_t
-   arithmetic in allocate_sdata would overflow while it is
-   calculating a value to be passed to malloc.  */
+/* A string can neither exceed STRING_BYTES_BOUND, nor be so long that
+   the size_t arithmetic in allocate_sdata could overflow.  */
 static ptrdiff_t const STRING_BYTES_MAX =
   min (STRING_BYTES_BOUND,
        ((SIZE_MAX
@@ -1032,7 +1029,7 @@ init_strings (void)
 
 #ifdef GC_CHECK_STRING_BYTES
 
-static int check_string_bytes_count;
+PER_THREAD_STATIC int check_string_bytes_count;
 
 /* Like macro STRING_BYTES, but with debugging check.  Can be
    called during GC, so pay attention to the mark bit.  */
@@ -1072,16 +1069,13 @@ check_string_bytes (bool all_p)
 {
   if (all_p)
     {
-      struct sblock *b;
-
-      for (b = large_sblocks; b; b = b->next)
+      for (struct sblock *b = large_sblocks; b; b = b->next)
 	{
 	  struct Lisp_String *s = b->data[0].string;
 	  if (s)
 	    string_bytes (s);
 	}
-
-      for (b = oldest_sblock; b; b = b->next)
+      for (struct sblock *b = oldest_sblock; b; b = b->next)
 	check_sblock (b);
     }
   else if (current_sblock)
@@ -1160,13 +1154,9 @@ allocate_string (void)
 #ifdef GC_CHECK_STRING_BYTES
   if (! noninteractive)
     {
-      if (++check_string_bytes_count == 200)
-	{
-	  check_string_bytes_count = 0;
-	  check_string_bytes (1);
-	}
-      else
-	check_string_bytes (0);
+      if (check_string_bytes_count > (INT_MAX >> 1))
+	check_string_bytes_count = 0; // avoid overflow
+      check_string_bytes (++check_string_bytes_count % 200 == 0);
     }
 #endif /* GC_CHECK_STRING_BYTES */
 
