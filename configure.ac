@@ -2424,10 +2424,10 @@ if test "$with_threads" = yes; then
 fi
 AC_MSG_RESULT([$threads_enabled])
 
-check_gcc_tls=yes
+check_gcc_tls=no
 AC_ARG_ENABLE([multithreading],
-  [AS_HELP_STRING([--disable-multithreading], [disallow multithreading])],
-  [test "$enableval" = no && check_gcc_tls=no])
+  [AS_HELP_STRING([--enable-multithreading], [enable multithreading])],
+  [test "$enableval" = yes && check_gcc_tls=yes])
 have_gcc_tls=no
 if test "$check_gcc_tls" = yes; then
   AC_MSG_CHECKING([for __thread declaration])
