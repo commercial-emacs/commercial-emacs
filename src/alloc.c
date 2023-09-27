@@ -56,6 +56,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 */
 
 #include "alloc.h"
+#include "thread.h"
 
 /* At least for glibc 2.26, malloc adds "sizeof size_t" for internal
    overhead, then rounds up to a multiple of MALLOC_ALIGNMENT.  Eggert
@@ -145,7 +146,8 @@ struct mem_node
   enum mem_type type;
 };
 
-static struct mem_node _mem_nil, *mem_nil = &_mem_nil;
+static struct mem_node _mem_nil;
+struct mem_node *mem_nil = &_mem_nil;
 
 #define MALLOC_PROBE(size)			\
   do {						\
@@ -180,10 +182,6 @@ deadp (Lisp_Object x)
 {
   return EQ (x, dead_object ());
 }
-
-/* Root of the tree describing allocated Lisp memory.  */
-
-static struct mem_node *mem_root;
 
 /* Sentinel node of the tree.  */
 
@@ -488,6 +486,15 @@ lisp_malloc (size_t nbytes, bool q_clear, enum mem_type type)
   return val;
 }
 
+/* Return mem_node within current thread's mem_root containing
+   START.  */
+
+static struct mem_node *
+mem_find_ (void *start)
+{
+  return mem_find (start, mem_root);
+}
+
 /* Free BLOCK.  This must be called to free memory allocated with a
    call to lisp_malloc.  */
 
@@ -497,7 +504,7 @@ lisp_free (void *block)
   if (block && ! pdumper_object_p (block))
     {
       free (block);
-      mem_delete (mem_find (block));
+      mem_delete (mem_find_ (block));
     }
 }
 
@@ -765,7 +772,7 @@ lisp_align_free (void *block)
   struct ablock *ablock = block;
   struct ablocks *abase = ABLOCK_ABASE (ablock);
 
-  mem_delete (mem_find (block));
+  mem_delete (mem_find_ (block));
 
   /* Put on free list.  */
   ablock->x.next_free = free_ablock;
@@ -2415,7 +2422,7 @@ sweep_vectors (void)
 	     assignment, then nothing in the block was marked.
 	     Harvest it back to OS.  */
 	  *bprev = block->next;
-	  mem_delete (mem_find (block->data));
+	  mem_delete (mem_find_ (block->data));
 	  xfree (block);
 	}
       else
@@ -3050,13 +3057,6 @@ becomes unreachable or only reachable from other finalizers.  */)
   return make_lisp_ptr (finalizer, Lisp_Vectorlike);
 }
 
-
-/* With the rare exception of functions implementing block-based
-   allocation of various types, you should not directly test or set GC
-   mark bits on objects.  Some objects might live in special memory
-   regions (e.g., a dump image) and might store their mark bits
-   elsewhere.  */
-
 static bool
 vector_marked_p (const struct Lisp_Vector *v)
 {
@@ -3199,12 +3199,13 @@ memory_full (size_t nbytes)
   xsignal (Qnil, Vmemory_signal_data);
 }
 
-/* Return mem_node containing START or failing that, mem_nil.  */
+/* Return mem_node within ROOT containing START or failing that,
+   mem_nil.  */
 
 struct mem_node *
-mem_find (void *start)
+mem_find (void *start, struct mem_node *root)
 {
-  struct mem_node *p = mem_root;
+  struct mem_node *p = root;
   while (p != mem_nil)
     {
       if (start < p->start)
@@ -3855,7 +3856,7 @@ mark_maybe_pointer (void *const * p)
       INT_SUBTRACT_WRAPV ((uintptr_t) *p, (uintptr_t) xpntr, &offset);
       INT_ADD_WRAPV ((uintptr_t) forwarded, offset, (uintptr_t *) p);
     }
-  else if ((m = mem_find (*p)) != mem_nil)
+  else if ((m = mem_find_ (*p)) != mem_nil)
     {
       switch (m->type)
 	{
@@ -3932,7 +3933,7 @@ mark_maybe_pointer (void *const * p)
 	  emacs_abort ();
 	}
     }
-  else if ((m = mem_find (p_sym)) != mem_nil && m->type == MEM_TYPE_SYMBOL)
+  else if ((m = mem_find_ (p_sym)) != mem_nil && m->type == MEM_TYPE_SYMBOL)
     {
       struct Lisp_Symbol *h = live_symbol_holding (m, p_sym);
       if (h)
@@ -4184,7 +4185,7 @@ valid_lisp_object_p (Lisp_Object obj)
   if (pdumper_object_p (p))
     return pdumper_object_p_precise (p) ? 1 : 0;
 
-  struct mem_node *m = mem_find (p);
+  struct mem_node *m = mem_find_ (p);
 
   if (m == mem_nil)
     {
@@ -5357,7 +5358,7 @@ gc_process_string (Lisp_Object *objp)
 static void
 process_mark_stack (ptrdiff_t base_sp)
 {
-#if GC_CHECK_MARKED_OBJECTS
+#ifdef ENABLE_CHECKING
   struct mem_node *m = NULL;
 #endif
 
@@ -5370,7 +5371,7 @@ process_mark_stack (ptrdiff_t base_sp)
       if (PURE_P (xpntr))
 	continue;
 
-#if GC_CHECK_MARKED_OBJECTS
+#ifdef ENABLE_CHECKING
 
       /* Under ENABLE_CHECKING, ensure OBJ's xpntr, e.g., struct
          Lisp_Symbol *, points to a block previously registered with
@@ -5386,7 +5387,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	if (mgc_fwd_xpntr (xpntr)			\
 	    || mgc_xpntr_p (xpntr))			\
 	  break;					\
-	m = mem_find (xpntr);				\
+	m = mem_find_among_threads (xpntr);		\
 	if (m == mem_nil)				\
 	  emacs_abort ();				\
       } while (0)
@@ -5425,12 +5426,12 @@ process_mark_stack (ptrdiff_t base_sp)
 	eassert (valid_lisp_object_p (ptr->u.s.function));	\
       } while (false)
 
-#else /* not GC_CHECK_MARKED_OBJECTS */
+#else /* not ENABLE_CHECKING */
 
 #define CHECK_ALLOCATED_AND_LIVE(LIVEP, MEM_TYPE)	((void) 0)
 #define CHECK_ALLOCATED_AND_LIVE_SYMBOL()		((void) 0)
 
-#endif /* not GC_CHECK_MARKED_OBJECTS */
+#endif
 
       switch (XTYPE (*objp))
 	{
@@ -5459,15 +5460,15 @@ process_mark_stack (ptrdiff_t base_sp)
 	      }
 	    else if (! vector_marked_p (ptr))
 	      {
-#ifdef GC_CHECK_MARKED_OBJECTS
+#ifdef ENABLE_CHECKING
 		if (! pdumper_object_p (xpntr)
 		    && ! SUBRP (*objp)
 		    && ! main_thread_p (xpntr))
 		  {
-		    m = mem_find (xpntr);
+		    m = mem_find_among_threads (xpntr);
 		    if (m == mem_nil)
 		      emacs_abort ();
-		    if (m->type == MEM_TYPE_VECTORLIKE)
+		    else if (m->type == MEM_TYPE_VECTORLIKE)
 		      CHECK_LIVE (live_large_vector_p, MEM_TYPE_VECTORLIKE);
 		    else
 		      CHECK_LIVE (live_small_vector_p, MEM_TYPE_VBLOCK);
@@ -6383,11 +6384,11 @@ init_runtime (void)
   static_string_allocator = &allocate_string;
   static_vector_allocator = &allocate_vector;
   static_interval_allocator = &allocate_interval;
-  mem_root = mem_nil;
   mem_nil->left = mem_nil->right = mem_nil;
   mem_nil->parent = NULL;
   mem_nil->color = MEM_BLACK;
   mem_nil->start = mem_nil->end = NULL;
+  mem_root = mem_nil;
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);
   mgc_initialize_spaces ();

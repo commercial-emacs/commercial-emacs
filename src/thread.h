@@ -139,6 +139,10 @@ struct thread_state
   sys_jmp_buf m_getcjmp;
 #define getcjmp (current_thread->m_getcjmp)
 
+  /* The red-black tree for finding the memory block of a Lisp_Object.  */
+  struct mem_node *m_mem_root;
+#define mem_root (current_thread->m_mem_root)
+
   /* The OS identifier for this thread.  */
   sys_thread_t thread_id;
 
@@ -273,6 +277,10 @@ int thread_select  (select_func *func, int max_fds, fd_set *rfds,
 
 void release_global_lock (void);
 void acquire_global_lock (struct thread_state *);
+
+#ifdef ENABLE_CHECKING
+struct mem_node *mem_find_among_threads (void *start);
+#endif
 
 INLINE_HEADER_END
 

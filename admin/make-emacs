@@ -41,7 +41,6 @@ $make = "gmake" unless $make;
 $rc = GetOptions ("help" => \$help,
 		  "enable-checking" => \$enable_checking,
 		  "no-warn" => \$no_warn,
-		  "check-marked" => \$check_marked,
 		  "all" => \$all,
 		  "no-optim" => \$no_optim,
 		  "check-lisp-type" => \$check_lisp_type,
@@ -68,7 +67,6 @@ Build Emacs.
  --boot			make bootstrap, log to boot.log
  --enable-checking	ENABLE_CHECKING=1
  --no-warn		disable warnings
- --check-marked		GC_CHECK_MARKED_OBJECTS=1
  --optim		no debug defines
  --gprof		make Emacs for profiling
  --check-lisp-type	define CHECK_LISP_OBJECT_TYPE
@@ -120,7 +118,6 @@ elsif (!$no_warn)
   }
 
 $defs = "-DGLYPH_DEBUG=1" unless $optim;
-$defs = "$defs -DGC_CHECK_MARKED_OBJECTS=1" if $check_marked;
 $defs = "$defs -DENABLE_CHECKING=1" if $enable_checking;
 
 if ($profile)

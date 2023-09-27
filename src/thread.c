@@ -34,6 +34,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "syssignal.h"
 #include "pdumper.h"
 #include "keyboard.h"
+#include "alloc.h"
 
 #ifdef HAVE_NS
 #include "nsterm.h"
@@ -71,8 +72,6 @@ struct thread_state *prevailing_thread = &main_thread.s;
 static struct thread_state *all_threads = &main_thread.s;
 
 static sys_mutex_t global_lock;
-
-extern volatile int interrupt_input_blocked;
 
 /* m_specpdl is set when the thread is created and cleared when the
    thread dies.  */
@@ -556,18 +555,32 @@ mark_one_thread (struct thread_state *thread)
      as mark_threads_callback does that by calling mark_object.  */
 }
 
+#ifdef ENABLE_CHECKING
+struct mem_node *
+mem_find_among_threads (void *start)
+{
+  struct mem_node *p = mem_nil;
+  for (struct thread_state *thr = all_threads;
+       thr != NULL && p == mem_nil;
+       thr = thr->next_thread)
+    {
+      p = mem_find (start, thr->m_mem_root);
+    }
+  return p;
+}
+#endif
+
 static void
 mark_threads_callback (void *ignore)
 {
-  struct thread_state *iter;
-
-  for (iter = all_threads; iter; iter = iter->next_thread)
+  for (struct thread_state *thr = all_threads;
+       thr != NULL;
+       thr = thr->next_thread)
     {
       Lisp_Object thread_obj;
-
-      XSETTHREAD (thread_obj, iter);
+      XSETTHREAD (thread_obj, thr);
       mark_object (&thread_obj);
-      mark_one_thread (iter);
+      mark_one_thread (thr);
     }
 }
 
@@ -696,13 +709,13 @@ run_thread (void *state)
 
   /* Unlink SELF from all_threads.  Avoid doing this before
      sys_cond_broadcast() lest GC.  */
-  for (struct thread_state **iter = &all_threads;
-       *iter != NULL;
-       iter = &(*iter)->next_thread)
+  for (struct thread_state **thr = &all_threads;
+       *thr != NULL;
+       thr = &(*thr)->next_thread)
     {
-      if (*iter == self)
+      if (*thr == self)
 	{
-	  *iter = (*iter)->next_thread;
+	  *thr = (*thr)->next_thread;
 	  break;
 	}
     }
@@ -771,6 +784,12 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   new_thread->m_specpdl = pdlvec + 1;  /* Skip the dummy entry.  */
   new_thread->m_specpdl_ptr = new_thread->m_specpdl;
   new_thread->m_specpdl_end = new_thread->m_specpdl + size;
+
+#ifdef HAVE_GCC_TLS
+  new_thread->m_mem_root = mem_nil;
+#else
+  new_thread->m_mem_root = main_thread.s.m_mem_root;
+#endif
 
   init_bc_thread (&new_thread->bc);
 
@@ -946,15 +965,15 @@ DEFUN ("all-threads", Fall_threads, Sall_threads, 0, 0, 0,
   (void)
 {
   Lisp_Object result = Qnil;
-  struct thread_state *iter;
 
-  for (iter = all_threads; iter; iter = iter->next_thread)
+  for (struct thread_state *thr = all_threads;
+       thr != NULL;
+       thr = thr->next_thread)
     {
-      if (thread_live_p (iter))
+      if (thread_live_p (thr))
 	{
 	  Lisp_Object thread;
-
-	  XSETTHREAD (thread, iter);
+	  XSETTHREAD (thread, thr);
 	  result = Fcons (thread, result);
 	}
     }
@@ -987,8 +1006,8 @@ init_threads (void)
   sys_cond_init (&main_thread.s.thread_condvar);
   sys_mutex_init (&global_lock);
   sys_mutex_lock (&global_lock);
-  if (current_thread != &main_thread.s)
-    emacs_abort ();
+  eassume (current_thread == &main_thread.s);
+  eassume (main_thread.s.m_mem_root != NULL);
   main_thread.s.thread_id = sys_thread_self ();
   main_thread.s.cooperative = true;
   init_bc_thread (&main_thread.s.bc);

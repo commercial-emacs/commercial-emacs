@@ -101,14 +101,6 @@
 # define GC_ASAN_POISON_OBJECTS 0
 #endif
 
-/* GC_CHECK_MARKED_OBJECTS means do sanity checks on allocated objects.
-   We turn that on by default when ENABLE_CHECKING is defined;
-   define GC_CHECK_MARKED_OBJECTS to zero to disable.  */
-
-#if defined ENABLE_CHECKING && !defined GC_CHECK_MARKED_OBJECTS
-# define GC_CHECK_MARKED_OBJECTS 1
-#endif
-
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -221,13 +213,13 @@ typedef struct sdata
 #define SDATA_OF_LISP_STRING(S) \
   ((sdata *) ((S)->u.s.data - FLEXSIZEOF (struct sdata, data, 0)))
 
-struct mem_node *mem_find (void *start);
+struct mem_node *mem_find (void *start, struct mem_node *root);
 
 enum { BLOCK_NOT_FOUND = EMACS_INT_MAX };
 
 /* Analogous to pdumper_object_p().  Return whether the OBJ points
    into a copy-collector block for getting a reprieve from
-   GC_CHECK_MARKED_OBJECTS.  */
+   ENABLE_CHECKING.  */
 _GL_ATTRIBUTE_CONST bool mgc_xpntr_p (const void *obj);
 _GL_ATTRIBUTE_CONST bool wrong_xpntr_p (const void *obj);
 
@@ -240,5 +232,7 @@ void *mgc_fwd_xpntr (const void *addr);
 void mgc_initialize_spaces (void);
 
 enum Space_Type mgc_find_xpntr (void *p, void **xpntr);
+
+extern struct mem_node *mem_nil;
 
 #endif  /* EMACS_ALLOC_H */
