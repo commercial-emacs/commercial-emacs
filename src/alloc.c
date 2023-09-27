@@ -486,14 +486,26 @@ lisp_malloc (size_t nbytes, bool q_clear, enum mem_type type)
   return val;
 }
 
-/* Return mem_node within current thread's mem_root containing
-   START.  */
+/* Return mem_node within ROOT containing START or failing that,
+   mem_nil.  */
 
-static struct mem_node *
-mem_find_ (void *start)
+struct mem_node *
+mem_find (void *start, struct mem_node *root)
 {
-  return mem_find (start, mem_root);
+  struct mem_node *p = root;
+  while (p != mem_nil)
+    {
+      if (start < p->start)
+	p = p->left;
+      else if (start >= p->end)
+	p = p->right;
+      else
+	break;
+    }
+  return p;
 }
+
+#define MEM_FIND(START) (mem_find (START, mem_root))
 
 /* Free BLOCK.  This must be called to free memory allocated with a
    call to lisp_malloc.  */
@@ -504,7 +516,7 @@ lisp_free (void *block)
   if (block && ! pdumper_object_p (block))
     {
       free (block);
-      mem_delete (mem_find_ (block));
+      mem_delete (MEM_FIND (block));
     }
 }
 
@@ -772,7 +784,7 @@ lisp_align_free (void *block)
   struct ablock *ablock = block;
   struct ablocks *abase = ABLOCK_ABASE (ablock);
 
-  mem_delete (mem_find_ (block));
+  mem_delete (MEM_FIND (block));
 
   /* Put on free list.  */
   ablock->x.next_free = free_ablock;
@@ -2422,7 +2434,7 @@ sweep_vectors (void)
 	     assignment, then nothing in the block was marked.
 	     Harvest it back to OS.  */
 	  *bprev = block->next;
-	  mem_delete (mem_find_ (block->data));
+	  mem_delete (MEM_FIND (block->data));
 	  xfree (block);
 	}
       else
@@ -3199,25 +3211,6 @@ memory_full (size_t nbytes)
   xsignal (Qnil, Vmemory_signal_data);
 }
 
-/* Return mem_node within ROOT containing START or failing that,
-   mem_nil.  */
-
-struct mem_node *
-mem_find (void *start, struct mem_node *root)
-{
-  struct mem_node *p = root;
-  while (p != mem_nil)
-    {
-      if (start < p->start)
-	p = p->left;
-      else if (start >= p->end)
-	p = p->right;
-      else
-	break;
-    }
-  return p;
-}
-
 /* Insert node representing mem block of TYPE spanning START and END.
    Return the inserted node.  */
 
@@ -3856,7 +3849,7 @@ mark_maybe_pointer (void *const * p)
       INT_SUBTRACT_WRAPV ((uintptr_t) *p, (uintptr_t) xpntr, &offset);
       INT_ADD_WRAPV ((uintptr_t) forwarded, offset, (uintptr_t *) p);
     }
-  else if ((m = mem_find_ (*p)) != mem_nil)
+  else if ((m = MEM_FIND (*p)) != mem_nil)
     {
       switch (m->type)
 	{
@@ -3933,7 +3926,7 @@ mark_maybe_pointer (void *const * p)
 	  emacs_abort ();
 	}
     }
-  else if ((m = mem_find_ (p_sym)) != mem_nil && m->type == MEM_TYPE_SYMBOL)
+  else if ((m = MEM_FIND (p_sym)) != mem_nil && m->type == MEM_TYPE_SYMBOL)
     {
       struct Lisp_Symbol *h = live_symbol_holding (m, p_sym);
       if (h)
@@ -4185,7 +4178,7 @@ valid_lisp_object_p (Lisp_Object obj)
   if (pdumper_object_p (p))
     return pdumper_object_p_precise (p) ? 1 : 0;
 
-  struct mem_node *m = mem_find_ (p);
+  struct mem_node *m = MEM_FIND (p);
 
   if (m == mem_nil)
     {
