@@ -1202,9 +1202,6 @@ record_unwind_current_buffer (void)
 
 extern Lisp_Object Vbuffer_alist;
 
-/* FOR_EACH_LIVE_BUFFER (LIST_VAR, BUF_VAR) followed by a statement is
-   a `for' loop which iterates over the buffers from Vbuffer_alist.  */
-
 #define FOR_EACH_LIVE_BUFFER(list_var, buf_var)			\
   FOR_EACH_ALIST_VALUE (Vbuffer_alist, list_var, buf_var)
 

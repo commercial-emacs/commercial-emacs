@@ -611,7 +611,7 @@ even if it is dead.  The return value is never nil.  */)
   bset_mark (b, Fmake_marker ());
   BUF_MARKERS (b) = NULL;
 
-  /* Put this in the alist of all live buffers.  */
+  /* Enter into global register.  */
   XSETBUFFER (buffer, b);
   Vbuffer_alist = nconc2 (Vbuffer_alist, list1 (Fcons (name, buffer)));
 
