@@ -36,10 +36,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keyboard.h"
 #include "alloc.h"
 
-#ifdef HAVE_NS
-#include "nsterm.h"
-#endif
-
 union aligned_thread_state
 {
   struct thread_state s;
