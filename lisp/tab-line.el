@@ -943,45 +943,6 @@ sight of the tab line."
     (popup-menu menu event)))
 
 
-;;; Touch screen support.
-
-(defun tab-line-track-tap (event &optional function)
-  "Track a tap starting from EVENT.
-If EVENT is not a `touchscreen-begin' event, return t.
-Otherwise, return t if the tap completes successfully, and nil if
-the tap should be ignored.
-
-If FUNCTION is specified and the tap does not complete within
-`touch-screen-delay' seconds, display the appropriate context
-menu by calling FUNCTION with EVENT, and return nil."
-  (if (not (eq (car-safe event) 'touchscreen-begin))
-      t
-    (let ((result (catch 'context-menu
-                    (let (timer)
-                      (unwind-protect
-                          (progn
-                            (when function
-                              (setq timer
-                                    (run-at-time touch-screen-delay t
-                                                 #'throw 'context-menu
-                                                 'context-menu)))
-                            (touch-screen-track-tap event))
-                        (when timer
-                          (cancel-timer timer)))))))
-      (cond ((eq result 'context-menu)
-             (prog1 nil
-               (funcall function event)))
-            (result t)))))
-
-(defun tab-line-event-start (event)
-  "Like `event-start'.
-However, return the correct mouse position list if EVENT is a
-`touchscreen-begin' event."
-  (or (and (eq (car-safe event) 'touchscreen-begin)
-           (cdadr event))
-      (event-start event)))
-
-
 ;;;###autoload
 (define-minor-mode tab-line-mode
   "Toggle display of tab line in the windows displaying the current buffer."
