@@ -3643,7 +3643,6 @@ you can later apply as a patch after reviewing the changes."
           (query-replace-read-args
            "Replace regexp as diff in marked files" t t)))
      (list (nth 0 common) (nth 1 common) (nth 2 common))))
-  (dired-post-do-command)
   (multi-file-replace-regexp-as-diff
    (dired-get-marked-files nil nil #'dired-nondirectory-p)
    from to delimited))
