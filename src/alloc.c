@@ -505,7 +505,22 @@ mem_find (void *start, struct mem_node *root)
   return p;
 }
 
-#define MEM_FIND(START) (mem_find (START, mem_root))
+/* A factor when `--enable-multhreading`.  */
+
+static struct mem_node *
+mem_find_among_threads (void *start)
+{
+  struct mem_node *p = mem_nil;
+  for (struct thread_state *thr = all_threads;
+       thr != NULL && p == mem_nil;
+       thr = thr->next_thread)
+    {
+      p = mem_find (start, thr->m_mem_root);
+    }
+  return p;
+}
+
+#define MEM_FIND(START) (mem_find_among_threads (START))
 
 /* Free BLOCK.  This must be called to free memory allocated with a
    call to lisp_malloc.  */
@@ -3784,25 +3799,22 @@ live_small_vector_p (struct mem_node *m, void *p)
    If P looks like it points to Lisp data, mark it and return true.  */
 
 static bool
-mark_maybe_pointer (void *const * p)
+mark_maybe_pointer (void *const *p)
 {
   bool ret = false;
   uintptr_t mask = VALMASK & UINTPTR_MAX;
   struct mem_node *m;
   enum Space_Type xpntr_type;
-  void *xpntr;
+  void *xpntr, *p_sym;
 
   /* Research Bug#41321.  If we didn't special-case Lisp_Symbol
      to subtract off lispsym in make_lisp_ptr(), this hack wouldn't
      be necessary.
   */
-  void *p_sym;
   INT_ADD_WRAPV ((uintptr_t) *p, (uintptr_t) lispsym, (uintptr_t *) &p_sym);
-
 #if USE_VALGRIND
   VALGRIND_MAKE_MEM_DEFINED (p, sizeof (*p));
 #endif
-
   if (pdumper_object_p (*p))
     {
       uintptr_t masked_p = (uintptr_t) *p & mask;
@@ -3832,6 +3844,7 @@ mark_maybe_pointer (void *const * p)
 	   || (xpntr_type = mgc_find_xpntr (p_sym, &xpntr)) != Space_Type_Max)
     {
       /* analogous logic to set_string_marked() */
+      ptrdiff_t offset;
       void *forwarded = mgc_fwd_xpntr (xpntr);
       if (! forwarded)
 	{
@@ -3845,7 +3858,6 @@ mark_maybe_pointer (void *const * p)
 	  forwarded = mgc_fwd_xpntr (xpntr);
 	}
       eassert (forwarded);
-      ptrdiff_t offset;
       INT_SUBTRACT_WRAPV ((uintptr_t) *p, (uintptr_t) xpntr, &offset);
       INT_ADD_WRAPV ((uintptr_t) forwarded, offset, (uintptr_t *) p);
     }
@@ -3855,7 +3867,6 @@ mark_maybe_pointer (void *const * p)
 	{
 	case MEM_TYPE_NON_LISP:
 	  break;
-
 	case MEM_TYPE_CONS:
 	  {
 	    struct Lisp_Cons *h = live_cons_holding (m, *p);
@@ -3866,7 +3877,6 @@ mark_maybe_pointer (void *const * p)
 	      }
 	  }
 	  break;
-
 	case MEM_TYPE_STRING:
 	  {
 	    struct Lisp_String *h = live_string_holding (m, *p);
@@ -3877,7 +3887,6 @@ mark_maybe_pointer (void *const * p)
 	      }
 	  }
 	  break;
-
 	case MEM_TYPE_SYMBOL:
 	  {
 	    struct Lisp_Symbol *h = live_symbol_holding (m, *p);
@@ -3888,7 +3897,6 @@ mark_maybe_pointer (void *const * p)
 	      }
 	  }
 	  break;
-
 	case MEM_TYPE_FLOAT:
 	  {
 	    struct Lisp_Float *h = live_float_holding (m, *p);
@@ -3899,7 +3907,6 @@ mark_maybe_pointer (void *const * p)
 	      }
 	  }
 	  break;
-
 	case MEM_TYPE_VECTORLIKE:
 	  {
 	    struct Lisp_Vector *h = live_large_vector_holding (m, *p);
@@ -3910,7 +3917,6 @@ mark_maybe_pointer (void *const * p)
 	      }
 	  }
 	  break;
-
 	case MEM_TYPE_VBLOCK:
 	  {
 	    struct Lisp_Vector *h = live_small_vector_holding (m, *p);
@@ -3921,7 +3927,6 @@ mark_maybe_pointer (void *const * p)
 	      }
 	  }
 	  break;
-
 	default:
 	  emacs_abort ();
 	}
@@ -4179,7 +4184,6 @@ valid_lisp_object_p (Lisp_Object obj)
     return pdumper_object_p_precise (p) ? 1 : 0;
 
   struct mem_node *m = MEM_FIND (p);
-
   if (m == mem_nil)
     {
       int valid = valid_pointer_p (p);
@@ -4187,39 +4191,28 @@ valid_lisp_object_p (Lisp_Object obj)
 	return valid;
 
       /* Strings and conses produced by AUTO_STRING etc. all get here.  */
-      if (SUBRP (obj) || STRINGP (obj) || CONSP (obj))
-	return 1;
-
-      return 0;
+      return (SUBRP (obj) || STRINGP (obj) || CONSP (obj)) ? 1 : 0;
     }
 
   switch (m->type)
     {
     case MEM_TYPE_NON_LISP:
       return 0;
-
     case MEM_TYPE_CONS:
       return live_cons_p (m, p);
-
     case MEM_TYPE_STRING:
       return live_string_p (m, p);
-
     case MEM_TYPE_SYMBOL:
       return live_symbol_p (m, p);
-
     case MEM_TYPE_FLOAT:
       return live_float_p (m, p);
-
     case MEM_TYPE_VECTORLIKE:
       return live_large_vector_p (m, p);
-
     case MEM_TYPE_VBLOCK:
       return live_small_vector_p (m, p);
-
     default:
       break;
     }
-
   return 0;
 }
 
@@ -5432,7 +5425,6 @@ process_mark_stack (ptrdiff_t base_sp)
 	  CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
 	  gc_process_string (objp);
 	  break;
-
 	case Lisp_Vectorlike:
 	  {
 	    struct Lisp_Vector *ptr = XVECTOR (*objp);
@@ -5557,7 +5549,6 @@ process_mark_stack (ptrdiff_t base_sp)
 	      }
 	  }
 	  break;
-
 	case Lisp_Symbol:
 	  {
 	    struct Lisp_Symbol *ptr = XSYMBOL (*objp);
@@ -5622,7 +5613,6 @@ process_mark_stack (ptrdiff_t base_sp)
 	      mark_automatic_object (make_lisp_ptr (ptr->u.s.next, Lisp_Symbol));
 	  }
 	  break;
-
 	case Lisp_Cons:
 	  {
 	    struct Lisp_Cons *ptr = XCONS (*objp);
@@ -5653,7 +5643,6 @@ process_mark_stack (ptrdiff_t base_sp)
 	    mark_stack_push (&ptr->u.s.car);
 	  }
 	  break;
-
 	case Lisp_Float:
 	  {
 	    struct Lisp_Float *ptr = XFLOAT (*objp);
@@ -5681,10 +5670,8 @@ process_mark_stack (ptrdiff_t base_sp)
 	      }
 	  }
 	  break;
-
 	case_Lisp_Int:
 	  break;
-
 	default:
 	  emacs_abort ();
 	}
@@ -5735,31 +5722,25 @@ survives_gc_p (Lisp_Object obj)
     case_Lisp_Int:
       survives_p = true;
       break;
-
     case Lisp_Symbol:
       survives_p = symbol_marked_p (XSYMBOL (obj));
       break;
-
     case Lisp_String:
       survives_p = string_marked_p (XSTRING (obj));
       break;
-
     case Lisp_Vectorlike:
       survives_p =
 	(SUBRP (obj) && !SUBR_NATIVE_COMPILEDP (obj)) ||
 	vector_marked_p (XVECTOR (obj));
       break;
-
     case Lisp_Cons:
       survives_p = cons_marked_p (XCONS (obj));
       break;
-
     case Lisp_Float:
       survives_p =
         XFLOAT_MARKED_P (XFLOAT (obj)) ||
         pdumper_object_p (XFLOAT (obj));
       break;
-
     default:
       emacs_abort ();
     }

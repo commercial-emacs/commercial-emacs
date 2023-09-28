@@ -278,9 +278,7 @@ int thread_select  (select_func *func, int max_fds, fd_set *rfds,
 void release_global_lock (void);
 void acquire_global_lock (struct thread_state *);
 
-#ifdef ENABLE_CHECKING
-struct mem_node *mem_find_among_threads (void *start);
-#endif
+extern struct thread_state *all_threads;
 
 INLINE_HEADER_END
 

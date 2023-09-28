@@ -34,7 +34,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "syssignal.h"
 #include "pdumper.h"
 #include "keyboard.h"
-#include "alloc.h"
+
+#ifdef HAVE_NS
+#include "nsterm.h"
+#endif
 
 union aligned_thread_state
 {
@@ -65,7 +68,7 @@ PER_THREAD struct thread_state *current_thread = &main_thread.s;
 struct thread_state *prevailing_thread = &main_thread.s;
 #endif
 
-static struct thread_state *all_threads = &main_thread.s;
+struct thread_state *all_threads = &main_thread.s;
 
 static sys_mutex_t global_lock;
 
@@ -550,21 +553,6 @@ mark_one_thread (struct thread_state *thread)
   /* No need to mark Lisp_Object members like m_last_thing_searched,
      as mark_threads_callback does that by calling mark_object.  */
 }
-
-#ifdef ENABLE_CHECKING
-struct mem_node *
-mem_find_among_threads (void *start)
-{
-  struct mem_node *p = mem_nil;
-  for (struct thread_state *thr = all_threads;
-       thr != NULL && p == mem_nil;
-       thr = thr->next_thread)
-    {
-      p = mem_find (start, thr->m_mem_root);
-    }
-  return p;
-}
-#endif
 
 static void
 mark_threads_callback (void *ignore)

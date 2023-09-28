@@ -233,6 +233,4 @@ void mgc_initialize_spaces (void);
 
 enum Space_Type mgc_find_xpntr (void *p, void **xpntr);
 
-extern struct mem_node *mem_nil;
-
 #endif  /* EMACS_ALLOC_H */

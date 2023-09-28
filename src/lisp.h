@@ -5136,6 +5136,8 @@ define_error (Lisp_Object name, const char *message, Lisp_Object parent);
 # define CACHEABLE /* empty */
 #endif
 
+extern struct mem_node *mem_nil;
+
 INLINE_HEADER_END
 
 #endif /* EMACS_LISP_H */
