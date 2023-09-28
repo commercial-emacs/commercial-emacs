@@ -56,7 +56,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 */
 
 #include "alloc.h"
-#include "thread.h"
+#include "mem_node.h"
 
 /* At least for glibc 2.26, malloc adds "sizeof size_t" for internal
    overhead, then rounds up to a multiple of MALLOC_ALIGNMENT.  Eggert
@@ -109,46 +109,6 @@ enum _GL_ATTRIBUTE_PACKED sdata_type
   Sdata_Pinned = -3,
 };
 
-/* Conservative stack scanning (mark_maybe_pointer) needs to
-   trace an arbitrary address back to its respective memory block.
-
-   To make these searches efficient, new blocks are stored in a global
-   red-black tree which is "fixed" after every insertion or deletion
-   such that:
-
-   1. Every node is either red or black.
-   2. Every leaf is black.
-   3. If a node is red, then both its children are black.
-   4. Every simple path from a node to a descendant leaf contains
-      the same number of black nodes.
-   5. The root is always black.
-
-   These invariants balance the tree so that its height can be no
-   greater than 2 log(N+1), where N is the number of internal nodes.
-   Searches, insertions and deletions are done in O(log N).
-  */
-
-struct mem_node
-{
-  /* Children of node, or mem_nil (but not NULL).  */
-  struct mem_node *left, *right;
-
-  /* The parent of this node.  In the root node, this is NULL.  */
-  struct mem_node *parent;
-
-  /* Start and end of allocated region.  */
-  void *start, *end;
-
-  /* Node color.  */
-  enum {MEM_BLACK, MEM_RED} color;
-
-  /* Memory type.  */
-  enum mem_type type;
-};
-
-static struct mem_node _mem_nil;
-struct mem_node *mem_nil = &_mem_nil;
-
 #define MALLOC_PROBE(size)			\
   do {						\
     if (profiler_memory_running)		\
@@ -182,15 +142,6 @@ deadp (Lisp_Object x)
 {
   return EQ (x, dead_object ());
 }
-
-/* Sentinel node of the tree.  */
-
-static struct mem_node *mem_insert (void *, void *, enum mem_type);
-static void mem_insert_fixup (struct mem_node *);
-static void mem_rotate_left (struct mem_node *);
-static void mem_rotate_right (struct mem_node *);
-static void mem_delete (struct mem_node *);
-static void mem_delete_fixup (struct mem_node *);
 
 Lisp_Object const *staticvec[NSTATICS];
 
@@ -481,46 +432,10 @@ lisp_malloc (size_t nbytes, bool q_clear, enum mem_type type)
   if (! val)
     memory_full (nbytes);
   else if (type != MEM_TYPE_NON_LISP)
-    mem_insert (val, (char *) val + nbytes, type);
+    mem_insert (val, (char *) val + nbytes, type, &mem_root);
   MALLOC_PROBE (nbytes);
   return val;
 }
-
-/* Return mem_node within ROOT containing START or failing that,
-   mem_nil.  */
-
-struct mem_node *
-mem_find (void *start, struct mem_node *root)
-{
-  struct mem_node *p = root;
-  while (p != mem_nil)
-    {
-      if (start < p->start)
-	p = p->left;
-      else if (start >= p->end)
-	p = p->right;
-      else
-	break;
-    }
-  return p;
-}
-
-/* A factor when `--enable-multhreading`.  */
-
-static struct mem_node *
-mem_find_among_threads (void *start)
-{
-  struct mem_node *p = mem_nil;
-  for (struct thread_state *thr = all_threads;
-       thr != NULL && p == mem_nil;
-       thr = thr->next_thread)
-    {
-      p = mem_find (start, thr->m_mem_root);
-    }
-  return p;
-}
-
-#define MEM_FIND(START) (mem_find_among_threads (START))
 
 /* Free BLOCK.  This must be called to free memory allocated with a
    call to lisp_malloc.  */
@@ -531,7 +446,7 @@ lisp_free (void *block)
   if (block && ! pdumper_object_p (block))
     {
       free (block);
-      mem_delete (MEM_FIND (block));
+      mem_delete (mem_find (block), &mem_root);
     }
 }
 
@@ -785,7 +700,7 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
   free_ablock = free_ablock->x.next_free;
 
   if (type != MEM_TYPE_NON_LISP)
-    mem_insert (val, (char *) val + nbytes, type);
+    mem_insert (val, (char *) val + nbytes, type, &mem_root);
 
   MALLOC_PROBE (nbytes);
 
@@ -799,7 +714,7 @@ lisp_align_free (void *block)
   struct ablock *ablock = block;
   struct ablocks *abase = ABLOCK_ABASE (ablock);
 
-  mem_delete (MEM_FIND (block));
+  mem_delete (mem_find (block), &mem_root);
 
   /* Put on free list.  */
   ablock->x.next_free = free_ablock;
@@ -2198,7 +2113,7 @@ allocate_vector_block (void)
   struct vector_block *block = xmalloc (sizeof *block);
 
   mem_insert (block->data, block->data + VBLOCK_NBYTES,
-	      MEM_TYPE_VBLOCK);
+	      MEM_TYPE_VBLOCK, &mem_root);
 
   block->next = vector_blocks;
   vector_blocks = block;
@@ -2449,7 +2364,7 @@ sweep_vectors (void)
 	     assignment, then nothing in the block was marked.
 	     Harvest it back to OS.  */
 	  *bprev = block->next;
-	  mem_delete (MEM_FIND (block->data));
+	  mem_delete (mem_find (block->data), &mem_root);
 	  xfree (block);
 	}
       else
@@ -3226,306 +3141,6 @@ memory_full (size_t nbytes)
   xsignal (Qnil, Vmemory_signal_data);
 }
 
-/* Insert node representing mem block of TYPE spanning START and END.
-   Return the inserted node.  */
-
-static struct mem_node *
-mem_insert (void *start, void *end, enum mem_type type)
-{
-  for (struct mem_node *node = mem_root, *parent = NULL; ; )
-    {
-      if (node == mem_nil)
-	{
-	  // insert here
-	  struct mem_node *x = xmalloc (sizeof *x);
-	  x->parent = parent;
-	  x->start = start;
-	  x->end = end;
-	  x->type = type;
-	  x->left = x->right = mem_nil;
-	  x->color = MEM_RED;
-
-	  // establish linkages
-	  if (node == mem_root)
-	    mem_root = x;
-	  else if (start < parent->start)
-	    parent->left = x;
-	  else
-	    parent->right = x;
-
-	  mem_insert_fixup (x);
-	  return x;
-	}
-      else
-	{
-	  parent = node;
-	  node = start < node->start ? node->left : node->right;
-	}
-    }
-  emacs_abort (); // should have returned by now
-}
-
-/* Insert node X, then rebalance red-black tree.  X is always red.  */
-
-static void
-mem_insert_fixup (struct mem_node *x)
-{
-  while (x != mem_root && x->parent->color == MEM_RED)
-    {
-      /* Ensure property 3, if node is red, children black. */
-      if (x->parent == x->parent->parent->left)
-	{
-	  /* X is a left grand-child, and Y is uncle.  */
-	  struct mem_node *y = x->parent->parent->right;
-
-	  if (y->color == MEM_RED)
-	    {
-	      /* Parent and uncle are red.  Change both to black
-		 because X is red.  Then proceed with grandparent.  */
-	      x->parent->color = MEM_BLACK;
-	      y->color = MEM_BLACK;
-	      x->parent->parent->color = MEM_RED;
-	      x = x->parent->parent;
-            }
-	  else
-	    {
-	      /* Parent is red but uncle is black.  */
-	      if (x == x->parent->right)
-		{
-		  /* collapsing a degenerate self-sibling? */
-		  x = x->parent;
-		  mem_rotate_left (x);
-                }
-
-	      x->parent->color = MEM_BLACK;
-	      x->parent->parent->color = MEM_RED;
-	      mem_rotate_right (x->parent->parent);
-            }
-        }
-      else
-	{
-	  /* Symmetrical where X is right grand-child  */
-	  struct mem_node *y = x->parent->parent->left;
-
-	  if (y->color == MEM_RED)
-	    {
-	      x->parent->color = MEM_BLACK;
-	      y->color = MEM_BLACK;
-	      x->parent->parent->color = MEM_RED;
-	      x = x->parent->parent;
-            }
-	  else
-	    {
-	      if (x == x->parent->left)
-		{
-		  x = x->parent;
-		  mem_rotate_right (x);
-		}
-
-	      x->parent->color = MEM_BLACK;
-	      x->parent->parent->color = MEM_RED;
-	      mem_rotate_left (x->parent->parent);
-            }
-        }
-    }
-  mem_root->color = MEM_BLACK;   /* Invariant: root is black.  */
-}
-
-/*   (x)                   (y)
-     / \                   / \
-    a   (y)      ===>    (x)  c
-        / \              / \
-       b   c            a   b  */
-
-static void
-mem_rotate_left (struct mem_node *x)
-{
-  struct mem_node *y;
-
-  /* Turn y's left sub-tree into x's right sub-tree.  */
-  y = x->right;
-  x->right = y->left;
-  if (y->left != mem_nil)
-    y->left->parent = x;
-
-  /* Y's parent was x's parent.  */
-  if (y != mem_nil)
-    y->parent = x->parent;
-
-  /* Get the parent to point to y instead of x.  */
-  if (x->parent)
-    {
-      if (x == x->parent->left)
-	x->parent->left = y;
-      else
-	x->parent->right = y;
-    }
-  else
-    mem_root = y;
-
-  /* Put x on y's left.  */
-  y->left = x;
-  if (x != mem_nil)
-    x->parent = y;
-}
-
-/*     (x)                (Y)
-       / \                / \
-     (y)  c      ===>    a  (x)
-     / \                    / \
-    a   b                  b   c  */
-
-static void
-mem_rotate_right (struct mem_node *x)
-{
-  struct mem_node *y = x->left;
-
-  x->left = y->right;
-  if (y->right != mem_nil)
-    y->right->parent = x;
-
-  if (y != mem_nil)
-    y->parent = x->parent;
-  if (x->parent)
-    {
-      if (x == x->parent->right)
-	x->parent->right = y;
-      else
-	x->parent->left = y;
-    }
-  else
-    mem_root = y;
-
-  y->right = x;
-  if (x != mem_nil)
-    x->parent = y;
-}
-
-static void
-mem_delete (struct mem_node *z)
-{
-  struct mem_node *x, *y;
-
-  if (!z || z == mem_nil)
-    return;
-
-  if (z->left == mem_nil || z->right == mem_nil)
-    y = z;
-  else
-    {
-      y = z->right;
-      while (y->left != mem_nil)
-	y = y->left;
-    }
-
-  if (y->left != mem_nil)
-    x = y->left;
-  else
-    x = y->right;
-
-  x->parent = y->parent;
-  if (y->parent)
-    {
-      if (y == y->parent->left)
-	y->parent->left = x;
-      else
-	y->parent->right = x;
-    }
-  else
-    mem_root = x;
-
-  if (y != z)
-    {
-      z->start = y->start;
-      z->end = y->end;
-      z->type = y->type;
-    }
-
-  if (y->color == MEM_BLACK)
-    mem_delete_fixup (x);
-
-  xfree (y);
-}
-
-/* Delete X, then rebalance red-black tree.  */
-
-static void
-mem_delete_fixup (struct mem_node *x)
-{
-  while (x != mem_root && x->color == MEM_BLACK)
-    {
-      if (x == x->parent->left)
-	{
-	  struct mem_node *w = x->parent->right;
-
-	  if (w->color == MEM_RED)
-	    {
-	      w->color = MEM_BLACK;
-	      x->parent->color = MEM_RED;
-	      mem_rotate_left (x->parent);
-	      w = x->parent->right;
-            }
-
-	  if (w->left->color == MEM_BLACK && w->right->color == MEM_BLACK)
-	    {
-	      w->color = MEM_RED;
-	      x = x->parent;
-            }
-	  else
-	    {
-	      if (w->right->color == MEM_BLACK)
-		{
-		  w->left->color = MEM_BLACK;
-		  w->color = MEM_RED;
-		  mem_rotate_right (w);
-		  w = x->parent->right;
-                }
-	      w->color = x->parent->color;
-	      x->parent->color = MEM_BLACK;
-	      w->right->color = MEM_BLACK;
-	      mem_rotate_left (x->parent);
-	      x = mem_root;
-            }
-        }
-      else
-	{
-	  struct mem_node *w = x->parent->left;
-
-	  if (w->color == MEM_RED)
-	    {
-	      w->color = MEM_BLACK;
-	      x->parent->color = MEM_RED;
-	      mem_rotate_right (x->parent);
-	      w = x->parent->left;
-            }
-
-	  if (w->right->color == MEM_BLACK && w->left->color == MEM_BLACK)
-	    {
-	      w->color = MEM_RED;
-	      x = x->parent;
-            }
-	  else
-	    {
-	      if (w->left->color == MEM_BLACK)
-		{
-		  w->right->color = MEM_BLACK;
-		  w->color = MEM_RED;
-		  mem_rotate_left (w);
-		  w = x->parent->left;
-                }
-
-	      w->color = x->parent->color;
-	      x->parent->color = MEM_BLACK;
-	      w->left->color = MEM_BLACK;
-	      mem_rotate_right (x->parent);
-	      x = mem_root;
-            }
-        }
-    }
-
-  x->color = MEM_BLACK;
-}
-
 /* Return P "made whole" as a Lisp_String if P's mem_block M
    corresponds to a Lisp_String data field.  */
 
@@ -3861,7 +3476,7 @@ mark_maybe_pointer (void *const *p)
       INT_SUBTRACT_WRAPV ((uintptr_t) *p, (uintptr_t) xpntr, &offset);
       INT_ADD_WRAPV ((uintptr_t) forwarded, offset, (uintptr_t *) p);
     }
-  else if ((m = MEM_FIND (*p)) != mem_nil)
+  else if ((m = mem_find (*p)) != mem_nil)
     {
       switch (m->type)
 	{
@@ -3931,7 +3546,7 @@ mark_maybe_pointer (void *const *p)
 	  emacs_abort ();
 	}
     }
-  else if ((m = MEM_FIND (p_sym)) != mem_nil && m->type == MEM_TYPE_SYMBOL)
+  else if ((m = mem_find (p_sym)) != mem_nil && m->type == MEM_TYPE_SYMBOL)
     {
       struct Lisp_Symbol *h = live_symbol_holding (m, p_sym);
       if (h)
@@ -4183,7 +3798,7 @@ valid_lisp_object_p (Lisp_Object obj)
   if (pdumper_object_p (p))
     return pdumper_object_p_precise (p) ? 1 : 0;
 
-  struct mem_node *m = MEM_FIND (p);
+  struct mem_node *m = mem_find (p);
   if (m == mem_nil)
     {
       int valid = valid_pointer_p (p);
@@ -5337,7 +4952,7 @@ gc_process_string (Lisp_Object *objp)
 
    Until commit 7a8798d, recursively calling mark_object() could
    easily overwhelm the call stack, which MARK_STK deftly circumvents.
-   However, we still recursively mark_object() less common Lisp types
+   However, we still recursively mark_object() not-as-common Lisp types
    like pseudovectors whose object depths presumably wouldn't trigger
    our pre-7a8798d problems.  */
 
@@ -5373,7 +4988,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	if (mgc_fwd_xpntr (xpntr)			\
 	    || mgc_xpntr_p (xpntr))			\
 	  break;					\
-	m = mem_find_among_threads (xpntr);		\
+	m = mem_find (xpntr);				\
 	if (m == mem_nil)				\
 	  emacs_abort ();				\
       } while (0)
@@ -5450,7 +5065,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		    && ! SUBRP (*objp)
 		    && ! main_thread_p (xpntr))
 		  {
-		    m = mem_find_among_threads (xpntr);
+		    m = mem_find (xpntr);
 		    if (m == mem_nil)
 		      emacs_abort ();
 		    else if (m->type == MEM_TYPE_VECTORLIKE)

@@ -168,21 +168,6 @@ typedef union {
 
 enum { LISP_ALIGNMENT = alignof (Lisp_Aligned) };
 
-enum _GL_ATTRIBUTE_PACKED mem_type
-{
-  MEM_TYPE_NON_LISP,
-  MEM_TYPE_CONS,
-  MEM_TYPE_STRING,
-  MEM_TYPE_SYMBOL,
-  MEM_TYPE_FLOAT,
-  /* Includes vectors but not non-bool vectorlikes. */
-  MEM_TYPE_VECTORLIKE,
-  /* Non-bool vectorlikes.  */
-  MEM_TYPE_VBLOCK,
-  MEM_TYPE_INTERVAL,
-  MEM_TYPE_NTYPES,
-};
-
 enum _GL_ATTRIBUTE_PACKED Space_Type
   {
     Space_Symbol = Lisp_Symbol,
@@ -212,8 +197,6 @@ typedef struct sdata
 
 #define SDATA_OF_LISP_STRING(S) \
   ((sdata *) ((S)->u.s.data - FLEXSIZEOF (struct sdata, data, 0)))
-
-struct mem_node *mem_find (void *start, struct mem_node *root);
 
 enum { BLOCK_NOT_FOUND = EMACS_INT_MAX };
 

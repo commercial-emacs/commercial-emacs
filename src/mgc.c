@@ -1,4 +1,5 @@
-#include <alloc.h>
+#include "alloc.h"
+#include "mem_node.h"
 #include "bitset.h"
 
 enum
@@ -587,7 +588,7 @@ mgc_handle_sigsegv (void *const fault_address)
   if (! NILP (Vmemory__protect_p))
     {
       Vmemory__protect_p = Qnil;
-      if (mem_find (fault_address, mem_root))
+      if (mem_find (fault_address))
 	{
 	  int pagesize = getpagesize ();
 	  char *page_start = (char *) ((uintptr_t) fault_address & ~(pagesize - 1));

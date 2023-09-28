@@ -527,6 +527,8 @@ dumped_with_pdumper_p (void)
 /* Defined in floatfns.c.  */
 extern double extract_float (Lisp_Object);
 
+/* Defined in threads.c.  */
+extern struct thread_state *all_threads;
 
 /* Low-level conversion and type checking.  */
 
@@ -5135,8 +5137,6 @@ define_error (Lisp_Object name, const char *message, Lisp_Object parent);
 #else
 # define CACHEABLE /* empty */
 #endif
-
-extern struct mem_node *mem_nil;
 
 INLINE_HEADER_END
 

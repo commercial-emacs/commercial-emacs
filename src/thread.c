@@ -34,6 +34,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "syssignal.h"
 #include "pdumper.h"
 #include "keyboard.h"
+#include "mem_node.h"
 
 #ifdef HAVE_NS
 #include "nsterm.h"
@@ -670,6 +671,13 @@ run_thread (void *state)
   internal_condition_case (invoke_thread, Qt, record_thread_error);
 
   update_processes_for_thread_death (self);
+
+  if (self->m_mem_root != main_thread.s.m_mem_root)
+    {
+      mem_merge_into (&main_thread.s.m_mem_root, self->m_mem_root);
+      mem_delete_root (&self->m_mem_root);
+      eassume (self->m_mem_root == mem_nil);
+    }
 
   /* 1- for unreachable dummy entry */
   xfree (self->m_specpdl - 1);
