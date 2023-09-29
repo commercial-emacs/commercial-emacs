@@ -343,8 +343,7 @@ suppress.  For example, (not free-vars) will suppress the `free-vars' warning.
 The t value means \"all non experimental warning types\", and
 excludes the types in `byte-compile--emacs-build-warning-types'.
 A value of `all' really means all."
-  :type `(choice (const :tag "Default selection" t)
-                 (const :tag "All" all)
+  :type `(choice (const :tag "All" t)
 		 (set :menu-tag "Some"
                       ,@(mapcar (lambda (x) `(const ,x))
                                 byte-compile-warning-types))))
@@ -1699,11 +1698,8 @@ Warn if documentation string of FORM is too wide.
 It is too wide if it has any lines longer than the largest of
 `fill-column' and `byte-compile-docstring-max-column'."
   (when (byte-compile-warning-enabled-p 'docstrings)
-    (let* ((kind nil) (name nil) (docs nil)
-           (prefix (lambda ()
-                     (format "%s%s"
-                             kind
-                             (if name (format-message " `%s' " name) "")))))
+    (let ((col (max byte-compile-docstring-max-column fill-column))
+          kind name docs)
       (pcase (car form)
         ((or 'autoload 'custom-declare-variable 'defalias
              'defconst 'define-abbrev-table
@@ -1711,12 +1707,14 @@ It is too wide if it has any lines longer than the largest of
              'custom-declare-face)
          (setq kind (nth 0 form))
          (setq name (nth 1 form))
-         (when (and (consp name) (eq (car name) 'quote))
-           (setq name (cadr name)))
          (setq docs (nth 3 form)))
         ('lambda
           (setq kind "")          ; can't be "function", unfortunately
-          (setq docs (nth 2 form))))
+          (setq docs (and (stringp (nth 2 form))
+                          (nth 2 form)))))
+      (when (and (consp name) (eq (car name) 'quote))
+        (setq name (cadr name)))
+      (setq name (if name (format " `%s' " name) ""))
       (when (and kind docs (stringp docs))
         (when (byte-compile--wide-docstring-p docs col)
           (byte-compile-warn
@@ -1732,7 +1730,7 @@ It is too wide if it has any lines longer than the largest of
           (byte-compile-warn
            (concat "%s%sdocstring has wrong usage of unescaped single quotes"
                    " (use \\=%c or different quoting such as %c...%c)")
-           (funcall prefix) ?' ?` ?'))
+           kind name ?' ?` ?'))
         ;; There's a "Unicode quote" in the string -- it should probably
         ;; be an ASCII one instead.
         (when (byte-compile-warning-enabled-p 'docstrings-non-ascii-quotes)
