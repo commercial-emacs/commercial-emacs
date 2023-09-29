@@ -1415,13 +1415,11 @@ SCHARS (Lisp_Object string)
   return nchars;
 }
 
-#ifdef GC_CHECK_STRING_BYTES
 extern ptrdiff_t string_bytes (struct Lisp_String *);
-#endif
 INLINE ptrdiff_t
 STRING_BYTES (struct Lisp_String *s)
 {
-#ifdef GC_CHECK_STRING_BYTES
+#ifdef ENABLE_CHECKING
   ptrdiff_t nbytes = string_bytes (s);
 #else
   ptrdiff_t nbytes = s->u.s.size_byte < 0 ? s->u.s.size : s->u.s.size_byte;
@@ -4981,12 +4979,6 @@ safe_free_unbind_to (specpdl_ref count, specpdl_ref sa_count, Lisp_Object val)
 # define USE_STACK_LISP_OBJECTS true
 #endif
 
-#ifdef GC_CHECK_STRING_BYTES
-enum { defined_GC_CHECK_STRING_BYTES = true };
-#else
-enum { defined_GC_CHECK_STRING_BYTES = false };
-#endif
-
 /* True for stack-based cons and string implementations, respectively.
    Use stack-based strings only if stack-based cons also works.
    Otherwise, STACK_CONS would create heap-based cons cells that
@@ -4995,8 +4987,12 @@ enum { defined_GC_CHECK_STRING_BYTES = false };
 enum
   {
     USE_STACK_CONS = USE_STACK_LISP_OBJECTS,
-    USE_STACK_STRING = (USE_STACK_CONS
-			&& !defined_GC_CHECK_STRING_BYTES)
+    USE_STACK_STRING =
+#ifdef ENABLE_CHECKING
+    0
+#else
+    USE_STACK_CONS
+#endif
   };
 
 /* Auxiliary macros used for auto allocation of Lisp objects.  Please

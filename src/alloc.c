@@ -890,17 +890,16 @@ PER_THREAD_STATIC struct sblock *large_sblocks;
 PER_THREAD_STATIC struct string_block *string_blocks;
 PER_THREAD_STATIC struct Lisp_String *string_free_list;
 
-#ifdef GC_CHECK_STRING_OVERRUN
-
+#ifdef ENABLE_CHECKING
+# define GC_STRING_OVERRUN_COOKIE_SIZE ROUNDUP (4, alignof (sdata))
 /* Check for overrun in string data blocks by appending a small
    "cookie" after each allocated string data block, and check for the
    presence of this cookie during GC.  */
-# define GC_STRING_OVERRUN_COOKIE_SIZE ROUNDUP (4, alignof (sdata))
 static char const string_overrun_cookie[GC_STRING_OVERRUN_COOKIE_SIZE] =
   { '\xde', '\xad', '\xbe', '\xef', /* Perhaps some zeros here.  */ };
-
 #else
 # define GC_STRING_OVERRUN_COOKIE_SIZE 0
+static char const *string_overrun_cookie = { '\0' };
 #endif
 
 /* Return the size of an sdata structure large enough to hold N bytes
@@ -918,15 +917,12 @@ sdata_size (ptrdiff_t n)
   return (unaligned_size + sdata_align - 1) & ~(sdata_align - 1);
 }
 
-/* Extra bytes to allocate for each string.  */
-#define GC_STRING_EXTRA GC_STRING_OVERRUN_COOKIE_SIZE
-
 /* A string can neither exceed STRING_BYTES_BOUND, nor be so long that
    the size_t arithmetic in allocate_sdata could overflow.  */
 static ptrdiff_t const STRING_BYTES_MAX =
   min (STRING_BYTES_BOUND,
        ((SIZE_MAX
-	 - GC_STRING_EXTRA
+	 - GC_STRING_OVERRUN_COOKIE_SIZE
 	 - FLEXSIZEOF (struct sblock, data, 0)
 	 - FLEXSIZEOF (struct sdata, data, 0))
 	& ~(sizeof (EMACS_INT) - 1)));
@@ -976,7 +972,7 @@ init_strings (void)
 # define ASAN_UNPOISON_STRING(s) ((void) 0)
 #endif
 
-#ifdef GC_CHECK_STRING_BYTES
+#ifdef ENABLE_CHECKING
 
 PER_THREAD_STATIC int check_string_bytes_count;
 
@@ -986,16 +982,15 @@ PER_THREAD_STATIC int check_string_bytes_count;
 ptrdiff_t
 string_bytes (struct Lisp_String *s)
 {
-  ptrdiff_t nbytes =
-    (s->u.s.size_byte < 0 ? s->u.s.size & ~ARRAY_MARK_FLAG : s->u.s.size_byte);
-
-  if (! PURE_P (s) && ! pdumper_object_p (s) && s->u.s.data
-      && nbytes != SDATA_OF_LISP_STRING (s)->nbytes)
-    emacs_abort ();
+  ptrdiff_t nbytes = (s->u.s.size_byte < 0)
+    ? s->u.s.size & ~ARRAY_MARK_FLAG
+    : s->u.s.size_byte;
+  eassume (PURE_P (s) || pdumper_object_p (s) || ! s->u.s.data
+	   || nbytes == SDATA_OF_LISP_STRING (s)->nbytes);
   return nbytes;
 }
 
-/* Check validity of Lisp strings' string_bytes member in B.  */
+/* Validate string_bytes member in B.  */
 
 static void
 check_sblock (struct sblock *b)
@@ -1005,7 +1000,7 @@ check_sblock (struct sblock *b)
       ptrdiff_t nbytes = sdata_size (from->string
 				     ? string_bytes (from->string)
 				     : from->nbytes);
-      from = (sdata *) ((char *) from + nbytes + GC_STRING_EXTRA);
+      from = (sdata *) ((char *) from + nbytes + GC_STRING_OVERRUN_COOKIE_SIZE);
     }
 }
 
@@ -1031,34 +1026,19 @@ check_string_bytes (bool all_p)
     check_sblock (current_sblock);
 }
 
-#else /* not GC_CHECK_STRING_BYTES */
-
-#define check_string_bytes(all) ((void) 0)
-
-#endif /* GC_CHECK_STRING_BYTES */
-
-#ifdef GC_CHECK_STRING_FREE_LIST
-
 /* Walk through the string free list looking for bogus next pointers.
    This may catch buffer overrun from a previous string.  */
 
 static void
 check_string_free_list (void)
 {
-  struct Lisp_String *s;
-
-  /* Pop a Lisp_String off the free list.  */
-  s = string_free_list;
-  while (s != NULL)
-    {
-      if ((uintptr_t) s < BLOCK_ALIGN)
-	emacs_abort ();
-      s = NEXT_FREE_LISP_STRING (s);
-    }
+  for (struct Lisp_String *s = string_free_list;
+       s != NULL;
+       s = NEXT_FREE_LISP_STRING (s))
+    eassume ((uintptr_t) s >= BLOCK_ALIGN);
 }
-#else
-#define check_string_free_list()
-#endif
+
+#endif /* ENABLE_CHECKING */
 
 /* Return a new Lisp_String.  */
 
@@ -1090,7 +1070,9 @@ allocate_string (void)
       ASAN_POISON_STRING_BLOCK (b);
     }
 
+#ifdef ENABLE_CHECKING
   check_string_free_list ();
+#endif
 
   /* Pop a Lisp_String off the free list.  */
   s = string_free_list;
@@ -1100,14 +1082,14 @@ allocate_string (void)
   ++strings_consed;
   bytes_since_gc += sizeof *s;
 
-#ifdef GC_CHECK_STRING_BYTES
+#ifdef ENABLE_CHECKING
   if (! noninteractive)
     {
       if (check_string_bytes_count > (INT_MAX >> 1))
 	check_string_bytes_count = 0; // avoid overflow
       check_string_bytes (++check_string_bytes_count % 200 == 0);
     }
-#endif /* GC_CHECK_STRING_BYTES */
+#endif
 
   return s;
 }
@@ -1136,7 +1118,7 @@ allocate_sdata (struct Lisp_String *s,
   if (nbytes > LARGE_STRING_THRESH || immovable)
     {
       size_t size = FLEXSIZEOF (struct sblock, data, sdata_nbytes);
-      b = lisp_malloc (size + GC_STRING_EXTRA, false, MEM_TYPE_NON_LISP);
+      b = lisp_malloc (size + GC_STRING_OVERRUN_COOKIE_SIZE, false, MEM_TYPE_NON_LISP);
       ASAN_POISON_SBLOCK_DATA (b, size);
       the_data = b->data;
       b->next = large_sblocks;
@@ -1148,7 +1130,7 @@ allocate_sdata (struct Lisp_String *s,
       b = current_sblock;
 
       if (b == NULL
-	  || ((SBLOCK_NBYTES - GC_STRING_EXTRA) <
+	  || ((SBLOCK_NBYTES - GC_STRING_OVERRUN_COOKIE_SIZE) <
 	      ((char *) b->next_free - (char *) b + sdata_nbytes)))
 	{
 	  /* Not enough room in the current sblock.  */
@@ -1170,7 +1152,7 @@ allocate_sdata (struct Lisp_String *s,
 
   ASAN_PREPARE_LIVE_SDATA (data, nbytes);
   the_data->string = s;
-  b->next_free = (sdata *) ((char *) the_data + sdata_nbytes + GC_STRING_EXTRA);
+  b->next_free = (sdata *) ((char *) the_data + sdata_nbytes + GC_STRING_OVERRUN_COOKIE_SIZE);
   eassert ((uintptr_t) b->next_free % alignof (sdata) == 0);
 
   the_data->nbytes = nbytes;
@@ -1178,10 +1160,8 @@ allocate_sdata (struct Lisp_String *s,
   s->u.s.size = nchars;
   s->u.s.size_byte = nbytes;
   s->u.s.data[nbytes] = '\0'; /* NBYTES is exclusive of the NUL terminator. */
-#ifdef GC_CHECK_STRING_OVERRUN
-  memcpy ((char *) the_data + sdata_nbytes, string_overrun_cookie,
-	  GC_STRING_OVERRUN_COOKIE_SIZE);
-#endif
+  eassume (memcpy ((char *) the_data + sdata_nbytes, string_overrun_cookie,
+		   GC_STRING_OVERRUN_COOKIE_SIZE));
 
   bytes_since_gc += sdata_nbytes;
 }
@@ -1322,12 +1302,16 @@ sweep_strings (void)
 	}
     } /* for each string block B.  */
 
+#ifdef ENABLE_CHECKING
   check_string_free_list ();
+#endif
 
   string_blocks = live_blocks;
   sweep_sdata ();
 
+#ifdef ENABLE_CHECKING
   check_string_free_list ();
+#endif
 }
 
 static void
@@ -1376,26 +1360,20 @@ sweep_sdata (void)
 	    {
 	      struct Lisp_String *s = from->string;
 	      const ptrdiff_t nbytes = from->nbytes;
-	      const ptrdiff_t step = sdata_size (nbytes) + GC_STRING_EXTRA;
+	      const ptrdiff_t step = sdata_size (nbytes) + GC_STRING_OVERRUN_COOKIE_SIZE;
 	      eassert (!s || ! XSTRING_MARKED_P (s));
 	      eassert (nbytes <= LARGE_STRING_THRESH);
 
-#ifdef GC_CHECK_STRING_BYTES
 	      /* Check that the string size recorded in the string is the
 		 same as the one recorded in the sdata structure.  */
-	      if (s && string_bytes (s) != from->nbytes)
-		emacs_abort ();
-#endif /* GC_CHECK_STRING_BYTES */
+	      eassume (! s || string_bytes (s) == from->nbytes);
 
 	      /* Compute NEXT_FROM now before FROM can mutate.  */
 	      next_from = (sdata *) ((char *) from + step);
 
-#ifdef GC_CHECK_STRING_OVERRUN
-	      if (memcmp (string_overrun_cookie,
-			  (char *) next_from - GC_STRING_OVERRUN_COOKIE_SIZE,
-			  GC_STRING_OVERRUN_COOKIE_SIZE))
-		emacs_abort ();
-#endif
+	      eassume (! memcmp (string_overrun_cookie,
+				 (char *) next_from - GC_STRING_OVERRUN_COOKIE_SIZE,
+				 GC_STRING_OVERRUN_COOKIE_SIZE));
 
 	      if (s != NULL) /* a live string to be compacted */
 		{

@@ -154,17 +154,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* Define this to check for errors in cons list. */
 #undef GC_CHECK_CONS_LIST
 
-/* Define this temporarily to hunt a bug. If defined, the size of strings is
-   redundantly recorded in sdata structures so that it can be compared to the
-   sizes recorded in Lisp strings. */
-#undef GC_CHECK_STRING_BYTES
-
-/* Define this to check the string free list. */
-#undef GC_CHECK_STRING_FREE_LIST
-
-/* Define this to check for short string overrun. */
-#undef GC_CHECK_STRING_OVERRUN
-
 /* Mark a secondary stack, like the register stack on the ia64. */
 #undef GC_MARK_SECONDARY_STACK
 
