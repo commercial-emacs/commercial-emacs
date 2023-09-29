@@ -694,8 +694,7 @@ See the documentation for `calculator-mode' for more information."
     (save-window-excursion
       (require 'electric) (message nil) ; hide load message
       (let ((old-buf (window-buffer (minibuffer-window)))
-            (echo-keystrokes 0)
-            (garbage-collection-messages nil)) ; no gc msg when electric
+            (echo-keystrokes 0))
         (set-window-buffer (minibuffer-window) calculator-buffer)
         (select-window (minibuffer-window))
         (calculator-reset)

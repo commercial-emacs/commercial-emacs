@@ -7073,4 +7073,6 @@ and return the value found in PLACE instead."
                ,(funcall setter val)
                ,val)))))
 
+(make-obsolete 'garbage-collection-messages nil "30.1")
+
 ;;; subr.el ends here

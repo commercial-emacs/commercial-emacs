@@ -88,7 +88,6 @@
            `(;; alloc.c
 	     (gc-cons-threshold alloc integer)
 	     (gc-cons-percentage alloc float)
-	     (garbage-collection-messages alloc boolean)
 	     ;; buffer.c
 	     (cursor-type display ,cursor-type-types)
 	     (mode-line-format mode-line sexp) ;Hard to do right.

@@ -2335,6 +2335,6 @@ whether files are locked by another Emacs session, as well as
 handling of the active region per `select-active-regions'.
 
 See also the info node `(elisp) Change Hooks'.  */);
-  inhibit_modification_hooks = 0;
+  inhibit_modification_hooks = false;
   DEFSYM (Qinhibit_modification_hooks, "inhibit-modification-hooks");
 }

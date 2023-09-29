@@ -4778,7 +4778,6 @@ garbage_collect (void)
 {
   static struct timespec gc_elapsed = { 0, 0 };
   Lisp_Object tail, buffer;
-  bool message_p = false;
   specpdl_ref count = SPECPDL_INDEX ();
   struct timespec start;
 
@@ -4805,16 +4804,6 @@ garbage_collect (void)
 		       : (size_t) -1);
 
   start = current_timespec ();
-
-  /* Restore what's currently displayed in the echo area.  */
-  if (NILP (Vmemory_full))
-    {
-      message_p = push_message ();
-      record_unwind_protect_void (pop_message_unwind);
-    }
-
-  if (garbage_collection_messages)
-    message1_nolog ("Garbage collecting...");
 
   shrink_regexp_cache ();
 
@@ -4883,14 +4872,6 @@ garbage_collect (void)
 
   /* Unblock as late as possible since it could signal (Bug#43389).  */
   unblock_input ();
-
-  if (garbage_collection_messages && NILP (Vmemory_full))
-    {
-      if (message_p || minibuf_level > 0)
-	restore_message ();
-      else
-	message1_nolog ("Garbage collecting...done");
-    }
 
   unbind_to (count, Qnil);
 
@@ -5080,15 +5061,12 @@ process_mark_stack (ptrdiff_t base_sp)
 		  case PVEC_BUFFER:
 		    mark_buffer ((struct buffer *) ptr);
 		    break;
-
 		  case PVEC_FRAME:
 		    mark_frame (ptr);
 		    break;
-
 		  case PVEC_WINDOW:
 		    mark_window (ptr);
 		    break;
-
 		  case PVEC_HASH_TABLE:
 		    {
 		      struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
@@ -5109,14 +5087,12 @@ process_mark_stack (ptrdiff_t base_sp)
 			  weak_hash_tables = h;
 			  set_vector_marked (XVECTOR (h->key_and_value));
 			}
-		      break;
 		    }
-
+		    break;
 		  case PVEC_CHAR_TABLE:
 		  case PVEC_SUB_CHAR_TABLE:
 		    mark_char_table (ptr, PVTYPE (ptr));
 		    break;
-
 		  case PVEC_BOOL_VECTOR:
 		    /* Can't be dumped bool vector since they're
 		       always marked (they're in the old section
@@ -5126,11 +5102,9 @@ process_mark_stack (ptrdiff_t base_sp)
 			     && ! pdumper_object_p (ptr));
 		    set_vector_marked (ptr);
 		    break;
-
 		  case PVEC_OVERLAY:
 		    mark_overlay (XOVERLAY (*objp));
 		    break;
-
 		  case PVEC_SUBR:
 #ifdef HAVE_NATIVE_COMP
 		    if (SUBR_NATIVE_COMPILEDP (*objp))
@@ -5145,10 +5119,9 @@ process_mark_stack (ptrdiff_t base_sp)
 		      }
 #endif
 		    break;
-
 		  case PVEC_FREE:
 		    emacs_abort ();
-
+		    break;
 		  default:
 		    {
 		      /* Same as mark_vectorlike() except stack push
@@ -6044,10 +6017,6 @@ If this portion is smaller than `gc-cons-threshold', this is ignored.  */);
   DEFVAR_LISP ("loadup-pure-table", Vloadup_pure_table,
 	       doc: /* Allocate objects in pure space during loadup.el.  */);
   Vloadup_pure_table = Qnil;
-
-  DEFVAR_BOOL ("garbage-collection-messages", garbage_collection_messages,
-	       doc: /* Non-nil means display messages at start and end of garbage collection.  */);
-  garbage_collection_messages = 0;
 
   DEFVAR_LISP ("post-gc-hook", Vpost_gc_hook,
 	       doc: /* Hook run after garbage collection has finished.  */);

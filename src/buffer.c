@@ -1429,7 +1429,7 @@ state of the current buffer.  Use with care.  */)
     ? current_buffer->base_buffer
     : current_buffer;
 
-  if (!inhibit_modification_hooks)
+  if (! inhibit_modification_hooks)
     {
       Lisp_Object fn = BVAR (b, file_truename);
       /* Test buffer-file-name so that binding it to nil is effective.  */
@@ -4578,10 +4578,10 @@ init_buffer_once (void)
 
   reset_buffer (&buffer_slot_defaults);
   eassert (NILP (BVAR (&buffer_slot_defaults, name)));
-  reset_buffer_local_variables (&buffer_slot_defaults, 1);
+  reset_buffer_local_variables (&buffer_slot_defaults, true);
   eassert (NILP (BVAR (&buffer_slot_symbols, name)));
   reset_buffer (&buffer_slot_symbols);
-  reset_buffer_local_variables (&buffer_slot_symbols, 1);
+  reset_buffer_local_variables (&buffer_slot_symbols, true);
   buffer_slot_defaults.text = &buffer_slot_defaults.own_text;
   buffer_slot_symbols.text = &buffer_slot_symbols.own_text;
   buffer_slot_defaults.indirections = 0;
@@ -4674,7 +4674,7 @@ init_buffer_once (void)
 
   Fset_buffer (Fget_buffer_create (build_pure_c_string ("*scratch*"), Qnil));
 
-  inhibit_modification_hooks = 0;
+  inhibit_modification_hooks = false;
 }
 
 void
