@@ -98,11 +98,17 @@ each clause."
   "Inhibit application of compiler macros if non-nil.")
 
 (defun macroexp--compiler-macro (handler form)
-  (condition-case-unless-debug err
-      (apply handler form (cdr form))
-    (error
-     (message "Compiler-macro error for %S: %S" (car form) err)
-     form)))
+  "Apply compiler macro HANDLER to FORM and return the result.
+Unless `macroexp-inhibit-compiler-macros' is non-nil, in which
+case return FORM unchanged."
+  (if macroexp-inhibit-compiler-macros
+      form
+    (condition-case-unless-debug err
+        (apply handler form (cdr form))
+      (error
+       (message "Warning: Optimization failure for %S: Handler: %S\n%S"
+                (car form) handler err)
+       form))))
 
 (defun macroexp--funcall-if-compiled (_form)
   "Pseudo function used internally by macroexp to delay warnings.
