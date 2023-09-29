@@ -70,7 +70,7 @@ enum { MALLOC_ALIGNMENT = 16 };
 enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
 #endif
 
-PER_THREAD bool gc_inhibited;
+bool gc_inhibited;
 
 struct Lisp_String *(*static_string_allocator) (void);
 struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t len, bool q_clear);
@@ -87,10 +87,10 @@ int number_finalizers_run;
 EMACS_INT bytes_since_gc;
 EMACS_INT bytes_between_gc;
 Lisp_Object Vmemory_full;
-PER_THREAD bool gc_in_progress;
+bool gc_in_progress;
 
 /* Last recorded live and free-list counts.  */
-PER_THREAD_STATIC struct
+static struct
 {
   size_t total_conses, total_free_conses;
   size_t total_symbols, total_free_symbols;

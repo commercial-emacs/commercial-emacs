@@ -3962,7 +3962,7 @@ extern struct Lisp_Vector *allocate_pseudovector (int, int, int, enum pvec_type)
 				   PSEUDOVECSIZE (type, field),	       \
 				   VECSIZE (type), tag))
 
-extern PER_THREAD bool gc_in_progress;
+extern bool gc_in_progress;
 extern Lisp_Object make_float (double);
 extern void display_malloc_warning (void);
 extern specpdl_ref inhibit_garbage_collection (void);
