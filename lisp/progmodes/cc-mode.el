@@ -1264,7 +1264,9 @@ Note that the style variables are always made local to the buffer."
   ;; VALUE (which should not be nil).
   ;; `(let ((-pos- ,pos)
   ;;	 (-value- ,value))
-  (c-put-char-property pos 'syntax-table value)
+  (if (equal value '(15))
+      (c-put-string-fence pos)
+    (c-put-char-property pos 'syntax-table value))
   (c-put-char-property pos 'c-fl-syn-tab value)
   (cond
    ((null c-min-syn-tab-mkr)
