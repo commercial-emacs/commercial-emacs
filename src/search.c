@@ -3388,6 +3388,7 @@ is to bind it with `let' around a small expression.  */);
   defsubr (&Smatch_data__translate);
   defsubr (&Sregexp_quote);
   defsubr (&Snewline_cache_check);
+  defsubr (&Sre__describe_compiled);
 
   pdumper_do_now_and_after_load (syms_of_search_for_pdumper);
 }
