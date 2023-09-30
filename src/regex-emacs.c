@@ -4103,6 +4103,9 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
      and need to test it, it's not garbage.  */
   re_char *match_end = NULL;
 
+  /* Final return value of the function.  */
+  ptrdiff_t retval = -1;        /* Presumes failure to match for now.  */
+
 #ifdef DEBUG_COMPILES_ARGUMENTS
   /* Counts the total number of registers pushed.  */
   ptrdiff_t num_regs_pushed = 0;
@@ -4353,13 +4356,11 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
 		       nfailure_points_pushed - nfailure_points_popped);
 	  DEBUG_PRINT ("%td registers pushed.\n", num_regs_pushed);
 
-	  ptrdiff_t dcnt = POINTER_TO_OFFSET (d) - pos;
+	  retval = POINTER_TO_OFFSET (d) - pos;
 
-	  DEBUG_PRINT ("Returning %td from re_match_2.\n", dcnt);
+	  DEBUG_PRINT ("Returning %td from re_match_2.\n", retval);
 
-	  unbind_to (count, Qnil);
-	  SAFE_FREE ();
-	  return dcnt;
+	  goto endof_re_match;
 	}
 
       /* Otherwise match next pattern command.  */
@@ -5210,7 +5211,7 @@ endof_re_match:
   unbind_to (count, Qnil);
   SAFE_FREE ();
 
-  return -1;				/* Failure to match.  */
+  return retval;
 }
 
 /* Subroutine definitions for re_match_2.  */
