@@ -1058,10 +1058,6 @@ allocate_string (void)
       ASAN_POISON_STRING_BLOCK (b);
     }
 
-#ifdef ENABLE_CHECKING
-  check_string_free_list ();
-#endif
-
   /* Pop a Lisp_String off the free list.  */
   s = string_free_list;
   ASAN_UNPOISON_STRING (s);
@@ -1292,10 +1288,6 @@ sweep_strings (void)
 	  live_blocks = b;
 	}
     } /* for each string block B.  */
-
-#ifdef ENABLE_CHECKING
-  check_string_free_list ();
-#endif
 
   string_blocks = live_blocks;
   sweep_sdata ();
