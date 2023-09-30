@@ -196,6 +196,7 @@ extern re_wctype_t re_wctype_parse (const unsigned char **strp,
 				    ptrdiff_t limit);
 
 #if ENABLE_CHECKING
+#include <stdio.h>
 extern void print_compiled_pattern (FILE *dest, struct re_pattern_buffer *bufp);
 #endif
 
