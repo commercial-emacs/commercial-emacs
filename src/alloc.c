@@ -976,18 +976,11 @@ init_strings (void)
 
 PER_THREAD_STATIC int check_string_bytes_count;
 
-/* Like macro STRING_BYTES, but with debugging check.  Can be
-   called during GC, so pay attention to the mark bit.  */
-
-ptrdiff_t
-string_bytes (struct Lisp_String *s)
+void
+check_string_bytes (struct Lisp_String *s, ptrdiff_t nbytes)
 {
-  ptrdiff_t nbytes = (s->u.s.size_byte < 0)
-    ? s->u.s.size & ~ARRAY_MARK_FLAG
-    : s->u.s.size_byte;
   eassume (PURE_P (s) || pdumper_object_p (s) || ! s->u.s.data
 	   || nbytes == SDATA_OF_LISP_STRING (s)->nbytes);
-  return nbytes;
 }
 
 /* Validate string_bytes member in B.  */
@@ -998,7 +991,7 @@ check_sblock (struct sblock *b)
   for (sdata *from = b->data, *end = b->next_free; from < end; )
     {
       ptrdiff_t nbytes = sdata_size (from->string
-				     ? string_bytes (from->string)
+				     ? STRING_BYTES (from->string)
 				     : from->nbytes);
       from = (sdata *) ((char *) from + nbytes + GC_STRING_OVERRUN_COOKIE_SIZE);
     }
@@ -1009,21 +1002,16 @@ check_sblock (struct sblock *b)
    recently allocated strings.  Used for hunting a bug.  */
 
 static void
-check_string_bytes (bool all_p)
+check_all_sblocks (void)
 {
-  if (all_p)
+  for (struct sblock *b = large_sblocks; b; b = b->next)
     {
-      for (struct sblock *b = large_sblocks; b; b = b->next)
-	{
-	  struct Lisp_String *s = b->data[0].string;
-	  if (s)
-	    string_bytes (s);
-	}
-      for (struct sblock *b = oldest_sblock; b; b = b->next)
-	check_sblock (b);
+      struct Lisp_String *s = b->data[0].string;
+      if (s)
+	STRING_BYTES (s);
     }
-  else if (current_sblock)
-    check_sblock (current_sblock);
+  for (struct sblock *b = oldest_sblock; b; b = b->next)
+    check_sblock (b);
 }
 
 /* Walk through the string free list looking for bogus next pointers.
@@ -1087,7 +1075,10 @@ allocate_string (void)
     {
       if (check_string_bytes_count > (INT_MAX >> 1))
 	check_string_bytes_count = 0; // avoid overflow
-      check_string_bytes (++check_string_bytes_count % 200 == 0);
+      if (++check_string_bytes_count % 200 == 0)
+	check_all_sblocks ();
+      else if (current_sblock)
+	check_sblock (current_sblock);
     }
 #endif
 
@@ -1366,7 +1357,7 @@ sweep_sdata (void)
 
 	      /* Check that the string size recorded in the string is the
 		 same as the one recorded in the sdata structure.  */
-	      eassume (! s || string_bytes (s) == from->nbytes);
+	      eassume (! s || STRING_BYTES (s) == from->nbytes);
 
 	      /* Compute NEXT_FROM now before FROM can mutate.  */
 	      next_from = (sdata *) ((char *) from + step);
@@ -5642,7 +5633,15 @@ gc_sweep (void)
 {
   mgc_flip_space ();
   sweep_strings ();
-  check_string_bytes (! noninteractive);
+#ifdef ENABLE_CHECKING
+  if (noninteractive)
+    {
+      if (current_sblock)
+	check_sblock (current_sblock);
+    }
+  else
+    check_all_sblocks ();
+#endif
   sweep_void ((void **) &cons_free_list, cons_block_index,
 	      (void **) &cons_block, Lisp_Cons, BLOCK_NCONS,
 	      offsetof (struct cons_block, conses),
@@ -5664,7 +5663,15 @@ gc_sweep (void)
   sweep_buffers ();
   sweep_vectors ();
   pdumper_clear_marks ();
-  check_string_bytes (! noninteractive);
+#ifdef ENABLE_CHECKING
+  if (noninteractive)
+    {
+      if (current_sblock)
+	check_sblock (current_sblock);
+    }
+  else
+    check_all_sblocks ();
+#endif
 }
 
 DEFUN ("memory-full", Fmemory_full, Smemory_full, 0, 0, 0,

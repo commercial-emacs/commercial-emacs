@@ -1415,14 +1415,16 @@ SCHARS (Lisp_Object string)
   return nchars;
 }
 
-extern ptrdiff_t string_bytes (struct Lisp_String *);
+#ifdef ENABLE_CHECKING
+extern void check_string_bytes (struct Lisp_String *s, ptrdiff_t nbytes);
+#endif
+
 INLINE ptrdiff_t
 STRING_BYTES (struct Lisp_String *s)
 {
-#ifdef ENABLE_CHECKING
-  ptrdiff_t nbytes = string_bytes (s);
-#else
   ptrdiff_t nbytes = s->u.s.size_byte < 0 ? s->u.s.size : s->u.s.size_byte;
+#ifdef ENABLE_CHECKING
+  check_string_bytes (s, nbytes);
 #endif
   eassume (0 <= nbytes);
   return nbytes;
