@@ -60,9 +60,8 @@
 
 (ert-deftest cl-print-tests-ellipsis-string ()
   "Ellipsis expansion works in strings."
-  (let* ((print-length 4)
-         (cl-print-string-length print-length)
-         (print-level 3))
+  (let ((print-length 4)
+        (print-level 3))
     (cl-print-tests-check-ellipsis-expansion
      "abcdefg" "\"abcd...\"" "efg")
     (cl-print-tests-check-ellipsis-expansion
@@ -164,5 +163,6 @@
       (let ((rep (cl-prin1-to-string thing)))
         (should (string= rep (cl-print-to-string-with-limit #'cl-prin1 thing 0)))
         (should (string= rep (cl-print-to-string-with-limit #'cl-prin1 thing nil)))))))
+
 
 ;;; cl-print-tests.el ends here.
