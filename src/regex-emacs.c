@@ -5194,6 +5194,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
   if (best_regs_set)
     goto restore_best_regs;
 
+ endof_re_match:
   unbind_to (count, Qnil);
   SAFE_FREE ();
 
