@@ -5871,7 +5871,7 @@ init_runtime (void)
   cons_block_index = BLOCK_NCONS;
   symbol_block_index = BLOCK_NSYMBOLS;
   most_recent_free_slot = VBLOCK_NFREE_LISTS;
-  vector_free_lists = xmalloc (VBLOCK_NFREE_LISTS * sizeof (struct Lisp_Vector *));
+  vector_free_lists = xzalloc (VBLOCK_NFREE_LISTS * sizeof (struct Lisp_Vector *));
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);
   mgc_initialize_spaces ();

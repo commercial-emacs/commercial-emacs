@@ -777,7 +777,7 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   new_thread->m_symbol_block_index = BLOCK_NSYMBOLS;
 
   new_thread->m_most_recent_free_slot = VBLOCK_NFREE_LISTS;
-  new_thread->m_vector_free_lists = xmalloc (VBLOCK_NFREE_LISTS *
+  new_thread->m_vector_free_lists = xzalloc (VBLOCK_NFREE_LISTS *
 					     sizeof (struct Lisp_Vector *));
   new_thread->m_mem_root = mem_nil;
 
