@@ -45,7 +45,7 @@ jobs:
     - name: brew-haha
       if: startsWith(runner.os, 'macOS')
       run: |
-        brew install libxml2 texinfo pkg-config
+        brew install autoconf gnutls libxml2 texinfo pkg-config gdb
         # github doc (unintelligible as of 20220428) suggests ">>" prepends to PATH.
         echo "`brew --prefix texinfo`/bin" >> $GITHUB_PATH
         echo "PKG_CONFIG_PATH=`brew --prefix libxml2`/lib/pkgconfig:$HOME/.local/lib/pkgconfig" >> $GITHUB_ENV
