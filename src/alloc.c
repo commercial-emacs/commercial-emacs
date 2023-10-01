@@ -58,16 +58,52 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "alloc.h"
 #include "mem_node.h"
 
-/* At least for glibc 2.26, malloc adds "sizeof size_t" for internal
-   overhead, then rounds up to a multiple of MALLOC_ALIGNMENT.  Eggert
-   claims a perf fillip if the final sum is a power of two.  */
-
-#define MALLOC_SIZE_NEAR(n) \
-  (ROUNDUP (max (n, sizeof (size_t)), MALLOC_ALIGNMENT) - sizeof (size_t))
-#ifdef __i386
-enum { MALLOC_ALIGNMENT = 16 };
+#ifdef HAVE_GCC_TLS
+# define mem_root (current_thread->m_mem_root)
+# define interval_blocks (current_thread->m_interval_blocks)
+# define interval_block_index (current_thread->m_interval_block_index)
+# define interval_free_list (current_thread->m_interval_free_list)
+# define oldest_sblock (current_thread->m_oldest_sblock)
+# define current_sblock (current_thread->m_current_sblock)
+# define large_sblocks (current_thread->m_large_sblocks)
+# define string_blocks (current_thread->m_string_blocks)
+# define string_free_list (current_thread->m_string_free_list)
+# define float_blocks (current_thread->m_float_blocks)
+# define float_block_index (current_thread->m_float_block_index)
+# define float_free_list (current_thread->m_float_free_list)
+# define cons_blocks (current_thread->m_cons_blocks)
+# define cons_block_index (current_thread->m_cons_block_index)
+# define cons_free_list (current_thread->m_cons_free_list)
+# define vector_blocks (current_thread->m_vector_blocks)
+# define vector_free_lists (current_thread->m_vector_free_lists)
+# define most_recent_free_slot (current_thread->m_most_recent_free_slot)
+# define large_vectors (current_thread->m_large_vectors)
+# define symbol_blocks (current_thread->m_symbol_blocks)
+# define symbol_block_index (current_thread->m_symbol_block_index)
+# define symbol_free_list (current_thread->m_symbol_free_list)
 #else
-enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
+# define mem_root (main_thread->m_mem_root)
+# define interval_blocks (main_thread->m_interval_blocks)
+# define interval_block_index (main_thread->m_interval_block_index)
+# define interval_free_list (main_thread->m_interval_free_list)
+# define oldest_sblock (main_thread->m_oldest_sblock)
+# define current_sblock (main_thread->m_current_sblock)
+# define large_sblocks (main_thread->m_large_sblocks)
+# define string_blocks (main_thread->m_string_blocks)
+# define string_free_list (main_thread->m_string_free_list)
+# define float_blocks (main_thread->m_float_blocks)
+# define float_block_index (main_thread->m_float_block_index)
+# define float_free_list (main_thread->m_float_free_list)
+# define cons_blocks (main_thread->m_cons_blocks)
+# define cons_block_index (main_thread->m_cons_block_index)
+# define cons_free_list (main_thread->m_cons_free_list)
+# define vector_blocks (main_thread->m_vector_blocks)
+# define vector_free_lists (main_thread->m_vector_free_lists)
+# define most_recent_free_slot (main_thread->m_most_recent_free_slot)
+# define large_vectors (main_thread->m_large_vectors)
+# define symbol_blocks (main_thread->m_symbol_blocks)
+# define symbol_block_index (main_thread->m_symbol_block_index)
+# define symbol_free_list (main_thread->m_symbol_free_list)
 #endif
 
 bool gc_inhibited;
@@ -450,56 +486,6 @@ lisp_free (void *block)
     }
 }
 
-/* The allocator malloc's blocks of BLOCK_ALIGN bytes.
-
-   Structs for blocks are statically defined, so calculate (at compile-time)
-   how many of each type will fit into its respective block.
-
-   For simpler blocks consisting only of an object array and a next pointer,
-   the numerator need only subtract off the size of the next pointer.
-
-   For blocks with an additional gcmarkbits array, say float_block, we
-   solve for y in the inequality:
-
-     BLOCK_ALIGN > y * sizeof (Lisp_Float) + sizeof (bits_word) * (y /
-     BITS_PER_BITS_WORD + 1) + sizeof (struct float_block *)
-*/
-
-enum
-{
-  /* Arbitrarily set in 2012 in commit 0dd6d66.  */
-  GC_DEFAULT_THRESHOLD = (1 << 17) * word_size,
-
-  BLOCK_NBITS = 15,
-  BLOCK_ALIGN = 1 << BLOCK_NBITS,
-  BLOCK_NBYTES = BLOCK_ALIGN - sizeof (uintptr_t), // subtract next ptr
-  BLOCK_NINTERVALS = (BLOCK_NBYTES) / sizeof (struct interval),
-  BLOCK_NSTRINGS = (BLOCK_NBYTES) / sizeof (struct Lisp_String),
-  BLOCK_NSYMBOLS = (BLOCK_NBYTES) / sizeof (struct Lisp_Symbol),
-  BLOCK_NFLOATS = ((BITS_PER_BITS_WORD / sizeof (bits_word))
-		   * (BLOCK_NBYTES - sizeof (bits_word))
-		   / ((BITS_PER_BITS_WORD / sizeof (bits_word))
-		      * sizeof (struct Lisp_Float)
-		      + 1)),
-  BLOCK_NCONS = ((BITS_PER_BITS_WORD / sizeof (bits_word))
-		 * (BLOCK_NBYTES - sizeof (bits_word))
-		 / ((BITS_PER_BITS_WORD / sizeof (bits_word))
-		    * sizeof (struct Lisp_Cons)
-		    + 1)),
-
-  /* Size `struct vector_block` */
-  VBLOCK_ALIGN = (1 << PSEUDOVECTOR_SIZE_BITS),
-  VBLOCK_NBYTES = VBLOCK_ALIGN - sizeof (uintptr_t), // subtract next ptr
-  LISP_VECTOR_MIN = header_size + sizeof (Lisp_Object), // vector of one
-  LARGE_VECTOR_THRESH = (VBLOCK_NBYTES >> 1) - word_size,
-
-  /* See free_slot() for sizing rationale.  */
-  VBLOCK_NFREE_LISTS = 1 + (LARGE_VECTOR_THRESH - LISP_VECTOR_MIN) / word_size,
-
-  SBLOCK_NBITS = 13,
-  SBLOCK_NBYTES = MALLOC_SIZE_NEAR(1 << SBLOCK_NBITS),
-  LARGE_STRING_THRESH = (SBLOCK_NBYTES >> 3),
-};
 // should someone decide to muck with VBLOCK_ALIGN...
 verify (VBLOCK_ALIGN % LISP_ALIGNMENT == 0);
 verify (VBLOCK_ALIGN <= (1 << PSEUDOVECTOR_SIZE_BITS));
@@ -762,10 +748,6 @@ struct interval_block
   struct interval_block *next;
 };
 
-static struct interval_block *interval_block;
-static int interval_block_index = BLOCK_NINTERVALS;
-static INTERVAL interval_free_list;
-
 #if GC_ASAN_POISON_OBJECTS
 # define ASAN_POISON_INTERVAL_BLOCK(b)         \
   __asan_poison_memory_region ((b)->intervals, \
@@ -804,12 +786,12 @@ allocate_interval (void)
 	  struct interval_block *newi
 	    = lisp_malloc (sizeof *newi, false, MEM_TYPE_NON_LISP);
 
-	  newi->next = interval_block;
+	  newi->next = interval_blocks;
 	  ASAN_POISON_INTERVAL_BLOCK (newi);
-	  interval_block = newi;
+	  interval_blocks = newi;
 	  interval_block_index = 0;
 	}
-      val = &interval_block->intervals[interval_block_index++];
+      val = &interval_blocks->intervals[interval_block_index++];
       ASAN_UNPOISON_INTERVAL (val);
     }
 
@@ -884,11 +866,6 @@ struct string_block
    current_sblock.  We always allocate from current_sblock.  */
 
 #define NEXT_FREE_LISP_STRING(S) ((S)->u.next)
-
-PER_THREAD_STATIC struct sblock *oldest_sblock, *current_sblock;
-PER_THREAD_STATIC struct sblock *large_sblocks;
-PER_THREAD_STATIC struct string_block *string_blocks;
-PER_THREAD_STATIC struct Lisp_String *string_free_list;
 
 #ifdef ENABLE_CHECKING
 # define GC_STRING_OVERRUN_COOKIE_SIZE ROUNDUP (4, alignof (sdata))
@@ -1695,12 +1672,6 @@ struct float_block
 # define ASAN_UNPOISON_FLOAT(p) ((void) 0)
 #endif
 
-/* Current float_block.  */
-
-PER_THREAD_STATIC struct float_block *float_block;
-PER_THREAD_STATIC int float_block_index = BLOCK_NFLOATS;
-PER_THREAD_STATIC struct Lisp_Float *float_free_list;
-
 Lisp_Object
 make_float (double float_value)
 {
@@ -1718,14 +1689,14 @@ make_float (double float_value)
 	{
 	  struct float_block *new
 	    = lisp_align_malloc (sizeof *new, MEM_TYPE_FLOAT);
-	  new->next = float_block;
+	  new->next = float_blocks;
 	  memset (new->gcmarkbits, 0, sizeof new->gcmarkbits);
 	  ASAN_POISON_FLOAT_BLOCK (new);
-	  float_block = new;
+	  float_blocks = new;
 	  float_block_index = 0;
 	}
-      ASAN_UNPOISON_FLOAT (&float_block->floats[float_block_index]);
-      XSETFLOAT (val, &float_block->floats[float_block_index]);
+      ASAN_UNPOISON_FLOAT (&float_blocks->floats[float_block_index]);
+      XSETFLOAT (val, &float_blocks->floats[float_block_index]);
       float_block_index++;
     }
 
@@ -1759,10 +1730,6 @@ struct cons_block
 
 #define XUNMARK_CONS(fptr) \
   UNSETMARKBIT (CONS_BLOCK (fptr), CONS_INDEX ((fptr)))
-
-PER_THREAD_STATIC struct cons_block *cons_block;
-PER_THREAD_STATIC int cons_block_index = BLOCK_NCONS;
-PER_THREAD_STATIC struct Lisp_Cons *cons_free_list;
 
 #if GC_ASAN_POISON_OBJECTS
 # define ASAN_POISON_CONS_BLOCK(b) \
@@ -1810,12 +1777,12 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
 	    = lisp_align_malloc (sizeof *new, MEM_TYPE_CONS);
 	  memset (new->gcmarkbits, 0, sizeof new->gcmarkbits);
 	  ASAN_POISON_CONS_BLOCK (new);
-	  new->next = cons_block;
-	  cons_block = new;
+	  new->next = cons_blocks;
+	  cons_blocks = new;
 	  cons_block_index = 0;
 	}
-      ASAN_UNPOISON_CONS (&cons_block->conses[cons_block_index]);
-      XSETCONS (val, &cons_block->conses[cons_block_index]);
+      ASAN_UNPOISON_CONS (&cons_blocks->conses[cons_block_index]);
+      XSETCONS (val, &cons_blocks->conses[cons_block_index]);
       cons_block_index++;
     }
 
@@ -2019,23 +1986,6 @@ struct vector_block
   char data[VBLOCK_NBYTES];
   struct vector_block *next;
 };
-
-/* Chain of vector blocks.  */
-
-PER_THREAD_STATIC struct vector_block *vector_blocks;
-
-/* See free_slot() for rationale.  */
-
-PER_THREAD_STATIC struct Lisp_Vector *vector_free_lists[VBLOCK_NFREE_LISTS];
-
-/* The last free list where we found large enough vector.  Trade
-   fragmentation risk for speed by commencing here on subsequenct
-   searches.  */
-PER_THREAD_STATIC ptrdiff_t most_recent_free_slot = VBLOCK_NFREE_LISTS;
-
-/* Singly-linked list of large vectors.  */
-
-PER_THREAD_STATIC struct large_vector *large_vectors;
 
 /* The only vector with 0 slots, allocated from pure space.  */
 
@@ -2271,7 +2221,7 @@ free_by_pvtype (struct Lisp_Vector *vector)
 static void
 sweep_vectors (void)
 {
-  memset (vector_free_lists, 0, sizeof (vector_free_lists));
+  memset (vector_free_lists, 0, VBLOCK_NFREE_LISTS * sizeof (struct Lisp_Vector *));
   most_recent_free_slot = VBLOCK_NFREE_LISTS;
 
   gcstat.total_vectors =
@@ -2650,20 +2600,6 @@ struct symbol_block
 # define ASAN_UNPOISON_SYMBOL(sym) ((void) 0)
 #endif
 
-/* Current symbol block and index of first unused Lisp_Symbol
-   structure in it.  */
-
-PER_THREAD_STATIC struct symbol_block *symbol_block;
-PER_THREAD_STATIC int symbol_block_index = BLOCK_NSYMBOLS;
-/* Pointer to the first symbol_block that contains pinned symbols.
-   Tests for 24.4 showed that at dump-time, Emacs contains about 15K symbols,
-   10K of which are pinned (and all but 250 of them are interned in obarray),
-   whereas a "typical session" has in the order of 30K symbols.
-   symbol_block_pinned lets mark_pinned_symbols scan only 15K symbols rather
-   than 30K to find the 10K symbols we need to mark.  */
-PER_THREAD_STATIC struct symbol_block *symbol_block_pinned;
-PER_THREAD_STATIC struct Lisp_Symbol *symbol_free_list;
-
 static void
 set_symbol_name (Lisp_Object sym, Lisp_Object name)
 {
@@ -2708,13 +2644,13 @@ DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
 	  struct symbol_block *new
 	    = lisp_malloc (sizeof *new, false, MEM_TYPE_SYMBOL);
 	  ASAN_POISON_SYMBOL_BLOCK (new);
-	  new->next = symbol_block;
-	  symbol_block = new;
+	  new->next = symbol_blocks;
+	  symbol_blocks = new;
 	  symbol_block_index = 0;
 	}
 
-      ASAN_UNPOISON_SYMBOL (&symbol_block->symbols[symbol_block_index]);
-      XSETSYMBOL (val, &symbol_block->symbols[symbol_block_index]);
+      ASAN_UNPOISON_SYMBOL (&symbol_blocks->symbols[symbol_block_index]);
+      XSETSYMBOL (val, &symbol_blocks->symbols[symbol_block_index]);
       symbol_block_index++;
     }
 
@@ -3169,7 +3105,7 @@ live_cons_holding (struct mem_node *m, void *p)
      one of the unused cells in the current cons block,
      and not be on the free list.  */
   if (0 <= distance && distance < sizeof b->conses
-      && (b != cons_block
+      && (b != cons_blocks
 	  || distance / sizeof b->conses[0] < cons_block_index))
     {
       ptrdiff_t off = distance % sizeof b->conses[0];
@@ -3215,7 +3151,7 @@ live_symbol_holding (struct mem_node *m, void *p)
      one of the unused cells in the current symbol block,
      and not be on the free list.  */
   if (0 <= distance && distance < sizeof b->symbols
-      && (b != symbol_block
+      && (b != symbol_blocks
 	  || distance / sizeof b->symbols[0] < symbol_block_index))
     {
       ptrdiff_t off = distance % sizeof b->symbols[0];
@@ -3273,7 +3209,7 @@ live_float_holding (struct mem_node *m, void *p)
     {
       int off = distance % sizeof b->floats[0];
       if ((off == Lisp_Float || off == 0)
-	  && (b != float_block
+	  && (b != float_blocks
 	      || distance / sizeof b->floats[0] < float_block_index))
 	{
 	  struct Lisp_Float *f = (struct Lisp_Float *) (cp - off);
@@ -3897,7 +3833,6 @@ pure_cons (Lisp_Object car, Lisp_Object cdr)
   return new;
 }
 
-
 /* Value is a float object with value NUM allocated from pure space.  */
 
 static Lisp_Object
@@ -4001,12 +3936,13 @@ Does not copy symbols.  Copies strings without text properties.  */)
     return purecopy (obj);
 }
 
-/* Pinned objects are marked before every GC cycle.  */
 static struct pinned_object
 {
   Lisp_Object object;
   struct pinned_object *next;
 } *pinned_objects;
+
+static struct symbol_block *first_block_pinned;
 
 static Lisp_Object
 purecopy (Lisp_Object obj)
@@ -4076,10 +4012,12 @@ purecopy (Lisp_Object obj)
   else if (SYMBOLP (obj))
     {
       if (! XSYMBOL (obj)->u.s.pinned && ! c_symbol_p (XSYMBOL (obj)))
-	{ /* We can't purify them, but they appear in many pure objects.
-	     Mark them as `pinned' so we know to mark them at every GC cycle.  */
+	{
+	  /* As of 2014, recording first block containing pinned
+	     symbols in FIRST_BLOCK_PINNED saves us scanning 15K
+	     symbols out of typically 30K.  */
 	  XSYMBOL (obj)->u.s.pinned = true;
-	  symbol_block_pinned = symbol_block;
+	  first_block_pinned = symbol_blocks;
 	}
       /* Don't hash-cons it.  */
       return obj;
@@ -4262,25 +4200,26 @@ compact_undo_list (Lisp_Object list)
 static void
 mark_pinned_objects (void)
 {
-  for (struct pinned_object *pobj = pinned_objects; pobj; pobj = pobj->next)
+  for (struct pinned_object *pobj = pinned_objects;
+       pobj != NULL;
+       pobj = pobj->next)
     mark_object (&pobj->object);
 }
 
 static void
 mark_pinned_symbols (void)
 {
-  struct symbol_block *sblk;
-  int lim = (symbol_block_pinned == symbol_block
-	     ? symbol_block_index : BLOCK_NSYMBOLS);
-
-  for (sblk = symbol_block_pinned; sblk; sblk = sblk->next)
+  for (struct symbol_block *sblk = first_block_pinned;
+       sblk != NULL;
+       sblk = sblk->next)
     {
-      struct Lisp_Symbol *sym = sblk->symbols, *end = sym + lim;
-      for (; sym < end; ++sym)
+      for (struct Lisp_Symbol *sym = sblk->symbols,
+	     *end = sym + (first_block_pinned == symbol_blocks
+			   ? symbol_block_index : BLOCK_NSYMBOLS);
+	   sym < end;
+	   ++sym)
 	if (sym->u.s.pinned)
 	  mark_automatic_object (make_lisp_ptr (sym, Lisp_Symbol));
-
-      lim = BLOCK_NSYMBOLS;
     }
 }
 
@@ -4306,8 +4245,7 @@ mark_most_objects (void)
     mark_object ((Lisp_Object *)staticvec[i]);
 }
 
-/* List of weak hash tables we found during marking the Lisp heap.
-   NULL on entry to garbage_collect and after it returns.  */
+/* Cache for marking Lisp heap.  NULL on gc entry and exit.  */
 PER_THREAD_STATIC struct Lisp_Hash_Table *weak_hash_tables;
 
 static void
@@ -5467,7 +5405,7 @@ sweep_void (void **free_list,
 static void
 sweep_intervals (void)
 {
-  struct interval_block **iprev = &interval_block;
+  struct interval_block **iprev = &interval_blocks;
   size_t cum_free = 0, cum_used = 0;
 
   interval_free_list = 0;
@@ -5480,7 +5418,7 @@ sweep_intervals (void)
 	   /* For first block, process up to prevailing
 	      INTERVAL_BLOCK_INDEX.  Subsequent blocks should contain
 	      BLOCK_NINTERVALS items. */
-	   i < (iblk == interval_block
+	   i < (iblk == interval_blocks
 		? interval_block_index
 		: BLOCK_NINTERVALS);
 	   i++)
@@ -5523,7 +5461,7 @@ static void
 sweep_symbols (void)
 {
   struct symbol_block *sblk;
-  struct symbol_block **sprev = &symbol_block;
+  struct symbol_block **sprev = &symbol_blocks;
   size_t cum_free = 0, cum_used = ARRAYELTS (lispsym);
 
   symbol_free_list = NULL;
@@ -5531,7 +5469,7 @@ sweep_symbols (void)
   for (int i = 0; i < ARRAYELTS (lispsym); i++)
     lispsym[i].u.s.gcmarkbit = false;
 
-  for (sblk = symbol_block; sblk; sblk = *sprev)
+  for (sblk = symbol_blocks; sblk; sblk = *sprev)
     {
       ASAN_UNPOISON_SYMBOL_BLOCK (sblk);
       int blk_free = 0;
@@ -5541,7 +5479,7 @@ sweep_symbols (void)
 	 SYMBOL_BLOCK_INDEX.  Subsequent iterations traverse whole
 	 blocks of BLOCK_NSYMBOLS. */
       struct Lisp_Symbol *end
-	= sym + (sblk == symbol_block ? symbol_block_index : BLOCK_NSYMBOLS);
+	= sym + (sblk == symbol_blocks ? symbol_block_index : BLOCK_NSYMBOLS);
 
       for (; sym < end; ++sym)
         {
@@ -5635,7 +5573,7 @@ gc_sweep (void)
     check_all_sblocks ();
 #endif
   sweep_void ((void **) &cons_free_list, cons_block_index,
-	      (void **) &cons_block, Lisp_Cons, BLOCK_NCONS,
+	      (void **) &cons_blocks, Lisp_Cons, BLOCK_NCONS,
 	      offsetof (struct cons_block, conses),
 	      offsetof (struct Lisp_Cons, u.s.u.chain),
 	      offsetof (struct cons_block, next),
@@ -5643,7 +5581,7 @@ gc_sweep (void)
 	      &gcstat.total_conses,
 	      &gcstat.total_free_conses);
   sweep_void ((void **) &float_free_list, float_block_index,
-	      (void **) &float_block, Lisp_Float, BLOCK_NFLOATS,
+	      (void **) &float_blocks, Lisp_Float, BLOCK_NFLOATS,
 	      offsetof (struct float_block, floats),
 	      offsetof (struct Lisp_Float, u.chain),
 	      offsetof (struct float_block, next),
@@ -5832,12 +5770,12 @@ which_symbols (Lisp_Object obj, EMACS_INT find_max)
 	     }
 	 }
 
-       for (sblk = symbol_block; sblk; sblk = sblk->next)
+       for (sblk = symbol_blocks; sblk; sblk = sblk->next)
 	 {
 	   struct Lisp_Symbol *asym = sblk->symbols;
 	   for (int bn = 0; bn < BLOCK_NSYMBOLS; bn++, asym++)
 	     {
-	       if (sblk == symbol_block && bn >= symbol_block_index)
+	       if (sblk == symbol_blocks && bn >= symbol_block_index)
 		 break;
 
 	       Lisp_Object sym = make_lisp_ptr (asym, Lisp_Symbol);
@@ -5928,6 +5866,12 @@ init_runtime (void)
   mem_nil->color = MEM_BLACK;
   mem_nil->start = mem_nil->end = NULL;
   mem_root = mem_nil;
+  interval_block_index = BLOCK_NINTERVALS;
+  float_block_index = BLOCK_NFLOATS;
+  cons_block_index = BLOCK_NCONS;
+  symbol_block_index = BLOCK_NSYMBOLS;
+  most_recent_free_slot = VBLOCK_NFREE_LISTS;
+  vector_free_lists = xmalloc (VBLOCK_NFREE_LISTS * sizeof (struct Lisp_Vector *));
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);
   mgc_initialize_spaces ();

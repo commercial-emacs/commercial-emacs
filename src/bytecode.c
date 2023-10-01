@@ -395,12 +395,6 @@ init_bc_thread (struct bc_thread_state *bc)
 }
 
 void
-free_bc_thread (struct bc_thread_state *bc)
-{
-  xfree (bc->stack);
-}
-
-void
 mark_bytecode (struct bc_thread_state *bc)
 {
   Lisp_Object *top = NULL;

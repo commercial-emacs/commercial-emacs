@@ -4,9 +4,9 @@
 
 enum
   {
-    BLOCK_NBITS = 13,
-    BLOCK_NBYTES = (1 << BLOCK_NBITS),
-    BLOCK_NWORDS = (BLOCK_NBYTES / word_size),
+    MGC_BLOCK_NBITS = 13,
+    MGC_BLOCK_NBYTES = (1 << MGC_BLOCK_NBITS),
+    MGC_BLOCK_NWORDS = (MGC_BLOCK_NBYTES / word_size),
   };
 
 typedef struct block_typemap
@@ -64,7 +64,7 @@ realloc_semispace (mgc_semispace *space)
 			       (1 + space->nblocks) * sizeof (block_typemap));
   if (resized_addrs
       && resized_typemaps
-      && (new_addr = xmalloc (BLOCK_NBYTES))) // laligned, chill.
+      && (new_addr = xmalloc (MGC_BLOCK_NBYTES))) // laligned, chill.
     {
       space->block_typemaps = resized_typemaps;
       memset (&space->block_typemaps[space->nblocks], 0, sizeof (block_typemap));
@@ -82,7 +82,7 @@ size_t block_of_xpntr (const void *xpntr)
   for (size_t i = 0; i < space_in_use->nblocks; ++i)
     {
       uintptr_t start = (uintptr_t) space_in_use->block_addrs[i], end;
-      INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
+      INT_ADD_WRAPV (start, MGC_BLOCK_NBYTES, &end);
       if (start <= xaddr && xaddr < end)
 	return i;
     }
@@ -96,7 +96,7 @@ xpntr_at (const mgc_semispace *space, size_t block, ptrdiff_t word, void **xpntr
   size_t mem_w, modulus;
   block_typemap *map = &space->block_typemaps[block];
 
-  eassert (word < BLOCK_NWORDS - 1); // -1 for term_block_magic
+  eassert (word < MGC_BLOCK_NWORDS - 1); // -1 for term_block_magic
 
   if (bitset_test (map->bitsets[MEM_TYPE_CONS], (bitset_bindex) word))
     {
@@ -274,7 +274,7 @@ next_block (mgc_semispace *space)
 	  if (*ptr)
 	    bitset_zero (*ptr);
 	  else
-	    *ptr = bitset_create (BLOCK_NWORDS, BITSET_FIXED);
+	    *ptr = bitset_create (MGC_BLOCK_NWORDS, BITSET_FIXED);
 	}
       return space->alloc_ptr;
     }
@@ -304,7 +304,7 @@ bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Space_Type xpntr_type)
 
   if (! retval
       /* -1 so we've room for term_block_magic.  */
-      || space->block_words_used + nwords > (BLOCK_NWORDS - 1))
+      || space->block_words_used + nwords > (MGC_BLOCK_NWORDS - 1))
     retval = next_block (space);
 
   if (retval)
@@ -701,7 +701,7 @@ bool wrong_xpntr_p (const void *xpntr)
   for (size_t i = 0; i < wrong->nblocks; ++i)
     {
       uintptr_t start = (uintptr_t) wrong->block_addrs[i], end;
-      INT_ADD_WRAPV (start, BLOCK_NBYTES, &end);
+      INT_ADD_WRAPV (start, MGC_BLOCK_NBYTES, &end);
       if (start <= xaddr && xaddr < end)
 	return true;
     }

@@ -621,6 +621,46 @@ enum symbol_trapped_write
   SYMBOL_TRAPPED_WRITE     /* trap the write, call watcher functions */
 };
 
+struct interval
+{
+  /* The first group of entries deal with the tree structure.  */
+  ptrdiff_t total_length;       /* Length of myself and both children.  */
+  ptrdiff_t position;	        /* Cache of interval's character position.  */
+                                /* This field is valid in the final
+                                   target interval returned by
+                                   find_interval, next_interval,
+                                   previous_interval and
+                                   update_interval.  It cannot be
+                                   depended upon in any intermediate
+                                   intervals traversed by these
+                                   functions, or any other
+                                   interval. */
+  struct interval *left;	/* Intervals which precede me.  */
+  struct interval *right;	/* Intervals which succeed me.  */
+
+  /* Parent in the tree, or the Lisp_Object containing this interval tree.  */
+  union
+  {
+    struct interval *interval;
+    Lisp_Object obj;
+  } up;
+  bool_bf up_obj : 1;
+
+  bool_bf gcmarkbit : 1;
+
+  /* The remaining components are `properties' of the interval.
+     The first four are duplicates for things which can be on the list,
+     for purposes of speed.  */
+
+  bool_bf write_protect : 1;	    /* True means can't modify.  */
+  bool_bf visible : 1;		    /* False means don't display.  */
+  bool_bf front_sticky : 1;	    /* True means text inserted just
+				       before this interval goes into it.  */
+  bool_bf rear_sticky : 1;	    /* Likewise for just after it.  */
+  Lisp_Object plist;		    /* Other properties.  */
+} GCALIGNED_STRUCT;
+verify (GCALIGNED (struct interval));
+
 struct Lisp_Symbol
 {
   union
@@ -1463,10 +1503,10 @@ string_immovable_p (Lisp_Object str)
 /* A regular vector is just a header plus an array of Lisp_Objects.  */
 
 struct Lisp_Vector
-  {
-    union vectorlike_header header;
-    Lisp_Object contents[FLEXIBLE_ARRAY_MEMBER];
-  } GCALIGNED_STRUCT;
+{
+  union vectorlike_header header;
+  Lisp_Object contents[FLEXIBLE_ARRAY_MEMBER];
+} GCALIGNED_STRUCT;
 
 INLINE bool
 (VECTORLIKEP) (Lisp_Object x)
@@ -1957,8 +1997,6 @@ typedef jmp_buf sys_jmp_buf;
 # define sys_setjmp(j) setjmp (j)
 # define sys_longjmp(j, v) longjmp (j, v)
 #endif
-
-#include "thread.h"
 
 /***********************************************************************
 			       Symbols
@@ -2960,6 +2998,71 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
     defvar_kboard (&ko_fwd, lname);				\
   } while (false)
 
+#ifdef __i386
+enum { MALLOC_ALIGNMENT = 16 };
+#else
+enum { MALLOC_ALIGNMENT = max (2 * sizeof (size_t), alignof (long double)) };
+#endif
+
+/* At least for glibc 2.26, malloc adds "sizeof size_t" for internal
+   overhead, then rounds up to a multiple of MALLOC_ALIGNMENT.  Eggert
+   claims a perf fillip if the final sum is a power of two.  */
+
+#define MALLOC_SIZE_NEAR(n) \
+  (ROUNDUP (max (n, sizeof (size_t)), MALLOC_ALIGNMENT) - sizeof (size_t))
+
+/* The allocator malloc's blocks of BLOCK_ALIGN bytes.
+
+   Structs for blocks are statically defined, so calculate (at compile-time)
+   how many of each type will fit into its respective block.
+
+   For simpler blocks consisting only of an object array and a next pointer,
+   the numerator need only subtract off the size of the next pointer.
+
+   For blocks with an additional gcmarkbits array, say float_block, we
+   solve for y in the inequality:
+
+     BLOCK_ALIGN > y * sizeof (Lisp_Float) + sizeof (bits_word) * (y /
+     BITS_PER_BITS_WORD + 1) + sizeof (struct float_block *)
+*/
+
+enum
+{
+  /* Arbitrarily set in 2012 in commit 0dd6d66.  */
+  GC_DEFAULT_THRESHOLD = (1 << 17) * word_size,
+
+  BLOCK_NBITS = 15,
+  BLOCK_ALIGN = 1 << BLOCK_NBITS,
+  BLOCK_NBYTES = BLOCK_ALIGN - sizeof (uintptr_t), // subtract next ptr
+  BLOCK_NINTERVALS = (BLOCK_NBYTES) / sizeof (struct interval),
+  BLOCK_NSTRINGS = (BLOCK_NBYTES) / sizeof (struct Lisp_String),
+  BLOCK_NSYMBOLS = (BLOCK_NBYTES) / sizeof (struct Lisp_Symbol),
+  BLOCK_NFLOATS = ((BITS_PER_BITS_WORD / sizeof (bits_word))
+		   * (BLOCK_NBYTES - sizeof (bits_word))
+		   / ((BITS_PER_BITS_WORD / sizeof (bits_word))
+		      * sizeof (struct Lisp_Float)
+		      + 1)),
+  BLOCK_NCONS = ((BITS_PER_BITS_WORD / sizeof (bits_word))
+		 * (BLOCK_NBYTES - sizeof (bits_word))
+		 / ((BITS_PER_BITS_WORD / sizeof (bits_word))
+		    * sizeof (struct Lisp_Cons)
+		    + 1)),
+
+  /* Size `struct vector_block` */
+  VBLOCK_ALIGN = (1 << PSEUDOVECTOR_SIZE_BITS),
+  VBLOCK_NBYTES = VBLOCK_ALIGN - sizeof (uintptr_t), // subtract next ptr
+  LISP_VECTOR_MIN = header_size + sizeof (Lisp_Object), // vector of one
+  LARGE_VECTOR_THRESH = (VBLOCK_NBYTES >> 1) - word_size,
+
+  /* See free_slot() for sizing rationale.  */
+  VBLOCK_NFREE_LISTS = 1 + (LARGE_VECTOR_THRESH - LISP_VECTOR_MIN) / word_size,
+
+  SBLOCK_NBITS = 13,
+  SBLOCK_NBYTES = MALLOC_SIZE_NEAR(1 << SBLOCK_NBITS),
+  LARGE_STRING_THRESH = (SBLOCK_NBYTES >> 3),
+};
+
+#include "thread.h"
 
 /* Elisp uses multiple stacks:
    - The C stack.
@@ -3301,7 +3404,6 @@ void staticpro (Lisp_Object const *);
 enum { NSTATICS = (1 << 11) };
 extern Lisp_Object const *staticvec[NSTATICS];
 extern int staticidx;
-
 
 /* Forward declarations for prototypes.  */
 struct window;

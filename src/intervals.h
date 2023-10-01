@@ -24,48 +24,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 INLINE_HEADER_BEGIN
 
-/* Basic data type for use of intervals.  */
-
-struct interval
-{
-  /* The first group of entries deal with the tree structure.  */
-  ptrdiff_t total_length;       /* Length of myself and both children.  */
-  ptrdiff_t position;	        /* Cache of interval's character position.  */
-                                /* This field is valid in the final
-                                   target interval returned by
-                                   find_interval, next_interval,
-                                   previous_interval and
-                                   update_interval.  It cannot be
-                                   depended upon in any intermediate
-                                   intervals traversed by these
-                                   functions, or any other
-                                   interval. */
-  struct interval *left;	/* Intervals which precede me.  */
-  struct interval *right;	/* Intervals which succeed me.  */
-
-  /* Parent in the tree, or the Lisp_Object containing this interval tree.  */
-  union
-  {
-    struct interval *interval;
-    Lisp_Object obj;
-  } up;
-  bool_bf up_obj : 1;
-
-  bool_bf gcmarkbit : 1;
-
-  /* The remaining components are `properties' of the interval.
-     The first four are duplicates for things which can be on the list,
-     for purposes of speed.  */
-
-  bool_bf write_protect : 1;	    /* True means can't modify.  */
-  bool_bf visible : 1;		    /* False means don't display.  */
-  bool_bf front_sticky : 1;	    /* True means text inserted just
-				       before this interval goes into it.  */
-  bool_bf rear_sticky : 1;	    /* Likewise for just after it.  */
-  Lisp_Object plist;		    /* Other properties.  */
-} GCALIGNED_STRUCT;
-verify (GCALIGNED (struct interval));
-
 /* These are macros for dealing with the interval tree.  */
 
 /* True if this interval has no right child.  */

@@ -45,9 +45,10 @@ union aligned_thread_state
   struct thread_state s;
   GCALIGNED_UNION_MEMBER
 };
+
 verify (GCALIGNED (union aligned_thread_state));
 
-static union aligned_thread_state main_thread
+static union aligned_thread_state main_state
   = {{
       .header.size = PVECHEADERSIZE (PVEC_THREAD,
 				     PSEUDOVECSIZE (struct thread_state,
@@ -63,13 +64,14 @@ static union aligned_thread_state main_thread
       .event_object = LISPSYM_INITIALLY (Qnil),
     }};
 
-PER_THREAD struct thread_state *current_thread = &main_thread.s;
+PER_THREAD struct thread_state *current_thread = &main_state.s;
+struct thread_state *const main_thread = &main_state.s;
 
 #ifdef HAVE_GCC_TLS
-struct thread_state *prevailing_thread = &main_thread.s;
+struct thread_state *prevailing_thread = &main_state.s;
 #endif
 
-struct thread_state *all_threads = &main_thread.s;
+struct thread_state *all_threads = &main_state.s;
 
 static sys_mutex_t global_lock;
 
@@ -578,7 +580,7 @@ mark_threads (void)
 void
 unmark_main_thread (void)
 {
-  main_thread.s.header.size &= ~ARRAY_MARK_FLAG;
+  main_state.s.header.size &= ~ARRAY_MARK_FLAG;
 }
 
 static void
@@ -672,9 +674,9 @@ run_thread (void *state)
 
   update_processes_for_thread_death (self);
 
-  if (self->m_mem_root != main_thread.s.m_mem_root)
+  if (self->m_mem_root != main_state.s.m_mem_root)
     {
-      mem_merge_into (&main_thread.s.m_mem_root, self->m_mem_root);
+      mem_merge_into (&main_state.s.m_mem_root, self->m_mem_root);
       mem_delete_root (&self->m_mem_root);
       eassume (self->m_mem_root == mem_nil);
     }
@@ -720,22 +722,14 @@ run_thread (void *state)
   return NULL;
 }
 
-static void
-free_search_regs (struct re_registers *regs)
-{
-  if (regs->num_regs != 0)
-    {
-      xfree (regs->start);
-      xfree (regs->end);
-    }
-}
-
 void
 finalize_one_thread (struct thread_state *state)
 {
-  free_search_regs (&state->m_search_regs);
+  xfree (state->m_search_regs.start);
+  xfree (state->m_search_regs.end);
   sys_cond_destroy (&state->thread_condvar);
-  free_bc_thread (&state->bc);
+  xfree (state->bc.stack);
+  xfree (state->m_vector_free_lists);
 }
 
 DEFUN ("make-thread", Fmake_thread, Smake_thread, 1, 3, 0,
@@ -748,7 +742,7 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   Lisp_Object result;
   sys_thread_t thr;
   struct thread_state *new_thread;
-  const ptrdiff_t size = 50;
+  const ptrdiff_t init_pdl = 50;
 
   /* Can't start a thread in temacs.  */
   if (! initialized)
@@ -772,19 +766,22 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   new_thread->m_current_buffer = current_thread->m_current_buffer;
 
   /* 1+ for unreachable dummy entry */
-  union specbinding *pdlvec = xmalloc ((1 + size) * sizeof (union specbinding));
+  union specbinding *pdlvec = xmalloc ((1 + init_pdl) * sizeof (union specbinding));
   new_thread->m_specpdl = pdlvec + 1;  /* Skip the dummy entry.  */
   new_thread->m_specpdl_ptr = new_thread->m_specpdl;
-  new_thread->m_specpdl_end = new_thread->m_specpdl + size;
+  new_thread->m_specpdl_end = new_thread->m_specpdl + init_pdl;
 
-#ifdef HAVE_GCC_TLS
+  new_thread->m_interval_block_index = BLOCK_NINTERVALS;
+  new_thread->m_float_block_index = BLOCK_NFLOATS;
+  new_thread->m_cons_block_index = BLOCK_NCONS;
+  new_thread->m_symbol_block_index = BLOCK_NSYMBOLS;
+
+  new_thread->m_most_recent_free_slot = VBLOCK_NFREE_LISTS;
+  new_thread->m_vector_free_lists = xmalloc (VBLOCK_NFREE_LISTS *
+					     sizeof (struct Lisp_Vector *));
   new_thread->m_mem_root = mem_nil;
-#else
-  new_thread->m_mem_root = main_thread.s.m_mem_root;
-#endif
 
   init_bc_thread (&new_thread->bc);
-
   sys_cond_init (&new_thread->thread_condvar);
 
   new_thread->next_thread = all_threads;
@@ -989,20 +986,20 @@ If CLEANUP is non-nil, remove this error form from history.  */)
 bool
 main_thread_p (const void *ptr)
 {
-  return ptr == &main_thread.s;
+  return ptr == &main_state.s;
 }
 
 void
 init_threads (void)
 {
-  sys_cond_init (&main_thread.s.thread_condvar);
+  sys_cond_init (&main_state.s.thread_condvar);
   sys_mutex_init (&global_lock);
   sys_mutex_lock (&global_lock);
-  eassume (current_thread == &main_thread.s);
-  eassume (main_thread.s.m_mem_root != NULL);
-  main_thread.s.thread_id = sys_thread_self ();
-  main_thread.s.cooperative = true;
-  init_bc_thread (&main_thread.s.bc);
+  eassume (current_thread == &main_state.s);
+  eassume (main_state.s.m_mem_root != NULL);
+  main_state.s.thread_id = sys_thread_self ();
+  main_state.s.cooperative = true;
+  init_bc_thread (&main_state.s.bc);
 }
 
 void
@@ -1042,7 +1039,7 @@ syms_of_threads (void)
   DEFVAR_LISP ("main-thread", Vmain_thread,
     doc: /* The main thread of Emacs.  */);
 #ifdef THREADS_ENABLED
-  XSETTHREAD (Vmain_thread, &main_thread.s);
+  XSETTHREAD (Vmain_thread, &main_state.s);
 #else
   Vmain_thread = Qnil;
 #endif

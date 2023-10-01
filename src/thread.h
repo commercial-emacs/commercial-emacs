@@ -141,7 +141,53 @@ struct thread_state
 
   /* The red-black tree for finding the memory block of a Lisp_Object.  */
   struct mem_node *m_mem_root;
-#define mem_root (current_thread->m_mem_root)
+
+  struct interval_block *m_interval_blocks;
+
+  int m_interval_block_index;
+
+  INTERVAL m_interval_free_list;
+
+  struct sblock *m_oldest_sblock;
+
+  struct sblock *m_current_sblock;
+
+  struct sblock *m_large_sblocks;
+
+  struct string_block *m_string_blocks;
+
+  struct Lisp_String *m_string_free_list;
+
+  struct float_block *m_float_blocks;
+
+  int m_float_block_index;
+
+  struct Lisp_Float *m_float_free_list;
+
+  struct cons_block *m_cons_blocks;
+
+  int m_cons_block_index;
+
+  struct Lisp_Cons *m_cons_free_list;
+
+  struct vector_block *m_vector_blocks;
+
+  /* See free_slot() for rationale.  */
+  struct Lisp_Vector **m_vector_free_lists;
+
+  /* The last free list where we found large enough vector.  Trade
+     fragmentation risk for speed by commencing here on subsequenct
+     searches.  */
+  ptrdiff_t m_most_recent_free_slot;
+
+  /* Singly-linked list of large vectors.  */
+  struct large_vector *m_large_vectors;
+
+  struct symbol_block *m_symbol_blocks;
+
+  int m_symbol_block_index;
+
+  struct Lisp_Symbol *m_symbol_free_list;
 
   /* The OS identifier for this thread.  */
   sys_thread_t thread_id;
@@ -259,6 +305,7 @@ XCONDVAR (Lisp_Object a)
 #endif
 
 extern PER_THREAD struct thread_state *current_thread;
+extern struct thread_state *const main_thread;
 
 extern void finalize_one_thread (struct thread_state *state);
 extern void finalize_one_mutex (struct Lisp_Mutex *);
