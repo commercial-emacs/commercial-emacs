@@ -3062,6 +3062,28 @@ enum
   LARGE_STRING_THRESH = (SBLOCK_NBYTES >> 3),
 };
 
+/* An aligned block of memory.  */
+struct ablock
+{
+  union
+  {
+    char payload[BLOCK_NBYTES];
+    struct ablock *next_free;
+  } x;
+
+  /* ABASE is the aligned base of the ablocks.  It is overloaded to
+     hold a virtual "busy" field that counts twice the number of used
+     ablock values in the parent ablocks, plus one if the real base of
+     the parent ablocks is ABASE (if the "busy" field is even, the
+     word before the first ablock holds a pointer to the real base).
+     The first ablock has a "busy" ABASE, and the others have an
+     ordinary pointer ABASE.  To tell the difference, the code assumes
+     that pointers, when cast to uintptr_t, are at least 2 *
+     ABLOCKS_NBLOCKS + 1.  */
+  struct ablocks *abase;
+};
+verify (sizeof (struct ablock) % BLOCK_ALIGN == 0);
+
 #include "thread.h"
 
 /* Elisp uses multiple stacks:

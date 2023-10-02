@@ -28,10 +28,29 @@ static void mem_delete_fixup (struct mem_node *, struct mem_node **root);
 static void mem_rotate_left (struct mem_node *, struct mem_node **root);
 static void mem_rotate_right (struct mem_node *, struct mem_node **root);
 
-/* A factor when `--enable-multhreading`.  */
+struct mem_node *
+mem_find (struct thread_state *thr, void *start)
+{
+  struct mem_node *p = thr->m_mem_root;
+  while (p != mem_nil)
+    {
+      if (start < p->start)
+	p = p->left;
+      else if (start >= p->end)
+	p = p->right;
+      else
+	break;
+    }
+  return p;
+}
+
+#ifdef ENABLE_CHECKING
+
+/* Please don't move this definition outside ENABLE_CHECKING as
+   someone might inadvertently call it in a production emacs.  */
 
 struct mem_node *
-mem_find (void *start)
+mem_find_which_thread (void *start, struct thread_state **which)
 {
   struct mem_node *p = mem_nil;
   for (struct thread_state *thr = all_threads;
@@ -46,11 +65,16 @@ mem_find (void *start)
 	  else if (start >= p->end)
 	    p = p->right;
 	  else
-	    break;
+	    {
+	      if (which)
+		*which = thr;
+	      break;
+	    }
 	}
     }
   return p;
 }
+#endif
 
 /* Destroy tree at ROOT.  */
 

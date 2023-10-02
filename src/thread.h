@@ -142,6 +142,8 @@ struct thread_state
   /* The red-black tree for finding the memory block of a Lisp_Object.  */
   struct mem_node *m_mem_root;
 
+  struct ablock *m_free_ablocks;
+
   struct interval_block *m_interval_blocks;
 
   int m_interval_block_index;
@@ -176,7 +178,7 @@ struct thread_state
   struct Lisp_Vector **m_vector_free_lists;
 
   /* The last free list where we found large enough vector.  Trade
-     fragmentation risk for speed by commencing here on subsequenct
+     fragmentation risk for speed by commencing here on subsequent
      searches.  */
   ptrdiff_t m_most_recent_free_slot;
 

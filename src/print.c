@@ -992,6 +992,7 @@ debug_print (Lisp_Object arg)
 }
 
 void safe_debug_print (Lisp_Object) EXTERNALLY_VISIBLE;
+
 void
 safe_debug_print (Lisp_Object arg)
 {

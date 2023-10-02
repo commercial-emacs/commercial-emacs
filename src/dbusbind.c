@@ -97,7 +97,7 @@ static bool xd_in_read_queued_messages = 0;
 /* Macros for debugging.  In order to enable them, build with
    "make MYCPPFLAGS='-DDBUS_DEBUG'".  */
 #ifdef DBUS_DEBUG
-#define XD_DEBUG_MESSAGE(...)						\
+# define XD_DEBUG_MESSAGE(...)						\
   do {									\
     char s[1024];							\
     snprintf (s, sizeof s, __VA_ARGS__);				\
@@ -105,7 +105,7 @@ static bool xd_in_read_queued_messages = 0;
       printf ("%s: %s\n", __func__, s);					\
     message ("%s: %s", __func__, s);					\
   } while (0)
-#define XD_DEBUG_VALID_LISP_OBJECT_P(object)				\
+# define XD_DEBUG_VALID_LISP_OBJECT_P(object)				\
   do {									\
     if (!valid_lisp_object_p (object))					\
       {									\
