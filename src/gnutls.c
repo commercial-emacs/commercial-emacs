@@ -2730,7 +2730,7 @@ method name. */)
   return digest_algorithms;
 }
 
-DEFUN ("gnutls-hash-mac", Fgnutls_hash_mac, Sgnutls_hash_mac, 3, 3, 0,
+DEFUN ("gnutls-hash-mac", Fgnutls_hash_mac, Sgnutls_hash_mac, 3, 4, 0,
        doc: /* Hash INPUT with HASH-METHOD and KEY into a unibyte string.
 
 Return nil on error.
@@ -2742,11 +2742,16 @@ will be wiped after use if it's a string.
 The INPUT can also be specified as a buffer or string or in other
 ways.
 
+The NONCE can also be specified as a buffer or string or in other
+ways. If MAC algorithm does not require nonce, the optional argument
+NONCE is ignored even if presented.
+
+
 The alist of MAC algorithms can be obtained with `gnutls-macs'.  The
 HASH-METHOD may be a string or symbol matching a key in that alist, or
 a plist with the `:mac-algorithm-id' numeric property, or the number
 itself. */)
-  (Lisp_Object hash_method, Lisp_Object key, Lisp_Object input)
+  (Lisp_Object hash_method, Lisp_Object key, Lisp_Object input, Lisp_Object nonce)
 {
   if (BUFFERP (input) || STRINGP (input))
     input = list1 (input);
@@ -2802,6 +2807,23 @@ itself. */)
   if (ret < GNUTLS_E_SUCCESS)
     error ("GnuTLS MAC %s initialization failed: %s",
 	   gnutls_mac_get_name (gma), emacs_gnutls_strerror (ret));
+
+  if (!NILP (nonce))
+    {
+      if (BUFFERP (nonce) || STRINGP (nonce))
+        nonce = list1 (nonce);
+
+      CHECK_CONS (nonce);
+
+      ptrdiff_t nstart_byte, nend_byte;
+      const char *ndata
+        = extract_data_from_object (nonce, &nstart_byte, &nend_byte);
+      if (ndata == NULL)
+        error ("GnuTLS MAC nonce extraction failed");
+
+      gnutls_hmac_set_nonce (hmac,
+			     ndata + nstart_byte, nend_byte - nstart_byte);
+    }
 
   ptrdiff_t istart_byte, iend_byte;
   const char *idata
