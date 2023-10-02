@@ -178,6 +178,7 @@ Major Structures of Emacs
 Advanced Features
 * Modes::               Major and minor modes alter Emacs's basic behavior.
 * Indentation::         Editing the white space at the beginnings of lines.
+* Alignment::           Making common parts of lines start at the same column.
 * Text::                Commands and modes for editing human languages.
 * Programs::            Commands and modes for editing programs.
 * Building::            Compiling, running and debugging programs.
@@ -1598,6 +1599,7 @@ Lisp programming.
 @include mule.texi
 @include modes.texi
 @include indent.texi
+@include align.texi
 @include text.texi
 @c Includes fortran-xtra.
 @include programs.texi
