@@ -3199,6 +3199,7 @@ is copied instead of being cut."
          ;; System tooltips tend to flicker and in general work
          ;; incorrectly.
          (use-system-tooltips nil)
+         (mark-even-if-inactive t)
          ;; Whether or not some text was ``cut'' from Emacs to another
          ;; program and the cleaanup code should not try modifying the
          ;; region.
