@@ -4381,10 +4381,11 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
 		       nfailure_points_pushed - nfailure_points_popped);
 	  DEBUG_PRINT ("%td registers pushed.\n", num_regs_pushed);
 
-	  retval = POINTER_TO_OFFSET (d) - pos;
+	  ptrdiff_t dcnt = POINTER_TO_OFFSET (d) - pos;
 
-	  DEBUG_PRINT ("Returning %td from re_match_2.\n", retval);
+	  DEBUG_PRINT ("Returning %td from re_match_2.\n", dcnt);
 
+	  retval = dcnt;
 	  goto endof_re_match;
 	}
 
