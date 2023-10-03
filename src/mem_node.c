@@ -31,7 +31,7 @@ static void mem_rotate_right (struct mem_node *, struct mem_node **root);
 struct mem_node *
 mem_find (struct thread_state *thr, void *start)
 {
-  struct mem_node *p = thr->m_mem_root;
+  struct mem_node *p = THREAD_FIELD (thr, m_mem_root);
   while (p != mem_nil)
     {
       if (start < p->start)

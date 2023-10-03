@@ -75,8 +75,7 @@ struct thread_state *all_threads = &main_state.s;
 
 static sys_mutex_t global_lock;
 
-/* m_specpdl is set when the thread is created and cleared when the
-   thread dies.  */
+/* m_specpdl is cleared when the thread dies.  */
 #define thread_live_p(STATE) ((STATE)->m_specpdl != NULL)
 
 static void

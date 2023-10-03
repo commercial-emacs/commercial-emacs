@@ -47,4 +47,10 @@ void mem_delete (struct mem_node *node, struct mem_node **root);
 struct mem_node *mem_find_which_thread (void *start, struct thread_state **which);
 #endif
 
+#ifdef HAVE_GCC_TLS
+# define THREAD_FIELD(thr, field) (thr->field)
+#else
+# define THREAD_FIELD(thr, field) (main_thread->field)
+#endif
+
 #endif  /* MEM_NODE_H */

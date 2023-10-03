@@ -482,7 +482,7 @@ lisp_free (struct thread_state *thr, void *block)
   if (block && ! pdumper_object_p (block))
     {
       free (block);
-      mem_delete (mem_find (thr, block), &thr->m_mem_root);
+      mem_delete (mem_find (thr, block), &THREAD_FIELD (thr, m_mem_root));
     }
 }
 
@@ -615,7 +615,7 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
 
   eassert (nbytes < BLOCK_ALIGN);
 
-  if (! thr->m_free_ablocks)
+  if (! THREAD_FIELD (thr, m_free_ablocks))
     {
       int i;
       bool aligned;
@@ -639,9 +639,9 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
       for (i = 0; i < (aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1); ++i)
 	{
 	  abase->blocks[i].abase = abase;
-	  abase->blocks[i].x.next_free = thr->m_free_ablocks;
+	  abase->blocks[i].x.next_free = THREAD_FIELD (thr, m_free_ablocks);
 	  ASAN_POISON_ABLOCK (&abase->blocks[i]);
-	  thr->m_free_ablocks = &abase->blocks[i];
+	  THREAD_FIELD (thr, m_free_ablocks) = &abase->blocks[i];
 	}
       intptr_t ialigned = aligned;
       ABLOCKS_BUSY (abase) = (struct ablocks *) ialigned;
@@ -653,15 +653,15 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
       eassert ((intptr_t) ABLOCKS_BUSY (abase) == aligned);
     }
 
-  ASAN_UNPOISON_ABLOCK (thr->m_free_ablocks);
-  abase = ABLOCK_ABASE (thr->m_free_ablocks);
+  ASAN_UNPOISON_ABLOCK (THREAD_FIELD (thr, m_free_ablocks));
+  abase = ABLOCK_ABASE (THREAD_FIELD (thr, m_free_ablocks));
   ABLOCKS_BUSY (abase)
     = (struct ablocks *) (2 + (intptr_t) ABLOCKS_BUSY (abase));
-  val = thr->m_free_ablocks;
-  thr->m_free_ablocks = thr->m_free_ablocks->x.next_free;
+  val = THREAD_FIELD (thr, m_free_ablocks);
+  THREAD_FIELD (thr, m_free_ablocks) = THREAD_FIELD (thr, m_free_ablocks)->x.next_free;
 
   if (type != MEM_TYPE_NON_LISP)
-    mem_insert (val, (char *) val + nbytes, type, &thr->m_mem_root);
+    mem_insert (val, (char *) val + nbytes, type, &THREAD_FIELD (thr, m_mem_root));
 
   MALLOC_PROBE (nbytes);
 
@@ -675,12 +675,12 @@ lisp_align_free (struct thread_state *thr, void *block)
   struct ablock *ablock = block;
   struct ablocks *abase = ABLOCK_ABASE (ablock);
 
-  mem_delete (mem_find (thr, block), &thr->m_mem_root);
+  mem_delete (mem_find (thr, block), &THREAD_FIELD (thr, m_mem_root));
 
   /* Put on free list.  */
-  ablock->x.next_free = thr->m_free_ablocks;
+  ablock->x.next_free = THREAD_FIELD (thr, m_free_ablocks);
   ASAN_POISON_ABLOCK (ablock);
-  thr->m_free_ablocks = ablock;
+  THREAD_FIELD (thr, m_free_ablocks) = ablock;
   /* Update busy count.  */
   intptr_t busy = (intptr_t) ABLOCKS_BUSY (abase) - 2;
   eassume (0 <= busy && busy <= 2 * ABLOCKS_NBLOCKS - 1);
@@ -690,7 +690,7 @@ lisp_align_free (struct thread_state *thr, void *block)
     { /* All the blocks are free.  */
       int i = 0;
       bool aligned = busy;
-      struct ablock **tem = &thr->m_free_ablocks;
+      struct ablock **tem = &THREAD_FIELD (thr, m_free_ablocks);
       struct ablock *atop = &abase->blocks[aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1];
 
       while (*tem)
@@ -952,13 +952,13 @@ check_sblock (struct sblock *b)
 static void
 check_all_sblocks (struct thread_state *thr)
 {
-  for (struct sblock *b = thr->m_large_sblocks; b != NULL; b = b->next)
+  for (struct sblock *b = THREAD_FIELD (thr, m_large_sblocks); b != NULL; b = b->next)
     {
       struct Lisp_String *s = b->data[0].string;
       if (s)
 	STRING_BYTES (s);
     }
-  for (struct sblock *b = thr->m_oldest_sblock; b != NULL; b = b->next)
+  for (struct sblock *b = THREAD_FIELD (thr, m_oldest_sblock); b != NULL; b = b->next)
     check_sblock (b);
 }
 
@@ -968,7 +968,7 @@ check_all_sblocks (struct thread_state *thr)
 static void
 check_string_free_list (struct thread_state *thr)
 {
-  for (struct Lisp_String *s = thr->m_string_free_list;
+  for (struct Lisp_String *s = THREAD_FIELD (thr, m_string_free_list);
        s != NULL;
        s = NEXT_FREE_LISP_STRING (s))
     eassume ((uintptr_t) s >= BLOCK_ALIGN);
@@ -1154,12 +1154,12 @@ sweep_strings (struct thread_state *thr)
     = gcstat.total_strings
     = gcstat.total_free_strings
     = 0;
-  thr->m_string_free_list = NULL;
+  THREAD_FIELD (thr, m_string_free_list) = NULL;
 
-  for (struct string_block *next, *b = thr->m_string_blocks;
+  for (struct string_block *next, *b = THREAD_FIELD (thr, m_string_blocks);
        b != NULL; b = next)
     {
-      struct Lisp_String *restore_free_list = thr->m_string_free_list;
+      struct Lisp_String *restore_free_list = THREAD_FIELD (thr, m_string_free_list);
       int i, nfree = 0;
 
       ASAN_UNPOISON_STRING_BLOCK (b);
@@ -1198,10 +1198,10 @@ sweep_strings (struct thread_state *thr)
 		  s->u.s.data = NULL;
 
 		  /* Put on free list.  */
-		  NEXT_FREE_LISP_STRING (s) = thr->m_string_free_list;
+		  NEXT_FREE_LISP_STRING (s) = THREAD_FIELD (thr, m_string_free_list);
 		  ASAN_POISON_STRING (s);
 		  ASAN_PREPARE_DEAD_SDATA (data, SDATA_NBYTES (data));
-		  thr->m_string_free_list = s;
+		  THREAD_FIELD (thr, m_string_free_list) = s;
 		  ++nfree;
 		}
 	    }
@@ -1210,7 +1210,7 @@ sweep_strings (struct thread_state *thr)
 	      /* S inexplicably not already on free list.  */
 	      NEXT_FREE_LISP_STRING (s) = string_free_list;
 	      ASAN_POISON_STRING (s);
-	      thr->m_string_free_list = s;
+	      THREAD_FIELD (thr, m_string_free_list) = s;
 	      ++nfree;
 	    }
 	} /* for each Lisp_String in block B.  */
@@ -1222,7 +1222,7 @@ sweep_strings (struct thread_state *thr)
 	{
 	  /* Harvest B back to OS.  */
 	  lisp_free (thr, b);
-	  thr->m_string_free_list = restore_free_list;
+	  THREAD_FIELD (thr, m_string_free_list) = restore_free_list;
 	}
       else
 	{
@@ -1232,7 +1232,7 @@ sweep_strings (struct thread_state *thr)
 	}
     } /* for each string block B.  */
 
-  thr->m_string_blocks = live_blocks;
+  THREAD_FIELD (thr, m_string_blocks) = live_blocks;
   sweep_sdata (thr);
 
 #ifdef ENABLE_CHECKING
@@ -1246,7 +1246,8 @@ sweep_sdata (struct thread_state *thr)
 {
   /* Simple sweep of large sblocks.  Side effect: reverses list.  */
   struct sblock *swept_large_sblocks = NULL;
-  for (struct sblock *next, *b = thr->m_large_sblocks; b != NULL; b = next)
+  for (struct sblock *next, *b = THREAD_FIELD (thr, m_large_sblocks);
+       b != NULL; b = next)
     {
       next = b->next;
 
@@ -1258,7 +1259,7 @@ sweep_sdata (struct thread_state *thr)
 	  swept_large_sblocks = b;
 	}
     }
-  thr->m_large_sblocks = swept_large_sblocks;
+  THREAD_FIELD (thr, m_large_sblocks) = swept_large_sblocks;
 
   /* Less simple compaction of non-large sblocks.
 
@@ -1272,7 +1273,7 @@ sweep_sdata (struct thread_state *thr)
      (oldest_sblock...current_sblock), and therein lies the
      compaction.
   */
-  struct sblock *tb = thr->m_oldest_sblock;
+  struct sblock *tb = THREAD_FIELD (thr, m_oldest_sblock);
   if (tb)
     {
       sdata *end_tb = (sdata *) ((char *) tb + SBLOCK_NBYTES);
@@ -1339,7 +1340,7 @@ sweep_sdata (struct thread_state *thr)
       tb->next_free = to;
       tb->next = NULL;
     }
-  thr->m_current_sblock = tb;
+  THREAD_FIELD (thr, m_current_sblock) = tb;
 }
 
 static Lisp_Object new_lisp_string (EMACS_INT, EMACS_INT, bool);
@@ -1981,10 +1982,10 @@ add_vector_free_lists (struct thread_state *thr,
   XSETPVECTYPESIZE (v, PVEC_FREE, 0, nwords);
   eassert (nbytes % word_size == 0);
   ptrdiff_t slot = free_slot (nbytes);
-  set_next_vector (v, thr->m_vector_free_lists[slot]);
+  set_next_vector (v, THREAD_FIELD (thr, m_vector_free_lists[slot]));
   ASAN_POISON_VECTOR_CONTENTS (v, nbytes - header_size);
-  thr->m_vector_free_lists[slot] = v;
-  thr->m_most_recent_free_slot = slot;
+  THREAD_FIELD (thr, m_vector_free_lists[slot]) = v;
+  THREAD_FIELD (thr, m_most_recent_free_slot) = slot;
 }
 
 static struct vector_block *
@@ -2194,13 +2195,13 @@ sweep_vectors (struct thread_state *thr)
     gcstat.total_vector_slots =
     gcstat.total_free_vector_slots = 0;
 
-  memset (thr->m_vector_free_lists, 0,
+  memset (THREAD_FIELD (thr, m_vector_free_lists), 0,
 	  VBLOCK_NFREE_LISTS * sizeof (struct Lisp_Vector *));
-  thr->m_most_recent_free_slot = VBLOCK_NFREE_LISTS;
+  THREAD_FIELD (thr, m_most_recent_free_slot) = VBLOCK_NFREE_LISTS;
 
   /* Non-large vectors in M_VECTOR_BLOCKS.  */
-  for (struct vector_block *block = thr->m_vector_blocks,
-	 **bprev = &thr->m_vector_blocks;
+  for (struct vector_block *block = THREAD_FIELD (thr, m_vector_blocks),
+	 **bprev = &THREAD_FIELD (thr, m_vector_blocks);
        block != NULL;
        block = *bprev)
     {
@@ -2245,7 +2246,7 @@ sweep_vectors (struct thread_state *thr)
 	     assignment, then nothing in the block was marked.
 	     Harvest it back to OS.  */
 	  *bprev = block->next;
-	  mem_delete (mem_find (thr, block->data), &thr->m_mem_root);
+	  mem_delete (mem_find (thr, block->data), &THREAD_FIELD (thr, m_mem_root));
 	  xfree (block);
 	}
       else
@@ -2261,8 +2262,8 @@ sweep_vectors (struct thread_state *thr)
     }
 
   /* Free floating large vectors.  */
-  for (struct large_vector *lv = thr->m_large_vectors,
-	 **lvprev = &thr->m_large_vectors;
+  for (struct large_vector *lv = THREAD_FIELD (thr, m_large_vectors),
+	 **lvprev = &THREAD_FIELD (thr, m_large_vectors);
        lv != NULL;
        lv = *lvprev)
     {
@@ -3068,8 +3069,8 @@ live_cons_holding (struct thread_state *thr, struct mem_node *m, void *p)
   /* P must be on a Lisp_Cons boundary, and behind cons_block_index,
      and not free-listed.  */
   if (0 <= distance && distance < sizeof b->conses
-      && (b != thr->m_cons_blocks
-	  || distance / sizeof b->conses[0] < thr->m_cons_block_index))
+      && (b != THREAD_FIELD (thr, m_cons_blocks)
+	  || distance / sizeof b->conses[0] < THREAD_FIELD (thr, m_cons_block_index)))
     {
       ptrdiff_t off = distance % sizeof b->conses[0];
       if (off == Lisp_Cons
@@ -3107,8 +3108,8 @@ live_symbol_holding (struct thread_state *thr, struct mem_node *m, void *p)
   /* P must be on a Lisp_Symbol boundary, and behind
      symbol_block_index, and not free-listed.  */
   if (0 <= distance && distance < sizeof b->symbols
-      && (b != thr->m_symbol_blocks
-	  || distance / sizeof b->symbols[0] < thr->m_symbol_block_index))
+      && (b != THREAD_FIELD (thr, m_symbol_blocks)
+	  || distance / sizeof b->symbols[0] < THREAD_FIELD (thr, m_symbol_block_index)))
     {
       ptrdiff_t off = distance % sizeof b->symbols[0];
       if (off == Lisp_Symbol
@@ -3154,8 +3155,8 @@ live_float_holding (struct thread_state *thr, struct mem_node *m, void *p)
       ptrdiff_t off = distance % sizeof b->floats[0];
       /* P be on a Lisp_Float boundary, and behind float_block_index.  */
       if ((off == Lisp_Float || off == 0)
-	  && (b != thr->m_float_blocks // not the wip block
-	      || distance / sizeof b->floats[0] < thr->m_float_block_index))
+	  && (b != THREAD_FIELD (thr, m_float_blocks) // not the wip block
+	      || distance / sizeof b->floats[0] < THREAD_FIELD (thr, m_float_block_index)))
 	{
 	  struct Lisp_Float *f = (struct Lisp_Float *) (cp - off);
 #if GC_ASAN_POISON_OBJECTS
@@ -5306,10 +5307,10 @@ sweep_void (struct thread_state *thr,
 static void
 sweep_intervals (struct thread_state *thr)
 {
-  struct interval_block **iprev = &thr->m_interval_blocks;
+  struct interval_block **iprev = &THREAD_FIELD (thr, m_interval_blocks);
   size_t cum_free = 0, cum_used = 0;
 
-  thr->m_interval_free_list = NULL;
+  THREAD_FIELD (thr, m_interval_free_list) = NULL;
   for (struct interval_block *iblk; (iblk = *iprev); )
     {
       int blk_free = 0;
@@ -5318,14 +5319,14 @@ sweep_intervals (struct thread_state *thr)
 	   /* For first block, process up to prevailing
 	      INTERVAL_BLOCK_INDEX.  Subsequent blocks should contain
 	      BLOCK_NINTERVALS items. */
-	   i < (iblk == thr->m_interval_blocks
-		? thr->m_interval_block_index
+	   i < (iblk == THREAD_FIELD (thr, m_interval_blocks)
+		? THREAD_FIELD (thr, m_interval_block_index)
 		: BLOCK_NINTERVALS);
 	   ++i)
         {
           if (! iblk->intervals[i].gcmarkbit)
             {
-              set_interval_parent (&iblk->intervals[i], thr->m_interval_free_list);
+              set_interval_parent (&iblk->intervals[i], THREAD_FIELD (thr, m_interval_free_list));
               interval_free_list = &iblk->intervals[i];
 	      ASAN_POISON_INTERVAL (&iblk->intervals[i]);
               ++blk_free;
@@ -5344,7 +5345,7 @@ sweep_intervals (struct thread_state *thr)
           *iprev = iblk->next;
           /* Unhook from the free list.  */
 	  ASAN_UNPOISON_INTERVAL (&iblk->intervals[0]);
-          thr->m_interval_free_list = INTERVAL_PARENT (&iblk->intervals[0]);
+          THREAD_FIELD (thr, m_interval_free_list) = INTERVAL_PARENT (&iblk->intervals[0]);
           lisp_free (thr, iblk);
         }
       else
@@ -5361,14 +5362,14 @@ static void
 sweep_symbols (struct thread_state *thr)
 {
   struct symbol_block *sblk;
-  struct symbol_block **sprev = &thr->m_symbol_blocks;
+  struct symbol_block **sprev = &THREAD_FIELD (thr, m_symbol_blocks);
   size_t cum_free = 0, cum_used = ARRAYELTS (lispsym);
 
-  thr->m_symbol_free_list = NULL;
+  THREAD_FIELD (thr, m_symbol_free_list) = NULL;
   for (int i = 0; i < ARRAYELTS (lispsym); ++i)
     lispsym[i].u.s.gcmarkbit = false;
 
-  for (sblk = thr->m_symbol_blocks; sblk != NULL; sblk = *sprev)
+  for (sblk = THREAD_FIELD (thr, m_symbol_blocks); sblk != NULL; sblk = *sprev)
     {
       ASAN_UNPOISON_SYMBOL_BLOCK (sblk);
       int blk_free = 0;
@@ -5378,7 +5379,7 @@ sweep_symbols (struct thread_state *thr)
 	 SYMBOL_BLOCK_INDEX.  Subsequent iterations traverse whole
 	 blocks of BLOCK_NSYMBOLS. */
       struct Lisp_Symbol *end
-	= sym + (sblk == thr->m_symbol_blocks ? thr->m_symbol_block_index : BLOCK_NSYMBOLS);
+	= sym + (sblk == THREAD_FIELD (thr, m_symbol_blocks) ? THREAD_FIELD (thr, m_symbol_block_index) : BLOCK_NSYMBOLS);
 
       for (; sym < end; ++sym)
         {
@@ -5395,9 +5396,9 @@ sweep_symbols (struct thread_state *thr)
                   /* Avoid re-free (bug#29066).  */
                   sym->u.s.redirect = SYMBOL_PLAINVAL;
                 }
-              sym->u.s.next = thr->m_symbol_free_list;
-              thr->m_symbol_free_list = sym;
-              thr->m_symbol_free_list->u.s.function = dead_object ();
+              sym->u.s.next = THREAD_FIELD (thr, m_symbol_free_list);
+              THREAD_FIELD (thr, m_symbol_free_list) = sym;
+              THREAD_FIELD (thr, m_symbol_free_list)->u.s.function = dead_object ();
 	      ASAN_POISON_SYMBOL (sym);
               ++blk_free;
             }
@@ -5410,7 +5411,7 @@ sweep_symbols (struct thread_state *thr)
           *sprev = sblk->next;
           /* Unhook from the free list.  */
 	  ASAN_UNPOISON_SYMBOL (&sblk->symbols[0]);
-          thr->m_symbol_free_list = sblk->symbols[0].u.s.next;
+          THREAD_FIELD (thr, m_symbol_free_list) = sblk->symbols[0].u.s.next;
           lisp_free (thr, sblk);
         }
       else
@@ -5463,12 +5464,12 @@ gc_sweep (void)
   mgc_flip_space ();
   for (struct thread_state *thr = all_threads;
        thr != NULL;
-       thr = thr->next_thread)
+       thr = THREAD_FIELD (thr, next_thread))
     {
       sweep_strings (thr);
       sweep_void (thr,
-		  (void **) &thr->m_cons_free_list, thr->m_cons_block_index,
-		  (void **) &thr->m_cons_blocks, Lisp_Cons, BLOCK_NCONS,
+		  (void **) &THREAD_FIELD (thr, m_cons_free_list), THREAD_FIELD (thr, m_cons_block_index),
+		  (void **) &THREAD_FIELD (thr, m_cons_blocks), Lisp_Cons, BLOCK_NCONS,
 		  offsetof (struct cons_block, conses),
 		  offsetof (struct Lisp_Cons, u.s.u.chain),
 		  offsetof (struct cons_block, next),
@@ -5476,8 +5477,8 @@ gc_sweep (void)
 		  &gcstat.total_conses,
 		  &gcstat.total_free_conses);
       sweep_void (thr,
-		  (void **) &thr->m_float_free_list, thr->m_float_block_index,
-		  (void **) &thr->m_float_blocks, Lisp_Float, BLOCK_NFLOATS,
+		  (void **) &THREAD_FIELD (thr, m_float_free_list), THREAD_FIELD (thr, m_float_block_index),
+		  (void **) &THREAD_FIELD (thr, m_float_blocks), Lisp_Float, BLOCK_NFLOATS,
 		  offsetof (struct float_block, floats),
 		  offsetof (struct Lisp_Float, u.chain),
 		  offsetof (struct float_block, next),
