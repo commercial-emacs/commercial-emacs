@@ -7164,8 +7164,8 @@ This inserts a status message into the process's buffer, if there is one.  */)
       set_marker_both (p->mark, p->buffer, PT, PT_BYTE);
 
       if (opoint >= before)
-	SET_PT_BOTH (opoint + (PT - before),
-		     opoint_byte + (PT_BYTE - before_byte));
+	SET_PT_BOTH (min (opoint + (PT - before), ZV),
+		     min (opoint_byte + (PT_BYTE - before_byte), ZV_BYTE));
       else
 	SET_PT_BOTH (opoint, opoint_byte);
 
