@@ -3020,8 +3020,6 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\|SQUASHFS\\)\\'" .
      ("\\.har\\'" . javascript-mode)
      ("\\.json\\'" . js-json-mode)
      ("\\.[ds]?va?h?\\'" . verilog-mode)
-     ("\\.by\\'" . bovine-grammar-mode)
-     ("\\.wy\\'" . wisent-grammar-mode)
      ("\\.erts\\'" . erts-mode)
      ;; .emacs or .gnus or .viper following a directory delimiter in
      ;; Unix or MS-DOS syntax.

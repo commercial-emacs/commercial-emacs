@@ -1030,7 +1030,7 @@ top_distclean=\
 	rm -f config.cache config.status config.log~ \
 	  Makefile makefile lib/gnulib.mk ${SUBDIR_MAKEFILES}
 
-distclean_dirs = $(clean_dirs) leim lisp admin/grammars
+distclean_dirs = $(clean_dirs) leim lisp
 
 $(foreach dir,$(distclean_dirs),$(eval $(call submake_template,$(dir),distclean)))
 

@@ -1089,7 +1089,6 @@ Return nil if there is nothing appropriate in the buffer near point."
    ("viper" "Variable Index" "Function Index")
    ("vtable" "Index")
    ("widget" "Index")
-   ("wisent" "Index")
    ("woman" "Variable Index" "Command Index")))
 
 ;; docstrings talk about elisp, so have apropos-mode follow emacs-lisp-mode

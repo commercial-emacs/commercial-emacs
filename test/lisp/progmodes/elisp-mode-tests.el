@@ -25,8 +25,6 @@
 (require 'ert)
 (require 'ert-x)
 (require 'xref)
-(eval-when-compile (require 'cl-lib))
-(require 'ert-x)
 
 ;;; Completion
 

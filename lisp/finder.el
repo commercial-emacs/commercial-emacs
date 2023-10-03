@@ -154,10 +154,8 @@ would otherwise be.")
     ("obsolete" . emacs)
     ("semantic" . semantic)
     ("analyze" . semantic)
-    ("bovine" . semantic)
     ("decorate" . semantic)
     ("symref" . semantic)
-    ("wisent" . semantic)
     ;; This should really be ("nxml" . nxml-mode), because nxml-mode.el
     ;; is the main file for the package.  Then we would not need an
     ;; entry in finder--builtins-descriptions.  But I do not know if

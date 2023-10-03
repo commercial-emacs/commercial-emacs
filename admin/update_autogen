@@ -279,20 +279,7 @@ echo "Running lisp/ make..."
 make -C lisp "$@" ldefs-boot.el EMACS=../src/bootstrap-emacs || die "make src error"
 
 
-# Refresh the prebuilt grammar-wy.el
-grammar_in=lisp/cedet/semantic/grammar-wy.el
-grammar_out=lisp/cedet/semantic/grm-wy-boot.el
-make -C admin/grammars/ ../../$grammar_in EMACS=../../src/bootstrap-emacs
-cp $grammar_in $grammar_out || die "cp grm_wy_boot error"
-
-
 echo "Checking status of loaddef files..."
-
-## It probably would be fine to just check+commit lisp/, since
-## making autoloads should not effect any other files.  But better
-## safe than sorry.
-modified=$(status $genfiles $ldefs_out $grammar_out) || die
-
 
 commit "loaddefs" $modified || die "commit error"
 

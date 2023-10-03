@@ -342,9 +342,6 @@ sed -f ../../msdos/sedadmin.inp < Makefile.in > Makefile
 Echo Configuring the admin/charsets directory...
 cd ..\charsets
 sed -f ../../msdos/sedadmin.inp < Makefile.in > Makefile
-Echo Configuring the admin/grammars directory...
-cd ..\grammars
-sed -f ../../msdos/sedadmin.inp < Makefile.in > Makefile
 cd ..\..
 :noadmin
 rem   ----------------------------------------------------------------------

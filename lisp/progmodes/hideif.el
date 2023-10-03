@@ -507,24 +507,17 @@ that form should be displayed.")
     (__STDC_HOST__    . hif-__STDC_HOST__)
     (__BASE_FILE__    . hif-__FILE__)))
 
-(declare-function semantic-c-hideif-lookup  "semantic/bovine/c" (var))
-(declare-function semantic-c-hideif-defined "semantic/bovine/c" (var))
-
 (defun hif-lookup (var)
-  (or (when (bound-and-true-p semantic-c-takeover-hideif)
-        (semantic-c-hideif-lookup var))
-      (let ((val (assq var hide-ifdef-env)))
-        (if val
-            (cdr val)
-          (if (setq val (assq var hif-predefine-alist))
-              (funcall (cdr val))
-            hif-undefined-symbol)))))
+  (let ((val (assq var hide-ifdef-env)))
+    (if val
+        (cdr val)
+      (if (setq val (assq var hif-predefine-alist))
+          (funcall (cdr val))
+        hif-undefined-symbol))))
 
 (defun hif-defined (var)
   (let (def)
     (cond
-     ((bound-and-true-p semantic-c-takeover-hideif)
-      (semantic-c-hideif-defined var))
      ;; Here we can't use hif-lookup as an empty definition like `#define EMPTY'
      ;; is considered defined but is evaluated as nil.
      ((assq var hide-ifdef-env) 1)

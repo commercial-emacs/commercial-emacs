@@ -86,14 +86,6 @@ src/verbose.mk
 *cus-load.el
 *loaddefs.el
 cldefs.el
-lisp/cedet/semantic/bovine/c-by.el
-lisp/cedet/semantic/bovine/make-by.el
-lisp/cedet/semantic/bovine/scm-by.el
-lisp/cedet/semantic/wisent/javat-wy.el
-lisp/cedet/semantic/wisent/js-wy.el
-lisp/cedet/semantic/wisent/python-wy.el
-lisp/cedet/srecode/srt-wy.el
-lisp/cedet/semantic/grammar-wy.el
 lisp/eshell/esh-groups.el
 lisp/finder-inf.el
 lisp/leim/ja-dic/

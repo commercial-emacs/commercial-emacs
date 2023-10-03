@@ -104,7 +104,7 @@ COMPILE_FIRST += $(lisp)/emacs-lisp/radix-tree.elc
 # to speed things up.  The org files are used to convert org files to
 # texi files.
 MAIN_FIRST = ./emacs-lisp/eieio.el ./emacs-lisp/eieio-base.el \
-  ./cedet/semantic/db.el ./emacs-lisp/cconv.el \
+  ./emacs-lisp/cconv.el \
   ./international/ja-dic-cnv.el \
   ./org/ox.el ./org/ox-texinfo.el ./org/org-macro.el ./org/org-element.el \
   ./org/oc.el ./org/ol.el ./emacs-lisp/cl-lib.el
@@ -414,19 +414,16 @@ compile-clean:
 	  fi; \
 	done
 
-.PHONY: gen-lisp leim semantic
+.PHONY: gen-lisp leim
 
 ## make -C ../admin/unidata all should be here, but that would race
 ## with ../src.  See comments above for loaddefs.
-gen-lisp: leim semantic
+gen-lisp: leim
 
 # (re)compile titdic-cnv before recursing into `leim` since its used to
 # generate some of the Quail source files from tables.
 leim: $(lisp)/international/titdic-cnv.elc
 	$(MAKE) -C ../leim all EMACS="$(EMACS)"
-
-semantic:
-	$(MAKE) -C ../admin/grammars all EMACS="$(EMACS:.%=../.%)"
 
 # Compile all Lisp files, but don't recompile those that are up to
 # date.  Some .el files don't get compiled because they set the
