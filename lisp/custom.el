@@ -34,7 +34,16 @@
 ;;; Code:
 
 (require 'widget)
-
+;;(require 'transitive-closure)
+(declare-function tc-reverse-rooted-graph
+                  "emacs-lisp/transitive-closure"
+                  (nodes edges &optional roots))
+(declare-function tc-graph-reachable
+                  "emacs-lisp/transitive-closure"
+                  (tcg &optional v))
+(declare-function tc-graph-ordering
+                  "emacs-lisp/transitive-closure"
+                  (tcg))
 (defvar custom-define-hook nil
   ;; Customize information for this option is in `cus-edit.el'.
   "Hook called after defining each customize option.")
@@ -148,11 +157,12 @@ the :set function."
   ;; This seemed to be at least as good as setting it to an arbitrary
   ;; value like nil (evaluating `value' is not an option because it
   ;; may have undesirable side-effects).
-  (if (listp custom-delayed-init-variables)
-      (push symbol custom-delayed-init-variables)
-    ;; In case this is called after startup, there is no "later" to which to
-    ;; delay it, so initialize it "normally" (bug#47072).
-    (custom-initialize-reset symbol value)))
+  (put symbol 'custom-implied-dependencies custom-delayed-init-variables)
+  (if (not (listp custom-delayed-init-variables))
+      ;; In case this is called after startup, there is no "later" to which to
+      ;; delay it, so initialize it "normally" (bug#47072).
+      (custom-initialize-reset symbol value)
+    (push symbol custom-delayed-init-variables)))
 
 (defun custom-declare-variable (symbol default doc &rest args)
   "Like `defcustom', but SYMBOL and DEFAULT are evaluated as normal arguments.
@@ -827,6 +837,23 @@ E.g. dumped variables whose default depends on run-time information."
 	   symbol
 	   (eval (car (or (get symbol 'saved-value)
 	                  (get symbol 'standard-value))))))
+
+(defun custom-runtime-setting (symbol)
+  "Reset the value of SYMBOL by re-evaluating standard value.
+Use the :set function to do so.  This is useful for customizable options
+that are defined before their standard value can really be computed.
+E.g. dumped variables whose default depends on run-time information."
+  ;; We are initializing
+  ;; the variable, and normally any :set function would not apply.
+  ;; For custom-initialize-delay, however, it is documented that "the
+  ;; (delayed) initialization is performed with the :set function".
+  ;; This is needed by eg global-font-lock-mode, which uses
+  ;; custom-initialize-delay but needs the :set function custom-set-minor-mode
+  ;; to also run during initialization.  So, long story short, we
+  ;; always do the funcall step, even if symbol was not bound before.
+  (funcall (or (get symbol 'custom-set) #'set-default)
+	   symbol
+	   (eval (car (get symbol 'standard-value)))))
 
 
 ;;; Custom Themes
@@ -1771,6 +1798,51 @@ If a choice with the same tag already exists, no action is taken."
     (unless (memq load loads)
       (push load loads)))
   (put symbol 'custom-loads loads))
+
+(defvar custom--reset-at-startup-vars nil)
+(defvar custom--restore-after-reset-vars nil)
+(defun custom--startup-calculate-initializations ()
+  (setq custom--reset-at-startup-vars nil)
+  (setq custom--restore-after-reset-vars nil)
+  (unless (listp custom-delayed-init-variables)
+    (let (vars deps saved tcg ordering explicit-startup startup-reachable)
+      (mapatoms
+       (lambda (s) (when (get s 'custom-type) (push s vars))))
+      (setq explicit-startup
+            (seq-filter (lambda (v)
+                          (get v 'custom-implied-dependencies))
+                    vars))
+      (setq deps
+            (mapcar (lambda (v)
+                      (let ((ds (get v 'custom-dependencies))
+                            (imp (get v 'custom-implied-dependencies)))
+                        `(,v ,@(seq-union ds imp))))
+                    vars))
+      (setq tcg (tc-reverse-rooted-graph vars deps explicit-startup))
+      (setq startup-reachable (tc-graph-reachable tcg))
+      (setq ordering (tc-graph-ordering tcg))
+      (setq custom--reset-at-startup-vars
+            (apply #'nconc (append ordering nil)))
+      (setq custom--restore-after-reset-vars
+            (seq-filter (lambda (v)
+                          (and (get v 'saved-value)))
+                        startup-reachable)))))
+
+(defun custom-do-startup-settings ()
+  (let ((ordering custom--reset-at-startup-vars)
+        (saved custom--restore-after-reset-vars)
+        var set-var)
+    (mapc (lambda (v)
+            (when (boundp v)
+              (makunbound v)))
+          custom--reset-at-startup-vars)
+    (while ordering
+      (custom-runtime-setting (pop ordering)))
+    (while saved
+      (custom-reevaluate-setting (pop saved)))))
+
+(add-hook 'after-pdump-load-hook
+          #'custom--startup-calculate-initializations)
 
 (provide 'custom)
 
