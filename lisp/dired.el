@@ -2515,17 +2515,58 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
     ["Delete Image Tag..." image-dired-delete-tag
      :help "Delete image tag from current or marked files"]))
 
+(declare-function mailcap-file-default-commands "mailcap" (files))
+(declare-function xdg-mime-apps "xdg" (mime))
+(declare-function xdg-desktop-read-file "xdg" (filename &optional group))
+
 (defun dired-context-menu (menu click)
   "Populate MENU with Dired mode commands at CLICK."
   (when (mouse-posn-property (event-start click) 'dired-filename)
     (define-key menu [dired-separator] menu-bar-separator)
-    (let ((easy-menu (make-sparse-keymap "Immediate")))
+    (require 'mailcap)
+    (require 'xdg)
+    (let* ((filename (save-excursion
+                       (mouse-set-point click)
+                       (dired-get-filename nil t)))
+           (mailcap-commands (mailcap-file-default-commands (list filename)))
+           (xdg-mime (when (executable-find "xdg-mime")
+                       (string-trim-right
+                        (shell-command-to-string
+                         (concat "xdg-mime query filetype " filename)))))
+           (xdg-mime-apps (unless (string-empty-p xdg-mime)
+                            (xdg-mime-apps xdg-mime)))
+           (desktop-commands
+            (mapcar (lambda (desktop)
+                      (setq desktop (xdg-desktop-read-file desktop))
+                      (cons (gethash "Name" desktop)
+                            (replace-regexp-in-string
+                             " .*" "" (gethash "Exec" desktop))))
+                    xdg-mime-apps))
+           (easy-menu (make-sparse-keymap "Immediate")))
       (easy-menu-define nil easy-menu nil
-        '("Immediate"
+        `("Immediate"
           ["Find This File" dired-mouse-find-file
            :help "Edit file at mouse click"]
           ["Find in Other Window" dired-mouse-find-file-other-window
-           :help "Edit file at mouse click in other window"]))
+           :help "Edit file at mouse click in other window"]
+          ,@(when (or desktop-commands mailcap-commands)
+              (list (cons "Open With"
+                          (append
+                           (mapcar (lambda (desktop-command)
+                                     `[,(car desktop-command)
+                                       (lambda ()
+                                         (interactive)
+                                         (dired-do-async-shell-command
+                                          ,(cdr desktop-command) nil
+                                          (list ,filename)))])
+                                   desktop-commands)
+                           (mapcar (lambda (mailcap-command)
+                                     `[,mailcap-command
+                                       (lambda ()
+                                         (interactive)
+                                         (dired-do-async-shell-command
+                                          ,mailcap-command nil (list ,filename)))])
+                                   mailcap-commands)))))))
       (dolist (item (reverse (lookup-key easy-menu [menu-bar immediate])))
         (when (consp item)
           (define-key menu (vector (car item)) (cdr item))))))
