@@ -43,7 +43,16 @@
                       (dom-node "div" '((class . "foo")
                                         (style . "color: red;"))
                                 (dom-node "p" '((id . "bar"))
-                                          "foo"))
+                                          "foo")
+                                (dom-node "p" '((id . "test-case-1")
+                                                (class . "class1"))
+                                          "text1")
+                                (dom-node "p" '((id . "test-case-2")
+                                                (class . "class12"))
+                                          "text2")
+                                (dom-node "p" '((id . "test-case-3")
+                                                (class . "class1 class2"))
+                                          "text3"))
                       (dom-node "div" '((title . "2nd div"))
                                 "bar"))))
 
@@ -105,8 +114,9 @@
 
 (ert-deftest dom-tests-texts ()
   (let ((dom (dom-tests--tree)))
-    (should (equal (dom-texts dom) "Test foo bar"))
-    (should (equal (dom-texts dom ", ") "Test, foo, bar"))))
+    (should (equal (dom-texts dom) "Test foo text1 text2 text3 bar"))
+    (should (equal (dom-texts dom ", ")
+                   "Test, foo, text1, text2, text3, bar"))))
 
 (ert-deftest dom-tests-child-by-tag ()
   (let ((dom (dom-tests--tree)))
@@ -121,13 +131,29 @@
 
 (ert-deftest dom-tests-strings ()
   (let ((dom (dom-tests--tree)))
-    (should (equal (dom-strings dom) '("Test" "foo" "bar")))
+    (should (equal (dom-strings dom)
+                   '("Test" "foo" "text1" "text2" "text3" "bar")))
     (should (equal (dom-strings (dom-children dom)) '("Test")))))
 
 (ert-deftest dom-tests-by-class ()
   (let ((dom (dom-tests--tree)))
     (should (equal (dom-tag (dom-by-class dom "foo")) "div"))
-    (should-not (dom-by-class dom "bar"))))
+    (should-not (dom-by-class dom "bar"))
+    (should (equal (mapcar (lambda (d) (dom-attr d 'id))
+                           (dom-by-class dom "class1"))
+                   '("test-case-1" "test-case-2" "test-case-3")))
+    (should (equal (mapcar (lambda (d) (dom-attr d 'id))
+                           (dom-by-class dom "class1$"))
+                   '("test-case-1" "test-case-3")))
+    (should (equal (mapcar (lambda (d) (dom-attr d 'id))
+                           (dom-by-class dom "^class2"))
+                   '("test-case-3")))
+    ;; Test that workaround still works.
+    (should (equal (mapcar (lambda (d) (dom-attr d 'id))
+                           (dom-by-class
+                            dom
+                            "\\(?:^\\| \\)class1\\(?:$\\| \\)"))
+                   '("test-case-1" "test-case-3")))))
 
 (ert-deftest dom-tests-by-style ()
   (let ((dom (dom-tests--tree)))
