@@ -27226,7 +27226,7 @@ x_get_current_wm_state (struct frame *f,
                         bool *sticky,
 			bool *shaded)
 {
-  unsigned long actual_size;
+  unsigned long actual_size = 0;
   int i;
   bool is_hidden = false;
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
@@ -27269,9 +27269,8 @@ x_get_current_wm_state (struct frame *f,
       actual_size = actual_bytes / sizeof *reply_data;
       reply_data = xcb_get_property_value (prop);
     }
-  else
+  else if (!prop || prop->type != (Atom) 0)
     {
-      actual_size = 0;
       is_hidden = FRAME_ICONIFIED_P (f);
     }
 #else
