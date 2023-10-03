@@ -2080,8 +2080,13 @@ connection."
                              (point)))
               (when (rcirc-buffer-process)
                 (save-excursion (rcirc-markup-timestamp sender response))
-                (dolist (fn rcirc-markup-text-functions)
-                  (save-excursion (funcall fn sender response)))
+                (save-restriction
+                  (when-let ((prop-match (text-property-search-forward 'rcirc-text)))
+                    (goto-char (prop-match-beginning prop-match))
+                    (narrow-to-region (prop-match-beginning prop-match)
+                                      (prop-match-end prop-match))
+                    (dolist (fn rcirc-markup-text-functions)
+                      (save-excursion (funcall fn sender response)))))
                 (when rcirc-fill-flag
                   (save-excursion (rcirc-markup-fill sender response))))
 
