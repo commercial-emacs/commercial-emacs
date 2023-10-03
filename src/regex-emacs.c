@@ -3835,7 +3835,6 @@ mutually_exclusive_aux (struct re_pattern_buffer *bufp, re_char *p1,
       break;
 
     case endline:
-      RETURN_CONSTRAIN (mutually_exclusive_exactn (data->bufp, data->p1, p2));
     case exactn:
       return mutually_exclusive_exactn (bufp, p1, p2);
 

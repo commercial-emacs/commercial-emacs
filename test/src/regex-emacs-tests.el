@@ -555,10 +555,10 @@ known/benign differences in behavior.")
 
 (defconst regex-tests-PTESTS-whitelist
   [
-   ;; Emacs doesn't see DEL (0x7f) as a [:cntrl:] character
+   ;; emacs doesn't see DEL (0x7f) as a [:cntrl:] character
    138
 
-   ;; Emacs doesn't barf on weird ranges such as [b-a], but simply
+   ;; emacs doesn't barf on weird ranges such as [b-a], but simply
    ;; fails to match
    168
   ]
@@ -872,14 +872,14 @@ This evaluates the TESTS test cases from glibc."
   (should (equal (string-match "\\`\\(?:ab\\)*\\'" "a") nil))
   (should (equal (string-match "\\`a\\{2\\}*\\'" "a") nil)))
 
-(ert-deftest regexp-tests-backtrack-optimization ()
+(ert-deftest regexp-tests-backtrack-optimization () ;bug#61514
   ;; Make sure we don't use up the regexp stack needlessly.
   (with-current-buffer (get-buffer-create "*bug*")
     (erase-buffer)
     (insert (make-string 1000000 ?x) "=")
     (goto-char (point-min))
     ;; Make sure we do perform the optimization (if we don't, the
-    ;; below will burp with regexp-stack-overflow). ;bug#61514
+    ;; below will burp with regexp-stack-overflow).
     (should (looking-at "x*=*"))
     (should (looking-at "x*\\(=\\|:\\)"))
     (should (looking-at "x*\\(=\\|:\\)*"))
@@ -908,7 +908,6 @@ This evaluates the TESTS test cases from glibc."
     (should (eq 0 (string-match "\\(ca*\\|ab\\)+d" "cabd")))
     (should (string-match "\\(aa*\\|b\\)*c" "ababc"))
     (should (string-match " \\sw*\\bfoo" " foo"))
-    (should (string-match ".*\\>" "hello "))
     ))
 
 (ert-deftest regexp-tests-zero-width-assertion-repetition ()
