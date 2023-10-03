@@ -47,6 +47,7 @@ as is common with most shells."
 
 (autoload 'eshell/pwd "em-dirs")
 
+;; TODO: convert λ into named function?
 (defcustom eshell-prompt-function
   (lambda ()
     (concat (abbreviate-file-name (eshell/pwd))

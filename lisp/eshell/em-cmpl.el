@@ -131,7 +131,7 @@ is non-nil."
   "An alist that defines simple argument type correlations.
 This is provided for common commands, as a simplistic alternative
 to writing a completion function."
-  :type '(repeat (cons string regexp)))
+  :type '(alist :key-type string :value-type regexp))
 
 (defun eshell-cmpl--custom-variable-docstring (pcomplete-var)
   "Generate the docstring of a variable derived from a pcomplete-* variable."
@@ -188,6 +188,7 @@ to writing a completion function."
   (eshell-cmpl--custom-variable-docstring 'pcomplete-restore-window-delay)
   :type (get 'pcomplete-restore-window-delay 'custom-type))
 
+;; TODO: convert λ into named function?
 (defcustom eshell-command-completion-function
   (lambda ()
     (pcomplete-here (eshell--complete-commands-list)))
@@ -199,6 +200,7 @@ to writing a completion function."
   (eshell-cmpl--custom-variable-docstring 'pcomplete-command-name-function)
   :type (get 'pcomplete-command-name-function 'custom-type))
 
+;; TODO: convert λ into named function?
 (defcustom eshell-default-completion-function
   (lambda ()
     (while (pcomplete-here

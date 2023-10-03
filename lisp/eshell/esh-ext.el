@@ -63,7 +63,7 @@ loaded into memory, thus beginning a new process."
 This can be useful on systems like Windows, where the operating system
 doesn't support the execution bit for shell scripts; or in cases where
 you want to associate an interpreter with a particular kind of script
-file, but the language won't let you but a `#!' interpreter line in
+file, but the language won't let you put a `#!' interpreter line in
 the file, and you don't want to make it executable since nothing else
 but Eshell will be able to understand
 `eshell-interpreter-alist'."
@@ -139,8 +139,9 @@ be called with all of those arguments.  Note that interpreter
 functions should throw `eshell-replace-command' with the alternate
 command form, or they should return a value compatible with the
 possible return values of `eshell-external-command', which see."
-  :type '(repeat (cons (choice regexp (function :tag "Predicate"))
-		       (choice string (function :tag "Interpreter"))))
+  :type '(alist
+          :key-type (choice regexp (function :tag "Predicate"))
+	  :value-type (choice string (function :tag "Interpreter")))
   :group 'eshell-ext)
 
 (defcustom eshell-alternate-command-hook nil
@@ -158,7 +159,7 @@ by the user on the command line."
 
 (defcustom eshell-command-interpreter-max-length 256
   "The maximum length of any command interpreter string, plus args."
-  :type 'integer
+  :type 'natnum
   :group 'eshell-ext)
 
 (defcustom eshell-explicit-command-char ?*

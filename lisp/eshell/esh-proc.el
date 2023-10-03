@@ -42,11 +42,11 @@ finish."
 
 (defcustom eshell-process-wait-seconds 0
   "The number of seconds to delay waiting for a synchronous process."
-  :type 'integer)
+  :type 'natnum)
 
 (defcustom eshell-process-wait-milliseconds 50
   "The number of milliseconds to delay waiting for a synchronous process."
-  :type 'integer)
+  :type 'natnum)
 
 (defcustom eshell-done-messages-in-minibuffer t
   "If non-nil, subjob \"Done\" messages will display in minibuffer."
@@ -582,7 +582,7 @@ If QUERY is non-nil, query the user with QUERY before calling FUNC."
 
 (defcustom eshell-kill-process-wait-time 5
   "Seconds to wait between sending termination signals to a subprocess."
-  :type 'integer)
+  :type 'natnum)
 
 (defcustom eshell-kill-process-signals '(SIGINT SIGQUIT SIGKILL)
   "Signals used to kill processes when an Eshell buffer exits.

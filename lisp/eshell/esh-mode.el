@@ -124,7 +124,12 @@ buffer.  If `this', scroll only the selected window.
 
 See `eshell-preinput-scroll-to-bottom'."
   :type '(radio (const :tag "Do not scroll Eshell windows" nil)
-		(const :tag "Scroll all windows showing the buffer" all)
+                ;; TODO: this looks weird, but matches exactly what
+                ;; docstring says.  Should we update docstring to say
+                ;; that anything unrecognized is considered "all", and
+                ;; we can use (other :tag "Tag" all) here?
+		(choice :tag "Scroll all windows showing the buffer"
+                        (const all) (const t))
                 (const :tag "Scroll only the selected window" this)))
 
 (defcustom eshell-scroll-to-bottom-on-output nil
@@ -136,7 +141,9 @@ scroll only those that are not the selected window.
 See variable `eshell-scroll-show-maximum-output' and function
 `eshell-postoutput-scroll-to-bottom'."
   :type '(radio (const :tag "Do not scroll Eshell windows" nil)
-		(const :tag "Scroll all windows showing the buffer" all)
+                ;; TODO: see `eshell-scroll-to-bottom-on-input'.
+                (choice :tag "Scroll all windows showing the buffer"
+                        (const all) (const t))
 		(const :tag "Scroll only the selected window" this)
                 (const :tag "Scroll all windows other than selected" others)))
 
@@ -151,7 +158,7 @@ See variable `eshell-scroll-to-bottom-on-output' and function
 (defcustom eshell-buffer-maximum-lines 1024
   "The maximum size in lines for eshell buffers.
 Eshell buffers are truncated from the top to be no greater than this
-number, if the function `eshell-truncate-buffer' is on
+number, if the function `eshell-truncate-buffer' is in
 `eshell-output-filter-functions'."
   :type 'natnum)
 
@@ -172,6 +179,7 @@ These functions get one argument, a string containing the text to be
 inserted.  They return the string as it should be inserted."
   :type 'hook)
 
+;; TODO: let-bind result of `apply'?
 (defcustom eshell-password-prompt-regexp
   (format "%s[^%s]*[%s]\\s *\\'"
           (regexp-opt password-word-equivalents t)

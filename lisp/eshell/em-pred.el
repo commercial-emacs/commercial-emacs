@@ -65,6 +65,7 @@ ordinary strings."
   :version "24.1"			; removed eshell-pred-initialize
   :type 'hook)
 
+;; TODO: convert λ's here into named functions?
 (defcustom eshell-predicate-alist
   '((?/ . (eshell-pred-file-type ?d))   ; directories
     (?. . (eshell-pred-file-type ?-))   ; regular files
@@ -107,9 +108,11 @@ ordinary strings."
 The format of each entry is
 
   (CHAR . PREDICATE-FUNC-SEXP)"
-  :type '(repeat (cons character sexp))
+  :type '(alist :key-type character :value-type sexp)
   :risky t)
 
+;; TODO: convert λ's here into named functions?  Or at least allow
+;; compiler to compile the λ's.
 (defcustom eshell-modifier-alist
   '((?E . (lambda (lst) (mapcar #'eshell-eval-argument lst)))
     (?L . (lambda (lst) (mapcar #'downcase lst)))
@@ -138,7 +141,7 @@ The format of each entry is
 The format of each entry is
 
   (CHAR . MODIFIER-FUNC-SEXP)"
-  :type '(repeat (cons character sexp))
+  :type '(alist :key-type character :value-type sexp)
   :risky t)
 
 (defvar eshell-predicate-help-string
