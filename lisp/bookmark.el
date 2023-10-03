@@ -374,9 +374,9 @@ type is read from the symbol property named
   (let ((handler (bookmark-get-handler bookmark-record)))
     (when (autoloadp (symbol-function handler))
       (autoload-do-load (symbol-function handler)))
-    (if (symbolp handler)
-        (get handler 'bookmark-handler-type)
-     "")))
+    (or (and (symbolp handler)
+             (get handler 'bookmark-handler-type))
+        "File")))
 
 (defun bookmark-all-names ()
   "Return a list of all current bookmark names."
@@ -1896,7 +1896,7 @@ Don't affect the buffer ring order."
                                   'follow-link t
                                   'help-echo "mouse-2: go to this bookmark in other window")
                     name)
-                 ,(or type "")
+                 ,type
                  ,@(if bookmark-bmenu-toggle-filenames
                        (list location))])
               entries)))
