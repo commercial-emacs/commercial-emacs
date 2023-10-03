@@ -93,6 +93,8 @@ a tool that can be used for symbol referencing."
        idutils)
      ( (lambda (rootdir) (file-exists-p (expand-file-name "cscope.out" rootdir))) .
        cscope )
+     ( (lambda (rootdir) (project-current nil rootdir)) .
+       project)
     )
   "Alist of tools usable by `semantic-symref'.
 Each entry is of the form:
