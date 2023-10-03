@@ -121,6 +121,27 @@ eius. Foo")))
   ;; w
 ")))
 
+(ert-deftest fill-test-balanced-fill-mode nil
+  "Basic tests of the `balanced-fill-mode' option."
+  (with-temp-buffer
+    (insert "Ccc ccc a bb dddd bb bb a ccc a jjjjjjjjjj a eeeee a hhhhhhhh bb dddd.")
+    (setq fill-column 15)
+    (setq-local balanced-fill-mode nil)
+    (fill-paragraph)
+    (should (string= (buffer-string) "Ccc ccc a bb\ndddd bb bb a\nccc a\njjjjjjjjjj a\neeeee a\nhhhhhhhh bb\ndddd.")))
+  (with-temp-buffer
+    (insert "Ccc ccc a bb dddd bb bb a ccc a jjjjjjjjjj a eeeee a hhhhhhhh bb dddd.")
+    (setq fill-column 15)
+    (setq-local balanced-fill-mode t)
+    (fill-paragraph)
+    (should (string= (buffer-string) "Ccc ccc a\nbb dddd bb\nbb a ccc a\njjjjjjjjjj\na eeeee a\nhhhhhhhh\nbb dddd.")))
+  (with-temp-buffer
+    (insert "Ccc ccc a bb dddd bb bb a ccc a jjjjjjjjjj a eeeee a hhhhhhhh bb dddd.")
+    (setq fill-column 15)
+    (setq-local balanced-fill-mode t)
+    (fill-paragraph 'full)
+    (should (string= (buffer-string) "Ccc    ccc    a\nbb    dddd   bb\nbb   a  ccc   a\njjjjjjjjjj\na    eeeee    a\nhhhhhhhh\nbb dddd."))))
+
 (provide 'fill-tests)
 
 ;;; fill-tests.el ends here

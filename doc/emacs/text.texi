@@ -497,6 +497,7 @@ text.
 * Fill Commands::  Commands to refill paragraphs and center lines.
 * Fill Prefix::    Filling paragraphs that are indented or in a comment, etc.
 * Adaptive Fill::  How Emacs can determine the fill prefix automatically.
+* Balanced Fill::  Breaking lines to look more even and neat.
 @end menu
 
 @node Auto Fill
@@ -832,6 +833,52 @@ function.  This function is called with point after the left margin of a
 line, and it should return the appropriate fill prefix based on that
 line.  If it returns @code{nil}, @code{adaptive-fill-regexp} gets
 a chance to find a prefix.
+
+@node Balanced Fill
+@subsection Balanced Filling
+
+@cindex balanced filling
+  Filling can consider an entire paragraph at a time when determining
+where to place line breaks, as an alternative to just greedily
+inserting a break after the last word that fits on each line.
+This may place line breaks sooner than strictly necessary if it
+will help to balance out the lengths of later lines.
+
+  For example, when @code{fill-column} is 20, compare the results
+of line breaking using the greedy fill algorithm (left) versus the
+balanced fill algorithm (right):
+
+@smallexample
+------ greedy ------    ----- balanced -----
+Hard and sharp as       Hard and sharp as
+flint, from which no    flint, from which
+steel had ever          no steel had ever
+struck out generous     struck out generous
+fire; secret, and       fire; secret, and
+self-contained, and     self-contained,
+solitary as an          and solitary as
+oyster.                 an oyster.
+------ greedy ------    ----- balanced -----
+@end smallexample
+
+  The balanced fill algorithm produces slightly shorter but more even
+line lengths, resulting in a less ragged right margin.  It also avoids
+leaving a single word alone on the last line.
+
+@findex balanced-fill-mode
+@vindex balanced-fill-mode
+@vindex balanced-fill-word-limit
+  You may enable the balanced fill algorithm with Balanced Fill mode,
+which is disabled by default.  To toggle it globally, type @kbd{M-x
+balanced-fill-mode}.  Note that even when it is enabled, paragraphs
+with more than @code{balanced-fill-word-limit} words will fall back
+to the faster greedy filling algorithm for speed.
+
+  To decide where to place line breaks, the balanced fill algorithm
+sums up a set of penalties to compute a score for how poor the layout
+of a paragraph is and then chooses the placement with the lowest
+score.  Type @code{M-x customize-group RET balanced-fill RET} to
+see options for fine-tuning the scoring penalties to taste.
 
 @node Case
 @section Case Conversion Commands
