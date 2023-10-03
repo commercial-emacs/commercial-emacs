@@ -5515,6 +5515,339 @@ completion alternatives to currently visited manuals."
 					     Info-directory-list
 					     (mapcar #'car Info-suffix-list))))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; This code below provides links of symbols (functions, variables,
+;; faces) within Emacs' Info viewer to their builtin help
+;; documentation.  This linking is done, when the symbol names in
+;; texinfo documentations (like the Emacs- and Elisp manual) are
+
+;; 1. Quoted symbol names like `quoted-symbol' or:
+
+;; 2. Function names are prefixed by M-x, for example M-x
+;; function-name or are quoted and prefixed like `M-x function-name'.
+
+;; 3. Function names appearing behind the following forms, which
+;; occur, for example, in the Elisp manual:
+
+;;   -- Special Form: function-name
+;;   -- Command: ...
+;;   -- Function: ...
+;;   -- Macro: ...
+
+;; 4. And variables names behind the following text:
+
+;;   -- User Option: variable-name
+;;   -- Variable: ...
+
+;; In any case all symbol names must be known to Emacs, which means it
+;; is either a built-in, or its Lisp package is loaded in the current
+;; Emacs session, or the symbol is auto-loaded.
+
+;; You can follow the additional links with the usual Info
+;; keybindings.  The customisation variable
+;; `mouse-1-click-follows-link' is influencing the clicking behavior
+;; (and the tooltips) of the links, the variable's default is 450
+;; (milli seconds) setting it to nil means only clicking with mouse-2
+;; is following the link (hint: Drew Adams).
+
+;; The link color of symbols - referencing their builtin documentation
+;; - is distinct from links which are referencing further Info
+;; documentation.
+
+;; Below code is checking if Info documents are relevant Elisp and
+;; Emacs related files to avoid false positives.  Please see the
+;; customization variable `info-none-emacs-or-elisp-documents'.
+
+;; The code uses mostly mechanisms from Emacs' lisp/help-mode.el file.
+
+
+
+(require 'button)
+(require 'cl-lib)
+(require 'help-mode)                   ;redundant?
+(require 'cl-seq)
+
+(defcustom info-make-xref-flag t
+  "Non-nil means create symbol links in info buffers.
+Please see the function `info-make-xrefs' for further
+information."
+  :type '(choice (const :tag "Create links" t)
+                 (const :tag "Do not link" nil))
+  :version "30.1"
+  :group 'info)
+
+;; We need to initalise Info-directory-list first.
+(info-initialize)
+;; Before declaring the following:
+(defvar info-emacs-info-dir-content
+  (mapcar 'file-name-nondirectory ;'file-name-sans-extension
+          (directory-files
+           (car
+            ;; search for the main Emacs' info/ directory
+            (cl-member "[^.]emacs" Info-directory-list :test 'string-match-p))
+           ;; don't list "." and ".."
+           t  "[^.]$"))
+  "List of file names in Emacs' own info/ directory.")
+
+;; FIXME: Turn into regexp list? Hint Stefan Monier or switch to alist
+;; with explanation of file name?
+(defcustom info-none-emacs-or-elisp-documents
+  '("aarm2012" ; Stefan: Ada manual, Elpa archive
+    "arm2012"  ; Stefan: Ada manual
+    "sicp"   ; T.V: Structure and Interpretation of Computer Programs,
+                                        ; Melpa archive
+    )
+  "List of all none GNU Emacs or Elisp documentation.
+Or other documents not to be checked for linking to their help
+documentation.  The list must contain only the base name of the
+files (without their file name extension \".info\")."
+  :type '(repeat string)
+  :version "30.1"
+  :group 'info)
+
+(defun info-check-docu-p ()
+  "Check if the current info file is relevant to Emacs.
+That means `Info-current-file' is either found in Emacs' info/
+directory or in `package-user-dir' and is not included in the
+`info-none-emacs-or-elisp-documents' list."
+  (let* ((ifile Info-current-file)
+         (ifi (when ifile
+                (file-name-sans-extension
+                 (file-name-nondirectory ifile))))
+         (pdir (when (boundp 'package-user-dir)
+                 (expand-file-name
+                  package-user-dir)))
+         (ifiles info-emacs-info-dir-content)
+         (ndocu info-none-emacs-or-elisp-documents))
+    (and ifile
+         (or (assoc-string (concat ifi ".info") ifiles)
+             ;; info files might be archived!
+             (assoc-string (concat ifi ".info.gz") ifiles)
+             (when pdir (string-match pdir ifile)))
+         (not (assoc-string ifi ndocu)))))
+
+;; FIXME: what are these variables for, suppress compiler warnings?
+(defvar describe-symbol-backends)      ;from help-mode.el
+(defvar help-xref-following)           ;dito
+
+;; This toggles the complete linking process
+(when info-make-xref-flag
+  (add-hook 'Info-selection-hook 'info-make-xrefs))
+
+(defface info-color
+  '((t (:inherit font-lock-doc-face
+                 ;; font-lock-preprocessor-face ; similar to link face (default)
+                 ;; font-lock-builtin-face ; similar (default Emacs)
+                 ;; font-lock-function-name-face ; similar (default)
+                 ;; info-face
+                 )))
+  "Face for the `symbol' reference items in `info' nodes."
+  :group 'info-colors)
+
+;; Button types
+
+(define-button-type 'info
+  'link t                         ;for Info-next-reference-or-link
+  'follow-link t
+  'face 'info-color
+  'action #'info-button-action)
+
+(define-button-type 'info-function
+  :supertype 'info
+  'info-function 'describe-function
+  'info-echo (purecopy "mouse-2, RET: describe this function"))
+
+(define-button-type 'info-variable
+  :supertype 'info
+  'info-function 'describe-variable
+  'info-echo (purecopy "mouse-2, RET: describe this variable"))
+
+(define-button-type 'info-face
+  :supertype 'info
+  'info-function 'describe-face
+  'info-echo (purecopy "mouse-2, RET: describe this face"))
+
+(define-button-type 'info-symbol
+  :supertype 'info
+  'info-function #'describe-symbol
+  'info-echo (purecopy "mouse-2, RET: describe this symbol"))
+
+(define-button-type 'info-function-def
+  :supertype 'info
+  'info-function (lambda (fun &optional file type)
+                        (or file
+                            (setq file (find-lisp-object-file-name fun type)))
+                        (if (not file)
+                            (message "Unable to find defining file")
+                          (require 'find-func)
+                          (when (eq file 'C-source)
+                            (setq file
+                                  (help-C-file-name (indirect-function fun) 'fun)))
+                          ;; Don't use find-function-noselect because it follows
+                          ;; aliases (which fails for built-in functions).
+                          (let ((location
+                                 (find-function-search-for-symbol fun type file)))
+                            (pop-to-buffer (car location))
+                            (run-hooks 'find-function-after-hook)
+                            (if (cdr location)
+                                (goto-char (cdr location))
+                              (message "Unable to find location in file")))))
+  'info-echo (purecopy "mouse-2, RET: find function's definition"))
+
+;; Functions
+
+(defun info-button-action (button)
+  "Call BUTTON's help function."
+  (info-do-xref nil
+                     (button-get button 'info-function)
+                     (button-get button 'info-args)))
+
+(defun info-do-xref (_pos function args)
+  "Call the help cross-reference function FUNCTION with args ARGS.
+Things are set up properly so that the resulting `help-buffer' has
+a proper [back] button."
+  ;; There is a reference at point.  Follow it.
+  (let ((help-xref-following nil))
+    (apply
+     function (if (eq function 'info)
+                  (append args (list (generate-new-buffer-name "*info*")))args))))
+
+(defun info-button (match-number type &rest args)
+  "Make a hyperlink for cross-reference text previously matched.
+MATCH-NUMBER is the subexpression of interest in the last matched
+regexp.  TYPE is the type of button to use.  Any remaining arguments are
+passed to the button's info-function when it is invoked.
+See `info-make-xrefs' Don't forget ARGS." ; -TODO-
+  ;; Don't mung properties we've added specially in some instances.
+  (unless (button-at (match-beginning match-number))
+    ;; (message "Creating button: %s." args)
+    (make-text-button (match-beginning match-number)
+                      (match-end match-number)
+                      'type type 'info-args args)))
+
+(defconst info-symbol-regexp
+  (purecopy (concat "\\(\\<\\(\\(variable\\|option\\)\\|"  ; Link to var
+                    "\\(function\\|command\\|call\\)\\|"   ; Link to function
+                    "\\(face\\)\\|"                       ; Link to face
+                    "\\(symbol\\|program\\|property\\)\\|" ; Don't link
+                    "\\(source \\(?:code \\)?\\(?:of\\|for\\)\\)\\)"
+                    "[ \t\n]+\\)?"
+                    ;; Note starting with word-syntax character:
+                    "['`‘]\\(\\sw\\(\\sw\\|\\s_\\)+\\|`\\)['’]"))
+  "Regexp matching info document references to their help references.
+The words preceding the quoted symbol can be used in doc strings to
+distinguish references to variables, functions and symbols.")
+
+;;;###autoload
+(defun info-make-xrefs (&optional buffer)
+  "Parse and hyperlink documentation cross-references in the given BUFFER.
+Find cross-reference information in a buffer and activate such cross
+references for selection with `help-follow'.  Cross-references have
+the canonical form `...'  and the type of reference may be
+disambiguated by the preceding word(s) used in
+`info-symbol-regexp'.
+
+Function names are also prefixed by \"M-x\", for example \"M-x
+function-name\" or are quoted and prefixed like `M-x
+function-name'.
+
+Also Function names appearing behind the following forms, which
+occur, for example, in the Elisp manual:
+
+ -- Special Form: function-name
+ -- Command: ...
+ -- Function: ...
+ -- Macro: ...
+
+And variables names behind the following text:
+
+ -- User Option: variable-name
+ -- Variable: ...
+
+Faces only get cross-referenced if preceded or followed by the
+word `face'.  Variables without variable documentation do not get
+cross-referenced, unless preceded by the word `variable' or
+`option'."
+  (interactive "b")
+  (when (info-check-docu-p)
+    (with-current-buffer (or buffer (current-buffer))
+      (save-excursion
+        (goto-char (point-min))
+        ;; Skip the header-type info, though it might be useful to parse
+        ;; it at some stage (e.g. "function in `library'").
+        ;;      (forward-paragraph)
+        (with-silent-modifications      ;from Stefan
+          (let (;(stab (syntax-table))
+                (case-fold-search t)
+                (inhibit-read-only t))
+            (with-syntax-table emacs-lisp-mode-syntax-table
+              ;; Quoted symbols
+              (save-excursion
+                (while (re-search-forward info-symbol-regexp nil t)
+                  (let* ((data (match-string 8))
+                         (sym (intern-soft data)))
+                    (if sym
+                        (cond
+                         ((match-string 3) ; `variable' &c
+                          (and (or (boundp sym) ; `variable' doesn't ensure
+                                        ; it's actually bound
+                                   (get sym 'variable-documentation))
+                               (info-button 8 'info-variable sym)))
+                         ((match-string 4) ; `function' &c
+                          (and (fboundp sym) ; similarly
+                               (info-button 8 'info-function sym)))
+                         ((match-string 5) ; `face'
+                          (and (facep sym)
+                               (info-button 8 'info-face sym)))
+                         ((match-string 6)) ; nothing for `symbol'
+                         ((match-string 7)
+                          (info-button 8 'info-function-def sym))
+                         ((cl-some (lambda (x) (funcall (nth 1 x) sym))
+                                   describe-symbol-backends)
+                          (info-button 8 'info-symbol sym)))))))
+
+              ;; (info "(elisp) Eval")
+              ;; Elisp manual      -- Special Form:
+              ;;                   -- Command:
+              ;;                   -- Function: function-name function
+              ;;                   -- Macro:
+              (save-excursion
+                (while (re-search-forward
+                        "-- \\(Special Form:\\|Command:\\|Function:\\|Macro:\\) "
+                        nil t)
+                  (looking-at "\\(\\sw\\|\\s_\\)+")
+                  (let ((sym (intern-soft (match-string 0))))
+                    (if (fboundp sym)
+                        (info-button 0 'info-function sym)))))
+
+              ;;              -- User Option:
+              ;;              -- Variable: variable-name
+              (save-excursion
+                (while (re-search-forward
+                        "-- \\(User Option:\\|Variable:\\) "
+                        nil t)
+                  (looking-at "\\(\\sw\\|\\s_\\)+")
+                  (let ((sym (intern-soft (match-string 0))))
+                    (if (boundp sym)
+                        (info-button 0 'info-variable sym)))))
+
+              ;; M-x prefixed functions
+              (save-excursion
+                (while (re-search-forward
+                        ;; Assume command name is only word and symbol
+                        ;; characters to get things like `use M-x foo->bar'.
+                        ;; Command required to end with word constituent
+                        ;; to avoid `.' at end of a sentence.
+                        ;; "\\<M-x\\s-+\\(\\sw\\(\\sw\\|\\s_\\)*\\sw\\)" nil t)
+                        ;; include M-x and quotes
+                        "['`‘]?M-x\\s-*\n?\\(\\sw\\(\\sw\\|\\s_\\)*\\sw\\)['’]?" nil t)
+                  (let ((sym (intern-soft (match-string 1))))
+                    ;; (message "found %s" sym)
+                    (if (fboundp sym)
+                        (info-button 1 'info-function sym))))))))))))
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 (provide 'info)
 
 ;;; info.el ends here
