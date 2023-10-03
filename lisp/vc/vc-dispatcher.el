@@ -827,7 +827,9 @@ the buffer contents as a comment."
   "Are we in a directory browser buffer?"
   (or (derived-mode-p 'vc-dir-mode)
       (derived-mode-p 'dired-mode)
-      (derived-mode-p 'diff-mode)))
+      (derived-mode-p 'diff-mode)
+      (derived-mode-p 'log-view-mode)
+      ))
 
 ;; These are unused.
 ;; (defun vc-dispatcher-in-fileset-p (fileset)

@@ -1398,6 +1398,24 @@ This prompts for a branch to merge from."
     (vc-git--out-ok "clone" remote directory))
   directory)
 
+(defun vc-git-modify-change-comment (_files rev comment)
+  "Modify the change comments on REV to COMMENT."
+  ;; This is very similar to using to "git commit --fixup=amend"
+  ;; command but it is more precise as it does the rebase matching
+  ;; with the hash instead of the subject line.  Also we can't use
+  ;; --fixup non-interactively (it doesn't support -m or -F) so this
+  ;; is much easier.
+  (vc-git-command nil 0 nil "commit"
+                  "--allow-empty"
+                  "-m" (concat "amend! " rev "\n\n" comment))
+  ;; We should really be able to do this "non-interactively" but we
+  ;; can't so we set GIT_SEQUENCE_EDITOR
+  (let ((process-environment
+         (cons
+          "GIT_SEQUENCE_EDITOR=:"
+          process-environment)))
+    (vc-git-command nil 0 nil "rebase" "--autosquash" "-i" (concat rev "~1"))))
+
 ;;; HISTORY FUNCTIONS
 
 (autoload 'vc-setup-buffer "vc-dispatcher")
@@ -1590,7 +1608,13 @@ or BRANCH^ (where \"^\" can be repeated)."
     (apply #'vc-git-command t nil nil
            `("log"
              ,revision
-             "-1"  "--no-color" ,@(ensure-list vc-git-log-switches)
+             "-1"  "--no-color"
+             ;; The same as the default "medium" format but it doesn't
+             ;; put spaces at the beginning of the body.  This is so
+             ;; we can grab this as the initial value when calling
+             ;; log-view-modify-change-comment
+             "--pretty=format:commit %H%nAuthor: %an %ae%nDate:   %ad%n%n%B"
+             ,@(ensure-list vc-git-log-switches)
              "--"))
     (goto-char (point-min))
     (unless (eobp)
