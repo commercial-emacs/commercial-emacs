@@ -400,12 +400,9 @@ buffer's content."
         (execute-kbd-macro (kbd "z RET M-< a"))
         (whitespace-tests--check-markers indirect 1 8))
       (kill-buffer indirect)
-      ;; When the buffer was modified above, the new "a" character at
-      ;; the beginning moved the base buffer's markers by one.  Emacs
-      ;; did not run the base buffer's `after-change-functions' after
-      ;; the indirect buffer was edited (Bug#46982), so the end result
-      ;; is just the shift by one.
-      (whitespace-tests--check-markers base 3 5))))
+      ;; The base buffer's markers have also been updated thanks to a
+      ;; workaround for Bug#46982.
+      (whitespace-tests--check-markers base 1 8))))
 
 (ert-deftest whitespace-tests--regular-clone-markers ()
   "Test `whitespace--clone' on regular clones."
@@ -422,6 +419,32 @@ buffer's content."
         (whitespace-tests--check-markers clone 1 8))
       (kill-buffer clone)
       (whitespace-tests--check-markers orig 2 4))))
+
+(ert-deftest whitespace-tests--indirect-mutual-marker-update ()
+  "Edits should update markers in base and all indirect buffers."
+  (whitespace-tests--with-test-buffer '(face empty)
+    (insert "\nx\n\n")
+    (let* ((indirects (list (clone-indirect-buffer nil nil)
+                            (clone-indirect-buffer nil nil)))
+           (bufs (cons (current-buffer) indirects)))
+      (dolist (editbuf bufs)
+        (dolist (buf bufs)
+          (whitespace-tests--check-markers buf 2 4))
+        (ert-with-buffer-selected editbuf
+          (buffer-enable-undo)
+          (undo-boundary)
+          (with-undo-amalgamate
+            (execute-kbd-macro (kbd "z RET M-< a"))))
+        (dolist (buf bufs)
+          (whitespace-tests--check-markers buf 1 8))
+        (ert-with-buffer-selected editbuf
+          (execute-kbd-macro (kbd "C-_")))
+        (dolist (buf bufs)
+          (whitespace-tests--check-markers buf 2 4)))
+      ;; `unwind-protect' is not used to clean up `indirects' because
+      ;; the buffers should only be killed on success.
+      (dolist (buf indirects)
+        (kill-buffer buf)))))
 
 (provide 'whitespace-tests)
 

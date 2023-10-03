@@ -2081,6 +2081,26 @@ resultant list will be returned."
                              (marker-insertion-type whitespace-eob-marker)))))
 
 
+(defvar whitespace--indirect-buffers nil
+  "Plist mapping a base buffer to a list of its indirect buffers.
+
+Used to work around Bug#46982.")
+
+
+(defun whitespace--refresh-indirect-buffers ()
+  "Refresh `whitespace--indirect-buffers'.
+
+Used to work around Bug#46982."
+  (setq whitespace--indirect-buffers nil)
+  ;; Keep track of all buffers -- not just those with
+  ;; `whitespace-mode' enabled -- in case `whitespace-mode' is enabled
+  ;; later.
+  (dolist (buf (buffer-list))
+    (let ((base (buffer-base-buffer buf)))
+      (when base
+        (push buf (plist-get whitespace--indirect-buffers base))))))
+
+
 (defun whitespace-color-on ()
   "Turn on color visualization."
   (when (whitespace-style-face-p)
@@ -2095,7 +2115,7 @@ resultant list will be returned."
     (setq-local whitespace-buffer-changed nil)
     (add-hook 'post-command-hook #'whitespace-post-command-hook nil t)
     (add-hook 'before-change-functions #'whitespace-buffer-changed nil t)
-    (add-hook 'after-change-functions #'whitespace--update-bob-eob
+    (add-hook 'after-change-functions #'whitespace--update-bob-eob-all
               ;; The -1 ensures that it runs before any
               ;; `font-lock-mode' hook functions.
               -1 t)
@@ -2192,8 +2212,8 @@ resultant list will be returned."
   (when (whitespace-style-face-p)
     (remove-hook 'post-command-hook #'whitespace-post-command-hook t)
     (remove-hook 'before-change-functions #'whitespace-buffer-changed t)
-    (remove-hook 'after-change-functions #'whitespace--update-bob-eob
-                 t)
+    (remove-hook 'after-change-functions
+                 #'whitespace--update-bob-eob-all t)
     (remove-hook 'clone-buffer-hook #'whitespace--clone t)
     (remove-hook 'clone-indirect-buffer-hook #'whitespace--clone t)
     (font-lock-remove-keywords nil whitespace-font-lock-keywords)
@@ -2375,6 +2395,32 @@ to `indent-tabs-mode' and `tab-width'."
     (with-current-buffer buffer
       (when whitespace-mode
         (font-lock-flush)))))
+
+(defun whitespace--update-bob-eob-all (&optional beg end &rest _)
+  "Call `whitespace--update-bob-eob' for the base and its indirect buffers.
+
+This function is intended to be used in `after-change-functions'.
+The `whitespace--update-bob-eob' function is only called for a
+buffer if the buffer has this function in its `after-change-functions'
+hook.  See `after-change-functions' for the meaning of BEG and
+END."
+  ;; Change hooks do not run for the base buffer when editing an
+  ;; indirect buffer, or for indirect buffers when editing the base
+  ;; buffer, even though the change affects all of them simultaneously
+  ;; (Bug#46982).  Work around that limitation by manually updating
+  ;; them all here.  `whitespace--update-bob-eob' is idempotent, so if
+  ;; Bug#46982 is fixed this should continue to work correctly (though
+  ;; it will be doing unnecessary work).
+  (let* ((base (or (buffer-base-buffer) (current-buffer)))
+         (indirect (plist-get whitespace--indirect-buffers base)))
+    (dolist (buf (cons base indirect))
+      (with-current-buffer buf
+        (when (memq #'whitespace--update-bob-eob-all
+                    after-change-functions)
+          ;; Positions in a base buffer always match positions in
+          ;; indirect buffers (even if narrowing differs) so there is
+          ;; no need to translate BEG or END.
+          (whitespace--update-bob-eob beg end))))))
 
 (defun whitespace--update-bob-eob (&optional beg end &rest _)
   "Update `whitespace-bob-marker' and `whitespace-eob-marker'.
@@ -2564,6 +2610,10 @@ It should be added buffer-locally to `write-file-functions'."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(whitespace--refresh-indirect-buffers)
+(add-hook 'buffer-list-update-hook
+          #'whitespace--refresh-indirect-buffers)
+
 (defvar whitespace--watched-vars
   '(fill-column indent-tabs-mode tab-width whitespace-line-column))
 
@@ -2580,6 +2630,8 @@ It should be added buffer-locally to `write-file-functions'."
     (dolist (buf (buffer-list))
       (set-buffer buf)
       (whitespace-mode -1)))
+  (remove-hook 'buffer-list-update-hook
+               #'whitespace--refresh-indirect-buffers)
   nil)					; continue standard unloading
 
 
