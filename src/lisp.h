@@ -3930,15 +3930,12 @@ mark_automatic_object (Lisp_Object obj)
 }
 
 extern void with_flushed_stack (void (*func) (void *arg), void *arg);
-extern void garbage_collect (void);
+extern bool garbage_collect (void);
 extern bool maybe_garbage_collect_eagerly (EMACS_INT factor);
 extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
 extern EMACS_INT bytes_since_gc;
 extern EMACS_INT bytes_between_gc;
-#ifdef HAVE_PDUMPER
-extern int number_finalizers_run;
-#endif
 extern Lisp_Object list1 (Lisp_Object);
 extern Lisp_Object list2 (Lisp_Object, Lisp_Object);
 extern Lisp_Object list3 (Lisp_Object, Lisp_Object, Lisp_Object);

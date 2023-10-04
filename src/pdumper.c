@@ -3928,13 +3928,8 @@ DEFUN ("dump-emacs-portable",
   if (! NILP (XCDR (Fall_threads ())))
     error ("No other Lisp threads can be running when this function is called");
 
-  /* Clear out any detritus in memory.  */
-  do
-    {
-      number_finalizers_run = 0;
-      garbage_collect ();
-    }
-  while (number_finalizers_run);
+  /* Clear detritus in memory.  */
+  while (garbage_collect ()); // while a finalizer was run
 
   specpdl_ref count = SPECPDL_INDEX ();
 

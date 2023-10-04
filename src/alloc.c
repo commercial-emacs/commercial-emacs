@@ -112,12 +112,6 @@ struct Lisp_String *(*static_string_allocator) (void);
 struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t len, bool q_clear);
 INTERVAL (*static_interval_allocator) (void);
 
-#ifdef HAVE_PDUMPER
-/* Number of finalizers run: used to loop over GC until we stop
-   generating garbage.  */
-int number_finalizers_run;
-#endif
-
 /* Exposed to lisp.h so that maybe_garbage_collect() can inline.  */
 
 EMACS_INT bytes_since_gc;
@@ -2812,20 +2806,17 @@ static void
 run_finalizer_function (Lisp_Object function)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-#ifdef HAVE_PDUMPER
-  ++number_finalizers_run;
-#endif
-
   specbind (Qinhibit_quit, Qt);
   internal_condition_case_1 (call0, function, Qt, run_finalizer_handler);
   unbind_to (count, Qnil);
 }
 
-static void
+static bool
 run_finalizers (struct Lisp_Finalizer *finalizers)
 {
   struct Lisp_Finalizer *finalizer;
   Lisp_Object function;
+  bool finalizer_run = false;
 
   while (finalizers->next != finalizers)
     {
@@ -2834,10 +2825,12 @@ run_finalizers (struct Lisp_Finalizer *finalizers)
       function = finalizer->function;
       if (! NILP (function))
 	{
+	  finalizer_run = true;
 	  finalizer->function = Qnil;
 	  run_finalizer_function (function);
 	}
     }
+  return finalizer_run;
 }
 
 DEFUN ("make-finalizer", Fmake_finalizer, Smake_finalizer, 1, 1, 0,
@@ -4584,7 +4577,8 @@ mark_stack_push (Lisp_Object *value)
 }
 
 /* Subroutine of Fgarbage_collect that does most of the work.  */
-void
+
+bool
 garbage_collect (void)
 {
   static struct timespec gc_elapsed = { 0, 0 };
@@ -4595,7 +4589,7 @@ garbage_collect (void)
   eassert (weak_hash_tables == NULL);
 
   if (gc_inhibited || gc_in_progress)
-    return;
+    return false;
 
   block_input ();
 
@@ -4687,7 +4681,7 @@ garbage_collect (void)
   unbind_to (count, Qnil);
 
   /* GC is complete: now we can run our finalizer callbacks.  */
-  run_finalizers (&doomed_finalizers);
+  bool finalizer_run = run_finalizers (&doomed_finalizers);
 
   if (main_thread_p (current_thread))
     {
@@ -4704,12 +4698,14 @@ garbage_collect (void)
 	malloc_probe (min (tot_before - tot_after, SIZE_MAX));
     }
 
-  if (!NILP (Vpost_gc_hook))
+  if (! NILP (Vpost_gc_hook))
     {
       specpdl_ref gc_count = inhibit_garbage_collection ();
       safe_run_hooks (Qpost_gc_hook);
       unbind_to (gc_count, Qnil);
     }
+
+  return finalizer_run;
 }
 
 static void
