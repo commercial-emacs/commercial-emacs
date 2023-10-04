@@ -3068,7 +3068,7 @@ struct ablock
   union
   {
     char payload[BLOCK_NBYTES];
-    struct ablock *next_free;
+    struct ablock *next;
   } x;
 
   /* ABASE is the aligned base of the ablocks.  It is overloaded to

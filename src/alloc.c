@@ -639,7 +639,7 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
       for (i = 0; i < (aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1); ++i)
 	{
 	  abase->blocks[i].abase = abase;
-	  abase->blocks[i].x.next_free = THREAD_FIELD (thr, m_free_ablocks);
+	  abase->blocks[i].x.next = THREAD_FIELD (thr, m_free_ablocks);
 	  ASAN_POISON_ABLOCK (&abase->blocks[i]);
 	  THREAD_FIELD (thr, m_free_ablocks) = &abase->blocks[i];
 	}
@@ -658,7 +658,7 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
   ABLOCKS_BUSY (abase)
     = (struct ablocks *) (2 + (intptr_t) ABLOCKS_BUSY (abase));
   val = THREAD_FIELD (thr, m_free_ablocks);
-  THREAD_FIELD (thr, m_free_ablocks) = THREAD_FIELD (thr, m_free_ablocks)->x.next_free;
+  THREAD_FIELD (thr, m_free_ablocks) = THREAD_FIELD (thr, m_free_ablocks)->x.next;
 
   if (type != MEM_TYPE_NON_LISP)
     mem_insert (val, (char *) val + nbytes, type, &THREAD_FIELD (thr, m_mem_root));
@@ -678,7 +678,7 @@ lisp_align_free (struct thread_state *thr, void *block)
   mem_delete (mem_find (thr, block), &THREAD_FIELD (thr, m_mem_root));
 
   /* Put on free list.  */
-  ablock->x.next_free = THREAD_FIELD (thr, m_free_ablocks);
+  ablock->x.next = THREAD_FIELD (thr, m_free_ablocks);
   ASAN_POISON_ABLOCK (ablock);
   THREAD_FIELD (thr, m_free_ablocks) = ablock;
   /* Update busy count.  */
@@ -702,10 +702,10 @@ lisp_align_free (struct thread_state *thr, void *block)
 	  if (*tem >= (struct ablock *) abase && *tem < atop)
 	    {
 	      ++i;
-	      *tem = (*tem)->x.next_free;
+	      *tem = (*tem)->x.next;
 	    }
 	  else
-	    tem = &(*tem)->x.next_free;
+	    tem = &(*tem)->x.next;
 	}
       eassert ((aligned & 1) == aligned);
       eassert (i == (aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1));
@@ -822,13 +822,11 @@ mark_interval_tree (INTERVAL *i)
 
 struct sblock
 {
-  /* NEXT points in the direction of oldest_sblock to
-     current_sblock from which new allocations issue.  */
-  struct sblock *next;
+  struct sblock *next; /* points in direction of oldest_sblock to
+			  current_sblock */
 
-  /* Points to next available sdata in DATA.
-     Points past end of sblock if none available.  */
-  sdata *next_free;
+  sdata *data_slot;  /* one-after last populated DATA slot. */
+
   sdata data[FLEXIBLE_ARRAY_MEMBER];
 };
 
@@ -838,8 +836,6 @@ struct string_block
   struct Lisp_String strings[BLOCK_NSTRINGS];
   struct string_block *next;
 };
-
-#define NEXT_FREE_LISP_STRING(S) ((S)->u.next)
 
 #ifdef ENABLE_CHECKING
 # define GC_STRING_OVERRUN_COOKIE_SIZE ROUNDUP (4, alignof (sdata))
@@ -939,7 +935,7 @@ check_string_bytes (struct Lisp_String *s, ptrdiff_t nbytes)
 static void
 check_sblock (struct sblock *b)
 {
-  for (sdata *from = b->data, *end = b->next_free; from < end; )
+  for (sdata *from = b->data, *end = b->data_slot; from < end; )
     {
       ptrdiff_t nbytes = sdata_size (from->string
 				     ? STRING_BYTES (from->string)
@@ -969,7 +965,7 @@ check_string_free_list (struct thread_state *thr)
 {
   for (struct Lisp_String *s = THREAD_FIELD (thr, m_string_free_list);
        s != NULL;
-       s = NEXT_FREE_LISP_STRING (s))
+       s = s->u.next)
     eassume ((uintptr_t) s >= BLOCK_ALIGN);
 }
 
@@ -999,7 +995,7 @@ allocate_string (void)
 	{
 	  s = b->strings + i;
 	  s->u.s.data = NULL; /* invariant for free-list strings */
-	  NEXT_FREE_LISP_STRING (s) = string_free_list;
+	  s->u.next = string_free_list;
 	  string_free_list = s;
 	}
       ASAN_POISON_STRING_BLOCK (b);
@@ -1008,7 +1004,7 @@ allocate_string (void)
   /* Pop a Lisp_String off the free list.  */
   s = string_free_list;
   ASAN_UNPOISON_STRING (s);
-  string_free_list = NEXT_FREE_LISP_STRING (s);
+  string_free_list = s->u.next;
 
   ++strings_consed;
   bytes_since_gc += sizeof *s;
@@ -1034,7 +1030,6 @@ allocate_sdata (struct Lisp_String *s,
 		EMACS_INT nchars, EMACS_INT nbytes,
 		bool immovable)
 {
-  sdata *the_data;
   struct sblock *b;
   ptrdiff_t sdata_nbytes;
 
@@ -1050,49 +1045,44 @@ allocate_sdata (struct Lisp_String *s,
       size_t size = FLEXSIZEOF (struct sblock, data, sdata_nbytes);
       b = lisp_malloc (size + GC_STRING_OVERRUN_COOKIE_SIZE, false, MEM_TYPE_NON_LISP);
       ASAN_POISON_SBLOCK_DATA (b, size);
-      the_data = b->data;
       b->next = large_sblocks;
-      b->next_free = the_data;
       large_sblocks = b;
+      b->data_slot = b->data;
     }
   else
     {
       b = current_sblock;
-
       if (b == NULL
 	  || ((SBLOCK_NBYTES - GC_STRING_OVERRUN_COOKIE_SIZE) <
-	      ((char *) b->next_free - (char *) b + sdata_nbytes)))
+	      ((char *) b->data_slot - (char *) b + sdata_nbytes)))
 	{
 	  /* Not enough room in the current sblock.  */
 	  b = lisp_malloc (SBLOCK_NBYTES, false, MEM_TYPE_NON_LISP);
 	  ASAN_POISON_SBLOCK_DATA (b, SBLOCK_SIZE);
-	  the_data = b->data;
 	  b->next = NULL;
-	  b->next_free = the_data;
-
+	  b->data_slot = b->data;
 	  if (current_sblock)
 	    current_sblock->next = b;
 	  else
 	    oldest_sblock = b;
 	  current_sblock = b;
 	}
-
-      the_data = b->next_free;
     }
 
   ASAN_PREPARE_LIVE_SDATA (data, nbytes);
-  the_data->string = s;
-  b->next_free = (sdata *) ((char *) the_data + sdata_nbytes + GC_STRING_OVERRUN_COOKIE_SIZE);
-  eassert ((uintptr_t) b->next_free % alignof (sdata) == 0);
-
-  the_data->nbytes = nbytes;
-  s->u.s.data = the_data->data;
+  b->data_slot->string = s;
+  b->data_slot->nbytes = nbytes;
+  s->u.s.data = b->data_slot->data;
   s->u.s.size = nchars;
   s->u.s.size_byte = nbytes;
   s->u.s.data[nbytes] = '\0'; /* NBYTES is exclusive of the NUL terminator. */
-  eassume (memcpy ((char *) the_data + sdata_nbytes, string_overrun_cookie,
+  eassume (memcpy ((char *) b->data_slot + sdata_nbytes, string_overrun_cookie,
 		   GC_STRING_OVERRUN_COOKIE_SIZE));
 
+  /* advance DATA_SLOT */
+  b->data_slot = (sdata *) ((char *) b->data_slot + sdata_nbytes
+			    + GC_STRING_OVERRUN_COOKIE_SIZE);
+  eassert ((uintptr_t) b->data_slot % alignof (sdata) == 0);
   bytes_since_gc += sdata_nbytes;
 }
 
@@ -1197,7 +1187,7 @@ sweep_strings (struct thread_state *thr)
 		  s->u.s.data = NULL;
 
 		  /* Put on free list.  */
-		  NEXT_FREE_LISP_STRING (s) = THREAD_FIELD (thr, m_string_free_list);
+		  s->u.next = THREAD_FIELD (thr, m_string_free_list);
 		  ASAN_POISON_STRING (s);
 		  ASAN_PREPARE_DEAD_SDATA (data, SDATA_NBYTES (data));
 		  THREAD_FIELD (thr, m_string_free_list) = s;
@@ -1207,7 +1197,7 @@ sweep_strings (struct thread_state *thr)
 	  else /* s->u.s.data == NULL */
 	    {
 	      /* S inexplicably not already on free list.  */
-	      NEXT_FREE_LISP_STRING (s) = THREAD_FIELD (thr, m_string_free_list);
+	      s->u.next = THREAD_FIELD (thr, m_string_free_list);
 	      ASAN_POISON_STRING (s);
 	      THREAD_FIELD (thr, m_string_free_list) = s;
 	      ++nfree;
@@ -1280,8 +1270,8 @@ sweep_sdata (struct thread_state *thr)
 
       for (struct sblock *b = tb; b != NULL; b = b->next)
 	{
-	  eassert ((char *) b->next_free <= (char *) b + SBLOCK_NBYTES);
-	  for (sdata *next_from, *end_from = b->next_free, *from = b->data;
+	  eassert ((char *) b->data_slot <= (char *) b + SBLOCK_NBYTES);
+	  for (sdata *next_from, *end_from = b->data_slot, *from = b->data;
 	       from < end_from;
 	       from = next_from)
 	    {
@@ -1308,7 +1298,7 @@ sweep_sdata (struct thread_state *thr)
 		  if (next_to > end_tb)
 		    {
 		      /* TB is full, proceed with the next sblock.  */
-		      tb->next_free = to;
+		      tb->data_slot = to;
 		      tb = tb->next;
 		      end_tb = (sdata *) ((char *) tb + SBLOCK_NBYTES);
 		      to = tb->data;
@@ -1336,7 +1326,7 @@ sweep_sdata (struct thread_state *thr)
 	  b = next;
 	}
 
-      tb->next_free = to;
+      tb->data_slot = to;
       tb->next = NULL;
     }
   THREAD_FIELD (thr, m_current_sblock) = tb;
