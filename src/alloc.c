@@ -822,6 +822,8 @@ mark_interval_tree (INTERVAL *i)
 
 struct sblock
 {
+  /* NEXT points in the direction of oldest_sblock to
+     current_sblock from which new allocations issue.  */
   struct sblock *next;
 
   /* Points to next available sdata in DATA.
@@ -836,9 +838,6 @@ struct string_block
   struct Lisp_String strings[BLOCK_NSTRINGS];
   struct string_block *next;
 };
-
-/* The NEXT pointers point in the direction of oldest_sblock to
-   current_sblock.  We always allocate from current_sblock.  */
 
 #define NEXT_FREE_LISP_STRING(S) ((S)->u.next)
 
@@ -1208,7 +1207,7 @@ sweep_strings (struct thread_state *thr)
 	  else /* s->u.s.data == NULL */
 	    {
 	      /* S inexplicably not already on free list.  */
-	      NEXT_FREE_LISP_STRING (s) = string_free_list;
+	      NEXT_FREE_LISP_STRING (s) = THREAD_FIELD (thr, m_string_free_list);
 	      ASAN_POISON_STRING (s);
 	      THREAD_FIELD (thr, m_string_free_list) = s;
 	      ++nfree;
@@ -5462,9 +5461,13 @@ static void
 gc_sweep (void)
 {
   mgc_flip_space ();
+#ifdef HAVE_GCC_TLS
   for (struct thread_state *thr = all_threads;
        thr != NULL;
-       thr = THREAD_FIELD (thr, next_thread))
+       thr = thr->next_thread)
+#else
+  struct thread_state *thr = main_thread;
+#endif
     {
       sweep_strings (thr);
       sweep_void (thr,
