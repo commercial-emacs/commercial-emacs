@@ -640,8 +640,8 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
 	{
 	  abase->blocks[i].abase = abase;
 	  abase->blocks[i].x.next = THREAD_FIELD (thr, m_free_ablocks);
-	  ASAN_POISON_ABLOCK (&abase->blocks[i]);
 	  THREAD_FIELD (thr, m_free_ablocks) = &abase->blocks[i];
+	  ASAN_POISON_ABLOCK (&abase->blocks[i]);
 	}
       intptr_t ialigned = aligned;
       ABLOCKS_BUSY (abase) = (struct ablocks *) ialigned;
@@ -679,8 +679,9 @@ lisp_align_free (struct thread_state *thr, void *block)
 
   /* Put on free list.  */
   ablock->x.next = THREAD_FIELD (thr, m_free_ablocks);
-  ASAN_POISON_ABLOCK (ablock);
   THREAD_FIELD (thr, m_free_ablocks) = ablock;
+  ASAN_POISON_ABLOCK (ablock);
+
   /* Update busy count.  */
   intptr_t busy = (intptr_t) ABLOCKS_BUSY (abase) - 2;
   eassume (0 <= busy && busy <= 2 * ABLOCKS_NBLOCKS - 1);
@@ -760,11 +761,10 @@ allocate_interval (void)
 	{
 	  struct interval_block *newi
 	    = lisp_malloc (sizeof *newi, false, MEM_TYPE_NON_LISP);
-
 	  newi->next = interval_blocks;
-	  ASAN_POISON_INTERVAL_BLOCK (newi);
 	  interval_blocks = newi;
 	  interval_block_index = 0;
+	  ASAN_POISON_INTERVAL_BLOCK (newi);
 	}
       val = &interval_blocks->intervals[interval_block_index++];
       ASAN_UNPOISON_INTERVAL (val);
@@ -1044,10 +1044,10 @@ allocate_sdata (struct Lisp_String *s,
     {
       size_t size = FLEXSIZEOF (struct sblock, data, sdata_nbytes);
       b = lisp_malloc (size + GC_STRING_OVERRUN_COOKIE_SIZE, false, MEM_TYPE_NON_LISP);
-      ASAN_POISON_SBLOCK_DATA (b, size);
       b->next = large_sblocks;
       large_sblocks = b;
       b->data_slot = b->data;
+      ASAN_POISON_SBLOCK_DATA (b, size);
     }
   else
     {
@@ -1058,7 +1058,6 @@ allocate_sdata (struct Lisp_String *s,
 	{
 	  /* Not enough room in the current sblock.  */
 	  b = lisp_malloc (SBLOCK_NBYTES, false, MEM_TYPE_NON_LISP);
-	  ASAN_POISON_SBLOCK_DATA (b, SBLOCK_SIZE);
 	  b->next = NULL;
 	  b->data_slot = b->data;
 	  if (current_sblock)
@@ -1066,6 +1065,7 @@ allocate_sdata (struct Lisp_String *s,
 	  else
 	    oldest_sblock = b;
 	  current_sblock = b;
+	  ASAN_POISON_SBLOCK_DATA (b, SBLOCK_SIZE);
 	}
     }
 
@@ -1076,12 +1076,11 @@ allocate_sdata (struct Lisp_String *s,
   s->u.s.size = nchars;
   s->u.s.size_byte = nbytes;
   s->u.s.data[nbytes] = '\0'; /* NBYTES is exclusive of the NUL terminator. */
-  eassume (memcpy ((char *) b->data_slot + sdata_nbytes, string_overrun_cookie,
-		   GC_STRING_OVERRUN_COOKIE_SIZE));
 
   /* advance DATA_SLOT */
-  b->data_slot = (sdata *) ((char *) b->data_slot + sdata_nbytes
-			    + GC_STRING_OVERRUN_COOKIE_SIZE);
+  char *next_slot = (char *) b->data_slot + sdata_nbytes;
+  eassume (memcpy (next_slot, string_overrun_cookie, GC_STRING_OVERRUN_COOKIE_SIZE));
+  b->data_slot = (sdata *) (next_slot + GC_STRING_OVERRUN_COOKIE_SIZE);
   eassert ((uintptr_t) b->data_slot % alignof (sdata) == 0);
   bytes_since_gc += sdata_nbytes;
 }
@@ -1188,19 +1187,19 @@ sweep_strings (struct thread_state *thr)
 
 		  /* Put on free list.  */
 		  s->u.next = THREAD_FIELD (thr, m_string_free_list);
-		  ASAN_POISON_STRING (s);
-		  ASAN_PREPARE_DEAD_SDATA (data, SDATA_NBYTES (data));
 		  THREAD_FIELD (thr, m_string_free_list) = s;
 		  ++nfree;
+		  ASAN_POISON_STRING (s);
+		  ASAN_PREPARE_DEAD_SDATA (data, SDATA_NBYTES (data));
 		}
 	    }
 	  else /* s->u.s.data == NULL */
 	    {
 	      /* S inexplicably not already on free list.  */
 	      s->u.next = THREAD_FIELD (thr, m_string_free_list);
-	      ASAN_POISON_STRING (s);
 	      THREAD_FIELD (thr, m_string_free_list) = s;
 	      ++nfree;
+	      ASAN_POISON_STRING (s);
 	    }
 	} /* for each Lisp_String in block B.  */
 
@@ -1648,9 +1647,9 @@ make_float (double float_value)
 	    = lisp_align_malloc (current_thread, sizeof *new, MEM_TYPE_FLOAT);
 	  new->next = float_blocks;
 	  memset (new->gcmarkbits, 0, sizeof new->gcmarkbits);
-	  ASAN_POISON_FLOAT_BLOCK (new);
 	  float_blocks = new;
 	  float_block_index = 0;
+	  ASAN_POISON_FLOAT_BLOCK (new);
 	}
       ASAN_UNPOISON_FLOAT (&float_blocks->floats[float_block_index]);
       XSETFLOAT (val, &float_blocks->floats[float_block_index]);
@@ -1733,10 +1732,10 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
 	  struct cons_block *new
 	    = lisp_align_malloc (current_thread, sizeof *new, MEM_TYPE_CONS);
 	  memset (new->gcmarkbits, 0, sizeof new->gcmarkbits);
-	  ASAN_POISON_CONS_BLOCK (new);
 	  new->next = cons_blocks;
 	  cons_blocks = new;
 	  cons_block_index = 0;
+	  ASAN_POISON_CONS_BLOCK (new);
 	}
       ASAN_UNPOISON_CONS (&cons_blocks->conses[cons_block_index]);
       XSETCONS (val, &cons_blocks->conses[cons_block_index]);
@@ -2603,10 +2602,10 @@ DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
 	{
 	  struct symbol_block *new
 	    = lisp_malloc (sizeof *new, false, MEM_TYPE_SYMBOL);
-	  ASAN_POISON_SYMBOL_BLOCK (new);
 	  new->next = symbol_blocks;
 	  symbol_blocks = new;
 	  symbol_block_index = 0;
+	  ASAN_POISON_SYMBOL_BLOCK (new);
 	}
 
       ASAN_UNPOISON_SYMBOL (&symbol_blocks->symbols[symbol_block_index]);
@@ -5238,9 +5237,9 @@ sweep_void (struct thread_state *thr,
 		    {
 		      *(struct Lisp_Float **) reclaim_next
 			= *(struct Lisp_Float **) free_list;
-                      ASAN_POISON_FLOAT (reclaim);
 		      *(struct Lisp_Float **) free_list
 			= (struct Lisp_Float *) reclaim;
+                      ASAN_POISON_FLOAT (reclaim);
 		    }
 		    break;
 		  default:
@@ -5317,8 +5316,8 @@ sweep_intervals (struct thread_state *thr)
             {
               set_interval_parent (&iblk->intervals[i], THREAD_FIELD (thr, m_interval_free_list));
               interval_free_list = &iblk->intervals[i];
-	      ASAN_POISON_INTERVAL (&iblk->intervals[i]);
               ++blk_free;
+	      ASAN_POISON_INTERVAL (&iblk->intervals[i]);
             }
           else
             {
@@ -5388,8 +5387,8 @@ sweep_symbols (struct thread_state *thr)
               sym->u.s.next = THREAD_FIELD (thr, m_symbol_free_list);
               THREAD_FIELD (thr, m_symbol_free_list) = sym;
               THREAD_FIELD (thr, m_symbol_free_list)->u.s.function = dead_object ();
-	      ASAN_POISON_SYMBOL (sym);
               ++blk_free;
+	      ASAN_POISON_SYMBOL (sym);
             }
         }
 
