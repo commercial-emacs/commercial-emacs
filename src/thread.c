@@ -644,6 +644,8 @@ run_thread (void *state)
   struct thread_state *self = state;
   union { char c; GCALIGNED_UNION_MEMBER } stack_pos;
 
+  eassert (self != &main_state.s);
+
 #ifdef HAVE_GCC_TLS
   current_thread = self;
 #endif
@@ -659,29 +661,26 @@ run_thread (void *state)
 #endif
     acquire_global_lock (self);
 
-  /* Put a dummy catcher at top-level so that handlerlist is never NULL.
-     This is important since handlerlist->nextfree holds the freelist
-     which would otherwise leak every time we unwind back to top-level.   */
-  handlerlist_sentinel = xzalloc (sizeof (struct handler));
-  handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
-  struct handler *c = push_handler (Qunbound, CATCHER);
-  eassert (c == handlerlist_sentinel);
-  handlerlist_sentinel->nextfree = NULL;
-  handlerlist_sentinel->next = NULL;
+  /* Obfuscatively ensuring a top-level catch probably by Tromey
+     (omnibus merge commit 39372e1).  */
+  struct handler *dummy = xzalloc (sizeof (struct handler));
+  handlerlist = handlerlist_sentinel = dummy;
+  handlerlist->nextfree = dummy;
+  eassert (handlerlist == push_handler (Qunbound, CATCHER));
+  handlerlist->next = handlerlist->nextfree = NULL;
 
   internal_condition_case (invoke_thread, Qt, record_thread_error);
 
   update_processes_for_thread_death (self);
 
-  if (self->m_mem_root != main_state.s.m_mem_root)
-    {
-      mem_merge_into (&main_state.s.m_mem_root, self->m_mem_root);
-      mem_delete_root (&self->m_mem_root);
-      eassume (self->m_mem_root == mem_nil);
-    }
+#ifdef HAVE_GCC_TLS
+  /* merge allocations into main.  */
+  mem_merge_into (&main_state.s.m_mem_root, self->m_mem_root);
+  mem_delete_root (&self->m_mem_root);
+  eassume (self->m_mem_root == mem_nil);
+#endif
 
-  /* 1- for unreachable dummy entry */
-  xfree (self->m_specpdl - 1);
+  xfree (self->m_specpdl - 1); /* 1- for unreachable dummy entry.  */
   self->m_specpdl = NULL;
   self->m_specpdl_ptr = NULL;
   self->m_specpdl_end = NULL;
