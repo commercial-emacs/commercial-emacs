@@ -775,6 +775,7 @@ but with a different end of line convention (bug#48137)."
   "Test verifying package signature."
   (skip-unless (not (eq system-type 'darwin)))
   (skip-unless (not (getenv "CI")))
+  (skip-unless (not (cl-search "enable-checking" system-configuration-options)))
   (skip-unless (ert-with-temp-directory homedir
                  (let ((process-environment
                         (cons (concat "HOME=" homedir)

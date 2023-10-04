@@ -39,6 +39,7 @@
 
 (ert-deftest test-pp-obarray ()
   "Make sure it's not quadratic."
+  (skip-unless (not (cl-search "enable-checking" system-configuration-options)))
   (should (< (benchmark-elapse (pp-to-string obarray)) 3.5)))
 
 ;;; pp-tests.el ends here.
