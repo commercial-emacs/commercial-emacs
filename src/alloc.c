@@ -1024,43 +1024,35 @@ allocate_sdata (struct Lisp_String *s,
 		EMACS_INT nchars, EMACS_INT nbytes,
 		bool immovable)
 {
-  struct sblock *b;
-  ptrdiff_t sdata_nbytes;
-
   eassert (nbytes >= nchars);
-
   if (nbytes > STRING_BYTES_MAX)
     error ("Requested %ld bytes exceeds %ld", nbytes, STRING_BYTES_MAX);
 
-  sdata_nbytes = sdata_size (nbytes);
-
+  ptrdiff_t sdata_nbytes = sdata_size (nbytes);
+  struct sblock *b = current_sblock;
   if (nbytes > LARGE_STRING_THRESH || immovable)
     {
-      size_t size = FLEXSIZEOF (struct sblock, data, sdata_nbytes);
+      const size_t size = FLEXSIZEOF (struct sblock, data, sdata_nbytes);
       b = lisp_malloc (size + GC_STRING_OVERRUN_COOKIE_SIZE, false, MEM_TYPE_NON_LISP);
       b->next = large_sblocks;
       large_sblocks = b;
       b->data_slot = b->data;
       ASAN_POISON_SBLOCK_DATA (b, size);
     }
-  else
+  else if (b == NULL
+	   || ((SBLOCK_NBYTES - GC_STRING_OVERRUN_COOKIE_SIZE) <
+	       ((char *) b->data_slot - (char *) b + sdata_nbytes)))
     {
-      b = current_sblock;
-      if (b == NULL
-	  || ((SBLOCK_NBYTES - GC_STRING_OVERRUN_COOKIE_SIZE) <
-	      ((char *) b->data_slot - (char *) b + sdata_nbytes)))
-	{
-	  /* Not enough room in the current sblock.  */
-	  b = lisp_malloc (SBLOCK_NBYTES, false, MEM_TYPE_NON_LISP);
-	  b->next = NULL;
-	  b->data_slot = b->data;
-	  if (current_sblock)
-	    current_sblock->next = b;
-	  else
-	    oldest_sblock = b;
-	  current_sblock = b;
-	  ASAN_POISON_SBLOCK_DATA (b, SBLOCK_SIZE);
-	}
+      /* Not enough room in the current sblock.  */
+      b = lisp_malloc (SBLOCK_NBYTES, false, MEM_TYPE_NON_LISP);
+      b->next = NULL;
+      b->data_slot = b->data;
+      if (current_sblock)
+	current_sblock->next = b;
+      else
+	oldest_sblock = b;
+      current_sblock = b;
+      ASAN_POISON_SBLOCK_DATA (b, SBLOCK_SIZE);
     }
 
   ASAN_PREPARE_LIVE_SDATA (data, nbytes);
