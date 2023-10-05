@@ -3851,7 +3851,7 @@ slurp_file (int fd, ptrdiff_t *size)
 static char *
 slurp_image (Lisp_Object filename, ptrdiff_t *size, const char *image_type)
 {
-  image_fd fd;
+  int fd;
   Lisp_Object file = image_find_image_fd (filename, &fd);
   if (!STRINGP (file))
     {
