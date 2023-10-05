@@ -5499,6 +5499,7 @@ gc_sweep (void)
   pdumper_clear_marks ();
 }
 
+#ifdef HAVE_GCC_TLS
 /* Come home.  */
 
 void
@@ -5625,6 +5626,7 @@ update_allocations_for_thread_death (struct thread_state *thr)
       main_thread->m_symbol_free_list = thr->m_symbol_free_list;
     }
 }
+#endif /* HAVE_GCC_TLS */
 
 DEFUN ("memory-full", Fmemory_full, Smemory_full, 0, 0, 0,
        doc: /* Non-nil means Emacs cannot get much more Lisp memory.  */)
