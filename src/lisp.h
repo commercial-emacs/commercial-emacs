@@ -584,9 +584,9 @@ INLINE void
 }
 
 /* Extract A's pointer value, assuming A's Lisp type is TYPE and the
-   extracted pointer's type is CTYPE *.  When !USE_LSB_TAG this simply
-   extracts A's low-order bits, as (uintptr_t) LISP_WORD_TAG (type) is
-   always zero then.  */
+   extracted pointer's type is CTYPE *.  This simply extracts A's
+   low-order bits when !USE_LSB_TAG since in that case LISP_WORD_TAG
+   is always zero.  */
 #define XUNTAG(a, type, ctype) \
   ((ctype *) ((uintptr_t) XLP (a) - (uintptr_t) LISP_WORD_TAG (type)))
 
@@ -3062,38 +3062,19 @@ enum
   LARGE_STRING_THRESH = (SBLOCK_NBYTES >> 3),
 };
 
-/* An aligned block of memory.  */
-struct ablock
-{
-  union
-  {
-    char payload[BLOCK_NBYTES];
-    struct ablock *next;
-  } x;
-
-  /* ABASE is the aligned base of the ablocks.  It is overloaded to
-     hold a virtual "busy" field that counts twice the number of used
-     ablock values in the parent ablocks, plus one if the real base of
-     the parent ablocks is ABASE (if the "busy" field is even, the
-     word before the first ablock holds a pointer to the real base).
-     The first ablock has a "busy" ABASE, and the others have an
-     ordinary pointer ABASE.  To tell the difference, the code assumes
-     that pointers, when cast to uintptr_t, are at least 2 *
-     ABLOCKS_NBLOCKS + 1.  */
-  struct ablocks *abase;
-};
-verify (sizeof (struct ablock) % BLOCK_ALIGN == 0);
-
 #include "thread.h"
 
 /* Elisp uses multiple stacks:
+
    - The C stack.
+
    - The specpdl stack, short for special push-down list, handles
      dynamic let-bindings, unwind-protects, and backtraces.  Commit
      2f592f9 unified specpdl with the erstwhile backtrace stack.
-   - The handler stack keeps track of active catch tags and condition-case
-     handlers.  It is allocated in a manually managed stack implemented by a
-     doubly-linked list allocated via xmalloc and never freed.  */
+
+   - The handler stack, implemented as a doubly-linked list, stores
+     active catch tags and condition-case handlers.  It is allocated
+     via xmalloc and never freed.  */
 
 enum specbind_tag {
   SPECPDL_UNWIND,		/* An unwind_protect function on Lisp_Object.  */

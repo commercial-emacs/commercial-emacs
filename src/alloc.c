@@ -566,27 +566,48 @@ lrealloc (void *p, size_t size)
   return newp;
 }
 
-#define ABLOCKS_NBLOCKS (1 << 4)
+/* An aligned block of memory.  */
+struct ablock
+{
+  union
+  {
+    char payload[BLOCK_NBYTES];
+    struct ablock *next;
+  } x;
 
+  /* Monnier devised ABASE to recover the unaligned malloc return
+     value when free'ing.  Its mechanism is nefariously
+     obfuscated. (ab6780c).  */
+  struct ablocks *abase;
+};
+verify (sizeof (struct ablock) % BLOCK_ALIGN == 0);
+
+#define ABLOCKS_NBLOCKS (1 << 4)
 struct ablocks
 {
   struct ablock blocks[ABLOCKS_NBLOCKS];
 };
 verify (sizeof (struct ablocks) % BLOCK_ALIGN == 0);
 
-#define ABLOCK_ABASE(block) \
+/* Busy refers to how unconscionably overloaded this thing is.  */
+#define ABLOCKS_BUSY(abase) ((abase)->blocks[0].abase)
+
+/* "The first ablock has a busy ABASE, and the others have an
+   ordinary pointer ABASE.  To tell the difference, the code assumes
+   that pointers when cast to uintptr_t, are at least 2 *
+   ABLOCKS_NBLOCKS + 1." (9341142)  */
+#define ABLOCK_ABASE(block)					\
   (((uintptr_t) (block)->abase) <= (1 + 2 * ABLOCKS_NBLOCKS)	\
    ? (struct ablocks *) (block)					\
    : (block)->abase)
 
-/* Virtual "busy" field.  */
-#define ABLOCKS_BUSY(a_base) ((a_base)->blocks[0].abase)
-
-/* Pointer to the (not necessarily aligned) malloc block.  */
+/* The potentially unaligned analog to ABLOCKS_ABASE.  */
 #ifdef USE_ALIGNED_ALLOC
-#define ABLOCKS_BASE(abase) (abase)
+# define ABLOCKS_BASE(abase) (abase)
 #else
-#define ABLOCKS_BASE(abase) \
+/* "If the busy field is even, the word before the first ablock
+   holds a pointer to the real base." (9341142)  */
+# define ABLOCKS_BASE(abase)						\
   (1 & (intptr_t) ABLOCKS_BUSY (abase) ? abase : ((void **) (abase))[-1])
 #endif
 
@@ -694,7 +715,7 @@ lisp_align_free (struct thread_state *thr, void *block)
 	  __asan_unpoison_memory_region (&(*tem)->x,
 					 sizeof ((*tem)->x));
 #endif
-	  if (*tem >= (struct ablock *) abase && *tem < atop)
+	  if ((struct ablock *) abase <= *tem && *tem < atop)
 	    {
 	      ++i;
 	      *tem = (*tem)->x.next;
@@ -741,29 +762,25 @@ struct interval_block
 static INTERVAL
 allocate_interval (void)
 {
-  INTERVAL val;
-
-  if (interval_free_list)
+  INTERVAL val = interval_free_list;
+  if (val)
     {
-      val = interval_free_list;
-      ASAN_UNPOISON_INTERVAL (val);
-      interval_free_list = INTERVAL_PARENT (interval_free_list);
+      interval_free_list = INTERVAL_PARENT (val);
     }
   else
     {
       if (interval_block_index == BLOCK_NINTERVALS)
 	{
-	  struct interval_block *newi
-	    = lisp_malloc (sizeof *newi, false, MEM_TYPE_NON_LISP);
-	  newi->next = interval_blocks;
-	  interval_blocks = newi;
+	  struct interval_block *newblk
+	    = lisp_malloc (sizeof *newblk, false, MEM_TYPE_NON_LISP);
+	  newblk->next = interval_blocks;
+	  interval_blocks = newblk;
 	  interval_block_index = 0;
-	  ASAN_POISON_INTERVAL_BLOCK (newi);
+	  ASAN_POISON_INTERVAL_BLOCK (newblk);
 	}
       val = &interval_blocks->intervals[interval_block_index++];
-      ASAN_UNPOISON_INTERVAL (val);
     }
-
+  ASAN_UNPOISON_INTERVAL (val);
   bytes_since_gc += sizeof (struct interval);
   ++intervals_consed;
   RESET_INTERVAL (val);
@@ -997,8 +1014,8 @@ allocate_string (void)
 
   /* Pop a Lisp_String off the free list.  */
   s = string_free_list;
-  ASAN_UNPOISON_STRING (s);
   string_free_list = s->u.next;
+  ASAN_UNPOISON_STRING (s);
 
   ++strings_consed;
   bytes_since_gc += sizeof *s;
@@ -1617,25 +1634,24 @@ struct float_block
 Lisp_Object
 make_float (double float_value)
 {
-  register Lisp_Object val;
-
+  Lisp_Object val;
   if (float_free_list)
     {
       XSETFLOAT (val, float_free_list);
-      ASAN_UNPOISON_FLOAT (float_free_list);
       float_free_list = float_free_list->u.chain;
+      ASAN_UNPOISON_FLOAT (float_free_list);
     }
   else
     {
       if (float_block_index == BLOCK_NFLOATS)
 	{
-	  struct float_block *new
-	    = lisp_align_malloc (current_thread, sizeof *new, MEM_TYPE_FLOAT);
-	  new->next = float_blocks;
-	  memset (new->gcmarkbits, 0, sizeof new->gcmarkbits);
-	  float_blocks = new;
+	  struct float_block *newblk
+	    = lisp_align_malloc (current_thread, sizeof *newblk, MEM_TYPE_FLOAT);
+	  newblk->next = float_blocks;
+	  memset (newblk->gcmarkbits, 0, sizeof newblk->gcmarkbits);
+	  float_blocks = newblk;
 	  float_block_index = 0;
-	  ASAN_POISON_FLOAT_BLOCK (new);
+	  ASAN_POISON_FLOAT_BLOCK (newblk);
 	}
       ASAN_UNPOISON_FLOAT (&float_blocks->floats[float_block_index]);
       XSETFLOAT (val, &float_blocks->floats[float_block_index]);
@@ -1715,13 +1731,13 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
     {
       if (cons_block_index == BLOCK_NCONS)
 	{
-	  struct cons_block *new
-	    = lisp_align_malloc (current_thread, sizeof *new, MEM_TYPE_CONS);
-	  memset (new->gcmarkbits, 0, sizeof new->gcmarkbits);
-	  new->next = cons_blocks;
-	  cons_blocks = new;
+	  struct cons_block *newblk
+	    = lisp_align_malloc (current_thread, sizeof *newblk, MEM_TYPE_CONS);
+	  memset (newblk->gcmarkbits, 0, sizeof newblk->gcmarkbits);
+	  newblk->next = cons_blocks;
+	  cons_blocks = newblk;
 	  cons_block_index = 0;
-	  ASAN_POISON_CONS_BLOCK (new);
+	  ASAN_POISON_CONS_BLOCK (newblk);
 	}
       ASAN_UNPOISON_CONS (&cons_blocks->conses[cons_block_index]);
       XSETCONS (val, &cons_blocks->conses[cons_block_index]);
@@ -1845,19 +1861,23 @@ DEFUN ("make-list", Fmake_list, Smake_list, 2, 2, 0,
   return val;
 }
 
-/* Sometimes a vector's contents are merely a pointer internally used
-   in vector allocation code.  On the rare platforms where a null
-   pointer cannot be tagged, represent it with a Lisp 0.
-   Usually you don't want to touch this.  */
+/* vector_free_lists[slot] needs to chain Lisp_Vector structs.  Since
+   struct Lisp_Vector lacks a next pointer, we cannibalize its
+   CONTENTS member.  What then of the Lisp_Vector's actual contents?
+   There aren't any since vector_free_lists are reclamations.
+*/
 
 static struct Lisp_Vector *
-next_vector (struct Lisp_Vector *v)
+vector_next (struct Lisp_Vector *v)
 {
   return XUNTAG (v->contents[0], Lisp_Int0, struct Lisp_Vector);
 }
 
+/* The comment for vector_next() explains why we can cavalierly use
+   CONTENTS as a poor but profligate man's next-pointer.  */
+
 static void
-set_next_vector (struct Lisp_Vector *v, struct Lisp_Vector *p)
+vector_set_next (struct Lisp_Vector *v, struct Lisp_Vector *p)
 {
   v->contents[0] = make_lisp_ptr (p, Lisp_Int0);
 }
@@ -1956,23 +1976,21 @@ add_vector_free_lists (struct thread_state *thr,
   XSETPVECTYPESIZE (v, PVEC_FREE, 0, nwords);
   eassert (nbytes % word_size == 0);
   ptrdiff_t slot = free_slot (nbytes);
-  set_next_vector (v, THREAD_FIELD (thr, m_vector_free_lists[slot]));
-  ASAN_POISON_VECTOR_CONTENTS (v, nbytes - header_size);
-  THREAD_FIELD (thr, m_vector_free_lists[slot]) = v;
   THREAD_FIELD (thr, m_most_recent_free_slot) = slot;
+  vector_set_next (v, THREAD_FIELD (thr, m_vector_free_lists[slot]));
+  THREAD_FIELD (thr, m_vector_free_lists[slot]) = v;
+  ASAN_POISON_VECTOR_CONTENTS (v, nbytes - header_size);
 }
 
 static struct vector_block *
 allocate_vector_block (void)
 {
-  struct vector_block *block = xmalloc (sizeof *block);
-
-  mem_insert (block->data, block->data + VBLOCK_NBYTES,
+  struct vector_block *newblk = xmalloc (sizeof *newblk);
+  mem_insert (newblk->data, newblk->data + VBLOCK_NBYTES,
 	      MEM_TYPE_VBLOCK, &mem_root);
-
-  block->next = vector_blocks;
-  vector_blocks = block;
-  return block;
+  newblk->next = vector_blocks;
+  vector_blocks = newblk;
+  return newblk;
 }
 
 static void
@@ -2317,7 +2335,7 @@ allocate_vector (ptrdiff_t len, bool q_clear)
 	      if (! restbytes || restbytes >= LISP_VECTOR_MIN)
 		{
 		  ASAN_UNPOISON_VECTOR_CONTENTS (p, nbytes - header_size);
-		  vector_free_lists[index] = next_vector (p);
+		  vector_free_lists[index] = vector_next (p);
 		  break;
 		}
 	      p = NULL;
@@ -5355,7 +5373,9 @@ sweep_symbols (struct thread_state *thr)
 	 SYMBOL_BLOCK_INDEX.  Subsequent iterations traverse whole
 	 blocks of BLOCK_NSYMBOLS. */
       struct Lisp_Symbol *end
-	= sym + (sblk == THREAD_FIELD (thr, m_symbol_blocks) ? THREAD_FIELD (thr, m_symbol_block_index) : BLOCK_NSYMBOLS);
+	= sym + (sblk == THREAD_FIELD (thr, m_symbol_blocks)
+		 ? THREAD_FIELD (thr, m_symbol_block_index)
+		 : BLOCK_NSYMBOLS);
 
       for (; sym < end; ++sym)
         {
@@ -5448,8 +5468,11 @@ gc_sweep (void)
     {
       sweep_strings (thr);
       sweep_void (thr,
-		  (void **) &THREAD_FIELD (thr, m_cons_free_list), THREAD_FIELD (thr, m_cons_block_index),
-		  (void **) &THREAD_FIELD (thr, m_cons_blocks), Lisp_Cons, BLOCK_NCONS,
+		  (void **) &THREAD_FIELD (thr, m_cons_free_list),
+		  THREAD_FIELD (thr, m_cons_block_index),
+		  (void **) &THREAD_FIELD (thr, m_cons_blocks),
+		  Lisp_Cons,
+		  BLOCK_NCONS,
 		  offsetof (struct cons_block, conses),
 		  offsetof (struct Lisp_Cons, u.s.u.chain),
 		  offsetof (struct cons_block, next),
@@ -5457,8 +5480,11 @@ gc_sweep (void)
 		  &gcstat.total_conses,
 		  &gcstat.total_free_conses);
       sweep_void (thr,
-		  (void **) &THREAD_FIELD (thr, m_float_free_list), THREAD_FIELD (thr, m_float_block_index),
-		  (void **) &THREAD_FIELD (thr, m_float_blocks), Lisp_Float, BLOCK_NFLOATS,
+		  (void **) &THREAD_FIELD (thr, m_float_free_list),
+		  THREAD_FIELD (thr, m_float_block_index),
+		  (void **) &THREAD_FIELD (thr, m_float_blocks),
+		  Lisp_Float,
+		  BLOCK_NFLOATS,
 		  offsetof (struct float_block, floats),
 		  offsetof (struct Lisp_Float, u.chain),
 		  offsetof (struct float_block, next),
@@ -5471,6 +5497,133 @@ gc_sweep (void)
       sweep_vectors (thr);
     }
   pdumper_clear_marks ();
+}
+
+/* Come home.  */
+
+void
+update_allocations_for_thread_death (struct thread_state *thr)
+{
+  mem_merge_into (&main_thread->m_mem_root, thr->m_mem_root);
+  mem_delete_root (&thr->m_mem_root);
+  eassume (thr->m_mem_root == mem_nil);
+
+  if (thr->m_free_ablocks)
+    {
+      eassert (main_thread->m_free_ablocks);
+      thr->m_free_ablocks->x.next = main_thread->m_free_ablocks;
+      main_thread->m_free_ablocks = thr->m_free_ablocks;
+    }
+
+  if (thr->m_large_sblocks)
+    {
+      thr->m_large_sblocks->next = main_thread->m_large_sblocks;
+      main_thread->m_large_sblocks = thr->m_large_sblocks;
+    }
+
+  if (thr->m_large_vectors)
+    {
+      thr->m_large_vectors->next = main_thread->m_large_vectors;
+      main_thread->m_large_vectors = thr->m_large_vectors;
+    }
+
+  if (thr->m_current_sblock)
+    {
+      if (main_thread->m_current_sblock)
+	{
+	  thr->m_current_sblock->next = main_thread->m_current_sblock;
+	}
+      else
+	{
+	  /* that's odd... */
+	  eassert (thr->m_oldest_sblock);
+	  main_thread->m_oldest_sblock = thr->m_oldest_sblock;
+	}
+      main_thread->m_current_sblock = thr->m_current_sblock;
+    }
+
+  if (thr->m_string_blocks)
+    {
+      thr->m_string_blocks->next = main_thread->m_string_blocks;
+      main_thread->m_string_blocks = thr->m_string_blocks;
+    }
+
+  if (thr->m_string_free_list)
+    {
+      thr->m_string_free_list->u.next = main_thread->m_string_free_list;
+      main_thread->m_string_free_list = thr->m_string_free_list;
+    }
+
+  if (thr->m_interval_blocks)
+    {
+      thr->m_interval_blocks->next = main_thread->m_interval_blocks;
+      main_thread->m_interval_blocks = thr->m_interval_blocks;
+      main_thread->m_interval_block_index = thr->m_interval_block_index;
+    }
+
+  if (thr->m_interval_free_list)
+    {
+      set_interval_parent (thr->m_interval_free_list, main_thread->m_interval_free_list);
+      main_thread->m_interval_free_list = thr->m_interval_free_list;
+    }
+
+  if (thr->m_float_blocks)
+    {
+      thr->m_float_blocks->next = main_thread->m_float_blocks;
+      main_thread->m_float_blocks = thr->m_float_blocks;
+      main_thread->m_float_block_index = thr->m_float_block_index;
+    }
+
+  if (thr->m_float_free_list)
+    {
+      thr->m_float_free_list->u.chain = main_thread->m_float_free_list;
+      main_thread->m_float_free_list = thr->m_float_free_list;
+    }
+
+  if (thr->m_cons_blocks)
+    {
+      thr->m_cons_blocks->next = main_thread->m_cons_blocks;
+      main_thread->m_cons_blocks = thr->m_cons_blocks;
+      main_thread->m_cons_block_index = thr->m_cons_block_index;
+    }
+
+  if (thr->m_cons_free_list)
+    {
+      thr->m_cons_free_list->u.s.u.chain = main_thread->m_cons_free_list;
+      main_thread->m_cons_free_list = thr->m_cons_free_list;
+    }
+
+  if (thr->m_vector_free_lists)
+    {
+      for (int slot = 0; slot < VBLOCK_NFREE_LISTS; ++slot)
+	{
+	  struct Lisp_Vector *v = thr->m_vector_free_lists[slot];
+	  if (v)
+	    {
+	      vector_set_next (v, main_thread->m_vector_free_lists[slot]);
+	      main_thread->m_vector_free_lists[slot] = v;
+	    }
+	}
+    }
+
+  if (thr->m_vector_blocks)
+    {
+      thr->m_vector_blocks->next = main_thread->m_vector_blocks;
+      main_thread->m_vector_blocks = thr->m_vector_blocks;
+    }
+
+  if (thr->m_symbol_blocks)
+    {
+      thr->m_symbol_blocks->next = main_thread->m_symbol_blocks;
+      main_thread->m_symbol_blocks = thr->m_symbol_blocks;
+      main_thread->m_symbol_block_index = thr->m_symbol_block_index;
+    }
+
+  if (thr->m_symbol_free_list)
+    {
+      thr->m_symbol_free_list->u.s.next = main_thread->m_symbol_free_list;
+      main_thread->m_symbol_free_list = thr->m_symbol_free_list;
+    }
 }
 
 DEFUN ("memory-full", Fmemory_full, Smemory_full, 0, 0, 0,

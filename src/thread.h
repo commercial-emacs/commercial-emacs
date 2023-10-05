@@ -51,6 +51,7 @@ struct bc_thread_state {
   char *stack_end;
 };
 
+struct ablock;
 struct thread_state
 {
   union vectorlike_header header;
@@ -326,6 +327,7 @@ int thread_select  (select_func *func, int max_fds, fd_set *rfds,
 
 void release_global_lock (void);
 void acquire_global_lock (struct thread_state *);
+extern void update_allocations_for_thread_death (struct thread_state *);
 
 INLINE_HEADER_END
 

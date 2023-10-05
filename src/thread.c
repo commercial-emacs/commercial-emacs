@@ -674,10 +674,8 @@ run_thread (void *state)
   update_processes_for_thread_death (self);
 
 #ifdef HAVE_GCC_TLS
-  /* merge allocations into main.  */
-  mem_merge_into (&main_state.s.m_mem_root, self->m_mem_root);
-  mem_delete_root (&self->m_mem_root);
-  eassume (self->m_mem_root == mem_nil);
+  /* Under preemptive, this needs to be queued until main is ready.  */
+  update_allocations_for_thread_death (self);
 #endif
 
   xfree (self->m_specpdl - 1); /* 1- for unreachable dummy entry.  */
