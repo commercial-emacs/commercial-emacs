@@ -658,6 +658,7 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
 
   ASAN_UNPOISON_ABLOCK (THREAD_FIELD (thr, m_free_ablocks));
   struct ablocks *abase = ABLOCK_ABASE (THREAD_FIELD (thr, m_free_ablocks));
+  /* He adds 2 to preserve evenness but to get us out of [0,1]? */
   ABLOCKS_BUSY (abase) = (struct ablocks *) (2 + (intptr_t) ABLOCKS_BUSY (abase));
   void *val = THREAD_FIELD (thr, m_free_ablocks);
   THREAD_FIELD (thr, m_free_ablocks) = THREAD_FIELD (thr, m_free_ablocks)->x.next;
@@ -685,13 +686,13 @@ lisp_align_free (struct thread_state *thr, void *block)
   struct ablocks *abase = ABLOCK_ABASE (ablock);
   /* undo +2 in lisp_align_malloc.  */
   intptr_t abase_or_aligned = (intptr_t) ABLOCKS_BUSY (abase) - 2;
-  eassume (0 <= abase_or_aligned && abase_or_aligned <= 2 * ABLOCKS_NBLOCKS - 1);
+  eassume (0 <= abase_or_aligned && abase_or_aligned <= 1 + 2 * ABLOCKS_NBLOCKS);
+  /* Busy is now without the +2.  Assumption is we won't need
+     it?  (we'll have entered ensuing free'ing clause).  */
   ABLOCKS_BUSY (abase) = (struct ablocks *) abase_or_aligned;
 
   if (abase_or_aligned < 2)
     {
-      /* It's an ALIGNED, i.e., the non-pointer sentinel of the first
-	 ablock.  We can harvest the entire `struct ablocks`.  */
       eassert ((abase_or_aligned & 1) == abase_or_aligned); // better be a bool
       struct ablock **tem = &THREAD_FIELD (thr, m_free_ablocks);
       struct ablock *end = &abase->blocks[abase_or_aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1];
