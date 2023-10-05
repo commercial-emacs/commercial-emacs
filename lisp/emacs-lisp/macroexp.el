@@ -94,6 +94,9 @@ each clause."
 	(macroexp--all-forms clause skip)
       clause)))
 
+(defvar macroexp-inhibit-compiler-macros nil
+  "Inhibit application of compiler macros if non-nil.")
+
 (defun macroexp--compiler-macro (handler form)
   (condition-case-unless-debug err
       (apply handler form (cdr form))
