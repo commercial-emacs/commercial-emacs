@@ -653,7 +653,7 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
 	  ASAN_POISON_ABLOCK (&abase->blocks[i]);
 	}
       /* overload busy field with aligned boolean */
-      ABLOCKS_BUSY (abase) = (struct ablocks *) (base == abase);
+      ABLOCKS_BUSY (abase) = (struct ablocks *) ((intptr_t) (base == abase));
 
       eassert ((uintptr_t) abase % BLOCK_ALIGN == 0);
       eassert (ABLOCK_ABASE (&abase->blocks[3]) == abase); /* 3 is arbitrary */
