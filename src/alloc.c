@@ -625,54 +625,47 @@ verify (sizeof (struct ablocks) % BLOCK_ALIGN == 0);
 static void *
 lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
 {
-  void *base, *val;
-  struct ablocks *abase;
-
-  eassert (nbytes < BLOCK_ALIGN);
-
   if (! THREAD_FIELD (thr, m_free_ablocks))
     {
-      int i;
-      bool aligned;
-
+      void *base;
+      struct ablocks *abase;
 #ifdef USE_ALIGNED_ALLOC
       abase = base = aligned_alloc (BLOCK_ALIGN, sizeof (struct ablocks));
 #else
       base = malloc (sizeof (struct ablocks));
       abase = pointer_align (base, BLOCK_ALIGN);
 #endif
-
       if (! base)
 	memory_full (sizeof (struct ablocks));
-
-      aligned = (base == abase);
-      if (! aligned)
+      else if (base != abase)
+	/* "word before first ablock is the real base." (9341142) */
 	((void **) abase)[-1] = base;
 
-      /* Initialize the blocks and put them on the free list.
-	 If BASE was not properly aligned, we can't use the last block.  */
-      for (i = 0; i < (aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1); ++i)
+      /* Like string blocks, begin ablock's life on free list.  If
+	 BASE unaligned, first block is slop.  */
+      for (int i = 0;
+	   i < ABLOCKS_NBLOCKS - (base == abase ? 0 : 1);
+	   ++i)
 	{
 	  abase->blocks[i].abase = abase;
 	  abase->blocks[i].x.next = THREAD_FIELD (thr, m_free_ablocks);
 	  THREAD_FIELD (thr, m_free_ablocks) = &abase->blocks[i];
 	  ASAN_POISON_ABLOCK (&abase->blocks[i]);
 	}
-      intptr_t ialigned = aligned;
-      ABLOCKS_BUSY (abase) = (struct ablocks *) ialigned;
+      /* overload busy field with aligned boolean */
+      ABLOCKS_BUSY (abase) = (struct ablocks *) (base == abase);
 
       eassert ((uintptr_t) abase % BLOCK_ALIGN == 0);
       eassert (ABLOCK_ABASE (&abase->blocks[3]) == abase); /* 3 is arbitrary */
       eassert (ABLOCK_ABASE (&abase->blocks[0]) == abase);
       eassert (ABLOCKS_BASE (abase) == base);
-      eassert ((intptr_t) ABLOCKS_BUSY (abase) == aligned);
+      eassert ((intptr_t) ABLOCKS_BUSY (abase) == (base == abase));
     }
 
   ASAN_UNPOISON_ABLOCK (THREAD_FIELD (thr, m_free_ablocks));
-  abase = ABLOCK_ABASE (THREAD_FIELD (thr, m_free_ablocks));
-  ABLOCKS_BUSY (abase)
-    = (struct ablocks *) (2 + (intptr_t) ABLOCKS_BUSY (abase));
-  val = THREAD_FIELD (thr, m_free_ablocks);
+  struct ablocks *abase = ABLOCK_ABASE (THREAD_FIELD (thr, m_free_ablocks));
+  ABLOCKS_BUSY (abase) = (struct ablocks *) (2 + (intptr_t) ABLOCKS_BUSY (abase));
+  void *val = THREAD_FIELD (thr, m_free_ablocks);
   THREAD_FIELD (thr, m_free_ablocks) = THREAD_FIELD (thr, m_free_ablocks)->x.next;
 
   if (type != MEM_TYPE_NON_LISP)
@@ -687,44 +680,45 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
 static void
 lisp_align_free (struct thread_state *thr, void *block)
 {
-  struct ablock *ablock = block;
-  struct ablocks *abase = ABLOCK_ABASE (ablock);
-
   mem_delete (mem_find (thr, block), &THREAD_FIELD (thr, m_mem_root));
 
   /* Put on free list.  */
+  struct ablock *ablock = block;
   ablock->x.next = THREAD_FIELD (thr, m_free_ablocks);
   THREAD_FIELD (thr, m_free_ablocks) = ablock;
   ASAN_POISON_ABLOCK (ablock);
 
-  /* Update busy count.  */
-  intptr_t busy = (intptr_t) ABLOCKS_BUSY (abase) - 2;
-  eassume (0 <= busy && busy <= 2 * ABLOCKS_NBLOCKS - 1);
-  ABLOCKS_BUSY (abase) = (struct ablocks *) busy;
+  struct ablocks *abase = ABLOCK_ABASE (ablock);
+  /* undo +2 in lisp_align_malloc.  */
+  intptr_t abase_or_aligned = (intptr_t) ABLOCKS_BUSY (abase) - 2;
+  eassume (0 <= abase_or_aligned && abase_or_aligned <= 2 * ABLOCKS_NBLOCKS - 1);
+  ABLOCKS_BUSY (abase) = (struct ablocks *) abase_or_aligned;
 
-  if (busy < 2)
-    { /* All the blocks are free.  */
-      int i = 0;
-      bool aligned = busy;
+  if (abase_or_aligned < 2)
+    {
+      /* It's an ALIGNED, i.e., the non-pointer sentinel of the first
+	 ablock.  We can harvest the entire `struct ablocks`.  */
+      eassert ((abase_or_aligned & 1) == abase_or_aligned); // better be a bool
       struct ablock **tem = &THREAD_FIELD (thr, m_free_ablocks);
-      struct ablock *atop = &abase->blocks[aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1];
+      struct ablock *end = &abase->blocks[abase_or_aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1];
 
-      while (*tem)
+      for (int i = 0; *tem; )
 	{
 #if GC_ASAN_POISON_OBJECTS
 	  __asan_unpoison_memory_region (&(*tem)->x,
 					 sizeof ((*tem)->x));
 #endif
-	  if ((struct ablock *) abase <= *tem && *tem < atop)
+	  if ((struct ablock *) abase <= *tem && *tem < end)
 	    {
 	      ++i;
 	      *tem = (*tem)->x.next;
+	      eassert (*tem || i == (abase_or_aligned
+				     ? ABLOCKS_NBLOCKS
+				     : ABLOCKS_NBLOCKS - 1));
 	    }
 	  else
 	    tem = &(*tem)->x.next;
 	}
-      eassert ((aligned & 1) == aligned);
-      eassert (i == (aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1));
 #ifdef USE_POSIX_MEMALIGN
       eassert ((uintptr_t) ABLOCKS_BASE (abase) % BLOCK_ALIGN == 0);
 #endif
