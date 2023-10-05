@@ -11128,10 +11128,12 @@ svg_load (struct frame *f, struct image *img)
       char *contents = slurp_image (file_name, &size, "SVG");
       if (contents == NULL)
 	return false;
-
-      /* If the file was slurped into memory properly, parse it.  */
-      if (!STRINGP (base_uri))
-        base_uri = file;
+      else if (!STRINGP (base_uri))
+	{
+	  int fd;
+	  base_uri = image_find_image_fd (file_name, &fd);
+	  eassert (STRINGP (base_uri)); // has-to-be if contents
+	}
       success_p = svg_load_image (f, img, contents, size,
                                   SSDATA (ENCODE_FILE (base_uri)));
       xfree (contents);
