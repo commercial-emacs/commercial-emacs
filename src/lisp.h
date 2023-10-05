@@ -4881,10 +4881,6 @@ extern char my_edata[];
 extern char my_endbss[];
 extern char *my_endbss_static;
 
-extern void *lmalloc (size_t size, bool clearit)
-  ATTRIBUTE_MALLOC_SIZE ((1)) ATTRIBUTE_RETURNS_NONNULL;
-extern void *lrealloc (void *p, size_t size)
-  ATTRIBUTE_ALLOC_SIZE ((2)) ATTRIBUTE_RETURNS_NONNULL;
 extern void *xmalloc (size_t)
   ATTRIBUTE_MALLOC_SIZE ((1)) ATTRIBUTE_RETURNS_NONNULL;
 extern void *xzalloc (size_t)

@@ -224,6 +224,28 @@ malloc_warning (const char *str)
 
 #endif
 
+#if (defined HAVE_ALIGNED_ALLOC			\
+     || (defined HYBRID_MALLOC			\
+	 ? defined HAVE_POSIX_MEMALIGN		\
+	 : !defined SYSTEM_MALLOC))
+# define USE_ALIGNED_ALLOC 1
+#elif !defined HYBRID_MALLOC && defined HAVE_POSIX_MEMALIGN
+# define USE_ALIGNED_ALLOC 1
+# define aligned_alloc my_aligned_alloc /* Avoid collision with lisp.h.  */
+static void *
+aligned_alloc (size_t alignment, size_t size)
+{
+  void *p;
+  return posix_memalign (&p, alignment, size) == 0 ? p : 0;
+}
+/* Verify POSIX invariant ALIGNMENT = (2^x) * sizeof (void *).  */
+verify (BLOCK_ALIGN % sizeof (void *) == 0
+	&& POWER_OF_2 (BLOCK_ALIGN / sizeof (void *)));
+verify (malloc_laligned ()
+	|| (LISP_ALIGNMENT % sizeof (void *) == 0
+	    && POWER_OF_2 (LISP_ALIGNMENT / sizeof (void *))));
+#endif
+
 /* Display an already-pending malloc warning.  */
 
 void
@@ -251,6 +273,60 @@ laligned (void *p, size_t size)
   return (malloc_laligned ()
 	  || (intptr_t) p % LISP_ALIGNMENT == 0
 	  || size % LISP_ALIGNMENT != 0);
+}
+
+/* Return allocation of at least SIZE bytes, ensuring Lisp alignment.
+
+   Q_CLEAR uses calloc() instead of malloc().
+*/
+
+static void *
+lmalloc (size_t size, bool q_clear)
+{
+  /* Callers assume a non-NULL return value, even for zero SIZE.  */
+  size_t adjsize = MALLOC_0_IS_NONNULL ? size : max (size, LISP_ALIGNMENT);
+  void *p = NULL;
+
+#ifdef USE_ALIGNED_ALLOC
+  /* When not malloc_laligned (rare), else-clause risks infloop.  */
+  if (! malloc_laligned () && (adjsize % LISP_ALIGNMENT == 0))
+    {
+      p = aligned_alloc (LISP_ALIGNMENT, adjsize);
+      if (q_clear && p && adjsize)
+	memclear (p, adjsize);
+    }
+  else
+#endif
+    {
+      for (;;)
+	{
+	  p = q_clear ? calloc (1, adjsize) : malloc (adjsize);
+	  if (p == NULL || laligned (p, adjsize))
+	    break;
+	  free (p);
+	  adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
+	}
+    }
+  eassert (p == NULL || laligned (p, adjsize));
+  return p;
+}
+
+static void *
+lrealloc (void *p, size_t size)
+{
+  /* xrealloc() relies on lrealloc() returning non-NULL even for size
+     == 0.  MALLOC_0_IS_NONNULL does not mean REALLOC_0_IS_NONNULL.  */
+  size_t adjsize = max (size, LISP_ALIGNMENT);
+  void *newp = p;
+  for (;;)
+    {
+      newp = realloc (newp, adjsize);
+      if (! adjsize || ! newp || laligned (newp, adjsize))
+	break;
+      adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
+    }
+  eassert (! newp || laligned (newp, adjsize));
+  return newp;
 }
 
 /* Like malloc but check for no memory and block interrupt input.  */
@@ -483,88 +559,6 @@ lisp_free (struct thread_state *thr, void *block)
 // should someone decide to muck with VBLOCK_ALIGN...
 verify (VBLOCK_ALIGN % LISP_ALIGNMENT == 0);
 verify (VBLOCK_ALIGN <= (1 << PSEUDOVECTOR_SIZE_BITS));
-
-#if (defined HAVE_ALIGNED_ALLOC			\
-     || (defined HYBRID_MALLOC			\
-	 ? defined HAVE_POSIX_MEMALIGN		\
-	 : !defined SYSTEM_MALLOC))
-# define USE_ALIGNED_ALLOC 1
-#elif !defined HYBRID_MALLOC && defined HAVE_POSIX_MEMALIGN
-# define USE_ALIGNED_ALLOC 1
-# define aligned_alloc my_aligned_alloc /* Avoid collision with lisp.h.  */
-static void *
-aligned_alloc (size_t alignment, size_t size)
-{
-  /* Permit suspect assumption that ALIGNMENT is either BLOCK_ALIGN or
-     LISP_ALIGNMENT since we'll rarely get here.  */
-  eassume (alignment == BLOCK_ALIGN
-	   || (! malloc_laligned () && alignment == LISP_ALIGNMENT));
-
-  /* Verify POSIX invariant ALIGNMENT = (2^x) * sizeof (void *).  */
-  verify (BLOCK_ALIGN % sizeof (void *) == 0
-	  && POWER_OF_2 (BLOCK_ALIGN / sizeof (void *)));
-  verify (malloc_laligned ()
-	  || (LISP_ALIGNMENT % sizeof (void *) == 0
-	      && POWER_OF_2 (LISP_ALIGNMENT / sizeof (void *))));
-
-  void *p;
-  return posix_memalign (&p, alignment, size) == 0 ? p : 0;
-}
-#endif
-
-/* Return allocation of at least SIZE bytes, ensuring Lisp alignment.
-
-   Q_CLEAR uses calloc() instead of malloc().
-*/
-
-void *
-lmalloc (size_t size, bool q_clear)
-{
-  /* Callers assume a non-NULL return value, even for zero SIZE.  */
-  size_t adjsize = MALLOC_0_IS_NONNULL ? size : max (size, LISP_ALIGNMENT);
-  void *p = NULL;
-
-#ifdef USE_ALIGNED_ALLOC
-  /* When not malloc_laligned (rare), else-clause risks infloop.  */
-  if (! malloc_laligned () && (adjsize % LISP_ALIGNMENT == 0))
-    {
-      p = aligned_alloc (LISP_ALIGNMENT, adjsize);
-      if (q_clear && p && adjsize)
-	memclear (p, adjsize);
-    }
-  else
-#endif
-    {
-      for (;;)
-	{
-	  p = q_clear ? calloc (1, adjsize) : malloc (adjsize);
-	  if (p == NULL || laligned (p, adjsize))
-	    break;
-	  free (p);
-	  adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
-	}
-    }
-  eassert (p == NULL || laligned (p, adjsize));
-  return p;
-}
-
-void *
-lrealloc (void *p, size_t size)
-{
-  /* xrealloc() relies on lrealloc() returning non-NULL even for size
-     == 0.  MALLOC_0_IS_NONNULL does not mean REALLOC_0_IS_NONNULL.  */
-  size_t adjsize = max (size, LISP_ALIGNMENT);
-  void *newp = p;
-  for (;;)
-    {
-      newp = realloc (newp, adjsize);
-      if (! adjsize || ! newp || laligned (newp, adjsize))
-	break;
-      adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
-    }
-  eassert (! newp || laligned (newp, adjsize));
-  return newp;
-}
 
 /* An aligned block of memory.  */
 struct ablock
