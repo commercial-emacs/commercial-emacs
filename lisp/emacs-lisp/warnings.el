@@ -114,11 +114,20 @@ not immediately displayed.
 The element must match an initial segment of the list TYPE.
 Thus, (foo bar) as an element matches (foo bar)
 or (foo bar ANYTHING...) as TYPE.
+An empty list as an element matches any TYPE.
 If TYPE is a symbol FOO, that is equivalent to the list (FOO),
 so only the element (FOO) will match it.
 See also `warning-suppress-log-types'."
   :type '(repeat (repeat symbol))
   :version "22.1")
+
+(defcustom warning-to-error-types nil
+  "List of warning types to signal as an error instead.
+If any element of this list matches the TYPE argument to `display-warning',
+an error is signaled instead of logging a warning.
+See `warning-suppress-types' for the format of elements in this list."
+  :type '(repeat (repeat symbol))
+  :version "30.1")
 
 ;; The autoload cookie is so that programs can bind this variable
 ;; safely, testing the existing value, before they call one of the
@@ -230,6 +239,12 @@ SUPPRESS-LIST is the list of kinds of warnings to suppress."
                               (cons (list type) warning-suppress-types)))
     (_ (message "Exiting"))))
 
+(defun warning-to-error (type message level)
+  (let* ((typename (if (consp type) (car type) type))
+         (level-info (assq level warning-levels)))
+    (error (nth 1 level-info)
+           (format warning-type-format typename))))
+
 ;;;###autoload
 (defun display-warning (type message &optional level buffer-name)
   "Display a warning message, MESSAGE.
@@ -263,105 +278,109 @@ This will also display buttons allowing the user to permanently
 disable automatic display of the warning or disable the warning
 entirely by setting `warning-suppress-types' or
 `warning-suppress-log-types' on their behalf."
-  (if (not (or after-init-time noninteractive (daemonp)))
-      ;; Ensure warnings that happen early in the startup sequence
-      ;; are visible when startup completes (bug#20792).
-      (delay-warning type message level buffer-name)
-    (unless level
-      (setq level :warning))
-    (unless buffer-name
-      (setq buffer-name "*Warnings*"))
+  (unless level
+    (setq level :warning))
+  (unless buffer-name
+    (setq buffer-name "*Warnings*"))
+  (cond
+   ((< (warning-numeric-level level)
+       (warning-numeric-level warning-minimum-log-level)))
+   ((warning-suppress-p type warning-suppress-log-types))
+   ((warning-suppress-p type warning-to-error-types)
+    (warning-to-error type message level))
+   ((not (or after-init-time noninteractive (daemonp)))
+    ;; Ensure warnings that happen early in the startup sequence
+    ;; are visible when startup completes (bug#20792).
+    (delay-warning type message level buffer-name))
+   (t
     (with-suppressed-warnings ((obsolete warning-level-aliases))
       (when-let ((new (cdr (assq level warning-level-aliases))))
         (warn "Warning level `%s' is obsolete; use `%s' instead" level new)
         (setq level new)))
-    (or (< (warning-numeric-level level)
-	   (warning-numeric-level warning-minimum-log-level))
-	(warning-suppress-p type warning-suppress-log-types)
-	(let* ((typename (if (consp type) (car type) type))
-	       (old (get-buffer buffer-name))
-	       (buffer (or old (get-buffer-create buffer-name)))
-	       (level-info (assq level warning-levels))
-               ;; `newline' may be unbound during bootstrap.
-               (newline (if (fboundp 'newline) #'newline
-                          (lambda () (insert "\n"))))
-	       start end)
-	  (with-current-buffer buffer
-	    ;; If we created the buffer, disable undo.
-	    (unless old
-	      (when (fboundp 'special-mode) ; Undefined during bootstrap.
-                (special-mode))
-	      (setq buffer-read-only t)
-	      (setq buffer-undo-list t))
-	    (goto-char (point-max))
-	    (when (and warning-series (symbolp warning-series))
-	      (setq warning-series
-		    (prog1 (point-marker)
-		      (unless (eq warning-series t)
-			(funcall warning-series)))))
-	    (let ((inhibit-read-only t))
-	      (unless (bolp)
-		(funcall newline))
-	      (setq start (point))
-              ;; Don't output the button when doing batch compilation
-              ;; and similar.
-              (unless (or noninteractive (eq type 'bytecomp))
-                (insert (buttonize (icon-string 'warnings-suppress)
-                                   #'warnings-suppress type)
-                        " "))
-	      (if warning-prefix-function
-		  (setq level-info (funcall warning-prefix-function
-					    level level-info)))
-	      (insert (format (nth 1 level-info)
-			      (format warning-type-format typename))
-		      message)
-              (funcall newline)
-	      (when (and warning-fill-prefix
-                         (not (string-search "\n" message))
-                         (not noninteractive))
-		(let ((fill-prefix warning-fill-prefix)
-		      (fill-column warning-fill-column))
-		  (fill-region start (point))))
-	      (setq end (point)))
-	    (when (and (markerp warning-series)
-		       (eq (marker-buffer warning-series) buffer))
-	      (goto-char warning-series)))
-	  (if (nth 2 level-info)
-	      (funcall (nth 2 level-info)))
-	  (cond (noninteractive
-		 ;; Noninteractively, take the text we inserted
-		 ;; in the warnings buffer and print it.
-		 ;; Do this unconditionally, since there is no way
-		 ;; to view logged messages unless we output them.
-		 (with-current-buffer buffer
-		   (save-excursion
-		     ;; Don't include the final newline in the arg
-		     ;; to `message', because it adds a newline.
-		     (goto-char end)
-		     (if (bolp)
-			 (forward-char -1))
-		     (message "%s" (buffer-substring start (point))))))
-		((and (daemonp) (null after-init-time))
-		 ;; Warnings assigned during daemon initialization go into
-		 ;; the messages buffer.
-		 (message "%s"
-			  (with-current-buffer buffer
-			    (save-excursion
-			      (goto-char end)
-			      (if (bolp)
-				  (forward-char -1))
-			      (buffer-substring start (point))))))
-		(t
-		 ;; Interactively, decide whether the warning merits
-		 ;; immediate display.
-		 (or (< (warning-numeric-level level)
-			(warning-numeric-level warning-minimum-level))
-		     (warning-suppress-p type warning-suppress-types)
-		     (let ((window (display-buffer buffer)))
-		       (when (and (markerp warning-series)
-				  (eq (marker-buffer warning-series) buffer))
-			 (set-window-start window warning-series))
-		       (sit-for 0)))))))))
+    (let* ((typename (if (consp type) (car type) type))
+	   (old (get-buffer buffer-name))
+	   (buffer (or old (get-buffer-create buffer-name)))
+	   (level-info (assq level warning-levels))
+           ;; `newline' may be unbound during bootstrap.
+           (newline (if (fboundp 'newline) #'newline
+                      (lambda () (insert "\n"))))
+	   start end)
+      (with-current-buffer buffer
+	;; If we created the buffer, disable undo.
+	(unless old
+	  (when (fboundp 'special-mode) ; Undefined during bootstrap.
+            (special-mode))
+	  (setq buffer-read-only t)
+	  (setq buffer-undo-list t))
+	(goto-char (point-max))
+	(when (and warning-series (symbolp warning-series))
+	  (setq warning-series
+		(prog1 (point-marker)
+		  (unless (eq warning-series t)
+		    (funcall warning-series)))))
+	(let ((inhibit-read-only t))
+	  (unless (bolp)
+	    (funcall newline))
+	  (setq start (point))
+          ;; Don't output the button when doing batch compilation
+          ;; and similar.
+          (unless (or noninteractive (eq type 'bytecomp))
+            (insert (buttonize (icon-string 'warnings-suppress)
+                               #'warnings-suppress type)
+                    " "))
+	  (if warning-prefix-function
+	      (setq level-info (funcall warning-prefix-function
+					level level-info)))
+	  (insert (format (nth 1 level-info)
+			  (format warning-type-format typename))
+		  message)
+          (funcall newline)
+	  (when (and warning-fill-prefix
+                     (not (string-search "\n" message))
+                     (not noninteractive))
+	    (let ((fill-prefix warning-fill-prefix)
+		  (fill-column warning-fill-column))
+	      (fill-region start (point))))
+	  (setq end (point)))
+	(when (and (markerp warning-series)
+		   (eq (marker-buffer warning-series) buffer))
+	  (goto-char warning-series)))
+      (if (nth 2 level-info)
+	  (funcall (nth 2 level-info)))
+      (cond (noninteractive
+	     ;; Noninteractively, take the text we inserted
+	     ;; in the warnings buffer and print it.
+	     ;; Do this unconditionally, since there is no way
+	     ;; to view logged messages unless we output them.
+	     (with-current-buffer buffer
+	       (save-excursion
+		 ;; Don't include the final newline in the arg
+		 ;; to `message', because it adds a newline.
+		 (goto-char end)
+		 (if (bolp)
+		     (forward-char -1))
+		 (message "%s" (buffer-substring start (point))))))
+	    ((and (daemonp) (null after-init-time))
+	     ;; Warnings assigned during daemon initialization go into
+	     ;; the messages buffer.
+	     (message "%s"
+		      (with-current-buffer buffer
+			(save-excursion
+			  (goto-char end)
+			  (if (bolp)
+			      (forward-char -1))
+			  (buffer-substring start (point))))))
+	    (t
+	     ;; Interactively, decide whether the warning merits
+	     ;; immediate display.
+	     (or (< (warning-numeric-level level)
+		    (warning-numeric-level warning-minimum-level))
+		 (warning-suppress-p type warning-suppress-types)
+		 (let ((window (display-buffer buffer)))
+		   (when (and (markerp warning-series)
+			      (eq (marker-buffer warning-series) buffer))
+		     (set-window-start window warning-series))
+		   (sit-for 0)))))))))
 
 ;; Use \\<special-mode-map> so that help-enable-autoload can do its thing.
 ;; Any keymap that is defined will do.
