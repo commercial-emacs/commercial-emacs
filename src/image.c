@@ -3844,27 +3844,6 @@ slurp_file (int fd, ptrdiff_t *size)
   return buf;
 }
 
-/* Like slurp_file above, but with added error handling.  Value is
-   null if an error occurred.  Set SIZE to the size of the file.
-   IMAGE_TYPE describes the image type (e.g. "PNG").  */
-
-static char *
-slurp_image (Lisp_Object filename, ptrdiff_t *size, const char *image_type)
-{
-  image_fd fd;
-  Lisp_Object file = image_find_image_fd (filename, &fd);
-  if (!STRINGP (file))
-    {
-      image_not_found_error (filename);
-      return NULL;
-    }
-  char *result = slurp_file (fd, size);
-  if (result == NULL)
-    image_error ("Error loading %s image `%s'",
-		 make_unibyte_string (image_type, strlen (image_type)),
-		 file);
-  return result;
-}
 
 
 /***********************************************************************
@@ -4583,9 +4562,13 @@ xbm_load (struct frame *f, struct image *img)
 	}
 
       ptrdiff_t size;
-      char *contents = slurp_image (file_name, &size, "XBM");
+      char *contents = slurp_file (fd, &size);
       if (contents == NULL)
-	return false;
+	{
+	  image_error ("Error loading XBM image `%s'", file);
+	  return 0;
+	}
+
       success_p = xbm_load_image (f, img, contents, contents + size);
       xfree (contents);
     }
@@ -5869,9 +5852,12 @@ xpm_load (struct frame *f,
 	}
 
       ptrdiff_t size;
-      char *contents = slurp_image (file_name, &size, "XPM");
+      char *contents = slurp_file (fd, &size);
       if (contents == NULL)
-	return false;
+	{
+	  image_error ("Error loading XPM image `%s'", file);
+	  return 0;
+	}
 
       success_p = xpm_load_image (f, img, contents, contents + size);
       xfree (contents);
@@ -6874,9 +6860,12 @@ pbm_load (struct frame *f, struct image *img)
 	}
 
       ptrdiff_t size;
-      contents = slurp_image (specified_file, &size, "PBM");
+      contents = slurp_file (fd, &size);
       if (contents == NULL)
-	return false;
+	{
+	  image_error ("Error reading `%s'", file);
+	  return 0;
+	}
 
       p = contents;
       end = contents + size;
@@ -9766,7 +9755,10 @@ webp_load (struct frame *f, struct image *img)
 
       contents = (uint8_t *) slurp_file (fd, &size);
       if (contents == NULL)
-	return false;
+	{
+	  image_error ("Error loading WebP image `%s'", file);
+	  return false;
+	}
     }
   else
     {
@@ -11166,10 +11158,12 @@ svg_load (struct frame *f, struct image *img)
 
       /* Read the entire file into memory.  */
       ptrdiff_t size;
-      char *contents = slurp_image (file_name, &size, "SVG");
+      char *contents = slurp_file (fd, &size);
       if (contents == NULL)
-	return false;
-
+	{
+	  image_error ("Error loading SVG image `%s'", file);
+	  return 0;
+	}
       /* If the file was slurped into memory properly, parse it.  */
       if (!STRINGP (base_uri))
         base_uri = file;
