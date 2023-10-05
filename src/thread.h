@@ -327,7 +327,9 @@ int thread_select  (select_func *func, int max_fds, fd_set *rfds,
 
 void release_global_lock (void);
 void acquire_global_lock (struct thread_state *);
+#ifdef HAVE_GCC_TLS
 extern void update_allocations_for_thread_death (struct thread_state *);
+#endif
 
 INLINE_HEADER_END
 
