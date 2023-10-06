@@ -11124,17 +11124,8 @@ svg_load (struct frame *f, struct image *img)
   base_uri = image_spec_value (img->spec, QCbase_uri, NULL);
   if (STRINGP (file_name))
     {
-      image_fd fd;
-      Lisp_Object file = image_find_image_fd (file_name, &fd);
-      if (!STRINGP (file))
-	{
-	  image_not_found_error (file_name);
-	  return false;
-	}
-
-      /* Read the entire file into memory.  */
       ptrdiff_t size;
-      char *contents = slurp_file (fd, &size);
+      char *contents = slurp_image (file_name, &size, "SVG");
       if (contents == NULL)
 	return false;
       else if (!STRINGP (base_uri))
