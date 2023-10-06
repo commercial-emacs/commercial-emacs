@@ -707,12 +707,12 @@ lisp_align_free (struct thread_state *thr, void *block)
 	    {
 	      ++i;
 	      *tem = (*tem)->x.next;
-	      eassert (*tem || i == (abase_or_aligned
-				     ? ABLOCKS_NBLOCKS
-				     : ABLOCKS_NBLOCKS - 1));
 	    }
 	  else
 	    tem = &(*tem)->x.next;
+	  eassert (*tem || i == (abase_or_aligned
+				 ? ABLOCKS_NBLOCKS
+				 : ABLOCKS_NBLOCKS - 1));
 	}
 #ifdef USE_POSIX_MEMALIGN
       eassert ((uintptr_t) ABLOCKS_BASE (abase) % BLOCK_ALIGN == 0);
