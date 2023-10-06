@@ -25,6 +25,10 @@ jobs:
         include:
           - os: ubuntu-latest
             gearing: alt-x
+          - os: ubuntu-latest
+            gearing: multithread
+          - os: macos-latest
+            gearing: multithread
     steps:
     - run: |
         git config --global core.autocrlf false
@@ -89,7 +93,7 @@ jobs:
       if: matrix.gearing == 'multithread'
       run: |
         ./autogen.sh
-        ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --enable-multithreading
+        ./configure $([ `uname` = 'Linux' ] && echo WERROR_CFLAGS=\'-Werror\') --prefix=$HOME/.local --enable-multithreading
         make -j4 check
     - name: make-linux
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'Linux')

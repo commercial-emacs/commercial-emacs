@@ -580,43 +580,46 @@ struct ablocks
   struct ablock blocks[ABLOCKS_NBLOCKS];
 };
 verify (sizeof (struct ablocks) % BLOCK_ALIGN == 0);
+verify (offsetof (struct ablocks, blocks) == 0);
 
-enum { ADDRESS_AT_LEAST = (1 + 2 * ABLOCKS_NBLOCKS) };
+/* Sentinel conflates the alignedness bool (at most 1) and the obtuse
+   double-counting ablock refcount (at most ABLOCK_NBLOCKS * 2).  */
+enum { MAX_SENTINEL = (1 + 2 * ABLOCKS_NBLOCKS) };
 
 /* Each ABLOCK *except the first* stores its parent ABLOCKS's (note
-   plurality) aligned starting address (so-called abase) in the
+   plural) aligned starting address (so-called abase) in the
    OVERLOADED field.
 
-   So if the OVERLOADED member looks like an address, return it
-   directly.
+   So if the OVERLOADED member cannot be a sentinel, it must be the
+   desired stored address.
 
    Otherwise, assume the ABLOCK is the first, and merely return
    itself.
 
    This was a poor design by a first-year graduate student.
 */
-#define ABLOCK_ABASE(ablock)					\
-  (((uintptr_t) (ablock)->overloaded) >= ADDRESS_AT_LEAST	\
-   ? (struct ablocks *) (ablock)->overloaded			\
+#define ABLOCK_ABASE(ablock)				\
+  (((uintptr_t) (ablock)->overloaded) > MAX_SENTINEL	\
+   ? (struct ablocks *) (ablock)->overloaded		\
    : (struct ablocks *) (ablock))
 
 /* The special first ablock's OVERLOADED is a sentinel value, not an
    abase address.
 
-   Upon creation of an ABLOCKS (note plurality), we assign the value
-   0 to the sentinel when the true base differs from the abase, or
-   1 if it doesn't (smooth sailing case).
+   Upon creation of an ABLOCKS (note plural), we assign the value
+   0 to the sentinel when the true base differs from the abase, amd
+   1 otherwise.
 
    Each time a component ablock of ABLOCKS is requisitioned, we
    increment the sentinel by 2 (thus preserving the even-odd bit
    indicating alignedness).
 
-   Should the sentinel get back down below 2, we'll know all the
-   component ablocks have been free-listed, and we can harvest back to
-   OS.
+   The sentinel falling below 2 implies all component ablocks were
+   free-listed, and we can harvest its ABLOCKS back to OS.
 
-   Enough RAM exists in the world that the first-year graduate student
-   did not need to obfuscate things like this.
+   Enough RAM existed in 2003 that the first-year graduate student did
+   not need to obfuscatedly conflate the refcount with the alignedness
+   in a single value.
 */
 #define ABASE_SENTINEL(abase) ((abase)->blocks[0].overloaded)
 
@@ -627,8 +630,7 @@ enum { ADDRESS_AT_LEAST = (1 + 2 * ABLOCKS_NBLOCKS) };
 # define ABASE_TRUE_BASE(abase) (abase)
 #else
 /* Windows: do worry.  An even-valued sentinel means a nontrivial true
-   base which we've stored in the slop between BASE and ABASE.
-*/
+   base which we've stored in the slop between BASE and ABASE.  */
 # define ABASE_TRUE_BASE(abase)						\
   (1 & (intptr_t) ABASE_SENTINEL (abase) ? abase : ((void **) (abase))[-1])
 #endif
@@ -686,25 +688,28 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
       eassert ((intptr_t) ABASE_SENTINEL (abase) == (base == abase));
     }
 
-  ASAN_UNPOISON_ABLOCK (THREAD_FIELD (thr, m_free_ablocks));
-  struct ablocks *abase = ABLOCK_ABASE (THREAD_FIELD (thr, m_free_ablocks));
-  /* Add 2 to denote detachment from free-list.  */
-  ABASE_SENTINEL (abase) = 2 + ABASE_SENTINEL (abase);
-  void *val = THREAD_FIELD (thr, m_free_ablocks);
-  THREAD_FIELD (thr, m_free_ablocks) = THREAD_FIELD (thr, m_free_ablocks)->x.next;
+  /* Pop retval off free list.  */
+  struct ablock *val = THREAD_FIELD (thr, m_free_ablocks);
+  ASAN_UNPOISON_ABLOCK (val);
+  THREAD_FIELD (thr, m_free_ablocks) = val->x.next;
 
+  struct ablocks *abase = ABLOCK_ABASE (val);
+  /* Increment reference count (by 2 to preserve even-odd bit).  */
+  ABASE_SENTINEL (abase) = 2 + ABASE_SENTINEL (abase);
+
+  /* Register with block lookup */
   if (type != MEM_TYPE_NON_LISP)
     mem_insert (val, (char *) val + nbytes, type, &THREAD_FIELD (thr, m_mem_root));
 
   MALLOC_PROBE (nbytes);
-
-  eassert (0 == ((uintptr_t) val) % BLOCK_ALIGN);
+  eassert (0 == (uintptr_t) val % BLOCK_ALIGN);
   return val;
 }
 
 static void
 lisp_align_free (struct thread_state *thr, void *block)
 {
+  /* Deregister from block lookup.  */
   mem_delete (mem_find (thr, block), &THREAD_FIELD (thr, m_mem_root));
 
   /* Put on free list.  */
@@ -713,31 +718,40 @@ lisp_align_free (struct thread_state *thr, void *block)
   THREAD_FIELD (thr, m_free_ablocks) = ablock;
   ASAN_POISON_ABLOCK (ablock);
 
+  /* Decrement reference count (by 2 to preserve even-odd bit).  */
   struct ablocks *abase = ABLOCK_ABASE (ablock);
-  /* undo +2 in lisp_align_malloc to indicate free-listed.  */
   ABASE_SENTINEL (abase) = ABASE_SENTINEL (abase) - 2;
-  if (ABASE_SENTINEL (abase) < 2)
-    {
-      /* all ABASE's ablocks have been free'd.  */
-      struct ablock **tem = &THREAD_FIELD (thr, m_free_ablocks);
-      const int end_index = ABLOCKS_NBLOCKS - (ABASE_SENTINEL (abase) ? 0 : 1);
-      struct ablock *end = &abase->blocks[end_index];
 
-      for (int i = 0; *tem; )
-	{
-#if GC_ASAN_POISON_OBJECTS
-	  __asan_unpoison_memory_region (&(*tem)->x,
-					 sizeof ((*tem)->x));
+  if (ABASE_SENTINEL (abase) < 2)
+    { /* all ABASE's ablocks have been free'd.  */
+      int ncollapsed = 0;
+      const int nblocks = ABLOCKS_NBLOCKS - (ABASE_SENTINEL (abase) ? 0 : 1);
+      struct ablock *const abase_end = &abase->blocks[nblocks];
+
+#ifdef HAVE_GCC_TLS
+      for (struct thread_state *thr = all_threads;
+	   thr != NULL;
+	   thr = thr->next_thread)
 #endif
-	  if ((struct ablock *) abase <= *tem && *tem < end)
+	{
+	  /* Traverse m_free_ablocks, collapsing ABASE's blocks. */
+	  struct ablock **pptr = &THREAD_FIELD (thr, m_free_ablocks);
+	  while (*pptr)
 	    {
-	      ++i;
-	      *tem = (*tem)->x.next;
+#if GC_ASAN_POISON_OBJECTS
+	      /* shouldn't this be in collapsed clause? */
+	      __asan_unpoison_memory_region (&(*pptr)->x, sizeof ((*pptr)->x));
+#endif
+	      if ((struct ablock *) abase <= *pptr && *pptr < abase_end)
+		{
+		  ++ncollapsed;
+		  *pptr = (*pptr)->x.next;
+		}
+	      else
+		pptr = &(*pptr)->x.next;
 	    }
-	  else
-	    tem = &(*tem)->x.next;
-	  eassert (*tem || i == end_index);
 	}
+      eassert (ncollapsed == nblocks);
 #ifdef USE_POSIX_MEMALIGN
       eassert ((uintptr_t) ABASE_TRUE_BASE (abase) % BLOCK_ALIGN == 0);
 #endif
@@ -5171,7 +5185,7 @@ sweep_void (struct thread_state *thr,
   *free_list = NULL;
 
   /* NEXT pointers point from CURRENT_BLOCK into the past.  The first
-     iteration processes items through the prevailing BLOCK_INDEX.
+     iteration processes CURRENT_BLOCK to the prevailing BLOCK_INDEX.
      Subsequent iterations process whole blocks of BLOCK_NITEMS items.  */
   for (void **prev = current_block, *blk = *prev;
        blk != NULL;
@@ -5234,7 +5248,7 @@ sweep_void (struct thread_state *thr,
 	    else
 	      {
 		++blk_free;
-		/* splice RECLAIM into free list. */
+		/* prepend RECLAIM to free list. */
 		void *reclaim = (void *) ((uintptr_t) blk + offset_items + c * xsize),
 		  *reclaim_next = (void *) ((uintptr_t) reclaim + offset_chain_from_item);
 		switch (xtype)
@@ -5270,8 +5284,8 @@ sweep_void (struct thread_state *thr,
 
       void *block_next = (void *) ((uintptr_t) blk + offset_next);
 
-      /* If BLK contains only free items and we've already seen more
-         than two such blocks, then deallocate BLK.  */
+      /* If BLK contains only free items and cumulative free items
+         would exceed two blocks worth, deallocate BLK.  */
       if (blk_free >= block_nitems && cum_free > block_nitems)
         {
 	  void *free_next = (void *) ((uintptr_t) blk + offset_items
@@ -5522,123 +5536,117 @@ update_allocations_for_thread_death (struct thread_state *thr)
   mem_delete_root (&thr->m_mem_root);
   eassume (thr->m_mem_root == mem_nil);
 
+#define PREPEND_ONTO_MAIN(type, next, what)		\
+  for (type p = thr->what; ; p = p->next)		\
+    if (p->next == NULL) {				\
+      p->next = main_thread->what;			\
+      main_thread->what = thr->what;			\
+      break; \
+    }
+
   if (thr->m_free_ablocks)
     {
-      eassert (main_thread->m_free_ablocks);
-      thr->m_free_ablocks->x.next = main_thread->m_free_ablocks;
-      main_thread->m_free_ablocks = thr->m_free_ablocks;
+      PREPEND_ONTO_MAIN (struct ablock *, x.next, m_free_ablocks);
     }
 
   if (thr->m_large_sblocks)
     {
-      thr->m_large_sblocks->next = main_thread->m_large_sblocks;
-      main_thread->m_large_sblocks = thr->m_large_sblocks;
+      PREPEND_ONTO_MAIN (struct sblock *, next, m_large_sblocks);
     }
 
   if (thr->m_large_vectors)
     {
-      thr->m_large_vectors->next = main_thread->m_large_vectors;
-      main_thread->m_large_vectors = thr->m_large_vectors;
+      PREPEND_ONTO_MAIN (struct large_vector *, next, m_large_vectors);
     }
 
   if (thr->m_current_sblock)
     {
-      if (main_thread->m_current_sblock)
-	{
-	  thr->m_current_sblock->next = main_thread->m_current_sblock;
-	}
-      else
-	{
-	  /* that's odd... */
-	  eassert (thr->m_oldest_sblock);
-	  main_thread->m_oldest_sblock = thr->m_oldest_sblock;
-	}
-      main_thread->m_current_sblock = thr->m_current_sblock;
+      thr->m_current_sblock->next = main_thread->m_oldest_sblock;
+      main_thread->m_oldest_sblock = thr->m_oldest_sblock;
+      if (! main_thread->m_current_sblock)
+	main_thread->m_current_sblock = thr->m_current_sblock;
     }
 
   if (thr->m_string_blocks)
     {
-      thr->m_string_blocks->next = main_thread->m_string_blocks;
-      main_thread->m_string_blocks = thr->m_string_blocks;
+      PREPEND_ONTO_MAIN (struct string_block *, next, m_string_blocks);
     }
 
   if (thr->m_string_free_list)
     {
-      thr->m_string_free_list->u.next = main_thread->m_string_free_list;
-      main_thread->m_string_free_list = thr->m_string_free_list;
+      PREPEND_ONTO_MAIN (struct Lisp_String *, u.next, m_string_free_list);
     }
 
   if (thr->m_interval_blocks)
     {
-      thr->m_interval_blocks->next = main_thread->m_interval_blocks;
-      main_thread->m_interval_blocks = thr->m_interval_blocks;
+      PREPEND_ONTO_MAIN (struct interval_block *, next, m_interval_blocks);
       main_thread->m_interval_block_index = thr->m_interval_block_index;
     }
 
   if (thr->m_interval_free_list)
     {
-      set_interval_parent (thr->m_interval_free_list, main_thread->m_interval_free_list);
-      main_thread->m_interval_free_list = thr->m_interval_free_list;
+      for (INTERVAL p = thr->m_interval_free_list; ; p = INTERVAL_PARENT (p))
+	if (INTERVAL_PARENT (p) == NULL) {
+	  set_interval_parent (p, main_thread->m_interval_free_list);
+	  main_thread->m_interval_free_list = thr->m_interval_free_list;
+	  break;
+	}
     }
 
   if (thr->m_float_blocks)
     {
-      thr->m_float_blocks->next = main_thread->m_float_blocks;
-      main_thread->m_float_blocks = thr->m_float_blocks;
+      PREPEND_ONTO_MAIN (struct float_block *, next, m_float_blocks);
       main_thread->m_float_block_index = thr->m_float_block_index;
     }
 
   if (thr->m_float_free_list)
     {
-      thr->m_float_free_list->u.chain = main_thread->m_float_free_list;
-      main_thread->m_float_free_list = thr->m_float_free_list;
+      PREPEND_ONTO_MAIN (struct Lisp_Float *, u.chain, m_float_free_list);
     }
 
   if (thr->m_cons_blocks)
     {
-      thr->m_cons_blocks->next = main_thread->m_cons_blocks;
-      main_thread->m_cons_blocks = thr->m_cons_blocks;
+      PREPEND_ONTO_MAIN (struct cons_block *, next, m_cons_blocks);
       main_thread->m_cons_block_index = thr->m_cons_block_index;
     }
 
   if (thr->m_cons_free_list)
     {
-      thr->m_cons_free_list->u.s.u.chain = main_thread->m_cons_free_list;
-      main_thread->m_cons_free_list = thr->m_cons_free_list;
+      PREPEND_ONTO_MAIN (struct Lisp_Cons *, u.s.u.chain, m_cons_free_list);
     }
 
   if (thr->m_vector_free_lists)
     {
       for (int slot = 0; slot < VBLOCK_NFREE_LISTS; ++slot)
 	{
-	  struct Lisp_Vector *v = thr->m_vector_free_lists[slot];
-	  if (v)
-	    {
-	      vector_set_next (v, main_thread->m_vector_free_lists[slot]);
-	      main_thread->m_vector_free_lists[slot] = v;
+	  for (struct Lisp_Vector *p = thr->m_vector_free_lists[slot];
+	       p != NULL;
+	       p = vector_next (p))
+	    if (vector_next (p) == NULL) {
+	      vector_set_next (p, main_thread->m_vector_free_lists[slot]);
+	      main_thread->m_vector_free_lists[slot] = p;
+	      break;
 	    }
 	}
     }
 
   if (thr->m_vector_blocks)
     {
-      thr->m_vector_blocks->next = main_thread->m_vector_blocks;
-      main_thread->m_vector_blocks = thr->m_vector_blocks;
+      PREPEND_ONTO_MAIN (struct vector_block *, next, m_vector_blocks);
     }
 
   if (thr->m_symbol_blocks)
     {
-      thr->m_symbol_blocks->next = main_thread->m_symbol_blocks;
-      main_thread->m_symbol_blocks = thr->m_symbol_blocks;
+      PREPEND_ONTO_MAIN (struct symbol_block *, next, m_symbol_blocks);
       main_thread->m_symbol_block_index = thr->m_symbol_block_index;
     }
 
   if (thr->m_symbol_free_list)
     {
-      thr->m_symbol_free_list->u.s.next = main_thread->m_symbol_free_list;
-      main_thread->m_symbol_free_list = thr->m_symbol_free_list;
+      PREPEND_ONTO_MAIN (struct Lisp_Symbol *, u.s.next, m_symbol_free_list);
     }
 }
+#undef PREPEND_ONTO_MAIN
 #endif /* HAVE_GCC_TLS */
 
 DEFUN ("memory-full", Fmemory_full, Smemory_full, 0, 0, 0,
