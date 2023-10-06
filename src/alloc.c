@@ -583,22 +583,22 @@ verify (sizeof (struct ablocks) % BLOCK_ALIGN == 0);
 
 enum { ADDRESS_AT_LEAST = (1 + 2 * ABLOCKS_NBLOCKS) };
 
-/* Retrieve the parent ABLOCKS's (note plurality) starting address of
-   an arbitrary ABLOCK.  We call this the ABLOCKS's aligned base or
-   "abase".
+/* Each ABLOCK *except the first* stores its parent ABLOCKS's (note
+   plurality) aligned starting address (so-called abase) in the
+   OVERLOADED field.
 
-   When the ABLOCK's OVERLOADED member looks like an address (true for
-   any non-first ablock), return it directly.
+   So if the OVERLOADED member looks like an address, return it
+   directly.
 
    Otherwise, assume the ABLOCK is the first, and merely return
    itself.
 
    This was a poor design by a first-year graduate student.
 */
-#define ABLOCK_ABASE(ablock)						\
-  (((uintptr_t) (ablock)->overloaded) <= ADDRESS_AT_LEAST		\
-   ? (struct ablocks *) (ablock)					\
-   : (struct ablocks *) (ablock)->overloaded)
+#define ABLOCK_ABASE(ablock)					\
+  (((uintptr_t) (ablock)->overloaded) >= ADDRESS_AT_LEAST	\
+   ? (struct ablocks *) (ablock)->overloaded			\
+   : (struct ablocks *) (ablock))
 
 /* The special first ablock's OVERLOADED is a sentinel value, not an
    abase address.
