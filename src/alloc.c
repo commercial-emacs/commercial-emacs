@@ -569,10 +569,8 @@ struct ablock
     struct ablock *next;
   } x;
 
-  /* Monnier devised ABASE to recover the unaligned malloc return
-     value when free'ing.  Its mechanism is nefariously
-     obfuscated. (ab6780c).  */
-  struct ablocks *abase;
+  /* It's complicated.  See ABLOCK_ABASE and ABASE_SENTINEL.  */
+  intptr_t overloaded;
 };
 verify (sizeof (struct ablock) % BLOCK_ALIGN == 0);
 
@@ -583,26 +581,56 @@ struct ablocks
 };
 verify (sizeof (struct ablocks) % BLOCK_ALIGN == 0);
 
-/* Busy refers to how unconscionably overloaded this thing is.  */
-#define ABLOCKS_BUSY(abase) ((abase)->blocks[0].abase)
+enum { ADDRESS_AT_LEAST = (1 + 2 * ABLOCKS_NBLOCKS) };
 
-/* "The first ablock has a busy ABASE, and the others have an
-   ordinary pointer ABASE.  To tell the difference, the code assumes
-   that pointers when cast to uintptr_t, are at least 2 *
-   ABLOCKS_NBLOCKS + 1." (9341142)  */
-#define ABLOCK_ABASE(block)					\
-  (((uintptr_t) (block)->abase) <= (1 + 2 * ABLOCKS_NBLOCKS)	\
-   ? (struct ablocks *) (block)					\
-   : (block)->abase)
+/* Retrieve the parent ABLOCKS's (note plurality) starting address of
+   an arbitrary ABLOCK.  We call this the ABLOCKS's aligned base or
+   "abase".
 
-/* The potentially unaligned analog to ABLOCKS_ABASE.  */
+   When the ABLOCK's OVERLOADED member looks like an address (true for
+   any non-first ablock), return it directly.
+
+   Otherwise, assume the ABLOCK is the first, and merely return
+   itself.
+
+   This was a poor design by a first-year graduate student.
+*/
+#define ABLOCK_ABASE(ablock)						\
+  (((uintptr_t) (ablock)->overloaded) <= ADDRESS_AT_LEAST		\
+   ? (struct ablocks *) (ablock)					\
+   : (struct ablocks *) (ablock)->overloaded)
+
+/* The special first ablock's OVERLOADED is a sentinel value, not an
+   abase address.
+
+   Upon creation of an ABLOCKS (note plurality), we assign the value
+   0 to the sentinel when the true base differs from the abase, or
+   1 if it doesn't (smooth sailing case).
+
+   Each time a component ablock of ABLOCKS is requisitioned, we
+   increment the sentinel by 2 (thus preserving the even-odd bit
+   indicating alignedness).
+
+   Should the sentinel get back down below 2, we'll know all the
+   component ablocks have been free-listed, and we can harvest back to
+   OS.
+
+   Enough RAM exists in the world that the first-year graduate student
+   did not need to obfuscate things like this.
+*/
+#define ABASE_SENTINEL(abase) ((abase)->blocks[0].overloaded)
+
+/* The true base is the address malloc returned.  It may not
+   be aligned, thus the notion of its corresponding ABASE.  */
 #ifdef USE_ALIGNED_ALLOC
-# define ABLOCKS_BASE(abase) (abase)
+/* POSIX systems: don't worry.  */
+# define ABASE_TRUE_BASE(abase) (abase)
 #else
-/* "If the busy field is even, the word before the first ablock
-   holds a pointer to the real base." (9341142)  */
-# define ABLOCKS_BASE(abase)						\
-  (1 & (intptr_t) ABLOCKS_BUSY (abase) ? abase : ((void **) (abase))[-1])
+/* Windows: do worry.  An even-valued sentinel means a nontrivial true
+   base which we've stored in the slop between BASE and ABASE.
+*/
+# define ABASE_TRUE_BASE(abase)						\
+  (1 & (intptr_t) ABASE_SENTINEL (abase) ? abase : ((void **) (abase))[-1])
 #endif
 
 #if GC_ASAN_POISON_OBJECTS
@@ -632,7 +660,8 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
       if (! base)
 	memory_full (sizeof (struct ablocks));
       else if (base != abase)
-	/* "word before first ablock is the real base." (9341142) */
+	/* Blink-and-you-miss-it storing true base in the slop between
+	   BASE and ABASE.  */
 	((void **) abase)[-1] = base;
 
       /* Like string blocks, begin ablock's life on free list.  If
@@ -641,25 +670,26 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
 	   i < ABLOCKS_NBLOCKS - (base == abase ? 0 : 1);
 	   ++i)
 	{
-	  abase->blocks[i].abase = abase;
+	  if (i == 0) // special first block store sentinel
+	    abase->blocks[i].overloaded = (intptr_t) (base == abase);
+	  else
+	    abase->blocks[i].overloaded = (intptr_t) abase;
 	  abase->blocks[i].x.next = THREAD_FIELD (thr, m_free_ablocks);
 	  THREAD_FIELD (thr, m_free_ablocks) = &abase->blocks[i];
 	  ASAN_POISON_ABLOCK (&abase->blocks[i]);
 	}
-      /* overload busy field with aligned boolean */
-      ABLOCKS_BUSY (abase) = (struct ablocks *) ((intptr_t) (base == abase));
-
       eassert ((uintptr_t) abase % BLOCK_ALIGN == 0);
       eassert (ABLOCK_ABASE (&abase->blocks[3]) == abase); /* 3 is arbitrary */
       eassert (ABLOCK_ABASE (&abase->blocks[0]) == abase);
-      eassert (ABLOCKS_BASE (abase) == base);
-      eassert ((intptr_t) ABLOCKS_BUSY (abase) == (base == abase));
+      eassert (ABASE_SENTINEL (abase) == abase->blocks[0].overloaded);
+      eassert (ABASE_TRUE_BASE (abase) == base);
+      eassert ((intptr_t) ABASE_SENTINEL (abase) == (base == abase));
     }
 
   ASAN_UNPOISON_ABLOCK (THREAD_FIELD (thr, m_free_ablocks));
   struct ablocks *abase = ABLOCK_ABASE (THREAD_FIELD (thr, m_free_ablocks));
-  /* He adds 2 to preserve evenness but to get us out of [0,1]? */
-  ABLOCKS_BUSY (abase) = (struct ablocks *) (2 + (intptr_t) ABLOCKS_BUSY (abase));
+  /* Add 2 to denote detachment from free-list.  */
+  ABASE_SENTINEL (abase) = 2 + ABASE_SENTINEL (abase);
   void *val = THREAD_FIELD (thr, m_free_ablocks);
   THREAD_FIELD (thr, m_free_ablocks) = THREAD_FIELD (thr, m_free_ablocks)->x.next;
 
@@ -684,18 +714,14 @@ lisp_align_free (struct thread_state *thr, void *block)
   ASAN_POISON_ABLOCK (ablock);
 
   struct ablocks *abase = ABLOCK_ABASE (ablock);
-  /* undo +2 in lisp_align_malloc.  */
-  intptr_t abase_or_aligned = (intptr_t) ABLOCKS_BUSY (abase) - 2;
-  eassume (0 <= abase_or_aligned && abase_or_aligned <= 1 + 2 * ABLOCKS_NBLOCKS);
-  /* Busy is now without the +2.  Assumption is we won't need
-     it?  (we'll have entered ensuing free'ing clause).  */
-  ABLOCKS_BUSY (abase) = (struct ablocks *) abase_or_aligned;
-
-  if (abase_or_aligned < 2)
+  /* undo +2 in lisp_align_malloc to indicate free-listed.  */
+  ABASE_SENTINEL (abase) = ABASE_SENTINEL (abase) - 2;
+  if (ABASE_SENTINEL (abase) < 2)
     {
-      eassert ((abase_or_aligned & 1) == abase_or_aligned); // better be a bool
+      /* all ABASE's ablocks have been free'd.  */
       struct ablock **tem = &THREAD_FIELD (thr, m_free_ablocks);
-      struct ablock *end = &abase->blocks[abase_or_aligned ? ABLOCKS_NBLOCKS : ABLOCKS_NBLOCKS - 1];
+      const int end_index = ABLOCKS_NBLOCKS - (ABASE_SENTINEL (abase) ? 0 : 1);
+      struct ablock *end = &abase->blocks[end_index];
 
       for (int i = 0; *tem; )
 	{
@@ -710,14 +736,12 @@ lisp_align_free (struct thread_state *thr, void *block)
 	    }
 	  else
 	    tem = &(*tem)->x.next;
-	  eassert (*tem || i == (abase_or_aligned
-				 ? ABLOCKS_NBLOCKS
-				 : ABLOCKS_NBLOCKS - 1));
+	  eassert (*tem || i == end_index);
 	}
 #ifdef USE_POSIX_MEMALIGN
-      eassert ((uintptr_t) ABLOCKS_BASE (abase) % BLOCK_ALIGN == 0);
+      eassert ((uintptr_t) ABASE_TRUE_BASE (abase) % BLOCK_ALIGN == 0);
 #endif
-      free (ABLOCKS_BASE (abase));
+      free (ABASE_TRUE_BASE (abase));
     }
 }
 

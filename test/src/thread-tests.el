@@ -505,7 +505,11 @@ The failure manifests only by being unable to exit the interactive emacs."
           (run-thread send-name
 		      (lambda () (threads-test-channel-send channel 42)))
           (run-thread recv-name
-		      (lambda () (threads-test-channel-recv channel))))))))
+		      (lambda () (threads-test-channel-recv channel)))))))
+  (cl-loop repeat 50
+           until (zerop (1- (length (all-threads))))
+           do (accept-process-output nil 0.2)
+           finally (should (zerop (1- (length (all-threads)))))))
 
 (ert-deftest threads-test-promiscuous-process ()
   "Hold to Tromey's seemingly arbitrary 2012 edict outlawing
