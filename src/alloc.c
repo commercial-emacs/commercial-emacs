@@ -607,7 +607,7 @@ enum { MAX_SENTINEL = (1 + 2 * ABLOCKS_NBLOCKS) };
    abase address.
 
    Upon creation of an ABLOCKS (note plural), we assign the value
-   0 to the sentinel when the true base differs from the abase, amd
+   0 to the sentinel when the true base differs from the abase, and
    1 otherwise.
 
    Each time a component ablock of ABLOCKS is requisitioned, we
