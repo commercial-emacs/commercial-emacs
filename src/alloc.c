@@ -629,21 +629,24 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
 #else
       base = malloc (sizeof (struct ablocks));
       abase = pointer_align (base, BLOCK_ALIGN);
+      if (base != abase)
+	eassert (abase > base);
 #endif
-      if (! base)
-	memory_full (sizeof (struct ablocks));
-      else if (base != abase)
-	/* Blink-and-you-miss-it storing true base in the slop between
-	   BASE and ABASE.  */
-	((void **) abase)[-1] = base;
+      if (! base) memory_full (sizeof (struct ablocks));
 
-      /* Like string blocks, begin ablock's life on free list.  If
-	 BASE unaligned, first block is slop.  */
-      for (int i = 0;
-	   i < ABLOCKS_NBLOCKS - (base == abase ? 0 : 1);
-	   ++i)
+      /* Like string blocks, begin ablock's life on free list.  */
+      for (int i = 0; i < ABLOCKS_NBLOCKS; ++i)
 	{
-	  if (i == 0) // special first block store sentinel
+	  if (base != abase && i >= ABLOCKS_NBLOCKS - 1)
+	    {
+	      /* Since ABASE exceeds BASE, the last slot of BLOCKS is
+		 off limits.  Stow the true BASE address in the slop
+		 between BASE and ABASE. */
+	      ((void **) abase)[-1] = base;
+	      eassert (ABASE_TRUE_BASE (abase) == base);
+	      continue;
+	    }
+	  else if (i == 0) // special first block store sentinel
 	    abase->blocks[i].overloaded = (intptr_t) (base == abase);
 	  else
 	    abase->blocks[i].overloaded = (intptr_t) abase;
@@ -5507,27 +5510,59 @@ update_allocations_for_thread_death (struct thread_state *thr)
   mem_delete_root (&thr->m_mem_root);
   eassume (thr->m_mem_root == mem_nil);
 
-#define PREPEND_ONTO_MAIN(type, next, what)		\
-  for (type p = thr->what; ; p = p->next)		\
-    if (p->next == NULL) {				\
-      p->next = main_thread->what;			\
-      main_thread->what = thr->what;			\
-      break; \
-    }
+#ifdef ENABLE_CHECKING
+#define CHECKSUM_BEFORE(type, next, what)				\
+  do {									\
+    for (struct type *p = thr->what; p != NULL; p = p->next)		\
+      ++len_thr;							\
+    for (struct type *p = main_thread->what; p != NULL; p = p->next)	\
+      ++len_main;							\
+  } while (0);
+#define CHECKSUM_AFTER(type, next, what)				\
+  do {									\
+    for (struct type *p = main_thread->what; p != NULL; p = p->next)	\
+      ++len_sum;							\
+  } while (0);
+#else
+#define CHECKSUM_BEFORE(type, next, what)	\
+    do {					\
+      void (len_thr);				\
+      void (len_main);				\
+      void (len_sum);				\
+    } while (0);
+#define CHECKSUM_AFTER(type, next, what)
+#endif /* ENABLE_CHECKING */
+
+#define PREPEND_ONTO_MAIN(type, next, what)			\
+  do {								\
+    int len_thr = 0, len_main = 0, len_sum = 0;			\
+    CHECKSUM_BEFORE (type, next, what);				\
+    for (struct type *p = thr->what; p != NULL; p = p->next)	\
+      {								\
+	if (p->next == NULL)					\
+	  {							\
+	    p->next = main_thread->what;			\
+	    main_thread->what = thr->what;			\
+	    break;						\
+	  }							\
+      }								\
+    CHECKSUM_AFTER (type, next, what);				\
+    eassert (len_sum == len_thr + len_main);			\
+  } while (0);
 
   if (thr->m_free_ablocks)
     {
-      PREPEND_ONTO_MAIN (struct ablock *, x.next, m_free_ablocks);
+      PREPEND_ONTO_MAIN (ablock, x.next, m_free_ablocks);
     }
 
   if (thr->m_large_sblocks)
     {
-      PREPEND_ONTO_MAIN (struct sblock *, next, m_large_sblocks);
+      PREPEND_ONTO_MAIN (sblock, next, m_large_sblocks);
     }
 
   if (thr->m_large_vectors)
     {
-      PREPEND_ONTO_MAIN (struct large_vector *, next, m_large_vectors);
+      PREPEND_ONTO_MAIN (large_vector, next, m_large_vectors);
     }
 
   if (thr->m_current_sblock)
@@ -5540,17 +5575,17 @@ update_allocations_for_thread_death (struct thread_state *thr)
 
   if (thr->m_string_blocks)
     {
-      PREPEND_ONTO_MAIN (struct string_block *, next, m_string_blocks);
+      PREPEND_ONTO_MAIN (string_block, next, m_string_blocks);
     }
 
   if (thr->m_string_free_list)
     {
-      PREPEND_ONTO_MAIN (struct Lisp_String *, u.next, m_string_free_list);
+      PREPEND_ONTO_MAIN (Lisp_String, u.next, m_string_free_list);
     }
 
   if (thr->m_interval_blocks)
     {
-      PREPEND_ONTO_MAIN (struct interval_block *, next, m_interval_blocks);
+      PREPEND_ONTO_MAIN (interval_block, next, m_interval_blocks);
       main_thread->m_interval_block_index = thr->m_interval_block_index;
     }
 
@@ -5566,24 +5601,24 @@ update_allocations_for_thread_death (struct thread_state *thr)
 
   if (thr->m_float_blocks)
     {
-      PREPEND_ONTO_MAIN (struct float_block *, next, m_float_blocks);
+      PREPEND_ONTO_MAIN (float_block, next, m_float_blocks);
       main_thread->m_float_block_index = thr->m_float_block_index;
     }
 
   if (thr->m_float_free_list)
     {
-      PREPEND_ONTO_MAIN (struct Lisp_Float *, u.chain, m_float_free_list);
+      PREPEND_ONTO_MAIN (Lisp_Float, u.chain, m_float_free_list);
     }
 
   if (thr->m_cons_blocks)
     {
-      PREPEND_ONTO_MAIN (struct cons_block *, next, m_cons_blocks);
+      PREPEND_ONTO_MAIN (cons_block, next, m_cons_blocks);
       main_thread->m_cons_block_index = thr->m_cons_block_index;
     }
 
   if (thr->m_cons_free_list)
     {
-      PREPEND_ONTO_MAIN (struct Lisp_Cons *, u.s.u.chain, m_cons_free_list);
+      PREPEND_ONTO_MAIN (Lisp_Cons, u.s.u.chain, m_cons_free_list);
     }
 
   if (thr->m_vector_free_lists)
@@ -5603,21 +5638,23 @@ update_allocations_for_thread_death (struct thread_state *thr)
 
   if (thr->m_vector_blocks)
     {
-      PREPEND_ONTO_MAIN (struct vector_block *, next, m_vector_blocks);
+      PREPEND_ONTO_MAIN (vector_block, next, m_vector_blocks);
     }
 
   if (thr->m_symbol_blocks)
     {
-      PREPEND_ONTO_MAIN (struct symbol_block *, next, m_symbol_blocks);
+      PREPEND_ONTO_MAIN (symbol_block, next, m_symbol_blocks);
       main_thread->m_symbol_block_index = thr->m_symbol_block_index;
     }
 
   if (thr->m_symbol_free_list)
     {
-      PREPEND_ONTO_MAIN (struct Lisp_Symbol *, u.s.next, m_symbol_free_list);
+      PREPEND_ONTO_MAIN (Lisp_Symbol, u.s.next, m_symbol_free_list);
     }
 }
 #undef PREPEND_ONTO_MAIN
+#undef CHECKSUM_BEFORE
+#undef CHECKSUM_AFTER
 #endif /* HAVE_GCC_TLS */
 
 DEFUN ("memory-full", Fmemory_full, Smemory_full, 0, 0, 0,
