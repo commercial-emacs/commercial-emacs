@@ -1573,13 +1573,9 @@ main (int argc, char **argv)
   emacs_backtrace (-1);
 
 #if !defined SYSTEM_MALLOC && !defined HYBRID_MALLOC
-  /* Arrange to get warning messages as memory fills up.  */
-  memory_warnings (0, malloc_warning);
-
   /* Call malloc at least once, to run malloc_initialize_hook.
      Also call realloc and free for consistency.  */
   free (realloc (malloc (4), 4));
-
 #endif	/* not SYSTEM_MALLOC and not HYBRID_MALLOC */
 
 #ifdef MSDOS

@@ -202,19 +202,3 @@ check_memory_limits (void)
 	warnlevel = warned_85;
     }
 }
-
-/* Enable memory usage warnings.
-   START says where the end of pure storage is.
-   WARNFUN specifies the function to call to issue a warning.  */
-
-void
-memory_warnings (void *start, void (*warnfun) (const char *))
-{
-  data_space_start = start ? start : data_start;
-
-  warn_function = warnfun;
-  __after_morecore_hook = check_memory_limits;
-
-  /* Force data limit to be recalculated on each run.  */
-  lim_data = 0;
-}

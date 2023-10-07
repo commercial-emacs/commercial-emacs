@@ -1914,25 +1914,6 @@ deliver_arith_signal (int sig)
   deliver_thread_signal (sig, handle_arith_signal);
 }
 
-#ifdef SIGDANGER
-
-/* Handler for SIGDANGER.  */
-static void
-handle_danger_signal (int sig)
-{
-  malloc_warning ("Operating system warns that virtual memory is running low.\n");
-
-  /* It might be unsafe to call do_auto_save now.  */
-  force_auto_save_soon ();
-}
-
-static void
-deliver_danger_signal (int sig)
-{
-  handle_signal (sig, handle_danger_signal);
-}
-#endif
-
 /* Treat SIG as a terminating signal, unless it is already ignored and
    we are in --batch mode.  Among other things, this makes nohup work.  */
 static void
@@ -2061,12 +2042,6 @@ init_signals (void)
 #endif
 #ifdef SIGXFSZ
   sigaction (SIGXFSZ, &process_fatal_action, 0);
-#endif
-
-#ifdef SIGDANGER
-  /* This just means available memory is getting low.  */
-  emacs_sigaction_init (&action, deliver_danger_signal);
-  sigaction (SIGDANGER, &action, 0);
 #endif
 
   /* AIX-specific signals.  */

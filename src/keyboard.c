@@ -1092,9 +1092,6 @@ command_loop (void)
       /* Reselect current window's buffer.  */
       set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
 
-      while (pending_malloc_warning)
-	display_malloc_warning ();
-
       Vdeactivate_mark = Qnil;
 
       /* Reinstate mouse drag events in case tool bar resizes in

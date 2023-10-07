@@ -3881,9 +3881,6 @@ extern void syms_of_sqlite (void);
 /* Defined in xsettings.c.  */
 extern void syms_of_xsettings (void);
 
-/* Defined in vm-limit.c.  */
-extern void memory_warnings (void *, void (*warnfun) (const char *));
-
 /* Defined in character.c.  */
 extern void parse_str_as_multibyte (const unsigned char *, ptrdiff_t,
 				    ptrdiff_t *, ptrdiff_t *);
@@ -3892,7 +3889,6 @@ extern void parse_str_as_multibyte (const unsigned char *, ptrdiff_t,
 extern void *my_heap_start (void);
 extern void check_pure_size (void);
 unsigned char *resize_string_data (Lisp_Object, ptrdiff_t, int, int);
-extern void malloc_warning (const char *);
 extern AVOID memory_full (size_t);
 extern bool survives_gc_p (Lisp_Object);
 extern void mark_objects (Lisp_Object *, ptrdiff_t);
@@ -3913,7 +3909,6 @@ mark_automatic_object (Lisp_Object obj)
 extern void with_flushed_stack (void (*func) (void *arg), void *arg);
 extern bool garbage_collect (void);
 extern bool maybe_garbage_collect_eagerly (EMACS_INT factor);
-extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
 extern EMACS_INT bytes_since_gc;
 extern EMACS_INT bytes_between_gc;
@@ -4066,7 +4061,6 @@ extern struct Lisp_Vector *allocate_pseudovector (int, int, int, enum pvec_type)
 
 extern bool gc_in_progress;
 extern Lisp_Object make_float (double);
-extern void display_malloc_warning (void);
 extern specpdl_ref inhibit_garbage_collection (void);
 extern void free_cons (struct Lisp_Cons *);
 extern bool mgc_handle_sigsegv (void *);

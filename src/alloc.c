@@ -145,11 +145,6 @@ enum _GL_ATTRIBUTE_PACKED sdata_type
       malloc_probe (size);			\
   } while (0)
 
-/* If nonzero, this is a warning delivered by malloc and not yet
-   displayed.  */
-
-const char *pending_malloc_warning;
-
 static void unchain_finalizer (struct Lisp_Finalizer *);
 static void mark_terminals (void);
 static void gc_sweep (void);
@@ -212,18 +207,6 @@ struct Lisp_Finalizer finalizers;
    running finalizers.  */
 struct Lisp_Finalizer doomed_finalizers;
 
-#if defined SIGDANGER || (!defined SYSTEM_MALLOC && !defined HYBRID_MALLOC)
-
-/* Function malloc calls this if it finds we are near exhausting storage.  */
-
-void
-malloc_warning (const char *str)
-{
-  pending_malloc_warning = str;
-}
-
-#endif
-
 #if (defined HAVE_ALIGNED_ALLOC			\
      || (defined HYBRID_MALLOC			\
 	 ? defined HAVE_POSIX_MEMALIGN		\
@@ -245,18 +228,6 @@ verify (malloc_laligned ()
 	|| (LISP_ALIGNMENT % sizeof (void *) == 0
 	    && POWER_OF_2 (LISP_ALIGNMENT / sizeof (void *))));
 #endif
-
-/* Display an already-pending malloc warning.  */
-
-void
-display_malloc_warning (void)
-{
-  call3 (intern ("display-warning"),
-	 intern ("alloc"),
-	 build_string (pending_malloc_warning),
-	 intern (":emergency"));
-  pending_malloc_warning = 0;
-}
 
 static inline bool
 malloc_laligned (void)
