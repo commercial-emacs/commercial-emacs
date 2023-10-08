@@ -4587,6 +4587,19 @@ mark_stack_push (Lisp_Object *value)
   return mark_stack_push_n (value, 1);
 }
 
+static void
+unstop_threads (void)
+{
+}
+
+/* Must be higher than highest synchronously generated signal handled,
+ * i.e., SIGSEGV, due to Linux signal handling pecularities. Katzman
+ * and Melis.
+ */
+#ifndef SIG_STOP_FOR_GC // choose you own signal if you must
+#define SIG_STOP_FOR_GC (SIGUSR2)
+#endif
+
 /* Subroutine of Fgarbage_collect that does most of the work.  */
 
 bool
@@ -4602,6 +4615,25 @@ garbage_collect (void)
   if (gc_inhibited || gc_in_progress)
     return false;
 
+#ifdef HAVE_GCC_TLS
+  for (struct thread_state *thr = all_threads;
+       thr != NULL;
+       thr = thr->next_thread)
+    {
+      if (thr == current_thread)
+	continue;
+      int err = pthread_kill (thr->thread_id, SIG_STOP_FOR_GC);
+      if (err == ESRCH)
+	continue; // THR already completed
+      else if (err)
+	{
+	  unstop_threads ();
+	  message_with_string ("pthread_kill failed: %s",
+			       Fnumber_to_string (make_fixnum (err)), true);
+	  return false;
+	}
+    }
+#endif
   block_input ();
 
   gc_in_progress = true;

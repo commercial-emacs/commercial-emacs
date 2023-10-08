@@ -9737,7 +9737,7 @@ format_nargs (char const *format)
 }
 
 /* Add a message with format string FORMAT and formatted arguments
-   to *Messages*.  */
+   to `*Messages*`.  */
 
 void
 add_to_log (const char *format, ...)
@@ -9772,7 +9772,8 @@ vadd_to_log (char const *format, va_list ap)
 }
 
 
-/* Output a newline in the *Messages* buffer if "needs" one.  */
+/* Output a newline to the "log", a misnomer for the `*Messages*`
+   buffer.  */
 
 void
 message_log_maybe_newline (void)
@@ -9782,14 +9783,8 @@ message_log_maybe_newline (void)
 }
 
 
-/* Add a string M of length NBYTES to the message log, optionally
-   terminated with a newline when NLFLAG is true.  MULTIBYTE, if
-   true, means interpret the contents of M as multibyte.  This
-   function calls low-level routines in order to bypass text property
-   hooks, etc. which might not be safe to run.
-
-   This may GC (insert may run before/after change hooks),
-   so the buffer M must NOT point to a Lisp string.  */
+/* Append a string M of length NBYTES to the "log", a misnomer for
+   Vmessages_buffer_name.  */
 
 void
 message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
@@ -9925,7 +9920,7 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
 	    }
 
 	  /* If we have more than the desired maximum number of lines
-	     in the *Messages* buffer now, delete the oldest ones.
+	     in the `*Messages*` buffer now, delete the oldest ones.
 	     This is safe because we don't have undo in this buffer.  */
 
 	  if (FIXNATP (Vmessage_log_max))
@@ -9966,7 +9961,7 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
       /* We called insert_1_both above with its 5th argument (PREPARE)
 	 false, which prevents insert_1_both from calling
 	 prepare_to_modify_buffer, which in turns prevents us from
-	 incrementing windows_or_buffers_changed even if *Messages* is
+	 incrementing windows_or_buffers_changed even if `*Messages*` is
 	 shown in some window.  So we must manually set
 	 windows_or_buffers_changed here to make up for that.  */
       windows_or_buffers_changed = old_windows_or_buffers_changed;
@@ -10072,10 +10067,8 @@ message_to_stderr (Lisp_Object m)
     errputc ('\n');
 }
 
-/* The non-logging version of message3.
-   This does not cancel echoing, because it is used for echoing.
-   Perhaps we need to make a separate function for echoing
-   and make this cancel echoing.  */
+/* Write M to echo area without cc'ing to the "log", a misnomer for
+   the `*Messages*` buffer.  */
 
 void
 message3_nolog (Lisp_Object m)
@@ -10084,13 +10077,9 @@ message3_nolog (Lisp_Object m)
 
   if (FRAME_INITIAL_P (sf))
     message_to_stderr (m);
-  /* Error messages get reported properly by cmd_error, so this must be just an
-     informative message; if the frame hasn't really been initialized yet, just
-     toss it.  */
   else if (INTERACTIVE && sf->glyphs_initialized_p)
     {
-      /* Get the frame containing the mini-buffer
-	 that the selected frame is using.  */
+      /* Locate frame of mini-buffer.  */
       Lisp_Object mini_window = FRAME_MINIBUF_WINDOW (sf);
       Lisp_Object frame = XWINDOW (mini_window)->frame;
       struct frame *f = XFRAME (frame);
@@ -10103,15 +10092,14 @@ message3_nolog (Lisp_Object m)
 	  set_message (m);
 	  if (minibuffer_auto_raise)
 	    Fraise_frame (frame);
-	  /* Assume we are not echoing.
-	     (If we are, echo_now will override this.)  */
+	  /* Inform read_char we're not echoing.  */
 	  echo_message_buffer = Qnil;
 	}
       else
 	clear_message (true, true);
 
       do_pending_window_change (false);
-      echo_area_display (true);
+      echo_area_display (true); /* actually show the message.  */
       do_pending_window_change (false);
       if (FRAME_TERMINAL (f)->frame_up_to_date_hook)
 	(*FRAME_TERMINAL (f)->frame_up_to_date_hook) (f);
@@ -17862,7 +17850,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
   set_buffer_internal (old);
   /* Avoid an abort in TEMP_SET_PT_BOTH if the buffer has become
-     shorter.  This can be caused by log truncation in *Messages*.  */
+     shorter.  This can be caused by log truncation in `*Messages*`.  */
   if (CHARPOS (lpoint) <= ZV)
     TEMP_SET_PT_BOTH (CHARPOS (lpoint), BYTEPOS (lpoint));
 
